@@ -40,14 +40,18 @@
 #endif
 
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
+#include <sys/queue.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <sys/time.h>
 #include <sys/ucontext.h>
+#include <sys/user.h>
 #include <sys/wait.h>
 
+#include <cheri/revoke.h>
 #include <sys/event.h>
 
 #include <machine/frame.h>
@@ -62,11 +66,14 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sysexits.h>
 #include <unistd.h>
+
+#include <libprocstat.h>
 
 #include "cheribsdtest.h"
 
@@ -815,12 +822,37 @@ CHERIBSDTEST(vm_reservation_align,
 	cheribsdtest_success();
 }
 
+static bool
+reservations_are_quarantined(void)
+{
+	uint8_t quarantine_unmapped_reservations;
+	size_t quarantine_unmapped_reservations_sz =
+	    sizeof(quarantine_unmapped_reservations);
+
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    sysctlbyname("vm.cheri_revoke.quarantine_unmapped_reservations",
+		&quarantine_unmapped_reservations,
+	        &quarantine_unmapped_reservations_sz, NULL, 0));
+
+	return (quarantine_unmapped_reservations != 0);
+}
+
+
+static const char *
+skip_need_quarantine_unmapped_reservations(const char *name __unused)
+{
+	if (reservations_are_quarantined())
+		return (NULL);
+	else
+		return ("unmapped reservations are not being quarantined");
+}
+
 /*
  * Check that after a reservation is unmapped, it is not possible to
  * reuse the old capability to create new fixed mappings.
- * This is an attempt of reusing a capability before revocation, in
- * a proper temporal-safety implementation will lead to failures so
- * we catch these early.
+ * This is an attempt to reuse a capability prior to a revocation pass.
+ * As this capability may be revoked at some arbitrary point in the
+ * future, we always disallow use.
  */
 CHERIBSDTEST(vm_reservation_mmap_after_free_fixed,
     "check that an old capability can not be used to mmap with MAP_FIXED "
@@ -835,8 +867,24 @@ CHERIBSDTEST(vm_reservation_mmap_after_free_fixed,
 	map = mmap(map, PAGE_SIZE, PROT_READ | PROT_WRITE,
 	    MAP_ANON | MAP_FIXED, -1, 0);
 	CHERIBSDTEST_VERIFY2(map == MAP_FAILED, "mmap after free succeeded");
-	CHERIBSDTEST_VERIFY2(errno == EPROT || errno == EACCES,
-	    "mmap after free failed with %d instead of EPROT / EACCES", errno);
+
+#ifdef CHERI_REVOKE
+	if (reservations_are_quarantined()) {
+		/*
+		 * There's nothing to cause the quarantined reservation to be
+		 * revoked between the munmap and mmap calls so we'll get an
+		 * ENOMEM here.
+		 *
+		 * XXX: ideally we'd trigger a revocation of this specific
+		 * reservation before the mmap call to test the same case with
+		 * and without revocation.
+		 */
+		CHERIBSDTEST_VERIFY2(errno == ENOMEM,
+		    "mmap after free failed with %d instead of ENOMEM", errno);
+	} else
+#endif
+		CHERIBSDTEST_VERIFY2(errno == EPROT,
+		    "mmap after free failed with %d instead of EPROT", errno);
 
 	cheribsdtest_success();
 }
@@ -1168,4 +1216,1027 @@ CHERIBSDTEST(vm_shm_largepage_basic,
 	cheribsdtest_success();
 }
 #endif /* PMAP_HAS_LARGEPAGES */
+
+/*
+ * Store a cap to a page and check that mincore reports it CAPSTORE.
+ *
+ * Due to a shortage of bits in mincore()'s uint8_t reporting bit vector, this
+ * particular test is not able to distinguish CAPSTORE and CAPDIRTY and so is
+ * not sensitive to the vm.pmap.enter_capstore_as_capdirty sysctl.
+ *
+ * On the other hand, this test is sensitive to the vm.capstore_on_alloc sysctl:
+ * if that is asserted, our cap-capable anonymous memory will be installed
+ * CAPSTORE (and possibly even CAPDIRTY, in light of the above) whereas, if this
+ * sysctl is clear, our initial view of said memory will be !CAPSTORE.
+ */
+CHERIBSDTEST(vm_capdirty, "verify capdirty marking and mincore")
+{
+#define CHERIBSDTEST_VM_CAPDIRTY_NPG	2
+	size_t sz = CHERIBSDTEST_VM_CAPDIRTY_NPG * getpagesize();
+	uint8_t capstore_on_alloc;
+	size_t capstore_on_alloc_sz = sizeof(capstore_on_alloc);
+
+	void * __capability *pg0;
+	unsigned char mcv[CHERIBSDTEST_VM_CAPDIRTY_NPG] = { 0 };
+
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    sysctlbyname("vm.capstore_on_alloc", &capstore_on_alloc,
+	        &capstore_on_alloc_sz, NULL, 0));
+
+	pg0 = CHERIBSDTEST_CHECK_SYSCALL(
+	    mmap(NULL, sz, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+
+	void * __capability *pg1 = (void *)&((char *)pg0)[getpagesize()];
+
+	/*
+	 * Pages are ZFOD and so will not be CAPSTORE, or, really, anything
+	 * else, either.
+	 */
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(pg0, sz, &mcv[0]));
+	CHERIBSDTEST_VERIFY2(mcv[0] == 0, "page 0 status 0");
+	CHERIBSDTEST_VERIFY2(mcv[1] == 0, "page 1 status 0");
+
+	/*
+	 * Write data to page 0, causing it to become allocated and MODIFIED.
+	 * If vm.capstore_on_alloc, then it should be CAPSTORE as well, despite
+	 * having never been the target of a capability store.
+	 */
+	*(char *)pg0 = 0x42;
+
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(pg0, sz, &mcv[0]));
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[0] & MINCORE_MODIFIED) != 0, "page 0 modified 1");
+	CHERIBSDTEST_VERIFY2(
+	    !(mcv[0] & MINCORE_CAPSTORE) == !capstore_on_alloc,
+	    "page 0 capstore 1");
+
+	/*
+	 * Write a capability to page 1 and check that it is MODIFIED and
+	 * CAPSTORE regardless of vm.capstore_on_alloc.
+	 */
+	*pg1 = (__cheri_tocap void * __capability)pg0;
+
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(pg0, sz, &mcv[0]));
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[1] & MINCORE_MODIFIED) != 0, "page 1 modified 2");
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[1] & MINCORE_CAPSTORE) != 0, "page 1 capstore 2");
+
+	CHERIBSDTEST_CHECK_SYSCALL(munmap(pg0, sz));
+	cheribsdtest_success();
+#undef CHERIBSDTEST_VM_CAPDIRTY_NPG
+}
+
+/*
+ * Revocation tests
+ */
+
+#ifdef CHERI_REVOKE
+
+/* Ick */
+static inline uint64_t
+get_cyclecount()
+{
+#if defined(__riscv)
+	return __builtin_readcyclecounter();
+#elif defined(__aarch64__)
+	uint64_t count;
+	__asm __volatile("mrs %0, cntvct_el0" : "=&r" (count));
+	return count;
+#else
+	return 0;
+#endif
+}
+
+static int
+check_revoked(void * __capability r)
+{
+	return (cheri_gettag(r) == 0) ||
+	    ((cheri_gettype(r) == -1L) && (cheri_getperm(r) == 0));
+}
+
+static void
+install_kqueue_cap(int kq, void * __capability revme)
+{
+	struct kevent ike;
+
+	EV_SET(&ike, (uintptr_t)&install_kqueue_cap,
+	    EVFILT_USER, EV_ADD | EV_ONESHOT | EV_DISABLE, NOTE_FFNOP, 0,
+	    revme);
+	CHERIBSDTEST_CHECK_SYSCALL(kevent(kq, &ike, 1, NULL, 0, NULL));
+	EV_SET(&ike, (uintptr_t)&install_kqueue_cap, EVFILT_USER, EV_KEEPUDATA,
+	    NOTE_FFNOP | NOTE_TRIGGER, 0, NULL);
+	CHERIBSDTEST_CHECK_SYSCALL(kevent(kq, &ike, 1, NULL, 0, NULL));
+}
+
+static void
+check_kqueue_cap(int kq, unsigned int valid)
+{
+	struct kevent ike, oke = { 0 };
+
+	EV_SET(&ike, (uintptr_t)&install_kqueue_cap,
+	    EVFILT_USER, EV_ENABLE|EV_KEEPUDATA, NOTE_FFNOP, 0, NULL);
+	CHERIBSDTEST_CHECK_SYSCALL(kevent(kq, &ike, 1, NULL, 0, NULL));
+	CHERIBSDTEST_CHECK_SYSCALL(kevent(kq, NULL, 0, &oke, 1, NULL));
+	CHERIBSDTEST_VERIFY2(
+	    __builtin_cheri_equal_exact(oke.ident, &install_kqueue_cap),
+	    "Bad identifier from kqueue");
+	CHERIBSDTEST_VERIFY2(oke.filter == EVFILT_USER,
+	    "Bad filter from kqueue");
+	CHERIBSDTEST_VERIFY2(check_revoked(oke.udata) == !valid,
+				"kqueue-held cap not as expected");
+}
+
+static void
+fprintf_cheri_revoke_stats(FILE *f, struct cheri_revoke_syscall_info crsi,
+    uint32_t cycsum)
+{
+	fprintf(f, "revoke:"
+		" edeq=%" PRIu64
+		" eenq=%" PRIu64
+
+		" psro=%" PRIu32
+		" psrw=%" PRIu32
+
+		" pfro=%" PRIu32
+		" pfrw=%" PRIu32
+
+		" pclg=%" PRIu32
+
+		" pskf=%" PRIu32
+		" pskn=%" PRIu32
+		" psks=%" PRIu32
+
+		" cfnd=%" PRIu32
+		" cfrv=%" PRIu32
+		" cnuk=%" PRIu32
+
+		" lscn=%" PRIu32
+		" pmkc=%" PRIu32
+
+		" pcyc=%" PRIu64
+		" fcyc=%" PRIu64
+		" tcyc=%" PRIu32
+		"\n",
+
+		crsi.epochs.dequeue,
+		crsi.epochs.enqueue,
+
+		crsi.stats.pages_scan_ro,
+		crsi.stats.pages_scan_rw,
+
+		crsi.stats.pages_faulted_ro,
+		crsi.stats.pages_faulted_rw,
+
+		crsi.stats.fault_visits,
+
+		crsi.stats.pages_skip_fast,
+		crsi.stats.pages_skip_nofill,
+		crsi.stats.pages_skip,
+
+		crsi.stats.caps_found,
+		crsi.stats.caps_found_revoked,
+		crsi.stats.caps_cleared,
+
+		crsi.stats.lines_scan,
+		crsi.stats.pages_mark_clean,
+
+		crsi.stats.page_scan_cycles,
+		crsi.stats.fault_cycles,
+		cycsum);
+}
+
+CHERIBSDTEST(cheri_revoke_lightly,
+    "A gentle test of capability revocation")
+{
+	void * __capability * __capability mb;
+	void * __capability sh;
+	const volatile struct cheri_revoke_info * __capability cri;
+	void * __capability revme;
+	struct cheri_revoke_syscall_info crsi;
+	int kq;
+	uint32_t cyc_start, cyc_end;
+
+	kq = CHERIBSDTEST_CHECK_SYSCALL(kqueue());
+	mb = CHERIBSDTEST_CHECK_SYSCALL(
+	    mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, mb, &sh));
+
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke_get_shadow(
+	    CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
+	    __DEQUALIFY_CAP(void * __capability *, &cri)));
+
+	/*
+	 * OK, armed with the shadow mapping... generate a capability to
+	 * the 0th granule of the map, spill it to the 1st granule,
+	 * stash it in the kqueue, and mark it as revoked in the shadow.
+	 */
+	revme = cheri_andperm(mb, ~CHERI_PERM_SW_VMEM);
+	((void * __capability *)mb)[1] = revme;
+	install_kqueue_cap(kq, revme);
+
+	((uint8_t * __capability)sh)[0] = 1;
+
+	crsi.epochs.enqueue = 0xC0FFEE;
+	crsi.epochs.dequeue = 0xB00;
+
+	cyc_start = get_cyclecount();
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke(CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_IGNORE_START |
+	    CHERI_REVOKE_TAKE_STATS , 0, &crsi));
+	cyc_end = get_cyclecount();
+	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
+
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.dequeue == crsi.epochs.dequeue,
+	    "Bad shared clock");
+
+	CHERIBSDTEST_VERIFY2(check_revoked(mb[1]), "Memory tag persists");
+	check_kqueue_cap(kq, 0);
+
+	/* Clear the revocation bit and do that again */
+	((uint8_t * __capability)sh)[0] = 0;
+
+	/*
+	 * We don't derive exactly the same thing, to prevent CSE from
+	 * firing.  More specifically, we adjust the offset first, taking
+	 * the path through the commutation diagram that doesn't share an
+	 * edge with the derivation above.
+	 */
+	revme = cheri_andperm(mb + 1, ~CHERI_PERM_SW_VMEM);
+	CHERIBSDTEST_VERIFY2(!check_revoked(revme), "Tag clear on 2nd revme?");
+	((void * __capability *)mb)[1] = revme;
+	install_kqueue_cap(kq, revme);
+
+	cyc_start = get_cyclecount();
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(CHERI_REVOKE_IGNORE_START |
+	    CHERI_REVOKE_TAKE_STATS, 0, &crsi));
+	cyc_end = get_cyclecount();
+	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
+
+	CHERIBSDTEST_VERIFY2(
+	    crsi.epochs.enqueue >= crsi.epochs.dequeue + 1,
+	    "Bad epoch clock state");
+
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.dequeue == crsi.epochs.dequeue,
+	    "Bad shared clock");
+
+	cyc_start = get_cyclecount();
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke(CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_TAKE_STATS,
+	    crsi.epochs.enqueue, &crsi));
+	cyc_end = get_cyclecount();
+	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
+
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.dequeue == crsi.epochs.dequeue,
+	    "Bad shared clock");
+
+	CHERIBSDTEST_VERIFY2(!check_revoked(mb[1]), "Memory tag cleared");
+
+	check_kqueue_cap(kq, 1);
+
+	munmap(mb, PAGE_SIZE);
+	close(kq);
+
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(cheri_revoke_capdirty,
+    "Probe the interaction of revocation and capdirty")
+{
+	void * __capability * __capability mb;
+	void * __capability sh;
+	const volatile struct cheri_revoke_info * __capability cri;
+	void * __capability revme;
+	struct cheri_revoke_syscall_info crsi;
+	uint32_t cyc_start, cyc_end;
+
+	mb = CHERIBSDTEST_CHECK_SYSCALL(mmap(0, PAGE_SIZE, PROT_READ |
+	    PROT_WRITE, MAP_ANON, -1, 0));
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke_get_shadow(
+	    CHERI_REVOKE_SHADOW_NOVMMAP, mb, &sh));
+
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
+	    __DEQUALIFY_CAP(void * __capability *,&cri)));
+
+	revme = cheri_andperm(cheri_setbounds(mb, 0x10), ~CHERI_PERM_SW_VMEM);
+	mb[0] = revme;
+
+	/* Mark the start of the arena as subject to revocation */
+	((uint8_t * __capability) sh)[0] = 1;
+
+	/*
+	 * Begin revocation; because we swing capabilities around and expect
+	 * them to be unrevoked, this test only really works on the store side.
+	 * We need to specify the side only at the beginning; it will "stick"
+	 * until the end of the epoch.
+	 *
+	 * TODO: perhaps it should be rewritten or should probe at capdirty
+	 * effects that are common to load-/store-side revocation.
+	 */
+	cyc_start = get_cyclecount();
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(CHERI_REVOKE_FORCE_STORE_SIDE |
+	    CHERI_REVOKE_IGNORE_START | CHERI_REVOKE_TAKE_STATS, 0, &crsi));
+	cyc_end = get_cyclecount();
+	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
+
+	CHERIBSDTEST_VERIFY2(cri->epochs.dequeue == crsi.epochs.dequeue,
+	    "Bad shared clock");
+
+	fprintf(stderr, "revme: %#.16lp\n", revme);
+	fprintf(stderr, "mb[0]: %#.16lp\n", mb[0]);
+
+	/* Between revocation sweeps, derive another cap and store */
+	revme = cheri_andperm(cheri_setbounds(mb, 0x11), ~CHERI_PERM_SW_VMEM);
+	mb[1] = revme;
+
+	cyc_start = get_cyclecount();
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(CHERI_REVOKE_IGNORE_START |
+	    CHERI_REVOKE_TAKE_STATS, 0, &crsi));
+	cyc_end = get_cyclecount();
+	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
+
+	CHERIBSDTEST_VERIFY2(cri->epochs.dequeue == crsi.epochs.dequeue,
+	    "Bad shared clock");
+
+	fprintf(stderr, "revme: %#.16lp\n", revme);
+	fprintf(stderr, "mb[0]: %#.16lp\n", mb[0]);
+	fprintf(stderr, "mb[1]: %#.16lp\n", mb[1]);
+
+	/* Between revocation sweeps, derive another cap and store */
+	revme = cheri_andperm(cheri_setbounds(mb, 0x12), ~CHERI_PERM_SW_VMEM);
+	mb[2] = revme;
+
+	cyc_start = get_cyclecount();
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(CHERI_REVOKE_LAST_PASS |
+	    CHERI_REVOKE_IGNORE_START | CHERI_REVOKE_TAKE_STATS, 0, &crsi));
+	cyc_end = get_cyclecount();
+	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
+
+	CHERIBSDTEST_VERIFY2(cri->epochs.dequeue == crsi.epochs.dequeue,
+	    "Bad shared clock");
+
+	fprintf(stderr, "revme: %#.16lp\n", revme);
+	fprintf(stderr, "mb[0]: %#.16lp\n", mb[0]);
+	fprintf(stderr, "mb[1]: %#.16lp\n", mb[1]);
+	fprintf(stderr, "mb[2]: %#.16lp\n", mb[2]);
+
+	CHERIBSDTEST_VERIFY2(!check_revoked(mb), "Arena revoked");
+	CHERIBSDTEST_VERIFY2(check_revoked(revme), "Register tag cleared");
+	CHERIBSDTEST_VERIFY2(check_revoked(mb[0]), "Memory tag 0 cleared");
+	CHERIBSDTEST_VERIFY2(check_revoked(mb[1]), "Memory tag 1 cleared");
+	CHERIBSDTEST_VERIFY2(check_revoked(mb[2]), "Memory tag 2 cleared");
+
+	munmap(mb, PAGE_SIZE);
+
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(cheri_revoke_loadside, "Test load-side revoker")
+{
+#define CHERIBSDTEST_VM_CHERI_REVOKE_LOADSIDE_NPG	3
+
+	void * __capability * __capability mb;
+	void * __capability sh;
+	const volatile struct cheri_revoke_info * __capability cri;
+	void * __capability revme;
+	struct cheri_revoke_syscall_info crsi;
+	uint32_t cyc_start, cyc_end;
+	unsigned char mcv[CHERIBSDTEST_VM_CHERI_REVOKE_LOADSIDE_NPG] = { 0 };
+	const size_t asz = CHERIBSDTEST_VM_CHERI_REVOKE_LOADSIDE_NPG *
+	    PAGE_SIZE;
+
+	mb = CHERIBSDTEST_CHECK_SYSCALL(
+	    mmap(0, asz, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, mb, &sh));
+
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke_get_shadow(
+	    CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
+	    __DEQUALIFY_CAP(void * __capability *, &cri)));
+
+	revme = cheri_andperm(mb, ~CHERI_PERM_SW_VMEM);
+	((void * __capability *)mb)[1] = revme;
+	((uint8_t * __capability)sh)[0] = 1;
+
+	/* Write and clear a capability one page up */
+	size_t capsperpage = PAGE_SIZE/sizeof(void * __capability);
+	((void * __capability volatile *)mb)[capsperpage] = revme;
+	((volatile uintptr_t *)mb)[capsperpage] = 0;
+
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, asz, &mcv[0]));
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[0] & MINCORE_CAPSTORE) != 0, "page 0 capstore 1");
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[1] & MINCORE_CAPSTORE) != 0, "page 1 capstore 1");
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[2] & MINCORE_CAPSTORE) == 0, "page 2 capstore 1");
+
+	/*
+	 * Begin load side.  This should be pretty speedy since we do no VM
+	 * walks.
+	 */
+	cyc_start = get_cyclecount();
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(CHERI_REVOKE_FORCE_LOAD_SIDE |
+	    CHERI_REVOKE_IGNORE_START | CHERI_REVOKE_TAKE_STATS, 0, &crsi));
+	cyc_end = get_cyclecount();
+	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
+
+	/*
+	 * Try to induce a read fault and check that the read result is revoked.
+	 * Unfortunately, we can't check its capdirty status, but it should
+	 * still be CAPSTORED, since not enough time has elapsed for the state
+	 * machine to declare it clean.
+	 */
+	revme = ((void * __capability *)mb)[1];
+	CHERIBSDTEST_VERIFY2(check_revoked(revme), "Fault didn't stop me!");
+
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, asz, &mcv[0]));
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[0] & MINCORE_CAPSTORE) != 0, "page 0 capstore 2.0");
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[1] & MINCORE_CAPSTORE) != 0, "page 1 capstore 2.0");
+
+	/*
+	 * This might redirty the 0th page, if we're keeping tags around on
+	 * revoked caps.  If it does, we expect the dirty bit to stay set
+	 * through the revoker sweep (though that's not strictly essential)
+	 */
+	((void * __capability *)mb)[2] = revme;
+
+	/*
+	 * Now do the background sweep and wait for everything to finish
+	 */
+	cyc_start = get_cyclecount();
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke(CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_IGNORE_START |
+		CHERI_REVOKE_TAKE_STATS, 0, &crsi));
+	cyc_end = get_cyclecount();
+	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
+
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, asz, &mcv[0]));
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[0] & MINCORE_CAPSTORE) != 0, "page 0 capstore 2.1");
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[1] & MINCORE_CAPSTORE) != 0, "page 1 capstore 2.1");
+
+	/* Re-dirty page 0 but not page 1 */
+	revme = cheri_andperm(mb + 1, ~CHERI_PERM_SW_VMEM);
+	CHERIBSDTEST_VERIFY2(!check_revoked(revme), "Tag clear on 2nd revme?");
+	((void * __capability *)mb)[1] = revme;
+
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, asz, &mcv[0]));
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[0] & MINCORE_CAPSTORE) != 0, "page 0 capstore 2.2");
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[1] & MINCORE_CAPSTORE) != 0, "page 1 capstore 2.2");
+
+	/*
+	 * Do another revocation, both parts at once this time.  This should
+	 * transition page 0 from capdirty to capstore, since all capabilities
+	 * on it are revoked.  Page 1, having previously been capstore, is now
+	 * capclean.
+	 */
+	cyc_start = get_cyclecount();
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke(CHERI_REVOKE_FORCE_LOAD_SIDE | CHERI_REVOKE_LAST_PASS |
+	        CHERI_REVOKE_IGNORE_START | CHERI_REVOKE_TAKE_STATS, 0, &crsi));
+	cyc_end = get_cyclecount();
+	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
+
+	CHERIBSDTEST_VERIFY2(check_revoked(mb[1]),
+	    "Revoker failure in full pass");
+
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, asz, &mcv[0]));
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[0] & MINCORE_CAPSTORE) != 0, "page 0 capstore 3");
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[1] & MINCORE_CAPSTORE) == 0, "page 1 capstore 3");
+
+	/*
+	 * Do that again so that we end with an odd CLG.
+	 */
+	cyc_start = get_cyclecount();
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke(CHERI_REVOKE_FORCE_LOAD_SIDE | CHERI_REVOKE_LAST_PASS |
+	        CHERI_REVOKE_IGNORE_START | CHERI_REVOKE_TAKE_STATS, 0, &crsi));
+	cyc_end = get_cyclecount();
+	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
+
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, asz, &mcv[0]));
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[0] & MINCORE_CAPSTORE) == 0, "page 0 capstore 4");
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[1] & MINCORE_CAPSTORE) == 0, "page 1 capstore 4");
+	/*
+	 * TODO:
+	 *
+	 * - check that we can store to a page at any point in that transition.
+	 */
+
+	cheribsdtest_success();
+
+#undef CHERIBSDTEST_VM_CHERI_REVOKE_LOADSIDE_NPG
+}
+
+/*
+ * Repeatedly invoke libcheri_caprevoke logic.
+ * Using a bump the pointer allocator, repeatedly grab rand()-omly sized
+ * objects and fill them with capabilities to themselves, mark them for
+ * revocation, revoke, and validate.
+ *
+ */
+
+#include <cheri/libcaprevoke.h>
+
+/* Just for debugging printouts */
+#ifndef CPU_CHERI
+#define CPU_CHERI
+#include <machine/pte.h>
+#include <machine/vmparam.h>
+#undef CPU_CHERI
+#else
+#include <machine/pte.h>
+#include <machine/vmparam.h>
+#endif
+
+static void
+cheribsdtest_cheri_revoke_lib_init(
+	size_t bigblock_caps,
+	void * __capability * __capability * obigblock,
+	void * __capability * oshadow,
+	const volatile struct cheri_revoke_info * __capability * ocri
+)
+{
+	void * __capability * __capability bigblock;
+
+	bigblock = CHERIBSDTEST_CHECK_SYSCALL(
+			mmap(0, bigblock_caps * sizeof(void * __capability),
+				PROT_READ | PROT_WRITE,
+				MAP_ANON, -1, 0));
+
+	for (size_t ix = 0; ix < bigblock_caps; ix++) {
+		/* Create self-referential VMMAP-free capabilities */
+
+		bigblock[ix] = cheri_andperm(
+				cheri_setbounds(&bigblock[ix], 16),
+				~CHERI_PERM_SW_VMEM);
+	}
+	*obigblock = bigblock;
+
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, bigblock,
+	    oshadow));
+
+	CHERIBSDTEST_CHECK_SYSCALL(
+		cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
+			__DEQUALIFY_CAP(void * __capability *,ocri)));
+}
+
+enum {
+	TCLR_MODE_STORE = 0,
+	TCLR_MODE_LOAD_ONCE = 1,
+	TCLR_MODE_LOAD_SPLIT = 2,
+};
+
+static void
+cheribsdtest_cheri_revoke_lib_run(
+	int verbose,
+	int paranoia,
+	int mode,
+	size_t bigblock_caps,
+	void * __capability * __capability bigblock,
+	void * __capability shadow,
+	const volatile struct cheri_revoke_info * __capability cri
+)
+{
+	size_t bigblock_offset = 0;
+	const vaddr_t sbase = cri->base_mem_nomap;
+
+	fprintf(stderr, "test_cheri_revoke_lib_run mode %d\n", mode);
+
+	while (bigblock_offset < bigblock_caps) {
+		struct cheri_revoke_syscall_info crsi;
+		uint32_t cyc_start, cyc_end;
+
+		size_t csz = rand() % 1024 + 1;
+		csz = MIN(csz, bigblock_caps - bigblock_offset);
+
+		if (verbose > 1) {
+			fprintf(stderr, "left=%zd csz=%zd\n",
+					bigblock_caps - bigblock_offset,
+					csz);
+		}
+
+		void * __capability * __capability chunk =
+			cheri_setbounds(bigblock + bigblock_offset,
+					 csz * sizeof(void * __capability));
+
+		if (verbose > 1) {
+			fprintf(stderr, "chunk: %#.16lp\n", chunk);
+		}
+
+		size_t chunk_offset = bigblock_offset;
+		bigblock_offset += csz;
+
+		if (verbose > 3) {
+			ptrdiff_t fwo, lwo;
+			uint64_t fwm, lwm;
+			caprev_shadow_nomap_offsets((vaddr_t)chunk,
+				csz * sizeof(void * __capability), &fwo, &lwo);
+			caprev_shadow_nomap_masks((vaddr_t)chunk,
+				csz * sizeof(void * __capability), &fwm, &lwm);
+
+			fprintf(stderr,
+				"premrk fwo=%lx lwo=%lx fw=%p "
+				"*fw=%016lx (fwm=%016lx) *lw=%016lx "
+				"(lwm=%016lx)\n",
+				fwo, lwo,
+				cheri_setaddress(shadow, sbase + fwo),
+				*(uint64_t *)(cheri_setaddress(shadow,
+					sbase + fwo)),
+				fwm,
+				*(uint64_t *)(cheri_setaddress(shadow,
+					sbase + lwo)),
+				lwm);
+		}
+
+		/* Mark the chunk for revocation */
+		CHERIBSDTEST_VERIFY2(caprev_shadow_nomap_set(
+		    cri->base_mem_nomap, shadow, chunk, chunk) == 0,
+		    "Shadow update collision");
+
+		__atomic_thread_fence(__ATOMIC_RELEASE);
+
+		if (verbose > 3) {
+			ptrdiff_t fwo, lwo;
+			caprev_shadow_nomap_offsets((vaddr_t)chunk,
+				csz * sizeof(void * __capability), &fwo, &lwo);
+
+			fprintf(stderr,
+				"marked fwo=%lx lwo=%lx fw=%p "
+				"*fw=%016lx *lw=%016lx\n",
+				fwo, lwo,
+				cheri_setaddress(shadow, sbase + fwo),
+				*(uint64_t *)(cheri_setaddress(shadow,
+					sbase + fwo)),
+				*(uint64_t *)(cheri_setaddress(shadow,
+					sbase + lwo)));
+		}
+
+		{
+			int crflags = CHERI_REVOKE_IGNORE_START |
+			    CHERI_REVOKE_TAKE_STATS;
+
+			switch(mode) {
+			case TCLR_MODE_STORE:
+				crflags |= CHERI_REVOKE_LAST_PASS |
+				    CHERI_REVOKE_FORCE_STORE_SIDE;
+				break;
+			case TCLR_MODE_LOAD_ONCE:
+				crflags |= CHERI_REVOKE_LAST_PASS |
+				    CHERI_REVOKE_FORCE_LOAD_SIDE;
+				break;
+			case TCLR_MODE_LOAD_SPLIT:
+				crflags |= CHERI_REVOKE_FORCE_LOAD_SIDE;
+				break;
+			}
+
+			cyc_start = get_cyclecount();
+			CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(crflags, 0,
+			    &crsi));
+			cyc_end = get_cyclecount();
+			if (verbose > 2) {
+				fprintf_cheri_revoke_stats(stderr, crsi,
+				    cyc_end - cyc_start);
+			}
+			CHERIBSDTEST_VERIFY2(cri->epochs.dequeue ==
+			    crsi.epochs.dequeue, "Bad shared clock");
+		}
+
+		/* Check the surroundings */
+		if (paranoia > 1) {
+			for (size_t ix = 0; ix < chunk_offset; ix++) {
+				CHERIBSDTEST_VERIFY2(
+				    !check_revoked(bigblock[ix]),
+				    "Revoked cap incorrectly below object, "
+				    "at ix=%zd", ix);
+			}
+			for (size_t ix = chunk_offset + csz; ix < bigblock_caps;
+			    ix++) {
+				CHERIBSDTEST_VERIFY2(
+				    !check_revoked(bigblock[ix]),
+				    "Revoked cap incorrectly above object, "
+				    "at ix=%zd", ix);
+			}
+		}
+
+		if (paranoia > 0) {
+			for (size_t ix = 0; ix < csz; ix++) {
+				if (!check_revoked(chunk[ix])) {
+					fprintf(stderr, "c %#.16lp\n",
+						chunk[ix]);
+					cheribsdtest_failure_errx(
+					    "Unrevoked at ix=%zd after revoke",
+					    ix);
+				}
+			}
+		}
+
+		if (mode == TCLR_MODE_LOAD_SPLIT) {
+			cyc_start = get_cyclecount();
+			CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(
+			    CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_IGNORE_START |
+			    CHERI_REVOKE_TAKE_STATS, 0, &crsi));
+			cyc_end = get_cyclecount();
+			if (verbose > 2) {
+				fprintf_cheri_revoke_stats(stderr, crsi,
+				    cyc_end - cyc_start);
+			}
+			CHERIBSDTEST_VERIFY2(cri->epochs.dequeue ==
+			    crsi.epochs.dequeue, "Bad shared clock");
+		}
+
+		caprev_shadow_nomap_clear(cri->base_mem_nomap, shadow, chunk);
+		__atomic_thread_fence(__ATOMIC_RELEASE);
+
+		for (size_t ix = 0; ix < csz; ix++) {
+			/* Put everything back */
+			chunk[ix] = cheri_andperm(
+					cheri_setbounds(&chunk[ix], 16),
+					~CHERI_PERM_SW_VMEM);
+		}
+	}
+}
+
+CHERIBSDTEST(cheri_revoke_lib, "Test libcheri_caprevoke internals")
+{
+		/* If debugging the revoker, some verbosity can help. 0 - 4. */
+	static const int verbose = 0;
+
+		/*
+		 * Tweaking paranoia can turn this test into more of a
+		 * benchmark than a correctness test.  At 0, no checks
+		 * will be performed; at 1, only the revoked object is
+		 * investigated, and at 2, the entire allocation arena
+		 * is tested.
+		 */
+	static const int paranoia = 2;
+
+	static const size_t bigblock_caps = 4096;
+
+	void * __capability * __capability bigblock;
+	void * __capability shadow;
+	const volatile struct cheri_revoke_info * __capability cri;
+
+	srand(1337);
+
+	cheribsdtest_cheri_revoke_lib_init(bigblock_caps, &bigblock, &shadow,
+	    &cri);
+
+	if (verbose > 0) {
+		fprintf(stderr, "bigblock: %#.16lp\n", bigblock);
+		fprintf(stderr, "shadow: %#.16lp\n", shadow);
+	}
+
+	cheribsdtest_cheri_revoke_lib_run(verbose, paranoia, TCLR_MODE_STORE,
+	    bigblock_caps, bigblock, shadow, cri);
+
+	cheribsdtest_cheri_revoke_lib_run(verbose, paranoia,
+	    TCLR_MODE_LOAD_ONCE, bigblock_caps, bigblock, shadow, cri);
+
+	cheribsdtest_cheri_revoke_lib_run(verbose, paranoia,
+	    TCLR_MODE_LOAD_SPLIT, bigblock_caps, bigblock, shadow, cri);
+
+	munmap(bigblock, bigblock_caps * sizeof(void * __capability));
+
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(cheri_revoke_lib_fork,
+    "Test libcheri_caprevoke with fork")
+{
+	static const int verbose = 0;
+	static const int paranoia = 2;
+
+	static const size_t bigblock_caps = 4096;
+
+	void * __capability * __capability bigblock;
+	void * __capability shadow;
+	const volatile struct cheri_revoke_info * __capability cri;
+
+	int pid;
+
+	srand(1337);
+
+	cheribsdtest_cheri_revoke_lib_init(bigblock_caps, &bigblock, &shadow,
+	    &cri);
+
+	if (verbose > 0) {
+		fprintf(stderr, "bigblock: %#.16lp\n", bigblock);
+		fprintf(stderr, "shadow: %#.16lp\n", shadow);
+	}
+
+	pid = fork();
+	if (pid == 0) {
+		cheribsdtest_cheri_revoke_lib_run(verbose, paranoia,
+		    TCLR_MODE_STORE, bigblock_caps, bigblock, shadow, cri);
+
+		cheribsdtest_cheri_revoke_lib_run(verbose, paranoia,
+		    TCLR_MODE_LOAD_ONCE, bigblock_caps, bigblock, shadow, cri);
+
+		cheribsdtest_cheri_revoke_lib_run(verbose, paranoia,
+		    TCLR_MODE_LOAD_SPLIT, bigblock_caps, bigblock, shadow, cri);
+	} else {
+		int res;
+
+		CHERIBSDTEST_VERIFY2(pid > 0, "fork failed");
+		waitpid(pid, &res, 0);
+		if (res == 0) {
+			cheribsdtest_success();
+		} else {
+			cheribsdtest_failure_errx("Bad child process exit");
+		}
+	}
+
+	munmap(bigblock, bigblock_caps * sizeof(void * __capability));
+
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(revoke_largest_quarantined_reservation,
+    "Verify that the largest quarantined reservation is revoked",
+    .ct_check_skip = skip_need_quarantine_unmapped_reservations)
+{
+	const size_t res_size = 0x100000000;
+	void * __capability res;
+	ptraddr_t res_addr;
+	struct procstat *psp;
+	struct kinfo_proc *kipp;
+	struct kinfo_vmentry *kivp;
+	uint pcnt, vmcnt;
+	bool found_res;
+
+	res = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, res_size, PROT_READ,
+	    MAP_ANON, -1, 0));
+	res_addr = (ptraddr_t)res;
+	CHERIBSDTEST_CHECK_SYSCALL(munmap(res, res_size));
+
+	psp = procstat_open_sysctl();
+	CHERIBSDTEST_VERIFY(psp != NULL);
+	kipp = procstat_getprocs(psp, KERN_PROC_PID, getpid(), &pcnt);
+	CHERIBSDTEST_VERIFY(kipp != NULL);
+	CHERIBSDTEST_VERIFY(pcnt == 1);
+	kivp = procstat_getvmmap(psp, kipp, &vmcnt);
+	CHERIBSDTEST_VERIFY(kivp != NULL);
+
+	found_res = false;
+	for (u_int i = 0; i < vmcnt; i++) {
+		/*
+		 * Look for an entry containing our reservation.  It
+		 * may have been merged with a previously quarantined
+		 * region so don't expect an exact match.
+		 */
+		if (kivp[i].kve_start <= res_addr &&
+		    kivp[i].kve_end >= res_addr + res_size) {
+			found_res = true;
+			CHERIBSDTEST_VERIFY(kivp[i].kve_type ==
+			    KVME_TYPE_QUARANTINED);
+		}
+	}
+	CHERIBSDTEST_VERIFY2(found_res, "reservation not found in vmmap");
+
+	procstat_freevmmap(psp, kivp);
+
+	/*
+	 * XXX: Assume that the revoker will revoke the largest
+	 * quarantined reservation.
+	 */
+	malloc_revoke();
+
+	kivp = procstat_getvmmap(psp, kipp, &vmcnt);
+	CHERIBSDTEST_VERIFY(kivp != NULL);
+
+	for (u_int i = 0; i < vmcnt; i++) {
+		/*
+		 * Look for an entry containing our reservation.  We
+		 * assuming res_size is large enough that it's the
+		 * reservation we revoke, we shouldn't find it.
+		 *
+		 * XXX: It's possible procstat_getvmmap() could trigger
+		 * reuse of this space, but probably not since we'll
+		 * have just flushed malloc()'s quarantine list so
+		 * there should be plenty of objects on the free list(s).
+		 */
+		if (kivp[i].kve_start <= res_addr &&
+		    kivp[i].kve_end >= res_addr + res_size) {
+			cheribsdtest_failure_errx(
+			    "reservation still in memory map");
+		}
+	}
+
+	procstat_freevmmap(psp, kivp);
+	procstat_freeprocs(psp, kipp);
+	procstat_close(psp);
+	cheribsdtest_success();
+}
+
+#define	NRES	3
+CHERIBSDTEST(revoke_merge_quarantined,
+    "Verify that adjacent non-neighbor reservations are revoked",
+    .ct_check_skip = skip_need_quarantine_unmapped_reservations)
+{
+	const size_t big_res_size = 0x100000000;
+	const size_t res_sizes[NRES] =
+	    { PAGE_SIZE, big_res_size, PAGE_SIZE };
+	const size_t res_offsets[NRES] =
+	    { PAGE_SIZE, big_res_size, 3 * big_res_size };
+	void * __capability res;
+	ptraddr_t res_addrs[NRES], working_space;
+	struct procstat *psp;
+	struct kinfo_proc *kipp;
+	struct kinfo_vmentry *kivp;
+	uint pcnt, vmcnt;
+	bool found_res[NRES] = {};
+
+	/*
+	 * Create a single large quarantined reservation with three
+	 * non-adjacent, quarantined neighbors inside it (the edges are
+	 * padded to prevent merging with neighbors are creation time).
+	 *
+	 * The three quarantined regions are:
+	 *  - A PAGE_SIZE entry at offset PAGE_SIZE.
+	 *  - A large (big_res_size) allocation at offset big_res_size.
+	 *  - A PAGE_SIZE reservation at offset 3*big_res_size.
+	 */
+	working_space = find_address_space_gap(big_res_size * 4, 0);
+	for (int r = 0; r < NRES; r++) {
+		res = CHERIBSDTEST_CHECK_SYSCALL(mmap(
+		    (void *)(uintptr_t)(working_space + res_offsets[r]),
+		    res_sizes[r], PROT_READ, MAP_ANON, -1, 0));
+		res_addrs[r] = (ptraddr_t)res;
+		CHERIBSDTEST_CHECK_SYSCALL(munmap(res, res_sizes[r]));
+	}
+
+	psp = procstat_open_sysctl();
+	CHERIBSDTEST_VERIFY(psp != NULL);
+	kipp = procstat_getprocs(psp, KERN_PROC_PID, getpid(), &pcnt);
+	CHERIBSDTEST_VERIFY(kipp != NULL);
+	CHERIBSDTEST_VERIFY(pcnt == 1);
+	kivp = procstat_getvmmap(psp, kipp, &vmcnt);
+	CHERIBSDTEST_VERIFY(kivp != NULL);
+
+	/*
+	 * Check that there are quarantines resevations at each expected
+	 * location.
+	 */
+	for (u_int i = 0; i < vmcnt; i++) {
+		for (int r = 0; r < NRES; r++) {
+			if (kivp[i].kve_start == res_addrs[r]) {
+				found_res[r] = true;
+				CHERIBSDTEST_VERIFY(kivp[i].kve_type ==
+				    KVME_TYPE_QUARANTINED);
+			}
+		}
+	}
+	for (int r = 0; r < NRES; r++)
+		CHERIBSDTEST_VERIFY2(found_res[r],
+		    "reservation not found in vmmap");
+
+	procstat_freevmmap(psp, kivp);
+
+	/*
+	 * XXX: Assume that the revoker will revoke the largest
+	 * quarantined reservation and merge it with it's neighbors.
+	 */
+	malloc_revoke();
+
+	kivp = procstat_getvmmap(psp, kipp, &vmcnt);
+	CHERIBSDTEST_VERIFY(kivp != NULL);
+
+	for (u_int i = 0; i < vmcnt; i++) {
+		/*
+		 * Check that no entries overlap our working space.
+		 */
+		if ((kivp[i].kve_start >= working_space &&
+		    kivp[i].kve_start < working_space + (4 * big_res_size)) ||
+		    (kivp[i].kve_end - 1 >= working_space &&
+		    kivp[i].kve_end - 1 < working_space + (4 * big_res_size))) {
+			cheribsdtest_failure_errx(
+			    "reservation(s) still in memory map");
+		}
+	}
+
+	procstat_freevmmap(psp, kivp);
+	procstat_freeprocs(psp, kipp);
+	procstat_close(psp);
+	cheribsdtest_success();
+}
+#undef NRES
+#endif /* CHERI_REVOKE */
+
 #endif /* __CHERI_PURE_CAPABILITY__ */

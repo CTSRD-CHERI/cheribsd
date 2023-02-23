@@ -402,10 +402,14 @@ SYSINIT(diagwarn2, SI_SUB_LAST, SI_ORDER_FIFTH,
 #if __has_feature(capabilities)
 static char cheri_notice[] =
 #ifdef __CHERI_PURE_CAPABILITY__
-    "CHERI pure-capability kernel.\n";
+    "CHERI pure-capability kernel"
 #else
-    "CHERI hybrid kernel.\n";
+    "CHERI hybrid kernel"
 #endif
+#ifdef CHERI_CAPREVOKE
+    " with revocation support"
+#endif
+    "\n";
 SYSINIT(cherinotice, SI_SUB_COPYRIGHT, SI_ORDER_ANY, print_caddr_t,
     cheri_notice);
 #endif
@@ -623,7 +627,10 @@ proc0_init(void *dummy __unused)
 
 	/* Allocate a prototype map so we have something to fork. */
 	p->p_vmspace = &vmspace0;
+	mtx_init(&vmspace0.vm_mtx, "vmspace", NULL, MTX_DEF);
 	refcount_init(&vmspace0.vm_refcnt, 1);
+	LIST_INIT(&vmspace0.vm_proclist);
+	LIST_INSERT_HEAD(&vmspace0.vm_proclist, p, p_vm_proclist);
 	pmap_pinit0(vmspace_pmap(&vmspace0));
 
 	/*

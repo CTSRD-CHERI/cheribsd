@@ -201,6 +201,7 @@
 #define	MINCORE_MODIFIED_OTHER	0x10 /* Page has been modified */
 #define	MINCORE_SUPER		0x60 /* Page is a "super" page */
 #define	MINCORE_PSIND(i)	(((i) << 5) & MINCORE_SUPER) /* Page size */
+#define	MINCORE_CAPSTORE	0x80 /* Page monitored for capabilities */
 
 /*
  * Anonymous object constant for shm_open().

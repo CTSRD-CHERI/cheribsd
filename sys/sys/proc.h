@@ -682,6 +682,8 @@ struct proc {
 					       (if I am reaper). */
 	LIST_ENTRY(proc) p_reapsibling;	/* (e) List of siblings - descendants of
 					       the same reaper. */
+	LIST_ENTRY(proc) p_vm_proclist; /* (b) List of processes sharing
+						p_vmspace  */
 	struct mtx	p_mtx;		/* (n) Lock for this struct. */
 	struct mtx	p_statmtx;	/* Lock for the stats */
 	struct mtx	p_itimmtx;	/* Lock for the virt/prof timers */
@@ -938,6 +940,7 @@ struct proc {
 #define	SINGLE_EXIT	1
 #define	SINGLE_BOUNDARY	2
 #define	SINGLE_ALLPROC	3
+#define	SINGLE_VMSPACE	4
 
 #ifdef MALLOC_DECLARE
 MALLOC_DECLARE(M_PARGS);
@@ -1291,10 +1294,19 @@ void	thread_unlink(struct thread *td);
 void	thread_unsuspend(struct proc *p);
 void	thread_wait(struct proc *p);
 
+#ifdef CHERI_CAPREVOKE
+struct vm_cheri_revoke_cookie;
+void cheri_revoke_td_frame(struct thread *td,
+    const struct vm_cheri_revoke_cookie *);
+#endif
+
 bool	stop_all_proc_block(void);
 void	stop_all_proc_unblock(void);
+
 void	stop_all_proc(void);
 void	resume_all_proc(void);
+void	stop_vmspace_proc(struct proc *cp);
+void	resume_vmspace_proc(struct proc *cp);
 
 static __inline int
 curthread_pflags_set(int flags)

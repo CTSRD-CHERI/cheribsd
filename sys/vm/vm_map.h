@@ -71,6 +71,14 @@
 #include <sys/lock.h>
 #include <sys/sx.h>
 #include <sys/_mutex.h>
+#include <sys/condvar.h>
+
+#ifdef CHERI_CAPREVOKE
+#include <sys/tree.h>
+
+#include <cheri/revoke.h>
+#include <cheri/revoke_kern.h>
+#endif
 
 /*
  *	Types defined:
@@ -101,6 +109,9 @@ union vm_map_object {
 struct vm_map_entry {
 	struct vm_map_entry *left;	/* left child or previous entry */
 	struct vm_map_entry *right;	/* right child or next entry */
+#ifdef CHERI_CAPREVOKE
+	RB_ENTRY(vm_map_entry) quarantine; /* quarantined entries */
+#endif
 	vm_offset_t start;		/* start address */
 	vm_offset_t end;		/* end address */
 	vm_offset_t reservation;	/* VM reservation ID (lowest VA)  */
@@ -179,6 +190,24 @@ vm_map_entry_system_wired_count(vm_map_entry_t entry)
 }
 #endif	/* _KERNEL */
 
+#ifdef CHERI_CAPREVOKE
+/*
+ * To support optimization as to which bitmap(s) we look at, given revocation
+ * runs may use different predicates on capabilities under test.
+ *
+ * Takes cutperm = cheri_getperm(cut) as an argument for optimization reasons.
+ *
+ * Returns any nonzero value to indicate revocation required.
+ */
+typedef unsigned long (*vm_cheri_revoke_test_fn)(
+    const uint8_t * __capability shadow, uintcap_t cut, unsigned long cutperm,
+    vm_offset_t start, vm_offset_t end);
+
+#ifdef CHERI_CAPREVOKE_STATS
+struct cheri_revoke_stats;
+#endif
+#endif
+
 /*
  *	A map is a set of map entries.  These map entries are
  *	organized as a threaded binary search tree.  Both structures
@@ -208,6 +237,36 @@ struct vm_map {
 	struct vm_map_entry header;	/* List of entries */
 	struct sx lock;			/* Lock for map data */
 	struct mtx system_mtx;
+#ifdef CHERI_CAPREVOKE
+	struct cv vm_cheri_revoke_cv;	/* (c) Cap. rev. is single file */
+	cheri_revoke_state_t vm_cheri_revoke_st;	/* Cap. rev. state */
+
+	/*
+	 * If revocation is in progress (as determined by vm_cheri_revoke_st,
+	 * this holds our current test predicate.
+	 */
+	vm_cheri_revoke_test_fn vm_cheri_revoke_test;
+	/*
+	 * Tree of map entries awaiting revocation, ordered by size and
+	 * virtual address.
+	 */
+	RB_HEAD(vm_map_quarantine, vm_map_entry) quarantine;
+	struct vm_map_entry *rev_entry;	/* entry being revoked */
+#ifdef CHERI_CAPREVOKE_STATS
+	/*
+	 * A slight abuse of an sx lock: readers may perform atomic ops on
+	 * the stat structure, but a write lock is necessary to zero out
+	 * the structure itself (CAPREVOKE_TAKE_STATS).
+	 */
+	struct sx vm_cheri_revoke_stats_sx;
+	/*
+	 * This is actually a struct cheri_revoke_stats, but that's not easily
+	 * brought into scope here.  There's an assertion in
+	 * sys/kern/kern_cheri_revoke.c that this is the same size.
+	 */
+	uint64_t vm_cheri_revoke_stats[12];
+#endif
+#endif
 	int nentries;			/* Number of entries */
 	vm_size_t size;			/* virtual size */
 	u_int timestamp;		/* Version number */
@@ -308,6 +367,9 @@ struct vmspace {
 	caddr_t vm_taddr;	/* (c) user virtual address of text */
 	caddr_t vm_daddr;	/* (c) user virtual address of data */
 	uintcap_t vm_shp_base;	/* shared page pointer */
+
+	struct mtx vm_mtx;
+	LIST_HEAD(, proc) vm_proclist;	/* processes sharing this vmspace */
 	u_int vm_refcnt;	/* number of references */
 	/*
 	 * Keep the PMAP last, so that CPU-specific variations of that
@@ -316,6 +378,9 @@ struct vmspace {
 	 */
 	struct pmap vm_pmap;	/* private physical map */
 };
+
+#define	VMSPACE_LOCK(vm)	mtx_lock(&(vm)->vm_mtx)
+#define	VMSPACE_UNLOCK(vm)	mtx_unlock(&(vm)->vm_mtx)
 
 #ifdef	_KERNEL
 static __inline pmap_t
@@ -370,6 +435,8 @@ bool vm_map_range_valid_KBI(vm_map_t map, vm_offset_t start, vm_offset_t end);
 			_vm_map_lock_downgrade(map, LOCK_FILE, LOCK_LINE)
 
 long vmspace_resident_count(struct vmspace *vmspace);
+void vmspace_insert_proc(struct vmspace *vm, struct proc *p);
+void vmspace_remove_proc(struct vmspace *vm, struct proc *p);
 #endif	/* _KERNEL */
 
 /*
@@ -407,6 +474,7 @@ long vmspace_resident_count(struct vmspace *vmspace);
 #define	VM_FAULT_WIRE	0x01	/* Wire the mapped page */
 #define	VM_FAULT_DIRTY	0x02	/* Dirty the page; use w/VM_PROT_COPY */
 #define	VM_FAULT_NOFILL	0x04	/* Fail if the pager doesn't have a copy */
+#define	VM_FAULT_NOPMAP 0x08    /* Do not update the pmap, just hold the page */
 
 /*
  * Initially, mappings are slightly sequential.  The maximum window size must
@@ -506,6 +574,8 @@ int vm_map_lookup_locked(vm_map_t *, vm_offset_t, vm_prot_t, vm_map_entry_t *, v
     vm_pindex_t *, vm_prot_t *, boolean_t *);
 void vm_map_lookup_done (vm_map_t, vm_map_entry_t);
 boolean_t vm_map_lookup_entry (vm_map_t, vm_offset_t, vm_map_entry_t *);
+boolean_t vm_map_entry_start_revocation(vm_map_t, vm_map_entry_t *);
+void vm_map_entry_end_revocation(vm_map_t map);
 bool vm_map_reservation_is_unmapped(vm_map_t, vm_offset_t);
 int vm_map_reservation_delete_locked(vm_map_t, vm_offset_t);
 int vm_map_reservation_create(vm_map_t, vm_pointer_t *, vm_size_t, vm_offset_t,

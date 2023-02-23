@@ -101,6 +101,10 @@ __FBSDID("$FreeBSD$");
 #include <cheri/cherireg.h>
 #endif
 
+#ifdef CHERI_CAPREVOKE
+#include <vm/vm_cheri_revoke.h>
+#endif
+
 #ifdef KDTRACE_HOOKS
 #include <sys/dtrace_bsd.h>
 dtrace_execexit_func_t	dtrace_fasttrap_exec;
@@ -1288,6 +1292,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		shmexit(vmspace);
 		pmap_remove_pages(vmspace_pmap(vmspace));
 		vm_map_clear(map);
+
 		/*
 		 * An exec terminates mlockall(MCL_FUTURE).
 		 * ASLR and W^X states must be re-evaluated.
@@ -1499,6 +1504,22 @@ exec_map_stack(struct image_params *imgp)
 	else
 #endif
 		p->p_psstrings = stack_top - sv->sv_psstringssz;
+
+#ifdef CHERI_CAPREVOKE
+	/*
+	 * For CheriABI, create an anonymous, CoW mapping for the revocation
+	 * bitmaps.
+	 *
+	 * XXX This almost surely belongs elsewhere, but I don't immediately
+	 * see a per-sv hook here.
+	 */
+	if (sv->sv_flags & SV_CHERI && imgp->cop == NULL) {
+		error = vm_map_install_cheri_revoke_shadow(map, sv);
+
+		if (error != KERN_SUCCESS)
+			return (vm_mmap_to_errno(error));
+	}
+#endif
 
 	/* Map a shared page */
 	obj = sv->sv_shared_page_obj;

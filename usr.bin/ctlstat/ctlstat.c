@@ -492,6 +492,9 @@ cctl_end_pelement(void *user_data, const char *name)
 	} else if (strcmp(name, "targ_port") == 0) {
 		if (targdata->lun >= 0 && targdata->target != NULL) {
 			if (targdata->lun >= targdata->ntargets) {
+				size_t oldsize = targdata->ntargets *
+					sizeof(char*);
+
 				/*
 				 * This can happen for example if there are
 				 * holes in CTL's lunlist.
@@ -500,8 +503,13 @@ cctl_end_pelement(void *user_data, const char *name)
 					targdata->lun + 1);
 				size_t newsize = targdata->ntargets *
 					sizeof(char*);
-				targdata->targets = rallocx(targdata->targets,
-					newsize, MALLOCX_ZERO);
+				targdata->targets = realloc(targdata->targets,
+					newsize);
+				if (targdata->targets == NULL)
+					err(1, "out of memory for targets");
+				bzero(
+				    ((char*)targdata->targets) + oldsize,
+				    newsize - oldsize);
 			}
 			free(targdata->targets[targdata->lun]);
 			targdata->targets[targdata->lun] = targdata->target;

@@ -1,0 +1,6 @@
+include	"GENERIC-MORELLO-CAPREVOKE"
+include	"../../conf/std.nodebug"
+
+nooptions CHERI_CAPREVOKE_STATS
+
+ident	GENERIC-MORELLO-CAPREVOKE-NODEBUG

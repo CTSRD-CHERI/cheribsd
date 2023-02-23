@@ -53,11 +53,13 @@ typedef	uint64_t	pt_entry_t;		/* page table entry */
 #define	ATTR_MASK		(ATTR_MASK_H | ATTR_MASK_L)
 #if __has_feature(capabilities)
 #define	ATTR_LC_MASK		(3UL << 61)
+#define	ATTR_LC_GEN_MASK	(1UL << 61)
 #define	ATTR_LC_DISABLED	(0UL << 61)
 #define	ATTR_LC_ENABLED		(1UL << 61)
 #define	ATTR_LC_GEN0		(2UL << 61)
 #define	ATTR_LC_GEN1		(3UL << 61)
 #define	ATTR_SC			(1UL << 60)
+#define	ATTR_CDBM		(1UL << 59)
 #endif
 /* Bits 58:55 are reserved for software */
 #define	ATTR_SW_UNUSED1		(1UL << 58)

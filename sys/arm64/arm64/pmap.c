@@ -465,6 +465,7 @@ static __inline vm_page_t pmap_remove_pt_page(pmap_t pmap, vm_offset_t va);
 #define	pmap_load_store(table, entry)	atomic_swap_64(table, entry)
 #define	pmap_set_bits(table, bits)	atomic_set_64(table, bits)
 #define	pmap_store(table, entry)	atomic_store_64(table, entry)
+#define	pmap_fcmpset(pte, exp, des)	atomic_fcmpset_64((pte), (exp), (des))
 
 /********************/
 /* Inline functions */
@@ -795,8 +796,37 @@ pmap_pte_memattr(pmap_t pmap, vm_memattr_t memattr)
 	}
 }
 
+#if __has_feature(capabilities)
+static inline uint64_t
+pmap_pte_cr(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
+{
+
+	if (prot & VM_PROT_READ_CAP) {
+#ifdef CHERI_CAPREVOKE
+		if ((va < VM_MAX_USER_ADDRESS) &&
+		    (pmap->pm_stage == PM_STAGE1)) {
+			/* Stage 1 user pages gated by CLG */
+			return pmap->flags.uclg ? ATTR_LC_GEN1 : ATTR_LC_GEN0;
+		} else {
+			/*
+			 * Kernel pages always load OK; Stage 2 doesn't support
+			 * CLG.
+			 */
+			return ATTR_LC_ENABLED;
+		}
+#else
+		return ATTR_LC_ENABLED;
+#endif
+	} else {
+		/* XXX Let's see what happens! */
+		return ATTR_LC_DISABLED;
+	}
+}
+#endif
+
 static pt_entry_t
-pmap_pte_prot(pmap_t pmap, vm_prot_t prot)
+pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m,
+    vm_offset_t va)
 {
 	pt_entry_t val;
 
@@ -806,12 +836,6 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot)
 			val |= ATTR_S1_XN;
 		if ((prot & VM_PROT_WRITE) == 0)
 			val |= ATTR_S1_AP(ATTR_S1_AP_RO);
-#if __has_feature(capabilities)
-		if ((prot & VM_PROT_READ_CAP) != 0)
-			val |= ATTR_LC_ENABLED;
-		if ((prot & VM_PROT_WRITE_CAP) != 0)
-			val |= ATTR_SC;
-#endif
 	} else {
 		if ((prot & VM_PROT_WRITE) != 0)
 			val |= ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE);
@@ -819,13 +843,23 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot)
 			val |= ATTR_S2_S2AP(ATTR_S2_S2AP_READ);
 		if ((prot & VM_PROT_EXECUTE) == 0)
 			val |= ATTR_S2_XN(ATTR_S2_XN_ALL);
-#if __has_feature(capabilities)
-		if ((prot & VM_PROT_READ_CAP) != 0)
-			val |= ATTR_LC_ENABLED;
-		if ((prot & VM_PROT_WRITE_CAP) != 0)
-			val |= ATTR_SC;
-#endif
 	}
+
+#if __has_feature(capabilities)
+	val |= pmap_pte_cr(pmap, va, prot);
+
+	VM_PAGE_ASSERT_PGA_CAPMETA_PMAP_ENTER(m, prot);
+	if ((prot & VM_PROT_WRITE_CAP) != 0)
+		/*
+		 * The page is CAPSTORE and this mapping is VM_PROT_WRITE_CAP.
+		 * Always set ATTR_CDBM. If the page is CAPDIRTY or this mapping
+		 * is created in response to a cap-write, also set ATTR_SC.
+		 *
+		 * XXX We could also conditionally set ATTR_SC if PGA_CAPDIRTY,
+		 * but it's not required.
+		 */
+		val |= (ATTR_CDBM);
+#endif
 
 	return (val);
 }
@@ -849,6 +883,47 @@ pmap_pte_dirty(pmap_t pmap, pt_entry_t pte)
 
 	return ((pte & ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE)) ==
 	    ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE));
+}
+
+#if __has_feature(capabilities)
+static inline int
+pmap_pte_capdirty(pmap_t pmap, pt_entry_t pte)
+{
+	KASSERT((pte & ATTR_SW_MANAGED) != 0, ("pte %#lx is unmanaged", pte));
+
+	KASSERT((pte & (ATTR_CDBM | ATTR_SC)) != ATTR_SC,
+	    ("pte %lx is cap-writable but missing ATTR_CDBM", pte));
+
+	return ((pte & ATTR_SC) == ATTR_SC);
+}
+#else
+static inline int
+pmap_pte_capdirty(pmap_t pmap, pt_entry_t pte)
+{
+
+	return (0);
+}
+#endif
+
+static inline void
+pmap_page_dirty(pmap_t pmap, pt_entry_t pte, vm_page_t m)
+{
+	if (pmap_pte_dirty(pmap, pte))
+		vm_page_dirty(m);
+
+#if __has_feature(capabilities)
+	/*
+	 * In its quest to avoid TLB shootdowns, the revoker sweep can create
+	 * SC-clear CDBM-set PTEs that nevertheless have SC-set TLBEs fronting
+	 * them.  Therefore, we must consider CDBM alone grounds for being
+	 * capability dirty when we remove a PTE.  (SC can be set only when
+	 * CDBM is also set, so we ignore it here.)
+	 *
+	 * TODO This is pretty heavy-handed.  Can we do better?
+	 */
+	if ((pte & (ATTR_CDBM)) == ATTR_CDBM)
+		vm_page_capdirty(m);
+#endif
 }
 
 static __inline void
@@ -2158,6 +2233,10 @@ pmap_pinit_stage(pmap_t pmap, enum pmap_stage stage, int levels)
 	}
 	pmap->pm_ttbr = VM_PAGE_TO_PHYS(m);
 
+#if __has_feature(capabilities)
+	pmap->flags.uclg = 0;
+#endif
+
 	return (1);
 }
 
@@ -2718,8 +2797,7 @@ reclaim_pv_chunk_domain(pmap_t locked_pmap, struct rwlock **lockp, int domain)
 					continue;
 				tpte = pmap_load_clear(pte);
 				m = PHYS_TO_VM_PAGE(tpte & ~ATTR_MASK);
-				if (pmap_pte_dirty(pmap, tpte))
-					vm_page_dirty(m);
+				pmap_page_dirty(pmap, tpte, m);
 				if ((tpte & ATTR_AF) != 0) {
 					pmap_invalidate_page(pmap, va, true);
 					vm_page_aflag_set(m, PGA_REFERENCED);
@@ -3264,8 +3342,7 @@ pmap_remove_l2(pmap_t pmap, pt_entry_t *l2, vm_offset_t sva,
 		CHANGE_PV_LIST_LOCK_TO_PHYS(lockp, old_l2 & ~ATTR_MASK);
 		pmap_pvh_free(pvh, pmap, sva);
 		for (mt = m; mt < &m[L2_SIZE / PAGE_SIZE]; mt++) {
-			if (pmap_pte_dirty(pmap, old_l2))
-				vm_page_dirty(mt);
+			pmap_page_dirty(pmap, old_l2, mt);
 			if (old_l2 & ATTR_AF)
 				vm_page_aflag_set(mt, PGA_REFERENCED);
 			if (TAILQ_EMPTY(&mt->md.pv_list) &&
@@ -3309,8 +3386,7 @@ pmap_remove_l3(pmap_t pmap, pt_entry_t *l3, vm_offset_t va,
 	pmap_resident_count_dec(pmap, 1);
 	if (old_l3 & ATTR_SW_MANAGED) {
 		m = PHYS_TO_VM_PAGE(old_l3 & ~ATTR_MASK);
-		if (pmap_pte_dirty(pmap, old_l3))
-			vm_page_dirty(m);
+		pmap_page_dirty(pmap, old_l3, m);
 		if (old_l3 & ATTR_AF)
 			vm_page_aflag_set(m, PGA_REFERENCED);
 		CHANGE_PV_LIST_LOCK_TO_VM_PAGE(lockp, m);
@@ -3363,8 +3439,7 @@ pmap_remove_l3_range(pmap_t pmap, pd_entry_t l2e, vm_offset_t sva,
 		pmap_resident_count_dec(pmap, 1);
 		if ((old_l3 & ATTR_SW_MANAGED) != 0) {
 			m = PHYS_TO_VM_PAGE(old_l3 & ~ATTR_MASK);
-			if (pmap_pte_dirty(pmap, old_l3))
-				vm_page_dirty(m);
+			pmap_page_dirty(pmap, old_l3, m);
 			if ((old_l3 & ATTR_AF) != 0)
 				vm_page_aflag_set(m, PGA_REFERENCED);
 			new_lock = PHYS_TO_PV_LIST_LOCK(VM_PAGE_TO_PHYS(m));
@@ -3604,8 +3679,7 @@ retry:
 		/*
 		 * Update the vm_page_t clean and reference bits.
 		 */
-		if (pmap_pte_dirty(pmap, tpte))
-			vm_page_dirty(m);
+		pmap_page_dirty(pmap, tpte, m);
 		pmap_unuse_pt(pmap, pv->pv_va, tpde, &free);
 		TAILQ_REMOVE(&m->md.pv_list, pv, pv_next);
 		m->md.pv_gen++;
@@ -3652,10 +3726,11 @@ pmap_protect_l2(pmap_t pmap, pt_entry_t *l2, vm_offset_t sva, pt_entry_t mask,
 	 */
 	if ((old_l2 & ATTR_SW_MANAGED) != 0 &&
 	    (nbits & ATTR_S1_AP(ATTR_S1_AP_RO)) != 0 &&
-	    pmap_pte_dirty(pmap, old_l2)) {
+	    (pmap_pte_dirty(pmap, old_l2) ||
+	    pmap_pte_capdirty(pmap, old_l2))) {
 		m = PHYS_TO_VM_PAGE(old_l2 & ~ATTR_MASK);
 		for (mt = m; mt < &m[L2_SIZE / PAGE_SIZE]; mt++)
-			vm_page_dirty(mt);
+			pmap_page_dirty(pmap, old_l2, mt);
 	}
 
 	/*
@@ -3762,8 +3837,10 @@ pmap_mask_set(pmap_t pmap, vm_offset_t sva, vm_offset_t eva, pt_entry_t mask,
 			 */
 			if ((l3 & ATTR_SW_MANAGED) != 0 &&
 			    (nbits & ATTR_S1_AP(ATTR_S1_AP_RO)) != 0 &&
-			    pmap_pte_dirty(pmap, l3))
-				vm_page_dirty(PHYS_TO_VM_PAGE(l3 & ~ATTR_MASK));
+			    (pmap_pte_dirty(pmap, l3) ||
+			    pmap_pte_capdirty(pmap, l3)))
+				pmap_page_dirty(pmap, l3,
+				    PHYS_TO_VM_PAGE(l3 & ~ATTR_MASK));
 
 			if (va == va_next)
 				va = sva;
@@ -3961,6 +4038,22 @@ pmap_promote_l2(pmap_t pmap, pd_entry_t *l2, vm_offset_t va, vm_page_t mpte,
 	}
 
 setl2:
+#if __has_feature(capabilities)
+		/*
+		 * Prohibit superpages involving CDBM-set SC-clear PTEs.  The
+		 * revoker creates these without TLB shootdown, and so there
+		 * may be a SC-set TLBE still in the system.  Thankfully,
+		 * these are ephemera: either they'll transition to CD-set
+		 * or CW-clear in the next revocation epoch.
+		 */
+		if ((newl2 & (ATTR_CDBM | ATTR_SC)) == ATTR_CDBM) {
+			atomic_add_long(&pmap_l2_p_failures, 1);
+			CTR2(KTR_PMAP, "pmap_promote_l2: CDBM failure for va "
+			    "%#lx in pmap %p", va, pmap);
+			return;
+		}
+#endif
+
 	if ((newl2 & (ATTR_S1_AP_RW_BIT | ATTR_SW_DBM)) ==
 	    (ATTR_S1_AP(ATTR_S1_AP_RO) | ATTR_SW_DBM)) {
 		/*
@@ -3994,6 +4087,21 @@ setl3:
 			    " in pmap %p", va, pmap);
 			return;
 		}
+#if __has_feature(capabilities)
+		/*
+		 * Prohibit superpages involving CDBM-set SC-clear PTEs.  The
+		 * revoker creates these without TLB shootdown, and so there
+		 * may be a SC-set TLBE still in the system.  Thankfully,
+		 * these are ephemera: either they'll transition to CD-set
+		 * or CW-clear in the next revocation epoch.
+		 */
+		if ((oldl3 & (ATTR_CDBM | ATTR_SC)) == ATTR_CDBM) {
+			atomic_add_long(&pmap_l2_p_failures, 1);
+			CTR2(KTR_PMAP, "pmap_promote_l2: CDBM failure for va "
+			    "%#lx in pmap %p", va, pmap);
+			return;
+		}
+#endif
 		pa -= PAGE_SIZE;
 	}
 
@@ -4158,7 +4266,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	pa = VM_PAGE_TO_PHYS(m);
 	new_l3 = (pt_entry_t)(pa | ATTR_DEFAULT | L3_PAGE);
 	new_l3 |= pmap_pte_memattr(pmap, m->md.pv_memattr);
-	new_l3 |= pmap_pte_prot(pmap, prot);
+	new_l3 |= pmap_pte_prot(pmap, prot, flags, m, va);
 
 	if ((flags & PMAP_ENTER_WIRED) != 0)
 		new_l3 |= ATTR_SW_WIRED;
@@ -4335,8 +4443,7 @@ havel3:
 			 * concurrent calls to pmap_page_test_mappings() and
 			 * pmap_ts_referenced().
 			 */
-			if (pmap_pte_dirty(pmap, orig_l3))
-				vm_page_dirty(om);
+			pmap_page_dirty(pmap, orig_l3, om);
 			if ((orig_l3 & ATTR_AF) != 0) {
 				pmap_invalidate_page(pmap, va, true);
 				vm_page_aflag_set(om, PGA_REFERENCED);
@@ -4412,9 +4519,8 @@ validate:
 			/* same PA, different attributes */
 			orig_l3 = pmap_load_store(l3, new_l3);
 			pmap_invalidate_page(pmap, va, true);
-			if ((orig_l3 & ATTR_SW_MANAGED) != 0 &&
-			    pmap_pte_dirty(pmap, orig_l3))
-				vm_page_dirty(m);
+			if ((orig_l3 & ATTR_SW_MANAGED) != 0)
+				pmap_page_dirty(pmap, orig_l3, m);
 		} else {
 			/*
 			 * orig_l3 == new_l3
@@ -4494,8 +4600,7 @@ pmap_enter_2mpage(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if (pmap != kernel_pmap)
 		new_l2 |= ATTR_S1_nG;
 #if __has_feature(capabilities)
-	if ((prot & VM_PROT_READ_CAP) != 0)
-		new_l2 |= ATTR_LC_ENABLED;
+	new_l2 |= pmap_pte_cr(pmap, va, prot);
 #endif
 	return (pmap_enter_l2(pmap, va, new_l2, PMAP_ENTER_NOSLEEP |
 	    PMAP_ENTER_NOREPLACE | PMAP_ENTER_NORECLAIM, m, lockp));
@@ -4835,8 +4940,7 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 	if (pmap != kernel_pmap)
 		l3_val |= ATTR_S1_nG;
 #if __has_feature(capabilities)
-	if ((prot & VM_PROT_READ_CAP) != 0)
-		l3_val |= ATTR_LC_ENABLED;
+	l3_val |= pmap_pte_cr(pmap, va, prot);
 #endif
 
 	/*
@@ -4857,6 +4961,505 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 
 	return (mpte);
 }
+
+#if __has_feature(capabilities)
+static inline void
+pmap_update_user_clg(pmap_t pmap)
+{
+
+	if (pmap->flags.uclg) {
+		WRITE_SPECIALREG(cctlr_el1,
+		    READ_SPECIALREG(cctlr_el1) | CCTLR_EL1_TGEN0_MASK);
+	} else {
+		WRITE_SPECIALREG(cctlr_el1,
+		    READ_SPECIALREG(cctlr_el1) & ~CCTLR_EL1_TGEN0_MASK);
+	}
+}
+
+static inline void
+pmap_update_pte_clg(pmap_t pmap, pt_entry_t *pte)
+{
+
+	if (pmap->flags.uclg) {
+		pmap_set_bits(pte, ATTR_LC_GEN_MASK);
+	} else {
+		pmap_clear_bits(pte, ATTR_LC_GEN_MASK);
+	}
+}
+
+/*
+ * Atomically push all the in-PTE, MD capdirty bits up to the MI layer.
+ *
+ * Demotes ATTR_SC superpages to avoid creating L2 PTEs with ATTR_CDBM set and
+ * and ATTR_SC unset.
+ *
+ * While this is a fairly long-running operation under the current pmap
+ * lock, it's going to be called only from single-threaded context, so there
+ * should be minimal contention (perhaps from the page daemon or updates to
+ * shared mappings) as no other cores are going to have this pmap active.
+ *
+ * XREF pmap_remove_pages
+ */
+void
+pmap_sync_capdirty(pmap_t pmap)
+{
+	pd_entry_t *pde;
+	pt_entry_t *pte, tpte;
+	vm_page_t m,mt;
+	pv_entry_t pv;
+	struct pv_chunk *pc, *npc;
+	int64_t bit;
+	uint64_t inuse, bitmask;
+	int field, idx, lvl;
+	vm_paddr_t pa;
+
+	PMAP_LOCK(pmap);
+
+	TAILQ_FOREACH_SAFE(pc, &pmap->pm_pvchunk, pc_list, npc) {
+		for (field = 0; field < _NPCM; field++) {
+			inuse = ~pc->pc_map[field] & pc_freemask[field];
+			while (inuse != 0) {
+				bit = ffsl(inuse) - 1;
+				bitmask = 1UL << bit;
+				idx = field * 64 + bit;
+				pv = &pc->pc_pventry[idx];
+				inuse &= ~bitmask;
+
+				pde = pmap_pde(pmap, pv->pv_va, &lvl);
+				KASSERT(pde != NULL,
+				    ("Attempting to sync an unmapped page"));
+
+				switch(lvl) {
+				case 1:
+					pte = pmap_l1_to_l2(pde, pv->pv_va);
+					tpte = pmap_load(pte);
+					KASSERT((tpte & ATTR_DESCR_MASK) ==
+					    L2_BLOCK,
+					    ("Attempting to sync an invalid "
+					    "block: %lx", tpte));
+
+					if (pmap_pte_capdirty(pmap, tpte)) {
+						pmap_demote_l2(pmap, pte,
+						    pv->pv_va);
+						pte = pmap_l2_to_l3(pde,
+						    pv->pv_va);
+						tpte = pmap_load(pte);
+					}
+					break;
+				case 2:
+					pte = pmap_l2_to_l3(pde, pv->pv_va);
+					tpte = pmap_load(pte);
+					KASSERT((tpte & ATTR_DESCR_MASK) ==
+					    L3_PAGE,
+					    ("Attempting to sync an invalid "
+					     "page: %lx", tpte));
+					break;
+				default:
+					panic(
+					    "Invalid page directory level: %d",
+					    lvl);
+				}
+
+
+				if (((tpte & ATTR_SW_MANAGED) == 0) ||
+				    !pmap_pte_capdirty(pmap, tpte))
+					continue;
+
+				pa = tpte & ~ATTR_MASK;
+				m = PHYS_TO_VM_PAGE(pa);
+				KASSERT(m->phys_addr == pa,
+				    ("vm_page_t %p phys_addr mismatch %016jx %016jx",
+				    m, (uintmax_t)m->phys_addr,
+				    (uintmax_t)tpte));
+
+				switch (lvl) {
+				case 1:
+					for (mt = m; mt < &m[L2_SIZE / PAGE_SIZE]; mt++)
+						vm_page_capdirty(mt);
+					break;
+				case 2:
+					vm_page_capdirty(m);
+					break;
+				}
+				pmap_clear_bits(pte, ATTR_SC);
+			}
+		}
+	}
+
+	pmap_invalidate_all(pmap);
+
+	PMAP_UNLOCK(pmap);
+}
+
+#ifdef CHERI_CAPREVOKE
+void
+pmap_caploadgen_next(pmap_t pmap)
+{
+
+	/*
+	 * Even though we're invalidating here, there's nothing that
+	 * necessarily stops a TLB from loading the current (soon-to-be-prior)
+	 * LCLG or GCLG bit.  However, doing this global invalidate does mean
+	 * that no cached values from the prior epoch will persist into the
+	 * next one, which is great, because with one bit we can't distinguish
+	 * both past and future from present!
+	 */
+
+	PMAP_LOCK(pmap);
+	pmap_invalidate_all(pmap);
+	pmap->flags.uclg++;
+	PMAP_UNLOCK(pmap);
+}
+
+/* XREF pmap_page_test_mappings */
+static void
+pmap_caploadgen_test_all_clean(vm_page_t m)
+{
+	struct rwlock *lock;
+	pv_entry_t pv;
+	struct md_page *pvh;
+	pt_entry_t pte;
+	pmap_t pmap;
+	int lvl, md_gen, pvh_gen;
+	boolean_t rv;
+
+	rv = TRUE;
+	lock = VM_PAGE_TO_PV_LIST_LOCK(m);
+	rw_rlock(lock);
+restart:
+	TAILQ_FOREACH(pv, &m->md.pv_list, pv_next) {
+		pmap = PV_PMAP(pv);
+		PMAP_ASSERT_STAGE1(pmap);
+		if (!PMAP_TRYLOCK(pmap)) {
+			md_gen = m->md.pv_gen;
+			rw_runlock(lock);
+			PMAP_LOCK(pmap);
+			rw_rlock(lock);
+			if (md_gen != m->md.pv_gen) {
+				PMAP_UNLOCK(pmap);
+				goto restart;
+			}
+		}
+		pte = pmap_load(pmap_pte(pmap, pv->pv_va, &lvl));
+		PMAP_UNLOCK(pmap);
+		KASSERT(lvl == 3,
+		    ("pmap_page_test_mappings: Invalid level %d", lvl));
+		if (pte & ATTR_CDBM) {
+			rv = FALSE;
+			goto out;
+		}
+		KASSERT((pte & ATTR_SC) == 0, ("ATTR_SC without ATTR_CDBM"));
+	}
+	if ((m->flags & PG_FICTITIOUS) == 0) {
+		pvh = page_to_pvh(m);
+		TAILQ_FOREACH(pv, &pvh->pv_list, pv_next) {
+			pmap = PV_PMAP(pv);
+			PMAP_ASSERT_STAGE1(pmap);
+			if (!PMAP_TRYLOCK(pmap)) {
+				md_gen = m->md.pv_gen;
+				pvh_gen = pvh->pv_gen;
+				rw_runlock(lock);
+				PMAP_LOCK(pmap);
+				rw_rlock(lock);
+				if (md_gen != m->md.pv_gen ||
+				    pvh_gen != pvh->pv_gen) {
+					PMAP_UNLOCK(pmap);
+					goto restart;
+				}
+			}
+			pte = pmap_load(pmap_pte(pmap, pv->pv_va, &lvl));
+			PMAP_UNLOCK(pmap);
+			KASSERT(lvl == 2,
+			    ("pmap_page_test_mappings: Invalid level %d", lvl));
+			if (pte & ATTR_CDBM) {
+				rv = FALSE;
+				goto out;
+			}
+			KASSERT((pte & ATTR_SC) == 0,
+			    ("ATTR_SC without ATTR_CDBM"));
+		}
+	}
+out:
+	rw_runlock(lock);
+	/*
+	 * It's important that we test the PGA_CAPDIRTY flag again *after*
+	 * we've looked at all the PTEs: we might have raced a removal of a PTE
+	 * that had ATTR_CDBM set.
+	 *
+	 * Despite not holding a pmap LOCKed right now, something is preventing
+	 * new mappings (PMAP_CAPLOADGEN_NONEWMAPS) and so we don't need to
+	 * worry that we're missing something here.
+	 */
+	if (rv && !(vm_page_astate_load(m).flags & PGA_CAPDIRTY)) {
+		vm_page_aflag_clear(m, PGA_CAPSTORE);
+	}
+}
+
+int
+pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
+{
+	enum pmap_caploadgen_res res;
+#if VM_NRESERVLEVEL > 0
+	pd_entry_t *l2, l2e;
+#endif
+	pt_entry_t *pte, tpte, exppte;
+	vm_page_t m;
+	int lvl;
+
+	PMAP_ASSERT_STAGE1(pmap);
+	PMAP_LOCK(pmap);
+
+	KASSERT(!(READ_SPECIALREG(cctlr_el1) & CCTLR_EL1_TGEN0_MASK) ==
+	    !(pmap->flags.uclg),
+	    ("pmap_caploadgen_update: pmap clg %d but CPU mismatch",
+	    (int)pmap->flags.uclg));
+
+	pte = pmap_pte(pmap, va, &lvl);
+	if (pte == NULL) {
+		m = NULL;
+		res = PMAP_CAPLOADGEN_UNABLE;
+		goto out;
+	}
+	tpte = pmap_load(pte);
+
+	switch (tpte & ATTR_LC_MASK) {
+	case ATTR_LC_DISABLED:	// tag clearing
+	case ATTR_LC_ENABLED:	// always allowed; not for us to worry about?
+		m = NULL;
+		res = PMAP_CAPLOADGEN_UNABLE;
+		goto out;
+	case ATTR_LC_GEN0:	// ah, here we go
+	case ATTR_LC_GEN1:
+		break;
+	}
+
+	switch(lvl) {
+		/*
+		 * Large page: bouncing out here means we'll take a VM fault to
+		 * find the page in question.
+		 *
+		 * XXX We'd rather just demote the pages right now, surely?
+		 */
+		case 1:
+		case 2:
+			m = NULL;
+			res = PMAP_CAPLOADGEN_UNABLE;
+			goto out;
+		case 3:
+			break;
+	}
+
+	if (!(tpte & ATTR_LC_GEN_MASK) == !(pmap->flags.uclg)) {
+		/* Page already scanned, just fence (maybe redundantly) */
+		if (flags & PMAP_CAPLOADGEN_UPDATETLB) {
+			pmap_invalidate_page(pmap, va, true);
+		}
+
+		m = NULL;
+		res = PMAP_CAPLOADGEN_ALREADY;
+		goto out;
+	}
+
+	m = PHYS_TO_VM_PAGE(tpte & ~ATTR_MASK);
+	if (*mp == m) {
+		/*
+		 * We expected this page here (i.e., this is the page we just
+		 * scanned), so go ahead and update.  We know that the CLG bits
+		 * must still be wrong in light of the earlier test.
+		 */
+		res = PMAP_CAPLOADGEN_OK;
+
+		if (!(flags & PMAP_CAPLOADGEN_HASCAPS)) {
+			/*
+			 * We didn't see a capability on this page; step this
+			 * PTE closer to being cap-clean.
+			 */
+			if (tpte & ATTR_SC) {
+				/*
+				 * CAP-DIRTY -> DIRTYABLE; we just do a store
+				 * here as there might be a capability store
+				 * between us having examined the page and the
+				 * store-release below, and so we're going to
+				 * scan the page again anyway.
+				 */
+				pmap_clear_bits(pte, ATTR_SC);
+			} else if (tpte & ATTR_CDBM) {
+				/*
+				 * PTE CAP-DIRTYABLE -> CAP-CLEAN
+				 *
+				 * We don't do a TLB shootdown here because
+				 * we're guaranteed that any TLB caching this
+				 * ATTR_CDBM-but-not-ATTR_SC entry will attempt
+				 * a CAS, and not just a blind AMO OR, to set
+				 * ATTR_SC. (See Morello 2.14 and ARM D5.4.11).
+				 *
+				 * The barrier at the start of a revocation
+				 * epoch ensures that no TLB can have a
+				 * ATTR_CDBM-and-ATTR_SC entry for this mapping
+				 * if we've gotten here.
+				 *
+				 * On the other hand, we do have to do this as a
+				 * CAS, to ensure that we don't end up with
+				 * ATTR_SC set (by a racing PTW) and no CDBM.
+				 * Spurious failures are fine, so we can use
+				 * fcmpset here.
+				 *
+				 * XXX: If we could, we'd like to mark this
+				 * entry as cap-load-faulting, but we don't have
+				 * such a mechanism on Morello.
+				 */
+				exppte = tpte;
+				pmap_fcmpset(pte, &exppte, exppte & ~ATTR_CDBM);
+
+			} else if (flags & PMAP_CAPLOADGEN_NONEWMAPS) {
+				/* No new mappings possible */
+				vm_page_astate_t mas = vm_page_astate_load(m);
+
+				if (mas.flags & PGA_CAPDIRTY) {
+					/* Page-level cleaning: -?> VACANT */
+					vm_page_aflag_clear(m, PGA_CAPDIRTY);
+				} else {
+					KASSERT(mas.flags & PGA_CAPSTORE,
+					    ("Page already CAP-CLEAN?"));
+					/* PTE CAP-CLEAN; page -?> IDLE */
+
+					// XXXNWF Why?
+					if (flags & PMAP_CAPLOADGEN_UPDATETLB) {
+						pmap_invalidate_page(pmap, va,
+						    true);
+					}
+					PMAP_UNLOCK(pmap);
+					pmap_caploadgen_test_all_clean(m);
+					m = NULL;
+					goto out_unlocked;
+				}
+			}
+		} else {
+			/*
+			 * Page has caps; may as well mark it dirty if we're
+			 * allowed to store here.
+			 *
+			 * We could clear PGA_CAPDIRTY here, too, but it
+			 * probably doesn't get set often ough to merit.
+			 */
+			if ((tpte & ATTR_CDBM) && !(tpte & ATTR_SC)) {
+				pmap_set_bits(pte, ATTR_SC);
+			}
+		}
+
+		/*
+		 * On the fast path, where we're just updating the CLG bit, this
+		 * is the only store to the PTE we'll do.  On slower paths,
+		 * we'll do additional atomics to update other bits.  This is
+		 * probably a better state of affairs (1 + epsilon AMOs, no
+		 * retries) than we could otherwise easily get (either 1 LL/SC
+		 * CAS + epsilon retries or 1 AMOSWAP to a zero PTE + 1 store).
+		 */
+		pmap_update_pte_clg(pmap, pte);
+
+		if (flags & PMAP_CAPLOADGEN_UPDATETLB) {
+			pmap_invalidate_page(pmap, va, true);
+		}
+		m = NULL;
+	} else if (!(vm_page_astate_load(m).flags & PGA_CAPSTORE)) {
+		KASSERT(!(tpte & ATTR_CDBM), ("!PGA_CAPSTORE but CDBM?"));
+		KASSERT(!(tpte & ATTR_SC), ("!PGA_CAPSTORE but SC?"));
+
+		/*
+		 * For tag-independent faults, we might still raise a
+		 * fault for !PGA_CAPSTORE pages if the TLB is holding
+		 * a stale LCLG.  Since the page really ought to be
+		 * capability clean at this point, we should be OK to
+		 * arbitarily manipulate the LCLG, so appease the TLB.
+		 */
+		pmap_update_pte_clg(pmap, pte);
+		if (flags & PMAP_CAPLOADGEN_UPDATETLB) {
+			pmap_invalidate_page(pmap, va, true);
+		}
+
+		m = NULL;
+		res = PMAP_CAPLOADGEN_CLEAN;
+	} else if (vm_page_tryxbusy(m)) {
+		/*
+		 * OK, have page xbusy'd and so PGA_WRITEABLE is stable, so
+		 * report how aggressively it can be swept.
+		 */
+		if (pmap_page_is_write_mapped(m)) {
+			res = PMAP_CAPLOADGEN_SCAN_RW_XBUSIED;
+		} else {
+			res = PMAP_CAPLOADGEN_SCAN_RO_XBUSIED;
+		}
+	} else if (vm_page_wire_mapped(m)) {
+		/*
+		 * OK, couldn't xbusy the page but could wire it down.  It's
+		 * safe to do a RO sweep now, and hopefully that's enough to
+		 * clear the page for return to service.
+		 */
+		res = PMAP_CAPLOADGEN_SCAN_RO_WIRED;
+	} else {
+		/* Could neither xbusy nor wire this page; fall back to VM */
+		m = NULL;
+		res = PMAP_CAPLOADGEN_TEARDOWN;
+	}
+
+
+out:
+#if VM_NRESERVLEVEL > 0
+	/*
+	 * If we...
+	 *   are on the background scan (as indicated by EXCLUSIVE),
+	 *   are writing back a PTE (m != NULL),
+	 *   have superpages enabled,
+	 *   are at the last page of an L2 entry,
+	 * then see if we can put a superpage back together.
+	 */
+	if ((flags & PMAP_CAPLOADGEN_NONEWMAPS) &&
+	    (m != NULL) && pmap_ps_enabled(pmap) &&
+	    ((va & (L2_OFFSET - L3_OFFSET)) == (L2_OFFSET - L3_OFFSET))) {
+
+		KASSERT(lvl == 3,
+		    ("pmap_caploadgen_update superpage: lvl != 3"));
+		KASSERT((m->flags & PG_FICTITIOUS) == 0,
+		    ("pmap_caploadgen_update superpage: m fictitious"));
+
+		/*
+		 * Find the page holding our L3 PTEs.  If all L3 entries exist
+		 * and the superpage would come from a fully populated
+		 * reservation, attempt promotion.
+		 */
+		l2 = pmap_l2(pmap, va);
+		l2e = pmap_load(l2);
+		vm_page_t mpte = PHYS_TO_VM_PAGE(l2e & ~ATTR_MASK);
+		if ((mpte->ref_count == Ln_ENTRIES) &&
+		    (vm_reserv_level_iffullpop(m) == 0)) {
+
+			struct rwlock *lock = NULL;
+			pmap_promote_l2(pmap, l2, va, mpte, &lock);
+			if (lock != NULL)
+				rw_wunlock(lock);
+		}
+	}
+#endif
+
+	PMAP_UNLOCK(pmap);
+out_unlocked:
+
+	// printf("pcu exit pte=%016lx (%016lx) va=%016lx (%016lx) *mp=%p m=%p res=%d\n",
+	// 	oldpte, newpte, va, *pva, *mp, m, res);
+
+	if (*mp != NULL) {
+		if (flags & PMAP_CAPLOADGEN_XBUSIED) {
+			vm_page_xunbusy(*mp);
+		} else {
+			vm_page_unwire_in_situ(*mp);
+		}
+	}
+	*mp = m;
+
+	return res;
+}
+#endif
+#endif
 
 /*
  * This code maps large physical mmap regions into the
@@ -5204,6 +5807,7 @@ pmap_copy_page_tags(vm_page_t msrc, vm_page_t mdst)
 	vm_pointer_t src = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(msrc));
 	vm_pointer_t dst = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(mdst));
 
+	VM_PAGE_ASSERT_PGA_CAPMETA_COPY(msrc, mdst);
 #endif
 	pagecopy((void *)src, (void *)dst);
 }
@@ -5502,16 +6106,17 @@ pmap_remove_pages(pmap_t pmap)
 				/*
 				 * Update the vm_page_t clean/reference bits.
 				 */
-				if (pmap_pte_dirty(pmap, tpte)) {
-					switch (lvl) {
-					case 1:
-						for (mt = m; mt < &m[L2_SIZE / PAGE_SIZE]; mt++)
-							vm_page_dirty(mt);
+				switch (lvl) {
+				case 1:
+					if (!pmap_pte_dirty(pmap, tpte) &&
+					    !pmap_pte_capdirty(pmap, tpte))
 						break;
-					case 2:
-						vm_page_dirty(m);
-						break;
-					}
+					for (mt = m; mt < &m[L2_SIZE / PAGE_SIZE]; mt++)
+						pmap_page_dirty(pmap, tpte, mt);
+					break;
+				case 2:
+					pmap_page_dirty(pmap, tpte, m);
+					break;
 				}
 
 				CHANGE_PV_LIST_LOCK_TO_VM_PAGE(&lock, m);
@@ -5797,9 +6402,7 @@ retry:
 			while (!atomic_fcmpset_64(pte, &oldpte,
 			    (oldpte | ATTR_S1_AP_RW_BIT) & ~ATTR_SW_DBM))
 				cpu_spinwait();
-			if ((oldpte & ATTR_S1_AP_RW_BIT) ==
-			    ATTR_S1_AP(ATTR_S1_AP_RW))
-				vm_page_dirty(m);
+			pmap_page_dirty(pmap, oldpte, m);
 			pmap_invalidate_page(pmap, pv->pv_va, true);
 		}
 		PMAP_UNLOCK(pmap);
@@ -5867,14 +6470,13 @@ retry:
 		va = pv->pv_va;
 		pte = pmap_pte_exists(pmap, va, 2, __func__);
 		tpte = pmap_load(pte);
-		if (pmap_pte_dirty(pmap, tpte)) {
-			/*
-			 * Although "tpte" is mapping a 2MB page, because
-			 * this function is called at a 4KB page granularity,
-			 * we only update the 4KB page under test.
-			 */
-			vm_page_dirty(m);
-		}
+		/*
+		 * Although "tpte" is mapping a 2MB page, because
+		 * this function is called at a 4KB page granularity,
+		 * we update only the 4KB page under test.
+		 */
+		pmap_page_dirty(pmap, tpte, m);
+
 		if ((tpte & ATTR_AF) != 0) {
 			/*
 			 * Since this reference bit is shared by 512 4KB pages,
@@ -5934,8 +6536,7 @@ small_mappings:
 		}
 		pte = pmap_pte_exists(pmap, pv->pv_va, 3, __func__);
 		tpte = pmap_load(pte);
-		if (pmap_pte_dirty(pmap, tpte))
-			vm_page_dirty(m);
+		pmap_page_dirty(pmap, tpte, m);
 		if ((tpte & ATTR_AF) != 0) {
 			if ((tpte & ATTR_SW_WIRED) == 0) {
 				pmap_clear_bits(pte, ATTR_AF);
@@ -6064,7 +6665,7 @@ pmap_advise(pmap_t pmap, vm_offset_t sva, vm_offset_t eva, int advice)
 					 * dirty now.
 					 */
 					m = PHYS_TO_VM_PAGE(oldl3 & ~ATTR_MASK);
-					vm_page_dirty(m);
+					pmap_page_dirty(pmap, oldl3, m);
 				}
 				while (!atomic_fcmpset_long(l3, &oldl3,
 				    (oldl3 & ~ATTR_AF) |
@@ -6883,6 +7484,10 @@ pmap_mincore(pmap_t pmap, vm_offset_t addr, vm_paddr_t *pap)
 			val |= MINCORE_MODIFIED | MINCORE_MODIFIED_OTHER;
 		if ((tpte & ATTR_AF) == ATTR_AF)
 			val |= MINCORE_REFERENCED | MINCORE_REFERENCED_OTHER;
+#if __has_feature(capabilities)
+		if ((tpte & ATTR_CDBM) == ATTR_CDBM)
+			val |= MINCORE_CAPSTORE;
+#endif
 
 		pa = (tpte & ~ATTR_MASK) | (addr & mask);
 	} else {
@@ -7085,6 +7690,10 @@ pmap_activate_int(pmap_t pmap)
 
 	if ((pmap->pm_stage == PM_STAGE1 && pmap == PCPU_GET(curpmap)) ||
 	    (pmap->pm_stage == PM_STAGE2 && pmap == PCPU_GET(curvmpmap))) {
+#if __has_feature(capabilities)
+		if (pmap->pm_stage == PM_STAGE1)
+			pmap_update_user_clg(pmap);
+#endif
 		/*
 		 * Handle the possibility that the old thread was preempted
 		 * after an "ic" or "tlbi" instruction but before it performed
@@ -7104,9 +7713,12 @@ pmap_activate_int(pmap_t pmap)
 	 * Ensure that the store to curpmap is globally visible before the
 	 * load from asid_epoch is performed.
 	 */
-	if (pmap->pm_stage == PM_STAGE1)
+	if (pmap->pm_stage == PM_STAGE1) {
 		PCPU_SET(curpmap, pmap);
-	else
+#if __has_feature(capabilities)
+		pmap_update_user_clg(pmap);
+#endif
+	} else
 		PCPU_SET(curvmpmap, pmap);
 	dsb(ish);
 	epoch = COOKIE_TO_EPOCH(pmap->pm_cookie);
@@ -7346,6 +7958,23 @@ pmap_fault(pmap_t pmap, uint64_t esr, uint64_t far)
 		}
 		PMAP_UNLOCK(pmap);
 		break;
+#if __has_feature(capabilities)
+	case ISS_DATA_DFSC_LC_SC:
+		if ((esr & ISS_DATA_WnR) == 0)
+			return (rv);
+		PMAP_LOCK(pmap);
+		ptep = pmap_pte(pmap, far, &lvl);
+		if (ptep != NULL &&
+		    ((pte = pmap_load(ptep)) & ATTR_CDBM) != 0) {
+			if ((pte & ATTR_SC) == 0) {
+				pmap_set_bits(ptep, ATTR_SC);
+				pmap_invalidate_page(pmap, far, true);
+			}
+			rv = KERN_SUCCESS;
+		}
+		PMAP_UNLOCK(pmap);
+		break;
+#endif
 	case ISS_DATA_DFSC_TF_L0:
 	case ISS_DATA_DFSC_TF_L1:
 	case ISS_DATA_DFSC_TF_L2:

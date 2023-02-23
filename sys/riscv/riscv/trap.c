@@ -60,6 +60,9 @@ __FBSDID("$FreeBSD$");
 #if __has_feature(capabilities)
 #include <sys/sysargmap.h>
 #include <cheri/cheric.h>
+#ifdef CHERI_CAPREVOKE
+#include <vm/vm_cheri_revoke.h>
+#endif
 #endif
 
 #ifdef FPE
@@ -348,10 +351,35 @@ page_fault_handler(struct trapframe *frame, int usermode)
 
 	va = trunc_page(stval);
 
+#ifdef CHERI_CAPREVOKE
+	if ((frame->tf_scause == SCAUSE_LOAD_CAP_PAGE_FAULT) &&
+	    (va < VM_MAX_USER_ADDRESS)) {
+		if (vm_cheri_revoke_fault_visit(p->p_vmspace, va) ==
+		    VM_CHERI_REVOKE_FAULT_RESOLVED)
+			goto done;
+		else {
+			/*
+			 * vm_cheri_revoke_fault_visit calls
+			 * pmap_caploadgen_update, so if it's left us
+			 * UNRESOLVED, then there's no point in trying the pmap
+			 * again.
+			 */
+			ftype = VM_PROT_READ | VM_PROT_READ_CAP;
+			goto skip_pmap;
+		}
+	}
+#endif
+
 	if (frame->tf_scause == SCAUSE_STORE_PAGE_FAULT) {
 		ftype = VM_PROT_WRITE;
 	} else if (frame->tf_scause == SCAUSE_INST_PAGE_FAULT) {
 		ftype = VM_PROT_EXECUTE;
+#if __has_feature(capabilities)
+	} else if (frame->tf_scause == SCAUSE_STORE_AMO_CAP_PAGE_FAULT) {
+		ftype = VM_PROT_WRITE | VM_PROT_WRITE_CAP;
+	} else if (frame->tf_scause == SCAUSE_LOAD_CAP_PAGE_FAULT) {
+		ftype = VM_PROT_READ | VM_PROT_READ_CAP;
+#endif
 	} else {
 		ftype = VM_PROT_READ;
 	}
@@ -359,6 +387,9 @@ page_fault_handler(struct trapframe *frame, int usermode)
 	if (VIRT_IS_VALID(va) && pmap_fault(map->pmap, va, ftype))
 		goto done;
 
+#ifdef CHERI_CAPREVOKE
+skip_pmap:
+#endif
 	error = vm_fault_trap(map, va, ftype, VM_FAULT_NORMAL, &sig, &ucode);
 	if (error != KERN_SUCCESS) {
 		if (usermode) {
@@ -437,6 +468,10 @@ do_trap_supervisor(struct trapframe *frame)
 	case SCAUSE_STORE_PAGE_FAULT:
 	case SCAUSE_LOAD_PAGE_FAULT:
 	case SCAUSE_INST_PAGE_FAULT:
+#if __has_feature(capabilities)
+	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
+	case SCAUSE_LOAD_CAP_PAGE_FAULT:
+#endif
 		page_fault_handler(frame, 0);
 		break;
 	case SCAUSE_BREAKPOINT:
@@ -458,8 +493,6 @@ do_trap_supervisor(struct trapframe *frame)
 		    (__cheri_addr unsigned long)frame->tf_sepc);
 		break;
 #if __has_feature(capabilities)
-	case SCAUSE_LOAD_CAP_PAGE_FAULT:
-	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
 	case SCAUSE_CHERI:
 		if (curthread->td_pcb->pcb_onfault != 0) {
 			frame->tf_a[0] = EPROT;
@@ -530,6 +563,10 @@ do_trap_user(struct trapframe *frame)
 	case SCAUSE_STORE_PAGE_FAULT:
 	case SCAUSE_LOAD_PAGE_FAULT:
 	case SCAUSE_INST_PAGE_FAULT:
+#if __has_feature(capabilities)
+	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
+	case SCAUSE_LOAD_CAP_PAGE_FAULT:
+#endif
 		page_fault_handler(frame, 1);
 		break;
 	case SCAUSE_ECALL_USER:
@@ -564,20 +601,6 @@ do_trap_user(struct trapframe *frame)
 	case SCAUSE_LOAD_MISALIGNED:
 	case SCAUSE_STORE_MISALIGNED:
 		call_trapsignal(td, SIGBUS, BUS_ADRALN,
-		    (uintcap_t)frame->tf_stval, exception, 0);
-		userret(td, frame);
-		break;
-	case SCAUSE_LOAD_CAP_PAGE_FAULT:
-		if (log_user_cheri_exceptions)
-			dump_cheri_exception(frame);
-		call_trapsignal(td, SIGSEGV, SEGV_LOADTAG,
-		    (uintcap_t)frame->tf_stval, exception, 0);
-		userret(td, frame);
-		break;
-	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
-		if (log_user_cheri_exceptions)
-			dump_cheri_exception(frame);
-		call_trapsignal(td, SIGSEGV, SEGV_STORETAG,
 		    (uintcap_t)frame->tf_stval, exception, 0);
 		userret(td, frame);
 		break;

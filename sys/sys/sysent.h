@@ -124,6 +124,12 @@ struct sysentvec {
 	vm_offset_t	sv_minuser;	/* VM_MIN_ADDRESS */
 	vm_offset_t	sv_maxuser;	/* VM_MAXUSER_ADDRESS */
 	vm_offset_t	sv_usrstack;	/* USRSTACK */
+#ifdef CHERI_CAPREVOKE
+	vm_offset_t	sv_cheri_revoke_shadow_base;
+	vm_offset_t	sv_cheri_revoke_shadow_offset;
+	vm_offset_t	sv_cheri_revoke_shadow_length;
+	vm_offset_t	sv_cheri_revoke_info_page;
+#endif
 	size_t		sv_psstringssz;	/* PS_STRINGS size */
 	int		sv_stackprot;	/* vm protection for stack */
 	int		(*sv_copyout_strings)(struct image_params *,

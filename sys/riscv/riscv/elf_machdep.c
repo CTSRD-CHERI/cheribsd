@@ -59,6 +59,11 @@ __FBSDID("$FreeBSD$");
 #include <machine/elf.h>
 #include <machine/md_var.h>
 
+#ifdef CHERI_CAPREVOKE
+#include <cheri/revoke.h>
+#include <vm/vm_cheri_revoke.h>
+#endif
+
 #include "linker_if.h"
 
 static const char *riscv_machine_arch(struct proc *p);
@@ -163,6 +168,55 @@ elf64_register_sysvec(void *arg)
 		sv->sv_shared_page_base = SHAREDPAGE_SV39;
 		break;
 	}
+
+#ifdef CHERI_CAPREVOKE
+	/*
+	 * How big do we need the fine-grained memory shadow bitmap to be?  This
+	 * will be either 1 << 40 or 1 << 32 bytes.
+	 */
+	const size_t shadow_fine_mem_size =
+	    sv->sv_maxuser / 8 / VM_CHERI_REVOKE_GSZ_MEM_NOMAP;
+
+	/* Land the shadow somewhere awkward but easy */
+	const vaddr_t shadow_fine_mem_top =
+	    sv->sv_usrstack & ~(shadow_fine_mem_size - 1);
+
+	/*
+	 * OK, now figure out how much further down we need to go for the other
+	 * structures.
+	 */
+
+	/*
+	 * The coarse-grained memory bitmap will be either 1 << 32 or 1 << 24
+	 * bytes.
+	 */
+	const size_t shadow_coarse_mem_size =
+	    sv->sv_maxuser / 8 / VM_CHERI_REVOKE_GSZ_MEM_MAP;
+
+	const size_t shadow_required_size = shadow_fine_mem_size
+	    + shadow_coarse_mem_size
+	    + VM_CHERI_REVOKE_BSZ_OTYPE;
+
+	const size_t shadow_representable_size =
+	    CHERI_REPRESENTABLE_LENGTH(shadow_required_size);
+
+	sv->sv_cheri_revoke_shadow_length = shadow_representable_size;
+	sv->sv_cheri_revoke_shadow_base =
+	    shadow_fine_mem_top - shadow_representable_size;
+
+	/*
+	 * This places the fine-grained memory bitmap at the top, and so
+	 * naturally aligned, region within the representation-padded region
+	 * just defined.
+	 */
+	sv->sv_cheri_revoke_shadow_offset =
+	    shadow_representable_size - shadow_fine_mem_size;
+
+	/* It's ugly, but simple: manage the info page as a separate object */
+	sv->sv_cheri_revoke_info_page =
+	    sv->sv_cheri_revoke_shadow_base - PAGE_SIZE;
+#endif
+
 }
 SYSINIT(elf_register_sysvec, SI_SUB_VM, SI_ORDER_ANY, elf64_register_sysvec,
     &elf_freebsd_sysvec);

@@ -149,6 +149,7 @@ struct kaiocb {
 	uint64_t seqno;			/* (*) job number */
 	aio_cancel_fn_t *cancel_fn;	/* (a) backend cancel function */
 	aio_handle_fn_t *handle_fn;	/* (c) backend handle function */
+	volatile u_int refcount;
 	union {				/* Backend-specific data fields */
 		struct {		/* BIO backend */
 			int	nbio;	/* Number of remaining bios */
@@ -210,6 +211,11 @@ void	aio_complete(struct kaiocb *job, long status, int error);
 void	aio_schedule(struct kaiocb *job, aio_handle_fn_t *func);
 bool	aio_set_cancel_function(struct kaiocb *job, aio_cancel_fn_t *func);
 void	aio_switch_vmspace(struct kaiocb *job);
+
+#ifdef CHERI_CAPREVOKE
+struct vm_cheri_revoke_cookie;
+void aio_cheri_revoke(struct proc *, const struct vm_cheri_revoke_cookie *);
+#endif
 
 #else /* !_KERNEL */
 
