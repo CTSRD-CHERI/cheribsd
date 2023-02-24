@@ -74,7 +74,7 @@ __FBSDID("$FreeBSD$");
 #else
 	str	x10, [sp, #(TF_ELR)]
 #endif
-	stp	w11, w12, [PTRN(sp), #(TF_SPSR)]
+	stp	x11, x12, [PTRN(sp), #(TF_SPSR)]
 	mrs	PTR(18), PTRN(tpidr_el1)
 .endm
 
