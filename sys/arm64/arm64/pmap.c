@@ -1241,7 +1241,7 @@ pmap_bootstrap_dmap(vm_paddr_t min_pa)
 	dmap_base_cap = cheri_setbounds(dmap_base_cap,
 	    dmap_phys_max - dmap_phys_base);
 	dmap_base_cap = cheri_andperm(dmap_base_cap,
-	    CHERI_PERMS_KERNEL_CODE | CHERI_PERMS_KERNEL_DATA);
+	    CHERI_PERMS_KERNEL_DATA);
 #endif
 
 	cpu_tlb_flushID();

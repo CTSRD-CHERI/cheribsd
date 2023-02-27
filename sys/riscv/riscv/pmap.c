@@ -610,10 +610,8 @@ pmap_bootstrap_dmap(vm_pointer_t kern_l1, vm_paddr_t min_pa, vm_paddr_t max_pa)
 	    DMAP_MIN_ADDRESS);
 	dmap_capability = cheri_setbounds(dmap_capability,
 	    dmap_phys_max - dmap_phys_base);
-
-	/* XXX: Is this the right set of permissions? */
 	dmap_capability = cheri_andperm(dmap_capability,
-	    CHERI_PERMS_KERNEL_CODE | CHERI_PERMS_KERNEL_DATA);
+	    CHERI_PERMS_KERNEL_DATA);
 #else
 	dmap_max_addr = va;
 #endif
