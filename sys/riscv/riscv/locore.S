@@ -401,9 +401,11 @@ va:
 	mv	s1, a1
 
 	/* Initialize cap relocs. */
-	cmove	ca0, cs0
+	li	t0, CHERI_PERMS_KERNEL_DATA
+	candperm ca0, cs0, t0
 	cllc	ca1, _C_LABEL(init_cap_relocs)
-	cmove	ca2, cs0
+	li	t0, CHERI_PERMS_KERNEL_CODE
+	candperm ca2, cs0, t0
 	cjalr	ca1
 
 	/* Initialize capabilities. */
