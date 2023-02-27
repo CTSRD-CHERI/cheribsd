@@ -17,8 +17,6 @@ SUBDIR_BOOTSTRAP= \
 	libcompiler_rt \
 	${_libcheribsdtest_dynamic} \
 	${_libclang_rt} \
-	libgcc_eh \
-	libgcc_s \
 	${_libcplusplus} \
 	${_libcxxrt} \
 	libelf \
