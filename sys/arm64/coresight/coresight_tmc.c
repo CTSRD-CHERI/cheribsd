@@ -125,6 +125,8 @@ tmc_start(device_t dev)
 
 	sc = device_get_softc(dev);
 
+printf("%s\n", __func__);
+
 	if (bus_read_4(sc->res[0], TMC_CTL) & CTL_TRACECAPTEN)
 		return (-1);
 
@@ -139,6 +141,8 @@ tmc_start(device_t dev)
 
 	if ((bus_read_4(sc->res[0], TMC_CTL) & CTL_TRACECAPTEN) == 0)
 		panic("Not enabled\n");
+
+printf("%s: enabled\n", __func__);
 
 	return (0);
 }
@@ -162,6 +166,28 @@ tmc_stop(device_t dev)
 	return (0);
 }
 
+static void
+tmc_dump(device_t dev)
+{
+	struct tmc_softc *sc;
+	uint32_t reg;
+
+	sc = device_get_softc(dev);
+
+	reg = bus_read_4(sc->res[0], TMC_DEVID);
+	if ((reg & DEVID_CONFIGTYPE_M) == DEVID_CONFIGTYPE_ETR)
+		printf("%s%d: STS %x, CTL %x, RSZ %x, RRP %x, RWP %x, "
+		    "LBUFLEVEL %x, CBUFLEVEL %x\n", __func__,
+		    device_get_unit(dev),
+		    bus_read_4(sc->res[0], TMC_STS),
+		    bus_read_4(sc->res[0], TMC_CTL),
+		    bus_read_4(sc->res[0], TMC_RSZ),
+		    bus_read_4(sc->res[0], TMC_RRP),
+		    bus_read_4(sc->res[0], TMC_RWP),
+		    bus_read_4(sc->res[0], TMC_CBUFLEVEL),
+		    bus_read_4(sc->res[0], TMC_LBUFLEVEL));
+}
+
 static int
 tmc_configure_etf(device_t dev)
 {
@@ -178,16 +204,7 @@ tmc_configure_etf(device_t dev)
 	bus_write_4(sc->res[0], TMC_FFCR, FFCR_EN_FMT | FFCR_EN_TI);
 
 	tmc_start(dev);
-
-	dprintf("%s: STS %x, CTL %x, RSZ %x, RRP %x, RWP %x, "
-	    "LBUFLEVEL %x, CBUFLEVEL %x\n", __func__,
-	    bus_read_4(sc->res[0], TMC_STS),
-	    bus_read_4(sc->res[0], TMC_CTL),
-	    bus_read_4(sc->res[0], TMC_RSZ),
-	    bus_read_4(sc->res[0], TMC_RRP),
-	    bus_read_4(sc->res[0], TMC_RWP),
-	    bus_read_4(sc->res[0], TMC_CBUFLEVEL),
-	    bus_read_4(sc->res[0], TMC_LBUFLEVEL));
+	tmc_dump(dev);
 
 	return (0);
 }
@@ -207,6 +224,7 @@ tmc_configure_etr(device_t dev, struct endpoint *endp,
 
 	/* Configure TMC */
 	bus_write_4(sc->res[0], TMC_MODE, MODE_CIRCULAR_BUFFER);
+	//bus_write_4(sc->res[0], TMC_MODE, MODE_SW_FIFO);
 
 	reg = AXICTL_PROT_CTRL_BIT1;
 	reg |= AXICTL_WRBURSTLEN_16;
@@ -317,6 +335,7 @@ tmc_configure(device_t dev, struct coresight_event *event)
 			paddr = VM_PAGE_TO_PHYS(pages[curpg++]);
 		}
 
+printf("%s: paddr %lx\n", __func__, paddr);
 		*ptr++ = ETR_SG_ENTRY(paddr, type);
 
 		/* Take next directory page. */
@@ -332,11 +351,22 @@ tmc_configure(device_t dev, struct coresight_event *event)
 	paddr = VM_PAGE_TO_PHYS(pages[curpg]);
 	*ptr++ = ETR_SG_ENTRY(paddr, ETR_SG_ET_LAST);
 
+#if 1
+	/* Dump */
+	ptr = (sgte_t *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(pt_dir[0]));
+	for (i = 0; i < nentries; i++)
+		printf("%s: entry %x\n", __func__, *ptr++);
+#endif
+
 	printf("%s: event->etr.pages %p\n", __func__, event->etr.pages);
 	printf("%s: event->etr.npages %d\n", __func__, event->etr.npages);
 
-	bus_write_4(sc->res[0], TMC_DBALO, event->etr.low);
-	bus_write_4(sc->res[0], TMC_DBAHI, event->etr.high);
+	uintptr_t pbase;
+
+	pbase = VM_PAGE_TO_PHYS(pt_dir[0]);
+
+	bus_write_4(sc->res[0], TMC_DBALO, pbase & 0xffffffff);
+	bus_write_4(sc->res[0], TMC_DBAHI, pbase >> 32);
 
 	return (0);
 }
@@ -444,6 +474,7 @@ tmc_intr(void *arg)
 	/* TODO */
 
 	printf("%s\n", __func__);
+	panic("interrupt received");
 }
 
 static int
@@ -527,6 +558,7 @@ static device_method_t tmc_methods[] = {
 	DEVMETHOD(coresight_configure,	tmc_configure),
 	DEVMETHOD(coresight_enable,	tmc_enable),
 	DEVMETHOD(coresight_disable,	tmc_disable),
+	DEVMETHOD(coresight_dump,	tmc_dump),
 	DEVMETHOD(coresight_read,	tmc_read),
 	DEVMETHOD_END
 };

@@ -60,9 +60,12 @@ coresight_event_init(struct hwt *hwt)
 	event->etr.started = 0;
 	event->etr.low = 0;
 	event->etr.high = 0;
+	event->etr.flags = ETR_FLAG_ALLOCATE;
 	event->etr.pages = hwt->pages;
 	event->etr.npages = hwt->npages;
+	event->etr.bufsize = hwt->npages * PAGE_SIZE;
 	event->excp_level = 0; /* User level */
+	event->excp_level = 1; /* Kernel */
 	event->src = CORESIGHT_ETMV4;
 	event->sink = CORESIGHT_TMC_ETR;
 
@@ -73,10 +76,36 @@ coresight_event_init(struct hwt *hwt)
 
 	event->etm.trace_id = 0x10;
 	coresight_init_event(hwt->cpu_id, event);
-};
+}
+
+static void
+coresight_event_start(struct hwt *hwt)
+{
+	struct coresight_event *event;
+
+	printf("%s: cpu_id %d\n", __func__, hwt->cpu_id);
+
+	event = &cs_event[hwt->cpu_id];
+
+	coresight_enable(hwt->cpu_id, event);
+}
+
+static void
+coresight_event_dump(struct hwt *hwt)
+{
+	struct coresight_event *event;
+
+	//printf("%s: cpu_id %d\n", __func__, hwt->cpu_id);
+
+	event = &cs_event[hwt->cpu_id];
+
+	coresight_dump(hwt->cpu_id, event);
+}
 
 static struct hwt_backend_ops coresight_ops = {
 	.hwt_event_init = coresight_event_init,
+	.hwt_event_start = coresight_event_start,
+	.hwt_event_dump = coresight_event_dump,
 };
 
 int

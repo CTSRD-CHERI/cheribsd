@@ -161,5 +161,6 @@ int coresight_init_event(int cpu, struct coresight_event *event);
 void coresight_enable(int cpu, struct coresight_event *event);
 void coresight_disable(int cpu, struct coresight_event *event);
 void coresight_read(int cpu, struct coresight_event *event);
+void coresight_dump(int cpu, struct coresight_event *event);
 
 #endif /* !_ARM64_CORESIGHT_CORESIGHT_H_ */
