@@ -40,7 +40,7 @@
 #ifndef _SYS_SYSTM_H_
 #define	_SYS_SYSTM_H_
 
-#include <sys/cdefs.h>
+#include <sys/types.h>
 #include <sys/callout.h>
 #include <sys/kassert.h>
 #include <sys/queue.h>
