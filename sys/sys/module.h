@@ -244,9 +244,13 @@ void	module_register_init(const void *);
 int	module_register(const struct moduledata *, struct linker_file *);
 module_t	module_lookupbyname(const char *);
 module_t	module_lookupbyid(int);
+module_t	module_lookupbyptr(uintptr_t);
 int	module_quiesce(module_t);
 void	module_reference(module_t);
 void	module_release(module_t);
+#ifdef __CHERI_PURE_CAPABILITY__
+uintcap_t module_capability(module_t mod, uintcap_t func);
+#endif
 int	module_unload(module_t);
 int	module_getid(module_t);
 module_t	module_getfnext(module_t);
