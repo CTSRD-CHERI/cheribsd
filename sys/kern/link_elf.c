@@ -1315,6 +1315,9 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 		goto out;
 #endif
 	link_elf_reloc_local(lf);
+	error = linker_load_policy(lf);
+	if (error != 0)
+		goto out;
 
 	VOP_UNLOCK(nd.ni_vp);
 	error = linker_load_dependencies(lf);

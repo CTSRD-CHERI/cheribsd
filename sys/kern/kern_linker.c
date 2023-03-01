@@ -637,6 +637,7 @@ linker_make_file(const char *pathname, linker_class_t lc)
 	lf->refs = 1;
 	lf->userrefs = 0;
 	lf->flags = 0;
+	lf->compartment = false;
 	lf->filename = strdup(filename, M_LINKER);
 	lf->pathname = strdup(pathname, M_LINKER);
 	LINKER_GET_NEXT_FILE_ID(lf->id);
@@ -2259,6 +2260,30 @@ linker_load_module(const char *kldname, const char *modname,
 	} while (0);
 	free(pathname, M_LINKER);
 	return (error);
+}
+
+int
+linker_load_policy(linker_file_t lf)
+{
+	struct mod_metadata **start, **stop, **mdp, *mp;
+	const struct mod_policy *policy;
+
+	if (linker_file_lookup_set(lf, MDT_SETNAME, &start, &stop, NULL) != 0)
+		return (0);
+
+	policy = NULL;
+	for (mdp = start; mdp < stop; mdp++) {
+		mp = *mdp;
+		if (mp->md_type != MDT_POLICY)
+			continue;
+		policy = (const struct mod_policy *)mp->md_data;
+		break;
+	}
+	if (policy == NULL)
+		return (0);
+
+	lf->compartment = policy->mp_compartment;
+	return (0);
 }
 
 /*
