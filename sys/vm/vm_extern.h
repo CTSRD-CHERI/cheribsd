@@ -43,6 +43,7 @@ struct vmem;
 
 struct cdev;
 struct cdevsw;
+struct compartment;
 struct domainset;
 
 /* These operate on kernel virtual addresses only. */
@@ -136,6 +137,8 @@ void vm_thread_dispose(struct thread *td);
 int vm_thread_new(struct thread *td, int pages);
 void vm_thread_stack_back(struct domainset *ds, vm_offset_t kaddr,
     vm_page_t ma[], int npages, int req_class);
+int vm_compartment_new(struct compartment *compartment);
+void vm_compartment_dispose(struct compartment *compartment);
 u_int vm_active_count(void);
 u_int vm_inactive_count(void);
 u_int vm_laundry_count(void);

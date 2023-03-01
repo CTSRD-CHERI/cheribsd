@@ -42,6 +42,7 @@
 #ifdef _KERNEL
 #include <sys/_eventhandler.h>
 #endif
+#include <sys/compartment.h>
 #include <sys/condvar.h>
 #ifndef _KERNEL
 #include <sys/filedesc.h>
@@ -390,6 +391,7 @@ struct thread {
 	int		td_pmcpend;
 	void		*td_remotereq;	/* (c) dbg remote request. */
 	off_t		td_ktr_io_lim;	/* (k) limit for ktrace file size */
+	TAILQ_HEAD(, compartment) td_compartments;	/* (k) Thread compartments. */
 #ifdef EPOCH_TRACE
 	SLIST_HEAD(, epoch_tracker) td_epochs;
 #endif
@@ -1288,6 +1290,7 @@ void	cpu_thread_swapout(struct thread *);
 struct	thread *thread_alloc(int pages);
 int	thread_alloc_stack(struct thread *, int pages);
 int	thread_check_susp(struct thread *td, bool sleep);
+void	thread_free_compartments(struct thread *td);
 void	thread_cow_get_proc(struct thread *newtd, struct proc *p);
 void	thread_cow_get(struct thread *newtd, struct thread *td);
 void	thread_cow_free(struct thread *td);

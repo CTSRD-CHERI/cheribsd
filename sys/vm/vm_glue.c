@@ -72,6 +72,7 @@
 #include <sys/msan.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
+#include <sys/compartment.h>
 #include <sys/racct.h>
 #include <sys/refcount.h>
 #include <sys/resourcevar.h>
@@ -359,6 +360,37 @@ vm_thread_stack_dispose(vm_pointer_t ks, int pages)
 	    (pages + KSTACK_GUARD_PAGES) * PAGE_SIZE);
 }
 
+static vm_pointer_t
+vm_kstack_new(int pages)
+{
+	vm_pointer_t ks;
+
+	ks = 0;
+	if (pages == kstack_pages && kstack_cache != NULL)
+		ks = (vm_pointer_t)uma_zalloc(kstack_cache, M_NOWAIT);
+
+	/*
+	 * Ensure that kstack objects can draw pages from any memory
+	 * domain.  Otherwise a local memory shortage can block a process
+	 * swap-in.
+	 */
+	if (ks == 0)
+		ks = vm_thread_stack_create(DOMAINSET_PREF(PCPU_GET(domain)),
+		    pages);
+
+	return (ks);
+}
+
+static void
+vm_kstack_dispose(vm_pointer_t ks, int pages)
+{
+
+	if (pages == kstack_pages)
+		uma_zfree(kstack_cache, (void *)ks);
+	else
+		vm_thread_stack_dispose(ks, pages);
+}
+
 /*
  * Allocate the kernel stack for a new thread.
  */
@@ -373,20 +405,10 @@ vm_thread_new(struct thread *td, int pages)
 	else if (pages > KSTACK_MAX_PAGES)
 		pages = KSTACK_MAX_PAGES;
 
-	ks = 0;
-	if (pages == kstack_pages && kstack_cache != NULL)
-		ks = (vm_pointer_t)uma_zalloc(kstack_cache, M_NOWAIT);
-
-	/*
-	 * Ensure that kstack objects can draw pages from any memory
-	 * domain.  Otherwise a local memory shortage can block a process
-	 * swap-in.
-	 */
-	if (ks == 0)
-		ks = vm_thread_stack_create(DOMAINSET_PREF(PCPU_GET(domain)),
-		    pages);
+	ks = vm_kstack_new(pages);
 	if (ks == 0)
 		return (0);
+
 	td->td_kstack = ks;
 	td->td_kstack_pages = pages;
 	kasan_mark((void *)ks, ptoa(pages), ptoa(pages), 0);
@@ -408,10 +430,35 @@ vm_thread_dispose(struct thread *td)
 	td->td_kstack = 0;
 	td->td_kstack_pages = 0;
 	kasan_mark((void *)ks, 0, ptoa(pages), KASAN_KSTACK_FREED);
-	if (pages == kstack_pages)
-		uma_zfree(kstack_cache, (void *)ks);
-	else
-		vm_thread_stack_dispose(ks, pages);
+	vm_kstack_dispose(ks, pages);
+}
+
+/*
+ * Allocate the kernel stack for a new compartment.
+ */
+int
+vm_compartment_new(struct compartment *compartment)
+{
+	vm_pointer_t ks;
+
+	ks = vm_kstack_new(kstack_pages);
+	if (ks == 0)
+		return (0);
+
+	compartment->c_kstack = ks;
+	compartment->c_kstackptr = ks + kstack_pages * PAGE_SIZE;
+	return (1);
+}
+
+void
+vm_compartment_dispose(struct compartment *compartment)
+{
+	vm_pointer_t ks;
+
+	ks = compartment->c_kstack;
+	compartment->c_kstack = 0;
+	compartment->c_kstackptr = 0;
+	vm_kstack_dispose(ks, kstack_pages);
 }
 
 /*

@@ -42,6 +42,8 @@
 #include <sys/module.h>
 #include <sys/linker.h>
 
+#include <cheri/cheric.h>
+
 static MALLOC_DEFINE(M_MODULE, "module", "module data structures");
 
 struct module {
@@ -208,6 +210,20 @@ module_release(module_t mod)
 	}
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+uintcap_t
+module_capability(module_t mod, uintcap_t func)
+{
+	struct linker_file *lf;
+	uintcap_t cap;
+
+	lf = mod->file;
+	cap = cheri_setaddress((uintcap_t)lf->address, func);
+	cap = cheri_andperm(cap, cheri_getperm(func));
+	return (cheri_sealentry(cheri_capmode(cap)));
+}
+#endif
+
 module_t
 module_lookupbyname(const char *name)
 {
@@ -235,6 +251,24 @@ module_lookupbyid(int modid)
                 if (mod->id == modid)
                         return(mod);
         return (NULL);
+}
+
+module_t
+module_lookupbyptr(uintptr_t ptr)
+{
+	struct linker_file *file;
+	module_t mod;
+
+        MOD_LOCK_ASSERT;
+
+	TAILQ_FOREACH(mod, &modules, link) {
+		file = mod->file;
+		if (ptr >= (uintptr_t)file->address &&
+		    ptr < (uintptr_t)file->address + file->size) {
+			break;
+		}
+	}
+	return (mod);
 }
 
 int
