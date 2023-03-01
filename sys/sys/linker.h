@@ -74,6 +74,7 @@ struct linker_file {
     int			flags;
 #define LINKER_FILE_LINKED	0x1	/* file has been fully linked */
 #define LINKER_FILE_MODULES	0x2	/* file has >0 modules at preload */
+    bool		compartment;	/* execute code in a compartment */
     TAILQ_ENTRY(linker_file) link;	/* list of all loaded files */
     char*		filename;	/* file which was loaded */
     char*		pathname;	/* file name with full path */
@@ -172,6 +173,7 @@ int linker_file_function_listall(linker_file_t,
  */
 int linker_add_class(linker_class_t _cls);
 int linker_file_unload(linker_file_t _file, int flags);
+int linker_load_policy(linker_file_t lf);
 int linker_load_dependencies(linker_file_t _lf);
 linker_file_t linker_make_file(const char* _filename, linker_class_t _cls);
 
