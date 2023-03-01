@@ -277,4 +277,5 @@ static moduledata_t zlib_mod = {
 	0
 };
 DECLARE_MODULE(zlib, zlib_mod, SI_SUB_DRIVERS, SI_ORDER_FIRST);
+MODULE_POLICY(zlib, true);
 MODULE_VERSION(zlib, 1);
