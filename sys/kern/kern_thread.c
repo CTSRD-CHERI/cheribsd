@@ -38,6 +38,7 @@
 #include <sys/msan.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
+#include <sys/compartment.h>
 #include <sys/bitstring.h>
 #include <sys/epoch.h>
 #include <sys/rangelock.h>
@@ -809,6 +810,7 @@ thread_recycle(struct thread *td, int pages)
 	if (td->td_kstack == 0 || td->td_kstack_pages != pages) {
 		if (td->td_kstack != 0)
 			vm_thread_dispose(td);
+		thread_free_compartments(td2);
 		if (!vm_thread_new(td, pages))
 			return (ENOMEM);
 		cpu_thread_alloc(td);
@@ -816,6 +818,17 @@ thread_recycle(struct thread *td, int pages)
 	kasan_thread_alloc(td);
 	kmsan_thread_alloc(td);
 	return (0);
+}
+
+void
+thread_free_compartments(struct thread *td)
+{
+	struct compartment *compartment, *tmpcompartment;
+
+	TAILQ_FOREACH_SAFE(compartment, &td->td_compartments, c_next,
+	    tmpcompartment) {
+		compartment_destroy(compartment);
+	}
 }
 
 /*
@@ -832,6 +845,7 @@ thread_free_batched(struct thread *td)
 	cpu_thread_free(td);
 	if (td->td_kstack != 0)
 		vm_thread_dispose(td);
+	thread_free_compartments(td);
 	callout_drain(&td->td_slpcallout);
 	/*
 	 * Freeing handled by the caller.
@@ -1078,6 +1092,7 @@ thread_link(struct thread *td, struct proc *p)
 	LIST_INIT(&td->td_contested);
 	LIST_INIT(&td->td_lprof[0]);
 	LIST_INIT(&td->td_lprof[1]);
+	TAILQ_INIT(&td->td_compartments);
 #ifdef EPOCH_TRACE
 	SLIST_INIT(&td->td_epochs);
 #endif
