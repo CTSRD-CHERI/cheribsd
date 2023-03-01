@@ -42,7 +42,8 @@
  * assembly source code.
  */
 #define	CHERI_PERM_GLOBAL			(1 << 0)	/* 0x00000001 */
-#define	CHERI_PERM_EXECUTIVE			(1 << 1)	/* 0x00000002 */
+#define	CHERI_PERM_EXECUTIVE_BIT		1
+#define	CHERI_PERM_EXECUTIVE			(1 << CHERI_PERM_EXECUTIVE_BIT)	/* 0x00000002 */
 #define	CHERI_PERM_SW0				(1 << 2)	/* 0x00000004 */
 #define	CHERI_PERM_SW1				(1 << 3)	/* 0x00000008 */
 #define	CHERI_PERM_SW2				(1 << 4)	/* 0x00000010 */
