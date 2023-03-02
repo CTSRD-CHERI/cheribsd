@@ -224,7 +224,6 @@ tmc_configure_etr(device_t dev, struct endpoint *endp,
 
 	/* Configure TMC */
 	bus_write_4(sc->res[0], TMC_MODE, MODE_CIRCULAR_BUFFER);
-	//bus_write_4(sc->res[0], TMC_MODE, MODE_SW_FIFO);
 
 	reg = AXICTL_PROT_CTRL_BIT1;
 	reg |= AXICTL_WRBURSTLEN_16;
@@ -316,32 +315,36 @@ tmc_configure(device_t dev, struct coresight_event *event)
 	vm_paddr_t paddr;
 	int sgtentry;
 	sgte_t *ptr;
-	int dirpg;
+	uint32_t dirpg;
 	int curpg;
 	int type;
 
 	sgtentry = 0;
-	dirpg = 0;
 	curpg = 0;
-
-	ptr = (sgte_t *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(pt_dir[dirpg]));
+	ptr = (sgte_t *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(pt_dir[0]));
+	dirpg = 1;
 
 	for (i = 0; i < nentries - 1; i++) {
+		//printf("entry %d dirpg %d\n", i, dirpg);
+
 		if (sgtentry == (SG_PT_ENTIRES_PER_PAGE - 1)) {
 			type = ETR_SG_ET_LINK;
-			paddr = VM_PAGE_TO_PHYS(pt_dir[dirpg++]);
+			paddr = VM_PAGE_TO_PHYS(pt_dir[dirpg]);
 		} else {
 			type = ETR_SG_ET_NORMAL;
-			paddr = VM_PAGE_TO_PHYS(pages[curpg++]);
+			paddr = VM_PAGE_TO_PHYS(pages[curpg]);
+			curpg++;
 		}
 
-printf("%s: paddr %lx\n", __func__, paddr);
+		//printf("%s: entry (%d/%d) type %d dirpg %d curpg %d paddr %lx\n", __func__, i, nentries, type, dirpg, curpg, paddr);
+
 		*ptr++ = ETR_SG_ENTRY(paddr, type);
 
 		/* Take next directory page. */
 		if (type == ETR_SG_ET_LINK) {
 			ptr = (sgte_t *)PHYS_TO_DMAP(
 				VM_PAGE_TO_PHYS(pt_dir[dirpg]));
+			dirpg++;
 		}
 
 		sgtentry = (sgtentry + 1) % SG_PT_ENTIRES_PER_PAGE;
@@ -349,9 +352,9 @@ printf("%s: paddr %lx\n", __func__, paddr);
 
 	/* Last entry. */
 	paddr = VM_PAGE_TO_PHYS(pages[curpg]);
-	*ptr++ = ETR_SG_ENTRY(paddr, ETR_SG_ET_LAST);
+	*ptr = ETR_SG_ENTRY(paddr, ETR_SG_ET_LAST);
 
-#if 1
+#if 0
 	/* Dump */
 	ptr = (sgte_t *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(pt_dir[0]));
 	for (i = 0; i < nentries; i++)
