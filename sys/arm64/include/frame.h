@@ -54,10 +54,11 @@ struct trapframe {
 #endif
 	uint64_t tf_spsr;
 	uint64_t tf_esr;
+	uint64_t tf_far;
 #if __has_feature(capabilities)
+	uint64_t tf_pad;
 	uintcap_t tf_x[30];
 #else
-	uint64_t pad; /* struct must be 16B aligned */
 	uint64_t tf_x[30];
 #endif
 };
