@@ -321,6 +321,7 @@ virtdone:
 	str	PTR(25), [PTR(0), #BP_KERN_STACK]
 	str	x27, [PTR(0), #BP_KERN_TTBR0]
 	str	x23, [PTR(0), #BP_BOOT_EL]
+	str	x4,  [PTR(0), #BP_HCR_EL2]
 
 	/* trace back starts here */
 	mov	fp, #0
@@ -474,8 +475,8 @@ LENTRY(drop_to_el1)
 	 */
 	tst	x4, #HCR_E2H
 	mov	x3, #CPTR_RES1	/* HCR_E2H == 0 */
-	mov	x4, #CPTR_FPEN	/* HCR_E2H == 1 */
-	csel	x2, x3, x4, eq
+	mov	x5, #CPTR_FPEN	/* HCR_E2H == 1 */
+	csel	x2, x3, x5, eq
 	msr	cptr_el2, x2
 
 #if __has_feature(capabilities)
