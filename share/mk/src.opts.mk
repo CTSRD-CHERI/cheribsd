@@ -415,6 +415,10 @@ __DEFAULT_NO_OPTIONS+=OPENMP
 BROKEN_OPTIONS+=OPENMP
 .endif
 
+.if ${__T} == "powerpc"
+BROKEN_OPTIONS+= ZFS
+.endif
+
 .include <bsd.mkopt.mk>
 
 .if ${.MAKE.OS} != "FreeBSD"
