@@ -110,6 +110,28 @@ hwt_event_start(struct hwt *hwt)
 }
 
 static int
+hwt_event_enable(struct hwt *hwt)
+{
+
+	printf("%s\n", __func__);
+
+	hwt_backend->ops->hwt_event_enable(hwt);
+
+	return (0);
+}
+
+static int
+hwt_event_disable(struct hwt *hwt)
+{
+
+	printf("%s\n", __func__);
+
+	hwt_backend->ops->hwt_event_disable(hwt);
+
+	return (0);
+}
+
+static int
 hwt_event_dump(struct hwt *hwt)
 {
 
@@ -473,7 +495,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 void
 hwt_switch_in(struct thread *td)
 {
-	//struct hwt_proc *hp;
+	struct hwt_proc *hp;
 	struct proc *p;
 
 	p = td->td_proc;
@@ -481,9 +503,11 @@ hwt_switch_in(struct thread *td)
 	if ((p->p_flag2 & P2_HWT) == 0)
 		return;
 
-	//hp = hwt_lookup_proc(p);
+	hp = hwt_lookup_proc(p);
 
 	//dprintf("%s: hp %p\n", __func__, hp);
+
+	hwt_event_enable(hp->hwt);
 }
 
 void
@@ -501,6 +525,7 @@ hwt_switch_out(struct thread *td)
 
 	//dprintf("%s: hp %p\n", __func__, hp);
 
+	hwt_event_disable(hp->hwt);
 	hwt_event_dump(hp->hwt);
 }
 

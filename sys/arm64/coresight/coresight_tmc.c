@@ -412,7 +412,7 @@ tmc_init(device_t dev)
 }
 
 static int
-tmc_enable(device_t dev, struct endpoint *endp,
+tmc_start_event(device_t dev, struct endpoint *endp,
     struct coresight_event *event)
 {
 	struct tmc_softc *sc;
@@ -446,7 +446,7 @@ tmc_enable(device_t dev, struct endpoint *endp,
 }
 
 static void
-tmc_disable(device_t dev, struct endpoint *endp,
+tmc_stop_event(device_t dev, struct endpoint *endp,
     struct coresight_event *event)
 {
 	struct tmc_softc *sc;
@@ -481,8 +481,7 @@ tmc_intr(void *arg)
 }
 
 static int
-tmc_read(device_t dev, struct endpoint *endp,
-    struct coresight_event *event)
+tmc_read(device_t dev, struct endpoint *endp, struct coresight_event *event)
 {
 	struct tmc_softc *sc;
 	uint32_t cur_ptr;
@@ -559,8 +558,8 @@ static device_method_t tmc_methods[] = {
 	/* Coresight interface */
 	DEVMETHOD(coresight_init,	tmc_init),
 	DEVMETHOD(coresight_configure,	tmc_configure),
-	DEVMETHOD(coresight_enable,	tmc_enable),
-	DEVMETHOD(coresight_disable,	tmc_disable),
+	DEVMETHOD(coresight_start,	tmc_start_event),
+	DEVMETHOD(coresight_stop,	tmc_stop_event),
 	DEVMETHOD(coresight_dump,	tmc_dump),
 	DEVMETHOD(coresight_read,	tmc_read),
 	DEVMETHOD_END

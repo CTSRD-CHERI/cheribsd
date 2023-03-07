@@ -64,6 +64,9 @@ struct hwt_owner {
 struct hwt_backend_ops {
 	void (*hwt_event_init)(struct hwt *hwt);
 	void (*hwt_event_start)(struct hwt *hwt);
+	void (*hwt_event_stop)(struct hwt *hwt);
+	void (*hwt_event_enable)(struct hwt *hwt);
+	void (*hwt_event_disable)(struct hwt *hwt);
 	void (*hwt_event_dump)(struct hwt *hwt);
 };
 
