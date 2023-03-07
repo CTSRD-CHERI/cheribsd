@@ -171,19 +171,29 @@ tmc_dump(device_t dev)
 {
 	struct tmc_softc *sc;
 	uint32_t reg;
+	size_t hi, lo;
+	size_t rrp, rwp;
 
 	sc = device_get_softc(dev);
 
+	lo = bus_read_4(sc->res[0], TMC_RRP);
+	hi = bus_read_4(sc->res[0], TMC_RRPHI);
+	rrp = lo | (hi << 32);
+
+	lo = bus_read_4(sc->res[0], TMC_RWP);
+	hi = bus_read_4(sc->res[0], TMC_RWPHI);
+	rwp = lo | (hi << 32);
+
 	reg = bus_read_4(sc->res[0], TMC_DEVID);
 	if ((reg & DEVID_CONFIGTYPE_M) == DEVID_CONFIGTYPE_ETR)
-		printf("%s%d: STS %x, CTL %x, RSZ %x, RRP %x, RWP %x, "
+		printf("%s%d: STS %x, CTL %x, RSZ %x, RRP %lx, RWP %lx, "
 		    "LBUFLEVEL %x, CBUFLEVEL %x\n", __func__,
 		    device_get_unit(dev),
 		    bus_read_4(sc->res[0], TMC_STS),
 		    bus_read_4(sc->res[0], TMC_CTL),
 		    bus_read_4(sc->res[0], TMC_RSZ),
-		    bus_read_4(sc->res[0], TMC_RRP),
-		    bus_read_4(sc->res[0], TMC_RWP),
+		    rrp,
+		    rwp,
 		    bus_read_4(sc->res[0], TMC_CBUFLEVEL),
 		    bus_read_4(sc->res[0], TMC_LBUFLEVEL));
 }
