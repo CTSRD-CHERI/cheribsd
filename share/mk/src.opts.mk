@@ -95,7 +95,6 @@ __DEFAULT_YES_OPTIONS = \
     EFI \
     ELFTOOLCHAIN_BOOTSTRAP \
     EXAMPLES \
-    FDT \
     FILE \
     FINGER \
     FLOPPY \
@@ -302,6 +301,12 @@ BROKEN_OPTIONS+=CLANG LLD LLDB CLANG_BOOTSTRAP LLD_BOOTSTRAP
 BROKEN_OPTIONS+=OFED
 .endif
 
+.if ${__T} == "i386" || ${__T} == "amd64"
+__DEFAULT_NO_OPTIONS += FDT
+.else
+__DEFAULT_YES_OPTIONS += FDT
+.endif
+
 .if ${__T:Marm*} == "" && ${__T:Mriscv64*} == ""
 __DEFAULT_YES_OPTIONS+=LLDB
 .else
@@ -414,6 +419,12 @@ __DEFAULT_NO_OPTIONS+=OPENMP
 .if ${__T} == "aarch64c" || ${__T:Mriscv*c*}
 BROKEN_OPTIONS+=OPENMP
 .endif
+
+.if ${__T} != "i386" && ${__T} != "amd64" && \
+    ${__T:Mpowerpc64*} == ""
+BROKEN_OPTIONS+= OFED
+.endif
+
 
 .if ${__T} == "powerpc"
 BROKEN_OPTIONS+= ZFS
