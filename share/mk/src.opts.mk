@@ -419,8 +419,7 @@ __DEFAULT_NO_OPTIONS+=OPENMP
 BROKEN_OPTIONS+=OPENMP
 .endif
 
-.if ${__T} != "i386" && ${__T} != "amd64" && \
-    ${__T:Mpowerpc64*} == ""
+.if ${__T:Marm*} != ""
 BROKEN_OPTIONS+= OFED
 .endif
 
