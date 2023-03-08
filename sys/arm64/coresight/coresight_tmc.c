@@ -186,16 +186,13 @@ tmc_dump(device_t dev)
 
 	reg = bus_read_4(sc->res[0], TMC_DEVID);
 	if ((reg & DEVID_CONFIGTYPE_M) == DEVID_CONFIGTYPE_ETR)
-		printf("%s%d: STS %x, CTL %x, RSZ %x, RRP %lx, RWP %lx, "
-		    "LBUFLEVEL %x, CBUFLEVEL %x\n", __func__,
+		printf("%s%d: STS %x, CTL %x, RSZ %x, RRP %lx, RWP %lx\n",
+		    __func__,
 		    device_get_unit(dev),
 		    bus_read_4(sc->res[0], TMC_STS),
 		    bus_read_4(sc->res[0], TMC_CTL),
 		    bus_read_4(sc->res[0], TMC_RSZ),
-		    rrp,
-		    rwp,
-		    bus_read_4(sc->res[0], TMC_CBUFLEVEL),
-		    bus_read_4(sc->res[0], TMC_LBUFLEVEL));
+		    rrp, rwp);
 }
 
 static int
@@ -344,9 +341,11 @@ tmc_configure(device_t dev, struct coresight_event *event)
 			type = ETR_SG_ET_NORMAL;
 			paddr = VM_PAGE_TO_PHYS(pages[curpg]);
 			curpg++;
+
+			if ((i % 100) == 0)
+				printf("%s: entry (%d/%d) type %d dirpg %d curpg %d paddr %lx\n", __func__, i, nentries, type, dirpg, curpg, paddr);
 		}
 
-		//printf("%s: entry (%d/%d) type %d dirpg %d curpg %d paddr %lx\n", __func__, i, nentries, type, dirpg, curpg, paddr);
 
 		*ptr++ = ETR_SG_ENTRY(paddr, type);
 

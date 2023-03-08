@@ -113,7 +113,7 @@ static int
 hwt_event_enable(struct hwt *hwt)
 {
 
-	printf("%s\n", __func__);
+	//printf("%s\n", __func__);
 
 	hwt_backend->ops->hwt_event_enable(hwt);
 
@@ -124,7 +124,7 @@ static int
 hwt_event_disable(struct hwt *hwt)
 {
 
-	printf("%s\n", __func__);
+	//printf("%s\n", __func__);
 
 	hwt_backend->ops->hwt_event_disable(hwt);
 
@@ -211,7 +211,7 @@ hwt_alloc_buffers(struct hwt_softc *sc, struct hwt *hwt)
 	int error;
 	int i;
 
-	hwt->npages = 4096;
+	hwt->npages = 4096 * 8;
 	hwt->pages = malloc(sizeof(struct vm_page *) * hwt->npages, M_HWT,
 	    M_WAITOK | M_ZERO);
 
@@ -484,6 +484,8 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		printf("%s: starting hwt %p\n", __func__, hwt);
 		hwt_event_start(hwt);
 
+		hwt->started = 1;
+
 		break;
 	default:
 		break;
@@ -507,7 +509,8 @@ hwt_switch_in(struct thread *td)
 
 	//dprintf("%s: hp %p\n", __func__, hp);
 
-	hwt_event_enable(hp->hwt);
+	if (hp->hwt->started)
+		hwt_event_enable(hp->hwt);
 }
 
 void
@@ -525,8 +528,10 @@ hwt_switch_out(struct thread *td)
 
 	//dprintf("%s: hp %p\n", __func__, hp);
 
-	hwt_event_disable(hp->hwt);
-	hwt_event_dump(hp->hwt);
+	if (hp->hwt->started) {
+		hwt_event_disable(hp->hwt);
+		hwt_event_dump(hp->hwt);
+	}
 }
 
 static int

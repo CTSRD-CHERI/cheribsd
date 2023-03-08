@@ -53,6 +53,7 @@ struct hwt {
 	int			hwt_id;
 	struct hwt_owner	*hwt_owner;
 	LIST_ENTRY(hwt)		next;
+	int			started;
 };
 
 struct hwt_owner {
