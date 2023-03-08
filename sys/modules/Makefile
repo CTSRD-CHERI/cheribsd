@@ -535,15 +535,8 @@ _rdma=		rdma
 .endif
 
 .if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
-    ${MACHINE_CPUARCH} == "i386"
-_ena=		ena
+    ${MACHINE_CPUARCH} == "i386" || ${MACHINE_ARCH:Mpowerpc64*} != ""
 _ipmi=		ipmi
-.if !${MACHINE_CPU:Mcheri}
-_iwlwifi=	iwlwifi
-.if ${MK_SOURCELESS_UCODE} != "no"
-_iwlwififw=	iwlwififw
-.endif
-.endif
 _mlx4=		mlx4
 _mlx5=		mlx5
 .if (${MK_INET_SUPPORT} != "no" && ${MK_INET6_SUPPORT} != "no") || \
@@ -554,6 +547,17 @@ _mlx5en=	mlx5en
 .if ${MK_OFED} != "no" || defined(ALL_MODULES)
 _mlx4ib=	mlx4ib
 _mlx5ib=	mlx5ib
+.endif
+.endif
+
+.if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
+    ${MACHINE_CPUARCH} == "i386"
+_ena=		ena
+.if !${MACHINE_CPU:Mcheri}
+_iwlwifi=	iwlwifi
+.if ${MK_SOURCELESS_UCODE} != "no"
+_iwlwififw=	iwlwififw
+.endif
 .endif
 .if !${MACHINE_ABI:Mpurecap}
 _ossl=		ossl
@@ -856,17 +860,8 @@ _nvme=		nvme
 .endif
 
 .if ${MACHINE_ARCH:Mpowerpc64*} != ""
-_ipmi=		ipmi
 _ixl=		ixl
-_mlx5=		mlx5
 _nvram=		opal_nvram
-.if ${MK_OFED} != "no" || defined(ALL_MODULES)
-_mlx5ib=	mlx5ib
-.endif
-.if (${MK_INET_SUPPORT} != "no" && ${MK_INET6_SUPPORT} != "no") || \
-       defined(ALL_MODULES)
-_mlx5en=	mlx5en
-.endif
 .endif
 
 .if ${MACHINE_CPUARCH} == "powerpc" && ${MACHINE_ARCH} != "powerpcspe"
