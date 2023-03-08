@@ -45,6 +45,8 @@
 #include <sys/kassert.h>
 #include <sys/queue.h>
 #include <sys/stdint.h>		/* for people using printf mainly */
+#include <machine/atomic.h>
+#include <machine/cpufunc.h>
 
 #include <machine/atomic.h>
 #include <machine/cpufunc.h>
