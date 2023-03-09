@@ -35,6 +35,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/eventhandler.h>
 #include <sys/ioccom.h>
 #include <sys/conf.h>
 #include <sys/proc.h>
@@ -66,6 +67,8 @@ __FBSDID("$FreeBSD$");
 
 #define	HWT_PROCHASH_SIZE	1024
 #define	HWT_OWNERHASH_SIZE	1024
+
+static eventhandler_tag hwt_exit_tag;
 
 struct mtx hwt_prochash_mtx;
 static u_long hwt_prochashmask;
@@ -549,6 +552,27 @@ static struct cdevsw hwt_cdevsw = {
 	.d_ioctl	= hwt_ioctl
 };
 
+static void
+hwt_process_exit(void *arg __unused, struct proc *p)
+{
+	struct hwt_owner *ho;
+	struct hwt *hwt;
+
+	/* Check if process is registered owner of any HWTs. */
+	ho = hwt_lookup_owner(p);
+	if (ho == NULL)
+		return;
+
+	printf("%s\n", __func__);
+
+	LIST_FOREACH(hwt, &ho->hwts, next) {
+		if (hwt->started) {
+			hwt->started = 0;
+			hwt_event_disable(hwt);
+		}
+	}
+}
+
 static int
 hwt_load(void)
 {
@@ -580,6 +604,9 @@ hwt_load(void)
         mtx_init(&hwt_prochash_mtx, "hwt-proc-hash", "hwt-leaf", MTX_SPIN);
 
 	hwt_ownerhash = hashinit(HWT_OWNERHASH_SIZE, M_HWT, &hwt_ownerhashmask);
+
+	hwt_exit_tag = EVENTHANDLER_REGISTER(process_exit, hwt_process_exit,
+	    NULL, EVENTHANDLER_PRI_ANY);
 
 	return (0);
 }
