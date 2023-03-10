@@ -63,9 +63,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
-#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
 #include <sys/abi_compat.h>
-#endif
 #include <sys/kernel.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
@@ -1448,6 +1446,7 @@ static int
 sysctl_msqids(SYSCTL_HANDLER_ARGS)
 {
 	struct msqid_kernel tmsqk;
+	struct msqid_kernel_sysctl tmsqk_u;
 #ifdef COMPAT_FREEBSD32
 	struct msqid_kernel32 tmsqk32;
 #endif
@@ -1478,7 +1477,7 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 			bzero(&tmsqk32, sizeof(tmsqk32));
 			freebsd32_ipcperm_out(&tmsqk.u.msg_perm,
 			    &tmsqk32.u.msg_perm);
-			/* Don't copy u.msg_first or u.msg_last */
+			/* Don't copy u.__msg_first or u.__msg_last */
 			CP(tmsqk, tmsqk32, u.msg_cbytes);
 			CP(tmsqk, tmsqk32, u.msg_qnum);
 			CP(tmsqk, tmsqk32, u.msg_qbytes);
@@ -1496,7 +1495,7 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 		if (!SV_CURPROC_FLAG(SV_CHERI)) {
 			bzero(&tmsqk64, sizeof(tmsqk64));
 			CP(tmsqk, tmsqk64, u.msg_perm);
-			/* Don't copy u.msg_first or u.msg_last */
+			/* Don't copy u.__msg_first or u.__msg_last */
 			CP(tmsqk, tmsqk64, u.msg_cbytes);
 			CP(tmsqk, tmsqk64, u.msg_qnum);
 			CP(tmsqk, tmsqk64, u.msg_qbytes);
@@ -1511,18 +1510,20 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 		} else
 #endif
 		{
-			/* Don't leak kernel pointers */
-			tmsqk.u.__msg_first = NULL;
-			tmsqk.u.__msg_last = NULL;
-			tmsqk.label = NULL;
-			tmsqk.cred = NULL;
-			/*
-			 * XXX: some padding also exists, but we take care to
-			 * allocate our pool of msqid_kernel structs with
-			 * zeroed memory so this should be OK.
-			 */
-			outaddr = &tmsqk;
-			outsize = sizeof(tmsqk);
+			bzero(&tmsqk_u, sizeof(tmsqk_u));
+			CP(tmsqk, tmsqk_u, u.msg_perm);
+			/* Don't copy u.__msg_first or u.__msg_last */
+			CP(tmsqk, tmsqk_u, u.msg_cbytes);
+			CP(tmsqk, tmsqk_u, u.msg_qnum);
+			CP(tmsqk, tmsqk_u, u.msg_qbytes);
+			CP(tmsqk, tmsqk_u, u.msg_lspid);
+			CP(tmsqk, tmsqk_u, u.msg_lrpid);
+			CP(tmsqk, tmsqk_u, u.msg_stime);
+			CP(tmsqk, tmsqk_u, u.msg_rtime);
+			CP(tmsqk, tmsqk_u, u.msg_ctime);
+			/* Don't copy label or cred */
+			outaddr = &tmsqk_u;
+			outsize = sizeof(tmsqk_u);
 		}
 		error = SYSCTL_OUT(req, outaddr, outsize);
 		if (error != 0)

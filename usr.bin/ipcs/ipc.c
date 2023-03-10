@@ -58,6 +58,17 @@ struct msqid_kernel	*msqids;
 struct shminfo		shminfo;
 struct shmid_kernel	*shmsegs;
 
+/*
+ * If any of these asserts fail, the kget code will need to be updated
+ * to translate from the _kernel_kvm version to _kernel.
+ */
+_Static_assert(sizeof(struct semid_kernel) == sizeof(struct semid_kernel_kvm),
+    "In-kernel struct semid_kernel ABI has changed");
+_Static_assert(sizeof(struct msqid_kernel) == sizeof(struct msqid_kernel_kvm),
+    "In-kernel struct msqid_kernel ABI has changed");
+_Static_assert(sizeof(struct shmid_kernel) == sizeof(struct shmid_kernel_kvm),
+    "In-kernel struct shmid_kernel ABI has changed");
+
 struct nlist symbols[] = {
 	{ .n_name = "sema" },
 	{ .n_name = "seminfo" },

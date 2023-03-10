@@ -134,19 +134,36 @@ struct msginfo {
 };
 
 /*
- * Kernel wrapper for the user-level structure.
+ * Kernel wrapper for struct msqid_ds.  This is used internally and exposed
+ * via kvm(3).  If this changes, consumers such as usr.bin/ipcs/ipc.c must
+ * be updated.  This struct ABI is unstable.
  */
+#ifdef _KERNEL
 struct msqid_kernel {
-	/*
-	 * Data structure exposed to user space.
-	 */
+#else
+struct msqid_kernel_kvm {
+#endif
 	struct	msqid_ds u;
-
-	/*
-	 * Kernel-private components of the message queue.
-	 */
 	struct	label *label;	/* MAC label */
 	struct	ucred *cred;	/* creator's credentials */
+};
+
+/*
+ * This is the public interface to msqid_ds via the kern.ipc.msqids sysctl.
+ * This struct ABI is stable.
+ *
+ * HISTORY: when kern.ipc.msqids was created, it exposed the internal
+ * kernel struct to match the existing kvm interface.  This defeated the
+ * purpose of having a kernel wrapper so they are now decoupled.
+ */
+#ifdef _KERNEL
+struct msqid_kernel_sysctl {
+#else
+struct msqid_kernel {
+#endif
+	struct  msqid_ds u;
+	void * __kerncap label;	/* Always NULL */
+	void * __kerncap cred;	/* Always NULL */
 };
 #endif
 

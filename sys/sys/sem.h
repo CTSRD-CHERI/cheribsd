@@ -122,12 +122,39 @@ struct seminfo {
 };
 
 /*
- * Kernel wrapper for the user-level structure
+ * Kernel wrapper for struct semid_ds.  This is used internally and exposed
+ * via kvm(3).  If this changes, consumers such as usr.bin/ipcs/ipc.c must
+ * be updated.
+ *
+ * This struct ABI is unstable.
  */
+#ifdef _KERNEL
 struct semid_kernel {
+#else
+struct semid_kernel_kvm {
+#endif
 	struct	semid_ds u;
 	struct	label *label;	/* MAC framework label */
 	struct	ucred *cred;	/* creator's credentials */
+};
+
+/*
+ * This is the public interface to semid_ds via the kern.ipc.sema sysctl.
+ *
+ * This struct ABI is stable.
+ *
+ * HISTORY: when kern.ipc.sema was created, it exposed the internal
+ * kernel struct to match the existing kvm interface.  This defeated the
+ * purpose of having a kernel wrapper so they are now decoupled.
+ */
+#ifdef _KERNEL
+struct semid_kernel_sysctl {
+#else
+struct semid_kernel {
+#endif
+	struct semid_ds u;
+	void * __kerncap label;	/* Always NULL */
+	void * __kerncap cred;	/* Always NULL */
 };
 
 /* internal "mode" bits */
