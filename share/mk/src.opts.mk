@@ -422,9 +422,9 @@ BROKEN_OPTIONS+=OPENMP
 BROKEN_OPTIONS+= OFED
 .endif
 
-
+# ZFS is broken on 32-bit powerpc, but works on 64-bit
 .if ${__T} == "powerpc"
-BROKEN_OPTIONS+= ZFS
+BROKEN_OPTIONS+= ZFS LOADER_ZFS
 .endif
 
 .include <bsd.mkopt.mk>
@@ -497,6 +497,7 @@ MK_KERBEROS:=	no
 MK_KERBEROS_SUPPORT:=	no
 MK_LDNS:=	no
 MK_PKGBOOTSTRAP:=	no
+MK_LOADER_ZFS:=	no
 MK_ZFS:=	no
 .endif
 
