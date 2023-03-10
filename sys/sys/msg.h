@@ -89,8 +89,8 @@ struct msqid_ds_old {
 
 struct msqid_ds {
 	struct	ipc_perm msg_perm;	/* msg queue permission bits */
-	struct	msg *__msg_first;	/* first message in the queue */
-	struct	msg *__msg_last;	/* last message in the queue */
+	void * __kerncap __msg_first;	/* unused */
+	void * __kerncap __msg_last;	/* unused */
 	msglen_t msg_cbytes;	/* number of bytes in use on the queue */
 	msgqnum_t msg_qnum;	/* number of msgs in the queue */
 	msglen_t msg_qbytes;	/* max # of bytes on the queue */
@@ -146,6 +146,8 @@ struct msqid_kernel_kvm {
 	struct	msqid_ds u;
 	struct	label *label;	/* MAC label */
 	struct	ucred *cred;	/* creator's credentials */
+	struct	msg *first_msg;
+	struct	msg *last_msg;
 };
 
 /*
