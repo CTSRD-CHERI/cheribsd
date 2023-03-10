@@ -264,7 +264,7 @@ hwt_alloc(struct hwt_softc *sc, struct thread *td)
 }
 
 static struct hwt_proc *
-hwt_lookup_proc(struct proc *p)
+hwt_lookup_proc_by_cpu(struct proc *p, int cpu)
 {
 	struct hwt_prochash *hph;
 	struct hwt_proc *hp;
@@ -275,7 +275,7 @@ hwt_lookup_proc(struct proc *p)
 
 	mtx_lock_spin(&hwt_prochash_mtx);
 	LIST_FOREACH(hp, hph, next) {
-		if (hp->p == p) {
+		if (hp->p == p && hp->cpu_id == cpu) {
 			mtx_unlock_spin(&hwt_prochash_mtx);
 			return (hp);
 		}
@@ -458,6 +458,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		hpnew->p = p;
 		hpnew->hwt_owner = ho;
 		hpnew->hwt = hwt;
+		hpnew->cpu_id = hwt->cpu_id;
 		hwt_insert_prochash(hpnew);
 
 		PROC_UNLOCK(p);
@@ -502,13 +503,15 @@ hwt_switch_in(struct thread *td)
 {
 	struct hwt_proc *hp;
 	struct proc *p;
+	int cpu;
 
 	p = td->td_proc;
-
 	if ((p->p_flag2 & P2_HWT) == 0)
 		return;
 
-	hp = hwt_lookup_proc(p);
+	cpu = PCPU_GET(cpuid);
+
+	hp = hwt_lookup_proc_by_cpu(p, cpu);
 
 	//dprintf("%s: hp %p\n", __func__, hp);
 
@@ -521,13 +524,15 @@ hwt_switch_out(struct thread *td)
 {
 	struct hwt_proc *hp;
 	struct proc *p;
+	int cpu;
 
 	p = td->td_proc;
-
 	if ((p->p_flag2 & P2_HWT) == 0)
 		return;
 
-	hp = hwt_lookup_proc(p);
+	cpu = PCPU_GET(cpuid);
+
+	hp = hwt_lookup_proc_by_cpu(p, cpu);
 
 	//dprintf("%s: hp %p\n", __func__, hp);
 
@@ -557,13 +562,34 @@ hwt_process_exit(void *arg __unused, struct proc *p)
 {
 	struct hwt_owner *ho;
 	struct hwt *hwt;
+	struct hwt_prochash *hph;
+	struct hwt_proc *hp;
+	int hindex;
+
+	/* Stop HWTs associated with exiting proc. */
+
+	hindex = HWT_HASH_PTR(p, hwt_prochashmask);
+	hph = &hwt_prochash[hindex];
+
+	mtx_lock_spin(&hwt_prochash_mtx);
+	LIST_FOREACH(hp, hph, next) {
+		if (hp->p == p) {
+			printf("%s: stopping hwt on cpu %d\n", __func__,
+			    hp->cpu_id);
+			hwt = hp->hwt;
+			hwt->started = 0;
+			hwt_event_disable(hwt);
+			hwt_event_dump(hwt);
+		}
+	}
+	mtx_unlock_spin(&hwt_prochash_mtx);
 
 	/* Check if process is registered owner of any HWTs. */
 	ho = hwt_lookup_owner(p);
 	if (ho == NULL)
 		return;
 
-	printf("%s\n", __func__);
+	printf("%s: stopping hwt owner\n", __func__);
 
 	LIST_FOREACH(hwt, &ho->hwts, next) {
 		if (hwt->started) {

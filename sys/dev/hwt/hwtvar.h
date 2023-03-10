@@ -44,6 +44,7 @@ struct hwt_proc {
 	struct hwt		*hwt;
 	struct hwt_owner	*hwt_owner;
 	LIST_ENTRY(hwt_proc)	next;
+	int			cpu_id;
 };
 
 struct hwt {
