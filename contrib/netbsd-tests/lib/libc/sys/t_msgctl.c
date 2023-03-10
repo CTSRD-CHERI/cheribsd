@@ -220,7 +220,6 @@ ATF_TC_BODY(msgctl_pid, tc)
 		_exit(EXIT_SUCCESS);
 	}
 
-	(void)sleep(1);
 	(void)wait(&sta);
 	(void)memset(&msgds, 0, sizeof(struct msqid_ds));
 
@@ -240,7 +239,6 @@ ATF_TC_BODY(msgctl_pid, tc)
 		_exit(EXIT_SUCCESS);
 	}
 
-	(void)sleep(1);
 	(void)wait(&sta);
 	(void)memset(&msgds, 0, sizeof(struct msqid_ds));
 
