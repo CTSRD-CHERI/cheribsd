@@ -1222,16 +1222,11 @@ shmunload(void)
 	return (0);
 }
 
-struct shmid_kernel_user {
-	struct shmid_ds u;
-	void * __capability kernel_bits[3];	/* Keep these NULL */
-};
-
 static int
 sysctl_shmsegs(SYSCTL_HANDLER_ARGS)
 {
 	struct shmid_kernel tshmseg;
-	struct shmid_kernel_user tshmseg_u;
+	struct shmid_kernel_sysctl tshmseg_u;
 #ifdef COMPAT_FREEBSD32
 	struct shmid_kernel32 tshmseg32;
 #endif
