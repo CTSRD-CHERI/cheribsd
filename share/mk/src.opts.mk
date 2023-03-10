@@ -418,12 +418,13 @@ __DEFAULT_NO_OPTIONS+=OPENMP
 BROKEN_OPTIONS+=OPENMP
 .endif
 
+# Broken on 32-bit arm, kernel module compile errors
 .if ${__T:Marm*} != ""
 BROKEN_OPTIONS+= OFED
 .endif
 
-# ZFS is broken on 32-bit powerpc, but works on 64-bit
-.if ${__T} == "powerpc"
+# ZFS is broken on 32-bit powerpc (missing atomics), but works on 64-bit
+.if ${__T} == "powerpc" || ${__T} == "powerpcspc"
 BROKEN_OPTIONS+= ZFS LOADER_ZFS
 .endif
 
