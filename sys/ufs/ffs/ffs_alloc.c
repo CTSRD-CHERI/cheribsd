@@ -2647,7 +2647,7 @@ ffs_blkfree(struct ufsmount *ump,
 	ufs2_daddr_t bno,
 	long size,
 	ino_t inum,
-	enum vtype vtype,
+	__enum_uint8(vtype) vtype,
 	struct workhead *dephd,
 	u_long key)
 {
