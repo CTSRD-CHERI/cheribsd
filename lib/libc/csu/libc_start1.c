@@ -132,6 +132,7 @@ finalizer(void)
 static void
 handle_static_init(int argc, char **argv, char **env)
 {
+#ifndef PIC
 	void (*fn)(int, char **, char **);
 	size_t array_size, n;
 
@@ -157,6 +158,7 @@ handle_static_init(int argc, char **argv, char **env)
 		if ((uintptr_t)fn != 0 && (uintptr_t)fn != 1)
 			fn(argc, argv, env);
 	}
+#endif
 }
 
 static void
