@@ -423,11 +423,6 @@ BROKEN_OPTIONS+=OPENMP
 BROKEN_OPTIONS+= OFED
 .endif
 
-# ZFS is broken on 32-bit powerpc (missing atomics), but works on 64-bit
-.if ${__T} == "powerpc" || ${__T} == "powerpcspe"
-BROKEN_OPTIONS+= ZFS LOADER_ZFS
-.endif
-
 .include <bsd.mkopt.mk>
 
 .if ${.MAKE.OS} != "FreeBSD"
