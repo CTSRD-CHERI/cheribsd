@@ -52,10 +52,10 @@ typedef int (*compressor_cb_t)(void *, size_t, off_t, void *);
 
 struct compressor_methods {
 	int format;
-	void *(* const init)(size_t, int);
-	void (* const reset)(void *);
-	int (* const write)(void *, void *, size_t, compressor_cb_t, void *);
-	void (* const fini)(void *);
+	void *(*init)(size_t, int);
+	void (*reset)(void *);
+	int (*write)(void *, void *, size_t, compressor_cb_t, void *);
+	void (*fini)(void *);
 	TAILQ_ENTRY(compressor_methods) next;
 };
 
