@@ -62,7 +62,7 @@ struct module {
 
 static TAILQ_HEAD(modulelist, module) modules;
 struct sx modules_sx;
-static int nextid = 1;
+static int nextid = MODULE_KERNEL_ID;
 static void module_shutdown(void *, int);
 
 static int
@@ -168,14 +168,23 @@ module_register(const moduledata_t *data, linker_file_t container)
 	newmod->id = nextid++;
 	newmod->name = (char *)(newmod + 1);
 	strcpy(newmod->name, data->name);
-	newmod->handler = data->evhand ? data->evhand : modevent_nop;
 	newmod->arg = data->priv;
 	bzero(&newmod->data, sizeof(newmod->data));
-	TAILQ_INSERT_TAIL(&modules, newmod, link);
+	newmod->file = container;
+	if (data->evhand != NULL) {
+		if (container != NULL && container->compartment) {
+			newmod->handler = compartment_entry_for_module(newmod,
+			    (uintptr_t)data->evhand);
+		} else {
+			newmod->handler = data->evhand;
+		}
+	} else {
+		newmod->handler = modevent_nop;
+	}
 
+	TAILQ_INSERT_TAIL(&modules, newmod, link);
 	if (container)
 		TAILQ_INSERT_TAIL(&container->modules, newmod, flink);
-	newmod->file = container;
 	MOD_XUNLOCK;
 	return (0);
 }
