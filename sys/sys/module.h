@@ -135,6 +135,7 @@ struct mod_policy {
 	MODULE_METADATA(_md_##module##_on_##mdepend, MDT_DEPEND,	\
 	    &_##module##_depend_on_##mdepend, #mdepend)
 
+#define	MODULE_KERNEL_ID	1
 /*
  * Every kernel has a 'kernel' module with the version set to
  * __FreeBSD_version.  We embed a MODULE_DEPEND() inside every module

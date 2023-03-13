@@ -53,6 +53,7 @@
 #include <sys/sysctl.h>
 #include <sys/sysproto.h>
 #include <sys/vnode.h>
+#include <sys/compartment.h>
 
 #ifdef DDB
 #include <ddb/ddb.h>
@@ -194,7 +195,9 @@ static void
 linker_file_sysinit(linker_file_t lf)
 {
 	struct sysinit **start, **stop, **sipp, **xipp, *save;
-	int last;
+	sysinit_cfunc_t func;
+	int id, last;
+	module_t mod;
 
 	KLD_DPF(FILE, ("linker_file_sysinit: calling SYSINITs for %s\n",
 	    lf->filename));
@@ -237,8 +240,35 @@ linker_file_sysinit(linker_file_t lf)
 			BOOTTRACE("%s: sysinit 0x%7x", lf->filename,
 			    (*sipp)->subsystem);
 
+		/*
+		 * XXXKW: Should the module be able to register a linker set
+		 * with this specific function to be called by the kernel?
+		 */
+		id = MODULE_KERNEL_ID;
+		func = (*sipp)->func;
+		if (lf->compartment) {
+			MOD_SLOCK;
+			mod = module_lookupbyptr((uintptr_t)func);
+			if (mod == NULL)
+				panic("linker_file_sysinit: unable to find module");
+			id = module_getid(mod);
+			MOD_SUNLOCK;
+
+			if (id == MODULE_KERNEL_ID) {
+				func = cheri_sealentry(cheri_capmode(
+				    cheri_setaddress(cheri_getpcc(),
+				    (uintptr_t)func)));
+			} else {
+				func = compartment_entry((uintptr_t)func);
+			}
+		}
+
 		/* Call function */
-		(*((*sipp)->func)) ((*sipp)->udata);
+		func((*sipp)->udata);
+
+		if (id != MODULE_KERNEL_ID)
+			compartment_trampoline_destroy((uintptr_t)func);
+
 		last = (*sipp)->subsystem;
 	}
 	mtx_unlock(&Giant);
@@ -249,7 +279,9 @@ static void
 linker_file_sysuninit(linker_file_t lf)
 {
 	struct sysinit **start, **stop, **sipp, **xipp, *save;
-	int last;
+	sysinit_cfunc_t func;
+	int id, last;
+	module_t mod;
 
 	KLD_DPF(FILE, ("linker_file_sysuninit: calling SYSUNINITs for %s\n",
 	    lf->filename));
@@ -294,8 +326,31 @@ linker_file_sysuninit(linker_file_t lf)
 			BOOTTRACE("%s: sysuninit 0x%7x", lf->filename,
 			    (*sipp)->subsystem);
 
+		id = MODULE_KERNEL_ID;
+		func = (*sipp)->func;
+		if (lf->compartment) {
+			MOD_SLOCK;
+			mod = module_lookupbyptr((uintptr_t)func);
+			if (mod == NULL)
+				panic("linker_file_sysuninit: unable to find module");
+			id = module_getid(mod);
+			MOD_SUNLOCK;
+
+			if (id == MODULE_KERNEL_ID) {
+				func = cheri_sealentry(cheri_capmode(
+				    cheri_setaddress(cheri_getpcc(),
+				    (uintptr_t)func)));
+			} else {
+				func = compartment_entry((uintptr_t)func);
+			}
+		}
+
 		/* Call function */
-		(*((*sipp)->func)) ((*sipp)->udata);
+		func((*sipp)->udata);
+
+		if (id != MODULE_KERNEL_ID)
+			compartment_trampoline_destroy((uintptr_t)func);
+
 		last = (*sipp)->subsystem;
 	}
 	mtx_unlock(&Giant);
