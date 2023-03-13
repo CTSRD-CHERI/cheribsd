@@ -38,12 +38,16 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 
+#include <sys/compartment.h>
 #include <sys/compressor.h>
 #include <sys/endian.h>
 #include <sys/kernel.h>
+#include <sys/lock.h>
 #include <sys/linker_set.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <sys/queue.h>
+#include <sys/sx.h>
 
 MALLOC_DEFINE(M_COMPRESS, "compressor", "kernel compression subroutines");
 
@@ -508,6 +512,24 @@ compressor_avail(int format)
 void
 compressor_register(struct compressor_methods *method)
 {
+	module_t mod;
+
+	MOD_SLOCK;
+
+	mod = module_lookupbyptr((uintptr_t)method->init);
+	if (mod == NULL)
+		panic("compressor_register: unable to find module");
+
+	method->init = compartment_entry_for_module(mod,
+	    (uintptr_t)method->init);
+	method->reset = compartment_entry_for_module(mod,
+	    (uintptr_t)method->reset);
+	method->write = compartment_entry_for_module(mod,
+	    (uintptr_t)method->write);
+	method->fini = compartment_entry_for_module(mod,
+	    (uintptr_t)method->fini);
+
+	MOD_SUNLOCK;
 
 	TAILQ_INSERT_TAIL(&compressors, method, next);
 }
