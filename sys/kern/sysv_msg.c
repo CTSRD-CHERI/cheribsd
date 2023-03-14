@@ -167,7 +167,7 @@ struct msgmap {
 
 static int nfree_msgmaps;	/* # of free map entries */
 static short free_msgmaps;	/* head of linked list of free map entries */
-static struct msg *free_msghdrs;/* list of free msg headers */
+static TAILQ_HEAD(, msg) free_msghdrs;	/* list of free msg headers */
 static char *msgpool;		/* MSGMAX byte long msg buffer pool */
 static struct msgmap *msgmaps;	/* MSGSEG msgmap structures */
 static struct msg *msghdrs;	/* MSGTQL msg headers */
@@ -277,16 +277,14 @@ msginit(void)
 	free_msgmaps = 0;
 	nfree_msgmaps = msginfo.msgseg;
 
+	TAILQ_INIT(&free_msghdrs);
 	for (i = 0; i < msginfo.msgtql; i++) {
 		msghdrs[i].msg_type = 0;
-		if (i > 0)
-			msghdrs[i-1].msg_next = &msghdrs[i];
-		msghdrs[i].msg_next = NULL;
+		TAILQ_INSERT_TAIL(&free_msghdrs, &msghdrs[i], msg_queue);
 #ifdef MAC
 		mac_sysvmsg_init(&msghdrs[i]);
 #endif
     	}
-	free_msghdrs = &msghdrs[0];
 
 	for (i = 0; i < msginfo.msgmni; i++) {
 		msqids[i].u.msg_qbytes = 0;	/* implies entry is available */
@@ -431,8 +429,7 @@ msg_freehdr(struct msg *msghdr)
 	}
 	if (msghdr->msg_spot != -1)
 		panic("msghdr->msg_spot != -1");
-	msghdr->msg_next = free_msghdrs;
-	free_msghdrs = msghdr;
+	TAILQ_INSERT_HEAD(&free_msghdrs, msghdrs, msg_queue);
 #ifdef MAC
 	mac_sysvmsg_cleanup(msghdr);
 #endif
@@ -441,7 +438,7 @@ msg_freehdr(struct msg *msghdr)
 static void
 msq_remove(struct msqid_kernel *msqkptr)
 {
-	struct msg *msghdr;
+	struct msg *msghdr, *tmpmsghdr;
 
 	racct_sub_cred(msqkptr->cred, RACCT_NMSGQ, 1);
 	racct_sub_cred(msqkptr->cred, RACCT_MSGQQUEUED, msqkptr->u.msg_qnum);
@@ -450,16 +447,12 @@ msq_remove(struct msqid_kernel *msqkptr)
 	msqkptr->cred = NULL;
 
 	/* Free the message headers */
-	msghdr = msqkptr->first_msg;
-	while (msghdr != NULL) {
-		struct msg *msghdr_tmp;
-
+	TAILQ_FOREACH_SAFE(msghdr, &msqkptr->queue, msg_queue, tmpmsghdr) {
 		/* Free the segments of each message */
 		msqkptr->u.msg_cbytes -= msghdr->msg_ts;
 		msqkptr->u.msg_qnum--;
-		msghdr_tmp = msghdr;
-		msghdr = msghdr->msg_next;
-		msg_freehdr(msghdr_tmp);
+		TAILQ_REMOVE(&msqkptr->queue, msghdr, msg_queue);
+		msg_freehdr(msghdr);
 	}
 
 	if (msqkptr->u.msg_cbytes != 0)
@@ -593,8 +586,7 @@ kern_msgctl(struct thread *td, int msqid, int cmd, struct msqid_ds *msqbuf)
 		 * thread cannot free a certain msghdr.  The msq will get
 		 * into an inconsistent state.
 		 */
-		for (msghdr = msqkptr->first_msg; msghdr != NULL;
-		    msghdr = msghdr->msg_next) {
+		TAILQ_FOREACH(msghdr, &msqkptr->queue, msg_queue) {
 			error = mac_sysvmsq_check_msgrmid(td->td_ucred, msghdr);
 			if (error != 0)
 				goto done2;
@@ -755,8 +747,7 @@ sys_msgget(struct thread *td, struct msgget_args *uap)
 		msqkptr->cred = crhold(cred);
 		/* Make sure that the returned msqid is unique */
 		msqkptr->u.msg_perm.seq = (msqkptr->u.msg_perm.seq + 1) & 0x7fff;
-		msqkptr->first_msg = NULL;
-		msqkptr->last_msg = NULL;
+		TAILQ_INIT(&msqkptr->queue);
 		msqkptr->u.msg_cbytes = 0;
 		msqkptr->u.msg_qnum = 0;
 		msqkptr->u.msg_qbytes = msginfo.msgmnb;
@@ -888,7 +879,7 @@ kern_msgsnd(struct thread *td, int msqid, const void * __capability msgp,
 			DPRINTF(("segs_needed > nfree_msgmaps\n"));
 			need_more_resources = 1;
 		}
-		if (free_msghdrs == NULL) {
+		if (TAILQ_EMPTY(&free_msghdrs)) {
 			DPRINTF(("no more msghdrs\n"));
 			need_more_resources = 1;
 		}
@@ -956,7 +947,7 @@ kern_msgsnd(struct thread *td, int msqid, const void * __capability msgp,
 		panic("segs_needed > nfree_msgmaps");
 	if (msgsz + msqkptr->u.msg_cbytes > msqkptr->u.msg_qbytes)
 		panic("msgsz + msg_cbytes > msg_qbytes");
-	if (free_msghdrs == NULL)
+	if (TAILQ_EMPTY(&free_msghdrs))
 		panic("no more msghdrs");
 
 	/*
@@ -972,8 +963,8 @@ kern_msgsnd(struct thread *td, int msqid, const void * __capability msgp,
 	 * Allocate a message header
 	 */
 
-	msghdr = free_msghdrs;
-	free_msghdrs = msghdr->msg_next;
+	msghdr = TAILQ_FIRST(&free_msghdrs);
+	TAILQ_REMOVE(&free_msghdrs, msghdr, msg_queue);
 	msghdr->msg_spot = -1;
 	msghdr->msg_ts = msgsz;
 	msghdr->msg_type = mtype;
@@ -1095,14 +1086,7 @@ kern_msgsnd(struct thread *td, int msqid, const void * __capability msgp,
 	/*
 	 * Put the message into the queue
 	 */
-	if (msqkptr->first_msg == NULL) {
-		msqkptr->first_msg = msghdr;
-		msqkptr->last_msg = msghdr;
-	} else {
-		msqkptr->last_msg->msg_next = msghdr;
-		msqkptr->last_msg = msghdr;
-	}
-	msqkptr->last_msg->msg_next = NULL;
+	TAILQ_INSERT_TAIL(&msqkptr->queue, msghdr, msg_queue);
 
 	msqkptr->u.msg_cbytes += msghdr->msg_ts;
 	msqkptr->u.msg_qnum++;
@@ -1209,8 +1193,8 @@ kern_msgrcv(struct thread *td, int msqid, void * __capability msgp,
 	msghdr = NULL;
 	while (msghdr == NULL) {
 		if (msgtyp == 0) {
-			msghdr = msqkptr->first_msg;
-			if (msghdr != NULL) {
+			if (!TAILQ_EMPTY(&msqkptr->queue)) {
+				msghdr = TAILQ_FIRST(&msqkptr->queue);
 				if (msgsz < msghdr->msg_ts &&
 				    (msgflg & MSG_NOERROR) == 0) {
 					DPRINTF(("first message on the queue "
@@ -1225,23 +1209,11 @@ kern_msgrcv(struct thread *td, int msqid, void * __capability msgp,
 				if (error != 0)
 					goto done2;
 #endif
-				if (msqkptr->first_msg ==
-				    msqkptr->last_msg) {
-					msqkptr->first_msg = NULL;
-					msqkptr->last_msg = NULL;
-				} else {
-					msqkptr->first_msg = msghdr->msg_next;
-					if (msqkptr->first_msg == NULL)
-						panic("msg_first/last screwed up #1");
-				}
+				TAILQ_REMOVE(&msqkptr->queue, msghdr,
+				    msg_queue);
 			}
 		} else {
-			struct msg *previous;
-			struct msg **prev;
-
-			previous = NULL;
-			prev = &(msqkptr->first_msg);
-			while ((msghdr = *prev) != NULL) {
+			TAILQ_FOREACH(msghdr, &msqkptr->queue, msg_queue) {
 				/*
 				 * Is this message's type an exact match or is
 				 * this message's type less than or equal to
@@ -1271,28 +1243,9 @@ kern_msgrcv(struct thread *td, int msqid, void * __capability msgp,
 					if (error != 0)
 						goto done2;
 #endif
-					*prev = msghdr->msg_next;
-					if (msghdr == msqkptr->last_msg) {
-						if (previous == NULL) {
-							if (prev !=
-							    &msqkptr->first_msg)
-								panic("__msg_first/last screwed up #2");
-							msqkptr->first_msg =
-							    NULL;
-							msqkptr->last_msg =
-							    NULL;
-						} else {
-							if (prev ==
-							    &msqkptr->first_msg)
-								panic("__msg_first/last screwed up #3");
-							msqkptr->last_msg =
-							    previous;
-						}
-					}
+					TAILQ_REMOVE(&msqkptr->queue, msghdr, msg_queue);
 					break;
 				}
-				previous = msghdr;
-				prev = &(msghdr->msg_next);
 			}
 		}
 

@@ -29,6 +29,9 @@
 #define	_WANT_SYSVIPC_INTERNALS
 #endif
 #include <sys/ipc.h>
+#if defined(_KERNEL) || defined(_WANT_SYSVMSG_INTERNALS)
+#include <sys/queue.h>
+#endif
 
 /*
  * The MSG_NOERROR identifier value, the msqid_ds struct and the msg struct
@@ -103,7 +106,7 @@ struct msqid_ds {
 
 #ifdef _KERNEL
 struct msg {
-	struct	msg *msg_next;  /* next msg in the chain */
+	TAILQ_ENTRY(msg) msg_queue;
 	long	msg_type; 	/* type of this message */
 				/* >0 -> type of this message */
 				/* 0 -> free header */
@@ -146,8 +149,7 @@ struct msqid_kernel_kvm {
 	struct	msqid_ds u;
 	struct	label *label;	/* MAC label */
 	struct	ucred *cred;	/* creator's credentials */
-	struct	msg *first_msg;
-	struct	msg *last_msg;
+	TAILQ_HEAD(, msg) queue;
 };
 
 /*
