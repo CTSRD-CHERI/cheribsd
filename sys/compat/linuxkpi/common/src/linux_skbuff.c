@@ -283,7 +283,7 @@ DB_SHOW_COMMAND(skb, db_show_skb)
 			return;
 	}
 
-	skb = (struct sk_buff *)addr;
+	skb = DB_DATA_PTR(addr, struct sk_buff);
 
 	db_printf("skb %p\n", skb);
 	db_printf("\tnext %p prev %p\n", skb->next, skb->prev);
