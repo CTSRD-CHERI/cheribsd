@@ -259,7 +259,7 @@ struct iwl_fw_ini_dump_entry {
 	struct list_head list;
 	u32 size;
 	u8 data[];
-} __packed;
+};
 
 /**
  * struct iwl_fw_error_dump_file - header of dump file
