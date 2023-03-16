@@ -103,6 +103,7 @@ psci_call(uintptr_t a, uintptr_t b, uintptr_t c, uintptr_t d)
 
 #define	PSCI_VER_MAJOR(v)		(((v) >> 16) & 0xFF)
 #define	PSCI_VER_MINOR(v)		((v) & 0xFF)
+#define	PSCI_VER(maj, min)		(((maj) << 16) | (min))
 
 #ifdef _KERNEL
 enum psci_fn {
