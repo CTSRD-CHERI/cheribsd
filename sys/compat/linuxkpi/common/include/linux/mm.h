@@ -252,17 +252,17 @@ get_page(struct vm_page *page)
 }
 
 extern long
-get_user_pages(unsigned long start, unsigned long nr_pages,
+get_user_pages(void * __capability start, unsigned long nr_pages,
     int gup_flags, struct page **,
     struct vm_area_struct **);
 
 extern int
-__get_user_pages_fast(unsigned long start, int nr_pages, int write,
+__get_user_pages_fast(void * __capability start, int nr_pages, int write,
     struct page **);
 
 extern long
 get_user_pages_remote(struct task_struct *, struct mm_struct *,
-    unsigned long start, unsigned long nr_pages,
+    void * __capability start, unsigned long nr_pages,
     int gup_flags, struct page **,
     struct vm_area_struct **);
 
