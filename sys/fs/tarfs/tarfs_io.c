@@ -159,8 +159,7 @@ tarfs_io_read_buf(struct tarfs_mount *tmp, bool raw,
 		    (size_t)off, len);
 		return (0);
 	}
-	aiov.iov_base = buf;
-	aiov.iov_len = len;
+	IOVEC_INIT(&aiov, buf, len);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_offset = off;
@@ -381,7 +380,7 @@ tarfs_zread_zstd(struct tarfs_zio *zio, struct uio *uiop)
 	MPASS(uiop->uio_iovcnt == 1);
 	MPASS(uiop->uio_iov->iov_len >= len);
 	if (uiop->uio_segflg == UIO_SYSSPACE) {
-		zob.dst = uiop->uio_iov->iov_base;
+		zob.dst = (__cheri_fromcap void *)uiop->uio_iov->iov_base;
 	} else {
 		TARFS_DPF(ALLOC, "%s: allocating %zu-byte bounce buffer\n",
 		    __func__, len);
@@ -409,8 +408,7 @@ tarfs_zread_zstd(struct tarfs_zio *zio, struct uio *uiop)
 	while (resid > 0) {
 		if (zib.pos == zib.size) {
 			/* request data from the underlying file */
-			aiov.iov_base = ibuf;
-			aiov.iov_len = bsize;
+			IOVEC_INIT(&aiov, ibuf, bsize);
 			auio.uio_iov = &aiov;
 			auio.uio_iovcnt = 1;
 			auio.uio_offset = zio->ipos;
@@ -570,8 +568,7 @@ tarfs_zstrategy(struct vop_strategy_args *ap)
 	size_t len;
 	int error;
 
-	iov.iov_base = bp->b_data;
-	iov.iov_len = bp->b_bcount;
+	IOVEC_INIT(&iov, bp->b_data, bp->b_bcount);
 	off = bp->b_iooffset;
 	len = bp->b_bcount;
 	bp->b_resid = len;

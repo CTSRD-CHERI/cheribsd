@@ -574,8 +574,7 @@ tarfs_strategy(struct vop_strategy_args *ap)
 	MPASS(bp->b_bufsize >= bp->b_bcount);
 	TARFS_DPF(VNODE, "%s(%p=%s, %zu, %ld/%ld)\n", __func__, tnp,
 	    tnp->name, (size_t)bp->b_iooffset, bp->b_bcount, bp->b_bufsize);
-	iov.iov_base = bp->b_data;
-	iov.iov_len = bp->b_bcount;
+	IOVEC_INIT(&iov, bp->b_data, bp->b_bcount);
 	off = bp->b_iooffset;
 	len = bp->b_bcount;
 	bp->b_resid = len;
