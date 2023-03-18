@@ -905,7 +905,8 @@ tarfs_mount(struct mount *mp)
 	if (vfs_flagopt(mp->mnt_optnew, "verify", NULL, 0)) {
 	    flags |= O_VERIFY;
 	}
-	NDINIT(&nd, LOOKUP, ISOPEN | FOLLOW | LOCKLEAF, UIO_SYSSPACE, from);
+	NDINIT(&nd, LOOKUP, ISOPEN | FOLLOW | LOCKLEAF, UIO_SYSSPACE,
+	    PTR2CAP(from));
 	error = namei(&nd);
 	if (error != 0)
 		return (error);
