@@ -44,13 +44,16 @@ __FBSDID("$FreeBSD$");
 #include <sys/module.h>
 #include <sys/mutex.h>
 #include <sys/sglist.h>
+#include <sys/rwlock.h>
 
 #include <vm/vm.h>
 #include <vm/vm_object.h>
 #include <vm/vm_page.h>
 #include <vm/vm_pageout.h>
+#include <vm/vm_pager.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_kern.h>
+#include <vm/vm_param.h>
 #include <vm/pmap.h>
 
 #include <dev/hwt/hwtvar.h>
@@ -248,6 +251,27 @@ printf("%s: pages added to sg\n", __func__);
 #endif
 
 	return (0);
+}
+
+static void
+hwt_destroy_buffers(struct hwt *hwt)
+{
+	vm_page_t m;
+	int i;
+
+	for (i = 0; i < hwt->npages; i++) {
+		m = hwt->pages[i];
+		if (m == NULL)
+			break;
+		vm_page_lock(m);
+		m->oflags |= VPO_UNMANAGED;
+		m->flags &= ~PG_FICTITIOUS;
+		vm_page_unwire_noq(m);
+		vm_page_free(m);
+		vm_page_unlock(m);
+	}
+
+	free(hwt->pages, M_HWT);
 }
 
 static struct hwt *
@@ -626,7 +650,7 @@ hwt_process_exit(void *arg __unused, struct proc *p)
 		mtx_lock(&ho->mtx);
 		LIST_FOREACH_SAFE(hwt, &ho->hwts, next, hwt_tmp) {
 			LIST_REMOVE(hwt, next);
-			/* TODO: destroy buffers. */
+			hwt_destroy_buffers(hwt);
 			free(hwt, M_HWT);
 		}
 		mtx_unlock(&ho->mtx);
