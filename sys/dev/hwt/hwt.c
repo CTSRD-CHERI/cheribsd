@@ -563,49 +563,62 @@ hwt_process_exit(void *arg __unused, struct proc *p)
 	struct hwt_owner *ho;
 	struct hwt *hwt;
 	struct hwt_prochash *hph;
-	struct hwt_proc *hp;
+	struct hwt_proc *hp, *hp1;
 	int hindex;
-
-	/* Stop HWTs associated with exiting proc. */
 
 	hindex = HWT_HASH_PTR(p, hwt_prochashmask);
 	hph = &hwt_prochash[hindex];
 
-	mtx_lock_spin(&hwt_prochash_mtx);
-	LIST_FOREACH(hp, hph, next) {
-		if (hp->p == p) {
-			printf("%s: stopping hwt on cpu %d\n", __func__,
-			    hp->cpu_id);
-			hwt = hp->hwt;
-			hwt->started = 0;
-			hwt_event_disable(hwt);
-			hwt_event_dump(hwt);
-		}
-	}
-	mtx_unlock_spin(&hwt_prochash_mtx);
-
-	/* Check if process is registered owner of any HWTs. */
 	ho = hwt_lookup_owner(p);
-	if (ho == NULL)
-		return;
+	if (ho == NULL) {
+		/* Stop HWTs associated with exiting proc. */
 
-	printf("%s: stopping hwt owner\n", __func__);
+		mtx_lock_spin(&hwt_prochash_mtx);
+		LIST_FOREACH(hp, hph, next) {
+			if (hp->p == p) {
+				printf("%s: stopping hwt on cpu %d\n", __func__,
+				    hp->cpu_id);
+				hwt = hp->hwt;
+				hwt->started = 0;
+				hwt_event_disable(hwt);
+				hwt_event_dump(hwt);
+			}
+		}
+		mtx_unlock_spin(&hwt_prochash_mtx);
+	} else {
+		/*
+		 * Stop HWTs associated with exiting owner.
+		 * Detach associated procs.
+		 */
 
-	struct hwt *hwt_tmp;
+		mtx_lock_spin(&hwt_prochash_mtx);
+		LIST_FOREACH_SAFE(hp, hph, next, hp1) {
+			if (hp->hwt_owner == ho) {
+				printf("%s: stopping hwt on cpu %d\n", __func__,
+				    hp->cpu_id);
+				hwt = hp->hwt;
+				hwt->started = 0;
+				hwt_event_disable(hwt);
+				hwt_event_dump(hwt);
+				LIST_REMOVE(hp, next);
+			}
+		}
+		mtx_unlock_spin(&hwt_prochash_mtx);
 
-	LIST_FOREACH_SAFE(hwt, &ho->hwts, next, hwt_tmp) {
-		if (hwt->started) {
-			hwt->started = 0;
-			hwt_event_disable(hwt);
+		printf("%s: stopping hwt owner\n", __func__);
+
+		struct hwt *hwt_tmp;
+
+		LIST_FOREACH_SAFE(hwt, &ho->hwts, next, hwt_tmp) {
 			LIST_REMOVE(hwt, next);
 			/* TODO: destroy buffers. */
 			free(hwt, M_HWT);
 		}
-	}
 
-	/* Destroy hwt owner. */
-	LIST_REMOVE(ho, next);
-	free(ho, M_HWT);
+		/* Destroy hwt owner. */
+		LIST_REMOVE(ho, next);
+		free(ho, M_HWT);
+	}
 }
 
 static int
