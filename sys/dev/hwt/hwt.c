@@ -210,10 +210,7 @@ retry:
 static int
 hwt_alloc_buffers(struct hwt_softc *sc, struct hwt *hwt)
 {
-	vm_page_t *m;
-	struct sglist *sg;
 	int error;
-	int i;
 
 	hwt->npages = 4096 * 8;
 	hwt->pages = malloc(sizeof(struct vm_page *) * hwt->npages, M_HWT,
@@ -224,6 +221,11 @@ hwt_alloc_buffers(struct hwt_softc *sc, struct hwt *hwt)
 		printf("%s: could not alloc pages\n", __func__);
 		return (error);
 	}
+
+#if 0
+	struct sglist *sg;
+	vm_page_t *m;
+	int i;
 
 	sg = sglist_alloc(hwt->npages, M_WAITOK);
 	if (sg == NULL) {
@@ -243,6 +245,7 @@ hwt_alloc_buffers(struct hwt_softc *sc, struct hwt *hwt)
 	}
 
 printf("%s: pages added to sg\n", __func__);
+#endif
 
 	return (0);
 }
