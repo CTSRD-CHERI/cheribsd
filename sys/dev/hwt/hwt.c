@@ -591,12 +591,21 @@ hwt_process_exit(void *arg __unused, struct proc *p)
 
 	printf("%s: stopping hwt owner\n", __func__);
 
-	LIST_FOREACH(hwt, &ho->hwts, next) {
+	struct hwt *hwt_tmp;
+
+	LIST_FOREACH_SAFE(hwt, &ho->hwts, next, hwt_tmp) {
 		if (hwt->started) {
 			hwt->started = 0;
 			hwt_event_disable(hwt);
+			LIST_REMOVE(hwt, next);
+			/* TODO: destroy buffers. */
+			free(hwt, M_HWT);
 		}
 	}
+
+	/* Destroy hwt owner. */
+	LIST_REMOVE(ho, next);
+	free(ho, M_HWT);
 }
 
 static int
