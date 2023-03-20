@@ -74,6 +74,7 @@ struct mtx hwt_prochash_mtx;
 static u_long hwt_prochashmask;
 static LIST_HEAD(hwt_prochash, hwt_proc)	*hwt_prochash;
 
+struct mtx hwt_ownerhash_mtx;
 static u_long hwt_ownerhashmask;
 static LIST_HEAD(hwt_ownerhash, hwt_owner)	*hwt_ownerhash;
 
@@ -317,14 +318,14 @@ hwt_lookup_owner(struct proc *p)
 	hindex = HWT_HASH_PTR(p, hwt_ownerhashmask);
 	hoh = &hwt_ownerhash[hindex];
 
-	mtx_lock_spin(&hwt_prochash_mtx);
+	mtx_lock_spin(&hwt_ownerhash_mtx);
 	LIST_FOREACH(ho, hoh, next) {
 		if (ho->p == p) {
-			mtx_unlock_spin(&hwt_prochash_mtx);
+			mtx_unlock_spin(&hwt_ownerhash_mtx);
 			return (ho);
 		}
 	}
-	mtx_unlock_spin(&hwt_prochash_mtx);
+	mtx_unlock_spin(&hwt_ownerhash_mtx);
 
 	return (NULL);
 }
@@ -404,7 +405,10 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			LIST_INIT(&ho->hwts);
 			hindex = HWT_HASH_PTR(ho->p, hwt_ownerhashmask);
 			hoh = &hwt_ownerhash[hindex];
+
+			mtx_lock_spin(&hwt_ownerhash_mtx);
 			LIST_INSERT_HEAD(hoh, ho, next);
+			mtx_unlock_spin(&hwt_ownerhash_mtx);
 		}
 
 		LIST_INSERT_HEAD(&ho->hwts, hwt, next);
@@ -616,7 +620,9 @@ hwt_process_exit(void *arg __unused, struct proc *p)
 		}
 
 		/* Destroy hwt owner. */
+		mtx_lock_spin(&hwt_ownerhash_mtx);
 		LIST_REMOVE(ho, next);
+		mtx_unlock_spin(&hwt_ownerhash_mtx);
 		free(ho, M_HWT);
 	}
 }
@@ -649,9 +655,10 @@ hwt_load(void)
 		return (error);
 
 	hwt_prochash = hashinit(HWT_PROCHASH_SIZE, M_HWT, &hwt_prochashmask);
-        mtx_init(&hwt_prochash_mtx, "hwt-proc-hash", "hwt-leaf", MTX_SPIN);
+        mtx_init(&hwt_prochash_mtx, "hwt-proc-hash", "hwt-proc", MTX_SPIN);
 
 	hwt_ownerhash = hashinit(HWT_OWNERHASH_SIZE, M_HWT, &hwt_ownerhashmask);
+        mtx_init(&hwt_ownerhash_mtx, "hwt-owner-hash", "hwt-owner", MTX_SPIN);
 
 	hwt_exit_tag = EVENTHANDLER_REGISTER(process_exit, hwt_process_exit,
 	    NULL, EVENTHANDLER_PRI_ANY);
