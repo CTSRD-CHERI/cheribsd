@@ -571,10 +571,11 @@ static struct cdevsw hwt_cdevsw = {
 static void
 hwt_process_exit(void *arg __unused, struct proc *p)
 {
-	struct hwt_owner *ho;
-	struct hwt *hwt;
-	struct hwt_prochash *hph;
 	struct hwt_proc *hp, *hp1;
+	struct hwt_prochash *hph;
+	struct hwt_owner *ho;
+	struct hwt *hwt_tmp;
+	struct hwt *hwt;
 	int hindex;
 
 	hindex = HWT_HASH_PTR(p, hwt_prochashmask);
@@ -618,8 +619,6 @@ hwt_process_exit(void *arg __unused, struct proc *p)
 		mtx_unlock_spin(&hwt_prochash_mtx);
 
 		printf("%s: stopping hwt owner\n", __func__);
-
-		struct hwt *hwt_tmp;
 
 		mtx_lock(&ho->mtx);
 		LIST_FOREACH_SAFE(hwt, &ho->hwts, next, hwt_tmp) {
