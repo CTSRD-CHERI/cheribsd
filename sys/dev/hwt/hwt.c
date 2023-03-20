@@ -335,11 +335,14 @@ hwt_lookup_by_id(struct hwt_owner *ho, int hwt_id)
 {
 	struct hwt *hwt;
 
+	mtx_lock(&ho->mtx);
 	LIST_FOREACH(hwt, &ho->hwts, next) {
 		if (hwt->hwt_id == hwt_id) {
+			mtx_unlock(&ho->mtx);
 			return (hwt);
 		}
 	}
+	mtx_unlock(&ho->mtx);
 
 	return (NULL);
 }
@@ -403,19 +406,23 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			    M_WAITOK | M_ZERO);
 			ho->p = p;
 			LIST_INIT(&ho->hwts);
-			hindex = HWT_HASH_PTR(ho->p, hwt_ownerhashmask);
-			hoh = &hwt_ownerhash[hindex];
+			mtx_init(&ho->mtx, "hwts", NULL, MTX_DEF);
 
 			mtx_lock_spin(&hwt_ownerhash_mtx);
+			hindex = HWT_HASH_PTR(ho->p, hwt_ownerhashmask);
+			hoh = &hwt_ownerhash[hindex];
 			LIST_INSERT_HEAD(hoh, ho, next);
 			mtx_unlock_spin(&hwt_ownerhash_mtx);
 		}
 
-		LIST_INSERT_HEAD(&ho->hwts, hwt, next);
-
 		hwt->cpu_id = halloc->cpu_id;
 		hwt->hwt_id = 110 + hwt->cpu_id;
 		hwt->hwt_owner = ho;
+
+		mtx_lock(&ho->mtx);
+		LIST_INSERT_HEAD(&ho->hwts, hwt, next);
+		mtx_unlock(&ho->mtx);
+
 		error = copyout(&hwt->hwt_id, halloc->hwt_id,
 		    sizeof(hwt->hwt_id));
 
@@ -578,7 +585,7 @@ hwt_process_exit(void *arg __unused, struct proc *p)
 		/* Stop HWTs associated with exiting proc. */
 
 		mtx_lock_spin(&hwt_prochash_mtx);
-		LIST_FOREACH(hp, hph, next) {
+		LIST_FOREACH_SAFE(hp, hph, next, hp1) {
 			if (hp->p == p) {
 				printf("%s: stopping hwt on cpu %d\n", __func__,
 				    hp->cpu_id);
@@ -586,6 +593,7 @@ hwt_process_exit(void *arg __unused, struct proc *p)
 				hwt->started = 0;
 				hwt_event_disable(hwt);
 				hwt_event_dump(hwt);
+				LIST_REMOVE(hp, next);
 			}
 		}
 		mtx_unlock_spin(&hwt_prochash_mtx);
@@ -613,11 +621,13 @@ hwt_process_exit(void *arg __unused, struct proc *p)
 
 		struct hwt *hwt_tmp;
 
+		mtx_lock(&ho->mtx);
 		LIST_FOREACH_SAFE(hwt, &ho->hwts, next, hwt_tmp) {
 			LIST_REMOVE(hwt, next);
 			/* TODO: destroy buffers. */
 			free(hwt, M_HWT);
 		}
+		mtx_unlock(&ho->mtx);
 
 		/* Destroy hwt owner. */
 		mtx_lock_spin(&hwt_ownerhash_mtx);

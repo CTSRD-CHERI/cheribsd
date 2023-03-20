@@ -59,6 +59,7 @@ struct hwt {
 
 struct hwt_owner {
 	struct proc		*p;
+	struct mtx		mtx; /* Protects hwts. */
 	LIST_HEAD(, hwt)	hwts; /* Owned HWTs. */
 	LIST_ENTRY(hwt_owner)	next;
 };
