@@ -276,12 +276,12 @@ hwt_destroy_buffers(struct hwt *hwt)
 		m = hwt->pages[i];
 		if (m == NULL)
 			break;
-		vm_page_lock(m);
+
+		vm_page_busy_acquire(m, 0);
 		m->oflags |= VPO_UNMANAGED;
 		m->flags &= ~PG_FICTITIOUS;
 		vm_page_unwire_noq(m);
 		vm_page_free(m);
-		vm_page_unlock(m);
 	}
 	VM_OBJECT_WUNLOCK(hwt->obj);
 
