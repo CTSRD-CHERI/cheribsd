@@ -41,19 +41,23 @@ __FBSDID("$FreeBSD$");
 #include <sys/proc.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/mman.h>
 #include <sys/module.h>
 #include <sys/mutex.h>
 #include <sys/sglist.h>
 #include <sys/rwlock.h>
 
 #include <vm/vm.h>
-#include <vm/vm_object.h>
-#include <vm/vm_page.h>
-#include <vm/vm_pageout.h>
-#include <vm/vm_pager.h>
+#include <vm/vm_param.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_kern.h>
-#include <vm/vm_param.h>
+#include <vm/vm_page.h>
+#include <vm/vm_map.h>
+#include <vm/vm_object.h>
+#include <vm/vm_pager.h>
+#include <vm/vm_pageout.h>
+#include <vm/vm_phys.h>
+#include <vm/vm_radix.h>
 #include <vm/pmap.h>
 
 #include <dev/hwt/hwtvar.h>
@@ -163,10 +167,11 @@ hwt_alloc_pages(vm_page_t *pages, int npages)
 {
 	vm_paddr_t low, high, boundary;
 	vm_memattr_t memattr;
-	int alignment;
+	vm_object_t obj;
 	vm_pointer_t va;
-	int pflags;
+	int alignment;
 	vm_page_t m;
+	int pflags;
 	int tries;
 	int i;
 
@@ -178,10 +183,15 @@ hwt_alloc_pages(vm_page_t *pages, int npages)
 	    VM_ALLOC_ZERO;
 	memattr = VM_MEMATTR_WRITE_COMBINING;
 
+	obj = vm_pager_allocate(OBJT_PHYS, 0, npages * PAGE_SIZE,
+	    PROT_READ, 0, curthread->td_ucred);
+
+	VM_OBJECT_WLOCK(obj);
+
 	for (i = 0; i < npages; i++) {
 		tries = 0;
 retry:
-		m = vm_page_alloc_noobj_contig(pflags, 1, low, high,
+		m = vm_page_alloc_contig(obj, i, pflags, 1, low, high,
 		    alignment, boundary, memattr);
 		if (m == NULL) {
 			if (tries < 3) {
@@ -192,6 +202,7 @@ retry:
 				goto retry;
 			}
 
+			VM_OBJECT_WUNLOCK(obj);
 			return (ENOMEM);
 		}
 
@@ -205,7 +216,9 @@ retry:
 		m->flags |= PG_FICTITIOUS;
 
 		pages[i] = m;
-        }
+	}
+
+	VM_OBJECT_WUNLOCK(obj);
 
 	return (0);
 }
