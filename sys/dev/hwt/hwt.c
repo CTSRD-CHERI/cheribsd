@@ -163,11 +163,10 @@ hwt_register(struct hwt_backend *backend)
 }
 
 static int
-hwt_alloc_pages(vm_page_t *pages, int npages)
+hwt_alloc_pages(struct hwt *hwt)
 {
 	vm_paddr_t low, high, boundary;
 	vm_memattr_t memattr;
-	vm_object_t obj;
 	vm_pointer_t va;
 	int alignment;
 	vm_page_t m;
@@ -183,15 +182,15 @@ hwt_alloc_pages(vm_page_t *pages, int npages)
 	    VM_ALLOC_ZERO;
 	memattr = VM_MEMATTR_WRITE_COMBINING;
 
-	obj = vm_pager_allocate(OBJT_PHYS, 0, npages * PAGE_SIZE,
+	hwt->obj = vm_pager_allocate(OBJT_PHYS, 0, hwt->npages * PAGE_SIZE,
 	    PROT_READ, 0, curthread->td_ucred);
 
-	VM_OBJECT_WLOCK(obj);
+	VM_OBJECT_WLOCK(hwt->obj);
 
-	for (i = 0; i < npages; i++) {
+	for (i = 0; i < hwt->npages; i++) {
 		tries = 0;
 retry:
-		m = vm_page_alloc_contig(obj, i, pflags, 1, low, high,
+		m = vm_page_alloc_contig(hwt->obj, i, pflags, 1, low, high,
 		    alignment, boundary, memattr);
 		if (m == NULL) {
 			if (tries < 3) {
@@ -202,7 +201,7 @@ retry:
 				goto retry;
 			}
 
-			VM_OBJECT_WUNLOCK(obj);
+			VM_OBJECT_WUNLOCK(hwt->obj);
 			return (ENOMEM);
 		}
 
@@ -215,10 +214,10 @@ retry:
 		m->oflags &= ~VPO_UNMANAGED;
 		m->flags |= PG_FICTITIOUS;
 
-		pages[i] = m;
+		hwt->pages[i] = m;
 	}
 
-	VM_OBJECT_WUNLOCK(obj);
+	VM_OBJECT_WUNLOCK(hwt->obj);
 
 	return (0);
 }
@@ -232,7 +231,7 @@ hwt_alloc_buffers(struct hwt_softc *sc, struct hwt *hwt)
 	hwt->pages = malloc(sizeof(struct vm_page *) * hwt->npages, M_HWT,
 	    M_WAITOK | M_ZERO);
 
-	error = hwt_alloc_pages(hwt->pages, hwt->npages);
+	error = hwt_alloc_pages(hwt);
 	if (error) {
 		printf("%s: could not alloc pages\n", __func__);
 		return (error);
@@ -272,6 +271,7 @@ hwt_destroy_buffers(struct hwt *hwt)
 	vm_page_t m;
 	int i;
 
+	VM_OBJECT_WLOCK(hwt->obj);
 	for (i = 0; i < hwt->npages; i++) {
 		m = hwt->pages[i];
 		if (m == NULL)
@@ -283,6 +283,9 @@ hwt_destroy_buffers(struct hwt *hwt)
 		vm_page_free(m);
 		vm_page_unlock(m);
 	}
+	VM_OBJECT_WUNLOCK(hwt->obj);
+
+	vm_object_deallocate(hwt->obj);
 
 	free(hwt->pages, M_HWT);
 }

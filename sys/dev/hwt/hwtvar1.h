@@ -29,72 +29,10 @@
  * $FreeBSD$
  */
 
-#ifndef _DEV_HWT_HWTVAR_H_
-#define _DEV_HWT_HWTVAR_H_
-
-#ifndef LOCORE
-static MALLOC_DEFINE(M_HWT, "hwt", "Hardware Trace");
-
-#define	HWT_LOCK(sc)			mtx_lock(&(sc)->mtx)
-#define	HWT_UNLOCK(sc)			mtx_unlock(&(sc)->mtx)
-#define	HWT_ASSERT_LOCKED(sc)		mtx_assert(&(sc)->mtx, MA_OWNED)
-
-struct hwt_proc {
-	struct proc		*p;
-	struct hwt		*hwt;
-	struct hwt_owner	*hwt_owner;
-	LIST_ENTRY(hwt_proc)	next;
-	int			cpu_id;
-};
-
-struct hwt {
-	vm_page_t		*pages;
-	int			npages;
-	int			cpu_id;
-	int			hwt_id;
-	struct hwt_owner	*hwt_owner;
-	LIST_ENTRY(hwt)		next;
-	int			started;
-	vm_object_t		obj;
-};
-
-struct hwt_owner {
-	struct proc		*p;
-	struct mtx		mtx; /* Protects hwts. */
-	LIST_HEAD(, hwt)	hwts; /* Owned HWTs. */
-	LIST_ENTRY(hwt_owner)	next;
-};
-
-struct hwt_backend_ops {
-	void (*hwt_event_init)(struct hwt *hwt);
-	void (*hwt_event_start)(struct hwt *hwt);
-	void (*hwt_event_stop)(struct hwt *hwt);
-	void (*hwt_event_enable)(struct hwt *hwt);
-	void (*hwt_event_disable)(struct hwt *hwt);
-	void (*hwt_event_dump)(struct hwt *hwt);
-};
-
-struct hwt_backend {
-	const char *name;
-	struct hwt_backend_ops *ops;
-};
-
-int hwt_register(struct hwt_backend *);
-
-struct hwt_softc {
-	struct cdev			*hwt_cdev;
-	struct mtx			mtx;
-
-	/*
-	 * List of CPU trace devices registered in HWT.
-	 * Protected by sc->mtx.
-	 */
-	TAILQ_HEAD(hwt_backend_list, hwt_backend)	hwt_backends;
-};
+#ifndef _DEV_HWT_HWTVAR1_H_
+#define _DEV_HWT_HWTVAR1_H_
 
 void hwt_switch_in(struct thread *td);
 void hwt_switch_out(struct thread *td);
 
-#endif /* !LOCORE */
-
-#endif /* !_DEV_HWT_HWTVAR_H_ */
+#endif /* !_DEV_HWT_HWTVAR1_H_ */

@@ -68,7 +68,7 @@
 #include <sys/pmckern.h>
 #endif
 
-#include <dev/hwt/hwtvar.h>
+#include <dev/hwt/hwtvar1.h>
 
 #ifdef KDTRACE_HOOKS
 #include <sys/dtrace_bsd.h>
