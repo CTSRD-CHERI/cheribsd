@@ -118,12 +118,12 @@ ENTRY(cpu_throw)
 	ldr	x6, [x4, #PCB_TPIDRRO]
 	msr	tpidrro_el0, x6
 #endif
-	ldp	PTR(19), PTR(20), [PTR(4), #PCB_REGS + 19 * PTR_WIDTH]
-	ldp	PTR(21), PTR(22), [PTR(4), #PCB_REGS + 21 * PTR_WIDTH]
-	ldp	PTR(23), PTR(24), [PTR(4), #PCB_REGS + 23 * PTR_WIDTH]
-	ldp	PTR(25), PTR(26), [PTR(4), #PCB_REGS + 25 * PTR_WIDTH]
-	ldp	PTR(27), PTR(28), [PTR(4), #PCB_REGS + 27 * PTR_WIDTH]
-	ldp	PTR(29), PTRN(lr), [PTR(4), #PCB_REGS + 29 * PTR_WIDTH]
+	ldp	PTR(19), PTR(20), [PTR(4), #PCB_REGS + (PCB_X19 + 0) * PTR_WIDTH]
+	ldp	PTR(21), PTR(22), [PTR(4), #PCB_REGS + (PCB_X19 + 2) * PTR_WIDTH]
+	ldp	PTR(23), PTR(24), [PTR(4), #PCB_REGS + (PCB_X19 + 4) * PTR_WIDTH]
+	ldp	PTR(25), PTR(26), [PTR(4), #PCB_REGS + (PCB_X19 + 6) * PTR_WIDTH]
+	ldp	PTR(27), PTR(28), [PTR(4), #PCB_REGS + (PCB_X19 + 8) * PTR_WIDTH]
+	ldp	PTR(29), PTRN(lr), [PTR(4), #PCB_REGS + (PCB_X19 + 10) * PTR_WIDTH]
 
 	ret
 END(cpu_throw)
@@ -143,12 +143,12 @@ ENTRY(cpu_switch)
 	ldr	PTR(4), [PTR(0), #TD_PCB]
 
 	/* Store the callee-saved registers */
-	stp	PTR(19), PTR(20), [PTR(4), #PCB_REGS + 19 * PTR_WIDTH]
-	stp	PTR(21), PTR(22), [PTR(4), #PCB_REGS + 21 * PTR_WIDTH]
-	stp	PTR(23), PTR(24), [PTR(4), #PCB_REGS + 23 * PTR_WIDTH]
-	stp	PTR(25), PTR(26), [PTR(4), #PCB_REGS + 25 * PTR_WIDTH]
-	stp	PTR(27), PTR(28), [PTR(4), #PCB_REGS + 27 * PTR_WIDTH]
-	stp	PTR(29), PTRN(lr), [PTR(4), #PCB_REGS + 29 * PTR_WIDTH]
+	stp	PTR(19), PTR(20), [PTR(4), #PCB_REGS + (PCB_X19 + 0) * PTR_WIDTH]
+	stp	PTR(21), PTR(22), [PTR(4), #PCB_REGS + (PCB_X19 + 2) * PTR_WIDTH]
+	stp	PTR(23), PTR(24), [PTR(4), #PCB_REGS + (PCB_X19 + 4) * PTR_WIDTH]
+	stp	PTR(25), PTR(26), [PTR(4), #PCB_REGS + (PCB_X19 + 6) * PTR_WIDTH]
+	stp	PTR(27), PTR(28), [PTR(4), #PCB_REGS + (PCB_X19 + 8) * PTR_WIDTH]
+	stp	PTR(29), PTRN(lr), [PTR(4), #PCB_REGS + (PCB_X19 + 10) * PTR_WIDTH]
 	/* And the old stack pointer */
 	mov	PTR(5), PTRN(sp)
 #if __has_feature(capabilities)
@@ -241,12 +241,12 @@ ENTRY(cpu_switch)
 	ldr	x6, [x4, #PCB_TPIDRRO]
 	msr	tpidrro_el0, x6
 #endif
-	ldp	PTR(19), PTR(20), [PTR(4), #PCB_REGS + 19 * PTR_WIDTH]
-	ldp	PTR(21), PTR(22), [PTR(4), #PCB_REGS + 21 * PTR_WIDTH]
-	ldp	PTR(23), PTR(24), [PTR(4), #PCB_REGS + 23 * PTR_WIDTH]
-	ldp	PTR(25), PTR(26), [PTR(4), #PCB_REGS + 25 * PTR_WIDTH]
-	ldp	PTR(27), PTR(28), [PTR(4), #PCB_REGS + 27 * PTR_WIDTH]
-	ldp	PTR(29), PTRN(lr), [PTR(4), #PCB_REGS + 29 * PTR_WIDTH]
+	ldp	PTR(19), PTR(20), [PTR(4), #PCB_REGS + (PCB_X19 + 0) * PTR_WIDTH]
+	ldp	PTR(21), PTR(22), [PTR(4), #PCB_REGS + (PCB_X19 + 2) * PTR_WIDTH]
+	ldp	PTR(23), PTR(24), [PTR(4), #PCB_REGS + (PCB_X19 + 4) * PTR_WIDTH]
+	ldp	PTR(25), PTR(26), [PTR(4), #PCB_REGS + (PCB_X19 + 6) * PTR_WIDTH]
+	ldp	PTR(27), PTR(28), [PTR(4), #PCB_REGS + (PCB_X19 + 8) * PTR_WIDTH]
+	ldp	PTR(29), PTRN(lr), [PTR(4), #PCB_REGS + (PCB_X19 + 10) * PTR_WIDTH]
 
 	str	PTR(zr), [PTR(4), #PCB_REGS + 18 * PTR_WIDTH]
 	ret
@@ -316,12 +316,12 @@ END(fork_trampoline)
 
 ENTRY(savectx)
 	/* Store the callee-saved registers */
-	stp	PTR(19), PTR(20), [PTR(0), #PCB_REGS + 19 * PTR_WIDTH]
-	stp	PTR(21), PTR(22), [PTR(0), #PCB_REGS + 21 * PTR_WIDTH]
-	stp	PTR(23), PTR(24), [PTR(0), #PCB_REGS + 23 * PTR_WIDTH]
-	stp	PTR(25), PTR(26), [PTR(0), #PCB_REGS + 25 * PTR_WIDTH]
-	stp	PTR(27), PTR(28), [PTR(0), #PCB_REGS + 27 * PTR_WIDTH]
-	stp	PTR(29), PTRN(lr), [PTR(0), #PCB_REGS + 29 * PTR_WIDTH]
+	stp	PTR(19), PTR(20), [PTR(0), #PCB_REGS + (PCB_X19 + 0) * PTR_WIDTH]
+	stp	PTR(21), PTR(22), [PTR(0), #PCB_REGS + (PCB_X19 + 2) * PTR_WIDTH]
+	stp	PTR(23), PTR(24), [PTR(0), #PCB_REGS + (PCB_X19 + 4) * PTR_WIDTH]
+	stp	PTR(25), PTR(26), [PTR(0), #PCB_REGS + (PCB_X19 + 6) * PTR_WIDTH]
+	stp	PTR(27), PTR(28), [PTR(0), #PCB_REGS + (PCB_X19 + 8) * PTR_WIDTH]
+	stp	PTR(29), PTRN(lr), [PTR(0), #PCB_REGS + (PCB_X19 + 10) * PTR_WIDTH]
 	/* And the old stack pointer */
 	mov	PTR(5), PTRN(sp)
 #if __has_feature(capabilities)
