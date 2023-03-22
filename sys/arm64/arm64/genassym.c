@@ -60,7 +60,6 @@ ASSYM(PCB_SIZE, roundup2(sizeof(struct pcb), STACKALIGNBYTES + 1));
 ASSYM(PCB_SINGLE_STEP_SHIFT, PCB_SINGLE_STEP_SHIFT);
 ASSYM(PCB_REGS, offsetof(struct pcb, pcb_x));
 ASSYM(PCB_X19, PCB_X19);
-ASSYM(PCB_LR, offsetof(struct pcb, pcb_lr));
 ASSYM(PCB_SP, offsetof(struct pcb, pcb_sp));
 #if __has_feature(capabilities)
 ASSYM(PCB_TPIDR, offsetof(struct pcb, pcb_tpidr_el0));
