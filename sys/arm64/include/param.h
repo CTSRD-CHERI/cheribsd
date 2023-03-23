@@ -111,6 +111,8 @@
 #ifndef KSTACK_PAGES
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	KSTACK_PAGES	5	/* pages of kernel stack (with pcb) */
+#elif defined(KASAN) || defined(KMSAN)
+#define	KSTACK_PAGES	6
 #else
 #define	KSTACK_PAGES	4	/* pages of kernel stack (with pcb) */
 #endif
