@@ -417,7 +417,7 @@ copyinuio(const struct iovec * __capability iovp, u_int iovcnt,
 		free(uio, M_IOV);
 		return (error);
 	}
-	uio->uio_iov = iov;
+	uio->uio_iov = cheri_kern_setbounds(iov, iovlen);
 	uio->uio_iovcnt = iovcnt;
 	uio->uio_segflg = UIO_USERSPACE;
 	uio->uio_offset = -1;
