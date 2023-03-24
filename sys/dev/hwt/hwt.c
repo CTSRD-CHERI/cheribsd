@@ -222,10 +222,26 @@ retry:
 	return (0);
 }
 
+static int
+hwt_mmap_single(struct cdev *cdev, vm_ooffset_t *offset, vm_size_t mapsize,
+    struct vm_object **objp, int nprot)
+{
+	struct hwt *hwt;
+
+	hwt = cdev->si_drv1;
+
+	if (nprot != PROT_READ || *offset != 0)
+		return (ENXIO);
+
+	*objp = hwt->obj;
+
+	return (0);
+}
+
 static struct cdevsw hwt_context_cdevsw = {
 	.d_version	= D_VERSION,
 	.d_name		= "hwt",
-	.d_mmap_single	= NULL,
+	.d_mmap_single	= hwt_mmap_single,
 	.d_ioctl	= NULL,
 };
 
@@ -633,18 +649,10 @@ hwt_switch_out(struct thread *td)
 	}
 }
 
-static int
-hwt_mmap_single(struct cdev *cdev, vm_ooffset_t *offset,
-    vm_size_t mapsize, struct vm_object **objp, int nprot)
-{
-
-	return (0);
-}
-
 static struct cdevsw hwt_cdevsw = {
 	.d_version	= D_VERSION,
 	.d_name		= "hwt",
-	.d_mmap_single	= hwt_mmap_single,
+	.d_mmap_single	= NULL,
 	.d_ioctl	= hwt_ioctl
 };
 
