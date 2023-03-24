@@ -53,8 +53,9 @@
             ..
             __ranges
             ..
-            __string
-            ..
+# XXX: Re-enable for CHERI LLVM 15
+#            __string
+#            ..
             __thread
             ..
             __type_traits
