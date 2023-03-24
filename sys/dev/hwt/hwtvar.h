@@ -56,6 +56,7 @@ struct hwt {
 	LIST_ENTRY(hwt)		next;
 	int			started;
 	vm_object_t		obj;
+	struct cdev		*cdev;
 };
 
 struct hwt_owner {

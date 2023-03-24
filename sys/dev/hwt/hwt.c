@@ -222,6 +222,36 @@ retry:
 	return (0);
 }
 
+static struct cdevsw hwt_context_cdevsw = {
+	.d_version	= D_VERSION,
+	.d_name		= "hwt",
+	.d_mmap_single	= NULL,
+	.d_ioctl	= NULL,
+};
+
+static int
+hwt_create_cdev(struct hwt *hwt)
+{
+	struct make_dev_args args;
+	int error;
+
+	dprintf("%s\n", __func__);
+
+	make_dev_args_init(&args);
+	args.mda_devsw = &hwt_context_cdevsw;
+	args.mda_flags = MAKEDEV_CHECKNAME | MAKEDEV_WAITOK;
+	args.mda_uid = UID_ROOT;
+	args.mda_gid = GID_WHEEL;
+	args.mda_mode = 0660;
+	args.mda_si_drv1 = hwt;
+
+	error = make_dev_s(&args, &hwt->cdev, "hwt_ctx_%d", hwt->hwt_id);
+	if (error != 0)
+		return (error);
+
+	return (0);
+}
+
 static int
 hwt_alloc_buffers(struct hwt_softc *sc, struct hwt *hwt)
 {
@@ -466,6 +496,13 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		LIST_INSERT_HEAD(&ho->hwts, hwt, next);
 		mtx_unlock(&ho->mtx);
 
+		error = hwt_create_cdev(hwt);
+		if (error) {
+			printf("%s: could not create cdev\n", __func__);
+			/* TODO */
+			return (error);
+		}
+
 		error = copyout(&hwt->hwt_id, halloc->hwt_id,
 		    sizeof(hwt->hwt_id));
 
@@ -667,6 +704,7 @@ hwt_process_exit(void *arg __unused, struct proc *p)
 		LIST_FOREACH_SAFE(hwt, &ho->hwts, next, hwt_tmp) {
 			LIST_REMOVE(hwt, next);
 			hwt_destroy_buffers(hwt);
+			destroy_dev(hwt->cdev);
 			free(hwt, M_HWT);
 		}
 		mtx_unlock(&ho->mtx);
