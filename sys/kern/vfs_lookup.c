@@ -1279,6 +1279,9 @@ good:
 					error = ENOENT;
 					goto bad2;
 				}
+				if (dp->v_mountedhere != mp) {
+					continue;
+				}
 			} else
 				crosslkflags &= ~LK_NODDLKTREAT;
 		}
