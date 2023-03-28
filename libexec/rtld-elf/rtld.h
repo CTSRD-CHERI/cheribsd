@@ -474,8 +474,10 @@ void dump_Elf_Rela(Obj_Entry *, const Elf_Rela *, u_long);
 
 #ifdef __CHERI_PURE_CAPABILITY__
 /* TODO: we should have a separate member for .text/rodata */
-#define get_codesegment_cap(obj) ((obj)->text_rodata_cap)
-#define get_datasegment_cap(obj) ((obj)->relocbase)
+#define get_codesegment_cap(obj)					\
+	(cheri_clearperm((obj)->text_rodata_cap, CAP_RELOC_REMOVE_PERMS))
+#define get_datasegment_cap(obj)				\
+	(cheri_clearperm((obj)->relocbase, CAP_RELOC_REMOVE_PERMS))
 #elif __has_feature(capabilities)
 #define get_codesegment_cap(obj)				\
 	(const char * __capability)cheri_setbounds(		\
