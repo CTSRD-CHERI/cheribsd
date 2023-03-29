@@ -121,7 +121,7 @@
 #endif
 
 #ifndef STANDARD_LIBRARY_PATH
-#define	STANDARD_LIBRARY_PATH	"/lib/casper:/lib:/usr/lib"
+#define	STANDARD_LIBRARY_PATH	"/lib:/usr/lib"
 #endif
 
 #ifndef LD_
