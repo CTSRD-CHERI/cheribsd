@@ -2590,7 +2590,7 @@ nfsrpc_createv4(vnode_t dvp, char *name, int namelen, struct vattr *vap,
 	/* Get the directory's post-op attributes. */
 	NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
 	*tl = txdr_unsigned(NFSV4OP_PUTFH);
-	nfsm_fhtom(nmp, nd, np->n_fhp->nfh_fh, np->n_fhp->nfh_len, 0);
+	(void)nfsm_fhtom(nmp, nd, np->n_fhp->nfh_fh, np->n_fhp->nfh_len, 0);
 	NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
 	*tl = txdr_unsigned(NFSV4OP_GETATTR);
 	(void) nfsrv_putattrbit(nd, &attrbits);
@@ -2790,7 +2790,7 @@ tryagain:
 			*tl++ = dstateid.other[2];
 			*tl = txdr_unsigned(NFSV4OP_PUTFH);
 			np = VTONFS(dvp);
-			nfsm_fhtom(nmp, nd, np->n_fhp->nfh_fh,
+			(void)nfsm_fhtom(nmp, nd, np->n_fhp->nfh_fh,
 			    np->n_fhp->nfh_len, 0);
 			NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
 			*tl = txdr_unsigned(NFSV4OP_REMOVE);
@@ -2878,7 +2878,7 @@ tryagain:
 				NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
 				*tl = txdr_unsigned(NFSV4OP_PUTFH);
 				np = VTONFS(tvp);
-				nfsm_fhtom(nmp, nd, np->n_fhp->nfh_fh,
+				(void)nfsm_fhtom(nmp, nd, np->n_fhp->nfh_fh,
 				    np->n_fhp->nfh_len, 0);
 				NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
 				*tl = txdr_unsigned(NFSV4OP_DELEGRETURN);
@@ -2898,7 +2898,7 @@ tryagain:
 			NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
 			*tl = txdr_unsigned(NFSV4OP_PUTFH);
 			np = VTONFS(fdvp);
-			nfsm_fhtom(nmp, nd, np->n_fhp->nfh_fh,
+			(void)nfsm_fhtom(nmp, nd, np->n_fhp->nfh_fh,
 			    np->n_fhp->nfh_len, 0);
 			NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
 			*tl = txdr_unsigned(NFSV4OP_SAVEFH);
@@ -2915,7 +2915,7 @@ tryagain:
 		(void) nfsrv_putattrbit(nd, &attrbits);
 		NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
 		*tl = txdr_unsigned(NFSV4OP_PUTFH);
-		nfsm_fhtom(nmp, nd, VTONFS(tdvp)->n_fhp->nfh_fh,
+		(void)nfsm_fhtom(nmp, nd, VTONFS(tdvp)->n_fhp->nfh_fh,
 		    VTONFS(tdvp)->n_fhp->nfh_len, 0);
 		NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
 		*tl = txdr_unsigned(NFSV4OP_GETATTR);
@@ -2926,7 +2926,7 @@ tryagain:
 	}
 	(void) nfsm_strtom(nd, fnameptr, fnamelen);
 	if (!(nd->nd_flag & ND_NFSV4))
-		nfsm_fhtom(nmp, nd, VTONFS(tdvp)->n_fhp->nfh_fh,
+		(void)nfsm_fhtom(nmp, nd, VTONFS(tdvp)->n_fhp->nfh_fh,
 			VTONFS(tdvp)->n_fhp->nfh_len, 0);
 	(void) nfsm_strtom(nd, tnameptr, tnamelen);
 	error = nfscl_request(nd, fdvp, p, cred);
@@ -3011,7 +3011,7 @@ nfsrpc_link(vnode_t dvp, vnode_t vp, char *name, int namelen,
 		NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
 		*tl = txdr_unsigned(NFSV4OP_PUTFH);
 	}
-	nfsm_fhtom(VFSTONFS(dvp->v_mount), nd, VTONFS(dvp)->n_fhp->nfh_fh,
+	(void)nfsm_fhtom(VFSTONFS(dvp->v_mount), nd, VTONFS(dvp)->n_fhp->nfh_fh,
 		VTONFS(dvp)->n_fhp->nfh_len, 0);
 	if (nd->nd_flag & ND_NFSV4) {
 		NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
@@ -3151,7 +3151,7 @@ nfsrpc_mkdir(vnode_t dvp, char *name, int namelen, struct vattr *vap,
 		(void) nfsrv_putattrbit(nd, &attrbits);
 		NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
 		*tl = txdr_unsigned(NFSV4OP_PUTFH);
-		nfsm_fhtom(nmp, nd, fhp->nfh_fh, fhp->nfh_len, 0);
+		(void)nfsm_fhtom(nmp, nd, fhp->nfh_fh, fhp->nfh_len, 0);
 		NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
 		*tl = txdr_unsigned(NFSV4OP_GETATTR);
 		(void) nfsrv_putattrbit(nd, &attrbits);
@@ -8204,7 +8204,7 @@ nfsrpc_createlayout(vnode_t dvp, char *name, int namelen, struct vattr *vap,
 	/* Get the directory's post-op attributes. */
 	NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
 	*tl = txdr_unsigned(NFSV4OP_PUTFH);
-	nfsm_fhtom(nmp, nd, np->n_fhp->nfh_fh, np->n_fhp->nfh_len, 0);
+	(void)nfsm_fhtom(nmp, nd, np->n_fhp->nfh_fh, np->n_fhp->nfh_len, 0);
 	NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
 	*tl = txdr_unsigned(NFSV4OP_GETATTR);
 	nfsrv_putattrbit(nd, &attrbits);
@@ -8609,7 +8609,7 @@ nfsrpc_copyrpc(vnode_t invp, off_t inoff, vnode_t outvp, off_t outoff,
 	nfsrv_putattrbit(nd, &attrbits);
 	NFSM_BUILD(tl, uint32_t *, NFSX_UNSIGNED);
 	*tl = txdr_unsigned(NFSV4OP_PUTFH);
-	nfsm_fhtom(nmp, nd, VTONFS(outvp)->n_fhp->nfh_fh,
+	(void)nfsm_fhtom(nmp, nd, VTONFS(outvp)->n_fhp->nfh_fh,
 	    VTONFS(outvp)->n_fhp->nfh_len, 0);
 	NFSM_BUILD(tl, uint32_t *, NFSX_UNSIGNED);
 	*tl = txdr_unsigned(NFSV4OP_COPY);
