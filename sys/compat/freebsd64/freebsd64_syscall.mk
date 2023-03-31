@@ -428,4 +428,4 @@ MIASM =  \
 	freebsd64_fspacectl.o \
 	sched_getcpu.o \
 	freebsd64_swapoff.o \
-	kqueue1.o
+	kqueuex.o
