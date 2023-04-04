@@ -54,6 +54,12 @@ __FBSDID("$FreeBSD$");
  * in x1. It will corrupt x0, x1, x2, x3, x4 and x6.
  */
 .macro cache_handle_range dcop = 0, ic = 0, icop = 0
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Ensure that the capability allows access to the range
+	 * [address, address + x1)
+	 */
+	scbnds	c6, c0, x1
+#endif
 .if \ic == 0
 	/* Load the D cache line size */
 	LDR_LABEL(x3, PTR(4), dcache_line_size)
@@ -73,11 +79,16 @@ __FBSDID("$FreeBSD$");
 	 * is valid within the target range of cache lines, otherwise strip the
 	 * tag and let the dc/ic instruction fail.
 	 */
-	LDR_LABEL(c6, c6, kernel_root_cap)
-	scvalue c0, c6, x0
-	add	x6, x1, x3
-	bic	x6, x6, x4
-	scbnds	c0, c0, x6
+	LDR_LABEL(c2, c2, kernel_root_cap)
+	scvalue c0, c2, x0
+	add	x2, x1, x3
+	bic	x2, x2, x4
+	scbnds	c0, c0, x2
+	chkss	c6, c0
+	b.mi	3f
+	/* Use c6 as the source here for more informative debug info */
+	clrtag	c0, c6
+3:
 #endif
 .if \ic != 0
 	mov	PTR(2), PTR(0)		/* Save the address */
