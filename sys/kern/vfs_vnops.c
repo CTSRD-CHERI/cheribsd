@@ -1933,7 +1933,10 @@ vn_start_write(struct vnode *vp, struct mount **mpp, int flags)
 	if (vp == NULL)
 		vfs_ref(mp);
 
-	return (vn_start_write_refed(mp, flags, false));
+	error = vn_start_write_refed(mp, flags, false);
+	if (error != 0 && (flags & V_NOWAIT) == 0)
+		*mpp = NULL;
+	return (error);
 }
 
 /*
@@ -1949,7 +1952,7 @@ vn_start_secondary_write(struct vnode *vp, struct mount **mpp, int flags)
 	struct mount *mp;
 	int error, mflags;
 
-	KASSERT((flags & ~V_VALID_FLAGS) == 0,
+	KASSERT((flags & (~V_VALID_FLAGS | V_XSLEEP)) == 0,
 	    ("%s: invalid flags passed %d\n", __func__, flags));
 
  retry:
@@ -1987,6 +1990,7 @@ vn_start_secondary_write(struct vnode *vp, struct mount **mpp, int flags)
 	if ((flags & V_NOWAIT) != 0) {
 		MNT_REL(mp);
 		MNT_IUNLOCK(mp);
+		*mpp = NULL;
 		return (EWOULDBLOCK);
 	}
 	/*
@@ -2002,6 +2006,7 @@ vn_start_secondary_write(struct vnode *vp, struct mount **mpp, int flags)
 	vfs_rel(mp);
 	if (error == 0)
 		goto retry;
+	*mpp = NULL;
 	return (error);
 }
 
