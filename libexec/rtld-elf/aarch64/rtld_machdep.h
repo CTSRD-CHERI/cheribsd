@@ -61,6 +61,8 @@ struct Struct_Obj_Entry;
 })
 #endif
 
+bool arch_digest_note(struct Struct_Obj_Entry *obj, const Elf_Note *note);
+
 uintptr_t reloc_jmpslot(uintptr_t *where, uintptr_t target,
     const struct Struct_Obj_Entry *defobj, const struct Struct_Obj_Entry *obj,
     const Elf_Rel *rel);
