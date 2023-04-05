@@ -696,6 +696,11 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 		panic("Undefined instruction: %08x",
 		    *(uint32_t * __capability)frame->tf_elr);
 		break;
+	case EXCP_BTI:
+		print_registers(frame);
+		print_gp_register("far", far);
+		panic("Branch Target exception");
+		break;
 	default:
 		print_registers(frame);
 		print_gp_register("far", far);
@@ -833,6 +838,11 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		}
 		PROC_UNLOCK(td->td_proc);
 		call_trapsignal(td, SIGTRAP, TRAP_TRACE,
+		    (void * __capability)frame->tf_elr, exception);
+		userret(td, frame);
+		break;
+	case EXCP_BTI:
+		call_trapsignal(td, SIGILL, ILL_ILLOPC,
 		    (void * __capability)frame->tf_elr, exception);
 		userret(td, frame);
 		break;
