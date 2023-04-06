@@ -266,12 +266,12 @@ get_page(struct vm_page *page)
 }
 
 extern long
-get_user_pages(unsigned long start, unsigned long nr_pages,
+get_user_pages(void * __capability start, unsigned long nr_pages,
     unsigned int gup_flags, struct page **,
     struct vm_area_struct **);
 
 static inline long
-pin_user_pages(unsigned long start, unsigned long nr_pages,
+pin_user_pages(void * __capability start, unsigned long nr_pages,
     unsigned int gup_flags, struct page **pages,
     struct vm_area_struct **vmas)
 {
@@ -279,11 +279,11 @@ pin_user_pages(unsigned long start, unsigned long nr_pages,
 }
 
 extern int
-__get_user_pages_fast(unsigned long start, int nr_pages, int write,
+__get_user_pages_fast(void * __capability start, int nr_pages, int write,
     struct page **);
 
 static inline int
-pin_user_pages_fast(unsigned long start, int nr_pages,
+pin_user_pages_fast(void * __capability start, int nr_pages,
     unsigned int gup_flags, struct page **pages)
 {
 	return __get_user_pages_fast(
@@ -292,13 +292,13 @@ pin_user_pages_fast(unsigned long start, int nr_pages,
 
 extern long
 get_user_pages_remote(struct task_struct *, struct mm_struct *,
-    unsigned long start, unsigned long nr_pages,
+    void * __capability start, unsigned long nr_pages,
     unsigned int gup_flags, struct page **,
     struct vm_area_struct **);
 
 static inline long
 pin_user_pages_remote(struct task_struct *task, struct mm_struct *mm,
-    unsigned long start, unsigned long nr_pages,
+    void * __capability start, unsigned long nr_pages,
     unsigned int gup_flags, struct page **pages,
     struct vm_area_struct **vmas)
 {
@@ -370,3 +370,12 @@ might_alloc(gfp_t gfp_mask __unused)
 #define	is_cow_mapping(flags)	(false)
 
 #endif					/* _LINUXKPI_LINUX_MM_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20230424,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END
