@@ -215,8 +215,8 @@ SUBDIR=	\
 	libiconv \
 	libmchain \
 	lindebugfs \
-	${_linuxkpi} \
-	${_linuxkpi_wlan} \
+	linuxkpi \
+	linuxkpi_wlan \
 	${_lio} \
 	lpt \
 	${_mac_biba} \
@@ -553,11 +553,9 @@ _mlx5ib=	mlx5ib
 .if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
     ${MACHINE_CPUARCH} == "i386"
 _ena=		ena
-.if !${MACHINE_CPU:Mcheri}
 _iwlwifi=	iwlwifi
 .if ${MK_SOURCELESS_UCODE} != "no"
 _iwlwififw=	iwlwififw
-.endif
 .endif
 .if !${MACHINE_ABI:Mpurecap}
 _ossl=		ossl
@@ -878,11 +876,6 @@ _bcm283x_pwm=  bcm283x_pwm
 # LLVM 10 crashes when building if_malo_pci.c, fixed in LLVM11:
 # https://bugs.llvm.org/show_bug.cgi?id=44351
 _malo=	malo
-.endif
-
-.if !${MACHINE_CPU:Mcheri}
-_linuxkpi=	linuxkpi
-_linuxkpi_wlan=	linuxkpi_wlan
 .endif
 
 # Some of these work in hybrid kernels but we disable them for consistency
