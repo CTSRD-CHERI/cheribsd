@@ -377,5 +377,4 @@ LD_EMULATION_powerpc64= elf64ppc_fbsd
 LD_EMULATION_powerpc64le= elf64lppc_fbsd
 LD_EMULATION_riscv64= elf64lriscv
 LD_EMULATION_riscv64c= elf64lriscv
-LD_EMULATION_riscv64sf= elf64lriscv
 LD_EMULATION=${LD_EMULATION_${MACHINE_ARCH}}

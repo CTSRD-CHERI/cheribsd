@@ -177,9 +177,7 @@ KNOWN_ARCHES?=	aarch64/arm64 \
 		powerpc64le/powerpc \
 		powerpcspe/powerpc \
 		riscv64/riscv \
-		riscv64sf/riscv \
-		riscv64c/riscv \
-		riscv64sfc/riscv
+		riscv64c/riscv
 
 .if ${TARGET} == ${TARGET_ARCH}
 _t=		${TARGET}

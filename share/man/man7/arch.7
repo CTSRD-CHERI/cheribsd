@@ -99,7 +99,6 @@ release to support each architecture.
 .It powerpc64le Ta 13.0
 .It riscv64     Ta 12.0
 .It riscv64c    Ta CheriBSD only
-.It riscv64sf   Ta 12.0
 .El
 .Pp
 Discontinued architectures are shown in the following table.
@@ -119,6 +118,7 @@ Discontinued architectures are shown in the following table.
 .It mips64elhf  Ta 12.0  Ta 13.x
 .It mips64hf    Ta 12.0  Ta 13.x
 .It pc98        Ta 2.2   Ta 11.4
+.It riscv64sf   Ta 12.0  Ta 13.x
 .It sparc64     Ta 5.0   Ta 12.x
 .El
 .Ss Type sizes
@@ -233,7 +233,6 @@ Machine-dependent type sizes:
 .It powerpc64le Ta 8 Ta  8 Ta  8 Ta 8
 .It riscv64     Ta 8 Ta  8 Ta 16 Ta 8
 .It riscv64c    Ta 8 Ta 16 Ta 16 Ta 8
-.It riscv64sf   Ta 8 Ta  8 Ta 16 Ta 8
 .El
 .Pp
 .Sy time_t
@@ -253,7 +252,6 @@ is 8 bytes on all supported architectures except i386.
 .It powerpc64le Ta little Ta unsigned
 .It riscv64     Ta little Ta   signed
 .It riscv64c    Ta little Ta   signed
-.It riscv64sf   Ta little Ta   signed
 .El
 .Ss Page Size
 .Bl -column -offset indent "Architecture" "Page Sizes"
@@ -270,7 +268,6 @@ is 8 bytes on all supported architectures except i386.
 .It powerpc64le Ta 4K
 .It riscv64     Ta 4K, 2M, 1G
 .It riscv64c    Ta 4K, 2M, 1G
-.It riscv64sf   Ta 4K, 2M, 1G
 .El
 .Ss Floating Point
 .Bl -column -offset indent "Architecture" "float, double" "long double"
@@ -287,7 +284,6 @@ is 8 bytes on all supported architectures except i386.
 .It powerpc64le Ta hard Ta hard, double precision
 .It riscv64     Ta hard Ta hard, quad precision
 .It riscv64c    Ta hard Ta hard, quad precision
-.It riscv64sf   Ta soft Ta soft, quad precision
 .El
 .Ss Default Tool Chain
 .Fx
@@ -319,7 +315,7 @@ or similar things like boot sequences.
 .It arm Ta arm Ta armv6, armv7
 .It i386 Ta i386 Ta i386
 .It powerpc Ta powerpc Ta powerpc, powerpcspe, powerpc64, powerpc64le
-.It riscv Ta riscv Ta riscv64, riscv64c, riscv64sf
+.It riscv Ta riscv Ta riscv64, riscv64c
 .El
 .Ss Predefined Macros
 The compiler provides a number of predefined macros.
@@ -359,7 +355,6 @@ Architecture-specific macros:
 .It powerpc64le Ta Dv __powerpc__ , Dv __powerpc64__
 .It riscv64     Ta Dv __riscv , Dv __riscv_xlen == 64
 .It riscv64c    Ta Dv __riscv , Dv __riscv_xlen == 64
-.It riscv64sf   Ta Dv __riscv , Dv __riscv_xlen == 64 , Dv __riscv_float_abi_soft
 .El
 .Pp
 Compilers may define additional variants of architecture-specific macros.
