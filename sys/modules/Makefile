@@ -659,6 +659,7 @@ _mpr=		mpr
 .endif
 
 .if ${MK_TESTS} != "no" || defined(ALL_MODULES)
+SUBDIR+=	ktest
 SUBDIR+=	tests
 .endif
 
