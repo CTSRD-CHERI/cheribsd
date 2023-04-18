@@ -260,10 +260,12 @@ dpcpu_copy(void *s, int size)
 		dpcpu = dpcpu_off[i];
 		if (dpcpu == 0)
 			continue;
-		memcpy((void *)(dpcpu + (ptraddr_t)s), s, size);
+		memcpy((void *)(dpcpu - DPCPU_BIAS + ((ptraddr_t)s - (ptraddr_t)DPCPU_START)),
+		    s, size);
 	}
 #else
-	memcpy((void *)(dpcpu_off[0] + (ptraddr_t)s), s, size);
+	memcpy((void *)(dpcpu_off[0] - DPCPU_BIAS + ((ptraddr_t)s - (ptraddr_t)DPCPU_START)),
+	    s, size);
 #endif
 }
 
