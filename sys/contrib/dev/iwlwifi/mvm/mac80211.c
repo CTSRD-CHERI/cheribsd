@@ -1681,7 +1681,7 @@ static void iwl_mvm_recalc_multicast(struct iwl_mvm *mvm)
 		IWL_ERR(mvm, "Failed to synchronize multicast groups update\n");
 }
 
-static u64 iwl_mvm_prepare_multicast(struct ieee80211_hw *hw,
+static uintptr_t iwl_mvm_prepare_multicast(struct ieee80211_hw *hw,
 				     struct netdev_hw_addr_list *mc_list)
 {
 	struct iwl_mvm *mvm = IWL_MAC80211_GET_MVM(hw);
@@ -1705,9 +1705,9 @@ static u64 iwl_mvm_prepare_multicast(struct ieee80211_hw *hw,
 	if (pass_all) {
 		cmd->pass_all = 1;
 #if defined(__linux__)
-		return (u64)(unsigned long)cmd;
+		return (unsigned long)cmd;
 #elif defined(__FreeBSD__)
-		return (u64)(uintptr_t)cmd;
+		return (uintptr_t)cmd;
 #endif
 	}
 
@@ -1725,16 +1725,16 @@ static u64 iwl_mvm_prepare_multicast(struct ieee80211_hw *hw,
 	}
 
 #if defined(__linux__)
-	return (u64)(unsigned long)cmd;
+	return (unsigned long)cmd;
 #elif defined(__FreeBSD__)
-	return (u64)(uintptr_t)cmd;
+	return (uintptr_t)cmd;
 #endif
 }
 
 static void iwl_mvm_configure_filter(struct ieee80211_hw *hw,
 				     unsigned int changed_flags,
 				     unsigned int *total_flags,
-				     u64 multicast)
+				     uintptr_t multicast)
 {
 	struct iwl_mvm *mvm = IWL_MAC80211_GET_MVM(hw);
 #if defined(__linux__)
@@ -5520,3 +5520,12 @@ const struct ieee80211_ops iwl_mvm_hw_ops = {
 	.sta_add_debugfs = iwl_mvm_sta_add_debugfs,
 #endif
 };
+// CHERI CHANGES START
+// {
+//   "updated": 20230424,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

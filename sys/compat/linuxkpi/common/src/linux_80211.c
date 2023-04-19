@@ -682,7 +682,7 @@ lkpi_update_mcast_filter(struct ieee80211com *ic, bool force)
 	struct list_head *le, *next;
 	struct netdev_hw_addr *addr;
 	struct ieee80211vap *vap;
-	u64 mc;
+	uintptr_t mc;
 	unsigned int changed_flags, total_flags;
 
 	lhw = ic->ic_softc;
@@ -5053,3 +5053,12 @@ linuxkpi_cfg80211_bss_flush(struct wiphy *wiphy)
 MODULE_VERSION(linuxkpi_wlan, 1);
 MODULE_DEPEND(linuxkpi_wlan, linuxkpi, 1, 1, 1);
 MODULE_DEPEND(linuxkpi_wlan, wlan, 1, 1, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20230424,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END
