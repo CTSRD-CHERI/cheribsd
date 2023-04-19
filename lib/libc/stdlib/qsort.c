@@ -152,7 +152,8 @@ local_qsort(void *a, size_t n, size_t es, cmp_t *cmp, void *thunk)
 	int cmp_result;
 	int swaptype_intcap_t, swaptype_int, swap_cnt;
 
-	if (__predict_false(n == 0))
+	/* if there are less than 2 elements, then sorting is not needed */
+	if (__predict_false(n < 2))
 		return;
 loop:
 	SWAPINIT(intcap_t, a, es);
