@@ -249,10 +249,10 @@ void lkpi_80211_mo_cancel_hw_scan(struct ieee80211_hw *, struct ieee80211_vif *)
 void lkpi_80211_mo_sw_scan_complete(struct ieee80211_hw *, struct ieee80211_vif *);
 void lkpi_80211_mo_sw_scan_start(struct ieee80211_hw *, struct ieee80211_vif *,
     const u8 *);
-u64 lkpi_80211_mo_prepare_multicast(struct ieee80211_hw *,
+uintptr_t lkpi_80211_mo_prepare_multicast(struct ieee80211_hw *,
     struct netdev_hw_addr_list *);
 void lkpi_80211_mo_configure_filter(struct ieee80211_hw *, unsigned int,
-    unsigned int *, u64);
+    unsigned int *, uintptr_t);
 int lkpi_80211_mo_sta_state(struct ieee80211_hw *, struct ieee80211_vif *,
     struct lkpi_sta *, enum ieee80211_sta_state);
 int lkpi_80211_mo_config(struct ieee80211_hw *, uint32_t);
@@ -291,7 +291,8 @@ int lkpi_80211_mo_set_key(struct ieee80211_hw *, enum set_key_cmd,
 //   "updated": 20230424,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "subobject_bounds"
+//     "subobject_bounds",
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END
