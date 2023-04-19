@@ -14,4 +14,6 @@ ATF_TESTS_PYTEST +=	test_rtnl_route.py
 
 CFLAGS+=	-I${.CURDIR:H:H:H}
 
+LD_FATAL_WARNINGS=no
+
 .include <bsd.test.mk>
