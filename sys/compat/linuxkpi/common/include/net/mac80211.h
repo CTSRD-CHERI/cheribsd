@@ -753,7 +753,7 @@ struct ieee80211_tx_info {
 			uint8_t				antenna;
 			uint16_t			tx_time;
 			bool				is_valid_ack_signal;
-			void				*status_driver_data[16 / sizeof(void *)];		/* XXX TODO */
+			void				*status_driver_data[MAX(16 / sizeof(void *), 2)];		/* XXX TODO */
 		} status;
 #define	IEEE80211_TX_INFO_DRIVER_DATA_SIZE	(5 * sizeof(void *))			/* XXX TODO 5? */
 		void					*driver_data[IEEE80211_TX_INFO_DRIVER_DATA_SIZE / sizeof(void *)];
