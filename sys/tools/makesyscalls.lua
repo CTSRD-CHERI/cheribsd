@@ -536,7 +536,7 @@ local pattern_table = {
 		pattern = "%%ABI_HEADERS%%",
 		process = function()
 			if config.abi_headers ~= "" then
-				line = config.abi_headers .. "\n"
+				local line = config.abi_headers .. "\n"
 				write_line("sysinc", line)
 			end
 		end,
@@ -1088,7 +1088,7 @@ local function handle_unimpl(sysnum, sysstart, sysend, comment)
 	end
 end
 
-local function handle_reserved(sysnum, sysstart, sysend, comment)
+local function handle_reserved(sysnum, sysstart, sysend)
 	handle_unimpl(sysnum, sysstart, sysend, "reserved for local use")
 end
 
