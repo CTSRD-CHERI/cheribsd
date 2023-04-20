@@ -305,7 +305,7 @@ komeda_drm_irq_hook(void *arg)
 
 	/* Temporary hack. */
 	sc->drm_dev.mode_config.max_width = 1920;
-	sc->drm_dev.mode_config.max_height = 1080;
+	sc->drm_dev.mode_config.max_height = 1200;
 
 	sc->drm_dev.mode_config.funcs = &komeda_drm_mode_config_funcs;
 	sc->drm_dev.mode_config.helper_private =
