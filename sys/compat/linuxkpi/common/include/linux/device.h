@@ -114,7 +114,7 @@ struct device {
 	dev_t		devt;
 	struct class	*class;
 	void		(*release)(struct device *dev);
-	struct kobject	kobj;
+	struct kobject	kobj __subobject_use_container_bounds;
 	void		*dma_priv;
 	void		*driver_data;
 	unsigned int	irq;
@@ -681,3 +681,12 @@ devm_kmemdup(struct device *dev, const void *src, size_t len, gfp_t gfp)
     devm_kmalloc((_dev), ((_sizen) * (_size)), (_gfp) | __GFP_ZERO)
 
 #endif	/* _LINUXKPI_LINUX_DEVICE_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20230424,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

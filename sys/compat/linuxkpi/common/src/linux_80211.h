@@ -68,7 +68,7 @@
 	printf("%s:%d: XXX LKPI80211 IMPROVE_TXQ\n", __func__, __LINE__)
 
 struct lkpi_radiotap_tx_hdr {
-	struct ieee80211_radiotap_header wt_ihdr;
+	struct ieee80211_radiotap_header wt_ihdr __subobject_use_container_bounds;
 	uint8_t		wt_flags;
 	uint8_t		wt_rate;
 	uint16_t	wt_chan_freq;
@@ -80,7 +80,7 @@ struct lkpi_radiotap_tx_hdr {
 	 (1 << IEEE80211_RADIOTAP_CHANNEL))
 
 struct lkpi_radiotap_rx_hdr {
-	struct ieee80211_radiotap_header wr_ihdr;
+	struct ieee80211_radiotap_header wr_ihdr __subobject_use_container_bounds;
 	uint64_t	wr_tsft;
 	uint8_t		wr_flags;
 	uint8_t		wr_rate;
@@ -106,7 +106,7 @@ struct lkpi_txq {
 	struct sk_buff_head	skbq;
 
 	/* Must be last! */
-	struct ieee80211_txq	txq __aligned(CACHE_LINE_SIZE);
+	struct ieee80211_txq	txq __aligned(CACHE_LINE_SIZE) __subobject_use_container_bounds;
 };
 #define	TXQ_TO_LTXQ(_txq)	container_of(_txq, struct lkpi_txq, txq)
 
@@ -128,14 +128,14 @@ struct lkpi_sta {
 	bool			in_mgd;				/* XXX-BZ should this be per-vif? */
 
 	/* Must be last! */
-	struct ieee80211_sta	sta __aligned(CACHE_LINE_SIZE);
+	struct ieee80211_sta	sta __aligned(CACHE_LINE_SIZE) __subobject_use_container_bounds;
 };
 #define	STA_TO_LSTA(_sta)	container_of(_sta, struct lkpi_sta, sta)
 #define	LSTA_TO_STA(_lsta)	(&(_lsta)->sta)
 
 struct lkpi_vif {
         TAILQ_ENTRY(lkpi_vif)	lvif_entry;
-	struct ieee80211vap	iv_vap;
+	struct ieee80211vap	iv_vap __subobject_use_container_bounds;
 
 	struct mtx		mtx;
 	struct wireless_dev	wdev;
@@ -151,7 +151,7 @@ struct lkpi_vif {
 	bool			hw_queue_stopped[IEEE80211_NUM_ACS];
 
 	/* Must be last! */
-	struct ieee80211_vif	vif __aligned(CACHE_LINE_SIZE);
+	struct ieee80211_vif	vif __aligned(CACHE_LINE_SIZE) __subobject_use_container_bounds;
 };
 #define	VAP_TO_LVIF(_vap)	container_of(_vap, struct lkpi_vif, iv_vap)
 #define	LVIF_TO_VAP(_lvif)	(&(_lvif)->iv_vap)
@@ -204,7 +204,7 @@ struct lkpi_hw {	/* name it mac80211_sc? */
 	bool				update_wme;
 
 	/* Must be last! */
-	struct ieee80211_hw		hw __aligned(CACHE_LINE_SIZE);
+	struct ieee80211_hw		hw __aligned(CACHE_LINE_SIZE) __subobject_use_container_bounds;
 };
 #define	LHW_TO_HW(_lhw)		(&(_lhw)->hw)
 #define	HW_TO_LHW(_hw)		container_of(_hw, struct lkpi_hw, hw)
@@ -213,7 +213,7 @@ struct lkpi_wiphy {
 	const struct cfg80211_ops	*ops;
 
 	/* Must be last! */
-	struct wiphy			wiphy __aligned(CACHE_LINE_SIZE);
+	struct wiphy			wiphy __aligned(CACHE_LINE_SIZE) __subobject_use_container_bounds;
 };
 #define	WIPHY_TO_LWIPHY(_wiphy)	container_of(_wiphy, struct lkpi_wiphy, wiphy)
 #define	LWIPHY_TO_WIPHY(_lwiphy)	(&(_lwiphy)->wiphy)
@@ -286,3 +286,12 @@ int lkpi_80211_mo_set_key(struct ieee80211_hw *, enum set_key_cmd,
     struct ieee80211_key_conf *);
 
 #endif	/* _LKPI_SRC_LINUX_80211_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20230424,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

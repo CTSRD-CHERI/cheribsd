@@ -312,7 +312,7 @@ struct pci_mmio_region {
 };
 
 struct pci_dev {
-	struct device		dev;
+	struct device		dev __subobject_member_used_for_c_inheritance;
 	struct list_head	links;
 	struct pci_driver	*pdrv;
 	struct pci_bus		*bus;
@@ -1730,3 +1730,12 @@ pci_irq_vector(struct pci_dev *pdev, unsigned int vector)
 }
 
 #endif	/* _LINUXKPI_LINUX_PCI_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20230424,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END
