@@ -1993,17 +1993,17 @@ iounmap(void *addr)
 void *
 vmap(struct page **pages, unsigned int count, unsigned long flags, int prot)
 {
-	vm_pointer_t off;
+	vm_pointer_t va;
 	size_t size;
 
 	size = count * PAGE_SIZE;
-	off = kva_alloc(size);
-	if (off == 0)
+	va = kva_alloc(size);
+	if (va == 0)
 		return (NULL);
-	vmmap_add((void *)off, size);
-	pmap_qenter(off, pages, count);
+	vmmap_add((void *)va, size);
+	pmap_qenter(va, pages, count);
 
-	return ((void *)off);
+	return ((void *)va);
 }
 
 void
