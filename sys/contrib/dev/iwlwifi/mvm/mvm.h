@@ -791,9 +791,9 @@ struct iwl_mvm {
 	struct mutex mutex;
 	struct list_head async_handlers_list;
 	spinlock_t async_handlers_lock;
-	struct work_struct async_handlers_wk;
+	struct work_struct async_handlers_wk __subobject_use_container_bounds;
 
-	struct work_struct roc_done_wk;
+	struct work_struct roc_done_wk __subobject_use_container_bounds;
 
 	unsigned long init_status;
 
@@ -815,7 +815,7 @@ struct iwl_mvm {
 	u32 ampdu_ref;
 	bool ampdu_toggle;
 
-	struct iwl_notif_wait_data notif_wait;
+	struct iwl_notif_wait_data notif_wait __subobject_use_container_bounds;
 
 	union {
 		struct mvm_statistics_rx_v3 rx_stats_v3;
@@ -834,7 +834,7 @@ struct iwl_mvm {
 		struct iwl_mvm_dqa_txq_info queue_info[IWL_MAX_HW_QUEUES];
 		struct iwl_mvm_tvqm_txq_info tvqm_info[IWL_MAX_TVQM_QUEUES];
 	};
-	struct work_struct add_stream_wk; /* To add streams to queues */
+	struct work_struct add_stream_wk __subobject_use_container_bounds; /* To add streams to queues */
 
 	const char *nvm_file_name;
 	struct iwl_nvm_data *nvm_data;
@@ -842,7 +842,7 @@ struct iwl_mvm {
 	struct iwl_mvm_csme_conn_info __rcu *csme_conn_info;
 	bool mei_rfkill_blocked;
 	bool mei_registered;
-	struct work_struct sap_connected_wk;
+	struct work_struct sap_connected_wk __subobject_use_container_bounds;
 
 	/*
 	 * NVM built based on the SAP data but that we can't free even after
@@ -1006,7 +1006,7 @@ struct iwl_mvm {
 	bool fw_static_smps_request;
 
 	unsigned long bt_coex_last_tcm_ts;
-	struct iwl_mvm_tcm tcm;
+	struct iwl_mvm_tcm tcm __subobject_use_container_bounds;
 
 	u8 uapsd_noagg_bssid_write_idx;
 	struct mac_address uapsd_noagg_bssids[IWL_MVM_UAPSD_NOAGG_BSSIDS_NUM]
@@ -2231,3 +2231,12 @@ void iwl_mvm_send_roaming_forbidden_event(struct iwl_mvm *mvm,
 					  bool forbidden);
 
 #endif /* __IWL_MVM_H__ */
+// CHERI CHANGES START
+// {
+//   "updated": 20230424,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END
