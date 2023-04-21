@@ -120,7 +120,7 @@ struct iwl_fw_runtime {
 
 	/* debug */
 	struct {
-		struct iwl_fwrt_wk_data wks[IWL_FW_RUNTIME_DUMP_WK_NUM];
+		struct iwl_fwrt_wk_data wks[IWL_FW_RUNTIME_DUMP_WK_NUM] __subobject_use_container_bounds;
 		unsigned long active_wks;
 
 		u8 conf;
@@ -204,3 +204,12 @@ int iwl_set_soc_latency(struct iwl_fw_runtime *fwrt);
 int iwl_configure_rxq(struct iwl_fw_runtime *fwrt);
 
 #endif /* __iwl_fw_runtime_h__ */
+// CHERI CHANGES START
+// {
+//   "updated": 20230424,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END
