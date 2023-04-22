@@ -98,7 +98,7 @@ check_uncompressed_data(const uint8_t *data, size_t datalen)
 	}
 }
 
-CHERIBSDTEST(test_deflate_zeroes, "Deflate a buffer of zeroes")
+CHERIBSDTEST(deflate_zeroes, "Deflate a buffer of zeroes")
 {
 	int ret;
 	size_t compsize;
@@ -132,7 +132,7 @@ CHERIBSDTEST(test_deflate_zeroes, "Deflate a buffer of zeroes")
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_inflate_zeroes, "Inflate a compressed buffer of zeroes")
+CHERIBSDTEST(inflate_zeroes, "Inflate a compressed buffer of zeroes")
 {
 	int ret;
 	uint8_t *outbuf;

@@ -178,7 +178,7 @@ static int
 arm_doorbell_detach(device_t dev)
 {
 
-	return (0);
+	return (EBUSY);
 }
 
 struct arm_doorbell *
@@ -226,24 +226,29 @@ arm_doorbell_ofw_get(device_t dev, const char *name)
 
 	if (ncells != 2) {
 		device_printf(dev, "Unexpected data size.\n");
+		OF_prop_free(cells);
 		return (NULL);
 	}
 
 	db_dev = OF_device_from_xref(parent);
 	if (db_dev == NULL) {
-		device_printf(dev, "%s: Can't get arm_doorbell device\n", __func__);
+		device_printf(dev, "%s: Can't get arm_doorbell device\n",
+		    __func__);
+		OF_prop_free(cells);
 		return (NULL);
 	}
 
 	chan = cells[0];
 	if (chan >= DOORBELL_N_CHANNELS) {
 		device_printf(dev, "Unexpected channel number.\n");
+		OF_prop_free(cells);
 		return (NULL);
 	}
 
 	db_id = cells[1];
 	if (db_id >= 32) {
 		device_printf(dev, "Unexpected channel bit.\n");
+		OF_prop_free(cells);
 		return (NULL);
 	}
 
@@ -253,7 +258,7 @@ arm_doorbell_ofw_get(device_t dev, const char *name)
 	db->chan = chan;
 	db->db = db_id;
 
-	free(cells, M_OFWPROP);
+	OF_prop_free(cells);
 
 	return (db);
 }

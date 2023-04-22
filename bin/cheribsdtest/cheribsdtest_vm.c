@@ -100,14 +100,14 @@ mmap_and_check_tag_stored(int fd, int protflags, int mapflags)
 		CHERIBSDTEST_CHECK_SYSCALL(close(fd));
 }
 
-CHERIBSDTEST(cheribsdtest_vm_tag_mmap_anon,
+CHERIBSDTEST(vm_tag_mmap_anon,
     "check tags are stored for MAP_ANON pages")
 {
 	mmap_and_check_tag_stored(-1, PROT_READ | PROT_WRITE, MAP_ANON);
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(cheribsdtest_vm_tag_shm_open_anon_shared,
+CHERIBSDTEST(vm_tag_shm_open_anon_shared,
     "check tags are stored for SHM_ANON MAP_SHARED pages")
 {
 	int fd = CHERIBSDTEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
@@ -116,7 +116,7 @@ CHERIBSDTEST(cheribsdtest_vm_tag_shm_open_anon_shared,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(cheribsdtest_vm_tag_shm_open_anon_private,
+CHERIBSDTEST(vm_tag_shm_open_anon_private,
     "check tags are stored for SHM_ANON MAP_PRIVATE pages")
 {
 	int fd = CHERIBSDTEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
@@ -128,7 +128,7 @@ CHERIBSDTEST(cheribsdtest_vm_tag_shm_open_anon_private,
 /*
  * Test aliasing of SHM_ANON objects
  */
-CHERIBSDTEST(cheribsdtest_vm_tag_shm_open_anon_shared2x,
+CHERIBSDTEST(vm_tag_shm_open_anon_shared2x,
     "test multiply-mapped SHM_ANON objects")
 {
 	void * __capability volatile * map2;
@@ -154,7 +154,7 @@ CHERIBSDTEST(cheribsdtest_vm_tag_shm_open_anon_shared2x,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(cheribsdtest_vm_shm_open_anon_unix_surprise,
+CHERIBSDTEST(vm_shm_open_anon_unix_surprise,
     "test SHM_ANON vs SCM_RIGHTS",
     .ct_xfail_reason =
 	"Tags currently survive cross-AS aliasing of SHM_ANON objects")
@@ -269,7 +269,7 @@ CHERIBSDTEST(cheribsdtest_vm_shm_open_anon_unix_surprise,
 	}
 }
 
-CHERIBSDTEST(cheribsdtest_shm_open_read_nocaps,
+CHERIBSDTEST(shm_open_read_nocaps,
     "check that read(2) of a shm_open fd does not return tags")
 {
 	void * __capability *map;
@@ -299,7 +299,7 @@ CHERIBSDTEST(cheribsdtest_shm_open_read_nocaps,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(cheribsdtest_shm_open_write_nocaps,
+CHERIBSDTEST(shm_open_write_nocaps,
     "check that write(2) of a shm_open fd does not set tags")
 {
 	void * __capability *map;
@@ -336,7 +336,7 @@ CHERIBSDTEST(cheribsdtest_shm_open_write_nocaps,
  * them to flow between address spaces.  It is difficult to know what to do
  * about this case, but it seems important to acknowledge.
  */
-CHERIBSDTEST(cheribsdtest_vm_cap_share_fd_kqueue,
+CHERIBSDTEST(vm_cap_share_fd_kqueue,
     "Demonstrate capability passing via shared FD table",
     .ct_xfail_reason = "Tags currently survive cross-AS shared FD tables")
 {
@@ -396,7 +396,7 @@ extern int __sys_sigaction(int, const struct sigaction *, struct sigaction *);
  * We can rfork and share the sigaction table across parent and child, which
  * again allows for capability passing across address spaces.
  */
-CHERIBSDTEST(cheribsdtest_vm_cap_share_sigaction,
+CHERIBSDTEST(vm_cap_share_sigaction,
     "Demonstrate capability passing via shared sigaction table",
     .ct_xfail_reason = "Tags currently survive cross-AS shared sigaction table")
 {
@@ -458,7 +458,7 @@ CHERIBSDTEST(cheribsdtest_vm_cap_share_sigaction,
 
 #endif
 
-CHERIBSDTEST(cheribsdtest_vm_tag_dev_zero_shared,
+CHERIBSDTEST(vm_tag_dev_zero_shared,
     "check tags are stored for /dev/zero MAP_SHARED pages")
 {
 	int fd = CHERIBSDTEST_CHECK_SYSCALL(open("/dev/zero", O_RDWR));
@@ -466,7 +466,7 @@ CHERIBSDTEST(cheribsdtest_vm_tag_dev_zero_shared,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(cheribsdtest_vm_tag_dev_zero_private,
+CHERIBSDTEST(vm_tag_dev_zero_private,
     "check tags are stored for /dev/zero MAP_PRIVATE pages")
 {
 	int fd = CHERIBSDTEST_CHECK_SYSCALL(open("/dev/zero", O_RDWR));
@@ -489,7 +489,7 @@ create_tempfile()
  * This case should fault.
  * XXXRW: I wonder if we also need some sort of load-related test?
  */
-CHERIBSDTEST(cheribsdtest_vm_notag_tmpfile_shared,
+CHERIBSDTEST(vm_notag_tmpfile_shared,
     "check tags are not stored for tmpfile() MAP_SHARED pages",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO | CT_FLAG_SI_ADDR,
     .ct_signum = SIGSEGV,
@@ -510,7 +510,7 @@ CHERIBSDTEST(cheribsdtest_vm_notag_tmpfile_shared,
 	cheribsdtest_failure_errx("tagged store succeeded");
 }
 
-CHERIBSDTEST(cheribsdtest_vm_tag_tmpfile_private,
+CHERIBSDTEST(vm_tag_tmpfile_private,
     "check tags are stored for tmpfile() MAP_PRIVATE pages",
     .ct_check_skip = skip_need_writable_tmp)
 {
@@ -519,7 +519,7 @@ CHERIBSDTEST(cheribsdtest_vm_tag_tmpfile_private,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(cheribsdtest_vm_tag_tmpfile_private_prefault,
+CHERIBSDTEST(vm_tag_tmpfile_private_prefault,
     "check tags are stored for tmpfile() MAP_PRIVATE, MAP_PREFAULT_READ pages",
     .ct_check_skip = skip_need_writable_tmp)
 {
@@ -565,7 +565,7 @@ skip_need_writable_tmp(const char *name __unused)
  * copy-on-write, then read back the capability and confirm that it still has
  * a tag.  (cheribsdtest_vm_cow_write)
  */
-CHERIBSDTEST(cheribsdtest_vm_cow_read,
+CHERIBSDTEST(vm_cow_read,
     "read capabilities from a copy-on-write page")
 {
 	void * __capability volatile *cp_copy;
@@ -614,7 +614,7 @@ CHERIBSDTEST(cheribsdtest_vm_cow_read,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(cheribsdtest_vm_cow_write,
+CHERIBSDTEST(vm_cow_write,
     "read capabilities from a faulted copy-on-write page")
 {
 	void * __capability volatile *cp_copy;
@@ -704,7 +704,7 @@ get_unrepresentable_length()
 /*
  * Check that the padding of a reservation faults on access
  */
-CHERIBSDTEST(cheribsdtest_vm_reservation_access_fault,
+CHERIBSDTEST(vm_reservation_access_fault,
     "check that we fault when accessing padding of a reservation",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE,
     .ct_signum = SIGSEGV,
@@ -737,7 +737,7 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_access_fault,
  * Check that a reserved range can not be reused for another mapping,
  * until the whole mapping is freed.
  */
-CHERIBSDTEST(cheribsdtest_vm_reservation_reuse,
+CHERIBSDTEST(vm_reservation_reuse,
     "check that we can not remap over a partially-unmapped reservation")
 {
 	void *map;
@@ -768,7 +768,7 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_reuse,
  * Check that alignment is promoted automatically to the first
  * representable boundary.
  */
-CHERIBSDTEST(cheribsdtest_vm_reservation_align,
+CHERIBSDTEST(vm_reservation_align,
     "check that mmap correctly align mappings")
 {
 	void *map;
@@ -822,7 +822,7 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_align,
  * a proper temporal-safety implementation will lead to failures so
  * we catch these early.
  */
-CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_after_free_fixed,
+CHERIBSDTEST(vm_reservation_mmap_after_free_fixed,
     "check that an old capability can not be used to mmap with MAP_FIXED "
     "after the reservation has been deleted")
 {
@@ -848,7 +848,7 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_after_free_fixed,
  * a proper temporal-safety implementation will lead to failures so
  * we catch these early.
  */
-CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_after_free,
+CHERIBSDTEST(vm_reservation_mmap_after_free,
     "check that an old capability can not be used to mmap after the "
     "reservation has been deleted")
 {
@@ -869,7 +869,7 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_after_free,
 /*
  * Check that reservations are aligned and padded correctly for shared mappings.
  */
-CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_shared,
+CHERIBSDTEST(vm_reservation_mmap_shared,
     "check reservation alignment and bounds for shared mappings")
 {
 	void *map;
@@ -897,7 +897,7 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_shared,
  * Check that we require NULL-derived capabilities when mmap().
  * Test mmap() with an invalid capability and no backing reservation.
  */
-CHERIBSDTEST(cheribsdtest_vm_mmap_invalid_cap,
+CHERIBSDTEST(vm_mmap_invalid_cap,
     "check that mmap with invalid capability hint fails")
 {
 	void *invalid = cheri_cleartag(cheri_setaddress(
@@ -919,7 +919,7 @@ CHERIBSDTEST(cheribsdtest_vm_mmap_invalid_cap,
  * Check that we require NULL-derived capabilities when mmap().
  * Test mmap() MAP_FIXED with an invalid capability and no backing reservation.
  */
-CHERIBSDTEST(cheribsdtest_vm_mmap_invalid_cap_fixed,
+CHERIBSDTEST(vm_mmap_invalid_cap_fixed,
     "check that mmap MAP_FIXED with invalid capability hint fails")
 {
 	void *invalid = cheri_cleartag(cheri_setaddress(
@@ -942,7 +942,7 @@ CHERIBSDTEST(cheribsdtest_vm_mmap_invalid_cap_fixed,
  * Test mmap() MAP_FIXED with an invalid capability and existing
  * backing reservation.
  */
-CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_invalid_cap,
+CHERIBSDTEST(vm_reservation_mmap_invalid_cap,
     "check that mmap over existing reservation with invalid "
     "capability hint fails")
 {
@@ -968,7 +968,7 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_invalid_cap,
 /*
  * Check that mmap() with a null-derived hint address succeeds.
  */
-CHERIBSDTEST(cheribsdtest_vm_reservation_mmap,
+CHERIBSDTEST(vm_reservation_mmap,
     "check mmap with NULL-derived hint address")
 {
 	uintptr_t hint;
@@ -989,7 +989,7 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_mmap,
  * Check that this fails if a mapping already exists at the target address
  * as MAP_FIXED implies MAP_EXCL in this case.
  */
-CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_fixed_unreserved,
+CHERIBSDTEST(vm_reservation_mmap_fixed_unreserved,
     "check mmap MAP_FIXED with NULL-derived hint address")
 {
 	uintptr_t hint;
@@ -1018,7 +1018,7 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_fixed_unreserved,
  * Check that mmap at fixed address with NULL-derived hint fails if
  * a reservation already exists at the target address.
  */
-CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_insert_null_derived,
+CHERIBSDTEST(vm_reservation_mmap_insert_null_derived,
     "check that mmap with NULL-derived hint address over existing "
     "reservation fails")
 {
@@ -1044,7 +1044,7 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_insert_null_derived,
  * Check that we can add a fixed mapping into an existing
  * reservation using a VM_MAP bearing capability.
  */
-CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_fixed_insert,
+CHERIBSDTEST(vm_reservation_mmap_fixed_insert,
     "check mmap MAP_FIXED into an existing reservation with a "
     "VM_MAP perm capability")
 {
@@ -1069,7 +1069,7 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_fixed_insert,
  * Check that attempting to add a fixed mapping into an existing
  * reservation using a capability without VM_MAP permission fails.
  */
-CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_fixed_insert_noperm,
+CHERIBSDTEST(vm_reservation_mmap_fixed_insert_noperm,
     "check that mmap MAP_FIXED into an existing reservation "
     "with a capability missing VM_MAP permission fails")
 {
@@ -1111,7 +1111,7 @@ get_pagesizes(size_t ps[static MAXPAGESIZES])
 /*
  * Builds on FreeBSD testsuite posixshm_test:largepage_basic.
  */
-CHERIBSDTEST(cheribsdtest_vm_shm_largepage_basic,
+CHERIBSDTEST(vm_shm_largepage_basic,
     "Test basic largepage SHM mapping setup and teardown")
 {
 	void *addr;

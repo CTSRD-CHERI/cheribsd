@@ -81,7 +81,7 @@ static void		 mix_patterns(void);
 static uint64_t		 quickhash(uint64_t v);
 static const char	*skip_swap_required(const char *name __unused)
 
-CHERIBSDTEST(cheribsdtest_vm_swap,
+CHERIBSDTEST(vm_swap,
     "check tags are swapped out by swap pager",
     .ct_check_skip = skip_swap_required})
 {

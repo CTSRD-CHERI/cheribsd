@@ -78,7 +78,7 @@
  * offsets and sizes as desired.
  */
 #define TEST_BOUNDS(test, desc, ...)						\
-	CHERIBSDTEST(test_bounds_##test,				\
+	CHERIBSDTEST(bounds_##test,				\
 	"Check bounds on " desc,					\
 	.ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC,		\
 	__VA_ARGS__)							\
@@ -483,7 +483,7 @@ TEST_BOUNDS(extern_global_array65536, "extern global uint8_t[16] (C size)");
  * variable is a correct source of size information.
  */
 #define	TEST_DYNAMIC_BOUNDS(test, type, ...)				\
-	CHERIBSDTEST(test_bounds_##test,				\
+	CHERIBSDTEST(bounds_##test,				\
 	"Check bounds on extern global " #type " (dynamic size)",	\
 	.ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_EXTERN,		\
 	__VA_ARGS__)							\

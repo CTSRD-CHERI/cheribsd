@@ -54,7 +54,7 @@ handler_func(int signum)
 	handler_signum = signum;
 }
 
-CHERIBSDTEST(test_signal_handler_usr1,
+CHERIBSDTEST(signal_handler_usr1,
     "Install a signal handler (sa_handler) for SIGUSR1 and check it works")
 {
 	struct sigaction sa;
@@ -88,7 +88,7 @@ sigaction_func(int signum, siginfo_t *siginfo, void *context __unused)
 	sigaction_info_si_code = siginfo->si_code;
 }
 
-CHERIBSDTEST(test_signal_sigaction_usr1,
+CHERIBSDTEST(signal_sigaction_usr1,
     "Install a signal handler (sa_sigaction) for SIGUSR1 and check it works")
 {
 	struct sigaction sa;
@@ -127,7 +127,7 @@ sigaltstack_func(int signum __unused)
 	sigaltstack_local_addr = (__cheri_addr size_t)&x;
 }
 
-CHERIBSDTEST(test_signal_sigaltstack,
+CHERIBSDTEST(signal_sigaltstack,
     "Check signal handlers use the alternate stack when enabled",
     .ct_xfail_reason = XFAIL_C18N_SIGALTSTACK)
 {
@@ -180,7 +180,7 @@ sigaltstack_disable_func(int signum __unused)
 	sigaltstack_disable_local_addr = (__cheri_addr size_t)&x;
 }
 
-CHERIBSDTEST(test_signal_sigaltstack_disable,
+CHERIBSDTEST(signal_sigaltstack_disable,
     "Check signal handlers don't use a given alternate stack when re-disabled")
 {
 	stack_t sigstk;
@@ -235,7 +235,7 @@ returncap_func(int signum __unused)
 	handler_returncap = __builtin_return_address(0);
 }
 
-CHERIBSDTEST(test_signal_returncap,
+CHERIBSDTEST(signal_returncap,
     "Test value of signal handler return capability")
 {
 	struct sigaction sa;

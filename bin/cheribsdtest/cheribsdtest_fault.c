@@ -75,7 +75,7 @@
 static char array[ARRAY_LEN];
 static char sink;
 
-CHERIBSDTEST(test_fault_bounds, "Exercise capability bounds check failure",
+CHERIBSDTEST(fault_bounds, "Exercise capability bounds check failure",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
     .ct_si_code = PROT_CHERI_BOUNDS,
@@ -91,7 +91,7 @@ CHERIBSDTEST(test_fault_bounds, "Exercise capability bounds check failure",
 	cheribsdtest_failure_errx("out of bounds access did not fault");
 }
 
-CHERIBSDTEST(test_fault_perm_load,
+CHERIBSDTEST(fault_perm_load,
     "Exercise capability load permission failure",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
@@ -105,7 +105,7 @@ CHERIBSDTEST(test_fault_perm_load,
 	cheribsdtest_failure_errx("access without required permissions did not fault");
 }
 
-CHERIBSDTEST(test_nofault_perm_load,
+CHERIBSDTEST(nofault_perm_load,
     "Exercise capability load permission success")
 {
 	char * __capability arrayp = cheri_ptrperm(array, sizeof(array),
@@ -115,7 +115,7 @@ CHERIBSDTEST(test_nofault_perm_load,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_illegal_perm_seal,
+CHERIBSDTEST(illegal_perm_seal,
     "Exercise capability seal permission failure",
     CT_SEAL_VIOLATION_EXCEPTION)
 {
@@ -139,7 +139,7 @@ CHERIBSDTEST(test_illegal_perm_seal,
 	    "%#lp with bad sealcap %#lp", sealed, sealcap);
 }
 
-CHERIBSDTEST(test_fault_perm_store,
+CHERIBSDTEST(fault_perm_store,
     "Exercise capability store permission failure",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
@@ -151,7 +151,7 @@ CHERIBSDTEST(test_fault_perm_store,
 	arrayp[0] = sink;
 }
 
-CHERIBSDTEST(test_nofault_perm_store,
+CHERIBSDTEST(nofault_perm_store,
     "Exercise capability store permission success")
 {
 	char * __capability arrayp = cheri_ptrperm(array, sizeof(array),
@@ -161,7 +161,7 @@ CHERIBSDTEST(test_nofault_perm_store,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_illegal_perm_unseal,
+CHERIBSDTEST(illegal_perm_unseal,
     "Exercise capability unseal permission failure",
     CT_SEAL_VIOLATION_EXCEPTION)
 {
@@ -189,7 +189,7 @@ CHERIBSDTEST(test_illegal_perm_unseal,
 	    "%#lp with bad unsealcap %#lp", unsealed, sealcap);
 }
 
-CHERIBSDTEST(test_fault_tag, "Store via untagged capability",
+CHERIBSDTEST(fault_tag, "Store via untagged capability",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
     .ct_si_code = PROT_CHERI_TAG,
@@ -202,7 +202,7 @@ CHERIBSDTEST(test_fault_tag, "Store via untagged capability",
 	*chp = '\0';
 }
 
-CHERIBSDTEST(test_nofault_cfromptr, "Exercise CFromPtr success")
+CHERIBSDTEST(nofault_cfromptr, "Exercise CFromPtr success")
 {
 	char buf[256];
 	void * __capability cb; /* derived from here */

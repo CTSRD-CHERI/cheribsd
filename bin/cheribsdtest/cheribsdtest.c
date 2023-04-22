@@ -229,6 +229,8 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 	const char *skip_reason, *xfail_reason, *flaky_reason;
 	char* failure_message;
 	ssize_t len;
+	const char *disallowed_prefixes[] = { "cheribsdtest_", "test_" };
+
 	xo_attr("classname", "%s.%s", PROG, ctp->ct_name);
 	xo_attr("name", "%s", ctp->ct_desc);
 	xo_open_instance("testcase");
@@ -237,6 +239,18 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 		    ctp->ct_desc);
 	reason[0] = '\0';
 	visreason[0] = '\0';
+	xfail_reason = NULL;
+
+	for (size_t i = 0; i < nitems(disallowed_prefixes); i++) {
+		if (strncmp(ctp->ct_name, disallowed_prefixes[i],
+		    strlen(disallowed_prefixes[i])) == 0) {
+
+			snprintf(reason, sizeof(reason),
+			    "test name begins with disallowed prefix '%s'",
+			    disallowed_prefixes[i]);
+			goto fail;
+		}
+	}
 
 	if (fast_tests_only && (ctp->ct_flags & CT_FLAG_SLOW))
 		return;

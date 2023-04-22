@@ -279,7 +279,7 @@ check_initreg_data_full_addrspace(void * __capability c)
 }
 #endif
 
-CHERIBSDTEST(test_initregs_default, "Test initial value of default capability")
+CHERIBSDTEST(initregs_default, "Test initial value of default capability")
 {
 
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -313,7 +313,7 @@ CHERIBSDTEST(test_initregs_default, "Test initial value of default capability")
 
 #define	CHERI_STACK_USE_MAX	(256 * 1024)
 
-CHERIBSDTEST(test_initregs_stack_user_perms,
+CHERIBSDTEST(initregs_stack_user_perms,
     "Test user permissions of stack capability")
 {
 	register_t v;
@@ -327,7 +327,7 @@ CHERIBSDTEST(test_initregs_stack_user_perms,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_initregs_stack,
+CHERIBSDTEST(initregs_stack,
     "Test initial value of stack capability")
 {
 	void * __capability c = cheri_getstack();
@@ -413,7 +413,7 @@ CHERIBSDTEST(test_initregs_stack,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_initregs_returncap, "Test value of return capability")
+CHERIBSDTEST(initregs_returncap, "Test value of return capability")
 {
 	void *c;
 	uintmax_t v;
@@ -444,7 +444,7 @@ CHERIBSDTEST(test_initregs_returncap, "Test value of return capability")
 }
 #endif
 
-CHERIBSDTEST(test_initregs_pcc,
+CHERIBSDTEST(initregs_pcc,
     "Test initial value of program-counter capability")
 {
 	void * __capability c;
@@ -457,7 +457,7 @@ CHERIBSDTEST(test_initregs_pcc,
 
 #ifdef __aarch64__
 #ifndef CHERIBSD_C18N_TESTS
-CHERIBSDTEST(test_initregs_restricted_default,
+CHERIBSDTEST(initregs_restricted_default,
     "Test initial value of restricted default capability")
 {
 	void * __capability c;
@@ -469,7 +469,7 @@ CHERIBSDTEST(test_initregs_restricted_default,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_initregs_restricted_stack,
+CHERIBSDTEST(initregs_restricted_stack,
     "Test initial value of restricted stack capability")
 {
 	void * __capability c;
@@ -481,7 +481,7 @@ CHERIBSDTEST(test_initregs_restricted_stack,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_initregs_restricted_thread,
+CHERIBSDTEST(initregs_restricted_thread,
     "Test initial value of restricted thread capability")
 {
 	void * __capability c;
