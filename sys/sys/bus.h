@@ -72,6 +72,7 @@ typedef enum device_property_type {
 	DEVICE_PROP_BUFFER = 1,
 	DEVICE_PROP_UINT32 = 2,
 	DEVICE_PROP_UINT64 = 3,
+	DEVICE_PROP_HANDLE = 4,
 } device_property_type_t;
 
 /**
@@ -760,6 +761,7 @@ void	bus_data_generation_update(void);
 #define BUS_LOCATOR_ACPI	"ACPI"
 #define BUS_LOCATOR_FREEBSD	"FreeBSD"
 #define BUS_LOCATOR_UEFI	"UEFI"
+#define BUS_LOCATOR_OFW		"OFW"
 
 extern int bus_current_pass;
 

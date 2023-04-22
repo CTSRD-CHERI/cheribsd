@@ -52,8 +52,9 @@ struct trapframe {
 	uint64_t tf_lr;
 	uint64_t tf_elr;
 #endif
-	uint32_t tf_spsr;
-	uint32_t tf_esr;
+	uint64_t tf_spsr;
+	uint64_t tf_esr;
+	uint64_t tf_far;
 #if __has_feature(capabilities)
 	uint64_t tf_pad;
 	uintcap_t tf_x[30];

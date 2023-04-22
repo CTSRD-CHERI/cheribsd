@@ -37,6 +37,7 @@
 #include <sys/dmu_tx.h>
 #include <sys/dmu_objset.h>
 #include <sys/arc.h>
+#include <sys/arc_impl.h>
 #include <sys/zap.h>
 #include <sys/zio.h>
 #include <sys/zfs_context.h>
@@ -126,10 +127,19 @@ static boolean_t scan_ds_queue_contains(dsl_scan_t *scn, uint64_t dsobj,
 static void scan_ds_queue_insert(dsl_scan_t *scn, uint64_t dsobj, uint64_t txg);
 static void scan_ds_queue_remove(dsl_scan_t *scn, uint64_t dsobj);
 static void scan_ds_queue_sync(dsl_scan_t *scn, dmu_tx_t *tx);
-static uint64_t dsl_scan_count_data_disks(vdev_t *vd);
+static uint64_t dsl_scan_count_data_disks(spa_t *spa);
 
 extern uint_t zfs_vdev_async_write_active_min_dirty_percent;
 static int zfs_scan_blkstats = 0;
+
+/*
+ * 'zpool status' uses bytes processed per pass to report throughput and
+ * estimate time remaining.  We define a pass to start when the scanning
+ * phase completes for a sequential resilver.  Optionally, this value
+ * may be used to reset the pass statistics every N txgs to provide an
+ * estimated completion time based on currently observed performance.
+ */
+static uint_t zfs_scan_report_txgs = 0;
 
 /*
  * By default zfs will check to ensure it is not over the hard memory
@@ -147,13 +157,13 @@ static int zfs_scan_strict_mem_lim = B_FALSE;
  * overload the drives with I/O, since that is protected by
  * zfs_vdev_scrub_max_active.
  */
-static unsigned long zfs_scan_vdev_limit = 4 << 20;
+static uint64_t zfs_scan_vdev_limit = 16 << 20;
 
 static uint_t zfs_scan_issue_strategy = 0;
 
 /* don't queue & sort zios, go direct */
 static int zfs_scan_legacy = B_FALSE;
-static unsigned long zfs_scan_max_ext_gap = 2 << 20; /* in bytes */
+static uint64_t zfs_scan_max_ext_gap = 2 << 20; /* in bytes */
 
 /*
  * fill_weight is non-tunable at runtime, so we copy it at module init from
@@ -192,9 +202,9 @@ static int zfs_no_scrub_io = B_FALSE; /* set to disable scrub i/o */
 static int zfs_no_scrub_prefetch = B_FALSE; /* set to disable scrub prefetch */
 static const enum ddt_class zfs_scrub_ddt_class_max = DDT_CLASS_DUPLICATE;
 /* max number of blocks to free in a single TXG */
-static unsigned long zfs_async_block_max_blocks = ULONG_MAX;
+static uint64_t zfs_async_block_max_blocks = UINT64_MAX;
 /* max number of dedup blocks to free in a single TXG */
-static unsigned long zfs_max_async_dedup_frees = 100000;
+static uint64_t zfs_max_async_dedup_frees = 100000;
 
 /* set to disable resilver deferring */
 static int zfs_resilver_disable_defer = B_FALSE;
@@ -281,7 +291,7 @@ typedef struct scan_io {
 	 * event of an error. This array must go at the end of the
 	 * struct to allow this for the variable number of elements.
 	 */
-	dva_t			sio_dva[0];
+	dva_t			sio_dva[];
 } scan_io_t;
 
 #define	SIO_SET_OFFSET(sio, x)		DVA_SET_OFFSET(&(sio)->sio_dva[0], x)
@@ -466,11 +476,12 @@ dsl_scan_init(dsl_pool_t *dp, uint64_t txg)
 
 	/*
 	 * Calculate the max number of in-flight bytes for pool-wide
-	 * scanning operations (minimum 1MB). Limits for the issuing
-	 * phase are done per top-level vdev and are handled separately.
+	 * scanning operations (minimum 1MB, maximum 1/4 of arc_c_max).
+	 * Limits for the issuing phase are done per top-level vdev and
+	 * are handled separately.
 	 */
-	scn->scn_maxinflight_bytes = MAX(zfs_scan_vdev_limit *
-	    dsl_scan_count_data_disks(spa->spa_root_vdev), 1ULL << 20);
+	scn->scn_maxinflight_bytes = MIN(arc_c_max / 4, MAX(1ULL << 20,
+	    zfs_scan_vdev_limit * dsl_scan_count_data_disks(spa)));
 
 	avl_create(&scn->scn_queue, scan_ds_queue_compare, sizeof (scan_ds_t),
 	    offsetof(scan_ds_t, sds_node));
@@ -604,6 +615,8 @@ dsl_scan_init(dsl_pool_t *dp, uint64_t txg)
 	}
 
 	spa_scan_stat_init(spa);
+	vdev_scan_stat_init(spa->spa_root_vdev);
+
 	return (0);
 }
 
@@ -763,6 +776,7 @@ dsl_scan_setup_sync(void *arg, dmu_tx_t *tx)
 	scn->scn_last_checkpoint = 0;
 	scn->scn_checkpointing = B_FALSE;
 	spa_scan_stat_init(spa);
+	vdev_scan_stat_init(spa->spa_root_vdev);
 
 	if (DSL_SCAN_IS_SCRUB_RESILVER(scn)) {
 		scn->scn_phys.scn_ddt_class_max = zfs_scrub_ddt_class_max;
@@ -944,13 +958,13 @@ dsl_scan_done(dsl_scan_t *scn, boolean_t complete, dmu_tx_t *tx)
 
 	if (dsl_scan_restarting(scn, tx))
 		spa_history_log_internal(spa, "scan aborted, restarting", tx,
-		    "errors=%llu", (u_longlong_t)spa_get_errlog_size(spa));
+		    "errors=%llu", (u_longlong_t)spa_approx_errlog_size(spa));
 	else if (!complete)
 		spa_history_log_internal(spa, "scan cancelled", tx,
-		    "errors=%llu", (u_longlong_t)spa_get_errlog_size(spa));
+		    "errors=%llu", (u_longlong_t)spa_approx_errlog_size(spa));
 	else
 		spa_history_log_internal(spa, "scan done", tx,
-		    "errors=%llu", (u_longlong_t)spa_get_errlog_size(spa));
+		    "errors=%llu", (u_longlong_t)spa_approx_errlog_size(spa));
 
 	if (DSL_SCAN_IS_SCRUB_RESILVER(scn)) {
 		spa->spa_scrub_active = B_FALSE;
@@ -1013,7 +1027,7 @@ dsl_scan_done(dsl_scan_t *scn, boolean_t complete, dmu_tx_t *tx)
 		    vdev_clear_resilver_deferred(spa->spa_root_vdev, tx)) {
 			spa_history_log_internal(spa,
 			    "starting deferred resilver", tx, "errors=%llu",
-			    (u_longlong_t)spa_get_errlog_size(spa));
+			    (u_longlong_t)spa_approx_errlog_size(spa));
 			spa_async_request(spa, SPA_ASYNC_RESILVER);
 		}
 
@@ -1470,6 +1484,7 @@ dsl_scan_zil_record(zilog_t *zilog, const lr_t *lrc, void *arg,
 		if (claim_txg == 0 || bp->blk_birth < claim_txg)
 			return (0);
 
+		ASSERT3U(BP_GET_LSIZE(bp), !=, 0);
 		SET_BOOKMARK(&zb, zh->zh_log.blk_cksum.zc_word[ZIL_ZC_OBJSET],
 		    lr->lr_foid, ZB_ZIL_LEVEL,
 		    lr->lr_offset / BP_GET_LSIZE(bp));
@@ -2020,6 +2035,26 @@ dsl_scan_visitbp(blkptr_t *bp, const zbookmark_phys_t *zb,
 	if (BP_IS_REDACTED(bp)) {
 		ASSERT(dsl_dataset_feature_is_active(ds,
 		    SPA_FEATURE_REDACTED_DATASETS));
+		return;
+	}
+
+	/*
+	 * Check if this block contradicts any filesystem flags.
+	 */
+	spa_feature_t f = SPA_FEATURE_LARGE_BLOCKS;
+	if (BP_GET_LSIZE(bp) > SPA_OLD_MAXBLOCKSIZE)
+		ASSERT(dsl_dataset_feature_is_active(ds, f));
+
+	f = zio_checksum_to_feature(BP_GET_CHECKSUM(bp));
+	if (f != SPA_FEATURE_NONE)
+		ASSERT(dsl_dataset_feature_is_active(ds, f));
+
+	f = zio_compress_to_feature(BP_GET_COMPRESS(bp));
+	if (f != SPA_FEATURE_NONE)
+		ASSERT(dsl_dataset_feature_is_active(ds, f));
+
+	if (bp->blk_birth <= scn->scn_phys.scn_cur_min_txg) {
+		scn->scn_lt_min_this_txg++;
 		return;
 	}
 
@@ -2810,8 +2845,9 @@ dsl_scan_visit(dsl_scan_t *scn, dmu_tx_t *tx)
 }
 
 static uint64_t
-dsl_scan_count_data_disks(vdev_t *rvd)
+dsl_scan_count_data_disks(spa_t *spa)
 {
+	vdev_t *rvd = spa->spa_root_vdev;
 	uint64_t i, leaves = 0;
 
 	for (i = 0; i < rvd->vdev_children; i++) {
@@ -3652,6 +3688,16 @@ dsl_scan_sync(dsl_pool_t *dp, dmu_tx_t *tx)
 	}
 
 	/*
+	 * Disabled by default, set zfs_scan_report_txgs to report
+	 * average performance over the last zfs_scan_report_txgs TXGs.
+	 */
+	if (!dsl_scan_is_paused_scrub(scn) && zfs_scan_report_txgs != 0 &&
+	    tx->tx_txg % zfs_scan_report_txgs == 0) {
+		scn->scn_issued_before_pass += spa->spa_scan_pass_issued;
+		spa_scan_stat_init(spa);
+	}
+
+	/*
 	 * It is possible to switch from unsorted to sorted at any time,
 	 * but afterwards the scan will remain sorted unless reloaded from
 	 * a checkpoint after a reboot.
@@ -3710,12 +3756,13 @@ dsl_scan_sync(dsl_pool_t *dp, dmu_tx_t *tx)
 		taskqid_t prefetch_tqid;
 
 		/*
-		 * Recalculate the max number of in-flight bytes for pool-wide
-		 * scanning operations (minimum 1MB). Limits for the issuing
-		 * phase are done per top-level vdev and are handled separately.
+		 * Calculate the max number of in-flight bytes for pool-wide
+		 * scanning operations (minimum 1MB, maximum 1/4 of arc_c_max).
+		 * Limits for the issuing phase are done per top-level vdev and
+		 * are handled separately.
 		 */
-		scn->scn_maxinflight_bytes = MAX(zfs_scan_vdev_limit *
-		    dsl_scan_count_data_disks(spa->spa_root_vdev), 1ULL << 20);
+		scn->scn_maxinflight_bytes = MIN(arc_c_max / 4, MAX(1ULL << 20,
+		    zfs_scan_vdev_limit * dsl_scan_count_data_disks(spa)));
 
 		if (scnp->scn_ddt_bookmark.ddb_class <=
 		    scnp->scn_ddt_class_max) {
@@ -3779,6 +3826,9 @@ dsl_scan_sync(dsl_pool_t *dp, dmu_tx_t *tx)
 			if (scn->scn_is_sorted) {
 				scn->scn_checkpointing = B_TRUE;
 				scn->scn_clearing = B_TRUE;
+				scn->scn_issued_before_pass +=
+				    spa->spa_scan_pass_issued;
+				spa_scan_stat_init(spa);
 			}
 			zfs_dbgmsg("scan complete for %s txg %llu",
 			    spa->spa_name,
@@ -4446,7 +4496,7 @@ dsl_scan_assess_vdev(dsl_pool_t *dp, vdev_t *vd)
 		spa_async_request(dp->dp_spa, SPA_ASYNC_RESILVER);
 }
 
-ZFS_MODULE_PARAM(zfs, zfs_, scan_vdev_limit, ULONG, ZMOD_RW,
+ZFS_MODULE_PARAM(zfs, zfs_, scan_vdev_limit, U64, ZMOD_RW,
 	"Max bytes in flight per leaf vdev for scrubs and resilvers");
 
 ZFS_MODULE_PARAM(zfs, zfs_, scrub_min_time_ms, UINT, ZMOD_RW,
@@ -4470,10 +4520,10 @@ ZFS_MODULE_PARAM(zfs, zfs_, no_scrub_io, INT, ZMOD_RW,
 ZFS_MODULE_PARAM(zfs, zfs_, no_scrub_prefetch, INT, ZMOD_RW,
 	"Set to disable scrub prefetching");
 
-ZFS_MODULE_PARAM(zfs, zfs_, async_block_max_blocks, ULONG, ZMOD_RW,
+ZFS_MODULE_PARAM(zfs, zfs_, async_block_max_blocks, U64, ZMOD_RW,
 	"Max number of blocks freed in one txg");
 
-ZFS_MODULE_PARAM(zfs, zfs_, max_async_dedup_frees, ULONG, ZMOD_RW,
+ZFS_MODULE_PARAM(zfs, zfs_, max_async_dedup_frees, U64, ZMOD_RW,
 	"Max number of dedup blocks freed in one txg");
 
 ZFS_MODULE_PARAM(zfs, zfs_, free_bpobj_enabled, INT, ZMOD_RW,
@@ -4494,7 +4544,7 @@ ZFS_MODULE_PARAM(zfs, zfs_, scan_legacy, INT, ZMOD_RW,
 ZFS_MODULE_PARAM(zfs, zfs_, scan_checkpoint_intval, UINT, ZMOD_RW,
 	"Scan progress on-disk checkpointing interval");
 
-ZFS_MODULE_PARAM(zfs, zfs_, scan_max_ext_gap, ULONG, ZMOD_RW,
+ZFS_MODULE_PARAM(zfs, zfs_, scan_max_ext_gap, U64, ZMOD_RW,
 	"Max gap in bytes between sequential scrub / resilver I/Os");
 
 ZFS_MODULE_PARAM(zfs, zfs_, scan_mem_lim_soft_fact, UINT, ZMOD_RW,
@@ -4505,6 +4555,9 @@ ZFS_MODULE_PARAM(zfs, zfs_, scan_strict_mem_lim, INT, ZMOD_RW,
 
 ZFS_MODULE_PARAM(zfs, zfs_, scan_fill_weight, UINT, ZMOD_RW,
 	"Tunable to adjust bias towards more filled segments during scans");
+
+ZFS_MODULE_PARAM(zfs, zfs_, scan_report_txgs, UINT, ZMOD_RW,
+	"Tunable to report resilver performance over the last N txgs");
 
 ZFS_MODULE_PARAM(zfs, zfs_, resilver_disable_defer, INT, ZMOD_RW,
 	"Process all resilvers immediately");

@@ -36,10 +36,16 @@
 
 struct trapframe;
 
+/* The first register in pcb_x is x19 */
+#define	PCB_X_START	19
+
+#define	PCB_X19		0
+#define	PCB_X20		1
+#define	PCB_FP		10
+#define	PCB_LR		11
+
 struct pcb {
-	uintptr_t	pcb_x[30];
-	uintptr_t	pcb_lr;
-	uintptr_t	_reserved;	/* Was pcb_pc */
+	uintptr_t	pcb_x[12];
 	/* These two need to be in order as we access them together */
 	uintptr_t	pcb_sp;
 	uintcap_t	pcb_tpidr_el0;

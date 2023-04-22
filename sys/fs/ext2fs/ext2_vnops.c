@@ -910,7 +910,7 @@ abortit:
 		if (error)
 			goto out;
 		VREF(tdvp);
-		error = vfs_relookup(tdvp, &tvp, tcnp);
+		error = vfs_relookup(tdvp, &tvp, tcnp, true);
 		if (error)
 			goto out;
 		vrele(tdvp);
@@ -1036,7 +1036,7 @@ abortit:
 	fcnp->cn_flags &= ~MODMASK;
 	fcnp->cn_flags |= LOCKPARENT | LOCKLEAF;
 	VREF(fdvp);
-	error = vfs_relookup(fdvp, &fvp, fcnp);
+	error = vfs_relookup(fdvp, &fvp, fcnp, true);
 	if (error == 0)
 		vrele(fdvp);
 	if (fvp != NULL) {
@@ -1088,6 +1088,15 @@ abortit:
 				if (namlen != 2 ||
 				    dirbuf->dotdot_name[0] != '.' ||
 				    dirbuf->dotdot_name[1] != '.') {
+					/*
+					 * The filesystem is in corrupted state,
+					 * need to run fsck to fix mangled dir
+					 * entry. From other side this error
+					 * need to be ignored because it is
+					 * too difficult to revert directories
+					 * to state before rename from this
+					 * point.
+					 */
 					ext2_dirbad(xp, (doff_t)12,
 					    "rename: mangled dir");
 				} else {

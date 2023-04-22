@@ -52,7 +52,6 @@ __FBSDID("$FreeBSD$");
 #include "un-namespace.h"
 #include "libc_private.h"
 
-extern char **environ;
 extern int _DYNAMIC __no_subobject_bounds;
 #pragma weak _DYNAMIC
 
@@ -409,15 +408,21 @@ _elf_aux_info(int aux, void *buf, int buflen)
 		break;
 	case AT_USRSTACKBASE:
 		if (buflen == sizeof(u_long)) {
-			*(u_long *)buf = usrstackbase;
-			res = 0;
+			if (usrstackbase != 0) {
+				*(u_long *)buf = usrstackbase;
+				res = 0;
+			} else
+				res = ENOENT;
 		} else
 			res = EINVAL;
 		break;
 	case AT_USRSTACKLIM:
 		if (buflen == sizeof(u_long)) {
-			*(u_long *)buf = usrstacklim;
-			res = 0;
+			if (usrstacklim != 0) {
+				*(u_long *)buf = usrstacklim;
+				res = 0;
+			} else
+				res = ENOENT;
 		} else
 			res = EINVAL;
 		break;

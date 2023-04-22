@@ -173,7 +173,7 @@ gv_plex_offset(struct gv_plex *p, off_t boff, off_t bcount, off_t *real_off,
 			return (GV_ERR_ISBUSY);
 		*sdno = stripeno % sdcount;
 
-		KASSERT(sdno >= 0, ("gv_plex_offset: sdno < 0"));
+		KASSERT(*sdno >= 0, ("gv_plex_offset: sdno < 0"));
 		stripestart = (stripeno / sdcount) *
 		    p->stripesize;
 		KASSERT(stripestart >= 0, ("gv_plex_offset: stripestart < 0"));
@@ -858,8 +858,7 @@ gv_init_complete(struct gv_plex *p, struct bio *bp)
 	 */
 	if (start >= s->drive_offset + s->size) {
 		/* Free the data we initialized. */
-		if (data != NULL)
-			g_free(data);
+		g_free(data);
 		g_topology_assert_not();
 		g_topology_lock();
 		g_access(cp, 0, -1, 0);

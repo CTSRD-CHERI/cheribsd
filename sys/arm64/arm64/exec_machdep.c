@@ -147,6 +147,13 @@ set_regs(struct thread *td, struct reg *regs)
 #endif
 	{
 		frame->tf_elr = regs->elr;
+		/*
+		 * frame->tf_spsr and regs->spsr on FreeBSD 13 was 32-bit
+		 * where from 14 they are 64 bit. As PSR_SETTABLE_64 clears
+		 * the upper 32 bits no compatibility handling is needed,
+		 * however if this is ever not the case we will need to add
+		 * these, similar to how it is done in set_mcontext.
+		 */
 		frame->tf_spsr &= ~PSR_SETTABLE_64;
 		frame->tf_spsr |= regs->spsr & PSR_SETTABLE_64;
 		/* Enable single stepping if userspace asked fot it */
@@ -175,16 +182,17 @@ fill_fpregs(struct thread *td, struct fpreg *regs)
 		 */
 		if (td == curthread)
 			vfp_save_state(td, pcb);
+	}
 
-		KASSERT(pcb->pcb_fpusaved == &pcb->pcb_fpustate,
-		    ("Called fill_fpregs while the kernel is using the VFP"));
-		memcpy(regs->fp_q, pcb->pcb_fpustate.vfp_regs,
-		    sizeof(regs->fp_q));
-		regs->fp_cr = pcb->pcb_fpustate.vfp_fpcr;
-		regs->fp_sr = pcb->pcb_fpustate.vfp_fpsr;
-	} else
+	KASSERT(pcb->pcb_fpusaved == &pcb->pcb_fpustate,
+	    ("Called fill_fpregs while the kernel is using the VFP"));
+	memcpy(regs->fp_q, pcb->pcb_fpustate.vfp_regs,
+	    sizeof(regs->fp_q));
+	regs->fp_cr = pcb->pcb_fpustate.vfp_fpcr;
+	regs->fp_sr = pcb->pcb_fpustate.vfp_fpsr;
+#else
+	memset(regs, 0, sizeof(*regs));
 #endif
-		memset(regs, 0, sizeof(*regs));
 	return (0);
 }
 
@@ -633,10 +641,22 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
 int
 set_mcontext(struct thread *td, mcontext_t *mcp)
 {
+#define	PSR_13_MASK	0xfffffffful
 	struct trapframe *tf = td->td_frame;
-	uint32_t spsr;
+	uint64_t spsr;
 
 	spsr = mcp->mc_gpregs.gp_spsr;
+#ifdef COMPAT_FREEBSD13
+	if (td->td_proc->p_osrel < P_OSREL_ARM64_SPSR) {
+		/*
+		 * Before FreeBSD 14 gp_spsr was 32 bit. The size of mc_gpregs
+		 * was identical because of padding so mask of the upper bits
+		 * that may be invalid on earlier releases.
+		 */
+		spsr &= PSR_13_MASK;
+	}
+#endif
+
 	if ((spsr & PSR_M_MASK) != PSR_M_EL0t ||
 	    (spsr & PSR_AARCH32) != 0 ||
 	    (spsr & PSR_DAIF) != (td->td_frame->tf_spsr & PSR_DAIF))
@@ -647,7 +667,14 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 	tf->tf_sp = mcp->mc_gpregs.gp_sp;
 	tf->tf_lr = mcp->mc_gpregs.gp_lr;
 	tf->tf_elr = mcp->mc_gpregs.gp_elr;
-	tf->tf_spsr = mcp->mc_gpregs.gp_spsr;
+#ifdef COMPAT_FREEBSD13
+	if (td->td_proc->p_osrel < P_OSREL_ARM64_SPSR) {
+		/* Keep the upper 32 bits of spsr on older releases */
+		tf->tf_spsr &= ~PSR_13_MASK;
+		tf->tf_spsr |= spsr;
+	} else
+#endif
+		tf->tf_spsr = spsr;
 	if ((tf->tf_spsr & PSR_SS) != 0) {
 		td->td_pcb->pcb_flags |= PCB_SINGLE_STEP;
 
@@ -658,6 +685,7 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 	set_fpcontext(td, mcp);
 
 	return (0);
+#undef PSR_13_MASK
 }
 #endif
 
@@ -667,30 +695,27 @@ get_fpcontext(struct thread *td, mcontext_t *mcp)
 #ifdef VFP
 	struct pcb *curpcb;
 
-	critical_enter();
+	MPASS(td == curthread);
 
 	curpcb = curthread->td_pcb;
-
 	if ((curpcb->pcb_fpflags & PCB_FP_STARTED) != 0) {
 		/*
 		 * If we have just been running VFP instructions we will
 		 * need to save the state to memcpy it below.
 		 */
 		vfp_save_state(td, curpcb);
-
-		KASSERT(curpcb->pcb_fpusaved == &curpcb->pcb_fpustate,
-		    ("Called get_fpcontext while the kernel is using the VFP"));
-		KASSERT((curpcb->pcb_fpflags & ~PCB_FP_USERMASK) == 0,
-		    ("Non-userspace FPU flags set in get_fpcontext"));
-		memcpy(mcp->mc_fpregs.fp_q, curpcb->pcb_fpustate.vfp_regs,
-		    sizeof(mcp->mc_fpregs.fp_q));
-		mcp->mc_fpregs.fp_cr = curpcb->pcb_fpustate.vfp_fpcr;
-		mcp->mc_fpregs.fp_sr = curpcb->pcb_fpustate.vfp_fpsr;
-		mcp->mc_fpregs.fp_flags = curpcb->pcb_fpflags;
-		mcp->mc_flags |= _MC_FP_VALID;
 	}
 
-	critical_exit();
+	KASSERT(curpcb->pcb_fpusaved == &curpcb->pcb_fpustate,
+	    ("Called get_fpcontext while the kernel is using the VFP"));
+	KASSERT((curpcb->pcb_fpflags & ~PCB_FP_USERMASK) == 0,
+	    ("Non-userspace FPU flags set in get_fpcontext"));
+	memcpy(mcp->mc_fpregs.fp_q, curpcb->pcb_fpustate.vfp_regs,
+	    sizeof(mcp->mc_fpregs.fp_q));
+	mcp->mc_fpregs.fp_cr = curpcb->pcb_fpustate.vfp_fpcr;
+	mcp->mc_fpregs.fp_sr = curpcb->pcb_fpustate.vfp_fpsr;
+	mcp->mc_fpregs.fp_flags = curpcb->pcb_fpflags;
+	mcp->mc_flags |= _MC_FP_VALID;
 #endif
 }
 
@@ -700,8 +725,7 @@ set_fpcontext(struct thread *td, mcontext_t *mcp)
 #ifdef VFP
 	struct pcb *curpcb;
 
-	critical_enter();
-
+	MPASS(td == curthread);
 	if ((mcp->mc_flags & _MC_FP_VALID) != 0) {
 		curpcb = curthread->td_pcb;
 
@@ -709,7 +733,9 @@ set_fpcontext(struct thread *td, mcontext_t *mcp)
 		 * Discard any vfp state for the current thread, we
 		 * are about to override it.
 		 */
+		critical_enter();
 		vfp_discard(td);
+		critical_exit();
 
 		KASSERT(curpcb->pcb_fpusaved == &curpcb->pcb_fpustate,
 		    ("Called set_fpcontext while the kernel is using the VFP"));
@@ -719,8 +745,6 @@ set_fpcontext(struct thread *td, mcontext_t *mcp)
 		curpcb->pcb_fpustate.vfp_fpsr = mcp->mc_fpregs.fp_sr;
 		curpcb->pcb_fpflags = mcp->mc_fpregs.fp_flags & PCB_FP_USERMASK;
 	}
-
-	critical_exit();
 #endif
 }
 

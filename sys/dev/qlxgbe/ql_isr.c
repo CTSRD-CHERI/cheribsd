@@ -62,7 +62,7 @@ qla_rx_intr(qla_host_t *ha, qla_sgl_rcv_t *sgc, uint32_t sds_idx)
 {
 	qla_rx_buf_t		*rxb;
 	struct mbuf		*mp = NULL, *mpf = NULL, *mpl = NULL;
-	struct ifnet		*ifp = ha->ifp;
+	if_t ifp = ha->ifp;
 	qla_sds_t		*sdsp;
 	struct ether_vlan_header *eh;
 	uint32_t		i, rem_len = 0;
@@ -165,33 +165,14 @@ qla_rx_intr(qla_host_t *ha, qla_sgl_rcv_t *sgc, uint32_t sds_idx)
 
 	mpf->m_pkthdr.flowid = sgc->rss_hash;
 
-#if __FreeBSD_version >= 1100000
 	M_HASHTYPE_SET(mpf, M_HASHTYPE_OPAQUE_HASH);
-#else
-#if (__FreeBSD_version >= 903511 && __FreeBSD_version < 1100000) 
-        M_HASHTYPE_SET(mpf, M_HASHTYPE_OPAQUE);
-#else
-        M_HASHTYPE_SET(mpf, M_HASHTYPE_NONE);
-#endif
-#endif /* #if __FreeBSD_version >= 1100000 */
 
 #if defined(INET) || defined(INET6)
-	if (ha->hw.enable_soft_lro) {
-#if (__FreeBSD_version >= 1100101)
-
+	if (ha->hw.enable_soft_lro)
 		tcp_lro_queue_mbuf(lro, mpf);
-
-#else
-		if (tcp_lro_rx(lro, mpf, 0))
-			(*ifp->if_input)(ifp, mpf);
-
-#endif /* #if (__FreeBSD_version >= 1100101) */
-
-	} else
+	else
 #endif
-	{
-		(*ifp->if_input)(ifp, mpf);
-	}
+		if_input(ifp, mpf);
 
 	if (sdsp->rx_free > ha->std_replenish)
 		qla_replenish_normal_rx(ha, sdsp, r_idx);
@@ -211,7 +192,7 @@ qla_lro_intr(qla_host_t *ha, qla_sgl_lro_t *sgc, uint32_t sds_idx)
 {
 	qla_rx_buf_t *rxb;
 	struct mbuf *mp = NULL, *mpf = NULL, *mpl = NULL;
-	struct ifnet *ifp = ha->ifp;
+	if_t ifp = ha->ifp;
 	qla_sds_t *sdsp;
 	struct ether_vlan_header *eh;
 	uint32_t i, rem_len = 0, pkt_length, iplen;
@@ -363,7 +344,7 @@ qla_lro_intr(qla_host_t *ha, qla_sgl_lro_t *sgc, uint32_t sds_idx)
 
 	if_inc_counter(ifp, IFCOUNTER_IPACKETS, 1);
 
-	(*ifp->if_input)(ifp, mpf);
+	if_input(ifp, mpf);
 
 	if (sdsp->rx_free > ha->std_replenish)
 		qla_replenish_normal_rx(ha, sdsp, r_idx);
@@ -735,21 +716,7 @@ ql_rcv_isr(qla_host_t *ha, uint32_t sds_idx, uint32_t count)
 		struct lro_ctrl		*lro;
 
 		lro = &ha->hw.sds[sds_idx].lro;
-
-#if (__FreeBSD_version >= 1100101)
-
 		tcp_lro_flush_all(lro);
-
-#else
-		struct lro_entry *queued;
-
-		while ((!SLIST_EMPTY(&lro->lro_active))) {
-			queued = SLIST_FIRST(&lro->lro_active);
-			SLIST_REMOVE_HEAD(&lro->lro_active, next);
-			tcp_lro_flush(lro, queued);
-		}
-
-#endif /* #if (__FreeBSD_version >= 1100101) */
 	}
 #endif
 
@@ -985,7 +952,7 @@ ql_isr(void *arg)
 	qla_host_t *ha ;
 	int idx;
 	qla_hw_t *hw;
-	struct ifnet *ifp;
+	if_t ifp;
 	qla_tx_fp_t *fp;
 
 	ha = ivec->ha;
@@ -999,7 +966,7 @@ ql_isr(void *arg)
 	hw->sds[idx].intr_count++;
 
 	if ((fp->fp_taskqueue != NULL) &&
-		(ifp->if_drv_flags & IFF_DRV_RUNNING))
+		(if_getdrvflags(ifp) & IFF_DRV_RUNNING))
 		taskqueue_enqueue(fp->fp_taskqueue, &fp->fp_task);
 
 	return;

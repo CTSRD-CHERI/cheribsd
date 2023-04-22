@@ -35,6 +35,7 @@
 __FBSDID("$FreeBSD$");
 
 #include "opt_bootp.h"
+#include "opt_inet.h"
 #include "opt_ipstealth.h"
 #include "opt_ipsec.h"
 #include "opt_route.h"
@@ -62,6 +63,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if_types.h>
 #include <net/if_var.h>
 #include <net/if_dl.h>
+#include <net/if_private.h>
 #include <net/pfil.h>
 #include <net/route.h>
 #include <net/route/nhop.h>
@@ -516,6 +518,11 @@ ip_input(struct mbuf *m)
 			IPSTAT_INC(ips_badaddr);
 			goto bad;
 		}
+	}
+	/* The unspecified address can appear only as a src address - RFC1122 */
+	if (__predict_false(ntohl(ip->ip_dst.s_addr) == INADDR_ANY)) {
+		IPSTAT_INC(ips_badaddr);
+		goto bad;
 	}
 
 	if (m->m_pkthdr.csum_flags & CSUM_IP_CHECKED) {

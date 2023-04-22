@@ -3,7 +3,7 @@
 .PATH: ${ZFSTOP}/lib/libzfsbootenv
 .PATH: ${ZFSTOP}/include
 
-PACKAGE=	runtime
+PACKAGE=	zfs
 LIB=		zfsbootenv
 SHLIB_MAJOR=	1
 

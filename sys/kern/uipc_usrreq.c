@@ -5,6 +5,7 @@
  *	The Regents of the University of California. All Rights Reserved.
  * Copyright (c) 2004-2009 Robert N. M. Watson All Rights Reserved.
  * Copyright (c) 2018 Matthew Macy
+ * Copyright (c) 2022 Gleb Smirnoff <glebius@FreeBSD.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -1338,7 +1339,7 @@ uipc_sosend_dgram(struct socket *so, struct sockaddr *addr, struct uio *uio,
 		f = NULL;
 	} else {
 		soroverflow_locked(so2);
-		error = (so->so_state & SS_NBIO) ? EAGAIN : ENOBUFS;
+		error = ENOBUFS;
 		if (f->m_next->m_type == MT_CONTROL)
 			unp_scan(f->m_next, unp_freerights);
 	}

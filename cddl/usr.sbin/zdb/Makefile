@@ -3,6 +3,7 @@
 .PATH: ${ZFSTOP}/cmd/zdb
 .PATH: ${ZFSTOP}/man/man8
 
+PACKAGE=	zfs
 PROG=	zdb
 MAN=	zdb.8
 INCS=	zdb.h

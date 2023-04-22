@@ -68,12 +68,14 @@ struct netlink_walkargs {
 	int dumped;
 };
 
-static eventhandler_tag ifdetach_event, ifattach_event, ifaddr_event;
+static eventhandler_tag ifdetach_event, ifattach_event, iflink_event, ifaddr_event;
 
 static SLIST_HEAD(, nl_cloner) nl_cloners = SLIST_HEAD_INITIALIZER(nl_cloners);
 
 static struct sx rtnl_cloner_lock;
 SX_SYSINIT(rtnl_cloner_lock, &rtnl_cloner_lock, "rtnl cloner lock");
+
+static struct nl_cloner *rtnl_iface_find_cloner_locked(const char *name);
 
 /*
  * RTM_GETLINK request
@@ -172,9 +174,11 @@ get_operstate(struct ifnet *ifp, struct if_state *pstate)
 
 	switch (ifp->if_type) {
 	case IFT_ETHER:
+	case IFT_L2VLAN:
 		get_operstate_ether(ifp, pstate);
 		break;
-	case IFT_LOOP:
+	default:
+		/* Map admin state to the operstate */
 		if (ifp->if_flags & IFF_UP) {
 			pstate->ifla_operstate = IF_OPER_UP;
 			pstate->ifla_carrier = 1;
@@ -234,11 +238,13 @@ dump_sa(struct nl_writer *nw, int attr, const struct sockaddr *sa)
  * @nw: message writer
  * @ifp: target interface
  * @hdr: template header
+ * @if_flags_mask: changed if_[drv]_flags bitmask
  *
  * This function is called without epoch and MAY sleep.
  */
 static bool
-dump_iface(struct nl_writer *nw, struct ifnet *ifp, const struct nlmsghdr *hdr)
+dump_iface(struct nl_writer *nw, struct ifnet *ifp, const struct nlmsghdr *hdr,
+    int if_flags_mask)
 {
         struct ifinfomsg *ifinfo;
 
@@ -253,13 +259,15 @@ dump_iface(struct nl_writer *nw, struct ifnet *ifp, const struct nlmsghdr *hdr)
         ifinfo->ifi_type = ifp->if_type;
         ifinfo->ifi_index = ifp->if_index;
         ifinfo->ifi_flags = ifp_flags_to_netlink(ifp);
-        ifinfo->ifi_change = 0;
-
-        nlattr_add_string(nw, IFLA_IFNAME, if_name(ifp));
+        ifinfo->ifi_change = if_flags_mask;
 
 	struct if_state ifs = {};
 	get_operstate(ifp, &ifs);
 
+	if (ifs.ifla_operstate == IF_OPER_UP)
+		ifinfo->ifi_flags |= IFF_LOWER_UP;
+
+        nlattr_add_string(nw, IFLA_IFNAME, if_name(ifp));
         nlattr_add_u8(nw, IFLA_OPERSTATE, ifs.ifla_operstate);
         nlattr_add_u8(nw, IFLA_CARRIER, ifs.ifla_carrier);
 
@@ -282,10 +290,22 @@ dump_iface(struct nl_writer *nw, struct ifnet *ifp, const struct nlmsghdr *hdr)
         nlattr_add_u32(nw, IFLA_MAX_MTU, 9000);
         nlattr_add_u32(nw, IFLA_GROUP, 0);
 */
+
+	if (ifp->if_description != NULL)
+		nlattr_add_string(nw, IFLA_IFALIAS, ifp->if_description);
+
 	get_stats(nw, ifp);
 
 	uint32_t val = (ifp->if_flags & IFF_PROMISC) != 0;
         nlattr_add_u32(nw, IFLA_PROMISCUITY, val);
+
+	sx_slock(&rtnl_cloner_lock);
+	struct nl_cloner *cloner = rtnl_iface_find_cloner_locked(ifp->if_dname);
+	if (cloner != NULL && cloner->dump_f != NULL) {
+		/* Ignore any dump error */
+		cloner->dump_f(ifp, nw);
+	}
+	sx_sunlock(&rtnl_cloner_lock);
 
         if (nlmsg_end(nw))
 		return (true);
@@ -316,6 +336,8 @@ check_ifmsg(void *hdr, struct nl_pstate *npt)
 static const struct nlfield_parser nlf_p_if[] = {
 	{ .off_in = _IN(ifi_type), .off_out = _OUT(ifi_type), .cb = nlf_get_u16 },
 	{ .off_in = _IN(ifi_index), .off_out = _OUT(ifi_index), .cb = nlf_get_u32 },
+	{ .off_in = _IN(ifi_flags), .off_out = _OUT(ifi_flags), .cb = nlf_get_u32 },
+	{ .off_in = _IN(ifi_change), .off_out = _OUT(ifi_change), .cb = nlf_get_u32 },
 };
 
 static const struct nlattr_parser nla_p_linfo[] = {
@@ -329,6 +351,7 @@ static const struct nlattr_parser nla_p_if[] = {
 	{ .type = IFLA_MTU, .off = _OUT(ifla_mtu), .cb = nlattr_get_uint32 },
 	{ .type = IFLA_LINK, .off = _OUT(ifi_index), .cb = nlattr_get_uint32 },
 	{ .type = IFLA_LINKINFO, .arg = &linfo_parser, .cb = nlattr_get_nested },
+	{ .type = IFLA_IFALIAS, .off = _OUT(ifla_ifalias), .cb = nlattr_get_string },
 	{ .type = IFLA_GROUP, .off = _OUT(ifla_group), .cb = nlattr_get_string },
 	{ .type = IFLA_ALT_IFNAME, .off = _OUT(ifla_ifname), .cb = nlattr_get_string },
 };
@@ -337,8 +360,10 @@ static const struct nlattr_parser nla_p_if[] = {
 NL_DECLARE_STRICT_PARSER(ifmsg_parser, struct ifinfomsg, check_ifmsg, nlf_p_if, nla_p_if);
 
 static bool
-match_iface(struct nl_parsed_link *attrs, struct ifnet *ifp)
+match_iface(struct ifnet *ifp, void *_arg)
 {
+	struct nl_parsed_link *attrs = (struct nl_parsed_link *)_arg;
+
 	if (attrs->ifi_index != 0 && attrs->ifi_index != ifp->if_index)
 		return (false);
 	if (attrs->ifi_type != 0 && attrs->ifi_index != ifp->if_type)
@@ -348,6 +373,15 @@ match_iface(struct nl_parsed_link *attrs, struct ifnet *ifp)
 	/* TODO: add group match */
 
 	return (true);
+}
+
+static int
+dump_cb(struct ifnet *ifp, void *_arg)
+{
+	struct netlink_walkargs *wa = (struct netlink_walkargs *)_arg;
+	if (!dump_iface(wa->nw, ifp, &wa->hdr, 0))
+		return (ENOMEM);
+	return (0);
 }
 
 /*
@@ -375,27 +409,38 @@ rtnl_handle_getlink(struct nlmsghdr *hdr, struct nlpcb *nlp, struct nl_pstate *n
 		.nw = npt->nw,
 		.hdr.nlmsg_pid = hdr->nlmsg_pid,
 		.hdr.nlmsg_seq = hdr->nlmsg_seq,
-		.hdr.nlmsg_flags = hdr->nlmsg_flags | NLM_F_MULTI,
+		.hdr.nlmsg_flags = hdr->nlmsg_flags,
 		.hdr.nlmsg_type = NL_RTM_NEWLINK,
 	};
 
-	/* Fast track for an interface w/ explicit index match */
-	if (attrs.ifi_index != 0) {
-		NET_EPOCH_ENTER(et);
-		ifp = ifnet_byindex_ref(attrs.ifi_index);
-		NET_EPOCH_EXIT(et);
-		NLP_LOG(LOG_DEBUG3, nlp, "fast track -> searching index %u", attrs.ifi_index);
+	/* Fast track for an interface w/ explicit name or index match */
+	if ((attrs.ifi_index != 0) || (attrs.ifla_ifname != NULL)) {
+		if (attrs.ifi_index != 0) {
+			NLP_LOG(LOG_DEBUG3, nlp, "fast track -> searching index %u",
+			    attrs.ifi_index);
+			NET_EPOCH_ENTER(et);
+			ifp = ifnet_byindex_ref(attrs.ifi_index);
+			NET_EPOCH_EXIT(et);
+		} else {
+			NLP_LOG(LOG_DEBUG3, nlp, "fast track -> searching name %s",
+			    attrs.ifla_ifname);
+			ifp = ifunit_ref(attrs.ifla_ifname);
+		}
+
 		if (ifp != NULL) {
-			if (match_iface(&attrs, ifp)) {
-				if (!dump_iface(wa.nw, ifp, &wa.hdr))
+			if (match_iface(ifp, &attrs)) {
+				if (!dump_iface(wa.nw, ifp, &wa.hdr, 0))
 					error = ENOMEM;
 			} else
-				error = ESRCH;
+				error = ENODEV;
 			if_rele(ifp);
 		} else
-			error = ESRCH;
+			error = ENODEV;
 		return (error);
 	}
+
+	/* Always treat non-direct-match as a multipart message */
+	wa.hdr.nlmsg_flags |= NLM_F_MULTI;
 
 	/*
 	 * Fetching some link properties require performing ioctl's that may be blocking.
@@ -404,48 +449,7 @@ rtnl_handle_getlink(struct nlmsghdr *hdr, struct nlpcb *nlp, struct nl_pstate *n
 	 */
 
 	NL_LOG(LOG_DEBUG2, "Start dump");
-
-	struct ifnet **match_array;
-	int offset = 0, base_count = 16; /* start with 128 bytes */
-	match_array = malloc(base_count * sizeof(void *), M_TEMP, M_NOWAIT);
-
-	NLP_LOG(LOG_DEBUG3, nlp, "MATCHING: index=%u type=%d name=%s",
-	    attrs.ifi_index, attrs.ifi_type, attrs.ifla_ifname);
-	NET_EPOCH_ENTER(et);
-        CK_STAILQ_FOREACH(ifp, &V_ifnet, if_link) {
-		wa.count++;
-		if (match_iface(&attrs, ifp)) {
-			if (offset < base_count) {
-				if (!if_try_ref(ifp))
-					continue;
-				match_array[offset++] = ifp;
-				continue;
-			}
-			/* Too many matches, need to reallocate */
-			struct ifnet **new_array;
-			int sz = base_count * sizeof(void *);
-			base_count *= 2;
-			new_array = malloc(sz * 2, M_TEMP, M_NOWAIT);
-			if (new_array == NULL) {
-				error = ENOMEM;
-				break;
-			}
-			memcpy(new_array, match_array, sz);
-			free(match_array, M_TEMP);
-			match_array = new_array;
-                }
-        }
-	NET_EPOCH_EXIT(et);
-
-	NL_LOG(LOG_DEBUG2, "Matched %d interface(s), dumping", offset);
-	for (int i = 0; error == 0 && i < offset; i++) {
-		if (!dump_iface(wa.nw, match_array[i], &wa.hdr))
-			error = ENOMEM;
-	}
-	for (int i = 0; i < offset; i++)
-		if_rele(match_array[i]);
-	free(match_array, M_TEMP);
-
+	if_foreach_sleep(match_iface, &attrs, dump_cb, &wa);
 	NL_LOG(LOG_DEBUG2, "End dump, iterated %d dumped %d", wa.count, wa.dumped);
 
 	if (!nlmsg_end_dump(wa.nw, error, &wa.hdr)) {
@@ -500,47 +504,175 @@ rtnl_handle_dellink(struct nlmsghdr *hdr, struct nlpcb *nlp, struct nl_pstate *n
 	return (error);
 }
 
+/*
+ * New link:
+ * type=RTM_NEWLINK, flags=NLM_F_REQUEST|NLM_F_ACK|NLM_F_EXCL|NLM_F_CREATE, seq=1668185590, pid=0},
+ *   {ifi_family=AF_UNSPEC, ifi_type=ARPHRD_NETROM, ifi_index=0, ifi_flags=0, ifi_change=0}
+ *    [
+ *     {{nla_len=8, nla_type=IFLA_MTU}, 123},
+ *     {{nla_len=10, nla_type=IFLA_IFNAME}, "vlan1"},
+ *     {{nla_len=24, nla_type=IFLA_LINKINFO},
+ *      [
+ *       {{nla_len=8, nla_type=IFLA_INFO_KIND}, "vlan"...},
+ *       {{nla_len=12, nla_type=IFLA_INFO_DATA}, "\x06\x00\x01\x00\x7b\x00\x00\x00"}]}]}
+ *
+ * Update link:
+ * type=RTM_NEWLINK, flags=NLM_F_REQUEST|NLM_F_ACK, seq=1668185923, pid=0},
+ * {ifi_family=AF_UNSPEC, ifi_type=ARPHRD_NETROM, ifi_index=if_nametoindex("lo"), ifi_flags=0, ifi_change=0},
+ * {{nla_len=8, nla_type=IFLA_MTU}, 123}}
+ *
+ *
+ * Check command availability:
+ * type=RTM_NEWLINK, flags=NLM_F_REQUEST|NLM_F_ACK, seq=0, pid=0},
+ *  {ifi_family=AF_UNSPEC, ifi_type=ARPHRD_NETROM, ifi_index=0, ifi_flags=0, ifi_change=0}
+ */
+
+
+static int
+create_link(struct nlmsghdr *hdr, struct nl_parsed_link *lattrs,
+    struct nlattr_bmask *bm, struct nlpcb *nlp, struct nl_pstate *npt)
+{
+	if (lattrs->ifla_ifname == NULL || strlen(lattrs->ifla_ifname) == 0) {
+		NLMSG_REPORT_ERR_MSG(npt, "empty IFLA_IFNAME attribute");
+		return (EINVAL);
+	}
+	if (lattrs->ifla_cloner == NULL || strlen(lattrs->ifla_cloner) == 0) {
+		NLMSG_REPORT_ERR_MSG(npt, "empty IFLA_INFO_KIND attribute");
+		return (EINVAL);
+	}
+
+	bool found = false;
+	int error = 0;
+
+	sx_slock(&rtnl_cloner_lock);
+	struct nl_cloner *cloner = rtnl_iface_find_cloner_locked(lattrs->ifla_cloner);
+	if (cloner != NULL) {
+		found = true;
+		error = cloner->create_f(lattrs, bm, nlp, npt);
+	}
+	sx_sunlock(&rtnl_cloner_lock);
+
+	if (!found)
+		error = generic_cloner.create_f(lattrs, bm, nlp, npt);
+
+	return (error);
+}
+
+static int
+modify_link(struct nlmsghdr *hdr, struct nl_parsed_link *lattrs,
+    struct nlattr_bmask *bm, struct nlpcb *nlp, struct nl_pstate *npt)
+{
+	struct ifnet *ifp = NULL;
+	struct epoch_tracker et;
+
+	if (lattrs->ifi_index == 0 && lattrs->ifla_ifname == NULL) {
+		/*
+		 * Applications like ip(8) verify RTM_NEWLINK command
+		 * existence by calling it with empty arguments. Always
+		 * return "innocent" error in that case.
+		 */
+		NLMSG_REPORT_ERR_MSG(npt, "empty ifi_index field");
+		return (EPERM);
+	}
+
+	if (lattrs->ifi_index != 0) {
+		NET_EPOCH_ENTER(et);
+		ifp = ifnet_byindex_ref(lattrs->ifi_index);
+		NET_EPOCH_EXIT(et);
+		if (ifp == NULL) {
+			NLMSG_REPORT_ERR_MSG(npt, "unable to find interface #%u",
+			    lattrs->ifi_index);
+			return (ENOENT);
+		}
+	}
+
+	if (ifp == NULL && lattrs->ifla_ifname != NULL) {
+		ifp = ifunit_ref(lattrs->ifla_ifname);
+		if (ifp == NULL) {
+			NLMSG_REPORT_ERR_MSG(npt, "unable to find interface %s",
+			    lattrs->ifla_ifname);
+			return (ENOENT);
+		}
+	}
+
+	MPASS(ifp != NULL);
+
+	/*
+	 * There can be multiple kinds of interfaces:
+	 * 1) cloned, with additional options
+	 * 2) cloned, but w/o additional options
+	 * 3) non-cloned (e.g. "physical).
+	 *
+	 * Thus, try to find cloner-specific callback and fallback to the
+	 * "default" handler if not found.
+	 */
+	bool found = false;
+	int error = 0;
+
+	sx_slock(&rtnl_cloner_lock);
+	struct nl_cloner *cloner = rtnl_iface_find_cloner_locked(ifp->if_dname);
+	if (cloner != NULL) {
+		found = true;
+		error = cloner->modify_f(ifp, lattrs, bm, nlp, npt);
+	}
+	sx_sunlock(&rtnl_cloner_lock);
+
+	if (!found)
+		error = generic_cloner.modify_f(ifp, lattrs, bm, nlp, npt);
+
+	if_rele(ifp);
+
+	return (error);
+}
+
+
 static int
 rtnl_handle_newlink(struct nlmsghdr *hdr, struct nlpcb *nlp, struct nl_pstate *npt)
 {
-	struct nl_cloner *cloner;
+	struct nlattr_bmask bm;
 	int error;
 
 	struct nl_parsed_link attrs = {};
 	error = nl_parse_nlmsg(hdr, &ifmsg_parser, npt, &attrs);
 	if (error != 0)
 		return (error);
+	nl_get_attrs_bmask_nlmsg(hdr, &ifmsg_parser, &bm);
 
-	if (attrs.ifla_ifname == NULL || strlen(attrs.ifla_ifname) == 0) {
-		/* Applications like ip(8) verify RTM_NEWLINK existance
-		 * by calling it with empty arguments. Always return "innocent"
-		 * error.
-		 */
-		NLMSG_REPORT_ERR_MSG(npt, "empty IFLA_IFNAME attribute");
-		return (EPERM);
-	}
-
-	if (attrs.ifla_cloner == NULL || strlen(attrs.ifla_cloner) == 0) {
-		NLMSG_REPORT_ERR_MSG(npt, "empty IFLA_INFO_KIND attribute");
-		return (EINVAL);
-	}
-
-	sx_slock(&rtnl_cloner_lock);
-	SLIST_FOREACH(cloner, &nl_cloners, next) {
-		if (!strcmp(attrs.ifla_cloner, cloner->name)) {
-			error = cloner->create_f(&attrs, nlp, npt);
-			sx_sunlock(&rtnl_cloner_lock);
-			return (error);
-		}
-	}
-	sx_sunlock(&rtnl_cloner_lock);
-
-	/* TODO: load cloner module if not exists & privilege permits */
-	NLMSG_REPORT_ERR_MSG(npt, "interface type %s not supported", attrs.ifla_cloner);
-	return (ENOTSUP);
-
-	return (error);
+	if (hdr->nlmsg_flags & NLM_F_CREATE)
+		return (create_link(hdr, &attrs, &bm, nlp, npt));
+	else
+		return (modify_link(hdr, &attrs, &bm, nlp, npt));
 }
+
+struct nl_parsed_ifa {
+	uint8_t		ifa_family;
+	uint8_t		ifa_prefixlen;
+	uint8_t		ifa_scope;
+	uint32_t	ifa_index;
+	uint32_t	ifa_flags;
+	struct sockaddr	*ifa_address;
+	struct sockaddr	*ifa_local;
+};
+
+#define	_IN(_field)	offsetof(struct ifaddrmsg, _field)
+#define	_OUT(_field)	offsetof(struct nl_parsed_ifa, _field)
+static const struct nlfield_parser nlf_p_ifa[] = {
+	{ .off_in = _IN(ifa_family), .off_out = _OUT(ifa_family), .cb = nlf_get_u8 },
+	{ .off_in = _IN(ifa_prefixlen), .off_out = _OUT(ifa_prefixlen), .cb = nlf_get_u8 },
+	{ .off_in = _IN(ifa_scope), .off_out = _OUT(ifa_scope), .cb = nlf_get_u8 },
+	{ .off_in = _IN(ifa_flags), .off_out = _OUT(ifa_flags), .cb = nlf_get_u8_u32 },
+	{ .off_in = _IN(ifa_index), .off_out = _OUT(ifa_index), .cb = nlf_get_u32 },
+};
+
+static const struct nlattr_parser nla_p_ifa[] = {
+	{ .type = IFA_ADDRESS, .off = _OUT(ifa_address), .cb = nlattr_get_ip },
+	{ .type = IFA_LOCAL, .off = _OUT(ifa_local), .cb = nlattr_get_ip },
+	{ .type = IFA_FLAGS, .off = _OUT(ifa_flags), .cb = nlattr_get_uint32 },
+};
+#undef _IN
+#undef _OUT
+NL_DECLARE_PARSER(ifaddrmsg_parser, struct ifaddrmsg, nlf_p_ifa, nla_p_ifa);
+
 
 /*
 
@@ -619,15 +751,11 @@ get_sa_plen(const struct sockaddr *sa)
         switch (sa->sa_family) {
 #ifdef INET
         case AF_INET:
-                if (sa == NULL)
-                        return (32);
                 paddr = &(((const struct sockaddr_in *)sa)->sin_addr);
                 return bitcount32(paddr->s_addr);;
 #endif
 #ifdef INET6
         case AF_INET6:
-                if (sa == NULL)
-                        return (128);
                 paddr6 = &(((const struct sockaddr_in6 *)sa)->sin6_addr);
                 return inet6_get_plen(paddr6);
 #endif
@@ -664,11 +792,23 @@ dump_iface_addr(struct nl_writer *nw, struct ifnet *ifp, struct ifaddr *ifa,
         ifamsg->ifa_scope = ifa_get_scope(ifa);
         ifamsg->ifa_index = ifp->if_index;
 
-        struct sockaddr *dst_sa = ifa->ifa_dstaddr;
-        if ((dst_sa == NULL) || (dst_sa->sa_family != sa->sa_family))
-                dst_sa = sa;
-        dump_sa(nw, IFA_ADDRESS, dst_sa);
-        dump_sa(nw, IFA_LOCAL, sa);
+	if (ifp->if_flags & IFF_POINTOPOINT) {
+		dump_sa(nw, IFA_ADDRESS, ifa->ifa_dstaddr);
+		dump_sa(nw, IFA_LOCAL, sa);
+	} else {
+		dump_sa(nw, IFA_ADDRESS, sa);
+#ifdef INET
+		/*
+		 * In most cases, IFA_ADDRESS == IFA_LOCAL
+		 * Skip IFA_LOCAL for anything except INET
+		 */
+		if (sa->sa_family == AF_INET)
+			dump_sa(nw, IFA_LOCAL, sa);
+#endif
+	}
+	if (ifp->if_flags & IFF_BROADCAST)
+		dump_sa(nw, IFA_BROADCAST, ifa->ifa_broadaddr);
+
         nlattr_add_string(nw, IFA_LABEL, if_name(ifp));
 
         uint32_t val = 0; // ifa->ifa_flags;
@@ -684,15 +824,39 @@ enomem:
 }
 
 static int
-rtnl_handle_getaddr(struct nlmsghdr *hdr, struct nlpcb *nlp, struct nl_pstate *npt)
+dump_iface_addrs(struct netlink_walkargs *wa, struct ifnet *ifp)
 {
         struct ifaddr *ifa;
+
+	CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
+		if (wa->family != 0 && wa->family != ifa->ifa_addr->sa_family)
+			continue;
+		if (ifa->ifa_addr->sa_family == AF_LINK)
+			continue;
+		wa->count++;
+		if (!dump_iface_addr(wa->nw, ifp, ifa, &wa->hdr))
+			return (ENOMEM);
+		wa->dumped++;
+	}
+
+	return (0);
+}
+
+static int
+rtnl_handle_getaddr(struct nlmsghdr *hdr, struct nlpcb *nlp, struct nl_pstate *npt)
+{
         struct ifnet *ifp;
 	int error = 0;
+
+	struct nl_parsed_ifa attrs = {};
+	error = nl_parse_nlmsg(hdr, &ifaddrmsg_parser, npt, &attrs);
+	if (error != 0)
+		return (error);
 
 	struct netlink_walkargs wa = {
 		.so = nlp,
 		.nw = npt->nw,
+		.family = attrs.ifa_family,
 		.hdr.nlmsg_pid = hdr->nlmsg_pid,
 		.hdr.nlmsg_seq = hdr->nlmsg_seq,
 		.hdr.nlmsg_flags = hdr->nlmsg_flags | NLM_F_MULTI,
@@ -701,22 +865,19 @@ rtnl_handle_getaddr(struct nlmsghdr *hdr, struct nlpcb *nlp, struct nl_pstate *n
 
 	NL_LOG(LOG_DEBUG2, "Start dump");
 
-        CK_STAILQ_FOREACH(ifp, &V_ifnet, if_link) {
-                CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
-                        if (wa.family != 0 && wa.family != ifa->ifa_addr->sa_family)
-                                continue;
-                        if (ifa->ifa_addr->sa_family == AF_LINK)
-                                continue;
-			wa.count++;
-                        if (!dump_iface_addr(wa.nw, ifp, ifa, &wa.hdr)) {
-                                error = ENOMEM;
-                                break;
-                        }
-			wa.dumped++;
-                }
-                if (error != 0)
-                        break;
-        }
+	if (attrs.ifa_index != 0) {
+		ifp = ifnet_byindex(attrs.ifa_index);
+		if (ifp == NULL)
+			error = ENOENT;
+		else
+			error = dump_iface_addrs(&wa, ifp);
+	} else {
+		CK_STAILQ_FOREACH(ifp, &V_ifnet, if_link) {
+			error = dump_iface_addrs(&wa, ifp);
+			if (error != 0)
+				break;
+		}
+	}
 
 	NL_LOG(LOG_DEBUG2, "End dump, iterated %d dumped %d", wa.count, wa.dumped);
 
@@ -767,9 +928,9 @@ rtnl_handle_ifaddr(void *arg __unused, struct ifaddr *ifa, int cmd)
 }
 
 static void
-rtnl_handle_ifattach(void *arg, struct ifnet *ifp)
+rtnl_handle_ifevent(struct ifnet *ifp, int nlmsg_type, int if_flags_mask)
 {
-	struct nlmsghdr hdr = { .nlmsg_type = NL_RTM_NEWLINK };
+	struct nlmsghdr hdr = { .nlmsg_type = nlmsg_type };
 	struct nl_writer nw = {};
 
 	if (!nl_has_listeners(NETLINK_ROUTE, RTNLGRP_LINK))
@@ -779,25 +940,36 @@ rtnl_handle_ifattach(void *arg, struct ifnet *ifp)
 		NL_LOG(LOG_DEBUG, "error allocating mbuf");
 		return;
 	}
-	dump_iface(&nw, ifp, &hdr);
+	dump_iface(&nw, ifp, &hdr, if_flags_mask);
         nlmsg_flush(&nw);
+}
+
+static void
+rtnl_handle_ifattach(void *arg, struct ifnet *ifp)
+{
+	NL_LOG(LOG_DEBUG2, "ifnet %s", if_name(ifp));
+	rtnl_handle_ifevent(ifp, NL_RTM_NEWLINK, 0);
 }
 
 static void
 rtnl_handle_ifdetach(void *arg, struct ifnet *ifp)
 {
-	struct nlmsghdr hdr = { .nlmsg_type = NL_RTM_DELLINK };
-	struct nl_writer nw = {};
+	NL_LOG(LOG_DEBUG2, "ifnet %s", if_name(ifp));
+	rtnl_handle_ifevent(ifp, NL_RTM_DELLINK, 0);
+}
 
-	if (!nl_has_listeners(NETLINK_ROUTE, RTNLGRP_LINK))
-		return;
+static void
+rtnl_handle_iflink(void *arg, struct ifnet *ifp)
+{
+	NL_LOG(LOG_DEBUG2, "ifnet %s", if_name(ifp));
+	rtnl_handle_ifevent(ifp, NL_RTM_NEWLINK, 0);
+}
 
-	if (!nlmsg_get_group_writer(&nw, NLMSG_LARGE, NETLINK_ROUTE, RTNLGRP_LINK)) {
-		NL_LOG(LOG_DEBUG, "error allocating mbuf");
-		return;
-	}
-	dump_iface(&nw, ifp, &hdr);
-        nlmsg_flush(&nw);
+void
+rtnl_handle_ifnet_event(struct ifnet *ifp, int if_flags_mask)
+{
+	NL_LOG(LOG_DEBUG2, "ifnet %s", if_name(ifp));
+	rtnl_handle_ifevent(ifp, NL_RTM_NEWLINK, if_flags_mask);
 }
 
 static const struct rtnl_cmd_handler cmd_handlers[] = {
@@ -838,7 +1010,7 @@ static const struct rtnl_cmd_handler cmd_handlers[] = {
 	},
 };
 
-static const struct nlhdr_parser *all_parsers[] = { &ifmsg_parser };
+static const struct nlhdr_parser *all_parsers[] = { &ifmsg_parser, &ifaddrmsg_parser };
 
 void
 rtnl_iface_add_cloner(struct nl_cloner *cloner)
@@ -848,11 +1020,25 @@ rtnl_iface_add_cloner(struct nl_cloner *cloner)
 	sx_xunlock(&rtnl_cloner_lock);
 }
 
-void rtnl_iface_del_cloner(struct nl_cloner *cloner)
+void
+rtnl_iface_del_cloner(struct nl_cloner *cloner)
 {
 	sx_xlock(&rtnl_cloner_lock);
 	SLIST_REMOVE(&nl_cloners, cloner, nl_cloner, next);
 	sx_xunlock(&rtnl_cloner_lock);
+}
+
+static struct nl_cloner *
+rtnl_iface_find_cloner_locked(const char *name)
+{
+	struct nl_cloner *cloner;
+
+	SLIST_FOREACH(cloner, &nl_cloners, next) {
+		if (!strcmp(name, cloner->name))
+			return (cloner);
+	}
+
+	return (NULL);
 }
 
 void
@@ -867,6 +1053,9 @@ rtnl_ifaces_init(void)
 	ifaddr_event = EVENTHANDLER_REGISTER(
 	    rt_addrmsg, rtnl_handle_ifaddr, NULL,
 	    EVENTHANDLER_PRI_ANY);
+	iflink_event = EVENTHANDLER_REGISTER(
+	    ifnet_link_event, rtnl_handle_iflink, NULL,
+	    EVENTHANDLER_PRI_ANY);
 	NL_VERIFY_PARSERS(all_parsers);
 	rtnl_iface_drivers_register();
 	rtnl_register_messages(cmd_handlers, NL_ARRAY_LEN(cmd_handlers));
@@ -878,4 +1067,5 @@ rtnl_ifaces_destroy(void)
 	EVENTHANDLER_DEREGISTER(ifnet_arrival_event, ifattach_event);
 	EVENTHANDLER_DEREGISTER(ifnet_departure_event, ifdetach_event);
 	EVENTHANDLER_DEREGISTER(rt_addrmsg, ifaddr_event);
+	EVENTHANDLER_DEREGISTER(ifnet_link_event, iflink_event);
 }

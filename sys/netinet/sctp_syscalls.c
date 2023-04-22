@@ -269,8 +269,7 @@ struct sctp_generic_sendmsg_args {
 };
 #endif
 int
-sys_sctp_generic_sendmsg(struct thread *td,
-    struct sctp_generic_sendmsg_args *uap)
+sys_sctp_generic_sendmsg(struct thread *td, struct sctp_generic_sendmsg_args *uap)
 {
 
 	return (kern_sys_sctp_generic_sendmsg(td, uap->sd, uap->msg, uap->mlen,
@@ -402,8 +401,7 @@ struct sctp_generic_sendmsg_iov_args {
 };
 #endif
 int
-sys_sctp_generic_sendmsg_iov(struct thread *td,
-    struct sctp_generic_sendmsg_iov_args *uap)
+sys_sctp_generic_sendmsg_iov(struct thread *td, struct sctp_generic_sendmsg_iov_args *uap)
 {
 
 	return (kern_sctp_generic_sendmsg_iov(td, uap->sd, uap->iov,
@@ -563,8 +561,7 @@ struct sctp_generic_recvmsg_args {
 };
 #endif
 int
-sys_sctp_generic_recvmsg(struct thread *td,
-    struct sctp_generic_recvmsg_args *uap)
+sys_sctp_generic_recvmsg(struct thread *td, struct sctp_generic_recvmsg_args *uap)
 {
 
 	return (kern_sctp_generic_recvmsg(td, uap->sd, uap->iov, uap->iovlen,

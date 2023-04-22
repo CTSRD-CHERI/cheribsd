@@ -210,6 +210,8 @@ static void
 ns8250_flush(struct uart_bas *bas, int what)
 {
 	uint8_t fcr;
+	uint8_t lsr;
+	int drain = 0;
 
 	fcr = FCR_ENABLE;
 #ifdef CPU_XBURST
@@ -221,6 +223,23 @@ ns8250_flush(struct uart_bas *bas, int what)
 		fcr |= FCR_RCV_RST;
 	uart_setreg(bas, REG_FCR, fcr);
 	uart_barrier(bas);
+
+	/*
+	 * Detect and work around emulated UARTs which don't implement the
+	 * FCR register; on these systems we need to drain the FIFO since
+	 * the flush we request doesn't happen.  One such system is the
+	 * Firecracker VMM, aka. the rust-vmm/vm-superio emulation code:
+	 * https://github.com/rust-vmm/vm-superio/issues/83
+	 */
+	lsr = uart_getreg(bas, REG_LSR);
+	if (((lsr & LSR_TEMT) == 0) && (what & UART_FLUSH_TRANSMITTER))
+		drain |= UART_DRAIN_TRANSMITTER;
+	if ((lsr & LSR_RXRDY) && (what & UART_FLUSH_RECEIVER))
+		drain |= UART_DRAIN_RECEIVER;
+	if (drain != 0) {
+		printf("ns8250: UART FCR is broken\n");
+		ns8250_drain(bas, drain);
+	}
 }
 
 static int
@@ -229,6 +248,10 @@ ns8250_param(struct uart_bas *bas, int baudrate, int databits, int stopbits,
 {
 	int divisor;
 	uint8_t lcr;
+
+	/* Don't change settings when running on Hyper-V */
+	if (vm_guest == VM_GUEST_HV)
+		return (0);
 
 	lcr = 0;
 	if (databits >= 8)
@@ -355,9 +378,11 @@ ns8250_putc(struct uart_bas *bas, int c)
 {
 	int limit;
 
-	limit = 250000;
-	while ((uart_getreg(bas, REG_LSR) & LSR_THRE) == 0 && --limit)
-		DELAY(4);
+	if (vm_guest != VM_GUEST_HV) {
+		limit = 250000;
+		while ((uart_getreg(bas, REG_LSR) & LSR_THRE) == 0 && --limit)
+			DELAY(4);
+	}
 	uart_setreg(bas, REG_DATA, c);
 	uart_barrier(bas);
 }
@@ -513,15 +538,15 @@ ns8250_bus_attach(struct uart_softc *sc)
 #endif
 	if (!resource_int_value("uart", device_get_unit(sc->sc_dev), "flags",
 	    &ivar)) {
-		if (UART_FLAGS_FCR_RX_LOW(ivar)) 
+		if (UART_FLAGS_FCR_RX_LOW(ivar))
 			ns8250->fcr |= FCR_RX_LOW;
-		else if (UART_FLAGS_FCR_RX_MEDL(ivar)) 
+		else if (UART_FLAGS_FCR_RX_MEDL(ivar))
 			ns8250->fcr |= FCR_RX_MEDL;
-		else if (UART_FLAGS_FCR_RX_HIGH(ivar)) 
+		else if (UART_FLAGS_FCR_RX_HIGH(ivar))
 			ns8250->fcr |= FCR_RX_HIGH;
 		else
 			ns8250->fcr |= FCR_RX_MEDH;
-	} else 
+	} else
 		ns8250->fcr |= FCR_RX_MEDH;
 
 	/* Get IER mask */

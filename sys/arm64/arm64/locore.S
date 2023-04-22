@@ -321,6 +321,18 @@ virtdone:
 	str	PTR(25), [PTR(0), #BP_KERN_STACK]
 	str	x27, [PTR(0), #BP_KERN_TTBR0]
 	str	x23, [PTR(0), #BP_BOOT_EL]
+	str	x4,  [PTR(0), #BP_HCR_EL2]
+
+#ifdef KASAN
+	/* Save bootparams */
+	mov	x19, x0
+
+	/* Bootstrap an early shadow map for the boot stack. */
+	bl	pmap_san_bootstrap
+
+	/* Restore bootparams */
+	mov	x0, x19
+#endif
 
 	/* trace back starts here */
 	mov	fp, #0
@@ -451,6 +463,10 @@ LENTRY(drop_to_el1)
 	ldr	x2, =(HCR_RW | HCR_APK | HCR_API)
 	msr	hcr_el2, x2
 
+	/* Stash value of HCR_EL2 for later */
+	isb
+	mrs	x4, hcr_el2
+
 	/* Load the Virtualization Process ID Register */
 	mrs	x2, midr_el1
 	msr	vpidr_el2, x2
@@ -463,8 +479,15 @@ LENTRY(drop_to_el1)
 	ldr	x2, .Lsctlr_res1
 	msr	sctlr_el1, x2
 
-	/* Don't trap to EL2 for exceptions */
-	mov	x2, #CPTR_RES1
+	/*
+	 * On some hardware, e.g., Apple M1, we can't clear E2H, so make sure we
+	 * don't trap to EL2 for SIMD register usage to have at least a
+	 * minimally usable system.
+	 */
+	tst	x4, #HCR_E2H
+	mov	x3, #CPTR_RES1	/* HCR_E2H == 0 */
+	mov	x5, #CPTR_FPEN	/* HCR_E2H == 1 */
+	csel	x2, x3, x5, eq
 	msr	cptr_el2, x2
 
 #if __has_feature(capabilities)
@@ -489,14 +512,17 @@ LENTRY(drop_to_el1)
 	msr	cntvoff_el2, xzr
 
 	/* Hypervisor trap functions */
-	adrp	x2, hyp_vectors
-	add	x2, x2, :lo12:hyp_vectors
+	adrp	x2, hyp_stub_vectors
+	add	x2, x2, :lo12:hyp_stub_vectors
 #if __has_feature(capabilities)
 	cvtp	c2, x2
 	msr	cvbar_el2, c2
 #else
 	msr	vbar_el2, x2
 #endif
+
+	/* Zero vttbr_el2 so a hypervisor can tell the host and guest apart */
+	msr	vttbr_el2, xzr
 
 	mov	x2, #(PSR_F | PSR_I | PSR_A | PSR_D | PSR_M_EL1h)
 	msr	spsr_el2, x2
@@ -533,32 +559,6 @@ LENTRY(drop_to_el1)
 .Lsctlr_res1:
 	.quad SCTLR_RES1
 LEND(drop_to_el1)
-
-#define	VECT_EMPTY	\
-	.align 7;	\
-	1:	b	1b
-
-	.align 11
-hyp_vectors:
-	VECT_EMPTY	/* Synchronous EL2t */
-	VECT_EMPTY	/* IRQ EL2t */
-	VECT_EMPTY	/* FIQ EL2t */
-	VECT_EMPTY	/* Error EL2t */
-
-	VECT_EMPTY	/* Synchronous EL2h */
-	VECT_EMPTY	/* IRQ EL2h */
-	VECT_EMPTY	/* FIQ EL2h */
-	VECT_EMPTY	/* Error EL2h */
-
-	VECT_EMPTY	/* Synchronous 64-bit EL1 */
-	VECT_EMPTY	/* IRQ 64-bit EL1 */
-	VECT_EMPTY	/* FIQ 64-bit EL1 */
-	VECT_EMPTY	/* Error 64-bit EL1 */
-
-	VECT_EMPTY	/* Synchronous 32-bit EL1 */
-	VECT_EMPTY	/* IRQ 32-bit EL1 */
-	VECT_EMPTY	/* FIQ 32-bit EL1 */
-	VECT_EMPTY	/* Error 32-bit EL1 */
 
 /*
  * Get the delta between the physical address we were loaded to and the

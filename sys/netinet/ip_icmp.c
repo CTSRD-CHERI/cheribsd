@@ -49,6 +49,7 @@ __FBSDID("$FreeBSD$");
 
 #include <net/if.h>
 #include <net/if_var.h>
+#include <net/if_private.h>
 #include <net/if_types.h>
 #include <net/route.h>
 #include <net/route/route_ctl.h>
@@ -66,7 +67,6 @@ __FBSDID("$FreeBSD$");
 #include <netinet/ip_options.h>
 #include <netinet/sctp.h>
 #include <netinet/tcp.h>
-#include <netinet/tcp_var.h>
 #include <netinet/tcpip.h>
 #include <netinet/icmp_var.h>
 
@@ -561,7 +561,8 @@ icmp_input(struct mbuf **mp, int *offp, int proto)
 		if (IN_MULTICAST(ntohl(icp->icmp_ip.ip_dst.s_addr)))
 			goto badcode;
 		/* Filter out responses to INADDR_ANY, protocols ignore it. */
-		if (icp->icmp_ip.ip_dst.s_addr == INADDR_ANY)
+		if (icp->icmp_ip.ip_dst.s_addr == INADDR_ANY ||
+		    icp->icmp_ip.ip_src.s_addr == INADDR_ANY)
 			goto freeit;
 #ifdef ICMPPRINTFS
 		if (icmpprintfs)

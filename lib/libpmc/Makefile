@@ -3,13 +3,12 @@
 # XXX: not at all purecap clean, but we need the headers...
 MK_WERROR=	no
 
-LIB=	pmc
+LIB_CXX= pmc
 
 SRCS=	libpmc.c pmclog.c libpmc_pmu_util.c libpmc_json.cc
 INCS=	pmc.h pmclog.h pmcformat.h
 
 CFLAGS+= -I${SRCTOP}/${RELDIR:H}/libpmcstat
-LDADD+=	-lc++
 
 .if ${MACHINE_CPUARCH} == "aarch64"
 EVENT_ARCH="arm64"
@@ -48,9 +47,6 @@ WARNS?=	3
 
 CFLAGS+= -I${.CURDIR} -I${SRCTOP}/sys
 CWARNFLAGS.gcc+= -Wno-shadow -Wno-cast-align
-
-# Silence warnings about usage of deprecated std::auto_ptr
-CXXWARNFLAGS+=	-Wno-deprecated-declarations
 
 MAN=	pmc.3
 MAN+=	pmc_allocate.3

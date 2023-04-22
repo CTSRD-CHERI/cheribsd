@@ -149,6 +149,9 @@ __FBSDID("$FreeBSD$");
 
 #define	SMMU_Q_ALIGN		(64 * 1024)
 
+#define		MAXADDR_48BIT	0xFFFFFFFFFFFFUL
+#define		MAXADDR_52BIT	0xFFFFFFFFFFFFFUL
+
 static struct resource_spec smmu_spec[] = {
 	{ SYS_RES_MEMORY, 0, RF_ACTIVE },
 	{ SYS_RES_IRQ, 0, RF_ACTIVE },
@@ -1652,7 +1655,7 @@ smmu_unmap(device_t dev, struct iommu_domain *iodom,
 	dprintf("%s: %lx, %ld, domain %d\n", __func__, va, size, domain->asid);
 
 	for (i = 0; i < size; i += PAGE_SIZE) {
-		if (pmap_smmu_remove(&domain->p, va) == 0) {
+		if (smmu_pmap_remove(&domain->p, va) == 0) {
 			/* pmap entry removed, invalidate TLB. */
 			smmu_tlbi_va(sc, va, domain->asid);
 		} else {
@@ -1687,7 +1690,7 @@ smmu_map(device_t dev, struct iommu_domain *iodom,
 
 	for (i = 0; size > 0; size -= PAGE_SIZE) {
 		pa = VM_PAGE_TO_PHYS(ma[i++]);
-		error = pmap_smmu_enter(&domain->p, va, pa, prot, 0);
+		error = smmu_pmap_enter(&domain->p, va, pa, prot, 0);
 		if (error)
 			return (error);
 		smmu_tlbi_va(sc, va, domain->asid);
@@ -1702,6 +1705,7 @@ smmu_map(device_t dev, struct iommu_domain *iodom,
 static struct iommu_domain *
 smmu_domain_alloc(device_t dev, struct iommu_unit *iommu)
 {
+	struct iommu_domain *iodom;
 	struct smmu_domain *domain;
 	struct smmu_unit *unit;
 	struct smmu_softc *sc;
@@ -1724,7 +1728,7 @@ smmu_domain_alloc(device_t dev, struct iommu_unit *iommu)
 
 	domain->asid = (uint16_t)new_asid;
 
-	iommu_pmap_pinit(&domain->p);
+	smmu_pmap_pinit(&domain->p);
 	PMAP_LOCK_INIT(&domain->p);
 
 	error = smmu_init_cd(sc, domain);
@@ -1742,7 +1746,15 @@ smmu_domain_alloc(device_t dev, struct iommu_unit *iommu)
 	LIST_INSERT_HEAD(&unit->domain_list, domain, next);
 	IOMMU_UNLOCK(iommu);
 
-	return (&domain->iodom);
+	iodom = &domain->iodom;
+
+	/*
+	 * Use 48-bit address space regardless of VAX bit
+	 * as we need 64k IOMMU_PAGE_SIZE for 52-bit space.
+	 */
+	iodom->end = MAXADDR_48BIT;
+
+	return (iodom);
 }
 
 static void
@@ -1760,8 +1772,8 @@ smmu_domain_free(device_t dev, struct iommu_domain *iodom)
 
 	cd = domain->cd;
 
-	iommu_pmap_remove_pages(&domain->p);
-	iommu_pmap_release(&domain->p);
+	smmu_pmap_remove_pages(&domain->p);
+	smmu_pmap_release(&domain->p);
 
 	smmu_tlbi_asid(sc, domain->asid);
 	smmu_asid_free(sc, domain->asid);

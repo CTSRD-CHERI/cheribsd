@@ -1097,15 +1097,15 @@ product AMOI H02		0x0802	H02 3G modem
 /* American Power Conversion products */
 product APC UPS			0x0002	Uninterruptible Power Supply
 
+/* American Power Conversion products */
+product APC UPS1000		0x0003	Uninterruptible Power Supply
+
 /* Ambit Microsystems products */
 product AMBIT WLAN		0x0302	WLAN
 product AMBIT NTL_250		0x6098	NTL 250 cable modem
 
 /* Apacer products */
 product APACER HT202		0xb113	USB 2.0 Flash Drive
-
-/* American Power Conversion products */
-product APC UPS			0x0002	Uninterruptible Power Supply
 
 /* Amigo Technology products */
 product AMIGO RT2870_1		0x9031	RT2870
@@ -1135,9 +1135,6 @@ product ANYDATA ADU_500A	0x6502	CDMA 2000 EV-DO USB Modem
 
 /* AOX, Inc. products */
 product AOX USB101		0x0008	Ethernet
-
-/* American Power Conversion products */
-product APC UPS			0x0002	Uninterruptible Power Supply
 
 /* Apple Computer products */
 product APPLE DUMMY		0x0000	Dummy product
@@ -1337,6 +1334,7 @@ product AZUREWAVE RTL8192SU_5	0x3325	RTL8192SU
 
 /* Baltech products */
 product BALTECH CARDREADER	0x9999	Card reader
+product BALTECH SMARTCARDREADER	0xf019	SmartCard reader
 
 /* Bayer products */
 product BAYER CONTOUR_CABLE	0x6001	FTDI compatible adapter
@@ -2551,9 +2549,7 @@ product HUAWEI K3770		0x14c9  3G modem
 product HUAWEI K3771		0x14ca  K3771
 product HUAWEI K3772		0x14cf	K3772
 product HUAWEI K3770_INIT	0x14d1  K3770 Initial
-product HUAWEI E3131_INIT	0x14fe	3G modem initial
 product HUAWEI E392		0x1505	LTE modem
-product HUAWEI E3131		0x1506	3G modem
 product HUAWEI K3765_INIT	0x1520	K3765 Initial
 product HUAWEI K4505_INIT	0x1521	K4505 Initial
 product HUAWEI K3772_INIT	0x1526	K3772 Initial
@@ -2567,6 +2563,12 @@ product HUAWEI E173		0x1c05	3G modem
 product HUAWEI E173_INIT	0x1c0b	3G modem initial
 product HUAWEI E3272		0x1c1e	LTE modem
 product HUAWEI E3372_INIT	0x1f01  LTE modem initial
+product HUAWEI E3372_NCM	0x1506  LTE modem in NCM mode
+product HUAWEI E3372v153_INIT	0x14fe	LTE modem initial
+product HUAWEI E3372v153_NCM	0x155f	LTE modem in NCM mode
+product HUAWEI E5573Cs322_NCM	0x155e	LTE AP modem NCM mode
+product HUAWEI E5573Cs322_ECM	0x14db	LTE AP modem ECM mode
+product HUAWEI E5573Cs322_ACM	0x1442	LTE AP modem ACM mode
 
 /* HUAWEI 3com products */
 product HUAWEI3COM WUB320G	0x0009	Aolynk WUB320g
@@ -2710,6 +2712,7 @@ product KEISOKUGIKEN USBDAQ	0x0068	HKS-0200 USBDAQ
 /* Kensington products */
 product KENSINGTON ORBIT	0x1003	Orbit USB/PS2 trackball
 product KENSINGTON TURBOBALL	0x1005	TurboBall
+product KENSINGTON SLIMBLADE	0x2041	Slimblade Trackball
 
 /* Synaptics products */
 product SYNAPTICS FPR9A		0x009a	Fingerprint Reader
@@ -3306,6 +3309,7 @@ product MICROSOFT WLNOTEBOOK3	0x00d2	Wireless Optical Mouse 3000 (Model 1049)
 product MICROSOFT NATURAL4000	0x00db	Natural Ergonomic Keyboard 4000
 product MICROSOFT WLNOTEBOOK2	0x00e1	Wireless Optical Mouse 3000 (Model 1056)
 product MICROSOFT XBOX360	0x0292	XBOX 360 WLAN
+product MICROSOFT WINDEVETH	0x0c5e	Windows Dev Kit 2023 Ethernet
 
 /* Microtech products */
 product MICROTECH SCSIDB25	0x0004	USB-SCSI-DB25
@@ -3982,7 +3986,9 @@ product QUANTA RW6815R		0xf003	HP iPAQ rw6815 RNDIS
 /* Quectel products */
 product QUECTEL EC25		0x0125	LTE modem
 product QUECTEL EM05		0x0127	LTE modem
+product QUECTEL EP06_E		0x0306	LTE modem
 product QUECTEL EM12_G          0x0512  LTE modem
+product QUECTEL EM160R		0x0620	LTE modem
 
 /* Quickshot products */
 product QUICKSHOT STRIKEPAD	0x6238	USB StrikePad

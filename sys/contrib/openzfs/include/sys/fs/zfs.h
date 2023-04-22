@@ -29,6 +29,7 @@
  * Copyright (c) 2019 Datto Inc.
  * Portions Copyright 2010 Robert Milkowski
  * Copyright (c) 2021, Colm Buckley <colm@tuatha.org>
+ * Copyright (c) 2022 Hewlett Packard Enterprise Development LP.
  */
 
 #ifndef	_SYS_FS_ZFS_H
@@ -354,6 +355,11 @@ typedef enum {
 	VDEV_PROP_BYTES_TRIM,
 	VDEV_PROP_REMOVING,
 	VDEV_PROP_ALLOCATING,
+	VDEV_PROP_FAILFAST,
+	VDEV_PROP_CHECKSUM_N,
+	VDEV_PROP_CHECKSUM_T,
+	VDEV_PROP_IO_N,
+	VDEV_PROP_IO_T,
 	VDEV_NUM_PROPS
 } vdev_prop_t;
 
@@ -501,7 +507,9 @@ typedef enum {
 
 typedef enum {
 	ZFS_REDUNDANT_METADATA_ALL,
-	ZFS_REDUNDANT_METADATA_MOST
+	ZFS_REDUNDANT_METADATA_MOST,
+	ZFS_REDUNDANT_METADATA_SOME,
+	ZFS_REDUNDANT_METADATA_NONE
 } zfs_redundant_metadata_type_t;
 
 typedef enum {
@@ -1653,6 +1661,7 @@ typedef enum {
 #define	ZFS_ONLINE_UNSPARE	0x2
 #define	ZFS_ONLINE_FORCEFAULT	0x4
 #define	ZFS_ONLINE_EXPAND	0x8
+#define	ZFS_ONLINE_SPARE	0x10
 #define	ZFS_OFFLINE_TEMPORARY	0x1
 
 /*

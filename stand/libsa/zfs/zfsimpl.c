@@ -118,29 +118,29 @@ static vdev_list_t zfs_vdevs;
  * List of ZFS features supported for read
  */
 static const char *features_for_read[] = {
-	"org.illumos:lz4_compress",
-	"com.delphix:hole_birth",
-	"com.delphix:extensible_dataset",
+	"com.datto:bookmark_v2",
+	"com.datto:encryption",
+	"com.datto:resilver_defer",
+	"com.delphix:bookmark_written",
+	"com.delphix:device_removal",
 	"com.delphix:embedded_data",
-	"org.open-zfs:large_blocks",
+	"com.delphix:extensible_dataset",
+	"com.delphix:head_errlog",
+	"com.delphix:hole_birth",
+	"com.delphix:obsolete_counts",
+	"com.delphix:spacemap_histogram",
+	"com.delphix:spacemap_v2",
+	"com.delphix:zpool_checkpoint",
+	"com.intel:allocation_classes",
+	"com.joyent:multi_vdev_crash_dump",
+	"org.freebsd:zstd_compress",
+	"org.illumos:lz4_compress",
 	"org.illumos:sha512",
 	"org.illumos:skein",
-	"org.zfsonlinux:large_dnode",
-	"com.joyent:multi_vdev_crash_dump",
-	"com.delphix:spacemap_histogram",
-	"com.delphix:zpool_checkpoint",
-	"com.delphix:spacemap_v2",
-	"com.datto:encryption",
-	"com.datto:bookmark_v2",
-	"org.zfsonlinux:allocation_classes",
-	"com.datto:resilver_defer",
-	"com.delphix:device_removal",
-	"com.delphix:obsolete_counts",
-	"com.intel:allocation_classes",
-	"org.freebsd:zstd_compress",
-	"com.delphix:bookmark_written",
-	"com.delphix:head_errlog",
+	"org.open-zfs:large_blocks",
 	"org.openzfs:blake3",
+	"org.zfsonlinux:allocation_classes",
+	"org.zfsonlinux:large_dnode",
 	NULL
 };
 
@@ -3068,11 +3068,12 @@ zfs_rlookup(const spa_t *spa, uint64_t objnum, char *result)
 	char name[256];
 	char component[256];
 	uint64_t dir_obj, parent_obj, child_dir_zapobj;
-	dnode_phys_t child_dir_zap, dataset, dir, parent;
+	dnode_phys_t child_dir_zap, snapnames_zap, dataset, dir, parent;
 	dsl_dir_phys_t *dd;
 	dsl_dataset_phys_t *ds;
 	char *p;
 	int len;
+	boolean_t issnap = B_FALSE;
 
 	p = &name[sizeof(name) - 1];
 	*p = '\0';
@@ -3083,6 +3084,8 @@ zfs_rlookup(const spa_t *spa, uint64_t objnum, char *result)
 	}
 	ds = (dsl_dataset_phys_t *)&dataset.dn_bonus;
 	dir_obj = ds->ds_dir_obj;
+	if (ds->ds_snapnames_zapobj == 0)
+		issnap = B_TRUE;
 
 	for (;;) {
 		if (objset_get_dnode(spa, spa->spa_mos, dir_obj, &dir) != 0)
@@ -3098,6 +3101,34 @@ zfs_rlookup(const spa_t *spa, uint64_t objnum, char *result)
 		    &parent) != 0)
 			return (EIO);
 		dd = (dsl_dir_phys_t *)&parent.dn_bonus;
+		if (issnap == B_TRUE) {
+			/*
+			 * The dataset we are looking up is a snapshot
+			 * the dir_obj is the parent already, we don't want
+			 * the grandparent just yet. Reset to the parent.
+			 */
+			dd = (dsl_dir_phys_t *)&dir.dn_bonus;
+			/* Lookup the dataset to get the snapname ZAP */
+			if (objset_get_dnode(spa, spa->spa_mos,
+			    dd->dd_head_dataset_obj, &dataset))
+				return (EIO);
+			ds = (dsl_dataset_phys_t *)&dataset.dn_bonus;
+			if (objset_get_dnode(spa, spa->spa_mos,
+			    ds->ds_snapnames_zapobj, &snapnames_zap) != 0)
+				return (EIO);
+			/* Get the name of the snapshot */
+			if (zap_rlookup(spa, &snapnames_zap, component,
+			    objnum) != 0)
+				return (EIO);
+			len = strlen(component);
+			p -= len;
+			memcpy(p, component, len);
+			--p;
+			*p = '@';
+			issnap = B_FALSE;
+			continue;
+		}
+
 		child_dir_zapobj = dd->dd_child_dir_zapobj;
 		if (objset_get_dnode(spa, spa->spa_mos, child_dir_zapobj,
 		    &child_dir_zap) != 0)
@@ -3127,9 +3158,11 @@ zfs_lookup_dataset(const spa_t *spa, const char *name, uint64_t *objnum)
 {
 	char element[256];
 	uint64_t dir_obj, child_dir_zapobj;
-	dnode_phys_t child_dir_zap, dir;
+	dnode_phys_t child_dir_zap, snapnames_zap, dir, dataset;
 	dsl_dir_phys_t *dd;
+	dsl_dataset_phys_t *ds;
 	const char *p, *q;
+	boolean_t issnap = B_FALSE;
 
 	if (objset_get_dnode(spa, spa->spa_mos,
 	    DMU_POOL_DIRECTORY_OBJECT, &dir))
@@ -3160,6 +3193,25 @@ zfs_lookup_dataset(const spa_t *spa, const char *name, uint64_t *objnum)
 			p += strlen(p);
 		}
 
+		if (issnap == B_TRUE) {
+		        if (objset_get_dnode(spa, spa->spa_mos,
+			    dd->dd_head_dataset_obj, &dataset))
+		                return (EIO);
+			ds = (dsl_dataset_phys_t *)&dataset.dn_bonus;
+			if (objset_get_dnode(spa, spa->spa_mos,
+			    ds->ds_snapnames_zapobj, &snapnames_zap) != 0)
+				return (EIO);
+			/* Actual loop condition #2. */
+			if (zap_lookup(spa, &snapnames_zap, element,
+			    sizeof (dir_obj), 1, &dir_obj) != 0)
+				return (ENOENT);
+			*objnum = dir_obj;
+			return (0);
+		} else if ((q = strchr(element, '@')) != NULL) {
+			issnap = B_TRUE;
+			element[q - element] = '\0';
+			p = q + 1;
+		}
 		child_dir_zapobj = dd->dd_child_dir_zapobj;
 		if (objset_get_dnode(spa, spa->spa_mos, child_dir_zapobj,
 		    &child_dir_zap) != 0)

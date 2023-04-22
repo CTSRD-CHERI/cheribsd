@@ -225,10 +225,14 @@ META_TGT_WHITELIST+= \
 .ORDER: buildkernel reinstallkernel.debug
 .ORDER: buildsysroot installsysroot
 
-_ORIGIAL_PATH:=${PATH}
+# Only sanitize PATH on FreeBSD.
+# PATH may include tools that are required to cross-build
+# on non-FreeBSD systems.
+.if ${.MAKE.OS} == "FreeBSD"
 PATH=	/sbin:/bin:/usr/sbin:/usr/bin
+.endif
 MAKEOBJDIRPREFIX?=	/usr/obj
-_MAKEOBJDIRPREFIX!= /usr/bin/env -i PATH="${PATH}" `command -v ${MAKE}` -m ${.CURDIR}/share/mk \
+_MAKEOBJDIRPREFIX!= /usr/bin/env -i PATH=${PATH:Q} `command -v ${MAKE}` -m ${.CURDIR}/share/mk \
     MK_AUTO_OBJ=no ${.MAKEFLAGS:MMAKEOBJDIRPREFIX=*} __MAKE_CONF=${__MAKE_CONF} \
     SRCCONF=${SRCCONF} SRC_ENV_CONF= \
     -f /dev/null -V MAKEOBJDIRPREFIX dummy
@@ -271,7 +275,7 @@ SUB_MAKE= `test -x ${MYMAKE} && echo ${MYMAKE} || echo ${MAKE}` \
 SUB_MAKE= ${MAKE} -m ${.CURDIR}/share/mk
 .endif
 
-_MAKE=	PATH="${PATH}" _ORIGIAL_PATH="${_ORIGIAL_PATH}" MAKE_CMD="${MAKE}" ${SUB_MAKE} -f Makefile.inc1 \
+_MAKE=	PATH=${PATH:Q} MAKE_CMD="${MAKE}" ${SUB_MAKE} -f Makefile.inc1 \
 	TARGET=${_TARGET} TARGET_ARCH=${_TARGET_ARCH} ${_MAKEARGS}
 
 .if defined(MK_META_MODE) && ${MK_META_MODE} == "yes"
@@ -535,14 +539,14 @@ TARGET_ARCHES_${target}?= ${target}
 .endfor
 
 .if defined(USE_GCC_TOOLCHAINS)
-TOOLCHAINS_amd64=	amd64-gcc9
-TOOLCHAINS_arm=		armv6-gcc9 armv7-gcc9
-TOOLCHAIN_armv7=	armv7-gcc9
-TOOLCHAINS_arm64=	aarch64-gcc9
-TOOLCHAINS_i386=	i386-gcc9
-TOOLCHAINS_powerpc=	powerpc-gcc9 powerpc64-gcc9
-TOOLCHAIN_powerpc64=	powerpc64-gcc9
-TOOLCHAINS_riscv=	riscv64-gcc9
+TOOLCHAINS_amd64=	amd64-gcc12
+TOOLCHAINS_arm=		armv6-gcc12 armv7-gcc12
+TOOLCHAIN_armv7=	armv7-gcc12
+TOOLCHAINS_arm64=	aarch64-gcc12
+TOOLCHAINS_i386=	i386-gcc12
+TOOLCHAINS_powerpc=	powerpc-gcc12 powerpc64-gcc12
+TOOLCHAIN_powerpc64=	powerpc64-gcc12
+TOOLCHAINS_riscv=	riscv64-gcc12
 .endif
 
 # If a target is using an external toolchain, set MAKE_PARAMS to enable use
@@ -599,7 +603,7 @@ universe-toolchain: .PHONY universe_prologue
 	@echo "> Toolchain bootstrap started on `LC_ALL=C date`"
 	@echo "--------------------------------------------------------------"
 	${_+_}@cd ${.CURDIR}; \
-	    env PATH=${PATH} ${SUB_MAKE} ${JFLAG} kernel-toolchain \
+	    env PATH=${PATH:Q} ${SUB_MAKE} ${JFLAG} kernel-toolchain \
 	    TARGET=${MACHINE} TARGET_ARCH=${MACHINE_ARCH} \
 	    OBJTOP="${HOST_OBJTOP}" \
 	    WITHOUT_SYSTEM_COMPILER=yes \

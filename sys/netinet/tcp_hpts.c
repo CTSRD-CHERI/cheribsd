@@ -29,7 +29,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_rss.h"
-#include "opt_tcpdebug.h"
 
 /**
  * Some notes about usage.
@@ -157,9 +156,6 @@ __FBSDID("$FreeBSD$");
 #include <netinet/tcp_hpts.h>
 #include <netinet/tcp_log_buf.h>
 
-#ifdef tcpdebug
-#include <netinet/tcp_debug.h>
-#endif				/* tcpdebug */
 #ifdef tcp_offload
 #include <netinet/tcp_offload.h>
 #endif
@@ -463,8 +459,8 @@ tcp_hpts_log(struct tcp_hpts_entry *hpts, struct tcpcb *tp, struct timeval *tv,
 	log.u_bbr.pkt_epoch = hpts->p_runningslot;
 	log.u_bbr.use_lt_bw = 1;
 	TCP_LOG_EVENTP(tp, NULL,
-		       &tp->t_inpcb->inp_socket->so_rcv,
-		       &tp->t_inpcb->inp_socket->so_snd,
+		       &tptosocket(tp)->so_rcv,
+		       &tptosocket(tp)->so_snd,
 		       BBR_LOG_HPTSDIAG, 0,
 		       0, &log, false, tv);
 }
@@ -731,7 +727,7 @@ max_slots_available(struct tcp_hpts_entry *hpts, uint32_t wheel_slot, uint32_t *
 	}
 	/*
 	 * To get the number left we can insert into we simply
-	 * subract the distance the pacer has to run from how
+	 * subtract the distance the pacer has to run from how
 	 * many slots there are.
 	 */
 	avail_on_wheel = NUM_OF_HPTSI_SLOTS - dis_to_travel;
@@ -1348,7 +1344,7 @@ again:
 			}
 			CURVNET_SET(inp->inp_vnet);
 			/* Lets do any logging that we might want to */
-			if (hpts_does_tp_logging && (tp->t_logstate != TCP_LOG_STATE_OFF)) {
+			if (hpts_does_tp_logging && tcp_bblogging_on(tp)) {
 				tcp_hpts_log(hpts, tp, &tv, slots_to_run, i, from_callout);
 			}
 
@@ -1368,10 +1364,10 @@ again:
 			if (error < 0)
 				goto skip_pacing;
 			inp->inp_hpts_calls = 0;
-			if (ninp && ninp->inp_ppcb) {
+			if (ninp) {
 				/*
 				 * If we have a nxt inp, see if we can
-				 * prefetch its ppcb. Note this may seem
+				 * prefetch it. Note this may seem
 				 * "risky" since we have no locks (other
 				 * than the previous inp) and there no
 				 * assurance that ninp was not pulled while
@@ -1399,8 +1395,11 @@ again:
 				 * TLB hit, and instead if <c> occurs just
 				 * cause us to load cache with a useless
 				 * address (to us).
+				 *
+				 * XXXGL: with tcpcb == inpcb, I'm unsure this
+				 * prefetch is still correct and useful.
 				 */
-				kern_prefetch(ninp->inp_ppcb, &prefetch_tp);
+				kern_prefetch(ninp, &prefetch_tp);
 				prefetch_tp = 1;
 			}
 			INP_WUNLOCK(inp);

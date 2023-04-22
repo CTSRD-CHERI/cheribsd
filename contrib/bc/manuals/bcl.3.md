@@ -2,7 +2,7 @@
 
 SPDX-License-Identifier: BSD-2-Clause
 
-Copyright (c) 2018-2021 Gavin D. Howard and contributors.
+Copyright (c) 2018-2023 Gavin D. Howard and contributors.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -38,20 +38,15 @@ bcl - library of arbitrary precision decimal arithmetic
 
 *#include <bcl.h>*
 
-Link with *-lbcl*.
-
-## Signals
-
-This procedure will allow clients to use signals to interrupt computations
-running in bcl(3).
-
-**void bcl_handleSignal(**_void_**);**
-
-**bool bcl_running(**_void_**);**
+Link with *-lbcl*, and on POSIX systems, *-lpthread* is also required.
 
 ## Setup
 
 These items allow clients to set up bcl(3).
+
+**BclError bcl_start(**_void_**);**
+
+**void bcl_end(**_void_**);**
 
 **BclError bcl_init(**_void_**);**
 
@@ -66,6 +61,10 @@ These items allow clients to set up bcl(3).
 **void bcl_setLeadingZeroes(bool** _leadingZeroes_**);**
 
 **void bcl_gc(**_void_**);**
+
+**bool bcl_digitClamp(**_void_**);**
+
+**void bcl_setDigitClamp(bool** _digitClamp_**);**
 
 ## Contexts
 
@@ -137,7 +136,11 @@ These items allow clients to convert numbers into and from strings and integers.
 
 **char\* bcl_string(BclNumber** _n_**);**
 
+**char\* bcl_string_keep(BclNumber** _n_**);**
+
 **BclError bcl_bigdig(BclNumber** _n_**, BclBigDig \***_result_**);**
+
+**BclError bcl_bigdig_keep(BclNumber** _n_**, BclBigDig \***_result_**);**
 
 **BclNumber bcl_bigdig2num(BclBigDig** _val_**);**
 
@@ -147,25 +150,47 @@ These items allow clients to run math on numbers.
 
 **BclNumber bcl_add(BclNumber** _a_**, BclNumber** _b_**);**
 
+**BclNumber bcl_add_keep(BclNumber** _a_**, BclNumber** _b_**);**
+
 **BclNumber bcl_sub(BclNumber** _a_**, BclNumber** _b_**);**
+
+**BclNumber bcl_sub_keep(BclNumber** _a_**, BclNumber** _b_**);**
 
 **BclNumber bcl_mul(BclNumber** _a_**, BclNumber** _b_**);**
 
+**BclNumber bcl_mul_keep(BclNumber** _a_**, BclNumber** _b_**);**
+
 **BclNumber bcl_div(BclNumber** _a_**, BclNumber** _b_**);**
+
+**BclNumber bcl_div_keep(BclNumber** _a_**, BclNumber** _b_**);**
 
 **BclNumber bcl_mod(BclNumber** _a_**, BclNumber** _b_**);**
 
+**BclNumber bcl_mod_keep(BclNumber** _a_**, BclNumber** _b_**);**
+
 **BclNumber bcl_pow(BclNumber** _a_**, BclNumber** _b_**);**
+
+**BclNumber bcl_pow_keep(BclNumber** _a_**, BclNumber** _b_**);**
 
 **BclNumber bcl_lshift(BclNumber** _a_**, BclNumber** _b_**);**
 
+**BclNumber bcl_lshift_keep(BclNumber** _a_**, BclNumber** _b_**);**
+
 **BclNumber bcl_rshift(BclNumber** _a_**, BclNumber** _b_**);**
+
+**BclNumber bcl_rshift_keep(BclNumber** _a_**, BclNumber** _b_**);**
 
 **BclNumber bcl_sqrt(BclNumber** _a_**);**
 
+**BclNumber bcl_sqrt_keep(BclNumber** _a_**);**
+
 **BclError bcl_divmod(BclNumber** _a_**, BclNumber** _b_**, BclNumber \***_c_**, BclNumber \***_d_**);**
 
+**BclError bcl_divmod_keep(BclNumber** _a_**, BclNumber** _b_**, BclNumber \***_c_**, BclNumber \***_d_**);**
+
 **BclNumber bcl_modexp(BclNumber** _a_**, BclNumber** _b_**, BclNumber** _c_**);**
+
+**BclNumber bcl_modexp_keep(BclNumber** _a_**, BclNumber** _b_**, BclNumber** _c_**);**
 
 ## Miscellaneous
 
@@ -196,11 +221,17 @@ generator in bcl(3).
 
 **BclNumber bcl_irand(BclNumber** _a_**);**
 
+**BclNumber bcl_irand_keep(BclNumber** _a_**);**
+
 **BclNumber bcl_frand(size_t** _places_**);**
 
 **BclNumber bcl_ifrand(BclNumber** _a_**, size_t** _places_**);**
 
+**BclNumber bcl_ifrand_keep(BclNumber** _a_**, size_t** _places_**);**
+
 **BclError bcl_rand_seedWithNum(BclNumber** _n_**);**
+
+**BclError bcl_rand_seedWithNum_keep(BclNumber** _n_**);**
 
 **BclError bcl_rand_seed(unsigned char** _seed_**[**_BCL_SEED_SIZE_**]);**
 
@@ -218,48 +249,22 @@ bcl(3) is a library that implements arbitrary-precision decimal math, as
 standardized by POSIX
 (https://pubs.opengroup.org/onlinepubs/9699919799/utilities/bc.html) in bc(1).
 
-bcl(3) is async-signal-safe if **bcl_handleSignal(**_void_**)** is used
-properly. (See the **SIGNAL HANDLING** section.)
-
 bcl(3) assumes that it is allowed to use the **bcl**, **Bcl**, **bc**, and
 **Bc** prefixes for symbol names without collision.
 
 All of the items in its interface are described below. See the documentation for
 each function for what each function can return.
 
-## Signals
-
-**void bcl_handleSignal(**_void_**)**
-
-:   An async-signal-safe function that can be called from a signal handler. If
-    called from a signal handler on the same thread as any executing bcl(3)
-    functions, it will interrupt the functions and force them to return early.
-    It is undefined behavior if this function is called from a thread that is
-    *not* executing any bcl(3) functions while any bcl(3) functions are
-    executing.
-
-    If execution *is* interrupted, **bcl_handleSignal(**_void_**)** does *not*
-    return to its caller.
-
-    See the **SIGNAL HANDLING** section.
-
-**bool bcl_running(**_void_**)**
-
-:   An async-signal-safe function that can be called from a signal handler. It
-    will return **true** if any bcl(3) procedures are running, which means it is
-    safe to call **bcl_handleSignal(**_void_**)**. Otherwise, it returns
-    **false**.
-
-    See the **SIGNAL HANDLING** section.
-
 ## Setup
 
-**BclError bcl_init(**_void_**)**
+**BclError bcl_start(**_void_**)**
 
 :   Initializes this library. This function can be called multiple times, but
-    each call must be matched by a call to **bcl_free(**_void_**)**. This is to
-    make it possible for multiple libraries and applications to initialize
-    bcl(3) without problem.
+    **bcl_end()** must only be called *once*. This is to make it possible for
+    multiple libraries and applications to initialize bcl(3) without problem.
+
+    It is suggested that client libraries call this function, but do not call
+    **bcl_end()**, and client applications should call both.
 
     If there was no error, **BCL_ERROR_NONE** is returned. Otherwise, this
     function can return:
@@ -269,13 +274,48 @@ each function for what each function can return.
     This function must be the first one clients call. Calling any other
     function without calling this one first is undefined behavior.
 
+**void bcl_end(**_void_**)**
+
+:   Deinitializes this library. This function must only be called *once*.
+
+    All data must have been freed before calling this function.
+
+    This function must be the last one clients call. Calling this function
+    before calling any other function is undefined behavior.
+
+**BclError bcl_init(**_void_**)**
+
+:   Initializes the library for the current thread. This function can be called
+    multiple times, but each call must be matched by a call to
+    **bcl_free(**_void_**)**. This is to make it possible for multiple libraries
+    and applications to initialize threads for bcl(3) without problem.
+
+    This function *must* be called from the thread that it is supposed to
+    initialize.
+
+    If there was no error, **BCL_ERROR_NONE** is returned. Otherwise, this
+    function can return:
+
+    * **BCL_ERROR_FATAL_ALLOC_ERR**
+
+    This function must be the second one clients call. Calling any other
+    function without calling **bcl_start()** and then this one first is
+    undefined behavior, except in the case of new threads. New threads can
+    safely call this function without calling **bcl_start()** if another thread
+    has previously called **bcl_start()**. But this function must still be the
+    first function in bcl(3) called by that new thread.
+
 **void bcl_free(**_void_**)**
 
 :   Decrements bcl(3)'s reference count and frees the data associated with it if
     the reference count is **0**.
 
-    This function must be the last one clients call. Calling this function
-    before calling any other function is undefined behavior.
+    This function *must* be called from the thread that it is supposed to
+    deinitialize.
+
+    This function must be the second to last one clients call. Calling this
+    function before calling any other function besides **bcl_end()** is
+    undefined behavior.
 
 **bool bcl_abortOnFatalError(**_void_**)**
 
@@ -284,6 +324,8 @@ each function for what each function can return.
     error occurs.
 
     If activated, clients do not need to check for fatal errors.
+
+    This value is *thread-local*; it applies to just the thread it is read on.
 
     The default is **false**.
 
@@ -294,6 +336,8 @@ each function for what each function can return.
     call. If *abrt* is **true**, bcl(3) will cause a **SIGABRT** on fatal errors
     after the call.
 
+    This value is *thread-local*; it applies to just the thread it is set on.
+
     If activated, clients do not need to check for fatal errors.
 
 **bool bcl_leadingZeroes(**_void_**)**
@@ -303,6 +347,8 @@ each function for what each function can return.
     **1**, and not equal to **0**. If **true** is returned, then leading zeroes
     will be added.
 
+    This value is *thread-local*; it applies to just the thread it is read on.
+
     The default is **false**.
 
 **void bcl_setLeadingZeroes(bool** _leadingZeroes_**)**
@@ -311,6 +357,37 @@ each function for what each function can return.
     **bcl_string()** when numbers are greater than **-1**, less than **1**, and
     not equal to **0**. If *leadingZeroes* is **true**, leading zeroes will be
     added to strings returned by **bcl_string()**.
+
+    This value is *thread-local*; it applies to just the thread it is set on.
+
+**bool bcl_digitClamp(**_void_**)**
+
+:   Queries and returns the state of whether digits in number strings that are
+    greater than or equal to the current **ibase** are clamped or not.
+
+    If **true** is returned, then digits are treated as though they are equal to
+    the value of **ibase** minus **1**. If this is *not* true, then digits are
+    treated as though they are equal to the value they would have if **ibase**
+    was large enough. They are then multiplied by the appropriate power of
+    **ibase**.
+
+    For example, with clamping off and an **ibase** of **3**, the string "AB"
+    would equal **3\^1\*A+3\^0\*B**, which is **3** times **10** plus **11**, or
+    **41**, while with clamping on and an **ibase** of **3**, the string "AB"
+    would be equal to **3\^1\*2+3\^0\*2**, which is **3** times **2** plus
+    **2**, or **8**.
+
+    This value is *thread-local*; it applies to just the thread it is read on.
+
+    The default is **true**.
+
+**void bcl_setDigitClamp(bool** _digitClamp_**)**
+
+:   Sets the state of whether digits in number strings that are greater than or
+    equal to the current **ibase** are clamped or not. For more information, see
+    the **bcl_digitClamp(**_void_**)** function.
+
+    This value is *thread-local*; it applies to just the thread it is set on.
 
 **void bcl_gc(**_void_**)**
 
@@ -356,6 +433,13 @@ an argument.
     undefined behavior to use a number created in a different context. Contexts
     are meant to isolate the numbers used by different clients in the same
     application.
+
+    Different threads also have different contexts, so any numbers created in
+    one thread are not valid in another thread. To pass values between contexts
+    and threads, use **bcl_string()** to produce a string to pass around, and
+    use **bcl_parse()** to parse the string. It is suggested that the **obase**
+    used to create the string be passed around with the string and used as the
+    **ibase** for **bcl_parse()** to ensure that the number will be the same.
 
 **BclContext bcl_ctxt_create(**_void_**)**
 
@@ -496,9 +580,9 @@ All procedures in this section require a valid current context.
 
 All procedures in this section require a valid current context.
 
-All procedures in this section consume the given **BclNumber** arguments that
-are not given to pointer arguments. See the **Consumption and Propagation**
-subsection below.
+All procedures in this section without the **_keep** suffix in their name
+consume the given **BclNumber** arguments that are not given to pointer
+arguments. See the **Consumption and Propagation** subsection below.
 
 **BclNumber bcl_parse(const char \*restrict** _val_**)**
 
@@ -526,6 +610,12 @@ subsection below.
     *n* is consumed; it cannot be used after the call. See the
     **Consumption and Propagation** subsection below.
 
+**char\* bcl_string_keep(BclNumber** _n_**)**
+
+:   Returns a string representation of *n* according the the current context's
+    **ibase**. The string is dynamically allocated and must be freed by the
+    caller.
+
 **BclError bcl_bigdig(BclNumber** _n_**, BclBigDig \***_result_**)**
 
 :   Converts *n* into a **BclBigDig** and returns the result in the space
@@ -543,6 +633,20 @@ subsection below.
     *n* is consumed; it cannot be used after the call. See the
     **Consumption and Propagation** subsection below.
 
+**BclError bcl_bigdig_keep(BclNumber** _n_**, BclBigDig \***_result_**)**
+
+:   Converts *n* into a **BclBigDig** and returns the result in the space
+    pointed to by *result*.
+
+    *a* must be smaller than **BC_OVERFLOW_MAX**. See the **LIMITS** section.
+
+    If there was no error, **BCL_ERROR_NONE** is returned. Otherwise, this
+    function can return:
+
+    * **BCL_ERROR_INVALID_NUM**
+    * **BCL_ERROR_INVALID_CONTEXT**
+    * **BCL_ERROR_MATH_OVERFLOW**
+
 **BclNumber bcl_bigdig2num(BclBigDig** _val_**)**
 
 :   Creates a **BclNumber** from *val*.
@@ -557,6 +661,10 @@ subsection below.
 
 All procedures in this section require a valid current context.
 
+All procedures in this section without the **_keep** suffix in their name
+consume the given **BclNumber** arguments that are not given to pointer
+arguments. See the **Consumption and Propagation** subsection below.
+
 All procedures in this section can return the following errors:
 
 * **BCL_ERROR_INVALID_NUM**
@@ -570,6 +678,20 @@ All procedures in this section can return the following errors:
 
     *a* and *b* are consumed; they cannot be used after the call. See the
     **Consumption and Propagation** subsection below.
+
+    *a* and *b* can be the same number.
+
+    bcl(3) will encode an error in the return value, if there was one. The error
+    can be queried with **bcl_err(BclNumber)**. Possible errors include:
+
+    * **BCL_ERROR_INVALID_NUM**
+    * **BCL_ERROR_INVALID_CONTEXT**
+    * **BCL_ERROR_FATAL_ALLOC_ERR**
+
+**BclNumber bcl_add_keep(BclNumber** _a_**, BclNumber** _b_**)**
+
+:   Adds *a* and *b* and returns the result. The *scale* of the result is the
+    max of the *scale*s of *a* and *b*.
 
     *a* and *b* can be the same number.
 
@@ -597,6 +719,20 @@ All procedures in this section can return the following errors:
     * **BCL_ERROR_INVALID_CONTEXT**
     * **BCL_ERROR_FATAL_ALLOC_ERR**
 
+**BclNumber bcl_sub_keep(BclNumber** _a_**, BclNumber** _b_**)**
+
+:   Subtracts *b* from *a* and returns the result. The *scale* of the result is
+    the max of the *scale*s of *a* and *b*.
+
+    *a* and *b* can be the same number.
+
+    bcl(3) will encode an error in the return value, if there was one. The error
+    can be queried with **bcl_err(BclNumber)**. Possible errors include:
+
+    * **BCL_ERROR_INVALID_NUM**
+    * **BCL_ERROR_INVALID_CONTEXT**
+    * **BCL_ERROR_FATAL_ALLOC_ERR**
+
 **BclNumber bcl_mul(BclNumber** _a_**, BclNumber** _b_**)**
 
 :   Multiplies *a* and *b* and returns the result. If *ascale* is the *scale* of
@@ -606,6 +742,22 @@ All procedures in this section can return the following errors:
 
     *a* and *b* are consumed; they cannot be used after the call. See the
     **Consumption and Propagation** subsection below.
+
+    *a* and *b* can be the same number.
+
+    bcl(3) will encode an error in the return value, if there was one. The error
+    can be queried with **bcl_err(BclNumber)**. Possible errors include:
+
+    * **BCL_ERROR_INVALID_NUM**
+    * **BCL_ERROR_INVALID_CONTEXT**
+    * **BCL_ERROR_FATAL_ALLOC_ERR**
+
+**BclNumber bcl_mul_keep(BclNumber** _a_**, BclNumber** _b_**)**
+
+:   Multiplies *a* and *b* and returns the result. If *ascale* is the *scale* of
+    *a* and *bscale* is the *scale* of *b*, the *scale* of the result is equal
+    to **min(ascale+bscale,max(scale,ascale,bscale))**, where **min()** and
+    **max()** return the obvious values.
 
     *a* and *b* can be the same number.
 
@@ -636,6 +788,23 @@ All procedures in this section can return the following errors:
     * **BCL_ERROR_MATH_DIVIDE_BY_ZERO**
     * **BCL_ERROR_FATAL_ALLOC_ERR**
 
+**BclNumber bcl_div_keep(BclNumber** _a_**, BclNumber** _b_**)**
+
+:   Divides *a* by *b* and returns the result. The *scale* of the result is the
+    *scale* of the current context.
+
+    *b* cannot be **0**.
+
+    *a* and *b* can be the same number.
+
+    bcl(3) will encode an error in the return value, if there was one. The error
+    can be queried with **bcl_err(BclNumber)**. Possible errors include:
+
+    * **BCL_ERROR_INVALID_NUM**
+    * **BCL_ERROR_INVALID_CONTEXT**
+    * **BCL_ERROR_MATH_DIVIDE_BY_ZERO**
+    * **BCL_ERROR_FATAL_ALLOC_ERR**
+
 **BclNumber bcl_mod(BclNumber** _a_**, BclNumber** _b_**)**
 
 :   Divides *a* by *b* to the *scale* of the current context, computes the
@@ -645,6 +814,23 @@ All procedures in this section can return the following errors:
 
     *a* and *b* are consumed; they cannot be used after the call. See the
     **Consumption and Propagation** subsection below.
+
+    *a* and *b* can be the same number.
+
+    bcl(3) will encode an error in the return value, if there was one. The error
+    can be queried with **bcl_err(BclNumber)**. Possible errors include:
+
+    * **BCL_ERROR_INVALID_NUM**
+    * **BCL_ERROR_INVALID_CONTEXT**
+    * **BCL_ERROR_MATH_DIVIDE_BY_ZERO**
+    * **BCL_ERROR_FATAL_ALLOC_ERR**
+
+**BclNumber bcl_mod_keep(BclNumber** _a_**, BclNumber** _b_**)**
+
+:   Divides *a* by *b* to the *scale* of the current context, computes the
+    modulus **a-(a/b)\*b**, and returns the modulus.
+
+    *b* cannot be **0**.
 
     *a* and *b* can be the same number.
 
@@ -681,6 +867,28 @@ All procedures in this section can return the following errors:
     * **BCL_ERROR_MATH_DIVIDE_BY_ZERO**
     * **BCL_ERROR_FATAL_ALLOC_ERR**
 
+**BclNumber bcl_pow_keep(BclNumber** _a_**, BclNumber** _b_**)**
+
+:   Calculates *a* to the power of *b* to the *scale* of the current context.
+    *b* must be an integer, but can be negative. If it is negative, *a* must
+    be non-zero.
+
+    *b* must be an integer. If *b* is negative, *a* must not be **0**.
+
+    *a* must be smaller than **BC_OVERFLOW_MAX**. See the **LIMITS** section.
+
+    *a* and *b* can be the same number.
+
+    bcl(3) will encode an error in the return value, if there was one. The error
+    can be queried with **bcl_err(BclNumber)**. Possible errors include:
+
+    * **BCL_ERROR_INVALID_NUM**
+    * **BCL_ERROR_INVALID_CONTEXT**
+    * **BCL_ERROR_MATH_NON_INTEGER**
+    * **BCL_ERROR_MATH_OVERFLOW**
+    * **BCL_ERROR_MATH_DIVIDE_BY_ZERO**
+    * **BCL_ERROR_FATAL_ALLOC_ERR**
+
 **BclNumber bcl_lshift(BclNumber** _a_**, BclNumber** _b_**)**
 
 :   Shifts *a* left (moves the radix right) by *b* places and returns the
@@ -690,6 +898,23 @@ All procedures in this section can return the following errors:
 
     *a* and *b* are consumed; they cannot be used after the call. See the
     **Consumption and Propagation** subsection below.
+
+    *a* and *b* can be the same number.
+
+    bcl(3) will encode an error in the return value, if there was one. The error
+    can be queried with **bcl_err(BclNumber)**. Possible errors include:
+
+    * **BCL_ERROR_INVALID_NUM**
+    * **BCL_ERROR_INVALID_CONTEXT**
+    * **BCL_ERROR_MATH_NON_INTEGER**
+    * **BCL_ERROR_FATAL_ALLOC_ERR**
+
+**BclNumber bcl_lshift_keep(BclNumber** _a_**, BclNumber** _b_**)**
+
+:   Shifts *a* left (moves the radix right) by *b* places and returns the
+    result. This is done in decimal. *b* must be an integer.
+
+    *b* must be an integer.
 
     *a* and *b* can be the same number.
 
@@ -721,6 +946,23 @@ All procedures in this section can return the following errors:
     * **BCL_ERROR_MATH_NON_INTEGER**
     * **BCL_ERROR_FATAL_ALLOC_ERR**
 
+**BclNumber bcl_rshift_keep(BclNumber** _a_**, BclNumber** _b_**)**
+
+:   Shifts *a* right (moves the radix left) by *b* places and returns the
+    result. This is done in decimal. *b* must be an integer.
+
+    *b* must be an integer.
+
+    *a* and *b* can be the same number.
+
+    bcl(3) will encode an error in the return value, if there was one. The error
+    can be queried with **bcl_err(BclNumber)**. Possible errors include:
+
+    * **BCL_ERROR_INVALID_NUM**
+    * **BCL_ERROR_INVALID_CONTEXT**
+    * **BCL_ERROR_MATH_NON_INTEGER**
+    * **BCL_ERROR_FATAL_ALLOC_ERR**
+
 **BclNumber bcl_sqrt(BclNumber** _a_**)**
 
 :   Calculates the square root of *a* and returns the result. The *scale* of the
@@ -730,6 +972,21 @@ All procedures in this section can return the following errors:
 
     *a* is consumed; it cannot be used after the call. See the
     **Consumption and Propagation** subsection below.
+
+    bcl(3) will encode an error in the return value, if there was one. The error
+    can be queried with **bcl_err(BclNumber)**. Possible errors include:
+
+    * **BCL_ERROR_INVALID_NUM**
+    * **BCL_ERROR_INVALID_CONTEXT**
+    * **BCL_ERROR_MATH_NEGATIVE**
+    * **BCL_ERROR_FATAL_ALLOC_ERR**
+
+**BclNumber bcl_sqrt_keep(BclNumber** _a_**)**
+
+:   Calculates the square root of *a* and returns the result. The *scale* of the
+    result is equal to the **scale** of the current context.
+
+    *a* cannot be negative.
 
     bcl(3) will encode an error in the return value, if there was one. The error
     can be queried with **bcl_err(BclNumber)**. Possible errors include:
@@ -761,6 +1018,25 @@ All procedures in this section can return the following errors:
     * **BCL_ERROR_MATH_DIVIDE_BY_ZERO**
     * **BCL_ERROR_FATAL_ALLOC_ERR**
 
+**BclError bcl_divmod_keep(BclNumber** _a_**, BclNumber** _b_**, BclNumber \***_c_**, BclNumber \***_d_**)**
+
+:   Divides *a* by *b* and returns the quotient in a new number which is put
+    into the space pointed to by *c*, and puts the modulus in a new number which
+    is put into the space pointed to by *d*.
+
+    *b* cannot be **0**.
+
+    *c* and *d* cannot point to the same place, nor can they point to the space
+    occupied by *a* or *b*.
+
+    If there was no error, **BCL_ERROR_NONE** is returned. Otherwise, this
+    function can return:
+
+    * **BCL_ERROR_INVALID_NUM**
+    * **BCL_ERROR_INVALID_CONTEXT**
+    * **BCL_ERROR_MATH_DIVIDE_BY_ZERO**
+    * **BCL_ERROR_FATAL_ALLOC_ERR**
+
 **BclNumber bcl_modexp(BclNumber** _a_**, BclNumber** _b_**, BclNumber** _c_**)**
 
 :   Computes a modular exponentiation where *a* is the base, *b* is the
@@ -772,6 +1048,25 @@ All procedures in this section can return the following errors:
 
     *a*, *b*, and *c* are consumed; they cannot be used after the call. See the
     **Consumption and Propagation** subsection below.
+
+    bcl(3) will encode an error in the return value, if there was one. The error
+    can be queried with **bcl_err(BclNumber)**. Possible errors include:
+
+    * **BCL_ERROR_INVALID_NUM**
+    * **BCL_ERROR_INVALID_CONTEXT**
+    * **BCL_ERROR_MATH_NEGATIVE**
+    * **BCL_ERROR_MATH_NON_INTEGER**
+    * **BCL_ERROR_MATH_DIVIDE_BY_ZERO**
+    * **BCL_ERROR_FATAL_ALLOC_ERR**
+
+**BclNumber bcl_modexp_keep(BclNumber** _a_**, BclNumber** _b_**, BclNumber** _c_**)**
+
+:   Computes a modular exponentiation where *a* is the base, *b* is the
+    exponent, and *c* is the modulus, and returns the result. The *scale* of the
+    result is equal to the **scale** of the current context.
+
+    *a*, *b*, and *c* must be integers. *c* must not be **0**. *b* must not be
+    negative.
 
     bcl(3) will encode an error in the return value, if there was one. The error
     can be queried with **bcl_err(BclNumber)**. Possible errors include:
@@ -839,6 +1134,10 @@ If necessary, the PRNG can be reseeded with one of the following functions:
 * **bcl_rand_seed(unsigned char[**_BCL_SEED_SIZE_**])**
 * **bcl_rand_reseed(**_void_**)**
 
+All procedures in this section without the **_keep** suffix in their name
+consume the given **BclNumber** arguments that are not given to pointer
+arguments. See the **Consumption and Propagation** subsection below.
+
 The following items allow clients to use the pseudo-random number generator. All
 procedures require a valid current context.
 
@@ -869,8 +1168,29 @@ procedures require a valid current context.
 
     *a* must be an integer and non-negative.
 
-    *a* is consumed; it cannot be used after the call. See the
-    **Consumption and Propagation** subsection below.
+    *a* is consumed; it cannot be used after the call. See the **Consumption and
+    Propagation** subsection below.
+
+    This procedure requires a valid current context.
+
+    bcl(3) will encode an error in the return value, if there was one. The error
+    can be queried with **bcl_err(BclNumber)**. Possible errors include:
+
+    * **BCL_ERROR_INVALID_NUM**
+    * **BCL_ERROR_INVALID_CONTEXT**
+    * **BCL_ERROR_MATH_NEGATIVE**
+    * **BCL_ERROR_MATH_NON_INTEGER**
+    * **BCL_ERROR_FATAL_ALLOC_ERR**
+
+**BclNumber bcl_irand_keep(BclNumber** _a_**)**
+
+:   Returns a random number that is not larger than *a* in a new number. If *a*
+    is **0** or **1**, the new number is equal to **0**. The bound is unlimited,
+    so it is not bound to the size of **BclRandInt**. This is done by generating
+    as many random numbers as necessary, multiplying them by certain exponents,
+    and adding them all together.
+
+    *a* must be an integer and non-negative.
 
     This procedure requires a valid current context.
 
@@ -904,8 +1224,26 @@ procedures require a valid current context.
 
     *a* must be an integer and non-negative.
 
-    *a* is consumed; it cannot be used after the call. See the
-    **Consumption and Propagation** subsection below.
+    *a* is consumed; it cannot be used after the call. See the **Consumption and
+    Propagation** subsection below.
+
+    This procedure requires a valid current context.
+
+    bcl(3) will encode an error in the return value, if there was one. The error
+    can be queried with **bcl_err(BclNumber)**. Possible errors include:
+
+    * **BCL_ERROR_INVALID_NUM**
+    * **BCL_ERROR_INVALID_CONTEXT**
+    * **BCL_ERROR_MATH_NEGATIVE**
+    * **BCL_ERROR_MATH_NON_INTEGER**
+    * **BCL_ERROR_FATAL_ALLOC_ERR**
+
+**BclNumber bcl_ifrand_keep(BclNumber** _a_**, size_t** _places_**)**
+
+:   Returns a random number less than *a* with *places* decimal digits after the
+    radix (decimal point). There are no limits on *a* or *places*.
+
+    *a* must be an integer and non-negative.
 
     This procedure requires a valid current context.
 
@@ -922,7 +1260,23 @@ procedures require a valid current context.
 
 :   Seeds the PRNG with *n*.
 
-    *n* is *not* consumed.
+    *n* is consumed.
+
+    This procedure requires a valid current context.
+
+    If there was no error, **BCL_ERROR_NONE** is returned. Otherwise, this
+    function can return:
+
+    * **BCL_ERROR_INVALID_NUM**
+    * **BCL_ERROR_INVALID_CONTEXT**
+
+    Note that if **bcl_rand_seed2num(**_void_**)** or
+    **bcl_rand_seed2num_err(BclNumber)** are called right after this function,
+    they are not guaranteed to return a number equal to *n*.
+
+**BclError bcl_rand_seedWithNum_keep(BclNumber** _n_**)**
+
+:   Seeds the PRNG with *n*.
 
     This procedure requires a valid current context.
 
@@ -994,7 +1348,7 @@ checked with **bcl_err(BclNumber)**, so the example above should properly
 be:
 
     BclNumber n = bcl_num_add(bcl_num_mul(a, b), bcl_num_div(c, d));
-    if (bc_num_err(n) != BCL_ERROR_NONE) {
+    if (bcl_err(n) != BCL_ERROR_NONE) {
         // Handle the error.
     }
 
@@ -1014,10 +1368,6 @@ codes defined in **BclError**. The complete list of codes is the following:
 **BCL_ERROR_INVALID_CONTEXT**
 
 :   An invalid **BclContext** is being used.
-
-**BCL_ERROR_SIGNAL**
-
-:   A signal interrupted execution.
 
 **BCL_ERROR_MATH_NEGATIVE**
 
@@ -1088,11 +1438,13 @@ codes defined in **BclError**. The complete list of codes is the following:
 
 # ATTRIBUTES
 
-When **bcl_handleSignal(**_void_**)** is used properly, bcl(3) is
-async-signal-safe.
+bcl(3) is *MT-Safe*: it is safe to call any functions from more than one thread.
+However, is is *not* safe to pass any data between threads except for strings
+returned by **bcl_string()**.
 
-bcl(3) is *MT-Unsafe*: it is unsafe to call any functions from more than one
-thread.
+bcl(3) is not *async-signal-safe*. It was not possible to make bcl(3) safe with
+signals and also make it safe with multiple threads. If it is necessary to be
+able to interrupt bcl(3), spawn a separate thread to run the calculation.
 
 # PERFORMANCE
 
@@ -1164,21 +1516,6 @@ These limits are meant to be effectively non-existent; the limits are so large
 become a problem. In fact, memory should be exhausted before these limits should
 be hit.
 
-# SIGNAL HANDLING
-
-If a signal handler calls **bcl_handleSignal(**_void_**)** from the same thread
-that there are bcl(3) functions executing in, it will cause all execution to
-stop as soon as possible, interrupting long-running calculations, if necessary
-and cause the function that was executing to return. If possible, the error code
-**BC_ERROR_SIGNAL** is returned.
-
-If execution *is* interrupted, **bcl_handleSignal(**_void_**)** does *not*
-return to its caller.
-
-It is undefined behavior if **bcl_handleSignal(**_void_**)** is called from
-a thread that is not executing bcl(3) functions, if bcl(3) functions are
-executing.
-
 # SEE ALSO
 
 bc(1) and dc(1)
@@ -1195,8 +1532,8 @@ use a period (**.**) as a radix point, regardless of the value of
 
 # BUGS
 
-None are known. Report bugs at https://git.yzena.com/gavin/bc.
+None are known. Report bugs at https://git.gavinhoward.com/gavin/bc.
 
 # AUTHORS
 
-Gavin D. Howard <gavin@yzena.com> and contributors.
+Gavin D. Howard <gavin@gavinhoward.com> and contributors.

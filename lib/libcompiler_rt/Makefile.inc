@@ -40,7 +40,6 @@ SRCF+=		divtc3
 SRCF+=		divti3
 SRCF+=		divxc3
 SRCF+=		enable_execute_stack
-SRCF+=		eprintf
 SRCF+=		extendhfsf2
 SRCF+=		ffsdi2
 SRCF+=		ffssi2
@@ -226,7 +225,7 @@ SRCF+=		stdatomic
 .endif
 
 .for file in ${SRCF}
-.if ${MACHINE_ARCH:Marmv[67]*} && (!defined(CPUTYPE) || ${CPUTYPE:M*soft*} == "") \
+.if ${MACHINE_CPUARCH} == "arm" && (!defined(CPUTYPE) || ${CPUTYPE:M*soft*} == "") \
     && exists(${CRTSRC}/${CRTARCH}/${file}vfp.S)
 SRCS+=		${file}vfp.S
 . elif exists(${CRTSRC}/${CRTARCH}/${file}.S)
