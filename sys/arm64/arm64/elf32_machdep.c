@@ -52,6 +52,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/vnode.h>
 
 #include <machine/elf.h>
+#include <machine/pcb.h>
 #ifdef VFP
 #include <machine/vfp.h>
 #endif
@@ -151,8 +152,7 @@ elf32_arm_abi_supported(const struct image_params *imgp,
 	    ID_AA64PFR0_EL0_64_32)
 		return (FALSE);
 
-#define	EF_ARM_EABI_VERSION(x)	(((x) & EF_ARM_EABIMASK) >> 24)
-#define	EF_ARM_EABI_FREEBSD_MIN	4
+#define	EF_ARM_EABI_FREEBSD_MIN	EF_ARM_EABI_VER4
 	hdr = (const Elf32_Ehdr *)imgp->image_header;
 	if (EF_ARM_EABI_VERSION(hdr->e_flags) < EF_ARM_EABI_FREEBSD_MIN) {
 		if (bootverbose)

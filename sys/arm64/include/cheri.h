@@ -40,8 +40,16 @@
 #endif
 
 #ifdef _KERNEL
-#define	__USER_DDC	((void * __capability)curthread->td_frame->tf_ddc)
+#define	__USER_DDC ((cheri_getperm(__USER_PCC) & CHERI_PERM_EXECUTIVE) ? \
+    (void * __capability)curthread->td_frame->tf_ddc :			\
+    (void * __capability)READ_SPECIALREG_CAP(rddc_el0))
 #define	__USER_PCC	((void * __capability)curthread->td_frame->tf_elr)
+
+/* Does the current thread add the base in CToPtr */
+#define __USER_DDC_OFFSET_ENABLED	\
+    (READ_SPECIALREG(cctlr_el0) & CCTLR_DDCBO_MASK)
+#define __USER_PCC_OFFSET_ENABLED	\
+    (READ_SPECIALREG(cctlr_el0) & CCTLR_PCCBO_MASK)
 
 /*
  * Special marker NOPs for the Morello FVP to start / stop region of interest

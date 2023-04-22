@@ -9,7 +9,7 @@
 .PATH: ${ZFSTOP}/module/zstd
 .PATH: ${ZFSTOP}/module/zstd/lib
 
-PACKAGE=	runtime
+PACKAGE=	zfs
 LIB=	zfs
 LIBADD= \
 	avl \

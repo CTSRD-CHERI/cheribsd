@@ -67,7 +67,7 @@ seq_read(struct linux_file *f, char *ubuf, size_t size, off_t *ppos)
 		return (-EINVAL);
 
 	size = min(rc - *ppos, size);
-	rc = strscpy(ubuf, sbuf_data(sbuf) + *ppos, size);
+	rc = strscpy(ubuf, sbuf_data(sbuf) + *ppos, size + 1);
 
 	/* add 1 for null terminator */
 	if (rc > 0)
@@ -79,8 +79,33 @@ seq_read(struct linux_file *f, char *ubuf, size_t size, off_t *ppos)
 int
 seq_write(struct seq_file *seq, const void *data, size_t len)
 {
+	int ret;
 
-	return (sbuf_bcpy(seq->buf, data, len));
+	ret = sbuf_bcpy(seq->buf, data, len);
+	if (ret == 0)
+		seq->size = sbuf_len(seq->buf);
+
+	return (ret);
+}
+
+void
+seq_putc(struct seq_file *seq, char c)
+{
+	int ret;
+
+	ret = sbuf_putc(seq->buf, c);
+	if (ret == 0)
+		seq->size = sbuf_len(seq->buf);
+}
+
+void
+seq_puts(struct seq_file *seq, const char *str)
+{
+	int ret;
+
+	ret = sbuf_printf(seq->buf, "%s", str);
+	if (ret == 0)
+		seq->size = sbuf_len(seq->buf);
 }
 
 /*
@@ -115,15 +140,14 @@ single_stop(struct seq_file *p, void *v)
 {
 }
 
-int
-seq_open(struct linux_file *f, const struct seq_operations *op)
+static int
+_seq_open_without_sbuf(struct linux_file *f, const struct seq_operations *op)
 {
 	struct seq_file *p;
 
 	if ((p = malloc(sizeof(*p), M_LSEQ, M_NOWAIT|M_ZERO)) == NULL)
 		return (-ENOMEM);
 
-	p->buf = sbuf_new_auto();
 	p->file = f;
 	p->op = op;
 	f->private_data = (void *) p;
@@ -131,7 +155,42 @@ seq_open(struct linux_file *f, const struct seq_operations *op)
 }
 
 int
-single_open(struct linux_file *f, int (*show)(struct seq_file *, void *), void *d)
+seq_open(struct linux_file *f, const struct seq_operations *op)
+{
+	int ret;
+
+	ret = _seq_open_without_sbuf(f, op);
+	if (ret == 0)
+		((struct seq_file *)f->private_data)->buf = sbuf_new_auto();
+
+	return (ret);
+}
+
+void *
+__seq_open_private(struct linux_file *f, const struct seq_operations *op, int size)
+{
+	struct seq_file *seq_file;
+	void *private;
+	int error;
+
+	private = malloc(size, M_LSEQ, M_NOWAIT|M_ZERO);
+	if (private == NULL)
+		return (NULL);
+
+	error = seq_open(f, op);
+	if (error < 0) {
+		free(private, M_LSEQ);
+		return (NULL);
+	}
+
+	seq_file = (struct seq_file *)f->private_data;
+	seq_file->private = private;
+
+	return (private);
+}
+
+static int
+_single_open_without_sbuf(struct linux_file *f, int (*show)(struct seq_file *, void *), void *d)
 {
 	struct seq_operations *op;
 	int rc = -ENOMEM;
@@ -142,13 +201,38 @@ single_open(struct linux_file *f, int (*show)(struct seq_file *, void *), void *
 		op->next = single_next;
 		op->stop = single_stop;
 		op->show = show;
-		rc = seq_open(f, op);
+		rc = _seq_open_without_sbuf(f, op);
 		if (rc)
 			free(op, M_LSEQ);
 		else
 			((struct seq_file *)f->private_data)->private = d;
 	}
 	return (rc);
+}
+
+int
+single_open(struct linux_file *f, int (*show)(struct seq_file *, void *), void *d)
+{
+	int ret;
+
+	ret = _single_open_without_sbuf(f, show, d);
+	if (ret == 0)
+		((struct seq_file *)f->private_data)->buf = sbuf_new_auto();
+
+	return (ret);
+}
+
+int
+single_open_size(struct linux_file *f, int (*show)(struct seq_file *, void *), void *d, size_t size)
+{
+	int ret;
+
+	ret = _single_open_without_sbuf(f, show, d);
+	if (ret == 0)
+		((struct seq_file *)f->private_data)->buf = sbuf_new(
+		    NULL, NULL, size, SBUF_AUTOEXTEND);
+
+	return (ret);
 }
 
 int
@@ -164,6 +248,16 @@ seq_release(struct inode *inode __unused, struct linux_file *file)
 	free(m, M_LSEQ);
 
 	return (0);
+}
+
+int
+seq_release_private(struct inode *inode __unused, struct linux_file *f)
+{
+	struct seq_file *seq;
+
+	seq = (struct seq_file *)f->private_data;
+	free(seq->private, M_LSEQ);
+	return (seq_release(inode, f));
 }
 
 int
@@ -186,7 +280,11 @@ single_release(struct vnode *v, struct linux_file *f)
 void
 lkpi_seq_vprintf(struct seq_file *m, const char *fmt, va_list args)
 {
-	sbuf_vprintf(m->buf, fmt, args);
+	int ret;
+
+	ret = sbuf_vprintf(m->buf, fmt, args);
+	if (ret == 0)
+		m->size = sbuf_len(m->buf);
 }
 
 void
@@ -195,6 +293,12 @@ lkpi_seq_printf(struct seq_file *m, const char *fmt, ...)
 	va_list args;
 
 	va_start(args, fmt);
-	seq_vprintf(m, fmt, args);
+	lkpi_seq_vprintf(m, fmt, args);
 	va_end(args);
+}
+
+bool
+seq_has_overflowed(struct seq_file *m)
+{
+	return (sbuf_len(m->buf) == -1);
 }

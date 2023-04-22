@@ -434,6 +434,14 @@ do_trap_supervisor(struct trapframe *frame)
 		panic("Memory access exception at 0x%016lx\n",
 		    (__cheri_addr unsigned long)frame->tf_sepc);
 		break;
+	case SCAUSE_LOAD_MISALIGNED:
+	case SCAUSE_STORE_MISALIGNED:
+	case SCAUSE_INST_MISALIGNED:
+		dump_regs(frame);
+		panic("Misaligned address exception at %#016lx: %#016lx\n",
+		    (__cheri_addr unsigned long)frame->tf_sepc,
+		    frame->tf_stval);
+		break;
 	case SCAUSE_STORE_PAGE_FAULT:
 	case SCAUSE_LOAD_PAGE_FAULT:
 	case SCAUSE_INST_PAGE_FAULT:
@@ -527,6 +535,13 @@ do_trap_user(struct trapframe *frame)
 		    exception, 0);
 		userret(td, frame);
 		break;
+	case SCAUSE_LOAD_MISALIGNED:
+	case SCAUSE_STORE_MISALIGNED:
+	case SCAUSE_INST_MISALIGNED:
+		call_trapsignal(td, SIGBUS, BUS_ADRALN, frame->tf_sepc,
+		    exception, 0);
+		userret(td, frame);
+		break;
 	case SCAUSE_STORE_PAGE_FAULT:
 	case SCAUSE_LOAD_PAGE_FAULT:
 	case SCAUSE_INST_PAGE_FAULT:
@@ -560,13 +575,6 @@ do_trap_user(struct trapframe *frame)
 		userret(td, frame);
 		break;
 #if __has_feature(capabilities)
-	/* M-mode emulates alignment of non-CHERI instructions */
-	case SCAUSE_LOAD_MISALIGNED:
-	case SCAUSE_STORE_MISALIGNED:
-		call_trapsignal(td, SIGBUS, BUS_ADRALN,
-		    (uintcap_t)frame->tf_stval, exception, 0);
-		userret(td, frame);
-		break;
 	case SCAUSE_LOAD_CAP_PAGE_FAULT:
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);

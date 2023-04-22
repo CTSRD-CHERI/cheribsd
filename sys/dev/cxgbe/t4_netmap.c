@@ -470,7 +470,7 @@ alloc_nm_txq_hwq(struct vi_info *vi, struct sge_nm_txq *nm_txq)
 		udb += (nm_txq->cntxt_id >> s_qpp) << PAGE_SHIFT;
 		nm_txq->udb_qid = nm_txq->cntxt_id & mask;
 		if (nm_txq->udb_qid >= PAGE_SIZE / UDBS_SEG_SIZE)
-	    		clrbit(&nm_txq->doorbells, DOORBELL_WCWR);
+			clrbit(&nm_txq->doorbells, DOORBELL_WCWR);
 		else {
 			udb += nm_txq->udb_qid << UDBS_SEG_SHIFT;
 			nm_txq->udb_qid = 0;
@@ -513,7 +513,7 @@ free_nm_txq_hwq(struct vi_info *vi, struct sge_nm_txq *nm_txq)
 
 static int
 cxgbe_netmap_simple_rss(struct adapter *sc, struct vi_info *vi,
-    struct ifnet *ifp, struct netmap_adapter *na)
+    if_t ifp, struct netmap_adapter *na)
 {
 	struct netmap_kring *kring;
 	struct sge_nm_rxq *nm_rxq;
@@ -581,7 +581,7 @@ cxgbe_netmap_simple_rss(struct adapter *sc, struct vi_info *vi,
  */
 static int
 cxgbe_netmap_split_rss(struct adapter *sc, struct vi_info *vi,
-    struct ifnet *ifp, struct netmap_adapter *na)
+    if_t ifp, struct netmap_adapter *na)
 {
 	struct netmap_kring *kring;
 	struct sge_nm_rxq *nm_rxq;
@@ -675,7 +675,7 @@ cxgbe_netmap_split_rss(struct adapter *sc, struct vi_info *vi,
 }
 
 static inline int
-cxgbe_netmap_rss(struct adapter *sc, struct vi_info *vi, struct ifnet *ifp,
+cxgbe_netmap_rss(struct adapter *sc, struct vi_info *vi, if_t ifp,
     struct netmap_adapter *na)
 {
 
@@ -686,7 +686,7 @@ cxgbe_netmap_rss(struct adapter *sc, struct vi_info *vi, struct ifnet *ifp,
 }
 
 static int
-cxgbe_netmap_on(struct adapter *sc, struct vi_info *vi, struct ifnet *ifp,
+cxgbe_netmap_on(struct adapter *sc, struct vi_info *vi, if_t ifp,
     struct netmap_adapter *na)
 {
 	struct netmap_slot *slot;
@@ -701,7 +701,7 @@ cxgbe_netmap_on(struct adapter *sc, struct vi_info *vi, struct ifnet *ifp,
 	MPASS(vi->nnmtxq > 0);
 
 	if ((vi->flags & VI_INIT_DONE) == 0 ||
-	    (ifp->if_drv_flags & IFF_DRV_RUNNING) == 0) {
+	    (if_getdrvflags(ifp) & IFF_DRV_RUNNING) == 0) {
 		if_printf(ifp, "cannot enable netmap operation because "
 		    "interface is not UP.\n");
 		return (EAGAIN);
@@ -776,7 +776,7 @@ cxgbe_netmap_on(struct adapter *sc, struct vi_info *vi, struct ifnet *ifp,
 }
 
 static int
-cxgbe_netmap_off(struct adapter *sc, struct vi_info *vi, struct ifnet *ifp,
+cxgbe_netmap_off(struct adapter *sc, struct vi_info *vi, if_t ifp,
     struct netmap_adapter *na)
 {
 	struct netmap_kring *kring;
@@ -852,8 +852,8 @@ cxgbe_netmap_off(struct adapter *sc, struct vi_info *vi, struct ifnet *ifp,
 static int
 cxgbe_netmap_reg(struct netmap_adapter *na, int on)
 {
-	struct ifnet *ifp = na->ifp;
-	struct vi_info *vi = ifp->if_softc;
+	if_t ifp = na->ifp;
+	struct vi_info *vi = if_getsoftc(ifp);
 	struct adapter *sc = vi->adapter;
 	int rc;
 
@@ -1107,8 +1107,8 @@ static int
 cxgbe_netmap_txsync(struct netmap_kring *kring, int flags)
 {
 	struct netmap_adapter *na = kring->na;
-	struct ifnet *ifp = na->ifp;
-	struct vi_info *vi = ifp->if_softc;
+	if_t ifp = na->ifp;
+	struct vi_info *vi = if_getsoftc(ifp);
 	struct adapter *sc = vi->adapter;
 	struct sge_nm_txq *nm_txq = &sc->sge.nm_txq[vi->first_nm_txq + kring->ring_id];
 	const u_int head = kring->rhead;
@@ -1171,8 +1171,8 @@ cxgbe_netmap_rxsync(struct netmap_kring *kring, int flags)
 {
 	struct netmap_adapter *na = kring->na;
 	struct netmap_ring *ring = kring->ring;
-	struct ifnet *ifp = na->ifp;
-	struct vi_info *vi = ifp->if_softc;
+	if_t ifp = na->ifp;
+	struct vi_info *vi = if_getsoftc(ifp);
 	struct adapter *sc = vi->adapter;
 	struct sge_nm_rxq *nm_rxq = &sc->sge.nm_rxq[vi->first_nm_rxq + kring->ring_id];
 	u_int const head = kring->rhead;
@@ -1313,7 +1313,7 @@ unwrap_nm_fw6_msg(const struct cpl_fw6_msg *cpl)
 }
 
 static void
-handle_nm_sge_egr_update(struct adapter *sc, struct ifnet *ifp,
+handle_nm_sge_egr_update(struct adapter *sc, if_t ifp,
     const struct cpl_sge_egr_update *egr)
 {
 	uint32_t oq;
@@ -1331,7 +1331,7 @@ service_nm_rxq(struct sge_nm_rxq *nm_rxq)
 {
 	struct vi_info *vi = nm_rxq->vi;
 	struct adapter *sc = vi->adapter;
-	struct ifnet *ifp = vi->ifp;
+	if_t ifp = vi->ifp;
 	struct netmap_adapter *na = NA(ifp);
 	struct netmap_kring *kring = na->rx_rings[nm_rxq->nid];
 	struct netmap_ring *ring = kring->ring;
@@ -1437,7 +1437,7 @@ service_nm_rxq(struct sge_nm_rxq *nm_rxq)
 	} else if (nframes > 0)
 		netmap_rx_irq(ifp, nm_rxq->nid, &work);
 
-    	t4_write_reg(sc, sc->sge_gts_reg, V_CIDXINC(ndesc) |
+	t4_write_reg(sc, sc->sge_gts_reg, V_CIDXINC(ndesc) |
 	    V_INGRESSQID((u32)nm_rxq->iq_cntxt_id) |
 	    V_SEINTARM(V_QINTR_TIMER_IDX(holdoff_tmr_idx)));
 }

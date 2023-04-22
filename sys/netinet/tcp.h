@@ -72,6 +72,9 @@ struct tcphdr {
 #define	TH_ECE	0x40
 #define	TH_CWR	0x80
 #define	TH_AE	0x100			/* maps into th_x2 */
+#define	TH_RES3	0x200
+#define	TH_RES2	0x400
+#define	TH_RES1	0x800
 #define	TH_FLAGS	(TH_FIN|TH_SYN|TH_RST|TH_PUSH|TH_ACK|TH_URG|TH_ECE|TH_CWR)
 #define	PRINT_TH_FLAGS	"\20\1FIN\2SYN\3RST\4PUSH\5ACK\6URG\7ECE\10CWR\11AE"
 
@@ -327,6 +330,18 @@ struct tcphdr {
 /* Maximum length of log ID. */
 #define TCP_LOG_ID_LEN	64
 
+/* TCP accounting counters */
+#define TCP_NUM_PROC_COUNTERS 11
+#define TCP_NUM_CNT_COUNTERS 13
+
+/* Must match counter array sizes in tcpcb */
+struct tcp_perf_info {
+	uint64_t	tcp_cnt_counters[TCP_NUM_CNT_COUNTERS];
+	uint64_t	tcp_proc_time[TCP_NUM_CNT_COUNTERS];
+	uint64_t	timebase;	/* timebase for tcp_proc_time */
+	uint8_t		tb_is_stable;	/* timebase is stable/invariant */
+};
+
 /*
  * The TCP_INFO socket option comes from the Linux 2.6 TCP API, and permits
  * the caller to query certain information about the state of a TCP
@@ -389,8 +404,18 @@ struct tcp_info {
 	u_int32_t	tcpi_rcv_ooopack;	/* Out-of-order packets */
 	u_int32_t	tcpi_snd_zerowin;	/* Zero-sized windows sent */
 
+	/* Accurate ECN counters. */
+	u_int32_t	tcpi_delivered_ce;
+	u_int32_t	tcpi_received_ce;		/* # of CE marks received */
+	u_int32_t	__tcpi_delivered_e1_bytes;
+	u_int32_t	__tcpi_delivered_e0_bytes;
+	u_int32_t	__tcpi_delivered_ce_bytes;
+	u_int32_t	__tcpi_received_e1_bytes;
+	u_int32_t	__tcpi_received_e0_bytes;
+	u_int32_t	__tcpi_received_ce_bytes;
+
 	/* Padding to grow without breaking ABI. */
-	u_int32_t	__tcpi_pad[26];		/* Padding. */
+	u_int32_t	__tcpi_pad[19];		/* Padding. */
 };
 
 /*

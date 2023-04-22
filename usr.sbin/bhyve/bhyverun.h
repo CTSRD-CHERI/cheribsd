@@ -34,16 +34,20 @@
 #define	VMEXIT_CONTINUE		(0)
 #define	VMEXIT_ABORT		(-1)
 
-struct vmctx;
 extern int guest_ncpus;
-extern uint16_t cores, sockets, threads;
+extern uint16_t cpu_cores, cpu_sockets, cpu_threads;
+
+struct vcpu;
+struct vmctx;
+struct vm_exit;
 
 void *paddr_guest2host(struct vmctx *ctx, uintptr_t addr, size_t len);
 #ifdef BHYVE_SNAPSHOT
 uintptr_t paddr_host2guest(struct vmctx *ctx, void *addr);
 #endif
 
-void fbsdrun_set_capabilities(struct vmctx *ctx, int cpu);
 int  fbsdrun_virtio_msix(void);
+
+int vmexit_task_switch(struct vmctx *, struct vcpu *, struct vm_exit *);
 
 #endif

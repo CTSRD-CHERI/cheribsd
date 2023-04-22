@@ -29,6 +29,9 @@
 #define	_WANT_SYSVIPC_INTERNALS
 #endif
 #include <sys/ipc.h>
+#if defined(_KERNEL) || defined(_WANT_SYSVMSG_INTERNALS)
+#include <sys/queue.h>
+#endif
 
 /*
  * The MSG_NOERROR identifier value, the msqid_ds struct and the msg struct
@@ -64,8 +67,8 @@ typedef	__time_t	time_t;
     defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
 struct msqid_ds_old {
 	struct	ipc_perm_old msg_perm;	/* msg queue permission bits */
-	struct	msg *__msg_first;	/* first message in the queue */
-	struct	msg *__msg_last;	/* last message in the queue */
+	struct	msg *__msg_first;	/* unused */
+	struct	msg *__msg_last;	/* unused */
 	msglen_t msg_cbytes;	/* number of bytes in use on the queue */
 	msgqnum_t msg_qnum;	/* number of msgs in the queue */
 	msglen_t msg_qbytes;	/* max # of bytes on the queue */
@@ -89,8 +92,8 @@ struct msqid_ds_old {
 
 struct msqid_ds {
 	struct	ipc_perm msg_perm;	/* msg queue permission bits */
-	struct	msg *__msg_first;	/* first message in the queue */
-	struct	msg *__msg_last;	/* last message in the queue */
+	void * __kerncap __msg_first __attribute__((deprecated));
+	void * __kerncap __msg_last __attribute__((deprecated));
 	msglen_t msg_cbytes;	/* number of bytes in use on the queue */
 	msgqnum_t msg_qnum;	/* number of msgs in the queue */
 	msglen_t msg_qbytes;	/* max # of bytes on the queue */
@@ -103,7 +106,7 @@ struct msqid_ds {
 
 #ifdef _KERNEL
 struct msg {
-	struct	msg *msg_next;  /* next msg in the chain */
+	TAILQ_ENTRY(msg) msg_queue;
 	long	msg_type; 	/* type of this message */
 				/* >0 -> type of this message */
 				/* 0 -> free header */
@@ -134,19 +137,37 @@ struct msginfo {
 };
 
 /*
- * Kernel wrapper for the user-level structure.
+ * Kernel wrapper for struct msqid_ds.  This is used internally and exposed
+ * via kvm(3).  If this changes, consumers such as usr.bin/ipcs/ipc.c must
+ * be updated.  This struct ABI is unstable.
  */
+#ifdef _KERNEL
 struct msqid_kernel {
-	/*
-	 * Data structure exposed to user space.
-	 */
+#else
+struct msqid_kernel_kvm {
+#endif
 	struct	msqid_ds u;
-
-	/*
-	 * Kernel-private components of the message queue.
-	 */
 	struct	label *label;	/* MAC label */
 	struct	ucred *cred;	/* creator's credentials */
+	TAILQ_HEAD(, msg) queue;
+};
+
+/*
+ * This is the public interface to msqid_ds via the kern.ipc.msqids sysctl.
+ * This struct ABI is stable.
+ *
+ * HISTORY: when kern.ipc.msqids was created, it exposed the internal
+ * kernel struct to match the existing kvm interface.  This defeated the
+ * purpose of having a kernel wrapper so they are now decoupled.
+ */
+#ifdef _KERNEL
+struct msqid_kernel_sysctl {
+#else
+struct msqid_kernel {
+#endif
+	struct  msqid_ds u;
+	void * __kerncap label;	/* Always NULL */
+	void * __kerncap cred;	/* Always NULL */
 };
 #endif
 

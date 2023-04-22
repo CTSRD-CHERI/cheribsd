@@ -38,6 +38,11 @@ extern char *kmem_asprintf(const char *fmt, ...)
 extern char *kmem_strdup(const char *str);
 extern void kmem_strfree(char *str);
 
+#define	kmem_scnprintf	scnprintf
+
+#define	POINTER_IS_VALID(p)	(!((uintptr_t)(p) & 0x3))
+#define	POINTER_INVALIDATE(pp)	(*(pp) = (void *)((uintptr_t)(*(pp)) | 0x1))
+
 /*
  * Memory allocation interfaces
  */

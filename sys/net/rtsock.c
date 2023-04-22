@@ -57,6 +57,7 @@
 
 #include <net/if.h>
 #include <net/if_var.h>
+#include <net/if_private.h>
 #include <net/if_dl.h>
 #include <net/if_llatbl.h>
 #include <net/if_types.h>
@@ -220,6 +221,7 @@ static void	send_rtm_reply(struct socket *so, struct rt_msghdr *rtm,
 static bool	can_export_rte(struct ucred *td_ucred, bool rt_is_host,
 			const struct sockaddr *rt_dst);
 static void	rtsock_notify_event(uint32_t fibnum, const struct rib_cmd_info *rc);
+static void	rtsock_ifmsg(struct ifnet *ifp, int if_flags_mask);
 
 static struct netisr_handler rtsock_nh = {
 	.nh_name = "rtsock",
@@ -297,7 +299,10 @@ rts_handle_route_event(uint32_t fibnum, const struct rib_cmd_info *rc)
 #endif
 		report_route_event(rc, (void *)(uintptr_t)fibnum);
 }
-static struct rtbridge rtsbridge = { .route_f = rts_handle_route_event };
+static struct rtbridge rtsbridge = {
+	.route_f = rts_handle_route_event,
+	.ifmsg_f = rtsock_ifmsg,
+};
 static struct rtbridge *rtsbridge_orig_p;
 
 static void
@@ -440,6 +445,13 @@ rts_detach(struct socket *so)
 	RTSOCK_UNLOCK();
 	free(rcb, M_PCB);
 	so->so_pcb = NULL;
+}
+
+static int
+rts_disconnect(struct socket *so)
+{
+
+	return (ENOTCONN);
 }
 
 static int
@@ -1928,8 +1940,8 @@ rt_missmsg(int type, struct rt_addrinfo *rtinfo, int flags, int error)
  * This routine is called to generate a message from the routing
  * socket indicating that the status of a network interface has changed.
  */
-void
-rt_ifmsg(struct ifnet *ifp)
+static void
+rtsock_ifmsg(struct ifnet *ifp, int if_flags_mask __unused)
 {
 	struct if_msghdr *ifm;
 	struct mbuf *m;
@@ -2710,6 +2722,7 @@ static struct protosw routesw = {
 	.pr_detach =		rts_detach,
 	.pr_send =		rts_send,
 	.pr_shutdown =		rts_shutdown,
+	.pr_disconnect =	rts_disconnect,
 	.pr_close =		rts_close,
 };
 

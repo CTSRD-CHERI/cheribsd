@@ -30,6 +30,7 @@
 #define _NETLINK_NETLINK_MESSAGE_WRITER_H_
 
 #ifdef _KERNEL
+
 /*
  * It is not meant to be included directly
  */
@@ -55,6 +56,7 @@ struct nl_writer {
 	uint8_t			writer_target;	/* NS_WRITER_TARGET_*  */
 	bool			ignore_limit;	/* If true, ignores RCVBUF limit */
 	bool			enomem;		/* True if ENOMEM occured */
+	bool			suppress_ack;	/* If true, don't send NLMSG_ERR */
 };
 #define	NS_WRITER_TARGET_SOCKET	0
 #define	NS_WRITER_TARGET_GROUP	1
@@ -123,17 +125,19 @@ nlattr_set_len(const struct nl_writer *nw, int off)
 static inline void *
 nlmsg_reserve_data_raw(struct nl_writer *nw, size_t sz)
 {
-        if (__predict_false(nw->offset + NETLINK_ALIGN(sz) > nw->alloc_len)) {
-		if (!nlmsg_refill_buffer(nw, NETLINK_ALIGN(sz)))
+	sz = NETLINK_ALIGN(sz);
+
+        if (__predict_false(nw->offset + sz > nw->alloc_len)) {
+		if (!nlmsg_refill_buffer(nw, sz))
 			return (NULL);
         }
 
         void *data_ptr = &nw->data[nw->offset];
-        nw->offset += NLMSG_ALIGN(sz);
+        nw->offset += sz;
 
         return (data_ptr);
 }
-#define nlmsg_reserve_object(_ns, _t)	((_t *)nlmsg_reserve_data_raw(_ns, NLA_ALIGN(sizeof(_t))))
+#define nlmsg_reserve_object(_ns, _t)	((_t *)nlmsg_reserve_data_raw(_ns, sizeof(_t)))
 #define nlmsg_reserve_data(_ns, _sz, _t)	((_t *)nlmsg_reserve_data_raw(_ns, _sz))
 
 static inline int
@@ -188,6 +192,16 @@ nlattr_add(struct nl_writer *nw, int attr_type, int attr_len, const void *data)
 }
 
 static inline bool
+nlattr_add_raw(struct nl_writer *nw, const struct nlattr *nla_src)
+{
+	int attr_len = nla_src->nla_len - sizeof(struct nlattr);
+
+	MPASS(attr_len >= 0);
+
+	return (nlattr_add(nw, nla_src->nla_type, attr_len, (const void *)(nla_src + 1)));
+}
+
+static inline bool
 nlattr_add_u8(struct nl_writer *nw, int attrtype, uint8_t value)
 {
 	return (nlattr_add(nw, attrtype, sizeof(uint8_t), &value));
@@ -234,6 +248,12 @@ nlattr_add_s64(struct nl_writer *nw, int attrtype, int64_t value)
 {
 	return (nlattr_add(nw, attrtype, sizeof(int64_t), &value));
 }
+
+struct in_addr;
+bool nlattr_add_in_addr(struct nl_writer *nw, int attrtype, const struct in_addr *in);
+
+struct in6_addr;
+bool nlattr_add_in6_addr(struct nl_writer *nw, int attrtype, const struct in6_addr *in6);
 
 static inline bool
 nlattr_add_flag(struct nl_writer *nw, int attrtype)

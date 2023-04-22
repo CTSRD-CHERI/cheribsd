@@ -103,6 +103,7 @@ struct image_params {
 	void * __capability imgact_capability;	/* copyout and mapping cap */
 #define IMGP_ASLR_SHARED_PAGE	0x1
 	uint32_t imgp_flags;
+	struct vnode *interpreter_vp;	/* vnode of the interpreter */
 };
 
 #ifdef _KERNEL

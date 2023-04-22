@@ -156,6 +156,17 @@ nullfs_mount(struct mount *mp)
 		}
 	}
 
+	/*
+	 * Lower vnode must be the same type as the covered vnode - we
+	 * don't allow mounting directories to files or vice versa.
+	 */
+	if ((lowerrootvp->v_type != VDIR && lowerrootvp->v_type != VREG) ||
+	    lowerrootvp->v_type != mp->mnt_vnodecovered->v_type) {
+		NULLFSDEBUG("nullfs_mount: target must be same type as fspath");
+		vput(lowerrootvp);
+		return (EINVAL);
+	}
+
 	xmp = (struct null_mount *) malloc(sizeof(struct null_mount),
 	    M_NULLFSMNT, M_WAITOK | M_ZERO);
 
@@ -201,6 +212,12 @@ nullfs_mount(struct mount *mp)
 		    &xmp->notify_node);
 	}
 
+	if (lowerrootvp == mp->mnt_vnodecovered) {
+		vn_lock(lowerrootvp, LK_EXCLUSIVE | LK_RETRY | LK_CANRECURSE);
+		lowerrootvp->v_vflag |= VV_CROSSLOCK;
+		VOP_UNLOCK(lowerrootvp);
+	}
+
 	MNT_ILOCK(mp);
 	if ((xmp->nullm_flags & NULLM_CACHE) != 0) {
 		mp->mnt_kern_flag |= lowerrootvp->v_mount->mnt_kern_flag &
@@ -224,9 +241,7 @@ nullfs_mount(struct mount *mp)
  * Free reference to null layer
  */
 static int
-nullfs_unmount(mp, mntflags)
-	struct mount *mp;
-	int mntflags;
+nullfs_unmount(struct mount *mp, int mntflags)
 {
 	struct null_mount *mntdata;
 	int error, flags;
@@ -261,6 +276,11 @@ nullfs_unmount(mp, mntflags)
 		vfs_unregister_for_notification(mntdata->nullm_vfs,
 		    &mntdata->notify_node);
 	}
+	if (mntdata->nullm_lowerrootvp == mp->mnt_vnodecovered) {
+		vn_lock(mp->mnt_vnodecovered, LK_EXCLUSIVE | LK_RETRY | LK_CANRECURSE);
+		mp->mnt_vnodecovered->v_vflag &= ~VV_CROSSLOCK;
+		VOP_UNLOCK(mp->mnt_vnodecovered);
+	}
 	vfs_unregister_upper(mntdata->nullm_vfs, &mntdata->upper_node);
 	vrele(mntdata->nullm_lowerrootvp);
 	mp->mnt_data = NULL;
@@ -269,10 +289,7 @@ nullfs_unmount(mp, mntflags)
 }
 
 static int
-nullfs_root(mp, flags, vpp)
-	struct mount *mp;
-	int flags;
-	struct vnode **vpp;
+nullfs_root(struct mount *mp, int flags, struct vnode **vpp)
 {
 	struct vnode *vp;
 	struct null_mount *mntdata;
@@ -325,9 +342,7 @@ nullfs_quotactl(struct mount *mp, int cmd, uid_t uid, void * __capability arg,
 }
 
 static int
-nullfs_statfs(mp, sbp)
-	struct mount *mp;
-	struct statfs *sbp;
+nullfs_statfs(struct mount *mp, struct statfs *sbp)
 {
 	int error;
 	struct statfs *mstat;
@@ -362,9 +377,7 @@ nullfs_statfs(mp, sbp)
 }
 
 static int
-nullfs_sync(mp, waitfor)
-	struct mount *mp;
-	int waitfor;
+nullfs_sync(struct mount *mp, int waitfor)
 {
 	/*
 	 * XXX - Assumes no data cached at null layer.
@@ -373,11 +386,7 @@ nullfs_sync(mp, waitfor)
 }
 
 static int
-nullfs_vget(mp, ino, flags, vpp)
-	struct mount *mp;
-	ino_t ino;
-	int flags;
-	struct vnode **vpp;
+nullfs_vget(struct mount *mp, ino_t ino, int flags, struct vnode **vpp)
 {
 	int error;
 
@@ -391,11 +400,7 @@ nullfs_vget(mp, ino, flags, vpp)
 }
 
 static int
-nullfs_fhtovp(mp, fidp, flags, vpp)
-	struct mount *mp;
-	struct fid *fidp;
-	int flags;
-	struct vnode **vpp;
+nullfs_fhtovp(struct mount *mp, struct fid *fidp, int flags, struct vnode **vpp)
 {
 	int error;
 
@@ -406,13 +411,9 @@ nullfs_fhtovp(mp, fidp, flags, vpp)
 	return (null_nodeget(mp, *vpp, vpp));
 }
 
-static int                        
-nullfs_extattrctl(mp, cmd, filename_vp, namespace, attrname)
-	struct mount *mp;
-	int cmd;
-	struct vnode *filename_vp;
-	int namespace;
-	const char *attrname;
+static int
+nullfs_extattrctl(struct mount *mp, int cmd, struct vnode *filename_vp,
+    int namespace, const char *attrname)
 {
 
 	return (VFS_EXTATTRCTL(MOUNTTONULLMOUNT(mp)->nullm_vfs, cmd,
@@ -488,7 +489,7 @@ static struct vfsops null_vfsops = {
 	.vfs_unlink_lowervp =	nullfs_unlink_lowervp,
 };
 
-VFS_SET(null_vfsops, nullfs, VFCF_LOOPBACK | VFCF_JAIL);
+VFS_SET(null_vfsops, nullfs, VFCF_LOOPBACK | VFCF_JAIL | VFCF_FILEMOUNT);
 // CHERI CHANGES START
 // {
 //   "updated": 20221205,
