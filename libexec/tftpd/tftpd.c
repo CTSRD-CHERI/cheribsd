@@ -52,8 +52,9 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/ioctl.h>
-#include <sys/stat.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/time.h>
 
 #include <netinet/in.h>
 #include <arpa/tftp.h>
@@ -68,6 +69,7 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "tftp-file.h"
@@ -132,13 +134,14 @@ main(int argc, char *argv[])
 	struct passwd	*nobody;
 	const char	*chuser = "nobody";
 	char		recvbuffer[MAXPKTSIZE];
-	int		allow_ro = 1, allow_wo = 1;
+	int		allow_ro = 1, allow_wo = 1, on = 1;
+	pid_t		pid;
 
 	tzset();			/* syslog in localtime */
 	acting_as_client = 0;
 
 	tftp_openlog("tftpd", LOG_PID | LOG_NDELAY, LOG_FTP);
-	while ((ch = getopt(argc, argv, "cCd:F:lnoOp:s:u:U:wW")) != -1) {
+	while ((ch = getopt(argc, argv, "cCd::F:lnoOp:s:u:U:wW")) != -1) {
 		switch (ch) {
 		case 'c':
 			ipchroot = 1;
@@ -147,7 +150,9 @@ main(int argc, char *argv[])
 			ipchroot = 2;
 			break;
 		case 'd':
-			if (atoi(optarg) != 0)
+			if (optarg == NULL)
+				debug++;
+			else if (atoi(optarg) != 0)
 				debug += atoi(optarg);
 			else
 				debug |= debug_finds(optarg);
@@ -218,12 +223,9 @@ main(int argc, char *argv[])
 
 	umask(mask);
 
-	{
-		int on = 1;
-		if (ioctl(0, FIONBIO, &on) < 0) {
-			tftp_log(LOG_ERR, "ioctl(FIONBIO): %s", strerror(errno));
-			exit(1);
-		}
+	if (ioctl(0, FIONBIO, &on) < 0) {
+		tftp_log(LOG_ERR, "ioctl(FIONBIO): %s", strerror(errno));
+		exit(1);
 	}
 
 	/* Find out who we are talking to and what we are going to do */
@@ -251,40 +253,14 @@ main(int argc, char *argv[])
 	 * break before doing the above "recvfrom", inetd would
 	 * spawn endless instances, clogging the system.
 	 */
-	{
-		int i, pid;
-
-		for (i = 1; i < 20; i++) {
-		    pid = fork();
-		    if (pid < 0) {
-				sleep(i);
-				/*
-				 * flush out to most recently sent request.
-				 *
-				 * This may drop some request, but those
-				 * will be resent by the clients when
-				 * they timeout.  The positive effect of
-				 * this flush is to (try to) prevent more
-				 * than one tftpd being started up to service
-				 * a single request from a single client.
-				 */
-				peerlen = sizeof peer_sock;
-				i = recvfrom(0, recvbuffer, MAXPKTSIZE, 0,
-				    (struct sockaddr *)&peer_sock, &peerlen);
-				if (i > 0) {
-					n = i;
-				}
-		    } else {
-				break;
-		    }
-		}
-		if (pid < 0) {
-			tftp_log(LOG_ERR, "fork: %s", strerror(errno));
-			exit(1);
-		} else if (pid != 0) {
-			exit(0);
-		}
+	pid = fork();
+	if (pid < 0) {
+		tftp_log(LOG_ERR, "fork: %s", strerror(errno));
+		exit(1);
+	} else if (pid != 0) {
+		exit(0);
 	}
+	/* child */
 
 #ifdef	LIBWRAP
 	/*
@@ -298,7 +274,7 @@ main(int argc, char *argv[])
 		request_set(&req, RQ_DAEMON, "tftpd", 0);
 
 		if (hosts_access(&req) == 0) {
-			if (debug&DEBUG_ACCESS)
+			if (debug & DEBUG_ACCESS)
 				tftp_log(LOG_WARNING,
 				    "Access denied by 'tftpd' entry "
 				    "in /etc/hosts.allow");
@@ -319,7 +295,7 @@ main(int argc, char *argv[])
 				exit(1);
 			}
 
-			if (debug&DEBUG_ACCESS) {
+			if (debug & DEBUG_ACCESS) {
 				if (allow_ro)
 					tftp_log(LOG_WARNING,
 					    "But allowed readonly access "
@@ -330,7 +306,7 @@ main(int argc, char *argv[])
 					    "via 'tftpd-wo' entry");
 			}
 		} else
-			if (debug&DEBUG_ACCESS)
+			if (debug & DEBUG_ACCESS)
 				tftp_log(LOG_WARNING,
 				    "Full access allowed"
 				    "in /etc/hosts.allow");
@@ -405,8 +381,9 @@ main(int argc, char *argv[])
 		me_sock.ss_family = peer_sock.ss_family;
 		me_sock.ss_len = peer_sock.ss_len;
 	}
-	close(0);
-	close(1);
+	close(STDIN_FILENO);
+	close(STDOUT_FILENO);
+	close(STDERR_FILENO);
 	peer = socket(peer_sock.ss_family, SOCK_DGRAM, 0);
 	if (peer < 0) {
 		tftp_log(LOG_ERR, "socket: %s", strerror(errno));
@@ -595,13 +572,13 @@ tftp_rrq(int peer, char *recvbuffer, ssize_t size)
 			n = receive_packet(peer, lrecvbuffer, MAXPKTSIZE,
 				NULL, timeoutpacket);
 			if (n < 0) {
-				if (debug&DEBUG_SIMPLE)
+				if (debug & DEBUG_SIMPLE)
 					tftp_log(LOG_DEBUG, "Aborting: %s",
 					    rp_strerror(n));
 				return;
 			}
 			if (rp->th_opcode != ACK) {
-				if (debug&DEBUG_SIMPLE)
+				if (debug & DEBUG_SIMPLE)
 					tftp_log(LOG_DEBUG,
 					    "Expected ACK, got %s on OACK",
 					    packettype(rp->th_opcode));
@@ -666,7 +643,7 @@ find_next_name(char *filename, int *fd)
 	for (i = 0; i < 100; i++) {
 		sprintf(newname, "%s.%s.%02d", filename, yyyymmdd, i);
 		*fd = open(newname,
-		    O_WRONLY | O_CREAT | O_EXCL, 
+		    O_WRONLY | O_CREAT | O_EXCL,
 		    S_IRUSR | S_IWUSR | S_IRGRP |
 		    S_IWGRP | S_IROTH | S_IWOTH);
 		if (*fd > 0)
@@ -787,8 +764,8 @@ validate_access(int peer, char **filep, int mode)
 					return (error + 100);
 			} else
 				fd = open(filename,
-				    O_WRONLY | O_TRUNC | O_CREAT, 
-				    S_IRUSR | S_IWUSR | S_IRGRP | 
+				    O_WRONLY | O_TRUNC | O_CREAT,
+				    S_IRUSR | S_IWUSR | S_IRGRP |
 				    S_IWGRP | S_IROTH | S_IWOTH );
 		} else
 			fd = open(filename, O_WRONLY | O_TRUNC);
@@ -812,14 +789,14 @@ tftp_xmitfile(int peer, const char *mode)
 
 	memset(&ts, 0, sizeof(ts));
 	now = time(NULL);
-	if (debug&DEBUG_SIMPLE)
+	if (debug & DEBUG_SIMPLE)
 		tftp_log(LOG_DEBUG, "Transmitting file");
 
 	tftp_read_init(0, file, mode);
 	block = 1;
 	tftp_send(peer, &block, &ts);
 	tftp_read_close();
-	if (debug&DEBUG_SIMPLE)
+	if (debug & DEBUG_SIMPLE)
 		tftp_log(LOG_INFO, "Sent %jd bytes in %jd seconds",
 		    (intmax_t)ts.amount, (intmax_t)time(NULL) - now);
 }
@@ -832,7 +809,7 @@ tftp_recvfile(int peer, const char *mode)
 	struct tftp_stats ts;
 
 	gettimeofday(&now1, NULL);
-	if (debug&DEBUG_SIMPLE)
+	if (debug & DEBUG_SIMPLE)
 		tftp_log(LOG_DEBUG, "Receiving file");
 
 	write_init(0, file, mode);
@@ -842,7 +819,7 @@ tftp_recvfile(int peer, const char *mode)
 
 	gettimeofday(&now2, NULL);
 
-	if (debug&DEBUG_SIMPLE) {
+	if (debug & DEBUG_SIMPLE) {
 		double f;
 		if (now1.tv_usec > now2.tv_usec) {
 			now2.tv_usec += 1000000;

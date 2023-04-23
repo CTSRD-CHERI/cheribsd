@@ -97,7 +97,6 @@ VNET_DEFINE(struct inpcbinfo, ripcbinfo);
  * The data hooks are not used here but it is convenient
  * to keep them all in one place.
  */
-VNET_DEFINE(ip_fw_chk_ptr_t, ip_fw_chk_ptr) = NULL;
 VNET_DEFINE(ip_fw_ctl_ptr_t, ip_fw_ctl_ptr) = NULL;
 
 int	(*ip_dn_ctl_ptr)(struct sockopt *);
@@ -182,7 +181,7 @@ rip_delhash(struct inpcb *inp)
 }
 #endif /* INET */
 
-INPCBSTORAGE_DEFINE(ripcbstor, "rawinp", "ripcb", "rip", "riphash");
+INPCBSTORAGE_DEFINE(ripcbstor, inpcb, "rawinp", "ripcb", "rip", "riphash");
 
 static void
 rip_init(void *arg __unused)

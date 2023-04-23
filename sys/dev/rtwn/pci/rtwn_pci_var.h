@@ -102,7 +102,7 @@ enum {
 	 RTWN_PCI_INTR_RX_DESC_UNAVAIL | RTWN_PCI_INTR_RX_DONE)
 
 struct rtwn_pci_softc {
-	struct rtwn_softc	pc_sc;		/* must be the first */
+	struct rtwn_softc	pc_sc __subobject_member_used_for_c_inheritance;		/* must be the first */
 
 	struct resource		*irq;
 	struct resource		*mem;

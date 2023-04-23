@@ -359,7 +359,7 @@ dtsec_if_enable_locked(struct dtsec_softc *sc)
 	if (error != E_OK)
 		return (EIO);
 
-	sc->sc_ifnet->if_drv_flags |= IFF_DRV_RUNNING;
+	if_setdrvflagbits(sc->sc_ifnet, IFF_DRV_RUNNING, 0);
 
 	/* Refresh link state */
 	dtsec_miibus_statchg(sc->sc_dev);
@@ -386,19 +386,19 @@ dtsec_if_disable_locked(struct dtsec_softc *sc)
 	if (error != E_OK)
 		return (EIO);
 
-	sc->sc_ifnet->if_drv_flags &= ~IFF_DRV_RUNNING;
+	if_setdrvflagbits(sc->sc_ifnet, 0, IFF_DRV_RUNNING);
 
 	return (0);
 }
 
 static int
-dtsec_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
+dtsec_if_ioctl(if_t ifp, u_long command, caddr_t data)
 {
 	struct dtsec_softc *sc;
 	struct ifreq *ifr;
 	int error;
 
-	sc = ifp->if_softc;
+	sc = if_getsoftc(ifp);
 	ifr = (struct ifreq *)data;
 	error = 0;
 
@@ -407,7 +407,7 @@ dtsec_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	case SIOCSIFMTU:
 		DTSEC_LOCK(sc);
 		if (dtsec_set_mtu(sc, ifr->ifr_mtu))
-			ifp->if_mtu = ifr->ifr_mtu;
+			if_setmtu(ifp, ifr->ifr_mtu);
 		else
 			error = EINVAL;
 		DTSEC_UNLOCK(sc);
@@ -415,7 +415,7 @@ dtsec_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	case SIOCSIFFLAGS:
 		DTSEC_LOCK(sc);
 
-		if (sc->sc_ifnet->if_flags & IFF_UP)
+		if (if_getflags(sc->sc_ifnet) & IFF_UP)
 			error = dtsec_if_enable_locked(sc);
 		else
 			error = dtsec_if_disable_locked(sc);
@@ -472,7 +472,7 @@ dtsec_if_init_locked(struct dtsec_softc *sc)
 
 	/* Set MAC address */
 	error = FM_MAC_ModifyMacAddr(sc->sc_mach,
-	    (t_EnetAddr *)IF_LLADDR(sc->sc_ifnet));
+	    (t_EnetAddr *)if_getlladdr(sc->sc_ifnet));
 	if (error != E_OK) {
 		device_printf(sc->sc_dev, "couldn't set MAC address.\n");
 		goto err;
@@ -482,7 +482,7 @@ dtsec_if_init_locked(struct dtsec_softc *sc)
 	if (sc->sc_mii)
 		callout_reset(&sc->sc_tick_callout, hz, dtsec_if_tick, sc);
 
-	if (sc->sc_ifnet->if_flags & IFF_UP) {
+	if (if_getflags(sc->sc_ifnet) & IFF_UP) {
 		error = dtsec_if_enable_locked(sc);
 		if (error != 0)
 			goto err;
@@ -513,18 +513,18 @@ dtsec_if_init(void *data)
 }
 
 static void
-dtsec_if_start(struct ifnet *ifp)
+dtsec_if_start(if_t ifp)
 {
 	struct dtsec_softc *sc;
 
-	sc = ifp->if_softc;
+	sc = if_getsoftc(ifp);
 	DTSEC_LOCK(sc);
 	sc->sc_start_locked(sc);
 	DTSEC_UNLOCK(sc);
 }
 
 static void
-dtsec_if_watchdog(struct ifnet *ifp)
+dtsec_if_watchdog(if_t ifp)
 {
 	/* TODO */
 }
@@ -536,9 +536,9 @@ dtsec_if_watchdog(struct ifnet *ifp)
  * @{
  */
 static int
-dtsec_ifmedia_upd(struct ifnet *ifp)
+dtsec_ifmedia_upd(if_t ifp)
 {
-	struct dtsec_softc *sc = ifp->if_softc;
+	struct dtsec_softc *sc = if_getsoftc(ifp);
 
 	DTSEC_LOCK(sc);
 	mii_mediachg(sc->sc_mii);
@@ -548,9 +548,9 @@ dtsec_ifmedia_upd(struct ifnet *ifp)
 }
 
 static void
-dtsec_ifmedia_sts(struct ifnet *ifp, struct ifmediareq *ifmr)
+dtsec_ifmedia_sts(if_t ifp, struct ifmediareq *ifmr)
 {
-	struct dtsec_softc *sc = ifp->if_softc;
+	struct dtsec_softc *sc = if_getsoftc(ifp);
 
 	DTSEC_LOCK(sc);
 
@@ -599,7 +599,7 @@ dtsec_attach(device_t dev)
 	struct dtsec_softc *sc;
 	device_t parent;
 	int error;
-	struct ifnet *ifp;
+	if_t ifp;
 
 	sc = device_get_softc(dev);
 
@@ -686,13 +686,13 @@ dtsec_attach(device_t dev)
 		return (ENOMEM);
 	}
 
-	ifp->if_softc = sc;
-	ifp->if_mtu = ETHERMTU;	/* TODO: Configure */
-	ifp->if_flags = IFF_SIMPLEX | IFF_BROADCAST;
-	ifp->if_init = dtsec_if_init;
-	ifp->if_start = dtsec_if_start;
-	ifp->if_ioctl = dtsec_if_ioctl;
-	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+	if_setsoftc(ifp, sc);
+
+	if_setflags(ifp, IFF_SIMPLEX | IFF_BROADCAST);
+	if_setinitfn(ifp, dtsec_if_init);
+	if_setstartfn(ifp, dtsec_if_start);
+	if_setioctlfn(ifp, dtsec_if_ioctl);
+	if_setsendqlen(ifp, IFQ_MAXLEN);
 
 	if (sc->sc_phy_addr >= 0)
 		if_initname(ifp, device_get_name(sc->sc_dev),
@@ -702,12 +702,11 @@ dtsec_attach(device_t dev)
 
 	/* TODO */
 #if 0
-	IFQ_SET_MAXLEN(&ifp->if_snd, TSEC_TX_NUM_DESC - 1);
-	ifp->if_snd.ifq_drv_maxlen = TSEC_TX_NUM_DESC - 1;
-	IFQ_SET_READY(&ifp->if_snd);
+	if_setsendqlen(ifp, TSEC_TX_NUM_DESC - 1);
+	if_setsendqready(ifp);
 #endif
-	ifp->if_capabilities = IFCAP_JUMBO_MTU; /* TODO: HWCSUM */
-	ifp->if_capenable = ifp->if_capabilities;
+
+	if_setcapenable(ifp, if_getcapabilities(ifp));
 
 	/* Attach PHY(s) */
 	error = mii_attach(sc->sc_dev, &sc->sc_mii_dev, ifp, dtsec_ifmedia_upd,

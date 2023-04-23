@@ -173,6 +173,9 @@ struct pcb *pmap_switch(struct thread *);
 
 extern void (*pmap_clean_stage2_tlbi)(void);
 extern void (*pmap_invalidate_vpipt_icache)(void);
+extern void (*pmap_stage2_invalidate_range)(uint64_t, vm_offset_t, vm_offset_t,
+    bool);
+extern void (*pmap_stage2_invalidate_all)(uint64_t);
 
 static inline int
 pmap_vmspace_copy(pmap_t dst_pmap __unused, pmap_t src_pmap __unused)
@@ -180,6 +183,14 @@ pmap_vmspace_copy(pmap_t dst_pmap __unused, pmap_t src_pmap __unused)
 
 	return (0);
 }
+
+#if defined(KASAN) || defined(KMSAN)
+struct arm64_bootparams;
+
+void	pmap_bootstrap_san(vm_paddr_t);
+void	pmap_san_enter(vm_offset_t);
+void	pmap_san_bootstrap(struct arm64_bootparams *);
+#endif
 
 #endif	/* _KERNEL */
 

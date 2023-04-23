@@ -1322,7 +1322,7 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 	bool have_scb, shown_borrowertd;
 
 	if (have_addr) {
-		error = copyincap(___USER_CFROMPTR(addr, userspace_root_cap),
+		error = copyincap(___USER_CFROMPTR(addr, userspace_root_cap, false),
 		    &scb, sizeof(scb));
 		if (error != 0) {
 			db_printf("%s: copyincap failed, error %d\n", __func__, error);

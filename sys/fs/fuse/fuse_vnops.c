@@ -478,7 +478,9 @@ fuse_vnop_advlock(struct vop_advlock_args *ap)
 	struct fuse_dispatcher fdi;
 	struct fuse_lk_in *fli;
 	struct fuse_lk_out *flo;
+	struct vattr vattr;
 	enum fuse_opcode op;
+	off_t size, start;
 	int dataflags, err;
 	int flags = ap->a_flags;
 
@@ -513,6 +515,33 @@ fuse_vnop_advlock(struct vop_advlock_args *ap)
 
 	vn_lock(vp, LK_SHARED | LK_RETRY);
 
+	switch (fl->l_whence) {
+	case SEEK_SET:
+	case SEEK_CUR:
+		/*
+		 * Caller is responsible for adding any necessary offset
+		 * when SEEK_CUR is used.
+		 */
+		start = fl->l_start;
+		break;
+
+	case SEEK_END:
+		err = fuse_internal_getattr(vp, &vattr, cred, td);
+		if (err)
+			goto out;
+		size = vattr.va_size;
+		if (size > OFF_MAX ||
+		    (fl->l_start > 0 && size > OFF_MAX - fl->l_start)) {
+			err = EOVERFLOW;
+			goto out;
+		}
+		start = size + fl->l_start;
+		break;
+
+	default:
+		return (EINVAL);
+	}
+
 	err = fuse_filehandle_get_anyflags(vp, &fufh, cred, pid);
 	if (err)
 		goto out;
@@ -523,9 +552,9 @@ fuse_vnop_advlock(struct vop_advlock_args *ap)
 	fli = fdi.indata;
 	fli->fh = fufh->fh_id;
 	fli->owner = td->td_proc->p_pid;
-	fli->lk.start = fl->l_start;
+	fli->lk.start = start;
 	if (fl->l_len != 0)
-		fli->lk.end = fl->l_start + fl->l_len - 1;
+		fli->lk.end = start + fl->l_len - 1;
 	else
 		fli->lk.end = INT64_MAX;
 	fli->lk.type = fl->l_type;
@@ -537,6 +566,7 @@ fuse_vnop_advlock(struct vop_advlock_args *ap)
 	if (err == 0 && op == FUSE_GETLK) {
 		flo = fdi.answ;
 		fl->l_type = flo->lk.type;
+		fl->l_whence = SEEK_SET;
 		if (flo->lk.type != F_UNLCK) {
 			fl->l_pid = flo->lk.pid;
 			fl->l_start = flo->lk.start;
@@ -637,6 +667,7 @@ fuse_vnop_allocate(struct vop_allocate_args *ap)
 		}
 	}
 
+	fdisp_destroy(&fdi);
 	return (err);
 }
 
@@ -1073,6 +1104,7 @@ fuse_vnop_create(struct vop_create_args *ap)
 		uint64_t nodeid = feo->nodeid;
 		uint64_t fh_id = foo->fh;
 
+		fdisp_destroy(fdip);
 		fdisp_init(fdip, sizeof(*fri));
 		fdisp_make(fdip, FUSE_RELEASE, mp, nodeid, td, cred);
 		fri = fdip->indata;
@@ -2991,6 +3023,7 @@ fuse_vnop_deallocate(struct vop_deallocate_args *ap)
 	err = fdisp_wait_answ(&fdi);
 
 	if (err == ENOSYS) {
+		fdisp_destroy(&fdi);
 		fsess_set_notimpl(mp, FUSE_FALLOCATE);
 		goto fallback;
 	} else if (err == EOPNOTSUPP) {
@@ -2998,6 +3031,7 @@ fuse_vnop_deallocate(struct vop_deallocate_args *ap)
 		 * The file system server does not support FUSE_FALLOCATE with
 		 * the supplied mode for this particular file.
 		 */
+		fdisp_destroy(&fdi);
 		goto fallback;
 	} else if (!err) {
 		/*
@@ -3017,6 +3051,7 @@ fuse_vnop_deallocate(struct vop_deallocate_args *ap)
 	}
 
 out:
+	fdisp_destroy(&fdi);
 	if (closefufh)
 		fuse_filehandle_close(vp, fufh, curthread, cred);
 

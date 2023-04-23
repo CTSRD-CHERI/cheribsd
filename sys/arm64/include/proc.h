@@ -193,16 +193,4 @@ struct mdproc {
 #endif
 #define	KINFO_PROC32_SIZE 816
 
-#ifdef _KERNEL
-
-#include <machine/pcb.h>
-
-#define	GET_STACK_USAGE(total, used) do {				\
-	struct thread *td = curthread;					\
-	(total) = td->td_kstack_pages * PAGE_SIZE - sizeof(struct pcb);	\
-	(used) = td->td_kstack + (total) - (vm_offset_t)&td;		\
-} while (0)
-
-#endif
-
 #endif /* !_MACHINE_PROC_H_ */

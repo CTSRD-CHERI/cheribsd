@@ -47,6 +47,8 @@ __FBSDID("$FreeBSD$");
 #include <kvm.h>
 #include <nlist.h>
 #include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "ipc.h"
 
@@ -57,6 +59,15 @@ struct msginfo		msginfo;
 struct msqid_kernel	*msqids;
 struct shminfo		shminfo;
 struct shmid_kernel	*shmsegs;
+
+/*
+ * If any of these asserts fail, the kget code will need to be updated
+ * to translate from the _kernel_kvm version to _kernel.
+ */
+_Static_assert(sizeof(struct semid_kernel) == sizeof(struct semid_kernel_kvm),
+    "In-kernel struct semid_kernel ABI has changed");
+_Static_assert(sizeof(struct shmid_kernel) == sizeof(struct shmid_kernel_kvm),
+    "In-kernel struct shmid_kernel ABI has changed");
 
 struct nlist symbols[] = {
 	{ .n_name = "sema" },
@@ -130,8 +141,10 @@ kget(int idx, void *addr, size_t size)
 {
 	const char *symn;		/* symbol name */
 	size_t tsiz;
-	int rv;
+	int rv, nentries;
 	unsigned long kaddr;
+	struct msqid_kernel *msqids_kernel;
+	struct msqid_kernel_kvm *msqids_kernel_kvm;
 	const char *sym2sysctl[] = {	/* symbol to sysctl name table */
 		"kern.ipc.sema",
 		"kern.ipc.seminfo",
@@ -158,6 +171,13 @@ kget(int idx, void *addr, size_t size)
 			rv = kvm_read(kd, symbols[idx].n_value,
 			    &msqids, tsiz);
 			kaddr = (u_long)msqids;
+
+			memset(addr, 0, size);
+			nentries = size / sizeof(struct msqid_kernel);
+			msqids_kernel = addr;
+			size = nentries * sizeof(struct msqid_kernel_kvm);
+			if ((addr = malloc(size)) == NULL)
+				err(1, "malloc");
 			break;
 		case X_SHMSEGS:
 			tsiz = sizeof(shmsegs);
@@ -180,6 +200,20 @@ kget(int idx, void *addr, size_t size)
 			errx(1, "%s: %s", symn, kvm_geterr(kd));
 		if ((unsigned)kvm_read(kd, kaddr, addr, size) != size)
 			errx(1, "%s: %s", symn, kvm_geterr(kd));
+
+		switch (idx) {
+		case X_MSQIDS:
+			msqids_kernel_kvm = addr;
+			for (int i = 0; i < nentries; i++) {
+				/*
+				 * struct msqid_ds is the same in both.
+				 * Other members were zeroed with the
+				 * memset above.
+				 */
+				msqids_kernel[i].u = msqids_kernel_kvm[i].u;
+			}
+			free(msqids_kernel_kvm);
+		}
 	} else {
 		switch (idx) {
 		case X_SHMINFO:

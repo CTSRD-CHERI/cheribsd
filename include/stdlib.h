@@ -132,7 +132,7 @@ size_t	 wcstombs(char * __restrict, const wchar_t * __restrict, size_t);
  * is not supported in the compilation environment (which therefore means
  * that it can't really be ISO C99).
  *
- * (The only other extension made by C99 in thie header is _Exit().)
+ * (The only other extension made by C99 in this header is _Exit().)
  */
 #if __ISO_C_VISIBLE >= 1999 || defined(__cplusplus)
 #ifdef __LONG_LONG_SUPPORTED
@@ -320,6 +320,7 @@ void	*reallocarray(void *, size_t, size_t) __result_use_check
 	    __alloc_size2(2, 3);
 void	*reallocf(void *, size_t) __result_use_check __alloc_size(2);
 int	 rpmatch(const char *);
+char	*secure_getenv(const char *);
 void	 setprogname(const char *);
 int	 sradixsort(const unsigned char **, int, const unsigned char *,
 	    unsigned);

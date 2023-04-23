@@ -505,6 +505,7 @@ extern volatile time_t	time_second;
 extern volatile time_t	time_uptime;
 extern struct bintime tc_tick_bt;
 extern sbintime_t tc_tick_sbt;
+extern time_t tick_seconds_max;
 extern struct bintime tick_bt;
 extern sbintime_t tick_sbt;
 extern int tc_precexp;
@@ -577,11 +578,19 @@ void	getboottimebin(struct bintime *boottimebin);
 /* Other functions */
 int	itimerdecr(struct itimerval *itp, int usec);
 int	itimerfix(struct timeval *tv);
-int	ppsratecheck(struct timeval *, int *, int);
+int	eventratecheck(struct timeval *, int *, int);
+#define	ppsratecheck(t, c, m) eventratecheck(t, c, m)
 int	ratecheck(struct timeval *, const struct timeval *);
 void	timevaladd(struct timeval *t1, const struct timeval *t2);
 void	timevalsub(struct timeval *t1, const struct timeval *t2);
 int	tvtohz(struct timeval *tv);
+
+/*
+ * The following HZ limits allow the tvtohz() function
+ * to only use integer computations.
+ */
+#define	HZ_MAXIMUM (INT_MAX / (1000000 >> 6)) /* 137kHz */
+#define	HZ_MINIMUM 8 /* hz */
 
 #define	TC_DEFAULTPERC		5
 

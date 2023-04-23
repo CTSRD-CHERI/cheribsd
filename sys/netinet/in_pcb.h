@@ -263,7 +263,6 @@ struct inpcb {
 	uint32_t inp_flowid;		/* (x) flow id / queue id */
 	struct m_snd_tag *inp_snd_tag;	/* (i) send tag for outgoing mbufs */
 	uint32_t inp_flowtype;		/* (x) M_HASHTYPE value */
-	uint32_t inp_rss_listen_bucket;	/* (x) overridden RSS listen bucket */
 
 	/* Local and foreign ports, local and foreign addr. */
 	struct	in_conninfo inp_inc;	/* (i) list for PCB's local port */
@@ -347,7 +346,7 @@ struct xinpcb {
 	uint32_t	inp_flowtype;		/* (s) */
 	int32_t		inp_flags;		/* (s,p) */
 	int32_t		inp_flags2;		/* (s) */
-	int32_t		inp_rss_listen_bucket;	/* (n) */
+	uint32_t	inp_unused;
 	int32_t		in6p_cksum;		/* (n) */
 	int32_t		inp_spare32[4];
 	uint16_t	in6p_hops;		/* (n) */
@@ -464,13 +463,14 @@ struct inpcbstorage {
 	uma_zone_t	ips_zone;
 	uma_zone_t	ips_portzone;
 	uma_init	ips_pcbinit;
+	size_t		ips_size;
 	const char *	ips_zone_name;
 	const char *	ips_portzone_name;
 	const char *	ips_infolock_name;
 	const char *	ips_hashlock_name;
 };
 
-#define INPCBSTORAGE_DEFINE(prot, lname, zname, iname, hname)		\
+#define INPCBSTORAGE_DEFINE(prot, ppcb, lname, zname, iname, hname)	\
 static int								\
 prot##_inpcb_init(void *mem, int size __unused, int flags __unused)	\
 {									\
@@ -480,6 +480,7 @@ prot##_inpcb_init(void *mem, int size __unused, int flags __unused)	\
 	return (0);							\
 }									\
 static struct inpcbstorage prot = {					\
+	.ips_size = sizeof(struct ppcb),				\
 	.ips_pcbinit = prot##_inpcb_init,				\
 	.ips_zone_name = zname,						\
 	.ips_portzone_name = zname " ports",				\
@@ -500,9 +501,10 @@ SYSUNINIT(prot##_inpcbstorage_uninit, SI_SUB_PROTO_DOMAIN,		\
 struct inpcblbgroup {
 	CK_LIST_ENTRY(inpcblbgroup) il_list;
 	struct epoch_context il_epoch_ctx;
+	struct ucred	*il_cred;
 	uint16_t	il_lport;			/* (c) */
 	u_char		il_vflag;			/* (c) */
-	u_int8_t		il_numa_domain;
+	uint8_t		il_numa_domain;
 	uint32_t	il_pad2;
 	union in_dependaddr il_dependladdr;		/* (c) */
 #define	il_laddr	il_dependladdr.id46_addr.ia46_addr4
@@ -546,7 +548,8 @@ void inp_unlock_assert(struct inpcb *);
 #define	inp_unlock_assert(inp)	do {} while (0)
 #endif
 
-void	inp_apply_all(void (*func)(struct inpcb *, void *), void *arg);
+void	inp_apply_all(struct inpcbinfo *, void (*func)(struct inpcb *, void *),
+	    void *arg);
 int 	inp_ip_tos_get(const struct inpcb *inp);
 void 	inp_ip_tos_set(struct inpcb *inp, int val);
 struct socket *
@@ -622,7 +625,7 @@ int	inp_so_options(const struct inpcb *inp);
 #define	INP_HDRINCL		0x00000008 /* user supplies entire IP header */
 #define	INP_HIGHPORT		0x00000010 /* user wants "high" port binding */
 #define	INP_LOWPORT		0x00000020 /* user wants "low" port binding */
-#define	INP_ANONPORT		0x00000040 /* port chosen for user */
+#define	INP_ANONPORT		0x00000040 /* read by netstat(1) */
 #define	INP_RECVIF		0x00000080 /* receive incoming interface */
 #define	INP_MTUDISC		0x00000100 /* user can do MTU discovery */
 /*	INP_FREED		0x00000200 private to in_pcb.c */
@@ -665,8 +668,8 @@ int	inp_so_options(const struct inpcb *inp);
 #define	INP_REUSEPORT		0x00000008 /* SO_REUSEPORT option is set */
 /*				0x00000010 */
 #define	INP_REUSEADDR		0x00000020 /* SO_REUSEADDR option is set */
-#define	INP_BINDMULTI		0x00000040 /* IP_BINDMULTI option is set */
-#define	INP_RSS_BUCKET_SET	0x00000080 /* IP_RSS_LISTEN_BUCKET is set */
+/*				0x00000040 */
+/*				0x00000080 */
 #define	INP_RECVFLOWID		0x00000100 /* populate recv datagram with flow info */
 #define	INP_RECVRSSBUCKETID	0x00000200 /* populate recv datagram with bucket id */
 #define	INP_RATE_LIMIT_CHANGED	0x00000400 /* rate limit needs attention */
@@ -713,10 +716,6 @@ VNET_DECLARE(int, ipport_lastauto);
 VNET_DECLARE(int, ipport_hifirstauto);
 VNET_DECLARE(int, ipport_hilastauto);
 VNET_DECLARE(int, ipport_randomized);
-VNET_DECLARE(int, ipport_randomcps);
-VNET_DECLARE(int, ipport_randomtime);
-VNET_DECLARE(int, ipport_stoprandom);
-VNET_DECLARE(int, ipport_tcpallocs);
 
 #define	V_ipport_reservedhigh	VNET(ipport_reservedhigh)
 #define	V_ipport_reservedlow	VNET(ipport_reservedlow)
@@ -727,10 +726,6 @@ VNET_DECLARE(int, ipport_tcpallocs);
 #define	V_ipport_hifirstauto	VNET(ipport_hifirstauto)
 #define	V_ipport_hilastauto	VNET(ipport_hilastauto)
 #define	V_ipport_randomized	VNET(ipport_randomized)
-#define	V_ipport_randomcps	VNET(ipport_randomcps)
-#define	V_ipport_randomtime	VNET(ipport_randomtime)
-#define	V_ipport_stoprandom	VNET(ipport_stoprandom)
-#define	V_ipport_tcpallocs	VNET(ipport_tcpallocs)
 
 void	in_pcbinfo_init(struct inpcbinfo *, struct inpcbstorage *,
 	    u_int, u_int);
@@ -738,18 +733,15 @@ void	in_pcbinfo_destroy(struct inpcbinfo *);
 void	in_pcbstorage_init(void *);
 void	in_pcbstorage_destroy(void *);
 
-int	in_pcbbind_check_bindmulti(const struct inpcb *ni,
-	    const struct inpcb *oi);
-
 void	in_pcbpurgeif0(struct inpcbinfo *, struct ifnet *);
 int	in_pcballoc(struct socket *, struct inpcbinfo *);
-int	in_pcbbind(struct inpcb *, struct sockaddr *, struct ucred *);
-int	in_pcbbind_setup(struct inpcb *, struct sockaddr *, in_addr_t *,
+int	in_pcbbind(struct inpcb *, struct sockaddr_in *, struct ucred *);
+int	in_pcbbind_setup(struct inpcb *, struct sockaddr_in *, in_addr_t *,
 	    u_short *, struct ucred *);
-int	in_pcbconnect(struct inpcb *, struct sockaddr *, struct ucred *, bool);
-int	in_pcbconnect_setup(struct inpcb *, struct sockaddr *, in_addr_t *,
-	    u_short *, in_addr_t *, u_short *, struct inpcb **,
-	    struct ucred *);
+int	in_pcbconnect(struct inpcb *, struct sockaddr_in *, struct ucred *,
+	    bool);
+int	in_pcbconnect_setup(struct inpcb *, struct sockaddr_in *, in_addr_t *,
+	    u_short *, in_addr_t *, u_short *, struct ucred *);
 void	in_pcbdetach(struct inpcb *);
 void	in_pcbdisconnect(struct inpcb *);
 void	in_pcbdrop(struct inpcb *);

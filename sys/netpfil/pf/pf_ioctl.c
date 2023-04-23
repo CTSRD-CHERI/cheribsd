@@ -72,6 +72,7 @@ __FBSDID("$FreeBSD$");
 
 #include <net/if.h>
 #include <net/if_var.h>
+#include <net/if_private.h>
 #include <net/vnet.h>
 #include <net/route.h>
 #include <net/pfil.h>
@@ -260,9 +261,9 @@ static struct cdevsw pf_cdevsw = {
 	.d_version =	D_VERSION,
 };
 
-volatile VNET_DEFINE_STATIC(int, pf_pfil_hooked);
+VNET_DEFINE_STATIC(bool, pf_pfil_hooked);
 #define V_pf_pfil_hooked	VNET(pf_pfil_hooked)
-volatile VNET_DEFINE_STATIC(int, pf_pfil_eth_hooked);
+VNET_DEFINE_STATIC(bool, pf_pfil_eth_hooked);
 #define V_pf_pfil_eth_hooked	VNET(pf_pfil_eth_hooked)
 
 /*
@@ -310,6 +311,8 @@ static void
 pfattach_vnet(void)
 {
 	u_int32_t *my_timeout = V_pf_default_rule.timeout;
+
+	bzero(&V_pf_status, sizeof(V_pf_status));
 
 	pf_initialize();
 	pfr_initialize();
@@ -380,11 +383,10 @@ pfattach_vnet(void)
 	my_timeout[PFTM_ADAPTIVE_START] = PFSTATE_ADAPT_START;
 	my_timeout[PFTM_ADAPTIVE_END] = PFSTATE_ADAPT_END;
 
-	bzero(&V_pf_status, sizeof(V_pf_status));
 	V_pf_status.debug = PF_DEBUG_URGENT;
 
-	V_pf_pfil_hooked = 0;
-	V_pf_pfil_eth_hooked = 0;
+	V_pf_pfil_hooked = false;
+	V_pf_pfil_eth_hooked = false;
 
 	/* XXX do our best to avoid a conflict */
 	V_pf_status.hostid = arc4random();
@@ -522,6 +524,8 @@ pf_free_eth_rule(struct pf_keth_rule *rule)
 	pf_qid_unref(rule->qid);
 #endif
 
+	if (rule->bridge_to)
+		pfi_kkif_unref(rule->bridge_to);
 	if (rule->kif)
 		pfi_kkif_unref(rule->kif);
 
@@ -2595,16 +2599,12 @@ pfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags, struct thread *td
 		if (V_pf_status.running)
 			error = EEXIST;
 		else {
-			int cpu;
-
 			hook_pf();
 			if (! TAILQ_EMPTY(V_pf_keth->active.rules))
 				hook_pf_eth();
 			V_pf_status.running = 1;
 			V_pf_status.since = time_second;
-
-			CPU_FOREACH(cpu)
-				V_pf_stateid[cpu] = time_second;
+			new_unrhdr64(&V_pf_stateid, time_second);
 
 			DPFPRINTF(PF_DEBUG_MISC, ("pf: started\n"));
 		}
@@ -2813,7 +2813,7 @@ DIOCGETETHRULE_error:
 		void			*nvlpacked = NULL;
 		struct pf_keth_rule	*rule = NULL, *tail = NULL;
 		struct pf_keth_ruleset	*ruleset = NULL;
-		struct pfi_kkif		*kif = NULL;
+		struct pfi_kkif		*kif = NULL, *bridge_to_kif = NULL;
 		const char		*anchor = "", *anchor_call = "";
 
 #define ERROUT(x)	ERROUT_IOCTL(DIOCADDETHRULE_error, x)
@@ -2865,6 +2865,8 @@ DIOCGETETHRULE_error:
 
 		if (rule->ifname[0])
 			kif = pf_kkif_create(M_WAITOK);
+		if (rule->bridge_to_name[0])
+			bridge_to_kif = pf_kkif_create(M_WAITOK);
 		rule->evaluations = counter_u64_alloc(M_WAITOK);
 		for (int i = 0; i < 2; i++) {
 			rule->packets[i] = counter_u64_alloc(M_WAITOK);
@@ -2880,6 +2882,12 @@ DIOCGETETHRULE_error:
 			pfi_kkif_ref(rule->kif);
 		} else
 			rule->kif = NULL;
+		if (rule->bridge_to_name[0]) {
+			rule->bridge_to = pfi_kkif_attach(bridge_to_kif,
+			    rule->bridge_to_name);
+			pfi_kkif_ref(rule->bridge_to);
+		} else
+			rule->bridge_to = NULL;
 
 #ifdef ALTQ
 		/* set queue IDs */
@@ -5826,6 +5834,8 @@ pf_getstatus(struct pfioc_nv *nv)
 	nvlist_add_number(nvl, "hostid", V_pf_status.hostid);
 	nvlist_add_number(nvl, "states", V_pf_status.states);
 	nvlist_add_number(nvl, "src_nodes", V_pf_status.src_nodes);
+	nvlist_add_bool(nvl, "syncookies_active",
+	    V_pf_status.syncookies_active);
 
 	/* counters */
 	error = pf_add_status_counters(nvl, "counters", V_pf_status.counters,
@@ -5905,7 +5915,7 @@ done:
 }
 
 /*
- * XXX - Check for version missmatch!!!
+ * XXX - Check for version mismatch!!!
  */
 static void
 pf_clear_all_states(void)
@@ -6333,7 +6343,7 @@ errout:
 }
 
 /*
- * XXX - Check for version missmatch!!!
+ * XXX - Check for version mismatch!!!
  */
 
 /*
@@ -6528,21 +6538,20 @@ VNET_DEFINE_STATIC(pfil_hook_t, pf_ip6_out_hook);
 static void
 hook_pf_eth(void)
 {
-	struct pfil_hook_args pha;
-	struct pfil_link_args pla;
+	struct pfil_hook_args pha = {
+		.pa_version = PFIL_VERSION,
+		.pa_modname = "pf",
+		.pa_type = PFIL_TYPE_ETHERNET,
+	};
+	struct pfil_link_args pla = {
+		.pa_version = PFIL_VERSION,
+	};
 	int ret __diagused;
 
-	if (V_pf_pfil_eth_hooked)
+	if (atomic_load_bool(&V_pf_pfil_eth_hooked))
 		return;
 
-	pha.pa_version = PFIL_VERSION;
-	pha.pa_modname = "pf";
-	pha.pa_ruleset = NULL;
-
-	pla.pa_version = PFIL_VERSION;
-
-	pha.pa_type = PFIL_TYPE_ETHERNET;
-	pha.pa_func = pf_eth_check_in;
+	pha.pa_mbuf_chk = pf_eth_check_in;
 	pha.pa_flags = PFIL_IN;
 	pha.pa_rulname = "eth-in";
 	V_pf_eth_in_hook = pfil_add_hook(&pha);
@@ -6551,7 +6560,7 @@ hook_pf_eth(void)
 	pla.pa_hook = V_pf_eth_in_hook;
 	ret = pfil_link(&pla);
 	MPASS(ret == 0);
-	pha.pa_func = pf_eth_check_out;
+	pha.pa_mbuf_chk = pf_eth_check_out;
 	pha.pa_flags = PFIL_OUT;
 	pha.pa_rulname = "eth-out";
 	V_pf_eth_out_hook = pfil_add_hook(&pha);
@@ -6561,28 +6570,27 @@ hook_pf_eth(void)
 	ret = pfil_link(&pla);
 	MPASS(ret == 0);
 
-	V_pf_pfil_eth_hooked = 1;
+	atomic_store_bool(&V_pf_pfil_eth_hooked, true);
 }
 
 static void
 hook_pf(void)
 {
-	struct pfil_hook_args pha;
-	struct pfil_link_args pla;
+	struct pfil_hook_args pha = {
+		.pa_version = PFIL_VERSION,
+		.pa_modname = "pf",
+	};
+	struct pfil_link_args pla = {
+		.pa_version = PFIL_VERSION,
+	};
 	int ret __diagused;
 
-	if (V_pf_pfil_hooked)
+	if (atomic_load_bool(&V_pf_pfil_hooked))
 		return;
-
-	pha.pa_version = PFIL_VERSION;
-	pha.pa_modname = "pf";
-	pha.pa_ruleset = NULL;
-
-	pla.pa_version = PFIL_VERSION;
 
 #ifdef INET
 	pha.pa_type = PFIL_TYPE_IP4;
-	pha.pa_func = pf_check_in;
+	pha.pa_mbuf_chk = pf_check_in;
 	pha.pa_flags = PFIL_IN;
 	pha.pa_rulname = "default-in";
 	V_pf_ip4_in_hook = pfil_add_hook(&pha);
@@ -6591,7 +6599,7 @@ hook_pf(void)
 	pla.pa_hook = V_pf_ip4_in_hook;
 	ret = pfil_link(&pla);
 	MPASS(ret == 0);
-	pha.pa_func = pf_check_out;
+	pha.pa_mbuf_chk = pf_check_out;
 	pha.pa_flags = PFIL_OUT;
 	pha.pa_rulname = "default-out";
 	V_pf_ip4_out_hook = pfil_add_hook(&pha);
@@ -6603,7 +6611,7 @@ hook_pf(void)
 #endif
 #ifdef INET6
 	pha.pa_type = PFIL_TYPE_IP6;
-	pha.pa_func = pf_check6_in;
+	pha.pa_mbuf_chk = pf_check6_in;
 	pha.pa_flags = PFIL_IN;
 	pha.pa_rulname = "default-in6";
 	V_pf_ip6_in_hook = pfil_add_hook(&pha);
@@ -6612,7 +6620,7 @@ hook_pf(void)
 	pla.pa_hook = V_pf_ip6_in_hook;
 	ret = pfil_link(&pla);
 	MPASS(ret == 0);
-	pha.pa_func = pf_check6_out;
+	pha.pa_mbuf_chk = pf_check6_out;
 	pha.pa_rulname = "default-out6";
 	pha.pa_flags = PFIL_OUT;
 	V_pf_ip6_out_hook = pfil_add_hook(&pha);
@@ -6623,27 +6631,27 @@ hook_pf(void)
 	MPASS(ret == 0);
 #endif
 
-	V_pf_pfil_hooked = 1;
+	atomic_store_bool(&V_pf_pfil_hooked, true);
 }
 
 static void
 dehook_pf_eth(void)
 {
 
-	if (V_pf_pfil_eth_hooked == 0)
+	if (!atomic_load_bool(&V_pf_pfil_eth_hooked))
 		return;
 
 	pfil_remove_hook(V_pf_eth_in_hook);
 	pfil_remove_hook(V_pf_eth_out_hook);
 
-	V_pf_pfil_eth_hooked = 0;
+	atomic_store_bool(&V_pf_pfil_eth_hooked, false);
 }
 
 static void
 dehook_pf(void)
 {
 
-	if (V_pf_pfil_hooked == 0)
+	if (!atomic_load_bool(&V_pf_pfil_hooked))
 		return;
 
 #ifdef INET
@@ -6655,7 +6663,7 @@ dehook_pf(void)
 	pfil_remove_hook(V_pf_ip6_out_hook);
 #endif
 
-	V_pf_pfil_hooked = 0;
+	atomic_store_bool(&V_pf_pfil_hooked, false);
 }
 
 static void

@@ -24,6 +24,7 @@ TESTS_SUBDIRS+=		${_netgraph}
 TESTS_SUBDIRS+=		netinet
 TESTS_SUBDIRS+=		netinet6
 TESTS_SUBDIRS+=		netipsec
+TESTS_SUBDIRS+=		netlink
 .if !${MACHINE_ABI:Mpurecap}
 TESTS_SUBDIRS+=		netmap
 .endif

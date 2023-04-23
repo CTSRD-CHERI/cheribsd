@@ -63,9 +63,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
-#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
 #include <sys/abi_compat.h>
-#endif
 #include <sys/kernel.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
@@ -169,7 +167,7 @@ struct msgmap {
 
 static int nfree_msgmaps;	/* # of free map entries */
 static short free_msgmaps;	/* head of linked list of free map entries */
-static struct msg *free_msghdrs;/* list of free msg headers */
+static TAILQ_HEAD(, msg) free_msghdrs;	/* list of free msg headers */
 static char *msgpool;		/* MSGMAX byte long msg buffer pool */
 static struct msgmap *msgmaps;	/* MSGSEG msgmap structures */
 static struct msg *msghdrs;	/* MSGTQL msg headers */
@@ -279,16 +277,14 @@ msginit(void)
 	free_msgmaps = 0;
 	nfree_msgmaps = msginfo.msgseg;
 
+	TAILQ_INIT(&free_msghdrs);
 	for (i = 0; i < msginfo.msgtql; i++) {
 		msghdrs[i].msg_type = 0;
-		if (i > 0)
-			msghdrs[i-1].msg_next = &msghdrs[i];
-		msghdrs[i].msg_next = NULL;
+		TAILQ_INSERT_TAIL(&free_msghdrs, &msghdrs[i], msg_queue);
 #ifdef MAC
 		mac_sysvmsg_init(&msghdrs[i]);
 #endif
     	}
-	free_msghdrs = &msghdrs[0];
 
 	for (i = 0; i < msginfo.msgmni; i++) {
 		msqids[i].u.msg_qbytes = 0;	/* implies entry is available */
@@ -433,8 +429,7 @@ msg_freehdr(struct msg *msghdr)
 	}
 	if (msghdr->msg_spot != -1)
 		panic("msghdr->msg_spot != -1");
-	msghdr->msg_next = free_msghdrs;
-	free_msghdrs = msghdr;
+	TAILQ_INSERT_HEAD(&free_msghdrs, msghdrs, msg_queue);
 #ifdef MAC
 	mac_sysvmsg_cleanup(msghdr);
 #endif
@@ -443,7 +438,7 @@ msg_freehdr(struct msg *msghdr)
 static void
 msq_remove(struct msqid_kernel *msqkptr)
 {
-	struct msg *msghdr;
+	struct msg *msghdr, *tmpmsghdr;
 
 	racct_sub_cred(msqkptr->cred, RACCT_NMSGQ, 1);
 	racct_sub_cred(msqkptr->cred, RACCT_MSGQQUEUED, msqkptr->u.msg_qnum);
@@ -452,16 +447,12 @@ msq_remove(struct msqid_kernel *msqkptr)
 	msqkptr->cred = NULL;
 
 	/* Free the message headers */
-	msghdr = msqkptr->u.__msg_first;
-	while (msghdr != NULL) {
-		struct msg *msghdr_tmp;
-
+	TAILQ_FOREACH_SAFE(msghdr, &msqkptr->queue, msg_queue, tmpmsghdr) {
 		/* Free the segments of each message */
 		msqkptr->u.msg_cbytes -= msghdr->msg_ts;
 		msqkptr->u.msg_qnum--;
-		msghdr_tmp = msghdr;
-		msghdr = msghdr->msg_next;
-		msg_freehdr(msghdr_tmp);
+		TAILQ_REMOVE(&msqkptr->queue, msghdr, msg_queue);
+		msg_freehdr(msghdr);
 	}
 
 	if (msqkptr->u.msg_cbytes != 0)
@@ -595,8 +586,7 @@ kern_msgctl(struct thread *td, int msqid, int cmd, struct msqid_ds *msqbuf)
 		 * thread cannot free a certain msghdr.  The msq will get
 		 * into an inconsistent state.
 		 */
-		for (msghdr = msqkptr->u.__msg_first; msghdr != NULL;
-		    msghdr = msghdr->msg_next) {
+		TAILQ_FOREACH(msghdr, &msqkptr->queue, msg_queue) {
 			error = mac_sysvmsq_check_msgrmid(td->td_ucred, msghdr);
 			if (error != 0)
 				goto done2;
@@ -643,13 +633,6 @@ kern_msgctl(struct thread *td, int msqid, int cmd, struct msqid_ds *msqbuf)
 		*msqbuf = msqkptr->u;
 		if (td->td_ucred->cr_prison != msqkptr->cred->cr_prison)
 			msqbuf->msg_perm.key = IPC_PRIVATE;
-
-		/*
-		 * Try to hide the fact that the structure layout is shared by
-		 * both the kernel and userland.  These pointers are not useful
-		 * to userspace.
-		 */
-		msqbuf->__msg_first = msqbuf->__msg_last = NULL;
 		break;
 
 	default:
@@ -760,8 +743,7 @@ sys_msgget(struct thread *td, struct msgget_args *uap)
 		msqkptr->cred = crhold(cred);
 		/* Make sure that the returned msqid is unique */
 		msqkptr->u.msg_perm.seq = (msqkptr->u.msg_perm.seq + 1) & 0x7fff;
-		msqkptr->u.__msg_first = NULL;
-		msqkptr->u.__msg_last = NULL;
+		TAILQ_INIT(&msqkptr->queue);
 		msqkptr->u.msg_cbytes = 0;
 		msqkptr->u.msg_qnum = 0;
 		msqkptr->u.msg_qbytes = msginfo.msgmnb;
@@ -893,7 +875,7 @@ kern_msgsnd(struct thread *td, int msqid, const void * __capability msgp,
 			DPRINTF(("segs_needed > nfree_msgmaps\n"));
 			need_more_resources = 1;
 		}
-		if (free_msghdrs == NULL) {
+		if (TAILQ_EMPTY(&free_msghdrs)) {
 			DPRINTF(("no more msghdrs\n"));
 			need_more_resources = 1;
 		}
@@ -961,7 +943,7 @@ kern_msgsnd(struct thread *td, int msqid, const void * __capability msgp,
 		panic("segs_needed > nfree_msgmaps");
 	if (msgsz + msqkptr->u.msg_cbytes > msqkptr->u.msg_qbytes)
 		panic("msgsz + msg_cbytes > msg_qbytes");
-	if (free_msghdrs == NULL)
+	if (TAILQ_EMPTY(&free_msghdrs))
 		panic("no more msghdrs");
 
 	/*
@@ -977,8 +959,8 @@ kern_msgsnd(struct thread *td, int msqid, const void * __capability msgp,
 	 * Allocate a message header
 	 */
 
-	msghdr = free_msghdrs;
-	free_msghdrs = msghdr->msg_next;
+	msghdr = TAILQ_FIRST(&free_msghdrs);
+	TAILQ_REMOVE(&free_msghdrs, msghdr, msg_queue);
 	msghdr->msg_spot = -1;
 	msghdr->msg_ts = msgsz;
 	msghdr->msg_type = mtype;
@@ -1100,14 +1082,7 @@ kern_msgsnd(struct thread *td, int msqid, const void * __capability msgp,
 	/*
 	 * Put the message into the queue
 	 */
-	if (msqkptr->u.__msg_first == NULL) {
-		msqkptr->u.__msg_first = msghdr;
-		msqkptr->u.__msg_last = msghdr;
-	} else {
-		msqkptr->u.__msg_last->msg_next = msghdr;
-		msqkptr->u.__msg_last = msghdr;
-	}
-	msqkptr->u.__msg_last->msg_next = NULL;
+	TAILQ_INSERT_TAIL(&msqkptr->queue, msghdr, msg_queue);
 
 	msqkptr->u.msg_cbytes += msghdr->msg_ts;
 	msqkptr->u.msg_qnum++;
@@ -1214,8 +1189,8 @@ kern_msgrcv(struct thread *td, int msqid, void * __capability msgp,
 	msghdr = NULL;
 	while (msghdr == NULL) {
 		if (msgtyp == 0) {
-			msghdr = msqkptr->u.__msg_first;
-			if (msghdr != NULL) {
+			if (!TAILQ_EMPTY(&msqkptr->queue)) {
+				msghdr = TAILQ_FIRST(&msqkptr->queue);
 				if (msgsz < msghdr->msg_ts &&
 				    (msgflg & MSG_NOERROR) == 0) {
 					DPRINTF(("first message on the queue "
@@ -1230,23 +1205,11 @@ kern_msgrcv(struct thread *td, int msqid, void * __capability msgp,
 				if (error != 0)
 					goto done2;
 #endif
-				if (msqkptr->u.__msg_first ==
-				    msqkptr->u.__msg_last) {
-					msqkptr->u.__msg_first = NULL;
-					msqkptr->u.__msg_last = NULL;
-				} else {
-					msqkptr->u.__msg_first = msghdr->msg_next;
-					if (msqkptr->u.__msg_first == NULL)
-						panic("msg_first/last screwed up #1");
-				}
+				TAILQ_REMOVE(&msqkptr->queue, msghdr,
+				    msg_queue);
 			}
 		} else {
-			struct msg *previous;
-			struct msg **prev;
-
-			previous = NULL;
-			prev = &(msqkptr->u.__msg_first);
-			while ((msghdr = *prev) != NULL) {
+			TAILQ_FOREACH(msghdr, &msqkptr->queue, msg_queue) {
 				/*
 				 * Is this message's type an exact match or is
 				 * this message's type less than or equal to
@@ -1276,28 +1239,9 @@ kern_msgrcv(struct thread *td, int msqid, void * __capability msgp,
 					if (error != 0)
 						goto done2;
 #endif
-					*prev = msghdr->msg_next;
-					if (msghdr == msqkptr->u.__msg_last) {
-						if (previous == NULL) {
-							if (prev !=
-							    &msqkptr->u.__msg_first)
-								panic("__msg_first/last screwed up #2");
-							msqkptr->u.__msg_first =
-							    NULL;
-							msqkptr->u.__msg_last =
-							    NULL;
-						} else {
-							if (prev ==
-							    &msqkptr->u.__msg_first)
-								panic("__msg_first/last screwed up #3");
-							msqkptr->u.__msg_last =
-							    previous;
-						}
-					}
+					TAILQ_REMOVE(&msqkptr->queue, msghdr, msg_queue);
 					break;
 				}
-				previous = msghdr;
-				prev = &(msghdr->msg_next);
 			}
 		}
 
@@ -1448,6 +1392,7 @@ static int
 sysctl_msqids(SYSCTL_HANDLER_ARGS)
 {
 	struct msqid_kernel tmsqk;
+	struct msqid_kernel_sysctl tmsqk_u;
 #ifdef COMPAT_FREEBSD32
 	struct msqid_kernel32 tmsqk32;
 #endif
@@ -1478,7 +1423,7 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 			bzero(&tmsqk32, sizeof(tmsqk32));
 			freebsd32_ipcperm_out(&tmsqk.u.msg_perm,
 			    &tmsqk32.u.msg_perm);
-			/* Don't copy u.msg_first or u.msg_last */
+			/* Don't copy u.__msg_first or u.__msg_last */
 			CP(tmsqk, tmsqk32, u.msg_cbytes);
 			CP(tmsqk, tmsqk32, u.msg_qnum);
 			CP(tmsqk, tmsqk32, u.msg_qbytes);
@@ -1496,7 +1441,7 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 		if (!SV_CURPROC_FLAG(SV_CHERI)) {
 			bzero(&tmsqk64, sizeof(tmsqk64));
 			CP(tmsqk, tmsqk64, u.msg_perm);
-			/* Don't copy u.msg_first or u.msg_last */
+			/* Don't copy u.__msg_first or u.__msg_last */
 			CP(tmsqk, tmsqk64, u.msg_cbytes);
 			CP(tmsqk, tmsqk64, u.msg_qnum);
 			CP(tmsqk, tmsqk64, u.msg_qbytes);
@@ -1511,18 +1456,20 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 		} else
 #endif
 		{
-			/* Don't leak kernel pointers */
-			tmsqk.u.__msg_first = NULL;
-			tmsqk.u.__msg_last = NULL;
-			tmsqk.label = NULL;
-			tmsqk.cred = NULL;
-			/*
-			 * XXX: some padding also exists, but we take care to
-			 * allocate our pool of msqid_kernel structs with
-			 * zeroed memory so this should be OK.
-			 */
-			outaddr = &tmsqk;
-			outsize = sizeof(tmsqk);
+			bzero(&tmsqk_u, sizeof(tmsqk_u));
+			CP(tmsqk, tmsqk_u, u.msg_perm);
+			/* Don't copy u.__msg_first or u.__msg_last */
+			CP(tmsqk, tmsqk_u, u.msg_cbytes);
+			CP(tmsqk, tmsqk_u, u.msg_qnum);
+			CP(tmsqk, tmsqk_u, u.msg_qbytes);
+			CP(tmsqk, tmsqk_u, u.msg_lspid);
+			CP(tmsqk, tmsqk_u, u.msg_lrpid);
+			CP(tmsqk, tmsqk_u, u.msg_stime);
+			CP(tmsqk, tmsqk_u, u.msg_rtime);
+			CP(tmsqk, tmsqk_u, u.msg_ctime);
+			/* Don't copy label or cred */
+			outaddr = &tmsqk_u;
+			outsize = sizeof(tmsqk_u);
 		}
 		error = SYSCTL_OUT(req, outaddr, outsize);
 		if (error != 0)
@@ -1764,8 +1711,7 @@ freebsd7_freebsd32_msgctl(struct thread *td,
 		if (error)
 			return (error);
 		freebsd32_ipcperm_old_in(&msqbuf32.msg_perm, &msqbuf.msg_perm);
-		PTRIN_CP(msqbuf32, msqbuf, __msg_first);
-		PTRIN_CP(msqbuf32, msqbuf, __msg_last);
+		bzero(&msqbuf, sizeof(msqbuf));
 		CP(msqbuf32, msqbuf, msg_cbytes);
 		CP(msqbuf32, msqbuf, msg_qnum);
 		CP(msqbuf32, msqbuf, msg_qbytes);
@@ -1781,8 +1727,7 @@ freebsd7_freebsd32_msgctl(struct thread *td,
 	if (uap->cmd == IPC_STAT) {
 		bzero(&msqbuf32, sizeof(msqbuf32));
 		freebsd32_ipcperm_old_out(&msqbuf.msg_perm, &msqbuf32.msg_perm);
-		PTROUT_CP(msqbuf, msqbuf32, __msg_first);
-		PTROUT_CP(msqbuf, msqbuf32, __msg_last);
+		/* Don't copy unused __msg_* */
 		CP(msqbuf, msqbuf32, msg_cbytes);
 		CP(msqbuf, msqbuf32, msg_qnum);
 		CP(msqbuf, msqbuf32, msg_qbytes);
@@ -1809,8 +1754,7 @@ freebsd32_msgctl(struct thread *td, struct freebsd32_msgctl_args *uap)
 		if (error)
 			return (error);
 		freebsd32_ipcperm_in(&msqbuf32.msg_perm, &msqbuf.msg_perm);
-		PTRIN_CP(msqbuf32, msqbuf, __msg_first);
-		PTRIN_CP(msqbuf32, msqbuf, __msg_last);
+		bzero(&msqbuf, sizeof(msqbuf));
 		CP(msqbuf32, msqbuf, msg_cbytes);
 		CP(msqbuf32, msqbuf, msg_qnum);
 		CP(msqbuf32, msqbuf, msg_qbytes);
@@ -1824,9 +1768,9 @@ freebsd32_msgctl(struct thread *td, struct freebsd32_msgctl_args *uap)
 	if (error)
 		return (error);
 	if (uap->cmd == IPC_STAT) {
+		bzero(&msqbuf32, sizeof(msqbuf32));
 		freebsd32_ipcperm_out(&msqbuf.msg_perm, &msqbuf32.msg_perm);
-		PTROUT_CP(msqbuf, msqbuf32, __msg_first);
-		PTROUT_CP(msqbuf, msqbuf32, __msg_last);
+		/* Don't copy unused __msg_* */
 		CP(msqbuf, msqbuf32, msg_cbytes);
 		CP(msqbuf, msqbuf32, msg_qnum);
 		CP(msqbuf, msqbuf32, msg_qbytes);
@@ -1915,8 +1859,7 @@ freebsd7_freebsd64_msgctl(struct thread *td,
 		if (error)
 			return (error);
 		ipcperm_old2new(&msqbuf64.msg_perm, &msqbuf.msg_perm);
-		msqbuf.__msg_first = NULL;	/* Unused */
-		msqbuf.__msg_last = NULL;	/* Unused */
+		bzero(&msqbuf, sizeof(msqbuf));
 		CP(msqbuf64, msqbuf, msg_cbytes);
 		CP(msqbuf64, msqbuf, msg_qnum);
 		CP(msqbuf64, msqbuf, msg_qbytes);
@@ -1961,8 +1904,7 @@ freebsd64_msgctl(struct thread *td, struct freebsd64_msgctl_args *uap)
 		if (error)
 			return (error);
 		CP(msqbuf64, msqbuf, msg_perm);
-		msqbuf.__msg_first = NULL;	/* Unused */
-		msqbuf.__msg_last = NULL;	/* Unused */
+		bzero(&msqbuf, sizeof(msqbuf));
 		CP(msqbuf64, msqbuf, msg_cbytes);
 		CP(msqbuf64, msqbuf, msg_qnum);
 		CP(msqbuf64, msqbuf, msg_qbytes);
@@ -1977,7 +1919,7 @@ freebsd64_msgctl(struct thread *td, struct freebsd64_msgctl_args *uap)
 		return (error);
 	if (uap->cmd == IPC_STAT) {
 		bzero(&msqbuf64, sizeof(msqbuf64));
-		/* Don't leak kernel points in __msg_* */
+		/* Don't leak kernel pointers in __msg_* */
 		CP(msqbuf, msqbuf64, msg_perm);
 		CP(msqbuf, msqbuf64, msg_cbytes);
 		CP(msqbuf, msqbuf64, msg_qnum);
@@ -2081,8 +2023,7 @@ freebsd7_msgctl(struct thread *td, struct freebsd7_msgctl_args *uap)
 		if (error)
 			return (error);
 		ipcperm_old2new(&msqold.msg_perm, &msqbuf.msg_perm);
-		CP(msqold, msqbuf, __msg_first);
-		CP(msqold, msqbuf, __msg_last);
+		bzero(&msqbuf, sizeof(msqbuf));
 		CP(msqold, msqbuf, msg_cbytes);
 		CP(msqold, msqbuf, msg_qnum);
 		CP(msqold, msqbuf, msg_qbytes);
@@ -2098,8 +2039,7 @@ freebsd7_msgctl(struct thread *td, struct freebsd7_msgctl_args *uap)
 	if (uap->cmd == IPC_STAT) {
 		bzero(&msqold, sizeof(msqold));
 		ipcperm_new2old(&msqbuf.msg_perm, &msqold.msg_perm);
-		CP(msqbuf, msqold, __msg_first);
-		CP(msqbuf, msqold, __msg_last);
+		/* Don't copy unused __msg_* */
 		CP(msqbuf, msqold, msg_cbytes);
 		CP(msqbuf, msqold, msg_qnum);
 		CP(msqbuf, msqold, msg_qbytes);

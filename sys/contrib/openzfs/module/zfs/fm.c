@@ -380,8 +380,7 @@ zfs_zevent_wait(zfs_zevent_t *ze)
 			break;
 		}
 
-		error = cv_wait_sig(&zevent_cv, &zevent_lock);
-		if (signal_pending(current)) {
+		if (cv_wait_sig(&zevent_cv, &zevent_lock) == 0) {
 			error = SET_ERROR(EINTR);
 			break;
 		} else if (!list_is_empty(&zevent_list)) {
@@ -955,6 +954,7 @@ fm_fmri_hc_create(nvlist_t *fmri, int version, const nvlist_t *auth,
 			}
 			atomic_inc_64(
 			    &erpt_kstat_data.fmri_set_failed.value.ui64);
+			va_end(ap);
 			return;
 		}
 	}

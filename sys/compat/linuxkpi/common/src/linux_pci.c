@@ -271,6 +271,23 @@ linux_pci_find(device_t dev, const struct pci_device_id **idp)
 	return (NULL);
 }
 
+struct pci_dev *
+lkpi_pci_get_device(uint16_t vendor, uint16_t device, struct pci_dev *odev)
+{
+	struct pci_dev *pdev;
+
+	KASSERT(odev == NULL, ("%s: odev argument not yet supported\n", __func__));
+
+	spin_lock(&pci_lock);
+	list_for_each_entry(pdev, &pci_devices, links) {
+		if (pdev->vendor == vendor && pdev->device == device)
+			break;
+	}
+	spin_unlock(&pci_lock);
+
+	return (pdev);
+}
+
 static void
 lkpi_pci_dev_release(struct device *dev)
 {
@@ -290,6 +307,9 @@ lkpifill_pci_dev(device_t dev, struct pci_dev *pdev)
 	pdev->subsystem_device = pci_get_subdevice(dev);
 	pdev->class = pci_get_class(dev);
 	pdev->revision = pci_get_revid(dev);
+	pdev->path_name = kasprintf(GFP_KERNEL, "%04d:%02d:%02d.%d",
+	    pci_get_domain(dev), pci_get_bus(dev), pci_get_slot(dev),
+	    pci_get_function(dev));
 	pdev->bus = malloc(sizeof(*pdev->bus), M_DEVBUF, M_WAITOK | M_ZERO);
 	/*
 	 * This should be the upstream bridge; pci_upstream_bridge()
@@ -303,6 +323,11 @@ lkpifill_pci_dev(device_t dev, struct pci_dev *pdev)
 	pdev->dev.parent = &linux_root_device;
 	pdev->dev.release = lkpi_pci_dev_release;
 	INIT_LIST_HEAD(&pdev->dev.irqents);
+
+	if (pci_msi_count(dev) > 0)
+		pdev->msi_desc = malloc(pci_msi_count(dev) *
+		    sizeof(*pdev->msi_desc), M_DEVBUF, M_WAITOK | M_ZERO);
+
 	kobject_init(&pdev->dev.kobj, &linux_dev_ktype);
 	kobject_set_name(&pdev->dev.kobj, device_get_nameunit(dev));
 	kobject_add(&pdev->dev.kobj, &linux_root_device.kobj,
@@ -315,6 +340,7 @@ static void
 lkpinew_pci_dev_release(struct device *dev)
 {
 	struct pci_dev *pdev;
+	int i;
 
 	pdev = to_pci_dev(dev);
 	if (pdev->root != NULL)
@@ -322,6 +348,12 @@ lkpinew_pci_dev_release(struct device *dev)
 	if (pdev->bus->self != pdev)
 		pci_dev_put(pdev->bus->self);
 	free(pdev->bus, M_DEVBUF);
+	if (pdev->msi_desc != NULL) {
+		for (i = pci_msi_count(pdev->dev.bsddev) - 1; i >= 0; i--)
+			free(pdev->msi_desc[i], M_DEVBUF);
+		free(pdev->msi_desc, M_DEVBUF);
+	}
+	kfree(pdev->path_name);
 	free(pdev, M_DEVBUF);
 }
 
@@ -931,7 +963,9 @@ out:
 			return (pdev->dev.irq_end - pdev->dev.irq_start);
 	}
 	if (flags & PCI_IRQ_MSI) {
-		error = pci_enable_msi(pdev);
+		if (pci_msi_count(pdev->dev.bsddev) < minv)
+			return (-ENOSPC);
+		error = _lkpi_pci_enable_msi_range(pdev, minv, maxv);
 		if (error == 0 && pdev->msi_enabled)
 			return (pdev->dev.irq_end - pdev->dev.irq_start);
 	}
@@ -941,6 +975,57 @@ out:
 	}
 
 	return (-EINVAL);
+}
+
+struct msi_desc *
+lkpi_pci_msi_desc_alloc(int irq)
+{
+	struct device *dev;
+	struct pci_dev *pdev;
+	struct msi_desc *desc;
+	struct pci_devinfo *dinfo;
+	struct pcicfg_msi *msi;
+	int vec;
+
+	dev = linux_pci_find_irq_dev(irq);
+	if (dev == NULL)
+		return (NULL);
+
+	pdev = to_pci_dev(dev);
+
+	if (pdev->msi_desc == NULL)
+		return (NULL);
+
+	if (irq < pdev->dev.irq_start || irq >= pdev->dev.irq_end)
+		return (NULL);
+
+	vec = pdev->dev.irq_start - irq;
+
+	if (pdev->msi_desc[vec] != NULL)
+		return (pdev->msi_desc[vec]);
+
+	dinfo = device_get_ivars(dev->bsddev);
+	msi = &dinfo->cfg.msi;
+
+	desc = malloc(sizeof(*desc), M_DEVBUF, M_WAITOK | M_ZERO);
+
+	desc->msi_attrib.is_64 =
+	   (msi->msi_ctrl & PCIM_MSICTRL_64BIT) ? true : false;
+	desc->msg.data = msi->msi_data;
+
+	pdev->msi_desc[vec] = desc;
+
+	return (desc);
+}
+
+bool
+pci_device_is_present(struct pci_dev *pdev)
+{
+	device_t dev;
+
+	dev = pdev->dev.bsddev;
+
+	return (bus_child_present(dev));
 }
 
 CTASSERT(sizeof(dma_addr_t) <= sizeof(uint64_t));
@@ -1165,7 +1250,7 @@ linuxkpi_dmam_alloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_ha
 	struct lkpi_devres_dmam_coherent *dr;
 
 	dr = lkpi_devres_alloc(lkpi_dmam_free_coherent,
-	   sizeof(*dr), GFP_KERNEL | __GFP_ZERO);
+	    sizeof(*dr), GFP_KERNEL | __GFP_ZERO);
 
 	if (dr == NULL)
 		return (NULL);

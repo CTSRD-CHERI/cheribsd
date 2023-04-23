@@ -62,6 +62,7 @@ static struct nvme_opcode_string admin_opcode[] = {
 	{ NVME_OPC_SET_FEATURES, "SET FEATURES" },
 	{ NVME_OPC_GET_FEATURES, "GET FEATURES" },
 	{ NVME_OPC_ASYNC_EVENT_REQUEST, "ASYNC EVENT REQUEST" },
+	{ NVME_OPC_NAMESPACE_MANAGEMENT, "NAMESPACE MANAGEMENT" },
 	{ NVME_OPC_FIRMWARE_ACTIVATE, "FIRMWARE ACTIVATE" },
 	{ NVME_OPC_FIRMWARE_IMAGE_DOWNLOAD, "FIRMWARE IMAGE DOWNLOAD" },
 	{ NVME_OPC_DEVICE_SELF_TEST, "DEVICE SELF-TEST" },
@@ -1175,8 +1176,7 @@ _nvme_qpair_submit_request(struct nvme_qpair *qpair, struct nvme_request *req)
 
 	TAILQ_REMOVE(&qpair->free_tr, tr, tailq);
 	TAILQ_INSERT_TAIL(&qpair->outstanding_tr, tr, tailq);
-	if (!qpair->timer_armed)
-		tr->deadline = SBT_MAX;
+	tr->deadline = SBT_MAX;
 	tr->req = req;
 
 	switch (req->type) {

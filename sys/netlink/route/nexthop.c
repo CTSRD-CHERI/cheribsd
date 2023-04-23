@@ -32,6 +32,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_route.h"
 #include <sys/types.h>
 #include <sys/ck.h>
+#include <sys/epoch.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/rmlock.h>
@@ -47,14 +48,13 @@ __FBSDID("$FreeBSD$");
 #include <netinet6/scope6_var.h>
 #include <netlink/netlink.h>
 #include <netlink/netlink_ctl.h>
-#include <netlink/netlink_var.h>
 #include <netlink/netlink_route.h>
 #include <netlink/route/route_var.h>
 
 #define	DEBUG_MOD_NAME	nl_nhop
 #define	DEBUG_MAX_LEVEL	LOG_DEBUG3
 #include <netlink/netlink_debug.h>
-_DECLARE_DEBUG(LOG_DEBUG3);
+_DECLARE_DEBUG(LOG_DEBUG);
 
 /*
  * This file contains the logic to maintain kernel nexthops and
@@ -553,8 +553,7 @@ delete_unhop(struct unhop_ctl *ctl, struct nlmsghdr *hdr, uint32_t uidx)
 
 	while (unhop_base != NULL) {
 		unhop_chain = unhop_base->un_nextchild;
-		epoch_call(net_epoch_preempt, destroy_unhop_epoch,
-		    &unhop_base->un_epoch_ctx);
+		NET_EPOCH_CALL(destroy_unhop_epoch, &unhop_base->un_epoch_ctx);
 		unhop_base = unhop_chain;
 	}
 
@@ -590,7 +589,7 @@ consider_resize(struct unhop_ctl *ctl, uint32_t new_size)
 }
 
 static bool __noinline
-vnet_init_unhops()
+vnet_init_unhops(void)
 {
         uint32_t num_buckets = 16;
         size_t alloc_size = CHT_SLIST_GET_RESIZE_SIZE(num_buckets);
@@ -632,7 +631,7 @@ vnet_destroy_unhops(const void *unused __unused)
 	V_un_ctl = NULL;
 
 	/* Wait till all unhop users finish their reads */
-	epoch_wait_preempt(net_epoch_preempt);
+	NET_EPOCH_WAIT();
 
 	UN_WLOCK(ctl);
 	CHT_SLIST_FOREACH_SAFE(&ctl->un_head, unhop, unhop, tmp) {
@@ -742,8 +741,34 @@ newnhg(struct unhop_ctl *ctl, struct nl_parsed_nhop *attrs, struct user_nhop *un
 	return (0);
 }
 
+/*
+ * Sets nexthop @nh gateway specified by @gw.
+ * If gateway is IPv6 link-local, alters @gw to include scopeid equal to
+ * @ifp ifindex.
+ * Returns 0 on success or errno.
+ */
+int
+nl_set_nexthop_gw(struct nhop_object *nh, struct sockaddr *gw, struct ifnet *ifp,
+    struct nl_pstate *npt)
+{
+#ifdef INET6
+	if (gw->sa_family == AF_INET6) {
+		struct sockaddr_in6 *gw6 = (struct sockaddr_in6 *)gw;
+		if (IN6_IS_ADDR_LINKLOCAL(&gw6->sin6_addr)) {
+			if (ifp == NULL) {
+				NLMSG_REPORT_ERR_MSG(npt, "interface not set");
+				return (EINVAL);
+			}
+			in6_set_unicast_scopeid(&gw6->sin6_addr, ifp->if_index);
+		}
+	}
+#endif
+	nhop_set_gw(nh, gw, true);
+	return (0);
+}
+
 static int
-newnhop(struct nl_parsed_nhop *attrs, struct user_nhop *unhop)
+newnhop(struct nl_parsed_nhop *attrs, struct user_nhop *unhop, struct nl_pstate *npt)
 {
 	struct ifaddr *ifa = NULL;
 	struct nhop_object *nh;
@@ -751,17 +776,17 @@ newnhop(struct nl_parsed_nhop *attrs, struct user_nhop *unhop)
 
 	if (!attrs->nha_blackhole) {
 		if (attrs->nha_gw == NULL) {
-			NL_LOG(LOG_DEBUG, "missing NHA_GATEWAY");
+			NLMSG_REPORT_ERR_MSG(npt, "missing NHA_GATEWAY");
 			return (EINVAL);
 		}
 		if (attrs->nha_oif == NULL) {
-			NL_LOG(LOG_DEBUG, "missing NHA_OIF");
+			NLMSG_REPORT_ERR_MSG(npt, "missing NHA_OIF");
 			return (EINVAL);
 		}
 		if (ifa == NULL)
 			ifa = ifaof_ifpforaddr(attrs->nha_gw, attrs->nha_oif);
 		if (ifa == NULL) {
-			NL_LOG(LOG_DEBUG, "Unable to determine default source IP");
+			NLMSG_REPORT_ERR_MSG(npt, "Unable to determine default source IP");
 			return (EINVAL);
 		}
 	}
@@ -778,7 +803,11 @@ newnhop(struct nl_parsed_nhop *attrs, struct user_nhop *unhop)
 	if (attrs->nha_blackhole)
 		nhop_set_blackhole(nh, NHF_BLACKHOLE);
 	else {
-		nhop_set_gw(nh, attrs->nha_gw, true);
+		error = nl_set_nexthop_gw(nh, attrs->nha_gw, attrs->nha_oif, npt);
+		if (error != 0) {
+			nhop_free(nh);
+			return (error);
+		}
 		nhop_set_transmit_ifp(nh, attrs->nha_oif);
 		nhop_set_src(nh, ifa);
 	}
@@ -840,7 +869,7 @@ rtnl_handle_newnhop(struct nlmsghdr *hdr, struct nlpcb *nlp,
 	if (attrs.nha_group)
 		error = newnhg(ctl, &attrs, unhop);
 	else
-		error = newnhop(&attrs, unhop);
+		error = newnhop(&attrs, unhop, npt);
 
 	if (error != 0) {
 		free(unhop, M_NETLINK);
@@ -998,7 +1027,7 @@ static const struct rtnl_cmd_handler cmd_handlers[] = {
 static const struct nlhdr_parser *all_parsers[] = { &nhmsg_parser };
 
 void
-rtnl_nexthops_init()
+rtnl_nexthops_init(void)
 {
 	NL_VERIFY_PARSERS(all_parsers);
 	rtnl_register_messages(cmd_handlers, NL_ARRAY_LEN(cmd_handlers));
