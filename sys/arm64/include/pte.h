@@ -60,6 +60,12 @@ typedef	uint64_t	pt_entry_t;		/* page table entry */
 #define	ATTR_SC			(1UL << 60)
 #define	ATTR_CDBM		(1UL << 59)
 #endif
+
+#define BASE_MASK		~ATTR_MASK
+#define BASE_ADDR(x)		((x) & BASE_MASK)
+
+#define PTE_TO_PHYS(pte)	BASE_ADDR(pte)
+
 /* Bits 58:55 are reserved for software */
 #define	ATTR_SW_UNUSED1		(1UL << 58)
 #define	ATTR_SW_NO_PROMOTE	(1UL << 57)
