@@ -109,6 +109,26 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/smbios/smbios.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+_Static_assert(sizeof(struct pcb) == 1424, "struct pcb is incorrect size");
+_Static_assert(offsetof(struct pcb, pcb_fpusaved) == 336,
+    "pcb_fpusaved changed offset");
+_Static_assert(offsetof(struct pcb, pcb_fpustate) == 368,
+    "pcb_fpustate changed offset");
+#elif __has_feature(capabilities)
+_Static_assert(sizeof(struct pcb) == 1296, "struct pcb is incorrect size");
+_Static_assert(offsetof(struct pcb, pcb_fpusaved) == 224,
+    "pcb_fpusaved changed offset");
+_Static_assert(offsetof(struct pcb, pcb_fpustate) == 240,
+    "pcb_fpustate changed offset");
+#else
+_Static_assert(sizeof(struct pcb) == 1216, "struct pcb is incorrect size");
+_Static_assert(offsetof(struct pcb, pcb_fpusaved) == 136,
+    "pcb_fpusaved changed offset");
+_Static_assert(offsetof(struct pcb, pcb_fpustate) == 160,
+    "pcb_fpustate changed offset");
+#endif
+
 enum arm64_bus arm64_bus_method = ARM64_BUS_NONE;
 
 /*
