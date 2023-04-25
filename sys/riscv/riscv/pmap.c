@@ -998,12 +998,22 @@ pmap_extract_and_hold(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
 	pt_entry_t *l3p, l3;
 	vm_paddr_t phys;
 	vm_page_t m;
+	bool use;
 
 	m = NULL;
 	PMAP_LOCK(pmap);
 	l3p = pmap_l3(pmap, va);
 	if (l3p != NULL && (l3 = pmap_load(l3p)) != 0) {
-		if ((l3 & PTE_W) != 0 || (prot & VM_PROT_WRITE) == 0) {
+		use = true;
+		if ((prot & VM_PROT_WRITE) != 0 && (l3 & PTE_W) == 0)
+			use = false;
+#if __has_feature(capabilities)
+		if ((prot & VM_PROT_READ_CAP) != 0 && (l3 & PTE_CR) == 0)
+			use = false;
+		if ((prot & VM_PROT_WRITE_CAP) != 0 && (l3 & PTE_CW) == 0)
+			use = false;
+#endif
+		if (use) {
 			phys = PTE_TO_PHYS(l3);
 			m = PHYS_TO_VM_PAGE(phys);
 			if (!vm_page_wire_mapped(m))

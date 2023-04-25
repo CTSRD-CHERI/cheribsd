@@ -109,7 +109,7 @@ kern_extattrctl(struct thread *td, const char * __capability path, int cmd,
 		if (error)
 			return (error);
 		filename_vp = nd.ni_vp;
-		NDFREE(&nd, NDF_NO_VP_RELE);
+		NDFREE_PNBUF(&nd);
 	}
 
 	/* path is always defined. */
@@ -121,13 +121,15 @@ kern_extattrctl(struct thread *td, const char * __capability path, int cmd,
 	mp = nd.ni_vp->v_mount;
 	error = vfs_busy(mp, 0);
 	if (error) {
-		NDFREE(&nd, 0);
+		vput(nd.ni_vp);
+		NDFREE_PNBUF(&nd);
 		mp = NULL;
 		goto out;
 	}
 	VOP_UNLOCK(nd.ni_vp);
 	error = vn_start_write(nd.ni_vp, &mp_writable, V_WAIT | V_PCATCH);
-	NDFREE(&nd, NDF_NO_VP_UNLOCK);
+	vrele(nd.ni_vp);
+	NDFREE_PNBUF(&nd);
 	if (error)
 		goto out;
 	if (filename_vp != NULL) {

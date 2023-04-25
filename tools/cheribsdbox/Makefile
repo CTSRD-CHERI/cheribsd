@@ -141,6 +141,7 @@ CRUNCH_PROGS_bin+=	cat \
 		rmdir \
 		sleep \
 		stty \
+		timeout \
 		test \
 		uuidgen
 
@@ -267,7 +268,6 @@ CRUNCH_PROGS_usr.bin+= \
 		tee \
 		tftp \
 		time \
-		timeout \
 		top \
 		touch \
 		tr \

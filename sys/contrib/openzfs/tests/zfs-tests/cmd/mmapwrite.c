@@ -52,6 +52,7 @@
  */
 
 #define	NORMAL_WRITE_TH_NUM	2
+#define	MAX_WRITE_BYTES	262144000
 
 static void *
 normal_writer(void *filename)
@@ -67,18 +68,25 @@ normal_writer(void *filename)
 	}
 
 	char buf = 'z';
-	while (1) {
+	off_t bytes_written = 0;
+
+	while (bytes_written < MAX_WRITE_BYTES) {
 		write_num = write(fd, &buf, 1);
 		if (write_num == 0) {
 			err(1, "write failed!");
 			break;
 		}
-		if (lseek(fd, page_size, SEEK_CUR) == -1) {
+		if ((bytes_written = lseek(fd, page_size, SEEK_CUR)) == -1) {
 			err(1, "lseek failed on %s: %s", file_path,
 			    strerror(errno));
 			break;
 		}
 	}
+
+	if (close(fd) != 0)
+		err(1, "failed to close file");
+
+	return (NULL);
 }
 
 static void *
@@ -88,29 +96,21 @@ map_writer(void *filename)
 	int ret = 0;
 	char *buf = NULL;
 	int page_size = getpagesize();
-	int op_errno = 0;
 	char *file_path = filename;
 
 	while (1) {
-		ret = access(file_path, F_OK);
-		if (ret) {
-			op_errno = errno;
-			if (op_errno == ENOENT) {
+		fd = open(file_path, O_RDWR);
+		if (fd == -1) {
+			if (errno == ENOENT) {
 				fd = open(file_path, O_RDWR | O_CREAT, 0777);
 				if (fd == -1) {
 					err(1, "open file failed");
 				}
-
 				ret = ftruncate(fd, page_size);
 				if (ret == -1) {
 					err(1, "truncate file failed");
 				}
 			} else {
-				err(1, "access file failed!");
-			}
-		} else {
-			fd = open(file_path, O_RDWR, 0777);
-			if (fd == -1) {
 				err(1, "open file failed");
 			}
 		}

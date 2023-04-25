@@ -41,6 +41,8 @@
  *	@(#)procfs_status.c	8.4 (Berkeley) 6/15/94
  */
 
+#include "opt_inet.h"
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -85,6 +87,10 @@ __FBSDID("$FreeBSD$");
 #include <net/if.h>
 #include <net/if_var.h>
 #include <net/if_types.h>
+
+#include <net/route.h>
+#include <net/route/nhop.h>
+#include <net/route/route_ctl.h>
 
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
@@ -1470,26 +1476,79 @@ linprocfs_doprocmem(PFS_FILL_ARGS)
 	return (error);
 }
 
+struct linux_ifname_cb_s {
+	struct ifnet *ifp;
+	int ethno;
+	char *buffer;
+	size_t buflen;
+};
+
+static int
+linux_ifname_cb(if_t ifp, void *arg)
+{
+	struct linux_ifname_cb_s *cbs = arg;
+
+	if (ifp == cbs->ifp)
+		return (snprintf(cbs->buffer, cbs->buflen, "eth%d", cbs->ethno));
+	if (!linux_use_real_ifname(ifp))
+		cbs->ethno++;
+	return (0);
+}
+
 static int
 linux_ifname(struct ifnet *ifp, char *buffer, size_t buflen)
 {
-	struct ifnet *ifscan;
-	int ethno;
+	struct linux_ifname_cb_s arg;
 
 	IFNET_RLOCK_ASSERT();
 
+	arg.ifp = ifp;
+	arg.buffer = buffer;
+	arg.buflen = buflen;
+	arg.ethno = 0;
+
 	/* Short-circuit non ethernet interfaces */
 	if (linux_use_real_ifname(ifp))
-		return (strlcpy(buffer, ifp->if_xname, buflen));
+		return (strlcpy(buffer, if_name(ifp), buflen));
 
 	/* Determine the (relative) unit number for ethernet interfaces */
-	ethno = 0;
-	CK_STAILQ_FOREACH(ifscan, &V_ifnet, if_link) {
-		if (ifscan == ifp)
-			return (snprintf(buffer, buflen, "eth%d", ethno));
-		if (!linux_use_real_ifname(ifscan))
-			ethno++;
-	}
+	return (if_foreach(linux_ifname_cb, &arg));
+}
+
+static int
+linprocfs_donetdev_cb(if_t ifp, void *arg)
+{
+	char ifname[16]; /* XXX LINUX_IFNAMSIZ */
+	struct sbuf *sb = arg;
+
+	linux_ifname(ifp, ifname, sizeof ifname);
+	sbuf_printf(sb, "%6.6s: ", ifname);
+	sbuf_printf(sb, "%7ju %7ju %4ju %4ju %4lu %5lu %10lu %9ju ",
+	    (uintmax_t )if_getcounter(ifp, IFCOUNTER_IBYTES),
+	    (uintmax_t )if_getcounter(ifp, IFCOUNTER_IPACKETS),
+	    (uintmax_t )if_getcounter(ifp, IFCOUNTER_IERRORS),
+	    (uintmax_t )if_getcounter(ifp, IFCOUNTER_IQDROPS),
+						/* rx_missed_errors */
+	    0UL,				/* rx_fifo_errors */
+	    0UL,				/* rx_length_errors +
+						 * rx_over_errors +
+						 * rx_crc_errors +
+						 * rx_frame_errors */
+	    0UL,				/* rx_compressed */
+	    (uintmax_t )if_getcounter(ifp, IFCOUNTER_IMCASTS));
+						/* XXX-BZ rx only? */
+	sbuf_printf(sb, "%8ju %7ju %4ju %4ju %4lu %5ju %7lu %10lu\n",
+	    (uintmax_t )if_getcounter(ifp, IFCOUNTER_OBYTES),
+	    (uintmax_t )if_getcounter(ifp, IFCOUNTER_OPACKETS),
+	    (uintmax_t )if_getcounter(ifp, IFCOUNTER_OERRORS),
+	    (uintmax_t )if_getcounter(ifp, IFCOUNTER_OQDROPS),
+	    0UL,				/* tx_fifo_errors */
+	    (uintmax_t )if_getcounter(ifp, IFCOUNTER_COLLISIONS),
+	    0UL,				/* tx_carrier_errors +
+						 * tx_aborted_errors +
+						 * tx_window_errors +
+						 * tx_heartbeat_errors*/
+	    0UL);				/* tx_compressed */
 
 	return (0);
 }
@@ -1500,9 +1559,6 @@ linux_ifname(struct ifnet *ifp, char *buffer, size_t buflen)
 static int
 linprocfs_donetdev(PFS_FILL_ARGS)
 {
-	char ifname[16]; /* XXX LINUX_IFNAMSIZ */
-	struct ifnet *ifp;
-
 	sbuf_printf(sb, "%6s|%58s|%s\n"
 	    "%6s|%58s|%58s\n",
 	    "Inter-", "   Receive", "  Transmit",
@@ -1512,36 +1568,78 @@ linprocfs_donetdev(PFS_FILL_ARGS)
 
 	CURVNET_SET(TD_TO_VNET(curthread));
 	IFNET_RLOCK();
-	CK_STAILQ_FOREACH(ifp, &V_ifnet, if_link) {
-		linux_ifname(ifp, ifname, sizeof ifname);
-		sbuf_printf(sb, "%6.6s: ", ifname);
-		sbuf_printf(sb, "%7ju %7ju %4ju %4ju %4lu %5lu %10lu %9ju ",
-		    (uintmax_t )ifp->if_get_counter(ifp, IFCOUNTER_IBYTES),
-		    (uintmax_t )ifp->if_get_counter(ifp, IFCOUNTER_IPACKETS),
-		    (uintmax_t )ifp->if_get_counter(ifp, IFCOUNTER_IERRORS),
-		    (uintmax_t )ifp->if_get_counter(ifp, IFCOUNTER_IQDROPS),
-							/* rx_missed_errors */
-		    0UL,				/* rx_fifo_errors */
-		    0UL,				/* rx_length_errors +
-							 * rx_over_errors +
-							 * rx_crc_errors +
-							 * rx_frame_errors */
-		    0UL,				/* rx_compressed */
-		    (uintmax_t )ifp->if_get_counter(ifp, IFCOUNTER_IMCASTS));
-							/* XXX-BZ rx only? */
-		sbuf_printf(sb, "%8ju %7ju %4ju %4ju %4lu %5ju %7lu %10lu\n",
-		    (uintmax_t )ifp->if_get_counter(ifp, IFCOUNTER_OBYTES),
-		    (uintmax_t )ifp->if_get_counter(ifp, IFCOUNTER_OPACKETS),
-		    (uintmax_t )ifp->if_get_counter(ifp, IFCOUNTER_OERRORS),
-		    (uintmax_t )ifp->if_get_counter(ifp, IFCOUNTER_OQDROPS),
-		    0UL,				/* tx_fifo_errors */
-		    (uintmax_t )ifp->if_get_counter(ifp, IFCOUNTER_COLLISIONS),
-		    0UL,				/* tx_carrier_errors +
-							 * tx_aborted_errors +
-							 * tx_window_errors +
-							 * tx_heartbeat_errors*/
-		    0UL);				/* tx_compressed */
-	}
+	if_foreach(linprocfs_donetdev_cb, sb);
+	IFNET_RUNLOCK();
+	CURVNET_RESTORE();
+
+	return (0);
+}
+
+struct walkarg {
+	struct sbuf *sb;
+};
+
+static int
+linux_route_print(struct rtentry *rt, void *vw)
+{
+#ifdef INET
+	struct walkarg *w = vw;
+	struct route_nhop_data rnd;
+	struct in_addr dst, mask;
+	struct nhop_object *nh;
+	char ifname[16];
+	uint32_t scopeid = 0;
+	uint32_t gw = 0;
+	uint32_t linux_flags = 0;
+
+	rt_get_inet_prefix_pmask(rt, &dst, &mask, &scopeid);
+
+	rt_get_rnd(rt, &rnd);
+
+	/* select only first route in case of multipath */
+	nh = nhop_select_func(rnd.rnd_nhop, 0);
+
+	linux_ifname(nh->nh_ifp, ifname, sizeof(ifname));
+
+	gw = (nh->nh_flags & NHF_GATEWAY)
+		? nh->gw4_sa.sin_addr.s_addr : 0;
+
+	linux_flags = RTF_UP |
+		(nhop_get_rtflags(nh) & (RTF_GATEWAY | RTF_HOST));
+
+	sbuf_printf(w->sb,
+		"%s\t"
+		"%08X\t%08X\t%04X\t"
+		"%d\t%u\t%d\t"
+		"%08X\t%d\t%u\t%u",
+		ifname,
+		dst.s_addr, gw, linux_flags,
+		0, 0, rnd.rnd_weight,
+		mask.s_addr, nh->nh_mtu, 0, 0);
+
+	sbuf_printf(w->sb, "\n\n");
+#endif
+	return (0);
+}
+
+/*
+ * Filler function for proc/net/route
+ */
+static int
+linprocfs_donetroute(PFS_FILL_ARGS)
+{
+	struct walkarg w = {
+		.sb = sb
+	};
+	uint32_t fibnum = curthread->td_proc->p_fibnum;
+
+	sbuf_printf(w.sb, "%-127s\n", "Iface\tDestination\tGateway "
+               "\tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU"
+               "\tWindow\tIRTT");
+
+	CURVNET_SET(TD_TO_VNET(curthread));
+	IFNET_RLOCK();
+	rib_walk(fibnum, AF_INET, false, linux_route_print, &w);
 	IFNET_RUNLOCK();
 	CURVNET_RESTORE();
 
@@ -2101,6 +2199,8 @@ linprocfs_init(PFS_INIT_ARGS)
 	/* /proc/net/... */
 	dir = pfs_create_dir(root, "net", NULL, NULL, NULL, 0);
 	pfs_create_file(dir, "dev", &linprocfs_donetdev,
+	    NULL, NULL, NULL, PFS_RD);
+	pfs_create_file(dir, "route", &linprocfs_donetroute,
 	    NULL, NULL, NULL, PFS_RD);
 
 	/* /proc/<pid>/... */

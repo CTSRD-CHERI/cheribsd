@@ -93,6 +93,13 @@ struct ptrace_vm_entry64 {
 	uint64_t	pve_path;	/* Path name of object. */
 };
 
+struct ptrace_sc_remote64 {
+	struct ptrace_sc_ret64 pscr_ret;
+	u_int		pscr_syscall;
+	u_int		pscr_nargs;
+	uint64_t	pscr_args;
+};
+
 static void
 ptrace_lwpinfo_to64(const struct ptrace_lwpinfo *pl,
     struct ptrace_lwpinfo64 *pl64)
@@ -144,6 +151,7 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 		struct ptrace_lwpinfo pl;
 		struct ptrace_vm_entry pve;
 		struct ptrace_coredump pc;
+		struct ptrace_sc_remote sr;
 #if __has_feature(capabilities)
 		struct capreg capreg;
 #endif
@@ -159,10 +167,13 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 		struct ptrace_io_desc64 piod;
 		struct ptrace_lwpinfo64 pl;
 		struct ptrace_vm_entry64 pve;
+		struct ptrace_sc_remote64 sr;
 		uint64_t args[nitems(td->td_sa.args)];
 		struct ptrace_sc_ret64 psr;
 		struct iovec64 vec;
 	} r64;
+	syscallarg_t pscr_args[nitems(td->td_sa.args)];
+	uint64_t pscr_args64[nitems(td->td_sa.args)];
 	void * __capability addr;
 	int data, error, i;
 
@@ -285,6 +296,30 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 			error = copyin(__USER_CAP(uap->addr, uap->data), &r.pc,
 			    uap->data);
 		break;
+	case PT_SC_REMOTE:
+		if (uap->data != sizeof(r64.sr)) {
+			error = EINVAL;
+			break;
+		}
+		error = copyin(__USER_CAP(uap->addr, uap->data), &r64.sr,
+		    uap->data);
+		if (error != 0)
+			break;
+		CP(r64.sr, r.sr, pscr_syscall);
+		CP(r64.sr, r.sr, pscr_nargs);
+		if (r.sr.pscr_nargs > nitems(td->td_sa.args)) {
+			error = EINVAL;
+			break;
+		}
+		error = copyin(__USER_CAP(r64.sr.pscr_args,
+		    sizeof(uint64_t) * r64.sr.pscr_nargs), pscr_args64,
+		    sizeof(uint64_t) * r64.sr.pscr_nargs);
+		if (error != 0)
+			break;
+		for (i = 0; i < r64.sr.pscr_nargs; i++)
+			pscr_args[i] = pscr_args64[i];
+		r.sr.pscr_args = pscr_args;
+		break;
 	default:
 		addr = __USER_CAP_UNBOUND(uap->addr);
 		break;
@@ -358,6 +393,13 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 		ptrace_sc_ret_to64(&r.psr, &r64.psr);
 		error = copyout(&r64.psr, __USER_CAP(uap->addr, uap->data),
 		    MIN(uap->data, sizeof(r64.psr)));
+		break;
+	case PT_SC_REMOTE:
+		ptrace_sc_ret_to64(&r.sr.pscr_ret, &r64.sr.pscr_ret);
+		error = copyout(&r64.sr.pscr_ret,
+		    (char * __capability)__USER_CAP(uap->addr, uap->data) +
+		    offsetof(struct ptrace_sc_remote64, pscr_ret),
+		    sizeof(r64.psr));
 		break;
 	}
 

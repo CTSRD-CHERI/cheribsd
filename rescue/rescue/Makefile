@@ -160,7 +160,7 @@ CRUNCH_LIBS+= -lmd
 CRUNCH_LIBS+= -lmt -lsbuf -lufs -lz
 
 .if ${MACHINE_CPUARCH} == "i386"
-CRUNCH_PROGS_sbin+= bsdlabel sconfig fdisk
+CRUNCH_PROGS_sbin+= bsdlabel fdisk
 CRUNCH_ALIAS_bsdlabel= disklabel
 #CRUNCH_PROGS+= mount_smbfs
 #CRUNCH_LIBS+= -lsmb
@@ -212,10 +212,13 @@ CRUNCH_PROGS_usr.bin+= zstd
 CRUNCH_ALIAS_zstd= unzstd zstdcat zstdmt
 CRUNCH_LIBS+=	${LDADD_zstd}
 
+CRUNCH_PROGS_usr.bin+=	fetch
+CRUNCH_LIBS+=	-lfetch
+
 CRUNCH_PROGS_usr.bin+= tar
 CRUNCH_LIBS+= -larchive
 .if ${MK_OPENSSL} != "no"
-CRUNCH_LIBS+= -lcrypto
+CRUNCH_LIBS+= -lssl -lcrypto
 .endif
 CRUNCH_LIBS+= -lmd
 

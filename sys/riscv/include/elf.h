@@ -105,13 +105,13 @@ __ElfType(Auxinfo);
 #define	DT_CHERI___CAPRELOCSSZ	DT_RISCV_CHERI___CAPRELOCSSZ
 
 /* Flags passed in AT_HWCAP */
-#define	HWCAP_ISA_BIT(c)	(1 << ((c) - 'A'))
-#define	HWCAP_ISA_I		HWCAP_ISA_BIT('I')
-#define	HWCAP_ISA_M		HWCAP_ISA_BIT('M')
-#define	HWCAP_ISA_A		HWCAP_ISA_BIT('A')
-#define	HWCAP_ISA_F		HWCAP_ISA_BIT('F')
-#define	HWCAP_ISA_D		HWCAP_ISA_BIT('D')
-#define	HWCAP_ISA_C		HWCAP_ISA_BIT('C')
+#define	HWCAP_ISA_BIT(c)	(1 << ((c) - 'a'))
+#define	HWCAP_ISA_I		HWCAP_ISA_BIT('i')
+#define	HWCAP_ISA_M		HWCAP_ISA_BIT('m')
+#define	HWCAP_ISA_A		HWCAP_ISA_BIT('a')
+#define	HWCAP_ISA_F		HWCAP_ISA_BIT('f')
+#define	HWCAP_ISA_D		HWCAP_ISA_BIT('d')
+#define	HWCAP_ISA_C		HWCAP_ISA_BIT('c')
 #define	HWCAP_ISA_G		\
     (HWCAP_ISA_I | HWCAP_ISA_M | HWCAP_ISA_A | HWCAP_ISA_F | HWCAP_ISA_D)
 

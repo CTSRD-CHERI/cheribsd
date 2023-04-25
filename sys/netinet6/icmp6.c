@@ -91,6 +91,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if_var.h>
 #include <net/if_dl.h>
 #include <net/if_llatbl.h>
+#include <net/if_private.h>
 #include <net/if_types.h>
 #include <net/route.h>
 #include <net/route/route_ctl.h>
@@ -137,7 +138,6 @@ VNET_DECLARE(int, icmp6_nodeinfo);
 static void icmp6_errcount(int, int);
 static int icmp6_rip6_input(struct mbuf **, int);
 static void icmp6_reflect(struct mbuf *, size_t);
-static int icmp6_ratelimit(const struct in6_addr *, const int, const int);
 static const char *icmp6_redirect_diag(struct in6_addr *,
 	struct in6_addr *, struct in6_addr *);
 static struct mbuf *ni6_input(struct mbuf *, int, struct prison *);
@@ -2727,7 +2727,7 @@ icmp6_ctloutput(struct socket *so, struct sockopt *sopt)
  * type - not used at this moment
  * code - not used at this moment
  */
-static int
+int
 icmp6_ratelimit(const struct in6_addr *dst, const int type,
     const int code)
 {

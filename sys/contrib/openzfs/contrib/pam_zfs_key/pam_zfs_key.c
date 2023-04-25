@@ -535,7 +535,7 @@ zfs_key_config_get_dataset(zfs_key_config_t *config)
 			return (NULL);
 		}
 
-		(void) zfs_iter_filesystems(zhp, find_dsname_by_prop_value,
+		(void) zfs_iter_filesystems(zhp, 0, find_dsname_by_prop_value,
 		    config);
 		zfs_close(zhp);
 		char *dsname = config->dsname;
@@ -754,7 +754,10 @@ pam_sm_open_session(pam_handle_t *pamh, int flags,
 		return (PAM_SUCCESS);
 	}
 	zfs_key_config_t config;
-	zfs_key_config_load(pamh, &config, argc, argv);
+	if (zfs_key_config_load(pamh, &config, argc, argv) != 0) {
+		return (PAM_SESSION_ERR);
+	}
+
 	if (config.uid < 1000) {
 		zfs_key_config_free(&config);
 		return (PAM_SUCCESS);

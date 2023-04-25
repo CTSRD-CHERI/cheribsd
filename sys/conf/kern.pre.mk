@@ -247,7 +247,8 @@ CDDL_CFLAGS=	\
 CDDL_C=		${CC} -c ${CDDL_CFLAGS} ${WERROR} ${.IMPSRC}
 
 # Special flags for managing the compat compiles for ZFS
-ZFS_CFLAGS+=	${CDDL_CFLAGS} -DBUILDING_ZFS -DHAVE_UIO_ZEROCOPY \
+ZFS_CFLAGS+=	-I$S/contrib/openzfs/module/icp/include \
+	${CDDL_CFLAGS} -DBUILDING_ZFS -DHAVE_UIO_ZEROCOPY \
 	-DWITH_NETDUMP -D__KERNEL__ -D_SYS_CONDVAR_H_ -DSMP \
 	-DIN_FREEBSD_BASE
 
@@ -388,5 +389,5 @@ MKMODULESENV+=	__MPATH="${__MPATH}"
 
 # Detect kernel config options that force stack frames to be turned on.
 DDB_ENABLED!=	grep DDB opt_ddb.h || true ; echo
-DTR_ENABLED!=	grep KDTRACE_FRAME opt_kdtrace.h || true ; echo
+DTRACE_ENABLED!=grep KDTRACE_FRAME opt_kdtrace.h || true ; echo
 HWPMC_ENABLED!=	grep HWPMC opt_hwpmc_hooks.h || true ; echo

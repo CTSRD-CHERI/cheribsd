@@ -17,10 +17,9 @@ SUBDIR_BOOTSTRAP= \
 	libcompiler_rt \
 	${_libcheribsdtest_dynamic} \
 	${_libclang_rt} \
-	libgcc_eh \
-	libgcc_s \
-	${_libcplusplus} \
-	${_libcxxrt} \
+	cheri-libc++ \
+	cheri-libc++experimental \
+	libcxxrt \
 	libelf \
 	libssp \
 	libssp_nonshared \
@@ -52,6 +51,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libcompat \
 	libcrypt \
 	libdevctl \
+	libdevdctl \
 	libdevinfo \
 	libdevstat \
 	libdl \
@@ -197,7 +197,6 @@ SUBDIR+=	clang
 .endif
 
 SUBDIR.${MK_CUSE}+= 	libcuse
-SUBDIR.${MK_CXX}+=	libdevdctl
 SUBDIR.${MK_TOOLCHAIN}+=libpe
 SUBDIR.${MK_DIALOG}+=	libdpv libfigpar
 SUBDIR.${MK_FILE}+=	libmagic
@@ -208,19 +207,11 @@ SUBDIR.${MK_KERBEROS_SUPPORT}+=	libcom_err
 SUBDIR.${MK_LDNS}+=	libldns
 SUBDIR.${MK_STATS}+=	libstats
 
-# The libraries under libclang_rt can only be built by clang and when we enable
-# C++ support.
-.if ${COMPILER_TYPE} == "clang" && ${MK_CXX} != "no" && \
-    !${MACHINE_ABI:Mpurecap}
+# The libraries under libclang_rt can only be built by clang.
+.if ${COMPILER_TYPE} == "clang" && !${MACHINE_ABI:Mpurecap}
 _libclang_rt=	libclang_rt
 .elif (${MK_ASAN} != "no" || ${MK_UBSAN} != "no") && make(all)
 .error Requested build with sanitizers but cannot build runtime libraries!
-.endif
-
-.if ${MK_CXX} != "no"
-_libcxxrt=	libcxxrt
-_libcplusplus=	cheri-libc++
-_libcplusplus+=	cheri-libc++experimental
 .endif
 
 SUBDIR.${MK_EFI}+=	libefivar
@@ -258,7 +249,7 @@ SUBDIR.${MK_RADIUS_SUPPORT}+=	libradius
 SUBDIR.${MK_SENDMAIL}+=	libmilter libsm libsmdb libsmutil
 SUBDIR.${MK_TELNET}+=	libtelnet
 SUBDIR.${MK_TESTS_SUPPORT}+=	atf
-SUBDIR.${MK_TESTS_SUPPORT}.${MK_CXX}+=	liblutok
+SUBDIR.${MK_TESTS_SUPPORT}+=	liblutok
 SUBDIR.${MK_TESTS}+=	tests
 SUBDIR.${MK_UNBOUND}+=	libunbound
 SUBDIR.${MK_USB}+=	libusbhid libusb

@@ -137,11 +137,11 @@ SYSCTL_CONST_STRING(_vfs_zfs_version, OID_AUTO, module, CTLFLAG_RD,
 /* arc.c */
 
 int
-param_set_arc_long(SYSCTL_HANDLER_ARGS)
+param_set_arc_u64(SYSCTL_HANDLER_ARGS)
 {
 	int err;
 
-	err = sysctl_handle_long(oidp, arg1, 0, req);
+	err = sysctl_handle_64(oidp, arg1, 0, req);
 	if (err != 0 || req->newptr == NULL)
 		return (err);
 
@@ -171,7 +171,7 @@ param_set_arc_max(SYSCTL_HANDLER_ARGS)
 	int err;
 
 	val = zfs_arc_max;
-	err = sysctl_handle_long(oidp, &val, 0, req);
+	err = sysctl_handle_64(oidp, &val, 0, req);
 	if (err != 0 || req->newptr == NULL)
 		return (SET_ERROR(err));
 
@@ -203,7 +203,7 @@ param_set_arc_min(SYSCTL_HANDLER_ARGS)
 	int err;
 
 	val = zfs_arc_min;
-	err = sysctl_handle_long(oidp, &val, 0, req);
+	err = sysctl_handle_64(oidp, &val, 0, req);
 	if (err != 0 || req->newptr == NULL)
 		return (SET_ERROR(err));
 
@@ -366,10 +366,10 @@ SYSCTL_UQUAD(_vfs_zfs, OID_AUTO, anon_size, CTLFLAG_RD,
 	&ARC_anon.arcs_size.rc_count, 0, "size of anonymous state");
 SYSCTL_UQUAD(_vfs_zfs, OID_AUTO, anon_metadata_esize, CTLFLAG_RD,
 	&ARC_anon.arcs_esize[ARC_BUFC_METADATA].rc_count, 0,
-	"size of anonymous state");
+	"size of metadata in anonymous state");
 SYSCTL_UQUAD(_vfs_zfs, OID_AUTO, anon_data_esize, CTLFLAG_RD,
 	&ARC_anon.arcs_esize[ARC_BUFC_DATA].rc_count, 0,
-	"size of anonymous state");
+	"size of data in anonymous state");
 /* END CSTYLED */
 
 extern arc_state_t ARC_mru;
@@ -424,6 +424,19 @@ SYSCTL_UQUAD(_vfs_zfs, OID_AUTO, mfu_ghost_data_esize, CTLFLAG_RD,
 	"size of data in mfu ghost state");
 /* END CSTYLED */
 
+extern arc_state_t ARC_uncached;
+
+/* BEGIN CSTYLED */
+SYSCTL_UQUAD(_vfs_zfs, OID_AUTO, uncached_size, CTLFLAG_RD,
+	&ARC_uncached.arcs_size.rc_count, 0, "size of uncached state");
+SYSCTL_UQUAD(_vfs_zfs, OID_AUTO, uncached_metadata_esize, CTLFLAG_RD,
+	&ARC_uncached.arcs_esize[ARC_BUFC_METADATA].rc_count, 0,
+	"size of metadata in uncached state");
+SYSCTL_UQUAD(_vfs_zfs, OID_AUTO, uncached_data_esize, CTLFLAG_RD,
+	&ARC_uncached.arcs_esize[ARC_BUFC_DATA].rc_count, 0,
+	"size of data in uncached state");
+/* END CSTYLED */
+
 extern arc_state_t ARC_l2c_only;
 
 /* BEGIN CSTYLED */
@@ -458,20 +471,6 @@ SYSCTL_UINT(_vfs_zfs_zfetch, OID_AUTO, max_idistance,
 /* dsl_pool.c */
 
 /* dnode.c */
-
-extern int zfs_default_bs;
-
-/* BEGIN CSTYLED */
-SYSCTL_INT(_vfs_zfs, OID_AUTO, default_bs, CTLFLAG_RWTUN,
-	&zfs_default_bs, 0, "Default dnode block shift");
-/* END CSTYLED */
-
-extern int zfs_default_ibs;
-
-/* BEGIN CSTYLED */
-SYSCTL_INT(_vfs_zfs, OID_AUTO, default_ibs, CTLFLAG_RWTUN,
-    &zfs_default_ibs, 0, "Default dnode indirect block shift");
-/* END CSTYLED */
 
 /* dsl_scan.c */
 
@@ -599,7 +598,7 @@ param_set_multihost_interval(SYSCTL_HANDLER_ARGS)
 {
 	int err;
 
-	err = sysctl_handle_long(oidp, &zfs_multihost_interval, 0, req);
+	err = sysctl_handle_64(oidp, &zfs_multihost_interval, 0, req);
 	if (err != 0 || req->newptr == NULL)
 		return (err);
 
@@ -676,7 +675,7 @@ param_set_deadman_synctime(SYSCTL_HANDLER_ARGS)
 	int err;
 
 	val = zfs_deadman_synctime_ms;
-	err = sysctl_handle_long(oidp, &val, 0, req);
+	err = sysctl_handle_64(oidp, &val, 0, req);
 	if (err != 0 || req->newptr == NULL)
 		return (err);
 	zfs_deadman_synctime_ms = val;
@@ -693,7 +692,7 @@ param_set_deadman_ziotime(SYSCTL_HANDLER_ARGS)
 	int err;
 
 	val = zfs_deadman_ziotime_ms;
-	err = sysctl_handle_long(oidp, &val, 0, req);
+	err = sysctl_handle_64(oidp, &val, 0, req);
 	if (err != 0 || req->newptr == NULL)
 		return (err);
 	zfs_deadman_ziotime_ms = val;
@@ -761,11 +760,11 @@ SYSCTL_INT(_vfs_zfs, OID_AUTO, space_map_ibs, CTLFLAG_RWTUN,
 int
 param_set_min_auto_ashift(SYSCTL_HANDLER_ARGS)
 {
-	uint64_t val;
+	int val;
 	int err;
 
 	val = zfs_vdev_min_auto_ashift;
-	err = sysctl_handle_64(oidp, &val, 0, req);
+	err = sysctl_handle_int(oidp, &val, 0, req);
 	if (err != 0 || req->newptr == NULL)
 		return (SET_ERROR(err));
 
@@ -779,20 +778,20 @@ param_set_min_auto_ashift(SYSCTL_HANDLER_ARGS)
 
 /* BEGIN CSTYLED */
 SYSCTL_PROC(_vfs_zfs, OID_AUTO, min_auto_ashift,
-	CTLTYPE_U64 | CTLFLAG_RWTUN | CTLFLAG_MPSAFE,
+	CTLTYPE_UINT | CTLFLAG_RWTUN | CTLFLAG_MPSAFE,
 	&zfs_vdev_min_auto_ashift, sizeof (zfs_vdev_min_auto_ashift),
-	param_set_min_auto_ashift, "QU",
+	param_set_min_auto_ashift, "IU",
 	"Min ashift used when creating new top-level vdev. (LEGACY)");
 /* END CSTYLED */
 
 int
 param_set_max_auto_ashift(SYSCTL_HANDLER_ARGS)
 {
-	uint64_t val;
+	int val;
 	int err;
 
 	val = zfs_vdev_max_auto_ashift;
-	err = sysctl_handle_64(oidp, &val, 0, req);
+	err = sysctl_handle_int(oidp, &val, 0, req);
 	if (err != 0 || req->newptr == NULL)
 		return (SET_ERROR(err));
 
@@ -806,9 +805,9 @@ param_set_max_auto_ashift(SYSCTL_HANDLER_ARGS)
 
 /* BEGIN CSTYLED */
 SYSCTL_PROC(_vfs_zfs, OID_AUTO, max_auto_ashift,
-	CTLTYPE_U64 | CTLFLAG_RWTUN | CTLFLAG_MPSAFE,
+	CTLTYPE_UINT | CTLFLAG_RWTUN | CTLFLAG_MPSAFE,
 	&zfs_vdev_max_auto_ashift, sizeof (zfs_vdev_max_auto_ashift),
-	param_set_max_auto_ashift, "QU",
+	param_set_max_auto_ashift, "IU",
 	"Max ashift used when optimizing for logical -> physical sector size on"
 	" new top-level vdevs. (LEGACY)");
 /* END CSTYLED */

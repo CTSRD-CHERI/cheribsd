@@ -46,6 +46,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #include <amd64/vmm/intel/vmcs.h>
+#include <x86/apicreg.h>
 
 #include <machine/atomic.h>
 #include <machine/segments.h>
@@ -182,10 +183,9 @@ static const char * const vmx_exit_reason_desc[] = {
 };
 
 typedef int (*vmexit_handler_t)(struct vmctx *, struct vm_exit *, int *vcpu);
-extern int vmexit_task_switch(struct vmctx *, struct vm_exit *, int *vcpu);
 
 int guest_ncpus;
-uint16_t cores, maxcpus, sockets, threads;
+uint16_t cpu_cores, cpu_sockets, cpu_threads;
 
 int raw_stdio = 0;
 
@@ -194,9 +194,7 @@ static const int BSP = 0;
 
 static cpuset_t cpumask;
 
-static void vm_loop(struct vmctx *ctx, int vcpu, uint64_t rip);
-
-static struct vm_exit *vmexit;
+static void vm_loop(struct vmctx *ctx, int vcpu);
 
 static struct bhyvestats {
 	uint64_t	vmexit_bogus;
@@ -332,7 +330,7 @@ parse_int_value(const char *key, const char *value, int minval, int maxval)
  * vm_set_topology().  vmm.ko may enforce tighter limits.
  */
 static void
-calc_topolopgy(void)
+calc_topology(void)
 {
 	const char *value;
 	bool explicit_cpus;
@@ -348,33 +346,34 @@ calc_topolopgy(void)
 	}
 	value = get_config_value("cores");
 	if (value != NULL)
-		cores = parse_int_value("cores", value, 1, UINT16_MAX);
+		cpu_cores = parse_int_value("cores", value, 1, UINT16_MAX);
 	else
-		cores = 1;
+		cpu_cores = 1;
 	value = get_config_value("threads");
 	if (value != NULL)
-		threads = parse_int_value("threads", value, 1, UINT16_MAX);
+		cpu_threads = parse_int_value("threads", value, 1, UINT16_MAX);
 	else
-		threads = 1;
+		cpu_threads = 1;
 	value = get_config_value("sockets");
 	if (value != NULL)
-		sockets = parse_int_value("sockets", value, 1, UINT16_MAX);
+		cpu_sockets = parse_int_value("sockets", value, 1, UINT16_MAX);
 	else
-		sockets = guest_ncpus;
+		cpu_sockets = guest_ncpus;
 
 	/*
 	 * Compute sockets * cores * threads avoiding overflow.  The
 	 * range check above insures these are 16 bit values.
 	 */
-	ncpus = (uint64_t)sockets * cores * threads;
+	ncpus = (uint64_t)cpu_sockets * cpu_cores * cpu_threads;
 	if (ncpus > UINT16_MAX)
 		errx(4, "Computed number of vCPUs too high: %ju",
 		    (uintmax_t)ncpus);
 
 	if (explicit_cpus) {
-		if (guest_ncpus != ncpus)
+		if (guest_ncpus != (int)ncpus)
 			errx(4, "Topology (%d sockets, %d cores, %d threads) "
-			    "does not match %d vCPUs", sockets, cores, threads,
+			    "does not match %d vCPUs",
+			    cpu_sockets, cpu_cores, cpu_threads,
 			    guest_ncpus);
 	} else
 		guest_ncpus = ncpus;
@@ -442,12 +441,12 @@ parse_cpuset(int vcpu, const char *list, cpuset_t *set)
 					errx(4, "Invalid hostcpu range %d-%d",
 					    start, pcpu);
 				while (start < pcpu) {
-					CPU_SET(start, vcpumap[vcpu]);
+					CPU_SET(start, set);
 					start++;
 				}
 				start = -1;
 			}
-			CPU_SET(pcpu, vcpumap[vcpu]);
+			CPU_SET(pcpu, set);
 			break;
 		case '-':
 			if (start >= 0)
@@ -526,7 +525,7 @@ fbsdrun_start_thread(void *param)
 {
 	char tname[MAXCOMLEN + 1];
 	struct mt_vmm_info *mtp;
-	int vcpu;
+	int error, vcpu;
 
 	mtp = param;
 	vcpu = mtp->mt_vcpu;
@@ -534,12 +533,18 @@ fbsdrun_start_thread(void *param)
 	snprintf(tname, sizeof(tname), "vcpu %d", vcpu);
 	pthread_set_name_np(mtp->mt_thr, tname);
 
+	if (vcpumap[vcpu] != NULL) {
+		error = pthread_setaffinity_np(mtp->mt_thr, sizeof(cpuset_t),
+		    vcpumap[vcpu]);
+		assert(error == 0);
+	}
+
 #ifdef BHYVE_SNAPSHOT
 	checkpoint_cpu_add(vcpu);
 #endif
 	gdb_cpu_add(vcpu);
 
-	vm_loop(mtp->mt_ctx, vcpu, vmexit[vcpu].rip);
+	vm_loop(mtp->mt_ctx, vcpu);
 
 	/* not reached */
 	exit(1);
@@ -547,16 +552,10 @@ fbsdrun_start_thread(void *param)
 }
 
 static void
-fbsdrun_addcpu(struct vmctx *ctx, int newcpu, uint64_t rip, bool suspend)
+fbsdrun_addcpu(struct vmctx *ctx, int newcpu, bool suspend)
 {
 	int error;
 
-	/*
-	 * The 'newcpu' must be activated in the context of 'fromcpu'. If
-	 * vm_activate_cpu() is delayed until newcpu's pthread starts running
-	 * then vmm.ko is out-of-sync with bhyve and this can create a race
-	 * with vm_suspend().
-	 */
 	error = vm_activate_cpu(ctx, newcpu);
 	if (error != 0)
 		err(EX_OSERR, "could not activate CPU %d", newcpu);
@@ -565,13 +564,6 @@ fbsdrun_addcpu(struct vmctx *ctx, int newcpu, uint64_t rip, bool suspend)
 
 	if (suspend)
 		vm_suspend_cpu(ctx, newcpu);
-
-	/*
-	 * Set up the vmexit struct to allow execution to start
-	 * at the given RIP
-	 */
-	vmexit[newcpu].rip = rip;
-	vmexit[newcpu].inst_length = 0;
 
 	mt_vmm_info[newcpu].mt_ctx = ctx;
 	mt_vmm_info[newcpu].mt_vcpu = newcpu;
@@ -631,7 +623,7 @@ vmexit_inout(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu)
 		fprintf(stderr, "Unhandled %s%c 0x%04x at 0x%lx\n",
 		    in ? "in" : "out",
 		    bytes == 1 ? 'b' : (bytes == 2 ? 'w' : 'l'),
-		    port, vmexit->rip);
+		    port, vme->rip);
 		return (VMEXIT_ABORT);
 	} else {
 		return (VMEXIT_CONTINUE);
@@ -681,15 +673,6 @@ vmexit_wrmsr(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu)
 			return (VMEXIT_CONTINUE);
 		}
 	}
-	return (VMEXIT_CONTINUE);
-}
-
-static int
-vmexit_spinup_ap(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu __unused)
-{
-
-	(void)spinup_ap(ctx, vme->u.spinup_ap.vcpu, vme->u.spinup_ap.rip);
-
 	return (VMEXIT_CONTINUE);
 }
 
@@ -939,6 +922,35 @@ vmexit_breakpoint(struct vmctx *ctx __unused, struct vm_exit *vme, int *pvcpu)
 	return (VMEXIT_CONTINUE);
 }
 
+static int
+vmexit_ipi(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu __unused)
+{
+	int error = -1;
+	int i;
+	switch (vme->u.ipi.mode) {
+	case APIC_DELMODE_INIT:
+		CPU_FOREACH_ISSET(i, &vme->u.ipi.dmask) {
+			error = vm_suspend_cpu(ctx, i);
+			if (error) {
+				warnx("%s: failed to suspend cpu %d\n",
+				    __func__, i);
+				break;
+			}
+		}
+		break;
+	case APIC_DELMODE_STARTUP:
+		CPU_FOREACH_ISSET(i, &vme->u.ipi.dmask) {
+			spinup_ap(ctx, i, vme->u.ipi.vector << PAGE_SHIFT);
+		}
+		error = 0;
+		break;
+	default:
+		break;
+	}
+
+	return (error);
+}
+
 static vmexit_handler_t handler[VM_EXITCODE_MAX] = {
 	[VM_EXITCODE_INOUT]  = vmexit_inout,
 	[VM_EXITCODE_INOUT_STR]  = vmexit_inout,
@@ -950,45 +962,37 @@ static vmexit_handler_t handler[VM_EXITCODE_MAX] = {
 	[VM_EXITCODE_WRMSR]  = vmexit_wrmsr,
 	[VM_EXITCODE_MTRAP]  = vmexit_mtrap,
 	[VM_EXITCODE_INST_EMUL] = vmexit_inst_emul,
-	[VM_EXITCODE_SPINUP_AP] = vmexit_spinup_ap,
 	[VM_EXITCODE_SUSPENDED] = vmexit_suspend,
 	[VM_EXITCODE_TASK_SWITCH] = vmexit_task_switch,
 	[VM_EXITCODE_DEBUG] = vmexit_debug,
 	[VM_EXITCODE_BPT] = vmexit_breakpoint,
+	[VM_EXITCODE_IPI] = vmexit_ipi,
 };
 
 static void
-vm_loop(struct vmctx *ctx, int vcpu, uint64_t startrip)
+vm_loop(struct vmctx *ctx, int vcpu)
 {
+	struct vm_exit vme;
 	int error, rc;
 	enum vm_exitcode exitcode;
 	cpuset_t active_cpus;
 
-	if (vcpumap[vcpu] != NULL) {
-		error = pthread_setaffinity_np(pthread_self(),
-		    sizeof(cpuset_t), vcpumap[vcpu]);
-		assert(error == 0);
-	}
-
 	error = vm_active_cpus(ctx, &active_cpus);
 	assert(CPU_ISSET(vcpu, &active_cpus));
 
-	error = vm_set_register(ctx, vcpu, VM_REG_GUEST_RIP, startrip);
-	assert(error == 0);
-
 	while (1) {
-		error = vm_run(ctx, vcpu, &vmexit[vcpu]);
+		error = vm_run(ctx, vcpu, &vme);
 		if (error != 0)
 			break;
 
-		exitcode = vmexit[vcpu].exitcode;
+		exitcode = vme.exitcode;
 		if (exitcode >= VM_EXITCODE_MAX || handler[exitcode] == NULL) {
 			fprintf(stderr, "vm_loop: unexpected exitcode 0x%x\n",
 			    exitcode);
 			exit(4);
 		}
 
-		rc = (*handler[exitcode])(ctx, &vmexit[vcpu], &vcpu);
+		rc = (*handler[exitcode])(ctx, &vme, &vcpu);
 
 		switch (rc) {
 		case VMEXIT_CONTINUE:
@@ -1023,7 +1027,7 @@ num_vcpus_allowed(struct vmctx *ctx)
 		return (1);
 }
 
-void
+static void
 fbsdrun_set_capabilities(struct vmctx *ctx, int cpu)
 {
 	int err, tmp;
@@ -1065,6 +1069,9 @@ fbsdrun_set_capabilities(struct vmctx *ctx, int cpu)
 	}
 
 	vm_set_capability(ctx, cpu, VM_CAP_ENABLE_INVPCID, 1);
+
+	err = vm_set_capability(ctx, cpu, VM_CAP_IPI_EXIT, 1);
+	assert(err == 0);
 }
 
 static struct vmctx *
@@ -1073,11 +1080,6 @@ do_open(const char *vmname)
 	struct vmctx *ctx;
 	int error;
 	bool reinit, romboot;
-#ifndef WITHOUT_CAPSICUM
-	cap_rights_t rights;
-	const cap_ioctl_t *cmds;
-	size_t ncmds;
-#endif
 
 	reinit = romboot = false;
 
@@ -1117,16 +1119,8 @@ do_open(const char *vmname)
 	}
 
 #ifndef WITHOUT_CAPSICUM
-	cap_rights_init(&rights, CAP_IOCTL, CAP_MMAP_RW);
-	if (caph_rights_limit(vm_get_device_fd(ctx), &rights) == -1)
-		errx(EX_OSERR, "Unable to apply rights for sandbox");
-	vm_get_ioctls(&ncmds);
-	cmds = vm_get_ioctls(NULL);
-	if (cmds == NULL)
-		errx(EX_OSERR, "out of memory");
-	if (caph_ioctls_limit(vm_get_device_fd(ctx), cmds, ncmds) == -1)
-		errx(EX_OSERR, "Unable to apply rights for sandbox");
-	free((cap_ioctl_t *)cmds);
+	if (vm_limit_rights(ctx) != 0)
+		err(EX_OSERR, "vm_limit_rights");
 #endif
 
 	if (reinit) {
@@ -1136,7 +1130,8 @@ do_open(const char *vmname)
 			exit(4);
 		}
 	}
-	error = vm_set_topology(ctx, sockets, cores, threads, maxcpus);
+	error = vm_set_topology(ctx, cpu_sockets, cpu_cores, cpu_threads,
+	    0 /* maxcpus, unimplemented */);
 	if (error)
 		errx(EX_OSERR, "vm_set_topology");
 	return (ctx);
@@ -1146,16 +1141,20 @@ static void
 spinup_vcpu(struct vmctx *ctx, int vcpu, bool suspend)
 {
 	int error;
-	uint64_t rip;
 
-	error = vm_get_register(ctx, vcpu, VM_REG_GUEST_RIP, &rip);
-	assert(error == 0);
+	if (vcpu != BSP) {
+		fbsdrun_set_capabilities(ctx, vcpu);
 
-	fbsdrun_set_capabilities(ctx, vcpu);
-	error = vm_set_capability(ctx, vcpu, VM_CAP_UNRESTRICTED_GUEST, 1);
-	assert(error == 0);
+		/*
+		 * Enable the 'unrestricted guest' mode for APs.
+		 *
+		 * APs startup in power-on 16-bit mode.
+		 */
+		error = vm_set_capability(ctx, vcpu, VM_CAP_UNRESTRICTED_GUEST, 1);
+		assert(error == 0);
+	}
 
-	fbsdrun_addcpu(ctx, vcpu, rip, suspend);
+	fbsdrun_addcpu(ctx, vcpu, suspend);
 }
 
 static bool
@@ -1401,7 +1400,7 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 
-	calc_topolopgy();
+	calc_topology();
 	build_vcpumaps();
 
 	value = get_config_value("memory.size");
@@ -1492,7 +1491,7 @@ main(int argc, char *argv[])
 #ifdef BHYVE_SNAPSHOT
 	if (restore_file != NULL) {
 		fprintf(stdout, "Pausing pci devs...\r\n");
-		if (vm_pause_user_devs(ctx) != 0) {
+		if (vm_pause_user_devs() != 0) {
 			fprintf(stderr, "Failed to pause PCI device state.\n");
 			exit(1);
 		}
@@ -1516,7 +1515,7 @@ main(int argc, char *argv[])
 		}
 
 		fprintf(stdout, "Resuming pci devs...\r\n");
-		if (vm_resume_user_devs(ctx) != 0) {
+		if (vm_resume_user_devs() != 0) {
 			fprintf(stderr, "Failed to resume PCI device state.\n");
 			exit(1);
 		}
@@ -1582,7 +1581,6 @@ main(int argc, char *argv[])
 #endif
 
 	/* Allocate per-VCPU resources. */
-	vmexit = calloc(guest_ncpus, sizeof(*vmexit));
 	mt_vmm_info = calloc(guest_ncpus, sizeof(*mt_vmm_info));
 
 	/*

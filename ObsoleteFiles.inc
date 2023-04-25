@@ -52,6 +52,54 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20230203: loader help files renamed
+OLD_FILES+=boot/loader.help
+
+# 20230201: timeout moved from /usr/bin to /bin
+OLD_FILES+=usr/tests/usr.bin/timeout/Kyuafile
+OLD_FILES+=usr/tests/usr.bin/timeout/timeout_test
+
+# 20230124: rtalloc.9 removed
+OLD_FILES+=usr/share/man/man9/rtalloc.9.gz
+
+# 20230123: PCBGROUP.9 removed
+OLD_FILES+=usr/share/man/man9/PCBGROUP.9.gz
+
+# 20221214: TCPDEBUG removed
+OLD_FILES+=usr/include/netinet/tcp_debug.h
+
+# 20221213: remove sync serial drivers and utilities
+OLD_FILES+=sbin/sconfig
+OLD_FILES+=usr/share/man/man4/ce.4
+OLD_FILES+=usr/share/man/man4/cp.4
+OLD_FILES+=usr/share/man/man8/sconfig.8.gz
+
+# 20221202: remove trpt(8)
+OLD_FILES+=usr/sbin/trpt
+OLD_FILES+=usr/share/man/man8/trpt.8.gz
+
+# 20221117: remove typo'd man page link
+OLD_FILES+=usr/share/man/man9/vm_map_wire_mapped.9.gz
+
+# 20221114: remove othermta
+OLD_FILES+=etc/rc.d/othermta
+
+# 20221109: remove rc.sendmail(8)
+OLD_FILES+=etc/rc.sendmail
+OLD_FILES+=usr/share/man/man8/rc.sendmail.8.gz
+
+# 20221015: update the ithread(9) man page
+OLD_FILES+=usr/share/man/man9/ithread.9.gz
+OLD_FILES+=usr/share/man/man9/ithread_add_handler.9.gz
+OLD_FILES+=usr/share/man/man9/ithread_create.9.gz
+OLD_FILES+=usr/share/man/man9/ithread_destroy.9.gz
+OLD_FILES+=usr/share/man/man9/ithread_priority.9.gz
+OLD_FILES+=usr/share/man/man9/ithread_remove_handler.9.gz
+OLD_FILES+=usr/share/man/man9/ithread_schedule.9.gz
+
+# 20221012: remove nls support from sort
+OLD_FILES+=usr/share/nls/hu_HU.ISO8859-2/sort.cat
+
 # 20221003: ip6protosw.h removed
 OLD_FILES+=usr/include/netinet6/ip6protosw.h
 
@@ -68,7 +116,6 @@ OLD_FILES+=usr/lib/libopie.a
 OLD_FILES+=usr/lib/libopie.so
 OLD_LIBS+=usr/lib/libopie.so.8
 OLD_FILES+=usr/lib/libopie_p.a
-OLD_FILES+=usr/bin/opieinfo
 OLD_FILES+=usr/lib/pam_opie.so
 OLD_LIBS+=usr/lib/pam_opie.so.6
 OLD_FILES+=usr/lib/pam_opieaccess.so
@@ -80,6 +127,7 @@ OLD_FILES+=usr/share/man/man1/otp-md4.1.gz
 OLD_FILES+=usr/share/man/man1/otp-md5.1.gz
 OLD_FILES+=usr/share/man/man1/otp-sha1.1.gz
 OLD_FILES+=usr/share/man/man4/opie.4.gz
+OLD_FILES+=usr/share/man/man4/skey.4.gz
 OLD_FILES+=usr/share/man/man5/opieaccess.5.gz
 OLD_FILES+=usr/share/man/man5/opiekeys.5.gz
 OLD_FILES+=usr/share/man/man8/pam_opie.8.gz
@@ -5250,10 +5298,6 @@ OLD_FILES+=usr/include/crypto/xform_auth.h
 OLD_FILES+=usr/include/crypto/xform_comp.h
 OLD_FILES+=usr/include/crypto/xform_enc.h
 
-# 20210315: if_wg(4) removed
-OLD_FILES+=usr/share/man/man4/if_wg.4.gz
-OLD_FILES+=usr/share/man/man4/wg.4.gz
-
 # 20210305: removed Poly1305_* symbols
 OLD_FILES+=usr/include/crypto/xform_poly1305.h
 
@@ -7891,8 +7935,6 @@ OLD_FILES+=usr/bin/mklocale
 OLD_FILES+=usr/share/man/man1/mklocale.1.gz
 OLD_FILES+=usr/bin/colldef
 OLD_FILES+=usr/share/man/man1/colldef.1.gz
-# 20190909: vm_map_unwire(9) removed
-OLD_FILES+=usr/share/man/man9/vm_map_unwire.9.gz
 # 20190904: Remove boot1.efifat and gptboot.efifat (which never should have been)
 OLD_FILES+=boot/boot1.efifat
 OLD_FILES+=boot/gptboot.efifat

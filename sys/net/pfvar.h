@@ -690,6 +690,8 @@ struct pf_keth_rule {
 	int			 qid;
 	char			 tagname[PF_TAG_NAME_SIZE];
 	uint16_t		 tag;
+	char			 bridge_to_name[IFNAMSIZ];
+	struct pfi_kkif		*bridge_to;
 	uint8_t			 action;
 	uint16_t		 dnpipe;
 	uint32_t		 dnflags;
@@ -1987,7 +1989,7 @@ VNET_DECLARE(void *, pf_swi_cookie);
 VNET_DECLARE(struct intr_event *, pf_swi_ie);
 #define	V_pf_swi_ie	VNET(pf_swi_ie)
 
-VNET_DECLARE(uint64_t, pf_stateid[MAXCPU]);
+VNET_DECLARE(struct unrhdr64, pf_stateid);
 #define	V_pf_stateid	VNET(pf_stateid)
 
 TAILQ_HEAD(pf_altqqueue, pf_altq);
@@ -2261,6 +2263,7 @@ int			 pf_set_syncookies(struct pfioc_nv *);
 int			 pf_synflood_check(struct pf_pdesc *);
 void			 pf_syncookie_send(struct mbuf *m, int off,
 			    struct pf_pdesc *);
+bool			 pf_syncookie_check(struct pf_pdesc *);
 u_int8_t		 pf_syncookie_validate(struct pf_pdesc *);
 struct mbuf *		 pf_syncookie_recreate_syn(uint8_t, int,
 			    struct pf_pdesc *);

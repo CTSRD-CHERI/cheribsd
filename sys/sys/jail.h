@@ -199,6 +199,7 @@ struct prison {
 	int		 pr_spare[2];
 	int		 pr_osreldate;			/* (c) kern.osreldate value */
 	unsigned long	 pr_hostid;			/* (p) jail hostid */
+	uint64_t	 pr_permid;			/* (c) permanent jail id */
 	char		 pr_name[MAXHOSTNAMELEN];	/* (p) admin jail name */
 	char		 pr_path[MAXPATHLEN];		/* (c) chroot path */
 	char		 pr_hostname[MAXHOSTNAMELEN];	/* (p) jail hostname */
@@ -253,7 +254,8 @@ struct prison_racct {
 #define	PR_ALLOW_SUSER			0x00000400
 #define	PR_ALLOW_RESERVED_PORTS		0x00008000
 #define	PR_ALLOW_KMEM_ACCESS		0x00010000	/* reserved, not used yet */
-#define	PR_ALLOW_ALL_STATIC		0x000187ff
+#define	PR_ALLOW_NFSD			0x00020000
+#define	PR_ALLOW_ALL_STATIC		0x000387ff
 
 /*
  * PR_ALLOW_DIFFERENCES determines which flags are able to be
@@ -420,6 +422,7 @@ void getjailname(struct ucred *cred, char *name, size_t len);
 void prison0_init(void);
 int prison_allow(struct ucred *, unsigned);
 int prison_check(struct ucred *cred1, struct ucred *cred2);
+bool prison_check_nfsd(struct ucred *cred);
 int prison_owns_vnet(struct ucred *);
 int prison_canseemount(struct ucred *cred, struct mount *mp);
 void prison_enforce_statfs(struct ucred *cred, struct mount *mp,
@@ -440,6 +443,7 @@ void prison_proc_iterate(struct prison *, void (*)(struct proc *, void *), void 
 void prison_set_allow(struct ucred *cred, unsigned flag, int enable);
 int prison_ischild(struct prison *, struct prison *);
 bool prison_isalive(const struct prison *);
+bool prison_isalive_permid(const uint64_t prison_permid);
 bool prison_isvalid(struct prison *);
 #if defined(INET) || defined(INET6)
 int prison_ip_check(const struct prison *, const pr_family_t, const void *);

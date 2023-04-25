@@ -61,6 +61,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if_types.h>
 #include <net/if_dl.h>
 #include <net/if_var.h>
+#include <net/if_private.h>
 #include <net/route.h>
 #include <net/vnet.h>
 
@@ -514,7 +515,8 @@ nd6_ns_output_fib(struct ifnet *ifp, const struct in6_addr *saddr6,
 			 * Do not send NS for CARP address if we are not
 			 * the CARP master.
 			 */
-			if (ifa != NULL && !(*carp_master_p)(ifa)) {
+			if (ifa != NULL && ifa->ifa_carp != NULL &&
+			    !(*carp_master_p)(ifa)) {
 				log(LOG_DEBUG,
 				    "nd6_ns_output: NS from BACKUP CARP address %s\n",
 				    ip6_sprintf(ip6buf, &ip6->ip6_src));

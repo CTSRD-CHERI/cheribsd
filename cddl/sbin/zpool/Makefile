@@ -8,7 +8,7 @@
 .PATH: ${ZFSTOP}/cmd/zpool/os/freebsd
 
 
-PACKAGE=	runtime
+PACKAGE=	zfs
 PROG=	zpool
 MAN= \
 	spl.4 \

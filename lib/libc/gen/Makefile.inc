@@ -192,6 +192,8 @@ SRCS+=	libcheri_caprevoke.c
 
 CFLAGS.arc4random.c= -I${SRCTOP}/sys -I${SRCTOP}/sys/crypto/chacha20
 
+CFLAGS.sysconf.c= -I${SRCTOP}/contrib/tzcode
+
 CFLAGS.dlfcn.c= ${RTLD_HDRS}
 CFLAGS.tls.c= ${RTLD_HDRS}
 

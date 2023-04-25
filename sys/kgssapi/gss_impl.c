@@ -149,7 +149,17 @@ kern_gssd_syscall(struct thread *td, const char * __capability upath)
 		 */
 		if (cl != NULL) {
 			int retry_count = 5;
+			struct timeval timo;
 			CLNT_CONTROL(cl, CLSET_RETRIES, &retry_count);
+
+			/*
+			 * Set the timeout for an upcall to 5 minutes.  The
+			 * default of 25 seconds is not long enough for some
+			 * gss_XXX() calls done by the gssd(8) daemon.
+			 */
+			timo.tv_sec = 5 * 60;
+			timo.tv_usec = 0;
+			CLNT_CONTROL(cl, CLSET_TIMEOUT, &timo);
 		}
 	} else
 		cl = NULL;

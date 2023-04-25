@@ -327,22 +327,10 @@ _host_abs_tools_to_symlink+=	/bin/bash:sh
 _host_tools_to_symlink:=${_host_tools_to_symlink:Nsh}
 .endif
 
-
-# Tools such as xz are not included in /usr/bin on macOS, so also look inside
-# the homebrew install directory.
-.if !defined(HOST_TOOLS_PATH_EXTRA)
-.if ${.MAKE.OS} == "Darwin"
-HOST_TOOLS_PATH_EXTRA!=env PATH="${_ORIGIAL_PATH}:${PATH}" brew --prefix 2> /dev/null || echo /usr/local
-HOST_TOOLS_PATH_EXTRA:=${HOST_TOOLS_PATH_EXTRA}/bin
-.info HOST_TOOLS_PATH_EXTRA inferred as ${HOST_TOOLS_PATH_EXTRA}
-.endif
-.endif
-
 host-symlinks:
 	@echo "Linking host tools into ${DESTDIR}/bin"
 .for _tool in ${_host_tools_to_symlink}
-	# The toplevel makefile forces $PATH to only be /usr/local/bin
-	@export PATH="$${PATH}:${HOST_TOOLS_PATH_EXTRA}"; \
+	@export PATH=$${PATH}:/usr/local/bin; \
 	source_path=`which ${_tool} || echo /dev/null/no/such`; \
 	if [ ! -e "$${source_path}" ] ; then \
 		echo "Cannot find host tool '${_tool}' in PATH ($$PATH)." >&2; false; \

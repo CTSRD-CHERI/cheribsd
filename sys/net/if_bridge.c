@@ -110,6 +110,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if_dl.h>
 #include <net/if_types.h>
 #include <net/if_var.h>
+#include <net/if_private.h>
 #include <net/pfil.h>
 #include <net/vnet.h>
 
@@ -415,7 +416,7 @@ SYSCTL_INT(_net_link_bridge, OID_AUTO, pfil_onlyip,
     "Only pass IP packets when pfil is enabled");
 
 /* run pfil hooks on the bridge interface */
-VNET_DEFINE_STATIC(int, pfil_bridge) = 1;
+VNET_DEFINE_STATIC(int, pfil_bridge) = 0;
 #define	V_pfil_bridge	VNET(pfil_bridge)
 SYSCTL_INT(_net_link_bridge, OID_AUTO, pfil_bridge,
     CTLFLAG_RWTUN | CTLFLAG_VNET, &VNET_NAME(pfil_bridge), 0,
@@ -433,7 +434,7 @@ SYSCTL_INT(_net_link_bridge, OID_AUTO, ipfw_arp,
     "Filter ARP packets through IPFW layer2");
 
 /* run pfil hooks on the member interface */
-VNET_DEFINE_STATIC(int, pfil_member) = 1;
+VNET_DEFINE_STATIC(int, pfil_member) = 0;
 #define	V_pfil_member	VNET(pfil_member)
 SYSCTL_INT(_net_link_bridge, OID_AUTO, pfil_member,
     CTLFLAG_RWTUN | CTLFLAG_VNET, &VNET_NAME(pfil_member), 0,
@@ -2062,8 +2063,13 @@ bridge_enqueue(struct bridge_softc *sc, struct ifnet *dst_ifp, struct mbuf *m)
 
 		M_ASSERTPKTHDR(m); /* We shouldn't transmit mbuf without pkthdr */
 		if ((err = dst_ifp->if_transmit(dst_ifp, m))) {
-			m_freem(m0);
-			if_inc_counter(sc->sc_ifp, IFCOUNTER_OERRORS, 1);
+			int n;
+
+			for (m = m0, n = 1; m != NULL; m = m0, n++) {
+				m0 = m->m_nextpkt;
+				m_freem(m);
+			}
+			if_inc_counter(sc->sc_ifp, IFCOUNTER_OERRORS, n);
 			break;
 		}
 

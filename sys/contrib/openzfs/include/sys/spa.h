@@ -600,7 +600,7 @@ typedef struct blkptr {
 
 /*
  * This macro allows code sharing between zfs, libzpool, and mdb.
- * 'func' is either snprintf() or mdb_snprintf().
+ * 'func' is either kmem_scnprintf() or mdb_snprintf().
  * 'ws' (whitespace) can be ' ' for single-line format, '\n' for multi-line.
  */
 
@@ -1146,7 +1146,7 @@ extern nvlist_t *zfs_event_create(spa_t *spa, vdev_t *vd, const char *type,
 extern void zfs_post_remove(spa_t *spa, vdev_t *vd);
 extern void zfs_post_state_change(spa_t *spa, vdev_t *vd, uint64_t laststate);
 extern void zfs_post_autoreplace(spa_t *spa, vdev_t *vd);
-extern uint64_t spa_get_errlog_size(spa_t *spa);
+extern uint64_t spa_approx_errlog_size(spa_t *spa);
 extern int spa_get_errlog(spa_t *spa, void *uaddr, uint64_t *count);
 extern void spa_errlog_rotate(spa_t *spa);
 extern void spa_errlog_drain(spa_t *spa);
@@ -1218,9 +1218,9 @@ int param_set_deadman_failmode(ZFS_MODULE_PARAM_ARGS);
 
 extern spa_mode_t spa_mode_global;
 extern int zfs_deadman_enabled;
-extern unsigned long zfs_deadman_synctime_ms;
-extern unsigned long zfs_deadman_ziotime_ms;
-extern unsigned long zfs_deadman_checktime_ms;
+extern uint64_t zfs_deadman_synctime_ms;
+extern uint64_t zfs_deadman_ziotime_ms;
+extern uint64_t zfs_deadman_checktime_ms;
 
 extern kmem_cache_t *zio_buf_cache[];
 extern kmem_cache_t *zio_data_buf_cache[];
