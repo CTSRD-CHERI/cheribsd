@@ -82,6 +82,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_pager.h>
 
 #include <machine/cpu.h>
+#include <machine/fpe.h>
 #include <machine/intr.h>
 #include <machine/kdb.h>
 #include <machine/machdep.h>
@@ -92,10 +93,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/sbi.h>
 #include <machine/trap.h>
 #include <machine/vmparam.h>
-
-#ifdef FPE
-#include <machine/fpe.h>
-#endif
 
 #ifdef DDB
 #include <ddb/ddb.h>
