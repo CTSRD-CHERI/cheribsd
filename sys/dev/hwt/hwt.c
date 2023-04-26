@@ -329,9 +329,8 @@ hwt_destroy_buffers(struct hwt *hwt)
 		vm_page_unwire_noq(m);
 		vm_page_free(m);
 	}
+	vm_pager_deallocate(hwt->obj);
 	VM_OBJECT_WUNLOCK(hwt->obj);
-
-	vm_object_deallocate(hwt->obj);
 
 	free(hwt->pages, M_HWT);
 }
@@ -711,8 +710,9 @@ hwt_process_exit(void *arg __unused, struct proc *p)
 		mtx_lock(&ho->mtx);
 		LIST_FOREACH_SAFE(hwt, &ho->hwts, next, hwt_tmp) {
 			LIST_REMOVE(hwt, next);
+printf("stopping hwt %d\n", hwt->hwt_id);
 			hwt_destroy_buffers(hwt);
-			destroy_dev(hwt->cdev);
+			destroy_dev_sched(hwt->cdev);
 			free(hwt, M_HWT);
 		}
 		mtx_unlock(&ho->mtx);
