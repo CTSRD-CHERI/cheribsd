@@ -109,7 +109,7 @@ efi_1t1_l3(vm_offset_t va)
 	if (*l0 == 0) {
 		m = efi_1t1_page();
 		mphys = VM_PAGE_TO_PHYS(m);
-		*l0 = mphys | L0_TABLE;
+		*l0 = PHYS_TO_PTE(mphys) | L0_TABLE;
 	} else {
 		mphys = PTE_TO_PHYS(*l0);
 	}
@@ -120,7 +120,7 @@ efi_1t1_l3(vm_offset_t va)
 	if (*l1 == 0) {
 		m = efi_1t1_page();
 		mphys = VM_PAGE_TO_PHYS(m);
-		*l1 = mphys | L1_TABLE;
+		*l1 = PHYS_TO_PTE(mphys) | L1_TABLE;
 	} else {
 		mphys = PTE_TO_PHYS(*l1);
 	}
@@ -131,7 +131,7 @@ efi_1t1_l3(vm_offset_t va)
 	if (*l2 == 0) {
 		m = efi_1t1_page();
 		mphys = VM_PAGE_TO_PHYS(m);
-		*l2 = mphys | L2_TABLE;
+		*l2 = PHYS_TO_PTE(mphys) | L2_TABLE;
 	} else {
 		mphys = PTE_TO_PHYS(*l2);
 	}
