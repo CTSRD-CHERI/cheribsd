@@ -656,13 +656,71 @@ static struct cdevsw hwt_cdevsw = {
 };
 
 static void
-hwt_process_exit(void *arg __unused, struct proc *p)
+hwt_stop_proc_hwts(struct hwt_prochash *hph, struct proc *p)
 {
 	struct hwt_proc *hp, *hp1;
-	struct hwt_prochash *hph;
-	struct hwt_owner *ho;
+	struct hwt *hwt;
+
+	mtx_lock_spin(&hwt_prochash_mtx);
+	LIST_FOREACH_SAFE(hp, hph, next, hp1) {
+		if (hp->p == p) {
+			printf("%s: stopping hwt on cpu %d\n", __func__,
+			    hp->cpu_id);
+			hwt = hp->hwt;
+			hwt->started = 0;
+			hwt_event_disable(hwt);
+			hwt_event_dump(hwt);
+			LIST_REMOVE(hp, next);
+		}
+	}
+	mtx_unlock_spin(&hwt_prochash_mtx);
+}
+
+static void
+hwt_stop_owner_hwts(struct hwt_prochash *hph, struct hwt_owner *ho)
+{
+	struct hwt_proc *hp, *hp1;
 	struct hwt *hwt_tmp;
 	struct hwt *hwt;
+
+	mtx_lock_spin(&hwt_prochash_mtx);
+	LIST_FOREACH_SAFE(hp, hph, next, hp1) {
+		if (hp->hwt_owner == ho) {
+			printf("%s: stopping hwt on cpu %d\n", __func__,
+			    hp->cpu_id);
+			hwt = hp->hwt;
+			hwt->started = 0;
+			hwt_event_disable(hwt);
+			hwt_event_dump(hwt);
+			LIST_REMOVE(hp, next);
+		}
+	}
+	mtx_unlock_spin(&hwt_prochash_mtx);
+
+	printf("%s: stopping hwt owner\n", __func__);
+
+	mtx_lock(&ho->mtx);
+	LIST_FOREACH_SAFE(hwt, &ho->hwts, next, hwt_tmp) {
+		LIST_REMOVE(hwt, next);
+printf("stopping hwt %d\n", hwt->hwt_id);
+		hwt_destroy_buffers(hwt);
+		destroy_dev_sched(hwt->cdev);
+		free(hwt, M_HWT);
+	}
+	mtx_unlock(&ho->mtx);
+
+	/* Destroy hwt owner. */
+	mtx_lock_spin(&hwt_ownerhash_mtx);
+	LIST_REMOVE(ho, next);
+	mtx_unlock_spin(&hwt_ownerhash_mtx);
+	free(ho, M_HWT);
+}
+
+static void
+hwt_process_exit(void *arg __unused, struct proc *p)
+{
+	struct hwt_prochash *hph;
+	struct hwt_owner *ho;
 	int hindex;
 
 	hindex = HWT_HASH_PTR(p, hwt_prochashmask);
@@ -671,57 +729,13 @@ hwt_process_exit(void *arg __unused, struct proc *p)
 	ho = hwt_lookup_owner(p);
 	if (ho == NULL) {
 		/* Stop HWTs associated with exiting proc. */
-
-		mtx_lock_spin(&hwt_prochash_mtx);
-		LIST_FOREACH_SAFE(hp, hph, next, hp1) {
-			if (hp->p == p) {
-				printf("%s: stopping hwt on cpu %d\n", __func__,
-				    hp->cpu_id);
-				hwt = hp->hwt;
-				hwt->started = 0;
-				hwt_event_disable(hwt);
-				hwt_event_dump(hwt);
-				LIST_REMOVE(hp, next);
-			}
-		}
-		mtx_unlock_spin(&hwt_prochash_mtx);
+		hwt_stop_proc_hwts(hph, p);
 	} else {
 		/*
 		 * Stop HWTs associated with exiting owner.
 		 * Detach associated procs.
 		 */
-
-		mtx_lock_spin(&hwt_prochash_mtx);
-		LIST_FOREACH_SAFE(hp, hph, next, hp1) {
-			if (hp->hwt_owner == ho) {
-				printf("%s: stopping hwt on cpu %d\n", __func__,
-				    hp->cpu_id);
-				hwt = hp->hwt;
-				hwt->started = 0;
-				hwt_event_disable(hwt);
-				hwt_event_dump(hwt);
-				LIST_REMOVE(hp, next);
-			}
-		}
-		mtx_unlock_spin(&hwt_prochash_mtx);
-
-		printf("%s: stopping hwt owner\n", __func__);
-
-		mtx_lock(&ho->mtx);
-		LIST_FOREACH_SAFE(hwt, &ho->hwts, next, hwt_tmp) {
-			LIST_REMOVE(hwt, next);
-printf("stopping hwt %d\n", hwt->hwt_id);
-			hwt_destroy_buffers(hwt);
-			destroy_dev_sched(hwt->cdev);
-			free(hwt, M_HWT);
-		}
-		mtx_unlock(&ho->mtx);
-
-		/* Destroy hwt owner. */
-		mtx_lock_spin(&hwt_ownerhash_mtx);
-		LIST_REMOVE(ho, next);
-		mtx_unlock_spin(&hwt_ownerhash_mtx);
-		free(ho, M_HWT);
+		hwt_stop_owner_hwts(hph, ho);
 	}
 }
 
