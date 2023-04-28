@@ -902,7 +902,7 @@ linux_mknod(struct thread *td, struct linux_mknod_args *args)
 	case S_IFCHR:
 	case S_IFBLK:
 		error = kern_mknodat(td, AT_FDCWD, path, seg,
-		    args->mode, args->dev);
+		    args->mode, linux_decode_dev(args->dev));
 		break;
 
 	case S_IFDIR:
@@ -957,7 +957,7 @@ linux_mknodat(struct thread *td, struct linux_mknodat_args *args)
 	case S_IFCHR:
 	case S_IFBLK:
 		error = kern_mknodat(td, dfd, path, seg, args->mode,
-		    args->dev);
+		    linux_decode_dev(args->dev));
 		break;
 
 	case S_IFDIR:
