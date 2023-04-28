@@ -95,6 +95,7 @@ struct mmap_req {
 #endif
 };
 
+uint64_t at2cnpflags(u_int at_flags, u_int mask);
 int	kern___acl_aclcheck_fd(struct thread *td, int filedes, acl_type_t type,
 	    const struct acl * __capability aclp);
 int	kern___acl_aclcheck_path(struct thread *td,
@@ -518,8 +519,7 @@ int	kern_sigqueue(struct thread *td, pid_t pid, int signum,
 int	kern_socket(struct thread *td, int domain, int type, int protocol);
 int	kern_statat(struct thread *td, int flag, int fd,
 	    const char * __capability path,
-	    enum uio_seg pathseg, struct stat *sbp,
-	    void (*hook)(struct vnode *vp, struct stat *sbp));
+	    enum uio_seg pathseg, struct stat *sbp);
 int	kern_specialfd(struct thread *td, int type, void * __capability arg);
 int	kern_statfs(struct thread *td, const char * __capability path,
 	    enum uio_seg pathseg, struct statfs *buf);
