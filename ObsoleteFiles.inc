@@ -463,11 +463,14 @@ OLD_DIRS+=usr/lib/clang/14.0.5/share
 OLD_DIRS+=usr/lib/clang/14.0.5
 
 # 20230208: new libc++ import which bumps version from 14.0.5 to 15.0.7
+.if 0
+# CHERI libc++ is still from 14.0.0
 OLD_FILES+=usr/include/c++/v1/__functional_base
 OLD_FILES+=usr/include/c++/v1/__libcpp_version
 OLD_FILES+=usr/include/c++/v1/__nullptr
 OLD_FILES+=usr/include/c++/v1/__string
 OLD_FILES+=usr/include/c++/v1/experimental/filesystem
+.endif
 
 # 20230203: loader help files renamed
 OLD_FILES+=boot/loader.help
@@ -1585,12 +1588,9 @@ OLD_DIRS+=usr/lib/clang/13.0.0/lib
 OLD_DIRS+=usr/lib/clang/13.0.0
 
 # 20220514: new libc++ import which bumps version from 13.0.0 to 14.0.3
-.if 0
-# CHERI libc++ is still from 13.0.0
 OLD_FILES+=usr/include/c++/v1/__function_like.h
 OLD_FILES+=usr/include/c++/v1/__memory/pointer_safety.h
 OLD_FILES+=usr/include/c++/v1/__utility/__decay_copy.h
-.endif
 
 # 20220418: uudecode merged into uuencode and renamed to bintrans
 OLD_FILES+=usr/lib/debug/usr/bin/uuencode.debug
