@@ -137,22 +137,29 @@ add_pathname(const char *path)
 	LIST_INSERT_HEAD(&pathnames, r, p_link);
 }
 
+/*
+ * XXX: If this whole function makes you feel uncomfortable, that's a good sign :)
+ * This needs to be replaced by returning p_fd to the calling process,
+ * to pass as fd to whateverat(2) on their side instead of doing it here...
+ * but that has its own problems.
+ */
 static int
-handle_pathname(const char *path)
+handle_pathname(int fd, const char *path)
 {
 	const struct pathname *r;
-	char *resolved;
+	char resolved[PATH_MAX];
+	int error;
 
+#ifdef notyet
+	error = realpathat(fd, path, resolved, sizeof(resolved), 0);
+#else
 	/*
-	 * XXX: If this function makes you feel uncomfortable, that's a good sign :)
-	 * This needs to be replaced by returning p_fd to the calling process,
-	 * to pass as fd to whateverat(2) on their side instead of doing it here...
-	 * but that has its own problems.
+	 * XXX: Not exported from libc for some reason.
 	 */
-	resolved = realpath(path, NULL);
-	if (resolved == NULL) {
-		if (vflag)
-			printf("%s: cannot canonicalize %s\n", __func__, path);
+	error = syscall(SYS___realpathat, fd, path, resolved, sizeof(resolved), 0);
+#endif
+	if (error < 0) {
+		warn("__realpathat(%d, \"%s\", ...)", fd, path);
 		return (EPERM);
 	}
 
@@ -185,7 +192,7 @@ main(int argc, char **argv)
 	uintcap_t fdcap;
 	ssize_t received;
 	pid_t pid;
-	int capc, ch, error, _error;
+	int capc, ch, error, _error, fd;
 
 	LIST_INIT(&pathnames);
 
@@ -348,15 +355,10 @@ main(int argc, char **argv)
 				goto respond;
 			}
 			break;
-		case SYS_fstatat:
-		case SYS_fchmodat:
-		case SYS_fchownat:
-		case SYS_utimensat:
-		case SYS_openat:
 		case SYS_fchdir:
 			/*
-			 * Syscalls that take an fd for their first argument, and a path
-			 * for the second.
+			 * Syscalls that take an fd for their first argument,
+			 * and there's no path argument.
 			 */
 			if ((size_t)received != sizeof(in)) {
 				warnx("size mismatch: received %zd, expected %zd",
@@ -365,17 +367,43 @@ main(int argc, char **argv)
 				goto respond;
 			}
 
-			if (in.arg[0] != (uintcap_t)AT_FDCWD) {
+			error = captofd((void *)in.arg[0], (int *)&in.arg[0]);
+			if (error != 0) {
+				warn("captofd: %#lp", (void *)in.arg[0]);
+				capvreturn(out, -in.op, error, ENOMSG, 0);
+				goto respond;
+			}
+			break;
+		case SYS_fstatat:
+		case SYS_fchmodat:
+		case SYS_fchownat:
+		case SYS_utimensat:
+		case SYS_openat:
+			/*
+			 * Syscalls that take an fd for their first argument,
+			 * and a path for the second.
+			 */
+			if ((size_t)received != sizeof(in)) {
+				warnx("size mismatch: received %zd, expected %zd",
+				    (size_t)received, sizeof(in));
+				capvreturn(out, 0, -1, ENOMSG, 0);
+				goto respond;
+			}
+
+			if (in.arg[0] == (uintcap_t)AT_FDCWD) {
+				fd = AT_FDCWD;
+			} else {
 				error = captofd((void *)in.arg[0], (int *)&in.arg[0]);
 				if (error != 0) {
 					warn("captofd: %#lp", (void *)in.arg[0]);
 					capvreturn(out, -in.op, error, ENOMSG, 0);
 					goto respond;
 				}
+				fd = (int)in.arg[0];
 			}
 
 			path = (const char *)in.arg[1];
-			error = handle_pathname(path);
+			error = handle_pathname(fd, path);
 			if (error != 0) {
 				if (vflag)
 					warnx("refusing to %s %s", sysdecode_syscallname(SYSDECODE_ABI_FREEBSD, in.op), path);
@@ -399,7 +427,7 @@ main(int argc, char **argv)
 			}
 
 			path = (const char *)in.arg[0];
-			error = handle_pathname(path);
+			error = handle_pathname(AT_FDCWD, path);
 			if (error != 0) {
 				if (vflag)
 					warnx("refusing to %s %s", sysdecode_syscallname(SYSDECODE_ABI_FREEBSD, in.op), path);
