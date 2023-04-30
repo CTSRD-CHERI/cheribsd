@@ -68,13 +68,13 @@ struct pathname {
 };
 
 LIST_HEAD(, pathname) pathnames = LIST_HEAD_INITIALIZER(pathnames);
-static bool kflag = false, vflag = false;
+static bool kflag = false, qflag = false, vflag = false;
 
 static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: cs [-kv] [-r path] [-w path] command [args ...]\n");
+	fprintf(stderr, "usage: cs [-kqv] [-r path] [-w path] command [args ...]\n");
 	exit(0);
 }
 
@@ -159,13 +159,12 @@ handle_pathname(int fd, const char *path)
 	error = syscall(SYS___realpathat, fd, path, resolved, sizeof(resolved), 0);
 #endif
 	if (error < 0) {
-		warn("__realpathat(%d, \"%s\", ...)", fd, path);
+		if (!qflag)
+			warn("__realpathat(%d, \"%s\", ...)", fd, path);
 		return (EPERM);
 	}
 
 	LIST_FOREACH(r, &pathnames, p_link) {
-		if (vflag)
-			printf("%s: comparing %s and %s\n", __func__, resolved, r->p_path);
 		if (strncmp(resolved, r->p_path, strlen(r->p_path)) == 0)
 			return (0);
 	}
@@ -196,10 +195,13 @@ main(int argc, char **argv)
 
 	LIST_INIT(&pathnames);
 
-	while ((ch = getopt(argc, argv, "kr:w:v")) != -1) {
+	while ((ch = getopt(argc, argv, "kqr:w:v")) != -1) {
 		switch (ch) {
 		case 'k':
 			kflag = true;
+			break;
+		case 'q':
+			qflag = true;
 			break;
 		case 'r':
 			add_pathname(optarg);
@@ -405,7 +407,7 @@ main(int argc, char **argv)
 			path = (const char *)in.arg[1];
 			error = handle_pathname(fd, path);
 			if (error != 0) {
-				if (vflag)
+				if (!qflag)
 					warnx("refusing to %s %s", sysdecode_syscallname(SYSDECODE_ABI_FREEBSD, in.op), path);
 				capvreturn(out, -in.op, -1, error, 0);
 				goto respond;
@@ -429,8 +431,7 @@ main(int argc, char **argv)
 			path = (const char *)in.arg[0];
 			error = handle_pathname(AT_FDCWD, path);
 			if (error != 0) {
-				if (vflag)
-					warnx("refusing to %s %s", sysdecode_syscallname(SYSDECODE_ABI_FREEBSD, in.op), path);
+				warnx("refusing to %s %s", sysdecode_syscallname(SYSDECODE_ABI_FREEBSD, in.op), path);
 				capvreturn(out, -in.op, -1, error, 0);
 				goto respond;
 			}

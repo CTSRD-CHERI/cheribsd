@@ -38,6 +38,7 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl k
+.Op Fl q
 .Op Fl v
 .Ar command Op Ar args ...
 .Sh DESCRIPTION
@@ -69,6 +70,8 @@ Use
 .Xr coaccept_slow 2
 instead of
 .Xr coaccept 2 .
+.It Fl q
+Be quiet; do not print out the file paths it denied access to.
 .It Fl r Ar path
 Make the
 .Ar path
@@ -94,11 +97,16 @@ The
 utility exits 0 on success, and >0 if an error occurs.
 .Sh EXAMPLES
 Run
-.Xr capv 1
-with access only to
-.Pa /usr :
-.Dl cs -r /usr capv -v
+.Xr ls 1
+to list files in
+.Pa /usr
+without giving it access to any other files:
+.Dl cs -r /usr ls -al /usr
 .Pp
+See what changes when you also allow
+.Pa /etc
+and silence down further warnings:
+.Dl cs -qr /usr -r /etc ls -al /usr
 .Sh SEE ALSO
 .Xr capv 1 ,
 .Xr coaccept 2 ,
@@ -106,7 +114,7 @@ with access only to
 .Xr capv 7
 .Sh BUGS
 .Nm
-cannot protect against malicious binaries - it only protects against
+cannot protect against malicious binaries - only against
 otherwise trustworthy binaries becoming compromised by malicious data.
 While
 .Ar command
@@ -135,6 +143,29 @@ is not currently allowed in
 capability mode, it is not possible for
 .Nm
 to support more than a single client process at a time.
+.Pp
+If you allow access to
+.Pa /proc
+you'll then be able to open
+.Pa /proc/curproc/mem
+and take over the
+.Nm
+instance.
+If you allow access to
+.Pa /dev ,
+you will be able to take over the whole machine.
+So maybe don't.
+In the long run,
+instead of calling the syscalls on behalf of the client,
+.Nm
+should be returning file descriptors to allowed directories (specified with
+.Fl r )
+for the clients to use them to call syscalls themselves.
+.Pp
+.Nm
+does not support any kind of path translation.
+This is a deliberate omission, to avoid mixing resource mapping
+with access control like NAT did.
 .Sh HISTORY
 The
 .Nm
