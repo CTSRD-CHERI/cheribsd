@@ -63,6 +63,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/machdep.h> /* For arm_set_delay */
 #endif
 
+#if defined(__aarch64__)
+#include <machine/undefined.h>
+#endif
+
 #ifdef FDT
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/ofw_bus.h>
@@ -235,12 +239,53 @@ setup_user_access(void *arg __unused)
 	isb();
 }
 
+#ifdef __aarch64__
+#if __has_feature(capabilities)
+static int
+cntfrq_handler(vm_offset_t va, uint32_t insn, struct trapframe *frame,
+	       uint32_t esr)
+{
+	uint64_t val;
+	int reg;
+
+	if ((insn & MRS_MASK) != MRS_VALUE)
+		return (0);
+
+	if (MRS_SPECIAL(insn) != MRS_SPECIAL(CNTFRQ_EL0))
+		return (0);
+
+	reg = MRS_REGISTER(insn);
+	val = READ_SPECIALREG(cntfrq_el0);
+	if (reg < nitems(frame->tf_x)) {
+		frame->tf_x[reg] = val;
+	} else if (reg == 30) {
+		frame->tf_lr = val;
+	}
+	frame->tf_elr += INSN_SIZE;
+
+	return (1);
+}
+#endif
+#endif
+
 static void
 tmr_setup_user_access(void *arg __unused)
 {
 
-	if (arm_tmr_sc != NULL)
+	if (arm_tmr_sc != NULL) {
 		smp_rendezvous(NULL, setup_user_access, NULL, NULL);
+#ifdef __aarch64__
+#if __has_feature(capabilities)
+                /*
+                 * This is required for Morello, because access to cntfrq_el0
+                 * is gated by the Access System Registers permission,
+                 * making it inaccessible to user space.
+                 * We emulate access here to work around this issue.
+                 */
+                install_undef_handler(true, cntfrq_handler);
+#endif
+#endif
+	}
 }
 SYSINIT(tmr_ua, SI_SUB_SMP, SI_ORDER_ANY, tmr_setup_user_access, NULL);
 
