@@ -37,6 +37,7 @@
 #include <sys/lock.h>
 #include <sys/module.h>
 #include <sys/mutex.h>
+#include <sys/smp.h>
 #include <machine/bus.h>
 
 #include <dev/ofw/ofw_bus.h>
@@ -100,19 +101,27 @@ coresight_fdt_get_ports(phandle_t dev_node, phandle_t node,
 }
 
 static int
-coresight_fdt_get_cpu(phandle_t node,
-    struct coresight_platform_data *pdata)
+coresight_fdt_get_cpu(phandle_t node, struct coresight_platform_data *pdata)
 {
+	struct pcpu *pcpu;
 	phandle_t cpu_node;
 	pcell_t xref;
-	pcell_t cpu_reg;
+	pcell_t cpu_reg[2];
+	int i;
 
 	if (OF_getencprop(node, "cpu", &xref, sizeof(xref)) != -1) {
 		cpu_node = OF_node_from_xref(xref);
 		if (OF_getencprop(cpu_node, "reg", (void *)&cpu_reg,
-			sizeof(cpu_reg)) > 0) {
-			pdata->cpu = cpu_reg;
-			return (0);
+		    sizeof(cpu_reg)) > 0) {
+			for (i = 0; i < mp_ncpus; i++) {
+				pcpu = cpuid_to_pcpu[i];
+				if (pcpu->pc_mpidr_low == cpu_reg[1] &&
+				    pcpu->pc_mpidr_high == cpu_reg[0]) {
+					pdata->cpu = pcpu->pc_cpuid;
+printf("cpuid %d\n", pdata->cpu);
+					return (0);
+				}
+			}
 		}
 	}
 

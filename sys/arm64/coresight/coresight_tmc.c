@@ -83,7 +83,7 @@ tmc_alloc_pages(struct tmc_softc *sc, vm_page_t *pages, int npages)
 	boundary = 0;
 	pflags = VM_ALLOC_NORMAL | VM_ALLOC_NOBUSY | VM_ALLOC_WIRED |
 	    VM_ALLOC_ZERO;
-	memattr = VM_MEMATTR_WRITE_COMBINING;
+	memattr = VM_MEMATTR_DEFAULT;
 
 	for (i = 0; i < npages; i++) {
 		tries = 0;
@@ -107,6 +107,7 @@ retry:
 
 		va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 		cpu_dcache_wb_range(va, PAGE_SIZE);
+		cpu_dcache_inv_range(va, PAGE_SIZE);
 		m->valid = VM_PAGE_BITS_ALL;
 		m->oflags &= ~VPO_UNMANAGED;
 		m->flags |= PG_FICTITIOUS;
@@ -125,7 +126,8 @@ tmc_start(device_t dev)
 
 	sc = device_get_softc(dev);
 
-printf("%s\n", __func__);
+	if (sc->dev_type == CORESIGHT_ETR)
+		printf("%s%d\n", __func__, device_get_unit(dev));
 
 	if (bus_read_4(sc->res[0], TMC_CTL) & CTL_TRACECAPTEN)
 		return (-1);
@@ -154,6 +156,8 @@ tmc_stop(device_t dev)
 	uint32_t reg;
 
 	sc = device_get_softc(dev);
+
+printf("%s\n", __func__);
 
 	reg = bus_read_4(sc->res[0], TMC_CTL);
 	reg &= ~CTL_TRACECAPTEN;
@@ -186,13 +190,14 @@ tmc_dump(device_t dev)
 
 	reg = bus_read_4(sc->res[0], TMC_DEVID);
 	if ((reg & DEVID_CONFIGTYPE_M) == DEVID_CONFIGTYPE_ETR)
-		printf("%s%d: STS %x, CTL %x, RSZ %x, RRP %lx, RWP %lx\n",
+		printf("%s%d: STS %x, CTL %x, RSZ %x, RRP %lx, RWP %lx, AXICTL %x\n",
 		    __func__,
 		    device_get_unit(dev),
 		    bus_read_4(sc->res[0], TMC_STS),
 		    bus_read_4(sc->res[0], TMC_CTL),
 		    bus_read_4(sc->res[0], TMC_RSZ),
-		    rrp, rwp);
+		    rrp, rwp,
+		    bus_read_4(sc->res[0], TMC_AXICTL));
 }
 
 static int
@@ -222,6 +227,8 @@ tmc_configure_etr(device_t dev, struct endpoint *endp,
 {
 	struct tmc_softc *sc;
 	uint32_t reg;
+
+printf("%s\n", __func__);
 
 	sc = device_get_softc(dev);
 
@@ -340,14 +347,20 @@ tmc_configure(device_t dev, struct coresight_event *event)
 		} else {
 			type = ETR_SG_ET_NORMAL;
 			paddr = VM_PAGE_TO_PHYS(pages[curpg]);
-			curpg++;
 
+#if 0
 			if ((i % 100) == 0)
-				printf("%s: entry (%d/%d) type %d dirpg %d curpg %d paddr %lx\n", __func__, i, nentries, type, dirpg, curpg, paddr);
+				printf("%s: entry (%d/%d) type %d dirpg %d "
+				    "curpg %d paddr %lx\n", __func__, i, nentries,
+				    type, dirpg, curpg, paddr);
+#endif
+
+			curpg++;
 		}
 
-
-		*ptr++ = ETR_SG_ENTRY(paddr, type);
+		*ptr = ETR_SG_ENTRY(paddr, type);
+		cpu_dcache_wb_range((vm_pointer_t)ptr, sizeof(sgte_t));
+		ptr++;
 
 		/* Take next directory page. */
 		if (type == ETR_SG_ET_LINK) {
@@ -362,6 +375,7 @@ tmc_configure(device_t dev, struct coresight_event *event)
 	/* Last entry. */
 	paddr = VM_PAGE_TO_PHYS(pages[curpg]);
 	*ptr = ETR_SG_ENTRY(paddr, ETR_SG_ET_LAST);
+	cpu_dcache_wb_range((vm_pointer_t)ptr, sizeof(sgte_t));
 
 #if 0
 	/* Dump */
@@ -373,9 +387,11 @@ tmc_configure(device_t dev, struct coresight_event *event)
 	printf("%s: event->etr.pages %p\n", __func__, event->etr.pages);
 	printf("%s: event->etr.npages %d\n", __func__, event->etr.npages);
 
-	uintptr_t pbase;
+	uint64_t pbase;
 
-	pbase = VM_PAGE_TO_PHYS(pt_dir[0]);
+	pbase = (uint64_t)VM_PAGE_TO_PHYS(pt_dir[0]);
+
+	printf("%s: pbase %lx\n", __func__, pbase);
 
 	bus_write_4(sc->res[0], TMC_DBALO, pbase & 0xffffffff);
 	bus_write_4(sc->res[0], TMC_DBAHI, pbase >> 32);
@@ -440,8 +456,8 @@ tmc_start_event(device_t dev, struct endpoint *endp,
 	 * We allow only one running configuration.
 	 */
 
-	if (event->etr.flags & ETR_FLAG_ALLOCATE) {
-		event->etr.flags &= ~ETR_FLAG_ALLOCATE;
+	//if (event->etr.flags & ETR_FLAG_ALLOCATE) {
+	//	event->etr.flags &= ~ETR_FLAG_ALLOCATE;
 		nev = atomic_fetchadd_int(&sc->nev, 1);
 		if (nev == 0) {
 			sc->event = event;
@@ -449,7 +465,7 @@ tmc_start_event(device_t dev, struct endpoint *endp,
 			tmc_configure_etr(dev, endp, event);
 			tmc_start(dev);
 		}
-	}
+	//}
 
 	return (0);
 }
@@ -469,14 +485,14 @@ tmc_stop_event(device_t dev, struct endpoint *endp,
 
 	KASSERT(sc->dev_type == CORESIGHT_ETR, ("Wrong dev_type"));
 
-	if (event->etr.flags & ETR_FLAG_RELEASE) {
-		event->etr.flags &= ~ETR_FLAG_RELEASE;
+	//if (event->etr.flags & ETR_FLAG_RELEASE) {
+	//	event->etr.flags &= ~ETR_FLAG_RELEASE;
 		nev = atomic_fetchadd_int(&sc->nev, -1);
 		if (nev == 1) {
 			tmc_stop(dev);
 			sc->event = NULL;
 		}
-	}
+	//}
 }
 
 static void
@@ -496,6 +512,8 @@ tmc_read(device_t dev, struct endpoint *endp, struct coresight_event *event)
 	uint32_t cur_ptr;
 
 	sc = device_get_softc(dev);
+
+	panic("read called");
 
 	if (sc->dev_type == CORESIGHT_ETF)
 		return (0);

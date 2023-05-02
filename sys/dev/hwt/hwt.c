@@ -102,7 +102,7 @@ static int
 hwt_event_init(struct hwt *hwt)
 {
 
-	printf("%s\n", __func__);
+	printf("%s: cpu %d\n", __func__, hwt->cpu_id);
 
 	hwt_backend->ops->hwt_event_init(hwt);
 
@@ -116,6 +116,17 @@ hwt_event_start(struct hwt *hwt)
 	printf("%s\n", __func__);
 
 	hwt_backend->ops->hwt_event_start(hwt);
+
+	return (0);
+}
+
+static int
+hwt_event_stop(struct hwt *hwt)
+{
+
+	printf("%s\n", __func__);
+
+	hwt_backend->ops->hwt_event_stop(hwt);
 
 	return (0);
 }
@@ -180,7 +191,7 @@ hwt_alloc_pages(struct hwt *hwt)
 	boundary = 0;
 	pflags = VM_ALLOC_NORMAL | VM_ALLOC_NOBUSY | VM_ALLOC_WIRED |
 	    VM_ALLOC_ZERO;
-	memattr = VM_MEMATTR_WRITE_COMBINING;
+	memattr = VM_MEMATTR_DEFAULT;
 
 	hwt->obj = vm_pager_allocate(OBJT_PHYS, 0, hwt->npages * PAGE_SIZE,
 	    PROT_READ, 0, curthread->td_ucred);
@@ -210,6 +221,7 @@ retry:
 
 		va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 		cpu_dcache_wb_range(va, PAGE_SIZE);
+		cpu_dcache_inv_range(va, PAGE_SIZE);
 		m->valid = VM_PAGE_BITS_ALL;
 		m->oflags &= ~VPO_UNMANAGED;
 		m->flags |= PG_FICTITIOUS;
@@ -617,9 +629,14 @@ hwt_switch_in(struct thread *td)
 
 	cpu = PCPU_GET(cpuid);
 
-	hp = hwt_lookup_proc_by_cpu(p, cpu);
+	dprintf("%s\n", __func__);
 
-	//dprintf("%s: hp %p\n", __func__, hp);
+	hp = hwt_lookup_proc_by_cpu(p, cpu);
+	if (!hp)
+		panic("no hp");
+
+	dprintf("%s: hp %p on cpu %d\n", __func__, hp, cpu);
+	dprintf("%s: hp->hwt->started %d\n", __func__, hp->hwt->started);
 
 	if (hp->hwt->started)
 		hwt_event_enable(hp->hwt);
@@ -640,7 +657,7 @@ hwt_switch_out(struct thread *td)
 
 	hp = hwt_lookup_proc_by_cpu(p, cpu);
 
-	//dprintf("%s: hp %p\n", __func__, hp);
+	dprintf("%s: hp %p from cpu %d\n", __func__, hp, cpu);
 
 	if (hp->hwt->started) {
 		hwt_event_disable(hp->hwt);
@@ -664,12 +681,13 @@ hwt_stop_proc_hwts(struct hwt_prochash *hph, struct proc *p)
 	mtx_lock_spin(&hwt_prochash_mtx);
 	LIST_FOREACH_SAFE(hp, hph, next, hp1) {
 		if (hp->p == p) {
-			printf("%s: stopping hwt on cpu %d\n", __func__,
+			printf("%s: stopping proc hwts on cpu %d\n", __func__,
 			    hp->cpu_id);
 			hwt = hp->hwt;
 			hwt->started = 0;
 			hwt_event_disable(hwt);
 			hwt_event_dump(hwt);
+			hwt_event_stop(hwt);
 			LIST_REMOVE(hp, next);
 		}
 	}
@@ -686,12 +704,13 @@ hwt_stop_owner_hwts(struct hwt_prochash *hph, struct hwt_owner *ho)
 	mtx_lock_spin(&hwt_prochash_mtx);
 	LIST_FOREACH_SAFE(hp, hph, next, hp1) {
 		if (hp->hwt_owner == ho) {
-			printf("%s: stopping hwt on cpu %d\n", __func__,
+			printf("%s: stopping owner hwts on cpu %d\n", __func__,
 			    hp->cpu_id);
 			hwt = hp->hwt;
 			hwt->started = 0;
 			hwt_event_disable(hwt);
 			hwt_event_dump(hwt);
+			hwt_event_stop(hwt);
 			LIST_REMOVE(hp, next);
 		}
 	}

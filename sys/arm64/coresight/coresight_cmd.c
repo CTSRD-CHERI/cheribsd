@@ -97,6 +97,8 @@ coresight_init_event(int cpu, struct coresight_event *event)
 	struct coresight_device *cs_dev;
 	struct endpoint *endp;
 
+printf("%s: cpu %d\n", __func__, cpu);
+
 	/* Start building path from source device */
 	TAILQ_FOREACH(cs_dev, &cs_devs, link) {
 		if (cs_dev->dev_type == event->src &&
@@ -117,16 +119,16 @@ coresight_init_event(int cpu, struct coresight_event *event)
 	/* Init all devices in the path */
 	LIST_FOREACH(endp, &event->endplist, endplink) {
 		cs_dev = endp->cs_dev;
-		printf("%s: initing dev %p type %d\n", __func__, cs_dev->dev,
-		    cs_dev->dev_type);
+		//printf("%s: initing dev %p type %d\n", __func__, cs_dev->dev,
+		//    cs_dev->dev_type);
 		CORESIGHT_INIT(cs_dev->dev);
 	}
 
 	/* Configure all devices in the path. */
 	LIST_FOREACH(endp, &event->endplist, endplink) {
 		cs_dev = endp->cs_dev;
-		printf("%s: configure dev %p type %d\n", __func__, cs_dev->dev,
-		    cs_dev->dev_type);
+		//printf("%s: configure dev %p type %d\n", __func__, cs_dev->dev,
+		//    cs_dev->dev_type);
 		CORESIGHT_CONFIGURE(cs_dev->dev, event);
 	}
 
@@ -165,6 +167,8 @@ coresight_enable(int cpu, struct coresight_event *event)
 
 	LIST_FOREACH(endp, &event->endplist, endplink) {
 		cs_dev = endp->cs_dev;
+		//printf("%s: enabling dev %p type %d\n", __func__, cs_dev->dev,
+		//    cs_dev->dev_type);
 		CORESIGHT_ENABLE(cs_dev->dev, endp, event);
 	}
 }
@@ -177,6 +181,8 @@ coresight_disable(int cpu, struct coresight_event *event)
 
 	LIST_FOREACH(endp, &event->endplist, endplink) {
 		cs_dev = endp->cs_dev;
+		//printf("%s: disabling dev %p type %d\n", __func__, cs_dev->dev,
+		//    cs_dev->dev_type);
 		CORESIGHT_DISABLE(cs_dev->dev, endp, event);
 	}
 }

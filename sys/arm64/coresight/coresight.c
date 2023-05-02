@@ -123,7 +123,7 @@ coresight_event_disable(struct hwt *hwt)
 
 	event = &cs_event[hwt->cpu_id];
 
-	coresight_enable(hwt->cpu_id, event);
+	coresight_disable(hwt->cpu_id, event);
 }
 
 static void
