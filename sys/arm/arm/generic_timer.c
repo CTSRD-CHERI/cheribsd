@@ -705,7 +705,9 @@ arm_tmr_attach(device_t dev)
 #endif
 
 	/* Use the virtual timer for userland (and eventcounter). */
-	sc->user_physical = false;
+	if (!TUNABLE_BOOL_FETCH("hw.user_access_phys_counter", &sc->user_physical)) {
+		sc->user_physical = false;
+	}
 
 #ifdef __aarch64__
 	/*
