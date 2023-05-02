@@ -33,6 +33,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/auxv.h>
+#include <sys/capsicum.h>
 #include <assert.h>
 #include <capv.h>
 #include <ctype.h>
@@ -188,6 +189,10 @@ main(int argc, char **argv)
 		coexecvpc(getppid(), argv[0], argv, new_capv, capc);
 		err(1, "%s", argv[0]);
 	}
+
+	error = cap_enter();
+	if (error != 0)
+		err(1, "cap_enter");
 
 	if (!nflag) {
 		error = cosetup(COSETUP_COCALL);
