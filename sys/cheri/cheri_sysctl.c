@@ -119,3 +119,13 @@ SYSCTL_INT(_security_cheri, OID_AUTO, runtime_revocation_async,
     CTLFLAG_RWTUN, &security_cheri_runtime_revocation_async, 0,
     "Userspace requests (a)synchronous revocation by default");
 #endif  /* CHERI_CAPREVOKE */
+
+static bool security_cheri_kernel_capability_flow_restriction =
+#ifdef CHERI_RESTRICT_KERNCAP_FLOW
+    true;
+#else
+    false;
+#endif
+SYSCTL_BOOL(_security_cheri, OID_AUTO, restrict_kernel_capflow,
+    CTLFLAG_RD, &security_cheri_kernel_capability_flow_restriction, 0,
+    "Kernel implements capability leak protection.");
