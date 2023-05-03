@@ -34,6 +34,9 @@
 
 #include <sys/cdefs.h>
 #include <sys/types.h>
+#if !defined(_KERNEL) && !defined(_STANDALONE)
+#include <stdbool.h>
+#endif
 
 #if __has_feature(capabilities)
 #include <cheri/cherireg.h>	/* Permission definitions. */
@@ -96,11 +99,7 @@
  * Return whether the two pointers are equal, including capability metadata if
  * in purecap mode.
  */
-#ifdef __cplusplus
 static inline bool
-#else
-static inline _Bool
-#endif
 cheri_ptr_equal_exact(void *x, void *y)
 {
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -140,11 +139,7 @@ cheri_ptr_equal_exact(void *x, void *y)
 })
 
 /* Check if the address is between cap.base and cap.top, i.e. in bounds */
-#ifdef __cplusplus
 static inline bool
-#else
-static inline _Bool
-#endif
 cheri_is_address_inbounds(const void * __capability cap, ptraddr_t addr)
 {
 	return (addr >= cheri_getbase(cap) && addr < cheri_gettop(cap));
