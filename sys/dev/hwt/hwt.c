@@ -98,6 +98,23 @@ struct hwt_softc hwt_sc;
 
 static struct hwt_backend *hwt_backend;
 
+static void
+hwt_dump_pages(struct hwt *hwt)
+{
+	vm_pointer_t va;
+	uint64_t *d;
+	vm_page_t m;
+
+	m = hwt->pages[0];
+
+	va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
+	d = (uint64_t *)va;
+
+	cpu_dcache_inv_range(va, PAGE_SIZE);
+
+	printf("data %lx %lx %lx %lx\n", d[0], d[1], d[2], d[3]);
+}
+
 static int
 hwt_event_init(struct hwt *hwt)
 {
@@ -178,7 +195,7 @@ hwt_alloc_pages(struct hwt *hwt)
 {
 	vm_paddr_t low, high, boundary;
 	vm_memattr_t memattr;
-	vm_pointer_t va;
+	//vm_pointer_t va;
 	int alignment;
 	vm_page_t m;
 	int pflags;
@@ -191,12 +208,14 @@ hwt_alloc_pages(struct hwt *hwt)
 	boundary = 0;
 	pflags = VM_ALLOC_NORMAL | VM_ALLOC_NOBUSY | VM_ALLOC_WIRED |
 	    VM_ALLOC_ZERO;
-	memattr = VM_MEMATTR_DEFAULT;
+	memattr = VM_MEMATTR_DEVICE;
 
-	hwt->obj = vm_pager_allocate(OBJT_PHYS, 0, hwt->npages * PAGE_SIZE,
+	hwt->obj = vm_pager_allocate(OBJT_DEVICE, 0, hwt->npages * PAGE_SIZE,
 	    PROT_READ, 0, curthread->td_ucred);
 
 	VM_OBJECT_WLOCK(hwt->obj);
+
+	vm_object_set_memattr(hwt->obj, memattr);
 
 	for (i = 0; i < hwt->npages; i++) {
 		tries = 0;
@@ -216,12 +235,12 @@ retry:
 			return (ENOMEM);
 		}
 
-		if ((m->flags & PG_ZERO) == 0)
-			pmap_zero_page(m);
+		//if ((m->flags & PG_ZERO) == 0)
+		//	pmap_zero_page(m);
 
-		va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
-		cpu_dcache_wb_range(va, PAGE_SIZE);
-		cpu_dcache_inv_range(va, PAGE_SIZE);
+		//va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
+		//cpu_dcache_wb_range(va, PAGE_SIZE);
+		//cpu_dcache_inv_range(va, PAGE_SIZE);
 		m->valid = VM_PAGE_BITS_ALL;
 		m->oflags &= ~VPO_UNMANAGED;
 		m->flags |= PG_FICTITIOUS;
@@ -230,6 +249,25 @@ retry:
 	}
 
 	VM_OBJECT_WUNLOCK(hwt->obj);
+
+	return (0);
+}
+
+static int
+hwt_mmap(struct cdev *cdev, vm_ooffset_t offset, vm_paddr_t *paddr,
+    int nprot, vm_memattr_t *memattr)
+{
+	struct hwt *hwt;
+	int page;
+
+	hwt = cdev->si_drv1;
+
+printf("%s: obj %p\n", __func__, hwt->obj);
+
+	page = offset / 4096;
+
+	*paddr = VM_PAGE_TO_PHYS(hwt->pages[page]);
+	*memattr = VM_MEMATTR_DEVICE;
 
 	return (0);
 }
@@ -247,13 +285,30 @@ hwt_mmap_single(struct cdev *cdev, vm_ooffset_t *offset, vm_size_t mapsize,
 
 	*objp = hwt->obj;
 
+	VM_OBJECT_WLOCK(hwt->obj);
+	vm_object_set_memattr(hwt->obj, VM_MEMATTR_DEVICE);
+	VM_OBJECT_WUNLOCK(hwt->obj);
+
+printf("%s: obj %p\n", __func__, hwt->obj);
+
+	return (0);
+}
+
+static int
+hwt_open(struct cdev *cdev, int oflags, int devtype, struct thread *td)
+{
+
+	printf("%s\n", __func__);
+
 	return (0);
 }
 
 static struct cdevsw hwt_context_cdevsw = {
 	.d_version	= D_VERSION,
 	.d_name		= "hwt",
-	.d_mmap_single	= hwt_mmap_single,
+	.d_open		= hwt_open,
+	.d_mmap		= hwt_mmap,
+	//.d_mmap_single	= hwt_mmap_single,
 	.d_ioctl	= NULL,
 };
 
@@ -468,13 +523,15 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	struct hwt_softc *sc;
 	struct hwt_attach *a;
 	struct hwt_start *s;
+	struct hwt_alloc *halloc;
 	struct proc *p;
-	int error;
+	struct hwt_flush *f;
 	struct hwt_proc *hp, *hpnew;
 	struct hwt *hwt __unused;
 	struct hwt_owner *ho;
 	struct hwt_ownerhash *hoh;
 	int hindex;
+	int error;
 
 	int len;
 
@@ -486,8 +543,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 	dprintf("%s: cmd %lx, addr %lx, len %d\n", __func__, cmd,
 	    (uint64_t)addr, len);
-
-	struct hwt_alloc *halloc;
 
 	switch (cmd) {
 	case HWT_IOC_ALLOC:
@@ -518,6 +573,8 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		hwt->cpu_id = halloc->cpu_id;
 		hwt->hwt_id = 110 + hwt->cpu_id;
 		hwt->hwt_owner = ho;
+
+printf("%s: hwt->cpu_id %d obj %p\n", __func__, hwt->cpu_id, hwt->obj);
 
 		mtx_lock(&ho->mtx);
 		LIST_INSERT_HEAD(&ho->hwts, hwt, next);
@@ -609,6 +666,32 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		hwt->started = 1;
 
 		break;
+	case HWT_IOC_FLUSH:
+		f = (struct hwt_flush *)addr;
+
+		dprintf("%s: inv dcache\n", __func__);
+		dprintf("%s: inv dcache, hwt_id %d\n", __func__, f->hwt_id);
+
+		/* Check if process is registered owner of any HWTs. */
+		ho = hwt_lookup_owner(td->td_proc);
+		if (ho == NULL) {
+			/* No HWTs allocated. So nothing to attach to. */
+			return (ENXIO);
+		}
+
+		/* Now find HWT we want to activate. */
+		hwt = hwt_lookup_by_id(ho, f->hwt_id);
+		if (hwt == NULL) {
+			/* No HWT with such id. */
+			return (ENXIO);
+		}
+
+		
+		dprintf("%s: inv dcache, va %#p, size %d\n", __func__,
+		    (void *)f->va, hwt->npages * PAGE_SIZE);
+		cpu_dcache_inv_range((vm_pointer_t)f->va, hwt->npages * PAGE_SIZE);
+
+		break;
 	default:
 		break;
 	};
@@ -688,6 +771,7 @@ hwt_stop_proc_hwts(struct hwt_prochash *hph, struct proc *p)
 			hwt_event_disable(hwt);
 			hwt_event_dump(hwt);
 			hwt_event_stop(hwt);
+			hwt_dump_pages(hwt);
 			LIST_REMOVE(hp, next);
 		}
 	}
