@@ -146,6 +146,19 @@ cheri_is_address_inbounds(const void * __capability cap, ptraddr_t addr)
 }
 
 /*
+ * Check if the capability is valid, unsealed, has the given permissions and
+ * grants access to length bytes at address base.
+ */
+static inline bool
+cheri_can_access(const void * __capability cap, ptraddr_t perms, ptraddr_t base,
+    size_t length)
+{
+	return (cheri_gettag(cap) && !cheri_getsealed(cap) &&
+	    (cheri_getperm(cap) & perms) == perms &&
+	    base >= cheri_getbase(cap) && base + length <= cheri_gettop(cap));
+}
+
+/*
  * Two variations on cheri_ptr() based on whether we are looking for a code or
  * data capability.  The compiler's use of CFromPtr will be with respect to
  * $ddc or $pcc depending on the type of the pointer derived, so we need to
