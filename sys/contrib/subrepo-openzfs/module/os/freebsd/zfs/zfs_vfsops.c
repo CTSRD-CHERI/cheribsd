@@ -230,7 +230,8 @@ zfs_get_temporary_prop(dsl_dataset_t *ds, zfs_prop_t zfs_prop, uint64_t *val,
 
 	vfs_unbusy(vfsp);
 	if (tmp != *val) {
-		(void) strcpy(setpoint, "temporary");
+		if (setpoint)
+			(void) strcpy(setpoint, "temporary");
 		*val = tmp;
 	}
 	return (0);
@@ -437,10 +438,6 @@ zfs_sync(vfs_t *vfsp, int waitfor)
 		zfsvfs_t *zfsvfs = vfsp->vfs_data;
 		dsl_pool_t *dp;
 		int error;
-
-		error = vfs_stdsync(vfsp, waitfor);
-		if (error != 0)
-			return (error);
 
 		if ((error = zfs_enter(zfsvfs, FTAG)) != 0)
 			return (error);
@@ -725,7 +722,7 @@ zfs_register_callbacks(vfs_t *vfsp)
 		nbmand = B_FALSE;
 	} else if (vfs_optionisset(vfsp, MNTOPT_NBMAND, NULL)) {
 		nbmand = B_TRUE;
-	} else if ((error = dsl_prop_get_int_ds(ds, "nbmand", &nbmand) != 0)) {
+	} else if ((error = dsl_prop_get_int_ds(ds, "nbmand", &nbmand)) != 0) {
 		dsl_pool_config_exit(dmu_objset_pool(os), FTAG);
 		return (error);
 	}
@@ -1328,15 +1325,8 @@ zfs_mount(vfs_t *vfsp)
 	}
 
 	fetch_osname_options(osname, &checkpointrewind);
-
-	/*
-         * TBD: Mounting ZFS as root causes a panic in zfsctl_is_node()
-         * add temporary workaround until issue is resolved
-         */
-	if ((vfsp->vfs_flag & MNT_ROOTFS) != 0 &&
-	    (vfsp->vfs_flag & MNT_UPDATE) == 0) {
-		isctlsnap = (zfsctl_is_node(mvp) && strchr(osname, '@') != NULL);
-	}
+	isctlsnap = (mvp != NULL && zfsctl_is_node(mvp) &&
+	    strchr(osname, '@') != NULL);
 
 	/*
 	 * Check for mount privilege?

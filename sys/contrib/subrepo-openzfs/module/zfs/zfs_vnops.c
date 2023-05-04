@@ -106,7 +106,7 @@ zfs_holey_common(znode_t *zp, ulong_t cmd, loff_t *off)
 		hole = B_FALSE;
 
 	/* Flush any mmap()'d data to disk */
-	if (zn_has_cached_data(zp))
+	if (zn_has_cached_data(zp, 0, file_sz - 1))
 		zn_flush_cached_data(zp, B_FALSE);
 
 	lr = zfs_rangelock_enter(&zp->z_rangelock, 0, file_sz, RL_READER);
@@ -288,7 +288,8 @@ zfs_read(struct znode *zp, zfs_uio_t *uio, int ioflag, cred_t *cr)
 			error = mappedread_sf(zp, nbytes, uio);
 		else
 #endif
-		if (zn_has_cached_data(zp) && !(ioflag & O_DIRECT)) {
+		if (zn_has_cached_data(zp, zfs_uio_offset(uio),
+		    zfs_uio_offset(uio) + nbytes - 1) && !(ioflag & O_DIRECT)) {
 			error = mappedread(zp, nbytes, uio);
 		} else {
 			error = dmu_read_uio_dbuf(sa_get_db(zp->z_sa_hdl),
@@ -696,7 +697,8 @@ zfs_write(znode_t *zp, zfs_uio_t *uio, int ioflag, cred_t *cr)
 			zfs_uioskip(uio, nbytes);
 			tx_bytes = nbytes;
 		}
-		if (tx_bytes && zn_has_cached_data(zp) &&
+		if (tx_bytes &&
+		    zn_has_cached_data(zp, woff, woff + tx_bytes - 1) &&
 		    !(ioflag & O_DIRECT)) {
 			update_pages(zp, woff, tx_bytes, zfsvfs->z_os);
 		}
@@ -876,7 +878,7 @@ zfs_get_data(void *arg, uint64_t gen, lr_write_t *lr, char *buf,
 		return (SET_ERROR(ENOENT));
 	}
 
-	zgd = (zgd_t *)kmem_zalloc(sizeof (zgd_t), KM_SLEEP);
+	zgd = kmem_zalloc(sizeof (zgd_t), KM_SLEEP);
 	zgd->zgd_lwb = lwb;
 	zgd->zgd_private = zp;
 

@@ -493,6 +493,7 @@ dmu_dump_write(dmu_send_cookie_t *dscp, dmu_object_type_t type, uint64_t object,
 	    (bp != NULL ? BP_GET_COMPRESS(bp) != ZIO_COMPRESS_OFF &&
 	    io_compressed : lsize != psize);
 	if (raw || compressed) {
+		ASSERT(bp != NULL);
 		ASSERT(raw || dscp->dsc_featureflags &
 		    DMU_BACKUP_FEATURE_COMPRESSED);
 		ASSERT(!BP_IS_EMBEDDED(bp));
@@ -584,7 +585,13 @@ dump_write_embedded(dmu_send_cookie_t *dscp, uint64_t object, uint64_t offset,
 
 	decode_embedded_bp_compressed(bp, buf);
 
-	if (dump_record(dscp, buf, P2ROUNDUP(drrw->drr_psize, 8)) != 0)
+	uint32_t psize = drrw->drr_psize;
+	uint32_t rsize = P2ROUNDUP(psize, 8);
+
+	if (psize != rsize)
+		memset(buf + psize, 0, rsize - psize);
+
+	if (dump_record(dscp, buf, rsize) != 0)
 		return (SET_ERROR(EINTR));
 	return (0);
 }
@@ -1586,8 +1593,6 @@ send_merge_thread(void *arg)
 		}
 		range_free(front_ranges[i]);
 	}
-	if (range == NULL)
-		range = kmem_zalloc(sizeof (*range), KM_SLEEP);
 	range->eos_marker = B_TRUE;
 	bqueue_enqueue_flush(&smt_arg->q, range, 1);
 	spl_fstrans_unmark(cookie);
@@ -1714,8 +1719,10 @@ enqueue_range(struct send_reader_thread_arg *srta, bqueue_t *q, dnode_t *dn,
 	struct send_range *range = range_alloc(range_type, dn->dn_object,
 	    blkid, blkid + count, B_FALSE);
 
-	if (blkid == DMU_SPILL_BLKID)
+	if (blkid == DMU_SPILL_BLKID) {
+		ASSERT3P(bp, !=, NULL);
 		ASSERT3U(BP_GET_TYPE(bp), ==, DMU_OT_SA);
+	}
 
 	switch (range_type) {
 	case HOLE:
@@ -1836,8 +1843,7 @@ send_reader_thread(void *arg)
 				continue;
 			}
 			uint64_t file_max =
-			    (dn->dn_maxblkid < range->end_blkid ?
-			    dn->dn_maxblkid : range->end_blkid);
+			    MIN(dn->dn_maxblkid, range->end_blkid);
 			/*
 			 * The object exists, so we need to try to find the
 			 * blkptr for each block in the range we're processing.
@@ -3023,8 +3029,7 @@ dmu_send_estimate_fast(dsl_dataset_t *origds, dsl_dataset_t *fromds,
 
 		dsl_dataset_name(origds, dsname);
 		(void) strcat(dsname, "/");
-		(void) strlcat(dsname, recv_clone_name,
-		    sizeof (dsname) - strlen(dsname));
+		(void) strlcat(dsname, recv_clone_name, sizeof (dsname));
 
 		err = dsl_dataset_hold(origds->ds_dir->dd_pool,
 		    dsname, FTAG, &ds);

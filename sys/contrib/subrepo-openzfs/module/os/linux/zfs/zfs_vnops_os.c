@@ -555,6 +555,7 @@ zfs_create(znode_t *dzp, char *name, vattr_t *vap, int excl,
 	boolean_t	fuid_dirtied;
 	boolean_t	have_acl = B_FALSE;
 	boolean_t	waited = B_FALSE;
+	boolean_t	skip_acl = (flag & ATTR_NOACLCHECK) ? B_TRUE : B_FALSE;
 
 	/*
 	 * If we have an ephemeral id, ACL, or XVATTR then
@@ -627,7 +628,7 @@ top:
 		 * Create a new file object and update the directory
 		 * to reference it.
 		 */
-		if ((error = zfs_zaccess(dzp, ACE_ADD_FILE, 0, B_FALSE, cr,
+		if ((error = zfs_zaccess(dzp, ACE_ADD_FILE, 0, skip_acl, cr,
 		    mnt_ns))) {
 			if (have_acl)
 				zfs_acl_ids_free(&acl_ids);
@@ -720,7 +721,6 @@ top:
 
 		if (have_acl)
 			zfs_acl_ids_free(&acl_ids);
-		have_acl = B_FALSE;
 
 		/*
 		 * A directory entry already exists for this name.
@@ -987,7 +987,7 @@ top:
 
 	mutex_enter(&zp->z_lock);
 	may_delete_now = atomic_read(&ZTOI(zp)->i_count) == 1 &&
-	    !(zp->z_is_mapped);
+	    !zn_has_cached_data(zp, 0, LLONG_MAX);
 	mutex_exit(&zp->z_lock);
 
 	/*
@@ -1075,7 +1075,8 @@ top:
 		    &xattr_obj_unlinked, sizeof (xattr_obj_unlinked));
 		delete_now = may_delete_now && !toobig &&
 		    atomic_read(&ZTOI(zp)->i_count) == 1 &&
-		    !(zp->z_is_mapped) && xattr_obj == xattr_obj_unlinked &&
+		    !zn_has_cached_data(zp, 0, LLONG_MAX) &&
+		    xattr_obj == xattr_obj_unlinked &&
 		    zfs_external_acl(zp) == acl_obj;
 	}
 
@@ -2186,7 +2187,7 @@ top:
 			vap->va_mask &= ~trim_mask;
 		}
 		err = secpolicy_vnode_setattr(cr, ip, vap, &oldva, flags,
-		    (int (*)(void *, int, cred_t *))zfs_zaccess_unix, zp);
+		    zfs_zaccess_unix, zp);
 		if (err)
 			goto out3;
 
@@ -2531,7 +2532,7 @@ out:
 		dmu_tx_commit(tx);
 		if (attrzp) {
 			if (err2 == 0 && handle_eadir)
-				err2 = zfs_setattr_dir(attrzp);
+				err = zfs_setattr_dir(attrzp);
 			zrele(attrzp);
 		}
 		zfs_znode_update_vfs(zp);

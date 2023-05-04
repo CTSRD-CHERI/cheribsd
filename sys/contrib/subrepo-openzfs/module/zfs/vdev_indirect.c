@@ -270,7 +270,7 @@ typedef struct indirect_split {
 	 */
 	indirect_child_t *is_good_child;
 
-	indirect_child_t is_child[1]; /* variable-length */
+	indirect_child_t is_child[];
 } indirect_split_t;
 
 /*
@@ -1479,12 +1479,12 @@ vdev_indirect_all_checksum_errors(zio_t *zio)
 
 			vdev_t *vd = ic->ic_vdev;
 
-			(void) zfs_ereport_post_checksum(zio->io_spa, vd,
-			    NULL, zio, is->is_target_offset, is->is_size,
-			    NULL, NULL, NULL);
 			mutex_enter(&vd->vdev_stat_lock);
 			vd->vdev_stat.vs_checksum_errors++;
 			mutex_exit(&vd->vdev_stat_lock);
+			(void) zfs_ereport_post_checksum(zio->io_spa, vd,
+			    NULL, zio, is->is_target_offset, is->is_size,
+			    NULL, NULL, NULL);
 		}
 	}
 }

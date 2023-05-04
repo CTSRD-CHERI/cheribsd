@@ -1039,7 +1039,7 @@ dsl_dataset_has_owner(dsl_dataset_t *ds)
 	return (rv);
 }
 
-static boolean_t
+boolean_t
 zfeature_active(spa_feature_t f, void *arg)
 {
 	switch (spa_feature_table[f].fi_type) {
@@ -1698,7 +1698,6 @@ dsl_dataset_snapshot_sync_impl(dsl_dataset_t *ds, const char *snapname,
 	dsl_dataset_phys_t *dsphys;
 	uint64_t dsobj, crtxg;
 	objset_t *mos = dp->dp_meta_objset;
-	static zil_header_t zero_zil __maybe_unused;
 	objset_t *os __maybe_unused;
 
 	ASSERT(RRW_WRITE_HELD(&dp->dp_config_rwlock));
@@ -1757,6 +1756,25 @@ dsl_dataset_snapshot_sync_impl(dsl_dataset_t *ds, const char *snapname,
 		if (zfeature_active(f, ds->ds_feature[f])) {
 			dsl_dataset_activate_feature(dsobj, f,
 			    ds->ds_feature[f], tx);
+		}
+	}
+
+	/*
+	 * We are not allowed to dirty a filesystem when done receiving
+	 * a snapshot. In this case some flags such as SPA_FEATURE_LARGE_BLOCKS
+	 * will not be set and a subsequent encrypted raw send will fail. Hence
+	 * activate this feature if needed here. This needs to happen only in
+	 * syncing context.
+	 */
+	if (dmu_tx_is_syncing(tx)) {
+		for (spa_feature_t f = 0; f < SPA_FEATURES; f++) {
+			if (zfeature_active(f, ds->ds_feature_activation[f]) &&
+			    !(zfeature_active(f, ds->ds_feature[f]))) {
+				dsl_dataset_activate_feature(dsobj, f,
+				    ds->ds_feature_activation[f], tx);
+				ds->ds_feature[f] =
+				    ds->ds_feature_activation[f];
+			}
 		}
 	}
 
@@ -2103,16 +2121,6 @@ dsl_dataset_sync(dsl_dataset_t *ds, zio_t *zio, dmu_tx_t *tx)
 	}
 
 	dmu_objset_sync(ds->ds_objset, zio, tx);
-
-	for (spa_feature_t f = 0; f < SPA_FEATURES; f++) {
-		if (zfeature_active(f, ds->ds_feature_activation[f])) {
-			if (zfeature_active(f, ds->ds_feature[f]))
-				continue;
-			dsl_dataset_activate_feature(ds->ds_object, f,
-			    ds->ds_feature_activation[f], tx);
-			ds->ds_feature[f] = ds->ds_feature_activation[f];
-		}
-	}
 }
 
 /*
@@ -2285,6 +2293,17 @@ dsl_dataset_sync_done(dsl_dataset_t *ds, dmu_tx_t *tx)
 	ASSERT(!dmu_objset_is_dirty(os, dmu_tx_get_txg(tx)));
 
 	dmu_buf_rele(ds->ds_dbuf, ds);
+
+	for (spa_feature_t f = 0; f < SPA_FEATURES; f++) {
+		if (zfeature_active(f,
+		    ds->ds_feature_activation[f])) {
+			if (zfeature_active(f, ds->ds_feature[f]))
+				continue;
+			dsl_dataset_activate_feature(ds->ds_object, f,
+			    ds->ds_feature_activation[f], tx);
+			ds->ds_feature[f] = ds->ds_feature_activation[f];
+		}
+	}
 }
 
 int
