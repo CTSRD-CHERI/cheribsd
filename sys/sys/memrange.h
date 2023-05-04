@@ -69,6 +69,14 @@ struct mem_livedump_arg {
 
 #define	MEM_KERNELDUMP	_IOW('m', 53, struct mem_livedump_arg)
 
+struct mem_cheri_cap_arg {
+	ptraddr_t	vaddr;
+	void * __kerncap buf;
+	size_t		len;
+};
+
+#define	MEM_READ_CHERI_CAP	_IOW('m', 100, struct mem_cheri_cap_arg)
+
 #ifdef _KERNEL
 
 MALLOC_DECLARE(M_MEMDESC);
