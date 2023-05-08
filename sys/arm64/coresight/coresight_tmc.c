@@ -243,7 +243,7 @@ printf("%s\n", __func__);
 	reg |= AXICTL_WRBURSTLEN_16;
 	if (sc->scatter_gather)
 		reg |= AXICTL_SG_MODE;
-	reg |= AXICTL_AXCACHE_OS;
+	//reg |= AXICTL_AXCACHE_OS;
 	bus_write_4(sc->res[0], TMC_AXICTL, reg);
 
 	reg = FFCR_EN_FMT | FFCR_EN_TI | FFCR_FON_FLIN |
@@ -395,6 +395,7 @@ tmc_configure(device_t dev, struct coresight_event *event)
 
 	bus_write_4(sc->res[0], TMC_DBALO, pbase & 0xffffffff);
 	bus_write_4(sc->res[0], TMC_DBAHI, pbase >> 32);
+	bus_write_4(sc->res[0], TMC_RSZ, (event->etr.npages * 4096) / 4);
 
 	return (0);
 }
@@ -460,8 +461,9 @@ tmc_start_event(device_t dev, struct endpoint *endp,
 	//	event->etr.flags &= ~ETR_FLAG_ALLOCATE;
 		nev = atomic_fetchadd_int(&sc->nev, 1);
 		if (nev == 0) {
+printf("%s\n", __func__);
 			sc->event = event;
-			tmc_stop(dev);
+			//tmc_stop(dev);
 			tmc_configure_etr(dev, endp, event);
 			tmc_start(dev);
 		}
@@ -489,6 +491,7 @@ tmc_stop_event(device_t dev, struct endpoint *endp,
 	//	event->etr.flags &= ~ETR_FLAG_RELEASE;
 		nev = atomic_fetchadd_int(&sc->nev, -1);
 		if (nev == 1) {
+printf("%s\n", __func__);
 			tmc_stop(dev);
 			sc->event = NULL;
 		}

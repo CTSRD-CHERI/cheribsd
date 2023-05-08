@@ -41,8 +41,6 @@
 	_IOW(HWT_MAGIC, 0x01, struct hwt_attach)
 #define	HWT_IOC_START \
 	_IOW(HWT_MAGIC, 0x02, struct hwt_start)
-#define	HWT_IOC_FLUSH \
-	_IOW(HWT_MAGIC, 0x03, struct hwt_flush)
 
 struct hwt_alloc {
 	int		*hwt_id;
@@ -55,11 +53,6 @@ struct hwt_attach {
 } __packed __aligned(16);
 
 struct hwt_start {
-	int		hwt_id;
-} __packed __aligned(16);
-
-struct hwt_flush {
-	void		*va;
 	int		hwt_id;
 } __packed __aligned(16);
 

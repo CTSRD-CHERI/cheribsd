@@ -210,13 +210,12 @@ hwt_alloc_pages(struct hwt *hwt)
 	    VM_ALLOC_ZERO;
 	memattr = VM_MEMATTR_DEVICE;
 
-	hwt->obj = vm_pager_allocate(OBJT_DEVICE, 0, hwt->npages * PAGE_SIZE,
+	hwt->obj = vm_pager_allocate(OBJT_PHYS, 0, hwt->npages * PAGE_SIZE,
 	    PROT_READ, 0, curthread->td_ucred);
 
+	//vm_object_set_memattr(hwt->obj, memattr);
+
 	VM_OBJECT_WLOCK(hwt->obj);
-
-	vm_object_set_memattr(hwt->obj, memattr);
-
 	for (i = 0; i < hwt->npages; i++) {
 		tries = 0;
 retry:
@@ -235,16 +234,18 @@ retry:
 			return (ENOMEM);
 		}
 
-		//if ((m->flags & PG_ZERO) == 0)
-		//	pmap_zero_page(m);
+#if 0
+printf("%s: zeroing page\n", __func__);
+		if ((m->flags & PG_ZERO) == 0)
+			pmap_zero_page(m);
+printf("%s: zeroing page done\n", __func__);
 
-		//va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
-		//cpu_dcache_wb_range(va, PAGE_SIZE);
-		//cpu_dcache_inv_range(va, PAGE_SIZE);
+		va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
+		cpu_dcache_wb_range(va, PAGE_SIZE);
+#endif
 		m->valid = VM_PAGE_BITS_ALL;
 		m->oflags &= ~VPO_UNMANAGED;
 		m->flags |= PG_FICTITIOUS;
-
 		hwt->pages[i] = m;
 	}
 
@@ -254,20 +255,10 @@ retry:
 }
 
 static int
-hwt_mmap(struct cdev *cdev, vm_ooffset_t offset, vm_paddr_t *paddr,
-    int nprot, vm_memattr_t *memattr)
+hwt_open(struct cdev *cdev, int oflags, int devtype, struct thread *td)
 {
-	struct hwt *hwt;
-	int page;
 
-	hwt = cdev->si_drv1;
-
-printf("%s: obj %p\n", __func__, hwt->obj);
-
-	page = offset / 4096;
-
-	*paddr = VM_PAGE_TO_PHYS(hwt->pages[page]);
-	*memattr = VM_MEMATTR_DEVICE;
+	printf("%s\n", __func__);
 
 	return (0);
 }
@@ -285,20 +276,13 @@ hwt_mmap_single(struct cdev *cdev, vm_ooffset_t *offset, vm_size_t mapsize,
 
 	*objp = hwt->obj;
 
+#if 0
 	VM_OBJECT_WLOCK(hwt->obj);
 	vm_object_set_memattr(hwt->obj, VM_MEMATTR_DEVICE);
 	VM_OBJECT_WUNLOCK(hwt->obj);
+#endif
 
 printf("%s: obj %p\n", __func__, hwt->obj);
-
-	return (0);
-}
-
-static int
-hwt_open(struct cdev *cdev, int oflags, int devtype, struct thread *td)
-{
-
-	printf("%s\n", __func__);
 
 	return (0);
 }
@@ -307,8 +291,7 @@ static struct cdevsw hwt_context_cdevsw = {
 	.d_version	= D_VERSION,
 	.d_name		= "hwt",
 	.d_open		= hwt_open,
-	.d_mmap		= hwt_mmap,
-	//.d_mmap_single	= hwt_mmap_single,
+	.d_mmap_single	= hwt_mmap_single,
 	.d_ioctl	= NULL,
 };
 
@@ -391,8 +374,8 @@ hwt_destroy_buffers(struct hwt *hwt)
 			break;
 
 		vm_page_busy_acquire(m, 0);
-		m->oflags |= VPO_UNMANAGED;
 		m->flags &= ~PG_FICTITIOUS;
+		m->oflags |= VPO_UNMANAGED;
 		vm_page_unwire_noq(m);
 		vm_page_free(m);
 	}
@@ -525,7 +508,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	struct hwt_start *s;
 	struct hwt_alloc *halloc;
 	struct proc *p;
-	struct hwt_flush *f;
 	struct hwt_proc *hp, *hpnew;
 	struct hwt *hwt __unused;
 	struct hwt_owner *ho;
@@ -664,32 +646,6 @@ printf("%s: hwt->cpu_id %d obj %p\n", __func__, hwt->cpu_id, hwt->obj);
 		hwt_event_start(hwt);
 
 		hwt->started = 1;
-
-		break;
-	case HWT_IOC_FLUSH:
-		f = (struct hwt_flush *)addr;
-
-		dprintf("%s: inv dcache\n", __func__);
-		dprintf("%s: inv dcache, hwt_id %d\n", __func__, f->hwt_id);
-
-		/* Check if process is registered owner of any HWTs. */
-		ho = hwt_lookup_owner(td->td_proc);
-		if (ho == NULL) {
-			/* No HWTs allocated. So nothing to attach to. */
-			return (ENXIO);
-		}
-
-		/* Now find HWT we want to activate. */
-		hwt = hwt_lookup_by_id(ho, f->hwt_id);
-		if (hwt == NULL) {
-			/* No HWT with such id. */
-			return (ENXIO);
-		}
-
-		
-		dprintf("%s: inv dcache, va %#p, size %d\n", __func__,
-		    (void *)f->va, hwt->npages * PAGE_SIZE);
-		cpu_dcache_inv_range((vm_pointer_t)f->va, hwt->npages * PAGE_SIZE);
 
 		break;
 	default:
