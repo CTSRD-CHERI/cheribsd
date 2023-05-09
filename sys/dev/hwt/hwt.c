@@ -191,6 +191,39 @@ hwt_register(struct hwt_backend *backend)
 }
 
 static int
+hwt_fault(vm_object_t vm_obj, vm_ooffset_t offset,
+    int prot, vm_page_t *mres)
+{
+
+printf("%s\n", __func__);
+
+	return (0);
+}
+
+static int
+hwt_ctor(void *handle, vm_ooffset_t size, vm_prot_t prot,
+    vm_ooffset_t foff, struct ucred *cred, u_short *color)
+{
+
+printf("%s\n", __func__);
+	*color = 0;
+	return (0);
+}
+
+static void
+hwt_dtor(void *handle)
+{
+
+printf("%s\n", __func__);
+}
+
+static struct cdev_pager_ops hwt_pager_ops = {
+	.cdev_pg_fault = hwt_fault,
+	.cdev_pg_ctor = hwt_ctor,
+	.cdev_pg_dtor = hwt_dtor
+}; 
+
+static int
 hwt_alloc_pages(struct hwt *hwt)
 {
 	vm_paddr_t low, high, boundary;
@@ -210,8 +243,10 @@ hwt_alloc_pages(struct hwt *hwt)
 	    VM_ALLOC_ZERO;
 	memattr = VM_MEMATTR_DEVICE;
 
-	hwt->obj = vm_pager_allocate(OBJT_PHYS, 0, hwt->npages * PAGE_SIZE,
-	    PROT_READ, 0, curthread->td_ucred);
+	//hwt->obj = vm_pager_allocate(OBJT_PHYS, 0, hwt->npages * PAGE_SIZE,
+	//    PROT_READ, 0, curthread->td_ucred);
+	hwt->obj = cdev_pager_allocate(hwt, OBJT_MGTDEVICE,
+	    &hwt_pager_ops, hwt->npages * PAGE_SIZE, PROT_READ, 0, curthread->td_ucred);
 
 	//vm_object_set_memattr(hwt->obj, memattr);
 
@@ -219,7 +254,7 @@ hwt_alloc_pages(struct hwt *hwt)
 	for (i = 0; i < hwt->npages; i++) {
 		tries = 0;
 retry:
-		m = vm_page_alloc_contig(hwt->obj, i, pflags, 1, low, high,
+		m = vm_page_alloc_noobj_contig(pflags, 1, low, high,
 		    alignment, boundary, memattr);
 		if (m == NULL) {
 			if (tries < 3) {
@@ -234,6 +269,7 @@ retry:
 			return (ENOMEM);
 		}
 
+
 #if 0
 printf("%s: zeroing page\n", __func__);
 		if ((m->flags & PG_ZERO) == 0)
@@ -247,6 +283,8 @@ printf("%s: zeroing page done\n", __func__);
 		m->oflags &= ~VPO_UNMANAGED;
 		m->flags |= PG_FICTITIOUS;
 		hwt->pages[i] = m;
+
+		vm_page_insert(m, hwt->obj, i);
 	}
 
 	VM_OBJECT_WUNLOCK(hwt->obj);
@@ -374,12 +412,14 @@ hwt_destroy_buffers(struct hwt *hwt)
 			break;
 
 		vm_page_busy_acquire(m, 0);
+		cdev_pager_free_page(hwt->obj, m);
 		m->flags &= ~PG_FICTITIOUS;
-		m->oflags |= VPO_UNMANAGED;
 		vm_page_unwire_noq(m);
 		vm_page_free(m);
+
 	}
 	vm_pager_deallocate(hwt->obj);
+
 	VM_OBJECT_WUNLOCK(hwt->obj);
 
 	free(hwt->pages, M_HWT);
