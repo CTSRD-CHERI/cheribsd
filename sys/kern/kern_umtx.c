@@ -5682,11 +5682,13 @@ umtx_thread_cleanup(struct thread *td)
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities",
-//     "support"
+//     "support",
+//     "ctoptr"
 //   ],
 //   "changes_purecap": [
 //     "subobject_bounds",
-//     "virtual_address"
+//     "uintcap_arithmetic",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

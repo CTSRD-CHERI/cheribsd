@@ -1956,10 +1956,8 @@ fail:
 //   "changes": [
 //     "iovec-macros",
 //     "user_capabilities",
-//     "support"
-//   ],
-//   "changes_purecap": [
-//     "virtual_address"
+//     "support",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

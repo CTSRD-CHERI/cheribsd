@@ -445,7 +445,8 @@ __END_DECLS
 //   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ],
 //   "changes_purecap": [
 //     "pointer_alignment",

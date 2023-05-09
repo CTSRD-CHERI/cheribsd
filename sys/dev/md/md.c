@@ -2226,7 +2226,8 @@ g_md_fini(struct g_class *mp __unused)
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc",
-//     "iovec-macros"
+//     "iovec-macros",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

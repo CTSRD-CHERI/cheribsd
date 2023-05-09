@@ -2184,7 +2184,8 @@ vm_mmap_to_errno(int rv)
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ],
 //   "changes_purecap": [
 //     "support",

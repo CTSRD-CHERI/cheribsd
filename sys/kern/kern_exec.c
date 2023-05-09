@@ -2404,7 +2404,8 @@ sbuf_drain_core_output(void *arg, const char *data, int len)
 //   "target_type": "kernel",
 //   "changes": [
 //     "integer_provenance",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ],
 //   "changes_purecap": [
 //     "pointer_as_integer",

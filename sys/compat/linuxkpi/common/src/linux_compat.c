@@ -2841,7 +2841,8 @@ CTASSERT(sizeof(unsigned long) == sizeof(uintptr_t));
 //   "changes": [
 //     "iovec-macros",
 //     "user_capabilities",
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

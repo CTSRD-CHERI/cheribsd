@@ -351,7 +351,8 @@ extern void *Malloc(size_t bytes, const char *file, int line);
 //   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
-//     "support"
+//     "support",
+//     "ctoptr"
 //   ],
 //   "change_comment": ""
 // }

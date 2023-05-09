@@ -1877,7 +1877,8 @@ filt_pipenotsup(struct knote *kn, long hint)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ],
 //   "changes_purecap": [
 //     "pointer_as_integer"

@@ -2968,7 +2968,8 @@ oce_read_env_variables( POCE_SOFTC sc )
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

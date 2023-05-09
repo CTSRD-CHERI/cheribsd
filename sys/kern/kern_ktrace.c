@@ -1467,7 +1467,8 @@ ktrcanset(struct thread *td, struct proc *targetp)
 //   "changes": [
 //     "iovec-macros",
 //     "support",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

@@ -9238,7 +9238,8 @@ nfscl_statfs(struct vnode *vp, struct ucred *cred, NFSPROC_T *td)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

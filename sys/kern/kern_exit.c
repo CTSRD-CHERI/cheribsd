@@ -1497,7 +1497,8 @@ proc_reparent(struct proc *child, struct proc *parent, bool set_oppid)
 //   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

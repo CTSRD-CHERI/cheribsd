@@ -5980,3 +5980,15 @@ load (struct module *module __unused, int cmd, void *arg __unused)
 
 	return error;
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "user_capabilities",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

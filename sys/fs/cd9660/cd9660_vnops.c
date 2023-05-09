@@ -857,7 +857,8 @@ VFS_VOP_VECTOR_REGISTER(cd9660_fifoops);
 //   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros"
+//     "iovec-macros",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

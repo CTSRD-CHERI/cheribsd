@@ -586,3 +586,17 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	PROC_LOCK(p);
 	mtx_lock(&psp->ps_mtx);
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "support",
+ *     "user_capablities",
+ *     "pointer_shape",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

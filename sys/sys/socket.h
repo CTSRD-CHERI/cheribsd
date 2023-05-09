@@ -799,7 +799,8 @@ void so_unlock(struct socket *so);
 //   "target_type": "header",
 //   "changes": [
 //     "pointer_alignment",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ],
 //   "changes_purecap": [
 //     "subobject_bounds"

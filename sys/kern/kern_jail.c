@@ -5033,7 +5033,8 @@ DB_SHOW_COMMAND(prison, db_show_prison_command)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ],
 //   "changes_purecap": [
 //     "kdb"

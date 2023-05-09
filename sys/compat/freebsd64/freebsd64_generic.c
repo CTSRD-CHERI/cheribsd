@@ -199,3 +199,14 @@ freebsd64_ppoll(struct thread *td, struct freebsd64_ppoll_args *uap)
 	return (user_ppoll(td, __USER_CAP_ARRAY(uap->fds, uap->nfds),
 	    uap->nfds, __USER_CAP_OBJ(uap->ts), __USER_CAP_OBJ(uap->set)));
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

@@ -7254,7 +7254,8 @@ MODULE_DEPEND(nfsd, nfssvc, 1, 1, 1);
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

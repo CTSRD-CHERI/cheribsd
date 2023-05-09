@@ -1666,7 +1666,8 @@ m_dispose_extcontrolm(struct mbuf *m)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

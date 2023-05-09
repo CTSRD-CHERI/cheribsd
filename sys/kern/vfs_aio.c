@@ -3715,10 +3715,10 @@ freebsd64_lio_listio(struct thread *td, struct freebsd64_lio_listio_args *uap)
 //     "iovec-macros",
 //     "kernel_sig_types",
 //     "user_capabilities",
-//     "support"
+//     "support",
+//     "ctoptr"
 //   ],
 //   "changes_purecap": [
-//     "virtual_address",
 //     "pointer_as_integer"
 //   ]
 // }

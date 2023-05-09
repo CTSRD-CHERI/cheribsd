@@ -5623,7 +5623,8 @@ DB_COMMAND_FLAGS(countfreebufs, db_coundfreebufs, DB_CMD_MEMSAFE)
 //     "pointer_as_integer",
 //     "kdb",
 //     "bounds_compression",
-//     "integer_provenance"
+//     "integer_provenance",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

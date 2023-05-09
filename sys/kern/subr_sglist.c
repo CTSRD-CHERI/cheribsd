@@ -992,8 +992,9 @@ sglist_slice(struct sglist *original, struct sglist **slice, size_t offset,
 //   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
+//     "user_capabilities",
 //     "iovec-macros",
-//     "virtual_address"
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

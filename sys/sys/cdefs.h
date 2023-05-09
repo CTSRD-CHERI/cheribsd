@@ -1170,7 +1170,8 @@
 //   "changes": [
 //     "integer_provenance",
 //     "support",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ],
 //   "changes_purecap": [
 //     "subobject_bounds"

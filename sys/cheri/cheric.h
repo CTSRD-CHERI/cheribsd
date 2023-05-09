@@ -440,6 +440,10 @@ ssize_t	strfcap(char * __restrict buf, size_t maxsize,
 // {
 //   "updated": 20221129,
 //   "target_type": "header",
+//   "changes": [
+//     "support",
+//     "ctoptr"
+//   ],
 //   "changes_purecap": [
 //     "support"
 //   ]

@@ -8883,3 +8883,15 @@ nfsrv_marknospc(char *devid, bool setit)
 		NFSUNLOCKLAYOUT(lhyp);
 	}
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "user_capabilities",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

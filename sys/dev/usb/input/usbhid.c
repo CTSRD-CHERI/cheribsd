@@ -896,3 +896,14 @@ MODULE_DEPEND(usbhid, hid, 1, 1, 1);
 MODULE_DEPEND(usbhid, hidbus, 1, 1, 1);
 MODULE_VERSION(usbhid, 1);
 USB_PNP_HOST_INFO(usbhid_devs);
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
