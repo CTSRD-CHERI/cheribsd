@@ -47,6 +47,7 @@ __SCCSID("@(#)kvm.c	8.2 (Berkeley) 2/13/94");
 #include <sys/pcpu.h>
 #include <sys/stat.h>
 #include <sys/sysctl.h>
+#include <sys/memrange.h>
 #include <sys/mman.h>
 
 #include <stdbool.h>
@@ -424,6 +425,29 @@ kvm_read2(kvm_t *kd, kvaddr_t kva, void *buf, size_t len)
 	}
 
 	return (cp - (char *)buf);
+}
+
+ssize_t
+kvm_readcap(kvm_t *kd __unused, kvaddr_t kva __unused, void *buf __unused,
+    size_t len __unused)
+{
+	if (ISALIVE(kd)) {
+		struct mem_cheri_cap_arg arg;
+
+		/*
+		 * We're using /dev/kem, use the MEM_READ_CHERI_CAP
+		 * ioctl.
+		 */
+		arg.vaddr = kva;
+		arg.buf = buf;
+		arg.len = len;
+		if (ioctl(kd->vmfd, MEM_READ_CHERI_CAP, &arg) == -1) {
+			_kvm_syserr(kd, 0, "ioctl(MEM_READ_CHERI_CAP)");
+			return (-1);
+		}
+		return (len);
+	}
+	return (-1);
 }
 
 ssize_t
