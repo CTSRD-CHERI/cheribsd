@@ -5597,7 +5597,7 @@ DB_SHOW_ALL_COMMAND(ifnets, db_show_all_ifnets)
 #endif	/* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",

@@ -159,7 +159,7 @@ kobject_uevent_env(struct kobject *kobj, int action, char *envp[])
 #endif /* _LINUXKPI_LINUX_KOBJECT_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20230424,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "subobject_bounds"

@@ -4884,7 +4884,7 @@ mxge_shutdown(device_t dev)
 */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "pointer_alignment",

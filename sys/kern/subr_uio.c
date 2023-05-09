@@ -569,7 +569,7 @@ casuword(volatile u_long * __capability addr, u_long old, u_long new)
 
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

@@ -5117,7 +5117,7 @@ MODULE_DEPEND(linuxkpi_wlan, linuxkpi, 1, 1, 1);
 MODULE_DEPEND(linuxkpi_wlan, wlan, 1, 1, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20230424,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer"

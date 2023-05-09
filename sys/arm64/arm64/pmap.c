@@ -8179,7 +8179,7 @@ SYSCTL_OID(_vm_pmap, OID_AUTO, kernel_maps,
     "Dump kernel address layout");
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "support",

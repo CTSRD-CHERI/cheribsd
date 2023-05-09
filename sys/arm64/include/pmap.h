@@ -199,7 +199,7 @@ void	pmap_san_bootstrap(struct arm64_bootparams *);
 #endif	/* !_MACHINE_PMAP_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "support",

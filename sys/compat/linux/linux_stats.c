@@ -822,7 +822,7 @@ linux_statx(struct thread *td, struct linux_statx_args *args)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

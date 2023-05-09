@@ -259,7 +259,7 @@ extern bool linux_flush_rcu_work(struct rcu_work *rwork);
 #endif					/* _LINUXKPI_LINUX_WORKQUEUE_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20230424,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "subobject_bounds"

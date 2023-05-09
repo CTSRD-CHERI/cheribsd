@@ -147,7 +147,7 @@ xa_to_value(const void *e)
 #endif		/* _LINUXKPI_LINUX_XARRAY_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20230424,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer"

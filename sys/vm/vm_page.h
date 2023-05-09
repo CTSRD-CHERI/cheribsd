@@ -1026,7 +1026,7 @@ vm_page_domain(vm_page_t m)
 #endif				/* !_VM_PAGE_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221212,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "pointer_as_integer",

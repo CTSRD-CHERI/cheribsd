@@ -218,7 +218,7 @@ MALLOC_DECLARE(M_CAMXPT);
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "subobject_bounds"
