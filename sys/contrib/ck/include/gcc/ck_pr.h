@@ -329,7 +329,7 @@ CK_PR_UNARY_S(8, uint8_t)
 #endif /* CK_PR_GCC_H */
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "support",

@@ -403,7 +403,7 @@ smbfs_statfs(struct mount *mp, struct statfs *sbp)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

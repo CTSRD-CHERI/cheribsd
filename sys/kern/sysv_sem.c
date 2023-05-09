@@ -2253,7 +2253,7 @@ freebsd64_semop(struct thread *td, struct freebsd64_semop_args *uap)
 #endif /* COMPAT_FREEBSD64 */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities",

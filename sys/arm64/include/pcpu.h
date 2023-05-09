@@ -129,7 +129,7 @@ init_cpu_pcpup(void *pcpup)
 #endif	/* !_MACHINE_PCPU_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "support"

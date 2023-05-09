@@ -173,7 +173,7 @@ void	init_linker_file_cap_relocs(const void *start_relocs,
 #endif /* _SYS_CHERI_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "support"

@@ -165,7 +165,7 @@ arm_smccc_1_2	hvc
 arm_smccc_1_2	smc
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "support"

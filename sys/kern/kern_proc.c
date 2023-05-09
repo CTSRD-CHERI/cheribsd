@@ -3881,7 +3881,7 @@ SYSCTL_PROC(_debug, OID_AUTO, stop_all_proc, CTLTYPE_INT | CTLFLAG_RW |
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities",

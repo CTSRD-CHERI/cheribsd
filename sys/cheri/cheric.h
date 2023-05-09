@@ -438,7 +438,7 @@ ssize_t	strfcap(char * __restrict buf, size_t maxsize,
 #endif /* _SYS_CHERIC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes": [
 //     "support",

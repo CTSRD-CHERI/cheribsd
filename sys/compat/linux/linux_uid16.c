@@ -350,7 +350,7 @@ linux_setresuid16(struct thread *td, struct linux_setresuid16_args *args)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

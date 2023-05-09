@@ -928,7 +928,7 @@ DECLARE_MODULE(if_epair, epair_mod, SI_SUB_PSEUDO, SI_ORDER_MIDDLE);
 MODULE_VERSION(if_epair, 3);
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

@@ -337,7 +337,7 @@ void	textdump_dumpsys(struct dumperinfo *di);
 #endif /* !_DDB_DDB_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",

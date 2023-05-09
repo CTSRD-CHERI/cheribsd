@@ -684,7 +684,7 @@ ccmp_decrypt(struct ieee80211_key *key, u_int64_t pn, struct mbuf *m, int hdrlen
 IEEE80211_CRYPTO_MODULE(ccmp, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20230424,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "subobject_bounds"

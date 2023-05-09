@@ -2874,7 +2874,7 @@ DB_SHOW_COMMAND_FLAGS(vmopag, vm_object_print_pages, DB_CMD_MEMSAFE)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20221212,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"

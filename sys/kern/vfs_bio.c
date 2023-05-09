@@ -5616,7 +5616,7 @@ DB_COMMAND_FLAGS(countfreebufs, db_coundfreebufs, DB_CMD_MEMSAFE)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "support",

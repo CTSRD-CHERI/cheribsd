@@ -2105,7 +2105,7 @@ DECLARE_MODULE(sysvshm, sysvshm_mod, SI_SUB_SYSV_SHM, SI_ORDER_FIRST);
 MODULE_VERSION(sysvshm, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities",

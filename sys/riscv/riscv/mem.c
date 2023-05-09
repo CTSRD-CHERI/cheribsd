@@ -160,7 +160,7 @@ memioctl_md(struct cdev *dev __unused, u_long cmd __unused,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",

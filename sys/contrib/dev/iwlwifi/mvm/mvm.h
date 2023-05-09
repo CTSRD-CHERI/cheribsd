@@ -2233,7 +2233,7 @@ void iwl_mvm_send_roaming_forbidden_event(struct iwl_mvm *mvm,
 #endif /* __IWL_MVM_H__ */
 // CHERI CHANGES START
 // {
-//   "updated": 20230424,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "subobject_bounds"

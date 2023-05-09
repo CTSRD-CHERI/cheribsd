@@ -1360,7 +1360,7 @@ EVENTHANDLER_LIST_DECLARE(thread_init);
 #endif	/* !_SYS_PROC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes": [
 //     "kernel_sig_types",

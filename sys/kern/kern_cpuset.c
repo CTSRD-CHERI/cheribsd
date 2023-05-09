@@ -2620,7 +2620,7 @@ DB_SHOW_COMMAND_FLAGS(domainsets, db_show_domainsets, DB_CMD_MEMSAFE)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

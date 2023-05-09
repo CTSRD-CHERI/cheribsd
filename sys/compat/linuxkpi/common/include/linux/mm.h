@@ -372,7 +372,7 @@ might_alloc(gfp_t gfp_mask __unused)
 #endif					/* _LINUXKPI_LINUX_MM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20230424,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer"

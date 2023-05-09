@@ -287,7 +287,7 @@ static driver_t fpgamgr_s10_driver = {
 DRIVER_MODULE(fpgamgr_s10, simplebus, fpgamgr_s10_driver, 0, 0);
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer"

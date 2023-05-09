@@ -206,7 +206,7 @@ int iwl_configure_rxq(struct iwl_fw_runtime *fwrt);
 #endif /* __iwl_fw_runtime_h__ */
 // CHERI CHANGES START
 // {
-//   "updated": 20230424,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "subobject_bounds"

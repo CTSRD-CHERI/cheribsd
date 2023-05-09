@@ -265,7 +265,7 @@ void	ohci_interrupt(ohci_softc_t *sc);
 #endif					/* _OHCI_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "subobject_bounds"
