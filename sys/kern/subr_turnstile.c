@@ -1332,8 +1332,7 @@ DB_SHOW_COMMAND(locktree, db_show_locktree)
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "kdb",
-//     "pointer_provenance",
-//     "virtual_address"
+//     "pointer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

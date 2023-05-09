@@ -472,7 +472,7 @@ ffs_rawread(struct vnode *vp,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities",
-//     "virtual_address"
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

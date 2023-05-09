@@ -5145,7 +5145,8 @@ user_copy_file_range(struct thread *td, int infd,
 //   "changes": [
 //     "iovec-macros",
 //     "kiovec_t",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

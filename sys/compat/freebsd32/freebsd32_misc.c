@@ -3958,7 +3958,7 @@ ofreebsd32_sethostid(struct thread *td, struct ofreebsd32_sethostid_args *uap)
 //     "kernel_sig_types",
 //     "integer_provenance",
 //     "user_capabilities",
-//     "other"
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

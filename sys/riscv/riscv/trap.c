@@ -604,3 +604,14 @@ do_trap_user(struct trapframe *frame)
 		    exception, frame->tf_stval);
 	}
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

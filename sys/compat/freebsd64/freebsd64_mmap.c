@@ -174,3 +174,17 @@ freebsd64_munlock(struct thread *td, struct freebsd64_munlock_args *uap)
 {
 	return (kern_munlock(td, (uintptr_t)uap->addr, uap->len));
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "support"
+ *   ],
+ *   "changes_purecap": [
+ *     "pointer_provenance"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

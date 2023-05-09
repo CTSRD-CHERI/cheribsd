@@ -4037,7 +4037,8 @@ ti_sysctl_node(struct ti_softc *sc)
 //   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

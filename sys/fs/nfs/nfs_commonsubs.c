@@ -5096,7 +5096,8 @@ nfsrpc_destroysession(struct nfsmount *nmp, struct nfsclsession *tsep,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

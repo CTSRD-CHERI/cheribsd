@@ -1977,7 +1977,8 @@ ncl_meta_setsize(struct vnode *vp, struct thread *td, u_quad_t nsize)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

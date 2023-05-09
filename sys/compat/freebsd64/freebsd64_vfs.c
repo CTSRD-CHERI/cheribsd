@@ -1249,3 +1249,15 @@ freebsd64_copy_file_range(struct thread *td,
 	    __USER_CAP_OBJ(uap->inoffp), uap->outfd,
 	    __USER_CAP_OBJ(uap->outoffp), uap->len, uap->flags));
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "support",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

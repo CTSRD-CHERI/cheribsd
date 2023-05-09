@@ -877,7 +877,8 @@ ifc_flags_get(struct if_clone *ifc)
 //   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

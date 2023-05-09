@@ -3844,7 +3844,7 @@ vn_lktype_write(struct mount *mp, struct vnode *vp)
 //   "changes": [
 //     "iovec-macros",
 //     "user_capabilities",
-//     "virtual_address"
+//     "ctoptr"
 //   ],
 //   "changes_purecap": [
 //     "pointer_as_integer"

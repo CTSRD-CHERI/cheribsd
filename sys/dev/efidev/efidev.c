@@ -348,3 +348,16 @@ static moduledata_t efidev_moddata = {
 DECLARE_MODULE(efidev, efidev_moddata, SI_SUB_DRIVERS, SI_ORDER_ANY);
 MODULE_VERSION(efidev, 1);
 MODULE_DEPEND(efidev, efirt, 1, 1, 1);
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "support",
+ *     "ioctl:misc",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

@@ -848,7 +848,8 @@ crypto_contiguous_subsegment(struct cryptop *crp, size_t skip, size_t len)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

@@ -2292,7 +2292,8 @@ MODULE_DEPEND(linprocfs, sysvshm, 1, 1, 1);
 //   "updated": 20221129,
 //   "target_type": "kernel",
 //   "changes": [
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

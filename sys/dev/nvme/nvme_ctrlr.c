@@ -1732,3 +1732,14 @@ fail:
 	(void)atomic_cmpset_32(&ctrlr->is_resetting, 1, 0);
 	return (0);
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

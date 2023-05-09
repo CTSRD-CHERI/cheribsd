@@ -1610,7 +1610,8 @@ getconfexit:
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ],
 //   "changes_purecap": [
 //     "pointer_as_integer",

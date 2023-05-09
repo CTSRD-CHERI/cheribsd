@@ -2363,7 +2363,7 @@ vm_fault_enable_pagefaults(int save)
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",
-//     "virtual_address"
+//     "ctoptr"
 //   ],
 //   "change_comment": ""
 // }

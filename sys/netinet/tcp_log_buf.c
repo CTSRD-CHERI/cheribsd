@@ -2880,3 +2880,15 @@ tcp_log_sendfile(struct socket *so, off_t offset, size_t nbytes, int flags)
 done:
 	INP_WUNLOCK(inp);
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "user_capabilities",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

@@ -3885,7 +3885,8 @@ SYSCTL_PROC(_debug, OID_AUTO, stop_all_proc, CTLTYPE_INT | CTLFLAG_RW |
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities",
-//     "support"
+//     "support",
+//     "ctoptr"
 //   ],
 //   "changes_purecap": [
 //     "pointer_as_integer"
