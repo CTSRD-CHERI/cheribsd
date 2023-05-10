@@ -269,7 +269,6 @@ retry:
 			return (ENOMEM);
 		}
 
-
 #if 0
 printf("%s: zeroing page\n", __func__);
 		if ((m->flags & PG_ZERO) == 0)
