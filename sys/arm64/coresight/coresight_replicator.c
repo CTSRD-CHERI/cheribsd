@@ -62,7 +62,7 @@ replicator_init(device_t dev)
 }
 
 static int
-replicator_enable(device_t dev, struct endpoint *endp,
+replicator_start(device_t dev, struct endpoint *endp,
     struct coresight_event *event)
 {
 	struct replicator_softc *sc;
@@ -82,7 +82,7 @@ replicator_enable(device_t dev, struct endpoint *endp,
 }
 
 static void
-replicator_disable(device_t dev, struct endpoint *endp,
+replicator_stop(device_t dev, struct endpoint *endp,
     struct coresight_event *event)
 {
 	struct replicator_softc *sc;
@@ -117,8 +117,8 @@ replicator_attach(device_t dev)
 static device_method_t replicator_methods[] = {
 	/* Coresight interface */
 	DEVMETHOD(coresight_init,	replicator_init),
-	DEVMETHOD(coresight_enable,	replicator_enable),
-	DEVMETHOD(coresight_disable,	replicator_disable),
+	DEVMETHOD(coresight_start,	replicator_start),
+	DEVMETHOD(coresight_stop,	replicator_stop),
 	DEVMETHOD_END
 };
 

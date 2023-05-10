@@ -74,7 +74,7 @@ funnel_init(device_t dev)
 }
 
 static int
-funnel_enable(device_t dev, struct endpoint *endp,
+funnel_start(device_t dev, struct endpoint *endp,
     struct coresight_event *event)
 {
 	struct funnel_softc *sc;
@@ -94,7 +94,7 @@ funnel_enable(device_t dev, struct endpoint *endp,
 }
 
 static void
-funnel_disable(device_t dev, struct endpoint *endp,
+funnel_stop(device_t dev, struct endpoint *endp,
     struct coresight_event *event)
 {
 	struct funnel_softc *sc;
@@ -133,8 +133,8 @@ funnel_attach(device_t dev)
 static device_method_t funnel_methods[] = {
 	/* Coresight interface */
 	DEVMETHOD(coresight_init,	funnel_init),
-	DEVMETHOD(coresight_enable,	funnel_enable),
-	DEVMETHOD(coresight_disable,	funnel_disable),
+	DEVMETHOD(coresight_start,	funnel_start),
+	DEVMETHOD(coresight_stop,	funnel_stop),
 	DEVMETHOD_END
 };
 
