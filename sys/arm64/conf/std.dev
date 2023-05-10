@@ -53,13 +53,13 @@ device		vt_efifb
 device		vt_simplefb
 
 # DRM Support
-options 	COMPAT_DRMCOMPAT
-device		drm
+#options 	COMPAT_DRMCOMPAT
+#device		drm
 
 # Video Drivers
-device		komeda_drm		# ARM Komeda Display Controller
-device		panfrost		# ARM Mali GPU Driver
-device		tda19988		# HDMI Controller by NXP
+#device		komeda_drm		# ARM Komeda Display Controller
+#device		panfrost		# ARM Mali GPU Driver
+#device		tda19988		# HDMI Controller by NXP
 
 # Pseudo devices.
 device		crypto			# core crypto support
