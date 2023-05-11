@@ -93,9 +93,6 @@ struct hwt_softc {
 	TAILQ_HEAD(hwt_backend_list, hwt_backend)	hwt_backends;
 };
 
-void hwt_switch_in(struct thread *td);
-void hwt_switch_out(struct thread *td);
-
 #endif /* !LOCORE */
 
 #endif /* !_DEV_HWT_HWTVAR_H_ */

@@ -61,6 +61,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 
 #include <dev/hwt/hwtvar.h>
+#include <dev/hwt/hwtvar1.h>
 #include <dev/hwt/hwt.h>
 
 #define	HWT_DEBUG
@@ -240,12 +241,8 @@ hwt_alloc_pages(struct hwt *hwt)
 	    VM_ALLOC_ZERO;
 	memattr = VM_MEMATTR_DEVICE;
 
-	//hwt->obj = vm_pager_allocate(OBJT_PHYS, 0, hwt->npages * PAGE_SIZE,
-	//    PROT_READ, 0, curthread->td_ucred);
 	hwt->obj = cdev_pager_allocate(hwt, OBJT_MGTDEVICE,
 	    &hwt_pager_ops, hwt->npages * PAGE_SIZE, PROT_READ, 0, curthread->td_ucred);
-
-	//vm_object_set_memattr(hwt->obj, memattr);
 
 	VM_OBJECT_WLOCK(hwt->obj);
 	for (i = 0; i < hwt->npages; i++) {
