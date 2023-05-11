@@ -95,6 +95,8 @@
 #include <sys/pmckern.h>
 #endif
 
+#include <dev/hwt/hwtvar1.h>
+
 static fo_rdwr_t	vn_read;
 static fo_rdwr_t	vn_write;
 static fo_rdwr_t	vn_io_fault;
@@ -2926,6 +2928,10 @@ vn_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr,
 		}
 	}
 #endif
+
+	if (error == 0)
+		hwt_record_mmap(td, vp, (uintptr_t) *addr);
+
 	return (error);
 }
 

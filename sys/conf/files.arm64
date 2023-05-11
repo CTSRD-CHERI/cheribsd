@@ -329,6 +329,7 @@ dev/hyperv/netvsc/if_hn.c			optional hyperv acpi
 dev/hyperv/pcib/vmbus_pcib.c			optional hyperv pci acpi
 
 dev/hwt/hwt.c					standard
+dev/hwt/hwt_record.c				standard
 
 dev/ice/if_ice_iflib.c				optional ice pci \
 	compile-with "${NORMAL_C} -I$S/dev/ice"

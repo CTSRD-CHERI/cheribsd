@@ -1,6 +1,7 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
  * Copyright (c) 2023 Ruslan Bukin <br@bsdpad.com>
- * All rights reserved.
  *
  * This work was supported by Innovate UK project 105694, "Digital Security
  * by Design (DSbD) Technology Platform Prototype".
@@ -25,15 +26,57 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
-#ifndef _DEV_HWT_HWTVAR1_H_
-#define _DEV_HWT_HWTVAR1_H_
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
-void hwt_switch_in(struct thread *td);
-void hwt_switch_out(struct thread *td);
-void hwt_record_mmap(struct thread *td, struct vnode *vp, uintptr_t addr);
+#include <sys/param.h>
+#include <sys/systm.h>
+#include <sys/eventhandler.h>
+#include <sys/ioccom.h>
+#include <sys/conf.h>
+#include <sys/proc.h>
+#include <sys/kernel.h>
+#include <sys/malloc.h>
+#include <sys/mman.h>
+#include <sys/module.h>
+#include <sys/mutex.h>
+#include <sys/sglist.h>
+#include <sys/rwlock.h>
+#include <sys/vnode.h>
 
-#endif /* !_DEV_HWT_HWTVAR1_H_ */
+#include <vm/vm.h>
+#include <vm/vm_param.h>
+#include <vm/vm_extern.h>
+#include <vm/vm_kern.h>
+#include <vm/vm_page.h>
+#include <vm/vm_map.h>
+#include <vm/vm_object.h>
+#include <vm/vm_pager.h>
+#include <vm/vm_pageout.h>
+#include <vm/vm_phys.h>
+#include <vm/vm_radix.h>
+#include <vm/pmap.h>
+
+#include <dev/hwt/hwtvar.h>
+#include <dev/hwt/hwtvar1.h>
+#include <dev/hwt/hwt.h>
+
+void
+hwt_record_mmap(struct thread *td, struct vnode *vp, uintptr_t addr)
+{
+	struct proc *p;
+	int error;
+
+	p = td->td_proc;
+	if ((p->p_flag2 & P2_HWT) == 0)
+		return;
+
+	char *fullpath;
+	char *freepath;
+
+	error = vn_fullpath(vp, &fullpath, &freepath);
+
+	printf("%s: err %d fullpath %s\n", __func__, error, fullpath);
+}
