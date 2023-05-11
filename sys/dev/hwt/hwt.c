@@ -195,8 +195,6 @@ hwt_fault(vm_object_t vm_obj, vm_ooffset_t offset,
     int prot, vm_page_t *mres)
 {
 
-printf("%s\n", __func__);
-
 	return (0);
 }
 
@@ -205,8 +203,8 @@ hwt_ctor(void *handle, vm_ooffset_t size, vm_prot_t prot,
     vm_ooffset_t foff, struct ucred *cred, u_short *color)
 {
 
-printf("%s\n", __func__);
 	*color = 0;
+
 	return (0);
 }
 
@@ -214,7 +212,6 @@ static void
 hwt_dtor(void *handle)
 {
 
-printf("%s\n", __func__);
 }
 
 static struct cdev_pager_ops hwt_pager_ops = {
@@ -313,14 +310,6 @@ hwt_mmap_single(struct cdev *cdev, vm_ooffset_t *offset, vm_size_t mapsize,
 
 	*objp = hwt->obj;
 
-#if 0
-	VM_OBJECT_WLOCK(hwt->obj);
-	vm_object_set_memattr(hwt->obj, VM_MEMATTR_DEVICE);
-	VM_OBJECT_WUNLOCK(hwt->obj);
-#endif
-
-printf("%s: obj %p\n", __func__, hwt->obj);
-
 	return (0);
 }
 
@@ -360,7 +349,7 @@ hwt_alloc_buffers(struct hwt_softc *sc, struct hwt *hwt)
 {
 	int error;
 
-	hwt->npages = 4096 * 8;
+	hwt->npages = (16 * 1024 * 1024) / 4096;
 	hwt->pages = malloc(sizeof(struct vm_page *) * hwt->npages, M_HWT,
 	    M_WAITOK | M_ZERO);
 
@@ -418,7 +407,6 @@ hwt_destroy_buffers(struct hwt *hwt)
 
 	}
 	vm_pager_deallocate(hwt->obj);
-
 	VM_OBJECT_WUNLOCK(hwt->obj);
 
 	free(hwt->pages, M_HWT);
