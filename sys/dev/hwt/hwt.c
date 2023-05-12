@@ -76,16 +76,6 @@ __FBSDID("$FreeBSD$");
 #define	HWT_PROCHASH_SIZE	1024
 #define	HWT_OWNERHASH_SIZE	1024
 
-static eventhandler_tag hwt_exit_tag;
-
-struct mtx hwt_prochash_mtx;
-static u_long hwt_prochashmask;
-static LIST_HEAD(hwt_prochash, hwt_proc)	*hwt_prochash;
-
-struct mtx hwt_ownerhash_mtx;
-static u_long hwt_ownerhashmask;
-static LIST_HEAD(hwt_ownerhash, hwt_owner)	*hwt_ownerhash;
-
 /*
  * Hash function.  Discard the lower 2 bits of the pointer since
  * these are always zero for our uses.  The hash multiplier is
@@ -95,8 +85,17 @@ static LIST_HEAD(hwt_ownerhash, hwt_owner)	*hwt_ownerhash;
 #define	_HWT_HM	11400714819323198486u	/* hash multiplier */
 #define	HWT_HASH_PTR(P, M)	((((unsigned long) (P) >> 2) * _HWT_HM) & (M))
 
-struct hwt_softc hwt_sc;
+static eventhandler_tag hwt_exit_tag;
 
+static struct mtx hwt_prochash_mtx;
+static u_long hwt_prochashmask;
+static LIST_HEAD(hwt_prochash, hwt_proc)	*hwt_prochash;
+
+static struct mtx hwt_ownerhash_mtx;
+static u_long hwt_ownerhashmask;
+static LIST_HEAD(hwt_ownerhash, hwt_owner)	*hwt_ownerhash;
+
+static struct hwt_softc hwt_sc;
 static struct hwt_backend *hwt_backend;
 
 static void
