@@ -57,7 +57,7 @@ struct sysent freebsd64_sysent[] = {
 	{ .sy_narg = AS(freebsd64_write_args), .sy_call = (sy_call_t *)freebsd64_write, .sy_auevent = AUE_WRITE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 4 = freebsd64_write */
 	{ .sy_narg = AS(freebsd64_open_args), .sy_call = (sy_call_t *)freebsd64_open, .sy_auevent = AUE_OPEN_RWTC, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 5 = freebsd64_open */
 	{ .sy_narg = AS(close_args), .sy_call = (sy_call_t *)sys_close, .sy_auevent = AUE_CLOSE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 6 = close */
-	{ .sy_narg = AS(freebsd64_wait4_args), .sy_call = (sy_call_t *)freebsd64_wait4, .sy_auevent = AUE_WAIT4, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 7 = freebsd64_wait4 */
+	{ .sy_narg = AS(freebsd64_wait4_args), .sy_call = (sy_call_t *)freebsd64_wait4, .sy_auevent = AUE_WAIT4, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 7 = freebsd64_wait4 */
 	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 8 = obsolete ocreat */
 	{ .sy_narg = AS(freebsd64_link_args), .sy_call = (sy_call_t *)freebsd64_link, .sy_auevent = AUE_LINK, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 9 = freebsd64_link */
 	{ .sy_narg = AS(freebsd64_unlink_args), .sy_call = (sy_call_t *)freebsd64_unlink, .sy_auevent = AUE_UNLINK, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 10 = freebsd64_unlink */
