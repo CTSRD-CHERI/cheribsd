@@ -35,6 +35,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/capsicum.h>
 #include <sys/param.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <assert.h>
 #include <capv.h>
 #include <ctype.h>
@@ -255,7 +256,7 @@ main(int argc, char **argv)
 	void * __capability *capv;
 	struct interposer *interposers;
 	pid_t pid;
-	int capc, ch, error, i;
+	int capc, ch, error, i, status;
 
 	while ((ch = getopt(argc, argv, "Ckv")) != -1) {
 		switch (ch) {
@@ -371,16 +372,11 @@ main(int argc, char **argv)
 	}
 
 	/*
-	 * Parent.  Nothing to do until SIGCHLD.  Can't use wait(2), because Capsicum,
-	 * and we don't have pdvfork(2), so lets wait for ourselves instead.
+	 * Parent.  Nothing to do until SIGCHLD.
 	 */
-	for (i = 0; i < capc; i++) {
-		if (capv[i] == NULL)
-			continue;
-		error = pthread_join(interposers[i].i_pthread, NULL);
-		if (error != 0)
-			err(1, "pthread_join");
-	}
+	error = wait(&status);
+	if (error != 0)
+		warn("wait");
 
 	/*
 	 * XXX: We're not passing pass child's exit code here.
