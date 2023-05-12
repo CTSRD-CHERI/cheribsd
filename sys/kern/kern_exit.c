@@ -1330,6 +1330,15 @@ kern_wait6(struct thread *td, idtype_t idtype, id_t id, int *status,
 
 	q = td->td_proc;
 
+	/*
+	 * In capsicum(4) capability mode we only allow waiting for process'
+	 * own children.
+	 */
+	if (IN_CAPABILITY_MODE(td)) {
+		if (idtype != P_ALL || id != 0)
+			return (ECAPMODE);
+	}
+
 	if ((pid_t)id == WAIT_MYPGRP && (idtype == P_PID || idtype == P_PGID)) {
 		PROC_LOCK(q);
 		id = (id_t)q->p_pgid;
@@ -1369,6 +1378,18 @@ loop_locked:
 		else if (ret != 1) {
 			td->td_retval[0] = pid;
 			return (0);
+		}
+
+		/*
+		 * When running in capsicum(4) mode, make wait(2) ignore
+		 * processes created with pdfork(2).  This is because one can
+		 * disown them - by passing their process descriptor to another
+		 * process - which needs to prevent it from touching them
+		 * afterwards.
+		 */
+		if (IN_CAPABILITY_MODE(td) && p->p_procdesc != NULL) {
+			printf("%s: pid %d (%s) has procdesc\n", __func__, p->p_pid, p->p_comm);
+			continue;
 		}
 
 		nfound++;
