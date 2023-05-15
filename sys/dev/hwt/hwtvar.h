@@ -51,14 +51,18 @@ struct hwt_mmap_entry {
 struct hwt_proc {
 	LIST_HEAD(, hwt_mmap_entry)	mmaps;
 	struct mtx			mtx; /* Protects mmaps. */
-	struct proc			*p;
+	struct proc			*p; /* Could be NULL if exited. */
+	pid_t				pid;
 	struct hwt			*hwt;
 	struct hwt_owner		*hwt_owner;
-	LIST_ENTRY(hwt_proc)		next;
+	LIST_ENTRY(hwt_proc)		next; /* Entry in prochash. */
+	LIST_ENTRY(hwt_proc)		next1; /* Entry in hwt procs. */
 	int				cpu_id;
+	int				exited;
 };
 
 struct hwt {
+	LIST_HEAD(, hwt_proc)	procs;
 	vm_page_t		*pages;
 	int			npages;
 	int			cpu_id;

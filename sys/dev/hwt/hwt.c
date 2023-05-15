@@ -415,6 +415,7 @@ hwt_alloc(struct hwt_softc *sc, struct thread *td)
 	int error;
 
 	hwt = malloc(sizeof(struct hwt), M_HWT, M_WAITOK | M_ZERO);
+	LIST_INIT(&hwt->procs);
 
 	error = hwt_alloc_buffers(sc, hwt);
 	if (error) {
@@ -443,6 +444,20 @@ hwt_lookup_proc_by_cpu(struct proc *p, int cpu)
 		}
 	}
 	mtx_unlock_spin(&hwt_prochash_mtx);
+
+	return (NULL);
+}
+
+static struct hwt_proc *
+hwt_lookup_proc_by_pid(struct hwt *hwt, pid_t pid)
+{
+	struct hwt_proc *hp;
+
+	LIST_FOREACH(hp, &hwt->procs, next1) {
+		if (hp->pid == pid) {
+			return (hp);
+		}
+	}
 
 	return (NULL);
 }
@@ -530,6 +545,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	struct hwt_attach *a;
 	struct hwt_start *s;
 	struct hwt_alloc *halloc;
+	struct hwt_mmap_get *mmap_get;
 	struct proc *p;
 	struct hwt_proc *hp, *hpnew;
 	struct hwt *hwt __unused;
@@ -666,10 +682,12 @@ printf("%s: hwt->cpu_id %d obj %p\n", __func__, hwt->cpu_id, hwt->obj);
 
 		p->p_flag2 |= P2_HWT;
 		hpnew->p = p;
+		hpnew->pid = a->pid;
 		hpnew->hwt_owner = ho;
 		hpnew->hwt = hwt;
 		hpnew->cpu_id = hwt->cpu_id;
 		hwt_insert_prochash(hpnew);
+		LIST_INSERT_HEAD(&hwt->procs, hpnew, next1);
 
 		PROC_UNLOCK(p);
 		break;
@@ -701,6 +719,77 @@ printf("%s: hwt->cpu_id %d obj %p\n", __func__, hwt->cpu_id, hwt->obj);
 		hwt->started = 1;
 
 		break;
+	case HWT_IOC_MMAP_GET:
+		mmap_get = (struct hwt_mmap_get *)addr;
+
+		/* Check if process is registered owner of any HWTs. */
+		ho = hwt_lookup_owner(td->td_proc);
+		if (ho == NULL)
+			return (ENXIO);
+
+		/* Now find HWT we want to activate. */
+		hwt = hwt_lookup_by_id(ho, mmap_get->hwt_id);
+		if (hwt == NULL) {
+			/* No HWT with such id. */
+			return (ENXIO);
+		}
+
+		hp = hwt_lookup_proc_by_pid(hwt, mmap_get->pid);
+		if (hp == NULL)
+			return (ENXIO);
+
+		struct hwt_mmap_entry *entry, *entry1;
+		struct hwt_mmap_user_entry *user_entry;
+		int nitems_req;
+		int i;
+
+		nitems_req = 0;
+
+		error = copyin(mmap_get->nentries, &nitems_req, sizeof(int));
+		if (error)
+			return (error);
+
+		if (nitems_req < 1)
+			return (ENXIO);
+		if (nitems_req > 1024)
+			return (ENXIO);
+
+		user_entry = malloc(sizeof(struct hwt_mmap_user_entry) * nitems_req, M_DEVBUF, M_WAITOK);
+
+		i = 0;
+
+printf("%s: copying mmaps\n", __func__);
+		mtx_lock_spin(&hp->mtx);
+		LIST_FOREACH_SAFE(entry, &hp->mmaps, next, entry1) {
+			user_entry[i].addr = entry->addr;
+			user_entry[i].size = entry->size;
+			strncpy(user_entry[i].fullpath, entry->fullpath,
+			    MAXPATHLEN);
+			LIST_REMOVE(entry, next);
+
+			i += 1;
+
+			/* TODO: deallocate entry. */
+
+			if (i == nitems_req)
+				break;
+		}
+		mtx_unlock_spin(&hp->mtx);
+
+		if (i == 0)
+			return (ENOENT);
+
+printf("%s: copying mmaps1\n", __func__);
+		error = copyout(user_entry, mmap_get->mmaps,
+		    sizeof(struct hwt_mmap_user_entry) * i);
+printf("%s: copying mmap completed, n %d, error %d\n", __func__, i, error);
+		if (error)
+			return (error);
+
+		error = copyout(&i, mmap_get->nentries, sizeof(int));
+
+		free(user_entry, M_DEVBUF);
+
 	default:
 		break;
 	};
@@ -781,7 +870,10 @@ hwt_stop_proc_hwts(struct hwt_prochash *hph, struct proc *p)
 			hwt_event_dump(hwt);
 			hwt_event_stop(hwt);
 			hwt_dump_pages(hwt);
+
 			LIST_REMOVE(hp, next);
+			hp->p = NULL;
+			hp->exited = 1;
 		}
 	}
 	mtx_unlock_spin(&hwt_prochash_mtx);
@@ -791,8 +883,7 @@ static void
 hwt_stop_owner_hwts(struct hwt_prochash *hph, struct hwt_owner *ho)
 {
 	struct hwt_proc *hp, *hp1;
-	struct hwt *hwt_tmp;
-	struct hwt *hwt;
+	struct hwt *hwt, *hwt1;
 
 	mtx_lock_spin(&hwt_prochash_mtx);
 	LIST_FOREACH_SAFE(hp, hph, next, hp1) {
@@ -812,7 +903,7 @@ hwt_stop_owner_hwts(struct hwt_prochash *hph, struct hwt_owner *ho)
 	printf("%s: stopping hwt owner\n", __func__);
 
 	mtx_lock(&ho->mtx);
-	LIST_FOREACH_SAFE(hwt, &ho->hwts, next, hwt_tmp) {
+	LIST_FOREACH_SAFE(hwt, &ho->hwts, next, hwt1) {
 		LIST_REMOVE(hwt, next);
 printf("stopping hwt %d\n", hwt->hwt_id);
 		hwt_destroy_buffers(hwt);
