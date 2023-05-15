@@ -64,17 +64,18 @@ __FBSDID("$FreeBSD$");
 #include <dev/hwt/hwt.h>
 
 void
-hwt_record_mmap(struct thread *td, struct vnode *vp, uintptr_t addr, size_t size)
+hwt_record_mmap(struct thread *td, struct vnode *vp, uintptr_t addr,
+    size_t size)
 {
+	char *fullpath;
+	char *freepath;
+
 	struct proc *p;
 	int error;
 
 	p = td->td_proc;
 	if ((p->p_flag2 & P2_HWT) == 0)
 		return;
-
-	char *fullpath;
-	char *freepath;
 
 	error = vn_fullpath(vp, &fullpath, &freepath);
 	if (error)

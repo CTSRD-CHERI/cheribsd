@@ -240,8 +240,8 @@ hwt_alloc_pages(struct hwt *hwt)
 	    VM_ALLOC_ZERO;
 	memattr = VM_MEMATTR_DEVICE;
 
-	hwt->obj = cdev_pager_allocate(hwt, OBJT_MGTDEVICE,
-	    &hwt_pager_ops, hwt->npages * PAGE_SIZE, PROT_READ, 0, curthread->td_ucred);
+	hwt->obj = cdev_pager_allocate(hwt, OBJT_MGTDEVICE, &hwt_pager_ops,
+	    hwt->npages * PAGE_SIZE, PROT_READ, 0, curthread->td_ucred);
 
 	VM_OBJECT_WLOCK(hwt->obj);
 	for (i = 0; i < hwt->npages; i++) {
