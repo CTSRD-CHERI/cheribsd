@@ -425,7 +425,7 @@ hwt_alloc(struct hwt_softc *sc, struct thread *td)
 	return (hwt);
 }
 
-static struct hwt_proc *
+struct hwt_proc *
 hwt_lookup_proc_by_cpu(struct proc *p, int cpu)
 {
 	struct hwt_prochash *hph;
@@ -597,6 +597,35 @@ printf("%s: hwt->cpu_id %d obj %p\n", __func__, hwt->cpu_id, hwt->obj);
 
 		break;
 
+#if 0
+	case HWT_IOC_ALLOC_PROC:
+		cp = (void *)addr;
+
+		p = pfind(cp->pid);
+		if (p == NULL)
+			return (ESRCH);
+
+		hp = hwt_lookup_proc_by_pid(p);
+		if (hp) {
+			/* Already attached. */
+			PROC_UNLOCK(p);
+			return (EEXIST);
+		}
+
+		hpnew = malloc(sizeof(struct hwt_proc), M_HWT,
+		    M_WAITOK | M_ZERO);
+		LIST_INIT(&hpnew->mmaps);
+		hpnew->p = p;
+		hpnew->hwt_owner = ho;
+		hpnew->hwt = hwt;
+		hpnew->cpu_id = hwt->cpu_id;
+		hwt_insert_prochash(hpnew);
+
+		p->p_flag2 |= P2_HWT;
+
+		PROC_UNLOCK(p);
+		break;
+#endif
 	case HWT_IOC_ATTACH:
 		a = (void *)addr;
 

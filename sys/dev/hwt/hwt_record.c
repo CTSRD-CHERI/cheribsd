@@ -67,14 +67,21 @@ void
 hwt_record_mmap(struct thread *td, struct vnode *vp, uintptr_t addr,
     size_t size)
 {
+	struct hwt_mmap_entry *entry;
+	struct hwt_proc *hp;
 	char *fullpath;
 	char *freepath;
-
 	struct proc *p;
 	int error;
+	int cpuid;
 
 	p = td->td_proc;
 	if ((p->p_flag2 & P2_HWT) == 0)
+		return;
+
+	cpuid = PCPU_GET(cpuid);
+	hp = hwt_lookup_proc_by_cpu(p, cpuid);
+	if (hp == NULL)
 		return;
 
 	error = vn_fullpath(vp, &fullpath, &freepath);
@@ -83,6 +90,16 @@ hwt_record_mmap(struct thread *td, struct vnode *vp, uintptr_t addr,
 
 	printf("%s: td %p addr %lx size %lx fullpath %s\n", __func__, td,
 	    (unsigned long)addr, size, fullpath);
+
+	entry = malloc(sizeof(struct hwt_mmap_entry), M_DEVBUF, M_WAITOK);
+	entry->fullpath = fullpath;
+	entry->td = td;
+	entry->vp = vp;
+	entry->addr = addr;
+	entry->size = size;
+
+printf("%s: inserting mmap entry for %s\n", __func__, fullpath);
+	LIST_INSERT_HEAD(&hp->mmaps, entry, next);
 }
 
 void

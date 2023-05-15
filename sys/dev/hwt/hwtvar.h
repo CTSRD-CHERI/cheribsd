@@ -39,12 +39,22 @@ static MALLOC_DEFINE(M_HWT, "hwt", "Hardware Trace");
 #define	HWT_UNLOCK(sc)			mtx_unlock(&(sc)->mtx)
 #define	HWT_ASSERT_LOCKED(sc)		mtx_assert(&(sc)->mtx, MA_OWNED)
 
+struct hwt_mmap_entry {
+	LIST_ENTRY(hwt_mmap_entry)	next;
+	void *fullpath;
+	struct thread *td;
+	struct vnode *vp;
+	uintptr_t addr;
+	size_t size;
+};
+
 struct hwt_proc {
-	struct proc		*p;
-	struct hwt		*hwt;
-	struct hwt_owner	*hwt_owner;
-	LIST_ENTRY(hwt_proc)	next;
-	int			cpu_id;
+	LIST_HEAD(, hwt_mmap_entry)	mmaps;
+	struct proc			*p;
+	struct hwt			*hwt;
+	struct hwt_owner		*hwt_owner;
+	LIST_ENTRY(hwt_proc)		next;
+	int				cpu_id;
 };
 
 struct hwt {
@@ -93,6 +103,7 @@ struct hwt_softc {
 	TAILQ_HEAD(hwt_backend_list, hwt_backend)	hwt_backends;
 };
 
-#endif /* !LOCORE */
+struct hwt_proc * hwt_lookup_proc_by_cpu(struct proc *p, int cpu);
 
+#endif /* !LOCORE */
 #endif /* !_DEV_HWT_HWTVAR_H_ */
