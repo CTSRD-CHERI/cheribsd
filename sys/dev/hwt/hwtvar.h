@@ -50,6 +50,7 @@ struct hwt_mmap_entry {
 
 struct hwt_proc {
 	LIST_HEAD(, hwt_mmap_entry)	mmaps;
+	struct mtx			mtx; /* Protects mmaps. */
 	struct proc			*p;
 	struct hwt			*hwt;
 	struct hwt_owner		*hwt_owner;

@@ -99,7 +99,9 @@ hwt_record_mmap(struct thread *td, struct vnode *vp, uintptr_t addr,
 	entry->size = size;
 
 printf("%s: inserting mmap entry for %s\n", __func__, fullpath);
+	mtx_lock_spin(&hp->mtx);
 	LIST_INSERT_HEAD(&hp->mmaps, entry, next);
+	mtx_unlock_spin(&hp->mtx);
 }
 
 void

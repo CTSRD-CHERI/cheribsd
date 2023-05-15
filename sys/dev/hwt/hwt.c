@@ -615,6 +615,7 @@ printf("%s: hwt->cpu_id %d obj %p\n", __func__, hwt->cpu_id, hwt->obj);
 		hpnew = malloc(sizeof(struct hwt_proc), M_HWT,
 		    M_WAITOK | M_ZERO);
 		LIST_INIT(&hpnew->mmaps);
+		mtx_init(&hpnew->mtx, "mmaps", NULL, MTX_SPIN);
 		hpnew->p = p;
 		hpnew->hwt_owner = ho;
 		hpnew->hwt = hwt;
