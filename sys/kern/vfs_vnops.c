@@ -2930,7 +2930,7 @@ vn_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr,
 #endif
 
 	if (error == 0)
-		hwt_record_mmap(td, vp, (uintptr_t) *addr);
+		hwt_record_mmap(td, vp, (uintptr_t) *addr, (size_t) size);
 
 	return (error);
 }

@@ -108,6 +108,8 @@
 #include <sys/pmckern.h>
 #endif
 
+#include <dev/hwt/hwtvar1.h>
+
 #if __has_feature(capabilities)
 #include <cheri/cheric.h>
 #endif
@@ -1040,6 +1042,8 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 	}
 #endif
 	rv = vm_map_remove_locked(map, addr, addr + size);
+
+	hwt_record_munmap(td, (uintptr_t) addr, (size_t) size);
 
 #ifdef HWPMC_HOOKS
 	if (rv == KERN_SUCCESS && __predict_false(pmc_handled)) {

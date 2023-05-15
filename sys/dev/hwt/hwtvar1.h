@@ -34,6 +34,7 @@
 
 void hwt_switch_in(struct thread *td);
 void hwt_switch_out(struct thread *td);
-void hwt_record_mmap(struct thread *td, struct vnode *vp, uintptr_t addr);
+void hwt_record_mmap(struct thread *td, struct vnode *vp, uintptr_t addr, size_t size);
+void hwt_record_munmap(struct thread *td, uintptr_t addr, size_t size);
 
 #endif /* !_DEV_HWT_HWTVAR1_H_ */
