@@ -1204,7 +1204,8 @@ el2_pagetable:
  * copied to places for userland to execute.
  */
 #define	SIGCODE(sym)						\
-	.section .rodata; .globl sym; .align 2; .type sym,#object; sym:	\
+	.section .rodata, "a", %progbits; .globl sym; .align 2; \
+	.type sym,#object; sym:					\
 	.cfi_startproc
 
 #ifdef COMPAT_FREEBSD64
