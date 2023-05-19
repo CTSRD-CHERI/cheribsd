@@ -94,7 +94,7 @@ answerback(capv_answerback_t *out)
 }
 
 static void
-capvreturn(capv_binds_return_t *out, int op, int error, int errno_)
+prepare(capv_binds_return_t *out, int op, int error, int errno_)
 {
 	memset(out, 0, sizeof(*out));
 	out->len = sizeof(*out);
@@ -316,7 +316,7 @@ main(int argc, char **argv)
 			if ((size_t)received < sizeof(capv_t)) {
 				warnx("size mismatch: received %zd, expected %zd",
 				    (size_t)received, sizeof(capv_t));
-				capvreturn(out, 0, -1, ENOMSG);
+				prepare(out, 0, -1, ENOMSG);
 				goto respond;
 			}
 
@@ -330,7 +330,7 @@ main(int argc, char **argv)
 			if ((size_t)received != sizeof(in)) {
 				warnx("size mismatch: received %zd, expected %zd",
 				    (size_t)received, sizeof(in));
-				capvreturn(out, 0, -1, ENOMSG);
+				prepare(out, 0, -1, ENOMSG);
 				goto respond;
 			}
 
@@ -340,18 +340,18 @@ main(int argc, char **argv)
 			error = captofd(in.s, &fd);
 			if (error != 0) {
 				warn("captofd: %#lp", in.s);
-				capvreturn(out, -in.op, error, ENOMSG);
+				prepare(out, -in.op, error, ENOMSG);
 				goto respond;
 			}
 			error = check_if_denied(&in.addr, in.addrlen, pid);
 			if (error != 0) {
-				capvreturn(out, -in.op, -1, error);
+				prepare(out, -in.op, -1, error);
 				goto respond;
 			}
 			break;
 		default:
 			warnx("unknown op %d", in.op);
-			capvreturn(out, -in.op, -1, ENOMSG);
+			prepare(out, -in.op, -1, ENOMSG);
 			goto respond;
 		}
 
@@ -377,7 +377,7 @@ main(int argc, char **argv)
 		switch (in.op) {
 		case SYS_bind:
 		case SYS_connect:
-			capvreturn(out, -in.op, error, errno);
+			prepare(out, -in.op, error, errno);
 
 			error = close(fd);
 			if (error != 0)
