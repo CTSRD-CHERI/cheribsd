@@ -135,6 +135,14 @@ struct xswdev {
 #endif
 #define PHYS_AVAIL_COUNT        (PHYS_AVAIL_ENTRIES + 2)
 
+#if PMAP_HAS_DMAP
+/*
+ * Check that a physical address range completely lies within the direct map.
+ */
+#define	PHYS_SZ_IN_DMAP(pa, sz)					\
+    (PHYS_IN_DMAP((pa)) && PHYS_IN_DMAP((pa) + (sz) - 1))
+#endif
+
 #ifndef ASSEMBLER
 #ifdef _KERNEL
 #define num_pages(x) \

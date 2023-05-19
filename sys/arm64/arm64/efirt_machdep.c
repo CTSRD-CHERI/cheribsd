@@ -148,11 +148,11 @@ efi_1t1_l3(vm_offset_t va)
  * indicate a failed mapping so that the caller may handle error.
  */
 vm_pointer_t
-efi_phys_to_kva(vm_paddr_t paddr)
+efi_phys_to_kva(vm_paddr_t paddr, vm_size_t size)
 {
 	vm_pointer_t vaddr;
 
-	if (PHYS_IN_DMAP(paddr)) {
+	if (PHYS_SZ_IN_DMAP(paddr, size)) {
 		vaddr = PHYS_TO_DMAP(paddr);
 		if (pmap_klookup(vaddr, NULL))
 			return (vaddr);
