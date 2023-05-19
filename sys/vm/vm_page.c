@@ -3835,7 +3835,7 @@ vm_page_free_prep(vm_page_t m)
 	if (PMAP_HAS_DMAP && (m->flags & PG_ZERO) != 0) {
 		uint64_t *p;
 		int i;
-		p = (uint64_t *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
+		p = (uint64_t *)PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(m));
 		for (i = 0; i < PAGE_SIZE / sizeof(uint64_t); i++, p++)
 			KASSERT(*p == 0, ("vm_page_free_prep %p PG_ZERO %d %jx",
 			    m, i, (uintmax_t)*p));
