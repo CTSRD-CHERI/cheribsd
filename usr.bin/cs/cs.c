@@ -110,7 +110,7 @@ answerback(capv_answerback_t *out)
 }
 
 static void
-capvreturn(capv_syscall_return_t *out, int op, int error, int errno_, uintcap_t fdcap)
+prepare(capv_syscall_return_t *out, int op, int error, int errno_, uintcap_t fdcap)
 {
 	memset(out, 0, sizeof(*out));
 	out->len = sizeof(*out);
@@ -329,7 +329,7 @@ main(int argc, char **argv)
 			if ((size_t)received < sizeof(capv_t)) {
 				warnx("size mismatch: received %zd, expected %zd",
 				    (size_t)received, sizeof(capv_t));
-				capvreturn(out, 0, -1, ENOMSG, 0);
+				prepare(out, 0, -1, ENOMSG, 0);
 				goto respond;
 			}
 
@@ -343,7 +343,7 @@ main(int argc, char **argv)
 			if ((size_t)received != sizeof(in)) {
 				warnx("size mismatch: received %zd, expected %zd",
 				    (size_t)received, sizeof(in));
-				capvreturn(out, 0, -1, ENOMSG, 0);
+				prepare(out, 0, -1, ENOMSG, 0);
 				goto respond;
 			}
 
@@ -353,7 +353,7 @@ main(int argc, char **argv)
 			error = captofd((void *)in.arg[0], (int *)&in.arg[0]);
 			if (error != 0) {
 				warn("captofd: %#lp", (void *)in.arg[0]);
-				capvreturn(out, -in.op, error, ENOMSG, 0);
+				prepare(out, -in.op, error, ENOMSG, 0);
 				goto respond;
 			}
 			break;
@@ -365,14 +365,14 @@ main(int argc, char **argv)
 			if ((size_t)received != sizeof(in)) {
 				warnx("size mismatch: received %zd, expected %zd",
 				    (size_t)received, sizeof(in));
-				capvreturn(out, 0, -1, ENOMSG, 0);
+				prepare(out, 0, -1, ENOMSG, 0);
 				goto respond;
 			}
 
 			error = captofd((void *)in.arg[0], (int *)&in.arg[0]);
 			if (error != 0) {
 				warn("captofd: %#lp", (void *)in.arg[0]);
-				capvreturn(out, -in.op, error, ENOMSG, 0);
+				prepare(out, -in.op, error, ENOMSG, 0);
 				goto respond;
 			}
 			break;
@@ -388,7 +388,7 @@ main(int argc, char **argv)
 			if ((size_t)received != sizeof(in)) {
 				warnx("size mismatch: received %zd, expected %zd",
 				    (size_t)received, sizeof(in));
-				capvreturn(out, 0, -1, ENOMSG, 0);
+				prepare(out, 0, -1, ENOMSG, 0);
 				goto respond;
 			}
 
@@ -398,7 +398,7 @@ main(int argc, char **argv)
 				error = captofd((void *)in.arg[0], (int *)&in.arg[0]);
 				if (error != 0) {
 					warn("captofd: %#lp", (void *)in.arg[0]);
-					capvreturn(out, -in.op, error, ENOMSG, 0);
+					prepare(out, -in.op, error, ENOMSG, 0);
 					goto respond;
 				}
 				fd = (int)in.arg[0];
@@ -409,7 +409,7 @@ main(int argc, char **argv)
 			if (error != 0) {
 				if (!qflag)
 					warnx("refusing to %s %s", sysdecode_syscallname(SYSDECODE_ABI_FREEBSD, in.op), path);
-				capvreturn(out, -in.op, -1, error, 0);
+				prepare(out, -in.op, -1, error, 0);
 				goto respond;
 			}
 			break;
@@ -424,7 +424,7 @@ main(int argc, char **argv)
 			if ((size_t)received != sizeof(in)) {
 				warnx("size mismatch: received %zd, expected %zd",
 				    (size_t)received, sizeof(in));
-				capvreturn(out, 0, -1, ENOMSG, 0);
+				prepare(out, 0, -1, ENOMSG, 0);
 				goto respond;
 			}
 
@@ -432,13 +432,13 @@ main(int argc, char **argv)
 			error = handle_pathname(AT_FDCWD, path);
 			if (error != 0) {
 				warnx("refusing to %s %s", sysdecode_syscallname(SYSDECODE_ABI_FREEBSD, in.op), path);
-				capvreturn(out, -in.op, -1, error, 0);
+				prepare(out, -in.op, -1, error, 0);
 				goto respond;
 			}
 			break;
 		default:
 			warnx("unknown op %d<%s>", in.op, sysdecode_syscallname(SYSDECODE_ABI_FREEBSD, in.op));
-			capvreturn(out, -in.op, -1, ENOSYS, 0);
+			prepare(out, -in.op, -1, ENOSYS, 0);
 			goto respond;
 		}
 
@@ -461,7 +461,7 @@ main(int argc, char **argv)
 				_error = capfromfd((void *)&fdcap, error);
 				if (_error != 0) {
 					warn("capfromfd");
-					capvreturn(out, -in.op, error, ENOMSG, 0);
+					prepare(out, -in.op, error, ENOMSG, 0);
 					goto respond;
 				}
 			}
@@ -496,7 +496,7 @@ main(int argc, char **argv)
 		 * XXX: So when do we close the descriptor returned by openat?
 		 */
 
-		capvreturn(out, -in.op, error, errno, fdcap);
+		prepare(out, -in.op, error, errno, fdcap);
 
 respond:
 		/*
