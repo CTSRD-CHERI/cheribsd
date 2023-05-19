@@ -1704,7 +1704,7 @@ struct pfioc_state_kill {
 struct pfioc_states {
 	int	ps_len;
 	union {
-		char * __kerncap 	 ps_buf;
+		void			* __kerncap ps_buf;
 		struct pfsync_state	* __kerncap ps_states;
 	};
 };
@@ -1713,7 +1713,7 @@ struct pfioc_states_v2 {
 	int		ps_len;
 	uint64_t	ps_req_version;
 	union {
-		char * __kerncap 	 ps_buf;
+		void			* __kerncap ps_buf;
 		struct pf_state_export	* __kerncap ps_states;
 	};
 };
@@ -1721,7 +1721,7 @@ struct pfioc_states_v2 {
 struct pfioc_src_nodes {
 	int	psn_len;
 	union {
-		char * __kerncap		 psn_buf;
+		void		* __kerncap psn_buf;
 		struct pf_src_node	* __kerncap psn_src_nodes;
 	};
 };
