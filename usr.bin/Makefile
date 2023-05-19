@@ -201,6 +201,7 @@ SUBDIR+= \
 	cotrace \
 	cs \
 	dispatch \
+	paths \
 	stevie
 .endif
 

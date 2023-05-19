@@ -265,6 +265,7 @@ SUBDIR+=	libbinds
 SUBDIR+=	libclocks
 SUBDIR+=	libcs
 SUBDIR+=	libmalloc_simple
+SUBDIR+=	libpaths
 .endif
 
 .include <bsd.subdir.mk>

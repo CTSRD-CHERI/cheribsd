@@ -29,12 +29,12 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd May 25, 2022
-.Dt CS 1
+.Dd May 25, 2023
+.Dt PATHS 1
 .Os
 .Sh NAME
-.Nm cs
-.Nd Capsicum service
+.Nm paths
+.Nd absolute pathname lookup service
 .Sh SYNOPSIS
 .Nm
 .Op Fl k
@@ -101,12 +101,12 @@ Run
 to list files in
 .Pa /usr
 without giving it access to any other files:
-.Dl cs -r /usr ls -al /usr
+.Dl paths -r /usr ls -al /usr
 .Pp
 See what changes when you also allow
 .Pa /etc
 and silence down further warnings:
-.Dl cs -qr /usr -r /etc ls -al /usr
+.Dl paths -qr /usr -r /etc ls -al /usr
 .Sh SEE ALSO
 .Xr capv 1 ,
 .Xr coaccept 2 ,
@@ -131,36 +131,6 @@ This would require implementing syscall remoting also for
 .Xr rtld 1 ,
 precluding the use of LD_PRELOAD.
 It would probably require moving the stubs directly into libc and rtld.
-.Pp
-Because after
-.Xr fork 2
-the child process is running in a fresh new address space
-and thus unable to communicate with colocated services,
-and because
-.Xr vfork 2
-is not currently allowed in
-.Xr capsicum 4
-capability mode, it is not possible for
-.Nm
-to support more than a single client process at a time.
-.Pp
-If you allow access to
-.Pa /proc
-you'll then be able to open
-.Pa /proc/curproc/mem
-and take over the
-.Nm
-instance.
-If you allow access to
-.Pa /dev ,
-you will be able to take over the whole machine.
-So maybe don't.
-In the long run,
-instead of calling the syscalls on behalf of the client,
-.Nm
-should be returning file descriptors to allowed directories (specified with
-.Fl r )
-for the clients to use them to call syscalls themselves.
 .Pp
 .Nm
 does not support any kind of path translation.
