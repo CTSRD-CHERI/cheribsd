@@ -111,7 +111,8 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	liby \
 	libz \
 	libzstd \
-	ncurses
+	ncurses \
+	nss_tacplus
 
 .if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64" && !defined(COMPAT_LIBCOMPAT)
 SUBDIR+=	libc_c18n libthr_c18n
@@ -158,6 +159,7 @@ SUBDIR_DEPEND_liblzma= libthr
 .if ${MK_OFED} != "no"
 SUBDIR_DEPEND_libpcap= ofed
 .endif
+SUBDIR_DEPEND_nss_tacplus= libtacplus
 
 .if !defined(COMPAT_LIBCOMPAT)
 SUBDIR+=	flua
