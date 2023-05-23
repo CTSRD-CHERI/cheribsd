@@ -1286,6 +1286,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	int32_t osrel;
 	bool free_interp;
 	int error, i, n;
+	struct proc *p;
 
 	hdr = (const Elf_Ehdr *)imgp->image_header;
 
@@ -1588,6 +1589,10 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	imgp->interp_start = 0;
 	imgp->interp_end = 0;
 
+	/* Main binary. */
+	if (td->td_proc->p_flag2 & P2_HWT)
+		printf("%s: execpath %s entry %lx\n", __func__, imgp->execpath, entry);
+
 	if (interp != NULL) {
 		VOP_UNLOCK(imgp->vp);
 		if ((map->flags & MAP_ASLR) != 0) {
@@ -1603,6 +1608,13 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
 		if (error != 0)
 			goto ret;
+
+		/* Runtime linker. */
+		p = td->td_proc;
+		if (p->p_flag2 & P2_HWT) {
+			printf("%s: interp %s imgp entry %lx\n", __func__, interp,
+			    imgp->entry_addr);
+		}
 	} else
 		addr = imgp->et_dyn_addr;
 
