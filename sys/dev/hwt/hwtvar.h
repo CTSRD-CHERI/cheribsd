@@ -39,18 +39,19 @@ static MALLOC_DEFINE(M_HWT, "hwt", "Hardware Trace");
 #define	HWT_UNLOCK(sc)			mtx_unlock(&(sc)->mtx)
 #define	HWT_ASSERT_LOCKED(sc)		mtx_assert(&(sc)->mtx, MA_OWNED)
 
-struct hwt_mmap_entry {
+#if 0
+struct hwt_record_entry {
 	LIST_ENTRY(hwt_mmap_entry)	next;
-	void *fullpath;
+	void *path;
 	struct thread *td;
-	struct vnode *vp;
 	uintptr_t addr;
 	size_t size;
 };
+#endif
 
 struct hwt_proc {
-	LIST_HEAD(, hwt_mmap_entry)	mmaps;
-	struct mtx			mtx; /* Protects mmaps. */
+	LIST_HEAD(, hwt_record_entry)	records;
+	struct mtx			mtx; /* Protects records. */
 	struct proc			*p; /* Could be NULL if exited. */
 	pid_t				pid;
 	struct hwt			*hwt;

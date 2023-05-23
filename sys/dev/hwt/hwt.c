@@ -60,8 +60,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_radix.h>
 #include <vm/pmap.h>
 
-#include <dev/hwt/hwtvar.h>
 #include <dev/hwt/hwtvar1.h>
+#include <dev/hwt/hwtvar.h>
 #include <dev/hwt/hwt.h>
 
 #define	HWT_DEBUG
@@ -545,7 +545,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	struct hwt_attach *a;
 	struct hwt_start *s;
 	struct hwt_alloc *halloc;
-	struct hwt_mmap_get *mmap_get;
+	struct hwt_record_get *record_get;
 	struct proc *p;
 	struct hwt_proc *hp, *hpnew;
 	struct hwt *hwt __unused;
@@ -630,8 +630,8 @@ printf("%s: hwt->cpu_id %d obj %p\n", __func__, hwt->cpu_id, hwt->obj);
 
 		hpnew = malloc(sizeof(struct hwt_proc), M_HWT,
 		    M_WAITOK | M_ZERO);
-		LIST_INIT(&hpnew->mmaps);
-		mtx_init(&hpnew->mtx, "mmaps", NULL, MTX_SPIN);
+		LIST_INIT(&hpnew->records);
+		mtx_init(&hpnew->mtx, "records", NULL, MTX_SPIN);
 		hpnew->p = p;
 		hpnew->hwt_owner = ho;
 		hpnew->hwt = hwt;
@@ -719,8 +719,8 @@ printf("%s: hwt->cpu_id %d obj %p\n", __func__, hwt->cpu_id, hwt->obj);
 		hwt->started = 1;
 
 		break;
-	case HWT_IOC_MMAP_GET:
-		mmap_get = (struct hwt_mmap_get *)addr;
+	case HWT_IOC_RECORD_GET:
+		record_get = (struct hwt_record_get *)addr;
 
 		/* Check if process is registered owner of any HWTs. */
 		ho = hwt_lookup_owner(td->td_proc);
@@ -728,24 +728,24 @@ printf("%s: hwt->cpu_id %d obj %p\n", __func__, hwt->cpu_id, hwt->obj);
 			return (ENXIO);
 
 		/* Now find HWT we want to activate. */
-		hwt = hwt_lookup_by_id(ho, mmap_get->hwt_id);
+		hwt = hwt_lookup_by_id(ho, record_get->hwt_id);
 		if (hwt == NULL) {
 			/* No HWT with such id. */
 			return (ENXIO);
 		}
 
-		hp = hwt_lookup_proc_by_pid(hwt, mmap_get->pid);
+		hp = hwt_lookup_proc_by_pid(hwt, record_get->pid);
 		if (hp == NULL)
 			return (ENXIO);
 
-		struct hwt_mmap_entry *entry, *entry1;
-		struct hwt_mmap_user_entry *user_entry;
+		struct hwt_record_entry *entry, *entry1;
+		struct hwt_record_user_entry *user_entry;
 		int nitems_req;
 		int i;
 
 		nitems_req = 0;
 
-		error = copyin(mmap_get->nentries, &nitems_req, sizeof(int));
+		error = copyin(record_get->nentries, &nitems_req, sizeof(int));
 		if (error)
 			return (error);
 
@@ -754,13 +754,13 @@ printf("%s: hwt->cpu_id %d obj %p\n", __func__, hwt->cpu_id, hwt->obj);
 		if (nitems_req > 1024)
 			return (ENXIO);
 
-		user_entry = malloc(sizeof(struct hwt_mmap_user_entry) * nitems_req, M_DEVBUF, M_WAITOK);
+		user_entry = malloc(sizeof(struct hwt_record_user_entry) * nitems_req, M_DEVBUF, M_WAITOK);
 
 		i = 0;
 
-printf("%s: copying mmaps\n", __func__);
+printf("%s: copying records\n", __func__);
 		mtx_lock_spin(&hp->mtx);
-		LIST_FOREACH_SAFE(entry, &hp->mmaps, next, entry1) {
+		LIST_FOREACH_SAFE(entry, &hp->records, next, entry1) {
 			user_entry[i].addr = entry->addr;
 			user_entry[i].size = entry->size;
 			strncpy(user_entry[i].fullpath, entry->fullpath,
@@ -779,14 +779,14 @@ printf("%s: copying mmaps\n", __func__);
 		if (i == 0)
 			return (ENOENT);
 
-printf("%s: copying mmaps1\n", __func__);
-		error = copyout(user_entry, mmap_get->mmaps,
-		    sizeof(struct hwt_mmap_user_entry) * i);
-printf("%s: copying mmap completed, n %d, error %d\n", __func__, i, error);
+printf("%s: copying records1\n", __func__);
+		error = copyout(user_entry, record_get->records,
+		    sizeof(struct hwt_record_user_entry) * i);
+printf("%s: copying records completed, n %d, error %d\n", __func__, i, error);
 		if (error)
 			return (error);
 
-		error = copyout(&i, mmap_get->nentries, sizeof(int));
+		error = copyout(&i, record_get->nentries, sizeof(int));
 
 		free(user_entry, M_DEVBUF);
 

@@ -2936,7 +2936,7 @@ vn_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr,
 
 	if ((prot & VM_PROT_EXECUTE) != 0 && error == 0) {
 		if (vn_fullpath(vp, &fullpath, &freepath) == 0) {
-			ent.path = fullpath;
+			ent.fullpath = fullpath;
 			ent.addr = (uintptr_t) *addr;
 			ent.size = (size_t) size;
 			hwt_record(td, HWT_RECORD_MMAP, &ent);

@@ -1594,7 +1594,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	/* HWT: record main binary. */
 	struct hwt_record_entry ent;
 	if (td->td_proc->p_flag2 & P2_HWT) {
-		ent.path = imgp->execpath;
+		ent.fullpath = imgp->execpath;
 		ent.addr = (uintptr_t) entry;
 		ent.size = (size_t) (imgp->end_addr - imgp->start_addr);
 		hwt_record(td, HWT_RECORD_EXECUTABLE, &ent);
@@ -1620,7 +1620,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		struct hwt_record_entry ent;
 		p = td->td_proc;
 		if (p->p_flag2 & P2_HWT) {
-			ent.path = interp;
+			ent.fullpath = interp;
 			ent.addr = (uintptr_t)imgp->entry_addr;
 			ent.size = (size_t) (imgp->interp_end - imgp->interp_start);
 			hwt_record(td, HWT_RECORD_INTERP, &ent);

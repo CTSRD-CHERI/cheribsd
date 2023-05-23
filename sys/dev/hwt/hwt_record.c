@@ -59,10 +59,11 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_radix.h>
 #include <vm/pmap.h>
 
-#include <dev/hwt/hwtvar.h>
 #include <dev/hwt/hwtvar1.h>
+#include <dev/hwt/hwtvar.h>
 #include <dev/hwt/hwt.h>
 
+#if 0
 static void
 hwt_record_mmap(struct thread *td, struct vnode *vp, uintptr_t addr,
     size_t size)
@@ -100,7 +101,7 @@ hwt_record_mmap(struct thread *td, struct vnode *vp, uintptr_t addr,
 
 printf("%s: inserting mmap entry for %s\n", __func__, fullpath);
 	mtx_lock_spin(&hp->mtx);
-	LIST_INSERT_HEAD(&hp->mmaps, entry, next);
+	LIST_INSERT_HEAD(&hp->records, entry, next);
 	mtx_unlock_spin(&hp->mtx);
 }
 
@@ -116,31 +117,51 @@ hwt_record_munmap(struct thread *td, uintptr_t addr, size_t size)
 	printf("%s: td %p addr %lx size %lx\n", __func__, td,
 	    (unsigned long) addr, size);
 }
+#endif
 
 void
 hwt_record(struct thread *td, enum hwt_record_type record_type,
     struct hwt_record_entry *ent)
 {
+	struct hwt_record_entry *entry;
+	struct hwt_proc *hp;
 	struct proc *p;
+	int cpuid;
 
 	p = td->td_proc;
 	if ((p->p_flag2 & P2_HWT) == 0)
 		return;
 
+	cpuid = PCPU_GET(cpuid);
+	hp = hwt_lookup_proc_by_cpu(p, cpuid);
+	if (hp == NULL)
+		return;
+
 	switch (record_type) {
 	case HWT_RECORD_MMAP:
-		printf("%s: MMAP path %s addr %lx size %lx\n", __func__, ent->path,
+		printf("%s: MMAP path %s addr %lx size %lx\n", __func__, ent->fullpath,
 		    (unsigned long)ent->addr, ent->size);
 		break;
 	case HWT_RECORD_EXECUTABLE:
-		printf("%s: EXEC path %s addr %lx size %lx\n", __func__, ent->path,
+		printf("%s: EXEC path %s addr %lx size %lx\n", __func__, ent->fullpath,
 		    (unsigned long)ent->addr, ent->size);
 		break;
 	case HWT_RECORD_INTERP:
-		printf("%s: INTP path %s addr %lx size %lx\n", __func__, ent->path,
+		printf("%s: INTP path %s addr %lx size %lx\n", __func__, ent->fullpath,
 		    (unsigned long)ent->addr, ent->size);
 		break;
+	case HWT_RECORD_MUNMAP:
 	default:
-		break;
+		return;
 	};
+
+	entry = malloc(sizeof(struct hwt_record_entry), M_DEVBUF, M_WAITOK);
+	entry->fullpath = strdup(ent->fullpath, M_DEVBUF);
+	entry->td = td;
+	entry->addr = ent->addr;
+	entry->size = ent->size;
+
+	mtx_lock_spin(&hp->mtx);
+	LIST_INSERT_HEAD(&hp->records, entry, next);
+	mtx_unlock_spin(&hp->mtx);
 }

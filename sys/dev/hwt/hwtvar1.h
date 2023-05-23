@@ -43,12 +43,14 @@ enum hwt_record_type {
 };
 
 struct hwt_record_entry {
-	char *path;
-	uintptr_t addr;
-	size_t size;
+	LIST_ENTRY(hwt_record_entry)	next;
+	char				*fullpath;
+	struct thread			*td;
+	uintptr_t			addr;
+	size_t				size;
 };
 
 void hwt_record(struct thread *td, enum hwt_record_type record_type,
-    struct hwt_record_entry *entry);
+    struct hwt_record_entry *ent);
 
 #endif /* !_DEV_HWT_HWTVAR1_H_ */
