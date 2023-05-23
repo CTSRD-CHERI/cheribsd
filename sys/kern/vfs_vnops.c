@@ -2929,7 +2929,8 @@ vn_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr,
 	}
 #endif
 
-	if (error == 0)
+	/* Dynamic libraries. */
+	if ((prot & VM_PROT_EXECUTE) != 0 && error == 0)
 		hwt_record_mmap(td, vp, (uintptr_t) *addr, (size_t) size);
 
 	return (error);
