@@ -1043,7 +1043,11 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 #endif
 	rv = vm_map_remove_locked(map, addr, addr + size);
 
-	hwt_record_munmap(td, (uintptr_t) addr, (size_t) size);
+	/* HWT: record dynamic libs unmap. */
+	struct hwt_record_entry ent;
+	ent.addr = (uintptr_t) addr;
+	ent.size = (size_t) size;
+	hwt_record(td, HWT_RECORD_MUNMAP, &ent);
 
 #ifdef HWPMC_HOOKS
 	if (rv == KERN_SUCCESS && __predict_false(pmc_handled)) {

@@ -63,7 +63,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/hwt/hwtvar1.h>
 #include <dev/hwt/hwt.h>
 
-void
+static void
 hwt_record_mmap(struct thread *td, struct vnode *vp, uintptr_t addr,
     size_t size)
 {
@@ -104,7 +104,7 @@ printf("%s: inserting mmap entry for %s\n", __func__, fullpath);
 	mtx_unlock_spin(&hp->mtx);
 }
 
-void
+static void
 hwt_record_munmap(struct thread *td, uintptr_t addr, size_t size)
 {
 	struct proc *p;
@@ -115,4 +115,32 @@ hwt_record_munmap(struct thread *td, uintptr_t addr, size_t size)
 
 	printf("%s: td %p addr %lx size %lx\n", __func__, td,
 	    (unsigned long) addr, size);
+}
+
+void
+hwt_record(struct thread *td, enum hwt_record_type record_type,
+    struct hwt_record_entry *ent)
+{
+	struct proc *p;
+
+	p = td->td_proc;
+	if ((p->p_flag2 & P2_HWT) == 0)
+		return;
+
+	switch (record_type) {
+	case HWT_RECORD_MMAP:
+		printf("%s: MMAP path %s addr %lx size %lx\n", __func__, ent->path,
+		    (unsigned long)ent->addr, ent->size);
+		break;
+	case HWT_RECORD_EXECUTABLE:
+		printf("%s: EXEC path %s addr %lx size %lx\n", __func__, ent->path,
+		    (unsigned long)ent->addr, ent->size);
+		break;
+	case HWT_RECORD_INTERP:
+		printf("%s: INTP path %s addr %lx size %lx\n", __func__, ent->path,
+		    (unsigned long)ent->addr, ent->size);
+		break;
+	default:
+		break;
+	};
 }

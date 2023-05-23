@@ -2929,9 +2929,21 @@ vn_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr,
 	}
 #endif
 
-	/* Dynamic libraries. */
-	if ((prot & VM_PROT_EXECUTE) != 0 && error == 0)
-		hwt_record_mmap(td, vp, (uintptr_t) *addr, (size_t) size);
+	/* HWT: record dynamic libs. */
+	struct hwt_record_entry ent;
+	char *fullpath;
+	char *freepath;
+
+	if ((prot & VM_PROT_EXECUTE) != 0 && error == 0) {
+		if (vn_fullpath(vp, &fullpath, &freepath) == 0) {
+			ent.path = fullpath;
+			ent.addr = (uintptr_t) *addr;
+			ent.size = (size_t) size;
+			hwt_record(td, HWT_RECORD_MMAP, &ent);
+			if (freepath != NULL)
+				free(freepath, M_TEMP);
+		}
+	}
 
 	return (error);
 }

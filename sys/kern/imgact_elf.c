@@ -82,6 +82,8 @@
 #include <vm/vm_object.h>
 #include <vm/vm_extern.h>
 
+#include <dev/hwt/hwtvar1.h>
+
 #if __has_feature(capabilities)
 #include <cheri/cheri.h>
 #endif
@@ -1589,9 +1591,14 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	imgp->interp_start = 0;
 	imgp->interp_end = 0;
 
-	/* Main binary. */
-	if (td->td_proc->p_flag2 & P2_HWT)
-		printf("%s: execpath %s entry %lx\n", __func__, imgp->execpath, entry);
+	/* HWT: record main binary. */
+	struct hwt_record_entry ent;
+	if (td->td_proc->p_flag2 & P2_HWT) {
+		ent.path = imgp->execpath;
+		ent.addr = (uintptr_t) entry;
+		ent.size = (size_t) (imgp->end_addr - imgp->start_addr);
+		hwt_record(td, HWT_RECORD_EXECUTABLE, &ent);
+	}
 
 	if (interp != NULL) {
 		VOP_UNLOCK(imgp->vp);
@@ -1609,11 +1616,14 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		if (error != 0)
 			goto ret;
 
-		/* Runtime linker. */
+		/* HWT: Record interp. */
+		struct hwt_record_entry ent;
 		p = td->td_proc;
 		if (p->p_flag2 & P2_HWT) {
-			printf("%s: interp %s imgp entry %lx\n", __func__, interp,
-			    imgp->entry_addr);
+			ent.path = interp;
+			ent.addr = (uintptr_t)imgp->entry_addr;
+			ent.size = (size_t) (imgp->interp_end - imgp->interp_start);
+			hwt_record(td, HWT_RECORD_INTERP, &ent);
 		}
 	} else
 		addr = imgp->et_dyn_addr;

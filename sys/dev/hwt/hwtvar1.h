@@ -34,7 +34,21 @@
 
 void hwt_switch_in(struct thread *td);
 void hwt_switch_out(struct thread *td);
-void hwt_record_mmap(struct thread *td, struct vnode *vp, uintptr_t addr, size_t size);
-void hwt_record_munmap(struct thread *td, uintptr_t addr, size_t size);
+
+enum hwt_record_type {
+	HWT_RECORD_MMAP,
+	HWT_RECORD_MUNMAP,
+	HWT_RECORD_EXECUTABLE,
+	HWT_RECORD_INTERP,
+};
+
+struct hwt_record_entry {
+	char *path;
+	uintptr_t addr;
+	size_t size;
+};
+
+void hwt_record(struct thread *td, enum hwt_record_type record_type,
+    struct hwt_record_entry *entry);
 
 #endif /* !_DEV_HWT_HWTVAR1_H_ */
