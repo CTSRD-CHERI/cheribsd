@@ -502,6 +502,61 @@ hwt_insert_ctxhash(struct hwt_ctx *ctx)
 }
 
 static int
+hwt_send_records(struct hwt_record_get *record_get, struct hwt_ctx *ctx)
+{
+	struct hwt_record_entry *entry, *entry1;
+	struct hwt_record_user_entry *user_entry;
+	int nitems_req;
+	int error;
+	int i;
+
+	nitems_req = 0;
+
+	error = copyin(record_get->nentries, &nitems_req, sizeof(int));
+	if (error)
+		return (error);
+
+	if (nitems_req < 1 || nitems_req > 1024)
+		return (ENXIO);
+
+	user_entry = malloc(sizeof(struct hwt_record_user_entry) * nitems_req,
+	    M_DEVBUF, M_WAITOK);
+
+	i = 0;
+
+	mtx_lock_spin(&ctx->mtx);
+	LIST_FOREACH_SAFE(entry, &ctx->records, next, entry1) {
+		user_entry[i].addr = entry->addr;
+		user_entry[i].size = entry->size;
+		strncpy(user_entry[i].fullpath, entry->fullpath,
+		    MAXPATHLEN);
+		LIST_REMOVE(entry, next);
+
+		i += 1;
+
+		/* TODO: deallocate entry. */
+
+		if (i == nitems_req)
+			break;
+	}
+	mtx_unlock_spin(&ctx->mtx);
+
+	if (i == 0)
+		return (ENOENT);
+
+	error = copyout(user_entry, record_get->records,
+	    sizeof(struct hwt_record_user_entry) * i);
+	if (error)
+		return (error);
+
+	error = copyout(&i, record_get->nentries, sizeof(int));
+
+	free(user_entry, M_DEVBUF);
+
+	return (error);
+}
+
+static int
 hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
     struct thread *td)
 {
@@ -532,9 +587,15 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	case HWT_IOC_ALLOC:
 		halloc = (struct hwt_alloc *)addr;
 
+		/* TODO: check cpu_id field for sanity. */
+
 		/* First get the owner. */
 		ho = hwt_lookup_owner(td->td_proc);
-		if (ho == NULL) {
+		if (ho) {
+			hwt = hwt_lookup_by_id(ho, halloc->cpu_id, halloc->pid);
+			if (hwt)
+				return (EEXIST);
+		} else {
 			ho = malloc(sizeof(struct hwt_owner), M_HWT,
 			    M_WAITOK | M_ZERO);
 			ho->p = td->td_proc;
@@ -547,8 +608,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			LIST_INSERT_HEAD(hoh, ho, next);
 			mtx_unlock_spin(&hwt_ownerhash_mtx);
 		}
-
-		/* TODO: ensure this ho does not have HWT with specified cpu_id and pid. */
 
 		/* Allocate a new HWT. */
 		hwt = hwt_alloc(sc, td);
@@ -570,8 +629,10 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		/* Since we done with malloc, now get the victim proc. */
 		p = pfind(halloc->pid);
-		if (p == NULL)
-			break;
+		if (p == NULL) {
+			/* TODO: deallocate resources. */
+			return (ENXIO);
+		}
 
 		hwt->p = p;
 
@@ -627,55 +688,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			return (ENXIO);
 		}
 
-		struct hwt_record_entry *entry, *entry1;
-		struct hwt_record_user_entry *user_entry;
-		int nitems_req;
-		int i;
-
-		nitems_req = 0;
-
-		error = copyin(record_get->nentries, &nitems_req, sizeof(int));
-		if (error)
-			return (error);
-
-		if (nitems_req < 1)
-			return (ENXIO);
-		if (nitems_req > 1024)
-			return (ENXIO);
-
-		user_entry = malloc(sizeof(struct hwt_record_user_entry) * nitems_req,
-		    M_DEVBUF, M_WAITOK);
-
-		i = 0;
-
-		mtx_lock_spin(&hwt->mtx);
-		LIST_FOREACH_SAFE(entry, &hwt->records, next, entry1) {
-			user_entry[i].addr = entry->addr;
-			user_entry[i].size = entry->size;
-			strncpy(user_entry[i].fullpath, entry->fullpath,
-			    MAXPATHLEN);
-			LIST_REMOVE(entry, next);
-
-			i += 1;
-
-			/* TODO: deallocate entry. */
-
-			if (i == nitems_req)
-				break;
-		}
-		mtx_unlock_spin(&hwt->mtx);
-
-		if (i == 0)
-			return (ENOENT);
-
-		error = copyout(user_entry, record_get->records,
-		    sizeof(struct hwt_record_user_entry) * i);
-		if (error)
-			return (error);
-
-		error = copyout(&i, record_get->nentries, sizeof(int));
-
-		free(user_entry, M_DEVBUF);
+		error = hwt_send_records(record_get, hwt);
 
 	default:
 		break;
