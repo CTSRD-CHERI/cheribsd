@@ -610,10 +610,8 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		/* Check if process is registered owner of any HWTs. */
 		ho = hwt_lookup_owner(td->td_proc);
-		if (ho == NULL) {
-			/* No HWTs allocated. So nothing to attach to. */
+		if (ho == NULL)
 			return (ENXIO);
-		}
 
 		/* Now find HWT we want to activate. */
 		hwt = hwt_lookup_by_id(ho, s->cpu_id, s->pid);
