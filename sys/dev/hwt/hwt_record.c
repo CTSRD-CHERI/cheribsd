@@ -68,17 +68,18 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
     struct hwt_record_entry *ent)
 {
 	struct hwt_record_entry *entry;
-	struct hwt_proc *hp;
+	struct hwt_ctx *ctx;
 	struct proc *p;
-	int cpuid;
+	int cpu_id;
 
 	p = td->td_proc;
 	if ((p->p_flag2 & P2_HWT) == 0)
 		return;
 
-	cpuid = PCPU_GET(cpuid);
-	hp = hwt_lookup_proc_by_cpu(p, cpuid);
-	if (hp == NULL)
+	cpu_id = PCPU_GET(cpuid);
+
+	ctx = hwt_lookup_ctx(p, cpu_id);
+	if (ctx == NULL)
 		return;
 
 	switch (record_type) {
@@ -105,7 +106,7 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 	entry->addr = ent->addr;
 	entry->size = ent->size;
 
-	mtx_lock_spin(&hp->mtx);
-	LIST_INSERT_HEAD(&hp->records, entry, next);
-	mtx_unlock_spin(&hp->mtx);
+	mtx_lock_spin(&ctx->mtx);
+	LIST_INSERT_HEAD(&ctx->records, entry, next);
+	mtx_unlock_spin(&ctx->mtx);
 }

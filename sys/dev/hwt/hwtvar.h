@@ -52,7 +52,6 @@ struct hwt_ctx {
 	int			cpu_id;
 	int			hwt_id;
 	struct hwt_owner	*hwt_owner;
-	LIST_ENTRY(hwt_ctx)		next;
 
 	int			status;
 
@@ -66,7 +65,7 @@ struct hwt_ctx {
 struct hwt_owner {
 	struct proc		*p;
 	struct mtx		mtx; /* Protects hwts. */
-	LIST_HEAD(, hwt)	hwts; /* Owned HWTs. */
+	LIST_HEAD(, hwt_ctx)	hwts; /* Owned HWTs. */
 	LIST_ENTRY(hwt_owner)	next;
 };
 
@@ -97,7 +96,7 @@ struct hwt_softc {
 	TAILQ_HEAD(hwt_backend_list, hwt_backend)	hwt_backends;
 };
 
-struct hwt_proc * hwt_lookup_proc_by_cpu(struct proc *p, int cpu);
+struct hwt_ctx * hwt_lookup_ctx(struct proc *p, int cpu_id);
 
 #endif /* !LOCORE */
 #endif /* !_DEV_HWT_HWTVAR_H_ */
