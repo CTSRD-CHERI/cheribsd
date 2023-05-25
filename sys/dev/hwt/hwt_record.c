@@ -63,62 +63,6 @@ __FBSDID("$FreeBSD$");
 #include <dev/hwt/hwtvar.h>
 #include <dev/hwt/hwt.h>
 
-#if 0
-static void
-hwt_record_mmap(struct thread *td, struct vnode *vp, uintptr_t addr,
-    size_t size)
-{
-	struct hwt_mmap_entry *entry;
-	struct hwt_proc *hp;
-	char *fullpath;
-	char *freepath;
-	struct proc *p;
-	int error;
-	int cpuid;
-
-	p = td->td_proc;
-	if ((p->p_flag2 & P2_HWT) == 0)
-		return;
-
-	cpuid = PCPU_GET(cpuid);
-	hp = hwt_lookup_proc_by_cpu(p, cpuid);
-	if (hp == NULL)
-		return;
-
-	error = vn_fullpath(vp, &fullpath, &freepath);
-	if (error)
-		return;
-
-	printf("%s: td %p addr %lx size %lx fullpath %s\n", __func__, td,
-	    (unsigned long)addr, size, fullpath);
-
-	entry = malloc(sizeof(struct hwt_mmap_entry), M_DEVBUF, M_WAITOK);
-	entry->fullpath = fullpath;
-	entry->td = td;
-	entry->vp = vp;
-	entry->addr = addr;
-	entry->size = size;
-
-printf("%s: inserting mmap entry for %s\n", __func__, fullpath);
-	mtx_lock_spin(&hp->mtx);
-	LIST_INSERT_HEAD(&hp->records, entry, next);
-	mtx_unlock_spin(&hp->mtx);
-}
-
-static void
-hwt_record_munmap(struct thread *td, uintptr_t addr, size_t size)
-{
-	struct proc *p;
-
-	p = td->td_proc;
-	if ((p->p_flag2 & P2_HWT) == 0)
-		return;
-
-	printf("%s: td %p addr %lx size %lx\n", __func__, td,
-	    (unsigned long) addr, size);
-}
-#endif
-
 void
 hwt_record(struct thread *td, enum hwt_record_type record_type,
     struct hwt_record_entry *ent)
