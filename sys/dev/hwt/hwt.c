@@ -98,23 +98,6 @@ static LIST_HEAD(hwt_ownerhash, hwt_owner)	*hwt_ownerhash;
 static struct hwt_softc hwt_sc;
 static struct hwt_backend *hwt_backend;
 
-static void
-hwt_dump_pages(struct hwt_context *hwt)
-{
-	vm_pointer_t va;
-	uint64_t *d;
-	vm_page_t m;
-
-	m = hwt->pages[0];
-
-	va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
-	d = (uint64_t *)va;
-
-	cpu_dcache_inv_range(va, PAGE_SIZE);
-
-	printf("data %lx %lx %lx %lx\n", d[0], d[1], d[2], d[3]);
-}
-
 static int
 hwt_event_init(struct hwt_context *hwt)
 {
@@ -766,7 +749,6 @@ hwt_stop_proc_hwts(struct hwt_contexthash *hch, struct proc *p)
 			hwt_event_disable(ctx);
 			hwt_event_dump(ctx);
 			hwt_event_stop(ctx);
-			hwt_dump_pages(ctx);
 
 			LIST_REMOVE(ctx, next);
 			ctx->p = NULL;
