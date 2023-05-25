@@ -567,6 +567,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 	switch (cmd) {
 	case HWT_IOC_ALLOC:
+		/* Allocate HWT context. */
 
 		halloc = (struct hwt_alloc *)addr;
 
@@ -656,31 +657,28 @@ printf("%s: hwt->cpu_id %d obj %p\n", __func__, hwt->cpu_id, hwt->obj);
 			return (ENXIO);
 		}
 
-		/* Now find HWT we want to attach to. */
+		/* Find HWT we want to attach to. */
 		hwt = hwt_lookup_by_id(ho, a->hwt_id);
 		if (hwt == NULL) {
 			/* No HWT with such id. */
 			return (ENXIO);
 		}
 
-		hpnew = malloc(sizeof(struct hwt_proc), M_HWT,
-		    M_WAITOK | M_ZERO);
-
+		/* Now get the proc. */
 		p = pfind(a->pid);
 		if (p == NULL)
 			break;
 
-		dprintf("%s: proc %p\n", __func__, p);
-
+		/* Ensure this proc is not attached already. */
 		hp = hwt_lookup_proc_by_hwt(p, hwt);
 		if (hp) {
-			/* Already attached. */
-			free(hpnew, M_HWT);
 			PROC_UNLOCK(p);
 			break;
 		}
 
-		p->p_flag2 |= P2_HWT;
+		/* Allocate HWT proc. */
+		hpnew = malloc(sizeof(struct hwt_proc), M_HWT,
+		    M_WAITOK | M_ZERO);
 		hpnew->p = p;
 		hpnew->pid = a->pid;
 		hpnew->hwt_owner = ho;
@@ -689,6 +687,7 @@ printf("%s: hwt->cpu_id %d obj %p\n", __func__, hwt->cpu_id, hwt->obj);
 		hwt_insert_prochash(hpnew);
 		LIST_INSERT_HEAD(&hwt->procs, hpnew, next1);
 
+		p->p_flag2 |= P2_HWT;
 		PROC_UNLOCK(p);
 		break;
 	case HWT_IOC_START:
@@ -727,7 +726,7 @@ printf("%s: hwt->cpu_id %d obj %p\n", __func__, hwt->cpu_id, hwt->obj);
 		if (ho == NULL)
 			return (ENXIO);
 
-		/* Now find HWT we want to activate. */
+		/* Now find required HWT. */
 		hwt = hwt_lookup_by_id(ho, record_get->hwt_id);
 		if (hwt == NULL) {
 			/* No HWT with such id. */
@@ -754,11 +753,11 @@ printf("%s: hwt->cpu_id %d obj %p\n", __func__, hwt->cpu_id, hwt->obj);
 		if (nitems_req > 1024)
 			return (ENXIO);
 
-		user_entry = malloc(sizeof(struct hwt_record_user_entry) * nitems_req, M_DEVBUF, M_WAITOK);
+		user_entry = malloc(sizeof(struct hwt_record_user_entry) * nitems_req,
+		    M_DEVBUF, M_WAITOK);
 
 		i = 0;
 
-printf("%s: copying records\n", __func__);
 		mtx_lock_spin(&hp->mtx);
 		LIST_FOREACH_SAFE(entry, &hp->records, next, entry1) {
 			user_entry[i].addr = entry->addr;
@@ -779,10 +778,8 @@ printf("%s: copying records\n", __func__);
 		if (i == 0)
 			return (ENOENT);
 
-printf("%s: copying records1\n", __func__);
 		error = copyout(user_entry, record_get->records,
 		    sizeof(struct hwt_record_user_entry) * i);
-printf("%s: copying records completed, n %d, error %d\n", __func__, i, error);
 		if (error)
 			return (error);
 
