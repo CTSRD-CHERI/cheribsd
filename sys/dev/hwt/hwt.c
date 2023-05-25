@@ -98,15 +98,13 @@ static LIST_HEAD(hwt_ownerhash, hwt_owner)	*hwt_ownerhash;
 static struct hwt_softc hwt_sc;
 static struct hwt_backend *hwt_backend;
 
-static int
+static void
 hwt_event_init(struct hwt_context *hwt)
 {
 
 	printf("%s: cpu %d\n", __func__, hwt->cpu_id);
 
 	hwt_backend->ops->hwt_event_init(hwt);
-
-	return (0);
 }
 
 static int
@@ -543,7 +541,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	struct hwt_ownerhash *hoh;
 	int hindex;
 	int error;
-
 	int len;
 
 	error = 0;
@@ -628,10 +625,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		if (hwt == NULL)
 			return (ENXIO);
 
-		printf("%s: initing hwt %p\n", __func__, hwt);
 		hwt_event_init(hwt);
-
-		printf("%s: starting hwt %p\n", __func__, hwt);
 		hwt_event_start(hwt);
 
 		hwt->started = 1;
@@ -646,7 +640,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			return (ENXIO);
 
 		error = hwt_send_records(rget, hwt);
-
 	default:
 		break;
 	};
