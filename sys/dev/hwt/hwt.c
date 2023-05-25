@@ -246,10 +246,10 @@ retry:
 		}
 
 #if 0
-printf("%s: zeroing page\n", __func__);
+		/* TODO */
+
 		if ((m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
-printf("%s: zeroing page done\n", __func__);
 
 		va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 		cpu_dcache_wb_range(va, PAGE_SIZE);
