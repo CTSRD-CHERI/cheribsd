@@ -44,8 +44,8 @@ struct hwt_ctx {
 	struct mtx			mtx; /* Protects records. */
 	struct proc			*p; /* Could be NULL if exited. */
 	pid_t				pid;
-	LIST_ENTRY(hwt_ctx)		next; /* Entry in prochash. */
-	LIST_ENTRY(hwt_ctx)		next1; /* Entry in hwt procs. */
+	LIST_ENTRY(hwt_ctx)		next; /* Entry in ctxhash. */
+	LIST_ENTRY(hwt_ctx)		next1; /* Entry in ho->hwts. */
 
 	vm_page_t		*pages;
 	int			npages;
@@ -66,7 +66,7 @@ struct hwt_owner {
 	struct proc		*p;
 	struct mtx		mtx; /* Protects hwts. */
 	LIST_HEAD(, hwt_ctx)	hwts; /* Owned HWTs. */
-	LIST_ENTRY(hwt_owner)	next;
+	LIST_ENTRY(hwt_owner)	next; /* Entry in hwt owner hash. */
 };
 
 struct hwt_backend_ops {

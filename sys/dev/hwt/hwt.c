@@ -333,7 +333,7 @@ hwt_create_cdev(struct hwt_ctx *hwt)
 	args.mda_mode = 0660;
 	args.mda_si_drv1 = hwt;
 
-	error = make_dev_s(&args, &hwt->cdev, "hwt_ctx_%d", hwt->pid);
+	error = make_dev_s(&args, &hwt->cdev, "hwt_%d%d", hwt->cpu_id, hwt->pid);
 	if (error != 0)
 		return (error);
 
@@ -476,7 +476,7 @@ hwt_lookup_by_id(struct hwt_owner *ho, int cpu_id, pid_t pid)
 	struct hwt_ctx *ctx;
 
 	mtx_lock(&ho->mtx);
-	LIST_FOREACH(ctx, &ho->hwts, next) {
+	LIST_FOREACH(ctx, &ho->hwts, next1) {
 		if (ctx->pid == pid && ctx->cpu_id == cpu_id) {
 			mtx_unlock(&ho->mtx);
 			return (ctx);
@@ -532,12 +532,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	case HWT_IOC_ALLOC:
 		halloc = (struct hwt_alloc *)addr;
 
-		/* First get the victim proc. */
-		p = pfind(halloc->pid);
-		if (p == NULL)
-			break;
-
-		/* Now get the owner. */
+		/* First get the owner. */
 		ho = hwt_lookup_owner(td->td_proc);
 		if (ho == NULL) {
 			ho = malloc(sizeof(struct hwt_owner), M_HWT,
@@ -559,24 +554,29 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		hwt = hwt_alloc(sc, td);
 		if (hwt == NULL) {
 			/* TODO: remove ho if it was created. */
-			PROC_UNLOCK(p);
 			return (ENOMEM);
 		}
 
 		hwt->cpu_id = halloc->cpu_id;
 		hwt->pid = halloc->pid;
-		hwt->p = p;
+		hwt->p = NULL;
 		hwt->hwt_owner = ho;
 
 		error = hwt_create_cdev(hwt);
 		if (error) {
 			printf("%s: could not create cdev\n", __func__);
-			PROC_UNLOCK(p);
 			return (error);
 		}
 
+		/* Since we done with malloc, now get the victim proc. */
+		p = pfind(halloc->pid);
+		if (p == NULL)
+			break;
+
+		hwt->p = p;
+
 		mtx_lock(&ho->mtx);
-		LIST_INSERT_HEAD(&ho->hwts, hwt, next);
+		LIST_INSERT_HEAD(&ho->hwts, hwt, next1);
 		mtx_unlock(&ho->mtx);
 
 		hwt_insert_ctxhash(hwt);
@@ -785,8 +785,8 @@ hwt_stop_owner_hwts(struct hwt_ctxhash *hch, struct hwt_owner *ho)
 	printf("%s: stopping hwt owner\n", __func__);
 
 	mtx_lock(&ho->mtx);
-	LIST_FOREACH_SAFE(ctx, &ho->hwts, next, ctx1) {
-		LIST_REMOVE(ctx, next);
+	LIST_FOREACH_SAFE(ctx, &ho->hwts, next1, ctx1) {
+		LIST_REMOVE(ctx, next1);
 printf("stopping hwt cpu_id %d pid %d\n", ctx->cpu_id, ctx->pid);
 		hwt_destroy_buffers(ctx);
 		destroy_dev_sched(ctx->cdev);
@@ -812,15 +812,15 @@ hwt_process_exit(void *arg __unused, struct proc *p)
 	hch = &hwt_ctxhash[hindex];
 
 	ho = hwt_lookup_owner(p);
-	if (ho == NULL) {
-		/* Stop HWTs associated with exiting proc. */
-		hwt_stop_proc_hwts(hch, p);
-	} else {
+	if (ho) {
 		/*
 		 * Stop HWTs associated with exiting owner.
 		 * Detach associated procs.
 		 */
 		hwt_stop_owner_hwts(hch, ho);
+	} else {
+		/* Stop HWTs associated with exiting proc. */
+		hwt_stop_proc_hwts(hch, p);
 	}
 }
 
