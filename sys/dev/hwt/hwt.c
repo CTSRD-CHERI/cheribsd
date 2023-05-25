@@ -208,7 +208,6 @@ hwt_alloc_pages(struct hwt_context *hwt)
 {
 	vm_paddr_t low, high, boundary;
 	vm_memattr_t memattr;
-	//vm_pointer_t va;
 	int alignment;
 	vm_page_t m;
 	int pflags;
@@ -247,6 +246,7 @@ retry:
 
 #if 0
 		/* TODO */
+		vm_pointer_t va;
 
 		if ((m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
