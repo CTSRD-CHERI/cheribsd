@@ -39,38 +39,26 @@ static MALLOC_DEFINE(M_HWT, "hwt", "Hardware Trace");
 #define	HWT_UNLOCK(sc)			mtx_unlock(&(sc)->mtx)
 #define	HWT_ASSERT_LOCKED(sc)		mtx_assert(&(sc)->mtx, MA_OWNED)
 
-#if 0
-struct hwt_record_entry {
-	LIST_ENTRY(hwt_mmap_entry)	next;
-	void *path;
-	struct thread *td;
-	uintptr_t addr;
-	size_t size;
-};
-#endif
-
-struct hwt_proc {
+struct hwt_ctx {
 	LIST_HEAD(, hwt_record_entry)	records;
 	struct mtx			mtx; /* Protects records. */
 	struct proc			*p; /* Could be NULL if exited. */
 	pid_t				pid;
-	struct hwt			*hwt;
-	struct hwt_owner		*hwt_owner;
-	LIST_ENTRY(hwt_proc)		next; /* Entry in prochash. */
-	LIST_ENTRY(hwt_proc)		next1; /* Entry in hwt procs. */
-	int				cpu_id;
-	int				exited;
-};
+	LIST_ENTRY(hwt_ctx)		next; /* Entry in prochash. */
+	LIST_ENTRY(hwt_ctx)		next1; /* Entry in hwt procs. */
 
-struct hwt {
-	LIST_HEAD(, hwt_proc)	procs;
 	vm_page_t		*pages;
 	int			npages;
 	int			cpu_id;
 	int			hwt_id;
 	struct hwt_owner	*hwt_owner;
-	LIST_ENTRY(hwt)		next;
+	LIST_ENTRY(hwt_ctx)		next;
+
+	int			status;
+
 	int			started;
+	int			exited;
+
 	vm_object_t		obj;
 	struct cdev		*cdev;
 };
@@ -83,12 +71,12 @@ struct hwt_owner {
 };
 
 struct hwt_backend_ops {
-	void (*hwt_event_init)(struct hwt *hwt);
-	void (*hwt_event_start)(struct hwt *hwt);
-	void (*hwt_event_stop)(struct hwt *hwt);
-	void (*hwt_event_enable)(struct hwt *hwt);
-	void (*hwt_event_disable)(struct hwt *hwt);
-	void (*hwt_event_dump)(struct hwt *hwt);
+	void (*hwt_event_init)(struct hwt_ctx *);
+	void (*hwt_event_start)(struct hwt_ctx *);
+	void (*hwt_event_stop)(struct hwt_ctx *);
+	void (*hwt_event_enable)(struct hwt_ctx *);
+	void (*hwt_event_disable)(struct hwt_ctx *);
+	void (*hwt_event_dump)(struct hwt_ctx *);
 };
 
 struct hwt_backend {

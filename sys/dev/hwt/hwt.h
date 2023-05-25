@@ -37,25 +37,19 @@
 #define	HWT_MAGIC	0x42
 #define	HWT_IOC_ALLOC \
 	_IOW(HWT_MAGIC, 0x00, struct hwt_alloc)
-#define	HWT_IOC_ATTACH \
-	_IOW(HWT_MAGIC, 0x01, struct hwt_attach)
 #define	HWT_IOC_START \
-	_IOW(HWT_MAGIC, 0x02, struct hwt_start)
+	_IOW(HWT_MAGIC, 0x01, struct hwt_start)
 #define	HWT_IOC_RECORD_GET \
-	_IOW(HWT_MAGIC, 0x03, struct hwt_record_get)
+	_IOW(HWT_MAGIC, 0x02, struct hwt_record_get)
 
 struct hwt_alloc {
-	int		*hwt_id;
 	int		cpu_id;
-} __packed __aligned(16);
-
-struct hwt_attach {
 	pid_t		pid;
-	int		hwt_id;
 } __packed __aligned(16);
 
 struct hwt_start {
-	int		hwt_id;
+	int		cpu_id;
+	pid_t		pid;
 } __packed __aligned(16);
 
 struct hwt_record_user_entry {
@@ -67,7 +61,7 @@ struct hwt_record_user_entry {
 struct hwt_record_get {
 	struct hwt_record_user_entry	*records;
 	int				*nentries;
-	int				hwt_id;
+	int				cpu_id;
 	pid_t				pid;
 } __packed __aligned(16);
 
