@@ -49,7 +49,7 @@ static struct hwt_backend backend;
 static struct coresight_event cs_event[MAXCPU];
 
 static void
-coresight_event_init(struct hwt_ctx *hwt)
+coresight_event_init(struct hwt_context *hwt)
 {
 	struct coresight_event *event;
 
@@ -79,7 +79,7 @@ coresight_event_init(struct hwt_ctx *hwt)
 }
 
 static void
-coresight_event_start(struct hwt_ctx *hwt)
+coresight_event_start(struct hwt_context *hwt)
 {
 	struct coresight_event *event;
 
@@ -91,7 +91,7 @@ coresight_event_start(struct hwt_ctx *hwt)
 }
 
 static void
-coresight_event_stop(struct hwt_ctx *hwt)
+coresight_event_stop(struct hwt_context *hwt)
 {
 	struct coresight_event *event;
 
@@ -103,7 +103,7 @@ coresight_event_stop(struct hwt_ctx *hwt)
 }
 
 static void
-coresight_event_enable(struct hwt_ctx *hwt)
+coresight_event_enable(struct hwt_context *hwt)
 {
 	struct coresight_event *event;
 
@@ -115,7 +115,7 @@ coresight_event_enable(struct hwt_ctx *hwt)
 }
 
 static void
-coresight_event_disable(struct hwt_ctx *hwt)
+coresight_event_disable(struct hwt_context *hwt)
 {
 	struct coresight_event *event;
 
@@ -127,7 +127,7 @@ coresight_event_disable(struct hwt_ctx *hwt)
 }
 
 static void
-coresight_event_dump(struct hwt_ctx *hwt)
+coresight_event_dump(struct hwt_context *hwt)
 {
 	struct coresight_event *event;
 

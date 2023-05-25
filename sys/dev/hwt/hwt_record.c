@@ -68,7 +68,7 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
     struct hwt_record_entry *ent)
 {
 	struct hwt_record_entry *entry;
-	struct hwt_ctx *ctx;
+	struct hwt_context *ctx;
 	struct proc *p;
 	int cpu_id;
 

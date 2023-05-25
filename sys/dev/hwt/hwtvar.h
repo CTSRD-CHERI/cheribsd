@@ -39,13 +39,13 @@ static MALLOC_DEFINE(M_HWT, "hwt", "Hardware Trace");
 #define	HWT_UNLOCK(sc)			mtx_unlock(&(sc)->mtx)
 #define	HWT_ASSERT_LOCKED(sc)		mtx_assert(&(sc)->mtx, MA_OWNED)
 
-struct hwt_ctx {
+struct hwt_context {
 	LIST_HEAD(, hwt_record_entry)	records;
 	struct mtx			mtx; /* Protects records. */
 	struct proc			*p; /* Could be NULL if exited. */
 	pid_t				pid;
-	LIST_ENTRY(hwt_ctx)		next; /* Entry in ctxhash. */
-	LIST_ENTRY(hwt_ctx)		next1; /* Entry in ho->hwts. */
+	LIST_ENTRY(hwt_context)		next; /* Entry in ctxhash. */
+	LIST_ENTRY(hwt_context)		next1; /* Entry in ho->hwts. */
 
 	vm_page_t		*pages;
 	int			npages;
@@ -63,19 +63,19 @@ struct hwt_ctx {
 };
 
 struct hwt_owner {
-	struct proc		*p;
-	struct mtx		mtx; /* Protects hwts. */
-	LIST_HEAD(, hwt_ctx)	hwts; /* Owned HWTs. */
-	LIST_ENTRY(hwt_owner)	next; /* Entry in hwt owner hash. */
+	struct proc			*p;
+	struct mtx			mtx; /* Protects hwts. */
+	LIST_HEAD(, hwt_context)	hwts; /* Owned HWTs. */
+	LIST_ENTRY(hwt_owner)		next; /* Entry in hwt owner hash. */
 };
 
 struct hwt_backend_ops {
-	void (*hwt_event_init)(struct hwt_ctx *);
-	void (*hwt_event_start)(struct hwt_ctx *);
-	void (*hwt_event_stop)(struct hwt_ctx *);
-	void (*hwt_event_enable)(struct hwt_ctx *);
-	void (*hwt_event_disable)(struct hwt_ctx *);
-	void (*hwt_event_dump)(struct hwt_ctx *);
+	void (*hwt_event_init)(struct hwt_context *);
+	void (*hwt_event_start)(struct hwt_context *);
+	void (*hwt_event_stop)(struct hwt_context *);
+	void (*hwt_event_enable)(struct hwt_context *);
+	void (*hwt_event_disable)(struct hwt_context *);
+	void (*hwt_event_dump)(struct hwt_context *);
 };
 
 struct hwt_backend {
@@ -96,7 +96,7 @@ struct hwt_softc {
 	TAILQ_HEAD(hwt_backend_list, hwt_backend)	hwt_backends;
 };
 
-struct hwt_ctx * hwt_lookup_ctx(struct proc *p, int cpu_id);
+struct hwt_context * hwt_lookup_ctx(struct proc *p, int cpu_id);
 
 #endif /* !LOCORE */
 #endif /* !_DEV_HWT_HWTVAR_H_ */
