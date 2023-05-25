@@ -338,31 +338,6 @@ hwt_alloc_buffers(struct hwt_softc *sc, struct hwt_context *hwt)
 		return (error);
 	}
 
-#if 0
-	struct sglist *sg;
-	vm_page_t *m;
-	int i;
-
-	sg = sglist_alloc(hwt->npages, M_WAITOK);
-	if (sg == NULL) {
-		printf("%s: could not allocate sg\n", __func__);
-		return (ENOMEM);
-	}
-
-	for (i = 0; i < hwt->npages; i++) {
-		m = &hwt->pages[i];
-		//printf("page %d maxseg %d\n", i, sg->sg_maxseg);
-		error = sglist_append_vmpages(sg, m, 0, PAGE_SIZE);
-		if (error != 0) {
-			printf("%s: cant add pages, error %d\n",
-			    __func__, error);
-			return (error);
-		}
-	}
-
-printf("%s: pages added to sg\n", __func__);
-#endif
-
 	return (0);
 }
 
