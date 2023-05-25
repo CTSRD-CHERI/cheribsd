@@ -385,7 +385,7 @@ hwt_alloc(struct hwt_softc *sc, struct thread *td)
 }
 
 struct hwt_context *
-hwt_lookup_ctx(struct proc *p, int cpu_id)
+hwt_lookup_contexthash(struct proc *p, int cpu_id)
 {
 	struct hwt_contexthash *hch;
 	struct hwt_context *ctx;
@@ -407,7 +407,7 @@ hwt_lookup_ctx(struct proc *p, int cpu_id)
 }
 
 static struct hwt_owner *
-hwt_lookup_owner(struct proc *p)
+hwt_lookup_ownerhash(struct proc *p)
 {
 	struct hwt_ownerhash *hoh;
 	struct hwt_owner *ho;
@@ -429,7 +429,7 @@ hwt_lookup_owner(struct proc *p)
 }
 
 static struct hwt_context *
-hwt_lookup_by_id(struct hwt_owner *ho, int cpu_id, pid_t pid)
+hwt_lookup_by_owner(struct hwt_owner *ho, int cpu_id, pid_t pid)
 {
 	struct hwt_context *ctx;
 
@@ -443,6 +443,21 @@ hwt_lookup_by_id(struct hwt_owner *ho, int cpu_id, pid_t pid)
 	mtx_unlock(&ho->mtx);
 
 	return (NULL);
+}
+
+static struct hwt_context *
+hwt_lookup_by_owner_p(struct proc *owner_p, int cpu_id, pid_t pid)
+{
+	struct hwt_context *ctx;
+	struct hwt_owner *ho;
+
+	ho = hwt_lookup_ownerhash(owner_p);
+	if (ho == NULL)
+		return (NULL);
+
+	ctx = hwt_lookup_by_owner(ho, cpu_id, pid);
+
+	return (ctx);
 }
 
 static void
@@ -521,7 +536,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	struct hwt_softc *sc;
 	struct hwt_start *s;
 	struct hwt_alloc *halloc;
-	struct hwt_record_get *record_get;
+	struct hwt_record_get *rget;
 	struct proc *p;
 	struct hwt_context *hwt __unused;
 	struct hwt_owner *ho;
@@ -548,9 +563,9 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		/* TODO: check cpu_id field for sanity. */
 
 		/* First get the owner. */
-		ho = hwt_lookup_owner(td->td_proc);
+		ho = hwt_lookup_ownerhash(td->td_proc);
 		if (ho) {
-			hwt = hwt_lookup_by_id(ho, halloc->cpu_id, halloc->pid);
+			hwt = hwt_lookup_by_owner(ho, halloc->cpu_id, halloc->pid);
 			if (hwt)
 				return (EEXIST);
 		} else {
@@ -609,16 +624,9 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		dprintf("%s: start, cpu_id %d pid %d\n", __func__, s->cpu_id, s->pid);
 
 		/* Check if process is registered owner of any HWTs. */
-		ho = hwt_lookup_owner(td->td_proc);
-		if (ho == NULL)
+		hwt = hwt_lookup_by_owner_p(td->td_proc, s->cpu_id, s->pid);
+		if (hwt == NULL)
 			return (ENXIO);
-
-		/* Now find HWT we want to activate. */
-		hwt = hwt_lookup_by_id(ho, s->cpu_id, s->pid);
-		if (hwt == NULL) {
-			/* No HWT with such id. */
-			return (ENXIO);
-		}
 
 		printf("%s: initing hwt %p\n", __func__, hwt);
 		hwt_event_init(hwt);
@@ -630,21 +638,14 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		break;
 	case HWT_IOC_RECORD_GET:
-		record_get = (struct hwt_record_get *)addr;
+		rget = (struct hwt_record_get *)addr;
 
 		/* Check if process is registered owner of any HWTs. */
-		ho = hwt_lookup_owner(td->td_proc);
-		if (ho == NULL)
+		hwt = hwt_lookup_by_owner_p(td->td_proc, rget->cpu_id, rget->pid);
+		if (hwt == NULL)
 			return (ENXIO);
 
-		/* Now find required HWT. */
-		hwt = hwt_lookup_by_id(ho, record_get->cpu_id, record_get->pid);
-		if (hwt == NULL) {
-			/* No HWT with such id. */
-			return (ENXIO);
-		}
-
-		error = hwt_send_records(record_get, hwt);
+		error = hwt_send_records(rget, hwt);
 
 	default:
 		break;
@@ -668,7 +669,7 @@ hwt_switch_in(struct thread *td)
 
 	dprintf("%s\n", __func__);
 
-	ctx = hwt_lookup_ctx(p, cpu_id);
+	ctx = hwt_lookup_contexthash(p, cpu_id);
 	if (!ctx)
 		panic("no ctx");
 
@@ -691,7 +692,7 @@ hwt_switch_out(struct thread *td)
 
 	cpu_id = PCPU_GET(cpuid);
 
-	ctx = hwt_lookup_ctx(p, cpu_id);
+	ctx = hwt_lookup_contexthash(p, cpu_id);
 
 	dprintf("%s: ctx %p from cpu_id %d\n", __func__, ctx, cpu_id);
 
@@ -780,7 +781,7 @@ hwt_process_exit(void *arg __unused, struct proc *p)
 	hindex = HWT_HASH_PTR(p, hwt_contexthashmask);
 	hch = &hwt_contexthash[hindex];
 
-	ho = hwt_lookup_owner(p);
+	ho = hwt_lookup_ownerhash(p);
 	if (ho) {
 		/*
 		 * Stop HWTs associated with exiting owner.

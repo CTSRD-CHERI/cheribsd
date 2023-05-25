@@ -96,7 +96,7 @@ struct hwt_softc {
 	TAILQ_HEAD(hwt_backend_list, hwt_backend)	hwt_backends;
 };
 
-struct hwt_context * hwt_lookup_ctx(struct proc *p, int cpu_id);
+struct hwt_context * hwt_lookup_contexthash(struct proc *p, int cpu_id);
 
 #endif /* !LOCORE */
 #endif /* !_DEV_HWT_HWTVAR_H_ */

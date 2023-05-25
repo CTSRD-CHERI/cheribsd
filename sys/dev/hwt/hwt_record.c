@@ -78,7 +78,7 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 
 	cpu_id = PCPU_GET(cpuid);
 
-	ctx = hwt_lookup_ctx(p, cpu_id);
+	ctx = hwt_lookup_contexthash(p, cpu_id);
 	if (ctx == NULL)
 		return;
 
