@@ -459,7 +459,7 @@ hwt_lookup_by_owner_p(struct proc *owner_p, int cpu_id, pid_t pid)
 }
 
 static void
-hwt_insert_ctxhash(struct hwt_context *ctx)
+hwt_insert_contexthash(struct hwt_context *ctx)
 {
 	struct hwt_contexthash *hch;
 	int hindex;
@@ -610,7 +610,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		LIST_INSERT_HEAD(&ho->hwts, hwt, next1);
 		mtx_unlock(&ho->mtx);
 
-		hwt_insert_ctxhash(hwt);
+		hwt_insert_contexthash(hwt);
 
 		p->p_flag2 |= P2_HWT;
 		PROC_UNLOCK(p);
@@ -624,12 +624,18 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		hwt = hwt_lookup_by_owner_p(td->td_proc, s->cpu_id, s->pid);
 		if (hwt == NULL)
 			return (ENXIO);
-
 		hwt_event_init(hwt);
+
+		p = pfind(s->pid);
+		if (p == NULL)
+			return (ENXIO);
+
+		KASSERT(hwt->p == p, ("something wrong"));
+
 		hwt_event_start(hwt);
 
-		hwt->started = 1;
-
+		p->p_flag2 |= P2_HWT;
+		PROC_UNLOCK(p);
 		break;
 	case HWT_IOC_RECORD_GET:
 		rget = (struct hwt_record_get *)addr;
@@ -668,8 +674,7 @@ hwt_switch_in(struct thread *td)
 
 	dprintf("%s: ctx %p on cpu_id %d\n", __func__, ctx, cpu_id);
 
-	if (ctx->started)
-		hwt_event_enable(ctx);
+	hwt_event_enable(ctx);
 }
 
 void
@@ -686,13 +691,13 @@ hwt_switch_out(struct thread *td)
 	cpu_id = PCPU_GET(cpuid);
 
 	ctx = hwt_lookup_contexthash(p, cpu_id);
+	if (ctx == NULL)
+		panic("no ctx on switch_out");
 
 	dprintf("%s: ctx %p from cpu_id %d\n", __func__, ctx, cpu_id);
 
-	if (ctx->started) {
-		hwt_event_disable(ctx);
-		hwt_event_dump(ctx);
-	}
+	hwt_event_disable(ctx);
+	hwt_event_dump(ctx);
 }
 
 static struct cdevsw hwt_cdevsw = {
@@ -712,14 +717,12 @@ hwt_stop_proc_hwts(struct hwt_contexthash *hch, struct proc *p)
 		if (ctx->p == p) {
 			printf("%s: stopping proc hwts on cpu %d\n", __func__,
 			    ctx->cpu_id);
-			ctx->started = 0;
 			hwt_event_disable(ctx);
 			hwt_event_dump(ctx);
 			hwt_event_stop(ctx);
 
 			LIST_REMOVE(ctx, next);
 			ctx->p = NULL;
-			ctx->exited = 1;
 		}
 	}
 	mtx_unlock_spin(&hwt_contexthash_mtx);
@@ -729,26 +732,34 @@ static void
 hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 {
 	struct hwt_context *ctx, *ctx1;
-
-	mtx_lock_spin(&hwt_contexthash_mtx);
-	LIST_FOREACH_SAFE(ctx, hch, next, ctx1) {
-		if (ctx->hwt_owner == ho) {
-			printf("%s: stopping owner hwts on cpu %d\n", __func__,
-			    ctx->cpu_id);
-			ctx->started = 0;
-			hwt_event_disable(ctx);
-			hwt_event_dump(ctx);
-			hwt_event_stop(ctx);
-			LIST_REMOVE(ctx, next);
-		}
-	}
-	mtx_unlock_spin(&hwt_contexthash_mtx);
+	struct proc *p;
 
 	printf("%s: stopping hwt owner\n", __func__);
 
 	mtx_lock(&ho->mtx);
 	LIST_FOREACH_SAFE(ctx, &ho->hwts, next1, ctx1) {
+
+		/* TODO */
+		p = ctx->p;
+		if (p) {
+			/* Remove HWT flag from victim, as we no longer trace it. */
+			PROC_LOCK(p);
+			p->p_flag2 &= ~P2_HWT;
+			PROC_UNLOCK(p);
+
+			/* Remove it from contexthash now. */
+			mtx_lock_spin(&hwt_contexthash_mtx);
+			LIST_REMOVE(ctx, next);
+			mtx_unlock_spin(&hwt_contexthash_mtx);
+
+			/* Stop it now */
+			hwt_event_disable(ctx);
+			hwt_event_dump(ctx);
+			hwt_event_stop(ctx);
+		}
+
 		LIST_REMOVE(ctx, next1);
+
 		dprintf("stopping hwt cpu_id %d pid %d\n",
 		    ctx->cpu_id, ctx->pid);
 		hwt_destroy_buffers(ctx);

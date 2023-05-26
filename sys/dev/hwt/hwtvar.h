@@ -43,23 +43,19 @@ struct hwt_context {
 	LIST_HEAD(, hwt_record_entry)	records;
 	struct mtx			mtx; /* Protects records. */
 	struct proc			*p; /* Could be NULL if exited. */
-	pid_t				pid;
 	LIST_ENTRY(hwt_context)		next; /* Entry in ctxhash. */
 	LIST_ENTRY(hwt_context)		next1; /* Entry in ho->hwts. */
 
-	vm_page_t		*pages;
-	int			npages;
-	int			cpu_id;
-	int			hwt_id;
-	struct hwt_owner	*hwt_owner;
+	vm_page_t			*pages;
+	int				npages;
 
-	int			status;
+	pid_t				pid;
+	int				cpu_id;
 
-	int			started;
-	int			exited;
+	struct hwt_owner		*hwt_owner;
 
-	vm_object_t		obj;
-	struct cdev		*cdev;
+	vm_object_t			obj;
+	struct cdev			*cdev;
 };
 
 struct hwt_owner {
