@@ -314,7 +314,8 @@ hwt_create_cdev(struct hwt_context *hwt)
 	args.mda_mode = 0660;
 	args.mda_si_drv1 = hwt;
 
-	error = make_dev_s(&args, &hwt->cdev, "hwt_%d%d", hwt->cpu_id, hwt->pid);
+	error = make_dev_s(&args, &hwt->cdev, "hwt_%d%d", hwt->cpu_id,
+	    hwt->pid);
 	if (error != 0)
 		return (error);
 
@@ -562,7 +563,8 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		/* First get the owner. */
 		ho = hwt_lookup_ownerhash(td->td_proc);
 		if (ho) {
-			hwt = hwt_lookup_by_owner(ho, halloc->cpu_id, halloc->pid);
+			hwt = hwt_lookup_by_owner(ho, halloc->cpu_id,
+			    halloc->pid);
 			if (hwt)
 				return (EEXIST);
 		} else {
@@ -618,7 +620,8 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	case HWT_IOC_START:
 		s = (struct hwt_start *)addr;
 
-		dprintf("%s: start, cpu_id %d pid %d\n", __func__, s->cpu_id, s->pid);
+		dprintf("%s: start, cpu_id %d pid %d\n", __func__, s->cpu_id,
+		    s->pid);
 
 		/* Check if process is registered owner of any HWTs. */
 		hwt = hwt_lookup_by_owner_p(td->td_proc, s->cpu_id, s->pid);
@@ -641,7 +644,8 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		rget = (struct hwt_record_get *)addr;
 
 		/* Check if process is registered owner of any HWTs. */
-		hwt = hwt_lookup_by_owner_p(td->td_proc, rget->cpu_id, rget->pid);
+		hwt = hwt_lookup_by_owner_p(td->td_proc, rget->cpu_id,
+		    rget->pid);
 		if (hwt == NULL)
 			return (ENXIO);
 
@@ -742,7 +746,10 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 		/* TODO */
 		p = ctx->p;
 		if (p) {
-			/* Remove HWT flag from victim, as we no longer trace it. */
+			/*
+			 * Remove HWT flag from the victim proc,
+			 * so we no longer trace it.
+			 */
 			PROC_LOCK(p);
 			p->p_flag2 &= ~P2_HWT;
 			PROC_UNLOCK(p);
@@ -825,7 +832,8 @@ hwt_load(void)
 	if (error != 0)
 		return (error);
 
-	hwt_contexthash = hashinit(HWT_PROCHASH_SIZE, M_HWT, &hwt_contexthashmask);
+	hwt_contexthash = hashinit(HWT_PROCHASH_SIZE, M_HWT,
+	    &hwt_contexthashmask);
         mtx_init(&hwt_contexthash_mtx, "hwt-proc-hash", "hwt-proc", MTX_SPIN);
 
 	hwt_ownerhash = hashinit(HWT_OWNERHASH_SIZE, M_HWT, &hwt_ownerhashmask);
