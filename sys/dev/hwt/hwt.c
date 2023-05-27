@@ -465,6 +465,8 @@ hwt_insert_contexthash(struct hwt_context *ctx)
 	struct hwt_contexthash *hch;
 	int hindex;
 
+	PROC_LOCK_ASSERT(ctx->p, MA_OWNED);
+
 	hindex = HWT_HASH_PTR(ctx->p, hwt_contexthashmask);
 	hch = &hwt_contexthash[hindex];
 
@@ -742,15 +744,12 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 
 	mtx_lock(&ho->mtx);
 	LIST_FOREACH_SAFE(ctx, &ho->hwts, next1, ctx1) {
-
-		/* TODO */
-		p = ctx->p;
-		if (p) {
+		p = pfind(ctx->pid);
+		if (p != NULL) {
 			/*
 			 * Remove HWT flag from the victim proc,
 			 * so we no longer trace it.
 			 */
-			PROC_LOCK(p);
 			p->p_flag2 &= ~P2_HWT;
 			PROC_UNLOCK(p);
 
@@ -759,7 +758,7 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 			LIST_REMOVE(ctx, next);
 			mtx_unlock_spin(&hwt_contexthash_mtx);
 
-			/* Stop it now */
+			/* Stop it now. */
 			hwt_event_disable(ctx);
 			hwt_event_dump(ctx);
 			hwt_event_stop(ctx);
