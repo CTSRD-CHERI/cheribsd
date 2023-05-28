@@ -165,6 +165,9 @@ linux_fetch_syscall_args(struct thread *td)
 	else
 		sa->callp = &p->p_sysent->sv_table[sa->code];
 
+	/* Restore r10 earlier to avoid doing this multiply times. */
+	frame->tf_r10 = frame->tf_rcx;
+
 	td->td_retval[0] = 0;
 	return (0);
 }
@@ -179,7 +182,6 @@ linux_set_syscall_retval(struct thread *td, int error)
 	switch (error) {
 	case 0:
 		frame->tf_rax = td->td_retval[0];
-		frame->tf_r10 = frame->tf_rcx;
 		break;
 
 	case ERESTART:
@@ -190,7 +192,6 @@ linux_set_syscall_retval(struct thread *td, int error)
 		 *
 		 */
 		frame->tf_rip -= frame->tf_err;
-		frame->tf_r10 = frame->tf_rcx;
 		break;
 
 	case EJUSTRETURN:
@@ -198,7 +199,6 @@ linux_set_syscall_retval(struct thread *td, int error)
 
 	default:
 		frame->tf_rax = bsd_to_linux_errno(error);
-		frame->tf_r10 = frame->tf_rcx;
 		break;
 	}
 
