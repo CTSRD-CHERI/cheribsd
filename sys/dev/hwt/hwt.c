@@ -793,10 +793,7 @@ hwt_process_exit(void *arg __unused, struct proc *p)
 
 	ho = hwt_lookup_ownerhash(p);
 	if (ho) {
-		/*
-		 * Stop HWTs associated with exiting owner.
-		 * Detach associated procs.
-		 */
+		/* Stop HWTs associated with exiting owner. */
 		hwt_stop_owner_hwts(hch, ho);
 	} else {
 		/* Stop HWTs associated with exiting proc. */
