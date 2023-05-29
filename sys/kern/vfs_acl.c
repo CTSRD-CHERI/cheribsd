@@ -439,7 +439,7 @@ kern___acl_get_fd(struct thread *td, int filedes, acl_type_t type,
 	int error;
 
 	AUDIT_ARG_FD(filedes);
-	error = getvnode(td, filedes,
+	error = getvnode_path(td, filedes,
 	    cap_rights_init_one(&rights, CAP_ACL_GET), &fp);
 	if (error == 0) {
 		error = vacl_get_acl(td, fp->f_vnode, type, aclp);
@@ -590,7 +590,7 @@ kern___acl_aclcheck_fd(struct thread *td, int filedes, acl_type_t type,
 	int error;
 
 	AUDIT_ARG_FD(filedes);
-	error = getvnode(td, filedes,
+	error = getvnode_path(td, filedes,
 	    cap_rights_init_one(&rights, CAP_ACL_CHECK), &fp);
 	if (error == 0) {
 		error = vacl_aclcheck(td, fp->f_vnode, type, aclp);
