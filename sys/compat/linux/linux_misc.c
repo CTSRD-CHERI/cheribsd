@@ -2557,7 +2557,122 @@ linux_seccomp(struct thread *td, struct linux_seccomp_args *args)
 	}
 }
 
-#ifndef COMPAT_LINUX32
+/*
+ * Takes a pointer to a pointer an array of pointers in userspace, loads
+ * the loads the current value and updates the array pointer.
+ */
+static int
+get_argenv_ptr(l_uintptr_t * __capability *arrayp, void * __capability *ptrp)
+{
+	l_uintptr_t * __capability array;
+#ifdef COMPAT_LINUX32
+	uint32_t ptr32;
+#elif defined(COMPAT_LINUX64)
+	uint64_t ptr64;
+#else
+	uintcap_t ptr;
+#endif
+
+	array = *arrayp;
+#ifdef COMPAT_LINUX32
+	if (fueword32(array, &ptr32) == -1)
+		return (EFAULT);
+	array += sizeof(ptr32);
+	*ptrp = __USER_CAP_STR((void *)(uintptr_t)ptr32);
+#elif defined(COMPAT_LINUX64)
+	if (fueword64(array, &ptr64) == -1)
+		return (EFAULT);
+	array += sizeof(ptr64);
+	*ptrp = __USER_CAP_STR((void *)(uintptr_t)ptr64);
+#else
+	if (fueptr(array, &ptr) == -1)
+		return (EFAULT);
+	array += sizeof(ptr);
+	*ptrp = (void * __capability)ptr;
+#endif
+	*arrayp = array;
+	return (0);
+}
+
+/*
+ * Custom version of exec_copyin_args(), to copy out argument and environment
+ * strings from the old process address space into the temporary string buffer.
+ * Based on freebsd32_exec_copyin_args.
+ */
+static int
+linux_exec_copyin_args(struct image_args *args, const char * __capability fname,
+    enum uio_seg segflg, l_uintptr_t * __capability argv,
+    l_uintptr_t * __capability envv)
+{
+	void * __capability ptr;
+	int error;
+
+	bzero(args, sizeof(*args));
+	if (argv == NULL)
+		return (EFAULT);
+
+	/*
+	 * Allocate demand-paged memory for the file name, argument, and
+	 * environment strings.
+	 */
+	error = exec_alloc_args(args);
+	if (error != 0)
+		return (error);
+
+	/*
+	 * Copy the file name.
+	 */
+	error = exec_args_add_fname(args, fname, segflg);
+	if (error != 0)
+		goto err_exit;
+
+	/*
+	 * extract arguments first
+	 */
+	for (;;) {
+		error = get_argenv_ptr(&argv, &ptr);
+		if (error != 0)
+			goto err_exit;
+		if (ptr == NULL)
+			break;
+		error = exec_args_add_arg(args, ptr, UIO_USERSPACE);
+		if (error != 0)
+			goto err_exit;
+	}
+
+	/*
+	 * This comment is from Linux do_execveat_common:
+	 * When argv is empty, add an empty string ("") as argv[0] to
+	 * ensure confused userspace programs that start processing
+	 * from argv[1] won't end up walking envp.
+	 */
+	if (args->argc == 0 &&
+	    (error = exec_args_add_arg(args, "", UIO_SYSSPACE) != 0))
+		goto err_exit;
+
+	/*
+	 * extract environment strings
+	 */
+	if (envv) {
+		for (;;) {
+			error = get_argenv_ptr(&envv, &ptr);
+			if (error != 0)
+				goto err_exit;
+			if (ptr == NULL)
+				break;
+			error = exec_args_add_env(args, ptr, UIO_USERSPACE);
+			if (error != 0)
+				goto err_exit;
+		}
+	}
+
+	return (0);
+
+err_exit:
+	exec_free_args(args);
+	return (error);
+}
+
 int
 linux_execve(struct thread *td, struct linux_execve_args *args)
 {
@@ -2566,7 +2681,7 @@ linux_execve(struct thread *td, struct linux_execve_args *args)
 
 	LINUX_CTR(execve);
 
-	error = exec_copyin_args(&eargs, __USER_CAP_PATH(args->path),
+	error = linux_exec_copyin_args(&eargs, __USER_CAP_PATH(args->path),
 	    UIO_USERSPACE, __USER_CAP_UNBOUND(args->argp),
 	    __USER_CAP_UNBOUND(args->envp));
 	if (error == 0)
@@ -2574,7 +2689,6 @@ linux_execve(struct thread *td, struct linux_execve_args *args)
 	AUDIT_SYSCALL_EXIT(error == EJUSTRETURN ? 0 : error, td);
 	return (error);
 }
-#endif
 // CHERI CHANGES START
 // {
 //   "updated": 20230509,
