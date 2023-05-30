@@ -737,13 +737,21 @@ hwt_stop_proc_hwts(struct hwt_contexthash *hch, struct proc *p)
 static void
 hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 {
-	struct hwt_context *ctx, *ctx1;
+	struct hwt_context *ctx;
 	struct proc *p;
 
 	printf("%s: stopping hwt owner\n", __func__);
 
-	mtx_lock(&ho->mtx);
-	LIST_FOREACH_SAFE(ctx, &ho->hwts, next1, ctx1) {
+	while (1) {
+		mtx_lock(&ho->mtx);
+		ctx = LIST_FIRST(&ho->hwts);
+		if (ctx)
+			LIST_REMOVE(ctx, next1);
+		mtx_unlock(&ho->mtx);
+
+		if (ctx == NULL)
+			break;
+
 		p = pfind(ctx->pid);
 		if (p != NULL) {
 			/*
@@ -764,20 +772,18 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 			hwt_event_stop(ctx);
 		}
 
-		LIST_REMOVE(ctx, next1);
-
 		dprintf("stopping hwt cpu_id %d pid %d\n",
 		    ctx->cpu_id, ctx->pid);
 		hwt_destroy_buffers(ctx);
 		destroy_dev_sched(ctx->cdev);
 		free(ctx, M_HWT);
 	}
-	mtx_unlock(&ho->mtx);
 
 	/* Destroy hwt owner. */
 	mtx_lock_spin(&hwt_ownerhash_mtx);
 	LIST_REMOVE(ho, next);
 	mtx_unlock_spin(&hwt_ownerhash_mtx);
+
 	free(ho, M_HWT);
 }
 
