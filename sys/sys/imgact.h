@@ -68,6 +68,7 @@ struct image_params {
 	unsigned long start_addr;	/* start of mapped image (including bss) */
 	unsigned long end_addr;		/* end of mapped image (including bss) */
 	unsigned long reloc_base;	/* load address of image */
+	unsigned long et_dyn_addr;	/* PIE load base */
 	unsigned long interp_start;	/* start of RTLD mapping (or zero) */
 	unsigned long interp_end;	/* end of RTLD mapping (or zero) */
 	char *interpreter_name;		/* name of the interpreter */
