@@ -759,12 +759,13 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 			 * so we no longer trace it.
 			 */
 			p->p_flag2 &= ~P2_HWT;
-			PROC_UNLOCK(p);
 
 			/* Remove it from contexthash now. */
 			mtx_lock_spin(&hwt_contexthash_mtx);
 			LIST_REMOVE(ctx, next);
 			mtx_unlock_spin(&hwt_contexthash_mtx);
+
+			PROC_UNLOCK(p);
 
 			/* Stop it now. */
 			hwt_event_disable(ctx);
