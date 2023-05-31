@@ -221,37 +221,133 @@ set_dbregs(struct thread *td, struct dbreg *regs)
 /* Number of capability registers in 'struct capreg'. */
 #define	NCAPREGS	(offsetof(struct capreg, tagmask) / sizeof(uintcap_t))
 
+/*
+ * These assume that the capabilities in struct trapframe
+ * follow the same layout as struct capreg.
+ */
+_Static_assert(offsetof(struct trapframe, tf_ra) ==
+    offsetof(struct capreg, cra), "cra mismatch");
+_Static_assert(offsetof(struct trapframe, tf_sp) ==
+    offsetof(struct capreg, csp), "csp mismatch");
+_Static_assert(offsetof(struct trapframe, tf_gp) ==
+    offsetof(struct capreg, cgp), "cgp mismatch");
+_Static_assert(offsetof(struct trapframe, tf_tp) ==
+    offsetof(struct capreg, ctp), "ctp mismatch");
+_Static_assert(offsetof(struct trapframe, tf_t) ==
+    offsetof(struct capreg, ct), "ct[] mismatch");
+_Static_assert(offsetof(struct trapframe, tf_s) ==
+    offsetof(struct capreg, cs), "cs[] mismatch");
+_Static_assert(offsetof(struct trapframe, tf_a) ==
+    offsetof(struct capreg, ca), "ca[] mismatch");
+_Static_assert(offsetof(struct trapframe, tf_a) ==
+    offsetof(struct capreg, ca), "ca[] mismatch");
+_Static_assert(offsetof(struct trapframe, tf_sepc) ==
+    offsetof(struct capreg, sepcc), "sepcc mismatch");
+_Static_assert(offsetof(struct trapframe, tf_ddc) ==
+    offsetof(struct capreg, ddc), "ddc mismatch");
+
 int
 fill_capregs(struct thread *td, struct capreg *regs)
 {
 	struct trapframe *frame;
-	uintcap_t *pcap;
+	uintcap_t *fcap, *rcap;
 	u_int i;
 
 	frame = td->td_frame;
 	memset(regs, 0, sizeof(*regs));
-	regs->cra = frame->tf_ra;
-	regs->csp = frame->tf_sp;
-	regs->cgp = frame->tf_gp;
-	regs->ctp = frame->tf_tp;
-	memcpy(regs->ct, frame->tf_t, sizeof(regs->ct));
-	memcpy(regs->cs, frame->tf_s, sizeof(regs->cs));
-	memcpy(regs->ca, frame->tf_a, sizeof(regs->ca));
-	regs->sepcc = frame->tf_sepc;
-	regs->ddc = frame->tf_ddc;
-	pcap = (uintcap_t *)regs;
+	fcap = (uintcap_t *)frame;
+	rcap = (uintcap_t *)regs;
 	for (i = 0; i < NCAPREGS; i++) {
-		if (cheri_gettag(pcap[i]))
+		rcap[i] = cheri_cleartag(fcap[i]);
+		if (cheri_gettag(fcap[i]))
 			regs->tagmask |= (uint64_t)1 << i;
 	}
 	return (0);
 }
 
+/*
+ * If a tagged in can be derived from the user registers of td,
+ * store the derived cap in *out and return true.  Otherwise, return
+ * false.  NB: This does not support deriving sealed caps except if
+ * the new capability matches an existing cap register.
+ */
+bool
+ptrace_derive_capreg_td(struct thread *td, uintcap_t in, uintcap_t *out)
+{
+	struct trapframe *frame;
+	void * __capability cap;
+	uintcap_t *fcap;
+	int otype;
+	u_int i;
+
+	frame = td->td_frame;
+	fcap = (uintcap_t *)frame;
+	for (i = 0; i < NCAPREGS; i++) {
+		if (!cheri_gettag(fcap[i]))
+			continue;
+
+		if (cheri_equal_exact(cheri_cleartag(fcap[i]), in)) {
+			*out = fcap[i];
+			return (true);
+		}
+
+		/* The only sealed caps that can be derived are sentries. */
+		otype = cheri_gettype(in);
+		switch (otype) {
+		case CHERI_OTYPE_UNSEALED:
+		case CHERI_OTYPE_SENTRY:
+			break;
+		default:
+			continue;
+		}
+
+		cap = cheri_buildcap((void * __capability)fcap[i], in);
+		if (cheri_gettag(cap)) {
+			*out = (uintcap_t)cap;
+			return (true);
+		}
+	}
+	return (false);
+}
+
 int
 set_capregs(struct thread *td, struct capreg *regs)
 {
+	uintcap_t tempregs[NCAPREGS];
+	struct proc *p = td->td_proc;
+	struct trapframe *frame;
+	uintcap_t *fcap, *rcap;
+	u_int i;
 
-	return (EOPNOTSUPP);
+	/*
+	 * To support more exotic cases like swapping the value of two
+	 * registers as well as error handling, construct a copy of
+	 * the new register set in tempregs[] that is copied to the
+	 * frame at the end.
+	 */
+	PROC_UNLOCK(p);
+	frame = td->td_frame;
+	fcap = (uintcap_t *)frame;
+	rcap = (uintcap_t *)regs;
+	for (i = 0; i < NCAPREGS; i++) {
+		if ((regs->tagmask & ((uint64_t)1 << i)) == 0) {
+			/* Always ok to set untagged values. */
+			tempregs[i] = rcap[i];
+		} else if (cheri_gettag(fcap[i]) &&
+		    cheri_equal_exact(cheri_cleartag(fcap[i]), rcap[i])) {
+			/* Preserve unchanged registers. */
+			tempregs[i] = fcap[i];
+		} else {
+			if (!ptrace_derive_cap(p, rcap[i], &tempregs[i])) {
+				PROC_LOCK(p);
+				return (EPROT);
+			}
+		}
+	}
+	PROC_LOCK(p);
+	memcpy(frame, tempregs, sizeof(tempregs));
+
+	return (0);
 }
 #endif
 
