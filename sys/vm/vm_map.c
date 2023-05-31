@@ -6085,6 +6085,65 @@ vm_map_reservation_is_unmapped(vm_map_t map, vm_offset_t reservation)
 	return (false);
 }
 
+#if __has_feature(capabilities)
+/* Return a capability for the reservation that includes va. */
+void * __capability
+vm_map_reservation_cap(vm_map_t map, vm_offset_t va)
+{
+	vm_map_entry_t entry;
+	void * __capability cap;
+	vm_offset_t end, reservation;
+	vm_prot_t max_prot;
+
+	cap = NULL;
+	vm_map_lock_read(map);
+	if (!vm_map_lookup_entry(map, va, &entry))
+		goto out;
+
+	if ((map->flags & MAP_RESERVATIONS) != 0) {
+		reservation = entry->reservation;
+		if (reservation != va) {
+			if (!vm_map_lookup_entry(map, reservation, &entry))
+				panic("%s: failed to find start of reservation",
+				    __func__);
+		}
+
+		max_prot = entry->max_protection;
+		end = entry->end;
+		entry = vm_map_entry_succ(entry);
+		while (entry->reservation == reservation) {
+			max_prot |= entry->max_protection;
+			end = entry->end;
+			entry = vm_map_entry_succ(entry);
+
+			/*
+			 * Pathological case of a single reservation
+			 * for entire map.
+			 */
+			if (entry->start == reservation)
+				break;
+		}
+	} else {
+		reservation = entry->start;
+		end = entry->end;
+		max_prot = entry->max_protection;
+	}
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	cap = (void * __capability)vm_map_buildcap(map, reservation,
+	    end - reservation, max_prot);
+#else
+	cap = cheri_setaddress(userspace_root_cap, reservation);
+	cap = cheri_setbounds(cap, end - reservation);
+	cap = cheri_andperm(cap, ~CHERI_PROT2PERM_MASK |
+	    vm_map_prot2perms(max_prot));
+#endif
+out:
+	vm_map_unlock_read(map);
+	return (cap);
+}
+#endif
+
 #ifdef INVARIANTS
 static void
 _vm_map_assert_consistent(vm_map_t map, int check)
