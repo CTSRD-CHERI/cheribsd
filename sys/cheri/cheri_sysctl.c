@@ -48,7 +48,7 @@ SYSCTL_NODE(_security_cheri, OID_AUTO, stats, CTLFLAG_RD, 0,
 
 /* XXXRW: Should possibly be u_long. */
 u_int	security_cheri_syscall_violations;
-SYSCTL_UINT(_security_cheri, OID_AUTO, syscall_violations, CTLFLAG_RD,
+SYSCTL_UINT(_security_cheri_stats, OID_AUTO, syscall_violations, CTLFLAG_RD,
     &security_cheri_syscall_violations, 0, "Number of system calls blocked");
 
 /*
