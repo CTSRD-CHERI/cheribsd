@@ -592,7 +592,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		ctx->cpu_id = halloc->cpu_id;
 		ctx->pid = halloc->pid;
-		ctx->p = NULL;
 		ctx->hwt_owner = ho;
 
 		error = hwt_create_cdev(ctx);
@@ -613,10 +612,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		mtx_lock(&ho->mtx);
 		LIST_INSERT_HEAD(&ho->hwts, ctx, next1);
 		mtx_unlock(&ho->mtx);
-
-		hwt_insert_contexthash(ctx);
-
-		p->p_flag2 |= P2_HWT;
 		PROC_UNLOCK(p);
 		break;
 	case HWT_IOC_START:
@@ -639,6 +634,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		hwt_event_start(ctx);
 
+		hwt_insert_contexthash(ctx);
 		p->p_flag2 |= P2_HWT;
 		PROC_UNLOCK(p);
 		break;
@@ -717,6 +713,10 @@ static void
 hwt_stop_proc_hwts(struct hwt_contexthash *hch, struct proc *p)
 {
 	struct hwt_context *ctx, *ctx1;
+
+	PROC_LOCK(p);
+	p->p_flag2 &= ~P2_HWT;
+	PROC_UNLOCK(p);
 
 	mtx_lock_spin(&hwt_contexthash_mtx);
 	LIST_FOREACH_SAFE(ctx, hch, next, ctx1) {
