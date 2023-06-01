@@ -466,6 +466,42 @@ ENTRY(sucap)
 END(sucap)
 #endif
 
+#if __has_feature(capabilities)
+/*
+ * cheri_buildcap_safe failed, return untagged input
+ */
+ENTRY(cbuildcap_fault)
+#ifdef __CHERI_PURE_CAPABILITY__
+	SET_FAULT_HANDLER(cnull, ca1)	/* Reset the handler function */
+#else
+	SET_FAULT_HANDLER(x0, a1)	/* Reset the handler function */
+#endif
+	ccleartag ca0, ca1
+	RETURN
+END(cbuildcap_fault)
+
+/*
+ * void * __capability cheri_buildcap_safe(volatile void * __capability,
+ *	intcap_t)
+ */
+ENTRY(cheri_buildcap_safe)
+#ifdef __CHERI_PURE_CAPABILITY__
+	clgc	ca6, cbuildcap_fault	/* Load the fault handler */
+	SET_FAULT_HANDLER(ca6, ca2)	/* And set it */
+#else
+	la	a6, cbuildcap_fault	/* Load the fault handler */
+	SET_FAULT_HANDLER(a6, a2)	/* And set it */
+#endif
+	cbuildcap ca0, ca0, ca1
+#ifdef __CHERI_PURE_CAPABILITY__
+	SET_FAULT_HANDLER(cnull, ca2)	/* Reset the fault handler */
+#else
+	SET_FAULT_HANDLER(x0, a2)	/* Reset the fault handler */
+#endif
+	RETURN
+END(cheri_buildcap_safe)
+#endif
+
 ENTRY(setjmp)
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Store the stack pointer */
