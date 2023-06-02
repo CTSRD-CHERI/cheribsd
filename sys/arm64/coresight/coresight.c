@@ -138,14 +138,22 @@ coresight_event_dump(struct hwt_context *hwt)
 	coresight_dump(hwt->cpu_id, event);
 }
 
-static void
-coresight_event_read(struct hwt_context *hwt)
+static int
+coresight_event_read(struct hwt_context *hwt, int *curpage,
+    vm_offset_t *curpage_offset)
 {
 	struct coresight_event *event;
 
 	event = &cs_event[hwt->cpu_id];
 
+	KASSERT(event != NULL, ("No event found"));
+
 	coresight_read(hwt->cpu_id, event);
+
+	*curpage = event->etr.curpage;
+	*curpage_offset = event->etr.curpage_offset;
+
+	return (0);
 }
 
 static struct hwt_backend_ops coresight_ops = {

@@ -69,6 +69,8 @@ struct hwt_record_get {
 
 struct hwt_bufptr_get {
 	int		*ptr;
+	int		*curpage;
+	vm_offset_t	*curpage_offset;
 	int		cpu_id;
 	pid_t		pid;
 } __packed __aligned(16);

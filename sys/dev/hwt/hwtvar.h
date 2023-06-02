@@ -73,7 +73,8 @@ struct hwt_backend_ops {
 	void (*hwt_event_enable)(struct hwt_context *);
 	void (*hwt_event_disable)(struct hwt_context *);
 	void (*hwt_event_dump)(struct hwt_context *);
-	void (*hwt_event_read)(struct hwt_context *);
+	int (*hwt_event_read)(struct hwt_context *, int *curpage,
+	    vm_offset_t *curpage_offset);
 };
 
 struct hwt_backend {

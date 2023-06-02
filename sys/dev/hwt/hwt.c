@@ -163,14 +163,15 @@ hwt_event_dump(struct hwt_context *ctx)
 }
 
 static int
-hwt_event_read(struct hwt_context *ctx)
+hwt_event_read(struct hwt_context *ctx, int *curpage, vm_offset_t *curpage_offset)
 {
+	int error;
 
 	//printf("%s\n", __func__);
 
-	hwt_backend->ops->hwt_event_read(ctx);
+	error = hwt_backend->ops->hwt_event_read(ctx, curpage, curpage_offset);
 
-	return (0);
+	return (error);
 }
 
 int
@@ -670,7 +671,19 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		if (ctx == NULL)
 			return (ENXIO);
 
-		hwt_event_read(ctx);
+		int curpage;
+		vm_offset_t curpage_offset;
+
+		hwt_event_read(ctx, &curpage, &curpage_offset);
+
+		error = copyout(&curpage, ptr_get->curpage, sizeof(int));
+		if (error)
+			return (error);
+		error = copyout(&curpage_offset, ptr_get->curpage_offset,
+		    sizeof(vm_offset_t));
+		if (error)
+			return (error);
+
 		break;
 	default:
 		break;
