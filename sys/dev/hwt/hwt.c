@@ -162,6 +162,17 @@ hwt_event_dump(struct hwt_context *ctx)
 	return (0);
 }
 
+static int
+hwt_event_read(struct hwt_context *ctx)
+{
+
+	//printf("%s\n", __func__);
+
+	hwt_backend->ops->hwt_event_read(ctx);
+
+	return (0);
+}
+
 int
 hwt_register(struct hwt_backend *backend)
 {
@@ -538,6 +549,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	struct hwt_start *s;
 	struct hwt_alloc *halloc;
 	struct hwt_record_get *rget;
+	struct hwt_bufptr_get *ptr_get;
 	struct proc *p;
 	struct hwt_context *ctx;
 	struct hwt_owner *ho;
@@ -648,6 +660,18 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			return (ENXIO);
 
 		error = hwt_send_records(rget, ctx);
+		break;
+	case HWT_IOC_BUFPTR_GET:
+		ptr_get = (struct hwt_bufptr_get *)addr;
+
+		/* Check if process is registered owner of any HWTs. */
+		ctx = hwt_lookup_by_owner_p(td->td_proc, ptr_get->cpu_id,
+		    ptr_get->pid);
+		if (ctx == NULL)
+			return (ENXIO);
+
+		hwt_event_read(ctx);
+		break;
 	default:
 		break;
 	};

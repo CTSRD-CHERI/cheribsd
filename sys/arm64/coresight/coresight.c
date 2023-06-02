@@ -138,6 +138,16 @@ coresight_event_dump(struct hwt_context *hwt)
 	coresight_dump(hwt->cpu_id, event);
 }
 
+static void
+coresight_event_read(struct hwt_context *hwt)
+{
+	struct coresight_event *event;
+
+	event = &cs_event[hwt->cpu_id];
+
+	coresight_read(hwt->cpu_id, event);
+}
+
 static struct hwt_backend_ops coresight_ops = {
 	.hwt_event_init = coresight_event_init,
 	.hwt_event_start = coresight_event_start,
@@ -145,6 +155,7 @@ static struct hwt_backend_ops coresight_ops = {
 	.hwt_event_enable = coresight_event_enable,
 	.hwt_event_disable = coresight_event_disable,
 	.hwt_event_dump = coresight_event_dump,
+	.hwt_event_read = coresight_event_read,
 };
 
 int

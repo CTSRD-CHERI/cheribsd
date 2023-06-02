@@ -512,14 +512,45 @@ static int
 tmc_read(device_t dev, struct endpoint *endp, struct coresight_event *event)
 {
 	struct tmc_softc *sc;
-	uint32_t cur_ptr;
+	uint64_t lo, hi;
+	uint64_t ptr;
 
 	sc = device_get_softc(dev);
 
-	panic("read called");
-
 	if (sc->dev_type == CORESIGHT_ETF)
 		return (0);
+
+	lo = bus_read_4(sc->res[0], TMC_RWP);
+	hi = bus_read_4(sc->res[0], TMC_RWPHI);
+	ptr = lo | (hi << 32);
+
+	vm_page_t page;
+	bool found;
+	int i;
+
+	page = PHYS_TO_VM_PAGE(ptr);
+
+	printf("CUR_PTR %lx\n", ptr);
+
+	found = false;
+
+	for (i = 0; i < event->etr.npages; i++) {
+		if (event->etr.pages[i] == page) {
+			found = true;
+			break;
+		}
+	}
+
+	if (found) {
+		event->etr.curpage = i;
+		event->etr.curpage_offset = ptr & 0xfff;
+		printf("CUR_PTR %lx, page %d of %d, offset %ld\n",
+		    ptr, i, event->etr.npages, event->etr.curpage_offset);
+	}
+
+	return (0);
+
+	uint64_t cur_ptr;
 
 	/*
 	 * Ensure the event we are reading information for

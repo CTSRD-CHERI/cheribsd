@@ -41,6 +41,8 @@
 	_IOW(HWT_MAGIC, 0x01, struct hwt_start)
 #define	HWT_IOC_RECORD_GET \
 	_IOW(HWT_MAGIC, 0x02, struct hwt_record_get)
+#define	HWT_IOC_BUFPTR_GET \
+	_IOW(HWT_MAGIC, 0x03, struct hwt_bufptr_get)
 
 struct hwt_alloc {
 	int		cpu_id;
@@ -63,6 +65,12 @@ struct hwt_record_get {
 	int				*nentries;
 	int				cpu_id;
 	pid_t				pid;
+} __packed __aligned(16);
+
+struct hwt_bufptr_get {
+	int		*ptr;
+	int		cpu_id;
+	pid_t		pid;
 } __packed __aligned(16);
 
 #endif /* !_DEV_HWT_HWT_H_ */

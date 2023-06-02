@@ -129,6 +129,8 @@ struct etr_state {
 #define	ETR_FLAG_RELEASE	(1 << 1)
 	vm_page_t *pages;
 	int npages;
+	int curpage;
+	vm_offset_t curpage_offset;
 };
 
 struct coresight_event {

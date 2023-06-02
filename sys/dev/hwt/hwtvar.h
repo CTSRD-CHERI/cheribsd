@@ -47,6 +47,7 @@ struct hwt_context {
 
 	vm_page_t			*pages;
 	int				npages;
+	int				ptr;
 
 	struct proc			*p; /* Could be NULL if exited. */
 	pid_t				pid;
@@ -72,6 +73,7 @@ struct hwt_backend_ops {
 	void (*hwt_event_enable)(struct hwt_context *);
 	void (*hwt_event_disable)(struct hwt_context *);
 	void (*hwt_event_dump)(struct hwt_context *);
+	void (*hwt_event_read)(struct hwt_context *);
 };
 
 struct hwt_backend {
