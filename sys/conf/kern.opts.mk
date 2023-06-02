@@ -99,9 +99,11 @@ __DEFAULT_NO_OPTIONS += FDT
 __DEFAULT_YES_OPTIONS += FDT
 .endif
 
-# Broken post OpenZFS import
 .if ${MACHINE_CPU:Mcheri}
+# Broken post OpenZFS import
 BROKEN_OPTIONS+=CDDL
+# iw_cxgbe fails to build
+BROKEN_OPTIONS+=OFED
 .endif
 
 # expanded inline from bsd.mkopt.mk to avoid share/mk dependency
