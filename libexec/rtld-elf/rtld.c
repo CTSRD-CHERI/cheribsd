@@ -5853,6 +5853,17 @@ allocate_module_tls(int index)
 		rtld_die();
 	}
 
+	if (obj->tls_static) {
+#ifdef TLS_VARIANT_I
+		p = (char *)_tcb_get() + obj->tlsoffset;
+#else
+		p = (char *)_tcb_get() - obj->tlsoffset;
+#endif
+		return (p);
+	}
+
+	obj->tls_dynamic = true;
+
 	p = malloc_aligned(obj->tlssize, obj->tlsalign, obj->tlspoffset);
 	memcpy(p, obj->tlsinit, obj->tlsinitsize);
 	memset(p + obj->tlsinitsize, 0, obj->tlssize - obj->tlsinitsize);
@@ -5863,6 +5874,9 @@ bool
 allocate_tls_offset(Obj_Entry *obj)
 {
     size_t off;
+
+    if (obj->tls_dynamic)
+	return (false);
 
     if (obj->tls_static)
 	return (true);
