@@ -385,6 +385,7 @@ hwt_alloc(struct hwt_softc *sc, struct thread *td)
 
 	ctx = malloc(sizeof(struct hwt_context), M_HWT, M_WAITOK | M_ZERO);
 	LIST_INIT(&ctx->records);
+	mtx_init(&ctx->mtx, "records", NULL, MTX_SPIN);
 
 	error = hwt_alloc_buffers(sc, ctx);
 	if (error) {
@@ -406,7 +407,7 @@ hwt_lookup_contexthash(struct proc *p, int cpu_id)
 	hch = &hwt_contexthash[hindex];
 
 	mtx_lock_spin(&hwt_contexthash_mtx);
-	LIST_FOREACH(ctx, hch, next) {
+	LIST_FOREACH(ctx, hch, next_hch) {
 		if (ctx->p == p && ctx->cpu_id == cpu_id) {
 			mtx_unlock_spin(&hwt_contexthash_mtx);
 			return (ctx);
@@ -445,7 +446,7 @@ hwt_lookup_by_owner(struct hwt_owner *ho, int cpu_id, pid_t pid)
 	struct hwt_context *ctx;
 
 	mtx_lock(&ho->mtx);
-	LIST_FOREACH(ctx, &ho->hwts, next1) {
+	LIST_FOREACH(ctx, &ho->hwts, next_hwts) {
 		if (ctx->pid == pid && ctx->cpu_id == cpu_id) {
 			mtx_unlock(&ho->mtx);
 			return (ctx);
@@ -483,7 +484,7 @@ hwt_insert_contexthash(struct hwt_context *ctx)
 	hch = &hwt_contexthash[hindex];
 
 	mtx_lock_spin(&hwt_contexthash_mtx);
-	LIST_INSERT_HEAD(hch, ctx, next);
+	LIST_INSERT_HEAD(hch, ctx, next_hch);
 	mtx_unlock_spin(&hwt_contexthash_mtx);
 }
 
@@ -589,9 +590,10 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			LIST_INIT(&ho->hwts);
 			mtx_init(&ho->mtx, "hwts", NULL, MTX_DEF);
 
-			mtx_lock_spin(&hwt_ownerhash_mtx);
 			hindex = HWT_HASH_PTR(ho->p, hwt_ownerhashmask);
 			hoh = &hwt_ownerhash[hindex];
+
+			mtx_lock_spin(&hwt_ownerhash_mtx);
 			LIST_INSERT_HEAD(hoh, ho, next);
 			mtx_unlock_spin(&hwt_ownerhash_mtx);
 		}
@@ -623,7 +625,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		ctx->p = p;
 
 		mtx_lock(&ho->mtx);
-		LIST_INSERT_HEAD(&ho->hwts, ctx, next1);
+		LIST_INSERT_HEAD(&ho->hwts, ctx, next_hwts);
 		mtx_unlock(&ho->mtx);
 		PROC_UNLOCK(p);
 		break;
@@ -751,20 +753,25 @@ hwt_stop_proc_hwts(struct hwt_contexthash *hch, struct proc *p)
 {
 	struct hwt_context *ctx, *ctx1;
 
+	printf("%s: stopping hwt proc\n", __func__);
+
 	PROC_LOCK(p);
 	p->p_flag2 &= ~P2_HWT;
 	PROC_UNLOCK(p);
 
 	mtx_lock_spin(&hwt_contexthash_mtx);
-	LIST_FOREACH_SAFE(ctx, hch, next, ctx1) {
+	LIST_FOREACH_SAFE(ctx, hch, next_hch, ctx1) {
 		if (ctx->p == p) {
-			printf("%s: stopping proc hwts on cpu %d\n", __func__,
+			printf("%s: stopping proc hwt on cpu %d\n", __func__,
 			    ctx->cpu_id);
 			hwt_event_disable(ctx);
 			hwt_event_dump(ctx);
 			hwt_event_stop(ctx);
 
-			LIST_REMOVE(ctx, next);
+			printf("%s0\n", __func__);
+			LIST_REMOVE(ctx, next_hch);
+			printf("%s1\n", __func__);
+
 			ctx->p = NULL;
 		}
 	}
@@ -783,7 +790,7 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 		mtx_lock(&ho->mtx);
 		ctx = LIST_FIRST(&ho->hwts);
 		if (ctx)
-			LIST_REMOVE(ctx, next1);
+			LIST_REMOVE(ctx, next_hwts);
 		mtx_unlock(&ho->mtx);
 
 		if (ctx == NULL)
@@ -799,7 +806,7 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 
 			/* Remove it from contexthash now. */
 			mtx_lock_spin(&hwt_contexthash_mtx);
-			LIST_REMOVE(ctx, next);
+			LIST_REMOVE(ctx, next_hch);
 			mtx_unlock_spin(&hwt_contexthash_mtx);
 
 			PROC_UNLOCK(p);
@@ -839,7 +846,7 @@ hwt_process_exit(void *arg __unused, struct proc *p)
 	if (ho) {
 		/* Stop HWTs associated with exiting owner. */
 		hwt_stop_owner_hwts(hch, ho);
-	} else {
+	} else if (p->p_flag2 & P2_HWT) {
 		/* Stop HWTs associated with exiting proc. */
 		hwt_stop_proc_hwts(hch, p);
 	}
