@@ -42,8 +42,9 @@ static MALLOC_DEFINE(M_HWT, "hwt", "Hardware Trace");
 struct hwt_context {
 	LIST_HEAD(, hwt_record_entry)	records;
 	struct mtx			mtx; /* Protects records. */
-	LIST_ENTRY(hwt_context)		next; /* Entry in ctxhash. */
-	LIST_ENTRY(hwt_context)		next1; /* Entry in ho->hwts. */
+
+	LIST_ENTRY(hwt_context)		next_hch; /* Entry in contexthash. */
+	LIST_ENTRY(hwt_context)		next_hwts; /* Entry in ho->hwts. */
 
 	vm_page_t			*pages;
 	int				npages;
