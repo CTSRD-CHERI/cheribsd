@@ -98,6 +98,8 @@ static LIST_HEAD(hwt_ownerhash, hwt_owner)	*hwt_ownerhash;
 static struct hwt_softc hwt_sc;
 static struct hwt_backend *hwt_backend;
 
+static struct mtx hwt_backend_mtx;
+
 static void
 hwt_event_init(struct hwt_context *ctx)
 {
@@ -113,7 +115,9 @@ hwt_event_start(struct hwt_context *ctx)
 
 	printf("%s\n", __func__);
 
+	mtx_lock_spin(&hwt_backend_mtx);
 	hwt_backend->ops->hwt_event_start(ctx);
+	mtx_unlock_spin(&hwt_backend_mtx);
 
 	return (0);
 }
@@ -124,7 +128,9 @@ hwt_event_stop(struct hwt_context *ctx)
 
 	printf("%s\n", __func__);
 
+	mtx_lock_spin(&hwt_backend_mtx);
 	hwt_backend->ops->hwt_event_stop(ctx);
+	mtx_unlock_spin(&hwt_backend_mtx);
 
 	return (0);
 }
@@ -135,7 +141,9 @@ hwt_event_enable(struct hwt_context *ctx)
 
 	//printf("%s\n", __func__);
 
+	mtx_lock_spin(&hwt_backend_mtx);
 	hwt_backend->ops->hwt_event_enable(ctx);
+	mtx_unlock_spin(&hwt_backend_mtx);
 
 	return (0);
 }
@@ -146,7 +154,9 @@ hwt_event_disable(struct hwt_context *ctx)
 
 	//printf("%s\n", __func__);
 
+	mtx_lock_spin(&hwt_backend_mtx);
 	hwt_backend->ops->hwt_event_disable(ctx);
+	mtx_unlock_spin(&hwt_backend_mtx);
 
 	return (0);
 }
@@ -157,7 +167,9 @@ hwt_event_dump(struct hwt_context *ctx)
 
 	//printf("%s\n", __func__);
 
+	mtx_lock_spin(&hwt_backend_mtx);
 	hwt_backend->ops->hwt_event_dump(ctx);
+	mtx_unlock_spin(&hwt_backend_mtx);
 
 	return (0);
 }
@@ -169,7 +181,9 @@ hwt_event_read(struct hwt_context *ctx, int *curpage, vm_offset_t *curpage_offse
 
 	//printf("%s\n", __func__);
 
+	mtx_lock_spin(&hwt_backend_mtx);
 	error = hwt_backend->ops->hwt_event_read(ctx, curpage, curpage_offset);
+	mtx_unlock_spin(&hwt_backend_mtx);
 
 	return (error);
 }
@@ -528,13 +542,12 @@ hwt_send_records(struct hwt_record_get *record_get, struct hwt_context *ctx)
 	}
 	mtx_unlock_spin(&ctx->mtx);
 
-	if (i == 0)
-		return (ENOENT);
-
-	error = copyout(user_entry, record_get->records,
-	    sizeof(struct hwt_record_user_entry) * i);
-	if (error)
-		return (error);
+	if (i != 0) {
+		error = copyout(user_entry, record_get->records,
+		    sizeof(struct hwt_record_user_entry) * i);
+		if (error)
+			return (error);
+	}
 
 	error = copyout(&i, record_get->nentries, sizeof(int));
 
@@ -885,6 +898,8 @@ hwt_load(void)
 
 	hwt_ownerhash = hashinit(HWT_OWNERHASH_SIZE, M_HWT, &hwt_ownerhashmask);
         mtx_init(&hwt_ownerhash_mtx, "hwt-owner-hash", "hwt-owner", MTX_SPIN);
+
+	mtx_init(&hwt_backend_mtx, "hwt backend", NULL, MTX_SPIN);
 
 	hwt_exit_tag = EVENTHANDLER_REGISTER(process_exit, hwt_process_exit,
 	    NULL, EVENTHANDLER_PRI_ANY);
