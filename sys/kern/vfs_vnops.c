@@ -95,7 +95,7 @@
 #include <sys/pmckern.h>
 #endif
 
-#include <dev/hwt/hwtvar1.h>
+#include <dev/hwt/hwt_hook.h>
 
 static fo_rdwr_t	vn_read;
 static fo_rdwr_t	vn_write;

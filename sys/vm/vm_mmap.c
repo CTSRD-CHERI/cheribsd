@@ -108,7 +108,7 @@
 #include <sys/pmckern.h>
 #endif
 
-#include <dev/hwt/hwtvar1.h>
+#include <dev/hwt/hwt_hook.h>
 
 #if __has_feature(capabilities)
 #include <cheri/cheric.h>
