@@ -119,6 +119,8 @@ hwt_event_start(struct hwt_context *ctx)
 	hwt_backend->ops->hwt_event_start(ctx);
 	mtx_unlock_spin(&hwt_backend_mtx);
 
+	printf("%s ok\n", __func__);
+
 	return (0);
 }
 
@@ -492,6 +494,8 @@ hwt_insert_contexthash(struct hwt_context *ctx)
 	struct hwt_contexthash *hch;
 	int hindex;
 
+printf("%s\n", __func__);
+
 	PROC_LOCK_ASSERT(ctx->p, MA_OWNED);
 
 	hindex = HWT_HASH_PTR(ctx->p, hwt_contexthashmask);
@@ -500,6 +504,8 @@ hwt_insert_contexthash(struct hwt_context *ctx)
 	mtx_lock_spin(&hwt_contexthash_mtx);
 	LIST_INSERT_HEAD(hch, ctx, next_hch);
 	mtx_unlock_spin(&hwt_contexthash_mtx);
+
+printf("%s ok\n", __func__);
 }
 
 static int
