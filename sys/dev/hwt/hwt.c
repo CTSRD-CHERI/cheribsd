@@ -60,7 +60,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_radix.h>
 #include <vm/pmap.h>
 
-#include <dev/hwt/hwtvar1.h>
+#include <dev/hwt/hwt_hook.h>
 #include <dev/hwt/hwtvar.h>
 #include <dev/hwt/hwt.h>
 

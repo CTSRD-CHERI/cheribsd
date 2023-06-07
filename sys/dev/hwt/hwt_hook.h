@@ -29,11 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef _DEV_HWT_HWTVAR1_H_
-#define _DEV_HWT_HWTVAR1_H_
-
-void hwt_switch_in(struct thread *td);
-void hwt_switch_out(struct thread *td);
+#ifndef _DEV_HWT_HWT_HOOK_H_
+#define _DEV_HWT_HWT_HOOK_H_
 
 enum hwt_record_type {
 	HWT_RECORD_MMAP,
@@ -50,7 +47,9 @@ struct hwt_record_entry {
 	size_t				size;
 };
 
+void hwt_switch_in(struct thread *td);
+void hwt_switch_out(struct thread *td);
 void hwt_record(struct thread *td, enum hwt_record_type record_type,
     struct hwt_record_entry *ent);
 
-#endif /* !_DEV_HWT_HWTVAR1_H_ */
+#endif /* !_DEV_HWT_HWT_HOOK_H_ */
