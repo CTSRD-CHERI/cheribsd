@@ -65,7 +65,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/hwt/hwt.h>
 
 #define	HWT_DEBUG
-//#undef	HWT_DEBUG
+#undef	HWT_DEBUG
 
 #ifdef	HWT_DEBUG
 #define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)
@@ -141,8 +141,6 @@ static int
 hwt_event_enable(struct hwt_context *ctx)
 {
 
-	//printf("%s\n", __func__);
-
 	mtx_lock_spin(&hwt_backend_mtx);
 	hwt_backend->ops->hwt_event_enable(ctx);
 	mtx_unlock_spin(&hwt_backend_mtx);
@@ -153,8 +151,6 @@ hwt_event_enable(struct hwt_context *ctx)
 static int
 hwt_event_disable(struct hwt_context *ctx)
 {
-
-	//printf("%s\n", __func__);
 
 	mtx_lock_spin(&hwt_backend_mtx);
 	hwt_backend->ops->hwt_event_disable(ctx);
@@ -167,8 +163,6 @@ static int
 hwt_event_dump(struct hwt_context *ctx)
 {
 
-	//printf("%s\n", __func__);
-
 	mtx_lock_spin(&hwt_backend_mtx);
 	hwt_backend->ops->hwt_event_dump(ctx);
 	mtx_unlock_spin(&hwt_backend_mtx);
@@ -180,8 +174,6 @@ static int
 hwt_event_read(struct hwt_context *ctx, int *curpage, vm_offset_t *curpage_offset)
 {
 	int error;
-
-	//printf("%s\n", __func__);
 
 	mtx_lock_spin(&hwt_backend_mtx);
 	error = hwt_backend->ops->hwt_event_read(ctx, curpage, curpage_offset);
