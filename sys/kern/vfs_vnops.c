@@ -95,7 +95,9 @@
 #include <sys/pmckern.h>
 #endif
 
+#ifdef HWT_HOOKS
 #include <dev/hwt/hwt_hook.h>
+#endif
 
 static fo_rdwr_t	vn_read;
 static fo_rdwr_t	vn_write;
@@ -2929,6 +2931,7 @@ vn_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr,
 	}
 #endif
 
+#ifdef HWT_HOOKS
 	/* HWT: record dynamic libs. */
 	struct hwt_record_entry ent;
 	char *fullpath;
@@ -2944,6 +2947,7 @@ vn_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr,
 				free(freepath, M_TEMP);
 		}
 	}
+#endif
 
 	return (error);
 }

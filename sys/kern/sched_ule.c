@@ -68,7 +68,9 @@
 #include <sys/pmckern.h>
 #endif
 
+#ifdef HWT_HOOKS
 #include <dev/hwt/hwt_hook.h>
+#endif
 
 #ifdef KDTRACE_HOOKS
 #include <sys/dtrace_bsd.h>
@@ -2294,14 +2296,20 @@ sched_switch(struct thread *td, int flags)
 		if (dtrace_vtime_active)
 			(*dtrace_vtime_switch_func)(newtd);
 #endif
+
+#ifdef HWT_HOOKS
 		hwt_switch_out(td);
+#endif
 
 		td->td_oncpu = NOCPU;
 		cpu_switch(td, newtd, mtx);
 		cpuid = td->td_oncpu = PCPU_GET(cpuid);
 
 		SDT_PROBE0(sched, , , on__cpu);
+#ifdef HWT_HOOKS
 		hwt_switch_in(td);
+#endif
+
 #ifdef	HWPMC_HOOKS
 		if (PMC_PROC_IS_USING_PMCS(td->td_proc))
 			PMC_SWITCH_CONTEXT(td, PMC_FN_CSW_IN);
