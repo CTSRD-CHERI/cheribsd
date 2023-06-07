@@ -371,7 +371,7 @@ colocation_unborrow(struct thread *td)
 	    "with td %p, pid %d (%s), switchercb %lp due to syscall %s ",
 	    td, td->td_proc->p_pid, td->td_proc->p_comm, td->td_scb,
 	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm, peertd->td_scb,
-		syscallname(td->td_proc, trapframe->tf_t[0]));
+		syscallname(td->td_proc, td->td_frame->tf_t[0]));
 
 #ifdef DDB
 	if (kdb_on_unborrow)
