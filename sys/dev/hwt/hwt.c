@@ -498,8 +498,12 @@ printf("%s\n", __func__);
 
 	PROC_LOCK_ASSERT(ctx->p, MA_OWNED);
 
+printf("%s0\n", __func__);
+
 	hindex = HWT_HASH_PTR(ctx->p, hwt_contexthashmask);
 	hch = &hwt_contexthash[hindex];
+
+printf("%s1 hch %p\n", __func__, hch);
 
 	mtx_lock_spin(&hwt_contexthash_mtx);
 	LIST_INSERT_HEAD(hch, ctx, next_hch);
@@ -641,6 +645,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			return (ENXIO);
 		}
 
+		p->p_flag2 |= P2_HWT;
 		ctx->p = p;
 
 		mtx_lock(&ho->mtx);
@@ -669,7 +674,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		hwt_event_start(ctx);
 
 		hwt_insert_contexthash(ctx);
-		p->p_flag2 |= P2_HWT;
 		PROC_UNLOCK(p);
 		break;
 	case HWT_IOC_RECORD_GET:
@@ -730,7 +734,7 @@ hwt_switch_in(struct thread *td)
 
 	ctx = hwt_lookup_contexthash(p, cpu_id);
 	if (!ctx)
-		panic("no ctx");
+		return;
 
 	dprintf("%s: ctx %p on cpu_id %d\n", __func__, ctx, cpu_id);
 
@@ -751,8 +755,8 @@ hwt_switch_out(struct thread *td)
 	cpu_id = PCPU_GET(cpuid);
 
 	ctx = hwt_lookup_contexthash(p, cpu_id);
-	if (ctx == NULL)
-		panic("no ctx on switch_out");
+	if (!ctx)
+		return;
 
 	dprintf("%s: ctx %p from cpu_id %d\n", __func__, ctx, cpu_id);
 
@@ -776,25 +780,26 @@ hwt_stop_proc_hwts(struct hwt_contexthash *hch, struct proc *p)
 
 	PROC_LOCK(p);
 	p->p_flag2 &= ~P2_HWT;
-	PROC_UNLOCK(p);
 
 	mtx_lock_spin(&hwt_contexthash_mtx);
 	LIST_FOREACH_SAFE(ctx, hch, next_hch, ctx1) {
 		if (ctx->p == p) {
 			printf("%s: stopping proc hwt on cpu %d\n", __func__,
 			    ctx->cpu_id);
-			hwt_event_disable(ctx);
-			hwt_event_dump(ctx);
-			hwt_event_stop(ctx);
 
 			printf("%s0\n", __func__);
 			LIST_REMOVE(ctx, next_hch);
 			printf("%s1\n", __func__);
 
+			hwt_event_disable(ctx);
+			hwt_event_dump(ctx);
+			hwt_event_stop(ctx);
+
 			ctx->p = NULL;
 		}
 	}
 	mtx_unlock_spin(&hwt_contexthash_mtx);
+	PROC_UNLOCK(p);
 }
 
 static void
@@ -817,27 +822,26 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 
 		p = pfind(ctx->pid);
 		if (p != NULL) {
-			/*
-			 * Remove HWT flag from the victim proc,
-			 * so we no longer trace it.
-			 */
-			p->p_flag2 &= ~P2_HWT;
+			dprintf("stopping hwt cpu_id %d pid %d\n",
+			    ctx->cpu_id, ctx->pid);
 
-			/* Remove it from contexthash now. */
-			mtx_lock_spin(&hwt_contexthash_mtx);
-			LIST_REMOVE(ctx, next_hch);
-			mtx_unlock_spin(&hwt_contexthash_mtx);
+			if (ctx->p) {
+				/* Remove it from contexthash now. */
+				mtx_lock_spin(&hwt_contexthash_mtx);
+				LIST_REMOVE(ctx, next_hch);
+
+				/* Stop it now on single CPU. */
+				hwt_event_disable(ctx);
+				hwt_event_dump(ctx);
+				hwt_event_stop(ctx);
+
+				ctx->p = NULL;
+				mtx_unlock_spin(&hwt_contexthash_mtx);
+			}
 
 			PROC_UNLOCK(p);
-
-			/* Stop it now. */
-			hwt_event_disable(ctx);
-			hwt_event_dump(ctx);
-			hwt_event_stop(ctx);
 		}
 
-		dprintf("stopping hwt cpu_id %d pid %d\n",
-		    ctx->cpu_id, ctx->pid);
 		hwt_destroy_buffers(ctx);
 		destroy_dev_sched(ctx->cdev);
 		free(ctx, M_HWT);
