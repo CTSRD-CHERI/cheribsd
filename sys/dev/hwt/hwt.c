@@ -104,7 +104,7 @@ static void
 hwt_event_init(struct hwt_context *ctx)
 {
 
-	printf("%s: cpu %d\n", __func__, ctx->cpu_id);
+	dprintf("%s: cpu %d\n", __func__, ctx->cpu_id);
 
 	hwt_backend->ops->hwt_event_init(ctx);
 }
@@ -113,13 +113,11 @@ static int
 hwt_event_start(struct hwt_context *ctx)
 {
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	mtx_lock_spin(&hwt_backend_mtx);
 	hwt_backend->ops->hwt_event_start(ctx);
 	mtx_unlock_spin(&hwt_backend_mtx);
-
-	printf("%s ok\n", __func__);
 
 	return (0);
 }
@@ -128,7 +126,7 @@ static int
 hwt_event_stop(struct hwt_context *ctx)
 {
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	mtx_lock_spin(&hwt_backend_mtx);
 	hwt_backend->ops->hwt_event_stop(ctx);
@@ -289,7 +287,7 @@ static int
 hwt_open(struct cdev *cdev, int oflags, int devtype, struct thread *td)
 {
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	return (0);
 }
@@ -486,22 +484,14 @@ hwt_insert_contexthash(struct hwt_context *ctx)
 	struct hwt_contexthash *hch;
 	int hindex;
 
-printf("%s\n", __func__);
-
 	PROC_LOCK_ASSERT(ctx->p, MA_OWNED);
-
-printf("%s0\n", __func__);
 
 	hindex = HWT_HASH_PTR(ctx->p, hwt_contexthashmask);
 	hch = &hwt_contexthash[hindex];
 
-printf("%s1 hch %p\n", __func__, hch);
-
 	mtx_lock_spin(&hwt_contexthash_mtx);
 	LIST_INSERT_HEAD(hch, ctx, next_hch);
 	mtx_unlock_spin(&hwt_contexthash_mtx);
-
-printf("%s ok\n", __func__);
 }
 
 static int
