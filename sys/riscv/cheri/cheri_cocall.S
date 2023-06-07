@@ -114,13 +114,13 @@ SIGCODE(switcher_cocall)
 	 * is returning to the callee and scb_borrower_thread
 	 * needs to be set to NULL in the callee's scb.
 	 */
-	cld	t1, SCB_BORROWER_TD(ct0)
+	clc	ct1, SCB_BORROWER_TD(ct0)
 	bnez	t1, 5f
-	cld	t4, SCB_TD(ct0)
-	csd	t4, SCB_BORROWER_TD(idc)
+	clc	ct4, SCB_TD(ct0)
+	csc	ct4, SCB_BORROWER_TD(idc)
 	j	6f
 5:
-	csd	zero, SCB_BORROWER_TD(ct0)
+	csc	cnull, SCB_BORROWER_TD(ct0)
 6:
 
 	/*
@@ -241,7 +241,7 @@ CSYM(switcher_cocall_copy_onfault)
 	csc	cnull, SCB_CALLER_SCB(ct1)
 
 	/* Clear state in the caller's scb. */
-	csd	zero, SCB_BORROWER_TD(idc)
+	csc	cnull, SCB_BORROWER_TD(idc)
 	csc	cnull, SCB_CALLEE_SCB(idc)
 
 	clc	csp, SCB_CSP(idc)
