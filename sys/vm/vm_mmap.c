@@ -108,7 +108,9 @@
 #include <sys/pmckern.h>
 #endif
 
+#ifdef HWT_HOOKS
 #include <dev/hwt/hwt_hook.h>
+#endif
 
 #if __has_feature(capabilities)
 #include <cheri/cheric.h>
@@ -1043,11 +1045,14 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 #endif
 	rv = vm_map_remove_locked(map, addr, addr + size);
 
-	/* HWT: record dynamic libs unmap. */
+#ifdef HWT_HOOKS
 	struct hwt_record_entry ent;
-	ent.addr = (uintptr_t) addr;
-	ent.size = (size_t) size;
-	hwt_record(td, HWT_RECORD_MUNMAP, &ent);
+	if (rv == KERN_SUCCESS) {
+		ent.addr = (uintptr_t) addr;
+		ent.size = (size_t) size;
+		hwt_record(td, HWT_RECORD_MUNMAP, &ent);
+	}
+#endif
 
 #ifdef HWPMC_HOOKS
 	if (rv == KERN_SUCCESS && __predict_false(pmc_handled)) {
