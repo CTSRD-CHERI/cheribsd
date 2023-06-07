@@ -38,6 +38,7 @@
 /*
  * When modifying this, make sure to update <machine/switcher.h>
  */
+#ifdef __CHERI_PURE_CAPABILITY__
 struct switchercb {
 	/*
 	 * Caller context: context of the thread that cocalled us.
@@ -116,6 +117,88 @@ struct switchercb {
 	 */
 	pid_t						scb_pid;
 };
+#else
+struct switchercb {
+	/*
+	 * Caller context: context of the thread that cocalled us.
+	 * This also serves as the callee's spinlock.  Must be first,
+	 * as the cllc instruction doesn't take an offset.
+	 *
+	 * This can also be set to a zero-length capability, with the offset
+	 * equal to errno to be returned by cocall(2).
+	 */
+	struct switchercb * __capability	scb_caller_scb;
+
+	/*
+	 * Callee context, context of the thread we're cocalling into.
+	 */
+	struct switchercb * __capability	scb_callee_scb;
+
+	/*
+	 * Thread owning the context; the same thread that called cosetup(2).
+	 */
+	struct thread				*scb_td;
+	char _pad0[CHERICAP_SIZE - sizeof(struct thread *)];
+
+	/*
+	 * Thread owning the context we're lending our thread to.  When
+	 * calling cocall(), this will be the callee thread.  NULL when
+	 * not lending.
+	 */
+	struct thread				*scb_borrower_td;
+	char _pad1[CHERICAP_SIZE - sizeof(struct thread *)];
+
+	/*
+	 * Capability to unseal peer context.
+	 */
+	void * __capability			scb_unsealcap;
+
+	/*
+	 * XXX
+	 */
+	void * __capability			scb_csp;
+
+	/*
+	 * XXX
+	 */
+	void * __capability			scb_cra;
+
+	/*
+	 * XXX
+	 */
+	const void * __capability		scb_outbuf;
+
+	/*
+	 * XXX
+	 */
+	size_t					scb_outlen;
+
+	/*
+	 * XXX
+	 */
+	void * __capability			scb_inbuf;
+
+	/*
+	 * XXX
+	 */
+	size_t					scb_inlen;
+
+	/*
+	 * XXX
+	 */
+	void * __capability			scb_cookiep;
+
+	/*
+	 * XXX-PBB
+	 */
+	lwpid_t						scb_tid;
+
+	/*
+	 * XXX-PBB
+	 */
+	pid_t						scb_pid;
+};
+#endif
 #endif
 
 struct mdthread {
