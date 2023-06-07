@@ -21,7 +21,7 @@
 
 namespace __asan {
 
-static void ProtectGap(uptr addr, usize size) {
+static void ProtectGap(uptr addr, uptr size) {
   if (!flags()->protect_shadow_gap) {
     // The shadow gap is unprotected, so there is a chance that someone
     // is actually using this memory. Which means it needs a shadow...
@@ -33,7 +33,7 @@ static void ProtectGap(uptr addr, usize size) {
           "protect_shadow_gap=0:"
           " not protecting shadow gap, allocating gap's shadow\n"
           "|| `[%p, %p]` || ShadowGap's shadow ||\n",
-          GapShadowBeg, GapShadowEnd);
+          (void*)GapShadowBeg, (void*)GapShadowEnd);
     ReserveShadowMemoryRange(GapShadowBeg, GapShadowEnd,
                              "unprotected gap shadow");
     return;
@@ -113,7 +113,7 @@ void InitializeShadowMemory() {
         "Shadow memory range interleaves with an existing memory mapping. "
         "ASan cannot proceed correctly. ABORTING.\n");
     Report("ASan shadow was supposed to be located in the [%p-%p] range.\n",
-           shadow_start, kHighShadowEnd);
+           (void*)shadow_start, (void*)kHighShadowEnd);
     MaybeReportLinuxPIEBug();
     DumpProcessMap();
     Die();

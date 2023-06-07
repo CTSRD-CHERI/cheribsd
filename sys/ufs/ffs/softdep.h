@@ -1123,7 +1123,7 @@ struct mount_softdeps {
 #define	softdep_alldeps			um_softdep->sd_alldeps
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "subobject_bounds"

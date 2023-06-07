@@ -1,7 +1,7 @@
 # $FreeBSD$
 
-SRCDIR=${SRCTOP}/sys/contrib/openzfs/module
-INCDIR=${SRCTOP}/sys/contrib/openzfs/include
+SRCDIR=${ZFSTOP}/module
+INCDIR=${ZFSTOP}/include
 
 KMOD=	zfs
 
@@ -143,6 +143,7 @@ SRCS+= spl_atomic.c
 SRCS+=	abd_os.c \
 	crypto_os.c \
 	dmu_os.c \
+	event_os.c \
 	hkdf.c \
 	kmod_core.c \
 	spa_os.c \
@@ -242,7 +243,6 @@ SRCS+=	abd.c \
 	sha256.c \
 	skein_zfs.c \
 	spa.c \
-	spa_boot.c \
 	spa_checkpoint.c \
 	spa_config.c \
 	spa_errlog.c \
@@ -342,16 +342,15 @@ CFLAGS+= -include ${SRCTOP}/sys/cddl/compat/opensolaris/sys/debug_compat.h
 CFLAGS+= -include ${INCDIR}/os/freebsd/spl/sys/ccompile.h
 CFLAGS+= -include ${SRCTOP}/sys/modules/zfs/static_ccompile.h
 
-CWARNFLAGS+=	${OPENZFS_CWARNFLAGS}
-
 CFLAGS.gcc+= -Wno-pointer-to-int-cast
 
 CFLAGS.lapi.c= -Wno-cast-qual
 CFLAGS.lcompat.c= -Wno-cast-qual
+CFLAGS.ldo.c= ${NO_WINFINITE_RECURSION}
 CFLAGS.lobject.c= -Wno-cast-qual
 CFLAGS.ltable.c= -Wno-cast-qual
 CFLAGS.lvm.c= -Wno-cast-qual
-CFLAGS.nvpair.c= -Wno-cast-qual -DHAVE_RPC_TYPES
+CFLAGS.nvpair.c= -Wno-cast-qual -DHAVE_RPC_TYPES ${NO_WSTRINGOP_OVERREAD}
 CFLAGS.spl_string.c= -Wno-cast-qual
 CFLAGS.spl_vm.c= -Wno-cast-qual
 CFLAGS.spl_zlib.c= -Wno-cast-qual
@@ -482,3 +481,7 @@ CFLAGS.zstd_fast.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
 CFLAGS.zstd_lazy.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
 CFLAGS.zstd_ldm.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
 CFLAGS.zstd_opt.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
+
+.if ${MACHINE_ARCH} == "aarch64c" || ${MACHINE_ARCH} == "riscv64c"
+CFLAGS+=-Xclang -cheri-bounds=conservative
+.endif

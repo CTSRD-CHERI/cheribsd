@@ -767,6 +767,10 @@ struct rk_pinctrl_conf rk3399_conf = {
 	.get_bias_value = rk3399_get_bias_value,
 };
 
+#define	GRF_IOFUNC_SEL0		0x0300
+#define	 GMAC1_IOMUX_SEL_M0		0x01000000
+#define	 GMAC1_IOMUX_SEL_M1		0x01000100
+
 static struct rk_pinctrl_gpio rk3568_gpio_bank[] = {
 	RK_GPIO(0, "gpio0"),
 	RK_GPIO(1, "gpio1"),
@@ -929,7 +933,14 @@ static uint32_t
 rk3568_get_pd_offset(struct rk_pinctrl_softc *sc, uint32_t bank)
 {
 
-	return (0);
+	if (bank == 0)
+		return (0x20);
+
+	/*
+	 * Registers start at 0x80, but bank index starts at 1. Return 0x70
+	 * so later calculations get the correct offset.
+	 */
+	return (0x70);
 }
 
 static struct syscon *
@@ -1171,11 +1182,31 @@ rk_pinctrl_configure_pin(struct rk_pinctrl_softc *sc, uint32_t *pindata)
 	}
 
 	/* Then drive strength */
-	rv = rk_pinctrl_parse_drive(sc, pin_conf, bank, subbank, &drive, &reg);
-	if (rv == 0) {
-		bit = (pin % 8) * 2;
-		mask = (0x3 << bit);
-		SYSCON_MODIFY_4(syscon, reg, mask, drive << bit | (mask << 16));
+	if (ofw_bus_node_is_compatible(ofw_bus_get_node(sc->dev),
+	    "rockchip,rk3568-pinctrl")) {
+		uint32_t value;
+		if (OF_getencprop(pin_conf, "drive-strength", &value,
+		    sizeof(value)) == 0) {
+			if (bank)
+				reg = 0x01c0 + (bank * 0x40) + (pin / 2 * 4);
+			else
+				reg = 0x0070 + (pin / 2 * 4);
+
+			drive = ((1 << (value + 1)) - 1) << (pin % 2);
+
+			mask = 0x3f << (pin % 2);;
+
+			SYSCON_WRITE_4(syscon, reg, drive | (mask << 16));
+		}
+	} else {
+		rv = rk_pinctrl_parse_drive(sc, pin_conf, bank, subbank, &drive,
+		    &reg);
+		if (rv == 0) {
+			bit = (pin % 8) * 2;
+			mask = (0x3 << bit);
+			SYSCON_MODIFY_4(syscon, reg, mask,
+			    drive << bit | (mask << 16));
+		}
 	}
 
 	/* Finally set the pin function */
@@ -1212,6 +1243,17 @@ rk_pinctrl_configure_pin(struct rk_pinctrl_softc *sc, uint32_t *pindata)
 	 * without hi-word write mask.
 	 */
 	SYSCON_MODIFY_4(syscon, reg, mask, function << bit | (mask << 16));
+
+	/* RK3568 specific pin mux for various functionalities */
+	if (ofw_bus_node_is_compatible(ofw_bus_get_node(sc->dev),
+	    "rockchip,rk3568-pinctrl")) {
+		if (bank == 3 && pin == 9 && function == 3)
+			SYSCON_WRITE_4(sc->grf,
+			    GRF_IOFUNC_SEL0, GMAC1_IOMUX_SEL_M0);
+		if (bank == 4 && pin == 7 && function == 3)
+			SYSCON_WRITE_4(sc->grf,
+			    GRF_IOFUNC_SEL0, GMAC1_IOMUX_SEL_M1);
+	}
 }
 
 static int
@@ -1418,21 +1460,6 @@ done:
 }
 
 static int
-rk_pinctrl_register_gpio(struct rk_pinctrl_softc *sc, char *gpio_name,
-    device_t gpio_dev)
-{
-	int i;
-
-	for(i = 0; i < sc->conf->ngpio_bank; i++) {
-		if (strcmp(gpio_name, sc->conf->gpio_bank[i].gpio_name) != 0)
-			continue;
-		sc->conf->gpio_bank[i].gpio_dev = gpio_dev;
-		return(0);
-	}
-	return (ENXIO);
-}
-
-static int
 rk_pinctrl_probe(device_t dev)
 {
 
@@ -1452,8 +1479,7 @@ rk_pinctrl_attach(device_t dev)
 	struct rk_pinctrl_softc *sc;
 	phandle_t node;
 	device_t cdev;
-	char *gpio_name, *eptr;
-	int rv;
+	int rv, gpio_unit;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
@@ -1491,51 +1517,25 @@ rk_pinctrl_attach(device_t dev)
 	bus_generic_probe(dev);
 
 	/* Attach child devices */
-	for (node = OF_child(node); node > 0; node = OF_peer(node)) {
+	for (node = OF_child(node), gpio_unit = 0; node > 0;
+	     node = OF_peer(node)) {
 		if (!ofw_bus_node_is_compatible(node, "rockchip,gpio-bank"))
 			continue;
-
-		rv = OF_getprop_alloc(node, "name", (void **)&gpio_name);
-		if (rv <= 0) {
-			device_printf(sc->dev, "Cannot GPIO subdevice name.\n");
-			continue;
-		}
-
 		cdev = simplebus_add_device(dev, node, 0, NULL, -1, NULL);
 		if (cdev == NULL) {
-			device_printf(dev, " Cannot add GPIO subdevice: %s\n",
-			    gpio_name);
-			OF_prop_free(gpio_name);
+			device_printf(dev, " Cannot add GPIO subdevice\n");
+			gpio_unit += 1;
 			continue;
 		}
-
 		rv = device_probe_and_attach(cdev);
 		if (rv != 0) {
 			device_printf(sc->dev,
-			    "Cannot attach GPIO subdevice: %s\n", gpio_name);
-			OF_prop_free(gpio_name);
+			    "Cannot attach GPIO subdevice\n");
+			gpio_unit += 1;
 			continue;
 		}
-
-		/* Grep device name from name property */
-		eptr = gpio_name;
-		strsep(&eptr, "@");
-		if (gpio_name == eptr) {
-			device_printf(sc->dev,
-			    "Unrecognized format of GPIO subdevice name: %s\n",
-			    gpio_name);
-			OF_prop_free(gpio_name);
-			continue;
-		}
-		rv =  rk_pinctrl_register_gpio(sc, gpio_name, cdev);
-		if (rv != 0) {
-			device_printf(sc->dev,
-			    "Cannot register GPIO subdevice %s: %d\n",
-			    gpio_name, rv);
-			OF_prop_free(gpio_name);
-			continue;
-		}
-		OF_prop_free(gpio_name);
+		sc->conf->gpio_bank[gpio_unit].gpio_dev = cdev;
+		gpio_unit += 1;
 	}
 
 	fdt_pinctrl_configure_tree(dev);

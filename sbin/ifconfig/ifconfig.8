@@ -28,7 +28,7 @@
 .\"     From: @(#)ifconfig.8	8.3 (Berkeley) 1/5/94
 .\" $FreeBSD$
 .\"
-.Dd July 11, 2022
+.Dd March 6, 2023
 .Dt IFCONFIG 8
 .Os
 .Sh NAME
@@ -2718,19 +2718,19 @@ Hash is calculated by using flowid bits in a packet header mbuf
 which are shifted by the number of this parameter.
 .It Cm use_numa
 Enable selection of egress ports based on the native
-.Xr NUMA 4
+.Xr numa 4
 domain for the packets being transmitted.
 This is currently only implemented for lacp mode.
 This works only on
-.Xr NUMA 4
+.Xr numa 4
 hardware, running a kernel compiled with the
-.Xr NUMA 4
+.Xr numa 4
 option, and when interfaces from multiple
-.Xr NUMA 4
+.Xr numa 4
 domains are ports of the aggregation interface.
 .It Cm -use_numa
 Disable selection of egress ports based on the native
-.Xr NUMA 4
+.Xr numa 4
 domain for the packets being transmitted.
 .It Cm lacp_fast_timeout
 Enable lacp fast-timeout on the interface.
@@ -2880,17 +2880,15 @@ must both be set at the same time.
 .It Cm vlanproto Ar vlan_proto
 Set the VLAN encapsulation protocol to
 .Ar vlan_proto .
-Supported encapsulation protocols are currently
-.Dq 802.1Q
-and
-.Dq 802.1ad .
-The default encapsulation protocol is
-.Dq 802.1Q .
-The
-.Dq 802.1ad
-protocol is also commonly known as
-.Dq QinQ ;
-either name can be used.
+Supported encapsulation protocols are currently:
+.Bl -tag
+.It Cm 802.1Q
+Default.
+.It Cm 802.1ad
+.It Cm QinQ
+Same as
+.Cm 802.1ad .
+.El
 .It Cm vlanpcp Ar priority_code_point
 Priority code point
 .Pq Dv PCP
@@ -3088,6 +3086,22 @@ The following states are recognized:
 .Cm MASTER
 and
 .Cm BACKUP .
+.It Cm peer Ar address
+Set the address to send (IPv4)
+.Xr carp 4
+announcements to.
+.It Cm mcast
+Restore the default destination address for (IPv4)
+.Xr carp 4
+announcements, which is 224.0.0.18.
+.It Cm peer6 Ar address
+Set the address to send (IPv6)
+.Xr carp 4
+announcements to.
+.It Cm mcast6
+Restore the default destination address for (IPv4)
+.Xr carp 4
+announcements, which is ff02::12.
 .El
 .Sh ENVIRONMENT
 The following environment variables affect the execution of

@@ -153,7 +153,7 @@ evaluate_fingerprint(struct vnode *vp, struct mac_veriexec_file_info *ip,
 		else
 			count = PAGE_SIZE;
 
-		error = vn_rdwr_inchunks(UIO_READ, vp, filebuf, count, offset,
+		error = vn_rdwr_inchunks(UIO_READ, vp, PTR2CAP(filebuf), count, offset,
 		    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED, &resid,
 		    td);
 		if (error)

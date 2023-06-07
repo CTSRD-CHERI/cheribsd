@@ -266,7 +266,7 @@ audit_record_write(struct vnode *vp, struct ucred *cred, void *data,
 		}
 	}
 
-	error = vn_rdwr(UIO_WRITE, vp, data, len, (off_t)0, UIO_SYSSPACE,
+	error = vn_rdwr(UIO_WRITE, vp, PTR2CAP(data), len, (off_t)0, UIO_SYSSPACE,
 	    IO_APPEND|IO_UNIT, cred, NULL, NULL, curthread);
 	if (error == ENOSPC)
 		goto fail_enospc;

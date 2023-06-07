@@ -39,6 +39,8 @@ CFLAGS.bootinfo.c += -I$(SRCTOP)/sys/teken
 CFLAGS.bootinfo.c += -I${SRCTOP}/contrib/pnglite
 CFLAGS.framebuffer.c += -I$(SRCTOP)/sys/teken
 CFLAGS.framebuffer.c += -I${SRCTOP}/contrib/pnglite
+CFLAGS.main.c += -I$(SRCTOP)/sys/teken
+CFLAGS.main.c += -I${SRCTOP}/contrib/pnglite
 CFLAGS.gfx_fb.c += -I$(SRCTOP)/sys/teken
 CFLAGS.gfx_fb.c += -I${SRCTOP}/sys/cddl/contrib/opensolaris/common/lz4
 CFLAGS.gfx_fb.c += -I${SRCTOP}/contrib/pnglite
@@ -66,6 +68,7 @@ CFLAGS+=	-DEFI
 .if defined(HAVE_FDT) && ${MK_FDT} != "no"
 .include	"${BOOTSRC}/fdt.mk"
 LIBEFI_FDT=	${BOOTOBJ}/efi/fdt/libefi_fdt.a
+HELP_FILES+=	${FDTSRC}/help.fdt
 .endif
 
 # Include bcache code.
@@ -81,6 +84,7 @@ CFLAGS+= -DEFI_SECUREBOOT
 
 NEWVERSWHAT=	"EFI loader" ${MACHINE}
 VERSION_FILE=	${.CURDIR}/../loader/version
+HELP_FILENAME=	loader.help.efi
 
 # Always add MI sources
 .include	"${BOOTSRC}/loader.mk"
@@ -103,7 +107,7 @@ LDFLAGS+=	-Wl,-T${LDSCRIPT},-Bsymbolic,-znotext -pie
 LDFLAGS+=	-Wl,--no-dynamic-linker
 .endif
 
-CLEANFILES+=	loader.efi
+CLEANFILES+=	${LOADER}.efi
 
 ${LOADER}.efi: ${PROG}
 	if ${NM} ${.ALLSRC} | grep ' U '; then \

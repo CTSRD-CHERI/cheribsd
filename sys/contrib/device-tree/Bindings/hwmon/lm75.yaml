@@ -14,6 +14,7 @@ properties:
   compatible:
     enum:
       - adi,adt75
+      - atmel,at30ts74
       - dallas,ds1775
       - dallas,ds75
       - dallas,ds7505
@@ -30,6 +31,7 @@ properties:
       - st,stds75
       - st,stlm75
       - microchip,tcn75
+      - ti,tmp1075
       - ti,tmp100
       - ti,tmp101
       - ti,tmp105

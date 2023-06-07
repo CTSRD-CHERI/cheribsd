@@ -36,17 +36,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include <stdlib.h>
-
 #include "libc_private.h"
-#include "ignore_init.c"
-
-#ifdef GCRT
-extern void _mcleanup(void);
-extern void monstartup(void *, void *);
-extern int eprol;
-extern int etext;
-#endif
+#include "csu_common.h"
 
 /*
  * For -pie executables rtld will process capability relocations, so we don't
@@ -57,15 +48,17 @@ extern int etext;
 #endif
 
 #ifdef SHOULD_PROCESS_CAP_RELOCS
+extern int _DYNAMIC;
+#pragma weak _DYNAMIC
+
 #include "crt_init_globals.c"
 #endif
 
-void __start(int argc, char **argv, char **env, void (*cleanup)(void));
+void __start(int argc, char **argv, char **env, void (*cleanup)(void)) __dead2;
 
 void
 __start(int argc, char **argv, char **env, void (*cleanup)(void))
 {
-
 #ifdef SHOULD_PROCESS_CAP_RELOCS
 	/*
 	 * Initialize __cap_relocs for static executables. The run-time linker
@@ -96,19 +89,10 @@ __start(int argc, char **argv, char **env, void (*cleanup)(void))
 	}
 #endif
 
-	handle_argv(argc, argv, env);
-
-	if (&_DYNAMIC != NULL)
-		atexit(cleanup);
-	else
-		_init_tls();
-
 #ifdef GCRT
-	atexit(_mcleanup);
-	monstartup(&eprol, &etext);
+	__libc_start1_gcrt(argc, argv, env, cleanup, main, &eprol, &etext);
 __asm__("eprol:");
+#else
+	__libc_start1(argc, argv, env, cleanup, main);
 #endif
-
-	handle_static_init(argc, argv, env);
-	exit(main(argc, argv, env));
 }

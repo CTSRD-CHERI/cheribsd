@@ -86,6 +86,7 @@ __DEFAULT_NO_OPTIONS = \
     UBSAN
 
 __DEFAULT_DEPENDENT_OPTIONS = \
+    CHERI_CAPREVOKE/CHERI \
     MAKE_CHECK_USE_SANDBOX/TESTS \
     STAGING_MAN/STAGING \
     STAGING_PROG/STAGING \
@@ -103,6 +104,8 @@ __DEFAULT_NO_OPTIONS+= PIE
 .else
 __DEFAULT_YES_OPTIONS+=PIE
 .endif
+
+.-include <local.opts.mk>
 
 .include <bsd.mkopt.mk>
 

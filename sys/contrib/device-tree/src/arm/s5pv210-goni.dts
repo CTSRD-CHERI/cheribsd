@@ -30,9 +30,9 @@
 
 	memory@30000000 {
 		device_type = "memory";
-		reg = <0x30000000 0x05000000
-			0x40000000 0x10000000
-			0x50000000 0x08000000>;
+		reg = <0x30000000 0x05000000>,
+			<0x40000000 0x10000000>,
+			<0x50000000 0x08000000>;
 	};
 
 	pmic_ap_clk: clock-0 {
@@ -358,15 +358,6 @@
 		reg = <0x4a>;
 		interrupt-parent = <&gpj0>;
 		interrupts = <5 IRQ_TYPE_EDGE_FALLING>;
-
-		atmel,x-line = <17>;
-		atmel,y-line = <11>;
-		atmel,x-size = <800>;
-		atmel,y-size = <480>;
-		atmel,burst-length = <0x21>;
-		atmel,threshold = <0x28>;
-		atmel,orientation = <1>;
-
 		vdd-supply = <&tsp_reg>;
 	};
 };

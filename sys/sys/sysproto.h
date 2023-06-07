@@ -753,6 +753,16 @@ struct flag_captured_args {
 	char message_l_[PADL_(const char * __capability)]; const char * __capability message; char message_r_[PADR_(const char * __capability)];
 	char key_l_[PADL_(uint32_t)]; uint32_t key; char key_r_[PADR_(uint32_t)];
 };
+struct cheri_revoke_get_shadow_args {
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char arena_l_[PADL_(void * __capability)]; void * __capability arena; char arena_r_[PADR_(void * __capability)];
+	char shadow_l_[PADL_(void * __capability)]; void * __capability shadow; char shadow_r_[PADR_(void * __capability)];
+};
+struct cheri_revoke_args {
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char start_epoch_l_[PADL_(uint64_t)]; uint64_t start_epoch; char start_epoch_r_[PADR_(uint64_t)];
+	char crsi_l_[PADL_(struct cheri_revoke_syscall_info * __capability)]; struct cheri_revoke_syscall_info * __capability crsi; char crsi_r_[PADR_(struct cheri_revoke_syscall_info * __capability)];
+};
 struct lchmod_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
@@ -2074,6 +2084,8 @@ int	sys_aio_write(struct thread *, struct aio_write_args *);
 int	sys_lio_listio(struct thread *, struct lio_listio_args *);
 int	sys_kbounce(struct thread *, struct kbounce_args *);
 int	sys_flag_captured(struct thread *, struct flag_captured_args *);
+int	sys_cheri_revoke_get_shadow(struct thread *, struct cheri_revoke_get_shadow_args *);
+int	sys_cheri_revoke(struct thread *, struct cheri_revoke_args *);
 int	sys_lchmod(struct thread *, struct lchmod_args *);
 int	sys_lutimes(struct thread *, struct lutimes_args *);
 int	sys_preadv(struct thread *, struct preadv_args *);
@@ -3030,6 +3042,8 @@ int	freebsd13_swapoff(struct thread *, struct freebsd13_swapoff_args *);
 #define	SYS_AUE_lio_listio	AUE_LIO_LISTIO
 #define	SYS_AUE_kbounce	AUE_NULL
 #define	SYS_AUE_flag_captured	AUE_NULL
+#define	SYS_AUE_cheri_revoke_get_shadow	AUE_NULL
+#define	SYS_AUE_cheri_revoke	AUE_NULL
 #define	SYS_AUE_freebsd11_getdents	AUE_O_GETDENTS
 #define	SYS_AUE_lchmod	AUE_LCHMOD
 #define	SYS_AUE_lutimes	AUE_LUTIMES

@@ -254,7 +254,7 @@ test_strfcap_number_one_cap(uintcap_t cap, const char *cap_desc)
 
 }
 
-CHERIBSDTEST(test_strfcap_numbers, "Checks of formats of a single number")
+CHERIBSDTEST(strfcap_numbers, "Checks of formats of a single number")
 {
 	char foo[4];
 	char * __capability foop = foo;
@@ -275,7 +275,7 @@ CHERIBSDTEST(test_strfcap_numbers, "Checks of formats of a single number")
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_strfcap_T, "Check of tag in format")
+CHERIBSDTEST(strfcap_T, "Check of tag in format")
 {
 	char str_t[128], str_u[128];
 	char * __capability cap = (__cheri_tocap char * __capability)str_t;
@@ -295,7 +295,7 @@ CHERIBSDTEST(test_strfcap_T, "Check of tag in format")
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_strfcap_textual, "Checks of %? and %%")
+CHERIBSDTEST(strfcap_textual, "Checks of %? and %%")
 {
 	char str[128];
 	char * __capability cap = str;
@@ -327,7 +327,7 @@ CHERIBSDTEST(test_strfcap_textual, "Checks of %? and %%")
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_strfcap_C, "Various checks of %C (%A and %P indirectly)")
+CHERIBSDTEST(strfcap_C, "Various checks of %C (%A and %P indirectly)")
 {
 	char data[64];
 	uintcap_t scalar = (uintcap_t)4;

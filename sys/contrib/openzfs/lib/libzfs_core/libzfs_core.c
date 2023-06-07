@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -22,10 +22,10 @@
 /*
  * Copyright (c) 2012, 2020 by Delphix. All rights reserved.
  * Copyright (c) 2013 Steven Hartland. All rights reserved.
- * Copyright (c) 2017 Datto Inc.
  * Copyright 2017 RackTop Systems.
  * Copyright (c) 2017 Open-E, Inc. All Rights Reserved.
  * Copyright (c) 2019, 2020 by Christian Schwarz. All rights reserved.
+ * Copyright (c) 2019 Datto Inc.
  */
 
 /*
@@ -235,7 +235,7 @@ lzc_ioctl(zfs_ioc_t ioc, const char *name,
 			break;
 		}
 	}
-	if (zc.zc_nvlist_dst_filled) {
+	if (zc.zc_nvlist_dst_filled && resultp != NULL) {
 		*resultp = fnvlist_unpack((void *)(uintptr_t)zc.zc_nvlist_dst,
 		    zc.zc_nvlist_dst_size);
 	}
@@ -986,7 +986,7 @@ recv_read(int fd, void *buf, int ilen)
 static int
 recv_impl(const char *snapname, nvlist_t *recvdprops, nvlist_t *localprops,
     uint8_t *wkeydata, uint_t wkeylen, const char *origin, boolean_t force,
-    boolean_t resumable, boolean_t raw, int input_fd,
+    boolean_t heal, boolean_t resumable, boolean_t raw, int input_fd,
     const dmu_replay_record_t *begin_record, uint64_t *read_bytes,
     uint64_t *errflags, nvlist_t **errors)
 {
@@ -1041,7 +1041,7 @@ recv_impl(const char *snapname, nvlist_t *recvdprops, nvlist_t *localprops,
 	/*
 	 * All receives with a payload should use the new interface.
 	 */
-	if (resumable || raw || wkeydata != NULL || payload) {
+	if (resumable || heal || raw || wkeydata != NULL || payload) {
 		nvlist_t *outnvl = NULL;
 		nvlist_t *innvl = fnvlist_alloc();
 
@@ -1081,6 +1081,8 @@ recv_impl(const char *snapname, nvlist_t *recvdprops, nvlist_t *localprops,
 		if (resumable)
 			fnvlist_add_boolean(innvl, "resumable");
 
+		if (heal)
+			fnvlist_add_boolean(innvl, "heal");
 
 		error = lzc_ioctl(ZFS_IOC_RECV_NEW, fsname, innvl, &outnvl);
 
@@ -1103,7 +1105,8 @@ recv_impl(const char *snapname, nvlist_t *recvdprops, nvlist_t *localprops,
 		fnvlist_free(outnvl);
 	} else {
 		zfs_cmd_t zc = {"\0"};
-		char *packed = NULL;
+		char *rp_packed = NULL;
+		char *lp_packed = NULL;
 		size_t size;
 
 		ASSERT3S(g_refcount, >, 0);
@@ -1112,14 +1115,14 @@ recv_impl(const char *snapname, nvlist_t *recvdprops, nvlist_t *localprops,
 		(void) strlcpy(zc.zc_value, snapname, sizeof (zc.zc_value));
 
 		if (recvdprops != NULL) {
-			packed = fnvlist_pack(recvdprops, &size);
-			zc.zc_nvlist_src = (uint64_t)(uintptr_t)packed;
+			rp_packed = fnvlist_pack(recvdprops, &size);
+			zc.zc_nvlist_src = (uint64_t)(uintptr_t)rp_packed;
 			zc.zc_nvlist_src_size = size;
 		}
 
 		if (localprops != NULL) {
-			packed = fnvlist_pack(localprops, &size);
-			zc.zc_nvlist_conf = (uint64_t)(uintptr_t)packed;
+			lp_packed = fnvlist_pack(localprops, &size);
+			zc.zc_nvlist_conf = (uint64_t)(uintptr_t)lp_packed;
 			zc.zc_nvlist_conf_size = size;
 		}
 
@@ -1154,8 +1157,10 @@ recv_impl(const char *snapname, nvlist_t *recvdprops, nvlist_t *localprops,
 				    zc.zc_nvlist_dst_size, errors, KM_SLEEP));
 		}
 
-		if (packed != NULL)
-			fnvlist_pack_free(packed, size);
+		if (rp_packed != NULL)
+			fnvlist_pack_free(rp_packed, size);
+		if (lp_packed != NULL)
+			fnvlist_pack_free(lp_packed, size);
 		free((void *)(uintptr_t)zc.zc_nvlist_dst);
 	}
 
@@ -1180,7 +1185,7 @@ lzc_receive(const char *snapname, nvlist_t *props, const char *origin,
     boolean_t force, boolean_t raw, int fd)
 {
 	return (recv_impl(snapname, props, NULL, NULL, 0, origin, force,
-	    B_FALSE, raw, fd, NULL, NULL, NULL, NULL));
+	    B_FALSE, B_FALSE, raw, fd, NULL, NULL, NULL, NULL));
 }
 
 /*
@@ -1194,7 +1199,7 @@ lzc_receive_resumable(const char *snapname, nvlist_t *props, const char *origin,
     boolean_t force, boolean_t raw, int fd)
 {
 	return (recv_impl(snapname, props, NULL, NULL, 0, origin, force,
-	    B_TRUE, raw, fd, NULL, NULL, NULL, NULL));
+	    B_FALSE, B_TRUE, raw, fd, NULL, NULL, NULL, NULL));
 }
 
 /*
@@ -1217,7 +1222,7 @@ lzc_receive_with_header(const char *snapname, nvlist_t *props,
 		return (EINVAL);
 
 	return (recv_impl(snapname, props, NULL, NULL, 0, origin, force,
-	    resumable, raw, fd, begin_record, NULL, NULL, NULL));
+	    B_FALSE, resumable, raw, fd, begin_record, NULL, NULL, NULL));
 }
 
 /*
@@ -1247,7 +1252,7 @@ lzc_receive_one(const char *snapname, nvlist_t *props,
 {
 	(void) action_handle, (void) cleanup_fd;
 	return (recv_impl(snapname, props, NULL, NULL, 0, origin, force,
-	    resumable, raw, input_fd, begin_record,
+	    B_FALSE, resumable, raw, input_fd, begin_record,
 	    read_bytes, errflags, errors));
 }
 
@@ -1269,7 +1274,27 @@ lzc_receive_with_cmdprops(const char *snapname, nvlist_t *props,
 {
 	(void) action_handle, (void) cleanup_fd;
 	return (recv_impl(snapname, props, cmdprops, wkeydata, wkeylen, origin,
-	    force, resumable, raw, input_fd, begin_record,
+	    force, B_FALSE, resumable, raw, input_fd, begin_record,
+	    read_bytes, errflags, errors));
+}
+
+/*
+ * Like lzc_receive_with_cmdprops, but allows the caller to pass an additional
+ * 'heal' argument.
+ *
+ * The heal arguments tells us to heal the provided snapshot using the provided
+ * send stream
+ */
+int lzc_receive_with_heal(const char *snapname, nvlist_t *props,
+    nvlist_t *cmdprops, uint8_t *wkeydata, uint_t wkeylen, const char *origin,
+    boolean_t force, boolean_t heal, boolean_t resumable, boolean_t raw,
+    int input_fd, const dmu_replay_record_t *begin_record, int cleanup_fd,
+    uint64_t *read_bytes, uint64_t *errflags, uint64_t *action_handle,
+    nvlist_t **errors)
+{
+	(void) action_handle, (void) cleanup_fd;
+	return (recv_impl(snapname, props, cmdprops, wkeydata, wkeylen, origin,
+	    force, heal, resumable, raw, input_fd, begin_record,
 	    read_bytes, errflags, errors));
 }
 

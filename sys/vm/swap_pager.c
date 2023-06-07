@@ -81,6 +81,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/disk.h>
 #include <sys/disklabel.h>
 #include <sys/eventhandler.h>
+#include <sys/endian.h>
 #include <sys/fcntl.h>
 #include <sys/limits.h>
 #include <sys/lock.h>
@@ -150,11 +151,23 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #define	SWAP_META_PAGES		PCTRIE_COUNT
-#if __has_feature(capabilities)
-#define	BITS_PER_TAGS_PER_PAGE					\
-	((PAGE_SIZE / CHERICAP_SIZE) / (8 * sizeof(uint64_t)))
 
-CTASSERT((PAGE_SIZE / CHERICAP_SIZE) % (8 * sizeof(uint64_t)) == 0);
+#if __has_feature(capabilities)
+typedef u_long tag_word_t;
+
+#define	tag_word_ffs(x)		ffsl((long)(x))
+
+#if __SIZEOF_LONG__ == 4
+#define	tag_word_letoh(x)	le32toh(x)
+#elif __SIZEOF_LONG__ == 8
+#define	tag_word_letoh(x)	le64toh(x)
+#else
+#error unsupported long size
+#endif
+
+#define	TAG_WORDS_PER_PAGE	(TAG_BYTES_PER_PAGE / sizeof(tag_word_t))
+
+CTASSERT(TAG_BYTES_PER_PAGE % sizeof(tag_word_t) == 0);
 #endif
 
 /*
@@ -166,7 +179,7 @@ CTASSERT((PAGE_SIZE / CHERICAP_SIZE) % (8 * sizeof(uint64_t)) == 0);
 struct swblk {
 	vm_pindex_t	p;
 #if __has_feature(capabilities)
-	uint64_t	swb_tags[SWAP_META_PAGES * BITS_PER_TAGS_PER_PAGE];
+	tag_word_t	t[SWAP_META_PAGES][TAG_WORDS_PER_PAGE];
 #endif
 	daddr_t		d[SWAP_META_PAGES];
 };
@@ -197,8 +210,8 @@ SYSCTL_PROC(_vm, OID_AUTO, swap_total, CTLTYPE_U64 | CTLFLAG_RD | CTLFLAG_MPSAFE
     &swap_total, 0, sysctl_page_shift, "QU",
     "Total amount of available swap storage.");
 
-static int overcommit = 0;
-SYSCTL_INT(_vm, VM_OVERCOMMIT, overcommit, CTLFLAG_RW, &overcommit, 0,
+int vm_overcommit __read_mostly = 0;
+SYSCTL_INT(_vm, VM_OVERCOMMIT, overcommit, CTLFLAG_RW, &vm_overcommit, 0,
     "Configure virtual memory overcommit behavior. See tuning(7) "
     "for details.");
 static unsigned long swzone;
@@ -217,11 +230,6 @@ static COUNTER_U64_DEFINE_EARLY(swap_free_completed);
 SYSCTL_COUNTER_U64(_vm_stats_swap, OID_AUTO, free_completed,
     CTLFLAG_RD, &swap_free_completed,
     "Number of deferred frees completed");
-
-/* bits from overcommit */
-#define	SWAP_RESERVE_FORCE_ON		(1 << 0)
-#define	SWAP_RESERVE_RLIMIT_ON		(1 << 1)
-#define	SWAP_RESERVE_ALLOW_NONWIRED	(1 << 2)
 
 static int
 sysctl_page_shift(SYSCTL_HANDLER_ARGS)
@@ -246,7 +254,8 @@ swap_reserve_by_cred_rlimit(u_long pincr, struct ucred *cred, int oc)
 	    prev + pincr > lim_cur(curthread, RLIMIT_SWAP) &&
 	    priv_check(curthread, PRIV_VM_SWAP_NORLIMIT) != 0) {
 		prev = atomic_fetchadd_long(&uip->ui_vmsize, -pincr);
-		KASSERT(prev >= pincr, ("negative vmsize for uid = %d\n", uip->ui_uid));
+		KASSERT(prev >= pincr,
+		    ("negative vmsize for uid %d\n", uip->ui_uid));
 		return (false);
 	}
 	return (true);
@@ -264,7 +273,8 @@ swap_release_by_cred_rlimit(u_long pdecr, struct ucred *cred)
 
 #ifdef notyet
 	prev = atomic_fetchadd_long(&uip->ui_vmsize, -pdecr);
-	KASSERT(prev >= pdecr, ("negative vmsize for uid = %d\n", uip->ui_uid));
+	KASSERT(prev >= pdecr,
+	    ("negative vmsize for uid %d\n", uip->ui_uid));
 #else
 	atomic_subtract_long(&uip->ui_vmsize, pdecr);
 #endif
@@ -297,8 +307,8 @@ swap_reserve_by_cred(vm_ooffset_t incr, struct ucred *cred)
 	static int curfail;
 	static struct timeval lastfail;
 
-	KASSERT((incr & PAGE_MASK) == 0, ("%s: incr: %ju & PAGE_MASK", __func__,
-	    (uintmax_t)incr));
+	KASSERT((incr & PAGE_MASK) == 0, ("%s: incr: %ju & PAGE_MASK",
+	    __func__, (uintmax_t)incr));
 
 #ifdef RACCT
 	if (RACCT_ENABLED()) {
@@ -314,7 +324,7 @@ swap_reserve_by_cred(vm_ooffset_t incr, struct ucred *cred)
 	prev = atomic_fetchadd_long(&swap_reserved, pincr);
 	r = prev + pincr;
 	s = swap_total;
-	oc = atomic_load_int(&overcommit);
+	oc = atomic_load_int(&vm_overcommit);
 	if (r > s && (oc & SWAP_RESERVE_ALLOW_NONWIRED) != 0) {
 		s += vm_cnt.v_page_count - vm_cnt.v_free_reserved -
 		    vm_wire_count();
@@ -322,13 +332,15 @@ swap_reserve_by_cred(vm_ooffset_t incr, struct ucred *cred)
 	if ((oc & SWAP_RESERVE_FORCE_ON) != 0 && r > s &&
 	    priv_check(curthread, PRIV_VM_SWAP_NOQUOTA) != 0) {
 		prev = atomic_fetchadd_long(&swap_reserved, -pincr);
-		KASSERT(prev >= pincr, ("swap_reserved < incr on overcommit fail"));
+		KASSERT(prev >= pincr,
+		    ("swap_reserved < incr on overcommit fail"));
 		goto out_error;
 	}
 
 	if (!swap_reserve_by_cred_rlimit(pincr, cred, oc)) {
 		prev = atomic_fetchadd_long(&swap_reserved, -pincr);
-		KASSERT(prev >= pincr, ("swap_reserved < incr on overcommit fail"));
+		KASSERT(prev >= pincr,
+		    ("swap_reserved < incr on overcommit fail"));
 		goto out_error;
 	}
 
@@ -336,7 +348,8 @@ swap_reserve_by_cred(vm_ooffset_t incr, struct ucred *cred)
 
 out_error:
 	if (ppsratecheck(&lastfail, &curfail, 1)) {
-		printf("uid %d, pid %d: swap reservation for %jd bytes failed\n",
+		printf("uid %d, pid %d: swap reservation "
+		    "for %jd bytes failed\n",
 		    cred->cr_ruidinfo->ui_uid, curproc->p_pid, incr);
 	}
 #ifdef RACCT
@@ -355,8 +368,8 @@ swap_reserve_force(vm_ooffset_t incr)
 {
 	u_long pincr;
 
-	KASSERT((incr & PAGE_MASK) == 0, ("%s: incr: %ju & PAGE_MASK", __func__,
-	    (uintmax_t)incr));
+	KASSERT((incr & PAGE_MASK) == 0, ("%s: incr: %ju & PAGE_MASK",
+	    __func__, (uintmax_t)incr));
 
 #ifdef RACCT
 	if (RACCT_ENABLED()) {
@@ -389,8 +402,8 @@ swap_release_by_cred(vm_ooffset_t decr, struct ucred *cred)
 	u_long prev;
 #endif
 
-	KASSERT((decr & PAGE_MASK) == 0, ("%s: decr: %ju & PAGE_MASK", __func__,
-	    (uintmax_t)decr));
+	KASSERT((decr & PAGE_MASK) == 0, ("%s: decr: %ju & PAGE_MASK",
+	    __func__, (uintmax_t)decr));
 
 	pdecr = atop(decr);
 #ifdef INVARIANTS
@@ -464,7 +477,7 @@ static void	swap_pager_update_writecount(vm_object_t object,
     vm_offset_t start, vm_offset_t end);
 static void	swap_pager_release_writecount(vm_object_t object,
     vm_offset_t start, vm_offset_t end);
-static void	swap_pager_freespace(vm_object_t object, vm_pindex_t start,
+static void	swap_pager_freespace_pgo(vm_object_t object, vm_pindex_t start,
     vm_size_t size);
 
 const struct pagerops swappagerops = {
@@ -479,7 +492,7 @@ const struct pagerops swappagerops = {
 	.pgo_pageunswapped = swap_pager_unswapped, /* remove swap related to page */
 	.pgo_update_writecount = swap_pager_update_writecount,
 	.pgo_release_writecount = swap_pager_release_writecount,
-	.pgo_freespace = swap_pager_freespace,
+	.pgo_freespace = swap_pager_freespace_pgo,
 };
 
 /*
@@ -516,9 +529,10 @@ static void cheri_restore_tag(void * __capability *);
 static void swp_pager_meta_cheri_get_tags(vm_page_t);
 static void swp_pager_meta_cheri_put_tags(vm_page_t);
 #endif
-static void swp_pager_meta_free(vm_object_t, vm_pindex_t, vm_pindex_t);
+static void swp_pager_meta_free(vm_object_t, vm_pindex_t, vm_pindex_t,
+    vm_size_t *);
 static void swp_pager_meta_transfer(vm_object_t src, vm_object_t dst,
-    vm_pindex_t pindex, vm_pindex_t count);
+    vm_pindex_t pindex, vm_pindex_t count, vm_size_t *freed);
 static void swp_pager_meta_free_all(vm_object_t);
 static daddr_t swp_pager_meta_lookup(vm_object_t, vm_pindex_t);
 
@@ -1013,11 +1027,21 @@ sysctl_swap_fragmentation(SYSCTL_HANDLER_ARGS)
  *
  *	The object must be locked.
  */
-static void
-swap_pager_freespace(vm_object_t object, vm_pindex_t start, vm_size_t size)
+void
+swap_pager_freespace(vm_object_t object, vm_pindex_t start, vm_size_t size,
+    vm_size_t *freed)
 {
+	MPASS((object->flags & OBJ_SWAP) != 0);
 
-	swp_pager_meta_free(object, start, size);
+	swp_pager_meta_free(object, start, size, freed);
+}
+
+static void
+swap_pager_freespace_pgo(vm_object_t object, vm_pindex_t start, vm_size_t size)
+{
+	MPASS((object->flags & OBJ_SWAP) != 0);
+
+	swp_pager_meta_free(object, start, size, NULL);
 }
 
 /*
@@ -1041,7 +1065,7 @@ swap_pager_reserve(vm_object_t object, vm_pindex_t start, vm_pindex_t size)
 		n = MIN(size - i, INT_MAX);
 		blk = swp_pager_getswapspace(&n);
 		if (blk == SWAPBLK_NONE) {
-			swp_pager_meta_free(object, start, i);
+			swp_pager_meta_free(object, start, i, NULL);
 			VM_OBJECT_WUNLOCK(object);
 			return (-1);
 		}
@@ -1058,11 +1082,27 @@ swap_pager_reserve(vm_object_t object, vm_pindex_t start, vm_pindex_t size)
 	return (0);
 }
 
+#if __has_feature(capabilities)
+static void
+swp_pager_cheri_xfer_tags(vm_object_t dstobject, vm_pindex_t pindex,
+    struct swblk *sb, vm_pindex_t srcmodpi)
+{
+	struct swblk *dstsb;
+	vm_pindex_t modpi;
+
+	dstsb = SWAP_PCTRIE_LOOKUP(&dstobject->un_pager.swp.swp_blks,
+	    rounddown(pindex, SWAP_META_PAGES));
+
+	modpi = pindex % SWAP_META_PAGES;
+	memcpy(&dstsb->t[modpi], &sb->t[srcmodpi], sizeof(sb->t[srcmodpi]));
+}
+#endif
+
 static bool
 swp_pager_xfer_source(vm_object_t srcobject, vm_object_t dstobject,
-    vm_pindex_t pindex, daddr_t addr)
+    vm_pindex_t pindex, struct swblk *sb, vm_pindex_t srcmodpi)
 {
-	daddr_t dstaddr __diagused;
+	daddr_t addr, dstaddr __diagused;
 
 	KASSERT((srcobject->flags & OBJ_SWAP) != 0,
 	    ("%s: srcobject not swappable", __func__));
@@ -1074,6 +1114,8 @@ swp_pager_xfer_source(vm_object_t srcobject, vm_object_t dstobject,
 		return (false);
 	}
 
+	addr = sb->d[srcmodpi];
+
 	/*
 	 * Destination has no swapblk and is not resident, transfer source.
 	 * swp_pager_meta_build() can sleep.
@@ -1083,6 +1125,10 @@ swp_pager_xfer_source(vm_object_t srcobject, vm_object_t dstobject,
 	KASSERT(dstaddr == SWAPBLK_NONE,
 	    ("Unexpected destination swapblk"));
 	VM_OBJECT_WLOCK(srcobject);
+
+#if __has_feature(capabilities)
+	swp_pager_cheri_xfer_tags(dstobject, pindex, sb, srcmodpi);
+#endif
 
 	return (true);
 }
@@ -1129,7 +1175,8 @@ swap_pager_copy(vm_object_t srcobject, vm_object_t dstobject,
 	/*
 	 * Transfer source to destination.
 	 */
-	swp_pager_meta_transfer(srcobject, dstobject, offset, dstobject->size);
+	swp_pager_meta_transfer(srcobject, dstobject, offset, dstobject->size,
+	    NULL);
 
 	/*
 	 * Free left over swap blocks in source.
@@ -2141,6 +2188,15 @@ allocated:
 	/* Enter block into metadata. */
 	sb->d[modpi] = swapblk;
 
+#if __has_feature(capabilities)
+	/*
+	 * No capabilities present for this block (yet); either this is
+	 * reserved swap space or the caller will populate the bitmap.
+	 */
+	if (swapblk != SWAPBLK_NONE)
+		memset(&sb->t[modpi], 0, sizeof(sb->t[modpi]));
+#endif
+
 	/*
 	 * Free the swblk if we end up with the empty page run.
 	 */
@@ -2154,46 +2210,19 @@ allocated:
  *	cheri_restore_tag:
  *
  *	Restore a single tag.
- *
- *	XXX: It would be nice to replace this with a more portable
- *	CSETTAG().
  */
 static void
 cheri_restore_tag(void * __capability *cp)
 {
-	size_t base, len, offset, perm, sealed, type;
-	void * __capability cap;
+	uintcap_t cap;
 	void * __capability newcap;
 	void * __capability sealcap;
 
-	cap = *cp;
+	cap = (uintcap_t)*cp;
 
-	base = cheri_getbase(cap);
-	len = cheri_getlen(cap);
-	offset = cheri_getoffset(cap);
-	perm = cheri_getperm(cap);
-	sealed = cheri_getsealed(cap);
-	type = cheri_gettype(cap);
-
-	newcap = swap_restore_cap;
-	newcap = cheri_setoffset(newcap, base);
-	newcap = cheri_setbounds(newcap, len);
-	newcap = cheri_andperm(newcap, perm);
-	newcap = cheri_incoffset(newcap, offset);
-
-	if (sealed) {
-		if (type == CHERI_OTYPE_SENTRY) {
-			newcap = cheri_sealentry(newcap);
-		} else {
-			sealcap = cheri_setoffset(swap_restore_cap, type);
-			newcap = cheri_seal(newcap, sealcap);
-		}
-	}
-
-	/*
-	 * XXX: Does this guarantee a bit for bit indentical result?
-	 * We should check in the slow path.
-	 */
+	newcap = cheri_buildcap(swap_restore_cap, cap);
+	sealcap = cheri_copytype(swap_restore_cap, cap);
+	newcap = cheri_condseal(newcap, sealcap);
 
 	*cp = newcap;
 }
@@ -2208,9 +2237,8 @@ static void
 swp_pager_meta_cheri_get_tags(vm_page_t page)
 {
 	size_t i, j;
-	uint64_t t;
+	tag_word_t t;
 	void * __capability *scan;
-	void * __capability *p;
 	struct swblk *sb;
 	vm_pindex_t modpi;
 
@@ -2219,15 +2247,13 @@ swp_pager_meta_cheri_get_tags(vm_page_t page)
 	    rounddown(page->pindex, SWAP_META_PAGES));
 
 	modpi = page->pindex % SWAP_META_PAGES;
-	for (i = modpi * BITS_PER_TAGS_PER_PAGE;
-	    i < (modpi + 1) * BITS_PER_TAGS_PER_PAGE; i++) {
-		p = scan;
-		for (t = sb->swb_tags[i]; t != 0; t >>= j) {
-			j = ffsl((long)t);
-			cheri_restore_tag(p + j - 1);
-			p += j;
+	for (i = 0; i < nitems(sb->t[modpi]); i++) {
+		t = tag_word_letoh(sb->t[modpi][i]);
+		while ((j = tag_word_ffs(t) - 1) != -1) {
+			cheri_restore_tag(scan + j);
+			t &= ~((tag_word_t)1 << j);
 		}
-		scan += 8 * sizeof(uint64_t);
+		scan += 8 * sizeof(tag_word_t);
 	}
 }
 
@@ -2239,31 +2265,16 @@ swp_pager_meta_cheri_get_tags(vm_page_t page)
 static void
 swp_pager_meta_cheri_put_tags(vm_page_t page)
 {
-	size_t i, j;
-	uint64_t t, m;
 	void * __capability *scan;
 	struct swblk *sb;
 	vm_pindex_t modpi;
-	int tag;
 
 	scan = (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(page));
 	sb = SWAP_PCTRIE_LOOKUP(&page->object->un_pager.swp.swp_blks,
 	    rounddown(page->pindex, SWAP_META_PAGES));
 
 	modpi = page->pindex % SWAP_META_PAGES;
-	for (i = modpi * BITS_PER_TAGS_PER_PAGE;
-	    i < (modpi + 1) * BITS_PER_TAGS_PER_PAGE; i++) {
-		t = 0;
-		m = 1;
-		for (j = 0; j < 8 * sizeof(uint64_t); j++) {
-			tag = cheri_gettag(*scan);
-			if (tag != 0)
-				t |= m;
-			m <<= 1;
-			scan++;
-		}
-		sb->swb_tags[i] = t;
-	}
+	cheri_read_tags_page(scan, &sb->t[modpi], NULL);
 }
 #endif
 
@@ -2276,16 +2287,22 @@ swp_pager_meta_cheri_put_tags(vm_page_t page)
  */
 static void
 swp_pager_meta_transfer(vm_object_t srcobject, vm_object_t dstobject,
-    vm_pindex_t pindex, vm_pindex_t count)
+    vm_pindex_t pindex, vm_pindex_t count, vm_size_t *moved)
 {
 	struct swblk *sb;
+	vm_page_t m;
 	daddr_t n_free, s_free;
 	vm_pindex_t offset, last;
+	vm_size_t mc;
 	int i, limit, start;
 
 	VM_OBJECT_ASSERT_WLOCKED(srcobject);
+	MPASS(moved == NULL || dstobject == NULL);
+
+	mc = 0;
+	m = NULL;
 	if (count == 0 || pctrie_is_empty(&srcobject->un_pager.swp.swp_blks))
-		return;
+		goto out;
 
 	swp_pager_init_freerange(&s_free, &n_free);
 	offset = pindex;
@@ -2302,10 +2319,18 @@ swp_pager_meta_transfer(vm_object_t srcobject, vm_object_t dstobject,
 			if (sb->d[i] == SWAPBLK_NONE)
 				continue;
 			if (dstobject == NULL ||
-			    !swp_pager_xfer_source(srcobject, dstobject, 
-			    sb->p + i - offset, sb->d[i])) {
+			    !swp_pager_xfer_source(srcobject, dstobject,
+			    sb->p + i - offset, sb, i)) {
 				swp_pager_update_freerange(&s_free, &n_free,
 				    sb->d[i]);
+			}
+			if (moved != NULL) {
+				if (m != NULL && m->pindex != pindex + i - 1)
+					m = NULL;
+				m = m != NULL ? vm_page_next(m) :
+				    vm_page_lookup(srcobject, pindex + i);
+				if (m == NULL || vm_page_none_valid(m))
+					mc++;
 			}
 			sb->d[i] = SWAPBLK_NONE;
 		}
@@ -2318,6 +2343,9 @@ swp_pager_meta_transfer(vm_object_t srcobject, vm_object_t dstobject,
 		}
 	}
 	swp_pager_freeswapspace(s_free, n_free);
+out:
+	if (moved != NULL)
+		*moved = mc;
 }
 
 /*
@@ -2331,9 +2359,10 @@ swp_pager_meta_transfer(vm_object_t srcobject, vm_object_t dstobject,
  *	with resident pages.
  */
 static void
-swp_pager_meta_free(vm_object_t object, vm_pindex_t pindex, vm_pindex_t count)
+swp_pager_meta_free(vm_object_t object, vm_pindex_t pindex, vm_pindex_t count,
+    vm_size_t *freed)
 {
-	swp_pager_meta_transfer(object, NULL, pindex, count);
+	swp_pager_meta_transfer(object, NULL, pindex, count, freed);
 }
 
 /*
@@ -2416,6 +2445,7 @@ swap_pager_find_least(vm_object_t object, vm_pindex_t pindex)
 	int i;
 
 	VM_OBJECT_ASSERT_LOCKED(object);
+	MPASS((object->flags & OBJ_SWAP) != 0);
 
 	if (pctrie_is_empty(&object->un_pager.swp.swp_blks))
 		return (object->size);
@@ -3298,7 +3328,7 @@ swap_pager_release_writecount(vm_object_t object, vm_offset_t start,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190918,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"

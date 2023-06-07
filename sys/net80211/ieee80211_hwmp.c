@@ -646,7 +646,7 @@ hwmp_send_action(struct ieee80211vap *vap,
 	}
 
 	m->m_pkthdr.len = m->m_len = frm - mtod(m, uint8_t *);
-	M_PREPEND(m, sizeof(struct ieee80211_frame), M_NOWAIT);
+	M_PREPEND(m, sizeof(struct ieee80211_frame), IEEE80211_M_NOWAIT);
 	if (m == NULL) {
 		ieee80211_free_node(ni);
 		vap->iv_stats.is_tx_nobuf++;
@@ -1928,8 +1928,8 @@ hwmp_discover(struct ieee80211vap *vap,
 		if (rt == NULL) {
 			rt = ieee80211_mesh_rt_add(vap, dest);
 			if (rt == NULL) {
-				IEEE80211_NOTE(vap, IEEE80211_MSG_HWMP,
-				    ni, "unable to add discovery path to %6D",
+				IEEE80211_DPRINTF(vap, IEEE80211_MSG_HWMP,
+				    "unable to add discovery path to %6D",
 				    dest, ":");
 				vap->iv_stats.is_mesh_rtaddfailed++;
 				goto done;

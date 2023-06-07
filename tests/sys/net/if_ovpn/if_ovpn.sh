@@ -383,6 +383,7 @@ atf_test_case "6in6" "cleanup"
 	sleep 10
 
 	atf_check -s exit:0 -o ignore jexec b ping6 -c 3 2001:db8:1::1
+	atf_check -s exit:0 -o ignore jexec b ping6 -c 3 -z 16 2001:db8:1::1
 }
 
 6in6_cleanup()
@@ -406,6 +407,7 @@ timeout_client_body()
 
 	vnet_mkjail a ${l}a
 	jexec a ifconfig ${l}a 192.0.2.1/24 up
+	jexec a ifconfig lo0 127.0.0.1/8 up
 	vnet_mkjail b ${l}b
 	jexec b ifconfig ${l}b 192.0.2.2/24 up
 
@@ -433,6 +435,8 @@ timeout_client_body()
 		topology subnet
 
 		keepalive 2 10
+
+		management 192.0.2.1 1234
 	"
 	ovpn_start b "
 		dev tun0
@@ -448,8 +452,7 @@ timeout_client_body()
 		key $(atf_get_srcdir)/client.key
 		dh $(atf_get_srcdir)/dh.pem
 
-		ping 2
-		ping-exit 10
+		keepalive 2 10
 	"
 
 	# Give the tunnel time to come up
@@ -457,19 +460,105 @@ timeout_client_body()
 
 	atf_check -s exit:0 -o ignore jexec b ping -c 3 198.51.100.1
 
-	# Kill the server
-	jexec a killall openvpn
+	# Kill the client
+	jexec b killall openvpn
 
-	# Now wait for the client to notice
-	sleep 20
+	# Now wait for the server to notice
+	sleep 15
 
-	if [ jexec b pgrep openvpn ]; then
-		jexec b ps auxf
-		atf_fail "OpenVPN client still running?"
-	fi
+	while echo "status" | jexec a nc -N 192.0.2.1 1234 | grep 192.0.2.2; do
+		echo "Client disconnect not discovered"
+		sleep 1
+	done
 }
 
 timeout_client_cleanup()
+{
+	ovpn_cleanup
+}
+
+atf_test_case "explicit_exit" "cleanup"
+explicit_exit_head()
+{
+	atf_set descr 'Test explicit exit notification'
+	atf_set require.user root
+	atf_set require.progs openvpn
+}
+
+explicit_exit_body()
+{
+	ovpn_init
+
+	l=$(vnet_mkepair)
+
+	vnet_mkjail a ${l}a
+	jexec a ifconfig ${l}a 192.0.2.1/24 up
+	jexec a ifconfig lo0 127.0.0.1/8 up
+	vnet_mkjail b ${l}b
+	jexec b ifconfig ${l}b 192.0.2.2/24 up
+
+	# Sanity check
+	atf_check -s exit:0 -o ignore jexec a ping -c 1 192.0.2.2
+
+	ovpn_start a "
+		dev ovpn0
+		dev-type tun
+		proto udp4
+
+		cipher AES-256-GCM
+		auth SHA256
+
+		local 192.0.2.1
+		server 198.51.100.0 255.255.255.0
+		ca $(atf_get_srcdir)/ca.crt
+		cert $(atf_get_srcdir)/server.crt
+		key $(atf_get_srcdir)/server.key
+		dh $(atf_get_srcdir)/dh.pem
+
+		mode server
+		script-security 2
+		auth-user-pass-verify /usr/bin/true via-env
+		topology subnet
+
+		management 192.0.2.1 1234
+	"
+	ovpn_start b "
+		dev tun0
+		dev-type tun
+
+		client
+
+		remote 192.0.2.1
+		auth-user-pass $(atf_get_srcdir)/user.pass
+
+		ca $(atf_get_srcdir)/ca.crt
+		cert $(atf_get_srcdir)/client.crt
+		key $(atf_get_srcdir)/client.key
+		dh $(atf_get_srcdir)/dh.pem
+
+		explicit-exit-notify
+	"
+
+	# Give the tunnel time to come up
+	sleep 10
+
+	atf_check -s exit:0 -o ignore jexec b ping -c 3 198.51.100.1
+
+	if ! echo "status" | jexec a nc -N 192.0.2.1 1234 | grep 192.0.2.2; then
+		atf_fail "Client not found in status list!"
+	fi
+
+	# Kill the client
+	jexec b killall openvpn
+
+	while echo "status" | jexec a nc -N 192.0.2.1 1234 | grep 192.0.2.2; do
+		jexec a ps auxf
+		echo "Client disconnect not discovered"
+		sleep 1
+	done
+}
+
+explicit_exit_cleanup()
 {
 	ovpn_cleanup
 }
@@ -690,16 +779,146 @@ route_to_cleanup()
 	pft_cleanup
 }
 
-atf_test_case "chacha" "cleanup"
-chacha_head()
+atf_test_case "ra" "cleanup"
+ra_head()
 {
-	atf_set descr 'Test DCO with the chacha algorithm'
+	atf_set descr 'Remote access with multiple clients'
 	atf_set require.user root
 	atf_set require.progs openvpn
 }
 
-chacha_body()
+ra_body()
 {
+	ovpn_init
+
+	bridge=$(vnet_mkbridge)
+	srv=$(vnet_mkepair)
+	lan=$(vnet_mkepair)
+	one=$(vnet_mkepair)
+	two=$(vnet_mkepair)
+
+	ifconfig ${bridge} up
+
+	ifconfig ${srv}a up
+	ifconfig ${bridge} addm ${srv}a
+	ifconfig ${one}a up
+	ifconfig ${bridge} addm ${one}a
+	ifconfig ${two}a up
+	ifconfig ${bridge} addm ${two}a
+
+	vnet_mkjail srv ${srv}b ${lan}a
+	jexec srv ifconfig ${srv}b 192.0.2.1/24 up
+	jexec srv ifconfig ${lan}a 203.0.113.1/24 up
+	vnet_mkjail lan ${lan}b
+	jexec lan ifconfig ${lan}b 203.0.113.2/24 up
+	jexec lan route add default 203.0.113.1
+	vnet_mkjail one ${one}b
+	jexec one ifconfig ${one}b 192.0.2.2/24 up
+	vnet_mkjail two ${two}b
+	jexec two ifconfig ${two}b 192.0.2.3/24 up
+
+	# Sanity checks
+	atf_check -s exit:0 -o ignore jexec one ping -c 1 192.0.2.1
+	atf_check -s exit:0 -o ignore jexec two ping -c 1 192.0.2.1
+	atf_check -s exit:0 -o ignore jexec srv ping -c 1 203.0.113.2
+
+	jexec srv sysctl net.inet.ip.forwarding=1
+
+	ovpn_start srv "
+		dev ovpn0
+		dev-type tun
+		proto udp4
+
+		cipher AES-256-GCM
+		auth SHA256
+
+		local 192.0.2.1
+		server 198.51.100.0 255.255.255.0
+
+		push \"route 203.0.113.0 255.255.255.0\"
+
+		ca $(atf_get_srcdir)/ca.crt
+		cert $(atf_get_srcdir)/server.crt
+		key $(atf_get_srcdir)/server.key
+		dh $(atf_get_srcdir)/dh.pem
+
+		mode server
+		duplicate-cn
+		script-security 2
+		auth-user-pass-verify /usr/bin/true via-env
+		topology subnet
+
+		keepalive 100 600
+	"
+	ovpn_start one "
+		dev tun0
+		dev-type tun
+
+		client
+
+		remote 192.0.2.1
+		auth-user-pass $(atf_get_srcdir)/user.pass
+
+		ca $(atf_get_srcdir)/ca.crt
+		cert $(atf_get_srcdir)/client.crt
+		key $(atf_get_srcdir)/client.key
+		dh $(atf_get_srcdir)/dh.pem
+
+		keepalive 100 600
+	"
+	sleep 2
+	ovpn_start two "
+		dev tun0
+		dev-type tun
+
+		client
+
+		remote 192.0.2.1
+		auth-user-pass $(atf_get_srcdir)/user.pass
+
+		ca $(atf_get_srcdir)/ca.crt
+		cert $(atf_get_srcdir)/client2.crt
+		key $(atf_get_srcdir)/client2.key
+		dh $(atf_get_srcdir)/dh.pem
+
+		keepalive 100 600
+	"
+
+	# Give the tunnel time to come up
+	sleep 10
+
+	atf_check -s exit:0 -o ignore jexec one ping -c 1 198.51.100.1
+	atf_check -s exit:0 -o ignore jexec two ping -c 1 198.51.100.1
+
+	# Client-to-client communication
+	atf_check -s exit:0 -o ignore jexec one ping -c 1 198.51.100.3
+	atf_check -s exit:0 -o ignore jexec two ping -c 1 198.51.100.2
+
+	# RA test
+	atf_check -s exit:0 -o ignore jexec one ping -c 1 203.0.113.1
+	atf_check -s exit:0 -o ignore jexec two ping -c 1 203.0.113.1
+
+	atf_check -s exit:0 -o ignore jexec srv ping -c 1 -S 203.0.113.1 198.51.100.2
+	atf_check -s exit:0 -o ignore jexec srv ping -c 1 -S 203.0.113.1 198.51.100.3
+
+	atf_check -s exit:0 -o ignore jexec one ping -c 1 203.0.113.2
+	atf_check -s exit:0 -o ignore jexec two ping -c 1 203.0.113.2
+
+	atf_check -s exit:0 -o ignore jexec lan ping -c 1 198.51.100.1
+	atf_check -s exit:0 -o ignore jexec lan ping -c 1 198.51.100.2
+	atf_check -s exit:0 -o ignore jexec lan ping -c 1 198.51.100.3
+	atf_check -s exit:2 -o ignore jexec lan ping -c 1 198.51.100.4
+}
+
+ra_cleanup()
+{
+	ovpn_cleanup
+}
+
+ovpn_algo_body()
+{
+	algo=$1
+
 	ovpn_init
 
 	l=$(vnet_mkepair)
@@ -717,8 +936,8 @@ chacha_body()
 		dev-type tun
 		proto udp4
 
-		cipher CHACHA20-POLY1305
-		data-ciphers CHACHA20-POLY1305
+		cipher ${algo}
+		data-ciphers ${algo}
 		auth SHA256
 
 		local 192.0.2.1
@@ -741,6 +960,9 @@ chacha_body()
 
 		client
 
+		cipher ${algo}
+		data-ciphers ${algo}
+
 		remote 192.0.2.1
 		auth-user-pass $(atf_get_srcdir)/user.pass
 
@@ -758,7 +980,38 @@ chacha_body()
 	atf_check -s exit:0 -o ignore jexec b ping -c 3 198.51.100.1
 }
 
+atf_test_case "chacha" "cleanup"
+chacha_head()
+{
+	atf_set descr 'Test DCO with the chacha algorithm'
+	atf_set require.user root
+	atf_set require.progs openvpn
+}
+
+chacha_body()
+{
+	ovpn_algo_body CHACHA20-POLY1305
+}
+
 chacha_cleanup()
+{
+	ovpn_cleanup
+}
+
+atf_test_case "gcm_128" "cleanup"
+gcm_128_head()
+{
+	atf_set descr 'Test DCO with AES-128-GCM'
+	atf_set require.user root
+	atf_set require.progs openvpn
+}
+
+gcm_128_body()
+{
+	ovpn_algo_body AES-128-GCM
+}
+
+gcm_128_cleanup()
 {
 	ovpn_cleanup
 }
@@ -771,7 +1024,10 @@ atf_init_test_cases()
 	atf_add_test_case "6in6"
 	atf_add_test_case "4in6"
 	atf_add_test_case "timeout_client"
+	atf_add_test_case "explicit_exit"
 	atf_add_test_case "multi_client"
 	atf_add_test_case "route_to"
+	atf_add_test_case "ra"
 	atf_add_test_case "chacha"
+	atf_add_test_case "gcm_128"
 }

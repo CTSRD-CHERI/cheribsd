@@ -76,7 +76,7 @@
  * cannot include sys/param.h and should only be updated here.
  */
 #undef __FreeBSD_version
-#define __FreeBSD_version 1400064
+#define __FreeBSD_version 1400084
 
 /*
  * __CheriBSD_version numbers describe CheriBSD ABIs.
@@ -108,7 +108,7 @@
 #undef __FreeBSD_kernel__
 #define __FreeBSD_kernel__
 
-#if defined(_KERNEL) || defined(IN_RTLD)
+#if defined(_KERNEL) || defined(_WANT_P_OSREL)
 #define	P_OSREL_SIGWAIT			700000
 #define	P_OSREL_SIGSEGV			700004
 #define	P_OSREL_MAP_ANON		800104
@@ -121,6 +121,8 @@
 #define	P_OSREL_CK_SUPERBLOCK		1300000
 #define	P_OSREL_CK_INODE		1300005
 #define	P_OSREL_POWERPC_NEW_AUX_ARGS	1300070
+#define	P_OSREL_TIDPID			1400079
+#define	P_OSREL_ARM64_SPSR		1400084
 
 #define	P_OSREL_MAJOR(x)		((x) / 100000)
 #endif
@@ -218,9 +220,7 @@
 
 #define MCLBYTES	(1 << MCLSHIFT)	/* size of an mbuf cluster */
 
-#if PAGE_SIZE < 2048
-#define	MJUMPAGESIZE	MCLBYTES
-#elif PAGE_SIZE <= 8192
+#if PAGE_SIZE <= 8192
 #define	MJUMPAGESIZE	PAGE_SIZE
 #else
 #define	MJUMPAGESIZE	(8 * 1024)
@@ -430,21 +430,27 @@ __END_DECLS
 	KASSERT((ptraddr_t)((p)) == 0 ||			\
 	    (ptraddr_t)((p)) >= VM_MAXUSER_ADDRESS,		\
 	    ("PTR2CAP on user address: %p", (p)));		\
-	(__cheri_tocap __typeof__((*p)) * __capability)(p);	\
+	(__cheri_tocap __typeof__((*(p))) * __capability)(p);	\
 	})
 #else
 #define	PTR2CAP(p)	(p)
 #endif
+
+#define	TAG_BYTES_PER_PAGE	(PAGE_SIZE / (sizeof(__uintcap_t) * NBBY))
 #endif
 
 #endif	/* _SYS_PARAM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190528,
+//   "updated": 20221205,
 //   "target_type": "header",
+//   "changes": [
+//     "user_capabilities"
+//   ],
 //   "changes_purecap": [
 //     "pointer_alignment",
-//     "pointer_shape"
+//     "pointer_shape",
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

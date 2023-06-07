@@ -268,16 +268,12 @@ span_head()
 {
 	atf_set descr 'Bridge span test'
 	atf_set require.user root
+	atf_set require.progs scapy
 }
 
 span_body()
 {
-	set -x
 	vnet_init
-
-	if [ "$(atf_config_get ci false)" = "true" ]; then
-		atf_skip "https://bugs.freebsd.org/260461"
-	fi
 
 	epair=$(vnet_mkepair)
 	epair_span=$(vnet_mkepair)

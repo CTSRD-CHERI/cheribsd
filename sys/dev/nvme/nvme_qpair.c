@@ -62,6 +62,7 @@ static struct nvme_opcode_string admin_opcode[] = {
 	{ NVME_OPC_SET_FEATURES, "SET FEATURES" },
 	{ NVME_OPC_GET_FEATURES, "GET FEATURES" },
 	{ NVME_OPC_ASYNC_EVENT_REQUEST, "ASYNC EVENT REQUEST" },
+	{ NVME_OPC_NAMESPACE_MANAGEMENT, "NAMESPACE MANAGEMENT" },
 	{ NVME_OPC_FIRMWARE_ACTIVATE, "FIRMWARE ACTIVATE" },
 	{ NVME_OPC_FIRMWARE_IMAGE_DOWNLOAD, "FIRMWARE IMAGE DOWNLOAD" },
 	{ NVME_OPC_DEVICE_SELF_TEST, "DEVICE SELF-TEST" },
@@ -344,14 +345,18 @@ static void
 nvme_qpair_print_completion(struct nvme_qpair *qpair,
     struct nvme_completion *cpl)
 {
-	uint16_t sct, sc;
+	uint8_t sct, sc, crd, m, dnr;
 
 	sct = NVME_STATUS_GET_SCT(cpl->status);
 	sc = NVME_STATUS_GET_SC(cpl->status);
+	crd = NVME_STATUS_GET_CRD(cpl->status);
+	m = NVME_STATUS_GET_M(cpl->status);
+	dnr = NVME_STATUS_GET_DNR(cpl->status);
 
-	nvme_printf(qpair->ctrlr, "%s (%02x/%02x) sqid:%d cid:%d cdw0:%x\n",
-	    get_status_string(sct, sc), sct, sc, cpl->sqid, cpl->cid,
-	    cpl->cdw0);
+	nvme_printf(qpair->ctrlr, "%s (%02x/%02x) crd:%x m:%x dnr:%x "
+	    "sqid:%d cid:%d cdw0:%x\n",
+	    get_status_string(sct, sc), sct, sc, crd, m, dnr,
+	    cpl->sqid, cpl->cid, cpl->cdw0);
 }
 
 static bool
@@ -1171,8 +1176,7 @@ _nvme_qpair_submit_request(struct nvme_qpair *qpair, struct nvme_request *req)
 
 	TAILQ_REMOVE(&qpair->free_tr, tr, tailq);
 	TAILQ_INSERT_TAIL(&qpair->outstanding_tr, tr, tailq);
-	if (!qpair->timer_armed)
-		tr->deadline = SBT_MAX;
+	tr->deadline = SBT_MAX;
 	tr->req = req;
 
 	switch (req->type) {

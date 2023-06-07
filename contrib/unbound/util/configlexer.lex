@@ -303,6 +303,7 @@ infra-cache-slabs{COLON}	{ YDVAR(1, VAR_INFRA_CACHE_SLABS) }
 infra-cache-numhosts{COLON}	{ YDVAR(1, VAR_INFRA_CACHE_NUMHOSTS) }
 infra-cache-lame-size{COLON}	{ YDVAR(1, VAR_INFRA_CACHE_LAME_SIZE) }
 infra-cache-min-rtt{COLON}	{ YDVAR(1, VAR_INFRA_CACHE_MIN_RTT) }
+infra-cache-max-rtt{COLON}	{ YDVAR(1, VAR_INFRA_CACHE_MAX_RTT) }
 infra-keep-probing{COLON}	{ YDVAR(1, VAR_INFRA_KEEP_PROBING) }
 num-queries-per-thread{COLON}	{ YDVAR(1, VAR_NUM_QUERIES_PER_THREAD) }
 jostle-timeout{COLON}		{ YDVAR(1, VAR_JOSTLE_TIMEOUT) }
@@ -364,6 +365,7 @@ view-first{COLON}		{ YDVAR(1, VAR_VIEW_FIRST) }
 do-not-query-address{COLON}	{ YDVAR(1, VAR_DO_NOT_QUERY_ADDRESS) }
 do-not-query-localhost{COLON}	{ YDVAR(1, VAR_DO_NOT_QUERY_LOCALHOST) }
 access-control{COLON}		{ YDVAR(2, VAR_ACCESS_CONTROL) }
+interface-action{COLON}		{ YDVAR(2, VAR_INTERFACE_ACTION) }
 send-client-subnet{COLON}	{ YDVAR(1, VAR_SEND_CLIENT_SUBNET) }
 client-subnet-zone{COLON}	{ YDVAR(1, VAR_CLIENT_SUBNET_ZONE) }
 client-subnet-always-forward{COLON} { YDVAR(1, VAR_CLIENT_SUBNET_ALWAYS_FORWARD) }
@@ -437,6 +439,7 @@ insecure-lan-zones{COLON}	{ YDVAR(1, VAR_INSECURE_LAN_ZONES) }
 statistics-interval{COLON}	{ YDVAR(1, VAR_STATISTICS_INTERVAL) }
 statistics-cumulative{COLON}	{ YDVAR(1, VAR_STATISTICS_CUMULATIVE) }
 extended-statistics{COLON}	{ YDVAR(1, VAR_EXTENDED_STATISTICS) }
+statistics-inhibit-zero{COLON}	{ YDVAR(1, VAR_STATISTICS_INHIBIT_ZERO) }
 shm-enable{COLON}		{ YDVAR(1, VAR_SHM_ENABLE) }
 shm-key{COLON}			{ YDVAR(1, VAR_SHM_KEY) }
 remote-control{COLON}		{ YDVAR(0, VAR_REMOTE_CONTROL) }
@@ -466,6 +469,10 @@ access-control-tag{COLON}	{ YDVAR(2, VAR_ACCESS_CONTROL_TAG) }
 access-control-tag-action{COLON} { YDVAR(3, VAR_ACCESS_CONTROL_TAG_ACTION) }
 access-control-tag-data{COLON}	{ YDVAR(3, VAR_ACCESS_CONTROL_TAG_DATA) }
 access-control-view{COLON}	{ YDVAR(2, VAR_ACCESS_CONTROL_VIEW) }
+interface-tag{COLON}		{ YDVAR(2, VAR_INTERFACE_TAG) }
+interface-tag-action{COLON}	{ YDVAR(3, VAR_INTERFACE_TAG_ACTION) }
+interface-tag-data{COLON}	{ YDVAR(3, VAR_INTERFACE_TAG_DATA) }
+interface-view{COLON}		{ YDVAR(2, VAR_INTERFACE_VIEW) }
 local-zone-override{COLON}	{ YDVAR(3, VAR_LOCAL_ZONE_OVERRIDE) }
 dnstap{COLON}			{ YDVAR(0, VAR_DNSTAP) }
 dnstap-enable{COLON}		{ YDVAR(1, VAR_DNSTAP_ENABLE) }
@@ -509,6 +516,8 @@ ratelimit-factor{COLON}		{ YDVAR(1, VAR_RATELIMIT_FACTOR) }
 ip-ratelimit-backoff{COLON}		{ YDVAR(1, VAR_IP_RATELIMIT_BACKOFF) }
 ratelimit-backoff{COLON}		{ YDVAR(1, VAR_RATELIMIT_BACKOFF) }
 outbound-msg-retry{COLON}		{ YDVAR(1, VAR_OUTBOUND_MSG_RETRY) }
+max-sent-count{COLON}		{ YDVAR(1, VAR_MAX_SENT_COUNT) }
+max-query-restarts{COLON}	{ YDVAR(1, VAR_MAX_QUERY_RESTARTS) }
 low-rtt{COLON}			{ YDVAR(1, VAR_LOW_RTT) }
 fast-server-num{COLON}		{ YDVAR(1, VAR_FAST_SERVER_NUM) }
 low-rtt-pct{COLON}		{ YDVAR(1, VAR_FAST_SERVER_PERMIL) }
@@ -557,6 +566,7 @@ edns-client-string{COLON}	{ YDVAR(2, VAR_EDNS_CLIENT_STRING) }
 edns-client-string-opcode{COLON} { YDVAR(1, VAR_EDNS_CLIENT_STRING_OPCODE) }
 nsid{COLON}			{ YDVAR(1, VAR_NSID ) }
 ede{COLON}			{ YDVAR(1, VAR_EDE ) }
+proxy-protocol-port{COLON}	{ YDVAR(1, VAR_PROXY_PROTOCOL_PORT) }
 <INITIAL,val>{NEWLINE}		{ LEXOUT(("NL\n")); cfg_parser->line++; }
 
 	/* Quoted strings. Strip leading and ending quotes */

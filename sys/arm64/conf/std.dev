@@ -27,6 +27,7 @@ device		fdt_pinctrl
 device		gpioregulator
 
 # I2C
+device		cdns_i2c		# Candence I2C
 device		iicbus
 device		iicmux
 device		iic
@@ -50,6 +51,15 @@ device		kbdmux
 
 device		vt_efifb
 
+# DRM Support
+options 	COMPAT_DRMCOMPAT
+device		drm
+
+# Video Drivers
+device		komeda_drm		# ARM Komeda Display Controller
+device		panfrost		# ARM Mali GPU Driver
+device		tda19988		# HDMI Controller by NXP
+
 # Pseudo devices.
 device		crypto			# core crypto support
 device		loop			# Network loopback
@@ -68,7 +78,7 @@ device		syscon
 
 # EVDEV support
 device		evdev			# input event device support
-options		EVDEV_SUPPORT		# evdev support in legacy drivers
+options 	EVDEV_SUPPORT		# evdev support in legacy drivers
 device		uinput			# install /dev/uinput cdev
 
 # PCI/PCI-X/PCIe Ethernet NICs that use iflib infrastructure
@@ -107,3 +117,6 @@ device		mmcsd			# mmc/sd flash cards
 # HID support
 options 	HID_DEBUG		# enable debug msgs
 device		hid			# Generic HID support
+
+# Firmware
+device		mmio_sram		# Generic on-chip SRAM

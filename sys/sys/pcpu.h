@@ -213,7 +213,8 @@ struct pcpu {
 	long		pc_cp_time[CPUSTATES];	/* statclock ticks */
 	struct _device	*pc_device;		/* CPU device handle */
 	void		*pc_netisr;		/* netisr SWI cookie */
-	int		pc_unused1;		/* unused field */
+	int8_t		pc_vfs_freevnodes;	/* freevnodes counter */
+	char		pc_unused1[3];		/* unused pad */
 	int		pc_domain;		/* Memory domain. */
 	struct rm_queue	pc_rm_queue;		/* rmlock list of trackers */
 	uintptr_t	pc_dynamic;		/* Dynamic per-cpu data area */
@@ -358,9 +359,10 @@ void	pcpu_init(struct pcpu *pcpu, int cpuid, size_t size);
 #endif /* !_SYS_PCPU_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20200708,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes_purecap": [
+//     "uintcap_arithmetic",
 //     "bounds_compression",
 //     "subobject_bounds"
 //   ]

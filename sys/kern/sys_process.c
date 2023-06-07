@@ -499,6 +499,171 @@ proc_writemem(struct thread *td, struct proc *p, vm_offset_t va, void *buf,
 	return (proc_iop(td, p, va, buf, len, UIO_WRITE));
 }
 
+#if __has_feature(capabilities)
+int
+proc_read_cheri_tags_page(vm_map_t map, vm_offset_t va, void *tagbuf,
+    bool *hastagsp)
+{
+	vm_page_t m;
+	void *page;
+	int error;
+
+	KASSERT(is_aligned(va, PAGE_SIZE),
+	    ("%s: user address %lx is not page-aligned", __func__, va));
+
+	/*
+	 * Fault in the next page, but only if it already exists.  If
+	 * the page doesn't exist, fill the tag buffer with zeroes.
+	 */
+	error = vm_fault(map, va, VM_PROT_READ, VM_FAULT_NOFILL, &m);
+	if (error == KERN_PAGE_NOT_FILLED) {
+		memset(tagbuf, 0, TAG_BYTES_PER_PAGE);
+		*hastagsp = false;
+		return (0);
+	}
+	if (error != 0)
+		return (EFAULT);
+
+	page = (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
+	cheri_read_tags_page(page, tagbuf, hastagsp);
+	vm_page_unwire(m, PQ_ACTIVE);
+	return (0);
+}
+
+static int
+proc_read_cheri_tags(struct proc *p, struct uio *uio)
+{
+	char tagbuf[TAG_BYTES_PER_PAGE];
+	vm_map_t map = &p->p_vmspace->vm_map;
+	vm_offset_t va;
+	int error;
+	bool hastags;
+
+	/*
+	 * Can't reuse uio_offset directly as uiomove increments it
+	 * based on the tag bitmask size.
+	 *
+	 * Require that the offset be aligned to the granularity of a
+	 * single bytes-worth of tags to simplify the implementation.
+	 * In theory any capability-aligned address would be ok, but
+	 * the returned bitmask bytes would have to be constructed by
+	 * selecting bits from adjacent bytes in the per-page bitmasks
+	 * returned by proc_read_cheri_tags_page.
+	 */
+	va = uio->uio_offset;
+	if (!is_aligned(va, sizeof(uintcap_t) * CHAR_BIT))
+		return (EINVAL);
+
+	/* Handle partial first page. */
+	if (va % PAGE_SIZE != 0) {
+		u_int pageoff, tagoff;
+
+		pageoff = va % PAGE_SIZE;
+		va = trunc_page(va);
+		error = proc_read_cheri_tags_page(map, va, tagbuf, &hastags);
+		if (error != 0)
+			return (error);
+
+		tagoff = pageoff / (sizeof(uintcap_t) * CHAR_BIT);
+		error = uiomove(tagbuf + tagoff, sizeof(tagbuf) - tagoff, uio);
+		if (error != 0)
+			return (error);
+
+		va += PAGE_SIZE;
+	}
+
+	while (uio->uio_resid > 0) {
+		error = proc_read_cheri_tags_page(map, va, tagbuf, &hastags);
+		if (error != 0)
+			return (error);
+
+		error = uiomove(tagbuf, sizeof(tagbuf), uio);
+		if (error != 0)
+			return (error);
+
+		va += PAGE_SIZE;
+	}
+
+	return (0);
+}
+
+static int
+proc_read_cheri_cap_page(vm_map_t map, vm_offset_t va, struct uio *uio)
+{
+	char capbuf[sizeof(uintcap_t) + 1];
+	uintcap_t *src;
+	vm_page_t m;
+	u_int pageoff, todo;
+	int error;
+
+	KASSERT(is_aligned(va, sizeof(uintcap_t)),
+	    ("%s: user address %lx is not capability-aligned", __func__, va));
+	pageoff = va & PAGE_MASK;
+	todo = (PAGE_SIZE - pageoff) / sizeof(uintcap_t) *
+	    (sizeof(uintcap_t) + 1);
+	todo = MIN(todo, uio->uio_resid);
+	va = trunc_page(va);
+
+	error = vm_fault(map, va, VM_PROT_READ, VM_FAULT_NOFILL, &m);
+	if (error == KERN_PAGE_NOT_FILLED) {
+		memset(capbuf, 0, sizeof(capbuf));
+		while (todo > 0) {
+			error = uiomove(capbuf, sizeof(capbuf), uio);
+			if (error != 0)
+				return (error);
+			todo -= sizeof(capbuf);
+		}
+		return (0);
+	}
+	if (error != KERN_SUCCESS)
+		return (EFAULT);
+
+	src = (uintcap_t *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m)) + pageoff /
+	    sizeof(uintcap_t);
+	while (todo > 0) {
+		capbuf[0] = cheri_gettag(*src);
+		memcpy(capbuf + 1, src, sizeof(*src));
+
+		error = uiomove(capbuf, sizeof(capbuf), uio);
+		if (error != 0)
+			break;
+		todo -= sizeof(capbuf);
+		src++;
+	}
+
+	vm_page_unwire(m, PQ_ACTIVE);
+	return (error);
+}
+
+static int
+proc_read_cheri_cap(struct proc *p, struct uio *uio)
+{
+	vm_map_t map = &p->p_vmspace->vm_map;
+	vm_offset_t va;
+	int error;
+
+	/*
+	 * Can't reuse uio_offset directly as uiomove increments it
+	 * based on the expanded capability size.
+	 */
+	va = uio->uio_offset;
+	if (!is_aligned(va, sizeof(uintcap_t)))
+		return (EINVAL);
+
+	if (uio->uio_resid % (sizeof(uintcap_t) + 1) != 0)
+		return (EINVAL);
+
+	error = 0;
+	while (uio->uio_resid > 0) {
+		error = proc_read_cheri_cap_page(map, va, uio);
+		if (error != 0)
+			break;
+		va = trunc_page(va) + PAGE_SIZE;
+	}
+	return (error);
+}
+#endif
+
 static int
 ptrace_vm_entry(struct thread *td, struct proc *p,
 		struct ptrace_vm_entry *pve)
@@ -636,6 +801,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		struct ptrace_lwpinfo pl;
 		struct ptrace_vm_entry pve;
 		struct ptrace_coredump pc;
+		struct ptrace_sc_remote sr;
 #if __has_feature(capabilities)
 		struct capreg capreg;
 #endif
@@ -647,6 +813,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		struct ptrace_sc_ret psr;
 		int ptevents;
 	} r;
+	syscallarg_t pscr_args[nitems(td->td_sa.args)];
 	void * __capability addr;
 	int error;
 
@@ -714,6 +881,24 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		else
 			error = copyin(uap->addr, &r.pc, uap->data);
 		break;
+	case PT_SC_REMOTE:
+		if (uap->data != sizeof(r.sr)) {
+			error = EINVAL;
+			break;
+		}
+		error = copyin(uap->addr, &r.sr, uap->data);
+		if (error != 0)
+			break;
+		if (r.sr.pscr_nargs > nitems(td->td_sa.args)) {
+			error = EINVAL;
+			break;
+		}
+		error = copyin(r.sr.pscr_args, pscr_args,
+		    sizeof(u_long) * r.sr.pscr_nargs);
+		if (error != 0)
+			break;
+		r.sr.pscr_args = pscr_args;
+		break;
 	default:
 		addr = uap->addr;
 		break;
@@ -777,6 +962,11 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 	case PT_GET_SC_RET:
 		error = copyout(&r.psr, uap->addr, MIN(uap->data,
 		    sizeof(r.psr)));
+		break;
+	case PT_SC_REMOTE:
+		error = copyout(&r.sr.pscr_ret, uap->addr +
+		    offsetof(struct ptrace_sc_remote, pscr_ret),
+		    sizeof(r.sr.pscr_ret));
 		break;
 	}
 
@@ -887,9 +1077,11 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 	struct ptrace_io_desc *piod = NULL;
 	struct ptrace_lwpinfo *pl;
 	struct ptrace_sc_ret *psr;
+	struct ptrace_sc_remote *pscr;
 	struct file *fp;
 	struct ptrace_coredump *pc;
 	struct thr_coredump_req *tcq;
+	struct thr_syscall_req *tsr;
 	int error, num, tmp;
 	lwpid_t tid = 0, *buf;
 #ifdef COMPAT_FREEBSD32
@@ -1147,9 +1339,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		CTR2(KTR_PTRACE, "PT_SUSPEND: tid %d (pid %d)", td2->td_tid,
 		    p->p_pid);
 		td2->td_dbgflags |= TDB_SUSPEND;
-		thread_lock(td2);
-		td2->td_flags |= TDF_NEEDSUSPCHK;
-		thread_unlock(td2);
+		ast_sched(td2, TDA_SUSPEND);
 		break;
 
 	case PT_RESUME:
@@ -1438,6 +1628,28 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			td2->td_dbgflags |= TDB_USERWR;
 			uio.uio_rw = UIO_WRITE;
 			break;
+#if __has_feature(capabilities)
+		case PIOD_READ_CHERI_TAGS:
+			CTR3(KTR_PTRACE,
+			    "PT_IO: pid %d: READ_CHERI_TAGS (%p, %#x)",
+			    p->p_pid, (uintptr_t)uio.uio_offset, uio.uio_resid);
+			uio.uio_rw = UIO_READ;
+			PROC_UNLOCK(p);
+			error = proc_read_cheri_tags(p, &uio);
+			piod->piod_len -= uio.uio_resid;
+			PROC_LOCK(p);
+			goto out;
+		case PIOD_READ_CHERI_CAP:
+			CTR3(KTR_PTRACE,
+			    "PT_IO: pid %d: READ_CHERI_CAP (%p, %#x)",
+			    p->p_pid, (uintptr_t)uio.uio_offset, uio.uio_resid);
+			uio.uio_rw = UIO_READ;
+			PROC_UNLOCK(p);
+			error = proc_read_cheri_cap(p, &uio);
+			piod->piod_len -= uio.uio_resid;
+			PROC_LOCK(p);
+			goto out;
+#endif
 		default:
 			error = EINVAL;
 			goto out;
@@ -1651,7 +1863,8 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			error = EBUSY;
 			goto coredump_cleanup_locked;
 		}
-		KASSERT((td2->td_dbgflags & TDB_COREDUMPRQ) == 0,
+		KASSERT((td2->td_dbgflags & (TDB_COREDUMPREQ |
+		    TDB_SCREMOTEREQ)) == 0,
 		    ("proc %d tid %d req coredump", p->p_pid, td2->td_tid));
 
 		tcq->tc_vp = fp->f_vnode;
@@ -1661,10 +1874,10 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			tcq->tc_flags |= SVC_NOCOMPRESS;
 		if ((pc->pc_flags & PC_ALL) != 0)
 			tcq->tc_flags |= SVC_ALL;
-		td2->td_coredump = tcq;
-		td2->td_dbgflags |= TDB_COREDUMPRQ;
+		td2->td_remotereq = tcq;
+		td2->td_dbgflags |= TDB_COREDUMPREQ;
 		thread_run_flash(td2);
-		while ((td2->td_dbgflags & TDB_COREDUMPRQ) != 0)
+		while ((td2->td_dbgflags & TDB_COREDUMPREQ) != 0)
 			msleep(p, &p->p_mtx, PPAUSE, "crdmp", 0);
 		error = tcq->tc_error;
 coredump_cleanup_locked:
@@ -1674,6 +1887,51 @@ coredump_cleanup:
 coredump_cleanup_nofp:
 		free(tcq, M_TEMP);
 		PROC_LOCK(p);
+		break;
+
+	case PT_SC_REMOTE:
+		pscr = (__cheri_fromcap void *)addr;
+		CTR2(KTR_PTRACE, "PT_SC_REMOTE: pid %d, syscall %d",
+		    p->p_pid, pscr->pscr_syscall);
+		if ((td2->td_dbgflags & TDB_BOUNDARY) == 0) {
+			error = EBUSY;
+			break;
+		}
+		PROC_UNLOCK(p);
+		MPASS(pscr->pscr_nargs <= nitems(td->td_sa.args));
+
+		tsr = malloc(sizeof(struct thr_syscall_req), M_TEMP,
+		    M_WAITOK | M_ZERO);
+
+		tsr->ts_sa.code = pscr->pscr_syscall;
+		tsr->ts_nargs = pscr->pscr_nargs;
+		memcpy(&tsr->ts_sa.args,
+		    (__cheri_fromcap void *)pscr->pscr_args,
+		    sizeof(syscallarg_t) * tsr->ts_nargs);
+
+		PROC_LOCK(p);
+		error = proc_can_ptrace(td, p);
+		if (error != 0) {
+			free(tsr, M_TEMP);
+			break;
+		}
+		if (td2->td_proc != p) {
+			free(tsr, M_TEMP);
+			error = ESRCH;
+			break;
+		}
+		KASSERT((td2->td_dbgflags & (TDB_COREDUMPREQ |
+		    TDB_SCREMOTEREQ)) == 0,
+		    ("proc %d tid %d req coredump", p->p_pid, td2->td_tid));
+
+		td2->td_remotereq = tsr;
+		td2->td_dbgflags |= TDB_SCREMOTEREQ;
+		thread_run_flash(td2);
+		while ((td2->td_dbgflags & TDB_SCREMOTEREQ) != 0)
+			msleep(p, &p->p_mtx, PPAUSE, "pscrx", 0);
+		error = 0;
+		memcpy(&pscr->pscr_ret, &tsr->ts_ret, sizeof(tsr->ts_ret));
+		free(tsr, M_TEMP);
 		break;
 
 	default:
@@ -1708,14 +1966,15 @@ fail:
 
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
+//     "user_capabilities",
 //     "support"
 //   ],
 //   "changes_purecap": [
-//     "uintptr_interp_offset"
+//     "virtual_address"
 //   ]
 // }
 // CHERI CHANGES END

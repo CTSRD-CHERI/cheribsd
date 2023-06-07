@@ -68,7 +68,7 @@ struct cpl_set_tcb_rpl;
 #include "offload.h"
 #include "tom/t4_tom.h"
 
-#define TOEPCB(so)  ((struct toepcb *)(so_sototcpcb((so))->t_toe))
+#define TOEPCB(so)  ((struct toepcb *)(sototcpcb((so))->t_toe))
 
 #include "iw_cxgbe.h"
 #include <linux/module.h>
@@ -128,7 +128,7 @@ static int rem_ep_from_listenlist(struct c4iw_listen_ep *lep);
 static struct c4iw_listen_ep *
 find_real_listen_ep(struct c4iw_listen_ep *master_lep, struct socket *so);
 static int get_ifnet_from_raddr(struct sockaddr_storage *raddr,
-		struct ifnet **ifp);
+		if_t *ifp);
 static void process_newconn(struct c4iw_listen_ep *master_lep,
 		struct socket *new_so);
 #define START_EP_TIMER(ep) \
@@ -234,8 +234,8 @@ struct listen_port_info {
  *   |listen_port_list  |
  *   |------------------|
  *            |
- *            |              |-----------|       |-----------|  
- *            |              | port_num:X|       | port_num:X|  
+ *            |              |-----------|       |-----------|
+ *            |              | port_num:X|       | port_num:X|
  *            |--------------|-list------|-------|-list------|-------....
  *                           | lep_list----|     | lep_list----|
  *                           | refcnt    | |     | refcnt    | |
@@ -245,13 +245,13 @@ struct listen_port_info {
  *                                         |                   |
  *                                         |                   |
  *                                         |                   |
- *                                         |                   |         lep1                  lep2         
+ *                                         |                   |         lep1                  lep2
  *                                         |                   |    |----------------|    |----------------|
  *                                         |                   |----| listen_ep_list |----| listen_ep_list |
  *                                         |                        |----------------|    |----------------|
  *                                         |
  *                                         |
- *                                         |        lep1                  lep2         
+ *                                         |        lep1                  lep2
  *                                         |   |----------------|    |----------------|
  *                                         |---| listen_ep_list |----| listen_ep_list |
  *                                             |----------------|    |----------------|
@@ -260,7 +260,7 @@ struct listen_port_info {
  * each TCP port number.
  *
  * Here 'lep1' is always marked as Master lep, because solisten() is always
- * called through first lep. 
+ * called through first lep.
  *
  */
 static struct listen_port_info *
@@ -337,7 +337,7 @@ find_real_listen_ep(struct c4iw_listen_ep *master_lep, struct socket *so)
 {
 	struct adapter *adap = NULL;
 	struct c4iw_listen_ep *lep = NULL;
-	struct ifnet *ifp = NULL, *hw_ifp = NULL;
+	if_t ifp = NULL, hw_ifp = NULL;
 	struct listen_port_info *port_info = NULL;
 	int i = 0, found_portinfo = 0, found_lep = 0;
 	uint16_t port;
@@ -348,7 +348,7 @@ find_real_listen_ep(struct c4iw_listen_ep *master_lep, struct socket *so)
 	 * TBD: lagg support, lagg + vlan support.
 	 */
 	ifp = TOEPCB(so)->l2te->ifp;
-	if (ifp->if_type == IFT_L2VLAN) {
+	if (if_gettype(ifp) == IFT_L2VLAN) {
 		hw_ifp = VLAN_TRUNKDEV(ifp);
 		if (hw_ifp == NULL) {
 			CTR4(KTR_IW_CXGBE, "%s: Failed to get parent ifnet of "
@@ -533,7 +533,7 @@ done:
 
 }
 static int
-get_ifnet_from_raddr(struct sockaddr_storage *raddr, struct ifnet **ifp)
+get_ifnet_from_raddr(struct sockaddr_storage *raddr, if_t *ifp)
 {
 	int err = 0;
 	struct nhop_object *nh;
@@ -1117,7 +1117,7 @@ process_socket_event(struct c4iw_ep *ep)
 
 	if (ep->com.state == DEAD) {
 		CTR3(KTR_IW_CXGBE, "%s: Pending socket event discarded "
-			"ep %p ep_state %s", __func__, ep, states[state]); 
+		    "ep %p ep_state %s", __func__, ep, states[state]);
 		return;
 	}
 
@@ -2593,7 +2593,7 @@ int c4iw_connect(struct iw_cm_id *cm_id, struct iw_cm_conn_param *conn_param)
 	int err = 0;
 	struct c4iw_dev *dev = to_c4iw_dev(cm_id->device);
 	struct c4iw_ep *ep = NULL;
-	struct ifnet    *nh_ifp;        /* Logical egress interface */
+	if_t nh_ifp;        /* Logical egress interface */
 	struct epoch_tracker et;
 #ifdef VIMAGE
 	struct rdma_cm_id *rdma_id = (struct rdma_cm_id*)cm_id->context;
@@ -2659,7 +2659,7 @@ int c4iw_connect(struct iw_cm_id *cm_id, struct iw_cm_conn_param *conn_param)
 		return err;
 	}
 
-	if (!(nh_ifp->if_capenable & IFCAP_TOE) ||
+	if (!(if_getcapenable(nh_ifp) & IFCAP_TOE) ||
 	    TOEDEV(nh_ifp) == NULL) {
 		err = -ENOPROTOOPT;
 		goto fail;
@@ -3058,7 +3058,7 @@ void __exit c4iw_cm_term(void)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

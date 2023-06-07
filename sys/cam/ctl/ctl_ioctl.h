@@ -256,7 +256,8 @@ struct ctl_ooa_entry {
 	ctl_ooa_cmd_flags	cmd_flags;
 	uint8_t			cdb[CTL_MAX_CDBLEN];
 	uint8_t			cdb_len;
-	uint32_t		tag_num;
+	uint64_t		tag_num;
+	ctl_tag_type		tag_type;
 	uint32_t		lun_num;
 	struct bintime		start_bt;
 };
@@ -465,6 +466,7 @@ struct ctl_lun_req {
 #endif
 		nvlist_t *	args_nvl;
 	};
+#define	CTL_MAX_ARGS_LEN	(1024 * 1024)
 	size_t			args_len;
 	void * __kerncap	result;
 	union {

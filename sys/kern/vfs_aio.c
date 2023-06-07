@@ -729,7 +729,7 @@ aio_fsync_vnode(struct thread *td, struct vnode *vp, int op)
 	int error;
 
 	for (;;) {
-		error = vn_start_write(vp, &mp, V_WAIT | PCATCH);
+		error = vn_start_write(vp, &mp, V_WAIT | V_PCATCH);
 		if (error != 0)
 			break;
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
@@ -1286,7 +1286,7 @@ aio_qbio(struct proc *p, struct kaiocb *job)
 	}
 
 	bios = malloc(sizeof(struct bio *) * iovcnt, M_TEMP, M_WAITOK);
-	atomic_store_int(&job->nbio, iovcnt);
+	refcount_init(&job->nbio, iovcnt);
 	for (i = 0; i < iovcnt; i++) {
 		struct vm_page** pages;
 		struct bio *bp;
@@ -2528,25 +2528,25 @@ aio_biowakeup(struct bio *bp)
 
 	aio_biocleanup(bp);
 
-	nbytes =bcount - resid;
+	nbytes = bcount - resid;
 	atomic_add_acq_long(&job->nbytes, nbytes);
 	nblks = btodb(nbytes);
+
 	/*
 	 * If multiple bios experienced an error, the job will reflect the
 	 * error of whichever failed bio completed last.
 	 */
 	if (flags & BIO_ERROR)
-		atomic_set_int(&job->error, bio_error);
+		atomic_store_int(&job->error, bio_error);
 	if (opcode & LIO_WRITE)
 		atomic_add_int(&job->outblock, nblks);
 	else
 		atomic_add_int(&job->inblock, nblks);
-	atomic_subtract_int(&job->nbio, 1);
 
-
-	if (atomic_load_int(&job->nbio) == 0) {
-		if (atomic_load_int(&job->error))
-			aio_complete(job, -1, job->error);
+	if (refcount_release(&job->nbio)) {
+		bio_error = atomic_load_int(&job->error);
+		if (bio_error != 0)
+			aio_complete(job, -1, bio_error);
 		else
 			aio_complete(job, atomic_load_long(&job->nbytes), 0);
 	}
@@ -3710,15 +3710,16 @@ freebsd64_lio_listio(struct thread *td, struct freebsd64_lio_listio_args *uap)
 
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "kernel_sig_types",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "support"
 //   ],
 //   "changes_purecap": [
-//     "uintptr_interp_offset",
+//     "virtual_address",
 //     "pointer_as_integer"
 //   ]
 // }

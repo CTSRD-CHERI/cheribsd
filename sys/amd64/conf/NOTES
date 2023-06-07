@@ -43,11 +43,6 @@ options 	IPI_PREEMPTION
 device		atpic			# Optional legacy pic support
 device		mptable			# Optional MPSPEC mptable support
 
-#
-# Watchdog routines.
-#
-options 	MP_WATCHDOG
-
 # Debugging options.
 #
 options 	COUNT_XINVLTLB_HITS	# Counters for TLB events
@@ -385,6 +380,9 @@ device		iwn6000g2bfw
 device		iwn6050fw
 device		wpifw
 
+# net80211 options
+options 	IEEE80211_DEBUG_REFCNT
+
 #
 # Non-Transparent Bridge (NTB) drivers
 #
@@ -503,6 +501,7 @@ device		kvm_clock	# KVM paravirtual clock driver
 
 # Microsoft Hyper-V enhancement support
 device 		hyperv		# HyperV drivers
+device		hvhid		# HyperV HID device
 
 # Xen HVM Guest Optimizations
 options 	XENHVM		# Xen HVM kernel infrastructure
@@ -631,7 +630,7 @@ options 	COMPAT_AOUT
 # ZFS support
 
 # NB: This depends on crypto, cryptodev and ZSTDIO
-options		ZFS
+options 	ZFS
 
 #####################################################################
 # VM OPTIONS
@@ -665,5 +664,5 @@ options 	VM_KMEM_SIZE_SCALE
 
 # GCOV (code coverage) support
 
-options		LINDEBUGFS
-options		GCOV
+options 	LINDEBUGFS
+options 	GCOV

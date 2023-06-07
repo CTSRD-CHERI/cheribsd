@@ -190,6 +190,7 @@ struct _s_x f_ipdscp[] = {
 	{ "af42", IPTOS_DSCP_AF42 >> 2 },	/* 100100 */
 	{ "af43", IPTOS_DSCP_AF43 >> 2 },	/* 100110 */
 	{ "be", IPTOS_DSCP_CS0 >> 2 }, 	/* 000000 */
+	{ "va", IPTOS_DSCP_VA >> 2 },	/* 101100 */
 	{ "ef", IPTOS_DSCP_EF >> 2 },	/* 101110 */
 	{ "cs0", IPTOS_DSCP_CS0 >> 2 },	/* 000000 */
 	{ "cs1", IPTOS_DSCP_CS1 >> 2 },	/* 001000 */
@@ -1890,6 +1891,10 @@ print_action_instruction(struct buf_pr *bp, const struct format_opts *fo,
 			bprintf(bp, "abort");
 		else if (cmd->arg1 == ICMP_UNREACH_HOST)
 			bprintf(bp, "reject");
+		else if (cmd->arg1 == ICMP_UNREACH_NEEDFRAG &&
+		    cmd->len == F_INSN_SIZE(ipfw_insn_u16))
+			bprintf(bp, "needfrag %u",
+			    ((const ipfw_insn_u16 *)cmd)->ports[0]);
 		else
 			print_reject_code(bp, cmd->arg1);
 		break;
@@ -3992,6 +3997,17 @@ compile_rule(char *av[], uint32_t *rbuf, int *rbufsize, struct tidx *tstate)
 		NEED1("missing reject code");
 		fill_reject_code(&action->arg1, *av);
 		av++;
+		if (action->arg1 == ICMP_UNREACH_NEEDFRAG && isdigit(**av)) {
+			uint16_t mtu;
+
+			mtu = strtoul(*av, NULL, 10);
+			if (mtu < 68 || mtu >= IP_MAXPACKET)
+				errx(EX_DATAERR, "illegal argument for %s",
+				    *(av - 1));
+			action->len = F_INSN_SIZE(ipfw_insn_u16);
+			((ipfw_insn_u16 *)action)->ports[0] = mtu;
+			av++;
+		}
 		break;
 
 	case TOK_UNREACH6:

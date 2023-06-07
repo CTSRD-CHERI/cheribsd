@@ -8,7 +8,6 @@
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
 // UNSUPPORTED: libcpp-no-concepts
-// UNSUPPORTED: gcc-10
 // UNSUPPORTED: libcpp-has-no-incomplete-ranges
 
 // template<class R>
@@ -47,8 +46,8 @@ struct ContiguousWhenNonConst {
     int *end();
     int *data() const;
 };
-static_assert( std::ranges::random_access_range<ContiguousWhenNonConst>);
 static_assert( std::ranges::contiguous_range<ContiguousWhenNonConst>);
+static_assert( std::ranges::random_access_range<const ContiguousWhenNonConst>);
 static_assert(!std::ranges::contiguous_range<const ContiguousWhenNonConst>);
 
 struct ContiguousWhenConst {
@@ -58,9 +57,9 @@ struct ContiguousWhenConst {
     int *end();
     const int *data() const;
 };
+static_assert( std::ranges::contiguous_range<const ContiguousWhenConst>);
 static_assert( std::ranges::random_access_range<ContiguousWhenConst>);
 static_assert(!std::ranges::contiguous_range<ContiguousWhenConst>);
-static_assert( std::ranges::contiguous_range<const ContiguousWhenConst>);
 
 struct DataFunctionWrongReturnType {
     const int *begin() const;
@@ -68,7 +67,7 @@ struct DataFunctionWrongReturnType {
     const char *data() const;
 };
 static_assert( std::ranges::random_access_range<DataFunctionWrongReturnType>);
-static_assert(!std::ranges::contiguous_range<const DataFunctionWrongReturnType>);
+static_assert(!std::ranges::contiguous_range<DataFunctionWrongReturnType>);
 
 struct WrongObjectness {
     const int *begin() const;
@@ -76,3 +75,21 @@ struct WrongObjectness {
     void *data() const;
 };
 static_assert(std::ranges::contiguous_range<WrongObjectness>);
+
+// Test ADL-proofing.
+struct Incomplete;
+template<class T> struct Holder { T t; };
+
+static_assert(!std::ranges::contiguous_range<Holder<Incomplete>*>);
+static_assert(!std::ranges::contiguous_range<Holder<Incomplete>*&>);
+static_assert(!std::ranges::contiguous_range<Holder<Incomplete>*&&>);
+static_assert(!std::ranges::contiguous_range<Holder<Incomplete>* const>);
+static_assert(!std::ranges::contiguous_range<Holder<Incomplete>* const&>);
+static_assert(!std::ranges::contiguous_range<Holder<Incomplete>* const&&>);
+
+static_assert( std::ranges::contiguous_range<Holder<Incomplete>*[10]>);
+static_assert( std::ranges::contiguous_range<Holder<Incomplete>*(&)[10]>);
+static_assert( std::ranges::contiguous_range<Holder<Incomplete>*(&&)[10]>);
+static_assert( std::ranges::contiguous_range<Holder<Incomplete>* const[10]>);
+static_assert( std::ranges::contiguous_range<Holder<Incomplete>* const(&)[10]>);
+static_assert( std::ranges::contiguous_range<Holder<Incomplete>* const(&&)[10]>);

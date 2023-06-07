@@ -99,7 +99,7 @@ struct nd_ifinfo {
 
 #ifdef _KERNEL
 #define ND_IFINFO(ifp) \
-	(((struct in6_ifextra *)(ifp)->if_afdata[AF_INET6])->nd_ifinfo)
+	(((struct in6_ifextra *)if_getafdata(ifp, AF_INET6))->nd_ifinfo)
 #define IN6_LINKMTU(ifp) \
 	((ND_IFINFO(ifp)->linkmtu && ND_IFINFO(ifp)->linkmtu < (ifp)->if_mtu) \
 	    ? ND_IFINFO(ifp)->linkmtu \
@@ -243,6 +243,7 @@ struct nd_prefix {
 #define ndpr_raf		ndpr_flags
 #define ndpr_raf_onlink		ndpr_flags.onlink
 #define ndpr_raf_auto		ndpr_flags.autonomous
+#define ndpr_raf_ra_derived	ndpr_flags.ra_derived
 #define ndpr_raf_router		ndpr_flags.router
 
 struct nd_pfxrouter {

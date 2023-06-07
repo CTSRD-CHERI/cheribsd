@@ -302,6 +302,12 @@ hdac_pin_patch(struct hdaa_widget *w)
 			patch_str = "as=2";
 			break;
 		}
+	} else if (id == HDA_CODEC_ALC235 && subid == ASUS_GL553VE_SUBVENDOR) {
+		switch (nid) {
+		case 33:
+			patch_str = "as=1 seq=15";
+			break;
+		}
 	} else if (id == HDA_CODEC_ALC256 && (subid == DELL_I7577_SUBVENDOR ||
 	    subid == DELL_L7480_SUBVENDOR)) {
 		switch (nid) {
@@ -313,7 +319,8 @@ hdac_pin_patch(struct hdaa_widget *w)
 			break;
 		}
 	} else if (id == HDA_CODEC_ALC257 &&
-	    (subid == LENOVO_L5AMD_SUBVENDOR)) {
+	    (subid == LENOVO_L5AMD_SUBVENDOR ||
+	    subid == LENOVO_L5INTEL_SUBVENDOR)) {
 		switch (nid) {
 		case 20:
 			patch_str = "as=1 seq=0";
@@ -323,10 +330,14 @@ hdac_pin_patch(struct hdaa_widget *w)
 			break;
 		}
 	} else if (id == HDA_CODEC_IDT92HD95B &&
-	    (subid == FRAMEWORK_LAPTOP_SUBVENDOR)) {
+	    (subid == FRAMEWORK_LAPTOP_0001_SUBVENDOR ||
+	    subid == FRAMEWORK_LAPTOP_0002_SUBVENDOR)) {
 		switch (nid) {
 		case 10:
 			patch_str = "as=1 seq=15 color=Black loc=Left";
+			break;
+		case 11:
+			patch_str = "as=3 seq=15 color=Black loc=Left";
 			break;
 		}
 	} else {

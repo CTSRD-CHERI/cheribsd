@@ -11,6 +11,7 @@ NLS_ALIASES=	POSIX C \
 # No need as it is empty and just causes rebuilds since this file does so much.
 UPDATE_DEPENDFILE=	no
 
+SUBDIR+=termcap
 .if ${MK_SENDMAIL} != "no"
 SUBDIR+=sendmail
 .endif
@@ -103,6 +104,9 @@ MTREES=		mtree/BSD.root.dist		/		\
 		mtree/BSD.usr.dist		/usr		\
 		mtree/BSD.include.dist		/usr/include	\
 		mtree/BSD.debug.dist		/usr/lib
+.if ${MACHINE_ABI:Mpurecap}
+MTREES+=	mtree/BSD.c18n.dist		/
+.endif
 .if ${MK_LIB64C} != "no"
 MTREES+=	mtree/BSD.lib64c.dist		/usr
 MTREES+=	mtree/BSD.lib64c.dist		/usr/lib/debug/usr
@@ -133,13 +137,11 @@ MTREES+=	mtree/BSD.sendmail.dist		/
 MTREES+=	../${mtree}			/
 .endfor
 
-# Clean up some directories that where mistakenly created as files that
-# should not have been as part of the nvi update in r281994.
-# This should be removed after 11.0-RELEASE.
-DISTRIB_CLEANUP_SHARE_FILES=	${SHAREDIR}/doc/usd/10.exref ${SHAREDIR}/doc/usd/11.edit
-DISTRIB_CLEANUP_SHARE_FILES+=	${SHAREDIR}/doc/usd/12.vi ${SHAREDIR}/doc/usd/13.viref
+# Clean up files that have changed into directories, as mtree cannot handle this
+# scenario.
+DISTRIB_CLEANUP_FILES+=	${INCLUDEDIR}/c++/v1/__string
 distrib-cleanup: .PHONY
-	for file in ${DISTRIB_CLEANUP_SHARE_FILES}; do \
+	for file in ${DISTRIB_CLEANUP_FILES}; do \
 		if [ -f ${DESTDIR}/$${file} ]; then \
 			rm -f ${DESTDIR}/$${file}; \
 		fi; \

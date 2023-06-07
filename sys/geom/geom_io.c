@@ -53,6 +53,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/stack.h>
 #include <sys/sysctl.h>
 #include <sys/vmem.h>
+#include <machine/stack.h>
 #include <machine/stdarg.h>
 
 #include <sys/errno.h>
@@ -1080,7 +1081,7 @@ g_format_bio(struct sbuf *sb, const struct bio *bp)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer"

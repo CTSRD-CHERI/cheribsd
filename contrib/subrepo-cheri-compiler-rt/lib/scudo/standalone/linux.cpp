@@ -41,7 +41,7 @@ uptr getPageSize() { return static_cast<uptr>(sysconf(_SC_PAGESIZE)); }
 
 void NORETURN die() { abort(); }
 
-void *map(void *Addr, usize Size, UNUSED const char *Name, usize Flags,
+void *map(void *Addr, uptr Size, UNUSED const char *Name, uptr Flags,
           UNUSED MapPlatformData *Data) {
   int MmapFlags = MAP_PRIVATE | MAP_ANONYMOUS;
   int MmapProt;
@@ -73,7 +73,7 @@ void *map(void *Addr, usize Size, UNUSED const char *Name, usize Flags,
   return P;
 }
 
-void unmap(void *Addr, usize Size, UNUSED usize Flags,
+void unmap(void *Addr, uptr Size, UNUSED uptr Flags,
            UNUSED MapPlatformData *Data) {
   if (munmap(Addr, Size) != 0)
     dieOnMapUnmapError();
@@ -86,7 +86,7 @@ void setMemoryPermission(uptr Addr, uptr Size, uptr Flags,
     dieOnMapUnmapError();
 }
 
-void releasePagesToOS(uptr BaseAddress, uptr Offset, usize Size,
+void releasePagesToOS(uptr BaseAddress, uptr Offset, uptr Size,
                       UNUSED MapPlatformData *Data) {
   void *Addr = reinterpret_cast<void *>(BaseAddress + Offset);
 

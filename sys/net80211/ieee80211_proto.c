@@ -48,6 +48,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if.h>
 #include <net/if_var.h>
 #include <net/if_media.h>
+#include <net/if_private.h>
 #include <net/ethernet.h>		/* XXX for ether_sprintf */
 
 #include <net80211/ieee80211_var.h>
@@ -273,12 +274,7 @@ ieee80211_proto_attach(struct ieee80211com *ic)
 		+ IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN
 		+ IEEE80211_WEP_EXTIVLEN;
 	/* XXX no way to recalculate on ifdetach */
-	if (ALIGN(hdrlen) > max_linkhdr) {
-		/* XXX sanity check... */
-		max_linkhdr = ALIGN(hdrlen);
-		max_hdr = max_linkhdr + max_protohdr;
-		max_datalen = MHLEN - max_hdr;
-	}
+	max_linkhdr_grow(ALIGN(hdrlen));
 	//ic->ic_protmode = IEEE80211_PROT_CTSONLY;
 
 	TASK_INIT(&ic->ic_parent_task, 0, parent_updown, ic);
@@ -602,7 +598,7 @@ ieee80211_dump_pkt(struct ieee80211com *ic,
 		printf(" QoS [TID %u%s]", qwh->i_qos[0] & IEEE80211_QOS_TID,
 			qwh->i_qos[0] & IEEE80211_QOS_ACKPOLICY ? " ACM" : "");
 	}
-	if (wh->i_fc[1] & IEEE80211_FC1_PROTECTED) {
+	if (IEEE80211_IS_PROTECTED(wh)) {
 		int off;
 
 		off = ieee80211_anyhdrspace(ic, wh);
@@ -1792,7 +1788,7 @@ ieee80211_wme_vap_getparams(struct ieee80211vap *vap, struct chanAccParams *wp)
 }
 
 /*
- * For NICs which only support one set of WME paramaters (ie, softmac NICs)
+ * For NICs which only support one set of WME parameters (ie, softmac NICs)
  * there may be different VAP WME parameters but only one is "active".
  * This returns the "NIC" WME parameters for the currently active
  * context.
@@ -1998,7 +1994,7 @@ ieee80211_start_locked(struct ieee80211vap *vap)
 		 * back in here and complete the work.
 		 */
 		ifp->if_drv_flags |= IFF_DRV_RUNNING;
-		ieee80211_notify_ifnet_change(vap);
+		ieee80211_notify_ifnet_change(vap, IFF_DRV_RUNNING);
 
 		/*
 		 * We are not running; if this we are the first vap
@@ -2112,7 +2108,7 @@ ieee80211_stop_locked(struct ieee80211vap *vap)
 	ieee80211_new_state_locked(vap, IEEE80211_S_INIT, -1);
 	if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 		ifp->if_drv_flags &= ~IFF_DRV_RUNNING;	/* mark us stopped */
-		ieee80211_notify_ifnet_change(vap);
+		ieee80211_notify_ifnet_change(vap, IFF_DRV_RUNNING);
 		if (--ic->ic_nrunning == 0) {
 			IEEE80211_DPRINTF(vap,
 			    IEEE80211_MSG_STATE | IEEE80211_MSG_DEBUG,

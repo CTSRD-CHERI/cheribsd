@@ -1553,6 +1553,7 @@ sysctl_sema(SYSCTL_HANDLER_ARGS)
 {
 	struct prison *pr, *rpr;
 	struct semid_kernel tsemak;
+	struct semid_kernel_sysctl tsemak_u;
 #ifdef COMPAT_FREEBSD32
 	struct semid_kernel32 tsemak32;
 #endif
@@ -1595,7 +1596,7 @@ sysctl_sema(SYSCTL_HANDLER_ARGS)
 		if (!SV_CURPROC_FLAG(SV_CHERI)) {
 			bzero(&tsemak64, sizeof(tsemak64));
 			CP(tsemak, tsemak64, u.sem_perm);
-			/* Don't copy u.sem_base */
+			/* Don't copy u.__sem_base */
 			CP(tsemak, tsemak64, u.sem_nsems);
 			CP(tsemak, tsemak64, u.sem_otime);
 			CP(tsemak, tsemak64, u.sem_ctime);
@@ -1605,11 +1606,15 @@ sysctl_sema(SYSCTL_HANDLER_ARGS)
 		} else
 #endif
 		{
-			tsemak.u.__sem_base = NULL;
-			tsemak.label = NULL;
-			tsemak.cred = NULL;
-			outaddr = &tsemak;
-			outsize = sizeof(tsemak);
+			bzero(&tsemak_u, sizeof(tsemak_u));
+			CP(tsemak, tsemak_u, u.sem_perm);
+			/* Don't copy u.__sem_base */
+			CP(tsemak, tsemak_u, u.sem_nsems);
+			CP(tsemak, tsemak_u, u.sem_otime);
+			CP(tsemak, tsemak_u, u.sem_ctime);
+			/* Don't copy label or cred */
+			outaddr = &tsemak_u;
+			outsize = sizeof(tsemak_u);
 		}
 		error = SYSCTL_OUT(req, outaddr, outsize);
 		if (error != 0)
@@ -1807,16 +1812,7 @@ static sy_call_t *semcalls[] = {
  * Entry point for all SEM calls.
  */
 int
-sys_semsys(td, uap)
-	struct thread *td;
-	/* XXX actually varargs. */
-	struct semsys_args /* {
-		int	which;
-		int	a2;
-		int	a3;
-		int	a4;
-		int	a5;
-	} */ *uap;
+sys_semsys(struct thread *td, struct semsys_args *uap)
 {
 	int error;
 
@@ -2257,7 +2253,7 @@ freebsd64_semop(struct thread *td, struct freebsd64_semop_args *uap)
 #endif /* COMPAT_FREEBSD64 */
 // CHERI CHANGES START
 // {
-//   "updated": 20190515,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

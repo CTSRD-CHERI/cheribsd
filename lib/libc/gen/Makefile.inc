@@ -8,9 +8,11 @@
 CFLAGS+=	-DNO_COMPAT7
 .endif
 
+.ifndef RTLD_SANDBOX
 CONFS+=	group master.passwd shells
 CONFSMODE_master.passwd=	600
 CONFSPACKAGE=   runtime
+.endif
 
 SRCS+=	__getosreldate.c \
 	__pthread_mutex_init_calloc_cb_stub.c \
@@ -181,7 +183,16 @@ SRCS+=	devname-compat11.c \
 	unvis-compat.c
 .endif
 
+.if ${MACHINE_ABI:Mpurecap} && ${MK_CHERI_CAPREVOKE} == "yes"
+CFLAGS.tls_malloc.c+=	-DCAPREVOKE
+CFLAGS.libcheri_caprevoke.c+=-I${SRCTOP}/lib/libcheri_caprevoke/${MACHINE_CPUARCH}
+.PATH:	${SRCTOP}/lib/libcheri_caprevoke
+SRCS+=	libcheri_caprevoke.c
+.endif
+
 CFLAGS.arc4random.c= -I${SRCTOP}/sys -I${SRCTOP}/sys/crypto/chacha20
+
+CFLAGS.sysconf.c= -I${SRCTOP}/contrib/tzcode
 
 CFLAGS.dlfcn.c= ${RTLD_HDRS}
 CFLAGS.tls.c= ${RTLD_HDRS}
@@ -500,7 +511,10 @@ MLINKS+=rand48.3 _rand48.3 \
 	rand48.3 seed48.3 \
 	rand48.3 srand48.3
 MLINKS+=recv.2 recvmmsg.2
-MLINKS+=scandir.3 alphasort.3
+MLINKS+=scandir.3 alphasort.3 \
+	scandir.3 scandirat.3 \
+	scandir.3 scandir_b.3 \
+	scandir.3 versionsort.3
 MLINKS+=sem_open.3 sem_close.3 \
 	sem_open.3 sem_unlink.3
 MLINKS+=sem_wait.3 sem_trywait.3
@@ -549,7 +563,6 @@ MLINKS+=tcsetattr.3 cfgetispeed.3 \
 	tcsetattr.3 tcgetattr.3
 MLINKS+=ttyname.3 isatty.3 \
 	ttyname.3 ttyname_r.3
-MLINKS+=tzset.3 tzsetwall.3
 MLINKS+=unvis.3 strunvis.3 \
 	unvis.3 strunvisx.3
 MLINKS+=vis.3 nvis.3 \

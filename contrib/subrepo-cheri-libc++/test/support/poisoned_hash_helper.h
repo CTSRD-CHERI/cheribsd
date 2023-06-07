@@ -57,7 +57,9 @@ using LibraryHashTypes = TypeList<
       char,
       signed char,
       unsigned char,
+#ifndef TEST_HAS_NO_WIDE_CHARACTERS
       wchar_t,
+#endif
 #ifndef _LIBCPP_HAS_NO_UNICODE_CHARS
       char16_t,
       char32_t,
@@ -70,7 +72,7 @@ using LibraryHashTypes = TypeList<
       unsigned long,
       long long,
       unsigned long long,
-#ifndef _LIBCPP_HAS_NO_INT128
+#ifndef TEST_HAS_NO_INT128
       __int128_t,
       __uint128_t,
 #endif

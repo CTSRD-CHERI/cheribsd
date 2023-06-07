@@ -336,7 +336,7 @@ retry:
 		if (ts.tv_nsec > 0)
 			cmd_latency += ts.tv_nsec / 1000000;
 
-		fprintf(stdout, "LUN %jd tag 0x%04x%s%s%s%s%s%s%s: %s. CDB: %s "
+		fprintf(stdout, "LUN %jd tag 0x%jx%s%s%s%s%s%s%s: %s. CDB: %s "
 			"(%0.0Lf ms)\n",
 			(intmax_t)entry->lun_num, entry->tag_num,
 			(entry->cmd_flags & CTL_OOACMD_FLAG_BLOCKED) ?
@@ -3964,7 +3964,7 @@ usage(int error)
 "-x                       : output port list in XML format\n"
 "lunmap options:\n"
 "-p targ_port             : specify target port number\n"
-"-L pLUN                  : specify port-visible LUN\n"
+"-l pLUN                  : specify port-visible LUN\n"
 "-L cLUN                  : specify CTL LUN\n",
 CTL_DEFAULT_DEV);
 }

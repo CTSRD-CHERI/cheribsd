@@ -95,28 +95,37 @@
 
 #define	PAGE_SHIFT_4K	12
 #define	PAGE_SIZE_4K	(1 << PAGE_SHIFT_4K)
-#define	PAGE_MASK_4K	(PAGE_SIZE_4K - 1)
 
 #define	PAGE_SHIFT_16K	14
 #define	PAGE_SIZE_16K	(1 << PAGE_SHIFT_16K)
-#define	PAGE_MASK_16K	(PAGE_SIZE_16K - 1)
 
 #define	PAGE_SHIFT_64K	16
 #define	PAGE_SIZE_64K	(1 << PAGE_SHIFT_64K)
-#define	PAGE_MASK_64K	(PAGE_SIZE_64K - 1)
 
 #define	PAGE_SHIFT	PAGE_SHIFT_4K
-#define	PAGE_SIZE	PAGE_SIZE_4K
-#define	PAGE_MASK	PAGE_MASK_4K
+#define	PAGE_SIZE	(1 << PAGE_SHIFT)
+#define	PAGE_MASK	(PAGE_SIZE - 1)
 
 #define	MAXPAGESIZES	3		/* maximum number of supported page sizes */
 
 #ifndef KSTACK_PAGES
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	KSTACK_PAGES	5	/* pages of kernel stack (with pcb) */
+#elif defined(KASAN) || defined(KMSAN)
+#define	KSTACK_PAGES	6
+#else
 #define	KSTACK_PAGES	4	/* pages of kernel stack (with pcb) */
+#endif
 #endif
 
 #define	KSTACK_GUARD_PAGES	1	/* pages of kstack guard; 0 disables */
 #define	PCPU_PAGES		1
+
+#ifdef PERTHREAD_SSP
+#define	NO_PERTHREAD_SSP	__nostackprotector
+#else
+#define	NO_PERTHREAD_SSP
+#endif
 
 /*
  * Mach derived conversion macros

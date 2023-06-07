@@ -29,20 +29,15 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
-
-#include <sys/fcntl.h>
 #include <sys/param.h>
-#include <sys/kernel.h>
+#include <sys/fcntl.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
-#include <sys/sdt.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysproto.h>
-#include <sys/systm.h>
 
 #ifdef COMPAT_LINUX32
 #include <machine/../linux32/linux.h>
@@ -355,7 +350,7 @@ linux_setresuid16(struct thread *td, struct linux_setresuid16_args *args)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20221129,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

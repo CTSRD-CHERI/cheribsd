@@ -75,6 +75,7 @@
 
 SET_DECLARE(cheri_tests_set, struct cheri_test);
 
+static StringList* cheri_skipped_tests;
 static StringList* cheri_failed_tests;
 static StringList* cheri_xfailed_tests;
 static StringList* cheri_xpassed_tests;
@@ -84,7 +85,7 @@ struct cheribsdtest_child_state *ccsp;
 
 static char *argv0;
 
-static int tests_run;
+static int tests_run, tests_skipped;
 static int tests_failed, tests_passed, tests_xfailed, tests_xpassed;
 static int execed;
 static int expected_failures;
@@ -225,9 +226,11 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 	char reason[TESTRESULT_STR_LEN * 2]; /* Potential output, plus some extra */
 	char visreason[sizeof(reason) * 4]; /* Space for vis(3) the string */
 	char buffer[TEST_BUFFER_LEN];
-	const char *xfail_reason, *flaky_reason;
+	const char *skip_reason, *xfail_reason, *flaky_reason;
 	char* failure_message;
 	ssize_t len;
+	const char *disallowed_prefixes[] = { "cheribsdtest_", "test_" };
+
 	xo_attr("classname", "%s.%s", PROG, ctp->ct_name);
 	xo_attr("name", "%s", ctp->ct_desc);
 	xo_open_instance("testcase");
@@ -236,9 +239,42 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 		    ctp->ct_desc);
 	reason[0] = '\0';
 	visreason[0] = '\0';
+	xfail_reason = NULL;
+
+	for (size_t i = 0; i < nitems(disallowed_prefixes); i++) {
+		if (strncmp(ctp->ct_name, disallowed_prefixes[i],
+		    strlen(disallowed_prefixes[i])) == 0) {
+
+			snprintf(reason, sizeof(reason),
+			    "test name begins with disallowed prefix '%s'",
+			    disallowed_prefixes[i]);
+			goto fail;
+		}
+	}
 
 	if (fast_tests_only && (ctp->ct_flags & CT_FLAG_SLOW))
 		return;
+
+	if (ctp->ct_check_skip != NULL) {
+		skip_reason = ctp->ct_check_skip(ctp->ct_name);
+		if (skip_reason != NULL) {
+			if (xo_get_style(NULL) == XO_STYLE_XML) {
+				xo_attr("message", "%s", skip_reason);
+				xo_emit("{e:skipped/%s}", "");
+			} else {
+				xo_emit(
+				    "{d:status/%s}: {d:name/%s}: "
+				    "{d:skip-reason/%s}\n",
+				    "SKIP", ctp->ct_name, skip_reason);
+			}
+			asprintf(&failure_message, "%s: %s", ctp->ct_name, skip_reason);
+			tests_skipped++;
+			sl_add(cheri_skipped_tests, failure_message);
+			xo_close_instance("testcase");
+			xo_flush();
+			return;
+		}
+	}
 
 	if (ctp->ct_check_xfail != NULL)
 		xfail_reason = ctp->ct_check_xfail(ctp->ct_name);
@@ -815,6 +851,7 @@ main(int argc, char *argv[])
 			err(EX_OSERR, "setrlimit");
 	}
 
+	cheri_skipped_tests = sl_init();
 	cheri_failed_tests = sl_init();
 	cheri_xfailed_tests = sl_init();
 	cheri_xpassed_tests = sl_init();
@@ -847,6 +884,11 @@ main(int argc, char *argv[])
 	xo_close_container("testsuites");
 
 	/* print a summary which tests failed */
+	if (cheri_skipped_tests->sl_cur != 0) {
+		xo_emit("Skipped:\n");
+		for (i = 0; (size_t)i < cheri_skipped_tests->sl_cur; i++)
+			xo_emit("  {d:%s}\n", cheri_skipped_tests->sl_str[i]);
+	}
 	if (cheri_xfailed_tests->sl_cur != 0) {
 		xo_emit("Expected failures:\n");
 		for (i = 0; (size_t)i < cheri_xfailed_tests->sl_cur; i++)
@@ -862,10 +904,11 @@ main(int argc, char *argv[])
 		for (i = 0; (size_t)i < cheri_xpassed_tests->sl_cur; i++)
 			xo_emit("  {d:%s}\n", cheri_xpassed_tests->sl_str[i]);
 	}
+	sl_free(cheri_skipped_tests, true);
 	sl_free(cheri_failed_tests, true);
 	sl_free(cheri_xfailed_tests, true);
 	sl_free(cheri_xpassed_tests, true);
-	if (tests_run > 1) {
+	if (tests_run + tests_skipped > 1) {
 		xo_emit("{Lc:SUMMARY}");
 		sep = " ";
 #define	EMIT_SUMMARY_FIELD(label, value)				\
@@ -876,6 +919,7 @@ main(int argc, char *argv[])
 				sep = ", ";				\
 			}						\
 		} while (0)
+		EMIT_SUMMARY_FIELD("skipped", tests_skipped);
 		EMIT_SUMMARY_FIELD("passed", tests_passed);
 		EMIT_SUMMARY_FIELD("failed", tests_failed);
 		EMIT_SUMMARY_FIELD("expectedly failed", tests_xfailed);

@@ -293,8 +293,6 @@ VNET_DECLARE(int, ip6_norbit_raif);	/* Disable R-bit in NA on RA
 					 * receiving IF. */
 VNET_DECLARE(int, ip6_rfc6204w3);	/* Accept defroute from RA even when
 					   forwarding enabled */
-VNET_DECLARE(int, ip6_log_interval);
-VNET_DECLARE(time_t, ip6_log_time);
 VNET_DECLARE(int, ip6_hdrnestlimit);	/* upper limit of # of extension
 					 * headers */
 VNET_DECLARE(int, ip6_dad_count);	/* DupAddrDetectionTransmits */
@@ -304,8 +302,6 @@ VNET_DECLARE(int, ip6_dad_count);	/* DupAddrDetectionTransmits */
 #define	V_ip6_no_radr			VNET(ip6_no_radr)
 #define	V_ip6_norbit_raif		VNET(ip6_norbit_raif)
 #define	V_ip6_rfc6204w3			VNET(ip6_rfc6204w3)
-#define	V_ip6_log_interval		VNET(ip6_log_interval)
-#define	V_ip6_log_time			VNET(ip6_log_time)
 #define	V_ip6_hdrnestlimit		VNET(ip6_hdrnestlimit)
 #define	V_ip6_dad_count			VNET(ip6_dad_count)
 
@@ -339,16 +335,15 @@ VNET_DECLARE(int, nd6_ignore_ipv6_only_ra);
 #define	V_nd6_ignore_ipv6_only_ra	VNET(nd6_ignore_ipv6_only_ra)
 #endif
 
+VNET_DECLARE(bool, ip6_log_cannot_forward);
+#define	V_ip6_log_cannot_forward	VNET(ip6_log_cannot_forward)
+
 extern struct	pr_usrreqs rip6_usrreqs;
 struct sockopt;
 
 struct inpcb;
 
 int	icmp6_ctloutput(struct socket *, struct sockopt *sopt);
-
-struct in6_ifaddr;
-int	ip6proto_register(short);
-int	ip6proto_unregister(short);
 
 void	ip6_input(struct mbuf *);
 void	ip6_direct_input(struct mbuf *);
@@ -395,14 +390,10 @@ int	route6_input(struct mbuf **, int *, int);
 void	frag6_init(void);
 void	frag6_destroy(void);
 int	frag6_input(struct mbuf **, int *, int);
-void	frag6_slowtimo(void);
 void	frag6_drain(void);
 
 void	rip6_init(void);
-int	rip6_input(struct mbuf **, int *, int);
-void	rip6_ctlinput(int, struct sockaddr *, void *);
 int	rip6_ctloutput(struct socket *, struct sockopt *);
-int	rip6_output(struct mbuf *, struct socket *, ...);
 int	rip6_usrreq(struct socket *,
 	    int, struct mbuf *, struct mbuf *, struct mbuf *, struct thread *);
 
@@ -419,6 +410,51 @@ int in6_selectroute(struct sockaddr_in6 *, struct ip6_pktopts *,
 u_int32_t ip6_randomid(void);
 u_int32_t ip6_randomflowlabel(void);
 void in6_delayed_cksum(struct mbuf *m, uint32_t plen, u_short offset);
+
+int	ip6_log_ratelimit(void);
+
+/*
+ * Argument type for the last arg of ip6proto_ctlinput_t().
+ *
+ * IPv6 ICMP IPv6 [exthdrs] finalhdr payload
+ * ^    ^    ^              ^
+ * |    |    ip6c_ip6       ip6c_off
+ * |    ip6c_icmp6
+ * ip6c_m
+ *
+ * ip6c_finaldst's sin6_addr usually points to ip6c_ip6->ip6_dst.  If the
+ * original * (internal) packet carries a routing header, it may point the
+ * final * destination address in the routing header.
+ *
+ * ip6c_src: ip6c_ip6->ip6_src + scope info + flowlabel in ip6c_ip6
+ *	(beware of flowlabel, if you try to compare it against others)
+ * ip6c_dst: ip6c_finaldst + scope info
+ */
+struct ip6ctlparam {
+	struct mbuf *ip6c_m;		/* start of mbuf chain */
+	struct icmp6_hdr *ip6c_icmp6;	/* icmp6 header of target packet */
+	struct ip6_hdr *ip6c_ip6;	/* ip6 header of target packet */
+	int ip6c_off;			/* offset of the target proto header */
+	struct sockaddr_in6 *ip6c_src;	/* srcaddr w/ additional info */
+	struct sockaddr_in6 *ip6c_dst;	/* (final) dstaddr w/ additional info */
+	struct sockaddr_in6 *ip6c_finaldst;	/* final destination address */
+	void *ip6c_cmdarg;		/* control command dependent data */
+	u_int8_t ip6c_nxt;		/* final next header field */
+};
+
+typedef int	ip6proto_input_t(struct mbuf **, int *, int);
+typedef void	ip6proto_ctlinput_t(struct ip6ctlparam *);
+int	ip6proto_register(uint8_t, ip6proto_input_t, ip6proto_ctlinput_t);
+int	ip6proto_unregister(uint8_t);
+#define	IP6PROTO_REGISTER(prot, input, ctl)	do {			\
+	int error __diagused;						\
+	error = ip6proto_register(prot, input, ctl);			\
+	MPASS(error == 0);						\
+} while (0)
+
+ip6proto_input_t	rip6_input;
+ip6proto_ctlinput_t	rip6_ctlinput;
+
 #endif /* _KERNEL */
 
 #endif /* !_NETINET6_IP6_VAR_H_ */

@@ -299,9 +299,6 @@ smbfs_unmount(struct mount *mp, int mntflags)
 	mp->mnt_data = NULL;
 	SMB_UNLOCK();
 	free(smp, M_SMBFSDATA);
-	MNT_ILOCK(mp);
-	mp->mnt_flag &= ~MNT_LOCAL;
-	MNT_IUNLOCK(mp);
 out:
 	smbfs_free_scred(scred);
 	return error;
@@ -406,10 +403,10 @@ smbfs_statfs(struct mount *mp, struct statfs *sbp)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros"
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

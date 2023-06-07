@@ -32,6 +32,8 @@ ATF_TESTS_C+=	reaper
 ATF_TESTS_C+=	sched_affinity
 ATF_TESTS_C+=	sigaltstack
 ATF_TESTS_C+=	sigwait
+ATF_TESTS_C+=	socket_accf
+ATF_TESTS_C+=	socket_msg_trunc
 TEST_METADATA.sigwait+=	is_exclusive="true"
 .if ${MACHINE_ARCH} != "i386" && ${MACHINE_ARCH:Mpowerpc*} == ""
 ATF_TESTS_C+=	subr_physmem_test
@@ -71,7 +73,7 @@ LIBADD.sys_getrandom+=			pthread
 LIBADD.ptrace_test+=			pthread
 LIBADD.unix_seqpacket_test+=		pthread
 LIBADD.kcov+=				pthread
-LIBADD.ktls_test+=			crypto
+LIBADD.ktls_test+=			crypto util
 LIBADD.sendfile_helper+=		pthread
 LIBADD.fdgrowtable_test+=		util pthread kvm procstat
 LIBADD.sigwait+=			rt

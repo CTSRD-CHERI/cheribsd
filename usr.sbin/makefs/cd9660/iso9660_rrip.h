@@ -52,17 +52,17 @@
 
 #define	 PX_LENGTH	   0x2C
 #define	 PN_LENGTH	   0x14
-#define	 TF_CREATION	   0x00
-#define	 TF_MODIFY	   0x01
-#define	 TF_ACCESS	   0x02
-#define	 TF_ATTRIBUTES	   0x04
-#define	 TF_BACKUP	   0x08
-#define	 TF_EXPIRATION	   0x10
-#define	 TF_EFFECTIVE	   0x20
-#define	 TF_LONGFORM	   0x40
-#define  NM_CONTINUE	   0x80
-#define	 NM_CURRENT	   0x100
-#define	 NM_PARENT	   0x200
+#define	 TF_CREATION	   0x01
+#define	 TF_MODIFY	   0x02
+#define	 TF_ACCESS	   0x04
+#define	 TF_ATTRIBUTES	   0x08
+#define	 TF_BACKUP	   0x10
+#define	 TF_EXPIRATION	   0x20
+#define	 TF_EFFECTIVE	   0x40
+#define	 TF_LONG_FORM	   0x80
+#define	 NM_CONTINUE	   0x01
+#define	 NM_CURRENT	   0x02
+#define	 NM_PARENT	   0x04
 
 
 #define	 SUSP_LOC_ENTRY	   0x01
@@ -209,7 +209,7 @@ struct ISO_SUSP_ATTRIBUTES {
 	char type_of[2];
 	char last_in_suf;	/* last entry in the System Use Field? */
 	/* Dan's addons - will merge later. This allows use of a switch */
-	char susp_type; 	/* SUSP or RRIP */
+	char susp_type;		/* SUSP or RRIP */
 	char entry_type;	/* Record type */
 	char write_location;
 	TAILQ_ENTRY(ISO_SUSP_ATTRIBUTES) rr_ll;

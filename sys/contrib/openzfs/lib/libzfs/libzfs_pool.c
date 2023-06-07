@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -60,9 +60,9 @@
 static boolean_t zpool_vdev_is_interior(const char *name);
 
 typedef struct prop_flags {
-	int create:1;	/* Validate property on creation */
-	int import:1;	/* Validate property on import */
-	int vdevprop:1;	/* Validate property as a VDEV property */
+	unsigned int create:1;	/* Validate property on creation */
+	unsigned int import:1;	/* Validate property on import */
+	unsigned int vdevprop:1; /* Validate property as a VDEV property */
 } prop_flags_t;
 
 /*
@@ -2214,7 +2214,6 @@ zpool_import_props(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 			    ((policy.zlp_rewind & ZPOOL_TRY_REWIND) != 0), nv);
 		}
 		nvlist_free(nv);
-		return (0);
 	}
 
 	return (ret);
@@ -2679,7 +2678,7 @@ vdev_to_nvlist_iter(nvlist_t *nv, nvlist_t *search, boolean_t *avail_spare,
 			if (zfs_strcmp_pathname(srchval, val, wholedisk) == 0)
 				return (nv);
 
-		} else if (strcmp(srchkey, ZPOOL_CONFIG_TYPE) == 0 && val) {
+		} else if (strcmp(srchkey, ZPOOL_CONFIG_TYPE) == 0) {
 			char *type, *idx, *end, *p;
 			uint64_t id, vdev_id;
 
@@ -2898,154 +2897,6 @@ zpool_find_vdev(zpool_handle_t *zhp, const char *path, boolean_t *avail_spare,
 	return (ret);
 }
 
-static int
-vdev_is_online(nvlist_t *nv)
-{
-	uint64_t ival;
-
-	if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_OFFLINE, &ival) == 0 ||
-	    nvlist_lookup_uint64(nv, ZPOOL_CONFIG_FAULTED, &ival) == 0 ||
-	    nvlist_lookup_uint64(nv, ZPOOL_CONFIG_REMOVED, &ival) == 0)
-		return (0);
-
-	return (1);
-}
-
-/*
- * Helper function for zpool_get_physpaths().
- */
-static int
-vdev_get_one_physpath(nvlist_t *config, char *physpath, size_t physpath_size,
-    size_t *bytes_written)
-{
-	size_t bytes_left, pos, rsz;
-	char *tmppath;
-	const char *format;
-
-	if (nvlist_lookup_string(config, ZPOOL_CONFIG_PHYS_PATH,
-	    &tmppath) != 0)
-		return (EZFS_NODEVICE);
-
-	pos = *bytes_written;
-	bytes_left = physpath_size - pos;
-	format = (pos == 0) ? "%s" : " %s";
-
-	rsz = snprintf(physpath + pos, bytes_left, format, tmppath);
-	*bytes_written += rsz;
-
-	if (rsz >= bytes_left) {
-		/* if physpath was not copied properly, clear it */
-		if (bytes_left != 0) {
-			physpath[pos] = 0;
-		}
-		return (EZFS_NOSPC);
-	}
-	return (0);
-}
-
-static int
-vdev_get_physpaths(nvlist_t *nv, char *physpath, size_t phypath_size,
-    size_t *rsz, boolean_t is_spare)
-{
-	char *type;
-	int ret;
-
-	if (nvlist_lookup_string(nv, ZPOOL_CONFIG_TYPE, &type) != 0)
-		return (EZFS_INVALCONFIG);
-
-	if (strcmp(type, VDEV_TYPE_DISK) == 0) {
-		/*
-		 * An active spare device has ZPOOL_CONFIG_IS_SPARE set.
-		 * For a spare vdev, we only want to boot from the active
-		 * spare device.
-		 */
-		if (is_spare) {
-			uint64_t spare = 0;
-			(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_IS_SPARE,
-			    &spare);
-			if (!spare)
-				return (EZFS_INVALCONFIG);
-		}
-
-		if (vdev_is_online(nv)) {
-			if ((ret = vdev_get_one_physpath(nv, physpath,
-			    phypath_size, rsz)) != 0)
-				return (ret);
-		}
-	} else if (strcmp(type, VDEV_TYPE_MIRROR) == 0 ||
-	    strcmp(type, VDEV_TYPE_RAIDZ) == 0 ||
-	    strcmp(type, VDEV_TYPE_REPLACING) == 0 ||
-	    (is_spare = (strcmp(type, VDEV_TYPE_SPARE) == 0))) {
-		nvlist_t **child;
-		uint_t count;
-		int i, ret;
-
-		if (nvlist_lookup_nvlist_array(nv,
-		    ZPOOL_CONFIG_CHILDREN, &child, &count) != 0)
-			return (EZFS_INVALCONFIG);
-
-		for (i = 0; i < count; i++) {
-			ret = vdev_get_physpaths(child[i], physpath,
-			    phypath_size, rsz, is_spare);
-			if (ret == EZFS_NOSPC)
-				return (ret);
-		}
-	}
-
-	return (EZFS_POOL_INVALARG);
-}
-
-/*
- * Get phys_path for a root pool config.
- * Return 0 on success; non-zero on failure.
- */
-static int
-zpool_get_config_physpath(nvlist_t *config, char *physpath, size_t phypath_size)
-{
-	size_t rsz;
-	nvlist_t *vdev_root;
-	nvlist_t **child;
-	uint_t count;
-	char *type;
-
-	rsz = 0;
-
-	if (nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
-	    &vdev_root) != 0)
-		return (EZFS_INVALCONFIG);
-
-	if (nvlist_lookup_string(vdev_root, ZPOOL_CONFIG_TYPE, &type) != 0 ||
-	    nvlist_lookup_nvlist_array(vdev_root, ZPOOL_CONFIG_CHILDREN,
-	    &child, &count) != 0)
-		return (EZFS_INVALCONFIG);
-
-	/*
-	 * root pool can only have a single top-level vdev.
-	 */
-	if (strcmp(type, VDEV_TYPE_ROOT) != 0 || count != 1)
-		return (EZFS_POOL_INVALARG);
-
-	(void) vdev_get_physpaths(child[0], physpath, phypath_size, &rsz,
-	    B_FALSE);
-
-	/* No online devices */
-	if (rsz == 0)
-		return (EZFS_NODEVICE);
-
-	return (0);
-}
-
-/*
- * Get phys_path for a root pool
- * Return 0 on success; non-zero on failure.
- */
-int
-zpool_get_physpath(zpool_handle_t *zhp, char *physpath, size_t phypath_size)
-{
-	return (zpool_get_config_physpath(zhp->zpool_config, physpath,
-	    phypath_size));
-}
-
 /*
  * Convert a vdev path to a GUID.  Returns GUID or 0 on error.
  *
@@ -3110,7 +2961,7 @@ zpool_vdev_online(zpool_handle_t *zhp, const char *path, int flags,
 
 	zc.zc_guid = fnvlist_lookup_uint64(tgt, ZPOOL_CONFIG_GUID);
 
-	if (avail_spare)
+	if (!(flags & ZFS_ONLINE_SPARE) && avail_spare)
 		return (zfs_error(hdl, EZFS_ISSPARE, errbuf));
 
 #ifndef __FreeBSD__
@@ -3219,6 +3070,40 @@ zpool_vdev_offline(zpool_handle_t *zhp, const char *path, boolean_t istmp)
 	default:
 		return (zpool_standard_error(hdl, errno, errbuf));
 	}
+}
+
+/*
+ * Remove the specified vdev asynchronously from the configuration, so
+ * that it may come ONLINE if reinserted. This is called from zed on
+ * Udev remove event.
+ * Note: We also have a similar function zpool_vdev_remove() that
+ * removes the vdev from the pool.
+ */
+int
+zpool_vdev_remove_wanted(zpool_handle_t *zhp, const char *path)
+{
+	zfs_cmd_t zc = {"\0"};
+	char errbuf[ERRBUFLEN];
+	nvlist_t *tgt;
+	boolean_t avail_spare, l2cache;
+	libzfs_handle_t *hdl = zhp->zpool_hdl;
+
+	(void) snprintf(errbuf, sizeof (errbuf),
+	    dgettext(TEXT_DOMAIN, "cannot remove %s"), path);
+
+	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
+	if ((tgt = zpool_find_vdev(zhp, path, &avail_spare, &l2cache,
+	    NULL)) == NULL)
+		return (zfs_error(hdl, EZFS_NODEVICE, errbuf));
+
+	zc.zc_guid = fnvlist_lookup_uint64(tgt, ZPOOL_CONFIG_GUID);
+
+	zc.zc_cookie = VDEV_STATE_REMOVED;
+
+	if (zfs_ioctl(hdl, ZFS_IOC_VDEV_SET_STATE, &zc) == 0)
+		return (0);
+
+	return (zpool_standard_error(hdl, errno, errbuf));
 }
 
 /*
@@ -4245,33 +4130,28 @@ zpool_get_errlog(zpool_handle_t *zhp, nvlist_t **nverrlistp)
 {
 	zfs_cmd_t zc = {"\0"};
 	libzfs_handle_t *hdl = zhp->zpool_hdl;
-	uint64_t count;
-	zbookmark_phys_t *zb = NULL;
-	int i;
+	zbookmark_phys_t *buf;
+	uint64_t buflen = 10000; /* approx. 1MB of RAM */
+
+	if (fnvlist_lookup_uint64(zhp->zpool_config,
+	    ZPOOL_CONFIG_ERRCOUNT) == 0)
+		return (0);
 
 	/*
-	 * Retrieve the raw error list from the kernel.  If the number of errors
-	 * has increased, allocate more space and continue until we get the
-	 * entire list.
+	 * Retrieve the raw error list from the kernel.  If it doesn't fit,
+	 * allocate a larger buffer and retry.
 	 */
-	count = fnvlist_lookup_uint64(zhp->zpool_config, ZPOOL_CONFIG_ERRCOUNT);
-	if (count == 0)
-		return (0);
-	zc.zc_nvlist_dst = (uintptr_t)zfs_alloc(zhp->zpool_hdl,
-	    count * sizeof (zbookmark_phys_t));
-	zc.zc_nvlist_dst_size = count;
 	(void) strcpy(zc.zc_name, zhp->zpool_name);
 	for (;;) {
+		buf = zfs_alloc(zhp->zpool_hdl,
+		    buflen * sizeof (zbookmark_phys_t));
+		zc.zc_nvlist_dst = (uintptr_t)buf;
+		zc.zc_nvlist_dst_size = buflen;
 		if (zfs_ioctl(zhp->zpool_hdl, ZFS_IOC_ERROR_LOG,
 		    &zc) != 0) {
-			free((void *)(uintptr_t)zc.zc_nvlist_dst);
+			free(buf);
 			if (errno == ENOMEM) {
-				void *dst;
-
-				count = zc.zc_nvlist_dst_size;
-				dst = zfs_alloc(zhp->zpool_hdl, count *
-				    sizeof (zbookmark_phys_t));
-				zc.zc_nvlist_dst = (uintptr_t)dst;
+				buflen *= 2;
 			} else {
 				return (zpool_standard_error_fmt(hdl, errno,
 				    dgettext(TEXT_DOMAIN, "errors: List of "
@@ -4289,18 +4169,17 @@ zpool_get_errlog(zpool_handle_t *zhp, nvlist_t **nverrlistp)
 	 * _not_ copied as part of the process.  So we point the start of our
 	 * array appropriate and decrement the total number of elements.
 	 */
-	zb = ((zbookmark_phys_t *)(uintptr_t)zc.zc_nvlist_dst) +
-	    zc.zc_nvlist_dst_size;
-	count -= zc.zc_nvlist_dst_size;
+	zbookmark_phys_t *zb = buf + zc.zc_nvlist_dst_size;
+	uint64_t zblen = buflen - zc.zc_nvlist_dst_size;
 
-	qsort(zb, count, sizeof (zbookmark_phys_t), zbookmark_mem_compare);
+	qsort(zb, zblen, sizeof (zbookmark_phys_t), zbookmark_mem_compare);
 
 	verify(nvlist_alloc(nverrlistp, 0, KM_SLEEP) == 0);
 
 	/*
 	 * Fill in the nverrlistp with nvlist's of dataset and object numbers.
 	 */
-	for (i = 0; i < count; i++) {
+	for (uint64_t i = 0; i < zblen; i++) {
 		nvlist_t *nv;
 
 		/* ignoring zb_blkid and zb_level for now */
@@ -4327,11 +4206,11 @@ zpool_get_errlog(zpool_handle_t *zhp, nvlist_t **nverrlistp)
 		nvlist_free(nv);
 	}
 
-	free((void *)(uintptr_t)zc.zc_nvlist_dst);
+	free(buf);
 	return (0);
 
 nomem:
-	free((void *)(uintptr_t)zc.zc_nvlist_dst);
+	free(buf);
 	return (no_memory(zhp->zpool_hdl));
 }
 
@@ -4832,8 +4711,8 @@ zpool_load_compat(const char *compat, boolean_t *features, char *report,
 		for (uint_t i = 0; i < SPA_FEATURES; i++)
 			features[i] = B_TRUE;
 
-	char err_badfile[1024] = "";
-	char err_badtoken[1024] = "";
+	char err_badfile[ZFS_MAXPROPLEN] = "";
+	char err_badtoken[ZFS_MAXPROPLEN] = "";
 
 	/*
 	 * We ignore errors from the directory open()
@@ -5120,6 +4999,17 @@ zpool_get_vdev_prop_value(nvlist_t *nvprop, vdev_prop_t prop, char *prop_name,
 				    (u_longlong_t)intval);
 			} else {
 				(void) snprintf(buf, len, "%llu%%",
+				    (u_longlong_t)intval);
+			}
+			break;
+		case VDEV_PROP_CHECKSUM_N:
+		case VDEV_PROP_CHECKSUM_T:
+		case VDEV_PROP_IO_N:
+		case VDEV_PROP_IO_T:
+			if (intval == UINT64_MAX) {
+				(void) strlcpy(buf, "-", len);
+			} else {
+				(void) snprintf(buf, len, "%llu",
 				    (u_longlong_t)intval);
 			}
 			break;

@@ -92,19 +92,15 @@ __FBSDID("$FreeBSD$");
 .endmacro
 #endif
 
-/*
- * int arm_smccc_hvc(register_t, register_t, register_t, register_t,
- *     register_t, register_t, register_t, register_t,
- *     struct arm_smccc_res *res)
- */
-ENTRY(arm_smccc_hvc)
+.macro arm_smccc_1_0	insn
+ENTRY(arm_smccc_\insn)
 #ifdef __CHERI_PURE_CAPABILITY__
 	save_registers
 #endif
 #if __has_feature(capabilities)
 	reset_ddc_el0
 #endif
-	hvc	#0
+	\insn	#0
 #if __has_feature(capabilities)
 	restore_ddc_el0
 #endif
@@ -116,36 +112,60 @@ ENTRY(arm_smccc_hvc)
 	stp	x0, x1, [PTR(4), #16 * 0]
 	stp	x2, x3, [PTR(4), #16 * 1]
 1:	ret
-END(arm_smccc_hvc)
+END(arm_smccc_\insn)
+.endm
 
 /*
- * int arm_smccc_smc(register_t, register_t, register_t, register_t,
+ * int arm_smccc_*(register_t, register_t, register_t, register_t,
  *     register_t, register_t, register_t, register_t,
  *     struct arm_smccc_res *res)
  */
-ENTRY(arm_smccc_smc)
+arm_smccc_1_0	hvc
+arm_smccc_1_0	smc
+
+.macro arm_smccc_1_2	insn
+ENTRY(arm_smccc_1_2_\insn)
 #ifdef __CHERI_PURE_CAPABILITY__
 	save_registers
 #endif
-#if __has_feature(capabilities)
-	reset_ddc_el0
-#endif
-	smc	#0
-#if __has_feature(capabilities)
-	restore_ddc_el0
-#endif
+	stp	PTR(1), PTR(19), [PTRN(sp), #-(2 * PTR_WIDTH)]!
+	mov	PTR(19), PTR(0)
+	ldp	x0, x1, [PTR(19), #16 * 0]
+	ldp	x2, x3, [PTR(19), #16 * 1]
+	ldp	x4, x5, [PTR(19), #16 * 2]
+	ldp	x6, x7, [PTR(19), #16 * 3]
+	ldp	x8, x9, [PTR(19), #16 * 4]
+	ldp	x10, x11, [PTR(19), #16 * 5]
+	ldp	x12, x13, [PTR(19), #16 * 6]
+	ldp	x14, x15, [PTR(19), #16 * 7]
+	ldp	x16, x17, [PTR(19), #16 * 8]
+	\insn	#0
+	ldr	PTR(19), [PTRN(sp)]
+	cbz	x19, 1f
+	stp	x0, x1, [PTR(19), #16 * 0]
+	stp	x2, x3, [PTR(19), #16 * 1]
+	stp	x4, x5, [PTR(19), #16 * 2]
+	stp	x6, x7, [PTR(19), #16 * 3]
+	stp	x8, x9, [PTR(19), #16 * 4]
+	stp	x10, x11, [PTR(19), #16 * 5]
+	stp	x12, x13, [PTR(19), #16 * 6]
+	stp	x14, x15, [PTR(19), #16 * 7]
+	stp	x16, x17, [PTR(19), #16 * 8]
+1:	ldp	PTR(zr), PTR(19), [PTRN(sp)], #(2 * PTR_WIDTH)
 #ifdef __CHERI_PURE_CAPABILITY__
 	restore_registers
 #endif
-	ldr	x4, [PTRN(sp)]
-	cbz	x4, 1f
-	stp	x0, x1, [PTR(4), #16 * 0]
-	stp	x2, x3, [PTR(4), #16 * 1]
-1:	ret
-END(arm_smccc_smc)
+	ret
+END(arm_smccc_1_2\insn)
+.endm
+/* int arm_smccc_1_2_*(const struct arm_smccc_1_2_regs *args,
+ *     struct arm_smccc_1_2_regs *res)
+ */
+arm_smccc_1_2	hvc
+arm_smccc_1_2	smc
 // CHERI CHANGES START
 // {
-//   "updated": 20210407,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "support"

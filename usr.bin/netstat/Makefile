@@ -6,6 +6,7 @@
 PROG=	netstat
 SRCS=	if.c inet.c main.c mbuf.c mroute.c netisr.c nl_symbols.c route.c \
 	unix.c mroute6.c ipsec.c bpf.c pfkey.c sctp.c common.c nhops.c nhgrp.c \
+	route_netlink.c \
 	nl_defs.h
 
 nl_symbols.c: nlist_symbols
@@ -56,6 +57,10 @@ CFLAGS+=-DPF
 BINGRP=	kmem
 BINMODE=2555
 LIBADD=	kvm memstat xo util
+
+# ld.lld: error: could not determine size of cap reloc against local object nla_p_donemsg
+# >>> defined in route_netlink.c (route_netlink.o:(.rodata+0xDAC0))
+LD_FATAL_WARNINGS=no
 
 .if ${MK_NETGRAPH_SUPPORT} != "no"
 SRCS+=	netgraph.c

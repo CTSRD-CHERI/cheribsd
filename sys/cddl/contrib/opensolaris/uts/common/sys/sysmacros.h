@@ -481,7 +481,7 @@ highbit64(uint64_t i)
 #endif	/* _SYS_SYSMACROS_H */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20221129,
 //   "target_type": "header",
 //   "changes": [
 //     "pointer_alignment"

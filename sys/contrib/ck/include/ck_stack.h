@@ -357,7 +357,7 @@ ck_stack_init(struct ck_stack *stack)
 #endif /* CK_STACK_H */
 // CHERI CHANGES START
 // {
-//   "updated": 20190812,
+//   "updated": 20221129,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "pointer_shape",

@@ -11,16 +11,25 @@ SHLIBDIR?= /lib
 .include <src.opts.mk>
 MK_SSP=	no
 
+.if !defined(LIBTHR_SRCTOP)
+LIBTHR_SRCTOP:=	${.PARSEDIR}
+.endif
+.PATH: ${LIBTHR_SRCTOP}
+
+.ifdef RTLD_SANDBOX
+SHLIB=thr
+.else
 LIB=thr
+.endif
 SHLIB_MAJOR= 3
 NO_WTHREAD_SAFETY=1
 NO_WCAST_ALIGN.gcc=1    # for gcc 4.2
 CFLAGS+=-DPTHREAD_KERNEL
 CFLAGS+=-I${SRCTOP}/lib/libc/include
 CFLAGS+=-I${SRCTOP}/lib/libc/${MACHINE_CPUARCH}
-CFLAGS+=-I${.CURDIR}/thread
-CFLAGS+=-I${.CURDIR}/arch/${MACHINE_CPUARCH}/include
-CFLAGS+=-I${.CURDIR}/sys
+CFLAGS+=-I${LIBTHR_SRCTOP}/thread
+CFLAGS+=-I${LIBTHR_SRCTOP}/arch/${MACHINE_CPUARCH}/include
+CFLAGS+=-I${LIBTHR_SRCTOP}/sys
 CFLAGS+=-I${SRCTOP}/libexec/rtld-elf
 CFLAGS+=-I${SRCTOP}/libexec/rtld-elf/${MACHINE_CPUARCH}
 CFLAGS+=-I${SRCTOP}/lib/libthread_db
@@ -44,30 +53,40 @@ CFLAGS+=-fexceptions
 CFLAGS+=-D_PTHREAD_FORCED_UNWIND
 .endif
 
+.ifdef RTLD_SANDBOX
+CFLAGS+=-DRTLD_SANDBOX
+.endif
+
 LDFLAGS+=-Wl,-znodelete
 
 VERSION_DEF=${SRCTOP}/lib/libc/Versions.def
-SYMBOL_MAPS=${.CURDIR}/pthread.map
+SYMBOL_MAPS=${LIBTHR_SRCTOP}/pthread.map
 
+.ifdef RTLD_SANDBOX
+SYMBOL_MAPS+=	${LIBTHR_SRCTOP}/pthread-c18n.map
+.endif
+
+.ifndef RTLD_SANDBOX
 MAN=	libthr.3
+.endif
 
 # enable extra internal consistency checks
 CFLAGS+=-D_PTHREADS_INVARIANTS
 
 PRECIOUSLIB=
 
-.PATH: ${.CURDIR}/arch/${MACHINE_CPUARCH}/${MACHINE_CPUARCH}
+.PATH: ${LIBTHR_SRCTOP}/arch/${MACHINE_CPUARCH}/${MACHINE_CPUARCH}
 .if ${MACHINE_ABI:Mpurecap}
 .PATH: ${SRCTOP}/lib/libmalloc_simple
 .else
 .PATH: ${SRCTOP}/libexec/rtld-elf
 .endif
 
-.if exists(${.CURDIR}/arch/${MACHINE_CPUARCH}/Makefile.inc)
-.include "${.CURDIR}/arch/${MACHINE_CPUARCH}/Makefile.inc"
+.if exists(${LIBTHR_SRCTOP}/arch/${MACHINE_CPUARCH}/Makefile.inc)
+.include "${LIBTHR_SRCTOP}/arch/${MACHINE_CPUARCH}/Makefile.inc"
 .endif
-.include "${.CURDIR}/sys/Makefile.inc"
-.include "${.CURDIR}/thread/Makefile.inc"
+.include "${LIBTHR_SRCTOP}/sys/Makefile.inc"
+.include "${LIBTHR_SRCTOP}/thread/Makefile.inc"
 .if ${MACHINE_ABI:Mpurecap}
 SRCS+=	malloc.c heap.c
 CFLAGS.malloc.c+=	-DIN_LIBTHR
@@ -76,6 +95,7 @@ CFLAGS.heap.c+=	-DIN_LIBTHR
 SRCS+= rtld_malloc.c
 .endif
 
+.ifndef RTLD_SANDBOX
 .if ${MK_INSTALLLIB} != "no"
 SYMLINKS+=lib${LIB}.a ${LIBDIR}/libpthread.a
 .endif
@@ -88,5 +108,6 @@ SYMLINKS+=lib${LIB}_p.a ${LIBDIR}/libpthread_p.a
 
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
+.endif
 
 .include <bsd.lib.mk>

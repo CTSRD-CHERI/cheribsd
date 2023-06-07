@@ -717,18 +717,19 @@ parse_directive(char **conf)
 	return (error);
 }
 
-static int
+static bool
 parse_mount_dev_present(const char *dev)
 {
 	struct nameidata nd;
 	int error;
 
-	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, PTR2CAP(dev));
+	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, PTR2CAP(dev));
 	error = namei(&nd);
-	if (!error)
-		vput(nd.ni_vp);
+	if (error != 0)
+		return (false);
+	vrele(nd.ni_vp);
 	NDFREE_PNBUF(&nd);
-	return (error != 0) ? 0 : 1;
+	return (true);
 }
 
 #define	ERRMSGL	255
@@ -792,7 +793,7 @@ parse_mount(char **conf)
 		ma = parse_mountroot_options(ma, opts);
 
 		error = kernel_mount(ma, MNT_ROOTFS);
-		if (error == 0 || timeout <= 0)
+		if (error == 0 || error == EILSEQ || timeout <= 0)
 			break;
 
 		if (root_mount_timeout * hz == timeout ||
@@ -956,7 +957,7 @@ vfs_mountroot_readconf(struct thread *td, struct sbuf *sb)
 	ofs = 0;
 	len = sizeof(buf) - 1;
 	while (1) {
-		error = vn_rdwr(UIO_READ, nd.ni_vp, buf, len, ofs,
+		error = vn_rdwr(UIO_READ, nd.ni_vp, PTR2CAP(buf), len, ofs,
 		    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred,
 		    NOCRED, &resid, td);
 		if (error)
@@ -977,6 +978,7 @@ static void
 vfs_mountroot_wait(void)
 {
 	struct root_hold_token *h;
+	struct thread *td;
 	struct timeval lastfail;
 	int curfail;
 
@@ -984,15 +986,16 @@ vfs_mountroot_wait(void)
 
 	curfail = 0;
 	lastfail.tv_sec = 0;
-	ppsratecheck(&lastfail, &curfail, 1);
+	eventratecheck(&lastfail, &curfail, 1);
+	td = curthread;
 	while (1) {
-		g_waitidle();
+		g_waitidle(td);
 		mtx_lock(&root_holds_mtx);
 		if (TAILQ_EMPTY(&root_holds)) {
 			mtx_unlock(&root_holds_mtx);
 			break;
 		}
-		if (ppsratecheck(&lastfail, &curfail, 1)) {
+		if (eventratecheck(&lastfail, &curfail, 1)) {
 			printf("Root mount waiting for:");
 			TAILQ_FOREACH(h, &root_holds, list)
 				printf(" %s", h->who);
@@ -1003,7 +1006,7 @@ vfs_mountroot_wait(void)
 		    hz);
 		TSUNWAIT("root mount");
 	}
-	g_waitidle();
+	g_waitidle(td);
 
 	TSEXIT();
 }
@@ -1029,7 +1032,7 @@ vfs_mountroot_wait_if_neccessary(const char *fs, const char *dev)
 	 * Note that we must wait for GEOM to finish reconfiguring itself,
 	 * eg for geom_part(4) to finish tasting.
 	 */
-	g_waitidle();
+	g_waitidle(curthread);
 	if (parse_mount_dev_present(dev))
 		return (0);
 

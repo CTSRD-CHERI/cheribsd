@@ -87,7 +87,6 @@ set_thread_tracing(void)
 		error = sysarch(QEMU_SET_QTRACE_USER, &intval);
 		if (error)
 			err(EX_OSERR, "QEMU_SET_QTRACE_USER");
-		CHERI_START_USER_TRACE;
 	}
 }
 

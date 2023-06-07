@@ -38,6 +38,8 @@
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/err.h>
+#include <linux/bitops.h> /* for BITS_PER_LONG */
+#include <linux/stdarg.h>
 
 #include <sys/libkern.h>
 
@@ -95,6 +97,15 @@ kmemdup(const void *src, size_t len, gfp_t gfp)
 	if (dst != NULL)
 		memcpy(dst, src, len);
 	return (dst);
+}
+
+static inline char *
+strndup_user(const char __user * __capability ustr, long n)
+{
+	if (n < 1)
+		return (ERR_PTR(-EINVAL));
+
+	return (memdup_user_nul(ustr, n - 1));
 }
 
 static inline char *
@@ -196,4 +207,64 @@ strscpy(char* dst, const char* src, size_t len)
 	return (-E2BIG);
 }
 
-#endif					/* _LINUXKPI_LINUX_STRING_H_ */
+static inline ssize_t
+strscpy_pad(char* dst, const char* src, size_t len)
+{
+
+	bzero(dst, len);
+
+	return (strscpy(dst, src, len));
+}
+
+static inline void *
+memset32(uint32_t *b, uint32_t c, size_t len)
+{
+	uint32_t *dst = b;
+
+	while (len--)
+		*dst++ = c;
+	return (b);
+}
+
+static inline void *
+memset64(uint64_t *b, uint64_t c, size_t len)
+{
+	uint64_t *dst = b;
+
+	while (len--)
+		*dst++ = c;
+	return (b);
+}
+
+static inline void *
+memset_p(void **p, void *v, size_t n)
+{
+
+	if (BITS_PER_LONG == 32)
+		return (memset32((uint32_t *)p, (uintptr_t)v, n));
+	else
+		return (memset64((uint64_t *)p, (uintptr_t)v, n));
+}
+
+static inline void
+memcpy_and_pad(void *dst, size_t dstlen, const void *src, size_t len, int ch)
+{
+
+	if (len >= dstlen) {
+		memcpy(dst, src, dstlen);
+	} else {
+		memcpy(dst, src, len);
+		/* Pad with given padding character. */
+		memset((char *)dst + len, ch, dstlen - len);
+	}
+}
+
+#define	memset_startat(ptr, bytepat, smember)				\
+({									\
+	uint8_t *_ptr = (uint8_t *)(ptr);				\
+	int _c = (int)(bytepat);					\
+	size_t _o = offsetof(typeof(*(ptr)), smember);			\
+	memset(_ptr + _o, _c, sizeof(*(ptr)) - _o);			\
+})
+
+#endif	/* _LINUXKPI_LINUX_STRING_H_ */

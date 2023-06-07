@@ -508,7 +508,7 @@ atomic_thread_fence_seq_cst(void)
 #endif /* _MACHINE_ATOMIC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20200803,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer"

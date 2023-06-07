@@ -24,6 +24,7 @@ SUBDIR= cat \
 	ls \
 	mkdir \
 	mv \
+	nproc \
 	pax \
 	pkill \
 	ps \
@@ -38,6 +39,7 @@ SUBDIR= cat \
 	stty \
 	sync \
 	test \
+	timeout \
 	uuidgen
 
 # Small cheri programs
@@ -45,9 +47,7 @@ SUBDIR= cat \
 SUBDIR.${MK_CHERI}+=	cheri_minimal_dynamic_exe
 SUBDIR.${MK_CHERI}+=	cheri_minimal_pie_exe
 SUBDIR.${MK_CHERI}+=	helloworld
-.if ${MK_CXX} != "no"
 SUBDIR.${MK_CHERI}+=	helloworld_cxx
-.endif
 SUBDIR.${MK_CHERI}+=	helloworld_static
 
 SUBDIR.${MK_CHERI}+=	cheribsdtest

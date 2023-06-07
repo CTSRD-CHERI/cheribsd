@@ -32,7 +32,7 @@
 .\"	from: @(#)sh.1	8.6 (Berkeley) 5/4/95
 .\" $FreeBSD$
 .\"
-.Dd May 10, 2021
+.Dd December 14, 2022
 .Dt SH 1
 .Os
 .Sh NAME
@@ -214,7 +214,7 @@ Do not overwrite existing files with
 .Ql > .
 .It Fl E Li emacs
 Enable the built-in
-.Xr emacs 1
+.Xr emacs 1 Pq Pa ports/editors/emacs
 command line editor (disables the
 .Fl V
 option if it has been set;
@@ -358,8 +358,9 @@ This option only has a long name.
 .It Li verify
 Set
 .Dv O_VERIFY
-when sourcing files or loading profiles. See also
-.Xr mac_veriexec 4 .
+when sourcing files or loading profiles.
+.\" See also
+.\" .Xr mac_veriexec 4 . TODO Does not exist; write it.
 .El
 .Pp
 The
@@ -377,7 +378,7 @@ to be enabled or disabled.
 For example, the following two invocations of
 .Nm
 both enable the built-in
-.Xr emacs 1
+.Xr emacs 1 Pq Pa ports/editors/emacs
 command line editor:
 .Bd -literal -offset indent
 set -E
@@ -1445,6 +1446,24 @@ for normal users and
 for superusers.
 .It Li \e\e
 A literal backslash.
+.It Li \e[
+Start of a sequence of non-printing characters (used, for example,
+to embed ANSI CSI sequences into the prompt).
+.It Li \e]
+End of a sequence of non-printing characters.
+.El
+.Pp
+The following special and non-printing characters are supported
+within the sequence of non-printing characters:
+.Bl -tag -width indent
+.It Li \ea
+Emits ASCII BEL (0x07, 007) character.
+.It Li \ee
+Emits ASCII ESC (0x1b, 033) character.
+.It Li \er
+Emits ASCII CR (0x0d, 015) character.
+.It Li \en
+Emits CRLF sequence.
 .El
 .It Va PS2
 The secondary prompt string, which defaults to
@@ -2868,7 +2887,7 @@ will return the argument.
 .Xr chsh 1 ,
 .Xr echo 1 ,
 .Xr ed 1 ,
-.Xr emacs 1 ,
+.Xr emacs 1 Pq Pa ports/editors/emacs ,
 .Xr kill 1 ,
 .Xr printf 1 ,
 .Xr pwd 1 ,

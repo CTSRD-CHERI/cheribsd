@@ -92,7 +92,7 @@ static uint8_t cmd_type[8] = {0x01, 0x86, 0xff, 0x01, 0x00, 0x00, 0x00, 0x00};
 
 struct ugold_softc;
 struct ugold_readout_msg {
-	struct usb_proc_msg hdr;
+	struct usb_proc_msg hdr __subobject_member_used_for_c_inheritance;
 	struct ugold_softc *sc;
 };
 

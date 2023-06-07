@@ -264,10 +264,12 @@ struct accept_filter_arg {
 #define	AF_ARP		35
 #define	AF_BLUETOOTH	36		/* Bluetooth sockets */
 #define	AF_IEEE80211	37		/* IEEE 802.11 protocol */
+#define	AF_NETLINK	38		/* Netlink protocol */
 #define	AF_INET_SDP	40		/* OFED Socket Direct Protocol ipv4 */
 #define	AF_INET6_SDP	42		/* OFED Socket Direct Protocol ipv6 */
 #define	AF_HYPERV	43		/* HyperV sockets */
-#define	AF_MAX		43
+#define	AF_DIVERT	44		/* divert(4) */
+#define	AF_MAX		44
 /*
  * When allocating a new AF_ constant, please only allocate
  * even numbered constants for FreeBSD until 134 as odd numbered AF_
@@ -389,8 +391,10 @@ struct sockproto {
 #define	PF_ARP		AF_ARP
 #define	PF_BLUETOOTH	AF_BLUETOOTH
 #define	PF_IEEE80211	AF_IEEE80211
+#define	PF_NETLINK	AF_NETLINK
 #define	PF_INET_SDP	AF_INET_SDP
 #define	PF_INET6_SDP	AF_INET6_SDP
+#define	PF_DIVERT	AF_DIVERT
 
 #define	PF_MAX		AF_MAX
 
@@ -759,7 +763,6 @@ __END_DECLS
 #ifdef _KERNEL
 struct socket;
 
-struct tcpcb *so_sototcpcb(struct socket *so);
 struct inpcb *so_sotoinpcb(struct socket *so);
 struct sockbuf *so_sockbuf_snd(struct socket *);
 struct sockbuf *so_sockbuf_rcv(struct socket *);
@@ -792,10 +795,11 @@ void so_unlock(struct socket *so);
 #endif /* !_SYS_SOCKET_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
-//     "pointer_alignment"
+//     "pointer_alignment",
+//     "user_capabilities"
 //   ],
 //   "changes_purecap": [
 //     "subobject_bounds"

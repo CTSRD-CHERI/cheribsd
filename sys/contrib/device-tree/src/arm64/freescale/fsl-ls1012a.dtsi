@@ -204,7 +204,7 @@
 				compatible = "fsl,sec-v5.4-job-ring",
 					     "fsl,sec-v5.0-job-ring",
 					     "fsl,sec-v4.0-job-ring";
-				reg	   = <0x10000 0x10000>;
+				reg = <0x10000 0x10000>;
 				interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
 			};
 
@@ -212,7 +212,7 @@
 				compatible = "fsl,sec-v5.4-job-ring",
 					     "fsl,sec-v5.0-job-ring",
 					     "fsl,sec-v4.0-job-ring";
-				reg	   = <0x20000 0x10000>;
+				reg = <0x20000 0x10000>;
 				interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
 			};
 
@@ -220,7 +220,7 @@
 				compatible = "fsl,sec-v5.4-job-ring",
 					     "fsl,sec-v5.0-job-ring",
 					     "fsl,sec-v4.0-job-ring";
-				reg	   = <0x30000 0x10000>;
+				reg = <0x30000 0x10000>;
 				interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
 			};
 
@@ -228,7 +228,7 @@
 				compatible = "fsl,sec-v5.4-job-ring",
 					     "fsl,sec-v5.0-job-ring",
 					     "fsl,sec-v4.0-job-ring";
-				reg	   = <0x40000 0x10000>;
+				reg = <0x40000 0x10000>;
 				interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
 			};
 
@@ -238,37 +238,45 @@
 					     "fsl,sec-v4.0-rtic";
 				#address-cells = <1>;
 				#size-cells = <1>;
-				reg = <0x60000 0x100 0x60e00 0x18>;
+				reg = <0x60000 0x100>, <0x60e00 0x18>;
 				ranges = <0x0 0x60100 0x500>;
 
 				rtic_a: rtic-a@0 {
 					compatible = "fsl,sec-v5.4-rtic-memory",
 						     "fsl,sec-v5.0-rtic-memory",
 						     "fsl,sec-v4.0-rtic-memory";
-					reg = <0x00 0x20 0x100 0x100>;
+					reg = <0x00 0x20>, <0x100 0x100>;
 				};
 
 				rtic_b: rtic-b@20 {
 					compatible = "fsl,sec-v5.4-rtic-memory",
 						     "fsl,sec-v5.0-rtic-memory",
 						     "fsl,sec-v4.0-rtic-memory";
-					reg = <0x20 0x20 0x200 0x100>;
+					reg = <0x20 0x20>, <0x200 0x100>;
 				};
 
 				rtic_c: rtic-c@40 {
 					compatible = "fsl,sec-v5.4-rtic-memory",
 						     "fsl,sec-v5.0-rtic-memory",
 						     "fsl,sec-v4.0-rtic-memory";
-					reg = <0x40 0x20 0x300 0x100>;
+					reg = <0x40 0x20>, <0x300 0x100>;
 				};
 
 				rtic_d: rtic-d@60 {
 					compatible = "fsl,sec-v5.4-rtic-memory",
 						     "fsl,sec-v5.0-rtic-memory",
 						     "fsl,sec-v4.0-rtic-memory";
-					reg = <0x60 0x20 0x400 0x100>;
+					reg = <0x60 0x20>, <0x400 0x100>;
 				};
 			};
+		};
+
+		sfp: efuse@1e80000 {
+			compatible = "fsl,ls1021a-sfp";
+			reg = <0x0 0x1e80000 0x0 0x10000>;
+			clocks = <&clockgen QORIQ_CLK_PLATFORM_PLL
+					    QORIQ_CLK_PLL_DIV(4)>;
+			clock-names = "sfp";
 		};
 
 		sec_mon: sec_mon@1e90000 {
@@ -465,7 +473,7 @@
 			status = "disabled";
 		};
 
-		edma0: edma@2c00000 {
+		edma0: dma-controller@2c00000 {
 			#dma-cells = <2>;
 			compatible = "fsl,vf610-edma";
 			reg = <0x0 0x2c00000 0x0 0x10000>,
@@ -522,8 +530,8 @@
 
 		pcie1: pcie@3400000 {
 			compatible = "fsl,ls1012a-pcie";
-			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
-			       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
+			reg = <0x00 0x03400000 0x0 0x00100000>, /* controller registers */
+			      <0x40 0x00000000 0x0 0x00002000>; /* configuration space */
 			reg-names = "regs", "config";
 			interrupts = <0 118 0x4>, /* controller interrupt */
 				     <0 117 0x4>; /* PME interrupt */

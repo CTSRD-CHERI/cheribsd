@@ -140,8 +140,8 @@ CRUNCH_LIBS+= -l80211 -lalias -lcam -lncursesw -ldevstat -lipsec -llzma
 CRUNCH_LIBS+= -lavl -lpthread -luutil -lumem -ltpool -lspl
 CRUNCH_LIBS_zfs+=	${LIBBE} \
 			${LIBZPOOL} \
-			${LIBZUTIL} \
 			${LIBZFS} \
+			${LIBZUTIL} \
 			${LIBZFS_CORE} \
 			${LIBZFSBOOTENV} \
 			${LIBICP_RESCUE} \
@@ -160,7 +160,7 @@ CRUNCH_LIBS+= -lmd
 CRUNCH_LIBS+= -lmt -lsbuf -lufs -lz
 
 .if ${MACHINE_CPUARCH} == "i386"
-CRUNCH_PROGS_sbin+= bsdlabel sconfig fdisk
+CRUNCH_PROGS_sbin+= bsdlabel fdisk
 CRUNCH_ALIAS_bsdlabel= disklabel
 #CRUNCH_PROGS+= mount_smbfs
 #CRUNCH_LIBS+= -lsmb
@@ -212,10 +212,13 @@ CRUNCH_PROGS_usr.bin+= zstd
 CRUNCH_ALIAS_zstd= unzstd zstdcat zstdmt
 CRUNCH_LIBS+=	${LDADD_zstd}
 
+CRUNCH_PROGS_usr.bin+=	fetch
+CRUNCH_LIBS+=	-lfetch
+
 CRUNCH_PROGS_usr.bin+= tar
 CRUNCH_LIBS+= -larchive
 .if ${MK_OPENSSL} != "no"
-CRUNCH_LIBS+= -lcrypto
+CRUNCH_LIBS+= -lssl -lcrypto
 .endif
 CRUNCH_LIBS+= -lmd
 
@@ -244,6 +247,9 @@ CRUNCH_ALIAS_chown= chgrp
 
 CRUNCH_LIBS+=		${OBJTOP}/lib/libifconfig/libifconfig.a
 CRUNCH_BUILDOPTS+=	CRUNCH_CFLAGS+=-I${OBJTOP}/lib/libifconfig
+# ld.lld: error: could not determine size of cap reloc against local object nla_p_donemsg
+# >>> defined in libifconfig_carp.c (libifconfig_carp.o:(.rodata+0x1E2C70)
+LD_FATAL_WARNINGS=	no
 
 CRUNCH_LIBS_ifconfig+=	${LIBNV}
 

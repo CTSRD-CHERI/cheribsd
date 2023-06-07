@@ -454,7 +454,7 @@ uint16_t ehci_get_port_speed_hostc(struct ehci_softc *sc, uint16_t index);
 #endif					/* _EHCI_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20210404,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "subobject_bounds"

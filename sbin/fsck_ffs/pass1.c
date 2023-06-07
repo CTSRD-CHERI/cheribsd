@@ -219,9 +219,10 @@ pass1(void)
 		 * If we were not able to determine in advance which inodes
 		 * were in use, then reduce the size of the inoinfo structure
 		 * to the size necessary to describe the inodes that we
-		 * really found.
+		 * really found. Always leave map space in the first cylinder
+		 * group in case we need to a root or lost+found directory.
 		 */
-		if (inumber == lastino)
+		if (inumber == lastino || c == 0)
 			continue;
 		inostathead[c].il_numalloced = inosused;
 		if (inosused == 0) {
@@ -251,8 +252,10 @@ checkinode(ino_t inumber, struct inodesc *idesc, int rebuildcg)
 	intmax_t size, fixsize;
 	int j, ret, offset;
 
-	if ((dp = getnextinode(inumber, rebuildcg)) == NULL)
+	if ((dp = getnextinode(inumber, rebuildcg)) == NULL) {
+		pfatal("INVALID INODE");
 		goto unknown;
+	}
 	mode = DIP(dp, di_mode) & IFMT;
 	if (mode == 0) {
 		if ((sblock.fs_magic == FS_UFS1_MAGIC &&
@@ -290,6 +293,7 @@ checkinode(ino_t inumber, struct inodesc *idesc, int rebuildcg)
 	    (mode == IFDIR && DIP(dp, di_size) > MAXDIRSIZE)) {
 		if (debug)
 			printf("bad size %ju:", (uintmax_t)DIP(dp, di_size));
+		pfatal("BAD FILE SIZE");
 		goto unknown;
 	}
 	if (!preen && mode == IFMT && reply("HOLD BAD BLOCK") == 1) {
@@ -305,19 +309,22 @@ checkinode(ino_t inumber, struct inodesc *idesc, int rebuildcg)
 		if (debug)
 			printf("bad special-file size %ju:",
 			    (uintmax_t)DIP(dp, di_size));
+		pfatal("BAD SPECIAL-FILE SIZE");
 		goto unknown;
 	}
 	if ((mode == IFBLK || mode == IFCHR) &&
 	    (dev_t)DIP(dp, di_rdev) == NODEV) {
 		if (debug)
 			printf("bad special-file rdev NODEV:");
+		pfatal("BAD SPECIAL-FILE RDEV");
 		goto unknown;
 	}
 	ndb = howmany(DIP(dp, di_size), sblock.fs_bsize);
 	if (ndb < 0) {
 		if (debug)
-			printf("bad size %ju ndb %ju:",
+			printf("negative size %ju ndb %ju:",
 				(uintmax_t)DIP(dp, di_size), (uintmax_t)ndb);
+		pfatal("NEGATIVE FILE SIZE");
 		goto unknown;
 	}
 	if (mode == IFBLK || mode == IFCHR)
@@ -342,24 +349,42 @@ checkinode(ino_t inumber, struct inodesc *idesc, int rebuildcg)
 			}
 		}
 	}
-	for (j = ndb; ndb < UFS_NDADDR && j < UFS_NDADDR; j++)
-		if (DIP(dp, di_db[j]) != 0) {
-			if (debug)
-				printf("bad direct addr[%d]: %ju\n", j,
-				    (uintmax_t)DIP(dp, di_db[j]));
-			goto unknown;
+	for (j = ndb; ndb < UFS_NDADDR && j < UFS_NDADDR; j++) {
+		if (DIP(dp, di_db[j]) == 0)
+			continue;
+		if (debug)
+			printf("invalid direct addr[%d]: %ju\n", j,
+			    (uintmax_t)DIP(dp, di_db[j]));
+		pfatal("INVALID DIRECT BLOCK");
+		ginode(inumber, &ip);
+		prtinode(&ip);
+		if (reply("CLEAR") == 1) {
+			DIP_SET(ip.i_dp, di_db[j], 0);
+			inodirty(&ip);
 		}
+		irelse(&ip);
+	}
 	for (j = 0, ndb -= UFS_NDADDR; ndb > 0; j++)
 		ndb /= NINDIR(&sblock);
-	for (; j < UFS_NIADDR; j++)
-		if (DIP(dp, di_ib[j]) != 0) {
-			if (debug)
-				printf("bad indirect addr: %ju\n",
-				    (uintmax_t)DIP(dp, di_ib[j]));
-			goto unknown;
+	for (; j < UFS_NIADDR; j++) {
+		if (DIP(dp, di_ib[j]) == 0)
+			continue;
+		if (debug)
+			printf("invalid indirect addr: %ju\n",
+			    (uintmax_t)DIP(dp, di_ib[j]));
+		pfatal("INVALID INDIRECT BLOCK");
+		ginode(inumber, &ip);
+		prtinode(&ip);
+		if (reply("CLEAR") == 1) {
+			DIP_SET(ip.i_dp, di_ib[j], 0);
+			inodirty(&ip);
 		}
-	if (ftypeok(dp) == 0)
+		irelse(&ip);
+	}
+	if (ftypeok(dp) == 0) {
+		pfatal("UNKNOWN FILE TYPE");
 		goto unknown;
+	}
 	n_files++;
 	inoinfo(inumber)->ino_linkcnt = DIP(dp, di_nlink);
 	if (mode == IFDIR) {
@@ -483,15 +508,14 @@ checkinode(ino_t inumber, struct inodesc *idesc, int rebuildcg)
 	}
 	return (1);
 unknown:
-	pfatal("UNKNOWN FILE TYPE I=%lu", (u_long)inumber);
-	inoinfo(inumber)->ino_state = FCLEAR;
+	ginode(inumber, &ip);
+	prtinode(&ip);
+	inoinfo(inumber)->ino_state = USTATE;
 	if (reply("CLEAR") == 1) {
-		inoinfo(inumber)->ino_state = USTATE;
-		ginode(inumber, &ip);
 		clearinode(ip.i_dp);
 		inodirty(&ip);
-		irelse(&ip);
 	}
+	irelse(&ip);
 	return (1);
 }
 

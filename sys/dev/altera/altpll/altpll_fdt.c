@@ -146,7 +146,7 @@ DRIVER_MODULE(altpll, simplebus, altpll_fdt_driver,
     altpll_devclass, 0, 0);
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "other"

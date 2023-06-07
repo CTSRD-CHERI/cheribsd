@@ -102,12 +102,25 @@ def buildImage(params, String suffix) {
         }
     }
     // No need for MFS_ROOT kernels when running the testsuite
-    if (!GlobalVars.isTestSuiteJob && suffix.startsWith('riscv64')) {
+    if (!GlobalVars.isTestSuiteJob && (suffix.startsWith('aarch64') || suffix.startsWith('morello') || suffix.startsWith('riscv64'))) {
+        def extraKernelsArgs = []
+        // AArch64/Morello doesn't have FPGA-specific kernels, and currently lacks MFS-ROOT-NODEBUG kernel configs
+        if (suffix.startsWith('riscv64')) {
+            extraKernelsArgs += [
+                    '--cheribsd/build-bench-kernels',
+                    '--cheribsd/build-fpga-kernels',
+            ]
+        } else {
+            // Override default from the earlier main build step
+            extraKernelsArgs += [
+                    '--cheribsd/no-build-bench-kernels',
+            ]
+        }
         stage("Building MFS_ROOT kernels") {
             sh label: "Building MFS_ROOT disk image",
                script: "./cheribuild/jenkins-cheri-build.py --build disk-image-mfs-root-${suffix} ${params.extraArgs}"
             sh label: "Building MFS_ROOT kernels",
-               script: "./cheribuild/jenkins-cheri-build.py --build cheribsd-mfs-root-kernel-${suffix} --cheribsd/build-bench-kernels --cheribsd/build-fpga-kernels ${params.extraArgs}"
+               script: "./cheribuild/jenkins-cheri-build.py --build cheribsd-mfs-root-kernel-${suffix} ${params.extraArgs} ${extraKernelsArgs.join(" ")}"
             // Move MFS_ROOT kernels into tarball/ so they aren't deleted
             sh "mv -fv kernel-${suffix}* tarball/"
         }
@@ -268,7 +281,7 @@ selectedArchitectures.each { suffix ->
         def extraBuildOptions = '-s'
         if (GlobalVars.isTestSuiteJob) {
             // Enable additional debug checks when running the testsuite
-            extraBuildOptions += ' -DMALLOC_DEBUG'
+            extraBuildOptions += ' -DWITHOUT_MALLOC_PRODUCTION'
         }
         def cheribuildArgs = [
                 "'--cheribsd/build-options=${extraBuildOptions}'",

@@ -31,8 +31,22 @@
 #ifndef _LINUXKPI_ACPI_VIDEO_H_
 #define _LINUXKPI_ACPI_VIDEO_H_
 
+#include <sys/errno.h>
+
 #define	ACPI_VIDEO_CLASS	"video"
 
 #define	ACPI_VIDEO_NOTIFY_PROBE	0x81
+
+static inline int
+acpi_video_register(void)
+{
+
+	return (-ENODEV);
+}
+
+static inline void
+acpi_video_unregister(void)
+{
+}
 
 #endif	/* _LINUXKPI_ACPI_VIDEO_H_ */

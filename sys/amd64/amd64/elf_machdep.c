@@ -446,7 +446,7 @@ elf_cpu_parse_dynamic(caddr_t loadbase __unused, Elf_Dyn *dynamic __unused)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200804,
+//   "updated": 20221129,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer"

@@ -58,6 +58,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if_var.h>
 #include <net/if_media.h>
 #include <net/if_llc.h>
+#include <net/if_private.h>
 #include <net/ethernet.h>
 
 #include <net80211/ieee80211_var.h>
@@ -1119,7 +1120,7 @@ ieee80211_mesh_forward_to_gates(struct ieee80211vap *vap,
 		ieee80211_mesh_rt_update(rt_dest, ms->ms_ppath->mpp_inact);
 		MESH_RT_UNLOCK(ms);
 		/* XXX: lock?? */
-		mcopy = m_dup(m, M_NOWAIT);
+		mcopy = m_dup(m, IEEE80211_M_NOWAIT);
 		for (; mcopy != NULL; mcopy = next) {
 			next = mcopy->m_nextpkt;
 			mcopy->m_nextpkt = NULL;
@@ -1175,7 +1176,7 @@ mesh_forward(struct ieee80211vap *vap, struct mbuf *m,
 		vap->iv_stats.is_mesh_fwd_disabled++;
 		return;
 	}
-	mcopy = m_dup(m, M_NOWAIT);
+	mcopy = m_dup(m, IEEE80211_M_NOWAIT);
 	if (mcopy == NULL) {
 		IEEE80211_NOTE_FRAME(vap, IEEE80211_MSG_MESH, wh,
 		    "%s", "frame not fwd'd, cannot dup");
@@ -1797,7 +1798,7 @@ mesh_input(struct ieee80211_node *ni, struct mbuf *m,
 			    ether_sprintf(wh->i_addr2), rssi);
 		}
 #endif
-		if (wh->i_fc[1] & IEEE80211_FC1_PROTECTED) {
+		if (IEEE80211_IS_PROTECTED(wh)) {
 			IEEE80211_DISCARD(vap, IEEE80211_MSG_INPUT,
 			    wh, NULL, "%s", "WEP set but not permitted");
 			vap->iv_stats.is_rx_mgtdiscard++; /* XXX */
@@ -2194,7 +2195,7 @@ mesh_parse_meshpeering_action(struct ieee80211_node *ni,
 		sendclose = 1;
 		IEEE80211_DISCARD(vap,
 		    IEEE80211_MSG_ACTION | IEEE80211_MSG_MESH,
-		    wh, NULL, "%s", "configuration missmatch");
+		    wh, NULL, "%s", "configuration mismatch");
 	}
 
 	if (sendclose) {
@@ -2668,7 +2669,7 @@ mesh_send_action(struct ieee80211_node *ni,
 		return EIO;		/* XXX */
 	}
 
-	M_PREPEND(m, sizeof(struct ieee80211_frame), M_NOWAIT);
+	M_PREPEND(m, sizeof(struct ieee80211_frame), IEEE80211_M_NOWAIT);
 	if (m == NULL) {
 		ieee80211_free_node(ni);
 		return ENOMEM;

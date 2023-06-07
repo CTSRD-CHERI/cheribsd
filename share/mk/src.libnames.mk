@@ -101,6 +101,7 @@ _LIBRARIES=	\
 		archive \
 		asn1 \
 		avl \
+		BlocksRuntime \
 		be \
 		begemot \
 		bluetooth \
@@ -122,6 +123,7 @@ _LIBRARIES=	\
 		cap_pwd \
 		cap_sysctl \
 		cap_syslog \
+		cheri_caprevoke \
 		com_err \
 		compiler_rt \
 		crypt \
@@ -181,7 +183,6 @@ _LIBRARIES=	\
 		nv \
 		nvpair \
 		opencsd \
-		opie \
 		pam \
 		panel \
 		panelw \
@@ -279,6 +280,10 @@ LIBVERIEXEC?=	${LIBVERIEXECDIR}/libveriexec.a
 # 2nd+ order consumers.  Auto-generating this would be better.
 _DP_80211=	sbuf bsdxml
 _DP_9p=		sbuf
+.if ${MK_CASPER} != "no"
+_DP_9p+=	casper cap_pwd cap_grp
+.endif
+
 # XXX: Not bootstrapped so uses host version on non-FreeBSD, so don't use a
 # FreeBSD-specific dependency list
 .if ${.MAKE.OS} == "FreeBSD" || !defined(BOOTSTRAPPING)
@@ -323,7 +328,6 @@ _DP_cap_syslog=	nv
 _DP_pcap=	ibverbs mlx5
 .endif
 _DP_pjdlog=	util
-_DP_opie=	md
 _DP_usb=	pthread
 _DP_unbound=	ssl crypto pthread
 _DP_rt=	pthread
@@ -334,9 +338,7 @@ _DP_radius=	crypto
 .endif
 _DP_rtld_db=	elf procstat
 _DP_procstat=	kvm util elf
-.if ${MK_CXX} == "yes"
 _DP_proc=	cxxrt
-.endif
 .if ${MK_CDDL} != "no"
 _DP_proc+=	ctf
 .endif
@@ -364,7 +366,7 @@ _DP_gmock=	gtest
 _DP_gmock_main=	gmock
 _DP_gtest_main=	gtest
 _DP_devstat=	kvm
-_DP_pam=	radius tacplus opie md util
+_DP_pam=	radius tacplus md util
 .if ${MK_KERBEROS} != "no"
 _DP_pam+=	krb5
 .endif
@@ -767,6 +769,8 @@ LIBEGACYDIR=	${_LIB_OBJTOP}/tools/build
 LIBLNDIR=	${_LIB_OBJTOP}/usr.bin/lex/lib
 
 LIBTERMCAPWDIR=	${LIBTINFOWDIR}
+
+.-include <site.src.libnames.mk>
 
 # Default other library directories to lib/libNAME.
 .for lib in ${_LIBRARIES}

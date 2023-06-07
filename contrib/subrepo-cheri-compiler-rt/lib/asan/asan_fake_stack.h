@@ -99,7 +99,7 @@ class FakeStack {
   }
 
   // Divide n by the number of frames in size class.
-  static uptr ModuloNumberOfFrames(uptr stack_size_log, uptr class_id, usize n) {
+  static uptr ModuloNumberOfFrames(uptr stack_size_log, uptr class_id, uptr n) {
     return n & (NumberOfFrames(stack_size_log, class_id) - 1);
   }
 
@@ -156,7 +156,7 @@ class FakeStack {
 
  private:
   FakeStack() { }
-  static const usize kFlagsOffset = 4096;  // This is were the flags begin.
+  static const uptr kFlagsOffset = 4096;  // This is were the flags begin.
   // Must match the number of uses of DEFINE_STACK_MALLOC_FREE_WITH_CLASS_ID
   COMPILER_CHECK(kNumberOfSizeClasses == 11);
   static const uptr kMaxStackMallocSize = ((uptr)1) << kMaxStackFrameSizeLog;

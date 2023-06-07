@@ -64,8 +64,6 @@ class AsanChunkView {
   bool Eq(const AsanChunkView &c) const { return chunk_ == c.chunk_; }
   u32 GetAllocStackId() const;
   u32 GetFreeStackId() const;
-  StackTrace GetAllocStack() const;
-  StackTrace GetFreeStack() const;
   AllocType GetAllocType() const;
   bool AddrIsInside(uptr addr, uptr access_size, sptr *offset) const {
     if (addr >= Beg() && (addr + access_size) <= End()) {
@@ -115,8 +113,8 @@ class AsanChunkFifoList: public IntrusiveList<AsanChunk> {
 };
 
 struct AsanMapUnmapCallback {
-  void OnMap(uptr p, usize size) const;
-  void OnUnmap(uptr p, usize size) const;
+  void OnMap(uptr p, uptr size) const;
+  void OnUnmap(uptr p, uptr size) const;
 };
 
 #if SANITIZER_CAN_USE_ALLOCATOR64
@@ -158,12 +156,12 @@ typedef DefaultSizeClassMap SizeClassMap;
 # endif
 template <typename AddressSpaceViewTy>
 struct AP64 {  // Allocator64 parameters. Deliberately using a short name.
-  static const vaddr kSpaceBeg = kAllocatorSpace;
-  static const usize kSpaceSize = kAllocatorSize;
-  static const usize kMetadataSize = 0;
+  static const uptr kSpaceBeg = kAllocatorSpace;
+  static const uptr kSpaceSize = kAllocatorSize;
+  static const uptr kMetadataSize = 0;
   typedef __asan::SizeClassMap SizeClassMap;
   typedef AsanMapUnmapCallback MapUnmapCallback;
-  static const usize kFlags = 0;
+  static const uptr kFlags = 0;
   using AddressSpaceView = AddressSpaceViewTy;
 };
 
@@ -174,14 +172,14 @@ using PrimaryAllocator = PrimaryAllocatorASVT<LocalAddressSpaceView>;
 typedef CompactSizeClassMap SizeClassMap;
 template <typename AddressSpaceViewTy>
 struct AP32 {
-  static const vaddr kSpaceBeg = 0;
+  static const uptr kSpaceBeg = 0;
   static const u64 kSpaceSize = SANITIZER_MMAP_RANGE_SIZE;
-  static const usize kMetadataSize = 0;
+  static const uptr kMetadataSize = 0;
   typedef __asan::SizeClassMap SizeClassMap;
-  static const usize kRegionSizeLog = 20;
+  static const uptr kRegionSizeLog = 20;
   using AddressSpaceView = AddressSpaceViewTy;
   typedef AsanMapUnmapCallback MapUnmapCallback;
-  static const usize kFlags = 0;
+  static const uptr kFlags = 0;
 };
 template <typename AddressSpaceView>
 using PrimaryAllocatorASVT = SizeClassAllocator32<AP32<AddressSpaceView> >;
@@ -205,22 +203,22 @@ struct AsanThreadLocalMallocStorage {
   AsanThreadLocalMallocStorage() {}
 };
 
-void *asan_memalign(uptr alignment, usize size, BufferedStackTrace *stack,
+void *asan_memalign(uptr alignment, uptr size, BufferedStackTrace *stack,
                     AllocType alloc_type);
 void asan_free(void *ptr, BufferedStackTrace *stack, AllocType alloc_type);
-void asan_delete(void *ptr, usize size, usize alignment,
+void asan_delete(void *ptr, uptr size, uptr alignment,
                  BufferedStackTrace *stack, AllocType alloc_type);
 
-void *asan_malloc(usize size, BufferedStackTrace *stack);
-void *asan_calloc(usize nmemb, usize size, BufferedStackTrace *stack);
-void *asan_realloc(void *p, usize size, BufferedStackTrace *stack);
-void *asan_reallocarray(void *p, usize nmemb, usize size,
+void *asan_malloc(uptr size, BufferedStackTrace *stack);
+void *asan_calloc(uptr nmemb, uptr size, BufferedStackTrace *stack);
+void *asan_realloc(void *p, uptr size, BufferedStackTrace *stack);
+void *asan_reallocarray(void *p, uptr nmemb, uptr size,
                         BufferedStackTrace *stack);
-void *asan_valloc(usize size, BufferedStackTrace *stack);
-void *asan_pvalloc(usize size, BufferedStackTrace *stack);
+void *asan_valloc(uptr size, BufferedStackTrace *stack);
+void *asan_pvalloc(uptr size, BufferedStackTrace *stack);
 
-void *asan_aligned_alloc(uptr alignment, usize size, BufferedStackTrace *stack);
-int asan_posix_memalign(void **memptr, usize alignment, usize size,
+void *asan_aligned_alloc(uptr alignment, uptr size, BufferedStackTrace *stack);
+int asan_posix_memalign(void **memptr, uptr alignment, uptr size,
                         BufferedStackTrace *stack);
 uptr asan_malloc_usable_size(const void *ptr, uptr pc, uptr bp);
 

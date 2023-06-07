@@ -892,7 +892,7 @@ struct __no_subobject_bounds {				\
 #endif /* !_SYS_QUEUE_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190812,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "subobject_bounds"

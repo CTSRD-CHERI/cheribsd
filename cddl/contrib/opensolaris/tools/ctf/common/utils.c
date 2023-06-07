@@ -22,7 +22,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20221128,
  *   "target_type": "lib",
  *   "changes": [],
  *   "change_comment": "duplicate definition of vwarn()"
@@ -44,30 +44,6 @@
 #include "utils.h"
 
 /*LINTLIBRARY*/
-
-static const char *pname;
-
-#pragma init(getpname)
-const char *
-getpname(void)
-{
-	const char *p, *q;
-
-	if (pname != NULL)
-		return (pname);
-
-	if ((p = getexecname()) != NULL)
-		q = strrchr(p, '/');
-	else
-		q = NULL;
-
-	if (q == NULL)
-		pname = p;
-	else
-		pname = q + 1;
-
-	return (pname);
-}
 
 void
 vdie(const char *format, va_list alist)

@@ -41,6 +41,7 @@
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/rwlock.h>
+#include <sys/seqc.h>
 #include <sys/sx.h>
 #include <sys/vmem.h>
 #include <vm/uma.h>
@@ -108,11 +109,7 @@ enum {
 	CTRL_EQ_QSIZE = 1024,
 	TX_EQ_QSIZE = 1024,
 
-#if MJUMPAGESIZE != MCLBYTES
 	SW_ZONE_SIZES = 4,	/* cluster, jumbop, jumbo9k, jumbo16k */
-#else
-	SW_ZONE_SIZES = 3,	/* cluster, jumbo9k, jumbo16k */
-#endif
 	CL_METADATA_SIZE = CACHE_LINE_SIZE,
 
 	SGE_MAX_WR_NDESC = SGE_MAX_WR_LEN / EQ_ESIZE, /* max WR size in desc */
@@ -128,7 +125,7 @@ enum {
 enum {
 	/* adapter intr_type */
 	INTR_INTX	= (1 << 0),
-	INTR_MSI 	= (1 << 1),
+	INTR_MSI	= (1 << 1),
 	INTR_MSIX	= (1 << 2)
 };
 
@@ -165,10 +162,10 @@ enum {
 	CXGBE_BUSY	= (1 << 9),
 
 	/* adapter error_flags.  reg_lock for HW_OFF_LIMITS, atomics for the rest. */
-	ADAP_STOPPED 	= (1 << 0),	/* Adapter has been stopped. */
-	ADAP_FATAL_ERR 	= (1 << 1),	/* Encountered a fatal error. */
-	HW_OFF_LIMITS 	= (1 << 2),	/* off limits to all except reset_thread */
-	ADAP_CIM_ERR 	= (1 << 3),	/* Error was related to FW/CIM. */
+	ADAP_STOPPED	= (1 << 0),	/* Adapter has been stopped. */
+	ADAP_FATAL_ERR	= (1 << 1),	/* Encountered a fatal error. */
+	HW_OFF_LIMITS	= (1 << 2),	/* off limits to all except reset_thread */
+	ADAP_CIM_ERR	= (1 << 3),	/* Error was related to FW/CIM. */
 
 	/* port flags */
 	HAS_TRACEQ	= (1 << 3),
@@ -178,8 +175,8 @@ enum {
 	DOOMED		= (1 << 0),
 	VI_INIT_DONE	= (1 << 1),
 	/* 1 << 2 is unused, was VI_SYSCTL_CTX */
-	TX_USES_VM_WR 	= (1 << 3),
-	VI_SKIP_STATS 	= (1 << 4),
+	TX_USES_VM_WR	= (1 << 3),
+	VI_SKIP_STATS	= (1 << 4),
 
 	/* adapter debug_flags */
 	DF_DUMP_MBOX		= (1 << 0),	/* Log all mbox cmd/rpl. */
@@ -200,7 +197,7 @@ struct vi_info {
 	struct port_info *pi;
 	struct adapter *adapter;
 
-	struct ifnet *ifp;
+	if_t ifp;
 	struct pfil_head *pfil;
 
 	unsigned long flags;
@@ -222,7 +219,7 @@ struct vi_info {
 	/* These need to be int as they are used in sysctl */
 	int ntxq;		/* # of tx queues */
 	int first_txq;		/* index of first tx queue */
-	int rsrv_noflowq; 	/* Reserve queue 0 for non-flowid packets */
+	int rsrv_noflowq;	/* Reserve queue 0 for non-flowid packets */
 	int nrxq;		/* # of rx queues */
 	int first_rxq;		/* index of first rx queue */
 	int nofldtxq;		/* # of offload tx queues */
@@ -332,7 +329,7 @@ struct port_info {
 	struct link_config link_cfg;
 	struct ifmedia media;
 
- 	struct port_stats stats;
+	struct port_stats stats;
 	u_int tnl_cong_drops;
 	u_int tx_parse_error;
 	int fcs_reg;
@@ -376,6 +373,11 @@ struct iq_desc {
 CTASSERT(sizeof(struct iq_desc) == IQ_ESIZE);
 
 enum {
+	/* iq type */
+	IQ_OTHER	= FW_IQ_IQTYPE_OTHER,
+	IQ_ETH		= FW_IQ_IQTYPE_NIC,
+	IQ_OFLD		= FW_IQ_IQTYPE_OFLD,
+
 	/* iq flags */
 	IQ_SW_ALLOCATED	= (1 << 0),	/* sw resources allocated */
 	IQ_HAS_FL	= (1 << 1),	/* iq associated with a freelist */
@@ -419,14 +421,15 @@ typedef int (*fw_msg_handler_t)(struct adapter *, const __be64 *);
  * Ingress Queue: T4 is producer, driver is consumer.
  */
 struct sge_iq {
-	uint32_t flags;
+	uint16_t flags;
+	uint8_t qtype;
 	volatile int state;
 	struct adapter *adapter;
 	struct iq_desc  *desc;	/* KVA of descriptor ring */
 	int8_t   intr_pktc_idx;	/* packet count threshold index */
 	uint8_t  gen;		/* generation bit */
 	uint8_t  intr_params;	/* interrupt holdoff parameters */
-	int8_t   cong;		/* congestion settings */
+	int8_t   cong_drop;	/* congestion drop settings for the queue */
 	uint16_t qsize;		/* size (# of entries) of the queue */
 	uint16_t sidx;		/* index of the entry with the status page */
 	uint16_t cidx;		/* consumer index */
@@ -600,7 +603,7 @@ struct txpkts {
 struct sge_txq {
 	struct sge_eq eq;	/* MUST be first */
 
-	struct ifnet *ifp;	/* the interface this txq belongs to */
+	if_t ifp;		/* the interface this txq belongs to */
 	struct mp_ring *r;	/* tx software ring */
 	struct tx_sdesc *sdesc;	/* KVA of software descriptor ring */
 	struct sglist *gl;
@@ -651,7 +654,7 @@ struct sge_rxq {
 	struct sge_iq iq __subobject_member_used_for_c_inheritance;	/* MUST be first */
 	struct sge_fl fl;	/* MUST follow iq */
 
-	struct ifnet *ifp;	/* the interface this rxq belongs to */
+	if_t ifp;		/* the interface this rxq belongs to */
 	struct lro_ctrl lro;	/* LRO state */
 
 	/* stats for common events first */
@@ -863,6 +866,15 @@ struct devnames {
 
 struct clip_entry;
 
+#define CNT_CAL_INFO 3
+struct clock_sync {
+	uint64_t hw_cur;
+	uint64_t hw_prev;
+	sbintime_t sbt_cur;
+	sbintime_t sbt_prev;
+	seqc_t gen;
+};
+
 struct adapter {
 	SLIST_ENTRY(adapter) link;
 	device_t dev;
@@ -928,7 +940,6 @@ struct adapter {
 	void *iwarp_softc;	/* (struct c4iw_dev *) */
 	struct iw_tunables iwt;
 	void *iscsi_ulp_softc;	/* (struct cxgbei_data *) */
-	void *ccr_softc;	/* (struct ccr_softc *) */
 	struct l2t_data *l2t;	/* L2 table */
 	struct smt_data *smt;	/* Source MAC Table */
 	struct tid_info tids;
@@ -945,7 +956,7 @@ struct adapter {
 
 	char ifp_lockname[16];
 	struct mtx ifp_lock;
-	struct ifnet *ifp;	/* tracer ifp */
+	if_t ifp;		/* tracer ifp */
 	struct ifmedia media;
 	int traceq;		/* iq used by all tracers, -1 if none */
 	int tracer_valid;	/* bitmap of valid tracers */
@@ -982,6 +993,11 @@ struct adapter {
 	struct mtx sfl_lock;	/* same cache-line as sc_lock? but that's ok */
 	TAILQ_HEAD(, sge_fl) sfl;
 	struct callout sfl_callout;
+	struct callout cal_callout;
+	struct clock_sync cal_info[CNT_CAL_INFO];
+	int cal_current;
+	int cal_count;
+	uint32_t cal_gen;
 
 	/*
 	 * Driver code that can run when the adapter is suspended must use this
@@ -1100,6 +1116,64 @@ hw_off_limits(struct adapter *sc)
 	int off_limits = atomic_load_int(&sc->error_flags) & HW_OFF_LIMITS;
 
 	return (__predict_false(off_limits != 0));
+}
+
+static inline int
+mbuf_nsegs(struct mbuf *m)
+{
+	M_ASSERTPKTHDR(m);
+	KASSERT(m->m_pkthdr.inner_l5hlen > 0,
+	    ("%s: mbuf %p missing information on # of segments.", __func__, m));
+
+	return (m->m_pkthdr.inner_l5hlen);
+}
+
+static inline void
+set_mbuf_nsegs(struct mbuf *m, uint8_t nsegs)
+{
+	M_ASSERTPKTHDR(m);
+	m->m_pkthdr.inner_l5hlen = nsegs;
+}
+
+/* Internal mbuf flags stored in PH_loc.eight[1]. */
+#define	MC_NOMAP		0x01
+#define	MC_RAW_WR		0x02
+#define	MC_TLS			0x04
+
+static inline int
+mbuf_cflags(struct mbuf *m)
+{
+	M_ASSERTPKTHDR(m);
+	return (m->m_pkthdr.PH_loc.eight[4]);
+}
+
+static inline void
+set_mbuf_cflags(struct mbuf *m, uint8_t flags)
+{
+	M_ASSERTPKTHDR(m);
+	m->m_pkthdr.PH_loc.eight[4] = flags;
+}
+
+static inline int
+mbuf_len16(struct mbuf *m)
+{
+	int n;
+
+	M_ASSERTPKTHDR(m);
+	n = m->m_pkthdr.PH_loc.eight[0];
+	if (!(mbuf_cflags(m) & MC_TLS))
+		MPASS(n > 0 && n <= SGE_MAX_WR_LEN / 16);
+
+	return (n);
+}
+
+static inline void
+set_mbuf_len16(struct mbuf *m, uint8_t len16)
+{
+	M_ASSERTPKTHDR(m);
+	if (!(mbuf_cflags(m) & MC_TLS))
+		MPASS(len16 > 0 && len16 <= SGE_MAX_WR_LEN / 16);
+	m->m_pkthdr.PH_loc.eight[0] = len16;
 }
 
 static inline uint32_t
@@ -1285,7 +1359,7 @@ void t4_sysctls(struct adapter *);
 int begin_synchronized_op(struct adapter *, struct vi_info *, int, char *);
 void doom_vi(struct adapter *, struct vi_info *);
 void end_synchronized_op(struct adapter *, int);
-int update_mac_settings(struct ifnet *, int);
+int update_mac_settings(if_t, int);
 int adapter_init(struct adapter *);
 int vi_init(struct vi_info *);
 void vi_sysctls(struct vi_info *);
@@ -1294,19 +1368,19 @@ int alloc_atid(struct adapter *, void *);
 void *lookup_atid(struct adapter *, int);
 void free_atid(struct adapter *, int);
 void release_tid(struct adapter *, int, struct sge_wrq *);
-int cxgbe_media_change(struct ifnet *);
-void cxgbe_media_status(struct ifnet *, struct ifmediareq *);
+int cxgbe_media_change(if_t);
+void cxgbe_media_status(if_t, struct ifmediareq *);
 void t4_os_cim_err(struct adapter *);
 
 #ifdef KERN_TLS
-/* t4_kern_tls.c */
-int cxgbe_tls_tag_alloc(struct ifnet *, union if_snd_tag_alloc_params *,
+/* t6_kern_tls.c */
+int t6_tls_tag_alloc(if_t, union if_snd_tag_alloc_params *,
     struct m_snd_tag **);
 void t6_ktls_modload(void);
 void t6_ktls_modunload(void);
-int t6_ktls_try(struct ifnet *, struct socket *, struct ktls_session *);
-int t6_ktls_parse_pkt(struct mbuf *, int *, int *);
-int t6_ktls_write_wr(struct sge_txq *, void *, struct mbuf *, u_int, u_int);
+int t6_ktls_try(if_t, struct socket *, struct ktls_session *);
+int t6_ktls_parse_pkt(struct mbuf *);
+int t6_ktls_write_wr(struct sge_txq *, void *, struct mbuf *, u_int);
 #endif
 
 /* t4_keyctx.c */
@@ -1377,18 +1451,17 @@ void t4_vi_intr(void *);
 void t4_intr_err(void *);
 void t4_intr_evt(void *);
 void t4_wrq_tx_locked(struct adapter *, struct sge_wrq *, struct wrqe *);
-void t4_update_fl_bufsize(struct ifnet *);
+void t4_update_fl_bufsize(if_t);
 struct mbuf *alloc_wr_mbuf(int, int);
 int parse_pkt(struct mbuf **, bool);
 void *start_wrq_wr(struct sge_wrq *, int, struct wrq_cookie *);
 void commit_wrq_wr(struct sge_wrq *, void *, struct wrq_cookie *);
-int tnl_cong(struct port_info *, int);
+int t4_sge_set_conm_context(struct adapter *, int, int, int);
 void t4_register_an_handler(an_handler_t);
 void t4_register_fw_msg_handler(int, fw_msg_handler_t);
 void t4_register_cpl_handler(int, cpl_handler_t);
 void t4_register_shared_cpl_handler(int, cpl_handler_t, int);
 #ifdef RATELIMIT
-int ethofld_transmit(struct ifnet *, struct mbuf *);
 void send_etid_flush_wr(struct cxgbe_rate_tag *);
 #endif
 
@@ -1416,10 +1489,10 @@ int sysctl_tc_params(SYSCTL_HANDLER_ARGS);
 void t4_init_etid_table(struct adapter *);
 void t4_free_etid_table(struct adapter *);
 struct cxgbe_rate_tag *lookup_etid(struct adapter *, int);
-int cxgbe_rate_tag_alloc(struct ifnet *, union if_snd_tag_alloc_params *,
+int cxgbe_rate_tag_alloc(if_t, union if_snd_tag_alloc_params *,
     struct m_snd_tag **);
 void cxgbe_rate_tag_free_locked(struct cxgbe_rate_tag *);
-void cxgbe_ratelimit_query(struct ifnet *, struct if_ratelimit_query_results *);
+void cxgbe_ratelimit_query(if_t, struct if_ratelimit_query_results *);
 #endif
 
 /* t4_filter.c */

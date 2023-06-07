@@ -18,14 +18,14 @@
 #include "asan_mapping.h"
 #include "interception/interception.h"
 
-DECLARE_REAL(void*, memcpy, void *to, const void *from, usize size)
-DECLARE_REAL(void*, memset, void *block, int c, usize size)
+DECLARE_REAL(void*, memcpy, void *to, const void *from, uptr size)
+DECLARE_REAL(void*, memset, void *block, int c, uptr size)
 
 namespace __asan {
 
 // Return true if we can quickly decide that the region is unpoisoned.
 // We assume that a redzone is at least 16 bytes.
-static inline bool QuickCheckForUnpoisonedRegion(uptr beg, usize size) {
+static inline bool QuickCheckForUnpoisonedRegion(uptr beg, uptr size) {
   if (size == 0) return true;
   if (size <= 32)
     return !AddressIsPoisoned(beg) &&
@@ -128,8 +128,8 @@ struct AsanInterceptorContext {
 // Behavior of functions like "memcpy" or "strcpy" is undefined
 // if memory intervals overlap. We report error in this case.
 // Macro is used to avoid creation of new frames.
-static inline bool RangesOverlap(const char *offset1, usize length1,
-                                 const char *offset2, usize length2) {
+static inline bool RangesOverlap(const char *offset1, uptr length1,
+                                 const char *offset2, uptr length2) {
   return !((offset1 + length1 <= offset2) || (offset2 + length2 <= offset1));
 }
 #define CHECK_RANGES_OVERLAP(name, _offset1, length1, _offset2, length2)   \

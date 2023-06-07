@@ -258,9 +258,14 @@ vm_object_t
 vm_pager_allocate(objtype_t type, void *handle, vm_ooffset_t size,
     vm_prot_t prot, vm_ooffset_t off, struct ucred *cred)
 {
+	vm_object_t object;
+
 	MPASS(type < nitems(pagertab));
 
-	return ((*pagertab[type]->pgo_alloc)(handle, size, prot, off, cred));
+	object = (*pagertab[type]->pgo_alloc)(handle, size, prot, off, cred);
+	if (object != NULL)
+		object->type = type;
+	return (object);
 }
 
 /*
@@ -430,6 +435,9 @@ vm_pager_alloc_dyn_type(struct pagerops *ops, int base_type)
 		FIX(mightbedirty);
 		FIX(getvp);
 		FIX(freespace);
+		FIX(page_inserted);
+		FIX(page_removed);
+		FIX(can_alloc_page);
 #undef FIX
 	}
 	pagertab[res] = ops;	/* XXXKIB should be rel, but acq is too much */
@@ -495,6 +503,8 @@ pbuf_init(void *mem, int size, int flags)
 {
 	struct buf *bp = mem;
 
+	TSENTER();
+
 	bp->b_kvabase = (void *)kva_alloc(ptoa(PBUF_PAGES));
 	if (bp->b_kvabase == NULL)
 		return (ENOMEM);
@@ -503,6 +513,8 @@ pbuf_init(void *mem, int size, int flags)
 	LIST_INIT(&bp->b_dep);
 	bp->b_rcred = bp->b_wcred = NOCRED;
 	bp->b_xflags = 0;
+
+	TSEXIT();
 
 	return (0);
 }

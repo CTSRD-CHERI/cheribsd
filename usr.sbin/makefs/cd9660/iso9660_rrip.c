@@ -699,11 +699,11 @@ cd9660node_rrip_tf(struct ISO_SUSP_ATTRIBUTES *p, fsnode *_node)
 	 */
 
 	cd9660_time_915(p->attr.rr_entry.TF.timestamp,
-		_node->inode->st.st_atime);
+		_node->inode->st.st_mtime);
 	p->attr.rr_entry.TF.h.length[0] += 7;
 
 	cd9660_time_915(p->attr.rr_entry.TF.timestamp + 7,
-		_node->inode->st.st_mtime);
+		_node->inode->st.st_atime);
 	p->attr.rr_entry.TF.h.length[0] += 7;
 
 	cd9660_time_915(p->attr.rr_entry.TF.timestamp + 14,
@@ -756,7 +756,7 @@ cd9660_rrip_add_NM(cd9660node *node, const char *name)
 	struct ISO_SUSP_ATTRIBUTES *r;
 
 	/*
-	 * Each NM record has 254 byes to work with. This means that
+	 * Each NM record has 254 bytes to work with. This means that
 	 * the name data itself only has 249 bytes to work with. So, a
 	 * name with 251 characters would require two nm records.
 	 */

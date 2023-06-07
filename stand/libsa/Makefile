@@ -15,7 +15,7 @@ LIB?=		sa
 # standalone components and stuff we have modified locally
 SRCS+=	gzguts.h zutil.h __main.c abort.c assert.c bcd.c environment.c \
 	getopt.c gets.c globals.c \
-	hexdump.c pager.c panic.c printf.c strdup.c strerror.c \
+	hexdump.c nvstore.c pager.c panic.c printf.c strdup.c strerror.c \
 	random.c sbrk.c tslog.c twiddle.c zalloc.c zalloc_malloc.c
 
 # private (pruned) versions of libc string functions
@@ -95,8 +95,10 @@ SRCS+=${i}
 .endfor
 
 # decompression functionality from zlib
+# https://github.com/madler/zlib/issues/633 documents why we suppress deprecated
+# prototype warnings.
 .PATH: ${SRCTOP}/sys/contrib/zlib
-ZLIB_CFLAGS=-DHAVE_MEMCPY -I${SRCTOP}/sys/contrib/zlib
+ZLIB_CFLAGS=-DHAVE_MEMCPY -I${SRCTOP}/sys/contrib/zlib ${NO_WDEPRECATED_NON_PROTOTYPE}
 .for i in adler32.c crc32.c infback.c inffast.c inflate.c inftrees.c zutil.c
 CFLAGS.${i}+=${ZLIB_CFLAGS}
 SRCS+=	${i}
@@ -110,7 +112,7 @@ CFLAGS.lz4.c+= -I${SRCTOP}/sys/cddl/contrib/opensolaris/common/lz4
 # Create a subset of includes that are safe, as well as adjusting those that aren't
 # The lists may drive people nuts, but they are explicitly opt-in
 FAKE_DIRS=xlocale arpa
-SAFE_INCS=a.out.h assert.h elf.h limits.h nlist.h setjmp.h stddef.h stdbool.h string.h strings.h time.h unistd.h uuid.h
+SAFE_INCS=a.out.h assert.h elf.h inttypes.h limits.h nlist.h setjmp.h stddef.h stdbool.h string.h strings.h time.h unistd.h uuid.h
 STAND_H_INC=ctype.h fcntl.h signal.h stdio.h stdlib.h
 OTHER_INC=stdarg.h errno.h stdint.h
 
@@ -170,8 +172,17 @@ SRCS+=	time.c
 .PATH: ${SRCTOP}/sys/ufs/ffs
 SRCS+=ffs_subr.c ffs_tables.c
 
-CFLAGS.dosfs.c+= -I${LDRSRC}
-CFLAGS.ufs.c+= -I${LDRSRC}
+#
+# i386 has a constrained space for its /boot/loader, so compile out the
+# extensive messages diagnosing bad superblocks. i386 doesn't support UEFI
+# booting, so doing it always makes sense natively there. When we compile
+# for 32-bit on amd64, LIBSA_CPUARCH is also i386 and we use libsa32 only
+# for the BIOS /boot/loader which has the same constraints.
+#
+.if ${LIBSA_CPUARCH} == "i386"
+CFLAGS.ffs_subr.c+= -DSTANDALONE_SMALL
+.endif
+
 CFLAGS.gzipfs.c+= ${ZLIB_CFLAGS}
 CFLAGS.pkgfs.c+= ${ZLIB_CFLAGS}
 CFLAGS.bzipfs.c+= -I${SRCTOP}/contrib/bzip2  -DBZ_NO_STDIO -DBZ_NO_COMPRESS

@@ -50,6 +50,8 @@
 #include <linux/spinlock.h>
 #include <linux/time.h>
 
+#include <linux/sched/mm.h>
+
 #include <asm/atomic.h>
 
 #define	MAX_SCHEDULE_TIMEOUT	INT_MAX
@@ -130,7 +132,8 @@ put_task_struct(struct task_struct *task)
 #define	yield()		kern_yield(PRI_UNCHANGED)
 #define	sched_yield()	sched_relinquish(curthread)
 
-#define	need_resched() (curthread->td_flags & TDF_NEEDRESCHED)
+#define	need_resched()	(curthread->td_owepreempt || \
+    td_ast_pending(curthread, TDA_SCHED))
 
 static inline int
 cond_resched_lock(spinlock_t *lock)

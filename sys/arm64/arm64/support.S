@@ -367,7 +367,7 @@ ENTRY(pagezero_cache)
 END(pagezero_cache)
 // CHERI CHANGES START
 // {
-//   "updated": 20210407,
+//   "updated": 20221129,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "support"

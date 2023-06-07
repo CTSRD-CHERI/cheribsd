@@ -40,11 +40,13 @@
 #ifndef _SYS_SYSTM_H_
 #define	_SYS_SYSTM_H_
 
-#include <sys/cdefs.h>
+#include <sys/types.h>
 #include <sys/callout.h>
 #include <sys/kassert.h>
 #include <sys/queue.h>
 #include <sys/stdint.h>		/* for people using printf mainly */
+#include <machine/atomic.h>
+#include <machine/cpufunc.h>
 
 #include <machine/atomic.h>
 #include <machine/cpufunc.h>
@@ -122,18 +124,20 @@ struct ucred;
  * Derive out-of-bounds and small values from NULL.  This allows common
  * sentinel values to work.
  */
-#define ___USER_CFROMPTR(ptr, cap)					\
+#define ___USER_CFROMPTR(ptr, cap, is_offset)				\
     ((void *)(uintptr_t)(ptr) == NULL ? NULL :				\
      ((vm_offset_t)(ptr) < 4096 ||					\
       (vm_offset_t)(ptr) > VM_MAXUSER_ADDRESS) ?			\
-	__builtin_cheri_offset_set(NULL, (ptraddr_t)(ptr)) :		\
-	__builtin_cheri_offset_set((cap), (ptraddr_t)(ptr)))
+	(void * __capability)(uintcap_t)(ptraddr_t)(ptr) :		\
+	(is_offset) ?							\
+	__builtin_cheri_offset_set((cap), (ptraddr_t)(ptr)) :		\
+	__builtin_cheri_address_set((cap), (ptraddr_t)(ptr)))
 
 #define	__USER_CAP_UNBOUND(ptr)						\
-	___USER_CFROMPTR((ptr), __USER_DDC)
+	___USER_CFROMPTR((ptr), __USER_DDC, __USER_DDC_OFFSET_ENABLED)
 
 #define	__USER_CODE_CAP(ptr)						\
-	___USER_CFROMPTR((ptr), __USER_PCC)
+	___USER_CFROMPTR((ptr), __USER_PCC, __USER_PCC_OFFSET_ENABLED)
 
 #define	__USER_CAP(ptr, len)						\
 ({									\
@@ -208,7 +212,6 @@ void	*hashinit_flags(int count, struct malloc_type *type,
 void	*phashinit(int count, struct malloc_type *type, u_long *nentries);
 void	*phashinit_flags(int count, struct malloc_type *type, u_long *nentries,
     int flags);
-void	g_waitidle(void);
 
 void	cpu_flush_dcache(void *, size_t);
 void	cpu_rootconf(void);
@@ -310,6 +313,8 @@ void	*memmovenocap(void * _Nonnull dest, const void * _Nonnull src,
 #define	memmovenocap	memmove
 #endif
 #if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
+void	* __capability memset_c(void * _Nonnull __capability buf, int c,
+	    size_t len);
 void	* __capability memcpy_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
 void	* __capability memcpynocap_c(void * _Nonnull __capability to,
@@ -319,6 +324,7 @@ void	* __capability memmove_c(void * _Nonnull __capability dest,
 void	* __capability memmovenocap_c(void * _Nonnull __capability dest,
 	    const void * _Nonnull __capability src, size_t n);
 #else
+#define	memset_c	memset
 #define	memcpy_c	memcpy
 #define	memcpynocap_c	memcpynocap
 #define	memmove_c	memmove
@@ -377,8 +383,6 @@ int	copyinstr(const void * __restrict __capability udaddr,
 	    size_t * __restrict lencopied);
 int	copyin(const void * __restrict __capability udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
-int	copyin_implicit_cap(const void * __restrict udaddr,
-	    void * _Nonnull __restrict kaddr, size_t len);
 #if __has_feature(capabilities)
 int	copyincap(const void * __restrict __capability udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
@@ -389,8 +393,6 @@ int	copyin_nofault(const void * __capability __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
 int	copyout(const void * _Nonnull __restrict kaddr,
 	    void * __restrict __capability udaddr, size_t len);
-int	copyout_implicit_cap(const void * _Nonnull __restrict kaddr,
-	    void * __restrict udaddr, size_t len);
 #if __has_feature(capabilities)
 int	copyoutcap(const void * _Nonnull __restrict kaddr,
 	    void * __capability __restrict udaddr, size_t len);
@@ -574,8 +576,11 @@ int	msleep_spin_sbt(const void * _Nonnull chan, struct mtx *mtx,
 	    0, C_HARDCLOCK)
 int	pause_sbt(const char *wmesg, sbintime_t sbt, sbintime_t pr,
 	    int flags);
-#define	pause(wmesg, timo)						\
-	pause_sbt((wmesg), tick_sbt * (timo), 0, C_HARDCLOCK)
+static __inline int
+pause(const char *wmesg, int timo)
+{
+	return (pause_sbt(wmesg, tick_sbt * timo, 0, C_HARDCLOCK));
+}
 #define	pause_sig(wmesg, timo)						\
 	pause_sbt((wmesg), tick_sbt * (timo), 0, C_HARDCLOCK | C_CATCH)
 #define	tsleep(chan, pri, wmesg, timo)					\
@@ -633,10 +638,6 @@ int alloc_unr_specific(struct unrhdr *uh, u_int item);
 int alloc_unrl(struct unrhdr *uh);
 void free_unr(struct unrhdr *uh, u_int item);
 
-#ifndef __LP64__
-#define UNR64_LOCKED
-#endif
-
 struct unrhdr64 {
         uint64_t	counter;
 };
@@ -648,16 +649,12 @@ new_unrhdr64(struct unrhdr64 *unr64, uint64_t low)
 	unr64->counter = low;
 }
 
-#ifdef UNR64_LOCKED
-uint64_t alloc_unr64(struct unrhdr64 *);
-#else
 static __inline uint64_t
 alloc_unr64(struct unrhdr64 *unr64)
 {
 
 	return (atomic_fetchadd_64(&unr64->counter, 1));
 }
-#endif
 
 void	intr_prof_stack_use(struct thread *td, struct trapframe *frame);
 
@@ -696,7 +693,7 @@ __NULLABILITY_PRAGMA_POP
 #endif /* !_SYS_SYSTM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"

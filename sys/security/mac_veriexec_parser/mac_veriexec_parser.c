@@ -242,7 +242,7 @@ open_file(const char *path, struct nameidata *nid)
 
 	pwd_ensure_dirs();
 
-	NDINIT(nid, LOOKUP, 0, UIO_SYSSPACE, path, curthread);
+	NDINIT(nid, LOOKUP, 0, UIO_SYSSPACE, path);
 	rc = vn_open(nid, &flags, 0, NULL);
 	NDFREE_PNBUF(nid);
 	if (rc != 0)
@@ -278,7 +278,7 @@ read_manifest(char *path, unsigned char *digest)
 
 	while (bytes_read < va.va_size) {
 		rc = vn_rdwr(
-		    UIO_READ, nid.ni_vp, data,
+		    UIO_READ, nid.ni_vp, PTR2CAP(data),
 		    va.va_size - bytes_read, bytes_read,
 		    UIO_SYSSPACE, IO_NODELOCKED,
 		    curthread->td_ucred, NOCRED, &resid, curthread);

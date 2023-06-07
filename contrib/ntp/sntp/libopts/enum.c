@@ -1,10 +1,11 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20221129,
  *   "target_type": "lib",
  *   "changes": [
- *     "pointer_bit_flags"
+ *     "pointer_bit_flags",
+ *     "pointer_as_integer"
  *   ],
  *   "change_comment": "",
  *   "hybrid_specific": false

@@ -184,10 +184,11 @@ __strong_reference(memcpynocap, memmovenocap);
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20200708,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "uintcap_arithmetic"
+//     "uintcap_arithmetic",
+//     "pointer_shape"
 //   ]
 // }
 // CHERI CHANGES END

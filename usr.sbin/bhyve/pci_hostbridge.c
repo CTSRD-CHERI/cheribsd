@@ -37,7 +37,7 @@ __FBSDID("$FreeBSD$");
 #include "pci_emul.h"
 
 static int
-pci_hostbridge_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
+pci_hostbridge_init(struct pci_devinst *pi, nvlist_t *nvl)
 {
 	const char *value;
 	u_int vendor, device;
@@ -65,23 +65,22 @@ pci_hostbridge_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 }
 
 static int
-pci_amd_hostbridge_legacy_config(nvlist_t *nvl, const char *opts)
+pci_amd_hostbridge_legacy_config(nvlist_t *nvl, const char *opts __unused)
 {
-
 	set_config_value_node(nvl, "vendor", "0x1022");	/* AMD */
 	set_config_value_node(nvl, "devid", "0x7432");	/* made up */
 
 	return (0);
 }
 
-struct pci_devemu pci_de_amd_hostbridge = {
+static const struct pci_devemu pci_de_amd_hostbridge = {
 	.pe_emu = "amd_hostbridge",
 	.pe_legacy_config = pci_amd_hostbridge_legacy_config,
 	.pe_alias = "hostbridge",
 };
 PCI_EMUL_SET(pci_de_amd_hostbridge);
 
-struct pci_devemu pci_de_hostbridge = {
+static const struct pci_devemu pci_de_hostbridge = {
 	.pe_emu = "hostbridge",
 	.pe_init = pci_hostbridge_init,
 };

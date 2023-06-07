@@ -7,6 +7,7 @@ import site
 
 config.cxx_under_test           = "@CMAKE_CXX_COMPILER@"
 config.project_obj_root         = "@CMAKE_BINARY_DIR@"
+config.install_root             = "@CMAKE_BINARY_DIR@"
 config.libunwind_src_root       = "@LIBUNWIND_SOURCE_DIR@"
 config.libunwind_obj_root       = "@LIBUNWIND_BINARY_DIR@"
 config.abi_library_root         = "@LIBUNWIND_LIBRARY_DIR@"
@@ -33,6 +34,7 @@ config.cxx_ext_threads          = @LIBUNWIND_BUILD_EXTERNAL_THREAD_LIBRARY@
 config.cxx_stdlib_under_test    = "cxx_default"
 # Avoid the slow checks for locale support (we don't care about those features).
 config.test_localization      = False
+config.x86_cet                  = @LIBUNWIND_ENABLE_CET@
 
 site.addsitedir(os.path.join(config.libunwind_src_root, 'test'))
 site.addsitedir(os.path.join(config.libcxx_src_root, 'utils'))

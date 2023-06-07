@@ -468,10 +468,11 @@ ffs_rawread(struct vnode *vp,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
-//     "user_capabilities"
+//     "user_capabilities",
+//     "virtual_address"
 //   ]
 // }
 // CHERI CHANGES END

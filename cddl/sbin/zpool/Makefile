@@ -1,7 +1,5 @@
 # $FreeBSD$
 
-ZFSTOP=	${SRCTOP}/sys/contrib/openzfs
-
 .PATH: ${ZFSTOP}/man/man4
 .PATH: ${ZFSTOP}/man/man5
 .PATH: ${ZFSTOP}/man/man7
@@ -10,10 +8,11 @@ ZFSTOP=	${SRCTOP}/sys/contrib/openzfs
 .PATH: ${ZFSTOP}/cmd/zpool/os/freebsd
 
 
-PACKAGE=	runtime
+PACKAGE=	zfs
 PROG=	zpool
 MAN= \
 	spl.4 \
+	vdevprops.7 \
 	zfs.4 \
 	zpool.8 \
 	zpool-add.8 \

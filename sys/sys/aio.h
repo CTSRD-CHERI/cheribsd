@@ -151,7 +151,7 @@ struct kaiocb {
 	aio_handle_fn_t *handle_fn;	/* (c) backend handle function */
 	union {				/* Backend-specific data fields */
 		struct {		/* BIO backend */
-			int	nbio;	/* Number of remaining bios */
+			volatile u_int nbio; /* Number of remaining bios */
 			int	error;	/* Worst error of all bios */
 			long	nbytes;	/* Bytes completed so far */
 		};
@@ -283,7 +283,7 @@ __END_DECLS
 #endif /* !_SYS_AIO_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"

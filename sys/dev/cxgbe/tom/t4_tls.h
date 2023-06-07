@@ -35,11 +35,6 @@
 
 #ifdef _KERNEL
 
-/* Timeouts for handshake timer in seconds. */
-#define TLS_SRV_HELLO_DONE		9
-#define TLS_SRV_HELLO_RD_TM		5
-#define TLS_SRV_HELLO_BKOFF_TM		15
-
 #define CONTENT_TYPE_CCS		20
 #define CONTENT_TYPE_ALERT		21
 #define CONTENT_TYPE_HANDSHAKE		22
@@ -63,7 +58,7 @@ enum {
 	CPL_TX_TLS_SFO_TYPE_ALERT,
 	CPL_TX_TLS_SFO_TYPE_HANDSHAKE,
 	CPL_TX_TLS_SFO_TYPE_DATA,
-	CPL_TX_TLS_SFO_TYPE_HEARTBEAT,	/* XXX: Shouldn't this be "CUSTOM"? */
+	CPL_TX_TLS_SFO_TYPE_CUSTOM,
 };
 
 struct tls_scmd {
@@ -76,7 +71,6 @@ struct tls_ofld_info {
 	int key_location;
 	int rx_key_addr;
 	int tx_key_addr;
-	uint64_t tx_seq_no;
 	uint16_t rx_version;
 	unsigned short fcplenmax;
 	unsigned short adjusted_plen;
@@ -85,7 +79,7 @@ struct tls_ofld_info {
 	struct tls_scmd scmd0;
 	u_int iv_len;
 	unsigned int tx_key_info_size;
-	struct callout handshake_timer;
+	size_t rx_resid;
 };
 
 struct tls_hdr {

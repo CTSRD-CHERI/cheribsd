@@ -34,7 +34,7 @@
 
 #include "cheribsdtest.h"
 
-CHERIBSDTEST(test_lazy_bind_args,
+CHERIBSDTEST(lazy_bind_args,
     "Check that lazy binding preserves capability argument metadata")
 {
 	void * __capability cap, * __capability cap2;

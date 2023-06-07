@@ -358,15 +358,25 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		break;
 
 	case R_RISCV_64:
+		error = lookup(lf, symidx, 1, &addr);
+		if (error != 0)
+			return (-1);
+
+		before64 = *where;
+		*where = addr + addend;
+		if (debug_kld)
+			printf("%p %c %-24s %016lx -> %016lx\n", where,
+			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
+			    before64, *where);
+		break;
+
 	case R_RISCV_JUMP_SLOT:
 		error = lookup(lf, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 
-		val = addr;
 		before64 = *where;
-		if (*where != val)
-			*where = val;
+		*where = addr;
 		if (debug_kld)
 			printf("%p %c %-24s %016lx -> %016lx\n", where,
 			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
@@ -591,10 +601,11 @@ elf_cpu_parse_dynamic(caddr_t loadbase __unused, Elf_Dyn *dynamic __unused)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200804,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

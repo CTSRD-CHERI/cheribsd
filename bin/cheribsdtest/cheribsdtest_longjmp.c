@@ -44,7 +44,7 @@
 
 #include "cheribsdtest.h"
 
-CHERIBSDTEST(cheribsdtest_setjmp, "Exercise setjmp without longjmp")
+CHERIBSDTEST(libc_setjmp, "Exercise setjmp without longjmp")
 {
 	jmp_buf jumpbuf;
 	int ret;
@@ -55,7 +55,7 @@ CHERIBSDTEST(cheribsdtest_setjmp, "Exercise setjmp without longjmp")
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(cheribsdtest_setjmp_longjmp, "Exercise setjmp with longjmp")
+CHERIBSDTEST(libc_setjmp_longjmp, "Exercise setjmp with longjmp")
 {
 	jmp_buf jumpbuf;
 	int ret;

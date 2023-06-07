@@ -2,7 +2,7 @@
 .\" The contents of this file are subject to the terms of the Common Development
 .\" and Distribution License (the "License").  You may not use this file except
 .\" in compliance with the License. You can obtain a copy of the license at
-.\" usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
+.\" usr/src/OPENSOLARIS.LICENSE or https://opensource.org/licenses/CDDL-1.0.
 .\"
 .\" See the License for the specific language governing permissions and
 .\" limitations under the License. When distributing Covered Code, include this
@@ -177,7 +177,8 @@ This is used to control
 how quickly taskqs ramp up the number of threads processing the queue.
 Because Linux thread creation and destruction are relatively inexpensive a
 small default value has been selected.
-This means that normally threads will be created aggressively which is desirable.
+This means that normally threads will be created aggressively which is
+desirable.
 Increasing this value will
 result in a slower thread creation rate which may be preferable for some
 configurations.

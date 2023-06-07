@@ -1,7 +1,7 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (C) 1992-2022 The FreeBSD Project. All rights reserved.
+ * Copyright (C) 1992-2023 The FreeBSD Project. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,14 +27,16 @@
 
 /* Copyrights macros  */
 
-/* Add a FreeBSD vendor copyright here */
+/* Add a FreeBSD vendor copyright here - or via CFLAGS */
+#ifndef COPYRIGHT_Vendor
 #define	COPYRIGHT_Vendor \
 	"Copyright 2011-2022 University of Cambridge.\n" \
 	"Copyright 2012-2022 SRI International.\n"
+#endif
 
 /* FreeBSD */
 #define COPYRIGHT_FreeBSD \
-	"Copyright (c) 1992-2022 The FreeBSD Project.\n"
+	"Copyright (c) 1992-2023 The FreeBSD Project.\n"
 
 /* Foundation */
 #define	TRADEMARK_Foundation \

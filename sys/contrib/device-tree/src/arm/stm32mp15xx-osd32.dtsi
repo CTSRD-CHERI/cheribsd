@@ -50,12 +50,6 @@
 			no-map;
 		};
 	};
-
-	reg_sip_eeprom: regulator_eeprom {
-		compatible = "regulator-fixed";
-		regulator-name = "sip_eeprom";
-		regulator-always-on;
-	};
 };
 
 &i2c4 {
@@ -78,6 +72,7 @@
 			compatible = "st,stpmic1-regulators";
 
 			ldo1-supply = <&v3v3>;
+			ldo3-supply = <&vdd_ddr>;
 			ldo6-supply = <&v3v3>;
 			pwr_sw1-supply = <&bst_out>;
 
@@ -146,8 +141,6 @@
 
 			vdd_usb: ldo4 {
 				regulator-name = "vdd_usb";
-				regulator-min-microvolt = <3300000>;
-				regulator-max-microvolt = <3300000>;
 				interrupts = <IT_CURLIM_LDO4 0>;
 			};
 
@@ -171,7 +164,6 @@
 			vref_ddr: vref_ddr {
 				regulator-name = "vref_ddr";
 				regulator-always-on;
-				regulator-over-current-protection;
 			};
 
 			bst_out: boost {
@@ -182,13 +174,13 @@
 			vbus_otg: pwr_sw1 {
 				regulator-name = "vbus_otg";
 				interrupts = <IT_OCP_OTG 0>;
-				regulator-active-discharge;
+				regulator-active-discharge = <1>;
 			};
 
 			vbus_sw: pwr_sw2 {
 				regulator-name = "vbus_sw";
 				interrupts = <IT_OCP_SWOUT 0>;
-				regulator-active-discharge;
+				regulator-active-discharge = <1>;
 			};
 		};
 
@@ -206,7 +198,7 @@
 
 	sip_eeprom: eeprom@50 {
 		compatible = "atmel,24c32";
-		vcc-supply = <&reg_sip_eeprom>;
+		vcc-supply = <&vdd>;
 		reg = <0x50>;
 	};
 };

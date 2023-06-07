@@ -430,6 +430,9 @@
  * __generic().  Unlike _Generic(), this macro can only distinguish
  * between a single type, so it requires nested invocations to
  * distinguish multiple cases.
+ *
+ * Note that the comma operator is used to force expr to decay in
+ * order to match _Generic().
  */
 
 #if (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L) || \
@@ -439,7 +442,7 @@
 #elif __GNUC_PREREQ__(3, 1) && !defined(__cplusplus)
 #define	__generic(expr, t, yes, no)					\
 	__builtin_choose_expr(						\
-	    __builtin_types_compatible_p(__typeof(expr), t), yes, no)
+	    __builtin_types_compatible_p(__typeof((0, (expr))), t), yes, no)
 #endif
 
 /*
@@ -1075,6 +1078,16 @@
 #define __nosanitizethread
 #endif
 
+/*
+ * Make it possible to opt out of stack smashing protection.
+ */
+#if __has_attribute(no_stack_protector)
+#define	__nostackprotector	__attribute__((no_stack_protector))
+#else
+#define	__nostackprotector	\
+	__attribute__((__optimize__("-fno-stack-protector")))
+#endif
+
 /* Guard variables and structure members by lock. */
 #define	__guarded_by(x)		__lock_annotate(guarded_by(x))
 #define	__pt_guarded_by(x)	__lock_annotate(pt_guarded_by(x))
@@ -1152,12 +1165,15 @@
 #endif /* !_SYS_CDEFS_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181121,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "integer_provenance",
 //     "support",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

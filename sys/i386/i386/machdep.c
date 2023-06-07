@@ -54,7 +54,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_isa.h"
 #include "opt_kstack_pages.h"
 #include "opt_maxmem.h"
-#include "opt_mp_watchdog.h"
 #include "opt_perfmon.h"
 #include "opt_platform.h"
 
@@ -117,6 +116,8 @@ __FBSDID("$FreeBSD$");
 
 #include <net/netisr.h>
 
+#include <dev/smbios/smbios.h>
+
 #include <machine/bootinfo.h>
 #include <machine/clock.h>
 #include <machine/cpu.h>
@@ -125,7 +126,6 @@ __FBSDID("$FreeBSD$");
 #include <x86/mca.h>
 #include <machine/md_var.h>
 #include <machine/metadata.h>
-#include <machine/mp_watchdog.h>
 #include <machine/pc/bios.h>
 #include <machine/pcb.h>
 #include <machine/pcb_ext.h>
@@ -1435,6 +1435,7 @@ init386(int first)
 	}
 
 	identify_hypervisor();
+	identify_hypervisor_smbios();
 
 	/* Init basic tunables, hz etc */
 	init_param1();
@@ -1648,6 +1649,8 @@ machdep_init_trampoline(void)
 
 	/* Re-initialize new IDT since the handlers were relocated */
 	setidt_disp = trampoline - start_exceptions;
+	if (bootverbose)
+		printf("Trampoline disposition %#zx\n", setidt_disp);
 	fixup_idt();
 
 	r_idt.rd_limit = sizeof(struct gate_descriptor) * NIDT - 1;

@@ -570,7 +570,7 @@ bpf_validate(const struct bpf_insn *f, int len)
 		if (!BPF_VALIDATE_CODE(p->code))
 			return (0);
 		/*
-		 * Check that that jumps are forward, and within
+		 * Check that the jumps are forward, and within
 		 * the code block.
 		 */
 		if (BPF_CLASS(p->code) == BPF_JMP) {
@@ -606,7 +606,7 @@ bpf_validate(const struct bpf_insn *f, int len)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20190603,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_alignment"

@@ -1,11 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Device Tree Source for OMAP2 SoC
  *
  * Copyright (C) 2011 Texas Instruments Incorporated - https://www.ti.com/
- *
- * This file is licensed under the terms of the GNU General Public License
- * version 2.  This program is licensed "as is" without any warranty of any
- * kind, whether express or implied.
  */
 
 #include <dt-bindings/bus/ti-sysc.h>
@@ -120,8 +117,6 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			interrupts = <56>;
-			dmas = <&sdma 27 &sdma 28>;
-			dma-names = "tx", "rx";
 		};
 
 		i2c2: i2c@48072000 {
@@ -131,8 +126,6 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			interrupts = <57>;
-			dmas = <&sdma 29 &sdma 30>;
-			dma-names = "tx", "rx";
 		};
 
 		mcspi1: spi@48098000 {

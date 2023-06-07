@@ -62,7 +62,7 @@ void s10_svc_free_memory(device_t dev, struct s10_svc_mem *mem);
 #endif	/* !_ARM64_INTEL_STRATIX10_SVC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20210407,
+//   "updated": 20221129,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer"

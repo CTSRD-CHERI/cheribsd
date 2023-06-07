@@ -35,6 +35,7 @@ LIBCOMPATWMAKEENV+= \
 		SYSROOT=${WORLDTMP} \
 		LIBDIR=/usr/lib${libcompat} \
 		SHLIBDIR=/usr/lib${libcompat} \
+		LIBDATADIR=/usr/lib${libcompat} \
 		DTRACE="${LIB$COMPATDTRACE:U${DTRACE}}"
 .if ${MK_META_MODE} != "no"
 # Don't rebuild build-tools targets during normal build.
@@ -68,6 +69,7 @@ LIBCOMPATWMAKE+=	${TIME_ENV} ${LIBCOMPATWMAKEENV} ${MAKE} ${LIBCOMPATWMAKEFLAGS}
 			MK_MAN=no MK_HTML=no
 LIBCOMPATIMAKE+=	${LIBCOMPATWMAKE:NINSTALL=*:NDESTDIR=*} \
 			${IMAKE_INSTALL} \
+			MK_INCLUDES=no \
 			-DLIBRARIES_ONLY
 
 .if ${MK_FILE} != "no"

@@ -17,10 +17,9 @@ SUBDIR_BOOTSTRAP= \
 	libcompiler_rt \
 	${_libcheribsdtest_dynamic} \
 	${_libclang_rt} \
-	libgcc_eh \
-	libgcc_s \
-	${_libcplusplus} \
-	${_libcxxrt} \
+	cheri-libc++ \
+	cheri-libc++experimental \
+	libcxxrt \
 	libelf \
 	libssp \
 	libssp_nonshared \
@@ -52,6 +51,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libcompat \
 	libcrypt \
 	libdevctl \
+	libdevdctl \
 	libdevinfo \
 	libdevstat \
 	libdl \
@@ -62,7 +62,8 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libexecinfo \
 	libexpat \
 	libfetch \
-	libfigpar \
+	libgcc_eh \
+	libgcc_s \
 	libgeom \
 	libifconfig \
 	libipsec \
@@ -81,7 +82,6 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	${_libnetmap} \
 	libnv \
 	libopenbsd \
-	libopie \
 	libpam \
 	libpathconv \
 	libpcap \
@@ -113,6 +113,10 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libzstd \
 	ncurses
 
+.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64" && !defined(COMPAT_CHERI)
+SUBDIR+=	libc_c18n libthr_c18n
+.endif
+
 .if !${MACHINE_ABI:Mpurecap}
 # Needs changes to be useful for purecap and not used by anything (yet)
 SUBDIR+=	libthread_db
@@ -142,8 +146,7 @@ SUBDIR_DEPEND_libgeom= libexpat libsbuf
 SUBDIR_DEPEND_librpcsec_gss= libgssapi
 SUBDIR_DEPEND_libmagic= libz
 SUBDIR_DEPEND_libmemstat= libkvm
-SUBDIR_DEPEND_libopie= libmd
-SUBDIR_DEPEND_libpam= libcrypt libopie ${_libradius} librpcsvc libtacplus libutil ${_libypclnt} ${_libcom_err} 
+SUBDIR_DEPEND_libpam= libcrypt ${_libradius} librpcsvc libtacplus libutil ${_libypclnt} ${_libcom_err}
 SUBDIR_DEPEND_libpjdlog= libutil
 SUBDIR_DEPEND_libprocstat= libkvm libutil
 SUBDIR_DEPEND_libradius= libmd
@@ -163,13 +166,17 @@ SUBDIR_DEPEND_flua=	libjail
 
 # NB: keep these sorted by MK_* knobs
 
-SUBDIR.${MK_ATM}+=	libngatm
 SUBDIR.${MK_BEARSSL}+=	libbearssl libsecureboot
 SUBDIR.${MK_BLACKLIST}+=libblacklist
 SUBDIR.${MK_BLUETOOTH}+=libbluetooth libsdp
 SUBDIR.${MK_BSNMP}+=	libbsnmp
 
 SUBDIR.${MK_CHERI}+=	libsyscalls
+
+.if ${MACHINE_ABI:Mpurecap} && ${MK_CHERI_CAPREVOKE} == "yes"
+SUBDIR+=	libcheri_caprevoke
+SUBDIR_DEPEND_libc+=	libcheri_caprevoke
+.endif
 
 .if ${MACHINE_CPU:Mcheri}
 _libcheribsdtest_dynamic=	libcheribsdtest_dynamic
@@ -189,9 +196,8 @@ SUBDIR+=	clang
 .endif
 
 SUBDIR.${MK_CUSE}+= 	libcuse
-SUBDIR.${MK_CXX}+=	libdevdctl
 SUBDIR.${MK_TOOLCHAIN}+=libpe
-SUBDIR.${MK_DIALOG}+=	libdpv
+SUBDIR.${MK_DIALOG}+=	libdpv libfigpar
 SUBDIR.${MK_FILE}+=	libmagic
 SUBDIR.${MK_GPIO}+=	libgpio
 SUBDIR.${MK_GSSAPI}+=	libgssapi librpcsec_gss
@@ -200,19 +206,11 @@ SUBDIR.${MK_KERBEROS_SUPPORT}+=	libcom_err
 SUBDIR.${MK_LDNS}+=	libldns
 SUBDIR.${MK_STATS}+=	libstats
 
-# The libraries under libclang_rt can only be built by clang and when we enable
-# C++ support.
-.if ${COMPILER_TYPE} == "clang" && ${MK_CXX} != "no" && \
-    !${MACHINE_ABI:Mpurecap}
+# The libraries under libclang_rt can only be built by clang.
+.if ${COMPILER_TYPE} == "clang" && !${MACHINE_ABI:Mpurecap}
 _libclang_rt=	libclang_rt
 .elif (${MK_ASAN} != "no" || ${MK_UBSAN} != "no") && make(all)
 .error Requested build with sanitizers but cannot build runtime libraries!
-.endif
-
-.if ${MK_CXX} != "no"
-_libcxxrt=	libcxxrt
-_libcplusplus=	cheri-libc++
-_libcplusplus+=	cheri-libc++experimental
 .endif
 
 SUBDIR.${MK_EFI}+=	libefivar
@@ -250,7 +248,7 @@ SUBDIR.${MK_RADIUS_SUPPORT}+=	libradius
 SUBDIR.${MK_SENDMAIL}+=	libmilter libsm libsmdb libsmutil
 SUBDIR.${MK_TELNET}+=	libtelnet
 SUBDIR.${MK_TESTS_SUPPORT}+=	atf
-SUBDIR.${MK_TESTS_SUPPORT}.${MK_CXX}+=	liblutok
+SUBDIR.${MK_TESTS_SUPPORT}+=	liblutok
 SUBDIR.${MK_TESTS}+=	tests
 SUBDIR.${MK_UNBOUND}+=	libunbound
 SUBDIR.${MK_USB}+=	libusbhid libusb

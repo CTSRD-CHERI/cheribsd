@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -78,6 +78,10 @@ extern "C" {
 #define	FM_EREPORT_PAYLOAD_ZFS_VDEV_READ_ERRORS	"vdev_read_errors"
 #define	FM_EREPORT_PAYLOAD_ZFS_VDEV_WRITE_ERRORS "vdev_write_errors"
 #define	FM_EREPORT_PAYLOAD_ZFS_VDEV_CKSUM_ERRORS "vdev_cksum_errors"
+#define	FM_EREPORT_PAYLOAD_ZFS_VDEV_CKSUM_N	"vdev_cksum_n"
+#define	FM_EREPORT_PAYLOAD_ZFS_VDEV_CKSUM_T	"vdev_cksum_t"
+#define	FM_EREPORT_PAYLOAD_ZFS_VDEV_IO_N	"vdev_io_n"
+#define	FM_EREPORT_PAYLOAD_ZFS_VDEV_IO_T	"vdev_io_t"
 #define	FM_EREPORT_PAYLOAD_ZFS_VDEV_DELAYS	"vdev_delays"
 #define	FM_EREPORT_PAYLOAD_ZFS_PARENT_GUID	"parent_guid"
 #define	FM_EREPORT_PAYLOAD_ZFS_PARENT_TYPE	"parent_type"

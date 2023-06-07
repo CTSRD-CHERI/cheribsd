@@ -19,6 +19,6 @@
 # $FreeBSD$
 
 include GENERIC
-include	std.MFS-ROOT
+include	"std.MFS-ROOT"
 
 ident	GENERIC-MFS-ROOT

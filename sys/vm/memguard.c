@@ -208,7 +208,7 @@ memguard_fudge(unsigned long km_size, const struct vm_map *parent_map)
 void
 memguard_init(vmem_t *parent)
 {
-	vm_offset_t base;
+	vm_pointer_t base;
 
 	vmem_alloc(parent, memguard_mapsize, M_BESTFIT | M_WAITOK, &base);
 	vmem_init(memguard_arena, "memguard arena", base, memguard_mapsize,
@@ -253,14 +253,14 @@ SYSINIT(memguard, SI_SUB_KLD, SI_ORDER_ANY, memguard_sysinit, NULL);
  * wired rather than the object field, which is used.
  */
 static u_long *
-v2sizep(vm_offset_t va)
+v2sizep(vm_pointer_t va)
 {
 	vm_paddr_t pa;
 	struct vm_page *p;
 
 	pa = pmap_kextract(va);
 	if (pa == 0)
-		panic("MemGuard detected double-free of %p", (void *)va);
+		panic("MemGuard detected double-free of %#p", (void *)va);
 	p = PHYS_TO_VM_PAGE(pa);
 	KASSERT(vm_page_wired(p) && p->a.queue == PQ_NONE,
 	    ("MEMGUARD: Expected wired page %p in vtomgfifo!", p));
@@ -268,7 +268,7 @@ v2sizep(vm_offset_t va)
 }
 
 static u_long *
-v2sizev(vm_offset_t va)
+v2sizev(vm_pointer_t va)
 {
 	vm_paddr_t pa;
 	struct vm_page *p;
@@ -289,7 +289,7 @@ v2sizev(vm_offset_t va)
 void *
 memguard_alloc(unsigned long req_size, int flags)
 {
-	vm_offset_t addr, origaddr;
+	vm_pointer_t addr, origaddr;
 	u_long size_p, size_v;
 	int do_guard, error, rv;
 
@@ -374,7 +374,7 @@ is_memguard_addr(void *addr)
 void
 memguard_free(void *ptr)
 {
-	vm_offset_t addr;
+	vm_pointer_t addr;
 	u_long req_size, size, sizev;
 	char *temp;
 	int i;
@@ -511,10 +511,12 @@ memguard_get_req_size(const void *addr)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "bounds_compression"
+//     "bounds_compression",
+//     "support",
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

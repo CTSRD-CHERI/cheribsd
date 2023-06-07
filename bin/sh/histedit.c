@@ -90,7 +90,7 @@ get_histfile(void)
 	const char *histfile;
 
 	/* don't try to save if the history size is 0 */
-	if (hist == NULL || histsizeval() == 0)
+	if (hist == NULL || !strcmp(histsizeval(), "0"))
 		return (NULL);
 	histfile = expandstr("${HISTFILE-${HOME-}/.sh_history}");
 
@@ -190,7 +190,7 @@ histedit(void)
 			if (el != NULL) {
 				if (hist)
 					el_set(el, EL_HIST, history, hist);
-				el_set(el, EL_PROMPT, getprompt);
+				el_set(el, EL_PROMPT_ESC, getprompt, '\001');
 				el_set(el, EL_ADDFN, "sh-complete",
 				    "Filename completion",
 				    sh_complete);
@@ -255,7 +255,6 @@ setterm(const char *term)
 int
 histcmd(int argc, char **argv __unused)
 {
-	int ch;
 	const char *editor = NULL;
 	HistEvent he;
 	int lflg = 0, nflg = 0, rflg = 0, sflg = 0;
@@ -277,25 +276,29 @@ histcmd(int argc, char **argv __unused)
 	if (argc == 1)
 		error("missing history argument");
 
-	while (not_fcnumber(*argptr) && (ch = nextopt("e:lnrs")) != '\0')
-		switch ((char)ch) {
-		case 'e':
-			editor = shoptarg;
-			break;
-		case 'l':
-			lflg = 1;
-			break;
-		case 'n':
-			nflg = 1;
-			break;
-		case 'r':
-			rflg = 1;
-			break;
-		case 's':
-			sflg = 1;
-			break;
-		}
-
+	while (not_fcnumber(*argptr))
+		do {
+			switch (nextopt("e:lnrs")) {
+			case 'e':
+				editor = shoptarg;
+				break;
+			case 'l':
+				lflg = 1;
+				break;
+			case 'n':
+				nflg = 1;
+				break;
+			case 'r':
+				rflg = 1;
+				break;
+			case 's':
+				sflg = 1;
+				break;
+			case '\0':
+				goto operands;
+			}
+		} while (nextopt_optptr != NULL);
+operands:
 	savehandler = handler;
 	/*
 	 * If executing...

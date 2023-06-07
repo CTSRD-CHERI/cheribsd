@@ -145,12 +145,7 @@ soo_write(struct file *fp, struct uio *uio, struct ucred *active_cred,
 	if (error)
 		return (error);
 #endif
-	error = sosend(so, 0, uio, 0, 0, 0, uio->uio_td);
-	if (error == EPIPE && (so->so_options & SO_NOSIGPIPE) == 0) {
-		PROC_LOCK(uio->uio_td->td_proc);
-		tdsignal(uio->uio_td, SIGPIPE);
-		PROC_UNLOCK(uio->uio_td->td_proc);
-	}
+	error = sousrsend(so, NULL, uio, NULL, 0, NULL);
 	return (error);
 }
 
@@ -276,8 +271,7 @@ soo_ioctl(struct file *fp, u_long cmd, void *data, struct ucred *active_cred,
 			CURVNET_RESTORE();
 		} else {
 			CURVNET_SET(so->so_vnet);
-			error = ((*so->so_proto->pr_usrreqs->pru_control)
-			    (so, cmd, data, 0, td));
+			error = so->so_proto->pr_control(so, cmd, data, 0, td);
 			CURVNET_RESTORE();
 		}
 		break;
@@ -304,7 +298,7 @@ static int
 soo_stat(struct file *fp, struct stat *ub, struct ucred *active_cred)
 {
 	struct socket *so = fp->f_data;
-	int error;
+	int error = 0;
 
 	bzero((caddr_t)ub, sizeof (*ub));
 	ub->st_mode = S_IFSOCK;
@@ -336,7 +330,8 @@ soo_stat(struct file *fp, struct stat *ub, struct ucred *active_cred)
 	}
 	ub->st_uid = so->so_cred->cr_uid;
 	ub->st_gid = so->so_cred->cr_gid;
-	error = so->so_proto->pr_usrreqs->pru_sense(so, ub);
+	if (so->so_proto->pr_sense)
+		error = so->so_proto->pr_sense(so, ub);
 	SOCK_UNLOCK(so);
 	return (error);
 }
@@ -414,13 +409,13 @@ soo_fill_kinfo(struct file *fp, struct kinfo_file *kif, struct filedesc *fdp)
 		}
 		break;
 	}
-	error = so->so_proto->pr_usrreqs->pru_sockaddr(so, &sa);
+	error = so->so_proto->pr_sockaddr(so, &sa);
 	if (error == 0 &&
 	    sa->sa_len <= sizeof(kif->kf_un.kf_sock.kf_sa_local)) {
 		bcopy(sa, &kif->kf_un.kf_sock.kf_sa_local, sa->sa_len);
 		free(sa, M_SONAME);
 	}
-	error = so->so_proto->pr_usrreqs->pru_peeraddr(so, &sa);
+	error = so->so_proto->pr_peeraddr(so, &sa);
 	if (error == 0 &&
 	    sa->sa_len <= sizeof(kif->kf_un.kf_sock.kf_sa_peer)) {
 		bcopy(sa, &kif->kf_un.kf_sock.kf_sa_peer, sa->sa_len);
@@ -646,15 +641,10 @@ retry:
 		error = mac_socket_check_send(fp->f_cred, so);
 		if (error == 0)
 #endif
-			error = sosend(so, NULL, job->uiop, NULL, NULL, flags,
-			    td);
+			error = sousrsend(so, NULL, job->uiop, NULL, flags,
+			    job->userproc);
 		if (td->td_ru.ru_msgsnd != ru_before)
 			job->msgsnd = 1;
-		if (error == EPIPE && (so->so_options & SO_NOSIGPIPE) == 0) {
-			PROC_LOCK(job->userproc);
-			kern_psignal(job->userproc, SIGPIPE);
-			PROC_UNLOCK(job->userproc);
-		}
 	}
 
 	done += cnt - job->uiop->uio_resid;
@@ -812,7 +802,7 @@ soo_aio_queue(struct file *fp, struct kaiocb *job)
 	int error;
 
 	so = fp->f_data;
-	error = (*so->so_proto->pr_usrreqs->pru_aio_queue)(so, job);
+	error = so->so_proto->pr_aio_queue(so, job);
 	if (error == 0)
 		return (0);
 
@@ -851,7 +841,7 @@ soo_aio_queue(struct file *fp, struct kaiocb *job)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros"

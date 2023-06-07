@@ -1434,11 +1434,12 @@ vm_reserv_to_superpage(vm_page_t m)
 
 // CHERI CHANGES START
 // {
-//   "updated": 20210415,
+//   "updated": 20221212,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",
-//     "subobject-bounds"
+//     "subobject_bounds",
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

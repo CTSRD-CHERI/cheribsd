@@ -224,6 +224,12 @@ properties:
           - const: empire-electronix,m712
           - const: allwinner,sun5i-a13
 
+      - description: Forlinx OKA40i-C Development board
+        items:
+          - const: forlinx,oka40i-c
+          - const: forlinx,feta40i-c
+          - const: allwinner,sun8i-r40
+
       - description: FriendlyARM NanoPi A64
         items:
           - const: friendlyarm,nanopi-a64
@@ -268,6 +274,11 @@ properties:
         items:
           - const: friendlyarm,nanopi-r1
           - const: allwinner,sun8i-h3
+
+      - description: FriendlyARM NanoPi R1S H5
+        items:
+          - const: friendlyarm,nanopi-r1s-h5
+          - const: allwinner,sun50i-h5
 
       - description: FriendlyARM ZeroPi
         items:
@@ -380,6 +391,11 @@ properties:
           - const: libretech,all-h5-cc-h5
           - const: allwinner,sun50i-h5
 
+      - description: Lichee Pi Nano
+        items:
+          - const: licheepi,licheepi-nano
+          - const: allwinner,suniv-f1c100s
+
       - description: Lichee Pi One
         items:
           - const: licheepi,licheepi-one
@@ -432,6 +448,11 @@ properties:
         items:
           - const: haoyu,a10-marsboard
           - const: allwinner,sun4i-a10
+
+      - description: HAOYU Electronics Marsboard A20
+        items:
+          - const: haoyu,a20-marsboard
+          - const: allwinner,sun7i-a20
 
       - description: MapleBoard MP130
         items:
@@ -797,6 +818,11 @@ properties:
           - const: oranth,tanix-tx6
           - const: allwinner,sun50i-h6
 
+      - description: Tanix TX6 mini
+        items:
+          - const: oranth,tanix-tx6-mini
+          - const: allwinner,sun50i-h6
+
       - description: TBS A711 Tablet
         items:
           - const: tbs-biometrics,a711
@@ -836,6 +862,11 @@ properties:
         items:
           - const: yones-toptech,bs1078-v2
           - const: allwinner,sun6i-a31s
+
+      - description: X96 Mate TV box
+        items:
+          - const: hechuang,x96-mate
+          - const: allwinner,sun50i-h616
 
       - description: Xunlong OrangePi
         items:
@@ -936,5 +967,10 @@ properties:
         items:
           - const: xunlong,orangepi-zero-plus2-h3
           - const: allwinner,sun8i-h3
+
+      - description: Xunlong OrangePi Zero 2
+        items:
+          - const: xunlong,orangepi-zero2
+          - const: allwinner,sun50i-h616
 
 additionalProperties: true

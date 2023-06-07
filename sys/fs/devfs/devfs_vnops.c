@@ -86,8 +86,6 @@ static MALLOC_DEFINE(M_CDEVPDATA, "DEVFSP", "Metainfo for cdev-fp data");
 
 struct mtx	devfs_de_interlock;
 MTX_SYSINIT(devfs_de_interlock, &devfs_de_interlock, "devfs interlock", MTX_DEF);
-struct sx	clone_drain_lock;
-SX_SYSINIT(clone_drain_lock, &clone_drain_lock, "clone events drain lock");
 struct mtx	cdevpriv_mtx;
 MTX_SYSINIT(cdevpriv_mtx, &cdevpriv_mtx, "cdevpriv lock", MTX_DEF);
 
@@ -616,6 +614,7 @@ loop:
 		return (error);
 	}
 	if (devfs_allocv_drop_refs(0, dmp, de)) {
+		vgone(vp);
 		vput(vp);
 		return (ENOENT);
 	}
@@ -623,6 +622,7 @@ loop:
 	mac_devfs_vnode_associate(mp, de, vp);
 #endif
 	sx_xunlock(&dmp->dm_lock);
+	vn_set_state(vp, VSTATE_CONSTRUCTED);
 	*vpp = vp;
 	return (0);
 }
@@ -1115,10 +1115,8 @@ devfs_lookupx(struct vop_lookup_args *ap, int *dm_unlock)
 		cdev = NULL;
 		DEVFS_DMP_HOLD(dmp);
 		sx_xunlock(&dmp->dm_lock);
-		sx_slock(&clone_drain_lock);
 		EVENTHANDLER_INVOKE(dev_clone,
 		    td->td_ucred, pname, strlen(pname), &cdev);
-		sx_sunlock(&clone_drain_lock);
 
 		if (cdev == NULL)
 			sx_xlock(&dmp->dm_lock);
@@ -1157,7 +1155,6 @@ devfs_lookupx(struct vop_lookup_args *ap, int *dm_unlock)
 	if (de == NULL || de->de_flags & DE_WHITEOUT) {
 		if ((nameiop == CREATE || nameiop == RENAME) &&
 		    (flags & (LOCKPARENT | WANTPARENT)) && (flags & ISLASTCN)) {
-			cnp->cn_flags |= SAVENAME;
 			return (EJUSTRETURN);
 		}
 		return (ENOENT);
@@ -2130,7 +2127,7 @@ CTASSERT(O_NONBLOCK == IO_NDELAY);
 CTASSERT(O_FSYNC == IO_SYNC);
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc",

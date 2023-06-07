@@ -28,9 +28,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <sys/cdefs.h>
+#include <sys/param.h>
+#include <machine/elf.h>
 #include <stdint.h>
 #include <stdlib.h>
+
+#include <cheri/cheric.h>
 
 #ifdef PIC
 #error "PIEs never need to initialise their own globals"

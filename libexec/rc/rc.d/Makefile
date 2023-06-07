@@ -22,19 +22,16 @@ CONFS=	DAEMON \
 	ctld \
 	ddb \
 	defaultroute \
-	devd \
 	devfs \
-	devmatch \
-	dhclient \
 	dmesg \
 	dumpon \
 	fsck \
 	gbde \
 	geli \
 	geli2 \
-	ggated \
 	gptboot \
 	growfs \
+	growfs_fstab \
 	hostid \
 	hostid_save \
 	hostname \
@@ -86,7 +83,6 @@ CONFS=	DAEMON \
 	random \
 	rarpd \
 	rctl \
-	resolv \
 	root \
 	route6d \
 	routing \
@@ -111,7 +107,28 @@ CONFS=	DAEMON \
 	ugidfw \
 	${_utx} \
 	var \
+	var_run \
 	watchdogd
+
+CONFGROUPS+=		DEVD
+DEVD=			devd
+DEVDPACKAGE=		devd
+
+CONFGROUPS+=		DEVMATCH
+DEVMATCH=		devmatch
+DEVMATCHPACKAGE=	devmatch
+
+CONFGROUPS+=		DHCLIENT
+DHCLIENT=		dhclient
+DHCLIENTPACKAGE=	dhclient
+
+CONFGROUPS+=		GGATED
+GGATED=			ggated
+GGATEDPACKAGE=		ggate
+
+CONFGROUPS+=		RESOLVCONF
+RESOLVCONF=		resolv
+RESOLVCONFPACKAGE=	resolvconf
 
 .if ${MK_NIS} != "no"
 CONFS+=	ypbind \
@@ -215,7 +232,8 @@ CONFS+=	ipfilter \
 .endif
 
 .if ${MK_IPFW} != "no"
-CONFS+=		ipfw
+CONFS+=		ipfw \
+		dnctl
 .if ${MK_NETGRAPH} != "no"
 CONFS+=		ipfw_netflow
 .endif
@@ -233,8 +251,10 @@ JAILPACKAGE=	jail
 .endif
 
 .if ${MK_LEGACY_CONSOLE} != "no"
-CONFS+=		moused
-CONFS+=		syscons
+CONFGROUPS+=	CONSOLE
+CONSOLE+=	moused
+CONSOLE+=	syscons
+CONSOLEPACKAGE=	console-tools
 .endif
 
 .if ${MK_LPR} != "no"
@@ -252,10 +272,6 @@ _kpasswdd=	kpasswdd
 DIRS+=	VAR_HEMIDAL
 VAR_HEMIDAL=	/var/heimdal
 VAR_HEMIDAL_MODE=	700
-.endif
-
-.if ${MK_MAIL} != "no"
-CONFS+=		othermta
 .endif
 
 .if ${MK_NS_CACHING} != "no"
@@ -327,6 +343,7 @@ ZFS+=		zfsd
 ZFS+=		zfskeys
 ZFS+=		zpool
 ZFS+=		zpoolreguid
+ZFS+=		zpoolupgrade
 ZFS+=		zvol
 ZFSPACKAGE=	rc
 .endif

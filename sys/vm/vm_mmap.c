@@ -388,6 +388,14 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 
 	perms = cheri_getperm(source_cap);
 	reqperms = vm_map_prot2perms(uap->prot);
+#ifdef CHERI_PERM_EXECUTIVE
+	if ((flags & MAP_FIXED) && (perms & CHERI_PERM_EXECUTIVE) == 0)
+		/*
+		 * Don't implicity require CHERI_PERM_EXECUTIVE if it's
+		 * not available in source capability.
+		 */
+		reqperms &= ~CHERI_PERM_EXECUTIVE;
+#endif
 	if ((perms & reqperms) != reqperms) {
 		SYSERRCAUSE("capability has insufficient perms (0x%lx)"
 		    "for request (0x%lx)", perms, reqperms);
@@ -472,6 +480,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	int align, error, fd, flags, max_prot, prot;
 	cap_rights_t rights;
 	mmap_check_fp_fn check_fp_fn;
+	int cap_prot;
 
 	orig_addr = addr = mrp->mr_hint;
 	max_addr = mrp->mr_max_addr;
@@ -506,8 +515,11 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	 * Always honor PROT_MAX if set.  If not, default to all
 	 * permissions unless we're implying maximum permissions.
 	 */
-	if (max_prot == 0)
+	if (max_prot == 0) {
 		max_prot = kern_mmap_maxprot(p, prot);
+		cap_prot = prot;
+	} else
+		cap_prot = max_prot;
 
 	vms = p->p_vmspace;
 	fp = NULL;
@@ -518,7 +530,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	 */
 	if (!SV_CURPROC_FLAG(SV_CHERI))
 		flags &= ~(MAP_RESERVED0020 | MAP_RESERVED0040);
-	
+
 	/*
 	 * Enforce the constraints.
 	 * Mapping of length 0 is only allowed for old binaries.
@@ -764,13 +776,13 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 		 * with maxprot later.
 		 */
 		cap_rights_init_one(&rights, CAP_MMAP);
-		if (max_prot & PROT_READ)
+		if (cap_prot & PROT_READ)
 			cap_rights_set_one(&rights, CAP_MMAP_R);
 		if ((flags & MAP_SHARED) != 0) {
-			if (max_prot & PROT_WRITE)
+			if (cap_prot & PROT_WRITE)
 				cap_rights_set_one(&rights, CAP_MMAP_W);
 		}
-		if (max_prot & PROT_EXEC)
+		if (cap_prot & PROT_EXEC)
 			cap_rights_set_one(&rights, CAP_MMAP_X);
 		error = fget_mmap(td, fd, &rights, &cap_maxprot, &fp);
 		if (error != 0)
@@ -780,15 +792,15 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 			error = EINVAL;
 			goto done;
 		}
-		if ((max_prot & cap_maxprot) != max_prot) {
+		if ((cap_prot & cap_maxprot) != cap_prot) {
 			SYSERRCAUSE("%s: unable to map file with "
-			    "requested maximum permissions", __func__);
+			    "requested permissions", __func__);
 			error = EINVAL;
 			goto done;
 		}
+		max_prot &= cap_maxprot;
 		if (check_fp_fn != NULL) {
-			error = check_fp_fn(fp, prot, max_prot & cap_maxprot,
-			    flags);
+			error = check_fp_fn(fp, prot, max_prot, flags);
 			if (error != 0)
 				goto done;
 		}
@@ -796,7 +808,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 			addr = orig_addr;
 		/* This relies on VM_PROT_* matching PROT_*. */
 		error = fo_mmap(fp, &vms->vm_map, &addr, max_addr, size,
-		    prot, max_prot & cap_maxprot, flags, pos, td);
+		    prot, max_prot, flags, pos, td);
 	}
 
 	if (error == 0) {
@@ -2168,7 +2180,7 @@ vm_mmap_to_errno(int rv)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20221212,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",
@@ -2176,7 +2188,8 @@ vm_mmap_to_errno(int rv)
 //   ],
 //   "changes_purecap": [
 //     "support",
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "bounds_compression"
 //   ]
 // }
 // CHERI CHANGES END

@@ -612,8 +612,7 @@ vm_forkproc(struct thread *td, struct proc *p2, struct thread *td2,
  * the process was still executing.
  */
 void
-vm_waitproc(p)
-	struct proc *p;
+vm_waitproc(struct proc *p)
 {
 
 	vmspace_exitfree(p);		/* and clean-out the vmspace */
@@ -650,7 +649,7 @@ vm_cap_allows_prot(const void * __capability cap, vm_prot_t prot)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",

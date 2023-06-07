@@ -103,6 +103,8 @@ struct devsw efipart_hddev = {
 	.dv_ioctl = efipart_ioctl,
 	.dv_print = efipart_printhd,
 	.dv_cleanup = nullsys,
+	.dv_fmtdev = disk_fmtdev,
+	.dv_parsedev = disk_parsedev,
 };
 
 static pdinfo_list_t fdinfo = STAILQ_HEAD_INITIALIZER(fdinfo);

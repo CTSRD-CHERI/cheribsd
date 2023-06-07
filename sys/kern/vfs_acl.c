@@ -231,7 +231,7 @@ vacl_set_acl(struct thread *td, struct vnode *vp, acl_type_t type,
 	error = acl_copyin(aclp, inkernelacl, type);
 	if (error != 0)
 		goto out;
-	error = vn_start_write(vp, &mp, V_WAIT | PCATCH);
+	error = vn_start_write(vp, &mp, V_WAIT | V_PCATCH);
 	if (error != 0)
 		goto out;
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
@@ -295,7 +295,7 @@ vacl_delete(struct thread *td, struct vnode *vp, acl_type_t type)
 	int error;
 
 	AUDIT_ARG_VALUE(type);
-	error = vn_start_write(vp, &mp, V_WAIT | PCATCH);
+	error = vn_start_write(vp, &mp, V_WAIT | V_PCATCH);
 	if (error != 0)
 		return (error);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
@@ -375,7 +375,8 @@ kern___acl_get_path(struct thread *td, const char *__capability path,
 	error = namei(&nd);
 	if (error == 0) {
 		error = vacl_get_acl(td, nd.ni_vp, type, aclp);
-		NDFREE(&nd, 0);
+		vrele(nd.ni_vp);
+		NDFREE_PNBUF(&nd);
 	}
 	return (error);
 }
@@ -413,7 +414,8 @@ kern___acl_set_path(struct thread *td, const char * __capability path,
 	error = namei(&nd);
 	if (error == 0) {
 		error = vacl_set_acl(td, nd.ni_vp, type, aclp);
-		NDFREE(&nd, 0);
+		vrele(nd.ni_vp);
+		NDFREE_PNBUF(&nd);
 	}
 	return (error);
 }
@@ -505,7 +507,8 @@ kern___acl_delete_path(struct thread *td, const char * __capability path,
 	error = namei(&nd);
 	if (error == 0) {
 		error = vacl_delete(td, nd.ni_vp, type);
-		NDFREE(&nd, 0);
+		vrele(nd.ni_vp);
+		NDFREE_PNBUF(&nd);
 	}
 	return (error);
 }
@@ -563,7 +566,7 @@ kern___acl_aclcheck_path(struct thread *td, const char * __capability path,
 	error = namei(&nd);
 	if (error == 0) {
 		error = vacl_aclcheck(td, nd.ni_vp, type, aclp);
-		NDFREE(&nd, 0);
+		NDFREE_PNBUF(&nd);
 	}
 	return (error);
 }
@@ -618,7 +621,7 @@ acl_free(struct acl *aclp)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

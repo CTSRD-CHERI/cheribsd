@@ -3,7 +3,7 @@
 SYSDIR?=	${SRCTOP}/sys
 
 .PATH:		${SYSDIR}/cddl/compat/opensolaris/kern
-.PATH:		${SYSDIR}/contrib/openzfs/module/os/freebsd/spl
+.PATH:		${ZFSTOP}/module/os/freebsd/spl
 
 KMOD=		opensolaris
 SRCS=		vnode_if.h \
@@ -34,4 +34,3 @@ IGNORE_PRAGMA=	1
 .include <bsd.kmod.mk>
 
 CFLAGS+=	-include ${SYSDIR}/cddl/compat/opensolaris/sys/debug_compat.h
-CWARNFLAGS+=	${OPENZFS_CWARNFLAGS}

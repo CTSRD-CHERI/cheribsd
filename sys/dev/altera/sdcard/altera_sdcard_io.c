@@ -449,7 +449,7 @@ altera_sdcard_io_complete(struct altera_sdcard_softc *sc, uint16_t asr)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_alignment"

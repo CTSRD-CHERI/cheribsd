@@ -33,8 +33,10 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/types.h>
+#include <sys/mman.h>
 
 #include <stdlib.h>
+#include <ucontext.h>
 
 #include "debug.h"
 #include "rtld.h"
@@ -62,11 +64,19 @@ void *_rtld_tlsdesc_dynamic(void *);
 void _exit(int);
 
 void
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+init_pltgot(Obj_Entry *obj, uintptr_t sealer_cap)
+#else
 init_pltgot(Obj_Entry *obj)
+#endif
 {
 
 	if (obj->pltgot != NULL) {
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+		obj->pltgot[1] = (uintptr_t) cheri_seal(obj, sealer_cap);
+#else
 		obj->pltgot[1] = (uintptr_t) obj;
+#endif
 		obj->pltgot[2] = (uintptr_t) &_rtld_bind_start;
 	}
 }
@@ -166,6 +176,257 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 	}
 }
 #endif /* __CHERI_PURE_CAPABILITY__ */
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+
+void _rtld_thread_start(struct pthread *);
+void _rtld_sighandler(int, siginfo_t *, void *);
+
+struct tramp {
+	const void *target;
+	uint32_t compart_id;
+	char code[];
+};
+
+struct tramp_pg {
+	struct tramp *cursor;		/* Points to start of unused space */
+	SLIST_ENTRY(tramp_pg) entries;	/* Points to start of next page */
+	struct tramp trampolines[];	/* Points to start of trampolines */
+};
+
+SLIST_HEAD(tramp_pgs, tramp_pg);
+
+/* Default stack size in libthr */
+#define SANDBOX_STACK_DEFAULT	(sizeof(void *) / 4 * 1024 * 1024)
+#define DEFAULT_STACK_TABLE_SIZE 2
+
+typedef uintptr_t *tramp_stk_table_t;
+
+static void
+get_rstk(uint32_t index, tramp_stk_table_t table, const void *target)
+{
+	size_t len = cheri_getlen(table) / sizeof(*table);
+
+	if (index < len) {
+		size_t size;
+		void *stk;
+		struct {
+			uint8_t generation;
+			uintptr_t top;
+		} *metadata;
+		struct Struct_Stack_Entry *entry;
+		Obj_Entry *dst;
+
+		size = SANDBOX_STACK_DEFAULT;
+		stk = (char *)mmap(NULL,
+				   size,
+				   PROT_READ | PROT_WRITE,
+				   MAP_ANON | MAP_PRIVATE | MAP_STACK,
+				   -1, 0) + size;
+		if (stk == MAP_FAILED)
+			rtld_die();
+
+		stk = cheri_clearperm(stk, CHERI_PERM_EXECUTIVE | CHERI_PERM_SW_VMEM);
+		metadata = stk;
+		metadata[-1].generation = 0;
+		metadata[-1].top = (uintptr_t)&metadata[-1];
+
+		table[index] = (uintptr_t)stk;
+
+		entry = xmalloc(sizeof(*entry));
+		entry->stack = stk;
+
+		dst = obj_from_addr(target);
+		lockinfo.wlock_acquire(dst->stackslock);
+		SLIST_INSERT_HEAD(&dst->stacks, entry, link);
+		lockinfo.lock_release(dst->stackslock);
+
+	} else {
+		size_t new_len;
+		tramp_stk_table_t new_table;
+
+		new_len = len * 2;
+		new_table = xcalloc(new_len, sizeof(*new_table));
+		if (new_table == NULL)
+			rtld_die();
+
+		assert(cheri_getlen(new_table) / sizeof(*new_table) == new_len);
+
+		memcpy(new_table, table, len * sizeof(*table));
+
+		asm ("msr	ctpidr_el0, %0" :: "C" (new_table));
+		free(table);
+	}
+}
+
+static void (*thr_thread_start)(struct pthread *);
+
+void
+_rtld_thread_start(struct pthread *curthread)
+{
+	tramp_stk_table_t tls;
+	asm ("mrs	%0, ctpidr_el0" : "=C" (tls));
+	asm ("msr	rctpidr_el0, %0" :: "C" (tls));
+
+	tls = xcalloc(DEFAULT_STACK_TABLE_SIZE, sizeof(*tls));
+	tls[0] = (uintptr_t)get_rstk;
+	asm ("msr	ctpidr_el0, %0" :: "C" (tls));
+
+	thr_thread_start(curthread);
+}
+
+void
+_rtld_thread_start_init(void (*p)(struct pthread *))
+{
+	assert((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) == 0);
+	assert(thr_thread_start == NULL);
+	thr_thread_start = tramp_pgs_append(p, obj_from_addr(p), NULL);
+}
+
+static void (*thr_sighandler)(int, siginfo_t *, void *);
+
+void
+_rtld_sighandler(int sig, siginfo_t *info, void *_ucp)
+{
+	uintptr_t csp, rcsp;
+	ucontext_t *ucp = _ucp;
+
+	csp = ucp->uc_mcontext.mc_capregs.cap_sp;
+	asm ("mrs	%0, rcsp_el0" : "=C" (rcsp));
+	ucp->uc_mcontext.mc_capregs.cap_sp = rcsp;
+
+	thr_sighandler(sig, info, ucp);
+
+	rcsp = ucp->uc_mcontext.mc_capregs.cap_sp;
+	asm ("msr	rcsp_el0, %0" :: "C" (rcsp));
+	ucp->uc_mcontext.mc_capregs.cap_sp = csp;
+}
+
+void
+_rtld_sighandler_init(void *p)
+{
+	assert((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) == 0);
+	assert(thr_sighandler == NULL);
+	thr_sighandler = tramp_pgs_append(p, obj_from_addr(p), NULL);
+}
+
+static void *
+set_bounds_get_remainder(struct tramp **inout, size_t len)
+{
+	void *hi = *inout;
+	void *lo;
+	ptraddr_t top_lo, alignment;
+	size_t remaining;
+
+	*inout = lo = cheri_setbounds(hi, len);
+	top_lo = cheri_gettop(lo);
+	remaining = cheri_gettop(hi) - top_lo;
+	alignment = CHERI_REPRESENTABLE_ALIGNMENT(remaining);
+	return (cheri_setaddress(hi, roundup2(top_lo, alignment)));
+}
+
+static struct tramp_pg *
+tramp_pg_create(void)
+{
+	struct tramp_pg *p;
+	p = mmap(NULL,
+		getpagesize(),
+		PROT_READ | PROT_WRITE | PROT_EXEC,
+		MAP_ANON | MAP_PRIVATE,
+		-1, 0);
+	if (p == MAP_FAILED)
+		return (NULL);
+	p->cursor = p->trampolines;
+	return (p);
+}
+
+static int
+exclude_symbol_in_lib(const char *name, const char *sym, const Obj_Entry *obj, const Elf_Sym *def)
+{
+	Name_Entry *entry;
+
+	if (def == NULL ||
+	    strcmp(sym, strtab_value(obj, def->st_name)) != 0)
+		return (0);
+
+	STAILQ_FOREACH(entry, &obj->names, link) {
+		if (strcmp(name, entry->name) == 0)
+			return (1);
+	}
+	return (0);
+}
+
+void *
+tramp_pgs_append(void *target, const Obj_Entry *obj, const Elf_Sym *def)
+{
+	extern const struct tramp tramp_template_exe, tramp_template_res;
+	extern const size_t sztramp_template_exe, sztramp_template_res;
+
+	static struct tramp_pgs pgs = SLIST_HEAD_INITIALIZER(pgs);
+
+	const struct tramp *template;
+	size_t len;
+
+	RtldLockState lockstate;
+	struct tramp_pg *pg;
+	bool did_allocate = false;
+	struct tramp *t;
+
+	if (exclude_symbol_in_lib("libc.so.7", "rfork", obj, def) ||
+	    exclude_symbol_in_lib("libc.so.7", "vfork", obj, def)) {
+		return (target);
+	}
+
+	if (cheri_getperm(target) & CHERI_PERM_EXECUTIVE) {
+		template = &tramp_template_exe;
+		len = sztramp_template_exe;
+	} else {
+		template = &tramp_template_res;
+		len = sztramp_template_res;
+	}
+	assert(len == cheri_getlen(template));
+
+	wlock_acquire(rtld_tramp_lock, &lockstate);
+
+	pg = SLIST_FIRST(&pgs);
+	if (pg == NULL) {
+allocate_new_page:
+		if (did_allocate)
+			rtld_die();
+		pg = tramp_pg_create();
+		if (pg == NULL)
+			rtld_die();
+		SLIST_INSERT_HEAD(&pgs, pg, entries);
+		did_allocate = true;
+	}
+
+	t = roundup2(pg->cursor, _Alignof(typeof(*t)));
+	pg->cursor = set_bounds_get_remainder(&t, len);
+	if (!cheri_gettag(t))
+		goto allocate_new_page;
+
+	lock_release(rtld_tramp_lock, &lockstate);
+
+	memcpy(t, template, len);
+	/*
+	 * Ensure i- and d-cache coherency after writing executable code.
+	 * The __clear_cache procedure rounds the addresses to
+	 * cache-line-aligned addresses.
+	 * Derive the start/end addresses from pg so that they have sufficiently
+	 * large bounds to contain these rounded addresses.
+	 */
+	__clear_cache(cheri_copyaddress(pg, t->code),
+	    cheri_copyaddress(pg, (uintptr_t)t + len));
+
+	t->target = target;
+	if (obj != NULL)
+		t->compart_id = obj->compart_id;
+
+	t = cheri_clearperm(t, FUNC_PTR_REMOVE_PERMS);
+	return (cheri_sealentry(cheri_capmode(&t->code)));
+}
+
+#endif
 
 int
 do_copy_relocations(Obj_Entry *dstobj)
@@ -427,6 +688,9 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 				continue;
 			}
 			target = (uintptr_t)make_function_pointer(def, defobj);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+			target = (uintptr_t)tramp_pgs_append((void *)target, defobj, def);
+#endif
 			reloc_jmpslot(where, target, defobj, obj,
 			    (const Elf_Rel *)rela);
 			break;
@@ -481,6 +745,9 @@ reloc_iresolve_one(Obj_Entry *obj, const Elf_Rela *rela,
 	ptr = (uintptr_t)(obj->relocbase + rela->r_addend);
 #endif
 	lock_release(rtld_bind_lock, lockstate);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	ptr = (uintptr_t)tramp_pgs_append((void *)ptr, obj, NULL);
+#endif
 	target = call_ifunc_resolver(ptr);
 	wlock_acquire(rtld_bind_lock, lockstate);
 	*where = target;
@@ -819,6 +1086,12 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 void
 allocate_initial_tls(Obj_Entry *objs)
 {
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	tramp_stk_table_t tls = xcalloc(DEFAULT_STACK_TABLE_SIZE, sizeof(*tls));
+	tls[0] = (uintptr_t)get_rstk;
+	asm ("msr	ctpidr_el0, %0\n" :: "C" (tls));
+#endif
 
 	/*
 	* Fix the size of the static TLS block by using the maximum

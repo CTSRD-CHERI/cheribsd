@@ -87,6 +87,7 @@
 #define	PT_VM_ENTRY	41	/* Get VM map (entry) */
 #define	PT_GETREGSET	42	/* Get a target register set */
 #define	PT_SETREGSET	43	/* Set a target register set */
+#define	PT_SC_REMOTE	44	/* Execute a syscall */
 
 #define	PT_GETCAPREGS	50	/* get capability registers */
 #define	PT_SETCAPREGS	51	/* set capability registers */
@@ -119,6 +120,8 @@ struct ptrace_io_desc {
 #define PIOD_WRITE_D	2	/* Write to D space */
 #define PIOD_READ_I	3	/* Read from I space */
 #define PIOD_WRITE_I	4	/* Write to I space */
+#define	PIOD_READ_CHERI_TAGS	5	/* Read packed memory tags */
+#define	PIOD_READ_CHERI_CAP	7	/* Read CHERI capabilities */
 
 /* Argument structure for PT_LWPINFO. */
 struct ptrace_lwpinfo {
@@ -210,13 +213,29 @@ struct ptrace_coredump {
 #define	PC_COMPRESS	0x00000001	/* Allow compression */
 #define	PC_ALL		0x00000002	/* Include non-dumpable entries */
 
+struct ptrace_sc_remote {
+	struct ptrace_sc_ret pscr_ret;
+	u_int	pscr_syscall;
+	u_int	pscr_nargs;
+	syscallarg_t * __kerncap pscr_args;
+};
+
 #ifdef _KERNEL
+
+#include <sys/proc.h>
+#include <vm/vm.h>
 
 struct thr_coredump_req {
 	struct vnode	*tc_vp;		/* vnode to write coredump to. */
 	off_t		tc_limit;	/* max coredump file size. */
 	int		tc_flags;	/* user flags */
 	int		tc_error;	/* request result */
+};
+
+struct thr_syscall_req {
+	struct ptrace_sc_ret ts_ret;
+	u_int	ts_nargs;
+	struct syscall_args ts_sa;
 };
 
 int	ptrace_set_pc(struct thread *_td, unsigned long _addr);
@@ -250,6 +269,8 @@ ssize_t	proc_readmem(struct thread *_td, struct proc *_p, vm_offset_t _va,
 ssize_t	proc_writemem(struct thread *_td, struct proc *_p, vm_offset_t _va,
 	    void *_buf, size_t _len);
 #if __has_feature(capabilities)
+int	proc_read_cheri_tags_page(vm_map_t _map, vm_offset_t _va,
+	    void *_tagbuf, bool *_hastags);
 int	proc_read_capregs(struct thread *_td, struct capreg *_capregs);
 int	proc_write_capregs(struct thread *_td, struct capreg *_capregs);
 #endif
@@ -282,9 +303,10 @@ __END_DECLS
 #endif	/* !_SYS_PTRACE_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
+//     "user_capabilities",
 //     "kernel_sig_types",
 //     "support"
 //   ]

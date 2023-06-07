@@ -1,7 +1,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20181113,
+ *   "updated": 20221129,
  *   "target_type": "lib",
  *   "changes": [
  *     "support",
@@ -287,34 +287,26 @@ a0dalloc(void *ptr) {
 
 void *
 bootstrap_malloc(size_t size) {
-	bool zero_size;
-
-	zero_size = false;
 	if (unlikely(size == 0)) {
 		size = 1;
-		zero_size = true;
 	}
 	size = ROUND_SIZE(size);
 
-	return BOUND_PTR(a0ialloc(size, false, false), zero_size ? 0 : size);
+	return BOUND_PTR(a0ialloc(size, false, false), size);
 }
 
 void *
 bootstrap_calloc(size_t num, size_t size) {
-	bool zero_size;
 	size_t num_size;
 
-	zero_size = false;
 	num_size = num * size;
 	if (unlikely(num_size == 0)) {
 		assert(num == 0 || size == 0);
-		zero_size = true;
 		num_size = 1;
 	}
 	num_size = ROUND_SIZE(num_size);
 
-	return BOUND_PTR(a0ialloc(num_size, true, false),
-	     zero_size ? 0 : num_size);
+	return BOUND_PTR(a0ialloc(num_size, true, false), num_size);
 }
 
 void
@@ -2280,7 +2272,6 @@ imalloc_init_check(static_opts_t *sopts, dynamic_opts_t *dopts) {
 /* Returns the errno-style error code of the allocation. */
 JEMALLOC_ALWAYS_INLINE int
 imalloc(static_opts_t *sopts, dynamic_opts_t *dopts) {
-	bool zero_size;
 	int ret;
 	size_t size;
 
@@ -2288,10 +2279,6 @@ imalloc(static_opts_t *sopts, dynamic_opts_t *dopts) {
 	 * CHERI: Rounding of allocation size occurs in imalloc_body()
 	 * via compute_size_with_overflow()
 	 */
-	zero_size = false;
-	if (unlikely(dopts->item_size * dopts->num_items == 0)) {
-		zero_size = true;
-	}
 
 	if (tsd_get_allocates() && !imalloc_init_check(sopts, dopts)) {
 		return ENOMEM;
@@ -2316,8 +2303,7 @@ imalloc(static_opts_t *sopts, dynamic_opts_t *dopts) {
 	if (ret == 0) {
 		/* overflow causes imalloc_body to return ENOMEM */
 		(void)compute_size_with_overflow(1, dopts, &size);
-		*dopts->result = BOUND_PTR(*dopts->result,
-		    zero_size ? 0 : size);
+		*dopts->result = BOUND_PTR(*dopts->result, size);
 	}
 	return ret;
 }
@@ -2810,7 +2796,7 @@ je_realloc(void *ptr, size_t arg_size) {
 	check_entry_exit_locking(tsdn);
 
 	LOG("core.realloc.exit", "result: %p", ret);
-	return (BOUND_PTR(ret, arg_size == 0 ? 0 : size));
+	return (BOUND_PTR(ret, size));
 }
 
 JEMALLOC_NOINLINE

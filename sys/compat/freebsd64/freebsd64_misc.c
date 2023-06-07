@@ -146,7 +146,6 @@ static int freebsd64_kevent_copyin(void *arg, struct kevent *kevp, int count);
 int
 freebsd64_wait4(struct thread *td, struct freebsd64_wait4_args *uap)
 {
-
 	return (kern_wait4(td, uap->pid, __USER_CAP_OBJ(uap->status),
 	    uap->options, __USER_CAP_OBJ(uap->rusage)));
 }
@@ -489,7 +488,6 @@ freebsd64_copyin_hdtr(const struct sf_hdtr64 * __capability uhdtr,
 int
 freebsd64_sendfile(struct thread *td, struct freebsd64_sendfile_args *uap)
 {
-
 	return (kern_sendfile(td, uap->fd, uap->s, uap->offset, uap->nbytes,
 	    __USER_CAP_OBJ(uap->hdtr), __USER_CAP_OBJ(uap->sbytes),
 	    uap->flags, 0, (copyin_hdtr_t *)freebsd64_copyin_hdtr,
@@ -499,7 +497,6 @@ freebsd64_sendfile(struct thread *td, struct freebsd64_sendfile_args *uap)
 int
 freebsd64_jail_set(struct thread *td, struct freebsd64_jail_set_args *uap)
 {
-
 	return (user_jail_set(td, __USER_CAP_ARRAY(uap->iovp, uap->iovcnt),
 	    uap->iovcnt, uap->flags, freebsd64_copyinuio));
 }
@@ -527,7 +524,6 @@ freebsd64_updateiov(const struct uio *uiop, struct iovec * __capability cb_arg)
 int
 freebsd64_jail_get(struct thread *td, struct freebsd64_jail_get_args *uap)
 {
-
 	return (user_jail_get(td, __USER_CAP_ARRAY(uap->iovp, uap->iovcnt),
 	    uap->iovcnt, uap->flags, freebsd64_copyinuio, freebsd64_updateiov));
 }
@@ -711,7 +707,6 @@ freebsd64_procctl(struct thread *td, struct freebsd64_procctl_args *uap)
 int
 freebsd64_nmount(struct thread *td, struct freebsd64_nmount_args *uap)
 {
-
 	return (kern_nmount(td, __USER_CAP_ARRAY(uap->iovp, uap->iovcnt),
 	    uap->iovcnt, uap->flags, freebsd64_copyinuio));
 }
@@ -893,7 +888,6 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 int
 freebsd64_mount(struct thread *td, struct freebsd64_mount_args *uap)
 {
-
 	/* XXX: probably need to fill this in... :-( */
 	return (ENOSYS);
 }
@@ -901,7 +895,6 @@ freebsd64_mount(struct thread *td, struct freebsd64_mount_args *uap)
 int
 freebsd64_kenv(struct thread *td, struct freebsd64_kenv_args *uap)
 {
-
 	return (kern_kenv(td, uap->what, __USER_CAP_STR(uap->name),
 	    __USER_CAP_STR(uap->value), uap->len));
 }
@@ -939,7 +932,6 @@ error:
 int
 freebsd64_audit(struct thread *td, struct freebsd64_audit_args *uap)
 {
-
 #ifdef	AUDIT
 	return (kern_audit(td, __USER_CAP(uap->record, uap->length),
 	    uap->length));
@@ -951,7 +943,6 @@ freebsd64_audit(struct thread *td, struct freebsd64_audit_args *uap)
 int
 freebsd64_auditon(struct thread *td, struct freebsd64_auditon_args *uap)
 {
-
 #ifdef	AUDIT
 	return (kern_auditon(td, uap->cmd, __USER_CAP(uap->data, uap->length),
 	    uap->length));
@@ -963,7 +954,6 @@ freebsd64_auditon(struct thread *td, struct freebsd64_auditon_args *uap)
 int
 freebsd64_getauid(struct thread *td, struct freebsd64_getauid_args *uap)
 {
-
 #ifdef	AUDIT
 	return (kern_getauid(td, __USER_CAP_OBJ(uap->auid)));
 #else
@@ -974,7 +964,6 @@ freebsd64_getauid(struct thread *td, struct freebsd64_getauid_args *uap)
 int
 freebsd64_setauid(struct thread *td, struct freebsd64_setauid_args *uap)
 {
-
 #ifdef	AUDIT
 	return (kern_setauid(td, __USER_CAP_OBJ(uap->auid)));
 #else
@@ -985,7 +974,6 @@ freebsd64_setauid(struct thread *td, struct freebsd64_setauid_args *uap)
 int
 freebsd64_getaudit(struct thread *td, struct freebsd64_getaudit_args *uap)
 {
-
 #ifdef	AUDIT
 	return (kern_getaudit(td, __USER_CAP_OBJ(uap->auditinfo)));
 #else
@@ -996,7 +984,6 @@ freebsd64_getaudit(struct thread *td, struct freebsd64_getaudit_args *uap)
 int
 freebsd64_setaudit(struct thread *td, struct freebsd64_setaudit_args *uap)
 {
-
 #ifdef	AUDIT
 	return (kern_setaudit(td, __USER_CAP_OBJ(uap->auditinfo)));
 #else
@@ -1008,7 +995,6 @@ int
 freebsd64_getaudit_addr(struct thread *td,
     struct freebsd64_getaudit_addr_args *uap)
 {
-
 #ifdef	AUDIT
 	return (kern_getaudit_addr(td,
 	    __USER_CAP(uap->auditinfo_addr, uap->length), uap->length));
@@ -1021,7 +1007,6 @@ int
 freebsd64_setaudit_addr(struct thread *td,
     struct freebsd64_setaudit_addr_args *uap)
 {
-
 #ifdef	AUDIT
 	return (kern_setaudit_addr(td, 
 	    __USER_CAP(uap->auditinfo_addr, uap->length), uap->length));
@@ -1033,7 +1018,6 @@ freebsd64_setaudit_addr(struct thread *td,
 int
 freebsd64_auditctl(struct thread *td, struct freebsd64_auditctl_args *uap)
 {
-
 #ifdef	AUDIT
 	return (kern_auditctl(td, __USER_CAP_STR(uap->path)));
 #else
@@ -1049,7 +1033,6 @@ freebsd64_auditctl(struct thread *td, struct freebsd64_auditctl_args *uap)
 int
 freebsd64_acct(struct thread *td, struct freebsd64_acct_args *uap)
 {
-
 	return (kern_acct(td, __USER_CAP_STR(uap->path)));
 }
 
@@ -1070,7 +1053,6 @@ freebsd64_flag_captured(struct thread *td,
 int
 freebsd64_pdfork(struct thread *td, struct freebsd64_pdfork_args *uap)
 {
-
 	return (kern_pdfork(td, __USER_CAP_OBJ(uap->fdp), uap->flags));
 }
 
@@ -1080,7 +1062,6 @@ freebsd64_pdfork(struct thread *td, struct freebsd64_pdfork_args *uap)
 int
 freebsd64_cpuset(struct thread *td, struct freebsd64_cpuset_args *uap)
 {
-
 	return (kern_cpuset(td, __USER_CAP_OBJ(uap->setid)));
 }
 
@@ -1088,7 +1069,6 @@ int
 freebsd64_cpuset_getid(struct thread *td,
     struct freebsd64_cpuset_getid_args *uap)
 {
-
 	return (kern_cpuset_getid(td, uap->level, uap->which, uap->id,
 	    __USER_CAP_OBJ(uap->setid)));
 }
@@ -1155,7 +1135,6 @@ int
 freebsd64_cpuset_getaffinity(struct thread *td,
     struct freebsd64_cpuset_getaffinity_args *uap)
 {
-
 	return (user_cpuset_getaffinity(td, uap->level, uap->which,
 	    uap->id, uap->cpusetsize, __USER_CAP(uap->mask, uap->cpusetsize),
 	    &cpuset_copy64_cb));
@@ -1165,7 +1144,6 @@ int
 freebsd64_cpuset_setaffinity(struct thread *td,
     struct freebsd64_cpuset_setaffinity_args *uap)
 {
-
 	return (user_cpuset_setaffinity(td, uap->level, uap->which, uap->id,
 	    uap->cpusetsize, __USER_CAP(uap->mask, uap->cpusetsize),
 	    &cpuset_copy64_cb));
@@ -1175,7 +1153,6 @@ int
 freebsd64_cpuset_getdomain(struct thread *td,
     struct freebsd64_cpuset_getdomain_args *uap)
 {
-
 	return (kern_cpuset_getdomain(td, uap->level, uap->which,
 	    uap->id, uap->domainsetsize,
 	    __USER_CAP(uap->mask, uap->domainsetsize),
@@ -1187,7 +1164,6 @@ int
 freebsd64_cpuset_setdomain(struct thread *td,
     struct freebsd64_cpuset_setdomain_args *uap)
 {
-
 	return (kern_cpuset_setdomain(td, uap->level, uap->which,
 	    uap->id, uap->domainsetsize,
 	    __USER_CAP(uap->mask, uap->domainsetsize), uap->policy,
@@ -1222,7 +1198,6 @@ freebsd64_fcntl(struct thread *td, struct freebsd64_fcntl_args *uap)
 int
 freebsd64_fstat(struct thread *td, struct freebsd64_fstat_args *uap)
 {
-
 	return (user_fstat(td, uap->fd, __USER_CAP_OBJ(uap->sb)));
 }
 
@@ -1233,7 +1208,6 @@ freebsd64_fstat(struct thread *td, struct freebsd64_fstat_args *uap)
 int
 freebsd64_ktrace(struct thread *td, struct freebsd64_ktrace_args *uap)
 {
-
 	return (kern_ktrace(td, __USER_CAP_STR(uap->fname), uap->ops,
 	    uap->facs, uap->pid));
 }
@@ -1241,7 +1215,6 @@ freebsd64_ktrace(struct thread *td, struct freebsd64_ktrace_args *uap)
 int
 freebsd64_utrace(struct thread *td, struct freebsd64_utrace_args *uap)
 {
-
 	return (kern_utrace(td, __USER_CAP(uap->addr, uap->len),
 	    uap->len));
 }
@@ -1253,14 +1226,12 @@ freebsd64_utrace(struct thread *td, struct freebsd64_utrace_args *uap)
 int
 freebsd64_kldload(struct thread *td, struct freebsd64_kldload_args *uap)
 {
-
 	return (user_kldload(td, __USER_CAP_STR(uap->file)));
 }
 
 int
 freebsd64_kldfind(struct thread *td, struct freebsd64_kldfind_args *uap)
 {
-
 	return (kern_kldfind(td, __USER_CAP_STR(uap->file)));
 }
 
@@ -1320,7 +1291,6 @@ int
 freebsd64_getloginclass(struct thread *td,
     struct freebsd64_getloginclass_args *uap)
 {
-
 	return (kern_getloginclass(td, __USER_CAP(uap->namebuf, uap->namelen),
 	    uap->namelen));
 }
@@ -1329,14 +1299,12 @@ int
 freebsd64_setloginclass(struct thread *td,
     struct freebsd64_setloginclass_args *uap)
 {
-
 	return (kern_setloginclass(td, __USER_CAP_STR(uap->namebuf)));
 }
 
 int
 freebsd64_uuidgen(struct thread *td, struct freebsd64_uuidgen_args *uap)
 {
-
 	return (user_uuidgen(td, __USER_CAP_ARRAY(uap->store, uap->count),
 	    uap->count));
 }
@@ -1347,14 +1315,12 @@ freebsd64_uuidgen(struct thread *td, struct freebsd64_uuidgen_args *uap)
 int
 freebsd64_modfind(struct thread *td, struct freebsd64_modfind_args *uap)
 {
-
 	return (kern_modfind(td, __USER_CAP_STR(uap->name)));
 }
 
 int
 freebsd64_modstat(struct thread *td, struct freebsd64_modstat_args *uap)
 {
-
 	return (kern_modstat(td, uap->modid, __USER_CAP_OBJ(uap->stat)));
 }
 
@@ -1364,7 +1330,6 @@ freebsd64_modstat(struct thread *td, struct freebsd64_modstat_args *uap)
 int
 freebsd64_getgroups(struct thread *td, struct freebsd64_getgroups_args *uap)
 {
-
 	return (kern_getgroups(td, uap->gidsetsize,
 	    __USER_CAP_ARRAY(uap->gidset, uap->gidsetsize)));
 }
@@ -1372,7 +1337,6 @@ freebsd64_getgroups(struct thread *td, struct freebsd64_getgroups_args *uap)
 int
 freebsd64_setgroups(struct thread *td, struct freebsd64_setgroups_args *uap)
 {
-
 	return (user_setgroups(td, uap->gidsetsize,
 	    __USER_CAP_ARRAY(uap->gidset, uap->gidsetsize)));
 }
@@ -1380,7 +1344,6 @@ freebsd64_setgroups(struct thread *td, struct freebsd64_setgroups_args *uap)
 int
 freebsd64_getresuid(struct thread *td, struct freebsd64_getresuid_args *uap)
 {
-
 	return (kern_getresuid(td, __USER_CAP_OBJ(uap->ruid),
 	    __USER_CAP_OBJ(uap->euid), __USER_CAP_OBJ(uap->suid)));
 }
@@ -1388,7 +1351,6 @@ freebsd64_getresuid(struct thread *td, struct freebsd64_getresuid_args *uap)
 int
 freebsd64_getresgid(struct thread *td, struct freebsd64_getresgid_args *uap)
 {
-
 	return (kern_getresgid(td, __USER_CAP_OBJ(uap->rgid),
 	    __USER_CAP_OBJ(uap->egid), __USER_CAP_OBJ(uap->sgid)));
 }
@@ -1396,7 +1358,6 @@ freebsd64_getresgid(struct thread *td, struct freebsd64_getresgid_args *uap)
 int
 freebsd64_getlogin(struct thread *td, struct freebsd64_getlogin_args *uap)
 {
-
 	return (kern_getlogin(td, __USER_CAP(uap->namebuf, uap->namelen),
 	    uap->namelen));
 }
@@ -1404,7 +1365,6 @@ freebsd64_getlogin(struct thread *td, struct freebsd64_getlogin_args *uap)
 int
 freebsd64_setlogin(struct thread *td, struct freebsd64_setlogin_args *uap)
 {
-
 	return (kern_setlogin(td, __USER_CAP_STR(uap->namebuf)));
 }
 
@@ -1429,7 +1389,6 @@ int
 freebsd64_rctl_get_rules(struct thread *td,
     struct freebsd64_rctl_get_rules_args *uap)
 {
-
 #ifdef RCTL
 	return (kern_rctl_get_rules(td, __USER_CAP(uap->inbufp, uap->inbuflen),
 	    uap->inbuflen, __USER_CAP(uap->outbufp, uap->outbuflen),
@@ -1443,7 +1402,6 @@ int
 freebsd64_rctl_get_limits(struct thread *td,
     struct freebsd64_rctl_get_limits_args *uap)
 {
-
 #ifdef RCTL
 	return (kern_rctl_get_limits(td, __USER_CAP(uap->inbufp, uap->inbuflen),
 	    uap->inbuflen, __USER_CAP(uap->outbufp, uap->outbuflen),
@@ -1457,7 +1415,6 @@ int
 freebsd64_rctl_add_rule(struct thread *td,
     struct freebsd64_rctl_add_rule_args *uap)
 {
-
 #ifdef RCTL
 	return (kern_rctl_add_rule(td, __USER_CAP(uap->inbufp, uap->inbuflen),
 	    uap->inbuflen, __USER_CAP(uap->outbufp, uap->outbuflen),
@@ -1471,7 +1428,6 @@ int
 freebsd64_rctl_remove_rule(struct thread *td,
     struct freebsd64_rctl_remove_rule_args *uap)
 {
-
 #ifdef RCTL
 	return (kern_rctl_remove_rule(td,
 	    __USER_CAP(uap->inbufp, uap->inbuflen), uap->inbuflen,
@@ -1488,7 +1444,6 @@ int
 freebsd64_rtprio_thread(struct thread *td,
     struct freebsd64_rtprio_thread_args *uap)
 {
-
 	return (kern_rtprio_thread(td, uap->function, uap->lwpid,
 	    __USER_CAP_OBJ(uap->rtp)));
 }
@@ -1496,7 +1451,6 @@ freebsd64_rtprio_thread(struct thread *td,
 int
 freebsd64_rtprio(struct thread *td, struct freebsd64_rtprio_args *uap)
 {
-
 	return (kern_rtprio(td, uap->function, uap->pid,
 	    __USER_CAP_OBJ(uap->rtp)));
 }
@@ -1645,7 +1599,6 @@ freebsd64_thr_self(struct thread *td, struct freebsd64_thr_self_args *uap)
 int
 freebsd64_thr_exit(struct thread *td, struct freebsd64_thr_exit_args *uap)
 {
-
 	umtx_thread_exit(td);
 
 	/* Signal userland that it can free the stack. */
@@ -1678,7 +1631,6 @@ int
 freebsd64_thr_set_name(struct thread *td,
     struct freebsd64_thr_set_name_args *uap)
 {
-
 	return (kern_thr_set_name(td, uap->id, __USER_CAP_STR(uap->name)));
 }
 
@@ -1737,7 +1689,6 @@ int
 freebsd64_sched_setparam(struct thread *td,
     struct freebsd64_sched_setparam_args * uap)
 {
-
 	return (user_sched_setparam(td, uap->pid,
 	    __USER_CAP_OBJ(uap->param)));
 }
@@ -1746,7 +1697,6 @@ int
 freebsd64_sched_getparam(struct thread *td,
     struct freebsd64_sched_getparam_args *uap)
 {
-
 	return (user_sched_getparam(td, uap->pid,
 	    __USER_CAP_OBJ(uap->param)));
 }
@@ -1755,7 +1705,6 @@ int
 freebsd64_sched_setscheduler(struct thread *td,
     struct freebsd64_sched_setscheduler_args *uap)
 {
-
 	return (user_sched_setscheduler(td, uap->pid, uap->policy,
 	    __USER_CAP_OBJ(uap->param)));
 }
@@ -1764,7 +1713,6 @@ int
 freebsd64_sched_rr_get_interval(struct thread *td,
     struct freebsd64_sched_rr_get_interval_args *uap)
 {
-
 	return (user_sched_rr_get_interval(td, uap->pid,
 	    __USER_CAP_OBJ(uap->interval)));
 }
@@ -1783,7 +1731,6 @@ FREEBSD64_SYSCALL_NOT_PRESENT_GEN(sched_rr_get_interval)
 int
 freebsd64_profil(struct thread *td, struct freebsd64_profil_args *uap)
 {
-
 	return (kern_profil(td, __USER_CAP(uap->samples, uap->size), uap->size,
 	    uap->offset, uap->scale));
 }
@@ -1795,14 +1742,12 @@ freebsd64_profil(struct thread *td, struct freebsd64_profil_args *uap)
 int
 freebsd64_swapon(struct thread *td, struct freebsd64_swapon_args *uap)
 {
-
 	return (kern_swapon(td, __USER_CAP_STR(uap->name)));
 }
 
 int
 freebsd64_swapoff(struct thread *td, struct freebsd64_swapoff_args *uap)
 {
-
 	return (kern_swapoff(td, __USER_CAP_STR(uap->name), UIO_USERSPACE,
 	    uap->flags));
 }
@@ -1812,7 +1757,6 @@ int
 freebsd13_freebsd64_swapoff(struct thread *td,
     struct freebsd13_freebsd64_swapoff_args *uap)
 {
-
 	return (kern_swapoff(td, __USER_CAP_STR(uap->name), UIO_USERSPACE, 0));
 }
 #endif
@@ -1824,7 +1768,6 @@ freebsd13_freebsd64_swapoff(struct thread *td,
 int
 freebsd64_cap_getmode(struct thread *td, struct freebsd64_cap_getmode_args *uap)
 {
-
 	return (kern_cap_getmode(td, __USER_CAP_OBJ(uap->modep)));
 }
 
@@ -1832,7 +1775,6 @@ int
 freebsd64_cap_rights_limit(struct thread *td,
    struct freebsd64_cap_rights_limit_args *uap)
 {
-
 	return (user_cap_rights_limit(td, uap->fd,
 	    __USER_CAP_OBJ(uap->rightsp)));
 }
@@ -1841,7 +1783,6 @@ int
 freebsd64___cap_rights_get(struct thread *td,
     struct freebsd64___cap_rights_get_args *uap)
 {
-
 	return (kern_cap_rights_get(td, uap->version, uap->fd,
 	    __USER_CAP_OBJ(uap->rightsp)));
 }
@@ -1850,7 +1791,6 @@ int
 freebsd64_cap_ioctls_limit(struct thread *td,
     struct freebsd64_cap_ioctls_limit_args *uap)
 {
-
 	return (user_cap_ioctls_limit(td, uap->fd,
 	    __USER_CAP_ARRAY(uap->cmds, uap->ncmds), uap->ncmds));
 }
@@ -1859,7 +1799,6 @@ int
 freebsd64_cap_ioctls_get(struct thread *td,
     struct freebsd64_cap_ioctls_get_args *uap)
 {
-
 	return (kern_cap_ioctls_get(td, uap->fd,
 	    __USER_CAP_ARRAY(uap->cmds, uap->maxcmds), uap->maxcmds));
 }
@@ -1868,7 +1807,6 @@ int
 freebsd64_cap_fcntls_get(struct thread *td,
    struct freebsd64_cap_fcntls_get_args *uap)
 {
-
 	return (kern_cap_fcntls_get(td, uap->fd,
 	    __USER_CAP_OBJ(uap->fcntlrightsp)));
 }
@@ -1876,7 +1814,6 @@ freebsd64_cap_fcntls_get(struct thread *td,
 int
 freebsd64_cap_getmode(struct thread *td, struct freebsd64_cap_getmode_args *uap)
 {
-
 	return (ENOSYS);
 }
 
@@ -1884,7 +1821,6 @@ int
 freebsd64_cap_rights_limit(struct thread *td,
    struct freebsd64_cap_rights_limit_args *uap)
 {
-
 	return (ENOSYS);
 }
 
@@ -1892,7 +1828,6 @@ int
 freebsd64___cap_rights_get(struct thread *td,
     struct freebsd64___cap_rights_get_args *uap)
 {
-
 	return (ENOSYS);
 }
 
@@ -1900,7 +1835,6 @@ int
 freebsd64_cap_ioctls_limit(struct thread *td,
     struct freebsd64_cap_ioctls_limit_args *uap)
 {
-
 	return (ENOSYS);
 }
 
@@ -1908,7 +1842,6 @@ int
 freebsd64_cap_ioctls_get(struct thread *td,
     struct freebsd64_cap_ioctls_get_args *uap)
 {
-
 	return (ENOSYS);
 }
 
@@ -1916,7 +1849,6 @@ int
 freebsd64_cap_fcntls_get(struct thread *td,
    struct freebsd64_cap_fcntls_get_args *uap)
 {
-
 	return (ENOSYS);
 }
 #endif /* !CAPABILITIES */
@@ -1927,7 +1859,6 @@ freebsd64_cap_fcntls_get(struct thread *td,
 int
 freebsd64_getrandom(struct thread *td, struct freebsd64_getrandom_args *uap)
 {
-
 	return (kern_getrandom(td, __USER_CAP(uap->buf, uap->buflen),
 	    uap->buflen, uap->flags));
 }
@@ -1935,7 +1866,6 @@ freebsd64_getrandom(struct thread *td, struct freebsd64_getrandom_args *uap)
 int
 freebsd64_pipe2(struct thread *td, struct freebsd64_pipe2_args *uap)
 {
-
 	return (kern_pipe2(td, __USER_CAP_ARRAY(uap->fildes, 2), uap->flags));
 }
 
@@ -1946,7 +1876,6 @@ freebsd64_pipe2(struct thread *td, struct freebsd64_pipe2_args *uap)
 int
 freebsd64_pdgetpid(struct thread *td, struct freebsd64_pdgetpid_args *uap)
 {
-
 	return (user_pdgetpid(td, uap->fd, __USER_CAP_OBJ(uap->pidp)));
 }
 
@@ -1957,13 +1886,11 @@ freebsd64_pdgetpid(struct thread *td, struct freebsd64_pdgetpid_args *uap)
 int
 freebsd64_syscall_helper_register(struct syscall_helper_data *sd, int flags)
 {
-
 	return (kern_syscall_helper_register(freebsd64_sysent, sd, flags));
 }
 
 int
 freebsd64_syscall_helper_unregister(struct syscall_helper_data *sd)
 {
-
 	return (kern_syscall_helper_unregister(freebsd64_sysent, sd));
 }

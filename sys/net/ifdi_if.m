@@ -41,6 +41,7 @@
 #include <net/iflib.h>
 #include <net/if_clone.h>
 #include <net/if_dl.h>
+#include <net/if_private.h>
 #include <net/if_types.h>
 
 INTERFACE ifdi;
@@ -473,7 +474,8 @@ METHOD bool needs_restart {
 } DEFAULT null_needs_restart;
 # CHERI CHANGES START
 # {
-#   "updated": 20180830,
+#   "updated": 20221205,
+#   "target_type": "kernel",
 #   "changes": [
 #     "user_capabilities"
 #   ]

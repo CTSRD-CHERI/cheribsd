@@ -15,9 +15,11 @@ MAN=	bhyve.8 bhyve_config.5
 BHYVE_SYSDIR?=${SRCTOP}
 
 SRCS=	\
+	acpi_device.c		\
 	atkbdc.c		\
 	acpi.c			\
 	audio.c			\
+	basl.c			\
 	bhyvegc.c		\
 	bhyverun.c		\
 	block_if.c		\
@@ -61,6 +63,7 @@ SRCS=	\
 	post.c			\
 	ps2kbd.c		\
 	ps2mouse.c		\
+	qemu_fwcfg.c		\
 	rfb.c			\
 	rtc.c			\
 	smbiostbl.c		\
@@ -86,14 +89,6 @@ CFLAGS.kernemu_dev.c+=	-I${SRCTOP}/sys/amd64
 SRCS+=	vmm_instruction_emul.c
 
 LIBADD=	vmmapi md nv pthread z util sbuf cam 9p
-
-.if ${MK_CASPER} != "no"
-LIBADD+=	casper
-LIBADD+=	cap_pwd
-LIBADD+=	cap_grp
-# Temporary disable capsicum, until we integrate checkpoint code with it.
-#CFLAGS+=-DWITH_CASPER
-.endif
 
 .if ${MK_BHYVE_SNAPSHOT} != "no"
 LIBADD+= ucl xo
@@ -131,7 +126,12 @@ CFLAGS+= -DBHYVE_SNAPSHOT
 CFLAGS+=-DGDB_LOG
 .endif
 
-WARNS?=	2
+# Disable thread safety analysis since it only finds very simple bugs and
+# yields many false positives.
+NO_WTHREAD_SAFETY=
+
+NO_WCAST_ALIGN=
 
 SUBDIR=	kbdlayout
+
 .include <bsd.prog.mk>

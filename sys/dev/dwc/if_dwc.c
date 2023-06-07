@@ -475,7 +475,7 @@ dwc_setup_rxfilter(struct dwc_softc *sc)
 	/*
 	 * Set the primary address.
 	 */
-	eaddr = IF_LLADDR(ifp);
+	eaddr = if_getlladdr(ifp);
 	lo = eaddr[0] | (eaddr[1] << 8) | (eaddr[2] << 16) |
 	    (eaddr[3] << 24);
 	hi = eaddr[4] | (eaddr[5] << 8);
@@ -1166,6 +1166,12 @@ dwc_init_locked(struct dwc_softc *sc)
 	if (if_getdrvflags(ifp) & IFF_DRV_RUNNING)
 		return;
 
+	/*
+	 * Call mii_mediachg() which will call back into dwc_miibus_statchg()
+	 * to set up the remaining config registers based on current media.
+	 */
+	mii_mediachg(sc->mii_softc);
+
 	dwc_setup_rxfilter(sc);
 	dwc_setup_core(sc);
 	dwc_enable_mac(sc, true);
@@ -1174,11 +1180,6 @@ dwc_init_locked(struct dwc_softc *sc)
 
 	if_setdrvflagbits(ifp, IFF_DRV_RUNNING, IFF_DRV_OACTIVE);
 
-	/*
-	 * Call mii_mediachg() which will call back into dwc_miibus_statchg()
-	 * to set up the remaining config registers based on current media.
-	 */
-	mii_mediachg(sc->mii_softc);
 	callout_reset(&sc->dwc_callout, hz, dwc_tick, sc);
 }
 

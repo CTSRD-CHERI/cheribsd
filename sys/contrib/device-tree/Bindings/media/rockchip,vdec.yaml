@@ -15,7 +15,13 @@ description: |-
 
 properties:
   compatible:
-    const: rockchip,rk3399-vdec
+    oneOf:
+      - const: rockchip,rk3399-vdec
+      - items:
+          - enum:
+              - rockchip,rk3228-vdec
+              - rockchip,rk3328-vdec
+          - const: rockchip,rk3399-vdec
 
   reg:
     maxItems: 1
@@ -36,6 +42,10 @@ properties:
       - const: ahb
       - const: cabac
       - const: core
+
+  assigned-clocks: true
+
+  assigned-clock-rates: true
 
   power-domains:
     maxItems: 1

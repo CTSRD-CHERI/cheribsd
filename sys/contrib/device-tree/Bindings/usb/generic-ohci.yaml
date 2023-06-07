@@ -24,9 +24,11 @@ properties:
               - allwinner,sun6i-a31-ohci
               - allwinner,sun7i-a20-ohci
               - allwinner,sun8i-a23-ohci
+              - allwinner,sun8i-a83t-ohci
               - allwinner,sun8i-h3-ohci
               - allwinner,sun8i-r40-ohci
               - allwinner,sun9i-a80-ohci
+              - allwinner,sun20i-d1-ohci
               - brcm,bcm3384-ohci
               - brcm,bcm63268-ohci
               - brcm,bcm6328-ohci
@@ -41,6 +43,7 @@ properties:
               - brcm,bcm7420-ohci
               - brcm,bcm7425-ohci
               - brcm,bcm7435-ohci
+              - hpe,gxp-ohci
               - ibm,476gtr-ohci
               - ingenic,jz4740-ohci
               - snps,hsdk-v1.0-ohci
@@ -101,13 +104,19 @@ properties:
       Overrides the detected port count
 
   phys:
-    maxItems: 1
+    minItems: 1
+    maxItems: 3
 
   phy-names:
     const: usb
 
   iommus:
     maxItems: 1
+
+  dr_mode:
+    enum:
+      - host
+      - otg
 
 required:
   - compatible

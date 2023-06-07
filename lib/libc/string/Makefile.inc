@@ -1,7 +1,10 @@
 #	@(#)Makefile.inc	8.1 (Berkeley) 6/4/93
 # $FreeBSD$
 
-.PATH: ${LIBC_SRCTOP}/${LIBC_ARCH}/string ${LIBC_SRCTOP}/string
+.if ${MK_MACHDEP_OPTIMIZATIONS} != "no"
+.PATH: ${LIBC_SRCTOP}/${LIBC_ARCH}/string
+.endif
+.PATH: ${LIBC_SRCTOP}/string
 .PATH: ${SRCTOP}/sys/libkern
 
 CFLAGS+= -I${LIBC_SRCTOP}/locale
@@ -16,7 +19,7 @@ MISRCS+=bcmp.c bcopy.c bzero.c explicit_bzero.c \
 	strcspn.c strdup.c strerror.c strlcat.c strlcpy.c strlen.c strmode.c \
 	strncat.c strncmp.c strncpy.c strndup.c strnlen.c strnstr.c \
 	strpbrk.c strrchr.c strsep.c strsignal.c strspn.c strstr.c strtok.c \
-	strxfrm.c swab.c \
+	strverscmp.c strxfrm.c swab.c \
 	timingsafe_bcmp.c \
 	timingsafe_memcmp.c \
 	wcpcpy.c wcpncpy.c wcscasecmp.c wcscat.c \
@@ -43,14 +46,16 @@ CFLAGS.memchr.c+=		-fno-sanitize=address
 .endif
 
 
+.if ${MK_MACHDEP_OPTIMIZATIONS} != "no"
 # machine-dependent string sources
 .sinclude "${LIBC_SRCTOP}/${LIBC_ARCH}/string/Makefile.inc"
+.endif
 
 MAN+=	bcmp.3 bcopy.3 bstring.3 bzero.3 ffs.3 index.3 memccpy.3 memchr.3 \
 	memcmp.3 memcpy.3 memmem.3 memmove.3 memset.3 strcasecmp.3 strcat.3 \
 	strchr.3 strcmp.3 strcoll.3 strcpy.3 strdup.3 strerror.3 \
 	string.3 strlcpy.3 strlen.3 strmode.3 strpbrk.3 strsep.3 \
-	strspn.3 strstr.3 strtok.3 strxfrm.3 swab.3 \
+	strspn.3 strstr.3 strtok.3 strverscmp.3 strxfrm.3 swab.3 \
 	timingsafe_bcmp.3 \
 	wcscoll.3 wcstok.3 \
 	wcswidth.3 wcsxfrm.3 wmemchr.3

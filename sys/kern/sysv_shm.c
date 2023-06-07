@@ -1222,16 +1222,11 @@ shmunload(void)
 	return (0);
 }
 
-struct shmid_kernel_user {
-	struct shmid_ds u;
-	void * __capability kernel_bits[3];	/* Keep these NULL */
-};
-
 static int
 sysctl_shmsegs(SYSCTL_HANDLER_ARGS)
 {
 	struct shmid_kernel tshmseg;
-	struct shmid_kernel_user tshmseg_u;
+	struct shmid_kernel_sysctl tshmseg_u;
 #ifdef COMPAT_FREEBSD32
 	struct shmid_kernel32 tshmseg32;
 #endif
@@ -2110,14 +2105,15 @@ DECLARE_MODULE(sysvshm, sysvshm_mod, SI_SUB_SYSV_SHM, SI_ORDER_FIRST);
 MODULE_VERSION(sysvshm, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20200708,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
 //     "pointer_as_integer",
-//     "support"
+//     "support",
+//     "bounds_compression"
 //   ]
 // }
 // CHERI CHANGES END

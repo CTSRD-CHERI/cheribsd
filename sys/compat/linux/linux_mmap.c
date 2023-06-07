@@ -34,9 +34,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include <sys/capsicum.h>
+#include <sys/fcntl.h>
 #include <sys/file.h>
-#include <sys/imgact.h>
 #include <sys/ktr.h>
 #include <sys/lock.h>
 #include <sys/mman.h>
@@ -423,7 +422,7 @@ linux_fixup_prot(struct thread *td, int *prot)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20200708,
+//   "updated": 20221129,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"

@@ -2,11 +2,10 @@
 
 .include <src.opts.mk>
 
-ZFSTOP=	${SRCTOP}/sys/contrib/openzfs
-
 .PATH: ${ZFSTOP}/cmd
 .PATH: ${ZFSTOP}/man/man1
 
+PACKAGE=	zfs
 PROG=	ztest
 MAN=	ztest.1
 

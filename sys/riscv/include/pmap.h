@@ -44,6 +44,7 @@
 #include <sys/_cpuset.h>
 #include <sys/_lock.h>
 #include <sys/_mutex.h>
+#include <sys/_pv_entry.h>
 
 #include <vm/_vm_radix.h>
 
@@ -86,34 +87,6 @@ struct pmap {
 	TAILQ_HEAD(,pv_chunk)	pm_pvchunk;	/* list of mappings in pmap */
 	LIST_ENTRY(pmap)	pm_list;	/* List of all pmaps */
 	struct vm_radix		pm_root;
-};
-
-typedef struct pv_entry {
-	vm_offset_t		pv_va;	/* virtual address for mapping */
-	TAILQ_ENTRY(pv_entry)	pv_next;
-} *pv_entry_t;
-
-/*
- * pv_entries are allocated in chunks per-process.  This avoids the
- * need to track per-pmap assignments.
- */
-#ifdef __CHERI_PURE_CAPABILITY__
-#define	_NPCM	2
-#define	_NPCPV	83
-#else
-#define	_NPCM	3
-#define	_NPCPV	168
-#endif
-struct pv_chunk {
-	struct pmap *		pc_pmap;
-	TAILQ_ENTRY(pv_chunk)	pc_list;
-	uint64_t		pc_map[_NPCM];  /* bitmap; 1 = free */
-	TAILQ_ENTRY(pv_chunk)	pc_lru;
-	struct pv_entry		pc_pventry[_NPCPV] __subobject_use_container_bounds;
-#ifdef __CHERI_PURE_CAPABILITY__
-	/* Ensure pv_chunk is a page. */
-	char			pc_pad[16];
-#endif
 };
 
 typedef struct pmap *pmap_t;
@@ -177,8 +150,8 @@ bool	pmap_ps_enabled(pmap_t);
 
 void	*pmap_mapdev(vm_paddr_t, vm_size_t);
 void	*pmap_mapbios(vm_paddr_t, vm_size_t);
-void	pmap_unmapdev(vm_pointer_t, vm_size_t);
-void	pmap_unmapbios(vm_pointer_t, vm_size_t);
+void	pmap_unmapdev(void *, vm_size_t);
+void	pmap_unmapbios(void *, vm_size_t);
 
 boolean_t pmap_map_io_transient(vm_page_t *, vm_pointer_t *, int, boolean_t);
 void	pmap_unmap_io_transient(vm_page_t *, vm_pointer_t *, int, boolean_t);
@@ -202,7 +175,7 @@ pmap_vmspace_copy(pmap_t dst_pmap __unused, pmap_t src_pmap __unused)
 #endif	/* !_MACHINE_PMAP_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20200803,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",

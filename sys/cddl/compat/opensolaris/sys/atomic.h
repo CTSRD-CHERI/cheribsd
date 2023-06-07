@@ -185,7 +185,7 @@ atomic_cas_ptr(volatile void *target, void *cmp,  void *newval)
 #endif	/* !_OPENSOLARIS_SYS_ATOMIC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20221129,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

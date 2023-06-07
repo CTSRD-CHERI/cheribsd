@@ -60,7 +60,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
-#include <sys/protosw.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/sysctl.h>
@@ -73,6 +72,7 @@ __FBSDID("$FreeBSD$");
 
 #include <net/if.h>
 #include <net/if_var.h>
+#include <net/if_private.h>
 #include <net/netisr.h>
 #include <net/vnet.h>
 
@@ -92,6 +92,10 @@ __FBSDID("$FreeBSD$");
 #ifndef KTR_IGMPV3
 #define KTR_IGMPV3 KTR_INET
 #endif
+
+#define	IGMP_SLOWHZ	2	/* 2 slow timeouts per second */
+#define	IGMP_FASTHZ	5	/* 5 fast timeouts per second */
+#define	IGMP_RESPONSE_BURST_INTERVAL	(IGMP_FASTHZ / 2)
 
 static struct igmp_ifsoftc *
 		igi_alloc_locked(struct ifnet *);
@@ -201,8 +205,8 @@ static MALLOC_DEFINE(M_IGMP, "igmp", "igmp state");
 /*
  * VIMAGE-wide globals.
  *
- * The IGMPv3 timers themselves need to run per-image, however,
- * protosw timers run globally (see tcp).
+ * The IGMPv3 timers themselves need to run per-image, however, for
+ * historical reasons, timers run globally.  This needs to be improved.
  * An ifnet can only be in one vimage at a time, and the loopback
  * ifnet, loif, is itself virtualized.
  * It would otherwise be possible to seriously hose IGMP state,
@@ -670,8 +674,9 @@ out:
 void
 igmp_ifdetach(struct ifnet *ifp)
 {
+	struct epoch_tracker	 et;
 	struct igmp_ifsoftc	*igi;
-	struct ifmultiaddr	*ifma, *next;
+	struct ifmultiaddr	*ifma;
 	struct in_multi		*inm;
 	struct in_multi_head inm_free_tmp;
 	CTR3(KTR_IGMPV3, "%s: called for ifp %p(%s)", __func__, ifp,
@@ -683,20 +688,16 @@ igmp_ifdetach(struct ifnet *ifp)
 	igi = ((struct in_ifinfo *)ifp->if_afdata[AF_INET])->ii_igmp;
 	if (igi->igi_version == IGMP_VERSION_3) {
 		IF_ADDR_WLOCK(ifp);
-	restart:
-		CK_STAILQ_FOREACH_SAFE(ifma, &ifp->if_multiaddrs, ifma_link, next) {
-			if (ifma->ifma_addr->sa_family != AF_INET ||
-			    ifma->ifma_protospec == NULL)
+		NET_EPOCH_ENTER(et);
+		CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+			inm = inm_ifmultiaddr_get_inm(ifma);
+			if (inm == NULL)
 				continue;
-			inm = (struct in_multi *)ifma->ifma_protospec;
 			if (inm->inm_state == IGMP_LEAVING_MEMBER)
 				inm_rele_locked(&inm_free_tmp, inm);
 			inm_clear_recorded(inm);
-			if (__predict_false(ifma_restart)) {
-				ifma_restart = false;
-				goto restart;
-			}
 		}
+		NET_EPOCH_EXIT(et);
 		IF_ADDR_WUNLOCK(ifp);
 		inm_release_list_deferred(&inm_free_tmp);
 	}
@@ -797,10 +798,9 @@ igmp_input_v1_query(struct ifnet *ifp, const struct ip *ip,
 	 * except those which are already running.
 	 */
 	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
-		if (ifma->ifma_addr->sa_family != AF_INET ||
-		    ifma->ifma_protospec == NULL)
+		inm = inm_ifmultiaddr_get_inm(ifma);
+		if (inm == NULL)
 			continue;
-		inm = (struct in_multi *)ifma->ifma_protospec;
 		if (inm->inm_timer != 0)
 			continue;
 		switch (inm->inm_state) {
@@ -816,7 +816,7 @@ igmp_input_v1_query(struct ifnet *ifp, const struct ip *ip,
 		case IGMP_AWAKENING_MEMBER:
 			inm->inm_state = IGMP_REPORTING_MEMBER;
 			inm->inm_timer = IGMP_RANDOM_DELAY(
-			    IGMP_V1V2_MAX_RI * PR_FASTHZ);
+			    IGMP_V1V2_MAX_RI * IGMP_FASTHZ);
 			V_current_state_timers_running = 1;
 			break;
 		case IGMP_LEAVING_MEMBER:
@@ -886,7 +886,7 @@ igmp_input_v2_query(struct ifnet *ifp, const struct ip *ip,
 
 	igmp_set_version(igi, IGMP_VERSION_2);
 
-	timer = igmp->igmp_code * PR_FASTHZ / IGMP_TIMER_SCALE;
+	timer = igmp->igmp_code * IGMP_FASTHZ / IGMP_TIMER_SCALE;
 	if (timer == 0)
 		timer = 1;
 
@@ -898,10 +898,9 @@ igmp_input_v2_query(struct ifnet *ifp, const struct ip *ip,
 		CTR2(KTR_IGMPV3, "process v2 general query on ifp %p(%s)",
 		    ifp, ifp->if_xname);
 		CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
-			if (ifma->ifma_addr->sa_family != AF_INET ||
-			    ifma->ifma_protospec == NULL)
+			inm = inm_ifmultiaddr_get_inm(ifma);
+			if (inm == NULL)
 				continue;
-			inm = (struct in_multi *)ifma->ifma_protospec;
 			igmp_v2_update_group(inm, timer);
 		}
 	} else {
@@ -1026,7 +1025,7 @@ igmp_input_v3_query(struct ifnet *ifp, const struct ip *ip,
 		     (IGMP_EXP(igmpv3->igmp_qqi) + 3);
 	}
 
-	timer = maxresp * PR_FASTHZ / IGMP_TIMER_SCALE;
+	timer = maxresp * IGMP_FASTHZ / IGMP_TIMER_SCALE;
 	if (timer == 0)
 		timer = 1;
 
@@ -1655,11 +1654,14 @@ igmp_input(struct mbuf **mp, int *offp, int proto)
  * Fast timeout handler (global).
  * VIMAGE: Timeout handlers are expected to service all vimages.
  */
-void
-igmp_fasttimo(void)
+static struct callout igmpfast_callout;
+static void
+igmp_fasttimo(void *arg __unused)
 {
+	struct epoch_tracker et;
 	VNET_ITERATOR_DECL(vnet_iter);
 
+	NET_EPOCH_ENTER(et);
 	VNET_LIST_RLOCK_NOSLEEP();
 	VNET_FOREACH(vnet_iter) {
 		CURVNET_SET(vnet_iter);
@@ -1667,6 +1669,9 @@ igmp_fasttimo(void)
 		CURVNET_RESTORE();
 	}
 	VNET_LIST_RUNLOCK_NOSLEEP();
+	NET_EPOCH_EXIT(et);
+
+	callout_reset(&igmpfast_callout, hz / IGMP_FASTHZ, igmp_fasttimo, NULL);
 }
 
 /*
@@ -1682,7 +1687,7 @@ igmp_fasttimo_vnet(void)
 	struct mbufq		 qrq;	/* Query response packets */
 	struct ifnet		*ifp;
 	struct igmp_ifsoftc	*igi;
-	struct ifmultiaddr	*ifma, *next;
+	struct ifmultiaddr	*ifma;
 	struct in_multi		*inm;
 	struct in_multi_head inm_free_tmp;
 	int			 loop, uri_fasthz;
@@ -1741,18 +1746,16 @@ igmp_fasttimo_vnet(void)
 		if (igi->igi_version == IGMP_VERSION_3) {
 			loop = (igi->igi_flags & IGIF_LOOPBACK) ? 1 : 0;
 			uri_fasthz = IGMP_RANDOM_DELAY(igi->igi_uri *
-			    PR_FASTHZ);
+			    IGMP_FASTHZ);
 			mbufq_init(&qrq, IGMP_MAX_G_GS_PACKETS);
 			mbufq_init(&scq, IGMP_MAX_STATE_CHANGE_PACKETS);
 		}
 
 		IF_ADDR_WLOCK(ifp);
-	restart:
-		CK_STAILQ_FOREACH_SAFE(ifma, &ifp->if_multiaddrs, ifma_link, next) {
-			if (ifma->ifma_addr->sa_family != AF_INET ||
-			    ifma->ifma_protospec == NULL)
+		CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+			inm = inm_ifmultiaddr_get_inm(ifma);
+			if (inm == NULL)
 				continue;
-			inm = (struct in_multi *)ifma->ifma_protospec;
 			switch (igi->igi_version) {
 			case IGMP_VERSION_1:
 			case IGMP_VERSION_2:
@@ -1763,10 +1766,6 @@ igmp_fasttimo_vnet(void)
 				igmp_v3_process_group_timers(&inm_free_tmp, &qrq,
 				    &scq, inm, uri_fasthz);
 				break;
-			}
-			if (__predict_false(ifma_restart)) {
-				ifma_restart = false;
-				goto restart;
 			}
 		}
 		IF_ADDR_WUNLOCK(ifp);
@@ -2000,7 +1999,7 @@ igmp_set_version(struct igmp_ifsoftc *igi, const int version)
 		 * Section 8.12.
 		 */
 		old_version_timer = igi->igi_rv * igi->igi_qi + igi->igi_qri;
-		old_version_timer *= PR_SLOWHZ;
+		old_version_timer *= IGMP_SLOWHZ;
 
 		if (version == IGMP_VERSION_1) {
 			igi->igi_v1_timer = old_version_timer;
@@ -2036,7 +2035,7 @@ igmp_set_version(struct igmp_ifsoftc *igi, const int version)
 static void
 igmp_v3_cancel_link_timers(struct igmp_ifsoftc *igi)
 {
-	struct ifmultiaddr	*ifma, *ifmatmp;
+	struct ifmultiaddr	*ifma;
 	struct ifnet		*ifp;
 	struct in_multi		*inm;
 	struct in_multi_head inm_free_tmp;
@@ -2063,11 +2062,10 @@ igmp_v3_cancel_link_timers(struct igmp_ifsoftc *igi)
 	 */
 	ifp = igi->igi_ifp;
 	IF_ADDR_WLOCK(ifp);
-	CK_STAILQ_FOREACH_SAFE(ifma, &ifp->if_multiaddrs, ifma_link, ifmatmp) {
-		if (ifma->ifma_addr->sa_family != AF_INET ||
-		    ifma->ifma_protospec == NULL)
+	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+		inm = inm_ifmultiaddr_get_inm(ifma);
+		if (inm == NULL)
 			continue;
-		inm = (struct in_multi *)ifma->ifma_protospec;
 		switch (inm->inm_state) {
 		case IGMP_NOT_MEMBER:
 		case IGMP_SILENT_MEMBER:
@@ -2193,11 +2191,14 @@ igmp_v1v2_process_querier_timers(struct igmp_ifsoftc *igi)
  * Global slowtimo handler.
  * VIMAGE: Timeout handlers are expected to service all vimages.
  */
-void
-igmp_slowtimo(void)
+static struct callout igmpslow_callout;
+static void
+igmp_slowtimo(void *arg __unused)
 {
+	struct epoch_tracker et;
 	VNET_ITERATOR_DECL(vnet_iter);
 
+	NET_EPOCH_ENTER(et);
 	VNET_LIST_RLOCK_NOSLEEP();
 	VNET_FOREACH(vnet_iter) {
 		CURVNET_SET(vnet_iter);
@@ -2205,6 +2206,9 @@ igmp_slowtimo(void)
 		CURVNET_RESTORE();
 	}
 	VNET_LIST_RUNLOCK_NOSLEEP();
+	NET_EPOCH_EXIT(et);
+
+	callout_reset(&igmpslow_callout, hz / IGMP_SLOWHZ, igmp_slowtimo, NULL);
 }
 
 /*
@@ -2324,6 +2328,8 @@ igmp_change_state(struct in_multi *inm)
 	 */
 	KASSERT(inm->inm_ifma != NULL, ("%s: no ifma", __func__));
 	ifp = inm->inm_ifma->ifma_ifp;
+	if (ifp == NULL)
+		return (0);
 	/*
 	 * Sanity check that netinet's notion of ifp is the
 	 * same as net's.
@@ -2433,7 +2439,7 @@ igmp_initial_join(struct in_multi *inm, struct igmp_ifsoftc *igi)
 			     IGMP_v1_HOST_MEMBERSHIP_REPORT);
 			if (error == 0) {
 				inm->inm_timer = IGMP_RANDOM_DELAY(
-				    IGMP_V1V2_MAX_RI * PR_FASTHZ);
+				    IGMP_V1V2_MAX_RI * IGMP_FASTHZ);
 				V_current_state_timers_running = 1;
 			}
 			break;
@@ -3383,11 +3389,9 @@ igmp_v3_dispatch_general_query(struct igmp_ifsoftc *igi)
 	ifp = igi->igi_ifp;
 
 	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
-		if (ifma->ifma_addr->sa_family != AF_INET ||
-		    ifma->ifma_protospec == NULL)
+		inm = inm_ifmultiaddr_get_inm(ifma);
+		if (inm == NULL)
 			continue;
-
-		inm = (struct in_multi *)ifma->ifma_protospec;
 		KASSERT(ifp == inm->inm_ifp,
 		    ("%s: inconsistent ifp", __func__));
 
@@ -3688,6 +3692,12 @@ igmp_modevent(module_t mod, int type, void *unused __unused)
 		IGMP_LOCK_INIT();
 		m_raopt = igmp_ra_alloc();
 		netisr_register(&igmp_nh);
+		callout_init(&igmpslow_callout, 1);
+		callout_reset(&igmpslow_callout, hz / IGMP_SLOWHZ,
+		    igmp_slowtimo, NULL);
+		callout_init(&igmpfast_callout, 1);
+		callout_reset(&igmpfast_callout, hz / IGMP_FASTHZ,
+		    igmp_fasttimo, NULL);
 		break;
 	case MOD_UNLOAD:
 		CTR1(KTR_IGMPV3, "%s: tearing down", __func__);
@@ -3710,7 +3720,7 @@ static moduledata_t igmp_mod = {
 DECLARE_MODULE(igmp, igmp_mod, SI_SUB_PROTO_MC, SI_ORDER_MIDDLE);
 // CHERI CHANGES START
 // {
-//   "updated": 20200803,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "kdb"

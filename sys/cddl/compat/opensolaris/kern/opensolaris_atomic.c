@@ -123,7 +123,7 @@ atomic_cas_64(volatile uint64_t *target, uint64_t cmp, uint64_t newval)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20191029,
+//   "updated": 20221129,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",

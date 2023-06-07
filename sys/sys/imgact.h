@@ -106,6 +106,7 @@ struct image_params {
 	void * __capability imgact_capability;	/* copyout and mapping cap */
 #define IMGP_ASLR_SHARED_PAGE	0x1
 	uint32_t imgp_flags;
+	struct vnode *interpreter_vp;	/* vnode of the interpreter */
 };
 
 #ifdef _KERNEL
@@ -144,7 +145,7 @@ void	post_execve(struct thread *td, int error, struct vmspace *oldvmspace);
 #endif /* !_SYS_IMGACT_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

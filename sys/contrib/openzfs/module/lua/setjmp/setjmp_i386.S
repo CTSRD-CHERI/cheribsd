@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -25,7 +25,7 @@
 
 #define	ENTRY(x) \
 	.text; \
-	.align	8; \
+	.balign	8; \
 	.globl	x; \
 	.type	x, @function; \
 x:

@@ -411,7 +411,7 @@
 	u32 bce_debug_temp = bce_debug;				\
 	bce_debug |= cond;
 
-/* Restore the previously overriden debug level. */
+/* Restore the previously overridden debug level. */
 #define DBPOP()							\
 	bce_debug = bce_debug_temp;
 
@@ -6298,7 +6298,7 @@ struct bce_softc
 	struct mtx		bce_mtx;
 
 	/* Interface info */
-	struct ifnet		*bce_ifp;
+	if_t			bce_ifp;
 
 	/* Parent device handle */
 	device_t		bce_dev;

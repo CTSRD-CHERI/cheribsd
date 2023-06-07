@@ -77,6 +77,9 @@ static fstype_t fstypes[] = {
 	ENTRY(cd9660),
 	ENTRY(ffs),
 	ENTRY(msdos),
+#ifdef HAVE_ZFS
+	ENTRY(zfs),
+#endif
 	{ .type = NULL	},
 };
 
@@ -97,7 +100,7 @@ main(int argc, char *argv[])
 	fstype_t	*fstype;
 	fsinfo_t	 fsoptions;
 	fsnode		*root;
-	int	 	 ch, i, len;
+	int		 ch, i, len;
 	const char	*subtree;
 	const char	*specfile;
 

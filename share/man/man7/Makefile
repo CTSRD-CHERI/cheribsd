@@ -10,6 +10,7 @@ MAN=	arch.7 \
 	build.7 \
 	c.7 \
 	clocks.7 \
+	compartmentalization.7 \
 	crypto.7 \
 	development.7 \
 	environ.7 \
@@ -26,6 +27,7 @@ MAN=	arch.7 \
 	release.7 \
 	sdoc.7 \
 	security.7 \
+	sizeof.7 \
 	sprog.7 \
 	stats.7 \
 	stdint.7 \
@@ -34,6 +36,7 @@ MAN=	arch.7 \
 	tuning.7
 
 MLINKS=	intro.7 miscellaneous.7
+MLINKS+= growfs.7 growfs_fstab.7
 MLINKS+= security.7 securelevel.7
 MLINKS+= c.7 c78.7
 MLINKS+= c.7 c89.7
@@ -43,6 +46,7 @@ MLINKS+= c.7 c99.7
 MLINKS+= c.7 c11.7
 MLINKS+= c.7 c17.7
 MLINKS+= c.7 c2x.7
+MLINKS+= compartmentalization.7 c18n.7
 
 .if ${MK_TESTS} != "no"
 ATF=	${SRCTOP}/contrib/atf

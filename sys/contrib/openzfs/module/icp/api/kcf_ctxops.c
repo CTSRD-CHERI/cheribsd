@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -88,7 +88,7 @@ crypto_create_ctx_template(crypto_mechanism_t *mech, crypto_key_t *key,
 	if (error != CRYPTO_SUCCESS)
 		return (error);
 
-	if ((ctx_tmpl = (kcf_ctx_template_t *)kmem_alloc(
+	if ((ctx_tmpl = kmem_alloc(
 	    sizeof (kcf_ctx_template_t), KM_SLEEP)) == NULL) {
 		KCF_PROV_REFRELE(pd);
 		return (CRYPTO_HOST_MEMORY);

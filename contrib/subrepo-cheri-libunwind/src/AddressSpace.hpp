@@ -1,4 +1,4 @@
-//===------------------------- AddressSpace.hpp ---------------------------===//
+//===----------------------------------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -134,7 +134,7 @@ public:
       __dwarf_section = assert_pointer_in_bounds(value);
   }
   uintptr_t dwarf_section() const { return __dwarf_section; }
-  size_t    dwarf_section_length;
+  size_t          dwarf_section_length;
 #endif
 #if defined(_LIBUNWIND_SUPPORT_DWARF_INDEX)
 private:
@@ -144,15 +144,15 @@ public:
       __dwarf_index_section = assert_pointer_in_bounds(value);
   }
   uintptr_t dwarf_index_section() const { return __dwarf_index_section; }
-  size_t    dwarf_index_section_length;
+  size_t          dwarf_index_section_length;
 #endif
 #if defined(_LIBUNWIND_SUPPORT_COMPACT_UNWIND)
-  uintptr_t    compact_unwind_section;
-  size_t       compact_unwind_section_length;
+  uintptr_t       compact_unwind_section;
+  size_t          compact_unwind_section_length;
 #endif
 #if defined(_LIBUNWIND_ARM_EHABI)
-  uintptr_t    arm_section;
-  size_t       arm_section_length;
+  uintptr_t       arm_section;
+  size_t          arm_section_length;
 #endif
 };
 
@@ -321,7 +321,7 @@ public:
 
   pint_t getEncodedP(pint_t &addr, pint_t end, uint8_t encoding,
                      pint_t datarelBase = 0);
-  bool findFunctionName(pc_t ip, char *buf, size_t bufLen, size_t *offset);
+  bool findFunctionName(pc_t ip, char *buf, size_t bufLen, unw_word_t *offset);
   bool findUnwindSections(pc_t targetAddr, UnwindInfoSections &info);
   bool findOtherFDE(addr_t targetAddr, pint_t &fde);
 
@@ -713,7 +713,7 @@ static bool checkForUnwindInfoSegment(const Elf_Phdr *phdr, uintptr_t image_base
       // .eh_frame_hdr records the start of .eh_frame, but not its size.
       // Rely on a zero terminator to find the end of the section.
       cbdata->sects->set_dwarf_section(hdrInfo.eh_frame_ptr);
-      cbdata->sects->dwarf_section_length = __SIZE_MAX__;
+      cbdata->sects->dwarf_section_length = SIZE_MAX;
       return true;
     }
   }
@@ -829,22 +829,22 @@ inline bool LocalAddressSpace::findUnwindSections(pc_t targetAddr,
     info.dso_base                      = (uintptr_t)dyldInfo.mh;
  #if defined(_LIBUNWIND_SUPPORT_DWARF_UNWIND)
     info.set_dwarf_section((uintptr_t)dyldInfo.dwarf_section);
-    info.dwarf_section_length          = dyldInfo.dwarf_section_length;
+    info.dwarf_section_length          = (size_t)dyldInfo.dwarf_section_length;
  #endif
     info.compact_unwind_section        = (uintptr_t)dyldInfo.compact_unwind_section;
-    info.compact_unwind_section_length = dyldInfo.compact_unwind_section_length;
+    info.compact_unwind_section_length = (size_t)dyldInfo.compact_unwind_section_length;
     return true;
   }
 #elif defined(_LIBUNWIND_SUPPORT_DWARF_UNWIND) && defined(_LIBUNWIND_IS_BAREMETAL)
   info.dso_base = 0;
   // Bare metal is statically linked, so no need to ask the dynamic loader
-  info.dwarf_section_length = (uintptr_t)(&__eh_frame_end - &__eh_frame_start);
+  info.dwarf_section_length = (size_t)(&__eh_frame_end - &__eh_frame_start);
   info.dwarf_section =        (uintptr_t)(&__eh_frame_start);
   _LIBUNWIND_TRACE_UNWINDING("findUnwindSections: section %p length %p",
                              (void *)info.dwarf_section, (void *)info.dwarf_section_length);
 #if defined(_LIBUNWIND_SUPPORT_DWARF_INDEX)
   info.dwarf_index_section =        (uintptr_t)(&__eh_frame_hdr_start);
-  info.dwarf_index_section_length = (uintptr_t)(&__eh_frame_hdr_end - &__eh_frame_hdr_start);
+  info.dwarf_index_section_length = (size_t)(&__eh_frame_hdr_end - &__eh_frame_hdr_start);
   _LIBUNWIND_TRACE_UNWINDING("findUnwindSections: index section %p length %p",
                              (void *)info.dwarf_index_section, (void *)info.dwarf_index_section_length);
 #endif
@@ -853,7 +853,7 @@ inline bool LocalAddressSpace::findUnwindSections(pc_t targetAddr,
 #elif defined(_LIBUNWIND_ARM_EHABI) && defined(_LIBUNWIND_IS_BAREMETAL)
   // Bare metal is statically linked, so no need to ask the dynamic loader
   info.arm_section =        (uintptr_t)(&__exidx_start);
-  info.arm_section_length = (uintptr_t)(&__exidx_end - &__exidx_start);
+  info.arm_section_length = (size_t)(&__exidx_end - &__exidx_start);
   _LIBUNWIND_TRACE_UNWINDING("findUnwindSections: section %p length %p",
                              (void *)info.arm_section, (void *)info.arm_section_length);
   if (info.arm_section && info.arm_section_length)
@@ -907,7 +907,7 @@ inline bool LocalAddressSpace::findUnwindSections(pc_t targetAddr,
   int length = 0;
   info.arm_section =
       (uintptr_t)dl_unwind_find_exidx((_Unwind_Ptr)targetAddr, &length);
-  info.arm_section_length = (uintptr_t)length * sizeof(EHABIIndexEntry);
+  info.arm_section_length = (size_t)length * sizeof(EHABIIndexEntry);
   if (info.arm_section && info.arm_section_length)
     return true;
 #elif defined(_LIBUNWIND_USE_DL_ITERATE_PHDR)
@@ -929,7 +929,8 @@ inline bool LocalAddressSpace::findOtherFDE(addr_t targetAddr, pint_t &fde) {
 }
 
 inline bool LocalAddressSpace::findFunctionName(pc_t ip, char *buf,
-                                                size_t bufLen, size_t *offset) {
+                                                size_t bufLen,
+                                                unw_word_t *offset) {
 #if _LIBUNWIND_USE_DLADDR
   Dl_info dyldInfo;
   CHERI_DBG("%s(0x%jx: %#p))\n", __func__, (uintmax_t)ip.address(),

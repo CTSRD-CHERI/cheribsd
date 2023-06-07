@@ -122,11 +122,12 @@ ufs_quotactl(struct mount *mp, int cmds, uid_t id, void * __capability arg,
 		vfs_ref(mp);
 		KASSERT(*mp_busy,
 		    ("%s called without busied mount", __func__));
-		vn_start_write(NULL, &mp, V_WAIT | V_MNTREF);
+		vn_start_write(NULL, &mp, V_WAIT);
 		vfs_unbusy(mp);
 		*mp_busy = false;
 		error = quotaoff(td, mp, type);
 		vn_finished_write(mp);
+		vfs_rel(mp);
 		break;
 
 	case Q_SETQUOTA32:
@@ -202,7 +203,7 @@ ufs_uninit(struct vfsconf *vfsp)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

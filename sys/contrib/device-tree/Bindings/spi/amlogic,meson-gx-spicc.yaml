@@ -8,7 +8,7 @@ $schema: "http://devicetree.org/meta-schemas/core.yaml#"
 title: Amlogic Meson SPI Communication Controller
 
 maintainers:
-  - Neil Armstrong <narmstrong@baylibre.com>
+  - Neil Armstrong <neil.armstrong@linaro.org>
 
 allOf:
   - $ref: "spi-controller.yaml#"
@@ -35,7 +35,6 @@ properties:
 
   clocks:
     minItems: 1
-    maxItems: 2
     items:
       - description: controller register bus clock
       - description: baud rate generator and delay control clock
@@ -96,4 +95,3 @@ examples:
               reg = <0>;
           };
     };
-

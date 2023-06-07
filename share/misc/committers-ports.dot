@@ -119,6 +119,7 @@ fjoe [label="Max Khon\nfjoe@FreeBSD.org\n2001/08/06"]
 flo [label="Florian Smeets\nflo@FreeBSD.org\n2010/12/07"]
 fluffy [label="Dima Panov\nfluffy@FreeBSD.org\n2009/08/10"]
 flz [label="Florent Thoumie\nflz@FreeBSD.org\n2005/03/01"]
+fuz [label="Robert Clausecker\nfuz@FreeBSD.org\n2023/02/02"]
 gabor [label="Gabor Kovesdan\ngabor@FreeBSD.org\n2006/12/05"]
 gahr [label="Pietro Cerutti\ngahr@FreeBSD.org\n2008/02/20"]
 garga [label="Renato Botelho\ngarga@FreeBSD.org\n2005/07/11"]
@@ -243,6 +244,7 @@ rnoland [label="Robert Noland\nrnoland@FreeBSD.org\n2008/07/21"]
 robak [label="Bartek Rutkowski\nrobak@FreeBSD.org\n2014/06/10"]
 rodrigo [label="Rodrigo Osorio\nrodrigo@FreeBSD.org\n2014/01/15"]
 romain [label="Romain Tartiere\nromain@FreeBSD.org\n2010/01/24"]
+ronald [label="Ronald Klop\nronald@FreeBSD.org\n2022/10/06"]
 rpaulo [label="Rui Paulo\nrpaulo@FreeBSD.org\n2014/07/15"]
 sahil [label="Sahil Tandon\nsahil@FreeBSD.org\n2010/04/11"]
 salvadore [label="Lorenzo Salvadore\nsalvadore@FreeBSD.org\n2020/02/21"]
@@ -299,6 +301,7 @@ yuri [label="Yuri Victorovich\nyuri@FreeBSD.org\n2017/10/30"]
 yzlin [label="Yi-Jheng Lin\nyzlin@FreeBSD.org\n2009/07/19"]
 zeising [label="Niclas Zeising\nzeising@FreeBSD.org\n2012/07/03"]
 zi [label="Ryan Steinmetz\nzi@FreeBSD.org\n2011/07/14"]
+zirias [label="Felix Palmen\nzirias@FreeBSD.org\n2022/08/02"]
 znerd [label="Ernst de Haan\nznerd@FreeBSD.org\n2001/11/15"]
 
 # Here are the mentor/mentee relationships.
@@ -424,6 +427,8 @@ eadler -> milki
 eadler -> tj
 eadler -> vg
 
+eduardo -> fuz
+
 edwin -> cperciva
 edwin -> erwin
 edwin -> linimon
@@ -457,6 +462,7 @@ fjoe -> krion
 fjoe -> osa
 
 flo -> bar
+flo -> fuz
 flo -> jase
 flo -> jbeich
 flo -> grembo
@@ -691,6 +697,8 @@ pi -> tz
 
 pizzamig -> tagattie
 
+pkubaj -> ronald
+
 rafan -> chinsan
 
 rakuco -> adridg
@@ -706,6 +714,7 @@ rene -> jmd
 rene -> joneum
 rene -> ler
 rene -> olivierd
+rene -> ronald
 
 rm -> koobs
 rm -> vg
@@ -785,6 +794,7 @@ tcberner -> rigoletto
 tcberner -> salvadore
 tcberner -> vishwin
 tcberner -> yuri
+tcberner -> zirias
 
 thierry -> jadawin
 thierry -> riggs

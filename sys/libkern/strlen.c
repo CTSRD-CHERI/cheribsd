@@ -146,11 +146,12 @@ size_t
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20171211,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_shape",
-//     "unsupported"
+//     "unsupported",
+//     "pointer_alignment"
 //   ]
 // }
 // CHERI CHANGES END

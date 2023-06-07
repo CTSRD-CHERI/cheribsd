@@ -57,7 +57,7 @@ void	am79900_intr(void *);
 #endif /* _DEV_LE_AM79900VAR_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190812,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "subobject_bounds"

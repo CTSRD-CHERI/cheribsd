@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/CTSRD-CHERI/zfs.git
+	branch = cheri-hybrid
+	commit = e4b13903a284500e039166ef3d820902bdd5a713
+	parent = 4d0ede3132ec304e78632272405f6b9552d4f49d
+	method = merge
+	cmdver = 0.4.3

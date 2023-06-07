@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if_pflog.h>
 #include <net/if_var.h>
 #include <net/if_clone.h>
+#include <net/if_private.h>
 #include <net/if_types.h>
 #include <net/vnet.h>
 #include <net/bpf.h>
@@ -208,7 +209,7 @@ ipfw_bpf_uninit(int last __unused)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

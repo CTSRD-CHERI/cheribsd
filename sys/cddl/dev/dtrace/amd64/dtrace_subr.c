@@ -33,12 +33,13 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/types.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/proc.h>
 #include <sys/smp.h>
 #include <sys/dtrace_impl.h>
 #include <sys/dtrace_bsd.h>
+#include <cddl/dev/dtrace/dtrace_cddl.h>
 #include <machine/clock.h>
 #include <machine/cpufunc.h>
 #include <machine/frame.h>
@@ -50,7 +51,7 @@
 extern void dtrace_getnanotime(struct timespec *tsp);
 extern int (*dtrace_invop_jump_addr)(struct trapframe *);
 
-int	dtrace_invop(uintptr_t, struct trapframe *, uintptr_t);
+int	dtrace_invop(uintptr_t, struct trapframe *, void **);
 int	dtrace_invop_start(struct trapframe *frame);
 void	dtrace_invop_init(void);
 void	dtrace_invop_uninit(void);
@@ -63,16 +64,22 @@ typedef struct dtrace_invop_hdlr {
 dtrace_invop_hdlr_t *dtrace_invop_hdlr;
 
 int
-dtrace_invop(uintptr_t addr, struct trapframe *frame, uintptr_t eax)
+dtrace_invop(uintptr_t addr, struct trapframe *frame, void **scratch)
 {
+	struct thread *td;
 	dtrace_invop_hdlr_t *hdlr;
 	int rval;
 
-	for (hdlr = dtrace_invop_hdlr; hdlr != NULL; hdlr = hdlr->dtih_next)
-		if ((rval = hdlr->dtih_func(addr, frame, eax)) != 0)
-			return (rval);
-
-	return (0);
+	td = curthread;
+	td->t_dtrace_trapframe = frame;
+	rval = 0;
+	for (hdlr = dtrace_invop_hdlr; hdlr != NULL; hdlr = hdlr->dtih_next) {
+		rval = hdlr->dtih_func(addr, frame, (uintptr_t)scratch);
+		if (rval != 0)
+			break;
+	}
+	td->t_dtrace_trapframe = NULL;
+	return (rval);
 }
 
 void

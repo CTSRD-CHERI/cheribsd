@@ -34,6 +34,8 @@
 #include <sys/errno.h>
 
 #define	EBADRQC		56	/* Bad request code */
+#define	EBADSLT		57	/* Invalid slot */
+#define	ENOKEY		126	/* Required key not available */
 
 #define	ECHRNG		EDOM
 #define	ETIME		ETIMEDOUT
@@ -44,6 +46,7 @@
 #define	ERESTARTSYS     512
 #define	ENOTSUPP	EOPNOTSUPP
 #define	ENONET		EHOSTDOWN
+#define	EHWPOISON	133	/* Memory page hardware error */
 
 /*
  * The error numbers below are arbitrary and do not resemble the numbers

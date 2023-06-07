@@ -28,7 +28,11 @@ MK_ASAN=	no
 MK_SSP=		no
 MK_UBSAN=	no
 
-.if !defined(NEED_COMPAT)
+.ifdef RTLD_SANDBOX
+CFLAGS+=-DRTLD_SANDBOX
+.endif
+
+.if !defined(NEED_COMPAT) && !defined(RTLD_SANDBOX)
 CONFS=		libmap.conf
 .endif
 PROG?=		ld-elf.so.1
@@ -91,6 +95,10 @@ LDFLAGS+=	-Wl,--version-script=${VERSION_MAP}
 
 .if exists(${RTLD_ELF_DIR}/${RTLD_ARCH}/Symbol.map)
 SYMBOL_MAPS+=	${RTLD_ELF_DIR}/${RTLD_ARCH}/Symbol.map
+.endif
+
+.ifdef RTLD_SANDBOX
+SYMBOL_MAPS+=	${RTLD_ELF_DIR}/Symbol-c18n.map
 .endif
 
 .sinclude "${RTLD_ELF_DIR}/${RTLD_ARCH}/Makefile.inc"

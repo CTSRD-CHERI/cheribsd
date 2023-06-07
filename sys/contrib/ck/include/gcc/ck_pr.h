@@ -329,10 +329,10 @@ CK_PR_UNARY_S(8, uint8_t)
 #endif /* CK_PR_GCC_H */
 // CHERI CHANGES START
 // {
-//   "updated": 20181108,
+//   "updated": 20221129,
 //   "target_type": "header",
 //   "changes_purecap": [
-//     "pointer_shape",
+//     "support",
 //     "other"
 //   ],
 //   "change_comment": "c11 atomic"

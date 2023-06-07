@@ -68,7 +68,11 @@ INCS+=		stdlib.h
 SRCS+=		reallocarray.c
 .endif
 
+.if exists(${HOST_INCLUDE_ROOT}/sys/stat.h)
 _WITH_UTIMENS!= grep -c utimensat ${HOST_INCLUDE_ROOT}/sys/stat.h || true
+.else
+_WITH_UTIMENS= 0
+.endif
 .if ${_WITH_UTIMENS} == 0
 SYSINCS+=	stat.h
 SRCS+=		futimens.c utimensat.c
@@ -81,7 +85,7 @@ SYSINCS+=	cdefs.h
 # Define ptraddr_t for bootstrapping
 INCS+=	stdint.h
 
-_WITH_EXPLICIT_BZERO!= grep -c explicit_bzero ${HOST_INCLUDE_ROOT}/strings.h || true
+_WITH_EXPLICIT_BZERO!= cat ${HOST_INCLUDE_ROOT}/strings.h ${HOST_INCLUDE_ROOT}/string.h | grep -c explicit_bzero || true
 .if ${_WITH_EXPLICIT_BZERO} == 0
 # .PATH: ${SRCTOP}/sys/libkern
 # Adding sys/libkern to .PATH breaks building the cross-build compat library
@@ -157,9 +161,18 @@ INCS+=	${SRCTOP}/include/nlist.h
 SYSINCS+=	${SRCTOP}/sys/sys/imgact_aout.h
 SYSINCS+=	${SRCTOP}/sys/sys/nlist_aout.h
 
+# macOS's bitstring lacks FreeBSD-specific additions used by makefs's ZFS code
+# and Linux doesn't have it at all.  Older FreeBSD versions lack recent
+# additions.
+INCS+=	${SRCTOP}/include/bitstring.h
+SYSINCS+=	${SRCTOP}/sys/sys/bitstring.h
 
 .if ${.MAKE.OS} != "FreeBSD"
 .PATH: ${.CURDIR}/cross-build
+
+# Needed by our sys/types.h wrapper
+SYSINCS+=	${SRCTOP}/sys/sys/bitcount.h
+
 # dbopen() behaves differently on Linux and FreeBSD so we ensure that we
 # bootstrap the FreeBSD db code. The cross-build headers #define dbopen() to
 # __freebsd_dbopen() so that we don't ever use the host version
@@ -188,6 +201,8 @@ SRCS+=	rpmatch.c
 # On Linux, glibc does not provide strlcpy,strlcat or strmode.
 .PATH: ${LIBC_SRCTOP}/string
 SRCS+=	strlcpy.c strlcat.c strmode.c
+# On Linux, glibc provides ffs* but not fls*
+SRCS+=	fls.c flsl.c flsll.c
 # Compile the fgetln/fgetwln/closefrom fallback code from libbsd:
 SRCS+=	fgetln_fallback.c fgetwln_fallback.c closefrom.c
 CFLAGS.closefrom.c+=	-DSTDC_HEADERS -DHAVE_SYS_DIR_H -DHAVE_DIRENT_H \
@@ -316,22 +331,10 @@ _host_abs_tools_to_symlink+=	/bin/bash:sh
 _host_tools_to_symlink:=${_host_tools_to_symlink:Nsh}
 .endif
 
-
-# Tools such as xz are not included in /usr/bin on macOS, so also look inside
-# the homebrew install directory.
-.if !defined(HOST_TOOLS_PATH_EXTRA)
-.if ${.MAKE.OS} == "Darwin"
-HOST_TOOLS_PATH_EXTRA!=env PATH="${_ORIGIAL_PATH}:${PATH}" brew --prefix 2> /dev/null || echo /usr/local
-HOST_TOOLS_PATH_EXTRA:=${HOST_TOOLS_PATH_EXTRA}/bin
-.info HOST_TOOLS_PATH_EXTRA inferred as ${HOST_TOOLS_PATH_EXTRA}
-.endif
-.endif
-
 host-symlinks:
 	@echo "Linking host tools into ${DESTDIR}/bin"
 .for _tool in ${_host_tools_to_symlink}
-	# The toplevel makefile forces $PATH to only be /usr/local/bin
-	@export PATH="$${PATH}:${HOST_TOOLS_PATH_EXTRA}"; \
+	@export PATH=$${PATH}:/usr/local/bin; \
 	source_path=`which ${_tool} || echo /dev/null/no/such`; \
 	if [ ! -e "$${source_path}" ] ; then \
 		echo "Cannot find host tool '${_tool}' in PATH ($$PATH)." >&2; false; \

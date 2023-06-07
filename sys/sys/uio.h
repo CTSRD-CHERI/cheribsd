@@ -97,12 +97,6 @@ int	uiomove_cap(void *cp, int n, struct uio *uio);
 int	uiomove_frombuf(void *buf, int buflen, struct uio *uio);
 int	uiomove_fromphys(struct vm_page *ma[], vm_offset_t offset, int n,
 	    struct uio *uio);
-#if __has_feature(capabilities)
-int	uiomove_fromphys_cap(struct vm_page *ma[], vm_offset_t offset, int n,
-	    struct uio *uio);
-#else
-#define	uiomove_fromphys_cap	uiomove_fromphys
-#endif
 int	uiomove_nofault(void *cp, int n, struct uio *uio);
 int	uiomove_object(struct vm_object *obj, off_t obj_size, struct uio *uio);
 int	updateiov(const struct uio *uiop, struct iovec * __capability iovp);
@@ -123,13 +117,14 @@ __END_DECLS
 #endif /* !_SYS_UIO_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "pointer_shape"
 //   ]
 // }
 // CHERI CHANGES END

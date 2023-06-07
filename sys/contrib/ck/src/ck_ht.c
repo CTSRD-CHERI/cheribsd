@@ -1033,10 +1033,11 @@ ck_ht_destroy(struct ck_ht *table)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190528,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes_purecap": [
-//     "pointer_alignment"
+//     "pointer_alignment",
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

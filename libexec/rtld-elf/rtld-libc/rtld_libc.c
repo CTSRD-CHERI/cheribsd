@@ -120,3 +120,16 @@ sysctl(const int *name, u_int namelen, void *oldp, size_t *oldlenp,
 	retval = __sys___sysctl(name, namelen, oldp, oldlenp, newp, newlen);
 	return (retval);
 }
+
+extern int __sys___sysctlbyname(const char *name, size_t namelen, void *oldp,
+    size_t *oldlenp, const void *newp, size_t newlen);
+
+int
+sysctlbyname(const char *name, void *oldp, size_t *oldlenp,
+    const void *newp, size_t newlen)
+{
+	size_t len;
+
+	len = strlen(name);
+	return (__sys___sysctlbyname(name, len, oldp, oldlenp, newp, newlen));
+}

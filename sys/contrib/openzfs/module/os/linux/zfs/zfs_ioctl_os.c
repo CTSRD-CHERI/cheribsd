@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -135,7 +135,7 @@ zfsdev_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 
 	vecnum = cmd - ZFS_IOC_FIRST;
 
-	zc = kmem_zalloc(sizeof (zfs_cmd_t), KM_SLEEP);
+	zc = vmem_zalloc(sizeof (zfs_cmd_t), KM_SLEEP);
 
 	if (ddi_copyin((void *)(uintptr_t)arg, zc, sizeof (zfs_cmd_t), 0)) {
 		error = -SET_ERROR(EFAULT);
@@ -146,7 +146,7 @@ zfsdev_ioctl(struct file *filp, unsigned cmd, unsigned long arg)
 	if (error == 0 && rc != 0)
 		error = -SET_ERROR(EFAULT);
 out:
-	kmem_free(zc, sizeof (zfs_cmd_t));
+	vmem_free(zc, sizeof (zfs_cmd_t));
 	return (error);
 
 }
@@ -369,8 +369,7 @@ MODULE_ALIAS("zcommon");
 MODULE_ALIAS("zzstd");
 MODULE_DESCRIPTION("ZFS");
 MODULE_AUTHOR(ZFS_META_AUTHOR);
-MODULE_LICENSE("Lua: MIT");
-MODULE_LICENSE("zstd: Dual BSD/GPL");
-MODULE_LICENSE("Dual BSD/GPL");
+MODULE_LICENSE("Dual MIT/GPL"); /* lua */
+MODULE_LICENSE("Dual BSD/GPL"); /* zstd / misc */
 MODULE_LICENSE(ZFS_META_LICENSE);
 MODULE_VERSION(ZFS_META_VERSION "-" ZFS_META_RELEASE);

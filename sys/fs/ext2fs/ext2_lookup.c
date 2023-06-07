@@ -265,7 +265,7 @@ nextentry:
 		error = 0;
 	if (ap->a_ncookies != NULL) {
 		if (error == 0) {
-			ap->a_ncookies -= ncookies;
+			*ap->a_ncookies -= ncookies;
 		} else {
 			free(*ap->a_cookies, M_TEMP);
 			*ap->a_ncookies = 0;
@@ -514,13 +514,10 @@ notfound:
 		 * We return ni_vp == NULL to indicate that the entry
 		 * does not currently exist; we leave a pointer to
 		 * the (locked) directory inode in ndp->ni_dvp.
-		 * The pathname buffer is saved so that the name
-		 * can be obtained later.
 		 *
 		 * NB - if the directory is unlocked, then this
 		 * information cannot be used.
 		 */
-		cnp->cn_flags |= SAVENAME;
 		return (EJUSTRETURN);
 	}
 	/*
@@ -542,8 +539,8 @@ found:
 	if (entryoffsetinblock + EXT2_DIR_REC_LEN(ep->e2d_namlen) >
 	    dp->i_size) {
 		ext2_dirbad(dp, i_offset, "i_size too small");
-		dp->i_size = entryoffsetinblock + EXT2_DIR_REC_LEN(ep->e2d_namlen);
-		dp->i_flag |= IN_CHANGE | IN_UPDATE;
+		brelse(bp);
+		return (EIO);
 	}
 	brelse(bp);
 
@@ -631,7 +628,6 @@ found:
 		    &tdp)) != 0)
 			return (error);
 		*vpp = tdp;
-		cnp->cn_flags |= SAVENAME;
 		return (0);
 	}
 	if (dd_ino != NULL)
@@ -803,16 +799,9 @@ ext2_search_dirblock(struct inode *ip, void *data, int *foundp,
 void
 ext2_dirbad(struct inode *ip, doff_t offset, char *how)
 {
-	struct mount *mp;
 
-	mp = ITOV(ip)->v_mount;
-	if ((mp->mnt_flag & MNT_RDONLY) == 0)
-		panic("ext2_dirbad: %s: bad dir ino %ju at offset %ld: %s\n",
-		    mp->mnt_stat.f_mntonname, (uintmax_t)ip->i_number,
-		    (long)offset, how);
-	else
-		SDT_PROBE4(ext2fs, , trace, ext2_dirbad_error,
-		    mp->mnt_stat.f_mntonname, ip->i_number, offset, how);
+	SDT_PROBE4(ext2fs, , trace, ext2_dirbad_error,
+	    ITOV(ip)->v_mount->mnt_stat.f_mntonname, ip->i_number, offset, how);
 }
 
 /*
@@ -822,6 +811,8 @@ ext2_dirbad(struct inode *ip, doff_t offset, char *how)
  *	record must be large enough to contain entry
  *	name is not longer than MAXNAMLEN
  *	name must be as long as advertised, and null terminated
+ *	inode number less then inode count
+ *	if root inode entry, it have correct name
  */
 static int
 ext2_check_direntry(struct vnode *dp, struct ext2fs_direct_2 *de,
@@ -840,6 +831,11 @@ ext2_check_direntry(struct vnode *dp, struct ext2fs_direct_2 *de,
 		error_msg = "directory entry across blocks";
 	else if (le32toh(de->e2d_ino) > fs->e2fs->e2fs_icount)
 		error_msg = "directory entry inode out of bounds";
+	else if (le32toh(de->e2d_ino) == EXT2_ROOTINO &&
+	    ((de->e2d_namlen != 1 && de->e2d_namlen != 2) ||
+	    (de->e2d_name[0] != '.') ||
+	    (de->e2d_namlen == 2 && de->e2d_name[1] != '.')))
+		error_msg = "bad root directory entry";
 
 	if (error_msg != NULL) {
 		SDT_PROBE5(ext2fs, , trace, ext2_dirbadentry_error,
@@ -923,10 +919,6 @@ ext2_direnter(struct inode *ip, struct vnode *dvp, struct componentname *cnp)
 	int DIRBLKSIZ = ip->i_e2fs->e2fs_bsize;
 	int error;
 
-#ifdef INVARIANTS
-	if ((cnp->cn_flags & SAVENAME) == 0)
-		panic("ext2_direnter: missing name");
-#endif
 	dp = VTOI(dvp);
 	newdir.e2d_ino = htole32(ip->i_number);
 	if (EXT2_HAS_INCOMPAT_FEATURE(ip->i_e2fs,
@@ -1174,7 +1166,7 @@ ext2_dirempty(struct inode *ip, ino_t parentino, struct ucred *cred)
 #define	MINDIRSIZ (sizeof(struct dirtemplate) / 2)
 
 	for (off = 0; off < ip->i_size; off += le16toh(dp->e2d_reclen)) {
-		error = vn_rdwr(UIO_READ, ITOV(ip), (caddr_t)dp, MINDIRSIZ,
+		error = vn_rdwr(UIO_READ, ITOV(ip), PTR2CAP(dp), MINDIRSIZ,
 		    off, UIO_SYSSPACE, IO_NODELOCKED | IO_NOMACCHECK, cred,
 		    NOCRED, &count, (struct thread *)0);
 		/*
@@ -1236,7 +1228,7 @@ ext2_checkpath(struct inode *source, struct inode *target, struct ucred *cred)
 			error = ENOTDIR;
 			break;
 		}
-		error = vn_rdwr(UIO_READ, vp, (caddr_t)&dirbuf,
+		error = vn_rdwr(UIO_READ, vp, PTR2CAP(&dirbuf),
 		    sizeof(struct dirtemplate), (off_t)0, UIO_SYSSPACE,
 		    IO_NODELOCKED | IO_NOMACCHECK, cred, NOCRED, NULL,
 		    NULL);

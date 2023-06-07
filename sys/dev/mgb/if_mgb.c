@@ -513,7 +513,7 @@ mgb_media_change(if_t ifp)
 
 	needs_reset = mii_mediachg(miid);
 	if (needs_reset != 0)
-		ifp->if_init(ctx);
+		if_init(ifp, ctx);
 	return (needs_reset);
 }
 
@@ -619,7 +619,7 @@ mgb_init(if_ctx_t ctx)
 		    error);
 }
 
-#ifdef DEBUG
+#if 0
 static void
 mgb_dump_some_stats(struct mgb_softc *sc)
 {

@@ -73,14 +73,14 @@ function add_debug_code(name, arg, pos, ind)
 	else
 		star = "";
 	if (lockdata[name, arg, pos] && (lockdata[name, arg, pos] != "-")) {
-		printc(ind"ASSERT_VI_UNLOCKED("star"a->a_"arg", \""uname"\");");
+		printc(ind"ASSERT_VI_UNLOCKED("star"a->a_"arg", \""uname" "pos" ("arg")\");");
 		# Add assertions for locking
 		if (lockdata[name, arg, pos] == "L")
-			printc(ind"ASSERT_VOP_LOCKED(" star "a->a_"arg", \""uname"\");");
+			printc(ind"ASSERT_VOP_LOCKED(" star "a->a_"arg", \""uname" "pos" ("arg")\");");
 		else if (lockdata[name, arg, pos] == "U")
-			printc(ind"ASSERT_VOP_UNLOCKED(" star "a->a_"arg", \""uname"\");");
+			printc(ind"ASSERT_VOP_UNLOCKED(" star "a->a_"arg", \""uname" "pos" ("arg")\");");
 		else if (lockdata[name, arg, pos] == "E")
-			printc(ind"ASSERT_VOP_ELOCKED(" star "a->a_"arg", \""uname"\");");
+			printc(ind"ASSERT_VOP_ELOCKED(" star "a->a_"arg", \""uname" "pos" ("arg")\");");
 		else if (0) {
 			# XXX More checks!
 		}
@@ -319,7 +319,7 @@ while ((getline < srcfile) > 0) {
 
 	if (hfile) {
 		# Print out the vop_F_args structure.
-		printh("struct "name"_args {\n\tstruct vop_generic_args a_gen;");
+		printh("struct "name"_args {\n\tstruct vop_generic_args a_gen __subobject_member_used_for_c_inheritance;");
 		for (i = 0; i < numargs; ++i)
 			printh("\t" t_spc(types[i]) "a_" args[i] ";");
 		printh("};");

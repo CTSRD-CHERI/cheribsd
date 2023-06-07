@@ -43,7 +43,14 @@ ldconfig_start()
 		machine_arch=$(sysctl -n hw.machine_arch)
 
 		case ${machine_arch} in
-		aarch64c|riscv64c)
+		aarch64c)
+			ldconfigc18n_hints_file="/var/run/ld-elf-c18n.so.hints"
+			_LDC="/usr/lib/c18n ${_LDC}"
+			startmsg 'Library-based compartmentalization ldconfig path:' ${_LDC}
+			${ldconfig} ${_ins} -f ${ldconfigc18n_hints_file} ${_LDC}
+			;&
+			# FALLTHROUGH
+		riscv64c)
 			for i in ${ldconfig_local64_dirs}; do
 				if [ -d "${i}" ]; then
 					_files=`find ${i} -type f`

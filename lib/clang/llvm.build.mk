@@ -30,6 +30,10 @@ CFLAGS+=	-DHAVE_VCS_VERSION_INC
 CFLAGS+=	-DNDEBUG
 .endif
 
+# Note that using TARGET_ARCH here is essential for a functional native-xtools
+# build!  For native-xtools, we're building binaries that will work on the
+# *host* machine (MACHINE_ARCH), but they should default to producing binaries
+# for the *target* machine (TARGET_ARCH).
 TARGET_ARCH?=	${MACHINE_ARCH}
 BUILD_ARCH?=	${MACHINE_ARCH}
 
@@ -37,15 +41,15 @@ BUILD_ARCH?=	${MACHINE_ARCH}
 # arm (for armv4 and armv5 CPUs) always uses the soft float ABI.
 # For all other targets, we stick with 'unknown'.
 .if ${TARGET_ARCH:Marmv[67]*} && (!defined(CPUTYPE) || ${CPUTYPE:M*soft*} == "")
-TARGET_ABI=	-gnueabihf
+TARGET_TRIPLE_ABI=	-gnueabihf
 .elif ${TARGET_ARCH:Marm*}
-TARGET_ABI=	-gnueabi
+TARGET_TRIPLE_ABI=	-gnueabi
 .else
-TARGET_ABI=
+TARGET_TRIPLE_ABI=
 .endif
 VENDOR=		unknown
 
-LLVM_TARGET_TRIPLE?=	${TARGET_ARCH:C/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/}-${VENDOR}-freebsd${OS_REVISION}${TARGET_ABI}
+LLVM_TARGET_TRIPLE?=	${TARGET_ARCH:C/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/}-${VENDOR}-freebsd${OS_REVISION}${TARGET_TRIPLE_ABI}
 LLVM_BUILD_TRIPLE?=	${BUILD_ARCH:C/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/}-${VENDOR}-freebsd${OS_REVISION}
 
 CFLAGS+=	-DLLVM_DEFAULT_TARGET_TRIPLE=\"${LLVM_TARGET_TRIPLE}\"

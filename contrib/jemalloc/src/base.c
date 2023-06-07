@@ -1,11 +1,12 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20181113,
+ *   "updated": 20221129,
  *   "target_type": "lib",
  *   "changes": [
  *     "pointer_alignment",
- *     "virtual_address"
+ *     "virtual_address",
+ *     "support"
  *   ]
  * }
  * CHERI CHANGES END

@@ -1776,6 +1776,8 @@ keg_alloc_slab(uma_keg_t keg, uma_zone_t zone, int domain, int flags,
 	uint8_t sflags;
 	int i;
 
+	TSENTER();
+
 	KASSERT(domain >= 0 && domain < vm_ndomains,
 	    ("keg_alloc_slab: domain %d out of range", domain));
 
@@ -1878,6 +1880,7 @@ keg_alloc_slab(uma_keg_t keg, uma_zone_t zone, int domain, int flags,
 	dom->ud_pages += keg->uk_ppera;
 	dom->ud_free_items += keg->uk_ipers;
 
+	TSEXIT();
 	return (slab);
 
 fail:
@@ -1966,7 +1969,7 @@ page_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	void *p;	/* Returned page */
 
 	*pflag = UMA_SLAB_KERNEL;
-	p = (void *)kmem_malloc_domainset(DOMAINSET_FIXED(domain), bytes, wait);
+	p = kmem_malloc_domainset(DOMAINSET_FIXED(domain), bytes, wait);
 
 	return (p);
 }
@@ -2132,7 +2135,7 @@ page_free(void *mem, vm_size_t size, uint8_t flags)
 	KASSERT((flags & UMA_SLAB_KERNEL) != 0,
 	    ("UMA: page_free used with invalid flags %x", flags));
 
-	kmem_free((vm_pointer_t)mem, size);
+	kmem_free(mem, size);
 }
 
 /*
@@ -2149,7 +2152,7 @@ page_free(void *mem, vm_size_t size, uint8_t flags)
 static void
 pcpu_page_free(void *mem, vm_size_t size, uint8_t flags)
 {
-	vm_offset_t sva, curva;
+	vm_pointer_t sva, curva;
 	vm_paddr_t paddr;
 	vm_page_t m;
 
@@ -2160,7 +2163,7 @@ pcpu_page_free(void *mem, vm_size_t size, uint8_t flags)
 		return;
 	}
 
-	sva = (vm_offset_t)mem;
+	sva = (vm_pointer_t)mem;
 	for (curva = sva; curva < sva + size; curva += PAGE_SIZE) {
 		paddr = pmap_kextract(curva);
 		m = PHYS_TO_VM_PAGE(paddr);
@@ -3605,7 +3608,8 @@ uma_zalloc_debug(uma_zone_t zone, void **itemp, void *udata, int flags)
 #endif
 
 #ifdef DEBUG_MEMGUARD
-	if ((zone->uz_flags & UMA_ZONE_SMR) == 0 && memguard_cmp_zone(zone)) {
+	if ((zone->uz_flags & (UMA_ZONE_SMR | UMA_ZFLAG_CACHE)) == 0 &&
+	    memguard_cmp_zone(zone)) {
 		void *item;
 		item = memguard_alloc(zone->uz_size, flags);
 		if (item != NULL) {
@@ -3640,7 +3644,8 @@ uma_zfree_debug(uma_zone_t zone, void *item, void *udata)
 	    ("uma_zfree_debug: called with spinlock or critical section held"));
 
 #ifdef DEBUG_MEMGUARD
-	if ((zone->uz_flags & UMA_ZONE_SMR) == 0 && is_memguard_addr(item)) {
+	if ((zone->uz_flags & (UMA_ZONE_SMR | UMA_ZFLAG_CACHE)) == 0 &&
+	    is_memguard_addr(item)) {
 		if (zone->uz_dtor != NULL)
 			zone->uz_dtor(item, zone->uz_size, udata);
 		if (zone->uz_fini != NULL)
@@ -6021,7 +6026,7 @@ DB_SHOW_COMMAND_FLAGS(umacache, db_show_umacache, DB_CMD_MEMSAFE)
 #endif	/* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 202000708,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_alignment",

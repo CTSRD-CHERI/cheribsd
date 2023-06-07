@@ -501,7 +501,7 @@ gicv3_its_table_init(device_t dev, struct gicv3_its_softc *sc)
 			nitspages = howmany(its_tbl_size, page_size);
 
 			/* Clear the fields we will be setting */
-			reg &= ~(GITS_BASER_VALID |
+			reg &= ~(GITS_BASER_VALID | GITS_BASER_INDIRECT |
 			    GITS_BASER_CACHE_MASK | GITS_BASER_TYPE_MASK |
 			    GITS_BASER_ESIZE_MASK | GITS_BASER_PA_MASK |
 			    GITS_BASER_SHARE_MASK | GITS_BASER_PSZ_MASK |
@@ -655,7 +655,7 @@ its_init_cpu_lpi(device_t dev, struct gicv3_its_softc *sc)
 			/* Non-cacheable */
 			xbaser |= GICR_PROPBASER_CACHE_NIN <<
 			    GICR_PROPBASER_CACHE_SHIFT;
-			/* Non-sareable */
+			/* Non-shareable */
 			xbaser |= GICR_PROPBASER_SHARE_NS <<
 			    GICR_PROPBASER_SHARE_SHIFT;
 			gic_r_write_8(gicv3, GICR_PROPBASER, xbaser);
@@ -2058,10 +2058,11 @@ gicv3_its_acpi_attach(device_t dev)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20210427,
+//   "updated": 20221129,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer-as-integer"
+//     "pointer_as_integer",
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

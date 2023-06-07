@@ -90,6 +90,8 @@ __ElfType(Auxinfo);
 
 #define	ELF_IS_CHERI(hdr) (((hdr)->e_flags & EF_RISCV_CHERIABI) != 0)
 
+#define	PT_MEMTAG_CHERI	PT_RISCV_MEMTAG_CHERI
+
 /* Define "machine" characteristics */
 #define	ELF_TARG_CLASS	ELFCLASS64
 #define	ELF_TARG_DATA	ELFDATA2LSB
@@ -103,13 +105,13 @@ __ElfType(Auxinfo);
 #define	DT_CHERI___CAPRELOCSSZ	DT_RISCV_CHERI___CAPRELOCSSZ
 
 /* Flags passed in AT_HWCAP */
-#define	HWCAP_ISA_BIT(c)	(1 << ((c) - 'A'))
-#define	HWCAP_ISA_I		HWCAP_ISA_BIT('I')
-#define	HWCAP_ISA_M		HWCAP_ISA_BIT('M')
-#define	HWCAP_ISA_A		HWCAP_ISA_BIT('A')
-#define	HWCAP_ISA_F		HWCAP_ISA_BIT('F')
-#define	HWCAP_ISA_D		HWCAP_ISA_BIT('D')
-#define	HWCAP_ISA_C		HWCAP_ISA_BIT('C')
+#define	HWCAP_ISA_BIT(c)	(1 << ((c) - 'a'))
+#define	HWCAP_ISA_I		HWCAP_ISA_BIT('i')
+#define	HWCAP_ISA_M		HWCAP_ISA_BIT('m')
+#define	HWCAP_ISA_A		HWCAP_ISA_BIT('a')
+#define	HWCAP_ISA_F		HWCAP_ISA_BIT('f')
+#define	HWCAP_ISA_D		HWCAP_ISA_BIT('d')
+#define	HWCAP_ISA_C		HWCAP_ISA_BIT('c')
 #define	HWCAP_ISA_G		\
     (HWCAP_ISA_I | HWCAP_ISA_M | HWCAP_ISA_A | HWCAP_ISA_F | HWCAP_ISA_D)
 

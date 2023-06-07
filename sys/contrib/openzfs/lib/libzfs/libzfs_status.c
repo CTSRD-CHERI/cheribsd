@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -222,7 +222,6 @@ check_status(nvlist_t *config, boolean_t isimport,
 {
 	pool_scan_stat_t *ps = NULL;
 	uint_t vsc, psc;
-	uint64_t nerr;
 	uint64_t suspended;
 	uint64_t hostid = 0;
 	uint64_t errata = 0;
@@ -392,6 +391,7 @@ check_status(nvlist_t *config, boolean_t isimport,
 	 * Persistent data errors.
 	 */
 	if (!isimport) {
+		uint64_t nerr;
 		if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_ERRCOUNT,
 		    &nerr) == 0 && nerr != 0)
 			return (ZPOOL_STATUS_CORRUPT_DATA);

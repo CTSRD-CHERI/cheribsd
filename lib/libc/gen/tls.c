@@ -30,7 +30,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20181121,
+ *   "updated": 20221129,
  *   "target_type": "lib",
  *   "changes": [
  *     "pointer_shape"
@@ -384,9 +384,7 @@ __libc_free_tls(void *tcb __unused, size_t tcbsize __unused,
 
 #endif /* PIC */
 
-#ifndef __CHERI_PURE_CAPABILITY__
-extern char **environ;
-#else
+#ifdef __CHERI_PURE_CAPABILITY__
 extern Elf_Auxinfo *__auxargs;
 #endif
 

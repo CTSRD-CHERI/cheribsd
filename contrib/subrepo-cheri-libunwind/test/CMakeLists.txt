@@ -12,7 +12,7 @@ set(_cxx_abi_link_flag "${LIBUNWIND_TEST_CXX_ABI_LIB_PATH}")
 if(NOT _cxx_abi_link_flag)
   if ("${LIBUNWIND_CXX_ABI}" STREQUAL "default")
     if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-      set(_cxx_abi_link_flag "libsupc++")
+      set(_cxx_abi_link_flag "-lsupc++")
     elseif (${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
       set(_cxx_abi_link_flag "-lcxxrt")
     elseif(APPLE)
@@ -93,7 +93,7 @@ if (NOT DEFINED LIBCXX_ENABLE_SHARED)
   set(LIBCXX_ENABLE_SHARED ON)
 endif()
 
-pythonize_bool(LIBUNWIND_BUILD_32_BITS)
+pythonize_bool(LIBUNWIND_ENABLE_CET)
 pythonize_bool(LIBCXX_ENABLE_SHARED)
 pythonize_bool(LIBUNWIND_ENABLE_SHARED)
 pythonize_bool(LIBUNWIND_ENABLE_THREADS)
@@ -113,6 +113,8 @@ macro(serialize_lit_param param value)
   string(APPEND SERIALIZED_LIT_PARAMS "config.${param} = ${value}\n")
 endmacro()
 
+serialize_lit_param(cxx_abi_link_flag "\"${_cxx_abi_link_flag}\"")
+
 serialize_lit_param(enable_experimental False)
 
 if (LLVM_USE_SANITIZER)
@@ -121,10 +123,6 @@ endif()
 
 if (LIBUNWIND_TARGET_TRIPLE)
   serialize_lit_param(target_triple "\"${LIBUNWIND_TARGET_TRIPLE}\"")
-endif()
-
-if (LIBUNWIND_BUILD_32_BITS)
-  serialize_lit_param(enable_32bit True)
 endif()
 
 if (NOT LIBUNWIND_TEST_ENABLE_EXCEPTIONS)

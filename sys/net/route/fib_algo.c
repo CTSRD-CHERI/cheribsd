@@ -1135,7 +1135,9 @@ destroy_fd_instance_epoch(epoch_context_t ctx)
 
 	fd = __containerof(ctx, struct fib_data, fd_epoch_ctx);
 
+	CURVNET_SET(fd->fd_vnet);
 	destroy_fd_instance(fd);
+	CURVNET_RESTORE();
 }
 
 /*
@@ -1736,7 +1738,7 @@ fib_set_algo_ptr(struct fib_data *fd, void *algo_data)
 void
 fib_epoch_call(epoch_callback_t callback, epoch_context_t ctx)
 {
-	epoch_call(net_epoch_preempt, callback, ctx);
+	NET_EPOCH_CALL(callback, ctx);
 }
 
 /*

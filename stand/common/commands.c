@@ -123,7 +123,6 @@ help_emitsummary(char *topic, char *subtopic, char *desc)
 	return (pager_output("\n"));
 }
 
-
 static int
 command_help(int argc, char *argv[])
 {
@@ -132,7 +131,8 @@ command_help(int argc, char *argv[])
 	char	*topic, *subtopic, *t, *s, *d;
 
 	/* page the help text from our load path */
-	snprintf(buf, sizeof(buf), "%s/boot/loader.help", getenv("loaddev"));
+	snprintf(buf, sizeof(buf), "%s/boot/%s", getenv("loaddev"),
+	    HELP_FILENAME);
 	if ((hfd = open(buf, O_RDONLY)) < 0) {
 		printf("Verbose help not available, "
 		    "use '?' to list commands\n");
@@ -576,3 +576,12 @@ command_readtest(int argc, char *argv[])
 }
 
 COMMAND_SET(readtest, "readtest", "Time a file read", command_readtest);
+
+static int
+command_quit(int argc, char *argv[])
+{
+	exit(0);
+	return (CMD_OK);
+}
+
+COMMAND_SET(quit, "quit", "exit the loader", command_quit);

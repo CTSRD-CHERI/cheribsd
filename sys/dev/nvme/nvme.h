@@ -204,6 +204,7 @@
 #define NVME_STATUS_GET_P(st)				(((st) >> NVME_STATUS_P_SHIFT) & NVME_STATUS_P_MASK)
 #define NVME_STATUS_GET_SC(st)				(((st) >> NVME_STATUS_SC_SHIFT) & NVME_STATUS_SC_MASK)
 #define NVME_STATUS_GET_SCT(st)				(((st) >> NVME_STATUS_SCT_SHIFT) & NVME_STATUS_SCT_MASK)
+#define NVME_STATUS_GET_CRD(st)				(((st) >> NVME_STATUS_CRD_SHIFT) & NVME_STATUS_CRD_MASK)
 #define NVME_STATUS_GET_M(st)				(((st) >> NVME_STATUS_M_SHIFT) & NVME_STATUS_M_MASK)
 #define NVME_STATUS_GET_DNR(st)				(((st) >> NVME_STATUS_DNR_SHIFT) & NVME_STATUS_DNR_MASK)
 
@@ -565,8 +566,24 @@ enum nvme_critical_warning_state {
 #define	NVME_SS_PAGE_SSTAT_GDE_SHIFT			(8)
 #define	NVME_SS_PAGE_SSTAT_GDE_MASK			(0x1)
 
+/* Features */
+/* Get Features */
+#define NVME_FEAT_GET_SEL_SHIFT				(8)
+#define NVME_FEAT_GET_SEL_MASK				(0x7)
+#define NVME_FEAT_GET_FID_SHIFT				(0)
+#define NVME_FEAT_GET_FID_MASK				(0xff)
+
+/* Set Features */
+#define NVME_FEAT_SET_SV_SHIFT				(31)
+#define NVME_FEAT_SET_SV_MASK				(0x1)
+#define NVME_FEAT_SET_FID_SHIFT				(0)
+#define NVME_FEAT_SET_FID_MASK				(0xff)
+
 /* Helper macro to combine *_MASK and *_SHIFT defines */
 #define NVMEB(name)	(name##_MASK << name##_SHIFT)
+
+/* Helper macro to extract value from x */
+#define NVMEV(name, x)  (((x) >> name##_SHIFT) & name##_MASK)
 
 /* CC register SHN field values */
 enum shn_value {
@@ -2035,7 +2052,7 @@ void	nvme_resv_status_swapbytes(struct nvme_resv_status *s __unused,
     size_t size __unused)
 {
 #if _BYTE_ORDER != _LITTLE_ENDIAN
-	u_int i, n;
+	size_t i, n;
 
 	s->gen = le32toh(s->gen);
 	n = (s->regctl[1] << 8) | s->regctl[0];
@@ -2053,7 +2070,7 @@ void	nvme_resv_status_ext_swapbytes(struct nvme_resv_status_ext *s __unused,
     size_t size __unused)
 {
 #if _BYTE_ORDER != _LITTLE_ENDIAN
-	u_int i, n;
+	size_t i, n;
 
 	s->gen = le32toh(s->gen);
 	n = (s->regctl[1] << 8) | s->regctl[0];

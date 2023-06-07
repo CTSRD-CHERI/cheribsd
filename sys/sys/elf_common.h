@@ -332,6 +332,7 @@ typedef struct {
 #define	EF_ARM_EABI_VER3	0x03000000
 #define	EF_ARM_EABI_VER4	0x04000000
 #define	EF_ARM_EABI_VER5	0x05000000
+#define	EF_ARM_EABI_VERSION(x)	((x) & EF_ARM_EABIMASK)
 #define	EF_ARM_INTERWORK	0x00000004
 #define	EF_ARM_APCS_26		0x00000008
 #define	EF_ARM_APCS_FLOAT	0x00000010
@@ -548,12 +549,14 @@ typedef struct {
 #define	PT_HISUNW	0x6fffffff
 #define	PT_HIOS		0x6fffffff	/* Last OS-specific. */
 #define	PT_LOPROC	0x70000000	/* First processor-specific type. */
+#define	PT_AARCH64_MEMTAG_CHERI	(PT_LOPROC + 3)
 #define	PT_ARM_ARCHEXT	0x70000000	/* ARM arch compat information. */
 #define	PT_ARM_EXIDX	0x70000001	/* ARM exception unwind tables. */
 #define	PT_MIPS_REGINFO		0x70000000	/* MIPS register usage info */
 #define	PT_MIPS_RTPROC		0x70000001	/* MIPS runtime procedure tbl */
 #define	PT_MIPS_OPTIONS		0x70000002	/* MIPS e_flags value*/
 #define	PT_MIPS_ABIFLAGS	0x70000003	/* MIPS fp mode */
+#define	PT_RISCV_MEMTAG_CHERI	0x7fffffff
 #define	PT_HIPROC	0x7fffffff	/* Last processor-specific type. */
 
 #define	PT_OPENBSD_RANDOMIZE	0x65A3DBE6	/* OpenBSD random data segment */
@@ -996,9 +999,11 @@ typedef struct {
 #define	AT_PS_STRINGS	32	/* struct ps_strings */
 #define	AT_FXRNG	33	/* Pointer to root RNG seed version. */
 #define	AT_KPRELOAD	34	/* Base of vdso, preloaded by rtld */
-#define	AT_CAPV		35	/* Capability vector passed to coexecvec(2) */
+#define	AT_USRSTACKBASE	35	/* Top of user stack */
+#define	AT_USRSTACKLIM	36	/* Grow limit of user stack */
+#define	AT_CAPV		37	/* Capability vector passed to coexecvec(2) */
 
-#define	AT_COUNT	36	/* Count of defined aux entry types. */
+#define	AT_COUNT	38	/* Count of defined aux entry types. */
 
 /*
  * Relocation types.
@@ -1386,8 +1391,6 @@ typedef struct {
 #define	R_RISCV_SUB16		38
 #define	R_RISCV_SUB32		39
 #define	R_RISCV_SUB64		40
-#define	R_RISCV_GNU_VTINHERIT	41
-#define	R_RISCV_GNU_VTENTRY	42
 #define	R_RISCV_ALIGN		43
 #define	R_RISCV_RVC_BRANCH	44
 #define	R_RISCV_RVC_JUMP	45
@@ -1536,11 +1539,12 @@ typedef struct {
 #define	R_X86_64_REX_GOTPCRELX	42
 
 #define	ELF_BSDF_SIGFASTBLK	0x0001	/* Kernel supports fast sigblock */
+#define	ELF_BSDF_VMNOOVERCOMMIT	0x0002
 
 #endif /* !_SYS_ELF_COMMON_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

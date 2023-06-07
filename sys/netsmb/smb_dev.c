@@ -970,7 +970,7 @@ smb_dev2share(int fd, int mode, struct smb_cred *scred,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc",

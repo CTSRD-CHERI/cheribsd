@@ -464,6 +464,7 @@ void mmu_radix_remove(pmap_t, vm_offset_t, vm_offset_t);
 void mmu_radix_remove_all(vm_page_t);
 void mmu_radix_remove_pages(pmap_t);
 void mmu_radix_remove_write(vm_page_t);
+void mmu_radix_sync_icache(pmap_t pm, vm_offset_t va, vm_size_t sz);
 void mmu_radix_unwire(pmap_t, vm_offset_t, vm_offset_t);
 void mmu_radix_zero_page(vm_page_t);
 void mmu_radix_zero_page_area(vm_page_t, int, int);
@@ -489,7 +490,7 @@ static void mmu_radix_pinit0(pmap_t);
 
 static void *mmu_radix_mapdev(vm_paddr_t, vm_size_t);
 static void *mmu_radix_mapdev_attr(vm_paddr_t, vm_size_t, vm_memattr_t);
-static void mmu_radix_unmapdev(vm_offset_t, vm_size_t);
+static void mmu_radix_unmapdev(void *, vm_size_t);
 static void mmu_radix_kenter_attr(vm_offset_t, vm_paddr_t, vm_memattr_t ma);
 static boolean_t mmu_radix_dev_direct_mapped(vm_paddr_t, vm_size_t);
 static void mmu_radix_dumpsys_map(vm_paddr_t pa, size_t sz, void **va);
@@ -542,6 +543,7 @@ static struct pmap_funcs mmu_radix_methods = {
 	.remove = mmu_radix_remove,
 	.remove_all = mmu_radix_remove_all,
 	.remove_write = mmu_radix_remove_write,
+	.sync_icache = mmu_radix_sync_icache,
 	.unwire = mmu_radix_unwire,
 	.zero_page = mmu_radix_zero_page,
 	.zero_page_area = mmu_radix_zero_page_area,
@@ -783,7 +785,7 @@ mmu_radix_tlbiel_flush(int scope)
 }
 
 static void
-mmu_radix_tlbie_all()
+mmu_radix_tlbie_all(void)
 {
 	if (powernv_enabled)
 		mmu_radix_tlbiel_flush(TLB_INVAL_SCOPE_GLOBAL);
@@ -1169,7 +1171,7 @@ pv_to_chunk(pv_entry_t pv)
 #define PV_PMAP(pv) (pv_to_chunk(pv)->pc_pmap)
 
 #define	PC_FREE0	0xfffffffffffffffful
-#define	PC_FREE1	0x3ffffffffffffffful
+#define	PC_FREE1	((1ul << (_NPCPV % 64)) - 1)
 
 static const uint64_t pc_freemask[_NPCM] = { PC_FREE0, PC_FREE1 };
 
@@ -3612,7 +3614,7 @@ radix_pgd_release(void *arg __unused, void **store, int count)
 }
 
 static void
-mmu_radix_init()
+mmu_radix_init(void)
 {
 	vm_page_t mpte;
 	vm_size_t s;
@@ -3686,7 +3688,7 @@ mmu_radix_init()
 	 */
 	s = (vm_size_t)(pv_npg * sizeof(struct md_page));
 	s = round_page(s);
-	pv_table = (struct md_page *)kmem_malloc(s, M_WAITOK | M_ZERO);
+	pv_table = kmem_malloc(s, M_WAITOK | M_ZERO);
 	for (i = 0; i < pv_npg; i++)
 		TAILQ_INIT(&pv_table[i].pv_list);
 	TAILQ_INIT(&pv_dummy.pv_list);
@@ -5406,7 +5408,10 @@ mmu_radix_remove_pages(pmap_t pmap)
 	struct rwlock *lock;
 	int64_t bit;
 	uint64_t inuse, bitmask;
-	int allfree, field, freed, idx;
+	int allfree, field, idx;
+#ifdef PV_STATS
+	int freed;
+#endif
 	boolean_t superpage;
 	vm_paddr_t pa;
 
@@ -5425,7 +5430,9 @@ mmu_radix_remove_pages(pmap_t pmap)
 	PMAP_LOCK(pmap);
 	TAILQ_FOREACH_SAFE(pc, &pmap->pm_pvchunk, pc_list, npc) {
 		allfree = 1;
+#ifdef PV_STATS
 		freed = 0;
+#endif
 		for (field = 0; field < _NPCM; field++) {
 			inuse = ~pc->pc_map[field] & pc_freemask[field];
 			while (inuse != 0) {
@@ -5542,7 +5549,9 @@ mmu_radix_remove_pages(pmap_t pmap)
 					}
 				}
 				pmap_unuse_pt(pmap, pv->pv_va, ptel3e, &free);
+#ifdef PV_STATS
 				freed++;
+#endif
 			}
 		}
 		PV_STAT(atomic_add_long(&pv_entry_frees, freed));
@@ -5893,12 +5902,14 @@ mmu_radix_page_set_memattr(vm_page_t m, vm_memattr_t ma)
 }
 
 static void
-mmu_radix_unmapdev(vm_offset_t va, vm_size_t size)
+mmu_radix_unmapdev(void *p, vm_size_t size)
 {
-	vm_offset_t offset;
+	vm_offset_t offset, va;
 
-	CTR3(KTR_PMAP, "%s(%#x, %#x)", __func__, va, size);
+	CTR3(KTR_PMAP, "%s(%p, %#x)", __func__, p, size);
+
 	/* If we gave a direct map region in pmap_mapdev, do nothing */
+	va = (vm_offset_t)p;
 	if (va >= DMAP_MIN_ADDRESS && va < DMAP_MAX_ADDRESS)
 		return;
 
@@ -5909,6 +5920,28 @@ mmu_radix_unmapdev(vm_offset_t va, vm_size_t size)
 	if (pmap_initialized) {
 		mmu_radix_qremove(va, atop(size));
 		kva_free(va, size);
+	}
+}
+
+void
+mmu_radix_sync_icache(pmap_t pm, vm_offset_t va, vm_size_t sz)
+{
+	vm_paddr_t pa = 0;
+	int sync_sz;
+
+	if (__predict_false(pm == NULL))
+		pm = &curthread->td_proc->p_vmspace->vm_pmap;
+
+	while (sz > 0) {
+		pa = pmap_extract(pm, va);
+		sync_sz = PAGE_SIZE - (va & PAGE_MASK);
+		sync_sz = min(sync_sz, sz);
+		if (pa != 0) {
+			pa += (va & PAGE_MASK);
+			__syncicache((void *)PHYS_TO_DMAP(pa), sync_sz);
+		}
+		va += sync_sz;
+		sz -= sync_sz;
 	}
 }
 
@@ -6078,7 +6111,7 @@ mmu_radix_dev_direct_mapped(vm_paddr_t pa, vm_size_t size)
 }
 
 static void
-mmu_radix_scan_init()
+mmu_radix_scan_init(void)
 {
 
 	CTR1(KTR_PMAP, "%s()", __func__);

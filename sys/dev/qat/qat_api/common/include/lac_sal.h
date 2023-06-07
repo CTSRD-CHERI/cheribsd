@@ -54,8 +54,7 @@ CpaStatus SalCtrl_ServiceCreate(sal_service_type_t service,
 				Cpa32U instance_num,
 				sal_service_t **pObj);
 
-/**
-*******************************************************************************
+/******************************************************************************
  * @ingroup SalCtl
  * @description
  *      This macro goes through the 'list' passed in as a parameter. For each
@@ -84,7 +83,7 @@ CpaStatus SalCtrl_ServiceCreate(sal_service_type_t service,
  *                              list: service or qat
  * @param[in]  device           The ADF accelerator handle for the device
  * @param[in]  function         The function pointer to call
- * @param[in/out] status_ret    If an error occured (i.e. status returned from
+ * @param[in/out] status_ret    If an error occurred (i.e. status returned from
  *                              function is not _SUCCESS) then status_ret is
  *                              overwritten with status returned from function.
  *

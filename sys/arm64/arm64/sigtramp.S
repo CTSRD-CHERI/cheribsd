@@ -46,7 +46,7 @@ SIGCODE(sigcode)
 #ifndef __CHERI_PURE_CAPABILITY__
 	.arch_extension c64
 #endif
-	blr	c8
+	blrr	c8
 	add	c0, csp, #SF_UC
 #else
 	blr	x8

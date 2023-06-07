@@ -429,7 +429,7 @@ static driver_t xdmatest_driver = {
 DRIVER_MODULE(xdmatest, simplebus, xdmatest_driver, 0, 0);
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer"

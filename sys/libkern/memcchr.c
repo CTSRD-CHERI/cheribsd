@@ -124,7 +124,7 @@ done:
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190603,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_shape",

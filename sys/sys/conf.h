@@ -279,7 +279,6 @@ void	destroy_dev(struct cdev *_dev);
 int	destroy_dev_sched(struct cdev *dev);
 int	destroy_dev_sched_cb(struct cdev *dev, void (*cb)(void *), void *arg);
 void	destroy_dev_drain(struct cdevsw *csw);
-void	drain_dev_clone_events(void);
 struct cdevsw *dev_refthread(struct cdev *_dev, int *_ref);
 struct cdevsw *devvn_refthread(struct vnode *vp, struct cdev **devp, int *_ref);
 void	dev_relthread(struct cdev *_dev, int _ref);
@@ -361,7 +360,21 @@ struct dumperinfo {
 
 extern int dumping;		/* system is dumping */
 
-void dump_savectx(void);
+/*
+ * Save registers for later extraction from a kernel dump.
+ *
+ * This must be inlined into the caller, which in turn must be the function that
+ * calls (mini)dumpsys().  Otherwise, the saved frame pointer will reference a
+ * stack frame that may be clobbered by subsequent function calls.
+ */
+#define	dump_savectx() do {		\
+	extern struct pcb dumppcb;	\
+	extern lwpid_t dumptid;		\
+					\
+	savectx(&dumppcb);		\
+	dumptid = curthread->td_tid;	\
+} while (0)
+
 int doadump(boolean_t);
 struct diocskerneldump_arg;
 int dumper_create(const struct dumperinfo *di_template, const char *devname,

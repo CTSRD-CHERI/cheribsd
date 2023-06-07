@@ -39,14 +39,12 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h>
-#include <sys/domain.h>
 #include <sys/eventhandler.h>
 #include <sys/kernel.h>
 #include <sys/ktls.h>
 #include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
-#include <sys/protosw.h>
 #include <sys/refcount.h>
 #include <sys/sf_buf.h>
 #include <sys/smp.h>
@@ -66,6 +64,9 @@ __FBSDID("$FreeBSD$");
 #include <vm/uma_dbg.h>
 
 #include <cheri/cheric.h>
+
+_Static_assert(MJUMPAGESIZE > MCLBYTES,
+    "Cluster must be smaller than a jumbo page");
 
 /*
  * In FreeBSD, Mbufs and Mbuf Clusters are allocated from UMA
@@ -398,14 +399,6 @@ mbuf_init(void *dummy)
 	uma_zone_set_warning(zone_jumbo16, "kern.ipc.nmbjumbo16 limit reached");
 	uma_zone_set_maxaction(zone_jumbo16, mb_reclaim);
 
-	/*
-	 * Hook event handler for low-memory situation, used to
-	 * drain protocols and push data back to the caches (UMA
-	 * later pushes it back to VM).
-	 */
-	EVENTHANDLER_REGISTER(vm_lowmem, mb_reclaim, NULL,
-	    EVENTHANDLER_PRI_FIRST);
-
 	snd_tag_count = counter_u64_alloc(M_WAITOK);
 }
 SYSINIT(mbuf, SI_SUB_MBUF, SI_ORDER_FIRST, mbuf_init, NULL);
@@ -487,7 +480,7 @@ dn_pack_import(void *arg __unused, void **store, int count, int domain __unused,
 	int i;
 
 	for (i = 0; i < count; i++) {
-		m = m_get(MT_DATA, M_NOWAIT);
+		m = m_get(M_NOWAIT, MT_DATA);
 		if (m == NULL)
 			break;
 		clust = uma_zalloc(dn_zone_clust, M_NOWAIT);
@@ -630,7 +623,7 @@ debugnet_mbuf_reinit(int nmbuf, int nclust, int clsize)
 	    NULL, UMA_ZONE_NOBUCKET);
 
 	while (nmbuf-- > 0) {
-		m = m_get(MT_DATA, M_WAITOK);
+		m = m_get(M_WAITOK, MT_DATA);
 		uma_zfree(dn_zone_mbuf, m);
 	}
 	while (nclust-- > 0) {
@@ -830,26 +823,12 @@ mb_ctor_pack(void *mem, int size, void *arg, int how)
 /*
  * This is the protocol drain routine.  Called by UMA whenever any of the
  * mbuf zones is closed to its limit.
- *
- * No locks should be held when this is called.  The drain routines have to
- * presently acquire some locks which raises the possibility of lock order
- * reversal.
  */
 static void
 mb_reclaim(uma_zone_t zone __unused, int pending __unused)
 {
-	struct epoch_tracker et;
-	struct domain *dp;
-	struct protosw *pr;
 
-	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK | WARN_PANIC, NULL, __func__);
-
-	NET_EPOCH_ENTER(et);
-	for (dp = domains; dp != NULL; dp = dp->dom_next)
-		for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++)
-			if (pr->pr_drain != NULL)
-				(*pr->pr_drain)();
-	NET_EPOCH_EXIT(et);
+	EVENTHANDLER_INVOKE(mbuf_lowmem, VM_LOW_MBUFS);
 }
 
 /*
@@ -1609,9 +1588,7 @@ m_snd_tag_alloc(struct ifnet *ifp, union if_snd_tag_alloc_params *params,
     struct m_snd_tag **mstp)
 {
 
-	if (ifp->if_snd_tag_alloc == NULL)
-		return (EOPNOTSUPP);
-	return (ifp->if_snd_tag_alloc(ifp, params, mstp));
+	return (if_snd_tag_alloc(ifp, params, mstp));
 }
 
 void
@@ -1643,13 +1620,13 @@ m_rcvif_serialize(struct mbuf *m)
 	u_short idx, gen;
 
 	M_ASSERTPKTHDR(m);
-	idx = m->m_pkthdr.rcvif->if_index;
-	gen = m->m_pkthdr.rcvif->if_idxgen;
+	idx = if_getindex(m->m_pkthdr.rcvif);
+	gen = if_getidxgen(m->m_pkthdr.rcvif);
 	m->m_pkthdr.rcvidx = idx;
 	m->m_pkthdr.rcvgen = gen;
 	if (__predict_false(m->m_pkthdr.leaf_rcvif != NULL)) {
-		idx = m->m_pkthdr.leaf_rcvif->if_index;
-		gen = m->m_pkthdr.leaf_rcvif->if_idxgen;
+		idx = if_getindex(m->m_pkthdr.leaf_rcvif);
+		gen = if_getidxgen(m->m_pkthdr.leaf_rcvif);
 	} else {
 		idx = -1;
 		gen = 0;
@@ -1667,7 +1644,7 @@ m_rcvif_restore(struct mbuf *m)
 	NET_EPOCH_ASSERT();
 
 	ifp = ifnet_byindexgen(m->m_pkthdr.rcvidx, m->m_pkthdr.rcvgen);
-	if (ifp == NULL || (ifp->if_flags & IFF_DYING))
+	if (ifp == NULL || (if_getflags(ifp) & IFF_DYING))
 		return (NULL);
 
 	if (__predict_true(m->m_pkthdr.leaf_rcvidx == (u_short)-1)) {
@@ -1675,7 +1652,7 @@ m_rcvif_restore(struct mbuf *m)
 	} else {
 		leaf_ifp = ifnet_byindexgen(m->m_pkthdr.leaf_rcvidx,
 		    m->m_pkthdr.leaf_rcvgen);
-		if (__predict_false(leaf_ifp != NULL && (leaf_ifp->if_flags & IFF_DYING)))
+		if (__predict_false(leaf_ifp != NULL && (if_getflags(leaf_ifp) & IFF_DYING)))
 			leaf_ifp = NULL;
 	}
 
@@ -1787,7 +1764,7 @@ mb_mapped_to_unmapped(struct mbuf *mp, int len, int mlen, int how,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "support"

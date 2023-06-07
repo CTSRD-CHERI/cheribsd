@@ -1123,7 +1123,7 @@ storvsc_attach(device_t dev)
 				    M_DEVBUF, M_WAITOK|M_ZERO);
 
 				sgl_node->sgl_data->sg_iov[j].iov_base =
-				    tmp_buff;
+				    PTR2CAP(tmp_buff);
 			}
 
 			LIST_INSERT_HEAD(&g_hv_sgl_page_pool.free_sgl_list,
@@ -1212,7 +1212,7 @@ cleanup:
 		sgl_node = LIST_FIRST(&g_hv_sgl_page_pool.free_sgl_list);
 		LIST_REMOVE(sgl_node, link);
 		for (j = 0; j < STORVSC_DATA_SEGCNT_MAX; j++) {
-			free(sgl_node->sgl_data->sg_iov[j].iov_base, M_DEVBUF);
+			free((__cheri_fromcap void *)sgl_node->sgl_data->sg_iov[j].iov_base, M_DEVBUF);
 		}
 		free(sgl_node->sgl_data, M_DEVBUF);
 		free(sgl_node, M_DEVBUF);
@@ -1272,7 +1272,7 @@ storvsc_detach(device_t dev)
 		sgl_node = LIST_FIRST(&g_hv_sgl_page_pool.free_sgl_list);
 		LIST_REMOVE(sgl_node, link);
 		for (j = 0; j < STORVSC_DATA_SEGCNT_MAX; j++){
-			free(sgl_node->sgl_data->sg_iov[j].iov_base, M_DEVBUF);
+			free((__cheri_fromcap void *)sgl_node->sgl_data->sg_iov[j].iov_base, M_DEVBUF);
 		}
 		free(sgl_node->sgl_data, M_DEVBUF);
 		free(sgl_node, M_DEVBUF);
@@ -1696,8 +1696,8 @@ storvsc_copy_sgl_to_bounce_buf(struct hv_sglist *bounce_sgl,
 
 	for (src_sgl_idx = 0; src_sgl_idx < orig_sgl_count; src_sgl_idx++) {
 		if (seg_bits & (1 << src_sgl_idx)) {
-			memcpy(bounce_sgl->sg_iov[src_sgl_idx].iov_base,
-			    (void*)orig_sgl[src_sgl_idx].ds_addr,
+			memcpy((__cheri_fromcap void *)bounce_sgl->sg_iov[src_sgl_idx].iov_base,
+			    (void*)(uintptr_t)orig_sgl[src_sgl_idx].ds_addr,
 			    orig_sgl[src_sgl_idx].ds_len);
 
 			bounce_sgl->sg_iov[src_sgl_idx].iov_len =
@@ -1728,8 +1728,8 @@ storvsc_copy_from_bounce_buf_to_sgl(bus_dma_segment_t *dest_sgl,
 	
 	for (sgl_idx = 0; sgl_idx < dest_sgl_count; sgl_idx++) {
 		if (seg_bits & (1 << sgl_idx)) {
-			memcpy((void*)(dest_sgl[sgl_idx].ds_addr),
-			    src_sgl->sg_iov[sgl_idx].iov_base,
+			memcpy((void*)(uintptr_t)(dest_sgl[sgl_idx].ds_addr),
+			    (__cheri_fromcap void *)src_sgl->sg_iov[sgl_idx].iov_base,
 			    src_sgl->sg_iov[sgl_idx].iov_len);
 		}
 	}
@@ -1830,6 +1830,7 @@ storvsc_xferbuf_prepare(void *arg, bus_dma_segment_t *segs, int nsegs, int error
 
 	for (i = 0; i < nsegs; i++) {
 #ifdef INVARIANTS
+#if !defined(__aarch64__)
 		if (nsegs > 1) {
 			if (i == 0) {
 				KASSERT((segs[i].ds_addr & PAGE_MASK) +
@@ -1850,9 +1851,22 @@ storvsc_xferbuf_prepare(void *arg, bus_dma_segment_t *segs, int nsegs, int error
 			}
 		}
 #endif
+#endif
 		prplist->gpa_page[i] = atop(segs[i].ds_addr);
 	}
 	reqp->prp_cnt = nsegs;
+
+	if ((ccb->ccb_h.flags & CAM_DIR_MASK) != CAM_DIR_NONE) {
+		bus_dmasync_op_t op;
+
+		if ((ccb->ccb_h.flags & CAM_DIR_MASK) == CAM_DIR_IN)
+			op = BUS_DMASYNC_PREREAD;
+		else
+			op = BUS_DMASYNC_PREWRITE;
+
+		bus_dmamap_sync(reqp->softc->storvsc_req_dtag,
+		    reqp->data_dmap, op);
+	}
 }
 
 /**
@@ -2020,7 +2034,7 @@ create_storvsc_request(union ccb *ccb, struct hv_storvsc_request *reqp)
 			/* transfer virtual address to physical frame number */
 			if (reqp->not_aligned_seg_bits & 0x1){
  				phys_addr =
-				    vtophys(reqp->bounce_sgl->sg_iov[0].iov_base);
+				    vtophys((__cheri_fromcap void *)reqp->bounce_sgl->sg_iov[0].iov_base);
 			}else{
  				phys_addr =
 					vtophys(storvsc_sglist[0].ds_addr);
@@ -2033,7 +2047,7 @@ create_storvsc_request(union ccb *ccb, struct hv_storvsc_request *reqp)
 			for (i = 1; i < storvsc_sg_count; i++) {
 				if (reqp->not_aligned_seg_bits & (1 << i)) {
 					phys_addr =
-					    vtophys(reqp->bounce_sgl->sg_iov[i].iov_base);
+					    vtophys((__cheri_fromcap void *)reqp->bounce_sgl->sg_iov[i].iov_base);
 				} else {
 					phys_addr =
 					    vtophys(storvsc_sglist[i].ds_addr);
@@ -2112,6 +2126,19 @@ storvsc_io_done(struct hv_storvsc_request *reqp)
 	bus_dma_segment_t *ori_sglist = NULL;
 	int ori_sg_count = 0;
 	const struct scsi_generic *cmd;
+
+	if ((ccb->ccb_h.flags & CAM_DIR_MASK) != CAM_DIR_NONE) {
+		bus_dmasync_op_t op;
+
+		if ((ccb->ccb_h.flags & CAM_DIR_MASK) == CAM_DIR_IN)
+			op = BUS_DMASYNC_POSTREAD;
+		else
+			op = BUS_DMASYNC_POSTWRITE;
+
+		bus_dmamap_sync(reqp->softc->storvsc_req_dtag,
+		    reqp->data_dmap, op);
+		bus_dmamap_unload(sc->storvsc_req_dtag, reqp->data_dmap);
+	}
 
 	/* destroy bounce buffer if it is used */
 	if (reqp->bounce_sgl_count) {

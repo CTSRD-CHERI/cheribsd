@@ -108,7 +108,7 @@ struct debugnet_conn_params {
 	uint32_t	dc_herald_datalen;
 
 	/*
-	 * Consistent with debugnet_send(), aux paramaters to debugnet
+	 * Consistent with debugnet_send(), aux parameters to debugnet
 	 * functions are provided host-endian (but converted to
 	 * network endian on the wire).
 	 */
@@ -263,7 +263,7 @@ extern int debugnet_arp_nretries;
 #define	DEBUGNET_NOTIFY_MTU(ifp)	debugnet_any_ifnet_update(ifp)
 
 #define	DEBUGNET_SET(ifp, driver)				\
-	(ifp)->if_debugnet_methods = &driver##_debugnet_methods
+	if_setdebugnet_methods((ifp), &driver##_debugnet_methods)
 
 #else /* !DEBUGNET || !INET */
 

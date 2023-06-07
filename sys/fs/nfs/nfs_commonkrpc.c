@@ -163,6 +163,87 @@ static int nfsv2_procid[NFS_V3NPROCS] = {
 };
 
 /*
+ * This static array indicates that a NFSv4 RPC should use
+ * RPCSEC_GSS, if the mount indicates that via sec=krb5[ip].
+ * System RPCs that do not use file handles will be false
+ * in this array so that they will use AUTH_SYS when the
+ * "syskrb5" mount option is specified, along with
+ * "sec=krb5[ip]".
+ */
+static bool nfscl_use_gss[NFSV42_NPROCS] = {
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	false,		/* SetClientID */
+	false,		/* SetClientIDConfirm */
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	false,		/* Renew */
+	true,
+	false,		/* ReleaseLockOwn */
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	false,		/* ExchangeID */
+	false,		/* CreateSession */
+	false,		/* DestroySession */
+	false,		/* DestroyClientID */
+	false,		/* FreeStateID */
+	true,
+	true,
+	true,
+	true,
+	false,		/* ReclaimComplete */
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	false,		/* BindConnectionToSession */
+	true,
+	true,
+	true,
+	true,
+};
+
+/*
  * Initialize sockets and congestion for a new NFS connection.
  * We do not free the sockaddr if error.
  * Which arguments are set to NULL indicate what kind of call it is.
@@ -679,7 +760,8 @@ newnfs_request(struct nfsrv_descript *nd, struct nfsmount *nmp,
 		}
 		NFSUNLOCKSTATE();
 	} else if (nmp != NULL && NFSHASKERB(nmp) &&
-	     nd->nd_procnum != NFSPROC_NULL) {
+	     nd->nd_procnum != NFSPROC_NULL && (!NFSHASSYSKRB5(nmp) ||
+	     nfscl_use_gss[nd->nd_procnum])) {
 		if (NFSHASALLGSSNAME(nmp) && nmp->nm_krbnamelen > 0)
 			nd->nd_flag |= ND_USEGSSNAME;
 		if ((nd->nd_flag & ND_USEGSSNAME) != 0) {
@@ -720,7 +802,7 @@ newnfs_request(struct nfsrv_descript *nd, struct nfsmount *nmp,
 		else
 			secflavour = RPCSEC_GSS_KRB5;
 		srv_principal = NFSMNT_SRVKRBNAME(nmp);
-	} else if (nmp != NULL && !NFSHASKERB(nmp) &&
+	} else if (nmp != NULL && (!NFSHASKERB(nmp) || NFSHASSYSKRB5(nmp)) &&
 	    nd->nd_procnum != NFSPROC_NULL &&
 	    (nd->nd_flag & ND_USEGSSNAME) != 0) {
 		/*
@@ -1080,12 +1162,12 @@ tryagain:
 						    }
 						    slot = nd->nd_slotid;
 						}
+						freeslot = slot;
 					} else if (slot != 0) {
 						printf("newnfs_request: Bad "
 						    "session slot=%d\n", slot);
 						slot = 0;
 					}
-					freeslot = slot;
 					if (retseq != sep->nfsess_slotseq[slot])
 						printf("retseq diff 0x%x\n",
 						    retseq);
@@ -1131,6 +1213,10 @@ tryagain:
 				sep = NFSMNT_MDSSESSION(nmp);
 				if (bcmp(sep->nfsess_sessionid, nd->nd_sequence,
 				    NFSX_V4SESSIONID) == 0) {
+					printf("Initiate recovery. If server "
+					    "has not rebooted, "
+					    "check NFS clients for unique "
+					    "/etc/hostid's\n");
 					/* Initiate recovery. */
 					sep->nfsess_defunct = 1;
 					NFSCL_DEBUG(1, "Marked defunct\n");
@@ -1169,6 +1255,8 @@ tryagain:
 						*tl++ = txdr_unsigned(slotseq);
 						*tl++ = txdr_unsigned(slotpos);
 						*tl = txdr_unsigned(maxslot);
+						nd->nd_slotid = slotpos;
+						nd->nd_flag |= ND_HASSLOTID;
 					}
 					if (reterr == NFSERR_BADSESSION ||
 					    reterr == 0) {

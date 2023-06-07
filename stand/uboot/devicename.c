@@ -115,7 +115,8 @@ uboot_parsedev(struct uboot_devdesc **dev, const char *devspec,
 
 #ifdef LOADER_DISK_SUPPORT
 	case DEVT_DISK:
-		err = disk_parsedev((struct disk_devdesc *)idev, np, path);
+		free(idev);
+		err = disk_parsedev((struct devdesc **)&idev, devspec, path);
 		if (err != 0)
 			goto fail;
 		break;
@@ -147,6 +148,10 @@ uboot_parsedev(struct uboot_devdesc **dev, const char *devspec,
 		goto fail;
 	}
 	idev->dd.d_dev = dv;
+	/*
+	 * dev can be NULL, since uboot_getdev calls us directly, rather than via
+	 * dv_parsedev in devparse() which otherwise ensures that it can't be NULL.
+	 */
 	if (dev == NULL) {
 		free(idev);
 	} else {
@@ -159,29 +164,6 @@ fail:
 	return (err);
 }
 
-
-char *
-uboot_fmtdev(void *vdev)
-{
-	struct uboot_devdesc *dev = (struct uboot_devdesc *)vdev;
-	static char buf[128];
-
-	switch(dev->dd.d_dev->dv_type) {
-	case DEVT_NONE:
-		strcpy(buf, "(no device)");
-		break;
-
-	case DEVT_DISK:
-#ifdef LOADER_DISK_SUPPORT
-		return (disk_fmtdev(vdev));
-#endif
-
-	case DEVT_NET:
-		sprintf(buf, "%s%d:", dev->dd.d_dev->dv_name, dev->dd.d_unit);
-		break;
-	}
-	return(buf);
-}
 
 /*
  * Set currdev to suit the value being supplied in (value).

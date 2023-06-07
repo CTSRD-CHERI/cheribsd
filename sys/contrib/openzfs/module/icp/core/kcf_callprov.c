@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -63,7 +63,7 @@ is_in_triedlist(kcf_provider_desc_t *pd, kcf_prov_tried_t *triedl)
 		if (triedl->pt_pd == pd)
 			return (B_TRUE);
 		triedl = triedl->pt_next;
-	};
+	}
 
 	return (B_FALSE);
 }

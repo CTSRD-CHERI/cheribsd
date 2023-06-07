@@ -653,7 +653,7 @@ g_ctl_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

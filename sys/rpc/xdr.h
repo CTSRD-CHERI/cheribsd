@@ -136,10 +136,7 @@ typedef struct XDR {
 #ifdef _KERNEL
 typedef	bool_t (*xdrproc_t)(XDR *, void *, ...);
 #else
-/*
- * XXX can't actually prototype it, because some take three args!!!
- */
-typedef	bool_t (*xdrproc_t)(XDR *, ...);
+typedef	bool_t (*xdrproc_t)(XDR *, void *, u_int);
 #endif
 
 /*

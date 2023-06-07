@@ -99,7 +99,7 @@ typedef int (*intel_smc_callfn_t)(uintptr_t, uintptr_t, uintptr_t,
 #endif /* _ARM64_INTEL_INTEL_SMC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20210407,
+//   "updated": 20221129,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer"

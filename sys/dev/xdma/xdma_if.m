@@ -30,6 +30,10 @@
 # $FreeBSD$
 #
 
+#include "opt_platform.h"
+
+#include <sys/malloc.h>
+
 #include <machine/bus.h>
 
 #ifdef FDT
@@ -79,6 +83,7 @@ METHOD int channel_submit_sg {
 	uint32_t			sg_n;
 };
 
+#ifdef FDT
 #
 # Notify driver we have machine-dependend data.
 #
@@ -88,6 +93,7 @@ METHOD int ofw_md_data {
 	int ncells;
 	void **data;
 };
+#endif
 
 #
 # Allocate both virtual and harware channels.
@@ -152,7 +158,7 @@ METHOD int iommu_remove {
 };
 # CHERI CHANGES START
 # {
-#   "updated": 20200706,
+#   "updated": 20221205,
 #   "target_type": "kernel",
 #   "changes_purecap": [
 #     "pointer_as_integer"

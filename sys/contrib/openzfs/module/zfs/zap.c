@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -946,9 +946,9 @@ fzap_length(zap_name_t *zn,
 	if (err != 0)
 		goto out;
 
-	if (integer_size != 0)
+	if (integer_size != NULL)
 		*integer_size = zeh.zeh_integer_size;
-	if (num_integers != 0)
+	if (num_integers != NULL)
 		*num_integers = zeh.zeh_num_integers;
 out:
 	zap_put_leaf(l);

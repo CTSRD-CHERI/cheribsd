@@ -87,10 +87,10 @@ struct sockaddr_un {
 #endif /* !_SYS_UN_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20210424,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "subobject-bounds"
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

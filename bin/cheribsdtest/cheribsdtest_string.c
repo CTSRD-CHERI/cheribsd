@@ -110,7 +110,7 @@ invalidate(struct Test *t1)
 		*x = 0xa5;
 }
 
-CHERIBSDTEST(test_string_memcpy_c, "Test explicit capability memcpy")
+CHERIBSDTEST(string_memcpy_c, "Test explicit capability memcpy")
 {
 	int i;
 	void * __capability cpy;
@@ -211,7 +211,7 @@ CHERIBSDTEST(test_string_memcpy_c, "Test explicit capability memcpy")
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_string_memcpy, "Test implicit capability memcpy")
+CHERIBSDTEST(string_memcpy, "Test implicit capability memcpy")
 {
 	int i;
 	void *copy;
@@ -271,7 +271,7 @@ CHERIBSDTEST(test_string_memcpy, "Test implicit capability memcpy")
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_string_memmove_c, "Test explicit capability memmove")
+CHERIBSDTEST(string_memmove_c, "Test explicit capability memmove")
 {
 	int i;
 	void * __capability cpy;
@@ -371,7 +371,7 @@ CHERIBSDTEST(test_string_memmove_c, "Test explicit capability memmove")
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_string_memmove, "Test implicit capability memmove")
+CHERIBSDTEST(string_memmove, "Test implicit capability memmove")
 {
 	int i;
 	void *copy;
@@ -438,7 +438,7 @@ CHERIBSDTEST(test_string_memmove, "Test implicit capability memmove")
  * can't replace it with an inline loop. We could also use -fno-builtin but that
  * could interfere with the other tests.
  */
-CHERIBSDTEST(test_unaligned_capability_copy_memcpy,
+CHERIBSDTEST(unaligned_capability_copy_memcpy,
     "Check that a memcpy() of valid capabilities to an unaligned destination "
     "strips tags")
 {
@@ -472,7 +472,7 @@ CHERIBSDTEST(test_unaligned_capability_copy_memcpy,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_unaligned_capability_copy_memmove,
+CHERIBSDTEST(unaligned_capability_copy_memmove,
     "Check that a memmove() of valid capabilities to an unaligned destination "
     "strips tags")
 {
@@ -507,7 +507,7 @@ CHERIBSDTEST(test_unaligned_capability_copy_memmove,
 }
 
 #ifdef KERNEL_MEMCPY_TESTS
-CHERIBSDTEST(test_string_kern_memcpy_c,
+CHERIBSDTEST(string_kern_memcpy_c,
     "Test explicit capability memcpy (kernel version)")
 {
 	int i;
@@ -596,7 +596,7 @@ CHERIBSDTEST(test_string_kern_memcpy_c,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_string_kern_memmove_c,
+CHERIBSDTEST(string_kern_memmove_c,
     "Test explicit capability memmove (kernel version)")
 {
 	int i;

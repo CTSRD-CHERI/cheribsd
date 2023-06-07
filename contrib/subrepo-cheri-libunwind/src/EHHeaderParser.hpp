@@ -1,4 +1,4 @@
-//===------------------------- EHHeaderParser.hpp -------------------------===//
+//===----------------------------------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -89,7 +89,7 @@ bool EHHeaderParser<A>::decodeTableEntry(
   pint_t fde =
       addressSpace.getEncodedP(tableEntry, ehHdrEnd, tableEnc, ehHdrStart);
   const char *message =
-      CFI_Parser<A>::decodeFDE(addressSpace, pc, fde, fdeInfo, cieInfo);
+      CFI_Parser<A>::decodeFDE(addressSpace, fde, fdeInfo, cieInfo);
   if (message != NULL) {
     _LIBUNWIND_DEBUG_LOG("EHHeaderParser::decodeTableEntry: bad fde: %s",
                          message);

@@ -392,7 +392,8 @@ kern_mac_get_path(struct thread *td, const char * __capability path_p,
 	mac_vnode_copy_label(nd.ni_vp->v_label, intlabel);
 	error = mac_vnode_externalize_label(intlabel, elements, buffer,
 	    mac.m_buflen);
-	NDFREE(&nd, 0);
+	vput(nd.ni_vp);
+	NDFREE_PNBUF(&nd);
 	mac_vnode_label_free(intlabel);
 
 	if (error == 0)
@@ -459,7 +460,7 @@ kern_mac_set_fd(struct thread *td, int fd, void * __capability mac_p)
 			break;
 		}
 		vp = fp->f_vnode;
-		error = vn_start_write(vp, &mp, V_WAIT | PCATCH);
+		error = vn_start_write(vp, &mp, V_WAIT | V_PCATCH);
 		if (error != 0) {
 			mac_vnode_label_free(intlabel);
 			break;
@@ -565,15 +566,15 @@ kern_mac_set_path(struct thread *td, const char * __capability path_p,
 	NDINIT(&nd, LOOKUP, LOCKLEAF | follow, UIO_USERSPACE, path_p);
 	error = namei(&nd);
 	if (error == 0) {
-		error = vn_start_write(nd.ni_vp, &mp, V_WAIT | PCATCH);
+		error = vn_start_write(nd.ni_vp, &mp, V_WAIT | V_PCATCH);
 		if (error == 0) {
 			error = vn_setlabel(nd.ni_vp, intlabel,
 			    td->td_ucred);
 			vn_finished_write(mp);
 		}
+		vput(nd.ni_vp);
+		NDFREE_PNBUF(&nd);
 	}
-
-	NDFREE(&nd, 0);
 out:
 	mac_vnode_label_free(intlabel);
 	return (error);
@@ -698,7 +699,7 @@ sys_mac_syscall(struct thread *td, struct mac_syscall_args *uap)
 #endif /* !MAC */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

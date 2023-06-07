@@ -8,7 +8,6 @@
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
 // UNSUPPORTED: libcpp-no-concepts
-// UNSUPPORTED: gcc-10
 // UNSUPPORTED: libcpp-has-no-incomplete-ranges
 
 // template<class D>
@@ -32,8 +31,6 @@ static_assert(!ValidViewInterfaceType<Empty*>);
 static_assert(!ValidViewInterfaceType<Empty const>);
 static_assert(!ValidViewInterfaceType<Empty &>);
 static_assert( ValidViewInterfaceType<Empty>);
-
-static_assert(std::derived_from<std::ranges::view_interface<Empty>, std::ranges::view_base>);
 
 using InputIter = cpp20_input_iterator<const int*>;
 
@@ -69,15 +66,23 @@ struct ForwardRange : std::ranges::view_interface<ForwardRange> {
   constexpr ForwardIter begin() const { return ForwardIter(const_cast<int*>(buff)); }
   constexpr ForwardIter end() const { return ForwardIter(const_cast<int*>(buff) + 8); }
 };
+static_assert(std::ranges::view<ForwardRange>);
 
 struct MoveOnlyForwardRange : std::ranges::view_interface<MoveOnlyForwardRange> {
   int buff[8] = {0, 1, 2, 3, 4, 5, 6, 7};
   MoveOnlyForwardRange(MoveOnlyForwardRange const&) = delete;
   MoveOnlyForwardRange(MoveOnlyForwardRange &&) = default;
+  MoveOnlyForwardRange& operator=(MoveOnlyForwardRange &&) = default;
   MoveOnlyForwardRange() = default;
   constexpr ForwardIter begin() const { return ForwardIter(const_cast<int*>(buff)); }
   constexpr ForwardIter end() const { return ForwardIter(const_cast<int*>(buff) + 8); }
 };
+static_assert(std::ranges::view<MoveOnlyForwardRange>);
+
+struct MI : std::ranges::view_interface<InputRange>,
+            std::ranges::view_interface<MoveOnlyForwardRange> {
+};
+static_assert(!std::ranges::view<MI>);
 
 struct EmptyIsTrue : std::ranges::view_interface<EmptyIsTrue> {
   int buff[8] = {0, 1, 2, 3, 4, 5, 6, 7};
@@ -85,6 +90,7 @@ struct EmptyIsTrue : std::ranges::view_interface<EmptyIsTrue> {
   constexpr ForwardIter end() const { return ForwardIter(const_cast<int*>(buff) + 8); }
   constexpr bool empty() const { return true; }
 };
+static_assert(std::ranges::view<EmptyIsTrue>);
 
 struct SizeIsTen : std::ranges::view_interface<SizeIsTen> {
   int buff[8] = {0, 1, 2, 3, 4, 5, 6, 7};
@@ -92,6 +98,7 @@ struct SizeIsTen : std::ranges::view_interface<SizeIsTen> {
   constexpr ForwardIter end() const { return ForwardIter(const_cast<int*>(buff) + 8); }
   constexpr size_t size() const { return 10; }
 };
+static_assert(std::ranges::view<SizeIsTen>);
 
 using RAIter = random_access_iterator<int*>;
 
@@ -100,6 +107,7 @@ struct RARange : std::ranges::view_interface<RARange> {
   constexpr RAIter begin() const { return RAIter(const_cast<int*>(buff)); }
   constexpr RAIter end() const { return RAIter(const_cast<int*>(buff) + 8); }
 };
+static_assert(std::ranges::view<RARange>);
 
 using ContIter = contiguous_iterator<const int*>;
 
@@ -108,6 +116,7 @@ struct ContRange : std::ranges::view_interface<ContRange> {
   constexpr ContIter begin() const { return ContIter(buff); }
   constexpr ContIter end() const { return ContIter(buff + 8); }
 };
+static_assert(std::ranges::view<ContRange>);
 
 struct DataIsNull : std::ranges::view_interface<DataIsNull> {
   int buff[8] = {0, 1, 2, 3, 4, 5, 6, 7};
@@ -115,6 +124,7 @@ struct DataIsNull : std::ranges::view_interface<DataIsNull> {
   constexpr ContIter end() const { return ContIter(buff + 8); }
   constexpr const int *data() const { return nullptr; }
 };
+static_assert(std::ranges::view<DataIsNull>);
 
 template<bool IsNoexcept>
 struct BoolConvertibleComparison : std::ranges::view_interface<BoolConvertibleComparison<IsNoexcept>> {
@@ -137,6 +147,8 @@ struct BoolConvertibleComparison : std::ranges::view_interface<BoolConvertibleCo
   constexpr ForwardIter begin() const noexcept { return ForwardIter(const_cast<int*>(buff)); }
   constexpr SentinelType end() const noexcept { return SentinelType(const_cast<int*>(buff) + 8); }
 };
+static_assert(std::ranges::view<BoolConvertibleComparison<true>>);
+static_assert(std::ranges::view<BoolConvertibleComparison<false>>);
 
 template<class T>
 concept EmptyInvocable = requires (T const& obj) { obj.empty(); };
@@ -292,6 +304,10 @@ constexpr bool testFrontBack() {
 
   return true;
 }
+
+struct V1 : std::ranges::view_interface<V1> { };
+struct V2 : std::ranges::view_interface<V2> { V1 base_; };
+static_assert(sizeof(V2) == sizeof(V1));
 
 int main(int, char**) {
   testEmpty();

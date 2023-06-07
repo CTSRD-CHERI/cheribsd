@@ -834,7 +834,7 @@ netmap_sync_kloop(struct netmap_priv_d *priv, struct nmreq_header *hdr)
 			 * so that if a notification on ring Y comes after
 			 * we have processed ring Y, but before we call
 			 * schedule(), we don't miss it. This is true because
-			 * the wake up function will change the the task state,
+			 * the wake up function will change the task state,
 			 * and therefore the schedule_timeout() call below
 			 * will observe the change).
 			 */
@@ -1158,7 +1158,7 @@ netmap_pt_guest_attach(struct netmap_adapter *arg,
 		       unsigned int nifp_offset, unsigned int memid)
 {
 	struct netmap_pt_guest_adapter *ptna;
-	struct ifnet *ifp = arg ? arg->ifp : NULL;
+	if_t ifp = arg ? arg->ifp : NULL;
 	int error;
 
 	/* get allocator */

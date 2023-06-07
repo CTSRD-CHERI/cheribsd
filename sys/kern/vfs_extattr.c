@@ -109,7 +109,7 @@ kern_extattrctl(struct thread *td, const char * __capability path, int cmd,
 		if (error)
 			return (error);
 		filename_vp = nd.ni_vp;
-		NDFREE(&nd, NDF_NO_VP_RELE);
+		NDFREE_PNBUF(&nd);
 	}
 
 	/* path is always defined. */
@@ -121,13 +121,15 @@ kern_extattrctl(struct thread *td, const char * __capability path, int cmd,
 	mp = nd.ni_vp->v_mount;
 	error = vfs_busy(mp, 0);
 	if (error) {
-		NDFREE(&nd, 0);
+		vput(nd.ni_vp);
+		NDFREE_PNBUF(&nd);
 		mp = NULL;
 		goto out;
 	}
 	VOP_UNLOCK(nd.ni_vp);
-	error = vn_start_write(nd.ni_vp, &mp_writable, V_WAIT | PCATCH);
-	NDFREE(&nd, NDF_NO_VP_UNLOCK);
+	error = vn_start_write(nd.ni_vp, &mp_writable, V_WAIT | V_PCATCH);
+	vrele(nd.ni_vp);
+	NDFREE_PNBUF(&nd);
 	if (error)
 		goto out;
 	if (filename_vp != NULL) {
@@ -183,7 +185,7 @@ extattr_set_vp(struct vnode *vp, int attrnamespace, const char *attrname,
 	if (nbytes > IOSIZE_MAX)
 		return (EINVAL);
 
-	error = vn_start_write(vp, &mp, V_WAIT | PCATCH);
+	error = vn_start_write(vp, &mp, V_WAIT | V_PCATCH);
 	if (error)
 		return (error);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
@@ -519,7 +521,7 @@ extattr_delete_vp(struct vnode *vp, int attrnamespace, const char *attrname,
 	struct mount *mp;
 	int error;
 
-	error = vn_start_write(vp, &mp, V_WAIT | PCATCH);
+	error = vn_start_write(vp, &mp, V_WAIT | V_PCATCH);
 	if (error)
 		return (error);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
@@ -793,7 +795,7 @@ kern_extattr_list_path(struct thread *td, const char * __capability path,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

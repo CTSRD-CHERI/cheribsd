@@ -190,6 +190,11 @@ ufs_itimes_locked(struct vnode *vp)
 void
 ufs_itimes(struct vnode *vp)
 {
+	struct inode *ip;
+
+	ip = VTOI(vp);
+	if ((ip->i_flag & (IN_ACCESS | IN_CHANGE | IN_UPDATE)) == 0)
+		return;
 
 	VI_LOCK(vp);
 	ufs_itimes_locked(vp);
@@ -354,13 +359,8 @@ ufs_close(
 	} */ *ap)
 {
 	struct vnode *vp = ap->a_vp;
-	int usecount;
 
-	VI_LOCK(vp);
-	usecount = vp->v_usecount;
-	if (usecount > 1)
-		ufs_itimes_locked(vp);
-	VI_UNLOCK(vp);
+	ufs_itimes(vp);
 	return (0);
 }
 
@@ -755,6 +755,9 @@ ufs_setattr(
 			 */
 			return (0);
 		}
+		error = vn_rlimit_trunc(vap->va_size, td);
+		if (error != 0)
+			return (error);
 		if ((error = UFS_TRUNCATE(vp, vap->va_size, IO_NORMAL |
 		    ((vap->va_vaflags & VA_SYNC) != 0 ? IO_SYNC : 0),
 		    cred)) != 0)
@@ -1099,11 +1102,6 @@ ufs_link(
 	struct direct newdir;
 	int error;
 
-#ifdef INVARIANTS
-	if ((cnp->cn_flags & HASBUF) == 0)
-		panic("ufs_link: no name");
-#endif
-
 	if (DOINGSUJ(tdvp)) {
 		error = softdep_prelink(tdvp, vp, cnp);
 		if (error != 0) {
@@ -1194,8 +1192,6 @@ ufs_whiteout(
 	case CREATE:
 		/* create a new directory whiteout */
 #ifdef INVARIANTS
-		if ((cnp->cn_flags & SAVENAME) == 0)
-			panic("ufs_whiteout: missing name");
 		if (OFSFMT(dvp))
 			panic("ufs_whiteout: old format filesystem");
 #endif
@@ -1283,11 +1279,6 @@ ufs_rename(
 
 	checkpath_locked = want_seqc_end = false;
 
-#ifdef INVARIANTS
-	if ((tcnp->cn_flags & HASBUF) == 0 ||
-	    (fcnp->cn_flags & HASBUF) == 0)
-		panic("ufs_rename: no name");
-#endif
 	endoff = 0;
 	mp = tdvp->v_mount;
 	VOP_UNLOCK(tdvp);
@@ -1519,8 +1510,6 @@ relock:
 		}
 		if (error)
 			goto unlockout;
-		if ((tcnp->cn_flags & SAVESTART) == 0)
-			panic("ufs_rename: lost to startdir");
 	}
 	if (fip->i_effnlink == 0 || fdp->i_effnlink == 0 ||
 	    tdp->i_effnlink == 0)
@@ -1741,7 +1730,9 @@ relock:
 			/* Journal must account for each new link. */
 			softdep_setup_dotdot_link(tdp, fip);
 		SET_I_OFFSET(fip, mastertemplate.dot_reclen);
-		ufs_dirrewrite(fip, fdp, newparent, DT_DIR, 0);
+		if (ufs_dirrewrite(fip, fdp, newparent, DT_DIR, 0) != 0)
+			ufs_dirbad(fip, mastertemplate.dot_reclen,
+			    "rename: missing .. entry");
 		cache_purge(fdvp);
 	}
 	error = ufs_dirremove(fdvp, fip, fcnp->cn_flags, 0);
@@ -2020,10 +2011,6 @@ ufs_mkdir(
 	int error, dmode;
 	long blkoff;
 
-#ifdef INVARIANTS
-	if ((cnp->cn_flags & HASBUF) == 0)
-		panic("ufs_mkdir: no name");
-#endif
 	dp = VTOI(dvp);
 	error = ufs_sync_nlink(dvp, NULL);
 	if (error != 0)
@@ -2391,7 +2378,7 @@ ufs_symlink(
 		UFS_INODE_SET_FLAG(ip, IN_SIZEMOD | IN_CHANGE | IN_UPDATE);
 		error = UFS_UPDATE(vp, 0);
 	} else
-		error = vn_rdwr(UIO_WRITE, vp, __DECONST(void *, ap->a_target),
+		error = vn_rdwr(UIO_WRITE, vp, PTR2CAP(__DECONST(void *, ap->a_target)),
 		    len, (off_t)0, UIO_SYSSPACE, IO_NODELOCKED | IO_NOMACCHECK,
 		    ap->a_cnp->cn_cred, NOCRED, NULL, NULL);
 	if (error)
@@ -2526,7 +2513,7 @@ nextentry:
 		error = 0;
 	if (ap->a_ncookies != NULL) {
 		if (error == 0) {
-			ap->a_ncookies -= ncookies;
+			*ap->a_ncookies -= ncookies;
 		} else {
 			free(*ap->a_cookies, M_TEMP);
 			*ap->a_ncookies = 0;
@@ -2640,14 +2627,8 @@ ufsfifo_close(
 		struct thread *a_td;
 	} */ *ap)
 {
-	struct vnode *vp = ap->a_vp;
-	int usecount;
 
-	VI_LOCK(vp);
-	usecount = vp->v_usecount;
-	if (usecount > 1)
-		ufs_itimes_locked(vp);
-	VI_UNLOCK(vp);
+	ufs_close(ap);
 	return (fifo_specops.vop_close(ap));
 }
 
@@ -2795,10 +2776,6 @@ ufs_makeinode(int mode, struct vnode *dvp, struct vnode **vpp,
 	int error;
 
 	pdir = VTOI(dvp);
-#ifdef INVARIANTS
-	if ((cnp->cn_flags & HASBUF) == 0)
-		panic("%s: no name", callfunc);
-#endif
 	*vpp = NULL;
 	if ((mode & IFMT) == 0)
 		mode |= IFREG;
@@ -2969,7 +2946,7 @@ ufs_ioctl(struct vop_ioctl_args *ap)
 	vp = ap->a_vp;
 	switch (ap->a_command) {
 	case FIOSEEKDATA:
-		error = vn_lock(vp, LK_SHARED);
+		error = vn_lock(vp, LK_EXCLUSIVE);
 		if (error == 0) {
 			error = ufs_bmap_seekdata(vp, (off_t *)ap->a_data);
 			VOP_UNLOCK(vp);

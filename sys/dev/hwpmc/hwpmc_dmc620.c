@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003-2008 Joseph Koshy
  * Copyright (c) 2007 The FreeBSD Foundation
@@ -131,7 +131,7 @@ dmc620_pmc_unregister(int unit)
 }
 
 int
-pmc_dmc620_nclasses()
+pmc_dmc620_nclasses(void)
 {
 
 	if (dmc620_npmcs > 0)

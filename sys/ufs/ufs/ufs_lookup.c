@@ -524,13 +524,10 @@ notfound:
 		 * We return ni_vp == NULL to indicate that the entry
 		 * does not currently exist; we leave a pointer to
 		 * the (locked) directory inode in ndp->ni_dvp.
-		 * The pathname buffer is saved so that the name
-		 * can be obtained later.
 		 *
 		 * NB - if the directory is unlocked, then this
 		 * information cannot be used.
 		 */
-		cnp->cn_flags |= SAVENAME;
 		return (EJUSTRETURN);
 	}
 	/*
@@ -551,9 +548,8 @@ found:
 	 */
 	if (i_offset + DIRSIZ(OFSFMT(vdp), ep) > dp->i_size) {
 		ufs_dirbad(dp, i_offset, "i_size too small");
-		dp->i_size = i_offset + DIRSIZ(OFSFMT(vdp), ep);
-		DIP_SET(dp, i_size, dp->i_size);
-		UFS_INODE_SET_FLAG(dp, IN_SIZEMOD | IN_CHANGE | IN_UPDATE);
+		brelse(bp);
+		return (EIO);
 	}
 	brelse(bp);
 
@@ -670,7 +666,6 @@ found:
 #endif
 
 		*vpp = tdp;
-		cnp->cn_flags |= SAVENAME;
 		return (0);
 	}
 	if (dd_ino != NULL)
@@ -762,17 +757,10 @@ found:
 void
 ufs_dirbad(struct inode *ip, doff_t offset, char *how)
 {
-	struct mount *mp;
 
-	mp = ITOV(ip)->v_mount;
-	if ((mp->mnt_flag & MNT_RDONLY) == 0)
-		panic("ufs_dirbad: %s: bad dir ino %ju at offset %ld: %s",
-		    mp->mnt_stat.f_mntonname, (uintmax_t)ip->i_number,
-		    (long)offset, how);
-	else
-		(void)printf("%s: bad dir ino %ju at offset %ld: %s\n",
-		    mp->mnt_stat.f_mntonname, (uintmax_t)ip->i_number,
-		    (long)offset, how);
+	(void)printf("%s: bad dir ino %ju at offset %ld: %s\n",
+	    ITOV(ip)->v_mount->mnt_stat.f_mntonname, (uintmax_t)ip->i_number,
+	    (long)offset, how);
 }
 
 /*
@@ -830,8 +818,6 @@ ufs_makedirentry(struct inode *ip, struct componentname *cnp,
 	u_int namelen;
 
 	namelen = (unsigned)cnp->cn_namelen;
-	KASSERT((cnp->cn_flags & SAVENAME) != 0,
-		("ufs_makedirentry: missing name"));
 	KASSERT(namelen <= UFS_MAXNAMLEN,
 		("ufs_makedirentry: name too long"));
 	newdirp->d_ino = ip->i_number;
@@ -1326,7 +1312,7 @@ ufs_dirempty(struct inode *ip, ino_t parentino, struct ucred *cred)
 #define	MINDIRSIZ (sizeof (struct dirtemplate) / 2)
 
 	for (off = 0; off < ip->i_size; off += dp->d_reclen) {
-		error = vn_rdwr(UIO_READ, ITOV(ip), (caddr_t)dp, MINDIRSIZ,
+		error = vn_rdwr(UIO_READ, ITOV(ip), PTR2CAP(dp), MINDIRSIZ,
 		    off, UIO_SYSSPACE, IO_NODELOCKED | IO_NOMACCHECK, cred,
 		    NOCRED, &count, (struct thread *)0);
 		/*
@@ -1394,7 +1380,7 @@ ufs_dir_dd_ino(struct vnode *vp, struct ucred *cred, ino_t *dd_ino,
 	/*
 	 * Have to read the directory.
 	 */
-	error = vn_rdwr(UIO_READ, vp, (caddr_t)&dirbuf,
+	error = vn_rdwr(UIO_READ, vp, PTR2CAP(&dirbuf),
 	    sizeof (struct dirtemplate), (off_t)0, UIO_SYSSPACE,
 	    IO_NODELOCKED | IO_NOMACCHECK, cred, NOCRED, NULL, NULL);
 	if (error != 0)
@@ -1587,8 +1573,11 @@ ufs_set_i_endoff(struct inode *ip, doff_t off, const char *file, int line)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ],
 //   "changes_purecap": [
 //     "subobject_bounds"
 //   ]

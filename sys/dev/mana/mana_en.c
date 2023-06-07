@@ -86,13 +86,13 @@ mana_rss_key_fill(void *k, size_t size)
 }
 
 static int
-mana_ifmedia_change(struct ifnet *ifp __unused)
+mana_ifmedia_change(if_t ifp __unused)
 {
 	return EOPNOTSUPP;
 }
 
 static void
-mana_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
+mana_ifmedia_status(if_t ifp, struct ifmediareq *ifmr)
 {
 	struct mana_port_context *apc = if_getsoftc(ifp);
 
@@ -119,7 +119,7 @@ mana_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 }
 
 static uint64_t
-mana_get_counter(struct ifnet *ifp, ift_counter cnt)
+mana_get_counter(if_t ifp, ift_counter cnt)
 {
 	struct mana_port_context *apc = if_getsoftc(ifp);
 	struct mana_port_stats *stats = &apc->port_stats;
@@ -143,7 +143,7 @@ mana_get_counter(struct ifnet *ifp, ift_counter cnt)
 }
 
 static void
-mana_qflush(struct ifnet *ifp)
+mana_qflush(if_t ifp)
 {
 	if_qflush(ifp);
 }
@@ -164,7 +164,7 @@ mana_restart(struct mana_port_context *apc)
 }
 
 static int
-mana_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
+mana_ioctl(if_t ifp, u_long command, caddr_t data)
 {
 	struct mana_port_context *apc = if_getsoftc(ifp);
 	struct ifrsskey *ifrk;
@@ -177,7 +177,7 @@ mana_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	case SIOCSIFMTU:
 		ifr = (struct ifreq *)data;
 		new_mtu = ifr->ifr_mtu;
-		if (ifp->if_mtu == new_mtu)
+		if (if_getmtu(ifp) == new_mtu)
 			break;
 		if ((new_mtu + 18 > MAX_FRAME_SIZE) ||
 		    (new_mtu + 18 < MIN_FRAME_SIZE)) {
@@ -199,15 +199,15 @@ mana_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	case SIOCSIFFLAGS:
-		if (ifp->if_flags & IFF_UP) {
-			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0) {
+		if (if_getflags(ifp) & IFF_UP) {
+			if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) == 0) {
 				MANA_APC_LOCK_LOCK(apc);
 				if (!apc->port_is_up)
 					rc = mana_up(apc);
 				MANA_APC_LOCK_UNLOCK(apc);
 			}
 		} else {
-			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
+			if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
 				MANA_APC_LOCK_LOCK(apc);
 				if (apc->port_is_up)
 					mana_down(apc);
@@ -416,7 +416,7 @@ mana_xmit(struct mana_txq *txq)
 {
 	enum mana_tx_pkt_format pkt_fmt = MANA_SHORT_PKT_FMT;
 	struct mana_send_buf_info *tx_info;
-	struct ifnet *ndev = txq->ndev;
+	if_t ndev = txq->ndev;
 	struct mbuf *mbuf;
 	struct mana_port_context *apc = if_getsoftc(ndev);
 	struct mana_port_stats *port_stats = &apc->port_stats;
@@ -584,7 +584,7 @@ static void
 mana_xmit_taskfunc(void *arg, int pending)
 {
 	struct mana_txq *txq = (struct mana_txq *)arg;
-	struct ifnet *ndev = txq->ndev;
+	if_t ndev = txq->ndev;
 	struct mana_port_context *apc = if_getsoftc(ndev);
 
 	while (!drbr_empty(ndev, txq->txq_br) && apc->port_is_up &&
@@ -717,7 +717,7 @@ mana_mbuf_csum_check(struct mbuf *mbuf)
 }
 
 static int
-mana_start_xmit(struct ifnet *ifp, struct mbuf *m)
+mana_start_xmit(if_t ifp, struct mbuf *m)
 {
 	struct mana_port_context *apc = if_getsoftc(ifp);
 	struct mana_txq *txq;
@@ -980,13 +980,52 @@ mana_query_vport_cfg(struct mana_port_context *apc, uint32_t vport_index,
 	return 0;
 }
 
-static int
+void
+mana_uncfg_vport(struct mana_port_context *apc)
+{
+	MANA_APC_LOCK_LOCK(apc);
+	apc->vport_use_count--;
+	if (apc->vport_use_count < 0) {
+		mana_err(NULL,
+		    "WARNING: vport_use_count less than 0: %u\n",
+		    apc->vport_use_count);
+	}
+	MANA_APC_LOCK_UNLOCK(apc);
+}
+
+int
 mana_cfg_vport(struct mana_port_context *apc, uint32_t protection_dom_id,
     uint32_t doorbell_pg_id)
 {
 	struct mana_config_vport_resp resp = {};
 	struct mana_config_vport_req req = {};
 	int err;
+
+	/* This function is used to program the Ethernet port in the hardware
+	 * table. It can be called from the Ethernet driver or the RDMA driver.
+	 *
+	 * For Ethernet usage, the hardware supports only one active user on a
+	 * physical port. The driver checks on the port usage before programming
+	 * the hardware when creating the RAW QP (RDMA driver) or exposing the
+	 * device to kernel NET layer (Ethernet driver).
+	 *
+	 * Because the RDMA driver doesn't know in advance which QP type the
+	 * user will create, it exposes the device with all its ports. The user
+	 * may not be able to create RAW QP on a port if this port is already
+	 * in used by the Ethernet driver from the kernel.
+	 *
+	 * This physical port limitation only applies to the RAW QP. For RC QP,
+	 * the hardware doesn't have this limitation. The user can create RC
+	 * QPs on a physical port up to the hardware limits independent of the
+	 * Ethernet usage on the same port.
+	 */
+	MANA_APC_LOCK_LOCK(apc);
+	if (apc->vport_use_count > 0) {
+		MANA_APC_LOCK_UNLOCK(apc);
+		return EBUSY;
+	}
+	apc->vport_use_count++;
+	MANA_APC_LOCK_UNLOCK(apc);
 
 	mana_gd_init_req_hdr(&req.hdr, MANA_CONFIG_VPORT_TX,
 	    sizeof(req), sizeof(resp));
@@ -1014,7 +1053,14 @@ mana_cfg_vport(struct mana_port_context *apc, uint32_t protection_dom_id,
 
 	apc->tx_shortform_allowed = resp.short_form_allowed;
 	apc->tx_vp_offset = resp.tx_vport_offset;
+
+	if_printf(apc->ndev, "Configured vPort %ju PD %u DB %u\n",
+	    apc->port_handle, protection_dom_id, doorbell_pg_id);
+
 out:
+	if (err)
+		mana_uncfg_vport(apc);
+
 	return err;
 }
 
@@ -1027,7 +1073,7 @@ mana_cfg_vport_steering(struct mana_port_context *apc,
 	uint16_t num_entries = MANA_INDIRECT_TABLE_SIZE;
 	struct mana_cfg_rx_steer_req *req = NULL;
 	struct mana_cfg_rx_steer_resp resp = {};
-	struct ifnet *ndev = apc->ndev;
+	if_t ndev = apc->ndev;
 	mana_handle_t *req_indir_tab;
 	uint32_t req_buf_size;
 	int err;
@@ -1078,12 +1124,16 @@ mana_cfg_vport_steering(struct mana_port_context *apc,
 		    resp.hdr.status);
 		err = EPROTO;
 	}
+
+	if_printf(ndev, "Configured steering vPort %ju entries %u\n",
+	    apc->port_handle, num_entries);
+
 out:
 	free(req, M_DEVBUF);
 	return err;
 }
 
-static int
+int
 mana_create_wq_obj(struct mana_port_context *apc,
     mana_handle_t vport,
     uint32_t wq_type, struct mana_obj_spec *wq_spec,
@@ -1092,7 +1142,7 @@ mana_create_wq_obj(struct mana_port_context *apc,
 {
 	struct mana_create_wqobj_resp resp = {};
 	struct mana_create_wqobj_req req = {};
-	struct ifnet *ndev = apc->ndev;
+	if_t ndev = apc->ndev;
 	int err;
 
 	mana_gd_init_req_hdr(&req.hdr, MANA_CREATE_WQ_OBJ,
@@ -1138,13 +1188,13 @@ out:
 	return err;
 }
 
-static void
+void
 mana_destroy_wq_obj(struct mana_port_context *apc, uint32_t wq_type,
     mana_handle_t wq_obj)
 {
 	struct mana_destroy_wqobj_resp resp = {};
 	struct mana_destroy_wqobj_req req = {};
-	struct ifnet *ndev = apc->ndev;
+	if_t ndev = apc->ndev;
 	int err;
 
 	mana_gd_init_req_hdr(&req.hdr, MANA_DESTROY_WQ_OBJ,
@@ -1309,7 +1359,7 @@ mana_poll_tx_cq(struct mana_cq *cq)
 	struct mana_txq *txq = cq->txq;
 	struct mana_port_context *apc;
 	uint16_t next_to_complete;
-	struct ifnet *ndev;
+	if_t ndev;
 	int comp_read;
 	int txq_idx = txq->idx;;
 	int i;
@@ -1500,7 +1550,7 @@ mana_rx_mbuf(struct mbuf *mbuf, struct mana_rxcomp_oob *cqe,
     struct mana_rxq *rxq)
 {
 	struct mana_stats *rx_stats = &rxq->stats;
-	struct ifnet *ndev = rxq->ndev;
+	if_t ndev = rxq->ndev;
 	uint32_t pkt_len = cqe->ppi[0].pkt_len;
 	uint16_t rxq_idx = rxq->rxq_idx;
 	struct mana_port_context *apc;
@@ -1519,8 +1569,8 @@ mana_rx_mbuf(struct mbuf *mbuf, struct mana_rxcomp_oob *cqe,
 	mbuf->m_len = pkt_len;
 	mbuf->m_pkthdr.rcvif = ndev;
 
-	if ((ndev->if_capenable & IFCAP_RXCSUM ||
-	    ndev->if_capenable & IFCAP_RXCSUM_IPV6) &&
+	if ((if_getcapenable(ndev) & IFCAP_RXCSUM ||
+	    if_getcapenable(ndev) & IFCAP_RXCSUM_IPV6) &&
 	    (cqe->rx_iphdr_csum_succeed)) {
 		mbuf->m_pkthdr.csum_flags = CSUM_IP_CHECKED;
 		mbuf->m_pkthdr.csum_flags |= CSUM_IP_VALID;
@@ -1579,13 +1629,13 @@ mana_rx_mbuf(struct mbuf *mbuf, struct mana_rxcomp_oob *cqe,
 	}
 
 	do_if_input = true;
-	if ((ndev->if_capenable & IFCAP_LRO) && do_lro) {
+	if ((if_getcapenable(ndev) & IFCAP_LRO) && do_lro) {
 		if (rxq->lro.lro_cnt != 0 &&
 		    tcp_lro_rx(&rxq->lro, mbuf, 0) == 0)
 			do_if_input = false;
 	}
 	if (do_if_input) {
-		ndev->if_input(ndev, mbuf);
+		if_input(ndev, mbuf);
 	}
 
 	counter_enter();
@@ -1602,7 +1652,7 @@ mana_process_rx_cqe(struct mana_rxq *rxq, struct mana_cq *cq,
 {
 	struct mana_rxcomp_oob *oob = (struct mana_rxcomp_oob *)cqe->cqe_data;
 	struct mana_recv_buf_oob *rxbuf_oob;
-	struct ifnet *ndev = rxq->ndev;
+	if_t ndev = rxq->ndev;
 	struct mana_port_context *apc;
 	struct mbuf *old_mbuf;
 	uint32_t curr, pktlen;
@@ -1640,13 +1690,8 @@ mana_process_rx_cqe(struct mana_rxq *rxq, struct mana_cq *cq,
 
 	if (pktlen == 0) {
 		/* data packets should never have packetlength of zero */
-#if defined(__amd64__)
-		if_printf(ndev, "RX pkt len=0, rq=%u, cq=%u, rxobj=0x%lx\n",
+		if_printf(ndev, "RX pkt len=0, rq=%u, cq=%u, rxobj=0x%jx\n",
 		    rxq->gdma_id, cq->gdma_id, rxq->rxobj);
-#else
-		if_printf(ndev, "RX pkt len=0, rq=%u, cq=%u, rxobj=0x%llx\n",
-		    rxq->gdma_id, cq->gdma_id, rxq->rxobj);
-#endif
 		return;
 	}
 
@@ -1893,7 +1938,7 @@ mana_destroy_txq(struct mana_port_context *apc)
 }
 
 static int
-mana_create_txq(struct mana_port_context *apc, struct ifnet *net)
+mana_create_txq(struct mana_port_context *apc, if_t net)
 {
 	struct mana_context *ac = apc->ac;
 	struct gdma_dev *gd = ac->gdma_dev;
@@ -1966,10 +2011,10 @@ mana_create_txq(struct mana_port_context *apc, struct ifnet *net)
 		memset(&wq_spec, 0, sizeof(wq_spec));
 		memset(&cq_spec, 0, sizeof(cq_spec));
 
-		wq_spec.gdma_region = txq->gdma_sq->mem_info.gdma_region;
+		wq_spec.gdma_region = txq->gdma_sq->mem_info.dma_region_handle;
 		wq_spec.queue_size = txq->gdma_sq->queue_size;
 
-		cq_spec.gdma_region = cq->gdma_cq->mem_info.gdma_region;
+		cq_spec.gdma_region = cq->gdma_cq->mem_info.dma_region_handle;
 		cq_spec.queue_size = cq->gdma_cq->queue_size;
 		cq_spec.modr_ctx_id = 0;
 		cq_spec.attached_eq = cq->gdma_cq->cq.parent->id;
@@ -1983,8 +2028,10 @@ mana_create_txq(struct mana_port_context *apc, struct ifnet *net)
 		txq->gdma_sq->id = wq_spec.queue_index;
 		cq->gdma_cq->id = cq_spec.queue_index;
 
-		txq->gdma_sq->mem_info.gdma_region = GDMA_INVALID_DMA_REGION;
-		cq->gdma_cq->mem_info.gdma_region = GDMA_INVALID_DMA_REGION;
+		txq->gdma_sq->mem_info.dma_region_handle =
+		    GDMA_INVALID_DMA_REGION;
+		cq->gdma_cq->mem_info.dma_region_handle =
+		    GDMA_INVALID_DMA_REGION;
 
 		txq->gdma_txq_id = txq->gdma_sq->id;
 
@@ -2201,7 +2248,7 @@ mana_push_wqe(struct mana_rxq *rxq)
 
 static struct mana_rxq *
 mana_create_rxq(struct mana_port_context *apc, uint32_t rxq_idx,
-    struct mana_eq *eq, struct ifnet *ndev)
+    struct mana_eq *eq, if_t ndev)
 {
 	struct gdma_dev *gd = apc->ac->gdma_dev;
 	struct mana_obj_spec wq_spec;
@@ -2242,7 +2289,7 @@ mana_create_rxq(struct mana_port_context *apc, uint32_t rxq_idx,
 		goto out;
 
 	/* Create LRO for the RQ */
-	if (ndev->if_capenable & IFCAP_LRO) {
+	if (if_getcapenable(ndev) & IFCAP_LRO) {
 		err = tcp_lro_init(&rxq->lro);
 		if (err) {
 			if_printf(ndev, "Failed to create LRO for rxq %d\n",
@@ -2285,10 +2332,10 @@ mana_create_rxq(struct mana_port_context *apc, uint32_t rxq_idx,
 
 	memset(&wq_spec, 0, sizeof(wq_spec));
 	memset(&cq_spec, 0, sizeof(cq_spec));
-	wq_spec.gdma_region = rxq->gdma_rq->mem_info.gdma_region;
+	wq_spec.gdma_region = rxq->gdma_rq->mem_info.dma_region_handle;
 	wq_spec.queue_size = rxq->gdma_rq->queue_size;
 
-	cq_spec.gdma_region = cq->gdma_cq->mem_info.gdma_region;
+	cq_spec.gdma_region = cq->gdma_cq->mem_info.dma_region_handle;
 	cq_spec.queue_size = cq->gdma_cq->queue_size;
 	cq_spec.modr_ctx_id = 0;
 	cq_spec.attached_eq = cq->gdma_cq->cq.parent->id;
@@ -2301,8 +2348,8 @@ mana_create_rxq(struct mana_port_context *apc, uint32_t rxq_idx,
 	rxq->gdma_rq->id = wq_spec.queue_index;
 	cq->gdma_cq->id = cq_spec.queue_index;
 
-	rxq->gdma_rq->mem_info.gdma_region = GDMA_INVALID_DMA_REGION;
-	cq->gdma_cq->mem_info.gdma_region = GDMA_INVALID_DMA_REGION;
+	rxq->gdma_rq->mem_info.dma_region_handle = GDMA_INVALID_DMA_REGION;
+	cq->gdma_cq->mem_info.dma_region_handle = GDMA_INVALID_DMA_REGION;
 
 	rxq->gdma_id = rxq->gdma_rq->id;
 	cq->gdma_id = cq->gdma_cq->id;
@@ -2361,7 +2408,7 @@ out:
 }
 
 static int
-mana_add_rx_queues(struct mana_port_context *apc, struct ifnet *ndev)
+mana_add_rx_queues(struct mana_port_context *apc, if_t ndev)
 {
 	struct mana_context *ac = apc->ac;
 	struct mana_rxq *rxq;
@@ -2399,10 +2446,12 @@ mana_destroy_vport(struct mana_port_context *apc)
 	}
 
 	mana_destroy_txq(apc);
+
+	mana_uncfg_vport(apc);
 }
 
 static int
-mana_create_vport(struct mana_port_context *apc, struct ifnet *net)
+mana_create_vport(struct mana_port_context *apc, if_t net)
 {
 	struct gdma_dev *gd = apc->ac->gdma_dev;
 	int err;
@@ -2449,7 +2498,7 @@ int mana_config_rss(struct mana_port_context *apc, enum TRI_STATE rx,
 }
 
 static int
-mana_init_port(struct ifnet *ndev)
+mana_init_port(if_t ndev)
 {
 	struct mana_port_context *apc = if_getsoftc(ndev);
 	uint32_t max_txq, max_rxq, max_queues;
@@ -2487,7 +2536,7 @@ reset_apc:
 }
 
 int
-mana_alloc_queues(struct ifnet *ndev)
+mana_alloc_queues(if_t ndev)
 {
 	struct mana_port_context *apc = if_getsoftc(ndev);
 	int err;
@@ -2556,7 +2605,7 @@ mana_init(void *arg)
 }
 
 static int
-mana_dealloc_queues(struct ifnet *ndev)
+mana_dealloc_queues(if_t ndev)
 {
 	struct mana_port_context *apc = if_getsoftc(ndev);
 	struct mana_txq *txq;
@@ -2634,7 +2683,7 @@ mana_down(struct mana_port_context *apc)
 }
 
 int
-mana_detach(struct ifnet *ndev)
+mana_detach(if_t ndev)
 {
 	struct mana_port_context *apc = if_getsoftc(ndev);
 	int err;
@@ -2659,11 +2708,11 @@ mana_detach(struct ifnet *ndev)
 
 static int
 mana_probe_port(struct mana_context *ac, int port_idx,
-    struct ifnet **ndev_storage)
+    if_t *ndev_storage)
 {
 	struct gdma_context *gc = ac->gdma_dev->gdma_context;
 	struct mana_port_context *apc;
-	struct ifnet *ndev;
+	if_t ndev;
 	int err;
 
 	ndev = if_alloc_dev(IFT_ETHER, gc->dev);
@@ -2691,6 +2740,7 @@ mana_probe_port(struct mana_context *ac, int port_idx,
 	apc->frame_size = DEFAULT_FRAME_SIZE;
 	apc->last_tx_cq_bind_cpu = -1;
 	apc->last_rx_cq_bind_cpu = -1;
+	apc->vport_use_count = 0;
 
 	MANA_APC_LOCK_INIT(apc);
 
@@ -2714,20 +2764,20 @@ mana_probe_port(struct mana_context *ac, int port_idx,
 	if (err)
 		goto reset_apc;
 
-	ndev->if_capabilities |= IFCAP_TXCSUM | IFCAP_TXCSUM_IPV6;
-	ndev->if_capabilities |= IFCAP_RXCSUM | IFCAP_RXCSUM_IPV6;
-	ndev->if_capabilities |= IFCAP_TSO4 | IFCAP_TSO6;
-
-	ndev->if_capabilities |= IFCAP_LRO | IFCAP_LINKSTATE;
+	if_setcapabilitiesbit(ndev,
+	    IFCAP_TXCSUM | IFCAP_TXCSUM_IPV6 |
+	    IFCAP_RXCSUM | IFCAP_RXCSUM_IPV6 |
+	    IFCAP_TSO4 | IFCAP_TSO6 |
+	    IFCAP_LRO | IFCAP_LINKSTATE, 0);
 
 	/* Enable all available capabilities by default. */
-	ndev->if_capenable = ndev->if_capabilities;
+	if_setcapenable(ndev, if_getcapabilities(ndev));
 
 	/* TSO parameters */
-	ndev->if_hw_tsomax = MAX_MBUF_FRAGS * MANA_TSO_MAXSEG_SZ -
-	    (ETHER_HDR_LEN + ETHER_VLAN_ENCAP_LEN);
-	ndev->if_hw_tsomaxsegcount = MAX_MBUF_FRAGS;
-	ndev->if_hw_tsomaxsegsize = PAGE_SIZE;
+	if_sethwtsomax(ndev, MAX_MBUF_FRAGS * MANA_TSO_MAXSEG_SZ -
+	    (ETHER_HDR_LEN + ETHER_VLAN_ENCAP_LEN));
+	if_sethwtsomaxsegcount(ndev, MAX_MBUF_FRAGS);
+	if_sethwtsomaxsegsize(ndev, PAGE_SIZE);
 
 	ifmedia_init(&apc->media, IFM_IMASK,
 	    mana_ifmedia_change, mana_ifmedia_status);
@@ -2812,7 +2862,7 @@ mana_remove(struct gdma_dev *gd)
 	struct gdma_context *gc = gd->gdma_context;
 	struct mana_context *ac = gd->driver_data;
 	device_t dev = gc->dev;
-	struct ifnet *ndev;
+	if_t ndev;
 	int i;
 
 	for (i = 0; i < ac->num_ports; i++) {

@@ -109,9 +109,9 @@ _CPUCFLAGS = -march=armv5te -D__XSCALE__
 _CPUCFLAGS = -mfloat-abi=softfp
 .  elif ${CPUTYPE} == "cortexa"
 _CPUCFLAGS = -march=armv7 -mfpu=vfp
-.  elif ${CPUTYPE:Marmv[4567]*} != ""
+.  elif ${CPUTYPE:Marmv[67]*} != ""
 # Handle all the armvX types that FreeBSD runs:
-#	armv4, armv4t, armv5, armv5te, armv6, armv6t2, armv7, armv7-a, armv7ve
+#	armv6, armv6t2, armv7, armv7-a, armv7ve
 # they require -march=. All the others require -mcpu=.
 _CPUCFLAGS = -march=${CPUTYPE}
 .  else
@@ -140,8 +140,9 @@ _CPUCFLAGS = -mcpu=${CPUTYPE}
 # Use -march when the CPU type is an architecture value, e.g. armv8.1-a
 _CPUCFLAGS = -march=${CPUTYPE}
 .  elif ${CPUTYPE} == "morello"
-# Don't use -march; we will add -march=morello or -march=morello+c64 later but
-# adding -march=morello here would override that as _CPUCFLAGS is added late.
+# Don't use -march; we will add -march=morello later so it's not necessary, and
+# it's not sufficient to use _CPUCFLAGS either as NO_CPU_CFLAGS should not
+# suppress enabling Morello support.
 # It is also not a valid value for -mcpu.
 .  else
 # Otherwise assume we have a CPU type
@@ -303,14 +304,18 @@ MACHINE_CPU += riscv
 .endif
 
 .if ${MACHINE_CPUARCH} == "aarch64"
+. if ${MACHINE_CPU:Mcheri}
+CFLAGS+=	-march=morello
+CFLAGS+=	-Xclang -morello-vararg=new
+LDFLAGS+=	-march=morello
+. endif
+
 . if ${MACHINE_ARCH:Maarch64*c*}
-CFLAGS+=	-march=morello+c64 -mabi=purecap
-CFLAGS+=	-Xclang -morello-vararg=new
-LDFLAGS+=	-march=morello+c64 -mabi=purecap
-. elif defined(CPUTYPE) && ${CPUTYPE} == "morello"
-CFLAGS+=	-march=morello -mabi=aapcs
-CFLAGS+=	-Xclang -morello-vararg=new
-LDFLAGS+=	-march=morello -mabi=aapcs
+CFLAGS+=	-mabi=purecap
+LDFLAGS+=	-mabi=purecap
+. else
+CFLAGS+=	-mabi=aapcs
+LDFLAGS+=	-mabi=aapcs
 . endif
 .endif
 
@@ -323,17 +328,11 @@ MACHINE_CPU += armv6
 . if ${MACHINE_ARCH:Marmv7*} != ""
 MACHINE_CPU += armv7
 . endif
-# armv6 and armv7 are a hybrid. It can use the softfp ABI, but doesn't emulate
-# floating point in the general case, so don't define softfp for it at this
-# time. arm is pure softfp, so define it for them.
-. if ${MACHINE_ARCH:Marmv[67]*} == ""
-MACHINE_CPU += softfp
-. endif
 # Normally armv6 and armv7 are hard float ABI from FreeBSD 11 onwards. However
 # when CPUTYPE has 'soft' in it, we use the soft-float ABI to allow building of
 # soft-float ABI libraries. In this case, we have to add the -mfloat-abi=softfp
 # to force that.
-. if ${MACHINE_ARCH:Marmv[67]*} && defined(CPUTYPE) && ${CPUTYPE:M*soft*} != ""
+. if defined(CPUTYPE) && ${CPUTYPE:M*soft*} != ""
 # Needs to be CFLAGS not _CPUCFLAGS because it's needed for the ABI
 # not a nice optimization. Please note: softfp ABI uses hardware floating
 # instructions, but passes arguments to function calls in integer regsiters.
@@ -412,22 +411,25 @@ CXXFLAGS += ${CXXFLAGS.${MACHINE_ARCH}}
 # MACHINE_ABI is a list of properties about the ABI used for MACHINE_ARCH.
 # The following properties are indicated with one of the follow values:
 #
+# Byte order:			big-endian, little-endian
 # Floating point ABI:		soft-float, hard-float
 # Size of long (size_t, etc):	long32, long64
 # Pointer type:			ptr32, ptr64, ptr128c
 # Size of time_t:		time32, time64
 # Capability ABI:		purecap
 #
-.if ${MACHINE_ARCH:Mriscv*sf*}
+.if (${MACHINE} == "arm" && (defined(CPUTYPE) && ${CPUTYPE:M*soft*})) || \
+    (${MACHINE_ARCH} == "powerpc" && (defined(CPUTYPE) && ${CPUTYPE} == "e500")) || \
+    ${MACHINE_ARCH:Mriscv*sf*}
 MACHINE_ABI+=	soft-float
 .else
 MACHINE_ABI+=	hard-float
 .endif
 # Currently all 64-bit architectures include 64 in their name (see arch(7)).
 .if ${MACHINE_ARCH:M*64*}
-MACHINE_ABI+=	long64
+MACHINE_ABI+=  long64
 .else
-MACHINE_ABI+=	long32
+MACHINE_ABI+=  long32
 .endif
 .if (${MACHINE_ARCH:Maarch64*c*} || ${MACHINE_ARCH:Mriscv*c*})
 MACHINE_ABI+=	purecap ptr128c
@@ -442,6 +444,11 @@ MACHINE_ABI+=	ptr32
 MACHINE_ABI+=	time32
 .else
 MACHINE_ABI+=	time64
+.endif
+.if ${MACHINE_ARCH:Mpowerpc*} && !${MACHINE_ARCH:M*le}
+MACHINE_ABI+=	big-endian
+.else
+MACHINE_ABI+=	little-endian
 .endif
 
 .if ${MACHINE_ABI:Mpurecap}

@@ -748,10 +748,11 @@ long uma_avail(void);
 #endif	/* _VM_UMA_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181121,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
-//     "integer_provenance"
+//     "integer_provenance",
+//     "pointer_shape"
 //   ]
 // }
 // CHERI CHANGES END

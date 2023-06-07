@@ -36,10 +36,16 @@
 
 struct trapframe;
 
+/* The first register in pcb_x is x19 */
+#define	PCB_X_START	19
+
+#define	PCB_X19		0
+#define	PCB_X20		1
+#define	PCB_FP		10
+#define	PCB_LR		11
+
 struct pcb {
-	uintptr_t	pcb_x[30];
-	uintptr_t	pcb_lr;
-	uintptr_t	_reserved;	/* Was pcb_pc */
+	uintptr_t	pcb_x[12];
 	/* These two need to be in order as we access them together */
 	uintptr_t	pcb_sp;
 	uintcap_t	pcb_tpidr_el0;
@@ -60,9 +66,9 @@ struct pcb {
 
 	struct vfpstate	*pcb_fpusaved;
 	int		pcb_fpflags;
-#define	PCB_FP_STARTED	0x01
-#define	PCB_FP_KERN	0x02
-#define	PCB_FP_NOSAVE	0x04
+#define	PCB_FP_STARTED	0x00000001
+#define	PCB_FP_KERN	0x40000000
+#define	PCB_FP_NOSAVE	0x80000000
 /* The bits passed to userspace in get_fpcontext */
 #define	PCB_FP_USERMASK	(PCB_FP_STARTED)
 	u_int		pcb_vfpcpu;	/* Last cpu this thread ran VFP code */
@@ -87,10 +93,11 @@ int	savectx(struct pcb *pcb) __returns_twice;
 #endif /* !_MACHINE_PCB_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20210407,
+//   "updated": 20221129,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "support"
+//     "support",
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

@@ -3001,6 +3001,15 @@ cache_validate(struct vnode *dvp, struct vnode *vp, struct componentname *cnp)
 	}
 	mtx_unlock(blp);
 }
+
+void
+cache_assert_no_entries(struct vnode *vp)
+{
+
+	VNPASS(TAILQ_EMPTY(&vp->v_cache_dst), vp);
+	VNPASS(LIST_EMPTY(&vp->v_cache_src), vp);
+	VNPASS(vp->v_cache_dd == NULL, vp);
+}
 #endif
 
 /*
@@ -3010,7 +3019,7 @@ void
 cache_purgevfs(struct mount *mp)
 {
 	struct vnode *vp, *mvp;
-	size_t visited, purged;
+	size_t visited __sdt_used, purged __sdt_used;
 
 	visited = purged = 0;
 	/*
@@ -3142,17 +3151,43 @@ kern___realpathat(struct thread *td, int fd, const char * __capability path,
 
 	if (flags != 0)
 		return (EINVAL);
-	NDINIT_ATRIGHTS(&nd, LOOKUP, FOLLOW | SAVENAME | WANTPARENT | AUDITVNODE1,
+	NDINIT_ATRIGHTS(&nd, LOOKUP, FOLLOW | WANTPARENT | AUDITVNODE1,
 	    pathseg, path, fd, &cap_fstat_rights);
 	if ((error = namei(&nd)) != 0)
 		return (error);
-	error = vn_fullpath_hardlink(nd.ni_vp, nd.ni_dvp, nd.ni_cnd.cn_nameptr,
-	    nd.ni_cnd.cn_namelen, &retbuf, &freebuf, &size);
+
+	if (nd.ni_vp->v_type == VREG && nd.ni_dvp->v_type != VDIR &&
+	    (nd.ni_vp->v_vflag & VV_ROOT) != 0) {
+		/*
+		 * This happens if vp is a file mount. The call to
+		 * vn_fullpath_hardlink can panic if path resolution can't be
+		 * handled without the directory.
+		 *
+		 * To resolve this, we find the vnode which was mounted on -
+		 * this should have a unique global path since we disallow
+		 * mounting on linked files.
+		 */
+		struct vnode *covered_vp;
+		error = vn_lock(nd.ni_vp, LK_SHARED);
+		if (error != 0)
+			goto out;
+		covered_vp = nd.ni_vp->v_mount->mnt_vnodecovered;
+		vref(covered_vp);
+		VOP_UNLOCK(nd.ni_vp);
+		error = vn_fullpath(covered_vp, &retbuf, &freebuf);
+		vrele(covered_vp);
+	} else {
+		error = vn_fullpath_hardlink(nd.ni_vp, nd.ni_dvp, nd.ni_cnd.cn_nameptr,
+		    nd.ni_cnd.cn_namelen, &retbuf, &freebuf, &size);
+	}
 	if (error == 0) {
 		error = copyout(retbuf, buf, size);
 		free(freebuf, M_TEMP);
 	}
-	NDFREE(&nd, 0);
+out:
+	vrele(nd.ni_vp);
+	vrele(nd.ni_dvp);
+	NDFREE_PNBUF(&nd);
 	return (error);
 }
 
@@ -3608,9 +3643,9 @@ vn_fullpath_any(struct vnode *vp, struct vnode *rdir, char *buf, char **retbuf,
 /*
  * Resolve an arbitrary vnode to a pathname (taking care of hardlinks).
  *
- * Since the namecache does not track hardlinks, the caller is
- * expected to first look up the target vnode with SAVENAME |
- * WANTPARENT flags passed to namei to get dvp and vp.
+ * Since the namecache does not track hardlinks, the caller is expected to
+ * first look up the target vnode with WANTPARENT flag passed to namei to get
+ * dvp and vp.
  *
  * Then we have 2 cases:
  * - if the found vnode is a directory, the path can be constructed just by
@@ -3810,6 +3845,72 @@ out:
 	return (error);
 }
 
+/*
+ * This is similar to vn_path_to_global_path but allows for regular
+ * files which may not be present in the cache.
+ *
+ * Requires a locked, referenced vnode.
+ * Vnode is re-locked on success or ENODEV, otherwise unlocked.
+ */
+int
+vn_path_to_global_path_hardlink(struct thread *td, struct vnode *vp,
+    struct vnode *dvp, char *path, u_int pathlen, const char *leaf_name,
+    size_t leaf_length)
+{
+	struct nameidata nd;
+	struct vnode *vp1;
+	char *rpath, *fbuf;
+	size_t len;
+	int error;
+
+	ASSERT_VOP_ELOCKED(vp, __func__);
+
+	/*
+	 * Construct global filesystem path from dvp, vp and leaf
+	 * name.
+	 */
+	VOP_UNLOCK(vp);
+	error = vn_fullpath_hardlink(vp, dvp, leaf_name, leaf_length,
+	    &rpath, &fbuf, &len);
+
+	if (error != 0) {
+		vrele(vp);
+		goto out;
+	}
+
+	if (strlen(rpath) >= pathlen) {
+		vrele(vp);
+		error = ENAMETOOLONG;
+		goto out;
+	}
+
+	/*
+	 * Re-lookup the vnode by path to detect a possible rename.
+	 * As a side effect, the vnode is relocked.
+	 * If vnode was renamed, return ENOENT.
+	 */
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1, UIO_SYSSPACE,
+	    PTR2CAP(path));
+	error = namei(&nd);
+	if (error != 0) {
+		vrele(vp);
+		goto out;
+	}
+	NDFREE_PNBUF(&nd);
+	vp1 = nd.ni_vp;
+	vrele(vp);
+	if (vp1 == vp)
+		strcpy(path, rpath);
+	else {
+		vput(vp1);
+		error = ENOENT;
+	}
+
+out:
+	free(fbuf, M_TEMP);
+	return (error);
+}
+
 #ifdef DDB
 static void
 db_print_vpath(struct vnode *vp)
@@ -3937,7 +4038,6 @@ struct cache_fpl {
 	enum cache_fpl_status status:8;
 	bool in_smr;
 	bool fsearch;
-	bool savename;
 	struct pwd **pwd;
 #ifdef INVARIANTS
 	struct cache_fpl_debug debug;
@@ -3960,10 +4060,8 @@ cache_fpl_cleanup_cnp(struct componentname *cnp)
 {
 
 	uma_zfree(namei_zone, cnp->cn_pnbuf);
-#ifdef DIAGNOSTIC
 	cnp->cn_pnbuf = NULL;
 	cnp->cn_nameptr = NULL;
-#endif
 }
 
 static struct vnode *
@@ -4175,7 +4273,6 @@ cache_fpl_handled_error_impl(struct cache_fpl *fpl, int error, int line)
 	fpl->line = line;
 	fpl->dvp = NULL;
 	fpl->tvp = NULL;
-	fpl->savename = false;
 	return (error);
 }
 
@@ -4190,9 +4287,9 @@ cache_fpl_terminated(struct cache_fpl *fpl)
 
 #define CACHE_FPL_SUPPORTED_CN_FLAGS \
 	(NC_NOMAKEENTRY | NC_KEEPPOSENTRY | LOCKLEAF | LOCKPARENT | WANTPARENT | \
-	 FAILIFEXISTS | FOLLOW | EMPTYPATH | LOCKSHARED | SAVENAME | SAVESTART | \
-	 WILLBEDIR | ISOPEN | NOMACCHECK | AUDITVNODE1 | AUDITVNODE2 | NOCAPCHECK | \
-	 OPENREAD | OPENWRITE | WANTIOCTLCAPS)
+	 FAILIFEXISTS | FOLLOW | EMPTYPATH | LOCKSHARED | WILLBEDIR | \
+	 ISOPEN | NOMACCHECK | AUDITVNODE1 | AUDITVNODE2 | NOCAPCHECK | OPENREAD | \
+	 OPENWRITE | WANTIOCTLCAPS)
 
 #define CACHE_FPL_INTERNAL_CN_FLAGS \
 	(ISDOTDOT | MAKEENTRY | ISLASTCN)
@@ -4426,7 +4523,7 @@ cache_fplookup_final_child(struct cache_fpl *fpl, enum vgetstate tvs)
 static int __noinline
 cache_fplookup_final_modifying(struct cache_fpl *fpl)
 {
-	struct nameidata *ndp;
+	struct nameidata *ndp __diagused;
 	struct componentname *cnp;
 	enum vgetstate dvs;
 	struct vnode *dvp, *tvp;
@@ -4539,15 +4636,8 @@ cache_fplookup_final_modifying(struct cache_fpl *fpl)
 	}
 
 	fpl->tvp = tvp;
-	fpl->savename = (cnp->cn_flags & SAVENAME) != 0;
 
 	if (tvp == NULL) {
-		if ((cnp->cn_flags & SAVESTART) != 0) {
-			ndp->ni_startdir = dvp;
-			vrefact(ndp->ni_startdir);
-			cnp->cn_flags |= SAVENAME;
-			fpl->savename = true;
-		}
 		MPASS(error == EJUSTRETURN);
 		if ((cnp->cn_flags & LOCKPARENT) == 0) {
 			VOP_UNLOCK(dvp);
@@ -4602,13 +4692,6 @@ cache_fplookup_final_modifying(struct cache_fpl *fpl)
 
 	if ((cnp->cn_flags & LOCKPARENT) == 0) {
 		VOP_UNLOCK(dvp);
-	}
-
-	if ((cnp->cn_flags & SAVESTART) != 0) {
-		ndp->ni_startdir = dvp;
-		vrefact(ndp->ni_startdir);
-		cnp->cn_flags |= SAVENAME;
-		fpl->savename = true;
 	}
 
 	return (cache_fpl_handled(fpl));
@@ -4765,8 +4848,6 @@ cache_fplookup_degenerate(struct cache_fpl *fpl)
 		return (cache_fpl_handled_error(fpl, EISDIR));
 	}
 
-	MPASS((cnp->cn_flags & SAVESTART) == 0);
-
 	if ((cnp->cn_flags & (LOCKPARENT|WANTPARENT)) != 0) {
 		return (cache_fplookup_final_withparent(fpl));
 	}
@@ -4887,8 +4968,6 @@ cache_fplookup_noentry(struct cache_fpl *fpl)
 		return (cache_fplookup_modifying(fpl));
 	}
 
-	MPASS((cnp->cn_flags & SAVESTART) == 0);
-
 	/*
 	 * Only try to fill in the component if it is the last one,
 	 * otherwise not only there may be several to handle but the
@@ -4953,9 +5032,6 @@ cache_fplookup_noentry(struct cache_fpl *fpl)
 	}
 
 	fpl->tvp = tvp;
-	if (!fpl->savename) {
-		MPASS((cnp->cn_flags & SAVENAME) == 0);
-	}
 
 	if (tvp == NULL) {
 		MPASS(error == EJUSTRETURN);
@@ -4999,6 +5075,12 @@ cache_fplookup_dot(struct cache_fpl *fpl)
 	int error;
 
 	MPASS(!seqc_in_modify(fpl->dvp_seqc));
+
+	if (__predict_false(fpl->dvp->v_type != VDIR)) {
+		cache_fpl_smr_exit(fpl);
+		return (cache_fpl_handled_error(fpl, ENOTDIR));
+	}
+
 	/*
 	 * Just re-assign the value. seqc will be checked later for the first
 	 * non-dot path component in line and/or before deciding to return the
@@ -5059,6 +5141,11 @@ cache_fplookup_dotdot(struct cache_fpl *fpl)
 		 * The opposite of climb mount is needed here.
 		 */
 		return (cache_fpl_partial(fpl));
+	}
+
+	if (__predict_false(dvp->v_type != VDIR)) {
+		cache_fpl_smr_exit(fpl);
+		return (cache_fpl_handled_error(fpl, ENOTDIR));
 	}
 
 	ncp = atomic_load_consume_ptr(&dvp->v_cache_dd);
@@ -5362,7 +5449,7 @@ cache_fplookup_climb_mount(struct cache_fpl *fpl)
 	vp = fpl->tvp;
 	vp_seqc = fpl->tvp_seqc;
 
-	VNPASS(vp->v_type == VDIR || vp->v_type == VBAD, vp);
+	VNPASS(vp->v_type == VDIR || vp->v_type == VREG || vp->v_type == VBAD, vp);
 	mp = atomic_load_ptr(&vp->v_mountedhere);
 	if (__predict_false(mp == NULL)) {
 		return (0);
@@ -5419,7 +5506,7 @@ cache_fplookup_cross_mount(struct cache_fpl *fpl)
 	vp = fpl->tvp;
 	vp_seqc = fpl->tvp_seqc;
 
-	VNPASS(vp->v_type == VDIR || vp->v_type == VBAD, vp);
+	VNPASS(vp->v_type == VDIR || vp->v_type == VREG || vp->v_type == VBAD, vp);
 	mp = atomic_load_ptr(&vp->v_mountedhere);
 	if (__predict_false(mp == NULL)) {
 		return (0);
@@ -6070,9 +6157,6 @@ cache_fplookup(struct nameidata *ndp, enum cache_fpl_status *status,
 	KASSERT ((cnp->cn_flags & CACHE_FPL_INTERNAL_CN_FLAGS) == 0,
 	    ("%s: internal flags found in cn_flags %" PRIx64, __func__,
 	    cnp->cn_flags));
-	if ((cnp->cn_flags & SAVESTART) != 0) {
-		MPASS(cnp->cn_nameiop != LOOKUP);
-	}
 	MPASS(cnp->cn_nameptr == cnp->cn_pnbuf);
 
 	if (__predict_false(!cache_can_fplookup(&fpl))) {
@@ -6089,7 +6173,6 @@ cache_fplookup(struct nameidata *ndp, enum cache_fpl_status *status,
 #endif
 	fpl.nulchar = &cnp->cn_nameptr[ndp->ni_pathlen - 1];
 	fpl.fsearch = false;
-	fpl.savename = (cnp->cn_flags & SAVENAME) != 0;
 	fpl.tvp = NULL; /* for degenerate path handling */
 	fpl.pwd = pwdp;
 	pwd = pwd_get_smr();
@@ -6128,23 +6211,18 @@ out:
 	if (__predict_true(fpl.status == CACHE_FPL_STATUS_HANDLED)) {
 		MPASS(error != CACHE_FPL_FAILED);
 		if (error != 0) {
+			cache_fpl_cleanup_cnp(fpl.cnp);
 			MPASS(fpl.dvp == NULL);
 			MPASS(fpl.tvp == NULL);
-			MPASS(fpl.savename == false);
 		}
 		ndp->ni_dvp = fpl.dvp;
 		ndp->ni_vp = fpl.tvp;
-		if (fpl.savename) {
-			cnp->cn_flags |= HASBUF;
-		} else {
-			cache_fpl_cleanup_cnp(cnp);
-		}
 	}
 	return (error);
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200708,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

@@ -1450,9 +1450,11 @@ int
 sys_kldsym(struct thread *td, struct kldsym_args *uap)
 {
 	struct kld_sym_lookup lookup;
+	struct kld_sym_lookup * __capability user_lookup;
 	int error;
 
-	error = copyincap(uap->data, &lookup, sizeof(lookup));
+	user_lookup = uap->data;
+	error = copyincap(user_lookup, &lookup, sizeof(lookup));
 	if (error != 0)
 		return (error);
 	if (lookup.version != sizeof(lookup) ||
@@ -1462,9 +1464,9 @@ sys_kldsym(struct thread *td, struct kldsym_args *uap)
 	    lookup.symname, &lookup.symvalue, &lookup.symsize);
 	if (error != 0)
 		return (error);
-	error = copyout(&lookup.symvalue, (char * __capability)uap->data +
-	    offsetof(struct kld_sym_lookup, symvalue), sizeof(lookup) -
-	    offsetof(struct kld_sym_lookup, symvalue));
+	error = suword(&user_lookup->symvalue, lookup.symvalue);
+	if (error == 0)
+		error = suword(&user_lookup->symsize, lookup.symsize);
 
 	return (error);
 }
@@ -1980,7 +1982,7 @@ linker_hints_lookup(const char *path, int pathlen, const char *modname,
 		goto bad;
 	}
 	hints = malloc(vattr.va_size, M_TEMP, M_WAITOK);
-	error = vn_rdwr(UIO_READ, nd.ni_vp, (caddr_t)hints, vattr.va_size, 0,
+	error = vn_rdwr(UIO_READ, nd.ni_vp, PTR2CAP(hints), vattr.va_size, 0,
 	    UIO_SYSSPACE, IO_NODELOCKED, cred, NOCRED, &reclen, td);
 	if (error)
 		goto bad;
@@ -2384,7 +2386,7 @@ SYSCTL_PROC(_kern, OID_AUTO, function_list,
     "kernel function list");
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

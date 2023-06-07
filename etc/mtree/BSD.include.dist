@@ -31,11 +31,17 @@
             ..
             __coroutine
             ..
+            __debug_utils
+            ..
             __filesystem
             ..
             __format
             ..
             __functional
+            ..
+            __fwd
+            ..
+            __ios
             ..
             __iterator
             ..
@@ -47,7 +53,12 @@
             ..
             __ranges
             ..
+# XXX: Re-enable for CHERI LLVM 15
+#            __string
+#            ..
             __thread
+            ..
+            __type_traits
             ..
             __utility
             ..
@@ -141,6 +152,8 @@
         veriexec
         ..
         vkbd
+        ..
+        wg
         ..
         wi
         ..
@@ -275,17 +288,11 @@
     ..
     netinet6
     ..
-    netipsec
+    netlink
+        route
+        ..
     ..
-    netnatm
-        api
-        ..
-        msg
-        ..
-        saal
-        ..
-        sig
-        ..
+    netipsec
     ..
     netpfil
         pf

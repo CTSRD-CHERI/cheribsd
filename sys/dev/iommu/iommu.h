@@ -109,6 +109,7 @@ struct iommu_domain {
 	struct iommu_map_entries_tailq unload_entries; /* (d) Entries to
 							 unload */
 	struct iommu_gas_entries_tree rb_root; /* (d) */
+	struct iommu_map_entry *start_gap;     /* (d) */
 	iommu_gaddr_t end;		/* (c) Highest address + 1 in
 					   the guest AS */
 	struct iommu_map_entry *first_place, *last_place; /* (d) */
@@ -169,15 +170,14 @@ void iommu_gas_init_domain(struct iommu_domain *domain);
 void iommu_gas_fini_domain(struct iommu_domain *domain);
 struct iommu_map_entry *iommu_gas_alloc_entry(struct iommu_domain *domain,
     u_int flags);
-void iommu_gas_free_entry(struct iommu_domain *domain,
-    struct iommu_map_entry *entry);
-void iommu_gas_free_space(struct iommu_domain *domain,
-    struct iommu_map_entry *entry);
+void iommu_gas_free_entry(struct iommu_map_entry *entry);
+void iommu_gas_free_space(struct iommu_map_entry *entry);
+void iommu_gas_remove(struct iommu_domain *domain, iommu_gaddr_t start,
+    iommu_gaddr_t size);
 int iommu_gas_map(struct iommu_domain *domain,
     const struct bus_dma_tag_common *common, iommu_gaddr_t size, int offset,
     u_int eflags, u_int flags, vm_page_t *ma, struct iommu_map_entry **res);
-void iommu_gas_free_region(struct iommu_domain *domain,
-    struct iommu_map_entry *entry);
+void iommu_gas_free_region(struct iommu_map_entry *entry);
 int iommu_gas_map_region(struct iommu_domain *domain,
     struct iommu_map_entry *entry, u_int eflags, u_int flags, vm_page_t *ma);
 int iommu_gas_reserve_region(struct iommu_domain *domain, iommu_gaddr_t start,

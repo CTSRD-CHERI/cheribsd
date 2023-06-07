@@ -15,13 +15,18 @@ description: |
 
 properties:
   compatible:
-    const: realtek,rt1015p
+    enum:
+      - realtek,rt1015p
+      - realtek,rt1019p
 
   sdb-gpios:
     description:
       GPIO used for shutdown control.
       0 means shut down; 1 means power on.
     maxItems: 1
+
+  "#sound-dai-cells":
+    const: 0
 
 required:
   - compatible

@@ -592,7 +592,7 @@ DECLARE_CLASS(xhci_pci_driver);
 #endif					/* _XHCI_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20210404,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "subobject_bounds"

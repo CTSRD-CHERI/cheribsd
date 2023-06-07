@@ -428,7 +428,7 @@ END(copyuser)
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20200804,
+ *   "updated": 20221205,
  *   "target_type": "kernel",
  *   "changes_purecap": [
  *     "support"

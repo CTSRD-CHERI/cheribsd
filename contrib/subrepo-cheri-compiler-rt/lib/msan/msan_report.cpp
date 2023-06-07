@@ -122,17 +122,17 @@ void ReportStats() {
   ScopedErrorReportLock l;
 
   if (__msan_get_track_origins() > 0) {
-    StackDepotStats *stack_depot_stats = StackDepotGetStats();
+    StackDepotStats stack_depot_stats = StackDepotGetStats();
     // FIXME: we want this at normal exit, too!
     // FIXME: but only with verbosity=1 or something
-    Printf("Unique heap origins: %zu\n", stack_depot_stats->n_uniq_ids);
-    Printf("Stack depot allocated bytes: %zu\n", stack_depot_stats->allocated);
+    Printf("Unique heap origins: %zu\n", stack_depot_stats.n_uniq_ids);
+    Printf("Stack depot allocated bytes: %zu\n", stack_depot_stats.allocated);
 
-    StackDepotStats *chained_origin_depot_stats = ChainedOriginDepotGetStats();
+    StackDepotStats chained_origin_depot_stats = ChainedOriginDepotGetStats();
     Printf("Unique origin histories: %zu\n",
-           chained_origin_depot_stats->n_uniq_ids);
+           chained_origin_depot_stats.n_uniq_ids);
     Printf("History depot allocated bytes: %zu\n",
-           chained_origin_depot_stats->allocated);
+           chained_origin_depot_stats.allocated);
   }
 }
 
@@ -180,7 +180,7 @@ class OriginSet {
   int next_id_;
 };
 
-void DescribeMemoryRange(const void *x, usize size) {
+void DescribeMemoryRange(const void *x, uptr size) {
   // Real limits.
   uptr start = MEM_TO_SHADOW(x);
   uptr end = start + size;
@@ -201,13 +201,18 @@ void DescribeMemoryRange(const void *x, usize size) {
 
   Decorator d;
   Printf("%s", d.Warning());
-  Printf("Shadow map of [%p, %p), %zu bytes:\n", start, end, end - start);
+  uptr start_x = reinterpret_cast<uptr>(x);
+  Printf("Shadow map [%p, %p) of [%p, %p), %zu bytes:\n",
+         reinterpret_cast<void *>(start), reinterpret_cast<void *>(end),
+         reinterpret_cast<void *>(start_x),
+         reinterpret_cast<void *>(start_x + end - start), end - start);
   Printf("%s", d.Default());
   while (s < e) {
     // Line start.
     if (pos % 16 == 0) {
       for (int i = 0; i < 4; ++i) origin_ids[i] = -1;
-      Printf("%p:", s);
+      Printf("%p[%p]:", reinterpret_cast<void *>(s),
+             reinterpret_cast<void *>(start_x - start + s));
     }
     // Group start.
     if (pos % 4 == 0) {
@@ -258,7 +263,7 @@ void DescribeMemoryRange(const void *x, usize size) {
   }
 }
 
-void ReportUMRInsideAddressRange(const char *what, const void *start, usize size,
+void ReportUMRInsideAddressRange(const char *what, const void *start, uptr size,
                                  uptr offset) {
   Decorator d;
   Printf("%s", d.Warning());

@@ -13,6 +13,9 @@
 // concept common_reference_with;
 
 #include <concepts>
+#include <type_traits>
+
+#include "test_macros.h"
 
 template <class T, class U>
 constexpr bool CheckCommonReferenceWith() noexcept {
@@ -51,7 +54,7 @@ static_assert(std::common_reference_with<void, void>);
 static_assert(CheckCommonReferenceWith<int, int>());
 static_assert(CheckCommonReferenceWith<int, long>());
 static_assert(CheckCommonReferenceWith<int, unsigned char>());
-#ifndef _LIBCPP_HAS_NO_INT128
+#ifndef TEST_HAS_NO_INT128
 static_assert(CheckCommonReferenceWith<int, __int128_t>());
 #endif
 static_assert(CheckCommonReferenceWith<int, double>());

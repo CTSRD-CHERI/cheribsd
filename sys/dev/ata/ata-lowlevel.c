@@ -990,11 +990,12 @@ ata_pio_write(struct ata_request *request, int length)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",
-//     "pointer_alignment"
+//     "pointer_alignment",
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

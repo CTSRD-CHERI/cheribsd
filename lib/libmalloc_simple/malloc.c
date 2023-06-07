@@ -45,12 +45,21 @@ static char *rcsid = "$FreeBSD$";
  */
 
 #include <sys/param.h>
+#ifdef CAPREVOKE
+#include <cheri/revoke.h>
+#include <sys/stdatomic.h>
+#endif
 #include <sys/types.h>
+#include <sys/queue.h>
 
+#ifdef CAPREVOKE
+#include <cheri/libcaprevoke.h>
+#endif
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
 #include <assert.h>
+#include <errno.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -71,7 +80,6 @@ static char *rcsid = "$FreeBSD$";
 #define	error_printf(...)	fprintf(stderr, __VA_ARGS__)
 #endif
 
-union overhead;
 static void morecore(int);
 
 /*
@@ -79,28 +87,43 @@ static void morecore(int);
  * contains a pointer to the next free block. When in use, the first
  * byte is set to MAGIC, and the second byte is the size index.
  */
-union	overhead {
-	union	overhead *ov_next;	/* when free */
-	struct {
-		u_char	ovu_magic;	/* magic number */
-		u_char	ovu_index;	/* bucket # */
-	} ovu;
+struct overhead {
+	union {
+		SLIST_ENTRY(overhead) ov_next;	/* when free */
+		void	*ov_real_allocation;	/* when realigned */
+		struct {
+			u_char	ovu_magic;	/* magic number */
+			u_char	ovu_index;	/* bucket # */
+		} ovu;
+	};
 #define	ov_magic	ovu.ovu_magic
 #define	ov_index	ovu.ovu_index
 };
+SLIST_HEAD(ov_listhead, overhead);
 
-#define	MALLOC_ALIGNMENT	sizeof(union overhead)
+#define	MALLOC_ALIGNMENT	sizeof(struct overhead)
 
 #define	MAGIC		0xef		/* magic # on accounting info */
 
 /*
- * nextf[i] is the pointer to the next free block of size
+ * nextf[i] is the head of the list of the next free block of size
  * (FIRST_BUCKET_SIZE << i).  The overhead information precedes the
  * data area returned to the user.
  */
-#define	FIRST_BUCKET_SIZE	32
+#define	FIRST_BUCKET_SHIFT	5
+#define	FIRST_BUCKET_SIZE	(1 << FIRST_BUCKET_SHIFT)
 #define	NBUCKETS 30
-static	union overhead *nextf[NBUCKETS];
+static struct ov_listhead nextf[NBUCKETS];
+
+#ifdef CAPREVOKE
+#define	MAX_QUARANTINE	(1024 * 1024)
+#define	MAX_PAINTED	(4 * MAX_QUARANTINE)
+static struct ov_listhead quarantine_bufs[NBUCKETS];
+static struct ov_listhead painted_bufs[NBUCKETS];
+static	size_t quarantine_size, painted_size;
+static	volatile const struct cheri_revoke_info *cri;
+static	cheri_revoke_epoch_t painted_epoch;
+#endif
 
 static	size_t pagesz;			/* page size */
 
@@ -131,10 +154,115 @@ bound_ptr(void *mem, size_t nbytes)
 	return (ptr);
 }
 
+#ifdef CAPREVOKE
+static void
+free_painted(void)
+{
+	int bucket;
+	struct overhead *op;
+
+	for (bucket = 0; bucket < NBUCKETS; bucket++) {
+		SLIST_FOREACH(op, &painted_bufs[bucket], ov_next)
+			__clear_shadow(op, FIRST_BUCKET_SIZE << bucket);
+	}
+
+	/* XXX: how do we know that no thread is revoking? */
+	atomic_thread_fence(memory_order_acq_rel);
+
+	while (!SLIST_EMPTY(&painted_bufs[bucket])) {
+		op = SLIST_FIRST(&painted_bufs[bucket]);
+		SLIST_REMOVE_HEAD(&painted_bufs[bucket], ov_next);
+		SLIST_INSERT_HEAD(&nextf[bucket], op, ov_next);
+	}
+	painted_size = 0;
+}
+
+static void
+try_revoke(int target_bucket)
+{
+	int bucket, error;
+	struct overhead *op;
+
+	/* See if prior painting has resulted in revoked pointers. */
+	/*
+	 * NB: despite the NULL check below, cri is always non-NULL if
+	 * used here.  We defer initilization as long as possible to
+	 * avoid the extra syscall in the common case.
+	 */
+	if (painted_size > 0 &&
+	    cheri_revoke_epoch_clears(cri->epochs.dequeue, painted_epoch))
+		free_painted();
+
+	if (quarantine_size < MAX_QUARANTINE && painted_size < MAX_PAINTED)
+		return;
+
+	if (cri == NULL) {
+		error = cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT,
+		    NULL, __DECONST(void **, &cri));
+
+		if (error == ENOSYS) {
+			assert(cri == NULL);
+			/*
+			 * Revocation is not supported; this is the baseline.
+			 * Just pretend like it succeeded and transfer all the
+			 * quarantined buffers to the free buffers.
+			 */
+
+			for (bucket = 0; bucket < NBUCKETS; bucket++) {
+				while (!SLIST_EMPTY(&quarantine_bufs[bucket])) {
+					op = SLIST_FIRST(
+					    &quarantine_bufs[bucket]);
+					SLIST_REMOVE_HEAD(
+					    &quarantine_bufs[bucket], ov_next);
+					SLIST_INSERT_HEAD(&nextf[bucket], op,
+					    ov_next);
+				}
+			}
+
+			return;
+		}
+		assert (error == 0);
+	}
+
+	/* Paint all buffers in quarantine */
+	for (bucket = 0; bucket < NBUCKETS; bucket++) {
+		while (!SLIST_EMPTY(&quarantine_bufs[bucket])) {
+			op = SLIST_FIRST(&quarantine_bufs[bucket]);
+			SLIST_REMOVE_HEAD(&quarantine_bufs[bucket], ov_next);
+			__paint_shadow(op, FIRST_BUCKET_SIZE << bucket);
+			SLIST_INSERT_HEAD(&painted_bufs[bucket], op, ov_next);
+		}
+	}
+	painted_size += quarantine_size;
+	quarantine_size = 0;
+	atomic_thread_fence(memory_order_acq_rel);
+	painted_epoch = cri->epochs.enqueue;
+
+	/*
+	 * Don't force revocation unless we've exceeded MAX_PAINTED and
+	 * it would return memory we actually want.  Otherwise, just
+	 * hope the base malloc does the job for us.
+	 */
+	if (painted_size < MAX_PAINTED ||
+	    SLIST_EMPTY(&painted_bufs[target_bucket]))
+		return;
+
+	while (!cheri_revoke_epoch_clears(cri->epochs.dequeue, painted_epoch)) {
+		error = cheri_revoke(CHERI_REVOKE_LAST_PASS, painted_epoch,
+		    NULL);
+		assert(error == 0);
+	}
+
+	free_painted();
+
+}
+#endif
+
 static void *
 __simple_malloc_unaligned(size_t nbytes)
 {
-	union overhead *op;
+	struct overhead *op;
+	struct ov_listhead *bucketp;
 	int bucket;
 	size_t amt;
 
@@ -162,32 +290,38 @@ __simple_malloc_unaligned(size_t nbytes)
 	}
 	if (bucket >= NBUCKETS)
 		return (NULL);
+	bucketp = &nextf[bucket];
 	/*
 	 * If nothing in hash bucket right now,
 	 * request more memory from the system.
 	 */
-	if ((op = nextf[bucket]) == NULL) {
+#ifdef CAPREVOKE
+	if (SLIST_EMPTY(bucketp))
+		try_revoke(bucket);
+#endif
+	if (SLIST_EMPTY(bucketp)) {
 		morecore(bucket);
-		if ((op = nextf[bucket]) == NULL)
+		if (SLIST_EMPTY(bucketp))
 			return (NULL);
 	}
 	/* remove from linked list */
-	nextf[bucket] = op->ov_next;
+	op = SLIST_FIRST(bucketp);
+	SLIST_REMOVE_HEAD(bucketp, ov_next);
 	/*
-	 * XXXQEMU: Set an ov_next capability to a NULL capability, clearing any
-	 * permissions.
+	 * XXXQEMU: Clear the overhead struct to remove any capability
+	 * permissions in ov_real_allocation.
 	 *
-	 * Based on a tag and permissions of ov_next, find_overhead() determines
-	 * if an allocation is aligned. The QEMU user mode for CheriABI doesn't
-	 * implement tagged memory and find_overhead() might incorrectly assume
-	 * the allocation is aligned because of a non-cleared tag. Having the
-	 * permissions cleared, find_overhead() behaves as expected under the
-	 * user mode.
+	 * Based on a tag and permissions of ov_real_allocation, find_overhead()
+	 * determines if an allocation is aligned. The QEMU user mode for
+	 * CheriABI doesn't implement tagged memory and find_overhead() might
+	 * incorrectly assume the allocation is aligned because of a
+	 * non-cleared tag. Having the permissions cleared, find_overhead()
+	 * behaves as expected under the user mode.
 	 *
 	 * This is a workaround and should be reverted once the user mode
 	 * implements tagged memory.
 	 */
-	op->ov_next = NULL;
+	memset(op, 0, sizeof(*op));
 	op->ov_magic = MAGIC;
 	op->ov_index = bucket;
 	return (op + 1);
@@ -197,17 +331,19 @@ static void *
 __simple_malloc_aligned(size_t nbytes, size_t align)
 {
 	ptraddr_t memshift;
-	void *mem, *res;
+	void *mem;
+	struct overhead *op;
+
 	if (align < sizeof(void *))
 		align = sizeof(void *);
 
-	mem = __simple_malloc_unaligned(nbytes + sizeof(void *) + align - 1);
-	memshift = roundup2((ptraddr_t)mem + sizeof(void *), align) -
+	mem = __simple_malloc_unaligned(nbytes + sizeof(*op) + align - 1);
+	memshift = roundup2((ptraddr_t)mem + sizeof(*op), align) -
 	    (ptraddr_t)mem;
 
-	res = (void *)((uintptr_t)mem + memshift);
-	*(void **)((uintptr_t)res - sizeof(void *)) = mem;
-	return (res);
+	op = (struct overhead *)((uintptr_t)mem + memshift);
+	(op - 1)->ov_real_allocation = mem;
+	return ((void *)op);
 }
 
 static void *
@@ -254,7 +390,7 @@ static void
 morecore(int bucket)
 {
 	char *buf;
-	union overhead *op;
+	struct overhead *op;
 	size_t sz;			/* size of desired block */
 	int amt;			/* amount to allocate */
 	int nblks;			/* how many blocks we get */
@@ -284,18 +420,17 @@ morecore(int bucket)
 	 * Add new memory allocated to that on
 	 * free list for this hash bucket.
 	 */
-	nextf[bucket] = op = (union overhead *)(void *)cheri_setbounds(buf, sz);
-	while (--nblks > 0) {
-		op->ov_next = (union overhead *)(void *)cheri_setbounds(buf + sz, sz);
+	for (; nblks > 0; nblks--) {
+		op = (struct overhead *)(void *)cheri_setbounds(buf, sz);
+		SLIST_INSERT_HEAD(&nextf[bucket], op, ov_next);
 		buf += sz;
-		op = op->ov_next;
 	}
 }
 
-static union overhead *
+static struct overhead *
 find_overhead(void * cp)
 {
-	union overhead *op;
+	struct overhead *op;
 
 	if (!cheri_gettag(cp))
 		return (NULL);
@@ -315,14 +450,14 @@ find_overhead(void * cp)
 	 *  - Be an internal allocator pointer (have the VMMAP permision).
 	 *  - Point somewhere before us and within the current pagepool.
 	 */
-	if (cheri_gettag(op->ov_next) &&
-	    (cheri_getperm(op->ov_next) & CHERI_PERM_SW_VMEM) != 0) {
+	if (cheri_gettag(op->ov_real_allocation) &&
+	    (cheri_getperm(op->ov_real_allocation) & CHERI_PERM_SW_VMEM) != 0) {
 		ptraddr_t base, pp_base;
 
 		pp_base = cheri_getbase(op);
-		base = cheri_getbase(op->ov_next);
+		base = cheri_getbase(op->ov_real_allocation);
 		if (base >= pp_base && base < cheri_getaddress(op)) {
-			op = op->ov_next;
+			op = op->ov_real_allocation;
 			op--;
 		}
 	}
@@ -346,7 +481,7 @@ static void
 __simple_free(void *cp)
 {
 	int bucket;
-	union overhead *op;
+	struct overhead *op;
 
 	if (cp == NULL)
 		return;
@@ -355,8 +490,12 @@ __simple_free(void *cp)
 		return;
 	bucket = op->ov_index;
 	ASSERT(bucket < NBUCKETS);
-	op->ov_next = nextf[bucket];	/* also clobbers ov_magic */
-	nextf[bucket] = op;
+#ifdef CAPREVOKE
+	SLIST_INSERT_HEAD(&quarantine_bufs[bucket], op, ov_next);
+	quarantine_size += FIRST_BUCKET_SIZE << bucket;
+#else
+	SLIST_INSERT_HEAD(&nextf[bucket], op, ov_next);
+#endif
 }
 
 static void *
@@ -364,7 +503,7 @@ __simple_realloc(void *cp, size_t nbytes)
 {
 	size_t cur_space;	/* Space in the current bucket */
 	size_t smaller_space;	/* Space in the next smaller bucket */
-	union overhead *op;
+	struct overhead *op;
 	char *res;
 
 #ifdef __CHERI_PURE_CAPABILITY__

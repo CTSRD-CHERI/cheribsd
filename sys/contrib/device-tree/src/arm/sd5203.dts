@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2020 Hisilicon Limited.
+ * Copyright (c) 2020 HiSilicon Limited.
  *
  * DTS file for Hisilicon SD5203 Board
  */
@@ -15,7 +15,7 @@
 	#size-cells = <1>;
 
 	chosen {
-		bootargs="console=ttyS0,9600 earlycon=uart8250,mmio32,0x1600d000";
+		bootargs = "console=ttyS0,9600 earlycon=uart8250,mmio32,0x1600d000";
 	};
 
 	aliases {

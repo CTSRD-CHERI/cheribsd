@@ -1,11 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Device Tree Source for OMAP2420 SoC
  *
  * Copyright (C) 2012 Texas Instruments Incorporated - https://www.ti.com/
- *
- * This file is licensed under the terms of the GNU General Public License
- * version 2.  This program is licensed "as is" without any warranty of any
- * kind, whether express or implied.
  */
 
 #include "omap2.dtsi"
@@ -192,16 +189,15 @@
 			compatible = "ti,omap2-mailbox";
 			reg = <0x48094000 0x200>;
 			interrupts = <26>, <34>;
-			interrupt-names = "dsp", "iva";
 			ti,hwmods = "mailbox";
 			#mbox-cells = <1>;
 			ti,mbox-num-users = <4>;
 			ti,mbox-num-fifos = <6>;
-			mbox_dsp: dsp {
+			mbox_dsp: mbox-dsp {
 				ti,mbox-tx = <0 0 0>;
 				ti,mbox-rx = <1 0 0>;
 			};
-			mbox_iva: iva {
+			mbox_iva: mbox-iva {
 				ti,mbox-tx = <2 1 3>;
 				ti,mbox-rx = <3 1 3>;
 			};

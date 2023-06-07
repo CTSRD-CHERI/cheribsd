@@ -95,6 +95,8 @@ __ElfType(Auxinfo);
 
 #define	ELF_IS_CHERI(hdr) (((hdr)->e_flags & EF_AARCH64_CHERI_PURECAP) != 0)
 
+#define	PT_MEMTAG_CHERI	PT_AARCH64_MEMTAG_CHERI
+
 /* Define "machine" characteristics */
 #if __ELF_WORD_SIZE == 64
 #define	ELF_TARG_CLASS	ELFCLASS64
@@ -109,7 +111,7 @@ __ElfType(Auxinfo);
 #endif
 
 #if __ELF_WORD_SIZE == 32
-#define	ET_DYN_LOAD_ADDR 0x12000
+#define	ET_DYN_LOAD_ADDR 0x01001000
 #else
 #define	ET_DYN_LOAD_ADDR 0x100000
 #endif

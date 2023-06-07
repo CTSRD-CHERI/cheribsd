@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd November 28, 2021
+.Dd August 19, 2022
 .Dt BHYVE 8
 .Os
 .Sh NAME
@@ -200,7 +200,9 @@ and
 .Cm com4 ,
 the boot ROM device
 .Cm bootrom ,
-and the debug/test device
+the
+.Cm fwcfg
+type and the debug/test device
 .Cm pc-testdev .
 .Pp
 The possible values for the
@@ -345,7 +347,7 @@ PCI 16550 serial device.
 .It Cm lpc
 LPC PCI-ISA bridge with COM1, COM2, COM3, and COM4 16550 serial ports,
 a boot ROM, and,
-optionally, the debug/test device.
+optionally, a fwcfg type and the debug/test device.
 The LPC bridge emulation can only be configured on bus 0.
 .It Cm fbuf
 Raw framebuffer device attached to VNC server.
@@ -390,6 +392,7 @@ Network device backends:
 .Xc
 .El
 .Sm on
+.Pp
 If
 .Cm mac
 is not specified, the MAC address is derived from a fixed OUI and the
@@ -519,15 +522,56 @@ address space, and any modifications the guest makes will be saved
 to that file.
 .El
 .Pp
-Pass-through device backends:
+Fwcfg types:
 .Bl -tag -width 10n
-.It Ns Ar slot Ns Cm \&/ Ns Ar bus Ns Cm \&/ Ns Ar function
-Connect to a PCI device on the host at the selector described by
+.It Ar fwcfg
+The fwcfg interface is used to pass information such as the CPU count or ACPI tables to the guest firmware.
+Supported values are
+.Ql bhyve
+and
+.Ql qemu .
+Due to backward compatibility reasons,
+.Ql bhyve
+is the default option.
+When
+.Ql bhyve
+is used, bhyve's fwctl interface is used.
+It currently reports only the CPU count to the guest firmware.
+The
+.Ql qemu
+option uses QEMU's fwcfg interface.
+This interface is widely used and allows user-defined information to be passed to the guest.
+It is used for passing the CPU count, ACPI tables, a boot order and many other things to the guest.
+Some operating systems such as Fedora CoreOS can be configured by qemu's fwcfg interface as well.
+.El
+.Pp
+Pass-through device backends:
+.Sm off
+.Bl -bullet
+.It
+.Cm ppt Ar N Oo , Ar passthru-device-options Oc
+.It
+.Ns Ar bus Cm \&/ Ar slot Cm \&/ Ar function
+.Op , Ar passthru-device-options
+.It
+.Cm pci Ar bus Cm : Ar slot Cm : Ns Ar function
+.Op , Ar passthru-device-options
+.El
+.Sm on
+.Pp
+Connect to a PCI device on the host either named ppt
+.Ns Ar N
+or at the selector described by
 .Ar slot ,
 .Ar bus ,
 and
 .Ar function
 numbers.
+.Pp
+The
+.Ar passthru-device-options
+are:
+.Bl -tag -width 10n
 .It Cm rom= Ns Ar romfile
 Add
 .Ar romfile

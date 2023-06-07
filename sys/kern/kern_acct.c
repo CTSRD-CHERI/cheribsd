@@ -435,7 +435,7 @@ acct_process(struct thread *td)
 	/*
 	 * Write the accounting information to the file.
 	 */
-	ret = vn_rdwr(UIO_WRITE, acct_vp, (caddr_t)&acct, sizeof (acct),
+	ret = vn_rdwr(UIO_WRITE, acct_vp, PTR2CAP(&acct), sizeof (acct),
 	    (off_t)0, UIO_SYSSPACE, IO_APPEND|IO_UNIT, acct_cred, NOCRED,
 	    NULL, td);
 	sx_sunlock(&acct_sx);
@@ -652,7 +652,7 @@ acct_thread(void *dummy)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

@@ -13,6 +13,10 @@
 # make sure this is defined in a consistent manner
 SRCTOP:= ${.PARSEDIR:tA:H:H}
 
+# ZFS source directory
+# XXX: This might belong somewhere a little less central...
+ZFSTOP=${SRCTOP}/sys/contrib/subrepo-openzfs
+
 .if ${.CURDIR} == ${SRCTOP}
 RELDIR= .
 RELTOP= .
@@ -41,6 +45,8 @@ _saveMAKEOBJDIRPREFIX:=	${MAKEOBJDIRPREFIX}
 _undefMAKEOBJDIRPREFIX=	t
 .endif
 .endif
+
+.-include <site.src.sys.env.mk>
 
 SRC_ENV_CONF?= /etc/src-env.conf
 .if !empty(SRC_ENV_CONF) && !target(_src_env_conf_included_)
@@ -89,6 +95,6 @@ MAKESYSPATH:=	${.PARSEDIR:tA}
 .endif
 
 .if ${RELDIR:U} == "." && ${.MAKE.LEVEL} == 0
-.sinclude "${.CURDIR}/Makefile.sys.inc"
+.-include "${.CURDIR}/Makefile.sys.inc"
 .endif
 .include <src.sys.obj.mk>

@@ -11,6 +11,10 @@
 	model = "Radxa Rock";
 	compatible = "radxa,rock", "rockchip,rk3188";
 
+	aliases {
+		mmc0 = &mmc0;
+	};
+
 	memory@60000000 {
 		device_type = "memory";
 		reg = <0x60000000 0x80000000>;
@@ -20,7 +24,7 @@
 		compatible = "gpio-keys";
 		autorepeat;
 
-		power {
+		key-power {
 			gpios = <&gpio0 RK_PA4 GPIO_ACTIVE_LOW>;
 			linux,code = <KEY_POWER>;
 			label = "GPIO Key Power";

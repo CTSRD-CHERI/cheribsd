@@ -57,12 +57,19 @@
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/mman.h>
+#include <sys/queue.h>
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
 #endif
+#ifdef CAPREVOKE
+#include <cheri/revoke.h>
+#include <sys/stdatomic.h>
+#include <cheri/libcaprevoke.h>
+#endif
 
 #include <assert.h>
+#include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -82,7 +89,6 @@
 static spinlock_t tls_malloc_lock = _SPINLOCK_INITIALIZER;
 #define	TLS_MALLOC_LOCK		if (__isthreaded) _SPINLOCK(&tls_malloc_lock)
 #define	TLS_MALLOC_UNLOCK	if (__isthreaded) _SPINUNLOCK(&tls_malloc_lock)
-union overhead;
 static void morecore(int);
 static void *__tls_malloc_aligned(size_t size, size_t align);
 
@@ -91,72 +97,78 @@ static void *__tls_malloc_aligned(size_t size, size_t align);
  * contains a pointer to the next free block. When in use, the first
  * byte is set to MAGIC, and the second byte is the size index.
  */
-union	overhead {
-	union	overhead *ov_next;	/* when free */
-	struct {
-		u_char	ovu_magic;	/* magic number */
-		u_char	ovu_index;	/* bucket # */
-	} ovu;
+struct overhead {
+	union {
+		SLIST_ENTRY(overhead) ov_next;	/* when free */
+		struct overhead *ov_real_allocation;	/* when realigned */
+		struct {
+			u_char	ovu_magic;	/* magic number */
+			u_char	ovu_index;	/* bucket # */
+		} ovu;
+	};
 #define	ov_magic	ovu.ovu_magic
 #define	ov_index	ovu.ovu_index
 };
+SLIST_HEAD(ov_listhead, overhead);
 
-#define	MALLOC_ALIGNMENT	sizeof(union overhead)
+struct pagepool_header {
+	size_t			 ph_size;
+#ifdef __CHERI_PURE_CAPABILITY__
+	size_t			 ph_pad1;
+#endif
+	SLIST_ENTRY(pagepool_header) ph_next;
+#ifdef CAPREVOKE
+	void			*ph_shadow;
+	void			*ph_pad2; /* align to 4 * sizeof(void *) */
+#endif
+};
+
+#define	MALLOC_ALIGNMENT	sizeof(struct overhead)
 
 #define	MAGIC		0xef		/* magic # on accounting info */
 
 /*
- * nextf[i] is the pointer to the next free block of size
+ * nextf[i] is the head of the list of the next free block of size
  * (FIRST_BUCKET_SIZE << i).  The overhead information precedes the
  * data area returned to the user.
  */
-#define	FIRST_BUCKET_SIZE	32
+#define	FIRST_BUCKET_SHIFT	5
+#define	FIRST_BUCKET_SIZE	(1 << FIRST_BUCKET_SHIFT)
 #define	NBUCKETS 30
-static	union overhead *nextf[NBUCKETS];
+static struct ov_listhead nextf[NBUCKETS];
+
+#ifdef CAPREVOKE
+#define	MAX_QUARANTINE	(1024 * 1024)
+static struct ov_listhead quarantine_bufs[NBUCKETS];
+static size_t quarantine_size;
+#endif
 
 static const size_t pagesz = PAGE_SIZE;			/* page size */
 
 #define	NPOOLPAGES	(32*1024/pagesz)
 
 static caddr_t	pagepool_start, pagepool_end;
-static size_t	n_pagepools, max_pagepools;
-static char	**pagepool_list;
+static SLIST_HEAD(, pagepool_header) curpp = SLIST_HEAD_INITIALIZER(curpp);
 
-static void
-__morepools(void)
-{
-	size_t osize, nsize;
-	char **new_pagepool_list;
+#ifdef CAPREVOKE
+volatile const struct cheri_revoke_info *cri;
 
-	osize = max_pagepools * sizeof(char *);
-	if (max_pagepools == 0)
-		max_pagepools = pagesz / (sizeof(char *) * 2);
-	max_pagepools *= 2;
-	nsize = max_pagepools * sizeof(char *);
-	if ((new_pagepool_list = mmap(0, nsize, PROT_READ|PROT_WRITE,
-	    MAP_ANON, -1, 0)) == MAP_FAILED)
-		abort();
-	memcpy(new_pagepool_list, pagepool_list, osize);
-	if (pagepool_list != NULL) {
-		if (munmap(pagepool_list, osize) != 0)
-			abort();
-	}
-	pagepool_list = new_pagepool_list;
-}
+static void paint_shadow(void *mem, size_t size);
+static void clear_shadow(void *mem, size_t size);
+static void do_revoke();
+#endif
 
 static int
 __morepages(int n)
 {
 	size_t	size;
+	struct pagepool_header *newpp;
 
 	n += NPOOLPAGES;	/* round up allocation. */
 	size = n * pagesz;
 #ifdef __CHERI_PURE_CAPABILITY__
 	size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
-
-	if (n_pagepools >= max_pagepools)
-		__morepools();
 
 	if (pagepool_end - pagepool_start > (ssize_t)pagesz) {
 		caddr_t extra_start = __builtin_align_up(pagepool_start,
@@ -181,12 +193,14 @@ __morepages(int n)
 #endif
 	}
 
-	if ((pagepool_start = mmap(0, size, PROT_READ|PROT_WRITE,
-	    MAP_ANON, -1, 0)) == MAP_FAILED)
+	if ((newpp = mmap(0, size, PROT_READ|PROT_WRITE, MAP_ANON, -1,
+	    0)) == MAP_FAILED)
 		return (0);
 
-	pagepool_end = pagepool_start + size;
-	pagepool_list[n_pagepools++] = pagepool_start;
+	newpp->ph_size = size;
+	SLIST_INSERT_HEAD(&curpp, newpp, ph_next);
+	pagepool_start = (char *)(newpp + 1);
+	pagepool_end = pagepool_start + (size - sizeof(*newpp));
 
 	return (size / pagesz);
 }
@@ -197,20 +211,16 @@ __rederive_pointer(void *ptr)
 #ifndef __CHERI_PURE_CAPABILITY__
 	return (ptr);
 #else
-	size_t i;
-	vm_offset_t addr;
+	struct pagepool_header *pp;
 
-	addr = cheri_getaddress(ptr);
 	TLS_MALLOC_LOCK;
-	for (i = 0; i < n_pagepools; i++) {
-		char *pool = pagepool_list[i];
-		if (cheri_is_address_inbounds(pool, addr)) {
+	SLIST_FOREACH(pp, &curpp, ph_next) {
+		if (cheri_is_address_inbounds(pp, cheri_getbase(ptr))) {
 			TLS_MALLOC_UNLOCK;
-			return (cheri_setaddress(pool, addr));
+			return (cheri_setaddress(pp, cheri_getaddress(ptr)));
 		}
 	}
 	TLS_MALLOC_UNLOCK;
-
 	return (NULL);
 #endif
 }
@@ -226,10 +236,71 @@ bound_ptr(void *mem, size_t nbytes)
 	return (ptr);
 }
 
+#ifdef CAPREVOKE
+static void
+try_revoke(int target_bucket)
+{
+	int bucket;
+	struct overhead *op;
+
+	/*
+	 * Don't revoke unless there is enough in quarantine and some of
+	 * it would be returned to the bucket we want to refill.
+	 */
+	if (quarantine_size < MAX_QUARANTINE ||
+	    SLIST_EMPTY(&quarantine_bufs[target_bucket]))
+		return;
+
+	if (cri == NULL) {
+		int error;
+
+		error = cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT,
+		    NULL, (void **)&cri);
+
+		if (error == ENOSYS) {
+			/*
+			 * Revocation is not supported; this is the baseline.
+			 * Just pretend like it worked.
+			 */
+			goto dequarantine;
+		}
+
+		assert(error == 0);
+	}
+
+
+	for (bucket = 0; bucket < NBUCKETS; bucket++) {
+		SLIST_FOREACH(op, &quarantine_bufs[bucket], ov_next)
+			paint_shadow(op, FIRST_BUCKET_SIZE << bucket);
+	}
+	atomic_thread_fence(memory_order_acq_rel);
+
+	do_revoke();
+
+	for (bucket = 0; bucket < NBUCKETS; bucket++) {
+		SLIST_FOREACH(op, &quarantine_bufs[bucket], ov_next)
+			clear_shadow(op, FIRST_BUCKET_SIZE << bucket);
+	}
+	atomic_thread_fence(memory_order_acq_rel);
+
+dequarantine:
+	for (bucket = 0; bucket < NBUCKETS; bucket++) {
+		while (!SLIST_EMPTY(&quarantine_bufs[bucket])) {
+			op = SLIST_FIRST(&quarantine_bufs[bucket]);
+			SLIST_REMOVE_HEAD(&quarantine_bufs[bucket], ov_next);
+			SLIST_INSERT_HEAD(&quarantine_bufs[bucket], op,
+			    ov_next);
+		}
+	}
+	quarantine_size = 0;
+}
+#endif
+
 static void *
 __tls_malloc(size_t nbytes)
 {
-	union overhead *op;
+	struct overhead *op;
+	struct ov_listhead *bucketp;
 	int bucket;
 	size_t amt;
 
@@ -248,36 +319,42 @@ __tls_malloc(size_t nbytes)
 	}
 	if (bucket >= NBUCKETS)
 		return (NULL);
+	bucketp = &nextf[bucket];
 	/*
 	 * If nothing in hash bucket right now,
 	 * request more memory from the system.
 	 */
 	TLS_MALLOC_LOCK;
-	if ((op = nextf[bucket]) == NULL) {
+#ifdef CAPREVOKE
+	if (SLIST_EMPTY(bucketp))
+		try_revoke(bucket);
+#endif
+	if (SLIST_EMPTY(bucketp)) {
 		morecore(bucket);
-		if ((op = nextf[bucket]) == NULL) {
+		if (SLIST_EMPTY(bucketp)) {
 			TLS_MALLOC_UNLOCK;
 			return (NULL);
 		}
 	}
 	/* remove from linked list */
-	nextf[bucket] = op->ov_next;
+	op = SLIST_FIRST(bucketp);
+	SLIST_REMOVE_HEAD(bucketp, ov_next);
 	TLS_MALLOC_UNLOCK;
 	/*
-	 * XXXQEMU: Set an ov_next capability to a NULL capability, clearing any
-	 * permissions.
+	 * XXXQEMU: Clear the overhead struct to remove any capability
+	 * permissions in ov_real_allocation.
 	 *
-	 * Based on a tag and permissions of ov_next, find_overhead() determines
-	 * if an allocation is aligned. The QEMU user mode for CheriABI doesn't
-	 * implement tagged memory and find_overhead() might incorrectly assume
-	 * the allocation is aligned because of a non-cleared tag. Having the
-	 * permissions cleared, find_overhead() behaves as expected under the
-	 * user mode.
+	 * Based on a tag and permissions of ov_real_allocation, find_overhead()
+	 * determines if an allocation is aligned. The QEMU user mode for
+	 * CheriABI doesn't implement tagged memory and find_overhead() might
+	 * incorrectly assume the allocation is aligned because of a
+	 * non-cleared tag. Having the permissions cleared, find_overhead()
+	 * behaves as expected under the user mode.
 	 *
 	 * This is a workaround and should be reverted once the user mode
 	 * implements tagged memory.
 	 */
-	op->ov_next = NULL;
+	memset(op, 0, sizeof(*op));
 	op->ov_magic = MAGIC;
 	op->ov_index = bucket;
 	return (op + 1);
@@ -325,7 +402,7 @@ static void
 morecore(int bucket)
 {
 	char *buf;
-	union overhead *op;
+	struct overhead *op;
 	size_t sz;			/* size of desired block */
 	int amt;			/* amount to allocate */
 	int nblks;			/* how many blocks we get */
@@ -350,18 +427,17 @@ morecore(int bucket)
 	 * Add new memory allocated to that on
 	 * free list for this hash bucket.
 	 */
-	nextf[bucket] = op = (union overhead *)(void *)cheri_setbounds(buf, sz);
-	while (--nblks > 0) {
-		op->ov_next = (union overhead *)(void *)cheri_setbounds(buf + sz, sz);
+	for (; nblks > 0; nblks--) {
+		op = (struct overhead *)(void *)cheri_setbounds(buf, sz);
+		SLIST_INSERT_HEAD(&nextf[bucket], op, ov_next);
 		buf += sz;
-		op = op->ov_next;
 	}
 }
 
-static union overhead *
+static struct overhead *
 find_overhead(void * cp)
 {
-	union overhead *op;
+	struct overhead *op;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (!cheri_gettag(cp))
@@ -381,14 +457,16 @@ find_overhead(void * cp)
 	 *  - Be an internal allocator pointer (have the VMMAP permision).
 	 *  - Point somewhere before us and within the current pagepool.
 	 */
-	if (cheri_gettag(op->ov_next) &&
-	    (cheri_getperm(op->ov_next) & CHERI_PERM_SW_VMEM) != 0) {
+	if (cheri_gettag(op->ov_real_allocation) &&
+	    (cheri_getperm(op->ov_real_allocation) & CHERI_PERM_SW_VMEM) != 0) {
 		ptraddr_t base, pp_base;
 
 		pp_base = cheri_getbase(op);
-		base = cheri_getbase(op->ov_next);
-		if (base >= pp_base && base < cheri_getaddress(op))
-			op = op->ov_next;
+		base = cheri_getbase(op->ov_real_allocation);
+		if (base >= pp_base && base < cheri_getaddress(op)) {
+			op = op->ov_real_allocation;
+			op--;
+		}
 	}
 #endif
 	if (op->ov_magic == MAGIC)
@@ -404,24 +482,54 @@ find_overhead(void * cp)
 	return (NULL);
 }
 
+#ifdef CAPREVOKE
 static void
-nextf_insert(void *mem, size_t size, int xbucket)
+paint_shadow(void *mem, size_t size)
 {
-	union overhead *op;
-	int bucket;
+	struct pagepool_header *pp;
 
-	bucket = __builtin_ctzl(size) - __builtin_ctzl(FIRST_BUCKET_SIZE);
-	if (bucket != xbucket) abort();
-	op = mem;
-	op->ov_next = nextf[bucket];
-	nextf[bucket] = op;
+	pp = cheri_setoffset(pp, 0);
+	/*
+	 * Defer initializing ph_shadow since odds are good we'll never
+	 * need it.
+	 */
+	if (pp->ph_shadow == NULL)
+		if (cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, pp,
+		    &pp->ph_shadow) != 0)
+			abort();
+	caprev_shadow_nomap_set_raw(cri->base_mem_nomap, pp->ph_shadow,
+	    (vaddr_t)mem, size);
 }
+
+static void
+clear_shadow(void *mem, size_t size)
+{
+	struct pagepool_header *pp;
+
+	pp = cheri_setoffset(pp, 0);
+	caprev_shadow_nomap_clear_raw(cri->base_mem_nomap, pp->ph_shadow,
+	    (vaddr_t)mem, size);
+}
+
+static void
+do_revoke(void)
+{
+	int error;
+
+	atomic_thread_fence(memory_order_acq_rel);
+	cheri_revoke_epoch_t start_epoch = cri->epochs.enqueue;
+	while (!cheri_revoke_epoch_clears(cri->epochs.dequeue, start_epoch)) {
+		error = cheri_revoke(CHERI_REVOKE_LAST_PASS, start_epoch, NULL);
+		assert(error == 0);
+	}
+}
+#endif /* CAPREVOKE */
 
 void
 tls_free(void *cp)
 {
 	int bucket;
-	union overhead *op;
+	struct overhead *op;
 
 	if (cp == NULL)
 		return;
@@ -430,9 +538,13 @@ tls_free(void *cp)
 		return;
 	TLS_MALLOC_LOCK;
 	bucket = op->ov_index;
-	if (bucket < NBUCKETS)
-		abort();
-	nextf_insert(op, FIRST_BUCKET_SIZE << bucket, bucket);
+	assert(bucket < NBUCKETS);
+#ifdef CAPREVOKE
+	SLIST_INSERT_HEAD(&quarantine_bufs[bucket], op, ov_next);
+	quarantine_size += FIRST_BUCKET_SIZE << bucket;
+#else
+	SLIST_INSERT_HEAD(&nextf[bucket], op, ov_next);
+#endif
 	TLS_MALLOC_UNLOCK;
 }
 
@@ -440,16 +552,17 @@ static void *
 __tls_malloc_aligned(size_t size, size_t align)
 {
 	ptraddr_t memshift;
-	void *mem, *res;
+	void *mem;
+	struct overhead *op;
 	if (align < sizeof(void *))
 		align = sizeof(void *);
 
-	mem = __tls_malloc(size + sizeof(void *) + align - 1);
-	memshift = roundup2((ptraddr_t)mem + sizeof(void *), align) -
+	mem = __tls_malloc(size + sizeof(*op) + align - 1);
+	memshift = roundup2((ptraddr_t)mem + sizeof(*op), align) -
 	    (ptraddr_t)mem;
-	res = (void *)((uintptr_t)mem + memshift);
-	*(void **)((uintptr_t)res - sizeof(void *)) = mem;
-	return (res);
+	op = (struct overhead *)((uintptr_t)mem + memshift);
+	(op - 1)->ov_real_allocation = mem;
+	return ((void *)op);
 }
 
 void *

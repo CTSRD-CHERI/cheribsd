@@ -182,7 +182,9 @@ ppt_detach(device_t dev)
 	num_pptdevs--;
 	TAILQ_REMOVE(&pptdev_list, ppt, next);
 	pci_disable_busmaster(dev);
-	iommu_add_device(iommu_host_domain(), pci_get_rid(dev));
+
+	if (iommu_host_domain() != NULL)
+		iommu_add_device(iommu_host_domain(), pci_get_rid(dev));
 
 	return (0);
 }
@@ -439,6 +441,23 @@ ppt_unassign_all(struct vm *vm)
 	return (0);
 }
 
+static bool
+ppt_valid_bar_mapping(struct pptdev *ppt, vm_paddr_t hpa, size_t len)
+{
+	struct pci_map *pm;
+	pci_addr_t base, size;
+
+	for (pm = pci_first_bar(ppt->dev); pm != NULL; pm = pci_next_bar(pm)) {
+		if (!PCI_BAR_MEM(pm->pm_value))
+			continue;
+		base = pm->pm_value & PCIM_BAR_MEM_BASE;
+		size = (pci_addr_t)1 << pm->pm_size;
+		if (hpa >= base && hpa + len <= base + size)
+			return (true);
+	}
+	return (false);
+}
+
 int
 ppt_map_mmio(struct vm *vm, int bus, int slot, int func,
 	     vm_paddr_t gpa, size_t len, vm_paddr_t hpa)
@@ -447,9 +466,16 @@ ppt_map_mmio(struct vm *vm, int bus, int slot, int func,
 	struct pptseg *seg;
 	struct pptdev *ppt;
 
+	if (len % PAGE_SIZE != 0 || len == 0 || gpa % PAGE_SIZE != 0 ||
+	    hpa % PAGE_SIZE != 0 || gpa + len < gpa || hpa + len < hpa)
+		return (EINVAL);
+
 	error = ppt_find(vm, bus, slot, func, &ppt);
 	if (error)
 		return (error);
+
+	if (!ppt_valid_bar_mapping(ppt, hpa, len))
+		return (EINVAL);
 
 	for (i = 0; i < MAX_MMIOSEGS; i++) {
 		seg = &ppt->mmio[i];
@@ -520,7 +546,7 @@ pptintr(void *arg)
 }
 
 int
-ppt_setup_msi(struct vm *vm, int vcpu, int bus, int slot, int func,
+ppt_setup_msi(struct vm *vm, int bus, int slot, int func,
 	      uint64_t addr, uint64_t msg, int numvec)
 {
 	int i, rid, flags;
@@ -613,7 +639,7 @@ ppt_setup_msi(struct vm *vm, int vcpu, int bus, int slot, int func,
 }
 
 int
-ppt_setup_msix(struct vm *vm, int vcpu, int bus, int slot, int func,
+ppt_setup_msix(struct vm *vm, int bus, int slot, int func,
 	       int idx, uint64_t addr, uint64_t msg, uint32_t vector_control)
 {
 	struct pptdev *ppt;

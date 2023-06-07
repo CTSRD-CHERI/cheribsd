@@ -87,7 +87,7 @@ int	rangeset_copy(struct rangeset *dst_rs, struct rangeset *src_rs);
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20190812,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "subobject_bounds"

@@ -10,7 +10,6 @@ DISABLE_PG_G		opt_pmap.h
 DISABLE_PSE		opt_pmap.h
 MAXMEM
 MPTABLE_FORCE_HTT
-MP_WATCHDOG
 NKPT			opt_pmap.h
 PERFMON
 PMAP_SHPGPERPROC	opt_pmap.h
@@ -105,3 +104,9 @@ XENHVM			opt_global.h
 
 # options for the Intel C600 SAS driver (isci)
 ISCI_LOGGING	opt_isci.h
+
+# Don't create a "legacy" PCI bridge if none is found.
+NO_LEGACY_PCIB		opt_cpu.h
+
+# Compatibility with Linux MP table bugs.
+MPTABLE_LINUX_BUG_COMPAT

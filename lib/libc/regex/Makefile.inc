@@ -11,7 +11,7 @@ SRCS+=	regcomp.c regerror.c regexec.c regfree.c
 SYM_MAPS+=${LIBC_SRCTOP}/regex/Symbol.map
 
 # manpages only included in libc version
-.if ${LIB} == "c"
+.if defined(LIB) && ${LIB} == "c"
 MAN+=	regex.3
 MAN+=	re_format.7
 

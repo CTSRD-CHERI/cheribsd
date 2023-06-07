@@ -751,18 +751,6 @@ ipf_state_ioctl(ipf_main_softc_t *softc, caddr_t data, ioctlcmd_t cmd,
 		error = ipf_state_getent(softc, softs, data);
 		break;
 
-	/*
-	 * Return a copy of the hash table bucket lengths
-	 */
-	case SIOCSTAT1 :
-		error = BCOPYOUT(softs->ipf_state_stats.iss_bucketlen, data,
-				 softs->ipf_state_size * sizeof(u_int));
-		if (error != 0) {
-			IPFERROR(100017);
-			error = EFAULT;
-		}
-		break;
-
 	case SIOCGENITER :
 	    {
 		ipftoken_t *token;
@@ -1904,7 +1892,7 @@ ipf_tcpoptions(ipf_state_softc_t *softs, fr_info_t *fin, tcphdr_t *tcp,
 
 			/*
 			 * Extract the TCP options we are interested in out of
-			 * the header and store them in the the tcpdata struct.
+			 * the header and store them in the tcpdata struct.
 			 */
 			switch (opt)
 			{
@@ -4563,9 +4551,7 @@ ipf_checkicmp6matchingstate(fr_info_t *fin)
 /* Initialise the array of timeout queues for TCP.                          */
 /* ------------------------------------------------------------------------ */
 void
-ipf_sttab_init(softc, tqp)
-	ipf_main_softc_t *softc;
-	ipftq_t *tqp;
+ipf_sttab_init(ipf_main_softc_t *softc, ipftq_t *tqp)
 {
 	int i;
 

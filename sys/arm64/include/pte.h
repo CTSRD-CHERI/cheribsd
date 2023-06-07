@@ -60,8 +60,8 @@ typedef	uint64_t	pt_entry_t;		/* page table entry */
 #define	ATTR_SC			(1UL << 60)
 #endif
 /* Bits 58:55 are reserved for software */
-#define	ATTR_SW_UNUSED2		(1UL << 58)
-#define	ATTR_SW_UNUSED1		(1UL << 57)
+#define	ATTR_SW_UNUSED1		(1UL << 58)
+#define	ATTR_SW_NO_PROMOTE	(1UL << 57)
 #define	ATTR_SW_MANAGED		(1UL << 56)
 #define	ATTR_SW_WIRED		(1UL << 55)
 

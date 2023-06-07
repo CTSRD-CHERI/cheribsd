@@ -146,7 +146,7 @@
 		};
 	};
 
-	reg_audio: regulator_audio {
+	reg_audio: regulator-audio {
 		compatible = "regulator-fixed";
 		regulator-name = "audio-1.8V";
 		regulator-min-microvolt = <1800000>;
@@ -174,7 +174,7 @@
 		vin-supply = <&reg_lcd>;
 	};
 
-	reg_cam0: regulator_camera {
+	reg_cam0: regulator-cam0 {
 		compatible = "regulator-fixed";
 		regulator-name = "reg_cam0";
 		regulator-min-microvolt = <1800000>;
@@ -183,7 +183,7 @@
 		enable-active-high;
 	};
 
-	reg_cam1: regulator_camera {
+	reg_cam1: regulator-cam1 {
 		compatible = "regulator-fixed";
 		regulator-name = "reg_cam1";
 		regulator-min-microvolt = <1800000>;
@@ -197,6 +197,14 @@
 		compatible = "audio-graph-card";
 		label = "rcar-sound";
 		dais = <&rsnd_port0>, <&rsnd_port1>;
+		widgets = "Microphone", "Mic Jack",
+			  "Line", "Line In Jack",
+			  "Headphone", "Headphone Jack";
+		mic-det-gpio = <&gpio0 2 GPIO_ACTIVE_LOW>;
+		routing = "Headphone Jack", "HPOUTL",
+			 "Headphone Jack", "HPOUTR",
+			 "IN3R", "MICBIAS",
+			 "Mic Jack", "IN3R";
 	};
 
 	vccq_sdhi0: regulator-vccq-sdhi0 {
@@ -264,19 +272,25 @@
 	status = "okay";
 };
 
-&du_out_rgb {
-	remote-endpoint = <&rgb_panel>;
+&du {
+	ports {
+		port@0 {
+			du_out_rgb: endpoint {
+				remote-endpoint = <&rgb_panel>;
+			};
+		};
+	};
 };
 
 &ehci0 {
 	dr_mode = "otg";
 	status = "okay";
-	clocks = <&cpg CPG_MOD 703>, <&cpg CPG_MOD 704>;
+	clocks = <&cpg CPG_MOD 703>, <&cpg CPG_MOD 704>, <&usb2_clksel>, <&versaclock5 3>;
 };
 
 &ehci1 {
 	status = "okay";
-	clocks = <&cpg CPG_MOD 703>, <&cpg CPG_MOD 704>;
+	clocks = <&cpg CPG_MOD 703>, <&cpg CPG_MOD 704>, <&usb2_clksel>, <&versaclock5 3>;
 };
 
 &hdmi0 {
@@ -351,11 +365,10 @@
 		clocks = <&x304_clk>;
 		clock-names = "xin";
 
-		assigned-clocks = <&versaclock6_bb 1>,
-				   <&versaclock6_bb 2>,
-				   <&versaclock6_bb 3>,
-				   <&versaclock6_bb 4>;
-		assigned-clock-rates =	<24000000>, <24000000>, <24000000>, <24576000>;
+		assigned-clocks = <&versaclock6_bb 1>, <&versaclock6_bb 2>,
+				  <&versaclock6_bb 3>, <&versaclock6_bb 4>;
+		assigned-clock-rates = <24000000>, <24000000>, <24000000>,
+				       <24576000>;
 
 		OUT1 {
 			idt,mode = <VC5_CMOS>;

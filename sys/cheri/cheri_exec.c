@@ -83,12 +83,20 @@ cheri_exec_pcc(struct thread *td, struct image_params *imgp)
 void * __capability
 cheri_sigcode_capability(struct thread *td)
 {
+	void * __capability tmpcap;
 	struct proc *p = td->td_proc;
 	struct sysentvec *sv;
 
 	sv = p->p_sysent;
 	KASSERT(PROC_HAS_SHP(p),
 	    ("CheriABI requires shared page for sigcode"));
-	return (cheri_capability_build_user_code(td, CHERI_CAP_USER_CODE_PERMS,
-	    PROC_SIGCODE(p), *sv->sv_szsigcode, 0));
+
+	tmpcap = (void * __capability)cheri_setboundsexact(
+	    cheri_andperm(PROC_SIGCODE(p), CHERI_CAP_USER_CODE_PERMS),
+	    *sv->sv_szsigcode);
+
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+		tmpcap = cheri_capmode(tmpcap);
+
+	return (cheri_sealentry(tmpcap));
 }

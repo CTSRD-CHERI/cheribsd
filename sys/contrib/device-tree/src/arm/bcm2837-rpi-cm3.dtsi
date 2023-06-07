@@ -14,7 +14,7 @@
 		 * Since there is no upstream GPIO driver yet,
 		 * remove the incomplete node.
 		 */
-		/delete-node/ act;
+		/delete-node/ led-act;
 	};
 
 	reg_3v3: fixed-regulator {
@@ -41,12 +41,12 @@
 		#gpio-cells = <2>;
 		gpio-line-names = "HDMI_HPD_N",
 				  "EMMC_EN_N",
-				  "NC",
-				  "NC",
-				  "NC",
-				  "NC",
-				  "NC",
-				  "NC";
+				  "",
+				  "",
+				  "",
+				  "",
+				  "",
+				  "";
 		status = "okay";
 	};
 };

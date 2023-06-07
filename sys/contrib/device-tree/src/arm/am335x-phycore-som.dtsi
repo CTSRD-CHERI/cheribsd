@@ -97,24 +97,26 @@
 	};
 };
 
-&cpsw_emac0 {
+&cpsw_port1 {
 	phy-handle = <&phy0>;
 	phy-mode = "rmii";
-	dual_emac_res_vlan = <1>;
+	ti,dual-emac-pvid = <1>;
 };
 
-&davinci_mdio {
+&cpsw_port2 {
+	status = "disabled";
+};
+
+&davinci_mdio_sw {
 	pinctrl-names = "default";
 	pinctrl-0 = <&mdio_pins>;
-	status = "okay";
 
 	phy0: ethernet-phy@0 {
 		reg = <0>;
 	};
 };
 
-&mac {
-	slaves = <1>;
+&mac_sw {
 	pinctrl-names = "default";
 	pinctrl-0 = <&ethernet0_pins>;
 	status = "okay";
@@ -329,7 +331,7 @@
 	pinctrl-0 = <&spi0_pins>;
 	status = "okay";
 
-	serial_flash: m25p80@0 {
+	serial_flash: flash@0 {
 		compatible = "jedec,spi-nor";
 		spi-max-frequency = <48000000>;
 		reg = <0x0>;

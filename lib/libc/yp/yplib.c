@@ -92,16 +92,12 @@ struct dom_binding {
 #endif
 #define MAX_RETRIES 20
 
-extern bool_t xdr_domainname(), xdr_ypbind_resp();
-extern bool_t xdr_ypreq_key(), xdr_ypresp_val();
-extern bool_t xdr_ypreq_nokey(), xdr_ypresp_key_val();
-extern bool_t xdr_ypresp_all(), xdr_ypresp_all_seq();
-extern bool_t xdr_ypresp_master();
+bool_t xdr_ypresp_all_seq(XDR *xdrs, u_long *objp);
 
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20181121,
+ *   "updated": 20221129,
  *   "target_type": "lib",
  *   "changes": [
  *     "calling_convention"

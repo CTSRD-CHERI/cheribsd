@@ -26,7 +26,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd November 25, 2021
+.Dd March 8, 2023
 .Dt ARCH 7
 .Os
 .Sh NAME
@@ -51,10 +51,10 @@ and later, unless otherwise noted.
 uses a flat address space.
 Variables of types
 .Vt unsigned long ,
-.Vt uintptr_t ,
+.Vt ptraddr_t ,
 and
 .Vt size_t
-and pointers all have the same representation.
+all have the same representation.
 .Pp
 In order to maximize compatibility with future pointer integrity mechanisms,
 manipulations of pointers as integers should be performed via
@@ -88,6 +88,7 @@ release to support each architecture.
 .Bl -column -offset indent "Architecture" "Initial Release"
 .It Sy Architecture Ta Sy Initial Release
 .It aarch64     Ta 11.0
+.It aarch64c    Ta CheriBSD only
 .It amd64       Ta 5.1
 .It armv6       Ta 10.0
 .It armv7       Ta 12.0
@@ -97,6 +98,7 @@ release to support each architecture.
 .It powerpc64   Ta 9.0
 .It powerpc64le Ta 13.0
 .It riscv64     Ta 12.0
+.It riscv64c    Ta CheriBSD only
 .It riscv64sf   Ta 12.0
 .El
 .Pp
@@ -126,21 +128,33 @@ architectures use some variant of the ELF (see
 .Xr elf 5 )
 .Sy Application Binary Interface
 (ABI) for the machine processor.
-All supported ABIs can be divided into two groups:
-.Bl -tag -width "Dv ILP32"
+All supported ABIs can be divided into three groups:
+.Bl -tag -width "Dv L64PC128"
 .It Dv ILP32
 .Vt int ,
+.Vt intptr_t ,
 .Vt long ,
+and
 .Vt void *
 types machine representations all have 4-byte size.
 .It Dv LP64
 .Vt int
 type machine representation uses 4 bytes,
 while
-.Vt long
+.Vt intptr_t ,
+.Vt long ,
 and
 .Vt void *
 are 8 bytes.
+.It Dv L64PC128
+.Vt int
+type machine representation uses 4 bytes.
+.Vt long
+type machine representation uses 8 bytes.
+.Vt intptr_t
+and
+.Vt void *
+are 16 byte capabilities.
 .El
 .Pp
 Some machines support more than one
@@ -158,7 +172,6 @@ Examples are:
 .It Sy LP64        Ta Sy ILP32 counterpart
 .It Dv amd64       Ta Dv i386
 .It Dv powerpc64   Ta Dv powerpc
-.It Dv mips64*     Ta Dv mips*
 .It Dv aarch64     Ta Dv armv6/armv7
 .El
 .Pp
@@ -169,16 +182,30 @@ or
 .Dv armv7
 binaries if the CPU implements
 .Dv AArch32
-execution state, however
+execution state, however older
+.Dv armv4
+and
 .Dv armv5
 binaries aren't supported.
+.Pp
+Architectures with 128-bit capabilities support both a
+.Dq native
+.Dv L64PC128
+execution environment and a
+.Dq legacy
+.Dv LP64
+environment:
+.Bl -column -offset indent "aarch64c" "LP64 counterpart"
+.It Sy L64PC128    Ta Sy LP64 counterpart
+.It Dv aarch64c    Ta Dv aarch64
+.It Dv riscv64c    Ta Dv riscv64
+.El
 .Pp
 On all supported architectures:
 .Bl -column -offset -indent "long long" "Size"
 .It Sy Type Ta Sy Size
 .It short Ta 2
 .It int Ta 4
-.It long Ta sizeof(void*)
 .It long long Ta 8
 .It float Ta 4
 .It double Ta 8
@@ -192,28 +219,21 @@ Most ILP32 ABIs, except
 require only 4-byte alignment for 64-bit integers.
 .Pp
 Machine-dependent type sizes:
-.Bl -column -offset indent "Architecture" "void *" "long double" "time_t"
-.It Sy Architecture Ta Sy void * Ta Sy long double Ta Sy time_t
-.It aarch64     Ta 8 Ta 16 Ta 8
-.It amd64       Ta 8 Ta 16 Ta 8
-.It armv6       Ta 4 Ta  8 Ta 8
-.It armv7       Ta 4 Ta  8 Ta 8
-.It i386        Ta 4 Ta 12 Ta 4
-.It mips        Ta 4 Ta  8 Ta 8
-.It mipsel      Ta 4 Ta  8 Ta 8
-.It mipselhf    Ta 4 Ta  8 Ta 8
-.It mipshf      Ta 4 Ta  8 Ta 8
-.It mipsn32     Ta 4 Ta  8 Ta 8
-.It mips64      Ta 8 Ta  8 Ta 8
-.It mips64el    Ta 8 Ta  8 Ta 8
-.It mips64elhf  Ta 8 Ta  8 Ta 8
-.It mips64hf    Ta 8 Ta  8 Ta 8
-.It powerpc     Ta 4 Ta  8 Ta 8
-.It powerpcspe  Ta 4 Ta  8 Ta 8
-.It powerpc64   Ta 8 Ta  8 Ta 8
-.It powerpc64le Ta 8 Ta  8 Ta 8
-.It riscv64     Ta 8 Ta 16 Ta 8
-.It riscv64sf   Ta 8 Ta 16 Ta 8
+.Bl -column -offset indent "Architecture" "long" "void *" "long double" "time_t"
+.It Sy Architecture Ta Sy long Ta Sy void * Ta Sy long double Ta Sy time_t
+.It aarch64     Ta 8 Ta  8 Ta 16 Ta 8
+.It aarch64c    Ta 8 Ta 16 Ta 16 Ta 8
+.It amd64       Ta 8 Ta  8 Ta 16 Ta 8
+.It armv6       Ta 4 Ta  4 Ta  8 Ta 8
+.It armv7       Ta 4 Ta  4 Ta  8 Ta 8
+.It i386        Ta 4 Ta  4 Ta 12 Ta 4
+.It powerpc     Ta 4 Ta  4 Ta  8 Ta 8
+.It powerpcspe  Ta 4 Ta  4 Ta  8 Ta 8
+.It powerpc64   Ta 8 Ta  8 Ta  8 Ta 8
+.It powerpc64le Ta 8 Ta  8 Ta  8 Ta 8
+.It riscv64     Ta 8 Ta  8 Ta 16 Ta 8
+.It riscv64c    Ta 8 Ta 16 Ta 16 Ta 8
+.It riscv64sf   Ta 8 Ta  8 Ta 16 Ta 8
 .El
 .Pp
 .Sy time_t
@@ -222,72 +242,51 @@ is 8 bytes on all supported architectures except i386.
 .Bl -column -offset indent "Architecture" "Endianness" "char Signedness"
 .It Sy Architecture Ta Sy Endianness Ta Sy char Signedness
 .It aarch64     Ta little Ta unsigned
+.It aarch64c    Ta little Ta unsigned
 .It amd64       Ta little Ta   signed
 .It armv6       Ta little Ta unsigned
 .It armv7       Ta little Ta unsigned
 .It i386        Ta little Ta   signed
-.It mips        Ta big    Ta   signed
-.It mipsel      Ta little Ta   signed
-.It mipselhf    Ta little Ta   signed
-.It mipshf      Ta big    Ta   signed
-.It mipsn32     Ta big    Ta   signed
-.It mips64      Ta big    Ta   signed
-.It mips64el    Ta little Ta   signed
-.It mips64elhf  Ta little Ta   signed
-.It mips64hf    Ta big    Ta   signed
 .It powerpc     Ta big    Ta unsigned
 .It powerpcspe  Ta big    Ta unsigned
 .It powerpc64   Ta big    Ta unsigned
 .It powerpc64le Ta little Ta unsigned
 .It riscv64     Ta little Ta   signed
+.It riscv64c    Ta little Ta   signed
 .It riscv64sf   Ta little Ta   signed
 .El
 .Ss Page Size
 .Bl -column -offset indent "Architecture" "Page Sizes"
 .It Sy Architecture Ta Sy Page Sizes
 .It aarch64     Ta 4K, 2M, 1G
+.It aarch64c    Ta 4K, 2M, 1G
 .It amd64       Ta 4K, 2M, 1G
 .It armv6       Ta 4K, 1M
 .It armv7       Ta 4K, 1M
 .It i386        Ta 4K, 2M (PAE), 4M
-.It mips        Ta 4K
-.It mipsel      Ta 4K
-.It mipselhf    Ta 4K
-.It mipshf      Ta 4K
-.It mipsn32     Ta 4K
-.It mips64      Ta 4K
-.It mips64el    Ta 4K
-.It mips64elhf  Ta 4K
-.It mips64hf    Ta 4K
 .It powerpc     Ta 4K
 .It powerpcspe  Ta 4K
 .It powerpc64   Ta 4K
 .It powerpc64le Ta 4K
 .It riscv64     Ta 4K, 2M, 1G
+.It riscv64c    Ta 4K, 2M, 1G
 .It riscv64sf   Ta 4K, 2M, 1G
 .El
 .Ss Floating Point
 .Bl -column -offset indent "Architecture" "float, double" "long double"
 .It Sy Architecture Ta Sy float, double Ta Sy long double
 .It aarch64     Ta hard Ta soft, quad precision
+.It aarch64c    Ta hard Ta soft, quad precision
 .It amd64       Ta hard Ta hard, 80 bit
 .It armv6       Ta hard Ta hard, double precision
 .It armv7       Ta hard Ta hard, double precision
 .It i386        Ta hard Ta hard, 80 bit
-.It mips        Ta soft Ta identical to double
-.It mipsel      Ta soft Ta identical to double
-.It mipselhf    Ta hard Ta identical to double
-.It mipshf      Ta hard Ta identical to double
-.It mipsn32     Ta soft Ta identical to double
-.It mips64      Ta soft Ta identical to double
-.It mips64el    Ta soft Ta identical to double
-.It mips64elhf  Ta hard Ta identical to double
-.It mips64hf    Ta hard Ta identical to double
 .It powerpc     Ta hard Ta hard, double precision
 .It powerpcspe  Ta hard Ta hard, double precision
 .It powerpc64   Ta hard Ta hard, double precision
 .It powerpc64le Ta hard Ta hard, double precision
 .It riscv64     Ta hard Ta hard, quad precision
+.It riscv64c    Ta hard Ta hard, quad precision
 .It riscv64sf   Ta soft Ta soft, quad precision
 .El
 .Ss Default Tool Chain
@@ -315,13 +314,12 @@ when referring to the kernel, interfaces dependent on a specific type of kernel
 or similar things like boot sequences.
 .Bl -column -offset indent "Dv MACHINE" "Dv MACHINE_CPUARCH" "Dv MACHINE_ARCH"
 .It Dv MACHINE Ta Dv MACHINE_CPUARCH Ta Dv MACHINE_ARCH
-.It arm64 Ta aarch64 Ta aarch64
+.It arm64 Ta aarch64 Ta aarch64, aarch64c
 .It amd64 Ta amd64 Ta amd64
 .It arm Ta arm Ta armv6, armv7
 .It i386 Ta i386 Ta i386
-.It mips Ta mips Ta mips, mipsel, mips64, mips64el, mipshf, mipselhf, mips64elhf, mipsn32
 .It powerpc Ta powerpc Ta powerpc, powerpcspe, powerpc64, powerpc64le
-.It riscv Ta riscv Ta riscv64, riscv64sf
+.It riscv Ta riscv Ta riscv64, riscv64c, riscv64sf
 .El
 .Ss Predefined Macros
 The compiler provides a number of predefined macros.
@@ -335,10 +333,11 @@ cc -x c -dM -E /dev/null
 .Ed
 .Pp
 Common type size and endianness macros:
-.Bl -column -offset indent "BYTE_ORDER" "Meaning"
+.Bl -column -offset indent "__CHERI_PURE_CAPABILITY__" "Meaning"
 .It Sy Macro Ta Sy Meaning
 .It Dv __LP64__ Ta 64-bit (8-byte) long and pointer, 32-bit (4-byte) int
 .It Dv __ILP32__ Ta 32-bit (4-byte) int, long and pointer
+.It Dv __CHERI_PURE_CAPABILITY__ Ta 128-bit (16-byte) capability pointer, 64-bit (8-byte) long
 .It Dv BYTE_ORDER Ta Either Dv BIG_ENDIAN or Dv LITTLE_ENDIAN .
 .Dv PDP11_ENDIAN
 is not used on
@@ -349,24 +348,17 @@ Architecture-specific macros:
 .Bl -column -offset indent "Architecture" "Predefined macros"
 .It Sy Architecture Ta Sy Predefined macros
 .It aarch64     Ta Dv __aarch64__
+.It aarch64c    Ta Dv __aarch64__
 .It amd64       Ta Dv __amd64__ , Dv __x86_64__
 .It armv6       Ta Dv __arm__ , Dv __ARM_ARCH >= 6
 .It armv7       Ta Dv __arm__ , Dv __ARM_ARCH >= 7
 .It i386        Ta Dv __i386__
-.It mips        Ta Dv __mips__ , Dv __MIPSEB__ , Dv __mips_o32
-.It mipsel      Ta Dv __mips__ , Dv __mips_o32
-.It mipselhf    Ta Dv __mips__ , Dv __mips_o32
-.It mipshf      Ta Dv __mips__ , Dv __MIPSEB__ , Dv __mips_o32
-.It mipsn32     Ta Dv __mips__ , Dv __MIPSEB__ , Dv __mips_n32
-.It mips64      Ta Dv __mips__ , Dv __MIPSEB__ , Dv __mips_n64
-.It mips64el    Ta Dv __mips__ , Dv __mips_n64
-.It mips64elhf  Ta Dv __mips__ , Dv __mips_n64
-.It mips64hf    Ta Dv __mips__ , Dv __MIPSEB__ , Dv __mips_n64
 .It powerpc     Ta Dv __powerpc__
 .It powerpcspe  Ta Dv __powerpc__ , Dv __SPE__
 .It powerpc64   Ta Dv __powerpc__ , Dv __powerpc64__
 .It powerpc64le Ta Dv __powerpc__ , Dv __powerpc64__
 .It riscv64     Ta Dv __riscv , Dv __riscv_xlen == 64
+.It riscv64c    Ta Dv __riscv , Dv __riscv_xlen == 64
 .It riscv64sf   Ta Dv __riscv , Dv __riscv_xlen == 64 , Dv __riscv_float_abi_soft
 .El
 .Pp
@@ -429,17 +421,13 @@ It may also encode a variation in the size of the integer or pointer.
 It may also encode a ISA revision.
 It may also encode hard versus soft floating point ABI and usage.
 It may also encode a variant ABI when the other factors do not
-uniquely define the ABI (e.g., MIPS' n32 ABI).
+uniquely define the ABI.
 It, along with
 .Dv MACHINE ,
 defines the ABI used by the system.
-For example, the MIPS CPU processor family supports 9 different
-combinations encoding pointer size, endian and hard versus soft float (for
-8 combinations) as well as N32 (which only ever had one variation of
-all these).
 Generally, the plain CPU name specifies the most common (or at least
 first) variant of the CPU.
-This is why mips and mips64 imply 'big endian' while 'armv6' and 'armv7'
+This is why powerpc and powerpc64 imply 'big endian' while 'armv6' and 'armv7'
 imply little endian.
 If we ever were to support the so-called x32 ABI (using 32-bit
 pointers on the amd64 architecture), it would most likely be encoded
@@ -453,10 +441,6 @@ Represents the source location for a given
 .Dv MACHINE_ARCH .
 It is generally the common prefix for all the MACHINE_ARCH that
 share the same implementation, though 'riscv' breaks this rule.
-For example,
-.Dv MACHINE_CPUARCH
-is defined to be mips for all the flavors of mips that we support
-since we support them all with a shared set of sources.
 While amd64 and i386 are closely related, MACHINE_CPUARCH is not x86
 for them.
 The

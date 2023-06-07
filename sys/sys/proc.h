@@ -157,7 +157,6 @@ struct pargs {
  *	k*- only accessed by curthread and from an interrupt
  *	kx- only accessed by curthread and by debugger
  *      l - the attaching proc or attaching proc parent
- *      m - Giant
  *      n - not locked, lazy
  *      o - ktrace lock
  *      q - td_contested lock
@@ -169,7 +168,6 @@ struct pargs {
  *      x - created at fork, only changes during single threading in exec
  *      y - created at first aio, doesn't change until exit or exec at which
  *          point we are single-threaded and only curthread changes it
- *      z - zombie threads lock
  *
  * If the locking key specifies two identifiers (for example, p_pptr) then
  * either lock is sufficient for read access, but both locks must be held
@@ -260,9 +258,10 @@ struct thread {
 	u_char		td_base_ithread_pri; /* (t) Base ithread pri */
 	struct kmsan_td	*td_kmsan;	/* (k) KMSAN state */
 
-/* Cleared during fork1() */
+/* Cleared during fork1(), thread_create(), or kthread_add(). */
 #define	td_startzero td_flags
 	int		td_flags;	/* (t) TDF_* flags. */
+	int		td_ast;		/* (t) TDA_* indicators */
 	int		td_inhibitors;	/* (t) Why can not run. */
 	int		td_pflags;	/* (k) Private thread (TDP_*) flags. */
 	int		td_pflags2;	/* (k) Private thread (TDP2_*) flags. */
@@ -328,7 +327,7 @@ struct thread {
 #endif
 #define	td_endzero td_sigmask
 
-/* Copied during fork1() or create_thread(). */
+/* Copied during fork1(), thread_create(), or kthread_add(). */
 #define	td_startcopy td_endzero
 	sigset_t	td_sigmask;	/* (c) Current signal mask. */
 	u_char		td_rqindex;	/* (t) Run queue index. */
@@ -348,7 +347,7 @@ struct thread {
 #define	td_endcopy td_pcb
 
 /*
- * Fields that must be manually set in fork1() or create_thread()
+ * Fields that must be manually set in fork1(), thread_create(), kthread_add(),
  * or already have been set in the allocator, constructor, etc.
  */
 	struct pcb	*td_pcb;	/* (k) Kernel VA of pcb and kstack. */
@@ -392,7 +391,7 @@ struct thread {
 	int		td_oncpu;	/* (t) Which cpu we are on. */
 	void		*td_lkpi_task;	/* LinuxKPI task struct pointer */
 	int		td_pmcpend;
-	void		*td_coredump;	/* (c) coredump request. */
+	void		*td_remotereq;	/* (c) dbg remote request. */
 	off_t		td_ktr_io_lim;	/* (k) limit for ktrace file size */
 #ifdef EPOCH_TRACE
 	SLIST_HEAD(, epoch_tracker) td_epochs;
@@ -464,26 +463,53 @@ do {									\
 #define	TDF_KTH_SUSP	0x00000100 /* kthread is suspended */
 #define	TDF_ALLPROCSUSP	0x00000200 /* suspended by SINGLE_ALLPROC */
 #define	TDF_BOUNDARY	0x00000400 /* Thread suspended at user boundary */
-#define	TDF_ASTPENDING	0x00000800 /* Thread has some asynchronous events. */
-#define	TDF_KQTICKLED	0x00001000 /* AST drain kqueue taskqueue */
+#define	TDF_UNUSED1	0x00000800 /* Available */
+#define	TDF_UNUSED2	0x00001000 /* Available */
 #define	TDF_SBDRY	0x00002000 /* Stop only on usermode boundary. */
 #define	TDF_UPIBLOCKED	0x00004000 /* Thread blocked on user PI mutex. */
-#define	TDF_NEEDSUSPCHK	0x00008000 /* Thread may need to suspend. */
-#define	TDF_NEEDRESCHED	0x00010000 /* Thread needs to yield. */
-#define	TDF_NEEDSIGCHK	0x00020000 /* Thread may need signal delivery. */
+#define	TDF_UNUSED3	0x00008000 /* Available */
+#define	TDF_UNUSED4	0x00010000 /* Available */
+#define	TDF_UNUSED5	0x00020000 /* Available */
 #define	TDF_NOLOAD	0x00040000 /* Ignore during load avg calculations. */
 #define	TDF_SERESTART	0x00080000 /* ERESTART on stop attempts. */
 #define	TDF_THRWAKEUP	0x00100000 /* Libthr thread must not suspend itself. */
 #define	TDF_SEINTR	0x00200000 /* EINTR on stop attempts. */
 #define	TDF_SWAPINREQ	0x00400000 /* Swapin request due to wakeup. */
-#define	TDF_DOING_SA	0x00800000 /* Doing SINGLE_ALLPROC, do not unsuspend me */
+#define	TDF_UNUSED6	0x00800000 /* Available */
 #define	TDF_SCHED0	0x01000000 /* Reserved for scheduler private use */
 #define	TDF_SCHED1	0x02000000 /* Reserved for scheduler private use */
 #define	TDF_SCHED2	0x04000000 /* Reserved for scheduler private use */
 #define	TDF_SCHED3	0x08000000 /* Reserved for scheduler private use */
-#define	TDF_ALRMPEND	0x10000000 /* Pending SIGVTALRM needs to be posted. */
-#define	TDF_PROFPEND	0x20000000 /* Pending SIGPROF needs to be posted. */
-#define	TDF_MACPEND	0x40000000 /* AST-based MAC event pending. */
+#define	TDF_UNUSED7	0x10000000 /* Available */
+#define	TDF_UNUSED8	0x20000000 /* Available */
+#define	TDF_UNUSED9	0x40000000 /* Available */
+#define	TDF_UNUSED10	0x80000000 /* Available */
+
+enum {
+	TDA_AST = 0,		/* Special: call all non-flagged AST handlers */
+	TDA_OWEUPC,
+	TDA_HWPMC,
+	TDA_VFORK,
+	TDA_ALRM,
+	TDA_PROF,
+	TDA_MAC,
+	TDA_SCHED,
+	TDA_UFS,
+	TDA_GEOM,
+	TDA_KQUEUE,
+	TDA_RACCT,
+	TDA_MOD1,		/* For third party use, before signals are */
+	TAD_MOD2,		/* processed .. */
+	TDA_SIG,
+	TDA_KTRACE,
+	TDA_SUSPEND,
+	TDA_SIGSUSPEND,
+	TDA_MOD3,		/* .. and after */
+	TAD_MOD4,
+	TDA_MAX,
+};
+#define	TDAI(tda)		(1U << (tda))
+#define	td_ast_pending(td, tda)	((td->td_ast & TDAI(tda)) != 0)
 
 /* Userland debug flags */
 #define	TDB_SUSPEND	0x00000001 /* Thread is suspended by debugger */
@@ -503,7 +529,9 @@ do {									\
 #define	TDB_FSTP	0x00001000 /* The thread is PT_ATTACH leader */
 #define	TDB_STEP	0x00002000 /* (x86) PSL_T set for PT_STEP */
 #define	TDB_SSWITCH	0x00004000 /* Suspended in ptracestop */
-#define	TDB_COREDUMPRQ	0x00008000 /* Coredump request */
+#define	TDB_BOUNDARY	0x00008000 /* ptracestop() at boundary */
+#define	TDB_COREDUMPREQ	0x00010000 /* Coredump request */
+#define	TDB_SCREMOTEREQ	0x00020000 /* Remote syscall request */
 
 /*
  * "Private" flags kept in td_pflags:
@@ -538,7 +566,7 @@ do {									\
 #define	TDP_RESETSPUR	0x04000000 /* Reset spurious page fault history. */
 #define	TDP_NERRNO	0x08000000 /* Last errno is already in td_errno */
 #define	TDP_UIOHELD	0x10000000 /* Current uio has pages held in td_ma */
-#define	TDP_UNUSED0	0x20000000 /* UNUSED */
+#define	TDP_INTCPCALLOUT 0x20000000 /* used by netinet/tcp_timer.c */
 #define	TDP_EXECVMSPC	0x40000000 /* Execve destroyed old vmspace */
 #define	TDP_SIGFASTPENDING 0x80000000 /* Pending signal due to sigfastblock */
 
@@ -699,8 +727,6 @@ struct proc {
 	int		p_pendingexits; /* (c) Count of pending thread exits. */
 	struct filemon	*p_filemon;	/* (c) filemon-specific data. */
 	int		p_pdeathsig;	/* (c) Signal from parent on exit. */
-	int		p_singlethr;	/* (c) Count of threads doing
-					   external thread_single() */
 /* End area that is zeroed on creation. */
 #define	p_endzero	p_magic
 
@@ -758,6 +784,7 @@ struct proc {
 	LIST_HEAD(, proc) p_orphans;	/* (e) Pointer to list of orphans. */
 
 	TAILQ_HEAD(, kq_timer_cb_data)	p_kqtim_stop;	/* (c) */
+	LIST_ENTRY(proc) p_jaillist;	/* (d) Jail process linkage. */
 };
 
 #define	p_session	p_pgrp->pg_session
@@ -888,22 +915,20 @@ struct proc {
 
 #ifdef _KERNEL
 
-/* Types and flags for mi_switch(). */
+/* Types and flags for mi_switch(9). */
 #define	SW_TYPE_MASK		0xff	/* First 8 bits are switch type */
-#define	SWT_NONE		0	/* Unspecified switch. */
-#define	SWT_PREEMPT		1	/* Switching due to preemption. */
-#define	SWT_OWEPREEMPT		2	/* Switching due to owepreempt. */
-#define	SWT_TURNSTILE		3	/* Turnstile contention. */
-#define	SWT_SLEEPQ		4	/* Sleepq wait. */
-#define	SWT_SLEEPQTIMO		5	/* Sleepq timeout wait. */
-#define	SWT_RELINQUISH		6	/* yield call. */
-#define	SWT_NEEDRESCHED		7	/* NEEDRESCHED was set. */
-#define	SWT_IDLE		8	/* Switching from the idle thread. */
-#define	SWT_IWAIT		9	/* Waiting for interrupts. */
-#define	SWT_SUSPEND		10	/* Thread suspended. */
-#define	SWT_REMOTEPREEMPT	11	/* Remote processor preempted. */
-#define	SWT_REMOTEWAKEIDLE	12	/* Remote processor preempted idle. */
-#define	SWT_COUNT		13	/* Number of switch types. */
+#define	SWT_OWEPREEMPT		1	/* Switching due to owepreempt. */
+#define	SWT_TURNSTILE		2	/* Turnstile contention. */
+#define	SWT_SLEEPQ		3	/* Sleepq wait. */
+#define	SWT_RELINQUISH		4	/* yield call. */
+#define	SWT_NEEDRESCHED		5	/* NEEDRESCHED was set. */
+#define	SWT_IDLE		6	/* Switching from the idle thread. */
+#define	SWT_IWAIT		7	/* Waiting for interrupts. */
+#define	SWT_SUSPEND		8	/* Thread suspended. */
+#define	SWT_REMOTEPREEMPT	9	/* Remote processor preempted. */
+#define	SWT_REMOTEWAKEIDLE	10	/* Remote processor preempted idle. */
+#define	SWT_BIND		11	/* Thread bound to a new CPU. */
+#define	SWT_COUNT		12	/* Number of switch types. */
 /* Flags */
 #define	SW_VOL		0x0100		/* Voluntary switch. */
 #define	SW_INVOL	0x0200		/* Involuntary switch. */
@@ -1123,7 +1148,23 @@ struct	fork_req {
 
 int	pget(pid_t pid, int flags, struct proc **pp);
 
+/* ast_register() flags */
+#define	ASTR_ASTF_REQUIRED	0x0001	/* td_ast TDAI(TDA_X) flag set is
+					   required for call */
+#define	ASTR_TDP		0x0002	/* td_pflags flag set is required */
+#define	ASTR_KCLEAR		0x0004	/* call me on ast_kclear() */
+#define	ASTR_UNCOND		0x0008	/* call me always */
+
 void	ast(struct trapframe *framep);
+void	ast_kclear(struct thread *td);
+void	ast_register(int ast, int ast_flags, int tdp,
+	    void (*f)(struct thread *td, int asts));
+void	ast_deregister(int tda);
+void	ast_sched_locked(struct thread *td, int tda);
+void	ast_sched_mask(struct thread *td, int ast);
+void	ast_sched(struct thread *td, int tda);
+void	ast_unsched_locked(struct thread *td, int tda);
+
 struct	thread *choosethread(void);
 int	cr_cansee(struct ucred *u1, struct ucred *u2);
 int	cr_canseesocket(struct ucred *cred, struct socket *so);
@@ -1136,7 +1177,6 @@ int	enterpgrp(struct proc *p, pid_t pgid, struct pgrp *pgrp,
 int	enterthispgrp(struct proc *p, struct pgrp *pgrp);
 void	faultin(struct proc *p);
 int	fork1(struct thread *, struct fork_req *);
-void	fork_rfppwait(struct thread *);
 void	fork_exit(void (*)(void *, struct trapframe *), void *,
 	    struct trapframe *);
 void	fork_return(struct thread *, struct trapframe *);
@@ -1188,7 +1228,7 @@ void	sess_hold(struct session *);
 void	sess_release(struct session *);
 int	setrunnable(struct thread *, int);
 void	setsugid(struct proc *p);
-int	should_yield(void);
+bool	should_yield(void);
 int	sigonstack(size_t sp);
 void	stopevent(struct proc *, u_int, u_int);
 struct	thread *tdfind(lwpid_t, pid_t);
@@ -1295,27 +1335,11 @@ curthread_pflags2_restore(int save)
 	curthread->td_pflags2 &= save;
 }
 
-static __inline bool
-kstack_contains(struct thread *td, vm_offset_t va, size_t len)
-{
-	return (va >= td->td_kstack && va + len >= va &&
-	    va + len <= td->td_kstack + td->td_kstack_pages * PAGE_SIZE);
-}
-
 static __inline __pure2 struct td_sched *
 td_get_sched(struct thread *td)
 {
 
 	return ((struct td_sched *)&td[1]);
-}
-
-extern void (*softdep_ast_cleanup)(struct thread *);
-static __inline void
-td_softdep_cleanup(struct thread *td)
-{
-
-	if (td->td_su != NULL && softdep_ast_cleanup != NULL)
-		softdep_ast_cleanup(td);
 }
 
 #define	PROC_ID_PID	0
@@ -1344,7 +1368,7 @@ EVENTHANDLER_LIST_DECLARE(thread_init);
 #endif	/* !_SYS_PROC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190812,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "kernel_sig_types",

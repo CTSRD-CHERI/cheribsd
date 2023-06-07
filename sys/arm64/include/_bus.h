@@ -45,7 +45,7 @@ typedef struct bus_space *bus_space_tag_t;
 #endif /* !_MACHINE__BUS_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20210404,
+//   "updated": 20221129,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer"

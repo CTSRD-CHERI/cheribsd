@@ -19,6 +19,22 @@ PROG=		${LOADER}.sym
 INTERNALPROG=
 NEWVERSWHAT?=	"bootstrap loader" x86
 VERSION_FILE=	${.CURDIR}/../loader/version
+#
+# There's 640k - 40k maximum space, less however much memory the BIOS uses.  A
+# non-random survey suggests that 20k-25k is a good value for 'most' machines.
+# We also need to subtract maximum stack usage (20-25k).
+#
+# So 640k - 40k - 25k - 25k = 550k = 563,200 bytes, but use 550,000 below for
+# some extra buffer for more complex setups and/or wider BIOS lomem variation.
+#
+# Some systems use more stack or have BIOS reserve more RAM (or both), and will
+# need to set this lower in /etc/src.conf if the above buffer is too small.
+#
+# sudo dd if=/dev/mem bs=1 iseek=0x413 count=2 | hd -d
+#
+# will tell you how many kiB of lomem are available.
+#
+LOADERSIZE?=	550000		# Largest known safe size for loader.bin
 
 .PATH:		${BOOTSRC}/i386/loader
 
@@ -38,11 +54,6 @@ HAVE_BCACHE=	yes
 HAVE_PNP=	yes
 HAVE_ISABUS=	yes
 
-.if ${MK_LOADER_FIREWIRE} == "yes"
-CFLAGS+=	-DLOADER_FIREWIRE_SUPPORT
-LIBFIREWIRE=	${BOOTOBJ}/i386/libfirewire/libfirewire.a
-.endif
-
 .if ${MK_LOADER_ZFS} == "yes"
 CFLAGS.main.c+=	-I${SYSDIR}/contrib/openzfs/include
 CFLAGS.main.c+=	-I${SYSDIR}/contrib/openzfs/include/os/freebsd/zfs
@@ -51,6 +62,7 @@ CFLAGS.main.c+=	-I${SYSDIR}/contrib/openzfs/include/os/freebsd/zfs
 .if exists(${.CURDIR}/help.i386)
 HELP_FILES=	${.CURDIR}/help.i386
 .endif
+HELP_FILENAME=	loader.help.bios
 
 # Always add MI sources
 .include	"${BOOTSRC}/loader.mk"
@@ -79,12 +91,15 @@ CFLAGS+=	-I${BOOTSRC}/i386
 8x16.c: ${SRCTOP}/contrib/terminus/ter-u16b.bdf
 	vtfontcvt -f compressed-source -o ${.TARGET} ${.ALLSRC}
 
+
 ${LOADER}: ${LOADER}.bin ${BTXLDR} ${BTXKERN}
 	btxld -v -f aout -e ${LOADER_ADDRESS} -o ${.TARGET} -l ${BTXLDR} \
 		-b ${BTXKERN} ${LOADER}.bin
 
 ${LOADER}.bin: ${LOADER}.sym
 	${STRIPBIN} -R .comment -R .note -o ${.TARGET} ${.ALLSRC}
+	@set -- `ls -l ${.TARGET}` ; x=$$((${LOADERSIZE}-$$5)); \
+	    echo "$$x bytes available"; test $$x -ge 0
 
 .if ${MK_LOADER_ZFS} == "yes" && ${LOADER_INTERP} == ${LOADER_DEFAULT_INTERP}
 LINKS+=		${BINDIR}/${LOADER} ${BINDIR}/zfsloader
@@ -98,8 +113,8 @@ FILESMODE_${LOADER}= ${BINMODE} -b
 # Note: crt0.o needs to be first for pxeboot(8) to work. It assumes that the
 # startup code is located at the start of the loader and will jump
 # there. Although btx is more flexible than this, the emulated boot2 environment
-# that pxeloader provides has none of that flexibility because it lacks access
-# to the a.out/elf headers and assumes an entry point of 0.
+# that pxeldr provides has none of that flexibility assumes an entry point of
+# 0. In addition, pxeldr and cdboot assume that it is loading an a.out file.
 #
 # We must add it to the LDFLAGS instead of the OBJS because the former won't try
 # to clean it. When it is in OBJS, this cleaning can lead to races where
@@ -108,8 +123,8 @@ FILESMODE_${LOADER}= ${BINMODE} -b
 # files.
 LDFLAGS+=	${BTXCRT}
 
-DPADD=	${LDR_INTERP32} ${LIBFIREWIRE} ${LIBI386} ${LIBSA32}
-LDADD=	${LDR_INTERP32} ${LIBFIREWIRE} ${LIBI386} ${LIBSA32}
+DPADD=	${LDR_INTERP32} ${LIBI386} ${LIBSA32}
+LDADD=	${LDR_INTERP32} ${LIBI386} ${LIBSA32}
 
 .if ${MACHINE_CPUARCH} == "amd64"
 CFLAGS+=	-DLOADER_PREFER_AMD64

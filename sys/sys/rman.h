@@ -72,9 +72,9 @@ enum	rman_type { RMAN_UNINIT = 0, RMAN_GAUGE, RMAN_ARRAY };
  * Userspace-exported structures.
  */
 struct u_resource {
-	uintptr_t	r_handle;		/* resource uniquifier */
-	uintptr_t	r_parent;		/* parent rman */
-	uintptr_t	r_device;		/* device owning this resource */
+	kvaddr_t	r_handle;		/* resource uniquifier */
+	kvaddr_t	r_parent;		/* parent rman */
+	kvaddr_t	r_device;		/* device owning this resource */
 	char		r_devname[RM_TEXTLEN];	/* device name XXX obsolete */
 
 	rman_res_t	r_start;		/* offset in resource space */
@@ -83,7 +83,7 @@ struct u_resource {
 };
 
 struct u_rman {
-	uintptr_t	rm_handle;		/* rman uniquifier */
+	kvaddr_t	rm_handle;		/* rman uniquifier */
 	char		rm_descr[RM_TEXTLEN];	/* rman description */
 
 	rman_res_t	rm_start;		/* base of managed region */

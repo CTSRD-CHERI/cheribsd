@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -28,6 +28,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <assert.h>
+#include <limits.h>
 #include "thread_pool_impl.h"
 
 static pthread_mutex_t thread_pool_lock = PTHREAD_MUTEX_INITIALIZER;

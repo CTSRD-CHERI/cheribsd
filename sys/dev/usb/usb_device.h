@@ -56,7 +56,7 @@ struct usb_symlink;		/* UGEN */
 #define	USB_UNCFG_FLAG_FREE_EP0	0x02		/* endpoint zero is freed */
 
 struct usb_udev_msg {
-	struct usb_proc_msg hdr;
+	struct usb_proc_msg hdr __subobject_member_used_for_c_inheritance;
 	struct usb_device *udev;
 };
 

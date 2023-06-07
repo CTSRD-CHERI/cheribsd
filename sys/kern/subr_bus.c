@@ -39,30 +39,21 @@ __FBSDID("$FreeBSD$");
 #include <sys/conf.h>
 #include <sys/domainset.h>
 #include <sys/eventhandler.h>
-#include <sys/filio.h>
 #include <sys/lock.h>
 #include <sys/kernel.h>
-#include <sys/kobj.h>
 #include <sys/limits.h>
 #include <sys/malloc.h>
 #include <sys/module.h>
 #include <sys/mutex.h>
-#include <sys/poll.h>
 #include <sys/priv.h>
-#include <sys/proc.h>
-#include <sys/condvar.h>
-#include <sys/queue.h>
 #include <machine/bus.h>
 #include <sys/random.h>
 #include <sys/refcount.h>
 #include <sys/rman.h>
 #include <sys/sbuf.h>
-#include <sys/selinfo.h>
-#include <sys/signalvar.h>
 #include <sys/smp.h>
 #include <sys/sysctl.h>
 #include <sys/systm.h>
-#include <sys/uio.h>
 #include <sys/bus.h>
 #include <sys/cpuset.h>
 
@@ -80,6 +71,10 @@ SYSCTL_NODE(_hw, OID_AUTO, bus, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
     NULL);
 SYSCTL_ROOT_NODE(OID_AUTO, dev, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
     NULL);
+
+static bool disable_failed_devs = false;
+SYSCTL_BOOL(_hw_bus, OID_AUTO, disable_failed_devices, CTLFLAG_RWTUN, &disable_failed_devs,
+    0, "Do not retry attaching devices that return an error from DEVICE_ATTACH the first time");
 
 /*
  * Used to attach drivers to devclasses.
@@ -161,6 +156,7 @@ static MALLOC_DEFINE(M_BUS_SC, "bus-sc", "Bus data structures, softc");
 
 EVENTHANDLER_LIST_DEFINE(device_attach);
 EVENTHANDLER_LIST_DEFINE(device_detach);
+EVENTHANDLER_LIST_DEFINE(device_nomatch);
 EVENTHANDLER_LIST_DEFINE(dev_lookup);
 
 #ifdef COMPAT_FREEBSD32
@@ -392,506 +388,6 @@ device_sysctl_fini(device_t dev)
 	sysctl_ctx_free(&dev->sysctl_ctx);
 	dev->sysctl_tree = NULL;
 }
-
-/*
- * /dev/devctl implementation
- */
-
-/*
- * This design allows only one reader for /dev/devctl.  This is not desirable
- * in the long run, but will get a lot of hair out of this implementation.
- * Maybe we should make this device a clonable device.
- *
- * Also note: we specifically do not attach a device to the device_t tree
- * to avoid potential chicken and egg problems.  One could argue that all
- * of this belongs to the root node.
- */
-
-#define DEVCTL_DEFAULT_QUEUE_LEN 1000
-static int sysctl_devctl_queue(SYSCTL_HANDLER_ARGS);
-static int devctl_queue_length = DEVCTL_DEFAULT_QUEUE_LEN;
-SYSCTL_PROC(_hw_bus, OID_AUTO, devctl_queue, CTLTYPE_INT | CTLFLAG_RWTUN |
-    CTLFLAG_MPSAFE, NULL, 0, sysctl_devctl_queue, "I", "devctl queue length");
-
-static d_open_t		devopen;
-static d_close_t	devclose;
-static d_read_t		devread;
-static d_ioctl_t	devioctl;
-static d_poll_t		devpoll;
-static d_kqfilter_t	devkqfilter;
-
-static struct cdevsw dev_cdevsw = {
-	.d_version =	D_VERSION,
-	.d_open =	devopen,
-	.d_close =	devclose,
-	.d_read =	devread,
-	.d_ioctl =	devioctl,
-	.d_poll =	devpoll,
-	.d_kqfilter =	devkqfilter,
-	.d_name =	"devctl",
-};
-
-#define DEVCTL_BUFFER (1024 - sizeof(void *))
-struct dev_event_info {
-	STAILQ_ENTRY(dev_event_info) dei_link;
-	char dei_data[DEVCTL_BUFFER];
-};
-
-STAILQ_HEAD(devq, dev_event_info);
-
-static struct dev_softc {
-	int		inuse;
-	int		nonblock;
-	int		queued;
-	int		async;
-	struct mtx	mtx;
-	struct cv	cv;
-	struct selinfo	sel;
-	struct devq	devq;
-	struct sigio	*sigio;
-	uma_zone_t	zone;
-} devsoftc;
-
-static void	filt_devctl_detach(struct knote *kn);
-static int	filt_devctl_read(struct knote *kn, long hint);
-
-struct filterops devctl_rfiltops = {
-	.f_isfd = 1,
-	.f_detach = filt_devctl_detach,
-	.f_event = filt_devctl_read,
-};
-
-static struct cdev *devctl_dev;
-
-static void
-devinit(void)
-{
-	int reserve;
-	uma_zone_t z;
-
-	devctl_dev = make_dev_credf(MAKEDEV_ETERNAL, &dev_cdevsw, 0, NULL,
-	    UID_ROOT, GID_WHEEL, 0600, "devctl");
-	mtx_init(&devsoftc.mtx, "dev mtx", "devd", MTX_DEF);
-	cv_init(&devsoftc.cv, "dev cv");
-	STAILQ_INIT(&devsoftc.devq);
-	knlist_init_mtx(&devsoftc.sel.si_note, &devsoftc.mtx);
-	if (devctl_queue_length > 0) {
-		/*
-		 * Allocate a zone for the messages. Preallocate 2% of these for
-		 * a reserve. Allow only devctl_queue_length slabs to cap memory
-		 * usage.  The reserve usually allows coverage of surges of
-		 * events during memory shortages. Normally we won't have to
-		 * re-use events from the queue, but will in extreme shortages.
-		 */
-		z = devsoftc.zone = uma_zcreate("DEVCTL",
-		    sizeof(struct dev_event_info), NULL, NULL, NULL, NULL,
-		    UMA_ALIGN_PTR, 0);
-		reserve = max(devctl_queue_length / 50, 100);	/* 2% reserve */
-		uma_zone_set_max(z, devctl_queue_length);
-		uma_zone_set_maxcache(z, 0);
-		uma_zone_reserve(z, reserve);
-		uma_prealloc(z, reserve);
-	}
-	devctl2_init();
-}
-
-static int
-devopen(struct cdev *dev, int oflags, int devtype, struct thread *td)
-{
-	mtx_lock(&devsoftc.mtx);
-	if (devsoftc.inuse) {
-		mtx_unlock(&devsoftc.mtx);
-		return (EBUSY);
-	}
-	/* move to init */
-	devsoftc.inuse = 1;
-	mtx_unlock(&devsoftc.mtx);
-	return (0);
-}
-
-static int
-devclose(struct cdev *dev, int fflag, int devtype, struct thread *td)
-{
-	mtx_lock(&devsoftc.mtx);
-	devsoftc.inuse = 0;
-	devsoftc.nonblock = 0;
-	devsoftc.async = 0;
-	cv_broadcast(&devsoftc.cv);
-	funsetown(&devsoftc.sigio);
-	mtx_unlock(&devsoftc.mtx);
-	return (0);
-}
-
-/*
- * The read channel for this device is used to report changes to
- * userland in realtime.  We are required to free the data as well as
- * the n1 object because we allocate them separately.  Also note that
- * we return one record at a time.  If you try to read this device a
- * character at a time, you will lose the rest of the data.  Listening
- * programs are expected to cope.
- */
-static int
-devread(struct cdev *dev, struct uio *uio, int ioflag)
-{
-	struct dev_event_info *n1;
-	int rv;
-
-	mtx_lock(&devsoftc.mtx);
-	while (STAILQ_EMPTY(&devsoftc.devq)) {
-		if (devsoftc.nonblock) {
-			mtx_unlock(&devsoftc.mtx);
-			return (EAGAIN);
-		}
-		rv = cv_wait_sig(&devsoftc.cv, &devsoftc.mtx);
-		if (rv) {
-			/*
-			 * Need to translate ERESTART to EINTR here? -- jake
-			 */
-			mtx_unlock(&devsoftc.mtx);
-			return (rv);
-		}
-	}
-	n1 = STAILQ_FIRST(&devsoftc.devq);
-	STAILQ_REMOVE_HEAD(&devsoftc.devq, dei_link);
-	devsoftc.queued--;
-	mtx_unlock(&devsoftc.mtx);
-	rv = uiomove(n1->dei_data, strlen(n1->dei_data), uio);
-	uma_zfree(devsoftc.zone, n1);
-	return (rv);
-}
-
-static	int
-devioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread *td)
-{
-	switch (cmd) {
-	case FIONBIO:
-		if (*(int*)data)
-			devsoftc.nonblock = 1;
-		else
-			devsoftc.nonblock = 0;
-		return (0);
-	case FIOASYNC:
-		if (*(int*)data)
-			devsoftc.async = 1;
-		else
-			devsoftc.async = 0;
-		return (0);
-	case FIOSETOWN:
-		return fsetown(*(int *)data, &devsoftc.sigio);
-	case FIOGETOWN:
-		*(int *)data = fgetown(&devsoftc.sigio);
-		return (0);
-
-		/* (un)Support for other fcntl() calls. */
-	case FIOCLEX:
-	case FIONCLEX:
-	case FIONREAD:
-	default:
-		break;
-	}
-	return (ENOTTY);
-}
-
-static	int
-devpoll(struct cdev *dev, int events, struct thread *td)
-{
-	int	revents = 0;
-
-	mtx_lock(&devsoftc.mtx);
-	if (events & (POLLIN | POLLRDNORM)) {
-		if (!STAILQ_EMPTY(&devsoftc.devq))
-			revents = events & (POLLIN | POLLRDNORM);
-		else
-			selrecord(td, &devsoftc.sel);
-	}
-	mtx_unlock(&devsoftc.mtx);
-
-	return (revents);
-}
-
-static int
-devkqfilter(struct cdev *dev, struct knote *kn)
-{
-	int error;
-
-	if (kn->kn_filter == EVFILT_READ) {
-		kn->kn_fop = &devctl_rfiltops;
-		knlist_add(&devsoftc.sel.si_note, kn, 0);
-		error = 0;
-	} else
-		error = EINVAL;
-	return (error);
-}
-
-static void
-filt_devctl_detach(struct knote *kn)
-{
-	knlist_remove(&devsoftc.sel.si_note, kn, 0);
-}
-
-static int
-filt_devctl_read(struct knote *kn, long hint)
-{
-	kn->kn_data = devsoftc.queued;
-	return (kn->kn_data != 0);
-}
-
-/**
- * @brief Return whether the userland process is running
- */
-bool
-devctl_process_running(void)
-{
-	return (devsoftc.inuse == 1);
-}
-
-static struct dev_event_info *
-devctl_alloc_dei(void)
-{
-	struct dev_event_info *dei = NULL;
-
-	mtx_lock(&devsoftc.mtx);
-	if (devctl_queue_length == 0)
-		goto out;
-	dei = uma_zalloc(devsoftc.zone, M_NOWAIT);
-	if (dei == NULL)
-		dei = uma_zalloc(devsoftc.zone, M_NOWAIT | M_USE_RESERVE);
-	if (dei == NULL) {
-		/*
-		 * Guard against no items in the queue. Normally, this won't
-		 * happen, but if lots of events happen all at once and there's
-		 * a chance we're out of allocated space but none have yet been
-		 * queued when we get here, leaving nothing to steal. This can
-		 * also happen with error injection. Fail safe by returning
-		 * NULL in that case..
-		 */
-		if (devsoftc.queued == 0)
-			goto out;
-		dei = STAILQ_FIRST(&devsoftc.devq);
-		STAILQ_REMOVE_HEAD(&devsoftc.devq, dei_link);
-		devsoftc.queued--;
-	}
-	MPASS(dei != NULL);
-	*dei->dei_data = '\0';
-out:
-	mtx_unlock(&devsoftc.mtx);
-	return (dei);
-}
-
-static struct dev_event_info *
-devctl_alloc_dei_sb(struct sbuf *sb)
-{
-	struct dev_event_info *dei;
-
-	dei = devctl_alloc_dei();
-	if (dei != NULL)
-		sbuf_new(sb, dei->dei_data, sizeof(dei->dei_data), SBUF_FIXEDLEN);
-	return (dei);
-}
-
-static void
-devctl_free_dei(struct dev_event_info *dei)
-{
-	uma_zfree(devsoftc.zone, dei);
-}
-
-static void
-devctl_queue(struct dev_event_info *dei)
-{
-	mtx_lock(&devsoftc.mtx);
-	STAILQ_INSERT_TAIL(&devsoftc.devq, dei, dei_link);
-	devsoftc.queued++;
-	cv_broadcast(&devsoftc.cv);
-	KNOTE_LOCKED(&devsoftc.sel.si_note, 0);
-	mtx_unlock(&devsoftc.mtx);
-	selwakeup(&devsoftc.sel);
-	if (devsoftc.async && devsoftc.sigio != NULL)
-		pgsigio(&devsoftc.sigio, SIGIO, 0);
-}
-
-/**
- * @brief Send a 'notification' to userland, using standard ways
- */
-void
-devctl_notify(const char *system, const char *subsystem, const char *type,
-    const char *data)
-{
-	struct dev_event_info *dei;
-	struct sbuf sb;
-
-	if (system == NULL || subsystem == NULL || type == NULL)
-		return;
-	dei = devctl_alloc_dei_sb(&sb);
-	if (dei == NULL)
-		return;
-	sbuf_cpy(&sb, "!system=");
-	sbuf_cat(&sb, system);
-	sbuf_cat(&sb, " subsystem=");
-	sbuf_cat(&sb, subsystem);
-	sbuf_cat(&sb, " type=");
-	sbuf_cat(&sb, type);
-	if (data != NULL) {
-		sbuf_putc(&sb, ' ');
-		sbuf_cat(&sb, data);
-	}
-	sbuf_putc(&sb, '\n');
-	if (sbuf_finish(&sb) != 0)
-		devctl_free_dei(dei);	/* overflow -> drop it */
-	else
-		devctl_queue(dei);
-}
-
-/*
- * Common routine that tries to make sending messages as easy as possible.
- * We allocate memory for the data, copy strings into that, but do not
- * free it unless there's an error.  The dequeue part of the driver should
- * free the data.  We don't send data when the device is disabled.  We do
- * send data, even when we have no listeners, because we wish to avoid
- * races relating to startup and restart of listening applications.
- *
- * devaddq is designed to string together the type of event, with the
- * object of that event, plus the plug and play info and location info
- * for that event.  This is likely most useful for devices, but less
- * useful for other consumers of this interface.  Those should use
- * the devctl_notify() interface instead.
- *
- * Output: 
- *	${type}${what} at $(location dev) $(pnp-info dev) on $(parent dev)
- */
-static void
-devaddq(const char *type, const char *what, device_t dev)
-{
-	struct dev_event_info *dei;
-	const char *parstr;
-	struct sbuf sb;
-
-	dei = devctl_alloc_dei_sb(&sb);
-	if (dei == NULL)
-		return;
-	sbuf_cpy(&sb, type);
-	sbuf_cat(&sb, what);
-	sbuf_cat(&sb, " at ");
-
-	/* Add in the location */
-	bus_child_location(dev, &sb);
-	sbuf_putc(&sb, ' ');
-
-	/* Add in pnpinfo */
-	bus_child_pnpinfo(dev, &sb);
-
-	/* Get the parent of this device, or / if high enough in the tree. */
-	if (device_get_parent(dev) == NULL)
-		parstr = ".";	/* Or '/' ? */
-	else
-		parstr = device_get_nameunit(device_get_parent(dev));
-	sbuf_cat(&sb, " on ");
-	sbuf_cat(&sb, parstr);
-	sbuf_putc(&sb, '\n');
-	if (sbuf_finish(&sb) != 0)
-		goto bad;
-	devctl_queue(dei);
-	return;
-bad:
-	devctl_free_dei(dei);
-}
-
-/*
- * A device was added to the tree.  We are called just after it successfully
- * attaches (that is, probe and attach success for this device).  No call
- * is made if a device is merely parented into the tree.  See devnomatch
- * if probe fails.  If attach fails, no notification is sent (but maybe
- * we should have a different message for this).
- */
-static void
-devadded(device_t dev)
-{
-	devaddq("+", device_get_nameunit(dev), dev);
-}
-
-/*
- * A device was removed from the tree.  We are called just before this
- * happens.
- */
-static void
-devremoved(device_t dev)
-{
-	devaddq("-", device_get_nameunit(dev), dev);
-}
-
-/*
- * Called when there's no match for this device.  This is only called
- * the first time that no match happens, so we don't keep getting this
- * message.  Should that prove to be undesirable, we can change it.
- * This is called when all drivers that can attach to a given bus
- * decline to accept this device.  Other errors may not be detected.
- */
-static void
-devnomatch(device_t dev)
-{
-	devaddq("?", "", dev);
-}
-
-static int
-sysctl_devctl_queue(SYSCTL_HANDLER_ARGS)
-{
-	int q, error;
-
-	q = devctl_queue_length;
-	error = sysctl_handle_int(oidp, &q, 0, req);
-	if (error || !req->newptr)
-		return (error);
-	if (q < 0)
-		return (EINVAL);
-
-	/*
-	 * When set as a tunable, we've not yet initialized the mutex.
-	 * It is safe to just assign to devctl_queue_length and return
-	 * as we're racing no one. We'll use whatever value set in
-	 * devinit.
-	 */
-	if (!mtx_initialized(&devsoftc.mtx)) {
-		devctl_queue_length = q;
-		return (0);
-	}
-
-	/*
-	 * XXX It's hard to grow or shrink the UMA zone. Only allow
-	 * disabling the queue size for the moment until underlying
-	 * UMA issues can be sorted out.
-	 */
-	if (q != 0)
-		return (EINVAL);
-	if (q == devctl_queue_length)
-		return (0);
-	mtx_lock(&devsoftc.mtx);
-	devctl_queue_length = 0;
-	uma_zdestroy(devsoftc.zone);
-	devsoftc.zone = 0;
-	mtx_unlock(&devsoftc.mtx);
-	return (0);
-}
-
-/**
- * @brief safely quotes strings that might have double quotes in them.
- *
- * The devctl protocol relies on quoted strings having matching quotes.
- * This routine quotes any internal quotes so the resulting string
- * is safe to pass to snprintf to construct, for example pnp info strings.
- *
- * @param sb	sbuf to place the characters into
- * @param src	Original buffer.
- */
-void
-devctl_safe_quote_sb(struct sbuf *sb, const char *src)
-{
-	while (*src != '\0') {
-		if (*src == '"' || *src == '\\')
-			sbuf_putc(sb, '\\');
-		sbuf_putc(sb, *src++);
-	}
-}
-
-/* End of /dev/devctl code */
 
 static struct device_list bus_data_devices;
 static int bus_data_generation = 1;
@@ -1160,6 +656,14 @@ devclass_driver_added(devclass_t dc, driver_t *driver)
 	}
 }
 
+static void
+device_handle_nomatch(device_t dev)
+{
+	BUS_PROBE_NOMATCH(dev->parent, dev);
+	EVENTHANDLER_DIRECT_INVOKE(device_nomatch, dev);
+	dev->flags |= DF_DONENOMATCH;
+}
+
 /**
  * @brief Add a device driver to a device class
  *
@@ -1276,9 +780,7 @@ devclass_driver_deleted(devclass_t busclass, devclass_t dc, driver_t *driver)
 					dev->flags &= ~DF_DONENOMATCH;
 					dev->flags |= DF_NEEDNOMATCH;
 				} else {
-					BUS_PROBE_NOMATCH(dev->parent, dev);
-					devnomatch(dev);
-					dev->flags |= DF_DONENOMATCH;
+					device_handle_nomatch(dev);
 				}
 			}
 		}
@@ -2763,6 +2265,7 @@ device_get_property(device_t dev, const char *prop, void *val, size_t sz,
 	switch (type) {
 	case DEVICE_PROP_ANY:
 	case DEVICE_PROP_BUFFER:
+	case DEVICE_PROP_HANDLE:	/* Size checks done in implementation. */
 		break;
 	case DEVICE_PROP_UINT32:
 		if (sz % 4 != 0)
@@ -2997,9 +2500,7 @@ device_probe(device_t dev)
 	if ((error = device_probe_child(dev->parent, dev)) != 0) {
 		if (bus_current_pass == BUS_PASS_DEFAULT &&
 		    !(dev->flags & DF_DONENOMATCH)) {
-			BUS_PROBE_NOMATCH(dev->parent, dev);
-			devnomatch(dev);
-			dev->flags |= DF_DONENOMATCH;
+			device_handle_nomatch(dev);
 		}
 		return (error);
 	}
@@ -3071,16 +2572,34 @@ device_attach(device_t dev)
 	if ((error = DEVICE_ATTACH(dev)) != 0) {
 		printf("device_attach: %s%d attach returned %d\n",
 		    dev->driver->name, dev->unit, error);
-		if (!(dev->flags & DF_FIXEDCLASS))
-			devclass_delete_device(dev->devclass, dev);
-		(void)device_set_driver(dev, NULL);
-		device_sysctl_fini(dev);
-		KASSERT(dev->busy == 0, ("attach failed but busy"));
-		dev->state = DS_NOTPRESENT;
+		if (disable_failed_devs) {
+			/*
+			 * When the user has asked to disable failed devices, we
+			 * directly disable the device, but leave it in the
+			 * attaching state. It will not try to probe/attach the
+			 * device further. This leaves the device numbering
+			 * intact for other similar devices in the system. It
+			 * can be removed from this state with devctl.
+			 */
+			device_disable(dev);
+		} else {
+			/*
+			 * Otherwise, when attach fails, tear down the state
+			 * around that so we can retry when, for example, new
+			 * drivers are loaded.
+			 */
+			if (!(dev->flags & DF_FIXEDCLASS))
+				devclass_delete_device(dev->devclass, dev);
+			(void)device_set_driver(dev, NULL);
+			device_sysctl_fini(dev);
+			KASSERT(dev->busy == 0, ("attach failed but busy"));
+			dev->state = DS_NOTPRESENT;
+		}
 		return (error);
 	}
 	dev->flags |= DF_ATTACHED_ONCE;
-	/* We only need the low bits of this time, but ranges from tens to thousands
+	/*
+	 * We only need the low bits of this time, but ranges from tens to thousands
 	 * have been seen, so keep 2 bytes' worth.
 	 */
 	attachentropy = (uint16_t)(get_cyclecount() - attachtime);
@@ -3089,7 +2608,6 @@ device_attach(device_t dev)
 	dev->state = DS_ATTACHED;
 	dev->flags &= ~DF_DONENOMATCH;
 	EVENTHANDLER_DIRECT_INVOKE(device_attach, dev);
-	devadded(dev);
 	return (0);
 }
 
@@ -3135,7 +2653,6 @@ device_detach(device_t dev)
 		EVENTHANDLER_DIRECT_INVOKE(device_detach, dev,
 		    EVHDEV_DETACH_COMPLETE);
 	}
-	devremoved(dev);
 	if (!device_is_quiet(dev))
 		device_printf(dev, "detached\n");
 	if (dev->parent)
@@ -5243,7 +4760,6 @@ root_resume(device_t dev)
 
 	error = bus_generic_resume(dev);
 	if (error == 0) {
-		devctl_notify("kern", "power", "resume", NULL); /* Deprecated gone in 14 */
 		devctl_notify("kernel", "power", "resume", NULL);
 	}
 	return (error);
@@ -5338,7 +4854,7 @@ root_bus_module_handler(module_t mod, int what, void* arg)
 		root_bus->driver = &root_driver;
 		root_bus->state = DS_ATTACHED;
 		root_devclass = devclass_find_internal("root", NULL, FALSE);
-		devinit();
+		devctl2_init();
 		return (0);
 
 	case MOD_SHUTDOWN:
@@ -5806,9 +5322,7 @@ device_gen_nomatch(device_t dev)
 
 	if (dev->flags & DF_NEEDNOMATCH &&
 	    dev->state == DS_NOTPRESENT) {
-		BUS_PROBE_NOMATCH(dev->parent, dev);
-		devnomatch(dev);
-		dev->flags |= DF_DONENOMATCH;
+		device_handle_nomatch(dev);
 	}
 	dev->flags &= ~DF_NEEDNOMATCH;
 	TAILQ_FOREACH(child, &dev->children, link) {
@@ -5846,27 +5360,26 @@ device_do_deferred_actions(void)
 	bus_data_generation_update();
 }
 
-static char *
-device_get_path(device_t dev, const char *locator)
+static int
+device_get_path(device_t dev, const char *locator, struct sbuf *sb)
 {
-	struct sbuf *sb;
-	ssize_t len;
-	char *rv = NULL;
+	device_t parent;
 	int error;
 
-	sb = sbuf_new(NULL, NULL, 0, SBUF_AUTOEXTEND | SBUF_INCLUDENUL);
-	error = BUS_GET_DEVICE_PATH(device_get_parent(dev), dev, locator, sb);
-	sbuf_finish(sb);	/* Note: errors checked with sbuf_len() below */
-	if (error != 0)
-		goto out;
-	len = sbuf_len(sb);
-	if (len <= 1)
-		goto out;
-	rv = malloc(len, M_BUS, M_NOWAIT);
-	memcpy(rv, sbuf_data(sb), len);
-out:
-	sbuf_delete(sb);
-	return (rv);
+	KASSERT(sb != NULL, ("sb is NULL"));
+	parent = device_get_parent(dev);
+	if (parent == NULL) {
+		error = sbuf_printf(sb, "/");
+	} else {
+		error = BUS_GET_DEVICE_PATH(parent, dev, locator, sb);
+		if (error == 0) {
+			error = sbuf_error(sb);
+			if (error == 0 && sbuf_len(sb) <= 1)
+				error = EIO;
+		}
+	}
+	sbuf_finish(sb);
+	return (error);
 }
 
 static int
@@ -6170,26 +5683,28 @@ devctl2_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		    req->dr_flags);
 		break;
 	case DEV_GET_PATH: {
+		struct sbuf *sb;
 		char locator[64];
-		char *path;
 		ssize_t len;
 
-		error = copyinstr(req->dr_buffer.buffer, locator, sizeof(locator), NULL);
-		if (error)
+		error = copyinstr(req->dr_buffer.buffer, locator,
+		    sizeof(locator), NULL);
+		if (error != 0)
 			break;
-		path = device_get_path(dev, locator);
-		if (path == NULL) {
-			error = ENOMEM;
-			break;
+		sb = sbuf_new(NULL, NULL, 0, SBUF_AUTOEXTEND |
+		    SBUF_INCLUDENUL /* | SBUF_WAITOK */);
+		error = device_get_path(dev, locator, sb);
+		if (error == 0) {
+			len = sbuf_len(sb);
+			if (req->dr_buffer.length < len) {
+				error = ENAMETOOLONG;
+			} else {
+				error = copyout(sbuf_data(sb),
+				    req->dr_buffer.buffer, len);
+			}
+			req->dr_buffer.length = len;
 		}
-		len = strlen(path) + 1;
-		if (req->dr_buffer.length < len) {
-			error = ENAMETOOLONG;
-		} else {
-			error = copyout(path, req->dr_buffer.buffer, len);
-		}
-		req->dr_buffer.length = len;
-		free(path, M_BUS);
+		sbuf_delete(sb);
 		break;
 	}
 	}
@@ -6245,8 +5760,6 @@ dev_wired_cache_fini(device_location_cache_t *dcp)
 	struct device_location_node *dln, *tdln;
 
 	TAILQ_FOREACH_SAFE(dln, &dcp->dlc_list, dln_link, tdln) {
-		/* Note: one allocation for both node and locator, but not path */
-		free(__DECONST(void *, dln->dln_path), M_BUS);
 		free(dln, M_BUS);
 	}
 	free(dcp, M_BUS);
@@ -6269,23 +5782,28 @@ static struct device_location_node *
 dev_wired_cache_add(device_location_cache_t *dcp, const char *locator, const char *path)
 {
 	struct device_location_node *dln;
-	char *l;
+	size_t loclen, pathlen;
 
-	dln = malloc(sizeof(*dln) + strlen(locator) + 1, M_BUS, M_WAITOK | M_ZERO);
-	dln->dln_locator = l = (char *)(dln + 1);
-	memcpy(l, locator, strlen(locator) + 1);
-	dln->dln_path = path;
+	loclen = strlen(locator) + 1;
+	pathlen = strlen(path) + 1;
+	dln = malloc(sizeof(*dln) + loclen + pathlen, M_BUS, M_WAITOK | M_ZERO);
+	dln->dln_locator = (char *)(dln + 1);
+	memcpy(__DECONST(char *, dln->dln_locator), locator, loclen);
+	dln->dln_path = dln->dln_locator + loclen;
+	memcpy(__DECONST(char *, dln->dln_path), path, pathlen);
 	TAILQ_INSERT_HEAD(&dcp->dlc_list, dln, dln_link);
 
 	return (dln);
 }
 
 bool
-dev_wired_cache_match(device_location_cache_t *dcp, device_t dev, const char *at)
+dev_wired_cache_match(device_location_cache_t *dcp, device_t dev,
+    const char *at)
 {
-	const char *cp, *path;
+	struct sbuf *sb;
+	const char *cp;
 	char locator[32];
-	int len;
+	int error, len;
 	struct device_location_node *res;
 
 	cp = strchr(at, ':');
@@ -6298,13 +5816,22 @@ dev_wired_cache_match(device_location_cache_t *dcp, device_t dev, const char *at
 	locator[len] = '\0';
 	cp++;
 
+	error = 0;
 	/* maybe cache this inside device_t and look that up, but not yet */
 	res = dev_wired_cache_lookup(dcp, locator);
 	if (res == NULL) {
-		path = device_get_path(dev, locator);
-		res = dev_wired_cache_add(dcp, locator, path);
+		sb = sbuf_new(NULL, NULL, 0, SBUF_AUTOEXTEND |
+		    SBUF_INCLUDENUL | SBUF_NOWAIT);
+		if (sb != NULL) {
+			error = device_get_path(dev, locator, sb);
+			if (error == 0) {
+				res = dev_wired_cache_add(dcp, locator,
+				    sbuf_data(sb));
+			}
+			sbuf_delete(sb);
+		}
 	}
-	if (res == NULL || res->dln_path == NULL)
+	if (error != 0 || res == NULL || res->dln_path == NULL)
 		return (false);
 
 	return (strcmp(res->dln_path, cp) == 0);
@@ -6393,9 +5920,10 @@ DB_SHOW_ALL_COMMAND(devices, db_show_all_devices)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20200803,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
+//     "support",
 //     "kdb"
 //   ]
 // }

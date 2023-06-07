@@ -153,8 +153,7 @@ vm_mem_init(void *dummy)
 void
 vm_ksubmap_init(struct kva_md_info *kmi)
 {
-	vm_pointer_t firstaddr;
-	caddr_t v;
+	caddr_t firstaddr, v;
 	vm_size_t size = 0;
 	long physmem_est;
 	vm_pointer_t minaddr;
@@ -173,9 +172,9 @@ vm_ksubmap_init(struct kva_md_info *kmi)
 	 * needed and allocates it.  The second pass assigns virtual
 	 * addresses to the various data structures.
 	 */
-	firstaddr = 0;
+	firstaddr = NULL;
 again:
-	v = (caddr_t)firstaddr;
+	v = firstaddr;
 
 	/*
 	 * Discount the physical memory larger than the size of kernel_map
@@ -189,7 +188,7 @@ again:
 	/*
 	 * End of first pass, size has been calculated so allocate memory
 	 */
-	if (firstaddr == 0) {
+	if (firstaddr == NULL) {
 		size = (vm_size_t)v;
 #ifdef VM_FREELIST_DMA32
 		/*
@@ -198,10 +197,10 @@ again:
 		 */
 		firstaddr = kmem_alloc_attr(size, M_ZERO | M_NOWAIT,
 		    (vm_paddr_t)1 << 32, ~(vm_paddr_t)0, VM_MEMATTR_DEFAULT);
-		if (firstaddr == 0)
+		if (firstaddr == NULL)
 #endif
 			firstaddr = kmem_malloc(size, M_ZERO | M_WAITOK);
-		if (firstaddr == 0)
+		if (firstaddr == NULL)
 			panic("startup: no room for tables");
 		goto again;
 	}
@@ -222,15 +221,15 @@ again:
 #ifdef __CHERI_PURE_CAPABILITY__
 	size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
-	firstaddr = kva_alloc(size);
+	firstaddr = (caddr_t)kva_alloc(size);
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_getlen(firstaddr) == size,
 	    ("Inexact bounds expected %zx found %zx",
 	    (size_t)size, (size_t)cheri_getlen(firstaddr)));
 #endif
-	kmi->buffer_sva = (vm_offset_t)firstaddr;
+	kmi->buffer_sva = (vm_pointer_t)firstaddr;
 	kmi->buffer_eva = kmi->buffer_sva + size;
-	vmem_init(buffer_arena, "buffer arena", firstaddr, size,
+	vmem_init(buffer_arena, "buffer arena", (vm_pointer_t)firstaddr, size,
 	    PAGE_SIZE, (mp_ncpus > 4) ? BKVASIZE * 8 : 0, M_WAITOK,
 	    VMEM_CAPABILITY_ARENA);
 
@@ -242,16 +241,16 @@ again:
 #ifdef __CHERI_PURE_CAPABILITY__
 		size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
-		firstaddr = kva_alloc(size);
+		firstaddr = (caddr_t)kva_alloc(size);
 #ifdef __CHERI_PURE_CAPABILITY__
 		KASSERT(cheri_getlen(firstaddr) == size,
 		    ("Inexact bounds expected %zx found %zx",
 		    (size_t)size, (size_t)cheri_getlen(firstaddr)));
 #endif
-		kmi->transient_sva = (vm_offset_t)firstaddr;
+		kmi->transient_sva = (vm_pointer_t)firstaddr;
 		kmi->transient_eva = kmi->transient_sva + size;
 		vmem_init(transient_arena, "transient arena",
-		    firstaddr, size, PAGE_SIZE, 0, M_WAITOK,
+		    (vm_pointer_t)firstaddr, size, PAGE_SIZE, 0, M_WAITOK,
 		    VMEM_CAPABILITY_ARENA);
 	}
 
@@ -274,10 +273,11 @@ again:
 }
 // CHERI CHANGES START
 // {
-//   "updated": 2020706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "bounds_compression"
+//     "bounds_compression",
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

@@ -1,11 +1,12 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20181113,
+ *   "updated": 20221129,
  *   "target_type": "lib",
  *   "changes": [
- *     "cheriabi_support"
- *   ]
+ *     "support"
+ *   ],
+ *   "change_comment": "cheriabi support"
  * }
  * CHERI CHANGES END
  */

@@ -22,8 +22,9 @@ namespace __sanitizer {
 uptr StackTrace::GetNextInstructionPc(uptr pc) {
 #if defined(__sparc__) || defined(__mips__)
   return pc + 8;
-#elif defined(__powerpc__) || defined(__arm__) || defined(__aarch64__)
-  return pc + 4;
+#elif defined(__powerpc__) || defined(__arm__) || defined(__aarch64__) || \
+    defined(__hexagon__)
+  return STRIP_PAC_PC((void *)pc) + 4;
 #elif SANITIZER_RISCV64
   // Current check order is 4 -> 2 -> 6 -> 8
   u8 InsnByte = *(u8 *)(pc);
@@ -55,7 +56,7 @@ uptr StackTrace::GetCurrentPc() {
   return GET_CALLER_PC();
 }
 
-void BufferedStackTrace::Init(const vaddr *pcs, usize cnt, bool extra_top_pc) {
+void BufferedStackTrace::Init(const uptr *pcs, usize cnt, uptr extra_top_pc) {
   size = cnt + !!extra_top_pc;
   CHECK_LE(size, kStackTraceMax);
   internal_memcpy(trace_buffer, pcs, cnt * sizeof(trace_buffer[0]));
@@ -64,7 +65,7 @@ void BufferedStackTrace::Init(const vaddr *pcs, usize cnt, bool extra_top_pc) {
   top_frame_bp = 0;
 }
 
-// Sparc implemention is in its own file.
+// Sparc implementation is in its own file.
 #if !defined(__sparc__)
 
 // In GCC on ARM bp points to saved lr, not fp, so we should check the next
@@ -156,7 +157,7 @@ void BufferedStackTrace::PopStackFrames(usize count) {
 
 static vaddr Distance(vaddr a, vaddr b) { return a < b ? b - a : a - b; }
 
-usize BufferedStackTrace::LocatePcInTrace(vaddr pc) {
+usize BufferedStackTrace::LocatePcInTrace(uptr pc) {
   usize best = 0;
   for (usize i = 1; i < size; ++i) {
     if (Distance(trace[i], pc) < Distance(trace[best], pc)) best = i;

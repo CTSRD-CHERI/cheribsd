@@ -134,11 +134,6 @@ struct ptrace_io_desc32 {
 	uint32_t	piod_len;
 };
 
-struct ptrace_sc_ret32 {
-	uint32_t	sr_retval[2];
-	int		sr_error;
-};
-
 struct ptrace_vm_entry32 {
 	int		pve_entry;
 	int		pve_timestamp;
@@ -904,6 +899,7 @@ freebsd32_ptrace(struct thread *td, struct freebsd32_ptrace_args *uap)
 		struct ptrace_lwpinfo pl;
 		struct ptrace_vm_entry pve;
 		struct ptrace_coredump pc;
+		struct ptrace_sc_remote sr;
 		struct dbreg32 dbreg;
 		struct fpreg32 fpreg;
 		struct reg32 reg;
@@ -917,10 +913,13 @@ freebsd32_ptrace(struct thread *td, struct freebsd32_ptrace_args *uap)
 		struct ptrace_lwpinfo32 pl;
 		struct ptrace_vm_entry32 pve;
 		struct ptrace_coredump32 pc;
+		struct ptrace_sc_remote32 sr;
 		uint32_t args[nitems(td->td_sa.args)];
 		struct ptrace_sc_ret32 psr;
 		struct iovec32 vec;
 	} r32;
+	syscallarg_t pscr_args[nitems(td->td_sa.args)];
+	u_int pscr_args32[nitems(td->td_sa.args)];
 	void * __capability addr;
 	int data, error, i;
 
@@ -1019,6 +1018,28 @@ freebsd32_ptrace(struct thread *td, struct freebsd32_ptrace_args *uap)
 		r.pc.pc_limit = PAIR32TO64(off_t, r32.pc.pc_limit);
 		data = sizeof(r.pc);
 		break;
+	case PT_SC_REMOTE:
+		if (uap->data != sizeof(r32.sr)) {
+			error = EINVAL;
+			break;
+		}
+		error = copyin(uap->addr, &r32.sr, uap->data);
+		if (error != 0)
+			break;
+		CP(r32.sr, r.sr, pscr_syscall);
+		CP(r32.sr, r.sr, pscr_nargs);
+		if (r.sr.pscr_nargs > nitems(td->td_sa.args)) {
+			error = EINVAL;
+			break;
+		}
+		error = copyin(PTRIN(r32.sr.pscr_args), pscr_args32,
+		    sizeof(u_int) * r32.sr.pscr_nargs);
+		if (error != 0)
+			break;
+		for (i = 0; i < r32.sr.pscr_nargs; i++)
+			pscr_args[i] = pscr_args32[i];
+		r.sr.pscr_args = pscr_args;
+		break;
 	default:
 		addr = uap->addr;
 		break;
@@ -1078,6 +1099,12 @@ freebsd32_ptrace(struct thread *td, struct freebsd32_ptrace_args *uap)
 		ptrace_sc_ret_to32(&r.psr, &r32.psr);
 		error = copyout(&r32.psr, uap->addr, MIN(uap->data,
 		    sizeof(r32.psr)));
+		break;
+	case PT_SC_REMOTE:
+		ptrace_sc_ret_to32(&r.sr.pscr_ret, &r32.sr.pscr_ret);
+		error = copyout(&r32.sr.pscr_ret, uap->addr +
+		    offsetof(struct ptrace_sc_remote32, pscr_ret),
+		    sizeof(r32.psr));
 		break;
 	}
 
@@ -1234,11 +1261,7 @@ freebsd32_copyoutmsghdr(struct msghdr *msg, struct msghdr32 *msg32)
 	return (error);
 }
 
-#ifndef __mips__
 #define FREEBSD32_ALIGNBYTES	(sizeof(int) - 1)
-#else
-#define FREEBSD32_ALIGNBYTES	(sizeof(long) - 1)
-#endif
 #define FREEBSD32_ALIGN(p)	\
 	(((u_long)(p) + FREEBSD32_ALIGNBYTES) & ~FREEBSD32_ALIGNBYTES)
 #define	FREEBSD32_CMSG_SPACE(l)	\
@@ -1459,6 +1482,7 @@ freebsd32_copyin_control(struct mbuf **mp, caddr_t buf, u_int buflen)
 	u_int msglen, outlen;
 	int error;
 
+	/* Enforce the size limit of the native implementation. */
 	if (buflen > MCLBYTES)
 		return (EINVAL);
 
@@ -1479,35 +1503,39 @@ freebsd32_copyin_control(struct mbuf **mp, caddr_t buf, u_int buflen)
 			break;
 		}
 		cm = (struct cmsghdr *)in1;
-		if (cm->cmsg_len < FREEBSD32_ALIGN(sizeof(*cm))) {
+		if (cm->cmsg_len < FREEBSD32_ALIGN(sizeof(*cm)) ||
+		    cm->cmsg_len > buflen) {
 			error = EINVAL;
 			break;
 		}
 		msglen = FREEBSD32_ALIGN(cm->cmsg_len);
-		if (msglen > buflen || msglen < cm->cmsg_len) {
+		if (msglen < cm->cmsg_len) {
 			error = EINVAL;
 			break;
 		}
+		/* The native ABI permits the final padding to be omitted. */
+		if (msglen > buflen)
+			msglen = buflen;
 		buflen -= msglen;
 
 		in1 = (char *)in1 + msglen;
 		outlen += CMSG_ALIGN(sizeof(*cm)) +
 		    CMSG_ALIGN(msglen - FREEBSD32_ALIGN(sizeof(*cm)));
 	}
-	if (error == 0 && outlen > MCLBYTES) {
-		/*
-		 * XXXMJ This implies that the upper limit on 32-bit aligned
-		 * control messages is less than MCLBYTES, and so we are not
-		 * perfectly compatible.  However, there is no platform
-		 * guarantee that mbuf clusters larger than MCLBYTES can be
-		 * allocated.
-		 */
-		error = EINVAL;
-	}
 	if (error != 0)
 		goto out;
 
+	/*
+	 * Allocate up to MJUMPAGESIZE space for the re-aligned and
+	 * re-padded control messages.  This allows a full MCLBYTES of
+	 * 32-bit sized and aligned messages to fit and avoids an ABI
+	 * mismatch with the native implementation.
+	 */
 	m = m_get2(outlen, M_WAITOK, MT_CONTROL, 0);
+	if (m == NULL) {
+		error = EINVAL;
+		goto out;
+	}
 	m->m_len = outlen;
 	md = mtod(m, void *);
 
@@ -3923,7 +3951,7 @@ ofreebsd32_sethostid(struct thread *td, struct ofreebsd32_sethostid_args *uap)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20221129,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
