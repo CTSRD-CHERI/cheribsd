@@ -48,4 +48,6 @@
 #define	XFAIL_VARARG_BOUNDS	"varargs bounds known to be unimplemented"
 #endif
 
+#define	CAPREG_PCC(capreg)	((capreg)->sepcc)
+
 #endif /* !_CHERIBSDTEST_H_ */
