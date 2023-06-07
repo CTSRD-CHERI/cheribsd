@@ -122,6 +122,7 @@ struct ptrace_io_desc {
 #define PIOD_WRITE_I	4	/* Write to I space */
 #define	PIOD_READ_CHERI_TAGS	5	/* Read packed memory tags */
 #define	PIOD_READ_CHERI_CAP	7	/* Read CHERI capabilities */
+#define	PIOD_WRITE_CHERI_CAP	8	/* Write CHERI capabilities */
 
 /* Argument structure for PT_LWPINFO. */
 struct ptrace_lwpinfo {

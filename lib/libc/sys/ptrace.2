@@ -408,6 +408,7 @@ struct ptrace_io_desc {
 #define PIOD_WRITE_I	4	/* Write to I space */
 #define PIOD_READ_CHERI_TAGS	5	/* Read packed memory tags */
 #define	PIOD_READ_CHERI_CAP	7	/* Read CHERI capabilities */
+#define	PIOD_WRITE_CHERI_CAP	8	/* Write CHERI capabilities */
 .Ed
 .Pp
 The
@@ -439,6 +440,19 @@ The address must be aligned to the size of a capability.
 Each capability is stored as a single byte holding the tag followed by
 the capability bytes as would be returned by a corresponding call using
 .Dv PIOD_READ_D .
+.Fa piod_len
+must be a multiple of the expanded value size and specifies the size of
+the expanded value buffer,
+not the amount of target address space.
+.Pp
+.Dv PIOD_WRITE_CHERI_CAP
+stores one or more capabilities starting at the virtual address
+.Fa piod_offs
+in the traced process's address space.
+The address must be aligned to the size of a capability.
+Each capability must be provided in the same expanded format returned by
+.Dv PIOD_READ_CHERI_CAP :
+a single byte holding the tag followed by the capability bytes.
 .Fa piod_len
 must be a multiple of the expanded value size and specifies the size of
 the expanded value buffer,
