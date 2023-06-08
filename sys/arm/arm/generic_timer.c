@@ -276,13 +276,13 @@ tmr_setup_user_access(void *arg __unused)
 		smp_rendezvous(NULL, setup_user_access, NULL, NULL);
 #ifdef __aarch64__
 #if __has_feature(capabilities)
-                /*
-                 * This is required for Morello, because access to cntfrq_el0
-                 * is gated by the Access System Registers permission,
-                 * making it inaccessible to user space.
-                 * We emulate access here to work around this issue.
-                 */
-                install_undef_handler(true, cntfrq_handler);
+		/*
+		 * This is required for Morello, because access to cntfrq_el0
+		 * is gated by the Access System Registers permission,
+		 * making it inaccessible to user space.
+		 * We emulate access here to work around this issue.
+		 */
+		install_undef_handler(true, cntfrq_handler);
 #endif
 #endif
 	}
