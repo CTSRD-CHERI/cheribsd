@@ -190,6 +190,56 @@ In this case requests return
 .Xr EPERM
 error.
 .El
+.Sh INJECTING CHERI CAPABILITIES
+.Pp
+Some requests such as
+.Dv PT_SETCAPREGS
+and
+.Dv PT_IO
+can inject tagged CHERI capabilities into the target process.
+The tag for these capabilities is stored separately from the rest of the
+capability,
+so the kernel must derive the requested capability from an existing
+capability.
+There are multiple classes of capabilities the kernel can use as the
+root for deriving a requested capability.
+The kernel will attempt to derive requested capabilities from all of
+the levels less than or equal to the current value of the
+.Dv security.cheri.ptrace_caps
+sysctl.
+The following levels are available:
+.Bl -tag
+.It 0
+Any tagged, unsealed capability in a user register of any thread in the
+target process can be used as a root.
+In addition, tagged and sealed capabilities equal to an existing user
+register of any thread in the target process can be injected.
+Sentry capabilities can be injected if they can be derived from an
+existing executable capability in a user register.
+.It 1
+Capabilities corresponding to any existing reservations in the address
+space of the target process can be used as root.
+Sentry capabilities can be injected if they can be derived from an
+executable mapping in the address space.
+.It 2
+A capability spanning the entire user address space can be used as the root.
+This permits injecting arbitrary
+.Pq forged
+user capabilities,
+including capabilities sealed with an arbitrary user object type.
+.El
+.Pp
+If a requested capability cannot be derived,
+the operation will fail with
+.Er EPROT .
+The
+.Dv security.cheri.stats.untagged_ptrace_caps
+sysctl counts the number of capability injection attempts which failed.
+.Pp
+The
+.Dv security.cheri.stats.forged_ptrace_caps
+sysctl counts the number of forged injected capabilities
+.Pq derived at level 2 .
 .Sh TRACING EVENTS
 .Pp
 Each traced process has a tracing event mask.
@@ -1463,6 +1513,12 @@ cannot return the pathname of the backing object because the buffer is not big
 enough.
 .Fa pve_pathlen
 holds the minimum buffer size required on return.
+.El
+.It Bq Er EPROT
+.Bl -bullet -compact
+.It
+A request attempted to inject a tagged CHERI capability that could not be
+derived.
 .El
 .El
 .Sh SEE ALSO
