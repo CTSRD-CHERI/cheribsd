@@ -306,7 +306,7 @@ MACHINE_CPU += riscv
 .if ${MACHINE_CPUARCH} == "aarch64"
 . if ${MACHINE_CPU:Mcheri}
 CFLAGS+=	-march=morello
-CFLAGS+=	-Xclang -morello-vararg=new -Xclang -morello-bounded-memargs-caller-only
+CFLAGS+=	-Xclang -morello-vararg=new -Xclang -morello-bounded-memargs=caller-only
 LDFLAGS+=	-march=morello
 . endif
 
