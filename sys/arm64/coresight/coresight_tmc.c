@@ -243,7 +243,7 @@ printf("%s\n", __func__);
 	reg |= AXICTL_WRBURSTLEN_16;
 	if (sc->scatter_gather)
 		reg |= AXICTL_SG_MODE;
-	//reg |= AXICTL_AXCACHE_OS;
+	/* reg |= AXICTL_AXCACHE_OS; */
 	bus_write_4(sc->res[0], TMC_AXICTL, reg);
 
 	reg = FFCR_EN_FMT | FFCR_EN_TI | FFCR_FON_FLIN |
@@ -342,7 +342,7 @@ tmc_configure(device_t dev, struct coresight_event *event)
 	dirpg = 1;
 
 	for (i = 0; i < nentries - 1; i++) {
-		//printf("entry %d dirpg %d\n", i, dirpg);
+		dprintf("entry %d dirpg %d\n", i, dirpg);
 
 		if (sgtentry == (SG_PT_ENTIRES_PER_PAGE - 1)) {
 			type = ETR_SG_ET_LINK;
@@ -460,17 +460,11 @@ tmc_start_event(device_t dev, struct endpoint *endp,
 	 * We allow only one running configuration.
 	 */
 
-	//if (event->etr.flags & ETR_FLAG_ALLOCATE) {
-	//	event->etr.flags &= ~ETR_FLAG_ALLOCATE;
-		nev = atomic_fetchadd_int(&sc->nev, 1);
-		if (nev == 0) {
-printf("%s\n", __func__);
-			sc->event = event;
-			//tmc_stop(dev);
-			tmc_configure_etr(dev, endp, event);
-			tmc_start(dev);
-		}
-	//}
+	nev = atomic_fetchadd_int(&sc->nev, 1);
+	if (nev == 0) {
+		tmc_configure_etr(dev, endp, event);
+		tmc_start(dev);
+	}
 
 	return (0);
 }
@@ -490,15 +484,9 @@ tmc_stop_event(device_t dev, struct endpoint *endp,
 
 	KASSERT(sc->dev_type == CORESIGHT_ETR, ("Wrong dev_type"));
 
-	//if (event->etr.flags & ETR_FLAG_RELEASE) {
-	//	event->etr.flags &= ~ETR_FLAG_RELEASE;
-		nev = atomic_fetchadd_int(&sc->nev, -1);
-		if (nev == 1) {
-printf("%s\n", __func__);
-			tmc_stop(dev);
-			sc->event = NULL;
-		}
-	//}
+	nev = atomic_fetchadd_int(&sc->nev, -1);
+	if (nev == 1)
+		tmc_stop(dev);
 }
 
 static void
@@ -549,27 +537,6 @@ tmc_read(device_t dev, struct endpoint *endp, struct coresight_event *event)
 		event->etr.curpage_offset = ptr & 0xfff;
 		printf("CUR_PTR %lx, page %d of %d, offset %ld\n",
 		    ptr, i, event->etr.npages, event->etr.curpage_offset);
-	}
-
-	return (0);
-
-	uint64_t cur_ptr;
-
-	/*
-	 * Ensure the event we are reading information for
-	 * is currently configured one.
-	 */
-	if (sc->event != event)
-		return (0);
-
-	if (bus_read_4(sc->res[0], TMC_STS) & STS_FULL) {
-		event->etr.offset = 0;
-		event->etr.cycle++;
-		tmc_stop(dev);
-		tmc_start(dev);
-	} else {
-		cur_ptr = bus_read_4(sc->res[0], TMC_RWP);
-		event->etr.offset = (cur_ptr - event->etr.low);
 	}
 
 	return (0);
