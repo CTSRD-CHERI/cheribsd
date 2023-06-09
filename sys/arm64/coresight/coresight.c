@@ -42,6 +42,15 @@
 #include <arm64/coresight/coresight.h>
 #include <dev/hwt/hwtvar.h>
 
+#define	CORESIGHT_DEBUG
+#undef CORESIGHT_DEBUG
+
+#ifdef CORESIGHT_DEBUG
+#define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)
+#else
+#define	dprintf(fmt, ...)
+#endif
+
 static struct mtx cs_mtx;
 struct coresight_device_list cs_devs;
 
@@ -53,9 +62,7 @@ coresight_event_init(struct hwt_context *hwt)
 {
 	struct coresight_event *event;
 
-#if 0
-	printf("%s: cpu_id %d\n", __func__, hwt->cpu_id);
-#endif
+	dprintf("%s: cpu_id %d\n", __func__, hwt->cpu_id);
 
 	event = &cs_event[hwt->cpu_id];
 	memset(event, 0, sizeof(struct coresight_event));
@@ -84,9 +91,7 @@ coresight_event_start(struct hwt_context *hwt)
 {
 	struct coresight_event *event;
 
-#if 0
-	printf("%s: cpu_id %d\n", __func__, hwt->cpu_id);
-#endif
+	dprintf("%s: cpu_id %d\n", __func__, hwt->cpu_id);
 
 	event = &cs_event[hwt->cpu_id];
 
