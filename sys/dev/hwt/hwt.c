@@ -68,7 +68,7 @@
 #define	HWT_OWNERHASH_SIZE	1024
 
 /* No real reason for this limitation except sanity checks. */
-#define	HWT_MAXBUFSIZE		(8U * 1024 * 1024 * 1024) /* 8 GB */
+#define	HWT_MAXBUFSIZE		(1U * 1024 * 1024 * 1024) /* 1 GB */
 
 /*
  * Hash function.  Discard the lower 2 bits of the pointer since
