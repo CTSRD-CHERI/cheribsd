@@ -60,7 +60,6 @@ coresight_event_init(struct hwt_context *hwt)
 	event->etr.started = 0;
 	event->etr.low = 0;
 	event->etr.high = 0;
-	event->etr.flags = ETR_FLAG_ALLOCATE;
 	event->etr.pages = hwt->pages;
 	event->etr.npages = hwt->npages;
 	event->etr.bufsize = hwt->npages * PAGE_SIZE;
