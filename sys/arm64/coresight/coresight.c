@@ -199,7 +199,8 @@ coresight_get_output_endpoint(struct coresight_platform_data *pdata)
 }
 
 struct coresight_device *
-coresight_get_output_device(struct coresight_device *cs_dev0, struct endpoint *endp, struct endpoint **out_endp)
+coresight_get_output_device(struct coresight_device *cs_dev0,
+    struct endpoint *endp, struct endpoint **out_endp)
 {
 	struct coresight_platform_data *pdata;
 	struct coresight_device *cs_dev;
@@ -212,8 +213,11 @@ coresight_get_output_device(struct coresight_device *cs_dev0, struct endpoint *e
 			case CORESIGHT_BUS_FDT:
 #ifdef FDT
 				if (endp->their_node == endp2->my_node) {
-					*out_endp = malloc(sizeof(struct endpoint), M_CORESIGHT, M_WAITOK | M_ZERO);
-					memcpy(*out_endp, endp2, sizeof(struct endpoint));
+					*out_endp =
+					    malloc(sizeof(struct endpoint),
+						M_CORESIGHT, M_WAITOK | M_ZERO);
+					memcpy(*out_endp, endp2,
+					    sizeof(struct endpoint));
 					return (cs_dev);
 				}
 #endif
@@ -222,8 +226,11 @@ coresight_get_output_device(struct coresight_device *cs_dev0, struct endpoint *e
 			case CORESIGHT_BUS_ACPI:
 #ifdef DEV_ACPI
 				if (endp->their_handle == endp2->my_handle) {
-					*out_endp = malloc(sizeof(struct endpoint), M_CORESIGHT, M_WAITOK | M_ZERO);
-					memcpy(*out_endp, endp2, sizeof(struct endpoint));
+					*out_endp =
+					    malloc(sizeof(struct endpoint),
+						M_CORESIGHT, M_WAITOK | M_ZERO);
+					memcpy(*out_endp, endp2,
+					    sizeof(struct endpoint));
 					return (cs_dev);
 				}
 #endif

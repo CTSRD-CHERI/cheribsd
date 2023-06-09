@@ -190,7 +190,7 @@ tmc_dump(device_t dev)
 
 	reg = bus_read_4(sc->res[0], TMC_DEVID);
 	if ((reg & DEVID_CONFIGTYPE_M) == DEVID_CONFIGTYPE_ETR)
-		printf("%s%d: STS %x, CTL %x, RSZ %x, RRP %lx, RWP %lx, AXICTL %x\n",
+		printf("%s%d: STS %x CTL %x RSZ %x RRP %lx RWP %lx AXICTL %x\n",
 		    __func__,
 		    device_get_unit(dev),
 		    bus_read_4(sc->res[0], TMC_STS),
@@ -253,8 +253,10 @@ printf("%s\n", __func__);
 	bus_write_4(sc->res[0], TMC_TRG, 8);
 
 	if (sc->scatter_gather) {
-		printf("%s: event->etr.pages %p\n", __func__, event->etr.pages);
-		printf("%s: event->etr.npages %d\n", __func__, event->etr.npages);
+		dprintf("%s: event->etr.pages %p\n", __func__,
+		    event->etr.pages);
+		dprintf("%s: event->etr.npages %d\n", __func__,
+		    event->etr.npages);
 	} else {
 		bus_write_4(sc->res[0], TMC_DBALO, event->etr.low);
 		bus_write_4(sc->res[0], TMC_DBAHI, event->etr.high);
@@ -354,8 +356,8 @@ tmc_configure(device_t dev, struct coresight_event *event)
 #ifdef TMC_DEBUG
 			if ((i % 100) == 0)
 				dprintf("%s: entry (%d/%d) type %d dirpg %d "
-				    "curpg %d paddr %lx\n", __func__, i, nentries,
-				    type, dirpg, curpg, paddr);
+				    "curpg %d paddr %lx\n", __func__, i,
+				    nentries, type, dirpg, curpg, paddr);
 #endif
 
 			curpg++;

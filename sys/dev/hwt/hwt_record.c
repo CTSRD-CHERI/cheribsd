@@ -60,16 +60,16 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 
 	switch (record_type) {
 	case HWT_RECORD_MMAP:
-		printf("%s: MMAP path %s addr %lx size %lx\n", __func__, ent->fullpath,
-		    (unsigned long)ent->addr, ent->size);
+		printf("%s: MMAP path %s addr %lx size %lx\n", __func__,
+		    ent->fullpath, (unsigned long)ent->addr, ent->size);
 		break;
 	case HWT_RECORD_EXECUTABLE:
-		printf("%s: EXEC path %s addr %lx size %lx\n", __func__, ent->fullpath,
-		    (unsigned long)ent->addr, ent->size);
+		printf("%s: EXEC path %s addr %lx size %lx\n", __func__,
+		    ent->fullpath, (unsigned long)ent->addr, ent->size);
 		break;
 	case HWT_RECORD_INTERP:
-		printf("%s: INTP path %s addr %lx size %lx\n", __func__, ent->fullpath,
-		    (unsigned long)ent->addr, ent->size);
+		printf("%s: INTP path %s addr %lx size %lx\n", __func__,
+		    ent->fullpath, (unsigned long)ent->addr, ent->size);
 		break;
 	case HWT_RECORD_MUNMAP:
 	default:

@@ -163,7 +163,8 @@ hwt_event_dump(struct hwt_context *ctx)
 }
 
 static int
-hwt_event_read(struct hwt_context *ctx, int *curpage, vm_offset_t *curpage_offset)
+hwt_event_read(struct hwt_context *ctx, int *curpage,
+    vm_offset_t *curpage_offset)
 {
 	int error;
 
