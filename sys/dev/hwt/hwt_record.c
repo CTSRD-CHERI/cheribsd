@@ -39,6 +39,15 @@
 #include <dev/hwt/hwt_hook.h>
 #include <dev/hwt/hwtvar.h>
 
+#define	HWT_RECORD_DEBUG
+#undef	HWT_RECORD_DEBUG
+
+#ifdef	HWT_RECORD_DEBUG
+#define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)
+#else
+#define	dprintf(fmt, ...)
+#endif
+
 void
 hwt_record(struct thread *td, enum hwt_record_type record_type,
     struct hwt_record_entry *ent)
@@ -60,15 +69,15 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 
 	switch (record_type) {
 	case HWT_RECORD_MMAP:
-		printf("%s: MMAP path %s addr %lx size %lx\n", __func__,
+		dprintf("%s: MMAP path %s addr %lx size %lx\n", __func__,
 		    ent->fullpath, (unsigned long)ent->addr, ent->size);
 		break;
 	case HWT_RECORD_EXECUTABLE:
-		printf("%s: EXEC path %s addr %lx size %lx\n", __func__,
+		dprintf("%s: EXEC path %s addr %lx size %lx\n", __func__,
 		    ent->fullpath, (unsigned long)ent->addr, ent->size);
 		break;
 	case HWT_RECORD_INTERP:
-		printf("%s: INTP path %s addr %lx size %lx\n", __func__,
+		dprintf("%s: INTP path %s addr %lx size %lx\n", __func__,
 		    ent->fullpath, (unsigned long)ent->addr, ent->size);
 		break;
 	case HWT_RECORD_MUNMAP:

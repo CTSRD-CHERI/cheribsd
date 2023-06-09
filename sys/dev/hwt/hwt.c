@@ -753,7 +753,7 @@ hwt_stop_proc_hwts(struct hwt_contexthash *hch, struct proc *p)
 {
 	struct hwt_context *ctx, *ctx1;
 
-	printf("%s: stopping hwt proc\n", __func__);
+	dprintf("%s: stopping hwt proc\n", __func__);
 
 	PROC_LOCK(p);
 	p->p_flag2 &= ~P2_HWT;
@@ -761,7 +761,7 @@ hwt_stop_proc_hwts(struct hwt_contexthash *hch, struct proc *p)
 	mtx_lock_spin(&hwt_contexthash_mtx);
 	LIST_FOREACH_SAFE(ctx, hch, next_hch, ctx1) {
 		if (ctx->p == p) {
-			printf("%s: stopping proc hwt on cpu %d\n", __func__,
+			dprintf("%s: stopping proc hwt on cpu %d\n", __func__,
 			    ctx->cpu_id);
 
 			LIST_REMOVE(ctx, next_hch);
@@ -781,7 +781,7 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 	struct hwt_context *ctx;
 	struct proc *p;
 
-	printf("%s: stopping hwt owner\n", __func__);
+	dprintf("%s: stopping hwt owner\n", __func__);
 
 	while (1) {
 		mtx_lock(&ho->mtx);

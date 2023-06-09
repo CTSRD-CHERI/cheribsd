@@ -59,6 +59,19 @@
 #define	dprintf(fmt, ...)
 #endif
 
+#define	SG_PT_ENTIRES_PER_PAGE	(PAGE_SIZE / sizeof(sgte_t))
+#define	ETR_SG_ET_MASK			0x3
+#define	ETR_SG_ET_LAST			0x1
+#define	ETR_SG_ET_NORMAL		0x2
+#define	ETR_SG_ET_LINK			0x3
+
+#define	ETR_SG_PAGE_SHIFT		12
+#define	ETR_SG_ADDR_SHIFT		4
+
+#define	ETR_SG_ENTRY(addr, type) \
+	(sgte_t)((((addr) >> ETR_SG_PAGE_SHIFT) << ETR_SG_ADDR_SHIFT) | \
+	    (type & ETR_SG_ET_MASK))
+
 static struct resource_spec tmc_spec[] = {
 	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
 	{ SYS_RES_IRQ,		0,	RF_ACTIVE | RF_OPTIONAL },
@@ -126,8 +139,9 @@ tmc_start(device_t dev)
 
 	sc = device_get_softc(dev);
 
-	if (sc->dev_type == CORESIGHT_ETR)
-		printf("%s%d\n", __func__, device_get_unit(dev));
+	if (sc->dev_type == CORESIGHT_ETR) {
+		dprintf("%s%d\n", __func__, device_get_unit(dev));
+	}
 
 	if (bus_read_4(sc->res[0], TMC_CTL) & CTL_TRACECAPTEN)
 		return (-1);
@@ -228,8 +242,6 @@ tmc_configure_etr(device_t dev, struct endpoint *endp,
 	struct tmc_softc *sc;
 	uint32_t reg;
 
-printf("%s\n", __func__);
-
 	sc = device_get_softc(dev);
 
 	do {
@@ -272,71 +284,27 @@ printf("%s\n", __func__);
 	return (0);
 }
 
-#define	SG_PT_ENTIRES_PER_PAGE	(PAGE_SIZE / sizeof(sgte_t))
-#define	ETR_SG_ET_MASK			0x3
-#define	ETR_SG_ET_LAST			0x1
-#define	ETR_SG_ET_NORMAL		0x2
-#define	ETR_SG_ET_LINK			0x3
-
-#define	ETR_SG_PAGE_SHIFT		12
-#define	ETR_SG_ADDR_SHIFT		4
-
-#define	ETR_SG_ENTRY(addr, type) \
-	(sgte_t)((((addr) >> ETR_SG_PAGE_SHIFT) << ETR_SG_ADDR_SHIFT) | \
-	    (type & ETR_SG_ET_MASK))
-
-static int
-tmc_configure(device_t dev, struct coresight_event *event)
+static vm_page_t *
+tmc_allocate_pgdir(struct tmc_softc *sc, vm_page_t *pages, int nentries,
+    int npt)
 {
-	struct tmc_softc *sc;
 	vm_page_t *pt_dir;
-	vm_page_t *pages;
-	uint32_t reg;
-	int nentries;
-	int nlinks;
-	int npages;
-	int error;
-	int npt;
-	int i;
-
-	sc = device_get_softc(dev);
-
-	reg = bus_read_4(sc->res[0], TMC_DEVID);
-	if ((reg & DEVID_CONFIGTYPE_M) != DEVID_CONFIGTYPE_ETR)
-		return (0);
-
-	if (!sc->scatter_gather)
-		return (0);
-
-	npages = event->etr.npages;
-	pages = event->etr.pages;
-
-	if (npages == 0 || pages == NULL)
-		return (EINVAL);
-
-	nlinks = npages / (SG_PT_ENTIRES_PER_PAGE - 1);
-	if (nlinks && ((npages % (SG_PT_ENTIRES_PER_PAGE - 1)) < 2))
-		nlinks--;
-	nentries = nlinks + npages;
-
-	npt = howmany(nentries, SG_PT_ENTIRES_PER_PAGE);
-
-	printf("%s: result nentries %d, npt %d\n", __func__, nentries, npt);
-
-	pt_dir = malloc(sizeof(struct vm_page *) * npt, M_DEVBUF,
-	    M_WAITOK | M_ZERO);
-	error = tmc_alloc_pages(sc, pt_dir, npt);
-	if (error) {
-		printf("%s: could not allocate pages\n", __func__);
-		return (-1);
-	}
-
 	vm_paddr_t paddr;
 	int sgtentry;
 	sgte_t *ptr;
 	uint32_t dirpg;
 	int curpg;
 	int type;
+	int error;
+	int i;
+
+	pt_dir = malloc(sizeof(struct vm_page *) * npt, M_DEVBUF,
+	    M_WAITOK | M_ZERO);
+	error = tmc_alloc_pages(sc, pt_dir, npt);
+	if (error) {
+		printf("%s: could not allocate pages\n", __func__);
+		return (NULL);
+	}
 
 	sgtentry = 0;
 	curpg = 0;
@@ -382,21 +350,62 @@ tmc_configure(device_t dev, struct coresight_event *event)
 	*ptr = ETR_SG_ENTRY(paddr, ETR_SG_ET_LAST);
 	cpu_dcache_wb_range((vm_pointer_t)ptr, sizeof(sgte_t));
 
+	return (pt_dir);
+}
+
+static int
+tmc_configure(device_t dev, struct coresight_event *event)
+{
+	struct tmc_softc *sc;
+	vm_page_t *pt_dir;
+	vm_page_t *pages;
+	uint64_t pbase;
+	uint32_t reg;
+	int nentries;
+	int nlinks;
+	int npages;
+	int npt;
+
+	sc = device_get_softc(dev);
+
+	reg = bus_read_4(sc->res[0], TMC_DEVID);
+	if ((reg & DEVID_CONFIGTYPE_M) != DEVID_CONFIGTYPE_ETR)
+		return (0);
+
+	if (!sc->scatter_gather)
+		return (0);
+
+	npages = event->etr.npages;
+	pages = event->etr.pages;
+
+	if (npages == 0 || pages == NULL)
+		return (EINVAL);
+
+	nlinks = npages / (SG_PT_ENTIRES_PER_PAGE - 1);
+	if (nlinks && ((npages % (SG_PT_ENTIRES_PER_PAGE - 1)) < 2))
+		nlinks--;
+	nentries = nlinks + npages;
+
+	npt = howmany(nentries, SG_PT_ENTIRES_PER_PAGE);
+
+	dprintf("%s: nentries %d, npt %d\n", __func__, nentries, npt);
+
+	pt_dir = tmc_allocate_pgdir(sc, pages, nentries, npt);
+	if (pt_dir == NULL)
+		return (ENOMEM);
+
 #ifdef TMC_DEBUG
-	/* Dump */
 	ptr = (sgte_t *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(pt_dir[0]));
 	for (i = 0; i < nentries; i++)
 		dprintf("%s: entry %x\n", __func__, *ptr++);
 #endif
 
-	printf("%s: event->etr.pages %p\n", __func__, event->etr.pages);
-	printf("%s: event->etr.npages %d\n", __func__, event->etr.npages);
-
-	uint64_t pbase;
+	dprintf("%s: event->etr.pages %p\n", __func__, event->etr.pages);
+	dprintf("%s: event->etr.npages %d\n", __func__, event->etr.npages);
 
 	pbase = (uint64_t)VM_PAGE_TO_PHYS(pt_dir[0]);
 
-	printf("%s: pbase %lx\n", __func__, pbase);
+	dprintf("%s: pbase %lx\n", __func__, pbase);
 
 	bus_write_4(sc->res[0], TMC_DBALO, pbase & 0xffffffff);
 	bus_write_4(sc->res[0], TMC_DBAHI, pbase >> 32);
@@ -504,11 +513,13 @@ static int
 tmc_read(device_t dev, struct endpoint *endp, struct coresight_event *event)
 {
 	struct tmc_softc *sc;
+	vm_page_t page;
+	bool found;
 	uint64_t lo, hi;
 	uint64_t ptr;
+	int i;
 
 	sc = device_get_softc(dev);
-
 	if (sc->dev_type == CORESIGHT_ETF)
 		return (0);
 
@@ -516,13 +527,7 @@ tmc_read(device_t dev, struct endpoint *endp, struct coresight_event *event)
 	hi = bus_read_4(sc->res[0], TMC_RWPHI);
 	ptr = lo | (hi << 32);
 
-	vm_page_t page;
-	bool found;
-	int i;
-
 	page = PHYS_TO_VM_PAGE(ptr);
-
-	printf("CUR_PTR %lx\n", ptr);
 
 	found = false;
 
@@ -536,7 +541,7 @@ tmc_read(device_t dev, struct endpoint *endp, struct coresight_event *event)
 	if (found) {
 		event->etr.curpage = i;
 		event->etr.curpage_offset = ptr & 0xfff;
-		printf("CUR_PTR %lx, page %d of %d, offset %ld\n",
+		dprintf("CUR_PTR %lx, page %d of %d, offset %ld\n",
 		    ptr, i, event->etr.npages, event->etr.curpage_offset);
 	}
 
