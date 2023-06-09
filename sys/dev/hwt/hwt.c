@@ -30,11 +30,7 @@
 
 /* Hardware Trace (HWT) framework. */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
-#include <sys/systm.h>
 #include <sys/eventhandler.h>
 #include <sys/ioccom.h>
 #include <sys/conf.h>
@@ -44,21 +40,16 @@ __FBSDID("$FreeBSD$");
 #include <sys/mman.h>
 #include <sys/module.h>
 #include <sys/mutex.h>
-#include <sys/sglist.h>
 #include <sys/rwlock.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
-#include <vm/vm_extern.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_page.h>
-#include <vm/vm_map.h>
 #include <vm/vm_object.h>
 #include <vm/vm_pager.h>
 #include <vm/vm_pageout.h>
 #include <vm/vm_phys.h>
-#include <vm/vm_radix.h>
-#include <vm/pmap.h>
 
 #include <dev/hwt/hwt_hook.h>
 #include <dev/hwt/hwtvar.h>
@@ -509,7 +500,7 @@ hwt_send_records(struct hwt_record_get *record_get, struct hwt_context *ctx)
 		return (ENXIO);
 
 	user_entry = malloc(sizeof(struct hwt_record_user_entry) * nitems_req,
-	    M_DEVBUF, M_WAITOK);
+	    M_HWT, M_WAITOK);
 
 	i = 0;
 
@@ -539,7 +530,7 @@ hwt_send_records(struct hwt_record_get *record_get, struct hwt_context *ctx)
 
 	error = copyout(&i, record_get->nentries, sizeof(int));
 
-	free(user_entry, M_DEVBUF);
+	free(user_entry, M_HWT);
 
 	return (error);
 }

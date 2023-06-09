@@ -28,40 +28,16 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/eventhandler.h>
-#include <sys/ioccom.h>
-#include <sys/conf.h>
 #include <sys/proc.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
-#include <sys/mman.h>
-#include <sys/module.h>
 #include <sys/mutex.h>
-#include <sys/sglist.h>
-#include <sys/rwlock.h>
-#include <sys/vnode.h>
 
 #include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/vm_extern.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_page.h>
-#include <vm/vm_map.h>
-#include <vm/vm_object.h>
-#include <vm/vm_pager.h>
-#include <vm/vm_pageout.h>
-#include <vm/vm_phys.h>
-#include <vm/vm_radix.h>
-#include <vm/pmap.h>
 
 #include <dev/hwt/hwt_hook.h>
 #include <dev/hwt/hwtvar.h>
-#include <dev/hwt/hwt.h>
 
 void
 hwt_record(struct thread *td, enum hwt_record_type record_type,
@@ -100,8 +76,8 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 		return;
 	};
 
-	entry = malloc(sizeof(struct hwt_record_entry), M_DEVBUF, M_WAITOK);
-	entry->fullpath = strdup(ent->fullpath, M_DEVBUF);
+	entry = malloc(sizeof(struct hwt_record_entry), M_HWT, M_WAITOK);
+	entry->fullpath = strdup(ent->fullpath, M_HWT);
 	entry->td = td;
 	entry->addr = ent->addr;
 	entry->size = ent->size;
