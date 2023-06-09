@@ -144,7 +144,7 @@ tmc_start(device_t dev)
 	if ((bus_read_4(sc->res[0], TMC_CTL) & CTL_TRACECAPTEN) == 0)
 		panic("Not enabled\n");
 
-printf("%s: enabled\n", __func__);
+	dprintf("%s: enabled\n", __func__);
 
 	return (0);
 }
@@ -157,7 +157,7 @@ tmc_stop(device_t dev)
 
 	sc = device_get_softc(dev);
 
-printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	reg = bus_read_4(sc->res[0], TMC_CTL);
 	reg &= ~CTL_TRACECAPTEN;
