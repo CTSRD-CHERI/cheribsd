@@ -151,7 +151,7 @@ hwt_event_disable(struct hwt_context *ctx)
 	return (0);
 }
 
-static int
+static int __unused
 hwt_event_dump(struct hwt_context *ctx)
 {
 
@@ -738,7 +738,6 @@ hwt_switch_out(struct thread *td)
 	dprintf("%s: ctx %p from cpu_id %d\n", __func__, ctx, cpu_id);
 
 	hwt_event_disable(ctx);
-	hwt_event_dump(ctx);
 }
 
 static struct cdevsw hwt_cdevsw = {
@@ -766,7 +765,6 @@ hwt_stop_proc_hwts(struct hwt_contexthash *hch, struct proc *p)
 
 			LIST_REMOVE(ctx, next_hch);
 			hwt_event_disable(ctx);
-			hwt_event_dump(ctx);
 			hwt_event_stop(ctx);
 
 			ctx->p = NULL;
@@ -806,7 +804,6 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 
 				/* Stop it now on single CPU. */
 				hwt_event_disable(ctx);
-				hwt_event_dump(ctx);
 				hwt_event_stop(ctx);
 
 				ctx->p = NULL;
