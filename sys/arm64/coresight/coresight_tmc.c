@@ -288,6 +288,7 @@ tmc_configure(device_t dev, struct coresight_event *event)
 {
 	struct tmc_softc *sc;
 	vm_page_t *pt_dir;
+	vm_page_t *pages;
 	uint32_t reg;
 	int nentries;
 	int nlinks;
@@ -305,9 +306,11 @@ tmc_configure(device_t dev, struct coresight_event *event)
 	if (!sc->scatter_gather)
 		return (0);
 
-	vm_page_t *pages;
 	npages = event->etr.npages;
 	pages = event->etr.pages;
+
+	if (npages == 0 || pages == NULL)
+		return (EINVAL);
 
 	nlinks = npages / (SG_PT_ENTIRES_PER_PAGE - 1);
 	if (nlinks && ((npages % (SG_PT_ENTIRES_PER_PAGE - 1)) < 2))

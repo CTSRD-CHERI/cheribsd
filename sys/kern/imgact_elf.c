@@ -33,6 +33,7 @@
 
 #include <sys/cdefs.h>
 #include "opt_capsicum.h"
+#include "opt_hwt_hooks.h"
 
 #include <sys/param.h>
 #include <sys/capsicum.h>

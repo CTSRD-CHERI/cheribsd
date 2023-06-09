@@ -1,6 +1,5 @@
 /*-
  * Copyright (c) 2023 Ruslan Bukin <br@bsdpad.com>
- * All rights reserved.
  *
  * This work was supported by Innovate UK project 105694, "Digital Security
  * by Design (DSbD) Technology Platform Prototype".
@@ -45,13 +44,14 @@
 	_IOW(HWT_MAGIC, 0x03, struct hwt_bufptr_get)
 
 struct hwt_alloc {
-	int		cpu_id;
+	size_t		bufsize;
 	pid_t		pid;
+	int		cpu_id;
 } __packed __aligned(16);
 
 struct hwt_start {
-	int		cpu_id;
 	pid_t		pid;
+	int		cpu_id;
 } __packed __aligned(16);
 
 struct hwt_record_user_entry {

@@ -76,6 +76,9 @@ __FBSDID("$FreeBSD$");
 #define	HWT_PROCHASH_SIZE	1024
 #define	HWT_OWNERHASH_SIZE	1024
 
+/* No real reason for this limitation. */
+#define	HWT_MAXBUFSIZE		(8U * 1024 * 1024 * 1024) /* 8 GB */
+
 /*
  * Hash function.  Discard the lower 2 bits of the pointer since
  * these are always zero for our uses.  The hash multiplier is
@@ -345,7 +348,7 @@ hwt_alloc_buffers(struct hwt_softc *sc, struct hwt_context *ctx)
 {
 	int error;
 
-	ctx->npages = (16 * 1024 * 1024) / 4096;
+	ctx->npages = ctx->bufsize / PAGE_SIZE;
 	ctx->pages = malloc(sizeof(struct vm_page *) * ctx->npages, M_HWT,
 	    M_WAITOK | M_ZERO);
 
@@ -387,17 +390,10 @@ static struct hwt_context *
 hwt_alloc(struct hwt_softc *sc, struct thread *td)
 {
 	struct hwt_context *ctx;
-	int error;
 
 	ctx = malloc(sizeof(struct hwt_context), M_HWT, M_WAITOK | M_ZERO);
 	LIST_INIT(&ctx->records);
 	mtx_init(&ctx->mtx, "records", NULL, MTX_SPIN);
-
-	error = hwt_alloc_buffers(sc, ctx);
-	if (error) {
-		printf("%s: can't allocate hwt\n", __func__);
-		return (NULL);
-	}
 
 	return (ctx);
 }
@@ -563,7 +559,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	struct hwt_ownerhash *hoh;
 	int hindex;
 	int error;
-	int len;
+	int len __unused;
 
 	error = 0;
 
@@ -578,8 +574,13 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	/* Allocate HWT context. */
 	case HWT_IOC_ALLOC:
 		halloc = (struct hwt_alloc *)addr;
-
-		/* TODO: check cpu_id field for sanity. */
+		if (halloc->bufsize > HWT_MAXBUFSIZE)
+			return (EINVAL);
+		if (halloc->bufsize % PAGE_SIZE)
+			return (EINVAL);
+		if (halloc->cpu_id < 0 ||
+		    halloc->cpu_id >= MAXCPU)
+			return (EINVAL);
 
 		/* First get the owner. */
 		ho = hwt_lookup_ownerhash(td->td_proc);
@@ -605,9 +606,12 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		/* Allocate a new HWT. */
 		ctx = hwt_alloc(sc, td);
-		if (ctx == NULL) {
-			/* TODO: remove ho if it was created. */
-			return (ENOMEM);
+		ctx->bufsize = halloc->bufsize;
+
+		error = hwt_alloc_buffers(sc, ctx);
+		if (error) {
+			printf("%s: can't allocate hwt buffers\n", __func__);
+			return (error);
 		}
 
 		ctx->cpu_id = halloc->cpu_id;
@@ -769,10 +773,7 @@ hwt_stop_proc_hwts(struct hwt_contexthash *hch, struct proc *p)
 			printf("%s: stopping proc hwt on cpu %d\n", __func__,
 			    ctx->cpu_id);
 
-			printf("%s0\n", __func__);
 			LIST_REMOVE(ctx, next_hch);
-			printf("%s1\n", __func__);
-
 			hwt_event_disable(ctx);
 			hwt_event_dump(ctx);
 			hwt_event_stop(ctx);

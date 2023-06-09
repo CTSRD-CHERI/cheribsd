@@ -1,6 +1,5 @@
 /*-
  * Copyright (c) 2023 Ruslan Bukin <br@bsdpad.com>
- * All rights reserved.
  *
  * This work was supported by Innovate UK project 105694, "Digital Security
  * by Design (DSbD) Technology Platform Prototype".
@@ -58,6 +57,8 @@ struct hwt_context {
 
 	vm_object_t			obj;
 	struct cdev			*cdev;
+
+	size_t				bufsize;
 };
 
 struct hwt_owner {
