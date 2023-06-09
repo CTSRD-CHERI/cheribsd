@@ -97,8 +97,6 @@ coresight_init_event(int cpu, struct coresight_event *event)
 	struct coresight_device *cs_dev;
 	struct endpoint *endp;
 
-printf("%s: cpu %d event %p\n", __func__, cpu, event);
-
 	/* Start building path from source device */
 	TAILQ_FOREACH(cs_dev, &cs_devs, link) {
 		if (cs_dev->dev_type == event->src &&
@@ -107,12 +105,6 @@ printf("%s: cpu %d event %p\n", __func__, cpu, event);
 			coresight_build_list(cs_dev, event);
 			break;
 		}
-	}
-
-//printf("%s: cpu %d path:\n", __func__, cpu);
-	LIST_FOREACH(endp, &event->endplist, endplink) {
-		cs_dev = endp->cs_dev;
-//printf("%s: endp %p cs_dev %p cs_dev->type %d cs_dev->pdata->cpu %d\n", __func__, endp, cs_dev, cs_dev->dev_type, cs_dev->pdata->cpu);
 	}
 
 	/* Ensure Coresight is initialized for the CPU */
@@ -125,14 +117,12 @@ printf("%s: cpu %d event %p\n", __func__, cpu, event);
 	/* Init all devices in the path */
 	LIST_FOREACH(endp, &event->endplist, endplink) {
 		cs_dev = endp->cs_dev;
-//printf("%s: initing dev %p type %d\n", __func__, cs_dev->dev, cs_dev->dev_type);
 		CORESIGHT_INIT(cs_dev->dev);
 	}
 
 	/* Configure all devices in the path. */
 	LIST_FOREACH(endp, &event->endplist, endplink) {
 		cs_dev = endp->cs_dev;
-//printf("%s: configure dev %p type %d\n", __func__, cs_dev->dev, cs_dev->dev_type);
 		CORESIGHT_CONFIGURE(cs_dev->dev, event);
 	}
 
@@ -169,12 +159,8 @@ coresight_enable(int cpu, struct coresight_event *event)
 	struct coresight_device *cs_dev;
 	struct endpoint *endp;
 
-printf("%s: cpu %d event %p\n", __func__, cpu, event);
-
 	LIST_FOREACH(endp, &event->endplist, endplink) {
 		cs_dev = endp->cs_dev;
-//printf("%s: enabling endp %p dev %p type %d cpu %d\n", __func__, endp, cs_dev, cs_dev->dev_type, cs_dev->pdata->cpu);
-
 		CORESIGHT_ENABLE(cs_dev->dev, endp, event);
 	}
 }
@@ -187,7 +173,6 @@ coresight_disable(int cpu, struct coresight_event *event)
 
 	LIST_FOREACH(endp, &event->endplist, endplink) {
 		cs_dev = endp->cs_dev;
-//printf("%s: disabling dev %p type %d\n", __func__, cs_dev->dev, cs_dev->dev_type);
 		CORESIGHT_DISABLE(cs_dev->dev, endp, event);
 	}
 }
