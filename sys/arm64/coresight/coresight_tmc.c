@@ -351,9 +351,9 @@ tmc_configure(device_t dev, struct coresight_event *event)
 			type = ETR_SG_ET_NORMAL;
 			paddr = VM_PAGE_TO_PHYS(pages[curpg]);
 
-#if 0
+#ifdef TMC_DEBUG
 			if ((i % 100) == 0)
-				printf("%s: entry (%d/%d) type %d dirpg %d "
+				dprintf("%s: entry (%d/%d) type %d dirpg %d "
 				    "curpg %d paddr %lx\n", __func__, i, nentries,
 				    type, dirpg, curpg, paddr);
 #endif
@@ -380,11 +380,11 @@ tmc_configure(device_t dev, struct coresight_event *event)
 	*ptr = ETR_SG_ENTRY(paddr, ETR_SG_ET_LAST);
 	cpu_dcache_wb_range((vm_pointer_t)ptr, sizeof(sgte_t));
 
-#if 0
+#ifdef TMC_DEBUG
 	/* Dump */
 	ptr = (sgte_t *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(pt_dir[0]));
 	for (i = 0; i < nentries; i++)
-		printf("%s: entry %x\n", __func__, *ptr++);
+		dprintf("%s: entry %x\n", __func__, *ptr++);
 #endif
 
 	printf("%s: event->etr.pages %p\n", __func__, event->etr.pages);
@@ -495,8 +495,7 @@ tmc_intr(void *arg)
 
 	/* TODO */
 
-	printf("%s\n", __func__);
-	panic("interrupt received");
+	panic("unhandled interrupt");
 }
 
 static int
