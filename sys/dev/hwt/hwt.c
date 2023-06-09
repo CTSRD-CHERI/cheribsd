@@ -76,7 +76,7 @@ __FBSDID("$FreeBSD$");
 #define	HWT_PROCHASH_SIZE	1024
 #define	HWT_OWNERHASH_SIZE	1024
 
-/* No real reason for this limitation. */
+/* No real reason for this limitation except sanity checks. */
 #define	HWT_MAXBUFSIZE		(8U * 1024 * 1024 * 1024) /* 8 GB */
 
 /*
