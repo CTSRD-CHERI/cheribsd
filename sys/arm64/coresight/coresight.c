@@ -94,8 +94,6 @@ coresight_event_stop(struct hwt_context *hwt)
 {
 	struct coresight_event *event;
 
-	dprintf("%s: cpu_id %d\n", __func__, hwt->cpu_id);
-
 	event = &cs_event[hwt->cpu_id];
 
 	coresight_stop(hwt->cpu_id, event);
