@@ -79,7 +79,7 @@ coresight_event_init(struct hwt_context *hwt)
 
 	/*
 	 * Set the trace ID required for ETM component.
-	 * TODO: this should be derived from pmctrace.
+	 * TODO: this should be derived from hwt(1).
 	 */
 
 	event->etm.trace_id = 0x10;
