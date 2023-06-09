@@ -230,7 +230,6 @@ tmc_configure_etf(device_t dev)
 	bus_write_4(sc->res[0], TMC_FFCR, FFCR_EN_FMT | FFCR_EN_TI);
 
 	tmc_start(dev);
-	tmc_dump(dev);
 
 	return (0);
 }

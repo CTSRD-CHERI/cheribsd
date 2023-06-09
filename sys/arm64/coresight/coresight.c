@@ -72,8 +72,7 @@ coresight_event_init(struct hwt_context *hwt)
 	event->etr.pages = hwt->pages;
 	event->etr.npages = hwt->npages;
 	event->etr.bufsize = hwt->npages * PAGE_SIZE;
-	event->excp_level = 1; /* Kernel */
-	event->excp_level = 0; /* User level */
+	event->excp_level = 0; /* TODO: User level only for now. */
 	event->src = CORESIGHT_ETMV4;
 	event->sink = CORESIGHT_TMC_ETR;
 
