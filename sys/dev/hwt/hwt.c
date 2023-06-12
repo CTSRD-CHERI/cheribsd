@@ -90,9 +90,8 @@ static u_long hwt_ownerhashmask;
 static LIST_HEAD(hwt_ownerhash, hwt_owner)	*hwt_ownerhash;
 
 static struct hwt_softc hwt_sc;
-static struct hwt_backend *hwt_backend;
-
 static struct mtx hwt_backend_mtx;
+static LIST_HEAD(, hwt_backend)	hwt_backends;
 
 static void
 hwt_event_init(struct hwt_context *ctx)
@@ -100,7 +99,7 @@ hwt_event_init(struct hwt_context *ctx)
 
 	dprintf("%s: cpu %d\n", __func__, ctx->cpu_id);
 
-	hwt_backend->ops->hwt_event_init(ctx);
+	ctx->hwt_backend->ops->hwt_event_init(ctx);
 }
 
 static int
@@ -110,7 +109,7 @@ hwt_event_start(struct hwt_context *ctx)
 	dprintf("%s\n", __func__);
 
 	mtx_lock_spin(&hwt_backend_mtx);
-	hwt_backend->ops->hwt_event_start(ctx);
+	ctx->hwt_backend->ops->hwt_event_start(ctx);
 	mtx_unlock_spin(&hwt_backend_mtx);
 
 	return (0);
@@ -123,7 +122,7 @@ hwt_event_stop(struct hwt_context *ctx)
 	dprintf("%s\n", __func__);
 
 	mtx_lock_spin(&hwt_backend_mtx);
-	hwt_backend->ops->hwt_event_stop(ctx);
+	ctx->hwt_backend->ops->hwt_event_stop(ctx);
 	mtx_unlock_spin(&hwt_backend_mtx);
 
 	return (0);
@@ -134,7 +133,7 @@ hwt_event_enable(struct hwt_context *ctx)
 {
 
 	mtx_lock_spin(&hwt_backend_mtx);
-	hwt_backend->ops->hwt_event_enable(ctx);
+	ctx->hwt_backend->ops->hwt_event_enable(ctx);
 	mtx_unlock_spin(&hwt_backend_mtx);
 
 	return (0);
@@ -145,7 +144,7 @@ hwt_event_disable(struct hwt_context *ctx)
 {
 
 	mtx_lock_spin(&hwt_backend_mtx);
-	hwt_backend->ops->hwt_event_disable(ctx);
+	ctx->hwt_backend->ops->hwt_event_disable(ctx);
 	mtx_unlock_spin(&hwt_backend_mtx);
 
 	return (0);
@@ -156,7 +155,7 @@ hwt_event_dump(struct hwt_context *ctx)
 {
 
 	mtx_lock_spin(&hwt_backend_mtx);
-	hwt_backend->ops->hwt_event_dump(ctx);
+	ctx->hwt_backend->ops->hwt_event_dump(ctx);
 	mtx_unlock_spin(&hwt_backend_mtx);
 
 	return (0);
@@ -169,17 +168,42 @@ hwt_event_read(struct hwt_context *ctx, int *curpage,
 	int error;
 
 	mtx_lock_spin(&hwt_backend_mtx);
-	error = hwt_backend->ops->hwt_event_read(ctx, curpage, curpage_offset);
+	error = ctx->hwt_backend->ops->hwt_event_read(ctx, curpage,
+	    curpage_offset);
 	mtx_unlock_spin(&hwt_backend_mtx);
 
 	return (error);
+}
+
+static struct hwt_backend *
+hwt_lookup_backend(const char *name)
+{
+	struct hwt_backend *backend;
+
+	mtx_lock_spin(&hwt_backend_mtx);
+	LIST_FOREACH(backend, &hwt_backends, next) {
+		if (strcmp(backend->name, name) == 0) {
+			mtx_unlock_spin(&hwt_backend_mtx);
+			return (backend);
+		}
+	}
+	mtx_unlock_spin(&hwt_backend_mtx);
+
+	return (NULL);
 }
 
 int
 hwt_register(struct hwt_backend *backend)
 {
 
-	hwt_backend = backend;
+	if (backend == NULL ||
+	    backend->name == NULL ||
+	    backend->ops == NULL)
+		return (EINVAL);
+
+	mtx_lock_spin(&hwt_backend_mtx);
+	LIST_INSERT_HEAD(&hwt_backends, backend, next);
+	mtx_unlock_spin(&hwt_backend_mtx);
 
 	return (0);
 }
@@ -545,15 +569,17 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	struct hwt_alloc *halloc;
 	struct hwt_record_get *rget;
 	struct hwt_bufptr_get *ptr_get;
+	char backend_name[HWT_BACKEND_MAXNAMELEN];
 	struct proc *p;
 	struct hwt_context *ctx;
 	struct hwt_owner *ho;
 	struct hwt_ownerhash *hoh;
+	struct hwt_backend *backend;
 	int hindex;
 	int error;
 	int len __unused;
-
-	error = 0;
+	int curpage;
+	vm_offset_t curpage_offset;
 
 	sc = dev->si_drv1;
 
@@ -573,6 +599,17 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		if (halloc->cpu_id < 0 ||
 		    halloc->cpu_id >= MAXCPU)
 			return (EINVAL);
+		if (halloc->backend_name == NULL)
+			return (EINVAL);
+
+		error = copyinstr(halloc->backend_name, (void *)backend_name,
+		    HWT_BACKEND_MAXNAMELEN, NULL);
+		if (error)
+			return (error);
+
+		backend = hwt_lookup_backend(backend_name);
+		if (backend == NULL)
+			return (ENXIO);
 
 		/* First get the owner. */
 		ho = hwt_lookup_ownerhash(td->td_proc);
@@ -599,6 +636,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		/* Allocate a new HWT. */
 		ctx = hwt_alloc(sc, td);
 		ctx->bufsize = halloc->bufsize;
+		ctx->hwt_backend = backend;
 
 		error = hwt_alloc_buffers(sc, ctx);
 		if (error) {
@@ -649,7 +687,9 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		KASSERT(ctx->p == p, ("something wrong"));
 
-		hwt_event_start(ctx);
+		error = hwt_event_start(ctx);
+		if (error)
+			return (error);
 
 		hwt_insert_contexthash(ctx);
 		PROC_UNLOCK(p);
@@ -674,9 +714,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		if (ctx == NULL)
 			return (ENXIO);
 
-		int curpage;
-		vm_offset_t curpage_offset;
-
 		hwt_event_read(ctx, &curpage, &curpage_offset);
 
 		error = copyout(&curpage, ptr_get->curpage, sizeof(int));
@@ -689,6 +726,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		break;
 	default:
+		error = ENXIO;
 		break;
 	};
 
@@ -856,11 +894,7 @@ hwt_load(void)
 
 	sc = &hwt_sc;
 
-	dprintf("%s\n", __func__);
-
-	mtx_init(&sc->mtx, "HWT driver", NULL, MTX_DEF);
-
-	TAILQ_INIT(&sc->hwt_backends);
+	LIST_INIT(&hwt_backends);
 
 	make_dev_args_init(&args);
 	args.mda_devsw = &hwt_cdevsw;
@@ -899,7 +933,6 @@ hwt_unload(void)
 	sc = &hwt_sc;
 
 	destroy_dev(sc->hwt_cdev);
-	mtx_destroy(&sc->mtx);
 
 	return (0);
 }
@@ -930,5 +963,5 @@ static moduledata_t hwt_mod = {
 	NULL
 };
 
-DECLARE_MODULE(hwt, hwt_mod, SI_SUB_LAST, SI_ORDER_ANY);
+DECLARE_MODULE(hwt, hwt_mod, SI_SUB_DRIVERS, SI_ORDER_FIRST);
 MODULE_VERSION(hwt, 1);

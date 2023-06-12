@@ -43,10 +43,13 @@
 #define	HWT_IOC_BUFPTR_GET \
 	_IOW(HWT_MAGIC, 0x03, struct hwt_bufptr_get)
 
+#define	HWT_BACKEND_MAXNAMELEN	256
+
 struct hwt_alloc {
 	size_t		bufsize;
 	pid_t		pid;
 	int		cpu_id;
+	char		*backend_name;
 } __packed __aligned(16);
 
 struct hwt_start {

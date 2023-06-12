@@ -53,8 +53,12 @@
 
 static struct mtx cs_mtx;
 struct coresight_device_list cs_devs;
+static struct hwt_backend_ops coresight_ops;
 
-static struct hwt_backend backend;
+static struct hwt_backend backend = {
+		.ops = &coresight_ops,
+		.name = "coresight",
+};
 static struct coresight_event cs_event[MAXCPU];
 
 static void
@@ -180,10 +184,8 @@ coresight_register(struct coresight_desc *desc)
 	TAILQ_INSERT_TAIL(&cs_devs, cs_dev, link);
 	mtx_unlock(&cs_mtx);
 
-	if (desc->dev_type == CORESIGHT_TMC_ETR) {
-		backend.ops = &coresight_ops;
+	if (desc->dev_type == CORESIGHT_TMC_ETR)
 		hwt_register(&backend);
-	}
 
 	return (0);
 }

@@ -59,6 +59,8 @@ struct hwt_context {
 	struct cdev			*cdev;
 
 	size_t				bufsize;
+
+	struct hwt_backend		*hwt_backend;
 };
 
 struct hwt_owner {
@@ -80,21 +82,15 @@ struct hwt_backend_ops {
 };
 
 struct hwt_backend {
-	const char *name;
-	struct hwt_backend_ops *ops;
+	const char			*name;
+	struct hwt_backend_ops		*ops;
+	LIST_ENTRY(hwt_backend)		next;
 };
 
 int hwt_register(struct hwt_backend *);
 
 struct hwt_softc {
 	struct cdev			*hwt_cdev;
-	struct mtx			mtx;
-
-	/*
-	 * List of CPU trace devices registered in HWT.
-	 * Protected by sc->mtx.
-	 */
-	TAILQ_HEAD(hwt_backend_list, hwt_backend)	hwt_backends;
 };
 
 struct hwt_context * hwt_lookup_contexthash(struct proc *p, int cpu_id);
