@@ -149,6 +149,17 @@ struct xswdev {
 	    (vm_paddr_t)(pa)));						\
 	cheri_kern_setboundsexact(PHYS_TO_DMAP(pa), PAGE_SIZE);		\
 })
+
+#define	PHYS_TO_DMAP_LEN(pa, len)					\
+({									\
+	KASSERT(PHYS_SZ_IN_DMAP(pa, len),				\
+	    ("%s: PA region is outside of dmap, PA: [0x%lx, 0x%lx)",	\
+	    __func__, (vm_paddr_t)(pa), (vm_paddr_t)((pa) + (len))));	\
+	KASSERT(trunc_page(pa) == trunc_page((pa) + (len) - 1),		\
+	    ("%s: PA chunk crosses page boundary, PA: [0x%lx, 0x%lx)",	\
+	    __func__, (vm_paddr_t)(pa), (vm_paddr_t)((pa) + (len))));	\
+	cheri_kern_setboundsexact(PHYS_TO_DMAP(pa), (len));		\
+})
 #endif
 
 #ifndef ASSEMBLER
