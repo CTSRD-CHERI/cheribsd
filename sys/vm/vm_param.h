@@ -141,6 +141,14 @@ struct xswdev {
  */
 #define	PHYS_SZ_IN_DMAP(pa, sz)					\
     (PHYS_IN_DMAP((pa)) && PHYS_IN_DMAP((pa) + (sz) - 1))
+
+#define	PHYS_TO_DMAP_PAGE(pa)						\
+({									\
+	KASSERT(is_aligned(pa, PAGE_SIZE),				\
+	    ("%s: PA is not page aligned, PA: 0x%lx", __func__,		\
+	    (vm_paddr_t)(pa)));						\
+	cheri_kern_setboundsexact(PHYS_TO_DMAP(pa), PAGE_SIZE);		\
+})
 #endif
 
 #ifndef ASSEMBLER
