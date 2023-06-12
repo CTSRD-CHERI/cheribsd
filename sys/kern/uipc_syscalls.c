@@ -307,15 +307,13 @@ user_accept(struct thread *td, int s, struct sockaddr * __capability uname,
 	if (error != 0)
 		return (error);
 
-	if (error == 0 && uname != NULL) {
 #ifdef COMPAT_OLDSOCK
-		if (SV_PROC_FLAG(td->td_proc, SV_AOUT) &&
-		    (flags & ACCEPT4_COMPAT) != 0)
-			((struct osockaddr *)name)->sa_family =
-			    name->sa_family;
+	if (SV_PROC_FLAG(td->td_proc, SV_AOUT) &&
+	    (flags & ACCEPT4_COMPAT) != 0)
+		((struct osockaddr *)name)->sa_family =
+		    name->sa_family;
 #endif
-		error = copyout(name, uname, namelen);
-	}
+	error = copyout(name, uname, namelen);
 	if (error == 0)
 		error = copyout(&namelen, anamelen, sizeof(namelen));
 	if (error != 0)
