@@ -79,8 +79,6 @@
 #define	_HWT_HM	11400714819323198486u	/* hash multiplier */
 #define	HWT_HASH_PTR(P, M)	((((unsigned long) (P) >> 2) * _HWT_HM) & (M))
 
-static eventhandler_tag hwt_exit_tag;
-
 static struct mtx hwt_contexthash_mtx;
 static u_long hwt_contexthashmask;
 static LIST_HEAD(hwt_contexthash, hwt_context)	*hwt_contexthash;
@@ -89,9 +87,11 @@ static struct mtx hwt_ownerhash_mtx;
 static u_long hwt_ownerhashmask;
 static LIST_HEAD(hwt_ownerhash, hwt_owner)	*hwt_ownerhash;
 
-static struct hwt_softc hwt_sc;
 static struct mtx hwt_backend_mtx;
 static LIST_HEAD(, hwt_backend)	hwt_backends;
+
+static eventhandler_tag hwt_exit_tag;
+static struct cdev *hwt_cdev;
 
 static void
 hwt_event_init(struct hwt_context *ctx)
@@ -360,7 +360,7 @@ hwt_create_cdev(struct hwt_context *ctx)
 }
 
 static int
-hwt_alloc_buffers(struct hwt_softc *sc, struct hwt_context *ctx)
+hwt_alloc_buffers(struct hwt_context *ctx)
 {
 	int error;
 
@@ -403,7 +403,7 @@ hwt_destroy_buffers(struct hwt_context *ctx)
 }
 
 static struct hwt_context *
-hwt_alloc(struct hwt_softc *sc, struct thread *td)
+hwt_alloc(struct thread *td)
 {
 	struct hwt_context *ctx;
 
@@ -564,7 +564,6 @@ static int
 hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
     struct thread *td)
 {
-	struct hwt_softc *sc;
 	struct hwt_start *s;
 	struct hwt_alloc *halloc;
 	struct hwt_record_get *rget;
@@ -580,8 +579,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	int len __unused;
 	int curpage;
 	vm_offset_t curpage_offset;
-
-	sc = dev->si_drv1;
 
 	len = IOCPARM_LEN(cmd);
 
@@ -634,11 +631,11 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		}
 
 		/* Allocate a new HWT. */
-		ctx = hwt_alloc(sc, td);
+		ctx = hwt_alloc(td);
 		ctx->bufsize = halloc->bufsize;
 		ctx->hwt_backend = backend;
 
-		error = hwt_alloc_buffers(sc, ctx);
+		error = hwt_alloc_buffers(ctx);
 		if (error) {
 			printf("%s: can't allocate hwt buffers\n", __func__);
 			return (error);
@@ -889,10 +886,7 @@ static int
 hwt_load(void)
 {
 	struct make_dev_args args;
-	struct hwt_softc *sc;
 	int error;
-
-	sc = &hwt_sc;
 
 	LIST_INIT(&hwt_backends);
 
@@ -902,9 +896,9 @@ hwt_load(void)
 	args.mda_uid = UID_ROOT;
 	args.mda_gid = GID_WHEEL;
 	args.mda_mode = 0660;
-	args.mda_si_drv1 = sc;
+	args.mda_si_drv1 = NULL;
 
-	error = make_dev_s(&args, &sc->hwt_cdev, "hwt");
+	error = make_dev_s(&args, &hwt_cdev, "hwt");
 	if (error != 0)
 		return (error);
 
@@ -926,13 +920,10 @@ hwt_load(void)
 static int
 hwt_unload(void)
 {
-	struct hwt_softc *sc;
 
 	dprintf("%s\n", __func__);
 
-	sc = &hwt_sc;
-
-	destroy_dev(sc->hwt_cdev);
+	destroy_dev(hwt_cdev);
 
 	return (0);
 }

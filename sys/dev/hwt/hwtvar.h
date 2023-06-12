@@ -89,10 +89,6 @@ struct hwt_backend {
 
 int hwt_register(struct hwt_backend *);
 
-struct hwt_softc {
-	struct cdev			*hwt_cdev;
-};
-
 struct hwt_context * hwt_lookup_contexthash(struct proc *p, int cpu_id);
 
 #endif /* !LOCORE */
