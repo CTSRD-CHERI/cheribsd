@@ -91,6 +91,9 @@ int hwt_register(struct hwt_backend *);
 
 struct hwt_softc {
 	struct cdev			*hwt_cdev;
+	eventhandler_tag		hwt_exit_tag;
+	struct mtx			hwt_backend_mtx;
+	LIST_HEAD(, hwt_backend)	hwt_backends;
 };
 
 struct hwt_context * hwt_lookup_contexthash(struct proc *p, int cpu_id);

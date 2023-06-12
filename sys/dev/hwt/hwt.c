@@ -79,8 +79,6 @@
 #define	_HWT_HM	11400714819323198486u	/* hash multiplier */
 #define	HWT_HASH_PTR(P, M)	((((unsigned long) (P) >> 2) * _HWT_HM) & (M))
 
-static eventhandler_tag hwt_exit_tag;
-
 static struct mtx hwt_contexthash_mtx;
 static u_long hwt_contexthashmask;
 static LIST_HEAD(hwt_contexthash, hwt_context)	*hwt_contexthash;
@@ -90,11 +88,9 @@ static u_long hwt_ownerhashmask;
 static LIST_HEAD(hwt_ownerhash, hwt_owner)	*hwt_ownerhash;
 
 static struct hwt_softc hwt_sc;
-static struct mtx hwt_backend_mtx;
-static LIST_HEAD(, hwt_backend)	hwt_backends;
 
 static void
-hwt_event_init(struct hwt_context *ctx)
+hwt_event_init(struct hwt_softc *sc, struct hwt_context *ctx)
 {
 
 	dprintf("%s: cpu %d\n", __func__, ctx->cpu_id);
@@ -103,91 +99,91 @@ hwt_event_init(struct hwt_context *ctx)
 }
 
 static int
-hwt_event_start(struct hwt_context *ctx)
+hwt_event_start(struct hwt_softc *sc, struct hwt_context *ctx)
 {
 
 	dprintf("%s\n", __func__);
 
-	mtx_lock_spin(&hwt_backend_mtx);
+	mtx_lock_spin(&sc->hwt_backend_mtx);
 	ctx->hwt_backend->ops->hwt_event_start(ctx);
-	mtx_unlock_spin(&hwt_backend_mtx);
+	mtx_unlock_spin(&sc->hwt_backend_mtx);
 
 	return (0);
 }
 
 static int
-hwt_event_stop(struct hwt_context *ctx)
+hwt_event_stop(struct hwt_softc *sc, struct hwt_context *ctx)
 {
 
 	dprintf("%s\n", __func__);
 
-	mtx_lock_spin(&hwt_backend_mtx);
+	mtx_lock_spin(&sc->hwt_backend_mtx);
 	ctx->hwt_backend->ops->hwt_event_stop(ctx);
-	mtx_unlock_spin(&hwt_backend_mtx);
+	mtx_unlock_spin(&sc->hwt_backend_mtx);
 
 	return (0);
 }
 
 static int
-hwt_event_enable(struct hwt_context *ctx)
+hwt_event_enable(struct hwt_softc *sc, struct hwt_context *ctx)
 {
 
-	mtx_lock_spin(&hwt_backend_mtx);
+	mtx_lock_spin(&sc->hwt_backend_mtx);
 	ctx->hwt_backend->ops->hwt_event_enable(ctx);
-	mtx_unlock_spin(&hwt_backend_mtx);
+	mtx_unlock_spin(&sc->hwt_backend_mtx);
 
 	return (0);
 }
 
 static int
-hwt_event_disable(struct hwt_context *ctx)
+hwt_event_disable(struct hwt_softc *sc, struct hwt_context *ctx)
 {
 
-	mtx_lock_spin(&hwt_backend_mtx);
+	mtx_lock_spin(&sc->hwt_backend_mtx);
 	ctx->hwt_backend->ops->hwt_event_disable(ctx);
-	mtx_unlock_spin(&hwt_backend_mtx);
+	mtx_unlock_spin(&sc->hwt_backend_mtx);
 
 	return (0);
 }
 
 static int __unused
-hwt_event_dump(struct hwt_context *ctx)
+hwt_event_dump(struct hwt_softc *sc, struct hwt_context *ctx)
 {
 
-	mtx_lock_spin(&hwt_backend_mtx);
+	mtx_lock_spin(&sc->hwt_backend_mtx);
 	ctx->hwt_backend->ops->hwt_event_dump(ctx);
-	mtx_unlock_spin(&hwt_backend_mtx);
+	mtx_unlock_spin(&sc->hwt_backend_mtx);
 
 	return (0);
 }
 
 static int
-hwt_event_read(struct hwt_context *ctx, int *curpage,
+hwt_event_read(struct hwt_softc *sc, struct hwt_context *ctx, int *curpage,
     vm_offset_t *curpage_offset)
 {
 	int error;
 
-	mtx_lock_spin(&hwt_backend_mtx);
+	mtx_lock_spin(&sc->hwt_backend_mtx);
 	error = ctx->hwt_backend->ops->hwt_event_read(ctx, curpage,
 	    curpage_offset);
-	mtx_unlock_spin(&hwt_backend_mtx);
+	mtx_unlock_spin(&sc->hwt_backend_mtx);
 
 	return (error);
 }
 
 static struct hwt_backend *
-hwt_lookup_backend(const char *name)
+hwt_lookup_backend(struct hwt_softc *sc, const char *name)
 {
 	struct hwt_backend *backend;
 
-	mtx_lock_spin(&hwt_backend_mtx);
-	LIST_FOREACH(backend, &hwt_backends, next) {
+	mtx_lock_spin(&sc->hwt_backend_mtx);
+	LIST_FOREACH(backend, &sc->hwt_backends, next) {
 		if (strcmp(backend->name, name) == 0) {
-			mtx_unlock_spin(&hwt_backend_mtx);
+			mtx_unlock_spin(&sc->hwt_backend_mtx);
 			return (backend);
 		}
 	}
-	mtx_unlock_spin(&hwt_backend_mtx);
+	mtx_unlock_spin(&sc->hwt_backend_mtx);
 
 	return (NULL);
 }
@@ -195,15 +191,18 @@ hwt_lookup_backend(const char *name)
 int
 hwt_register(struct hwt_backend *backend)
 {
+	struct hwt_softc *sc;
+
+	sc = &hwt_sc;
 
 	if (backend == NULL ||
 	    backend->name == NULL ||
 	    backend->ops == NULL)
 		return (EINVAL);
 
-	mtx_lock_spin(&hwt_backend_mtx);
-	LIST_INSERT_HEAD(&hwt_backends, backend, next);
-	mtx_unlock_spin(&hwt_backend_mtx);
+	mtx_lock_spin(&sc->hwt_backend_mtx);
+	LIST_INSERT_HEAD(&sc->hwt_backends, backend, next);
+	mtx_unlock_spin(&sc->hwt_backend_mtx);
 
 	return (0);
 }
@@ -459,7 +458,8 @@ hwt_lookup_ownerhash(struct proc *p)
 }
 
 static struct hwt_context *
-hwt_lookup_by_owner(struct hwt_owner *ho, int cpu_id, pid_t pid)
+hwt_lookup_by_owner(struct hwt_softc *sc, struct hwt_owner *ho, int cpu_id,
+    pid_t pid)
 {
 	struct hwt_context *ctx;
 
@@ -476,7 +476,8 @@ hwt_lookup_by_owner(struct hwt_owner *ho, int cpu_id, pid_t pid)
 }
 
 static struct hwt_context *
-hwt_lookup_by_owner_p(struct proc *owner_p, int cpu_id, pid_t pid)
+hwt_lookup_by_owner_p(struct hwt_softc *sc, struct proc *owner_p, int cpu_id,
+    pid_t pid)
 {
 	struct hwt_context *ctx;
 	struct hwt_owner *ho;
@@ -485,7 +486,7 @@ hwt_lookup_by_owner_p(struct proc *owner_p, int cpu_id, pid_t pid)
 	if (ho == NULL)
 		return (NULL);
 
-	ctx = hwt_lookup_by_owner(ho, cpu_id, pid);
+	ctx = hwt_lookup_by_owner(sc, ho, cpu_id, pid);
 
 	return (ctx);
 }
@@ -607,14 +608,14 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		if (error)
 			return (error);
 
-		backend = hwt_lookup_backend(backend_name);
+		backend = hwt_lookup_backend(sc, backend_name);
 		if (backend == NULL)
 			return (ENXIO);
 
 		/* First get the owner. */
 		ho = hwt_lookup_ownerhash(td->td_proc);
 		if (ho) {
-			ctx = hwt_lookup_by_owner(ho, halloc->cpu_id,
+			ctx = hwt_lookup_by_owner(sc, ho, halloc->cpu_id,
 			    halloc->pid);
 			if (ctx)
 				return (EEXIST);
@@ -676,10 +677,10 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		    s->pid);
 
 		/* Check if process is registered owner of any HWTs. */
-		ctx = hwt_lookup_by_owner_p(td->td_proc, s->cpu_id, s->pid);
+		ctx = hwt_lookup_by_owner_p(sc, td->td_proc, s->cpu_id, s->pid);
 		if (ctx == NULL)
 			return (ENXIO);
-		hwt_event_init(ctx);
+		hwt_event_init(sc, ctx);
 
 		p = pfind(s->pid);
 		if (p == NULL)
@@ -687,7 +688,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		KASSERT(ctx->p == p, ("something wrong"));
 
-		error = hwt_event_start(ctx);
+		error = hwt_event_start(sc, ctx);
 		if (error)
 			return (error);
 
@@ -698,7 +699,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		rget = (struct hwt_record_get *)addr;
 
 		/* Check if process is registered owner of any HWTs. */
-		ctx = hwt_lookup_by_owner_p(td->td_proc, rget->cpu_id,
+		ctx = hwt_lookup_by_owner_p(sc, td->td_proc, rget->cpu_id,
 		    rget->pid);
 		if (ctx == NULL)
 			return (ENXIO);
@@ -709,12 +710,12 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		ptr_get = (struct hwt_bufptr_get *)addr;
 
 		/* Check if process is registered owner of any HWTs. */
-		ctx = hwt_lookup_by_owner_p(td->td_proc, ptr_get->cpu_id,
+		ctx = hwt_lookup_by_owner_p(sc, td->td_proc, ptr_get->cpu_id,
 		    ptr_get->pid);
 		if (ctx == NULL)
 			return (ENXIO);
 
-		hwt_event_read(ctx, &curpage, &curpage_offset);
+		hwt_event_read(sc, ctx, &curpage, &curpage_offset);
 
 		error = copyout(&curpage, ptr_get->curpage, sizeof(int));
 		if (error)
@@ -737,8 +738,11 @@ void
 hwt_switch_in(struct thread *td)
 {
 	struct hwt_context *ctx;
+	struct hwt_softc *sc;
 	struct proc *p;
 	int cpu_id;
+
+	sc = &hwt_sc;
 
 	p = td->td_proc;
 	if ((p->p_flag2 & P2_HWT) == 0)
@@ -754,15 +758,18 @@ hwt_switch_in(struct thread *td)
 
 	dprintf("%s: ctx %p on cpu_id %d\n", __func__, ctx, cpu_id);
 
-	hwt_event_enable(ctx);
+	hwt_event_enable(sc, ctx);
 }
 
 void
 hwt_switch_out(struct thread *td)
 {
 	struct hwt_context *ctx;
+	struct hwt_softc *sc;
 	struct proc *p;
 	int cpu_id;
+
+	sc = &hwt_sc;
 
 	p = td->td_proc;
 	if ((p->p_flag2 & P2_HWT) == 0)
@@ -776,7 +783,7 @@ hwt_switch_out(struct thread *td)
 
 	dprintf("%s: ctx %p from cpu_id %d\n", __func__, ctx, cpu_id);
 
-	hwt_event_disable(ctx);
+	hwt_event_disable(sc, ctx);
 }
 
 static struct cdevsw hwt_cdevsw = {
@@ -787,7 +794,8 @@ static struct cdevsw hwt_cdevsw = {
 };
 
 static void
-hwt_stop_proc_hwts(struct hwt_contexthash *hch, struct proc *p)
+hwt_stop_proc_hwts(struct hwt_softc *sc, struct hwt_contexthash *hch,
+    struct proc *p)
 {
 	struct hwt_context *ctx, *ctx1;
 
@@ -803,8 +811,8 @@ hwt_stop_proc_hwts(struct hwt_contexthash *hch, struct proc *p)
 			    ctx->cpu_id);
 
 			LIST_REMOVE(ctx, next_hch);
-			hwt_event_disable(ctx);
-			hwt_event_stop(ctx);
+			hwt_event_disable(sc, ctx);
+			hwt_event_stop(sc, ctx);
 
 			ctx->p = NULL;
 		}
@@ -814,7 +822,8 @@ hwt_stop_proc_hwts(struct hwt_contexthash *hch, struct proc *p)
 }
 
 static void
-hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
+hwt_stop_owner_hwts(struct hwt_softc *sc, struct hwt_contexthash *hch,
+    struct hwt_owner *ho)
 {
 	struct hwt_context *ctx;
 	struct proc *p;
@@ -842,8 +851,8 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 				LIST_REMOVE(ctx, next_hch);
 
 				/* Stop it now on single CPU. */
-				hwt_event_disable(ctx);
-				hwt_event_stop(ctx);
+				hwt_event_disable(sc, ctx);
+				hwt_event_stop(sc, ctx);
 
 				ctx->p = NULL;
 				mtx_unlock_spin(&hwt_contexthash_mtx);
@@ -866,11 +875,14 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 }
 
 static void
-hwt_process_exit(void *arg __unused, struct proc *p)
+hwt_process_exit(void *arg, struct proc *p)
 {
 	struct hwt_contexthash *hch;
+	struct hwt_softc *sc;
 	struct hwt_owner *ho;
 	int hindex;
+
+	sc = arg;
 
 	hindex = HWT_HASH_PTR(p, hwt_contexthashmask);
 	hch = &hwt_contexthash[hindex];
@@ -878,10 +890,10 @@ hwt_process_exit(void *arg __unused, struct proc *p)
 	ho = hwt_lookup_ownerhash(p);
 	if (ho) {
 		/* Stop HWTs associated with exiting owner. */
-		hwt_stop_owner_hwts(hch, ho);
+		hwt_stop_owner_hwts(sc, hch, ho);
 	} else if (p->p_flag2 & P2_HWT) {
 		/* Stop HWTs associated with exiting proc. */
-		hwt_stop_proc_hwts(hch, p);
+		hwt_stop_proc_hwts(sc, hch, p);
 	}
 }
 
@@ -894,7 +906,7 @@ hwt_load(void)
 
 	sc = &hwt_sc;
 
-	LIST_INIT(&hwt_backends);
+	LIST_INIT(&sc->hwt_backends);
 
 	make_dev_args_init(&args);
 	args.mda_devsw = &hwt_cdevsw;
@@ -915,10 +927,10 @@ hwt_load(void)
 	hwt_ownerhash = hashinit(HWT_OWNERHASH_SIZE, M_HWT, &hwt_ownerhashmask);
         mtx_init(&hwt_ownerhash_mtx, "hwt-owner-hash", "hwt-owner", MTX_SPIN);
 
-	mtx_init(&hwt_backend_mtx, "hwt backend", NULL, MTX_SPIN);
+	mtx_init(&sc->hwt_backend_mtx, "hwt backend", NULL, MTX_SPIN);
 
-	hwt_exit_tag = EVENTHANDLER_REGISTER(process_exit, hwt_process_exit,
-	    NULL, EVENTHANDLER_PRI_ANY);
+	sc->hwt_exit_tag = EVENTHANDLER_REGISTER(process_exit, hwt_process_exit,
+	    sc, EVENTHANDLER_PRI_ANY);
 
 	return (0);
 }
