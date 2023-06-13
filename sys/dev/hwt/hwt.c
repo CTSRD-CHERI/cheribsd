@@ -720,7 +720,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		error = hwt_priv_check(td->td_proc, p);
 		if (error) {
 			/* TODO: deallocate resources. */
-printf("access deny\n");
 			PROC_UNLOCK(p);
 			return (error);
 		}
