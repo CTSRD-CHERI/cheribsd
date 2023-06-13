@@ -199,7 +199,9 @@ static int  rtld_verify_versions(const Objlist *);
 static int  rtld_verify_object_versions(Obj_Entry *);
 static void object_add_name(Obj_Entry *, const char *);
 static int  object_match_name(const Obj_Entry *, const char *);
-static void ld_utrace_log(int, void *, void *, size_t, int, const char *);
+#if !defined(__CHERI_PURE_CAPABILITY__) || !defined(RTLD_SANDBOX)
+static void ld_utrace_log(int, void *, void *, size_t, int, const char *, const char *);
+#endif
 static void rtld_fill_dl_phdr_info(const Obj_Entry *obj,
     struct dl_phdr_info *phdr_info);
 static uint32_t gnu_hash(const char *);
@@ -232,6 +234,10 @@ static const char *ld_preload_fds;/* Environment variable for libraries represen
 static const char *ld_elf_hints_path;	/* Environment variable for alternative hints path */
 static const char *ld_tracing;	/* Called from ldd to print libs */
 static const char *ld_utrace;	/* Use utrace() to log events. */
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+const char *ld_utrace_compartment;	/* Use utrace() to log compartmentalisation-related events. */
+const char *ld_compartment_overhead;	/* Simulate overhead during compartment transitions. */
+#endif
 static bool ld_skip_init_funcs = false;	/* XXXAR: debug environment variable to verify relocation processing */
 static struct obj_entry_q obj_list;	/* Queue of all loaded objects */
 static Obj_Entry *obj_main;	/* The main program shared object */
@@ -316,10 +322,11 @@ int tls_max_index = 1;		/* Largest module index allocated */
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 /*
- * Globals for compartmentalisation
+ * Sealers for RTLD privileged information
  */
-uint32_t compart_max_index; /* Largest compartment index allocated */
-static uintptr_t sealer_cap; /* Sealer for RTLD privilege information */
+#define RTLD_SEALER_EXE_LEN	0x200
+static uintptr_t sealer_res;
+uintptr_t sealer_pltgot, sealer_jmpbuf, sealer_tramp;
 #endif
 
 static bool ld_library_path_rpath = false;
@@ -349,12 +356,16 @@ static void (*rtld_exit_ptr)(void);
 
 #define	LD_UTRACE(e, h, mb, ms, r, n) do {			\
 	if (ld_utrace != NULL)					\
-		ld_utrace_log(e, h, mb, ms, r, n);		\
+		ld_utrace_log(e, h, mb, ms, r, n, NULL);		\
 } while (0)
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+void
+#else
 static void
+#endif
 ld_utrace_log(int event, void *handle, void *mapbase, size_t mapsize,
-    int refcnt, const char *name)
+    int refcnt, const char *name, const char *symbol)
 {
 	struct utrace_rtld ut;
 	static const char rtld_utrace_sig[RTLD_UTRACE_SIG_SZ] = RTLD_UTRACE_SIG;
@@ -368,6 +379,8 @@ ld_utrace_log(int event, void *handle, void *mapbase, size_t mapsize,
 	bzero(ut.name, sizeof(ut.name));
 	if (name)
 		strlcpy(ut.name, name, sizeof(ut.name));
+	if (symbol)
+		strlcpy(ut.symbol, symbol, sizeof(ut.symbol));
 	utrace(&ut, sizeof(ut));
 }
 
@@ -399,6 +412,10 @@ enum {
 	LD_TRACE_LOADED_OBJECTS_ALL,
 	LD_SHOW_AUXV,
 	LD_SKIP_INIT_FUNCS,
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	LD_UTRACE_COMPARTMENT,
+	LD_COMPARTMENT_OVERHEAD,
+#endif
 };
 
 struct ld_env_var_desc {
@@ -437,6 +454,10 @@ static struct ld_env_var_desc ld_env_vars[] = {
 	LD_ENV_DESC(TRACE_LOADED_OBJECTS_ALL, false),
 	LD_ENV_DESC(SHOW_AUXV, false),
 	LD_ENV_DESC(SKIP_INIT_FUNCS, true),
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	LD_ENV_DESC(UTRACE_COMPARTMENT, true),
+	LD_ENV_DESC(COMPARTMENT_OVERHEAD, true),
+#endif
 };
 
 static const char *
@@ -823,6 +844,10 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     if (!ld_tracing)
 	ld_tracing = ld_get_env_var(LD_TRACE_LOADED_OBJECTS);
     ld_utrace = ld_get_env_var(LD_UTRACE);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+    ld_utrace_compartment = ld_get_env_var(LD_UTRACE_COMPARTMENT);
+    ld_compartment_overhead = ld_get_env_var(LD_COMPARTMENT_OVERHEAD);
+#endif
 
     set_ld_elf_hints_path();
 #ifdef DEBUG
@@ -1118,7 +1143,11 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     *objp = obj_main;
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    return ((func_ptr_type)tramp_pgs_append(cheri_sealentry(obj_main->entry), obj_main, NULL));
+    return ((func_ptr_type)tramp_intern(&(struct tramp_data) {
+	.target = cheri_sealentry(obj_main->entry),
+	.obj = obj_main,
+	.sig = (struct tramp_sig) { true, 3, false, NONE }
+    }));
 #else
     return ((func_ptr_type)obj_main->entry);
 #endif
@@ -1132,7 +1161,12 @@ rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def)
 
 	ptr = (void *)make_function_pointer(def, obj);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	ptr = tramp_pgs_append(ptr, obj, def);
+	ptr = tramp_intern(&(struct tramp_data) {
+		.target = ptr,
+		.obj = obj,
+		.def = def,
+		.sig = (struct tramp_sig) { true, 8, false, C0 }
+	});
 #endif
 	target = call_ifunc_resolver(ptr);
 	return ((void *)target);
@@ -1149,7 +1183,7 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
     RtldLockState lockstate;
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    obj = cheri_unseal(obj, sealer_cap);
+    obj = cheri_unseal(obj, sealer_pltgot);
 #endif
 
     rlock_acquire(rtld_bind_lock, &lockstate);
@@ -1188,7 +1222,11 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
      * that the trampoline needs.
      */
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    target = (uintptr_t)tramp_pgs_append((void *)target, defobj, def);
+    target = (uintptr_t)tramp_intern(&(struct tramp_data) {
+	.target = (void *)target,
+	.obj = defobj,
+	.def = def
+    });
 #endif
     target = reloc_jmpslot(where, target, defobj, obj, rel);
     lock_release(rtld_bind_lock, &lockstate);
@@ -1936,7 +1974,7 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 #endif
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    obj->compart_id = ++compart_max_index;
+    obj->compart_id = allocate_compart_id();
 #endif
 
     obj->entry = entry;
@@ -2725,9 +2763,19 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
     r_debug.r_ldbase = obj_rtld.relocbase;
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    if (sysctlbyname("security.cheri.sealcap", &sealer_cap,
-                     &(size_t) { sizeof(sealer_cap) }, NULL, 0) < 0)
-	rtld_die();
+    /*
+     * Allocate otypes for RTLD use.
+     */
+    uintptr_t sealer;
+    if (sysctlbyname("security.cheri.sealcap", &sealer,
+        &(size_t) { sizeof(sealer) }, NULL, 0) < 0)
+            rtld_fatal("sysctlbyname failed");
+    sealer_pltgot = cheri_setboundsexact(sealer, 1); sealer += 1;
+    sealer_jmpbuf = cheri_setboundsexact(sealer, 1); sealer += 1;
+    sealer_tramp = cheri_setboundsexact(sealer, 72); sealer += 72;
+    sealer_res = cheri_setboundsexact(sealer,
+        cheri_gettop(sealer) - cheri_getoffset(sealer));
+    tramp_init();
 #endif
 }
 
@@ -3389,9 +3437,6 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 	if (reg != NULL) {
 		func_ptr_type exit_ptr = make_rtld_function_pointer(rtld_exit);
 		dbg("Calling __libc_atexit(rtld_exit (" PTR_FMT "))", (void*)exit_ptr);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-		reg = tramp_pgs_append(reg, obj_from_addr(reg), NULL);
-#endif
 		reg(exit_ptr);
 		rtld_exit_ptr = make_rtld_function_pointer(rtld_nop_exit);
 	}
@@ -3622,11 +3667,7 @@ relocate_object(Obj_Entry *obj, bool bind_now, Obj_Entry *rtldobj,
 		return (-1);
 
 	/* Set the special PLT or GOT entries. */
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	init_pltgot(obj, sealer_cap);
-#else
 	init_pltgot(obj);
-#endif
 
 	/* Process the PLT relocations. */
 	if (reloc_plt(obj, flags, lockstate) == -1)
@@ -4317,13 +4358,21 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
 	    sym = __DECONST(void*, make_function_pointer(def, defobj));
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	    sym = tramp_pgs_append(sym, defobj, def);
+	    sym = tramp_intern(&(struct tramp_data) {
+		.target = sym,
+		.obj = defobj,
+		.def = def
+	    });
 #endif
 	    dbg("dlsym(%s) is function: " PTR_FMT, name, sym);
 	} else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
 	    sym = rtld_resolve_ifunc(defobj, def);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	    sym = tramp_pgs_append(sym, defobj, def);
+	    sym = tramp_intern(&(struct tramp_data) {
+		.target = sym,
+		.obj = defobj,
+		.def = def
+	    });
 #endif
 	    dbg("dlsym(%s) is ifunc. Resolved to: " PTR_FMT, name, sym);
 	} else if (ELF_ST_TYPE(def->st_info) == STT_TLS) {
@@ -4560,6 +4609,15 @@ dl_iterate_phdr(__dl_iterate_hdr_callback callback, void *param)
 
 	init_marker(&marker);
 	error = 0;
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	callback = _rtld_sandbox_code(callback, (struct tramp_sig) {
+		.valid = true,
+		.reg_args = 3,
+		.mem_args = false,
+		.ret_args = C0
+	});
+#endif
 
 	wlock_acquire(rtld_phdr_lock, &phdr_lockstate);
 	wlock_acquire(rtld_bind_lock, &bind_lockstate);
@@ -4859,12 +4917,30 @@ get_program_var_addr(const char *name, RtldLockState *lockstate)
     donelist_init(&donelist);
     if (symlook_global(&req, &donelist) != 0)
 	return (NULL);
-    if (ELF_ST_TYPE(req.sym_out->st_info) == STT_FUNC)
+    if (ELF_ST_TYPE(req.sym_out->st_info) == STT_FUNC) {
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	void *target = make_function_pointer(req.sym_out, req.defobj_out);
+	return tramp_intern(&(struct tramp_data) {
+		.target = target,
+		.obj = req.defobj_out,
+		.def = req.sym_out
+	});
+#else
 	return ((const void **)make_function_pointer(req.sym_out,
 	  req.defobj_out));
-    else if (ELF_ST_TYPE(req.sym_out->st_info) == STT_GNU_IFUNC)
+#endif
+    } else if (ELF_ST_TYPE(req.sym_out->st_info) == STT_GNU_IFUNC) {
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	void *target = rtld_resolve_ifunc(req.defobj_out, req.sym_out);
+	return tramp_intern(&(struct tramp_data) {
+		.target = target,
+		.obj = req.defobj_out,
+		.def = req.sym_out
+	});
+#else
 	return ((const void **)rtld_resolve_ifunc(req.defobj_out, req.sym_out));
-    else
+#endif
+    } else
 	return (const void **)make_data_pointer(req.sym_out, req.defobj_out);
 }
 

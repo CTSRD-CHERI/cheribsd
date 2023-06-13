@@ -53,12 +53,6 @@ ENTRY(setjmp)
 	mov	x0, #1				/* SIG_BLOCK */
 	bl	sigprocmask
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	/* Store Executive mode state */
-	bl	_rtld_setjmp
-	mov	c1, c0
-#endif
-
 	ldp	REG(0), REGN(lr), [REGN(sp)]
 	add	REGN(sp), REGN(sp), #(REG_WIDTH * 2)
 
@@ -66,6 +60,13 @@ ENTRY(setjmp)
 	ldr	x8, .Lmagic
 	mov	REG(9), REGN(sp)
 	stp	REG(8), REG(9), [REG(0)], #(REG_WIDTH * 2)
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	/* Store Executive mode state */
+	str	clr, [csp, #-16]!
+	bl	_rtld_setjmp
+	ldr	clr, [csp], #16
+#endif
 
 	/* Store the general purpose registers and lr */
 	stp	REG(19), REG(20), [REG(0)], #(REG_WIDTH * 2)
@@ -80,11 +81,6 @@ ENTRY(setjmp)
 	stp	d10, d11, [REG(0)], #16
 	stp	d12, d13, [REG(0)], #16
 	stp	d14, d15, [REG(0)], #16
-
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	/* Store Executive mode state */
-	str	c1, [REG(0)], #16
-#endif
 
 	/* Return value */
 	mov	x0, #0
@@ -119,6 +115,12 @@ ENTRY(longjmp)
 	ldr	REG(8), [REG(0)], #(REG_WIDTH)
 	mov	REGN(sp), REG(8)
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	/* Restore Executive mode state and general purpose registers */
+	bl	_rtld_longjmp
+	/* Restore lr */
+	ldr	clr, [c0], #CAP_WIDTH
+#else
 	/* Restore the general purpose registers and lr */
 	ldp	REG(19), REG(20), [REG(0)], #(REG_WIDTH * 2)
 	ldp	REG(21), REG(22), [REG(0)], #(REG_WIDTH * 2)
@@ -126,22 +128,13 @@ ENTRY(longjmp)
 	ldp	REG(25), REG(26), [REG(0)], #(REG_WIDTH * 2)
 	ldp	REG(27), REG(28), [REG(0)], #(REG_WIDTH * 2)
 	ldp	REG(29), REGN(lr), [REG(0)], #(REG_WIDTH * 2)
+#endif
 
 	/* Restore the vfp registers */
 	ldp	d8, d9, [REG(0)], #16
 	ldp	d10, d11, [REG(0)], #16
 	ldp	d12, d13, [REG(0)], #16
 	ldp	d14, d15, [REG(0)], #16
-
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	/* Restore Executive mode state */
-	stp	REG(1), REGN(lr), [REGN(sp), #-(REG_WIDTH * 2)]!
-
-	ldr	c0, [c0], #16
-	bl	_rtld_longjmp
-
-	ldp	REG(1), REGN(lr), [REGN(sp)], #(REG_WIDTH * 2)
-#endif
 
 	/* Load the return value */
 	cmp	x1, #0
