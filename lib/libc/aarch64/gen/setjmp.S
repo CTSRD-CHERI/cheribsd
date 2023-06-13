@@ -53,14 +53,15 @@ ENTRY(setjmp)
 	mov	x0, #1				/* SIG_BLOCK */
 	bl	sigprocmask
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	/* Store Executive mode state */
-	bl	_rtld_setjmp
-	mov	c1, c0
-#endif
-
 	ldp	REG(0), REGN(lr), [REGN(sp)]
 	add	REGN(sp), REGN(sp), #(REG_WIDTH * 2)
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	/* Store Executive mode state */
+	str	REGN(lr), [REGN(sp), #-REG_WIDTH]!
+	bl	_rtld_setjmp
+	ldr	REGN(lr), [REGN(sp)], #REG_WIDTH
+#endif
 
 	/* Store the magic value and stack pointer */
 	ldr	x8, .Lmagic
@@ -80,11 +81,6 @@ ENTRY(setjmp)
 	stp	d10, d11, [REG(0)], #16
 	stp	d12, d13, [REG(0)], #16
 	stp	d14, d15, [REG(0)], #16
-
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	/* Store Executive mode state */
-	str	c1, [REG(0)], #16
-#endif
 
 	/* Return value */
 	mov	x0, #0
@@ -109,6 +105,11 @@ ENTRY(longjmp)
 	ldp	REG(0), REGN(lr), [REGN(sp)]
 	add	REGN(sp), REGN(sp), #(REG_WIDTH * 4)
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	/* Restore Executive mode state */
+	bl	_rtld_longjmp
+#endif
+
 	/* Check the magic value */
 	ldr	REG(8), [REG(0)], #(REG_WIDTH)
 	ldr	x9, .Lmagic
@@ -132,16 +133,6 @@ ENTRY(longjmp)
 	ldp	d10, d11, [REG(0)], #16
 	ldp	d12, d13, [REG(0)], #16
 	ldp	d14, d15, [REG(0)], #16
-
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	/* Restore Executive mode state */
-	stp	REG(1), REGN(lr), [REGN(sp), #-(REG_WIDTH * 2)]!
-
-	ldr	c0, [c0], #16
-	bl	_rtld_longjmp
-
-	ldp	REG(1), REGN(lr), [REGN(sp)], #(REG_WIDTH * 2)
-#endif
 
 	/* Load the return value */
 	cmp	x1, #0

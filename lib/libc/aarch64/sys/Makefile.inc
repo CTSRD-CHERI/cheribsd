@@ -11,3 +11,8 @@ MDASM=	cerror.S \
 # Don't generate default code for these syscalls:
 NOASM+=	sbrk.o \
 	vfork.o
+
+.ifdef RTLD_SANDBOX
+SRCS+=	thr_exit.c
+PSEUDO+=	_thr_exit.o
+.endif
