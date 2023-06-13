@@ -63,7 +63,7 @@ void _exit(int);
 
 void
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-init_pltgot(Obj_Entry *obj, uintptr_t sealer_cap)
+init_pltgot(Obj_Entry *obj, uintptr_t sealer)
 #else
 init_pltgot(Obj_Entry *obj)
 #endif
@@ -71,7 +71,7 @@ init_pltgot(Obj_Entry *obj)
 
 	if (obj->pltgot != NULL) {
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-		obj->pltgot[1] = (uintptr_t) cheri_seal(obj, sealer_cap);
+		obj->pltgot[1] = (uintptr_t) cheri_seal(obj, sealer);
 #else
 		obj->pltgot[1] = (uintptr_t) obj;
 #endif
@@ -183,14 +183,13 @@ void _rtld_sighandler(int, siginfo_t *, void *);
 
 struct tramp {
 	const void *target;
-	uint32_t compart_id;
-	char code[];
+	uint32_t code[];
 };
 
 struct tramp_pg {
-	struct tramp *cursor;		/* Points to start of unused space */
-	SLIST_ENTRY(tramp_pg) entries;	/* Points to start of next page */
-	struct tramp trampolines[];	/* Points to start of trampolines */
+	void *cursor;			/* Start of unused space */
+	SLIST_ENTRY(tramp_pg) entries;	/* Link to next page */
+	void *trampolines[];		/* Start of trampolines */
 };
 
 SLIST_HEAD(tramp_pgs, tramp_pg);
@@ -199,63 +198,52 @@ SLIST_HEAD(tramp_pgs, tramp_pg);
 #define SANDBOX_STACK_DEFAULT	(sizeof(void *) / 4 * 1024 * 1024)
 #define DEFAULT_STACK_TABLE_SIZE 2
 
-typedef uintptr_t *tramp_stk_table_t;
-
-static void
-get_rstk(uint32_t index, tramp_stk_table_t table, const void *target)
+void *
+get_rstk(const void *target, uint32_t index, tramp_stk_table_t table)
 {
 	size_t len = cheri_getlen(table) / sizeof(*table);
 
-	if (index < len) {
-		size_t size;
-		void *stk;
-		struct {
-			uint8_t generation;
-			uintptr_t top;
-		} *metadata;
-		struct Struct_Stack_Entry *entry;
-		Obj_Entry *dst;
+	assert(cheri_gettag(table));
 
-		size = SANDBOX_STACK_DEFAULT;
-		stk = (char *)mmap(NULL,
-				   size,
-				   PROT_READ | PROT_WRITE,
-				   MAP_ANON | MAP_PRIVATE | MAP_STACK,
-				   -1, 0) + size;
-		if (stk == MAP_FAILED)
-			rtld_die();
+	if (len <= index) {
+		size_t new_len = index * 2;
+		table = realloc(table, new_len * sizeof(*table));
+		if (table == NULL)
+			rtld_fatal("realloc failed");
+		memset(&table[len], 0, (new_len - len) * sizeof(*table));
 
-		stk = cheri_clearperm(stk, CHERI_PERM_EXECUTIVE | CHERI_PERM_SW_VMEM);
-		metadata = stk;
-		metadata[-1].generation = 0;
-		metadata[-1].top = (uintptr_t)&metadata[-1];
-
-		table[index] = (uintptr_t)stk;
-
-		entry = xmalloc(sizeof(*entry));
-		entry->stack = stk;
-
-		dst = obj_from_addr(target);
-		lockinfo.wlock_acquire(dst->stackslock);
-		SLIST_INSERT_HEAD(&dst->stacks, entry, link);
-		lockinfo.lock_release(dst->stackslock);
-
-	} else {
-		size_t new_len;
-		tramp_stk_table_t new_table;
-
-		new_len = len * 2;
-		new_table = xcalloc(new_len, sizeof(*new_table));
-		if (new_table == NULL)
-			rtld_die();
-
-		assert(cheri_getlen(new_table) / sizeof(*new_table) == new_len);
-
-		memcpy(new_table, table, len * sizeof(*table));
-
-		asm ("msr	ctpidr_el0, %0" :: "C" (new_table));
-		free(table);
+		asm ("msr	ctpidr_el0, %0" :: "C" (table));
 	}
+
+	assert(table[index] == 0);
+
+	size_t size = SANDBOX_STACK_DEFAULT;
+	uintptr_t *stk;
+	struct Struct_Stack_Entry *entry;
+	Obj_Entry *dst;
+
+	stk = (uintptr_t *)((char *)mmap(NULL,
+	    size,
+	    PROT_READ | PROT_WRITE,
+	    MAP_ANON | MAP_PRIVATE | MAP_STACK,
+	    -1, 0) + size);
+	if (stk == MAP_FAILED)
+		rtld_fatal("mmap failed");
+
+	stk = cheri_clearperm(stk, CHERI_PERM_EXECUTIVE | CHERI_PERM_SW_VMEM);
+	stk[-1] = (uintptr_t)&stk[-1];
+
+	table[index] = (uintptr_t)stk;
+
+	entry = xmalloc(sizeof(*entry));
+	entry->stack = stk;
+
+	dst = obj_from_addr(target);
+	lockinfo.wlock_acquire(dst->stackslock);
+	SLIST_INSERT_HEAD(&dst->stacks, entry, link);
+	lockinfo.lock_release(dst->stackslock);
+
+	return (stk);
 }
 
 static void (*thr_thread_start)(struct pthread *);
@@ -268,7 +256,7 @@ _rtld_thread_start(struct pthread *curthread)
 	asm ("msr	rctpidr_el0, %0" :: "C" (tls));
 
 	tls = xcalloc(DEFAULT_STACK_TABLE_SIZE, sizeof(*tls));
-	tls[0] = (uintptr_t)get_rstk;
+	tls[0] = (uintptr_t)_rtld_get_rstk;
 	asm ("msr	ctpidr_el0, %0" :: "C" (tls));
 
 	thr_thread_start(curthread);
@@ -279,7 +267,7 @@ _rtld_thread_start_init(void (*p)(struct pthread *))
 {
 	assert((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) == 0);
 	assert(thr_thread_start == NULL);
-	thr_thread_start = tramp_pgs_append(p, obj_from_addr(p), NULL);
+	thr_thread_start = _rtld_sandbox_code(p);
 }
 
 static void (*thr_sighandler)(int, siginfo_t *, void *);
@@ -306,37 +294,42 @@ _rtld_sighandler_init(void *p)
 {
 	assert((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) == 0);
 	assert(thr_sighandler == NULL);
-	thr_sighandler = tramp_pgs_append(p, obj_from_addr(p), NULL);
-}
-
-static void *
-set_bounds_get_remainder(struct tramp **inout, size_t len)
-{
-	void *hi = *inout;
-	void *lo;
-	ptraddr_t top_lo, alignment;
-	size_t remaining;
-
-	*inout = lo = cheri_setbounds(hi, len);
-	top_lo = cheri_gettop(lo);
-	remaining = cheri_gettop(hi) - top_lo;
-	alignment = CHERI_REPRESENTABLE_ALIGNMENT(remaining);
-	return (cheri_setaddress(hi, roundup2(top_lo, alignment)));
+	thr_sighandler = _rtld_sandbox_code(p);
 }
 
 static struct tramp_pg *
-tramp_pg_create(void)
+tramp_pgs_expand(struct tramp_pgs *pgs)
 {
-	struct tramp_pg *p;
-	p = mmap(NULL,
-		getpagesize(),
-		PROT_READ | PROT_WRITE | PROT_EXEC,
-		MAP_ANON | MAP_PRIVATE,
-		-1, 0);
-	if (p == MAP_FAILED)
-		return (NULL);
-	p->cursor = p->trampolines;
-	return (p);
+	struct tramp_pg *pg = mmap(NULL,
+	    /*
+	     * 64K is the largest size such that any capability-aligned
+	     * proper sub-range can be exactly bounded by a Morello
+	     * capability.
+	     */
+	    64 * 1024,
+	    PROT_READ | PROT_WRITE | PROT_EXEC,
+	    MAP_ANON | MAP_PRIVATE,
+	    -1, 0);
+	if (pg == MAP_FAILED)
+		rtld_fatal("mmap failed");
+	pg->cursor = pg->trampolines;
+	SLIST_INSERT_HEAD(pgs, pg, entries);
+	return (pg);
+}
+
+static void *
+tramp_pg_push(struct tramp_pg *pg, size_t len)
+{
+	void *cursor = pg->cursor;
+	void *tramp = cheri_setbounds(cursor, len);
+	ptraddr_t n_cursor = roundup2(cheri_gettop(tramp), _Alignof(void *));
+	ptrdiff_t remaining = cheri_gettop(cursor) - n_cursor;
+
+	cursor = cheri_setaddress(cursor, n_cursor);
+	pg->cursor = cheri_setboundsexact(cursor, remaining);
+	assert(!cheri_gettag(tramp) || cheri_gettag(pg->cursor));
+
+	return (tramp);
 }
 
 static int
@@ -355,74 +348,149 @@ exclude_symbol_in_lib(const char *name, const char *sym, const Obj_Entry *obj, c
 	return (0);
 }
 
+static size_t
+tramp_compile(struct tramp *tramp, const void *target, const Obj_Entry *obj)
+{
+#define IMPORT(template) \
+	extern const uint32_t tramp_##template[]; \
+	extern const size_t size_tramp_##template
+
+#define TRANSITION(template, ...) \
+	if (code == tramp_##template) { \
+		memcpy(buf, tramp_##template, size_tramp_##template); \
+		size += size_tramp_##template; \
+		buf += size_tramp_##template / sizeof(*tramp_##template); \
+		__VA_ARGS__ \
+		continue; \
+	}
+
+#define TO(template) \
+	code = tramp_##template
+
+	IMPORT(header);
+	IMPORT(header_res);
+	IMPORT(save_caller);
+	IMPORT(switch_stack);
+	IMPORT(clear_regs);
+	IMPORT(invoke_res);
+	IMPORT(invoke_exe);
+	IMPORT(return);
+
+	uint32_t *buf = tramp->code;
+	size_t size = offsetof(typeof(*tramp), code);
+	const void *code = tramp_header;
+	bool executive = cheri_getperm(target) & CHERI_PERM_EXECUTIVE;
+
+	tramp->target = target;
+
+	for (; code != NULL; ) {
+		TRANSITION(header, {
+			if (executive)
+				TO(save_caller);
+			else
+				TO(header_res);
+		})
+		TRANSITION(header_res, {
+			buf[-2] |= obj->compart_id << 5;
+			TO(save_caller);
+		})
+		TRANSITION(save_caller, {
+			if (executive)
+				TO(invoke_exe);
+			else
+				TO(switch_stack);
+		})
+		TRANSITION(switch_stack, {
+			TO(clear_regs);
+		})
+		if (code == tramp_clear_regs) {
+			/* TODO: Clear unused argument registers */
+			TO(invoke_res);
+			continue;
+		}
+		TRANSITION(invoke_res, {
+			TO(return);
+		})
+		TRANSITION(invoke_exe, {
+			TO(return);
+		})
+		TRANSITION(return, {
+			code = NULL;
+		})
+	}
+
+#undef IMPORT
+#undef TRANSITION
+#undef TO
+
+	return (size);
+}
+
 void *
 tramp_pgs_append(void *target, const Obj_Entry *obj, const Elf_Sym *def)
 {
-	extern const struct tramp tramp_template_exe, tramp_template_res;
-	extern const size_t sztramp_template_exe, sztramp_template_res;
-
 	static struct tramp_pgs pgs = SLIST_HEAD_INITIALIZER(pgs);
 
-	const struct tramp *template;
 	size_t len;
-
+	/* A capability-aligned buffer large enough to hold a trampoline */
+	void *tmp[32];
 	RtldLockState lockstate;
 	struct tramp_pg *pg;
-	bool did_allocate = false;
-	struct tramp *t;
+	struct tramp *tramp;
 
 	if (exclude_symbol_in_lib("libc.so.7", "rfork", obj, def) ||
 	    exclude_symbol_in_lib("libc.so.7", "vfork", obj, def)) {
 		return (target);
 	}
 
-	if (cheri_getperm(target) & CHERI_PERM_EXECUTIVE) {
-		template = &tramp_template_exe;
-		len = sztramp_template_exe;
-	} else {
-		template = &tramp_template_res;
-		len = sztramp_template_res;
-	}
-	assert(len == cheri_getlen(template));
+	/* Fill a temporary buffer with the trampoline and obtain its length */
+	len = tramp_compile((struct tramp *)tmp, target, obj);
 
+	/*
+	 * The lock ensures the consistency of the trampoline pages and the
+	 * trampoline lookup table.
+	 */
 	wlock_acquire(rtld_tramp_lock, &lockstate);
-
 	pg = SLIST_FIRST(&pgs);
-	if (pg == NULL) {
-allocate_new_page:
-		if (did_allocate)
-			rtld_die();
-		pg = tramp_pg_create();
-		if (pg == NULL)
-			rtld_die();
-		SLIST_INSERT_HEAD(&pgs, pg, entries);
-		did_allocate = true;
+	if (pg == NULL)
+		pg = tramp_pgs_expand(&pgs);
+	tramp = tramp_pg_push(pg, len);
+	if (!cheri_gettag(tramp)) {
+		pg = tramp_pgs_expand(&pgs);
+		tramp = tramp_pg_push(pg, len);
 	}
-
-	t = roundup2(pg->cursor, _Alignof(typeof(*t)));
-	pg->cursor = set_bounds_get_remainder(&t, len);
-	if (!cheri_gettag(t))
-		goto allocate_new_page;
-
 	lock_release(rtld_tramp_lock, &lockstate);
 
-	memcpy(t, template, len);
+	assert(cheri_gettag(tramp));
+	memcpy(tramp, tmp, len);
+
 	/*
-	 * Ensure i- and d-cache coherency after writing executable code.
-	 * The __clear_cache procedure rounds the addresses to
-	 * cache-line-aligned addresses.
-	 * Derive the start/end addresses from pg so that they have sufficiently
-	 * large bounds to contain these rounded addresses.
+	 * Ensure i- and d-cache coherency after writing executable code. The
+	 * __clear_cache procedure rounds the addresses to cache-line-aligned
+	 * addresses. Derive the start/end addresses from pg so that they have
+	 * sufficiently large bounds to contain these rounded addresses.
 	 */
-	__clear_cache(cheri_copyaddress(pg, t->code),
-	    cheri_copyaddress(pg, (uintptr_t)t + len));
+	__clear_cache(cheri_copyaddress(pg, tramp->code),
+	    cheri_copyaddress(pg, (char *)tramp + len));
 
-	t->target = target;
-	if (obj != NULL)
-		t->compart_id = obj->compart_id;
+	tramp = cheri_clearperm(tramp, FUNC_PTR_REMOVE_PERMS);
+	return (cheri_sealentry(cheri_capmode(&tramp->code)));
+}
 
-	t = cheri_clearperm(t, FUNC_PTR_REMOVE_PERMS);
-	return (cheri_sealentry(cheri_capmode(&t->code)));
+void *
+_rtld_sandbox_code(void *f)
+{
+	if (cheri_gettag(f) &&
+	    ((cheri_getperm(f) & CHERI_PERM_EXECUTIVE) == 0) &&
+	    ((cheri_getperm(f) & CHERI_PERM_EXECUTE) != 0) &&
+	    (cheri_getsealed(f) != 0) && (cheri_gettype(f) == 1)) {
+
+		f = tramp_pgs_append(f, obj_from_addr(f), NULL);
+
+		return (f);
+	}
+
+	rtld_fatal("_rtld_sandbox_code: Invalid argument %#p", f);
 }
 
 #endif
@@ -1088,7 +1156,7 @@ allocate_initial_tls(Obj_Entry *objs)
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 	tramp_stk_table_t tls = xcalloc(DEFAULT_STACK_TABLE_SIZE, sizeof(*tls));
-	tls[0] = (uintptr_t)get_rstk;
+	tls[0] = (uintptr_t)_rtld_get_rstk;
 	asm ("msr	ctpidr_el0, %0\n" :: "C" (tls));
 #endif
 

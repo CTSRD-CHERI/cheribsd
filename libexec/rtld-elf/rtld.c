@@ -318,8 +318,7 @@ int tls_max_index = 1;		/* Largest module index allocated */
 /*
  * Globals for compartmentalisation
  */
-uint32_t compart_max_index; /* Largest compartment index allocated */
-static uintptr_t sealer_cap; /* Sealer for RTLD privilege information */
+uintptr_t sealer_cap; /* Sealer for RTLD privilege information */
 #endif
 
 static bool ld_library_path_rpath = false;
@@ -1939,7 +1938,7 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 #endif
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    obj->compart_id = ++compart_max_index;
+    obj->compart_id = allocate_compart_id();
 #endif
 
     obj->entry = entry;
@@ -3393,7 +3392,7 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 		func_ptr_type exit_ptr = make_rtld_function_pointer(rtld_exit);
 		dbg("Calling __libc_atexit(rtld_exit (" PTR_FMT "))", (void*)exit_ptr);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-		reg = tramp_pgs_append(reg, obj_from_addr(reg), NULL);
+		reg = _rtld_sandbox_code(reg);
 #endif
 		reg(exit_ptr);
 		rtld_exit_ptr = make_rtld_function_pointer(rtld_nop_exit);
@@ -4563,6 +4562,10 @@ dl_iterate_phdr(__dl_iterate_hdr_callback callback, void *param)
 
 	init_marker(&marker);
 	error = 0;
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	callback = _rtld_sandbox_code(callback);
+#endif
 
 	wlock_acquire(rtld_phdr_lock, &phdr_lockstate);
 	wlock_acquire(rtld_bind_lock, &bind_lockstate);

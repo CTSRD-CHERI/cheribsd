@@ -424,7 +424,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	obj->tlsinit = mapbase + phtls->p_vaddr;
     }
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    obj->compart_id = ++compart_max_index;
+    obj->compart_id = allocate_compart_id();
 #endif
 #ifndef __CHERI_PURE_CAPABILITY__
     obj->stack_flags = stack_flags;
@@ -639,3 +639,13 @@ convert_flags(int elfflags)
 	flags |= MAP_NOCORE;
     return flags;
 }
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+uint16_t allocate_compart_id(void)
+{
+	static uint16_t max_compart_id;
+	if (++max_compart_id == 0)
+		rtld_fatal("max_compart_id overflowed");
+	return (max_compart_id);
+}
+#endif

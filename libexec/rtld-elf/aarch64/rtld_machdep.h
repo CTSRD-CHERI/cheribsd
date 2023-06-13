@@ -209,7 +209,12 @@ extern void *__tls_get_addr(tls_index *ti);
 #define md_abi_variant_hook(x)
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+typedef uintptr_t *tramp_stk_table_t;
+
+void _rtld_get_rstk(void);
+void *get_rstk(const void *, uint32_t, tramp_stk_table_t);
 void *tramp_pgs_append(void *, const Obj_Entry *, const Elf_Sym *);
+void *_rtld_sandbox_code(void *);
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__

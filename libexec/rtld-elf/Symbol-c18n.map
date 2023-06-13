@@ -9,4 +9,5 @@ FBSDprivate_1.0 {
     _rtld_sighandler;
     _rtld_setjmp;
     _rtld_longjmp;
+    _rtld_sandbox_code;
 };
