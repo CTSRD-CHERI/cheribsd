@@ -44,6 +44,8 @@
 #define	UTRACE_DLSYM_START		11
 #define	UTRACE_DLSYM_STOP		12
 #define	UTRACE_RTLD_ERROR		13
+#define	UTRACE_COMPARTMENT_ENTER	14
+#define	UTRACE_COMPARTMENT_LEAVE	15
 
 #define	RTLD_UTRACE_SIG_SZ		4
 #define	RTLD_UTRACE_SIG			"RTLD"
@@ -56,6 +58,7 @@ struct utrace_rtld {
 	size_t mapsize;
 	int refcnt;			/* Used for 'mode' */
 	char name[MAXPATHLEN];
+	char symbol[128];
 };
 
 #endif

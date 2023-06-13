@@ -151,13 +151,26 @@ make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
 
 /* TODO: Per-function captable/PLT/FNDESC support */
 #ifdef RTLD_SANDBOX
-#define make_rtld_function_pointer(target_func)	(tramp_pgs_append((target_func), NULL, NULL))
+#define make_rtld_function_pointer(_target)				\
+	(tramp_intern(&(struct tramp_data) {				\
+		.target = _target,					\
+		.obj = &obj_rtld,					\
+		.sig = (struct tramp_sig) { true, 0, false, NONE }	\
+	}))
 
-#define call_init_array_pointer(obj, target)				\
-	(((InitArrFunc)tramp_pgs_append((void *)(target).value, obj, NULL))(main_argc, main_argv, environ))
+#define call_init_array_pointer(_obj, _target)				\
+	(((InitArrFunc)tramp_intern(&(struct tramp_data) {		\
+		.target = (void *)(_target).value,			\
+		.obj = _obj,						\
+		.sig = (struct tramp_sig) { true, 3, false, NONE }	\
+	}))(main_argc, main_argv, environ))
 
-#define call_fini_array_pointer(obj, target)				\
-	(((InitFunc)tramp_pgs_append((void *)(target).value, obj, NULL))())
+#define call_fini_array_pointer(_obj, _target)				\
+	(((InitFunc)tramp_intern(&(struct tramp_data) {			\
+		.target = (void *)(_target).value,			\
+		.obj = _obj,						\
+		.sig = (struct tramp_sig) { true, 0, false, NONE }	\
+	}))())
 #else
 #define call_init_array_pointer(obj, target)				\
 	(((InitArrFunc)(target).value)(main_argc, main_argv, environ))
@@ -209,7 +222,29 @@ extern void *__tls_get_addr(tls_index *ti);
 #define md_abi_variant_hook(x)
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-void *tramp_pgs_append(void *, const Obj_Entry *, const Elf_Sym *);
+typedef const void *tramp;
+struct tramp_data {
+	void *target;
+	const Obj_Entry *obj;
+	const Elf_Sym *def;
+	tramp *entry;
+	struct tramp_sig {
+		bool valid : 1;
+		unsigned reg_args : 4;
+		bool mem_args : 1;
+		enum tramp_ret_args: unsigned {
+			C0_AND_C1,
+			C0,
+			NONE,
+			INDIRECT
+		} ret_args : 2;
+	} sig;
+};
+
+void tramp_init(void);
+void *tramp_intern(const struct tramp_data *);
+void *_rtld_sandbox_code(void *, struct tramp_sig);
+void *_rtld_safebox_code(void *, struct tramp_sig);
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__

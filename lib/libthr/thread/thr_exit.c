@@ -47,6 +47,10 @@
 #include "thr_private.h"
 
 static void	exit_thread(void) __dead2;
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+__weak_reference(thr_exit, _rtld_thr_exit);
+void _rtld_thr_exit(long *);
+#endif
 
 __weak_reference(_Tthr_exit, pthread_exit);
 __weak_reference(_Tthr_exit, _pthread_exit);
@@ -322,7 +326,11 @@ exit_thread(void)
 	 * Kernel will do wakeup at the address, so joiner thread
 	 * will be resumed if it is sleeping at the address.
 	 */
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	_rtld_thr_exit(&curthread->tid);
+#else
 	thr_exit(&curthread->tid);
+#endif
 	PANIC("thr_exit() returned");
 	/* Never reach! */
 }
