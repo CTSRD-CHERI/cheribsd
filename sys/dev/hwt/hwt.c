@@ -351,7 +351,7 @@ hwt_create_cdev(struct hwt_context *ctx)
 	args.mda_mode = 0660;
 	args.mda_si_drv1 = ctx;
 
-	error = make_dev_s(&args, &ctx->cdev, "hwt_%d%d", ctx->cpu_id,
+	error = make_dev_s(&args, &ctx->cdev, "hwt_%d_%d", ctx->cpu_id,
 	    ctx->pid);
 	if (error != 0)
 		return (error);
@@ -560,6 +560,64 @@ hwt_send_records(struct hwt_record_get *record_get, struct hwt_context *ctx)
 	return (error);
 }
 
+/*
+ * Check if owner process *o can trace target process *t;
+ */
+
+static int
+hwt_priv_check(struct proc *o, struct proc *t)
+{
+	struct ucred *oc, *tc;
+	int error;
+	int i;
+
+	PROC_LOCK(o);
+	oc = o->p_ucred;
+	crhold(oc);
+	PROC_UNLOCK(o);
+
+	PROC_LOCK_ASSERT(t, MA_OWNED);
+	tc = t->p_ucred;
+	crhold(tc);
+
+	error = 0;
+
+	/*
+	 * The effective uid of the HWT owner should match at least one
+	 * of the effective / real / saved uids of the target process.
+	 */
+
+	if (oc->cr_uid != tc->cr_uid &&
+	    oc->cr_uid != tc->cr_svuid &&
+	    oc->cr_uid != tc->cr_ruid) {
+		error = EPERM;
+		goto done;
+	}
+
+	/*
+	 * Everyone of the target's group ids must be in the owner's
+	 * group list.
+	 */
+	for (i = 0; i < tc->cr_ngroups; i++)
+		if (!groupmember(tc->cr_groups[i], oc)) {
+			error = EPERM;
+			goto done;
+		}
+
+	/* Check the read and saved GIDs too. */
+	if (!groupmember(tc->cr_rgid, oc) ||
+	    !groupmember(tc->cr_svgid, oc)) {
+			error = EPERM;
+			goto done;
+	}
+
+done:
+	crfree(tc);
+	crfree(oc);
+
+	return (error);
+}
+
 static int
 hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
     struct thread *td)
@@ -647,7 +705,8 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		error = hwt_create_cdev(ctx);
 		if (error) {
-			printf("%s: could not create cdev\n", __func__);
+			printf("%s: could not create cdev, error %d\n",
+			    __func__, error);
 			return (error);
 		}
 
@@ -656,6 +715,14 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		if (p == NULL) {
 			/* TODO: deallocate resources. */
 			return (ENXIO);
+		}
+
+		error = hwt_priv_check(td->td_proc, p);
+		if (error) {
+			/* TODO: deallocate resources. */
+printf("access deny\n");
+			PROC_UNLOCK(p);
+			return (error);
 		}
 
 		p->p_flag2 |= P2_HWT;
