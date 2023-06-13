@@ -61,7 +61,7 @@ struct hwt_record_user_entry {
 	char fullpath[MAXPATHLEN];
 	uintptr_t addr;
 	size_t size;
-} __packed __aligned(16);
+} __aligned(16);
 
 struct hwt_record_get {
 	struct hwt_record_user_entry	*records;
