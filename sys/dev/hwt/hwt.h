@@ -50,25 +50,25 @@ struct hwt_alloc {
 	pid_t		pid;
 	int		cpu_id;
 	char		*backend_name;
-} __aligned(16);
+} __packed __aligned(16);
 
 struct hwt_start {
 	pid_t		pid;
 	int		cpu_id;
-} __aligned(16);
+} __packed __aligned(16);
 
 struct hwt_record_user_entry {
 	char fullpath[MAXPATHLEN];
 	uintptr_t addr;
 	size_t size;
-} __aligned(16);
+} __packed __aligned(16);
 
 struct hwt_record_get {
 	struct hwt_record_user_entry	*records;
 	int				*nentries;
 	int				cpu_id;
 	pid_t				pid;
-} __aligned(16);
+} __packed __aligned(16);
 
 struct hwt_bufptr_get {
 	int		*ptr;
@@ -76,6 +76,6 @@ struct hwt_bufptr_get {
 	vm_offset_t	*curpage_offset;
 	int		cpu_id;
 	pid_t		pid;
-} __aligned(16);
+} __packed __aligned(16);
 
 #endif /* !_DEV_HWT_HWT_H_ */
