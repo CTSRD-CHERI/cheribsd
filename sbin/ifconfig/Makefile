@@ -84,7 +84,6 @@ LD_FATAL_WARNINGS=no
 MAN=	ifconfig.8
 
 CFLAGS+= -Wall -Wmissing-prototypes -Wcast-qual -Wwrite-strings -Wnested-externs
-WARNS?=	2
 
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
