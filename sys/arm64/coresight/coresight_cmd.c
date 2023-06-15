@@ -136,6 +136,30 @@ coresight_configure(struct coresight_event *event, int cpu)
 }
 
 void
+coresight_start(struct coresight_event *event, int cpu)
+{
+	struct coresight_device *cs_dev;
+	struct endpoint *endp;
+
+	LIST_FOREACH(endp, &event->endplist, endplink) {
+		cs_dev = endp->cs_dev;
+		CORESIGHT_START(cs_dev->dev, endp, event);
+	}
+}
+
+void
+coresight_stop(struct coresight_event *event, int cpu)
+{
+	struct coresight_device *cs_dev;
+	struct endpoint *endp;
+
+	LIST_FOREACH(endp, &event->endplist, endplink) {
+		cs_dev = endp->cs_dev;
+		CORESIGHT_STOP(cs_dev->dev, endp, event);
+	}
+}
+
+void
 coresight_enable(struct coresight_event *event, int cpu)
 {
 	struct coresight_device *cs_dev;

@@ -162,6 +162,8 @@ int coresight_register(struct coresight_desc *desc);
 
 int coresight_init_event(struct coresight_event *event, int cpu);
 void coresight_configure(struct coresight_event *event, int cpu);
+void coresight_start(struct coresight_event *event, int cpu);
+void coresight_stop(struct coresight_event *event, int cpu);
 void coresight_enable(struct coresight_event *event, int cpu);
 void coresight_disable(struct coresight_event *event, int cpu);
 void coresight_read(struct coresight_event *event, int cpu);
