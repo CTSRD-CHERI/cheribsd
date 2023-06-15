@@ -74,9 +74,9 @@ struct hwt_owner {
 };
 
 struct hwt_backend_ops {
-	void (*hwt_event_init)(struct hwt_thread *, int cpu_id);
-	void (*hwt_event_start)(struct hwt_thread *, int cpu_id);
-	void (*hwt_event_stop)(struct hwt_thread *, int cpu_id);
+	void (*hwt_backend_init)(void);
+	void (*hwt_event_init)(struct hwt_context *);
+	void (*hwt_event_configure)(struct hwt_thread *, int cpu_id);
 	void (*hwt_event_enable)(struct hwt_thread *, int cpu_id);
 	void (*hwt_event_disable)(struct hwt_thread *, int cpu_id);
 	void (*hwt_event_dump)(struct hwt_thread *, int cpu_id);

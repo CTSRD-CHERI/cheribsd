@@ -159,12 +159,12 @@ struct coresight_device *
     coresight_get_output_device(struct coresight_device *cs_dev,
     struct endpoint *endp, struct endpoint **);
 int coresight_register(struct coresight_desc *desc);
-int coresight_init_event(int cpu, struct coresight_event *event);
-void coresight_start(int cpu, struct coresight_event *event);
-void coresight_stop(int cpu, struct coresight_event *event);
-void coresight_enable(int cpu, struct coresight_event *event);
-void coresight_disable(int cpu, struct coresight_event *event);
-void coresight_read(int cpu, struct coresight_event *event);
-void coresight_dump(int cpu, struct coresight_event *event);
+
+int coresight_init_event(struct coresight_event *event, int cpu);
+void coresight_configure(struct coresight_event *event, int cpu);
+void coresight_enable(struct coresight_event *event, int cpu);
+void coresight_disable(struct coresight_event *event, int cpu);
+void coresight_read(struct coresight_event *event, int cpu);
+void coresight_dump(struct coresight_event *event, int cpu);
 
 #endif /* !_ARM64_CORESIGHT_CORESIGHT_H_ */

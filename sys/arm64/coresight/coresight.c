@@ -37,6 +37,7 @@
 #include <sys/lock.h>
 #include <sys/module.h>
 #include <sys/mutex.h>
+#include <sys/smp.h>
 #include <machine/bus.h>
 
 #include <arm64/coresight/coresight.h>
@@ -62,14 +63,28 @@ static struct hwt_backend backend = {
 static struct coresight_event cs_event[MAXCPU];
 
 static void
-coresight_event_init(struct hwt_thread *thr, int cpu_id)
+coresight_backend_init(void)
+{
+	struct coresight_event *event;
+	int cpu;
+
+	for (cpu = 0; cpu < mp_ncpus; cpu++) {
+		event = &cs_event[cpu];
+		memset(event, 0, sizeof(struct coresight_event));
+		event->src = CORESIGHT_ETMV4;
+		event->sink = CORESIGHT_TMC_ETR;
+		coresight_init_event(event, cpu);
+	}
+}
+
+static void
+coresight_event_configure(struct hwt_thread *thr, int cpu_id)
 {
 	struct coresight_event *event;
 
 	dprintf("%s: cpu_id %d\n", __func__, cpu_id);
 
 	event = &cs_event[cpu_id];
-	memset(event, 0, sizeof(struct coresight_event));
 	event->etr.started = 0;
 	event->etr.low = 0;
 	event->etr.high = 0;
@@ -77,8 +92,6 @@ coresight_event_init(struct hwt_thread *thr, int cpu_id)
 	event->etr.npages = thr->npages;
 	event->etr.bufsize = thr->npages * PAGE_SIZE;
 	event->excp_level = 0; /* TODO: User level only for now. */
-	event->src = CORESIGHT_ETMV4;
-	event->sink = CORESIGHT_TMC_ETR;
 
 	/*
 	 * Set the trace ID required for ETM component.
@@ -86,29 +99,7 @@ coresight_event_init(struct hwt_thread *thr, int cpu_id)
 	 */
 
 	event->etm.trace_id = 0x10;
-	coresight_init_event(cpu_id, event);
-}
-
-static void
-coresight_event_start(struct hwt_thread *thr, int cpu_id)
-{
-	struct coresight_event *event;
-
-	dprintf("%s: cpu_id %d\n", __func__, cpu_id);
-
-	event = &cs_event[cpu_id];
-
-	coresight_start(cpu_id, event);
-}
-
-static void
-coresight_event_stop(struct hwt_thread *thr, int cpu_id)
-{
-	struct coresight_event *event;
-
-	event = &cs_event[cpu_id];
-
-	coresight_stop(cpu_id, event);
+	coresight_configure(event, cpu_id);
 }
 
 static void
@@ -118,7 +109,7 @@ coresight_event_enable(struct hwt_thread *thr, int cpu_id)
 
 	event = &cs_event[cpu_id];
 
-	coresight_enable(cpu_id, event);
+	coresight_enable(event, cpu_id);
 }
 
 static void
@@ -128,7 +119,7 @@ coresight_event_disable(struct hwt_thread *thr, int cpu_id)
 
 	event = &cs_event[cpu_id];
 
-	coresight_disable(cpu_id, event);
+	coresight_disable(event, cpu_id);
 }
 
 static void
@@ -138,7 +129,7 @@ coresight_event_dump(struct hwt_thread *thr, int cpu_id)
 
 	event = &cs_event[cpu_id];
 
-	coresight_dump(cpu_id, event);
+	coresight_dump(event, cpu_id);
 }
 
 static int
@@ -151,7 +142,7 @@ coresight_event_read(struct hwt_thread *thr, int cpu_id,
 
 	KASSERT(event != NULL, ("No event found"));
 
-	coresight_read(cpu_id, event);
+	coresight_read(event, cpu_id);
 
 	*curpage = event->etr.curpage;
 	*curpage_offset = event->etr.curpage_offset;
@@ -160,9 +151,8 @@ coresight_event_read(struct hwt_thread *thr, int cpu_id,
 }
 
 static struct hwt_backend_ops coresight_ops = {
-	.hwt_event_init = coresight_event_init,
-	.hwt_event_start = coresight_event_start,
-	.hwt_event_stop = coresight_event_stop,
+	.hwt_backend_init = coresight_backend_init,
+	.hwt_event_configure = coresight_event_configure,
 	.hwt_event_enable = coresight_event_enable,
 	.hwt_event_disable = coresight_event_disable,
 	.hwt_event_dump = coresight_event_dump,
