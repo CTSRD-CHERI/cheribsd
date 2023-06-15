@@ -165,7 +165,6 @@
 
 #if __has_feature(capabilities)
 #define	SCCSR_E			(1 << 0)
-#define	SCCSR_D			(1 << 1)
 #define	SCCSR_TAG_CLEARING	(1 << 31)
 #define	TVAL_CAP_CAUSE_SHIFT	0
 #define	TVAL_CAP_CAUSE_MASK	(0x1f << TVAL_CAP_CAUSE_SHIFT)
