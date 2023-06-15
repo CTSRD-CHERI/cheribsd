@@ -94,12 +94,14 @@ static eventhandler_tag hwt_exit_tag;
 static struct cdev *hwt_cdev;
 
 static int
-hwt_backend_init(struct hwt_backend *backend)
+hwt_event_init(struct hwt_thread *thr)
 {
+	struct hwt_context *ctx;
 
 	dprintf("%s\n", __func__);
 
-	backend->ops->hwt_backend_init();
+	ctx = thr->ctx;
+	ctx->hwt_backend->ops->hwt_event_init(thr);
 
 	return (0);
 }
@@ -715,10 +717,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		if (backend == NULL)
 			return (ENXIO);
 
-		error = hwt_backend_init(backend);
-		if (error)
-			return (error);
-
 		/* First get the owner. */
 		ho = hwt_lookup_ownerhash(td->td_proc);
 		if (ho) {
@@ -779,6 +777,10 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		LIST_INSERT_HEAD(&ho->hwts, ctx, next_hwts);
 		mtx_unlock(&ho->mtx);
 		PROC_UNLOCK(p);
+
+		error = hwt_event_init(thr);
+		if (error)
+			return (error);
 
 		error = hwt_create_cdev(thr);
 		if (error) {

@@ -63,7 +63,7 @@ static struct hwt_backend backend = {
 static struct coresight_event cs_event[MAXCPU];
 
 static void
-coresight_backend_init(void)
+coresight_event_init(struct hwt_thread *thr)
 {
 	struct coresight_event *event;
 	int cpu;
@@ -71,35 +71,38 @@ coresight_backend_init(void)
 	for (cpu = 0; cpu < mp_ncpus; cpu++) {
 		event = &cs_event[cpu];
 		memset(event, 0, sizeof(struct coresight_event));
+		event->etr.started = 0;
+		event->etr.low = 0;
+		event->etr.high = 0;
+		event->etr.pages = thr->pages;
+		event->etr.npages = thr->npages;
+		event->etr.bufsize = thr->npages * PAGE_SIZE;
+		event->excp_level = 0; /* TODO: User level only for now. */
 		event->src = CORESIGHT_ETMV4;
 		event->sink = CORESIGHT_TMC_ETR;
+
+		/*
+		 * Set the trace ID required for ETM component.
+		 * TODO: this should be derived from hwt(1).
+		 */
+
+		event->etm.trace_id = 0x10;
 		coresight_init_event(event, cpu);
+
+		/*
+		 * Configure pipeline immediately since Coresight merges
+		 * everything to a single buffer. We don't need to reconfigure
+		 * components until this user releases coresight.
+		 */
+
+		coresight_configure(event, cpu);
 	}
 }
 
 static void
 coresight_event_configure(struct hwt_thread *thr, int cpu_id)
 {
-	struct coresight_event *event;
 
-	dprintf("%s: cpu_id %d\n", __func__, cpu_id);
-
-	event = &cs_event[cpu_id];
-	event->etr.started = 0;
-	event->etr.low = 0;
-	event->etr.high = 0;
-	event->etr.pages = thr->pages;
-	event->etr.npages = thr->npages;
-	event->etr.bufsize = thr->npages * PAGE_SIZE;
-	event->excp_level = 0; /* TODO: User level only for now. */
-
-	/*
-	 * Set the trace ID required for ETM component.
-	 * TODO: this should be derived from hwt(1).
-	 */
-
-	event->etm.trace_id = 0x10;
-	coresight_configure(event, cpu_id);
 }
 
 static void
@@ -122,16 +125,6 @@ coresight_event_disable(struct hwt_thread *thr, int cpu_id)
 	coresight_disable(event, cpu_id);
 }
 
-static void
-coresight_event_dump(struct hwt_thread *thr, int cpu_id)
-{
-	struct coresight_event *event;
-
-	event = &cs_event[cpu_id];
-
-	coresight_dump(event, cpu_id);
-}
-
 static int
 coresight_event_read(struct hwt_thread *thr, int cpu_id,
     int *curpage, vm_offset_t *curpage_offset)
@@ -150,13 +143,23 @@ coresight_event_read(struct hwt_thread *thr, int cpu_id,
 	return (0);
 }
 
+static void
+coresight_event_dump(struct hwt_thread *thr, int cpu_id)
+{
+	struct coresight_event *event;
+
+	event = &cs_event[cpu_id];
+
+	coresight_dump(event, cpu_id);
+}
+
 static struct hwt_backend_ops coresight_ops = {
-	.hwt_backend_init = coresight_backend_init,
+	.hwt_event_init = coresight_event_init,
 	.hwt_event_configure = coresight_event_configure,
 	.hwt_event_enable = coresight_event_enable,
 	.hwt_event_disable = coresight_event_disable,
-	.hwt_event_dump = coresight_event_dump,
 	.hwt_event_read = coresight_event_read,
+	.hwt_event_dump = coresight_event_dump,
 };
 
 int

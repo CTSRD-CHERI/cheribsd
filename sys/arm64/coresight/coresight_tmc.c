@@ -353,7 +353,8 @@ tmc_allocate_pgdir(struct tmc_softc *sc, vm_page_t *pages, int nentries,
 }
 
 static int
-tmc_configure(device_t dev, struct coresight_event *event)
+tmc_configure(device_t dev, struct endpoint *endp,
+    struct coresight_event *event)
 {
 	struct tmc_softc *sc;
 	vm_page_t *pt_dir;

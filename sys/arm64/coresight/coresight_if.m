@@ -44,6 +44,18 @@ METHOD int configure {
 	struct coresight_event *event;
 };
 
+METHOD int start {
+	device_t dev;
+	struct endpoint *endp;
+	struct coresight_event *event;
+};
+
+METHOD void stop {
+	device_t dev;
+	struct endpoint *endp;
+	struct coresight_event *event;
+}
+
 METHOD int enable {
 	device_t dev;
 	struct endpoint *endp;
