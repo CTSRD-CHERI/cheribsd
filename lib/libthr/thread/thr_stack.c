@@ -157,6 +157,7 @@ round_up(size_t size)
 	return size;
 }
 
+#ifndef __CHERI_PURE_CAPABILITY__
 void
 _thr_stack_fix_protection(struct pthread *thrd)
 {
@@ -203,6 +204,7 @@ __thr_map_stacks_exec(void)
 		_thr_stack_fix_protection(thrd);
 	THREAD_LIST_UNLOCK(curthread);
 }
+#endif
 
 int
 _thr_stack_alloc(struct pthread_attr *attr)
