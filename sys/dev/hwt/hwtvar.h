@@ -74,14 +74,14 @@ struct hwt_owner {
 };
 
 struct hwt_backend_ops {
-	void (*hwt_event_init)(struct hwt_context *);
-	void (*hwt_event_start)(struct hwt_context *);
-	void (*hwt_event_stop)(struct hwt_context *);
-	void (*hwt_event_enable)(struct hwt_context *);
-	void (*hwt_event_disable)(struct hwt_context *);
-	void (*hwt_event_dump)(struct hwt_context *);
-	int (*hwt_event_read)(struct hwt_context *, int *curpage,
-	    vm_offset_t *curpage_offset);
+	void (*hwt_event_init)(struct hwt_thread *, int cpu_id);
+	void (*hwt_event_start)(struct hwt_thread *, int cpu_id);
+	void (*hwt_event_stop)(struct hwt_thread *, int cpu_id);
+	void (*hwt_event_enable)(struct hwt_thread *, int cpu_id);
+	void (*hwt_event_disable)(struct hwt_thread *, int cpu_id);
+	void (*hwt_event_dump)(struct hwt_thread *, int cpu_id);
+	int (*hwt_event_read)(struct hwt_thread *, int cpu_id,
+	    int *curpage, vm_offset_t *curpage_offset);
 };
 
 struct hwt_backend {
@@ -92,7 +92,7 @@ struct hwt_backend {
 
 int hwt_register(struct hwt_backend *);
 
-struct hwt_context * hwt_lookup_contexthash(struct proc *p, int cpu_id);
+struct hwt_context * hwt_lookup_contexthash(struct proc *p);
 
 #endif /* !LOCORE */
 #endif /* !_DEV_HWT_HWTVAR_H_ */

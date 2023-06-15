@@ -94,81 +94,109 @@ static eventhandler_tag hwt_exit_tag;
 static struct cdev *hwt_cdev;
 
 static void
-hwt_event_init(struct hwt_context *ctx)
+hwt_event_init(struct hwt_thread *thr, int cpu_id)
 {
+	struct hwt_context *ctx;
 
-	dprintf("%s: cpu %d\n", __func__, ctx->cpu_id);
+	dprintf("%s: cpu %d\n", __func__, cpu_id);
 
-	ctx->hwt_backend->ops->hwt_event_init(ctx);
+	ctx = thr->ctx;
+	ctx->hwt_backend->ops->hwt_event_init(thr, cpu_id);
 }
 
 static int
-hwt_event_start(struct hwt_context *ctx)
+hwt_event_start(struct hwt_thread *thr, int cpu_id)
 {
+	struct hwt_context *ctx;
 
 	dprintf("%s\n", __func__);
 
+	ctx = thr->ctx;
+
 	mtx_lock_spin(&hwt_backend_mtx);
-	ctx->hwt_backend->ops->hwt_event_start(ctx);
+	ctx->hwt_backend->ops->hwt_event_start(thr, cpu_id);
 	mtx_unlock_spin(&hwt_backend_mtx);
 
 	return (0);
 }
 
 static int
-hwt_event_stop(struct hwt_context *ctx)
+hwt_event_stop(struct hwt_thread *thr, int cpu_id)
 {
+	struct hwt_context *ctx;
 
 	dprintf("%s\n", __func__);
 
+	ctx = thr->ctx;
+
 	mtx_lock_spin(&hwt_backend_mtx);
-	ctx->hwt_backend->ops->hwt_event_stop(ctx);
+	ctx->hwt_backend->ops->hwt_event_stop(thr, cpu_id);
 	mtx_unlock_spin(&hwt_backend_mtx);
 
 	return (0);
 }
 
 static int
-hwt_event_enable(struct hwt_context *ctx)
+hwt_event_enable(struct hwt_thread *thr, int cpu_id)
 {
+	struct hwt_context *ctx;
+
+	dprintf("%s\n", __func__);
+
+	ctx = thr->ctx;
 
 	mtx_lock_spin(&hwt_backend_mtx);
-	ctx->hwt_backend->ops->hwt_event_enable(ctx);
+	ctx->hwt_backend->ops->hwt_event_enable(thr, cpu_id);
 	mtx_unlock_spin(&hwt_backend_mtx);
 
 	return (0);
 }
 
 static int
-hwt_event_disable(struct hwt_context *ctx)
+hwt_event_disable(struct hwt_thread *thr, int cpu_id)
 {
+	struct hwt_context *ctx;
+
+	dprintf("%s\n", __func__);
+
+	ctx = thr->ctx;
 
 	mtx_lock_spin(&hwt_backend_mtx);
-	ctx->hwt_backend->ops->hwt_event_disable(ctx);
+	ctx->hwt_backend->ops->hwt_event_disable(thr, cpu_id);
 	mtx_unlock_spin(&hwt_backend_mtx);
 
 	return (0);
 }
 
 static int __unused
-hwt_event_dump(struct hwt_context *ctx)
+hwt_event_dump(struct hwt_thread *thr, int cpu_id)
 {
+	struct hwt_context *ctx;
+
+	dprintf("%s\n", __func__);
+
+	ctx = thr->ctx;
 
 	mtx_lock_spin(&hwt_backend_mtx);
-	ctx->hwt_backend->ops->hwt_event_dump(ctx);
+	ctx->hwt_backend->ops->hwt_event_dump(thr, cpu_id);
 	mtx_unlock_spin(&hwt_backend_mtx);
 
 	return (0);
 }
 
 static int
-hwt_event_read(struct hwt_context *ctx, int *curpage,
+hwt_event_read(struct hwt_thread *thr, int cpu_id, int *curpage,
     vm_offset_t *curpage_offset)
 {
+	struct hwt_context *ctx;
 	int error;
 
+	dprintf("%s\n", __func__);
+
+	ctx = thr->ctx;
+
 	mtx_lock_spin(&hwt_backend_mtx);
-	error = ctx->hwt_backend->ops->hwt_event_read(ctx, curpage,
+	error = ctx->hwt_backend->ops->hwt_event_read(thr, cpu_id, curpage,
 	    curpage_offset);
 	mtx_unlock_spin(&hwt_backend_mtx);
 
@@ -344,7 +372,7 @@ hwt_create_cdev(struct hwt_thread *thr)
 
 	ctx = thr->ctx;
 
-	printf("%s: cpu_id %d pid %d\n", __func__, ctx->cpu_id, ctx->pid);
+	printf("%s: pid %d tid %d\n", __func__, ctx->pid, thr->tid);
 
 	make_dev_args_init(&args);
 	args.mda_devsw = &hwt_context_cdevsw;
@@ -383,28 +411,28 @@ hwt_alloc_buffers(struct hwt_thread *thr)
 }
 
 static void
-hwt_destroy_buffers(struct hwt_context *ctx)
+hwt_destroy_buffers(struct hwt_thread *thr)
 {
 	vm_page_t m;
 	int i;
 
-	VM_OBJECT_WLOCK(ctx->obj);
-	for (i = 0; i < ctx->npages; i++) {
-		m = ctx->pages[i];
+	VM_OBJECT_WLOCK(thr->obj);
+	for (i = 0; i < thr->npages; i++) {
+		m = thr->pages[i];
 		if (m == NULL)
 			break;
 
 		vm_page_busy_acquire(m, 0);
-		cdev_pager_free_page(ctx->obj, m);
+		cdev_pager_free_page(thr->obj, m);
 		m->flags &= ~PG_FICTITIOUS;
 		vm_page_unwire_noq(m);
 		vm_page_free(m);
 
 	}
-	vm_pager_deallocate(ctx->obj);
-	VM_OBJECT_WUNLOCK(ctx->obj);
+	vm_pager_deallocate(thr->obj);
+	VM_OBJECT_WUNLOCK(thr->obj);
 
-	free(ctx->pages, M_HWT);
+	free(thr->pages, M_HWT);
 }
 
 static struct hwt_context *
@@ -423,7 +451,7 @@ hwt_alloc(void)
 }
 
 struct hwt_context *
-hwt_lookup_contexthash(struct proc *p, int cpu_id)
+hwt_lookup_contexthash(struct proc *p)
 {
 	struct hwt_contexthash *hch;
 	struct hwt_context *ctx;
@@ -434,7 +462,7 @@ hwt_lookup_contexthash(struct proc *p, int cpu_id)
 
 	mtx_lock_spin(&hwt_contexthash_mtx);
 	LIST_FOREACH(ctx, hch, next_hch) {
-		if (ctx->p == p && ctx->cpu_id == cpu_id) {
+		if (ctx->p == p) {
 			mtx_unlock_spin(&hwt_contexthash_mtx);
 			return (ctx);
 		}
@@ -467,13 +495,13 @@ hwt_lookup_ownerhash(struct proc *p)
 }
 
 static struct hwt_context *
-hwt_lookup_by_owner(struct hwt_owner *ho, int cpu_id, pid_t pid)
+hwt_lookup_by_owner(struct hwt_owner *ho, pid_t pid)
 {
 	struct hwt_context *ctx;
 
 	mtx_lock(&ho->mtx);
 	LIST_FOREACH(ctx, &ho->hwts, next_hwts) {
-		if (ctx->pid == pid && ctx->cpu_id == cpu_id) {
+		if (ctx->pid == pid) {
 			mtx_unlock(&ho->mtx);
 			return (ctx);
 		}
@@ -484,7 +512,7 @@ hwt_lookup_by_owner(struct hwt_owner *ho, int cpu_id, pid_t pid)
 }
 
 static struct hwt_context *
-hwt_lookup_by_owner_p(struct proc *owner_p, int cpu_id, pid_t pid)
+hwt_lookup_by_owner_p(struct proc *owner_p, pid_t pid)
 {
 	struct hwt_context *ctx;
 	struct hwt_owner *ho;
@@ -493,7 +521,7 @@ hwt_lookup_by_owner_p(struct proc *owner_p, int cpu_id, pid_t pid)
 	if (ho == NULL)
 		return (NULL);
 
-	ctx = hwt_lookup_by_owner(ho, cpu_id, pid);
+	ctx = hwt_lookup_by_owner(ho, pid);
 
 	return (ctx);
 }
@@ -627,9 +655,10 @@ done:
 }
 
 static struct hwt_thread *
-hwt_thread_alloc(struct hwt_context *ctx, struct thread *ttd)
+hwt_thread_alloc(struct hwt_context *ctx)
 {
 	struct hwt_thread *thr;
+	int error;
 
 	thr = malloc(sizeof(struct hwt_thread), M_HWT, M_WAITOK | M_ZERO);
 	thr->ctx = ctx;
@@ -637,7 +666,7 @@ hwt_thread_alloc(struct hwt_context *ctx, struct thread *ttd)
 	error = hwt_alloc_buffers(thr);
 	if (error) {
 		printf("%s: can't allocate hwt buffers\n", __func__);
-		return (error);
+		return (NULL);
 	}
 
 	return (thr);
@@ -703,8 +732,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		/* First get the owner. */
 		ho = hwt_lookup_ownerhash(td->td_proc);
 		if (ho) {
-			ctx = hwt_lookup_by_owner(ho, halloc->cpu_id,
-			    halloc->pid);
+			ctx = hwt_lookup_by_owner(ho, halloc->pid);
 			if (ctx)
 				return (EEXIST);
 		} else {
@@ -731,7 +759,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		if (thr == NULL)
 			return (ENOMEM);
 
-		ctx->cpu_id = halloc->cpu_id;
 		ctx->pid = halloc->pid;
 		ctx->hwt_owner = ho;
 
@@ -778,7 +805,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		    s->pid);
 
 		/* Check if process is registered owner of any HWTs. */
-		ctx = hwt_lookup_by_owner_p(td->td_proc, s->cpu_id, s->pid);
+		ctx = hwt_lookup_by_owner_p(td->td_proc, s->pid);
 		if (ctx == NULL)
 			return (ENXIO);
 		hwt_event_init(ctx);
@@ -800,8 +827,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		rget = (struct hwt_record_get *)addr;
 
 		/* Check if process is registered owner of any HWTs. */
-		ctx = hwt_lookup_by_owner_p(td->td_proc, rget->cpu_id,
-		    rget->pid);
+		ctx = hwt_lookup_by_owner_p(td->td_proc, rget->pid);
 		if (ctx == NULL)
 			return (ENXIO);
 
@@ -811,8 +837,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		ptr_get = (struct hwt_bufptr_get *)addr;
 
 		/* Check if process is registered owner of any HWTs. */
-		ctx = hwt_lookup_by_owner_p(td->td_proc, ptr_get->cpu_id,
-		    ptr_get->pid);
+		ctx = hwt_lookup_by_owner_p(td->td_proc, ptr_get->pid);
 		if (ctx == NULL)
 			return (ENXIO);
 
@@ -850,13 +875,13 @@ hwt_switch_in(struct thread *td)
 
 	dprintf("%s\n", __func__);
 
-	ctx = hwt_lookup_contexthash(p, cpu_id);
+	ctx = hwt_lookup_contexthash(p);
 	if (!ctx)
 		return;
 
 	dprintf("%s: ctx %p on cpu_id %d\n", __func__, ctx, cpu_id);
 
-	hwt_event_enable(ctx);
+	hwt_event_enable(thr, cpu_id);
 }
 
 void
@@ -872,13 +897,13 @@ hwt_switch_out(struct thread *td)
 
 	cpu_id = PCPU_GET(cpuid);
 
-	ctx = hwt_lookup_contexthash(p, cpu_id);
+	ctx = hwt_lookup_contexthash(p);
 	if (!ctx)
 		return;
 
 	dprintf("%s: ctx %p from cpu_id %d\n", __func__, ctx, cpu_id);
 
-	hwt_event_disable(ctx);
+	hwt_event_disable(thr, cpu_id);
 }
 
 static struct cdevsw hwt_cdevsw = {
@@ -901,8 +926,7 @@ hwt_stop_proc_hwts(struct hwt_contexthash *hch, struct proc *p)
 	mtx_lock_spin(&hwt_contexthash_mtx);
 	LIST_FOREACH_SAFE(ctx, hch, next_hch, ctx1) {
 		if (ctx->p == p) {
-			dprintf("%s: stopping proc hwt on cpu %d\n", __func__,
-			    ctx->cpu_id);
+			dprintf("%s: stopping proc hwt\n", __func__);
 
 			LIST_REMOVE(ctx, next_hch);
 			hwt_event_disable(ctx);
@@ -935,8 +959,7 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 
 		p = pfind(ctx->pid);
 		if (p != NULL) {
-			dprintf("stopping hwt cpu_id %d pid %d\n",
-			    ctx->cpu_id, ctx->pid);
+			dprintf("stopping hwt pid %d\n", ctx->pid);
 
 			if (ctx->p) {
 				/* Remove it from contexthash now. */
@@ -954,8 +977,8 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 			PROC_UNLOCK(p);
 		}
 
-		hwt_destroy_buffers(ctx);
-		destroy_dev_sched(ctx->cdev);
+		hwt_destroy_buffers(thr);
+		destroy_dev_sched(thr->cdev);
 		free(ctx, M_HWT);
 	}
 

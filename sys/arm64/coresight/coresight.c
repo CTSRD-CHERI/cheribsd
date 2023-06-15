@@ -62,20 +62,20 @@ static struct hwt_backend backend = {
 static struct coresight_event cs_event[MAXCPU];
 
 static void
-coresight_event_init(struct hwt_context *hwt)
+coresight_event_init(struct hwt_thread *thr, int cpu_id)
 {
 	struct coresight_event *event;
 
-	dprintf("%s: cpu_id %d\n", __func__, hwt->cpu_id);
+	dprintf("%s: cpu_id %d\n", __func__, cpu_id);
 
-	event = &cs_event[hwt->cpu_id];
+	event = &cs_event[cpu_id];
 	memset(event, 0, sizeof(struct coresight_event));
 	event->etr.started = 0;
 	event->etr.low = 0;
 	event->etr.high = 0;
-	event->etr.pages = hwt->pages;
-	event->etr.npages = hwt->npages;
-	event->etr.bufsize = hwt->npages * PAGE_SIZE;
+	event->etr.pages = thr->pages;
+	event->etr.npages = thr->npages;
+	event->etr.bufsize = thr->npages * PAGE_SIZE;
 	event->excp_level = 0; /* TODO: User level only for now. */
 	event->src = CORESIGHT_ETMV4;
 	event->sink = CORESIGHT_TMC_ETR;
@@ -86,72 +86,72 @@ coresight_event_init(struct hwt_context *hwt)
 	 */
 
 	event->etm.trace_id = 0x10;
-	coresight_init_event(hwt->cpu_id, event);
+	coresight_init_event(cpu_id, event);
 }
 
 static void
-coresight_event_start(struct hwt_context *hwt)
+coresight_event_start(struct hwt_thread *thr, int cpu_id)
 {
 	struct coresight_event *event;
 
-	dprintf("%s: cpu_id %d\n", __func__, hwt->cpu_id);
+	dprintf("%s: cpu_id %d\n", __func__, cpu_id);
 
-	event = &cs_event[hwt->cpu_id];
+	event = &cs_event[cpu_id];
 
-	coresight_start(hwt->cpu_id, event);
+	coresight_start(cpu_id, event);
 }
 
 static void
-coresight_event_stop(struct hwt_context *hwt)
+coresight_event_stop(struct hwt_thread *thr, int cpu_id)
 {
 	struct coresight_event *event;
 
-	event = &cs_event[hwt->cpu_id];
+	event = &cs_event[cpu_id];
 
-	coresight_stop(hwt->cpu_id, event);
+	coresight_stop(cpu_id, event);
 }
 
 static void
-coresight_event_enable(struct hwt_context *hwt)
+coresight_event_enable(struct hwt_thread *thr, int cpu_id)
 {
 	struct coresight_event *event;
 
-	event = &cs_event[hwt->cpu_id];
+	event = &cs_event[cpu_id];
 
-	coresight_enable(hwt->cpu_id, event);
+	coresight_enable(cpu_id, event);
 }
 
 static void
-coresight_event_disable(struct hwt_context *hwt)
+coresight_event_disable(struct hwt_thread *thr, int cpu_id)
 {
 	struct coresight_event *event;
 
-	event = &cs_event[hwt->cpu_id];
+	event = &cs_event[cpu_id];
 
-	coresight_disable(hwt->cpu_id, event);
+	coresight_disable(cpu_id, event);
 }
 
 static void
-coresight_event_dump(struct hwt_context *hwt)
+coresight_event_dump(struct hwt_thread *thr, int cpu_id)
 {
 	struct coresight_event *event;
 
-	event = &cs_event[hwt->cpu_id];
+	event = &cs_event[cpu_id];
 
-	coresight_dump(hwt->cpu_id, event);
+	coresight_dump(cpu_id, event);
 }
 
 static int
-coresight_event_read(struct hwt_context *hwt, int *curpage,
-    vm_offset_t *curpage_offset)
+coresight_event_read(struct hwt_thread *thr, int cpu_id,
+    int *curpage, vm_offset_t *curpage_offset)
 {
 	struct coresight_event *event;
 
-	event = &cs_event[hwt->cpu_id];
+	event = &cs_event[cpu_id];
 
 	KASSERT(event != NULL, ("No event found"));
 
-	coresight_read(hwt->cpu_id, event);
+	coresight_read(cpu_id, event);
 
 	*curpage = event->etr.curpage;
 	*curpage_offset = event->etr.curpage_offset;

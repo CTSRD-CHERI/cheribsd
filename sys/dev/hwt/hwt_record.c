@@ -55,15 +55,12 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 	struct hwt_record_entry *entry;
 	struct hwt_context *ctx;
 	struct proc *p;
-	int cpu_id;
 
 	p = td->td_proc;
 	if ((p->p_flag2 & P2_HWT) == 0)
 		return;
 
-	cpu_id = PCPU_GET(cpuid);
-
-	ctx = hwt_lookup_contexthash(p, cpu_id);
+	ctx = hwt_lookup_contexthash(p);
 	if (ctx == NULL)
 		return;
 
