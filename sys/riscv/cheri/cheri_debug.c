@@ -56,8 +56,10 @@ DB_SHOW_COMMAND(scr, ddb_dump_scr)
 	uint64_t sccsr;
 
 	sccsr = csr_read(sccsr);
-	db_printf("sccsr: %s, %s\n", sccsr & SCCSR_E ? "enabled" : "disabled",
-	    sccsr & SCCSR_D ? "dirty" : "clean");
+	db_printf("sccsr: %s, %s, %s semantics\n",
+	    sccsr & SCCSR_E ? "enabled" : "disabled",
+	    sccsr & SCCSR_D ? "dirty" : "clean",
+	    sccsr & SCCSR_TAG_CLEARING ? "tag-clearing" : "trapping");
 
 	db_printf("ddc: %#.16lp\n",  scr_read(ddc));
 	db_printf("pcc: %#.16lp\n",  scr_read(pcc));
