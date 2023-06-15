@@ -67,7 +67,7 @@ static struct resource_spec etm_spec[] = {
 };
 
 static int
-etm_prepare(device_t dev, struct coresight_event *event)
+etm_start(device_t dev, struct endpoint *endp, struct coresight_event *event)
 {
 	struct etm_softc *sc;
 	uint32_t reg;
@@ -193,16 +193,6 @@ etm_init(device_t dev)
 	dprintf("ETM Version: %d.%d\n",
 	    (reg & TRCIDR1_TRCARCHMAJ_M) >> TRCIDR1_TRCARCHMAJ_S,
 	    (reg & TRCIDR1_TRCARCHMIN_M) >> TRCIDR1_TRCARCHMIN_S);
-
-	return (0);
-}
-
-static int
-etm_start(device_t dev, struct endpoint *endp,
-    struct coresight_event *event)
-{
-
-	etm_prepare(dev, event);
 
 	return (0);
 }
