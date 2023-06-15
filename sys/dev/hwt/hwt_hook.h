@@ -36,6 +36,8 @@ enum hwt_record_type {
 	HWT_RECORD_MUNMAP,
 	HWT_RECORD_EXECUTABLE,
 	HWT_RECORD_INTERP,
+	HWT_RECORD_THREAD_CREATE,
+	HWT_RECORD_THREAD_SET_NAME,
 };
 
 struct hwt_record_entry {

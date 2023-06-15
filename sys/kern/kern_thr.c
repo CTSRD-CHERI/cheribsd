@@ -29,6 +29,7 @@
 #include <sys/cdefs.h>
 #include "opt_posix.h"
 #include "opt_hwpmc_hooks.h"
+#include "opt_hwt_hooks.h"
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
@@ -56,6 +57,9 @@
 #include <sys/limits.h>
 #ifdef	HWPMC_HOOKS
 #include <sys/pmckern.h>
+#endif
+#ifdef	HWT_HOOKS
+#include <dev/hwt/hwt_hook.h>
 #endif
 
 #include <machine/frame.h>
@@ -265,6 +269,10 @@ thread_create(struct thread *td, struct rtprio *rtp,
 		PMC_CALL_HOOK(newtd, PMC_FN_THR_CREATE, NULL);
 	else if (PMC_SYSTEM_SAMPLING_ACTIVE())
 		PMC_CALL_HOOK_UNLOCKED(newtd, PMC_FN_THR_CREATE_LOG, NULL);
+#endif
+
+#ifdef HWT_HOOKS
+	hwt_record(newtd, HWT_RECORD_THREAD_CREATE, NULL);
 #endif
 
 	tidhash_add(newtd);
@@ -608,6 +616,9 @@ kern_thr_set_name(struct thread *td, lwpid_t id,
 #ifdef HWPMC_HOOKS
 	if (PMC_PROC_IS_USING_PMCS(p) || PMC_SYSTEM_SAMPLING_ACTIVE())
 		PMC_CALL_HOOK_UNLOCKED(ttd, PMC_FN_THR_CREATE_LOG, NULL);
+#endif
+#ifdef HWT_HOOKS
+	hwt_record(ttd, HWT_RECORD_THREAD_SET_NAME, NULL);
 #endif
 #ifdef KTR
 	sched_clear_tdname(ttd);

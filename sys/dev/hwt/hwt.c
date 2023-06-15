@@ -341,7 +341,7 @@ hwt_create_cdev(struct hwt_context *ctx)
 	struct make_dev_args args;
 	int error;
 
-	dprintf("%s\n", __func__);
+	printf("%s: cpu_id %d pid %d\n", __func__, ctx->cpu_id, ctx->pid);
 
 	make_dev_args_init(&args);
 	args.mda_devsw = &hwt_context_cdevsw;
@@ -716,6 +716,11 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			/* TODO: deallocate resources. */
 			return (ENXIO);
 		}
+
+		struct thread *vtd;
+		vtd = FIRST_THREAD_IN_PROC(p);
+		printf("%s: ALLOC first thread tid %d\n", __func__,
+		    vtd->td_tid);
 
 		error = hwt_priv_check(td->td_proc, p);
 		if (error) {

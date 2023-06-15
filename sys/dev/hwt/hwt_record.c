@@ -81,9 +81,19 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 		    ent->fullpath, (unsigned long)ent->addr, ent->size);
 		break;
 	case HWT_RECORD_MUNMAP:
+		break;
+	case HWT_RECORD_THREAD_CREATE:
+		printf("%s: NEW thread %p, tid %d\n", __func__, td, td->td_tid);
+		break;
+	case HWT_RECORD_THREAD_SET_NAME:
+		printf("%s: SET_NAME thread %p\n", __func__, td);
+		break;
 	default:
 		return;
 	};
+
+	if (ent == NULL)
+		return;
 
 	entry = malloc(sizeof(struct hwt_record_entry), M_HWT, M_WAITOK);
 	entry->fullpath = strdup(ent->fullpath, M_HWT);
