@@ -89,8 +89,10 @@ interpos_func_t __libc_interposing[INTERPOS_MAX] = {
 	SLOT_SYS(kevent)
 	SLOT_SYS(wait6)
 	SLOT_SYS(ppoll)
+#ifndef __CHERI_PURE_CAPABILITY__
 #ifndef INTERPOS_SYSCALLS_ONLY
 	SLOT_LIBC(map_stacks_exec)
+#endif
 #endif
 	SLOT_SYS(fdatasync)
 	SLOT_SYS(clock_nanosleep)
