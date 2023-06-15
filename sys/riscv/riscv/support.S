@@ -472,9 +472,9 @@ END(sucap)
  */
 ENTRY(cbuildcap_fault)
 #ifdef __CHERI_PURE_CAPABILITY__
-	SET_FAULT_HANDLER(cnull, ca1)	/* Reset the handler function */
+	SET_FAULT_HANDLER(cnull, ca2)	/* Reset the handler function */
 #else
-	SET_FAULT_HANDLER(x0, a1)	/* Reset the handler function */
+	SET_FAULT_HANDLER(x0, a2)	/* Reset the handler function */
 #endif
 	ccleartag ca0, ca1
 	RETURN
