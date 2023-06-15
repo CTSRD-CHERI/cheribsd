@@ -140,7 +140,9 @@ static int load_needed_objects(Obj_Entry *, int);
 static int load_preload_objects(const char *, bool);
 static int load_kpreload(const void *addr);
 static Obj_Entry *load_object(const char *, int fd, const Obj_Entry *, int);
+#ifndef __CHERI_PURE_CAPABILITY__
 static void map_stacks_exec(RtldLockState *);
+#endif
 static int obj_disable_relro(Obj_Entry *);
 static int obj_enforce_relro(Obj_Entry *);
 static void objlist_call_fini(Objlist *, Obj_Entry *, RtldLockState *);
@@ -284,8 +286,12 @@ static int osreldate;
 size_t *pagesizes;
 size_t page_size;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+static int stack_prot = PROT_READ | PROT_WRITE;
+#else
 static int stack_prot = PROT_READ | PROT_WRITE | PROT_EXEC;
 static int max_stack_flags;
+#endif
 
 /*
  * Global declarations normally provided by crt1.  The dynamic linker is
@@ -851,7 +857,9 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	close(fd);
 	if (obj_main == NULL)
 	    rtld_die();
+#ifndef __CHERI_PURE_CAPABILITY__
 	max_stack_flags = obj_main->stack_flags;
+#endif
     } else {				/* Main program already loaded. */
 	dbg("processing main program's program header");
 	assert(aux_info[AT_PHDR] != NULL);
@@ -1050,12 +1058,12 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 
     r_debug_state(NULL, &obj_main->linkmap); /* say hello to gdb! */
 
-    map_stacks_exec(NULL);
-
 #ifdef __CHERI_PURE_CAPABILITY__
     /* old crt does not exist for CheriABI */
     obj_main->crt_no_init = true;
 #else
+    map_stacks_exec(NULL);
+
     if (!obj_main->crt_no_init) {
 	/*
 	 * Make sure we don't call the main program's init and fini
@@ -1818,6 +1826,7 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 	obj->relocbase = __DECONST(char *, phdr) - ph->p_vaddr;
 	break;
     }
+
 #ifdef __CHERI_PURE_CAPABILITY__
     /*
      * Position dependent binaries can cause relocbase to be unrepresentable.
@@ -1834,9 +1843,9 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 	    "relocation base (" PTR_FMT ")", path, obj->relocbase);
 	return NULL;
     }
-#endif
-
+#else
     obj->stack_flags = PF_X | PF_R | PF_W;
+#endif
 
     for (ph = phdr;  ph < phlimit;  ph++) {
 	switch (ph->p_type) {
@@ -1880,7 +1889,15 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 	    break;
 
 	case PT_GNU_STACK:
+#ifdef __CHERI_PURE_CAPABILITY__
+	    if ((ph->p_flags & PF_X) != 0) {
+		_rtld_error("%s: PF_X in PT_GNU_STACK", path);
+		obj_free(obj);
+		return (NULL);
+	    }
+#else
 	    obj->stack_flags = ph->p_flags;
+#endif
 	    break;
 
 	case PT_GNU_RELRO:
@@ -2549,12 +2566,20 @@ parse_rtld_phdr(Obj_Entry *obj)
 	const Elf_Phdr *ph;
 	Elf_Note *note_start, *note_end;
 
+#ifndef __CHERI_PURE_CAPABILITY__
 	obj->stack_flags = PF_X | PF_R | PF_W;
+#endif
 	for (ph = obj->phdr;  (const char *)ph < (const char *)obj->phdr +
 	    obj->phsize; ph++) {
 		switch (ph->p_type) {
 		case PT_GNU_STACK:
+#ifdef __CHERI_PURE_CAPABILITY__
+			if ((ph->p_flags & PF_X) != 0)
+				rtld_fatal("%s: PF_X in PT_GNU_STACK",
+				    obj->path);
+#else
 			obj->stack_flags = ph->p_flags;
+#endif
 			break;
 		case PT_GNU_RELRO:
 			obj->relro_page = obj->relocbase +
@@ -3104,7 +3129,9 @@ do_load_object(int fd, const char *name, char *path, struct stat *sbp,
     obj_count++;
     obj_loads++;
     linkmap_add(obj);	/* for GDB & dlinfo() */
+#ifndef __CHERI_PURE_CAPABILITY__
     max_stack_flags |= obj->stack_flags;
+#endif
 
     dbg("  %p .. %p: %s", obj->mapbase,
          obj->mapbase + obj->mapsize - 1, obj->path);
@@ -3146,7 +3173,15 @@ load_kpreload(const void *addr)
 			break;
 		case PT_GNU_STACK:
 			/* Absense of PT_GNU_STACK implies stack_flags == 0. */
+#ifdef __CHERI_PURE_CAPABILITY__
+			if ((phdr->p_flags & PF_X) != 0) {
+				_rtld_error("%s: PF_X in PT_GNU_STACK", kname);
+				obj_free(obj);
+				return (-1);
+			}
+#else
 			obj->stack_flags = phdr->p_flags;
+#endif
 			break;
 		case PT_LOAD:
 			if (seg0 == NULL || seg0->p_vaddr > phdr->p_vaddr)
@@ -3186,7 +3221,9 @@ load_kpreload(const void *addr)
 	obj_count++;
 	obj_loads++;
 	linkmap_add(obj);	/* for GDB & dlinfo() */
+#ifndef __CHERI_PURE_CAPABILITY__
 	max_stack_flags |= obj->stack_flags;
+#endif
 
 	LD_UTRACE(UTRACE_LOAD_OBJECT, obj, obj->mapbase, 0, 0, obj->path);
 	return (0);
@@ -4126,7 +4163,9 @@ dlopen_object(const char *name, int fd, Obj_Entry *refobj, int lo_flags,
     GDB_STATE(RT_CONSISTENT,obj ? &obj->linkmap : NULL);
 
     if ((lo_flags & RTLD_LO_EARLY) == 0) {
+#ifndef __CHERI_PURE_CAPABILITY__
 	map_stacks_exec(lockstate);
+#endif
 	if (obj != NULL)
 	    distribute_static_tls(&initlist, lockstate);
     }
@@ -6211,6 +6250,7 @@ obj_enforce_relro(Obj_Entry *obj)
 	return (obj_remap_relro(obj, PROT_READ));
 }
 
+#ifndef __CHERI_PURE_CAPABILITY__
 static void
 map_stacks_exec(RtldLockState *lockstate)
 {
@@ -6225,6 +6265,7 @@ map_stacks_exec(RtldLockState *lockstate)
 		thr_map_stacks_exec();
 	}
 }
+#endif
 
 static void
 distribute_static_tls(Objlist *list, RtldLockState *lockstate)
