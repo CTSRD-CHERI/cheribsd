@@ -107,7 +107,9 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     Elf_Addr bss_vaddr;
     Elf_Addr bss_vlimit;
     caddr_t bss_addr;
+#ifndef __CHERI_PURE_CAPABILITY__
     Elf_Word stack_flags;
+#endif
     Elf_Addr relro_page;
     size_t relro_size;
     caddr_t note_start;
@@ -140,7 +142,9 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     note_map = NULL;
     note_map_len = 0;
     segs = alloca(sizeof(segs[0]) * hdr->e_phnum);
+#ifndef __CHERI_PURE_CAPABILITY__
     stack_flags = PF_X | PF_R | PF_W;
+#endif
     text_end = 0;
     while (phdr < phlimit) {
 	switch (phdr->p_type) {
@@ -187,7 +191,14 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	    break;
 
 	case PT_GNU_STACK:
+#ifdef __CHERI_PURE_CAPABILITY__
+	    if ((phdr->p_flags & PF_X) != 0) {
+		_rtld_error("%s: PF_X in PT_GNU_STACK", path);
+		goto error;
+	    }
+#else
 	    stack_flags = phdr->p_flags;
+#endif
 	    break;
 
 	case PT_GNU_RELRO:
@@ -417,7 +428,9 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
     obj->compart_id = ++compart_max_index;
 #endif
+#ifndef __CHERI_PURE_CAPABILITY__
     obj->stack_flags = stack_flags;
+#endif
     obj->relro_page = obj->relocbase + rtld_trunc_page(relro_page);
     obj->relro_size = rtld_trunc_page(relro_page + relro_size) -
       rtld_trunc_page(relro_page);
