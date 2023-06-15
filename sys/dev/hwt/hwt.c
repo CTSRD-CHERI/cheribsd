@@ -239,7 +239,7 @@ static struct cdev_pager_ops hwt_pager_ops = {
 }; 
 
 static int
-hwt_alloc_pages(struct hwt_context *ctx)
+hwt_alloc_pages(struct hwt_thread *thr)
 {
 	vm_paddr_t low, high, boundary;
 	vm_memattr_t memattr;
@@ -257,11 +257,11 @@ hwt_alloc_pages(struct hwt_context *ctx)
 	    VM_ALLOC_ZERO;
 	memattr = VM_MEMATTR_DEVICE;
 
-	ctx->obj = cdev_pager_allocate(ctx, OBJT_MGTDEVICE, &hwt_pager_ops,
-	    ctx->npages * PAGE_SIZE, PROT_READ, 0, curthread->td_ucred);
+	thr->obj = cdev_pager_allocate(thr, OBJT_MGTDEVICE, &hwt_pager_ops,
+	    thr->npages * PAGE_SIZE, PROT_READ, 0, curthread->td_ucred);
 
-	VM_OBJECT_WLOCK(ctx->obj);
-	for (i = 0; i < ctx->npages; i++) {
+	VM_OBJECT_WLOCK(thr->obj);
+	for (i = 0; i < thr->npages; i++) {
 		tries = 0;
 retry:
 		m = vm_page_alloc_noobj_contig(pflags, 1, low, high,
@@ -275,7 +275,7 @@ retry:
 				goto retry;
 			}
 
-			VM_OBJECT_WUNLOCK(ctx->obj);
+			VM_OBJECT_WUNLOCK(thr->obj);
 			return (ENOMEM);
 		}
 
@@ -292,12 +292,12 @@ retry:
 		m->valid = VM_PAGE_BITS_ALL;
 		m->oflags &= ~VPO_UNMANAGED;
 		m->flags |= PG_FICTITIOUS;
-		ctx->pages[i] = m;
+		thr->pages[i] = m;
 
-		vm_page_insert(m, ctx->obj, i);
+		vm_page_insert(m, thr->obj, i);
 	}
 
-	VM_OBJECT_WUNLOCK(ctx->obj);
+	VM_OBJECT_WUNLOCK(thr->obj);
 
 	return (0);
 }
@@ -315,14 +315,14 @@ static int
 hwt_mmap_single(struct cdev *cdev, vm_ooffset_t *offset, vm_size_t mapsize,
     struct vm_object **objp, int nprot)
 {
-	struct hwt_context *ctx;
+	struct hwt_thread *thr;
 
-	ctx = cdev->si_drv1;
+	thr = cdev->si_drv1;
 
 	if (nprot != PROT_READ || *offset != 0)
 		return (ENXIO);
 
-	*objp = ctx->obj;
+	*objp = thr->obj;
 
 	return (0);
 }
@@ -336,10 +336,13 @@ static struct cdevsw hwt_context_cdevsw = {
 };
 
 static int
-hwt_create_cdev(struct hwt_context *ctx)
+hwt_create_cdev(struct hwt_thread *thr)
 {
 	struct make_dev_args args;
+	struct hwt_context *ctx;
 	int error;
+
+	ctx = thr->ctx;
 
 	printf("%s: cpu_id %d pid %d\n", __func__, ctx->cpu_id, ctx->pid);
 
@@ -349,10 +352,9 @@ hwt_create_cdev(struct hwt_context *ctx)
 	args.mda_uid = UID_ROOT;
 	args.mda_gid = GID_WHEEL;
 	args.mda_mode = 0660;
-	args.mda_si_drv1 = ctx;
+	args.mda_si_drv1 = thr;
 
-	error = make_dev_s(&args, &ctx->cdev, "hwt_%d_%d", ctx->cpu_id,
-	    ctx->pid);
+	error = make_dev_s(&args, &thr->cdev, "hwt_%d_%d", ctx->pid, thr->tid);
 	if (error != 0)
 		return (error);
 
@@ -360,15 +362,18 @@ hwt_create_cdev(struct hwt_context *ctx)
 }
 
 static int
-hwt_alloc_buffers(struct hwt_context *ctx)
+hwt_alloc_buffers(struct hwt_thread *thr)
 {
+	struct hwt_context *ctx;
 	int error;
 
-	ctx->npages = ctx->bufsize / PAGE_SIZE;
-	ctx->pages = malloc(sizeof(struct vm_page *) * ctx->npages, M_HWT,
+	ctx = thr->ctx;
+
+	thr->npages = ctx->bufsize / PAGE_SIZE;
+	thr->pages = malloc(sizeof(struct vm_page *) * thr->npages, M_HWT,
 	    M_WAITOK | M_ZERO);
 
-	error = hwt_alloc_pages(ctx);
+	error = hwt_alloc_pages(thr);
 	if (error) {
 		printf("%s: could not alloc pages\n", __func__);
 		return (error);
@@ -403,13 +408,16 @@ hwt_destroy_buffers(struct hwt_context *ctx)
 }
 
 static struct hwt_context *
-hwt_alloc(struct thread *td)
+hwt_alloc(void)
 {
 	struct hwt_context *ctx;
 
 	ctx = malloc(sizeof(struct hwt_context), M_HWT, M_WAITOK | M_ZERO);
 	LIST_INIT(&ctx->records);
-	mtx_init(&ctx->mtx, "records", NULL, MTX_SPIN);
+	mtx_init(&ctx->mtx, "hwt records", NULL, MTX_SPIN);
+
+	LIST_INIT(&ctx->threads);
+	mtx_init(&ctx->mtx_threads, "hwt threads", NULL, MTX_SPIN);
 
 	return (ctx);
 }
@@ -618,6 +626,30 @@ done:
 	return (error);
 }
 
+static struct hwt_thread *
+hwt_thread_alloc(struct hwt_context *ctx, struct thread *ttd)
+{
+	struct hwt_thread *thr;
+
+	thr = malloc(sizeof(struct hwt_thread), M_HWT, M_WAITOK | M_ZERO);
+	thr->ctx = ctx;
+
+	error = hwt_alloc_buffers(thr);
+	if (error) {
+		printf("%s: can't allocate hwt buffers\n", __func__);
+		return (error);
+	}
+
+	return (thr);
+}
+
+static void
+hwt_thread_assign(struct hwt_thread *thr, struct thread *ttd)
+{
+
+	thr->tid = ttd->td_tid;
+}
+
 static int
 hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
     struct thread *td)
@@ -637,6 +669,8 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	int len __unused;
 	int curpage;
 	vm_offset_t curpage_offset;
+	struct hwt_thread *thr;
+	struct thread *ttd; /* Target thread. */
 
 	len = IOCPARM_LEN(cmd);
 
@@ -689,26 +723,17 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		}
 
 		/* Allocate a new HWT. */
-		ctx = hwt_alloc(td);
+		ctx = hwt_alloc();
 		ctx->bufsize = halloc->bufsize;
 		ctx->hwt_backend = backend;
 
-		error = hwt_alloc_buffers(ctx);
-		if (error) {
-			printf("%s: can't allocate hwt buffers\n", __func__);
-			return (error);
-		}
+		thr = hwt_thread_alloc(ctx);
+		if (thr == NULL)
+			return (ENOMEM);
 
 		ctx->cpu_id = halloc->cpu_id;
 		ctx->pid = halloc->pid;
 		ctx->hwt_owner = ho;
-
-		error = hwt_create_cdev(ctx);
-		if (error) {
-			printf("%s: could not create cdev, error %d\n",
-			    __func__, error);
-			return (error);
-		}
 
 		/* Since we done with malloc, now get the victim proc. */
 		p = pfind(halloc->pid);
@@ -717,10 +742,11 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			return (ENXIO);
 		}
 
-		struct thread *vtd;
-		vtd = FIRST_THREAD_IN_PROC(p);
+		ttd = FIRST_THREAD_IN_PROC(p);
+		hwt_thread_assign(thr, ttd);
+
 		printf("%s: ALLOC first thread tid %d\n", __func__,
-		    vtd->td_tid);
+		    ttd->td_tid);
 
 		error = hwt_priv_check(td->td_proc, p);
 		if (error) {
@@ -736,6 +762,14 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		LIST_INSERT_HEAD(&ho->hwts, ctx, next_hwts);
 		mtx_unlock(&ho->mtx);
 		PROC_UNLOCK(p);
+
+		error = hwt_create_cdev(thr);
+		if (error) {
+			printf("%s: could not create cdev, error %d\n",
+			    __func__, error);
+			return (error);
+		}
+
 		break;
 	case HWT_IOC_START:
 		s = (struct hwt_start *)addr;

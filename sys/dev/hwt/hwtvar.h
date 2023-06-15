@@ -38,28 +38,31 @@ static MALLOC_DEFINE(M_HWT, "hwt", "Hardware Trace");
 #define	HWT_UNLOCK(sc)			mtx_unlock(&(sc)->mtx)
 #define	HWT_ASSERT_LOCKED(sc)		mtx_assert(&(sc)->mtx, MA_OWNED)
 
+struct hwt_thread {
+	vm_page_t			*pages;
+	int				npages;
+	lwpid_t				tid;
+	vm_object_t			obj;
+	struct cdev			*cdev;
+	struct hwt_context		*ctx;
+	LIST_ENTRY(hwt_thread)		next;
+};
+
 struct hwt_context {
+	LIST_HEAD(, hwt_thread)		threads;
+	struct mtx			mtx_threads; /* Protects threads. */
+	size_t				bufsize; /* Applied to each hwt_thread*/
+
 	LIST_HEAD(, hwt_record_entry)	records;
 	struct mtx			mtx; /* Protects records. */
 
 	LIST_ENTRY(hwt_context)		next_hch; /* Entry in contexthash. */
 	LIST_ENTRY(hwt_context)		next_hwts; /* Entry in ho->hwts. */
 
-	vm_page_t			*pages;
-	int				npages;
-	int				ptr;
-
 	struct proc			*p; /* Could be NULL if exited. */
 	pid_t				pid;
-	int				cpu_id;
 
 	struct hwt_owner		*hwt_owner;
-
-	vm_object_t			obj;
-	struct cdev			*cdev;
-
-	size_t				bufsize;
-
 	struct hwt_backend		*hwt_backend;
 };
 
