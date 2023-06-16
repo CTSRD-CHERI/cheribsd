@@ -633,8 +633,9 @@ hwt_send_records(struct hwt_record_get *record_get, struct hwt_context *ctx)
 		user_entry[i].size = entry->size;
 		user_entry[i].record_type = entry->record_type;
 		user_entry[i].tid = entry->tid;
-		strncpy(user_entry[i].fullpath, entry->fullpath,
-		    MAXPATHLEN);
+		if (entry->fullpath != NULL)
+			strncpy(user_entry[i].fullpath, entry->fullpath,
+			    MAXPATHLEN);
 		LIST_REMOVE(entry, next);
 
 		i += 1;
@@ -864,6 +865,16 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			    __func__, error);
 			return (error);
 		}
+
+		struct hwt_record_entry *entry;
+		entry = malloc(sizeof(struct hwt_record_entry), M_HWT,
+		    M_WAITOK | M_ZERO);
+		entry->record_type = HWT_RECORD_THREAD_CREATE;
+		entry->tid = thr->tid;
+
+		mtx_lock_spin(&ctx->mtx);
+		LIST_INSERT_HEAD(&ctx->records, entry, next);
+		mtx_unlock_spin(&ctx->mtx);
 
 		break;
 	case HWT_IOC_START:
