@@ -26,7 +26,7 @@ fi
 # $1 directory
 # $2 source filename w/o extension
 # $3 source extension
-clean_dep()
+_clean_dep()
 {
 	if egrep -qw "$2\.$3" "$OBJTOP"/$1/.depend.$2.*o 2>/dev/null; then
 		echo "Removing stale dependencies and objects for $2.$3"
@@ -39,6 +39,14 @@ clean_dep()
 		    "$OBJTOP"/obj-lib64c/$1/$2.*o \
 		    "$OBJTOP"/obj-lib32/$1/.depend.$2.* \
 		    "$OBJTOP"/obj-lib32/$1/$2.*o
+	fi
+}
+
+clean_dep()
+{
+	_clean_dep "$1" "$2" "$3"
+	if [ "$1" == "lib/libc" ]; then
+		_clean_dep lib/libc_c18n "$2" "$3"
 	fi
 }
 
