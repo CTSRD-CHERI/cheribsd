@@ -93,8 +93,10 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 		return;
 
 	entry = malloc(sizeof(struct hwt_record_entry), M_HWT, M_WAITOK);
+	entry->record_type = record_type;
 	entry->fullpath = strdup(ent->fullpath, M_HWT);
 	entry->td = td;
+	entry->tid = td->td_tid;
 	entry->addr = ent->addr;
 	entry->size = ent->size;
 

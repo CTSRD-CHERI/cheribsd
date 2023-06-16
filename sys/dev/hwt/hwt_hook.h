@@ -41,9 +41,11 @@ enum hwt_record_type {
 };
 
 struct hwt_record_entry {
+	enum hwt_record_type		record_type;
 	LIST_ENTRY(hwt_record_entry)	next;
 	char				*fullpath;
 	struct thread			*td;
+	lwpid_t				tid;
 	uintptr_t			addr;
 	size_t				size;
 };

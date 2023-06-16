@@ -58,9 +58,11 @@ struct hwt_start {
 } __aligned(16);
 
 struct hwt_record_user_entry {
+	enum hwt_record_type record_type;
 	char fullpath[MAXPATHLEN];
 	uintptr_t addr;
 	size_t size;
+	lwpid_t tid;
 } __aligned(16);
 
 struct hwt_record_get {

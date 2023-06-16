@@ -631,6 +631,8 @@ hwt_send_records(struct hwt_record_get *record_get, struct hwt_context *ctx)
 	LIST_FOREACH_SAFE(entry, &ctx->records, next, entry1) {
 		user_entry[i].addr = entry->addr;
 		user_entry[i].size = entry->size;
+		user_entry[i].record_type = entry->record_type;
+		user_entry[i].tid = entry->tid;
 		strncpy(user_entry[i].fullpath, entry->fullpath,
 		    MAXPATHLEN);
 		LIST_REMOVE(entry, next);
