@@ -108,6 +108,7 @@ coresight_event_deinit(void)
 
 	for (cpu = 0; cpu < mp_ncpus; cpu++) {
 		event = &cs_event[cpu];
+		coresight_disable(event, cpu);
 		coresight_stop(event, cpu);
 	}
 }
