@@ -184,7 +184,7 @@ hwt_event_dump(struct hwt_thread *thr, int cpu_id)
 }
 
 static int
-hwt_event_read(struct hwt_thread *thr, int cpu_id, int *curpage,
+hwt_event_read(struct hwt_thread *thr, int *curpage,
     vm_offset_t *curpage_offset)
 {
 	struct hwt_context *ctx;
@@ -195,7 +195,7 @@ hwt_event_read(struct hwt_thread *thr, int cpu_id, int *curpage,
 	ctx = thr->ctx;
 
 	mtx_lock_spin(&hwt_backend_mtx);
-	error = ctx->hwt_backend->ops->hwt_event_read(thr, cpu_id, curpage,
+	error = ctx->hwt_backend->ops->hwt_event_read(thr, 0, curpage,
 	    curpage_offset);
 	mtx_unlock_spin(&hwt_backend_mtx);
 
@@ -354,12 +354,110 @@ hwt_mmap_single(struct cdev *cdev, vm_ooffset_t *offset, vm_size_t mapsize,
 	return (0);
 }
 
+static struct hwt_context *
+hwt_lookup_by_owner(struct hwt_owner *ho, pid_t pid)
+{
+	struct hwt_context *ctx;
+
+	mtx_lock(&ho->mtx);
+	LIST_FOREACH(ctx, &ho->hwts, next_hwts) {
+		if (ctx->pid == pid) {
+			mtx_unlock(&ho->mtx);
+			return (ctx);
+		}
+	}
+	mtx_unlock(&ho->mtx);
+
+	return (NULL);
+}
+
+static struct hwt_owner *
+hwt_lookup_ownerhash(struct proc *p)
+{
+	struct hwt_ownerhash *hoh;
+	struct hwt_owner *ho;
+	int hindex;
+
+	hindex = HWT_HASH_PTR(p, hwt_ownerhashmask);
+	hoh = &hwt_ownerhash[hindex];
+
+	mtx_lock_spin(&hwt_ownerhash_mtx);
+	LIST_FOREACH(ho, hoh, next) {
+		if (ho->p == p) {
+			mtx_unlock_spin(&hwt_ownerhash_mtx);
+			return (ho);
+		}
+	}
+	mtx_unlock_spin(&hwt_ownerhash_mtx);
+
+	return (NULL);
+}
+
+static struct hwt_context *
+hwt_lookup_by_owner_p(struct proc *owner_p, pid_t pid)
+{
+	struct hwt_context *ctx;
+	struct hwt_owner *ho;
+
+	ho = hwt_lookup_ownerhash(owner_p);
+	if (ho == NULL)
+		return (NULL);
+
+	ctx = hwt_lookup_by_owner(ho, pid);
+
+	return (ctx);
+}
+
+
+static int
+hwt_thread_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
+    struct thread *td)
+{
+	struct hwt_bufptr_get *ptr_get;
+	struct hwt_context *ctx;
+	vm_offset_t curpage_offset;
+	struct hwt_thread *thr;
+	int curpage;
+	int error;
+
+	thr = dev->si_drv1;
+
+	switch (cmd) {
+	case HWT_IOC_BUFPTR_GET:
+		ptr_get = (struct hwt_bufptr_get *)addr;
+
+		/* Check if process is registered owner of any HWTs. */
+		ctx = hwt_lookup_by_owner_p(td->td_proc, ptr_get->pid);
+		if (ctx == NULL)
+			return (ENXIO);
+
+		if (ctx != thr->ctx)
+			return (ENXIO);
+
+		hwt_event_read(thr, &curpage, &curpage_offset);
+
+		error = copyout(&curpage, ptr_get->curpage, sizeof(int));
+		if (error)
+			return (error);
+		error = copyout(&curpage_offset, ptr_get->curpage_offset,
+		    sizeof(vm_offset_t));
+		if (error)
+			return (error);
+
+		break;
+	default:
+		break;
+	}
+
+	return (0);
+}
+
 static struct cdevsw hwt_context_cdevsw = {
 	.d_version	= D_VERSION,
 	.d_name		= "hwt",
 	.d_open		= hwt_open,
 	.d_mmap_single	= hwt_mmap_single,
-	.d_ioctl	= NULL,
+	.d_ioctl	= hwt_thread_ioctl
 };
 
 static int
@@ -469,60 +567,6 @@ hwt_lookup_contexthash(struct proc *p)
 	mtx_unlock_spin(&hwt_contexthash_mtx);
 
 	return (NULL);
-}
-
-static struct hwt_owner *
-hwt_lookup_ownerhash(struct proc *p)
-{
-	struct hwt_ownerhash *hoh;
-	struct hwt_owner *ho;
-	int hindex;
-
-	hindex = HWT_HASH_PTR(p, hwt_ownerhashmask);
-	hoh = &hwt_ownerhash[hindex];
-
-	mtx_lock_spin(&hwt_ownerhash_mtx);
-	LIST_FOREACH(ho, hoh, next) {
-		if (ho->p == p) {
-			mtx_unlock_spin(&hwt_ownerhash_mtx);
-			return (ho);
-		}
-	}
-	mtx_unlock_spin(&hwt_ownerhash_mtx);
-
-	return (NULL);
-}
-
-static struct hwt_context *
-hwt_lookup_by_owner(struct hwt_owner *ho, pid_t pid)
-{
-	struct hwt_context *ctx;
-
-	mtx_lock(&ho->mtx);
-	LIST_FOREACH(ctx, &ho->hwts, next_hwts) {
-		if (ctx->pid == pid) {
-			mtx_unlock(&ho->mtx);
-			return (ctx);
-		}
-	}
-	mtx_unlock(&ho->mtx);
-
-	return (NULL);
-}
-
-static struct hwt_context *
-hwt_lookup_by_owner_p(struct proc *owner_p, pid_t pid)
-{
-	struct hwt_context *ctx;
-	struct hwt_owner *ho;
-
-	ho = hwt_lookup_ownerhash(owner_p);
-	if (ho == NULL)
-		return (NULL);
-
-	ctx = hwt_lookup_by_owner(ho, pid);
-
-	return (ctx);
 }
 
 static struct hwt_thread *
@@ -713,11 +757,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	int hindex;
 	int error;
 	int len __unused;
-#if 0
-	int curpage;
-	vm_offset_t curpage_offset;
-	struct hwt_bufptr_get *ptr_get;
-#endif
 	struct hwt_thread *thr;
 	struct thread *ttd; /* Target thread. */
 
@@ -858,27 +897,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		error = hwt_send_records(rget, ctx);
 		break;
-#if 0
-	case HWT_IOC_BUFPTR_GET:
-		ptr_get = (struct hwt_bufptr_get *)addr;
-
-		/* Check if process is registered owner of any HWTs. */
-		ctx = hwt_lookup_by_owner_p(td->td_proc, ptr_get->pid);
-		if (ctx == NULL)
-			return (ENXIO);
-
-		hwt_event_read(thr, &curpage, &curpage_offset);
-
-		error = copyout(&curpage, ptr_get->curpage, sizeof(int));
-		if (error)
-			return (error);
-		error = copyout(&curpage_offset, ptr_get->curpage_offset,
-		    sizeof(vm_offset_t));
-		if (error)
-			return (error);
-
-		break;
-#endif
 	default:
 		error = ENXIO;
 		break;
