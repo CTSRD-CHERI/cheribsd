@@ -107,6 +107,17 @@ hwt_event_init(struct hwt_thread *thr)
 }
 
 static int
+hwt_event_deinit(struct hwt_context *ctx)
+{
+
+	dprintf("%s\n", __func__);
+
+	ctx->hwt_backend->ops->hwt_event_deinit();
+
+	return (0);
+}
+
+static int
 hwt_event_configure(struct hwt_thread *thr, int cpu_id)
 {
 	struct hwt_context *ctx;
@@ -512,6 +523,25 @@ hwt_lookup_by_owner_p(struct proc *owner_p, pid_t pid)
 	return (ctx);
 }
 
+static struct hwt_thread *
+hwt_lookup_thread(struct hwt_context *ctx, struct thread *td)
+{
+	struct hwt_thread *thr, *thr1;
+
+	mtx_lock_spin(&ctx->mtx_threads);
+	LIST_FOREACH_SAFE(thr, &ctx->threads, next, thr1) {
+		if (thr->tid == td->td_tid) {
+			mtx_unlock_spin(&ctx->mtx_threads);
+			return (thr);
+		}
+	}
+	mtx_unlock_spin(&ctx->mtx_threads);
+
+	panic("thread not found");
+
+	return (NULL);
+}
+
 static void
 hwt_insert_contexthash(struct hwt_context *ctx)
 {
@@ -778,6 +808,10 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		mtx_unlock(&ho->mtx);
 		PROC_UNLOCK(p);
 
+		mtx_lock_spin(&ctx->mtx_threads);
+		LIST_INSERT_HEAD(&ctx->threads, thr, next);
+		mtx_unlock_spin(&ctx->mtx_threads);
+
 		error = hwt_event_init(thr);
 		if (error)
 			return (error);
@@ -871,7 +905,7 @@ hwt_switch_in(struct thread *td)
 	if (!ctx)
 		return;
 
-	thr = NULL; /* TODO */
+	thr = hwt_lookup_thread(ctx, td);
 
 	dprintf("%s: ctx %p on cpu_id %d\n", __func__, ctx, cpu_id);
 
@@ -899,7 +933,7 @@ hwt_switch_out(struct thread *td)
 
 	dprintf("%s: ctx %p from cpu_id %d\n", __func__, ctx, cpu_id);
 
-	thr = NULL;
+	thr = hwt_lookup_thread(ctx, td);
 
 	hwt_event_disable(thr, cpu_id);
 }
@@ -927,7 +961,7 @@ hwt_stop_proc_hwts(struct hwt_contexthash *hch, struct proc *p)
 			dprintf("%s: stopping proc hwt\n", __func__);
 
 			LIST_REMOVE(ctx, next_hch);
-			//hwt_event_disable(ctx);
+			hwt_event_deinit(ctx);
 
 			ctx->p = NULL;
 		}
@@ -939,6 +973,7 @@ hwt_stop_proc_hwts(struct hwt_contexthash *hch, struct proc *p)
 static void
 hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 {
+	struct hwt_thread *thr, *thr1;
 	struct hwt_context *ctx;
 	struct proc *p;
 
@@ -963,8 +998,8 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 				mtx_lock_spin(&hwt_contexthash_mtx);
 				LIST_REMOVE(ctx, next_hch);
 
-				/* Stop it now on single CPU. */
-				//hwt_event_disable(ctx);
+				/* Stop it now on every CPU. */
+				hwt_event_deinit(ctx);
 
 				ctx->p = NULL;
 				mtx_unlock_spin(&hwt_contexthash_mtx);
@@ -973,8 +1008,14 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 			PROC_UNLOCK(p);
 		}
 
-		//hwt_destroy_buffers(thr);
-		//destroy_dev_sched(thr->cdev);
+		mtx_lock_spin(&ctx->mtx_threads);
+		LIST_FOREACH_SAFE(thr, &ctx->threads, next, thr1) {
+			LIST_REMOVE(thr, next);
+			hwt_destroy_buffers(thr);
+			destroy_dev_sched(thr->cdev);
+		}
+		mtx_unlock_spin(&ctx->mtx_threads);
+
 		free(ctx, M_HWT);
 	}
 

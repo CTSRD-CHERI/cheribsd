@@ -101,6 +101,18 @@ coresight_event_init(struct hwt_thread *thr)
 }
 
 static void
+coresight_event_deinit(void)
+{
+	struct coresight_event *event;
+	int cpu;
+
+	for (cpu = 0; cpu < mp_ncpus; cpu++) {
+		event = &cs_event[cpu];
+		coresight_stop(event, cpu);
+	}
+}
+
+static void
 coresight_event_configure(struct hwt_thread *thr, int cpu_id)
 {
 
@@ -124,18 +136,6 @@ coresight_event_disable(struct hwt_thread *thr, int cpu_id)
 	event = &cs_event[cpu_id];
 
 	coresight_disable(event, cpu_id);
-}
-
-static void
-coresight_event_deinit(void)
-{
-	struct coresight_event *event;
-	int cpu;
-
-	for (cpu = 0; cpu < mp_ncpus; cpu++) {
-		event = &cs_event[cpu];
-		coresight_stop(event, cpu);
-	}
 }
 
 static int
