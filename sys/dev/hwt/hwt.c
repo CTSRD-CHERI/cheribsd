@@ -110,9 +110,11 @@ static int
 hwt_event_deinit(struct hwt_context *ctx)
 {
 
-	dprintf("%s\n", __func__);
+	printf("%s\n", __func__);
 
+	mtx_lock_spin(&hwt_backend_mtx);
 	ctx->hwt_backend->ops->hwt_event_deinit();
+	mtx_unlock_spin(&hwt_backend_mtx);
 
 	return (0);
 }
@@ -950,7 +952,7 @@ hwt_stop_proc_hwts(struct hwt_contexthash *hch, struct proc *p)
 {
 	struct hwt_context *ctx, *ctx1;
 
-	dprintf("%s: stopping hwt proc\n", __func__);
+	printf("%s: stopping hwt proc\n", __func__);
 
 	PROC_LOCK(p);
 	p->p_flag2 &= ~P2_HWT;
@@ -958,7 +960,7 @@ hwt_stop_proc_hwts(struct hwt_contexthash *hch, struct proc *p)
 	mtx_lock_spin(&hwt_contexthash_mtx);
 	LIST_FOREACH_SAFE(ctx, hch, next_hch, ctx1) {
 		if (ctx->p == p) {
-			dprintf("%s: stopping proc hwt\n", __func__);
+			printf("%s: stopping proc hwt\n", __func__);
 
 			LIST_REMOVE(ctx, next_hch);
 			hwt_event_deinit(ctx);
@@ -977,7 +979,7 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 	struct hwt_context *ctx;
 	struct proc *p;
 
-	dprintf("%s: stopping hwt owner\n", __func__);
+	printf("%s: stopping hwt owner\n", __func__);
 
 	while (1) {
 		mtx_lock(&ho->mtx);
@@ -991,7 +993,7 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 
 		p = pfind(ctx->pid);
 		if (p != NULL) {
-			dprintf("stopping hwt pid %d\n", ctx->pid);
+			printf("stopping hwt pid %d\n", ctx->pid);
 
 			if (ctx->p) {
 				/* Remove it from contexthash now. */
@@ -1006,10 +1008,13 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 			}
 
 			PROC_UNLOCK(p);
+			printf("pid %d stopped\n", ctx->pid);
 		}
 
+		printf("%s: remove threads\n", __func__);
 		mtx_lock_spin(&ctx->mtx_threads);
 		LIST_FOREACH_SAFE(thr, &ctx->threads, next, thr1) {
+			printf("%s: remove thread 1\n", __func__);
 			LIST_REMOVE(thr, next);
 			hwt_destroy_buffers(thr);
 			destroy_dev_sched(thr->cdev);
