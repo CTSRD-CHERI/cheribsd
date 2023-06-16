@@ -59,7 +59,7 @@ struct hwt_context {
 	LIST_ENTRY(hwt_context)		next_hch; /* Entry in contexthash. */
 	LIST_ENTRY(hwt_context)		next_hwts; /* Entry in ho->hwts. */
 
-	struct proc			*p; /* Could be NULL if exited. */
+	struct proc			*proc; /* Could be NULL if exited. */
 	pid_t				pid;
 
 	struct hwt_owner		*hwt_owner;
