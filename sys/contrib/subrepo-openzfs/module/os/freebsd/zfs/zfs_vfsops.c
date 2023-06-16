@@ -153,7 +153,12 @@ struct vfsops zfs_vfsops = {
 	.vfs_quotactl =		zfs_quotactl,
 };
 
-VFS_SET(zfs_vfsops, zfs, VFCF_JAIL | VFCF_DELEGADMIN);
+#ifdef VFCF_CROSS_COPY_FILE_RANGE
+VFS_SET(zfs_vfsops, zfs,
+    VFCF_DELEGADMIN | VFCF_JAIL | VFCF_CROSS_COPY_FILE_RANGE);
+#else
+VFS_SET(zfs_vfsops, zfs, VFCF_DELEGADMIN | VFCF_JAIL);
+#endif
 
 /*
  * We need to keep a count of active fs's.
@@ -2495,7 +2500,9 @@ zfs_jailparam_set(void *obj, void *data)
 		mount_snapshot = -1;
 	else
 		jsys = JAIL_SYS_NEW;
-	if (jsys == JAIL_SYS_NEW) {
+	switch (jsys) {
+	case JAIL_SYS_NEW:
+	{
 		/* "zfs=new" or "zfs.*": the prison gets its own ZFS info. */
 		struct zfs_jailparam *zjp;
 
@@ -2513,12 +2520,22 @@ zfs_jailparam_set(void *obj, void *data)
 		if (mount_snapshot != -1)
 			zjp->mount_snapshot = mount_snapshot;
 		mtx_unlock(&pr->pr_mtx);
-	} else {
+		break;
+	}
+	case JAIL_SYS_INHERIT:
 		/* "zfs=inherit": inherit the parent's ZFS info. */
 		mtx_lock(&pr->pr_mtx);
 		osd_jail_del(pr, zfs_jailparam_slot);
 		mtx_unlock(&pr->pr_mtx);
+		break;
+	case -1:
+		/*
+		 * If the setting being changed is not ZFS related
+		 * then do nothing.
+		 */
+		break;
 	}
+
 	return (0);
 }
 
