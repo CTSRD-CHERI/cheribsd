@@ -452,12 +452,12 @@ hwt_thread_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	return (0);
 }
 
-static struct cdevsw hwt_context_cdevsw = {
+static struct cdevsw hwt_thread_cdevsw = {
 	.d_version	= D_VERSION,
 	.d_name		= "hwt",
 	.d_open		= hwt_open,
 	.d_mmap_single	= hwt_mmap_single,
-	.d_ioctl	= hwt_thread_ioctl
+	.d_ioctl	= hwt_thread_ioctl,
 };
 
 static int
@@ -472,7 +472,7 @@ hwt_create_cdev(struct hwt_thread *thr)
 	printf("%s: pid %d tid %d\n", __func__, ctx->pid, thr->tid);
 
 	make_dev_args_init(&args);
-	args.mda_devsw = &hwt_context_cdevsw;
+	args.mda_devsw = &hwt_thread_cdevsw;
 	args.mda_flags = MAKEDEV_CHECKNAME | MAKEDEV_WAITOK;
 	args.mda_uid = UID_ROOT;
 	args.mda_gid = GID_WHEEL;
@@ -738,10 +738,10 @@ hwt_thread_alloc(struct hwt_context *ctx)
 }
 
 static void
-hwt_thread_assign(struct hwt_thread *thr, struct thread *ttd)
+hwt_thread_assign(struct hwt_thread *thr, struct thread *td)
 {
 
-	thr->tid = ttd->td_tid;
+	thr->tid = td->td_tid;
 }
 
 static int
@@ -832,10 +832,8 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		}
 
 		ttd = FIRST_THREAD_IN_PROC(p);
-		hwt_thread_assign(thr, ttd);
 
-		printf("%s: ALLOC first thread tid %d\n", __func__,
-		    ttd->td_tid);
+		hwt_thread_assign(thr, ttd);
 
 		error = hwt_priv_check(td->td_proc, p);
 		if (error) {
@@ -893,7 +891,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			return (ENXIO);
 
 		ctx->proc = p;
-		KASSERT(ctx->proc == p, ("something wrong"));
 
 		hwt_insert_contexthash(ctx);
 		PROC_UNLOCK(p);
@@ -939,6 +936,8 @@ hwt_switch_in(struct thread *td)
 		return;
 
 	thr = hwt_lookup_thread(ctx, td);
+	if (thr == NULL)
+		panic("%s: thread is NULL", __func__);
 
 	printf("%s: ctx %p on cpu_id %d\n", __func__, ctx, cpu_id);
 
@@ -967,6 +966,8 @@ hwt_switch_out(struct thread *td)
 	printf("%s: ctx %p from cpu_id %d\n", __func__, ctx, cpu_id);
 
 	thr = hwt_lookup_thread(ctx, td);
+	if (thr == NULL)
+		panic("%s: thread is NULL", __func__);
 
 	hwt_event_disable(thr, cpu_id);
 }
