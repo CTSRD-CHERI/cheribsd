@@ -737,6 +737,29 @@ hwt_thread_alloc(struct hwt_context *ctx)
 	return (thr);
 }
 
+int
+hwt_thread_create(struct hwt_context *ctx, struct thread *td)
+{
+	struct hwt_thread *thr;
+	int error;
+
+	thr = hwt_thread_alloc(ctx);
+	thr->tid = td->td_tid;
+
+	error = hwt_create_cdev(thr);
+	if (error) {
+		printf("%s: could not create cdev, error %d\n",
+		    __func__, error);
+		return (error);
+	}
+
+	mtx_lock_spin(&ctx->mtx_threads);
+	LIST_INSERT_HEAD(&ctx->threads, thr, next);
+	mtx_unlock_spin(&ctx->mtx_threads);
+
+	return (0);
+}
+
 static void
 hwt_thread_assign(struct hwt_thread *thr, struct thread *td)
 {

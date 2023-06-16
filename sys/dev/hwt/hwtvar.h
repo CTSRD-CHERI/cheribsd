@@ -93,6 +93,7 @@ struct hwt_backend {
 };
 
 int hwt_register(struct hwt_backend *);
+int hwt_thread_create(struct hwt_context *ctx, struct thread *td);
 
 struct hwt_context * hwt_lookup_contexthash(struct proc *p);
 

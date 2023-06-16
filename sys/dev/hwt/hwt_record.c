@@ -80,6 +80,7 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 	case HWT_RECORD_MUNMAP:
 		break;
 	case HWT_RECORD_THREAD_CREATE:
+		hwt_thread_create(ctx, td);
 		printf("%s: NEW thread %p, tid %d\n", __func__, td, td->td_tid);
 		break;
 	case HWT_RECORD_THREAD_SET_NAME:
@@ -89,16 +90,16 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 		return;
 	};
 
-	if (ent == NULL)
-		return;
-
 	entry = malloc(sizeof(struct hwt_record_entry), M_HWT, M_WAITOK);
 	entry->record_type = record_type;
-	entry->fullpath = strdup(ent->fullpath, M_HWT);
 	entry->td = td;
 	entry->tid = td->td_tid;
-	entry->addr = ent->addr;
-	entry->size = ent->size;
+
+	if (ent) {
+		entry->fullpath = strdup(ent->fullpath, M_HWT);
+		entry->addr = ent->addr;
+		entry->size = ent->size;
+	}
 
 	mtx_lock_spin(&ctx->mtx);
 	LIST_INSERT_HEAD(&ctx->records, entry, next);
