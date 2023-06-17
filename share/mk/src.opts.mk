@@ -53,6 +53,9 @@ __<src.opts.mk>__:
 # BROKEN was selected as the least imperfect one considered at the
 # time. Options are added to BROKEN_OPTIONS list on a per-arch basis.
 # At this time, there's no provision for mutually incompatible options.
+# Options listed in 'REQUIRED_OPTIONS' will be hard-wired to 'yes'; this
+# is intended as a transitional measure while options are in the process
+# of being removed.
 
 __DEFAULT_YES_OPTIONS = \
     ACCT \
@@ -217,6 +220,8 @@ __DEFAULT_YES_OPTIONS+=	\
 	CHERI_CAPREVOKE \
 	CHERIBSDBOX \
 	LIB64C
+
+__REQUIRED_OPTIONS = \
 
 # LEFT/RIGHT. Left options which default to "yes" unless their corresponding
 # RIGHT option is disabled.
