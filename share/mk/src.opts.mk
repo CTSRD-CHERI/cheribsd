@@ -76,9 +76,7 @@ __DEFAULT_YES_OPTIONS = \
     BSNMP \
     BZIP2 \
     CALENDAR \
-    CAPSICUM \
     CAROOT \
-    CASPER \
     CCD \
     CDDL \
     CLANG \
@@ -222,6 +220,8 @@ __DEFAULT_YES_OPTIONS+=	\
 	LIB64C
 
 __REQUIRED_OPTIONS = \
+    CAPSICUM \
+    CASPER
 
 # LEFT/RIGHT. Left options which default to "yes" unless their corresponding
 # RIGHT option is disabled.
