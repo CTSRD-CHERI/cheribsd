@@ -730,9 +730,8 @@ hwt_thread_alloc(struct hwt_context *ctx, struct hwt_thread **thr0)
 	thr->ctx = ctx;
 
 	error = hwt_alloc_buffers(thr);
-	if (error) {
+	if (error)
 		return (error);
-	}
 
 	*thr0 = thr;
 
