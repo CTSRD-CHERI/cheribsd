@@ -60,6 +60,7 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 	if ((p->p_flag2 & P2_HWT) == 0)
 		return;
 
+	/* We must have a ctx. */
 	ctx = hwt_lookup_contexthash(p);
 
 	switch (record_type) {
