@@ -764,7 +764,6 @@ static void
 hwt_thread_assign(struct hwt_thread *thr, struct thread *td)
 {
 
-	thr->tid = td->td_tid;
 }
 
 static int
@@ -784,7 +783,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	int error;
 	int len __unused;
 	struct hwt_thread *thr;
-	struct thread *ttd; /* Target thread. */
 
 	len = IOCPARM_LEN(cmd);
 
@@ -817,10 +815,12 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		/* First get the owner. */
 		ho = hwt_lookup_ownerhash(td->td_proc);
 		if (ho) {
+			/* Check if the owner already tracing this pid. */
 			ctx = hwt_lookup_by_owner(ho, halloc->pid);
 			if (ctx)
 				return (EEXIST);
 		} else {
+			/* Create a new owner. */
 			ho = malloc(sizeof(struct hwt_owner), M_HWT,
 			    M_WAITOK | M_ZERO);
 			ho->p = td->td_proc;
@@ -840,6 +840,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		ctx->bufsize = halloc->bufsize;
 		ctx->hwt_backend = backend;
 
+		/* Allocate first thread and buffers. */
 		thr = hwt_thread_alloc(ctx);
 		if (thr == NULL)
 			return (ENOMEM);
@@ -854,9 +855,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			return (ENXIO);
 		}
 
-		ttd = FIRST_THREAD_IN_PROC(p);
-
-		hwt_thread_assign(thr, ttd);
+		thr->tid = FIRST_THREAD_IN_PROC(p)->td_tid;
 
 		error = hwt_priv_check(td->td_proc, p);
 		if (error) {
@@ -886,6 +885,8 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			    __func__, error);
 			return (error);
 		}
+
+		/* Pass thread ID to user for mmap. */
 
 		struct hwt_record_entry *entry;
 		entry = malloc(sizeof(struct hwt_record_entry), M_HWT,
