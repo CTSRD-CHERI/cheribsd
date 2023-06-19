@@ -80,11 +80,12 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 	case HWT_RECORD_MUNMAP:
 		break;
 	case HWT_RECORD_THREAD_CREATE:
+		dprintf("%s: NEW thread %p, tid %d\n", __func__, td,
+		    td->td_tid);
 		hwt_thread_create(ctx, td);
-		printf("%s: NEW thread %p, tid %d\n", __func__, td, td->td_tid);
 		break;
 	case HWT_RECORD_THREAD_SET_NAME:
-		printf("%s: SET_NAME thread %p\n", __func__, td);
+		dprintf("%s: THREAD_SET_NAME %p\n", __func__, td);
 		break;
 	default:
 		return;
