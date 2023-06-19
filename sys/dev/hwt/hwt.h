@@ -33,6 +33,8 @@
 #ifndef _DEV_HWT_HWT_H_
 #define _DEV_HWT_HWT_H_
 
+#include "hwt_record.h"
+
 #define	HWT_MAGIC	0x42
 #define	HWT_IOC_ALLOC \
 	_IOW(HWT_MAGIC, 0x00, struct hwt_alloc)

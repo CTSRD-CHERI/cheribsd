@@ -28,24 +28,16 @@
  * $FreeBSD$
  */
 
-#ifndef _DEV_HWT_HWT_HOOK_H_
-#define _DEV_HWT_HWT_HOOK_H_
+#ifndef _DEV_HWT_HWT_RECORD_H_
+#define _DEV_HWT_HWT_RECORD_H_
 
-#include "hwt_record.h"
-
-struct hwt_record_entry {
-	enum hwt_record_type		record_type;
-	LIST_ENTRY(hwt_record_entry)	next;
-	char				*fullpath;
-	struct thread			*td;
-	lwpid_t				tid;
-	uintptr_t			addr;
-	size_t				size;
+enum hwt_record_type {
+	HWT_RECORD_MMAP,
+	HWT_RECORD_MUNMAP,
+	HWT_RECORD_EXECUTABLE,
+	HWT_RECORD_INTERP,
+	HWT_RECORD_THREAD_CREATE,
+	HWT_RECORD_THREAD_SET_NAME,
 };
 
-void hwt_switch_in(struct thread *td);
-void hwt_switch_out(struct thread *td);
-void hwt_record(struct thread *td, enum hwt_record_type record_type,
-    struct hwt_record_entry *ent);
-
-#endif /* !_DEV_HWT_HWT_HOOK_H_ */
+#endif /* !_DEV_HWT_HWT_RECORD_H_ */
