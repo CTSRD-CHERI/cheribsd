@@ -48,13 +48,11 @@
 struct hwt_alloc {
 	size_t		bufsize;
 	pid_t		pid;
-	int		cpu_id;
 	char		*backend_name;
 } __aligned(16);
 
 struct hwt_start {
 	pid_t		pid;
-	int		cpu_id;
 } __aligned(16);
 
 struct hwt_record_user_entry {
@@ -68,7 +66,6 @@ struct hwt_record_user_entry {
 struct hwt_record_get {
 	struct hwt_record_user_entry	*records;
 	int				*nentries;
-	int				cpu_id;
 	pid_t				pid;
 } __aligned(16);
 
@@ -76,7 +73,6 @@ struct hwt_bufptr_get {
 	int		*ptr;
 	int		*curpage;
 	vm_offset_t	*curpage_offset;
-	int		cpu_id;
 	pid_t		pid;
 } __aligned(16);
 

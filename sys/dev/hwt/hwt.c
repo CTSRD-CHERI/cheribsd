@@ -797,9 +797,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			return (EINVAL);
 		if (halloc->bufsize % PAGE_SIZE)
 			return (EINVAL);
-		if (halloc->cpu_id < 0 ||
-		    halloc->cpu_id >= MAXCPU)
-			return (EINVAL);
 		if (halloc->backend_name == NULL)
 			return (EINVAL);
 
@@ -902,8 +899,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	case HWT_IOC_START:
 		s = (struct hwt_start *)addr;
 
-		dprintf("%s: start, cpu_id %d pid %d\n", __func__, s->cpu_id,
-		    s->pid);
+		dprintf("%s: start, pid %d\n", __func__, s->pid);
 
 		/* Check if process is registered owner of any HWTs. */
 		ctx = hwt_lookup_by_owner_p(td->td_proc, s->pid);
