@@ -287,7 +287,6 @@ hwt_alloc_pages(struct hwt_thread *thr)
 	thr->obj = cdev_pager_allocate(thr, OBJT_MGTDEVICE, &hwt_pager_ops,
 	    thr->npages * PAGE_SIZE, PROT_READ, 0, curthread->td_ucred);
 
-	VM_OBJECT_WLOCK(thr->obj);
 	for (i = 0; i < thr->npages; i++) {
 		tries = 0;
 retry:
@@ -302,7 +301,6 @@ retry:
 				goto retry;
 			}
 
-			VM_OBJECT_WUNLOCK(thr->obj);
 			return (ENOMEM);
 		}
 
@@ -321,10 +319,10 @@ retry:
 		m->flags |= PG_FICTITIOUS;
 		thr->pages[i] = m;
 
+		VM_OBJECT_WLOCK(thr->obj);
 		vm_page_insert(m, thr->obj, i);
+		VM_OBJECT_WUNLOCK(thr->obj);
 	}
-
-	VM_OBJECT_WUNLOCK(thr->obj);
 
 	return (0);
 }
