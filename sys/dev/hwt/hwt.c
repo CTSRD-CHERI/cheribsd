@@ -730,12 +730,6 @@ hwt_thread_alloc(struct hwt_context *ctx, struct hwt_thread **thr0)
 		return (error);
 	}
 
-	error = hwt_create_cdev(thr);
-	if (error) {
-		/* TODO: destroy buffers and thr. */
-		return (error);
-	}
-
 	*thr0 = thr;
 
 	return (0);
@@ -876,6 +870,12 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		error = hwt_event_init(thr);
 		if (error)
 			return (error);
+
+		error = hwt_create_cdev(thr);
+		if (error) {
+			/* TODO: destroy buffers and thr. */
+			return (error);
+		}
 
 		/* Pass thread ID to user for mmap. */
 
