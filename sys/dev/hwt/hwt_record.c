@@ -93,7 +93,6 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 
 	entry = malloc(sizeof(struct hwt_record_entry), M_HWT, M_WAITOK);
 	entry->record_type = record_type;
-	entry->td = td;
 	entry->tid = td->td_tid;
 
 	if (ent) {
