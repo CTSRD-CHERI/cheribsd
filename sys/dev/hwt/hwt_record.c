@@ -61,8 +61,6 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 		return;
 
 	ctx = hwt_lookup_contexthash(p);
-	if (ctx == NULL)
-		return;
 
 	switch (record_type) {
 	case HWT_RECORD_MMAP:

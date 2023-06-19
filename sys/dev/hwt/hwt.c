@@ -545,7 +545,7 @@ hwt_alloc(void)
 }
 
 /*
- * To use by hwt_switch_in/out only.
+ * To use by hwt_switch_in/out() and hwt_record() only.
  */
 struct hwt_context *
 hwt_lookup_contexthash(struct proc *p)
@@ -570,7 +570,7 @@ hwt_lookup_contexthash(struct proc *p)
 }
 
 /*
- * To use by hwt_switch_in/out only.
+ * To use by hwt_switch_in/out() only.
  */
 static struct hwt_thread *
 hwt_lookup_thread(struct hwt_context *ctx, struct thread *td)
