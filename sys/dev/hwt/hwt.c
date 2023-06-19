@@ -544,6 +544,9 @@ hwt_alloc(void)
 	return (ctx);
 }
 
+/*
+ * To use by hwt_switch_in/out only.
+ */
 struct hwt_context *
 hwt_lookup_contexthash(struct proc *p)
 {
@@ -563,9 +566,12 @@ hwt_lookup_contexthash(struct proc *p)
 	}
 	mtx_unlock_spin(&hwt_contexthash_mtx);
 
-	return (NULL);
+	panic("ctx not found");
 }
 
+/*
+ * To use by hwt_switch_in/out only.
+ */
 static struct hwt_thread *
 hwt_lookup_thread(struct hwt_context *ctx, struct thread *td)
 {
@@ -581,8 +587,6 @@ hwt_lookup_thread(struct hwt_context *ctx, struct thread *td)
 	mtx_unlock_spin(&ctx->mtx_threads);
 
 	panic("thread not found");
-
-	return (NULL);
 }
 
 static void
@@ -762,135 +766,142 @@ hwt_thread_create(struct hwt_context *ctx, struct thread *td)
 }
 
 static int
+hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
+{
+	char backend_name[HWT_BACKEND_MAXNAMELEN];
+	struct hwt_backend *backend;
+	struct hwt_ownerhash *hoh;
+	struct hwt_context *ctx;
+	struct hwt_thread *thr;
+	struct hwt_owner *ho;
+	struct proc *p;
+	int hindex;
+	int error;
+
+	if (halloc->bufsize > HWT_MAXBUFSIZE)
+		return (EINVAL);
+	if (halloc->bufsize % PAGE_SIZE)
+		return (EINVAL);
+	if (halloc->backend_name == NULL)
+		return (EINVAL);
+
+	error = copyinstr(halloc->backend_name, (void *)backend_name,
+	    HWT_BACKEND_MAXNAMELEN, NULL);
+	if (error)
+		return (error);
+
+	backend = hwt_lookup_backend(backend_name);
+	if (backend == NULL)
+		return (ENXIO);
+
+	/* First get the owner. */
+	ho = hwt_lookup_ownerhash(td->td_proc);
+	if (ho) {
+		/* Check if the owner already tracing this pid. */
+		ctx = hwt_lookup_by_owner(ho, halloc->pid);
+		if (ctx)
+			return (EEXIST);
+	} else {
+		/* Create a new owner. */
+		ho = malloc(sizeof(struct hwt_owner), M_HWT,
+		    M_WAITOK | M_ZERO);
+		ho->p = td->td_proc;
+		LIST_INIT(&ho->hwts);
+		mtx_init(&ho->mtx, "hwts", NULL, MTX_DEF);
+
+		hindex = HWT_HASH_PTR(ho->p, hwt_ownerhashmask);
+		hoh = &hwt_ownerhash[hindex];
+
+		mtx_lock_spin(&hwt_ownerhash_mtx);
+		LIST_INSERT_HEAD(hoh, ho, next);
+		mtx_unlock_spin(&hwt_ownerhash_mtx);
+	}
+
+	/* Allocate a new HWT. */
+	ctx = hwt_alloc();
+	ctx->bufsize = halloc->bufsize;
+	ctx->hwt_backend = backend;
+
+	/* Allocate first thread and buffers. */
+	error = hwt_thread_alloc(ctx, &thr);
+	if (error)
+		return (error);
+
+	ctx->pid = halloc->pid;
+	ctx->hwt_owner = ho;
+
+	/* Since we done with malloc, now get the victim proc. */
+	p = pfind(halloc->pid);
+	if (p == NULL) {
+		/* TODO: deallocate resources. */
+		return (ENXIO);
+	}
+
+	thr->tid = FIRST_THREAD_IN_PROC(p)->td_tid;
+
+	error = hwt_priv_check(td->td_proc, p);
+	if (error) {
+		/* TODO: deallocate resources. */
+		PROC_UNLOCK(p);
+		return (error);
+	}
+
+	p->p_flag2 |= P2_HWT;
+
+	mtx_lock(&ho->mtx);
+	LIST_INSERT_HEAD(&ho->hwts, ctx, next_hwts);
+	mtx_unlock(&ho->mtx);
+	PROC_UNLOCK(p);
+
+	mtx_lock_spin(&ctx->mtx_threads);
+	LIST_INSERT_HEAD(&ctx->threads, thr, next);
+	mtx_unlock_spin(&ctx->mtx_threads);
+
+	error = hwt_event_init(thr);
+	if (error)
+		return (error);
+
+	error = hwt_create_cdev(thr);
+	if (error) {
+		/* TODO: destroy buffers and thr. */
+		return (error);
+	}
+
+	/* Pass thread ID to user for mmap. */
+
+	struct hwt_record_entry *entry;
+	entry = malloc(sizeof(struct hwt_record_entry), M_HWT,
+	    M_WAITOK | M_ZERO);
+	entry->record_type = HWT_RECORD_THREAD_CREATE;
+	entry->tid = thr->tid;
+
+	mtx_lock_spin(&ctx->mtx);
+	LIST_INSERT_HEAD(&ctx->records, entry, next);
+	mtx_unlock_spin(&ctx->mtx);
+
+	return (0);
+}
+
+static int
 hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
     struct thread *td)
 {
-	struct hwt_start *s;
-	struct hwt_alloc *halloc;
 	struct hwt_record_get *rget;
-	char backend_name[HWT_BACKEND_MAXNAMELEN];
-	struct proc *p;
+	struct hwt_alloc *halloc;
 	struct hwt_context *ctx;
-	struct hwt_owner *ho;
-	struct hwt_ownerhash *hoh;
-	struct hwt_backend *backend;
-	int hindex;
+	struct hwt_start *s;
+	struct proc *p;
 	int error;
-	int len __unused;
-	struct hwt_thread *thr;
-
-	len = IOCPARM_LEN(cmd);
-
-	dprintf("%s: cmd %lx, addr %lx, len %d\n", __func__, cmd,
-	    (uint64_t)addr, len);
 
 	switch (cmd) {
-	/* Allocate HWT context. */
 	case HWT_IOC_ALLOC:
+		/* Allocate HWT context. */
 		halloc = (struct hwt_alloc *)addr;
-		if (halloc->bufsize > HWT_MAXBUFSIZE)
-			return (EINVAL);
-		if (halloc->bufsize % PAGE_SIZE)
-			return (EINVAL);
-		if (halloc->backend_name == NULL)
-			return (EINVAL);
+		error = hwt_ioctl_alloc(td, halloc);
+		return (error);
 
-		error = copyinstr(halloc->backend_name, (void *)backend_name,
-		    HWT_BACKEND_MAXNAMELEN, NULL);
-		if (error)
-			return (error);
-
-		backend = hwt_lookup_backend(backend_name);
-		if (backend == NULL)
-			return (ENXIO);
-
-		/* First get the owner. */
-		ho = hwt_lookup_ownerhash(td->td_proc);
-		if (ho) {
-			/* Check if the owner already tracing this pid. */
-			ctx = hwt_lookup_by_owner(ho, halloc->pid);
-			if (ctx)
-				return (EEXIST);
-		} else {
-			/* Create a new owner. */
-			ho = malloc(sizeof(struct hwt_owner), M_HWT,
-			    M_WAITOK | M_ZERO);
-			ho->p = td->td_proc;
-			LIST_INIT(&ho->hwts);
-			mtx_init(&ho->mtx, "hwts", NULL, MTX_DEF);
-
-			hindex = HWT_HASH_PTR(ho->p, hwt_ownerhashmask);
-			hoh = &hwt_ownerhash[hindex];
-
-			mtx_lock_spin(&hwt_ownerhash_mtx);
-			LIST_INSERT_HEAD(hoh, ho, next);
-			mtx_unlock_spin(&hwt_ownerhash_mtx);
-		}
-
-		/* Allocate a new HWT. */
-		ctx = hwt_alloc();
-		ctx->bufsize = halloc->bufsize;
-		ctx->hwt_backend = backend;
-
-		/* Allocate first thread and buffers. */
-		error = hwt_thread_alloc(ctx, &thr);
-		if (error)
-			return (error);
-
-		ctx->pid = halloc->pid;
-		ctx->hwt_owner = ho;
-
-		/* Since we done with malloc, now get the victim proc. */
-		p = pfind(halloc->pid);
-		if (p == NULL) {
-			/* TODO: deallocate resources. */
-			return (ENXIO);
-		}
-
-		thr->tid = FIRST_THREAD_IN_PROC(p)->td_tid;
-
-		error = hwt_priv_check(td->td_proc, p);
-		if (error) {
-			/* TODO: deallocate resources. */
-			PROC_UNLOCK(p);
-			return (error);
-		}
-
-		p->p_flag2 |= P2_HWT;
-
-		mtx_lock(&ho->mtx);
-		LIST_INSERT_HEAD(&ho->hwts, ctx, next_hwts);
-		mtx_unlock(&ho->mtx);
-		PROC_UNLOCK(p);
-
-		mtx_lock_spin(&ctx->mtx_threads);
-		LIST_INSERT_HEAD(&ctx->threads, thr, next);
-		mtx_unlock_spin(&ctx->mtx_threads);
-
-		error = hwt_event_init(thr);
-		if (error)
-			return (error);
-
-		error = hwt_create_cdev(thr);
-		if (error) {
-			/* TODO: destroy buffers and thr. */
-			return (error);
-		}
-
-		/* Pass thread ID to user for mmap. */
-
-		struct hwt_record_entry *entry;
-		entry = malloc(sizeof(struct hwt_record_entry), M_HWT,
-		    M_WAITOK | M_ZERO);
-		entry->record_type = HWT_RECORD_THREAD_CREATE;
-		entry->tid = thr->tid;
-
-		mtx_lock_spin(&ctx->mtx);
-		LIST_INSERT_HEAD(&ctx->records, entry, next);
-		mtx_unlock_spin(&ctx->mtx);
-
-		break;
 	case HWT_IOC_START:
+		/* Start tracing. */
 		s = (struct hwt_start *)addr;
 
 		dprintf("%s: start, pid %d\n", __func__, s->pid);
@@ -908,9 +919,8 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		hwt_insert_contexthash(ctx);
 		PROC_UNLOCK(p);
-		error = 0;
+		return (0);
 
-		break;
 	case HWT_IOC_RECORD_GET:
 		rget = (struct hwt_record_get *)addr;
 
@@ -920,13 +930,14 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			return (ENXIO);
 
 		error = hwt_send_records(rget, ctx);
-		break;
+		return (error);
 	default:
-		error = ENXIO;
-		break;
+		return (ENXIO);
 	};
 
-	return (error);
+	/* Unreached. */
+
+	return (ENXIO);
 }
 
 void
@@ -943,17 +954,10 @@ hwt_switch_in(struct thread *td)
 
 	cpu_id = PCPU_GET(cpuid);
 
-	dprintf("%s\n", __func__);
-
 	ctx = hwt_lookup_contexthash(p);
-	if (!ctx)
-		return;
-
 	thr = hwt_lookup_thread(ctx, td);
-	if (thr == NULL)
-		panic("%s: thread is NULL", __func__);
 
-	printf("%s: ctx %p on cpu_id %d\n", __func__, ctx, cpu_id);
+	dprintf("%s: thr %p on cpu_id %d\n", __func__, thr, cpu_id);
 
 	hwt_event_configure(thr, cpu_id);
 	hwt_event_enable(thr, cpu_id);
@@ -974,14 +978,9 @@ hwt_switch_out(struct thread *td)
 	cpu_id = PCPU_GET(cpuid);
 
 	ctx = hwt_lookup_contexthash(p);
-	if (!ctx)
-		return;
-
-	printf("%s: ctx %p from cpu_id %d\n", __func__, ctx, cpu_id);
-
 	thr = hwt_lookup_thread(ctx, td);
-	if (thr == NULL)
-		panic("%s: thread is NULL", __func__);
+
+	dprintf("%s: thr %p on cpu_id %d\n", __func__, thr, cpu_id);
 
 	hwt_event_disable(thr, cpu_id);
 }
