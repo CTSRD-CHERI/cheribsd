@@ -406,7 +406,6 @@ hwt_lookup_by_owner_p(struct proc *owner_p, pid_t pid)
 	return (ctx);
 }
 
-
 static int
 hwt_thread_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
     struct thread *td)
@@ -717,8 +716,8 @@ done:
 	return (error);
 }
 
-static struct hwt_thread *
-hwt_thread_alloc(struct hwt_context *ctx)
+static int
+hwt_thread_alloc(struct hwt_context *ctx, struct hwt_thread **thr0)
 {
 	struct hwt_thread *thr;
 	int error;
@@ -728,11 +727,18 @@ hwt_thread_alloc(struct hwt_context *ctx)
 
 	error = hwt_alloc_buffers(thr);
 	if (error) {
-		printf("%s: can't allocate hwt buffers\n", __func__);
-		return (NULL);
+		return (error);
 	}
 
-	return (thr);
+	error = hwt_create_cdev(thr);
+	if (error) {
+		/* TODO: destroy buffers and thr. */
+		return (error);
+	}
+
+	*thr0 = thr;
+
+	return (0);
 }
 
 int
@@ -741,7 +747,10 @@ hwt_thread_create(struct hwt_context *ctx, struct thread *td)
 	struct hwt_thread *thr;
 	int error;
 
-	thr = hwt_thread_alloc(ctx);
+	error = hwt_thread_alloc(ctx, &thr);
+	if (error)
+		return (error);
+
 	thr->tid = td->td_tid;
 
 	error = hwt_create_cdev(thr);
@@ -830,9 +839,9 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		ctx->hwt_backend = backend;
 
 		/* Allocate first thread and buffers. */
-		thr = hwt_thread_alloc(ctx);
-		if (thr == NULL)
-			return (ENOMEM);
+		error = hwt_thread_alloc(ctx, &thr);
+		if (error)
+			return (error);
 
 		ctx->pid = halloc->pid;
 		ctx->hwt_owner = ho;
@@ -867,13 +876,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		error = hwt_event_init(thr);
 		if (error)
 			return (error);
-
-		error = hwt_create_cdev(thr);
-		if (error) {
-			printf("%s: could not create cdev, error %d\n",
-			    __func__, error);
-			return (error);
-		}
 
 		/* Pass thread ID to user for mmap. */
 
