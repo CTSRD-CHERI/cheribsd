@@ -760,12 +760,6 @@ hwt_thread_create(struct hwt_context *ctx, struct thread *td)
 	return (0);
 }
 
-static void
-hwt_thread_assign(struct hwt_thread *thr, struct thread *td)
-{
-
-}
-
 static int
 hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
     struct thread *td)
