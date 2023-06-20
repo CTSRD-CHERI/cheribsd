@@ -179,7 +179,8 @@ efi_init(void)
 		return (0);
 	}
 
-	efi_systbl = (struct efi_systbl *)efi_phys_to_kva(efi_systbl_phys);
+	efi_systbl = (struct efi_systbl *)efi_phys_to_kva(efi_systbl_phys,
+	    sizeof(struct efi_systbl));
 	if (efi_systbl == NULL || efi_systbl->st_hdr.th_sig != EFI_SYSTBL_SIG) {
 		efi_systbl = NULL;
 		if (bootverbose)
@@ -248,7 +249,8 @@ efi_init(void)
 	 * with an old loader.efi, check if the RS->GetTime function is within
 	 * the EFI map, and fail to attach if not.
 	 */
-	rtdm = (struct efi_rt *)efi_phys_to_kva((uintptr_t)efi_runtime);
+	rtdm = (struct efi_rt *)efi_phys_to_kva((uintptr_t)efi_runtime,
+	    sizeof(struct efi_rt));
 	if (rtdm == NULL || !efi_is_in_map(map, ndesc, efihdr->descriptor_size,
 	    (vm_offset_t)rtdm->rt_gettime)) {
 		if (bootverbose)
@@ -548,11 +550,12 @@ efi_call(struct efirt_callinfo *ecp)
     ((uintptr_t)cheri_sealentry(cheri_andperm(			\
 	cheri_setaddress(kernel_root_cap,			\
 	    ((struct efi_rt *)efi_phys_to_kva((uintptr_t)	\
-	    efi_runtime))->method), CHERI_PERMS_KERNEL_CODE)))
+	    efi_runtime, sizeof(struct efi_rt)))->method),	\
+	CHERI_PERMS_KERNEL_CODE)))
 #else
 #define	EFI_RT_METHOD_PA(method)				\
     ((uintptr_t)((struct efi_rt *)efi_phys_to_kva((uintptr_t)	\
-    efi_runtime))->method)
+    efi_runtime, sizeof(struct efi_rt)))->method)
 #endif
 
 static int

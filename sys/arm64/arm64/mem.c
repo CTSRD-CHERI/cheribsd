@@ -42,6 +42,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_page.h>
+#include <vm/vm_param.h>
 
 #include <cheri/cheric.h>
 
@@ -80,7 +81,7 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 			/* If the address is in the DMAP just copy it */
 			if (VIRT_IN_DMAP(v)) {
 #ifdef __CHERI_PURE_CAPABILITY__
-				error = uiomove(cheri_setbounds(
+				error = uiomove(cheri_setboundsexact(
 				    cheri_setaddress(dmap_base_cap, v), cnt),
 				    cnt, uio);
 #else
@@ -106,8 +107,8 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 		case CDEV_MINOR_MEM:
 			/* If within the DMAP use this to copy from */
 			if (PHYS_IN_DMAP(v)) {
-				error = uiomove((void *)cheri_kern_setbounds(
-				    PHYS_TO_DMAP(v), cnt), cnt, uio);
+				error = uiomove((void *)PHYS_TO_DMAP_LEN(v, cnt),
+				    cnt, uio);
 				break;
 			}
 

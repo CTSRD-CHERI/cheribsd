@@ -182,30 +182,19 @@
     (va) < (dmap_max_addr))
 #endif
 
-#define	PMAP_HAS_DMAP	1
 #ifdef __CHERI_PURE_CAPABILITY__
-#define	PHYS_TO_DMAP(pa)						\
-({									\
-	KASSERT(PHYS_IN_DMAP(pa),					\
-	    ("%s: PA out of range, PA: 0x%lx", __func__,		\
-	    (vm_paddr_t)(pa)));						\
-	(vm_pointer_t)dmap_capability + ((pa) - dmap_phys_base);	\
-})
-
-#define	DMAP_TO_PHYS(va)						\
-({									\
-	KASSERT(VIRT_IN_DMAP(va),					\
-	    ("%s: VA out of range, VA: 0x%lx", __func__,		\
-	    (vm_offset_t)(va)));					\
-	dmap_phys_base + ((vm_offset_t)(va) - (ptraddr_t)dmap_capability); \
-})
+#define	_DMAP_BASE dmap_capability
 #else
+#define	_DMAP_BASE (void *)DMAP_MIN_ADDRESS
+#endif
+
+#define	PMAP_HAS_DMAP	1
 #define	PHYS_TO_DMAP(pa)						\
 ({									\
 	KASSERT(PHYS_IN_DMAP(pa),					\
 	    ("%s: PA out of range, PA: 0x%lx", __func__,		\
 	    (vm_paddr_t)(pa)));						\
-	((pa) - dmap_phys_base) + DMAP_MIN_ADDRESS;			\
+	(vm_pointer_t)_DMAP_BASE + ((pa) - dmap_phys_base);		\
 })
 
 #define	DMAP_TO_PHYS(va)						\
@@ -213,9 +202,8 @@
 	KASSERT(VIRT_IN_DMAP(va),					\
 	    ("%s: VA out of range, VA: 0x%lx", __func__,		\
 	    (vm_offset_t)(va)));					\
-	((va) - DMAP_MIN_ADDRESS) + dmap_phys_base;			\
+	dmap_phys_base + ((vm_offset_t)(va) - (ptraddr_t)_DMAP_BASE);	\
 })
-#endif
 
 #define	VM_MIN_USER_ADDRESS		(0x0000000000000000UL)
 #define	VM_MAX_USER_ADDRESS_SV39	(0x0000004000000000UL)
@@ -277,7 +265,7 @@ extern void *init_pt_va;
 #define	ZERO_REGION_SIZE	(64 * 1024)	/* 64KB */
 
 #define	DEVMAP_MAX_VADDR	VM_MAX_KERNEL_ADDRESS
-#define	PMAP_MAPDEV_EARLY_SIZE	(L2_SIZE * 2)
+#define	PMAP_MAPDEV_EARLY_SIZE	L2_SIZE
 
 /*
  * No non-transparent large page support in the pmap.
