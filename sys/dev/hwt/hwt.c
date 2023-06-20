@@ -525,7 +525,7 @@ hwt_alloc(void)
 
 	ctx = malloc(sizeof(struct hwt_context), M_HWT, M_WAITOK | M_ZERO);
 	LIST_INIT(&ctx->records);
-	mtx_init(&ctx->mtx_records, "hwt records", NULL, MTX_SPIN);
+	mtx_init(&ctx->mtx_records, "hwt records", NULL, MTX_DEF);
 
 	LIST_INIT(&ctx->threads);
 	mtx_init(&ctx->mtx_threads, "hwt threads", NULL, MTX_SPIN);
@@ -617,7 +617,7 @@ hwt_send_records(struct hwt_record_get *record_get, struct hwt_context *ctx)
 
 	i = 0;
 
-	mtx_lock_spin(&ctx->mtx_records);
+	mtx_lock(&ctx->mtx_records);
 	LIST_FOREACH_SAFE(entry, &ctx->records, next, entry1) {
 		user_entry[i].addr = entry->addr;
 		user_entry[i].size = entry->size;
@@ -637,7 +637,7 @@ hwt_send_records(struct hwt_record_get *record_get, struct hwt_context *ctx)
 		if (i == nitems_req)
 			break;
 	}
-	mtx_unlock_spin(&ctx->mtx_records);
+	mtx_unlock(&ctx->mtx_records);
 
 	if (i > 0) {
 		error = copyout(user_entry, record_get->records,
@@ -865,9 +865,9 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 	entry->record_type = HWT_RECORD_THREAD_CREATE;
 	entry->tid = thr->tid;
 
-	mtx_lock_spin(&ctx->mtx_records);
+	mtx_lock(&ctx->mtx_records);
 	LIST_INSERT_HEAD(&ctx->records, entry, next);
-	mtx_unlock_spin(&ctx->mtx_records);
+	mtx_unlock(&ctx->mtx_records);
 
 	return (0);
 }

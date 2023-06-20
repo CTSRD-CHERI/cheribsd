@@ -95,12 +95,13 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 	entry->tid = td->td_tid;
 
 	if (ent) {
+		KASSERT(ent->fullpath != NULL, ("fullpath is NULL"));
 		entry->fullpath = strdup(ent->fullpath, M_HWT);
 		entry->addr = ent->addr;
 		entry->size = ent->size;
 	}
 
-	mtx_lock_spin(&ctx->mtx_records);
+	mtx_lock(&ctx->mtx_records);
 	LIST_INSERT_HEAD(&ctx->records, entry, next);
-	mtx_unlock_spin(&ctx->mtx_records);
+	mtx_unlock(&ctx->mtx_records);
 }
