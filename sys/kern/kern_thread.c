@@ -807,10 +807,10 @@ thread_alloc(int pages)
 int
 thread_recycle(struct thread *td, int pages)
 {
+	thread_free_compartments(td2);
 	if (td->td_kstack == 0 || td->td_kstack_pages != pages) {
 		if (td->td_kstack != 0)
 			vm_thread_dispose(td);
-		thread_free_compartments(td2);
 		if (!vm_thread_new(td, pages))
 			return (ENOMEM);
 		cpu_thread_alloc(td);
