@@ -336,6 +336,18 @@ module_setspecific(module_t mod, modspecific_t *datap)
 	mod->data = *datap;
 }
 
+bool
+module_getpolicy(module_t mod)
+{
+
+	MOD_LOCK_ASSERT;
+
+	if (mod->file == NULL)
+		panic("module_getpolicy: missing file");
+
+	return (mod->file->compartment);
+}
+
 linker_file_t
 module_file(module_t mod)
 {
