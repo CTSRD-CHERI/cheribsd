@@ -73,23 +73,23 @@ struct hwt_owner {
 	LIST_ENTRY(hwt_owner)		next; /* Entry in hwt owner hash. */
 };
 
-struct hwt_backend_ops {
-	void (*hwt_event_init)(struct hwt_thread *);
-	void (*hwt_event_deinit)(void);
-	void (*hwt_event_configure)(struct hwt_thread *, int cpu_id);
-	void (*hwt_event_enable)(struct hwt_thread *, int cpu_id);
-	void (*hwt_event_disable)(struct hwt_thread *, int cpu_id);
-	int (*hwt_event_read)(struct hwt_thread *, int cpu_id,
-	    int *curpage, vm_offset_t *curpage_offset);
-
-	/* Debugging only. */
-	void (*hwt_event_dump)(struct hwt_thread *, int cpu_id);
-};
-
 struct hwt_backend {
 	const char			*name;
 	struct hwt_backend_ops		*ops;
 	LIST_ENTRY(hwt_backend)		next;
+};
+
+struct hwt_backend_ops {
+	void (*hwt_backend_init)(struct hwt_thread *);
+	void (*hwt_backend_deinit)(void);
+	void (*hwt_backend_configure)(struct hwt_thread *, int cpu_id);
+	void (*hwt_backend_enable)(struct hwt_thread *, int cpu_id);
+	void (*hwt_backend_disable)(struct hwt_thread *, int cpu_id);
+	int (*hwt_backend_read)(struct hwt_thread *, int cpu_id,
+	    int *curpage, vm_offset_t *curpage_offset);
+
+	/* Debugging only. */
+	void (*hwt_backend_dump)(struct hwt_thread *, int cpu_id);
 };
 
 int hwt_register(struct hwt_backend *);

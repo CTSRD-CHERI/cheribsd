@@ -96,7 +96,7 @@ static LIST_HEAD(, hwt_backend)	hwt_backends;
 #define	BACKEND_UNLOCK	mtx_unlock_spin(&hwt_backend_mtx)
 
 static int
-hwt_event_init(struct hwt_thread *thr)
+hwt_backend_init(struct hwt_thread *thr)
 {
 	struct hwt_context *ctx;
 
@@ -105,27 +105,27 @@ hwt_event_init(struct hwt_thread *thr)
 	ctx = thr->ctx;
 
 	BACKEND_LOCK;
-	ctx->hwt_backend->ops->hwt_event_init(thr);
+	ctx->hwt_backend->ops->hwt_backend_init(thr);
 	BACKEND_UNLOCK;
 
 	return (0);
 }
 
 static int
-hwt_event_deinit(struct hwt_context *ctx)
+hwt_backend_deinit(struct hwt_context *ctx)
 {
 
 	printf("%s\n", __func__);
 
 	BACKEND_LOCK;
-	ctx->hwt_backend->ops->hwt_event_deinit();
+	ctx->hwt_backend->ops->hwt_backend_deinit();
 	BACKEND_UNLOCK;
 
 	return (0);
 }
 
 static int
-hwt_event_configure(struct hwt_thread *thr, int cpu_id)
+hwt_backend_configure(struct hwt_thread *thr, int cpu_id)
 {
 	struct hwt_context *ctx;
 
@@ -134,14 +134,14 @@ hwt_event_configure(struct hwt_thread *thr, int cpu_id)
 	ctx = thr->ctx;
 
 	BACKEND_LOCK;
-	ctx->hwt_backend->ops->hwt_event_configure(thr, cpu_id);
+	ctx->hwt_backend->ops->hwt_backend_configure(thr, cpu_id);
 	BACKEND_UNLOCK;
 
 	return (0);
 }
 
 static int
-hwt_event_enable(struct hwt_thread *thr, int cpu_id)
+hwt_backend_enable(struct hwt_thread *thr, int cpu_id)
 {
 	struct hwt_context *ctx;
 
@@ -150,14 +150,14 @@ hwt_event_enable(struct hwt_thread *thr, int cpu_id)
 	ctx = thr->ctx;
 
 	BACKEND_LOCK;
-	ctx->hwt_backend->ops->hwt_event_enable(thr, cpu_id);
+	ctx->hwt_backend->ops->hwt_backend_enable(thr, cpu_id);
 	BACKEND_UNLOCK;
 
 	return (0);
 }
 
 static int
-hwt_event_disable(struct hwt_thread *thr, int cpu_id)
+hwt_backend_disable(struct hwt_thread *thr, int cpu_id)
 {
 	struct hwt_context *ctx;
 
@@ -166,14 +166,14 @@ hwt_event_disable(struct hwt_thread *thr, int cpu_id)
 	ctx = thr->ctx;
 
 	BACKEND_LOCK;
-	ctx->hwt_backend->ops->hwt_event_disable(thr, cpu_id);
+	ctx->hwt_backend->ops->hwt_backend_disable(thr, cpu_id);
 	BACKEND_UNLOCK;
 
 	return (0);
 }
 
 static int __unused
-hwt_event_dump(struct hwt_thread *thr, int cpu_id)
+hwt_backend_dump(struct hwt_thread *thr, int cpu_id)
 {
 	struct hwt_context *ctx;
 
@@ -182,14 +182,14 @@ hwt_event_dump(struct hwt_thread *thr, int cpu_id)
 	ctx = thr->ctx;
 
 	BACKEND_LOCK;
-	ctx->hwt_backend->ops->hwt_event_dump(thr, cpu_id);
+	ctx->hwt_backend->ops->hwt_backend_dump(thr, cpu_id);
 	BACKEND_UNLOCK;
 
 	return (0);
 }
 
 static int
-hwt_event_read(struct hwt_thread *thr, int *curpage,
+hwt_backend_read(struct hwt_thread *thr, int *curpage,
     vm_offset_t *curpage_offset)
 {
 	struct hwt_context *ctx;
@@ -200,7 +200,7 @@ hwt_event_read(struct hwt_thread *thr, int *curpage,
 	ctx = thr->ctx;
 
 	BACKEND_LOCK;
-	error = ctx->hwt_backend->ops->hwt_event_read(thr, 0, curpage,
+	error = ctx->hwt_backend->ops->hwt_backend_read(thr, 0, curpage,
 	    curpage_offset);
 	BACKEND_UNLOCK;
 
@@ -436,7 +436,7 @@ hwt_thread_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		if (ctx != thr->ctx)
 			return (ENXIO);
 
-		hwt_event_read(thr, &curpage, &curpage_offset);
+		hwt_backend_read(thr, &curpage, &curpage_offset);
 
 		error = copyout(&curpage, ptr_get->curpage, sizeof(int));
 		if (error)
@@ -861,7 +861,7 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 	LIST_INSERT_HEAD(&ctx->threads, thr, next);
 	mtx_unlock_spin(&ctx->mtx_threads);
 
-	error = hwt_event_init(thr);
+	error = hwt_backend_init(thr);
 	if (error)
 		return (error);
 
@@ -963,8 +963,8 @@ hwt_switch_in(struct thread *td)
 
 	dprintf("%s: thr %p on cpu_id %d\n", __func__, thr, cpu_id);
 
-	hwt_event_configure(thr, cpu_id);
-	hwt_event_enable(thr, cpu_id);
+	hwt_backend_configure(thr, cpu_id);
+	hwt_backend_enable(thr, cpu_id);
 }
 
 void
@@ -986,7 +986,7 @@ hwt_switch_out(struct thread *td)
 
 	dprintf("%s: thr %p on cpu_id %d\n", __func__, thr, cpu_id);
 
-	hwt_event_disable(thr, cpu_id);
+	hwt_backend_disable(thr, cpu_id);
 }
 
 static struct cdevsw hwt_cdevsw = {
@@ -1012,7 +1012,7 @@ hwt_stop_proc_hwts(struct hwt_contexthash *hch, struct proc *p)
 			printf("%s: stopping proc hwt\n", __func__);
 
 			LIST_REMOVE(ctx, next_hch);
-			hwt_event_deinit(ctx);
+			hwt_backend_deinit(ctx);
 
 			ctx->proc = NULL;
 		}
@@ -1054,7 +1054,7 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 			}
 
 			/* Stop it now on every CPU. */
-			hwt_event_deinit(ctx);
+			hwt_backend_deinit(ctx);
 
 			PROC_UNLOCK(p);
 			printf("pid %d stopped\n", ctx->pid);
