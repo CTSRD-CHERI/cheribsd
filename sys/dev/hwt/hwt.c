@@ -87,11 +87,13 @@ static struct mtx hwt_ownerhash_mtx;
 static u_long hwt_ownerhashmask;
 static LIST_HEAD(hwt_ownerhash, hwt_owner)	*hwt_ownerhash;
 
-static struct mtx hwt_backend_mtx;
-static LIST_HEAD(, hwt_backend)	hwt_backends;
-
 static eventhandler_tag hwt_exit_tag;
 static struct cdev *hwt_cdev;
+
+static struct mtx hwt_backend_mtx;
+static LIST_HEAD(, hwt_backend)	hwt_backends;
+#define	BACKEND_LOCK	mtx_lock_spin(&hwt_backend_mtx)
+#define	BACKEND_UNLOCK	mtx_unlock_spin(&hwt_backend_mtx)
 
 static int
 hwt_event_init(struct hwt_thread *thr)
@@ -101,7 +103,10 @@ hwt_event_init(struct hwt_thread *thr)
 	dprintf("%s\n", __func__);
 
 	ctx = thr->ctx;
+
+	BACKEND_LOCK;
 	ctx->hwt_backend->ops->hwt_event_init(thr);
+	BACKEND_UNLOCK;
 
 	return (0);
 }
@@ -112,9 +117,9 @@ hwt_event_deinit(struct hwt_context *ctx)
 
 	printf("%s\n", __func__);
 
-	mtx_lock_spin(&hwt_backend_mtx);
+	BACKEND_LOCK;
 	ctx->hwt_backend->ops->hwt_event_deinit();
-	mtx_unlock_spin(&hwt_backend_mtx);
+	BACKEND_UNLOCK;
 
 	return (0);
 }
@@ -128,9 +133,9 @@ hwt_event_configure(struct hwt_thread *thr, int cpu_id)
 
 	ctx = thr->ctx;
 
-	mtx_lock_spin(&hwt_backend_mtx);
+	BACKEND_LOCK;
 	ctx->hwt_backend->ops->hwt_event_configure(thr, cpu_id);
-	mtx_unlock_spin(&hwt_backend_mtx);
+	BACKEND_UNLOCK;
 
 	return (0);
 }
@@ -144,9 +149,9 @@ hwt_event_enable(struct hwt_thread *thr, int cpu_id)
 
 	ctx = thr->ctx;
 
-	mtx_lock_spin(&hwt_backend_mtx);
+	BACKEND_LOCK;
 	ctx->hwt_backend->ops->hwt_event_enable(thr, cpu_id);
-	mtx_unlock_spin(&hwt_backend_mtx);
+	BACKEND_UNLOCK;
 
 	return (0);
 }
@@ -160,9 +165,9 @@ hwt_event_disable(struct hwt_thread *thr, int cpu_id)
 
 	ctx = thr->ctx;
 
-	mtx_lock_spin(&hwt_backend_mtx);
+	BACKEND_LOCK;
 	ctx->hwt_backend->ops->hwt_event_disable(thr, cpu_id);
-	mtx_unlock_spin(&hwt_backend_mtx);
+	BACKEND_UNLOCK;
 
 	return (0);
 }
@@ -176,9 +181,9 @@ hwt_event_dump(struct hwt_thread *thr, int cpu_id)
 
 	ctx = thr->ctx;
 
-	mtx_lock_spin(&hwt_backend_mtx);
+	BACKEND_LOCK;
 	ctx->hwt_backend->ops->hwt_event_dump(thr, cpu_id);
-	mtx_unlock_spin(&hwt_backend_mtx);
+	BACKEND_UNLOCK;
 
 	return (0);
 }
@@ -194,10 +199,10 @@ hwt_event_read(struct hwt_thread *thr, int *curpage,
 
 	ctx = thr->ctx;
 
-	mtx_lock_spin(&hwt_backend_mtx);
+	BACKEND_LOCK;
 	error = ctx->hwt_backend->ops->hwt_event_read(thr, 0, curpage,
 	    curpage_offset);
-	mtx_unlock_spin(&hwt_backend_mtx);
+	BACKEND_UNLOCK;
 
 	return (error);
 }
@@ -207,14 +212,14 @@ hwt_lookup_backend(const char *name)
 {
 	struct hwt_backend *backend;
 
-	mtx_lock_spin(&hwt_backend_mtx);
+	BACKEND_LOCK;
 	LIST_FOREACH(backend, &hwt_backends, next) {
 		if (strcmp(backend->name, name) == 0) {
-			mtx_unlock_spin(&hwt_backend_mtx);
+			BACKEND_UNLOCK;
 			return (backend);
 		}
 	}
-	mtx_unlock_spin(&hwt_backend_mtx);
+	BACKEND_UNLOCK;
 
 	return (NULL);
 }
@@ -228,9 +233,9 @@ hwt_register(struct hwt_backend *backend)
 	    backend->ops == NULL)
 		return (EINVAL);
 
-	mtx_lock_spin(&hwt_backend_mtx);
+	BACKEND_LOCK;
 	LIST_INSERT_HEAD(&hwt_backends, backend, next);
-	mtx_unlock_spin(&hwt_backend_mtx);
+	BACKEND_UNLOCK;
 
 	return (0);
 }
