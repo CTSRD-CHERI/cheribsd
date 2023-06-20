@@ -28,6 +28,9 @@ device		cryptodev	# /dev/crypto to test zlib via crypto(9)
 # Don't compile in the zlib device
 nodevice	zlib
 
+# Enable compartmentalization by default
+options 	CHERI_COMPARTMENTALIZE_KERNEL
+
 # Make sure not compile in components that depend on contrib zlib code
 nooptions 	DDB_CTF		# Kernel ELF linker loads CTF data
 nooptions 	GEOM_UZIP	# Read-only compressed disks
