@@ -149,7 +149,7 @@ struct etm_config {
 	uint8_t excp_level;
 };
 
-static MALLOC_DEFINE(M_CORESIGHT, "coresight", "ARM Coresight");
+MALLOC_DECLARE(M_CORESIGHT);
 
 struct coresight_platform_data *coresight_fdt_get_platform_data(device_t dev);
 struct coresight_platform_data *coresight_acpi_get_platform_data(device_t dev);

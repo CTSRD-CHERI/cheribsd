@@ -31,8 +31,7 @@
 #ifndef _DEV_HWT_HWTVAR_H_
 #define _DEV_HWT_HWTVAR_H_
 
-#ifndef LOCORE
-static MALLOC_DEFINE(M_HWT, "hwt", "Hardware Trace");
+MALLOC_DECLARE(M_HWT);
 
 #define	HWT_LOCK(sc)			mtx_lock(&(sc)->mtx)
 #define	HWT_UNLOCK(sc)			mtx_unlock(&(sc)->mtx)
@@ -97,5 +96,4 @@ int hwt_thread_create(struct hwt_context *ctx, struct thread *td);
 
 struct hwt_context * hwt_lookup_contexthash(struct proc *p);
 
-#endif /* !LOCORE */
 #endif /* !_DEV_HWT_HWTVAR_H_ */

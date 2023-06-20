@@ -52,6 +52,8 @@
 #define	dprintf(fmt, ...)
 #endif
 
+MALLOC_DEFINE(M_CORESIGHT, "coresight", "ARM Coresight");
+
 static struct mtx cs_mtx;
 struct coresight_device_list cs_devs;
 static struct hwt_backend_ops coresight_ops;

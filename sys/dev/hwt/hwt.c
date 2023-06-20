@@ -70,6 +70,8 @@
 /* No real reason for this limitation except sanity checks. */
 #define	HWT_MAXBUFSIZE		(1U * 1024 * 1024 * 1024) /* 1 GB */
 
+MALLOC_DEFINE(M_HWT, "hwt", "Hardware Trace");
+
 /*
  * Hash function.  Discard the lower 2 bits of the pointer since
  * these are always zero for our uses.  The hash multiplier is
@@ -613,7 +615,7 @@ hwt_send_records(struct hwt_record_get *record_get, struct hwt_context *ctx)
 		return (ENXIO);
 
 	user_entry = malloc(sizeof(struct hwt_record_user_entry) * nitems_req,
-	    M_HWT, M_WAITOK);
+	    M_HWT, M_WAITOK | M_ZERO);
 
 	i = 0;
 
@@ -639,14 +641,12 @@ hwt_send_records(struct hwt_record_get *record_get, struct hwt_context *ctx)
 	}
 	mtx_unlock(&ctx->mtx_records);
 
-	if (i > 0) {
+	if (i > 0)
 		error = copyout(user_entry, record_get->records,
 		    sizeof(struct hwt_record_user_entry) * i);
-		if (error)
-			return (error);
-	}
 
-	error = copyout(&i, record_get->nentries, sizeof(int));
+	if (error == 0)
+		error = copyout(&i, record_get->nentries, sizeof(int));
 
 	free(user_entry, M_HWT);
 
@@ -1060,6 +1060,7 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 
 			hwt_destroy_buffers(thr);
 			destroy_dev_sched(thr->cdev);
+			free(thr, M_HWT);
 		}
 
 		free(ctx, M_HWT);

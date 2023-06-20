@@ -1291,9 +1291,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	int32_t osrel;
 	bool free_interp;
 	int error, i, n;
-#ifdef HWT_HOOKS
-	struct proc *p;
-#endif
 
 	hdr = (const Elf_Ehdr *)imgp->image_header;
 
@@ -1601,8 +1598,8 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	struct hwt_record_entry ent;
 	if (td->td_proc->p_flag2 & P2_HWT) {
 		ent.fullpath = imgp->execpath;
-		ent.addr = (uintptr_t) entry;
-		ent.size = (size_t) (imgp->end_addr - imgp->start_addr);
+		ent.addr = (uintptr_t)entry;
+		ent.size = (size_t)(imgp->end_addr - imgp->start_addr);
 		hwt_record(td, HWT_RECORD_EXECUTABLE, &ent);
 	}
 #endif
@@ -1626,11 +1623,11 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 #ifdef HWT_HOOKS
 		/* HWT: Record interp. */
 		struct hwt_record_entry ent;
-		p = td->td_proc;
-		if (p->p_flag2 & P2_HWT) {
+		if (td->td_proc->p_flag2 & P2_HWT) {
 			ent.fullpath = interp;
 			ent.addr = (uintptr_t)imgp->entry_addr;
-			ent.size = (size_t) (imgp->interp_end - imgp->interp_start);
+			ent.size = (size_t)(imgp->interp_end -
+			    imgp->interp_start);
 			hwt_record(td, HWT_RECORD_INTERP, &ent);
 		}
 #endif
