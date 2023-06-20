@@ -152,7 +152,7 @@ struct kaiocb {
 	volatile u_int refcount;
 	union {				/* Backend-specific data fields */
 		struct {		/* BIO backend */
-			int	nbio;	/* Number of remaining bios */
+			volatile u_int nbio; /* Number of remaining bios */
 			int	error;	/* Worst error of all bios */
 			long	nbytes;	/* Bytes completed so far */
 		};

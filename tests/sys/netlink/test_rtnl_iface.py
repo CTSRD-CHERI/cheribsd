@@ -17,6 +17,7 @@ from atf_python.sys.net.netlink import NlmBaseFlags
 from atf_python.sys.net.netlink import NlmNewFlags
 from atf_python.sys.net.netlink import NlMsgType
 from atf_python.sys.net.netlink import NlRtMsgType
+from atf_python.sys.net.netlink import rtnl_ifla_attrs
 from atf_python.sys.net.vnet import SingleVnetTestTemplate
 
 
@@ -90,6 +91,40 @@ class TestRtNlIface(NetlinkTestTemplate, SingleVnetTestTemplate):
         assert rx_msg.error_code == 0
 
         self.get_interface_byname("lo10")
+
+    @pytest.mark.require_user("root")
+    def test_create_iface_plain_retvals(self):
+        """Tests loopback creation w/o any parameters"""
+        flags = NlmNewFlags.NLM_F_EXCL.value | NlmNewFlags.NLM_F_CREATE.value
+        msg = NetlinkIflaMessage(self.helper, NlRtMsgType.RTM_NEWLINK.value)
+        msg.nl_hdr.nlmsg_flags = (
+            flags | NlmBaseFlags.NLM_F_ACK.value | NlmBaseFlags.NLM_F_REQUEST.value
+        )
+        msg.add_nla(NlAttrStr(IflattrType.IFLA_IFNAME, "lo10"))
+        msg.add_nla(
+            NlAttrNested(
+                IflattrType.IFLA_LINKINFO,
+                [
+                    NlAttrStrn(IflinkInfo.IFLA_INFO_KIND, "lo"),
+                ],
+            )
+        )
+
+        rx_msg = self.get_reply(msg)
+        assert rx_msg.is_type(NlMsgType.NLMSG_ERROR)
+        assert rx_msg.error_code == 0
+        assert rx_msg.cookie is not None
+        nla_list, _ = rx_msg.parse_attrs(bytes(rx_msg.cookie)[4:], rtnl_ifla_attrs)
+        nla_map = {n.nla_type: n for n in nla_list}
+        assert IflattrType.IFLA_IFNAME.value in nla_map
+        assert nla_map[IflattrType.IFLA_IFNAME.value].text == "lo10"
+        assert IflattrType.IFLA_NEW_IFINDEX.value in nla_map
+        assert nla_map[IflattrType.IFLA_NEW_IFINDEX.value].u32 > 0
+
+        lo_msg = self.get_interface_byname("lo10")
+        assert (
+            lo_msg.base_hdr.ifi_index == nla_map[IflattrType.IFLA_NEW_IFINDEX.value].u32
+        )
 
     @pytest.mark.require_user("root")
     def test_create_iface_attrs(self):
@@ -207,6 +242,67 @@ class TestRtNlIface(NetlinkTestTemplate, SingleVnetTestTemplate):
         assert rx_msg.is_type(NlMsgType.NLMSG_ERROR)
         assert rx_msg.error_code == errno.ENODEV
 
+    @pytest.mark.require_user("root")
+    def test_dump_ifaces_many(self):
+        """Tests if interface dummp is not missing interfaces"""
+
+        ifmap = {}
+        ifmap[socket.if_nametoindex("lo0")] = "lo0"
+
+        for i in range(40):
+            ifname = "lo{}".format(i + 1)
+            flags = NlmNewFlags.NLM_F_EXCL.value | NlmNewFlags.NLM_F_CREATE.value
+            msg = NetlinkIflaMessage(self.helper, NlRtMsgType.RTM_NEWLINK.value)
+            msg.nl_hdr.nlmsg_flags = (
+                flags | NlmBaseFlags.NLM_F_ACK.value | NlmBaseFlags.NLM_F_REQUEST.value
+            )
+            msg.add_nla(NlAttrStr(IflattrType.IFLA_IFNAME, ifname))
+            msg.add_nla(
+                NlAttrNested(
+                    IflattrType.IFLA_LINKINFO,
+                    [
+                        NlAttrStrn(IflinkInfo.IFLA_INFO_KIND, "lo"),
+                    ],
+                )
+            )
+
+            rx_msg = self.get_reply(msg)
+            assert rx_msg.is_type(NlMsgType.NLMSG_ERROR)
+            nla_list, _ = rx_msg.parse_attrs(bytes(rx_msg.cookie)[4:], rtnl_ifla_attrs)
+            nla_map = {n.nla_type: n for n in nla_list}
+            assert nla_map[IflattrType.IFLA_IFNAME.value].text == ifname
+            ifindex = nla_map[IflattrType.IFLA_NEW_IFINDEX.value].u32
+            assert ifindex > 0
+            assert ifindex not in ifmap
+            ifmap[ifindex] = ifname
+
+            # Dump all interfaces and check if the output matches ifmap
+            kernel_ifmap = {}
+            msg = NetlinkIflaMessage(self.helper, NlRtMsgType.RTM_GETLINK.value)
+            msg.nl_hdr.nlmsg_flags = (
+                NlmBaseFlags.NLM_F_ACK.value | NlmBaseFlags.NLM_F_REQUEST.value
+            )
+            self.write_message(msg)
+            while True:
+                rx_msg = self.read_message()
+                if msg.nl_hdr.nlmsg_seq != rx_msg.nl_hdr.nlmsg_seq:
+                    raise ValueError(
+                        "unexpected seq {}".format(rx_msg.nl_hdr.nlmsg_seq)
+                    )
+                if rx_msg.is_type(NlMsgType.NLMSG_ERROR):
+                    raise ValueError("unexpected message {}".format(rx_msg))
+                if rx_msg.is_type(NlMsgType.NLMSG_DONE):
+                    break
+                if not rx_msg.is_type(NlRtMsgType.RTM_NEWLINK):
+                    raise ValueError("unexpected message {}".format(rx_msg))
+
+                ifindex = rx_msg.base_hdr.ifi_index
+                assert ifindex == rx_msg.base_hdr.ifi_index
+                ifname = rx_msg.get_nla(IflattrType.IFLA_IFNAME).text
+                if ifname.startswith("lo"):
+                    kernel_ifmap[ifindex] = ifname
+            assert kernel_ifmap == ifmap
+
     #
     # *
     # * {len=76, type=RTM_NEWLINK, flags=NLM_F_REQUEST|NLM_F_ACK|NLM_F_EXCL|NLM_F_CREATE, seq=1662892737, pid=0},
@@ -217,7 +313,6 @@ class TestRtNlIface(NetlinkTestTemplate, SingleVnetTestTemplate):
     # *      {{nla_len=8, nla_type=IFLA_INFO_KIND}, "vlan"...},
     # *      {{nla_len=12, nla_type=IFLA_INFO_DATA}, "\x06\x00\x01\x00\x16\x00\x00\x00"}
     # */
-    @pytest.mark.skip(reason="vlan support needs more work")
     @pytest.mark.require_user("root")
     def test_create_vlan_plain(self):
         """Creates 802.1Q VLAN interface in vlanXX and ifX fashion"""

@@ -174,10 +174,13 @@ lkpi_lsta_remove(struct lkpi_sta *lsta, struct lkpi_vif *lvif)
 {
 	struct ieee80211_node *ni;
 
+	IMPROVE("XXX-BZ remove tqe_prev check once ni-sta-state-sync is fixed");
+
 	ni = lsta->ni;
 
 	LKPI_80211_LVIF_LOCK(lvif);
-	TAILQ_REMOVE(&lvif->lsta_head, lsta, lsta_entry);
+	if (lsta->lsta_entry.tqe_prev != NULL)
+		TAILQ_REMOVE(&lvif->lsta_head, lsta, lsta_entry);
 	LKPI_80211_LVIF_UNLOCK(lvif);
 
 	lsta->ni = NULL;
@@ -244,9 +247,11 @@ lkpi_lsta_alloc(struct ieee80211vap *vap, const uint8_t mac[IEEE80211_ADDR_LEN],
 			ltxq->txq.ac = tid_to_mac80211_ac[tid & 7];
 		}
 		ltxq->seen_dequeue = false;
+		ltxq->stopped = false;
 		ltxq->txq.vif = vif;
 		ltxq->txq.tid = tid;
 		ltxq->txq.sta = sta;
+		TAILQ_ELEM_INIT(ltxq, txq_entry);
 		skb_queue_head_init(&ltxq->skbq);
 		sta->txq[tid] = &ltxq->txq;
 	}
@@ -2276,6 +2281,9 @@ lkpi_ic_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ],
 			vif->hw_queue[i] = i;
 		else
 			vif->hw_queue[i] = 0;
+
+		/* Initialize the queue to running. Stopped? */
+		lvif->hw_queue_stopped[i] = false;
 	}
 	vif->cab_queue = IEEE80211_INVAL_HW_QUEUE;
 
@@ -4268,13 +4276,25 @@ linuxkpi_ieee80211_tx_dequeue(struct ieee80211_hw *hw,
     struct ieee80211_txq *txq)
 {
 	struct lkpi_txq *ltxq;
+	struct lkpi_vif *lvif;
 	struct sk_buff *skb;
 
+	skb = NULL;
 	ltxq = TXQ_TO_LTXQ(txq);
 	ltxq->seen_dequeue = true;
 
+	if (ltxq->stopped)
+		goto stopped;
+
+	lvif = VIF_TO_LVIF(ltxq->txq.vif);
+	if (lvif->hw_queue_stopped[ltxq->txq.ac]) {
+		ltxq->stopped = true;
+		goto stopped;
+	}
+
 	skb = skb_dequeue(&ltxq->skbq);
 
+stopped:
 	return (skb);
 }
 

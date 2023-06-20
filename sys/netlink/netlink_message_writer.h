@@ -124,17 +124,19 @@ nlattr_set_len(const struct nl_writer *nw, int off)
 static inline void *
 nlmsg_reserve_data_raw(struct nl_writer *nw, size_t sz)
 {
-        if (__predict_false(nw->offset + NETLINK_ALIGN(sz) > nw->alloc_len)) {
-		if (!nlmsg_refill_buffer(nw, NETLINK_ALIGN(sz)))
+	sz = NETLINK_ALIGN(sz);
+
+        if (__predict_false(nw->offset + sz > nw->alloc_len)) {
+		if (!nlmsg_refill_buffer(nw, sz))
 			return (NULL);
         }
 
         void *data_ptr = &nw->data[nw->offset];
-        nw->offset += NLMSG_ALIGN(sz);
+        nw->offset += sz;
 
         return (data_ptr);
 }
-#define nlmsg_reserve_object(_ns, _t)	((_t *)nlmsg_reserve_data_raw(_ns, NLA_ALIGN(sizeof(_t))))
+#define nlmsg_reserve_object(_ns, _t)	((_t *)nlmsg_reserve_data_raw(_ns, sizeof(_t)))
 #define nlmsg_reserve_data(_ns, _sz, _t)	((_t *)nlmsg_reserve_data_raw(_ns, _sz))
 
 static inline int
@@ -186,6 +188,16 @@ nlattr_add(struct nl_writer *nw, int attr_type, int attr_len, const void *data)
 	}
         nw->offset += required_len;
         return (true);
+}
+
+static inline bool
+nlattr_add_raw(struct nl_writer *nw, const struct nlattr *nla_src)
+{
+	int attr_len = nla_src->nla_len - sizeof(struct nlattr);
+
+	MPASS(attr_len >= 0);
+
+	return (nlattr_add(nw, nla_src->nla_type, attr_len, (const void *)(nla_src + 1)));
 }
 
 static inline bool

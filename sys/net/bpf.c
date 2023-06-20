@@ -1646,7 +1646,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 #endif
 		{
 			struct timeval *tv = (struct timeval *)addr;
-#if defined(COMPAT_FREEBSD32) && !defined(__mips__)
+#if defined(COMPAT_FREEBSD32)
 			struct timeval32 *tv32;
 			struct timeval tv64;
 
@@ -3159,12 +3159,27 @@ bpf_tap(struct bpf_if *bp, u_char *pkt, u_int pktlen)
 }
 
 void
+bpf_tap_if(if_t ifp, u_char *pkt, u_int pktlen)
+{
+}
+
+void
 bpf_mtap(struct bpf_if *bp, struct mbuf *m)
 {
 }
 
 void
+bpf_mtap_if(if_t ifp, struct mbuf *m)
+{
+}
+
+void
 bpf_mtap2(struct bpf_if *bp, void *d, u_int l, struct mbuf *m)
+{
+}
+
+void
+bpf_mtap2_if(if_t ifp, void *data, u_int dlen, struct mbuf *m)
 {
 }
 

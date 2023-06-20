@@ -215,10 +215,6 @@ The following are the options that dc(1) accepts.
 :   Makes dc(1) print all numbers greater than **-1** and less than **1**, and
     not equal to **0**, with a leading zero.
 
-    This can be set for individual numbers with the **plz(x)**, plznl(x)**,
-    **pnlz(x)**, and **pnlznl(x)** functions in the extended math library (see
-    the **LIBRARY** section).
-
     This is a **non-portable extension**.
 
 All long options are **non-portable extensions**.
@@ -918,6 +914,12 @@ other character produces a parse error (see the **ERRORS** section).
 :   Pushes the line length set by **DC_LINE_LENGTH** (see the **ENVIRONMENT
     VARIABLES** section) onto the stack.
 
+**gx**
+
+:   Pushes **1** onto the stack if extended register mode is on, **0**
+    otherwise. See the *Extended Register Mode* subsection of the **REGISTERS**
+    section for more information.
+
 **gz**
 
 :   Pushes **0** onto the stack if the leading zero setting has not been enabled
@@ -1336,8 +1338,8 @@ https://pubs.opengroup.org/onlinepubs/9699919799/utilities/bc.html .
 
 # BUGS
 
-None are known. Report bugs at https://git.yzena.com/gavin/bc .
+None are known. Report bugs at https://git.gavinhoward.com/gavin/bc .
 
 # AUTHOR
 
-Gavin D. Howard <gavin@yzena.com> and contributors.
+Gavin D. Howard <gavin@gavinhoward.com> and contributors.

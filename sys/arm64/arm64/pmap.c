@@ -1492,7 +1492,6 @@ pmap_init_pv_table(void)
 	struct pmap_large_md_page *pvd;
 	vm_size_t used_pvd;
 	vm_size_t s;
-	long start, highest;
 	int domain, i, j, pages;
 
 	/*
@@ -1524,19 +1523,14 @@ pmap_init_pv_table(void)
 	 * Iterate physical segments to allocate domain-local memory for PV
 	 * list headers.
 	 */
-	highest = -1;
-	s = 0;
+	pvd = pv_table;
 	for (i = 0; i < vm_phys_nsegs; i++) {
 		seg = &vm_phys_segs[i];
 		pages = pmap_l2_pindex(roundup2(seg->end, L2_SIZE)) -
 		    pmap_l2_pindex(seg->start);
 		domain = seg->domain;
 
-		start = highest + 1;
-		pvd = &pv_table[start];
-
 		s = round_page(pages * sizeof(*pvd));
-		highest = start + (s / sizeof(*pvd)) - 1;
 
 		for (j = 0; j < s; j += PAGE_SIZE) {
 			vm_page_t m = vm_page_alloc_noobj_domain(domain,

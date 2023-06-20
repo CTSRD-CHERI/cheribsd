@@ -31,6 +31,7 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
+#include <sys/jail.h>
 #include <sys/kernel.h>
 #include <sys/kobj.h>
 #include <sys/lock.h>
@@ -73,8 +74,9 @@ static struct syscall_helper_data gssd32_syscalls[] = {
 #endif
 
 struct kgss_mech_list kgss_mechs;
-CLIENT *kgss_gssd_handle;
 struct mtx kgss_gssd_lock;
+
+KGSS_VNET_DEFINE(CLIENT *, kgss_gssd_handle) = NULL;
 
 static int	kern_gssd_syscall(struct thread *td,
 		    const char * __capability upath);
@@ -164,10 +166,12 @@ kern_gssd_syscall(struct thread *td, const char * __capability upath)
 	} else
 		cl = NULL;
 
+	KGSS_CURVNET_SET_QUIET(KGSS_TD_TO_VNET(curthread));
 	mtx_lock(&kgss_gssd_lock);
-	oldcl = kgss_gssd_handle;
-	kgss_gssd_handle = cl;
+	oldcl = KGSS_VNET(kgss_gssd_handle);
+	KGSS_VNET(kgss_gssd_handle) = cl;
 	mtx_unlock(&kgss_gssd_lock);
+	KGSS_CURVNET_RESTORE();
 
 	if (oldcl != NULL) {
 		CLNT_CLOSE(oldcl);
@@ -279,12 +283,16 @@ kgss_transfer_context(gss_ctx_id_t ctx)
 	enum clnt_stat stat;
 	OM_uint32 maj_stat;
 
-	if (!kgss_gssd_handle)
+	KGSS_CURVNET_SET_QUIET(KGSS_TD_TO_VNET(curthread));
+	if (!KGSS_VNET(kgss_gssd_handle)) {
+		KGSS_CURVNET_RESTORE();
 		return (GSS_S_FAILURE);
+	}
 
 	args.ctx = ctx->handle;
 	bzero(&res, sizeof(res));
-	stat = gssd_export_sec_context_1(&args, &res, kgss_gssd_handle);
+	stat = gssd_export_sec_context_1(&args, &res, KGSS_VNET(kgss_gssd_handle));
+	KGSS_CURVNET_RESTORE();
 	if (stat != RPC_SUCCESS) {
 		return (GSS_S_FAILURE);
 	}
@@ -318,11 +326,13 @@ kgss_gssd_client(void)
 {
 	CLIENT *cl;
 
+	KGSS_CURVNET_SET_QUIET(KGSS_TD_TO_VNET(curthread));
 	mtx_lock(&kgss_gssd_lock);
-	cl = kgss_gssd_handle;
+	cl = KGSS_VNET(kgss_gssd_handle);
 	if (cl != NULL)
 		CLNT_ACQUIRE(cl);
 	mtx_unlock(&kgss_gssd_lock);
+	KGSS_CURVNET_RESTORE();
 	return (cl);
 }
 

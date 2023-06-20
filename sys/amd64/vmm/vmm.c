@@ -254,7 +254,6 @@ DEFINE_VMMOPS_IFUNC(void, vmspace_free, (struct vmspace *vmspace))
 DEFINE_VMMOPS_IFUNC(struct vlapic *, vlapic_init, (void *vcpui))
 DEFINE_VMMOPS_IFUNC(void, vlapic_cleanup, (struct vlapic *vlapic))
 #ifdef BHYVE_SNAPSHOT
-DEFINE_VMMOPS_IFUNC(int, snapshot, (void *vmi, struct vm_snapshot_meta *meta))
 DEFINE_VMMOPS_IFUNC(int, vcpu_snapshot, (void *vcpui,
     struct vm_snapshot_meta *meta))
 DEFINE_VMMOPS_IFUNC(int, restore_tsc, (void *vcpui, uint64_t now))
@@ -1930,10 +1929,8 @@ restart:
 	 * VM_EXITCODE_INST_EMUL could access the apic which could transform the
 	 * exit code into VM_EXITCODE_IPI.
 	 */
-	if (error == 0 && vme->exitcode == VM_EXITCODE_IPI) {
-		retu = false;
+	if (error == 0 && vme->exitcode == VM_EXITCODE_IPI)
 		error = vm_handle_ipi(vcpu, vme, &retu);
-	}
 
 	if (error == 0 && retu == false)
 		goto restart;
@@ -2861,6 +2858,8 @@ vm_snapshot_vcpus(struct vm *vm, struct vm_snapshot_meta *meta)
 		 */
 		tsc = now + vcpu->tsc_offset;
 		SNAPSHOT_VAR_OR_LEAVE(tsc, meta, ret, done);
+		if (meta->op == VM_SNAPSHOT_RESTORE)
+			vcpu->tsc_offset = tsc;
 	}
 
 done:
@@ -2917,9 +2916,6 @@ vm_snapshot_req(struct vm *vm, struct vm_snapshot_meta *meta)
 	int ret = 0;
 
 	switch (meta->dev_req) {
-	case STRUCT_VMX:
-		ret = vmmops_snapshot(vm->cookie, meta);
-		break;
 	case STRUCT_VMCX:
 		ret = vm_snapshot_vcpu(vm, meta);
 		break;

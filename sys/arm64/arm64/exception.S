@@ -41,45 +41,44 @@ __FBSDID("$FreeBSD$");
 .macro	save_registers_head el
 .if \el == 1
 	mov	PTR(18), PTRN(sp)
-	sub	PTRN(sp), PTRN(sp), #128
+	stp	CAP(0),  CAP(1),  [PTRN(sp), #(TF_X - TF_SIZE - 128)]!
+.else
+	stp	CAP(0),  CAP(1),  [PTRN(sp), #(TF_X - TF_SIZE)]!
 .endif
-	sub	PTRN(sp), PTRN(sp), #(TF_SIZE)
-	stp	CAP(28), CAP(29), [PTRN(sp), #(TF_X + 28 * CAP_WIDTH)]
-	stp	CAP(26), CAP(27), [PTRN(sp), #(TF_X + 26 * CAP_WIDTH)]
-	stp	CAP(24), CAP(25), [PTRN(sp), #(TF_X + 24 * CAP_WIDTH)]
-	stp	CAP(22), CAP(23), [PTRN(sp), #(TF_X + 22 * CAP_WIDTH)]
-	stp	CAP(20), CAP(21), [PTRN(sp), #(TF_X + 20 * CAP_WIDTH)]
-	stp	CAP(18), CAP(19), [PTRN(sp), #(TF_X + 18 * CAP_WIDTH)]
-	stp	CAP(16), CAP(17), [PTRN(sp), #(TF_X + 16 * CAP_WIDTH)]
-	stp	CAP(14), CAP(15), [PTRN(sp), #(TF_X + 14 * CAP_WIDTH)]
-	stp	CAP(12), CAP(13), [PTRN(sp), #(TF_X + 12 * CAP_WIDTH)]
-	stp	CAP(10), CAP(11), [PTRN(sp), #(TF_X + 10 * CAP_WIDTH)]
-	stp	CAP(8),  CAP(9),  [PTRN(sp), #(TF_X + 8  * CAP_WIDTH)]
-	stp	CAP(6),  CAP(7),  [PTRN(sp), #(TF_X + 6  * CAP_WIDTH)]
-	stp	CAP(4),  CAP(5),  [PTRN(sp), #(TF_X + 4  * CAP_WIDTH)]
-	stp	CAP(2),  CAP(3),  [PTRN(sp), #(TF_X + 2  * CAP_WIDTH)]
-	stp	CAP(0),  CAP(1),  [PTRN(sp), #(TF_X + 0  * CAP_WIDTH)]
+	stp	CAP(2),  CAP(3),  [PTRN(sp), #(2  * CAP_WIDTH)]
+	stp	CAP(4),  CAP(5),  [PTRN(sp), #(4  * CAP_WIDTH)]
+	stp	CAP(6),  CAP(7),  [PTRN(sp), #(6  * CAP_WIDTH)]
+	stp	CAP(8),  CAP(9),  [PTRN(sp), #(8  * CAP_WIDTH)]
+	stp	CAP(10), CAP(11), [PTRN(sp), #(10 * CAP_WIDTH)]
+	stp	CAP(12), CAP(13), [PTRN(sp), #(12 * CAP_WIDTH)]
+	stp	CAP(14), CAP(15), [PTRN(sp), #(14 * CAP_WIDTH)]
+	stp	CAP(16), CAP(17), [PTRN(sp), #(16 * CAP_WIDTH)]
+	stp	CAP(18), CAP(19), [PTRN(sp), #(18 * CAP_WIDTH)]
+	stp	CAP(20), CAP(21), [PTRN(sp), #(20 * CAP_WIDTH)]
+	stp	CAP(22), CAP(23), [PTRN(sp), #(22 * CAP_WIDTH)]
+	stp	CAP(24), CAP(25), [PTRN(sp), #(24 * CAP_WIDTH)]
+	stp	CAP(26), CAP(27), [PTRN(sp), #(26 * CAP_WIDTH)]
+	stp	CAP(28), CAP(29), [PTRN(sp), #(28 * CAP_WIDTH)]
+.if \el == 0
+	mrs	CAP(18), CAPN(sp_el0)
+.endif
 #if __has_feature(capabilities)
 	mrs	c9, ddc_el0
 #endif
 	mrs	CAP(10), CAPN(elr_el1)
 	mrs	x11, spsr_el1
 	mrs	x12, esr_el1
-.if \el == 0
-	mrs	CAP(18), CAPN(sp_el0)
-.endif
+	stp	CAP(18), CAPN(lr), [PTRN(sp), #(TF_SP - TF_X)]!
 #if __has_feature(capabilities)
 	stp	c10, c9, [PTRN(sp), #(TF_ELR)]
 #else
 	str	x10, [sp, #(TF_ELR)]
 #endif
 	stp	w11, w12, [PTRN(sp), #(TF_SPSR)]
-	stp	CAP(18), CAPN(lr), [PTRN(sp), #(TF_SP)]
 	mrs	PTR(18), PTRN(tpidr_el1)
 .endm
 
 .macro	save_registers el
-	add	PTR(29), PTRN(sp), #(TF_SIZE)
 .if \el == 0
 #if defined(PERTHREAD_SSP)
 	/* Load the SSP canary to sp_el0 */

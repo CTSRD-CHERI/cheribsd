@@ -40,6 +40,12 @@
 #include <sys/uio.h>
 #include <sys/vnode.h>
 
+#if defined(ZSTDIO)
+#define TARFS_ZIO 1
+#else
+#undef TARFS_ZIO
+#endif
+
 #ifdef ZSTDIO
 #define ZSTD_STATIC_LINKING_ONLY
 #include <contrib/zstd/lib/zstd.h>
@@ -213,6 +219,7 @@ static ZSTD_customMem tarfs_zstd_mem = {
 };
 #endif
 
+#ifdef TARFS_ZIO
 /*
  * Updates the decompression frame index, recording the current input and
  * output offsets in a new index entry, and growing the index if
@@ -239,6 +246,7 @@ tarfs_zio_update_index(struct tarfs_zio *zio, off_t i, off_t o)
 	MPASS(zio->idx[zio->curidx].i == i);
 	MPASS(zio->idx[zio->curidx].o == o);
 }
+#endif
 
 /*
  * VOP_ACCESS for zio node.
@@ -382,7 +390,7 @@ tarfs_zread_zstd(struct tarfs_zio *zio, struct uio *uiop)
 	if (uiop->uio_segflg == UIO_SYSSPACE) {
 		zob.dst = (__cheri_fromcap void *)uiop->uio_iov->iov_base;
 	} else {
-		TARFS_DPF(ALLOC, "%s: allocating %zu-byte bounce buffer\n",
+		TARFS_DPF(BOUNCE, "%s: allocating %zu-byte bounce buffer\n",
 		    __func__, len);
 		zob.dst = obuf = malloc(len, M_TEMP, M_WAITOK);
 	}
@@ -478,7 +486,7 @@ fail_unlocked:
 		if (uiop->uio_segflg == UIO_SYSSPACE) {
 			uiop->uio_resid = resid;
 		} else if (len > resid) {
-			TARFS_DPF(ALLOC, "%s: bounced %zu bytes\n", __func__,
+			TARFS_DPF(BOUNCE, "%s: bounced %zu bytes\n", __func__,
 			    len - resid);
 			error = uiomove(obuf, len - resid, uiop);
 #ifdef TARFS_DEBUG
@@ -487,7 +495,7 @@ fail_unlocked:
 		}
 	}
 	if (obuf != NULL) {
-		TARFS_DPF(ALLOC, "%s: freeing bounce buffer\n", __func__);
+		TARFS_DPF(BOUNCE, "%s: freeing bounce buffer\n", __func__);
 		free(obuf, M_TEMP);
 	}
 	if (rl != NULL)
@@ -549,8 +557,6 @@ tarfs_zreclaim(struct vop_reclaim_args *ap)
 
 	TARFS_DPF(ZIO, "%s(%p)\n", __func__, vp);
 	vp->v_data = NULL;
-	vnode_destroy_vobject(vp);
-	cache_purge(vp);
 	return (0);
 }
 
@@ -599,6 +605,7 @@ static struct vop_vector tarfs_znodeops = {
 };
 VFS_VOP_VECTOR_REGISTER(tarfs_znodeops);
 
+#ifdef TARFS_ZIO
 /*
  * Initializes the decompression layer.
  */
@@ -620,7 +627,7 @@ tarfs_zio_init(struct tarfs_mount *tmp, off_t i, off_t o)
 	zio->idx[zio->curidx].o = zio->opos = o;
 	tmp->zio = zio;
 	TARFS_DPF(ALLOC, "%s: allocated zio index\n", __func__);
-	getnewvnode("tarfsz", tmp->vfs, &tarfs_znodeops, &zvp);
+	(void)getnewvnode("tarfsz", tmp->vfs, &tarfs_znodeops, &zvp);
 	zvp->v_data = zio;
 	zvp->v_type = VREG;
 	zvp->v_mount = tmp->vfs;
@@ -629,6 +636,7 @@ tarfs_zio_init(struct tarfs_mount *tmp, off_t i, off_t o)
 	TARFS_DPF(ZIO, "%s: created zio node\n", __func__);
 	return (zio);
 }
+#endif
 
 /*
  * Initializes the I/O layer, including decompression if the signature of
@@ -639,7 +647,7 @@ int
 tarfs_io_init(struct tarfs_mount *tmp)
 {
 	uint8_t *block;
-#ifdef ZSTDIO
+#ifdef TARFS_ZIO
 	struct tarfs_zio *zio = NULL;
 #endif
 	ssize_t res;
@@ -675,6 +683,7 @@ bad:
 	return (error);
 }
 
+#ifdef TARFS_ZIO
 /*
  * Tears down the decompression layer.
  */
@@ -711,6 +720,7 @@ tarfs_zio_fini(struct tarfs_mount *tmp)
 	tmp->zio = NULL;
 	return (error);
 }
+#endif
 
 /*
  * Tears down the I/O layer, including the decompression layer if
@@ -721,8 +731,10 @@ tarfs_io_fini(struct tarfs_mount *tmp)
 {
 	int error = 0;
 
+#ifdef TARFS_ZIO
 	if (tmp->zio != NULL) {
 		error = tarfs_zio_fini(tmp);
 	}
+#endif
 	return (error);
 }

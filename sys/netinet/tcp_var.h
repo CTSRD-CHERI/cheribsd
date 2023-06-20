@@ -127,20 +127,27 @@ struct sackhint {
 STAILQ_HEAD(tcp_log_stailq, tcp_log_mem);
 
 typedef enum {
-	TT_DELACK = 0,
-	TT_REXMT,
+	TT_REXMT = 0,
 	TT_PERSIST,
 	TT_KEEP,
 	TT_2MSL,
+	TT_DELACK,
 	TT_N,
 } tt_which;
+
+typedef enum {
+	TT_PROCESSING = 0,
+	TT_PROCESSED,
+	TT_STARTING,
+	TT_STOPPING,
+} tt_what;
 
 /*
  * Tcp control block, one per tcp connection.
  */
 struct tcpcb {
 	struct inpcb t_inpcb __subobject_member_used_for_c_inheritance;
-					/* embedded protocol indepenent cb */
+					/* embedded protocol independent cb */
 #define	t_start_zero	t_fb
 #define	t_zero_size	(sizeof(struct tcpcb) - \
 			    offsetof(struct tcpcb, t_start_zero))
@@ -210,6 +217,9 @@ struct tcpcb {
 	tcp_seq	snd_recover;		/* for use in NewReno Fast Recovery */
 	char	t_oobflags;		/* have some */
 	char	t_iobc;			/* input character */
+	uint8_t t_nic_ktls_xmit:1,	/* active nic ktls xmit sessions */
+		t_nic_ktls_xmit_dis:1,	/* disabled nic xmit ktls? */
+		t_nic_ktls_spare:6;	/* spare nic ktls */
 	int	t_rxtcur;		/* current retransmit value (ticks) */
 
 	int	t_rxtshift;		/* log(2) of rexmt exp. backoff */
@@ -1190,7 +1200,6 @@ void	 tcpip_fillheaders(struct inpcb *, uint16_t, void *, void *);
 void	 tcp_timer_activate(struct tcpcb *, tt_which, u_int);
 bool	 tcp_timer_active(struct tcpcb *, tt_which);
 void	 tcp_timer_stop(struct tcpcb *);
-void	 tcp_trace(short, short, struct tcpcb *, void *, struct tcphdr *, int);
 int	 inp_to_cpuid(struct inpcb *inp);
 /*
  * All tcp_hc_* functions are IPv4 and IPv6 (via in_conninfo)
@@ -1275,7 +1284,7 @@ tcp_set_flags(struct tcphdr *th, uint16_t flags)
 
 static inline void
 tcp_account_for_send(struct tcpcb *tp, uint32_t len, uint8_t is_rxt,
-    uint8_t is_tlp, int hw_tls)
+    uint8_t is_tlp, bool hw_tls)
 {
 	if (is_tlp) {
 		tp->t_sndtlppack++;

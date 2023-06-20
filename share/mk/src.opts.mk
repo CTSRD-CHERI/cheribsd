@@ -59,7 +59,6 @@ __DEFAULT_YES_OPTIONS = \
     ACPI \
     APM \
     AT \
-    ATM \
     AUDIT \
     AUTHPF \
     AUTOFS \
@@ -96,7 +95,6 @@ __DEFAULT_YES_OPTIONS = \
     EFI \
     ELFTOOLCHAIN_BOOTSTRAP \
     EXAMPLES \
-    FDT \
     FILE \
     FINGER \
     FLOPPY \
@@ -145,7 +143,6 @@ __DEFAULT_YES_OPTIONS = \
     MAILWRAPPER \
     MAKE \
     MLX5TOOL \
-    NDIS \
     NETCAT \
     NETGRAPH \
     NLS_CATALOGS \
@@ -302,6 +299,12 @@ BROKEN_OPTIONS+=CLANG LLD LLDB CLANG_BOOTSTRAP LLD_BOOTSTRAP
 BROKEN_OPTIONS+=OFED
 .endif
 
+.if ${__T} == "i386" || ${__T} == "amd64"
+__DEFAULT_NO_OPTIONS += FDT
+.else
+__DEFAULT_YES_OPTIONS += FDT
+.endif
+
 .if ${__T:Marm*} == "" && ${__T:Mriscv64*} == ""
 __DEFAULT_YES_OPTIONS+=LLDB
 .else
@@ -360,8 +363,8 @@ BROKEN_OPTIONS+=LOADER_UBOOT
 BROKEN_OPTIONS+=LOADER_GELI LOADER_LUA
 .endif
 
-# Kernel TLS is enabled by default on amd64 and aarch64
-.if ${__T:Maarch64*} || ${__T} == "amd64"
+# Kernel TLS is enabled by default on amd64, aarch64 and powerpc64*
+.if ${__T:Maarch64*} || ${__T} == "amd64" || ${__T:Mpowerpc64*} != ""
 __DEFAULT_YES_OPTIONS+=OPENSSL_KTLS
 .else
 __DEFAULT_NO_OPTIONS+=OPENSSL_KTLS
@@ -413,6 +416,16 @@ __DEFAULT_NO_OPTIONS+=OPENMP
 # XXX: Not yet ported for purecap
 .if ${__T} == "aarch64c" || ${__T:Mriscv*c*}
 BROKEN_OPTIONS+=OPENMP
+.endif
+
+# Broken on 32-bit arm, kernel module compile errors
+.if ${__T:Marm*} != ""
+BROKEN_OPTIONS+= OFED
+.endif
+
+# ZFS is broken on 32-bit powerpc (missing atomics), but works on 64-bit
+.if ${__T} == "powerpc" || ${__T} == "powerpcspe"
+BROKEN_OPTIONS+= ZFS LOADER_ZFS
 .endif
 
 .include <bsd.mkopt.mk>
@@ -470,7 +483,6 @@ MK_DMAGENT:=	no
 .endif
 
 .if ${MK_NETGRAPH} == "no"
-MK_ATM:=	no
 MK_BLUETOOTH:=	no
 .endif
 
@@ -486,6 +498,7 @@ MK_KERBEROS:=	no
 MK_KERBEROS_SUPPORT:=	no
 MK_LDNS:=	no
 MK_PKGBOOTSTRAP:=	no
+MK_LOADER_ZFS:=	no
 MK_ZFS:=	no
 .endif
 

@@ -165,6 +165,7 @@ tarfs_getattr(struct vop_getattr_args *ap)
 static int
 tarfs_lookup(struct vop_cachedlookup_args *ap)
 {
+	struct tarfs_mount *tmp;
 	struct tarfs_node *dirnode, *parent, *tnp;
 	struct componentname *cnp;
 	struct vnode *dvp, **vpp;
@@ -180,6 +181,7 @@ tarfs_lookup(struct vop_cachedlookup_args *ap)
 	*vpp = NULLVP;
 	dirnode = VP_TO_TARFS_NODE(dvp);
 	parent = dirnode->parent;
+	tmp = dirnode->tmp;
 	tnp = NULL;
 
 	TARFS_DPF(LOOKUP, "%s(%p=%s, %.*s)\n", __func__,
@@ -228,7 +230,7 @@ tarfs_lookup(struct vop_cachedlookup_args *ap)
 		    (tnp->type != VDIR && tnp->type != VLNK))
 			return (ENOTDIR);
 
-		error = vn_vget_ino(dvp, tnp->ino, cnp->cn_lkflags, vpp);
+		error = VFS_VGET(tmp->vfs, tnp->ino, cnp->cn_lkflags, vpp);
 		if (error != 0)
 			return (error);
 	}
@@ -250,7 +252,7 @@ tarfs_lookup(struct vop_cachedlookup_args *ap)
 static int
 tarfs_readdir(struct vop_readdir_args *ap)
 {
-	struct dirent cde;
+	struct dirent cde = { };
 	struct tarfs_node *current, *tnp;
 	struct vnode *vp;
 	struct uio *uio;
@@ -294,6 +296,7 @@ tarfs_readdir(struct vop_readdir_args *ap)
 		cde.d_reclen = GENERIC_DIRSIZ(&cde);
 		if (cde.d_reclen > uio->uio_resid)
 			goto full;
+		dirent_terminate(&cde);
 		error = uiomove(&cde, cde.d_reclen, uio);
 		if (error)
 			return (error);
@@ -317,6 +320,7 @@ tarfs_readdir(struct vop_readdir_args *ap)
 		cde.d_reclen = GENERIC_DIRSIZ(&cde);
 		if (cde.d_reclen > uio->uio_resid)
 			goto full;
+		dirent_terminate(&cde);
 		error = uiomove(&cde, cde.d_reclen, uio);
 		if (error)
 			return (error);
@@ -374,6 +378,7 @@ tarfs_readdir(struct vop_readdir_args *ap)
 		cde.d_reclen = GENERIC_DIRSIZ(&cde);
 		if (cde.d_reclen > uio->uio_resid)
 			goto full;
+		dirent_terminate(&cde);
 		error = uiomove(&cde, cde.d_reclen, uio);
 		if (error != 0)
 			goto done;
@@ -521,8 +526,6 @@ tarfs_reclaim(struct vop_reclaim_args *ap)
 	tnp = VP_TO_TARFS_NODE(vp);
 
 	vfs_hash_remove(vp);
-	vnode_destroy_vobject(vp);
-	cache_purge(vp);
 
 	TARFS_NODE_LOCK(tnp);
 	tnp->vnode = NULLVP;

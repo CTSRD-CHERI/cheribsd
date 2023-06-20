@@ -72,7 +72,7 @@ modify_generic(struct ifnet *ifp, struct nl_parsed_link *lattrs,
 	if (lattrs->ifla_ifalias != NULL) {
 		if (nlp_has_priv(nlp, PRIV_NET_SETIFDESCR)) {
 			int len = strlen(lattrs->ifla_ifalias) + 1;
-			char *buf = if_allocdescr(len, true);
+			char *buf = if_allocdescr(len, M_WAITOK);
 
 			memcpy(buf, lattrs->ifla_ifalias, len);
 			if_setdescr(ifp, buf);
@@ -110,19 +110,48 @@ modify_generic(struct ifnet *ifp, struct nl_parsed_link *lattrs,
 }
 
 /*
- * Generic creation interface handler.
- * Responsible for creating interfaces w/o parameters and setting
- * misc attributes such as state, mtu or description.
+ * Saves the resulting ifindex and ifname to report them
+ *  to userland along with the operation result.
+ * NLA format:
+ * NLMSGERR_ATTR_COOKIE(nested)
+ *  IFLA_NEW_IFINDEX(u32)
+ *  IFLA_IFNAME(string)
  */
+static void
+store_cookie(struct nl_pstate *npt, struct ifnet *ifp)
+{
+	int ifname_len = strlen(if_name(ifp));
+	uint32_t ifindex = (uint32_t)ifp->if_index;
+
+	int nla_len = sizeof(struct nlattr) * 3 +
+		sizeof(ifindex) + NL_ITEM_ALIGN(ifname_len + 1);
+	struct nlattr *nla_cookie = npt_alloc(npt, nla_len);
+
+	/* Nested TLV */
+	nla_cookie->nla_len = nla_len;
+	nla_cookie->nla_type = NLMSGERR_ATTR_COOKIE;
+
+	struct nlattr *nla = nla_cookie + 1;
+	nla->nla_len = sizeof(struct nlattr) + sizeof(ifindex);
+	nla->nla_type = IFLA_NEW_IFINDEX;
+	memcpy(NLA_DATA(nla), &ifindex, sizeof(ifindex));
+
+	nla = NLA_NEXT(nla);
+	nla->nla_len = sizeof(struct nlattr) + ifname_len + 1;
+	nla->nla_type = IFLA_IFNAME;
+	strlcpy(NLA_DATA(nla), if_name(ifp), ifname_len + 1);
+
+	nlmsg_report_cookie(npt, nla_cookie);
+}
+
 static int
-create_generic(struct nl_parsed_link *lattrs, const struct nlattr_bmask *bm,
-    struct nlpcb *nlp, struct nl_pstate *npt)
+create_generic_ifd(struct nl_parsed_link *lattrs, const struct nlattr_bmask *bm,
+    struct ifc_data *ifd, struct nlpcb *nlp, struct nl_pstate *npt)
 {
 	int error = 0;
 
-	struct ifc_data ifd = {};
 	struct ifnet *ifp = NULL;
-	error = ifc_create_ifp(lattrs->ifla_ifname, &ifd, &ifp);
+	error = ifc_create_ifp(lattrs->ifla_ifname, ifd, &ifp);
 
 	NLP_LOG(LOG_DEBUG2, nlp, "clone for %s returned %d", lattrs->ifla_ifname, error);
 
@@ -135,10 +164,25 @@ create_generic(struct nl_parsed_link *lattrs, const struct nlattr_bmask *bm,
 		if (!success)
 			return (EINVAL);
 		error = modify_generic(ifp, lattrs, bm, nlp, npt);
+		if (error == 0)
+			store_cookie(npt, ifp);
 		if_rele(ifp);
 	}
 
 	return (error);
+}
+/*
+ * Generic creation interface handler.
+ * Responsible for creating interfaces w/o parameters and setting
+ * misc attributes such as state, mtu or description.
+ */
+static int
+create_generic(struct nl_parsed_link *lattrs, const struct nlattr_bmask *bm,
+    struct nlpcb *nlp, struct nl_pstate *npt)
+{
+	struct ifc_data ifd = {};
+
+	return (create_generic_ifd(lattrs, bm, &ifd, nlp, npt));
 }
 
 struct nl_cloner generic_cloner = {
@@ -221,17 +265,14 @@ create_vlan(struct nl_parsed_link *lattrs, const struct nlattr_bmask *bm,
 		return (ENOENT);
 	}
 
-	/* Waiting till if_clone changes lands */
-/*
 	struct vlanreq params = {
 		.vlr_tag = attrs.vlan_id,
 		.vlr_proto = attrs.vlan_proto,
 	};
-*/
-	int ifname_len = strlen(lattrs->ifla_ifname) + 1;
-	error = if_clone_create(lattrs->ifla_ifname, ifname_len, NULL);
+	strlcpy(params.vlr_parent, if_name(ifp), sizeof(params.vlr_parent));
+	struct ifc_data ifd = { .flags = IFC_F_SYSSPACE, .params = &params };
 
-	NLP_LOG(LOG_DEBUG2, nlp, "clone for %s returned %d", lattrs->ifla_ifname, error);
+	error = create_generic_ifd(lattrs, bm, &ifd, nlp, npt);
 
 	if_rele(ifp);
 	return (error);

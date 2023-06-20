@@ -31,11 +31,17 @@
             ..
             __coroutine
             ..
+            __debug_utils
+            ..
             __filesystem
             ..
             __format
             ..
             __functional
+            ..
+            __fwd
+            ..
+            __ios
             ..
             __iterator
             ..
@@ -47,7 +53,12 @@
             ..
             __ranges
             ..
+# XXX: Re-enable for CHERI LLVM 15
+#            __string
+#            ..
             __thread
+            ..
+            __type_traits
             ..
             __utility
             ..
@@ -282,16 +293,6 @@
         ..
     ..
     netipsec
-    ..
-    netnatm
-        api
-        ..
-        msg
-        ..
-        saal
-        ..
-        sig
-        ..
     ..
     netpfil
         pf

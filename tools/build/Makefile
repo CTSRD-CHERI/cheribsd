@@ -68,7 +68,11 @@ INCS+=		stdlib.h
 SRCS+=		reallocarray.c
 .endif
 
+.if exists(${HOST_INCLUDE_ROOT}/sys/stat.h)
 _WITH_UTIMENS!= grep -c utimensat ${HOST_INCLUDE_ROOT}/sys/stat.h || true
+.else
+_WITH_UTIMENS= 0
+.endif
 .if ${_WITH_UTIMENS} == 0
 SYSINCS+=	stat.h
 SRCS+=		futimens.c utimensat.c
@@ -81,7 +85,7 @@ SYSINCS+=	cdefs.h
 # Define ptraddr_t for bootstrapping
 INCS+=	stdint.h
 
-_WITH_EXPLICIT_BZERO!= grep -c explicit_bzero ${HOST_INCLUDE_ROOT}/strings.h || true
+_WITH_EXPLICIT_BZERO!= cat ${HOST_INCLUDE_ROOT}/strings.h ${HOST_INCLUDE_ROOT}/string.h | grep -c explicit_bzero || true
 .if ${_WITH_EXPLICIT_BZERO} == 0
 # .PATH: ${SRCTOP}/sys/libkern
 # Adding sys/libkern to .PATH breaks building the cross-build compat library

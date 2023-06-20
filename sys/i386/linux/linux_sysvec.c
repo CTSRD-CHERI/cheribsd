@@ -32,31 +32,27 @@ __FBSDID("$FreeBSD$");
 #define __ELF_WORD_SIZE	32
 
 #include <sys/param.h>
-#include <sys/systm.h>
 #include <sys/exec.h>
 #include <sys/fcntl.h>
 #include <sys/imgact.h>
 #include <sys/imgact_aout.h>
 #include <sys/imgact_elf.h>
 #include <sys/kernel.h>
+#include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/module.h>
+#include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/stddef.h>
-#include <sys/signalvar.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
-#include <sys/vnode.h>
 
-#include <vm/vm.h>
 #include <vm/pmap.h>
-#include <vm/vm_extern.h>
+#include <vm/vm.h>
 #include <vm/vm_map.h>
-#include <vm/vm_object.h>
 #include <vm/vm_page.h>
-#include <vm/vm_param.h>
 
 #include <machine/cpu.h>
 #include <machine/cputypes.h>
@@ -909,6 +905,7 @@ linux_elf_modevent(module_t mod, int type, void *data)
 				linux_ioctl_register_handler(*lihp);
 			linux_dev_shm_create();
 			linux_osd_jail_register();
+			linux_netlink_register();
 			stclohz = (stathz ? stathz : hz);
 			if (bootverbose)
 				printf("Linux ELF exec handler installed\n");
@@ -929,6 +926,7 @@ linux_elf_modevent(module_t mod, int type, void *data)
 		if (error == 0) {
 			SET_FOREACH(lihp, linux_ioctl_handler_set)
 				linux_ioctl_unregister_handler(*lihp);
+			linux_netlink_deregister();
 			linux_dev_shm_destroy();
 			linux_osd_jail_deregister();
 			if (bootverbose)
@@ -949,4 +947,5 @@ static moduledata_t linux_elf_mod = {
 };
 
 DECLARE_MODULE_TIED(linuxelf, linux_elf_mod, SI_SUB_EXEC, SI_ORDER_ANY);
+MODULE_DEPEND(linuxelf, netlink, 1, 1, 1);
 FEATURE(linux, "Linux 32bit support");

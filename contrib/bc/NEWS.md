@@ -1,5 +1,67 @@
 # News
 
+## 6.4.0
+
+This is a production release that fixes a `read()`/`?` bug and adds features to
+`bcl`.
+
+The bug was that multiple read calls could repeat old data.
+
+The new features in `bcl` are functions to preserve `BclNumber` arguments and
+not free them.
+
+***WARNING for `bcl` Users***: The `bcl_rand_seedWithNum()` function used to not
+consume its arguments. Now it does. This change could have made this version
+`7.0.0`, but I'm 99.9% confident that there are no `bcl` users, or if there are,
+they probably don't use the PRNG. So I took a risk and didn't update the major
+version.
+
+`bcl` now includes more capacity to check for invalid numbers when built to run
+under Valgrind.
+
+## 6.3.1
+
+This is a production release that fixes a `bc` dependency loop for minimal
+environments and Linux from Scratch.
+
+## 6.3.0
+
+This is a production release with a couple of fixes for manuals and a new
+feature for `dc`: there is now a command to query whether extended registers are
+enabled or not.
+
+Users who don't care do not need to upgrade.
+
+## 6.2.6
+
+This is a production release that fixes an install bug that affected locale
+installation of all locales when using `mksh`. Users do ***NOT*** need to
+upgrade if they don't use `mksh` and/or don't need to install all locales.
+
+## 6.2.5
+
+This is a production release that fixes a test bug that affected Android and
+`mksh`. Users do ***NOT*** need to upgrade unless they use `mksh` or another
+affected shell and need to run the test suite.
+
+## 6.2.4
+
+This is a production release that fixes a test failure that happens when
+`tests/bc/scripts/timeconst.bc` doesn't exist. This should only affect
+packagers.
+
+This bug happened because I forgot something I added in the previous release:
+better error checking in tests to help packagers. Unfortunately, I was too
+zealous with the error checking.
+
+## 6.2.3
+
+This is a production release that moves `bc` to <https://git.gavinhoward.com>.
+
+That's all it does: update links. Users do ***NOT*** need to upgrade; there are
+redirects that will stay in place indefinitely. This release is only for new
+users.
+
 ## 6.2.2
 
 This is a production release that fixes a bug.

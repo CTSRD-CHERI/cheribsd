@@ -15,6 +15,7 @@ MAN=	bhyve.8 bhyve_config.5
 BHYVE_SYSDIR?=${SRCTOP}
 
 SRCS=	\
+	acpi_device.c		\
 	atkbdc.c		\
 	acpi.c			\
 	audio.c			\
@@ -87,14 +88,6 @@ CFLAGS.kernemu_dev.c+=	-I${SRCTOP}/sys/amd64
 SRCS+=	vmm_instruction_emul.c
 
 LIBADD=	vmmapi md nv pthread z util sbuf cam 9p
-
-.if ${MK_CASPER} != "no"
-LIBADD+=	casper
-LIBADD+=	cap_pwd
-LIBADD+=	cap_grp
-# Temporary disable capsicum, until we integrate checkpoint code with it.
-#CFLAGS+=-DWITH_CASPER
-.endif
 
 .if ${MK_BHYVE_SNAPSHOT} != "no"
 LIBADD+= ucl xo

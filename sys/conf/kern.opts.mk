@@ -78,19 +78,13 @@ __DEFAULT_NO_OPTIONS = \
 BROKEN_OPTIONS+= INIT_ALL_ZERO
 .endif
 
-.if ${MACHINE_CPUARCH} == "arm"
-. if ${MACHINE_ARCH:Marmv[67]*} == ""
-BROKEN_OPTIONS+= CDDL ZFS
-. endif
-.endif
-
-.if ${MACHINE_CPUARCH} == "powerpc" && ${MACHINE_ARCH} == "powerpc"
+# ZFS is broken on 32-bit powerpc, missing atomics
+.if ${MACHINE_ARCH} == "powerpc" || ${MACHINE_ARCH} == "powerpcspe"
 BROKEN_OPTIONS+= ZFS
 .endif
 
-# Things that don't work because the kernel doesn't have the support
-# for them.
-.if ${MACHINE} != "i386" && ${MACHINE} != "amd64"
+# Broken on 32-bit arm, kernel module compile errors
+.if ${MACHINE_CPUARCH} == "arm"
 BROKEN_OPTIONS+= OFED
 .endif
 

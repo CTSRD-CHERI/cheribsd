@@ -2719,7 +2719,6 @@ rxd_frag_to_sd(iflib_rxq_t rxq, if_rxd_frag_t irf, bool unload, if_rxsd_t sd,
 	cidx = irf->irf_idx;
 	fl = &rxq->ifr_fl[flid];
 	sd->ifsd_fl = fl;
-	m = fl->ifl_sds.ifsd_m[cidx];
 	sd->ifsd_cl = &fl->ifl_sds.ifsd_cl[cidx];
 	fl->ifl_credits--;
 #if MEMORY_LOGGING
@@ -2738,8 +2737,7 @@ rxd_frag_to_sd(iflib_rxq_t rxq, if_rxd_frag_t irf, bool unload, if_rxsd_t sd,
 		payload  = *sd->ifsd_cl;
 		payload +=  ri->iri_pad;
 		len = ri->iri_len - ri->iri_pad;
-		*pf_rv = pfil_run_hooks(rxq->pfil, payload, ri->iri_ifp,
-		    len | PFIL_MEMPTR | PFIL_IN, NULL);
+		*pf_rv = pfil_mem_in(rxq->pfil, payload, len, ri->iri_ifp, &m);
 		switch (*pf_rv) {
 		case PFIL_DROPPED:
 		case PFIL_CONSUMED:
@@ -2752,8 +2750,8 @@ rxd_frag_to_sd(iflib_rxq_t rxq, if_rxd_frag_t irf, bool unload, if_rxsd_t sd,
 		case PFIL_REALLOCED:
 			/*
 			 * The filter copied it.  Everything is recycled.
+			 * 'm' points at new mbuf.
 			 */
-			m = pfil_mem2mbuf(payload);
 			unload = 0;
 			break;
 		case PFIL_PASS:
@@ -2761,12 +2759,14 @@ rxd_frag_to_sd(iflib_rxq_t rxq, if_rxd_frag_t irf, bool unload, if_rxsd_t sd,
 			 * Filter said it was OK, so receive like
 			 * normal
 			 */
+			m = fl->ifl_sds.ifsd_m[cidx];
 			fl->ifl_sds.ifsd_m[cidx] = NULL;
 			break;
 		default:
 			MPASS(0);
 		}
 	} else {
+		m = fl->ifl_sds.ifsd_m[cidx];
 		fl->ifl_sds.ifsd_m[cidx] = NULL;
 		if (pf_rv != NULL)
 			*pf_rv = PFIL_PASS;
@@ -2896,7 +2896,7 @@ iflib_rxd_pkt_get(iflib_rxq_t rxq, if_rxd_info_t ri)
 static void
 iflib_get_ip_forwarding(struct lro_ctrl *lc, bool *v4, bool *v6)
 {
-	CURVNET_SET(lc->ifp->if_vnet); /* XXX - DRVAPI */
+	CURVNET_SET(if_getvnet(lc->ifp));
 #if defined(INET6)
 	*v6 = V_ip6_forwarding;
 #endif
@@ -2986,7 +2986,7 @@ iflib_rxeof(iflib_rxq_t rxq, qidx_t budget)
 	}
 
 	/* pfil needs the vnet to be set */
-	CURVNET_SET_QUIET(ifp->if_vnet); /* XXX - DRVAPI */
+	CURVNET_SET_QUIET(if_getvnet(ifp));
 	for (budget_left = budget; budget_left > 0 && avail > 0;) {
 		if (__predict_false(!CTX_ACTIVE(ctx))) {
 			DBG_COUNTER_INC(rx_ctx_inactive);
@@ -4109,7 +4109,7 @@ _task_fn_tx(void *context)
 		goto skip_ifmp;
 #endif
 #ifdef ALTQ
-	if (ALTQ_IS_ENABLED(&ifp->if_snd)) /* XXX - DRVAPI */
+	if (if_altq_is_enabled(ifp))
 		iflib_altq_if_start(ifp);
 #endif
 	if (txq->ift_db_pending)
@@ -4321,7 +4321,7 @@ iflib_if_transmit(if_t ifp, struct mbuf *m)
 	else if (ctx->isc_txq_select)
 		qidx = ctx->isc_txq_select(ctx->ifc_softc, m);
 	/* If not, use iflib's standard method */
-	else if ((NTXQSETS(ctx) > 1) && M_HASHTYPE_GET(m) && !ALTQ_IS_ENABLED(&ifp->if_snd))
+	else if ((NTXQSETS(ctx) > 1) && M_HASHTYPE_GET(m) && !if_altq_is_enabled(ifp))
 		qidx = QIDX(ctx, m);
 
 	/* Set TX queue */
@@ -4426,7 +4426,7 @@ iflib_altq_if_transmit(if_t ifp, struct mbuf *m)
 {
 	int err;
 
-	if (ALTQ_IS_ENABLED(&ifp->if_snd)) { /* XXX - DRVAPI */
+	if (if_altq_is_enabled(ifp)) {
 		IFQ_ENQUEUE(&ifp->if_snd, m, err); /* XXX - DRVAPI */
 		if (err == 0)
 			iflib_altq_if_start(ifp);

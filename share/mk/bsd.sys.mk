@@ -108,10 +108,6 @@ CWARNFLAGS.clang+=	-Wno-address-of-packed-member
 .if ${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} >= 90100
 CWARNFLAGS.gcc+=	-Wno-address-of-packed-member
 .endif
-.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 70000 && \
-    ${MACHINE_CPUARCH} == "arm" && !${MACHINE_ARCH:Marmv[67]*}
-CWARNFLAGS.clang+=	-Wno-atomic-alignment
-.endif
 .endif # WARNS <= 3
 .if ${WARNS} <= 2
 CWARNFLAGS.clang+=	-Wno-switch -Wno-switch-enum -Wno-knr-promoted-parameter
@@ -131,6 +127,7 @@ CWARNFLAGS+=		-Wno-misleading-indentation
 NO_WBITWISE_INSTEAD_OF_LOGICAL=	-Wno-bitwise-instead-of-logical
 .endif
 .if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 150000
+NO_WSTRICT_PROTOTYPES=	-Wno-strict-prototypes
 NO_WDEPRECATED_NON_PROTOTYPE=-Wno-deprecated-non-prototype
 .endif
 .if ${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} >= 100100

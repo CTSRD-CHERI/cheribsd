@@ -76,7 +76,7 @@
  * cannot include sys/param.h and should only be updated here.
  */
 #undef __FreeBSD_version
-#define __FreeBSD_version 1400078
+#define __FreeBSD_version 1400082
 
 /*
  * __CheriBSD_version numbers describe CheriBSD ABIs.
@@ -108,7 +108,7 @@
 #undef __FreeBSD_kernel__
 #define __FreeBSD_kernel__
 
-#if defined(_KERNEL) || defined(IN_RTLD)
+#if defined(_KERNEL) || defined(_WANT_P_OSREL)
 #define	P_OSREL_SIGWAIT			700000
 #define	P_OSREL_SIGSEGV			700004
 #define	P_OSREL_MAP_ANON		800104
@@ -121,6 +121,7 @@
 #define	P_OSREL_CK_SUPERBLOCK		1300000
 #define	P_OSREL_CK_INODE		1300005
 #define	P_OSREL_POWERPC_NEW_AUX_ARGS	1300070
+#define	P_OSREL_TIDPID			1400079
 
 #define	P_OSREL_MAJOR(x)		((x) / 100000)
 #endif

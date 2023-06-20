@@ -372,7 +372,7 @@ The following are the options that bc(1) accepts.
 :   Makes bc(1) print all numbers greater than **-1** and less than **1**, and
     not equal to **0**, with a leading zero.
 
-    This can be set for individual numbers with the **plz(x)**, plznl(x)**,
+    This can be set for individual numbers with the **plz(x)**, **plznl(x)**,
     **pnlz(x)**, and **pnlznl(x)** functions in the extended math library (see
     the **LIBRARY** section).
 
@@ -2464,8 +2464,8 @@ use a period (**.**) as a radix point, regardless of the value of
 Before version **6.1.0**, this bc(1) had incorrect behavior for the **quit**
 statement.
 
-No other bugs are known. Report bugs at https://git.yzena.com/gavin/bc .
+No other bugs are known. Report bugs at https://git.gavinhoward.com/gavin/bc .
 
 # AUTHORS
 
-Gavin D. Howard <gavin@yzena.com> and contributors.
+Gavin D. Howard <gavin@gavinhoward.com> and contributors.

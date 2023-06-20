@@ -128,11 +128,9 @@ cust_install_machine_files ( ) (
 customize_cmd cust_install_files
 customize_cmd cust_install_machine_files 
 
-# NB: leave c++ enabled so devd can be built
 CONF_BUILD="
 LOCAL_XTOOL_DIRS=usr.bin/mkimg
 WITHOUT_ACPI=true
-WITHOUT_ATM=true
 WITHOUT_AUDIT=true
 WITHOUT_BLUETOOTH=true
 WITHOUT_CALENDAR=true

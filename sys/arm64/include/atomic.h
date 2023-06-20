@@ -29,8 +29,6 @@
 #ifndef	_MACHINE_ATOMIC_H_
 #define	_MACHINE_ATOMIC_H_
 
-#include <machine/cheri.h>
-
 #define	isb()		__asm __volatile("isb" : : : "memory")
 
 /*
@@ -60,6 +58,7 @@
 #else
 
 #include <sys/atomic_common.h>
+#include <machine/cheri.h>
 
 #ifdef _KERNEL
 extern bool lse_supported;

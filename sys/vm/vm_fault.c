@@ -465,21 +465,17 @@ vm_fault_soft_fast(struct faultstate *fs)
 #endif
 	int psind;
 	vm_offset_t vaddr;
-	enum fault_status res;
 	vm_prot_t realprot;
 
 	MPASS(fs->vp == NULL);
 
-	res = FAULT_SUCCESS;
 	vaddr = fs->vaddr;
 	vm_object_busy(fs->first_object);
 	m = vm_page_lookup(fs->first_object, fs->first_pindex);
 	/* A busy page can be mapped for read|execute access. */
 	if (m == NULL || ((fs->prot & VM_PROT_WRITE) != 0 &&
-	    vm_page_busied(m)) || !vm_page_all_valid(m)) {
-		res = FAULT_FAILURE;
-		goto out;
-	}
+	    vm_page_busied(m)) || !vm_page_all_valid(m))
+		goto fail;
 	m_map = m;
 	psind = 0;
 #if VM_NRESERVLEVEL > 0
@@ -531,8 +527,7 @@ vm_fault_soft_fast(struct faultstate *fs)
 		 * the map lock and checking.  We'll go through the full fault
 		 * path and deal with it there.
 		 */
-		res = FAULT_FAILURE;
-		goto out;
+		goto fail;
 	}
 #endif
 
@@ -547,14 +542,11 @@ vm_fault_soft_fast(struct faultstate *fs)
 		vm_page_aflag_set(m_map, PGA_CAPSTORE);
 
 	if ((fs->fault_flags & VM_FAULT_NOPMAP) == 0) {
-		int pres = pmap_enter(fs->map->pmap, vaddr, m_map, realprot,
+		if (pmap_enter(fs->map->pmap, vaddr, m_map, realprot,
 		    fs->fault_type |
 		    PMAP_ENTER_NOSLEEP | (fs->wired ? PMAP_ENTER_WIRED : 0),
-		    psind);
-		if (pres != KERN_SUCCESS) {
-			res = FAULT_FAILURE;
-			goto out;
-		}
+		    psind) != KERN_SUCCESS)
+			goto fail;
 	}
 	if (fs->m_hold != NULL) {
 		(*fs->m_hold) = m;
@@ -564,12 +556,13 @@ vm_fault_soft_fast(struct faultstate *fs)
 		vm_fault_prefault(fs, vaddr, PFBAK, PFFOR, true);
 	VM_OBJECT_RUNLOCK(fs->first_object);
 	vm_fault_dirty(fs, m);
+	vm_object_unbusy(fs->first_object);
 	vm_map_lookup_done(fs->map, fs->entry);
 	curthread->td_ru.ru_minflt++;
-
-out:
+	return (FAULT_SUCCESS);
+fail:
 	vm_object_unbusy(fs->first_object);
-	return (res);
+	return (FAULT_FAILURE);
 }
 
 static void
@@ -1707,10 +1700,9 @@ vm_fault_object(struct faultstate *fs, int *behindp, int *aheadp)
 	}
 
 	/*
-	 * Default objects have no pager so no exclusive busy exists
-	 * to protect this page in the chain.  Skip to the next
-	 * object without dropping the lock to preserve atomicity of
-	 * shadow faults.
+	 * Check to see if the pager can possibly satisfy this fault.
+	 * If not, skip to the next object without dropping the lock to
+	 * preserve atomicity of shadow faults.
 	 */
 	if (fault_object_needs_getpages(fs->object)) {
 		/*

@@ -198,6 +198,7 @@ MAN=	accept_filter.9 \
 	KASSERT.9 \
 	kern_reboot.9 \
 	kern_testfrwk.9 \
+	kern_yield.9 \
 	kernacc.9 \
 	kernel_mount.9 \
 	khelp.9 \
@@ -320,6 +321,7 @@ MAN=	accept_filter.9 \
 	signal.9 \
 	sleep.9 \
 	sleepqueue.9 \
+	smr.9 \
 	socket.9 \
 	stack.9 \
 	store.9 \
@@ -1334,6 +1336,8 @@ MLINKS+=intr_event.9 intr_event_add_handler.9 \
 	intr_event.9 intr_event_handle.9 \
 	intr_event.9 intr_event_remove_handler.9 \
 	intr_event.9 intr_priority.9
+MLINKS+=kern_yield.9 maybe_yield.9 \
+	kern_yield.9 should_yield.9
 MLINKS+=kernacc.9 useracc.9
 MLINKS+=kernel_mount.9 free_mntarg.9 \
 	kernel_mount.9 mount_arg.9 \
@@ -2050,6 +2054,14 @@ MLINKS+=sleepqueue.9 init_sleepqueues.9 \
 	sleepqueue.9 sleepq_type.9 \
 	sleepqueue.9 sleepq_wait.9 \
 	sleepqueue.9 sleepq_wait_sig.9
+MLINKS+=smr.9 smr_advance.9 \
+	smr.9 smr_create.9 \
+	smr.9 smr_destroy.9 \
+	smr.9 smr_enter.9 \
+	smr.9 smr_exit.9 \
+	smr.9 smr_poll.9 \
+	smr.9 smr_synchronize.9 \
+	smr.9 smr_wait.9
 MLINKS+=socket.9 soabort.9 \
 	socket.9 soaccept.9 \
 	socket.9 sobind.9 \
