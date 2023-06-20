@@ -50,11 +50,11 @@ struct hwt_thread {
 
 struct hwt_context {
 	LIST_HEAD(, hwt_thread)		threads;
-	struct mtx			mtx_threads; /* Protects threads. */
-	size_t				bufsize; /* Applied to each hwt_thread*/
+	struct mtx			mtx_threads;
+	size_t				bufsize; /* Applied to hwt_thread. */
 
 	LIST_HEAD(, hwt_record_entry)	records;
-	struct mtx			mtx; /* Protects records. */
+	struct mtx			mtx_records;
 
 	LIST_ENTRY(hwt_context)		next_hch; /* Entry in contexthash. */
 	LIST_ENTRY(hwt_context)		next_hwts; /* Entry in ho->hwts. */

@@ -100,7 +100,7 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 		entry->size = ent->size;
 	}
 
-	mtx_lock_spin(&ctx->mtx);
+	mtx_lock_spin(&ctx->mtx_records);
 	LIST_INSERT_HEAD(&ctx->records, entry, next);
-	mtx_unlock_spin(&ctx->mtx);
+	mtx_unlock_spin(&ctx->mtx_records);
 }
