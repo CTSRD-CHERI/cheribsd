@@ -257,6 +257,7 @@ int	module_getid(module_t);
 module_t	module_getfnext(module_t);
 const char *	module_getname(module_t);
 void	module_setspecific(module_t, modspecific_t *);
+bool module_getpolicy(module_t mod);
 struct linker_file *module_file(module_t);
 
 #ifdef	MOD_DEBUG
