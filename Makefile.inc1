@@ -3485,7 +3485,6 @@ list-old-libs: .PHONY
 	    -V "OLD_LIBS:Mlib/*:S,^lib,usr/lib64c," \
 	    -V "OLD_LIBS:Musr/lib/*:S,^usr/lib,usr/lib64c," \
 	    -V "OLD_LIBS:Mlib/casper/*:S,^lib/casper,usr/lib64c," | \
-	    xargs -n1 | sort
 	    sed -E 's/[[:space:]]+/\n/g' | sort
 
 delete-old-libs: .PHONY
