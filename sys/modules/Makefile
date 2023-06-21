@@ -83,6 +83,7 @@ SUBDIR=	\
 	${_cfi} \
 	${_chromebook_platform} \
 	${_ciss} \
+	compartment_test \
 	${_coretemp} \
 	${_cpsw} \
 	${_cpuctl} \
