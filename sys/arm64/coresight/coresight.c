@@ -65,7 +65,7 @@ static struct hwt_backend backend = {
 static struct coresight_event cs_event[MAXCPU];
 
 static void
-coresight_event_init(struct hwt_thread *thr)
+coresight_backend_init(struct hwt_thread *thr)
 {
 	struct coresight_event *event;
 	int cpu_id;
@@ -97,7 +97,7 @@ coresight_event_init(struct hwt_thread *thr)
 }
 
 static void
-coresight_event_deinit(void)
+coresight_backend_deinit(void)
 {
 	struct coresight_event *event;
 	int cpu_id;
@@ -111,7 +111,7 @@ coresight_event_deinit(void)
 }
 
 static void
-coresight_event_configure(struct hwt_thread *thr, int cpu_id)
+coresight_backend_configure(struct hwt_thread *thr, int cpu_id)
 {
 	struct coresight_event *event;
 
@@ -125,7 +125,7 @@ coresight_event_configure(struct hwt_thread *thr, int cpu_id)
 }
 
 static void
-coresight_event_enable(struct hwt_thread *thr, int cpu_id)
+coresight_backend_enable(struct hwt_thread *thr, int cpu_id)
 {
 	struct coresight_event *event;
 
@@ -135,7 +135,7 @@ coresight_event_enable(struct hwt_thread *thr, int cpu_id)
 }
 
 static void
-coresight_event_disable(struct hwt_thread *thr, int cpu_id)
+coresight_backend_disable(struct hwt_thread *thr, int cpu_id)
 {
 	struct coresight_event *event;
 
@@ -145,7 +145,7 @@ coresight_event_disable(struct hwt_thread *thr, int cpu_id)
 }
 
 static int
-coresight_event_read(struct hwt_thread *thr, int cpu_id,
+coresight_backend_read(struct hwt_thread *thr, int cpu_id,
     int *curpage, vm_offset_t *curpage_offset)
 {
 	struct coresight_event *event;
@@ -163,7 +163,7 @@ coresight_event_read(struct hwt_thread *thr, int cpu_id,
 }
 
 static void
-coresight_event_dump(struct hwt_thread *thr, int cpu_id)
+coresight_backend_dump(struct hwt_thread *thr, int cpu_id)
 {
 	struct coresight_event *event;
 
@@ -173,13 +173,16 @@ coresight_event_dump(struct hwt_thread *thr, int cpu_id)
 }
 
 static struct hwt_backend_ops coresight_ops = {
-	.hwt_backend_init = coresight_event_init,
-	.hwt_backend_deinit = coresight_event_deinit,
-	.hwt_backend_configure = coresight_event_configure,
-	.hwt_backend_enable = coresight_event_enable,
-	.hwt_backend_disable = coresight_event_disable,
-	.hwt_backend_read = coresight_event_read,
-	.hwt_backend_dump = coresight_event_dump,
+	.hwt_backend_init = coresight_backend_init,
+	.hwt_backend_deinit = coresight_backend_deinit,
+
+	.hwt_backend_configure = coresight_backend_configure,
+
+	.hwt_backend_enable = coresight_backend_enable,
+	.hwt_backend_disable = coresight_backend_disable,
+
+	.hwt_backend_read = coresight_backend_read,
+	.hwt_backend_dump = coresight_backend_dump,
 };
 
 int
