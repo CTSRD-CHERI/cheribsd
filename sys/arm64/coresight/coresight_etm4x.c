@@ -100,9 +100,6 @@ etm_start(device_t dev, struct endpoint *endp, struct coresight_event *event)
 	/* Enable trace synchronization every 4096 bytes of trace. */
 	bus_write_4(sc->res, TRCSYNCPR, TRCSYNCPR_4K);
 
-	/* Set a value for the trace ID */
-	bus_write_4(sc->res, TRCTRACEIDR, event->etm.trace_id);
-
 	dprintf("%s: IDR0 is %x\n", __func__, bus_read_4(sc->res, TRCIDR(0)));
 	dprintf("%s: IDR1 is %x\n", __func__, bus_read_4(sc->res, TRCIDR(1)));
 	dprintf("%s: IDR2 is %x\n", __func__, bus_read_4(sc->res, TRCIDR(2)));
@@ -207,6 +204,9 @@ etm_enable(device_t dev, struct endpoint *endp,
 	sc = device_get_softc(dev);
 
 	dprintf("%s%d\n", __func__, device_get_unit(dev));
+
+	/* Set a value for the trace ID */
+	bus_write_4(sc->res, TRCTRACEIDR, event->etm.trace_id);
 
 	/* Enable the trace unit */
 	bus_write_4(sc->res, TRCPRGCTLR, TRCPRGCTLR_EN);

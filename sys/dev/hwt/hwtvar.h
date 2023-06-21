@@ -45,6 +45,7 @@ struct hwt_thread {
 	struct cdev			*cdev;
 	struct hwt_context		*ctx;
 	LIST_ENTRY(hwt_thread)		next;
+	int				thread_id; /* Specific to ARM backend.*/
 };
 
 struct hwt_context {
@@ -63,6 +64,7 @@ struct hwt_context {
 
 	struct hwt_owner		*hwt_owner;
 	struct hwt_backend		*hwt_backend;
+	int				thread_counter;
 };
 
 struct hwt_owner {

@@ -522,6 +522,8 @@ hwt_alloc(void)
 	struct hwt_context *ctx;
 
 	ctx = malloc(sizeof(struct hwt_context), M_HWT, M_WAITOK | M_ZERO);
+	ctx->thread_counter = 1;
+
 	LIST_INIT(&ctx->records);
 	mtx_init(&ctx->mtx_records, "hwt records", NULL, MTX_DEF);
 
@@ -754,6 +756,8 @@ hwt_thread_create(struct hwt_context *ctx, struct thread *td)
 		return (error);
 	}
 
+	thr->thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
+
 	mtx_lock_spin(&ctx->mtx_threads);
 	LIST_INSERT_HEAD(&ctx->threads, thr, next);
 	mtx_unlock_spin(&ctx->mtx_threads);
@@ -845,6 +849,8 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 
 	thr->ctx = ctx;
 	thr->tid = FIRST_THREAD_IN_PROC(p)->td_tid;
+
+	thr->thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
 
 	mtx_lock_spin(&ctx->mtx_threads);
 	LIST_INSERT_HEAD(&ctx->threads, thr, next);

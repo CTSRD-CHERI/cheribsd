@@ -463,8 +463,7 @@ tmc_start(device_t dev, struct endpoint *endp,
 	if (sc->dev_type == CORESIGHT_ETF)
 		return (0);
 
-	KASSERT(sc->dev_type == CORESIGHT_ETR,
-	    ("Wrong dev_type"));
+	KASSERT(sc->dev_type == CORESIGHT_ETR, ("Wrong dev_type"));
 
 	/*
 	 * Multiple CPUs can call this same time.

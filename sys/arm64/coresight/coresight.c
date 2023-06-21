@@ -83,12 +83,6 @@ coresight_event_init(struct hwt_thread *thr)
 		event->src = CORESIGHT_ETMV4;
 		event->sink = CORESIGHT_TMC_ETR;
 
-		/*
-		 * Set the trace ID required for ETM component.
-		 * TODO: this should be derived from hwt(1).
-		 */
-
-		event->etm.trace_id = 0x10;
 		coresight_init_event(event, cpu);
 
 		/*
@@ -106,10 +100,10 @@ static void
 coresight_event_deinit(void)
 {
 	struct coresight_event *event;
-	int cpu;
+	int cpu_id;
 
-	for (cpu = 0; cpu < mp_ncpus; cpu++) {
-		event = &cs_event[cpu];
+	for (cpu_id = 0; cpu_id < mp_ncpus; cpu_id++) {
+		event = &cs_event[cpu_id];
 		coresight_disable(event);
 		coresight_stop(event);
 	}
@@ -118,7 +112,15 @@ coresight_event_deinit(void)
 static void
 coresight_event_configure(struct hwt_thread *thr, int cpu_id)
 {
+	struct coresight_event *event;
 
+	event = &cs_event[cpu_id];
+
+	/*
+	 * OpenCSD needs a trace ID to distinguish traces as they
+	 * merged to a single buffer.
+	 */
+	event->etm.trace_id = thr->thread_id;
 }
 
 static void
