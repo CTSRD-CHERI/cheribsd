@@ -118,9 +118,6 @@ struct etm_state {
 };
 
 struct etr_state {
-	boolean_t started;
-	uint32_t cycle;
-	uint32_t offset;
 	uint32_t low;
 	uint32_t high;
 	uint32_t bufsize;
@@ -161,11 +158,16 @@ struct coresight_device *
 int coresight_register(struct coresight_desc *desc);
 
 int coresight_init_event(struct coresight_event *event, int cpu);
+
 void coresight_configure(struct coresight_event *event);
+void coresight_deconfigure(struct coresight_event *event);
+
 void coresight_start(struct coresight_event *event);
 void coresight_stop(struct coresight_event *event);
+
 void coresight_enable(struct coresight_event *event);
 void coresight_disable(struct coresight_event *event);
+
 void coresight_read(struct coresight_event *event);
 void coresight_dump(struct coresight_event *event);
 

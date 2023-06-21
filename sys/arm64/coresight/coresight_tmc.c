@@ -452,11 +452,9 @@ tmc_init(device_t dev)
 }
 
 static int
-tmc_start(device_t dev, struct endpoint *endp,
-    struct coresight_event *event)
+tmc_start(device_t dev, struct endpoint *endp, struct coresight_event *event)
 {
 	struct tmc_softc *sc;
-	uint32_t nev;
 
 	sc = device_get_softc(dev);
 
@@ -465,26 +463,16 @@ tmc_start(device_t dev, struct endpoint *endp,
 
 	KASSERT(sc->dev_type == CORESIGHT_ETR, ("Wrong dev_type"));
 
-	/*
-	 * Multiple CPUs can call this same time.
-	 * We allow only one running configuration.
-	 */
-
-	nev = atomic_fetchadd_int(&sc->nev, 1);
-	if (nev == 0) {
-		tmc_configure_etr(dev, endp, event);
-		tmc_enable(dev);
-	}
+	tmc_configure_etr(dev, endp, event);
+	tmc_enable(dev);
 
 	return (0);
 }
 
 static void
-tmc_stop(device_t dev, struct endpoint *endp,
-    struct coresight_event *event)
+tmc_stop(device_t dev, struct endpoint *endp, struct coresight_event *event)
 {
 	struct tmc_softc *sc;
-	uint32_t nev;
 
 	sc = device_get_softc(dev);
 
@@ -494,9 +482,7 @@ tmc_stop(device_t dev, struct endpoint *endp,
 
 	KASSERT(sc->dev_type == CORESIGHT_ETR, ("Wrong dev_type"));
 
-	nev = atomic_fetchadd_int(&sc->nev, -1);
-	if (nev == 1)
-		tmc_disable(dev);
+	tmc_disable(dev);
 }
 
 static void

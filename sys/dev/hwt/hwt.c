@@ -555,7 +555,7 @@ hwt_lookup_contexthash(struct proc *p)
 	}
 	mtx_unlock_spin(&hwt_contexthash_mtx);
 
-	panic("ctx not found");
+	return (NULL);
 }
 
 /*
@@ -856,11 +856,12 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 	LIST_INSERT_HEAD(&ctx->threads, thr, next);
 	mtx_unlock_spin(&ctx->mtx_threads);
 
-	p->p_flag2 |= P2_HWT;
-
 	mtx_lock(&ho->mtx);
 	LIST_INSERT_HEAD(&ho->hwts, ctx, next_hwts);
 	mtx_unlock(&ho->mtx);
+
+	p->p_flag2 |= P2_HWT;
+
 	PROC_UNLOCK(p);
 
 	error = hwt_create_cdev(thr);
@@ -969,6 +970,8 @@ hwt_switch_in(struct thread *td)
 	cpu_id = PCPU_GET(cpuid);
 
 	ctx = hwt_lookup_contexthash(p);
+	if (ctx == NULL)
+		return;
 	thr = hwt_lookup_thread(ctx, td);
 
 	dprintf("%s: thr %p on cpu_id %d\n", __func__, thr, cpu_id);
@@ -992,6 +995,8 @@ hwt_switch_out(struct thread *td)
 	cpu_id = PCPU_GET(cpuid);
 
 	ctx = hwt_lookup_contexthash(p);
+	if (ctx == NULL)
+		return;
 	thr = hwt_lookup_thread(ctx, td);
 
 	dprintf("%s: thr %p on cpu_id %d\n", __func__, thr, cpu_id);

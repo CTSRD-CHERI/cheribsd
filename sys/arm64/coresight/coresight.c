@@ -68,12 +68,11 @@ static void
 coresight_event_init(struct hwt_thread *thr)
 {
 	struct coresight_event *event;
-	int cpu;
+	int cpu_id;
 
-	for (cpu = 0; cpu < mp_ncpus; cpu++) {
-		event = &cs_event[cpu];
+	for (cpu_id = 0; cpu_id < mp_ncpus; cpu_id++) {
+		event = &cs_event[cpu_id];
 		memset(event, 0, sizeof(struct coresight_event));
-		event->etr.started = 0;
 		event->etr.low = 0;
 		event->etr.high = 0;
 		event->etr.pages = thr->pages;
@@ -83,16 +82,17 @@ coresight_event_init(struct hwt_thread *thr)
 		event->src = CORESIGHT_ETMV4;
 		event->sink = CORESIGHT_TMC_ETR;
 
-		coresight_init_event(event, cpu);
+		coresight_init_event(event, cpu_id);
 
 		/*
 		 * Configure pipeline immediately since Coresight merges
 		 * everything to a single buffer. We don't need to reconfigure
-		 * components until this user releases coresight.
+		 * components until the user release coresight.
 		 */
 
 		coresight_configure(event);
-		coresight_start(event);
+		if (cpu_id == 0)
+			coresight_start(event);
 	}
 }
 
@@ -105,7 +105,8 @@ coresight_event_deinit(void)
 	for (cpu_id = 0; cpu_id < mp_ncpus; cpu_id++) {
 		event = &cs_event[cpu_id];
 		coresight_disable(event);
-		coresight_stop(event);
+		if (cpu_id == 0)
+			coresight_stop(event);
 	}
 }
 

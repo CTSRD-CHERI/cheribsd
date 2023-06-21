@@ -67,7 +67,8 @@ static struct resource_spec etm_spec[] = {
 };
 
 static int
-etm_start(device_t dev, struct endpoint *endp, struct coresight_event *event)
+etm_configure(device_t dev, struct endpoint *endp,
+    struct coresight_event *event)
 {
 	struct etm_softc *sc;
 	uint32_t reg;
@@ -266,7 +267,7 @@ etm_attach(device_t dev)
 static device_method_t etm_methods[] = {
 	/* Coresight interface */
 	DEVMETHOD(coresight_init,	etm_init),
-	DEVMETHOD(coresight_start,	etm_start),
+	DEVMETHOD(coresight_configure,	etm_configure),
 	DEVMETHOD(coresight_enable,	etm_enable),
 	DEVMETHOD(coresight_disable,	etm_disable),
 	DEVMETHOD_END

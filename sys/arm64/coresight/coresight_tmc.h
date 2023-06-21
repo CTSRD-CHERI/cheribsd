@@ -119,7 +119,6 @@ DECLARE_CLASS(tmc_driver);
 struct tmc_softc {
 	struct resource			*res[2];
 	device_t			dev;
-	uint64_t			cycle;
 	struct coresight_platform_data	*pdata;
 	uint32_t			dev_type;
 #define	CORESIGHT_UNKNOWN		0
