@@ -257,7 +257,7 @@ static struct cdev_pager_ops hwt_pager_ops = {
 }; 
 
 static int
-hwt_alloc_pages(struct hwt_thread *thr)
+hwt_thread_alloc_pages(struct hwt_thread *thr)
 {
 	vm_paddr_t low, high, boundary;
 	vm_memattr_t memattr;
@@ -475,18 +475,14 @@ hwt_create_cdev(struct hwt_thread *thr)
 }
 
 static int
-hwt_alloc_buffers(struct hwt_thread *thr)
+hwt_thread_alloc_buffers(struct hwt_thread *thr)
 {
-	struct hwt_context *ctx;
 	int error;
 
-	ctx = thr->ctx;
-
-	thr->npages = ctx->bufsize / PAGE_SIZE;
 	thr->pages = malloc(sizeof(struct vm_page *) * thr->npages, M_HWT,
 	    M_WAITOK | M_ZERO);
 
-	error = hwt_alloc_pages(thr);
+	error = hwt_thread_alloc_pages(thr);
 	if (error) {
 		printf("%s: could not alloc pages\n", __func__);
 		return (error);
@@ -496,7 +492,7 @@ hwt_alloc_buffers(struct hwt_thread *thr)
 }
 
 static void
-hwt_destroy_buffers(struct hwt_thread *thr)
+hwt_thread_destroy_buffers(struct hwt_thread *thr)
 {
 	vm_page_t m;
 	int i;
@@ -712,15 +708,15 @@ done:
 }
 
 static int
-hwt_thread_alloc(struct hwt_context *ctx, struct hwt_thread **thr0)
+hwt_thread_alloc(struct hwt_thread **thr0, size_t bufsize)
 {
 	struct hwt_thread *thr;
 	int error;
 
 	thr = malloc(sizeof(struct hwt_thread), M_HWT, M_WAITOK | M_ZERO);
-	thr->ctx = ctx;
+	thr->npages = bufsize / PAGE_SIZE;
 
-	error = hwt_alloc_buffers(thr);
+	error = hwt_thread_alloc_buffers(thr);
 	if (error)
 		return (error);
 
@@ -729,16 +725,26 @@ hwt_thread_alloc(struct hwt_context *ctx, struct hwt_thread **thr0)
 	return (0);
 }
 
+static void
+hwt_thread_free(struct hwt_thread *thr)
+{
+
+	hwt_thread_destroy_buffers(thr);
+
+	free(thr, M_HWT);
+}
+
 int
 hwt_thread_create(struct hwt_context *ctx, struct thread *td)
 {
 	struct hwt_thread *thr;
 	int error;
 
-	error = hwt_thread_alloc(ctx, &thr);
+	error = hwt_thread_alloc(&thr, ctx->bufsize);
 	if (error)
 		return (error);
 
+	thr->ctx = ctx;
 	thr->tid = td->td_tid;
 
 	error = hwt_create_cdev(thr);
@@ -787,7 +793,7 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 	/* First get the owner. */
 	ho = hwt_lookup_ownerhash(td->td_proc);
 	if (ho) {
-		/* Check if the owner already tracing this pid. */
+		/* Check if the owner have this pid configured already. */
 		ctx = hwt_lookup_by_owner(ho, halloc->pid);
 		if (ctx)
 			return (EEXIST);
@@ -807,34 +813,42 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 		mtx_unlock_spin(&hwt_ownerhash_mtx);
 	}
 
-	/* Allocate a new HWT. */
+	/* Allocate a new HWT context. */
 	ctx = hwt_alloc();
 	ctx->bufsize = halloc->bufsize;
+	ctx->pid = halloc->pid;
 	ctx->hwt_backend = backend;
+	ctx->hwt_owner = ho;
 
 	/* Allocate first thread and buffers. */
-	error = hwt_thread_alloc(ctx, &thr);
-	if (error)
+	error = hwt_thread_alloc(&thr, ctx->bufsize);
+	if (error) {
+		free(ctx, M_HWT);
 		return (error);
-
-	ctx->pid = halloc->pid;
-	ctx->hwt_owner = ho;
+	}
 
 	/* Since we done with malloc, now get the victim proc. */
 	p = pfind(halloc->pid);
 	if (p == NULL) {
-		/* TODO: deallocate resources. */
+		hwt_thread_free(thr);
+		free(ctx, M_HWT);
 		return (ENXIO);
 	}
 
-	thr->tid = FIRST_THREAD_IN_PROC(p)->td_tid;
-
 	error = hwt_priv_check(td->td_proc, p);
 	if (error) {
-		/* TODO: deallocate resources. */
+		hwt_thread_free(thr);
+		free(ctx, M_HWT);
 		PROC_UNLOCK(p);
 		return (error);
 	}
+
+	thr->ctx = ctx;
+	thr->tid = FIRST_THREAD_IN_PROC(p)->td_tid;
+
+	mtx_lock_spin(&ctx->mtx_threads);
+	LIST_INSERT_HEAD(&ctx->threads, thr, next);
+	mtx_unlock_spin(&ctx->mtx_threads);
 
 	p->p_flag2 |= P2_HWT;
 
@@ -843,17 +857,9 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 	mtx_unlock(&ho->mtx);
 	PROC_UNLOCK(p);
 
-	mtx_lock_spin(&ctx->mtx_threads);
-	LIST_INSERT_HEAD(&ctx->threads, thr, next);
-	mtx_unlock_spin(&ctx->mtx_threads);
-
-	error = hwt_backend_init(thr);
-	if (error)
-		return (error);
-
 	error = hwt_create_cdev(thr);
 	if (error) {
-		/* TODO: destroy buffers and thr. */
+		/* TODO: deallocate resources. */
 		return (error);
 	}
 
@@ -877,8 +883,8 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
     struct thread *td)
 {
 	struct hwt_record_get *rget;
-	struct hwt_alloc *halloc;
 	struct hwt_context *ctx;
+	struct hwt_thread *thr;
 	struct hwt_start *s;
 	struct proc *p;
 	int error;
@@ -886,8 +892,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	switch (cmd) {
 	case HWT_IOC_ALLOC:
 		/* Allocate HWT context. */
-		halloc = (struct hwt_alloc *)addr;
-		error = hwt_ioctl_alloc(td, halloc);
+		error = hwt_ioctl_alloc(td, (struct hwt_alloc *)addr);
 		return (error);
 
 	case HWT_IOC_START:
@@ -896,19 +901,32 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		dprintf("%s: start, pid %d\n", __func__, s->pid);
 
-		/* Check if process is registered owner of any HWTs. */
 		ctx = hwt_lookup_by_owner_p(td->td_proc, s->pid);
 		if (ctx == NULL)
 			return (ENXIO);
 
+		mtx_lock_spin(&ctx->mtx_threads);
+		thr = LIST_FIRST(&ctx->threads);
+		mtx_unlock_spin(&ctx->mtx_threads);
+
+		KASSERT(thr != NULL, ("thr is NULL"));
+
+		/* Pass first thread as needed by Coresight, not Intel PT. */
+		error = hwt_backend_init(thr);
+		if (error)
+			return (error);
+
 		p = pfind(s->pid);
-		if (p == NULL)
+		if (p == NULL) {
+			/* TODO: deinit backend. */
 			return (ENXIO);
+		}
 
 		ctx->proc = p;
 
 		hwt_insert_contexthash(ctx);
 		PROC_UNLOCK(p);
+
 		return (0);
 
 	case HWT_IOC_RECORD_GET:
@@ -1058,7 +1076,7 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 			if (thr == NULL)
 				break;
 
-			hwt_destroy_buffers(thr);
+			hwt_thread_destroy_buffers(thr);
 			destroy_dev_sched(thr->cdev);
 			free(thr, M_HWT);
 		}
