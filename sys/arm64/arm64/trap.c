@@ -259,7 +259,7 @@ align_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	if (!lower) {
 		print_registers(frame);
 		print_gp_register("far", far);
-		printf(" esr: %16lx\n", esr);
+		printf(" esr: 0x%.16lx\n", esr);
 		panic("Misaligned access from kernel space!");
 	}
 
@@ -421,7 +421,7 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	if (td->td_md.md_spinlock_count != 0) {
 		print_registers(frame);
 		print_gp_register("far", far);
-		printf(" esr: %.16lx\n", esr);
+		printf(" esr: 0x%.16lx\n", esr);
 		panic("data abort with spinlock held (spinlock count %d != 0)",
 		    td->td_md.md_spinlock_count);
 	}
@@ -430,7 +430,7 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	    WARN_GIANTOK, NULL, "Kernel page fault") != 0) {
 		print_registers(frame);
 		print_gp_register("far", far);
-		printf(" esr: %16lx\n", esr);
+		printf(" esr: 0x%.16lx\n", esr);
 		panic("data abort in critical section or under mutex");
 	}
 
@@ -495,7 +495,7 @@ bad_far:
 			printf("Fatal data abort:\n");
 			print_registers(frame);
 			print_gp_register("far", far);
-			printf(" esr: %16lx\n", esr);
+			printf(" esr: 0x%.16lx\n", esr);
 
 #ifdef KDB
 			if (debugger_on_trap) {
@@ -507,7 +507,7 @@ bad_far:
 					return;
 			}
 #endif
-			panic("vm_fault failed: %lx error %d",
+			panic("vm_fault failed: 0x%lx error %d",
 			    (uint64_t)frame->tf_elr, error);
 		}
 	}
@@ -520,7 +520,7 @@ bad_far:
 #define PRINT_REG(name, value)					\
 	printf(" %s: %#.16lp\n", name, (void * __capability)(value))
 #else
-#define PRINT_REG(name, value)	printf(" %s: %16lx\n", name, value)
+#define PRINT_REG(name, value)	printf(" %s: 0x%.16lx\n", name, value)
 #endif
 
 static void
@@ -536,7 +536,7 @@ print_gp_register(const char *name, uintcap_t value)
 #if __has_feature(capabilities)
 	printf(" %s: %#.16lp", name, (void * __capability)value);
 #else
-	printf(" %s: %16lx", name, value);
+	printf(" %s: 0x%.16lx", name, value);
 #endif
 #if defined(DDB)
 	/* If this looks like a kernel address try to find the symbol */
@@ -544,7 +544,7 @@ print_gp_register(const char *name, uintcap_t value)
 		sym = db_search_symbol(value, DB_STGY_ANY, &offset);
 		if (sym != C_DB_SYM_NULL) {
 			db_symbol_values(sym, &sym_name, &sym_value);
-			printf(" (%s + %lx)", sym_name, offset);
+			printf(" (%s + 0x%lx)", sym_name, offset);
 		}
 	}
 #endif
@@ -568,7 +568,7 @@ print_registers(struct trapframe *frame)
 	PRINT_REG(" sp", frame->tf_sp);
 	print_gp_register(" lr", frame->tf_lr);
 	print_gp_register("elr", frame->tf_elr);
-	printf("spsr: %16lx\n", frame->tf_spsr);
+	printf("spsr: 0x%.16lx\n", frame->tf_spsr);
 }
 
 #ifdef VFP
@@ -616,8 +616,8 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 #endif
 
 	CTR4(KTR_TRAP,
-	    "do_el1_sync: curthread: %p, esr %lx, elr: %lx, frame: %p", td,
-	    esr, frame->tf_elr, frame);
+	    "do_el1_sync: curthread: %p, esr 0x%lx, elr: 0x%lx, frame: %p",
+	    td, esr, frame->tf_elr, frame);
 
 	/*
 	 * Enable debug exceptions if we aren't already handling one. They will
@@ -637,7 +637,7 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 #endif
 		{
 			print_registers(frame);
-			printf(" esr: %16lx\n", esr);
+			printf(" esr: 0x%.16lx\n", esr);
 			panic("VFP exception in the kernel");
 		}
 		break;
@@ -650,8 +650,8 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 		} else {
 			print_registers(frame);
 			print_gp_register("far", far);
-			printf(" esr: %16lx\n", esr);
-			panic("Unhandled EL1 %s abort: %x",
+			printf(" esr: 0x%.16lx\n", esr);
+			panic("Unhandled EL1 %s abort: 0x%x",
 			    exception == EXCP_INSN_ABORT ? "instruction" :
 			    "data", dfsc);
 		}
@@ -695,7 +695,7 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 	default:
 		print_registers(frame);
 		print_gp_register("far", far);
-		panic("Unknown kernel exception %x esr_el1 %lx", exception,
+		panic("Unknown kernel exception 0x%x esr_el1 0x%lx", exception,
 		    esr);
 	}
 }
@@ -710,7 +710,7 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 
 	/* Check we have a sane environment when entering from userland */
 	KASSERT((uintptr_t)get_pcpu() >= VM_MIN_KERNEL_ADDRESS,
-	    ("Invalid pcpu address from userland: %p (tpidr %lx)",
+	    ("Invalid pcpu address from userland: %p (tpidr 0x%lx)",
 	     get_pcpu(), READ_SPECIALREG(tpidr_el1)));
 
 	kasan_mark(frame, sizeof(*frame), sizeof(*frame), 0);
@@ -730,8 +730,8 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 	intr_enable();
 
 	CTR4(KTR_TRAP,
-	    "do_el0_sync: curthread: %p, esr %lx, elr: %lx, frame: %p", td, esr,
-	    frame->tf_elr, frame);
+	    "do_el0_sync: curthread: %p, esr 0x%lx, elr: 0x%lx, frame: %p",
+	    td, esr, frame->tf_elr, frame);
 
 	switch (exception) {
 	case EXCP_FP_SIMD:
@@ -768,8 +768,8 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		else {
 			print_registers(frame);
 			print_gp_register("far", far);
-			printf(" esr: %16lx\n", esr);
-			panic("Unhandled EL0 %s abort: %x",
+			printf(" esr: 0x%.16lx\n", esr);
+			panic("Unhandled EL0 %s abort: 0x%x",
 			    exception == EXCP_INSN_ABORT_L ? "instruction" :
 			    "data", dfsc);
 		}
@@ -861,7 +861,7 @@ do_serror(struct trapframe *frame)
 
 	print_registers(frame);
 	print_gp_register("far", far);
-	printf(" esr: %16lx\n", esr);
+	printf(" esr: 0x%.16lx\n", esr);
 	panic("Unhandled System Error");
 }
 
@@ -876,6 +876,6 @@ unhandled_exception(struct trapframe *frame)
 
 	print_registers(frame);
 	print_gp_register("far", far);
-	printf(" esr: %16lx\n", esr);
+	printf(" esr: 0x%.16lx\n", esr);
 	panic("Unhandled exception");
 }
