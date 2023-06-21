@@ -37,6 +37,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/proc.h>
 #include <sys/compartment.h>
 #include <sys/kernel.h>
+#include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/module.h>
@@ -52,8 +53,28 @@ __FBSDID("$FreeBSD$");
 
 MALLOC_DEFINE(M_COMPARTMENT, "compartment", "kernel compartment");
 
+SYSCTL_NODE(_security, OID_AUTO, compartment, CTLFLAG_RD, 0,
+    "Compartment subsystem");
+SYSCTL_NODE(_security_compartment, OID_AUTO, counters, CTLFLAG_RD, 0,
+    "Counters for compartment trampolines");
+
+#define	COMPARTMENT_TRAMPOLINE_TYPE_ENTRY	0
+#define	COMPARTMENT_TRAMPOLINE_TYPE_JUMP	1
+#define	COMPARTMENT_TRAMPOLINE_TYPE_MAX		COMPARTMENT_TRAMPOLINE_TYPE_JUMP
+
+unsigned long compartment_trampoline_counters[COMPARTMENT_TRAMPOLINE_TYPE_MAX + 1];
+
+SYSCTL_ULONG(_security_compartment_counters, OID_AUTO, entry, CTLFLAG_RW,
+    &compartment_trampoline_counters[COMPARTMENT_TRAMPOLINE_TYPE_ENTRY], 0,
+    "Number of compartment entries");
+
+SYSCTL_ULONG(_security_compartment_counters, OID_AUTO, jump, CTLFLAG_RW,
+    &compartment_trampoline_counters[COMPARTMENT_TRAMPOLINE_TYPE_JUMP], 0,
+    "Number of compartment jumps");
+
 struct compartment_trampoline {
 	int		ct_compartment_id;
+	int		ct_type;
 	uintcap_t	ct_compartment_func;
 	uintcap_t	ct_compartment_stackptr_func;
 	char		ct_code[] __subobject_use_container_bounds;
@@ -104,9 +125,15 @@ compartment_find(int id)
 }
 
 vm_pointer_t
-compartment_entry_stackptr(int id)
+compartment_entry_stackptr(int id, int type)
 {
 	struct compartment *compartment;
+
+	/*
+	 * TODO: Make compartment_trampoline_counters actual atomic counters.
+	 */
+	if (compartment_trampoline_counters[type] < ULONG_MAX)
+		compartment_trampoline_counters[type]++;
 
 	compartment = compartment_find(id);
 	if (compartment == NULL)
@@ -115,8 +142,8 @@ compartment_entry_stackptr(int id)
 }
 
 static struct compartment_trampoline *
-compartment_trampoline_create(const module_t mod, void *data, size_t size,
-    uintcap_t func)
+compartment_trampoline_create(const module_t mod, int type, void *data,
+    size_t size, uintcap_t func)
 {
 	struct compartment_trampoline *trampoline;
 
@@ -131,6 +158,7 @@ compartment_trampoline_create(const module_t mod, void *data, size_t size,
 	cpu_icache_sync_range((vm_pointer_t)trampoline, (vm_size_t)size);
 
 	trampoline->ct_compartment_id = module_getid(mod);
+	trampoline->ct_type = type;
 	trampoline->ct_compartment_func = module_capability(mod, func);
 	if (trampoline->ct_compartment_id == 1) {
 		trampoline->ct_compartment_stackptr_func = 0;
@@ -165,7 +193,8 @@ compartment_entry_for_module(const module_t mod, uintptr_t func)
 {
 
 	func = cheri_clearperm(func, CHERI_PERM_EXECUTIVE);
-	return (compartment_trampoline_create(mod, compartment_entry_trampoline,
+	return (compartment_trampoline_create(mod,
+	    COMPARTMENT_TRAMPOLINE_TYPE_ENTRY, compartment_entry_trampoline,
 	    szcompartment_entry_trampoline, func));
 }
 
@@ -203,7 +232,8 @@ compartment_jump(uintptr_t func)
 	if (mod == NULL)
 		panic("compartment_jump: unable to find module");
 
-	codeptr = compartment_trampoline_create(mod, compartment_jump_trampoline,
+	codeptr = compartment_trampoline_create(mod,
+	    COMPARTMENT_TRAMPOLINE_TYPE_JUMP, compartment_jump_trampoline,
 	    szcompartment_jump_trampoline, func);
 
 	MOD_SUNLOCK;
