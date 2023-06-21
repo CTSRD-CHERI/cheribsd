@@ -132,7 +132,7 @@ retry:
 }
 
 static int
-tmc_start(device_t dev)
+tmc_enable(device_t dev)
 {
 	struct tmc_softc *sc;
 	uint32_t reg;
@@ -164,7 +164,7 @@ tmc_start(device_t dev)
 }
 
 static int
-tmc_stop(device_t dev)
+tmc_disable(device_t dev)
 {
 	struct tmc_softc *sc;
 	uint32_t reg;
@@ -229,7 +229,7 @@ tmc_configure_etf(device_t dev)
 	bus_write_4(sc->res[0], TMC_MODE, MODE_HW_FIFO);
 	bus_write_4(sc->res[0], TMC_FFCR, FFCR_EN_FMT | FFCR_EN_TI);
 
-	tmc_start(dev);
+	tmc_enable(dev);
 
 	return (0);
 }
@@ -452,7 +452,7 @@ tmc_init(device_t dev)
 }
 
 static int
-tmc_start_event(device_t dev, struct endpoint *endp,
+tmc_start(device_t dev, struct endpoint *endp,
     struct coresight_event *event)
 {
 	struct tmc_softc *sc;
@@ -474,14 +474,14 @@ tmc_start_event(device_t dev, struct endpoint *endp,
 	nev = atomic_fetchadd_int(&sc->nev, 1);
 	if (nev == 0) {
 		tmc_configure_etr(dev, endp, event);
-		tmc_start(dev);
+		tmc_enable(dev);
 	}
 
 	return (0);
 }
 
 static void
-tmc_stop_event(device_t dev, struct endpoint *endp,
+tmc_stop(device_t dev, struct endpoint *endp,
     struct coresight_event *event)
 {
 	struct tmc_softc *sc;
@@ -497,7 +497,7 @@ tmc_stop_event(device_t dev, struct endpoint *endp,
 
 	nev = atomic_fetchadd_int(&sc->nev, -1);
 	if (nev == 1)
-		tmc_stop(dev);
+		tmc_disable(dev);
 }
 
 static void
@@ -595,8 +595,8 @@ static device_method_t tmc_methods[] = {
 	/* Coresight interface */
 	DEVMETHOD(coresight_init,	tmc_init),
 	DEVMETHOD(coresight_configure,	tmc_configure),
-	DEVMETHOD(coresight_start,	tmc_start_event),
-	DEVMETHOD(coresight_stop,	tmc_stop_event),
+	DEVMETHOD(coresight_start,	tmc_start),
+	DEVMETHOD(coresight_stop,	tmc_stop),
 	DEVMETHOD(coresight_dump,	tmc_dump),
 	DEVMETHOD(coresight_read,	tmc_read),
 	DEVMETHOD_END
