@@ -41,6 +41,8 @@
 #include <sys/module.h>
 #include <sys/queue.h>
 
+SYSCTL_DECL(_security_compartment);
+
 struct thread;
 
 struct compartment {
@@ -53,7 +55,7 @@ struct compartment {
 
 void compartment_destroy(struct compartment *compartment);
 void compartment_trampoline_destroy(uintptr_t func);
-vm_pointer_t compartment_entry_stackptr(int id);
+vm_pointer_t compartment_entry_stackptr(int id, int type);
 void *compartment_call(uintptr_t func);
 void *compartment_entry_for_module(const module_t mod, uintptr_t func);
 void *compartment_entry(uintptr_t func);

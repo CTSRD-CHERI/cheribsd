@@ -40,6 +40,8 @@ __FBSDID("$FreeBSD$");
 TRAMPOLINECODE(compartment_entry_trampoline)
 compartment_entry_id:
 	.word		0
+trampoline_type:
+	.word		0
 	.p2align	4
 compartment_entry_func:
 	.chericap	0
@@ -59,6 +61,7 @@ compartment_entry_stackptr_func:
 
 	/* Get or allocate a callee stack. */
 	ldr	x0, compartment_entry_id
+	ldr	x1, trampoline_type
 	ldr	c10, compartment_entry_stackptr_func
 	blr	c10
 
