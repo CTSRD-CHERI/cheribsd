@@ -124,7 +124,7 @@ coresight_init_event(struct coresight_event *event, int cpu)
 }
 
 void
-coresight_configure(struct coresight_event *event, int cpu)
+coresight_configure(struct coresight_event *event)
 {
 	struct coresight_device *cs_dev;
 	struct endpoint *endp;
@@ -136,7 +136,7 @@ coresight_configure(struct coresight_event *event, int cpu)
 }
 
 void
-coresight_start(struct coresight_event *event, int cpu)
+coresight_start(struct coresight_event *event)
 {
 	struct coresight_device *cs_dev;
 	struct endpoint *endp;
@@ -148,7 +148,7 @@ coresight_start(struct coresight_event *event, int cpu)
 }
 
 void
-coresight_stop(struct coresight_event *event, int cpu)
+coresight_stop(struct coresight_event *event)
 {
 	struct coresight_device *cs_dev;
 	struct endpoint *endp;
@@ -160,7 +160,7 @@ coresight_stop(struct coresight_event *event, int cpu)
 }
 
 void
-coresight_enable(struct coresight_event *event, int cpu)
+coresight_enable(struct coresight_event *event)
 {
 	struct coresight_device *cs_dev;
 	struct endpoint *endp;
@@ -172,7 +172,7 @@ coresight_enable(struct coresight_event *event, int cpu)
 }
 
 void
-coresight_disable(struct coresight_event *event, int cpu)
+coresight_disable(struct coresight_event *event)
 {
 	struct coresight_device *cs_dev;
 	struct endpoint *endp;
@@ -184,7 +184,7 @@ coresight_disable(struct coresight_event *event, int cpu)
 }
 
 void
-coresight_dump(struct coresight_event *event, int cpu)
+coresight_dump(struct coresight_event *event)
 {
 	struct coresight_device *cs_dev;
 	struct endpoint *endp;
@@ -196,7 +196,7 @@ coresight_dump(struct coresight_event *event, int cpu)
 }
 
 void
-coresight_read(struct coresight_event *event, int cpu)
+coresight_read(struct coresight_event *event)
 {
 	struct coresight_device *cs_dev;
 	struct endpoint *endp;

@@ -97,8 +97,8 @@ coresight_event_init(struct hwt_thread *thr)
 		 * components until this user releases coresight.
 		 */
 
-		coresight_configure(event, cpu);
-		coresight_start(event, cpu);
+		coresight_configure(event);
+		coresight_start(event);
 	}
 }
 
@@ -110,8 +110,8 @@ coresight_event_deinit(void)
 
 	for (cpu = 0; cpu < mp_ncpus; cpu++) {
 		event = &cs_event[cpu];
-		coresight_disable(event, cpu);
-		coresight_stop(event, cpu);
+		coresight_disable(event);
+		coresight_stop(event);
 	}
 }
 
@@ -128,7 +128,7 @@ coresight_event_enable(struct hwt_thread *thr, int cpu_id)
 
 	event = &cs_event[cpu_id];
 
-	coresight_enable(event, cpu_id);
+	coresight_enable(event);
 }
 
 static void
@@ -138,7 +138,7 @@ coresight_event_disable(struct hwt_thread *thr, int cpu_id)
 
 	event = &cs_event[cpu_id];
 
-	coresight_disable(event, cpu_id);
+	coresight_disable(event);
 }
 
 static int
@@ -151,7 +151,7 @@ coresight_event_read(struct hwt_thread *thr, int cpu_id,
 
 	KASSERT(event != NULL, ("No event found"));
 
-	coresight_read(event, cpu_id);
+	coresight_read(event);
 
 	*curpage = event->etr.curpage;
 	*curpage_offset = event->etr.curpage_offset;
@@ -166,7 +166,7 @@ coresight_event_dump(struct hwt_thread *thr, int cpu_id)
 
 	event = &cs_event[cpu_id];
 
-	coresight_dump(event, cpu_id);
+	coresight_dump(event);
 }
 
 static struct hwt_backend_ops coresight_ops = {
