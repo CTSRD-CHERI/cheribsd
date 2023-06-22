@@ -5250,6 +5250,13 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 			new_entry->cred = NULL;
 
 			vm_map_entry_link(new_map, new_entry);
+			/*
+			 * Install as rev_entry if required before adding
+			 * to the quarantine list so we don't get merged
+			 * with a newly quarantined neighbor.
+			 */
+			if (old_entry == old_map->rev_entry)
+				new_map->rev_entry = new_entry;
 			vm_map_entry_quarantine(new_map, new_entry);
 			vmspace_map_entry_forked(vm1, vm2, new_entry);
 
