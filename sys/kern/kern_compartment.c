@@ -94,9 +94,6 @@ compartment_create(int id)
 		panic("compartment_create unable to allocate stack");
 	}
 
-	printf("compartment_create: stack pointer %#lp",
-	    (void *)compartment->c_kstackptr);
-
 	TAILQ_INSERT_HEAD(&compartment->c_thread->td_compartments, compartment,
 	    c_next);
 	return (compartment);
