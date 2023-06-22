@@ -127,12 +127,21 @@ struct mrsas_iocpacket32 {
 #pragma pack()
 #endif					/* COMPAT_FREEBSD32 */
 
+#if !__CHERI_USER_ABI
+/*
+ * Packing is gratutious, but part of the ABI. Don't pack in CheriABI
+ * where it won't work.
+ */
+#pragma pack(1)
+#endif
 struct mfi_ioc_passthru {
 	struct mrsas_dcmd_frame ioc_frame;
 	uint32_t pad_skinny_flag;
 	uint32_t buf_size;
-	uint8_t *buf;
-} __packed;
+	uint8_t * __kerncap buf;
+};
+
+#pragma pack()
 
 #define MFIIO_PASSTHRU  _IOWR('C', 102, struct mfi_ioc_passthru)
 
