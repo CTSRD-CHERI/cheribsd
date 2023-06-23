@@ -2300,6 +2300,7 @@ sched_switch(struct thread *td, int flags)
 
 #ifdef HWT_HOOKS
 		hwt_switch_out(td);
+		hwt_switch_in(newtd);
 #endif
 
 		td->td_oncpu = NOCPU;
@@ -2307,9 +2308,6 @@ sched_switch(struct thread *td, int flags)
 		cpuid = td->td_oncpu = PCPU_GET(cpuid);
 
 		SDT_PROBE0(sched, , , on__cpu);
-#ifdef HWT_HOOKS
-		hwt_switch_in(td);
-#endif
 
 #ifdef	HWPMC_HOOKS
 		if (PMC_PROC_IS_USING_PMCS(td->td_proc))
@@ -3135,6 +3133,10 @@ sched_ap_entry(void)
 
 	newtd = sched_throw_grab(tdq);
 
+#ifdef HWT_HOOKS
+	hwt_switch_in(newtd);
+#endif
+
 	/* doesn't return */
 	cpu_throw(NULL, newtd);
 }
@@ -3160,6 +3162,10 @@ sched_throw(struct thread *td)
 	thread_lock_block(td);
 
 	newtd = sched_throw_grab(tdq);
+
+#ifdef HWT_HOOKS
+	hwt_switch_in(newtd);
+#endif
 
 	/* doesn't return */
 	cpu_switch(td, newtd, TDQ_LOCKPTR(tdq));
