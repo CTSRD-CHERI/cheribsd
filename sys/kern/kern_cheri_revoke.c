@@ -359,13 +359,13 @@ fast_out:
 		    (flags & CHERI_REVOKE_LAST_NO_EARLY) == 0) {
 			int vmcflags = 0;
 
-			    /* Userspace can ask us to avoid an IPI here */
+			/* Userspace can ask us to avoid an IPI here */
 			vmcflags |= (flags & CHERI_REVOKE_EARLY_SYNC)
-					? VM_CHERI_REVOKE_SYNC_CD : 0;
+			    ? VM_CHERI_REVOKE_SYNC_CD : 0;
 
-			    /* If not first pass, only recently capdirty */
+			/* If not first pass, only recently capdirty */
 			vmcflags |= (entryst == CHERI_REVOKE_ST_SS_INITED)
-					? VM_CHERI_REVOKE_INCREMENTAL : 0;
+			    ? VM_CHERI_REVOKE_INCREMENTAL : 0;
 
 			res = vm_cheri_revoke_pass(&vmcrc, vmcflags);
 
