@@ -608,6 +608,7 @@ ocsd_err_t TrcPktDecodeEtmV4I::decodePacket()
 
     default:
         // any other packet - bad packet error
+printf("UNKNOWN PACKET %d\n", m_curr_packet_in->getType());
         err = handleBadPacket("Unknown packet type.", m_index_curr_pkt);
         break;
     }
