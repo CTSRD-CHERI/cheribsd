@@ -42,7 +42,7 @@
 #include "hwtvar.h"
 
 int
-hwt_elf_count_libs(const char *elf_path, int *nlibs0)
+hwt_elf_count_libs(const char *elf_path, uint32_t *nlibs0)
 {
 	GElf_Shdr shdr;
 	GElf_Phdr ph;
@@ -53,7 +53,7 @@ hwt_elf_count_libs(const char *elf_path, int *nlibs0)
 	Elf_Data *data;
 	GElf_Dyn dyn;
 	int is_dynamic;
-	int nlibs;
+	uint32_t nlibs;
 	int fd;
 	size_t i;
 
