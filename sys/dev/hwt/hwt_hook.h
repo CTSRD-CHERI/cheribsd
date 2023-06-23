@@ -44,6 +44,7 @@ struct hwt_record_entry {
 
 void hwt_switch_in(struct thread *td);
 void hwt_switch_out(struct thread *td);
+void hwt_thread_exit(struct thread *td);
 void hwt_record(struct thread *td, enum hwt_record_type record_type,
     struct hwt_record_entry *ent);
 
