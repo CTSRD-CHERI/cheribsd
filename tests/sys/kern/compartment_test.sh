@@ -91,7 +91,7 @@ main() {
 		;;
 	esac
 
-	_statsfile="stats/$(basename $(dirname $(sysctl -n kern.bootfile)))_${_status}_$(date "+%Y-%m-%d.%H:%M:%S").txt"
+	_statsfile="stats/${_test}_${_status}_$(basename $(dirname $(sysctl -n kern.bootfile)))_$(date "+%Y-%m-%d.%H:%M:%S").txt"
 	check mkdir -p stats
 
 	case "${_test}" in
