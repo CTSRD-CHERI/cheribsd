@@ -56,7 +56,7 @@
 #include <libpmcstat.h>
 
 #define	PMCTRACE_CS_DEBUG
-//#undef	PMCTRACE_CS_DEBUG
+#undef	PMCTRACE_CS_DEBUG
 
 #ifdef	PMCTRACE_CS_DEBUG
 #define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)

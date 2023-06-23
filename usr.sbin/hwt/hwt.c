@@ -282,7 +282,5 @@ main(int argc __unused, char **argv, char **env)
 
 	close(fd);
 
-	//while (1);
-
 	return (0);
 }
