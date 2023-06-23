@@ -96,15 +96,12 @@ static struct mtx hwt_backend_mtx;
 static LIST_HEAD(, hwt_backend)	hwt_backends;
 
 static int
-hwt_backend_init(struct hwt_thread *thr)
+hwt_backend_init(struct hwt_context *ctx)
 {
-	struct hwt_context *ctx;
 
 	dprintf("%s\n", __func__);
 
-	ctx = thr->ctx;
-
-	ctx->hwt_backend->ops->hwt_backend_init(thr);
+	ctx->hwt_backend->ops->hwt_backend_init(ctx);
 
 	return (0);
 }
@@ -113,7 +110,7 @@ static int
 hwt_backend_deinit(struct hwt_context *ctx)
 {
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	ctx->hwt_backend->ops->hwt_backend_deinit();
 
@@ -255,6 +252,20 @@ static struct cdev_pager_ops hwt_pager_ops = {
 	.cdev_pg_ctor = hwt_ctor,
 	.cdev_pg_dtor = hwt_dtor
 }; 
+
+struct hwt_thread *
+hwt_thread_get_first(struct hwt_context *ctx)
+{
+	struct hwt_thread *thr;
+
+	mtx_lock_spin(&ctx->mtx_threads);
+	thr = LIST_FIRST(&ctx->threads);
+	mtx_unlock_spin(&ctx->mtx_threads);
+
+	KASSERT(thr != NULL, ("thr is NULL"));
+
+	return (thr);
+}
 
 static int
 hwt_thread_alloc_pages(struct hwt_thread *thr)
@@ -919,8 +930,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		KASSERT(thr != NULL, ("thr is NULL"));
 
-		/* Pass first thread as needed by Coresight, not Intel PT. */
-		error = hwt_backend_init(thr);
+		error = hwt_backend_init(ctx);
 		if (error)
 			return (error);
 

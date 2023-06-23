@@ -81,7 +81,7 @@ struct hwt_backend {
 };
 
 struct hwt_backend_ops {
-	void (*hwt_backend_init)(struct hwt_thread *);
+	void (*hwt_backend_init)(struct hwt_context *);
 	void (*hwt_backend_deinit)(void);
 	void (*hwt_backend_configure)(struct hwt_thread *, int cpu_id);
 	void (*hwt_backend_enable)(struct hwt_thread *, int cpu_id);
@@ -95,7 +95,7 @@ struct hwt_backend_ops {
 
 int hwt_register(struct hwt_backend *);
 int hwt_thread_create(struct hwt_context *ctx, struct thread *td);
-
+struct hwt_thread * hwt_thread_get_first(struct hwt_context *ctx);
 struct hwt_context * hwt_lookup_contexthash(struct proc *p);
 
 #endif /* !_DEV_HWT_HWTVAR_H_ */

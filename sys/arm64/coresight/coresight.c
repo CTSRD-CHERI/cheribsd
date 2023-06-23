@@ -65,10 +65,17 @@ static struct hwt_backend backend = {
 static struct coresight_event cs_event[MAXCPU];
 
 static void
-coresight_backend_init(struct hwt_thread *thr)
+coresight_backend_init(struct hwt_context *ctx)
 {
 	struct coresight_event *event;
+	struct hwt_thread *thr;
 	int cpu_id;
+
+	/*
+	 * Use buffer from the first thread as Funnel merges traces from
+	 * all CPUs to a single place.
+	 */
+	thr = hwt_thread_get_first(ctx);
 
 	for (cpu_id = 0; cpu_id < mp_ncpus; cpu_id++) {
 		event = &cs_event[cpu_id];
