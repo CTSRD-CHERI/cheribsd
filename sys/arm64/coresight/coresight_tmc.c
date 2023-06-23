@@ -261,7 +261,7 @@ tmc_configure_etr(device_t dev, struct endpoint *endp,
 	    FFCR_FON_TRIG_EVT | FFCR_TRIGON_TRIGIN;
 	bus_write_4(sc->res[0], TMC_FFCR, reg);
 
-	bus_write_4(sc->res[0], TMC_TRG, 8);
+	bus_write_4(sc->res[0], TMC_TRG, 0x3ff);
 
 	if (sc->scatter_gather) {
 		dprintf("%s: event->etr.pages %p\n", __func__,
