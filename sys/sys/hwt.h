@@ -28,16 +28,56 @@
  * $FreeBSD$
  */
 
-#ifndef _DEV_HWT_HWT_RECORD_H_
-#define _DEV_HWT_HWT_RECORD_H_
+/* User-visible header. */
 
-enum hwt_record_type {
-	HWT_RECORD_MMAP,
-	HWT_RECORD_MUNMAP,
-	HWT_RECORD_EXECUTABLE,
-	HWT_RECORD_INTERP,
-	HWT_RECORD_THREAD_CREATE,
-	HWT_RECORD_THREAD_SET_NAME,
-};
+#include <sys/param.h>
+#include <sys/types.h>
+#include <sys/hwt_record.h>
 
-#endif /* !_DEV_HWT_HWT_RECORD_H_ */
+#ifndef _DEV_HWT_HWT_H_
+#define _DEV_HWT_HWT_H_
+
+#define	HWT_MAGIC	0x42
+#define	HWT_IOC_ALLOC \
+	_IOW(HWT_MAGIC, 0x00, struct hwt_alloc)
+#define	HWT_IOC_START \
+	_IOW(HWT_MAGIC, 0x01, struct hwt_start)
+#define	HWT_IOC_RECORD_GET \
+	_IOW(HWT_MAGIC, 0x02, struct hwt_record_get)
+#define	HWT_IOC_BUFPTR_GET \
+	_IOW(HWT_MAGIC, 0x03, struct hwt_bufptr_get)
+
+#define	HWT_BACKEND_MAXNAMELEN	256
+
+struct hwt_alloc {
+	size_t		bufsize;
+	pid_t		pid;
+	const char	*backend_name;
+} __aligned(16);
+
+struct hwt_start {
+	pid_t		pid;
+} __aligned(16);
+
+struct hwt_record_user_entry {
+	enum hwt_record_type record_type;
+	char fullpath[MAXPATHLEN];
+	uintptr_t addr;
+	size_t size;
+	lwpid_t tid;
+} __aligned(16);
+
+struct hwt_record_get {
+	struct hwt_record_user_entry	*records;
+	int				*nentries;
+	pid_t				pid;
+} __aligned(16);
+
+struct hwt_bufptr_get {
+	int		*ptr;
+	int		*curpage;
+	vm_offset_t	*curpage_offset;
+	pid_t		pid;
+} __aligned(16);
+
+#endif /* !_DEV_HWT_HWT_H_ */

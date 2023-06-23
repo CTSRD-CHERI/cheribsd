@@ -41,6 +41,7 @@
 #include <sys/module.h>
 #include <sys/mutex.h>
 #include <sys/rwlock.h>
+#include <sys/hwt.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -53,7 +54,6 @@
 
 #include <dev/hwt/hwt_hook.h>
 #include <dev/hwt/hwtvar.h>
-#include <dev/hwt/hwt.h>
 
 #define	HWT_DEBUG
 #undef	HWT_DEBUG

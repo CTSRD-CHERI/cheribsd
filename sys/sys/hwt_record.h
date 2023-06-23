@@ -28,6 +28,8 @@
  * $FreeBSD$
  */
 
+/* User-visible header. */
+
 #ifndef _DEV_HWT_HWT_RECORD_H_
 #define _DEV_HWT_HWT_RECORD_H_
 

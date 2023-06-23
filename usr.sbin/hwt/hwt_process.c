@@ -34,6 +34,7 @@
 #include <sys/mman.h>
 #include <sys/errno.h>
 #include <sys/wait.h>
+#include <sys/hwt.h>
 
 #include <assert.h>
 #include <stdio.h>
@@ -44,7 +45,6 @@
 #include <sysexits.h>
 #include <string.h>
 
-#include "hwt.h"
 #include "hwtvar.h"
 
 #include "libpmcstat_stubs.h"

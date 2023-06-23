@@ -33,6 +33,8 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/errno.h>
+#include <sys/hwt.h>
+#include <sys/hwt_record.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,7 +43,6 @@
 #include <signal.h>
 #include <string.h>
 
-#include "hwt.h"
 #include "hwtvar.h"
 
 #include "libpmcstat_stubs.h"

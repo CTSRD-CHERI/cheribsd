@@ -28,10 +28,10 @@
  * $FreeBSD$
  */
 
+#include <sys/hwt_record.h>
+
 #ifndef _DEV_HWT_HWT_HOOK_H_
 #define _DEV_HWT_HWT_HOOK_H_
-
-#include "hwt_record.h"
 
 struct hwt_record_entry {
 	enum hwt_record_type		record_type;

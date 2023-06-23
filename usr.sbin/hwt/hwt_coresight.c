@@ -35,6 +35,7 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/errno.h>
+#include <sys/hwt.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,7 +49,6 @@
 #include <opencsd/c_api/ocsd_c_api_types.h>
 #include <opencsd/c_api/opencsd_c_api.h>
 
-#include "hwt.h"
 #include "hwtvar.h"
 #include "hwt_coresight.h"
 

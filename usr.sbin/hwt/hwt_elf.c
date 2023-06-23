@@ -30,6 +30,8 @@
 
 #include <sys/param.h>
 #include <sys/types.h>
+#include <sys/hwt.h>
+
 #include <assert.h>
 #include <fcntl.h>
 #include <gelf.h>
@@ -38,7 +40,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "hwt.h"
 #include "hwtvar.h"
 
 int

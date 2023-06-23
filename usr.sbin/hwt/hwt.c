@@ -35,6 +35,7 @@
 #include <sys/errno.h>
 #include <sys/wait.h>
 #include <sys/time.h>
+#include <sys/hwt.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -46,7 +47,6 @@
 #include "libpmcstat_stubs.h"
 #include <libpmcstat.h>
 
-#include "hwt.h"
 #include "hwtvar.h"
 #include "hwt_coresight.h"
 
