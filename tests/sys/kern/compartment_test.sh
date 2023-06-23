@@ -115,7 +115,11 @@ main() {
 
 			check sudo sysctl -q security.compartment.test.${_test_sysctl}=${nentries} >/dev/null
 
-			counters_check "${nentries}"
+			if [ "${_status}" = "enabled" ]; then
+				counters_check "${nentries}"
+			else
+				counters_check 0
+			fi
 		done
 
 		for ii in $(jot ${ITERATIONS} 0); do
