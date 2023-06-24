@@ -51,6 +51,7 @@ struct hwt_context {
 };
 
 struct hwt_context * hwt_ctx_alloc(void);
+void hwt_ctx_free(struct hwt_context *ctx);
 
 struct hwt_context * hwt_ctx_lookup_by_owner(struct hwt_owner *ho, pid_t pid);
 struct hwt_context * hwt_ctx_lookup_contexthash(struct proc *p);

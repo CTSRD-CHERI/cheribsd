@@ -88,6 +88,13 @@ hwt_ctx_alloc(void)
 	return (ctx);
 }
 
+void
+hwt_ctx_free(struct hwt_context *ctx)
+{
+
+	free(ctx, M_HWT_CTX);
+}
+
 /*
  * To use by hwt_switch_in/out() and hwt_record() only.
  */

@@ -217,7 +217,7 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 	/* Allocate first thread and buffers. */
 	error = hwt_thread_alloc(&thr, ctx->bufsize);
 	if (error) {
-		free(ctx, M_HWT_CTX);
+		hwt_ctx_free(ctx);
 		return (error);
 	}
 
@@ -225,14 +225,14 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 	p = pfind(halloc->pid);
 	if (p == NULL) {
 		hwt_thread_free(thr);
-		free(ctx, M_HWT_CTX);
+		hwt_ctx_free(ctx);
 		return (ENXIO);
 	}
 
 	error = hwt_priv_check(td->td_proc, p);
 	if (error) {
 		hwt_thread_free(thr);
-		free(ctx, M_HWT_CTX);
+		hwt_ctx_free(ctx);
 		PROC_UNLOCK(p);
 		return (error);
 	}
@@ -460,13 +460,13 @@ hwt_stop_owner_hwts(struct hwt_owner *ho)
 			if (thr == NULL)
 				break;
 
-			/* TODO: hwt_thread_free instead ? */
-			hwt_thread_destroy_buffers(thr);
+			/* TODO: move into hwt_thread_free? */
 			destroy_dev_sched(thr->cdev);
-			free(thr, M_HWT_THREAD);
+
+			hwt_thread_free(thr);
 		}
 
-		free(ctx, M_HWT_CTX);
+		hwt_ctx_free(ctx);
 	}
 
 	hwt_owner_destroy(ho);
