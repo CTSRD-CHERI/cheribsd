@@ -214,7 +214,7 @@ hwt_thread_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		ptr_get = (struct hwt_bufptr_get *)addr;
 
 		/* Check if process is registered owner of any HWTs. */
-		ctx = hwt_lookup_by_owner_p(td->td_proc, ptr_get->pid);
+		ctx = hwt_ctx_lookup_by_owner_p(td->td_proc, ptr_get->pid);
 		if (ctx == NULL)
 			return (ENXIO);
 

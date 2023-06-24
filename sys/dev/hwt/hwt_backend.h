@@ -60,7 +60,7 @@ int hwt_backend_read(struct hwt_thread *thr, int *curpage,
     vm_offset_t *curpage_offset);
 
 int hwt_register(struct hwt_backend *);
-struct hwt_backend * hwt_lookup_backend(const char *name);
+struct hwt_backend * hwt_backend_lookup(const char *name);
 
 void hwt_backend_load(void);
 

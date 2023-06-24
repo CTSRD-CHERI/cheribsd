@@ -86,7 +86,7 @@ static eventhandler_tag hwt_exit_tag;
 static struct cdev *hwt_cdev;
 
 static struct hwt_context *
-hwt_lookup_by_owner(struct hwt_owner *ho, pid_t pid)
+hwt_ctx_lookup_by_owner(struct hwt_owner *ho, pid_t pid)
 {
 	struct hwt_context *ctx;
 
@@ -103,7 +103,7 @@ hwt_lookup_by_owner(struct hwt_owner *ho, pid_t pid)
 }
 
 static struct hwt_owner *
-hwt_lookup_ownerhash(struct proc *p)
+hwt_ctx_lookup_ownerhash(struct proc *p)
 {
 	struct hwt_ownerhash *hoh;
 	struct hwt_owner *ho;
@@ -125,22 +125,22 @@ hwt_lookup_ownerhash(struct proc *p)
 }
 
 struct hwt_context *
-hwt_lookup_by_owner_p(struct proc *owner_p, pid_t pid)
+hwt_ctx_lookup_by_owner_p(struct proc *owner_p, pid_t pid)
 {
 	struct hwt_context *ctx;
 	struct hwt_owner *ho;
 
-	ho = hwt_lookup_ownerhash(owner_p);
+	ho = hwt_ctx_lookup_ownerhash(owner_p);
 	if (ho == NULL)
 		return (NULL);
 
-	ctx = hwt_lookup_by_owner(ho, pid);
+	ctx = hwt_ctx_lookup_by_owner(ho, pid);
 
 	return (ctx);
 }
 
 static struct hwt_context *
-hwt_alloc(void)
+hwt_ctx_alloc(void)
 {
 	struct hwt_context *ctx;
 
@@ -160,7 +160,7 @@ hwt_alloc(void)
  * To use by hwt_switch_in/out() and hwt_record() only.
  */
 struct hwt_context *
-hwt_lookup_contexthash(struct proc *p)
+hwt_ctx_lookup_contexthash(struct proc *p)
 {
 	struct hwt_contexthash *hch;
 	struct hwt_context *ctx;
@@ -182,7 +182,7 @@ hwt_lookup_contexthash(struct proc *p)
 }
 
 static void
-hwt_insert_contexthash(struct hwt_context *ctx)
+hwt_ctx_insert_contexthash(struct hwt_context *ctx)
 {
 	struct hwt_contexthash *hch;
 	int hindex;
@@ -198,7 +198,8 @@ hwt_insert_contexthash(struct hwt_context *ctx)
 }
 
 static int
-hwt_send_records(struct hwt_record_get *record_get, struct hwt_context *ctx)
+hwt_ioctl_send_records(struct hwt_context *ctx,
+    struct hwt_record_get *record_get)
 {
 	struct hwt_record_entry *entry, *entry1;
 	struct hwt_record_user_entry *user_entry;
@@ -337,15 +338,15 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 	if (error)
 		return (error);
 
-	backend = hwt_lookup_backend(backend_name);
+	backend = hwt_backend_lookup(backend_name);
 	if (backend == NULL)
 		return (ENXIO);
 
 	/* First get the owner. */
-	ho = hwt_lookup_ownerhash(td->td_proc);
+	ho = hwt_ctx_lookup_ownerhash(td->td_proc);
 	if (ho) {
 		/* Check if the owner have this pid configured already. */
-		ctx = hwt_lookup_by_owner(ho, halloc->pid);
+		ctx = hwt_ctx_lookup_by_owner(ho, halloc->pid);
 		if (ctx)
 			return (EEXIST);
 	} else {
@@ -365,7 +366,7 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 	}
 
 	/* Allocate a new HWT context. */
-	ctx = hwt_alloc();
+	ctx = hwt_ctx_alloc();
 	ctx->bufsize = halloc->bufsize;
 	ctx->pid = halloc->pid;
 	ctx->hwt_backend = backend;
@@ -452,7 +453,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		dprintf("%s: start, pid %d\n", __func__, s->pid);
 
-		ctx = hwt_lookup_by_owner_p(td->td_proc, s->pid);
+		ctx = hwt_ctx_lookup_by_owner_p(td->td_proc, s->pid);
 		if (ctx == NULL)
 			return (ENXIO);
 
@@ -474,7 +475,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		ctx->proc = p;
 
-		hwt_insert_contexthash(ctx);
+		hwt_ctx_insert_contexthash(ctx);
 		PROC_UNLOCK(p);
 
 		return (0);
@@ -483,11 +484,11 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		rget = (struct hwt_record_get *)addr;
 
 		/* Check if process is registered owner of any HWTs. */
-		ctx = hwt_lookup_by_owner_p(td->td_proc, rget->pid);
+		ctx = hwt_ctx_lookup_by_owner_p(td->td_proc, rget->pid);
 		if (ctx == NULL)
 			return (ENXIO);
 
-		error = hwt_send_records(rget, ctx);
+		error = hwt_ioctl_send_records(ctx, rget);
 		return (error);
 	default:
 		return (ENXIO);
@@ -512,7 +513,7 @@ hwt_switch_in(struct thread *td)
 
 	cpu_id = PCPU_GET(cpuid);
 
-	ctx = hwt_lookup_contexthash(p);
+	ctx = hwt_ctx_lookup_contexthash(p);
 	if (ctx == NULL)
 		return;
 	thr = hwt_thread_lookup(ctx, td);
@@ -538,7 +539,7 @@ hwt_switch_out(struct thread *td)
 
 	cpu_id = PCPU_GET(cpuid);
 
-	ctx = hwt_lookup_contexthash(p);
+	ctx = hwt_ctx_lookup_contexthash(p);
 	if (ctx == NULL)
 		return;
 	thr = hwt_thread_lookup(ctx, td);
@@ -563,7 +564,7 @@ hwt_thread_exit(struct thread *td)
 
 	cpu_id = PCPU_GET(cpuid);
 
-	ctx = hwt_lookup_contexthash(p);
+	ctx = hwt_ctx_lookup_contexthash(p);
 	if (ctx == NULL)
 		return;
 	thr = hwt_thread_lookup(ctx, td);
@@ -646,7 +647,7 @@ hwt_process_exit(void *arg __unused, struct proc *p)
 	hch = &hwt_contexthash[hindex];
 
 	/* Stop HWTs associated with exiting owner, if any. */
-	ho = hwt_lookup_ownerhash(p);
+	ho = hwt_ctx_lookup_ownerhash(p);
 	if (ho)
 		hwt_stop_owner_hwts(hch, ho);
 }

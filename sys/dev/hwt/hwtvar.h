@@ -74,7 +74,7 @@ struct hwt_owner {
 	LIST_ENTRY(hwt_owner)		next; /* Entry in hwt owner hash. */
 };
 
-struct hwt_context * hwt_lookup_contexthash(struct proc *p);
-struct hwt_context * hwt_lookup_by_owner_p(struct proc *owner_p, pid_t pid);
+struct hwt_context * hwt_ctx_lookup_contexthash(struct proc *p);
+struct hwt_context * hwt_ctx_lookup_by_owner_p(struct proc *owner_p, pid_t pid);
 
 #endif /* !_DEV_HWT_HWTVAR_H_ */

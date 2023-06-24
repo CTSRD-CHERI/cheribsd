@@ -164,7 +164,7 @@ hwt_backend_read(struct hwt_thread *thr, int *curpage,
 }
 
 struct hwt_backend *
-hwt_lookup_backend(const char *name)
+hwt_backend_lookup(const char *name)
 {
 	struct hwt_backend *backend;
 
