@@ -201,12 +201,9 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 			return (EEXIST);
 	} else {
 		/* Create a new owner. */
-		ho = malloc(sizeof(struct hwt_owner), M_HWT_OWNER,
-		    M_WAITOK | M_ZERO);
-		ho->p = td->td_proc;
-		LIST_INIT(&ho->hwts);
-		mtx_init(&ho->mtx, "hwts", NULL, MTX_DEF);
-
+		ho = hwt_owner_create(td->td_proc);
+		if (ho == NULL)
+			return (ENOMEM);
 		hwt_owner_insert(ho);
 	}
 
@@ -262,15 +259,7 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 
 	/* Pass thread ID to user for mmap. */
 
-	struct hwt_record_entry *entry;
-	entry = malloc(sizeof(struct hwt_record_entry), M_HWT_RECORD,
-	    M_WAITOK | M_ZERO);
-	entry->record_type = HWT_RECORD_THREAD_CREATE;
-	entry->tid = thr->tid;
-
-	mtx_lock(&ctx->mtx_records);
-	LIST_INSERT_HEAD(&ctx->records, entry, next);
-	mtx_unlock(&ctx->mtx_records);
+	hwt_record_thread(thr);
 
 	return (0);
 }

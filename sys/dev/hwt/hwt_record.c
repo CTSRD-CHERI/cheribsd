@@ -143,3 +143,21 @@ hwt_record_grab(struct hwt_context *ctx,
 
 	return (i);
 }
+
+void
+hwt_record_thread(struct hwt_thread *thr)
+{
+	struct hwt_record_entry *entry;
+	struct hwt_context *ctx;
+
+	ctx = thr->ctx;
+
+	entry = malloc(sizeof(struct hwt_record_entry), M_HWT_RECORD,
+	    M_WAITOK | M_ZERO);
+	entry->record_type = HWT_RECORD_THREAD_CREATE;
+	entry->tid = thr->tid;
+
+	mtx_lock(&ctx->mtx_records);
+	LIST_INSERT_HEAD(&ctx->records, entry, next);
+	mtx_unlock(&ctx->mtx_records);
+}

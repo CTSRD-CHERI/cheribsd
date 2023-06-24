@@ -38,6 +38,7 @@ struct hwt_owner {
 	LIST_ENTRY(hwt_owner)		next; /* Entry in hwt owner hash. */
 };
 
+struct hwt_owner * hwt_owner_create(struct proc *p);
 void hwt_owner_insert(struct hwt_owner *ho);
 void hwt_owner_destroy(struct hwt_owner *ho);
 

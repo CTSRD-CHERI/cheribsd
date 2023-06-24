@@ -124,6 +124,21 @@ hwt_owner_insert(struct hwt_owner *ho)
 	mtx_unlock_spin(&hwt_ownerhash_mtx);
 }
 
+struct hwt_owner *
+hwt_owner_create(struct proc *p)
+{
+	struct hwt_owner *ho;
+
+	ho = malloc(sizeof(struct hwt_owner), M_HWT_OWNER,
+	    M_WAITOK | M_ZERO);
+	ho->p = p;
+
+	LIST_INIT(&ho->hwts);
+	mtx_init(&ho->mtx, "hwts", NULL, MTX_DEF);
+
+	return (ho);
+}
+
 void
 hwt_owner_destroy(struct hwt_owner *ho)
 {
