@@ -31,13 +31,17 @@
 #ifndef _DEV_HWT_HWT_THREAD_H_
 #define _DEV_HWT_HWT_THREAD_H_
 
+/* Thread allocation. */
 int hwt_thread_alloc(struct hwt_thread **thr0, size_t bufsize);
 int hwt_thread_create_cdev(struct hwt_thread *thr);
 int hwt_thread_create(struct hwt_context *ctx, struct thread *td);
 
+/* Thread de-allocation. */
 void hwt_thread_free(struct hwt_thread *thr);
 void hwt_thread_destroy_buffers(struct hwt_thread *thr);
 
+/* Thread list mgt. */
+void hwt_thread_insert(struct hwt_context *ctx, struct hwt_thread *thr);
 struct hwt_thread * hwt_thread_first(struct hwt_context *ctx);
 struct hwt_thread * hwt_thread_lookup(struct hwt_context *ctx,
     struct thread *td);

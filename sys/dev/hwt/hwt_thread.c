@@ -392,3 +392,12 @@ hwt_thread_create(struct hwt_context *ctx, struct thread *td)
 
 	return (0);
 }
+
+void
+hwt_thread_insert(struct hwt_context *ctx, struct hwt_thread *thr)
+{
+
+	mtx_lock_spin(&ctx->mtx_threads);
+	LIST_INSERT_HEAD(&ctx->threads, thr, next);
+	mtx_unlock_spin(&ctx->mtx_threads);
+}

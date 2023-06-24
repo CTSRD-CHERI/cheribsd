@@ -43,15 +43,6 @@
 #include <sys/rwlock.h>
 #include <sys/hwt.h>
 
-#include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_page.h>
-#include <vm/vm_object.h>
-#include <vm/vm_pager.h>
-#include <vm/vm_pageout.h>
-#include <vm/vm_phys.h>
-
 #include <dev/hwt/hwt_hook.h>
 #include <dev/hwt/hwtvar.h>
 #include <dev/hwt/hwt_backend.h>
@@ -407,9 +398,7 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 	thr->tid = FIRST_THREAD_IN_PROC(p)->td_tid;
 	thr->thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
 
-	mtx_lock_spin(&ctx->mtx_threads);
-	LIST_INSERT_HEAD(&ctx->threads, thr, next);
-	mtx_unlock_spin(&ctx->mtx_threads);
+	hwt_thread_insert(ctx, thr);
 
 	mtx_lock(&ho->mtx);
 	LIST_INSERT_HEAD(&ho->hwts, ctx, next_hwts);
