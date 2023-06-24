@@ -66,6 +66,8 @@
 #define	dprintf(fmt, ...)
 #endif
 
+static MALLOC_DEFINE(M_HWT_THREAD, "hwt_thread", "Hardware Trace");
+
 static int
 hwt_thread_fault(vm_object_t vm_obj, vm_ooffset_t offset,
     int prot, vm_page_t *mres)

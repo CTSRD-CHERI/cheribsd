@@ -58,6 +58,8 @@
 
 #define	HWT_CONTEXTHASH_SIZE	1024
 
+static MALLOC_DEFINE(M_HWT_CTX, "hwt_ctx", "Hardware Trace");
+
 /*
  * Hash function.  Discard the lower 2 bits of the pointer since
  * these are always zero for our uses.  The hash multiplier is

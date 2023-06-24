@@ -65,11 +65,6 @@
 
 static MALLOC_DEFINE(M_HWT, "hwt", "Hardware Trace");
 
-MALLOC_DEFINE(M_HWT_RECORD, "hwt_record", "Hardware Trace");
-MALLOC_DEFINE(M_HWT_CTX, "hwt_ctx", "Hardware Trace");
-MALLOC_DEFINE(M_HWT_OWNER, "hwt_owner", "Hardware Trace");
-MALLOC_DEFINE(M_HWT_THREAD, "hwt_thread", "Hardware Trace");
-
 static eventhandler_tag hwt_exit_tag;
 static struct cdev *hwt_cdev;
 

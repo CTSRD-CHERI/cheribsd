@@ -52,6 +52,8 @@
 #define	dprintf(fmt, ...)
 #endif
 
+static MALLOC_DEFINE(M_HWT_RECORD, "hwt_record", "Hardware Trace");
+
 void
 hwt_record(struct thread *td, enum hwt_record_type record_type,
     struct hwt_record_entry *ent)

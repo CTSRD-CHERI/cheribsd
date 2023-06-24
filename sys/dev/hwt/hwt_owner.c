@@ -58,6 +58,8 @@
 
 #define	HWT_OWNERHASH_SIZE	1024
 
+static MALLOC_DEFINE(M_HWT_OWNER, "hwt_owner", "Hardware Trace");
+
 /*
  * Hash function.  Discard the lower 2 bits of the pointer since
  * these are always zero for our uses.  The hash multiplier is
