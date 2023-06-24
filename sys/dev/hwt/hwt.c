@@ -54,6 +54,7 @@
 
 #include <dev/hwt/hwt_hook.h>
 #include <dev/hwt/hwtvar.h>
+#include <dev/hwt/hwt_backend.h>
 
 #define	HWT_DEBUG
 #undef	HWT_DEBUG
@@ -91,137 +92,6 @@ static LIST_HEAD(hwt_ownerhash, hwt_owner)	*hwt_ownerhash;
 
 static eventhandler_tag hwt_exit_tag;
 static struct cdev *hwt_cdev;
-
-static struct mtx hwt_backend_mtx;
-static LIST_HEAD(, hwt_backend)	hwt_backends;
-
-static int
-hwt_backend_init(struct hwt_context *ctx)
-{
-
-	dprintf("%s\n", __func__);
-
-	ctx->hwt_backend->ops->hwt_backend_init(ctx);
-
-	return (0);
-}
-
-static int
-hwt_backend_deinit(struct hwt_context *ctx)
-{
-
-	dprintf("%s\n", __func__);
-
-	ctx->hwt_backend->ops->hwt_backend_deinit();
-
-	return (0);
-}
-
-static int
-hwt_backend_configure(struct hwt_thread *thr, int cpu_id)
-{
-	struct hwt_context *ctx;
-
-	dprintf("%s\n", __func__);
-
-	ctx = thr->ctx;
-
-	ctx->hwt_backend->ops->hwt_backend_configure(thr, cpu_id);
-
-	return (0);
-}
-
-static int
-hwt_backend_enable(struct hwt_thread *thr, int cpu_id)
-{
-	struct hwt_context *ctx;
-
-	dprintf("%s\n", __func__);
-
-	ctx = thr->ctx;
-
-	ctx->hwt_backend->ops->hwt_backend_enable(thr, cpu_id);
-
-	return (0);
-}
-
-static int
-hwt_backend_disable(struct hwt_thread *thr, int cpu_id)
-{
-	struct hwt_context *ctx;
-
-	dprintf("%s\n", __func__);
-
-	ctx = thr->ctx;
-
-	ctx->hwt_backend->ops->hwt_backend_disable(thr, cpu_id);
-
-	return (0);
-}
-
-static int __unused
-hwt_backend_dump(struct hwt_thread *thr, int cpu_id)
-{
-	struct hwt_context *ctx;
-
-	dprintf("%s\n", __func__);
-
-	ctx = thr->ctx;
-
-	ctx->hwt_backend->ops->hwt_backend_dump(thr, cpu_id);
-
-	return (0);
-}
-
-static int
-hwt_backend_read(struct hwt_thread *thr, int *curpage,
-    vm_offset_t *curpage_offset)
-{
-	struct hwt_context *ctx;
-	int error;
-
-	dprintf("%s\n", __func__);
-
-	ctx = thr->ctx;
-
-	error = ctx->hwt_backend->ops->hwt_backend_read(thr, 0, curpage,
-	    curpage_offset);
-
-	return (error);
-}
-
-static struct hwt_backend *
-hwt_lookup_backend(const char *name)
-{
-	struct hwt_backend *backend;
-
-	mtx_lock_spin(&hwt_backend_mtx);
-	LIST_FOREACH(backend, &hwt_backends, next) {
-		if (strcmp(backend->name, name) == 0) {
-			mtx_unlock_spin(&hwt_backend_mtx);
-			return (backend);
-		}
-	}
-	mtx_unlock_spin(&hwt_backend_mtx);
-
-	return (NULL);
-}
-
-int
-hwt_register(struct hwt_backend *backend)
-{
-
-	if (backend == NULL ||
-	    backend->name == NULL ||
-	    backend->ops == NULL)
-		return (EINVAL);
-
-	mtx_lock_spin(&hwt_backend_mtx);
-	LIST_INSERT_HEAD(&hwt_backends, backend, next);
-	mtx_unlock_spin(&hwt_backend_mtx);
-
-	return (0);
-}
 
 static int
 hwt_fault(vm_object_t vm_obj, vm_ooffset_t offset,
@@ -1124,8 +994,6 @@ hwt_load(void)
 	struct make_dev_args args;
 	int error;
 
-	LIST_INIT(&hwt_backends);
-
 	make_dev_args_init(&args);
 	args.mda_devsw = &hwt_cdevsw;
 	args.mda_flags = MAKEDEV_CHECKNAME | MAKEDEV_WAITOK;
@@ -1145,7 +1013,7 @@ hwt_load(void)
 	hwt_ownerhash = hashinit(HWT_OWNERHASH_SIZE, M_HWT, &hwt_ownerhashmask);
         mtx_init(&hwt_ownerhash_mtx, "hwt-owner-hash", "hwt-owner", MTX_SPIN);
 
-	mtx_init(&hwt_backend_mtx, "hwt backend", NULL, MTX_SPIN);
+	hwt_backend_load();
 
 	hwt_exit_tag = EVENTHANDLER_REGISTER(process_exit, hwt_process_exit,
 	    NULL, EVENTHANDLER_PRI_ANY);

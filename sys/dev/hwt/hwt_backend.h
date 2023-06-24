@@ -28,54 +28,41 @@
  * $FreeBSD$
  */
 
-#ifndef _DEV_HWT_HWTVAR_H_
-#define _DEV_HWT_HWTVAR_H_
+#ifndef _DEV_HWT_HWT_BACKEND_H_
+#define _DEV_HWT_HWT_BACKEND_H_
 
-MALLOC_DECLARE(M_HWT);
+struct hwt_backend_ops {
+	void (*hwt_backend_init)(struct hwt_context *);
+	void (*hwt_backend_deinit)(void);
+	void (*hwt_backend_configure)(struct hwt_thread *, int cpu_id);
+	void (*hwt_backend_enable)(struct hwt_thread *, int cpu_id);
+	void (*hwt_backend_disable)(struct hwt_thread *, int cpu_id);
+	int (*hwt_backend_read)(struct hwt_thread *, int cpu_id,
+	    int *curpage, vm_offset_t *curpage_offset);
 
-#define	HWT_LOCK(sc)			mtx_lock(&(sc)->mtx)
-#define	HWT_UNLOCK(sc)			mtx_unlock(&(sc)->mtx)
-#define	HWT_ASSERT_LOCKED(sc)		mtx_assert(&(sc)->mtx, MA_OWNED)
-
-struct hwt_thread {
-	vm_page_t			*pages;
-	int				npages;
-	lwpid_t				tid;
-	vm_object_t			obj;
-	struct cdev			*cdev;
-	struct hwt_context		*ctx;
-	LIST_ENTRY(hwt_thread)		next;
-	int				thread_id; /* Specific to ARM backend.*/
+	/* Debugging only. */
+	void (*hwt_backend_dump)(struct hwt_thread *, int cpu_id);
 };
 
-struct hwt_context {
-	LIST_HEAD(, hwt_thread)		threads;
-	struct mtx			mtx_threads;
-	size_t				bufsize; /* Applied to hwt_thread. */
-
-	LIST_HEAD(, hwt_record_entry)	records;
-	struct mtx			mtx_records;
-
-	LIST_ENTRY(hwt_context)		next_hch; /* Entry in contexthash. */
-	LIST_ENTRY(hwt_context)		next_hwts; /* Entry in ho->hwts. */
-
-	struct proc			*proc; /* Could be NULL if exited. */
-	pid_t				pid;
-
-	struct hwt_owner		*hwt_owner;
-	struct hwt_backend		*hwt_backend;
-	int				thread_counter;
+struct hwt_backend {
+	const char			*name;
+	struct hwt_backend_ops		*ops;
+	LIST_ENTRY(hwt_backend)		next;
 };
 
-struct hwt_owner {
-	struct proc			*p;
-	struct mtx			mtx; /* Protects hwts. */
-	LIST_HEAD(, hwt_context)	hwts; /* Owned HWTs. */
-	LIST_ENTRY(hwt_owner)		next; /* Entry in hwt owner hash. */
-};
+int hwt_backend_init(struct hwt_context *ctx);
+int hwt_backend_deinit(struct hwt_context *ctx);
+int hwt_backend_configure(struct hwt_thread *thr, int cpu_id);
+int hwt_backend_enable(struct hwt_thread *thr, int cpu_id);
+int hwt_backend_disable(struct hwt_thread *thr, int cpu_id);
+int hwt_backend_dump(struct hwt_thread *thr, int cpu_id);
+int hwt_backend_read(struct hwt_thread *thr, int *curpage,
+    vm_offset_t *curpage_offset);
 
-int hwt_thread_create(struct hwt_context *ctx, struct thread *td);
-struct hwt_thread * hwt_thread_get_first(struct hwt_context *ctx);
-struct hwt_context * hwt_lookup_contexthash(struct proc *p);
+int hwt_register(struct hwt_backend *);
+struct hwt_backend * hwt_lookup_backend(const char *name);
 
-#endif /* !_DEV_HWT_HWTVAR_H_ */
+void hwt_backend_load(void);
+
+#endif /* !_DEV_HWT_HWT_BACKEND_H_ */
+

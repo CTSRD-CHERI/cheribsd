@@ -329,6 +329,7 @@ dev/hyperv/netvsc/if_hn.c			optional hyperv acpi
 dev/hyperv/pcib/vmbus_pcib.c			optional hyperv pci acpi
 
 dev/hwt/hwt.c					optional hwt
+dev/hwt/hwt_backend.c				optional hwt
 dev/hwt/hwt_record.c				optional hwt
 
 dev/ice/if_ice_iflib.c				optional ice pci \

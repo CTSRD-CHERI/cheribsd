@@ -42,6 +42,7 @@
 
 #include <arm64/coresight/coresight.h>
 #include <dev/hwt/hwtvar.h>
+#include <dev/hwt/hwt_backend.h>
 
 #define	CORESIGHT_DEBUG
 #undef CORESIGHT_DEBUG
