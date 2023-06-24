@@ -56,7 +56,7 @@
 #define	dprintf(fmt, ...)
 #endif
 
-#define	HWT_PROCHASH_SIZE	1024
+#define	HWT_CONTEXTHASH_SIZE	1024
 
 /*
  * Hash function.  Discard the lower 2 bits of the pointer since
@@ -76,7 +76,7 @@ hwt_ctx_alloc(void)
 {
 	struct hwt_context *ctx;
 
-	ctx = malloc(sizeof(struct hwt_context), M_HWT, M_WAITOK | M_ZERO);
+	ctx = malloc(sizeof(struct hwt_context), M_HWT_CTX, M_WAITOK | M_ZERO);
 	ctx->thread_counter = 1;
 
 	LIST_INIT(&ctx->records);
@@ -142,7 +142,7 @@ void
 hwt_context_load(void)
 {
 
-	hwt_contexthash = hashinit(HWT_PROCHASH_SIZE, M_HWT,
+	hwt_contexthash = hashinit(HWT_CONTEXTHASH_SIZE, M_HWT_CTX,
 	    &hwt_contexthashmask);
         mtx_init(&hwt_contexthash_mtx, "hwt-proc-hash", "hwt-proc", MTX_SPIN);
 }

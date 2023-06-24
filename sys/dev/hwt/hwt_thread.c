@@ -285,8 +285,8 @@ hwt_thread_alloc_buffers(struct hwt_thread *thr)
 {
 	int error;
 
-	thr->pages = malloc(sizeof(struct vm_page *) * thr->npages, M_HWT,
-	    M_WAITOK | M_ZERO);
+	thr->pages = malloc(sizeof(struct vm_page *) * thr->npages,
+	    M_HWT_THREAD, M_WAITOK | M_ZERO);
 
 	error = hwt_thread_alloc_pages(thr);
 	if (error) {
@@ -319,7 +319,7 @@ hwt_thread_destroy_buffers(struct hwt_thread *thr)
 	vm_pager_deallocate(thr->obj);
 	VM_OBJECT_WUNLOCK(thr->obj);
 
-	free(thr->pages, M_HWT);
+	free(thr->pages, M_HWT_THREAD);
 }
 
 /*
@@ -348,7 +348,8 @@ hwt_thread_alloc(struct hwt_thread **thr0, size_t bufsize)
 	struct hwt_thread *thr;
 	int error;
 
-	thr = malloc(sizeof(struct hwt_thread), M_HWT, M_WAITOK | M_ZERO);
+	thr = malloc(sizeof(struct hwt_thread), M_HWT_THREAD,
+	    M_WAITOK | M_ZERO);
 	thr->npages = bufsize / PAGE_SIZE;
 
 	error = hwt_thread_alloc_buffers(thr);
@@ -366,7 +367,7 @@ hwt_thread_free(struct hwt_thread *thr)
 
 	hwt_thread_destroy_buffers(thr);
 
-	free(thr, M_HWT);
+	free(thr, M_HWT_THREAD);
 }
 
 int

@@ -62,11 +62,9 @@
 /* No real reason for this limitation except sanity checks. */
 #define	HWT_MAXBUFSIZE		(1U * 1024 * 1024 * 1024) /* 1 GB */
 
-MALLOC_DEFINE(M_HWT, "hwt", "Hardware Trace");
 MALLOC_DEFINE(M_HWT_RECORD, "hwt_record", "Hardware Trace");
 MALLOC_DEFINE(M_HWT_CTX, "hwt_ctx", "Hardware Trace");
 MALLOC_DEFINE(M_HWT_OWNER, "hwt_owner", "Hardware Trace");
-MALLOC_DEFINE(M_HWT_BACKEND, "hwt_backend", "Hardware Trace");
 MALLOC_DEFINE(M_HWT_THREAD, "hwt_thread", "Hardware Trace");
 
 static eventhandler_tag hwt_exit_tag;
@@ -92,7 +90,7 @@ hwt_ioctl_send_records(struct hwt_context *ctx,
 		return (ENXIO);
 
 	user_entry = malloc(sizeof(struct hwt_record_user_entry) * nitems_req,
-	    M_HWT, M_WAITOK | M_ZERO);
+	    M_HWT_RECORD, M_WAITOK | M_ZERO);
 
 	i = 0;
 
@@ -105,11 +103,11 @@ hwt_ioctl_send_records(struct hwt_context *ctx,
 		if (entry->fullpath != NULL) {
 			strncpy(user_entry[i].fullpath, entry->fullpath,
 			    MAXPATHLEN);
-			free(entry->fullpath, M_HWT);
+			free(entry->fullpath, M_HWT_RECORD);
 		}
 		LIST_REMOVE(entry, next);
 
-		free(entry, M_HWT);
+		free(entry, M_HWT_RECORD);
 
 		i += 1;
 
@@ -125,7 +123,7 @@ hwt_ioctl_send_records(struct hwt_context *ctx,
 	if (error == 0)
 		error = copyout(&i, record_get->nentries, sizeof(int));
 
-	free(user_entry, M_HWT);
+	free(user_entry, M_HWT_RECORD);
 
 	return (error);
 }
@@ -224,7 +222,7 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 			return (EEXIST);
 	} else {
 		/* Create a new owner. */
-		ho = malloc(sizeof(struct hwt_owner), M_HWT,
+		ho = malloc(sizeof(struct hwt_owner), M_HWT_OWNER,
 		    M_WAITOK | M_ZERO);
 		ho->p = td->td_proc;
 		LIST_INIT(&ho->hwts);
@@ -243,7 +241,7 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 	/* Allocate first thread and buffers. */
 	error = hwt_thread_alloc(&thr, ctx->bufsize);
 	if (error) {
-		free(ctx, M_HWT);
+		free(ctx, M_HWT_CTX);
 		return (error);
 	}
 
@@ -251,14 +249,14 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 	p = pfind(halloc->pid);
 	if (p == NULL) {
 		hwt_thread_free(thr);
-		free(ctx, M_HWT);
+		free(ctx, M_HWT_CTX);
 		return (ENXIO);
 	}
 
 	error = hwt_priv_check(td->td_proc, p);
 	if (error) {
 		hwt_thread_free(thr);
-		free(ctx, M_HWT);
+		free(ctx, M_HWT_CTX);
 		PROC_UNLOCK(p);
 		return (error);
 	}
@@ -286,7 +284,7 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 	/* Pass thread ID to user for mmap. */
 
 	struct hwt_record_entry *entry;
-	entry = malloc(sizeof(struct hwt_record_entry), M_HWT,
+	entry = malloc(sizeof(struct hwt_record_entry), M_HWT_RECORD,
 	    M_WAITOK | M_ZERO);
 	entry->record_type = HWT_RECORD_THREAD_CREATE;
 	entry->tid = thr->tid;
@@ -497,10 +495,10 @@ hwt_stop_owner_hwts(struct hwt_owner *ho)
 			/* TODO: hwt_thread_free instead ? */
 			hwt_thread_destroy_buffers(thr);
 			destroy_dev_sched(thr->cdev);
-			free(thr, M_HWT);
+			free(thr, M_HWT_THREAD);
 		}
 
-		free(ctx, M_HWT);
+		free(ctx, M_HWT_CTX);
 	}
 
 	hwt_owner_destroy(ho);

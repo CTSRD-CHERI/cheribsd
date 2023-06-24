@@ -133,13 +133,14 @@ hwt_owner_destroy(struct hwt_owner *ho)
 	LIST_REMOVE(ho, next);
 	mtx_unlock_spin(&hwt_ownerhash_mtx);
 
-	free(ho, M_HWT);
+	free(ho, M_HWT_OWNER);
 }
 
 void
 hwt_owner_load(void)
 {
 
-	hwt_ownerhash = hashinit(HWT_OWNERHASH_SIZE, M_HWT, &hwt_ownerhashmask);
+	hwt_ownerhash = hashinit(HWT_OWNERHASH_SIZE, M_HWT_OWNER,
+	    &hwt_ownerhashmask);
         mtx_init(&hwt_ownerhash_mtx, "hwt-owner-hash", "hwt-owner", MTX_SPIN);
 }
