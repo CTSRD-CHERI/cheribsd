@@ -48,6 +48,7 @@
 #include <dev/hwt/hwt_backend.h>
 #include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_thread.h>
+#include <dev/hwt/hwt_owner.h>
 
 #define	HWT_DEBUG
 #undef	HWT_DEBUG
@@ -210,10 +211,10 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 		return (ENXIO);
 
 	/* First get the owner. */
-	ho = hwt_ctx_lookup_ownerhash(td->td_proc);
+	ho = hwt_owner_lookup(td->td_proc);
 	if (ho) {
 		/* Check if the owner have this pid configured already. */
-		ctx = hwt_ctx_lookup_by_owner(ho, halloc->pid);
+		ctx = hwt_owner_lookup_ctx(ho, halloc->pid);
 		if (ctx)
 			return (EEXIST);
 	} else {
@@ -497,7 +498,7 @@ hwt_process_exit(void *arg __unused, struct proc *p)
 	struct hwt_owner *ho;
 
 	/* Stop HWTs associated with exiting owner, if any. */
-	ho = hwt_ctx_lookup_ownerhash(p);
+	ho = hwt_owner_lookup(p);
 	if (ho)
 		hwt_stop_owner_hwts(ho);
 }

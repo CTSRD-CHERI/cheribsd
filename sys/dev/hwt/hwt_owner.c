@@ -57,7 +57,7 @@
 #define	dprintf(fmt, ...)
 #endif
 
-#define	HWT_PROCHASH_SIZE	1024
+#define	HWT_OWNERHASH_SIZE	1024
 
 /*
  * Hash function.  Discard the lower 2 bits of the pointer since
@@ -68,97 +68,79 @@
 #define	_HWT_HM	11400714819323198486u	/* hash multiplier */
 #define	HWT_HASH_PTR(P, M)	((((unsigned long) (P) >> 2) * _HWT_HM) & (M))
 
-static struct mtx hwt_contexthash_mtx;
-static u_long hwt_contexthashmask;
-static LIST_HEAD(hwt_contexthash, hwt_context)	*hwt_contexthash;
+static struct mtx hwt_ownerhash_mtx;
+static u_long hwt_ownerhashmask;
+static LIST_HEAD(hwt_ownerhash, hwt_owner)	*hwt_ownerhash;
 
 struct hwt_context *
-hwt_ctx_lookup_by_owner_p(struct proc *owner_p, pid_t pid)
-{
-	struct hwt_context *ctx;
-	struct hwt_owner *ho;
-
-	ho = hwt_owner_lookup(owner_p);
-	if (ho == NULL)
-		return (NULL);
-
-	ctx = hwt_owner_lookup_ctx(ho, pid);
-
-	return (ctx);
-}
-
-struct hwt_context *
-hwt_ctx_alloc(void)
+hwt_owner_lookup_ctx(struct hwt_owner *ho, pid_t pid)
 {
 	struct hwt_context *ctx;
 
-	ctx = malloc(sizeof(struct hwt_context), M_HWT, M_WAITOK | M_ZERO);
-	ctx->thread_counter = 1;
-
-	LIST_INIT(&ctx->records);
-	mtx_init(&ctx->mtx_records, "hwt records", NULL, MTX_DEF);
-
-	LIST_INIT(&ctx->threads);
-	mtx_init(&ctx->mtx_threads, "hwt threads", NULL, MTX_SPIN);
-
-	return (ctx);
-}
-
-/*
- * To use by hwt_switch_in/out() and hwt_record() only.
- */
-struct hwt_context *
-hwt_ctx_lookup_contexthash(struct proc *p)
-{
-	struct hwt_contexthash *hch;
-	struct hwt_context *ctx;
-	int hindex;
-
-	hindex = HWT_HASH_PTR(p, hwt_contexthashmask);
-	hch = &hwt_contexthash[hindex];
-
-	mtx_lock_spin(&hwt_contexthash_mtx);
-	LIST_FOREACH(ctx, hch, next_hch) {
-		if (ctx->proc == p) {
-			mtx_unlock_spin(&hwt_contexthash_mtx);
+	mtx_lock(&ho->mtx);
+	LIST_FOREACH(ctx, &ho->hwts, next_hwts) {
+		if (ctx->pid == pid) {
+			mtx_unlock(&ho->mtx);
 			return (ctx);
 		}
 	}
-	mtx_unlock_spin(&hwt_contexthash_mtx);
+	mtx_unlock(&ho->mtx);
 
-	panic("no ctx");
+	return (NULL);
 }
 
-void
-hwt_ctx_insert_contexthash(struct hwt_context *ctx)
+struct hwt_owner *
+hwt_owner_lookup(struct proc *p)
 {
-	struct hwt_contexthash *hch;
+	struct hwt_ownerhash *hoh;
+	struct hwt_owner *ho;
 	int hindex;
 
-	PROC_LOCK_ASSERT(ctx->proc, MA_OWNED);
+	hindex = HWT_HASH_PTR(p, hwt_ownerhashmask);
+	hoh = &hwt_ownerhash[hindex];
 
-	hindex = HWT_HASH_PTR(ctx->proc, hwt_contexthashmask);
-	hch = &hwt_contexthash[hindex];
+	mtx_lock_spin(&hwt_ownerhash_mtx);
+	LIST_FOREACH(ho, hoh, next) {
+		if (ho->p == p) {
+			mtx_unlock_spin(&hwt_ownerhash_mtx);
+			return (ho);
+		}
+	}
+	mtx_unlock_spin(&hwt_ownerhash_mtx);
 
-	mtx_lock_spin(&hwt_contexthash_mtx);
-	LIST_INSERT_HEAD(hch, ctx, next_hch);
-	mtx_unlock_spin(&hwt_contexthash_mtx);
+	return (NULL);
 }
 
 void
-hwt_ctx_remove(struct hwt_context *ctx)
+hwt_owner_insert(struct hwt_owner *ho)
 {
+	struct hwt_ownerhash *hoh;
+	int hindex;
 
-	mtx_lock_spin(&hwt_contexthash_mtx);
-	LIST_REMOVE(ctx, next_hch);
-	mtx_unlock_spin(&hwt_contexthash_mtx);
+	hindex = HWT_HASH_PTR(ho->p, hwt_ownerhashmask);
+	hoh = &hwt_ownerhash[hindex];
+
+	mtx_lock_spin(&hwt_ownerhash_mtx);
+	LIST_INSERT_HEAD(hoh, ho, next);
+	mtx_unlock_spin(&hwt_ownerhash_mtx);
 }
 
 void
-hwt_context_load(void)
+hwt_owner_destroy(struct hwt_owner *ho)
 {
 
-	hwt_contexthash = hashinit(HWT_PROCHASH_SIZE, M_HWT,
-	    &hwt_contexthashmask);
-        mtx_init(&hwt_contexthash_mtx, "hwt-proc-hash", "hwt-proc", MTX_SPIN);
+	/* Destroy hwt owner. */
+	mtx_lock_spin(&hwt_ownerhash_mtx);
+	LIST_REMOVE(ho, next);
+	mtx_unlock_spin(&hwt_ownerhash_mtx);
+
+	free(ho, M_HWT);
+}
+
+void
+hwt_owner_load(void)
+{
+
+	hwt_ownerhash = hashinit(HWT_OWNERHASH_SIZE, M_HWT, &hwt_ownerhashmask);
+        mtx_init(&hwt_ownerhash_mtx, "hwt-owner-hash", "hwt-owner", MTX_SPIN);
 }
