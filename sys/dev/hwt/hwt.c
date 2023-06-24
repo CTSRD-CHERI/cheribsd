@@ -49,6 +49,7 @@
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_owner.h>
 #include <dev/hwt/hwt_backend.h>
+#include <dev/hwt/hwt_record.h>
 
 #define	HWT_DEBUG
 #undef	HWT_DEBUG
@@ -62,6 +63,8 @@
 /* No real reason for this limitation except sanity checks. */
 #define	HWT_MAXBUFSIZE		(1U * 1024 * 1024 * 1024) /* 1 GB */
 
+static MALLOC_DEFINE(M_HWT, "hwt", "Hardware Trace");
+
 MALLOC_DEFINE(M_HWT_RECORD, "hwt_record", "Hardware Trace");
 MALLOC_DEFINE(M_HWT_CTX, "hwt_ctx", "Hardware Trace");
 MALLOC_DEFINE(M_HWT_OWNER, "hwt_owner", "Hardware Trace");
@@ -74,7 +77,6 @@ static int
 hwt_ioctl_send_records(struct hwt_context *ctx,
     struct hwt_record_get *record_get)
 {
-	struct hwt_record_entry *entry, *entry1;
 	struct hwt_record_user_entry *user_entry;
 	int nitems_req;
 	int error;
@@ -90,32 +92,9 @@ hwt_ioctl_send_records(struct hwt_context *ctx,
 		return (ENXIO);
 
 	user_entry = malloc(sizeof(struct hwt_record_user_entry) * nitems_req,
-	    M_HWT_RECORD, M_WAITOK | M_ZERO);
+	    M_HWT, M_WAITOK | M_ZERO);
 
-	i = 0;
-
-	mtx_lock(&ctx->mtx_records);
-	LIST_FOREACH_SAFE(entry, &ctx->records, next, entry1) {
-		user_entry[i].addr = entry->addr;
-		user_entry[i].size = entry->size;
-		user_entry[i].record_type = entry->record_type;
-		user_entry[i].tid = entry->tid;
-		if (entry->fullpath != NULL) {
-			strncpy(user_entry[i].fullpath, entry->fullpath,
-			    MAXPATHLEN);
-			free(entry->fullpath, M_HWT_RECORD);
-		}
-		LIST_REMOVE(entry, next);
-
-		free(entry, M_HWT_RECORD);
-
-		i += 1;
-
-		if (i == nitems_req)
-			break;
-	}
-	mtx_unlock(&ctx->mtx_records);
-
+	i = hwt_record_grab(ctx, user_entry, nitems_req);
 	if (i > 0)
 		error = copyout(user_entry, record_get->records,
 		    sizeof(struct hwt_record_user_entry) * i);
@@ -123,7 +102,7 @@ hwt_ioctl_send_records(struct hwt_context *ctx,
 	if (error == 0)
 		error = copyout(&i, record_get->nentries, sizeof(int));
 
-	free(user_entry, M_HWT_RECORD);
+	free(user_entry, M_HWT);
 
 	return (error);
 }

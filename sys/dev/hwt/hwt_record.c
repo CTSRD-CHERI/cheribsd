@@ -33,6 +33,7 @@
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
+#include <sys/hwt.h>
 
 #include <vm/vm.h>
 
@@ -40,6 +41,7 @@
 #include <dev/hwt/hwtvar.h>
 #include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_thread.h>
+#include <dev/hwt/hwt_record.h>
 
 #define	HWT_RECORD_DEBUG
 #undef	HWT_RECORD_DEBUG
@@ -106,4 +108,38 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 	mtx_lock(&ctx->mtx_records);
 	LIST_INSERT_HEAD(&ctx->records, entry, next);
 	mtx_unlock(&ctx->mtx_records);
+}
+
+int
+hwt_record_grab(struct hwt_context *ctx,
+    struct hwt_record_user_entry *user_entry, int nitems_req)
+{
+	struct hwt_record_entry *entry, *entry1;
+	int i;
+
+	i = 0;
+
+	mtx_lock(&ctx->mtx_records);
+	LIST_FOREACH_SAFE(entry, &ctx->records, next, entry1) {
+		user_entry[i].addr = entry->addr;
+		user_entry[i].size = entry->size;
+		user_entry[i].record_type = entry->record_type;
+		user_entry[i].tid = entry->tid;
+		if (entry->fullpath != NULL) {
+			strncpy(user_entry[i].fullpath, entry->fullpath,
+			    MAXPATHLEN);
+			free(entry->fullpath, M_HWT_RECORD);
+		}
+		LIST_REMOVE(entry, next);
+
+		free(entry, M_HWT_RECORD);
+
+		i += 1;
+
+		if (i == nitems_req)
+			break;
+	}
+	mtx_unlock(&ctx->mtx_records);
+
+	return (i);
 }
