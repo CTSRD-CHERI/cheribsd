@@ -300,6 +300,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	struct hwt_record_get *rget;
 	struct hwt_context *ctx;
 	struct hwt_thread *thr;
+	struct hwt_owner *ho;
 	struct hwt_start *s;
 	struct proc *p;
 	int error;
@@ -316,7 +317,11 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		dprintf("%s: start, pid %d\n", __func__, s->pid);
 
-		ctx = hwt_ctx_lookup_by_owner_p(td->td_proc, s->pid);
+		ho = hwt_owner_lookup(td->td_proc);
+		if (ho == NULL)
+			return (ENXIO);
+
+		ctx = hwt_owner_lookup_ctx(ho, s->pid);
 		if (ctx == NULL)
 			return (ENXIO);
 
@@ -347,7 +352,11 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		rget = (struct hwt_record_get *)addr;
 
 		/* Check if process is registered owner of any HWTs. */
-		ctx = hwt_ctx_lookup_by_owner_p(td->td_proc, rget->pid);
+		ho = hwt_owner_lookup(td->td_proc);
+		if (ho == NULL)
+			return (ENXIO);
+
+		ctx = hwt_owner_lookup_ctx(ho, rget->pid);
 		if (ctx == NULL)
 			return (ENXIO);
 

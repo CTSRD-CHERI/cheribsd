@@ -73,21 +73,6 @@ static u_long hwt_contexthashmask;
 static LIST_HEAD(hwt_contexthash, hwt_context)	*hwt_contexthash;
 
 struct hwt_context *
-hwt_ctx_lookup_by_owner_p(struct proc *owner_p, pid_t pid)
-{
-	struct hwt_context *ctx;
-	struct hwt_owner *ho;
-
-	ho = hwt_owner_lookup(owner_p);
-	if (ho == NULL)
-		return (NULL);
-
-	ctx = hwt_owner_lookup_ctx(ho, pid);
-
-	return (ctx);
-}
-
-struct hwt_context *
 hwt_ctx_alloc(void)
 {
 	struct hwt_context *ctx;

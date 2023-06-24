@@ -34,7 +34,6 @@
 struct hwt_context * hwt_ctx_alloc(void);
 
 struct hwt_context * hwt_ctx_lookup_by_owner(struct hwt_owner *ho, pid_t pid);
-struct hwt_context * hwt_ctx_lookup_by_owner_p(struct proc *owner_p, pid_t pid);
 struct hwt_context * hwt_ctx_lookup_contexthash(struct proc *p);
 
 void hwt_ctx_insert_contexthash(struct hwt_context *ctx);
