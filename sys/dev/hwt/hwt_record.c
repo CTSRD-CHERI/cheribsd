@@ -39,6 +39,7 @@
 #include <dev/hwt/hwt_hook.h>
 #include <dev/hwt/hwtvar.h>
 #include <dev/hwt/hwt_thread.h>
+#include <dev/hwt/hwt_context.h>
 
 #define	HWT_RECORD_DEBUG
 #undef	HWT_RECORD_DEBUG

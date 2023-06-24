@@ -46,6 +46,7 @@
 #include <dev/hwt/hwt_hook.h>
 #include <dev/hwt/hwtvar.h>
 #include <dev/hwt/hwt_backend.h>
+#include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_thread.h>
 
 #define	HWT_DEBUG
@@ -57,145 +58,13 @@
 #define	dprintf(fmt, ...)
 #endif
 
-#define	HWT_PROCHASH_SIZE	1024
-#define	HWT_OWNERHASH_SIZE	1024
-
 /* No real reason for this limitation except sanity checks. */
 #define	HWT_MAXBUFSIZE		(1U * 1024 * 1024 * 1024) /* 1 GB */
 
 MALLOC_DEFINE(M_HWT, "hwt", "Hardware Trace");
 
-/*
- * Hash function.  Discard the lower 2 bits of the pointer since
- * these are always zero for our uses.  The hash multiplier is
- * round((2^LONG_BIT) * ((sqrt(5)-1)/2)).
- */
-
-#define	_HWT_HM	11400714819323198486u	/* hash multiplier */
-#define	HWT_HASH_PTR(P, M)	((((unsigned long) (P) >> 2) * _HWT_HM) & (M))
-
-static struct mtx hwt_contexthash_mtx;
-static u_long hwt_contexthashmask;
-static LIST_HEAD(hwt_contexthash, hwt_context)	*hwt_contexthash;
-
-static struct mtx hwt_ownerhash_mtx;
-static u_long hwt_ownerhashmask;
-static LIST_HEAD(hwt_ownerhash, hwt_owner)	*hwt_ownerhash;
-
 static eventhandler_tag hwt_exit_tag;
 static struct cdev *hwt_cdev;
-
-static struct hwt_context *
-hwt_ctx_lookup_by_owner(struct hwt_owner *ho, pid_t pid)
-{
-	struct hwt_context *ctx;
-
-	mtx_lock(&ho->mtx);
-	LIST_FOREACH(ctx, &ho->hwts, next_hwts) {
-		if (ctx->pid == pid) {
-			mtx_unlock(&ho->mtx);
-			return (ctx);
-		}
-	}
-	mtx_unlock(&ho->mtx);
-
-	return (NULL);
-}
-
-static struct hwt_owner *
-hwt_ctx_lookup_ownerhash(struct proc *p)
-{
-	struct hwt_ownerhash *hoh;
-	struct hwt_owner *ho;
-	int hindex;
-
-	hindex = HWT_HASH_PTR(p, hwt_ownerhashmask);
-	hoh = &hwt_ownerhash[hindex];
-
-	mtx_lock_spin(&hwt_ownerhash_mtx);
-	LIST_FOREACH(ho, hoh, next) {
-		if (ho->p == p) {
-			mtx_unlock_spin(&hwt_ownerhash_mtx);
-			return (ho);
-		}
-	}
-	mtx_unlock_spin(&hwt_ownerhash_mtx);
-
-	return (NULL);
-}
-
-struct hwt_context *
-hwt_ctx_lookup_by_owner_p(struct proc *owner_p, pid_t pid)
-{
-	struct hwt_context *ctx;
-	struct hwt_owner *ho;
-
-	ho = hwt_ctx_lookup_ownerhash(owner_p);
-	if (ho == NULL)
-		return (NULL);
-
-	ctx = hwt_ctx_lookup_by_owner(ho, pid);
-
-	return (ctx);
-}
-
-static struct hwt_context *
-hwt_ctx_alloc(void)
-{
-	struct hwt_context *ctx;
-
-	ctx = malloc(sizeof(struct hwt_context), M_HWT, M_WAITOK | M_ZERO);
-	ctx->thread_counter = 1;
-
-	LIST_INIT(&ctx->records);
-	mtx_init(&ctx->mtx_records, "hwt records", NULL, MTX_DEF);
-
-	LIST_INIT(&ctx->threads);
-	mtx_init(&ctx->mtx_threads, "hwt threads", NULL, MTX_SPIN);
-
-	return (ctx);
-}
-
-/*
- * To use by hwt_switch_in/out() and hwt_record() only.
- */
-struct hwt_context *
-hwt_ctx_lookup_contexthash(struct proc *p)
-{
-	struct hwt_contexthash *hch;
-	struct hwt_context *ctx;
-	int hindex;
-
-	hindex = HWT_HASH_PTR(p, hwt_contexthashmask);
-	hch = &hwt_contexthash[hindex];
-
-	mtx_lock_spin(&hwt_contexthash_mtx);
-	LIST_FOREACH(ctx, hch, next_hch) {
-		if (ctx->proc == p) {
-			mtx_unlock_spin(&hwt_contexthash_mtx);
-			return (ctx);
-		}
-	}
-	mtx_unlock_spin(&hwt_contexthash_mtx);
-
-	panic("no ctx");
-}
-
-static void
-hwt_ctx_insert_contexthash(struct hwt_context *ctx)
-{
-	struct hwt_contexthash *hch;
-	int hindex;
-
-	PROC_LOCK_ASSERT(ctx->proc, MA_OWNED);
-
-	hindex = HWT_HASH_PTR(ctx->proc, hwt_contexthashmask);
-	hch = &hwt_contexthash[hindex];
-
-	mtx_lock_spin(&hwt_contexthash_mtx);
-	LIST_INSERT_HEAD(hch, ctx, next_hch);
-	mtx_unlock_spin(&hwt_contexthash_mtx);
-}
 
 static int
 hwt_ioctl_send_records(struct hwt_context *ctx,
@@ -318,12 +187,10 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 {
 	char backend_name[HWT_BACKEND_MAXNAMELEN];
 	struct hwt_backend *backend;
-	struct hwt_ownerhash *hoh;
 	struct hwt_context *ctx;
 	struct hwt_thread *thr;
 	struct hwt_owner *ho;
 	struct proc *p;
-	int hindex;
 	int error;
 
 	if (halloc->bufsize > HWT_MAXBUFSIZE)
@@ -357,12 +224,7 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 		LIST_INIT(&ho->hwts);
 		mtx_init(&ho->mtx, "hwts", NULL, MTX_DEF);
 
-		hindex = HWT_HASH_PTR(ho->p, hwt_ownerhashmask);
-		hoh = &hwt_ownerhash[hindex];
-
-		mtx_lock_spin(&hwt_ownerhash_mtx);
-		LIST_INSERT_HEAD(hoh, ho, next);
-		mtx_unlock_spin(&hwt_ownerhash_mtx);
+		hwt_owner_insert(ho);
 	}
 
 	/* Allocate a new HWT context. */
@@ -583,7 +445,7 @@ static struct cdevsw hwt_cdevsw = {
 };
 
 static void
-hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
+hwt_stop_owner_hwts(struct hwt_owner *ho)
 {
 	struct hwt_context *ctx;
 	struct hwt_thread *thr;
@@ -603,9 +465,7 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 		hwt_backend_deinit(ctx);
 
 		/* TODO: ensure ctx is in context hash before removal. */
-		mtx_lock_spin(&hwt_contexthash_mtx);
-		LIST_REMOVE(ctx, next_hch);
-		mtx_unlock_spin(&hwt_contexthash_mtx);
+		hwt_ctx_remove(ctx);
 
 		printf("%s: remove threads\n", __func__);
 
@@ -628,28 +488,18 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 		free(ctx, M_HWT);
 	}
 
-	/* Destroy hwt owner. */
-	mtx_lock_spin(&hwt_ownerhash_mtx);
-	LIST_REMOVE(ho, next);
-	mtx_unlock_spin(&hwt_ownerhash_mtx);
-
-	free(ho, M_HWT);
+	hwt_owner_destroy(ho);
 }
 
 static void
 hwt_process_exit(void *arg __unused, struct proc *p)
 {
-	struct hwt_contexthash *hch;
 	struct hwt_owner *ho;
-	int hindex;
-
-	hindex = HWT_HASH_PTR(p, hwt_contexthashmask);
-	hch = &hwt_contexthash[hindex];
 
 	/* Stop HWTs associated with exiting owner, if any. */
 	ho = hwt_ctx_lookup_ownerhash(p);
 	if (ho)
-		hwt_stop_owner_hwts(hch, ho);
+		hwt_stop_owner_hwts(ho);
 }
 
 static int
@@ -670,13 +520,7 @@ hwt_load(void)
 	if (error != 0)
 		return (error);
 
-	hwt_contexthash = hashinit(HWT_PROCHASH_SIZE, M_HWT,
-	    &hwt_contexthashmask);
-        mtx_init(&hwt_contexthash_mtx, "hwt-proc-hash", "hwt-proc", MTX_SPIN);
-
-	hwt_ownerhash = hashinit(HWT_OWNERHASH_SIZE, M_HWT, &hwt_ownerhashmask);
-        mtx_init(&hwt_ownerhash_mtx, "hwt-owner-hash", "hwt-owner", MTX_SPIN);
-
+	hwt_context_load();
 	hwt_backend_load();
 
 	hwt_exit_tag = EVENTHANDLER_REGISTER(process_exit, hwt_process_exit,
