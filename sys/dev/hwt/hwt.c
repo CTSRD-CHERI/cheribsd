@@ -495,6 +495,7 @@ hwt_load(void)
 	if (error != 0)
 		return (error);
 
+	hwt_owner_load();
 	hwt_context_load();
 	hwt_backend_load();
 
