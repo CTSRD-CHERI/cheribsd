@@ -30,8 +30,8 @@
 
 /* User-visible header. */
 
-#ifndef _DEV_HWT_HWT_RECORD_H_
-#define _DEV_HWT_HWT_RECORD_H_
+#ifndef _SYS_HWT_RECORD_H_
+#define _SYS_HWT_RECORD_H_
 
 enum hwt_record_type {
 	HWT_RECORD_MMAP,
@@ -42,4 +42,4 @@ enum hwt_record_type {
 	HWT_RECORD_THREAD_SET_NAME,
 };
 
-#endif /* !_DEV_HWT_HWT_RECORD_H_ */
+#endif /* !_SYS_HWT_RECORD_H_ */

@@ -34,8 +34,8 @@
 #include <sys/types.h>
 #include <sys/hwt_record.h>
 
-#ifndef _DEV_HWT_HWT_H_
-#define _DEV_HWT_HWT_H_
+#ifndef _SYS_HWT_H_
+#define _SYS_HWT_H_
 
 #define	HWT_MAGIC	0x42
 #define	HWT_IOC_ALLOC \
@@ -80,4 +80,4 @@ struct hwt_bufptr_get {
 	pid_t		pid;
 } __aligned(16);
 
-#endif /* !_DEV_HWT_HWT_H_ */
+#endif /* !_SYS_HWT_H_ */
