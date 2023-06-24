@@ -45,10 +45,10 @@
 
 #include <dev/hwt/hwt_hook.h>
 #include <dev/hwt/hwtvar.h>
-#include <dev/hwt/hwt_backend.h>
 #include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_owner.h>
+#include <dev/hwt/hwt_backend.h>
 
 #define	HWT_DEBUG
 #undef	HWT_DEBUG
@@ -63,6 +63,11 @@
 #define	HWT_MAXBUFSIZE		(1U * 1024 * 1024 * 1024) /* 1 GB */
 
 MALLOC_DEFINE(M_HWT, "hwt", "Hardware Trace");
+MALLOC_DEFINE(M_HWT_RECORD, "hwt_record", "Hardware Trace");
+MALLOC_DEFINE(M_HWT_CTX, "hwt_ctx", "Hardware Trace");
+MALLOC_DEFINE(M_HWT_OWNER, "hwt_owner", "Hardware Trace");
+MALLOC_DEFINE(M_HWT_BACKEND, "hwt_backend", "Hardware Trace");
+MALLOC_DEFINE(M_HWT_THREAD, "hwt_thread", "Hardware Trace");
 
 static eventhandler_tag hwt_exit_tag;
 static struct cdev *hwt_cdev;

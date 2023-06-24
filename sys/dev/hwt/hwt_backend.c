@@ -43,17 +43,10 @@
 #include <sys/rwlock.h>
 #include <sys/hwt.h>
 
-#include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_page.h>
-#include <vm/vm_object.h>
-#include <vm/vm_pager.h>
-#include <vm/vm_pageout.h>
-#include <vm/vm_phys.h>
-
 #include <dev/hwt/hwt_hook.h>
 #include <dev/hwt/hwtvar.h>
+#include <dev/hwt/hwt_context.h>
+#include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_backend.h>
 
 #define	HWT_BACKEND_DEBUG

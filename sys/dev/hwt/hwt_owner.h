@@ -31,6 +31,13 @@
 #ifndef _DEV_HWT_HWT_OWNER_H_
 #define _DEV_HWT_HWT_OWNER_H_
 
+struct hwt_owner {
+	struct proc			*p;
+	struct mtx			mtx; /* Protects hwts. */
+	LIST_HEAD(, hwt_context)	hwts; /* Owned HWTs. */
+	LIST_ENTRY(hwt_owner)		next; /* Entry in hwt owner hash. */
+};
+
 void hwt_owner_insert(struct hwt_owner *ho);
 void hwt_owner_destroy(struct hwt_owner *ho);
 

@@ -31,6 +31,17 @@
 #ifndef _DEV_HWT_HWT_THREAD_H_
 #define _DEV_HWT_HWT_THREAD_H_
 
+struct hwt_thread {
+	vm_page_t			*pages;
+	int				npages;
+	lwpid_t				tid;
+	vm_object_t			obj;
+	struct cdev			*cdev;
+	struct hwt_context		*ctx;
+	LIST_ENTRY(hwt_thread)		next;
+	int				thread_id; /* Specific to ARM backend.*/
+};
+
 /* Thread allocation. */
 int hwt_thread_alloc(struct hwt_thread **thr0, size_t bufsize);
 int hwt_thread_create_cdev(struct hwt_thread *thr);

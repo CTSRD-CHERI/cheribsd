@@ -43,9 +43,8 @@
 
 #include <dev/hwt/hwt_hook.h>
 #include <dev/hwt/hwtvar.h>
-#include <dev/hwt/hwt_backend.h>
-#include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_context.h>
+#include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_owner.h>
 
 #define	HWT_DEBUG
