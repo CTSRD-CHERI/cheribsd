@@ -41,7 +41,7 @@
 #include <machine/bus.h>
 
 #include <arm64/coresight/coresight.h>
-#include <dev/hwt/hwtvar.h>
+
 #include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_backend.h>
