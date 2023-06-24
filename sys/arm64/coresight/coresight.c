@@ -43,6 +43,7 @@
 #include <arm64/coresight/coresight.h>
 #include <dev/hwt/hwtvar.h>
 #include <dev/hwt/hwt_backend.h>
+#include <dev/hwt/hwt_thread.h>
 
 #define	CORESIGHT_DEBUG
 #undef CORESIGHT_DEBUG
@@ -76,7 +77,7 @@ coresight_backend_init(struct hwt_context *ctx)
 	 * Use buffer from the first thread as Funnel merges traces from
 	 * all CPUs to a single place.
 	 */
-	thr = hwt_thread_get_first(ctx);
+	thr = hwt_thread_first(ctx);
 
 	for (cpu_id = 0; cpu_id < mp_ncpus; cpu_id++) {
 		event = &cs_event[cpu_id];

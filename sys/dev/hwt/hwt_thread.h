@@ -28,53 +28,18 @@
  * $FreeBSD$
  */
 
-#ifndef _DEV_HWT_HWTVAR_H_
-#define _DEV_HWT_HWTVAR_H_
+#ifndef _DEV_HWT_HWT_THREAD_H_
+#define _DEV_HWT_HWT_THREAD_H_
 
-MALLOC_DECLARE(M_HWT);
+int hwt_thread_alloc(struct hwt_thread **thr0, size_t bufsize);
+int hwt_thread_create_cdev(struct hwt_thread *thr);
+int hwt_thread_create(struct hwt_context *ctx, struct thread *td);
 
-#define	HWT_LOCK(sc)			mtx_lock(&(sc)->mtx)
-#define	HWT_UNLOCK(sc)			mtx_unlock(&(sc)->mtx)
-#define	HWT_ASSERT_LOCKED(sc)		mtx_assert(&(sc)->mtx, MA_OWNED)
+void hwt_thread_free(struct hwt_thread *thr);
+void hwt_thread_destroy_buffers(struct hwt_thread *thr);
 
-struct hwt_thread {
-	vm_page_t			*pages;
-	int				npages;
-	lwpid_t				tid;
-	vm_object_t			obj;
-	struct cdev			*cdev;
-	struct hwt_context		*ctx;
-	LIST_ENTRY(hwt_thread)		next;
-	int				thread_id; /* Specific to ARM backend.*/
-};
+struct hwt_thread * hwt_thread_first(struct hwt_context *ctx);
+struct hwt_thread * hwt_thread_lookup(struct hwt_context *ctx,
+    struct thread *td);
 
-struct hwt_context {
-	LIST_HEAD(, hwt_thread)		threads;
-	struct mtx			mtx_threads;
-	size_t				bufsize; /* Applied to hwt_thread. */
-
-	LIST_HEAD(, hwt_record_entry)	records;
-	struct mtx			mtx_records;
-
-	LIST_ENTRY(hwt_context)		next_hch; /* Entry in contexthash. */
-	LIST_ENTRY(hwt_context)		next_hwts; /* Entry in ho->hwts. */
-
-	struct proc			*proc; /* Could be NULL if exited. */
-	pid_t				pid;
-
-	struct hwt_owner		*hwt_owner;
-	struct hwt_backend		*hwt_backend;
-	int				thread_counter;
-};
-
-struct hwt_owner {
-	struct proc			*p;
-	struct mtx			mtx; /* Protects hwts. */
-	LIST_HEAD(, hwt_context)	hwts; /* Owned HWTs. */
-	LIST_ENTRY(hwt_owner)		next; /* Entry in hwt owner hash. */
-};
-
-struct hwt_context * hwt_lookup_contexthash(struct proc *p);
-struct hwt_context * hwt_lookup_by_owner_p(struct proc *owner_p, pid_t pid);
-
-#endif /* !_DEV_HWT_HWTVAR_H_ */
+#endif /* !_DEV_HWT_HWT_THREAD_H_ */

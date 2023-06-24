@@ -331,6 +331,7 @@ dev/hyperv/pcib/vmbus_pcib.c			optional hyperv pci acpi
 dev/hwt/hwt.c					optional hwt
 dev/hwt/hwt_backend.c				optional hwt
 dev/hwt/hwt_record.c				optional hwt
+dev/hwt/hwt_thread.c				optional hwt
 
 dev/ice/if_ice_iflib.c				optional ice pci \
 	compile-with "${NORMAL_C} -I$S/dev/ice"

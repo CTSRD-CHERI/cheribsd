@@ -55,6 +55,7 @@
 #include <dev/hwt/hwt_hook.h>
 #include <dev/hwt/hwtvar.h>
 #include <dev/hwt/hwt_backend.h>
+#include <dev/hwt/hwt_thread.h>
 
 #define	HWT_DEBUG
 #undef	HWT_DEBUG
@@ -92,137 +93,6 @@ static LIST_HEAD(hwt_ownerhash, hwt_owner)	*hwt_ownerhash;
 
 static eventhandler_tag hwt_exit_tag;
 static struct cdev *hwt_cdev;
-
-static int
-hwt_fault(vm_object_t vm_obj, vm_ooffset_t offset,
-    int prot, vm_page_t *mres)
-{
-
-	return (0);
-}
-
-static int
-hwt_ctor(void *handle, vm_ooffset_t size, vm_prot_t prot,
-    vm_ooffset_t foff, struct ucred *cred, u_short *color)
-{
-
-	*color = 0;
-
-	return (0);
-}
-
-static void
-hwt_dtor(void *handle)
-{
-
-}
-
-static struct cdev_pager_ops hwt_pager_ops = {
-	.cdev_pg_fault = hwt_fault,
-	.cdev_pg_ctor = hwt_ctor,
-	.cdev_pg_dtor = hwt_dtor
-}; 
-
-struct hwt_thread *
-hwt_thread_get_first(struct hwt_context *ctx)
-{
-	struct hwt_thread *thr;
-
-	mtx_lock_spin(&ctx->mtx_threads);
-	thr = LIST_FIRST(&ctx->threads);
-	mtx_unlock_spin(&ctx->mtx_threads);
-
-	KASSERT(thr != NULL, ("thr is NULL"));
-
-	return (thr);
-}
-
-static int
-hwt_thread_alloc_pages(struct hwt_thread *thr)
-{
-	vm_paddr_t low, high, boundary;
-	vm_memattr_t memattr;
-	int alignment;
-	vm_page_t m;
-	int pflags;
-	int tries;
-	int i;
-
-	alignment = PAGE_SIZE;
-	low = 0;
-	high = -1UL;
-	boundary = 0;
-	pflags = VM_ALLOC_NORMAL | VM_ALLOC_NOBUSY | VM_ALLOC_WIRED |
-	    VM_ALLOC_ZERO;
-	memattr = VM_MEMATTR_DEVICE;
-
-	thr->obj = cdev_pager_allocate(thr, OBJT_MGTDEVICE, &hwt_pager_ops,
-	    thr->npages * PAGE_SIZE, PROT_READ, 0, curthread->td_ucred);
-
-	for (i = 0; i < thr->npages; i++) {
-		tries = 0;
-retry:
-		m = vm_page_alloc_noobj_contig(pflags, 1, low, high,
-		    alignment, boundary, memattr);
-		if (m == NULL) {
-			if (tries < 3) {
-				if (!vm_page_reclaim_contig(pflags, 1, low,
-				    high, alignment, boundary))
-					vm_wait(NULL);
-				tries++;
-				goto retry;
-			}
-
-			return (ENOMEM);
-		}
-
-#if 0
-		/* TODO */
-		vm_pointer_t va;
-
-		if ((m->flags & PG_ZERO) == 0)
-			pmap_zero_page(m);
-
-		va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
-		cpu_dcache_wb_range(va, PAGE_SIZE);
-#endif
-		m->valid = VM_PAGE_BITS_ALL;
-		m->oflags &= ~VPO_UNMANAGED;
-		m->flags |= PG_FICTITIOUS;
-		thr->pages[i] = m;
-
-		VM_OBJECT_WLOCK(thr->obj);
-		vm_page_insert(m, thr->obj, i);
-		VM_OBJECT_WUNLOCK(thr->obj);
-	}
-
-	return (0);
-}
-
-static int
-hwt_open(struct cdev *cdev, int oflags, int devtype, struct thread *td)
-{
-
-	dprintf("%s\n", __func__);
-
-	return (0);
-}
-
-static int
-hwt_mmap_single(struct cdev *cdev, vm_ooffset_t *offset, vm_size_t mapsize,
-    struct vm_object **objp, int nprot)
-{
-	struct hwt_thread *thr;
-
-	thr = cdev->si_drv1;
-
-	if (nprot != PROT_READ || *offset != 0)
-		return (ENXIO);
-
-	*objp = thr->obj;
-
-	return (0);
-}
 
 static struct hwt_context *
 hwt_lookup_by_owner(struct hwt_owner *ho, pid_t pid)
@@ -263,7 +133,7 @@ hwt_lookup_ownerhash(struct proc *p)
 	return (NULL);
 }
 
-static struct hwt_context *
+struct hwt_context *
 hwt_lookup_by_owner_p(struct proc *owner_p, pid_t pid)
 {
 	struct hwt_context *ctx;
@@ -276,125 +146,6 @@ hwt_lookup_by_owner_p(struct proc *owner_p, pid_t pid)
 	ctx = hwt_lookup_by_owner(ho, pid);
 
 	return (ctx);
-}
-
-static int
-hwt_thread_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
-    struct thread *td)
-{
-	struct hwt_bufptr_get *ptr_get;
-	struct hwt_context *ctx;
-	vm_offset_t curpage_offset;
-	struct hwt_thread *thr;
-	int curpage;
-	int error;
-
-	thr = dev->si_drv1;
-
-	switch (cmd) {
-	case HWT_IOC_BUFPTR_GET:
-		ptr_get = (struct hwt_bufptr_get *)addr;
-
-		/* Check if process is registered owner of any HWTs. */
-		ctx = hwt_lookup_by_owner_p(td->td_proc, ptr_get->pid);
-		if (ctx == NULL)
-			return (ENXIO);
-
-		if (ctx != thr->ctx)
-			return (ENXIO);
-
-		hwt_backend_read(thr, &curpage, &curpage_offset);
-
-		error = copyout(&curpage, ptr_get->curpage, sizeof(int));
-		if (error)
-			return (error);
-		error = copyout(&curpage_offset, ptr_get->curpage_offset,
-		    sizeof(vm_offset_t));
-		if (error)
-			return (error);
-
-		break;
-	default:
-		break;
-	}
-
-	return (0);
-}
-
-static struct cdevsw hwt_thread_cdevsw = {
-	.d_version	= D_VERSION,
-	.d_name		= "hwt",
-	.d_open		= hwt_open,
-	.d_mmap_single	= hwt_mmap_single,
-	.d_ioctl	= hwt_thread_ioctl,
-};
-
-static int
-hwt_create_cdev(struct hwt_thread *thr)
-{
-	struct make_dev_args args;
-	struct hwt_context *ctx;
-	int error;
-
-	ctx = thr->ctx;
-
-	printf("%s: pid %d tid %d\n", __func__, ctx->pid, thr->tid);
-
-	make_dev_args_init(&args);
-	args.mda_devsw = &hwt_thread_cdevsw;
-	args.mda_flags = MAKEDEV_CHECKNAME | MAKEDEV_WAITOK;
-	args.mda_uid = UID_ROOT;
-	args.mda_gid = GID_WHEEL;
-	args.mda_mode = 0660;
-	args.mda_si_drv1 = thr;
-
-	error = make_dev_s(&args, &thr->cdev, "hwt_%d_%d", ctx->pid, thr->tid);
-	if (error != 0)
-		return (error);
-
-	return (0);
-}
-
-static int
-hwt_thread_alloc_buffers(struct hwt_thread *thr)
-{
-	int error;
-
-	thr->pages = malloc(sizeof(struct vm_page *) * thr->npages, M_HWT,
-	    M_WAITOK | M_ZERO);
-
-	error = hwt_thread_alloc_pages(thr);
-	if (error) {
-		printf("%s: could not alloc pages\n", __func__);
-		return (error);
-	}
-
-	return (0);
-}
-
-static void
-hwt_thread_destroy_buffers(struct hwt_thread *thr)
-{
-	vm_page_t m;
-	int i;
-
-	VM_OBJECT_WLOCK(thr->obj);
-	for (i = 0; i < thr->npages; i++) {
-		m = thr->pages[i];
-		if (m == NULL)
-			break;
-
-		vm_page_busy_acquire(m, 0);
-		cdev_pager_free_page(thr->obj, m);
-		m->flags &= ~PG_FICTITIOUS;
-		vm_page_unwire_noq(m);
-		vm_page_free(m);
-
-	}
-	vm_pager_deallocate(thr->obj);
-	VM_OBJECT_WUNLOCK(thr->obj);
-
-	free(thr->pages, M_HWT);
 }
 
 static struct hwt_context *
@@ -437,26 +188,6 @@ hwt_lookup_contexthash(struct proc *p)
 	mtx_unlock_spin(&hwt_contexthash_mtx);
 
 	panic("no ctx");
-}
-
-/*
- * To use by hwt_switch_in/out() only.
- */
-static struct hwt_thread *
-hwt_lookup_thread(struct hwt_context *ctx, struct thread *td)
-{
-	struct hwt_thread *thr, *thr1;
-
-	mtx_lock_spin(&ctx->mtx_threads);
-	LIST_FOREACH_SAFE(thr, &ctx->threads, next, thr1) {
-		if (thr->tid == td->td_tid) {
-			mtx_unlock_spin(&ctx->mtx_threads);
-			return (thr);
-		}
-	}
-	mtx_unlock_spin(&ctx->mtx_threads);
-
-	panic("thread not found");
 }
 
 static void
@@ -591,64 +322,6 @@ done:
 }
 
 static int
-hwt_thread_alloc(struct hwt_thread **thr0, size_t bufsize)
-{
-	struct hwt_thread *thr;
-	int error;
-
-	thr = malloc(sizeof(struct hwt_thread), M_HWT, M_WAITOK | M_ZERO);
-	thr->npages = bufsize / PAGE_SIZE;
-
-	error = hwt_thread_alloc_buffers(thr);
-	if (error)
-		return (error);
-
-	*thr0 = thr;
-
-	return (0);
-}
-
-static void
-hwt_thread_free(struct hwt_thread *thr)
-{
-
-	hwt_thread_destroy_buffers(thr);
-
-	free(thr, M_HWT);
-}
-
-int
-hwt_thread_create(struct hwt_context *ctx, struct thread *td)
-{
-	struct hwt_thread *thr;
-	int error;
-
-	error = hwt_thread_alloc(&thr, ctx->bufsize);
-	if (error)
-		return (error);
-
-	thr->ctx = ctx;
-	thr->tid = td->td_tid;
-
-	error = hwt_create_cdev(thr);
-	if (error) {
-		printf("%s: could not create cdev, error %d\n",
-		    __func__, error);
-		return (error);
-	}
-
-	thr->thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
-
-	mtx_lock_spin(&ctx->mtx_threads);
-	LIST_INSERT_HEAD(&ctx->threads, thr, next);
-	mtx_unlock_spin(&ctx->mtx_threads);
-
-	printf("new thread %p index %d\n", thr, thr->thread_id);
-
-	return (0);
-}
-
-static int
 hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 {
 	char backend_name[HWT_BACKEND_MAXNAMELEN];
@@ -746,7 +419,7 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 
 	PROC_UNLOCK(p);
 
-	error = hwt_create_cdev(thr);
+	error = hwt_thread_create_cdev(thr);
 	if (error) {
 		/* TODO: deallocate resources. */
 		return (error);
@@ -853,7 +526,7 @@ hwt_switch_in(struct thread *td)
 	ctx = hwt_lookup_contexthash(p);
 	if (ctx == NULL)
 		return;
-	thr = hwt_lookup_thread(ctx, td);
+	thr = hwt_thread_lookup(ctx, td);
 
 	printf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
 	    thr->thread_id, td->td_tid, cpu_id);
@@ -879,7 +552,7 @@ hwt_switch_out(struct thread *td)
 	ctx = hwt_lookup_contexthash(p);
 	if (ctx == NULL)
 		return;
-	thr = hwt_lookup_thread(ctx, td);
+	thr = hwt_thread_lookup(ctx, td);
 
 	printf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
 	    thr->thread_id, td->td_tid, cpu_id);
@@ -904,7 +577,7 @@ hwt_thread_exit(struct thread *td)
 	ctx = hwt_lookup_contexthash(p);
 	if (ctx == NULL)
 		return;
-	thr = hwt_lookup_thread(ctx, td);
+	thr = hwt_thread_lookup(ctx, td);
 
 	printf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
 	    thr->thread_id, td->td_tid, cpu_id);
@@ -956,6 +629,7 @@ hwt_stop_owner_hwts(struct hwt_contexthash *hch, struct hwt_owner *ho)
 			if (thr == NULL)
 				break;
 
+			/* TODO: hwt_thread_free instead ? */
 			hwt_thread_destroy_buffers(thr);
 			destroy_dev_sched(thr->cdev);
 			free(thr, M_HWT);
