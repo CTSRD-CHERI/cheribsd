@@ -6016,7 +6016,7 @@ iflib_register(if_ctx_t ctx)
 	if_settransmitfn(ifp, iflib_if_transmit);
 #endif
 	if_setqflushfn(ifp, iflib_if_qflush);
-	iflags = IFF_MULTICAST | IFF_KNOWSEPOCH;
+	iflags = IFF_MULTICAST;
 
 	if ((sctx->isc_flags & IFLIB_PSEUDO) &&
 		(sctx->isc_flags & IFLIB_PSEUDO_ETHER) == 0)
@@ -7358,7 +7358,7 @@ iflib_debugnet_poll(if_t ifp, int count)
 #endif /* DEBUGNET */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",

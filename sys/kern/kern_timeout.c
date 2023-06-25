@@ -195,9 +195,9 @@ struct callout_cpu {
 #define	cc_migration_time(cc, dir)	cc->cc_exec_entity[dir].ce_migration_time
 #define	cc_migration_prec(cc, dir)	cc->cc_exec_entity[dir].ce_migration_prec
 
-static struct callout_cpu cc_cpu[MAXCPU];
+DPCPU_DEFINE_STATIC(struct callout_cpu, cc_cpu);
 #define	CPUBLOCK	MAXCPU
-#define	CC_CPU(cpu)	(&cc_cpu[(cpu)])
+#define	CC_CPU(cpu)	DPCPU_ID_PTR(cpu, cc_cpu)
 #define	CC_SELF()	CC_CPU(PCPU_GET(cpuid))
 #else
 static struct callout_cpu cc_cpu;
@@ -1554,7 +1554,7 @@ DB_SHOW_COMMAND_FLAGS(callout_last, db_show_callout_last, DB_CMD_MEMSAFE)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "kdb"

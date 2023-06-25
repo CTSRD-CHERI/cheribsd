@@ -526,6 +526,7 @@ int vm_map_reservation_create_locked(vm_map_t, vm_pointer_t *, vm_size_t, vm_pro
 int vm_map_reservation_get(vm_map_t, vm_offset_t, vm_size_t, vm_offset_t *);
 #if __has_feature(capabilities)
 int vm_map_prot2perms(vm_prot_t prot);
+void * __capability vm_map_reservation_cap(vm_map_t, vm_offset_t);
 #endif
 #ifdef __CHERI_PURE_CAPABILITY__
 vm_pointer_t _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
@@ -591,7 +592,7 @@ pid_t vm_get_cap_owner(struct thread *td, const uintcap_t c);
 #endif				/* _VM_MAP_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

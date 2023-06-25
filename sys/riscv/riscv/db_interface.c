@@ -162,7 +162,7 @@ db_write_bytes(vm_offset_t addr, size_t size, char *data)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "kdb"

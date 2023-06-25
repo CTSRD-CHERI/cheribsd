@@ -405,3 +405,16 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 
 	return (error);
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "support",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
+

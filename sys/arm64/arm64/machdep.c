@@ -109,6 +109,26 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/smbios/smbios.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+_Static_assert(sizeof(struct pcb) == 1456, "struct pcb is incorrect size");
+_Static_assert(offsetof(struct pcb, pcb_fpusaved) == 336,
+    "pcb_fpusaved changed offset");
+_Static_assert(offsetof(struct pcb, pcb_fpustate) == 400,
+    "pcb_fpustate changed offset");
+#elif __has_feature(capabilities)
+_Static_assert(sizeof(struct pcb) == 1344, "struct pcb is incorrect size");
+_Static_assert(offsetof(struct pcb, pcb_fpusaved) == 224,
+    "pcb_fpusaved changed offset");
+_Static_assert(offsetof(struct pcb, pcb_fpustate) == 288,
+    "pcb_fpustate changed offset");
+#else
+_Static_assert(sizeof(struct pcb) == 1248, "struct pcb is incorrect size");
+_Static_assert(offsetof(struct pcb, pcb_fpusaved) == 136,
+    "pcb_fpusaved changed offset");
+_Static_assert(offsetof(struct pcb, pcb_fpustate) == 192,
+    "pcb_fpustate changed offset");
+#endif
+
 enum arm64_bus arm64_bus_method = ARM64_BUS_NONE;
 
 /*
@@ -314,8 +334,7 @@ cpu_pcpu_init(struct pcpu *pcpu, int cpuid, size_t size)
 {
 
 	pcpu->pc_acpi_id = 0xffffffff;
-	pcpu->pc_mpidr_low = 0xffffffff;
-	pcpu->pc_mpidr_high = 0xffffffff;
+	pcpu->pc_mpidr = UINT64_MAX;
 }
 
 void
@@ -386,6 +405,7 @@ init_proc0(vm_pointer_t kstack)
 #endif
 	thread0.td_pcb = (struct pcb *)(thread0.td_kstack +
 	    thread0.td_kstack_pages * PAGE_SIZE) - 1;
+	thread0.td_pcb->pcb_flags = 0;
 	thread0.td_pcb->pcb_fpflags = 0;
 	thread0.td_pcb->pcb_fpusaved = &thread0.td_pcb->pcb_fpustate;
 	thread0.td_pcb->pcb_vfpcpu = UINT_MAX;
@@ -428,7 +448,7 @@ arm64_get_writable_addr(vm_pointer_t addr, vm_pointer_t *out)
 	 * If it is within the DMAP region and is writable use that.
 	 */
 	if (PHYS_IN_DMAP(pa)) {
-		addr = PHYS_TO_DMAP(pa);
+		addr = PHYS_TO_DMAP_PAGE(pa);
 		if (PAR_SUCCESS(arm64_address_translate_s1e1w(addr))) {
 			*out = addr;
 			return (true);
@@ -1193,7 +1213,7 @@ DB_SHOW_COMMAND(vtop, db_show_vtop)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",

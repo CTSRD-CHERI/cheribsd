@@ -76,7 +76,7 @@
  * cannot include sys/param.h and should only be updated here.
  */
 #undef __FreeBSD_version
-#define __FreeBSD_version 1400084
+#define __FreeBSD_version 1400088
 
 /*
  * __CheriBSD_version numbers describe CheriBSD ABIs.
@@ -442,10 +442,11 @@ __END_DECLS
 #endif	/* _SYS_PARAM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes": [
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ],
 //   "changes_purecap": [
 //     "pointer_alignment",

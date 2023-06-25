@@ -437,7 +437,7 @@ is_fpu_kern_thread(u_int flags __unused)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "support"

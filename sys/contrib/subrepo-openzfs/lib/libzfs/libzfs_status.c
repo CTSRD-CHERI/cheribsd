@@ -168,7 +168,8 @@ find_vdev_problem(nvlist_t *vdev, int (*func)(vdev_stat_t *, uint_t),
 	 * later.
 	 */
 	if (ignore_replacing == B_TRUE) {
-		char *type = fnvlist_lookup_string(vdev, ZPOOL_CONFIG_TYPE);
+		const char *type = fnvlist_lookup_string(vdev,
+		    ZPOOL_CONFIG_TYPE);
 		if (strcmp(type, VDEV_TYPE_REPLACING) == 0)
 			return (B_FALSE);
 	}
@@ -222,7 +223,6 @@ check_status(nvlist_t *config, boolean_t isimport,
 {
 	pool_scan_stat_t *ps = NULL;
 	uint_t vsc, psc;
-	uint64_t nerr;
 	uint64_t suspended;
 	uint64_t hostid = 0;
 	uint64_t errata = 0;
@@ -392,6 +392,7 @@ check_status(nvlist_t *config, boolean_t isimport,
 	 * Persistent data errors.
 	 */
 	if (!isimport) {
+		uint64_t nerr;
 		if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_ERRCOUNT,
 		    &nerr) == 0 && nerr != 0)
 			return (ZPOOL_STATUS_CORRUPT_DATA);

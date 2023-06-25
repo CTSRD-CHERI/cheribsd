@@ -478,11 +478,169 @@ fill_capregs(struct thread *td, struct capreg *regs)
 	return (0);
 }
 
+/* Try to derive tagged version of in from reg. */
+static bool
+derive_capreg(uintcap_t reg, uintcap_t in, uintcap_t *out)
+{
+	void * __capability cap;
+	int otype;
+
+	if (!cheri_gettag(reg))
+		return (false);
+
+	if (cheri_equal_exact(cheri_cleartag(reg), in)) {
+		*out = reg;
+		return (true);
+	}
+
+	/* The only sealed caps that can be derived are sentries. */
+	otype = cheri_gettype(in);
+	switch (otype) {
+	case CHERI_OTYPE_UNSEALED:
+	case CHERI_OTYPE_SENTRY:
+		break;
+	default:
+		return (false);
+	}
+
+	cap = cheri_buildcap((void * __capability)reg, in);
+	if (otype == CHERI_OTYPE_SENTRY)
+		cap = cheri_sealentry(cap);
+	if (cheri_gettag(cap)) {
+		*out = (uintcap_t)cap;
+		return (true);
+	}
+
+	return (false);
+}
+
+/*
+ * If a tagged in can be derived from the user registers of td,
+ * store the derived cap in *out and return true.  Otherwise, return
+ * false.  NB: This does not support deriving sealed caps except if
+ * the new capability matches an existing cap register.
+ */
+bool
+ptrace_derive_capreg_td(struct thread *td, uintcap_t in, uintcap_t *out)
+{
+	struct trapframe *frame;
+	u_int i;
+
+	frame = td->td_frame;
+	if (derive_capreg(frame->tf_sp, in, out))
+		return (true);
+	if (derive_capreg(frame->tf_lr, in, out))
+		return (true);
+	if (derive_capreg(frame->tf_elr, in, out))
+		return (true);
+	if (derive_capreg(frame->tf_ddc, in, out))
+		return (true);
+	for (i = 0; i < nitems(frame->tf_x); i++) {
+		if (derive_capreg(frame->tf_x[i], in, out))
+			return (true);
+	}
+	return (false);
+}
+
+static bool
+set_capreg(struct thread *td, u_int idx, uint64_t tagmask, uintcap_t old,
+    uintcap_t new, uintcap_t *out)
+{
+	if ((tagmask & ((uint64_t)1 << idx)) == 0) {
+		/* Always ok to set untagged values. */
+		*out = new;
+		return (true);
+	}
+
+	if (cheri_gettag(old) && cheri_equal_exact(cheri_cleartag(old), new)) {
+		/* Preserve unchanged registers. */
+		*out = old;
+		return (true);
+	}
+
+	return (ptrace_derive_cap(td->td_proc, new, out));
+}
+
 int
 set_capregs(struct thread *td, struct capreg *regs)
 {
+	struct capreg tempregs;
+	struct proc *p = td->td_proc;
+	struct trapframe *frame;
+	u_int i;
 
-	return (EOPNOTSUPP);
+	/*
+	 * To support more exotic cases like swapping the value of two
+	 * registers as well as error handling, construct a copy of
+	 * the new register set in tempregs that is copied to the
+	 * frame at the end.
+	 */
+	PROC_UNLOCK(p);
+	frame = td->td_frame;
+
+	for (i = 0; i < nitems(frame->tf_x); i++) {
+		if (!set_capreg(td, i, regs->tagmask, frame->tf_x[i],
+		    regs->c[i], &tempregs.c[i]))
+			goto fail;
+	}
+	if (!set_capreg(td, i, regs->tagmask, frame->tf_lr, regs->clr,
+	    &tempregs.clr))
+		goto fail;
+	i++;
+	if (!set_capreg(td, i, regs->tagmask, frame->tf_sp, regs->csp,
+	    &tempregs.csp))
+		goto fail;
+	i++;
+	if (!set_capreg(td, i, regs->tagmask, frame->tf_elr, regs->celr,
+	    &tempregs.celr))
+		goto fail;
+	i++;
+	if (!set_capreg(td, i, regs->tagmask, frame->tf_ddc, regs->ddc,
+	    &tempregs.ddc))
+		goto fail;
+	i++;
+	if (!set_capreg(td, i, regs->tagmask, td->td_pcb->pcb_tpidr_el0,
+	    regs->ctpidr, &tempregs.ctpidr))
+		goto fail;
+	i++;
+	if (!set_capreg(td, i, regs->tagmask, td->td_pcb->pcb_tpidrro_el0,
+	    regs->ctpidrro, &tempregs.ctpidrro))
+		goto fail;
+	i++;
+	if (!set_capreg(td, i, regs->tagmask, td->td_pcb->pcb_cid_el0,
+	    regs->cid, &tempregs.cid))
+		goto fail;
+	i++;
+	if (!set_capreg(td, i, regs->tagmask, td->td_pcb->pcb_rcsp_el0,
+	    regs->rcsp, &tempregs.rcsp))
+		goto fail;
+	i++;
+	if (!set_capreg(td, i, regs->tagmask, td->td_pcb->pcb_rddc_el0,
+	    regs->rddc, &tempregs.rddc))
+		goto fail;
+	i++;
+	if (!set_capreg(td, i, regs->tagmask, td->td_pcb->pcb_rctpidr_el0,
+	    regs->rctpidr, &tempregs.rctpidr))
+		goto fail;
+
+	PROC_LOCK(p);
+	memcpy(frame->tf_x, tempregs.c, sizeof(frame->tf_x));
+	frame->tf_lr = tempregs.clr;
+	frame->tf_sp = tempregs.csp;
+	frame->tf_elr = tempregs.celr;
+	frame->tf_ddc = tempregs.ddc;
+	td->td_pcb->pcb_tpidr_el0 = tempregs.ctpidr;
+	td->td_pcb->pcb_tpidrro_el0 = tempregs.ctpidrro;
+	td->td_pcb->pcb_cid_el0 = tempregs.cid;
+	td->td_pcb->pcb_rcsp_el0 = tempregs.rcsp;
+	td->td_pcb->pcb_rddc_el0 = tempregs.rddc;
+	td->td_pcb->pcb_rctpidr_el0 = tempregs.rctpidr;
+
+	return (0);
+
+fail:
+	PROC_LOCK(p);
+	return (EPROT);
 }
 #endif
 

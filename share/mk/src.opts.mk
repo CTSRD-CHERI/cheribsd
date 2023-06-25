@@ -145,6 +145,7 @@ __DEFAULT_YES_OPTIONS = \
     MLX5TOOL \
     NETCAT \
     NETGRAPH \
+    NETLINK_SUPPORT \
     NLS_CATALOGS \
     NS_CACHING \
     NTP \
@@ -155,7 +156,6 @@ __DEFAULT_YES_OPTIONS = \
     PF \
     PKGBOOTSTRAP \
     PMC \
-    PORTSNAP \
     PPP \
     QUOTAS \
     RADIUS_SUPPORT \
@@ -244,8 +244,6 @@ __DEFAULT_DEPENDENT_OPTIONS= \
 __DEFAULT_DEPENDENT_OPTIONS+= ${var}_SUPPORT/${var}
 .endfor
 
-.-include <site.src.opts.mk>
-
 #
 # Default behaviour of some options depends on the architecture.  Unfortunately
 # this means that we have to test TARGET_ARCH (the buildworld case) as well
@@ -273,7 +271,7 @@ __LLVM_TARGETS= \
 		powerpc \
 		riscv \
 		x86
-__LLVM_TARGET_FILT=	C/(amd64|i386)/x86/:C/powerpc.*/powerpc/:C/armv[67]/arm/:C/riscv.*/riscv/:C/mips.*/mips/
+__LLVM_TARGET_FILT=	C/(amd64|i386)/x86/:C/powerpc.*/powerpc/:C/armv[67]/arm/:C/riscv.*/riscv/
 .for __llt in ${__LLVM_TARGETS}
 # Default enable the given TARGET's LLVM_TARGET support
 .if ${__T:${__LLVM_TARGET_FILT}} == ${__llt}
@@ -320,9 +318,6 @@ BROKEN_OPTIONS+=LIB32
 # LIB64 is supported on aarch64*c* and riscv64*c*
 .if ${__T:Maarch64*c*} || ${__T:Mriscv64*c*}
 __DEFAULT_YES_OPTIONS+=LIB64
-# In principle, LIB32 could work on architectures where it's supported, but
-# Makefile.libcompat only supports one compat layer.
-BROKEN_OPTIONS+=LIB32
 .else
 BROKEN_OPTIONS+=LIB64
 .endif
@@ -423,6 +418,14 @@ BROKEN_OPTIONS+=OPENMP
 .if ${__T:Marm*} != ""
 BROKEN_OPTIONS+= OFED
 .endif
+
+# MK_host_egacy is set by local.sys.mk so is valid here
+.if ${MACHINE} == "host" && ${MK_host_egacy} == "yes"
+# we cannot expect tests to work
+BROKEN_OPTIONS+= TESTS
+.endif
+
+.-include <site.src.opts.mk>
 
 .include <bsd.mkopt.mk>
 

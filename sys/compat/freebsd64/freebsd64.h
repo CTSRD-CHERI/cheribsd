@@ -203,3 +203,14 @@ struct iovec64 {
 };
 
 #endif /* !_COMPAT_FREEBSD64_FREEBSD64_H_ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "header",
+ *   "changes": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

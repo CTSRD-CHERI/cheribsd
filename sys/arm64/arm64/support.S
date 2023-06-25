@@ -219,15 +219,15 @@ END(fueword32)
  * long fueword(volatile const void * __capability, int64_t *)
  * int64_t fueword64(volatile const void * __capability, int64_t *)
  */
-ENTRY(fueword)
 EENTRY(fueword64)
+ENTRY(fueword)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-7), fsu_fault_nopcb
 	fsudata	ldtr, x0, 0
 	str	x0, [PTR(1)]		/* Save the data in kernel space */
 	mov	x0, #0			/* Success */
 	ret				/* Return */
-EEND(fueword64)
 END(fueword)
+EEND(fueword64)
 
 #if __has_feature(capabilities)
 /*
@@ -275,14 +275,14 @@ END(suword32)
 /*
  * int suword(volatile void * __capability, long)
  */
-ENTRY(suword)
 EENTRY(suword64)
+ENTRY(suword)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-7), fsu_fault_nopcb
 	fsudata	sttr, x1, 0
 	mov	x0, #0			/* Success */
 	ret				/* Return */
-EEND(suword64)
 END(suword)
+EEND(suword64)
 
 #if __has_feature(capabilities)
 /*
@@ -367,7 +367,7 @@ ENTRY(pagezero_cache)
 END(pagezero_cache)
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "support"

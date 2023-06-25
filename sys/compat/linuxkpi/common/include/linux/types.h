@@ -84,7 +84,7 @@ typedef unsigned long irq_hw_number_t;
 struct list_head {
 	struct list_head *next;
 	struct list_head *prev;
-};
+} __subobject_use_container_bounds;
 #endif
 
 struct rcu_head {
@@ -96,3 +96,12 @@ typedef void (*call_rcu_func_t)(struct rcu_head *head, rcu_callback_t func);
 typedef int linux_task_fn_t(void *data);
 
 #endif	/* _LINUXKPI_LINUX_TYPES_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20230509,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

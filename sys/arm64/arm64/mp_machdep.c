@@ -554,8 +554,7 @@ start_cpu(u_int cpuid, uint64_t target_cpu, int domain, vm_paddr_t release_addr)
 	    M_WAITOK | M_ZERO);
 	pmap_disable_promotion((vm_offset_t)pcpup, size);
 	pcpu_init(pcpup, cpuid, sizeof(struct pcpu));
-	pcpup->pc_mpidr_low = target_cpu & CPU_AFF_MASK;
-	pcpup->pc_mpidr_high = (target_cpu & CPU_AFF_MASK) >> 32;
+	pcpup->pc_mpidr = target_cpu & CPU_AFF_MASK;
 
 	dpcpu[cpuid - 1] = (void *)(pcpup + 1);
 	dpcpu_init(dpcpu[cpuid - 1], cpuid);
@@ -776,8 +775,7 @@ cpu_mp_start(void)
 	/* CPU 0 is always boot CPU. */
 	CPU_SET(0, &all_cpus);
 	mpidr = READ_SPECIALREG(mpidr_el1) & CPU_AFF_MASK;
-	cpuid_to_pcpu[0]->pc_mpidr_low = mpidr;
-	cpuid_to_pcpu[0]->pc_mpidr_high = mpidr >> 32;
+	cpuid_to_pcpu[0]->pc_mpidr = mpidr;
 
 	switch(arm64_bus_method) {
 #ifdef DEV_ACPI
@@ -913,9 +911,8 @@ intr_ipi_lookup(u_int ipi)
  *  source mapped.
  */
 void
-intr_ipi_dispatch(u_int ipi, struct trapframe *tf)
+intr_ipi_dispatch(u_int ipi)
 {
-	void *arg;
 	struct intr_ipi *ii;
 
 	ii = intr_ipi_lookup(ipi);
@@ -924,12 +921,7 @@ intr_ipi_dispatch(u_int ipi, struct trapframe *tf)
 
 	intr_ipi_increment_count(ii->ii_count, PCPU_GET(cpuid));
 
-	/*
-	 * Supply ipi filter with trapframe argument
-	 * if none is registered.
-	 */
-	arg = ii->ii_handler_arg != NULL ? ii->ii_handler_arg : tf;
-	ii->ii_handler(arg);
+	ii->ii_handler(ii->ii_handler_arg);
 }
 
 #ifdef notyet
@@ -1038,7 +1030,7 @@ ipi_selected(cpuset_t cpus, u_int ipi)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",

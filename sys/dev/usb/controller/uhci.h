@@ -251,7 +251,7 @@ void	uhci_interrupt(uhci_softc_t *sc);
 #endif					/* _UHCI_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "subobject_bounds"

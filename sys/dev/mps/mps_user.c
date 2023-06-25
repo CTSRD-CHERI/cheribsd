@@ -2509,3 +2509,15 @@ mps_ioctl_devsw(struct cdev *dev, u_long com, caddr_t arg, int flag,
 #endif
 	return (mps_ioctl(dev, com, arg, flag, td));
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "user_capabilities",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

@@ -68,7 +68,7 @@ void siginfo_to_siginfo32(const siginfo_t *src, struct siginfo32 *dst);
 #endif /* !_COMPAT_FREEBSD32_SIGNAL_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes": [
 //     "kernel_sig_types"

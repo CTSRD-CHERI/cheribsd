@@ -172,7 +172,7 @@ extern u_int	intr_nirq;	/* number of IRQs on intrng platforms */
 #endif	/* _SYS_INTR_H */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "pointer_as_integer"

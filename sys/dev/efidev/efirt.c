@@ -32,6 +32,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_acpi.h"
+
 #include <sys/param.h>
 #include <sys/efi.h>
 #include <sys/eventhandler.h>
@@ -60,6 +62,10 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm.h>
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
+
+#ifdef DEV_ACPI
+#include <contrib/dev/acpica/include/acpi.h>
+#endif
 
 #define EFI_TABLE_ALLOC_MAX 0x800000
 
@@ -179,7 +185,8 @@ efi_init(void)
 		return (0);
 	}
 
-	efi_systbl = (struct efi_systbl *)efi_phys_to_kva(efi_systbl_phys);
+	efi_systbl = (struct efi_systbl *)efi_phys_to_kva(efi_systbl_phys,
+	    sizeof(struct efi_systbl));
 	if (efi_systbl == NULL || efi_systbl->st_hdr.th_sig != EFI_SYSTBL_SIG) {
 		efi_systbl = NULL;
 		if (bootverbose)
@@ -248,7 +255,8 @@ efi_init(void)
 	 * with an old loader.efi, check if the RS->GetTime function is within
 	 * the EFI map, and fail to attach if not.
 	 */
-	rtdm = (struct efi_rt *)efi_phys_to_kva((uintptr_t)efi_runtime);
+	rtdm = (struct efi_rt *)efi_phys_to_kva((uintptr_t)efi_runtime,
+	    sizeof(struct efi_rt));
 	if (rtdm == NULL || !efi_is_in_map(map, ndesc, efihdr->descriptor_size,
 	    (vm_offset_t)rtdm->rt_gettime)) {
 		if (bootverbose)
@@ -548,11 +556,12 @@ efi_call(struct efirt_callinfo *ecp)
     ((uintptr_t)cheri_sealentry(cheri_andperm(			\
 	cheri_setaddress(kernel_root_cap,			\
 	    ((struct efi_rt *)efi_phys_to_kva((uintptr_t)	\
-	    efi_runtime))->method), CHERI_PERMS_KERNEL_CODE)))
+	    efi_runtime, sizeof(struct efi_rt)))->method),	\
+	CHERI_PERMS_KERNEL_CODE)))
 #else
 #define	EFI_RT_METHOD_PA(method)				\
     ((uintptr_t)((struct efi_rt *)efi_phys_to_kva((uintptr_t)	\
-    efi_runtime))->method)
+    efi_runtime, sizeof(struct efi_rt)))->method)
 #endif
 
 static int
@@ -593,6 +602,74 @@ get_time(struct efi_tm *tm)
 	 */
 	error = efi_get_time_locked(tm, &dummy);
 	EFI_TIME_UNLOCK();
+	return (error);
+}
+
+static int
+get_waketime(uint8_t *enabled, uint8_t *pending, struct efi_tm *tm)
+{
+	struct efirt_callinfo ec;
+	int error;
+#ifdef DEV_ACPI
+	UINT32 acpiRtcEnabled;
+#endif
+
+	if (efi_runtime == NULL)
+		return (ENXIO);
+
+	EFI_TIME_LOCK();
+	bzero(&ec, sizeof(ec));
+	ec.ec_name = "rt_getwaketime";
+	ec.ec_argcnt = 3;
+	ec.ec_arg1 = (uintptr_t)enabled;
+	ec.ec_arg2 = (uintptr_t)pending;
+	ec.ec_arg3 = (uintptr_t)tm;
+	ec.ec_fptr = EFI_RT_METHOD_PA(rt_getwaketime);
+	error = efi_call(&ec);
+	EFI_TIME_UNLOCK();
+
+#ifdef DEV_ACPI
+	if (error == 0) {
+		error = AcpiReadBitRegister(ACPI_BITREG_RT_CLOCK_ENABLE,
+		    &acpiRtcEnabled);
+		if (ACPI_SUCCESS(error)) {
+			*enabled = *enabled && acpiRtcEnabled;
+		} else
+			error = EIO;
+	}
+#endif
+
+	return (error);
+}
+
+static int
+set_waketime(uint8_t enable, struct efi_tm *tm)
+{
+	struct efirt_callinfo ec;
+	int error;
+
+	if (efi_runtime == NULL)
+		return (ENXIO);
+
+	EFI_TIME_LOCK();
+	bzero(&ec, sizeof(ec));
+	ec.ec_name = "rt_setwaketime";
+	ec.ec_argcnt = 2;
+	ec.ec_arg1 = (uintptr_t)enable;
+	ec.ec_arg2 = (uintptr_t)tm;
+	ec.ec_fptr = EFI_RT_METHOD_PA(rt_setwaketime);
+	error = efi_call(&ec);
+	EFI_TIME_UNLOCK();
+
+#ifdef DEV_ACPI
+	if (error == 0) {
+		error = AcpiWriteBitRegister(ACPI_BITREG_RT_CLOCK_ENABLE,
+		    (enable != 0) ? 1 : 0);
+		if (ACPI_FAILURE(error))
+			error = EIO;
+	}
+#endif
+
 	return (error);
 }
 
@@ -738,6 +815,8 @@ const static struct efi_ops efi_ops = {
 	.get_time_capabilities = get_time_capabilities,
 	.reset_system = reset_system,
 	.set_time = set_time,
+	.get_waketime = get_waketime,
+	.set_waketime = set_waketime,
 	.var_get = var_get,
 	.var_nextname = var_nextname,
 	.var_set = var_set,

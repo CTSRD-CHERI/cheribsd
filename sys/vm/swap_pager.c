@@ -467,7 +467,7 @@ static int	swap_pager_getpages(vm_object_t, vm_page_t *, int, int *,
     int *);
 static int	swap_pager_getpages_async(vm_object_t, vm_page_t *, int, int *,
     int *, pgo_getpages_iodone_t, void *);
-static void	swap_pager_putpages(vm_object_t, vm_page_t *, int, boolean_t, int *);
+static void	swap_pager_putpages(vm_object_t, vm_page_t *, int, int, int *);
 static boolean_t
 		swap_pager_haspage(vm_object_t object, vm_pindex_t pindex, int *before, int *after);
 static void	swap_pager_init(void);
@@ -2242,7 +2242,7 @@ swp_pager_meta_cheri_get_tags(vm_page_t page)
 	struct swblk *sb;
 	vm_pindex_t modpi;
 
-	scan = (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(page));
+	scan = (void *)PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(page));
 	sb = SWAP_PCTRIE_LOOKUP(&page->object->un_pager.swp.swp_blks,
 	    rounddown(page->pindex, SWAP_META_PAGES));
 
@@ -2269,7 +2269,7 @@ swp_pager_meta_cheri_put_tags(vm_page_t page)
 	struct swblk *sb;
 	vm_pindex_t modpi;
 
-	scan = (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(page));
+	scan = (void *)PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(page));
 	sb = SWAP_PCTRIE_LOOKUP(&page->object->un_pager.swp.swp_blks,
 	    rounddown(page->pindex, SWAP_META_PAGES));
 
@@ -3328,7 +3328,7 @@ swap_pager_release_writecount(vm_object_t object, vm_offset_t start,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"

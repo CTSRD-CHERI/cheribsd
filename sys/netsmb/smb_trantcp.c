@@ -691,7 +691,7 @@ struct smb_tran_desc smb_tran_nbtcp_desc = {
 };
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

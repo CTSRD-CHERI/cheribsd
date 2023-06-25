@@ -150,14 +150,20 @@ void	cheri_otype_free(otype_t);
 void	cheri_read_tags_page(const void *page, void *tagbuf, bool *hastagsp);
 
 /*
+ * Functions to derive capabilities for ptrace.
+ */
+struct proc;
+bool	ptrace_derive_cap(struct proc *p, uintcap_t in, uintcap_t *out);
+bool	ptrace_derive_capreg_td(struct thread *td, uintcap_t in,
+    uintcap_t *out);
+bool	vm_derive_capreg(struct proc *p, uintcap_t in, uintcap_t *out);
+
+/*
  * Global sysctl definitions.
  */
 SYSCTL_DECL(_security_cheri);
 SYSCTL_DECL(_security_cheri_stats);
-extern u_int	security_cheri_debugger_on_sandbox_signal;
 extern u_int	security_cheri_debugger_on_sandbox_syscall;
-extern u_int	security_cheri_debugger_on_sandbox_unwind;
-extern u_int	security_cheri_sandboxed_signals;
 extern u_int	security_cheri_syscall_violations;
 extern u_int	security_cheri_bound_legacy_capabilities;
 extern u_int	cheri_cloadtags_stride;
@@ -196,7 +202,7 @@ void	db_print_scb_td(struct thread *td);
 #endif /* _SYS_CHERI_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "support"

@@ -4541,7 +4541,7 @@ nfs_pathconf(struct vop_pathconf_args *ap)
 				    NFSV4CONTENT_HOLE, td->td_ucred, &nfsva,
 				    &attrflag);
 				if (attrflag != 0)
-					nfscl_loadattrcache(&vp, &nfsva,
+					(void) nfscl_loadattrcache(&vp, &nfsva,
 					    NULL, 0, 1);
 				mtx_lock(&nmp->nm_mtx);
 				if (error == NFSERR_NOTSUPP)
@@ -4565,7 +4565,7 @@ nfs_pathconf(struct vop_pathconf_args *ap)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros"

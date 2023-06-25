@@ -56,4 +56,6 @@
 #define	TLS_EXACT_BOUNDS
 #endif
 
+#define	CAPREG_PCC(capreg)	((capreg)->celr)
+
 #endif /* !_CHERIBSDTEST_H_ */

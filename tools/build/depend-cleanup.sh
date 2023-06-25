@@ -26,7 +26,7 @@ fi
 # $1 directory
 # $2 source filename w/o extension
 # $3 source extension
-clean_dep()
+_clean_dep()
 {
 	if egrep -qw "$2\.$3" "$OBJTOP"/$1/.depend.$2.*o 2>/dev/null; then
 		echo "Removing stale dependencies and objects for $2.$3"
@@ -39,6 +39,14 @@ clean_dep()
 		    "$OBJTOP"/obj-lib64c/$1/$2.*o \
 		    "$OBJTOP"/obj-lib32/$1/.depend.$2.* \
 		    "$OBJTOP"/obj-lib32/$1/$2.*o
+	fi
+}
+
+clean_dep()
+{
+	_clean_dep "$1" "$2" "$3"
+	if [ "$1" == "lib/libc" ]; then
+		_clean_dep lib/libc_c18n "$2" "$3"
 	fi
 }
 
@@ -120,3 +128,6 @@ clean_dep   usr.sbin/config  mkmakefile c
 # 20230209  83d7ed8af3d9    convert to main.cc and mkoptions.cc
 clean_dep   usr.sbin/config  main c
 clean_dep   usr.sbin/config  mkoptions c
+
+# 20230401  54579376c05e    kqueue1 from syscall to C wrapper
+clean_dep   lib/libc        kqueue1 S

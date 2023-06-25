@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2020-2022 The FreeBSD Foundation
+ * Copyright (c) 2020-2023 The FreeBSD Foundation
  * Copyright (c) 2020-2021 Bjoern A. Zeeb
  *
  * This software was developed by Björn Zeeb under sponsorship from
@@ -68,7 +68,7 @@
 	printf("%s:%d: XXX LKPI80211 IMPROVE_TXQ\n", __func__, __LINE__)
 
 struct lkpi_radiotap_tx_hdr {
-	struct ieee80211_radiotap_header wt_ihdr;
+	struct ieee80211_radiotap_header wt_ihdr __subobject_use_container_bounds;
 	uint8_t		wt_flags;
 	uint8_t		wt_rate;
 	uint16_t	wt_chan_freq;
@@ -80,7 +80,7 @@ struct lkpi_radiotap_tx_hdr {
 	 (1 << IEEE80211_RADIOTAP_CHANNEL))
 
 struct lkpi_radiotap_rx_hdr {
-	struct ieee80211_radiotap_header wr_ihdr;
+	struct ieee80211_radiotap_header wr_ihdr __subobject_use_container_bounds;
 	uint64_t	wr_tsft;
 	uint8_t		wr_flags;
 	uint8_t		wr_rate;
@@ -106,7 +106,7 @@ struct lkpi_txq {
 	struct sk_buff_head	skbq;
 
 	/* Must be last! */
-	struct ieee80211_txq	txq __aligned(CACHE_LINE_SIZE);
+	struct ieee80211_txq	txq __aligned(CACHE_LINE_SIZE) __subobject_use_container_bounds;
 };
 #define	TXQ_TO_LTXQ(_txq)	container_of(_txq, struct lkpi_txq, txq)
 
@@ -128,14 +128,14 @@ struct lkpi_sta {
 	bool			in_mgd;				/* XXX-BZ should this be per-vif? */
 
 	/* Must be last! */
-	struct ieee80211_sta	sta __aligned(CACHE_LINE_SIZE);
+	struct ieee80211_sta	sta __aligned(CACHE_LINE_SIZE) __subobject_use_container_bounds;
 };
 #define	STA_TO_LSTA(_sta)	container_of(_sta, struct lkpi_sta, sta)
 #define	LSTA_TO_STA(_lsta)	(&(_lsta)->sta)
 
 struct lkpi_vif {
         TAILQ_ENTRY(lkpi_vif)	lvif_entry;
-	struct ieee80211vap	iv_vap;
+	struct ieee80211vap	iv_vap __subobject_use_container_bounds;
 
 	struct mtx		mtx;
 	struct wireless_dev	wdev;
@@ -151,7 +151,7 @@ struct lkpi_vif {
 	bool			hw_queue_stopped[IEEE80211_NUM_ACS];
 
 	/* Must be last! */
-	struct ieee80211_vif	vif __aligned(CACHE_LINE_SIZE);
+	struct ieee80211_vif	vif __aligned(CACHE_LINE_SIZE) __subobject_use_container_bounds;
 };
 #define	VAP_TO_LVIF(_vap)	container_of(_vap, struct lkpi_vif, iv_vap)
 #define	LVIF_TO_VAP(_lvif)	(&(_lvif)->iv_vap)
@@ -173,7 +173,7 @@ struct lkpi_hw {	/* name it mac80211_sc? */
 	TAILQ_HEAD(, lkpi_vif)		lvif_head;
 	struct sx			lvif_sx;
 
-	struct mtx			mtx;
+	struct sx			sx;
 
 	uint32_t			txq_generation[IEEE80211_NUM_ACS];
 	TAILQ_HEAD(, lkpi_txq)		scheduled_txqs[IEEE80211_NUM_ACS];
@@ -195,6 +195,7 @@ struct lkpi_hw {	/* name it mac80211_sc? */
 #define	LKPI_LHW_SCAN_RUNNING		0x00000001
 #define	LKPI_LHW_SCAN_HW		0x00000002
 	uint32_t			scan_flags;
+	struct mtx			scan_mtx;
 
 	int				supbands;	/* Number of supported bands. */
 	int				max_rates;	/* Maximum number of bitrates supported in any channel. */
@@ -204,7 +205,7 @@ struct lkpi_hw {	/* name it mac80211_sc? */
 	bool				update_wme;
 
 	/* Must be last! */
-	struct ieee80211_hw		hw __aligned(CACHE_LINE_SIZE);
+	struct ieee80211_hw		hw __aligned(CACHE_LINE_SIZE) __subobject_use_container_bounds;
 };
 #define	LHW_TO_HW(_lhw)		(&(_lhw)->hw)
 #define	HW_TO_LHW(_hw)		container_of(_hw, struct lkpi_hw, hw)
@@ -213,18 +214,36 @@ struct lkpi_wiphy {
 	const struct cfg80211_ops	*ops;
 
 	/* Must be last! */
-	struct wiphy			wiphy __aligned(CACHE_LINE_SIZE);
+	struct wiphy			wiphy __aligned(CACHE_LINE_SIZE) __subobject_use_container_bounds;
 };
 #define	WIPHY_TO_LWIPHY(_wiphy)	container_of(_wiphy, struct lkpi_wiphy, wiphy)
 #define	LWIPHY_TO_WIPHY(_lwiphy)	(&(_lwiphy)->wiphy)
 
+#define	LKPI_80211_LHW_LOCK_INIT(_lhw)			\
+    sx_init_flags(&(_lhw)->sx, "lhw", SX_RECURSE);
+#define	LKPI_80211_LHW_LOCK_DESTROY(_lhw)		\
+    sx_destroy(&(_lhw)->sx);
+#define	LKPI_80211_LHW_LOCK(_lhw)			\
+    sx_xlock(&(_lhw)->sx)
+#define	LKPI_80211_LHW_UNLOCK(_lhw)			\
+    sx_xunlock(&(_lhw)->sx)
+#define	LKPI_80211_LHW_LOCK_ASSERT(_lhw)		\
+    sx_assert(&(_lhw)->sx, SA_LOCKED)
+#define	LKPI_80211_LHW_UNLOCK_ASSERT(_lhw)		\
+    sx_assert(&(_lhw)->sx, SA_UNLOCKED)
 
-#define	LKPI_80211_LHW_LOCK(_lhw)	mtx_lock(&(_lhw)->mtx)
-#define	LKPI_80211_LHW_UNLOCK(_lhw)	mtx_unlock(&(_lhw)->mtx)
-#define	LKPI_80211_LHW_LOCK_ASSERT(_lhw) \
-    mtx_assert(&(_lhw)->mtx, MA_OWNED)
-#define	LKPI_80211_LHW_UNLOCK_ASSERT(_lhw) \
-    mtx_assert(&(_lhw)->mtx, MA_NOTOWNED)
+#define	LKPI_80211_LHW_SCAN_LOCK_INIT(_lhw)		\
+    mtx_init(&(_lhw)->scan_mtx, "lhw-scan", NULL, MTX_DEF | MTX_RECURSE);
+#define	LKPI_80211_LHW_SCAN_LOCK_DESTROY(_lhw)		\
+    mtx_destroy(&(_lhw)->scan_mtx);
+#define	LKPI_80211_LHW_SCAN_LOCK(_lhw)			\
+    mtx_lock(&(_lhw)->scan_mtx)
+#define	LKPI_80211_LHW_SCAN_UNLOCK(_lhw)        	\
+    mtx_unlock(&(_lhw)->scan_mtx)
+#define	LKPI_80211_LHW_SCAN_LOCK_ASSERT(_lhw)		\
+    mtx_assert(&(_lhw)->scan_mtx, MA_OWNED)
+#define	LKPI_80211_LHW_SCAN_UNLOCK_ASSERT(_lhw)		\
+    mtx_assert(&(_lhw)->scan_mtx, MA_NOTOWNED)
 
 #define	LKPI_80211_LHW_LVIF_LOCK(_lhw)	sx_xlock(&(_lhw)->lvif_sx)
 #define	LKPI_80211_LHW_LVIF_UNLOCK(_lhw) sx_xunlock(&(_lhw)->lvif_sx)
@@ -249,10 +268,10 @@ void lkpi_80211_mo_cancel_hw_scan(struct ieee80211_hw *, struct ieee80211_vif *)
 void lkpi_80211_mo_sw_scan_complete(struct ieee80211_hw *, struct ieee80211_vif *);
 void lkpi_80211_mo_sw_scan_start(struct ieee80211_hw *, struct ieee80211_vif *,
     const u8 *);
-u64 lkpi_80211_mo_prepare_multicast(struct ieee80211_hw *,
+uintptr_t lkpi_80211_mo_prepare_multicast(struct ieee80211_hw *,
     struct netdev_hw_addr_list *);
 void lkpi_80211_mo_configure_filter(struct ieee80211_hw *, unsigned int,
-    unsigned int *, u64);
+    unsigned int *, uintptr_t);
 int lkpi_80211_mo_sta_state(struct ieee80211_hw *, struct ieee80211_vif *,
     struct lkpi_sta *, enum ieee80211_sta_state);
 int lkpi_80211_mo_config(struct ieee80211_hw *, uint32_t);
@@ -286,3 +305,13 @@ int lkpi_80211_mo_set_key(struct ieee80211_hw *, enum set_key_cmd,
     struct ieee80211_key_conf *);
 
 #endif	/* _LKPI_SRC_LINUX_80211_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20230509,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds",
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

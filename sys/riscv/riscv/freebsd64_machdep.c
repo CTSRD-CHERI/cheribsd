@@ -77,7 +77,6 @@ _Static_assert(sizeof(mcontext64_t) == 864, "mcontext64_t size incorrect");
 _Static_assert(sizeof(ucontext64_t) == 936, "ucontext64_t size incorrect");
 _Static_assert(sizeof(struct siginfo64) == 80, "struct siginfo64 size incorrect");
 
-static const char *freebsd64_riscv_machine_arch(struct proc *p);
 static void	freebsd64_sendsig(sig_t, ksiginfo_t *, sigset_t *);
 
 extern const char *freebsd64_syscallnames[];
@@ -117,23 +116,12 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_thread_detach = NULL,
 	.sv_trap	= NULL,
 	.sv_hwcap	= &elf_hwcap,
-	.sv_machine_arch = freebsd64_riscv_machine_arch,
 	.sv_onexec_old	= exec_onexec_old,
 	.sv_onexit	= exit_onexit,
 	.sv_regset_begin = SET_BEGIN(__elfN(regset)),
 	.sv_regset_end	= SET_LIMIT(__elfN(regset)),
 };
 INIT_SYSENTVEC(freebsd64_sysent, &elf_freebsd_freebsd64_sysvec);
-
-static const char *
-freebsd64_riscv_machine_arch(struct proc *p)
-{
-
-	if ((p->p_elf_flags & EF_RISCV_FLOAT_ABI_MASK) ==
-	    EF_RISCV_FLOAT_ABI_SOFT)
-		return (MACHINE_ARCH64SF);
-	return (MACHINE_ARCH64);
-}
 
 static Elf64_Brandinfo freebsd_freebsd64_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,
@@ -368,3 +356,15 @@ elf64_dump_thread(struct thread *td __unused, void *dst __unused,
     size_t *off __unused)
 {
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "support",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

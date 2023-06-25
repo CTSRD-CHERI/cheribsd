@@ -19,6 +19,15 @@ CFLAGS+= -DINET6
 .endif
 CFLAGS+= -I.
 
+.if ${MK_NETLINK_SUPPORT} != "no"
+SRCS+= route_netlink.c
+
+# ld.lld: error: could not determine size of cap reloc against local object nla_p_donemsg
+LD_FATAL_WARNINGS=no
+.else
+CFLAGS+=-DWITHOUT_NETLINK
+.endif
+
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
 
