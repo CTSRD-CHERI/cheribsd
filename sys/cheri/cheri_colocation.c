@@ -60,6 +60,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_pageout.h>
 #include <vm/vm_map.h>
 
+#include <machine/pcb.h>
+
 #ifdef DDB
 #include <ddb/ddb.h>
 #include <sys/kdb.h>
