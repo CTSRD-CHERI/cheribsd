@@ -116,9 +116,7 @@ static inline vm_pointer_t
 sf_buf_kva(struct sf_buf *sf)
 {
 	if (PMAP_HAS_DMAP)
-		return (cheri_kern_setbounds(
-		    PHYS_TO_DMAP(VM_PAGE_TO_PHYS((vm_page_t)sf)),
-		    PAGE_SIZE));
+		return (PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS((vm_page_t)sf)));
 
         return (sf->kva);
 }
@@ -198,7 +196,7 @@ extern counter_u64_t sfstat[sizeof(struct sfstat) / sizeof(uint64_t)];
 #endif /* !_SYS_SF_BUF_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "support",

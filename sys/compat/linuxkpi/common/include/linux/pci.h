@@ -312,7 +312,7 @@ struct pci_mmio_region {
 };
 
 struct pci_dev {
-	struct device		dev;
+	struct device		dev __subobject_member_used_for_c_inheritance;
 	struct list_head	links;
 	struct pci_driver	*pdrv;
 	struct pci_bus		*bus;
@@ -1178,6 +1178,7 @@ static bool pcie_capability_reg_implemented(struct pci_dev *dev, int pos)
 static inline int
 pcie_capability_read_dword(struct pci_dev *dev, int pos, u32 *dst)
 {
+	*dst = 0;
 	if (pos & 3)
 		return -EINVAL;
 
@@ -1190,6 +1191,7 @@ pcie_capability_read_dword(struct pci_dev *dev, int pos, u32 *dst)
 static inline int
 pcie_capability_read_word(struct pci_dev *dev, int pos, u16 *dst)
 {
+	*dst = 0;
 	if (pos & 3)
 		return -EINVAL;
 
@@ -1730,3 +1732,12 @@ pci_irq_vector(struct pci_dev *pdev, unsigned int vector)
 }
 
 #endif	/* _LINUXKPI_LINUX_PCI_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20230509,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1065,7 +1065,7 @@ SYSCTL_PROC(_debug, OID_AUTO, uma_reclaim_domain,
     "");
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "uintcap_arithmetic",

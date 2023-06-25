@@ -318,9 +318,9 @@ vfprintf(FILE * __restrict fp, const char * __restrict fmt0, va_list ap)
 #define	BUF	32
 #else
 /* For CHERI we need enough space to print a capability dump:
- * 0x0000007ffffecc10 [rwxRW,0x0000007ffffecc10-0x0000007ffffecc50] (invalid,sealed)
+ * 0x0000007ffffecc10 [rwxRW,0x0000007ffffecc10-0x0000007ffffecc50] (invalid,sealed,capmode)
  *
- * The current maximum length is 81 chars but in case we decide to
+ * The current maximum length is 89 chars but in case we decide to
  * print more info in the future we just use 128 since we have enough
  * stack space here anyway.
 */

@@ -610,7 +610,7 @@ is_magic_sighandler_constant(ptraddr_t handler) {
 #endif /* !_SYS_SIGNAL_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes": [
 //     "kernel_sig_types",

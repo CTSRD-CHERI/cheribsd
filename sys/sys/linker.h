@@ -388,7 +388,7 @@ __END_DECLS
 #endif /* !_SYS_LINKER_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities",

@@ -404,7 +404,7 @@ exec_sysvec_init_secondary(struct sysentvec *sv, struct sysentvec *sv2)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",

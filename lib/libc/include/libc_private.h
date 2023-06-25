@@ -444,7 +444,9 @@ int _elf_aux_info(int aux, void *buf, int buflen);
 struct dl_phdr_info;
 int __elf_phdr_match_addr(struct dl_phdr_info *, void *);
 void __init_elf_aux_vector(void);
+#ifndef __CHERI_PURE_CAPABILITY__
 void __libc_map_stacks_exec(void);
+#endif
 void __libc_distribute_static_tls(__size_t, void *, __size_t, __size_t);
 __uintptr_t __libc_static_tls_base(__size_t);
 

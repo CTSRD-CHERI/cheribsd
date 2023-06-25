@@ -30,6 +30,10 @@
 
 /* Portions Copyright 2010 Robert Milkowski */
 
+#if defined(_KERNEL)
+#include <sys/simd.h>
+#endif
+
 #include <sys/zio.h>
 #include <sys/spa.h>
 #include <sys/u8_textprep.h>

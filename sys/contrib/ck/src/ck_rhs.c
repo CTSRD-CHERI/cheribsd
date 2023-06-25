@@ -1479,7 +1479,7 @@ ck_rhs_init(struct ck_rhs *hs,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "pointer_alignment"

@@ -5097,6 +5097,7 @@ partition_resources(struct adapter *sc)
 retry:
 	rc = apply_cfg_and_initialize(sc, cfg_file, &caps_allowed);
 	if (rc != 0 && fallback) {
+		dump_devlog(sc);
 		device_printf(sc->dev,
 		    "failed (%d) to configure card with \"%s\" profile, "
 		    "will fall back to a basic configuration and retry.\n",
@@ -13267,10 +13268,11 @@ DRIVER_MODULE(vcc, cc, vcc_driver, 0, 0);
 MODULE_VERSION(vcc, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

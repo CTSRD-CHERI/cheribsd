@@ -3458,6 +3458,7 @@ prison_check_af(struct ucred *cred, int af)
 #endif
 	case AF_LOCAL:
 	case AF_ROUTE:
+	case AF_NETLINK:
 		break;
 	default:
 		if (!(pr->pr_allow & PR_ALLOW_SOCKET_AF))
@@ -5028,11 +5029,12 @@ DB_SHOW_COMMAND(prison, db_show_prison_command)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ],
 //   "changes_purecap": [
 //     "kdb"

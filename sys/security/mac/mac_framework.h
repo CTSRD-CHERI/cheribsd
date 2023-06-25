@@ -216,6 +216,7 @@ void	mac_ipq_reassemble(struct ipq *q, struct mbuf *m);
 void	mac_ipq_update(struct mbuf *m, struct ipq *q);
 
 int	mac_kdb_check_backend(struct kdb_dbbe *be);
+int	mac_kdb_grant_backend(struct kdb_dbbe *be);
 
 int	mac_kenv_check_dump(struct ucred *cred);
 int	mac_kenv_check_get(struct ucred *cred, char *name);
@@ -715,7 +716,7 @@ int	vop_stdsetlabel_ea(struct vop_setlabel_args *ap);
 #endif /* !_SECURITY_MAC_MAC_FRAMEWORK_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"

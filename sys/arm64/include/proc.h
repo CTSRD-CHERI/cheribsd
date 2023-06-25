@@ -176,6 +176,8 @@ struct mdthread {
 	struct {
 		struct ptrauth_key apia;
 	} md_ptrauth_kern;
+
+	uint64_t md_reserved[4];
 };
 
 struct mdproc {

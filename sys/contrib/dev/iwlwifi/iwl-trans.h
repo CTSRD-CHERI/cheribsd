@@ -252,7 +252,7 @@ struct iwl_rx_cmd_buffer {
 
 static inline void *rxb_addr(struct iwl_rx_cmd_buffer *r)
 {
-	return (void *)((unsigned long)page_address(r->_page) + r->_offset);
+	return (void *)((uintptr_t)page_address(r->_page) + r->_offset);
 }
 
 static inline int rxb_offset(struct iwl_rx_cmd_buffer *r)
@@ -1557,3 +1557,12 @@ int __must_check iwl_pci_register_driver(void);
 void iwl_pci_unregister_driver(void);
 
 #endif /* __iwl_trans_h__ */
+// CHERI CHANGES START
+// {
+//   "updated": 20230509,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

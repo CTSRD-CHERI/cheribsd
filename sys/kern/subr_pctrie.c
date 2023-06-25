@@ -819,7 +819,7 @@ DB_SHOW_COMMAND(pctrienode, db_show_pctrienode)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "kdb"

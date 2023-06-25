@@ -161,3 +161,14 @@ union semun_old64 {
 #endif
 
 #endif /* !_COMPAT_FREEBSD64_FREEBSD64_IPC_H_ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "header",
+ *   "changes": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

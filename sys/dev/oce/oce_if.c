@@ -2111,7 +2111,7 @@ oce_attach_ifp(POCE_SOFTC sc)
 	ifmedia_add(&sc->media, IFM_ETHER | IFM_AUTO, 0, NULL);
 	ifmedia_set(&sc->media, IFM_ETHER | IFM_AUTO);
 
-	if_setflags(sc->ifp, IFF_BROADCAST | IFF_MULTICAST | IFF_KNOWSEPOCH);
+	if_setflags(sc->ifp, IFF_BROADCAST | IFF_MULTICAST);
 	if_setioctlfn(sc->ifp, oce_ioctl);
 	if_setstartfn(sc->ifp, oce_start);
 	if_setinitfn(sc->ifp, oce_init);
@@ -2964,11 +2964,12 @@ oce_read_env_variables( POCE_SOFTC sc )
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

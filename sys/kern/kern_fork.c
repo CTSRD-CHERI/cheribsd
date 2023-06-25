@@ -511,7 +511,7 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	    P2_ASLR_IGNSTART | P2_NOTRACE | P2_NOTRACE_EXEC |
 	    P2_PROTMAX_ENABLE | P2_PROTMAX_DISABLE | P2_TRAPCAP |
 	    P2_STKGAP_DISABLE | P2_STKGAP_DISABLE_EXEC | P2_NO_NEW_PRIVS |
-	    P2_WXORX_DISABLE | P2_WXORX_ENABLE_EXEC);
+	    P2_WXORX_DISABLE | P2_WXORX_ENABLE_EXEC | P2_NOCOLOCATE);
 	p2->p_swtick = ticks;
 	if (p1->p_flag & P_PROFIL)
 		startprofclock(p2);
@@ -1192,7 +1192,7 @@ fork_init(void *arg __unused)
 SYSINIT(fork, SI_SUB_INTRINSIC, SI_ORDER_ANY, fork_init, NULL);
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

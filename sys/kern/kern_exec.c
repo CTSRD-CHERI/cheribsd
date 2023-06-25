@@ -455,10 +455,15 @@ kern_execve(struct thread *td, struct image_args *args,
 	}
 
 	if (opportunistic_coexecve != 0) {
-#ifdef OPPORTUNISTIC_USE_PARENTS
+#ifndef OPPORTUNISTIC_USE_SID
 		sx_slock(&proctree_lock);
 		cop = proc_realparent(p);
 		PROC_LOCK(cop);
+		if (cop->p_flag2 & P2_NOCOLOCATE) {
+			PROC_UNLOCK(cop);
+			sx_sunlock(&proctree_lock);
+			goto fallback;
+		}
 #else
 		/*
 		 * If we're the session leader and we're executing something,
@@ -979,6 +984,7 @@ interpret:
 		p->p_flag2 &= ~P2_NOTRACE;
 	if ((p->p_flag2 & P2_STKGAP_DISABLE_EXEC) == 0)
 		p->p_flag2 &= ~P2_STKGAP_DISABLE;
+	p->p_flag2 &= ~P2_NOCOLOCATE;
 	if (p->p_flag & P_PPWAIT) {
 		p->p_flag &= ~(P_PPWAIT | P_PPTRACE);
 		cv_broadcast(&p->p_pwait);
@@ -1091,7 +1097,8 @@ interpret:
 	if (PMC_SYSTEM_SAMPLING_ACTIVE() || PMC_PROC_IS_USING_PMCS(p)) {
 		VOP_UNLOCK(imgp->vp);
 		pe.pm_credentialschanged = credential_changing;
-		pe.pm_entryaddr = imgp->entry_addr;
+		pe.pm_baseaddr = imgp->reloc_base;
+		pe.pm_dynaddr = imgp->et_dyn_addr;
 
 		PMC_CALL_HOOK_X(td, PMC_FN_PROCESS_EXEC, (void *) &pe);
 		vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
@@ -2691,11 +2698,12 @@ sbuf_drain_core_output(void *arg, const char *data, int len)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "integer_provenance",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ],
 //   "changes_purecap": [
 //     "pointer_as_integer",

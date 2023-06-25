@@ -2262,7 +2262,7 @@ vm_map_findspace(vm_map_t map, vm_offset_t start, vm_size_t length)
 	VM_MAP_ASSERT_LOCKED(map);
 	KASSERT((map->flags & MAP_RESERVATIONS) == 0 ||
 	    length == CHERI_REPRESENTABLE_LENGTH(length),
-	    ("%s: imprecise length %#lx", __func__, length));
+	    ("%s: imprecise length %#jx", __func__, (uintmax_t)length));
 
 	/*
 	 * Request must fit within min/max VM address and must avoid
@@ -4747,7 +4747,7 @@ vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end,
 		 */
 		if ((entry->eflags & MAP_ENTRY_IS_SUB_MAP) != 0 ||
 		    entry->object.vm_object != NULL)
-			pmap_remove(map->pmap, entry->start, entry->end);
+			pmap_map_delete(map->pmap, entry->start, entry->end);
 
 		if (entry->end == map->anon_loc)
 			map->anon_loc = entry->start;
@@ -6555,7 +6555,64 @@ vm_get_cap_owner(struct thread *td, const uintcap_t c)
 
 	return (pid);
 }
-#endif /* __has_feature(capabilities) */
+
+/* Return a capability for the reservation that includes va. */
+void * __capability
+vm_map_reservation_cap(vm_map_t map, vm_offset_t va)
+{
+	vm_map_entry_t entry;
+	void * __capability cap;
+	vm_offset_t end, reservation;
+	vm_prot_t max_prot;
+
+	cap = NULL;
+	vm_map_lock_read(map);
+	if (!vm_map_lookup_entry(map, va, &entry))
+		goto out;
+
+	if ((map->flags & MAP_RESERVATIONS) != 0) {
+		reservation = entry->reservation;
+		if (reservation != va) {
+			if (!vm_map_lookup_entry(map, reservation, &entry))
+				panic("%s: failed to find start of reservation",
+				    __func__);
+		}
+
+		max_prot = entry->max_protection;
+		end = entry->end;
+		entry = vm_map_entry_succ(entry);
+		while (entry->reservation == reservation) {
+			max_prot |= entry->max_protection;
+			end = entry->end;
+			entry = vm_map_entry_succ(entry);
+
+			/*
+			 * Pathological case of a single reservation
+			 * for entire map.
+			 */
+			if (entry->start == reservation)
+				break;
+		}
+	} else {
+		reservation = entry->start;
+		end = entry->end;
+		max_prot = entry->max_protection;
+	}
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	cap = (void * __capability)vm_map_buildcap(map, reservation,
+	    end - reservation, max_prot);
+#else
+	cap = cheri_setaddress(userspace_root_cap, reservation);
+	cap = cheri_setbounds(cap, end - reservation);
+	cap = cheri_andperm(cap, ~CHERI_PROT2PERM_MASK |
+	    vm_map_prot2perms(max_prot));
+#endif
+out:
+	vm_map_unlock_read(map);
+	return (cap);
+}
+#endif
 
 #ifdef INVARIANTS
 static void
@@ -6607,7 +6664,7 @@ _vm_map_assert_consistent(vm_map_t map, int check)
 		    (entry->eflags & MAP_ENTRY_UNMAPPED) != 0),
 		    ("map %p prev->start %jx, start %jx, reservation %jx, "
 		    "both MAP_ENTRY_UNMAPPED", map, (uintmax_t)prev->start,
-		    (uintmax_t)entry->start, entry->reservation));
+		    (uintmax_t)entry->start, (uintmax_t)entry->reservation));
 		cur = map->root;
 		lbound = ubound = header;
 		for (;;) {
@@ -6748,7 +6805,7 @@ DB_SHOW_COMMAND(procvm, procvm)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "platform"

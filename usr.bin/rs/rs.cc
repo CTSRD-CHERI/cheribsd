@@ -463,6 +463,7 @@ getnum(const char *p)
 // CHERI CHANGES START
 // {
 //   "updated": 20180713,
+//   "target_type": "prog",
 //   "changes": [
 //     "pointer_provenance"
 //   ],

@@ -653,6 +653,22 @@ initriscv(struct riscv_bootparams *rvbp)
 
 	cninit();
 
+#if __has_feature(capabilities)
+	/*
+	 * Now that printf() is ready, we check for the required CHERI features
+	 * needed to run this version of CheriBSD to detect incompatible (old)
+	 * implementations instead of failing with obscure errors later on.
+	 * TODO: we should do this earlier since this check may actually be
+	 * too late to print a helpful error message. Once moved earlier, we
+	 * could use SBI print calls to output the error instead of printf.
+	 */
+	if ((csr_read(sccsr) & SCCSR_TAG_CLEARING) == 0) {
+		printf("WARNING: CHERI implementation raises exceptions on "
+		       "invalid operations. This is no longer supported and "
+		       "will become a hard error soon\n");
+	}
+#endif
+
 	/*
 	 * Dump the boot metadata. We have to wait for cninit() since console
 	 * output is required. If it's grossly incorrect the kernel will never
@@ -685,7 +701,7 @@ initriscv(struct riscv_bootparams *rvbp)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",

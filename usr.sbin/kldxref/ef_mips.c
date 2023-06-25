@@ -35,6 +35,7 @@
  * CHERI CHANGES START
  * {
  *   "updated": 20200507,
+ *   "target_type": "prog",
  *   "changes": [
  *     "bounds_compression"
  *   ]

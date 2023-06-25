@@ -44,6 +44,21 @@
 /* Set to -1 to prevent it from being zeroed with the rest of BSS */
 void * __capability userspace_root_cap = (void * __capability)(intcap_t)-1;
 
+static u_int cheri_ptrace_caps;
+SYSCTL_UINT(_security_cheri, OID_AUTO, ptrace_caps, CTLFLAG_RWTUN,
+    &cheri_ptrace_caps, 0,
+    "Control derivation of caps for ptrace: 0 = registers only; 1 = any valid userspace mapping; 2 = any userspace cap");
+
+static u_long cheri_forged_ptrace_caps;
+SYSCTL_ULONG(_security_cheri_stats, OID_AUTO, forged_ptrace_caps, CTLFLAG_RD,
+    &cheri_forged_ptrace_caps, 0,
+    "Number of forged capabilities injected via ptrace");
+
+static u_long cheri_untagged_ptrace_caps;
+SYSCTL_ULONG(_security_cheri_stats, OID_AUTO, untagged_ptrace_caps, CTLFLAG_RD,
+    &cheri_untagged_ptrace_caps, 0,
+    "Number of capabilities injected via ptrace that failed to tag");
+
 /*
  * Build a new userspace capability derived from userspace_root_cap.
  * The resulting capability may include both read and execute permissions,
@@ -155,4 +170,47 @@ _cheri_capability_build_user_rwx_unchecked(uint32_t perms, ptraddr_t basep,
 {
 	return (cheri_setoffset(cheri_andperm(cheri_setbounds(
 	    cheri_setoffset(userspace_root_cap, basep), length), perms), off));
+}
+
+/*
+ * Try to store a tagged capability in *out, derived from an untagged
+ * "bag of bits" in in.  If a tagged capability cannot be derived,
+ * return false and leave *out unchanged.
+ */
+bool
+ptrace_derive_cap(struct proc *p, uintcap_t in, uintcap_t *out)
+{
+	struct thread *td;
+	void * __capability cap;
+	void * __capability sealcap;
+
+	/*
+	 * Try to derive from existing user registers in this
+	 * process.
+	 */
+	FOREACH_THREAD_IN_PROC(p, td) {
+		if (ptrace_derive_capreg_td(td, in, out))
+			return (true);
+	}
+
+	if (cheri_ptrace_caps >= 1) {
+		/* Try to derive from valid memory mappings. */
+		if (vm_derive_capreg(p, in, out))
+			return (true);
+	}
+
+	if (cheri_ptrace_caps >= 2) {
+		/* If forging is allowed, derive from the userspace root. */
+		cap = cheri_buildcap(userspace_root_cap, in);
+		sealcap = cheri_copytype(userspace_root_sealcap, in);
+		cap = cheri_condseal(cap, sealcap);
+		if (cheri_gettag(cap)) {
+			atomic_add_long(&cheri_forged_ptrace_caps, 1);
+			*out = (uintcap_t)cap;
+			return (true);
+		}
+	}
+
+	atomic_add_long(&cheri_untagged_ptrace_caps, 1);
+	return (false);
 }

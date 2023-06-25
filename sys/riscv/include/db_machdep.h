@@ -94,3 +94,15 @@ typedef long		db_expr_t;
 void db_print_cap(struct thread *td, const char *name, const void * __capability value);
 
 #endif /* !_MACHINE_DB_MACHDEP_H_ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "header",
+ *   "changes_purecap": [
+ *     "kdb",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

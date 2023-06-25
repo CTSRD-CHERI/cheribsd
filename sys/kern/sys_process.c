@@ -524,7 +524,7 @@ proc_read_cheri_tags_page(vm_map_t map, vm_offset_t va, void *tagbuf,
 	if (error != 0)
 		return (EFAULT);
 
-	page = (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
+	page = (void *)PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(m));
 	cheri_read_tags_page(page, tagbuf, hastagsp);
 	vm_page_unwire(m, PQ_ACTIVE);
 	return (0);
@@ -618,7 +618,7 @@ proc_read_cheri_cap_page(vm_map_t map, vm_offset_t va, struct uio *uio)
 	if (error != KERN_SUCCESS)
 		return (EFAULT);
 
-	src = (uintcap_t *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m)) + pageoff /
+	src = (uintcap_t *)PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(m)) + pageoff /
 	    sizeof(uintcap_t);
 	while (todo > 0) {
 		capbuf[0] = cheri_gettag(*src);
@@ -656,6 +656,80 @@ proc_read_cheri_cap(struct proc *p, struct uio *uio)
 	error = 0;
 	while (uio->uio_resid > 0) {
 		error = proc_read_cheri_cap_page(map, va, uio);
+		if (error != 0)
+			break;
+		va = trunc_page(va) + PAGE_SIZE;
+	}
+	return (error);
+}
+
+static int
+proc_write_cheri_cap_page(struct proc *p, vm_map_t map, vm_offset_t va,
+    struct uio *uio)
+{
+	char capbuf[sizeof(uintcap_t) + 1];
+	uintcap_t *dst, cap;
+	vm_page_t m;
+	u_int pageoff, todo;
+	int error;
+
+	KASSERT(is_aligned(va, sizeof(uintcap_t)),
+	    ("%s: user address %lx is not capability-aligned", __func__, va));
+	pageoff = va & PAGE_MASK;
+	todo = (PAGE_SIZE - pageoff) / sizeof(uintcap_t) *
+	    (sizeof(uintcap_t) + 1);
+	todo = MIN(todo, uio->uio_resid);
+	va = trunc_page(va);
+
+	error = vm_fault(map, va, VM_PROT_WRITE | VM_PROT_WRITE_CAP, 0, &m);
+	if (error != KERN_SUCCESS)
+		return (EFAULT);
+
+	dst = (uintcap_t *)PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(m)) + pageoff /
+	    sizeof(uintcap_t);
+	while (todo > 0) {
+		error = uiomove(capbuf, sizeof(capbuf), uio);
+		if (error != 0)
+			break;
+
+		memcpy(&cap, capbuf + 1, sizeof(cap));
+		if (capbuf[0] != 0) {
+			if (!ptrace_derive_cap(p, cap, dst)) {
+				error = EPROT;
+				break;
+			}
+		} else
+			*dst = cap;
+
+		todo -= sizeof(capbuf);
+		dst++;
+	}
+
+	vm_page_unwire(m, PQ_ACTIVE);
+	return (error);
+}
+
+static int
+proc_write_cheri_cap(struct proc *p, struct uio *uio)
+{
+	vm_map_t map = &p->p_vmspace->vm_map;
+	vm_offset_t va;
+	int error;
+
+	/*
+	 * Can't reuse uio_offset directly as uiomove increments it
+	 * based on the expanded capability size.
+	 */
+	va = uio->uio_offset;
+	if (!is_aligned(va, sizeof(uintcap_t)))
+		return (EINVAL);
+
+	if (uio->uio_resid % (sizeof(uintcap_t) + 1) != 0)
+		return (EINVAL);
+
+	error = 0;
+	while (uio->uio_resid > 0) {
+		error = proc_write_cheri_cap_page(p, map, va, uio);
 		if (error != 0)
 			break;
 		va = trunc_page(va) + PAGE_SIZE;
@@ -1649,6 +1723,17 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			piod->piod_len -= uio.uio_resid;
 			PROC_LOCK(p);
 			goto out;
+		case PIOD_WRITE_CHERI_CAP:
+			CTR3(KTR_PTRACE,
+			    "PT_IO: pid %d: WRITE_CHERI_CAP (%p, %#x)",
+			    p->p_pid, (uintptr_t)uio.uio_offset, uio.uio_resid);
+			td2->td_dbgflags |= TDB_USERWR;
+			uio.uio_rw = UIO_WRITE;
+			PROC_UNLOCK(p);
+			error = proc_write_cheri_cap(p, &uio);
+			piod->piod_len -= uio.uio_resid;
+			PROC_LOCK(p);
+			goto out;
 #endif
 		default:
 			error = EINVAL;
@@ -1966,15 +2051,13 @@ fail:
 
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "user_capabilities",
-//     "support"
-//   ],
-//   "changes_purecap": [
-//     "virtual_address"
+//     "support",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

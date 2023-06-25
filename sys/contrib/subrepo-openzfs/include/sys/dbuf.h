@@ -55,6 +55,8 @@ extern "C" {
 #define	DB_RF_NEVERWAIT		(1 << 4)
 #define	DB_RF_CACHED		(1 << 5)
 #define	DB_RF_NO_DECRYPT	(1 << 6)
+#define	DB_RF_PARTIAL_FIRST	(1 << 7)
+#define	DB_RF_PARTIAL_MORE	(1 << 8)
 
 /*
  * The simplified state transition diagram for dbufs looks like:
@@ -170,6 +172,7 @@ typedef struct dbuf_dirty_record {
 			override_states_t dr_override_state;
 			uint8_t dr_copies;
 			boolean_t dr_nopwrite;
+			boolean_t dr_brtwrite;
 			boolean_t dr_has_raw_params;
 
 			/*
@@ -294,6 +297,8 @@ typedef struct dmu_buf_impl {
 	/* Tells us which dbuf cache this dbuf is in, if any */
 	dbuf_cached_state_t db_caching_status;
 
+	uint64_t db_hash;
+
 	/* Data which is unique to data (leaf) blocks: */
 
 	/* User callback information. */
@@ -319,6 +324,9 @@ typedef struct dmu_buf_impl {
 	uint8_t db_pending_evict;
 
 	uint8_t db_dirtycnt;
+
+	/* The buffer was partially read.  More reads may follow. */
+	uint8_t db_partial_read;
 } dmu_buf_impl_t;
 
 #define	DBUF_HASH_MUTEX(h, idx) \
@@ -364,7 +372,7 @@ void dbuf_rele_and_unlock(dmu_buf_impl_t *db, const void *tag,
     boolean_t evicting);
 
 dmu_buf_impl_t *dbuf_find(struct objset *os, uint64_t object, uint8_t level,
-    uint64_t blkid);
+    uint64_t blkid, uint64_t *hash_out);
 
 int dbuf_read(dmu_buf_impl_t *db, zio_t *zio, uint32_t flags);
 void dmu_buf_will_not_fill(dmu_buf_t *db, dmu_tx_t *tx);
@@ -374,6 +382,7 @@ void dbuf_assign_arcbuf(dmu_buf_impl_t *db, arc_buf_t *buf, dmu_tx_t *tx);
 dbuf_dirty_record_t *dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx);
 dbuf_dirty_record_t *dbuf_dirty_lightweight(dnode_t *dn, uint64_t blkid,
     dmu_tx_t *tx);
+boolean_t dbuf_undirty(dmu_buf_impl_t *db, dmu_tx_t *tx);
 arc_buf_t *dbuf_loan_arcbuf(dmu_buf_impl_t *db);
 void dmu_buf_write_embedded(dmu_buf_t *dbuf, void *data,
     bp_embedded_type_t etype, enum zio_compress comp,

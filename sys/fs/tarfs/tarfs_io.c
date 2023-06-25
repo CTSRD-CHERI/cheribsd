@@ -738,3 +738,15 @@ tarfs_io_fini(struct tarfs_mount *tmp)
 #endif
 	return (error);
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "iovec-macros",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

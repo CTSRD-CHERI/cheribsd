@@ -321,7 +321,7 @@ struct thread {
 	int		td_errno;	/* (k) Error from last syscall. */
 	size_t		td_vslock_sz;	/* (k) amount of vslock-ed space */
 	struct kcov_info *td_kcov_info;	/* (*) Kernel code coverage data */
-	u_int		td_ucredref;	/* (k) references on td_realucred */
+	long		td_ucredref;	/* (k) references on td_realucred */
 #if __has_feature(capabilities)
 	void * __capability td_scb;	/* (k) switcher control block */
 #endif
@@ -748,6 +748,7 @@ struct proc {
 	uint64_t	p_elf_flags;	/* (x) ELF flags */
 	void		*p_elf_brandinfo; /* (x) Elf_Brandinfo, NULL for
 						 non ELF binaries. */
+	sbintime_t	p_umtx_min_timeout;
 	vm_offset_t	p_psstrings;
 	vm_offset_t	p_vm_maxsaddr;	/* user VA at max stack growth */
 	vm_offset_t	p_vm_stacktop;	/* top of the stack, may not be page-aligned */
@@ -891,6 +892,7 @@ struct proc {
 #define	P2_WEXIT		0x00040000	/* exit just started, no
 						   external thread_single() is
 						   permitted */
+#define	P2_NOCOLOCATE		0x00080000
 
 /* Flags protected by proctree_lock, kept in p_treeflags. */
 #define	P_TREE_ORPHANED		0x00000001	/* Reparented, on orphan list */
@@ -1368,7 +1370,7 @@ EVENTHANDLER_LIST_DECLARE(thread_init);
 #endif	/* !_SYS_PROC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes": [
 //     "kernel_sig_types",

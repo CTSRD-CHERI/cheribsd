@@ -2454,3 +2454,15 @@ aiotx_init_toep(struct toepcb *toep)
 	TASK_INIT(&toep->aiotx_task, 0, t4_aiotx_task, toep);
 }
 #endif
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "user_capabilities",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

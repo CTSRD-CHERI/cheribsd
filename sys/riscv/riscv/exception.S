@@ -84,6 +84,12 @@ __FBSDID("$FreeBSD$");
 	sd	tp, (TF_TP)(sp)
 	ld	tp, (TF_SIZE)(sp)
 #endif
+.else
+#if __has_feature(capabilities)
+	csc	ctp, (TF_TP)(csp)
+#else
+	sd	tp, (TF_TP)(sp)
+#endif
 .endif
 
 #if __has_feature(capabilities)
@@ -479,7 +485,7 @@ END(cpu_exception_handler_user)
 /*-
  * CHERI CHANGES START
  * {
- *   "updated": 20221205,
+ *   "updated": 20230509,
  *   "target_type": "kernel",
  *   "changes_purecap": [
  *     "support"

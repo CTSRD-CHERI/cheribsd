@@ -403,15 +403,14 @@ panfrost_mmu_intr(void *arg)
 static void
 panfrost_mmu_pgtable_alloc(struct panfrost_mmu *mmu)
 {
-	pmap_t p;
+	struct smmu_pmap *p;
 
 	p = &mmu->p;
 
 	smmu_pmap_pinit(p);
-	PMAP_LOCK_INIT(p);
 
 	/* Ensure root directory is visible to GPU. */
-	cpu_dcache_wbinv_range((vm_pointer_t)p->pm_l0, sizeof(pd_entry_t));
+	cpu_dcache_wbinv_range((vm_pointer_t)p->sp_l0, sizeof(pd_entry_t));
 
 	mmu->as = -1;
 }
@@ -421,13 +420,13 @@ panfrost_mmu_enable(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 {
 	vm_paddr_t paddr;
 	uint64_t memattr;
-	pmap_t p;
+	struct smmu_pmap *p;
 	int as;
 
 	as = mmu->as;
 	p = &mmu->p;
 
-	paddr = p->pm_l0_paddr;
+	paddr = p->sp_l0_paddr;
 	paddr |= ARM_MALI_LPAE_TTBR_READ_INNER;
 	paddr |= ARM_MALI_LPAE_TTBR_ADRMODE_TABLE;
 

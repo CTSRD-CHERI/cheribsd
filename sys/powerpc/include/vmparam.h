@@ -321,6 +321,7 @@ extern	int vm_level_0_order;
 #define DMAP_TO_PHYS(x) ({						\
 	KASSERT(hw_direct_map, ("Direct map not provided by PMAP"));	\
 	(x) &~ DMAP_BASE_ADDRESS; })
+#define	PHYS_TO_DMAP_PAGE(x) PHYS_TO_DMAP(x)
 
 /*
  * No non-transparent large page support in the pmap.

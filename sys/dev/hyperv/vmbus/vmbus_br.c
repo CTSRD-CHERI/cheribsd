@@ -720,3 +720,14 @@ vmbus_rxbr_read(struct vmbus_rxbr *rbr, void *data, int dlen, uint32_t skip)
 
 	return (0);
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

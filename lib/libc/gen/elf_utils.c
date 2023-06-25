@@ -39,7 +39,9 @@
 #include "libc_private.h"
 #include "static_tls.h"
 
+#ifndef __CHERI_PURE_CAPABILITY__
 void __pthread_map_stacks_exec(void);
+#endif
 void __pthread_distribute_static_tls(size_t, void *, size_t, size_t);
 
 int
@@ -73,6 +75,7 @@ __elf_phdr_match_addr(struct dl_phdr_info *phdr_info, void *addr)
 	return (i != phdr_info->dlpi_phnum);
 }
 
+#ifndef __CHERI_PURE_CAPABILITY__
 void
 __libc_map_stacks_exec(void)
 {
@@ -104,6 +107,7 @@ __pthread_map_stacks_exec(void)
 
 	((void (*)(void))__libc_interposing[INTERPOS_map_stacks_exec])();
 }
+#endif
 
 void
 __libc_distribute_static_tls(size_t offset, void *src, size_t len,

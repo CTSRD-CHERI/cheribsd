@@ -94,7 +94,7 @@ struct delayed_work {
 		struct mtx mtx;
 		int	expires;
 	} timer;
-};
+} __subobject_use_container_bounds;
 
 #define	DECLARE_DELAYED_WORK(name, fn)					\
 	struct delayed_work name;					\
@@ -257,3 +257,12 @@ extern bool linux_queue_rcu_work(struct workqueue_struct *wq, struct rcu_work *r
 extern bool linux_flush_rcu_work(struct rcu_work *rwork);
 
 #endif					/* _LINUXKPI_LINUX_WORKQUEUE_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20230509,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

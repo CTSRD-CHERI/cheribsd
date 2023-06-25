@@ -1768,7 +1768,7 @@ linux_file_mmap_sub(struct thread *td, vm_size_t objsize, vm_prot_t prot,
 }
 
 static int
-linux_file_mmap(struct file *fp, vm_map_t map, vm_offset_t *addr,
+linux_file_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr,
     vm_offset_t max_addr, vm_size_t size, vm_prot_t prot,
     vm_prot_t cap_maxprot, int flags, vm_ooffset_t foff, struct thread *td)
 {
@@ -1993,17 +1993,17 @@ iounmap(void *addr)
 void *
 vmap(struct page **pages, unsigned int count, unsigned long flags, int prot)
 {
-	vm_offset_t off;
+	vm_pointer_t va;
 	size_t size;
 
 	size = count * PAGE_SIZE;
-	off = kva_alloc(size);
-	if (off == 0)
+	va = kva_alloc(size);
+	if (va == 0)
 		return (NULL);
-	vmmap_add((void *)off, size);
-	pmap_qenter(off, pages, count);
+	vmmap_add((void *)va, size);
+	pmap_qenter(va, pages, count);
 
-	return ((void *)off);
+	return ((void *)va);
 }
 
 void
@@ -2014,8 +2014,8 @@ vunmap(void *addr)
 	vmmap = vmmap_remove(addr);
 	if (vmmap == NULL)
 		return;
-	pmap_qremove((vm_offset_t)addr, vmmap->vm_size / PAGE_SIZE);
-	kva_free((vm_offset_t)addr, vmmap->vm_size);
+	pmap_qremove((vm_pointer_t)addr, vmmap->vm_size / PAGE_SIZE);
+	kva_free((vm_pointer_t)addr, vmmap->vm_size);
 	kfree(vmmap);
 }
 
@@ -2831,14 +2831,18 @@ SYSUNINIT(linux_compat, SI_SUB_DRIVERS, SI_ORDER_SECOND, linux_compat_uninit, NU
  * used. Assert these types have the same size, else some parts of the
  * LinuxKPI may not work like expected:
  */
+#if !__has_feature(capabilities)
 CTASSERT(sizeof(unsigned long) == sizeof(uintptr_t));
+#endif
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "pointer_as_integer",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

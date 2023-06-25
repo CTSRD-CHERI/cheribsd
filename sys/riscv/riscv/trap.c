@@ -416,7 +416,7 @@ fatal:
 	}
 #endif
 	panic("Fatal page fault at %#lx: %#016lx",
-	    (__cheri_addr unsigned long)frame->tf_sepc, stval);
+	    (unsigned long)frame->tf_sepc, stval);
 }
 
 void
@@ -447,7 +447,7 @@ do_trap_supervisor(struct trapframe *frame)
 #endif
 
 	CTR3(KTR_TRAP, "do_trap_supervisor: curthread: %p, sepc: %lx, frame: %p",
-	    curthread, (__cheri_addr unsigned long)frame->tf_sepc, frame);
+	    curthread, (unsigned long)frame->tf_sepc, frame);
 
 	switch (exception) {
 	case SCAUSE_LOAD_ACCESS_FAULT:
@@ -455,14 +455,14 @@ do_trap_supervisor(struct trapframe *frame)
 	case SCAUSE_INST_ACCESS_FAULT:
 		dump_regs(frame);
 		panic("Memory access exception at 0x%016lx\n",
-		    (__cheri_addr unsigned long)frame->tf_sepc);
+		    (unsigned long)frame->tf_sepc);
 		break;
 	case SCAUSE_LOAD_MISALIGNED:
 	case SCAUSE_STORE_MISALIGNED:
 	case SCAUSE_INST_MISALIGNED:
 		dump_regs(frame);
 		panic("Misaligned address exception at %#016lx: %#016lx\n",
-		    (__cheri_addr unsigned long)frame->tf_sepc,
+		    (unsigned long)frame->tf_sepc,
 		    frame->tf_stval);
 		break;
 	case SCAUSE_STORE_PAGE_FAULT:
@@ -486,7 +486,7 @@ do_trap_supervisor(struct trapframe *frame)
 	case SCAUSE_ILLEGAL_INSTRUCTION:
 		dump_regs(frame);
 		panic("Illegal instruction at 0x%016lx\n",
-		    (__cheri_addr unsigned long)frame->tf_sepc);
+		    (unsigned long)frame->tf_sepc);
 		break;
 #if __has_feature(capabilities)
 	case SCAUSE_LOAD_CAP_PAGE_FAULT:
@@ -502,7 +502,7 @@ do_trap_supervisor(struct trapframe *frame)
 		switch (exception) {
 		default:
 			panic("Fatal capability page fault %#lx: %#016lx",
-			    (__cheri_addr unsigned long)frame->tf_sepc,
+			    (unsigned long)frame->tf_sepc,
 			    frame->tf_stval);
 			break;
 		case SCAUSE_CHERI:
@@ -549,7 +549,7 @@ do_trap_user(struct trapframe *frame)
 	intr_enable();
 
 	CTR3(KTR_TRAP, "do_trap_user: curthread: %p, sepc: %lx, frame: %p",
-	    curthread, (__cheri_addr unsigned long)frame->tf_sepc, frame);
+	    curthread, (unsigned long)frame->tf_sepc, frame);
 
 	switch (exception) {
 	case SCAUSE_LOAD_ACCESS_FAULT:
@@ -712,3 +712,15 @@ DB_SHOW_COMMAND(frame, db_show_frame)
 	db_show_frame_td(td, td->td_frame);
 }
 #endif /* __has_feature(capabilities) */
+
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

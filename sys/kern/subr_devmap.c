@@ -131,6 +131,7 @@ void
 devmap_add_entry(vm_paddr_t pa, vm_size_t sz)
 {
 	struct devmap_entry *m;
+	vm_offset_t va;
 
 	if (devmap_bootstrap_done)
 		panic("devmap_add_entry() after devmap_bootstrap()");
@@ -149,14 +150,27 @@ devmap_add_entry(vm_paddr_t pa, vm_size_t sz)
 	 * we end with a nice efficient section mapping.
 	 */
 	if ((pa & 0x000fffff) == 0 && (sz & 0x000fffff) == 0) {
-		akva_devmap_vaddr = trunc_1mpage(akva_devmap_vaddr - sz);
+		va = trunc_1mpage(akva_devmap_vaddr - sz);
 	} else
 #endif
 	{
-		akva_devmap_vaddr = trunc_page(akva_devmap_vaddr - sz);
+		va = trunc_page(akva_devmap_vaddr - sz);
 	}
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(sz == CHERI_REPRESENTABLE_LENGTH(sz),
+	    ("%s: devmap entry is not representable [0x%08jx, 0x%08jx]",
+	    __func__, (uintmax_t)va, (uintmax_t)va + sz));
+	KASSERT(va == CHERI_REPRESENTABLE_BASE(va, sz),
+	    ("%s: devmap entry is not representable [0x%08jx, 0x%08jx]",
+	     __func__, (uintmax_t)va, (uintmax_t)va + sz));
+#endif
+	KASSERT(va >= VM_MAX_KERNEL_ADDRESS - PMAP_MAPDEV_EARLY_SIZE,
+	    ("%s: early devmap too small", __func__));
+	akva_devmap_vaddr = va;
+
 	m = &akva_devmap_entries[akva_devmap_idx++];
-	m->pd_va    = akva_devmap_vaddr;
+	m->pd_va    = va;
 	m->pd_pa    = pa;
 	m->pd_size  = sz;
 }
@@ -223,7 +237,12 @@ devmap_ptov(vm_paddr_t pa, vm_size_t size)
 	for (pd = devmap_table; pd->pd_size != 0; ++pd) {
 		if (pa >= pd->pd_pa && pa + size <= pd->pd_pa + pd->pd_size)
 #ifdef __CHERI_PURE_CAPABILITY__
-			return (cheri_setbounds(cheri_setaddress(
+			/*
+			 * This assumes that the static mappings are always
+			 * representable. This must be enforced when inserting
+			 * entries.
+			 */
+			return (cheri_setboundsexact(cheri_setaddress(
 			    devmap_capability, pd->pd_va + (pa - pd->pd_pa)),
 			    size));
 #else
@@ -292,7 +311,7 @@ pmap_mapdev(vm_paddr_t pa, vm_size_t size)
 		akva_devmap_vaddr = CHERI_REPRESENTABLE_BASE(akva_devmap_vaddr,
 		    size);
 		akva_devmap_vaddr = trunc_page(akva_devmap_vaddr);
-		va = (vm_pointer_t)cheri_setbounds(cheri_setaddress(
+		va = (vm_pointer_t)cheri_setboundsexact(cheri_setaddress(
 		    devmap_capability, akva_devmap_vaddr), size);
 		KASSERT(va + cheri_getlen((void *)va) <= oldva,
 		    ("%s: early devmap overlaps", __func__));
@@ -338,7 +357,7 @@ pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma)
 		akva_devmap_vaddr = CHERI_REPRESENTABLE_BASE(akva_devmap_vaddr,
 		    size);
 		akva_devmap_vaddr = trunc_page(akva_devmap_vaddr);
-		va = (vm_pointer_t)cheri_setbounds(cheri_setaddress(
+		va = (vm_pointer_t)cheri_setboundsexact(cheri_setaddress(
 		    devmap_capability, akva_devmap_vaddr), size);
 		KASSERT(va + cheri_getlen((void *)va) <= oldva,
 		    ("%s: early devmap overlaps", __func__));
@@ -406,7 +425,7 @@ DB_SHOW_COMMAND_FLAGS(devmap, db_show_devmap, DB_CMD_MEMSAFE)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_provenance",

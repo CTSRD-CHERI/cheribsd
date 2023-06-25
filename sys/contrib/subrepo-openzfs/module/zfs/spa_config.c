@@ -245,7 +245,7 @@ spa_write_cachefile(spa_t *target, boolean_t removing, boolean_t postsysevent,
 {
 	spa_config_dirent_t *dp, *tdp;
 	nvlist_t *nvl;
-	char *pool_name;
+	const char *pool_name;
 	boolean_t ccw_failure;
 	int error = 0;
 
@@ -356,6 +356,8 @@ spa_write_cachefile(spa_t *target, boolean_t removing, boolean_t postsysevent,
 		vdev_post_kobj_evt(target->spa_root_vdev);
 		for (int i = 0; i < target->spa_l2cache.sav_count; i++)
 			vdev_post_kobj_evt(target->spa_l2cache.sav_vdevs[i]);
+		for (int i = 0; i < target->spa_spares.sav_count; i++)
+			vdev_post_kobj_evt(target->spa_spares.sav_vdevs[i]);
 	}
 }
 
@@ -416,7 +418,7 @@ spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg, int getstats)
 	unsigned long hostid = 0;
 	boolean_t locked = B_FALSE;
 	uint64_t split_guid;
-	char *pool_name;
+	const char *pool_name;
 
 	if (vd == NULL) {
 		vd = rvd;
