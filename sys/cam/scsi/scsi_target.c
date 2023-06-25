@@ -1156,3 +1156,16 @@ targccblen(xpt_opcode func_code)
 
 	return (len);
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "support",
+ *     "user_capabilities",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

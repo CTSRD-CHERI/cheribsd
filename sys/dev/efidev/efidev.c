@@ -167,6 +167,21 @@ efidev_ioctl(struct cdev *dev __unused, u_long cmd, caddr_t addr,
 		error = efi_set_time(tm);
 		break;
 	}
+	case EFIIOC_GET_WAKETIME:
+	{
+		struct efi_waketime_ioc *wt = (struct efi_waketime_ioc *)addr;
+
+		error = efi_get_waketime(&wt->enabled, &wt->pending,
+		    &wt->waketime);
+		break;
+	}
+	case EFIIOC_SET_WAKETIME:
+	{
+		struct efi_waketime_ioc *wt = (struct efi_waketime_ioc *)addr;
+
+		error = efi_set_waketime(wt->enabled, &wt->waketime);
+		break;
+	}
 	case EFIIOC_VAR_GET:
 	{
 		struct efi_var_ioc *ev = (struct efi_var_ioc *)addr;
@@ -348,3 +363,16 @@ static moduledata_t efidev_moddata = {
 DECLARE_MODULE(efidev, efidev_moddata, SI_SUB_DRIVERS, SI_ORDER_ANY);
 MODULE_VERSION(efidev, 1);
 MODULE_DEPEND(efidev, efirt, 1, 1, 1);
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "support",
+ *     "ioctl:misc",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

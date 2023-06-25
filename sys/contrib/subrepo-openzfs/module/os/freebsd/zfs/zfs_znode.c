@@ -34,6 +34,7 @@
 #include <sys/systm.h>
 #include <sys/sysmacros.h>
 #include <sys/resource.h>
+#include <sys/resourcevar.h>
 #include <sys/mntent.h>
 #include <sys/u8_textprep.h>
 #include <sys/dsl_dataset.h>
@@ -386,7 +387,6 @@ void
 zfs_znode_dmu_fini(znode_t *zp)
 {
 	ASSERT(MUTEX_HELD(ZFS_OBJ_MUTEX(zp->z_zfsvfs, zp->z_id)) ||
-	    zp->z_unlinked ||
 	    ZFS_TEARDOWN_INACTIVE_WRITE_HELD(zp->z_zfsvfs));
 
 	sa_handle_destroy(zp->z_sa_hdl);
@@ -449,6 +449,13 @@ zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, int blksz,
 	zp->z_vnode = vp;
 	vp->v_data = zp;
 
+	/*
+	 * Acquire the vnode lock before any possible interaction with the
+	 * outside world.  Specifically, there is an error path that calls
+	 * zfs_vnode_forget() and the vnode should be exclusively locked.
+	 */
+	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
+
 	ASSERT(!POINTER_IS_VALID(zp->z_zfsvfs));
 
 	zp->z_sa_hdl = NULL;
@@ -464,8 +471,6 @@ zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, int blksz,
 #if __FreeBSD_version >= 1300139
 	atomic_store_ptr(&zp->z_cached_symlink, NULL);
 #endif
-
-	vp = ZTOV(zp);
 
 	zfs_znode_sa_init(zfsvfs, zp, db, obj_type, hdl);
 
@@ -536,10 +541,9 @@ zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, int blksz,
 	zp->z_zfsvfs = zfsvfs;
 	mutex_exit(&zfsvfs->z_znodes_lock);
 
-	/*
-	 * Acquire vnode lock before making it available to the world.
-	 */
-	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
+#if __FreeBSD_version >= 1400077
+	vn_set_state(vp, VSTATE_CONSTRUCTED);
+#endif
 	VN_LOCK_AREC(vp);
 	if (vp->v_type != VFIFO)
 		VN_LOCK_ASHARE(vp);
@@ -1686,7 +1690,7 @@ zfs_create_fs(objset_t *os, cred_t *cr, nvlist_t *zplprops, dmu_tx_t *tx)
 	while ((elem = nvlist_next_nvpair(zplprops, elem)) != NULL) {
 		/* For the moment we expect all zpl props to be uint64_ts */
 		uint64_t val;
-		char *name;
+		const char *name;
 
 		ASSERT3S(nvpair_type(elem), ==, DATA_TYPE_UINT64);
 		val = fnvpair_value_uint64(elem);
@@ -1705,6 +1709,7 @@ zfs_create_fs(objset_t *os, cred_t *cr, nvlist_t *zplprops, dmu_tx_t *tx)
 	}
 	ASSERT3U(version, !=, 0);
 	error = zap_update(os, moid, ZPL_VERSION_STR, 8, 1, &version, tx);
+	ASSERT0(error);
 
 	/*
 	 * Create zap object used for SA attribute registration
@@ -2107,5 +2112,30 @@ zfs_znode_parent_and_name(znode_t *zp, znode_t **dzpp, char *buf)
 		return (err);
 	err = zfs_zget(zfsvfs, parent, dzpp);
 	return (err);
+}
+#endif /* _KERNEL */
+
+#ifdef _KERNEL
+int
+zfs_rlimit_fsize(off_t fsize)
+{
+	struct thread *td = curthread;
+	off_t lim;
+
+	if (td == NULL)
+		return (0);
+
+	lim = lim_cur(td, RLIMIT_FSIZE);
+	if (__predict_true((uoff_t)fsize <= lim))
+		return (0);
+
+	/*
+	 * The limit is reached.
+	 */
+	PROC_LOCK(td->td_proc);
+	kern_psignal(td->td_proc, SIGXFSZ);
+	PROC_UNLOCK(td->td_proc);
+
+	return (EFBIG);
 }
 #endif /* _KERNEL */

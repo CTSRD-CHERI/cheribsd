@@ -1488,7 +1488,7 @@ pmc_process_csw_in(struct thread *td)
 
 		PMCDBG3(CSW,SWI,1,"cpu=%d ri=%d new=%jd", cpu, ri, newvalue);
 
-		pcd->pcd_write_pmc(cpu, adjri, newvalue);
+		pcd->pcd_write_pmc(cpu, adjri, pm, newvalue);
 
 		/* If a sampling mode PMC, reset stalled state. */
 		if (PMC_TO_MODE(pm) == PMC_MODE_TS)
@@ -1498,7 +1498,7 @@ pmc_process_csw_in(struct thread *td)
 		pm->pm_pcpu_state[cpu].pps_cpustate = 1;
 
 		/* Start the PMC. */
-		pcd->pcd_start_pmc(cpu, adjri);
+		pcd->pcd_start_pmc(cpu, adjri, pm);
 	}
 
 	/*
@@ -1601,7 +1601,7 @@ pmc_process_csw_out(struct thread *td)
 		 */
 		pm->pm_pcpu_state[cpu].pps_cpustate = 0;
 		if (pm->pm_pcpu_state[cpu].pps_stalled == 0)
-			pcd->pcd_stop_pmc(cpu, adjri);
+			pcd->pcd_stop_pmc(cpu, adjri, pm);
 
 		KASSERT(counter_u64_fetch(pm->pm_runcount) > 0,
 			("[pmc,%d] pm=%p runcount %ld", __LINE__, (void *) pm,
@@ -1625,7 +1625,7 @@ pmc_process_csw_out(struct thread *td)
 			    ("[pmc,%d] pp refcnt = %d", __LINE__,
 				pp->pp_refcnt));
 
-			pcd->pcd_read_pmc(cpu, adjri, &newvalue);
+			pcd->pcd_read_pmc(cpu, adjri, pm, &newvalue);
 
 			if (mode == PMC_MODE_TS) {
 				PMCDBG3(CSW,SWO,1,"cpu=%d ri=%d val=%jd (samp)",
@@ -2126,7 +2126,8 @@ pmc_hook_handler(struct thread *td, int function, void *arg)
 		CK_LIST_FOREACH(po, &pmc_ss_owners, po_ssnext)
 		    if (po->po_flags & PMC_PO_OWNS_LOGFILE)
 			    pmclog_process_procexec(po, PMC_ID_INVALID,
-				p->p_pid, pk->pm_entryaddr, fullpath);
+				p->p_pid, pk->pm_baseaddr, pk->pm_dynaddr,
+				fullpath);
 		PMC_EPOCH_EXIT();
 
 		PROC_LOCK(p);
@@ -2170,8 +2171,8 @@ pmc_hook_handler(struct thread *td, int function, void *arg)
 				if (po->po_sscount == 0 &&
 				    po->po_flags & PMC_PO_OWNS_LOGFILE)
 					pmclog_process_procexec(po, pm->pm_id,
-					    p->p_pid, pk->pm_entryaddr,
-					    fullpath);
+					    p->p_pid, pk->pm_baseaddr,
+					    pk->pm_dynaddr, fullpath);
 			}
 
 		if (freepath)
@@ -2824,7 +2825,7 @@ pmc_release_pmc_descriptor(struct pmc *pm)
 			PMCDBG2(PMC,REL,2, "stopping cpu=%d ri=%d", cpu, ri);
 
 			critical_enter();
-			pcd->pcd_stop_pmc(cpu, adjri);
+			pcd->pcd_stop_pmc(cpu, adjri, pm);
 			critical_exit();
 		}
 
@@ -3246,7 +3247,7 @@ pmc_start(struct pmc *pm)
 	pm->pm_state = PMC_STATE_RUNNING;
 
 	critical_enter();
-	if ((error = pcd->pcd_write_pmc(cpu, adjri,
+	if ((error = pcd->pcd_write_pmc(cpu, adjri, pm,
 		 PMC_IS_SAMPLING_MODE(mode) ?
 		 pm->pm_sc.pm_reloadcount :
 		 pm->pm_sc.pm_initial)) == 0) {
@@ -3256,7 +3257,7 @@ pmc_start(struct pmc *pm)
 
 		/* Indicate that we desire this to run. Start it. */
 		pm->pm_pcpu_state[cpu].pps_cpustate = 1;
-		error = pcd->pcd_start_pmc(cpu, adjri);
+		error = pcd->pcd_start_pmc(cpu, adjri, pm);
 	}
 	critical_exit();
 
@@ -3321,8 +3322,9 @@ pmc_stop(struct pmc *pm)
 
 	pm->pm_pcpu_state[cpu].pps_cpustate = 0;
 	critical_enter();
-	if ((error = pcd->pcd_stop_pmc(cpu, adjri)) == 0)
-		error = pcd->pcd_read_pmc(cpu, adjri, &pm->pm_sc.pm_initial);
+	if ((error = pcd->pcd_stop_pmc(cpu, adjri, pm)) == 0)
+		error = pcd->pcd_read_pmc(cpu, adjri, pm,
+		    &pm->pm_sc.pm_initial);
 	critical_exit();
 
 	pmc_restore_cpu_binding(&pb);
@@ -3434,6 +3436,12 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 
 		if ((error = copyin(arg, &cl, sizeof(cl))) != 0) {
 			pmclog_proc_ignite(pmclog_proc_handle, NULL);
+			break;
+		}
+
+		/* No flags currently implemented */
+		if (cl.pm_flags != 0) {
+			error = EINVAL;
 			break;
 		}
 
@@ -4400,7 +4408,7 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 				if ((pm->pm_flags & PMC_F_ATTACHED_TO_OWNER) &&
 				    (pm->pm_state == PMC_STATE_RUNNING))
 					error = (*pcd->pcd_read_pmc)(cpu, adjri,
-					    &oldvalue);
+					    pm, &oldvalue);
 				else
 					oldvalue = pm->pm_gv.pm_savedvalue;
 			}
@@ -4425,13 +4433,14 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 
 			critical_enter();
 			/* save old value */
-			if (prw.pm_flags & PMC_F_OLDVALUE)
+			if (prw.pm_flags & PMC_F_OLDVALUE) {
 				if ((error = (*pcd->pcd_read_pmc)(cpu, adjri,
-					 &oldvalue)))
+				    pm, &oldvalue)))
 					goto error;
+			}
 			/* write out new value */
 			if (prw.pm_flags & PMC_F_NEWVALUE)
-				error = (*pcd->pcd_write_pmc)(cpu, adjri,
+				error = (*pcd->pcd_write_pmc)(cpu, adjri, pm,
 				    prw.pm_value);
 		error:
 			critical_exit();
@@ -5028,7 +5037,7 @@ pmc_process_samples(int cpu, ring_type_t ring)
 			continue;
 
 		pm->pm_pcpu_state[cpu].pps_stalled = 0;
-		(*pcd->pcd_start_pmc)(cpu, adjri);
+		(*pcd->pcd_start_pmc)(cpu, adjri, pm);
 	}
 }
 
@@ -5162,11 +5171,11 @@ pmc_process_exit(void *arg __unused, struct proc *p)
 			if (pm->pm_pcpu_state[cpu].pps_cpustate) {
 				pm->pm_pcpu_state[cpu].pps_cpustate = 0;
 				if (!pm->pm_pcpu_state[cpu].pps_stalled) {
-					(void) pcd->pcd_stop_pmc(cpu, adjri);
+					(void) pcd->pcd_stop_pmc(cpu, adjri, pm);
 
 					if (PMC_TO_MODE(pm) == PMC_MODE_TC) {
 						pcd->pcd_read_pmc(cpu, adjri,
-						    &newvalue);
+						    pm, &newvalue);
 						tmp = newvalue -
 						    PMC_PCPU_SAVED(cpu,ri);
 
@@ -5394,7 +5403,7 @@ pmc_kld_load(void *arg __unused, linker_file_t lf)
 	CK_LIST_FOREACH(po, &pmc_ss_owners, po_ssnext)
 		if (po->po_flags & PMC_PO_OWNS_LOGFILE)
 			pmclog_process_map_in(po, (pid_t) -1,
-			    (uintfptr_t) lf->address, lf->filename);
+			    (uintfptr_t) lf->address, lf->pathname);
 	PMC_EPOCH_EXIT();
 
 	/*
@@ -5980,3 +5989,15 @@ load (struct module *module __unused, int cmd, void *arg __unused)
 
 	return error;
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "user_capabilities",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

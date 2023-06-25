@@ -57,6 +57,7 @@
 #define	pmap_page_get_memattr(m)	((m)->md.pv_memattr)
 #define	pmap_page_is_write_mapped(m)	(((m)->a.flags & PGA_WRITEABLE) != 0)
 void pmap_page_set_memattr(vm_page_t m, vm_memattr_t ma);
+#define	pmap_map_delete(pmap, sva, eva)	pmap_remove(pmap, sva, eva)
 
 /*
  * Pmap stuff
@@ -175,7 +176,7 @@ pmap_vmspace_copy(pmap_t dst_pmap __unused, pmap_t src_pmap __unused)
 #endif	/* !_MACHINE_PMAP_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",

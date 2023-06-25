@@ -22,7 +22,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20221128,
+ *   "updated": 20230509,
  *   "target_type": "lib",
  *   "changes": [
  *     "pointer_alignment"

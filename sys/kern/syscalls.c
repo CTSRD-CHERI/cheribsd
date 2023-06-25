@@ -145,7 +145,7 @@ const char *syscallnames[] = {
 	"mkdir",			/* 136 = mkdir */
 	"rmdir",			/* 137 = rmdir */
 	"utimes",			/* 138 = utimes */
-	"obs_4.2",			/* 139 = obsolete 4.2 sigreturn */
+	"obs_sigreturn",			/* 139 = obsolete sigreturn */
 	"adjtime",			/* 140 = adjtime */
 	"compat.getpeername",		/* 141 = old getpeername */
 	"compat.gethostid",		/* 142 = old gethostid */
@@ -589,4 +589,5 @@ const char *syscallnames[] = {
 	"fspacectl",			/* 580 = fspacectl */
 	"sched_getcpu",			/* 581 = sched_getcpu */
 	"swapoff",			/* 582 = swapoff */
+	"kqueuex",			/* 583 = kqueuex */
 };

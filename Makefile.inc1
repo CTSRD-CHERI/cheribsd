@@ -161,10 +161,10 @@ TARGET_TRIPLE_ABI=	gnueabi
 .endif
 .endif
 MACHINE_TRIPLE_ABI?=	unknown
-MACHINE_TRIPLE_MACHINE=${MACHINE_ARCH:S/aarch64c/aarch64/:S/amd64/x86_64/:C/sf$//:S/riscv64c/riscv64/}
+MACHINE_TRIPLE_MACHINE=${MACHINE_ARCH:S/aarch64c/aarch64/:S/amd64/x86_64/:S/riscv64c/riscv64/}
 MACHINE_TRIPLE?=${MACHINE_TRIPLE_MACHINE}-${MACHINE_TRIPLE_ABI}-freebsd${OS_REVISION}
 TARGET_TRIPLE_ABI?=	unknown
-TARGET_TRIPLE_MACHINE=	${TARGET_ARCH:S/aarch64c/aarch64/:S/amd64/x86_64/:C/sf$//:S/riscv64c/riscv64/}
+TARGET_TRIPLE_MACHINE=	${TARGET_ARCH:S/aarch64c/aarch64/:S/amd64/x86_64/:S/riscv64c/riscv64/}
 TARGET_TRIPLE?=	${TARGET_TRIPLE_MACHINE}-${TARGET_TRIPLE_ABI}-freebsd${OS_REVISION}
 KNOWN_ARCHES?=	aarch64/arm64 \
 		aarch64c/arm64 \
@@ -177,9 +177,7 @@ KNOWN_ARCHES?=	aarch64/arm64 \
 		powerpc64le/powerpc \
 		powerpcspe/powerpc \
 		riscv64/riscv \
-		riscv64sf/riscv \
-		riscv64c/riscv \
-		riscv64sfc/riscv
+		riscv64c/riscv
 
 .if ${TARGET} == ${TARGET_ARCH}
 _t=		${TARGET}
@@ -915,12 +913,14 @@ XCFLAGS+=	--sysroot=${WORLDTMP}
 XCFLAGS+=	${BFLAGS}
 .endif
 
+.if ${MK_LIB32} == "yes"
+_LIBCOMPATS+=	32
+.endif
+.if ${MK_LIB64} == "yes"
+_LIBCOMPATS+=	64
+.endif
 .if ${MK_LIB64C} == "yes"
-_LIBCOMPAT= 64C
-.elif ${MK_LIB32} == "yes"
-_LIBCOMPAT= 32
-.elif ${MK_LIB64} == "yes"
-_LIBCOMPAT= 64
+_LIBCOMPATS+=	64C
 .endif
 .include "Makefile.libcompat"
 
@@ -1151,8 +1151,7 @@ _bootstrap-tools:
 	${_+_}cd ${.CURDIR}; ${BMAKE} _NO_INCLUDE_COMPILERMK=t _cleanobj_fast_depend_hack
 .endif
 	${_+_}cd ${.CURDIR}; ${BMAKE} bootstrap-tools
-	mkdir -p ${WORLDTMP}/usr ${WORLDTMP}/lib/casper ${WORLDTMP}/lib/geom \
-	    ${WORLDTMP}/bin
+	mkdir -p ${WORLDTMP}/usr ${WORLDTMP}/lib/geom ${WORLDTMP}/bin
 	${WORLDTMP_MTREE} -f ${.CURDIR}/etc/mtree/BSD.usr.dist \
 	    -p ${WORLDTMP}/usr >/dev/null
 	${WORLDTMP_MTREE} -f ${.CURDIR}/etc/mtree/BSD.include.dist \
@@ -1179,9 +1178,9 @@ _cleanobj:
 	# Avoid including bsd.compiler.mk in clean and obj with _NO_INCLUDE_COMPILERMK
 	# since the restricted $PATH might not contain a valid cc binary
 	${_+_}cd ${.CURDIR}; ${WMAKE} _NO_INCLUDE_COMPILERMK=t ${CLEANDIR}
-.if defined(_LIBCOMPAT)
-	${_+_}cd ${.CURDIR}; ${LIBCOMPATWMAKE} _NO_INCLUDE_COMPILERMK=t -f Makefile.inc1 ${CLEANDIR}
-.endif
+.for LIBCOMPAT in ${_LIBCOMPATS}
+	${_+_}cd ${.CURDIR}; ${LIB${LIBCOMPAT}WMAKE} _NO_INCLUDE_COMPILERMK=t -f Makefile.inc1 ${CLEANDIR}
+.endfor
 .else
 	${_+_}cd ${.CURDIR}; ${WMAKE} _NO_INCLUDE_COMPILERMK=t _cleanobj_fast_depend_hack
 .endif	# ${MK_CLEAN} == "yes"
@@ -1257,8 +1256,10 @@ WMAKE_TGTS+=	_includes
 .endif
 .if !defined(NO_LIBS)
 WMAKE_TGTS+=	_libraries
-.if defined(_LIBCOMPAT) && empty(SUBDIR_OVERRIDE)
+.if empty(SUBDIR_OVERRIDE)
+.for libcompat in ${libcompats}
 WMAKE_TGTS+=	build${libcompat}
+.endfor
 .endif
 .endif
 .if !defined(SYSROOT_ONLY)
@@ -1322,7 +1323,7 @@ buildenv: .PHONY
 	INSTALL="${INSTALL_CMD} ${INSTALLFLAGS}" \
 	MTREE_CMD="${MTREE_CMD} ${MTREEFLAGS}" BUILDENV=1 ${BUILDENV_SHELL}
 
-TOOLCHAIN_TGTS=	${WMAKE_TGTS:Neverything:Nbuild${libcompat}}
+TOOLCHAIN_TGTS=	${WMAKE_TGTS:Neverything:${libcompats:@v@Nbuild${v}@:ts:}}
 toolchain: ${TOOLCHAIN_TGTS} .PHONY
 KERNEL_TOOLCHAIN_TGTS=	${TOOLCHAIN_TGTS:N_obj:N_cleanobj:N_includes:N_libraries}
 .if make(kernel-toolchain)
@@ -1463,9 +1464,9 @@ ITOOLS+=${LOCAL_ITOOLS}
 
 # Non-base distributions produced by the base system
 EXTRA_DISTRIBUTIONS=
-.if defined(_LIBCOMPAT)
+.for libcompat in ${libcompats}
 EXTRA_DISTRIBUTIONS+=	lib${libcompat}
-.endif
+.endfor
 .if ${MK_TESTS} != "no"
 EXTRA_DISTRIBUTIONS+=	tests
 .endif
@@ -1525,14 +1526,14 @@ distributeworld installworld stageworld installsysroot: _installcheck_world .PHO
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.debug.dist \
 	    -p ${DESTDIR}/${DISTDIR}/${dist}/usr/lib >/dev/null
 .endif
-.if defined(_LIBCOMPAT)
+.for libcompat in ${libcompats}
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.lib${libcompat}.dist \
 	    -p ${DESTDIR}/${DISTDIR}/${dist}/usr >/dev/null
 .if ${MK_DEBUG_FILES} != "no"
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.lib${libcompat}.dist \
 	    -p ${DESTDIR}/${DISTDIR}/${dist}/usr/lib/debug/usr >/dev/null
 .endif
-.endif
+.endfor
 .if ${MK_TESTS} != "no" && ${dist} == "tests"
 	-mkdir -p ${DESTDIR}/${DISTDIR}/${dist}${TESTSBASE}
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.tests.dist \
@@ -1556,16 +1557,16 @@ distributeworld installworld stageworld installsysroot: _installcheck_world .PHO
 .if ${TARGET_ARCH} == "amd64"
 	echo "./${dist}/usr/include/i386 type=dir uname=root gname=wheel mode=0755" >> ${METALOG}
 .endif
-.if defined(_LIBCOMPAT)
+.for libcompat in ${libcompats}
 	${IMAKEENV} ${DISTR_MTREE} -C -f ${.CURDIR}/etc/mtree/BSD.lib${libcompat}.dist | \
 	    sed -e 's#^\./#./${dist}/usr/#' >> ${METALOG}
-.endif
+.endfor
 .endif
 .endfor
 	-mkdir ${DESTDIR}/${DISTDIR}/base
 	${_+_}cd ${.CURDIR}/etc; ${CROSSENV} PATH=${TMPPATH:Q} ${MAKE} \
 	    METALOG=${METALOG} ${IMAKE_INSTALL} ${IMAKE_MTREE} \
-	    DISTBASE=/base DESTDIR=${DESTDIR}/${DISTDIR}/base \
+	    DISTBASE=/base DESTDIR=${INSTALL_DDIR}/base \
 	    LOCAL_MTREE=${LOCAL_MTREE:Q} distrib-dirs
 	${INSTALL_SYMLINK} ${INSTALLFLAGS} usr/src/sys ${INSTALL_DDIR}/base/sys
 .endif # make(distributeworld)
@@ -1591,7 +1592,7 @@ distributeworld installworld stageworld installsysroot: _installcheck_world .PHO
 	@# the relevant mtree line.
 	cd ${DESTDIR}/${DISTDIR}; \
 	find ./${dist} | ${METALOG_SORT_CMD} -u ${METALOG} - | \
-	awk 'BEGIN { print "#${MTREE_MAGIC}" } !/ type=/ { file = $$1 } / type=/ { if ($$1 == file) { sub(/^\.\/${dist}\//, "./"); print } }' > \
+	awk 'BEGIN { print "#${MTREE_MAGIC}" } !/ type=/ { file = $$1 } / type=/ { if ($$1 == file) { sub(/^\.\/${dist}/, "."); print } }' > \
 	${DESTDIR}/${DISTDIR}/${dist}.meta
 .endfor
 .for dist in ${DEBUG_DISTRIBUTIONS}
@@ -1601,7 +1602,7 @@ distributeworld installworld stageworld installsysroot: _installcheck_world .PHO
 	@# the relevant mtree line.
 	cd ${DESTDIR}/${DISTDIR}; \
 	find ./${dist}/usr/lib/debug | ${METALOG_SORT_CMD} -u ${METALOG} - | \
-	awk 'BEGIN { print "#${MTREE_MAGIC}" } !/ type=/ { file = $$1 } / type=/ { if ($$1 == file) { sub(/^\.\/${dist}\//, "./"); print } }' > \
+	awk 'BEGIN { print "#${MTREE_MAGIC}" } !/ type=/ { file = $$1 } / type=/ { if ($$1 == file) { sub(/^\.\/${dist}/, "."); print } }' > \
 	${DESTDIR}/${DISTDIR}/${dist}.debug.meta
 .endfor
 .endif
@@ -1689,9 +1690,9 @@ restage reinstall reinstallsysroot: .MAKE .PHONY
 	@echo ">>> Installing everything started on `LC_ALL=C date`"
 	@echo "--------------------------------------------------------------"
 	${_+_}cd ${.CURDIR}; ${MAKE} -f Makefile.inc1 install
-.if defined(_LIBCOMPAT)
+.for libcompat in ${libcompats}
 	${_+_}cd ${.CURDIR}; ${MAKE} -f Makefile.inc1 install${libcompat}
-.endif
+.endfor
 	@echo "--------------------------------------------------------------"
 	@echo ">>> Adding symlinks for native ABI libdir: ${MACHINE_ABI}"
 	@echo "--------------------------------------------------------------"
@@ -1724,10 +1725,10 @@ redistribute: .MAKE .PHONY
 	@echo ">>> Distributing everything"
 	@echo "--------------------------------------------------------------"
 	${_+_}cd ${.CURDIR}; ${MAKE} -f Makefile.inc1 distribute
-.if defined(_LIBCOMPAT)
+.for libcompat in ${libcompats}
 	${_+_}cd ${.CURDIR}; ${MAKE} -f Makefile.inc1 distribute${libcompat} \
 	    DISTRIBUTION=lib${libcompat}
-.endif
+.endfor
 
 distrib-dirs distribution: .MAKE .PHONY
 .if defined(SYSROOT_ONLY)
@@ -1819,7 +1820,7 @@ _cleankernobj_fast_depend_hack: .PHONY
 .endfor
 .endif
 
-${WMAKE_TGTS:N_worldtmp:Nbuild${libcompat}} ${.ALLTARGETS:M_*:N_worldtmp}: .MAKE .PHONY
+${WMAKE_TGTS:N_worldtmp:${libcompats:@v@Nbuild${v}@:ts:}} ${.ALLTARGETS:M_*:N_worldtmp}: .MAKE .PHONY
 
 # record kernel(s) build time in seconds
 .if make(buildkernel)
@@ -3488,7 +3489,6 @@ list-old-libs: .PHONY
 	    -V "OLD_LIBS:Mlib/*:S,^lib,usr/lib64c," \
 	    -V "OLD_LIBS:Musr/lib/*:S,^usr/lib,usr/lib64c," \
 	    -V "OLD_LIBS:Mlib/casper/*:S,^lib/casper,usr/lib64c," | \
-	    xargs -n1 | sort
 	    sed -E 's/[[:space:]]+/\n/g' | sort
 
 delete-old-libs: .PHONY
@@ -3579,9 +3579,11 @@ check-old: check-old-files check-old-libs check-old-dirs .PHONY
 #
 # showconfig - show build configuration.
 #
+# ignore lower case knobs (not for use with WITH*)
+#
 showconfig: .PHONY
 	@(${MAKE} -n -f ${.CURDIR}/sys/conf/kern.opts.mk -V dummy -dg1 UPDATE_DEPENDFILE=no NO_OBJ=yes MACHINE=${TARGET} MACHINE_ARCH=${TARGET_ARCH}; \
-	  ${MAKE} -n -f ${.CURDIR}/share/mk/src.opts.mk -V dummy -dg1 UPDATE_DEPENDFILE=no NO_OBJ=yes) 2>&1 | grep ^MK_ | sort -u
+	  ${MAKE} -n -f ${.CURDIR}/share/mk/src.opts.mk -V dummy -dg1 UPDATE_DEPENDFILE=no NO_OBJ=yes) 2>&1 | grep '^MK_[A-Z]' | sort -u
 
 .if !empty(KRNLOBJDIR) && !empty(KERNCONF)
 DTBOUTPUTPATH= ${KRNLOBJDIR}/${KERNCONF}/
@@ -3766,10 +3768,10 @@ _xi-mtree: .PHONY
 .if ${TARGET_ARCH} == "amd64"
 	mkdir -p ${XDDESTDIR}/usr/include/i386
 .endif
-.if defined(_LIBCOMPAT)
+.for libcompat in ${libcompats}
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.lib${libcompat}.dist \
 	    -p ${XDDESTDIR}/usr >/dev/null
-.endif
+.endfor
 .if ${MK_TESTS} != "no"
 	mkdir -p ${XDDESTDIR}${TESTSBASE}
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.tests.dist \

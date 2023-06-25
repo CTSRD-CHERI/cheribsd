@@ -8,6 +8,16 @@ how to build different parts of the project, etc. The
 [developer's handbook](https://docs.freebsd.org/en/books/developers-handbook/)
 is another useful resource.
 
+FreeBSD accepts source code contributions using one of several methods:
+- A GitHub [pull request](https://github.com/freebsd/freebsd-src/pulls)
+- A code review in [Phabricator](https://reviews.freebsd.org/differential)
+- An attachment on a [Bugzilla ticket](https://bugs.freebsd.org)
+- Direct access to the [Git repository](https://cgit.freebsd.org/src/)
+
+The preferred method depends on a few factors including the size or scope of
+the change.  GitHub pull requests are preferred for relatively straightforward
+changes where the contributor already has a GitHub account.
+
 ## GitHub Pull Requests
 
 Presently, GitHub 'freebsd-src' repository is one of the publish-only services
@@ -29,6 +39,7 @@ A pull request will be considered if:
 * Fixup commits should be squashed with the commit they are fixing. Each commit in your branch should be suitable for FreeBSD's repository.
 * Commits should include one or more `Signed-off-by:` lines with full name and email address certifying [Developer Certificate of Origin](https://developercertificate.org/).
 * The commits follow FreeBSD's style guide. See [Style](#Style).
+* Run tools/build/checkstyle9.pl on your git branch and eliminate all errors
 * The commits should not introduce trailing white space.
 * If the commmit fixes a bug, please add 'PR: <bugnumber>' to the comment message.
 * If there's a code review in phabricator, please include a link as a 'Differential Revision: ' line.

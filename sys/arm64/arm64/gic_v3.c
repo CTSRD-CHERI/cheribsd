@@ -631,7 +631,7 @@ arm_gic_v3_intr(void *arg)
 			/* Call EOI for all IPI before dispatch. */
 			gic_icc_write(EOIR1, (uint64_t)active_irq);
 #ifdef SMP
-			intr_ipi_dispatch(sgi_to_ipi[gi->gi_irq], tf);
+			intr_ipi_dispatch(sgi_to_ipi[gi->gi_irq]);
 #else
 			device_printf(sc->dev, "SGI %ju on UP system detected\n",
 			    (uintmax_t)(active_irq - GIC_FIRST_SGI));
@@ -1653,7 +1653,7 @@ gic_v3_map_msi(device_t dev, device_t child, struct intr_irqsrc *isrc,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "subobject_bounds"

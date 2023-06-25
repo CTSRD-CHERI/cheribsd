@@ -588,7 +588,7 @@ SYSCTL_PROC(_debug, OID_AUTO, dump_modinfo,
     "pretty-print the bootloader metadata");
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_provenance",

@@ -108,7 +108,8 @@ Issued when a pool is exported.
 .It Sy zpool.import
 Issued when a pool is imported.
 .It Sy zpool.reguid
-Issued when a REGUID (new unique identifier for the pool have been regenerated) have been detected.
+Issued when a REGUID (new unique identifier for the pool have been regenerated)
+have been detected.
 .It Sy vdev.unknown
 Issued when the vdev is unknown.
 Such as trying to clear device errors on a vdev that have failed/been kicked
@@ -226,7 +227,8 @@ ID of vdev (if any).
 .It Sy vdev_fru
 Physical FRU location.
 .It Sy vdev_state
-State of vdev (0=uninitialized, 1=closed, 2=offline, 3=removed, 4=failed to open, 5=faulted, 6=degraded, 7=healthy).
+State of vdev (0=uninitialized, 1=closed, 2=offline, 3=removed, 4=failed to
+open, 5=faulted, 6=degraded, 7=healthy).
 .It Sy vdev_ashift
 The ashift value of the vdev.
 .It Sy vdev_complete_ts
@@ -373,7 +375,8 @@ If this field exists, it is an array of counters.
 Each entry counts bit clears in a particular bit of a big-endian uint64 type.
 The first entry counts bits
 clears of the high-order bit of the first byte, the 9th byte, etc, and the
-last entry counts clears of the low-order bit of the 8th byte, the 16th byte, etc.
+last entry counts clears of the low-order bit of the 8th byte, the 16th byte,
+etc.
 This information is useful for observing a stuck bit in a parallel data
 path, such as IDE or parallel SCSI.
 .El
@@ -403,28 +406,30 @@ ZIO_STAGE_CHECKSUM_GENERATE:0x00000080:-W---
 
 ZIO_STAGE_NOP_WRITE:0x00000100:-W---
 
-ZIO_STAGE_DDT_READ_START:0x00000200:R----
-ZIO_STAGE_DDT_READ_DONE:0x00000400:R----
-ZIO_STAGE_DDT_WRITE:0x00000800:-W---
-ZIO_STAGE_DDT_FREE:0x00001000:--F--
+ZIO_STAGE_BRT_FREE:0x00000200:--F--
 
-ZIO_STAGE_GANG_ASSEMBLE:0x00002000:RWFC-
-ZIO_STAGE_GANG_ISSUE:0x00004000:RWFC-
+ZIO_STAGE_DDT_READ_START:0x00000400:R----
+ZIO_STAGE_DDT_READ_DONE:0x00000800:R----
+ZIO_STAGE_DDT_WRITE:0x00001000:-W---
+ZIO_STAGE_DDT_FREE:0x00002000:--F--
 
-ZIO_STAGE_DVA_THROTTLE:0x00008000:-W---
-ZIO_STAGE_DVA_ALLOCATE:0x00010000:-W---
-ZIO_STAGE_DVA_FREE:0x00020000:--F--
-ZIO_STAGE_DVA_CLAIM:0x00040000:---C-
+ZIO_STAGE_GANG_ASSEMBLE:0x00004000:RWFC-
+ZIO_STAGE_GANG_ISSUE:0x00008000:RWFC-
 
-ZIO_STAGE_READY:0x00080000:RWFCI
+ZIO_STAGE_DVA_THROTTLE:0x00010000:-W---
+ZIO_STAGE_DVA_ALLOCATE:0x00020000:-W---
+ZIO_STAGE_DVA_FREE:0x00040000:--F--
+ZIO_STAGE_DVA_CLAIM:0x00080000:---C-
 
-ZIO_STAGE_VDEV_IO_START:0x00100000:RW--I
-ZIO_STAGE_VDEV_IO_DONE:0x00200000:RW--I
-ZIO_STAGE_VDEV_IO_ASSESS:0x00400000:RW--I
+ZIO_STAGE_READY:0x00100000:RWFCI
 
-ZIO_STAGE_CHECKSUM_VERIFY:0x00800000:R----
+ZIO_STAGE_VDEV_IO_START:0x00200000:RW--I
+ZIO_STAGE_VDEV_IO_DONE:0x00400000:RW--I
+ZIO_STAGE_VDEV_IO_ASSESS:0x00800000:RW--I
 
-ZIO_STAGE_DONE:0x01000000:RWFCI
+ZIO_STAGE_CHECKSUM_VERIFY:0x01000000:R----
+
+ZIO_STAGE_DONE:0x02000000:RWFCI
 .TE
 .
 .Sh I/O FLAGS

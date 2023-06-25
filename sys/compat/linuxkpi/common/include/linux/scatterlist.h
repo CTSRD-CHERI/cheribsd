@@ -119,7 +119,7 @@ sg_assign_page(struct scatterlist *sg, struct page *page)
 {
 	unsigned long page_link = sg->page_link & SG_PAGE_LINK_MASK;
 
-	sg->page_link = page_link | (unsigned long)page;
+	sg->page_link = page_link | (uintptr_t)page;
 }
 
 static inline void
@@ -176,7 +176,7 @@ sg_chain(struct scatterlist *prv, unsigned int prv_nents,
 
 	sg->offset = 0;
 	sg->length = 0;
-	sg->page_link = ((unsigned long)sgl |
+	sg->page_link = ((uintptr_t)sgl |
 	    SG_PAGE_LINK_CHAIN) & ~SG_PAGE_LINK_LAST;
 }
 
@@ -214,7 +214,7 @@ static inline void
 sg_kfree(struct scatterlist *sg, unsigned int nents)
 {
 	if (nents == SG_MAX_SINGLE_ALLOC) {
-		free_page((unsigned long)sg);
+		free_page((uintptr_t)sg);
 	} else
 		kfree(sg);
 }
@@ -383,8 +383,6 @@ __sg_alloc_table_from_pages(struct sg_table *sgt,
 		unsigned long seg_size;
 		unsigned int j;
 
-		s = sg_next(s);
-
 		len = 0;
 		for (j = cur + 1; j < count; ++j) {
 			len += PAGE_SIZE;
@@ -398,6 +396,8 @@ __sg_alloc_table_from_pages(struct sg_table *sgt,
 		size -= seg_size;
 		off = 0;
 		cur = j;
+
+		s = sg_next(s);
 	}
 	KASSERT(s != NULL, ("s is NULL after loop in __sg_alloc_table_from_pages()"));
 
@@ -649,7 +649,7 @@ sg_pcopy_to_buffer(struct scatterlist *sgl, unsigned int nents,
 				break;
 			vaddr = (char *)sf_buf_kva(sf);
 		} else
-			vaddr = (char *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(page));
+			vaddr = (char *)PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(page));
 		memcpy(buf, vaddr + sg->offset + offset, len);
 		if (!PMAP_HAS_DMAP)
 			sf_buf_free(sf);
@@ -668,3 +668,12 @@ sg_pcopy_to_buffer(struct scatterlist *sgl, unsigned int nents,
 }
 
 #endif					/* _LINUXKPI_LINUX_SCATTERLIST_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20230509,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

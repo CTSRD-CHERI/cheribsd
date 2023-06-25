@@ -48,37 +48,18 @@
 #define	MACHINE		"riscv"
 #endif
 
-/* Always use the hard-float arch for the kernel. */
-#if !defined(_KERNEL) && defined(__riscv_float_abi_soft)
-#define	_SF_SUFFIX	"sf"
-#else
-#define	_SF_SUFFIX	""
-#endif
-
 /* Always use the purecap arch for the kernel. */
-#if defined(__CHERI_PURE_CAPABILITY__) || (defined(_KERNEL) && __has_feature(capabilities))
-#define	_PURECAP_SUFFIX	"c"
-#else
-#define	_PURECAP_SUFFIX	""
-#endif
-
-#ifndef MACHINE_ARCH
-#define	MACHINE_ARCH	"riscv64" _SF_SUFFIX _PURECAP_SUFFIX
-#endif
-#ifndef MACHINE_ARCHSF
-#define	MACHINE_ARCHSF	"riscv64sf" _PURECAP_SUFFIX
-#endif
-#if __has_feature(capabilities)
-# ifndef MACHINE_ARCH64
-#  define	MACHINE_ARCH64		"riscv64"
-#  define	MACHINE_ARCH64SF	"riscv64sf"
+#if defined(__CHERI_PURE_CAPABILITY__) || (defined(_KERNEL) && \
+    __has_feature(capabilities))
+# ifndef MACHINE_ARCH
+#  define	MACHINE_ARCH	"riscv64c"
 # endif
-#endif
-#ifdef _KERNEL
-# ifdef COMPAT_FREEBSD64
-#  define	MACHINE_ARCHES		"riscv64c riscv64sfc riscv64 riscv64sf"
-# else
-#  define	MACHINE_ARCHES		MACHINE_ARCH " " MACHINE_ARCHSF
+# ifndef MACHINE_ARCH64
+#  define	MACHINE_ARCH64	"riscv64"
+# endif
+#else
+# ifndef MACHINE_ARCH
+#  define	MACHINE_ARCH	"riscv64"
 # endif
 #endif
 

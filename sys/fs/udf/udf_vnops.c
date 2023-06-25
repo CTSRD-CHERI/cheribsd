@@ -289,9 +289,6 @@ udf_getattr(struct vop_getattr_args *a)
 	struct udf_node *node;
 	struct vattr *vap;
 	struct file_entry *fentry;
-	struct timespec ts;
-
-	ts.tv_sec = 0;
 
 	vp = a->a_vp;
 	vap = a->a_vap;
@@ -1488,7 +1485,7 @@ udf_bmap_internal(struct udf_node *node, off_t offset, daddr_t *sector,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros"

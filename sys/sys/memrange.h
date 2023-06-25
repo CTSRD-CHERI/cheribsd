@@ -7,6 +7,8 @@
 #ifndef _SYS_MEMRANGE_H_
 #define	_SYS_MEMRANGE_H_
 
+#include <sys/ioccom.h>
+
 /* Memory range attributes */
 #define MDF_UNCACHEABLE		(1<<0)	/* region not cached */
 #define MDF_WRITECOMBINE	(1<<1)	/* region supports "write combine" action */
@@ -68,6 +70,14 @@ struct mem_livedump_arg {
 };
 
 #define	MEM_KERNELDUMP	_IOW('m', 53, struct mem_livedump_arg)
+
+struct mem_cheri_cap_arg {
+	ptraddr_t	vaddr;
+	void * __kerncap buf;
+	size_t		len;
+};
+
+#define	MEM_READ_CHERI_CAP	_IOW('m', 100, struct mem_cheri_cap_arg)
 
 #ifdef _KERNEL
 

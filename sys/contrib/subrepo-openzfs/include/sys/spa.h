@@ -65,6 +65,7 @@ typedef struct spa_aux_vdev spa_aux_vdev_t;
 typedef struct ddt ddt_t;
 typedef struct ddt_entry ddt_entry_t;
 typedef struct zbookmark_phys zbookmark_phys_t;
+typedef struct zbookmark_err_phys zbookmark_err_phys_t;
 
 struct bpobj;
 struct bplist;
@@ -663,6 +664,7 @@ typedef struct blkptr {
 			    (u_longlong_t)DVA_GET_ASIZE(dva),		\
 			    ws);					\
 		}							\
+		ASSERT3S(copies, >, 0);					\
 		if (BP_IS_ENCRYPTED(bp)) {				\
 			len += func(buf + len, size - len,		\
 			    "salt=%llx iv=%llx:%llx%c",			\
@@ -678,7 +680,7 @@ typedef struct blkptr {
 		len += func(buf + len, size - len,			\
 		    "[L%llu %s] %s %s %s %s %s %s %s%c"			\
 		    "size=%llxL/%llxP birth=%lluL/%lluP fill=%llu%c"	\
-		    "cksum=%llx:%llx:%llx:%llx",			\
+		    "cksum=%016llx:%016llx:%016llx:%016llx",		\
 		    (u_longlong_t)BP_GET_LEVEL(bp),			\
 		    type,						\
 		    checksum,						\
@@ -1133,7 +1135,8 @@ extern const char *spa_state_to_name(spa_t *spa);
 
 /* error handling */
 struct zbookmark_phys;
-extern void spa_log_error(spa_t *spa, const zbookmark_phys_t *zb);
+extern void spa_log_error(spa_t *spa, const zbookmark_phys_t *zb,
+    const uint64_t *birth);
 extern void spa_remove_error(spa_t *spa, zbookmark_phys_t *zb);
 extern int zfs_ereport_post(const char *clazz, spa_t *spa, vdev_t *vd,
     const zbookmark_phys_t *zb, zio_t *zio, uint64_t state);
@@ -1146,7 +1149,7 @@ extern nvlist_t *zfs_event_create(spa_t *spa, vdev_t *vd, const char *type,
 extern void zfs_post_remove(spa_t *spa, vdev_t *vd);
 extern void zfs_post_state_change(spa_t *spa, vdev_t *vd, uint64_t laststate);
 extern void zfs_post_autoreplace(spa_t *spa, vdev_t *vd);
-extern uint64_t spa_get_errlog_size(spa_t *spa);
+extern uint64_t spa_approx_errlog_size(spa_t *spa);
 extern int spa_get_errlog(spa_t *spa, void * __capability uaddr, uint64_t *count);
 extern void spa_errlog_rotate(spa_t *spa);
 extern void spa_errlog_drain(spa_t *spa);

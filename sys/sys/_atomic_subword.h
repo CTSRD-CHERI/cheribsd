@@ -272,3 +272,15 @@ atomic_testandclear_long(volatile u_long *p, u_int v)
 #endif
 
 #endif	/* _SYS__ATOMIC_SUBWORD_H_ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "pointer_alignment",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

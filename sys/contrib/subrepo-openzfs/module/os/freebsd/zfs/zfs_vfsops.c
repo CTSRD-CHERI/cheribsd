@@ -89,6 +89,10 @@ int zfs_debug_level;
 SYSCTL_INT(_vfs_zfs, OID_AUTO, debug, CTLFLAG_RWTUN, &zfs_debug_level, 0,
 	"Debug level");
 
+int zfs_bclone_enabled;
+SYSCTL_INT(_vfs_zfs, OID_AUTO, bclone_enabled, CTLFLAG_RWTUN,
+	&zfs_bclone_enabled, 0, "Enable block cloning");
+
 struct zfs_jailparam {
 	int mount_snapshot;
 };
@@ -153,7 +157,12 @@ struct vfsops zfs_vfsops = {
 	.vfs_quotactl =		zfs_quotactl,
 };
 
-VFS_SET(zfs_vfsops, zfs, VFCF_JAIL | VFCF_DELEGADMIN);
+#ifdef VFCF_CROSS_COPY_FILE_RANGE
+VFS_SET(zfs_vfsops, zfs,
+    VFCF_DELEGADMIN | VFCF_JAIL | VFCF_CROSS_COPY_FILE_RANGE);
+#else
+VFS_SET(zfs_vfsops, zfs, VFCF_DELEGADMIN | VFCF_JAIL);
+#endif
 
 /*
  * We need to keep a count of active fs's.
@@ -230,7 +239,8 @@ zfs_get_temporary_prop(dsl_dataset_t *ds, zfs_prop_t zfs_prop, uint64_t *val,
 
 	vfs_unbusy(vfsp);
 	if (tmp != *val) {
-		(void) strcpy(setpoint, "temporary");
+		if (setpoint)
+			(void) strcpy(setpoint, "temporary");
 		*val = tmp;
 	}
 	return (0);
@@ -437,10 +447,6 @@ zfs_sync(vfs_t *vfsp, int waitfor)
 		zfsvfs_t *zfsvfs = vfsp->vfs_data;
 		dsl_pool_t *dp;
 		int error;
-
-		error = vfs_stdsync(vfsp, waitfor);
-		if (error != 0)
-			return (error);
 
 		if ((error = zfs_enter(zfsvfs, FTAG)) != 0)
 			return (error);
@@ -725,7 +731,7 @@ zfs_register_callbacks(vfs_t *vfsp)
 		nbmand = B_FALSE;
 	} else if (vfs_optionisset(vfsp, MNTOPT_NBMAND, NULL)) {
 		nbmand = B_TRUE;
-	} else if ((error = dsl_prop_get_int_ds(ds, "nbmand", &nbmand) != 0)) {
+	} else if ((error = dsl_prop_get_int_ds(ds, "nbmand", &nbmand)) != 0) {
 		dsl_pool_config_exit(dmu_objset_pool(os), FTAG);
 		return (error);
 	}
@@ -1328,15 +1334,8 @@ zfs_mount(vfs_t *vfsp)
 	}
 
 	fetch_osname_options(osname, &checkpointrewind);
-
-	/*
-         * TBD: Mounting ZFS as root causes a panic in zfsctl_is_node()
-         * add temporary workaround until issue is resolved
-         */
-	if ((vfsp->vfs_flag & MNT_ROOTFS) != 0 &&
-	    (vfsp->vfs_flag & MNT_UPDATE) == 0) {
-		isctlsnap = (zfsctl_is_node(mvp) && strchr(osname, '@') != NULL);
-	}
+	isctlsnap = (mvp != NULL && zfsctl_is_node(mvp) &&
+	    strchr(osname, '@') != NULL);
 
 	/*
 	 * Check for mount privilege?
@@ -2505,7 +2504,9 @@ zfs_jailparam_set(void *obj, void *data)
 		mount_snapshot = -1;
 	else
 		jsys = JAIL_SYS_NEW;
-	if (jsys == JAIL_SYS_NEW) {
+	switch (jsys) {
+	case JAIL_SYS_NEW:
+	{
 		/* "zfs=new" or "zfs.*": the prison gets its own ZFS info. */
 		struct zfs_jailparam *zjp;
 
@@ -2523,12 +2524,22 @@ zfs_jailparam_set(void *obj, void *data)
 		if (mount_snapshot != -1)
 			zjp->mount_snapshot = mount_snapshot;
 		mtx_unlock(&pr->pr_mtx);
-	} else {
+		break;
+	}
+	case JAIL_SYS_INHERIT:
 		/* "zfs=inherit": inherit the parent's ZFS info. */
 		mtx_lock(&pr->pr_mtx);
 		osd_jail_del(pr, zfs_jailparam_slot);
 		mtx_unlock(&pr->pr_mtx);
+		break;
+	case -1:
+		/*
+		 * If the setting being changed is not ZFS related
+		 * then do nothing.
+		 */
+		break;
 	}
+
 	return (0);
 }
 

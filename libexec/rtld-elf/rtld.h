@@ -230,7 +230,9 @@ typedef struct Struct_Obj_Entry {
     const Elf_Phdr *phdr;	/* Program header if it is mapped, else NULL */
     size_t phsize;		/* Size of program header in bytes */
     const char *interp;		/* Pathname of the interpreter, if any */
+#ifndef __CHERI_PURE_CAPABILITY__
     Elf_Word stack_flags;
+#endif
 
     /* TLS information */
     int tlsindex;		/* Index in DTV for this module */
@@ -474,8 +476,10 @@ void dump_Elf_Rela(Obj_Entry *, const Elf_Rela *, u_long);
 
 #ifdef __CHERI_PURE_CAPABILITY__
 /* TODO: we should have a separate member for .text/rodata */
-#define get_codesegment_cap(obj) ((obj)->text_rodata_cap)
-#define get_datasegment_cap(obj) ((obj)->relocbase)
+#define get_codesegment_cap(obj)					\
+	(cheri_clearperm((obj)->text_rodata_cap, CAP_RELOC_REMOVE_PERMS))
+#define get_datasegment_cap(obj)				\
+	(cheri_clearperm((obj)->relocbase, CAP_RELOC_REMOVE_PERMS))
 #elif __has_feature(capabilities)
 #define get_codesegment_cap(obj)				\
 	(const char * __capability)cheri_setbounds(		\
@@ -523,7 +527,7 @@ __BEGIN_DECLS
  */
 uintptr_t rtld_round_page(uintptr_t);
 uintptr_t rtld_trunc_page(uintptr_t);
-unsigned long elf_hash(const char *);
+Elf32_Word elf_hash(const char *);
 const Elf_Sym *find_symdef(unsigned long, const Obj_Entry *,
   const Obj_Entry **, int, SymCache *, struct Struct_RtldLockState *);
 void lockdflt_init(void);

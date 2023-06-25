@@ -2539,3 +2539,15 @@ storvsc_sysuninit(void *arg __unused)
 }
 SYSUNINIT(storvsc_sys_uninit, SI_SUB_DRIVERS, SI_ORDER_SECOND,
     storvsc_sysuninit, NULL);
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "user_capabilities",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

@@ -254,8 +254,10 @@ __div_u64(uint64_t u, uint32_t v)
  * replacements for libgcc-provided functions and will never be called
  * directly.
  */
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmissing-prototypes"
+#endif
 
 /*
  * Implementation of 64-bit unsigned division for 32-bit machines.
@@ -449,7 +451,9 @@ __aeabi_ldivmod(int64_t u, int64_t v)
 EXPORT_SYMBOL(__aeabi_ldivmod);
 #endif /* __arm || __arm__ */
 
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic pop
+#endif
 
 #endif /* BITS_PER_LONG */
 
@@ -492,7 +496,7 @@ int ddi_strto##type(const char *str, char **endptr,			\
 			if (tolower(str[1]) == 'x' && isxdigit(str[2])) { \
 				base = 16; /* hex */			\
 				ptr += 2;				\
-			} else if (str[1] >= '0' && str[1] < 8) {	\
+			} else if (str[1] >= '0' && str[1] < '8') {	\
 				base = 8; /* octal */			\
 				ptr += 1;				\
 			} else {					\

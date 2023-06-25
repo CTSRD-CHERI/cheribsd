@@ -277,12 +277,12 @@ lkpi_80211_mo_sw_scan_start(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 /*
  * We keep the Linux type here;  it really is an uintptr_t.
  */
-u64
+uintptr_t
 lkpi_80211_mo_prepare_multicast(struct ieee80211_hw *hw,
     struct netdev_hw_addr_list *mc_list)
 {
 	struct lkpi_hw *lhw;
-	u64 ptr;
+	uintptr_t ptr;
 
 	lhw = HW_TO_LHW(hw);
 	if (lhw->ops->prepare_multicast == NULL)
@@ -295,7 +295,7 @@ lkpi_80211_mo_prepare_multicast(struct ieee80211_hw *hw,
 
 void
 lkpi_80211_mo_configure_filter(struct ieee80211_hw *hw, unsigned int changed_flags,
-    unsigned int *total_flags, u64 mc_ptr)
+    unsigned int *total_flags, uintptr_t mc_ptr)
 {
 	struct lkpi_hw *lhw;
 
@@ -679,3 +679,12 @@ lkpi_80211_mo_set_key(struct ieee80211_hw *hw, enum set_key_cmd cmd,
 out:
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20230509,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

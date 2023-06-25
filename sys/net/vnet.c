@@ -248,7 +248,7 @@ vnet_alloc(void)
 
 	/*
 	 * Allocate storage for virtualized global variables and copy in
-	 * initial values form our 'master' copy.
+	 * initial values from our 'master' copy.
 	 */
 	vnet->vnet_data_mem = malloc(VNET_SIZE, M_VNET_DATA, M_WAITOK);
 	memcpy(vnet->vnet_data_mem, (void *)VNET_START, VNET_BYTES);
@@ -820,7 +820,7 @@ DB_SHOW_COMMAND_FLAGS(vnetrcrs, db_show_vnetrcrs, DB_CMD_MEMSAFE)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "kdb",

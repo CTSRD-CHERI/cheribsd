@@ -141,7 +141,7 @@
 #define	FREEBSD64_SYS_freebsd64_mkdir	136
 #define	FREEBSD64_SYS_freebsd64_rmdir	137
 #define	FREEBSD64_SYS_freebsd64_utimes	138
-				/* 139 is obsolete 4.2 sigreturn */
+				/* 139 is obsolete sigreturn */
 #define	FREEBSD64_SYS_freebsd64_adjtime	140
 				/* 141 is obsolete ogetpeername */
 				/* 142 is obsolete ogethostid */
@@ -522,4 +522,5 @@
 #define	FREEBSD64_SYS_freebsd64_fspacectl	580
 #define	FREEBSD64_SYS_sched_getcpu	581
 #define	FREEBSD64_SYS_freebsd64_swapoff	582
-#define	FREEBSD64_SYS_MAXSYSCALL	583
+#define	FREEBSD64_SYS_kqueuex	583
+#define	FREEBSD64_SYS_MAXSYSCALL	584

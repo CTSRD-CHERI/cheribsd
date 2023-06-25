@@ -145,7 +145,7 @@ const char *freebsd64_syscallnames[] = {
 	"freebsd64_mkdir",			/* 136 = freebsd64_mkdir */
 	"freebsd64_rmdir",			/* 137 = freebsd64_rmdir */
 	"freebsd64_utimes",			/* 138 = freebsd64_utimes */
-	"obs_4.2",			/* 139 = obsolete 4.2 sigreturn */
+	"obs_sigreturn",			/* 139 = obsolete sigreturn */
 	"freebsd64_adjtime",			/* 140 = freebsd64_adjtime */
 	"obs_ogetpeername",			/* 141 = obsolete ogetpeername */
 	"obs_ogethostid",			/* 142 = obsolete ogethostid */
@@ -589,4 +589,5 @@ const char *freebsd64_syscallnames[] = {
 	"freebsd64_fspacectl",			/* 580 = freebsd64_fspacectl */
 	"sched_getcpu",			/* 581 = sched_getcpu */
 	"freebsd64_swapoff",			/* 582 = freebsd64_swapoff */
+	"kqueuex",			/* 583 = kqueuex */
 };

@@ -60,7 +60,15 @@ cleanup_worldtmp: .PHONY .NOMETA
 	rm -rf ${OBJTOP}/tmp
 beforedirdeps: cleanup_worldtmp
 .endif
-.endif
+
+# pseudo option for building host tools on old or non-FreeBSD host
+# allows us to leverage Makefile.depend.options with
+# DIRDEPS_OPTIONS = host_egacy
+# dirdeps-options.mk will qualify with ${DEP_MACHINE} (and others)
+# before looking at the bare option.
+MK_host_egacy.host= ${MK_host_egacy}
+
+.endif				# !target(_DIRDEP_USE)
 
 # reset this each time
 DIRDEPS_FILTER.xtras=
@@ -69,6 +77,7 @@ DIRDEPS_FILTER.xtras+= Nusr.bin/clang/clang.host
 .endif
 
 .if ${DEP_MACHINE} != "host"
+MK_host_egacy.${DEP_MACHINE}= no
 
 # this is how we can handle optional dependencies
 .if ${DEP_RELDIR} == "lib/libc"
@@ -207,12 +216,13 @@ DIRDEPS+= ${_lib${_lib}reldir}
 
 .if ${MK_STAGING} == "yes"
 # we need targets/pseudo/stage to prep the stage tree
-.if ${DEP_RELDIR} != "targets/pseudo/stage"
+.if ${DEP_RELDIR:N.:N${SRCTOP}:N*pseudo/stage} != ""
 DIRDEPS += targets/pseudo/stage
 .endif
 .endif
 
 DEP_MACHINE_ARCH = ${MACHINE_ARCH.${DEP_MACHINE}}
+DEP_MACHINE_CPUARCH = ${DEP_MACHINE_ARCH:${__TO_CPUARCH}}
 CSU_DIR.${DEP_MACHINE_ARCH} ?= csu/${DEP_MACHINE_ARCH}
 CSU_DIR := ${CSU_DIR.${DEP_MACHINE_ARCH}}
 BOOT_MACHINE_DIR:= ${BOOT_MACHINE_DIR.${DEP_MACHINE}}
