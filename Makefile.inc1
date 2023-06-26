@@ -913,14 +913,14 @@ XCFLAGS+=	--sysroot=${WORLDTMP}
 XCFLAGS+=	${BFLAGS}
 .endif
 
-.if ${MK_LIB64C} == "yes"
-_LIBCOMPATS+=	64C
-.endif
 .if ${MK_LIB32} == "yes"
 _LIBCOMPATS+=	32
 .endif
 .if ${MK_LIB64} == "yes"
 _LIBCOMPATS+=	64
+.endif
+.if ${MK_LIB64C} == "yes"
+_LIBCOMPATS+=	64C
 .endif
 .include "Makefile.libcompat"
 
