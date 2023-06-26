@@ -28,8 +28,6 @@
  * SUCH DAMAGE.
  */
 
-/* Hardware Trace (HWT) framework. */
-
 #include <sys/param.h>
 #include <sys/eventhandler.h>
 #include <sys/ioccom.h>
@@ -43,15 +41,8 @@
 #include <sys/rwlock.h>
 #include <sys/hwt.h>
 
-#include <dev/hwt/hwt_hook.h>
-#include <dev/hwt/hwt_context.h>
-#include <dev/hwt/hwt_contexthash.h>
-#include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_owner.h>
 #include <dev/hwt/hwt_ownerhash.h>
-#include <dev/hwt/hwt_backend.h>
-#include <dev/hwt/hwt_record.h>
-#include <dev/hwt/hwt_ioctl.h>
 
 #define	HWT_DEBUG
 #undef	HWT_DEBUG
@@ -62,90 +53,74 @@
 #define	dprintf(fmt, ...)
 #endif
 
-static eventhandler_tag hwt_exit_tag;
-static struct cdev *hwt_cdev;
-static struct cdevsw hwt_cdevsw = {
-	.d_version	= D_VERSION,
-	.d_name		= "hwt",
-	.d_mmap_single	= NULL,
-	.d_ioctl	= hwt_ioctl
-};
+#define	HWT_OWNERHASH_SIZE	1024
 
-static void
-hwt_process_exit(void *arg __unused, struct proc *p)
+static MALLOC_DEFINE(M_HWT_OWNERHASH, "hwt owner hash", "Hardware Trace");
+
+/*
+ * Hash function.  Discard the lower 2 bits of the pointer since
+ * these are always zero for our uses.  The hash multiplier is
+ * round((2^LONG_BIT) * ((sqrt(5)-1)/2)).
+ */
+
+#define	_HWT_HM	11400714819323198486u	/* hash multiplier */
+#define	HWT_HASH_PTR(P, M)	((((unsigned long) (P) >> 2) * _HWT_HM) & (M))
+
+static struct mtx hwt_ownerhash_mtx;
+static u_long hwt_ownerhashmask;
+static LIST_HEAD(hwt_ownerhash, hwt_owner)	*hwt_ownerhash;
+
+struct hwt_owner *
+hwt_ownerhash_lookup(struct proc *p)
 {
+	struct hwt_ownerhash *hoh;
 	struct hwt_owner *ho;
+	int hindex;
 
-	/* Stop HWTs associated with exiting owner, if any. */
-	ho = hwt_ownerhash_lookup(p);
-	if (ho)
-		hwt_owner_shutdown(ho);
-}
+	hindex = HWT_HASH_PTR(p, hwt_ownerhashmask);
+	hoh = &hwt_ownerhash[hindex];
 
-static int
-hwt_load(void)
-{
-	struct make_dev_args args;
-	int error;
-
-	make_dev_args_init(&args);
-	args.mda_devsw = &hwt_cdevsw;
-	args.mda_flags = MAKEDEV_CHECKNAME | MAKEDEV_WAITOK;
-	args.mda_uid = UID_ROOT;
-	args.mda_gid = GID_WHEEL;
-	args.mda_mode = 0660;
-	args.mda_si_drv1 = NULL;
-
-	error = make_dev_s(&args, &hwt_cdev, "hwt");
-	if (error != 0)
-		return (error);
-
-	hwt_ownerhash_load();
-	hwt_contexthash_load();
-	hwt_backend_load();
-
-	hwt_exit_tag = EVENTHANDLER_REGISTER(process_exit, hwt_process_exit,
-	    NULL, EVENTHANDLER_PRI_ANY);
-
-	return (0);
-}
-
-static int
-hwt_unload(void)
-{
-
-	dprintf("%s\n", __func__);
-
-	destroy_dev(hwt_cdev);
-
-	return (0);
-}
-
-static int
-hwt_modevent(module_t mod, int type, void *data)
-{
-	int error;
-
-	switch (type) {
-	case MOD_LOAD:
-		error = hwt_load();
-		break;
-	case MOD_UNLOAD:
-		error = hwt_unload();
-		break;
-	default:
-		error = 0;
-		break;
+	mtx_lock_spin(&hwt_ownerhash_mtx);
+	LIST_FOREACH(ho, hoh, next) {
+		if (ho->p == p) {
+			mtx_unlock_spin(&hwt_ownerhash_mtx);
+			return (ho);
+		}
 	}
+	mtx_unlock_spin(&hwt_ownerhash_mtx);
 
-	return (error);
+	return (NULL);
 }
 
-static moduledata_t hwt_mod = {
-	"hwt",
-	hwt_modevent,
-	NULL
-};
+void
+hwt_ownerhash_insert(struct hwt_owner *ho)
+{
+	struct hwt_ownerhash *hoh;
+	int hindex;
 
-DECLARE_MODULE(hwt, hwt_mod, SI_SUB_DRIVERS, SI_ORDER_FIRST);
-MODULE_VERSION(hwt, 1);
+	hindex = HWT_HASH_PTR(ho->p, hwt_ownerhashmask);
+	hoh = &hwt_ownerhash[hindex];
+
+	mtx_lock_spin(&hwt_ownerhash_mtx);
+	LIST_INSERT_HEAD(hoh, ho, next);
+	mtx_unlock_spin(&hwt_ownerhash_mtx);
+}
+
+void
+hwt_ownerhash_remove(struct hwt_owner *ho)
+{
+
+	/* Destroy hwt owner. */
+	mtx_lock_spin(&hwt_ownerhash_mtx);
+	LIST_REMOVE(ho, next);
+	mtx_unlock_spin(&hwt_ownerhash_mtx);
+}
+
+void
+hwt_ownerhash_load(void)
+{
+
+	hwt_ownerhash = hashinit(HWT_OWNERHASH_SIZE, M_HWT_OWNERHASH,
+	    &hwt_ownerhashmask);
+        mtx_init(&hwt_ownerhash_mtx, "hwt-owner-hash", "hwt-owner", MTX_SPIN);
+}

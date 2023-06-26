@@ -46,6 +46,7 @@
 #include <dev/hwt/hwt_contexthash.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_owner.h>
+#include <dev/hwt/hwt_ownerhash.h>
 #include <dev/hwt/hwt_backend.h>
 
 #define	HWT_DEBUG
@@ -57,22 +58,7 @@
 #define	dprintf(fmt, ...)
 #endif
 
-#define	HWT_OWNERHASH_SIZE	1024
-
 static MALLOC_DEFINE(M_HWT_OWNER, "hwt_owner", "Hardware Trace");
-
-/*
- * Hash function.  Discard the lower 2 bits of the pointer since
- * these are always zero for our uses.  The hash multiplier is
- * round((2^LONG_BIT) * ((sqrt(5)-1)/2)).
- */
-
-#define	_HWT_HM	11400714819323198486u	/* hash multiplier */
-#define	HWT_HASH_PTR(P, M)	((((unsigned long) (P) >> 2) * _HWT_HM) & (M))
-
-static struct mtx hwt_ownerhash_mtx;
-static u_long hwt_ownerhashmask;
-static LIST_HEAD(hwt_ownerhash, hwt_owner)	*hwt_ownerhash;
 
 struct hwt_context *
 hwt_owner_lookup_ctx(struct hwt_owner *ho, pid_t pid)
@@ -92,42 +78,6 @@ hwt_owner_lookup_ctx(struct hwt_owner *ho, pid_t pid)
 }
 
 struct hwt_owner *
-hwt_owner_lookup(struct proc *p)
-{
-	struct hwt_ownerhash *hoh;
-	struct hwt_owner *ho;
-	int hindex;
-
-	hindex = HWT_HASH_PTR(p, hwt_ownerhashmask);
-	hoh = &hwt_ownerhash[hindex];
-
-	mtx_lock_spin(&hwt_ownerhash_mtx);
-	LIST_FOREACH(ho, hoh, next) {
-		if (ho->p == p) {
-			mtx_unlock_spin(&hwt_ownerhash_mtx);
-			return (ho);
-		}
-	}
-	mtx_unlock_spin(&hwt_ownerhash_mtx);
-
-	return (NULL);
-}
-
-void
-hwt_owner_insert(struct hwt_owner *ho)
-{
-	struct hwt_ownerhash *hoh;
-	int hindex;
-
-	hindex = HWT_HASH_PTR(ho->p, hwt_ownerhashmask);
-	hoh = &hwt_ownerhash[hindex];
-
-	mtx_lock_spin(&hwt_ownerhash_mtx);
-	LIST_INSERT_HEAD(hoh, ho, next);
-	mtx_unlock_spin(&hwt_ownerhash_mtx);
-}
-
-struct hwt_owner *
 hwt_owner_create(struct proc *p)
 {
 	struct hwt_owner *ho;
@@ -143,13 +93,8 @@ hwt_owner_create(struct proc *p)
 }
 
 void
-hwt_owner_destroy(struct hwt_owner *ho)
+hwt_owner_free(struct hwt_owner *ho)
 {
-
-	/* Destroy hwt owner. */
-	mtx_lock_spin(&hwt_ownerhash_mtx);
-	LIST_REMOVE(ho, next);
-	mtx_unlock_spin(&hwt_ownerhash_mtx);
 
 	free(ho, M_HWT_OWNER);
 }
@@ -208,14 +153,6 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 		hwt_ctx_free(ctx);
 	}
 
-	hwt_owner_destroy(ho);
-}
-
-void
-hwt_owner_load(void)
-{
-
-	hwt_ownerhash = hashinit(HWT_OWNERHASH_SIZE, M_HWT_OWNER,
-	    &hwt_ownerhashmask);
-        mtx_init(&hwt_ownerhash_mtx, "hwt-owner-hash", "hwt-owner", MTX_SPIN);
+	hwt_ownerhash_remove(ho);
+	hwt_owner_free(ho);
 }

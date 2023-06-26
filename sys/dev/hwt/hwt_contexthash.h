@@ -28,20 +28,12 @@
  * $FreeBSD$
  */
 
-#ifndef _DEV_HWT_HWT_OWNER_H_
-#define _DEV_HWT_HWT_OWNER_H_
+#ifndef _DEV_HWT_HWT_CONTEXTHASH_H_
+#define _DEV_HWT_HWT_CONTEXTHASH_H_
 
-struct hwt_owner {
-	struct proc			*p;
-	struct mtx			mtx; /* Protects hwts. */
-	LIST_HEAD(, hwt_context)	hwts; /* Owned HWTs. */
-	LIST_ENTRY(hwt_owner)		next; /* Entry in hwt owner hash. */
-};
+struct hwt_context * hwt_contexthash_lookup(struct proc *p);
+void hwt_contexthash_insert(struct hwt_context *ctx);
+void hwt_contexthash_remove(struct hwt_context *ctx);
+void hwt_contexthash_load(void);
 
-
-struct hwt_context * hwt_owner_lookup_ctx(struct hwt_owner *ho, pid_t pid);
-struct hwt_owner * hwt_owner_create(struct proc *p);
-void hwt_owner_free(struct hwt_owner *ho);
-void hwt_owner_shutdown(struct hwt_owner *ho);
-
-#endif /* !_DEV_HWT_HWT_OWNER_H_ */
+#endif /* !_DEV_HWT_HWT_CONTEXTHASH_H_ */

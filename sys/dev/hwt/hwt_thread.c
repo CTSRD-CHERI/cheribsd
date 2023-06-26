@@ -54,6 +54,7 @@
 #include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_owner.h>
+#include <dev/hwt/hwt_ownerhash.h>
 #include <dev/hwt/hwt_backend.h>
 
 #define	HWT_THREAD_DEBUG
@@ -218,7 +219,7 @@ hwt_thread_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		ptr_get = (struct hwt_bufptr_get *)addr;
 
 		/* Check if process is registered owner of any HWTs. */
-		ho = hwt_owner_lookup(td->td_proc);
+		ho = hwt_ownerhash_lookup(td->td_proc);
 		if (ho == NULL)
 			return (ENXIO);
 

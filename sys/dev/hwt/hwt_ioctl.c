@@ -48,6 +48,7 @@
 #include <dev/hwt/hwt_contexthash.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_owner.h>
+#include <dev/hwt/hwt_ownerhash.h>
 #include <dev/hwt/hwt_backend.h>
 #include <dev/hwt/hwt_record.h>
 #include <dev/hwt/hwt_ioctl.h>
@@ -186,7 +187,7 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 		return (ENXIO);
 
 	/* First get the owner. */
-	ho = hwt_owner_lookup(td->td_proc);
+	ho = hwt_ownerhash_lookup(td->td_proc);
 	if (ho) {
 		/* Check if the owner have this pid configured already. */
 		ctx = hwt_owner_lookup_ctx(ho, halloc->pid);
@@ -197,7 +198,7 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 		ho = hwt_owner_create(td->td_proc);
 		if (ho == NULL)
 			return (ENOMEM);
-		hwt_owner_insert(ho);
+		hwt_ownerhash_insert(ho);
 	}
 
 	/* Allocate a new HWT context. */
@@ -282,7 +283,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		dprintf("%s: start, pid %d\n", __func__, s->pid);
 
-		ho = hwt_owner_lookup(td->td_proc);
+		ho = hwt_ownerhash_lookup(td->td_proc);
 		if (ho == NULL)
 			return (ENXIO);
 
@@ -311,7 +312,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		rget = (struct hwt_record_get *)addr;
 
 		/* Check if process is registered owner of any HWTs. */
-		ho = hwt_owner_lookup(td->td_proc);
+		ho = hwt_ownerhash_lookup(td->td_proc);
 		if (ho == NULL)
 			return (ENXIO);
 

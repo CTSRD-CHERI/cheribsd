@@ -335,6 +335,7 @@ dev/hwt/hwt_contexthash.c			optional hwt
 dev/hwt/hwt_hook.c				optional hwt
 dev/hwt/hwt_ioctl.c				optional hwt
 dev/hwt/hwt_owner.c				optional hwt
+dev/hwt/hwt_ownerhash.c				optional hwt
 dev/hwt/hwt_record.c				optional hwt
 dev/hwt/hwt_thread.c				optional hwt
 
