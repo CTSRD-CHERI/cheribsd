@@ -45,6 +45,7 @@
 #include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_owner.h>
+#include <dev/hwt/hwt_backend.h>
 
 #define	HWT_DEBUG
 #undef	HWT_DEBUG
@@ -150,6 +151,63 @@ hwt_owner_destroy(struct hwt_owner *ho)
 	mtx_unlock_spin(&hwt_ownerhash_mtx);
 
 	free(ho, M_HWT_OWNER);
+}
+
+void
+hwt_owner_shutdown(struct hwt_owner *ho)
+{
+	struct hwt_context *ctx;
+	struct hwt_thread *thr;
+
+	printf("%s: stopping hwt owner\n", __func__);
+
+	while (1) {
+		mtx_lock(&ho->mtx);
+		ctx = LIST_FIRST(&ho->hwts);
+		if (ctx)
+			LIST_REMOVE(ctx, next_hwts);
+		mtx_unlock(&ho->mtx);
+
+		if (ctx == NULL)
+			break;
+
+		hwt_ctx_remove(ctx);
+
+		/*
+		 * It could be that hwt_switch_in/out() or hwt_record() have
+		 * this ctx locked right here.
+		 * if not, change state immediately, so they give up.
+		 */
+
+		hwt_ctx_lock(ctx);
+		ctx->state = 0;
+		hwt_ctx_unlock(ctx);
+
+		/* hwt_switch_in() is now completed. */
+
+		hwt_backend_deinit(ctx);
+
+		printf("%s: remove threads\n", __func__);
+
+		while (1) {
+			mtx_lock_spin(&ctx->mtx_threads);
+			thr = LIST_FIRST(&ctx->threads);
+			if (thr)
+				LIST_REMOVE(thr, next);
+			mtx_unlock_spin(&ctx->mtx_threads);
+
+			if (thr == NULL)
+				break;
+
+			/* TODO: move into hwt_thread_free? */
+			destroy_dev_sched(thr->cdev);
+			hwt_thread_free(thr);
+		}
+
+		hwt_ctx_free(ctx);
+	}
+
+	hwt_owner_destroy(ho);
 }
 
 void

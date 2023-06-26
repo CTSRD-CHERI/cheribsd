@@ -60,77 +60,14 @@
 #define	dprintf(fmt, ...)
 #endif
 
-/* No real reason for this limitation except sanity checks. */
-#define	HWT_MAXBUFSIZE		(1U * 1024 * 1024 * 1024) /* 1 GB */
-
-static MALLOC_DEFINE(M_HWT, "hwt", "Hardware Trace");
-
 static eventhandler_tag hwt_exit_tag;
 static struct cdev *hwt_cdev;
-
 static struct cdevsw hwt_cdevsw = {
 	.d_version	= D_VERSION,
 	.d_name		= "hwt",
 	.d_mmap_single	= NULL,
 	.d_ioctl	= hwt_ioctl
 };
-
-static void
-hwt_stop_owner_hwts(struct hwt_owner *ho)
-{
-	struct hwt_context *ctx;
-	struct hwt_thread *thr;
-
-	printf("%s: stopping hwt owner\n", __func__);
-
-	while (1) {
-		mtx_lock(&ho->mtx);
-		ctx = LIST_FIRST(&ho->hwts);
-		if (ctx)
-			LIST_REMOVE(ctx, next_hwts);
-		mtx_unlock(&ho->mtx);
-
-		if (ctx == NULL)
-			break;
-
-		hwt_ctx_remove(ctx);
-
-		/*
-		 * It could be that hwt_switch_in/out() or hwt_record() have
-		 * this ctx locked right here.
-		 * if not, change state immediately, so they give up.
-		 */
-
-		hwt_ctx_lock(ctx);
-		ctx->state = 0;
-		hwt_ctx_unlock(ctx);
-
-		/* hwt_switch_in() is now completed. */
-
-		hwt_backend_deinit(ctx);
-
-		printf("%s: remove threads\n", __func__);
-
-		while (1) {
-			mtx_lock_spin(&ctx->mtx_threads);
-			thr = LIST_FIRST(&ctx->threads);
-			if (thr)
-				LIST_REMOVE(thr, next);
-			mtx_unlock_spin(&ctx->mtx_threads);
-
-			if (thr == NULL)
-				break;
-
-			/* TODO: move into hwt_thread_free? */
-			destroy_dev_sched(thr->cdev);
-			hwt_thread_free(thr);
-		}
-
-		hwt_ctx_free(ctx);
-	}
-
-	hwt_owner_destroy(ho);
-}
 
 static void
 hwt_process_exit(void *arg __unused, struct proc *p)
@@ -140,7 +77,7 @@ hwt_process_exit(void *arg __unused, struct proc *p)
 	/* Stop HWTs associated with exiting owner, if any. */
 	ho = hwt_owner_lookup(p);
 	if (ho)
-		hwt_stop_owner_hwts(ho);
+		hwt_owner_shutdown(ho);
 }
 
 static int
