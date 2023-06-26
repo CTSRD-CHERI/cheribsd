@@ -268,9 +268,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	struct hwt_context *ctx;
 	struct hwt_owner *ho;
 	struct hwt_start *s;
-#if 0
-	struct proc *p;
-#endif
 	int error;
 
 	switch (cmd) {
