@@ -45,6 +45,7 @@
 
 #include <dev/hwt/hwt_hook.h>
 #include <dev/hwt/hwt_context.h>
+#include <dev/hwt/hwt_contexthash.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_owner.h>
 #include <dev/hwt/hwt_backend.h>
@@ -244,7 +245,7 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 	p->p_flag2 |= P2_HWT;
 
 	ctx->proc = p;
-	hwt_ctx_insert_contexthash(ctx);
+	hwt_contexthash_insert(ctx);
 	PROC_UNLOCK(p);
 
 	error = hwt_thread_create_cdev(thr, ctx->pid);

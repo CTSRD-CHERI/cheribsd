@@ -39,6 +39,7 @@
 
 #include <dev/hwt/hwt_hook.h>
 #include <dev/hwt/hwt_context.h>
+#include <dev/hwt/hwt_contexthash.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_record.h>
 
@@ -68,7 +69,7 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 	if ((p->p_flag2 & P2_HWT) == 0)
 		return;
 
-	ctx = hwt_ctx_lookup_contexthash(p);
+	ctx = hwt_contexthash_lookup(p);
 	if (ctx == NULL)
 		return;
 
@@ -125,7 +126,7 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 		entry->size = ent->size;
 	}
 
-	ctx = hwt_ctx_lookup_contexthash(p);
+	ctx = hwt_contexthash_lookup(p);
 	if (ctx == NULL) {
 		/* TODO: release resources. */
 		return;

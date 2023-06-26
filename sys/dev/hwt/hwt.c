@@ -45,6 +45,7 @@
 
 #include <dev/hwt/hwt_hook.h>
 #include <dev/hwt/hwt_context.h>
+#include <dev/hwt/hwt_contexthash.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_owner.h>
 #include <dev/hwt/hwt_backend.h>
@@ -99,7 +100,7 @@ hwt_load(void)
 		return (error);
 
 	hwt_owner_load();
-	hwt_context_load();
+	hwt_contexthash_load();
 	hwt_backend_load();
 
 	hwt_exit_tag = EVENTHANDLER_REGISTER(process_exit, hwt_process_exit,

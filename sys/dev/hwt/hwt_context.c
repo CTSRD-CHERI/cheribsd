@@ -55,22 +55,7 @@
 #define	dprintf(fmt, ...)
 #endif
 
-#define	HWT_CONTEXTHASH_SIZE	1024
-
 static MALLOC_DEFINE(M_HWT_CTX, "hwt_ctx", "Hardware Trace");
-
-/*
- * Hash function.  Discard the lower 2 bits of the pointer since
- * these are always zero for our uses.  The hash multiplier is
- * round((2^LONG_BIT) * ((sqrt(5)-1)/2)).
- */
-
-#define	_HWT_HM	11400714819323198486u	/* hash multiplier */
-#define	HWT_HASH_PTR(P, M)	((((unsigned long) (P) >> 2) * _HWT_HM) & (M))
-
-static struct mtx hwt_contexthash_mtx;
-static u_long hwt_contexthashmask;
-static LIST_HEAD(hwt_contexthash, hwt_context)	*hwt_contexthash;
 
 struct hwt_context *
 hwt_ctx_alloc(void)
@@ -98,33 +83,6 @@ hwt_ctx_free(struct hwt_context *ctx)
 	free(ctx, M_HWT_CTX);
 }
 
-/*
- * To use by hwt_switch_in/out() and hwt_record() only.
- * This function returns mtx locked.
- */
-struct hwt_context *
-hwt_ctx_lookup_contexthash(struct proc *p)
-{
-	struct hwt_contexthash *hch;
-	struct hwt_context *ctx;
-	int hindex;
-
-	hindex = HWT_HASH_PTR(p, hwt_contexthashmask);
-	hch = &hwt_contexthash[hindex];
-
-	mtx_lock_spin(&hwt_contexthash_mtx);
-	LIST_FOREACH(ctx, hch, next_hch) {
-		if (ctx->proc == p) {
-			mtx_lock_spin(&ctx->mtx);
-			mtx_unlock_spin(&hwt_contexthash_mtx);
-			return (ctx);
-		}
-	}
-	mtx_unlock_spin(&hwt_contexthash_mtx);
-
-	return (NULL);
-}
-
 void
 hwt_ctx_lock(struct hwt_context *ctx)
 {
@@ -137,38 +95,4 @@ hwt_ctx_unlock(struct hwt_context *ctx)
 {
 
 	mtx_unlock_spin(&ctx->mtx);
-}
-
-void
-hwt_ctx_insert_contexthash(struct hwt_context *ctx)
-{
-	struct hwt_contexthash *hch;
-	int hindex;
-
-	PROC_LOCK_ASSERT(ctx->proc, MA_OWNED);
-
-	hindex = HWT_HASH_PTR(ctx->proc, hwt_contexthashmask);
-	hch = &hwt_contexthash[hindex];
-
-	mtx_lock_spin(&hwt_contexthash_mtx);
-	LIST_INSERT_HEAD(hch, ctx, next_hch);
-	mtx_unlock_spin(&hwt_contexthash_mtx);
-}
-
-void
-hwt_ctx_remove(struct hwt_context *ctx)
-{
-
-	mtx_lock_spin(&hwt_contexthash_mtx);
-	LIST_REMOVE(ctx, next_hch);
-	mtx_unlock_spin(&hwt_contexthash_mtx);
-}
-
-void
-hwt_context_load(void)
-{
-
-	hwt_contexthash = hashinit(HWT_CONTEXTHASH_SIZE, M_HWT_CTX,
-	    &hwt_contexthashmask);
-	mtx_init(&hwt_contexthash_mtx, "hwt-proc-hash", "hwt-proc", MTX_SPIN);
 }

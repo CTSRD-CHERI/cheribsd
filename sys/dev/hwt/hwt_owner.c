@@ -43,6 +43,7 @@
 
 #include <dev/hwt/hwt_hook.h>
 #include <dev/hwt/hwt_context.h>
+#include <dev/hwt/hwt_contexthash.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_owner.h>
 #include <dev/hwt/hwt_backend.h>
@@ -171,7 +172,7 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 		if (ctx == NULL)
 			break;
 
-		hwt_ctx_remove(ctx);
+		hwt_contexthash_remove(ctx);
 
 		/*
 		 * It could be that hwt_switch_in/out() or hwt_record() have

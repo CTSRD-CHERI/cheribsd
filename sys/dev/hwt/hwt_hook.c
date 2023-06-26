@@ -45,6 +45,7 @@
 
 #include <dev/hwt/hwt_hook.h>
 #include <dev/hwt/hwt_context.h>
+#include <dev/hwt/hwt_contexthash.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_owner.h>
 #include <dev/hwt/hwt_backend.h>
@@ -73,7 +74,7 @@ hwt_switch_in(struct thread *td)
 
 	cpu_id = PCPU_GET(cpuid);
 
-	ctx = hwt_ctx_lookup_contexthash(p);
+	ctx = hwt_contexthash_lookup(p);
 	if (ctx == NULL)
 		return;
 
@@ -107,7 +108,7 @@ hwt_switch_out(struct thread *td)
 
 	cpu_id = PCPU_GET(cpuid);
 
-	ctx = hwt_ctx_lookup_contexthash(p);
+	ctx = hwt_contexthash_lookup(p);
 	if (ctx == NULL)
 		return;
 
@@ -138,7 +139,7 @@ hwt_thread_exit(struct thread *td)
 
 	cpu_id = PCPU_GET(cpuid);
 
-	ctx = hwt_ctx_lookup_contexthash(p);
+	ctx = hwt_contexthash_lookup(p);
 	if (ctx == NULL)
 		return;
 
