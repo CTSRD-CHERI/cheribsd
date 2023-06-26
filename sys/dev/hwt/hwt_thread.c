@@ -368,37 +368,6 @@ hwt_thread_free(struct hwt_thread *thr)
 	free(thr, M_HWT_THREAD);
 }
 
-int
-hwt_thread_create(struct hwt_context *ctx, struct thread *td)
-{
-	struct hwt_thread *thr;
-	int error;
-
-	error = hwt_thread_alloc(&thr, ctx->bufsize);
-	if (error)
-		return (error);
-
-	thr->ctx = ctx;
-	thr->tid = td->td_tid;
-
-	error = hwt_thread_create_cdev(thr, ctx->pid);
-	if (error) {
-		printf("%s: could not create cdev, error %d\n",
-		    __func__, error);
-		return (error);
-	}
-
-	thr->thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
-
-	mtx_lock_spin(&ctx->mtx_threads);
-	LIST_INSERT_HEAD(&ctx->threads, thr, next);
-	mtx_unlock_spin(&ctx->mtx_threads);
-
-	printf("new thread %p index %d\n", thr, thr->thread_id);
-
-	return (0);
-}
-
 void
 hwt_thread_insert(struct hwt_context *ctx, struct hwt_thread *thr)
 {

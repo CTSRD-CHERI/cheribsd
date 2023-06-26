@@ -45,7 +45,6 @@ struct hwt_thread {
 /* Thread allocation. */
 int hwt_thread_alloc(struct hwt_thread **thr0, size_t bufsize);
 int hwt_thread_create_cdev(struct hwt_thread *thr, pid_t pid);
-int hwt_thread_create(struct hwt_context *ctx, struct thread *td);
 
 /* Thread de-allocation. */
 void hwt_thread_free(struct hwt_thread *thr);
