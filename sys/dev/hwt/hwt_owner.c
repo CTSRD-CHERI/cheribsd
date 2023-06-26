@@ -125,9 +125,9 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 		 * if not, change state immediately, so they give up.
 		 */
 
-		hwt_ctx_lock(ctx);
+		HWT_CTX_LOCK(ctx);
 		ctx->state = 0;
-		hwt_ctx_unlock(ctx);
+		HWT_CTX_UNLOCK(ctx);
 
 		/* hwt_switch_in() is now completed. */
 

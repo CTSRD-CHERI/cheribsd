@@ -74,7 +74,7 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 		return;
 
 	bufsize = ctx->bufsize;
-	hwt_ctx_unlock(ctx);
+	HWT_CTX_UNLOCK(ctx);
 
 	switch (record_type) {
 	case HWT_RECORD_MMAP:
@@ -137,7 +137,7 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 		LIST_INSERT_HEAD(&ctx->threads, thr, next);
 	}
 	LIST_INSERT_HEAD(&ctx->records, entry, next);
-	hwt_ctx_unlock(ctx);
+	HWT_CTX_UNLOCK(ctx);
 }
 
 int

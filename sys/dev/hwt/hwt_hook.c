@@ -79,7 +79,7 @@ hwt_switch_in(struct thread *td)
 		return;
 
 	if (ctx->state != CTX_STATE_RUNNING) {
-		hwt_ctx_unlock(ctx);
+		HWT_CTX_UNLOCK(ctx);
 		return;
 	}
 
@@ -91,7 +91,7 @@ hwt_switch_in(struct thread *td)
 	hwt_backend_configure(thr, cpu_id);
 	hwt_backend_enable(thr, cpu_id);
 
-	hwt_ctx_unlock(ctx);
+	HWT_CTX_UNLOCK(ctx);
 }
 
 void
@@ -113,7 +113,7 @@ hwt_switch_out(struct thread *td)
 		return;
 
 	if (ctx->state != CTX_STATE_RUNNING) {
-		hwt_ctx_unlock(ctx);
+		HWT_CTX_UNLOCK(ctx);
 		return;
 	}
 	thr = hwt_thread_lookup(ctx, td);
@@ -122,7 +122,7 @@ hwt_switch_out(struct thread *td)
 	    thr->thread_id, td->td_tid, cpu_id);
 
 	hwt_backend_disable(thr, cpu_id);
-	hwt_ctx_unlock(ctx);
+	HWT_CTX_UNLOCK(ctx);
 }
 
 void
@@ -144,7 +144,7 @@ hwt_thread_exit(struct thread *td)
 		return;
 
 	if (ctx->state != CTX_STATE_RUNNING) {
-		hwt_ctx_unlock(ctx);
+		HWT_CTX_UNLOCK(ctx);
 		return;
 	}
 	thr = hwt_thread_lookup(ctx, td);
@@ -153,5 +153,5 @@ hwt_thread_exit(struct thread *td)
 	    thr->thread_id, td->td_tid, cpu_id);
 
 	hwt_backend_disable(thr, cpu_id);
-	hwt_ctx_unlock(ctx);
+	HWT_CTX_UNLOCK(ctx);
 }

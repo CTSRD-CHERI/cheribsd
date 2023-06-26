@@ -117,6 +117,7 @@ hwt_thread_alloc_pages(struct hwt_thread *thr)
 {
 	vm_paddr_t low, high, boundary;
 	vm_memattr_t memattr;
+	vm_pointer_t va;
 	int alignment;
 	vm_page_t m;
 	int pflags;
@@ -153,15 +154,13 @@ retry:
 		}
 
 #if 0
-		/* TODO */
-		vm_pointer_t va;
-
 		if ((m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
+#endif
 
 		va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 		cpu_dcache_wb_range(va, PAGE_SIZE);
-#endif
+
 		m->valid = VM_PAGE_BITS_ALL;
 		m->oflags &= ~VPO_UNMANAGED;
 		m->flags |= PG_FICTITIOUS;
