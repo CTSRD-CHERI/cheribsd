@@ -55,21 +55,10 @@ struct hwt_context {
 #define	CTX_STATE_RUNNING		(1 << 1)
 };
 
+#define hwt_ctx_lock(ctx)	mtx_lock_spin(&(ctx)->mtx);
+#define hwt_ctx_unlock(ctx)	mtx_unlock_spin(&(ctx)->mtx);
+
 struct hwt_context * hwt_ctx_alloc(void);
 void hwt_ctx_free(struct hwt_context *ctx);
-
-struct hwt_context * hwt_ctx_lookup_by_owner(struct hwt_owner *ho, pid_t pid);
-struct hwt_context * hwt_ctx_lookup_contexthash(struct proc *p);
-
-void hwt_ctx_insert_contexthash(struct hwt_context *ctx);
-void hwt_ctx_remove(struct hwt_context *ctx);
-
-struct hwt_owner * hwt_ctx_lookup_ownerhash(struct proc *p);
-void hwt_owner_insert(struct hwt_owner *ho);
-void hwt_owner_destroy(struct hwt_owner *ho);
-
-void hwt_context_load(void);
-void hwt_ctx_lock(struct hwt_context *ctx);
-void hwt_ctx_unlock(struct hwt_context *ctx);
 
 #endif /* !_DEV_HWT_HWT_CONTEXT_H_ */

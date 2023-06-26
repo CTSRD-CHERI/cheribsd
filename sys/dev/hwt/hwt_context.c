@@ -82,17 +82,3 @@ hwt_ctx_free(struct hwt_context *ctx)
 
 	free(ctx, M_HWT_CTX);
 }
-
-void
-hwt_ctx_lock(struct hwt_context *ctx)
-{
-
-	mtx_lock_spin(&ctx->mtx);
-}
-
-void
-hwt_ctx_unlock(struct hwt_context *ctx)
-{
-
-	mtx_unlock_spin(&ctx->mtx);
-}
