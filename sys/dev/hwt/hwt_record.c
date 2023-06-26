@@ -59,14 +59,21 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 {
 	struct hwt_record_entry *entry;
 	struct hwt_context *ctx;
+	struct hwt_thread *thr;
 	struct proc *p;
+	size_t bufsize;
+	int error;
 
 	p = td->td_proc;
 	if ((p->p_flag2 & P2_HWT) == 0)
 		return;
 
-	/* We must have a ctx. */
 	ctx = hwt_ctx_lookup_contexthash(p);
+	if (ctx == NULL)
+		return;
+
+	bufsize = ctx->bufsize;
+	hwt_ctx_unlock(ctx);
 
 	switch (record_type) {
 	case HWT_RECORD_MMAP:
@@ -86,7 +93,19 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 	case HWT_RECORD_THREAD_CREATE:
 		dprintf("%s: NEW thread %p, tid %d\n", __func__, td,
 		    td->td_tid);
-		hwt_thread_create(ctx, td);
+
+		error = hwt_thread_alloc(&thr, bufsize);
+		thr->tid = td->td_tid;
+
+		error = hwt_thread_create_cdev(thr, p->p_pid);
+		if (error) {
+			printf("%s: could not create cdev, error %d\n",
+			    __func__, error);
+			return;
+		}
+
+		printf("new thread %p index %d\n", thr, thr->thread_id);
+
 		break;
 	case HWT_RECORD_THREAD_SET_NAME:
 		dprintf("%s: THREAD_SET_NAME %p\n", __func__, td);
@@ -106,9 +125,18 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 		entry->size = ent->size;
 	}
 
-	mtx_lock(&ctx->mtx_records);
+	ctx = hwt_ctx_lookup_contexthash(p);
+	if (ctx == NULL) {
+		/* TODO: release resources. */
+		return;
+	}
+	if (record_type == HWT_RECORD_THREAD_CREATE) {
+		thr->ctx = ctx;
+		thr->thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
+		LIST_INSERT_HEAD(&ctx->threads, thr, next);
+	}
 	LIST_INSERT_HEAD(&ctx->records, entry, next);
-	mtx_unlock(&ctx->mtx_records);
+	hwt_ctx_unlock(ctx);
 }
 
 int

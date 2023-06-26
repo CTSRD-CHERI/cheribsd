@@ -223,6 +223,7 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 		return (ENXIO);
 	}
 
+	/* Ensure we can trace it. */
 	error = hwt_priv_check(td->td_proc, p);
 	if (error) {
 		hwt_thread_free(thr);
@@ -231,28 +232,30 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 		return (error);
 	}
 
+	/* All good. */
 	thr->ctx = ctx;
 	thr->tid = FIRST_THREAD_IN_PROC(p)->td_tid;
 	thr->thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
-
 	hwt_thread_insert(ctx, thr);
 
+	/* hwt_owner_insert_ctx? */
 	mtx_lock(&ho->mtx);
 	LIST_INSERT_HEAD(&ho->hwts, ctx, next_hwts);
 	mtx_unlock(&ho->mtx);
 
 	p->p_flag2 |= P2_HWT;
 
+	ctx->proc = p;
+	hwt_ctx_insert_contexthash(ctx);
 	PROC_UNLOCK(p);
 
-	error = hwt_thread_create_cdev(thr);
+	error = hwt_thread_create_cdev(thr, ctx->pid);
 	if (error) {
 		/* TODO: deallocate resources. */
 		return (error);
 	}
 
 	/* Pass thread ID to user for mmap. */
-
 	hwt_record_thread(thr);
 
 	return (0);
@@ -264,10 +267,11 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 {
 	struct hwt_record_get *rget;
 	struct hwt_context *ctx;
-	struct hwt_thread *thr;
 	struct hwt_owner *ho;
 	struct hwt_start *s;
+#if 0
 	struct proc *p;
+#endif
 	int error;
 
 	switch (cmd) {
@@ -290,26 +294,20 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		if (ctx == NULL)
 			return (ENXIO);
 
-		mtx_lock_spin(&ctx->mtx_threads);
-		thr = LIST_FIRST(&ctx->threads);
-		mtx_unlock_spin(&ctx->mtx_threads);
-
-		KASSERT(thr != NULL, ("thr is NULL"));
-
-		error = hwt_backend_init(ctx);
-		if (error)
-			return (error);
-
-		p = pfind(s->pid);
-		if (p == NULL) {
-			/* TODO: deinit backend. */
+		mtx_lock_spin(&ctx->mtx);
+		if (ctx->state == CTX_STATE_RUNNING) {
+			/* Already running ? */
+			mtx_unlock_spin(&ctx->mtx);
 			return (ENXIO);
 		}
+		ctx->state = CTX_STATE_RUNNING;
+		mtx_unlock_spin(&ctx->mtx);
 
-		ctx->proc = p;
-
-		hwt_ctx_insert_contexthash(ctx);
-		PROC_UNLOCK(p);
+		error = hwt_backend_init(ctx);
+		if (error) {
+			/* TODO: restore state. */
+			return (error);
+		}
 
 		return (0);
 
@@ -353,6 +351,12 @@ hwt_switch_in(struct thread *td)
 	ctx = hwt_ctx_lookup_contexthash(p);
 	if (ctx == NULL)
 		return;
+
+	if (ctx->state != CTX_STATE_RUNNING) {
+		hwt_ctx_unlock(ctx);
+		return;
+	}
+
 	thr = hwt_thread_lookup(ctx, td);
 
 	printf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
@@ -360,6 +364,8 @@ hwt_switch_in(struct thread *td)
 
 	hwt_backend_configure(thr, cpu_id);
 	hwt_backend_enable(thr, cpu_id);
+
+	hwt_ctx_unlock(ctx);
 }
 
 void
@@ -379,12 +385,18 @@ hwt_switch_out(struct thread *td)
 	ctx = hwt_ctx_lookup_contexthash(p);
 	if (ctx == NULL)
 		return;
+
+	if (ctx->state != CTX_STATE_RUNNING) {
+		hwt_ctx_unlock(ctx);
+		return;
+	}
 	thr = hwt_thread_lookup(ctx, td);
 
 	printf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
 	    thr->thread_id, td->td_tid, cpu_id);
 
 	hwt_backend_disable(thr, cpu_id);
+	hwt_ctx_unlock(ctx);
 }
 
 void
@@ -404,12 +416,18 @@ hwt_thread_exit(struct thread *td)
 	ctx = hwt_ctx_lookup_contexthash(p);
 	if (ctx == NULL)
 		return;
+
+	if (ctx->state != CTX_STATE_RUNNING) {
+		hwt_ctx_unlock(ctx);
+		return;
+	}
 	thr = hwt_thread_lookup(ctx, td);
 
 	printf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
 	    thr->thread_id, td->td_tid, cpu_id);
 
 	hwt_backend_disable(thr, cpu_id);
+	hwt_ctx_unlock(ctx);
 }
 
 static struct cdevsw hwt_cdevsw = {
@@ -437,10 +455,21 @@ hwt_stop_owner_hwts(struct hwt_owner *ho)
 		if (ctx == NULL)
 			break;
 
-		hwt_backend_deinit(ctx);
-
-		/* TODO: ensure ctx is in context hash before removal. */
 		hwt_ctx_remove(ctx);
+
+		/*
+		 * It could be that hwt_switch_in/out() or hwt_record() have
+		 * this ctx locked right here.
+		 * if not, change state immediately, so they give up.
+		 */
+
+		hwt_ctx_lock(ctx);
+		ctx->state = 0;
+		hwt_ctx_unlock(ctx);
+
+		/* hwt_switch_in() is now completed. */
+
+		hwt_backend_deinit(ctx);
 
 		printf("%s: remove threads\n", __func__);
 
@@ -456,7 +485,6 @@ hwt_stop_owner_hwts(struct hwt_owner *ho)
 
 			/* TODO: move into hwt_thread_free? */
 			destroy_dev_sched(thr->cdev);
-
 			hwt_thread_free(thr);
 		}
 

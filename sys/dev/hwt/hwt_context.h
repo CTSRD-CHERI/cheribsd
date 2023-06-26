@@ -48,6 +48,11 @@ struct hwt_context {
 	struct hwt_owner		*hwt_owner;
 	struct hwt_backend		*hwt_backend;
 	int				thread_counter;
+
+	struct mtx			mtx;
+	int				state;
+#define	CTX_STATE_INITIALIZED		(1 << 0)
+#define	CTX_STATE_RUNNING		(1 << 1)
 };
 
 struct hwt_context * hwt_ctx_alloc(void);
@@ -64,5 +69,7 @@ void hwt_owner_insert(struct hwt_owner *ho);
 void hwt_owner_destroy(struct hwt_owner *ho);
 
 void hwt_context_load(void);
+void hwt_ctx_lock(struct hwt_context *ctx);
+void hwt_ctx_unlock(struct hwt_context *ctx);
 
 #endif /* !_DEV_HWT_HWT_CONTEXT_H_ */

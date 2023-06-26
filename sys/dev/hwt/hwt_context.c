@@ -86,6 +86,8 @@ hwt_ctx_alloc(void)
 	LIST_INIT(&ctx->threads);
 	mtx_init(&ctx->mtx_threads, "hwt threads", NULL, MTX_SPIN);
 
+	mtx_init(&ctx->mtx, "ctx", NULL, MTX_SPIN);
+
 	return (ctx);
 }
 
@@ -98,6 +100,7 @@ hwt_ctx_free(struct hwt_context *ctx)
 
 /*
  * To use by hwt_switch_in/out() and hwt_record() only.
+ * This function returns mtx locked.
  */
 struct hwt_context *
 hwt_ctx_lookup_contexthash(struct proc *p)
@@ -112,13 +115,28 @@ hwt_ctx_lookup_contexthash(struct proc *p)
 	mtx_lock_spin(&hwt_contexthash_mtx);
 	LIST_FOREACH(ctx, hch, next_hch) {
 		if (ctx->proc == p) {
+			mtx_lock_spin(&ctx->mtx);
 			mtx_unlock_spin(&hwt_contexthash_mtx);
 			return (ctx);
 		}
 	}
 	mtx_unlock_spin(&hwt_contexthash_mtx);
 
-	panic("no ctx");
+	return (NULL);
+}
+
+void
+hwt_ctx_lock(struct hwt_context *ctx)
+{
+
+	mtx_lock_spin(&ctx->mtx);
+}
+
+void
+hwt_ctx_unlock(struct hwt_context *ctx)
+{
+
+	mtx_unlock_spin(&ctx->mtx);
 }
 
 void
@@ -152,5 +170,5 @@ hwt_context_load(void)
 
 	hwt_contexthash = hashinit(HWT_CONTEXTHASH_SIZE, M_HWT_CTX,
 	    &hwt_contexthashmask);
-        mtx_init(&hwt_contexthash_mtx, "hwt-proc-hash", "hwt-proc", MTX_SPIN);
+	mtx_init(&hwt_contexthash_mtx, "hwt-proc-hash", "hwt-proc", MTX_SPIN);
 }

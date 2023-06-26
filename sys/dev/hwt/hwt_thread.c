@@ -256,15 +256,12 @@ static struct cdevsw hwt_thread_cdevsw = {
 };
 
 int
-hwt_thread_create_cdev(struct hwt_thread *thr)
+hwt_thread_create_cdev(struct hwt_thread *thr, pid_t pid)
 {
 	struct make_dev_args args;
-	struct hwt_context *ctx;
 	int error;
 
-	ctx = thr->ctx;
-
-	printf("%s: pid %d tid %d\n", __func__, ctx->pid, thr->tid);
+	printf("%s: pid %d tid %d\n", __func__, pid, thr->tid);
 
 	make_dev_args_init(&args);
 	args.mda_devsw = &hwt_thread_cdevsw;
@@ -274,7 +271,7 @@ hwt_thread_create_cdev(struct hwt_thread *thr)
 	args.mda_mode = 0660;
 	args.mda_si_drv1 = thr;
 
-	error = make_dev_s(&args, &thr->cdev, "hwt_%d_%d", ctx->pid, thr->tid);
+	error = make_dev_s(&args, &thr->cdev, "hwt_%d_%d", pid, thr->tid);
 	if (error != 0)
 		return (error);
 
@@ -384,7 +381,7 @@ hwt_thread_create(struct hwt_context *ctx, struct thread *td)
 	thr->ctx = ctx;
 	thr->tid = td->td_tid;
 
-	error = hwt_thread_create_cdev(thr);
+	error = hwt_thread_create_cdev(thr, ctx->pid);
 	if (error) {
 		printf("%s: could not create cdev, error %d\n",
 		    __func__, error);
