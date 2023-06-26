@@ -195,7 +195,7 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 			return (EEXIST);
 	} else {
 		/* Create a new owner. */
-		ho = hwt_owner_create(td->td_proc);
+		ho = hwt_owner_alloc(td->td_proc);
 		if (ho == NULL)
 			return (ENOMEM);
 		hwt_ownerhash_insert(ho);

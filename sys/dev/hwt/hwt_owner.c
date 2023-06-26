@@ -78,7 +78,7 @@ hwt_owner_lookup_ctx(struct hwt_owner *ho, pid_t pid)
 }
 
 struct hwt_owner *
-hwt_owner_create(struct proc *p)
+hwt_owner_alloc(struct proc *p)
 {
 	struct hwt_owner *ho;
 
