@@ -67,44 +67,9 @@ static MALLOC_DEFINE(M_HWT, "hwt", "Hardware Trace");
 static eventhandler_tag hwt_exit_tag;
 static struct cdev *hwt_cdev;
 
-static int
-hwt_ioctl_send_records(struct hwt_context *ctx,
-    struct hwt_record_get *record_get)
-{
-	struct hwt_record_user_entry *user_entry;
-	int nitems_req;
-	int error;
-	int i;
-
-	nitems_req = 0;
-
-	error = copyin(record_get->nentries, &nitems_req, sizeof(int));
-	if (error)
-		return (error);
-
-	if (nitems_req < 1 || nitems_req > 1024)
-		return (ENXIO);
-
-	user_entry = malloc(sizeof(struct hwt_record_user_entry) * nitems_req,
-	    M_HWT, M_WAITOK | M_ZERO);
-
-	i = hwt_record_grab(ctx, user_entry, nitems_req);
-	if (i > 0)
-		error = copyout(user_entry, record_get->records,
-		    sizeof(struct hwt_record_user_entry) * i);
-
-	if (error == 0)
-		error = copyout(&i, record_get->nentries, sizeof(int));
-
-	free(user_entry, M_HWT);
-
-	return (error);
-}
-
 /*
  * Check if owner process *o can trace target process *t;
  */
-
 static int
 hwt_priv_check(struct proc *o, struct proc *t)
 {
@@ -155,6 +120,40 @@ hwt_priv_check(struct proc *o, struct proc *t)
 done:
 	crfree(tc);
 	crfree(oc);
+
+	return (error);
+}
+
+static int
+hwt_ioctl_send_records(struct hwt_context *ctx,
+    struct hwt_record_get *record_get)
+{
+	struct hwt_record_user_entry *user_entry;
+	int nitems_req;
+	int error;
+	int i;
+
+	nitems_req = 0;
+
+	error = copyin(record_get->nentries, &nitems_req, sizeof(int));
+	if (error)
+		return (error);
+
+	if (nitems_req < 1 || nitems_req > 1024)
+		return (ENXIO);
+
+	user_entry = malloc(sizeof(struct hwt_record_user_entry) * nitems_req,
+	    M_HWT, M_WAITOK | M_ZERO);
+
+	i = hwt_record_grab(ctx, user_entry, nitems_req);
+	if (i > 0)
+		error = copyout(user_entry, record_get->records,
+		    sizeof(struct hwt_record_user_entry) * i);
+
+	if (error == 0)
+		error = copyout(&i, record_get->nentries, sizeof(int));
+
+	free(user_entry, M_HWT);
 
 	return (error);
 }
@@ -332,102 +331,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	/* Unreached. */
 
 	return (ENXIO);
-}
-
-void
-hwt_switch_in(struct thread *td)
-{
-	struct hwt_context *ctx;
-	struct hwt_thread *thr;
-	struct proc *p;
-	int cpu_id;
-
-	p = td->td_proc;
-	if ((p->p_flag2 & P2_HWT) == 0)
-		return;
-
-	cpu_id = PCPU_GET(cpuid);
-
-	ctx = hwt_ctx_lookup_contexthash(p);
-	if (ctx == NULL)
-		return;
-
-	if (ctx->state != CTX_STATE_RUNNING) {
-		hwt_ctx_unlock(ctx);
-		return;
-	}
-
-	thr = hwt_thread_lookup(ctx, td);
-
-	printf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
-	    thr->thread_id, td->td_tid, cpu_id);
-
-	hwt_backend_configure(thr, cpu_id);
-	hwt_backend_enable(thr, cpu_id);
-
-	hwt_ctx_unlock(ctx);
-}
-
-void
-hwt_switch_out(struct thread *td)
-{
-	struct hwt_context *ctx;
-	struct hwt_thread *thr;
-	struct proc *p;
-	int cpu_id;
-
-	p = td->td_proc;
-	if ((p->p_flag2 & P2_HWT) == 0)
-		return;
-
-	cpu_id = PCPU_GET(cpuid);
-
-	ctx = hwt_ctx_lookup_contexthash(p);
-	if (ctx == NULL)
-		return;
-
-	if (ctx->state != CTX_STATE_RUNNING) {
-		hwt_ctx_unlock(ctx);
-		return;
-	}
-	thr = hwt_thread_lookup(ctx, td);
-
-	printf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
-	    thr->thread_id, td->td_tid, cpu_id);
-
-	hwt_backend_disable(thr, cpu_id);
-	hwt_ctx_unlock(ctx);
-}
-
-void
-hwt_thread_exit(struct thread *td)
-{
-	struct hwt_context *ctx;
-	struct hwt_thread *thr;
-	struct proc *p;
-	int cpu_id;
-
-	p = td->td_proc;
-	if ((p->p_flag2 & P2_HWT) == 0)
-		return;
-
-	cpu_id = PCPU_GET(cpuid);
-
-	ctx = hwt_ctx_lookup_contexthash(p);
-	if (ctx == NULL)
-		return;
-
-	if (ctx->state != CTX_STATE_RUNNING) {
-		hwt_ctx_unlock(ctx);
-		return;
-	}
-	thr = hwt_thread_lookup(ctx, td);
-
-	printf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
-	    thr->thread_id, td->td_tid, cpu_id);
-
-	hwt_backend_disable(thr, cpu_id);
-	hwt_ctx_unlock(ctx);
 }
 
 static struct cdevsw hwt_cdevsw = {
