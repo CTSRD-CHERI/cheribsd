@@ -148,6 +148,7 @@ hwt_thread_exit(struct thread *td)
 		return;
 	}
 	thr = hwt_thread_lookup(ctx, td);
+	thr->state = HWT_THREAD_STATE_EXITED;
 
 	printf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
 	    thr->thread_id, td->td_tid, cpu_id);
