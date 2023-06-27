@@ -54,8 +54,9 @@ struct hwt_context {
 #define	CTX_STATE_RUNNING		(1 << 0)
 };
 
-#define HWT_CTX_LOCK(ctx)	mtx_lock_spin(&(ctx)->mtx);
-#define HWT_CTX_UNLOCK(ctx)	mtx_unlock_spin(&(ctx)->mtx);
+#define	HWT_CTX_LOCK(ctx)		mtx_lock_spin(&(ctx)->mtx)
+#define	HWT_CTX_UNLOCK(ctx)		mtx_unlock_spin(&(ctx)->mtx)
+#define	HWT_CTX_ASSERT_LOCKED(ctx)	mtx_assert(&(ctx)->mtx, MA_OWNED)
 
 struct hwt_context * hwt_ctx_alloc(void);
 void hwt_ctx_free(struct hwt_context *ctx);

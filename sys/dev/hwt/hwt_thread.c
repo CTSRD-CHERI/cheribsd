@@ -328,6 +328,8 @@ hwt_thread_lookup(struct hwt_context *ctx, struct thread *td)
 {
 	struct hwt_thread *thr, *thr1;
 
+	HWT_CTX_ASSERT_LOCKED(ctx);
+
 	mtx_lock_spin(&ctx->mtx_threads);
 	LIST_FOREACH_SAFE(thr, &ctx->threads, next, thr1) {
 		if (thr->tid == td->td_tid) {
