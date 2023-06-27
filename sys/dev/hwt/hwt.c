@@ -45,17 +45,43 @@
  *                  Enables tracing unit for a given context.
  *               c) HWT_IOC_RECORD_GET
  *                  Transfers record entries collected during program execution
- *                  for a given context to userspace, such as mmaping tables,
+ *                  for a given context to userspace, such as mmaping tables
+ *                  of executable and dynamic libraries, interpreter,
  *                  thread IDs, etc.
  *
  * /dev/hwt_%d_%d, pid, tid
  *    .mmap
- *        Maps tracing buffers to userspace
+ *        Maps tracing buffers to userspace.
  *    .ioctl
  *        hwt_thread_ioctl():
  *               a) HWT_IOC_BUFPTR_GET
- *                  Transfers current hardware filling buffer pointer to
- *                  userspace.
+ *                  Transfers current hardware pointer in the filling buffer
+ *                  to userspace.
+ *
+ * HWT context lifecycle:
+ * 1. User invokes HWT_IOC_ALLOC ioctl with information about pid to trace and
+ *    size of the buffers for the trace data to allocate.
+ *    Some architectures may have different tracing units supported, so user
+ *    also provides backend name to use for this context, e.g. "coresight".
+ * 2. Kernel allocates context, lookups the proc for the given pid. Creates
+ *    first hwt_thread in the context and allocates trace buffers for it.
+ *    Immediately, kernel initializes tracing backend.
+ * 3. User invokes HWT_IOC_START ioctl, kernel marks context as RUNNING.
+ *    At this point any HWT hook invocation by scheduler enables/disables
+ *    tracing for the threads associated with the context (threads of the proc).
+ *    Any new threads creation (of the target proc) will be invoking
+ *    corresponding hooks in HWT framework, so that new hwt_thread and buffers
+ *    allocated, character device created on the fly.
+ * 4. User issues HWT_IOC_RECORD_GET ioctl to fetch information about mmaping
+ *    tables and threads created during application startup.
+ * 5. User mmaps tracing buffers of each thread to userspace (using
+ *    /dev/hwt_%pid_%tid character devices).
+ * 6. User can repeat 4 if expected thread is not yet created during target
+ *    application execution.
+ * 7. User issues HWT_IOC_BUFPTR_GET ioctl to get current filling level of the
+ *    hardware buffer of a given thread.
+ * 8. User invokes tracing decoder library to process available data.
+ * 9. User repeates 7.
  */
 
 #include <sys/param.h>
