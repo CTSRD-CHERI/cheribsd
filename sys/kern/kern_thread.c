@@ -1004,7 +1004,7 @@ thread_exit(void)
 #endif
 
 #ifdef	HWT_HOOKS
-	hwt_thread_exit(td);
+	HWT_CALL_HOOK(td, HWT_THREAD_EXIT, NULL);
 #endif
 
 	PROC_UNLOCK(p);

@@ -60,7 +60,7 @@
 #define	dprintf(fmt, ...)
 #endif
 
-void
+static void
 hwt_switch_in(struct thread *td)
 {
 	struct hwt_context *ctx;
@@ -94,7 +94,7 @@ hwt_switch_in(struct thread *td)
 	HWT_CTX_UNLOCK(ctx);
 }
 
-void
+static void
 hwt_switch_out(struct thread *td)
 {
 	struct hwt_context *ctx;
@@ -125,7 +125,7 @@ hwt_switch_out(struct thread *td)
 	HWT_CTX_UNLOCK(ctx);
 }
 
-void
+static void
 hwt_thread_exit(struct thread *td)
 {
 	struct hwt_context *ctx;
@@ -161,6 +161,17 @@ static void
 hwt_hook_handler(struct thread *td, int func, void *arg)
 {
 
+	switch (func) {
+	case HWT_SWITCH_IN:
+		hwt_switch_in(td);
+		break;
+	case HWT_SWITCH_OUT:
+		hwt_switch_out(td);
+		break;
+	case HWT_THREAD_EXIT:
+		hwt_thread_exit(td);
+		break;
+	};
 }
 
 void
@@ -168,4 +179,11 @@ hwt_hook_load(void)
 {
 
 	hwt_hook = hwt_hook_handler;
+}
+
+void
+hwt_hook_unload(void)
+{
+
+	hwt_hook = NULL;
 }

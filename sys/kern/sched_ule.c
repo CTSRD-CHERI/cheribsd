@@ -2299,8 +2299,8 @@ sched_switch(struct thread *td, int flags)
 #endif
 
 #ifdef HWT_HOOKS
-		hwt_switch_out(td);
-		hwt_switch_in(newtd);
+		HWT_CALL_HOOK(td, HWT_SWITCH_OUT, NULL);
+		HWT_CALL_HOOK(newtd, HWT_SWITCH_IN, NULL);
 #endif
 
 		td->td_oncpu = NOCPU;
@@ -3134,7 +3134,7 @@ sched_ap_entry(void)
 	newtd = sched_throw_grab(tdq);
 
 #ifdef HWT_HOOKS
-	hwt_switch_in(newtd);
+	HWT_CALL_HOOK(newtd, HWT_SWITCH_IN, NULL);
 #endif
 
 	/* doesn't return */
@@ -3164,7 +3164,7 @@ sched_throw(struct thread *td)
 	newtd = sched_throw_grab(tdq);
 
 #ifdef HWT_HOOKS
-	hwt_switch_in(newtd);
+	HWT_CALL_HOOK(newtd, HWT_SWITCH_IN, NULL);
 #endif
 
 	/* doesn't return */

@@ -33,11 +33,9 @@
 #ifndef _DEV_HWT_HWT_HOOK_H_
 #define _DEV_HWT_HWT_HOOK_H_
 
-enum hwt_hook_func {
-	HWT_SWITCH_IN,
-	HWT_SWITCH_OUT,
-	HWT_THREAD_EXIT,
-};
+#define	HWT_SWITCH_IN	0
+#define	HWT_SWITCH_OUT	1
+#define	HWT_THREAD_EXIT	2
 
 struct hwt_record_entry {
 	enum hwt_record_type		record_type;
@@ -51,12 +49,15 @@ struct hwt_record_entry {
 void hwt_record(struct thread *td, enum hwt_record_type record_type,
     struct hwt_record_entry *ent);
 
-void hwt_switch_in(struct thread *td);
-void hwt_switch_out(struct thread *td);
-void hwt_thread_exit(struct thread *td);
-
 void hwt_hook_load(void);
+void hwt_hook_unload(void);
 
 extern void (*hwt_hook)(struct thread *td, int func, void *arg);
+
+#define	HWT_CALL_HOOK(td, func, arg)			\
+do {							\
+	if (hwt_hook != NULL)				\
+		(hwt_hook)((td), (func), (arg));	\
+} while (0)
 
 #endif /* !_DEV_HWT_HWT_HOOK_H_ */
