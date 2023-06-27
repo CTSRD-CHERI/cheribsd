@@ -9,16 +9,18 @@ __<${_this:T}>__:
 # - 32-bit compat libraries on PowerPC, and AMD64.
 # - 64-bit compat on CHERI RISC-V and Morello.
 
-.if defined(_LIBCOMPAT)
+.if defined(_LIBCOMPATS)
 
 .include <bsd.compat.mk>
 
+.for libcompatidx _LIBCOMPAT libcompat in ${_LIBCOMPATS:range:@i@${i} ${_LIBCOMPATS:[$i]} ${libcompats:[$i]}@}
+
 # Yes, the flags are redundant.
-LIBCOMPAT_COMPILERS= \
-		CC="${XCC} ${LIBCOMPATCFLAGS}" \
-		CXX="${XCXX} ${LIBCOMPATCXXFLAGS} ${LIBCOMPATCFLAGS}" \
-		CPP="${XCPP} ${LIBCOMPATCFLAGS}"
-LIBCOMPATWMAKEENV+= \
+LIB${_LIBCOMPAT}_COMPILERS= \
+		CC="${XCC} ${LIB${_LIBCOMPAT}CFLAGS}" \
+		CXX="${XCXX} ${LIB${_LIBCOMPAT}CXXFLAGS} ${LIB${_LIBCOMPAT}CFLAGS}" \
+		CPP="${XCPP} ${LIB${_LIBCOMPAT}CFLAGS}"
+LIB${_LIBCOMPAT}WMAKEENV+= \
 		INSTALL="${INSTALL_CMD} -U" \
 		PATH=${TMPPATH} \
 		SYSROOT=${WORLDTMP} \
@@ -28,10 +30,10 @@ LIBCOMPATWMAKEENV+= \
 		DTRACE="${LIB$COMPATDTRACE:U${DTRACE}}"
 .if ${MK_META_MODE} != "no"
 # Don't rebuild build-tools targets during normal build.
-LIBCOMPATWMAKEENV+=	BUILD_TOOLS_META=.NOMETA
+LIB${_LIBCOMPAT}WMAKEENV+=	BUILD_TOOLS_META=.NOMETA
 .endif
-LIBCOMPATWMAKEFLAGS+= \
-		${LIBCOMPAT_COMPILERS} \
+LIB${_LIBCOMPAT}WMAKEFLAGS+= \
+		${LIB${_LIBCOMPAT}_COMPILERS} \
 		DESTDIR=${WORLDTMP} \
 		-DNO_CPU_CFLAGS \
 		MK_BOOT=no \
@@ -47,16 +49,17 @@ LIBCOMPATWMAKEFLAGS+= \
 # bsd.linker.mk. This provides a noticeable speed-up as it avoids multiple
 # processes from being spawned in each subdirectory.
 .for _var in ${_TOOLCHAIN_METADATA_VARS}
-LIBCOMPATWMAKEFLAGS+=	${_var}="${X_${_var}}"
+LIB${_LIBCOMPAT}WMAKEFLAGS+=	${_var}="${X_${_var}}"
 .endfor
-LIBCOMPATWMAKEFLAGS+=_NO_INCLUDE_LINKERMK=yes _NO_INCLUDE_COMPILERMK=yes
+LIB${_LIBCOMPAT}WMAKEFLAGS+=_NO_INCLUDE_LINKERMK=yes _NO_INCLUDE_COMPILERMK=yes
 
-LIBCOMPATWMAKE+=	${TIME_ENV} ${LIBCOMPATWMAKEENV} ${MAKE} ${LIBCOMPATWMAKEFLAGS} \
-			OBJTOP=${LIBCOMPAT_OBJTOP} \
+LIB${_LIBCOMPAT}WMAKE+=	${TIME_ENV} ${LIB${_LIBCOMPAT}WMAKEENV} ${MAKE} \
+			${LIB${_LIBCOMPAT}WMAKEFLAGS} \
+			OBJTOP=${LIB${_LIBCOMPAT}_OBJTOP} \
 			OBJROOT='$${OBJTOP}/' \
 			MAKEOBJDIRPREFIX= \
 			MK_MAN=no MK_HTML=no
-LIBCOMPATIMAKE+=	${LIBCOMPATWMAKE:NINSTALL=*:NDESTDIR=*} \
+LIB${_LIBCOMPAT}IMAKE+=	${LIB${_LIBCOMPAT}WMAKE:NINSTALL=*:NDESTDIR=*} \
 			${IMAKE_INSTALL} \
 			MK_INCLUDES=no \
 			-DLIBRARIES_ONLY
@@ -65,7 +68,7 @@ LIBCOMPATIMAKE+=	${LIBCOMPATWMAKE:NINSTALL=*:NDESTDIR=*} \
 build${libcompat}: .PHONY
 	@echo
 	@echo "--------------------------------------------------------------"
-	@echo ">>> stage 4.3: building lib${libcompat} shim libraries"
+	@echo ">>> stage 4.3.${libcompatidx}: building lib${libcompat} shim libraries"
 	@echo "--------------------------------------------------------------"
 	${WORLDTMP_MTREE} -f ${.CURDIR}/etc/mtree/BSD.lib${libcompat}.dist \
 	    -p ${WORLDTMP}/usr >/dev/null
@@ -78,7 +81,7 @@ build${libcompat}: .PHONY
 	    MAKEFLAGS="-m ${.CURDIR}/tools/build/mk ${.MAKEFLAGS}" \
 	    ${MAKE} -f Makefile.inc1 \
 	    DESTDIR= \
-	    OBJTOP=${LIBCOMPAT_OBJTOP} \
+	    OBJTOP=${LIB${_LIBCOMPAT}_OBJTOP} \
 	    OBJROOT='$${OBJTOP}/' \
 	    MAKEOBJDIRPREFIX= \
 	    -DNO_LINT \
@@ -91,11 +94,11 @@ build${libcompat}: .PHONY
 	    MK_WERROR=no \
 	    _lc_build-tools
 	${_+_}cd ${.CURDIR}; \
-	    ${LIBCOMPATWMAKE} -f Makefile.inc1 -DNO_FSCHG libraries
+	    ${LIB${_LIBCOMPAT}WMAKE} -f Makefile.inc1 -DNO_FSCHG libraries
 
 distribute${libcompat} install${libcompat}: .PHONY
 	${_+_}cd ${.CURDIR}; \
-	    ${LIBCOMPATIMAKE} -f Makefile.inc1 _lc_${.TARGET:S/${libcompat}$//}
+	    ${LIB${_LIBCOMPAT}IMAKE} -f Makefile.inc1 _lc_${.TARGET:S/${libcompat}$//}
 
 .if ${.TARGETS:Mlib${libcompat}buildenv}
 .if ${.MAKEFLAGS:M-j}
@@ -110,14 +113,16 @@ lib${libcompat}buildenv: .PHONY
 	# Note: we have to remove TARGET and TARGET_ARCH from MAKEFLAGS since
 	# otherwise src.opts.mk will pick the wrong MK_FOO values.
 	@cd ${BUILDENV_DIR} && \
-	    env ${LIBCOMPATWMAKEENV} ${LIBCOMPAT_COMPILERS} BUILDENV=1 \
-	    TARGET=${LIBCOMPAT_MACHINE} TARGET_ARCH=${LIBCOMPAT_MACHINE_ARCH} \
+	    env ${LIB${_LIBCOMPAT}WMAKEENV} ${LIB${_LIBCOMPAT}_COMPILERS} BUILDENV=1 \
+	    TARGET=${LIB${_LIBCOMPAT}_MACHINE} TARGET_ARCH=${LIB${_LIBCOMPAT}_MACHINE_ARCH} \
 	    INSTALL="${INSTALL_CMD} ${INSTALLFLAGS}" \
 	    MTREE_CMD="${MTREE_CMD} ${MTREEFLAGS}" \
 	    "MAKEFLAGS=${MAKEFLAGS:NTARGET*}" ${BUILDENV_SHELL} || true
 .endif
 
-.endif # defined(_LIBCOMPAT)
+.endfor # libcompatidx _LIBCOMPAT libcompat
+
+.endif # defined(_LIBCOMPATS)
 
 # These depend on MK_*, which could vary between the native and compat
 # architectures. Thus targets using them are run within a compat sub-make
