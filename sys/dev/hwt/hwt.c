@@ -48,6 +48,7 @@
 #include <dev/hwt/hwt_ownerhash.h>
 #include <dev/hwt/hwt_backend.h>
 #include <dev/hwt/hwt_ioctl.h>
+#include <dev/hwt/hwt_hook.h>
 
 #define	HWT_DEBUG
 #undef	HWT_DEBUG
@@ -96,12 +97,13 @@ hwt_load(void)
 	if (error != 0)
 		return (error);
 
+	hwt_exit_tag = EVENTHANDLER_REGISTER(process_exit, hwt_process_exit,
+	    NULL, EVENTHANDLER_PRI_ANY);
+
 	hwt_ownerhash_load();
 	hwt_contexthash_load();
 	hwt_backend_load();
-
-	hwt_exit_tag = EVENTHANDLER_REGISTER(process_exit, hwt_process_exit,
-	    NULL, EVENTHANDLER_PRI_ANY);
+	hwt_hook_load();
 
 	return (0);
 }

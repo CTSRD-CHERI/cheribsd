@@ -156,3 +156,16 @@ hwt_thread_exit(struct thread *td)
 	hwt_backend_disable(thr, cpu_id);
 	HWT_CTX_UNLOCK(ctx);
 }
+
+static void
+hwt_hook_handler(struct thread *td, int func, void *arg)
+{
+
+}
+
+void
+hwt_hook_load(void)
+{
+
+	hwt_hook = hwt_hook_handler;
+}

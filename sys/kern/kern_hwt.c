@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
  * Copyright (c) 2023 Ruslan Bukin <br@bsdpad.com>
  *
  * This work was supported by Innovate UK project 105694, "Digital Security
@@ -24,39 +26,21 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
-#include <sys/hwt_record.h>
+#include <sys/param.h>
+#include <sys/eventhandler.h>
+#include <sys/ioccom.h>
+#include <sys/conf.h>
+#include <sys/proc.h>
+#include <sys/kernel.h>
+#include <sys/malloc.h>
+#include <sys/mman.h>
+#include <sys/module.h>
+#include <sys/mutex.h>
+#include <sys/rwlock.h>
+#include <sys/hwt.h>
 
-#ifndef _DEV_HWT_HWT_HOOK_H_
-#define _DEV_HWT_HWT_HOOK_H_
+#include <dev/hwt/hwt_hook.h>
 
-enum hwt_hook_func {
-	HWT_SWITCH_IN,
-	HWT_SWITCH_OUT,
-	HWT_THREAD_EXIT,
-};
-
-struct hwt_record_entry {
-	enum hwt_record_type		record_type;
-	LIST_ENTRY(hwt_record_entry)	next;
-	char				*fullpath;
-	lwpid_t				tid;
-	uintptr_t			addr;
-	size_t				size;
-};
-
-void hwt_record(struct thread *td, enum hwt_record_type record_type,
-    struct hwt_record_entry *ent);
-
-void hwt_switch_in(struct thread *td);
-void hwt_switch_out(struct thread *td);
-void hwt_thread_exit(struct thread *td);
-
-void hwt_hook_load(void);
-
-extern void (*hwt_hook)(struct thread *td, int func, void *arg);
-
-#endif /* !_DEV_HWT_HWT_HOOK_H_ */
+void __read_mostly (*hwt_hook)(struct thread *td, int func, void *arg) = NULL;

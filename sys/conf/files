@@ -3886,6 +3886,7 @@ kern/kern_ffclock.c		standard
 kern/kern_flag.c		standard
 kern/kern_fork.c		standard
 kern/kern_hhook.c		standard
+kern/kern_hwt.c			standard
 kern/kern_idle.c		standard
 kern/kern_intr.c		standard
 kern/kern_jail.c		standard
