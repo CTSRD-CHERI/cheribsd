@@ -249,6 +249,12 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 	hwt_contexthash_insert(ctx);
 	PROC_UNLOCK(p);
 
+	error = hwt_backend_init(ctx);
+	if (error) {
+		/* TODO: deallocate resources. */
+		return (error);
+	}
+
 	error = hwt_thread_create_cdev(thr, ctx->pid);
 	if (error) {
 		/* TODO: deallocate resources. */
@@ -299,12 +305,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		}
 		ctx->state = CTX_STATE_RUNNING;
 		mtx_unlock_spin(&ctx->mtx);
-
-		error = hwt_backend_init(ctx);
-		if (error) {
-			/* TODO: restore state. */
-			return (error);
-		}
 
 		return (0);
 
