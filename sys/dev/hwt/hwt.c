@@ -28,7 +28,35 @@
  * SUCH DAMAGE.
  */
 
-/* Hardware Trace (HWT) framework. */
+/*
+ * Hardware Trace framework.
+ *
+ * Design overview.
+ *
+ * The framework provides character devices for mmap(2) and ioctl(2) system call
+ * allowing user to manage CPU (hardware) tracing units.
+ *
+ * /dev/hwt:
+ *    .ioctl:
+ *        hwt_ioctl(): 
+ *               a) HWT_IOC_ALLOC
+ *                  Allocates kernel tracing context CTX for a given pid.
+ *               b) HWT_IOC_START
+ *                  Enables tracing unit for a given context.
+ *               c) HWT_IOC_RECORD_GET
+ *                  Transfers record entries collected during program execution
+ *                  for a given context to userspace, such as mmaping tables,
+ *                  thread IDs, etc.
+ *
+ * /dev/hwt_%d_%d, pid, tid
+ *    .mmap
+ *        Maps tracing buffers to userspace
+ *    .ioctl
+ *        hwt_thread_ioctl():
+ *               a) HWT_IOC_BUFPTR_GET
+ *                  Transfers current hardware filling buffer pointer to
+ *                  userspace.
+ */
 
 #include <sys/param.h>
 #include <sys/eventhandler.h>
