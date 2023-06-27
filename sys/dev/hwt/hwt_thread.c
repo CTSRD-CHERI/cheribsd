@@ -413,8 +413,6 @@ hwt_thread_create(struct thread *td, struct hwt_thread **thr0)
 		return (error);
 	}
 
-	printf("new thread %p index %d\n", thr, thr->thread_id);
-
 	ctx = hwt_contexthash_lookup(p);
 	if (ctx == NULL) {
 		/* TODO: deallocate resources. */

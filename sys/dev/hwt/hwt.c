@@ -159,12 +159,13 @@ hwt_load(void)
 	if (error != 0)
 		return (error);
 
+	hwt_backend_load();
+	hwt_contexthash_load();
+	hwt_ownerhash_load();
+
 	hwt_exit_tag = EVENTHANDLER_REGISTER(process_exit, hwt_process_exit,
 	    NULL, EVENTHANDLER_PRI_ANY);
 
-	hwt_ownerhash_load();
-	hwt_contexthash_load();
-	hwt_backend_load();
 	hwt_hook_load();
 
 	return (0);

@@ -2308,7 +2308,6 @@ sched_switch(struct thread *td, int flags)
 		cpuid = td->td_oncpu = PCPU_GET(cpuid);
 
 		SDT_PROBE0(sched, , , on__cpu);
-
 #ifdef	HWPMC_HOOKS
 		if (PMC_PROC_IS_USING_PMCS(td->td_proc))
 			PMC_SWITCH_CONTEXT(td, PMC_FN_CSW_IN);
