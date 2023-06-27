@@ -55,93 +55,47 @@
 static MALLOC_DEFINE(M_HWT_RECORD, "hwt_record", "Hardware Trace");
 
 void
-hwt_record(struct thread *td, enum hwt_record_type record_type,
-    struct hwt_record_entry *ent)
+hwt_record(struct thread *td, struct hwt_record_entry *ent)
 {
 	struct hwt_record_entry *entry;
 	struct hwt_context *ctx;
-	struct hwt_thread *thr;
 	struct proc *p;
-	size_t bufsize;
-	int error;
 
 	p = td->td_proc;
-	if ((p->p_flag2 & P2_HWT) == 0)
-		return;
 
-	ctx = hwt_contexthash_lookup(p);
-	if (ctx == NULL)
-		return;
-
-	bufsize = ctx->bufsize;
-	HWT_CTX_UNLOCK(ctx);
-
-	switch (record_type) {
-	case HWT_RECORD_MMAP:
-		dprintf("%s: MMAP path %s addr %lx size %lx\n", __func__,
-		    ent->fullpath, (unsigned long)ent->addr, ent->size);
-		break;
-	case HWT_RECORD_EXECUTABLE:
-		dprintf("%s: EXEC path %s addr %lx size %lx\n", __func__,
-		    ent->fullpath, (unsigned long)ent->addr, ent->size);
-		break;
-	case HWT_RECORD_INTERP:
-		dprintf("%s: INTP path %s addr %lx size %lx\n", __func__,
-		    ent->fullpath, (unsigned long)ent->addr, ent->size);
-		break;
-	case HWT_RECORD_MUNMAP:
-		break;
-	case HWT_RECORD_THREAD_CREATE:
-		dprintf("%s: NEW thread %p, tid %d\n", __func__, td,
-		    td->td_tid);
-
-		error = hwt_thread_alloc(&thr, bufsize);
-		if (error) {
-			printf("%s: could not allocate thread, error %d\n",
-			    __func__, error);
-			return;
-		}
-
-		thr->tid = td->td_tid;
-
-		error = hwt_thread_create_cdev(thr, p->p_pid);
-		if (error) {
-			printf("%s: could not create cdev, error %d\n",
-			    __func__, error);
-			return;
-		}
-
-		printf("new thread %p index %d\n", thr, thr->thread_id);
-
-		break;
-	case HWT_RECORD_THREAD_SET_NAME:
-		dprintf("%s: THREAD_SET_NAME %p\n", __func__, td);
-		break;
-	default:
-		return;
-	};
+	KASSERT(ent != NULL, ("ent is NULL"));
+	KASSERT(ent->fullpath != NULL, ("fullpath is NULL"));
 
 	entry = malloc(sizeof(struct hwt_record_entry), M_HWT_RECORD, M_WAITOK);
-	entry->record_type = record_type;
+	entry->record_type = ent->record_type;
 	entry->tid = td->td_tid;
-
-	if (ent) {
-		KASSERT(ent->fullpath != NULL, ("fullpath is NULL"));
-		entry->fullpath = strdup(ent->fullpath, M_HWT_RECORD);
-		entry->addr = ent->addr;
-		entry->size = ent->size;
-	}
+	entry->fullpath = strdup(ent->fullpath, M_HWT_RECORD);
+	entry->addr = ent->addr;
+	entry->size = ent->size;
 
 	ctx = hwt_contexthash_lookup(p);
 	if (ctx == NULL) {
 		/* TODO: release resources. */
 		return;
 	}
-	if (record_type == HWT_RECORD_THREAD_CREATE) {
-		thr->ctx = ctx;
-		thr->thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
-		LIST_INSERT_HEAD(&ctx->threads, thr, next);
-	}
+	LIST_INSERT_HEAD(&ctx->records, entry, next);
+	HWT_CTX_UNLOCK(ctx);
+}
+
+void
+hwt_record_thread(struct hwt_thread *thr)
+{
+	struct hwt_record_entry *entry;
+	struct hwt_context *ctx;
+
+	ctx = thr->ctx;
+
+	entry = malloc(sizeof(struct hwt_record_entry), M_HWT_RECORD,
+	    M_WAITOK | M_ZERO);
+	entry->record_type = HWT_RECORD_THREAD_CREATE;
+	entry->tid = thr->tid;
+
+	HWT_CTX_LOCK(ctx);
 	LIST_INSERT_HEAD(&ctx->records, entry, next);
 	HWT_CTX_UNLOCK(ctx);
 }
@@ -177,22 +131,4 @@ hwt_record_grab(struct hwt_context *ctx,
 	}
 
 	return (i);
-}
-
-void
-hwt_record_thread(struct hwt_thread *thr)
-{
-	struct hwt_record_entry *entry;
-	struct hwt_context *ctx;
-
-	ctx = thr->ctx;
-
-	entry = malloc(sizeof(struct hwt_record_entry), M_HWT_RECORD,
-	    M_WAITOK | M_ZERO);
-	entry->record_type = HWT_RECORD_THREAD_CREATE;
-	entry->tid = thr->tid;
-
-	HWT_CTX_LOCK(ctx);
-	LIST_INSERT_HEAD(&ctx->records, entry, next);
-	HWT_CTX_UNLOCK(ctx);
 }

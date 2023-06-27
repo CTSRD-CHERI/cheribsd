@@ -1050,7 +1050,8 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 	if (rv == KERN_SUCCESS) {
 		ent.addr = (uintptr_t) addr;
 		ent.size = (size_t) size;
-		hwt_record(td, HWT_RECORD_MUNMAP, &ent);
+		ent.record_type = HWT_RECORD_MUNMAP;
+		HWT_CALL_HOOK(td, HWT_RECORD, &ent);
 	}
 #endif
 

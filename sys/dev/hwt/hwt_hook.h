@@ -33,9 +33,12 @@
 #ifndef _DEV_HWT_HWT_HOOK_H_
 #define _DEV_HWT_HWT_HOOK_H_
 
-#define	HWT_SWITCH_IN	0
-#define	HWT_SWITCH_OUT	1
-#define	HWT_THREAD_EXIT	2
+#define	HWT_SWITCH_IN		0
+#define	HWT_SWITCH_OUT		1
+#define	HWT_THREAD_EXIT		2
+#define	HWT_THREAD_CREATE	3
+#define	HWT_THREAD_SET_NAME	4
+#define	HWT_RECORD		5
 
 struct hwt_record_entry {
 	enum hwt_record_type		record_type;
@@ -45,9 +48,6 @@ struct hwt_record_entry {
 	uintptr_t			addr;
 	size_t				size;
 };
-
-void hwt_record(struct thread *td, enum hwt_record_type record_type,
-    struct hwt_record_entry *ent);
 
 void hwt_hook_load(void);
 void hwt_hook_unload(void);

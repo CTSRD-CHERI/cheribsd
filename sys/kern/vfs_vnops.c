@@ -2943,7 +2943,8 @@ vn_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr,
 			ent.fullpath = fullpath;
 			ent.addr = (uintptr_t) *addr;
 			ent.size = (size_t) size;
-			hwt_record(td, HWT_RECORD_MMAP, &ent);
+			ent.record_type = HWT_RECORD_MMAP;
+			HWT_CALL_HOOK(td, HWT_RECORD, &ent);
 			if (freepath != NULL)
 				free(freepath, M_TEMP);
 		}

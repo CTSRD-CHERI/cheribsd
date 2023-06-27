@@ -52,6 +52,7 @@
 
 #include <dev/hwt/hwt_hook.h>
 #include <dev/hwt/hwt_context.h>
+#include <dev/hwt/hwt_contexthash.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_owner.h>
 #include <dev/hwt/hwt_ownerhash.h>
@@ -374,4 +375,57 @@ hwt_thread_insert(struct hwt_context *ctx, struct hwt_thread *thr)
 	HWT_CTX_ASSERT_LOCKED(ctx);
 
 	LIST_INSERT_HEAD(&ctx->threads, thr, next);
+}
+
+int
+hwt_thread_create(struct thread *td, struct hwt_thread **thr0)
+{
+	struct hwt_context *ctx;
+	struct hwt_thread *thr;
+	struct proc *p;
+	size_t bufsize;
+	int error;
+
+	p = td->td_proc;
+
+	ctx = hwt_contexthash_lookup(p);
+	if (ctx == NULL)
+		return (ENXIO);
+	bufsize = ctx->bufsize;
+	HWT_CTX_UNLOCK(ctx);
+
+	dprintf("%s: NEW thread %p, tid %d\n", __func__, td,
+	    td->td_tid);
+
+	error = hwt_thread_alloc(&thr, bufsize);
+	if (error) {
+		printf("%s: could not allocate thread, error %d\n",
+		    __func__, error);
+		return (error);
+	}
+
+	thr->tid = td->td_tid;
+
+	error = hwt_thread_create_cdev(thr, p->p_pid);
+	if (error) {
+		printf("%s: could not create cdev, error %d\n",
+		    __func__, error);
+		return (error);
+	}
+
+	printf("new thread %p index %d\n", thr, thr->thread_id);
+
+	ctx = hwt_contexthash_lookup(p);
+	if (ctx == NULL) {
+		/* TODO: deallocate resources. */
+		return (ENXIO);
+	}
+	thr->ctx = ctx;
+	thr->thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
+	LIST_INSERT_HEAD(&ctx->threads, thr, next);
+	HWT_CTX_UNLOCK(ctx);
+
+	*thr0 = thr;
+
+	return (0);
 }

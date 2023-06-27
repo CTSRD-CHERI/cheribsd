@@ -1600,7 +1600,8 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		ent.fullpath = imgp->execpath;
 		ent.addr = (uintptr_t)entry;
 		ent.size = (size_t)(imgp->end_addr - imgp->start_addr);
-		hwt_record(td, HWT_RECORD_EXECUTABLE, &ent);
+		ent.record_type = HWT_RECORD_EXECUTABLE;
+		HWT_CALL_HOOK(td, HWT_RECORD, &ent);
 	}
 #endif
 
@@ -1628,7 +1629,8 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			ent.addr = (uintptr_t)imgp->entry_addr;
 			ent.size = (size_t)(imgp->interp_end -
 			    imgp->interp_start);
-			hwt_record(td, HWT_RECORD_INTERP, &ent);
+			ent.record_type = HWT_RECORD_INTERP;
+			HWT_CALL_HOOK(td, HWT_RECORD, &ent);
 		}
 #endif
 	} else

@@ -34,5 +34,6 @@
 int hwt_record_grab(struct hwt_context *ctx,
     struct hwt_record_user_entry *user_entry, int nitems_req);
 void hwt_record_thread(struct hwt_thread *thr);
+void hwt_record(struct thread *td, struct hwt_record_entry *ent);
 
 #endif /* !_DEV_HWT_HWT_RECORD_H_ */

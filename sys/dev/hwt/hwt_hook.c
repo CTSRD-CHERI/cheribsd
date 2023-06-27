@@ -69,8 +69,6 @@ hwt_switch_in(struct thread *td)
 	int cpu_id;
 
 	p = td->td_proc;
-	if ((p->p_flag2 & P2_HWT) == 0)
-		return;
 
 	cpu_id = PCPU_GET(cpuid);
 
@@ -103,8 +101,6 @@ hwt_switch_out(struct thread *td)
 	int cpu_id;
 
 	p = td->td_proc;
-	if ((p->p_flag2 & P2_HWT) == 0)
-		return;
 
 	cpu_id = PCPU_GET(cpuid);
 
@@ -134,8 +130,6 @@ hwt_thread_exit(struct thread *td)
 	int cpu_id;
 
 	p = td->td_proc;
-	if ((p->p_flag2 & P2_HWT) == 0)
-		return;
 
 	cpu_id = PCPU_GET(cpuid);
 
@@ -160,6 +154,13 @@ hwt_thread_exit(struct thread *td)
 static void
 hwt_hook_handler(struct thread *td, int func, void *arg)
 {
+	struct hwt_thread *thr;
+	struct proc *p;
+	int error;
+
+	p = td->td_proc;
+	if ((p->p_flag2 & P2_HWT) == 0)
+		return;
 
 	switch (func) {
 	case HWT_SWITCH_IN:
@@ -168,8 +169,19 @@ hwt_hook_handler(struct thread *td, int func, void *arg)
 	case HWT_SWITCH_OUT:
 		hwt_switch_out(td);
 		break;
+	case HWT_THREAD_CREATE:
+		error = hwt_thread_create(td, &thr);
+		if (error == 0)
+			hwt_record_thread(thr);
+		break;
+	case HWT_THREAD_SET_NAME:
+		/* TODO. */
+		break;
 	case HWT_THREAD_EXIT:
 		hwt_thread_exit(td);
+		break;
+	case HWT_RECORD:
+		hwt_record(td, arg);
 		break;
 	};
 }

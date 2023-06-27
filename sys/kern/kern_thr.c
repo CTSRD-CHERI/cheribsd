@@ -272,7 +272,7 @@ thread_create(struct thread *td, struct rtprio *rtp,
 #endif
 
 #ifdef HWT_HOOKS
-	hwt_record(newtd, HWT_RECORD_THREAD_CREATE, NULL);
+	HWT_CALL_HOOK(newtd, HWT_THREAD_CREATE, NULL);
 #endif
 
 	tidhash_add(newtd);
@@ -618,7 +618,7 @@ kern_thr_set_name(struct thread *td, lwpid_t id,
 		PMC_CALL_HOOK_UNLOCKED(ttd, PMC_FN_THR_CREATE_LOG, NULL);
 #endif
 #ifdef HWT_HOOKS
-	hwt_record(ttd, HWT_RECORD_THREAD_SET_NAME, NULL);
+	HWT_CALL_HOOK(ttd, HWT_THREAD_SET_NAME, NULL);
 #endif
 #ifdef KTR
 	sched_clear_tdname(ttd);
