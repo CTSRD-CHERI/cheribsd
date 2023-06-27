@@ -47,7 +47,6 @@ struct hwt_context {
 	struct hwt_backend		*hwt_backend;
 	int				thread_counter;
 
-	struct mtx                      mtx_records;
 	struct mtx			mtx;
 	int				state;
 #define	CTX_STATE_RUNNING		(1 << 0)

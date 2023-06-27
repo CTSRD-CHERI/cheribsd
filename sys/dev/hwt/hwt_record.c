@@ -150,13 +150,19 @@ int
 hwt_record_grab(struct hwt_context *ctx,
     struct hwt_record_user_entry *user_entry, int nitems_req)
 {
-	struct hwt_record_entry *entry, *entry1;
+	struct hwt_record_entry *entry;
 	int i;
 
-	i = 0;
+	for (i = 0; i < nitems_req; i++) {
+		HWT_CTX_LOCK(ctx);
+		entry = LIST_FIRST(&ctx->records);
+		if (entry)
+			LIST_REMOVE(entry, next);
+		HWT_CTX_UNLOCK(ctx);
 
-	mtx_lock(&ctx->mtx_records);
-	LIST_FOREACH_SAFE(entry, &ctx->records, next, entry1) {
+		if (entry == NULL)
+			break;
+
 		user_entry[i].addr = entry->addr;
 		user_entry[i].size = entry->size;
 		user_entry[i].record_type = entry->record_type;
@@ -166,16 +172,9 @@ hwt_record_grab(struct hwt_context *ctx,
 			    MAXPATHLEN);
 			free(entry->fullpath, M_HWT_RECORD);
 		}
-		LIST_REMOVE(entry, next);
 
 		free(entry, M_HWT_RECORD);
-
-		i += 1;
-
-		if (i == nitems_req)
-			break;
 	}
-	mtx_unlock(&ctx->mtx_records);
 
 	return (i);
 }
@@ -193,7 +192,7 @@ hwt_record_thread(struct hwt_thread *thr)
 	entry->record_type = HWT_RECORD_THREAD_CREATE;
 	entry->tid = thr->tid;
 
-	mtx_lock(&ctx->mtx_records);
+	HWT_CTX_LOCK(ctx);
 	LIST_INSERT_HEAD(&ctx->records, entry, next);
-	mtx_unlock(&ctx->mtx_records);
+	HWT_CTX_UNLOCK(ctx);
 }
