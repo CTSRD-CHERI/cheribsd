@@ -42,4 +42,15 @@ enum hwt_record_type {
 	HWT_RECORD_THREAD_SET_NAME,
 };
 
+#ifdef _KERNEL
+struct hwt_record_entry {
+	enum hwt_record_type		record_type;
+	LIST_ENTRY(hwt_record_entry)	next;
+	char				*fullpath;
+	lwpid_t				tid;
+	uintptr_t			addr;
+	size_t				size;
+};
+#endif
+
 #endif /* !_SYS_HWT_RECORD_H_ */

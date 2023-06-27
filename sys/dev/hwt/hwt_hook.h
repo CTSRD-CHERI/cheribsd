@@ -40,24 +40,15 @@
 #define	HWT_THREAD_SET_NAME	4
 #define	HWT_RECORD		5
 
-struct hwt_record_entry {
-	enum hwt_record_type		record_type;
-	LIST_ENTRY(hwt_record_entry)	next;
-	char				*fullpath;
-	lwpid_t				tid;
-	uintptr_t			addr;
-	size_t				size;
-};
-
-void hwt_hook_load(void);
-void hwt_hook_unload(void);
-
-extern void (*hwt_hook)(struct thread *td, int func, void *arg);
-
 #define	HWT_CALL_HOOK(td, func, arg)			\
 do {							\
 	if (hwt_hook != NULL)				\
 		(hwt_hook)((td), (func), (arg));	\
 } while (0)
+
+extern void (*hwt_hook)(struct thread *td, int func, void *arg);
+
+void hwt_hook_load(void);
+void hwt_hook_unload(void);
 
 #endif /* !_DEV_HWT_HWT_HOOK_H_ */
