@@ -42,10 +42,11 @@ struct hwt_record_entry {
 	size_t				size;
 };
 
+void hwt_record(struct thread *td, enum hwt_record_type record_type,
+    struct hwt_record_entry *ent);
+
 void hwt_switch_in(struct thread *td);
 void hwt_switch_out(struct thread *td);
 void hwt_thread_exit(struct thread *td);
-void hwt_record(struct thread *td, enum hwt_record_type record_type,
-    struct hwt_record_entry *ent);
 
 #endif /* !_DEV_HWT_HWT_HOOK_H_ */

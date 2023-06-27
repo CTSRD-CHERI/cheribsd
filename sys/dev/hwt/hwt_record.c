@@ -96,6 +96,12 @@ hwt_record(struct thread *td, enum hwt_record_type record_type,
 		    td->td_tid);
 
 		error = hwt_thread_alloc(&thr, bufsize);
+		if (error) {
+			printf("%s: could not allocate thread, error %d\n",
+			    __func__, error);
+			return;
+		}
+
 		thr->tid = td->td_tid;
 
 		error = hwt_thread_create_cdev(thr, p->p_pid);

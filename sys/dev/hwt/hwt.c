@@ -41,16 +41,12 @@
 #include <sys/module.h>
 #include <sys/mutex.h>
 #include <sys/rwlock.h>
-#include <sys/hwt.h>
 
-#include <dev/hwt/hwt_hook.h>
-#include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_contexthash.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_owner.h>
 #include <dev/hwt/hwt_ownerhash.h>
 #include <dev/hwt/hwt_backend.h>
-#include <dev/hwt/hwt_record.h>
 #include <dev/hwt/hwt_ioctl.h>
 
 #define	HWT_DEBUG
@@ -115,6 +111,8 @@ hwt_unload(void)
 {
 
 	dprintf("%s\n", __func__);
+
+	/* TODO: deallocate resources. */
 
 	destroy_dev(hwt_cdev);
 
