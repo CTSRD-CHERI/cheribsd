@@ -33,7 +33,6 @@
 
 struct hwt_context {
 	LIST_HEAD(, hwt_thread)		threads;
-	struct mtx			mtx_threads;
 	size_t				bufsize; /* Applied to hwt_thread. */
 
 	LIST_HEAD(, hwt_record_entry)	records;

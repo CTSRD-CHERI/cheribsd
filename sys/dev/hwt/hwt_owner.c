@@ -136,11 +136,11 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 		printf("%s: remove threads\n", __func__);
 
 		while (1) {
-			mtx_lock_spin(&ctx->mtx_threads);
+			HWT_CTX_LOCK(ctx);
 			thr = LIST_FIRST(&ctx->threads);
 			if (thr)
 				LIST_REMOVE(thr, next);
-			mtx_unlock_spin(&ctx->mtx_threads);
+			HWT_CTX_UNLOCK(ctx);
 
 			if (thr == NULL)
 				break;

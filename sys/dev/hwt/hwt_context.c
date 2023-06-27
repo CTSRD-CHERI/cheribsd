@@ -69,7 +69,6 @@ hwt_ctx_alloc(void)
 	mtx_init(&ctx->mtx_records, "hwt records", NULL, MTX_DEF);
 
 	LIST_INIT(&ctx->threads);
-	mtx_init(&ctx->mtx_threads, "hwt threads", NULL, MTX_SPIN);
 
 	mtx_init(&ctx->mtx, "ctx", NULL, MTX_SPIN);
 

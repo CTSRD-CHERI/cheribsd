@@ -75,10 +75,14 @@ coresight_backend_init(struct hwt_context *ctx)
 	int cpu_id;
 
 	/*
-	 * Use buffer from the first thread as Funnel merges traces from
+	 * 1. Use buffer from the first thread as Funnel merges traces from
 	 * all CPUs to a single place.
+	 *
+	 * 2. Ctx was just allocated, so the lock is not really needed.
 	 */
+	HWT_CTX_LOCK(ctx);
 	thr = hwt_thread_first(ctx);
+	HWT_CTX_UNLOCK(ctx);
 
 	for (cpu_id = 0; cpu_id < mp_ncpus; cpu_id++) {
 		event = &cs_event[cpu_id];

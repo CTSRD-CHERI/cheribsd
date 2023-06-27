@@ -103,9 +103,9 @@ hwt_thread_first(struct hwt_context *ctx)
 {
 	struct hwt_thread *thr;
 
-	mtx_lock_spin(&ctx->mtx_threads);
+	HWT_CTX_ASSERT_LOCKED(ctx);
+
 	thr = LIST_FIRST(&ctx->threads);
-	mtx_unlock_spin(&ctx->mtx_threads);
 
 	KASSERT(thr != NULL, ("thr is NULL"));
 
@@ -330,14 +330,11 @@ hwt_thread_lookup(struct hwt_context *ctx, struct thread *td)
 
 	HWT_CTX_ASSERT_LOCKED(ctx);
 
-	mtx_lock_spin(&ctx->mtx_threads);
 	LIST_FOREACH_SAFE(thr, &ctx->threads, next, thr1) {
 		if (thr->tid == td->td_tid) {
-			mtx_unlock_spin(&ctx->mtx_threads);
 			return (thr);
 		}
 	}
-	mtx_unlock_spin(&ctx->mtx_threads);
 
 	panic("thread not found");
 }
@@ -374,7 +371,7 @@ void
 hwt_thread_insert(struct hwt_context *ctx, struct hwt_thread *thr)
 {
 
-	mtx_lock_spin(&ctx->mtx_threads);
+	HWT_CTX_ASSERT_LOCKED(ctx);
+
 	LIST_INSERT_HEAD(&ctx->threads, thr, next);
-	mtx_unlock_spin(&ctx->mtx_threads);
 }

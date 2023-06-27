@@ -236,7 +236,10 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 	thr->ctx = ctx;
 	thr->tid = FIRST_THREAD_IN_PROC(p)->td_tid;
 	thr->thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
+
+	HWT_CTX_LOCK(ctx);
 	hwt_thread_insert(ctx, thr);
+	HWT_CTX_UNLOCK(ctx);
 
 	/* hwt_owner_insert_ctx? */
 	mtx_lock(&ho->mtx);
