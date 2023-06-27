@@ -29,12 +29,19 @@
  */
 
 /*
- * Hardware Trace framework.
+ * Hardware Tracing framework.
+ *
+ *    The framework manages hardware tracing units that collect information
+ * about software execution and store it as events in highly compressed format
+ * into DRAM. The events cover information about control flow changes of a
+ * program, whether branches taken or not, exceptions taken, timing information,
+ * cycles elapsed and more. That allows us to restore entire program flow of a
+ * given application without performance impact.
  *
  * Design overview.
  *
- * The framework provides character devices for mmap(2) and ioctl(2) system call
- * allowing user to manage CPU (hardware) tracing units.
+ *    The framework provides character devices for mmap(2) and ioctl(2) system
+ * calls to allow user to manage CPU (hardware) tracing units.
  *
  * /dev/hwt:
  *    .ioctl:
@@ -44,10 +51,10 @@
  *               b) HWT_IOC_START
  *                  Enables tracing unit for a given context.
  *               c) HWT_IOC_RECORD_GET
- *                  Transfers record entries collected during program execution
- *                  for a given context to userspace, such as mmaping tables
- *                  of executable and dynamic libraries, interpreter,
- *                  thread IDs, etc.
+ *                  Transfers (small) record entries collected during program
+ *                  execution for a given context to userspace, such as mmaping
+ *                  tables of executable and dynamic libraries, interpreter,
+ *                  tid of threads created, etc.
  *
  * /dev/hwt_%d_%d, pid, tid
  *    .mmap
@@ -69,9 +76,9 @@
  * 3. User invokes HWT_IOC_START ioctl, kernel marks context as RUNNING.
  *    At this point any HWT hook invocation by scheduler enables/disables
  *    tracing for the threads associated with the context (threads of the proc).
- *    Any new threads creation (of the target proc) will be invoking
+ *    Any new threads creation (of the target proc) procedures will be invoking
  *    corresponding hooks in HWT framework, so that new hwt_thread and buffers
- *    allocated, character device created on the fly.
+ *    allocated, character device for mmap(2) created on the fly.
  * 4. User issues HWT_IOC_RECORD_GET ioctl to fetch information about mmaping
  *    tables and threads created during application startup.
  * 5. User mmaps tracing buffers of each thread to userspace (using
@@ -80,8 +87,9 @@
  *    application execution.
  * 7. User issues HWT_IOC_BUFPTR_GET ioctl to get current filling level of the
  *    hardware buffer of a given thread.
- * 8. User invokes tracing decoder library to process available data.
- * 9. User repeates 7.
+ * 8. User invokes trace decoder library to process available data and see the
+ *    results in human readable form.
+ * 9. User repeates 7 if needed.
  */
 
 #include <sys/param.h>
