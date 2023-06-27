@@ -33,21 +33,21 @@
 
 struct hwt_context {
 	LIST_HEAD(, hwt_thread)		threads;
-	size_t				bufsize; /* Applied to hwt_thread. */
-
 	LIST_HEAD(, hwt_record_entry)	records;
-	struct mtx			mtx_records;
 
 	LIST_ENTRY(hwt_context)		next_hch; /* Entry in contexthash. */
 	LIST_ENTRY(hwt_context)		next_hwts; /* Entry in ho->hwts. */
 
-	struct proc			*proc; /* Could be NULL if exited. */
-	pid_t				pid;
+	size_t				bufsize; /* Trace bufsize for each thr*/
+
+	struct proc			*proc; /* Target proc. */
+	pid_t				pid; /* Target pid. */
 
 	struct hwt_owner		*hwt_owner;
 	struct hwt_backend		*hwt_backend;
 	int				thread_counter;
 
+	struct mtx                      mtx_records;
 	struct mtx			mtx;
 	int				state;
 #define	CTX_STATE_RUNNING		(1 << 0)
