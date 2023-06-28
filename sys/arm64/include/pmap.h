@@ -188,7 +188,9 @@ extern void (*pmap_invalidate_vpipt_icache)(void);
 static inline int
 pmap_vmspace_copy(pmap_t dst_pmap __unused, pmap_t src_pmap __unused)
 {
-
+#if __has_feature(capabilities)
+	dst_pmap->flags.uclg = src_pmap->flags.uclg;
+#endif
 	return (0);
 }
 

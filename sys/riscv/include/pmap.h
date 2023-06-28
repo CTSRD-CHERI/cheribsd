@@ -175,7 +175,9 @@ int	pmap_fault(pmap_t, vm_offset_t, vm_prot_t);
 static inline int
 pmap_vmspace_copy(pmap_t dst_pmap __unused, pmap_t src_pmap __unused)
 {
-
+#if __has_feature(capabilities)
+	dst_pmap->flags.uclg = src_pmap->flags.uclg;
+#endif
 	return (0);
 }
 

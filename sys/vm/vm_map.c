@@ -5060,7 +5060,6 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 	vm2->vm_map.vm_cheri_revoke_st = vm1->vm_map.vm_cheri_revoke_st;
 #endif
 
-	/* XXX NWF This should copy across the CLG? */
 	error = pmap_vmspace_copy(new_map->pmap, old_map->pmap);
 	if (error != 0) {
 		sx_xunlock(&old_map->lock);
