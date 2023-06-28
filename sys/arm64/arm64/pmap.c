@@ -5563,7 +5563,7 @@ out:
 				rw_wunlock(lock);
 		}
 	}
-#endif
+#endif /* VM_NRESERVLEVEL > 0 */
 
 	PMAP_UNLOCK(pmap);
 out_unlocked:
@@ -5582,8 +5582,8 @@ out_unlocked:
 
 	return res;
 }
-#endif
-#endif
+#endif /* CHERI_CAPREVOKE */
+#endif /* __has_feature(capabilities) */
 
 /*
  * This code maps large physical mmap regions into the
