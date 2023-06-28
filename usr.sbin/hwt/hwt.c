@@ -55,7 +55,6 @@
 #define	NSOCKPAIRFD		2
 
 static struct trace_context tcs;
-static int ncpu;
 
 void
 hwt_sleep(void)
@@ -80,19 +79,16 @@ hwt_procexit(pid_t pid, int exit_status __unused)
 }
 
 static int
-hwt_ctx_alloc(int fd)
+hwt_ctx_alloc(struct trace_context *tc)
 {
-	struct trace_context *tc;
 	struct hwt_alloc al;
 	int error;
-
-	tc = &tcs;
 
 	al.pid = tc->pid;
 	al.bufsize = tc->bufsize;
 	al.backend_name = "coresight";
 
-	error = ioctl(fd, HWT_IOC_ALLOC, &al);
+	error = ioctl(tc->fd, HWT_IOC_ALLOC, &al);
 	if (error != 0)
 		return (error);
 
@@ -124,6 +120,16 @@ hwt_map_memory(struct trace_context *tc, int tid)
 	return (0);
 }
 
+static int __unused
+hwt_ncpu(void)
+{
+	int ncpu;
+
+	ncpu = sysconf(_SC_NPROCESSORS_CONF);
+
+	return (ncpu);
+}
+
 size_t
 hwt_get_offs(struct trace_context *tc, size_t *offs)
 {
@@ -149,14 +155,11 @@ hwt_get_offs(struct trace_context *tc, size_t *offs)
 }
 
 static int
-hwt_get_records(uint32_t *nrec)
+hwt_get_records(struct trace_context *tc, uint32_t *nrec)
 {
-	struct trace_context *tc;
 	int tot_records;
 	int nrecords;
 	int error;
-
-	tc = &tcs;
 
 	tot_records = 0;
 
@@ -171,26 +174,81 @@ hwt_get_records(uint32_t *nrec)
 	return (0);
 }
 
+static int
+hwt_find_sym(struct trace_context *tc)
+{
+	struct pmcstat_symbol *sym;
+	uintptr_t addr_start;
+	uintptr_t addr_end;
+
+	sym = pmcstat_symbol_search_by_name(tc->pp, tc->image_name,
+	    tc->func_name, &addr_start, &addr_end);
+	if (sym) {
+		printf("sym found, start end %lx %lx\n", (uint64_t)addr_start,
+		    (uint64_t)addr_end);
+		return (0);
+	}
+
+	return (ENOENT);
+}
+
+static int
+hwt_start_tracing(struct trace_context *tc)
+{
+	struct hwt_start s;
+	int error;
+
+	s.pid = tc->pid;
+	error = ioctl(tc->fd, HWT_IOC_START, &s);
+
+	return (error);
+}
+
 int
-main(int argc __unused, char **argv, char **env)
+main(int argc, char **argv, char **env)
 {
 	struct hwt_record_user_entry *entry;
 	struct pmcstat_process *pp;
 	struct trace_context *tc;
-	struct hwt_start s;
 	uint32_t tot_rec;
 	uint32_t nrec;
 	uint32_t nlibs;
 	char **cmd;
 	int error;
-	int fd;
 	int sockpair[NSOCKPAIRFD];
 	int pid;
-	size_t bufsize;
-
-	cmd = argv + 1;
+	int option;
 
 	tc = &tcs;
+
+	memset(tc, 0, sizeof(struct trace_context));
+
+	while ((option = getopt(argc, argv, "t:i:f:")) != -1)
+		switch (option) {
+		case 'i':
+			tc->image_name = strdup(optarg);
+			break;
+		case 'f':
+			tc->func_name = strdup(optarg);
+			break;
+		case 't':
+			tc->thread_id = atoi(optarg);
+			break;
+		default:
+			break;
+		}
+
+	if ((tc->image_name == NULL && tc->func_name != NULL) ||
+	    (tc->image_name != NULL && tc->func_name == NULL)) {
+		printf("For address range tracing specify both image and func,"
+		    " or none of them.\n");
+		exit(1);
+	}
+
+	argv += optind;
+	argc += optind;
+
+	cmd = argv;
 
 	error = hwt_elf_count_libs(*cmd, &nlibs);
 	if (error != 0) {
@@ -200,12 +258,10 @@ main(int argc __unused, char **argv, char **env)
 
 	nlibs += 1; /* add binary itself. */
 
-	ncpu = sysconf(_SC_NPROCESSORS_CONF);
-
 	printf("cmd is %s, nlibs %d\n", *cmd, nlibs);
 
-	fd = open("/dev/hwt", O_RDWR);
-	if (fd < 0) {
+	tc->fd = open("/dev/hwt", O_RDWR);
+	if (tc->fd < 0) {
 		printf("Can't open /dev/hwt\n");
 		return (-1);
 	}
@@ -220,15 +276,11 @@ main(int argc __unused, char **argv, char **env)
 	pp->pp_pid = pid;
 	pp->pp_isactive = 1;
 
-	bufsize = 16 * 1024 * 1024;
-
 	tc->pp = pp;
 	tc->pid = pid;
-	tc->fd = fd;
+	tc->bufsize = 16 * 1024 * 1024;
 
-	tc->bufsize = bufsize;
-
-	error = hwt_ctx_alloc(fd);
+	error = hwt_ctx_alloc(tc);
 	if (error) {
 		printf("%s: failed to alloc ctx, pid %d error %d\n", __func__,
 		    tc->pid, error);
@@ -238,7 +290,7 @@ main(int argc __unused, char **argv, char **env)
 		return (error);
 	}
 
-	error = hwt_get_records(&nrec);
+	error = hwt_get_records(tc, &nrec);
 	if (error != 0)
 		return (error);
 
@@ -253,14 +305,18 @@ main(int argc __unused, char **argv, char **env)
 		return (error);
 	}
 
-	printf("starting tracing\n");
+	if (tc->func_name == NULL) {
+		/* No address range filtering. Start tracing immediately. */
 
-	s.pid = tc->pid;
-	error = ioctl(fd, HWT_IOC_START, &s);
-	if (error) {
-		printf("%s: failed to start tracing, error %d\n", __func__,
-		    error);
-		return (error);
+		error = hwt_start_tracing(tc);
+		if (error) {
+			printf("%s: failed to start tracing, error %d\n",
+			    __func__, error);
+			return (error);
+		}
+	} else {
+		tc->pause_on_mmap_once = 1;
+		/* TODO: configure pause on mmap. */
 	}
 
 	error = hwt_process_start(sockpair);
@@ -272,15 +328,18 @@ main(int argc __unused, char **argv, char **env)
 	tot_rec = 0;
 
 	do {
-		error = hwt_get_records(&nrec);
+		error = hwt_get_records(tc, &nrec);
 		if (error != 0)
 			return (error);
 		tot_rec += nrec;
 	} while (tot_rec < nlibs);
 
+	if (tc->func_name)
+		hwt_find_sym(tc);
+
 	hwt_coresight_process(tc);
 
-	close(fd);
+	close(tc->fd);
 
 	return (0);
 }

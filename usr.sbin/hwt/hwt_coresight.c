@@ -262,7 +262,7 @@ create_generic_decoder(dcd_tree_handle_t handle, const char *p_name,
 }
 
 static ocsd_err_t
-create_decoder_etmv4(dcd_tree_handle_t dcd_tree_h, struct trace_context *tc)
+create_decoder_etmv4(struct trace_context *tc, dcd_tree_handle_t dcd_tree_h)
 {
 	ocsd_etmv4_cfg trace_config;
 	ocsd_err_t ret;
@@ -272,7 +272,7 @@ create_decoder_etmv4(dcd_tree_handle_t dcd_tree_h, struct trace_context *tc)
 
 	trace_config.reg_configr = 0x00001fc6;
 	trace_config.reg_configr = 0x000000C1;
-	trace_config.reg_traceidr = 0x00000001;	/* Trace ID */
+	trace_config.reg_traceidr = tc->thread_id + 1;
 
 	trace_config.reg_idr0   = 0x28000ea1;
 	trace_config.reg_idr1   = 0x4100f424;
@@ -326,19 +326,10 @@ cs_process_chunk(struct trace_context *tc, size_t start, size_t end)
 			    &bytes_this_time);
 			bytes_done += bytes_this_time;
 			dprintf("BYTES DONE %d\n", bytes_done);
-			if (OCSD_DATA_RESP_IS_WAIT(dp_ret)) {
-printf("wait");
-				exit(12);
-			}
-
 		} else if (OCSD_DATA_RESP_IS_WAIT(dp_ret)) {
-printf("WAIT");
-exit(5);
 			dp_ret = ocsd_dt_process_data(dcdtree_handle,
 			    OCSD_OP_FLUSH, 0, 0, NULL, NULL);
 		} else {
-printf("FATAL");
-exit(6);
 			ret = OCSD_ERR_DATA_DECODE_FATAL;
 		}
 	}
@@ -523,7 +514,7 @@ hwt_coresight_init(struct trace_context *tc)
 	//cs_flags |= FLAG_FRAME_RAW_UNPACKED;
 	//cs_flags |= FLAG_FRAME_RAW_PACKED;
 
-	error = create_decoder_etmv4(dcdtree_handle, tc);
+	error = create_decoder_etmv4(tc, dcdtree_handle);
 	if (error != OCSD_OK) {
 		printf("can't create decoder: tc->base %#p\n", tc->base);
 		return (-2);
@@ -557,7 +548,6 @@ hwt_coresight_process(struct trace_context *tc)
 	hwt_coresight_init(tc);
 
 	error = hwt_get_offs(tc, &offs);
-printf("OFFS %ld\n", offs);
 	if (error)
 		return (-1);
 
@@ -579,7 +569,6 @@ printf("OFFS %ld\n", offs);
 			break;
 
 		error = hwt_get_offs(tc, &offs);
-printf("OFFS %ld, err %d\n", offs, error);
 		if (error)
 			return (-1);
 
