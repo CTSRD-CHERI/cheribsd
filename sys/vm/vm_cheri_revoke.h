@@ -114,6 +114,8 @@ enum {
 
 int vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *, int);
 
+void vm_cheri_assert_consistent_clg(struct vm_map *map);
+
 /*  Shadow region installation into vm map */
 int vm_map_install_cheri_revoke_shadow(struct vm_map *map, struct sysentvec *);
 

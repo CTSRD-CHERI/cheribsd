@@ -4126,6 +4126,33 @@ out_unlocked:
 
 	return res;
 }
+
+void
+pmap_assert_consistent_clg(pmap_t pmap, vm_offset_t va)
+{
+	pt_entry_t *l2, l2e, *l3, l3e, tpte;
+
+	l2 = pmap_l2(pmap, va);
+	if (l2 == NULL || ((l2e = pmap_load(l2)) & PTE_V) == 0)
+		return;
+	if ((l2e & PTE_RWX) != 0) {
+		/* Large page */
+		tpte = l2e;
+	} else {
+		l3 = pmap_l2_to_l3(l2, va);
+		if (l3 == NULL || ((l3e = pmap_load(l3)) & PTE_V) == 0)
+			return;
+		tpte = l3e;
+	}
+
+	if ((tpte & PTE_CW) == 0)
+		return;
+	if ((tpte & PTE_CRG) == 0) {
+		KASSERT(pmap->flags.uclg == 0, ("PTR_CRG unset, but GCLG set"));
+	} else {
+		KASSERT(pmap->flags.uclg == 1, ("PTR_CRG set, but GCLG unset"));
+	}
+}
 #endif /* CHERI_CAPREVOKE */
 #endif /* __has_feature(capabilities) */
 

@@ -873,6 +873,28 @@ out:
 	return res;
 }
 
+void
+vm_cheri_assert_consistent_clg(struct vm_map *map)
+{
+	pmap_t pmap = map->pmap;
+	vm_map_entry_t entry;
+	vm_offset_t addr;
+
+	/* Called with map lock held */
+
+	VM_MAP_ENTRY_FOREACH(entry, map) {
+		if ((entry->max_protection & VM_PROT_READ_CAP) == 0 ||
+		    entry->object.vm_object == NULL) {
+			continue;
+		}
+
+		for (addr = entry->start; addr < entry->end;
+		    addr += pagesizes[0]) {
+			pmap_assert_consistent_clg(pmap, addr);
+		}
+	}
+}
+
 /*
  * XXX Should this encapsulate a barrier around epochs and stat collection and
  * all that?  I don't think there are any meaningful races around epoch close,

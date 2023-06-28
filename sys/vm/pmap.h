@@ -142,6 +142,7 @@ enum pmap_caploadgen_res {
 int		 pmap_caploadgen_update(pmap_t, vm_offset_t, vm_page_t *,
 		    int flags);
 void		 pmap_caploadgen_next(pmap_t pmap);
+void		 pmap_assert_consistent_clg(pmap_t, vm_offset_t);
 #endif
 void		 pmap_clear_modify(vm_page_t m);
 void		 pmap_copy(pmap_t, pmap_t, vm_offset_t, vm_size_t, vm_offset_t);

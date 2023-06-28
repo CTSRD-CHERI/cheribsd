@@ -579,7 +579,9 @@ skip_last_pass:
 	     ((myst == CHERI_REVOKE_ST_SS_LAST) ||
 	      (myst == CHERI_REVOKE_ST_LS_CLOSING))) {
 
-		// XXX Assert all capdirty PTEs have LCLG equal to GCLG
+#ifdef DIAGNOSTIC
+		vm_cheri_assert_consistent_clg(&vm->vm_map);
+#endif
 
 		/* Signal the end of this revocation epoch */
 		epoch++;
