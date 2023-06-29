@@ -157,19 +157,14 @@ hwt_get_offs(struct trace_context *tc, size_t *offs)
 static int
 hwt_get_records(struct trace_context *tc, uint32_t *nrec)
 {
-	int tot_records;
 	int nrecords;
 	int error;
-
-	tot_records = 0;
 
 	error = hwt_record_fetch(tc, &nrecords);
 	if (error)
 		return (error);
 
-	tot_records += nrecords;
-
-	*nrec = tot_records;
+	*nrec = nrecords;
 
 	return (0);
 }
