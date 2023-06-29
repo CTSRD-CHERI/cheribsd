@@ -1201,6 +1201,10 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		vmspace = p->p_vmspace;
 		map = &vmspace->vm_map;
 	}
+#ifdef CHERI_CAPREVOKE
+	KASSERT(map->vm_cheri_revoke_st == CHERI_REVOKE_ST_NONE,
+	    ("vm_map still revoking"));
+#endif
 	map->flags |= imgp->map_flags;
 	if (sv->sv_flags & SV_CHERI)
 		map->flags |= MAP_RESERVATIONS;
