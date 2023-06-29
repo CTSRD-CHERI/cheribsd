@@ -107,6 +107,7 @@ __FBSDID("$FreeBSD$");
 
 #ifdef CHERI_CAPREVOKE
 #include <cheri/revoke.h>
+#include <vm/vm_cheri_revoke.h>
 #endif
 
 /*
@@ -5252,6 +5253,9 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 #endif
 		}
 	}
+#if defined(CHERI_CAPREVOKE) && defined(DIAGNOSTIC)
+	vm_cheri_assert_consistent_clg(new_map);
+#endif
 	/*
 	 * Use inlined vm_map_unlock() to postpone handling the deferred
 	 * map entries, which cannot be done until both old_map and
