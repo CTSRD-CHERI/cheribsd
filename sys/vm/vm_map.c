@@ -4769,6 +4769,9 @@ vm_map_clear(vm_map_t map)
 
 	vm_map_lock(map);
 	result = vm_map_delete(map, vm_map_min(map), vm_map_max(map), false);
+#ifdef CHERI_CAPREVOKE
+	map->vm_cheri_revoke_st = CHERI_REVOKE_ST_NONE;
+#endif
 	vm_map_unlock(map);
 
 	return (result);
