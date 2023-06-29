@@ -107,18 +107,19 @@ coresight_fdt_get_cpu(phandle_t node, struct coresight_platform_data *pdata)
 	phandle_t cpu_node;
 	pcell_t xref;
 	pcell_t cpu_reg[2];
+	uint64_t mpidr;
 	int i;
 
 	if (OF_getencprop(node, "cpu", &xref, sizeof(xref)) != -1) {
 		cpu_node = OF_node_from_xref(xref);
 		if (OF_getencprop(cpu_node, "reg", (void *)&cpu_reg,
 		    sizeof(cpu_reg)) > 0) {
+			mpidr = cpu_reg[1];
+			mpidr |= ((uint64_t)cpu_reg[0] << 32);
 			for (i = 0; i < mp_ncpus; i++) {
 				pcpu = cpuid_to_pcpu[i];
-				if (pcpu->pc_mpidr_low == cpu_reg[1] &&
-				    pcpu->pc_mpidr_high == cpu_reg[0]) {
+				if (pcpu->pc_mpidr == mpidr) {
 					pdata->cpu = pcpu->pc_cpuid;
-printf("cpuid %d\n", pdata->cpu);
 					return (0);
 				}
 			}
