@@ -170,6 +170,11 @@ static const struct syscall_decode decoded_syscalls[] = {
 	  .args = { { Int, 0 }, { CapRights, 1 } } },
 	{ .name = "chdir", .ret_type = 1, .nargs = 1,
 	  .args = { { Name, 0 } } },
+	{ .name = "cheri_revoke", .ret_type = 1, .nargs = 3,
+	  .args = { { CheriRevokeFlags, 0 }, { Quad, 1 }, { Ptr | OUT, 2} } },
+	{ .name = "cheri_revoke_get_shadow", .ret_type = 1, .nargs = 3,
+	  .args = { { CheriRevokeGetShadowFlags, 0 }, { Ptr, 1 },
+		    {  Ptr | OUT, 2} } },
 	{ .name = "chflags", .ret_type = 1, .nargs = 2,
 	  .args = { { Name | IN, 0 }, { FileFlags, 1 } } },
 	{ .name = "chflagsat", .ret_type = 1, .nargs = 4,
@@ -2445,6 +2450,13 @@ print_arg(struct syscall_arg *sc, syscallarg_t *args, syscallarg_t *retval,
 		print_mask_arg32(sysdecode_cap_fcntlrights, fp, rights);
 		break;
 	}
+	case CheriRevokeFlags:
+		print_mask_arg(sysdecode_cr_flags, fp, args[sc->offset]);
+		break;
+	case CheriRevokeGetShadowFlags:
+		print_mask_arg(sysdecode_cr_get_shadow_flags, fp,
+		    args[sc->offset]);
+		break;
 	case Fadvice:
 		print_integer_arg(sysdecode_fadvice, fp, args[sc->offset]);
 		break;

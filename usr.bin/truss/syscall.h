@@ -91,6 +91,8 @@ enum Argtype {
 	Atfd,
 	Atflags,
 	CapFcntlRights,
+	CheriRevokeFlags,
+	CheriRevokeGetShadowFlags,
 	Closerangeflags,
 	Extattrnamespace,
 	Fadvice,
