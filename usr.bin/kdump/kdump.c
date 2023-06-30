@@ -1609,6 +1609,21 @@ ktrsyscall_freebsd(struct ktr_syscall *ktr, register_t **resip,
 				narg--;
 				c = ',';
 				break;
+			case SYS_cheri_revoke:
+				putchar('(');
+				print_mask_arg(sysdecode_cr_flags, *ip);
+				ip++;
+				narg--;
+				c = ',';
+				break;
+			case SYS_cheri_revoke_get_shadow:
+				putchar('(');
+				print_mask_arg(sysdecode_cr_get_shadow_flags,
+				    *ip);
+				ip++;
+				narg--;
+				c = ',';
+				break;
 			}
 			switch (ktr->ktr_code) {
 			case SYS_chflagsat:
