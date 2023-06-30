@@ -47,6 +47,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/stat.h>
 #include <sys/thr.h>
 #include <sys/umtx.h>
+#include <cheri/revoke.h>
 #include <machine/sysarch.h>
 #include <netinet/in.h>
 #include <netinet/sctp.h>
@@ -241,6 +242,18 @@ sysdecode_cap_fcntlrights(FILE *fp, uint32_t rights, uint32_t *rem)
 {
 
 	return (print_mask_int(fp, capfcntl, rights, rem));
+}
+
+bool
+sysdecode_cr_flags(FILE *fp, int flags, int *rem)
+{
+	return (print_mask_int(fp, cr_flags, flags, rem));
+}
+
+bool
+sysdecode_cr_get_shadow_flags(FILE *fp, int flags, int *rem)
+{
+	return (print_mask_int(fp, cr_get_shadow_flags, flags, rem));
 }
 
 bool
