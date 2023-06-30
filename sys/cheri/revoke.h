@@ -34,7 +34,9 @@
 #ifndef __SYS_CHERI_REVOKE_H__
 #define	__SYS_CHERI_REVOKE_H__
 
+#if __has_feature(capabilities)
 #include <cheri/cherireg.h> /* For CHERI_OTYPE_BITS */
+#endif
 
 typedef uint64_t cheri_revoke_epoch_t;
 #define CHERI_REVOKE_ST_EPOCH_WIDTH	61
@@ -73,6 +75,7 @@ static inline int cheri_revoke_epoch_clears(cheri_revoke_epoch_t now,
 	return cheri_revoke_epoch_ge(now, then + (then & 1) + 2);
 }
 
+#if __has_feature(capabilities)
 /* Returns 1 if cap is revoked, 0 otherwise. */
 static inline int
 cheri_revoke_is_revoked(const void * __capability cap)
@@ -83,6 +86,7 @@ cheri_revoke_is_revoked(const void * __capability cap)
 	return (__builtin_cheri_tag_get(cap) == 0);
 #endif
 }
+#endif
 
 /*************************** SHADOW BITMAP LAYOUT ***************************/
 
@@ -133,8 +137,10 @@ cheri_revoke_is_revoked(const void * __capability cap)
 static const size_t VM_CHERI_REVOKE_GSZ_MEM_NOMAP = sizeof(void * __capability);
 static const size_t VM_CHERI_REVOKE_GSZ_OTYPE = 1;
 
+#if __has_feature(capabilities)
 static const size_t VM_CHERI_REVOKE_BSZ_OTYPE =
   ((1 << CHERI_OTYPE_BITS) / VM_CHERI_REVOKE_GSZ_OTYPE / 8);
+#endif
 
 /*************************** REVOKER CONTROL FLAGS ***************************/
 
