@@ -1801,6 +1801,8 @@ enum {
 	TCLR_MODE_STORE = 0,
 	TCLR_MODE_LOAD_ONCE = 1,
 	TCLR_MODE_LOAD_SPLIT = 2,
+	TCLR_MODE_LOAD_SPLIT_INIT = 3,
+	TCLR_MODE_LOAD_SPLIT_FINI = 4,
 };
 
 static void
@@ -1822,9 +1824,23 @@ cheribsdtest_cheri_revoke_lib_run(
 	while (bigblock_offset < bigblock_caps) {
 		struct cheri_revoke_syscall_info crsi;
 		uint32_t cyc_start, cyc_end;
+		size_t csz;
 
-		size_t csz = rand() % 1024 + 1;
-		csz = MIN(csz, bigblock_caps - bigblock_offset);
+		switch (mode) {
+			case TCLR_MODE_LOAD_SPLIT_INIT:
+			case TCLR_MODE_LOAD_SPLIT_FINI:
+				/*
+				 * Just do one big block so we can
+				 * call this function once to open the
+				 * epoch and once to close it.
+				 */
+				csz = bigblock_caps - bigblock_offset;
+				break;
+			default:
+				csz = rand() % 1024 + 1;
+				csz = MIN(csz, bigblock_caps - bigblock_offset);
+				break;
+		}
 
 		if (verbose > 1) {
 			fprintf(stderr, "left=%zd csz=%zd\n",
@@ -1842,6 +1858,9 @@ cheribsdtest_cheri_revoke_lib_run(
 
 		size_t chunk_offset = bigblock_offset;
 		bigblock_offset += csz;
+
+		if (mode == TCLR_MODE_LOAD_SPLIT_FINI)
+			goto load_split_fini;
 
 		if (verbose > 3) {
 			ptrdiff_t fwo, lwo;
@@ -1946,8 +1965,11 @@ cheribsdtest_cheri_revoke_lib_run(
 				}
 			}
 		}
+		if (mode == TCLR_MODE_LOAD_SPLIT_INIT)
+			return;
 
 		if (mode == TCLR_MODE_LOAD_SPLIT) {
+load_split_fini:
 			cyc_start = get_cyclecount();
 			CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(
 			    CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_IGNORE_START |
@@ -2051,6 +2073,57 @@ CHERIBSDTEST(cheri_revoke_lib_fork,
 
 		cheribsdtest_cheri_revoke_lib_run(verbose, paranoia,
 		    TCLR_MODE_LOAD_SPLIT, bigblock_caps, bigblock, shadow, cri);
+	} else {
+		int res;
+
+		CHERIBSDTEST_VERIFY2(pid > 0, "fork failed");
+		waitpid(pid, &res, 0);
+		if (res == 0) {
+			cheribsdtest_success();
+		} else {
+			cheribsdtest_failure_errx("Bad child process exit");
+		}
+	}
+
+	munmap(bigblock, bigblock_caps * sizeof(void * __capability));
+
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(cheri_revoke_lib_fork_split,
+    "Test libcheri_caprevoke split across fork")
+{
+	static const int verbose = 0;
+	static const int paranoia = 2;
+
+	static const size_t bigblock_caps = 4096;
+
+	void * __capability * __capability bigblock;
+	void * __capability shadow;
+	const volatile struct cheri_revoke_info * __capability cri;
+
+	int pid;
+
+	srand(1337);
+
+	cheribsdtest_cheri_revoke_lib_init(bigblock_caps, &bigblock, &shadow,
+	    &cri);
+
+	if (verbose > 0) {
+		fprintf(stderr, "bigblock: %#.16lp\n", bigblock);
+		fprintf(stderr, "shadow: %#.16lp\n", shadow);
+	}
+
+	/* Open the epoch and begin revocation */
+	cheribsdtest_cheri_revoke_lib_run(verbose, paranoia,
+	    TCLR_MODE_LOAD_SPLIT_INIT, bigblock_caps, bigblock, shadow, cri);
+
+	pid = fork();
+	if (pid == 0) {
+		/* Finish revocation */
+		cheribsdtest_cheri_revoke_lib_run(verbose, paranoia,
+		    TCLR_MODE_LOAD_SPLIT_FINI, bigblock_caps, bigblock,
+		    shadow, cri);
 	} else {
 		int res;
 
