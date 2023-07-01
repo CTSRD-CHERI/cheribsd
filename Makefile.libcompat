@@ -9,7 +9,8 @@ __<${_this:T}>__:
 # - 32-bit compat libraries on PowerPC, and AMD64.
 # - 64-bit compat on CHERI RISC-V and Morello.
 
-.if defined(_LIBCOMPATS)
+# XXX: bsd.compat.mk stubbed out for cleandir
+.if defined(_LIBCOMPATS) && !make(cleandir)
 
 .include <bsd.compat.mk>
 
