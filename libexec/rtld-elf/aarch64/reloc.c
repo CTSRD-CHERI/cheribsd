@@ -39,6 +39,9 @@
 #include "debug.h"
 #include "rtld.h"
 #include "rtld_printf.h"
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#include "rtld_libc.h"
+#endif
 
 #if __has_feature(capabilities)
 #include "cheri_reloc.h"
@@ -215,14 +218,14 @@ get_rstk(const void *target, uint32_t index, tramp_stk_table_t table)
 		asm ("msr	ctpidr_el0, %0" :: "C" (table));
 	}
 
-	assert(table[index] == 0);
+	assert(table[index] == NULL);
 
 	size_t size = SANDBOX_STACK_DEFAULT;
-	uintptr_t *stk;
+	void **stk;
 	struct Struct_Stack_Entry *entry;
 	Obj_Entry *dst;
 
-	stk = (uintptr_t *)((char *)mmap(NULL,
+	stk = (void **)((char *)mmap(NULL,
 	    size,
 	    PROT_READ | PROT_WRITE,
 	    MAP_ANON | MAP_PRIVATE | MAP_STACK,
@@ -231,9 +234,9 @@ get_rstk(const void *target, uint32_t index, tramp_stk_table_t table)
 		rtld_fatal("mmap failed");
 
 	stk = cheri_clearperm(stk, CHERI_PERM_EXECUTIVE | CHERI_PERM_SW_VMEM);
-	stk[-1] = (uintptr_t)&stk[-1];
+	stk[-1] = &stk[-1];
 
-	table[index] = (uintptr_t)stk;
+	table[index] = stk;
 
 	entry = xmalloc(sizeof(*entry));
 	entry->stack = stk;
@@ -249,6 +252,14 @@ get_rstk(const void *target, uint32_t index, tramp_stk_table_t table)
 static void (*thr_thread_start)(struct pthread *);
 
 void
+_rtld_thread_start_init(void (*p)(struct pthread *))
+{
+	assert((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) == 0);
+	assert(thr_thread_start == NULL);
+	thr_thread_start = _rtld_sandbox_code(p);
+}
+
+void
 _rtld_thread_start(struct pthread *curthread)
 {
 	tramp_stk_table_t tls;
@@ -256,18 +267,27 @@ _rtld_thread_start(struct pthread *curthread)
 	asm ("msr	rctpidr_el0, %0" :: "C" (tls));
 
 	tls = xcalloc(DEFAULT_STACK_TABLE_SIZE, sizeof(*tls));
-	tls[0] = (uintptr_t)_rtld_get_rstk;
+	tls[0] = _rtld_get_rstk;
 	asm ("msr	ctpidr_el0, %0" :: "C" (tls));
 
 	thr_thread_start(curthread);
 }
 
 void
-_rtld_thread_start_init(void (*p)(struct pthread *))
+_rtld_thr_exit(long *state)
 {
-	assert((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) == 0);
-	assert(thr_thread_start == NULL);
-	thr_thread_start = _rtld_sandbox_code(p);
+	tramp_stk_table_t tls;
+	asm ("mrs	%0, ctpidr_el0" : "=C" (tls));
+
+	vaddr_t top = cheri_gettop(tls);
+	for (tramp_stk_table_t cur = &tls[1]; (vaddr_t)cur < top; ++cur) {
+		void *stk = cheri_setaddress(*cur, cheri_getbase(*cur));
+		if (stk != NULL && munmap(stk, SANDBOX_STACK_DEFAULT) != 0)
+			rtld_fatal("munmap failed");
+	}
+	free(tls);
+
+	thr_exit(state);
 }
 
 static void (*thr_sighandler)(int, siginfo_t *, void *);
@@ -1156,7 +1176,7 @@ allocate_initial_tls(Obj_Entry *objs)
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 	tramp_stk_table_t tls = xcalloc(DEFAULT_STACK_TABLE_SIZE, sizeof(*tls));
-	tls[0] = (uintptr_t)_rtld_get_rstk;
+	tls[0] = _rtld_get_rstk;
 	asm ("msr	ctpidr_el0, %0\n" :: "C" (tls));
 #endif
 
