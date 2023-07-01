@@ -43,7 +43,7 @@ CFLAGS.thr_symbols.c+=	-Wno-missing-variable-declarations
 CFLAGS.thr_sig.c+=	-fno-sanitize=address
 .endif
 
-.if ${MACHINE_CPUARCH} == "arm"
+.if ${MACHINE_CPUARCH} == "arm" || defined(RTLD_SANDBOX)
 NO_THREAD_UNWIND_STACK= yes
 .endif
 
