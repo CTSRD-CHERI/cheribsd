@@ -84,10 +84,10 @@ struct hwt_bufptr_get {
 
 struct hwt_set_config {
 	pid_t			pid;
-
-	/* Passed to backend as is. */
+	/* The following passed to backend as is. */
 	void			*config;
 	int			config_size;
-};
+	int			config_version;
+} __aligned(16);
 
 #endif /* !_SYS_HWT_H_ */

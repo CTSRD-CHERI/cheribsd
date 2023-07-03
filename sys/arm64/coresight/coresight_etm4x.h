@@ -170,7 +170,66 @@
 #define	TRCPIDR567(n)		(0xFD4 + ((n) - 5) * 0x4) /*  Management Peripheral ID5 to Peripheral ID7 Registers */
 #define	TRCCIDR(n)		(0xFF0 + (n) * 0x4)	/* Management Component IDn Register [n=0-4] */
 
-DECLARE_CLASS(etm_driver);
+/* ETMv4 resources */
+#define ETM_MAX_NR_PE			8
+#define ETMv4_MAX_CNTR			4
+#define ETM_MAX_SEQ_STATES		4
+#define ETM_MAX_EXT_INP_SEL		4
+#define ETM_MAX_EXT_INP			256
+#define ETM_MAX_EXT_OUT			4
+#define ETM_MAX_SINGLE_ADDR_CMP		16
+#define ETM_MAX_ADDR_RANGE_CMP		(ETM_MAX_SINGLE_ADDR_CMP / 2)
+#define ETM_MAX_DATA_VAL_CMP		8
+#define ETMv4_MAX_CTXID_CMP		8
+#define ETM_MAX_VMID_CMP		8
+#define ETM_MAX_PE_CMP			8
+#define ETM_MAX_RES_SEL			32
+#define ETM_MAX_SS_CMP			8
+
+struct etmv4_config {
+	uint32_t		mode;
+	uint32_t		pe_sel;
+	uint32_t		cfg;
+	uint32_t		eventctrl0;
+	uint32_t		eventctrl1;
+	uint32_t		stall_ctrl;
+	uint32_t		ts_ctrl;
+	uint32_t		syncfreq;
+	uint32_t		ccctlr;
+	uint32_t		bb_ctrl;
+	uint32_t		vinst_ctrl;
+	uint32_t		viiectlr;
+	uint32_t		vissctlr;
+	uint32_t		vipcssctlr;
+	uint8_t			seq_idx;
+	uint32_t		seq_ctrl[ETM_MAX_SEQ_STATES];
+	uint32_t		seq_rst;
+	uint32_t		seq_state;
+	uint8_t			cntr_idx;
+	uint32_t		cntrldvr[ETMv4_MAX_CNTR];
+	uint32_t		cntr_ctrl[ETMv4_MAX_CNTR];
+	uint32_t		cntr_val[ETMv4_MAX_CNTR];
+	uint8_t			res_idx;
+	uint32_t		res_ctrl[ETM_MAX_RES_SEL];
+	uint8_t			ss_idx;
+	uint32_t		ss_ctrl[ETM_MAX_SS_CMP];
+	uint32_t		ss_status[ETM_MAX_SS_CMP];
+	uint32_t		ss_pe_cmp[ETM_MAX_SS_CMP];
+	uint8_t			addr_idx;
+	uint64_t		addr_val[ETM_MAX_SINGLE_ADDR_CMP];
+	uint64_t		addr_acc[ETM_MAX_SINGLE_ADDR_CMP];
+	uint8_t			addr_type[ETM_MAX_SINGLE_ADDR_CMP];
+	uint8_t			ctxid_idx;
+	uint64_t		ctxid_pid[ETMv4_MAX_CTXID_CMP];
+	uint32_t		ctxid_mask0;
+	uint32_t		ctxid_mask1;
+	uint8_t			vmid_idx;
+	uint64_t		vmid_val[ETM_MAX_VMID_CMP];
+	uint32_t		vmid_mask0;
+	uint32_t		vmid_mask1;
+	uint32_t		ext_inp;
+	uint8_t			s_ex_level;
+};
 
 struct etm_softc {
 	struct resource			*res;
@@ -178,5 +237,7 @@ struct etm_softc {
 };
 
 int etm_attach(device_t dev);
+
+DECLARE_CLASS(etm_driver);
 
 #endif /* !_ARM64_CORESIGHT_ETM4X_H_ */
