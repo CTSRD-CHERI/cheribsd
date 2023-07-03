@@ -66,7 +66,7 @@
 /* No real reason for this limitation except sanity checks. */
 #define	HWT_MAXBUFSIZE		(1U * 1024 * 1024 * 1024) /* 1 GB */
 
-static MALLOC_DEFINE(M_HWT_IOCTL, "hwt ioctl", "Hardware Trace");
+static MALLOC_DEFINE(M_HWT_IOCTL, "hwt_ioctl", "Hardware Trace");
 
 /*
  * Check if owner process *o can trace target process *t.

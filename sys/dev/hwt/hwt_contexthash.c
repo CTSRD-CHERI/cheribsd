@@ -56,7 +56,7 @@
 
 #define	HWT_CONTEXTHASH_SIZE	1024
 
-static MALLOC_DEFINE(M_HWT_CONTEXTHASH, "hwt context hash", "Hardware Trace");
+static MALLOC_DEFINE(M_HWT_CONTEXTHASH, "hwt_chash", "Hardware Trace");
 
 /*
  * Hash function.  Discard the lower 2 bits of the pointer since

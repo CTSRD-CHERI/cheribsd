@@ -55,7 +55,7 @@
 
 #define	HWT_OWNERHASH_SIZE	1024
 
-static MALLOC_DEFINE(M_HWT_OWNERHASH, "hwt owner hash", "Hardware Trace");
+static MALLOC_DEFINE(M_HWT_OWNERHASH, "hwt_ohash", "Hardware Trace");
 
 /*
  * Hash function.  Discard the lower 2 bits of the pointer since
