@@ -72,6 +72,8 @@ static int
 etm_configure_etmv4(device_t dev, struct etmv4_config *config)
 {
 
+	dprintf("%s_%d\n", __func__, device_get_unit(dev));
+
 	return (0);
 }
 
