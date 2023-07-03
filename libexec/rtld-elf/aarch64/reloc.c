@@ -184,10 +184,7 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 void _rtld_thread_start(struct pthread *);
 void _rtld_sighandler(int, siginfo_t *, void *);
 
-struct tramp {
-	const void *target;
-	uint32_t code[];
-};
+typedef const void *tramp;
 
 struct tramp_pg {
 	void *cursor;			/* Start of unused space */
@@ -369,7 +366,7 @@ exclude_symbol_in_lib(const char *name, const char *sym, const Obj_Entry *obj, c
 }
 
 static size_t
-tramp_compile(struct tramp *tramp, const void *target, const Obj_Entry *obj)
+tramp_compile(tramp **entry, const void *target, const Obj_Entry *obj, const Elf_Sym *def)
 {
 #define IMPORT(template) \
 	extern const uint32_t tramp_##template[]; \
@@ -377,9 +374,8 @@ tramp_compile(struct tramp *tramp, const void *target, const Obj_Entry *obj)
 
 #define TRANSITION(template, ...) \
 	if (code == tramp_##template) { \
-		memcpy(buf, tramp_##template, size_tramp_##template); \
+		buf = mempcpy(buf, tramp_##template, size_tramp_##template); \
 		size += size_tramp_##template; \
-		buf += size_tramp_##template / sizeof(*tramp_##template); \
 		__VA_ARGS__ \
 		continue; \
 	}
@@ -388,20 +384,26 @@ tramp_compile(struct tramp *tramp, const void *target, const Obj_Entry *obj)
 	code = tramp_##template
 
 	IMPORT(header);
+	IMPORT(header_utrace);
 	IMPORT(header_res);
 	IMPORT(save_caller);
 	IMPORT(switch_stack);
 	IMPORT(clear_regs);
 	IMPORT(invoke_res);
 	IMPORT(invoke_exe);
+	IMPORT(utrace_return);
 	IMPORT(return);
 
-	uint32_t *buf = tramp->code;
-	size_t size = offsetof(typeof(*tramp), code);
-	const void *code = tramp_header;
+	uint32_t *buf = (void *)*entry;
+	size_t size = 0;
+	const void *code;
 	bool executive = cheri_getperm(target) & CHERI_PERM_EXECUTIVE;
+	bool utrace = ld_utrace_compartment != NULL;
 
-	tramp->target = target;
+	if (utrace)
+		code = tramp_header_utrace;
+	else
+		code = tramp_header;
 
 	for (; code != NULL; ) {
 		TRANSITION(header, {
@@ -410,8 +412,25 @@ tramp_compile(struct tramp *tramp, const void *target, const Obj_Entry *obj)
 			else
 				TO(header_res);
 		})
+		TRANSITION(header_utrace, {
+			if (executive) {
+				TO(save_caller);
+				*(*entry)++ = "RTLD";
+			} else {
+				TO(header_res);
+				*(*entry)++ = obj == NULL ?
+				    "<unknown>" :
+				    STAILQ_EMPTY(&obj->names) ?
+				    obj->path :
+				    STAILQ_FIRST(&obj->names)->name;
+			}
+			/* def != NULL implies that obj != NULL */
+			*(*entry)++ = def == NULL ? "<unknown>" :
+			    strtab_value(obj, def->st_name);
+			*(*entry)++ = ld_utrace_log;
+		})
 		TRANSITION(header_res, {
-			buf[-2] |= obj->compart_id << 5;
+			buf[-2] |= (uint32_t)obj->compart_id << 5;
 			TO(save_caller);
 		})
 		TRANSITION(save_caller, {
@@ -429,9 +448,18 @@ tramp_compile(struct tramp *tramp, const void *target, const Obj_Entry *obj)
 			continue;
 		}
 		TRANSITION(invoke_res, {
-			TO(return);
+			if (utrace)
+				TO(utrace_return);
+			else
+				TO(return);
 		})
 		TRANSITION(invoke_exe, {
+			if (utrace)
+				TO(utrace_return);
+			else
+				TO(return);
+		})
+		TRANSITION(utrace_return, {
 			TO(return);
 		})
 		TRANSITION(return, {
@@ -439,11 +467,13 @@ tramp_compile(struct tramp *tramp, const void *target, const Obj_Entry *obj)
 		})
 	}
 
+	*(*entry)++ = target;
+
+	return (size);
+
 #undef IMPORT
 #undef TRANSITION
 #undef TO
-
-	return (size);
 }
 
 void *
@@ -453,10 +483,10 @@ tramp_pgs_append(void *target, const Obj_Entry *obj, const Elf_Sym *def)
 
 	size_t len;
 	/* A capability-aligned buffer large enough to hold a trampoline */
-	void *tmp[32];
+	const void *tmp[40];
+	tramp *tramp, *entry = tmp;
 	RtldLockState lockstate;
 	struct tramp_pg *pg;
-	struct tramp *tramp;
 
 	if (exclude_symbol_in_lib("libc.so.7", "rfork", obj, def) ||
 	    exclude_symbol_in_lib("libc.so.7", "vfork", obj, def)) {
@@ -464,7 +494,7 @@ tramp_pgs_append(void *target, const Obj_Entry *obj, const Elf_Sym *def)
 	}
 
 	/* Fill a temporary buffer with the trampoline and obtain its length */
-	len = tramp_compile((struct tramp *)tmp, target, obj);
+	len = tramp_compile(&entry, target, obj, def);
 
 	/*
 	 * The lock ensures the consistency of the trampoline pages and the
@@ -480,9 +510,10 @@ tramp_pgs_append(void *target, const Obj_Entry *obj, const Elf_Sym *def)
 		tramp = tramp_pg_push(pg, len);
 	}
 	lock_release(rtld_tramp_lock, &lockstate);
-
 	assert(cheri_gettag(tramp));
-	memcpy(tramp, tmp, len);
+
+	entry = tramp + (entry - tmp);
+	tramp = mempcpy(tramp, tmp, len);
 
 	/*
 	 * Ensure i- and d-cache coherency after writing executable code. The
@@ -490,11 +521,11 @@ tramp_pgs_append(void *target, const Obj_Entry *obj, const Elf_Sym *def)
 	 * addresses. Derive the start/end addresses from pg so that they have
 	 * sufficiently large bounds to contain these rounded addresses.
 	 */
-	__clear_cache(cheri_copyaddress(pg, tramp->code),
-	    cheri_copyaddress(pg, (char *)tramp + len));
+	__clear_cache(cheri_copyaddress(pg, entry),
+	    cheri_copyaddress(pg, tramp));
 
-	tramp = cheri_clearperm(tramp, FUNC_PTR_REMOVE_PERMS);
-	return (cheri_sealentry(cheri_capmode(&tramp->code)));
+	entry = cheri_clearperm(entry, FUNC_PTR_REMOVE_PERMS);
+	return (cheri_sealentry(cheri_capmode(entry)));
 }
 
 void *

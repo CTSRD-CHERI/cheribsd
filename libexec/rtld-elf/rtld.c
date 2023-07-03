@@ -199,7 +199,9 @@ static int  rtld_verify_versions(const Objlist *);
 static int  rtld_verify_object_versions(Obj_Entry *);
 static void object_add_name(Obj_Entry *, const char *);
 static int  object_match_name(const Obj_Entry *, const char *);
-static void ld_utrace_log(int, void *, void *, size_t, int, const char *);
+#if !defined(__CHERI_PURE_CAPABILITY__) || !defined(RTLD_SANDBOX)
+static void ld_utrace_log(int, void *, void *, size_t, int, const char *, const char *);
+#endif
 static void rtld_fill_dl_phdr_info(const Obj_Entry *obj,
     struct dl_phdr_info *phdr_info);
 static uint32_t gnu_hash(const char *);
@@ -232,6 +234,9 @@ static const char *ld_preload_fds;/* Environment variable for libraries represen
 static const char *ld_elf_hints_path;	/* Environment variable for alternative hints path */
 static const char *ld_tracing;	/* Called from ldd to print libs */
 static const char *ld_utrace;	/* Use utrace() to log events. */
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+const char *ld_utrace_compartment;	/* Use utrace() to log compartmentalisation-related events. */
+#endif
 static bool ld_skip_init_funcs = false;	/* XXXAR: debug environment variable to verify relocation processing */
 static struct obj_entry_q obj_list;	/* Queue of all loaded objects */
 static Obj_Entry *obj_main;	/* The main program shared object */
@@ -348,12 +353,16 @@ static void (*rtld_exit_ptr)(void);
 
 #define	LD_UTRACE(e, h, mb, ms, r, n) do {			\
 	if (ld_utrace != NULL)					\
-		ld_utrace_log(e, h, mb, ms, r, n);		\
+		ld_utrace_log(e, h, mb, ms, r, n, NULL);		\
 } while (0)
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+void
+#else
 static void
+#endif
 ld_utrace_log(int event, void *handle, void *mapbase, size_t mapsize,
-    int refcnt, const char *name)
+    int refcnt, const char *name, const char *symbol)
 {
 	struct utrace_rtld ut;
 	static const char rtld_utrace_sig[RTLD_UTRACE_SIG_SZ] = RTLD_UTRACE_SIG;
@@ -367,6 +376,8 @@ ld_utrace_log(int event, void *handle, void *mapbase, size_t mapsize,
 	bzero(ut.name, sizeof(ut.name));
 	if (name)
 		strlcpy(ut.name, name, sizeof(ut.name));
+	if (symbol)
+		strlcpy(ut.symbol, symbol, sizeof(ut.symbol));
 	utrace(&ut, sizeof(ut));
 }
 
@@ -398,6 +409,9 @@ enum {
 	LD_TRACE_LOADED_OBJECTS_ALL,
 	LD_SHOW_AUXV,
 	LD_SKIP_INIT_FUNCS,
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	LD_UTRACE_COMPARTMENT,
+#endif
 };
 
 struct ld_env_var_desc {
@@ -436,6 +450,9 @@ static struct ld_env_var_desc ld_env_vars[] = {
 	LD_ENV_DESC(TRACE_LOADED_OBJECTS_ALL, false),
 	LD_ENV_DESC(SHOW_AUXV, false),
 	LD_ENV_DESC(SKIP_INIT_FUNCS, true),
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	LD_ENV_DESC(UTRACE_COMPARTMENT, true),
+#endif
 };
 
 static const char *
@@ -822,6 +839,9 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     if (!ld_tracing)
 	ld_tracing = ld_get_env_var(LD_TRACE_LOADED_OBJECTS);
     ld_utrace = ld_get_env_var(LD_UTRACE);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+    ld_utrace_compartment = ld_get_env_var(LD_UTRACE_COMPARTMENT);
+#endif
 
     set_ld_elf_hints_path();
 #ifdef DEBUG

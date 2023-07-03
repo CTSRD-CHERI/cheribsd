@@ -147,6 +147,12 @@ print_utrace_rtld(FILE *fp, void *p)
 	case UTRACE_RTLD_ERROR:
 		fprintf(fp, "RTLD: error: %s\n", ut->name);
 		break;
+	case UTRACE_COMPARTMENT_ENTER:
+		fprintf(fp, "RTLD: c18n: enter %s at %s (%p)\n", ut->name, ut->symbol, ut->handle);
+		break;
+	case UTRACE_COMPARTMENT_LEAVE:
+		fprintf(fp, "RTLD: c18n: leave %s at %s\n", ut->name, ut->symbol);
+		break;
 
 	default:
 		return (0);

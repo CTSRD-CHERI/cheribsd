@@ -751,7 +751,9 @@ END(_rtld_get_rstk)
 	.quad	end_##sym - sym
 
 TRAMP(tramp_header)
-	ldr	c10, #-16
+tramp_header_target:
+	.chericap	0
+	ldr	c10, tramp_header_target
 	mrs	c17, rcsp_el0
 	mov	c18, csp
 
@@ -764,6 +766,58 @@ TRAMP(tramp_header)
 	stp	c17, c19, [csp, #-(CAP_WIDTH * 12)]
 	stp	c18, c30, [csp, #-(CAP_WIDTH * 14)]!
 TRAMPEND(tramp_header)
+
+TRAMP(tramp_header_utrace)
+tramp_header_utrace_name:
+	.chericap	0
+tramp_header_utrace_symbol:
+	.chericap	0
+tramp_header_utrace_log:
+	.chericap	0
+tramp_header_utrace_target:
+	.chericap	0
+	ldr	c10, tramp_header_utrace_name
+	ldr	c11, tramp_header_utrace_symbol
+	ldr	c12, tramp_header_utrace_log
+	mrs	c17, rcsp_el0
+	mov	c18, csp
+
+	str	c12, [csp, #-CAP_WIDTH]
+	stp	c10, c11, [csp, #-(CAP_WIDTH * 3)]!
+
+	/* Save callee-saved registers */
+	stp	c28, c29, [csp, #-(CAP_WIDTH * 2)]
+	stp	c26, c27, [csp, #-(CAP_WIDTH * 4)]
+	stp	c24, c25, [csp, #-(CAP_WIDTH * 6)]
+	stp	c22, c23, [csp, #-(CAP_WIDTH * 8)]
+	stp	c20, c21, [csp, #-(CAP_WIDTH * 10)]
+	stp	c17, c19, [csp, #-(CAP_WIDTH * 12)]
+	stp	c18, c30, [csp, #-(CAP_WIDTH * 14)]!
+
+	stp	c8, c9, [csp, #-(CAP_WIDTH * 2)]
+	stp	c6, c7, [csp, #-(CAP_WIDTH * 4)]
+	stp	c4, c5, [csp, #-(CAP_WIDTH * 6)]
+	stp	c2, c3, [csp, #-(CAP_WIDTH * 8)]
+	stp	c0, c1, [csp, #-(CAP_WIDTH * 10)]!
+
+	mov	w0, #14			/* event = UTRACE_ENTER_COMPARTMENT */
+	ldr	c1, tramp_header_utrace_target		/* handle = target */
+	mov	x2, xzr
+	mov	x3, xzr
+	mov	x4, xzr
+	mov	c5, c10					/* name = obj->path */
+	mov	c6, c11					/* symbol = st_name */
+	mov	c7, c12
+	blr	c7					/* call ld_utrace_log */
+
+	ldp	c8, c9, [csp, #(CAP_WIDTH * 8)]
+	ldp	c6, c7, [csp, #(CAP_WIDTH * 6)]
+	ldp	c4, c5, [csp, #(CAP_WIDTH * 4)]
+	ldp	c2, c3, [csp, #(CAP_WIDTH * 2)]
+	ldp	c0, c1, [csp], #(CAP_WIDTH * 10)
+	ldp	c30, c17, [csp, #CAP_WIDTH]
+	ldr	c10, tramp_header_utrace_target
+TRAMPEND(tramp_header_utrace)
 
 TRAMP(tramp_header_res)
 	mrs	c18, ctpidr_el0		/* c18 = table */
@@ -831,14 +885,14 @@ TRAMPEND(tramp_switch_stack)
 TRAMP(tramp_invoke_exe)
 	blr	c10
 
-	ldp	c18, c30, [csp]
-	ldp	c10, c19, [csp, #(CAP_WIDTH * 2)]
 	/* Restore callee-saved registers */
-	ldp	c20, c21, [csp, #(CAP_WIDTH * 4)]
-	ldp	c22, c23, [csp, #(CAP_WIDTH * 6)]
-	ldp	c24, c25, [csp, #(CAP_WIDTH * 8)]
-	ldp	c26, c27, [csp, #(CAP_WIDTH * 10)]
-	ldp	c28, c29, [csp, #(CAP_WIDTH * 12)]
+	ldp	c18, c30, [csp], #(CAP_WIDTH * 14)
+	ldp	c10, c19, [csp, #-(CAP_WIDTH * 12)]
+	ldp	c20, c21, [csp, #-(CAP_WIDTH * 10)]
+	ldp	c22, c23, [csp, #-(CAP_WIDTH * 8)]
+	ldp	c24, c25, [csp, #-(CAP_WIDTH * 6)]
+	ldp	c26, c27, [csp, #-(CAP_WIDTH * 4)]
+	ldp	c28, c29, [csp, #-(CAP_WIDTH * 2)]
 
 	/* Clear c11 */
 	mov	x11, xzr
@@ -887,14 +941,14 @@ TRAMP(tramp_invoke_res)
 	msr	rcsp_el0, c11
 	blrr	c10
 
-	ldp	c18, c30, [csp]
-	ldp	c10, c19, [csp, #(CAP_WIDTH * 2)]
 	/* Restore callee-saved registers */
-	ldp	c20, c21, [csp, #(CAP_WIDTH * 4)]
-	ldp	c22, c23, [csp, #(CAP_WIDTH * 6)]
-	ldp	c24, c25, [csp, #(CAP_WIDTH * 8)]
-	ldp	c26, c27, [csp, #(CAP_WIDTH * 10)]
-	ldp	c28, c29, [csp, #(CAP_WIDTH * 12)]
+	ldp	c18, c30, [csp], #(CAP_WIDTH * 14)
+	ldp	c10, c19, [csp, #-(CAP_WIDTH * 12)]
+	ldp	c20, c21, [csp, #-(CAP_WIDTH * 10)]
+	ldp	c22, c23, [csp, #-(CAP_WIDTH * 8)]
+	ldp	c24, c25, [csp, #-(CAP_WIDTH * 6)]
+	ldp	c26, c27, [csp, #-(CAP_WIDTH * 4)]
+	ldp	c28, c29, [csp, #-(CAP_WIDTH * 2)]
 
 	/*
 	 * Callee's saved rcsp may have changed during the call (e.g. because it
@@ -906,6 +960,25 @@ TRAMP(tramp_invoke_res)
 	scvalue	c13, c12, x11
 	str	c12, [c13, #-CAP_WIDTH]
 TRAMPEND(tramp_invoke_res)
+
+TRAMP(tramp_utrace_return)
+	swp	c0, c5, [csp]
+	add	csp, csp, #CAP_WIDTH
+	swp	c1, c6, [csp]
+	ldr	c7, [csp, #CAP_WIDTH]
+	stp	c30, c10, [csp, #-(CAP_WIDTH * 3)]!
+	str	c18, [csp, #-CAP_WIDTH]!
+	mov	w0, #15
+	mov	x1, xzr
+	mov	x2, xzr
+	mov	x3, xzr
+	mov	x4, xzr
+	blr	c7
+	ldr	c18, [csp], #CAP_WIDTH
+	ldp	c30, c10, [csp], #(CAP_WIDTH * 2)
+	ldp	c0, c1, [csp]
+	mov	x11, xzr
+TRAMPEND(tramp_utrace_return)
 
 TRAMP(tramp_return)
 	/*

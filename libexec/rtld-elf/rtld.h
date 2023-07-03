@@ -84,6 +84,7 @@ extern int tls_max_index;
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 extern uintptr_t sealer_cap;
+extern const char *ld_utrace_compartment;
 #endif
 
 extern int npagesizes;
@@ -551,6 +552,7 @@ int convert_prot(int elfflags);
 bool check_elf_headers(const Elf_Ehdr *hdr, const char *path);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 uint16_t allocate_compart_id(void);
+void ld_utrace_log(int, void *, void *, size_t, int, const char *, const char *);
 #endif
 
 /*
