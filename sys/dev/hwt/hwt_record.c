@@ -38,6 +38,7 @@
 #include <vm/vm.h>
 
 #include <dev/hwt/hwt_hook.h>
+#include <dev/hwt/hwt_config.h>
 #include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_contexthash.h>
 #include <dev/hwt/hwt_thread.h>

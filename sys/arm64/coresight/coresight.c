@@ -42,7 +42,9 @@
 
 #include <arm64/coresight/coresight.h>
 
+#include <dev/hwt/hwt_config.h>
 #include <dev/hwt/hwt_context.h>
+#include <dev/hwt/hwt_config.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_backend.h>
 

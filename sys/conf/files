@@ -1904,6 +1904,7 @@ dev/hwpmc/hwpmc_mod.c		optional hwpmc
 dev/hwpmc/hwpmc_soft.c		optional hwpmc
 dev/hwt/hwt.c			optional hwt
 dev/hwt/hwt_backend.c		optional hwt
+dev/hwt/hwt_config.c		optional hwt
 dev/hwt/hwt_context.c		optional hwt
 dev/hwt/hwt_contexthash.c	optional hwt
 dev/hwt/hwt_hook.c		optional hwt

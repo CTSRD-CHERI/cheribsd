@@ -46,6 +46,8 @@
 	_IOW(HWT_MAGIC, 0x02, struct hwt_record_get)
 #define	HWT_IOC_BUFPTR_GET \
 	_IOW(HWT_MAGIC, 0x03, struct hwt_bufptr_get)
+#define	HWT_IOC_SET_CONFIG \
+	_IOW(HWT_MAGIC, 0x04, struct hwt_set_config)
 
 #define	HWT_BACKEND_MAXNAMELEN	256
 
@@ -60,11 +62,11 @@ struct hwt_start {
 } __aligned(16);
 
 struct hwt_record_user_entry {
-	enum hwt_record_type record_type;
-	char fullpath[MAXPATHLEN];
-	uintptr_t addr;
-	size_t size;
-	lwpid_t tid;
+	enum hwt_record_type	record_type;
+	char			fullpath[MAXPATHLEN];
+	uintptr_t		addr;
+	size_t			size;
+	lwpid_t			tid;
 } __aligned(16);
 
 struct hwt_record_get {
@@ -77,7 +79,15 @@ struct hwt_bufptr_get {
 	int		*ptr;
 	int		*curpage;
 	vm_offset_t	*curpage_offset;
-	pid_t		pid;
+	pid_t		pid;	/* TODO: remove this field? */
 } __aligned(16);
+
+struct hwt_set_config {
+	pid_t			pid;
+
+	/* Passed to backend as is. */
+	void			*config;
+	int			config_size;
+};
 
 #endif /* !_SYS_HWT_H_ */

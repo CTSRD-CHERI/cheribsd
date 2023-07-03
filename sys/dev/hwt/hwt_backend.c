@@ -44,6 +44,7 @@
 #include <sys/hwt.h>
 
 #include <dev/hwt/hwt_hook.h>
+#include <dev/hwt/hwt_config.h>
 #include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_backend.h>
@@ -91,6 +92,8 @@ hwt_backend_configure(struct hwt_thread *thr, int cpu_id)
 
 	ctx = thr->ctx;
 
+	HWT_CTX_ASSERT_LOCKED(ctx);
+
 	ctx->hwt_backend->ops->hwt_backend_configure(thr, cpu_id);
 
 	return (0);
@@ -105,6 +108,8 @@ hwt_backend_enable(struct hwt_thread *thr, int cpu_id)
 
 	ctx = thr->ctx;
 
+	HWT_CTX_ASSERT_LOCKED(ctx);
+
 	ctx->hwt_backend->ops->hwt_backend_enable(thr, cpu_id);
 
 	return (0);
@@ -118,6 +123,8 @@ hwt_backend_disable(struct hwt_thread *thr, int cpu_id)
 	dprintf("%s\n", __func__);
 
 	ctx = thr->ctx;
+
+	HWT_CTX_ASSERT_LOCKED(ctx);
 
 	ctx->hwt_backend->ops->hwt_backend_disable(thr, cpu_id);
 

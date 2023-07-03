@@ -44,6 +44,7 @@
 #include <sys/hwt.h>
 
 #include <dev/hwt/hwt_hook.h>
+#include <dev/hwt/hwt_config.h>
 #include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_contexthash.h>
 #include <dev/hwt/hwt_thread.h>
@@ -270,11 +271,45 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 	return (0);
 }
 
+#define	HWT_CONFIG_MAX_SIZE	1024
+
+static int
+hwt_ioctl_set_config(struct thread *td, struct hwt_context *ctx,
+    struct hwt_set_config *sconf)
+{
+	size_t config_size;
+	void *old_config;
+	void *config;
+	int error;
+
+	config_size = sconf->config_size;
+	if (config_size > HWT_CONFIG_MAX_SIZE)
+		return (EFBIG);
+
+	config = malloc(config_size, M_HWT_IOCTL, M_WAITOK | M_ZERO);
+
+	old_config = NULL;
+
+	HWT_CTX_LOCK(ctx);
+	error = copyin(sconf->config, config, config_size);
+	if (error == 0) {
+		old_config = ctx->config;
+		ctx->config = config;
+	}
+	HWT_CTX_UNLOCK(ctx);
+
+	if (old_config != NULL)
+		free(old_config, M_HWT_IOCTL);
+
+	return (error);
+}
+
 int
 hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
     struct thread *td)
 {
 	struct hwt_record_get *rget;
+	struct hwt_set_config *sconf;
 	struct hwt_context *ctx;
 	struct hwt_owner *ho;
 	struct hwt_start *s;
@@ -292,6 +327,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		dprintf("%s: start, pid %d\n", __func__, s->pid);
 
+		/* Check if process is registered owner of any HWTs. */
 		ho = hwt_ownerhash_lookup(td->td_proc);
 		if (ho == NULL)
 			return (ENXIO);
@@ -324,6 +360,21 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			return (ENXIO);
 
 		error = hwt_ioctl_send_records(ctx, rget);
+		return (error);
+
+	case HWT_IOC_SET_CONFIG:
+		sconf = (struct hwt_set_config *)addr;
+
+		/* Check if process is registered owner of any HWTs. */
+		ho = hwt_ownerhash_lookup(td->td_proc);
+		if (ho == NULL)
+			return (ENXIO);
+
+		ctx = hwt_owner_lookup_ctx(ho, sconf->pid);
+		if (ctx == NULL)
+			return (ENXIO);
+
+		error = hwt_ioctl_set_config(td, ctx, sconf);
 		return (error);
 	default:
 		return (ENXIO);

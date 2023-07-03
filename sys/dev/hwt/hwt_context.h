@@ -43,6 +43,8 @@ struct hwt_context {
 	struct proc			*proc; /* Target proc. */
 	pid_t				pid; /* Target pid. */
 
+	void				*config;
+
 	struct hwt_owner		*hwt_owner;
 	struct hwt_backend		*hwt_backend;
 	int				thread_counter;
