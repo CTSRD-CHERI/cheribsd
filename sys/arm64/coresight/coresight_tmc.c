@@ -356,6 +356,13 @@ static int
 tmc_configure(device_t dev, struct endpoint *endp,
     struct coresight_event *event)
 {
+
+	return (0);
+}
+
+static int
+tmc_setup(device_t dev, struct endpoint *endp, struct coresight_event *event)
+{
 	struct tmc_softc *sc;
 	vm_page_t *pt_dir;
 	vm_page_t *pages;
@@ -579,6 +586,7 @@ static device_method_t tmc_methods[] = {
 
 	/* Coresight interface */
 	DEVMETHOD(coresight_init,	tmc_init),
+	DEVMETHOD(coresight_setup,	tmc_setup),
 	DEVMETHOD(coresight_configure,	tmc_configure),
 	DEVMETHOD(coresight_start,	tmc_start),
 	DEVMETHOD(coresight_stop,	tmc_stop),

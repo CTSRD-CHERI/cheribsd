@@ -38,6 +38,12 @@ METHOD int init {
 	device_t dev;
 };
 
+METHOD int setup {
+	device_t dev;
+	struct endpoint *endp;
+	struct coresight_event *event;
+};
+
 METHOD int configure {
 	device_t dev;
 	struct endpoint *endp;

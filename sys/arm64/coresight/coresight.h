@@ -46,6 +46,8 @@
 #include <dev/acpica/acpivar.h>
 #endif
 
+#include <dev/hwt/hwt_thread.h>
+
 #define	CORESIGHT_ITCTRL	0xf00
 #define	CORESIGHT_CLAIMSET	0xfa0
 #define	CORESIGHT_CLAIMCLR	0xfa4
@@ -158,6 +160,8 @@ struct coresight_device *
 int coresight_register(struct coresight_desc *desc);
 
 int coresight_init_event(struct coresight_event *event, int cpu);
+
+void coresight_setup(struct coresight_event *event, struct hwt_thread *thr);
 
 void coresight_configure(struct coresight_event *event);
 void coresight_deconfigure(struct coresight_event *event);

@@ -80,6 +80,7 @@ etm_configure(device_t dev, struct endpoint *endp,
 
 	/* Configure ETM */
 
+#if 1
 	/*
 	 * Enable the return stack, global timestamping,
 	 * Context ID, and Virtual context identifier tracing.
@@ -169,6 +170,7 @@ etm_configure(device_t dev, struct endpoint *endp,
 
 	/* No address filtering for ViewData. */
 	bus_write_4(sc->res, TRCVDSACCTLR, 0);
+#endif
 
 	return (0);
 }

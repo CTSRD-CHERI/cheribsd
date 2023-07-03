@@ -100,13 +100,7 @@ coresight_backend_init(struct hwt_context *ctx)
 
 		coresight_init_event(event, cpu_id);
 
-		/*
-		 * Configure pipeline immediately since Coresight merges
-		 * everything to a single buffer. We don't need to reconfigure
-		 * components until the user release coresight.
-		 */
-
-		coresight_configure(event);
+		coresight_setup(event, thr);
 		if (cpu_id == 0)
 			coresight_start(event);
 	}
@@ -134,10 +128,12 @@ coresight_backend_configure(struct hwt_thread *thr, int cpu_id)
 	event = &cs_event[cpu_id];
 
 	/*
-	 * OpenCSD needs a trace ID to distinguish traces as they
-	 * merged to a single buffer.
+	 * OpenCSD needs a trace ID to distinguish trace sessions
+	 * as they are merged to a single buffer by using funnel
+	 * device.
 	 */
 	event->etm.trace_id = thr->thread_id;
+	coresight_configure(event);
 }
 
 static void
