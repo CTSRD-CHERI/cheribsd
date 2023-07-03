@@ -44,6 +44,8 @@ struct hwt_context {
 	pid_t				pid; /* Target pid. */
 
 	void				*config;
+	size_t				config_size;
+	int				config_version;
 
 	struct hwt_owner		*hwt_owner;
 	struct hwt_backend		*hwt_backend;

@@ -86,7 +86,7 @@ struct hwt_set_config {
 	pid_t			pid;
 	/* The following passed to backend as is. */
 	void			*config;
-	int			config_size;
+	size_t			config_size;
 	int			config_version;
 } __aligned(16);
 

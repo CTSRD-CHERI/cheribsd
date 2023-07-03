@@ -63,7 +63,7 @@ replicator_init(device_t dev)
 
 static int
 replicator_configure(device_t dev, struct endpoint *endp,
-    struct coresight_event *event)
+    struct coresight_event *event, struct hwt_thread *thr)
 {
 	struct replicator_softc *sc;
 

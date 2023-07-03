@@ -133,7 +133,7 @@ coresight_backend_configure(struct hwt_thread *thr, int cpu_id)
 	 * device.
 	 */
 	event->etm.trace_id = thr->thread_id;
-	coresight_configure(event);
+	coresight_configure(event, thr);
 }
 
 static void

@@ -41,6 +41,8 @@
 #include <arm64/coresight/coresight.h>
 #include <arm64/coresight/coresight_etm4x.h>
 
+#include <dev/hwt/hwt_context.h>
+
 #include "coresight_if.h"
 
 #define	ETM_DEBUG
@@ -67,8 +69,14 @@ static struct resource_spec etm_spec[] = {
 };
 
 static int
-etm_configure(device_t dev, struct endpoint *endp,
-    struct coresight_event *event)
+etm_configure_etmv4(device_t dev, struct etmv4_config *config)
+{
+
+	return (0);
+}
+
+static int
+etm_configure_etmv4_default(device_t dev, struct coresight_event *event)
 {
 	struct etm_softc *sc;
 	uint32_t reg;
@@ -80,7 +88,6 @@ etm_configure(device_t dev, struct endpoint *endp,
 
 	/* Configure ETM */
 
-#if 1
 	/*
 	 * Enable the return stack, global timestamping,
 	 * Context ID, and Virtual context identifier tracing.
@@ -170,9 +177,31 @@ etm_configure(device_t dev, struct endpoint *endp,
 
 	/* No address filtering for ViewData. */
 	bus_write_4(sc->res, TRCVDSACCTLR, 0);
-#endif
 
 	return (0);
+}
+
+static int
+etm_configure(device_t dev, struct endpoint *endp,
+    struct coresight_event *event, struct hwt_thread *thr)
+{
+	struct etmv4_config *config;
+	struct hwt_context *ctx;
+	int error;
+
+	dprintf("%s%d\n", __func__, device_get_unit(dev));
+
+	ctx = thr->ctx;
+
+	if (ctx->config &&
+	    ctx->config_size == sizeof(struct etmv4_config) &&
+	    ctx->config_version == 1) {
+		config = (struct etmv4_config *)ctx->config;
+		error = etm_configure_etmv4(dev, config);
+	} else
+		error = etm_configure_etmv4_default(dev, event);
+
+	return (error);
 }
 
 static int

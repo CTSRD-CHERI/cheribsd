@@ -163,7 +163,7 @@ int coresight_init_event(struct coresight_event *event, int cpu);
 
 void coresight_setup(struct coresight_event *event, struct hwt_thread *thr);
 
-void coresight_configure(struct coresight_event *event);
+void coresight_configure(struct coresight_event *event, struct hwt_thread *thr);
 void coresight_deconfigure(struct coresight_event *event);
 
 void coresight_start(struct coresight_event *event);
