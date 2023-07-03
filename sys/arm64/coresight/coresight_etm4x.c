@@ -71,8 +71,78 @@ static struct resource_spec etm_spec[] = {
 static int
 etm_configure_etmv4(device_t dev, struct etmv4_config *config)
 {
+	struct etm_softc *sc;
+	int i;
+
+	sc = device_get_softc(dev);
 
 	dprintf("%s_%d\n", __func__, device_get_unit(dev));
+
+	bus_write_4(sc->res, TRCCONFIGR, config->cfg);
+	bus_write_4(sc->res, TRCEVENTCTL0R, config->eventctrl0);
+	bus_write_4(sc->res, TRCEVENTCTL1R, config->eventctrl1);
+	bus_write_4(sc->res, TRCSTALLCTLR, config->stall_ctrl);
+	bus_write_4(sc->res, TRCTSCTLR, config->ts_ctrl);
+	bus_write_4(sc->res, TRCSYNCPR, config->syncfreq);
+	bus_write_4(sc->res, TRCVICTLR, config->vinst_ctrl);
+
+	/* Address-range filtering. */
+	for (i = 0; i < ETM_MAX_SINGLE_ADDR_CMP; i++) {
+		bus_write_8(sc->res, TRCACVR(i), config->addr_val[i]);
+		bus_write_8(sc->res, TRCACATR(i), config->addr_acc[i]);
+	}
+	bus_write_4(sc->res, TRCVIIECTLR, config->viiectlr);
+
+	bus_write_4(sc->res, TRCVDARCCTLR, 0);
+	bus_write_4(sc->res, TRCSSCSR(0), 0);
+	bus_write_4(sc->res, TRCVISSCTLR, config->vissctlr);
+	bus_write_4(sc->res, TRCVDCTLR, 0);
+	bus_write_4(sc->res, TRCVDSACCTLR, 0);
+
+#if 0
+        uint32_t                mode;
+        uint32_t                pe_sel;
+        uint32_t                cfg;
+        uint32_t                eventctrl0;
+        uint32_t                eventctrl1;
+        uint32_t                stall_ctrl;
+        uint32_t                ts_ctrl;
+        uint32_t                syncfreq;
+        uint32_t                ccctlr;
+        uint32_t                bb_ctrl;
+        uint32_t                vinst_ctrl;
+        uint32_t                viiectlr;
+        uint32_t                vissctlr;
+        uint32_t                vipcssctlr;
+        uint8_t                 seq_idx;
+        uint32_t                seq_ctrl[ETM_MAX_SEQ_STATES];
+        uint32_t                seq_rst;
+        uint32_t                seq_state;
+        uint8_t                 cntr_idx;
+        uint32_t                cntrldvr[ETMv4_MAX_CNTR];
+        uint32_t                cntr_ctrl[ETMv4_MAX_CNTR];
+        uint32_t                cntr_val[ETMv4_MAX_CNTR];
+        uint8_t                 res_idx;
+        uint32_t                res_ctrl[ETM_MAX_RES_SEL];
+        uint8_t                 ss_idx;
+        uint32_t                ss_ctrl[ETM_MAX_SS_CMP];
+        uint32_t                ss_status[ETM_MAX_SS_CMP];
+        uint32_t                ss_pe_cmp[ETM_MAX_SS_CMP];
+        uint8_t                 addr_idx;
+        uint64_t                addr_val[ETM_MAX_SINGLE_ADDR_CMP];
+        uint64_t                addr_acc[ETM_MAX_SINGLE_ADDR_CMP];
+        uint8_t                 addr_type[ETM_MAX_SINGLE_ADDR_CMP];
+        uint8_t                 ctxid_idx;
+        uint64_t                ctxid_pid[ETMv4_MAX_CTXID_CMP];
+        uint32_t                ctxid_mask0;
+        uint32_t                ctxid_mask1;
+        uint8_t                 vmid_idx;
+        uint64_t                vmid_val[ETM_MAX_VMID_CMP];
+        uint32_t                vmid_mask0;
+        uint32_t                vmid_mask1;
+        uint32_t                ext_inp; 
+        uint8_t                 s_ex_level;
+#endif
 
 	return (0);
 }
