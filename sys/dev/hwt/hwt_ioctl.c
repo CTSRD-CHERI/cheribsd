@@ -283,6 +283,9 @@ hwt_ioctl_set_config(struct thread *td, struct hwt_context *ctx,
 	int error;
 
 	config_size = sconf->config_size;
+	if (config_size == 0)
+		return (0);
+
 	if (config_size > HWT_CONFIG_MAX_SIZE)
 		return (EFBIG);
 
@@ -377,7 +380,12 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			return (ENXIO);
 
 		error = hwt_ioctl_set_config(td, ctx, sconf);
-		return (error);
+		if (error)
+			return (error);
+
+		ctx->pause_on_mmap = sconf->pause_on_mmap ? 1 : 0;
+
+		return (0);
 	default:
 		return (ENXIO);
 	};

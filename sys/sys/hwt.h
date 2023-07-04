@@ -84,6 +84,10 @@ struct hwt_bufptr_get {
 
 struct hwt_set_config {
 	pid_t			pid;
+
+	/* Configuration of ctx. */
+	int			pause_on_mmap;
+
 	/* The following passed to backend as is. */
 	void			*config;
 	size_t			config_size;
