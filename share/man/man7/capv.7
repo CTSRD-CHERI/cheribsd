@@ -37,12 +37,12 @@
 .Nd capability vector
 .Sh DESCRIPTION
 .\"
-.\" Provide a brief overview and point at other manpages.  Let's keep it short.
+.\" Provide a brief overview and point at other man pages.  Keep it short.
 .\"
 The capability vector is a mechanism to pass a set of memory capabilities
 to a newly spawned process.
 It is an array of memory capabilities which gets inherited over
-.Xr fork 2
+.Xr vfork 2
 and
 .Xr execve 2 ,
 similar to how credentials and file descriptors are.
@@ -101,30 +101,25 @@ The
 .Xr clearances 1
 is another interposer, implementing arbitrary security policies for chosen
 services; can be used as an alternative to restricting capability transfer.
-.Pp
-To experiment with the switcher itself, eg to explore capability
-transfer policies, see
-.Xr dispatch 1 .
-.Pp
-For a general tutorial on process colocation, see:
-.Pp
-.Lk https://github.com/CTSRD-CHERI/cheripedia/wiki/Colocation-Tutorial
+.Sh EXAMPLES
+Spawn a
+.Xr clocks 1
+service and query it with
+.Xr capv 1 :
+.Dl clocks capv
 .Sh SEE ALSO
 .Xr binds 1 ,
 .Xr capv 1 ,
 .Xr clearances 1 ,
 .Xr clocks 1 ,
-.Xr coexec 1 ,
 .Xr colookup 1 ,
 .Xr coping 1 ,
 .Xr coregister 1 ,
 .Xr cs 1 ,
-.Xr dispatch 1 ,
-.Xr cocall 2 ,
-.Xr coexecvec 2 ,
 .Xr capvfetch 3 ,
 .Xr capvset 3 ,
-.Xr elf_aux_info 3
+.Xr elf_aux_info 3 ,
+.Xr colocation 7
 .Sh AUTHORS
 .An -nosplit
 The idea of capability vector came from

@@ -1,0 +1,136 @@
+.\"
+.\" Copyright (c) 2023 Edward Tomasz Napierala <en322@cl.cam.ac.uk>
+.\" All rights reserved.
+.\"
+.\" This software was developed by the University of Cambridge Computer
+.\" Laboratory as part of the CHERI for Hypervisors and Operating Systems
+.\" (CHaOS) project, funded by EPSRC grant EP/V000292/1.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\" $FreeBSD$
+.\"
+.Dd April 3, 2023
+.Dt COLOCATION 7
+.Os
+.Sh NAME
+.Nm colocation
+.Nd process colocation
+.Sh DESCRIPTION
+.\"
+.\" Provide a brief overview and point at other man pages.  Keep it short.
+.\"
+Process colocation is a mechanism for processes to share a virtual address space,
+.\" XXX: There's no cheri(7) man page.
+while preserving the usual protection and separation by employing CHERI.
+Because memory capabilities must not be transferred between address spaces,
+colocation enables their use as an IPC mechanism.
+Included is a set of APIs and mechanisms to make use of that capability.
+For a general tutorial see:
+.Pp
+.Lk https://github.com/CTSRD-CHERI/cheripedia/wiki/Colocation-Tutorial
+.Pp
+To execute a binary colocated with another process indicated by its PID.
+use
+.Xr coexecve 2
+instead of the usual
+.Xr execve 2 .
+Processes can also get colocated opportunistically.
+.Pp
+Capabilities can be transferred between colocated processes using
+a number of mechanisms:
+via buffers passed to
+.Xr cocall 2
+and
+.Xr coaccept 2 ;
+sent over
+.Xr unix 4
+domain sockets using
+.Dv SCM_CAPS ;
+or inherited from parent process via
+.Xr capv 7 .
+There is also
+.Xr switcher 7 ,
+an RPC-like mechanism, unusually lightweight thanks
+to bypassing the kernel with CInvoke.
+See
+.Xr coaccept 2
+and
+.Xr cocall 2
+for API documentation,
+and
+.Xr stevie 1
+and
+.Xr coping 1
+for trivial code examples.
+See
+.Xr capv 7
+for a list of less trivial ones.
+.Pp
+To experiment with custom modifications to the switcher itself,
+eg to explore capability transfer policies, see
+.Xr dispatch 1 .
+.Pp
+.Nm
+is orthogonal to
+.Xr compartmentalization 7 .
+It is expected to be possible to use both at the same time.
+.Sh SYSCTL VARIABLES
+The following variables are available as both
+.Xr sysctl 8
+variables and
+.Xr loader 8
+tunables:
+.Bl -tag -width indent
+.It Va debug.colocation_debug
+Set to 1 to enable debug messages.
+Defaults to 0.
+.It Va kern.opportunistic_coexecve
+Set to 0 to disable opportunistic colocation.
+Defaults to 1.
+.Sh EXAMPLES
+Show the memory map of your current shell and everything
+that got opportunistically colocated with it:
+.Dl procstat vm $$
+.Sh SEE ALSO
+.Xr coexec 1 ,
+.Xr coping 1 ,
+.Xr dispatch 1 ,
+.Xr stevie 1 ,
+.Xr coaccept 2 ,
+.Xr cocall 2 ,
+.Xr coexecve 2 ,
+.Xr capv 7
+.Sh AUTHORS
+.An -nosplit
+Process colocation was implemented by
+.An Edward Tomasz Napierala Aq Mt en322@cl.cam.ac.uk
+at the University of Cambridge Computer Laboratory under DARPA/AFRL contract
+(FA8750-10-C-0237) ("CTSRD"), as part of the DARPA CRASH research programme.
+.Sh BUGS
+It should be able to colocate processes using
+.Xr posix_spawn 3
+instead of the
+.Xr vfork 2
+/
+.Xr coexecve 2
+pair.
