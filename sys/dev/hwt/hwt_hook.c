@@ -217,6 +217,7 @@ hwt_hook_handler(struct thread *td, int func, void *arg)
 	case HWT_EXEC:
 		hwt_hook_mmap(td);
 		hwt_record(td, arg);
+		break;
 	case HWT_MMAP:
 		hwt_hook_mmap(td);
 		hwt_record(td, arg);
