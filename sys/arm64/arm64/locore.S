@@ -266,8 +266,7 @@ virtdone:
 	 * no place to store the PCB pointer here.
 	 * XXX-AM: It could be another bootparam if needed
 	 */
-	mov	PTRN(sp), PTR(7)
-	sub	PTRN(sp), PTRN(sp), #PCB_SIZE
+	sub	PTRN(sp), PTR(7), #PCB_SIZE
 
 	/* Zero the BSS */
 	buildptr_range 15, 14, _bss_start, _end
