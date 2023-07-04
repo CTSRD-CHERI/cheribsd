@@ -153,6 +153,37 @@ hwt_thread_exit(struct thread *td)
 }
 
 static void
+hwt_hook_mmap(struct thread *td)
+{
+	struct hwt_context *ctx;
+	struct proc *p;
+	int pause;
+
+	p = td->td_proc;
+
+	ctx = hwt_contexthash_lookup(p);
+	if (ctx == NULL)
+		return;
+
+	if (ctx->state != CTX_STATE_RUNNING) {
+		HWT_CTX_UNLOCK(ctx);
+		return;
+	}
+
+	pause = ctx->pause_on_mmap ? 1 : 0;
+
+	HWT_CTX_UNLOCK(ctx);
+
+	if (pause) {
+		PROC_LOCK(p);
+		PROC_SLOCK(p);
+		thread_suspend_switch(td, p);
+		PROC_SUNLOCK(p);
+		PROC_UNLOCK(p);
+	}
+}
+
+static void
 hwt_hook_handler(struct thread *td, int func, void *arg)
 {
 	struct hwt_thread *thr;
@@ -180,6 +211,13 @@ hwt_hook_handler(struct thread *td, int func, void *arg)
 		break;
 	case HWT_THREAD_EXIT:
 		hwt_thread_exit(td);
+		break;
+	case HWT_EXEC:
+		hwt_hook_mmap(td);
+		hwt_record(td, arg);
+	case HWT_MMAP:
+		hwt_hook_mmap(td);
+		hwt_record(td, arg);
 		break;
 	case HWT_RECORD:
 		hwt_record(td, arg);

@@ -39,6 +39,8 @@
 #define	HWT_THREAD_CREATE	3
 #define	HWT_THREAD_SET_NAME	4
 #define	HWT_RECORD		5
+#define	HWT_MMAP		6
+#define	HWT_EXEC		7
 
 #define	HWT_CALL_HOOK(td, func, arg)			\
 do {							\

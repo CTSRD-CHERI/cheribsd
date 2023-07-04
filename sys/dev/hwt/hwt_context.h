@@ -47,6 +47,8 @@ struct hwt_context {
 	size_t				config_size;
 	int				config_version;
 
+	int				pause_on_mmap;
+
 	struct hwt_owner		*hwt_owner;
 	struct hwt_backend		*hwt_backend;
 	int				thread_counter;
