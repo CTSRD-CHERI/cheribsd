@@ -165,10 +165,12 @@ hwt_hook_mmap(struct thread *td)
 	if (ctx == NULL)
 		return;
 
+#if 0
 	if (ctx->state != CTX_STATE_RUNNING) {
 		HWT_CTX_UNLOCK(ctx);
 		return;
 	}
+#endif
 
 	pause = ctx->pause_on_mmap ? 1 : 0;
 
