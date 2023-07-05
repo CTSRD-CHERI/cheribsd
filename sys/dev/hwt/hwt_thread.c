@@ -352,7 +352,7 @@ hwt_thread_alloc(struct hwt_thread **thr0, size_t bufsize)
 
 	thr->npages = bufsize / PAGE_SIZE;
 
-	mtx_init(&thr->mtx, "thr", NULL, MTX_DEF);
+	mtx_init(&thr->mtx, "thr", NULL, MTX_SPIN);
 
 	error = hwt_thread_alloc_buffers(thr);
 	if (error)
