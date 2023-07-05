@@ -80,14 +80,14 @@ hwt_ownerhash_lookup(struct proc *p)
 	hindex = HWT_HASH_PTR(p, hwt_ownerhashmask);
 	hoh = &hwt_ownerhash[hindex];
 
-	mtx_lock_spin(&hwt_ownerhash_mtx);
+	HWT_OWNERHASH_LOCK();
 	LIST_FOREACH(ho, hoh, next) {
 		if (ho->p == p) {
-			mtx_unlock_spin(&hwt_ownerhash_mtx);
+			HWT_OWNERHASH_UNLOCK();
 			return (ho);
 		}
 	}
-	mtx_unlock_spin(&hwt_ownerhash_mtx);
+	HWT_OWNERHASH_UNLOCK();
 
 	return (NULL);
 }
@@ -101,9 +101,9 @@ hwt_ownerhash_insert(struct hwt_owner *ho)
 	hindex = HWT_HASH_PTR(ho->p, hwt_ownerhashmask);
 	hoh = &hwt_ownerhash[hindex];
 
-	mtx_lock_spin(&hwt_ownerhash_mtx);
+	HWT_OWNERHASH_LOCK();
 	LIST_INSERT_HEAD(hoh, ho, next);
-	mtx_unlock_spin(&hwt_ownerhash_mtx);
+	HWT_OWNERHASH_UNLOCK();
 }
 
 void
@@ -111,9 +111,9 @@ hwt_ownerhash_remove(struct hwt_owner *ho)
 {
 
 	/* Destroy hwt owner. */
-	mtx_lock_spin(&hwt_ownerhash_mtx);
+	HWT_OWNERHASH_LOCK();
 	LIST_REMOVE(ho, next);
-	mtx_unlock_spin(&hwt_ownerhash_mtx);
+	HWT_OWNERHASH_UNLOCK();
 }
 
 void

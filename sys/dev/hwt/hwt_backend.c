@@ -167,14 +167,14 @@ hwt_backend_lookup(const char *name)
 {
 	struct hwt_backend *backend;
 
-	mtx_lock_spin(&hwt_backend_mtx);
+	HWT_BACKEND_LOCK();
 	LIST_FOREACH(backend, &hwt_backends, next) {
 		if (strcmp(backend->name, name) == 0) {
-			mtx_unlock_spin(&hwt_backend_mtx);
+			HWT_BACKEND_UNLOCK();
 			return (backend);
 		}
 	}
-	mtx_unlock_spin(&hwt_backend_mtx);
+	HWT_BACKEND_UNLOCK();
 
 	return (NULL);
 }
@@ -188,9 +188,9 @@ hwt_register(struct hwt_backend *backend)
 	    backend->ops == NULL)
 		return (EINVAL);
 
-	mtx_lock_spin(&hwt_backend_mtx);
+	HWT_BACKEND_LOCK();
 	LIST_INSERT_HEAD(&hwt_backends, backend, next);
-	mtx_unlock_spin(&hwt_backend_mtx);
+	HWT_BACKEND_UNLOCK();
 
 	return (0);
 }

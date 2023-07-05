@@ -36,4 +36,7 @@ void hwt_ownerhash_insert(struct hwt_owner *ho);
 void hwt_ownerhash_remove(struct hwt_owner *ho);
 void hwt_ownerhash_load(void);
 
+#define	HWT_OWNERHASH_LOCK()		mtx_lock_spin(&hwt_ownerhash_mtx)
+#define	HWT_OWNERHASH_UNLOCK()		mtx_unlock_spin(&hwt_ownerhash_mtx)
+
 #endif /* !_DEV_HWT_HWT_OWNERHASH_H_ */

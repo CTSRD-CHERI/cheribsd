@@ -85,15 +85,15 @@ hwt_contexthash_lookup(struct proc *p)
 	hindex = HWT_HASH_PTR(p, hwt_contexthashmask);
 	hch = &hwt_contexthash[hindex];
 
-	mtx_lock_spin(&hwt_contexthash_mtx);
+	HWT_CTXHASH_LOCK();
 	LIST_FOREACH(ctx, hch, next_hch) {
 		if (ctx->proc == p) {
 			HWT_CTX_LOCK(ctx);
-			mtx_unlock_spin(&hwt_contexthash_mtx);
+			HWT_CTXHASH_UNLOCK();
 			return (ctx);
 		}
 	}
-	mtx_unlock_spin(&hwt_contexthash_mtx);
+	HWT_CTXHASH_UNLOCK();
 
 	return (NULL);
 }
@@ -109,18 +109,18 @@ hwt_contexthash_insert(struct hwt_context *ctx)
 	hindex = HWT_HASH_PTR(ctx->proc, hwt_contexthashmask);
 	hch = &hwt_contexthash[hindex];
 
-	mtx_lock_spin(&hwt_contexthash_mtx);
+	HWT_CTXHASH_LOCK();
 	LIST_INSERT_HEAD(hch, ctx, next_hch);
-	mtx_unlock_spin(&hwt_contexthash_mtx);
+	HWT_CTXHASH_UNLOCK();
 }
 
 void
 hwt_contexthash_remove(struct hwt_context *ctx)
 {
 
-	mtx_lock_spin(&hwt_contexthash_mtx);
+	HWT_CTXHASH_LOCK();
 	LIST_REMOVE(ctx, next_hch);
-	mtx_unlock_spin(&hwt_contexthash_mtx);
+	HWT_CTXHASH_UNLOCK();
 }
 
 void

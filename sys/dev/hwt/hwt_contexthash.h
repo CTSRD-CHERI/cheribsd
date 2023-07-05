@@ -36,4 +36,7 @@ void hwt_contexthash_insert(struct hwt_context *ctx);
 void hwt_contexthash_remove(struct hwt_context *ctx);
 void hwt_contexthash_load(void);
 
+#define	HWT_CTXHASH_LOCK()	mtx_lock_spin(&hwt_contexthash_mtx)
+#define	HWT_CTXHASH_UNLOCK()	mtx_unlock_spin(&hwt_contexthash_mtx)
+
 #endif /* !_DEV_HWT_HWT_CONTEXTHASH_H_ */
