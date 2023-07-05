@@ -32,7 +32,6 @@
 #define _DEV_HWT_HWT_CONFIG_H_
 
 struct hwt_config {
-	int kernel;
 };
 
 #endif /* !_DEV_HWT_HWT_CONFIG_H_ */
