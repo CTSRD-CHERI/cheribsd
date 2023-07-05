@@ -38,6 +38,7 @@
 #include <sys/mman.h>
 #include <sys/module.h>
 #include <sys/mutex.h>
+#include <sys/refcount.h>
 #include <sys/rwlock.h>
 #include <sys/hwt.h>
 
@@ -154,14 +155,11 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 
 			HWT_THR_UNLOCK(thr);
 
-			/*
-			 * TODO: ensure thread woke up and no longer uses thr.
-			 * add refcount ?
-			 */
-
 			/* TODO: move into hwt_thread_free? */
 			destroy_dev_sched(thr->cdev);
-			hwt_thread_free(thr);
+
+			if (refcount_release(&thr->refcnt))
+				hwt_thread_free(thr);
 		}
 
 		hwt_ctx_free(ctx);

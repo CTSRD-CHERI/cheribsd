@@ -38,6 +38,7 @@
 #include <sys/mman.h>
 #include <sys/module.h>
 #include <sys/mutex.h>
+#include <sys/refcount.h>
 #include <sys/rwlock.h>
 #include <sys/hwt.h>
 
@@ -373,6 +374,8 @@ hwt_thread_alloc(struct hwt_thread **thr0, size_t bufsize)
 	thr->npages = bufsize / PAGE_SIZE;
 
 	mtx_init(&thr->mtx, "thr", NULL, MTX_SPIN);
+
+	refcount_init(&thr->refcnt, 1);
 
 	error = hwt_thread_alloc_buffers(thr);
 	if (error)

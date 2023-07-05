@@ -43,6 +43,7 @@ struct hwt_thread {
 	int				state;
 #define	HWT_THREAD_STATE_EXITED		(1 << 0)
 	struct mtx			mtx;
+	u_int				refcnt;
 };
 
 /* Thread allocation. */

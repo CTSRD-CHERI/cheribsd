@@ -40,6 +40,7 @@
 #include <sys/mman.h>
 #include <sys/module.h>
 #include <sys/mutex.h>
+#include <sys/refcount.h>
 #include <sys/rwlock.h>
 #include <sys/hwt.h>
 
@@ -173,10 +174,19 @@ hwt_hook_mmap(struct thread *td)
 
 	thr = hwt_thread_lookup(ctx, td);
 
+	/*
+	 * msleep(9) atomically releases the mtx lock, so take refcount
+	 * to ensure that thr is not destroyed.
+	 */
+	refcount_acquire(&thr->refcnt);
+
 	if (pause)
 		msleep_spin(thr, &thr->mtx, "hwt-mmap", 0);
 
 	HWT_THR_UNLOCK(thr);
+
+	if (refcount_release(&thr->refcnt))
+		hwt_thread_free(thr);
 }
 
 static void
