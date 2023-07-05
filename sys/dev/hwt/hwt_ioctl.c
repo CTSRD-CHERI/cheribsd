@@ -400,11 +400,18 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		if (ctx == NULL)
 			return (ENXIO);
 
+		HWT_CTX_LOCK(ctx);
 		thr = hwt_thread_lookup_by_tid(ctx, hwakeup->tid);
+		if (thr)
+			HWT_THR_LOCK(thr);
+		HWT_CTX_UNLOCK(ctx);
+
 		if (thr == NULL)
 			return (ENOENT);
 
 		wakeup(thr);
+
+		HWT_THR_UNLOCK(thr);
 
 		return (0);
 	default:

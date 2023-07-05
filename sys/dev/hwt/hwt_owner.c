@@ -134,17 +134,30 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 
 		hwt_backend_deinit(ctx);
 
-		printf("%s: remove threads\n", __func__);
+		/* Remove thread first. */
+
+		dprintf("%s: remove threads\n", __func__);
 
 		while (1) {
 			HWT_CTX_LOCK(ctx);
 			thr = LIST_FIRST(&ctx->threads);
-			if (thr)
+			if (thr) {
 				LIST_REMOVE(thr, next);
+				HWT_THR_LOCK(thr);
+			}
 			HWT_CTX_UNLOCK(ctx);
 
 			if (thr == NULL)
 				break;
+
+			wakeup(thr);
+
+			HWT_THR_UNLOCK(thr);
+
+			/*
+			 * TODO: ensure thread woke up and no longer uses thr.
+			 * add refcount ?
+			 */
 
 			/* TODO: move into hwt_thread_free? */
 			destroy_dev_sched(thr->cdev);

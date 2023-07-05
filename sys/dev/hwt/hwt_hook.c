@@ -173,10 +173,8 @@ hwt_hook_mmap(struct thread *td)
 
 	thr = hwt_thread_lookup(ctx, td);
 
-	if (pause) {
-		thr->sleeping = 1;
+	if (pause)
 		msleep_spin(thr, &thr->mtx, "hwt-mmap", 0);
-	}
 
 	HWT_THR_UNLOCK(thr);
 }
