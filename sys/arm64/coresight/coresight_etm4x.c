@@ -318,7 +318,7 @@ etm_enable(device_t dev, struct endpoint *endp,
 	/* Wait for an IDLE bit to be LOW */
 	do {
 		reg = bus_read_4(sc->res, TRCSTATR);
-	} while ((reg & TRCSTATR_IDLE) == 1);
+	} while (reg & TRCSTATR_IDLE);
 
 	if ((bus_read_4(sc->res, TRCPRGCTLR) & TRCPRGCTLR_EN) == 0)
 		panic("etm is not enabled\n");
