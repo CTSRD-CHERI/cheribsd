@@ -72,9 +72,12 @@ static int
 etm_configure_etmv4(device_t dev, struct etmv4_config *config)
 {
 	struct etm_softc *sc;
+	int cpu;
 	int i;
 
 	sc = device_get_softc(dev);
+
+	cpu = PCPU_GET(cpuid);
 
 	dprintf("%s_%d\n", __func__, device_get_unit(dev));
 
@@ -85,6 +88,7 @@ etm_configure_etmv4(device_t dev, struct etmv4_config *config)
 	bus_write_4(sc->res, TRCTSCTLR, config->ts_ctrl);
 	bus_write_4(sc->res, TRCSYNCPR, config->syncfreq);
 	bus_write_4(sc->res, TRCVICTLR, config->vinst_ctrl);
+	bus_write_4(sc->res, TRCPROCSELR, cpu); /* Not sure if this is needed.*/
 
 	/* Address-range filtering. */
 	for (i = 0; i < ETM_MAX_SINGLE_ADDR_CMP; i++) {
