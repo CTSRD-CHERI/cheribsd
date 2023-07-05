@@ -317,7 +317,9 @@ etm_enable(device_t dev, struct endpoint *endp,
 	bus_write_4(sc->res, TRCTRACEIDR, event->etm.trace_id);
 
 	/* Enable the trace unit */
-	bus_write_4(sc->res, TRCPRGCTLR, TRCPRGCTLR_EN);
+	reg = bus_read_4(sc->res, TRCPRGCTLR);
+	reg |= TRCPRGCTLR_EN;
+	bus_write_4(sc->res, TRCPRGCTLR, reg);
 
 	/* Wait for an IDLE bit to be LOW */
 	do {
@@ -342,7 +344,9 @@ etm_disable(device_t dev, struct endpoint *endp,
 	dprintf("%s%d\n", __func__, device_get_unit(dev));
 
 	/* Disable the trace unit */
-	bus_write_4(sc->res, TRCPRGCTLR, 0);
+	reg = bus_read_4(sc->res, TRCPRGCTLR);
+	reg &= ~TRCPRGCTLR_EN;
+	bus_write_4(sc->res, TRCPRGCTLR, reg);
 
 	/* Wait for an IDLE bit */
 	do {
