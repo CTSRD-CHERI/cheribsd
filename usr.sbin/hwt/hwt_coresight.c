@@ -535,7 +535,7 @@ hwt_coresight_init(struct trace_context *tc)
 	return (0);
 }
 
-void
+static void
 hwt_coresight_fill_config(struct trace_context *tc, struct etmv4_config *config)
 {
 	int excp_level;
