@@ -328,9 +328,11 @@ hwt_thread_destroy_buffers(struct hwt_thread *thr)
 struct hwt_thread *
 hwt_thread_lookup_by_tid(struct hwt_context *ctx, lwpid_t tid)
 {
-	struct hwt_thread *thr, *thr1;
+	struct hwt_thread *thr;
 
-	LIST_FOREACH_SAFE(thr, &ctx->threads, next, thr1) {
+	HWT_CTX_ASSERT_LOCKED(ctx);
+
+	LIST_FOREACH(thr, &ctx->threads, next) {
 		if (thr->tid == tid)
 			return (thr);
 	}
@@ -344,11 +346,11 @@ hwt_thread_lookup_by_tid(struct hwt_context *ctx, lwpid_t tid)
 struct hwt_thread *
 hwt_thread_lookup(struct hwt_context *ctx, struct thread *td)
 {
-	struct hwt_thread *thr, *thr1;
+	struct hwt_thread *thr;
 
 	HWT_CTX_ASSERT_LOCKED(ctx);
 
-	LIST_FOREACH_SAFE(thr, &ctx->threads, next, thr1) {
+	LIST_FOREACH(thr, &ctx->threads, next) {
 		if (thr->tid == td->td_tid) {
 			HWT_THR_LOCK(thr);
 			HWT_CTX_UNLOCK(ctx);
