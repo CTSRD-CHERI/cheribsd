@@ -42,6 +42,7 @@ struct hwt_thread {
 	int				thread_id; /* Specific to ARM backend.*/
 	int				state;
 #define	HWT_THREAD_STATE_EXITED		(1 << 0)
+	struct mtx			mtx;
 };
 
 /* Thread allocation. */

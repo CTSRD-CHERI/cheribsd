@@ -349,7 +349,10 @@ hwt_thread_alloc(struct hwt_thread **thr0, size_t bufsize)
 
 	thr = malloc(sizeof(struct hwt_thread), M_HWT_THREAD,
 	    M_WAITOK | M_ZERO);
+
 	thr->npages = bufsize / PAGE_SIZE;
+
+	mtx_init(&thr->mtx, "thr", NULL, MTX_DEF);
 
 	error = hwt_thread_alloc_buffers(thr);
 	if (error)
