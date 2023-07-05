@@ -44,6 +44,7 @@
 #include <string.h>
 
 #include "hwtvar.h"
+#include "hwt_coresight.h"
 
 #include "libpmcstat_stubs.h"
 #include <libpmcstat.h>
@@ -80,35 +81,45 @@ hwt_record_fetch(struct trace_context *tc, int *nrecords)
 		return (error);
 	}
 
+printf("%s: error %d: nent %d\n", __func__, error, nentries);
+
 	for (j = 0; j < nentries; j++) {
 		entry = &tc->records[j];
 
-		if (entry->record_type > 3) {
-			continue;
-		}
+		switch (entry->record_type) {
+		case HWT_RECORD_MMAP:
+		case HWT_RECORD_MUNMAP:
+		case HWT_RECORD_EXECUTABLE:
+		case HWT_RECORD_INTERP:
+			printf("  lib #%d: path %s addr %lx size %lx\n", j,
+			    entry->fullpath,
+			    (unsigned long)entry->addr,
+			    entry->size);
 
-		printf("  lib #%d: path %s addr %lx size %lx\n", j,
-		    entry->fullpath,
-		    (unsigned long)entry->addr,
-		    entry->size);
+			path = pmcstat_string_intern(entry->fullpath);
+			if ((image = pmcstat_image_from_path(path, 0,
+			    &args, &plugins)) == NULL)
+				return (-1);
 
-		path = pmcstat_string_intern(entry->fullpath);
-		if ((image = pmcstat_image_from_path(path, 0,
-		    &args, &plugins)) == NULL)
-			return (-1);
+			if (image->pi_type == PMCSTAT_IMAGE_UNKNOWN)
+				pmcstat_image_determine_type(image, &args);
 
-		if (image->pi_type == PMCSTAT_IMAGE_UNKNOWN)
-			pmcstat_image_determine_type(image, &args);
-
-		addr = (unsigned long)entry->addr & ~1;
-		addr -= (image->pi_start - image->pi_vaddr);
-		pmcstat_image_link(tc->pp, image, addr);
+			addr = (unsigned long)entry->addr & ~1;
+			addr -= (image->pi_start - image->pi_vaddr);
+			pmcstat_image_link(tc->pp, image, addr);
 #if 0
-		printf("image pi_vaddr %lx pi_start %lx pi_entry %lx\n",
-		    (unsigned long)image->pi_vaddr,
-		    (unsigned long)image->pi_start,
-		    (unsigned long)image->pi_entry);
+			printf("image pi_vaddr %lx pi_start %lx pi_entry %lx\n",
+			    (unsigned long)image->pi_vaddr,
+			    (unsigned long)image->pi_start,
+			    (unsigned long)image->pi_entry);
 #endif
+			hwt_mmap_received(tc);
+			break;
+		case HWT_RECORD_THREAD_CREATE:
+		case HWT_RECORD_THREAD_SET_NAME:
+		default:
+			break;
+		}
 	}
 
 	*nrecords = nentries;

@@ -535,6 +535,71 @@ hwt_coresight_init(struct trace_context *tc)
 	return (0);
 }
 
+void
+hwt_coresight_fill_config(struct trace_context *tc, struct etmv4_config *config)
+{
+	int excp_level;
+	uint32_t reg;
+	uint32_t val;
+	int i;
+
+	memset(config, 0, sizeof(struct etmv4_config));
+
+	reg = TRCCONFIGR_RS | TRCCONFIGR_TS;
+	reg |= TRCCONFIGR_CID | TRCCONFIGR_VMID;
+	reg |= TRCCONFIGR_INSTP0_LDRSTR;
+	reg |= TRCCONFIGR_COND_ALL;
+	config->cfg = reg;
+
+	config->ts_ctrl = 0;
+	config->syncfreq = TRCSYNCPR_4K;
+
+	excp_level = 1; /* User mode. */
+
+	reg = TRCVICTLR_SSSTATUS;
+	reg |= (1 << EVENT_SEL_S);
+	reg |= TRCVICTLR_EXLEVEL_NS(excp_level);
+	reg |= TRCVICTLR_EXLEVEL_S(excp_level);
+	config->vinst_ctrl = reg;
+
+	/* Address-range filtering. */
+	val = 0;
+	for (i = 0; i < tc->nranges * 2; i++) {
+		config->addr_val[i] = tc->addr_ranges[i];
+
+		reg = TRCACATR_EXLEVEL_S(excp_level);
+		reg |= TRCACATR_EXLEVEL_NS(excp_level);
+		config->addr_acc[i] = reg;
+
+		/* Include the range ID. */
+		val |= (1 << (TRCVIIECTLR_INCLUDE_S + i / 2));
+	}
+	config->viiectlr = val;
+}
+
+int
+hwt_coresight_set_config(struct trace_context *tc)
+{
+	struct hwt_set_config sconf;
+	struct etmv4_config *config;
+	int error;
+
+	config = malloc(sizeof(struct etmv4_config));
+	hwt_coresight_fill_config(tc, config);
+
+	tc->config = config;
+
+	sconf.pid = tc->pid;
+	sconf.config = config;
+	sconf.config_size = sizeof(struct etmv4_config);
+	sconf.config_version = 1;
+	sconf.pause_on_mmap = tc->suspend_on_mmap ? 1 : 0;
+
+	error = ioctl(tc->fd, HWT_IOC_SET_CONFIG, &sconf);
+
+	return (error);
+}
+
 int
 hwt_coresight_process(struct trace_context *tc)
 {
@@ -542,6 +607,7 @@ hwt_coresight_process(struct trace_context *tc)
 	size_t end;
 	size_t offs;
 	int error;
+	int t;
 
 	/* Coresight data is always on CPU0 due to funnelling by HW. */
 
@@ -557,8 +623,6 @@ hwt_coresight_process(struct trace_context *tc)
 	end = offs;
 
 	cs_process_chunk(tc, start, end);
-
-	int t;
 
 	t = 0;
 

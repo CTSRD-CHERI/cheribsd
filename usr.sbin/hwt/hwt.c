@@ -79,6 +79,51 @@ hwt_procexit(pid_t pid, int exit_status __unused)
 }
 
 static int
+hwt_unsuspend_proc(struct trace_context *tc)
+{
+	int error;
+
+	error = kill(tc->pid, SIGCONT);
+
+	return (error);
+}
+
+int
+hwt_mmap_received(struct trace_context *tc)
+{
+	int error;
+
+	if (!tc->suspend_on_mmap)
+		return (0);
+
+	if (tc->func_name == NULL)
+		return (0);
+
+	error = hwt_find_sym(tc);
+	if (error != 0) {
+		hwt_unsuspend_proc(tc);
+		return (-1);
+	}
+
+	tc->suspend_on_mmap = 0;
+
+	/* Start tracing. */
+	error = hwt_coresight_set_config(tc);
+	if (error)
+		return (-2);
+
+	error = hwt_start_tracing(tc);
+	if (error)
+		return (-2);
+
+	printf("%s: tracing started\n", __func__);
+
+	hwt_unsuspend_proc(tc);
+
+	return (0);
+}
+
+static int
 hwt_ctx_alloc(struct trace_context *tc)
 {
 	struct hwt_alloc al;
@@ -169,7 +214,7 @@ hwt_get_records(struct trace_context *tc, uint32_t *nrec)
 	return (0);
 }
 
-static int
+int
 hwt_find_sym(struct trace_context *tc)
 {
 	struct pmcstat_symbol *sym;
@@ -181,13 +226,16 @@ hwt_find_sym(struct trace_context *tc)
 	if (sym) {
 		printf("sym found, start end %lx %lx\n", (uint64_t)addr_start,
 		    (uint64_t)addr_end);
+		tc->addr_ranges[tc->nranges] = addr_start;
+		tc->addr_ranges[tc->nranges + 1] = addr_end;
+		tc->nranges += 1;
 		return (0);
 	}
 
 	return (ENOENT);
 }
 
-static int
+int
 hwt_start_tracing(struct trace_context *tc)
 {
 	struct hwt_start s;
@@ -279,9 +327,6 @@ main(int argc, char **argv, char **env)
 	if (error) {
 		printf("%s: failed to alloc ctx, pid %d error %d\n", __func__,
 		    tc->pid, error);
-
-		while (1);
-
 		return (error);
 	}
 
@@ -300,18 +345,23 @@ main(int argc, char **argv, char **env)
 		return (error);
 	}
 
+	if (tc->func_name != NULL)
+		tc->suspend_on_mmap = 1;
+
+	error = hwt_coresight_set_config(tc);
+	if (error != 0) {
+		printf("can't set config");
+		return (error);
+	}
+
 	if (tc->func_name == NULL) {
 		/* No address range filtering. Start tracing immediately. */
-
 		error = hwt_start_tracing(tc);
 		if (error) {
 			printf("%s: failed to start tracing, error %d\n",
 			    __func__, error);
 			return (error);
 		}
-	} else {
-		tc->pause_on_mmap_once = 1;
-		/* TODO: configure pause on mmap. */
 	}
 
 	error = hwt_process_start(sockpair);
@@ -322,15 +372,18 @@ main(int argc, char **argv, char **env)
 
 	tot_rec = 0;
 
+	/*
+	 * Ensure we got expected amount of mmap/interp records so that
+	 * mapping tables constructed before we do symbol lookup.
+	 */
+
 	do {
 		error = hwt_get_records(tc, &nrec);
 		if (error != 0)
 			return (error);
 		tot_rec += nrec;
+		hwt_sleep();
 	} while (tot_rec < nlibs);
-
-	if (tc->func_name)
-		hwt_find_sym(tc);
 
 	hwt_coresight_process(tc);
 
