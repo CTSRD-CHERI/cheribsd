@@ -341,14 +341,14 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		if (ctx == NULL)
 			return (ENXIO);
 
-		mtx_lock_spin(&ctx->mtx);
+		HWT_CTX_LOCK(ctx);
 		if (ctx->state == CTX_STATE_RUNNING) {
 			/* Already running ? */
-			mtx_unlock_spin(&ctx->mtx);
+			HWT_CTX_UNLOCK(ctx);
 			return (ENXIO);
 		}
 		ctx->state = CTX_STATE_RUNNING;
-		mtx_unlock_spin(&ctx->mtx);
+		HWT_CTX_UNLOCK(ctx);
 
 		return (0);
 

@@ -88,7 +88,7 @@ hwt_contexthash_lookup(struct proc *p)
 	mtx_lock_spin(&hwt_contexthash_mtx);
 	LIST_FOREACH(ctx, hch, next_hch) {
 		if (ctx->proc == p) {
-			mtx_lock_spin(&ctx->mtx);
+			HWT_CTX_LOCK(ctx);
 			mtx_unlock_spin(&hwt_contexthash_mtx);
 			return (ctx);
 		}
