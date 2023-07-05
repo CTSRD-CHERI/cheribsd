@@ -92,7 +92,7 @@ hwt_backend_configure(struct hwt_thread *thr, int cpu_id)
 
 	ctx = thr->ctx;
 
-	HWT_CTX_ASSERT_LOCKED(ctx);
+	HWT_THR_ASSERT_LOCKED(thr);
 
 	ctx->hwt_backend->ops->hwt_backend_configure(thr, cpu_id);
 
@@ -108,7 +108,7 @@ hwt_backend_enable(struct hwt_thread *thr, int cpu_id)
 
 	ctx = thr->ctx;
 
-	HWT_CTX_ASSERT_LOCKED(ctx);
+	HWT_THR_ASSERT_LOCKED(thr);
 
 	ctx->hwt_backend->ops->hwt_backend_enable(thr, cpu_id);
 
@@ -124,7 +124,7 @@ hwt_backend_disable(struct hwt_thread *thr, int cpu_id)
 
 	ctx = thr->ctx;
 
-	HWT_CTX_ASSERT_LOCKED(ctx);
+	HWT_THR_ASSERT_LOCKED(thr);
 
 	ctx->hwt_backend->ops->hwt_backend_disable(thr, cpu_id);
 

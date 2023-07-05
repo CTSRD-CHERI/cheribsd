@@ -90,7 +90,7 @@ hwt_switch_in(struct thread *td)
 	hwt_backend_configure(thr, cpu_id);
 	hwt_backend_enable(thr, cpu_id);
 
-	HWT_CTX_UNLOCK(ctx);
+	HWT_THR_UNLOCK(thr);
 }
 
 static void
@@ -119,7 +119,7 @@ hwt_switch_out(struct thread *td)
 	    thr->thread_id, td->td_tid, cpu_id);
 
 	hwt_backend_disable(thr, cpu_id);
-	HWT_CTX_UNLOCK(ctx);
+	HWT_THR_UNLOCK(thr);
 }
 
 static void
@@ -143,19 +143,21 @@ hwt_thread_exit(struct thread *td)
 		return;
 	}
 	thr = hwt_thread_lookup(ctx, td);
+
 	thr->state = HWT_THREAD_STATE_EXITED;
 
 	printf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
 	    thr->thread_id, td->td_tid, cpu_id);
 
 	hwt_backend_disable(thr, cpu_id);
-	HWT_CTX_UNLOCK(ctx);
+	HWT_THR_UNLOCK(thr);
 }
 
 static void
 hwt_hook_mmap(struct thread *td)
 {
 	struct hwt_context *ctx;
+	struct hwt_thread *thr;
 	struct proc *p;
 	int pause;
 
@@ -165,24 +167,18 @@ hwt_hook_mmap(struct thread *td)
 	if (ctx == NULL)
 		return;
 
-#if 0
-	if (ctx->state != CTX_STATE_RUNNING) {
-		HWT_CTX_UNLOCK(ctx);
-		return;
-	}
-#endif
+	/* The ctx state could be any here. */
 
 	pause = ctx->pause_on_mmap ? 1 : 0;
 
-	HWT_CTX_UNLOCK(ctx);
+	thr = hwt_thread_lookup(ctx, td);
 
 	if (pause) {
-		PROC_LOCK(p);
-		PROC_SLOCK(p);
-		thread_suspend_switch(td, p);
-		PROC_SUNLOCK(p);
-		PROC_UNLOCK(p);
+		thr->sleeping = 1;
+		msleep_spin(thr, &thr->mtx, "hwt-mmap", 0);
 	}
+
+	HWT_THR_UNLOCK(thr);
 }
 
 static void

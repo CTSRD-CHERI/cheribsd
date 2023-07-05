@@ -318,6 +318,8 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	struct hwt_context *ctx;
 	struct hwt_owner *ho;
 	struct hwt_start *s;
+	struct hwt_wakeup *hwakeup;
+	struct hwt_thread *thr;
 	int error;
 
 	switch (cmd) {
@@ -384,6 +386,25 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			return (error);
 
 		ctx->pause_on_mmap = sconf->pause_on_mmap ? 1 : 0;
+
+		return (0);
+	case HWT_IOC_WAKEUP:
+		hwakeup = (struct hwt_wakeup *)addr;
+
+		/* Check if process is registered owner of any HWTs. */
+		ho = hwt_ownerhash_lookup(td->td_proc);
+		if (ho == NULL)
+			return (ENXIO);
+
+		ctx = hwt_owner_lookup_ctx(ho, hwakeup->pid);
+		if (ctx == NULL)
+			return (ENXIO);
+
+		thr = hwt_thread_lookup_by_tid(ctx, hwakeup->tid);
+		if (thr == NULL)
+			return (ENOENT);
+
+		wakeup(thr);
 
 		return (0);
 	default:

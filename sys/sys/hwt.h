@@ -48,6 +48,8 @@
 	_IOW(HWT_MAGIC, 0x03, struct hwt_bufptr_get)
 #define	HWT_IOC_SET_CONFIG \
 	_IOW(HWT_MAGIC, 0x04, struct hwt_set_config)
+#define	HWT_IOC_WAKEUP \
+	_IOW(HWT_MAGIC, 0x05, struct hwt_wakeup)
 
 #define	HWT_BACKEND_MAXNAMELEN	256
 
@@ -59,6 +61,11 @@ struct hwt_alloc {
 
 struct hwt_start {
 	pid_t		pid;
+} __aligned(16);
+
+struct hwt_wakeup {
+	pid_t		pid;
+	lwpid_t		tid;
 } __aligned(16);
 
 struct hwt_record_user_entry {

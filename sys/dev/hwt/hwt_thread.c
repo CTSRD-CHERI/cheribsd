@@ -323,6 +323,22 @@ hwt_thread_destroy_buffers(struct hwt_thread *thr)
 }
 
 /*
+ * Called by ctx owner only.
+ */
+struct hwt_thread *
+hwt_thread_lookup_by_tid(struct hwt_context *ctx, lwpid_t tid)
+{
+	struct hwt_thread *thr, *thr1;
+
+	LIST_FOREACH_SAFE(thr, &ctx->threads, next, thr1) {
+		if (thr->tid == tid)
+			return (thr);
+	}
+
+	return (NULL);
+}
+
+/*
  * To use by hwt_switch_in/out() only.
  */
 struct hwt_thread *
@@ -334,6 +350,8 @@ hwt_thread_lookup(struct hwt_context *ctx, struct thread *td)
 
 	LIST_FOREACH_SAFE(thr, &ctx->threads, next, thr1) {
 		if (thr->tid == td->td_tid) {
+			HWT_THR_LOCK(thr);
+			HWT_CTX_UNLOCK(ctx);
 			return (thr);
 		}
 	}
