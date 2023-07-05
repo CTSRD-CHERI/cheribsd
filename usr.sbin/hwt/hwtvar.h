@@ -64,6 +64,7 @@ void hwt_sleep(void);
 int hwt_elf_count_libs(const char *elf_path, uint32_t *nlibs0);
 int hwt_find_sym(struct trace_context *tc);
 int hwt_start_tracing(struct trace_context *tc);
-int hwt_mmap_received(struct trace_context *tc);
+int hwt_mmap_received(struct trace_context *tc,
+    struct hwt_record_user_entry *entry);
 
 #endif /* !_HWTVAR_H_ */

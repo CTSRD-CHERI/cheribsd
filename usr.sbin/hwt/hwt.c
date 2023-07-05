@@ -79,17 +79,22 @@ hwt_procexit(pid_t pid, int exit_status __unused)
 }
 
 static int
-hwt_unsuspend_proc(struct trace_context *tc)
+hwt_unsuspend_proc(struct trace_context *tc, lwpid_t tid)
 {
+	struct hwt_wakeup w;
 	int error;
 
-	error = kill(tc->pid, SIGCONT);
+	w.pid = tc->pid;
+	w.tid = tid;
+
+	error = ioctl(tc->fd, HWT_IOC_WAKEUP, &w);
 
 	return (error);
 }
 
 int
-hwt_mmap_received(struct trace_context *tc)
+hwt_mmap_received(struct trace_context *tc,
+    struct hwt_record_user_entry *entry)
 {
 	int error;
 
@@ -101,7 +106,7 @@ hwt_mmap_received(struct trace_context *tc)
 
 	error = hwt_find_sym(tc);
 	if (error != 0) {
-		hwt_unsuspend_proc(tc);
+		hwt_unsuspend_proc(tc, entry->tid);
 		return (-1);
 	}
 
@@ -118,7 +123,7 @@ hwt_mmap_received(struct trace_context *tc)
 
 	printf("%s: tracing started\n", __func__);
 
-	hwt_unsuspend_proc(tc);
+	hwt_unsuspend_proc(tc, entry->tid);
 
 	return (0);
 }
@@ -134,10 +139,8 @@ hwt_ctx_alloc(struct trace_context *tc)
 	al.backend_name = "coresight";
 
 	error = ioctl(tc->fd, HWT_IOC_ALLOC, &al);
-	if (error != 0)
-		return (error);
 
-	return (0);
+	return (error);
 }
 
 static int

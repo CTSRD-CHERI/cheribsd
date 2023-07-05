@@ -113,7 +113,7 @@ printf("%s: error %d: nent %d\n", __func__, error, nentries);
 			    (unsigned long)image->pi_start,
 			    (unsigned long)image->pi_entry);
 #endif
-			hwt_mmap_received(tc);
+			hwt_mmap_received(tc, entry);
 			break;
 		case HWT_RECORD_THREAD_CREATE:
 		case HWT_RECORD_THREAD_SET_NAME:
