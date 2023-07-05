@@ -304,9 +304,8 @@ typedef struct Struct_Obj_Entry {
     int vernum;			/* Number of entries in vertab */
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    SLIST_HEAD(, Struct_Stack_Entry) stacks; /* List of object's per-thread stacks */
-    void *stackslock;
     uint16_t compart_id;
+    struct Struct_Stack_Entry *_Atomic stacks; /* List of object's per-thread stacks */
 #endif
 
     void* init_ptr;		/* Initialization function to call */

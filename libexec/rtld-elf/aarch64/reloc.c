@@ -40,6 +40,7 @@
 #include "rtld.h"
 #include "rtld_printf.h"
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#include <stdatomic.h>
 #include "rtld_libc.h"
 #endif
 
@@ -202,9 +203,7 @@ void *
 get_rstk(const void *target, uint32_t index, tramp_stk_table_t table)
 {
 	size_t len = cheri_getlen(table) / sizeof(*table);
-
-	assert(cheri_gettag(table));
-
+	assert(len <= index || table[index] == NULL);
 	if (len <= index) {
 		size_t new_len = index * 2;
 		table = realloc(table, new_len * sizeof(*table));
@@ -214,34 +213,30 @@ get_rstk(const void *target, uint32_t index, tramp_stk_table_t table)
 
 		asm ("msr	ctpidr_el0, %0" :: "C" (table));
 	}
-
 	assert(table[index] == NULL);
 
-	size_t size = SANDBOX_STACK_DEFAULT;
 	void **stk;
-	struct Struct_Stack_Entry *entry;
-	Obj_Entry *dst;
+	struct Struct_Stack_Entry *_Atomic *head, *entry;
 
+	len = SANDBOX_STACK_DEFAULT;
 	stk = (void **)((char *)mmap(NULL,
-	    size,
+	    len,
 	    PROT_READ | PROT_WRITE,
 	    MAP_ANON | MAP_PRIVATE | MAP_STACK,
-	    -1, 0) + size);
+	    -1, 0) + len);
 	if (stk == MAP_FAILED)
 		rtld_fatal("mmap failed");
-
 	stk = cheri_clearperm(stk, CHERI_PERM_EXECUTIVE | CHERI_PERM_SW_VMEM);
 	stk[-1] = &stk[-1];
 
 	table[index] = stk;
 
+	head = &obj_from_addr(target)->stacks;
 	entry = xmalloc(sizeof(*entry));
 	entry->stack = stk;
-
-	dst = obj_from_addr(target);
-	lockinfo.wlock_acquire(dst->stackslock);
-	SLIST_INSERT_HEAD(&dst->stacks, entry, link);
-	lockinfo.lock_release(dst->stackslock);
+	SLIST_NEXT(entry, link) = *head;
+	while(!atomic_compare_exchange_weak(
+	    head, &SLIST_NEXT(entry, link), entry));
 
 	return (stk);
 }

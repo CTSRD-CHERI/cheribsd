@@ -602,10 +602,6 @@ obj_new(void)
     STAILQ_INIT(&obj->dldags);
     STAILQ_INIT(&obj->dagmembers);
     STAILQ_INIT(&obj->names);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    SLIST_INIT(&obj->stacks);
-    obj->stackslock = lockinfo.lock_create();
-#endif
     return obj;
 }
 
