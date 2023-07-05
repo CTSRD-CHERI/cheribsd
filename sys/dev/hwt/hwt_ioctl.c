@@ -291,16 +291,17 @@ hwt_ioctl_set_config(struct thread *td, struct hwt_context *ctx,
 
 	config = malloc(config_size, M_HWT_IOCTL, M_WAITOK | M_ZERO);
 
-	old_config = NULL;
+	error = copyin(sconf->config, config, config_size);
+	if (error) {
+		free(config, M_HWT_IOCTL);
+		return (error);
+	}
 
 	HWT_CTX_LOCK(ctx);
-	error = copyin(sconf->config, config, config_size);
-	if (error == 0) {
-		old_config = ctx->config;
-		ctx->config = config;
-		ctx->config_size = sconf->config_size;
-		ctx->config_version = sconf->config_version;
-	}
+	old_config = ctx->config;
+	ctx->config = config;
+	ctx->config_size = sconf->config_size;
+	ctx->config_version = sconf->config_version;
 	HWT_CTX_UNLOCK(ctx);
 
 	if (old_config != NULL)
