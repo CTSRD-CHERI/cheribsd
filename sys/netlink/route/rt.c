@@ -708,7 +708,19 @@ finalize_nhop(struct nhop_object *nh, const struct sockaddr *dst, int *perror)
 	}
 	/* Both nh_ifp and gateway are set */
 	if (nh->nh_ifa == NULL) {
-		struct ifaddr *ifa = ifaof_ifpforaddr(&nh->gw_sa, nh->nh_ifp);
+		const struct sockaddr *gw_sa = &nh->gw_sa;
+
+		if (gw_sa->sa_family != dst->sa_family) {
+			/*
+			 * Use dst as the target for determining the default
+			 * preferred ifa IF
+			 * 1) the gateway is link-level (e.g. direct route)
+			 * 2) the gateway family is different (e.g. IPv4 over IPv6).
+			 */
+			gw_sa = dst;
+		}
+
+		struct ifaddr *ifa = ifaof_ifpforaddr(gw_sa, nh->nh_ifp);
 		if (ifa == NULL) {
 			NL_LOG(LOG_DEBUG, "Unable to determine ifa, skipping");
 			*perror = EINVAL;
@@ -732,7 +744,7 @@ get_pxflag(const struct nl_parsed_route *attrs)
 			pxflag = NHF_DEFAULT;
 		break;
 	case AF_INET6:
-		if (attrs->rtm_dst_len == 32)
+		if (attrs->rtm_dst_len == 128)
 			pxflag = NHF_HOST;
 		else if (attrs->rtm_dst_len == 0)
 			pxflag = NHF_DEFAULT;
@@ -776,6 +788,7 @@ create_nexthop_one(struct nl_parsed_route *attrs, struct rta_mpath_nh *mpnh,
 	}
 	if (mpnh->ifp != NULL)
 		nhop_set_transmit_ifp(nh, mpnh->ifp);
+	nhop_set_pxtype_flag(nh, get_pxflag(attrs));
 	nhop_set_rtflags(nh, attrs->rta_rtflags);
 	if (attrs->rtm_protocol > RTPROT_STATIC)
 		nhop_set_origin(nh, attrs->rtm_protocol);
@@ -852,6 +865,7 @@ create_nexthop_from_attrs(struct nl_parsed_route *attrs,
 			nhop_set_broadcast(nh, true);
 		if (attrs->rtm_protocol > RTPROT_STATIC)
 			nhop_set_origin(nh, attrs->rtm_protocol);
+		nhop_set_pxtype_flag(nh, get_pxflag(attrs));
 		nhop_set_rtflags(nh, attrs->rta_rtflags);
 
 		switch (attrs->rtm_type) {

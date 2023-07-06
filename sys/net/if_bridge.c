@@ -267,6 +267,7 @@ struct bridge_softc {
 	uint32_t		sc_brtexceeded;	/* # of cache drops */
 	struct ifnet		*sc_ifaddr;	/* member mac copied from */
 	struct ether_addr	sc_defaddr;	/* Default MAC address */
+	if_input_fn_t		sc_if_input;	/* Saved copy of if_input */
 	struct epoch_context	sc_epoch_ctx;
 };
 
@@ -298,6 +299,7 @@ static int	bridge_altq_transmit(if_t, struct mbuf *);
 #endif
 static void	bridge_qflush(struct ifnet *);
 static struct mbuf *bridge_input(struct ifnet *, struct mbuf *);
+static void	bridge_inject(struct ifnet *, struct mbuf *);
 static int	bridge_output(struct ifnet *, struct mbuf *, struct sockaddr *,
 		    struct rtentry *);
 static int	bridge_enqueue(struct bridge_softc *, struct ifnet *,
@@ -387,9 +389,12 @@ static int	bridge_fragment(struct ifnet *, struct mbuf **mp,
 static void	bridge_linkstate(struct ifnet *ifp);
 static void	bridge_linkcheck(struct bridge_softc *sc);
 
-/* The default bridge vlan is 1 (IEEE 802.1Q-2003 Table 9-2) */
+/*
+ * Use the "null" value from IEEE 802.1Q-2014 Table 9-2
+ * to indicate untagged frames.
+ */
 #define	VLANTAGOF(_m)	\
-    (_m->m_flags & M_VLANTAG) ? EVL_VLANOFTAG(_m->m_pkthdr.ether_vtag) : 1
+    (_m->m_flags & M_VLANTAG) ? EVL_VLANOFTAG(_m->m_pkthdr.ether_vtag) : DOT1Q_VID_NULL
 
 static struct bstp_cb_ops bridge_ops = {
 	.bcb_state = bridge_state_change,
@@ -768,6 +773,15 @@ bridge_clone_create(struct if_clone *ifc, char *name, size_t len,
 #ifdef VIMAGE
 	ifp->if_reassign = bridge_reassign;
 #endif
+	sc->sc_if_input = ifp->if_input;	/* ether_input */
+	ifp->if_input = bridge_inject;
+
+	/*
+	 * Allow BRIDGE_INPUT() to pass in packets originating from the bridge
+	 * itself via bridge_inject().  This is required for netmap but
+	 * otherwise has no effect.
+	 */
+	ifp->if_bridge_input = bridge_input;
 
 	BRIDGE_LIST_LOCK();
 	LIST_INSERT_HEAD(&V_bridge_list, sc, sc_list);
@@ -1628,8 +1642,13 @@ static int
 bridge_ioctl_daddr(struct bridge_softc *sc, void *arg)
 {
 	struct ifbareq *req = arg;
+	int vlan = req->ifba_vlan;
 
-	return (bridge_rtdaddr(sc, req->ifba_dst, req->ifba_vlan));
+	/* Userspace uses '0' to mean 'any vlan' */
+	if (vlan == 0)
+		vlan = DOT1Q_VID_RSVD_IMPL;
+
+	return (bridge_rtdaddr(sc, req->ifba_dst, vlan));
 }
 
 static int
@@ -2355,6 +2374,19 @@ bridge_forward(struct bridge_softc *sc, struct bridge_iflist *sbif,
 	    sbif->bif_stp.bp_state == BSTP_IFSTATE_LEARNING)
 		goto drop;
 
+#ifdef DEV_NETMAP
+	/*
+	 * Hand the packet to netmap only if it wasn't injected by netmap
+	 * itself.
+	 */
+	if ((m->m_flags & M_BRIDGE_INJECT) == 0 &&
+	    (if_getcapenable(ifp) & IFCAP_NETMAP) != 0) {
+		ifp->if_input(ifp, m);
+		return;
+	}
+	m->m_flags &= ~M_BRIDGE_INJECT;
+#endif
+
 	/*
 	 * At this point, the port either doesn't participate
 	 * in spanning tree or it is in the forwarding state.
@@ -2461,7 +2493,7 @@ drop:
 static struct mbuf *
 bridge_input(struct ifnet *ifp, struct mbuf *m)
 {
-	struct bridge_softc *sc = ifp->if_bridge;
+	struct bridge_softc *sc;
 	struct bridge_iflist *bif, *bif2;
 	struct ifnet *bifp;
 	struct ether_header *eh;
@@ -2471,11 +2503,31 @@ bridge_input(struct ifnet *ifp, struct mbuf *m)
 
 	NET_EPOCH_ASSERT();
 
-	if ((sc->sc_ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
-		return (m);
-
-	bifp = sc->sc_ifp;
+	eh = mtod(m, struct ether_header *);
 	vlan = VLANTAGOF(m);
+
+	sc = ifp->if_bridge;
+	if (sc == NULL) {
+		/*
+		 * This packet originated from the bridge itself, so it must
+		 * have been transmitted by netmap.  Derive the "source"
+		 * interface from the source address and drop the packet if the
+		 * source address isn't known.
+		 */
+		KASSERT((m->m_flags & M_BRIDGE_INJECT) != 0,
+		    ("%s: ifnet %p missing a bridge softc", __func__, ifp));
+		sc = if_getsoftc(ifp);
+		ifp = bridge_rtlookup(sc, eh->ether_shost, vlan);
+		if (ifp == NULL) {
+			if_inc_counter(sc->sc_ifp, IFCOUNTER_IERRORS, 1);
+			m_freem(m);
+			return (NULL);
+		}
+		m->m_pkthdr.rcvif = ifp;
+	}
+	bifp = sc->sc_ifp;
+	if ((bifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
+		return (m);
 
 	/*
 	 * Implement support for bridge monitoring. If this flag has been
@@ -2495,8 +2547,6 @@ bridge_input(struct ifnet *ifp, struct mbuf *m)
 	if (bif == NULL) {
 		return (m);
 	}
-
-	eh = mtod(m, struct ether_header *);
 
 	bridge_span(sc, m);
 
@@ -2526,6 +2576,18 @@ bridge_input(struct ifnet *ifp, struct mbuf *m)
 		/* Perform the bridge forwarding function with the copy. */
 		bridge_forward(sc, bif, mc);
 
+#ifdef DEV_NETMAP
+		/*
+		 * If netmap is enabled and has not already seen this packet,
+		 * then it will be consumed by bridge_forward().
+		 */
+		if ((if_getcapenable(bifp) & IFCAP_NETMAP) != 0 &&
+		    (m->m_flags & M_BRIDGE_INJECT) == 0) {
+			m_freem(m);
+			return (NULL);
+		}
+#endif
+
 		/*
 		 * Reinject the mbuf as arriving on the bridge so we have a
 		 * chance at claiming multicast packets. We can not loop back
@@ -2542,7 +2604,8 @@ bridge_input(struct ifnet *ifp, struct mbuf *m)
 		}
 		if (mc2 != NULL) {
 			mc2->m_pkthdr.rcvif = bifp;
-			(*bifp->if_input)(bifp, mc2);
+			mc2->m_flags &= ~M_BRIDGE_INJECT;
+			sc->sc_if_input(bifp, mc2);
 		}
 
 		/* Return the original packet for local processing. */
@@ -2570,6 +2633,18 @@ bridge_input(struct ifnet *ifp, struct mbuf *m)
 #define	PFIL_HOOKED_INET6	false
 #endif
 
+#ifdef DEV_NETMAP
+#define	GRAB_FOR_NETMAP(ifp, m) do {					\
+	if ((if_getcapenable(ifp) & IFCAP_NETMAP) != 0 &&		\
+	    ((m)->m_flags & M_BRIDGE_INJECT) == 0) {			\
+		(ifp)->if_input(ifp, m);				\
+		return (NULL);						\
+	}								\
+} while (0)
+#else
+#define	GRAB_FOR_NETMAP(ifp, m)
+#endif
+
 #define GRAB_OUR_PACKETS(iface)						\
 	if ((iface)->if_type == IFT_GIF)				\
 		continue;						\
@@ -2592,7 +2667,9 @@ bridge_input(struct ifnet *ifp, struct mbuf *m)
 		/* It's passing over or to the bridge, locally. */	\
 		ETHER_BPF_MTAP(bifp, m);				\
 		if_inc_counter(bifp, IFCOUNTER_IPACKETS, 1);		\
-		if_inc_counter(bifp, IFCOUNTER_IBYTES, m->m_pkthdr.len); \
+		if_inc_counter(bifp, IFCOUNTER_IBYTES, m->m_pkthdr.len);\
+		/* Hand the packet over to netmap if necessary. */	\
+		GRAB_FOR_NETMAP(bifp, m);				\
 		/* Filter on the physical interface. */			\
 		if (V_pfil_local_phys && (PFIL_HOOKED_IN(V_inet_pfil_head) || \
 		    PFIL_HOOKED_INET6)) {				\
@@ -2635,12 +2712,35 @@ bridge_input(struct ifnet *ifp, struct mbuf *m)
 #undef CARP_CHECK_WE_ARE_DST
 #undef CARP_CHECK_WE_ARE_SRC
 #undef PFIL_HOOKED_INET6
+#undef GRAB_FOR_NETMAP
 #undef GRAB_OUR_PACKETS
 
 	/* Perform the bridge forwarding function. */
 	bridge_forward(sc, bif, m);
 
 	return (NULL);
+}
+
+/*
+ * Inject a packet back into the host ethernet stack.  This will generally only
+ * be used by netmap when an application writes to the host TX ring.  The
+ * M_BRIDGE_INJECT flag ensures that the packet is re-routed to the bridge
+ * interface after ethernet processing.
+ */
+static void
+bridge_inject(struct ifnet *ifp, struct mbuf *m)
+{
+	struct bridge_softc *sc;
+
+	KASSERT((if_getcapenable(ifp) & IFCAP_NETMAP) != 0,
+	    ("%s: iface %s is not running in netmap mode",
+	    __func__, if_name(ifp)));
+	KASSERT((m->m_flags & M_BRIDGE_INJECT) == 0,
+	    ("%s: mbuf %p has M_BRIDGE_INJECT set", __func__, m));
+
+	m->m_flags |= M_BRIDGE_INJECT;
+	sc = if_getsoftc(ifp);
+	sc->sc_if_input(ifp, m);
 }
 
 /*
@@ -2794,10 +2894,6 @@ bridge_rtupdate(struct bridge_softc *sc, const uint8_t *dst, uint16_t vlan,
 	     dst[3] == 0 && dst[4] == 0 && dst[5] == 0) != 0)
 		return (EINVAL);
 
-	/* 802.1p frames map to vlan 1 */
-	if (vlan == 0)
-		vlan = 1;
-
 	/*
 	 * A route for this destination might already exist.  If so,
 	 * update it, otherwise create a new one.
@@ -2865,11 +2961,10 @@ bridge_rtupdate(struct bridge_softc *sc, const uint8_t *dst, uint16_t vlan,
 
 		if (V_log_mac_flap &&
 		    ppsratecheck(&V_log_last, &V_log_count, V_log_interval)) {
-			uint8_t *addr = &brt->brt_addr[0];
 			log(LOG_NOTICE,
-			    "%s: mac address %02x:%02x:%02x:%02x:%02x:%02x vlan %d moved from %s to %s\n",
+			    "%s: mac address %6D vlan %d moved from %s to %s\n",
 			    sc->sc_ifp->if_xname,
-			    addr[0], addr[1], addr[2], addr[3], addr[4], addr[5],
+			    &brt->brt_addr[0], ":",
 			    brt->brt_vlan,
 			    obif->bif_ifp->if_xname,
 			    bif->bif_ifp->if_xname);
@@ -3009,8 +3104,8 @@ bridge_rtdaddr(struct bridge_softc *sc, const uint8_t *addr, uint16_t vlan)
 	BRIDGE_RT_LOCK(sc);
 
 	/*
-	 * If vlan is zero then we want to delete for all vlans so the lookup
-	 * may return more than one.
+	 * If vlan is DOT1Q_VID_RSVD_IMPL then we want to delete for all vlans
+	 * so the lookup may return more than one.
 	 */
 	while ((brt = bridge_rtnode_lookup(sc, addr, vlan)) != NULL) {
 		bridge_rtnode_destroy(sc, brt);
@@ -3141,7 +3236,7 @@ bridge_rtnode_lookup(struct bridge_softc *sc, const uint8_t *addr, uint16_t vlan
 	hash = bridge_rthash(sc, addr);
 	CK_LIST_FOREACH(brt, &sc->sc_rthash[hash], brt_hash) {
 		dir = bridge_rtnode_addr_cmp(addr, brt->brt_addr);
-		if (dir == 0 && (brt->brt_vlan == vlan || vlan == 0))
+		if (dir == 0 && (brt->brt_vlan == vlan || vlan == DOT1Q_VID_RSVD_IMPL))
 			return (brt);
 		if (dir > 0)
 			return (NULL);

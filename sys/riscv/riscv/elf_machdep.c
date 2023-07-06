@@ -66,8 +66,6 @@ __FBSDID("$FreeBSD$");
 
 #include "linker_if.h"
 
-static const char *riscv_machine_arch(struct proc *p);
-
 u_long elf_hwcap;
 
 static struct sysentvec elf_freebsd_sysvec = {
@@ -114,23 +112,12 @@ static struct sysentvec elf_freebsd_sysvec = {
 	.sv_thread_detach = NULL,
 	.sv_trap	= NULL,
 	.sv_hwcap	= &elf_hwcap,
-	.sv_machine_arch = riscv_machine_arch,
 	.sv_onexec_old	= exec_onexec_old,
 	.sv_onexit	= exit_onexit,
 	.sv_regset_begin = SET_BEGIN(__elfN(regset)),
 	.sv_regset_end  = SET_LIMIT(__elfN(regset)),
 };
 INIT_SYSENTVEC(elf_sysvec, &elf_freebsd_sysvec);
-
-static const char *
-riscv_machine_arch(struct proc *p)
-{
-
-	if ((p->p_elf_flags & EF_RISCV_FLOAT_ABI_MASK) ==
-	    EF_RISCV_FLOAT_ABI_SOFT)
-		return (MACHINE_ARCHSF);
-	return (MACHINE_ARCH);
-}
 
 static __ElfN(Brandinfo) freebsd_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,

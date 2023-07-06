@@ -231,6 +231,7 @@ _Static_assert(sizeof(struct vnode) <= 448, "vnode size crosses 448 bytes");
 				   never cleared once set */
 #define	VIRF_MOUNTPOINT	0x0004	/* This vnode is mounted on */
 #define	VIRF_TEXT_REF	0x0008	/* Executable mappings ref the vnode */
+#define	VIRF_CROSSMP	0x0010	/* Cross-mp vnode, no locking */
 
 #define	VI_UNUSED0	0x0001	/* unused */
 #define	VI_MOUNT	0x0002	/* Mount in progress */
@@ -760,8 +761,8 @@ bool	vn_isdisk_error(struct vnode *vp, int *errp);
 bool	vn_isdisk(struct vnode *vp);
 int	_vn_lock(struct vnode *vp, int flags, const char *file, int line);
 #define vn_lock(vp, flags) _vn_lock(vp, flags, __FILE__, __LINE__)
-void	vn_lock_pair(struct vnode *vp1, bool vp1_locked, struct vnode *vp2,
-	    bool vp2_locked);
+void	vn_lock_pair(struct vnode *vp1, bool vp1_locked, int lkflags1,
+	    struct vnode *vp2, bool vp2_locked, int lkflags2);
 int	vn_open(struct nameidata *ndp, int *flagp, int cmode, struct file *fp);
 int	vn_open_cred(struct nameidata *ndp, int *flagp, int cmode,
 	    u_int vn_open_flags, struct ucred *cred, struct file *fp);

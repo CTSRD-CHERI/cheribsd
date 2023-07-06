@@ -1,4 +1,4 @@
-/*	$NetBSD: cd9660.c,v 1.32 2011/08/23 17:09:11 christos Exp $	*/
+/*	$NetBSD: cd9660.c,v 1.56 2019/10/18 04:09:02 msaitoh Exp $	*/
 
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-NetBSD AND BSD-4-Clause
@@ -115,7 +115,7 @@ __FBSDID("$FreeBSD$");
 static void cd9660_finalize_PVD(iso9660_disk *);
 static cd9660node *cd9660_allocate_cd9660node(void);
 static void cd9660_set_defaults(iso9660_disk *);
-static int cd9660_arguments_set_string(const char *, const char *, int,
+static int cd9660_arguments_set_string(const char *, const char *, size_t,
     char, char *);
 static void cd9660_populate_iso_dir_record(
     struct _iso_directory_record_cd9660 *, u_char, u_char, u_char,
@@ -147,10 +147,6 @@ static int cd9660_level1_convert_filename(iso9660_disk *, const char *, char *,
     int);
 static int cd9660_level2_convert_filename(iso9660_disk *, const char *, char *,
     int);
-#if 0
-static int cd9660_joliet_convert_filename(iso9660_disk *, const char *, char *,
-    int);
-#endif
 static int cd9660_convert_filename(iso9660_disk *, const char *, char *, int);
 static void cd9660_populate_dot_records(iso9660_disk *, cd9660node *);
 static int64_t cd9660_compute_offsets(iso9660_disk *, cd9660node *, int64_t);
@@ -328,10 +324,11 @@ cd9660_cleanup_opts(fsinfo_t *fsopts)
 }
 
 static int
-cd9660_arguments_set_string(const char *val, const char *fieldtitle, int length,
-			    char testmode, char * dest)
+cd9660_arguments_set_string(const char *val, const char *fieldtitle,
+    size_t length, char testmode, char *dest)
 {
-	int len, test;
+	size_t len;
+	int test;
 
 	if (val == NULL)
 		warnx("error: '%s' requires a string argument", fieldtitle);
@@ -1585,11 +1582,6 @@ cd9660_compute_full_filename(cd9660node *node, char *buf)
 		errx(EXIT_FAILURE, "Pathname too long.");
 }
 
-/* NEW filename conversion method */
-typedef int(*cd9660_filename_conversion_functor)(iso9660_disk *, const char *,
-    char *, int);
-
-
 /*
  * TODO: These two functions are almost identical.
  * Some code cleanup is possible here
@@ -1722,16 +1714,6 @@ cd9660_level2_convert_filename(iso9660_disk *diskStructure, const char *oldname,
 	return namelen + extlen + found_ext;
 }
 
-#if 0
-static int
-cd9660_joliet_convert_filename(iso9660_disk *diskStructure, const char *oldname,
-    char *newname, int is_file)
-{
-	/* TODO: implement later, move to cd9660_joliet.c ?? */
-}
-#endif
-
-
 /*
  * Convert a file name to ISO compliant file name
  * @param char * oldname The original filename
@@ -1745,13 +1727,13 @@ cd9660_convert_filename(iso9660_disk *diskStructure, const char *oldname,
     char *newname, int is_file)
 {
 	assert(1 <= diskStructure->isoLevel && diskStructure->isoLevel <= 2);
-	/* NEW */
-	cd9660_filename_conversion_functor conversion_function = NULL;
 	if (diskStructure->isoLevel == 1)
-		conversion_function = &cd9660_level1_convert_filename;
+		return(cd9660_level1_convert_filename(diskStructure,
+		    oldname, newname, is_file));
 	else if (diskStructure->isoLevel == 2)
-		conversion_function = &cd9660_level2_convert_filename;
-	return (*conversion_function)(diskStructure, oldname, newname, is_file);
+		return (cd9660_level2_convert_filename(diskStructure,
+		    oldname, newname, is_file));
+	abort();
 }
 
 int

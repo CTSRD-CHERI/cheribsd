@@ -3602,11 +3602,12 @@ dev/xdma/xdma_sglist.c		optional xdma
 dev/xen/balloon/balloon.c	optional xenhvm
 dev/xen/blkfront/blkfront.c	optional xenhvm
 dev/xen/blkback/blkback.c	optional xenhvm
+dev/xen/bus/xen_intr.c		optional xenhvm
 dev/xen/bus/xenpv.c		optional xenhvm
 dev/xen/console/xen_console.c	optional xenhvm
 dev/xen/control/control.c	optional xenhvm
 dev/xen/cpu/xen_acpi_cpu.c	optional xenhvm
-dev/xen/efi/pvefi.c		optional xenhvm efirt
+dev/xen/efi/pvefi.c		optional xenhvm xenefi efirt
 dev/xen/grant_table/grant_table.c	optional xenhvm
 dev/xen/netback/netback.c	optional xenhvm
 dev/xen/netfront/netfront.c	optional xenhvm
@@ -5328,6 +5329,7 @@ vm/vm_swapout_dummy.c		optional NO_SWAPPING
 vm/vm_unix.c			standard
 vm/vnode_pager.c		standard
 xen/features.c			optional xenhvm
+xen/xen_common.c		optional xenhvm
 xen/xenbus/xenbus_if.m		optional xenhvm
 xen/xenbus/xenbus.c		optional xenhvm
 xen/xenbus/xenbusb_if.m		optional xenhvm

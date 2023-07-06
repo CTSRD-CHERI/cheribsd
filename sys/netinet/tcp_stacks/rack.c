@@ -8113,6 +8113,9 @@ rack_stop_all_timers(struct tcpcb *tp, struct tcp_rack *rack)
 		/* We enter in persists, set the flag appropriately */
 		rack->rc_in_persist = 1;
 	}
+	if (tcp_in_hpts(rack->rc_inp)) {
+		tcp_hpts_remove(rack->rc_inp);
+	}
 }
 
 static void
@@ -11578,7 +11581,7 @@ rack_log_hybrid(struct tcp_rack *rack, uint32_t seq,
 			log.u_bbr.lt_epoch = (uint32_t)((cur->deadline >> 32) & 0x00000000ffffffff) ;
 			log.u_bbr.bbr_state = 1;
 			off = (uint64_t)(cur) - (uint64_t)(&rack->rc_tp->t_http_info[0]);
-			log.u_bbr.bbr_substate = (uint8_t)(off / sizeof(struct http_sendfile_track));
+			log.u_bbr.use_lt_bw = (uint8_t)(off / sizeof(struct http_sendfile_track));
 		} else {
 			log.u_bbr.flex2 = err;
 		}
@@ -16433,6 +16436,9 @@ rack_do_compressed_ack_processing(struct tcpcb *tp, struct socket *so, struct mb
 	return (0);
 }
 
+#define	TCP_LRO_TS_OPTION \
+    ntohl((TCPOPT_NOP << 24) | (TCPOPT_NOP << 16) | \
+	  (TCPOPT_TIMESTAMP << 8) | TCPOLEN_TIMESTAMP)
 
 static int
 rack_do_segment_nounlock(struct tcpcb *tp, struct mbuf *m, struct tcphdr *th,
@@ -16458,6 +16464,8 @@ rack_do_segment_nounlock(struct tcpcb *tp, struct mbuf *m, struct tcphdr *th,
 	struct tcp_rack *rack;
 	struct rack_sendmap *rsm;
 	int32_t prev_state = 0;
+	int no_output = 0;
+	int slot_remaining = 0;
 #ifdef TCP_ACCOUNTING
 	int ack_val_set = 0xf;
 #endif
@@ -16479,6 +16487,44 @@ rack_do_segment_nounlock(struct tcpcb *tp, struct mbuf *m, struct tcphdr *th,
 		 * some initialization. Call that now.
 		 */
 		rack_deferred_init(tp, rack);
+	}
+	/*
+	 * Check to see if we need to skip any output plans. This
+	 * can happen in the non-LRO path where we are pacing and
+	 * must process the ack coming in but need to defer sending
+	 * anything becase a pacing timer is running.
+	 */
+	us_cts = tcp_tv_to_usectick(tv);
+	if ((rack->rc_always_pace == 1) &&
+	    (rack->rc_ack_can_sendout_data == 0) &&
+	    (rack->r_ctl.rc_hpts_flags & PACE_PKT_OUTPUT) &&
+	    (TSTMP_LT(us_cts, rack->r_ctl.rc_last_output_to))) {
+		/*
+		 * Ok conditions are right for queuing the packets
+		 * but we do have to check the flags in the inp, it
+		 * could be, if a sack is present, we want to be awoken and
+		 * so should process the packets.
+		 */
+		slot_remaining = rack->r_ctl.rc_last_output_to - us_cts;
+		if (rack->rc_inp->inp_flags2 & INP_DONT_SACK_QUEUE) {
+			no_output = 1;
+		} else {
+			/*
+			 * If there is no options, or just a
+			 * timestamp option, we will want to queue
+			 * the packets. This is the same that LRO does
+			 * and will need to change with accurate ECN.
+			 */
+			uint32_t *ts_ptr;
+			int optlen;
+
+			optlen = (th->th_off << 2) - sizeof(struct tcphdr);
+			ts_ptr = (uint32_t *)(th + 1);
+			if ((optlen == 0) ||
+			    ((optlen == TCPOLEN_TSTAMP_APPA) &&
+			     (*ts_ptr == TCP_LRO_TS_OPTION)))
+				no_output = 1;
+		}
 	}
 	if (m->m_flags & M_ACKCMP) {
 		/*
@@ -16914,7 +16960,7 @@ rack_do_segment_nounlock(struct tcpcb *tp, struct mbuf *m, struct tcphdr *th,
 			}
 		}
 #endif
-		if (nxt_pkt == 0) {
+		if ((nxt_pkt == 0) && (no_output == 0)) {
 			if ((rack->r_wanted_output != 0) || (rack->r_fast_output != 0)) {
 do_output_now:
 				if (tcp_output(tp) < 0) {
@@ -16926,6 +16972,16 @@ do_output_now:
 				did_out = 1;
 			}
 			rack_start_hpts_timer(rack, tp, cts, 0, 0, 0);
+			rack_free_trim(rack);
+		} else if ((no_output == 1) &&
+			   (nxt_pkt == 0)  &&
+			   (tcp_in_hpts(rack->rc_inp) == 0)) {
+			/*
+			 * We are not in hpts and we had a pacing timer up. Use
+			 * the remaining time (slot_remaining) to restart the timer.
+			 */
+			KASSERT ((slot_remaining != 0), ("slot remaining is zero for rack:%p tp:%p", rack, tp));
+			rack_start_hpts_timer(rack, tp, cts, slot_remaining, 0, 0);
 			rack_free_trim(rack);
 		}
 		/* Update any rounds needed */
@@ -23369,6 +23425,7 @@ rack_set_sockopt(struct tcpcb *tp, struct sockopt *sopt)
 	struct inpcb *inp = tptoinpcb(tp);
 #ifdef INET6
 	struct ip6_hdr *ip6;
+	int32_t mask, tclass;
 #endif
 #ifdef INET
 	struct ip *ip;
@@ -23376,7 +23433,7 @@ rack_set_sockopt(struct tcpcb *tp, struct sockopt *sopt)
 	struct tcp_rack *rack;
 	struct tcp_hybrid_req hybrid;
 	uint64_t loptval;
-	int32_t error = 0, mask, optval, tclass;
+	int32_t error = 0, optval;
 
 	rack = (struct tcp_rack *)tp->t_fb_ptr;
 	if (rack == NULL) {
