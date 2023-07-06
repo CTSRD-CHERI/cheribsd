@@ -28,6 +28,9 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+
 /*
  * Fragments consist of a 64-bit address followed by a 56-bit length and an
  * 8-bit permission field.
@@ -102,3 +105,22 @@ crt1_handle_rela(const Elf_Rela *r, void *data_cap, const void *code_cap)
 		break;
 	}
 }
+#else
+static void
+crt1_handle_rela(const Elf_Rela *r)
+{
+	typedef Elf_Addr (*ifunc_resolver_t)(
+	    uint64_t, uint64_t, uint64_t, uint64_t,
+	    uint64_t, uint64_t, uint64_t, uint64_t);
+	Elf_Addr *ptr, *where, target;
+
+	switch (ELF_R_TYPE(r->r_info)) {
+	case R_AARCH64_IRELATIVE:
+		ptr = (Elf_Addr *)r->r_addend;
+		where = (Elf_Addr *)r->r_offset;
+		target = ((ifunc_resolver_t)ptr)(0, 0, 0, 0, 0, 0, 0, 0);
+		*where = target;
+		break;
+	}
+}
+#endif

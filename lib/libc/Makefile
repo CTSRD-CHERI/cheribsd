@@ -107,6 +107,7 @@ MIASM=
 NOASM=
 
 .include "${LIBC_SRCTOP}/${LIBC_ARCH}/Makefile.inc"
+.include "${LIBC_SRCTOP}/csu/Makefile.inc"
 .include "${LIBC_SRCTOP}/db/Makefile.inc"
 .if ${MACHINE_CPU:Mcheri}
 .include "${LIBC_SRCTOP}/cheri/Makefile.inc"

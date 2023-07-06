@@ -197,6 +197,7 @@ __DEFAULT_NO_OPTIONS = \
     CLANG_EXTRAS \
     CLANG_FORMAT \
     DETECT_TZ_CHANGES \
+    DISK_IMAGE_TOOLS_BOOTSTRAP \
     DTRACE_TESTS \
     EXPERIMENTAL \
     HESIOD \
@@ -421,11 +422,6 @@ BROKEN_OPTIONS+=OPENMP
 # Broken on 32-bit arm, kernel module compile errors
 .if ${__T:Marm*} != ""
 BROKEN_OPTIONS+= OFED
-.endif
-
-# ZFS is broken on 32-bit powerpc (missing atomics), but works on 64-bit
-.if ${__T} == "powerpc" || ${__T} == "powerpcspe"
-BROKEN_OPTIONS+= ZFS LOADER_ZFS
 .endif
 
 .include <bsd.mkopt.mk>

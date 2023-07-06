@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: BSD-1-Clause
  *
  * Copyright 2012 Konstantin Belousov <kib@FreeBSD.org>
- * Copyright (c) 2018 The FreeBSD Foundation
+ * Copyright (c) 2018, 2023 The FreeBSD Foundation
  *
  * Parts of this software was developed by Konstantin Belousov
  * <kib@FreeBSD.org> under sponsorship from the FreeBSD Foundation.
@@ -38,18 +38,18 @@
  * CHERI CHANGES END
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/elf.h>
 #include <sys/elf_common.h>
+#include <stdlib.h>
+#include "libc_private.h"
 
-#ifdef __CHERI__
-#include <cheri/cheric.h>
+/* purecap PIEs always have their relocations processed by rtld */
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(PIC) && \
+    !defined(CRT_IRELOC_SUPPRESS)
+#undef	CRT_IRELOC_RELA
+#define	CRT_IRELOC_SUPPRESS
 #endif
-
-extern int main(int, char **, char **);
 
 extern void (*__preinit_array_start[])(int, char **, char **) __hidden;
 extern void (*__preinit_array_end[])(int, char **, char **) __hidden;
@@ -109,9 +109,6 @@ process_irelocs(void)
 #error "Define platform reloc type"
 #endif
 
-char **environ;
-const char *__progname = "";
-
 #ifndef CRT_ATEXIT_SUPPRESS
 static void
 finalizer(void)
@@ -132,9 +129,10 @@ finalizer(void)
 }
 #endif
 
-static inline void
+static void
 handle_static_init(int argc, char **argv, char **env)
 {
+#ifndef PIC
 	void (*fn)(int, char **, char **);
 	size_t array_size, n;
 
@@ -160,9 +158,10 @@ handle_static_init(int argc, char **argv, char **env)
 		if ((uintptr_t)fn != 0 && (uintptr_t)fn != 1)
 			fn(argc, argv, env);
 	}
+#endif
 }
 
-static inline void
+static void
 handle_argv(int argc, char *argv[], char **env)
 {
 	const char *s;
@@ -177,3 +176,69 @@ handle_argv(int argc, char *argv[], char **env)
 		}
 	}
 }
+
+void
+__libc_start1(int argc, char *argv[], char *env[], void (*cleanup)(void),
+    int (*mainX)(int, char *[], char *[])
+#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef CRT_IRELOC_SUPPRESS
+    , void *data_cap __unused, const void *code_cap __unused
+#else
+    , void *data_cap, const void *code_cap
+#endif
+#endif
+	)
+{
+	handle_argv(argc, argv, env);
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (cleanup != NULL) {
+#else
+	if (&_DYNAMIC != NULL) {
+#endif
+		atexit(cleanup);
+	} else {
+#ifndef CRT_IRELOC_SUPPRESS
+		INIT_IRELOCS;
+#ifdef __CHERI_PURE_CAPABILITY__
+		process_irelocs(data_cap, code_cap);
+#else
+		process_irelocs();
+#endif
+#endif
+		_init_tls();
+	}
+
+	handle_static_init(argc, argv, env);
+	exit(mainX(argc, argv, env));
+}
+
+#ifndef __CHERI_PURE_CAPABILITY__
+/* XXXKIB _mcleanup and monstartup defs */
+extern void _mcleanup(void);
+extern void monstartup(void *, void *);
+
+void
+__libc_start1_gcrt(int argc, char *argv[], char *env[],
+    void (*cleanup)(void), int (*mainX)(int, char *[], char *[]),
+    int *eprolp, int *etextp)
+{
+	handle_argv(argc, argv, env);
+
+	if (&_DYNAMIC != NULL) {
+		atexit(cleanup);
+	} else {
+#ifndef CRT_IRELOC_SUPPRESS
+		INIT_IRELOCS;
+		process_irelocs();
+#endif
+		_init_tls();
+	}
+
+	atexit(_mcleanup);
+	monstartup(eprolp, etextp);
+
+	handle_static_init(argc, argv, env);
+	exit(mainX(argc, argv, env));
+}
+#endif

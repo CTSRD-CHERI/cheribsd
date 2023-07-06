@@ -39,6 +39,8 @@
 #include <sys/_types.h>
 #include <sys/_pthreadtypes.h>
 
+extern char **environ;
+
 /*
  * The kernel doesn't expose PID_MAX to the user space. Save it here
  * to allow to run a newer world on a pre-1400079 kernel.
@@ -253,6 +255,18 @@ enum {
  */
 #ifdef YP
 int _yp_check(char **);
+#endif
+
+#ifdef __CHERI_PURE_CAPABILITY__
+void __libc_start1(int, char *[], char *[],
+    void (*)(void), int (*)(int, char *[], char *[]), void *,
+    const void *) __dead2;
+#else
+void __libc_start1(int, char *[], char *[],
+    void (*)(void), int (*)(int, char *[], char *[])) __dead2;
+void __libc_start1_gcrt(int, char *[], char *[],
+    void (*)(void), int (*)(int, char *[], char *[]),
+    int *, int *) __dead2;
 #endif
 
 /*
