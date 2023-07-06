@@ -159,7 +159,7 @@ struct iwl_rxq {
 	void *rb_stts;
 	dma_addr_t rb_stts_dma;
 	spinlock_t lock;
-	struct napi_struct napi;
+	struct napi_struct napi __subobject_use_container_bounds;
 	struct iwl_rx_mem_buffer *queue[RX_QUEUE_SIZE];
 };
 
@@ -182,7 +182,7 @@ struct iwl_rb_allocator {
 	struct list_head rbd_empty;
 	spinlock_t lock;
 	struct workqueue_struct *alloc_wq;
-	struct work_struct rx_alloc;
+	struct work_struct rx_alloc __subobject_use_container_bounds;
 };
 
 /**
@@ -349,7 +349,7 @@ struct iwl_trans_pcie {
 	struct iwl_rxq *rxq;
 	struct iwl_rx_mem_buffer *rx_pool;
 	struct iwl_rx_mem_buffer **global_table;
-	struct iwl_rb_allocator rba;
+	struct iwl_rb_allocator rba __subobject_use_container_bounds;
 	union {
 		struct iwl_context_info *ctxt_info;
 		struct iwl_context_info_gen3 *ctxt_info_gen3;
@@ -363,7 +363,7 @@ struct iwl_trans_pcie {
 	dma_addr_t iml_dma_addr;
 	struct iwl_trans *trans;
 
-	struct net_device napi_dev;
+	struct net_device napi_dev __subobject_use_container_bounds;
 
 	/* INT ICT Table */
 	__le32 *ict_tbl;
@@ -419,7 +419,7 @@ struct iwl_trans_pcie {
 	struct cont_rec fw_mon_data;
 #endif
 
-	struct msix_entry msix_entries[IWL_MAX_RX_HW_QUEUES];
+	struct msix_entry msix_entries[IWL_MAX_RX_HW_QUEUES] __subobject_use_container_bounds;
 	bool msix_enabled;
 	u8 shared_vec_mask;
 	u32 alloc_vecs;
@@ -842,3 +842,12 @@ int iwl_trans_pcie_copy_imr(struct iwl_trans *trans,
 			    u32 dst_addr, u64 src_addr, u32 byte_cnt);
 
 #endif /* __iwl_trans_int_pcie_h__ */
+// CHERI CHANGES START
+// {
+//   "updated": 20230424,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

@@ -259,7 +259,7 @@ struct iwl_fw_ini_dump_entry {
 	struct list_head list;
 	u32 size;
 	u8 data[];
-} __packed;
+};
 
 /**
  * struct iwl_fw_error_dump_file - header of dump file
@@ -558,3 +558,12 @@ struct iwl_fw_error_dump_trigger_desc {
 };
 
 #endif /* __fw_error_dump_h__ */
+// CHERI CHANGES START
+// {
+//   "updated": 20230424,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

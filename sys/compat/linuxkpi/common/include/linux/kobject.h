@@ -55,7 +55,7 @@ extern const struct kobj_type linux_kfree_type;
 struct kobject {
 	struct kobject		*parent;
 	char			*name;
-	struct kref		kref;
+	struct kref		kref __subobject_use_container_bounds;
 	const struct kobj_type	*ktype;
 	struct list_head	entry;
 	struct sysctl_oid	*oidp;
@@ -157,3 +157,12 @@ kobject_uevent_env(struct kobject *kobj, int action, char *envp[])
 }
 
 #endif /* _LINUXKPI_LINUX_KOBJECT_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20230424,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

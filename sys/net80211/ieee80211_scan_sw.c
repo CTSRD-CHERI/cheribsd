@@ -53,7 +53,7 @@ __FBSDID("$FreeBSD$");
 #include <net/bpf.h>
 
 struct scan_state {
-	struct ieee80211_scan_state base;	/* public state */
+	struct ieee80211_scan_state base __subobject_member_used_for_c_inheritance; /* public state */
 
 	u_int			ss_iflags;	/* flags used internally */
 #define	ISCAN_MINDWELL 		0x0001		/* min dwell time reached */
@@ -1042,3 +1042,12 @@ ieee80211_swscan_attach(struct ieee80211com *ic)
 	ic->ic_scan_curchan = scan_curchan;
 	ic->ic_scan_mindwell = scan_mindwell;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20230424,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

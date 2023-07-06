@@ -248,7 +248,6 @@ ENTRY(cpu_switch)
 	ldp	PTR(27), PTR(28), [PTR(4), #PCB_REGS + (PCB_X19 + 8) * PTR_WIDTH]
 	ldp	PTR(29), PTRN(lr), [PTR(4), #PCB_REGS + (PCB_X19 + 10) * PTR_WIDTH]
 
-	str	PTR(zr), [PTR(4), #PCB_REGS + 18 * PTR_WIDTH]
 	ret
 END(cpu_switch)
 

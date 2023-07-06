@@ -608,7 +608,7 @@ struct iwl_mvm_tx_resp {
 	__le16 frame_ctrl;
 	__le16 tx_queue;
 	__le16 reserved2;
-	struct agg_tx_status status;
+	struct agg_tx_status status __subobject_use_container_bounds;
 } __packed; /* TX_RSP_API_S_VER_6,
 	       TX_RSP_API_S_VER_7 */
 
@@ -964,3 +964,12 @@ struct iwl_scd_txq_cfg_rsp {
 } __packed; /* SCD_QUEUE_CFG_RSP_API_S_VER_1 */
 
 #endif /* __iwl_fw_api_tx_h__ */
+// CHERI CHANGES START
+// {
+//   "updated": 20230424,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

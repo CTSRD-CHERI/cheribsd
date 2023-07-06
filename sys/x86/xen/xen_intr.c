@@ -6,6 +6,7 @@
  * Copyright (c) 2002-2005, K A Fraser
  * Copyright (c) 2005, Intel Corporation <xiaofeng.ling@intel.com>
  * Copyright (c) 2012, Spectra Logic Corporation
+ * Copyright © 2021-2023, Elliott Mitchell
  *
  * This file may be distributed separately from the Linux kernel, or
  * incorporated into other software packages, subject to the following license:
@@ -51,12 +52,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 
 #include <machine/intr_machdep.h>
-#include <x86/apicvar.h>
-#include <x86/apicreg.h>
 #include <machine/smp.h>
 #include <machine/stdarg.h>
-
-#include <machine/xen/synch_bitops.h>
 
 #include <xen/xen-os.h>
 #include <xen/hvm.h>
@@ -116,9 +113,8 @@ DPCPU_DEFINE_STATIC(struct xen_intr_pcpu_data, xen_intr_pcpu) = {
 
 DPCPU_DECLARE(struct vcpu_info *, vcpu_info);
 
-#define	XEN_INVALID_EVTCHN	0 /* Invalid event channel */
-
-#define	is_valid_evtchn(x)	((x) != XEN_INVALID_EVTCHN)
+#define	INVALID_EVTCHN		(~(evtchn_port_t)0) /* Invalid event channel */
+#define	is_valid_evtchn(x)	((uintmax_t)(x) < NR_EVENT_CHANNELS)
 
 struct xenisrc {
 	struct intsrc	xi_intsrc;
@@ -285,8 +281,16 @@ xen_intr_find_unused_isrc(enum evtchn_type type)
 
 		vector = first_evtchn_irq + isrc_idx;
 		isrc = (struct xenisrc *)intr_lookup_source(vector);
-		if (isrc != NULL
-		 && isrc->xi_type == EVTCHN_TYPE_UNBOUND) {
+		/*
+		 * Since intr_register_source() must be called while unlocked,
+		 * isrc == NULL *will* occur, though very infrequently.
+		 *
+		 * This also allows a very small gap where a foreign intrusion
+		 * into Xen's interrupt range could be examined by this test.
+		 */
+		if (__predict_true(isrc != NULL) &&
+		    __predict_true(isrc->xi_intsrc.is_pic == &xen_intr_pic) &&
+		    isrc->xi_type == EVTCHN_TYPE_UNBOUND) {
 			KASSERT(isrc->xi_intsrc.is_handlers == 0,
 			    ("Free evtchn still has handlers"));
 			isrc->xi_type = type;
@@ -310,13 +314,14 @@ xen_intr_alloc_isrc(enum evtchn_type type)
 	static int warned;
 	struct xenisrc *isrc;
 	unsigned int vector;
+	int error;
 
 	KASSERT(mtx_owned(&xen_intr_isrc_lock), ("Evtchn alloc lock not held"));
 
-	if (xen_intr_auto_vector_count > NR_EVENT_CHANNELS) {
+	if (xen_intr_auto_vector_count >= NR_EVENT_CHANNELS) {
 		if (!warned) {
 			warned = 1;
-			printf("%s: Event channels exhausted.\n", __func__);
+			printf("%s: Xen interrupts exhausted.\n", __func__);
 		}
 		return (NULL);
 	}
@@ -332,7 +337,10 @@ xen_intr_alloc_isrc(enum evtchn_type type)
 	isrc->xi_intsrc.is_pic = &xen_intr_pic;
 	isrc->xi_vector = vector;
 	isrc->xi_type = type;
-	intr_register_source(&isrc->xi_intsrc);
+	error = intr_register_source(&isrc->xi_intsrc);
+	if (error != 0)
+		panic("%s(): failed registering interrupt %u, error=%d\n",
+		    __func__, vector, error);
 	mtx_lock(&xen_intr_isrc_lock);
 
 	return (isrc);
@@ -349,26 +357,29 @@ static int
 xen_intr_release_isrc(struct xenisrc *isrc)
 {
 
-	mtx_lock(&xen_intr_isrc_lock);
 	KASSERT(isrc->xi_intsrc.is_handlers == 0,
 	    ("Release called, but xenisrc still in use"));
-	evtchn_mask_port(isrc->xi_port);
-	evtchn_clear_port(isrc->xi_port);
+	mtx_lock(&xen_intr_isrc_lock);
+	if (is_valid_evtchn(isrc->xi_port)) {
+		evtchn_mask_port(isrc->xi_port);
+		evtchn_clear_port(isrc->xi_port);
 
-	/* Rebind port to CPU 0. */
-	evtchn_cpu_mask_port(isrc->xi_cpu, isrc->xi_port);
-	evtchn_cpu_unmask_port(0, isrc->xi_port);
+		/* Rebind port to CPU 0. */
+		evtchn_cpu_mask_port(isrc->xi_cpu, isrc->xi_port);
+		evtchn_cpu_unmask_port(0, isrc->xi_port);
 
-	if (isrc->xi_close != 0 && is_valid_evtchn(isrc->xi_port)) {
-		struct evtchn_close close = { .port = isrc->xi_port };
-		if (HYPERVISOR_event_channel_op(EVTCHNOP_close, &close))
-			panic("EVTCHNOP_close failed");
+		if (isrc->xi_close != 0) {
+			struct evtchn_close close = { .port = isrc->xi_port };
+
+			if (HYPERVISOR_event_channel_op(EVTCHNOP_close, &close))
+				panic("EVTCHNOP_close failed");
+		}
+
+		xen_intr_port_to_isrc[isrc->xi_port] = NULL;
 	}
-
-	xen_intr_port_to_isrc[isrc->xi_port] = NULL;
 	isrc->xi_cpu = 0;
 	isrc->xi_type = EVTCHN_TYPE_UNBOUND;
-	isrc->xi_port = 0;
+	isrc->xi_port = INVALID_EVTCHN;
 	isrc->xi_cookie = NULL;
 	mtx_unlock(&xen_intr_isrc_lock);
 	return (0);
@@ -420,6 +431,7 @@ xen_intr_bind_isrc(struct xenisrc **isrcp, evtchn_port_t local_port,
 		}
 	}
 	isrc->xi_port = local_port;
+	isrc->xi_close = 0;
 	xen_intr_port_to_isrc[local_port] = isrc;
 	refcount_init(&isrc->xi_refcount, 1);
 	mtx_unlock(&xen_intr_isrc_lock);
@@ -471,9 +483,10 @@ xen_intr_bind_isrc(struct xenisrc **isrcp, evtchn_port_t local_port,
  *           events.
  */
 static inline u_long
-xen_intr_active_ports(struct xen_intr_pcpu_data *pcpu, shared_info_t *sh,
-    u_int idx)
+xen_intr_active_ports(const struct xen_intr_pcpu_data *const pcpu,
+    const u_int idx)
 {
+	volatile const shared_info_t *const sh = HYPERVISOR_shared_info;
 
 	CTASSERT(sizeof(sh->evtchn_mask[0]) == sizeof(sh->evtchn_pending[0]));
 	CTASSERT(sizeof(sh->evtchn_mask[0]) == sizeof(pcpu->evtchn_enabled[0]));
@@ -495,7 +508,6 @@ xen_intr_handle_upcall(struct trapframe *trap_frame)
 	u_int l1i, l2i, port, cpu __diagused;
 	u_long masked_l1, masked_l2;
 	struct xenisrc *isrc;
-	shared_info_t *s;
 	vcpu_info_t *v;
 	struct xen_intr_pcpu_data *pc;
 	u_long l1, l2;
@@ -508,7 +520,6 @@ xen_intr_handle_upcall(struct trapframe *trap_frame)
 
 	cpu = PCPU_GET(cpuid);
 	pc  = DPCPU_PTR(xen_intr_pcpu);
-	s   = HYPERVISOR_shared_info;
 	v   = DPCPU_GET(vcpu_info);
 
 	if (!xen_has_percpu_evtchn()) {
@@ -546,7 +557,7 @@ xen_intr_handle_upcall(struct trapframe *trap_frame)
 		l1i = ffsl(masked_l1) - 1;
 
 		do {
-			l2 = xen_intr_active_ports(pc, s, l1i);
+			l2 = xen_intr_active_ports(pc, l1i);
 
 			l2i = (l2i + 1) % LONG_BIT;
 			masked_l2 = l2 & ((~0UL) << l2i);
@@ -560,7 +571,7 @@ xen_intr_handle_upcall(struct trapframe *trap_frame)
 
 			/* process port */
 			port = (l1i * LONG_BIT) + l2i;
-			synch_clear_bit(port, &s->evtchn_pending[0]);
+			evtchn_clear_port(port);
 
 			isrc = xen_intr_port_to_isrc[port];
 			if (__predict_false(isrc == NULL))
@@ -582,7 +593,7 @@ xen_intr_handle_upcall(struct trapframe *trap_frame)
 
 		} while (l2i != LONG_BIT - 1);
 
-		l2 = xen_intr_active_ports(pc, s, l1i);
+		l2 = xen_intr_active_ports(pc, l1i);
 		if (l2 == 0) {
 			/*
 			 * We handled all ports, so we can clear the
@@ -607,6 +618,19 @@ xen_intr_init(void *dummy __unused)
 
 	if (!xen_domain())
 		return (0);
+
+	_Static_assert(is_valid_evtchn(0),
+	    "is_valid_evtchn(0) fails (unused by Xen, but valid by interface");
+	_Static_assert(is_valid_evtchn(NR_EVENT_CHANNELS - 1),
+	    "is_valid_evtchn(max) fails (is a valid channel)");
+	_Static_assert(!is_valid_evtchn(NR_EVENT_CHANNELS),
+	    "is_valid_evtchn(>max) fails (NOT a valid channel)");
+	_Static_assert(!is_valid_evtchn(~(evtchn_port_t)0),
+	    "is_valid_evtchn(maxint) fails (overflow?)");
+	_Static_assert(!is_valid_evtchn(INVALID_EVTCHN),
+	    "is_valid_evtchn(INVALID_EVTCHN) fails (must be invalid!)");
+	_Static_assert(!is_valid_evtchn(-1),
+	    "is_valid_evtchn(-1) fails (negative are invalid)");
 
 	mtx_init(&xen_intr_isrc_lock, "xen-irq-lock", NULL, MTX_DEF);
 
@@ -683,16 +707,6 @@ xen_rebind_ipi(struct xenisrc *isrc)
 		panic("unable to rebind xen IPI: %d", error);
 
 	isrc->xi_port = bind_ipi.port;
-	isrc->xi_cpu = 0;
-	xen_intr_port_to_isrc[bind_ipi.port] = isrc;
-
-	error = xen_intr_assign_cpu(&isrc->xi_intsrc,
-	                            cpu_apic_ids[cpu]);
-	if (error)
-		panic("unable to bind xen IPI to CPU#%d: %d",
-		      cpu, error);
-
-	evtchn_unmask_port(bind_ipi.port);
 #else
 	panic("Resume IPI event channel on UP");
 #endif
@@ -713,18 +727,43 @@ xen_rebind_virq(struct xenisrc *isrc)
 		panic("unable to rebind xen VIRQ#%d: %d", isrc->xi_virq, error);
 
 	isrc->xi_port = bind_virq.port;
-	isrc->xi_cpu = 0;
-	xen_intr_port_to_isrc[bind_virq.port] = isrc;
+}
+
+static struct xenisrc *
+xen_intr_rebind_isrc(struct xenisrc *isrc)
+{
+#ifdef SMP
+	u_int cpu = isrc->xi_cpu;
+	int error;
+#endif
+	struct xenisrc *prev;
+
+	switch (isrc->xi_type) {
+	case EVTCHN_TYPE_IPI:
+		xen_rebind_ipi(isrc);
+		break;
+	case EVTCHN_TYPE_VIRQ:
+		xen_rebind_virq(isrc);
+		break;
+	default:
+		return (NULL);
+	}
+
+	prev = xen_intr_port_to_isrc[isrc->xi_port];
+	xen_intr_port_to_isrc[isrc->xi_port] = isrc;
 
 #ifdef SMP
+	isrc->xi_cpu = 0;
 	error = xen_intr_assign_cpu(&isrc->xi_intsrc,
 	                            cpu_apic_ids[cpu]);
 	if (error)
-		panic("unable to bind xen VIRQ#%d to CPU#%d: %d",
-		      isrc->xi_virq, cpu, error);
+		panic("%s(): unable to rebind Xen channel %u to vCPU%u: %d",
+		    __func__, isrc->xi_port, cpu, error);
 #endif
 
-	evtchn_unmask_port(bind_virq.port);
+	evtchn_unmask_port(isrc->xi_port);
+
+	return (prev);
 }
 
 /**
@@ -734,7 +773,6 @@ static void
 xen_intr_resume(struct pic *unused, bool suspend_cancelled)
 {
 	shared_info_t *s = HYPERVISOR_shared_info;
-	struct xenisrc *isrc;
 	u_int isrc_idx;
 	int i;
 
@@ -754,28 +792,29 @@ xen_intr_resume(struct pic *unused, bool suspend_cancelled)
 	for (i = 0; i < nitems(s->evtchn_mask); i++)
 		atomic_store_rel_long(&s->evtchn_mask[i], ~0);
 
-	/* Remove port -> isrc mappings */
-	memset(xen_intr_port_to_isrc, 0, sizeof(xen_intr_port_to_isrc));
+	/* Clear existing port mappings */
+	for (isrc_idx = 0; isrc_idx < NR_EVENT_CHANNELS; ++isrc_idx)
+		if (xen_intr_port_to_isrc[isrc_idx] != NULL)
+			xen_intr_port_to_isrc[isrc_idx]->xi_port =
+			    INVALID_EVTCHN;
 
-	/* Free unused isrcs and rebind VIRQs and IPIs */
-	for (isrc_idx = 0; isrc_idx < xen_intr_auto_vector_count; isrc_idx++) {
-		u_int vector;
+	/* Remap in-use isrcs, using xen_intr_port_to_isrc as listing */
+	for (isrc_idx = 0; isrc_idx < NR_EVENT_CHANNELS; ++isrc_idx) {
+		struct xenisrc *cur = xen_intr_port_to_isrc[isrc_idx];
 
-		vector = first_evtchn_irq + isrc_idx;
-		isrc = (struct xenisrc *)intr_lookup_source(vector);
-		if (isrc != NULL) {
-			isrc->xi_port = 0;
-			switch (isrc->xi_type) {
-			case EVTCHN_TYPE_IPI:
-				xen_rebind_ipi(isrc);
-				break;
-			case EVTCHN_TYPE_VIRQ:
-				xen_rebind_virq(isrc);
-				break;
-			default:
-				break;
-			}
-		}
+		/* empty or entry already taken care of */
+		if (cur == NULL || cur->xi_port == isrc_idx)
+			continue;
+
+		xen_intr_port_to_isrc[isrc_idx] = NULL;
+
+		do {
+			KASSERT(!is_valid_evtchn(cur->xi_port),
+			    ("%s(): Multiple channels on single intr?",
+			    __func__));
+
+			cur = xen_intr_rebind_isrc(cur);
+		} while (cur != NULL);
 	}
 }
 
@@ -1287,7 +1326,7 @@ int
 xen_intr_get_evtchn_from_port(evtchn_port_t port, xen_intr_handle_t *handlep)
 {
 
-	if (!is_valid_evtchn(port) || port >= NR_EVENT_CHANNELS)
+	if (!is_valid_evtchn(port))
 		return (EINVAL);
 
 	if (handlep == NULL) {

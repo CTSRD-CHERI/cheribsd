@@ -1711,6 +1711,10 @@ relock:
 	 */
 	if (doingdirectory && newparent) {
 		/*
+		 * Set the directory depth based on its new parent.
+		 */
+		DIP_SET(fip, i_dirdepth, DIP(tdp, i_dirdepth) + 1);
+		/*
 		 * If tip exists we simply use its link, otherwise we must
 		 * add a new one.
 		 */
@@ -2073,7 +2077,7 @@ ufs_mkdir(
 				 * XXX This seems to never be accessed out of
 				 * our context so a stack variable is ok.
 				 */
-				refcount_init(&ucred.cr_ref, 1);
+				ucred.cr_ref = 1;
 				ucred.cr_uid = ip->i_uid;
 				ucred.cr_ngroups = 1;
 				ucred.cr_groups = &ucred_group;
@@ -2121,6 +2125,7 @@ ufs_mkdir(
 	ip->i_effnlink = 2;
 	ip->i_nlink = 2;
 	DIP_SET(ip, i_nlink, 2);
+	DIP_SET(ip, i_dirdepth, DIP(dp,i_dirdepth) + 1);
 
 	if (cnp->cn_flags & ISWHITEOUT) {
 		ip->i_flags |= UF_OPAQUE;
@@ -2825,7 +2830,7 @@ ufs_makeinode(int mode, struct vnode *dvp, struct vnode **vpp,
 			 * XXX This seems to never be accessed out of our
 			 * context so a stack variable is ok.
 			 */
-			refcount_init(&ucred.cr_ref, 1);
+			ucred.cr_ref = 1;
 			ucred.cr_uid = ip->i_uid;
 			ucred.cr_ngroups = 1;
 			ucred.cr_groups = &ucred_group;

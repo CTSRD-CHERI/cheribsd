@@ -41,6 +41,14 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+/*
+ * Partition Status Information from Apple Tech Note 1189
+ */
+#define	APPLE_PS_VALID		0x00000001	/* Entry is valid */
+#define	APPLE_PS_ALLOCATED	0x00000002	/* Entry is allocated */
+#define	APPLE_PS_READABLE	0x00000010	/* Entry is readable */
+#define	APPLE_PS_WRITABLE	0x00000020	/* Entry is writable */
+
 #ifdef DEBUG
 #define	ELTORITO_DPRINTF(__x)	printf __x
 #else
@@ -540,7 +548,7 @@ cd9660_write_mbr_partition_entry(FILE *fd, int idx, off_t sector_start,
 
 	if (fseeko(fd, (off_t)(idx) * 16 + 0x1be, SEEK_SET) == -1)
 		err(1, "fseeko");
-	
+
 	val = 0x80; /* Bootable */
 	fwrite(&val, sizeof(val), 1, fd);
 
@@ -574,15 +582,8 @@ cd9660_write_apm_partition_entry(FILE *fd, int idx, int total_partitions,
 	uint32_t apm32, part_status;
 	uint16_t apm16;
 
-	/* See Apple Tech Note 1189 for the details about the pmPartStatus
-	 * flags.
-	 * Below the flags which are default:
-	 * - IsValid     0x01
-	 * - IsAllocated 0x02
-	 * - IsReadable  0x10
-	 * - IsWritable  0x20
-	 */
-	part_status = 0x01 | 0x02 | 0x10 | 0x20;
+	part_status = APPLE_PS_VALID | APPLE_PS_ALLOCATED | APPLE_PS_READABLE |
+	    APPLE_PS_WRITABLE;
 
 	if (fseeko(fd, (off_t)(idx + 1) * sector_size, SEEK_SET) == -1)
 		err(1, "fseeko");
@@ -610,7 +611,7 @@ cd9660_write_apm_partition_entry(FILE *fd, int idx, int total_partitions,
 	apm32 = 0;
 	/* pmLgDataStart */
 	fwrite(&apm32, sizeof(apm32), 1, fd);
-	/* pmDataCnt */ 
+	/* pmDataCnt */
 	apm32 = htobe32(nsectors);
 	fwrite(&apm32, sizeof(apm32), 1, fd);
 	/* pmPartStatus */
@@ -659,9 +660,9 @@ cd9660_write_boot(iso9660_disk *diskStructure, FILE *fd)
 		}
 		cd9660_copy_file(diskStructure, fd, t->sector, t->filename);
 
-		if (t->system == ET_SYS_MAC) 
+		if (t->system == ET_SYS_MAC)
 			apm_partitions++;
-		if (t->system == ET_SYS_PPC) 
+		if (t->system == ET_SYS_PPC)
 			mbr_partitions++;
 	}
 

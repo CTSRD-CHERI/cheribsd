@@ -221,7 +221,7 @@ struct ieee80211_chanctx_conf {
 	struct cfg80211_chan_def		min_def;
 
 	/* Must stay last. */
-	uint8_t					drv_priv[0] __aligned(CACHE_LINE_SIZE);
+	uint8_t					drv_priv[0] __aligned(CACHE_LINE_SIZE) __subobject_use_container_bounds;
 };
 
 struct ieee80211_rate_status {
@@ -592,7 +592,7 @@ struct ieee80211_txq {
 	uint8_t				tid;
 
 	/* Must stay last. */
-	uint8_t				drv_priv[0] __aligned(CACHE_LINE_SIZE);
+	uint8_t				drv_priv[0] __aligned(CACHE_LINE_SIZE) __subobject_use_container_bounds;
 };
 
 struct ieee80211_sta_rates {
@@ -645,7 +645,7 @@ struct ieee80211_sta {
 	struct ieee80211_link_sta		deflink;
 
 	/* Must stay last. */
-	uint8_t					drv_priv[0] __aligned(CACHE_LINE_SIZE);
+	uint8_t					drv_priv[0] __aligned(CACHE_LINE_SIZE) __subobject_use_container_bounds;
 };
 
 struct ieee80211_tdls_ch_sw_params {
@@ -716,7 +716,7 @@ struct ieee80211_vif {
 /* #endif */
 
 	/* Must stay last. */
-	uint8_t				drv_priv[0] __aligned(CACHE_LINE_SIZE);
+	uint8_t				drv_priv[0] __aligned(CACHE_LINE_SIZE) __subobject_use_container_bounds;
 };
 
 struct ieee80211_vif_chanctx_switch {
@@ -753,7 +753,7 @@ struct ieee80211_tx_info {
 			uint8_t				antenna;
 			uint16_t			tx_time;
 			bool				is_valid_ack_signal;
-			void				*status_driver_data[16 / sizeof(void *)];		/* XXX TODO */
+			void				*status_driver_data[MAX(16 / sizeof(void *), 2)];		/* XXX TODO */
 		} status;
 #define	IEEE80211_TX_INFO_DRIVER_DATA_SIZE	(5 * sizeof(void *))			/* XXX TODO 5? */
 		void					*driver_data[IEEE80211_TX_INFO_DRIVER_DATA_SIZE / sizeof(void *)];
@@ -886,7 +886,7 @@ struct ieee80211_ops {
 	void (*sta_set_4addr)(struct ieee80211_hw *, struct ieee80211_vif *, struct ieee80211_sta *, bool);
 	void (*sta_set_decap_offload)(struct ieee80211_hw *, struct ieee80211_vif *, struct ieee80211_sta *, bool);
 
-	u64  (*prepare_multicast)(struct ieee80211_hw *, struct netdev_hw_addr_list *);
+	uintptr_t  (*prepare_multicast)(struct ieee80211_hw *, struct netdev_hw_addr_list *);
 
 	int  (*ampdu_action)(struct ieee80211_hw *, struct ieee80211_vif *, struct ieee80211_ampdu_params *);
 
@@ -915,7 +915,7 @@ struct ieee80211_ops {
 	int  (*remain_on_channel)(struct ieee80211_hw *, struct ieee80211_vif *, struct ieee80211_channel *, int, enum ieee80211_roc_type);
 	int  (*cancel_remain_on_channel)(struct ieee80211_hw *, struct ieee80211_vif *);
 
-	void (*configure_filter)(struct ieee80211_hw *, unsigned int, unsigned int *, u64);
+	void (*configure_filter)(struct ieee80211_hw *, unsigned int, unsigned int *, uintptr_t);
 	void (*config_iface_filter)(struct ieee80211_hw *, struct ieee80211_vif *, unsigned int, unsigned int);
 
 	void (*bss_info_changed)(struct ieee80211_hw *, struct ieee80211_vif *, struct ieee80211_bss_conf *, u64);
@@ -2471,3 +2471,13 @@ ieeee80211_obss_color_collision_notify(struct ieee80211_vif *vif,
     linuxkpi_ieee80211_send_bar(_v, _r, _t, _s)
 
 #endif	/* _LINUXKPI_NET_MAC80211_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20230424,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds",
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

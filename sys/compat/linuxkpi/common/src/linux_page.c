@@ -193,8 +193,8 @@ linux_free_kmem(vm_pointer_t addr, unsigned int order)
 }
 
 static int
-linux_get_user_pages_internal(vm_map_t map, unsigned long start, int nr_pages,
-    int write, struct page **pages)
+linux_get_user_pages_internal(vm_map_t map, void * __capability start,
+    int nr_pages, int write, struct page **pages)
 {
 	vm_prot_t prot;
 	size_t len;
@@ -202,30 +202,38 @@ linux_get_user_pages_internal(vm_map_t map, unsigned long start, int nr_pages,
 
 	prot = write ? (VM_PROT_READ | VM_PROT_WRITE) : VM_PROT_READ;
 	len = ptoa((vm_offset_t)nr_pages);
-	count = vm_fault_quick_hold_pages(map, (void *)(uintptr_t)start, len, prot, pages, nr_pages);
+	count = vm_fault_quick_hold_pages(map, start, len, prot, pages, nr_pages);
 	return (count == -1 ? -EFAULT : nr_pages);
 }
 
 int
-__get_user_pages_fast(unsigned long start, int nr_pages, int write,
+__get_user_pages_fast(void * __capability addr, int nr_pages, int write,
     struct page **pages)
 {
 	vm_map_t map;
 	vm_page_t *mp;
+	vm_offset_t start;
 	vm_offset_t va;
 	vm_offset_t end;
+	vm_size_t len;
 	vm_prot_t prot;
 	int count;
 
 	if (nr_pages == 0 || in_interrupt())
 		return (0);
 
+	prot = write ? (VM_PROT_READ | VM_PROT_WRITE) : VM_PROT_READ;
+	len = ptoa((vm_offset_t)nr_pages);
+#if __has_feature(capabilities)
+	if (!__CAP_CHECK(addr, len) || !vm_cap_allows_prot(addr, prot))
+		return (-1);
+#endif
 	MPASS(pages != NULL);
 	map = &curthread->td_proc->p_vmspace->vm_map;
-	end = start + ptoa((vm_offset_t)nr_pages);
+	start = (__cheri_addr vm_offset_t)addr;
+	end = start + len;
 	if (!vm_map_range_valid(map, start, end))
 		return (-EINVAL);
-	prot = write ? (VM_PROT_READ | VM_PROT_WRITE) : VM_PROT_READ;
 	for (count = 0, mp = pages, va = start; va < end;
 	    mp++, va += PAGE_SIZE, count++) {
 		*mp = pmap_extract_and_hold(map->pmap, va, prot);
@@ -251,7 +259,7 @@ __get_user_pages_fast(unsigned long start, int nr_pages, int write,
 
 long
 get_user_pages_remote(struct task_struct *task, struct mm_struct *mm,
-    unsigned long start, unsigned long nr_pages, unsigned int gup_flags,
+    void * __capability start, unsigned long nr_pages, unsigned int gup_flags,
     struct page **pages, struct vm_area_struct **vmas)
 {
 	vm_map_t map;
@@ -262,8 +270,8 @@ get_user_pages_remote(struct task_struct *task, struct mm_struct *mm,
 }
 
 long
-get_user_pages(unsigned long start, unsigned long nr_pages,
-    unsigned int gup_flags, struct page **pages, struct vm_area_struct **vmas)
+get_user_pages(void * __capability start, unsigned long nr_pages, unsigned int gup_flags,
+    struct page **pages, struct vm_area_struct **vmas)
 {
 	vm_map_t map;
 
@@ -541,7 +549,8 @@ linuxkpi__page_frag_cache_drain(struct page *page, size_t count __unused)
 //   "updated": 20221129,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

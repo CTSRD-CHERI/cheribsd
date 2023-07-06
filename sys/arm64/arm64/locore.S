@@ -1144,6 +1144,15 @@ ENTRY(abort)
 	b abort
 END(abort)
 
+.bss
+
+	.align	PAGE_SHIFT
+	.type	initstack,#object
+initstack:
+	.space	(PAGE_SIZE * KSTACK_PAGES)
+initstack_end:
+	.size	initstack, initstack_end - initstack
+
 	.section .init_pagetable, "aw", %nobits
 	.align PAGE_SHIFT
 	/*
@@ -1176,20 +1185,12 @@ pagetable_l0_ttbr0_bootstrap:
 	.space	PAGE_SIZE
 pagetable_l0_ttbr0:
 	.space	PAGE_SIZE
-
 pagetable_end:
 
 	.type	el2_pagetable,#object
 el2_pagetable:
 	.space	PAGE_SIZE
 	.size	el2_pagetable, . - el2_pagetable
-
-	.align	4
-	.type	initstack,#object
-initstack:
-	.space	(PAGE_SIZE * KSTACK_PAGES)
-initstack_end:
-	.size	initstack, initstack_end - initstack
 
 /*
  * sigcode has to be labeled as an #object type so that the symbols
