@@ -530,13 +530,9 @@ _rtld_sandbox_code(void *f)
 	    ((cheri_getperm(f) & CHERI_PERM_EXECUTIVE) == 0) &&
 	    ((cheri_getperm(f) & CHERI_PERM_EXECUTE) != 0) &&
 	    (cheri_getsealed(f) != 0) && (cheri_gettype(f) == 1)) {
-
 		f = tramp_pgs_append(f, obj_from_addr(f), NULL);
-
-		return (f);
 	}
-
-	rtld_fatal("_rtld_sandbox_code: Invalid argument %#p", f);
+	return (f);
 }
 
 #endif

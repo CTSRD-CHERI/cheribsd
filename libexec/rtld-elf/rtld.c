@@ -3411,9 +3411,6 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 	if (reg != NULL) {
 		func_ptr_type exit_ptr = make_rtld_function_pointer(rtld_exit);
 		dbg("Calling __libc_atexit(rtld_exit (" PTR_FMT "))", (void*)exit_ptr);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-		reg = _rtld_sandbox_code(reg);
-#endif
 		reg(exit_ptr);
 		rtld_exit_ptr = make_rtld_function_pointer(rtld_nop_exit);
 	}
@@ -4885,10 +4882,15 @@ get_program_var_addr(const char *name, RtldLockState *lockstate)
     donelist_init(&donelist);
     if (symlook_global(&req, &donelist) != 0)
 	return (NULL);
-    if (ELF_ST_TYPE(req.sym_out->st_info) == STT_FUNC)
+    if (ELF_ST_TYPE(req.sym_out->st_info) == STT_FUNC) {
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	void *target = make_function_pointer(req.sym_out, req.defobj_out);
+	return tramp_pgs_append(target, req.defobj_out, req.sym_out);
+#else
 	return ((const void **)make_function_pointer(req.sym_out,
 	  req.defobj_out));
-    else if (ELF_ST_TYPE(req.sym_out->st_info) == STT_GNU_IFUNC)
+#endif
+    } else if (ELF_ST_TYPE(req.sym_out->st_info) == STT_GNU_IFUNC)
 	return ((const void **)rtld_resolve_ifunc(req.defobj_out, req.sym_out));
     else
 	return (const void **)make_data_pointer(req.sym_out, req.defobj_out);
