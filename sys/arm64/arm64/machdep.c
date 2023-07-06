@@ -34,6 +34,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/asan.h>
 #include <sys/buf.h>
 #include <sys/bus.h>
 #include <sys/cons.h>
@@ -365,10 +366,10 @@ makectx(struct trapframe *tf, struct pcb *pcb)
 	int i;
 
 	for (i = 0; i < nitems(pcb->pcb_x); i++)
-		pcb->pcb_x[i] = tf->tf_x[i];
+		pcb->pcb_x[i] = tf->tf_x[i + PCB_X_START];
 
-	/* NB: pcb_lr is the PC, see PC_REGS() in db_machdep.h */
-	pcb->pcb_lr = tf->tf_elr;
+	/* NB: pcb_x[PCB_LR] is the PC, see PC_REGS() in db_machdep.h */
+	pcb->pcb_x[PCB_LR] = tf->tf_elr;
 	pcb->pcb_sp = tf->tf_sp;
 }
 
@@ -970,6 +971,18 @@ initarm(struct arm64_bootparams *abp)
 	/*  Do the same for reserve entries in the EFI MEMRESERVE table */
 	if (efi_systbl_phys != 0)
 		exclude_efi_memreserve(efi_systbl_phys);
+
+	/*
+	 * We carefully bootstrap the sanitizer map after we've excluded
+	 * absolutely everything else that could impact phys_avail.  There's not
+	 * always enough room for the initial shadow map after the kernel, so
+	 * we'll end up searching for segments that we can safely use.  Those
+	 * segments also get excluded from phys_avail.
+	 */
+#if defined(KASAN)
+	pmap_bootstrap_san(KERNBASE - abp->kern_delta);
+#endif
+
 	physmem_init_kernel_globals();
 
 	devmap_bootstrap(0, NULL);
@@ -1015,6 +1028,7 @@ initarm(struct arm64_bootparams *abp)
 	pan_enable();
 
 	kcsan_cpu_init(0);
+	kasan_init();
 
 	env = kern_getenv("kernelname");
 	if (env != NULL)

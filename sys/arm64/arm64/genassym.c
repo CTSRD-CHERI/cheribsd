@@ -59,7 +59,7 @@ ASSYM(PC_SSBD, offsetof(struct pcpu, pc_ssbd));
 ASSYM(PCB_SIZE, roundup2(sizeof(struct pcb), STACKALIGNBYTES + 1));
 ASSYM(PCB_SINGLE_STEP_SHIFT, PCB_SINGLE_STEP_SHIFT);
 ASSYM(PCB_REGS, offsetof(struct pcb, pcb_x));
-ASSYM(PCB_LR, offsetof(struct pcb, pcb_lr));
+ASSYM(PCB_X19, PCB_X19);
 ASSYM(PCB_SP, offsetof(struct pcb, pcb_sp));
 #if __has_feature(capabilities)
 ASSYM(PCB_TPIDR, offsetof(struct pcb, pcb_tpidr_el0));
@@ -91,6 +91,7 @@ ASSYM(TF_ELR, offsetof(struct trapframe, tf_elr));
 ASSYM(TF_DDC, offsetof(struct trapframe, tf_ddc));
 #endif
 ASSYM(TF_SPSR, offsetof(struct trapframe, tf_spsr));
+ASSYM(TF_ESR, offsetof(struct trapframe, tf_esr));
 ASSYM(TF_X, offsetof(struct trapframe, tf_x));
 
 #ifdef __CHERI_PURE_CAPABILITY__
