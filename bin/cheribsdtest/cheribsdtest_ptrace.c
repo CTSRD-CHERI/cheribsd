@@ -34,10 +34,12 @@
 #error "This code requires a CHERI-aware compiler"
 #endif
 
+#include <sys/mman.h>
 #include <sys/ptrace.h>
 #include <sys/wait.h>
 
 #include <errno.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -196,6 +198,58 @@ CHERIBSDTEST(ptrace_readcap_pageend,
 	memcpy(&cap, &capbuf[1], sizeof(cap));
 	CHERIBSDTEST_VERIFY2(cheri_equal_exact(cheri_cleartag(pp[last_index]),
 	    cap), "Mismatch in non-tag bits of first capability");
+
+	finish_child(pid);
+
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(ptrace_writecap, "Basic tests of PIOD_WRITE_CHERI_CAP")
+{
+	struct capreg capreg;
+	struct ptrace_io_desc piod;
+	pid_t pid;
+	int fd;
+	uintcap_t *map, pp[2];
+	char capbuf[2][sizeof(uintcap_t) + 1];
+
+	fd = CHERIBSDTEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
+	CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
+
+	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
+	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+
+	pid = fork_child();
+
+	/* Fetch the capability registers of the child. */
+	CHERIBSDTEST_CHECK_SYSCALL(ptrace(PT_GETCAPREGS, pid, (caddr_t)&capreg,
+	    0));
+
+	/* Write a modified PCC with a small offset. */
+	pp[0] = CAPREG_PCC(&capreg) + 16;
+	pp[1] = 42;
+
+	capbuf[0][0] = 1;
+	memcpy(&capbuf[0][1], &pp[0], sizeof(pp[0]));
+	capbuf[1][0] = 0;
+	memcpy(&capbuf[1][1], &pp[1], sizeof(pp[1]));
+
+	piod.piod_op = PIOD_WRITE_CHERI_CAP;
+	piod.piod_offs = map;
+	piod.piod_addr = capbuf;
+	piod.piod_len = sizeof(capbuf);
+	CHERIBSDTEST_CHECK_SYSCALL(ptrace(PT_IO, pid, (caddr_t)&piod, 0));
+
+	CHERIBSDTEST_VERIFY(piod.piod_len == sizeof(capbuf));
+
+	CHERIBSDTEST_VERIFY2(cheri_gettag(map[0]) == 1,
+	    "Tag not set in first injected capability");
+	CHERIBSDTEST_VERIFY2(cheri_equal_exact(cheri_cleartag(map[0]), pp[0]),
+	    "Mismatch in non-tag bits of first capability");
+	CHERIBSDTEST_VERIFY2(cheri_gettag(map[1]) == 0,
+	    "Tag set in second injected capability");
+	CHERIBSDTEST_VERIFY2(cheri_equal_exact(map[1], pp[1]),
+	    "Mismatch in non-tag bits of second capability");
 
 	finish_child(pid);
 

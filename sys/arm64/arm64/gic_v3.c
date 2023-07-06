@@ -1653,7 +1653,7 @@ gic_v3_map_msi(device_t dev, device_t child, struct intr_irqsrc *isrc,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "subobject_bounds"

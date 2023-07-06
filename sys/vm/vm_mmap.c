@@ -2182,13 +2182,49 @@ vm_mmap_to_errno(int rv)
 		return (EINVAL);
 	}
 }
+
+#if __has_feature(capabilities)
+bool
+vm_derive_capreg(struct proc *p, uintcap_t in, uintcap_t *out)
+{
+	void * __capability cap;
+	vm_map_t map;
+	int otype;
+
+	/* The only sealed caps supported for this are sentries. */
+	otype = cheri_gettype(in);
+	switch (otype) {
+	case CHERI_OTYPE_UNSEALED:
+	case CHERI_OTYPE_SENTRY:
+		break;
+	default:
+		return (0);
+	}
+
+	map = &p->p_vmspace->vm_map;
+	cap = vm_map_reservation_cap(map, (vm_offset_t)in);
+
+	cap = cheri_buildcap(cap, in);
+#ifdef __aarch64__
+	/* Morello requires explicit sealing for entry. */
+	if (otype == CHERI_OTYPE_SENTRY)
+		cap = cheri_sealentry(cap);
+#endif
+	if (cheri_gettag(cap)) {
+		*out = (uintcap_t)cap;
+		return (true);
+	}
+	return (false);
+}
+#endif
 // CHERI CHANGES START
 // {
-//   "updated": 20221212,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ],
 //   "changes_purecap": [
 //     "support",

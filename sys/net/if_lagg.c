@@ -2171,12 +2171,14 @@ lagg_input_ethernet(struct ifnet *ifp, struct mbuf *m)
 		return (NULL);
 	}
 
-	ETHER_BPF_MTAP(scifp, m);
-
 	m = lagg_proto_input(sc, lp, m);
-	if (m != NULL && (scifp->if_flags & IFF_MONITOR) != 0) {
-		m_freem(m);
-		m = NULL;
+	if (m != NULL) {
+		ETHER_BPF_MTAP(scifp, m);
+
+		if ((scifp->if_flags & IFF_MONITOR) != 0) {
+			m_freem(m);
+			m = NULL;
+		}
 	}
 
 #ifdef DEV_NETMAP
@@ -2192,29 +2194,28 @@ lagg_input_ethernet(struct ifnet *ifp, struct mbuf *m)
 static struct mbuf *
 lagg_input_infiniband(struct ifnet *ifp, struct mbuf *m)
 {
-	struct epoch_tracker et;
 	struct lagg_port *lp = ifp->if_lagg;
 	struct lagg_softc *sc = lp->lp_softc;
 	struct ifnet *scifp = sc->sc_ifp;
 
-	NET_EPOCH_ENTER(et);
+	NET_EPOCH_ASSERT();
 	if ((scifp->if_drv_flags & IFF_DRV_RUNNING) == 0 ||
 	    lp->lp_detaching != 0 ||
 	    sc->sc_proto == LAGG_PROTO_NONE) {
-		NET_EPOCH_EXIT(et);
 		m_freem(m);
 		return (NULL);
 	}
 
-	infiniband_bpf_mtap(scifp, m);
-
 	m = lagg_proto_input(sc, lp, m);
-	if (m != NULL && (scifp->if_flags & IFF_MONITOR) != 0) {
-		m_freem(m);
-		m = NULL;
+	if (m != NULL) {
+		infiniband_bpf_mtap(scifp, m);
+
+		if ((scifp->if_flags & IFF_MONITOR) != 0) {
+			m_freem(m);
+			m = NULL;
+		}
 	}
 
-	NET_EPOCH_EXIT(et);
 	return (m);
 }
 
@@ -2707,7 +2708,7 @@ lagg_default_input(struct lagg_softc *sc, struct lagg_port *lp, struct mbuf *m)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

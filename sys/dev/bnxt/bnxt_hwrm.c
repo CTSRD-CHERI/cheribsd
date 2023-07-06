@@ -2455,3 +2455,15 @@ void bnxt_hwrm_ring_info_get(struct bnxt_softc *softc, uint8_t ring_type,
 
 	return;
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "user_capabilities",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

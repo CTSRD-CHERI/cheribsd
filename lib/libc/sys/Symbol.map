@@ -425,7 +425,7 @@ FBSD_1.7 {
 	cheri_revoke;
 	cheri_revoke_get_shadow;
 	fspacectl;
-	kqueue1;
+	kqueuex;
 	swapoff;
 };
 

@@ -381,7 +381,7 @@ int efi_status_to_errno(efi_status status);
 #endif /* _SYS_EFI_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "pointer_as_integer",

@@ -38,7 +38,7 @@
 .Ft int
 .Fn kqueue "void"
 .Ft int
-.Fn kqueue1 "u_int flags"
+.Fn kqueuex "u_int flags"
 .Ft int
 .Fo kevent
 .Fa "int kq"
@@ -92,7 +92,7 @@ flag, then the descriptor table is shared,
 which will allow sharing of the kqueue between two processes.
 .Pp
 The
-.Fn kqueue1
+.Fn kqueuex
 system call also creates a new kernel event queue, and additionally takes
 the
 .Fa flags
@@ -105,7 +105,15 @@ The returned file descriptor is automatically closed on
 The
 .Ql fd = kqueue()
 call is equivalent to
-.Ql fd = kqueue1(0) .
+.Ql fd = kqueuex(0) .
+.Pp
+For compatibility with
+.Nx ,
+the
+.Fn kqueue1
+function is provided, which accepts the
+.Dv O_CLOEXEC
+flag with the expected semantic.
 .Pp
 The
 .Fn kevent
@@ -773,6 +781,10 @@ main(int argc, char **argv)
 		printf("Something was written in '%s'\en", argv[1]);
 	}
     }
+
+    /* kqueues are destroyed upon close() */
+    (void)close(kq);
+    (void)close(fd);
 }
 .Ed
 .Sh ERRORS

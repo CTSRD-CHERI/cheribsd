@@ -47,14 +47,12 @@
 #include <sys/simd.h>
 #include <zfs_fletcher.h>
 
-ZFS_NO_SANITIZE_UNDEFINED
 static void
 fletcher_4_avx2_init(fletcher_4_ctx_t *ctx)
 {
 	memset(ctx->avx, 0, 4 * sizeof (zfs_fletcher_avx_t));
 }
 
-ZFS_NO_SANITIZE_UNDEFINED
 static void
 fletcher_4_avx2_fini(fletcher_4_ctx_t *ctx, zio_cksum_t *zcp)
 {
@@ -106,22 +104,18 @@ fletcher_4_avx2_native(fletcher_4_ctx_t *ctx, const void *buf, uint64_t size)
 	const uint64_t *ip = buf;
 	const uint64_t *ipend = (uint64_t *)((uint8_t *)ip + size);
 
-	kfpu_begin();
-
 	FLETCHER_4_AVX2_RESTORE_CTX(ctx);
 
-	for (; ip < ipend; ip += 2) {
+	do {
 		asm volatile("vpmovzxdq %0, %%ymm4"::"m" (*ip));
 		asm volatile("vpaddq %ymm4, %ymm0, %ymm0");
 		asm volatile("vpaddq %ymm0, %ymm1, %ymm1");
 		asm volatile("vpaddq %ymm1, %ymm2, %ymm2");
 		asm volatile("vpaddq %ymm2, %ymm3, %ymm3");
-	}
+	} while ((ip += 2) < ipend);
 
 	FLETCHER_4_AVX2_SAVE_CTX(ctx);
 	asm volatile("vzeroupper");
-
-	kfpu_end();
 }
 
 static void
@@ -134,13 +128,11 @@ fletcher_4_avx2_byteswap(fletcher_4_ctx_t *ctx, const void *buf, uint64_t size)
 	const uint64_t *ip = buf;
 	const uint64_t *ipend = (uint64_t *)((uint8_t *)ip + size);
 
-	kfpu_begin();
-
 	FLETCHER_4_AVX2_RESTORE_CTX(ctx);
 
 	asm volatile("vmovdqu %0, %%ymm5" :: "m" (mask));
 
-	for (; ip < ipend; ip += 2) {
+	do {
 		asm volatile("vpmovzxdq %0, %%ymm4"::"m" (*ip));
 		asm volatile("vpshufb %ymm5, %ymm4, %ymm4");
 
@@ -148,12 +140,10 @@ fletcher_4_avx2_byteswap(fletcher_4_ctx_t *ctx, const void *buf, uint64_t size)
 		asm volatile("vpaddq %ymm0, %ymm1, %ymm1");
 		asm volatile("vpaddq %ymm1, %ymm2, %ymm2");
 		asm volatile("vpaddq %ymm2, %ymm3, %ymm3");
-	}
+	} while ((ip += 2) < ipend);
 
 	FLETCHER_4_AVX2_SAVE_CTX(ctx);
 	asm volatile("vzeroupper");
-
-	kfpu_end();
 }
 
 static boolean_t fletcher_4_avx2_valid(void)
@@ -169,6 +159,7 @@ const fletcher_4_ops_t fletcher_4_avx2_ops = {
 	.fini_byteswap = fletcher_4_avx2_fini,
 	.compute_byteswap = fletcher_4_avx2_byteswap,
 	.valid = fletcher_4_avx2_valid,
+	.uses_fpu = B_TRUE,
 	.name = "avx2"
 };
 

@@ -690,7 +690,7 @@ int lkpi_devm_add_action_or_reset(struct device *dev, void (*action)(void *), vo
 #endif	/* _LINUXKPI_LINUX_DEVICE_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20230424,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "subobject_bounds"

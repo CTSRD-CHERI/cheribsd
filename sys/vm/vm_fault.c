@@ -2668,11 +2668,11 @@ vm_fault_enable_pagefaults(int save)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",
-//     "virtual_address"
+//     "ctoptr"
 //   ],
 //   "change_comment": ""
 // }

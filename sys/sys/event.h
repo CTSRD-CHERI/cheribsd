@@ -241,7 +241,7 @@ struct kevent64 {
 #define NOTE_NSECONDS		0x00000008	/* data is nanoseconds */
 #define	NOTE_ABSTIME		0x00000010	/* timeout is absolute */
 
-/* Flags for kqueue1(2) */
+/* Flags for kqueuex(2) */
 #define	KQUEUE_CLOEXEC	0x00000001	/* close on exec */
 
 struct knote;
@@ -393,7 +393,8 @@ struct timespec;
 
 __BEGIN_DECLS
 int     kqueue(void);
-int     kqueue1(unsigned flags);
+int     kqueuex(unsigned flags);
+int     kqueue1(int flags);
 int     kevent(int kq, const struct kevent *changelist, int nchanges,
 	    struct kevent *eventlist, int nevents,
 	    const struct timespec *timeout);
@@ -404,7 +405,7 @@ __END_DECLS
 #endif /* !_SYS_EVENT_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"

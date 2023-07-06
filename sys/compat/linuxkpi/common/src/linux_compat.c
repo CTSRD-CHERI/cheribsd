@@ -2836,12 +2836,13 @@ CTASSERT(sizeof(unsigned long) == sizeof(uintptr_t));
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "user_capabilities",
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

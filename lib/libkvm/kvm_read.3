@@ -38,6 +38,7 @@
 .Sh NAME
 .Nm kvm_read ,
 .Nm kvm_read2 ,
+.Nm kvm_readcap ,
 .Nm kvm_write
 .Nd read or write kernel virtual memory
 .Sh LIBRARY
@@ -48,6 +49,8 @@
 .Fn kvm_read "kvm_t *kd" "unsigned long addr" "void *buf" "size_t nbytes"
 .Ft ssize_t
 .Fn kvm_read2 "kvm_t *kd" "kvaddr_t addr" "void *buf" "size_t nbytes"
+.Ft ssize_t
+.Fn kvm_readcap "kvm_t *kd" "kvaddr_t addr" "void *buf" "size_t nbytes"
 .Ft ssize_t
 .Fn kvm_write "kvm_t *kd" "unsigned long addr" "const void *buf" "size_t nbytes"
 .Sh DESCRIPTION
@@ -63,9 +66,10 @@ See
 for information regarding opening kernel virtual memory and crash dumps.
 .Pp
 The
-.Fn kvm_read
+.Fn kvm_read ,
+.Fn kvm_read2 ,
 and
-.Fn kvm_read2
+.Fn kvm_readcap
 functions transfer
 .Fa nbytes
 bytes of data from
@@ -84,13 +88,26 @@ read or write process address spaces.
 .Pp
 The
 .Fn kvm_read2
-function uses a different type
+and
+.Fn kvm_readcap
+functions use a different type
 .Pq Vt kvaddr_t
 for the
 .Fa addr
 argument to allow use of addresses larger than
 .Dv ULONG_MAX
 when examining non-native kernel images.
+.Pp
+.Fn kvm_readcap
+fetches the expanded value of one or more capabilities.
+.Fa addr
+must be aligned to the size of a capability.
+Each capability is stored as a single byte holding the tag followed by
+the capability bytes as would be returned by a corresponding call to
+.Fn kvm_read2 .
+.Fa nbytes must be a multiple of the expanded value size and specifies the
+size of the expanded value buffer,
+not the amount of kernel virtual memory address space.
 .Sh RETURN VALUES
 Upon success, the number of bytes actually transferred is returned.
 Otherwise, -1 is returned.

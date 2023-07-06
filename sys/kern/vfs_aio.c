@@ -2210,7 +2210,7 @@ kern_aio_error(struct thread *td, struct aiocb * __capability ujob,
 	}
 	AIO_LOCK(ki);
 	TAILQ_FOREACH(job, &ki->kaio_all, allist) {
-		if ((__cheri_addr ptraddr_t)job->ujob == (__cheri_addr ptraddr_t)ujob) {
+		if (job->ujob == ujob) {
 			if (job->jobflags & KAIOCB_FINISHED)
 				td->td_retval[0] =
 					job->uaiocb._aiocb_private.error;
@@ -2239,8 +2239,7 @@ int
 sys_aio_error(struct thread *td, struct aio_error_args *uap)
 {
 
-	return (kern_aio_error(td, (struct aiocb * __capability)uap->aiocbp,
-	    &aiocb_ops));
+	return (kern_aio_error(td, uap->aiocbp, &aiocb_ops));
 }
 
 /* syscall - asynchronous read from a file (REALTIME) */
@@ -3048,7 +3047,7 @@ aiocb32_copyin(void * __capability ujob, struct kaiocb *kjob, int type)
 static long
 aiocb32_fetch_status(void * __capability ujob)
 {
-	struct aiocb32 *ujob32;
+	struct aiocb32 * __capability ujob32;
 
 	ujob32 = (struct aiocb32 * __capability)ujob;
 	return (fuword32(&ujob32->_aiocb_private.status));
@@ -3057,7 +3056,7 @@ aiocb32_fetch_status(void * __capability ujob)
 static long
 aiocb32_fetch_error(void * __capability ujob)
 {
-	struct aiocb32 *ujob32;
+	struct aiocb32 * __capability ujob32;
 
 	ujob32 = (struct aiocb32 * __capability)ujob;
 	return (fuword32(&ujob32->_aiocb_private.error));
@@ -3066,7 +3065,7 @@ aiocb32_fetch_error(void * __capability ujob)
 static int
 aiocb32_store_status(void * __capability ujob, long status)
 {
-	struct aiocb32 *ujob32;
+	struct aiocb32 * __capability ujob32;
 
 	ujob32 = (struct aiocb32 * __capability)ujob;
 	return (suword32(&ujob32->_aiocb_private.status, status));
@@ -3075,7 +3074,7 @@ aiocb32_store_status(void * __capability ujob, long status)
 static int
 aiocb32_store_error(void * __capability ujob, long error)
 {
-	struct aiocb32 *ujob32;
+	struct aiocb32 * __capability ujob32;
 
 	ujob32 = (struct aiocb32 * __capability)ujob;
 	return (suword32(&ujob32->_aiocb_private.error, error));
@@ -3084,7 +3083,7 @@ aiocb32_store_error(void * __capability ujob, long error)
 static int
 aiocb32_store_kernelinfo(void * __capability ujob, long jobref)
 {
-	struct aiocb32 *ujob32;
+	struct aiocb32 * __capability ujob32;
 
 	ujob32 = (struct aiocb32 * __capability)ujob;
 	return (suword32(&ujob32->_aiocb_private.kernelinfo, jobref));
@@ -3847,16 +3846,16 @@ freebsd64_lio_listio(struct thread *td, struct freebsd64_lio_listio_args *uap)
 
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "kernel_sig_types",
 //     "user_capabilities",
-//     "support"
+//     "support",
+//     "ctoptr"
 //   ],
 //   "changes_purecap": [
-//     "virtual_address",
 //     "pointer_as_integer"
 //   ]
 // }

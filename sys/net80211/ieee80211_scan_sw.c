@@ -1044,7 +1044,7 @@ ieee80211_swscan_attach(struct ieee80211com *ic)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20230424,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "subobject_bounds"

@@ -1069,7 +1069,7 @@ sys_kqueue(struct thread *td, struct kqueue_args *uap)
 }
 
 int
-sys_kqueue1(struct thread *td, struct kqueue1_args *uap)
+sys_kqueuex(struct thread *td, struct kqueuex_args *uap)
 {
 	int flags;
 
@@ -3013,7 +3013,7 @@ again:
 
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "integer_provenance",

@@ -366,7 +366,7 @@ pwd_set(struct pwddesc *pdp, struct pwd *newpwd)
 #endif /* !_SYS_FILEDESC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "subobject_bounds"

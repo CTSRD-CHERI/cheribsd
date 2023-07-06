@@ -1255,7 +1255,7 @@ cheri_revoke_td_frame(struct thread *td, const struct vm_cheri_revoke_cookie
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",

@@ -42,13 +42,26 @@ change the behavior of the pool.
 .Pp
 The following are read-only properties:
 .Bl -tag -width "unsupported@guid"
-.It Cm allocated
+.It Sy allocated
 Amount of storage used within the pool.
 See
 .Sy fragmentation
 and
 .Sy free
 for more information.
+.It Sy bcloneratio
+The ratio of the total amount of storage that would be required to store all
+the cloned blocks without cloning to the actual storage used.
+The
+.Sy bcloneratio
+property is calculated as:
+.Pp
+.Sy ( ( bclonesaved + bcloneused ) * 100 ) / bcloneused
+.It Sy bclonesaved
+The amount of additional storage that would be required if block cloning
+was not used.
+.It Sy bcloneused
+The amount of storage used by cloned blocks.
 .It Sy capacity
 Percentage of pool space used.
 This property can also be referred to by its shortened column name,
@@ -82,11 +95,13 @@ By contrast, the
 property describes how much new data can be written to ZFS filesystems/volumes.
 The zpool
 .Sy free
-property is not generally useful for this purpose, and can be substantially more than the zfs
+property is not generally useful for this purpose, and can be substantially more
+than the zfs
 .Sy available
 space.
 This discrepancy is due to several factors, including raidz parity;
-zfs reservation, quota, refreservation, and refquota properties; and space set aside by
+zfs reservation, quota, refreservation, and refquota properties; and space set
+aside by
 .Sy spa_slop_shift
 (see
 .Xr zfs 4
@@ -101,16 +116,16 @@ Over time
 will decrease while
 .Sy free
 increases.
-.It Sy leaked
-Space not released while
-.Sy freeing
-due to corruption, now permanently leaked into the pool.
+.It Sy guid
+A unique identifier for the pool.
 .It Sy health
 The current health of the pool.
 Health can be one of
 .Sy ONLINE , DEGRADED , FAULTED , OFFLINE, REMOVED , UNAVAIL .
-.It Sy guid
-A unique identifier for the pool.
+.It Sy leaked
+Space not released while
+.Sy freeing
+due to corruption, now permanently leaked into the pool.
 .It Sy load_guid
 A unique identifier for the pool.
 Unlike the
@@ -272,7 +287,8 @@ using the
 command.
 .It Sy bootfs Ns = Ns Sy (unset) Ns | Ns Ar pool Ns Op / Ns Ar dataset
 Identifies the default bootable dataset for the root pool.
-This property is expected to be set mainly by the installation and upgrade programs.
+This property is expected to be set mainly by the installation and upgrade
+programs.
 Not all Linux distribution boot processes use the bootfs property.
 .It Sy cachefile Ns = Ns Ar path Ns | Ns Sy none
 Controls the location of where the pool configuration is cached.

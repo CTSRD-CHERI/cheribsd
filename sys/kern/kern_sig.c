@@ -4717,13 +4717,14 @@ sigfastblock_setpend(struct thread *td, bool resched)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "kernel_sig_types",
 //     "integer_provenance",
 //     "user_capabilities",
-//     "pointer_alignment"
+//     "pointer_alignment",
+//     "ctoptr"
 //   ],
 //   "changes_purecap": [
 //     "support"

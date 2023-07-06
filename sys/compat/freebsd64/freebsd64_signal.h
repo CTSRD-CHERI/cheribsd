@@ -70,3 +70,14 @@ int	convert_sigevent64(const struct sigevent64 *sig64,
 	    struct sigevent *sig);
 
 #endif /* _COMPAT_FREEBSD64_FREEBSD64_SIGNAL_H_ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "header",
+ *   "changes": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

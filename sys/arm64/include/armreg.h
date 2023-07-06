@@ -153,6 +153,14 @@
 #define	CNTPCT_EL0_CRm		0
 #define	CNTPCT_EL0_op2		1
 
+/* CNTFRQ_EL0 */
+#define	CNTFRQ_EL0		MRS_REG(CNTFRQ_EL0)
+#define	CNTFRQ_EL0_op0		3
+#define	CNTFRQ_EL0_op1		3
+#define	CNTFRQ_EL0_CRn		14
+#define	CNTFRQ_EL0_CRm		0
+#define	CNTFRQ_EL0_op2		0
+
 /* CPACR_EL1 */
 #define	CPACR_ZEN_MASK		(0x3 << 16)
 #define	 CPACR_ZEN_TRAP_ALL1	(0x0 << 16) /* Traps from EL0 and EL1 */

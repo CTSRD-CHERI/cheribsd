@@ -71,6 +71,8 @@ dnode_stats_t dnode_stats = {
 	{ "dnode_move_active",			KSTAT_DATA_UINT64 },
 };
 
+dnode_sums_t dnode_sums;
+
 static kstat_t *dnode_ksp;
 static kmem_cache_t *dnode_cache;
 
@@ -225,6 +227,72 @@ dnode_dest(void *arg, void *unused)
 	avl_destroy(&dn->dn_dbufs);
 }
 
+static int
+dnode_kstats_update(kstat_t *ksp, int rw)
+{
+	dnode_stats_t *ds = ksp->ks_data;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+	ds->dnode_hold_dbuf_hold.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_hold_dbuf_hold);
+	ds->dnode_hold_dbuf_read.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_hold_dbuf_read);
+	ds->dnode_hold_alloc_hits.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_hold_alloc_hits);
+	ds->dnode_hold_alloc_misses.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_hold_alloc_misses);
+	ds->dnode_hold_alloc_interior.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_hold_alloc_interior);
+	ds->dnode_hold_alloc_lock_retry.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_hold_alloc_lock_retry);
+	ds->dnode_hold_alloc_lock_misses.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_hold_alloc_lock_misses);
+	ds->dnode_hold_alloc_type_none.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_hold_alloc_type_none);
+	ds->dnode_hold_free_hits.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_hold_free_hits);
+	ds->dnode_hold_free_misses.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_hold_free_misses);
+	ds->dnode_hold_free_lock_misses.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_hold_free_lock_misses);
+	ds->dnode_hold_free_lock_retry.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_hold_free_lock_retry);
+	ds->dnode_hold_free_refcount.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_hold_free_refcount);
+	ds->dnode_hold_free_overflow.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_hold_free_overflow);
+	ds->dnode_free_interior_lock_retry.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_free_interior_lock_retry);
+	ds->dnode_allocate.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_allocate);
+	ds->dnode_reallocate.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_reallocate);
+	ds->dnode_buf_evict.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_buf_evict);
+	ds->dnode_alloc_next_chunk.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_alloc_next_chunk);
+	ds->dnode_alloc_race.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_alloc_race);
+	ds->dnode_alloc_next_block.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_alloc_next_block);
+	ds->dnode_move_invalid.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_move_invalid);
+	ds->dnode_move_recheck1.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_move_recheck1);
+	ds->dnode_move_recheck2.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_move_recheck2);
+	ds->dnode_move_special.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_move_special);
+	ds->dnode_move_handle.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_move_handle);
+	ds->dnode_move_rwlock.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_move_rwlock);
+	ds->dnode_move_active.value.ui64 =
+	    wmsum_value(&dnode_sums.dnode_move_active);
+	return (0);
+}
+
 void
 dnode_init(void)
 {
@@ -233,11 +301,41 @@ dnode_init(void)
 	    0, dnode_cons, dnode_dest, NULL, NULL, NULL, 0);
 	kmem_cache_set_move(dnode_cache, dnode_move);
 
+	wmsum_init(&dnode_sums.dnode_hold_dbuf_hold, 0);
+	wmsum_init(&dnode_sums.dnode_hold_dbuf_read, 0);
+	wmsum_init(&dnode_sums.dnode_hold_alloc_hits, 0);
+	wmsum_init(&dnode_sums.dnode_hold_alloc_misses, 0);
+	wmsum_init(&dnode_sums.dnode_hold_alloc_interior, 0);
+	wmsum_init(&dnode_sums.dnode_hold_alloc_lock_retry, 0);
+	wmsum_init(&dnode_sums.dnode_hold_alloc_lock_misses, 0);
+	wmsum_init(&dnode_sums.dnode_hold_alloc_type_none, 0);
+	wmsum_init(&dnode_sums.dnode_hold_free_hits, 0);
+	wmsum_init(&dnode_sums.dnode_hold_free_misses, 0);
+	wmsum_init(&dnode_sums.dnode_hold_free_lock_misses, 0);
+	wmsum_init(&dnode_sums.dnode_hold_free_lock_retry, 0);
+	wmsum_init(&dnode_sums.dnode_hold_free_refcount, 0);
+	wmsum_init(&dnode_sums.dnode_hold_free_overflow, 0);
+	wmsum_init(&dnode_sums.dnode_free_interior_lock_retry, 0);
+	wmsum_init(&dnode_sums.dnode_allocate, 0);
+	wmsum_init(&dnode_sums.dnode_reallocate, 0);
+	wmsum_init(&dnode_sums.dnode_buf_evict, 0);
+	wmsum_init(&dnode_sums.dnode_alloc_next_chunk, 0);
+	wmsum_init(&dnode_sums.dnode_alloc_race, 0);
+	wmsum_init(&dnode_sums.dnode_alloc_next_block, 0);
+	wmsum_init(&dnode_sums.dnode_move_invalid, 0);
+	wmsum_init(&dnode_sums.dnode_move_recheck1, 0);
+	wmsum_init(&dnode_sums.dnode_move_recheck2, 0);
+	wmsum_init(&dnode_sums.dnode_move_special, 0);
+	wmsum_init(&dnode_sums.dnode_move_handle, 0);
+	wmsum_init(&dnode_sums.dnode_move_rwlock, 0);
+	wmsum_init(&dnode_sums.dnode_move_active, 0);
+
 	dnode_ksp = kstat_create("zfs", 0, "dnodestats", "misc",
 	    KSTAT_TYPE_NAMED, sizeof (dnode_stats) / sizeof (kstat_named_t),
 	    KSTAT_FLAG_VIRTUAL);
 	if (dnode_ksp != NULL) {
 		dnode_ksp->ks_data = &dnode_stats;
+		dnode_ksp->ks_update = dnode_kstats_update;
 		kstat_install(dnode_ksp);
 	}
 }
@@ -249,6 +347,35 @@ dnode_fini(void)
 		kstat_delete(dnode_ksp);
 		dnode_ksp = NULL;
 	}
+
+	wmsum_fini(&dnode_sums.dnode_hold_dbuf_hold);
+	wmsum_fini(&dnode_sums.dnode_hold_dbuf_read);
+	wmsum_fini(&dnode_sums.dnode_hold_alloc_hits);
+	wmsum_fini(&dnode_sums.dnode_hold_alloc_misses);
+	wmsum_fini(&dnode_sums.dnode_hold_alloc_interior);
+	wmsum_fini(&dnode_sums.dnode_hold_alloc_lock_retry);
+	wmsum_fini(&dnode_sums.dnode_hold_alloc_lock_misses);
+	wmsum_fini(&dnode_sums.dnode_hold_alloc_type_none);
+	wmsum_fini(&dnode_sums.dnode_hold_free_hits);
+	wmsum_fini(&dnode_sums.dnode_hold_free_misses);
+	wmsum_fini(&dnode_sums.dnode_hold_free_lock_misses);
+	wmsum_fini(&dnode_sums.dnode_hold_free_lock_retry);
+	wmsum_fini(&dnode_sums.dnode_hold_free_refcount);
+	wmsum_fini(&dnode_sums.dnode_hold_free_overflow);
+	wmsum_fini(&dnode_sums.dnode_free_interior_lock_retry);
+	wmsum_fini(&dnode_sums.dnode_allocate);
+	wmsum_fini(&dnode_sums.dnode_reallocate);
+	wmsum_fini(&dnode_sums.dnode_buf_evict);
+	wmsum_fini(&dnode_sums.dnode_alloc_next_chunk);
+	wmsum_fini(&dnode_sums.dnode_alloc_race);
+	wmsum_fini(&dnode_sums.dnode_alloc_next_block);
+	wmsum_fini(&dnode_sums.dnode_move_invalid);
+	wmsum_fini(&dnode_sums.dnode_move_recheck1);
+	wmsum_fini(&dnode_sums.dnode_move_recheck2);
+	wmsum_fini(&dnode_sums.dnode_move_special);
+	wmsum_fini(&dnode_sums.dnode_move_handle);
+	wmsum_fini(&dnode_sums.dnode_move_rwlock);
+	wmsum_fini(&dnode_sums.dnode_move_active);
 
 	kmem_cache_destroy(dnode_cache);
 	dnode_cache = NULL;
@@ -1637,20 +1764,29 @@ dnode_try_claim(objset_t *os, uint64_t object, int slots)
 }
 
 /*
- * Checks if the dnode contains any uncommitted dirty records.
+ * Checks if the dnode might contain any uncommitted changes to data blocks.
+ * Dirty metadata (e.g. bonus buffer) does not count.
  */
 boolean_t
 dnode_is_dirty(dnode_t *dn)
 {
 	mutex_enter(&dn->dn_mtx);
-
 	for (int i = 0; i < TXG_SIZE; i++) {
-		if (multilist_link_active(&dn->dn_dirty_link[i])) {
+		list_t *list = &dn->dn_dirty_records[i];
+		for (dbuf_dirty_record_t *dr = list_head(list);
+		    dr != NULL; dr = list_next(list, dr)) {
+			if (dr->dr_dbuf == NULL ||
+			    (dr->dr_dbuf->db_blkid != DMU_BONUS_BLKID &&
+			    dr->dr_dbuf->db_blkid != DMU_SPILL_BLKID)) {
+				mutex_exit(&dn->dn_mtx);
+				return (B_TRUE);
+			}
+		}
+		if (dn->dn_free_ranges[i] != NULL) {
 			mutex_exit(&dn->dn_mtx);
 			return (B_TRUE);
 		}
 	}
-
 	mutex_exit(&dn->dn_mtx);
 
 	return (B_FALSE);
@@ -2280,17 +2416,9 @@ dnode_spill_freed(dnode_t *dn)
 uint64_t
 dnode_block_freed(dnode_t *dn, uint64_t blkid)
 {
-	void *dp = spa_get_dsl(dn->dn_objset->os_spa);
 	int i;
 
 	if (blkid == DMU_BONUS_BLKID)
-		return (FALSE);
-
-	/*
-	 * If we're in the process of opening the pool, dp will not be
-	 * set yet, but there shouldn't be anything dirty.
-	 */
-	if (dp == NULL)
 		return (FALSE);
 
 	if (dn->dn_free_txg)
@@ -2469,8 +2597,9 @@ dnode_next_offset_level(dnode_t *dn, int flags, uint64_t *offset,
 
 		if (inc < 0) {
 			/* traversing backwards; position offset at the end */
-			ASSERT3U(*offset, <=, start);
-			*offset = MIN(*offset + (1ULL << span) - 1, start);
+			if (span < 8 * sizeof (*offset))
+				*offset = MIN(*offset + (1ULL << span) - 1,
+				    start);
 		} else if (*offset < start) {
 			*offset = start;
 		}
@@ -2521,7 +2650,9 @@ dnode_next_offset(dnode_t *dn, int flags, uint64_t *offset,
 		rw_enter(&dn->dn_struct_rwlock, RW_READER);
 
 	if (dn->dn_phys->dn_nlevels == 0) {
-		error = SET_ERROR(ESRCH);
+		if (!(flags & DNODE_FIND_HOLE)) {
+			error = SET_ERROR(ESRCH);
+		}
 		goto out;
 	}
 
@@ -2577,3 +2708,8 @@ EXPORT_SYMBOL(dnode_free_range);
 EXPORT_SYMBOL(dnode_evict_dbufs);
 EXPORT_SYMBOL(dnode_evict_bonus);
 #endif
+
+ZFS_MODULE_PARAM(zfs, zfs_, default_bs, INT, ZMOD_RW,
+	"Default dnode block shift");
+ZFS_MODULE_PARAM(zfs, zfs_, default_ibs, INT, ZMOD_RW,
+	"Default dnode indirect block shift");

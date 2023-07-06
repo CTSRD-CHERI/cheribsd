@@ -2233,8 +2233,7 @@ static int
 zfs_zaccess_dataset_check(znode_t *zp, uint32_t v4_mode)
 {
 	if ((v4_mode & WRITE_MASK) && (zfs_is_readonly(ZTOZSB(zp))) &&
-	    (!Z_ISDEV(ZTOI(zp)->i_mode) ||
-	    (Z_ISDEV(ZTOI(zp)->i_mode) && (v4_mode & WRITE_MASK_ATTRS)))) {
+	    (!Z_ISDEV(ZTOI(zp)->i_mode) || (v4_mode & WRITE_MASK_ATTRS))) {
 		return (SET_ERROR(EROFS));
 	}
 
@@ -2582,7 +2581,6 @@ zfs_fastaccesschk_execute(znode_t *zdp, cred_t *cr)
 	}
 
 	if (uid == KUID_TO_SUID(ZTOI(zdp)->i_uid)) {
-		owner = B_TRUE;
 		if (zdp->z_mode & S_IXUSR) {
 			mutex_exit(&zdp->z_acl_lock);
 			return (0);
@@ -2592,7 +2590,6 @@ zfs_fastaccesschk_execute(znode_t *zdp, cred_t *cr)
 		}
 	}
 	if (groupmember(KGID_TO_SGID(ZTOI(zdp)->i_gid), cr)) {
-		groupmbr = B_TRUE;
 		if (zdp->z_mode & S_IXGRP) {
 			mutex_exit(&zdp->z_acl_lock);
 			return (0);
@@ -2721,7 +2718,6 @@ zfs_zaccess(znode_t *zp, int mode, int flags, boolean_t skipaclchk, cred_t *cr,
 		 * read_acl/read_attributes
 		 */
 
-		error = 0;
 		ASSERT(working_mode != 0);
 
 		if ((working_mode & (ACE_READ_ACL|ACE_READ_ATTRIBUTES) &&
@@ -2788,7 +2784,7 @@ zfs_zaccess_rwx(znode_t *zp, mode_t mode, int flags, cred_t *cr,
  * Access function for secpolicy_vnode_setattr
  */
 int
-zfs_zaccess_unix(znode_t *zp, mode_t mode, cred_t *cr)
+zfs_zaccess_unix(void *zp, int mode, cred_t *cr)
 {
 	int v4_mode = zfs_unix_to_v4(mode >> 6);
 

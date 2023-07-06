@@ -436,7 +436,7 @@ DB_SHOW_ALIAS_FLAGS(allpcpu, db_show_cpu_all, DB_CMD_MEMSAFE);
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "bounds_compression",

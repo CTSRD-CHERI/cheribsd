@@ -460,6 +460,21 @@ SYSCTL_INT(_net_link_bridge, OID_AUTO, allow_llz_overlap,
     "Allow overlap of link-local scope "
     "zones of a bridge interface and the member interfaces");
 
+/* log MAC address port flapping */
+VNET_DEFINE_STATIC(bool, log_mac_flap) = true;
+#define	V_log_mac_flap	VNET(log_mac_flap)
+SYSCTL_BOOL(_net_link_bridge, OID_AUTO, log_mac_flap,
+    CTLFLAG_RW | CTLFLAG_VNET, &VNET_NAME(log_mac_flap), true,
+    "Log MAC address port flapping");
+
+VNET_DEFINE_STATIC(int, log_interval) = 5;
+VNET_DEFINE_STATIC(int, log_count) = 0;
+VNET_DEFINE_STATIC(struct timeval, log_last) = { 0 };
+
+#define	V_log_interval	VNET(log_interval)
+#define	V_log_count	VNET(log_count)
+#define	V_log_last	VNET(log_last)
+
 struct bridge_control {
 	int	(*bc_func)(struct bridge_softc *, void *);
 	int	bc_argsize;
@@ -2539,32 +2554,28 @@ bridge_input(struct ifnet *ifp, struct mbuf *m)
 		return (m);
 	}
 
-#if (defined(INET) || defined(INET6))
-#   define OR_CARP_CHECK_WE_ARE_DST(iface) \
-	|| ((iface)->if_carp \
-	    && (*carp_forus_p)((iface), eh->ether_dhost))
-#   define OR_CARP_CHECK_WE_ARE_SRC(iface) \
-	|| ((iface)->if_carp \
-	    && (*carp_forus_p)((iface), eh->ether_shost))
+#if defined(INET) || defined(INET6)
+#define	CARP_CHECK_WE_ARE_DST(iface) \
+	((iface)->if_carp && (*carp_forus_p)((iface), eh->ether_dhost))
+#define	CARP_CHECK_WE_ARE_SRC(iface) \
+	((iface)->if_carp && (*carp_forus_p)((iface), eh->ether_shost))
 #else
-#   define OR_CARP_CHECK_WE_ARE_DST(iface)
-#   define OR_CARP_CHECK_WE_ARE_SRC(iface)
+#define	CARP_CHECK_WE_ARE_DST(iface)	false
+#define	CARP_CHECK_WE_ARE_SRC(iface)	false
 #endif
 
 #ifdef INET6
-#   define OR_PFIL_HOOKED_INET6 \
-	|| PFIL_HOOKED_IN(V_inet6_pfil_head)
+#define	PFIL_HOOKED_INET6	PFIL_HOOKED_IN(V_inet6_pfil_head)
 #else
-#   define OR_PFIL_HOOKED_INET6
+#define	PFIL_HOOKED_INET6	false
 #endif
 
-#define GRAB_OUR_PACKETS(iface) \
-	if ((iface)->if_type == IFT_GIF) \
-		continue; \
-	/* It is destined for us. */ \
-	if (memcmp(IF_LLADDR((iface)), eh->ether_dhost,  ETHER_ADDR_LEN) == 0 \
-	    OR_CARP_CHECK_WE_ARE_DST((iface))				\
-	    ) {								\
+#define GRAB_OUR_PACKETS(iface)						\
+	if ((iface)->if_type == IFT_GIF)				\
+		continue;						\
+	/* It is destined for us. */					\
+	if (memcmp(IF_LLADDR(iface), eh->ether_dhost, ETHER_ADDR_LEN) == 0 || \
+	    CARP_CHECK_WE_ARE_DST(iface)) {				\
 		if (bif->bif_flags & IFBIF_LEARNING) {			\
 			error = bridge_rtupdate(sc, eh->ether_shost,	\
 			    vlan, bif, 0, IFBAF_DYNAMIC);		\
@@ -2583,8 +2594,8 @@ bridge_input(struct ifnet *ifp, struct mbuf *m)
 		if_inc_counter(bifp, IFCOUNTER_IPACKETS, 1);		\
 		if_inc_counter(bifp, IFCOUNTER_IBYTES, m->m_pkthdr.len); \
 		/* Filter on the physical interface. */			\
-		if (V_pfil_local_phys && (PFIL_HOOKED_IN(V_inet_pfil_head) \
-		     OR_PFIL_HOOKED_INET6)) {				\
+		if (V_pfil_local_phys && (PFIL_HOOKED_IN(V_inet_pfil_head) || \
+		    PFIL_HOOKED_INET6)) {				\
 			if (bridge_pfil(&m, NULL, ifp,			\
 			    PFIL_IN) != 0 || m == NULL) {		\
 				return (NULL);				\
@@ -2596,9 +2607,8 @@ bridge_input(struct ifnet *ifp, struct mbuf *m)
 	}								\
 									\
 	/* We just received a packet that we sent out. */		\
-	if (memcmp(IF_LLADDR((iface)), eh->ether_shost, ETHER_ADDR_LEN) == 0 \
-	    OR_CARP_CHECK_WE_ARE_SRC((iface))			\
-	    ) {								\
+	if (memcmp(IF_LLADDR(iface), eh->ether_shost, ETHER_ADDR_LEN) == 0 || \
+	    CARP_CHECK_WE_ARE_SRC(iface)) {				\
 		m_freem(m);						\
 		return (NULL);						\
 	}
@@ -2622,9 +2632,9 @@ bridge_input(struct ifnet *ifp, struct mbuf *m)
 		GRAB_OUR_PACKETS(bif2->bif_ifp)
 	}
 
-#undef OR_CARP_CHECK_WE_ARE_DST
-#undef OR_CARP_CHECK_WE_ARE_SRC
-#undef OR_PFIL_HOOKED_INET6
+#undef CARP_CHECK_WE_ARE_DST
+#undef CARP_CHECK_WE_ARE_SRC
+#undef PFIL_HOOKED_INET6
 #undef GRAB_OUR_PACKETS
 
 	/* Perform the bridge forwarding function. */
@@ -2773,6 +2783,7 @@ bridge_rtupdate(struct bridge_softc *sc, const uint8_t *dst, uint16_t vlan,
     struct bridge_iflist *bif, int setflags, uint8_t flags)
 {
 	struct bridge_rtnode *brt;
+	struct bridge_iflist *obif;
 	int error;
 
 	BRIDGE_LOCK_OR_NET_EPOCH_ASSERT(sc);
@@ -2796,7 +2807,7 @@ bridge_rtupdate(struct bridge_softc *sc, const uint8_t *dst, uint16_t vlan,
 
 		/* Check again, now that we have the lock. There could have
 		 * been a race and we only want to insert this once. */
-		if ((brt = bridge_rtnode_lookup(sc, dst, vlan)) != NULL) {
+		if (bridge_rtnode_lookup(sc, dst, vlan) != NULL) {
 			BRIDGE_RT_UNLOCK(sc);
 			return (0);
 		}
@@ -2845,12 +2856,24 @@ bridge_rtupdate(struct bridge_softc *sc, const uint8_t *dst, uint16_t vlan,
 	}
 
 	if ((brt->brt_flags & IFBAF_TYPEMASK) == IFBAF_DYNAMIC &&
-	    brt->brt_dst != bif) {
+	    (obif = brt->brt_dst) != bif) {
 		BRIDGE_RT_LOCK(sc);
 		brt->brt_dst->bif_addrcnt--;
 		brt->brt_dst = bif;
 		brt->brt_dst->bif_addrcnt++;
 		BRIDGE_RT_UNLOCK(sc);
+
+		if (V_log_mac_flap &&
+		    ppsratecheck(&V_log_last, &V_log_count, V_log_interval)) {
+			uint8_t *addr = &brt->brt_addr[0];
+			log(LOG_NOTICE,
+			    "%s: mac address %02x:%02x:%02x:%02x:%02x:%02x vlan %d moved from %s to %s\n",
+			    sc->sc_ifp->if_xname,
+			    addr[0], addr[1], addr[2], addr[3], addr[4], addr[5],
+			    brt->brt_vlan,
+			    obif->bif_ifp->if_xname,
+			    bif->bif_ifp->if_xname);
+		}
 	}
 
 	if ((flags & IFBAF_TYPEMASK) == IFBAF_DYNAMIC)
@@ -3792,7 +3815,7 @@ bridge_linkcheck(struct bridge_softc *sc)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

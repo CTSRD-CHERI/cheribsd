@@ -2289,10 +2289,11 @@ MODULE_DEPEND(linprocfs, sysvsem, 1, 1, 1);
 MODULE_DEPEND(linprocfs, sysvshm, 1, 1, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END
