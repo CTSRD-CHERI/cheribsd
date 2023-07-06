@@ -323,6 +323,11 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	struct hwt_thread *thr;
 	int error;
 
+	/* Check if process is registered owner of any HWTs. */
+	ho = hwt_ownerhash_lookup(td->td_proc);
+	if (ho == NULL && cmd != HWT_IOC_ALLOC)
+		return (ENXIO);
+
 	switch (cmd) {
 	case HWT_IOC_ALLOC:
 		/* Allocate HWT context. */
@@ -332,14 +337,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	case HWT_IOC_START:
 		/* Start tracing. */
 		s = (struct hwt_start *)addr;
-
 		dprintf("%s: start, pid %d\n", __func__, s->pid);
-
-		/* Check if process is registered owner of any HWTs. */
-		ho = hwt_ownerhash_lookup(td->td_proc);
-		if (ho == NULL)
-			return (ENXIO);
-
 		ctx = hwt_owner_lookup_ctx(ho, s->pid);
 		if (ctx == NULL)
 			return (ENXIO);
@@ -357,12 +355,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 	case HWT_IOC_RECORD_GET:
 		rget = (struct hwt_record_get *)addr;
-
-		/* Check if process is registered owner of any HWTs. */
-		ho = hwt_ownerhash_lookup(td->td_proc);
-		if (ho == NULL)
-			return (ENXIO);
-
 		ctx = hwt_owner_lookup_ctx(ho, rget->pid);
 		if (ctx == NULL)
 			return (ENXIO);
@@ -372,12 +364,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 	case HWT_IOC_SET_CONFIG:
 		sconf = (struct hwt_set_config *)addr;
-
-		/* Check if process is registered owner of any HWTs. */
-		ho = hwt_ownerhash_lookup(td->td_proc);
-		if (ho == NULL)
-			return (ENXIO);
-
 		ctx = hwt_owner_lookup_ctx(ho, sconf->pid);
 		if (ctx == NULL)
 			return (ENXIO);
@@ -391,12 +377,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		return (0);
 	case HWT_IOC_WAKEUP:
 		hwakeup = (struct hwt_wakeup *)addr;
-
-		/* Check if process is registered owner of any HWTs. */
-		ho = hwt_ownerhash_lookup(td->td_proc);
-		if (ho == NULL)
-			return (ENXIO);
-
 		ctx = hwt_owner_lookup_ctx(ho, hwakeup->pid);
 		if (ctx == NULL)
 			return (ENXIO);
