@@ -312,6 +312,21 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	 *
 	 */
 1:
+#ifdef RTLD_SANDBOX
+	/*
+	 * Caller must be Restricted, so save its rcsp at the bottom of its own
+	 * stack. This step is only needed for _rtld_tlsdesc_dynamic because it
+	 * might call external functions.
+	 *
+	 * For the same reason, the Restricted stack needs to be saved and
+	 * restored upon return.
+	 */
+	mrs	c3, rcsp_el0
+	gclim	x4, c3
+	scvalue	c4, c3, x4
+	str	c3, [c4, #-CAP_WIDTH]
+#endif
+
 	/* Save non-callee-saved capability registers as well as c19 */
 	stp	c29, c30, [csp, #-(10 * 32)]!
 	.cfi_adjust_cfa_offset	10 * 32
@@ -327,7 +342,11 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	stp	c13, c14, [csp, #(6 * 32)]
 	stp	c15, c16, [csp, #(7 * 32)]
 	stp	c17, c18, [csp, #(8 * 32)]
+#ifdef RTLD_SANDBOX
+	stp	c19,  c3, [csp, #(9 * 32)]
+#else
 	str	c19,	  [csp, #(9 * 32)]
+#endif
 	.cfi_rel_offset		 c1, 32
 	.cfi_rel_offset		 c2, 48
 	.cfi_rel_offset		 c5, 64
@@ -356,7 +375,12 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	scbnds	c0, c0, x19
 
 	/* Restore slow path registers */
+#ifdef RTLD_SANDBOX
+	ldp	c19,  c3, [csp, #(9 * 32)]
+	msr	rcsp_el0, c3
+#else
 	ldr	c19,	  [csp, #(9 * 32)]
+#endif
 	ldp	c17, c18, [csp, #(8 * 32)]
 	ldp	c15, c16, [csp, #(7 * 32)]
 	ldp	c13, c14, [csp, #(6 * 32)]
