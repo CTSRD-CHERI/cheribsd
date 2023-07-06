@@ -140,6 +140,7 @@ struct cpu_desc {
 	uint64_t	id_aa64mmfr1;
 	uint64_t	id_aa64mmfr2;
 	uint64_t	id_aa64mmfr3;
+	uint64_t	id_aa64mmfr4;
 	uint64_t	id_aa64pfr0;
 	uint64_t	id_aa64pfr1;
 	uint64_t	id_aa64zfr0;
@@ -1304,6 +1305,12 @@ static const struct mrs_field id_aa64mmfr3_fields[] = {
 };
 
 
+/* ID_AA64MMFR4_EL1 */
+static const struct mrs_field id_aa64mmfr4_fields[] = {
+	MRS_FIELD_END,
+};
+
+
 /* ID_AA64PFR0_EL1 */
 static const struct mrs_field_value id_aa64pfr0_csv3[] = {
 	MRS_FIELD_VALUE(ID_AA64PFR0_CSV3_NONE, ""),
@@ -1796,6 +1803,7 @@ static const struct mrs_user_reg user_regs[] = {
 	USER_REG(ID_AA64MMFR1_EL1, id_aa64mmfr1),
 	USER_REG(ID_AA64MMFR2_EL1, id_aa64mmfr2),
 	USER_REG(ID_AA64MMFR3_EL1, id_aa64mmfr3),
+	USER_REG(ID_AA64MMFR4_EL1, id_aa64mmfr4),
 
 	USER_REG(ID_AA64PFR0_EL1, id_aa64pfr0),
 	USER_REG(ID_AA64PFR1_EL1, id_aa64pfr1),
@@ -2527,6 +2535,11 @@ print_cpu_features(u_int cpu, struct cpu_desc *desc,
 		print_id_register(sb, "Memory Model Features 3",
 		    desc->id_aa64mmfr3, id_aa64mmfr3_fields);
 
+	/* AArch64 Memory Model Feature Register 4 */
+	if (SHOULD_PRINT_REG(id_aa64mmfr4))
+		print_id_register(sb, "Memory Model Features 4",
+		    desc->id_aa64mmfr4, id_aa64mmfr4_fields);
+
 	/* AArch64 Debug Feature Register 0 */
 	if (SHOULD_PRINT_REG(id_aa64dfr0))
 		print_id_register(sb, "Debug Features 0",
@@ -2642,6 +2655,7 @@ identify_cpu(u_int cpu)
 	desc->id_aa64mmfr1 = READ_SPECIALREG(id_aa64mmfr1_el1);
 	desc->id_aa64mmfr2 = READ_SPECIALREG(id_aa64mmfr2_el1);
 	desc->id_aa64mmfr3 = READ_SPECIALREG(id_aa64mmfr3_el1);
+	desc->id_aa64mmfr4 = READ_SPECIALREG(id_aa64mmfr4_el1);
 	desc->id_aa64pfr0 = READ_SPECIALREG(id_aa64pfr0_el1);
 	desc->id_aa64pfr1 = READ_SPECIALREG(id_aa64pfr1_el1);
 
