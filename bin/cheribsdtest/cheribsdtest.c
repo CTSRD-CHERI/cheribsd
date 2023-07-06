@@ -430,6 +430,11 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 		 */
 		goto pass;
 	}
+	if (WIFSIGNALED(status)) {
+		snprintf(reason, sizeof(reason), "Child exited with signal %d",
+		    WTERMSIG(status));
+		goto fail;
+	}
 	if (!WIFEXITED(status)) {
 		snprintf(reason, sizeof(reason), "Child exited abnormally");
 		goto fail;
