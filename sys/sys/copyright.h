@@ -30,8 +30,8 @@
 /* Add a FreeBSD vendor copyright here - or via CFLAGS */
 #ifndef COPYRIGHT_Vendor
 #define	COPYRIGHT_Vendor \
-	"Copyright 2011-2022 University of Cambridge.\n" \
-	"Copyright 2012-2022 SRI International.\n"
+	"Copyright 2011-2023 University of Cambridge.\n" \
+	"Copyright 2012-2023 SRI International.\n"
 #endif
 
 /* FreeBSD */

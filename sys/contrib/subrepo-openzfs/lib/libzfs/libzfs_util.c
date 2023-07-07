@@ -1199,8 +1199,8 @@ zcmd_free_nvlists(zfs_cmd_t *zc)
 }
 
 static void
-zcmd_write_nvlist_com(libzfs_handle_t *hdl, uintptr_t *outnv, uint64_t *outlen,
-    nvlist_t *nvl)
+zcmd_write_nvlist_com(libzfs_handle_t *hdl, uint64ptr_t *outnv,
+    uint64_t *outlen, nvlist_t *nvl)
 {
 	char *packed;
 

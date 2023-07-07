@@ -2181,7 +2181,7 @@ vm_map_findspace(vm_map_t map, vm_offset_t start, vm_size_t length)
 	VM_MAP_ASSERT_LOCKED(map);
 	KASSERT((map->flags & MAP_RESERVATIONS) == 0 ||
 	    length == CHERI_REPRESENTABLE_LENGTH(length),
-	    ("%s: imprecise length %#lx", __func__, length));
+	    ("%s: imprecise length %#jx", __func__, (uintmax_t)length));
 
 	/*
 	 * Request must fit within min/max VM address and must avoid
@@ -6476,7 +6476,7 @@ _vm_map_assert_consistent(vm_map_t map, int check)
 		    (entry->eflags & MAP_ENTRY_UNMAPPED) != 0),
 		    ("map %p prev->start %jx, start %jx, reservation %jx, "
 		    "both MAP_ENTRY_UNMAPPED", map, (uintmax_t)prev->start,
-		    (uintmax_t)entry->start, entry->reservation));
+		    (uintmax_t)entry->start, (uintmax_t)entry->reservation));
 		cur = map->root;
 		lbound = ubound = header;
 		for (;;) {

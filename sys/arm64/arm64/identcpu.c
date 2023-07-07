@@ -1314,18 +1314,22 @@ static struct mrs_field_hwcap id_aa64pfr1_bt_caps[] = {
 };
 #endif
 
+#if __has_feature(capabilities)
 static struct mrs_field_value id_aa64pfr1_ce[] = {
 	MRS_FIELD_VALUE(ID_AA64PFR1_CE_NONE, ""),
 	MRS_FIELD_VALUE(ID_AA64PFR1_CE_MORELLO, "Morello"),
 	MRS_FIELD_VALUE_END,
 };
+#endif
 
 static struct mrs_field id_aa64pfr1_fields[] = {
 	MRS_FIELD(ID_AA64PFR1, MTE, false, MRS_EXACT, id_aa64pfr1_mte),
 	MRS_FIELD_HWCAP(ID_AA64PFR1, SSBS, false, MRS_LOWER, id_aa64pfr1_ssbs,
 	    id_aa64pfr1_ssbs_caps),
 	MRS_FIELD(ID_AA64PFR1, BT, false, MRS_EXACT, id_aa64pfr1_bt),
+#if __has_feature(capabilities)
 	MRS_FIELD(ID_AA64PFR1, CE, false, MRS_EXACT, id_aa64pfr1_ce),
+#endif
 	MRS_FIELD_END,
 };
 

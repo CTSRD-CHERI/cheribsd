@@ -77,7 +77,7 @@ ENTRY(.rtld_start)
 #ifdef RTLD_SANDBOX
 	blr	c8				/* Jump to the entry point */
 #else
-	br      c8                              /* Jump to the entry point */
+	br	c8				/* Jump to the entry point */
 #endif
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
 	mov	x19, x0		/* Put ps_strings in a callee-saved register */

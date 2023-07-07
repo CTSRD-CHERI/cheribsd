@@ -288,6 +288,7 @@ selectedArchitectures.each { suffix ->
                 '--cheribsd/default-kernel-abi=hybrid',
                 '--keep-install-dir',
                 '--install-prefix=/rootfs',
+                '--cheribsd/build-lib32',
                 '--cheribsd/build-tests',
                 '--cheribsd/build-bench-kernels',
                 '--cheribsd/caprevoke-kernel',

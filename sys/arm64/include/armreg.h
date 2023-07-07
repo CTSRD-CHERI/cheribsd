@@ -426,11 +426,13 @@
 #define	 ISS_DATA_DFSC_ECC_L2	(0x1e << 0)
 #define	 ISS_DATA_DFSC_ECC_L3	(0x1f << 0)
 #define	 ISS_DATA_DFSC_ALIGN	(0x21 << 0)
+#if __has_feature(capabilities)
 #define	 ISS_DATA_DFSC_CAP_TAG	(0x28 << 0)
 #define	 ISS_DATA_DFSC_CAP_SEALED (0x29 << 0)
 #define	 ISS_DATA_DFSC_CAP_BOUND (0x2a << 0)
 #define	 ISS_DATA_DFSC_CAP_PERM	(0x2b << 0)
 #define	 ISS_DATA_DFSC_LC_SC	(0x2c << 0)
+#endif
 #define	 ISS_DATA_DFSC_TLB_CONFLICT (0x30 << 0)
 #define	ESR_ELx_IL		(0x01 << 25)
 #define	ESR_ELx_EC_SHIFT	26
@@ -1099,11 +1101,13 @@
 #define	ID_AA64PFR1_RAS_frac_VAL(x)	((x) & ID_AA64PFR1_RAS_frac_MASK)
 #define	 ID_AA64PFR1_RAS_frac_V1	(UL(0x0) << ID_AA64PFR1_RAS_frac_SHIFT)
 #define	 ID_AA64PFR1_RAS_frac_V2	(UL(0x1) << ID_AA64PFR1_RAS_frac_SHIFT)
+#if __has_feature(capabilities)
 #define	ID_AA64PFR1_CE_SHIFT		20
 #define	ID_AA64PFR1_CE_MASK		(UL(0xf) << ID_AA64PFR1_CE_SHIFT)
 #define	ID_AA64PFR1_CE_VAL(x)		((x) & ID_AA64PFR1_CE_MASK)
 #define	 ID_AA64PFR1_CE_NONE		(UL(0x0) << ID_AA64PFR1_CE_SHIFT)
 #define	 ID_AA64PFR1_CE_MORELLO		(UL(0x1) << ID_AA64PFR1_CE_SHIFT)
+#endif
 
 /* ID_AA64ZFR0_EL1 */
 #define	ID_AA64ZFR0_EL1			MRS_REG(ID_AA64ZFR0_EL1)
@@ -1854,7 +1858,9 @@
 #define	PSR_DAIF_DEFAULT (PSR_F)
 #define	PSR_IL		0x00100000UL
 #define	PSR_SS		0x00200000UL
+#if __has_feature(capabilities)
 #define	PSR_C64		0x04000000UL
+#endif
 #define	PSR_V		0x10000000UL
 #define	PSR_C		0x20000000UL
 #define	PSR_Z		0x40000000UL

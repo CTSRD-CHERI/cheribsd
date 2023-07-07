@@ -135,7 +135,6 @@ struct xswdev {
 #endif
 #define PHYS_AVAIL_COUNT        (PHYS_AVAIL_ENTRIES + 2)
 
-#if PMAP_HAS_DMAP
 /*
  * Check that a physical address range completely lies within the direct map.
  */
@@ -145,22 +144,21 @@ struct xswdev {
 #define	PHYS_TO_DMAP_PAGE(pa)						\
 ({									\
 	KASSERT(is_aligned(pa, PAGE_SIZE),				\
-	    ("%s: PA is not page aligned, PA: 0x%lx", __func__,		\
-	    (vm_paddr_t)(pa)));						\
+	    ("%s: PA is not page aligned, PA: 0x%jx", __func__,		\
+	    (uintmax_t)(pa)));						\
 	cheri_kern_setboundsexact(PHYS_TO_DMAP(pa), PAGE_SIZE);		\
 })
 
 #define	PHYS_TO_DMAP_LEN(pa, len)					\
 ({									\
 	KASSERT(PHYS_SZ_IN_DMAP(pa, len),				\
-	    ("%s: PA region is outside of dmap, PA: [0x%lx, 0x%lx)",	\
-	    __func__, (vm_paddr_t)(pa), (vm_paddr_t)((pa) + (len))));	\
+	    ("%s: PA region is outside of dmap, PA: [0x%jx, 0x%jx)",	\
+	    __func__, (uintmax_t)(pa), (uintmax_t)((pa) + (len))));	\
 	KASSERT(trunc_page(pa) == trunc_page((pa) + (len) - 1),		\
-	    ("%s: PA chunk crosses page boundary, PA: [0x%lx, 0x%lx)",	\
-	    __func__, (vm_paddr_t)(pa), (vm_paddr_t)((pa) + (len))));	\
+	    ("%s: PA chunk crosses page boundary, PA: [0x%jx, 0x%jx)",	\
+	    __func__, (uintmax_t)(pa), (uintmax_t)((pa) + (len))));	\
 	cheri_kern_setboundsexact(PHYS_TO_DMAP(pa), (len));		\
 })
-#endif
 
 #ifndef ASSEMBLER
 #ifdef _KERNEL

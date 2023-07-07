@@ -671,7 +671,7 @@ proc_write_cheri_cap_page(struct proc *p, vm_map_t map, vm_offset_t va,
 	if (error != KERN_SUCCESS)
 		return (EFAULT);
 
-	dst = (uintcap_t *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m)) + pageoff /
+	dst = (uintcap_t *)PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(m)) + pageoff /
 	    sizeof(uintcap_t);
 	while (todo > 0) {
 		error = uiomove(capbuf, sizeof(capbuf), uio);

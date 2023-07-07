@@ -47,10 +47,6 @@
 #include <sys/stdint.h>		/* for people using printf mainly */
 #include <machine/atomic.h>
 #include <machine/cpufunc.h>
-
-#include <machine/atomic.h>
-#include <machine/cpufunc.h>
-#include <machine/pcb.h>
 #if __has_feature(capabilities)
 #include <machine/vmparam.h>
 #endif
