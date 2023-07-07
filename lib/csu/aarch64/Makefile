@@ -10,6 +10,7 @@ CFLAGS+=	-I${.CURDIR}
 CFLAGS+=	-I${.CURDIR:H}/common-cheri
 .endif
 
-CRT1OBJS+=	crt1_s.o
+CRT1SRC=	crt1_s.S
+CRT1OBJ=	crt1_c.o
 
 .include <bsd.lib.mk>

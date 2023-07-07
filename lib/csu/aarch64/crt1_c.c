@@ -33,10 +33,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include <sys/types.h>
-
-#include <stdbool.h>
-#include "libc_private.h"
 #include "csu_common.h"
 
 /*
@@ -44,23 +40,16 @@ __FBSDID("$FreeBSD$");
  * need to include the code here.
  */
 #if __has_feature(capabilities) && !defined(PIC)
-#define SHOULD_PROCESS_CAP_RELOCS
-#endif
-
-#ifdef SHOULD_PROCESS_CAP_RELOCS
 extern int _DYNAMIC;
 #pragma weak _DYNAMIC
 
 #include "crt_init_globals.c"
-#endif
 
-void __start(int, char **, char **, void (*)(void)) __dead2;
+void	__process_cap_relocs(char *env[]);
 
-/* The entry function. */
 void
-__start(int argc, char *argv[], char *env[], void (*cleanup)(void))
+__process_cap_relocs(char *env[])
 {
-#ifdef SHOULD_PROCESS_CAP_RELOCS
 	/*
 	 * Initialize __cap_relocs for static executables.  Dynamic
 	 * executables should not have any, and the runtime linker
@@ -89,12 +78,5 @@ __start(int argc, char *argv[], char *env[], void (*cleanup)(void))
 			crt_init_globals(phdr, phnum, NULL, NULL, NULL);
 		}
 	}
-#endif
-
-#ifdef GCRT
-	__libc_start1_gcrt(argc, argv, env, cleanup, main, &eprol, &etext);
-__asm__("eprol:");
-#else
-	__libc_start1(argc, argv, env, cleanup, main);
-#endif
 }
+#endif
