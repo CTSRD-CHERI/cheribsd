@@ -84,6 +84,12 @@ __FBSDID("$FreeBSD$");
 	sd	tp, (TF_TP)(sp)
 	ld	tp, (TF_SIZE)(sp)
 #endif
+.else
+#if __has_feature(capabilities)
+	csc	ctp, (TF_TP)(csp)
+#else
+	sd	tp, (TF_TP)(sp)
+#endif
 .endif
 
 #if __has_feature(capabilities)

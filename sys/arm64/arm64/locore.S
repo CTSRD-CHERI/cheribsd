@@ -289,8 +289,12 @@ virtdone:
 #if __has_feature(capabilities)
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Do capability relocations */
+	ldr	x0, =~CHERI_PERMS_KERNEL_DATA
 	mrs	c1, ddc
+	clrperm	c1, c1, x0
+	ldr	x0, =~CHERI_PERMS_KERNEL_CODE
 	adr	c2, #0
+	clrperm	c2, c2, x0
 	/* Assume can we reach _DYNAMIC from PCC */
 	adrp	c0, _DYNAMIC
 	add	c0, c0, :lo12:_DYNAMIC

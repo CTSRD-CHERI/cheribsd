@@ -60,6 +60,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_object.h>
 #include <vm/vm_page.h>
 #include <vm/vm_pager.h>
+#include <vm/vm_param.h>
 
 static pml5_entry_t *efi_pml5;
 static pml4_entry_t *efi_pml4;
@@ -92,12 +93,12 @@ efi_destroy_1t1_map(void)
  * indicate a failed mapping so that the caller may handle error.
  */
 vm_offset_t
-efi_phys_to_kva(vm_paddr_t paddr)
+efi_phys_to_kva(vm_paddr_t paddr, vm_size_t size)
 {
 
-	if (paddr >= dmaplimit)
-		return (0);
-	return (PHYS_TO_DMAP(paddr));
+	if (PHYS_SZ_IN_DMAP(paddr, size))
+		return (PHYS_TO_DMAP(paddr));
+	return (0);
 }
 
 static vm_page_t

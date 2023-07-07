@@ -709,6 +709,22 @@ get_unrepresentable_length()
 }
 
 /*
+ * Check that globals do not have the SW_VMEM permission bit after
+ * capability relocation.
+ */
+static char test_buffer[64];
+static void *test_bufferp = (void *)&test_buffer;
+
+CHERIBSDTEST(vm_sw_perm_on_capreloc,
+	     "Check that the SW_VMEM permission is not present on globals.")
+{
+	CHERIBSDTEST_VERIFY(cheri_gettag(test_bufferp));
+	CHERIBSDTEST_VERIFY((cheri_getperm(test_bufferp) & CHERI_PERM_SW_VMEM) == 0);
+
+	cheribsdtest_success();
+}
+
+/*
  * Check that the padding of a reservation faults on access
  */
 CHERIBSDTEST(vm_reservation_access_fault,

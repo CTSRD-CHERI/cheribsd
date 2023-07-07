@@ -235,7 +235,7 @@ pagetables:
 #endif
 	srli	s2, s2, PAGE_SHIFT
 
-	li	a5, (VM_MAX_KERNEL_ADDRESS - L2_SIZE)
+	li	a5, (VM_MAX_KERNEL_ADDRESS - PMAP_MAPDEV_EARLY_SIZE)
 	srli	a5, a5, L1_SHIFT	/* >> L1_SHIFT */
 	andi	a5, a5, Ln_ADDR_MASK	/* & Ln_ADDR_MASK */
 	li	t4, PTE_V
@@ -273,7 +273,9 @@ pagetables:
 
 	/* Store the L2 table entry for the DTB */
 	li	a6, PTE_SIZE
-	li	a5, 510
+	li	a5, VM_EARLY_DTB_ADDRESS
+	srli	a5, a5, L2_SHIFT    /* >> L2_SHIFT */
+	andi	a5, a5, Ln_ADDR_MASK    /* & Ln_ADDR_MASK */
 	mulw	a5, a5, a6
 #ifdef __CHERI_PURE_CAPABILITY__
 	cincoffset ct1, cs1, a5
@@ -399,9 +401,11 @@ va:
 	mv	s1, a1
 
 	/* Initialize cap relocs. */
-	cmove	ca0, cs0
+	li	t0, CHERI_PERMS_KERNEL_DATA
+	candperm ca0, cs0, t0
 	cllc	ca1, _C_LABEL(init_cap_relocs)
-	cmove	ca2, cs0
+	li	t0, CHERI_PERMS_KERNEL_CODE
+	candperm ca2, cs0, t0
 	cjalr	ca1
 
 	/* Initialize capabilities. */

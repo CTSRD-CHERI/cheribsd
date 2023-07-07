@@ -109,7 +109,7 @@ smmu_pmap_l0_to_l1(pd_entry_t *l0, vm_offset_t va)
 {
 	pd_entry_t *l1;
 
-	l1 = (pd_entry_t *)PHYS_TO_DMAP(smmu_pmap_load(l0) & ~ATTR_MASK);
+	l1 = (pd_entry_t *)PHYS_TO_DMAP_PAGE(smmu_pmap_load(l0) & ~ATTR_MASK);
 	return (&l1[smmu_l1_index(va)]);
 }
 
@@ -140,7 +140,7 @@ smmu_pmap_l1_to_l2(pd_entry_t *l1p, vm_offset_t va)
 	    ("%s: L1 entry %#lx for %#lx is invalid", __func__, l1, va));
 	KASSERT((l1 & ATTR_DESCR_TYPE_MASK) == ATTR_DESCR_TYPE_TABLE,
 	    ("%s: L1 entry %#lx for %#lx is a leaf", __func__, l1, va));
-	l2p = (pd_entry_t *)PHYS_TO_DMAP(l1 & ~ATTR_MASK);
+	l2p = (pd_entry_t *)PHYS_TO_DMAP_PAGE(l1 & ~ATTR_MASK);
 	return (&l2p[smmu_l2_index(va)]);
 }
 
@@ -172,7 +172,7 @@ smmu_pmap_l2_to_l3(pd_entry_t *l2p, vm_offset_t va)
 	    ("%s: L2 entry %#lx for %#lx is invalid", __func__, l2, va));
 	KASSERT((l2 & ATTR_DESCR_TYPE_MASK) == ATTR_DESCR_TYPE_TABLE,
 	    ("%s: L2 entry %#lx for %#lx is a leaf", __func__, l2, va));
-	l3p = (pt_entry_t *)PHYS_TO_DMAP(l2 & ~ATTR_MASK);
+	l3p = (pt_entry_t *)PHYS_TO_DMAP_PAGE(l2 & ~ATTR_MASK);
 	return (&l3p[smmu_l3_index(va)]);
 }
 
@@ -395,7 +395,7 @@ smmu_pmap_pinit(pmap_t pmap)
 	m = vm_page_alloc_noobj(VM_ALLOC_WAITOK | VM_ALLOC_WIRED |
 	    VM_ALLOC_ZERO);
 	pmap->pm_l0_paddr = VM_PAGE_TO_PHYS(m);
-	pmap->pm_l0 = (pd_entry_t *)PHYS_TO_DMAP(pmap->pm_l0_paddr);
+	pmap->pm_l0 = (pd_entry_t *)PHYS_TO_DMAP_PAGE(pmap->pm_l0_paddr);
 
 	vm_radix_init(&pmap->pm_root);
 	bzero(&pmap->pm_stats, sizeof(pmap->pm_stats));
@@ -481,7 +481,7 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex)
 			l1pg->ref_count++;
 		}
 
-		l1 = (pd_entry_t *)PHYS_TO_DMAP(smmu_pmap_load(l0) &~ATTR_MASK);
+		l1 = (pd_entry_t *)PHYS_TO_DMAP_PAGE(smmu_pmap_load(l0) &~ATTR_MASK);
 		l1 = &l1[ptepindex & Ln_ADDR_MASK];
 		smmu_pmap_store(l1, VM_PAGE_TO_PHYS(m) | IOMMU_L1_TABLE);
 	} else {
@@ -502,10 +502,10 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex)
 				return (NULL);
 			}
 			tl0 = smmu_pmap_load(l0);
-			l1 = (pd_entry_t *)PHYS_TO_DMAP(tl0 & ~ATTR_MASK);
+			l1 = (pd_entry_t *)PHYS_TO_DMAP_PAGE(tl0 & ~ATTR_MASK);
 			l1 = &l1[l1index & Ln_ADDR_MASK];
 		} else {
-			l1 = (pd_entry_t *)PHYS_TO_DMAP(tl0 & ~ATTR_MASK);
+			l1 = (pd_entry_t *)PHYS_TO_DMAP_PAGE(tl0 & ~ATTR_MASK);
 			l1 = &l1[l1index & Ln_ADDR_MASK];
 			tl1 = smmu_pmap_load(l1);
 			if (tl1 == 0) {
@@ -522,7 +522,7 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex)
 			}
 		}
 
-		l2 = (pd_entry_t *)PHYS_TO_DMAP(smmu_pmap_load(l1) &~ATTR_MASK);
+		l2 = (pd_entry_t *)PHYS_TO_DMAP_PAGE(smmu_pmap_load(l1) &~ATTR_MASK);
 		l2 = &l2[ptepindex & Ln_ADDR_MASK];
 		smmu_pmap_store(l2, VM_PAGE_TO_PHYS(m) | IOMMU_L2_TABLE);
 	}
@@ -798,7 +798,7 @@ smmu_pmap_remove_pages(pmap_t pmap)
 		}
 		pa0 = l0e & ~ATTR_MASK;
 		m0 = PHYS_TO_VM_PAGE(pa0);
-		l1 = (pd_entry_t *)PHYS_TO_DMAP(pa0);
+		l1 = (pd_entry_t *)PHYS_TO_DMAP_PAGE(pa0);
 
 		for (j = smmu_l1_index(sva); j < Ln_ENTRIES; j++) {
 			l1e = l1[j];
@@ -812,7 +812,7 @@ smmu_pmap_remove_pages(pmap_t pmap)
 			}
 			pa1 = l1e & ~ATTR_MASK;
 			m1 = PHYS_TO_VM_PAGE(pa1);
-			l2 = (pd_entry_t *)PHYS_TO_DMAP(pa1);
+			l2 = (pd_entry_t *)PHYS_TO_DMAP_PAGE(pa1);
 
 			for (k = smmu_l2_index(sva); k < Ln_ENTRIES; k++) {
 				l2e = l2[k];
@@ -822,7 +822,7 @@ smmu_pmap_remove_pages(pmap_t pmap)
 				}
 				pa = l2e & ~ATTR_MASK;
 				m = PHYS_TO_VM_PAGE(pa);
-				l3 = (pt_entry_t *)PHYS_TO_DMAP(pa);
+				l3 = (pt_entry_t *)PHYS_TO_DMAP_PAGE(pa);
 
 				for (l = smmu_l3_index(sva); l < Ln_ENTRIES;
 				    l++, sva += IOMMU_L3_SIZE) {

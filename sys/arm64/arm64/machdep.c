@@ -433,7 +433,7 @@ arm64_get_writable_addr(vm_pointer_t addr, vm_pointer_t *out)
 	 * If it is within the DMAP region and is writable use that.
 	 */
 	if (PHYS_IN_DMAP(pa)) {
-		addr = PHYS_TO_DMAP(pa);
+		addr = PHYS_TO_DMAP_PAGE(pa);
 		if (PAR_SUCCESS(arm64_address_translate_s1e1w(addr))) {
 			*out = addr;
 			return (true);

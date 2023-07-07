@@ -57,7 +57,7 @@ uma_small_alloc(uma_zone_t zone, vm_size_t bytes, int domain, u_int8_t *flags,
 		dump_add_page(pa);
 	KASSERT(bytes == PAGE_SIZE, ("%s: invalid allocation size %zu",
 	    __func__, bytes));
-	va = (void *)cheri_kern_setbounds(PHYS_TO_DMAP(pa), PAGE_SIZE);
+	va = (void *)PHYS_TO_DMAP_PAGE(pa);
 	return (va);
 }
 

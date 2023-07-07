@@ -2663,6 +2663,9 @@ sync_vnode(struct synclist *slp, struct bufobj **bo, struct thread *td)
 		mtx_lock(&sync_mtx);
 		return (*bo == LIST_FIRST(slp));
 	}
+	MPASSERT(mp == NULL || (curthread->td_pflags & TDP_IGNSUSP) != 0 ||
+	    (mp->mnt_kern_flag & MNTK_SUSPENDED) == 0, mp,
+	    ("suspended mp syncing vp %p", vp));
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 	(void) VOP_FSYNC(vp, MNT_LAZY, td);
 	VOP_UNLOCK(vp);
@@ -5021,6 +5024,7 @@ static struct vop_vector sync_vnodeops = {
 	.vop_bypass =	VOP_EOPNOTSUPP,
 	.vop_close =	sync_close,
 	.vop_fsync =	sync_fsync,
+	.vop_getwritemount = vop_stdgetwritemount,
 	.vop_inactive =	sync_inactive,
 	.vop_need_inactive = vop_stdneed_inactive,
 	.vop_reclaim =	sync_reclaim,

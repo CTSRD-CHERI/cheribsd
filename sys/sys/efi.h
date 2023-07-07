@@ -261,7 +261,7 @@ struct efirt_callinfo;
 /* Internal MD EFI functions */
 int efi_arch_enter(void);
 void efi_arch_leave(void);
-vm_pointer_t efi_phys_to_kva(vm_paddr_t);
+vm_pointer_t efi_phys_to_kva(vm_paddr_t, vm_size_t);
 int efi_rt_arch_call(struct efirt_callinfo *);
 #ifdef __CHERI_PURE_CAPABILITY__
 int efi_rt_arch_call_nofault(struct efirt_callinfo *);

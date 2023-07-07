@@ -353,22 +353,15 @@ CFLAGS.gcc+= -mabi=spe -mfloat-gprs=double -Wa,-me500
 .endif
 
 .if ${MACHINE_CPUARCH} == "riscv"
-RISCV_MARCH=	rv64ima
-.if !${MACHINE_ARCH:Mriscv*sf*}
-RISCV_MARCH:=	${RISCV_MARCH}fd
-.endif
-RISCV_MARCH:=	${RISCV_MARCH}c
+RISCV_MARCH=	rv64imafdc
 .if ${MACHINE_CPU:Mcheri}
 RISCV_MARCH:=	${RISCV_MARCH}xcheri
 .endif
 
 .if ${MACHINE_ARCH:Mriscv*c*}
-RISCV_ABI=	l64pc128
+RISCV_ABI=	l64pc128d
 .else
-RISCV_ABI=	lp64
-.endif
-.if !${MACHINE_ARCH:Mriscv*sf}
-RISCV_ABI:=	${RISCV_ABI}d
+RISCV_ABI=	lp64d
 .endif
 
 CFLAGS += -march=${RISCV_MARCH} -mabi=${RISCV_ABI}
@@ -419,8 +412,7 @@ CXXFLAGS += ${CXXFLAGS.${MACHINE_ARCH}}
 # Capability ABI:		purecap
 #
 .if (${MACHINE} == "arm" && (defined(CPUTYPE) && ${CPUTYPE:M*soft*})) || \
-    (${MACHINE_ARCH} == "powerpc" && (defined(CPUTYPE) && ${CPUTYPE} == "e500")) || \
-    ${MACHINE_ARCH:Mriscv*sf*}
+    (${MACHINE_ARCH} == "powerpc" && (defined(CPUTYPE) && ${CPUTYPE} == "e500"))
 MACHINE_ABI+=	soft-float
 .else
 MACHINE_ABI+=	hard-float

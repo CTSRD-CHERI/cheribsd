@@ -141,7 +141,7 @@
 #define	FREEBSD64_SYS_freebsd64_mkdir	136
 #define	FREEBSD64_SYS_freebsd64_rmdir	137
 #define	FREEBSD64_SYS_freebsd64_utimes	138
-				/* 139 is obsolete 4.2 sigreturn */
+				/* 139 is obsolete sigreturn */
 #define	FREEBSD64_SYS_freebsd64_adjtime	140
 				/* 141 is obsolete ogetpeername */
 				/* 142 is obsolete ogethostid */

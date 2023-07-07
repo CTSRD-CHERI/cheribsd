@@ -145,7 +145,6 @@ SUBDIR=	alias \
 	split \
 	stat \
 	stdbuf \
-	strings \
 	su \
 	syscall_timing \
 	systat \
@@ -271,6 +270,7 @@ SUBDIR.${MK_TOOLCHAIN}+=	nm
 SUBDIR.${MK_TOOLCHAIN}+=	objcopy
 SUBDIR.${MK_TOOLCHAIN}+=	readelf
 SUBDIR.${MK_TOOLCHAIN}+=	size
+SUBDIR+=			strings
 .endif
 SUBDIR.${MK_TOOLCHAIN}+=	c89
 SUBDIR.${MK_TOOLCHAIN}+=	c99

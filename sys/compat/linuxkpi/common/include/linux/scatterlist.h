@@ -383,8 +383,6 @@ __sg_alloc_table_from_pages(struct sg_table *sgt,
 		unsigned long seg_size;
 		unsigned int j;
 
-		s = sg_next(s);
-
 		len = 0;
 		for (j = cur + 1; j < count; ++j) {
 			len += PAGE_SIZE;
@@ -398,6 +396,8 @@ __sg_alloc_table_from_pages(struct sg_table *sgt,
 		size -= seg_size;
 		off = 0;
 		cur = j;
+
+		s = sg_next(s);
 	}
 	KASSERT(s != NULL, ("s is NULL after loop in __sg_alloc_table_from_pages()"));
 
@@ -649,7 +649,7 @@ sg_pcopy_to_buffer(struct scatterlist *sgl, unsigned int nents,
 				break;
 			vaddr = (char *)sf_buf_kva(sf);
 		} else
-			vaddr = (char *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(page));
+			vaddr = (char *)PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(page));
 		memcpy(buf, vaddr + sg->offset + offset, len);
 		if (!PMAP_HAS_DMAP)
 			sf_buf_free(sf);
