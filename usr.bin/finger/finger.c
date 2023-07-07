@@ -111,7 +111,7 @@ PERSON *people = NULL;
 
 static void loginlist(void);
 static int option(int, char **);
-static void usage(void);
+static void usage(void) __dead2;
 static void userlist(int, char **);
 
 static int
