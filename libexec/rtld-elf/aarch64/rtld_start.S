@@ -49,6 +49,7 @@ __FBSDID("$FreeBSD$");
 
 ENTRY(.rtld_start)
 #ifdef __CHERI_PURE_CAPABILITY__
+	.cfi_undefined	c30
 	mov	c19, c0				/* Put aux in a callee-saved register */
 	mov	c20, csp			/* And the stack pointer */
 
@@ -80,15 +81,18 @@ ENTRY(.rtld_start)
 	br	c8				/* Jump to the entry point */
 #endif
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
+	.cfi_undefined	x30
 	mov	x19, x0		/* Put ps_strings in a callee-saved register */
 
 	sub	sp, sp, #16	/* Make room for obj_main & exit proc */
+	.cfi_adjust_cfa_offset	16
 
 	mov	x1, sp		/* exit_proc */
 	add	x2, x1, #8	/* obj_main */
 	bl	_rtld		/* Call the loader */
 	mov	x8, x0		/* Backup the entry point */
 	ldp	x2, x1, [sp], #16 /* Load cleanup, obj_main */
+	.cfi_adjust_cfa_offset	0
 
 	mov	x0, x19		/* Restore ps_strings */
 	br	x8		/* Jump to the entry point */
