@@ -1806,7 +1806,6 @@ cheribsdtest_cheri_revoke_lib_init(
 }
 
 enum {
-	TCLR_MODE_STORE = 0,
 	TCLR_MODE_LOAD_ONCE = 1,
 	TCLR_MODE_LOAD_SPLIT = 2,
 	TCLR_MODE_LOAD_SPLIT_INIT = 3,
@@ -1919,10 +1918,6 @@ cheribsdtest_cheri_revoke_lib_run(
 			    CHERI_REVOKE_TAKE_STATS;
 
 			switch(mode) {
-			case TCLR_MODE_STORE:
-				crflags |= CHERI_REVOKE_LAST_PASS |
-				    CHERI_REVOKE_FORCE_STORE_SIDE;
-				break;
 			case TCLR_MODE_LOAD_ONCE:
 				crflags |= CHERI_REVOKE_LAST_PASS |
 				    CHERI_REVOKE_FORCE_LOAD_SIDE;
@@ -2029,9 +2024,6 @@ CHERIBSDTEST(cheri_revoke_lib, "Test libcheri_caprevoke internals")
 		fprintf(stderr, "shadow: %#.16lp\n", shadow);
 	}
 
-	cheribsdtest_cheri_revoke_lib_run(paranoia, TCLR_MODE_STORE,
-	    bigblock_caps, bigblock, shadow, cri);
-
 	cheribsdtest_cheri_revoke_lib_run(paranoia,
 	    TCLR_MODE_LOAD_ONCE, bigblock_caps, bigblock, shadow, cri);
 
@@ -2046,7 +2038,6 @@ CHERIBSDTEST(cheri_revoke_lib, "Test libcheri_caprevoke internals")
 CHERIBSDTEST(cheri_revoke_lib_fork,
     "Test libcheri_caprevoke with fork")
 {
-	static const int verbose = 0;
 	static const int paranoia = 2;
 
 	static const size_t bigblock_caps = 4096;
@@ -2069,9 +2060,6 @@ CHERIBSDTEST(cheri_revoke_lib_fork,
 
 	pid = fork();
 	if (pid == 0) {
-		cheribsdtest_cheri_revoke_lib_run(paranoia,
-		    TCLR_MODE_STORE, bigblock_caps, bigblock, shadow, cri);
-
 		cheribsdtest_cheri_revoke_lib_run(paranoia,
 		    TCLR_MODE_LOAD_ONCE, bigblock_caps, bigblock, shadow, cri);
 
