@@ -197,25 +197,11 @@ static const size_t VM_CHERI_REVOKE_BSZ_OTYPE =
 #define	CHERI_REVOKE_LAST_NO_EARLY	0x0010
 
 /*
- * Force a synchronization with the PMAP before doing a non-LAST pass
- * (including the EARLY part of a LAST call).  This should let us measure the
- * impact of lazily synchronizing with the PMAP capdirty bits.
- *
- * This may also be useful if one were to do intermediate (i.e., neither
- * opening nor closing) passes, but at present we do not.
- *
- * Meaningless if CHERI_REVOKE_LAST_NO_EARLY also set.
- *
- * XXX This has probably lost any utility it may ever have had.
- */
-#define	CHERI_REVOKE_EARLY_SYNC		0x0020
-
-/*
  * Reset the stats counters to zero "after" reporting
  */
 #define	CHERI_REVOKE_TAKE_STATS		0x1000
 
-/*
+	/*
  * Information conveyed to userland about a given cheri_revoke scan.
  *
  * Given what's being counted, here are some things possibly useful to fitting a
