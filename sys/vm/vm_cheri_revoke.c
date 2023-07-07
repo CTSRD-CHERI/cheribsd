@@ -41,11 +41,9 @@ vm_cheri_revoke_should_visit_page(vm_page_t m, int flags)
 		return 1;
 
 	/*
-	 * If this is an incremental scan, we only care about
-	 * recently-capdirty pages, so can stop here.
+	 * XXX: we used to bail here on incremental runs on store side.
+	 * Does this function continue to make sense?
 	 */
-	if (flags & VM_CHERI_REVOKE_INCREMENTAL)
-		return 0;
 
 	/*
 	 * On the other hand, for full scans, we want to visit all pages
