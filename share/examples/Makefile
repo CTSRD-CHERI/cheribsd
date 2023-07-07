@@ -72,6 +72,10 @@ SE_BOOTFORTH= \
 	menuconf.4th \
 	screen.4th
 
+.if ${MK_CHERI} != "no"
+SUBDIR+=	cheribsdtest
+.endif
+
 SE_DIRS+=	csh
 SE_CSH=	dot.cshrc
 
