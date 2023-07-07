@@ -79,9 +79,6 @@ enum cheri_revoke_state {
 	CHERI_REVOKE_ST_LS_INITING = 1, /* "load-side" opening now */
 	CHERI_REVOKE_ST_LS_INITED  = 2, /* "load-side" open (= 1 opens done) */
 	CHERI_REVOKE_ST_LS_CLOSING = 3, /* "load-side" background working */
-	CHERI_REVOKE_ST_SS_INITING = 4, /* "store-side" opening now */
-	CHERI_REVOKE_ST_SS_INITED  = 5, /* "store-side" open (> 0 opens done) */
-	CHERI_REVOKE_ST_SS_LAST    = 6, /* "store-side" closing */
 };
 
 #define CHERI_REVOKE_ST_ST_MASK	0x7
@@ -105,16 +102,13 @@ cheri_revoke_st_set(cheri_revoke_state_t *st, cheri_revoke_epoch_t epoch,
 }
 
 static inline bool
-cheri_revoke_st_is_loadside(cheri_revoke_state_t st) {
+cheri_revoke_st_is_revoking(cheri_revoke_state_t st) {
 	switch (cheri_revoke_st_get_state(st)) {
 	case CHERI_REVOKE_ST_LS_INITING:
 	case CHERI_REVOKE_ST_LS_INITED:
 	case CHERI_REVOKE_ST_LS_CLOSING:
 		return true;
 	case CHERI_REVOKE_ST_NONE:
-	case CHERI_REVOKE_ST_SS_INITING:
-	case CHERI_REVOKE_ST_SS_INITED:
-	case CHERI_REVOKE_ST_SS_LAST:
 		return false;
 	}
 }

@@ -384,7 +384,6 @@ vm_fault_cheri_revoke(struct faultstate *fs, vm_page_t m, bool canwrite)
 	 */
 	int hascaps, res;
 	struct vm_cheri_revoke_cookie crc;
-	cheri_revoke_state_t vm_cheri_revoke_st = fs->map->vm_cheri_revoke_st;
 
 	res = vm_cheri_revoke_cookie_init(fs->map, &crc);
 	KASSERT(res == KERN_SUCCESS, ("cheri revoke cookie init WTF"));
@@ -438,18 +437,11 @@ vm_fault_cheri_revoke(struct faultstate *fs, vm_page_t m, bool canwrite)
 	if (hascaps & VM_CHERI_REVOKE_PAGE_DIRTY) {
 		if (!canwrite) {
 			return VFCR_NEED_WRITE;
-		} else if (cheri_revoke_st_is_loadside(vm_cheri_revoke_st)) {
-			/*
-			 * Writable pages having lost a CAS race in the load
-			 * side revocation design are benign.
-			 */
-			return VFCR_OK;
 		} else {
-			KASSERT(cheri_revoke_st_get_state(vm_cheri_revoke_st) !=
-			    CHERI_REVOKE_ST_SS_LAST,
-			    ("VM_CHERI_REVOKE_PAGE_DIRTY & write during STW"));
-
-			/* We'll catch it next time around */
+			/*
+			 * Either not revoking or we've lost a CAS race
+			 * and the page is writable which is benign.
+			 */
 			return VFCR_OK;
 		}
 	}
@@ -2228,7 +2220,7 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
 	 *
 	 * XXX CAPREVOKE This could be much better in just about every way
 	 */
-	if (cheri_revoke_st_is_loadside(fs->map->vm_cheri_revoke_st)) {
+	if (cheri_revoke_st_is_revoking(fs->map->vm_cheri_revoke_st)) {
 		return;
 	}
 #endif

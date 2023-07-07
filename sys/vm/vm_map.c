@@ -3096,7 +3096,7 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 	 *
 	 * XXX CAPREVOKE This could be much better in just about every way
 	 */
-	if (cheri_revoke_st_is_loadside(map->vm_cheri_revoke_st)) {
+	if (cheri_revoke_st_is_revoking(map->vm_cheri_revoke_st)) {
 		return;
 	}
 #endif
