@@ -41,10 +41,6 @@ FEATURE(cheri_revoke, "CHERI capability revocation support");
 SYSCTL_NODE(_vm, OID_AUTO, cheri_revoke, CTLFLAG_RD | CTLFLAG_MPSAFE,  0,
     "CHERI capability revocation configuration");
 
-static bool cheri_revoke_load_side = true;
-SYSCTL_BOOL(_vm_cheri_revoke, OID_AUTO, load_side, CTLFLAG_RW,
-    &cheri_revoke_load_side, 1, "Use load-side revocation by default");
-
 /*
  * When revoking capabilities, we have to visit several kernel hoarders.
  *
@@ -197,23 +193,10 @@ fast_out:
 		case CHERI_REVOKE_ST_NONE:
 			KASSERT((epoch & 1) == 0, ("Odd epoch NONE"));
 
-			/* Figure out how userland wants us to do this */
-			bool load_side = cheri_revoke_load_side;
-			load_side &= !(flags & CHERI_REVOKE_FORCE_STORE_SIDE);
-			load_side |= (flags & CHERI_REVOKE_FORCE_LOAD_SIDE);
-
-			if (load_side) {
-				if (flags & CHERI_REVOKE_LAST_PASS) {
-					myst = CHERI_REVOKE_ST_LS_CLOSING;
-				} else {
-					myst = CHERI_REVOKE_ST_LS_INITING;
-				}
+			if (flags & CHERI_REVOKE_LAST_PASS) {
+				myst = CHERI_REVOKE_ST_LS_CLOSING;
 			} else {
-				if (flags & CHERI_REVOKE_LAST_PASS) {
-					myst = CHERI_REVOKE_ST_SS_LAST;
-				} else {
-					myst = CHERI_REVOKE_ST_SS_INITING;
-				}
+				myst = CHERI_REVOKE_ST_LS_INITING;
 			}
 			break;
 		case CHERI_REVOKE_ST_SS_INITED:

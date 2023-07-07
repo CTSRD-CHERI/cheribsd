@@ -211,18 +211,6 @@ static const size_t VM_CHERI_REVOKE_BSZ_OTYPE =
 #define	CHERI_REVOKE_EARLY_SYNC		0x0020
 
 /*
- * If opening a new revocation epoch, ignore the default mode and run this one
- * using the load-side algorithm.
- */
-#define	CHERI_REVOKE_FORCE_LOAD_SIDE	0x0040
-
-/*
- * If opening a new revocation epoch, ignore the default mode and run this one
- * using the store-side algorithm.
- */
-#define	CHERI_REVOKE_FORCE_STORE_SIDE	0x0080
-
-/*
  * Reset the stats counters to zero "after" reporting
  */
 #define	CHERI_REVOKE_TAKE_STATS		0x1000
