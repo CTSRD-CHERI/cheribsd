@@ -63,8 +63,9 @@
 #define	dprintf(fmt, ...)
 #endif
 
-/* No real reason for this limitation except sanity checks. */
-#define	HWT_MAXBUFSIZE		(1U * 1024 * 1024 * 1024) /* 1 GB */
+/* No real reason for these limitations just sanity checks. */
+#define	HWT_MAXBUFSIZE		(32UL * 1024 * 1024 * 1024) /* 32 GB */
+#define	HWT_MAXCONFIGSIZE	1024
 
 static MALLOC_DEFINE(M_HWT_IOCTL, "hwt_ioctl", "Hardware Trace");
 
@@ -271,8 +272,6 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 	return (0);
 }
 
-#define	HWT_CONFIG_MAX_SIZE	1024
-
 static int
 hwt_ioctl_set_config(struct thread *td, struct hwt_context *ctx,
     struct hwt_set_config *sconf)
@@ -286,7 +285,7 @@ hwt_ioctl_set_config(struct thread *td, struct hwt_context *ctx,
 	if (config_size == 0)
 		return (0);
 
-	if (config_size > HWT_CONFIG_MAX_SIZE)
+	if (config_size > HWT_MAXCONFIGSIZE)
 		return (EFBIG);
 
 	config = malloc(config_size, M_HWT_IOCTL, M_WAITOK | M_ZERO);
