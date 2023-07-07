@@ -3541,7 +3541,6 @@ list-old-libs: .PHONY
 	    -V "OLD_LIBS:Mlib/*:S,^lib,usr/lib64c," \
 	    -V "OLD_LIBS:Musr/lib/*:S,^usr/lib,usr/lib64c," \
 	    -V "OLD_LIBS:Mlib/casper/*:S,^lib/casper,usr/lib64c," | \
-	    xargs -n1 | sort
 	    sed -E 's/[[:space:]]+/\n/g' | sort
 
 delete-old-libs: .PHONY
@@ -3632,9 +3631,11 @@ check-old: check-old-files check-old-libs check-old-dirs .PHONY
 #
 # showconfig - show build configuration.
 #
+# ignore lower case knobs (not for use with WITH*)
+#
 showconfig: .PHONY
 	@(${MAKE} -n -f ${.CURDIR}/sys/conf/kern.opts.mk -V dummy -dg1 UPDATE_DEPENDFILE=no NO_OBJ=yes MACHINE=${TARGET} MACHINE_ARCH=${TARGET_ARCH}; \
-	  ${MAKE} -n -f ${.CURDIR}/share/mk/src.opts.mk -V dummy -dg1 UPDATE_DEPENDFILE=no NO_OBJ=yes) 2>&1 | grep ^MK_ | sort -u
+	  ${MAKE} -n -f ${.CURDIR}/share/mk/src.opts.mk -V dummy -dg1 UPDATE_DEPENDFILE=no NO_OBJ=yes) 2>&1 | grep '^MK_[A-Z]' | sort -u
 
 .if !empty(KRNLOBJDIR) && !empty(KERNCONF)
 DTBOUTPUTPATH= ${KRNLOBJDIR}/${KERNCONF}/

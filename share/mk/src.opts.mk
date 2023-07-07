@@ -145,6 +145,7 @@ __DEFAULT_YES_OPTIONS = \
     MLX5TOOL \
     NETCAT \
     NETGRAPH \
+    NETLINK_SUPPORT \
     NLS_CATALOGS \
     NS_CACHING \
     NTP \
@@ -155,7 +156,6 @@ __DEFAULT_YES_OPTIONS = \
     PF \
     PKGBOOTSTRAP \
     PMC \
-    PORTSNAP \
     PPP \
     QUOTAS \
     RADIUS_SUPPORT \
@@ -422,10 +422,10 @@ BROKEN_OPTIONS+=OPENMP
 BROKEN_OPTIONS+= OFED
 .endif
 
-.if ${__T} == "i386" || ${__T} == "amd64"
-__DEFAULT_YES_OPTIONS+=NETLINK_SUPPORT
-.else
-__DEFAULT_NO_OPTIONS+=NETLINK_SUPPORT
+# MK_host_egacy is set by local.sys.mk so is valid here
+.if ${MACHINE} == "host" && ${MK_host_egacy} == "yes"
+# we cannot expect tests to work
+BROKEN_OPTIONS+= TESTS
 .endif
 
 .-include <site.src.opts.mk>

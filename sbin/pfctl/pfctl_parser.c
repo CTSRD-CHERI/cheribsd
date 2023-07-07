@@ -71,7 +71,7 @@ void		 print_port (u_int8_t, u_int16_t, u_int16_t, const char *, int);
 void		 print_ugid (u_int8_t, unsigned, unsigned, const char *, unsigned);
 void		 print_flags (u_int8_t);
 void		 print_fromto(struct pf_rule_addr *, pf_osfp_t,
-		    struct pf_rule_addr *, u_int8_t, u_int8_t, int, int);
+		    struct pf_rule_addr *, sa_family_t, u_int8_t, int, int);
 int		 ifa_skip_if(const char *filter, struct node_host *p);
 
 struct node_host	*host_if(const char *, int, int *);
@@ -755,6 +755,8 @@ print_eth_rule(struct pfctl_eth_rule *r, const char *anchor_call,
 	static const char *actiontypes[] = { "pass", "block", "", "", "", "",
 	    "", "", "", "", "", "", "match" };
 
+	int i;
+
 	if (rule_numbers)
 		printf("@%u ", r->nr);
 
@@ -797,6 +799,13 @@ print_eth_rule(struct pfctl_eth_rule *r, const char *anchor_call,
 	print_fromto(&r->ipsrc, PF_OSFP_ANY, &r->ipdst,
 	    r->proto == ETHERTYPE_IP ? AF_INET : AF_INET6, 0,
 	    0, 0);
+
+	i = 0;
+	while (r->label[i][0])
+		printf(" label \"%s\"", r->label[i++]);
+	if (r->ridentifier)
+		printf(" ridentifier %u", r->ridentifier);
+
 	if (r->qname[0])
 		printf(" queue %s", r->qname);
 	if (r->tagname[0])
