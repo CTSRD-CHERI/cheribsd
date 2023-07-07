@@ -476,31 +476,6 @@ tmc_start(device_t dev, struct endpoint *endp, struct coresight_event *event)
 	return (0);
 }
 
-static void
-tmc_stop(device_t dev, struct endpoint *endp, struct coresight_event *event)
-{
-	struct tmc_softc *sc;
-
-	sc = device_get_softc(dev);
-
-	/* ETF configuration is static */
-	if (sc->dev_type == CORESIGHT_ETF)
-		return;
-
-	KASSERT(sc->dev_type == CORESIGHT_ETR, ("Wrong dev_type"));
-
-	tmc_disable(dev);
-}
-
-static void
-tmc_intr(void *arg)
-{
-
-	/* TODO */
-
-	panic("unhandled interrupt");
-}
-
 static int
 tmc_read(device_t dev, struct endpoint *endp, struct coresight_event *event)
 {
@@ -538,6 +513,34 @@ tmc_read(device_t dev, struct endpoint *endp, struct coresight_event *event)
 	}
 
 	return (0);
+}
+
+static void
+tmc_stop(device_t dev, struct endpoint *endp, struct coresight_event *event)
+{
+	struct tmc_softc *sc;
+
+	sc = device_get_softc(dev);
+
+	/* ETF configuration is static */
+	if (sc->dev_type == CORESIGHT_ETF)
+		return;
+
+	KASSERT(sc->dev_type == CORESIGHT_ETR, ("Wrong dev_type"));
+
+	/* Make final readings before stopping TMC. */
+	tmc_read(dev, endp, event);
+
+	tmc_disable(dev);
+}
+
+static void
+tmc_intr(void *arg)
+{
+
+	/* TODO */
+
+	panic("unhandled interrupt");
 }
 
 int
