@@ -39,6 +39,7 @@
 #undef NDEBUG
 #include <assert.h>
 #include <string.h>
+#include "rtld_paths.h"
 #include "rtld_printf.h"
 
 __BEGIN_DECLS
@@ -75,19 +76,8 @@ __END_DECLS
 #define dbg_cheri_plt(...)		dbg_cat(CHERI_PLT, __VA_ARGS__)
 #define dbg_cheri_plt_verbose(...)	dbg_cat(CHERI_PLT_VERBOSE, __VA_ARGS__)
 
-
-#if defined(COMPAT_32BIT)
-#define _MYNAME	"ld-elf32.so.1"
-#elif defined(COMPAT_64BIT)
-#define _MYNAME	"ld-elf64.so.1"
-#elif defined(COMPAT_CHERI)
-#define _MYNAME	"ld-elf64c.so.1"
-#else
-#define _MYNAME	"ld-elf.so.1"
-#endif
-
 #define msg(s)		rtld_putstr(s)
-#define trace()		msg(_MYNAME ": " __XSTRING(__LINE__) "\n")
+#define trace()		msg(_BASENAME_RTLD ": " __XSTRING(__LINE__) "\n")
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #define PTR_FMT "%#p"
