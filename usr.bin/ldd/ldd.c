@@ -489,15 +489,15 @@ is_executable(const char *fname, int fd, int *is_shlib, int *type,
 	*rtld = _PATH_RTLD;
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (!ELF_IS_CHERI(&ehdr))
-		*rtld = _COMPAT64_PATH_RTLD;
+		*rtld = __PATH_RTLD("64");
 #elif __has_feature(capabilities)
 	if (ELF_IS_CHERI(&ehdr))
-		*rtld = _CHERIABI_PATH_RTLD;
+		*rtld = __PATH_RTLD("64c");
 #endif
 #if __ELF_WORD_SIZE > 32 && defined(ELF32_SUPPORTED)
 	if (gelf_getclass(elf) == ELFCLASS32) {
 		*type = TYPE_ELF32;
-		*rtld = _COMPAT32_PATH_RTLD;
+		*rtld = __PATH_RTLD("32");
 	}
 #endif
 
