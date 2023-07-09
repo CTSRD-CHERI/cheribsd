@@ -159,7 +159,7 @@ SUBDIR_DEPEND_liblzma= libthr
 SUBDIR_DEPEND_libpcap= ofed
 .endif
 
-.if !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT) && !defined(COMPAT_CHERI)
+.if !defined(COMPAT_LIBCOMPAT)
 SUBDIR+=	flua
 SUBDIR_DEPEND_flua=	libjail
 .endif
@@ -188,7 +188,7 @@ SUBDIR+= libsimple_printf
 .endif
 .endif
 
-.if !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT) && !defined(COMPAT_SOFTFP) && !defined(COMPAT_CHERI)
+.if !defined(COMPAT_LIBCOMPAT)
 .if ${MK_CLANG} != "no" || ${MK_LLD} != "no" || \
     ${MK_LLDB} != "no" || ${MK_LLVM_BINUTILS} != "no"
 SUBDIR+=	clang
