@@ -18,9 +18,9 @@ __<${_this:T}>__:
 
 # Yes, the flags are redundant.
 LIB${_LIBCOMPAT}_COMPILERS= \
-		CC="${XCC} ${LIB${_LIBCOMPAT}CFLAGS}" \
-		CXX="${XCXX} ${LIB${_LIBCOMPAT}CXXFLAGS} ${LIB${_LIBCOMPAT}CFLAGS}" \
-		CPP="${XCPP} ${LIB${_LIBCOMPAT}CFLAGS}"
+		CC="${XCC} ${LIB${_LIBCOMPAT}CFLAGS:@v@${v:Q}@}" \
+		CXX="${XCXX} ${LIB${_LIBCOMPAT}CXXFLAGS:@v@${v:Q}@} ${LIB${_LIBCOMPAT}CFLAGS:@v@${v:Q}@}" \
+		CPP="${XCPP} ${LIB${_LIBCOMPAT}CFLAGS:@v@${v:Q}@}"
 LIB${_LIBCOMPAT}WMAKEENV+= \
 		INSTALL="${INSTALL_CMD} -U" \
 		PATH=${TMPPATH} \
