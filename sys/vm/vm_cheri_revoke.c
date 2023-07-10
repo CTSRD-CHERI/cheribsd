@@ -125,16 +125,6 @@ vm_cheri_revoke_visit_rw(
 		 * concurrently, but by construction any such must have already
 		 * been scanned for revocation.  Exposing this capdirtiness to
 		 * the MI layer is too cheap to worry about.
-		 *
-		 * Store-side visits might see new caps during the concurrent
-		 * phase and these pages need to be revisited.  Hopefully the
-		 * PTE is capdirty in such a scenario, but it does't hurt to
-		 * promote the dirtiness to the MI layer here.  During the
-		 * world-stopped phase, we shouldn't be seeing new
-		 * capabilities...  But, because it's possible that userspace
-		 * has aliased pages across address spaces and this whole
-		 * revocation thing mooted, we don't assert here lest userspace
-		 * be able to panic the kernel.
 		 */
 		vm_page_capdirty(m);
 	}
@@ -164,10 +154,8 @@ vm_cheri_revoke_visit_ro(
 	CHERI_REVOKE_STATS_BUMP(crst, pages_scan_ro);
 
 	/*
-	 * As above, it's safe to clear this flag here on either the load or
-	 * store side, regardless of aliasing.  On the store side, we don't
-	 * need to visit this page again and on the load side we won't IDLE the
-	 * page in any racing CLG fault handler.
+	 * As above, it's safe to clear this flag here, regardless of aliasing.
+	 * We won't IDLE the page in any racing CLG fault handler.
 	 */
 	vm_page_aflag_clear(m, PGA_CAPDIRTY);
 	hascaps = vm_cheri_revoke_page_ro(crc, m);
@@ -673,12 +661,6 @@ ok:
 		mxbusy = false;
 	}
 
-	/*
-	 * XXX In all the excitement for load-side, we've neglected store-side's
-	 * ability to ever clear PGA_CAPSTORE.  That needs some attention for
-	 * fair comparison!
-	 */
-
 	mas = vm_page_astate_load(m);
 	KASSERT(((mas.flags & PGA_CAPDIRTY) == 0) ||
 		!(flags & VM_CHERI_REVOKE_BARRIERED),
@@ -804,11 +786,6 @@ vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *crc, int flags)
 
 	/* Stay on this core for the duration */
 	sched_pin();
-
-	if (flags & VM_CHERI_REVOKE_SYNC_CD) {
-		/* Flush out all the MD capdirty bits to the MI layer. */
-		pmap_sync_capdirty(map->pmap);
-	}
 
 	/*
 	 * Downgrade VM map locks to read-locked but busy to guard against

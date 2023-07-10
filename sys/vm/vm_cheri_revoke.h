@@ -108,7 +108,6 @@ enum {
 
 	/* Set externally, checked per pass */
 	VM_CHERI_REVOKE_TLB_FLUSH   = 0x40, /* shootdown TLBs */
-	VM_CHERI_REVOKE_SYNC_CD     = 0x80, /* pmap capdirty -> MI */
 };
 
 int vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *, int);
