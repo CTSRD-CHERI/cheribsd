@@ -300,8 +300,11 @@ static int
 cs_process_chunk_raw(struct trace_context *tc, size_t start, size_t len,
     uint32_t *consumed)
 {
+	void *base;
 
-	fwrite(tc->base + start, len, 1, tc->f);
+	start = (uintptr_t)tc->base + (uintptr_t)start;
+
+	fwrite(base, len, 1, tc->f);
 
 	*consumed = len;
 
@@ -578,7 +581,7 @@ hwt_coresight_fill_config(struct trace_context *tc, struct etmv4_config *config)
 	config->viiectlr = val;
 }
 
-int
+static int
 hwt_coresight_set_config(struct trace_context *tc)
 {
 	struct hwt_set_config sconf;
@@ -601,18 +604,16 @@ hwt_coresight_set_config(struct trace_context *tc)
 	return (error);
 }
 
-int
+static int
 hwt_coresight_process(struct trace_context *tc)
 {
-	size_t start;
-	size_t end;
 	size_t offs;
 	size_t new_offs;
 	int error;
 	int t;
 	struct cs_decoder *dec;
 	uint32_t processed;
-	int cursor;
+	size_t cursor;
 	int len;
 	size_t totals;
 

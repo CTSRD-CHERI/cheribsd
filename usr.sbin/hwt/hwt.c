@@ -51,7 +51,7 @@
 #include "hwtvar.h"
 
 #if defined(__aarch64__)
-extern struct trace_dev_methods cs_methods;
+#include "hwt_coresight.h"
 #endif
 
 #define	PARENTSOCKET		0
@@ -64,7 +64,7 @@ static struct trace_dev trace_devs[] = {
 #if defined(__aarch64__)
 	{ "coresight",	"ARM Coresight", &cs_methods },
 #endif
-	{ NULL, NULL }
+	{ NULL, NULL, NULL }
 };
 
 void

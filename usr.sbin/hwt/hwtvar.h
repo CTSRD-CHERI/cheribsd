@@ -40,8 +40,8 @@ struct trace_dev_methods {
 };
 
 struct trace_dev {
-	char *name;
-	char *fullname;
+	const char *name;
+	const char *fullname;
 	struct trace_dev_methods *methods;
 };
 
