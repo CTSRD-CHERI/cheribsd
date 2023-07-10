@@ -36,6 +36,7 @@
 #include <sys/mman.h>
 #include <sys/errno.h>
 #include <sys/hwt.h>
+#include <sys/wait.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -64,7 +65,6 @@
 #define	dprintf(fmt, ...)
 #endif
 
-static dcd_tree_handle_t dcdtree_handle;
 static int cs_flags = 0;
 #define	FLAG_FORMAT			(1 << 0)
 #define	FLAG_FRAME_RAW_UNPACKED		(1 << 1)
@@ -73,6 +73,11 @@ static int cs_flags = 0;
 
 #define	PACKET_STR_LEN	1024
 static char packet_str[PACKET_STR_LEN];
+
+struct cs_decoder {
+	dcd_tree_handle_t dcdtree_handle;
+	int dp_ret;
+};
 
 static ocsd_err_t
 attach_raw_printers(dcd_tree_handle_t dcd_tree_h)
@@ -292,51 +297,39 @@ create_decoder_etmv4(struct trace_context *tc, dcd_tree_handle_t dcd_tree_h)
 }
 
 static int
-cs_process_chunk(struct trace_context *tc, size_t start, size_t end)
+cs_process_chunk_raw(struct trace_context *tc, size_t start, size_t len,
+    uint32_t *consumed)
 {
-	uint32_t bytes_done;
-	uint8_t *p_block;
-	uint32_t bytes_this_time;
-	int block_index;
-	size_t block_size;
-	int dp_ret;
-	int ret;
 
-	dprintf("%s: tc->base %#p\n", __func__, tc->base);
+	fwrite(tc->base + start, len, 1, tc->f);
 
-	bytes_this_time = 0;
-	block_index = start;
-	bytes_done = 0;
-	block_size = end - start;
-	p_block = (uint8_t *)((uintptr_t)tc->base + start);
-
-	ret = OCSD_OK;
-	dp_ret = OCSD_RESP_CONT;
-
-	while (bytes_done < (uint32_t)block_size && (ret == OCSD_OK)) {
-
-		if (OCSD_DATA_RESP_IS_CONT(dp_ret)) {
-			dprintf("process data, block_size %ld, bytes_done %d\n",
-			    block_size, bytes_done);
-			dp_ret = ocsd_dt_process_data(dcdtree_handle,
-			    OCSD_OP_DATA,
-			    block_index + bytes_done,
-			    block_size - bytes_done,
-			    ((uint8_t *)p_block) + bytes_done,
-			    &bytes_this_time);
-			bytes_done += bytes_this_time;
-			dprintf("BYTES DONE %d\n", bytes_done);
-		} else if (OCSD_DATA_RESP_IS_WAIT(dp_ret)) {
-			dp_ret = ocsd_dt_process_data(dcdtree_handle,
-			    OCSD_OP_FLUSH, 0, 0, NULL, NULL);
-		} else {
-			ret = OCSD_ERR_DATA_DECODE_FATAL;
-		}
-	}
-
-	//ocsd_dt_process_data(dcdtree_handle, OCSD_OP_EOT, 0, 0, NULL, NULL);
+	*consumed = len;
 
 	return (0);
+}
+
+static int
+cs_process_chunk(struct trace_context *tc, struct cs_decoder *dec,
+    size_t start, size_t len, uint32_t *consumed)
+{
+	int error;
+
+	if (tc->raw) {
+		error = cs_process_chunk_raw(tc, start, len, consumed);
+		return (error);
+	}
+
+	/* TODO: base + start ? */
+	error = ocsd_dt_process_data(dec->dcdtree_handle,
+	    OCSD_OP_DATA, start, len, (uint8_t *)tc->base,
+	    consumed);
+
+	if (*consumed != len) {
+		printf("error");
+		exit(5);
+	}
+
+	return (error);
 }
 
 struct pmcstat_pcmap *
@@ -395,8 +388,13 @@ gen_trace_elem_print_lookup(const void *p_context,
 	unsigned long offset;
 	uint64_t newpc;
 	uint64_t ip;
+	FILE *out;
 
 	tc = (const struct trace_context *)p_context;
+	if (tc->filename)
+		out = tc->f;
+	else
+		out = stdout;
 
 	resp = OCSD_RESP_CONT;
 
@@ -426,16 +424,16 @@ gen_trace_elem_print_lookup(const void *p_context,
 
 	switch (elem->elem_type) {
 	case OCSD_GEN_TRC_ELEM_UNKNOWN:
-		printf("Unknown packet.\n");
+		fprintf(out, "Unknown packet.\n");
 		return (resp);
 	case OCSD_GEN_TRC_ELEM_NO_SYNC:
-		printf("No sync.\n");
+		fprintf(out, "No sync.\n");
 		return (resp);
 	case OCSD_GEN_TRC_ELEM_TRACE_ON:
-		printf("Trace on.\n");
+		fprintf(out, "Trace on.\n");
 		return (resp);
 	case OCSD_GEN_TRC_ELEM_EO_TRACE:
-		printf("End of Trace.\n");
+		fprintf(out, "End of Trace.\n");
 		return (resp);
 	case OCSD_GEN_TRC_ELEM_PE_CONTEXT:
 		break;
@@ -447,17 +445,17 @@ gen_trace_elem_print_lookup(const void *p_context,
 	case OCSD_GEN_TRC_ELEM_ADDR_UNKNOWN:
 		return (resp);
 	case OCSD_GEN_TRC_ELEM_EXCEPTION:
-		printf("Exception #%d (%s)\n", elem->exception_number,
+		fprintf(out, "Exception #%d (%s)\n", elem->exception_number,
 		    ARMv8Excep[elem->exception_number]);
 		return (resp);
 	case OCSD_GEN_TRC_ELEM_EXCEPTION_RET:
-		printf("Exception RET to %lx\n", elem->st_addr);
+		fprintf(out, "Exception RET to %lx\n", elem->st_addr);
 		return (resp);
 	case OCSD_GEN_TRC_ELEM_TIMESTAMP:
-		printf("Timestamp: %lx\n", elem->timestamp);
+		fprintf(out, "Timestamp: %lx\n", elem->timestamp);
 		return (resp);
 	case OCSD_GEN_TRC_ELEM_CYCLE_COUNT:
-		printf("Cycle count: %d\n", elem->cycle_count);
+		fprintf(out, "Cycle count: %d\n", elem->cycle_count);
 		return (resp);
 	case OCSD_GEN_TRC_ELEM_EVENT:
 	case OCSD_GEN_TRC_ELEM_SWTRACE:
@@ -480,13 +478,15 @@ gen_trace_elem_print_lookup(const void *p_context,
 	if (sym) {
 		offset = newpc - (sym->ps_start + image->pi_vaddr);
 
-		printf("pc 0x%08lx (%lx)\t%12s\t%s+0x%lx\n", //elem->elem_type,
+		fprintf(out, "pc 0x%08lx (%lx)\t%12s\t%s+0x%lx\n",
+		    //elem->elem_type,
 		    ip, newpc,
 		    pmcstat_string_unintern(image->pi_name),
 		    pmcstat_string_unintern(sym->ps_name), offset);
 	} else
 		if (image)
-			printf("pc 0x%08lx (%lx)\t%12s\n", //elem->elem_type,
+			fprintf(out, "pc 0x%08lx (%lx)\t%12s\n",
+			    //elem->elem_type,
 			    ip, newpc,
 			    pmcstat_string_unintern(image->pi_name));
 		else {
@@ -496,16 +496,17 @@ gen_trace_elem_print_lookup(const void *p_context,
 	return (resp);
 }
 
-int
-hwt_coresight_init(struct trace_context *tc)
+static int
+hwt_coresight_init(struct trace_context *tc, struct cs_decoder *dec)
 {
 	int error;
 
 	ocsd_def_errlog_init(OCSD_ERR_SEV_INFO, 1);
 
-	dcdtree_handle = ocsd_create_dcd_tree(OCSD_TRC_SRC_FRAME_FORMATTED,
+	dec->dp_ret = OCSD_RESP_CONT;
+	dec->dcdtree_handle = ocsd_create_dcd_tree(OCSD_TRC_SRC_FRAME_FORMATTED,
 	    OCSD_DFRMTR_FRAME_MEM_ALIGN);
-	if (dcdtree_handle == C_API_INVALID_TREE_HANDLE) {
+	if (dec->dcdtree_handle == C_API_INVALID_TREE_HANDLE) {
 		printf("can't find dcd tree\n");
 		return (-1);
 	}
@@ -514,23 +515,23 @@ hwt_coresight_init(struct trace_context *tc)
 	//cs_flags |= FLAG_FRAME_RAW_UNPACKED;
 	//cs_flags |= FLAG_FRAME_RAW_PACKED;
 
-	error = create_decoder_etmv4(tc, dcdtree_handle);
+	error = create_decoder_etmv4(tc, dec->dcdtree_handle);
 	if (error != OCSD_OK) {
 		printf("can't create decoder: tc->base %#p\n", tc->base);
 		return (-2);
 	}
 
 #ifdef PMCTRACE_CS_DEBUG
-	ocsd_tl_log_mapped_mem_ranges(dcdtree_handle);
+	ocsd_tl_log_mapped_mem_ranges(dec->dcdtree_handle);
 #endif
 
 	if (cs_flags & FLAG_FORMAT)
-		ocsd_dt_set_gen_elem_printer(dcdtree_handle);
+		ocsd_dt_set_gen_elem_printer(dec->dcdtree_handle);
 	else
-		ocsd_dt_set_gen_elem_outfn(dcdtree_handle,
+		ocsd_dt_set_gen_elem_outfn(dec->dcdtree_handle,
 		    gen_trace_elem_print_lookup, tc);
 
-	attach_raw_printers(dcdtree_handle);
+	attach_raw_printers(dec->dcdtree_handle);
 
 	return (0);
 }
@@ -606,64 +607,80 @@ hwt_coresight_process(struct trace_context *tc)
 	size_t start;
 	size_t end;
 	size_t offs;
+	size_t new_offs;
 	int error;
 	int t;
+	struct cs_decoder *dec;
+	uint32_t processed;
+	int cursor;
+	int len;
+	size_t totals;
 
 	/* Coresight data is always on CPU0 due to funnelling by HW. */
 
-	hwt_coresight_init(tc);
+	dec = malloc(sizeof(struct cs_decoder));
+
+	hwt_coresight_init(tc, dec);
 
 	error = hwt_get_offs(tc, &offs);
 	if (error)
 		return (-1);
 
+#if 0
 	printf("data to process %ld\n", offs);
+#endif
 
-	start = 0;
-	end = offs;
+	cursor = 0;
+	processed = 0;
+	totals = 0;
+	len = offs;
 
-	cs_process_chunk(tc, start, end);
+	cs_process_chunk(tc, dec, cursor, len, &processed);
+	cursor += processed;
+	totals += processed;
 
 	t = 0;
 
 	while (1) {
-		hwt_sleep();
-
-		if (tc->terminate && t++ > 2)
-			break;
-
-		error = hwt_get_offs(tc, &offs);
+		error = hwt_get_offs(tc, &new_offs);
 		if (error)
 			return (-1);
 
-		if (offs == end) {
+		if (new_offs == cursor) {
 			/* No new entries in trace. */
+			if (tc->terminate && t++ > 2)
+				break;
 			hwt_sleep();
-			continue;
-		}
-
-		if (offs > end) {
+		} else if (new_offs > cursor) {
 			/* New entries in the trace buffer. */
-			start = end;
-			end = offs;
-			cs_process_chunk(tc, start, end);
-			hwt_sleep();
-			continue;
-		}
+			len = new_offs - cursor;
+			cs_process_chunk(tc, dec, cursor, len, &processed);
+			cursor += processed;
+			totals += processed;
+			t = 0;
 
-		if (offs < end) {
+		} else if (new_offs < cursor) {
 			/* New entries in the trace buffer. Buffer wrapped. */
-			start = end;
-			end = tc->bufsize;
-			cs_process_chunk(tc, start, end);
+			len = tc->bufsize - cursor;
+			cs_process_chunk(tc, dec, cursor, len, &processed);
+			cursor += processed;
+			totals += processed;
 
-			start = 0;
-			end = offs;
-			cs_process_chunk(tc, start, end);
-
-			hwt_sleep();
+			cursor = 0;
+			len = new_offs;
+			cs_process_chunk(tc, dec, cursor, len, &processed);
+			cursor += processed;
+			totals += processed;
+			t = 0;
 		}
 	}
 
+	printf("\nBytes processed: %ld\n", totals);
+
 	return (0);
 }
+
+struct trace_dev_methods cs_methods = {
+	.process = hwt_coresight_process,
+	.set_config = hwt_coresight_set_config,
+};

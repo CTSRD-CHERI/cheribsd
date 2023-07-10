@@ -279,8 +279,4 @@ struct etmv4_config {
 	uint8_t			s_ex_level;
 };
 
-int hwt_coresight_init(struct trace_context *tc);
-int hwt_coresight_set_config(struct trace_context *tc);
-int hwt_coresight_process(struct trace_context *tc);
-
 #endif /* !_HWT_CORESIGHT_H_ */

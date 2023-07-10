@@ -32,11 +32,25 @@
 
 #define	TC_MAX_ADDR_RANGES	16
 
+struct trace_context;
+
+struct trace_dev_methods {
+	int (*process)(struct trace_context *tc);
+	int (*set_config)(struct trace_context *tc);
+};
+
+struct trace_dev {
+	char *name;
+	char *fullname;
+	struct trace_dev_methods *methods;
+};
+
 struct trace_context {
+	struct trace_dev *trace_dev;
 	struct pmcstat_process *pp;
 	struct hwt_record_user_entry *records;
 	void *base;
-	int bufsize;
+	size_t bufsize;
 	int pid;
 	int fd;
 	int thr_fd;
@@ -52,6 +66,13 @@ struct trace_context {
 
 	/* Backend-specific config. */
 	void *config;
+
+	/* Raw trace. */
+	int raw;
+
+	/* Trace file. */
+	char *filename;
+	FILE *f;
 };
 
 struct pmcstat_process *hwt_process_alloc(void);

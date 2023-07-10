@@ -36,6 +36,7 @@
 #include <sys/wait.h>
 #include <sys/time.h>
 #include <sys/hwt.h>
+#include <sys/stat.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,13 +49,23 @@
 #include <libpmcstat.h>
 
 #include "hwtvar.h"
-#include "hwt_coresight.h"
+
+#if defined(__aarch64__)
+extern struct trace_dev_methods cs_methods;
+#endif
 
 #define	PARENTSOCKET		0
 #define	CHILDSOCKET		1
 #define	NSOCKPAIRFD		2
 
 static struct trace_context tcs;
+
+static struct trace_dev trace_devs[] = {
+#if defined(__aarch64__)
+	{ "coresight",	"ARM Coresight", &cs_methods },
+#endif
+	{ NULL, NULL }
+};
 
 void
 hwt_sleep(void)
@@ -113,7 +124,7 @@ hwt_mmap_received(struct trace_context *tc,
 	tc->suspend_on_mmap = 0;
 
 	/* Start tracing. */
-	error = hwt_coresight_set_config(tc);
+	error = tc->trace_dev->methods->set_config(tc);
 	if (error)
 		return (-2);
 
@@ -136,7 +147,7 @@ hwt_ctx_alloc(struct trace_context *tc)
 
 	al.pid = tc->pid;
 	al.bufsize = tc->bufsize;
-	al.backend_name = "coresight";
+	al.backend_name = tc->trace_dev->name;
 
 	error = ioctl(tc->fd, HWT_IOC_ALLOC, &al);
 
@@ -195,7 +206,9 @@ hwt_get_offs(struct trace_context *tc, size_t *offs)
 	if (error)
 		return (error);
 
-	printf("curpage %d curpage_offset %ld\n", curpage, curpage_offset);
+#if 0
+	printf("curpage %ld curpage_offset %ld\n", curpage, curpage_offset);
+#endif
 
 	*offs = curpage * PAGE_SIZE + curpage_offset;
 
@@ -256,25 +269,72 @@ main(int argc, char **argv, char **env)
 	struct hwt_record_user_entry *entry;
 	struct pmcstat_process *pp;
 	struct trace_context *tc;
+	struct stat st;
 	uint32_t tot_rec;
 	uint32_t nrec;
 	uint32_t nlibs;
 	char **cmd;
+	char *trace_dev_name;
 	int error;
 	int sockpair[NSOCKPAIRFD];
 	int pid;
 	int option;
+	int i;
+	int found;
 
 	tc = &tcs;
 
 	memset(tc, 0, sizeof(struct trace_context));
 
-	while ((option = getopt(argc, argv, "t:i:f:")) != -1)
+	/* Defaults */
+	tc->bufsize = 128 * 1024 * 1024;
+
+	/* First available is default trace device. */
+	tc->trace_dev = &trace_devs[0];
+	if (tc->trace_dev->name == NULL) {
+		printf("No trace devices available\n");
+		return (1);
+	}
+
+	while ((option = getopt(argc, argv, "c:b:rw:t:i:f:")) != -1)
 		switch (option) {
+		case 'c':
+			trace_dev_name = strdup(optarg);
+			found = 0;
+			for (i = 0; trace_devs[i].name != NULL; i++) {
+				if (strcmp(trace_devs[i].name,
+				    trace_dev_name) == 0) {
+					tc->trace_dev = &trace_devs[i];
+					found = 1;
+					break;
+				}
+			}
+			if (!found) {
+				printf("Trace device \"%s\" not available.\n",
+				    trace_dev_name);
+				return (ENOENT);
+			}
+			break;
+		case 'b':
+			tc->bufsize = atol(optarg);
+			break;
+		case 'r':
+			/* Do not decode trace. */
+			tc->raw = 1;
+			break;
+		case 'w':
+			/* Store trace into a file. */
+			tc->filename = strdup(optarg);
+			break;
 		case 'i':
+			/*
+			 * Name of dynamic lib or main executable for IP
+			 * address range filtering.
+			 */
 			tc->image_name = strdup(optarg);
 			break;
 		case 'f':
+			/* Name of the func to trace. */
 			tc->func_name = strdup(optarg);
 			break;
 		case 't':
@@ -283,6 +343,19 @@ main(int argc, char **argv, char **env)
 		default:
 			break;
 		}
+
+	if (tc->raw != 0 && tc->filename == NULL) {
+		printf("Filename must be specified for the raw data.\n");
+		exit(1);
+	}
+
+	if (tc->filename != NULL) {
+		tc->f = fopen(tc->filename, "w");
+		if (tc->f == NULL) {
+			printf("could not open file %s\n", tc->filename);
+			return (ENXIO);
+		}
+	}
 
 	if ((tc->image_name == NULL && tc->func_name != NULL) ||
 	    (tc->image_name != NULL && tc->func_name == NULL)) {
@@ -295,6 +368,12 @@ main(int argc, char **argv, char **env)
 	argc += optind;
 
 	cmd = argv;
+
+	error = stat(*cmd, &st);
+	if (error) {
+		printf("Could not find target executable, error %d.\n", error);
+		return (error);
+	}
 
 	error = hwt_elf_count_libs(*cmd, &nlibs);
 	if (error != 0) {
@@ -324,7 +403,6 @@ main(int argc, char **argv, char **env)
 
 	tc->pp = pp;
 	tc->pid = pid;
-	tc->bufsize = 16 * 1024 * 1024;
 
 	error = hwt_ctx_alloc(tc);
 	if (error) {
@@ -351,7 +429,7 @@ main(int argc, char **argv, char **env)
 	if (tc->func_name != NULL)
 		tc->suspend_on_mmap = 1;
 
-	error = hwt_coresight_set_config(tc);
+	error = tc->trace_dev->methods->set_config(tc);
 	if (error != 0) {
 		printf("can't set config");
 		return (error);
@@ -388,9 +466,12 @@ main(int argc, char **argv, char **env)
 		hwt_sleep();
 	} while (tot_rec < nlibs);
 
-	hwt_coresight_process(tc);
+	tc->trace_dev->methods->process(tc);
 
 	close(tc->fd);
+
+	if (tc->filename)
+		fclose(tc->f);
 
 	return (0);
 }
