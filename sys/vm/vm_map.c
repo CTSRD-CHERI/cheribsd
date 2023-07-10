@@ -4768,10 +4768,20 @@ vm_map_clear(vm_map_t map)
 	int result;
 
 	vm_map_lock(map);
-	result = vm_map_delete(map, vm_map_min(map), vm_map_max(map), false);
 #ifdef CHERI_CAPREVOKE
+	/*
+	 * vm_map_clear() is the ultimate revocation (no mappings means
+	 * no capabilities).  Clear revocation state.
+	 */
 	map->vm_cheri_revoke_st = CHERI_REVOKE_ST_NONE;
+	/* quarantine is drained below. */
+	map->rev_entry = NULL;
+#ifdef CHERI_CAPREVOKE_STATS
+	memset(&map->vm_cheri_revoke_stats, 0,
+	    sizeof(map->vm_cheri_revoke_stats));
 #endif
+#endif
+	result = vm_map_delete(map, vm_map_min(map), vm_map_max(map), false);
 	vm_map_unlock(map);
 
 	return (result);
