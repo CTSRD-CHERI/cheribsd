@@ -312,7 +312,7 @@ fast_out:
 	 */
 	if ((entryst == CHERI_REVOKE_ST_INITED) &&
 	    (myst == CHERI_REVOKE_ST_CLOSING))
-		goto ls_close_already_inited;
+		goto close_already_inited;
 
 	KASSERT(myst == CHERI_REVOKE_ST_INITING ||
 	    myst == CHERI_REVOKE_ST_CLOSING,
@@ -458,7 +458,7 @@ fast_out:
 
 		if (myst == CHERI_REVOKE_ST_CLOSING) {
 			int crflags;
-ls_close_already_inited:
+close_already_inited:	/* (entryst == CHERI_REVOKE_ST_INITED) above */
 			crflags = VM_CHERI_REVOKE_LOAD_SIDE;
 
 			/* We're on the load side; walk the VM again. */
