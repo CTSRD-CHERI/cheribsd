@@ -37,35 +37,33 @@
 /*
  * The outermost capability revocation state machine.
  *
- *   We begin with no revocation in progress (CAPREVST_NONE).  Userland can
- *   request that we steal the calling thread to carry out an initial pass,
- *   which will begin the next epoch and visit all cap-dirty pages in the
- *   address space, moving us to CAPREVST_INIT_PASS for the duration and to
- *   CAPREVST_INIT_DONE upon completion, before returning to userland.
+ *   We begin with no revocation in progress (CHERI_REVOKE_ST_NONE).
+ *   We then select a revocation mode and optionally a unmapped entry
+ *   to revoke along side capabilities without the SW_VMEM permission
+ *   and quarantined in userspace.  It then transitions to one of
+ *   CHERI_REVOKE_ST_INITING or CHERI_REVOKE_ST_CLOSING.
  *
- *   We are now in the store-side steady state for this epoch: we need only
- *   look at *recently* capdirty pages, kernel hoarders, and register files
- *   to find should-be-revoked pages.  Userland can request additional
- *   passes, which will be *incremental* passes, visiting only capdirty
- *   pages (and keeping us in CAPREVST_STORE_DONE).
+ *   At this point, we enter the barrier phase, attemping to
+ *   single thread the process (resetting to our initial state and
+ *   restarting the call on failure).  We then revoke each trap frame
+ *   and sigaltstack before incrementing the GCLG and perform a TLB
+ *   shootdown.  Finally we end single threading.  At this point,
+ *   thread state can not be further contaminated with capabilities to be
+ *   revoked as loads will fault and a scan will be performed.
  *
- *   Alternatively, userland can request that we finish this epoch,
- *   transitioning us into CAPREVST_LAST_PASS for the duration.  This pass
- *   visits all recently capdirty pages, kernel hoarders, and thread
- *   register files.  It implies at least some brief window of
- *   thread_single'd life.  When this pass finishes, it again increments
- *   the epoch counter, signaling the end of this epoch.
+ *   If we're in CHERI_REVOKE_ST_INITING we then transition to
+ *   CHERI_REVOKE_ST_INITED and publish our newly opened epoch.
+ *   Alternatively, if we're in CHERI_REVOKE_ST_CLOSING we perform
+ *   a final scan of all unscanned pages, before transitioning back to
+ *   CHERI_REVOKE_ST_NONE and publishing the newly closed epoch.
  *
- *     XXX The thread_single window can be reduced by using the "load-side"
- *     strategy, in which we temporarily remove read access to all
- *     recently-capdirty pages and then un-thread_single.  We would continue
- *     to use the calling thread to sweep pages "in the background", but would
- *     also clean pages when taking vm faults.  The epoch must not end
- *     before all pages have been cleaned!
+ *   We reenter the state machine at CHERI_REVOKE_ST_INITED and
+ *   the CHERI_REVOKE_LAST_PASS flag set, we proceed as though we were
+ *   in CHERI_REVOKE_ST_CLOSING as described above, scanning unscanned
+ *   pages and transitioning to CHERI_REVOKE_ST_NONE.
  *
- *   Userland might cause us to jump directly from CAPREVST_NONE to
- *   CAPREVST_LAST_PASS.  This case is *almost* like the above, except that
- *   we have to consider *all* capdirty pages, not just recently-capdirty.
+ *   Absent concurrent calls to cheri_revoke(2) we will always enter
+ *   with the state CHERI_REVOKE_ST_NONE or CHERI_REVOKE_ST_INITED.
  *
  * The state and epoch counter are stored in the same per-process word,
  * vm_caprev_st.  There is, at present, at most one thread actively engaged
