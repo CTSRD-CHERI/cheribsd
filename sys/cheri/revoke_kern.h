@@ -81,8 +81,8 @@ enum cheri_revoke_state {
 	CHERI_REVOKE_ST_CLOSING = 3, /* background working */
 };
 
-#define CHERI_REVOKE_ST_ST_MASK	0x7
-#define CHERI_REVOKE_ST_EPOCH_SHIFT	3
+#define CHERI_REVOKE_ST_ST_MASK		0x3
+#define CHERI_REVOKE_ST_EPOCH_SHIFT	2
 
 static inline enum cheri_revoke_state
 cheri_revoke_st_get_state(cheri_revoke_state_t st) {
