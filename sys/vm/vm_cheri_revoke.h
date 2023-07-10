@@ -101,7 +101,6 @@ void vm_cheri_revoke_info_page(struct vm_map *map, struct sysentvec *,
 enum {
 	/* Set externally, checked per page */
 	VM_CHERI_REVOKE_BARRIERED   = 0x08, /* world is stopped (debug) */
-	VM_CHERI_REVOKE_LOAD_SIDE   = 0x10, /* this is the load-side scan */
 
 	/* Set internally, checked per page */
 	VM_CHERI_REVOKE_QUICK_SUCCESSOR = 0x20,

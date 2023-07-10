@@ -379,7 +379,7 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 	 *    immediate fallback to the VM (vm_page_grab_valid or vm_fault).
 	 *
 	 */
-	if (flags & VM_CHERI_REVOKE_LOAD_SIDE) {
+	{
 		int pmres;
 
 		pmres = pmap_caploadgen_update(crc->map->pmap, addr, &m, 0);
@@ -599,11 +599,11 @@ ok:
 	KASSERT(mxbusy || mwired, ("caprevoke !xbusy !wired?"));
 
 	/*
-	 * If this is the load side and we hit the VM, then the LCLG bit should
-	 * already be up to date (if present; see the above INVARIANTS test).
+	 * If we hit the VM, then the LCLG bit should already be up to date
+	 * (if present; see the above INVARIANTS test).
 	 * Otherwise, the load side should update the LCLG bit now.
 	 */
-	if (!mdidvm && (flags & VM_CHERI_REVOKE_LOAD_SIDE)) {
+	if (!mdidvm) {
 		vm_page_t m2 = m;
 		int pmres;
 
@@ -639,7 +639,7 @@ ok:
 	 * Even if the page has been replaced, it must have been by another act
 	 * of the VM, and so the CLG should be absent or up to date.
 	 */
-	if (mdidvm && (flags & VM_CHERI_REVOKE_LOAD_SIDE)) {
+	if (mdidvm) {
 		int pmres;
 		vm_page_t m2 = m;
 
@@ -831,8 +831,7 @@ vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *crc, int flags)
 	 * increment the CLG for the *next* pass (while we've got the world
 	 * stopped.)
 	 *
-	if (flags & VM_CHERI_REVOKE_LOAD_SIDE)
-		pmap_invalidate_all(pmap);
+	pmap_invalidate_all(pmap);
 	 */
 
 out:
