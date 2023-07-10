@@ -1140,7 +1140,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     *objp = obj_main;
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    return ((func_ptr_type)tramp_pgs_append(cheri_sealentry(obj_main->entry), obj_main, NULL));
+    return ((func_ptr_type)tramp_intern(cheri_sealentry(obj_main->entry), obj_main, NULL));
 #else
     return ((func_ptr_type)obj_main->entry);
 #endif
@@ -1154,7 +1154,7 @@ rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def)
 
 	ptr = (void *)make_function_pointer(def, obj);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	ptr = tramp_pgs_append(ptr, obj, def);
+	ptr = tramp_intern(ptr, obj, def);
 #endif
 	target = call_ifunc_resolver(ptr);
 	return ((void *)target);
@@ -1210,7 +1210,7 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
      * that the trampoline needs.
      */
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    target = (uintptr_t)tramp_pgs_append((void *)target, defobj, def);
+    target = (uintptr_t)tramp_intern((void *)target, defobj, def);
 #endif
     target = reloc_jmpslot(where, target, defobj, obj, rel);
     lock_release(rtld_bind_lock, &lockstate);
@@ -2749,7 +2749,8 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
     if (sysctlbyname("security.cheri.sealcap", &sealer_cap,
                      &(size_t) { sizeof(sealer_cap) }, NULL, 0) < 0)
-	rtld_die();
+	rtld_fatal("sysctlbyname failed");
+    tramp_init();
 #endif
 }
 
@@ -4336,13 +4337,13 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
 	    sym = __DECONST(void*, make_function_pointer(def, defobj));
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	    sym = tramp_pgs_append(sym, defobj, def);
+	    sym = tramp_intern(sym, defobj, def);
 #endif
 	    dbg("dlsym(%s) is function: " PTR_FMT, name, sym);
 	} else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
 	    sym = rtld_resolve_ifunc(defobj, def);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	    sym = tramp_pgs_append(sym, defobj, def);
+	    sym = tramp_intern(sym, defobj, def);
 #endif
 	    dbg("dlsym(%s) is ifunc. Resolved to: " PTR_FMT, name, sym);
 	} else if (ELF_ST_TYPE(def->st_info) == STT_TLS) {
@@ -4885,7 +4886,7 @@ get_program_var_addr(const char *name, RtldLockState *lockstate)
     if (ELF_ST_TYPE(req.sym_out->st_info) == STT_FUNC) {
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 	void *target = make_function_pointer(req.sym_out, req.defobj_out);
-	return tramp_pgs_append(target, req.defobj_out, req.sym_out);
+	return tramp_intern(target, req.defobj_out, req.sym_out);
 #else
 	return ((const void **)make_function_pointer(req.sym_out,
 	  req.defobj_out));
