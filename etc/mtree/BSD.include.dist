@@ -192,10 +192,6 @@
         unionfs
         ..
     ..
-    gcc
-        4.2
-        ..
-    ..
     geom
         cache
         ..
