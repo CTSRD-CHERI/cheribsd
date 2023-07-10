@@ -75,10 +75,10 @@
 typedef uint64_t cheri_revoke_state_t;
 
 enum cheri_revoke_state {
-	CHERI_REVOKE_ST_NONE       = 0, /* No revocation is in progress */
-	CHERI_REVOKE_ST_LS_INITING = 1, /* "load-side" opening now */
-	CHERI_REVOKE_ST_LS_INITED  = 2, /* "load-side" open (= 1 opens done) */
-	CHERI_REVOKE_ST_LS_CLOSING = 3, /* "load-side" background working */
+	CHERI_REVOKE_ST_NONE    = 0, /* No revocation is in progress */
+	CHERI_REVOKE_ST_INITING = 1, /* opening now */
+	CHERI_REVOKE_ST_INITED  = 2, /* open (= 1 opens done) */
+	CHERI_REVOKE_ST_CLOSING = 3, /* background working */
 };
 
 #define CHERI_REVOKE_ST_ST_MASK	0x7
@@ -104,9 +104,9 @@ cheri_revoke_st_set(cheri_revoke_state_t *st, cheri_revoke_epoch_t epoch,
 static inline bool
 cheri_revoke_st_is_revoking(cheri_revoke_state_t st) {
 	switch (cheri_revoke_st_get_state(st)) {
-	case CHERI_REVOKE_ST_LS_INITING:
-	case CHERI_REVOKE_ST_LS_INITED:
-	case CHERI_REVOKE_ST_LS_CLOSING:
+	case CHERI_REVOKE_ST_INITING:
+	case CHERI_REVOKE_ST_INITED:
+	case CHERI_REVOKE_ST_CLOSING:
 		return true;
 	case CHERI_REVOKE_ST_NONE:
 		return false;

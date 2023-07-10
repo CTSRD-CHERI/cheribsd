@@ -194,30 +194,30 @@ fast_out:
 			KASSERT((epoch & 1) == 0, ("Odd epoch NONE"));
 
 			if (flags & CHERI_REVOKE_LAST_PASS) {
-				myst = CHERI_REVOKE_ST_LS_CLOSING;
+				myst = CHERI_REVOKE_ST_CLOSING;
 			} else {
-				myst = CHERI_REVOKE_ST_LS_INITING;
+				myst = CHERI_REVOKE_ST_INITING;
 			}
 			break;
-		case CHERI_REVOKE_ST_LS_INITED:
+		case CHERI_REVOKE_ST_INITED:
 			KASSERT((epoch & 1) == 1, ("Even epoch LS_INITED"));
 			/*
 			 * If a load-side epoch is already open, there's
 			 * nothing to be done other than end it.
 			 */
 			if (flags & CHERI_REVOKE_LAST_PASS) {
-				myst = CHERI_REVOKE_ST_LS_CLOSING;
+				myst = CHERI_REVOKE_ST_CLOSING;
 			} else {
 				goto fast_out;
 			}
 			break;
-		case CHERI_REVOKE_ST_LS_CLOSING:
+		case CHERI_REVOKE_ST_CLOSING:
 			/* There is another revoker in progress.  Wait? */
 			if ((flags & CHERI_REVOKE_ONLY_IF_OPEN) != 0) {
 				goto fast_out;
 			}
 			/* FALLTHROUGH */
-		case CHERI_REVOKE_ST_LS_INITING:
+		case CHERI_REVOKE_ST_INITING:
 			KASSERT(vmm->system_map == 0, ("System map?"));
 
 			if ((flags & CHERI_REVOKE_NO_WAIT_OK) != 0) {
@@ -240,10 +240,10 @@ fast_out:
 		}
 
 		KASSERT((entryst == CHERI_REVOKE_ST_NONE) ||
-			(entryst == CHERI_REVOKE_ST_LS_INITED),
+			(entryst == CHERI_REVOKE_ST_INITED),
 		    ("Beginning revocation with bad entry state"));
-		KASSERT((myst == CHERI_REVOKE_ST_LS_INITING) ||
-			(myst == CHERI_REVOKE_ST_LS_CLOSING),
+		KASSERT((myst == CHERI_REVOKE_ST_INITING) ||
+			(myst == CHERI_REVOKE_ST_CLOSING),
 		    ("Beginning revocation with bad current state"));
 
 		if (((flags & CHERI_REVOKE_ONLY_IF_OPEN) != 0) &&
@@ -295,7 +295,7 @@ fast_out:
 	 * vm map lock to do this, because copyout might need the map).
 	 */
 	if ((entryst == CHERI_REVOKE_ST_NONE) &&
-	    (myst == CHERI_REVOKE_ST_LS_CLOSING)) {
+	    (myst == CHERI_REVOKE_ST_CLOSING)) {
 		crepochs.enqueue = epoch + 2;
 	} else {
 		crepochs.enqueue = epoch + 1;
@@ -310,12 +310,12 @@ fast_out:
 	 * to close it out, there's no need to do any thread singling, so
 	 * don't.
 	 */
-	if ((entryst == CHERI_REVOKE_ST_LS_INITED) &&
-	    (myst == CHERI_REVOKE_ST_LS_CLOSING))
+	if ((entryst == CHERI_REVOKE_ST_INITED) &&
+	    (myst == CHERI_REVOKE_ST_CLOSING))
 		goto ls_close_already_inited;
 
-	KASSERT(myst == CHERI_REVOKE_ST_LS_INITING ||
-	    myst == CHERI_REVOKE_ST_LS_CLOSING,
+	KASSERT(myst == CHERI_REVOKE_ST_INITING ||
+	    myst == CHERI_REVOKE_ST_CLOSING,
 	    ("Bad target state in revoker."));
 
 	/* Begin barrier phase! */
@@ -360,8 +360,8 @@ fast_out:
 		 * soon as it's on core again.  This will require a barrier
 		 * before we can increment the epoch counter or transition to
 		 * the next state in the CHERI_REVOKE_ST state machine (i.e.,
-		 * from CHERI_REVOKE_ST_LS_CLOSING to CHERI_REVOKE_ST_NONE or
-		 * from CHERI_REVOKE_ST_LS_INITING to CHERI_REVOKE_ST_LS_INITED).
+		 * from CHERI_REVOKE_ST_CLOSING to CHERI_REVOKE_ST_NONE or
+		 * from CHERI_REVOKE_ST_INITING to CHERI_REVOKE_ST_INITED).
 		 * This also risks the use of ptrace() to expose to userspace
 		 * the trap frame of a stalled thread that has not yet scanned
 		 * itself.  Yick.
@@ -383,8 +383,8 @@ fast_out:
 	switch(myst) {
 	default:
 		panic("impossible");
-	case CHERI_REVOKE_ST_LS_CLOSING:
-	case CHERI_REVOKE_ST_LS_INITING:
+	case CHERI_REVOKE_ST_CLOSING:
+	case CHERI_REVOKE_ST_INITING:
 		if (entryst == CHERI_REVOKE_ST_NONE) {
 			/*
 			 * Increment the GCLG.  Immediately install for the
@@ -451,12 +451,12 @@ fast_out:
 	if (entryst == CHERI_REVOKE_ST_NONE) {
 		epoch++;
 
-		KASSERT((myst == CHERI_REVOKE_ST_LS_INITING) ||
-			(myst == CHERI_REVOKE_ST_LS_CLOSING),
+		KASSERT((myst == CHERI_REVOKE_ST_INITING) ||
+			(myst == CHERI_REVOKE_ST_CLOSING),
 			("Bad myst when finishing loadside"));
-		entryst = CHERI_REVOKE_ST_LS_INITED;
+		entryst = CHERI_REVOKE_ST_INITED;
 
-		if (myst == CHERI_REVOKE_ST_LS_CLOSING) {
+		if (myst == CHERI_REVOKE_ST_CLOSING) {
 			int crflags;
 ls_close_already_inited:
 			crflags = VM_CHERI_REVOKE_LOAD_SIDE;
@@ -468,7 +468,7 @@ ls_close_already_inited:
 
 	/* OK, that's that.  Where do we stand now? */
 	if ((res == KERN_SUCCESS) &&
-	    (myst == CHERI_REVOKE_ST_LS_CLOSING)) {
+	    (myst == CHERI_REVOKE_ST_CLOSING)) {
 
 #ifdef DIAGNOSTIC
 		vm_cheri_assert_consistent_clg(&vm->vm_map);
