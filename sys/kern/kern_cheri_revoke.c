@@ -520,8 +520,6 @@ fast_out:
 		break;
 	}
 
-	vm_map_entry_end_revocation(&vm->vm_map);
-
 	PROC_LOCK(td->td_proc);
 	_PRELE(td->td_proc);
 	if ((td->td_proc->p_flag & P_HADTHREADS) != 0) {
@@ -588,6 +586,8 @@ skip_last_pass:
 		crepochs.dequeue = epoch;
 		vm_cheri_revoke_publish_epochs(info_page, &crepochs);
 		entryst = CHERI_REVOKE_ST_NONE;
+
+		vm_map_entry_end_revocation(&vm->vm_map);
 	}
 
 	vm_map_lock(vmm);
