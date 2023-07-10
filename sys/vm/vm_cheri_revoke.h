@@ -104,9 +104,6 @@ enum {
 
 	/* Set internally, checked per page */
 	VM_CHERI_REVOKE_QUICK_SUCCESSOR = 0x20,
-
-	/* Set externally, checked per pass */
-	VM_CHERI_REVOKE_TLB_FLUSH   = 0x40, /* shootdown TLBs */
 };
 
 int vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *, int);
