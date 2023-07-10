@@ -453,7 +453,7 @@ fast_out:
 
 		KASSERT((myst == CHERI_REVOKE_ST_INITING) ||
 			(myst == CHERI_REVOKE_ST_CLOSING),
-			("Bad myst when finishing loadside"));
+			("Bad myst when finishing"));
 		entryst = CHERI_REVOKE_ST_INITED;
 
 		if (myst == CHERI_REVOKE_ST_CLOSING) {
@@ -461,7 +461,7 @@ fast_out:
 close_already_inited:	/* (entryst == CHERI_REVOKE_ST_INITED) above */
 			crflags = VM_CHERI_REVOKE_LOAD_SIDE;
 
-			/* We're on the load side; walk the VM again. */
+			/* Walk the VM */
 			res = vm_cheri_revoke_pass(&vmcrc, crflags);
 		}
 	}
