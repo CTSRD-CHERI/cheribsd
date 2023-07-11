@@ -597,7 +597,9 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 		end = MAX(end, seg_addr + seg_size);
 	}
 
-	if (hdr->e_type == ET_EXEC && !is_aligned(start + rbase,
+	reservation = start + rbase;
+#ifdef __ELF_CHERI
+	if (hdr->e_type == ET_EXEC && !is_aligned(reservation,
 	    CHERI_REPRESENTABLE_ALIGNMENT(end - start))) {
 		/*
 		 * We can't change the load address for position dependent
@@ -615,8 +617,9 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 	 * For RTLD we also align upwards to avoid aligning down into the
 	 * memory region for the main binary.
 	 */
-	reservation = roundup2(start + rbase,
+	reservation = roundup2(reservation,
 	    CHERI_REPRESENTABLE_ALIGNMENT(end - start));
+#endif
 	result = vm_map_reservation_create(map, &reservation, end - start,
 	    PAGE_SIZE, VM_PROT_ALL);
 	if (result != KERN_SUCCESS)
