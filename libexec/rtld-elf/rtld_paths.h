@@ -50,7 +50,7 @@
 #define	_PATH_LIBMAP_CONF	"/etc/libmap64c.conf"
 #define	_BASENAME_RTLD		_CHERIABI_BASENAME_RTLD
 #define	STANDARD_LIBRARY_PATH	"/lib64c:/usr/lib64c"
-#define	LD_			"LD_CHERI_"
+#define	LD_			"LD_64C_"
 #endif
 
 #ifndef _PATH_ELF32_HINTS
