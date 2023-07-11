@@ -41,6 +41,7 @@
 #include <sys/module.h>
 #include <sys/mutex.h>
 #include <sys/rwlock.h>
+#include <sys/smp.h>
 #include <sys/hwt.h>
 
 #include <dev/hwt/hwt_hook.h>
@@ -162,46 +163,18 @@ hwt_ioctl_send_records(struct hwt_context *ctx,
 }
 
 static int
-hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
+hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
+    struct hwt_backend *backend, struct hwt_alloc *halloc)
 {
-	char backend_name[HWT_BACKEND_MAXNAMELEN];
-	struct hwt_backend *backend;
 	struct hwt_context *ctx;
 	struct hwt_thread *thr;
-	struct hwt_owner *ho;
 	struct proc *p;
 	int error;
 
-	if (halloc->bufsize > HWT_MAXBUFSIZE)
-		return (EINVAL);
-	if (halloc->bufsize % PAGE_SIZE)
-		return (EINVAL);
-	if (halloc->backend_name == NULL)
-		return (EINVAL);
-
-	error = copyinstr(halloc->backend_name, (void *)backend_name,
-	    HWT_BACKEND_MAXNAMELEN, NULL);
-	if (error)
-		return (error);
-
-	backend = hwt_backend_lookup(backend_name);
-	if (backend == NULL)
-		return (ENXIO);
-
-	/* First get the owner. */
-	ho = hwt_ownerhash_lookup(td->td_proc);
-	if (ho) {
-		/* Check if the owner have this pid configured already. */
-		ctx = hwt_owner_lookup_ctx(ho, halloc->pid);
-		if (ctx)
-			return (EEXIST);
-	} else {
-		/* Create a new owner. */
-		ho = hwt_owner_alloc(td->td_proc);
-		if (ho == NULL)
-			return (ENOMEM);
-		hwt_ownerhash_insert(ho);
-	}
+	/* Check if the owner have this pid configured already. */
+	ctx = hwt_owner_lookup_ctx(ho, halloc->pid);
+	if (ctx)
+		return (EEXIST);
 
 	/* Allocate a new HWT context. */
 	ctx = hwt_ctx_alloc();
@@ -209,6 +182,7 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 	ctx->pid = halloc->pid;
 	ctx->hwt_backend = backend;
 	ctx->hwt_owner = ho;
+	ctx->mode = HWT_MODE_THREAD;
 
 	/* Allocate first thread and buffers. */
 	error = hwt_thread_alloc(&thr, ctx->bufsize);
@@ -270,6 +244,81 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 	hwt_record_thread(thr);
 
 	return (0);
+}
+
+static int
+hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
+    struct hwt_backend *backend, struct hwt_alloc *halloc)
+{
+	struct hwt_context *ctx;
+	int cpu;
+
+	cpu = halloc->cpu;
+	if (CPU_ABSENT(cpu) || CPU_ISSET(cpu, &hlt_cpus_mask))
+		return (ENXIO);
+
+	/* Check if the owner have this cpu configured already. */
+	ctx = hwt_owner_lookup_ctx_by_cpu(ho, halloc->cpu);
+	if (ctx)
+		return (EEXIST);
+
+	/* Allocate a new HWT context. */
+	ctx = hwt_ctx_alloc();
+	ctx->bufsize = halloc->bufsize;
+	ctx->cpu = cpu;
+	ctx->hwt_backend = backend;
+	ctx->hwt_owner = ho;
+	ctx->mode = HWT_MODE_CPU;
+
+	return (ENXIO);
+}
+
+static int
+hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
+{
+	char backend_name[HWT_BACKEND_MAXNAMELEN];
+	struct hwt_backend *backend;
+	struct hwt_owner *ho;
+	int error;
+
+	if (halloc->bufsize > HWT_MAXBUFSIZE)
+		return (EINVAL);
+	if (halloc->bufsize % PAGE_SIZE)
+		return (EINVAL);
+	if (halloc->backend_name == NULL)
+		return (EINVAL);
+
+	error = copyinstr(halloc->backend_name, (void *)backend_name,
+	    HWT_BACKEND_MAXNAMELEN, NULL);
+	if (error)
+		return (error);
+
+	backend = hwt_backend_lookup(backend_name);
+	if (backend == NULL)
+		return (ENXIO);
+
+	/* First get the owner. */
+	ho = hwt_ownerhash_lookup(td->td_proc);
+	if (ho == NULL) {
+		/* Create a new owner. */
+		ho = hwt_owner_alloc(td->td_proc);
+		if (ho == NULL)
+			return (ENOMEM);
+		hwt_ownerhash_insert(ho);
+	}
+
+	switch (halloc->mode) {
+	case HWT_MODE_THREAD:
+		error = hwt_ioctl_alloc_mode_thread(td, ho, backend, halloc);
+		break;
+	case HWT_MODE_CPU:
+		error = hwt_ioctl_alloc_mode_cpu(td, ho, backend, halloc);
+		break;
+	default:
+		error = ENXIO;
+	};
+
+	return (error);
 }
 
 static int

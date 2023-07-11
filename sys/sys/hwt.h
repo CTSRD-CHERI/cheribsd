@@ -53,9 +53,14 @@
 
 #define	HWT_BACKEND_MAXNAMELEN	256
 
+#define	HWT_MODE_THREAD		1
+#define	HWT_MODE_CPU		2
+
 struct hwt_alloc {
 	size_t		bufsize;
-	pid_t		pid;
+	pid_t		pid;		/* thread mode */
+	int		mode;
+	int		cpu;		/* cpu mode */
 	const char	*backend_name;
 } __aligned(16);
 

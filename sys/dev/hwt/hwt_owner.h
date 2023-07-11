@@ -43,5 +43,6 @@ struct hwt_context * hwt_owner_lookup_ctx(struct hwt_owner *ho, pid_t pid);
 struct hwt_owner * hwt_owner_alloc(struct proc *p);
 void hwt_owner_free(struct hwt_owner *ho);
 void hwt_owner_shutdown(struct hwt_owner *ho);
+struct hwt_context * hwt_owner_lookup_ctx_by_cpu(struct hwt_owner *ho, int cpu);
 
 #endif /* !_DEV_HWT_HWT_OWNER_H_ */

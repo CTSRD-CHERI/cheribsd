@@ -39,6 +39,8 @@ struct hwt_context {
 	LIST_ENTRY(hwt_context)		next_hwts; /* Entry in ho->hwts. */
 
 	size_t				bufsize; /* Trace bufsize for each thr*/
+	int				mode;
+	int				cpu;
 
 	struct proc			*proc; /* Target proc. */
 	pid_t				pid; /* Target pid. */
