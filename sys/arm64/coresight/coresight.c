@@ -121,7 +121,7 @@ coresight_backend_deinit(void)
 }
 
 static void
-coresight_backend_configure(struct hwt_thread *thr, int cpu_id)
+coresight_backend_configure(struct hwt_context *ctx, int cpu_id, int thread_id)
 {
 	struct coresight_event *event;
 
@@ -132,12 +132,13 @@ coresight_backend_configure(struct hwt_thread *thr, int cpu_id)
 	 * as they are merged to a single buffer by using funnel
 	 * device.
 	 */
-	event->etm.trace_id = thr->thread_id;
-	coresight_configure(event, thr);
+	event->etm.trace_id = thread_id;
+
+	coresight_configure(event, ctx);
 }
 
 static void
-coresight_backend_enable(struct hwt_thread *thr, int cpu_id)
+coresight_backend_enable(int cpu_id)
 {
 	struct coresight_event *event;
 
@@ -147,7 +148,7 @@ coresight_backend_enable(struct hwt_thread *thr, int cpu_id)
 }
 
 static void
-coresight_backend_disable(struct hwt_thread *thr, int cpu_id)
+coresight_backend_disable(int cpu_id)
 {
 	struct coresight_event *event;
 
@@ -157,8 +158,7 @@ coresight_backend_disable(struct hwt_thread *thr, int cpu_id)
 }
 
 static int
-coresight_backend_read(struct hwt_thread *thr, int cpu_id,
-    int *curpage, vm_offset_t *curpage_offset)
+coresight_backend_read(int cpu_id, int *curpage, vm_offset_t *curpage_offset)
 {
 	struct coresight_event *event;
 
@@ -175,7 +175,7 @@ coresight_backend_read(struct hwt_thread *thr, int cpu_id,
 }
 
 static void
-coresight_backend_dump(struct hwt_thread *thr, int cpu_id)
+coresight_backend_dump(int cpu_id)
 {
 	struct coresight_event *event;
 

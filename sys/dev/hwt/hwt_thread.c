@@ -232,7 +232,7 @@ hwt_thread_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		if (ctx != thr->ctx)
 			return (ENXIO);
 
-		hwt_backend_read(thr, &curpage, &curpage_offset);
+		hwt_backend_read(ctx, &curpage, &curpage_offset);
 
 		error = copyout(&curpage, ptr_get->curpage, sizeof(int));
 		if (error)

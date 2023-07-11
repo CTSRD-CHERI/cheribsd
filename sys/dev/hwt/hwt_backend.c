@@ -84,79 +84,59 @@ hwt_backend_deinit(struct hwt_context *ctx)
 }
 
 int
-hwt_backend_configure(struct hwt_thread *thr, int cpu_id)
+hwt_backend_configure(struct hwt_context *ctx, int cpu_id, int thread_id)
 {
-	struct hwt_context *ctx;
 
 	dprintf("%s\n", __func__);
 
-	ctx = thr->ctx;
-
-	HWT_THR_ASSERT_LOCKED(thr);
-
-	ctx->hwt_backend->ops->hwt_backend_configure(thr, cpu_id);
+	ctx->hwt_backend->ops->hwt_backend_configure(ctx, cpu_id, thread_id);
 
 	return (0);
 }
 
 int
-hwt_backend_enable(struct hwt_thread *thr, int cpu_id)
+hwt_backend_enable(struct hwt_context *ctx, int cpu_id)
 {
-	struct hwt_context *ctx;
 
 	dprintf("%s\n", __func__);
 
-	ctx = thr->ctx;
-
-	HWT_THR_ASSERT_LOCKED(thr);
-
-	ctx->hwt_backend->ops->hwt_backend_enable(thr, cpu_id);
+	ctx->hwt_backend->ops->hwt_backend_enable(cpu_id);
 
 	return (0);
 }
 
 int
-hwt_backend_disable(struct hwt_thread *thr, int cpu_id)
+hwt_backend_disable(struct hwt_context *ctx, int cpu_id)
 {
-	struct hwt_context *ctx;
 
 	dprintf("%s\n", __func__);
 
-	ctx = thr->ctx;
-
-	HWT_THR_ASSERT_LOCKED(thr);
-
-	ctx->hwt_backend->ops->hwt_backend_disable(thr, cpu_id);
+	ctx->hwt_backend->ops->hwt_backend_disable(cpu_id);
 
 	return (0);
 }
 
 int __unused
-hwt_backend_dump(struct hwt_thread *thr, int cpu_id)
+hwt_backend_dump(struct hwt_context *ctx, int cpu_id)
 {
-	struct hwt_context *ctx;
 
 	dprintf("%s\n", __func__);
 
-	ctx = thr->ctx;
-
-	ctx->hwt_backend->ops->hwt_backend_dump(thr, cpu_id);
+	ctx->hwt_backend->ops->hwt_backend_dump(cpu_id);
 
 	return (0);
 }
 
 int
-hwt_backend_read(struct hwt_thread *thr, int *curpage,
+hwt_backend_read(struct hwt_context *ctx, int *curpage,
     vm_offset_t *curpage_offset)
 {
-	struct hwt_context *ctx;
 	int error;
 
 	dprintf("%s\n", __func__);
 
-	ctx = thr->ctx;
-
-	error = ctx->hwt_backend->ops->hwt_backend_read(thr, 0, curpage,
+	/* TODO: first arg. */
+	error = ctx->hwt_backend->ops->hwt_backend_read(0, curpage,
 	    curpage_offset);
 
 	return (error);

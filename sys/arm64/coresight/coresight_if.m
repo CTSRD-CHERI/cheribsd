@@ -48,7 +48,7 @@ METHOD int configure {
 	device_t dev;
 	struct endpoint *endp;
 	struct coresight_event *event;
-	struct hwt_thread *thr;
+	struct hwt_context *ctx;
 };
 
 METHOD void deconfigure {

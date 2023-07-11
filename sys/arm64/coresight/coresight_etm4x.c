@@ -259,15 +259,12 @@ etm_configure_etmv4_default(device_t dev, struct coresight_event *event)
 
 static int
 etm_configure(device_t dev, struct endpoint *endp,
-    struct coresight_event *event, struct hwt_thread *thr)
+    struct coresight_event *event, struct hwt_context *ctx)
 {
 	struct etmv4_config *config;
-	struct hwt_context *ctx;
 	int error;
 
 	dprintf("%s%d\n", __func__, device_get_unit(dev));
-
-	ctx = thr->ctx;
 
 	if (ctx->config &&
 	    ctx->config_size == sizeof(struct etmv4_config) &&
