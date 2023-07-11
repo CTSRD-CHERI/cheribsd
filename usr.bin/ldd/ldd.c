@@ -486,7 +486,7 @@ is_executable(const char *fname, int fd, int *is_shlib, int *type,
 	}
 
 	*type = TYPE_ELF;
-	*rtld = _DEFAULT_PATH_RTLD;
+	*rtld = _PATH_RTLD;
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (!ELF_IS_CHERI(&ehdr))
 		*rtld = _COMPAT64_PATH_RTLD;
