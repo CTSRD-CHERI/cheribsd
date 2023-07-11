@@ -37,8 +37,8 @@
 
 #include <sys/cdefs.h>
 
-#ifdef COMPAT_64BIT
-#define	_PATH_LOCALBASE	"/usr/local64"
+#if defined(COMPAT_LIB64)
+#define	_PATH_LOCALBASE	"/usr/local" COMPAT_libcompat
 #else
 #define	_PATH_LOCALBASE	"/usr/local"
 #endif
