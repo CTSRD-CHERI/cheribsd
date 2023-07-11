@@ -123,7 +123,7 @@ coresight_backend_deinit(void)
 }
 
 static int
-coresight_backend_configure(struct hwt_context *ctx, int cpu_id, int thread_id)
+coresight_backend_configure(struct hwt_context *ctx, int cpu_id, int session_id)
 {
 	struct coresight_event *event;
 
@@ -134,7 +134,7 @@ coresight_backend_configure(struct hwt_context *ctx, int cpu_id, int thread_id)
 	 * as they are merged to a single buffer by using funnel
 	 * device.
 	 */
-	event->etm.trace_id = thread_id;
+	event->etm.trace_id = session_id;
 
 	coresight_configure(event, ctx);
 
