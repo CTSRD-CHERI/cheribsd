@@ -39,7 +39,7 @@ struct hwt_thread {
 	struct cdev			*cdev;
 	struct hwt_context		*ctx;
 	LIST_ENTRY(hwt_thread)		next;
-	int				thread_id; /* Specific to ARM backend.*/
+	int				session_id;
 	int				state;
 #define	HWT_THREAD_STATE_EXITED		(1 << 0)
 	struct mtx			mtx;

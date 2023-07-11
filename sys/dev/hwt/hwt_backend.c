@@ -84,12 +84,12 @@ hwt_backend_deinit(struct hwt_context *ctx)
 }
 
 int
-hwt_backend_configure(struct hwt_context *ctx, int cpu_id, int thread_id)
+hwt_backend_configure(struct hwt_context *ctx, int cpu_id, int session_id)
 {
 
 	dprintf("%s\n", __func__);
 
-	ctx->hwt_backend->ops->hwt_backend_configure(ctx, cpu_id, thread_id);
+	ctx->hwt_backend->ops->hwt_backend_configure(ctx, cpu_id, session_id);
 
 	return (0);
 }

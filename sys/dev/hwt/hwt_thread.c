@@ -446,7 +446,7 @@ hwt_thread_create(struct thread *td, struct hwt_thread **thr0)
 		return (ENXIO);
 	}
 	thr->ctx = ctx;
-	thr->thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
+	thr->session_id = atomic_fetchadd_int(&ctx->session_counter, 1);
 	LIST_INSERT_HEAD(&ctx->threads, thr, next);
 	HWT_CTX_UNLOCK(ctx);
 
