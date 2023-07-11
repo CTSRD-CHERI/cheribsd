@@ -79,8 +79,8 @@ CHERIBSDTEST(sentry_dlsym,
 	void *handle;
 	const char *libm_so;
 
-#if defined(COMPAT_CHERI)
-	libm_so = "/usr/lib64c/" LIBM_SONAME;
+#ifdef COMPAT_libcompat
+	libm_so = "/usr/lib" COMPAT_libcompat "/" LIBM_SONAME;
 #else
 	libm_so = "/lib/" LIBM_SONAME;
 #endif
