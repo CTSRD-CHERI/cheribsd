@@ -69,7 +69,7 @@ static struct hwt_backend backend = {
 };
 static struct coresight_event cs_event[MAXCPU];
 
-static void
+static int
 coresight_backend_init(struct hwt_context *ctx)
 {
 	struct coresight_event *event;
@@ -104,6 +104,8 @@ coresight_backend_init(struct hwt_context *ctx)
 		if (cpu_id == 0)
 			coresight_start(event);
 	}
+
+	return (0);
 }
 
 static void
@@ -120,7 +122,7 @@ coresight_backend_deinit(void)
 	}
 }
 
-static void
+static int
 coresight_backend_configure(struct hwt_context *ctx, int cpu_id, int thread_id)
 {
 	struct coresight_event *event;
@@ -135,6 +137,8 @@ coresight_backend_configure(struct hwt_context *ctx, int cpu_id, int thread_id)
 	event->etm.trace_id = thread_id;
 
 	coresight_configure(event, ctx);
+
+	return (0);
 }
 
 static void

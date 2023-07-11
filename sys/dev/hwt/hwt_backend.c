@@ -64,67 +64,62 @@ static LIST_HEAD(, hwt_backend)	hwt_backends;
 int
 hwt_backend_init(struct hwt_context *ctx)
 {
+	int error;
 
 	dprintf("%s\n", __func__);
 
-	ctx->hwt_backend->ops->hwt_backend_init(ctx);
+	error = ctx->hwt_backend->ops->hwt_backend_init(ctx);
 
-	return (0);
+	return (error);
 }
 
-int
+void
 hwt_backend_deinit(struct hwt_context *ctx)
 {
 
 	dprintf("%s\n", __func__);
 
 	ctx->hwt_backend->ops->hwt_backend_deinit();
-
-	return (0);
 }
 
 int
 hwt_backend_configure(struct hwt_context *ctx, int cpu_id, int session_id)
 {
+	int error;
 
 	dprintf("%s\n", __func__);
 
-	ctx->hwt_backend->ops->hwt_backend_configure(ctx, cpu_id, session_id);
+	error = ctx->hwt_backend->ops->hwt_backend_configure(ctx, cpu_id,
+	    session_id);
 
-	return (0);
+	return (error);
 }
 
-int
+void
 hwt_backend_enable(struct hwt_context *ctx, int cpu_id)
 {
 
 	dprintf("%s\n", __func__);
 
 	ctx->hwt_backend->ops->hwt_backend_enable(cpu_id);
-
-	return (0);
 }
 
-int
+void
 hwt_backend_disable(struct hwt_context *ctx, int cpu_id)
 {
 
 	dprintf("%s\n", __func__);
 
 	ctx->hwt_backend->ops->hwt_backend_disable(cpu_id);
-
-	return (0);
 }
 
-int __unused
+void __unused
 hwt_backend_dump(struct hwt_context *ctx, int cpu_id)
 {
 
 	dprintf("%s\n", __func__);
 
 	ctx->hwt_backend->ops->hwt_backend_dump(cpu_id);
-
-	return (0);
 }
 
 int
