@@ -1186,7 +1186,6 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		shmexit(vmspace);
 		pmap_remove_pages(vmspace_pmap(vmspace));
 		vm_map_clear(map);
-
 		/*
 		 * An exec terminates mlockall(MCL_FUTURE).
 		 * ASLR and W^X states must be re-evaluated.
