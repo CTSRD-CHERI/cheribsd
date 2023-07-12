@@ -50,6 +50,7 @@
 #include <dev/hwt/hwt_owner.h>
 #include <dev/hwt/hwt_ownerhash.h>
 #include <dev/hwt/hwt_backend.h>
+#include <dev/hwt/hwt_vm.h>
 
 #define	HWT_DEBUG
 #undef	HWT_DEBUG
@@ -173,7 +174,9 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 			HWT_THR_UNLOCK(thr);
 
 			/* TODO: move into hwt_thread_free? */
-			destroy_dev_sched(thr->cdev);
+			struct hwt_vm *vm;
+			vm = thr->vm;
+			destroy_dev_sched(vm->cdev);
 
 			if (refcount_release(&thr->refcnt))
 				hwt_thread_free(thr);

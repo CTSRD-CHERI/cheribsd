@@ -54,6 +54,7 @@
 #include <dev/hwt/hwt_backend.h>
 #include <dev/hwt/hwt_record.h>
 #include <dev/hwt/hwt_ioctl.h>
+#include <dev/hwt/hwt_vm.h>
 
 #define	HWT_IOCTL_DEBUG
 #undef	HWT_IOCTL_DEBUG
@@ -190,6 +191,7 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 		hwt_ctx_free(ctx);
 		return (error);
 	}
+	thr->vm->ctx = ctx;
 
 	/* Since we done with malloc, now get the victim proc. */
 	p = pfind(halloc->pid);
@@ -269,6 +271,32 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 	ctx->hwt_backend = backend;
 	ctx->hwt_owner = ho;
 	ctx->mode = HWT_MODE_CPU;
+
+#if 0
+	/* Allocate buffers. */
+	error = hwt_ctx_alloc_buffers(ctx);
+	if (error) {
+		hwt_ctx_free(ctx);
+		return (error);
+	}
+
+	/* hwt_owner_insert_ctx? */
+	mtx_lock(&ho->mtx);
+	LIST_INSERT_HEAD(&ho->hwts, ctx, next_hwts);
+	mtx_unlock(&ho->mtx);
+
+	error = hwt_backend_init(ctx);
+	if (error) {
+		/* TODO: deallocate resources. */
+		return (error);
+	}
+
+	error = hwt_ctx_create_cdev(ctx);
+	if (error) {
+		/* TODO: deallocate resources. */
+		return (error);
+	}
+#endif
 
 	return (ENXIO);
 }

@@ -47,6 +47,7 @@
 #include <dev/hwt/hwt_config.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_backend.h>
+#include <dev/hwt/hwt_vm.h>
 
 #define	CORESIGHT_DEBUG
 #undef CORESIGHT_DEBUG
@@ -74,6 +75,7 @@ coresight_backend_init(struct hwt_context *ctx)
 {
 	struct coresight_event *event;
 	struct hwt_thread *thr;
+	struct hwt_vm *vm;
 	int cpu_id;
 
 	/*
@@ -86,14 +88,16 @@ coresight_backend_init(struct hwt_context *ctx)
 	thr = hwt_thread_first(ctx);
 	HWT_CTX_UNLOCK(ctx);
 
+	vm = thr->vm;
+
 	for (cpu_id = 0; cpu_id < mp_ncpus; cpu_id++) {
 		event = &cs_event[cpu_id];
 		memset(event, 0, sizeof(struct coresight_event));
 		event->etr.low = 0;
 		event->etr.high = 0;
-		event->etr.pages = thr->pages;
-		event->etr.npages = thr->npages;
-		event->etr.bufsize = thr->npages * PAGE_SIZE;
+		event->etr.pages = vm->pages;
+		event->etr.npages = vm->npages;
+		event->etr.bufsize = vm->npages * PAGE_SIZE;
 		event->excp_level = 0; /* TODO: User level only for now. */
 		event->src = CORESIGHT_ETMV4;
 		event->sink = CORESIGHT_TMC_ETR;
