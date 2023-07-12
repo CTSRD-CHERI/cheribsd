@@ -42,7 +42,7 @@ NETBSD_ATF_TESTS_C+=	div_test
 NETBSD_ATF_TESTS_C+=	getenv_test
 NETBSD_ATF_TESTS_C+=	exit_test
 NETBSD_ATF_TESTS_C+=	hsearch_test
-.if ${MK_DLMALLOC} == no || !defined(LIBCHERI)
+.if ${MK_DLMALLOC} == no || !${MACHINE_ABI:Mpurecap}
 NETBSD_ATF_TESTS_C+=	posix_memalign_test
 .endif
 NETBSD_ATF_TESTS_C+=	random_test
