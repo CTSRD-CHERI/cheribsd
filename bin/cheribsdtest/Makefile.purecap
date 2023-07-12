@@ -12,7 +12,6 @@ CHERI_C_TESTS=	yes
 .if ${MK_CHERI_CAPREVOKE} == "yes"
 LIBADD+=cheri_caprevoke
 CFLAGS+=-DCHERI_REVOKE
-LIBADD+=procstat
 .endif
 
 .include "${.PARSEDIR}/Makefile.cheribsdtest"
