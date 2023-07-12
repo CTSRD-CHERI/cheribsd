@@ -107,10 +107,10 @@ ENTRY(arm_smccc_\insn)
 #ifdef __CHERI_PURE_CAPABILITY__
 	restore_registers
 #endif
-	ldr	x4, [PTRN(sp)]
+	ldr	PTR(4), [PTRN(sp)]
 	cbz	x4, 1f
-	stp	x0, x1, [PTR(4), #16 * 0]
-	stp	x2, x3, [PTR(4), #16 * 1]
+	stp	PTR(0), PTR(1), [PTR(4), #(2 * PTR_WIDTH) * 0]
+	stp	PTR(2), PTR(3), [PTR(4), #(2 * PTR_WIDTH) * 1]
 1:	ret
 END(arm_smccc_\insn)
 .endm
