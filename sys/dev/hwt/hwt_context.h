@@ -38,18 +38,21 @@ struct hwt_context {
 	LIST_ENTRY(hwt_context)		next_hch; /* Entry in contexthash. */
 	LIST_ENTRY(hwt_context)		next_hwts; /* Entry in ho->hwts. */
 
-	size_t				bufsize; /* Trace bufsize for each thr*/
 	int				mode;
-	int				cpu;
 
+	/* CPU mode. */
+	int				cpu;
+	struct hwt_vm			*vm;
+	size_t				bufsize; /* Trace bufsize for each vm.*/
+
+	/* Thread mode. */
 	struct proc			*proc; /* Target proc. */
 	pid_t				pid; /* Target pid. */
+	int				pause_on_mmap;
 
 	void				*config;
 	size_t				config_size;
 	int				config_version;
-
-	int				pause_on_mmap;
 
 	struct hwt_owner		*hwt_owner;
 	struct hwt_backend		*hwt_backend;
