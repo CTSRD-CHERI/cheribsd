@@ -310,7 +310,6 @@ out:
 		hascookie = true;
 	}
 
-	
 	uint64_t cyc_end = get_cyclecount();
 	sx_slock(&uvms->vm_map.vm_cheri_revoke_stats_sx);
 	{
@@ -1014,7 +1013,7 @@ vm_map_install_cheri_revoke_shadow(struct vm_map *map, struct sysentvec *sv)
 	if (error != KERN_SUCCESS) {
 		goto out;
 	}
-	
+
 	/*
 	 * XXX We should probably be tracking the shadow object in the map,
 	 * but what to do in fork()?
