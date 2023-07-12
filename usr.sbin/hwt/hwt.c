@@ -38,6 +38,8 @@
 #include <sys/hwt.h>
 #include <sys/stat.h>
 
+#include <err.h>
+#include <sysexits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -145,6 +147,7 @@ hwt_ctx_alloc(struct trace_context *tc)
 	struct hwt_alloc al;
 	int error;
 
+	al.mode = HWT_MODE_THREAD;
 	al.pid = tc->pid;
 	al.bufsize = tc->bufsize;
 	al.backend_name = tc->trace_dev->name;
@@ -263,6 +266,26 @@ hwt_start_tracing(struct trace_context *tc)
 	return (error);
 }
 
+static void
+usage(void)
+{
+
+	errx(EX_USAGE,
+		"hwt [-c devname] [-b bufsize] [-t id] [-r] [-w file] [-i name]"
+		    " [-f name] path\n"
+		"\t -c\tname\t\tName of tracing device, e.g. coresight\n"
+		"\t -b\tbufsize\t\tSize of trace buffer (per each thread) in bytes.\n"
+		"\t -t\tid\t\tThread index of application passed to decoder\n"
+		"\t -r\t\t\tRaw flag. Do not decode results\n"
+		"\t -w\tfilename\tStore results into file\n"
+		"\t -i\tname\t\tfilter by dynamic library / executable name\n"
+		"\t -f\tname\t\tfilter by function name\n"
+
+#if defined(__aarch64__)
+#endif
+        );
+}
+
 int
 main(int argc, char **argv, char **env)
 {
@@ -296,7 +319,7 @@ main(int argc, char **argv, char **env)
 		return (1);
 	}
 
-	while ((option = getopt(argc, argv, "c:b:rw:t:i:f:")) != -1)
+	while ((option = getopt(argc, argv, "hc:b:rw:t:i:f:")) != -1)
 		switch (option) {
 		case 'c':
 			trace_dev_name = strdup(optarg);
@@ -340,6 +363,9 @@ main(int argc, char **argv, char **env)
 		case 't':
 			tc->thread_id = atoi(optarg);
 			break;
+		case 'h':
+			usage();
+			break;
 		default:
 			break;
 		}
@@ -358,16 +384,17 @@ main(int argc, char **argv, char **env)
 	}
 
 	if ((tc->image_name == NULL && tc->func_name != NULL) ||
-	    (tc->image_name != NULL && tc->func_name == NULL)) {
-		printf("For address range tracing specify both image and func,"
-		    " or none of them.\n");
-		exit(1);
-	}
+	    (tc->image_name != NULL && tc->func_name == NULL))
+		errx(EX_USAGE, "For address range tracing specify both image "
+		    "and func, or none of them.");
 
 	argv += optind;
 	argc += optind;
 
 	cmd = argv;
+
+	if (*cmd == NULL)
+		usage();
 
 	error = stat(*cmd, &st);
 	if (error) {
@@ -430,19 +457,15 @@ main(int argc, char **argv, char **env)
 		tc->suspend_on_mmap = 1;
 
 	error = tc->trace_dev->methods->set_config(tc);
-	if (error != 0) {
-		printf("can't set config");
-		return (error);
-	}
+	if (error != 0)
+		errx(EX_DATAERR, "can't set config");
 
 	if (tc->func_name == NULL) {
 		/* No address range filtering. Start tracing immediately. */
 		error = hwt_start_tracing(tc);
-		if (error) {
-			printf("%s: failed to start tracing, error %d\n",
-			    __func__, error);
-			return (error);
-		}
+		if (error)
+			errx(EX_SOFTWARE, "failed to start tracing, error %d\n",
+			    error);
 	}
 
 	error = hwt_process_start(sockpair);
