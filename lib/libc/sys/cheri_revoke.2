@@ -166,7 +166,7 @@ also obtain access to the shadow space:
 .Bd -literal
     struct arena_meta *meta = // ...
     meta->ptr = mmap(/* ... */);
- 
+
     int res = cheri_revoke_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, meta->ptr,
                                &meta->caprev_sh);
     assert(res == 0);
@@ -196,7 +196,7 @@ and then return all usable chunks to service:
     reusable(chunk);
 
     /* And others may be as well */
-    for(chunk = more; 
+    for(chunk = more;
         chunk && caprev_epoch_clears(cri->epochs.dequeue, chunk->caprev_enq);
         chunk = chunk->next) {
       reusable(chunk);
