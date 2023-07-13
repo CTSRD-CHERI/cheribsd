@@ -69,7 +69,7 @@ hwt_record(struct thread *td, struct hwt_record_entry *ent)
 
 	entry = malloc(sizeof(struct hwt_record_entry), M_HWT_RECORD, M_WAITOK);
 	entry->record_type = ent->record_type;
-	entry->tid = td->td_tid;
+	entry->thread_id = -1;
 	entry->fullpath = strdup(ent->fullpath, M_HWT_RECORD);
 	entry->addr = ent->addr;
 	entry->size = ent->size;
@@ -94,7 +94,7 @@ hwt_record_thread(struct hwt_thread *thr)
 	entry = malloc(sizeof(struct hwt_record_entry), M_HWT_RECORD,
 	    M_WAITOK | M_ZERO);
 	entry->record_type = HWT_RECORD_THREAD_CREATE;
-	entry->tid = thr->session_id;
+	entry->thread_id = thr->session_id;
 
 	HWT_CTX_LOCK(ctx);
 	LIST_INSERT_HEAD(&ctx->records, entry, next);
@@ -121,7 +121,7 @@ hwt_record_grab(struct hwt_context *ctx,
 		user_entry[i].addr = entry->addr;
 		user_entry[i].size = entry->size;
 		user_entry[i].record_type = entry->record_type;
-		user_entry[i].tid = entry->tid;
+		user_entry[i].thread_id = entry->thread_id;
 		if (entry->fullpath != NULL) {
 			strncpy(user_entry[i].fullpath, entry->fullpath,
 			    MAXPATHLEN);

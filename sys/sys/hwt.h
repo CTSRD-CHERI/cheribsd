@@ -78,13 +78,12 @@ struct hwt_record_user_entry {
 	char			fullpath[MAXPATHLEN];
 	uintptr_t		addr;
 	size_t			size;
-	lwpid_t			tid;
+	int			thread_id;
 } __aligned(16);
 
 struct hwt_record_get {
 	struct hwt_record_user_entry	*records;
 	int				*nentries;
-	pid_t				pid;
 } __aligned(16);
 
 struct hwt_bufptr_get {
@@ -93,8 +92,6 @@ struct hwt_bufptr_get {
 } __aligned(16);
 
 struct hwt_set_config {
-	pid_t			pid;
-
 	/* Configuration of ctx. */
 	int			pause_on_mmap;
 
