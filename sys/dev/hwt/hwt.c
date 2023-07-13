@@ -67,7 +67,7 @@
  *                  This allows to set backend-specific configuration of the
  *                  trace unit.
  *               d) HWT_IOC_WAKEUP
- *                  This wakes up a thread, that is currently sleeping.
+ *                  This wakes up a thread that is currently sleeping.
  *               e) HWT_IOC_BUFPTR_GET
  *                  Transfers current hardware pointer in the filling buffer
  *                  to userspace.
