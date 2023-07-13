@@ -223,5 +223,7 @@ hwt_thread_create(struct thread *td, struct hwt_thread **thr0)
 
 	*thr0 = thr;
 
+	/* TODO: handle non-zero status */
+
 	return (0);
 }
