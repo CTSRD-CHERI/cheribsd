@@ -69,7 +69,6 @@ hwt_record_fetch(struct trace_context *tc, int *nrecords)
 
 	tc->records = malloc(sizeof(struct hwt_record_user_entry) * nentries);
 
-	record_get.pid = tc->pid;
 	record_get.records = tc->records;
 	record_get.nentries = &nentries;
 

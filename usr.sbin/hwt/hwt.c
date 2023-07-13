@@ -92,13 +92,10 @@ hwt_procexit(pid_t pid, int exit_status __unused)
 }
 
 static int
-hwt_unsuspend_proc(struct trace_context *tc, lwpid_t tid)
+hwt_unsuspend_proc(struct trace_context *tc)
 {
 	struct hwt_wakeup w;
 	int error;
-
-	w.pid = tc->pid;
-	w.tid = tid;
 
 	error = ioctl(tc->thr_fd, HWT_IOC_WAKEUP, &w);
 
@@ -119,7 +116,7 @@ hwt_mmap_received(struct trace_context *tc,
 
 	error = hwt_find_sym(tc);
 	if (error != 0) {
-		hwt_unsuspend_proc(tc, entry->tid);
+		hwt_unsuspend_proc(tc);
 		return (-1);
 	}
 
@@ -136,7 +133,7 @@ hwt_mmap_received(struct trace_context *tc,
 
 	printf("%s: tracing started\n", __func__);
 
-	hwt_unsuspend_proc(tc, entry->tid);
+	hwt_unsuspend_proc(tc);
 
 	return (0);
 }
@@ -259,7 +256,6 @@ hwt_start_tracing(struct trace_context *tc)
 	struct hwt_start s;
 	int error;
 
-	s.pid = tc->pid;
 	error = ioctl(tc->thr_fd, HWT_IOC_START, &s);
 
 	return (error);

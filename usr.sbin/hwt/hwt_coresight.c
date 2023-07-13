@@ -594,7 +594,6 @@ hwt_coresight_set_config(struct trace_context *tc)
 
 	tc->config = config;
 
-	sconf.pid = tc->pid;
 	sconf.config = config;
 	sconf.config_size = sizeof(struct etmv4_config);
 	sconf.config_version = 1;
