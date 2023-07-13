@@ -47,21 +47,28 @@
  *    .ioctl:
  *        hwt_ioctl(): 
  *               a) HWT_IOC_ALLOC
- *                  Allocates kernel tracing context CTX for a given pid.
- *               b) HWT_IOC_START
- *                  Enables tracing unit for a given context.
- *               c) HWT_IOC_RECORD_GET
- *                  Transfers (small) record entries collected during program
- *                  execution for a given context to userspace, such as mmaping
- *                  tables of executable and dynamic libraries, interpreter,
- *                  tid of threads created, etc.
+ *                  Allocates kernel tracing context ctx for a given pid,
+ *                  returns unique ident.
+ *                  Creates a new character device for ctx management.
  *
- * /dev/hwt_%d_%d, pid, tid
+ * /dev/hwt_%d_%d, ident, thread_id
  *    .mmap
  *        Maps tracing buffers to userspace.
  *    .ioctl
  *        hwt_thread_ioctl():
- *               a) HWT_IOC_BUFPTR_GET
+ *               a) HWT_IOC_START
+ *                  Enables tracing unit for a given context.
+ *               b) HWT_IOC_RECORD_GET
+ *                  Transfers (small) record entries collected during program
+ *                  execution for a given context to userspace, such as mmaping
+ *                  tables of executable and dynamic libraries, interpreter,
+ *                  tid of threads created, etc.
+ *               c) HWT_IOC_SET_CONFIG
+ *                  This allows to set backend-specific configuration of the
+ *                  trace unit.
+ *               d) HWT_IOC_WAKEUP
+ *                  This wakes up a thread, that is currently sleeping.
+ *               e) HWT_IOC_BUFPTR_GET
  *                  Transfers current hardware pointer in the filling buffer
  *                  to userspace.
  *
@@ -73,16 +80,19 @@
  * 2. Kernel allocates context, lookups the proc for the given pid. Creates
  *    first hwt_thread in the context and allocates trace buffers for it.
  *    Immediately, kernel initializes tracing backend.
- * 3. User invokes HWT_IOC_START ioctl, kernel marks context as RUNNING.
+ *    Kernel creates character device and returns unique identificator of
+ *    trace context.
+ * 3. User opens new character device to operate with the new context.
+ *    User invokes HWT_IOC_START ioctl, kernel marks context as RUNNING.
  *    At this point any HWT hook invocation by scheduler enables/disables
- *    tracing for the threads associated with the context (threads of the proc).
+ *    tracing for threads associated with the context (threads of the proc).
  *    Any new threads creation (of the target proc) procedures will be invoking
  *    corresponding hooks in HWT framework, so that new hwt_thread and buffers
  *    allocated, character device for mmap(2) created on the fly.
  * 4. User issues HWT_IOC_RECORD_GET ioctl to fetch information about mmaping
  *    tables and threads created during application startup.
  * 5. User mmaps tracing buffers of each thread to userspace (using
- *    /dev/hwt_%pid_%tid character devices).
+ *    /dev/hwt_%d_%d % (ident, thread_id) character devices).
  * 6. User can repeat 4 if expected thread is not yet created during target
  *    application execution.
  * 7. User issues HWT_IOC_BUFPTR_GET ioctl to get current filling level of the
