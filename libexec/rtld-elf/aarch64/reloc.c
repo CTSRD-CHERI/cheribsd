@@ -183,64 +183,15 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 
+typedef void **tramp_stk_table_t;
+
 void _rtld_thread_start(struct pthread *);
 void _rtld_sighandler(int, siginfo_t *, void *);
+void *get_rstk(const void *, uint32_t, tramp_stk_table_t);
 
-typedef const void *tramp;
-
-struct tramp_pg {
-	void *_Atomic cursor;		/* Start of unused space */
-	SLIST_ENTRY(tramp_pg) link;	/* Link to next page */
-	void *trampolines[];		/* Start of trampolines */
-};
-
-/* Default stack size in libthr */
-#define SANDBOX_STACK_DEFAULT	(sizeof(void *) / 4 * 1024 * 1024)
 #define DEFAULT_STACK_TABLE_SIZE 2
-
-void *
-get_rstk(const void *target, uint32_t index, tramp_stk_table_t table)
-{
-	size_t len = cheri_getlen(table) / sizeof(*table);
-	assert(len <= index || table[index] == NULL);
-	if (len <= index) {
-		size_t new_len = index * 2;
-		table = realloc(table, new_len * sizeof(*table));
-		if (table == NULL)
-			rtld_fatal("realloc failed");
-		memset(&table[len], 0, (new_len - len) * sizeof(*table));
-
-		asm ("msr	ctpidr_el0, %0" :: "C" (table));
-	}
-	assert(table[index] == NULL);
-
-	void **stk;
-	struct Struct_Stack_Entry *_Atomic *head, *entry;
-
-	len = SANDBOX_STACK_DEFAULT;
-	stk = (void **)((char *)mmap(NULL,
-	    len,
-	    PROT_READ | PROT_WRITE,
-	    MAP_ANON | MAP_PRIVATE | MAP_STACK,
-	    -1, 0) + len);
-	if (stk == MAP_FAILED)
-		rtld_fatal("mmap failed");
-	stk = cheri_clearperm(stk, CHERI_PERM_EXECUTIVE | CHERI_PERM_SW_VMEM);
-	stk[-1] = &stk[-1];
-
-	table[index] = stk;
-
-	head = &obj_from_addr(target)->stacks;
-	entry = xmalloc(sizeof(*entry));
-	entry->stack = stk;
-	SLIST_NEXT(entry, link) = atomic_load_explicit(
-	    head, memory_order_relaxed);
-	while(!atomic_compare_exchange_weak_explicit(
-	    head, &SLIST_NEXT(entry, link), entry,
-	    memory_order_release, memory_order_relaxed));
-
-	return (stk);
-}
+/* Default stack size in libthr */
+#define DEFAULT_SANDBOX_STACK_SIZE	(sizeof(void *) / 4 * 1024 * 1024)
 
 static void (*thr_thread_start)(struct pthread *);
 
@@ -249,7 +200,10 @@ _rtld_thread_start_init(void (*p)(struct pthread *))
 {
 	assert((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) == 0);
 	assert(thr_thread_start == NULL);
-	thr_thread_start = _rtld_sandbox_code(p);
+	thr_thread_start = _rtld_sandbox_code(p, (struct tramp_sig) {
+		.valid = true,
+		.reg_args = 1, .mem_args = false, .ret_args = NONE
+	});
 }
 
 void
@@ -275,7 +229,7 @@ _rtld_thr_exit(long *state)
 	vaddr_t top = cheri_gettop(tls);
 	for (tramp_stk_table_t cur = &tls[1]; (vaddr_t)cur < top; ++cur) {
 		void *stk = cheri_setaddress(*cur, cheri_getbase(*cur));
-		if (stk != NULL && munmap(stk, SANDBOX_STACK_DEFAULT) != 0)
+		if (stk != NULL && munmap(stk, DEFAULT_SANDBOX_STACK_SIZE) != 0)
 			rtld_fatal("munmap failed");
 	}
 	free(tls);
@@ -303,11 +257,58 @@ _rtld_sighandler(int sig, siginfo_t *info, void *_ucp)
 }
 
 void
-_rtld_sighandler_init(void *p)
+_rtld_sighandler_init(void (*p)(int, siginfo_t *, void *))
 {
 	assert((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) == 0);
 	assert(thr_sighandler == NULL);
-	thr_sighandler = _rtld_sandbox_code(p);
+	thr_sighandler = _rtld_sandbox_code(p, (struct tramp_sig) {
+		.valid = true,
+		.reg_args = 3, .mem_args = false, .ret_args = NONE
+	});
+}
+
+void *
+get_rstk(const void *target, uint32_t index, tramp_stk_table_t table)
+{
+	size_t len = cheri_getlen(table) / sizeof(*table);
+	assert(len <= index || table[index] == NULL);
+	if (len <= index) {
+		size_t new_len = index * 2;
+		table = realloc(table, new_len * sizeof(*table));
+		if (table == NULL)
+			rtld_fatal("realloc failed");
+		memset(&table[len], 0, (new_len - len) * sizeof(*table));
+
+		asm ("msr	ctpidr_el0, %0" :: "C" (table));
+	}
+	assert(table[index] == NULL);
+
+	void **stk;
+	struct Struct_Stack_Entry *_Atomic *head, *entry;
+
+	len = DEFAULT_SANDBOX_STACK_SIZE;
+	stk = (void **)((char *)mmap(NULL,
+	    len,
+	    PROT_READ | PROT_WRITE,
+	    MAP_ANON | MAP_PRIVATE | MAP_STACK,
+	    -1, 0) + len);
+	if (stk == MAP_FAILED)
+		rtld_fatal("mmap failed");
+	stk = cheri_clearperm(stk, CHERI_PERM_EXECUTIVE | CHERI_PERM_SW_VMEM);
+	stk[-1] = &stk[-1];
+
+	table[index] = stk;
+
+	head = &obj_from_addr(target)->stacks;
+	entry = xmalloc(sizeof(*entry));
+	entry->stack = stk;
+	SLIST_NEXT(entry, link) = atomic_load_explicit(head,
+	    memory_order_relaxed);
+	while(!atomic_compare_exchange_weak_explicit(
+	    head, &SLIST_NEXT(entry, link), entry,
+	    memory_order_release, memory_order_relaxed));
+
+	return (stk);
 }
 
 static int
@@ -326,110 +327,11 @@ exclude_symbol_in_lib(const char *name, const char *sym, const Obj_Entry *obj, c
 	return (0);
 }
 
-static size_t
-tramp_compile(tramp **entry, const void *target, const Obj_Entry *obj, const Elf_Sym *def)
-{
-#define IMPORT(template) \
-	extern const uint32_t tramp_##template[]; \
-	extern const size_t size_tramp_##template
-
-#define TRANSITION(template, ...) \
-	if (code == tramp_##template) { \
-		buf = mempcpy(buf, tramp_##template, size_tramp_##template); \
-		size += size_tramp_##template; \
-		__VA_ARGS__ \
-		continue; \
-	}
-
-#define TO(template) \
-	code = tramp_##template
-
-	IMPORT(header);
-	IMPORT(header_utrace);
-	IMPORT(header_res);
-	IMPORT(save_caller);
-	IMPORT(switch_stack);
-	IMPORT(clear_regs);
-	IMPORT(invoke_res);
-	IMPORT(invoke_exe);
-	IMPORT(utrace_return);
-	IMPORT(return);
-
-	uint32_t *buf = (void *)*entry;
-	size_t size = 0;
-	const void *code;
-	bool executive = cheri_getperm(target) & CHERI_PERM_EXECUTIVE;
-	bool utrace = ld_utrace_compartment != NULL;
-
-	if (utrace)
-		code = tramp_header_utrace;
-	else
-		code = tramp_header;
-
-	for (; code != NULL; ) {
-		TRANSITION(header, {
-			if (executive)
-				TO(save_caller);
-			else
-				TO(header_res);
-		})
-		TRANSITION(header_utrace, {
-			if (executive)
-				TO(save_caller);
-			else
-				TO(header_res);
-			*(*entry)++ = STAILQ_EMPTY(&obj->names) ?  obj->path :
-			    STAILQ_FIRST(&obj->names)->name;
-			*(*entry)++ = def == NULL ? "<unknown>" :
-			    strtab_value(obj, def->st_name);
-			*(*entry)++ = ld_utrace_log;
-		})
-		TRANSITION(header_res, {
-			buf[-2] |= (uint32_t)obj->compart_id << 5;
-			TO(save_caller);
-		})
-		TRANSITION(save_caller, {
-			if (executive)
-				TO(invoke_exe);
-			else
-				TO(switch_stack);
-		})
-		TRANSITION(switch_stack, {
-			TO(clear_regs);
-		})
-		if (code == tramp_clear_regs) {
-			/* TODO: Clear unused argument registers */
-			TO(invoke_res);
-			continue;
-		}
-		TRANSITION(invoke_res, {
-			if (utrace)
-				TO(utrace_return);
-			else
-				TO(return);
-		})
-		TRANSITION(invoke_exe, {
-			if (utrace)
-				TO(utrace_return);
-			else
-				TO(return);
-		})
-		TRANSITION(utrace_return, {
-			TO(return);
-		})
-		TRANSITION(return, {
-			code = NULL;
-		})
-	}
-
-	*(*entry)++ = target;
-
-	return (size);
-
-#undef IMPORT
-#undef TRANSITION
-#undef TO
-}
+struct tramp_pg {
+	void *_Atomic cursor;		/* Start of unused space */
+	SLIST_ENTRY(tramp_pg) link;	/* Link to next page */
+	void *trampolines[];		/* Start of trampolines */
+};
 
 static struct tramp_pg *
 tramp_pg_new(struct tramp_pg *next)
@@ -476,19 +378,14 @@ tramp_pg_push(struct tramp_pg *pg, size_t len)
 	return (tramp);
 }
 
-typedef int32_t slot_index;
+typedef int64_t slot_index;
 
 static struct {
+	struct tramp_data *data;
 	struct tramp_map_kv {
 		_Atomic vaddr_t key;
 		_Atomic slot_index index;
 	} *map;
-	struct tramp_data {
-		void *entry;
-		const Obj_Entry *obj;
-		const Elf_Sym *sym;
-		vaddr_t key;
-	} *data;
 	_Atomic slot_index size, writers;
 	int exp;
 } tramp_table;
@@ -536,8 +433,8 @@ void
 tramp_init()
 {
 	int exp = 9;
-	tramp_table.map = tramp_map_new(exp);
 	tramp_table.data = tramp_data_expand(exp);
+	tramp_table.map = tramp_map_new(exp);
 	tramp_table.exp = exp;
 
 	atomic_store_explicit(&tramp_pgs.head, tramp_pg_new(NULL),
@@ -580,7 +477,7 @@ resizeTable(int exp)
 	size = atomic_load_explicit(&tramp_table.size, memory_order_relaxed);
 
 	for (slot_index idx = 0; idx < size; ++idx) {
-		key = data[idx].key;
+		key = (vaddr_t)data[idx].target;
 		hash = pointerHash(key);
 		slot = hash;
 		do
@@ -593,27 +490,150 @@ resizeTable(int exp)
 		    memory_order_relaxed);
 	}
 
-	tramp_table.map = map;
 	tramp_table.data = data;
+	tramp_table.map = map;
 	tramp_table.exp = exp;
 }
 
+static size_t
+tramp_compile(tramp **entry, const struct tramp_data *data)
+{
+#define IMPORT(template) \
+	extern const uint32_t tramp_##template[]; \
+	extern const size_t size_tramp_##template
+
+#define TRANSITION(template, ...) \
+	if (code == tramp_##template) { \
+		buf = mempcpy(buf, tramp_##template, size_tramp_##template); \
+		size += size_tramp_##template; \
+		__VA_ARGS__ \
+		continue; \
+	}
+
+#define TO(template) \
+	code = tramp_##template
+
+	IMPORT(header);
+	IMPORT(header_utrace);
+	IMPORT(header_res);
+	IMPORT(save_caller);
+	IMPORT(switch_stack);
+	IMPORT(clear_regs);
+	IMPORT(invoke_res);
+	IMPORT(invoke_exe);
+	IMPORT(utrace_return);
+	IMPORT(return);
+
+	uint32_t *buf = (void *)*entry;
+	const void *code;
+	size_t size = 0;
+	bool executive = cheri_getperm(data->target) & CHERI_PERM_EXECUTIVE;
+	bool utrace = ld_utrace_compartment != NULL;
+
+	if (utrace)
+		code = tramp_header_utrace;
+	else
+		code = tramp_header;
+
+	for (; code != NULL; ) {
+		TRANSITION(header, {
+			if (executive)
+				TO(save_caller);
+			else
+				TO(header_res);
+		})
+		TRANSITION(header_utrace, {
+			if (executive)
+				TO(save_caller);
+			else
+				TO(header_res);
+			*(*entry)++ = STAILQ_EMPTY(&data->obj->names) ?
+			    data->obj->path :
+			    STAILQ_FIRST(&data->obj->names)->name;
+			*(*entry)++ = data->def == NULL ? "<unknown>" :
+			    strtab_value(data->obj, data->def->st_name);
+			*(*entry)++ = ld_utrace_log;
+		})
+		TRANSITION(header_res, {
+			buf[-2] |= (uint32_t)data->obj->compart_id << 5;
+			TO(save_caller);
+		})
+		TRANSITION(save_caller, {
+			if (data->sig.valid)
+				buf[-2] |= (uint32_t)data->sig.ret_args << 5;
+			if (executive)
+				TO(invoke_exe);
+			else
+				TO(switch_stack);
+		})
+		TRANSITION(switch_stack, {
+			TO(clear_regs);
+		})
+		if (code == tramp_clear_regs) {
+			if (data->sig.valid) {
+				if (!data->sig.mem_args) {
+					buf = mempcpy(buf, tramp_clear_regs,
+					    sizeof(*tramp_clear_regs));
+					size += sizeof(*tramp_clear_regs);
+				}
+				if (data->sig.ret_args != INDIRECT) {
+					buf = mempcpy(buf, tramp_clear_regs + 1,
+					    sizeof(*tramp_clear_regs));
+					size += sizeof(*tramp_clear_regs);
+				}
+				int to_clear = 8 - data->sig.reg_args;
+				buf = mempcpy(buf, tramp_clear_regs + 2,
+				    sizeof(*tramp_clear_regs) * to_clear);
+				size += sizeof(*tramp_clear_regs) * to_clear;
+			}
+			TO(invoke_res);
+			continue;
+		}
+		TRANSITION(invoke_res, {
+			if (utrace)
+				TO(utrace_return);
+			else
+				TO(return);
+		})
+		TRANSITION(invoke_exe, {
+			if (utrace)
+				TO(utrace_return);
+			else
+				TO(return);
+		})
+		TRANSITION(utrace_return, {
+			TO(return);
+		})
+		TRANSITION(return, {
+			code = NULL;
+		})
+	}
+
+	*(*entry)++ = data->target;
+
+	return (size);
+
+#undef IMPORT
+#undef TRANSITION
+#undef TO
+}
+
 static void *
-tramp_pgs_append(void *target, const Obj_Entry *obj, const Elf_Sym *def)
+tramp_pgs_append(const struct tramp_data *data)
 {
 	size_t len;
 	/* A capability-aligned buffer large enough to hold a trampoline */
-	const void *tmp[40];
+	tramp tmp[40];
 	tramp *tramp, *entry = tmp;
 	struct tramp_pg *pg;
 
-	if (exclude_symbol_in_lib("libc.so.7", "rfork", obj, def) ||
-	    exclude_symbol_in_lib("libc.so.7", "vfork", obj, def)) {
-		return (target);
+	if (exclude_symbol_in_lib("libc.so.7", "rfork", data->obj, data->def) ||
+	    exclude_symbol_in_lib("libc.so.7", "vfork", data->obj, data->def)) {
+		return (data->target);
 	}
 
 	/* Fill a temporary buffer with the trampoline and obtain its length */
-	len = tramp_compile(&entry, target, obj, def);
+	len = tramp_compile(&entry, data);
 
 	pg = atomic_load_explicit(&tramp_pgs.head, memory_order_acquire);
 	tramp = tramp_pg_push(pg, len);
@@ -651,22 +671,30 @@ tramp_pgs_append(void *target, const Obj_Entry *obj, const Elf_Sym *def)
 }
 
 void *
-tramp_intern(void *target, const Obj_Entry *obj, const Elf_Sym *def)
+tramp_intern(const struct tramp_data *data)
 {
 	void *entry;
 	RtldLockState lockstate;
+	const void *target = data->target;
 	const uint32_t hash = pointerHash((uint64_t)target);
-	slot_index slot, writers, idx;
+	slot_index slot, idx;
 	vaddr_t key;
 	int exp;
 
-	if (!cheri_gettag(target) ||
-	    ((cheri_getperm(target) & CHERI_PERM_EXECUTE) == 0) ||
+	assert(data->entry == NULL);
+
+	if (((cheri_getperm(target) & CHERI_PERM_EXECUTE) == 0) ||
 	    (cheri_getsealed(target) == 0) || (cheri_gettype(target) != 1))
 		return (NULL);
+#ifndef TRAMP_LINEAR_INSERTION
 start:
+#endif
 	slot = hash;
+#ifdef TRAMP_LINEAR_INSERTION
+	wlock_acquire(rtld_tramp_lock, &lockstate);
+#else
 	rlock_acquire(rtld_tramp_lock, &lockstate);
+#endif
 	exp = tramp_table.exp;
 	do {
 		slot = nextSlot(slot, hash, exp);
@@ -674,6 +702,7 @@ start:
 		    memory_order_relaxed);
 		if (key != 0)
 			continue;
+#ifndef TRAMP_LINEAR_INSERTION
 		/*
 		 * Invariant: tramp_table.size <= tramp_table.writers
 		 *
@@ -681,8 +710,8 @@ start:
 		 * tramp_table.size corresponds to an increment in
 		 * tramp_table.writers.
 		 */
-		writers = atomic_fetch_add_explicit(&tramp_table.writers, 1,
-		    memory_order_relaxed);
+		slot_index writers = atomic_fetch_add_explicit(
+		    &tramp_table.writers, 1, memory_order_relaxed);
 		/*
 		 * Invariant: tramp_table.size <= writers < tramp_table.writers
 		 */
@@ -692,6 +721,7 @@ start:
 			lock_release(rtld_tramp_lock, &lockstate);
 			goto start;
 		}
+#endif
 		/*
 		 * Invariant: writers < LOAD_FACTOR
 		 *
@@ -704,8 +734,12 @@ start:
 		    memory_order_relaxed, memory_order_relaxed))
 			goto insert;
 		else
+#ifdef TRAMP_LINEAR_INSERTION
+			rtld_fatal("tramp_intern failed to insert key");
+#else
 			atomic_fetch_sub_explicit(&tramp_table.writers, 1,
 			    memory_order_relaxed);
+#endif
 	} while (key != (vaddr_t)target);
 	/*
 	 * Load-acquire the index until it becomes available.
@@ -717,35 +751,31 @@ start:
 	entry = tramp_table.data[idx].entry;
 	goto end;
 insert:
-	if (obj == NULL)
-		obj = obj_from_addr(target);
-	if (obj == NULL)
-		rtld_fatal("%#p does not belong to any object", target);
 	idx = atomic_fetch_add_explicit(&tramp_table.size, 1,
 	    memory_order_relaxed);
 	/*
 	 * Invariant: tramp_table.size <= LOAD_FACTOR
+	 *
+	 * Construct the data array entry.
 	 */
-	entry = tramp_pgs_append(target, obj, def);
+	entry = tramp_pgs_append(data);
+	tramp_table.data[idx] = *data;
+	tramp_table.data[idx].entry = entry;
 	/*
-	 * Fill the data array entry and store-release its index.
+	 * Store-release the index.
 	 */
-	tramp_table.data[idx] = (struct tramp_data) {
-		.entry = entry,
-		.obj = obj,
-		.sym = def,
-		.key = (vaddr_t)target
-	};
 	atomic_store_explicit(&tramp_table.map[slot].index, idx,
 	    memory_order_release);
 	/*
 	 * If tramp_table.size == LOAD_FACTOR, resize the table.
 	 */
 	if (idx + 1 == tramp_table_load_factor(exp)) {
+#ifndef TRAMP_LINEAR_INSERTION
 		/*
 		 * Wait for other readers to complete.
 		 */
 		lock_upgrade(rtld_tramp_lock, &lockstate);
+#endif
 		/*
 		 * There can be no other writer racing with us for the resize.
 		 */
@@ -757,10 +787,29 @@ end:
 }
 
 void *
-_rtld_sandbox_code(void *target)
+_rtld_sandbox_code(void *target, struct tramp_sig sig)
 {
-	if ((cheri_getperm(target) & CHERI_PERM_EXECUTIVE) == 0)
-		target =  tramp_intern(target, NULL, NULL);
+	const Obj_Entry *obj;
+
+	if (sig.reg_args > 8)
+		rtld_fatal(
+		    "_rtld_sandbox_code: invalid tramp_sig.reg_args = %u",
+		    sig.reg_args);
+
+	if (cheri_gettag(target) &&
+	    (cheri_getperm(target) & CHERI_PERM_EXECUTIVE) == 0) {
+
+		obj = obj_from_addr(target);
+		if (obj == NULL)
+			rtld_fatal("%#p does not belong to any object", target);
+
+		target =  tramp_intern(&(struct tramp_data) {
+			.target = target,
+			.obj = obj,
+			.sig = sig
+		});
+	}
+
 	return (target);
 }
 
@@ -1027,7 +1076,10 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 			}
 			target = (uintptr_t)make_function_pointer(def, defobj);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-			target = (uintptr_t)tramp_intern((void *)target, defobj, def);
+			target = (uintptr_t)tramp_intern(&(struct tramp_data) {
+				.target = (void *)target,
+				.obj = defobj
+			});
 #endif
 			reloc_jmpslot(where, target, defobj, obj,
 			    (const Elf_Rel *)rela);
@@ -1084,7 +1136,10 @@ reloc_iresolve_one(Obj_Entry *obj, const Elf_Rela *rela,
 #endif
 	lock_release(rtld_bind_lock, lockstate);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	ptr = (uintptr_t)tramp_intern((void *)ptr, obj, NULL);
+	ptr = (uintptr_t)tramp_intern(&(struct tramp_data) {
+		.target = (void *)ptr,
+		.obj = obj
+	});
 #endif
 	target = call_ifunc_resolver(ptr);
 	wlock_acquire(rtld_bind_lock, lockstate);

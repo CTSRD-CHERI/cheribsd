@@ -344,6 +344,7 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	stp	c17, c18, [csp, #(8 * 32)]
 #ifdef RTLD_SANDBOX
 	stp	c19,  c3, [csp, #(9 * 32)]
+	.cfi_rel_offset		 c3, 304
 #else
 	str	c19,	  [csp, #(9 * 32)]
 #endif
@@ -513,7 +514,8 @@ ENTRY(_rtld_setjmp)
 	 * 	-2.	Caller's stack
 	 * 	-1.	Return address
 	 * 	0.	Link to previous frame
-	 * When setjmp is called, the following is pushed to the Executive stack:
+	 * When setjmp is called, the following is pushed to the Executive
+	 * stack:
 	 * 	1.	Caller's data
 	 * 	2.	Caller's stack
 	 * 	3.	Return address
@@ -623,7 +625,8 @@ ENTRY(_rtld_longjmp)
 	 *
 	 * Before longjmp is called, the top of the Executive stack contains:
 	 * 	0.	Link to previous frame
-	 * When longjmp is called, the following is pushed to the Executive stack:
+	 * When longjmp is called, the following is pushed to the Executive
+	 * stack:
 	 * 	1.	Caller's data
 	 * 	2.	Caller's stack
 	 * 	3.	Return address
@@ -648,8 +651,9 @@ ENTRY(_rtld_longjmp)
 	 * 	6.	Caller's stack
 	 * 	7.	Return address
 	 * 	8.	Link to 4
-	 * When longjmp makes its final branch, it will go to the returning phase
-	 * of setjmp's trampoline, which unwinds to the frame and PC supplied by 3.
+	 * When longjmp makes its final branch, it will go to the returning
+	 * phase of setjmp's trampoline, which unwinds to the frame and PC
+	 * supplied by 3.
 	 */
 
 	/*
@@ -844,9 +848,9 @@ tramp_header_utrace_target:
 TRAMPEND(tramp_header_utrace)
 
 TRAMP(tramp_header_res)
-	mrs	c18, ctpidr_el0		/* c18 = table */
-	movz	w12, #0			/* w12 = index, to be patched at runtime */
-	gclen	x13, c18		/* x13 = len(table) */
+	mrs	c18, ctpidr_el0	/* c18 = table */
+	movz	w12, #0		/* w12 = index, to be patched at runtime */
+	gclen	x13, c18	/* x13 = len(table) */
 TRAMPEND(tramp_header_res)
 
 TRAMP(tramp_save_caller)
@@ -854,7 +858,7 @@ TRAMP(tramp_save_caller)
 	 * If caller is Restricted, save its rcsp at the bottom of its own stack.
 	 * Otherwise, the caller is RTLD or Restricted code performing a
 	 * tail-call. In either case, there is no need to save the rcsp of the
-	 * caller.  This step must be done before the table lookup so that
+	 * caller. This step must be done before the table lookup so that
 	 * same-compartment switches get the correct stack.
 	 */
 	gcperm	x14, c30
@@ -863,17 +867,23 @@ TRAMP(tramp_save_caller)
 	scvalue	c16, c17, x15
 	str	c17, [c16, #-CAP_WIDTH]
 
-	/* Save the number of unused return value registers in the flags of csp */
+	/*
+	 * Save the number of unused return value registers in the flags of csp.
+	 */
 1:	movz	x16, #0
 	scflgs	csp, csp, x16
 TRAMPEND(tramp_save_caller)
 
 TRAMP(tramp_switch_stack)
-	/* Callee is Restricted, so switch to its saved rcsp at the bottom of itself */
-	/* Use subs instead of cmp to clear a register tag */
-	subs	x17, x13, x12, lsl #4			/* if (len(table) <= index) */
-	b.ls	2f					/* goto 2f */
-	ldr	c11, [c18, w12, uxtw #4]		/* c11 = table[index] */
+	/*
+	 * Callee is Restricted, so switch to its saved rcsp at the bottom of
+	 * itself.
+	 *
+	 * Use subs instead of cmp to clear a register tag.
+	 */
+	subs	x17, x13, x12, lsl #4		/* if (len(table) <= index) */
+	b.ls	2f				/* goto 2f */
+	ldr	c11, [c18, w12, uxtw #4]	/* c11 = table[index] */
 	cbnz	x11, 3f
 	/*
 	 * Call get_rstk(), which may invoke Restricted code (e.g. locking
@@ -1008,14 +1018,15 @@ TRAMP(tramp_return)
 	/*
 	 * Clear unused return value registers. The registers to clear is
 	 * encoded as follows and stored in the flags of csp:
-	 * - None:	0b0x
-	 * - c1 only:	0b10
-	 * - c1 and c2:	0b11
+	 * - None:	0b00
+	 * - c1 only:	0b01
+	 * - c1 and c2:	0b1x
 	 * Use comparison and csel to avoid branching.
+	 *
+	 * Use subs instead of cmp to clear a register tag.
 	 */
 	gcflgs	x12, csp
-	/* Use subs instead of cmp to clear a register tag */
-	subs	x13, x12, #0b10
+	subs	x13, x12, #0b01
 	csel	c1, czr, c1, hs
 	csel	c0, czr, c0, hi
 
@@ -1043,7 +1054,10 @@ TRAMP(tramp_return)
 	mov	csp, c18
 	mov	x18, xzr
 
-	/* Restore caller's saved rcsp (has no effect is caller is Executive) */
+	/*
+	 * Restore caller's saved rcsp (has no effect if the caller is
+	 * Executive).
+	 */
 	msr	rcsp_el0, c10
 	retr	c30
 TRAMPEND(tramp_return)
