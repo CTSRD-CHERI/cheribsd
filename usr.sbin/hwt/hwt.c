@@ -104,7 +104,7 @@ hwt_unsuspend_proc(struct trace_context *tc)
 
 int
 hwt_mmap_received(struct trace_context *tc,
-    struct hwt_record_user_entry *entry)
+    struct hwt_record_user_entry *entry __unused)
 {
 	int error;
 
@@ -284,7 +284,6 @@ usage(void)
 int
 main(int argc, char **argv, char **env)
 {
-	struct hwt_record_user_entry *entry;
 	struct pmcstat_process *pp;
 	struct trace_context *tc;
 	struct stat st;
