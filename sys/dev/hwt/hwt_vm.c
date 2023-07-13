@@ -202,21 +202,19 @@ hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 	vm = dev->si_drv1;
 
+	ctx = vm->ctx;
+
 	switch (cmd) {
 	case HWT_IOC_BUFPTR_GET:
 		ptr_get = (struct hwt_bufptr_get *)addr;
 
-		/* Check if process is registered owner of any HWTs. */
+		/* Ensure process is registered owner of this ctx. */
 		ho = hwt_ownerhash_lookup(td->td_proc);
 		if (ho == NULL)
 			return (ENXIO);
 
-		ctx = hwt_owner_lookup_ctx(ho, ptr_get->pid);
-		if (ctx == NULL)
-			return (ENXIO);
-
-		if (ctx != vm->ctx)
-			return (ENXIO);
+		if (ctx->hwt_owner != ho)
+			return (EPERM);
 
 		/* TODO: fix cpu_id (second arg) */
 		error = hwt_backend_read(ctx, 0, &curpage, &curpage_offset);
