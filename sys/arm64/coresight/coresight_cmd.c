@@ -123,40 +123,55 @@ coresight_init_event(struct coresight_event *event, int cpu)
 	return (0);
 }
 
-void
+int
 coresight_setup(struct coresight_event *event, struct hwt_thread *thr)
 {
 	struct coresight_device *cs_dev;
 	struct endpoint *endp;
+	int error;
 
 	LIST_FOREACH(endp, &event->endplist, endplink) {
 		cs_dev = endp->cs_dev;
-		CORESIGHT_SETUP(cs_dev->dev, endp, event);
+		error = CORESIGHT_SETUP(cs_dev->dev, endp, event);
+		if (error != ENXIO && error != 0)
+			return (error);
 	}
+
+	return (0);
 }
 
-void
+int
 coresight_configure(struct coresight_event *event, struct hwt_context *ctx)
 {
 	struct coresight_device *cs_dev;
 	struct endpoint *endp;
+	int error;
 
 	LIST_FOREACH(endp, &event->endplist, endplink) {
 		cs_dev = endp->cs_dev;
-		CORESIGHT_CONFIGURE(cs_dev->dev, endp, event, ctx);
+		error = CORESIGHT_CONFIGURE(cs_dev->dev, endp, event, ctx);
+		if (error != ENXIO && error != 0)
+			return (error);
 	}
+
+	return (0);
 }
 
-void
+int
 coresight_start(struct coresight_event *event)
 {
 	struct coresight_device *cs_dev;
 	struct endpoint *endp;
+	int error;
 
 	LIST_FOREACH(endp, &event->endplist, endplink) {
 		cs_dev = endp->cs_dev;
-		CORESIGHT_START(cs_dev->dev, endp, event);
+		error = CORESIGHT_START(cs_dev->dev, endp, event);
+		if (error != ENXIO && error != 0)
+			return (error);
 	}
+
+	return (0);
 }
 
 void

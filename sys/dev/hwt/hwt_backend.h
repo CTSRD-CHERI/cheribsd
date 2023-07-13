@@ -59,8 +59,7 @@ void hwt_backend_disable(struct hwt_context *ctx, int cpu_id);
 void hwt_backend_dump(struct hwt_context *ctx, int cpu_id);
 int hwt_backend_read(struct hwt_context *ctx, int cpu_id, int *curpage,
     vm_offset_t *curpage_offset);
-
-int hwt_register(struct hwt_backend *);
+int hwt_backend_register(struct hwt_backend *);
 struct hwt_backend * hwt_backend_lookup(const char *name);
 
 void hwt_backend_load(void);

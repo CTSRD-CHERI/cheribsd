@@ -154,7 +154,7 @@ hwt_backend_lookup(const char *name)
 }
 
 int
-hwt_register(struct hwt_backend *backend)
+hwt_backend_register(struct hwt_backend *backend)
 {
 
 	if (backend == NULL ||

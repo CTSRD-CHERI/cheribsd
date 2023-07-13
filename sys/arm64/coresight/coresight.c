@@ -77,6 +77,7 @@ coresight_backend_init(struct hwt_context *ctx)
 	struct hwt_thread *thr;
 	struct hwt_vm *vm;
 	int cpu_id;
+	int error;
 
 	/*
 	 * 1. Use buffer from the first thread as Funnel merges traces from
@@ -102,11 +103,19 @@ coresight_backend_init(struct hwt_context *ctx)
 		event->src = CORESIGHT_ETMV4;
 		event->sink = CORESIGHT_TMC_ETR;
 
-		coresight_init_event(event, cpu_id);
+		error = coresight_init_event(event, cpu_id);
+		if (error)
+			return (error);
 
-		coresight_setup(event, thr);
-		if (cpu_id == 0)
-			coresight_start(event);
+		error = coresight_setup(event, thr);
+		if (error)
+			return (error);
+
+		if (cpu_id == 0) {
+			error = coresight_start(event);
+			if (error)
+				return (error);
+		}
 	}
 
 	return (0);
@@ -130,6 +139,7 @@ static int
 coresight_backend_configure(struct hwt_context *ctx, int cpu_id, int session_id)
 {
 	struct coresight_event *event;
+	int error;
 
 	event = &cs_event[cpu_id];
 
@@ -140,9 +150,9 @@ coresight_backend_configure(struct hwt_context *ctx, int cpu_id, int session_id)
 	 */
 	event->etm.trace_id = session_id;
 
-	coresight_configure(event, ctx);
+	error = coresight_configure(event, ctx);
 
-	return (0);
+	return (error);
 }
 
 static void
@@ -211,6 +221,7 @@ int
 coresight_register(struct coresight_desc *desc)
 {
 	struct coresight_device *cs_dev;
+	int error;
 
 	cs_dev = malloc(sizeof(struct coresight_device),
 	    M_CORESIGHT, M_WAITOK | M_ZERO);
@@ -222,8 +233,11 @@ coresight_register(struct coresight_desc *desc)
 	TAILQ_INSERT_TAIL(&cs_devs, cs_dev, link);
 	mtx_unlock(&cs_mtx);
 
-	if (desc->dev_type == CORESIGHT_TMC_ETR)
-		hwt_register(&backend);
+	if (desc->dev_type == CORESIGHT_TMC_ETR) {
+		error = hwt_backend_register(&backend);
+		if (error != 0)
+			return (error);
+	}
 
 	return (0);
 }
