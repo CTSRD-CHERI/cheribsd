@@ -95,7 +95,7 @@ hwt_ctx_alloc(void)
 	int error;
 
 	ctx = malloc(sizeof(struct hwt_context), M_HWT_CTX, M_WAITOK | M_ZERO);
-	ctx->session_counter = 0;
+	ctx->thread_counter = 0;
 
 	LIST_INIT(&ctx->records);
 	LIST_INIT(&ctx->threads);

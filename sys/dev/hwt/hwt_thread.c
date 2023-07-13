@@ -185,17 +185,16 @@ hwt_thread_create(struct thread *td, struct hwt_thread **thr0)
 
 	p = td->td_proc;
 
+	/* 1. First find our ctx and collect some information from it. */
 	ctx = hwt_contexthash_lookup(p);
 	if (ctx == NULL)
 		return (ENXIO);
 	bufsize = ctx->bufsize;
-	thread_id = atomic_fetchadd_int(&ctx->session_counter, 1);
+	thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
 	sprintf(path, "hwt_%d_%d", ctx->ident, thread_id);
 	HWT_CTX_UNLOCK(ctx);
 
-	dprintf("%s: NEW thread %p, tid %d\n", __func__, td,
-	    td->td_tid);
-
+	/* 2. Now we can allocate some memory. */
 	error = hwt_thread_alloc(&thr, bufsize);
 	if (error) {
 		printf("%s: could not allocate thread, error %d\n",
@@ -203,9 +202,14 @@ hwt_thread_create(struct thread *td, struct hwt_thread **thr0)
 		return (error);
 	}
 
-	thr->thread_id = thread_id;
-	thr->tid = td->td_tid;
+	error = hwt_vm_create_cdev(thr->vm, path);
+	if (error) {
+		printf("%s: could not create cdev, error %d\n",
+		    __func__, error);
+		return (error);
+	}
 
+	/* 3. Take ctx again, as it may gone during previous step. */
 	ctx = hwt_contexthash_lookup(p);
 	if (ctx == NULL) {
 		/* TODO: deallocate resources. */
@@ -213,15 +217,10 @@ hwt_thread_create(struct thread *td, struct hwt_thread **thr0)
 	}
 	thr->vm->ctx = ctx;
 	thr->ctx = ctx;
+	thr->thread_id = thread_id;
+	thr->tid = td->td_tid;
 	LIST_INSERT_HEAD(&ctx->threads, thr, next);
 	HWT_CTX_UNLOCK(ctx);
-
-	error = hwt_vm_create_cdev(thr->vm, path);
-	if (error) {
-		printf("%s: could not create cdev, error %d\n",
-		    __func__, error);
-		return (error);
-	}
 
 	*thr0 = thr;
 

@@ -57,7 +57,7 @@ struct hwt_context {
 
 	struct hwt_owner		*hwt_owner;
 	struct hwt_backend		*hwt_backend;
-	int				session_counter;
+	int				thread_counter;
 
 	struct mtx			mtx;
 	int				state;
