@@ -428,14 +428,15 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	}
 
 #if __has_feature(capabilities)
-	if ((esr & ISS_DATA_DFSC_MASK) == ISS_DATA_DFSC_LC_SC) {
+	if ((esr & ISS_DATA_DFSC_MASK) == ISS_DATA_DFSC_LC_SC &&
+	    (esr & ISS_DATA_WnR) == 0) {
 		sig = SIGSEGV;
-		ucode = (esr & ISS_DATA_WnR) == 0 ? SEGV_LOADTAG :
-		    SEGV_STORETAG;
+		ucode = SEGV_LOADTAG;
 		error = KERN_FAILURE;
 		goto bad_far;
 	}
 #endif
+
 	switch (ESR_ELx_EXCEPTION(esr)) {
 	case EXCP_INSN_ABORT:
 	case EXCP_INSN_ABORT_L:
@@ -450,8 +451,15 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 		 */
 		if ((esr & ISS_DATA_WnR) == 0 || (esr & ISS_DATA_CM) != 0)
 			ftype = VM_PROT_READ;
-		else
+		else {
 			ftype = VM_PROT_WRITE;
+
+#if __has_feature(capabilities)
+			if ((esr & ISS_DATA_DFSC_MASK) ==
+			    ISS_DATA_DFSC_LC_SC)
+				ftype |= VM_PROT_WRITE_CAP;
+#endif
+		}
 		break;
 	}
 

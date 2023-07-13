@@ -844,7 +844,7 @@ pmap_pte_memattr(pmap_t pmap, vm_memattr_t memattr)
 }
 
 static pt_entry_t
-pmap_pte_prot(pmap_t pmap, vm_prot_t prot)
+pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m)
 {
 	pt_entry_t val;
 
@@ -866,8 +866,19 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot)
 #if __has_feature(capabilities)
 	if ((prot & VM_PROT_READ_CAP) != 0)
 		val |= ATTR_LC_ENABLED;
-	if ((prot & VM_PROT_WRITE_CAP) != 0)
-		val |= ATTR_SC;
+
+	VM_PAGE_ASSERT_PGA_CAPMETA_PMAP_ENTER(m, prot);
+	if ((prot & VM_PROT_WRITE_CAP) != 0) {
+		/*
+		 * The page is CAPSTORE and this mapping is VM_PROT_WRITE_CAP.
+		 * Always set ATTR_CDBM. If the page is CAPDIRTY or this mapping
+		 * is created in response to a cap-write, also set ATTR_SC.
+		 *
+		 * XXX We could also conditionally set ATTR_SC if PGA_CAPDIRTY,
+		 * but it's not required.
+		 */
+		val |= ATTR_CDBM;
+	}
 #endif
 
 	return (val);
@@ -894,11 +905,40 @@ pmap_pte_dirty(pmap_t pmap, pt_entry_t pte)
 	    ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE));
 }
 
+static inline int
+pmap_pte_capdirty(pmap_t pmap, pt_entry_t pte)
+{
+#if __has_feature(capabilities)
+	KASSERT((pte & ATTR_SW_MANAGED) != 0, ("pte %#lx is unmanaged", pte));
+
+	KASSERT((pte & (ATTR_CDBM | ATTR_SC)) != ATTR_SC,
+	    ("pte %lx is cap-writable but missing ATTR_CDBM", pte));
+
+	return ((pte & ATTR_SC) == ATTR_SC);
+#else
+	return (0);
+#endif
+}
+
 static inline void
 pmap_page_dirty(pmap_t pmap, pt_entry_t pte, vm_page_t m)
 {
 	if (pmap_pte_dirty(pmap, pte))
 		vm_page_dirty(m);
+
+#if __has_feature(capabilities)
+	/*
+	 * In its quest to avoid TLB shootdowns, the revoker sweep can create
+	 * SC-clear CDBM-set PTEs that nevertheless have SC-set TLBEs fronting
+	 * them.  Therefore, we must consider CDBM alone grounds for being
+	 * capability dirty when we remove a PTE.  (SC can be set only when
+	 * CDBM is also set, so we ignore it here.)
+	 *
+	 * TODO This is pretty heavy-handed.  Can we do better?
+	 */
+	if ((pte & (ATTR_CDBM)) == ATTR_CDBM)
+		vm_page_capdirty(m);
+#endif
 }
 
 static __inline void
@@ -3918,7 +3958,7 @@ pmap_protect_l2(pmap_t pmap, pt_entry_t *l2, vm_offset_t sva, pt_entry_t mask,
 	 */
 	if ((old_l2 & ATTR_SW_MANAGED) != 0 &&
 	    (nbits & ATTR_S1_AP(ATTR_S1_AP_RO)) != 0 &&
-	    pmap_pte_dirty(pmap, old_l2)) {
+	    (pmap_pte_dirty(pmap, old_l2) || pmap_pte_capdirty(pmap, old_l2))) {
 		m = PHYS_TO_VM_PAGE(old_l2 & ~ATTR_MASK);
 		for (mt = m; mt < &m[L2_SIZE / PAGE_SIZE]; mt++)
 			pmap_page_dirty(pmap, old_l2, mt);
@@ -4470,7 +4510,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	pa = VM_PAGE_TO_PHYS(m);
 	new_l3 = (pt_entry_t)(pa | ATTR_DEFAULT | L3_PAGE);
 	new_l3 |= pmap_pte_memattr(pmap, m->md.pv_memattr);
-	new_l3 |= pmap_pte_prot(pmap, prot);
+	new_l3 |= pmap_pte_prot(pmap, prot, flags, m);
 
 	if ((flags & PMAP_ENTER_WIRED) != 0)
 		new_l3 |= ATTR_SW_WIRED;
@@ -5507,6 +5547,7 @@ pmap_copy_page_tags(vm_page_t msrc, vm_page_t mdst)
 	vm_pointer_t src = PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(msrc));
 	vm_pointer_t dst = PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(mdst));
 
+	VM_PAGE_ASSERT_PGA_CAPMETA_COPY(msrc, mdst);
 #endif
 	pagecopy((void *)src, (void *)dst);
 }
@@ -5808,7 +5849,8 @@ pmap_remove_pages(pmap_t pmap)
 				 */
 				switch (lvl) {
 				case 1:
-					if (!pmap_pte_dirty(pmap, tpte))
+					if (!pmap_pte_dirty(pmap, tpte) &&
+					    !pmap_pte_capdirty(pmap, tpte))
 						break;
 					for (mt = m; mt < &m[L2_SIZE / PAGE_SIZE]; mt++)
 						pmap_page_dirty(pmap, tpte, mt);
@@ -7190,6 +7232,10 @@ pmap_mincore(pmap_t pmap, vm_offset_t addr, vm_paddr_t *pap)
 			val |= MINCORE_MODIFIED | MINCORE_MODIFIED_OTHER;
 		if ((tpte & ATTR_AF) == ATTR_AF)
 			val |= MINCORE_REFERENCED | MINCORE_REFERENCED_OTHER;
+#if __has_feature(capabilities)
+		if ((tpte & ATTR_CDBM) == ATTR_CDBM)
+			val |= MINCORE_CAPSTORE;
+#endif
 
 		pa = (tpte & ~ATTR_MASK) | (addr & mask);
 	} else {
@@ -7650,6 +7696,23 @@ pmap_fault(pmap_t pmap, uint64_t esr, uint64_t far)
 		}
 		PMAP_UNLOCK(pmap);
 		break;
+#if __has_feature(capabilities)
+	case ISS_DATA_DFSC_LC_SC:
+		if ((esr & ISS_DATA_WnR) == 0)
+			return (rv);
+		PMAP_LOCK(pmap);
+		ptep = pmap_pte(pmap, far, &lvl);
+		if (ptep != NULL &&
+		    ((pte = pmap_load(ptep)) & ATTR_CDBM) != 0) {
+			if ((pte & ATTR_SC) == 0) {
+				pmap_set_bits(ptep, ATTR_SC);
+				pmap_s1_invalidate_page(pmap, far, true);
+			}
+			rv = KERN_SUCCESS;
+		}
+		PMAP_UNLOCK(pmap);
+		break;
+#endif
 	case ISS_DATA_DFSC_TF_L0:
 	case ISS_DATA_DFSC_TF_L1:
 	case ISS_DATA_DFSC_TF_L2:
