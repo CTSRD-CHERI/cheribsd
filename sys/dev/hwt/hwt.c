@@ -51,9 +51,9 @@
  *                  returns unique ident.
  *                  Creates a new character device for ctx management.
  *
- * /dev/hwt_%d_%d, ident, thread_id
+ * /dev/hwt_%d[_%d], ident[, thread_id]
  *    .mmap
- *        Maps tracing buffers to userspace.
+ *        Maps tracing buffers of the corresponding thread to userspace.
  *    .ioctl
  *        hwt_thread_ioctl():
  *               a) HWT_IOC_START
