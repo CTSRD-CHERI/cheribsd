@@ -100,7 +100,7 @@ hwt_unsuspend_proc(struct trace_context *tc, lwpid_t tid)
 	w.pid = tc->pid;
 	w.tid = tid;
 
-	error = ioctl(tc->fd, HWT_IOC_WAKEUP, &w);
+	error = ioctl(tc->thr_fd, HWT_IOC_WAKEUP, &w);
 
 	return (error);
 }
@@ -151,6 +151,7 @@ hwt_ctx_alloc(struct trace_context *tc)
 	al.pid = tc->pid;
 	al.bufsize = tc->bufsize;
 	al.backend_name = tc->trace_dev->name;
+	al.ident = &tc->ident;
 
 	error = ioctl(tc->fd, HWT_IOC_ALLOC, &al);
 
@@ -162,7 +163,7 @@ hwt_map_memory(struct trace_context *tc, int tid)
 {
 	char filename[32];
 
-	sprintf(filename, "/dev/hwt_%d_%d", tc->pid, tid);
+	sprintf(filename, "/dev/hwt_%d_%d", tc->ident, tid);
 
 	tc->thr_fd = open(filename, O_RDONLY);
 	if (tc->thr_fd < 0) {
@@ -199,12 +200,10 @@ hwt_get_offs(struct trace_context *tc, size_t *offs)
 	vm_offset_t curpage_offset;
 	int curpage;
 	int error;
-	int ptr;
 
-	bget.pid = tc->pid;
-	bget.ptr = &ptr;
 	bget.curpage = &curpage;
 	bget.curpage_offset = &curpage_offset;
+
 	error = ioctl(tc->thr_fd, HWT_IOC_BUFPTR_GET, &bget);
 	if (error)
 		return (error);
@@ -261,7 +260,7 @@ hwt_start_tracing(struct trace_context *tc)
 	int error;
 
 	s.pid = tc->pid;
-	error = ioctl(tc->fd, HWT_IOC_START, &s);
+	error = ioctl(tc->thr_fd, HWT_IOC_START, &s);
 
 	return (error);
 }
@@ -409,6 +408,7 @@ main(int argc, char **argv, char **env)
 	}
 
 	nlibs += 1; /* add binary itself. */
+	nlibs += 1; /* add thread 0 entry. */
 
 	printf("cmd is %s, nlibs %d\n", *cmd, nlibs);
 
@@ -438,16 +438,7 @@ main(int argc, char **argv, char **env)
 		return (error);
 	}
 
-	error = hwt_get_records(tc, &nrec);
-	if (error != 0)
-		return (error);
-
-	if (nrec != 1)
-		return (error);
-
-	entry = &tc->records[0];
-
-	error = hwt_map_memory(tc, entry->tid);
+	error = hwt_map_memory(tc, 0);
 	if (error != 0) {
 		printf("can't map memory");
 		return (error);

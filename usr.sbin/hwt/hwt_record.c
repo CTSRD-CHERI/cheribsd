@@ -73,7 +73,7 @@ hwt_record_fetch(struct trace_context *tc, int *nrecords)
 	record_get.records = tc->records;
 	record_get.nentries = &nentries;
 
-	error = ioctl(tc->fd, HWT_IOC_RECORD_GET, &record_get);
+	error = ioctl(tc->thr_fd, HWT_IOC_RECORD_GET, &record_get);
 	if (error != 0) {
 		printf("RECORD_GET error %d entires %d\n",
 		    error, nentries);

@@ -55,7 +55,9 @@ struct trace_context {
 	int fd;
 	int thr_fd;
 	int terminate;
+
 	int thread_id;
+	int ident;
 
 	/* Address range filtering. */
 	int suspend_on_mmap;

@@ -600,7 +600,7 @@ hwt_coresight_set_config(struct trace_context *tc)
 	sconf.config_version = 1;
 	sconf.pause_on_mmap = tc->suspend_on_mmap ? 1 : 0;
 
-	error = ioctl(tc->fd, HWT_IOC_SET_CONFIG, &sconf);
+	error = ioctl(tc->thr_fd, HWT_IOC_SET_CONFIG, &sconf);
 
 	return (error);
 }
@@ -625,8 +625,10 @@ hwt_coresight_process(struct trace_context *tc)
 	hwt_coresight_init(tc, dec);
 
 	error = hwt_get_offs(tc, &offs);
-	if (error)
+	if (error) {
+		printf("%s: cant get offset\n", __func__);
 		return (-1);
+	}
 
 #if 0
 	printf("data to process %ld\n", offs);
