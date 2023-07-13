@@ -179,7 +179,7 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 	/* All good. */
 	thr->ctx = ctx;
 	thr->tid = FIRST_THREAD_IN_PROC(p)->td_tid;
-	thr->session_id = atomic_fetchadd_int(&ctx->session_counter, 1);
+	thr->thread_id = atomic_fetchadd_int(&ctx->session_counter, 1);
 
 	HWT_CTX_LOCK(ctx);
 	hwt_thread_insert(ctx, thr);
@@ -202,7 +202,7 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 		return (error);
 	}
 
-	sprintf(path, "hwt_%d_%d", ctx->ident, thr->session_id);
+	sprintf(path, "hwt_%d_%d", ctx->ident, thr->thread_id);
 	error = hwt_vm_create_cdev(thr->vm, path);
 	if (error) {
 		/* TODO: deallocate resources. */

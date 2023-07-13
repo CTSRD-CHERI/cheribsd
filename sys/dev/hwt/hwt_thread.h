@@ -36,7 +36,7 @@ struct hwt_thread {
 	struct hwt_context		*ctx;
 	lwpid_t				tid;
 	LIST_ENTRY(hwt_thread)		next;
-	int				session_id;
+	int				thread_id;
 	int				state;
 #define	HWT_THREAD_STATE_EXITED		(1 << 0)
 	struct mtx			mtx;

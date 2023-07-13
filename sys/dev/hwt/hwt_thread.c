@@ -181,7 +181,7 @@ hwt_thread_create(struct thread *td, struct hwt_thread **thr0)
 	size_t bufsize;
 	char path[MAXPATHLEN];
 	int error;
-	int session_id;
+	int thread_id;
 
 	p = td->td_proc;
 
@@ -189,8 +189,8 @@ hwt_thread_create(struct thread *td, struct hwt_thread **thr0)
 	if (ctx == NULL)
 		return (ENXIO);
 	bufsize = ctx->bufsize;
-	session_id = atomic_fetchadd_int(&ctx->session_counter, 1);
-	sprintf(path, "hwt_%d_%d", ctx->ident, session_id);
+	thread_id = atomic_fetchadd_int(&ctx->session_counter, 1);
+	sprintf(path, "hwt_%d_%d", ctx->ident, thread_id);
 	HWT_CTX_UNLOCK(ctx);
 
 	dprintf("%s: NEW thread %p, tid %d\n", __func__, td,
@@ -203,7 +203,7 @@ hwt_thread_create(struct thread *td, struct hwt_thread **thr0)
 		return (error);
 	}
 
-	thr->session_id = session_id;
+	thr->thread_id = thread_id;
 	thr->tid = td->td_tid;
 
 	ctx = hwt_contexthash_lookup(p);

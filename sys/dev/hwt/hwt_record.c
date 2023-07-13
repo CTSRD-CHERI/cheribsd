@@ -94,7 +94,7 @@ hwt_record_thread(struct hwt_thread *thr)
 	entry = malloc(sizeof(struct hwt_record_entry), M_HWT_RECORD,
 	    M_WAITOK | M_ZERO);
 	entry->record_type = HWT_RECORD_THREAD_CREATE;
-	entry->thread_id = thr->session_id;
+	entry->thread_id = thr->thread_id;
 
 	HWT_CTX_LOCK(ctx);
 	LIST_INSERT_HEAD(&ctx->records, entry, next);
