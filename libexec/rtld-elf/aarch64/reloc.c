@@ -42,6 +42,7 @@
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 #include <stdatomic.h>
 #include "rtld_libc.h"
+#include "rtld_utrace.h"
 #endif
 
 #if __has_feature(capabilities)
@@ -495,6 +496,30 @@ resizeTable(int exp)
 	tramp_table.exp = exp;
 }
 
+static void
+tramp_hook(int event, void *target, const Obj_Entry *obj, const Elf_Sym *def)
+{
+	Elf64_Word sym_num = def == NULL ? 0 : def->st_name;
+	const char *name = STAILQ_EMPTY(&obj->names) ? obj->path :
+	    STAILQ_FIRST(&obj->names)->name;
+	const char *sym = def == NULL ? "<unknown>" :
+	    strtab_value(obj, def->st_name);
+	void *tls;
+
+	if (ld_utrace_compartment != NULL) {
+		asm ("mrs	%0, rctpidr_el0" : "=C" (tls));
+		if (event == 0)
+			ld_utrace_log(UTRACE_COMPARTMENT_ENTER,
+			    target, tls, sym_num, 0, name, sym);
+		else
+			ld_utrace_log(UTRACE_COMPARTMENT_LEAVE,
+			    target, tls, sym_num, 0, name, sym);
+	}
+	if (ld_compartment_overhead != NULL) {
+		getpid();
+	}
+}
+
 static size_t
 tramp_compile(tramp **entry, const struct tramp_data *data)
 {
@@ -514,24 +539,25 @@ tramp_compile(tramp **entry, const struct tramp_data *data)
 	code = tramp_##template
 
 	IMPORT(header);
-	IMPORT(header_utrace);
+	IMPORT(header_hook);
 	IMPORT(header_res);
 	IMPORT(save_caller);
 	IMPORT(switch_stack);
 	IMPORT(clear_regs);
 	IMPORT(invoke_res);
 	IMPORT(invoke_exe);
-	IMPORT(utrace_return);
+	IMPORT(return_hook);
 	IMPORT(return);
 
 	uint32_t *buf = (void *)*entry;
 	const void *code;
 	size_t size = 0;
 	bool executive = cheri_getperm(data->target) & CHERI_PERM_EXECUTIVE;
-	bool utrace = ld_utrace_compartment != NULL;
+	bool hook = ld_utrace_compartment != NULL ||
+	    ld_compartment_overhead != NULL;
 
-	if (utrace)
-		code = tramp_header_utrace;
+	if (hook)
+		code = tramp_header_hook;
 	else
 		code = tramp_header;
 
@@ -542,17 +568,14 @@ tramp_compile(tramp **entry, const struct tramp_data *data)
 			else
 				TO(header_res);
 		})
-		TRANSITION(header_utrace, {
+		TRANSITION(header_hook, {
 			if (executive)
 				TO(save_caller);
 			else
 				TO(header_res);
-			*(*entry)++ = STAILQ_EMPTY(&data->obj->names) ?
-			    data->obj->path :
-			    STAILQ_FIRST(&data->obj->names)->name;
-			*(*entry)++ = data->def == NULL ? "<unknown>" :
-			    strtab_value(data->obj, data->def->st_name);
-			*(*entry)++ = ld_utrace_log;
+			*(*entry)++ = data->obj;
+			*(*entry)++ = data->def;
+			*(*entry)++ = tramp_hook;
 		})
 		TRANSITION(header_res, {
 			buf[-2] |= (uint32_t)data->obj->compart_id << 5;
@@ -590,18 +613,18 @@ tramp_compile(tramp **entry, const struct tramp_data *data)
 			continue;
 		}
 		TRANSITION(invoke_res, {
-			if (utrace)
-				TO(utrace_return);
+			if (hook)
+				TO(return_hook);
 			else
 				TO(return);
 		})
 		TRANSITION(invoke_exe, {
-			if (utrace)
-				TO(utrace_return);
+			if (hook)
+				TO(return_hook);
 			else
 				TO(return);
 		})
-		TRANSITION(utrace_return, {
+		TRANSITION(return_hook, {
 			TO(return);
 		})
 		TRANSITION(return, {
@@ -623,7 +646,7 @@ tramp_pgs_append(const struct tramp_data *data)
 {
 	size_t len;
 	/* A capability-aligned buffer large enough to hold a trampoline */
-	tramp tmp[40];
+	tramp tmp[48];
 	tramp *tramp, *entry = tmp;
 	struct tramp_pg *pg;
 

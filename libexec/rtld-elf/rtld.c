@@ -236,6 +236,7 @@ static const char *ld_tracing;	/* Called from ldd to print libs */
 static const char *ld_utrace;	/* Use utrace() to log events. */
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 const char *ld_utrace_compartment;	/* Use utrace() to log compartmentalisation-related events. */
+const char *ld_compartment_overhead;	/* Simulate overhead during compartment transitions. */
 #endif
 static bool ld_skip_init_funcs = false;	/* XXXAR: debug environment variable to verify relocation processing */
 static struct obj_entry_q obj_list;	/* Queue of all loaded objects */
@@ -411,6 +412,7 @@ enum {
 	LD_SKIP_INIT_FUNCS,
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 	LD_UTRACE_COMPARTMENT,
+	LD_COMPARTMENT_OVERHEAD,
 #endif
 };
 
@@ -452,6 +454,7 @@ static struct ld_env_var_desc ld_env_vars[] = {
 	LD_ENV_DESC(SKIP_INIT_FUNCS, true),
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 	LD_ENV_DESC(UTRACE_COMPARTMENT, true),
+	LD_ENV_DESC(COMPARTMENT_OVERHEAD, true),
 #endif
 };
 
@@ -841,6 +844,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     ld_utrace = ld_get_env_var(LD_UTRACE);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
     ld_utrace_compartment = ld_get_env_var(LD_UTRACE_COMPARTMENT);
+    ld_compartment_overhead = ld_get_env_var(LD_COMPARTMENT_OVERHEAD);
 #endif
 
     set_ld_elf_hints_path();

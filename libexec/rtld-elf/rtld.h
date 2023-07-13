@@ -85,6 +85,7 @@ extern int tls_max_index;
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 extern uintptr_t sealer_cap;
 extern const char *ld_utrace_compartment;
+extern const char *ld_compartment_overhead;
 #endif
 
 extern int npagesizes;

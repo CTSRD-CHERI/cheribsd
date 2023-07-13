@@ -730,18 +730,23 @@ END(_rtld_longjmp)
 ENTRY(_rtld_get_rstk)
 	/*
 	 * This function MUST preserve all caller-saved registers and return the
-	 * requested stack.
+	 * requested stack except:
+	 * - c11: Target restricted stack
+	 * - c18: Code capability to this function
 	 */
-	stp	c18, c30, [csp, #-(CAP_WIDTH * 2)]
-	stp	c16, c17, [csp, #-(CAP_WIDTH * 4)]
-	stp	c14, c15, [csp, #-(CAP_WIDTH * 6)]
-	stp	c12, c13, [csp, #-(CAP_WIDTH * 8)]
-	stp	c10, c11, [csp, #-(CAP_WIDTH * 10)]
-	stp	c8, c9, [csp, #-(CAP_WIDTH * 12)]
-	stp	c6, c7, [csp, #-(CAP_WIDTH * 14)]
-	stp	c4, c5, [csp, #-(CAP_WIDTH * 16)]
-	stp	c2, c3, [csp, #-(CAP_WIDTH * 18)]
-	stp	c0, c1, [csp, #-(CAP_WIDTH * 20)]!
+	stp	c17, c30, [csp, #-(CAP_WIDTH * 2)]
+	stp	c15, c16, [csp, #-(CAP_WIDTH * 4)]
+	stp	c13, c14, [csp, #-(CAP_WIDTH * 6)]
+	stp	c10, c12, [csp, #-(CAP_WIDTH * 8)]
+	stp	c8, c9, [csp, #-(CAP_WIDTH * 10)]
+	stp	c6, c7, [csp, #-(CAP_WIDTH * 12)]
+	stp	c4, c5, [csp, #-(CAP_WIDTH * 14)]
+	stp	c2, c3, [csp, #-(CAP_WIDTH * 16)]
+	stp	c0, c1, [csp, #-(CAP_WIDTH * 18)]!
+	stp	q6, q7, [csp, #-(16 * 2)]
+	stp	q4, q5, [csp, #-(16 * 4)]
+	stp	q2, q3, [csp, #-(16 * 6)]
+	stp	q0, q1, [csp, #-(16 * 8)]!
 
 	mov	c0, c10					/* c0 = data */
 	mov	w1, w12					/* w1 = index */
@@ -750,16 +755,19 @@ ENTRY(_rtld_get_rstk)
 	bl	get_rstk
 	mov	c11, c0
 
-	ldp	c18, c30, [csp, #(CAP_WIDTH * 18)]
-	ldp	c16, c17, [csp, #(CAP_WIDTH * 16)]
-	ldp	c14, c15, [csp, #(CAP_WIDTH * 14)]
-	ldp	c12, c13, [csp, #(CAP_WIDTH * 12)]
-	ldr	c10, [csp, #(CAP_WIDTH * 10)]
+	ldp	q6, q7, [csp, #(16 * 6)]
+	ldp	q4, q5, [csp, #(16 * 4)]
+	ldp	q2, q3, [csp, #(16 * 2)]
+	ldp	q0, q1, [csp], #(16 * 8)
+	ldp	c17, c30, [csp, #(CAP_WIDTH * 16)]
+	ldp	c15, c16, [csp, #(CAP_WIDTH * 14)]
+	ldp	c13, c14, [csp, #(CAP_WIDTH * 12)]
+	ldp	c10, c12, [csp, #(CAP_WIDTH * 10)]
 	ldp	c8, c9, [csp, #(CAP_WIDTH * 8)]
 	ldp	c6, c7, [csp, #(CAP_WIDTH * 6)]
 	ldp	c4, c5, [csp, #(CAP_WIDTH * 4)]
 	ldp	c2, c3, [csp, #(CAP_WIDTH * 2)]
-	ldp	c0, c1, [csp], #(CAP_WIDTH * 20)
+	ldp	c0, c1, [csp], #(CAP_WIDTH * 18)
 
 	ret
 END(_rtld_get_rstk)
@@ -785,7 +793,7 @@ tramp_header_target:
 	mrs	c17, rcsp_el0
 	mov	c18, csp
 
-	/* Save callee-saved registers */
+	/* Push frame */
 	stp	c28, c29, [csp, #-(CAP_WIDTH * 2)]
 	stp	c26, c27, [csp, #-(CAP_WIDTH * 4)]
 	stp	c24, c25, [csp, #-(CAP_WIDTH * 6)]
@@ -795,25 +803,25 @@ tramp_header_target:
 	stp	c18, c30, [csp, #-(CAP_WIDTH * 14)]!
 TRAMPEND(tramp_header)
 
-TRAMP(tramp_header_utrace)
-tramp_header_utrace_name:
+TRAMP(tramp_header_hook)
+tramp_header_hook_obj:
 	.chericap	0
-tramp_header_utrace_symbol:
+tramp_header_hook_def:
 	.chericap	0
-tramp_header_utrace_log:
+tramp_header_hook_function:
 	.chericap	0
-tramp_header_utrace_target:
+tramp_header_hook_target:
 	.chericap	0
-	ldr	c10, tramp_header_utrace_name
-	ldr	c11, tramp_header_utrace_symbol
-	ldr	c12, tramp_header_utrace_log
+	ldr	c10, tramp_header_hook_obj
+	ldr	c11, tramp_header_hook_def
+	ldr	c12, tramp_header_hook_function
 	mrs	c17, rcsp_el0
 	mov	c18, csp
 
 	str	c12, [csp, #-CAP_WIDTH]
 	stp	c10, c11, [csp, #-(CAP_WIDTH * 3)]!
 
-	/* Save callee-saved registers */
+	/* Push frame */
 	stp	c28, c29, [csp, #-(CAP_WIDTH * 2)]
 	stp	c26, c27, [csp, #-(CAP_WIDTH * 4)]
 	stp	c24, c25, [csp, #-(CAP_WIDTH * 6)]
@@ -822,30 +830,36 @@ tramp_header_utrace_target:
 	stp	c17, c19, [csp, #-(CAP_WIDTH * 12)]
 	stp	c18, c30, [csp, #-(CAP_WIDTH * 14)]!
 
+	/* Save argument registers */
 	stp	c8, c9, [csp, #-(CAP_WIDTH * 2)]
 	stp	c6, c7, [csp, #-(CAP_WIDTH * 4)]
 	stp	c4, c5, [csp, #-(CAP_WIDTH * 6)]
 	stp	c2, c3, [csp, #-(CAP_WIDTH * 8)]
 	stp	c0, c1, [csp, #-(CAP_WIDTH * 10)]!
+	stp	q6, q7, [csp, #-(16 * 2)]
+	stp	q4, q5, [csp, #-(16 * 4)]
+	stp	q2, q3, [csp, #-(16 * 6)]
+	stp	q0, q1, [csp, #-(16 * 8)]!
 
-	mov	w0, #14			/* event = UTRACE_ENTER_COMPARTMENT */
-	ldr	c1, tramp_header_utrace_target		/* handle = target */
-	mov	x2, xzr
-	mov	x3, xzr
-	mov	x4, xzr
-	mov	c5, c10					/* name = obj->path */
-	mov	c6, c11					/* symbol = st_name */
-	mov	c7, c12
-	blr	c7					/* call ld_utrace_log */
+	mov	w0, #0
+	ldr	c1, tramp_header_hook_target
+	mov	c2, c10
+	mov	c3, c11
+	blr	c12
 
+	/* Restore argument registers */
+	ldp	q6, q7, [csp, #(16 * 6)]
+	ldp	q4, q5, [csp, #(16 * 4)]
+	ldp	q2, q3, [csp, #(16 * 2)]
+	ldp	q0, q1, [csp], #(16 * 8)
 	ldp	c8, c9, [csp, #(CAP_WIDTH * 8)]
 	ldp	c6, c7, [csp, #(CAP_WIDTH * 6)]
 	ldp	c4, c5, [csp, #(CAP_WIDTH * 4)]
 	ldp	c2, c3, [csp, #(CAP_WIDTH * 2)]
 	ldp	c0, c1, [csp], #(CAP_WIDTH * 10)
 	ldp	c30, c17, [csp, #CAP_WIDTH]
-	ldr	c10, tramp_header_utrace_target
-TRAMPEND(tramp_header_utrace)
+	ldr	c10, tramp_header_hook_target
+TRAMPEND(tramp_header_hook)
 
 TRAMP(tramp_header_res)
 	mrs	c18, ctpidr_el0	/* c18 = table */
@@ -995,24 +1009,39 @@ TRAMP(tramp_invoke_res)
 	str	c12, [c13, #-CAP_WIDTH]
 TRAMPEND(tramp_invoke_res)
 
-TRAMP(tramp_utrace_return)
-	swp	c0, c5, [csp]
+TRAMP(tramp_return_hook)
+	/* Save return value registers */
+	swp	c0, c2, [csp]
 	add	csp, csp, #CAP_WIDTH
-	swp	c1, c6, [csp]
-	ldr	c7, [csp, #CAP_WIDTH]
-	stp	c30, c10, [csp, #-(CAP_WIDTH * 3)]!
-	str	c18, [csp, #-CAP_WIDTH]!
-	mov	w0, #15
+	swp	c1, c3, [csp]
+
+	/* Save temporary registers and return address */
+	add	csp, csp, #CAP_WIDTH
+	swp	c10, c4, [csp]
+	stp	c18, c30, [csp, #-(CAP_WIDTH * 4)]!
+
+	/* Save floating point registers */
+	stp	q6, q7, [csp, #-(16 * 2)]
+	stp	q4, q5, [csp, #-(16 * 4)]
+	stp	q2, q3, [csp, #-(16 * 6)]
+	stp	q0, q1, [csp, #-(16 * 8)]!
+
+	mov	w0, #1
 	mov	x1, xzr
-	mov	x2, xzr
-	mov	x3, xzr
-	mov	x4, xzr
-	blr	c7
-	ldr	c18, [csp], #CAP_WIDTH
-	ldp	c30, c10, [csp], #(CAP_WIDTH * 2)
-	ldp	c0, c1, [csp]
+	blr	c4
+
+	/* Restore floating point registers */
+	ldp	q6, q7, [csp, #(16 * 6)]
+	ldp	q4, q5, [csp, #(16 * 4)]
+	ldp	q2, q3, [csp, #(16 * 2)]
+	ldp	q0, q1, [csp], #(16 * 8)
+
+	/* Restore temporary registers and return address */
+	ldp	c18, c30, [csp], #(CAP_WIDTH * 2)
+	ldp	c0, c1, [csp], #(CAP_WIDTH * 2)
+	ldr	c10, [csp], #CAP_WIDTH
 	mov	x11, xzr
-TRAMPEND(tramp_utrace_return)
+TRAMPEND(tramp_return_hook)
 
 TRAMP(tramp_return)
 	/*
