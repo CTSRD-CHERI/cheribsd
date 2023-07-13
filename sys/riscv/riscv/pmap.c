@@ -230,6 +230,12 @@ __FBSDID("$FreeBSD$");
 #define	VM_PAGE_TO_PV_LIST_LOCK(m)	\
 			PHYS_TO_PV_LIST_LOCK(VM_PAGE_TO_PHYS(m))
 
+#if __has_feature(capabilities)
+#define	PTE_DIRTY_BITS	(PTE_D | PTE_CD)
+#else
+#define	PTE_DIRTY_BITS	(PTE_D)
+#endif
+
 static SYSCTL_NODE(_vm, OID_AUTO, pmap, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "VM/pmap parameters");
 
@@ -2243,6 +2249,20 @@ pmap_page_dirty(pt_entry_t entry, vm_page_t m)
 {
 	if ((entry & PTE_D) != 0)
 		vm_page_dirty(m);
+
+#if __has_feature(capabilities)
+	/*
+	 * In its quest to avoid TLB shootdowns, the revoker sweep can create
+	 * CD-clear CW-set PTEs that nevertheless have CD-set TLBEs fronting
+	 * them.  Therefore, we must consider PTE_CW alone grounds for being
+	 * capability dirty when we remove a PTE.  (PTE_CD can be set only when
+	 * PTE_CW is also set, so we ignore it here.)
+	 *
+	 * TODO This is pretty heavy-handed.  Can we do better?
+	 */
+	if ((entry & PTE_CW) != 0)
+		vm_page_capdirty(m);
+#endif
 }
 
 /*
@@ -2594,7 +2614,8 @@ resume:
 			if (sva + L2_SIZE == va_next && eva >= va_next) {
 retryl2:
 				if ((prot & VM_PROT_WRITE) == 0 &&
-				    (l2e & PTE_SW_MANAGED) != 0) {
+				    (l2e & PTE_SW_MANAGED) != 0 &&
+				    (l2e & PTE_DIRTY_BITS) != 0) {
 					pa = PTE_TO_PHYS(l2e);
 					m = PHYS_TO_VM_PAGE(pa);
 					for (mt = m; mt < &m[Ln_ENTRIES]; mt++)
@@ -2635,7 +2656,8 @@ retryl3:
 			if ((l3e & PTE_V) == 0)
 				continue;
 			if ((prot & VM_PROT_WRITE) == 0 &&
-			    (l3e & PTE_SW_MANAGED) != 0) {
+			    (l3e & PTE_SW_MANAGED) != 0 &&
+			    (l2e & PTE_DIRTY_BITS) != 0) {
 				m = PHYS_TO_VM_PAGE(PTE_TO_PHYS(l3e));
 				pmap_page_dirty(l3e, m);
 			}
@@ -2676,6 +2698,9 @@ pmap_fault(pmap_t pmap, vm_offset_t va, vm_prot_t ftype)
 
 	if ((pmap != kernel_pmap && (oldpte & PTE_U) == 0) ||
 	    ((ftype & VM_PROT_WRITE) != 0 && (oldpte & PTE_W) == 0) ||
+#if __has_feature(capabilities)
+	    ((ftype & VM_PROT_WRITE_CAP) != 0 && (oldpte & PTE_CW) == 0) ||
+#endif
 	    (ftype == VM_PROT_EXECUTE && (oldpte & PTE_X) == 0) ||
 	    (ftype == VM_PROT_READ && (oldpte & PTE_R) == 0))
 		goto done;
@@ -2683,6 +2708,11 @@ pmap_fault(pmap_t pmap, vm_offset_t va, vm_prot_t ftype)
 	bits = PTE_A;
 	if ((ftype & VM_PROT_WRITE) != 0)
 		bits |= PTE_D;
+
+#if __has_feature(capabilities)
+	if ((ftype & VM_PROT_WRITE_CAP) != 0)
+		bits |= PTE_CD;
+#endif
 
 	/*
 	 * Spurious faults can occur if the implementation caches invalid
@@ -2926,6 +2956,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	va = trunc_page(va);
 	if ((m->oflags & VPO_UNMANAGED) == 0)
 		VM_PAGE_OBJECT_BUSY_ASSERT(m);
+	VM_PAGE_ASSERT_PGA_CAPMETA_PMAP_ENTER(m, prot);
 	pa = VM_PAGE_TO_PHYS(m);
 	pn = (pa / PAGE_SIZE);
 
@@ -2942,7 +2973,9 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if (prot & VM_PROT_READ_CAP)
 		new_l3 |= PTE_CR;
 	if (prot & VM_PROT_WRITE_CAP)
-		new_l3 |= PTE_CW | PTE_CD;
+		new_l3 |= PTE_CW;
+	if (flags & VM_PROT_WRITE_CAP)
+		new_l3 |= PTE_CD;
 #endif
 
 	new_l3 |= (pn << PTE_PPN0_S);
@@ -2957,6 +2990,10 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if ((m->oflags & VPO_UNMANAGED) != 0) {
 		if (prot & VM_PROT_WRITE)
 			new_l3 |= PTE_D;
+#if __has_feature(capabilities)
+		if (prot & VM_PROT_WRITE_CAP)
+			new_l3 |= PTE_CD;
+#endif
 	} else
 		new_l3 |= PTE_SW_MANAGED;
 
@@ -3723,6 +3760,7 @@ pmap_copy_page_tags(vm_page_t msrc, vm_page_t mdst)
 	vm_pointer_t src = PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(msrc));
 	vm_pointer_t dst = PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(mdst));
 
+	VM_PAGE_ASSERT_PGA_CAPMETA_COPY(msrc, mdst);
 #endif
 	pagecopy((void *)src, (void *)dst);
 }
@@ -4043,7 +4081,8 @@ pmap_remove_pages(pmap_t pmap)
 				/*
 				 * Update the vm_page_t clean/reference bits.
 				 */
-				if ((tpte & PTE_W) != 0) {
+				if ((tpte & PTE_W) != 0 &&
+				    (tpte & PTE_DIRTY_BITS) != 0) {
 					if (superpage)
 						for (mt = m;
 						    mt < &m[Ln_ENTRIES]; mt++)
@@ -4710,6 +4749,10 @@ pmap_mincore(pmap_t pmap, vm_offset_t addr, vm_paddr_t *pap)
 			val |= MINCORE_MODIFIED | MINCORE_MODIFIED_OTHER;
 		if ((tpte & PTE_A) != 0)
 			val |= MINCORE_REFERENCED | MINCORE_REFERENCED_OTHER;
+#if __has_feature(capabilities)
+		if ((tpte & PTE_CW) != 0)
+			val |= MINCORE_CAPSTORE;
+#endif
 		managed = (tpte & PTE_SW_MANAGED) == PTE_SW_MANAGED;
 	} else {
 		managed = false;
