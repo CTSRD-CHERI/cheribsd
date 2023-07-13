@@ -854,12 +854,6 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot)
 			val |= ATTR_S1_XN;
 		if ((prot & VM_PROT_WRITE) == 0)
 			val |= ATTR_S1_AP(ATTR_S1_AP_RO);
-#if __has_feature(capabilities)
-		if ((prot & VM_PROT_READ_CAP) != 0)
-			val |= ATTR_LC_ENABLED;
-		if ((prot & VM_PROT_WRITE_CAP) != 0)
-			val |= ATTR_SC;
-#endif
 	} else {
 		if ((prot & VM_PROT_WRITE) != 0)
 			val |= ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE);
@@ -867,13 +861,14 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot)
 			val |= ATTR_S2_S2AP(ATTR_S2_S2AP_READ);
 		if ((prot & VM_PROT_EXECUTE) == 0)
 			val |= ATTR_S2_XN(ATTR_S2_XN_ALL);
-#if __has_feature(capabilities)
-		if ((prot & VM_PROT_READ_CAP) != 0)
-			val |= ATTR_LC_ENABLED;
-		if ((prot & VM_PROT_WRITE_CAP) != 0)
-			val |= ATTR_SC;
-#endif
 	}
+
+#if __has_feature(capabilities)
+	if ((prot & VM_PROT_READ_CAP) != 0)
+		val |= ATTR_LC_ENABLED;
+	if ((prot & VM_PROT_WRITE_CAP) != 0)
+		val |= ATTR_SC;
+#endif
 
 	return (val);
 }
