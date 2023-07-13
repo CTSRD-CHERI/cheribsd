@@ -36,7 +36,9 @@ struct hwt_vm {
 	int				npages;
 	vm_object_t			obj;
 	struct cdev			*cdev;
+
 	struct hwt_context		*ctx;
+	struct hwt_thread		*thr;
 };
 
 struct hwt_vm * hwt_vm_alloc(void);

@@ -139,6 +139,7 @@ hwt_thread_alloc(struct hwt_thread **thr0, size_t bufsize)
 	vm->npages = bufsize / PAGE_SIZE;
 
 	thr->vm = vm;
+	vm->thr = thr;
 
 	mtx_init(&thr->mtx, "thr", NULL, MTX_SPIN);
 
@@ -202,6 +203,7 @@ hwt_thread_create(struct thread *td, struct hwt_thread **thr0)
 		return (error);
 	}
 
+	thr->session_id = session_id;
 	thr->tid = td->td_tid;
 
 	ctx = hwt_contexthash_lookup(p);

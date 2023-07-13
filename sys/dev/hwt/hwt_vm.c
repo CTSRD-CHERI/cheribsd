@@ -194,13 +194,10 @@ static int
 hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
     struct thread *td)
 {
-	struct hwt_wakeup *hwakeup;
 	struct hwt_record_get *rget;
 	struct hwt_set_config *sconf;
 	struct hwt_bufptr_get *ptr_get;
-	struct hwt_start *s __unused;
 
-	struct hwt_thread *thr;
 	struct hwt_context *ctx;
 	struct hwt_vm *vm;
 	struct hwt_owner *ho;
@@ -225,11 +222,7 @@ hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	switch (cmd) {
 	case HWT_IOC_START:
 		/* Start tracing. */
-		s = (struct hwt_start *)addr;
-
-		dprintf("%s: start, pid %d\n", __func__, s->pid);
-
-		/* TODO: s->pid is not needed. */
+		dprintf("%s: start\n", __func__);
 
 		HWT_CTX_LOCK(ctx);
 		if (ctx->state == CTX_STATE_RUNNING) {
@@ -257,20 +250,13 @@ hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		break;
 
 	case HWT_IOC_WAKEUP:
-		hwakeup = (struct hwt_wakeup *)addr;
 
-		HWT_CTX_LOCK(ctx);
-		thr = hwt_thread_lookup_by_tid(ctx, hwakeup->tid);
-		if (thr)
-			HWT_THR_LOCK(thr);
-		HWT_CTX_UNLOCK(ctx);
+		/* CPU mode check ? */
+		if (vm->thr == NULL)
+			return (ENXIO);
 
-		if (thr == NULL)
-			return (ENOENT);
+		wakeup(vm->thr);
 
-		wakeup(thr);
-
-		HWT_THR_UNLOCK(thr);
 		break;
 
 	case HWT_IOC_BUFPTR_GET:

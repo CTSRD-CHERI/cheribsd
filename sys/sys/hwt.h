@@ -66,12 +66,11 @@ struct hwt_alloc {
 } __aligned(16);
 
 struct hwt_start {
-	pid_t		pid;
+	int		reserved;
 } __aligned(16);
 
 struct hwt_wakeup {
-	pid_t		pid;
-	lwpid_t		tid;
+	int		reserved;
 } __aligned(16);
 
 struct hwt_record_user_entry {
