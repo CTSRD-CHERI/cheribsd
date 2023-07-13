@@ -489,7 +489,11 @@ main(int argc, char **argv, char **env)
 		hwt_sleep();
 	} while (tot_rec < nlibs);
 
-	tc->trace_dev->methods->process(tc);
+	error = tc->trace_dev->methods->process(tc);
+	if (error) {
+		printf("cant process data, error %d\n", error);
+		return (error);
+	}
 
 	close(tc->fd);
 

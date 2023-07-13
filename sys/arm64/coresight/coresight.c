@@ -169,17 +169,19 @@ static int
 coresight_backend_read(int cpu_id, int *curpage, vm_offset_t *curpage_offset)
 {
 	struct coresight_event *event;
+	int error;
 
 	event = &cs_event[cpu_id];
 
 	KASSERT(event != NULL, ("No event found"));
 
-	coresight_read(event);
+	error = coresight_read(event);
+	if (error == 0) {
+		*curpage = event->etr.curpage;
+		*curpage_offset = event->etr.curpage_offset;
+	}
 
-	*curpage = event->etr.curpage;
-	*curpage_offset = event->etr.curpage_offset;
-
-	return (0);
+	return (error);
 }
 
 static void

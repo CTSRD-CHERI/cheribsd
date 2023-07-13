@@ -207,14 +207,19 @@ coresight_dump(struct coresight_event *event)
 	}
 }
 
-void
+int
 coresight_read(struct coresight_event *event)
 {
 	struct coresight_device *cs_dev;
 	struct endpoint *endp;
+	int error;
 
 	LIST_FOREACH(endp, &event->endplist, endplink) {
 		cs_dev = endp->cs_dev;
-		CORESIGHT_READ(cs_dev->dev, endp, event);
+		error = CORESIGHT_READ(cs_dev->dev, endp, event);
+		if (error != ENXIO && error != 0)
+			return (error);
 	}
+
+	return (0);
 }

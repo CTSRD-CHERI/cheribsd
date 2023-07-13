@@ -488,7 +488,7 @@ tmc_read(device_t dev, struct endpoint *endp, struct coresight_event *event)
 
 	sc = device_get_softc(dev);
 	if (sc->dev_type == CORESIGHT_ETF)
-		return (0);
+		return (ENXIO);
 
 	lo = bus_read_4(sc->res[0], TMC_RWP);
 	hi = bus_read_4(sc->res[0], TMC_RWPHI);
@@ -510,9 +510,11 @@ tmc_read(device_t dev, struct endpoint *endp, struct coresight_event *event)
 		event->etr.curpage_offset = ptr & 0xfff;
 		dprintf("CUR_PTR %lx, page %d of %d, offset %ld\n",
 		    ptr, i, event->etr.npages, event->etr.curpage_offset);
+
+		return (0);
 	}
 
-	return (0);
+	return (ENOENT);
 }
 
 static void

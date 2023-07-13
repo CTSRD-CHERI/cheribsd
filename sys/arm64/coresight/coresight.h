@@ -173,7 +173,7 @@ void coresight_stop(struct coresight_event *event);
 void coresight_enable(struct coresight_event *event);
 void coresight_disable(struct coresight_event *event);
 
-void coresight_read(struct coresight_event *event);
+int coresight_read(struct coresight_event *event);
 void coresight_dump(struct coresight_event *event);
 
 #endif /* !_ARM64_CORESIGHT_CORESIGHT_H_ */

@@ -218,8 +218,10 @@ hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		if (ctx != vm->ctx)
 			return (ENXIO);
 
-		/* TODO: second arg */
-		hwt_backend_read(ctx, 0, &curpage, &curpage_offset);
+		/* TODO: fix cpu_id (second arg) */
+		error = hwt_backend_read(ctx, 0, &curpage, &curpage_offset);
+		if (error)
+			return (error);
 
 		error = copyout(&curpage, ptr_get->curpage, sizeof(int));
 		if (error)
