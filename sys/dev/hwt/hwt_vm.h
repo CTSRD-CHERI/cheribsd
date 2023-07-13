@@ -39,8 +39,8 @@ struct hwt_vm {
 	struct hwt_context		*ctx;
 };
 
-extern struct cdevsw hwt_vm_cdevsw;
 struct hwt_vm * hwt_vm_alloc(void);
+int hwt_vm_create_cdev(struct hwt_vm *vm, char *path);
 
 int hwt_vm_alloc_buffers(struct hwt_vm *vm);
 void hwt_vm_destroy_buffers(struct hwt_vm *vm);

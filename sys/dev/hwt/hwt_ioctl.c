@@ -167,6 +167,7 @@ static int
 hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
     struct hwt_backend *backend, struct hwt_alloc *halloc)
 {
+	char path[MAXPATHLEN];
 	struct hwt_context *ctx;
 	struct hwt_thread *thr;
 	struct proc *p;
@@ -236,7 +237,8 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 		return (error);
 	}
 
-	error = hwt_thread_create_cdev(thr, ctx->pid);
+	sprintf(path, "hwt_%d_%d", ctx->pid, thr->tid);
+	error = hwt_vm_create_cdev(thr->vm, path);
 	if (error) {
 		/* TODO: deallocate resources. */
 		return (error);
@@ -253,6 +255,9 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
     struct hwt_backend *backend, struct hwt_alloc *halloc)
 {
 	struct hwt_context *ctx;
+	struct hwt_vm *vm;
+	char path[MAXPATHLEN];
+	int error;
 	int cpu;
 
 	cpu = halloc->cpu;
@@ -272,9 +277,14 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 	ctx->hwt_owner = ho;
 	ctx->mode = HWT_MODE_CPU;
 
-#if 0
+	vm = hwt_vm_alloc();
+	vm->ctx = ctx;
+	vm->npages = ctx->bufsize / PAGE_SIZE;
+
+	ctx->vm = vm;
+
 	/* Allocate buffers. */
-	error = hwt_ctx_alloc_buffers(ctx);
+	error = hwt_vm_alloc_buffers(vm);
 	if (error) {
 		hwt_ctx_free(ctx);
 		return (error);
@@ -291,14 +301,15 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 		return (error);
 	}
 
-	error = hwt_ctx_create_cdev(ctx);
+	sprintf(path, "hwt_%d", ctx->cpu);
+
+	error = hwt_vm_create_cdev(ctx->vm, path);
 	if (error) {
 		/* TODO: deallocate resources. */
 		return (error);
 	}
-#endif
 
-	return (ENXIO);
+	return (0);
 }
 
 static int

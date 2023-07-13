@@ -239,7 +239,7 @@ hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	return (0);
 }
 
-struct cdevsw hwt_vm_cdevsw = {
+static struct cdevsw hwt_vm_cdevsw = {
 	.d_version	= D_VERSION,
 	.d_name		= "hwt",
 	.d_open		= hwt_vm_open,
@@ -247,14 +247,13 @@ struct cdevsw hwt_vm_cdevsw = {
 	.d_ioctl	= hwt_vm_ioctl,
 };
 
-#if 0
 int
-hwt_vm_create_cdev(struct hwt_vm *thr, pid_t pid)
+hwt_vm_create_cdev(struct hwt_vm *vm, char *path)
 {
 	struct make_dev_args args;
 	int error;
 
-	printf("%s: pid %d tid %d\n", __func__, pid, thr->tid);
+	printf("%s: path %s\n", __func__, path);
 
 	make_dev_args_init(&args);
 	args.mda_devsw = &hwt_vm_cdevsw;
@@ -262,15 +261,14 @@ hwt_vm_create_cdev(struct hwt_vm *thr, pid_t pid)
 	args.mda_uid = UID_ROOT;
 	args.mda_gid = GID_WHEEL;
 	args.mda_mode = 0660;
-	args.mda_si_drv1 = thr;
+	args.mda_si_drv1 = vm;
 
-	error = make_dev_s(&args, &vm->cdev, "hwt_%d_%d", pid, thr->tid);
+	error = make_dev_s(&args, &vm->cdev, "%s", path);
 	if (error != 0)
 		return (error);
 
 	return (0);
 }
-#endif
 
 struct hwt_vm *
 hwt_vm_alloc(void)

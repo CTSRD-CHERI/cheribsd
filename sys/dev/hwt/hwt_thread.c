@@ -86,32 +86,6 @@ hwt_thread_first(struct hwt_context *ctx)
 	return (thr);
 }
 
-int
-hwt_thread_create_cdev(struct hwt_thread *thr, pid_t pid)
-{
-	struct make_dev_args args;
-	struct hwt_vm *vm;
-	int error;
-
-	printf("%s: pid %d tid %d\n", __func__, pid, thr->tid);
-
-	vm = thr->vm;
-
-	make_dev_args_init(&args);
-	args.mda_devsw = &hwt_vm_cdevsw;
-	args.mda_flags = MAKEDEV_CHECKNAME | MAKEDEV_WAITOK;
-	args.mda_uid = UID_ROOT;
-	args.mda_gid = GID_WHEEL;
-	args.mda_mode = 0660;
-	args.mda_si_drv1 = vm;
-
-	error = make_dev_s(&args, &vm->cdev, "hwt_%d_%d", pid, thr->tid);
-	if (error != 0)
-		return (error);
-
-	return (0);
-}
-
 /*
  * Called by ctx owner only.
  */
@@ -204,6 +178,7 @@ hwt_thread_create(struct thread *td, struct hwt_thread **thr0)
 	struct hwt_thread *thr;
 	struct proc *p;
 	size_t bufsize;
+	char path[MAXPATHLEN];
 	int error;
 
 	p = td->td_proc;
@@ -227,7 +202,8 @@ hwt_thread_create(struct thread *td, struct hwt_thread **thr0)
 	thr->vm->ctx = ctx;
 	thr->tid = td->td_tid;
 
-	error = hwt_thread_create_cdev(thr, p->p_pid);
+	sprintf(path, "hwt_%d_%d", p->p_pid, td->td_tid);
+	error = hwt_vm_create_cdev(thr->vm, path);
 	if (error) {
 		printf("%s: could not create cdev, error %d\n",
 		    __func__, error);
