@@ -405,7 +405,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	struct hwt_set_config *sconf;
 	struct hwt_context *ctx;
 	struct hwt_owner *ho;
-	struct hwt_start *s;
 	struct hwt_wakeup *hwakeup;
 	struct hwt_thread *thr;
 	int error;
@@ -420,25 +419,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		/* Allocate HWT context. */
 		error = hwt_ioctl_alloc(td, (struct hwt_alloc *)addr);
 		return (error);
-
-	case HWT_IOC_START:
-		/* Start tracing. */
-		s = (struct hwt_start *)addr;
-		dprintf("%s: start, pid %d\n", __func__, s->pid);
-		ctx = hwt_owner_lookup_ctx(ho, s->pid);
-		if (ctx == NULL)
-			return (ENXIO);
-
-		HWT_CTX_LOCK(ctx);
-		if (ctx->state == CTX_STATE_RUNNING) {
-			/* Already running ? */
-			HWT_CTX_UNLOCK(ctx);
-			return (ENXIO);
-		}
-		ctx->state = CTX_STATE_RUNNING;
-		HWT_CTX_UNLOCK(ctx);
-
-		return (0);
 
 	case HWT_IOC_RECORD_GET:
 		rget = (struct hwt_record_get *)addr;

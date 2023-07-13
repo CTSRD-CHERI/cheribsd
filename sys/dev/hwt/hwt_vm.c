@@ -196,25 +196,46 @@ hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	struct hwt_context *ctx;
 	struct hwt_vm *vm;
 	struct hwt_owner *ho;
+	struct hwt_start *s __unused;
 	vm_offset_t curpage_offset;
 	int curpage;
 	int error;
 
 	vm = dev->si_drv1;
+	KASSERT(vm != NULL, ("si_drv1 is NULL"));
 
 	ctx = vm->ctx;
 
+	/* Ensure process is registered owner of this HWT. */
+	ho = hwt_ownerhash_lookup(td->td_proc);
+	if (ho == NULL)
+		return (ENXIO);
+
+	if (ctx->hwt_owner != ho)
+		return (EPERM);
+
 	switch (cmd) {
+	case HWT_IOC_START:
+		/* Start tracing. */
+		s = (struct hwt_start *)addr;
+
+		dprintf("%s: start, pid %d\n", __func__, s->pid);
+
+		/* TODO: s->pid is not needed. */
+
+		HWT_CTX_LOCK(ctx);
+		if (ctx->state == CTX_STATE_RUNNING) {
+			/* Already running ? */
+			HWT_CTX_UNLOCK(ctx);
+			return (ENXIO);
+		}
+		ctx->state = CTX_STATE_RUNNING;
+		HWT_CTX_UNLOCK(ctx);
+
+		return (0);
+
 	case HWT_IOC_BUFPTR_GET:
 		ptr_get = (struct hwt_bufptr_get *)addr;
-
-		/* Ensure process is registered owner of this ctx. */
-		ho = hwt_ownerhash_lookup(td->td_proc);
-		if (ho == NULL)
-			return (ENXIO);
-
-		if (ctx->hwt_owner != ho)
-			return (EPERM);
 
 		/* TODO: fix cpu_id (second arg) */
 		error = hwt_backend_read(ctx, 0, &curpage, &curpage_offset);
