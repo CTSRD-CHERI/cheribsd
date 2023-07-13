@@ -52,9 +52,9 @@
 #include <vm/vm_phys.h>
 
 #include <dev/hwt/hwt_hook.h>
-#include <dev/hwt/hwt_config.h>
 #include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_contexthash.h>
+#include <dev/hwt/hwt_config.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_owner.h>
 #include <dev/hwt/hwt_ownerhash.h>
@@ -202,7 +202,7 @@ hwt_thread_create(struct thread *td, struct hwt_thread **thr0)
 	thr->vm->ctx = ctx;
 	thr->tid = td->td_tid;
 
-	sprintf(path, "hwt_%d_%d", p->p_pid, td->td_tid);
+	sprintf(path, "hwt_%d_%d", ctx->ident, thr->session_id);
 	error = hwt_vm_create_cdev(thr->vm, path);
 	if (error) {
 		printf("%s: could not create cdev, error %d\n",

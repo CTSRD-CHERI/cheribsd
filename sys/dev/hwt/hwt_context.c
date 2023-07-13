@@ -29,6 +29,7 @@
  */
 
 #include <sys/param.h>
+#include <sys/bitstring.h>
 #include <sys/eventhandler.h>
 #include <sys/ioccom.h>
 #include <sys/conf.h>
@@ -42,8 +43,8 @@
 #include <sys/hwt.h>
 
 #include <dev/hwt/hwt_hook.h>
-#include <dev/hwt/hwt_config.h>
 #include <dev/hwt/hwt_context.h>
+#include <dev/hwt/hwt_config.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_owner.h>
 
@@ -58,17 +59,55 @@
 
 static MALLOC_DEFINE(M_HWT_CTX, "hwt_ctx", "Hardware Trace");
 
+static bitstr_t *ident_set;
+static int ident_set_size;
+static struct mtx ident_set_mutex;
+
+static int
+hwt_ctx_ident_alloc(int *new_ident)
+{
+ 
+	mtx_lock_spin(&ident_set_mutex);
+	bit_ffc(ident_set, ident_set_size, new_ident);
+	if (*new_ident == -1) {
+		mtx_unlock_spin(&ident_set_mutex);
+		return (ENOMEM);
+	}
+	bit_set(ident_set, *new_ident);
+	mtx_unlock_spin(&ident_set_mutex);
+
+	return (0);
+}
+
+static void
+hwt_ctx_ident_free(int ident)
+{
+
+	mtx_lock_spin(&ident_set_mutex);
+	bit_clear(ident_set, ident);
+	mtx_unlock_spin(&ident_set_mutex);
+}
+
 struct hwt_context *
 hwt_ctx_alloc(void)
 {
 	struct hwt_context *ctx;
+	int error;
 
 	ctx = malloc(sizeof(struct hwt_context), M_HWT_CTX, M_WAITOK | M_ZERO);
-	ctx->session_counter = 1;
+	ctx->session_counter = 0;
 
 	LIST_INIT(&ctx->records);
 	LIST_INIT(&ctx->threads);
 	mtx_init(&ctx->mtx, "ctx", NULL, MTX_SPIN);
+
+	hwt_ctx_ident_alloc(&ctx->ident);
+
+	error = hwt_ctx_ident_alloc(&ctx->ident);
+	if (error) {
+		printf("could not allocate ident bit str\n");
+		return (NULL);
+	}
 
 	return (ctx);
 }
@@ -77,5 +116,15 @@ void
 hwt_ctx_free(struct hwt_context *ctx)
 {
 
+	hwt_ctx_ident_free(ctx->ident);
 	free(ctx, M_HWT_CTX);
+}
+
+void
+hwt_ctx_load(void)
+{
+
+	ident_set_size = (1 << 8);
+	ident_set = bit_alloc(ident_set_size, M_HWT_CTX, M_WAITOK);
+	mtx_init(&ident_set_mutex, "ident set", NULL, MTX_SPIN);
 }

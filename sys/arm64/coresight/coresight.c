@@ -38,6 +38,7 @@
 #include <sys/module.h>
 #include <sys/mutex.h>
 #include <sys/smp.h>
+#include <sys/hwt.h>
 #include <machine/bus.h>
 
 #include <arm64/coresight/coresight.h>
@@ -147,8 +148,10 @@ coresight_backend_configure(struct hwt_context *ctx, int cpu_id, int session_id)
 	 * OpenCSD needs a trace ID to distinguish trace sessions
 	 * as they are merged to a single buffer by using funnel
 	 * device.
+	 *
+	 * etmv4 session_id can't be 0.
 	 */
-	event->etm.trace_id = session_id;
+	event->etm.trace_id = session_id + 1;
 
 	error = coresight_configure(event, ctx);
 

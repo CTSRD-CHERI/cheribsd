@@ -39,6 +39,7 @@ struct hwt_context {
 	LIST_ENTRY(hwt_context)		next_hwts; /* Entry in ho->hwts. */
 
 	int				mode;
+	int				ident;
 
 	/* CPU mode. */
 	int				cpu;
@@ -69,5 +70,6 @@ struct hwt_context {
 
 struct hwt_context * hwt_ctx_alloc(void);
 void hwt_ctx_free(struct hwt_context *ctx);
+void hwt_ctx_load(void);
 
 #endif /* !_DEV_HWT_HWT_CONTEXT_H_ */

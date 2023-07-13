@@ -104,6 +104,7 @@
 #include <sys/mutex.h>
 #include <sys/rwlock.h>
 
+#include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_contexthash.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_owner.h>
@@ -155,13 +156,14 @@ hwt_load(void)
 	args.mda_mode = 0660;
 	args.mda_si_drv1 = NULL;
 
+	hwt_backend_load();
+	hwt_ctx_load();
+	hwt_contexthash_load();
+	hwt_ownerhash_load();
+
 	error = make_dev_s(&args, &hwt_cdev, "hwt");
 	if (error != 0)
 		return (error);
-
-	hwt_backend_load();
-	hwt_contexthash_load();
-	hwt_ownerhash_load();
 
 	hwt_exit_tag = EVENTHANDLER_REGISTER(process_exit, hwt_process_exit,
 	    NULL, EVENTHANDLER_PRI_ANY);

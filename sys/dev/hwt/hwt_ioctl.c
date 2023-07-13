@@ -45,9 +45,9 @@
 #include <sys/hwt.h>
 
 #include <dev/hwt/hwt_hook.h>
-#include <dev/hwt/hwt_config.h>
 #include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_contexthash.h>
+#include <dev/hwt/hwt_config.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_owner.h>
 #include <dev/hwt/hwt_ownerhash.h>
@@ -67,7 +67,6 @@
 
 /* No real reason for these limitations just sanity checks. */
 #define	HWT_MAXBUFSIZE		(32UL * 1024 * 1024 * 1024) /* 32 GB */
-#define	HWT_MAXCONFIGSIZE	1024
 
 static MALLOC_DEFINE(M_HWT_IOCTL, "hwt_ioctl", "Hardware Trace");
 
@@ -125,40 +124,6 @@ hwt_priv_check(struct proc *o, struct proc *t)
 done:
 	crfree(tc);
 	crfree(oc);
-
-	return (error);
-}
-
-static int
-hwt_ioctl_send_records(struct hwt_context *ctx,
-    struct hwt_record_get *record_get)
-{
-	struct hwt_record_user_entry *user_entry;
-	int nitems_req;
-	int error;
-	int i;
-
-	nitems_req = 0;
-
-	error = copyin(record_get->nentries, &nitems_req, sizeof(int));
-	if (error)
-		return (error);
-
-	if (nitems_req < 1 || nitems_req > 1024)
-		return (ENXIO);
-
-	user_entry = malloc(sizeof(struct hwt_record_user_entry) * nitems_req,
-	    M_HWT_IOCTL, M_WAITOK | M_ZERO);
-
-	i = hwt_record_grab(ctx, user_entry, nitems_req);
-	if (i > 0)
-		error = copyout(user_entry, record_get->records,
-		    sizeof(struct hwt_record_user_entry) * i);
-
-	if (error == 0)
-		error = copyout(&i, record_get->nentries, sizeof(int));
-
-	free(user_entry, M_HWT_IOCTL);
 
 	return (error);
 }
@@ -237,12 +202,16 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 		return (error);
 	}
 
-	sprintf(path, "hwt_%d_%d", ctx->pid, thr->tid);
+	sprintf(path, "hwt_%d_%d", ctx->ident, thr->session_id);
 	error = hwt_vm_create_cdev(thr->vm, path);
 	if (error) {
 		/* TODO: deallocate resources. */
 		return (error);
 	}
+
+	error = copyout(&ctx->ident, halloc->ident, sizeof(int));
+	if (error)
+		return (error);
 
 	/* Pass thread ID to user for mmap. */
 	hwt_record_thread(thr);
@@ -309,7 +278,9 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 		return (error);
 	}
 
-	return (0);
+	error = copyout(&ctx->ident, halloc->ident, sizeof(int));
+
+	return (error);
 }
 
 static int
@@ -360,108 +331,17 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 	return (error);
 }
 
-static int
-hwt_ioctl_set_config(struct thread *td, struct hwt_context *ctx,
-    struct hwt_set_config *sconf)
-{
-	size_t config_size;
-	void *old_config;
-	void *config;
-	int error;
-
-	config_size = sconf->config_size;
-	if (config_size == 0)
-		return (0);
-
-	if (config_size > HWT_MAXCONFIGSIZE)
-		return (EFBIG);
-
-	config = malloc(config_size, M_HWT_IOCTL, M_WAITOK | M_ZERO);
-
-	error = copyin(sconf->config, config, config_size);
-	if (error) {
-		free(config, M_HWT_IOCTL);
-		return (error);
-	}
-
-	HWT_CTX_LOCK(ctx);
-	old_config = ctx->config;
-	ctx->config = config;
-	ctx->config_size = sconf->config_size;
-	ctx->config_version = sconf->config_version;
-	HWT_CTX_UNLOCK(ctx);
-
-	if (old_config != NULL)
-		free(old_config, M_HWT_IOCTL);
-
-	return (error);
-}
-
 int
 hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
     struct thread *td)
 {
-	struct hwt_record_get *rget;
-	struct hwt_set_config *sconf;
-	struct hwt_context *ctx;
-	struct hwt_owner *ho;
-	struct hwt_wakeup *hwakeup;
-	struct hwt_thread *thr;
 	int error;
-
-	/* Check if process is registered owner of any HWTs. */
-	ho = hwt_ownerhash_lookup(td->td_proc);
-	if (ho == NULL && cmd != HWT_IOC_ALLOC)
-		return (ENXIO);
 
 	switch (cmd) {
 	case HWT_IOC_ALLOC:
 		/* Allocate HWT context. */
 		error = hwt_ioctl_alloc(td, (struct hwt_alloc *)addr);
 		return (error);
-
-	case HWT_IOC_RECORD_GET:
-		rget = (struct hwt_record_get *)addr;
-		ctx = hwt_owner_lookup_ctx(ho, rget->pid);
-		if (ctx == NULL)
-			return (ENXIO);
-
-		error = hwt_ioctl_send_records(ctx, rget);
-		return (error);
-
-	case HWT_IOC_SET_CONFIG:
-		sconf = (struct hwt_set_config *)addr;
-		ctx = hwt_owner_lookup_ctx(ho, sconf->pid);
-		if (ctx == NULL)
-			return (ENXIO);
-
-		error = hwt_ioctl_set_config(td, ctx, sconf);
-		if (error)
-			return (error);
-
-		ctx->pause_on_mmap = sconf->pause_on_mmap ? 1 : 0;
-
-		return (0);
-	case HWT_IOC_WAKEUP:
-		hwakeup = (struct hwt_wakeup *)addr;
-		ctx = hwt_owner_lookup_ctx(ho, hwakeup->pid);
-		if (ctx == NULL)
-			return (ENXIO);
-
-		HWT_CTX_LOCK(ctx);
-		thr = hwt_thread_lookup_by_tid(ctx, hwakeup->tid);
-		if (thr)
-			HWT_THR_LOCK(thr);
-		HWT_CTX_UNLOCK(ctx);
-
-		if (thr == NULL)
-			return (ENOENT);
-
-		wakeup(thr);
-
-		HWT_THR_UNLOCK(thr);
-
-		return (0);
 	default:
 		return (ENXIO);
 	};

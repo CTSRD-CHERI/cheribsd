@@ -38,11 +38,13 @@
 #include <vm/vm.h>
 
 #include <dev/hwt/hwt_hook.h>
-#include <dev/hwt/hwt_config.h>
 #include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_contexthash.h>
+#include <dev/hwt/hwt_config.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_record.h>
+
+#define	HWT_MAXCONFIGSIZE	PAGE_SIZE
 
 #define	HWT_CONFIG_DEBUG
 #undef	HWT_CONFIG_DEBUG
@@ -54,3 +56,40 @@
 #endif
 
 static MALLOC_DEFINE(M_HWT_CONFIG, "hwt_config", "HWT config");
+
+int
+hwt_config_set(struct thread *td, struct hwt_context *ctx,
+    struct hwt_set_config *sconf)
+{
+	size_t config_size;
+	void *old_config;
+	void *config;
+	int error;
+
+	config_size = sconf->config_size;
+	if (config_size == 0)
+		return (0);
+
+	if (config_size > HWT_MAXCONFIGSIZE)
+		return (EFBIG);
+
+	config = malloc(config_size, M_HWT_CONFIG, M_WAITOK | M_ZERO);
+
+	error = copyin(sconf->config, config, config_size);
+	if (error) {
+		free(config, M_HWT_CONFIG);
+		return (error);
+	}
+
+	HWT_CTX_LOCK(ctx);
+	old_config = ctx->config;
+	ctx->config = config;
+	ctx->config_size = sconf->config_size;
+	ctx->config_version = sconf->config_version;
+	HWT_CTX_UNLOCK(ctx);
+
+	if (old_config != NULL)
+		free(old_config, M_HWT_CONFIG);
+
+	return (error);
+}

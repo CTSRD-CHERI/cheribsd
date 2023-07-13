@@ -44,8 +44,8 @@
 #include <sys/hwt.h>
 
 #include <dev/hwt/hwt_hook.h>
-#include <dev/hwt/hwt_config.h>
 #include <dev/hwt/hwt_context.h>
+#include <dev/hwt/hwt_config.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_backend.h>
 

@@ -34,4 +34,7 @@
 struct hwt_config {
 };
 
+int hwt_config_set(struct thread *td, struct hwt_context *ctx,
+    struct hwt_set_config *sconf);
+
 #endif /* !_DEV_HWT_HWT_CONFIG_H_ */

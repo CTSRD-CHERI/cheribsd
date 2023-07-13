@@ -38,9 +38,9 @@
 #include <vm/vm.h>
 
 #include <dev/hwt/hwt_hook.h>
-#include <dev/hwt/hwt_config.h>
 #include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_contexthash.h>
+#include <dev/hwt/hwt_config.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_record.h>
 
@@ -94,7 +94,7 @@ hwt_record_thread(struct hwt_thread *thr)
 	entry = malloc(sizeof(struct hwt_record_entry), M_HWT_RECORD,
 	    M_WAITOK | M_ZERO);
 	entry->record_type = HWT_RECORD_THREAD_CREATE;
-	entry->tid = thr->tid;
+	entry->tid = thr->session_id;
 
 	HWT_CTX_LOCK(ctx);
 	LIST_INSERT_HEAD(&ctx->records, entry, next);
@@ -132,4 +132,37 @@ hwt_record_grab(struct hwt_context *ctx,
 	}
 
 	return (i);
+}
+
+int
+hwt_record_send(struct hwt_context *ctx, struct hwt_record_get *record_get)
+{
+	struct hwt_record_user_entry *user_entry;
+	int nitems_req;
+	int error;
+	int i;
+
+	nitems_req = 0;
+
+	error = copyin(record_get->nentries, &nitems_req, sizeof(int));
+	if (error)
+		return (error);
+
+	if (nitems_req < 1 || nitems_req > 1024)
+		return (ENXIO);
+
+	user_entry = malloc(sizeof(struct hwt_record_user_entry) * nitems_req,
+	    M_HWT_RECORD, M_WAITOK | M_ZERO);
+
+	i = hwt_record_grab(ctx, user_entry, nitems_req);
+	if (i > 0)
+		error = copyout(user_entry, record_get->records,
+		    sizeof(struct hwt_record_user_entry) * i);
+
+	if (error == 0)
+		error = copyout(&i, record_get->nentries, sizeof(int));
+
+	free(user_entry, M_HWT_RECORD);
+
+	return (error);
 }

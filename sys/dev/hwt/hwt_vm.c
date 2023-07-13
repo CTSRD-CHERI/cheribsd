@@ -52,13 +52,15 @@
 #include <vm/vm_phys.h>
 
 #include <dev/hwt/hwt_hook.h>
-#include <dev/hwt/hwt_config.h>
 #include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_contexthash.h>
+#include <dev/hwt/hwt_config.h>
 #include <dev/hwt/hwt_owner.h>
 #include <dev/hwt/hwt_ownerhash.h>
+#include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_backend.h>
 #include <dev/hwt/hwt_vm.h>
+#include <dev/hwt/hwt_record.h>
 
 #define	HWT_THREAD_DEBUG
 #undef	HWT_THREAD_DEBUG
@@ -192,11 +194,17 @@ static int
 hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
     struct thread *td)
 {
+	struct hwt_wakeup *hwakeup;
+	struct hwt_record_get *rget;
+	struct hwt_set_config *sconf;
 	struct hwt_bufptr_get *ptr_get;
+	struct hwt_start *s __unused;
+
+	struct hwt_thread *thr;
 	struct hwt_context *ctx;
 	struct hwt_vm *vm;
 	struct hwt_owner *ho;
-	struct hwt_start *s __unused;
+
 	vm_offset_t curpage_offset;
 	int curpage;
 	int error;
@@ -231,8 +239,39 @@ hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		}
 		ctx->state = CTX_STATE_RUNNING;
 		HWT_CTX_UNLOCK(ctx);
+		break;
 
-		return (0);
+	case HWT_IOC_RECORD_GET:
+		rget = (struct hwt_record_get *)addr;
+		error = hwt_record_send(ctx, rget);
+		if (error)
+			return (error);
+		break;
+
+	case HWT_IOC_SET_CONFIG:
+		sconf = (struct hwt_set_config *)addr;
+		error = hwt_config_set(td, ctx, sconf);
+		if (error)
+			return (error);
+		ctx->pause_on_mmap = sconf->pause_on_mmap ? 1 : 0;
+		break;
+
+	case HWT_IOC_WAKEUP:
+		hwakeup = (struct hwt_wakeup *)addr;
+
+		HWT_CTX_LOCK(ctx);
+		thr = hwt_thread_lookup_by_tid(ctx, hwakeup->tid);
+		if (thr)
+			HWT_THR_LOCK(thr);
+		HWT_CTX_UNLOCK(ctx);
+
+		if (thr == NULL)
+			return (ENOENT);
+
+		wakeup(thr);
+
+		HWT_THR_UNLOCK(thr);
+		break;
 
 	case HWT_IOC_BUFPTR_GET:
 		ptr_get = (struct hwt_bufptr_get *)addr;
@@ -249,7 +288,6 @@ hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		    sizeof(vm_offset_t));
 		if (error)
 			return (error);
-
 		break;
 	default:
 		break;

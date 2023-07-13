@@ -41,9 +41,9 @@
 #include <sys/rwlock.h>
 #include <sys/hwt.h>
 
-#include <dev/hwt/hwt_config.h>
 #include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_contexthash.h>
+#include <dev/hwt/hwt_config.h>
 
 #define	HWT_DEBUG
 #undef	HWT_DEBUG
