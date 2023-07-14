@@ -101,7 +101,7 @@ hwt_record_entry_free(struct hwt_record_entry *entry)
 	free(entry, M_HWT_RECORD);
 }
 
-int
+static int
 hwt_record_grab(struct hwt_context *ctx,
     struct hwt_record_user_entry *user_entry, int nitems_req)
 {

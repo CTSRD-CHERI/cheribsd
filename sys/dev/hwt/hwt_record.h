@@ -31,8 +31,6 @@
 #ifndef _DEV_HWT_HWT_RECORD_H_
 #define _DEV_HWT_HWT_RECORD_H_
 
-int hwt_record_grab(struct hwt_context *ctx,
-    struct hwt_record_user_entry *user_entry, int nitems_req);
 int hwt_record_send(struct hwt_context *ctx, struct hwt_record_get *record_get);
 void hwt_record(struct thread *td, struct hwt_record_entry *ent);
 
