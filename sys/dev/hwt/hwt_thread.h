@@ -34,7 +34,7 @@
 struct hwt_thread {
 	struct hwt_vm			*vm;
 	struct hwt_context		*ctx;
-	lwpid_t				tid;
+	struct thread			*td;
 	LIST_ENTRY(hwt_thread)		next;
 	int				thread_id;
 	int				state;

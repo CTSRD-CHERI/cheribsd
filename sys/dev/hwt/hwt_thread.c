@@ -98,7 +98,7 @@ hwt_thread_lookup(struct hwt_context *ctx, struct thread *td)
 	HWT_CTX_ASSERT_LOCKED(ctx);
 
 	LIST_FOREACH(thr, &ctx->threads, next) {
-		if (thr->tid == td->td_tid) {
+		if (thr->td == td) {
 			HWT_THR_LOCK(thr);
 			HWT_CTX_UNLOCK(ctx);
 			return (thr);
@@ -215,7 +215,7 @@ hwt_thread_create(struct thread *td)
 	thr->vm->ctx = ctx;
 	thr->ctx = ctx;
 	thr->thread_id = thread_id;
-	thr->tid = td->td_tid;
+	thr->td = td;
 	LIST_INSERT_HEAD(&ctx->threads, thr, next);
 	LIST_INSERT_HEAD(&ctx->records, entry, next);
 	HWT_CTX_UNLOCK(ctx);
