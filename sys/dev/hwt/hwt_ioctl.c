@@ -210,8 +210,10 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 	}
 
 	error = copyout(&ctx->ident, halloc->ident, sizeof(int));
-	if (error)
+	if (error) {
+		/* TODO: deallocate resources. */
 		return (error);
+	}
 
 	return (0);
 }
@@ -269,7 +271,6 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 	}
 
 	sprintf(path, "hwt_%d", ctx->cpu);
-
 	error = hwt_vm_create_cdev(ctx->vm, path);
 	if (error) {
 		/* TODO: deallocate resources. */
@@ -277,8 +278,12 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 	}
 
 	error = copyout(&ctx->ident, halloc->ident, sizeof(int));
+	if (error) {
+		/* TODO: deallocate resources. */
+		return (error);
+	}
 
-	return (error);
+	return (0);
 }
 
 static int
