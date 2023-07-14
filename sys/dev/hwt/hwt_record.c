@@ -95,21 +95,10 @@ hwt_record_entry_alloc(void)
 }
 
 void
-hwt_record_thread(struct hwt_thread *thr)
+hwt_record_entry_free(struct hwt_record_entry *entry)
 {
-	struct hwt_record_entry *entry;
-	struct hwt_context *ctx;
 
-	ctx = thr->ctx;
-
-	entry = malloc(sizeof(struct hwt_record_entry), M_HWT_RECORD,
-	    M_WAITOK | M_ZERO);
-	entry->record_type = HWT_RECORD_THREAD_CREATE;
-	entry->thread_id = thr->thread_id;
-
-	HWT_CTX_LOCK(ctx);
-	LIST_INSERT_HEAD(&ctx->records, entry, next);
-	HWT_CTX_UNLOCK(ctx);
+	free(entry, M_HWT_RECORD);
 }
 
 int

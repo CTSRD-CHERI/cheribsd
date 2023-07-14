@@ -213,9 +213,6 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 	if (error)
 		return (error);
 
-	/* Pass thread ID to user for mmap. */
-	hwt_record_thread(thr);
-
 	return (0);
 }
 
