@@ -84,6 +84,10 @@ hwt_switch_in(struct thread *td)
 	}
 
 	thr = hwt_thread_lookup(ctx, td);
+	if (thr == NULL) {
+		HWT_CTX_UNLOCK(ctx);
+		return;
+	}
 
 	printf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
 	    thr->thread_id, td->td_tid, cpu_id);
@@ -115,6 +119,10 @@ hwt_switch_out(struct thread *td)
 		return;
 	}
 	thr = hwt_thread_lookup(ctx, td);
+	if (thr == NULL) {
+		HWT_CTX_UNLOCK(ctx);
+		return;
+	}
 
 	printf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
 	    thr->thread_id, td->td_tid, cpu_id);
@@ -144,6 +152,10 @@ hwt_thread_exit(struct thread *td)
 		return;
 	}
 	thr = hwt_thread_lookup(ctx, td);
+	if (thr == NULL) {
+		HWT_CTX_UNLOCK(ctx);
+		return;
+	}
 
 	thr->state = HWT_THREAD_STATE_EXITED;
 
@@ -173,6 +185,10 @@ hwt_hook_mmap(struct thread *td)
 	pause = ctx->pause_on_mmap ? 1 : 0;
 
 	thr = hwt_thread_lookup(ctx, td);
+	if (thr == NULL) {
+		HWT_CTX_UNLOCK(ctx);
+		return;
+	}
 
 	/*
 	 * msleep(9) atomically releases the mtx lock, so take refcount

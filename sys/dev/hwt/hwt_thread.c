@@ -123,7 +123,12 @@ hwt_thread_lookup(struct hwt_context *ctx, struct thread *td)
 		}
 	}
 
-	panic("thread not found");
+	/*
+	 * We are here because the hook on thread creation failed to allocate
+	 * a thread.
+	 */
+
+	return (NULL);
 }
 
 int
@@ -232,8 +237,6 @@ hwt_thread_create(struct thread *td)
 	LIST_INSERT_HEAD(&ctx->threads, thr, next);
 	LIST_INSERT_HEAD(&ctx->records, entry, next);
 	HWT_CTX_UNLOCK(ctx);
-
-	/* TODO: handle non-zero status in the caller of this func. */
 
 	return (0);
 }
