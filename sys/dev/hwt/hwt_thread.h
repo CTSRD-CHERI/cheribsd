@@ -56,8 +56,6 @@ void hwt_thread_insert(struct hwt_context *ctx, struct hwt_thread *thr);
 struct hwt_thread * hwt_thread_first(struct hwt_context *ctx);
 struct hwt_thread * hwt_thread_lookup(struct hwt_context *ctx,
     struct thread *td);
-struct hwt_thread * hwt_thread_lookup_by_tid(struct hwt_context *ctx,
-    lwpid_t tid);
 
 #define	HWT_THR_LOCK(thr)		mtx_lock_spin(&(thr)->mtx)
 #define	HWT_THR_UNLOCK(thr)		mtx_unlock_spin(&(thr)->mtx)

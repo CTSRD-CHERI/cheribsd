@@ -88,24 +88,6 @@ hwt_thread_first(struct hwt_context *ctx)
 }
 
 /*
- * Called by ctx owner only.
- */
-struct hwt_thread *
-hwt_thread_lookup_by_tid(struct hwt_context *ctx, lwpid_t tid)
-{
-	struct hwt_thread *thr;
-
-	HWT_CTX_ASSERT_LOCKED(ctx);
-
-	LIST_FOREACH(thr, &ctx->threads, next) {
-		if (thr->tid == tid)
-			return (thr);
-	}
-
-	return (NULL);
-}
-
-/*
  * To use by hwt_switch_in/out() only.
  */
 struct hwt_thread *
