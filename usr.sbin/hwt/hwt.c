@@ -403,7 +403,6 @@ main(int argc, char **argv, char **env)
 	}
 
 	nlibs += 1; /* add binary itself. */
-	nlibs += 1; /* add thread 0 entry. */
 
 	printf("cmd is %s, nlibs %d\n", *cmd, nlibs);
 
