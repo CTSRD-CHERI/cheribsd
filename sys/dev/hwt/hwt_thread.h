@@ -49,7 +49,6 @@ int hwt_thread_create(struct thread *td);
 
 /* Thread de-allocation. */
 void hwt_thread_free(struct hwt_thread *thr);
-void hwt_thread_destroy_buffers(struct hwt_thread *thr);
 
 /* Thread list mgt. */
 void hwt_thread_insert(struct hwt_context *ctx, struct hwt_thread *thr);
