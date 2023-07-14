@@ -60,6 +60,7 @@
 #include <dev/hwt/hwt_ownerhash.h>
 #include <dev/hwt/hwt_backend.h>
 #include <dev/hwt/hwt_vm.h>
+#include <dev/hwt/hwt_record.h>
 
 #define	HWT_THREAD_DEBUG
 #undef	HWT_THREAD_DEBUG
@@ -172,9 +173,14 @@ hwt_thread_insert(struct hwt_context *ctx, struct hwt_thread *thr)
 	LIST_INSERT_HEAD(&ctx->threads, thr, next);
 }
 
+/*
+ * This is called by hooks only.
+ * TODO: Move to hwt_hook.c ?
+ */
 int
-hwt_thread_create(struct thread *td, struct hwt_thread **thr0)
+hwt_thread_create(struct thread *td)
 {
+	struct hwt_record_entry *entry;
 	struct hwt_context *ctx;
 	struct hwt_thread *thr;
 	struct proc *p;
@@ -209,6 +215,10 @@ hwt_thread_create(struct thread *td, struct hwt_thread **thr0)
 		return (error);
 	}
 
+	entry = hwt_record_entry_alloc();
+	entry->record_type = HWT_RECORD_THREAD_CREATE;
+	entry->thread_id = thread_id;
+
 	/* 3. Take ctx again, as it may gone during previous step. */
 	ctx = hwt_contexthash_lookup(p);
 	if (ctx == NULL) {
@@ -220,11 +230,10 @@ hwt_thread_create(struct thread *td, struct hwt_thread **thr0)
 	thr->thread_id = thread_id;
 	thr->tid = td->td_tid;
 	LIST_INSERT_HEAD(&ctx->threads, thr, next);
+	LIST_INSERT_HEAD(&ctx->records, entry, next);
 	HWT_CTX_UNLOCK(ctx);
 
-	*thr0 = thr;
-
-	/* TODO: handle non-zero status */
+	/* TODO: handle non-zero status in the caller of this func. */
 
 	return (0);
 }

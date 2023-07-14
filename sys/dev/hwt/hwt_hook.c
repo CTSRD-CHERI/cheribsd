@@ -192,9 +192,7 @@ hwt_hook_mmap(struct thread *td)
 static void
 hwt_hook_handler(struct thread *td, int func, void *arg)
 {
-	struct hwt_thread *thr;
 	struct proc *p;
-	int error;
 
 	p = td->td_proc;
 	if ((p->p_flag2 & P2_HWT) == 0)
@@ -208,9 +206,7 @@ hwt_hook_handler(struct thread *td, int func, void *arg)
 		hwt_switch_out(td);
 		break;
 	case HWT_THREAD_CREATE:
-		error = hwt_thread_create(td, &thr);
-		if (error == 0)
-			hwt_record_thread(thr);
+		hwt_thread_create(td);
 		break;
 	case HWT_THREAD_SET_NAME:
 		/* TODO. */

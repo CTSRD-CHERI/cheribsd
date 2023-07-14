@@ -83,6 +83,17 @@ hwt_record(struct thread *td, struct hwt_record_entry *ent)
 	HWT_CTX_UNLOCK(ctx);
 }
 
+struct hwt_record_entry *
+hwt_record_entry_alloc(void)
+{
+	struct hwt_record_entry *entry;
+
+	entry = malloc(sizeof(struct hwt_record_entry), M_HWT_RECORD,
+	    M_WAITOK | M_ZERO);
+
+	return (entry);
+}
+
 void
 hwt_record_thread(struct hwt_thread *thr)
 {
