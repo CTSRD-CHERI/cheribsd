@@ -283,6 +283,8 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 		return (error);
 	}
 
+	hwt_record_kernel_objects(ctx);
+
 	return (0);
 }
 

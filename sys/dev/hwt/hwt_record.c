@@ -34,6 +34,8 @@
 #include <sys/malloc.h>
 #include <sys/mutex.h>
 #include <sys/hwt.h>
+#include <sys/linker.h>
+#include <sys/pmckern.h> /* linker_hwpmc_list_objects */
 
 #include <vm/vm.h>
 
@@ -165,4 +167,26 @@ hwt_record_send(struct hwt_context *ctx, struct hwt_record_get *record_get)
 	free(user_entry, M_HWT_RECORD);
 
 	return (error);
+}
+
+void
+hwt_record_kernel_objects(struct hwt_context *ctx)
+{
+	struct hwt_record_entry *entry;
+	struct pmckern_map_in *kobase;
+	int i;
+
+	kobase = linker_hwpmc_list_objects();
+	for (i = 0; kobase[i].pm_file != NULL; i++) {
+		entry = malloc(sizeof(struct hwt_record_entry), M_HWT_RECORD,
+		    M_WAITOK);
+		entry->record_type = HWT_RECORD_KERNEL;
+		entry->fullpath = strdup(kobase[i].pm_file, M_HWT_RECORD);
+		entry->addr = kobase[i].pm_address;
+
+		HWT_CTX_LOCK(ctx);
+		LIST_INSERT_HEAD(&ctx->records, entry, next);
+		HWT_CTX_UNLOCK(ctx);
+	}
+	free(kobase, M_LINKER);
 }
