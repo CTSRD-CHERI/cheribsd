@@ -199,7 +199,7 @@ hwt_map_memory(struct trace_context *tc, int tid)
 		return (-1);
 	}
 
-	printf("%s: tc->base %#p\n", __func__, tc->base);
+	printf("%s: tc->base %p\n", __func__, tc->base);
 
 	return (0);
 }

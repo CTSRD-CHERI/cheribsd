@@ -562,7 +562,7 @@ hwt_coresight_init(struct trace_context *tc, struct cs_decoder *dec,
 
 	error = create_decoder_etmv4(tc, dec->dcdtree_handle, thread_id);
 	if (error != OCSD_OK) {
-		printf("can't create decoder: tc->base %#p\n", tc->base);
+		printf("can't create decoder: tc->base %p\n", tc->base);
 		return (-2);
 	}
 
