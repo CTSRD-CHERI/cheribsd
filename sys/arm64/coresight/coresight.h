@@ -160,9 +160,7 @@ struct coresight_device *
 int coresight_register(struct coresight_desc *desc);
 
 int coresight_init_event(struct coresight_event *event, int cpu);
-
-int coresight_setup(struct coresight_event *event, struct hwt_thread *thr);
-
+int coresight_setup(struct coresight_event *event);
 int coresight_configure(struct coresight_event *event,
     struct hwt_context *ctx);
 void coresight_deconfigure(struct coresight_event *event);

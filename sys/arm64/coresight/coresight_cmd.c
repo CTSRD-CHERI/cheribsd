@@ -124,7 +124,7 @@ coresight_init_event(struct coresight_event *event, int cpu)
 }
 
 int
-coresight_setup(struct coresight_event *event, struct hwt_thread *thr)
+coresight_setup(struct coresight_event *event)
 {
 	struct coresight_device *cs_dev;
 	struct endpoint *endp;

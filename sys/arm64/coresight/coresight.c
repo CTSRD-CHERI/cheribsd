@@ -72,7 +72,7 @@ static struct hwt_backend backend = {
 static struct coresight_event cs_event[MAXCPU];
 
 static int
-coresight_backend_init(struct hwt_context *ctx)
+coresight_backend_init_thread(struct hwt_context *ctx)
 {
 	struct coresight_event *event;
 	struct hwt_thread *thr;
@@ -100,7 +100,7 @@ coresight_backend_init(struct hwt_context *ctx)
 		event->etr.pages = vm->pages;
 		event->etr.npages = vm->npages;
 		event->etr.bufsize = vm->npages * PAGE_SIZE;
-		event->excp_level = 0; /* TODO: User level only for now. */
+		event->excp_level = 0;
 		event->src = CORESIGHT_ETMV4;
 		event->sink = CORESIGHT_TMC_ETR;
 
@@ -108,7 +108,7 @@ coresight_backend_init(struct hwt_context *ctx)
 		if (error)
 			return (error);
 
-		error = coresight_setup(event, thr);
+		error = coresight_setup(event);
 		if (error)
 			return (error);
 
@@ -120,6 +120,55 @@ coresight_backend_init(struct hwt_context *ctx)
 	}
 
 	return (0);
+}
+
+static int
+coresight_backend_init_cpu(struct hwt_context *ctx)
+{
+	struct coresight_event *event;
+	struct hwt_vm *vm;
+	int error;
+
+	vm = ctx->vm;
+
+	event = &cs_event[ctx->cpu];
+	memset(event, 0, sizeof(struct coresight_event));
+
+	event->etr.low = 0;
+	event->etr.high = 0;
+	event->etr.pages = vm->pages;
+	event->etr.npages = vm->npages;
+	event->etr.bufsize = vm->npages * PAGE_SIZE;
+	event->excp_level = 1;
+	event->src = CORESIGHT_ETMV4;
+	event->sink = CORESIGHT_TMC_ETR;
+
+	error = coresight_init_event(event, ctx->cpu);
+	if (error)
+		return (error);
+
+	error = coresight_setup(event);
+	if (error)
+		return (error);
+
+	error = coresight_start(event);
+	if (error)
+		return (error);
+
+	return (0);
+}
+
+static int
+coresight_backend_init(struct hwt_context *ctx)
+{
+	int error;
+
+	if (ctx->mode == HWT_MODE_THREAD)
+		error = coresight_backend_init_thread(ctx);
+	else
+		error = coresight_backend_init_cpu(ctx);
+
+	return (error);
 }
 
 static void
