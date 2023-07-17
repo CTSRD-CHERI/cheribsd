@@ -137,7 +137,8 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 		if (ctx == NULL)
 			break;
 
-		hwt_contexthash_remove(ctx);
+		if (ctx->mode == HWT_MODE_THREAD)
+			hwt_contexthash_remove(ctx);
 
 		/*
 		 * It could be that hwt_switch_in/out() or hwt_record() have
@@ -158,6 +159,9 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 		dprintf("%s: remove threads\n", __func__);
 
 		while (1) {
+			/* TODO */
+			if (ctx->mode == HWT_MODE_CPU)
+				break;
 			HWT_CTX_LOCK(ctx);
 			thr = LIST_FIRST(&ctx->threads);
 			if (thr) {

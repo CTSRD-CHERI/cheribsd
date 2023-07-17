@@ -232,6 +232,12 @@ hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		}
 		ctx->state = CTX_STATE_RUNNING;
 		HWT_CTX_UNLOCK(ctx);
+
+		if (ctx->mode == HWT_MODE_CPU) {
+			hwt_backend_configure(ctx, ctx->cpu, ctx->cpu);
+			hwt_backend_enable(ctx, ctx->cpu);
+		}
+
 		break;
 
 	case HWT_IOC_RECORD_GET:

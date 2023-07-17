@@ -270,7 +270,7 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 		return (error);
 	}
 
-	sprintf(path, "hwt_%d", ctx->cpu);
+	sprintf(path, "hwt_%d", ctx->ident);
 	error = hwt_vm_create_cdev(ctx->vm, path);
 	if (error) {
 		/* TODO: deallocate resources. */
