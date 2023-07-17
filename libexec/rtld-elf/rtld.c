@@ -322,9 +322,11 @@ int tls_max_index = 1;		/* Largest module index allocated */
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 /*
- * Globals for compartmentalisation
+ * Sealers for RTLD privileged information
  */
-uintptr_t sealer_cap; /* Sealer for RTLD privilege information */
+#define RTLD_SEALER_EXE_LEN	0x200
+static uintptr_t sealer_res;
+uintptr_t sealer_pltgot, sealer_jmpbuf, sealer_tramp;
 #endif
 
 static bool ld_library_path_rpath = false;
@@ -1146,7 +1148,8 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
     return ((func_ptr_type)tramp_intern(&(struct tramp_data) {
 	.target = cheri_sealentry(obj_main->entry),
-	.obj = obj_main
+	.obj = obj_main,
+	.sig = (struct tramp_sig) { true, 3, false, NONE }
     }));
 #else
     return ((func_ptr_type)obj_main->entry);
@@ -1164,7 +1167,8 @@ rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def)
 	ptr = tramp_intern(&(struct tramp_data) {
 		.target = ptr,
 		.obj = obj,
-		.def = def
+		.def = def,
+		.sig = (struct tramp_sig) { true, 8, false, C0 }
 	});
 #endif
 	target = call_ifunc_resolver(ptr);
@@ -1182,7 +1186,7 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
     RtldLockState lockstate;
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    obj = cheri_unseal(obj, sealer_cap);
+    obj = cheri_unseal(obj, sealer_pltgot);
 #endif
 
     rlock_acquire(rtld_bind_lock, &lockstate);
@@ -2762,9 +2766,18 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
     r_debug.r_ldbase = obj_rtld.relocbase;
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    if (sysctlbyname("security.cheri.sealcap", &sealer_cap,
-                     &(size_t) { sizeof(sealer_cap) }, NULL, 0) < 0)
-	rtld_fatal("sysctlbyname failed");
+    /*
+     * Allocate otypes for RTLD use.
+     */
+    uintptr_t sealer;
+    if (sysctlbyname("security.cheri.sealcap", &sealer,
+        &(size_t) { sizeof(sealer) }, NULL, 0) < 0)
+            rtld_fatal("sysctlbyname failed");
+    sealer_pltgot = cheri_setboundsexact(sealer, 1); sealer += 1;
+    sealer_jmpbuf = cheri_setboundsexact(sealer, 1); sealer += 1;
+    sealer_tramp = cheri_setboundsexact(sealer, 72); sealer += 72;
+    sealer_res = cheri_setboundsexact(sealer,
+        cheri_gettop(sealer) - cheri_getoffset(sealer));
     tramp_init();
 #endif
 }
@@ -3657,11 +3670,7 @@ relocate_object(Obj_Entry *obj, bool bind_now, Obj_Entry *rtldobj,
 		return (-1);
 
 	/* Set the special PLT or GOT entries. */
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	init_pltgot(obj, sealer_cap);
-#else
 	init_pltgot(obj);
-#endif
 
 	/* Process the PLT relocations. */
 	if (reloc_plt(obj, flags, lockstate) == -1)
@@ -4923,9 +4932,18 @@ get_program_var_addr(const char *name, RtldLockState *lockstate)
 	return ((const void **)make_function_pointer(req.sym_out,
 	  req.defobj_out));
 #endif
-    } else if (ELF_ST_TYPE(req.sym_out->st_info) == STT_GNU_IFUNC)
+    } else if (ELF_ST_TYPE(req.sym_out->st_info) == STT_GNU_IFUNC) {
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	void *target = rtld_resolve_ifunc(req.defobj_out, req.sym_out);
+	return tramp_intern(&(struct tramp_data) {
+		.target = target,
+		.obj = req.defobj_out,
+		.def = req.sym_out
+	});
+#else
 	return ((const void **)rtld_resolve_ifunc(req.defobj_out, req.sym_out));
-    else
+#endif
+    } else
 	return (const void **)make_data_pointer(req.sym_out, req.defobj_out);
 }
 

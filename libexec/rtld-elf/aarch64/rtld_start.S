@@ -107,11 +107,12 @@ END(.rtld_start)
  */
 ENTRY(_rtld_bind_start)
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	/* Calls to _rtld_bind_start do not go through the trampoline
-	 * because _rtld_bind_start never returns, which would break the
-	 * trampoline's invariant.
-	 * But we still need to manually perform some of the trampoline's
-	 * work, i.e., saving the caller's stack pointer at its bottom.
+	/*
+	 * Calls to _rtld_bind_start do not go through the trampoline because
+	 * _rtld_bind_start never returns, which would break the trampoline's
+	 * invariant. But we still need to manually perform some of the
+	 * trampoline's work, i.e., saving the caller's stack pointer at its
+	 * bottom.
 	 */
 	mrs	c17, rcsp_el0
 	.cfi_def_cfa_register c17
@@ -583,7 +584,7 @@ ENTRY(_rtld_setjmp)
 	sub	c2, c2, #(SETJMP_SHIFT * CAP_WIDTH)
 
 	/* Load RTLD sealer to detect other jump buffers */
-	ldr	c5, sealer_cap
+	ldr	c5, sealer_jmpbuf
 
 	/* Shift -3, -2, and -1 */
 3:	ldr	c3, [c1, #(SETJMP_SHIFT * CAP_WIDTH)]
@@ -676,7 +677,7 @@ ENTRY(_rtld_longjmp)
 	 * c2: Frame of the supplied buffer
 	 */
 	ldr	c4, [c2]
-	ldr	c5, sealer_cap
+	ldr	c5, sealer_jmpbuf
 2:	unseal	c3, c4, c5
 	ldr	c4, [c3]
 	gcseal	x6, c4

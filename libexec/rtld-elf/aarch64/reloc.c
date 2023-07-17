@@ -68,16 +68,12 @@ void _rtld_get_rstk(void);
 #endif
 
 void
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-init_pltgot(Obj_Entry *obj, uintptr_t sealer)
-#else
 init_pltgot(Obj_Entry *obj)
-#endif
 {
 
 	if (obj->pltgot != NULL) {
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-		obj->pltgot[1] = (uintptr_t) cheri_seal(obj, sealer);
+		obj->pltgot[1] = (uintptr_t) cheri_seal(obj, sealer_pltgot);
 #else
 		obj->pltgot[1] = (uintptr_t) obj;
 #endif
@@ -442,6 +438,7 @@ tramp_init()
 	    memory_order_relaxed);
 }
 
+/* Taken from https://github.com/skeeto/hash-prospector/issues/19 */
 static uint32_t
 pointerHash(uint64_t key) {
 	uint32_t x = key ^ (key >> 32);
@@ -698,17 +695,14 @@ tramp_intern(const struct tramp_data *data)
 {
 	void *entry;
 	RtldLockState lockstate;
-	const void *target = data->target;
-	const uint32_t hash = pointerHash((uint64_t)target);
+	vaddr_t target = (vaddr_t)data->target;
+	const uint32_t hash = pointerHash(target);
 	slot_index slot, idx;
 	vaddr_t key;
 	int exp;
 
 	assert(data->entry == NULL);
 
-	if (((cheri_getperm(target) & CHERI_PERM_EXECUTE) == 0) ||
-	    (cheri_getsealed(target) == 0) || (cheri_gettype(target) != 1))
-		return (NULL);
 #ifndef TRAMP_LINEAR_INSERTION
 start:
 #endif
@@ -753,7 +747,7 @@ start:
 		 * Race to acquire the current slot.
 		 */
 		if (atomic_compare_exchange_strong_explicit(
-		    &tramp_table.map[slot].key, &key, (vaddr_t)target,
+		    &tramp_table.map[slot].key, &key, target,
 		    memory_order_relaxed, memory_order_relaxed))
 			goto insert;
 		else
@@ -763,7 +757,7 @@ start:
 			atomic_fetch_sub_explicit(&tramp_table.writers, 1,
 			    memory_order_relaxed);
 #endif
-	} while (key != (vaddr_t)target);
+	} while (key != target);
 	/*
 	 * Load-acquire the index until it becomes available.
 	 */
@@ -809,31 +803,73 @@ end:
 	return (entry);
 }
 
+static void
+tramp_sig_validate(struct tramp_sig sig) {
+	if (sig.valid && sig.reg_args > 8)
+		rtld_fatal("Invalid tramp_sig.reg_args = %u", sig.reg_args);
+}
+
+static long
+tramp_sig_to_otype(struct tramp_sig sig) {
+	return sig.ret_args | (sig.mem_args << 2) | (sig.reg_args << 3);
+}
+
 void *
 _rtld_sandbox_code(void *target, struct tramp_sig sig)
 {
 	const Obj_Entry *obj;
+	void *target_unsealed;
 
-	if (sig.reg_args > 8)
-		rtld_fatal(
-		    "_rtld_sandbox_code: invalid tramp_sig.reg_args = %u",
-		    sig.reg_args);
+	tramp_sig_validate(sig);
 
-	if (cheri_gettag(target) &&
-	    (cheri_getperm(target) & CHERI_PERM_EXECUTIVE) == 0) {
+	if ((cheri_getperm(target) & CHERI_PERM_EXECUTIVE) != 0)
+		return (target);
 
-		obj = obj_from_addr(target);
-		if (obj == NULL)
-			rtld_fatal("%#p does not belong to any object", target);
+	obj = obj_from_addr(target);
+	if (obj == NULL)
+		rtld_fatal("%#p does not belong to any object", target);
 
-		target =  tramp_intern(&(struct tramp_data) {
-			.target = target,
-			.obj = obj,
-			.sig = sig
-		});
+	target_unsealed = cheri_unseal(target, sealer_tramp);
+	if (cheri_gettag(target_unsealed)) {
+		if (sig.valid &&
+		    cheri_gettype(target) !=
+		    (long)cheri_getbase(sealer_tramp) + tramp_sig_to_otype(sig))
+			rtld_fatal("Signature mismatch");
+		target = cheri_sealentry(target_unsealed);
 	}
 
+	target = tramp_intern(&(struct tramp_data) {
+		.target = target,
+		.obj = obj,
+		.sig = sig
+	});
+
 	return (target);
+}
+
+void *
+_rtld_safebox_code(void *target, struct tramp_sig sig)
+{
+	const Obj_Entry *obj;
+
+	tramp_sig_validate(sig);
+
+	if ((cheri_getperm(target) & CHERI_PERM_EXECUTIVE) != 0)
+		return (target);
+
+	obj = obj_from_addr(target);
+	if (obj == NULL)
+		rtld_fatal("%#p does not belong to any object", target);
+
+	if (sig.valid) {
+		asm ("chkssu	%0, %0, %1\n"
+		    : "=C" (target)
+		    : "C" (obj->text_rodata_cap));
+		target = cheri_seal(target,
+		    sealer_tramp + tramp_sig_to_otype(sig));
+	}
+
+	return target;
 }
 
 #endif
@@ -1247,6 +1283,13 @@ reloc_gnu_ifunc(Obj_Entry *obj, int flags,
 				continue;
 			lock_release(rtld_bind_lock, lockstate);
 			target = (uintptr_t)rtld_resolve_ifunc(defobj, def);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+			target = (uintptr_t)tramp_intern(&(struct tramp_data) {
+				.target = (void *)target,
+				.obj = defobj,
+				.def = def
+			});
+#endif
 			wlock_acquire(rtld_bind_lock, lockstate);
 			reloc_jmpslot(where, target, defobj, obj,
 			    (const Elf_Rel *)rela);

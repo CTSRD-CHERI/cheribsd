@@ -83,7 +83,7 @@ extern Elf_Addr tls_dtv_generation;
 extern int tls_max_index;
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-extern uintptr_t sealer_cap;
+extern uintptr_t sealer_pltgot, sealer_jmpbuf, sealer_tramp;
 extern const char *ld_utrace_compartment;
 extern const char *ld_compartment_overhead;
 #endif
@@ -567,11 +567,7 @@ int reloc_iresolve(Obj_Entry *, struct Struct_RtldLockState *);
 int reloc_iresolve_nonplt(Obj_Entry *, struct Struct_RtldLockState *);
 int reloc_gnu_ifunc(Obj_Entry *, int flags, struct Struct_RtldLockState *);
 void ifunc_init(Elf_Auxinfo[__min_size(AT_COUNT)]);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-void init_pltgot(Obj_Entry *, uintptr_t);
-#else
 void init_pltgot(Obj_Entry *);
-#endif
 void allocate_initial_tls(Obj_Entry *);
 
 #if __has_feature(capabilities)
