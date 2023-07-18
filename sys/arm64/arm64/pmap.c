@@ -844,7 +844,8 @@ pmap_pte_memattr(pmap_t pmap, vm_memattr_t memattr)
 }
 
 static pt_entry_t
-pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m)
+pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m,
+    vm_offset_t va)
 {
 	pt_entry_t val;
 
@@ -871,13 +872,18 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m)
 	if ((prot & VM_PROT_WRITE_CAP) != 0) {
 		/*
 		 * The page is CAPSTORE and this mapping is VM_PROT_WRITE_CAP.
-		 * Always set ATTR_CDBM. If the page is CAPDIRTY or this mapping
-		 * is created in response to a cap-write, also set ATTR_SC.
+		 * Always set ATTR_CDBM for userspace.
+		 *
+		 * XXX: work around a qemu limitation (no CDBM support) and set
+		 * ATTR_SC for the kernel where emulating ATTR_CDBM is hard.
 		 *
 		 * XXX We could also conditionally set ATTR_SC if PGA_CAPDIRTY,
 		 * but it's not required.
 		 */
-		val |= ATTR_CDBM;
+		if (va < VM_MAX_USER_ADDRESS)
+			val |= ATTR_CDBM;
+		else
+			val |= ATTR_SC;
 	}
 #endif
 
@@ -4510,7 +4516,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	pa = VM_PAGE_TO_PHYS(m);
 	new_l3 = (pt_entry_t)(pa | ATTR_DEFAULT | L3_PAGE);
 	new_l3 |= pmap_pte_memattr(pmap, m->md.pv_memattr);
-	new_l3 |= pmap_pte_prot(pmap, prot, flags, m);
+	new_l3 |= pmap_pte_prot(pmap, prot, flags, m, va);
 
 	if ((flags & PMAP_ENTER_WIRED) != 0)
 		new_l3 |= ATTR_SW_WIRED;
