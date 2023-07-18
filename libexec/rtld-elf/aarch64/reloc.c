@@ -1137,7 +1137,8 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 			target = (uintptr_t)tramp_intern(&(struct tramp_data) {
 				.target = (void *)target,
-				.obj = defobj
+				.obj = defobj,
+				.def = def
 			});
 #endif
 			reloc_jmpslot(where, target, defobj, obj,
