@@ -559,12 +559,15 @@ hwt_coresight_fill_config(struct trace_context *tc, struct etmv4_config *config)
 	config->ts_ctrl = 0;
 	config->syncfreq = TRCSYNCPR_4K;
 
-	excp_level = 1; /* User mode. */
+	if (tc->mode == HWT_MODE_THREAD)
+		excp_level = 0; /* User mode. */
+	else
+		excp_level = 1; /* CPU mode. */
 
 	reg = TRCVICTLR_SSSTATUS;
 	reg |= (1 << EVENT_SEL_S);
-	reg |= TRCVICTLR_EXLEVEL_NS(excp_level);
-	reg |= TRCVICTLR_EXLEVEL_S(excp_level);
+	reg |= TRCVICTLR_EXLEVEL_NS(1 << excp_level);
+	reg |= TRCVICTLR_EXLEVEL_S(1 << excp_level);
 	config->vinst_ctrl = reg;
 
 	/* Address-range filtering. */
@@ -572,8 +575,8 @@ hwt_coresight_fill_config(struct trace_context *tc, struct etmv4_config *config)
 	for (i = 0; i < tc->nranges * 2; i++) {
 		config->addr_val[i] = tc->addr_ranges[i];
 
-		reg = TRCACATR_EXLEVEL_S(excp_level);
-		reg |= TRCACATR_EXLEVEL_NS(excp_level);
+		reg = TRCACATR_EXLEVEL_S(1 << excp_level);
+		reg |= TRCACATR_EXLEVEL_NS(1 << excp_level);
 		config->addr_acc[i] = reg;
 
 		/* Include the range ID. */

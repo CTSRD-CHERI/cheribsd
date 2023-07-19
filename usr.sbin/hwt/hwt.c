@@ -38,6 +38,7 @@
 #include <sys/hwt.h>
 #include <sys/stat.h>
 
+#include <assert.h>
 #include <err.h>
 #include <sysexits.h>
 #include <stdio.h>
@@ -108,6 +109,8 @@ hwt_mmap_received(struct trace_context *tc,
 {
 	int error;
 
+	assert(tc->mode == HWT_MODE_THREAD);
+
 	if (!tc->suspend_on_mmap)
 		return (0);
 
@@ -122,7 +125,6 @@ hwt_mmap_received(struct trace_context *tc,
 
 	tc->suspend_on_mmap = 0;
 
-	/* Start tracing. */
 	error = tc->trace_dev->methods->set_config(tc);
 	if (error)
 		return (-2);
@@ -144,8 +146,14 @@ hwt_ctx_alloc(struct trace_context *tc)
 	struct hwt_alloc al;
 	int error;
 
-	al.mode = HWT_MODE_THREAD;
-	al.pid = tc->pid;
+	memset(&al, 0, sizeof(struct hwt_alloc));
+
+	al.mode = tc->mode;
+	if (tc->mode == HWT_MODE_THREAD)
+		al.pid = tc->pid;
+	else
+		al.cpu = tc->cpu;
+
 	al.bufsize = tc->bufsize;
 	al.backend_name = tc->trace_dev->name;
 	al.ident = &tc->ident;
@@ -160,7 +168,10 @@ hwt_map_memory(struct trace_context *tc, int tid)
 {
 	char filename[32];
 
-	sprintf(filename, "/dev/hwt_%d_%d", tc->ident, tid);
+	if (tc->mode == HWT_MODE_THREAD)
+		sprintf(filename, "/dev/hwt_%d_%d", tc->ident, tid);
+	else
+		sprintf(filename, "/dev/hwt_%d", tc->ident);
 
 	tc->thr_fd = open(filename, O_RDONLY);
 	if (tc->thr_fd < 0) {
@@ -190,7 +201,7 @@ hwt_ncpu(void)
 	return (ncpu);
 }
 
-size_t
+int
 hwt_get_offs(struct trace_context *tc, size_t *offs)
 {
 	struct hwt_bufptr_get bget;
@@ -266,14 +277,15 @@ usage(void)
 {
 
 	errx(EX_USAGE,
-		"hwt [-c devname] [-b bufsize] [-t id] [-r] [-w file] [-i name]"
-		    " [-f name] path\n"
+		"hwt [-s cpu_id] [-c devname] [-b bufsize] [-t id] [-r] [-w file] [-i name]"
+		    " [-f name] [path to executable]\n"
+		"\t -s\tcpu_id\t\tCPU (kernel) mode\n"
 		"\t -c\tname\t\tName of tracing device, e.g. coresight\n"
 		"\t -b\tbufsize\t\tSize of trace buffer (per each thread) in bytes.\n"
 		"\t -t\tid\t\tThread index of application passed to decoder\n"
 		"\t -r\t\t\tRaw flag. Do not decode results\n"
 		"\t -w\tfilename\tStore results into file\n"
-		"\t -i\tname\t\tfilter by dynamic library / executable name\n"
+		"\t -i\tname\t\tfilter by dynamic library / executable name or 'kernel' \n"
 		"\t -f\tname\t\tfilter by function name\n"
 
 #if defined(__aarch64__)
@@ -281,20 +293,173 @@ usage(void)
         );
 }
 
-int
-main(int argc, char **argv, char **env)
+static int
+hwt_mode_cpu(struct trace_context *tc)
 {
-	struct pmcstat_process *pp;
-	struct trace_context *tc;
+	int error;
+
+	if (tc->image_name == NULL || tc->func_name == NULL)
+		errx(EX_USAGE, "IP range filtering must be setup for CPU"
+		    " tracing");
+
+	error = hwt_ctx_alloc(tc);
+	if (error) {
+		printf("%s: failed to alloc kernel-mode ctx, error %d\n",
+		    __func__, error);
+		return (error);
+	}
+
+	error = hwt_map_memory(tc, 0);
+	if (error != 0) {
+		printf("can't map memory");
+		return (error);
+	}
+
+	tc->pp->pp_pid = -1;
+
+	uint32_t nrec;
+	int tot_rec;
+	int nlibs;
+
+	nlibs = 1;
+	tot_rec = 0;
+
+	do {
+		error = hwt_get_records(tc, &nrec);
+		if (error != 0)
+			return (error);
+		tot_rec += nrec;
+		hwt_sleep();
+	} while (tot_rec < nlibs);
+
+	error = hwt_find_sym(tc);
+	if (error)
+		errx(EX_USAGE, "could not find symbol");
+
+	error = tc->trace_dev->methods->set_config(tc);
+	if (error != 0)
+		errx(EX_DATAERR, "can't set config");
+
+	error = hwt_start_tracing(tc);
+	if (error)
+		errx(EX_SOFTWARE, "failed to start tracing, error %d\n", error);
+
+#if 0
+	size_t offs;
+	while (1) {
+		hwt_get_offs(tc, &offs);
+		printf("new offs %lx\n", offs);
+		sleep(1);
+	}
+#endif
+
+	error = tc->trace_dev->methods->process(tc);
+	if (error) {
+		printf("cant process data, error %d\n", error);
+		return (error);
+	}
+
+	return (0);
+}
+
+static int
+hwt_mode_thread(struct trace_context *tc, char **cmd, char **env)
+{
 	struct stat st;
 	uint32_t tot_rec;
 	uint32_t nrec;
 	uint32_t nlibs;
-	char **cmd;
+	int sockpair[NSOCKPAIRFD];
+	int error;
+
+	if (tc->func_name != NULL)
+		tc->suspend_on_mmap = 1;
+
+	error = stat(*cmd, &st);
+	if (error) {
+		printf("Could not find target executable, error %d.\n", error);
+		return (error);
+	}
+
+	error = hwt_elf_count_libs(*cmd, &nlibs);
+	if (error != 0) {
+		printf("could not count libs\n");
+		return (error);
+	}
+
+	nlibs += 1; /* add binary itself. */
+
+	printf("cmd is %s, nlibs %d\n", *cmd, nlibs);
+
+	error = hwt_process_create(sockpair, cmd, env, &tc->pid);
+	if (error != 0)
+		return (error);
+
+	printf("%s: process pid %d created\n", __func__, tc->pid);
+
+	tc->pp->pp_pid = tc->pid;
+
+	error = hwt_ctx_alloc(tc);
+	if (error) {
+		printf("%s: failed to alloc ctx, pid %d error %d\n", __func__,
+		    tc->pid, error);
+		return (error);
+	}
+
+	error = hwt_map_memory(tc, 0);
+	if (error != 0) {
+		printf("can't map memory");
+		return (error);
+	}
+
+	error = tc->trace_dev->methods->set_config(tc);
+	if (error != 0)
+		errx(EX_DATAERR, "can't set config");
+
+	if (tc->func_name == NULL) {
+		/* No address range filtering. Start tracing immediately. */
+		error = hwt_start_tracing(tc);
+		if (error)
+			errx(EX_SOFTWARE, "failed to start tracing, error %d\n",
+			    error);
+	}
+
+	error = hwt_process_start(sockpair);
+	if (error != 0)
+		return (error);
+
+	printf("nlibs %d\n", nlibs);
+
+	tot_rec = 0;
+
+	/*
+	 * Ensure we got expected amount of mmap/interp records so that
+	 * mapping tables constructed before we do symbol lookup.
+	 */
+
+	do {
+		error = hwt_get_records(tc, &nrec);
+		if (error != 0)
+			return (error);
+		tot_rec += nrec;
+		hwt_sleep();
+	} while (tot_rec < nlibs);
+
+	error = tc->trace_dev->methods->process(tc);
+	if (error) {
+		printf("cant process data, error %d\n", error);
+		return (error);
+	}
+
+	return (0);
+}
+
+int
+main(int argc, char **argv, char **env)
+{
+	struct trace_context *tc;
 	char *trace_dev_name;
 	int error;
-	int sockpair[NSOCKPAIRFD];
-	int pid;
 	int option;
 	int i;
 	int found;
@@ -313,8 +478,14 @@ main(int argc, char **argv, char **env)
 		return (1);
 	}
 
-	while ((option = getopt(argc, argv, "hc:b:rw:t:i:f:")) != -1)
+	tc->mode = HWT_MODE_THREAD;
+
+	while ((option = getopt(argc, argv, "s:hc:b:rw:t:i:f:")) != -1)
 		switch (option) {
+		case 's':
+			tc->mode = HWT_MODE_CPU;
+			tc->cpu = atoi(optarg);
+			break;
 		case 'c':
 			trace_dev_name = strdup(optarg);
 			found = 0;
@@ -382,102 +553,26 @@ main(int argc, char **argv, char **env)
 		errx(EX_USAGE, "For address range tracing specify both image "
 		    "and func, or none of them.");
 
-	argv += optind;
-	argc += optind;
-
-	cmd = argv;
-
-	if (*cmd == NULL)
-		usage();
-
-	error = stat(*cmd, &st);
-	if (error) {
-		printf("Could not find target executable, error %d.\n", error);
-		return (error);
-	}
-
-	error = hwt_elf_count_libs(*cmd, &nlibs);
-	if (error != 0) {
-		printf("could not count libs\n");
-		return (error);
-	}
-
-	nlibs += 1; /* add binary itself. */
-
-	printf("cmd is %s, nlibs %d\n", *cmd, nlibs);
-
 	tc->fd = open("/dev/hwt", O_RDWR);
 	if (tc->fd < 0) {
 		printf("Can't open /dev/hwt\n");
 		return (-1);
 	}
 
-	error = hwt_process_create(sockpair, cmd, env, &pid);
-	if (error != 0)
-		return (error);
+	tc->pp = hwt_process_alloc();
+	tc->pp->pp_isactive = 1;
 
-	printf("%s: process pid %d created\n", __func__, pid);
+	argc += optind;
+	argv += optind;
 
-	pp = hwt_process_alloc();
-	pp->pp_pid = pid;
-	pp->pp_isactive = 1;
-
-	tc->pp = pp;
-	tc->pid = pid;
-
-	error = hwt_ctx_alloc(tc);
-	if (error) {
-		printf("%s: failed to alloc ctx, pid %d error %d\n", __func__,
-		    tc->pid, error);
-		return (error);
-	}
-
-	error = hwt_map_memory(tc, 0);
-	if (error != 0) {
-		printf("can't map memory");
-		return (error);
-	}
-
-	if (tc->func_name != NULL)
-		tc->suspend_on_mmap = 1;
-
-	error = tc->trace_dev->methods->set_config(tc);
-	if (error != 0)
-		errx(EX_DATAERR, "can't set config");
-
-	if (tc->func_name == NULL) {
-		/* No address range filtering. Start tracing immediately. */
-		error = hwt_start_tracing(tc);
-		if (error)
-			errx(EX_SOFTWARE, "failed to start tracing, error %d\n",
-			    error);
-	}
-
-	error = hwt_process_start(sockpair);
-	if (error != 0)
-		return (error);
-
-	printf("nlibs %d\n", nlibs);
-
-	tot_rec = 0;
-
-	/*
-	 * Ensure we got expected amount of mmap/interp records so that
-	 * mapping tables constructed before we do symbol lookup.
-	 */
-
-	do {
-		error = hwt_get_records(tc, &nrec);
-		if (error != 0)
-			return (error);
-		tot_rec += nrec;
-		hwt_sleep();
-	} while (tot_rec < nlibs);
-
-	error = tc->trace_dev->methods->process(tc);
-	if (error) {
-		printf("cant process data, error %d\n", error);
-		return (error);
+	if (tc->mode == HWT_MODE_THREAD) {
+		if (*argv == NULL)
+			usage();
+		error = hwt_mode_thread(tc, argv, env);
+	} else {
+		if (*argv != NULL)
+			usage();
+		error = hwt_mode_cpu(tc);
 	}
 
 	close(tc->fd);
@@ -485,5 +580,5 @@ main(int argc, char **argv, char **env)
 	if (tc->filename)
 		fclose(tc->f);
 
-	return (0);
+	return (error);
 }

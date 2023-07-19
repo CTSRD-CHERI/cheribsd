@@ -52,6 +52,7 @@ struct trace_context {
 	void *base;
 	size_t bufsize;
 	int pid;
+	int cpu;
 	int fd;
 	int thr_fd;
 	int terminate;
@@ -75,6 +76,8 @@ struct trace_context {
 	/* Trace file. */
 	char *filename;
 	FILE *f;
+
+	int mode;
 };
 
 struct pmcstat_process *hwt_process_alloc(void);
@@ -82,7 +85,7 @@ int hwt_process_create(int *sockpair, char **cmd, char **env, int *pid0);
 int hwt_process_start(int *sockpair);
 int hwt_record_fetch(struct trace_context *tc, int *nrecords);
 void hwt_procexit(pid_t pid, int status);
-size_t hwt_get_offs(struct trace_context *tc, size_t *offs);
+int hwt_get_offs(struct trace_context *tc, size_t *offs);
 void hwt_sleep(void);
 int hwt_elf_count_libs(const char *elf_path, uint32_t *nlibs0);
 int hwt_find_sym(struct trace_context *tc);
