@@ -201,9 +201,10 @@ coresight_backend_deinit(void)
 	for (cpu_id = 0; cpu_id < mp_ncpus; cpu_id++) {
 		event = &cs_event[cpu_id];
 		coresight_disable(event);
-		if (cpu_id == 0)
-			coresight_stop(event);
 	}
+
+	event = &cs_event[0];
+	coresight_stop(event);
 }
 
 static int
