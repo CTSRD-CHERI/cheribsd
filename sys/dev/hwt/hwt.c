@@ -48,6 +48,7 @@
  *        hwt_ioctl(): 
  *               a) HWT_IOC_ALLOC
  *                  Allocates kernel tracing context ctx for a given pid,
+ *                  and for required mode of operation (CPU or Thread mode),
  *                  returns unique ident.
  *                  Creates a new character device for ctx management.
  *
