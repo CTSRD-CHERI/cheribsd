@@ -99,6 +99,9 @@ static int ctl_size[CTLTYPE+1] = {
 	[CTLTYPE_U16] = sizeof(uint16_t),
 	[CTLTYPE_U32] = sizeof(uint32_t),
 	[CTLTYPE_U64] = sizeof(uint64_t),
+#if __has_feature(capabilities)
+	[CTLTYPE_CAP] = sizeof(uintcap_t),
+#endif
 };
 
 static const char *ctl_typename[CTLTYPE+1] = {
@@ -117,6 +120,9 @@ static const char *ctl_typename[CTLTYPE+1] = {
 	[CTLTYPE_NODE] = "node",
 	[CTLTYPE_STRING] = "string",
 	[CTLTYPE_OPAQUE] = "opaque",
+#if __has_feature(capabilities)
+	[CTLTYPE_CAP] = "capability",
+#endif
 };
 
 static void
@@ -1234,6 +1240,24 @@ show_var(int *oid, int nlen, bool honor_skip)
 		}
 		free(oval);
 		return (0);
+
+#if __has_feature(capabilities)
+	case CTLTYPE_CAP:
+		if (!nflag)
+			printf("%s%s", name, sep);
+		if (lflag)
+			printf("%zd%s", len, sep);
+		sep1 = "";
+		while (len >= sizeof(uintcap_t)) {
+			uintcap_t ptr = *(uintcap_t*)p;
+			fputs(sep1, stdout);
+			printf("%#lp", (void * __capability)ptr);
+			sep1 = " ";
+			len -= sizeof(uintcap_t);
+			p += sizeof(uintcap_t);
+		}
+		return (0);
+#endif
 
 	case CTLTYPE_OPAQUE:
 		i = 0;
