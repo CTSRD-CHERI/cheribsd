@@ -38,18 +38,13 @@
 #define _SYS_HWT_H_
 
 #define	HWT_MAGIC	0x42
-#define	HWT_IOC_ALLOC \
-	_IOW(HWT_MAGIC, 0x00, struct hwt_alloc)
-#define	HWT_IOC_START \
-	_IOW(HWT_MAGIC, 0x01, struct hwt_start)
-#define	HWT_IOC_RECORD_GET \
-	_IOW(HWT_MAGIC, 0x02, struct hwt_record_get)
-#define	HWT_IOC_BUFPTR_GET \
-	_IOW(HWT_MAGIC, 0x03, struct hwt_bufptr_get)
-#define	HWT_IOC_SET_CONFIG \
-	_IOW(HWT_MAGIC, 0x04, struct hwt_set_config)
-#define	HWT_IOC_WAKEUP \
-	_IOW(HWT_MAGIC, 0x05, struct hwt_wakeup)
+#define	HWT_IOC_ALLOC		_IOW(HWT_MAGIC, 0x00, struct hwt_alloc)
+#define	HWT_IOC_START		_IOW(HWT_MAGIC, 0x01, struct hwt_start)
+#define	HWT_IOC_STOP		_IOW(HWT_MAGIC, 0x02, struct hwt_stop)
+#define	HWT_IOC_RECORD_GET	_IOW(HWT_MAGIC, 0x03, struct hwt_record_get)
+#define	HWT_IOC_BUFPTR_GET	_IOW(HWT_MAGIC, 0x04, struct hwt_bufptr_get)
+#define	HWT_IOC_SET_CONFIG	_IOW(HWT_MAGIC, 0x05, struct hwt_set_config)
+#define	HWT_IOC_WAKEUP		_IOW(HWT_MAGIC, 0x06, struct hwt_wakeup)
 
 #define	HWT_BACKEND_MAXNAMELEN	256
 
@@ -66,6 +61,10 @@ struct hwt_alloc {
 } __aligned(16);
 
 struct hwt_start {
+	int		reserved;
+} __aligned(16);
+
+struct hwt_stop {
 	int		reserved;
 } __aligned(16);
 

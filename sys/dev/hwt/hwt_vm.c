@@ -240,6 +240,10 @@ hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		break;
 
+	case HWT_IOC_STOP:
+		/* TODO */
+		break;
+
 	case HWT_IOC_RECORD_GET:
 		rget = (struct hwt_record_get *)addr;
 		error = hwt_record_send(ctx, rget);
@@ -257,9 +261,10 @@ hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 	case HWT_IOC_WAKEUP:
 
-		/* CPU mode check ? */
-		if (vm->thr == NULL)
+		if (ctx->mode == HWT_MODE_CPU)
 			return (ENXIO);
+
+		KASSERT(vm->thr != NULL, ("thr is NULL"));
 
 		wakeup(vm->thr);
 
