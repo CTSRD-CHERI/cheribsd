@@ -147,6 +147,7 @@ hwt_thread_free(struct hwt_thread *thr)
 {
 
 	hwt_vm_destroy_buffers(thr->vm);
+	hwt_vm_free(thr->vm);
 
 	free(thr, M_HWT_THREAD);
 }

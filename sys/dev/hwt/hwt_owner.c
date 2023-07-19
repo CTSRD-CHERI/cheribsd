@@ -163,6 +163,7 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 			vm = ctx->vm;
 			destroy_dev_sched(vm->cdev);
 			hwt_vm_destroy_buffers(vm);
+			hwt_vm_free(vm);
 		} else do {
 			HWT_CTX_LOCK(ctx);
 			thr = LIST_FIRST(&ctx->threads);

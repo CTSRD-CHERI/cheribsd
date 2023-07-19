@@ -42,6 +42,7 @@ struct hwt_vm {
 };
 
 struct hwt_vm * hwt_vm_alloc(void);
+void hwt_vm_free(struct hwt_vm *vm);
 int hwt_vm_create_cdev(struct hwt_vm *vm, char *path);
 
 int hwt_vm_alloc_buffers(struct hwt_vm *vm);

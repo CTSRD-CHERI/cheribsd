@@ -334,6 +334,13 @@ hwt_vm_alloc(void)
 	return (vm);
 }
 
+void
+hwt_vm_free(struct hwt_vm *vm)
+{
+
+	free(vm, M_HWT_VM);
+}
+
 int
 hwt_vm_alloc_buffers(struct hwt_vm *vm)
 {
