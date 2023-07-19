@@ -139,11 +139,6 @@ coresight_backend_init_cpu(struct hwt_context *ctx)
 	event = &cs_event[ctx->cpu];
 	memset(event, 0, sizeof(struct coresight_event));
 
-	event->etr.low = 0;
-	event->etr.high = 0;
-	event->etr.pages = vm->pages;
-	event->etr.npages = vm->npages;
-	event->etr.bufsize = vm->npages * PAGE_SIZE;
 	event->excp_level = 1;
 	event->src = CORESIGHT_ETMV4;
 	event->sink = CORESIGHT_TMC_ETR;
@@ -151,6 +146,27 @@ coresight_backend_init_cpu(struct hwt_context *ctx)
 	error = coresight_init_event(event, ctx->cpu);
 	if (error)
 		return (error);
+
+	/* The following is TMC (ETR) only, so pick first event for that. */
+	if (ctx->cpu != 0) {
+		event = &cs_event[0];
+		memset(event, 0, sizeof(struct coresight_event));
+
+		event->excp_level = 1;
+		event->src = CORESIGHT_ETMV4;
+		event->sink = CORESIGHT_TMC_ETR;
+
+		error = coresight_init_event(event, ctx->cpu);
+		if (error)
+			return (error);
+	}
+
+	/* TMC(ETR) configuration. */
+	event->etr.low = 0;
+	event->etr.high = 0;
+	event->etr.pages = vm->pages;
+	event->etr.npages = vm->npages;
+	event->etr.bufsize = vm->npages * PAGE_SIZE;
 
 	error = coresight_setup(event);
 	if (error)
@@ -239,7 +255,7 @@ coresight_backend_read(int cpu_id, int *curpage, vm_offset_t *curpage_offset)
 	int error;
 
 	/*
-	 * coresight_read() is TMC(ETR) only method, and we have a single
+	 * coresight_read() is TMC(ETR) only method. Also, we have a single
 	 * TMC(ETR) per system configured from event 0. So read data from
 	 * event 0.
 	 */
