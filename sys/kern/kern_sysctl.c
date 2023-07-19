@@ -1762,6 +1762,36 @@ sysctl_handle_64(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
+#if __has_feature(capabilities)
+/*
+ * Handle a CHERI capability
+ * Two cases:
+ *     a variable:  point arg1 at it.
+ *     a constant:  pass it in arg2.
+ */
+int
+sysctl_handle_cap(SYSCTL_HANDLER_ARGS)
+{
+	int error = 0;
+	uintcap_t tmpout;
+
+	/*
+	 * Attempt to get a coherent snapshot by making a copy of the data.
+	 */
+	if (arg1)
+		tmpout = *(uintcap_t *)arg1;
+	else
+		tmpout = arg2;
+	error = SYSCTL_OUT(req, &tmpout, sizeof(uintcap_t));
+
+	if (error || !req->newptr)
+		return (error);
+
+	/* no capability input (use OPAQUE if necessary) */
+	return (EPERM);
+}
+#endif
+
 /*
  * Handle our generic '\0' terminated 'C' string.
  * Two cases:
