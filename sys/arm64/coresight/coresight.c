@@ -108,11 +108,11 @@ coresight_backend_init_thread(struct hwt_context *ctx)
 		if (error)
 			return (error);
 
-		error = coresight_setup(event);
-		if (error)
-			return (error);
-
 		if (cpu_id == 0) {
+			error = coresight_setup(event);
+			if (error)
+				return (error);
+
 			error = coresight_start(event);
 			if (error)
 				return (error);
