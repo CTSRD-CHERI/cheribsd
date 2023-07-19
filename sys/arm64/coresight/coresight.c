@@ -95,11 +95,6 @@ coresight_backend_init_thread(struct hwt_context *ctx)
 	for (cpu_id = 0; cpu_id < mp_ncpus; cpu_id++) {
 		event = &cs_event[cpu_id];
 		memset(event, 0, sizeof(struct coresight_event));
-		event->etr.low = 0;
-		event->etr.high = 0;
-		event->etr.pages = vm->pages;
-		event->etr.npages = vm->npages;
-		event->etr.bufsize = vm->npages * PAGE_SIZE;
 		event->excp_level = 0;
 		event->src = CORESIGHT_ETMV4;
 		event->sink = CORESIGHT_TMC_ETR;
@@ -109,6 +104,16 @@ coresight_backend_init_thread(struct hwt_context *ctx)
 			return (error);
 
 		if (cpu_id == 0) {
+			event->etr.low = 0;
+			event->etr.high = 0;
+			event->etr.pages = vm->pages;
+			event->etr.npages = vm->npages;
+			event->etr.bufsize = vm->npages * PAGE_SIZE;
+
+			/*
+			 * These methods are TMC only. We have single
+			 * TMC(ETR) per system, so call them on CPU0 only.
+			 */
 			error = coresight_setup(event);
 			if (error)
 				return (error);
@@ -233,7 +238,13 @@ coresight_backend_read(int cpu_id, int *curpage, vm_offset_t *curpage_offset)
 	struct coresight_event *event;
 	int error;
 
-	event = &cs_event[cpu_id];
+	/*
+	 * coresight_read() is TMC(ETR) only method, and we have a single
+	 * TMC(ETR) per system configured from event 0. So read data from
+	 * event 0.
+	 */
+
+	event = &cs_event[0];
 
 	KASSERT(event != NULL, ("No event found"));
 
