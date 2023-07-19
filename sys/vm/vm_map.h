@@ -570,7 +570,7 @@ int vm_map_protect(vm_map_t map, vm_offset_t start, vm_offset_t end,
 int vm_map_remove_locked(vm_map_t, vm_offset_t, vm_offset_t);
 int vm_map_remove (vm_map_t, vm_offset_t, vm_offset_t);
 int vm_map_clear(vm_map_t);
-void vm_map_try_merge_entries(vm_map_t map, vm_map_entry_t prev,
+vm_map_entry_t vm_map_try_merge_entries(vm_map_t map, vm_map_entry_t prev,
     vm_map_entry_t entry);
 void vm_map_startup (void);
 int vm_map_submap (vm_map_t, vm_pointer_t, vm_pointer_t, vm_map_t);
