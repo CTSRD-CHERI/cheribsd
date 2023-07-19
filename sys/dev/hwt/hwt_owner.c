@@ -149,9 +149,15 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 
 		HWT_CTX_LOCK(ctx);
 		ctx->state = 0;
+		LIST_FOREACH(thr, &ctx->threads, next) {
+			HWT_THR_LOCK(thr);
+			HWT_THR_UNLOCK(thr);
+		}
 		HWT_CTX_UNLOCK(ctx);
 
-		/* hwt_switch_in() is now completed. */
+		/*
+		 * hook invocation is now completed.
+		 */
 
 		hwt_backend_deinit(ctx);
 
