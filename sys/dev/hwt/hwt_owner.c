@@ -126,7 +126,7 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 	struct hwt_thread *thr;
 	struct hwt_vm *vm;
 
-	printf("%s: stopping hwt owner\n", __func__);
+	dprintf("%s: stopping hwt owner\n", __func__);
 
 	while (1) {
 		mtx_lock(&ho->mtx);

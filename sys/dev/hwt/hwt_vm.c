@@ -307,7 +307,7 @@ hwt_vm_create_cdev(struct hwt_vm *vm, char *path)
 	struct make_dev_args args;
 	int error;
 
-	printf("%s: path %s\n", __func__, path);
+	dprintf("%s: path %s\n", __func__, path);
 
 	make_dev_args_init(&args);
 	args.mda_devsw = &hwt_vm_cdevsw;
