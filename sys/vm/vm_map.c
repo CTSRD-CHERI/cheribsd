@@ -374,6 +374,13 @@ vmspace_alloc(vm_pointer_t min, vm_pointer_t max, pmap_pinit_t pinit)
 	vm->vm_taddr = 0;
 	vm->vm_daddr = 0;
 	vm->vm_maxsaddr = 0;
+#if __has_feature(capabilities)
+	/*
+	 * CID's are allocated from 1 to avoid confusion with the
+	 * NULL CID installed in each thread at creation.
+	 */
+	vm->vm_prev_cid = 0;
+#endif
 	return (vm);
 }
 
@@ -553,6 +560,31 @@ vmspace_switch_aio(struct vmspace *newvm)
 
 	vmspace_free(oldvm);
 }
+
+#if __has_feature(capabilities)
+uint64_t
+vmspace_cid_alloc(struct vmspace *vm)
+{
+	struct vm_map *map;
+	uint64_t cid;
+
+	map = &vm->vm_map;
+	vm_map_lock(map);
+	if (map->busy)
+		vm_map_wait_busy(map);
+
+	cid = ++vm->vm_prev_cid;
+
+	vm_map_unlock(map);
+
+#ifdef CHERI_COMPARTMENT_ID_USERSPACE_LENGTH
+	KASSERT(cid < CHERI_COMPARTMENT_ID_USERSPACE_LENGTH,
+	    ("cid >= CHERI_COMPARTMENT_ID_USERSPACE_LENGTH"));
+#endif
+
+	return (cid);
+}
+#endif /* __has_feature(capabilities) */
 
 void
 _vm_map_lock(vm_map_t map, const char *file, int line)
@@ -4780,6 +4812,10 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 		vmspace_free(vm2);
 		return (NULL);
 	}
+
+#if __has_feature(capabilities)
+	vm2->vm_prev_cid = vm1->vm_prev_cid;
+#endif
 
 	new_map->anon_loc = old_map->anon_loc;
 	new_map->flags |= old_map->flags & (MAP_ASLR | MAP_ASLR_IGNSTART |

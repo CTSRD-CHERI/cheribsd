@@ -96,6 +96,7 @@
 				/* 88 is obsolete osethostname */
 #define	FREEBSD64_SYS_getdtablesize	89
 #define	FREEBSD64_SYS_dup2	90
+#define	FREEBSD64_SYS_freebsd64_cheri_cidcap_alloc	91
 #define	FREEBSD64_SYS_freebsd64_fcntl	92
 #define	FREEBSD64_SYS_freebsd64_select	93
 #define	FREEBSD64_SYS_fsync	95

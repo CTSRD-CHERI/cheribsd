@@ -73,6 +73,7 @@ MIASM =  \
 	freebsd64_getitimer.o \
 	getdtablesize.o \
 	dup2.o \
+	freebsd64_cheri_cidcap_alloc.o \
 	freebsd64_fcntl.o \
 	freebsd64_select.o \
 	fsync.o \
