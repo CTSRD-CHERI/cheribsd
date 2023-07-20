@@ -30,14 +30,17 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/types.h>
 #include <sys/sysctl.h>
+
+#include <cheri/cidcap.h>
 
 #include "cheribsdtest.h"
 
 #ifdef CHERI_PERM_COMPARTMENT_ID
 
 static uintcap_t
-get_cidcap(void)
+get_cidcap_sysctl(void)
 {
 	uintcap_t cidcap;
 	size_t cidcap_size;
@@ -49,30 +52,30 @@ get_cidcap(void)
 	return (cidcap);
 }
 
-CHERIBSDTEST(cidcap_sysctl, "Retrieve cidcap using sysctl(3)")
+static void
+check_cidcap(uintcap_t cidcap, size_t base, size_t length, size_t offset)
 {
-	uintcap_t cidcap;
 	uint64_t v;
 
-	cidcap = get_cidcap();
-
-	/* Base. */
-	v = cheri_getbase(cidcap);
-	if (v != CHERI_COMPARTMENT_ID_USERSPACE_BASE)
-		cheribsdtest_failure_errx("base %jx (expected %jx)", v,
-		    (uintmax_t)CHERI_COMPARTMENT_ID_USERSPACE_BASE);
+	if (base != (size_t)-1) {
+		/* Base. */
+		v = cheri_getbase(cidcap);
+		if (v != base)
+			cheribsdtest_failure_errx("base %jx (expected %jx)", v,
+			    (uintmax_t)base);
+	}
 
 	/* Length. */
 	v = cheri_getlen(cidcap);
-	if (v != CHERI_COMPARTMENT_ID_USERSPACE_LENGTH)
+	if (v != length)
 		cheribsdtest_failure_errx("length 0x%jx (expected 0x%jx)", v,
-		    (uintmax_t)CHERI_COMPARTMENT_ID_USERSPACE_LENGTH);
+		    (uintmax_t)length);
 
 	/* Offset. */
 	v = cheri_getoffset(cidcap);
-	if (v != CHERI_COMPARTMENT_ID_USERSPACE_OFFSET)
+	if (v != offset)
 		cheribsdtest_failure_errx("offset %jx (expected %jx)", v,
-		    (uintmax_t)CHERI_COMPARTMENT_ID_USERSPACE_OFFSET);
+		    (uintmax_t)offset);
 
 	/* Type -- should have unsealed type. */
 	v = cheri_gettype(cidcap);
@@ -95,6 +98,18 @@ CHERIBSDTEST(cidcap_sysctl, "Retrieve cidcap using sysctl(3)")
 	v = cheri_gettag(cidcap);
 	if (v != 1)
 		cheribsdtest_failure_errx("tag %jx (expected 1)", v);
+}
+
+CHERIBSDTEST(cidcap_sysctl, "Retrieve cidcap using sysctl(3)")
+{
+	uintcap_t cidcap;
+
+	cidcap = get_cidcap_sysctl();
+
+	check_cidcap(cidcap, CHERI_COMPARTMENT_ID_USERSPACE_BASE,
+	    CHERI_COMPARTMENT_ID_USERSPACE_LENGTH,
+	    CHERI_COMPARTMENT_ID_USERSPACE_OFFSET);
+
 	cheribsdtest_success();
 }
 #endif /* CHERI_PERM_COMPARTMENT_ID */
