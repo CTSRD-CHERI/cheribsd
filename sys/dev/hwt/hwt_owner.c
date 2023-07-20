@@ -142,26 +142,23 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 			hwt_contexthash_remove(ctx);
 
 		/*
-		 * It could be that hwt_switch_in/out() or hwt_record() have
-		 * this ctx locked right here.
-		 * if not, change state immediately, so they give up.
+		 * It could be that a hook has this ctx locked right here.
 		 */
 
 		HWT_CTX_LOCK(ctx);
 		ctx->state = 0;
 		LIST_FOREACH(thr, &ctx->threads, next) {
+			/*
+			 * Ensure hook invocation is now completed.
+			 */
 			HWT_THR_LOCK(thr);
 			HWT_THR_UNLOCK(thr);
 		}
 		HWT_CTX_UNLOCK(ctx);
 
-		/*
-		 * hook invocation is now completed.
-		 */
+		/* Note that a thread could be still sleeping on msleep_spin. */
 
 		hwt_backend_deinit(ctx);
-
-		/* Remove thread first. */
 
 		dprintf("%s: remove threads\n", __func__);
 
