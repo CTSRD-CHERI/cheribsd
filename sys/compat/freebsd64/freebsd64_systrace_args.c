@@ -534,6 +534,13 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
+	/* freebsd64_cheri_cidcap_alloc */
+	case 91: {
+		struct freebsd64_cheri_cidcap_alloc_args *p = params;
+		uarg[a++] = (intptr_t)p->cidp; /* uintcap_t * */
+		*n_args = 1;
+		break;
+	}
 	/* freebsd64_fcntl */
 	case 92: {
 		struct freebsd64_fcntl_args *p = params;
@@ -4253,6 +4260,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 1:
 			p = "u_int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* freebsd64_cheri_cidcap_alloc */
+	case 91:
+		switch (ndx) {
+		case 0:
+			p = "userland uintcap_t *";
 			break;
 		default:
 			break;
@@ -9513,6 +9530,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 89:
 	/* dup2 */
 	case 90:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* freebsd64_cheri_cidcap_alloc */
+	case 91:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

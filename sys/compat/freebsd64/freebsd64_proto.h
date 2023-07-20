@@ -229,6 +229,9 @@ struct freebsd64_getitimer_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
 	char itv_l_[PADL_(struct itimerval *)]; struct itimerval * itv; char itv_r_[PADR_(struct itimerval *)];
 };
+struct freebsd64_cheri_cidcap_alloc_args {
+	char cidp_l_[PADL_(uintcap_t *)]; uintcap_t * cidp; char cidp_r_[PADR_(uintcap_t *)];
+};
 struct freebsd64_fcntl_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
@@ -1561,6 +1564,7 @@ int	freebsd64_setgroups(struct thread *, struct freebsd64_setgroups_args *);
 int	freebsd64_setitimer(struct thread *, struct freebsd64_setitimer_args *);
 int	freebsd64_swapon(struct thread *, struct freebsd64_swapon_args *);
 int	freebsd64_getitimer(struct thread *, struct freebsd64_getitimer_args *);
+int	freebsd64_cheri_cidcap_alloc(struct thread *, struct freebsd64_cheri_cidcap_alloc_args *);
 int	freebsd64_fcntl(struct thread *, struct freebsd64_fcntl_args *);
 int	freebsd64_select(struct thread *, struct freebsd64_select_args *);
 int	freebsd64_connect(struct thread *, struct freebsd64_connect_args *);
@@ -2097,6 +2101,7 @@ int	freebsd13_freebsd64_swapoff(struct thread *, struct freebsd13_freebsd64_swap
 #define	FREEBSD64_SYS_AUE_freebsd64_setitimer	AUE_SETITIMER
 #define	FREEBSD64_SYS_AUE_freebsd64_swapon	AUE_SWAPON
 #define	FREEBSD64_SYS_AUE_freebsd64_getitimer	AUE_GETITIMER
+#define	FREEBSD64_SYS_AUE_freebsd64_cheri_cidcap_alloc	AUE_NULL
 #define	FREEBSD64_SYS_AUE_freebsd64_fcntl	AUE_FCNTL
 #define	FREEBSD64_SYS_AUE_freebsd64_select	AUE_SELECT
 #define	FREEBSD64_SYS_AUE_freebsd64_connect	AUE_CONNECT

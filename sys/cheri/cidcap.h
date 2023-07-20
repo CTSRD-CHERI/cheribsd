@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2023 SRI International
+ * Copyright (c) 2023 SRI Internationl
  *
  * This software was developed by SRI International, the University of
  * Cambridge Computer Laboratory (Department of Computer Science and
@@ -30,55 +30,12 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/param.h>
-#include <sys/proc.h>
-#include <sys/syscallsubr.h>
-#include <sys/sysctl.h>
-#include <sys/sysproto.h>
-#include <sys/systm.h>
+#ifndef __SYS_CHERI_CIDCAP_H__
+#define	__SYS_CHERI_CIDCAP_H__
 
-#if __has_feature(capabilities)
-#include <cheri/cheri.h>
-#include <cheri/cheric.h>
-#include <cheri/cherireg.h>
+#ifndef _KERNEL
+/* XXX: currently Morello specific */
+int	cheri_cidcap_alloc(uintcap_t *cidcap);
 #endif
 
-#include <vm/vm_extern.h>
-
-#if __has_feature(capabilities) && defined(CHERI_PERM_COMPARTMENT_ID)
-
-/* Set to -1 to prevent it from being zeroed with the rest of BSS */
-uintcap_t userspace_root_cidcap = (uintcap_t)-1;
-SYSCTL_CAPABILITY(_security_cheri, OID_AUTO, cidcap, CTLFLAG_RD | CTLFLAG_PTROUT,
-    &userspace_root_cidcap, 0, "CHERI compartment ID root capability");
-
-int
-kern_cheri_cidcap_alloc(struct thread *td, uintcap_t * __capability cidp)
-{
-	uint64_t cid;
-	uintcap_t cidcap;
-
-	cid = vmspace_cid_alloc(td->td_proc->p_vmspace);
-	cidcap = (uintcap_t)cheri_setbounds(
-	    cheri_setaddress(userspace_root_cidcap, cid), 1);
-
-	KASSERT(cheri_gettag(cidcap), ("untagged cidcap allocated"));
-
-	return (copyoutcap(&cidcap, cidp, sizeof(cidcap)));
-}
-
-int
-sys_cheri_cidcap_alloc(struct thread *td, struct cheri_cidcap_alloc_args *uap)
-{
-	return (kern_cheri_cidcap_alloc(td, uap->cidp));
-}
-
-#else /* !(__has_feature(capabilities) && defined(CHERI_PERM_COMPARTMENT_ID)) */
-
-int
-sys_cheri_cidcap_alloc(struct thread *td, struct cheri_cidcap_alloc_args *uap)
-{
-	return (ENOSYS);
-}
-
-#endif /* !(__has_feature(capabilities) && defined(CHERI_PERM_COMPARTMENT_ID)) */
+#endif /* __SYS_CHERI_CIDCAP_H__ */

@@ -297,6 +297,7 @@ vm_map_rootcap(vm_map_t map)
  *
  * List of locks
  *	(c)	const until freed
+ *	(d)	busy vm_map when manipulating
  */
 struct vmspace {
 	struct vm_map vm_map;	/* VM address map */
@@ -311,6 +312,9 @@ struct vmspace {
 	vm_offset_t vm_stacktop; /* top of the stack, may not be page-aligned */
 	uintcap_t vm_shp_base;	/* shared page pointer */
 	u_int vm_refcnt;	/* number of references */
+#if __has_feature(capabilities)
+	uint64_t vm_prev_cid;	/* (d) last compartment ID allocated */
+#endif
 	/*
 	 * Keep the PMAP last, so that CPU-specific variations of that
 	 * structure on a single architecture don't result in offset

@@ -112,4 +112,27 @@ CHERIBSDTEST(cidcap_sysctl, "Retrieve cidcap using sysctl(3)")
 
 	cheribsdtest_success();
 }
+
+CHERIBSDTEST(cidcap_alloc, "Retrieve cidcap using cheri_cidcap_alloc(2)")
+{
+	uintcap_t cidcap1, cidcap2;
+
+	/*
+	 * XXX: there's no inherent reason why the allocator should
+	 * return seqential CID's from 1. This is an artifact of the
+	 * counter based implementation and the fact that RTLD and CSU
+	 * bits don't currently request any CIDs.  Should that happen,
+	 * we'll probably want to stop validating the base and just pass
+	 * -1 for the base.
+	 */
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_cidcap_alloc(&cidcap1));
+	check_cidcap(cidcap1, 1, 1, 0);
+
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_cidcap_alloc(&cidcap2));
+	check_cidcap(cidcap2, 2, 1, 0);
+
+	CHERIBSDTEST_VERIFY(cidcap1 != cidcap2);
+
+	cheribsdtest_success();
+}
 #endif /* CHERI_PERM_COMPARTMENT_ID */

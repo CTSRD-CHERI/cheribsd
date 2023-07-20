@@ -381,7 +381,7 @@ contrib/openzfs/module/zfs/zvol.c		optional zfs compile-with "${ZFS_C}"
 
 # CHERI and CHERI-compat related files
 cheri/cheri_asserts.c			optional cpu_cheri
-cheri/cheri_cidcap.c			optional cpu_cheri
+cheri/cheri_cidcap.c			standard
 cheri/cheri_exec.c			optional cpu_cheri
 cheri/cheri_sysctl.c			optional cpu_cheri
 cheri/cheri_otype.c			optional cpu_cheri
@@ -408,6 +408,7 @@ compat/freebsd32/freebsd32_misc.c	optional compat_freebsd32
 compat/freebsd32/freebsd32_syscalls.c	optional compat_freebsd32
 compat/freebsd32/freebsd32_sysent.c	optional compat_freebsd32
 compat/freebsd64/freebsd64_abort2.c	optional compat_freebsd64
+compat/freebsd64/freebsd64_cheri.c	optional compat_freebsd64
 compat/freebsd64/freebsd64_generic.c	optional compat_freebsd64
 compat/freebsd64/freebsd64_jail.c		optional compat_freebsd64
 compat/freebsd64/freebsd64_mac.c		optional compat_freebsd64

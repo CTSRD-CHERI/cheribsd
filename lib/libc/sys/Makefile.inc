@@ -181,6 +181,7 @@ MAN+=	abort2.2 \
 	cap_ioctls_limit.2 \
 	cap_rights_limit.2 \
 	chdir.2 \
+	cheri_cidcap_alloc.2 \
 	chflags.2 \
 	chmod.2 \
 	chown.2 \
