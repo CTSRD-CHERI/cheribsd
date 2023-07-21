@@ -2657,7 +2657,7 @@ retryl3:
 				continue;
 			if ((prot & VM_PROT_WRITE) == 0 &&
 			    (l3e & PTE_SW_MANAGED) != 0 &&
-			    (l2e & PTE_DIRTY_BITS) != 0) {
+			    (l3e & PTE_DIRTY_BITS) != 0) {
 				m = PHYS_TO_VM_PAGE(PTE_TO_PHYS(l3e));
 				pmap_page_dirty(l3e, m);
 			}
