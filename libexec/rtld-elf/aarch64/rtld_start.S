@@ -360,7 +360,7 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	ldp	c15, c16, [csp, #(7 * 32)]
 	ldp	c13, c14, [csp, #(6 * 32)]
 	ldp	c11, c12, [csp, #(5 * 32)]
-	ldp	c9, c10,  [csp, #(5 * 32)]
+	ldp	c9, c10,  [csp, #(4 * 32)]
 	ldp	c7, c8,   [csp, #(3 * 32)]
 	ldp	c5, c6,   [csp, #(2 * 32)]
 	ldp	c1, c2,   [csp, #(1 * 32)]
