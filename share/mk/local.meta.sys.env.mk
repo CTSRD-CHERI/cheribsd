@@ -12,9 +12,9 @@
 
 # from src/Makefile (for universe)
 TARGET_ARCHES_arm?=     arm armv6 armv7
-TARGET_ARCHES_arm64?=   aarch64
+TARGET_ARCHES_arm64?=   aarch64 aarch64c
 TARGET_ARCHES_powerpc?= powerpc powerpc64 powerpc64le powerpcspe
-TARGET_ARCHES_riscv?=   riscv64
+TARGET_ARCHES_riscv?=   riscv64 riscv64c
 
 # some corner cases
 BOOT_MACHINE_DIR.amd64 = boot/i386
