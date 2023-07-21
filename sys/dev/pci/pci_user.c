@@ -147,7 +147,7 @@ struct pci_bar_mmap64 {
 #define	PCIOCLISTVPD64	_IOC_NEWTYPE(PCIOCLISTVPD, struct pci_list_vpd_io64)
 /*
  * We don't support PCIOCGETCONF_OLD64 because the earliest
- * COMPAT_FREEBSD64 architecture didn't exist until 9.0 (mips).
+ * COMPAT_FREEBSD64 architecture didn't exist until 11.0 (aarch64).
  */
 #define	PCIOCBARMMAP64	_IOC_NEWTYPE(PCIOCBARMMAP, struct pci_bar_mmap64)
 #endif
