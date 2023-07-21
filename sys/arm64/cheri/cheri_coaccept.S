@@ -216,10 +216,18 @@ SIGCODE(switcher_coaccept)
 	 */
 	sub	x11, x4, x13
 	cmp	x11, #0
+	mov	x14, x13
 	bge	2f
 	mov	x13, x4
+	mov	x14, x13
 
 2:
+	//If we use this mov instruction instead of the two "mov x14, x13" above
+	//then this function returns '8' even if x13 and x4 contain values
+	//larger than eight. This is an odd bug that cannot be explained by a
+	//flaw in the assembly code. This issue occurs on qemu. I haven't
+	//tested if it can be reproduced on an actual Morello board.
+	//mov	x14, x13
 	add	x13, x13, #-8
 	ldr	x11, [c3, x13]
 	str	x11, [c12, x13]
@@ -234,8 +242,9 @@ SIGCODE(switcher_coaccept)
 	/*
 	 * Return success; clear the carry flag.
 	 */
-	adds	x0, x0, x0
 	mov	x0, 0
+	adds	x0, x0, x0
+	mov	x0, x14
 3:
 	/* Preserve x0, which is our return value. */
 	mov	x1, 0

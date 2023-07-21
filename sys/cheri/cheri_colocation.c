@@ -338,9 +338,6 @@ colocation_unborrow(struct thread *td)
 	struct switchercb scb;
 	struct thread *peertd;
 	struct trapframe peertrapframe;
-#ifdef __aarch64__
-	uintcap_t peertpidr;
-#endif
 	bool have_scb;
 
 	have_scb = colocation_fetch_scb(td, &scb);
@@ -386,14 +383,16 @@ colocation_unborrow(struct thread *td)
 		kdb_enter(KDB_WHY_CHERI, "unborrow");
 #endif
 
-
 #ifdef __aarch64__
 	/*
-	 * On aarch64, the TLS pointer is in TPC, not in td_frame.
+	 * Because this thread was borrowed by a callee coprocess this
+	 * register contains the starting address of the thread local storage
+	 * (TLS) of another thread. This overwrites this address with the
+	 * TLS starting address that actually belongs to this thread.
+	 * We have to do this here because the value in this register is written
+	 * to kernel data structures when we execute copark later on.
 	 */
-	peertpidr = peertd->td_pcb->pcb_tpidr_el0;
-	peertd->td_pcb->pcb_tpidr_el0 = td->td_pcb->pcb_tpidr_el0;
-	td->td_pcb->pcb_tpidr_el0 = peertpidr;
+	WRITE_SPECIALREG_CAP(ctpidr_el0, scb.scb_tls);
 #endif
 
 	memcpy(&peertrapframe, peertd->td_frame, sizeof(struct trapframe));
@@ -743,7 +742,6 @@ kern_cogetpid(struct thread *td, pid_t * __capability pidp)
 int
 sys_copark(struct thread *td, struct copark_args *uap)
 {
-
 	return (kern_copark(td));
 }
 
