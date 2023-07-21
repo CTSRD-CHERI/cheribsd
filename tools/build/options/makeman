@@ -25,7 +25,7 @@ t=$(mktemp -d -t makeman)
 trap 'test -d $t && rm -rf $t' exit
 
 srcdir=$(realpath ../../..)
-make="make -C $srcdir -m $srcdir/share/mk"
+make="make -C $srcdir -m $srcdir/share/mk _NO_INCLUDE_COMPILERMK=t _NO_INCLUDE_LINKERMK=t"
 
 #
 # usage: no_targets all_targets yes_targets
