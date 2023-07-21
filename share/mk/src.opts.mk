@@ -385,11 +385,6 @@ BROKEN_OPTIONS+=CHERI_CAPREVOKE
 BROKEN_OPTIONS+=LIB64C
 .endif
 
-.if ${.MAKE.OS} != "FreeBSD"
-# tablegen will not build on non-FreeBSD so also disable target clang and lld
-BROKEN_OPTIONS+=CLANG LLD
-.endif
-
 .if ${__T} != "amd64" && ${__T} != "i386" && ${__T} != "aarch64"
 BROKEN_OPTIONS+=HYPERV
 .endif
@@ -427,17 +422,6 @@ BROKEN_OPTIONS+= TESTS
 .-include <site.src.opts.mk>
 
 .include <bsd.mkopt.mk>
-
-.if ${.MAKE.OS} != "FreeBSD"
-# Building on a Linux/Mac requires an external toolchain to be specified
-# since clang/gcc will not build there using the FreeBSD makefiles
-MK_BINUTILS_BOOTSTRAP:=no
-MK_CLANG_BOOTSTRAP:=no
-MK_LLD_BOOTSTRAP:=no
-MK_GCC_BOOTSTRAP:=no
-# However, the elftoolchain tools build and should be used
-# MK_ELFTOOLCHAIN_BOOTSTRAP:=	yes
-.endif
 
 #
 # Force some options off if their dependencies are off.
