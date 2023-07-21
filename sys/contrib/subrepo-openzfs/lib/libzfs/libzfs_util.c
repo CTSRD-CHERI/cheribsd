@@ -1199,8 +1199,8 @@ zcmd_free_nvlists(zfs_cmd_t *zc)
 }
 
 static void
-zcmd_write_nvlist_com(libzfs_handle_t *hdl, uint64ptr_t *outnv,
-    uint64_t *outlen, nvlist_t *nvl)
+zcmd_write_nvlist_com(libzfs_handle_t *hdl, uint64ptr_t *outnv, uint64_t *outlen,
+    nvlist_t *nvl)
 {
 	char *packed;
 
@@ -1966,7 +1966,7 @@ zfs_version_print(void)
  * Return 1 if the user requested ANSI color output, and our terminal supports
  * it.  Return 0 for no color.
  */
-static int
+int
 use_color(void)
 {
 	static int use_color = -1;
