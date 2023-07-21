@@ -37,12 +37,7 @@ TESTS_SUBDIRS+=		vfs
 TESTS_SUBDIRS+=		vm
 TESTS_SUBDIRS+=		vmm
 
-
-# XXXAR: the audit tests are flaky when running on QEMU CHERI and often time out
-# during cleanup. They start and stop a new auditd for every test CASE which
-# takes a really long time on QEMU. In the latest jenkins run these tests took
-# 9.5 hours to run! Skip them until we can run them at a reasonable speed.
-.if ${MK_AUDIT} != "no" && ${MK_CHERI} == "no"
+.if ${MK_AUDIT} != "no"
 _audit=	audit
 .endif
 
