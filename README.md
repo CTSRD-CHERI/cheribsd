@@ -2,8 +2,8 @@
 
 CheriBSD extends FreeBSD to implement memory protection and
 software compartmentalization features supported by the CHERI ISA.
-CheriBSD includes support for CHERI extensions to the MIPS and RISC-V
-architectures.
+CheriBSD includes support for CHERI extensions to the Armv8-A (via
+Morello) and RISC-V architectures.
 To build and run CheriBSD we recommend using the
 [cheribuild](https://github.com/CTSRD-CHERI/cheribuild) script.
 
