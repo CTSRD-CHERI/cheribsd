@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1984-2022  Mark Nudelman
+ * Copyright (C) 1984-2023  Mark Nudelman
  *
  * You may distribute under the terms of either the GNU General Public
  * License or the Less License, as specified in the README file.
@@ -248,9 +248,11 @@ public int clear_bg;            /* Clear fills with background color */
 public int missing_cap = 0;     /* Some capability is missing */
 public char *kent = NULL;       /* Keypad ENTER sequence */
 public int term_init_done = FALSE;
+public int full_screen = TRUE;
 
 static int attrmode = AT_NORMAL;
 static int termcap_debug = -1;
+static int no_alt_screen;       /* sc_init does not switch to alt screen */
 extern int binattr;
 extern int one_screen;
 #if LESSTEST
@@ -258,9 +260,9 @@ extern char *ttyin_name;
 #endif /*LESSTEST*/
 
 #if !MSDOS_COMPILER
-static char *cheaper LESSPARAMS((char *t1, char *t2, char *def));
-static void tmodes LESSPARAMS((char *incap, char *outcap, char **instr,
-    char **outstr, char *def_instr, char *def_outstr, char **spp));
+static char *cheaper(char *t1, char *t2, char *def);
+static void tmodes(char *incap, char *outcap, char **instr,
+    char **outstr, char *def_instr, char *def_outstr, char **spp);
 #endif
 
 /*
@@ -277,6 +279,7 @@ char PC_, *UP, *BC;
 #endif
 
 extern int quiet;               /* If VERY_QUIET, use visual bell for bell */
+extern int no_vbell;
 extern int no_back_scroll;
 extern int swindow;
 extern int no_init;
@@ -304,9 +307,72 @@ extern DWORD console_mode;
 extern int tty;
 #endif
 
-extern char *tgetstr();
-extern char *tgoto();
+#if (HAVE_TERMIOS_H && HAVE_TERMIOS_FUNCS) || defined(TCGETA)
+/*
+ * Set termio flags for use by less.
+ */
+static void set_termio_flags(
+#if HAVE_TERMIOS_H && HAVE_TERMIOS_FUNCS
+	struct termios *s
+#else
+	struct termio *s
+#endif
+	)
+{
+	s->c_lflag &= ~(0
+#ifdef ICANON
+		| ICANON
+#endif
+#ifdef ECHO
+		| ECHO
+#endif
+#ifdef ECHOE
+		| ECHOE
+#endif
+#ifdef ECHOK
+		| ECHOK
+#endif
+#if ECHONL
+		| ECHONL
+#endif
+	);
 
+	s->c_oflag |= (0
+#ifdef OXTABS
+		| OXTABS
+#else
+#ifdef TAB3
+		| TAB3
+#else
+#ifdef XTABS
+		| XTABS
+#endif
+#endif
+#endif
+#ifdef OPOST
+		| OPOST
+#endif
+#ifdef ONLCR
+		| ONLCR
+#endif
+	);
+
+	s->c_oflag &= ~(0
+#ifdef ONOEOT
+		| ONOEOT
+#endif
+#ifdef OCRNL
+		| OCRNL
+#endif
+#ifdef ONOCR
+		| ONOCR
+#endif
+#ifdef ONLRET
+		| ONLRET
+#endif
+	);
+}
+#endif
 
 /*
  * Change terminal to "raw mode", or restore to "normal" mode.
@@ -319,15 +385,22 @@ extern char *tgoto();
  *         etc. are NOT disabled.
  * It doesn't matter whether an input \n is mapped to \r, or vice versa.
  */
-	public void
-raw_mode(on)
-	int on;
+public void raw_mode(int on)
 {
 	static int curr_on = 0;
 
 	if (on == curr_on)
 			return;
 	erase2_char = '\b'; /* in case OS doesn't know about erase2 */
+#if LESSTEST
+	if (ttyin_name != NULL)
+	{
+		/* {{ For consistent conditions when running tests. }} */
+		erase_char = '\b';
+		kill_char = CONTROL('U');
+		werase_char = CONTROL('W');
+	} else
+#endif /*LESSTEST*/
 #if HAVE_TERMIOS_H && HAVE_TERMIOS_FUNCS
     {
 	struct termios s;
@@ -339,157 +412,118 @@ raw_mode(on)
 		/*
 		 * Get terminal modes.
 		 */
-		tcgetattr(tty, &s);
-
-		/*
-		 * Save modes and set certain variables dependent on modes.
-		 */
-		if (!saved_term)
+		if (tcgetattr(tty, &s) < 0)
 		{
-			save_term = s;
-			saved_term = 1;
-		}
+			erase_char = '\b';
+			kill_char = CONTROL('U');
+			werase_char = CONTROL('W');
+		} else
+		{
+			/*
+			 * Save modes and set certain variables dependent on modes.
+			 */
+			if (!saved_term)
+			{
+				save_term = s;
+				saved_term = 1;
+			}
 #if HAVE_OSPEED
-		switch (cfgetospeed(&s))
-		{
+			switch (cfgetospeed(&s))
+			{
 #ifdef B0
-		case B0: ospeed = 0; break;
+			case B0: ospeed = 0; break;
 #endif
 #ifdef B50
-		case B50: ospeed = 1; break;
+			case B50: ospeed = 1; break;
 #endif
 #ifdef B75
-		case B75: ospeed = 2; break;
+			case B75: ospeed = 2; break;
 #endif
 #ifdef B110
-		case B110: ospeed = 3; break;
+			case B110: ospeed = 3; break;
 #endif
 #ifdef B134
-		case B134: ospeed = 4; break;
+			case B134: ospeed = 4; break;
 #endif
 #ifdef B150
-		case B150: ospeed = 5; break;
+			case B150: ospeed = 5; break;
 #endif
 #ifdef B200
-		case B200: ospeed = 6; break;
+			case B200: ospeed = 6; break;
 #endif
 #ifdef B300
-		case B300: ospeed = 7; break;
+			case B300: ospeed = 7; break;
 #endif
 #ifdef B600
-		case B600: ospeed = 8; break;
+			case B600: ospeed = 8; break;
 #endif
 #ifdef B1200
-		case B1200: ospeed = 9; break;
+			case B1200: ospeed = 9; break;
 #endif
 #ifdef B1800
-		case B1800: ospeed = 10; break;
+			case B1800: ospeed = 10; break;
 #endif
 #ifdef B2400
-		case B2400: ospeed = 11; break;
+			case B2400: ospeed = 11; break;
 #endif
 #ifdef B4800
-		case B4800: ospeed = 12; break;
+			case B4800: ospeed = 12; break;
 #endif
 #ifdef B9600
-		case B9600: ospeed = 13; break;
+			case B9600: ospeed = 13; break;
 #endif
 #ifdef EXTA
-		case EXTA: ospeed = 14; break;
+			case EXTA: ospeed = 14; break;
 #endif
 #ifdef EXTB
-		case EXTB: ospeed = 15; break;
+			case EXTB: ospeed = 15; break;
 #endif
 #ifdef B57600
-		case B57600: ospeed = 16; break;
+			case B57600: ospeed = 16; break;
 #endif
 #ifdef B115200
-		case B115200: ospeed = 17; break;
+			case B115200: ospeed = 17; break;
 #endif
-		default: ;
-		}
+			default: ;
+			}
 #endif
-		erase_char = s.c_cc[VERASE];
+			erase_char = s.c_cc[VERASE];
 #ifdef VERASE2
-		erase2_char = s.c_cc[VERASE2];
+			erase2_char = s.c_cc[VERASE2];
 #endif
-		kill_char = s.c_cc[VKILL];
+			kill_char = s.c_cc[VKILL];
 #ifdef VWERASE
-		werase_char = s.c_cc[VWERASE];
+			werase_char = s.c_cc[VWERASE];
 #else
-		werase_char = CONTROL('W');
+			werase_char = CONTROL('W');
 #endif
 
-		/*
-		 * Set the modes to the way we want them.
-		 */
-		s.c_lflag &= ~(0
-#ifdef ICANON
-			| ICANON
-#endif
-#ifdef ECHO
-			| ECHO
-#endif
-#ifdef ECHOE
-			| ECHOE
-#endif
-#ifdef ECHOK
-			| ECHOK
-#endif
-#if ECHONL
-			| ECHONL
-#endif
-		);
-
-		s.c_oflag |= (0
-#ifdef OXTABS
-			| OXTABS
-#else
-#ifdef TAB3
-			| TAB3
-#else
-#ifdef XTABS
-			| XTABS
-#endif
-#endif
-#endif
-#ifdef OPOST
-			| OPOST
-#endif
-#ifdef ONLCR
-			| ONLCR
-#endif
-		);
-
-		s.c_oflag &= ~(0
-#ifdef ONOEOT
-			| ONOEOT
-#endif
-#ifdef OCRNL
-			| OCRNL
-#endif
-#ifdef ONOCR
-			| ONOCR
-#endif
-#ifdef ONLRET
-			| ONLRET
-#endif
-		);
-		s.c_cc[VMIN] = 1;
-		s.c_cc[VTIME] = 0;
+			/*
+			 * Set the modes to the way we want them.
+			 */
+			set_termio_flags(&s);
+			s.c_cc[VMIN] = 1;
+			s.c_cc[VTIME] = 0;
 #ifdef VLNEXT
-		s.c_cc[VLNEXT] = 0;
+			s.c_cc[VLNEXT] = 0;
 #endif
 #ifdef VDSUSP
-		s.c_cc[VDSUSP] = 0;
+			s.c_cc[VDSUSP] = 0;
+#endif
+#ifdef VSTOP
+			s.c_cc[VSTOP] = 0;
+#endif
+#ifdef VSTART
+			s.c_cc[VSTART] = 0;
 #endif
 #if MUST_SET_LINE_DISCIPLINE
-		/*
-		 * System's termios is broken; need to explicitly 
-		 * request TERMIODISC line discipline.
-		 */
-		s.c_line = TERMIODISC;
+			/*
+			 * System's termios is broken; need to explicitly 
+			 * request TERMIODISC line discipline.
+			 */
+			s.c_line = TERMIODISC;
 #endif
+		}
 	} else
 	{
 		/*
@@ -550,11 +584,15 @@ raw_mode(on)
 		/*
 		 * Set the modes to the way we want them.
 		 */
-		s.c_lflag &= ~(ICANON|ECHO|ECHOE|ECHOK|ECHONL);
-		s.c_oflag |=  (OPOST|ONLCR|TAB3);
-		s.c_oflag &= ~(OCRNL|ONOCR|ONLRET);
+		set_termio_flags(&s);
 		s.c_cc[VMIN] = 1;
 		s.c_cc[VTIME] = 0;
+#ifdef VSTOP
+		s.c_cc[VSTOP] = 0;
+#endif
+#ifdef VSTART
+		s.c_cc[VSTART] = 0;
+#endif
 	} else
 	{
 		/*
@@ -684,9 +722,7 @@ raw_mode(on)
  */
 static int hardcopy;
 
-	static char *
-ltget_env(capname)
-	char *capname;
+static char * ltget_env(char *capname)
 {
 	char name[64];
 
@@ -710,9 +746,7 @@ ltget_env(capname)
 	return (lgetenv(name));
 }
 
-	static int
-ltgetflag(capname)
-	char *capname;
+static int ltgetflag(char *capname)
 {
 	char *s;
 
@@ -723,9 +757,7 @@ ltgetflag(capname)
 	return (tgetflag(capname));
 }
 
-	static int
-ltgetnum(capname)
-	char *capname;
+static int ltgetnum(char *capname)
 {
 	char *s;
 
@@ -736,10 +768,7 @@ ltgetnum(capname)
 	return (tgetnum(capname));
 }
 
-	static char *
-ltgetstr(capname, pp)
-	char *capname;
-	char **pp;
+static char * ltgetstr(char *capname, char **pp)
 {
 	char *s;
 
@@ -754,8 +783,7 @@ ltgetstr(capname, pp)
 /*
  * Get size of the output screen.
  */
-	public void
-scrsize(VOID_PARAM)
+public void scrsize(void)
 {
 	char *s;
 	int sys_height;
@@ -774,6 +802,10 @@ scrsize(VOID_PARAM)
 
 	sys_width = sys_height = 0;
 
+#if LESSTEST
+	if (ttyin_name != NULL)
+#endif /*LESSTEST*/
+	{
 #if MSDOS_COMPILER==MSOFTC
 	{
 		struct videoconfig w;
@@ -856,6 +888,7 @@ scrsize(VOID_PARAM)
 #endif
 #endif
 #endif
+	}
 
 	if (sys_height > 0)
 		sc_height = sys_height;
@@ -865,6 +898,12 @@ scrsize(VOID_PARAM)
 	else if ((n = ltgetnum("li")) > 0)
 		sc_height = n;
 #endif
+	if ((s = lgetenv("LESS_LINES")) != NULL)
+	{
+		int height = atoi(s);
+		sc_height = (height < 0) ? sc_height + height : height;
+		full_screen = FALSE;
+	}
 	if (sc_height <= 0)
 		sc_height = DEF_SC_HEIGHT;
 
@@ -876,6 +915,11 @@ scrsize(VOID_PARAM)
 	else if ((n = ltgetnum("co")) > 0)
 		sc_width = n;
 #endif
+	if ((s = lgetenv("LESS_COLUMNS")) != NULL)
+	{
+		int width = atoi(s);
+		sc_width = (width < 0) ? sc_width + width : width;
+	}
 	if (sc_width <= 0)
 		sc_width = DEF_SC_WIDTH;
 }
@@ -884,8 +928,7 @@ scrsize(VOID_PARAM)
 /*
  * Figure out how many empty loops it takes to delay a millisecond.
  */
-	static void
-get_clock(VOID_PARAM)
+static void get_clock(void)
 {
 	clock_t start;
 	
@@ -912,9 +955,7 @@ get_clock(VOID_PARAM)
 /*
  * Delay for a specified number of milliseconds.
  */
-	static void
-delay(msec)
-	int msec;
+static void delay(int msec)
 {
 	long i;
 	
@@ -929,9 +970,7 @@ delay(msec)
 /*
  * Return the characters actually input by a "special" key.
  */
-	public char *
-special_key_str(key)
-	int key;
+public char * special_key_str(int key)
 {
 	static char tbuf[40];
 	char *s;
@@ -1111,8 +1150,7 @@ special_key_str(key)
 /*
  * Get terminal capabilities via termcap.
  */
-	public void
-get_term(VOID_PARAM)
+public void get_term(void)
 {
 	termcap_debug = !isnullenv(lgetenv("LESS_TERMCAP_DEBUG"));
 #if MSDOS_COMPILER
@@ -1227,6 +1265,7 @@ get_term(VOID_PARAM)
 	above_mem = ltgetflag("da");
 	below_mem = ltgetflag("db");
 	clear_bg = ltgetflag("ut");
+	no_alt_screen = ltgetflag("NR");
 
 	/*
 	 * Assumes termcap variable "sg" is the printing width of:
@@ -1362,7 +1401,7 @@ get_term(VOID_PARAM)
 	 * to move the cursor to the lower left corner of the screen.
 	 */
 	t1 = ltgetstr("ll", &sp);
-	if (t1 == NULL)
+	if (t1 == NULL || !full_screen)
 		t1 = "";
 	if (*sc_move == '\0')
 		t2 = "";
@@ -1422,17 +1461,13 @@ get_term(VOID_PARAM)
 static int costcount;
 
 /*ARGSUSED*/
-	static int
-inc_costcount(c)
-	int c;
+static int inc_costcount(int c)
 {
 	costcount++;
 	return (c);
 }
 
-	static int
-cost(t)
-	char *t;
+static int cost(char *t)
 {
 	costcount = 0;
 	tputs(t, sc_height, inc_costcount);
@@ -1444,10 +1479,7 @@ cost(t)
  * The best, if both exist, is the one with the lower 
  * cost (see cost() function).
  */
-	static char *
-cheaper(t1, t2, def)
-	char *t1, *t2;
-	char *def;
+static char * cheaper(char *t1, char *t2, char *def)
 {
 	if (*t1 == '\0' && *t2 == '\0')
 	{
@@ -1463,15 +1495,7 @@ cheaper(t1, t2, def)
 	return (t2);
 }
 
-	static void
-tmodes(incap, outcap, instr, outstr, def_instr, def_outstr, spp)
-	char *incap;
-	char *outcap;
-	char **instr;
-	char **outstr;
-	char *def_instr;
-	char *def_outstr;
-	char **spp;
+static void tmodes(char *incap, char *outcap, char **instr, char **outstr, char *def_instr, char *def_outstr, char **spp)
 {
 	*instr = ltgetstr(incap, spp);
 	if (*instr == NULL)
@@ -1503,8 +1527,7 @@ tmodes(incap, outcap, instr, outstr, def_instr, def_outstr, spp)
 #if MSDOS_COMPILER
 
 #if MSDOS_COMPILER==WIN32C
-	static void
-_settextposition(int row, int col)
+static void _settextposition(int row, int col)
 {
 	COORD cpos;
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
@@ -1519,8 +1542,7 @@ _settextposition(int row, int col)
 /*
  * Initialize the screen to the correct color at startup.
  */
-	static void
-initcolor(VOID_PARAM)
+static void initcolor(void)
 {
 #if MSDOS_COMPILER==BORLANDC || MSDOS_COMPILER==DJGPPC
 	intensevideo();
@@ -1555,8 +1577,7 @@ initcolor(VOID_PARAM)
 /*
  * Enable virtual terminal processing, if available.
  */
-	static void
-win32_init_vt_term(VOID_PARAM)
+static void win32_init_vt_term(void)
 {
 	DWORD output_mode;
 
@@ -1573,8 +1594,7 @@ win32_init_vt_term(VOID_PARAM)
 	}
 }
 
-	static void
-win32_deinit_vt_term(VOID_PARAM)
+static void win32_deinit_vt_term(void)
 {
 	if (vt_enabled == 1 && con_out == con_out_save)
 		SetConsoleMode(con_out, init_output_mode);
@@ -1583,8 +1603,7 @@ win32_deinit_vt_term(VOID_PARAM)
 /*
  * Termcap-like init with a private win32 console.
  */
-	static void
-win32_init_term(VOID_PARAM)
+static void win32_init_term(void)
 {
 	CONSOLE_SCREEN_BUFFER_INFO scr;
 	COORD size;
@@ -1618,8 +1637,7 @@ win32_init_term(VOID_PARAM)
 /*
  * Restore the startup console.
  */
-	static void
-win32_deinit_term(VOID_PARAM)
+static void win32_deinit_term(void)
 {
 	if (con_out_save == INVALID_HANDLE_VALUE)
 		return;
@@ -1632,14 +1650,10 @@ win32_deinit_term(VOID_PARAM)
 #endif
 
 #if !MSDOS_COMPILER
-	static void
-do_tputs(str, affcnt, f_putc)
-	char *str;
-	int affcnt;
-	int (*f_putc)(int);
+static void do_tputs(char *str, int affcnt, int (*f_putc)(int))
 {
 #if LESSTEST
-	if (ttyin_name != NULL)
+	if (ttyin_name != NULL && f_putc == putchr)
 		putstr(str);
 	else
 #endif /*LESSTEST*/
@@ -1650,11 +1664,7 @@ do_tputs(str, affcnt, f_putc)
  * Like tputs but we handle $<...> delay strings here because
  * some implementations of tputs don't perform delays correctly.
  */
-	static void
-ltputs(str, affcnt, f_putc)
-	char *str;
-	int affcnt;
-	int (*f_putc)(int);
+static void ltputs(char *str, int affcnt, int (*f_putc)(int))
 {
 	while (str != NULL && *str != '\0')
 	{
@@ -1673,9 +1683,10 @@ ltputs(str, affcnt, f_putc)
 				do_tputs(str2, affcnt, f_putc);
 				str += slen + 2;
 				/* Perform the delay. */
-				delay = lstrtoi(str, &str);
+				delay = lstrtoi(str, &str, 10);
 				if (*str == '*')
-					delay *= affcnt;
+					if (ckd_mul(&delay, delay, affcnt))
+						delay = INT_MAX;
 				flush();
 				sleep_ms(delay);
 				/* Skip past closing ">" at end of delay string. */
@@ -1697,8 +1708,7 @@ ltputs(str, affcnt, f_putc)
  * Configure the termimal so mouse clicks and wheel moves 
  * produce input to less.
  */
-	public void
-init_mouse(VOID_PARAM)
+public void init_mouse(void)
 {
 #if !MSDOS_COMPILER
 	ltputs(sc_s_mousecap, sc_height, putchr);
@@ -1715,8 +1725,7 @@ init_mouse(VOID_PARAM)
  * Configure the terminal so mouse clicks and wheel moves
  * are handled by the system (so text can be selected, etc).
  */
-	public void
-deinit_mouse(VOID_PARAM)
+public void deinit_mouse(void)
 {
 #if !MSDOS_COMPILER
 	ltputs(sc_e_mousecap, sc_height, putchr);
@@ -1731,8 +1740,7 @@ deinit_mouse(VOID_PARAM)
 /*
  * Initialize terminal
  */
-	public void
-init(VOID_PARAM)
+public void init(void)
 {
 	clear_bot_if_needed();
 #if !MSDOS_COMPILER
@@ -1741,6 +1749,14 @@ init(VOID_PARAM)
 		if (!no_init)
 		{
 			ltputs(sc_init, sc_height, putchr);
+			/*
+			 * Some terminals leave the cursor unmoved when switching 
+			 * to the alt screen. To avoid having the text appear at
+			 * a seemingly random line on the alt screen, move to 
+			 * lower left if we are using an alt screen.
+			 */
+			if (*sc_init != '\0' && *sc_deinit != '\0' && !no_alt_screen)
+				lower_left();
 			term_init_done = 1;
 		}
 		if (!no_keypad)
@@ -1787,8 +1803,7 @@ init(VOID_PARAM)
 /*
  * Deinitialize terminal
  */
-	public void
-deinit(VOID_PARAM)
+public void deinit(void)
 {
 	if (!init_done)
 		return;
@@ -1825,14 +1840,12 @@ deinit(VOID_PARAM)
 /*
  * Are we interactive (ie. writing to an initialized tty)?
  */
-	public int
-interactive(VOID_PARAM)
+public int interactive(void)
 {
 	return (is_tty && init_done);
 }
 
-	static void
-assert_interactive(VOID_PARAM)
+static void assert_interactive(void)
 {
 	if (interactive()) return;
 	/* abort(); */
@@ -1841,8 +1854,7 @@ assert_interactive(VOID_PARAM)
 /*
  * Home cursor (move to upper left corner of screen).
  */
-	public void
-home(VOID_PARAM)
+public void home(void)
 {
 	assert_interactive();
 #if !MSDOS_COMPILER
@@ -1853,12 +1865,21 @@ home(VOID_PARAM)
 #endif
 }
 
+#if LESSTEST
+public void dump_screen(void)
+{
+	char dump_cmd[32];
+	SNPRINTF1(dump_cmd, sizeof(dump_cmd), ESCS"0;0;%dR", sc_width * sc_height);
+	ltputs(dump_cmd, sc_height, putchr);
+	flush();
+}
+#endif /*LESSTEST*/
+
 /*
  * Add a blank line (called with cursor at home).
  * Should scroll the display down.
  */
-	public void
-add_line(VOID_PARAM)
+public void add_line(void)
 {
 	assert_interactive();
 #if !MSDOS_COMPILER
@@ -1916,9 +1937,7 @@ add_line(VOID_PARAM)
  * window upward.  This is needed to stop leaking the topmost line 
  * into the scrollback buffer when we go down-one-line (in WIN32).
  */
-	public void
-remove_top(n)
-	int n;
+public void remove_top(int n)
 {
 #if MSDOS_COMPILER==WIN32C
 	SMALL_RECT rcSrc, rcClip;
@@ -1970,8 +1989,7 @@ remove_top(n)
 /*
  * Clear the screen.
  */
-	static void
-win32_clear(VOID_PARAM)
+static void win32_clear(void)
 {
 	/*
 	 * This will clear only the currently visible rows of the NT
@@ -2001,9 +2019,7 @@ win32_clear(VOID_PARAM)
  * Remove the n topmost lines and scroll everything below it in the 
  * window upward.
  */
-	public void
-win32_scroll_up(n)
-	int n;
+public void win32_scroll_up(int n)
 {
 	SMALL_RECT rcSrc, rcClip;
 	CHAR_INFO fillchar;
@@ -2067,8 +2083,7 @@ win32_scroll_up(n)
 /*
  * Move cursor to lower left corner of screen.
  */
-	public void
-lower_left(VOID_PARAM)
+public void lower_left(void)
 {
 	assert_interactive();
 #if !MSDOS_COMPILER
@@ -2082,8 +2097,7 @@ lower_left(VOID_PARAM)
 /*
  * Move cursor to left position of current line.
  */
-	public void
-line_left(VOID_PARAM)
+public void line_left(void)
 {
 	assert_interactive();
 #if !MSDOS_COMPILER
@@ -2117,8 +2131,7 @@ line_left(VOID_PARAM)
  * Check if the console size has changed and reset internals 
  * (in lieu of SIGWINCH for WIN32).
  */
-	public void
-check_winch(VOID_PARAM)
+public void check_winch(void)
 {
 #if MSDOS_COMPILER==WIN32C
 	CONSOLE_SCREEN_BUFFER_INFO scr;
@@ -2147,9 +2160,7 @@ check_winch(VOID_PARAM)
 /*
  * Goto a specific line on the screen.
  */
-	public void
-goto_line(sindex)
-	int sindex;
+public void goto_line(int sindex)
 {
 	assert_interactive();
 #if !MSDOS_COMPILER
@@ -2167,8 +2178,7 @@ goto_line(sindex)
  * briefly and then switching back to the normal screen.
  * {{ Yuck!  There must be a better way to get a visual bell. }}
  */
-	static void
-create_flash(VOID_PARAM)
+static void create_flash(void)
 {
 #if MSDOS_COMPILER==MSOFTC
 	struct videoconfig w;
@@ -2214,9 +2224,10 @@ create_flash(VOID_PARAM)
 /*
  * Output the "visual bell", if there is one.
  */
-	public void
-vbell(VOID_PARAM)
+public void vbell(void)
 {
+	if (no_vbell)
+		return;
 #if !MSDOS_COMPILER
 	if (*sc_visual_bell == '\0')
 		return;
@@ -2278,8 +2289,7 @@ vbell(VOID_PARAM)
 /*
  * Make a noise.
  */
-	static void
-beep(VOID_PARAM)
+static void beep(void)
 {
 #if !MSDOS_COMPILER
 	putchr(CONTROL('G'));
@@ -2295,8 +2305,7 @@ beep(VOID_PARAM)
 /*
  * Ring the terminal bell.
  */
-	public void
-bell(VOID_PARAM)
+public void bell(void)
 {
 	if (quiet == VERY_QUIET)
 		vbell();
@@ -2307,8 +2316,7 @@ bell(VOID_PARAM)
 /*
  * Clear the screen.
  */
-	public void
-clear(VOID_PARAM)
+public void clear(void)
 {
 	assert_interactive();
 #if !MSDOS_COMPILER
@@ -2327,8 +2335,7 @@ clear(VOID_PARAM)
  * Clear from the cursor to the end of the cursor's line.
  * {{ This must not move the cursor. }}
  */
-	public void
-clear_eol(VOID_PARAM)
+public void clear_eol(void)
 {
 	/* assert_interactive();*/
 #if !MSDOS_COMPILER
@@ -2387,8 +2394,7 @@ clear_eol(VOID_PARAM)
  * Clear the current line.
  * Clear the screen if there's off-screen memory below the display.
  */
-	static void
-clear_eol_bot(VOID_PARAM)
+static void clear_eol_bot(void)
 {
 	assert_interactive();
 #if MSDOS_COMPILER
@@ -2405,8 +2411,7 @@ clear_eol_bot(VOID_PARAM)
  * Clear the bottom line of the display.
  * Leave the cursor at the beginning of the bottom line.
  */
-	public void
-clear_bot(VOID_PARAM)
+public void clear_bot(void)
 {
 	/*
 	 * If we're in a non-normal attribute mode, temporarily exit
@@ -2439,9 +2444,7 @@ clear_bot(VOID_PARAM)
 /*
  * Parse a 4-bit color char.
  */
-	static int
-parse_color4(ch)
-	char ch;
+static int parse_color4(char ch)
 {
 	switch (ch)
 	{
@@ -2469,9 +2472,7 @@ parse_color4(ch)
 /*
  * Parse a color as a decimal integer.
  */
-	static int
-parse_color6(ps)
-	char **ps;
+static int parse_color6(char **ps)
 {
 	if (**ps == '-')
 	{
@@ -2480,8 +2481,8 @@ parse_color6(ps)
 	} else
 	{
 		char *ops = *ps;
-		int color = lstrtoi(ops, ps);
-		if (*ps == ops)
+		int color = lstrtoi(ops, ps, 10);
+		if (color < 0 || *ps == ops)
 			return CV_ERROR;
 		return color;
 	}
@@ -2493,11 +2494,7 @@ parse_color6(ps)
  *  CV_4BIT: fg/bg values are OR of CV_{RGB} bits.
  *  CV_6BIT: fg/bg values are integers entered by user.
  */
-	public COLOR_TYPE
-parse_color(str, p_fg, p_bg)
-	char *str;
-	int *p_fg;
-	int *p_bg;
+public COLOR_TYPE parse_color(char *str, int *p_fg, int *p_bg)
 {
 	int fg;
 	int bg;
@@ -2526,9 +2523,7 @@ parse_color(str, p_fg, p_bg)
 
 #if !MSDOS_COMPILER
 
-	static int
-sgr_color(color)
-	int color;
+static int sgr_color(int color)
 {
 	switch (color)
 	{
@@ -2554,11 +2549,7 @@ sgr_color(color)
 	}
 }
 
-	static void
-tput_fmt(fmt, color, f_putc)
-	char *fmt;
-	int color;
-	int (*f_putc)(int);
+static void tput_fmt(char *fmt, int color, int (*f_putc)(int))
 {
 	char buf[INT_STRLEN_BOUND(int)+16];
 	if (color == attrcolor)
@@ -2568,10 +2559,7 @@ tput_fmt(fmt, color, f_putc)
 	attrcolor = color;
 }
 
-	static void
-tput_color(str, f_putc)
-	char *str;
-	int (*f_putc)(int);
+static void tput_color(char *str, int (*f_putc)(int))
 {
 	int fg;
 	int bg;
@@ -2601,12 +2589,7 @@ tput_color(str, f_putc)
 	}
 }
 
-	static void
-tput_inmode(mode_str, attr, attr_bit, f_putc)
-	char *mode_str;
-	int attr;
-	int attr_bit;
-	int (*f_putc)(int);
+static void tput_inmode(char *mode_str, int attr, int attr_bit, int (*f_putc)(int))
 {
 	char *color_str;
 	if ((attr & attr_bit) == 0)
@@ -2622,11 +2605,7 @@ tput_inmode(mode_str, attr, attr_bit, f_putc)
 	tput_color(color_str, f_putc);
 }
 
-	static void
-tput_outmode(mode_str, attr_bit, f_putc)
-	char *mode_str;
-	int attr_bit;
-	int (*f_putc)(int);
+static void tput_outmode(char *mode_str, int attr_bit, int (*f_putc)(int))
 {
 	if ((attrmode & attr_bit) == 0)
 		return;
@@ -2636,10 +2615,7 @@ tput_outmode(mode_str, attr_bit, f_putc)
 #else /* MSDOS_COMPILER */
 
 #if MSDOS_COMPILER==WIN32C
-	static int
-WIN32put_fmt(fmt, color)
-	char *fmt;
-	int color;
+static int WIN32put_fmt(char *fmt, int color)
 {
 	char buf[INT_STRLEN_BOUND(int)+16];
 	int len = SNPRINTF1(buf, sizeof(buf), fmt, color);
@@ -2648,9 +2624,7 @@ WIN32put_fmt(fmt, color)
 }
 #endif
 
-	static int
-win_set_color(attr)
-	int attr;
+static int win_set_color(int attr)
 {
 	int fg;
 	int bg;
@@ -2694,9 +2668,7 @@ win_set_color(attr)
 
 #endif /* MSDOS_COMPILER */
 
-	public void
-at_enter(attr)
-	int attr;
+public void at_enter(int attr)
 {
 	attr = apply_at_specials(attr);
 #if !MSDOS_COMPILER
@@ -2732,8 +2704,7 @@ at_enter(attr)
 	attrmode = attr;
 }
 
-	public void
-at_exit(VOID_PARAM)
+public void at_exit(void)
 {
 #if !MSDOS_COMPILER
 	/* Undo things in the reverse order we did them.  */
@@ -2749,9 +2720,7 @@ at_exit(VOID_PARAM)
 	attrmode = AT_NORMAL;
 }
 
-	public void
-at_switch(attr)
-	int attr;
+public void at_switch(int attr)
 {
 	int new_attrmode = apply_at_specials(attr);
 	int ignore_modes = AT_ANSI;
@@ -2763,10 +2732,7 @@ at_switch(attr)
 	}
 }
 
-	public int
-is_at_equiv(attr1, attr2)
-	int attr1;
-	int attr2;
+public int is_at_equiv(int attr1, int attr2)
 {
 	attr1 = apply_at_specials(attr1);
 	attr2 = apply_at_specials(attr2);
@@ -2774,9 +2740,7 @@ is_at_equiv(attr1, attr2)
 	return (attr1 == attr2);
 }
 
-	public int
-apply_at_specials(attr)
-	int attr;
+public int apply_at_specials(int attr)
 {
 	if (attr & AT_BINARY)
 		attr |= binattr;
@@ -2790,8 +2754,7 @@ apply_at_specials(attr)
 /*
  * Output a plain backspace, without erasing the previous char.
  */
-	public void
-putbs(VOID_PARAM)
+public void putbs(void)
 {
 	if (termcap_debug)
 		putstr("<bs>");
@@ -2834,8 +2797,7 @@ putbs(VOID_PARAM)
 /*
  * Determine whether an input character is waiting to be read.
  */
-	public int
-win32_kbhit(VOID_PARAM)
+public int win32_kbhit(void)
 {
 	INPUT_RECORD ip;
 	DWORD read;
@@ -2895,6 +2857,7 @@ win32_kbhit(VOID_PARAM)
 	} while (ip.EventType != KEY_EVENT ||
 		ip.Event.KeyEvent.bKeyDown != TRUE ||
 		(ip.Event.KeyEvent.wVirtualScanCode == 0 && ip.Event.KeyEvent.uChar.UnicodeChar == 0) ||
+		((ip.Event.KeyEvent.dwControlKeyState & (RIGHT_ALT_PRESSED|LEFT_CTRL_PRESSED)) == (RIGHT_ALT_PRESSED|LEFT_CTRL_PRESSED) && ip.Event.KeyEvent.uChar.UnicodeChar == 0) ||
 		ip.Event.KeyEvent.wVirtualKeyCode == VK_KANJI ||
 		ip.Event.KeyEvent.wVirtualKeyCode == VK_SHIFT ||
 		ip.Event.KeyEvent.wVirtualKeyCode == VK_CONTROL ||
@@ -2945,8 +2908,7 @@ win32_kbhit(VOID_PARAM)
 /*
  * Read a character from the keyboard.
  */
-	public char
-WIN32getch(VOID_PARAM)
+public char WIN32getch(void)
 {
 	char ascii;
 	static unsigned char utf8[UTF8_MAX_LENGTH];
@@ -3002,20 +2964,14 @@ WIN32getch(VOID_PARAM)
 #if MSDOS_COMPILER
 /*
  */
-	public void
-WIN32setcolors(fg, bg)
-	int fg;
-	int bg;
+public void WIN32setcolors(int fg, int bg)
 {
 	SETCOLORS(fg, bg);
 }
 
 /*
  */
-	public void
-WIN32textout(text, len)
-	char *text;
-	int len;
+public void WIN32textout(char *text, int len)
 {
 #if MSDOS_COMPILER==WIN32C
 	DWORD written;

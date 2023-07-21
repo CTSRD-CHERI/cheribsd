@@ -818,7 +818,6 @@ void vm_page_assert_pga_writeable(vm_page_t m, uint16_t bits);
 	    (_busy_lock & VPB_BIT_FLAGMASK) | VPB_CURTHREAD_EXCLUSIVE)); \
 } while (0)
 #if __has_feature(capabilities)
-
 void vm_page_assert_pga_capmeta_copy(vm_page_t msrc, vm_page_t mdst);
 #define	VM_PAGE_ASSERT_PGA_CAPMETA_COPY(msrc, mdst)			\
 	vm_page_assert_pga_capmeta_copy(msrc, mdst)

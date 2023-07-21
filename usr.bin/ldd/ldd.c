@@ -71,14 +71,14 @@ __FBSDID("$FreeBSD$");
 	setenv("LD_" name, value, overwrite);		\
 	setenv("LD_32_" name, value, overwrite);	\
 	setenv("LD_64_" name, value, overwrite);	\
-	setenv("LD_CHERI_" name, value, overwrite);	\
+	setenv("LD_64C_" name, value, overwrite);	\
 } while (0)
 
 #define	LDD_UNSETENV(name) do {		\
 	unsetenv("LD_" name);		\
 	unsetenv("LD_32_" name);	\
 	unsetenv("LD_64_" name);	\
-	unsetenv("LD_CHERI_" name);	\
+	unsetenv("LD_64C_" name);	\
 } while (0)
 
 static int	is_executable(const char *fname, int fd, int *is_shlib,
@@ -486,18 +486,18 @@ is_executable(const char *fname, int fd, int *is_shlib, int *type,
 	}
 
 	*type = TYPE_ELF;
-	*rtld = _DEFAULT_PATH_RTLD;
+	*rtld = _PATH_RTLD;
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (!ELF_IS_CHERI(&ehdr))
-		*rtld = _COMPAT64_PATH_RTLD;
+		*rtld = __PATH_RTLD("64");
 #elif __has_feature(capabilities)
 	if (ELF_IS_CHERI(&ehdr))
-		*rtld = _CHERIABI_PATH_RTLD;
+		*rtld = __PATH_RTLD("64c");
 #endif
 #if __ELF_WORD_SIZE > 32 && defined(ELF32_SUPPORTED)
 	if (gelf_getclass(elf) == ELFCLASS32) {
 		*type = TYPE_ELF32;
-		*rtld = _COMPAT32_PATH_RTLD;
+		*rtld = __PATH_RTLD("32");
 	}
 #endif
 

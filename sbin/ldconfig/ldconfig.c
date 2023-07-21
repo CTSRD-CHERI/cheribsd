@@ -81,9 +81,9 @@ main(int argc, char **argv)
 	}
 
 	if (is_32)
-		hints_file = _PATH_ELF32_HINTS;
+		hints_file = __PATH_ELF_HINTS("32");
 	else if (is_64)
-		hints_file = _PATH_ELF64_HINTS;
+		hints_file = __PATH_ELF_HINTS("64");
 	else
 		hints_file = _PATH_ELF_HINTS;
 	while((c = getopt(argc, argv, "Rf:imrsv")) != -1) {

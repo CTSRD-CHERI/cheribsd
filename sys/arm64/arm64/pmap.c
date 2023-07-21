@@ -897,7 +897,7 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m,
 	val |= pmap_pte_cr(pmap, va, prot);
 
 	VM_PAGE_ASSERT_PGA_CAPMETA_PMAP_ENTER(m, prot);
-	if ((prot & VM_PROT_WRITE_CAP) != 0)
+	if ((prot & VM_PROT_WRITE_CAP) != 0) {
 		/*
 		 * The page is CAPSTORE and this mapping is VM_PROT_WRITE_CAP.
 		 * Always set ATTR_CDBM. If the page is CAPDIRTY or this mapping
@@ -906,7 +906,11 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m,
 		 * XXX We could also conditionally set ATTR_SC if PGA_CAPDIRTY,
 		 * but it's not required.
 		 */
-		val |= (ATTR_CDBM);
+		if (va < VM_MAX_USER_ADDRESS)
+			val |= ATTR_CDBM;
+		else
+			val |= ATTR_SC;
+	}
 #endif
 
 	return (val);
@@ -933,25 +937,20 @@ pmap_pte_dirty(pmap_t pmap, pt_entry_t pte)
 	    ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE));
 }
 
-#if __has_feature(capabilities)
 static inline int
 pmap_pte_capdirty(pmap_t pmap, pt_entry_t pte)
 {
+#if __has_feature(capabilities)
 	KASSERT((pte & ATTR_SW_MANAGED) != 0, ("pte %#lx is unmanaged", pte));
 
 	KASSERT((pte & (ATTR_CDBM | ATTR_SC)) != ATTR_SC,
 	    ("pte %lx is cap-writable but missing ATTR_CDBM", pte));
 
 	return ((pte & ATTR_SC) == ATTR_SC);
-}
 #else
-static inline int
-pmap_pte_capdirty(pmap_t pmap, pt_entry_t pte)
-{
-
 	return (0);
-}
 #endif
+}
 
 static inline void
 pmap_page_dirty(pmap_t pmap, pt_entry_t pte, vm_page_t m)
@@ -3995,8 +3994,7 @@ pmap_protect_l2(pmap_t pmap, pt_entry_t *l2, vm_offset_t sva, pt_entry_t mask,
 	 */
 	if ((old_l2 & ATTR_SW_MANAGED) != 0 &&
 	    (nbits & ATTR_S1_AP(ATTR_S1_AP_RO)) != 0 &&
-	    (pmap_pte_dirty(pmap, old_l2) ||
-	    pmap_pte_capdirty(pmap, old_l2))) {
+	    (pmap_pte_dirty(pmap, old_l2) || pmap_pte_capdirty(pmap, old_l2))) {
 		m = PHYS_TO_VM_PAGE(old_l2 & ~ATTR_MASK);
 		for (mt = m; mt < &m[L2_SIZE / PAGE_SIZE]; mt++)
 			pmap_page_dirty(pmap, old_l2, mt);
@@ -4105,9 +4103,7 @@ pmap_mask_set_locked(pmap_t pmap, vm_offset_t sva, vm_offset_t eva, pt_entry_t m
 			 * update the page's dirty field.
 			 */
 			if ((l3 & ATTR_SW_MANAGED) != 0 &&
-			    (nbits & ATTR_S1_AP(ATTR_S1_AP_RO)) != 0 &&
-			    (pmap_pte_dirty(pmap, l3) ||
-			    pmap_pte_capdirty(pmap, l3)))
+			    (nbits & ATTR_S1_AP(ATTR_S1_AP_RO)) != 0)
 				pmap_page_dirty(pmap, l3,
 				    PHYS_TO_VM_PAGE(l3 & ~ATTR_MASK));
 
@@ -6746,6 +6742,7 @@ retry:
 			while (!atomic_fcmpset_64(pte, &oldpte,
 			    (oldpte | set) & ~clear))
 				cpu_spinwait();
+
 			pmap_page_dirty(pmap, oldpte, m);
 			pmap_invalidate_page(pmap, pv->pv_va, true);
 		}
@@ -6820,7 +6817,6 @@ retry:
 		 * we update only the 4KB page under test.
 		 */
 		pmap_page_dirty(pmap, tpte, m);
-
 		if ((tpte & ATTR_AF) != 0) {
 			/*
 			 * Since this reference bit is shared by 512 4KB pages,
@@ -8387,33 +8383,33 @@ pmap_align_superpage(vm_object_t object, vm_ooffset_t offset,
  * \param vaddr       On return contains the kernel virtual memory address
  *                    of the pages passed in the page parameter.
  * \param count       Number of pages passed in.
- * \param can_fault   TRUE if the thread using the mapped pages can take
- *                    page faults, FALSE otherwise.
+ * \param can_fault   true if the thread using the mapped pages can take
+ *                    page faults, false otherwise.
  *
- * \returns TRUE if the caller must call pmap_unmap_io_transient when
- *          finished or FALSE otherwise.
+ * \returns true if the caller must call pmap_unmap_io_transient when
+ *          finished or false otherwise.
  *
  */
-boolean_t
+bool
 pmap_map_io_transient(vm_page_t page[], vm_pointer_t vaddr[], int count,
-    boolean_t can_fault)
+    bool can_fault)
 {
 	vm_paddr_t paddr;
-	boolean_t needs_mapping;
+	bool needs_mapping;
 	int error __diagused, i;
 
 	/*
 	 * Allocate any KVA space that we need, this is done in a separate
 	 * loop to prevent calling vmem_alloc while pinned.
 	 */
-	needs_mapping = FALSE;
+	needs_mapping = false;
 	for (i = 0; i < count; i++) {
 		paddr = VM_PAGE_TO_PHYS(page[i]);
 		if (__predict_false(!PHYS_IN_DMAP(paddr))) {
 			error = vmem_alloc(kernel_arena, PAGE_SIZE,
 			    M_BESTFIT | M_WAITOK, &vaddr[i]);
 			KASSERT(error == 0, ("vmem_alloc failed: %d", error));
-			needs_mapping = TRUE;
+			needs_mapping = true;
 		} else {
 			vaddr[i] = PHYS_TO_DMAP_PAGE(paddr);
 		}
@@ -8421,7 +8417,7 @@ pmap_map_io_transient(vm_page_t page[], vm_pointer_t vaddr[], int count,
 
 	/* Exit early if everything is covered by the DMAP */
 	if (!needs_mapping)
-		return (FALSE);
+		return (false);
 
 	if (!can_fault)
 		sched_pin();
@@ -8438,7 +8434,7 @@ pmap_map_io_transient(vm_page_t page[], vm_pointer_t vaddr[], int count,
 
 void
 pmap_unmap_io_transient(vm_page_t page[], vm_pointer_t vaddr[], int count,
-    boolean_t can_fault)
+    bool can_fault)
 {
 	vm_paddr_t paddr;
 	int i;

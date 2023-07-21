@@ -231,9 +231,9 @@ __FBSDID("$FreeBSD$");
 			PHYS_TO_PV_LIST_LOCK(VM_PAGE_TO_PHYS(m))
 
 #if __has_feature(capabilities)
-#define PTE_DIRTY_BITS	(PTE_D | PTE_CD)
+#define	PTE_DIRTY_BITS	(PTE_D | PTE_CD)
 #else
-#define PTE_DIRTY_BITS	(PTE_D)
+#define	PTE_DIRTY_BITS	(PTE_D)
 #endif
 
 static SYSCTL_NODE(_vm, OID_AUTO, pmap, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
@@ -2249,7 +2249,7 @@ pmap_remove_kernel_l2(pmap_t pmap, pt_entry_t *l2, vm_offset_t va)
 	    __func__, l2, oldl2));
 }
 
-static __inline void
+static inline void
 pmap_page_dirty(pt_entry_t entry, vm_page_t m)
 {
 	if ((entry & PTE_D) != 0)
@@ -5481,33 +5481,33 @@ pmap_align_superpage(vm_object_t object, vm_ooffset_t offset,
  * \param vaddr       On return contains the kernel virtual memory address
  *                    of the pages passed in the page parameter.
  * \param count       Number of pages passed in.
- * \param can_fault   TRUE if the thread using the mapped pages can take
- *                    page faults, FALSE otherwise.
+ * \param can_fault   true if the thread using the mapped pages can take
+ *                    page faults, false otherwise.
  *
- * \returns TRUE if the caller must call pmap_unmap_io_transient when
- *          finished or FALSE otherwise.
+ * \returns true if the caller must call pmap_unmap_io_transient when
+ *          finished or false otherwise.
  *
  */
-boolean_t
+bool
 pmap_map_io_transient(vm_page_t page[], vm_pointer_t vaddr[], int count,
-    boolean_t can_fault)
+    bool can_fault)
 {
 	vm_paddr_t paddr;
-	boolean_t needs_mapping;
+	bool needs_mapping;
 	int error __diagused, i;
 
 	/*
 	 * Allocate any KVA space that we need, this is done in a separate
 	 * loop to prevent calling vmem_alloc while pinned.
 	 */
-	needs_mapping = FALSE;
+	needs_mapping = false;
 	for (i = 0; i < count; i++) {
 		paddr = VM_PAGE_TO_PHYS(page[i]);
 		if (__predict_false(paddr >= DMAP_MAX_PHYSADDR)) {
 			error = vmem_alloc(kernel_arena, PAGE_SIZE,
 			    M_BESTFIT | M_WAITOK, &vaddr[i]);
 			KASSERT(error == 0, ("vmem_alloc failed: %d", error));
-			needs_mapping = TRUE;
+			needs_mapping = true;
 		} else {
 			vaddr[i] = PHYS_TO_DMAP_PAGE(paddr);
 		}
@@ -5515,7 +5515,7 @@ pmap_map_io_transient(vm_page_t page[], vm_pointer_t vaddr[], int count,
 
 	/* Exit early if everything is covered by the DMAP */
 	if (!needs_mapping)
-		return (FALSE);
+		return (false);
 
 	if (!can_fault)
 		sched_pin();
@@ -5532,7 +5532,7 @@ pmap_map_io_transient(vm_page_t page[], vm_pointer_t vaddr[], int count,
 
 void
 pmap_unmap_io_transient(vm_page_t page[], vm_pointer_t vaddr[], int count,
-    boolean_t can_fault)
+    bool can_fault)
 {
 	vm_paddr_t paddr;
 	int i;

@@ -597,11 +597,14 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 		end = MAX(end, seg_addr + seg_size);
 	}
 
-	if (hdr->e_type == ET_EXEC && !is_aligned(start + rbase,
+	reservation = start + rbase;
+#ifdef __ELF_CHERI
+	if (hdr->e_type == ET_EXEC && !is_aligned(reservation,
 	    CHERI_REPRESENTABLE_ALIGNMENT(end - start))) {
 		/*
-		 * We can't change the load address for position dependent
-		 *  executables, so we have to give up and report an error.
+		 * We can't change the load address for position
+		 * dependent executables, so we have to give up and
+		 * report an error.
 		 */
 		uprintf("Warning: Attempted to load position-dependent "
 		    "executable with non-representable base: %s\n",
@@ -610,13 +613,14 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 	}
 
 	/*
-	 * Note: vm_map_reservation_create aligns down, but we have to align
-	 * upwards here to avoid rounding down to zero for the main executable.
-	 * For RTLD we also align upwards to avoid aligning down into the
-	 * memory region for the main binary.
+	 * Note: vm_map_reservation_create aligns down, but we have to
+	 * align upwards here to avoid rounding down to zero for the main
+	 * executable. For RTLD we also align upwards to avoid aligning
+	 * down into the memory region for the main binary.
 	 */
-	reservation = roundup2(start + rbase,
+	reservation = roundup2(reservation,
 	    CHERI_REPRESENTABLE_ALIGNMENT(end - start));
+#endif
 	result = vm_map_reservation_create(map, &reservation, end - start,
 	    PAGE_SIZE, VM_PROT_ALL);
 	if (result != KERN_SUCCESS)

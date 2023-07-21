@@ -86,7 +86,6 @@ cheri_revoke_is_revoked(const void * __capability cap)
 	return (__builtin_cheri_tag_get(cap) == 0);
 #endif
 }
-#endif
 
 /*************************** SHADOW BITMAP LAYOUT ***************************/
 
@@ -137,10 +136,9 @@ cheri_revoke_is_revoked(const void * __capability cap)
 static const size_t VM_CHERI_REVOKE_GSZ_MEM_NOMAP = sizeof(void * __capability);
 static const size_t VM_CHERI_REVOKE_GSZ_OTYPE = 1;
 
-#if __has_feature(capabilities)
 static const size_t VM_CHERI_REVOKE_BSZ_OTYPE =
   ((1 << CHERI_OTYPE_BITS) / VM_CHERI_REVOKE_GSZ_OTYPE / 8);
-#endif
+#endif /* __has_feature(capabilities) */
 
 /*************************** REVOKER CONTROL FLAGS ***************************/
 

@@ -1615,7 +1615,6 @@ ktrsyscall_freebsd(struct ktr_syscall *ktr, register_t **resip,
 				ip++;
 				narg--;
 				c = ',';
-				/* XXX: don't need to print the rest? */
 				break;
 			case SYS_cheri_revoke_get_shadow:
 				putchar('(');
@@ -1624,7 +1623,6 @@ ktrsyscall_freebsd(struct ktr_syscall *ktr, register_t **resip,
 				ip++;
 				narg--;
 				c = ',';
-				/* XXX: don't need to print the rest? */
 				break;
 			}
 			switch (ktr->ktr_code) {

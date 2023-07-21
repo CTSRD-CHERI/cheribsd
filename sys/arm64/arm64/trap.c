@@ -439,6 +439,16 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 		panic("data abort in critical section or under mutex");
 	}
 
+#if __has_feature(capabilities)
+	if ((esr & ISS_DATA_DFSC_MASK) == ISS_DATA_DFSC_LC_SC &&
+	    (esr & ISS_DATA_WnR) == 0) {
+		sig = SIGSEGV;
+		ucode = SEGV_LOADTAG;
+		error = KERN_FAILURE;
+		goto bad_far;
+	}
+#endif
+
 	switch (ESR_ELx_EXCEPTION(esr)) {
 	case EXCP_INSN_ABORT:
 	case EXCP_INSN_ABORT_L:

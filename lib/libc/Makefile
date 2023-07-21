@@ -6,9 +6,6 @@ SHLIBDIR?= /lib
 
 .include <src.opts.mk>
 
-# Force building of libc_pic.a
-MK_TOOLCHAIN=	yes
-
 .if !defined(LIBC_SRCTOP)
 LIBC_SRCTOP:= ${.PARSEDIR}
 .endif

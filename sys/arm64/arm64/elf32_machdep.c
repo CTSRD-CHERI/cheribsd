@@ -150,7 +150,7 @@ elf32_arm_abi_supported(const struct image_params *imgp,
 	/* Check if we support AArch32 */
 	if (ID_AA64PFR0_EL0_VAL(READ_SPECIALREG(id_aa64pfr0_el1)) !=
 	    ID_AA64PFR0_EL0_64_32)
-		return (FALSE);
+		return (false);
 
 #define	EF_ARM_EABI_FREEBSD_MIN	EF_ARM_EABI_VER4
 	hdr = (const Elf32_Ehdr *)imgp->image_header;
@@ -160,10 +160,10 @@ elf32_arm_abi_supported(const struct image_params *imgp,
 			    "(rev %d) image %s",
 			    EF_ARM_EABI_VERSION(hdr->e_flags),
 			    imgp->args->fname);
-		return (FALSE);
+		return (false);
         }
 
-	return (TRUE);
+	return (true);
 }
 
 static int

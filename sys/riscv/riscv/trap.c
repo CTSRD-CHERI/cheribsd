@@ -65,9 +65,7 @@ __FBSDID("$FreeBSD$");
 #endif
 #endif
 
-#ifdef FPE
 #include <machine/fpe.h>
-#endif
 #include <machine/frame.h>
 #include <machine/pcb.h>
 #include <machine/pcpu.h>
@@ -478,7 +476,6 @@ do_trap_supervisor(struct trapframe *frame)
 	case SCAUSE_INST_PAGE_FAULT:
 #if __has_feature(capabilities)
 	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
-	case SCAUSE_LOAD_CAP_PAGE_FAULT:
 #endif
 		page_fault_handler(frame, 0);
 		break;
@@ -589,7 +586,6 @@ do_trap_user(struct trapframe *frame)
 		ecall_handler();
 		break;
 	case SCAUSE_ILLEGAL_INSTRUCTION:
-#ifdef FPE
 		if ((pcb->pcb_fpflags & PCB_FP_STARTED) == 0) {
 			/*
 			 * May be a FPE trap. Enable FPE usage
@@ -601,7 +597,6 @@ do_trap_user(struct trapframe *frame)
 			pcb->pcb_fpflags |= PCB_FP_STARTED;
 			break;
 		}
-#endif
 		call_trapsignal(td, SIGILL, ILL_ILLTRP, frame->tf_sepc,
 		    exception, 0);
 		userret(td, frame);

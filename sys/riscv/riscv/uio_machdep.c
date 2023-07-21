@@ -66,7 +66,7 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 	size_t cnt;
 	int error = 0;
 	int save = 0;
-	boolean_t mapped;
+	bool mapped;
 
 	KASSERT(uio->uio_rw == UIO_READ || uio->uio_rw == UIO_WRITE,
 	    ("uiomove_fromphys: mode"));
@@ -74,7 +74,7 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 	    ("uiomove_fromphys proc"));
 	save = td->td_pflags & TDP_DEADLKTREAT;
 	td->td_pflags |= TDP_DEADLKTREAT;
-	mapped = FALSE;
+	mapped = false;
 	while (n > 0 && uio->uio_resid) {
 		iov = uio->uio_iov;
 		cnt = iov->iov_len;
@@ -89,7 +89,7 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 		cnt = min(cnt, PAGE_SIZE - page_offset);
 		if (uio->uio_segflg != UIO_NOCOPY) {
 			mapped = pmap_map_io_transient(
-			    &ma[offset >> PAGE_SHIFT], &vaddr, 1, TRUE);
+			    &ma[offset >> PAGE_SHIFT], &vaddr, 1, true);
 			cp = (char *)vaddr + page_offset;
 		}
 		switch (uio->uio_segflg) {
@@ -113,8 +113,8 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 		}
 		if (__predict_false(mapped)) {
 			pmap_unmap_io_transient(&ma[offset >> PAGE_SHIFT],
-			    &vaddr, 1, TRUE);
-			mapped = FALSE;
+			    &vaddr, 1, true);
+			mapped = false;
 		}
 		IOVEC_ADVANCE(iov, cnt);
 		uio->uio_resid -= cnt;
@@ -126,7 +126,7 @@ out:
 	if (__predict_false(mapped)) {
 		panic("TODO 3");
 		pmap_unmap_io_transient(&ma[offset >> PAGE_SHIFT], &vaddr, 1,
-		    TRUE);
+		    true);
 	}
 	if (save == 0)
 		td->td_pflags &= ~TDP_DEADLKTREAT;

@@ -36,7 +36,7 @@
 #define	LIBSTDBUF	"/usr/lib/libstdbuf.so"
 #define	LIBSTDBUF32	"/usr/lib32/libstdbuf.so"
 #define	LIBSTDBUF64	"/usr/lib64/libstdbuf.so"
-#define	LIBSTDBUFCHERI	"/usr/lib64c/libstdbuf.so"
+#define	LIBSTDBUF64C	"/usr/lib64c/libstdbuf.so"
 
 extern char *__progname;
 
@@ -119,15 +119,15 @@ main(int argc, char *argv[])
 	if (i < 0 || putenv(preload1) == -1)
 		warn("Failed to set environment variable: LD_64_PRELOAD");
 
-	preload0 = getenv("LD_CHERI_PRELOAD");
+	preload0 = getenv("LD_64C_PRELOAD");
 	if (preload0 == NULL)
-		i = asprintf(&preload1, "LD_CHERI_PRELOAD=" LIBSTDBUFCHERI);
+		i = asprintf(&preload1, "LD_64C_PRELOAD=" LIBSTDBUF64C);
 	else
-		i = asprintf(&preload1, "LD_CHERI_PRELOAD=%s:%s", preload0,
-		    LIBSTDBUFCHERI);
+		i = asprintf(&preload1, "LD_64C_PRELOAD=%s:%s", preload0,
+		    LIBSTDBUF64C);
 
 	if (i < 0 || putenv(preload1) == -1)
-		warn("Failed to set environment variable: LD_CHERI_PRELOAD");
+		warn("Failed to set environment variable: LD_64C_PRELOAD");
 
 	execvp(argv[0], argv);
 	err(2, "%s", argv[0]);

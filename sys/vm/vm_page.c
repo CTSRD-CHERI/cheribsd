@@ -5448,7 +5448,7 @@ vm_page_ps_test(vm_page_t m, int flags, vm_page_t skip_m)
 		if (m[i].object != object)
 			return (false);
 
-		// XXX CAPSTORE checks shouldn't exempt m_skip?
+		/* XXX CAPSTORE checks shouldn't exempt m_skip? */
 		if ((flags & PS_ALL_CAPSTORE) != 0) {
 			if (!(vm_page_astate_load(&m[i]).flags & PGA_CAPSTORE))
 				return (false);
@@ -5573,9 +5573,10 @@ vm_page_assert_pga_capmeta_copy(vm_page_t msrc, vm_page_t mdst)
 {
 	vm_page_astate_t msrca = vm_page_astate_load(msrc);
 	vm_page_astate_t mdsta = vm_page_astate_load(mdst);
-	KASSERT((mdsta.flags & msrca.flags &
-	    (PGA_CAPSTORE | PGA_CAPDIRTY))
-	    == (msrca.flags & (PGA_CAPSTORE | PGA_CAPDIRTY)),
+	int srccd __diagused = msrca.flags & (PGA_CAPSTORE | PGA_CAPDIRTY);
+	int dstcd __diagused = mdsta.flags & (PGA_CAPSTORE | PGA_CAPDIRTY);
+
+	KASSERT((dstcd & srccd) == srccd,
 	    ("pmap_copy_page_internal bad capdirty metadata"));
 }
 

@@ -375,6 +375,41 @@ struct pfi_dynaddr {
 #define	PF_STATE_LOCK_ASSERT(s)		do {} while (0)
 #endif /* INVARIANTS */
 
+#ifdef INVARIANTS
+#define	PF_SRC_NODE_LOCK(sn)						\
+	do {								\
+		struct pf_ksrc_node *_sn = (sn);			\
+		struct pf_srchash *_sh = &V_pf_srchash[			\
+		    pf_hashsrc(&_sn->addr, _sn->af)];			\
+		MPASS(_sn->lock == &_sh->lock);				\
+		mtx_lock(_sn->lock);					\
+	} while (0)
+#define	PF_SRC_NODE_UNLOCK(sn)						\
+	do {								\
+		struct pf_ksrc_node *_sn = (sn);			\
+		struct pf_srchash *_sh = &V_pf_srchash[			\
+		    pf_hashsrc(&_sn->addr, _sn->af)];			\
+		MPASS(_sn->lock == &_sh->lock);				\
+		mtx_unlock(_sn->lock);					\
+	} while (0)
+#else
+#define	PF_SRC_NODE_LOCK(sn)	mtx_lock((sn)->lock)
+#define	PF_SRC_NODE_UNLOCK(sn)	mtx_unlock((sn)->lock)
+#endif
+
+#ifdef INVARIANTS
+#define	PF_SRC_NODE_LOCK_ASSERT(sn)					\
+	do {								\
+		struct pf_ksrc_node *_sn = (sn);			\
+		struct pf_srchash *_sh = &V_pf_srchash[			\
+		    pf_hashsrc(&_sn->addr, _sn->af)];			\
+		MPASS(_sn->lock == &_sh->lock);				\
+		PF_HASHROW_ASSERT(_sh);					\
+	} while (0)
+#else /* !INVARIANTS */
+#define	PF_SRC_NODE_LOCK_ASSERT(sn)		do {} while (0)
+#endif /* INVARIANTS */
+
 extern struct mtx_padalign pf_unlnkdrules_mtx;
 #define	PF_UNLNKDRULES_LOCK()	mtx_lock(&pf_unlnkdrules_mtx)
 #define	PF_UNLNKDRULES_UNLOCK()	mtx_unlock(&pf_unlnkdrules_mtx)
@@ -845,6 +880,7 @@ struct pf_ksrc_node {
 	u_int32_t	 expire;
 	sa_family_t	 af;
 	u_int8_t	 ruletype;
+	struct mtx	*lock;
 };
 #endif
 
@@ -1668,32 +1704,26 @@ struct pfioc_state_kill {
 struct pfioc_states {
 	int	ps_len;
 	union {
-		char * __kerncap 	 psu_buf;
-		struct pfsync_state	* __kerncap psu_states;
-	} ps_u;
-#define ps_buf		ps_u.psu_buf
-#define ps_states	ps_u.psu_states
+		char * __kerncap 	 ps_buf;
+		struct pfsync_state	* __kerncap ps_states;
+	};
 };
 
 struct pfioc_states_v2 {
 	int		ps_len;
 	uint64_t	ps_req_version;
 	union {
-		char * __kerncap 	 psu_buf;
-		struct pf_state_export	* __kerncap psu_states;
-	} ps_u;
-#define ps_buf		ps_u.psu_buf
-#define ps_states	ps_u.psu_states
+		char * __kerncap 	 ps_buf;
+		struct pf_state_export	* __kerncap ps_states;
+	};
 };
 
 struct pfioc_src_nodes {
 	int	psn_len;
 	union {
-		char * __kerncap		 psu_buf;
-		struct pf_src_node	* __kerncap psu_src_nodes;
-	} psn_u;
-#define psn_buf		psn_u.psu_buf
-#define psn_src_nodes	psn_u.psu_src_nodes
+		char * __kerncap		 psn_buf;
+		struct pf_src_node	* __kerncap psn_src_nodes;
+	};
 };
 
 struct pfioc_if {
@@ -2120,7 +2150,8 @@ extern struct pf_kstate		*pf_find_state_all(struct pf_state_key_cmp *,
 extern bool			pf_find_state_all_exists(struct pf_state_key_cmp *,
 				    u_int);
 extern struct pf_ksrc_node	*pf_find_src_node(struct pf_addr *,
-				    struct pf_krule *, sa_family_t, int);
+				    struct pf_krule *, sa_family_t,
+				    struct pf_srchash **, bool);
 extern void			 pf_unlink_src_node(struct pf_ksrc_node *);
 extern u_int			 pf_free_src_nodes(struct pf_ksrc_node_list *);
 extern void			 pf_print_state(struct pf_kstate *);
@@ -2135,7 +2166,7 @@ VNET_DECLARE(struct ifnet *,		 sync_ifp);
 VNET_DECLARE(struct pf_krule,		 pf_default_rule);
 #define	V_pf_default_rule		  VNET(pf_default_rule)
 extern void			 pf_addrcpy(struct pf_addr *, struct pf_addr *,
-				    u_int8_t);
+				    sa_family_t);
 void				pf_free_rule(struct pf_krule *);
 
 int	pf_test_eth(int, int, struct ifnet *, struct mbuf **, struct inpcb *);
@@ -2150,7 +2181,7 @@ int	pf_test6(int, int, struct ifnet *, struct mbuf **, struct inpcb *);
 int	pf_normalize_ip6(struct mbuf **, int, struct pfi_kkif *, u_short *,
 	    struct pf_pdesc *);
 void	pf_poolmask(struct pf_addr *, struct pf_addr*,
-	    struct pf_addr *, struct pf_addr *, u_int8_t);
+	    struct pf_addr *, struct pf_addr *, sa_family_t);
 void	pf_addr_inc(struct pf_addr *, sa_family_t);
 int	pf_refragment6(struct ifnet *, struct mbuf **, struct m_tag *, bool);
 #endif /* INET6 */
@@ -2355,7 +2386,7 @@ int	pf_osfp_get(struct pf_osfp_ioctl *);
 int	pf_osfp_match(struct pf_osfp_enlist *, pf_osfp_t);
 
 #ifdef _KERNEL
-void			 pf_print_host(struct pf_addr *, u_int16_t, u_int8_t);
+void			 pf_print_host(struct pf_addr *, u_int16_t, sa_family_t);
 
 void			 pf_step_into_anchor(struct pf_kanchor_stackframe *, int *,
 			    struct pf_kruleset **, int, struct pf_krule **,
@@ -2372,7 +2403,7 @@ int			 pf_step_out_of_keth_anchor(struct pf_keth_anchor_stackframe *,
 			    struct pf_keth_rule **, struct pf_keth_rule **,
 			    int *);
 
-int			 pf_map_addr(u_int8_t, struct pf_krule *,
+u_short			 pf_map_addr(u_int8_t, struct pf_krule *,
 			    struct pf_addr *, struct pf_addr *,
 			    struct pf_addr *, struct pf_ksrc_node **);
 struct pf_krule		*pf_get_translation(struct pf_pdesc *, struct mbuf *,

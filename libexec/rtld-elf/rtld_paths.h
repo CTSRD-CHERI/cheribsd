@@ -31,105 +31,82 @@
 
 #undef _PATH_ELF_HINTS
 
-#define	_DEFAULT_BASENAME_RTLD		"ld-elf.so.1"
-#ifndef	_CHERIABI_BASENAME_RTLD
-#define	_CHERIABI_BASENAME_RTLD		"ld-elf64c.so.1"
+#ifndef _RTLD_COMPAT_LIB_SUFFIX
+#ifdef COMPAT_libcompat
+#define	_RTLD_COMPAT_LIB_SUFFIX	COMPAT_libcompat
+#else
+#define	_RTLD_COMPAT_LIB_SUFFIX	""
 #endif
-#ifndef	_COMPAT32_BASENAME_RTLD
-#define	_COMPAT32_BASENAME_RTLD		"ld-elf32.so.1"
-#endif
-#ifndef	_COMPAT64_BASENAME_RTLD
-#define	_COMPAT64_BASENAME_RTLD		"ld-elf64.so.1"
-#endif
-#ifndef	_C18N_BASENAME_RTLD
-#define	_C18N_BASENAME_RTLD		"ld-elf-c18n.so.1"
 #endif
 
-#ifdef COMPAT_CHERI
-#define	_PATH_ELF_HINTS		"/var/run/ld-elf64c.so.hints"
-#define	_PATH_LIBMAP_CONF	"/etc/libmap64c.conf"
-#define	_BASENAME_RTLD		_CHERIABI_BASENAME_RTLD
-#define	STANDARD_LIBRARY_PATH	"/lib64c:/usr/lib64c"
-#define	LD_			"LD_CHERI_"
+#ifndef _RTLD_COMPAT_ENV_SUFFIX
+#ifdef COMPAT_LIBCOMPAT
+#define	_RTLD_COMPAT_ENV_SUFFIX	COMPAT_LIBCOMPAT "_"
+#else
+#define	_RTLD_COMPAT_ENV_SUFFIX	""
+#endif
 #endif
 
-#ifndef _PATH_ELF32_HINTS
-#define	_PATH_ELF32_HINTS	"/var/run/ld-elf32.so.hints"
-#endif
-
-#ifdef COMPAT_32BIT
-#define	_PATH_ELF_HINTS		_PATH_ELF32_HINTS
-#define	_PATH_LIBMAP_CONF	"/etc/libmap32.conf"
-#define	_BASENAME_RTLD		_COMPAT32_BASENAME_RTLD
-#define	STANDARD_LIBRARY_PATH	"/lib32:/usr/lib32"
-#define	LD_			"LD_32_"
-#define	TOKEN_LIB		"lib32"
-#endif
-
-#ifndef _PATH_ELF64_HINTS
-#define	_PATH_ELF64_HINTS	"/var/run/ld-elf64.so.hints"
-#endif
-
-#ifdef COMPAT_64BIT
-#define	_PATH_ELF_HINTS		_PATH_ELF64_HINTS
-#define	_PATH_LIBMAP_CONF	"/etc/libmap64.conf"
-#define	_BASENAME_RTLD		_COMPAT64_BASENAME_RTLD
-#define	STANDARD_LIBRARY_PATH	"/lib64:/usr/lib64"
-#define	LD_			"LD_64_"
-#endif
-
-#ifndef _PATH_ELF_C18N_HINTS
-#define	_PATH_ELF_C18N_HINTS	"/var/run/ld-elf-c18n.so.hints"
-#endif
-
+#ifndef _RTLD_C18N_FILE_SUFFIX
 #ifdef RTLD_SANDBOX
-#define	_PATH_ELF_HINTS		_PATH_ELF_C18N_HINTS
-#define	_PATH_LIBMAP_CONF	"/etc/libmap-c18n.conf"
-#define	_BASENAME_RTLD		_C18N_BASENAME_RTLD
-#define	STANDARD_LIBRARY_PATH	"/lib/casper:/usr/lib/c18n:/lib:/usr/lib"
-#define	LD_			"LD_C18N_"
+#define	_RTLD_C18N_FILE_SUFFIX	"-c18n"
+#else
+#define	_RTLD_C18N_FILE_SUFFIX	""
+#endif
+#endif
+
+#ifndef _RTLD_C18N_ENV_SUFFIX
+#ifdef RTLD_SANDBOX
+#define	_RTLD_C18N_ENV_SUFFIX	"C18N_"
+#else
+#define	_RTLD_C18N_ENV_SUFFIX	""
+#endif
+#endif
+
+#ifndef __PATH_ELF_HINTS
+#define	__PATH_ELF_HINTS(_lc)	"/var/run/ld-elf" _lc ".so.hints"
 #endif
 
 #ifndef _PATH_ELF_HINTS
-#define	_PATH_ELF_HINTS		"/var/run/ld-elf.so.hints"
+#define	_PATH_ELF_HINTS		__PATH_ELF_HINTS(_RTLD_COMPAT_LIB_SUFFIX _RTLD_C18N_FILE_SUFFIX)
 #endif
 
 #ifndef _PATH_LIBMAP_CONF
-#define	_PATH_LIBMAP_CONF	"/etc/libmap.conf"
+#define	_PATH_LIBMAP_CONF	"/etc/libmap" _RTLD_COMPAT_LIB_SUFFIX _RTLD_C18N_FILE_SUFFIX ".conf"
+#endif
+
+#ifndef __BASENAME_RTLD
+#define	__BASENAME_RTLD(_lc)	"ld-elf" _lc ".so.1"
 #endif
 
 #ifndef _BASENAME_RTLD
-#define	_BASENAME_RTLD		_DEFAULT_BASENAME_RTLD
+#define	_BASENAME_RTLD		__BASENAME_RTLD(_RTLD_COMPAT_LIB_SUFFIX _RTLD_C18N_FILE_SUFFIX)
+#endif
+
+#ifndef __PATH_RTLD
+#define	__PATH_RTLD(_lc)	"/libexec/" __BASENAME_RTLD(_lc)
 #endif
 
 #ifndef _PATH_RTLD
-#define	_PATH_RTLD		"/libexec/" _BASENAME_RTLD
-#endif
-
-/* Provide these constants for /usr/bin/ldd32 */
-#ifndef _DEFAULT_PATH_RTLD
-#define	_DEFAULT_PATH_RTLD	"/libexec/" _DEFAULT_BASENAME_RTLD
-#endif
-#ifndef _CHERIABI_PATH_RTLD
-#define	_CHERIABI_PATH_RTLD	"/libexec/" _CHERIABI_BASENAME_RTLD
-#endif
-#ifndef _COMPAT32_PATH_RTLD
-#define	_COMPAT32_PATH_RTLD	"/libexec/" _COMPAT32_BASENAME_RTLD
-#endif
-#ifndef _COMPAT64_PATH_RTLD
-#define	_COMPAT64_PATH_RTLD	"/libexec/" _COMPAT64_BASENAME_RTLD
+#define	_PATH_RTLD		__PATH_RTLD(_RTLD_COMPAT_LIB_SUFFIX _RTLD_C18N_FILE_SUFFIX)
 #endif
 
 #ifndef STANDARD_LIBRARY_PATH
-#define	STANDARD_LIBRARY_PATH	"/lib:/usr/lib"
+#ifdef RTLD_SANDBOX
+#define	STANDARD_LIBRARY_PATH	"/lib" _RTLD_COMPAT_LIB_SUFFIX "/casper:" \
+				"/usr/lib" _RTLD_COMPAT_LIB_SUFFIX "/c18n:" \
+				"/lib" _RTLD_COMPAT_LIB_SUFFIX ":/usr/lib" _RTLD_COMPAT_LIB_SUFFIX
+#else
+#define	STANDARD_LIBRARY_PATH	"/lib" _RTLD_COMPAT_LIB_SUFFIX ":/usr/lib" _RTLD_COMPAT_LIB_SUFFIX
+#endif
 #endif
 
 #ifndef LD_
-#define	LD_			"LD_"
+#define	LD_			"LD_" _RTLD_COMPAT_ENV_SUFFIX _RTLD_C18N_ENV_SUFFIX
 #endif
 
 #ifndef TOKEN_LIB
-#define	TOKEN_LIB		"lib"
+#define	TOKEN_LIB		"lib" _RTLD_COMPAT_LIB_SUFFIX
 #endif
 
 #ifdef IN_RTLD
