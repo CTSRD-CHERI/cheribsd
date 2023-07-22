@@ -32,8 +32,7 @@
 #ifndef RTLD_MALLOC_H
 #define	RTLD_MALLOC_H
 
-#include <sys/cdefs.h>
-
+void *__crt_aligned_alloc_offset(size_t align, size_t size, size_t offset) __hidden;
 void *__crt_calloc(size_t num, size_t size) __hidden;
 void __crt_free(void *cp) __hidden;
 void *__crt_malloc(size_t nbytes) __hidden;
