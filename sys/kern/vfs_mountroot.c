@@ -363,13 +363,13 @@ vfs_mountroot_shuffle(struct thread *td, struct mount *mpdevfs)
 		    PTR2CAP(fspath));
 		error = namei(&nd);
 		if (error) {
-			NDFREE_PNBUF(&nd);
 			fspath = "/mnt";
 			NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE,
 			    PTR2CAP(fspath));
 			error = namei(&nd);
 		}
 		if (!error) {
+			NDFREE_PNBUF(&nd);
 			vp = nd.ni_vp;
 			error = (vp->v_type == VDIR) ? 0 : ENOTDIR;
 			if (!error)
@@ -387,7 +387,6 @@ vfs_mountroot_shuffle(struct thread *td, struct mount *mpdevfs)
 			} else
 				vput(vp);
 		}
-		NDFREE_PNBUF(&nd);
 
 		if (error)
 			printf("mountroot: unable to remount previous root "
@@ -398,6 +397,7 @@ vfs_mountroot_shuffle(struct thread *td, struct mount *mpdevfs)
 	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, "/dev");
 	error = namei(&nd);
 	if (!error) {
+		NDFREE_PNBUF(&nd);
 		vp = nd.ni_vp;
 		error = (vp->v_type == VDIR) ? 0 : ENOTDIR;
 		if (!error)
@@ -424,7 +424,6 @@ vfs_mountroot_shuffle(struct thread *td, struct mount *mpdevfs)
 	if (error)
 		printf("mountroot: unable to remount devfs under /dev "
 		    "(error %d)\n", error);
-	NDFREE_PNBUF(&nd);
 
 	if (mporoot == mpdevfs) {
 		vfs_unbusy(mpdevfs);
