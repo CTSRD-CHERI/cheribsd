@@ -170,6 +170,13 @@ CFLAGS+=	-fno-omit-frame-pointer -mno-omit-leaf-frame-pointer
 CFLAGS+=	-fPIC
 .endif
 
+.if ${MACHINE_CPUARCH} == "aarch64"
+# https://bugs.freebsd.org/264094
+# lld >= 14 and recent GNU ld can relax adrp+add and adrp+ldr instructions,
+# which breaks VNET.
+LDFLAGS+=	--no-relax
+.endif
+
 # XXX-AM: This is a workaround for not having full eflag support in morello lld.
 # should be removed as soon as the linker can link in capability mode based on
 # input files eflags instead.
