@@ -233,19 +233,16 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 	CPU_FOREACH(cpu_id) {
 		if (!CPU_ISSET(cpu_id, &halloc->cpu_map))
 			continue;
-
-		if (CPU_ABSENT(cpu_id) || CPU_ISSET(cpu_id, &hlt_cpus_mask))
+		/* Ensure CPU is not halted. */
+		if (CPU_ISSET(cpu_id, &hlt_cpus_mask))
 			return (ENXIO);
-	}
-
 #if 0
-	cpu = halloc->cpu;
-
-	/* Check if the owner have this cpu configured already. */
-	ctx = hwt_owner_lookup_ctx_by_cpu(ho, halloc->cpu);
-	if (ctx)
-		return (EEXIST);
+		/* TODO: Check if the owner have this cpu configured already. */
+		ctx = hwt_owner_lookup_ctx_by_cpu(ho, halloc->cpu);
+		if (ctx)
+			return (EEXIST);
 #endif
+	}
 
 	/* Allocate a new HWT context. */
 	ctx = hwt_ctx_alloc();
