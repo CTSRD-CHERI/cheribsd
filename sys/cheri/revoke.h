@@ -38,8 +38,8 @@
 #include <cheri/cherireg.h> /* For CHERI_OTYPE_BITS */
 #endif
 
-typedef uint64_t cheri_revoke_epoch_t;
-#define CHERI_REVOKE_ST_EPOCH_WIDTH	61
+typedef	uint64_t	cheri_revoke_epoch_t;
+#define	CHERI_REVOKE_ST_EPOCH_WIDTH	61
 
 /*
  * Epoch greater than orderings: a > b, a >= b.
@@ -59,20 +59,25 @@ typedef uint64_t cheri_revoke_epoch_t;
  * XXX this almost surely belongs somewhere else.
  */
 
-static inline int cheri_revoke_epoch_gt(cheri_revoke_epoch_t a,
-    cheri_revoke_epoch_t b) {
+static inline int
+cheri_revoke_epoch_gt(cheri_revoke_epoch_t a, cheri_revoke_epoch_t b)
+{
 	static const cheri_revoke_epoch_t top =
 	    1ULL << (CHERI_REVOKE_ST_EPOCH_WIDTH-1);
-	return ((a < b) && ((b - a) > top)) || ((a > b) && ((a - b) < top));
-}
-static inline int cheri_revoke_epoch_ge(cheri_revoke_epoch_t a,
-    cheri_revoke_epoch_t b) {
-	return (a == b) || cheri_revoke_epoch_gt(a, b);
+
+	return ((a < b && b - a > top) || (a > b && a - b < top));
 }
 
-static inline int cheri_revoke_epoch_clears(cheri_revoke_epoch_t now,
-                                         cheri_revoke_epoch_t then) {
-	return cheri_revoke_epoch_ge(now, then + (then & 1) + 2);
+static inline int
+cheri_revoke_epoch_ge(cheri_revoke_epoch_t a, cheri_revoke_epoch_t b)
+{
+	return (a == b || cheri_revoke_epoch_gt(a, b));
+}
+
+static inline int
+cheri_revoke_epoch_clears(cheri_revoke_epoch_t now, cheri_revoke_epoch_t then)
+{
+	return (cheri_revoke_epoch_ge(now, then + (then & 1) + 2));
 }
 
 #if __has_feature(capabilities)
@@ -142,88 +147,85 @@ static const size_t VM_CHERI_REVOKE_BSZ_OTYPE =
 
 /*************************** REVOKER CONTROL FLAGS ***************************/
 
-	/*
-	 * Finish the current revocation epoch this pass.
-	 * If there is no current revocation epoch, start one and then
-	 * finish it.
-	 *
-	 * If this flag is not given, then either start an epoch by doing
-	 * the first (full) pass or continue an epoch by doing an
-	 * incremental pass.  (For the load side algorithm, incremental passes
-	 * except the opening one are essentially no-ops.)
-	 */
-#define CHERI_REVOKE_LAST_PASS	0x0001
+/*
+ * Finish the current revocation epoch this pass.  If there is no current
+ * revocation epoch, start one and then finish it.
+ *
+ * If this flag is not given, then either start an epoch by doing the first
+ * (full) pass or continue an epoch by doing an incremental pass.  (For the
+ * load side algorithm, incremental passes except the opening one are
+ * essentially no-ops.)
+ */
+#define	CHERI_REVOKE_LAST_PASS		0x0001
 
-	/*
-	 * If this bit is set, the kernel is free to return without making
-	 * progress.
-	 */
-#define	CHERI_REVOKE_NO_WAIT_OK	0x0002
+/*
+ * If this bit is set, the kernel is free to return without making progress.
+ */
+#define	CHERI_REVOKE_NO_WAIT_OK		0x0002
 
-	/*
-	 * Ignore the given epoch argument and always attempt to advance the
-	 * epoch clock relative to its value "at the time of the call".
-	 */
+/*
+ * Ignore the given epoch argument and always attempt to advance the epoch
+ * clock relative to its value "at the time of the call".
+ */
 #define	CHERI_REVOKE_IGNORE_START	0x0004
 
-	/*
-	 * Do a pass only if an epoch is open after synchronization.
-	 *
-	 * XXX This has probably lost any utility it may ever have had.
-	 */
+/*
+ * Do a pass only if an epoch is open after synchronization.
+ *
+ * XXX This has probably lost any utility it may ever have had.
+ */
 #define	CHERI_REVOKE_ONLY_IF_OPEN	0x0008
 
-	/*
-	 * Ordinarily, cheri_revoke with CHERI_REVOKE_LAST_PASS attempts to
-	 * minimize the amount of work it does with the world held in
-	 * single-threaded state.  It will do up to two passes:
-	 *
-	 *   * an opening/incremental pass with the world running
-	 *
-	 *   * a pass with the world stopped, which visits kernel hoarders
-	 *     and recently-dirty pages (since the above pass)
-	 *
-	 * The first may be disabled by passing CHERI_REVOKE_LAST_NO_EARLY,
-	 * causing more work to be pushed into the world-stopped phase.
-	 *
-	 * Setting CHERI_REVOKE_LAST_NO_EARLY when not setting
-	 * CHERI_REVOKE_LAST_PASS will cause no passes to be performed.
-	 *
-	 * XXX This has probably lost any utility it may ever have had.
-	 */
-#define CHERI_REVOKE_LAST_NO_EARLY	0x0010
+/*
+ * Ordinarily, cheri_revoke with CHERI_REVOKE_LAST_PASS attempts to minimize
+ * the amount of work it does with the world held in single-threaded state.  It
+ * will do up to two passes:
+ *
+ *   * an opening/incremental pass with the world running
+ *
+ *   * a pass with the world stopped, which visits kernel hoarders and
+ *     recently-dirty pages (since the above pass)
+ *
+ * The first may be disabled by passing CHERI_REVOKE_LAST_NO_EARLY, causing
+ * more work to be pushed into the world-stopped phase.
+ *
+ * Setting CHERI_REVOKE_LAST_NO_EARLY when not setting CHERI_REVOKE_LAST_PASS
+ * will cause no passes to be performed.
+ *
+ * XXX This has probably lost any utility it may ever have had.
+ */
+#define	CHERI_REVOKE_LAST_NO_EARLY	0x0010
 
-	/*
-	 * Force a synchronization with the PMAP before doing a non-LAST
-	 * pass (including the EARLY part of a LAST call).  This should let
-	 * us measure the impact of lazily synchronizing with the PMAP
-	 * capdirty bits.
-	 *
-	 * This may also be useful if one were to do intermediate (i.e.,
-	 * neither opening nor closing) passes, but at present we do not.
-	 *
-	 * Meaningless if CHERI_REVOKE_LAST_NO_EARLY also set.
-	 *
-	 * XXX This has probably lost any utility it may ever have had.
-	 */
-#define CHERI_REVOKE_EARLY_SYNC	0x0020
+/*
+ * Force a synchronization with the PMAP before doing a non-LAST pass
+ * (including the EARLY part of a LAST call).  This should let us measure the
+ * impact of lazily synchronizing with the PMAP capdirty bits.
+ *
+ * This may also be useful if one were to do intermediate (i.e., neither
+ * opening nor closing) passes, but at present we do not.
+ *
+ * Meaningless if CHERI_REVOKE_LAST_NO_EARLY also set.
+ *
+ * XXX This has probably lost any utility it may ever have had.
+ */
+#define	CHERI_REVOKE_EARLY_SYNC		0x0020
 
-	/*
-         * If opening a new revocation epoch, ignore the default mode and run
-         * this one using the load-side algorithm.
-	 */
-#define CHERI_REVOKE_FORCE_LOAD_SIDE	0x0040
+/*
+ * If opening a new revocation epoch, ignore the default mode and run this one
+ * using the load-side algorithm.
+ */
+#define	CHERI_REVOKE_FORCE_LOAD_SIDE	0x0040
 
-	/*
-         * If opening a new revocation epoch, ignore the default mode and run
-         * this one using the store-side algorithm.
-	 */
-#define CHERI_REVOKE_FORCE_STORE_SIDE	0x0080
+/*
+ * If opening a new revocation epoch, ignore the default mode and run this one
+ * using the store-side algorithm.
+ */
+#define	CHERI_REVOKE_FORCE_STORE_SIDE	0x0080
 
-	/*
-	 * Reset the stats counters to zero "after" reporting
-	 */
-#define CHERI_REVOKE_TAKE_STATS	0x1000
+/*
+ * Reset the stats counters to zero "after" reporting
+ */
+#define	CHERI_REVOKE_TAKE_STATS		0x1000
 
 /*
  * Information conveyed to userland about a given cheri_revoke scan.
@@ -315,24 +317,24 @@ struct cheri_revoke_stats {
  * better.  Apologies.  Eventually, there will be only one.
  */
 struct cheri_revoke_epochs {
-	cheri_revoke_epoch_t enqueue; /* Label on entry to quarantine */
-	cheri_revoke_epoch_t dequeue; /* Gates removal from quarantine */
+	cheri_revoke_epoch_t	enqueue; /* Label on entry to quarantine */
+	cheri_revoke_epoch_t	dequeue; /* Gates removal from quarantine */
 };
 
 struct cheri_revoke_info {
-	const ptraddr_t base_mem_nomap;
-	const ptraddr_t base_otype;
+	const ptraddr_t			base_mem_nomap;
+	const ptraddr_t			base_otype;
 
-	struct cheri_revoke_epochs epochs;
+	struct cheri_revoke_epochs	epochs;
 };
 
 struct cheri_revoke_syscall_info {
-	struct cheri_revoke_epochs epochs;
-	struct cheri_revoke_stats stats;
+	struct cheri_revoke_epochs	epochs;
+	struct cheri_revoke_stats	stats;
 };
 
-#define	CHERI_REVOKE_SHADOW_NOVMMAP	0x00	/* The ordinary shadow space */
-#define CHERI_REVOKE_SHADOW_OTYPE	0x01	/* The otype shadow space */
+#define	CHERI_REVOKE_SHADOW_NOVMMAP		0x00	/* The ordinary shadow space */
+#define	CHERI_REVOKE_SHADOW_OTYPE		0x01	/* The otype shadow space */
 /*
  * It is not possible to ask for the _MEM_MAP bitmask, as we intend that one
  * to be used by the kernel internally for munmap().  Maybe that's wrong?
@@ -342,43 +344,42 @@ struct cheri_revoke_syscall_info {
  * bitmask, but it's 256 times as many bits to flip.
  */
 
-#define CHERI_REVOKE_SHADOW_INFO_STRUCT	0x03	/* R/O access to shared state */
+#define	CHERI_REVOKE_SHADOW_INFO_STRUCT		0x03	/* R/O access to shared state */
 
 /*
  * XXX This should go away as soon as we have allocators w/ per-arena shadows
  * or come to depend on CHERI+MTE, whichever happens first.  However, the
  * minimal-bookkeeping version of libmrs uses this, and that's very convenient.
  */
-#define CHERI_REVOKE_SHADOW_NOVMMAP_ENTIRE 0x07	/* The entire shadow region */
+#define	CHERI_REVOKE_SHADOW_NOVMMAP_ENTIRE	0x07	/* The entire shadow region */
 
-#define CHERI_REVOKE_SHADOW_SPACE_MASK	0x07	/* Flag bits for shadow index */
+#define	CHERI_REVOKE_SHADOW_SPACE_MASK		0x07	/* Flag bits for shadow index */
 
 #ifndef _KERNEL
-	/*
-	 * Drive the revocation state machine.
-	 *
-	 * If the current epoch clock is sufficient to caprvoke_epoch_clears
-	 * start_epoch, this call returns immediately, populating
-	 * statout->epoch_{init,fini} with the current clock's value.
-	 *
-	 * XXX if cheri_revoke_epoch becomes more complex than a scalar type,
-	 * this prototype will need to change or we'll need to be more
-	 * explicit about it being a hint or something.
-	 */
-int cheri_revoke(int flags, cheri_revoke_epoch_t start_epoch,
-		struct cheri_revoke_syscall_info *crsi);
+/*
+ * Drive the revocation state machine.
+ *
+ * If the current epoch clock is sufficient to caprvoke_epoch_clears
+ * start_epoch, this call returns immediately, populating
+ * statout->epoch_{init,fini} with the current clock's value.
+ *
+ * XXX if cheri_revoke_epoch becomes more complex than a scalar type, this
+ * prototype will need to change or we'll need to be more explicit about it
+ * being a hint or something.
+ */
+int	cheri_revoke(int flags, cheri_revoke_epoch_t start_epoch,
+    struct cheri_revoke_syscall_info *crsi);
 
-	/*
-	 * Request a capability to the shadow bitmap state for the given
-	 * arena.  Flags determine which space is requested; the arena cap
-	 * must have appropriate privileges.
-	 *
-	 * This call must fail if the resulting capability would not be
-	 * representable due to alignment constraints.
-	 */
-int cheri_revoke_get_shadow(int flags,
-	void * __capability arena,
-	void * __capability * shadow);
+/*
+ * Request a capability to the shadow bitmap state for the given arena.  Flags
+ * determine which space is requested; the arena cap must have appropriate
+ * privileges.
+ *
+ * This call must fail if the resulting capability would not be representable
+ * due to alignment constraints.
+ */
+int	cheri_revoke_get_shadow(int flags, void * __capability arena,
+    void * __capability * shadow);
 #endif
 
 #endif /* !__SYS_CHERI_REVOKE_H__ */
