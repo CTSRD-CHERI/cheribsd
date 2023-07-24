@@ -316,7 +316,7 @@ static struct cdevsw hwt_vm_cdevsw = {
 	.d_ioctl	= hwt_vm_ioctl,
 };
 
-int
+static int
 hwt_vm_create_cdev(struct hwt_vm *vm, char *path)
 {
 	struct make_dev_args args;
@@ -382,7 +382,7 @@ hwt_vm_destroy_buffers(struct hwt_vm *vm)
 }
 
 int
-hwt_vm_alloc(size_t bufsize, struct hwt_vm **vm0)
+hwt_vm_alloc(size_t bufsize, char *path, struct hwt_vm **vm0)
 {
 	struct hwt_vm *vm;
 	int error;
@@ -393,6 +393,12 @@ hwt_vm_alloc(size_t bufsize, struct hwt_vm **vm0)
 	error = hwt_vm_alloc_buffers(vm);
 	if (error) {
 		free(vm, M_HWT_VM);
+		return (error);
+	}
+
+	error = hwt_vm_create_cdev(vm, path);
+	if (error) {
+		/* TODO: deallocate resources. */
 		return (error);
 	}
 

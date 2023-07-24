@@ -137,6 +137,7 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 	struct hwt_context *ctx;
 	struct hwt_thread *thr;
 	struct proc *p;
+	int thread_id;
 	int error;
 
 	/* Check if the owner have this pid configured already. */
@@ -152,8 +153,11 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 	ctx->hwt_owner = ho;
 	ctx->mode = HWT_MODE_THREAD;
 
+	thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
+
 	/* Allocate first thread and buffers. */
-	error = hwt_thread_alloc(&thr, ctx->bufsize);
+	sprintf(path, "hwt_%d_%d", ctx->ident, thread_id);
+	error = hwt_thread_alloc(&thr, path, ctx->bufsize);
 	if (error) {
 		hwt_ctx_free(ctx);
 		return (error);
@@ -180,7 +184,7 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 	/* All good. */
 	thr->ctx = ctx;
 	thr->td = FIRST_THREAD_IN_PROC(p);
-	thr->thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
+	thr->thread_id = thread_id;
 
 	HWT_CTX_LOCK(ctx);
 	hwt_thread_insert(ctx, thr);
@@ -198,13 +202,6 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 	PROC_UNLOCK(p);
 
 	error = hwt_backend_init(ctx);
-	if (error) {
-		/* TODO: deallocate resources. */
-		return (error);
-	}
-
-	sprintf(path, "hwt_%d_%d", ctx->ident, thr->thread_id);
-	error = hwt_vm_create_cdev(thr->vm, path);
 	if (error) {
 		/* TODO: deallocate resources. */
 		return (error);
@@ -256,7 +253,8 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 		if (!CPU_ISSET(cpu_id, &halloc->cpu_map))
 			continue;
 
-		error = hwt_vm_alloc(ctx->bufsize, &vm);
+		sprintf(path, "hwt_%d_%d", ctx->ident, cpu_id);
+		error = hwt_vm_alloc(ctx->bufsize, path, &vm);
 		if (error) {
 			hwt_ctx_free(ctx);
 			return (error);
@@ -269,13 +267,6 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 		cpu->vm = vm;
 
 		vm->cpu = cpu;
-
-		sprintf(path, "hwt_%d_%d", ctx->ident, cpu_id);
-		error = hwt_vm_create_cdev(vm, path);
-		if (error) {
-			/* TODO: deallocate resources. */
-			return (error);
-		}
 
 		HWT_CTX_LOCK(ctx);
 		hwt_cpu_insert(ctx, cpu);

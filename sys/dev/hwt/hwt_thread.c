@@ -114,13 +114,13 @@ hwt_thread_lookup(struct hwt_context *ctx, struct thread *td)
 }
 
 int
-hwt_thread_alloc(struct hwt_thread **thr0, size_t bufsize)
+hwt_thread_alloc(struct hwt_thread **thr0, char *path, size_t bufsize)
 {
 	struct hwt_thread *thr;
 	struct hwt_vm *vm;
 	int error;
 
-	error = hwt_vm_alloc(bufsize, &vm);
+	error = hwt_vm_alloc(bufsize, path, &vm);
 	if (error)
 		return (error);
 
@@ -185,16 +185,9 @@ hwt_thread_create(struct thread *td)
 	HWT_CTX_UNLOCK(ctx);
 
 	/* 2. Now we can allocate some memory. */
-	error = hwt_thread_alloc(&thr, bufsize);
+	error = hwt_thread_alloc(&thr, path, bufsize);
 	if (error) {
 		printf("%s: could not allocate thread, error %d\n",
-		    __func__, error);
-		return (error);
-	}
-
-	error = hwt_vm_create_cdev(thr->vm, path);
-	if (error) {
-		printf("%s: could not create cdev, error %d\n",
 		    __func__, error);
 		return (error);
 	}
