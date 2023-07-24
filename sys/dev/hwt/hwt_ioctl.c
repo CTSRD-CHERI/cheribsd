@@ -262,7 +262,6 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 		vm = hwt_vm_alloc();
 		vm->ctx = ctx;
 		vm->npages = ctx->bufsize / PAGE_SIZE;
-		vm->thr = NULL;
 
 		/* Allocate buffers. */
 		error = hwt_vm_alloc_buffers(vm);
