@@ -86,9 +86,12 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysent.h>
 #include <sys/shm.h>
 
-#include <cheri/cheric.h>
 #if __has_feature(capabilities)
 #include <cheri/cheri.h>
+#endif
+#include <cheri/cheric.h>
+#ifdef CHERI_CAPREVOKE
+#include <cheri/revoke.h>
 #endif
 
 #include <vm/vm.h>
@@ -104,9 +107,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vnode_pager.h>
 #include <vm/swap_pager.h>
 #include <vm/uma.h>
-
 #ifdef CHERI_CAPREVOKE
-#include <cheri/revoke.h>
 #include <vm/vm_cheri_revoke.h>
 #endif
 

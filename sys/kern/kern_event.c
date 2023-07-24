@@ -78,16 +78,12 @@ __FBSDID("$FreeBSD$");
 #include <machine/atomic.h>
 
 #include <vm/uma.h>
-#include <vm/vm_extern.h>
-
 #ifdef CHERI_CAPREVOKE
-#include <cheri/cheric.h>
-#include <cheri/revoke.h>
+#include <vm/vm_cheri_revoke.h>
 #ifdef CHERI_CAPREVOKE_STATS
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
 #endif
-#include <vm/vm_cheri_revoke.h>
 #endif
 
 MALLOC_DEFINE(M_KQUEUE, "kqueue", "memory for kqueue system");

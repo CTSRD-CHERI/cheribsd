@@ -83,6 +83,9 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 #include <vm/vm_page.h>
 #include <vm/vm_map.h>
+#ifdef CHERI_CAPREVOKE
+#include <vm/vm_cheri_revoke.h>
+#endif
 #include <vm/vm_kern.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_object.h>
@@ -99,10 +102,6 @@ __FBSDID("$FreeBSD$");
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 #include <cheri/cherireg.h>
-#endif
-
-#ifdef CHERI_CAPREVOKE
-#include <vm/vm_cheri_revoke.h>
 #endif
 
 #ifdef KDTRACE_HOOKS

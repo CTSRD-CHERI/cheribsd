@@ -74,7 +74,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/aio.h>
 
 #ifdef CHERI_CAPREVOKE
-#include <cheri/cheric.h>
 #include <cheri/revoke.h>
 #include <vm/vm_cheri_revoke.h>
 #endif
