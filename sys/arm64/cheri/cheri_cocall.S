@@ -219,23 +219,17 @@ SIGCODE(switcher_cocall)
 	 */
 	sub	x11, x4, x13
 	cmp	x11, #0
-	mov	x14, x13
-	bge	3f
+	bge	use_coaccept_input_buffer_len
 	mov	x13, x4
+use_coaccept_input_buffer_len:
 	mov	x14, x13
 
 CSYM(switcher_cocall_copy_start)
-3:
-	//If we use this mov instruction instead of the two "mov x14, x13" above
-	//then this function returns '8' even if x13 and x4 contain values
-	//larger than eight. This is an odd bug that cannot be explained by a
-	//flaw in the assembly code. This issue occurs on qemu. I haven't
-	//tested if it can be reproduced on an actual Morello board.
-	//mov	x14, x13
+copy_loop:
 	add	x13, x13, #-8
 	ldr	x11, [c3, x13]
 	str	x11, [c12, x13]
-	cbnz	x13, 3b
+	cbnz	x13, copy_loop
 CSYM(switcher_cocall_copy_end)
 
 	/*
