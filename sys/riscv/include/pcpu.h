@@ -42,8 +42,6 @@
 #include <machine/cpu.h>
 #include <machine/cpufunc.h>
 
-#define	ALT_STACK_SIZE	128
-
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	__PCPU_PAD	168
 #else
