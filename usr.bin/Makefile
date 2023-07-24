@@ -186,12 +186,12 @@ SUBDIR=	alias \
 	yes \
 	zstd
 
-.if ${MACHINE_ARCH:Mriscv64*}
+.if ${MACHINE_CPUARCH} == "riscv"
 SUBDIR+=	minimal_count_stats
 .endif
 
-# Tracing currently only implemented for CHERI-QEMU architectures
-.if ${MACHINE} == "riscv"
+# Tracing currently only implemented for some CHERI-QEMU architectures
+.if ${MACHINE_CPUARCH} == "riscv"
 SUBDIR+=	qtrace
 .endif
 

@@ -286,10 +286,13 @@ CRUNCH_ALIAS_hexdump=	hd od
 CRUNCH_ALIAS_w=	uptime
 CRUNCH_PROGS_usr.bin+=su
 
-# Tracing currently only implemented for CHERI-QEMU architectures
-.if ${MACHINE} == "riscv"
-CRUNCH_PROGS_usr.bin+=	qtrace
+.if ${MACHINE_CPUARCH} == "riscv"
 CRUNCH_PROGS_usr.bin+=	minimal_count_stats
+.endif
+
+# Tracing currently only implemented for some CHERI-QEMU architectures
+.if ${MACHINE_CPUARCH} == "riscv"
+CRUNCH_PROGS_usr.bin+=	qtrace
 .endif
 
 
