@@ -146,6 +146,7 @@ retry:
 		}
 
 #if 0
+		/* TODO: could not clean device memory on arm64. */
 		if ((m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
 #endif
