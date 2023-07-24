@@ -48,18 +48,20 @@ __FBSDID("$FreeBSD$");
 #include <sys/signalvar.h>
 #include <sys/vnode.h>
 
-#include <vm/vm.h>
-#include <vm/vm_param.h>
+#ifdef CHERI_CAPREVOKE
+#include <cheri/revoke.h>
+#endif
 
 #include <machine/elf.h>
 #include <machine/md_var.h>
 
-#include "linker_if.h"
-
+#include <vm/vm.h>
+#include <vm/vm_param.h>
 #ifdef CHERI_CAPREVOKE
-#include <cheri/revoke.h>
 #include <vm/vm_cheri_revoke.h>
 #endif
+
+#include "linker_if.h"
 
 u_long __read_frequently elf_hwcap;
 u_long __read_frequently elf_hwcap2;

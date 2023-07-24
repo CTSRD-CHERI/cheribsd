@@ -90,22 +90,15 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
 #include <vm/uma.h>
-
-#include <sys/jail.h>
-
-// TODO NWF: Audit headers
-#if __has_feature(capabilities)
-#include <cheri/cheri.h>
-#include <cheri/cheric.h>
 #ifdef CHERI_CAPREVOKE
+#include <vm/vm_cheri_revoke.h>
 #ifdef CHERI_CAPREVOKE_STATS
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
 #endif
-#include <vm/vm_cheri_revoke.h>
-#include <cheri/revoke.h>
 #endif
-#endif
+
+#include <sys/jail.h>
 
 #include <machine/cpu.h>
 
