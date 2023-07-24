@@ -74,7 +74,6 @@ hwt_record(struct thread *td, struct hwt_record_entry *ent)
 	entry->thread_id = -1;
 	entry->fullpath = strdup(ent->fullpath, M_HWT_RECORD);
 	entry->addr = ent->addr;
-	entry->size = ent->size;
 
 	ctx = hwt_contexthash_lookup(p);
 	if (ctx == NULL) {
@@ -121,7 +120,6 @@ hwt_record_grab(struct hwt_context *ctx,
 			break;
 
 		user_entry[i].addr = entry->addr;
-		user_entry[i].size = entry->size;
 		user_entry[i].record_type = entry->record_type;
 		user_entry[i].thread_id = entry->thread_id;
 		if (entry->fullpath != NULL) {

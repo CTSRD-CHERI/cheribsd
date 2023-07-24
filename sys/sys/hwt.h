@@ -76,7 +76,6 @@ struct hwt_record_user_entry {
 	enum hwt_record_type	record_type;
 	char			fullpath[MAXPATHLEN];
 	uintptr_t		addr;
-	size_t			size;
 	int			thread_id;
 } __aligned(16);
 

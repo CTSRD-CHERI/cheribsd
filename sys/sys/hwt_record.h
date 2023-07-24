@@ -50,7 +50,6 @@ struct hwt_record_entry {
 	char				*fullpath;
 	int				thread_id;
 	uintptr_t			addr;
-	size_t				size;
 };
 #endif
 

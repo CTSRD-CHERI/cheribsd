@@ -1599,7 +1599,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	if (td->td_proc->p_flag2 & P2_HWT) {
 		ent.fullpath = imgp->execpath;
 		ent.addr = (uintptr_t)entry;
-		ent.size = (size_t)(imgp->end_addr - imgp->start_addr);
 		ent.record_type = HWT_RECORD_EXECUTABLE;
 		HWT_CALL_HOOK(td, HWT_EXEC, &ent);
 	}
@@ -1627,8 +1626,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		if (td->td_proc->p_flag2 & P2_HWT) {
 			ent.fullpath = interp;
 			ent.addr = (uintptr_t)imgp->entry_addr;
-			ent.size = (size_t)(imgp->interp_end -
-			    imgp->interp_start);
 			ent.record_type = HWT_RECORD_INTERP;
 			HWT_CALL_HOOK(td, HWT_EXEC, &ent);
 		}
