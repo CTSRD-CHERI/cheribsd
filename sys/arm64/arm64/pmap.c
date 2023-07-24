@@ -900,8 +900,10 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m,
 	if ((prot & VM_PROT_WRITE_CAP) != 0) {
 		/*
 		 * The page is CAPSTORE and this mapping is VM_PROT_WRITE_CAP.
-		 * Always set ATTR_CDBM. If the page is CAPDIRTY or this mapping
-		 * is created in response to a cap-write, also set ATTR_SC.
+		 * Always set ATTR_CDBM for userspace.
+		 *
+		 * XXX: work around a qemu limitation (no CDBM support) and set
+		 * ATTR_SC for the kernel where emulating ATTR_CDBM is hard.
 		 *
 		 * XXX We could also conditionally set ATTR_SC if PGA_CAPDIRTY,
 		 * but it's not required.
