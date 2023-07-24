@@ -46,6 +46,7 @@
 #include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_contexthash.h>
 #include <dev/hwt/hwt_config.h>
+#include <dev/hwt/hwt_cpu.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_owner.h>
 #include <dev/hwt/hwt_ownerhash.h>
@@ -126,6 +127,7 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 {
 	struct hwt_context *ctx;
 	struct hwt_thread *thr;
+	struct hwt_cpu *cpu;
 	struct hwt_vm *vm;
 
 	dprintf("%s: stopping hwt owner\n", __func__);
@@ -162,16 +164,25 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 
 		hwt_backend_deinit(ctx);
 
-		dprintf("%s: remove threads\n", __func__);
-
 		if (ctx->mode == HWT_MODE_CPU) {
-#if 0
-			vm = ctx->vm;
-			destroy_dev_sched(vm->cdev);
-			hwt_vm_destroy_buffers(vm);
-			hwt_vm_free(vm);
-#endif
+			do {
+				HWT_CTX_LOCK(ctx);
+				cpu = LIST_FIRST(&ctx->cpus);
+				if (cpu)
+					LIST_REMOVE(cpu, next);
+				HWT_CTX_UNLOCK(ctx);
+
+				if (cpu == NULL)
+					break;
+
+				vm = cpu->vm;
+				destroy_dev_sched(vm->cdev);
+				hwt_vm_destroy_buffers(vm);
+				hwt_vm_free(vm);
+			} while (1);
 		} else do {
+			dprintf("%s: remove threads\n", __func__);
+
 			HWT_CTX_LOCK(ctx);
 			thr = LIST_FIRST(&ctx->threads);
 			if (thr) {
