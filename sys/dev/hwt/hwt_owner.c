@@ -115,11 +115,52 @@ hwt_owner_alloc(struct proc *p)
 	return (ho);
 }
 
-void
-hwt_owner_free(struct hwt_owner *ho)
+static void
+hwt_owner_free_cpus(struct hwt_context *ctx)
 {
+	struct hwt_cpu *cpu;
 
-	free(ho, M_HWT_OWNER);
+	do {
+		HWT_CTX_LOCK(ctx);
+		cpu = LIST_FIRST(&ctx->cpus);
+		if (cpu)
+			LIST_REMOVE(cpu, next);
+		HWT_CTX_UNLOCK(ctx);
+
+		if (cpu == NULL)
+			break;
+
+		/* TODO: hwt_cpu_free() ? */
+		hwt_vm_free(cpu->vm);
+	} while (1);
+}
+
+static void
+hwt_owner_free_threads(struct hwt_context *ctx)
+{
+	struct hwt_thread *thr;
+
+	dprintf("%s: remove threads\n", __func__);
+
+	do {
+		HWT_CTX_LOCK(ctx);
+		thr = LIST_FIRST(&ctx->threads);
+		if (thr) {
+			LIST_REMOVE(thr, next);
+			HWT_THR_LOCK(thr);
+		}
+		HWT_CTX_UNLOCK(ctx);
+
+		if (thr == NULL)
+			break;
+
+		wakeup(thr);
+
+		HWT_THR_UNLOCK(thr);
+
+		if (refcount_release(&thr->refcnt))
+			hwt_thread_free(thr);
+	} while (1);
 }
 
 void
@@ -127,7 +168,6 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 {
 	struct hwt_context *ctx;
 	struct hwt_thread *thr;
-	struct hwt_cpu *cpu;
 
 	dprintf("%s: stopping hwt owner\n", __func__);
 
@@ -150,10 +190,10 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 
 		HWT_CTX_LOCK(ctx);
 		ctx->state = 0;
+		/*
+		 * Ensure hook invocation is now completed.
+		 */
 		LIST_FOREACH(thr, &ctx->threads, next) {
-			/*
-			 * Ensure hook invocation is now completed.
-			 */
 			HWT_THR_LOCK(thr);
 			HWT_THR_UNLOCK(thr);
 		}
@@ -163,45 +203,14 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 
 		hwt_backend_deinit(ctx);
 
-		if (ctx->mode == HWT_MODE_CPU) {
-			do {
-				HWT_CTX_LOCK(ctx);
-				cpu = LIST_FIRST(&ctx->cpus);
-				if (cpu)
-					LIST_REMOVE(cpu, next);
-				HWT_CTX_UNLOCK(ctx);
-
-				if (cpu == NULL)
-					break;
-
-				/* TODO: hwt_cpu_free */
-				hwt_vm_free(cpu->vm);
-			} while (1);
-		} else do {
-			dprintf("%s: remove threads\n", __func__);
-
-			HWT_CTX_LOCK(ctx);
-			thr = LIST_FIRST(&ctx->threads);
-			if (thr) {
-				LIST_REMOVE(thr, next);
-				HWT_THR_LOCK(thr);
-			}
-			HWT_CTX_UNLOCK(ctx);
-
-			if (thr == NULL)
-				break;
-
-			wakeup(thr);
-
-			HWT_THR_UNLOCK(thr);
-
-			if (refcount_release(&thr->refcnt))
-				hwt_thread_free(thr);
-		} while (1);
+		if (ctx->mode == HWT_MODE_CPU)
+			hwt_owner_free_cpus(ctx);
+		else
+			hwt_owner_free_threads(ctx);
 
 		hwt_ctx_free(ctx);
 	}
 
 	hwt_ownerhash_remove(ho);
-	hwt_owner_free(ho);
+	free(ho, M_HWT_OWNER);
 }
