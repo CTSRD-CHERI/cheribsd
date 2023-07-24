@@ -241,6 +241,11 @@ hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			cpu = vm->cpu;
 			hwt_backend_configure(ctx, cpu->cpu_id, cpu->cpu_id);
 			hwt_backend_enable(ctx, cpu->cpu_id);
+		} else {
+			/*
+			 * Tracing backend will be configured and enabled
+			 * during hook invocation. See hwt_hook.c.
+			 */
 		}
 
 		break;
