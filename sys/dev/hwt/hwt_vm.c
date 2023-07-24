@@ -381,6 +381,16 @@ hwt_vm_destroy_buffers(struct hwt_vm *vm)
 	free(vm->pages, M_HWT_VM);
 }
 
+void
+hwt_vm_free(struct hwt_vm *vm)
+{
+
+	if (vm->cdev)
+		destroy_dev_sched(vm->cdev);
+	hwt_vm_destroy_buffers(vm);
+	free(vm, M_HWT_VM);
+}
+
 int
 hwt_vm_alloc(size_t bufsize, char *path, struct hwt_vm **vm0)
 {
@@ -398,21 +408,11 @@ hwt_vm_alloc(size_t bufsize, char *path, struct hwt_vm **vm0)
 
 	error = hwt_vm_create_cdev(vm, path);
 	if (error) {
-		/* TODO: deallocate resources. */
+		hwt_vm_free(vm);
 		return (error);
 	}
 
 	*vm0 = vm;
 
 	return (0);
-}
-
-void
-hwt_vm_free(struct hwt_vm *vm)
-{
-
-	if (vm->cdev)
-		destroy_dev_sched(vm->cdev);
-	hwt_vm_destroy_buffers(vm);
-	free(vm, M_HWT_VM);
 }
