@@ -1907,6 +1907,7 @@ dev/hwt/hwt_backend.c		optional hwt
 dev/hwt/hwt_config.c		optional hwt
 dev/hwt/hwt_context.c		optional hwt
 dev/hwt/hwt_contexthash.c	optional hwt
+dev/hwt/hwt_cpu.c		optional hwt
 dev/hwt/hwt_hook.c		optional hwt
 dev/hwt/hwt_ioctl.c		optional hwt
 dev/hwt/hwt_owner.c		optional hwt

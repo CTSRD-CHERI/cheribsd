@@ -32,7 +32,6 @@
 #define _DEV_HWT_HWT_CONTEXT_H_
 
 struct hwt_context {
-	LIST_HEAD(, hwt_thread)		threads;
 	LIST_HEAD(, hwt_record_entry)	records;
 
 	LIST_ENTRY(hwt_context)		next_hch; /* Entry in contexthash. */
@@ -42,22 +41,23 @@ struct hwt_context {
 	int				ident;
 
 	/* CPU mode. */
-	int				cpu;
-	struct hwt_vm			*vm;
-	size_t				bufsize; /* Trace bufsize for each vm.*/
+	cpuset_t			cpu_map;
+	LIST_HEAD(, hwt_cpu)		cpus;
 
 	/* Thread mode. */
 	struct proc			*proc; /* Target proc. */
 	pid_t				pid; /* Target pid. */
+	LIST_HEAD(, hwt_thread)		threads;
+	int				thread_counter;
 	int				pause_on_mmap;
 
+	size_t				bufsize; /* Trace bufsize for each vm.*/
 	void				*config;
 	size_t				config_size;
 	int				config_version;
 
 	struct hwt_owner		*hwt_owner;
 	struct hwt_backend		*hwt_backend;
-	int				thread_counter;
 
 	struct mtx			mtx;
 	int				state;

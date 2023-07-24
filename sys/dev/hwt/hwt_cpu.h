@@ -28,37 +28,17 @@
  * $FreeBSD$
  */
 
-#ifndef _DEV_HWT_HWT_THREAD_H_
-#define _DEV_HWT_HWT_THREAD_H_
+#ifndef _DEV_HWT_HWT_CPU_H_
+#define _DEV_HWT_HWT_CPU_H_
 
-struct hwt_thread {
-	struct hwt_vm			*vm;
-	struct hwt_context		*ctx;
-	struct thread			*td;
-	LIST_ENTRY(hwt_thread)		next;
-	int				thread_id;
-	int				state;
-#define	HWT_THREAD_STATE_EXITED		(1 << 0)
-	struct mtx			mtx;
-	u_int				refcnt;
-	int				cpu_id; /* last cpu_id */
+struct hwt_cpu {
+	int			cpu_id;
+	struct hwt_vm		*vm;
+	LIST_ENTRY(hwt_cpu)	next;
 };
 
-/* Thread allocation. */
-int hwt_thread_alloc(struct hwt_thread **thr0, size_t bufsize);
-int hwt_thread_create(struct thread *td);
+struct hwt_cpu * hwt_cpu_alloc(void);
+struct hwt_cpu * hwt_cpu_first(struct hwt_context *ctx);
+void hwt_cpu_insert(struct hwt_context *ctx, struct hwt_cpu *cpu);
 
-/* Thread de-allocation. */
-void hwt_thread_free(struct hwt_thread *thr);
-
-/* Thread list mgt. */
-void hwt_thread_insert(struct hwt_context *ctx, struct hwt_thread *thr);
-struct hwt_thread * hwt_thread_first(struct hwt_context *ctx);
-struct hwt_thread * hwt_thread_lookup(struct hwt_context *ctx,
-    struct thread *td);
-
-#define	HWT_THR_LOCK(thr)		mtx_lock_spin(&(thr)->mtx)
-#define	HWT_THR_UNLOCK(thr)		mtx_unlock_spin(&(thr)->mtx)
-#define	HWT_THR_ASSERT_LOCKED(thr)	mtx_assert(&(thr)->mtx, MA_OWNED)
-
-#endif /* !_DEV_HWT_HWT_THREAD_H_ */
+#endif /* !_DEV_HWT_HWT_CPU_H_ */

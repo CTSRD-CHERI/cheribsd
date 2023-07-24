@@ -48,6 +48,7 @@
 #include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_contexthash.h>
 #include <dev/hwt/hwt_config.h>
+#include <dev/hwt/hwt_cpu.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_owner.h>
 #include <dev/hwt/hwt_ownerhash.h>
@@ -223,40 +224,69 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
     struct hwt_backend *backend, struct hwt_alloc *halloc)
 {
 	struct hwt_context *ctx;
+	struct hwt_cpu *cpu;
 	struct hwt_vm *vm;
 	char path[MAXPATHLEN];
 	int error;
-	int cpu;
+	int cpu_id;
 
+	CPU_FOREACH(cpu_id) {
+		if (!CPU_ISSET(cpu_id, &halloc->cpu_map))
+			continue;
+
+		if (CPU_ABSENT(cpu_id) || CPU_ISSET(cpu_id, &hlt_cpus_mask))
+			return (ENXIO);
+	}
+
+#if 0
 	cpu = halloc->cpu;
-	if (CPU_ABSENT(cpu) || CPU_ISSET(cpu, &hlt_cpus_mask))
-		return (ENXIO);
 
 	/* Check if the owner have this cpu configured already. */
 	ctx = hwt_owner_lookup_ctx_by_cpu(ho, halloc->cpu);
 	if (ctx)
 		return (EEXIST);
+#endif
 
 	/* Allocate a new HWT context. */
 	ctx = hwt_ctx_alloc();
 	ctx->bufsize = halloc->bufsize;
-	ctx->cpu = cpu;
 	ctx->hwt_backend = backend;
 	ctx->hwt_owner = ho;
 	ctx->mode = HWT_MODE_CPU;
+	ctx->cpu_map = halloc->cpu_map;
 
-	vm = hwt_vm_alloc();
-	vm->ctx = ctx;
-	vm->npages = ctx->bufsize / PAGE_SIZE;
-	vm->thr = NULL;
+	CPU_FOREACH(cpu_id) {
+		if (!CPU_ISSET(cpu_id, &halloc->cpu_map))
+			continue;
 
-	ctx->vm = vm;
+		vm = hwt_vm_alloc();
+		vm->ctx = ctx;
+		vm->npages = ctx->bufsize / PAGE_SIZE;
+		vm->thr = NULL;
 
-	/* Allocate buffers. */
-	error = hwt_vm_alloc_buffers(vm);
-	if (error) {
-		hwt_ctx_free(ctx);
-		return (error);
+		/* Allocate buffers. */
+		error = hwt_vm_alloc_buffers(vm);
+		if (error) {
+			hwt_ctx_free(ctx);
+			return (error);
+		}
+
+		cpu = hwt_cpu_alloc();
+		cpu->cpu_id = cpu_id;
+		cpu->vm = vm;
+
+		vm->cpu = cpu;
+
+		sprintf(path, "hwt_%d_%d", ctx->ident, cpu_id);
+		error = hwt_vm_create_cdev(vm, path);
+		if (error) {
+			/* TODO: deallocate resources. */
+			return (error);
+		}
+
+		HWT_CTX_LOCK(ctx);
+		hwt_cpu_insert(ctx, cpu);
+		HWT_CTX_UNLOCK(ctx);
 	}
 
 	/* hwt_owner_insert_ctx? */
@@ -265,13 +295,6 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 	mtx_unlock(&ho->mtx);
 
 	error = hwt_backend_init(ctx);
-	if (error) {
-		/* TODO: deallocate resources. */
-		return (error);
-	}
-
-	sprintf(path, "hwt_%d", ctx->ident);
-	error = hwt_vm_create_cdev(ctx->vm, path);
 	if (error) {
 		/* TODO: deallocate resources. */
 		return (error);

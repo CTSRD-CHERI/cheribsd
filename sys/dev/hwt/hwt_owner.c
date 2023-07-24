@@ -80,6 +80,7 @@ hwt_owner_lookup_ctx(struct hwt_owner *ho, pid_t pid)
 	return (NULL);
 }
 
+#if 0
 struct hwt_context *
 hwt_owner_lookup_ctx_by_cpu(struct hwt_owner *ho, int cpu)
 {
@@ -96,6 +97,7 @@ hwt_owner_lookup_ctx_by_cpu(struct hwt_owner *ho, int cpu)
 
 	return (NULL);
 }
+#endif
 
 struct hwt_owner *
 hwt_owner_alloc(struct proc *p)
@@ -163,10 +165,12 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 		dprintf("%s: remove threads\n", __func__);
 
 		if (ctx->mode == HWT_MODE_CPU) {
+#if 0
 			vm = ctx->vm;
 			destroy_dev_sched(vm->cdev);
 			hwt_vm_destroy_buffers(vm);
 			hwt_vm_free(vm);
+#endif
 		} else do {
 			HWT_CTX_LOCK(ctx);
 			thr = LIST_FIRST(&ctx->threads);

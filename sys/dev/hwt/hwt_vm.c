@@ -55,6 +55,7 @@
 #include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_contexthash.h>
 #include <dev/hwt/hwt_config.h>
+#include <dev/hwt/hwt_cpu.h>
 #include <dev/hwt/hwt_owner.h>
 #include <dev/hwt/hwt_ownerhash.h>
 #include <dev/hwt/hwt_thread.h>
@@ -201,8 +202,10 @@ hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	struct hwt_context *ctx;
 	struct hwt_vm *vm;
 	struct hwt_owner *ho;
+	struct hwt_cpu *cpu;
 
 	vm_offset_t curpage_offset;
+	int cpu_id;
 	int curpage;
 	int error;
 
@@ -234,8 +237,9 @@ hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		HWT_CTX_UNLOCK(ctx);
 
 		if (ctx->mode == HWT_MODE_CPU) {
-			hwt_backend_configure(ctx, ctx->cpu, ctx->cpu);
-			hwt_backend_enable(ctx, ctx->cpu);
+			cpu = vm->cpu;
+			hwt_backend_configure(ctx, cpu->cpu_id, cpu->cpu_id);
+			hwt_backend_enable(ctx, cpu->cpu_id);
 		}
 
 		break;
@@ -273,7 +277,12 @@ hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	case HWT_IOC_BUFPTR_GET:
 		ptr_get = (struct hwt_bufptr_get *)addr;
 
-		error = hwt_backend_read(ctx, ctx->cpu, &curpage,
+		if (ctx->mode == HWT_MODE_THREAD)
+			cpu_id = vm->thr->cpu_id;
+		else
+			cpu_id = vm->cpu->cpu_id;
+
+		error = hwt_backend_read(ctx, cpu_id, &curpage,
 		    &curpage_offset);
 		if (error)
 			return (error);

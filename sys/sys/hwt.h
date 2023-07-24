@@ -55,7 +55,7 @@ struct hwt_alloc {
 	size_t		bufsize;
 	int		mode;
 	pid_t		pid;		/* thread mode */
-	int		cpu;		/* cpu mode */
+	cpuset_t	cpu_map;	/* cpu mode only */
 	const char	*backend_name;
 	int		*ident;
 } __aligned(16);

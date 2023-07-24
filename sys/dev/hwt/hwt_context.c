@@ -101,6 +101,8 @@ hwt_ctx_alloc(void)
 	LIST_INIT(&ctx->threads);
 	mtx_init(&ctx->mtx, "ctx", NULL, MTX_SPIN);
 
+	LIST_INIT(&ctx->cpus);
+
 	hwt_ctx_ident_alloc(&ctx->ident);
 
 	error = hwt_ctx_ident_alloc(&ctx->ident);

@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
  * Copyright (c) 2023 Ruslan Bukin <br@bsdpad.com>
  *
  * This work was supported by Innovate UK project 105694, "Digital Security
@@ -24,41 +26,71 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
-#ifndef _DEV_HWT_HWT_THREAD_H_
-#define _DEV_HWT_HWT_THREAD_H_
+#include <sys/param.h>
+#include <sys/proc.h>
+#include <sys/kernel.h>
+#include <sys/lock.h>
+#include <sys/malloc.h>
+#include <sys/mutex.h>
+#include <sys/hwt.h>
 
-struct hwt_thread {
-	struct hwt_vm			*vm;
-	struct hwt_context		*ctx;
-	struct thread			*td;
-	LIST_ENTRY(hwt_thread)		next;
-	int				thread_id;
-	int				state;
-#define	HWT_THREAD_STATE_EXITED		(1 << 0)
-	struct mtx			mtx;
-	u_int				refcnt;
-	int				cpu_id; /* last cpu_id */
-};
+#include <vm/vm.h>
 
-/* Thread allocation. */
-int hwt_thread_alloc(struct hwt_thread **thr0, size_t bufsize);
-int hwt_thread_create(struct thread *td);
+#include <dev/hwt/hwt_hook.h>
+#include <dev/hwt/hwt_context.h>
+#include <dev/hwt/hwt_contexthash.h>
+#include <dev/hwt/hwt_config.h>
+#include <dev/hwt/hwt_thread.h>
+#include <dev/hwt/hwt_record.h>
+#include <dev/hwt/hwt_cpu.h>
 
-/* Thread de-allocation. */
-void hwt_thread_free(struct hwt_thread *thr);
+#define	HWT_CPU_DEBUG
+#undef	HWT_CPU_DEBUG
 
-/* Thread list mgt. */
-void hwt_thread_insert(struct hwt_context *ctx, struct hwt_thread *thr);
-struct hwt_thread * hwt_thread_first(struct hwt_context *ctx);
-struct hwt_thread * hwt_thread_lookup(struct hwt_context *ctx,
-    struct thread *td);
+#ifdef	HWT_CPU_DEBUG
+#define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)
+#else
+#define	dprintf(fmt, ...)
+#endif
 
-#define	HWT_THR_LOCK(thr)		mtx_lock_spin(&(thr)->mtx)
-#define	HWT_THR_UNLOCK(thr)		mtx_unlock_spin(&(thr)->mtx)
-#define	HWT_THR_ASSERT_LOCKED(thr)	mtx_assert(&(thr)->mtx, MA_OWNED)
+static MALLOC_DEFINE(M_HWT_CPU, "hwt_cpu", "HWT cpu");
 
-#endif /* !_DEV_HWT_HWT_THREAD_H_ */
+struct hwt_cpu *
+hwt_cpu_alloc(void)
+{
+	struct hwt_cpu *cpu;
+
+	cpu = malloc(sizeof(struct hwt_cpu), M_HWT_CPU, M_WAITOK | M_ZERO);
+        
+        return (cpu);
+}
+
+struct hwt_cpu *
+hwt_cpu_first(struct hwt_context *ctx)
+{
+	struct hwt_cpu *cpu;
+
+	HWT_CTX_ASSERT_LOCKED(ctx);
+
+	cpu = LIST_FIRST(&ctx->cpus);
+
+	KASSERT(cpu != NULL, ("cpu is NULL"));
+
+	return (cpu);
+}
+
+void
+hwt_cpu_insert(struct hwt_context *ctx, struct hwt_cpu *cpu)
+{
+	struct hwt_cpu *c;
+
+	HWT_CTX_ASSERT_LOCKED(ctx);
+
+	c = LIST_FIRST(&ctx->cpus);
+	if (c)
+		LIST_INSERT_AFTER(c, cpu, next);
+	else
+		LIST_INSERT_HEAD(&ctx->cpus, cpu, next);
+}

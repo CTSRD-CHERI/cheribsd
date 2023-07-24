@@ -46,6 +46,7 @@
 #include <dev/hwt/hwt_config.h>
 #include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_config.h>
+#include <dev/hwt/hwt_cpu.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_backend.h>
 #include <dev/hwt/hwt_vm.h>
@@ -133,33 +134,29 @@ coresight_backend_init_cpu(struct hwt_context *ctx)
 	struct coresight_event *event;
 	struct hwt_vm *vm;
 	int error;
+	int cpu_id;
 
-	vm = ctx->vm;
+	CPU_FOREACH(cpu_id) {
+		if (!CPU_ISSET(cpu_id, &ctx->cpu_map))
+			continue;
 
-	event = &cs_event[ctx->cpu];
-	memset(event, 0, sizeof(struct coresight_event));
-
-	event->excp_level = 1;
-	event->src = CORESIGHT_ETMV4;
-	event->sink = CORESIGHT_TMC_ETR;
-
-	error = coresight_init_event(event, ctx->cpu);
-	if (error)
-		return (error);
-
-	/* The following is TMC (ETR) only, so pick first event for that. */
-	if (ctx->cpu != 0) {
-		event = &cs_event[0];
+		event = &cs_event[cpu_id];
 		memset(event, 0, sizeof(struct coresight_event));
 
 		event->excp_level = 1;
 		event->src = CORESIGHT_ETMV4;
 		event->sink = CORESIGHT_TMC_ETR;
 
-		error = coresight_init_event(event, ctx->cpu);
+		error = coresight_init_event(event, cpu_id);
 		if (error)
 			return (error);
 	}
+
+	/* The following is TMC (ETR) only, so pick vm from the first CPU */
+	event = &cs_event[CPU_FFS(&ctx->cpu_map) - 1];
+	HWT_CTX_LOCK(ctx);
+	vm = hwt_cpu_first(ctx)->vm;
+	HWT_CTX_UNLOCK(ctx);
 
 	/* TMC(ETR) configuration. */
 	event->etr.low = 0;

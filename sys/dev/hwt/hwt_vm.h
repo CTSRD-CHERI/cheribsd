@@ -38,7 +38,8 @@ struct hwt_vm {
 	struct cdev			*cdev;
 
 	struct hwt_context		*ctx;
-	struct hwt_thread		*thr;
+	struct hwt_cpu			*cpu;	/* cpu mode only. */
+	struct hwt_thread		*thr;	/* thr mode only. */
 };
 
 struct hwt_vm * hwt_vm_alloc(void);
