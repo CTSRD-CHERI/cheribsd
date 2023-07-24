@@ -128,7 +128,6 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 	struct hwt_context *ctx;
 	struct hwt_thread *thr;
 	struct hwt_cpu *cpu;
-	struct hwt_vm *vm;
 
 	dprintf("%s: stopping hwt owner\n", __func__);
 
@@ -175,10 +174,8 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 				if (cpu == NULL)
 					break;
 
-				vm = cpu->vm;
-				destroy_dev_sched(vm->cdev);
-				hwt_vm_destroy_buffers(vm);
-				hwt_vm_free(vm);
+				/* TODO: hwt_cpu_free */
+				hwt_vm_free(cpu->vm);
 			} while (1);
 		} else do {
 			dprintf("%s: remove threads\n", __func__);
@@ -198,9 +195,6 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 
 			HWT_THR_UNLOCK(thr);
 
-			vm = thr->vm;
-			/* TODO: move into hwt_thread_free? */
-			destroy_dev_sched(vm->cdev);
 			if (refcount_release(&thr->refcnt))
 				hwt_thread_free(thr);
 		} while (1);

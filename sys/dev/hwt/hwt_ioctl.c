@@ -259,16 +259,13 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 		if (!CPU_ISSET(cpu_id, &halloc->cpu_map))
 			continue;
 
-		vm = hwt_vm_alloc();
-		vm->ctx = ctx;
-		vm->npages = ctx->bufsize / PAGE_SIZE;
-
-		/* Allocate buffers. */
-		error = hwt_vm_alloc_buffers(vm);
+		error = hwt_vm_alloc(ctx->bufsize, &vm);
 		if (error) {
 			hwt_ctx_free(ctx);
 			return (error);
 		}
+
+		vm->ctx = ctx;
 
 		cpu = hwt_cpu_alloc();
 		cpu->cpu_id = cpu_id;

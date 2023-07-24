@@ -120,22 +120,19 @@ hwt_thread_alloc(struct hwt_thread **thr0, size_t bufsize)
 	struct hwt_vm *vm;
 	int error;
 
+	error = hwt_vm_alloc(bufsize, &vm);
+	if (error)
+		return (error);
+
 	thr = malloc(sizeof(struct hwt_thread), M_HWT_THREAD,
 	    M_WAITOK | M_ZERO);
-
-	vm = hwt_vm_alloc();
-	vm->npages = bufsize / PAGE_SIZE;
-
 	thr->vm = vm;
-	vm->thr = thr;
 
 	mtx_init(&thr->mtx, "thr", NULL, MTX_SPIN);
 
 	refcount_init(&thr->refcnt, 1);
 
-	error = hwt_vm_alloc_buffers(vm);
-	if (error)
-		return (error);
+	vm->thr = thr;
 
 	*thr0 = thr;
 
@@ -146,7 +143,6 @@ void
 hwt_thread_free(struct hwt_thread *thr)
 {
 
-	hwt_vm_destroy_buffers(thr->vm);
 	hwt_vm_free(thr->vm);
 
 	free(thr, M_HWT_THREAD);

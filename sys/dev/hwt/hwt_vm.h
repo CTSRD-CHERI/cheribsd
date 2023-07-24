@@ -42,11 +42,9 @@ struct hwt_vm {
 	struct hwt_thread		*thr;	/* thr mode only. */
 };
 
-struct hwt_vm * hwt_vm_alloc(void);
+int hwt_vm_alloc(size_t bufsize, struct hwt_vm **vm0);
 void hwt_vm_free(struct hwt_vm *vm);
-int hwt_vm_create_cdev(struct hwt_vm *vm, char *path);
 
-int hwt_vm_alloc_buffers(struct hwt_vm *vm);
-void hwt_vm_destroy_buffers(struct hwt_vm *vm);
+int hwt_vm_create_cdev(struct hwt_vm *vm, char *path);
 
 #endif /* !_DEV_HWT_HWT_VM_H_ */

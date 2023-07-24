@@ -339,24 +339,7 @@ hwt_vm_create_cdev(struct hwt_vm *vm, char *path)
 	return (0);
 }
 
-struct hwt_vm *
-hwt_vm_alloc(void)
-{
-	struct hwt_vm *vm;
-
-	vm = malloc(sizeof(struct hwt_vm), M_HWT_VM, M_WAITOK | M_ZERO);
-
-	return (vm);
-}
-
-void
-hwt_vm_free(struct hwt_vm *vm)
-{
-
-	free(vm, M_HWT_VM);
-}
-
-int
+static int
 hwt_vm_alloc_buffers(struct hwt_vm *vm)
 {
 	int error;
@@ -373,7 +356,7 @@ hwt_vm_alloc_buffers(struct hwt_vm *vm)
 	return (0);
 }
 
-void
+static void
 hwt_vm_destroy_buffers(struct hwt_vm *vm)
 {
 	vm_page_t m;
@@ -396,4 +379,34 @@ hwt_vm_destroy_buffers(struct hwt_vm *vm)
 	VM_OBJECT_WUNLOCK(vm->obj);
 
 	free(vm->pages, M_HWT_VM);
+}
+
+int
+hwt_vm_alloc(size_t bufsize, struct hwt_vm **vm0)
+{
+	struct hwt_vm *vm;
+	int error;
+
+	vm = malloc(sizeof(struct hwt_vm), M_HWT_VM, M_WAITOK | M_ZERO);
+	vm->npages = bufsize / PAGE_SIZE;
+
+	error = hwt_vm_alloc_buffers(vm);
+	if (error) {
+		free(vm, M_HWT_VM);
+		return (error);
+	}
+
+	*vm0 = vm;
+
+	return (0);
+}
+
+void
+hwt_vm_free(struct hwt_vm *vm)
+{
+
+	if (vm->cdev)
+		destroy_dev_sched(vm->cdev);
+	hwt_vm_destroy_buffers(vm);
+	free(vm, M_HWT_VM);
 }
