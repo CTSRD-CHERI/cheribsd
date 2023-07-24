@@ -26,8 +26,3 @@ sm_os.h: ${SENDMAIL_DIR}/include/sm/os/sm_os_freebsd.h .NOMETA
 .include <bsd.lib.mk>
 
 CWARNFLAGS+= ${NO_WDEPRECATED_NON_PROTOTYPE} ${NO_WSTRICT_PROTOTYPES}
-
-.if ${MK_CHERI} != "no"
-# This code is completely broken
-CFLAGS+=	-Wno-error=cheri-prototypes
-.endif

@@ -21,7 +21,3 @@ etc-mailrc:
 	    -m 644 ${EFILES} ${DESTDIR}/etc
 
 .include <bsd.prog.mk>
-.if ${MK_CHERI} != "no"
-# This code is completely broken
-CFLAGS+=	-Wno-error=cheri-prototypes
-.endif

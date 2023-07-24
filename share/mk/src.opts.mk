@@ -213,7 +213,7 @@ __DEFAULT_NO_OPTIONS = \
     ZONEINFO_LEAPSECONDS_SUPPORT \
 
 __DEFAULT_YES_OPTIONS+=	\
-	CHERI \
+	CHERI_CAPREVOKE \
 	CHERIBSDBOX \
 	LIB64C
 
@@ -221,6 +221,7 @@ __DEFAULT_YES_OPTIONS+=	\
 # RIGHT option is disabled.
 __DEFAULT_DEPENDENT_OPTIONS= \
 	CLANG_FULL/CLANG \
+	DLMALLOC/CHERI_CAPREVOKE \
 	LLVM_TARGET_ALL/CLANG \
 	LOADER_VERIEXEC/BEARSSL \
 	LOADER_EFI_SECUREBOOT/LOADER_VERIEXEC \
@@ -271,7 +272,7 @@ __LLVM_TARGETS= \
 		powerpc \
 		riscv \
 		x86
-__LLVM_TARGET_FILT=	C/(amd64|i386)/x86/:C/powerpc.*/powerpc/:C/armv[67]/arm/:C/riscv.*/riscv/
+__LLVM_TARGET_FILT=	C/(amd64|i386)/x86/:C/powerpc.*/powerpc/:C/armv[67]/arm/:C/aarch64c/aarch64/:C/riscv.*/riscv/
 .for __llt in ${__LLVM_TARGETS}
 # Default enable the given TARGET's LLVM_TARGET support
 .if ${__T:${__LLVM_TARGET_FILT}} == ${__llt}
@@ -374,7 +375,6 @@ BROKEN_OPTIONS+=MLX5TOOL
 
 .if (${__C} != "cheri" && ${__C} != "morello" && \
     !${__T:Maarch64*c*} && !${__T:Mriscv64*c*})
-BROKEN_OPTIONS+=CHERI
 BROKEN_OPTIONS+=CHERI_CAPREVOKE
 .endif
 
@@ -384,11 +384,6 @@ BROKEN_OPTIONS+=CHERI_CAPREVOKE
 .if (${__C} != "cheri" && ${__C} != "morello") || \
     (${__T:Maarch64*c*} || ${__T:Mriscv64*c*})
 BROKEN_OPTIONS+=LIB64C
-.endif
-
-.if ${.MAKE.OS} != "FreeBSD"
-# tablegen will not build on non-FreeBSD so also disable target clang and lld
-BROKEN_OPTIONS+=CLANG LLD
 .endif
 
 .if ${__T} != "amd64" && ${__T} != "i386" && ${__T} != "aarch64"
@@ -428,17 +423,6 @@ BROKEN_OPTIONS+= TESTS
 .-include <site.src.opts.mk>
 
 .include <bsd.mkopt.mk>
-
-.if ${.MAKE.OS} != "FreeBSD"
-# Building on a Linux/Mac requires an external toolchain to be specified
-# since clang/gcc will not build there using the FreeBSD makefiles
-MK_BINUTILS_BOOTSTRAP:=no
-MK_CLANG_BOOTSTRAP:=no
-MK_LLD_BOOTSTRAP:=no
-MK_GCC_BOOTSTRAP:=no
-# However, the elftoolchain tools build and should be used
-# MK_ELFTOOLCHAIN_BOOTSTRAP:=	yes
-.endif
 
 #
 # Force some options off if their dependencies are off.

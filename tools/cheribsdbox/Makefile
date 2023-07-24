@@ -11,14 +11,6 @@ PROG=	cheribsdbox
 CHERIBSDBOX_DIR?=	/bin
 BINDIR?=${CHERIBSDBOX_DIR}
 
-# We want to build all these tools as statically linked binaries, but for MIPS
-# we don't want to build this as purecap yet since it generates a captable that
-# is too large to link.
-.if ${MACHINE_ARCH:Mmips64*} && ${MK_LIB64} == "yes"
-NEED_COMPAT=	64
-CRUNCH_BUILDOPTS+=	NEED_COMPAT=64
-CRUNCH_OBJTOP=		${OBJTOP}/obj-lib64
-.endif
 CRUNCH_OBJTOP?=		${OBJTOP}
 CRUNCH_BUILDOPTS+=	-DWITHOUT_TESTS MK_TESTS=no -D_CRUNCHGEN
 # Avoid linking against libcasper for tcpdump/traceroute/kdump:
@@ -295,16 +287,13 @@ CRUNCH_ALIAS_hexdump=	hd od
 CRUNCH_ALIAS_w=	uptime
 CRUNCH_PROGS_usr.bin+=su
 
-# Tracing currently only implemented for CHERI-QEMU architectures
-.if ${MACHINE} == "mips" || ${MACHINE} == "riscv"
-CRUNCH_PROGS_usr.bin+=	qtrace
-.endif
-.if ${MACHINE_ARCH:Mmips64*} || ${MACHINE_ARCH:Mriscv64*}
+.if ${MACHINE_CPUARCH} == "riscv"
 CRUNCH_PROGS_usr.bin+=	minimal_count_stats
-.if ${MACHINE_ARCH:Mmips64*}
-# backwards compat for old benchmark scripts
-CRUNCH_ALIAS_minimal_count_stats= beri_count_stats
 .endif
+
+# Tracing currently only implemented for some CHERI-QEMU architectures
+.if ${MACHINE_CPUARCH} == "riscv"
+CRUNCH_PROGS_usr.bin+=	qtrace
 .endif
 
 

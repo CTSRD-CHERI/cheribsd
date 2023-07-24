@@ -72,7 +72,7 @@ SE_BOOTFORTH= \
 	menuconf.4th \
 	screen.4th
 
-.if ${MK_CHERI} != "no"
+.if ${MACHINE_ABI:Mpurecap} || ${MK_LIB64C} == "yes"
 SUBDIR+=	cheribsdtest
 .endif
 
