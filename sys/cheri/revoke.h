@@ -320,8 +320,8 @@ struct cheri_revoke_epochs {
 };
 
 struct cheri_revoke_info {
-        const vaddr_t base_mem_nomap;
-        const vaddr_t base_otype;
+	const ptraddr_t base_mem_nomap;
+	const ptraddr_t base_otype;
 
 	struct cheri_revoke_epochs epochs;
 };
