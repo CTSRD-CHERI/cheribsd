@@ -34,6 +34,7 @@
 #include <sys/mman.h>
 #include <sys/errno.h>
 #include <sys/wait.h>
+#include <sys/cpuset.h>
 #include <sys/hwt.h>
 
 #include <assert.h>

@@ -33,6 +33,7 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/errno.h>
+#include <sys/cpuset.h>
 #include <sys/hwt.h>
 #include <sys/hwt_record.h>
 
@@ -89,10 +90,9 @@ printf("%s: error %d: nent %d\n", __func__, error, nentries);
 		case HWT_RECORD_MUNMAP:
 		case HWT_RECORD_EXECUTABLE:
 		case HWT_RECORD_INTERP:
-			printf("  lib #%d: path %s addr %lx size %lx\n", j,
+			printf("  lib #%d: path %s addr %lx\n", j,
 			    entry->fullpath,
-			    (unsigned long)entry->addr,
-			    entry->size);
+			    (unsigned long)entry->addr);
 
 			path = pmcstat_string_intern(entry->fullpath);
 			if ((image = pmcstat_image_from_path(path, 0,

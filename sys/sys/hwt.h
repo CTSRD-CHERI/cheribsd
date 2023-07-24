@@ -31,6 +31,7 @@
 /* User-visible header. */
 
 #include <sys/param.h>
+#include <sys/cpuset.h>
 #include <sys/types.h>
 #include <sys/hwt_record.h>
 

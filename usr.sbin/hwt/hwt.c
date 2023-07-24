@@ -35,6 +35,7 @@
 #include <sys/errno.h>
 #include <sys/wait.h>
 #include <sys/time.h>
+#include <sys/cpuset.h>
 #include <sys/hwt.h>
 #include <sys/stat.h>
 
@@ -144,15 +145,20 @@ static int
 hwt_ctx_alloc(struct trace_context *tc)
 {
 	struct hwt_alloc al;
+	cpuset_t cpu_map;
 	int error;
+
+	CPU_ZERO(&cpu_map);
 
 	memset(&al, 0, sizeof(struct hwt_alloc));
 
 	al.mode = tc->mode;
 	if (tc->mode == HWT_MODE_THREAD)
 		al.pid = tc->pid;
-	else
-		al.cpu = tc->cpu;
+	else {
+		CPU_SET(tc->cpu, &cpu_map);
+		al.cpu_map = cpu_map;
+	}
 
 	al.bufsize = tc->bufsize;
 	al.backend_name = tc->trace_dev->name;
@@ -171,7 +177,7 @@ hwt_map_memory(struct trace_context *tc, int tid)
 	if (tc->mode == HWT_MODE_THREAD)
 		sprintf(filename, "/dev/hwt_%d_%d", tc->ident, tid);
 	else
-		sprintf(filename, "/dev/hwt_%d", tc->ident);
+		sprintf(filename, "/dev/hwt_%d_%d", tc->ident, tc->cpu);
 
 	tc->thr_fd = open(filename, O_RDONLY);
 	if (tc->thr_fd < 0) {
