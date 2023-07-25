@@ -62,12 +62,29 @@ static uint64_t caprev_shadow_nomap_last_word_mask(ptraddr_t base, size_t len);
  * the fine-grained bitmap where the first word would be located.
  */
 
+static size_t
+caprev_shadow_nomap_granule(ptraddr_t addr)
+{
+	return (addr / VM_CHERI_REVOKE_GSZ_MEM_NOMAP);
+}
+
+static ptrdiff_t
+caprev_shadow_nomap_word_offset(ptraddr_t addr)
+{
+	return ((ptrdiff_t)rounddown2(caprev_shadow_nomap_granule(addr) / 8,
+	    sizeof(uint64_t)));
+}
+
+static size_t
+caprev_shadow_nomap_offset_in_word(ptraddr_t addr)
+{
+	return (caprev_shadow_nomap_granule(addr) % (8 * sizeof(uint64_t)));
+}
+
 static ptrdiff_t
 caprev_shadow_nomap_first_word_offset(ptraddr_t base)
 {
-	return ((ptrdiff_t)(
-	    base / VM_CHERI_REVOKE_GSZ_MEM_NOMAP / 8 / sizeof(uint64_t)) *
-	    sizeof(uint64_t));
+	return (caprev_shadow_nomap_word_offset(base));
 }
 
 static ptrdiff_t
@@ -76,8 +93,7 @@ caprev_shadow_nomap_last_word_offset(ptraddr_t base, size_t len)
 	if (len == 0)
 		return (caprev_shadow_nomap_first_word_offset(base));
 
-	return ((ptrdiff_t)((base + len - 1) / VM_CHERI_REVOKE_GSZ_MEM_NOMAP /
-	    8 / sizeof(uint64_t)) * sizeof(uint64_t));
+	return (caprev_shadow_nomap_word_offset(base + len - 1));
 }
 
 /*
@@ -88,33 +104,20 @@ caprev_shadow_nomap_last_word_offset(ptraddr_t base, size_t len)
 static uint64_t
 caprev_shadow_nomap_first_word_mask(ptraddr_t base, size_t len)
 {
+	size_t lsb, setwidth;
 	uint64_t res;
-	int lsb;
 
 	/* What's the least significant bit's position within the word? */
-	lsb = (base / VM_CHERI_REVOKE_GSZ_MEM_NOMAP) % (8 *
-	    sizeof(uint64_t));
+	lsb = caprev_shadow_nomap_offset_in_word(base);
+	setwidth = len / VM_CHERI_REVOKE_GSZ_MEM_NOMAP;
+
+	res = ~(((uint64_t)1 << lsb) - 1);
 
 	if (caprev_shadow_nomap_first_word_offset(base) ==
-	    caprev_shadow_nomap_last_word_offset(base, len)) {
+	    caprev_shadow_nomap_last_word_offset(base, len) &&
+	    lsb + setwidth != 64)
 		/* The object occupies only some bits in the first word */
-
-		int setwidth = len / VM_CHERI_REVOKE_GSZ_MEM_NOMAP;
-
-		if (lsb + setwidth == 64) {
-			/*
-			 * Object fills this word completely, but does not spill
-			 * to the next
-			 */
-			res = ~(((uint64_t)1 << lsb) - 1);
-		} else {
-			res = (~(((uint64_t)1 << (lsb + setwidth)) - 1) ^
-			    (~(((uint64_t)1 << lsb) - 1)));
-		}
-	} else {
-		/* The object runs off the end of this word. */
-		res = ~(((uint64_t)1 << lsb) - 1);
-	}
+		res = res ^ ~(((uint64_t)1 << (lsb + setwidth)) - 1);
 
 	return (htole64(res));
 }
@@ -122,29 +125,18 @@ caprev_shadow_nomap_first_word_mask(ptraddr_t base, size_t len)
 static uint64_t
 caprev_shadow_nomap_last_word_mask(ptraddr_t base, size_t len)
 {
-	uint64_t res;
-	int msb;
+	size_t msb;
 
 	if (caprev_shadow_nomap_first_word_offset(base) ==
-	    caprev_shadow_nomap_last_word_offset(base, len)) {
+	    caprev_shadow_nomap_last_word_offset(base, len))
 		/*
 		 * There are no more bits to set that haven't been taken care of
 		 * by the the first word, so just return 0.
 		 */
 		return (0);
-	}
 
-	msb = ((base + len - 1) / VM_CHERI_REVOKE_GSZ_MEM_NOMAP) %
-	    (8 * sizeof(uint64_t));
-
-	if (msb == 63) {
-		/* This object runs to the end of its last word */
-		return (~(uint64_t)0);
-	}
-
-	res = ((uint64_t)1 << (msb + 1)) - 1;
-
-	return (htole64(res));
+	msb = caprev_shadow_nomap_offset_in_word(base + len - 1);
+	return (htole64(~(uint64_t)0 >> (63 - msb)));
 }
 
 /*
