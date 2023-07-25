@@ -98,10 +98,9 @@ hwt_ctx_alloc(void)
 	ctx->thread_counter = 0;
 
 	LIST_INIT(&ctx->records);
-	LIST_INIT(&ctx->threads);
+	TAILQ_INIT(&ctx->threads);
+	TAILQ_INIT(&ctx->cpus);
 	mtx_init(&ctx->mtx, "ctx", NULL, MTX_SPIN);
-
-	LIST_INIT(&ctx->cpus);
 
 	hwt_ctx_ident_alloc(&ctx->ident);
 

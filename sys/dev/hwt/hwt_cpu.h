@@ -34,7 +34,7 @@
 struct hwt_cpu {
 	int			cpu_id;
 	struct hwt_vm		*vm;
-	LIST_ENTRY(hwt_cpu)	next;
+	TAILQ_ENTRY(hwt_cpu)	next;
 };
 
 struct hwt_cpu * hwt_cpu_alloc(void);

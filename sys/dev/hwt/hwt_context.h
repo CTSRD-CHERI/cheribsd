@@ -42,12 +42,12 @@ struct hwt_context {
 
 	/* CPU mode. */
 	cpuset_t			cpu_map;
-	LIST_HEAD(, hwt_cpu)		cpus;
+	TAILQ_HEAD(, hwt_cpu)		cpus;
 
 	/* Thread mode. */
 	struct proc			*proc; /* Target proc. */
 	pid_t				pid; /* Target pid. */
-	LIST_HEAD(, hwt_thread)		threads;
+	TAILQ_HEAD(, hwt_thread)	threads;
 	int				thread_counter;
 	int				pause_on_mmap;
 

@@ -81,7 +81,7 @@ hwt_cpu_first(struct hwt_context *ctx)
 
 	HWT_CTX_ASSERT_LOCKED(ctx);
 
-	cpu = LIST_FIRST(&ctx->cpus);
+	cpu = TAILQ_FIRST(&ctx->cpus);
 
 	KASSERT(cpu != NULL, ("cpu is NULL"));
 
@@ -91,13 +91,8 @@ hwt_cpu_first(struct hwt_context *ctx)
 void
 hwt_cpu_insert(struct hwt_context *ctx, struct hwt_cpu *cpu)
 {
-	struct hwt_cpu *c;
 
 	HWT_CTX_ASSERT_LOCKED(ctx);
 
-	c = LIST_FIRST(&ctx->cpus);
-	if (c)
-		LIST_INSERT_AFTER(c, cpu, next);
-	else
-		LIST_INSERT_HEAD(&ctx->cpus, cpu, next);
+	TAILQ_INSERT_TAIL(&ctx->cpus, cpu, next);
 }

@@ -80,7 +80,7 @@ hwt_thread_first(struct hwt_context *ctx)
 
 	HWT_CTX_ASSERT_LOCKED(ctx);
 
-	thr = LIST_FIRST(&ctx->threads);
+	thr = TAILQ_FIRST(&ctx->threads);
 
 	KASSERT(thr != NULL, ("thr is NULL"));
 
@@ -97,7 +97,7 @@ hwt_thread_lookup(struct hwt_context *ctx, struct thread *td)
 
 	HWT_CTX_ASSERT_LOCKED(ctx);
 
-	LIST_FOREACH(thr, &ctx->threads, next) {
+	TAILQ_FOREACH(thr, &ctx->threads, next) {
 		if (thr->td == td) {
 			HWT_THR_LOCK(thr);
 			HWT_CTX_UNLOCK(ctx);
@@ -154,7 +154,7 @@ hwt_thread_insert(struct hwt_context *ctx, struct hwt_thread *thr)
 
 	HWT_CTX_ASSERT_LOCKED(ctx);
 
-	LIST_INSERT_HEAD(&ctx->threads, thr, next);
+	TAILQ_INSERT_TAIL(&ctx->threads, thr, next);
 }
 
 /*
@@ -206,7 +206,7 @@ hwt_thread_create(struct thread *td)
 	thr->ctx = ctx;
 	thr->thread_id = thread_id;
 	thr->td = td;
-	LIST_INSERT_HEAD(&ctx->threads, thr, next);
+	TAILQ_INSERT_TAIL(&ctx->threads, thr, next);
 	LIST_INSERT_HEAD(&ctx->records, entry, next);
 	HWT_CTX_UNLOCK(ctx);
 

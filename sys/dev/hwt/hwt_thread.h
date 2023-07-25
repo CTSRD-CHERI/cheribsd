@@ -35,7 +35,7 @@ struct hwt_thread {
 	struct hwt_vm			*vm;
 	struct hwt_context		*ctx;
 	struct thread			*td;
-	LIST_ENTRY(hwt_thread)		next;
+	TAILQ_ENTRY(hwt_thread)		next;
 	int				thread_id;
 	int				state;
 #define	HWT_THREAD_STATE_EXITED		(1 << 0)

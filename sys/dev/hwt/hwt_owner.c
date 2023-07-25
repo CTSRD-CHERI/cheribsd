@@ -122,9 +122,9 @@ hwt_owner_free_cpus(struct hwt_context *ctx)
 
 	do {
 		HWT_CTX_LOCK(ctx);
-		cpu = LIST_FIRST(&ctx->cpus);
+		cpu = TAILQ_FIRST(&ctx->cpus);
 		if (cpu)
-			LIST_REMOVE(cpu, next);
+			TAILQ_REMOVE(&ctx->cpus, cpu, next);
 		HWT_CTX_UNLOCK(ctx);
 
 		if (cpu == NULL)
@@ -144,9 +144,9 @@ hwt_owner_free_threads(struct hwt_context *ctx)
 
 	do {
 		HWT_CTX_LOCK(ctx);
-		thr = LIST_FIRST(&ctx->threads);
+		thr = TAILQ_FIRST(&ctx->threads);
 		if (thr) {
-			LIST_REMOVE(thr, next);
+			TAILQ_REMOVE(&ctx->threads, thr, next);
 			HWT_THR_LOCK(thr);
 		}
 		HWT_CTX_UNLOCK(ctx);
@@ -193,7 +193,7 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 		/*
 		 * Ensure hook invocation is now completed.
 		 */
-		LIST_FOREACH(thr, &ctx->threads, next) {
+		TAILQ_FOREACH(thr, &ctx->threads, next) {
 			HWT_THR_LOCK(thr);
 			HWT_THR_UNLOCK(thr);
 		}
