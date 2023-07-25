@@ -153,6 +153,12 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 	ctx->hwt_owner = ho;
 	ctx->mode = HWT_MODE_THREAD;
 
+	error = copyout(&ctx->ident, halloc->ident, sizeof(int));
+	if (error) {
+		hwt_ctx_free(ctx);
+		return (error);
+	}
+
 	thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
 
 	/* Allocate first thread and buffers. */
@@ -201,15 +207,11 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 	hwt_contexthash_insert(ctx);
 	PROC_UNLOCK(p);
 
+	/* TODO: move this to a separate ioctl */
 	error = hwt_backend_init(ctx);
 	if (error) {
-		/* TODO: deallocate resources. */
-		return (error);
-	}
-
-	error = copyout(&ctx->ident, halloc->ident, sizeof(int));
-	if (error) {
-		/* TODO: deallocate resources. */
+		hwt_thread_free(thr);
+		hwt_ctx_free(ctx);
 		return (error);
 	}
 
@@ -249,6 +251,12 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 	ctx->mode = HWT_MODE_CPU;
 	ctx->cpu_map = halloc->cpu_map;
 
+	error = copyout(&ctx->ident, halloc->ident, sizeof(int));
+	if (error) {
+		hwt_ctx_free(ctx);
+		return (error);
+	}
+
 	CPU_FOREACH(cpu_id) {
 		if (!CPU_ISSET(cpu_id, &halloc->cpu_map))
 			continue;
@@ -256,6 +264,7 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 		sprintf(path, "hwt_%d_%d", ctx->ident, cpu_id);
 		error = hwt_vm_alloc(ctx->bufsize, path, &vm);
 		if (error) {
+			/* TODO: remove all allocated cpus. */
 			hwt_ctx_free(ctx);
 			return (error);
 		}
@@ -279,12 +288,6 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 	mtx_unlock(&ho->mtx);
 
 	error = hwt_backend_init(ctx);
-	if (error) {
-		/* TODO: deallocate resources. */
-		return (error);
-	}
-
-	error = copyout(&ctx->ident, halloc->ident, sizeof(int));
 	if (error) {
 		/* TODO: deallocate resources. */
 		return (error);
