@@ -199,7 +199,8 @@ hwt_thread_create(struct thread *td)
 	/* 3. Take ctx again, as it may gone during previous step. */
 	ctx = hwt_contexthash_lookup(p);
 	if (ctx == NULL) {
-		/* TODO: deallocate resources. */
+		hwt_record_entry_free(entry);
+		hwt_thread_free(thr);
 		return (ENXIO);
 	}
 	thr->vm->ctx = ctx;
