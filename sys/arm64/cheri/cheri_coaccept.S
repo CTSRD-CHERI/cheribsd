@@ -148,7 +148,7 @@ SIGCODE(switcher_coaccept)
 	str	x11, SCB_BORROWER_TD(c29)
 	b	5f
 4:
-	str	czr, SCB_BORROWER_TD(c8)
+	str	xzr, SCB_BORROWER_TD(c8)
 5:
 
 	/*
