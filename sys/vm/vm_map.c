@@ -5216,7 +5216,7 @@ vm_map_growstack(vm_map_t map, vm_offset_t addr, vm_map_entry_t gap_entry)
 	struct vmspace *vm;
 	struct ucred *cred;
 	vm_pointer_t gap_end, gap_start, grow_start;
-	vm_size_t grow_amount, guard, max_grow;
+	vm_size_t grow_amount, guard, max_grow, sgp;
 	vm_prot_t prot, max;
 	rlim_t lmemlim, stacklim, vmemlim;
 	int rv, rv1 __diagused;
@@ -5376,6 +5376,7 @@ retry:
 		 */
 		prot = VM_PROT_EXTRACT(gap_entry->offset);
 		max = VM_PROT_MAX_EXTRACT(gap_entry->offset);
+		sgp = gap_entry->next_read;
 
 		stack_reservation = vm_map_buildcap(map, gap_entry->start,
 		    stack_entry->end - gap_entry->start, prot);
@@ -5406,11 +5407,13 @@ retry:
 		    stack_entry->reservation);
 		if (rv != KERN_SUCCESS) {
 			if (gap_deleted) {
-				rv1 = vm_map_insert(map, NULL, 0, gap_start,
+				rv1 = vm_map_insert1(map, NULL, 0, gap_start,
 				    gap_end, VM_PROT_NONE, VM_PROT_NONE,
 				    MAP_CREATE_GUARD | MAP_CREATE_STACK_GAP_DN,
-				    stack_entry->reservation);
+				    stack_entry->reservation, &gap_entry);
 				MPASS(rv1 == KERN_SUCCESS);
+				gap_entry->next_read = sgp;
+				gap_entry->offset = prot | VM_PROT_MAX(max);
 			} else {
 				if (map->flags & MAP_RESERVATIONS)
 					vm_map_entry_delete(map, tmp_entry);
