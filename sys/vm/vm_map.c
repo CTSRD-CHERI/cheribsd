@@ -188,46 +188,11 @@ static int vm_map_clip_start(vm_map_t map, vm_map_entry_t entry,
 			start = end;			\
 		}
 
-#ifdef CPU_QEMU_MALTA
-#include <machine/cheri.h>
-
-static void
-vm_map_log(const char *prefix, vm_map_entry_t entry)
-{
-	char buffer[128];
-	char prt[6];
-
-	if (!(curthread->td_md.md_flags & MDTD_QTRACE))
-		return;
-	if (entry->protection & VM_PROT_READ)
-		prt[0] = 'r';
-	else
-		prt[0] = '-';
-	if (entry->protection & VM_PROT_WRITE)
-		prt[1] = 'w';
-	else
-		prt[1] = '-';
-	if (entry->protection & VM_PROT_EXECUTE)
-		prt[2] = 'x';
-	else
-		prt[2] = '-';
-	if (entry->protection & VM_PROT_READ_CAP)
-		prt[3] = 'R';
-	else
-		prt[3] = '-';
-	if (entry->protection & VM_PROT_WRITE_CAP)
-		prt[4] = 'W';
-	else
-		prt[4] = '-';
-	prt[5] = '\0';
-	snprintf(buffer, sizeof(buffer), "VMMAP %d: %s: start=%p end=%p prt=%s",
-	    curproc->p_pid, prefix, (void *)(uintptr_t)entry->start,
-	    (void *)(uintptr_t)entry->end, prt);
-	CHERI_TRACE_STRING(buffer);
-}
-#else
+/*
+ * XXX: MIPS implementation removed.  vm_map_log() should be implemented
+ * or removed entirely.
+ */
 #define	vm_map_log(prefix, entry)
-#endif
 
 #ifndef UMA_MD_SMALL_ALLOC
 
