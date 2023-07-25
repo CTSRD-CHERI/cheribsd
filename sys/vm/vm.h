@@ -97,6 +97,13 @@ typedef u_char vm_prot_t;	/* protection codes */
 	((prot) | (((prot) & VM_PROT_READ) != 0 ? VM_PROT_READ_CAP : 0) | \
 	    (((prot) & VM_PROT_WRITE) != 0 ? VM_PROT_WRITE_CAP : 0))
 
+#define	VM_PROT_EXTRACT(prot)	((prot) & VM_PROT_ALL)
+
+#define	VM_PROT_MAX_SHIFT	16
+#define	VM_PROT_MAX(prot)	((prot) << VM_PROT_MAX_SHIFT)
+#define	VM_PROT_MAX_EXTRACT(prot)					\
+	(((prot) >> VM_PROT_MAX_SHIFT) & VM_PROT_ALL)
+
 enum obj_type {
 	OBJT_RESERVED = 0,	/* was OBJT_DEFAULT */
 	OBJT_SWAP,

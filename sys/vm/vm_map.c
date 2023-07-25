@@ -5163,7 +5163,7 @@ vm_map_stack_locked(vm_map_t map, vm_pointer_t addrbos, vm_size_t max_ssize,
 		 * object offset.
 		 */
 		gap_entry->next_read = sgp;
-		gap_entry->offset = prot;
+		gap_entry->offset = prot | VM_PROT_MAX(max);
 	} else {
 		(void)vm_map_delete(map, bot, top, false);
 	}
@@ -5183,7 +5183,7 @@ vm_map_growstack(vm_map_t map, vm_offset_t addr, vm_map_entry_t gap_entry)
 	struct ucred *cred;
 	vm_pointer_t gap_end, gap_start, grow_start;
 	vm_size_t grow_amount, guard, max_grow;
-	vm_prot_t prot;
+	vm_prot_t prot, max;
 	rlim_t lmemlim, stacklim, vmemlim;
 	int rv, rv1 __diagused;
 	bool gap_deleted, grow_down, is_procstack;
@@ -5340,7 +5340,8 @@ retry:
 		 * The gap_entry "offset" field is overloaded.  See
 		 * vm_map_stack_locked().
 		 */
-		prot = gap_entry->offset;
+		prot = VM_PROT_EXTRACT(gap_entry->offset);
+		max = VM_PROT_MAX_EXTRACT(gap_entry->offset);
 
 		stack_reservation = vm_map_buildcap(map, gap_entry->start,
 		    stack_entry->end - gap_entry->start, prot);
@@ -5367,7 +5368,7 @@ retry:
 		}
 		/* XXX-AM: Would be nice to just grow the object as below */
 		rv = vm_map_insert(map, NULL, 0, grow_start,
-		    grow_start + grow_amount, prot, prot, MAP_STACK_GROWS_DOWN,
+		    grow_start + grow_amount, prot, max, MAP_STACK_GROWS_DOWN,
 		    stack_entry->reservation);
 		if (rv != KERN_SUCCESS) {
 			if (gap_deleted) {
