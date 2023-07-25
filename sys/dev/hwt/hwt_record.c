@@ -77,7 +77,8 @@ hwt_record(struct thread *td, struct hwt_record_entry *ent)
 
 	ctx = hwt_contexthash_lookup(p);
 	if (ctx == NULL) {
-		/* TODO: release resources. */
+		free(entry->fullpath, M_HWT_RECORD);
+		free(entry, M_HWT_RECORD);
 		return;
 	}
 	LIST_INSERT_HEAD(&ctx->records, entry, next);
