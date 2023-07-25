@@ -186,34 +186,37 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 		PROC_UNLOCK(p);
 		return (error);
 	}
+	p->p_flag2 |= P2_HWT;
+	thr->td = FIRST_THREAD_IN_PROC(p);
+	ctx->proc = p;
+	PROC_UNLOCK(p);
 
 	/* All good. */
 	thr->ctx = ctx;
-	thr->td = FIRST_THREAD_IN_PROC(p);
 	thr->thread_id = thread_id;
 
 	HWT_CTX_LOCK(ctx);
 	hwt_thread_insert(ctx, thr);
 	HWT_CTX_UNLOCK(ctx);
 
+	error = hwt_backend_init(ctx);
+	if (error) {
+		hwt_thread_free(thr);
+		hwt_ctx_free(ctx);
+		/* TODO: remove P2_HWT from proc, if it is still there. */
+		return (error);
+	}
+
 	/* hwt_owner_insert_ctx? */
 	mtx_lock(&ho->mtx);
 	LIST_INSERT_HEAD(&ho->hwts, ctx, next_hwts);
 	mtx_unlock(&ho->mtx);
 
-	p->p_flag2 |= P2_HWT;
-
-	ctx->proc = p;
+	/*
+	 * Hooks are now in action after this, but the ctx is not in RUNNING
+	 * state.
+	 */
 	hwt_contexthash_insert(ctx);
-	PROC_UNLOCK(p);
-
-	/* TODO: move this to a separate ioctl */
-	error = hwt_backend_init(ctx);
-	if (error) {
-		hwt_thread_free(thr);
-		hwt_ctx_free(ctx);
-		return (error);
-	}
 
 	return (0);
 }
@@ -269,29 +272,29 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 			return (error);
 		}
 
-		vm->ctx = ctx;
-
 		cpu = hwt_cpu_alloc();
 		cpu->cpu_id = cpu_id;
 		cpu->vm = vm;
 
 		vm->cpu = cpu;
+		vm->ctx = ctx;
 
 		HWT_CTX_LOCK(ctx);
 		hwt_cpu_insert(ctx, cpu);
 		HWT_CTX_UNLOCK(ctx);
 	}
 
+	error = hwt_backend_init(ctx);
+	if (error) {
+		/* TODO: remove all allocated cpus. */
+		hwt_ctx_free(ctx);
+		return (error);
+	}
+
 	/* hwt_owner_insert_ctx? */
 	mtx_lock(&ho->mtx);
 	LIST_INSERT_HEAD(&ho->hwts, ctx, next_hwts);
 	mtx_unlock(&ho->mtx);
-
-	error = hwt_backend_init(ctx);
-	if (error) {
-		/* TODO: deallocate resources. */
-		return (error);
-	}
 
 	hwt_record_kernel_objects(ctx);
 

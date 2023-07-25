@@ -104,8 +104,6 @@ hwt_contexthash_insert(struct hwt_context *ctx)
 	struct hwt_contexthash *hch;
 	int hindex;
 
-	PROC_LOCK_ASSERT(ctx->proc, MA_OWNED);
-
 	hindex = HWT_HASH_PTR(ctx->proc, hwt_contexthashmask);
 	hch = &hwt_contexthash[hindex];
 
