@@ -188,7 +188,7 @@ SYSCTL_INT(_kern, OID_AUTO, suspend_blocked, CTLFLAG_RW,
  * If CHERI-QEMU ISA-level tracing is enabled in buffered mode
  * we emit the trace on panic.
  */
-#if defined(CPU_QEMU_RISCV) || defined(CPU_QEMU_MALTA)
+#if defined(CPU_QEMU_RISCV)
 extern u_int qemu_trace_buffered;
 #endif
 
@@ -917,7 +917,7 @@ panic(const char *fmt, ...)
 	if (nonexistent_function_so_that_panic_saves_retaddr)
 		nonexistent_function_so_that_panic_saves_retaddr();
 	va_list ap;
-#if defined(CPU_QEMU_RISCV) || defined(CPU_QEMU_MALTA)
+#if defined(CPU_QEMU_RISCV)
 	if (qemu_trace_buffered)
 		QEMU_FLUSH_TRACE_BUFFER;
 #endif
