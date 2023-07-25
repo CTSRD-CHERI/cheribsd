@@ -130,8 +130,8 @@ hwt_owner_free_cpus(struct hwt_context *ctx)
 		if (cpu == NULL)
 			break;
 
-		/* TODO: hwt_cpu_free() ? */
 		hwt_vm_free(cpu->vm);
+		hwt_cpu_free(cpu);
 	} while (1);
 }
 
