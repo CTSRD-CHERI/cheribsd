@@ -135,11 +135,7 @@ typedef	__ptraddr_t		ptraddr_t;
 #endif
 
 #ifndef _VADDR_T_DECLARED
-#ifndef __CHERI_PURE_CAPABILITY__
-typedef	__uintptr_t		vaddr_t;
-#else
-typedef	__uint64_t		vaddr_t;
-#endif
+typedef	ptraddr_t		vaddr_t;
 #define	_VADDR_T_DECLARED
 #endif
 
