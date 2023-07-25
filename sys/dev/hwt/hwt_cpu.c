@@ -63,8 +63,15 @@ hwt_cpu_alloc(void)
 	struct hwt_cpu *cpu;
 
 	cpu = malloc(sizeof(struct hwt_cpu), M_HWT_CPU, M_WAITOK | M_ZERO);
-        
-        return (cpu);
+
+	return (cpu);
+}
+
+void
+hwt_cpu_free(struct hwt_cpu *cpu)
+{
+
+	free(cpu, M_HWT_CPU);
 }
 
 struct hwt_cpu *

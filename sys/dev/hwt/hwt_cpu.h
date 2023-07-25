@@ -38,6 +38,8 @@ struct hwt_cpu {
 };
 
 struct hwt_cpu * hwt_cpu_alloc(void);
+void hwt_cpu_free(struct hwt_cpu *cpu);
+
 struct hwt_cpu * hwt_cpu_first(struct hwt_context *ctx);
 void hwt_cpu_insert(struct hwt_context *ctx, struct hwt_cpu *cpu);
 
