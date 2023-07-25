@@ -4,7 +4,7 @@
 __<${_this:T}>__:
 
 # Makefile for the compatibility libraries.
-# - 32-bit compat libraries on PowerPC, and AMD64.
+# - 32-bit compat libraries on some 64-bit architectures
 # - 64-bit compat on CHERI RISC-V and Morello.
 
 # XXX: bsd.compat.mk stubbed out for cleandir
