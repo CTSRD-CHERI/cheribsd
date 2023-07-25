@@ -30,6 +30,10 @@
  * $FreeBSD$
  */
 
+#ifdef __arm__
+#include <arm/_align.h>
+#else /* !__arm__ */
+
 #ifndef _MACHINE__ALIGN_H_
 #define	_MACHINE__ALIGN_H_
 
@@ -42,3 +46,5 @@
 #define	_ALIGN(p)	__builtin_align_up((p), _ALIGNBYTES + 1)
 
 #endif /* !_MACHINE__ALIGN_H_ */
+
+#endif /* !__arm__ */

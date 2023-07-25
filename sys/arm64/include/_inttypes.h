@@ -30,6 +30,10 @@
  * $FreeBSD$
  */
 
+#ifdef __arm__
+#include <arm/_inttypes.h>
+#else /* !__arm__ */
+
 #ifndef _MACHINE__INTTYPES_H_
 #define	_MACHINE__INTTYPES_H_
 
@@ -217,3 +221,5 @@
 #define	SCNxPTR		__PRIptr"x" /* uintptr_t */
 
 #endif /* !_MACHINE__INTTYPES_H_ */
+
+#endif /* !__arm__ */

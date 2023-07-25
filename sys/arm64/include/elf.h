@@ -26,6 +26,10 @@
  * $FreeBSD$
  */
 
+#ifdef __arm__
+#include <arm/elf.h>
+#else /* !__arm__ */
+
 #ifndef	_MACHINE_ELF_H_
 #define	_MACHINE_ELF_H_
 
@@ -209,3 +213,5 @@ void elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap);
 #endif
 
 #endif /* !_MACHINE_ELF_H_ */
+
+#endif /* !__arm__ */
