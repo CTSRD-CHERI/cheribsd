@@ -135,6 +135,7 @@ typedef	__ptraddr_t		ptraddr_t;
 #endif
 
 #ifndef _VADDR_T_DECLARED
+__attribute__((__deprecated__("use ptraddr_t instead")))
 typedef	ptraddr_t		vaddr_t;
 #define	_VADDR_T_DECLARED
 #endif
