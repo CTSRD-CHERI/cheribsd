@@ -358,8 +358,6 @@ CHERIBSDTEST(vm_cap_share_fd_kqueue,
 		CHERIBSDTEST_VERIFY2(oke.ident == 0x2BAD, "Bad identifier from kqueue");
 		CHERIBSDTEST_VERIFY2(oke.filter == EVFILT_USER, "Bad filter from kqueue");
 
-		fprintf(stderr, "oke.udata %#lp\n", oke.udata);
-
 		exit(cheri_gettag(oke.udata));
 	} else {
 		int res;
@@ -428,8 +426,6 @@ CHERIBSDTEST(vm_cap_share_sigaction,
 
 		/* Read it again and check that we get the same value back. */
 		CHERIBSDTEST_CHECK_SYSCALL(__sys_sigaction(SIGUSR1, NULL, &sa));
-		fprintf(stderr, "child value read from sigaction(): ");
-		fprintf(stderr, "sa.sa_handler %#lp\n", sa.sa_handler);
 		CHERIBSDTEST_CHECK_EQ_CAP(sa.sa_handler, passme);
 
 		exit(0);
@@ -442,8 +438,6 @@ CHERIBSDTEST(vm_cap_share_sigaction,
 		sa.sa_flags = 1;
 
 		CHERIBSDTEST_CHECK_SYSCALL(__sys_sigaction(SIGUSR1, NULL, &sa));
-		fprintf(stderr, "parent sa read from sigaction(): ");
-		fprintf(stderr, "sa.sa_handler %#lp\n", sa.sa_handler);
 
 		/* Flags should be zero on read */
 		CHERIBSDTEST_CHECK_EQ_LONG(sa.sa_flags, 0);
