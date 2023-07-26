@@ -63,6 +63,7 @@ int hwt_backend_register(struct hwt_backend *);
 struct hwt_backend * hwt_backend_lookup(const char *name);
 
 void hwt_backend_load(void);
+void hwt_backend_unload(void);
 
 #define	HWT_BACKEND_LOCK()		mtx_lock_spin(&hwt_backend_mtx)
 #define	HWT_BACKEND_UNLOCK()		mtx_unlock_spin(&hwt_backend_mtx)

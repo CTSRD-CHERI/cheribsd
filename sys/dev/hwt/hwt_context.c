@@ -130,3 +130,10 @@ hwt_ctx_load(void)
 	ident_set = bit_alloc(ident_set_size, M_HWT_CTX, M_WAITOK);
 	mtx_init(&ident_set_mutex, "ident set", NULL, MTX_SPIN);
 }
+
+void
+hwt_ctx_unload(void)
+{
+
+	/* TODO */
+}

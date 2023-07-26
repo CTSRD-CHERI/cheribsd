@@ -188,11 +188,13 @@ static int
 hwt_unload(void)
 {
 
-	dprintf("%s\n", __func__);
-
-	/* TODO: deallocate resources. */
-
+	hwt_hook_unload();
+	EVENTHANDLER_DEREGISTER(process_exit, hwt_exit_tag);
 	destroy_dev(hwt_cdev);
+	hwt_ownerhash_unload();
+	hwt_contexthash_unload();
+	hwt_ctx_unload();
+	hwt_backend_unload();
 
 	return (0);
 }

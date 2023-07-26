@@ -176,3 +176,10 @@ hwt_backend_load(void)
 	mtx_init(&hwt_backend_mtx, "hwt backend", NULL, MTX_SPIN);
 	LIST_INIT(&hwt_backends);
 }
+
+void
+hwt_backend_unload(void)
+{
+
+	/* TODO */
+}

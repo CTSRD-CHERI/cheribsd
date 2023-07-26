@@ -129,3 +129,10 @@ hwt_contexthash_load(void)
 	    &hwt_contexthashmask);
 	mtx_init(&hwt_contexthash_mtx, "hwt ctx hash", "hwt ctx", MTX_SPIN);
 }
+
+void
+hwt_contexthash_unload(void)
+{
+
+	/* TODO */
+}

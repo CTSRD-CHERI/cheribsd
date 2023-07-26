@@ -70,6 +70,8 @@ struct hwt_context {
 
 struct hwt_context * hwt_ctx_alloc(void);
 void hwt_ctx_free(struct hwt_context *ctx);
+
 void hwt_ctx_load(void);
+void hwt_ctx_unload(void);
 
 #endif /* !_DEV_HWT_HWT_CONTEXT_H_ */

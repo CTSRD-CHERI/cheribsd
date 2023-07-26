@@ -124,3 +124,10 @@ hwt_ownerhash_load(void)
 	    &hwt_ownerhashmask);
         mtx_init(&hwt_ownerhash_mtx, "hwt-owner-hash", "hwt-owner", MTX_SPIN);
 }
+
+void
+hwt_ownerhash_unload(void)
+{
+
+	/* TODO */
+}
