@@ -180,6 +180,13 @@ hwt_backend_load(void)
 void
 hwt_backend_unload(void)
 {
+	struct hwt_backend *backend, *tmp;
 
-	/* TODO */
+	HWT_BACKEND_LOCK();
+	LIST_FOREACH_SAFE(backend, &hwt_backends, next, tmp) {
+		LIST_REMOVE(backend, next);
+	}
+	HWT_BACKEND_UNLOCK();
+
+	mtx_destroy(&hwt_backend_mtx);
 }
