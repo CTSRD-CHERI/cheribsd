@@ -128,6 +128,16 @@ hwt_ownerhash_load(void)
 void
 hwt_ownerhash_unload(void)
 {
+	struct hwt_ownerhash *hoh;
+	struct hwt_owner *ho, *tmp;
 
-	/* TODO */
+	HWT_OWNERHASH_LOCK();
+	for (hoh = hwt_ownerhash;
+	    hoh <= &hwt_ownerhash[hwt_ownerhashmask];
+	    hoh++) {
+		LIST_FOREACH_SAFE(ho, hoh, next, tmp) {
+			LIST_REMOVE(ho, next);
+		}
+	}
+	HWT_OWNERHASH_UNLOCK();
 }
