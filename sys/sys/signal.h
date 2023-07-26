@@ -137,20 +137,14 @@ typedef	__uid_t		uid_t;
 #define	SIGRTMIN	65
 #define	SIGRTMAX	126
 
-#ifdef _KERNEL
-#if !__has_feature(capabilities)
-#define	__intcap_t __intptr_t
-#endif
 /*
- * In the kernel we need to cast to __intcap_t since we are assigning to a
- * capability. If we did this in hybrid userspace we would generate a CToPtr
- * which causes all of the SIG_* constants to evaluate to 0.
+ * In a hybrid kernel we need to cast via __intcap_t since we are assigning to
+ * a capability and would otherwise get a CFromPtr rather than a null-derived
+ * capability. In all other cases the inner __kintcap_t cast is unnecessary but
+ * harmless. This is a workaround for what is really a hybrid C "spec" bug.
  */
 #define __SIGHANDLER_CONSTANT(value)	\
-    ((__sighandler_t * __kerncap)(__intcap_t)value)
-#else
-#define __SIGHANDLER_CONSTANT(value) ((__sighandler_t *)(__intptr_t)value)
-#endif
+    ((__sighandler_t * __kerncap)(__kintcap_t)value)
 #define	SIG_DFL		__SIGHANDLER_CONSTANT(0)
 #define	SIG_IGN		__SIGHANDLER_CONSTANT(1)
 #define	SIG_ERR		__SIGHANDLER_CONSTANT(-1)
