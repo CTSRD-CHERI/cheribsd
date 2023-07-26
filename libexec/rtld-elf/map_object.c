@@ -509,12 +509,6 @@ get_elf_header(int fd, const char *path, const struct stat *sbp,
 	if (!check_elf_headers(hdr, path))
 		goto error;
 
-#ifndef ELF_IS_CHERI
-#if __has_feature(capabilities)
-#error "Must have ELF_IS_CHERI for CHERI architectures"
-#endif
-#define ELF_IS_CHERI(hdr) false
-#endif
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (!ELF_IS_CHERI(hdr))
 #else
