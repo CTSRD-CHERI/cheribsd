@@ -117,6 +117,7 @@ void
 hwt_ctx_free(struct hwt_context *ctx)
 {
 
+	hwt_config_free(ctx);
 	hwt_ctx_ident_free(ctx->ident);
 	free(ctx, M_HWT_CTX);
 }

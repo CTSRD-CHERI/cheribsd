@@ -31,10 +31,8 @@
 #ifndef _DEV_HWT_HWT_CONFIG_H_
 #define _DEV_HWT_HWT_CONFIG_H_
 
-struct hwt_config {
-};
-
 int hwt_config_set(struct thread *td, struct hwt_context *ctx,
     struct hwt_set_config *sconf);
+void hwt_config_free(struct hwt_context *ctx);
 
 #endif /* !_DEV_HWT_HWT_CONFIG_H_ */

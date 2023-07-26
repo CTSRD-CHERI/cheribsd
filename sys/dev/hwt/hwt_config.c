@@ -93,3 +93,15 @@ hwt_config_set(struct thread *td, struct hwt_context *ctx,
 
 	return (error);
 }
+
+void
+hwt_config_free(struct hwt_context *ctx)
+{
+
+	if (ctx->config == NULL)
+		return;
+
+	free(ctx->config, M_HWT_CONFIG);
+
+	ctx->config = NULL;
+}
