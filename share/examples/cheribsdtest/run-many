@@ -70,5 +70,5 @@ for suffix in $suffixes; do
 	echo
 	echo $prog
 	echo $prog | sed 's/./-/g'
-	$prog -a | grep -v '^\(TEST\|X\?\(PASS\|FAIL\)\):' || :
+	$prog -a | grep -v '^\(TEST\|X\?\(PASS\|FAIL\)\|SKIP\):' || :
 done
