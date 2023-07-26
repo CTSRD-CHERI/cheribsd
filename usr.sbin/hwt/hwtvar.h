@@ -69,6 +69,7 @@ struct trace_context {
 
 	/* Backend-specific config. */
 	void *config;
+	int flag_format;
 
 	/* Raw trace. */
 	int raw;

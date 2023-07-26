@@ -283,17 +283,18 @@ usage(void)
 {
 
 	errx(EX_USAGE,
-		"hwt [-s cpu_id] [-c devname] [-b bufsize] [-t id] [-r] [-w file] [-i name]"
+		"hwt [-s cpu_id] [-c devname] [-b bufsize] [-t id] [-g] [-r] [-w file] [-i name]"
 		    " [-f name] [path to executable]\n"
-		"\t -s\tcpu_id\t\tCPU (kernel) mode\n"
-		"\t -c\tname\t\tName of tracing device, e.g. coresight\n"
+		"\t -s\tcpu_id\t\tCPU (kernel) mode.\n"
+		"\t -c\tname\t\tName of tracing device, e.g. 'coresight'.\n"
 		"\t -b\tbufsize\t\tSize of trace buffer (per each thread) in bytes.\n"
-		"\t -t\tid\t\tThread index of application passed to decoder\n"
-		"\t -r\t\t\tRaw flag. Do not decode results\n"
-		"\t -w\tfilename\tStore results into file\n"
-		"\t -i\tname\t\tfilter by dynamic library / executable name or 'kernel' \n"
-		"\t -f\tname\t\tfilter by function name\n"
-
+		"\t -t\tid\t\tThread index of application passed to decoder.\n"
+		"\t -r\t\t\tRaw flag. Do not decode results.\n"
+		"\t -w\tfilename\tStore results into file.\n"
+		"\t -g\t\t\tFormat flag.\n"
+		"\t -i\tname\t\tFilter by dynamic library, executable name,\n"
+		"\t\t\t\tkernel module name or 'kernel'.\n"
+		"\t -f\tname\t\tFilter by function name."
 #if defined(__aarch64__)
 #endif
         );
@@ -302,6 +303,7 @@ usage(void)
 static int
 hwt_mode_cpu(struct trace_context *tc)
 {
+	uint32_t nrec;
 	int error;
 
 	if (tc->image_name == NULL || tc->func_name == NULL)
@@ -323,20 +325,11 @@ hwt_mode_cpu(struct trace_context *tc)
 
 	tc->pp->pp_pid = -1;
 
-	uint32_t nrec;
-	int tot_rec;
-	int nlibs;
+	error = hwt_get_records(tc, &nrec);
+	if (error != 0)
+		return (error);
 
-	nlibs = 1;
-	tot_rec = 0;
-
-	do {
-		error = hwt_get_records(tc, &nrec);
-		if (error != 0)
-			return (error);
-		tot_rec += nrec;
-		hwt_sleep();
-	} while (tot_rec < nlibs);
+	printf("Received %d kernel mappings\n", nrec);
 
 	error = hwt_find_sym(tc);
 	if (error)
@@ -349,15 +342,6 @@ hwt_mode_cpu(struct trace_context *tc)
 	error = hwt_start_tracing(tc);
 	if (error)
 		errx(EX_SOFTWARE, "failed to start tracing, error %d\n", error);
-
-#if 0
-	size_t offs;
-	while (1) {
-		hwt_get_offs(tc, &offs);
-		printf("new offs %lx\n", offs);
-		sleep(1);
-	}
-#endif
 
 	error = tc->trace_dev->methods->process(tc);
 	if (error) {
@@ -434,7 +418,7 @@ hwt_mode_thread(struct trace_context *tc, char **cmd, char **env)
 	if (error != 0)
 		return (error);
 
-	printf("nlibs %d\n", nlibs);
+	printf("Expect %d records.\n", nlibs);
 
 	tot_rec = 0;
 
@@ -453,7 +437,7 @@ hwt_mode_thread(struct trace_context *tc, char **cmd, char **env)
 
 	error = tc->trace_dev->methods->process(tc);
 	if (error) {
-		printf("cant process data, error %d\n", error);
+		printf("Can't process data, error %d.\n", error);
 		return (error);
 	}
 
@@ -486,7 +470,7 @@ main(int argc, char **argv, char **env)
 
 	tc->mode = HWT_MODE_THREAD;
 
-	while ((option = getopt(argc, argv, "s:hc:b:rw:t:i:f:")) != -1)
+	while ((option = getopt(argc, argv, "gs:hc:b:rw:t:i:f:")) != -1)
 		switch (option) {
 		case 's':
 			tc->mode = HWT_MODE_CPU;
@@ -533,6 +517,9 @@ main(int argc, char **argv, char **env)
 			break;
 		case 't':
 			tc->thread_id = atoi(optarg);
+			break;
+		case 'g':
+			tc->flag_format = 1;
 			break;
 		case 'h':
 			usage();
