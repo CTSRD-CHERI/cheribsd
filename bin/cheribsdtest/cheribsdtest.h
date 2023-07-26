@@ -75,6 +75,8 @@
  */
 #define	NULL_DERIVED_VOIDP(x) ((void *)(uintptr_t)(ptraddr_t)(x))
 
+extern int verbose;
+
 /*
  * Shared memory interface between tests and the test controller process.
  */
