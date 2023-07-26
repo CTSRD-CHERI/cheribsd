@@ -39,6 +39,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/capsicum.h>
 #include <sys/compressor.h>
+#include <sys/elf.h>
 #include <sys/exec.h>
 #include <sys/fcntl.h>
 #include <sys/imgact.h>
@@ -88,7 +89,6 @@ __FBSDID("$FreeBSD$");
 #endif
 #include <cheri/cheric.h>
 
-#include <machine/elf.h>
 #include <machine/md_var.h>
 
 #define ELF_NOTE_ROUNDSIZE	4
@@ -529,23 +529,13 @@ __elfN(check_header)(const Elf_Ehdr *hdr)
 	    hdr->e_ident[EI_DATA] != ELF_TARG_DATA ||
 	    hdr->e_ident[EI_VERSION] != EV_CURRENT ||
 	    hdr->e_phentsize != sizeof(Elf_Phdr) ||
+#ifdef __ELF_CHERI
+	    !ELF_IS_CHERI(hdr) ||
+#else
+	    ELF_IS_CHERI(hdr) ||
+#endif
 	    hdr->e_version != ELF_TARG_VER)
 		return (ENOEXEC);
-
-	/*
-	 * imgact_elf64c.c will "claim" non-CHERI binaries only to
-	 * choke on them later without trying imgact_elf64.c (and vice
-	 * versa).  We have to reject an ABI mismatch early so that
-	 * the imgact hook returns -1 instead of ENOXEC which means
-	 * doing it here.
-	 */
-#ifdef __ELF_CHERI
-	if (!ELF_IS_CHERI(hdr))
-		return (ENOEXEC);
-#elif __has_feature(capabilities)
-	if (ELF_IS_CHERI(hdr))
-		return (ENOEXEC);
-#endif
 
 	/*
 	 * Make sure we have at least one brand for this machine.
