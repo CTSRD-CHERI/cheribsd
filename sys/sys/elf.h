@@ -40,4 +40,11 @@
 #include <sys/elf32.h>
 #include <sys/elf64.h>
 
+#ifndef ELF_IS_CHERI
+#if __has_feature(capabilities)
+#error "Must have ELF_IS_CHERI for CHERI architectures"
+#endif
+#define ELF_IS_CHERI(hdr) false
+#endif
+
 #endif /* !_SYS_ELF_H_ */
