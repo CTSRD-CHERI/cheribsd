@@ -76,8 +76,6 @@ check_initreg_code(void * __capability c)
 {
 	uintmax_t v;
 
-	fprintf(stderr, "c %#lp\n", c);
-
 #if defined(__CHERI_PURE_CAPABILITY__)
 	/*
 	 * Dynamically linked pure-capability code should have a program
