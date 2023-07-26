@@ -91,9 +91,10 @@ static int fast_tests_only;
 static int qtrace;
 static int qtrace_user_mode_only;
 static int sleep_after_test;
-static int verbose;
 static int coredump_enabled;
 static int debugger_enabled;
+
+int verbose;
 
 static void
 usage(void)
