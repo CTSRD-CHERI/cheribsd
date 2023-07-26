@@ -199,9 +199,8 @@ CHERIBSDTEST(vm_shm_open_anon_unix_surprise,
 						0));
 		c = *map;
 
-		fprintf(stderr, "rx cap: v:%lu b:%016jx l:%016zx o:%jx\n",
-			(unsigned long)cheri_gettag(c), cheri_getbase(c),
-			cheri_getlen(c), cheri_getoffset(c));
+		if (verbose)
+			fprintf(stderr, "rx cap: %#lp\n", c);
 
 		tag = cheri_gettag(c);
 		CHERIBSDTEST_VERIFY2(tag == 0, "tag read");
@@ -235,9 +234,8 @@ CHERIBSDTEST(vm_shm_open_anon_unix_surprise,
 		c = *map;
 		CHERIBSDTEST_VERIFY2(cheri_gettag(c) != 0, "tag written");
 
-		fprintf(stderr, "tx cap: v:%lu b:%016jx l:%016zx o:%jx\n",
-			(unsigned long)cheri_gettag(c), cheri_getbase(c),
-			cheri_getlen(c), cheri_getoffset(c));
+		if (verbose)
+			fprintf(stderr, "tx cap: %#lp\n", c);
 
 		CHERIBSDTEST_CHECK_SYSCALL(munmap(map, getpagesize()));
 
