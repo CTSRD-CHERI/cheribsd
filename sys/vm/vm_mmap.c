@@ -2100,12 +2100,12 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
 		return (EINVAL);
 
 	if ((flags & MAP_FIXED) == 0) {
-		fitit = TRUE;
+		fitit = true;
 		*addr = round_page(*addr);
 	} else {
 		if (*addr != trunc_page(*addr))
 			return (EINVAL);
-		fitit = FALSE;
+		fitit = false;
 	}
 
 	if (flags & MAP_ANON) {
