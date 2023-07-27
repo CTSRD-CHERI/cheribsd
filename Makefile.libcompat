@@ -3,8 +3,6 @@
 .if !targets(__<${_this:T}>__)
 __<${_this:T}>__:
 
-.include <src.libnames.mk>
-
 # Makefile for the compatibility libraries.
 # - 32-bit compat libraries on PowerPC, and AMD64.
 # - 64-bit compat on CHERI RISC-V and Morello.
