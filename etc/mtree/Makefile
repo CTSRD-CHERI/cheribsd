@@ -9,13 +9,13 @@ FILES=	\
 	BSD.debug.dist \
 	BSD.include.dist \
 	BSD.root.dist \
+	${_BSD.c18n.dist} \
 	${_BSD.lib32.dist} \
 	${_BSD.lib64.dist} \
 	${_BSD.lib64c.dist} \
 	${_BSD.sendmail.dist} \
 	${_BSD.tests.dist} \
 	BSD.usr.dist \
-	${_BSD.c18n.dist} \
 	BSD.var.dist
 
 .if ${MACHINE_ABI:Mpurecap}
