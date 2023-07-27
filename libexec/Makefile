@@ -3,6 +3,8 @@
 
 .include <src.opts.mk>
 
+.include <bsd.compat.pre.mk>
+
 SUBDIR=	${_atf} \
 	${_atrun} \
 	${_blacklistd-helper} \
@@ -87,17 +89,18 @@ _rtld-elf=	rtld-elf rtld-elf-debug
 .if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
 SUBDIR+=	rtld-elf-c18n
 .endif
-SUBDIR.${MK_LIB32}+=	rtld-elf32
-SUBDIR.${MK_LIB64}+=	rtld-elf64
-SUBDIR.${MK_LIB64C}+=	rtld-elf64c rtld-elf64c-debug
 # rtld.1 needs to be installed before the cross-dir MLINKS can work.
 SUBDIR_INSTALL_USE_DEPENDS=
 SUBDIR_DEPEND_rtld-elf-c18n=	rtld-elf
 SUBDIR_DEPEND_rtld-elf-debug=	rtld-elf
-SUBDIR_DEPEND_rtld-elf32=	rtld-elf
-SUBDIR_DEPEND_rtld-elf64=	rtld-elf
-SUBDIR_DEPEND_rtld-elf64c=	rtld-elf
-SUBDIR_DEPEND_rtld-elf64c-debug=	rtld-elf
+.for LIBCOMPAT libcompat in ${_ALL_LIBCOMPATS_libcompats}
+SUBDIR.${MK_LIB${LIBCOMPAT}}+=	rtld-elf${libcompat}
+SUBDIR_DEPEND_rtld-elf${libcompat}=	rtld-elf
+.if exists(${.CURDIR}/rtld-elf${libcompat}-debug)
+SUBDIR.${MK_LIB${LIBCOMPAT}}+=	rtld-elf${libcompat}-debug
+SUBDIR_DEPEND_rtld-elf${libcompat}-debug=	rtld-elf
+.endif
+.endfor
 .endif
 
 .if ${MK_RBOOTD} != "no"
