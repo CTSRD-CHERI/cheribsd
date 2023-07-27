@@ -223,8 +223,8 @@ _rtld_thr_exit(long *state)
 	tramp_stk_table_t tls;
 	asm ("mrs	%0, ctpidr_el0" : "=C" (tls));
 
-	vaddr_t top = cheri_gettop(tls);
-	for (tramp_stk_table_t cur = &tls[1]; (vaddr_t)cur < top; ++cur) {
+	ptraddr_t top = cheri_gettop(tls);
+	for (tramp_stk_table_t cur = &tls[1]; (ptraddr_t)cur < top; ++cur) {
 		void *stk = cheri_setaddress(*cur, cheri_getbase(*cur));
 		if (stk != NULL && munmap(stk, DEFAULT_SANDBOX_STACK_SIZE) != 0)
 			rtld_fatal("munmap failed");
@@ -380,7 +380,7 @@ typedef int64_t slot_index;
 static struct {
 	struct tramp_data *data;
 	struct tramp_map_kv {
-		_Atomic vaddr_t key;
+		_Atomic ptraddr_t key;
 		_Atomic slot_index index;
 	} *map;
 	_Atomic slot_index size, writers;
@@ -463,7 +463,7 @@ resizeTable(int exp)
 {
 	struct tramp_map_kv *map;
 	struct tramp_data *data;
-	vaddr_t key;
+	ptraddr_t key;
 	uint32_t hash;
 	slot_index size, slot;
 
@@ -475,7 +475,7 @@ resizeTable(int exp)
 	size = atomic_load_explicit(&tramp_table.size, memory_order_relaxed);
 
 	for (slot_index idx = 0; idx < size; ++idx) {
-		key = (vaddr_t)data[idx].target;
+		key = (ptraddr_t)data[idx].target;
 		hash = pointerHash(key);
 		slot = hash;
 		do
@@ -695,10 +695,10 @@ tramp_intern(const struct tramp_data *data)
 {
 	void *entry;
 	RtldLockState lockstate;
-	vaddr_t target = (vaddr_t)data->target;
+	ptraddr_t target = (ptraddr_t)data->target;
 	const uint32_t hash = pointerHash(target);
 	slot_index slot, idx;
-	vaddr_t key;
+	ptraddr_t key;
 	int exp;
 
 	assert(data->entry == NULL);
