@@ -83,6 +83,7 @@ SUBDIR=	\
 	${_cfi} \
 	${_chromebook_platform} \
 	${_ciss} \
+	${_coresight} \
 	${_coretemp} \
 	${_cpsw} \
 	${_cpuctl} \
@@ -653,6 +654,12 @@ _ice_ddp=	ice_ddp
 .if ${MK_INET_SUPPORT} != "no" && ${MK_INET6_SUPPORT} != "no"
 _irdma=		irdma
 .endif
+.endif
+.endif
+
+.if ${MACHINE_CPUARCH} == "aarch64"
+.if !empty(OPT_FDT)
+_coresight=	coresight
 .endif
 .endif
 

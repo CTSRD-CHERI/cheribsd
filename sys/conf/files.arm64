@@ -144,19 +144,19 @@ arm64/coresight/coresight_acpi.c		optional hwt acpi
 arm64/coresight/coresight_fdt.c			optional hwt fdt
 arm64/coresight/coresight_if.m			optional hwt
 arm64/coresight/coresight_cmd.c			optional hwt
-arm64/coresight/coresight_cpu_debug.c		optional hwt fdt
-arm64/coresight/coresight_etm4x.c		optional hwt
-arm64/coresight/coresight_etm4x_acpi.c		optional hwt acpi
-arm64/coresight/coresight_etm4x_fdt.c		optional hwt fdt
-arm64/coresight/coresight_funnel.c		optional hwt
-arm64/coresight/coresight_funnel_acpi.c		optional hwt acpi
-arm64/coresight/coresight_funnel_fdt.c		optional hwt fdt
-arm64/coresight/coresight_replicator.c		optional hwt
-arm64/coresight/coresight_replicator_acpi.c	optional hwt acpi
-arm64/coresight/coresight_replicator_fdt.c	optional hwt fdt
-arm64/coresight/coresight_tmc.c			optional hwt
-arm64/coresight/coresight_tmc_acpi.c		optional hwt acpi
-arm64/coresight/coresight_tmc_fdt.c		optional hwt fdt
+arm64/coresight/coresight_cpu_debug.c		optional hwt coresight fdt
+arm64/coresight/coresight_etm4x.c		optional hwt coresight
+arm64/coresight/coresight_etm4x_acpi.c		optional hwt coresight acpi
+arm64/coresight/coresight_etm4x_fdt.c		optional hwt coresight fdt
+arm64/coresight/coresight_funnel.c		optional hwt coresight
+arm64/coresight/coresight_funnel_acpi.c		optional hwt coresight acpi
+arm64/coresight/coresight_funnel_fdt.c		optional hwt coresight fdt
+arm64/coresight/coresight_replicator.c		optional hwt coresight
+arm64/coresight/coresight_replicator_acpi.c	optional hwt coresight acpi
+arm64/coresight/coresight_replicator_fdt.c	optional hwt coresight fdt
+arm64/coresight/coresight_tmc.c			optional hwt coresight
+arm64/coresight/coresight_tmc_acpi.c		optional hwt coresight acpi
+arm64/coresight/coresight_tmc_fdt.c		optional hwt coresight fdt
 
 dev/smbios/smbios_subr.c			standard
 
