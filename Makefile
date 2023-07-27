@@ -178,8 +178,8 @@ TGTS=	all all-man buildenv buildenvvars buildkernel buildsysroot buildworld \
 	build32 distribute32 install32 \
 	build64 distribute64 install64 \
 	build64c distribute64c \
-	lib64cbuildenv lib64cbuildenvvars \
-	lib64buildenv lib64buildenvvars lib32buildenv lib32buildenvvars \
+	lib64cbuildenv \
+	lib64buildenv lib32buildenv \
 	builddtb xdev xdev-build xdev-install \
 	xdev-links native-xtools native-xtools-install stageworld stagekernel \
 	stage-packages stage-packages-kernel stage-packages-world \
