@@ -28,6 +28,8 @@ MK_ASAN=	no
 MK_SSP=		no
 MK_UBSAN=	no
 
+.include <bsd.compat.pre.mk>
+
 .ifdef RTLD_SANDBOX
 CFLAGS+=-DRTLD_SANDBOX
 .endif
@@ -36,13 +38,11 @@ CFLAGS+=-DRTLD_SANDBOX
 CONFS=		libmap.conf
 .endif
 PROG?=		ld-elf.so.1
-.if (${PROG:M*ld-elf32*} != "")
-TAGS+=		lib32
+.for _libcompat in ${_ALL_libcompats}
+.if ${PROG:M*ld-elf${_libcompat}[-.]*} != ""
+TAGS+=		lib${_libcompat}
 .endif
-.if (${PROG:M*ld-elf64*} != "")
-TAGS+=		lib64
-.endif
-.PATH: ${RTLD_ELF_DIR}
+.endfor
 SRCS= \
 	crtbrand.S \
 	rtld_start.S \
