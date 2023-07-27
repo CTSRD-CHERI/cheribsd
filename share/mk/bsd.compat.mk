@@ -8,7 +8,7 @@ __<${_this:T}>__:
 
 .include <src.opts.mk>
 
-_ALL_LIBCOMPATS:=	32 64 64C
+.include <bsd.compat.pre.mk>
 
 .if defined(_LIBCOMPATS)
 COMPAT_ARCH?=	${TARGET_ARCH}
