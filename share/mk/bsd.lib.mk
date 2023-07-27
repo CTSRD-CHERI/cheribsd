@@ -458,6 +458,7 @@ _EXTRADEPEND:
 
 .if !target(install)
 
+INSTALLFLAGS+= -C
 .if defined(PRECIOUSLIB)
 .if !defined(NO_FSCHG)
 SHLINSTALLFLAGS+= -fschg
@@ -508,10 +509,10 @@ realinstall: _libinstall installpcfiles
 .ORDER: beforeinstall _libinstall
 _libinstall:
 .if defined(LIB) && !empty(LIB) && ${MK_INSTALLLIB} != "no"
-	${INSTALL} ${TAG_ARGS:D${TAG_ARGS},dev} -C -o ${LIBOWN} -g ${LIBGRP} -m ${LIBMODE} \
+	${INSTALL} ${TAG_ARGS:D${TAG_ARGS},dev} -o ${LIBOWN} -g ${LIBGRP} -m ${LIBMODE} \
 	    ${_INSTALLFLAGS} lib${LIB_PRIVATE}${LIB}${_STATICLIB_SUFFIX}.a ${DESTDIR}${_LIBDIR}/
 .if ${MK_PROFILE} != "no"
-	${INSTALL} ${TAG_ARGS:D${TAG_ARGS},dev} -C -o ${LIBOWN} -g ${LIBGRP} -m ${LIBMODE} \
+	${INSTALL} ${TAG_ARGS:D${TAG_ARGS},dev} -o ${LIBOWN} -g ${LIBGRP} -m ${LIBMODE} \
 	    ${_INSTALLFLAGS} lib${LIB_PRIVATE}${LIB}_p.a ${DESTDIR}${_LIBDIR}/
 .endif
 .endif
@@ -529,7 +530,7 @@ _libinstall:
 .endif
 .if defined(SHLIB_LINK)
 .if commands(${SHLIB_LINK:R}.ld)
-	${INSTALL} ${TAG_ARGS:D${TAG_ARGS},dev} -S -C -o ${LIBOWN} -g ${LIBGRP} -m ${LIBMODE} \
+	${INSTALL} ${TAG_ARGS:D${TAG_ARGS},dev} -S -o ${LIBOWN} -g ${LIBGRP} -m ${LIBMODE} \
 	    ${_INSTALLFLAGS} ${SHLIB_LINK:R}.ld \
 	    ${DESTDIR}${_LIBDIR}/${SHLIB_LINK}
 .for _SHLIB_LINK_LINK in ${SHLIB_LDSCRIPT_LINKS}
