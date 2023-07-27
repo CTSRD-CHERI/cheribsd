@@ -11,6 +11,7 @@ SUBDIR= arpa protocols rpcsvc rpc xlocale
 .if ${MACHINE_CPUARCH} == "amd64"
 SUBDIR+=	i386
 .endif
+SUBDIR.${MK_LIB64C}+=	lib64c
 SUBDIR_PARALLEL=
 INCS=	a.out.h ar.h assert.h bitstring.h byteswap.h \
 	complex.h cpio.h _ctype.h ctype.h \
