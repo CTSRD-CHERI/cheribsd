@@ -29,6 +29,9 @@ _BSD.lib32.dist=	BSD.lib32.dist
 .endif
 .if ${MK_LIB64} != "no"
 _BSD.lib64.dist=	BSD.lib64.dist
+.if ${MK_PKGBOOTSTRAP} != "no"
+_BSD.lib64.dist+=	BSD.pkg64.dist
+.endif
 .endif
 .if ${MK_SENDMAIL} != "no"
 _BSD.sendmail.dist=	BSD.sendmail.dist
