@@ -100,3 +100,4 @@ DEFINE_CLASS_1(funnel, funnel_fdt_driver, funnel_fdt_methods,
 
 EARLY_DRIVER_MODULE(funnel, simplebus, funnel_fdt_driver, 0, 0,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
+MODULE_DEPEND(funnel, coresight, 1, 1, 1);

@@ -1,6 +1,7 @@
 # $FreeBSD$
 
 SUBDIR = \
+	coresight	\
 	cpu_debug	\
 	etm4x		\
 	funnel		\

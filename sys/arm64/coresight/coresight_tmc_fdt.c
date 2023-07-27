@@ -98,3 +98,4 @@ DEFINE_CLASS_1(tmc, tmc_fdt_driver, tmc_fdt_methods,
 
 EARLY_DRIVER_MODULE(tmc, simplebus, tmc_fdt_driver, 0, 0,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
+MODULE_DEPEND(tmc, coresight, 1, 1, 1);

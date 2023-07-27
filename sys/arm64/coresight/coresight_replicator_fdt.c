@@ -88,3 +88,4 @@ DEFINE_CLASS_1(replicator, replicator_fdt_driver, replicator_fdt_methods,
 
 EARLY_DRIVER_MODULE(replicator, simplebus, replicator_fdt_driver, 0, 0,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
+MODULE_DEPEND(replicator, coresight, 1, 1, 1);

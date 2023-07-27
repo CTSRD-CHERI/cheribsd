@@ -379,12 +379,31 @@ coresight_get_output_device(struct coresight_device *cs_dev0,
 	return (NULL);
 }
 
-static void
-coresight_init(void)
+static int
+coresight_modevent(module_t mod, int type, void *data)
 {
 
-	mtx_init(&cs_mtx, "ARM Coresight", NULL, MTX_DEF);
-	TAILQ_INIT(&cs_devs);
+	switch (type) {
+	case MOD_LOAD:
+		mtx_init(&cs_mtx, "ARM Coresight", NULL, MTX_DEF);
+		TAILQ_INIT(&cs_devs);
+		break;
+	case MOD_UNLOAD:
+		mtx_destroy(&cs_mtx);
+		break;
+	default:
+		break;
+	}
+ 
+        return (0);
 }
-
-SYSINIT(coresight, SI_SUB_DRIVERS, SI_ORDER_FIRST, coresight_init, NULL);
+ 
+static moduledata_t coresight_mod = {
+	"coresight",
+        coresight_modevent,
+        NULL
+};
+   
+DECLARE_MODULE(coresight, coresight_mod, SI_SUB_DRIVERS, SI_ORDER_FIRST);
+MODULE_DEPEND(coresight, hwt, 1, 1, 1);
+MODULE_VERSION(coresight, 1);

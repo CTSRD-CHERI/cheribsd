@@ -139,11 +139,11 @@ dev/drm/bridges/dw_hdmi/dw_hdmi_phy_if.m	optional drm fdt dw_hdmi aw_de2_drm
 # ANX6345 RGB to eDP bridge
 dev/drm/bridges/anx6345/anx6345.c		optional fdt anx6345 compile-with "${DRM_C}"
 
-arm64/coresight/coresight.c			optional hwt
-arm64/coresight/coresight_acpi.c		optional hwt acpi
-arm64/coresight/coresight_fdt.c			optional hwt fdt
-arm64/coresight/coresight_if.m			optional hwt
-arm64/coresight/coresight_cmd.c			optional hwt
+arm64/coresight/coresight.c			optional hwt coresight
+arm64/coresight/coresight_acpi.c		optional hwt coresight acpi
+arm64/coresight/coresight_fdt.c			optional hwt coresight fdt
+arm64/coresight/coresight_if.m			optional hwt coresight
+arm64/coresight/coresight_cmd.c			optional hwt coresight
 arm64/coresight/coresight_cpu_debug.c		optional hwt coresight fdt
 arm64/coresight/coresight_etm4x.c		optional hwt coresight
 arm64/coresight/coresight_etm4x_acpi.c		optional hwt coresight acpi

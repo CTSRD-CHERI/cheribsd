@@ -158,3 +158,4 @@ static driver_t debug_driver = {
 EARLY_DRIVER_MODULE(debug, simplebus, debug_driver, 0, 0,
     BUS_PASS_BUS + BUS_PASS_ORDER_LATE);
 MODULE_VERSION(debug, 1);
+MODULE_DEPEND(debug, coresight, 1, 1, 1);

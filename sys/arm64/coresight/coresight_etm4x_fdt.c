@@ -88,3 +88,4 @@ DEFINE_CLASS_1(etm, etm_fdt_driver, etm_fdt_methods,
 
 EARLY_DRIVER_MODULE(etm, simplebus, etm_fdt_driver, 0, 0,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
+MODULE_DEPEND(etm, coresight, 1, 1, 1);
