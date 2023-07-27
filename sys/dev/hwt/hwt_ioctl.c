@@ -323,7 +323,7 @@ hwt_ioctl_alloc(struct thread *td, struct hwt_alloc *halloc)
 
 	backend = hwt_backend_lookup(backend_name);
 	if (backend == NULL)
-		return (ENXIO);
+		return (ENODEV);
 
 	/* First get the owner. */
 	ho = hwt_ownerhash_lookup(td->td_proc);
