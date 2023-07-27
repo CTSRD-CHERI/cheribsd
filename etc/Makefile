@@ -4,6 +4,8 @@
 .include <src.opts.mk>
 .include <src.tools.mk>
 
+.include <bsd.compat.pre.mk>
+
 FILESGROUPS=	FILES
 NLS_ALIASES=	POSIX C \
 		en_US.US_ASCII C
@@ -107,21 +109,16 @@ MTREES=		mtree/BSD.root.dist		/		\
 .if ${MACHINE_ABI:Mpurecap}
 MTREES+=	mtree/BSD.c18n.dist		/
 .endif
-.if ${MK_LIB64C} != "no"
-MTREES+=	mtree/BSD.lib64c.dist		/usr
-MTREES+=	mtree/BSD.lib64c.dist		/usr/lib/debug/usr
+.for LIBCOMPAT libcompat in ${_ALL_LIBCOMPATS_libcompats}
+.if ${MK_LIB${LIBCOMPAT}} != "no"
+MTREES+=	mtree/BSD.lib${libcompat}.dist	/usr
+MTREES+=	mtree/BSD.lib${libcompat}.dist	/usr/lib/debug/usr
+.if exists(${.CURDIR}/mtree/BSD.pkg${libcompat}.dist) && \
+    ${MK_PKGBOOTSTRAP} != "no"
+MTREES+=	mtree/BSD.pkg${libcompat}.dist	/
 .endif
-.if ${MK_LIB32} != "no"
-MTREES+=	mtree/BSD.lib32.dist		/usr
-MTREES+=	mtree/BSD.lib32.dist		/usr/lib/debug/usr
 .endif
-.if ${MK_LIB64} != "no"
-.if ${MK_PKGBOOTSTRAP} != "no"
-MTREES+=	mtree/BSD.pkg64.dist		/
-.endif
-MTREES+=	mtree/BSD.lib64.dist		/usr
-MTREES+=	mtree/BSD.lib64.dist		/usr/lib/debug/usr
-.endif
+.endfor
 .if ${MK_TESTS} != "no"
 MTREES+=	mtree/BSD.tests.dist		${TESTSBASE}
 MTREES+=	mtree/BSD.tests.dist		/usr/lib/debug/${TESTSBASE}
