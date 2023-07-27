@@ -139,6 +139,7 @@ SUBDIR=	\
 	${_hptnr} \
 	${_hptrr} \
 	hwpmc \
+	hwt \
 	${_hyperv} \
 	i2c \
 	${_iavf} \
