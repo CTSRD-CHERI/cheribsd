@@ -151,6 +151,8 @@ struct etm_config {
 MALLOC_DECLARE(M_CORESIGHT);
 
 struct coresight_platform_data *coresight_fdt_get_platform_data(device_t dev);
+void coresight_fdt_release_platform_data(struct coresight_platform_data *pdata);
+
 struct coresight_platform_data *coresight_acpi_get_platform_data(device_t dev);
 struct endpoint *
     coresight_get_output_endpoint(struct coresight_platform_data *pdata);
@@ -173,5 +175,7 @@ void coresight_disable(struct coresight_event *event);
 
 int coresight_read(struct coresight_event *event);
 void coresight_dump(struct coresight_event *event);
+
+int coresight_unregister(device_t dev);
 
 #endif /* !_ARM64_CORESIGHT_CORESIGHT_H_ */

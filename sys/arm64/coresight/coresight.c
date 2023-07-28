@@ -319,6 +319,27 @@ coresight_register(struct coresight_desc *desc)
 	return (0);
 }
 
+int
+coresight_unregister(device_t dev)
+{
+	struct coresight_device *cs_dev, *tmp;
+
+	mtx_lock(&cs_mtx);
+	TAILQ_FOREACH_SAFE(cs_dev, &cs_devs, link, tmp) {
+		if (cs_dev->dev == dev) {
+			TAILQ_REMOVE(&cs_devs, cs_dev, link);
+			mtx_unlock(&cs_mtx);
+			if (cs_dev->dev_type == CORESIGHT_TMC_ETR)
+				hwt_backend_unregister(&backend);
+			free(cs_dev, M_CORESIGHT);
+			return (0);
+		}
+	}
+	mtx_unlock(&cs_mtx);
+
+	return (ENOENT);
+}
+
 struct endpoint *
 coresight_get_output_endpoint(struct coresight_platform_data *pdata)
 {

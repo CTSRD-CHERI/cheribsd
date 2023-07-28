@@ -585,9 +585,28 @@ tmc_attach(device_t dev)
 	return (0);
 }
 
+int
+tmc_detach(device_t dev)
+{
+	struct tmc_softc *sc;
+	int error;
+
+	sc = device_get_softc(dev);
+
+	error = coresight_unregister(dev);
+
+	if (sc->intrhand != NULL)
+		bus_teardown_intr(dev, sc->res[1], sc->intrhand);
+
+	bus_release_resources(dev, tmc_spec, sc->res);
+
+	return (error);
+}
+
 static device_method_t tmc_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_attach,	tmc_attach),
+	DEVMETHOD(device_detach,	tmc_detach),
 
 	/* Coresight interface */
 	DEVMETHOD(coresight_init,	tmc_init),

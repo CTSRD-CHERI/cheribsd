@@ -160,3 +160,14 @@ coresight_fdt_get_platform_data(device_t dev)
 
 	return (pdata);
 }
+
+void
+coresight_fdt_release_platform_data(struct coresight_platform_data *pdata)
+{
+	struct endpoint *endp, *tmp;
+
+	TAILQ_FOREACH_SAFE(endp, &pdata->endpoints, link, tmp) {
+		TAILQ_REMOVE(&pdata->endpoints, endp, link);
+		free(endp, M_CORESIGHT);
+	}
+}

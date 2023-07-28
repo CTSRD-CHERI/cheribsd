@@ -59,7 +59,15 @@
 #endif
 
 static struct mtx hwt_backend_mtx;
-static LIST_HEAD(, hwt_backend)	hwt_backends;
+
+struct hwt_backend_entry {
+	struct hwt_backend *backend;
+	LIST_ENTRY(hwt_backend_entry) next;
+};
+
+static LIST_HEAD(, hwt_backend_entry)	hwt_backends;
+
+static MALLOC_DEFINE(M_HWT_BACKEND, "hwt_backend", "HWT backend");
 
 int
 hwt_backend_init(struct hwt_context *ctx)
@@ -139,10 +147,12 @@ hwt_backend_read(struct hwt_context *ctx, int cpu_id, int *curpage,
 struct hwt_backend *
 hwt_backend_lookup(const char *name)
 {
+	struct hwt_backend_entry *entry;
 	struct hwt_backend *backend;
 
 	HWT_BACKEND_LOCK();
-	LIST_FOREACH(backend, &hwt_backends, next) {
+	LIST_FOREACH(entry, &hwt_backends, next) {
+		backend = entry->backend;
 		if (strcmp(backend->name, name) == 0) {
 			HWT_BACKEND_UNLOCK();
 			return (backend);
@@ -156,17 +166,50 @@ hwt_backend_lookup(const char *name)
 int
 hwt_backend_register(struct hwt_backend *backend)
 {
+	struct hwt_backend_entry *entry;
 
 	if (backend == NULL ||
 	    backend->name == NULL ||
 	    backend->ops == NULL)
 		return (EINVAL);
 
+#if 0
+	mtx_init(&entry->mtx, "BKND", NULL, MTX_DEF);
+#endif
+ 
+	entry = malloc(sizeof(struct hwt_backend_entry), M_HWT_BACKEND,
+	    M_WAITOK | M_ZERO);
+	entry->backend = backend;
+
 	HWT_BACKEND_LOCK();
-	LIST_INSERT_HEAD(&hwt_backends, backend, next);
+	LIST_INSERT_HEAD(&hwt_backends, entry, next);
+	HWT_BACKEND_UNLOCK();
+ 
+	return (0);
+}
+
+int
+hwt_backend_unregister(struct hwt_backend *backend)
+{
+	struct hwt_backend_entry *entry, *tmp;
+
+	if (backend == NULL)
+		return (EINVAL);
+
+	/* TODO: check if not in use */
+
+	HWT_BACKEND_LOCK();
+	LIST_FOREACH_SAFE(entry, &hwt_backends, next, tmp) {
+		if (entry->backend == backend) {
+			LIST_REMOVE(entry, next);
+			HWT_BACKEND_UNLOCK();
+			free(entry, M_HWT_BACKEND);
+			return (0);
+		}
+	}
 	HWT_BACKEND_UNLOCK();
 
-	return (0);
+	return (ENOENT);
 }
 
 void
@@ -180,13 +223,6 @@ hwt_backend_load(void)
 void
 hwt_backend_unload(void)
 {
-	struct hwt_backend *backend, *tmp;
-
-	HWT_BACKEND_LOCK();
-	LIST_FOREACH_SAFE(backend, &hwt_backends, next, tmp) {
-		LIST_REMOVE(backend, next);
-	}
-	HWT_BACKEND_UNLOCK();
 
 	mtx_destroy(&hwt_backend_mtx);
 }

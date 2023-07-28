@@ -86,10 +86,28 @@ tmc_fdt_attach(device_t dev)
 	return (tmc_attach(dev));
 }
 
+static int
+tmc_fdt_detach(device_t dev)
+{
+	struct tmc_softc *sc;
+	int error;
+
+	sc = device_get_softc(dev);
+ 
+	coresight_fdt_release_platform_data(sc->pdata);
+
+	sc->pdata = NULL;
+
+	error = tmc_detach(dev);
+
+	return (error);
+}
+
 static device_method_t tmc_fdt_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		tmc_fdt_probe),
 	DEVMETHOD(device_attach,	tmc_fdt_attach),
+	DEVMETHOD(device_detach,	tmc_fdt_detach),
 	DEVMETHOD_END
 };
 

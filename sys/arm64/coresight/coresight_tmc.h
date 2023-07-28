@@ -133,5 +133,6 @@ struct tmc_softc {
 typedef uint32_t sgte_t;
 
 int tmc_attach(device_t dev);
+int tmc_detach(device_t dev);
 
 #endif /* !_ARM64_CORESIGHT_CORESIGHT_TMC_H_ */
