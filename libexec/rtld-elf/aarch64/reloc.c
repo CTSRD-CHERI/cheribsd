@@ -308,20 +308,20 @@ get_rstk(const void *target, uint32_t index, tramp_stk_table_t table)
 	return (stk);
 }
 
-static int
-exclude_symbol_in_lib(const char *name, const char *sym, const Obj_Entry *obj, const Elf_Sym *def)
+static bool
+exclude_symbol_in_lib(const char *name, const char *sym, const struct tramp_data *data)
 {
 	Name_Entry *entry;
 
-	if (def == NULL ||
-	    strcmp(sym, strtab_value(obj, def->st_name)) != 0)
-		return (0);
+	if (data->def == NULL ||
+	    strcmp(sym, strtab_value(data->obj, data->def->st_name)) != 0)
+		return (false);
 
-	STAILQ_FOREACH(entry, &obj->names, link) {
+	STAILQ_FOREACH(entry, &data->obj->names, link) {
 		if (strcmp(name, entry->name) == 0)
-			return (1);
+			return (true);
 	}
-	return (0);
+	return (false);
 }
 
 struct tramp_pg {
@@ -547,18 +547,13 @@ tramp_compile(tramp **entry, const struct tramp_data *data)
 	IMPORT(return);
 
 	uint32_t *buf = (void *)*entry;
-	const void *code;
 	size_t size = 0;
 	bool executive = cheri_getperm(data->target) & CHERI_PERM_EXECUTIVE;
 	bool hook = ld_utrace_compartment != NULL ||
 	    ld_compartment_overhead != NULL;
 
-	if (hook)
-		code = tramp_header_hook;
-	else
-		code = tramp_header;
-
-	for (; code != NULL; ) {
+	for (const void *code = hook ? tramp_header_hook : tramp_header;
+	    code != NULL; ) {
 		TRANSITION(header, {
 			if (executive)
 				TO(save_caller);
@@ -647,11 +642,6 @@ tramp_pgs_append(const struct tramp_data *data)
 	tramp *tramp, *entry = tmp;
 	struct tramp_pg *pg;
 
-	if (exclude_symbol_in_lib("libc.so.7", "rfork", data->obj, data->def) ||
-	    exclude_symbol_in_lib("libc.so.7", "vfork", data->obj, data->def)) {
-		return (data->target);
-	}
-
 	/* Fill a temporary buffer with the trampoline and obtain its length */
 	len = tramp_compile(&entry, data);
 
@@ -688,6 +678,76 @@ tramp_pgs_append(const struct tramp_data *data)
 
 	entry = cheri_clearperm(entry, FUNC_PTR_REMOVE_PERMS);
 	return (cheri_sealentry(cheri_capmode(entry)));
+}
+
+static bool
+tramp_sig_equal(struct tramp_sig lhs, struct tramp_sig rhs)
+{
+	return (lhs.reg_args == rhs.reg_args &&
+		lhs.mem_args == rhs.mem_args &&
+		lhs.ret_args == rhs.ret_args);
+}
+
+static bool
+tramp_sig_compatible(struct tramp_sig lhs, struct tramp_sig rhs)
+{
+	return (!(lhs.valid && rhs.valid) || tramp_sig_equal(lhs, rhs));
+}
+
+static bool
+tramp_sig_resolve(struct tramp_sig *lhs, struct tramp_sig rhs)
+{
+	if (!lhs->valid) {
+		*lhs = rhs;
+		return (true);
+	}
+	return (!rhs.valid || tramp_sig_equal(*lhs, rhs));
+}
+
+static tramp_sig_int
+tramp_sig_to_int(struct tramp_sig sig)
+{
+	tramp_sig_int ret;
+	memcpy(&ret, &sig, sizeof(tramp_sig_int));
+	return ret;
+}
+
+static void *
+tramp_get_entry(const struct tramp_data *found, const struct tramp_data *data)
+{
+	if (tramp_sig_compatible(found->sig, data->sig))
+		return (found->entry);
+	else
+		rtld_fatal(
+		    "Incompatible signatures for function %s: "
+		    "%s requests %02hhX and %s provides %02hhX",
+		    strtab_value(data->obj, data->def->st_name),
+		    data->obj->path, tramp_sig_to_int(data->sig),
+		    found->obj->path, tramp_sig_to_int(found->sig));
+}
+
+static void *
+tramp_create_entry(struct tramp_data *data)
+{
+	struct tramp_sig sig;
+
+	if (exclude_symbol_in_lib("libc.so.7", "rfork", data) ||
+	    exclude_symbol_in_lib("libc.so.7", "vfork", data)) {
+		return (data->target);
+	}
+
+	if (data->def != NULL) {
+		sig = fetch_tramp_sig(data->obj, data->def - data->obj->symtab);
+		if (!tramp_sig_resolve(&data->sig, sig))
+			rtld_fatal(
+			    "Incompatible signatures for function %s: "
+			    "requests %02hhX and %s provides %02hhX",
+			    strtab_value(data->obj, data->def->st_name),
+			    tramp_sig_to_int(data->sig), data->obj->path,
+			    tramp_sig_to_int(sig));
+	}
+
+	return (data->entry = tramp_pgs_append(data));
 }
 
 void *
@@ -765,7 +825,7 @@ start:
 	        idx = atomic_load_explicit(&tramp_table.map[slot].index,
 	            memory_order_acquire);
 	while (idx == -1);
-	entry = tramp_table.data[idx].entry;
+	entry = tramp_get_entry(&tramp_table.data[idx], data);
 	goto end;
 insert:
 	idx = atomic_fetch_add_explicit(&tramp_table.size, 1,
@@ -773,11 +833,10 @@ insert:
 	/*
 	 * Invariant: tramp_table.size <= LOAD_FACTOR
 	 *
-	 * Construct the data array entry.
+	 * Create the data array entry.
 	 */
-	entry = tramp_pgs_append(data);
 	tramp_table.data[idx] = *data;
-	tramp_table.data[idx].entry = entry;
+	entry = tramp_create_entry(&tramp_table.data[idx]);
 	/*
 	 * Store-release the index.
 	 */
@@ -804,14 +863,16 @@ end:
 }
 
 static void
-tramp_sig_validate(struct tramp_sig sig) {
+tramp_sig_validate(struct tramp_sig sig)
+{
 	if (sig.valid && sig.reg_args > 8)
 		rtld_fatal("Invalid tramp_sig.reg_args = %u", sig.reg_args);
 }
 
 static long
-tramp_sig_to_otype(struct tramp_sig sig) {
-	return sig.ret_args | (sig.mem_args << 2) | (sig.reg_args << 3);
+tramp_sig_to_otype(struct tramp_sig sig)
+{
+	return (sig.ret_args | (sig.mem_args << 2) | (sig.reg_args << 3));
 }
 
 void *
@@ -1138,7 +1199,9 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 			target = (uintptr_t)tramp_intern(&(struct tramp_data) {
 				.target = (void *)target,
 				.obj = defobj,
-				.def = def
+				.def = def,
+				.sig = fetch_tramp_sig(obj,
+				    ELF_R_SYM(rela->r_info))
 			});
 #endif
 			reloc_jmpslot(where, target, defobj, obj,
@@ -1288,7 +1351,9 @@ reloc_gnu_ifunc(Obj_Entry *obj, int flags,
 			target = (uintptr_t)tramp_intern(&(struct tramp_data) {
 				.target = (void *)target,
 				.obj = defobj,
-				.def = def
+				.def = def,
+				.sig = fetch_tramp_sig(obj,
+				    ELF_R_TYPE(rela->r_info))
 			});
 #endif
 			wlock_acquire(rtld_bind_lock, lockstate);

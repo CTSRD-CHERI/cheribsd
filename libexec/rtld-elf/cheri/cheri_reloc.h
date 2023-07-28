@@ -120,7 +120,8 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 		symval = tramp_intern(&(struct tramp_data) {
 			.target = symval,
 			.obj = defobj,
-			.def = def
+			.def = def,
+			.sig = fetch_tramp_sig(obj, r_symndx)
 		});
 #endif
 		if (__predict_false(symval == NULL)) {

@@ -307,6 +307,7 @@ typedef struct Struct_Obj_Entry {
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
     uint16_t compart_id;
     struct Struct_Stack_Entry *_Atomic stacks; /* List of object's per-thread stacks */
+    const struct tramp_sig *sigtab;
 #endif
 
     void* init_ptr;		/* Initialization function to call */
@@ -372,6 +373,36 @@ typedef struct Struct_Obj_Entry {
     ino_t ino;			/* Object's inode number */
     void *priv;			/* Platform-dependent */
 } Obj_Entry;
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+typedef const void *tramp;
+typedef uint8_t tramp_sig_int;
+
+struct tramp_data {
+	void *target;
+	const Obj_Entry *obj;
+	const Elf_Sym *def;
+	tramp *entry;
+	struct tramp_sig {
+		enum tramp_ret_args: unsigned char {
+			C0_AND_C1,
+			C0,
+			NONE,
+			INDIRECT
+		} ret_args : 2;
+		bool mem_args : 1;
+		unsigned char reg_args : 4;
+		bool valid : 1;
+	} sig;
+};
+_Static_assert(sizeof(struct tramp_sig) == sizeof(tramp_sig_int),
+    "Unexpected tramp_sig size");
+
+void tramp_init(void);
+void *tramp_intern(const struct tramp_data *);
+void *_rtld_sandbox_code(void *, struct tramp_sig);
+void *_rtld_safebox_code(void *, struct tramp_sig);
+#endif
 
 #define RTLD_MAGIC	0xd550b87a
 #define RTLD_VERSION	1
@@ -440,6 +471,9 @@ typedef struct Struct_SymLook {
     uint32_t hash_gnu;
     const Ver_Entry *ventry;
     int flags;
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+    struct tramp_sig sig;
+#endif
     const Obj_Entry *defobj_out;
     const Elf_Sym *sym_out;
     struct Struct_RtldLockState *lockstate;
@@ -551,6 +585,7 @@ const Ver_Entry *fetch_ventry(const Obj_Entry *obj, unsigned long);
 int convert_prot(int elfflags);
 bool check_elf_headers(const Elf_Ehdr *hdr, const char *path);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+struct tramp_sig fetch_tramp_sig(const Obj_Entry *, unsigned long);
 uint16_t allocate_compart_id(void);
 void ld_utrace_log(int, void *, void *, size_t, int, const char *, const char *);
 #endif
