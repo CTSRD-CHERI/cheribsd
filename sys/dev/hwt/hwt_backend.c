@@ -224,5 +224,7 @@ void
 hwt_backend_unload(void)
 {
 
+	/* TODO: ensure all unregistered */
+
 	mtx_destroy(&hwt_backend_mtx);
 }

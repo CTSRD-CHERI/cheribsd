@@ -134,5 +134,6 @@ void
 hwt_contexthash_unload(void)
 {
 
-	/* TODO */
+	mtx_destroy(&hwt_contexthash_mtx);
+	hashdestroy(hwt_contexthash, M_HWT_CONTEXTHASH, hwt_contexthashmask);
 }

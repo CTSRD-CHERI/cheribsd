@@ -135,5 +135,6 @@ void
 hwt_ctx_unload(void)
 {
 
-	/* TODO */
+	mtx_destroy(&ident_set_mutex);
+	free(ident_set, M_HWT_CTX);
 }
