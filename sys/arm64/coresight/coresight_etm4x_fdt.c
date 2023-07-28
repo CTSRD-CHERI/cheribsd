@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2020 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2018-2023 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
  *
  * This software was developed by BAE Systems, the University of Cambridge
@@ -104,3 +104,4 @@ DEFINE_CLASS_1(coresight_etm4x, coresight_etm4x_fdt_driver, etm_fdt_methods,
 EARLY_DRIVER_MODULE(coresight_etm4x, simplebus, coresight_etm4x_fdt_driver,
     0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
 MODULE_DEPEND(coresight_etm4x, coresight, 1, 1, 1);
+MODULE_VERSION(coresight_etm4x, 1);

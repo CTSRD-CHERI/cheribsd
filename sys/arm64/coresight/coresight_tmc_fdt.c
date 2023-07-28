@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2020 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2018-2023 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
  *
  * This software was developed by BAE Systems, the University of Cambridge
@@ -121,3 +121,4 @@ MODULE_DEPEND(coresight_tmc, coresight_cpu_debug, 1, 1, 1);
 MODULE_DEPEND(coresight_tmc, coresight_etm4x, 1, 1, 1);
 MODULE_DEPEND(coresight_tmc, coresight_funnel, 1, 1, 1);
 MODULE_DEPEND(coresight_tmc, coresight_replicator, 1, 1, 1);
+MODULE_VERSION(coresight_tmc, 1);

@@ -116,3 +116,4 @@ DEFINE_CLASS_1(coresight_funnel, coresight_funnel_fdt_driver,
 EARLY_DRIVER_MODULE(coresight_funnel, simplebus, coresight_funnel_fdt_driver,
     0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
 MODULE_DEPEND(coresight_funnel, coresight, 1, 1, 1);
+MODULE_VERSION(coresight_funnel, 1);
