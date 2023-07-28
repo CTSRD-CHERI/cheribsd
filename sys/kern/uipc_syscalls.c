@@ -864,7 +864,8 @@ osend(struct thread *td, struct osend_args *uap)
 	msg.msg_namelen = 0;
 	msg.msg_iov = &aiov;
 	msg.msg_iovlen = 1;
-	IOVEC_INIT_C(&aiov, uap->buf, uap->len);
+	IOVEC_INIT_C(&aiov, __DECONST_CAP(void * __capability, uap->buf),
+	    uap->len);
 	msg.msg_control = 0;
 	msg.msg_flags = 0;
 	return (user_sendit(td, uap->s, &msg, uap->flags));
