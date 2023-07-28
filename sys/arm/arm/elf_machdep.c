@@ -185,7 +185,7 @@ store_ptr(Elf_Addr *where, Elf_Addr val)
 
 /* Process one elf relocation with addend. */
 static int
-elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
+elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
     int type, int local, elf_lookup_fn lookup)
 {
 	Elf_Addr *where;
@@ -217,7 +217,7 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 
 	if (local) {
 		if (rtype == R_ARM_RELATIVE) {	/* A + B */
-			addr = elf_relocaddr(lf, relocbase + addend);
+			addr = elf_relocaddr(lf, (Elf_Addr)relocbase + addend);
 			if (load_ptr(where) != addr)
 				store_ptr(where, addr);
 		}
@@ -264,7 +264,7 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 }
 
 int
-elf_reloc(linker_file_t lf, Elf_Addr relocbase, const void *data, int type,
+elf_reloc(linker_file_t lf, char *relocbase, const void *data, int type,
     elf_lookup_fn lookup)
 {
 
@@ -272,7 +272,7 @@ elf_reloc(linker_file_t lf, Elf_Addr relocbase, const void *data, int type,
 }
 
 int
-elf_reloc_local(linker_file_t lf, Elf_Addr relocbase, const void *data,
+elf_reloc_local(linker_file_t lf, char *relocbase, const void *data,
     int type, elf_lookup_fn lookup)
 {
 
