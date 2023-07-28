@@ -887,7 +887,7 @@ ufs_extattr_get(struct vnode *vp, int attrnamespace, const char *name,
 	 * how much.
 	 */
 	bzero(&ueh, sizeof(struct ufs_extattr_header));
-	IOVEC_INIT_OBJ(&local_aiov, &ueh);
+	IOVEC_INIT_OBJ(&local_aiov, ueh);
 	local_aio.uio_iov = &local_aiov;
 	local_aio.uio_iovcnt = 1;
 	local_aio.uio_rw = UIO_READ;
@@ -1090,7 +1090,7 @@ ufs_extattr_set(struct vnode *vp, int attrnamespace, const char *name,
 	ueh.ueh_len = uio->uio_resid;
 	ueh.ueh_flags = UFS_EXTATTR_ATTR_FLAG_INUSE;
 	ueh.ueh_i_gen = ip->i_gen;
-	IOVEC_INIT_OBJ(&local_aiov, &ueh);
+	IOVEC_INIT_OBJ(&local_aiov, ueh);
 	local_aio.uio_iov = &local_aiov;
 	local_aio.uio_iovcnt = 1;
 	local_aio.uio_rw = UIO_WRITE;
@@ -1187,7 +1187,7 @@ ufs_extattr_rm(struct vnode *vp, int attrnamespace, const char *name,
 	 */
 	bzero(&ueh, sizeof(struct ufs_extattr_header));
 
-	IOVEC_INIT_OBJ(&local_aiov, &ueh);
+	IOVEC_INIT_OBJ(&local_aiov, ueh);
 	local_aio.uio_iov = &local_aiov;
 	local_aio.uio_iovcnt = 1;
 	local_aio.uio_rw = UIO_READ;
@@ -1232,7 +1232,7 @@ ufs_extattr_rm(struct vnode *vp, int attrnamespace, const char *name,
 	ueh.ueh_flags = 0;
 	ueh.ueh_len = 0;
 
-	IOVEC_INIT_OBJ(&local_aiov, &ueh);
+	IOVEC_INIT_OBJ(&local_aiov, ueh);
 	local_aio.uio_iov = &local_aiov;
 	local_aio.uio_iovcnt = 1;
 	local_aio.uio_rw = UIO_WRITE;
