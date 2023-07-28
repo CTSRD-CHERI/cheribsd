@@ -604,10 +604,6 @@ tmc_detach(device_t dev)
 }
 
 static device_method_t tmc_methods[] = {
-	/* Device interface */
-	DEVMETHOD(device_attach,	tmc_attach),
-	DEVMETHOD(device_detach,	tmc_detach),
-
 	/* Coresight interface */
 	DEVMETHOD(coresight_init,	tmc_init),
 	DEVMETHOD(coresight_setup,	tmc_setup),

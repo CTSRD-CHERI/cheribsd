@@ -139,10 +139,32 @@ debug_attach(device_t dev)
 	return (0);
 }
 
+static int
+debug_detach(device_t dev)
+{
+	struct debug_softc *sc;
+	int error;
+
+	sc = device_get_softc(dev);
+
+	error = coresight_unregister(dev);
+	if (error)
+		return (error);
+
+	coresight_fdt_release_platform_data(sc->pdata);
+
+	sc->pdata = NULL;
+
+	bus_release_resources(dev, debug_spec, &sc->res);
+
+	return (0);
+}
+
 static device_method_t debug_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		debug_probe),
 	DEVMETHOD(device_attach,	debug_attach),
+	DEVMETHOD(device_detach,	debug_detach),
 
 	/* Coresight interface */
 	DEVMETHOD(coresight_init,	debug_init),

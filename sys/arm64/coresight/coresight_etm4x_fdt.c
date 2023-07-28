@@ -76,10 +76,25 @@ etm_fdt_attach(device_t dev)
 	return (etm_attach(dev));
 }
 
+static int
+etm_fdt_detach(device_t dev)
+{
+	struct etm_softc *sc;
+
+	sc = device_get_softc(dev);
+
+	coresight_fdt_release_platform_data(sc->pdata);
+
+	sc->pdata = NULL;
+
+	return (etm_detach(dev));
+}
+
 static device_method_t etm_fdt_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		etm_fdt_probe),
 	DEVMETHOD(device_attach,	etm_fdt_attach),
+	DEVMETHOD(device_detach,	etm_fdt_detach),
 	DEVMETHOD_END
 };
 

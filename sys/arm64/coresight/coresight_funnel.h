@@ -74,5 +74,6 @@ struct funnel_softc {
 };
 
 int funnel_attach(device_t dev);
+int funnel_detach(device_t dev);
 
 #endif /* !_ARM64_CORESIGHT_CORESIGHT_FUNNEL_H_ */

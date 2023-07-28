@@ -42,5 +42,6 @@ struct replicator_softc {
 };
 
 int replicator_attach(device_t dev);
+int replicator_detach(device_t dev);
 
 #endif /* !_ARM64_CORESIGHT_CORESIGHT_REPLICATOR_H_ */

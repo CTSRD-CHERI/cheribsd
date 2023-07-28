@@ -76,10 +76,25 @@ replicator_fdt_attach(device_t dev)
 	return (replicator_attach(dev));
 }
 
+static int
+replicator_fdt_detach(device_t dev)
+{
+	struct replicator_softc *sc;
+
+	sc = device_get_softc(dev);
+
+	coresight_fdt_release_platform_data(sc->pdata);
+
+	sc->pdata = NULL;
+
+	return (replicator_detach(dev));
+}
+
 static device_method_t replicator_fdt_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		replicator_fdt_probe),
 	DEVMETHOD(device_attach,	replicator_fdt_attach),
+	DEVMETHOD(device_detach,	replicator_fdt_detach),
 	DEVMETHOD_END
 };
 

@@ -88,10 +88,24 @@ funnel_fdt_attach(device_t dev)
 	return (funnel_attach(dev));
 }
 
+static int
+funnel_fdt_detach(device_t dev)
+{
+	struct funnel_softc *sc;
+
+	sc = device_get_softc(dev);
+	coresight_fdt_release_platform_data(sc->pdata);
+
+	sc->pdata = NULL;
+
+	return (funnel_detach(dev));
+}
+
 static device_method_t funnel_fdt_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		funnel_fdt_probe),
 	DEVMETHOD(device_attach,	funnel_fdt_attach),
+	DEVMETHOD(device_detach,	funnel_fdt_detach),
 	DEVMETHOD_END
 };
 

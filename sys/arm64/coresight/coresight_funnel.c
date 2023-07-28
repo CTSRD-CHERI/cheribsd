@@ -130,6 +130,23 @@ funnel_attach(device_t dev)
 	return (0);
 }
 
+int
+funnel_detach(device_t dev)
+{
+	struct funnel_softc *sc;
+	int error;
+
+	sc = device_get_softc(dev);
+ 
+	error = coresight_unregister(dev);
+	if (error)
+		return (error);
+
+	bus_release_resources(dev, funnel_spec, &sc->res);
+
+	return (0);
+}
+
 static device_method_t funnel_methods[] = {
 	/* Coresight interface */
 	DEVMETHOD(coresight_init,	funnel_init),

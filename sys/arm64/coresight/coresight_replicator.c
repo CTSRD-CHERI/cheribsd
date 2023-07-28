@@ -114,6 +114,23 @@ replicator_attach(device_t dev)
 	return (0);
 }
 
+int
+replicator_detach(device_t dev)
+{
+	struct replicator_softc *sc;
+	int error;
+
+	sc = device_get_softc(dev);
+
+	error = coresight_unregister(dev);
+	if (error)
+		return (error);
+
+	bus_release_resources(dev, replicator_spec, &sc->res);
+
+	return (0);
+}
+
 static device_method_t replicator_methods[] = {
 	/* Coresight interface */
 	DEVMETHOD(coresight_init,	replicator_init),
