@@ -35,6 +35,9 @@
 
 #include "debug.h"
 #include "rtld.h"
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#include "rtld_c18n.h"
+#endif
 
 #ifdef RTLD_HAS_CAPRELOCS
 /* The clang-provided header is not warning-clean: */
@@ -120,7 +123,8 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 		symval = tramp_intern(&(struct tramp_data) {
 			.target = symval,
 			.obj = defobj,
-			.def = def
+			.def = def,
+			.sig = fetch_tramp_sig(obj, r_symndx)
 		});
 #endif
 		if (__predict_false(symval == NULL)) {
