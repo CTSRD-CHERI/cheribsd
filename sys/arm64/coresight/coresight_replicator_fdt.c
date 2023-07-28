@@ -98,9 +98,11 @@ static device_method_t replicator_fdt_methods[] = {
 	DEVMETHOD_END
 };
 
-DEFINE_CLASS_1(replicator, replicator_fdt_driver, replicator_fdt_methods,
-    sizeof(struct replicator_softc), replicator_driver);
+DEFINE_CLASS_1(coresight_replicator, coresight_replicator_fdt_driver,
+    replicator_fdt_methods, sizeof(struct replicator_softc),
+    coresight_replicator_driver);
 
-EARLY_DRIVER_MODULE(replicator, simplebus, replicator_fdt_driver, 0, 0,
+EARLY_DRIVER_MODULE(coresight_replicator, simplebus,
+    coresight_replicator_fdt_driver, 0, 0,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
-MODULE_DEPEND(replicator, coresight, 1, 1, 1);
+MODULE_DEPEND(coresight_replicator, coresight, 1, 1, 1);

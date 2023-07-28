@@ -155,5 +155,5 @@ static device_method_t funnel_methods[] = {
 	DEVMETHOD_END
 };
 
-DEFINE_CLASS_0(funnel, funnel_driver, funnel_methods,
+DEFINE_CLASS_0(coresight_funnel, coresight_funnel_driver, funnel_methods,
     sizeof(struct funnel_softc));

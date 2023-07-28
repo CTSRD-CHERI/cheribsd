@@ -65,7 +65,7 @@
 #define	HWTYPE_FUNNEL		1
 #define	HWTYPE_STATIC_FUNNEL	2
 
-DECLARE_CLASS(funnel_driver);
+DECLARE_CLASS(coresight_funnel_driver);
 
 struct funnel_softc {
 	struct resource			*res;

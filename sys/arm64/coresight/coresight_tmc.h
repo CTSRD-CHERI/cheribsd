@@ -114,7 +114,7 @@
 #define	TMC_COMPID2	0xFF8 /* Component ID2 Register */
 #define	TMC_COMPID3	0xFFC /* Component ID3 Register */
 
-DECLARE_CLASS(tmc_driver);
+DECLARE_CLASS(coresight_tmc_driver);
 
 struct tmc_softc {
 	struct resource			*res[2];

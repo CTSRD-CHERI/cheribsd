@@ -172,12 +172,12 @@ static device_method_t debug_methods[] = {
 };
 
 static driver_t debug_driver = {
-	"debug",
+	"coresight_cpu_debug",
 	debug_methods,
 	sizeof(struct debug_softc),
 };
 
-EARLY_DRIVER_MODULE(debug, simplebus, debug_driver, 0, 0,
+EARLY_DRIVER_MODULE(coresight_cpu_debug, simplebus, debug_driver, 0, 0,
     BUS_PASS_BUS + BUS_PASS_ORDER_LATE);
-MODULE_VERSION(debug, 1);
-MODULE_DEPEND(debug, coresight, 1, 1, 1);
+MODULE_VERSION(coresight_cpu_debug, 1);
+MODULE_DEPEND(coresight_cpu_debug, coresight, 1, 1, 1);

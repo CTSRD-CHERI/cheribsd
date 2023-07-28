@@ -139,5 +139,5 @@ static device_method_t replicator_methods[] = {
 	DEVMETHOD_END
 };
 
-DEFINE_CLASS_0(replicator, replicator_driver, replicator_methods,
-    sizeof(struct replicator_softc));
+DEFINE_CLASS_0(coresight_replicator, coresight_replicator_driver,
+    replicator_methods, sizeof(struct replicator_softc));

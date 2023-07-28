@@ -109,9 +109,10 @@ static device_method_t funnel_fdt_methods[] = {
 	DEVMETHOD_END
 };
 
-DEFINE_CLASS_1(funnel, funnel_fdt_driver, funnel_fdt_methods,
-    sizeof(struct funnel_softc), funnel_driver);
+DEFINE_CLASS_1(coresight_funnel, coresight_funnel_fdt_driver,
+    funnel_fdt_methods, sizeof(struct funnel_softc),
+    coresight_funnel_driver);
 
-EARLY_DRIVER_MODULE(funnel, simplebus, funnel_fdt_driver, 0, 0,
-    BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
-MODULE_DEPEND(funnel, coresight, 1, 1, 1);
+EARLY_DRIVER_MODULE(coresight_funnel, simplebus, coresight_funnel_fdt_driver,
+    0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
+MODULE_DEPEND(coresight_funnel, coresight, 1, 1, 1);

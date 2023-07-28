@@ -615,4 +615,5 @@ static device_method_t tmc_methods[] = {
 	DEVMETHOD_END
 };
 
-DEFINE_CLASS_0(tmc, tmc_driver, tmc_methods, sizeof(struct tmc_softc));
+DEFINE_CLASS_0(coresight_tmc, coresight_tmc_driver, tmc_methods,
+    sizeof(struct tmc_softc));

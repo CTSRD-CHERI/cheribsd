@@ -34,7 +34,7 @@
 #define	REPLICATOR_IDFILTER0	0x00
 #define	REPLICATOR_IDFILTER1	0x04
 
-DECLARE_CLASS(replicator_driver);
+DECLARE_CLASS(coresight_replicator_driver);
 
 struct replicator_softc {
 	struct resource			*res;
