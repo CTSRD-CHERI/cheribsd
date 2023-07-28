@@ -75,7 +75,8 @@ _module_run(void *arg)
 	long offset;
 
 	pc = (caddr_t)arg;
-	if (linker_search_symbol_name(pc, name, sizeof(name), &offset) != 0)
+	if (linker_search_symbol_name((ptraddr_t)pc, name, sizeof(name),
+	    &offset) != 0)
 		printf("Running ??? (%p)\n", pc);
 	else
 		printf("Running %s (%p)\n", name, pc);
