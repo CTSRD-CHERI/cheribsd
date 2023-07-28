@@ -351,7 +351,7 @@ kern_shmdt_locked(struct thread *td, const void * __capability shmaddr)
 {
 	struct proc *p = td->td_proc;
 	struct shmmap_state *shmmap_s;
-	static struct shmid_kernel *shmseg;
+	static struct shmid_kernel *shmseg __unused;
 #ifdef MAC
 	int error;
 #endif
