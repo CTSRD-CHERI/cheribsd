@@ -544,6 +544,10 @@ worlds: .PHONY
 # powerpcspe excluded from main list until clang fixed
 EXTRA_ARCHES_powerpc=	powerpcspe
 .endif
+.if defined(NO_CHERI_TARGETS)
+CHERI_ARCHES_arm64=
+CHERI_ARCHES_riscv=
+.endif
 TARGETS?= ${TARGET_MACHINE_LIST}
 _UNIVERSE_TARGETS=	${TARGETS}
 .for target in ${TARGETS}
@@ -744,6 +748,9 @@ _THINNER=cat
 _THINNER=grep 'LINT' || true
 .else
 _THINNER=xargs grep -L "^.NO_UNIVERSE" || true
+.endif
+.if defined(NO_CHERI_KERNELS)
+_THINNER:=grep -v 'CHERI\|MORELLO' | ${_THINNER}
 .endif
 KERNCONFS!=	cd ${KERNSRCDIR}/${TARGET}/conf && \
 		find [[:upper:][:digit:]]*[[:upper:][:digit:]] \
