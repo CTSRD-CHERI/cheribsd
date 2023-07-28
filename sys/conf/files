@@ -392,8 +392,6 @@ cheri/cheri_usercap.c			optional cpu_cheri
 # dtrace specific
 cddl/contrib/opensolaris/uts/common/dtrace/dtrace.c	optional dtrace compile-with "${DTRACE_C}" \
 							warning "kernel contains CDDL licensed DTRACE"
-cddl/contrib/opensolaris/uts/common/dtrace/fasttrap.c	optional dtrace_fasttrap | dtraceall compile-with "${FASTTRAP_C}"
-cddl/contrib/opensolaris/common/unicode/u8_textprep.c   optional dtrace_fasttrap | dtraceall compile-with "${FASTTRAP_C}"
 cddl/contrib/opensolaris/uts/common/dtrace/dtrace_xoroshiro128_plus.c	optional dtrace compile-with "${DTRACE_C}"
 cddl/dev/dtmalloc/dtmalloc.c		optional dtmalloc        | dtraceall compile-with "${CDDL_C}"
 cddl/dev/profile/profile.c		optional dtrace_profile  | dtraceall compile-with "${CDDL_C}"
