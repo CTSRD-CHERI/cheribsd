@@ -326,7 +326,7 @@ elf_is_ifunc_reloc(Elf_Size r_info)
 
 /* Process one elf relocation with addend. */
 static int
-elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
+elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
     int type, int local, elf_lookup_fn lookup)
 {
 	Elf_Addr *where;
@@ -364,7 +364,7 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 		break;
 
 	case R_PPC_RELATIVE:	/* doubleword64 B + A */
-		*where = elf_relocaddr(lf, relocbase + addend);
+		*where = elf_relocaddr(lf, (Elf_Addr)relocbase + addend);
 		break;
 
 	case R_PPC_JMP_SLOT:	/* function descriptor copy */
@@ -378,7 +378,7 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 		break;
 
 	case R_PPC_IRELATIVE:
-		addr = relocbase + addend;
+		addr = (Elf_Addr)relocbase + addend;
 		val = ((Elf64_Addr (*)(void))addr)();
 		if (*where != val)
 			*where = val;
@@ -426,7 +426,7 @@ elf_reloc_self(Elf_Dyn *dynp, Elf_Addr relocbase)
 }
 
 int
-elf_reloc(linker_file_t lf, Elf_Addr relocbase, const void *data, int type,
+elf_reloc(linker_file_t lf, char *relocbase, const void *data, int type,
     elf_lookup_fn lookup)
 {
 
@@ -434,7 +434,7 @@ elf_reloc(linker_file_t lf, Elf_Addr relocbase, const void *data, int type,
 }
 
 int
-elf_reloc_local(linker_file_t lf, Elf_Addr relocbase, const void *data,
+elf_reloc_local(linker_file_t lf, char *relocbase, const void *data,
     int type, elf_lookup_fn lookup)
 {
 
