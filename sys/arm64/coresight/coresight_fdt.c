@@ -170,4 +170,6 @@ coresight_fdt_release_platform_data(struct coresight_platform_data *pdata)
 		TAILQ_REMOVE(&pdata->endpoints, endp, link);
 		free(endp, M_CORESIGHT);
 	}
+
+	free(pdata, M_CORESIGHT);
 }
