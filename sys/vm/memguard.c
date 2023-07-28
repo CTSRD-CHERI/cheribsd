@@ -260,7 +260,7 @@ v2sizep(vm_pointer_t va)
 
 	pa = pmap_kextract(va);
 	if (pa == 0)
-		panic("MemGuard detected double-free of %#p", (void *)va);
+		panic("MemGuard detected double-free of %p", (void *)va);
 	p = PHYS_TO_VM_PAGE(pa);
 	KASSERT(vm_page_wired(p) && p->a.queue == PQ_NONE,
 	    ("MEMGUARD: Expected wired page %p in vtomgfifo!", p));
