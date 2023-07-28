@@ -630,6 +630,7 @@ typedef struct {
 #define	DT_SUNW_FILTER		0x6000000f	/* symbol filter name */
 #define	DT_SUNW_CAP		0x60000010	/* hardware/software */
 #define	DT_SUNW_ASLR		0x60000023	/* ASLR control */
+#define	DT_CHERI_C18N_SIG	0x60000100	/* function signature (c18n) */
 #define	DT_HIOS		0x6ffff000	/* Last OS-specific */
 
 /*

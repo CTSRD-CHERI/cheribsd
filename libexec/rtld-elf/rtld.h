@@ -82,12 +82,6 @@ extern size_t tls_static_space;
 extern Elf_Addr tls_dtv_generation;
 extern int tls_max_index;
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-extern uintptr_t sealer_pltgot, sealer_jmpbuf, sealer_tramp;
-extern const char *ld_utrace_compartment;
-extern const char *ld_compartment_overhead;
-#endif
-
 extern int npagesizes;
 extern size_t *pagesizes;
 extern size_t page_size;
@@ -142,13 +136,6 @@ typedef struct Struct_Name_Entry {
     STAILQ_ENTRY(Struct_Name_Entry) link;
     char   name[1];
 } Name_Entry;
-
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-struct Struct_Stack_Entry {
-    SLIST_ENTRY(Struct_Stack_Entry) link;
-    void *stack;
-};
-#endif
 
 /* Lock object */
 typedef struct Struct_LockInfo {
@@ -307,6 +294,7 @@ typedef struct Struct_Obj_Entry {
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
     uint16_t compart_id;
     struct Struct_Stack_Entry *_Atomic stacks; /* List of object's per-thread stacks */
+    const struct tramp_sig *sigtab;
 #endif
 
     void* init_ptr;		/* Initialization function to call */
@@ -550,10 +538,6 @@ void free_tls_offset(Obj_Entry *obj);
 const Ver_Entry *fetch_ventry(const Obj_Entry *obj, unsigned long);
 int convert_prot(int elfflags);
 bool check_elf_headers(const Elf_Ehdr *hdr, const char *path);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-uint16_t allocate_compart_id(void);
-void ld_utrace_log(int, void *, void *, size_t, int, const char *, const char *);
-#endif
 
 /*
  * MD function declarations.

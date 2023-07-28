@@ -66,6 +66,9 @@
 #include "rtld.h"
 #include "rtld_machdep.h"
 #include "rtld_libc.h"
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#include "rtld_c18n.h"
+#endif
 
 void _rtld_thread_init(struct RtldLockInfo *) __exported;
 void _rtld_atfork_pre(int *) __exported;

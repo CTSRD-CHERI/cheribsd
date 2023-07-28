@@ -69,6 +69,9 @@
 #include "rtld_utrace.h"
 #include "notes.h"
 #include "rtld_libc.h"
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#include "rtld_c18n.h"
+#endif
 
 /* Types. */
 typedef void (*func_ptr_type)(void);
@@ -234,10 +237,6 @@ static const char *ld_preload_fds;/* Environment variable for libraries represen
 static const char *ld_elf_hints_path;	/* Environment variable for alternative hints path */
 static const char *ld_tracing;	/* Called from ldd to print libs */
 static const char *ld_utrace;	/* Use utrace() to log events. */
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-const char *ld_utrace_compartment;	/* Use utrace() to log compartmentalisation-related events. */
-const char *ld_compartment_overhead;	/* Simulate overhead during compartment transitions. */
-#endif
 static bool ld_skip_init_funcs = false;	/* XXXAR: debug environment variable to verify relocation processing */
 static struct obj_entry_q obj_list;	/* Queue of all loaded objects */
 static Obj_Entry *obj_main;	/* The main program shared object */
@@ -319,15 +318,6 @@ size_t tls_static_space;	/* Static TLS space allocated */
 static size_t tls_static_max_align;
 Elf_Addr tls_dtv_generation = 1;	/* Used to detect when dtv size changes */
 int tls_max_index = 1;		/* Largest module index allocated */
-
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-/*
- * Sealers for RTLD privileged information
- */
-#define RTLD_SEALER_EXE_LEN	0x200
-static uintptr_t sealer_res;
-uintptr_t sealer_pltgot, sealer_jmpbuf, sealer_tramp;
-#endif
 
 static bool ld_library_path_rpath = false;
 bool ld_fast_sigblock = false;
@@ -1146,7 +1136,8 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     return ((func_ptr_type)tramp_intern(&(struct tramp_data) {
 	.target = cheri_sealentry(obj_main->entry),
 	.obj = obj_main,
-	.sig = (struct tramp_sig) { true, 3, false, NONE }
+	.sig = (struct tramp_sig) { .valid = true,
+	    .reg_args = 3, .mem_args = false, .ret_args = NONE }
     }));
 #else
     return ((func_ptr_type)obj_main->entry);
@@ -1165,7 +1156,8 @@ rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def)
 		.target = ptr,
 		.obj = obj,
 		.def = def,
-		.sig = (struct tramp_sig) { true, 8, false, C0 }
+		.sig = (struct tramp_sig) { .valid = true,
+		    .reg_args = 8, .mem_args = false, .ret_args = C0 }
 	});
 #endif
 	target = call_ifunc_resolver(ptr);
@@ -1225,7 +1217,8 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
     target = (uintptr_t)tramp_intern(&(struct tramp_data) {
 	.target = (void *)target,
 	.obj = defobj,
-	.def = def
+	.def = def,
+	.sig = fetch_tramp_sig(obj, ELF_R_SYM(rel->r_info))
     });
 #endif
     target = reloc_jmpslot(where, target, defobj, obj, rel);
@@ -1501,6 +1494,13 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	case DT_SYMENT:
 	    assert(dynp->d_un.d_val == sizeof(Elf_Sym));
 	    break;
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	case DT_CHERI_C18N_SIG:
+	    obj->sigtab = (const struct tramp_sig *)
+	      (obj->relocbase + dynp->d_un.d_ptr);
+	    break;
+#endif
 
 	case DT_STRTAB:
 	    obj->strtab = (const char *)(obj->relocbase + dynp->d_un.d_ptr);
@@ -2773,8 +2773,6 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
     sealer_pltgot = cheri_setboundsexact(sealer, 1); sealer += 1;
     sealer_jmpbuf = cheri_setboundsexact(sealer, 1); sealer += 1;
     sealer_tramp = cheri_setboundsexact(sealer, 72); sealer += 72;
-    sealer_res = cheri_setboundsexact(sealer,
-        cheri_gettop(sealer) - cheri_getoffset(sealer));
     tramp_init();
 #endif
 }
