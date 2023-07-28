@@ -141,8 +141,8 @@ SIGCODE(switcher_cocall)
 	 */
 	ldr	x9, SCB_BORROWER_TD(c8)
 	cbnz	x9, 5f
-	ldr	x12, SCB_TD(c8)
-	str	x12, SCB_BORROWER_TD(c29)
+	ldr	c12, SCB_TD(c8)
+	str	c12, SCB_BORROWER_TD(c29)
 	b	6f
 5:
 	str	czr, SCB_BORROWER_TD(c8)

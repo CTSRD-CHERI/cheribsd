@@ -351,7 +351,11 @@ colocation_unborrow(struct thread *td)
 	if (!have_scb)
 		return;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	peertd = scb.scb_borrower_td;
+#else
 	peertd = (__cheri_fromcap struct thread *)scb.scb_borrower_td;
+#endif
 	if (peertd == NULL) {
 		/*
 		 * Nothing borrowed yet.
@@ -375,10 +379,13 @@ colocation_unborrow(struct thread *td)
 #error "what architecture is this?"
 #endif
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(td == scb.scb_td, ("%s: td %p != scb_td %p\n", __func__, td, (__cheri_fromcap struct thread *)scb.scb_td));
+#else
 	KASSERT(td == (__cheri_fromcap struct thread *)scb.scb_td,
 	    ("%s: td %p != scb_td %p\n", __func__, td, (__cheri_fromcap struct thread *)scb.scb_td));
-	KASSERT(peertd != td,
-	    ("%s: peertd %p == td %p\n", __func__, peertd, td));
+#endif
+	KASSERT(peertd != td, ("%s: peertd %p == td %p\n", __func__, peertd, td));
 
 	COLOCATION_DEBUG("replacing current td %p, pid %d (%s), switchercb %lp, "
 	    "with td %p, pid %d (%s), switchercb %lp",
@@ -539,7 +546,6 @@ setup_scb(struct thread *td)
 int
 sys__cosetup(struct thread *td, struct _cosetup_args *uap)
 {
-
 	return (kern_cosetup(td, uap->what, uap->code, uap->data));
 }
 
@@ -590,6 +596,9 @@ kern_cosetup(struct thread *td, int what,
 	void * __capability datacap;
 	struct vmspace *vmspace;
 	int error;
+#ifdef __CHERI_PURE_CAPABILITY__
+	uint64_t codecap_addr = 0;
+#endif
 
 	KASSERT(switcher_sealcap != (void * __capability)-1,
              ("%s: uninitialized switcher_sealcap", __func__));
@@ -616,6 +625,17 @@ kern_cosetup(struct thread *td, int what,
 			    td->td_proc->p_sysent->sv_cocall_base,
 			    td->td_proc->p_sysent->sv_cocall_len);
 		}
+#ifdef __CHERI_PURE_CAPABILITY__
+		/*
+		 * The least significant bit of the code capability needs to be set.
+		 * Otherwise, the CPU leaves C64 mode after the BLRS instruction that
+		 * is used to jump into the switcher code. The switcher code provided
+		 * by purecap kernels uses capabilities and so fails if it is not
+		 * executed in C64 mode.
+		 */
+		codecap_addr = cheri_getaddress(codecap);
+		codecap = cheri_setaddress(codecap, codecap_addr + 1);
+#endif
 		codecap = cheri_seal(codecap, switcher_sealcap);
 		error = sucap(codep, (intcap_t)codecap) == 0 ? 0 : EFAULT;
 		if (error != 0)
@@ -634,6 +654,11 @@ kern_cosetup(struct thread *td, int what,
 			    td->td_proc->p_sysent->sv_coaccept_base,
 			    td->td_proc->p_sysent->sv_coaccept_len);
 		}
+#ifdef __CHERI_PURE_CAPABILITY__
+		// See comment above in the "COSETUP_COCALL" case.
+		codecap_addr = cheri_getaddress(codecap);
+		codecap = cheri_setaddress(codecap, codecap_addr + 1);
+#endif
 		codecap = cheri_seal(codecap, switcher_sealcap);
 		error = sucap(codep, (intcap_t)codecap) == 0 ? 0 : EFAULT;
 		if (error != 0)
