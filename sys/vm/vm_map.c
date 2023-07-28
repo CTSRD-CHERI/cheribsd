@@ -3013,6 +3013,13 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 	VM_OBJECT_RUNLOCK(object);
 }
 
+static void
+vm_map_protect_guard(vm_map_entry_t entry, vm_prot_t new_prot,
+    vm_prot_t new_maxprot, int flags)
+{
+	MPASS((entry->eflags & MAP_ENTRY_GUARD) != 0);
+}
+
 /*
  *	vm_map_protect:
  *
@@ -3074,12 +3081,14 @@ restart_checks:
 		check_prot |= new_maxprot;
 	for (entry = first_entry; entry->start < end;
 	    entry = vm_map_entry_succ(entry)) {
-		if ((entry->eflags &
-		    (MAP_ENTRY_GUARD | MAP_ENTRY_UNMAPPED)) != 0)
+		if ((entry->eflags & MAP_ENTRY_UNMAPPED) != 0)
 			continue;
 		if ((entry->eflags & MAP_ENTRY_IS_SUB_MAP) != 0) {
 			vm_map_unlock(map);
 			return (KERN_INVALID_ARGUMENT);
+		}
+		if ((entry->eflags & MAP_ENTRY_GUARD) != 0) {
+			continue;
 		}
 
 		/*
@@ -3203,9 +3212,14 @@ restart_checks:
 	    vm_map_try_merge_entries(map, prev_entry, entry),
 	    prev_entry = entry, entry = vm_map_entry_succ(entry)) {
 		if (rv != KERN_SUCCESS ||
-		    (entry->eflags &
-		    (MAP_ENTRY_GUARD | MAP_ENTRY_UNMAPPED)) != 0)
+		    (entry->eflags & MAP_ENTRY_UNMAPPED) != 0)
 			continue;
+
+		if ((entry->eflags & MAP_ENTRY_GUARD) != 0) {
+			vm_map_protect_guard(entry, new_prot, new_maxprot,
+			    flags);
+			continue;
+		}
 
 		old_prot = entry->protection;
 
