@@ -273,7 +273,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 #endif
     }
 
-    dbg("Allocating entire object: mmap(" PTR_FMT ", 0x%lx, 0x%x, 0x%x, -1, 0)",
+    dbg("Allocating entire object: mmap(" PTR_FMT ", 0x%zx, 0x%x, 0x%x, -1, 0)",
 	    base_addr, mapsize, PROT_NONE | PROT_MAX(_PROT_ALL), base_flags);
     mapbase = mmap(base_addr, mapsize, PROT_NONE | PROT_MAX(_PROT_ALL),
 	base_flags, -1, 0);
