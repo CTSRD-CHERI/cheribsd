@@ -165,8 +165,10 @@ devmap_add_entry(vm_paddr_t pa, vm_size_t sz)
 	    ("%s: devmap entry is not representable [0x%08jx, 0x%08jx]",
 	     __func__, (uintmax_t)va, (uintmax_t)va + sz));
 #endif
+#ifndef __arm__
 	KASSERT(va >= VM_MAX_KERNEL_ADDRESS - PMAP_MAPDEV_EARLY_SIZE,
 	    ("%s: early devmap too small", __func__));
+#endif
 	akva_devmap_vaddr = va;
 
 	m = &akva_devmap_entries[akva_devmap_idx++];
