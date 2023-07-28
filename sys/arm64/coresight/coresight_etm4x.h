@@ -239,6 +239,6 @@ struct etm_softc {
 int etm_attach(device_t dev);
 int etm_detach(device_t dev);
 
-DECLARE_CLASS(coresight_etm_driver);
+DECLARE_CLASS(coresight_etm4x_driver);
 
 #endif /* !_ARM64_CORESIGHT_ETM4X_H_ */

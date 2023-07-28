@@ -398,5 +398,5 @@ static device_method_t etm_methods[] = {
 	DEVMETHOD_END
 };
 
-DEFINE_CLASS_0(coresight_etm, coresight_etm_driver, etm_methods,
+DEFINE_CLASS_0(coresight_etm4x, coresight_etm4x_driver, etm_methods,
     sizeof(struct etm_softc));
