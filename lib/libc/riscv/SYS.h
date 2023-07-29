@@ -79,7 +79,7 @@ ENTRY(__sys_##name);						\
 	_SYSCALL(name);						\
 	bnez	t0, 1f; 					\
 	RETURN;							\
-1:	ASM_LOCAL_TAILCALL(t1, cerror);				\
+1:	_TAIL	cerror@plt;					\
 END(__sys_##name)
 
 #define	RSYSCALL(name)						\
@@ -89,7 +89,7 @@ ENTRY(__sys_##name);						\
 	_SYSCALL(name);						\
 	bnez	t0, 1f; 					\
 	RETURN;							\
-1:	ASM_LOCAL_TAILCALL(t1, cerror);				\
+1:	_TAIL	cerror@plt;					\
 END(__sys_##name)
 
 /* Do a system call where the _x() is also custom (e.g. fcntl, ioctl) */
@@ -98,5 +98,5 @@ ENTRY(__sys_##name);						\
 	_SYSCALL(name);						\
 	bnez	t0, 1f; 					\
 	RETURN;							\
-1:	ASM_LOCAL_TAILCALL(t1, cerror);				\
+1:	_TAIL	cerror@plt;					\
 END(__sys_##name)
