@@ -928,7 +928,7 @@ public:
 private:
 
 #if defined(_LIBUNWIND_ARM_EHABI)
-  bool getInfoFromEHABISection(pint_t pc, const UnwindInfoSections &sects);
+  bool getInfoFromEHABISection(pc_t pc, const UnwindInfoSections &sects);
 
   int stepWithEHABI() {
     size_t len = 0;
@@ -1383,7 +1383,7 @@ template <typename A>
 EHABISectionIterator<A> EHABISectionUpperBound(
     EHABISectionIterator<A> first,
     EHABISectionIterator<A> last,
-    typename A::pint_t value) {
+    typename A::pc_t value) {
   size_t len = last - first;
   while (len > 0) {
     size_t l2 = len / 2;

@@ -671,6 +671,7 @@ static bool checkAddrInSegment(const Elf_Phdr *phdr, uintptr_t image_base,
   ((pinfo->dlpi_name && pinfo->dlpi_name[0] != '\0') ? pinfo->dlpi_name        \
                                                      : "<self>")
 
+#if defined(_LIBUNWIND_SUPPORT_DWARF_UNWIND)
 static bool boundEhFrameFromPhdr(struct dl_phdr_info *pinfo,
                                  uintptr_t image_base,
                                  dl_iterate_cb_data *cbdata) {
@@ -694,6 +695,7 @@ static bool boundEhFrameFromPhdr(struct dl_phdr_info *pinfo,
   CHERI_DBG("Could not find PT_LOAD of .eh_frame in %s\n", PINFO_NAME(pinfo));
   return false;
 }
+#endif
 
 static bool checkForUnwindInfoSegment(const Elf_Phdr *phdr, uintptr_t image_base,
                                       dl_iterate_cb_data *cbdata) {
@@ -808,10 +810,12 @@ static int findUnwindSectionsByPhdr(struct dl_phdr_info *pinfo,
   }
 
   CHERI_DBG("found_text && found_unwind in %s\n", PINFO_NAME(pinfo));
+#if defined(_LIBUNWIND_SUPPORT_DWARF_UNWIND)
   // Find the PT_LOAD containing .eh_frame.
   if (!boundEhFrameFromPhdr(pinfo, image_base, cbdata)) {
     return 0;
   }
+#endif
 #if defined(_LIBUNWIND_USE_FRAME_HEADER_CACHE)
   TheFrameHeaderCache.add(cbdata->sects);
 #endif
