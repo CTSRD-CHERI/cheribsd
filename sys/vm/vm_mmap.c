@@ -1089,16 +1089,16 @@ sys_mprotect(struct thread *td, struct mprotect_args *uap)
 #endif
 
 	return (kern_mprotect(td, (uintptr_t)(uintcap_t)uap->addr, uap->len,
-	    uap->prot));
+	    uap->prot, 0));
 }
 
 int
-kern_mprotect(struct thread *td, uintptr_t addr0, size_t size, int prot)
+kern_mprotect(struct thread *td, uintptr_t addr0, size_t size, int prot,
+    int flags)
 {
 	vm_offset_t addr;
 	vm_size_t pageoff;
 	int vm_error, max_prot;
-	int flags;
 
 	addr = addr0;
 	if ((prot & ~(_PROT_ALL | PROT_MAX(_PROT_ALL))) != 0)
@@ -1122,15 +1122,14 @@ kern_mprotect(struct thread *td, uintptr_t addr0, size_t size, int prot)
 	    (vm_error = vm_wxcheck(td->td_proc, "mprotect")))
 		goto out;
 
-	flags = VM_MAP_PROTECT_SET_PROT | VM_MAP_PROTECT_KEEP_CAP;
+	flags |= VM_MAP_PROTECT_SET_PROT | VM_MAP_PROTECT_KEEP_CAP;
 	if (max_prot != 0) {
 		if ((max_prot & prot) != prot)
 			return (ENOTSUP);
 		flags |= VM_MAP_PROTECT_SET_MAXPROT;
 	}
-	if (vm_error == KERN_SUCCESS)
-		vm_error = vm_map_protect(&td->td_proc->p_vmspace->vm_map,
-		    addr, addr + size, prot, max_prot, flags);
+	vm_error = vm_map_protect(&td->td_proc->p_vmspace->vm_map,
+	    addr, addr + size, prot, max_prot, flags);
 
 out:
 	switch (vm_error) {
