@@ -99,9 +99,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/ktrace.h>
 #endif
 
-#ifdef INET
 #include <netinet/in.h>
-#endif
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
