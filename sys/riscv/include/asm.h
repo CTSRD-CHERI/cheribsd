@@ -79,12 +79,16 @@
 	csrc	sstatus, tmp
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#define CAPABILITY_REG(reg)	c##reg
-#define MOVE_REG(dst, src)	cmove CAPABILITY_REG(dst), CAPABILITY_REG(src)
-#define RETURN	cret
+#define	CAPABILITY_REG(reg)	c##reg
+#define	MOVE_REG(dst, src)	cmove CAPABILITY_REG(dst), CAPABILITY_REG(src)
+#define	_CALL	ccall
+#define	_TAIL	ctail
+#define	RETURN	cret
 #else
-#define MOVE_REG(dst, src)	mv dst, src
-#define RETURN	ret
+#define	MOVE_REG(dst, src)	mv dst, src
+#define	_CALL	call
+#define	_TAIL	tail
+#define	RETURN	ret
 #endif
 
 #endif /* _MACHINE_ASM_H_ */
