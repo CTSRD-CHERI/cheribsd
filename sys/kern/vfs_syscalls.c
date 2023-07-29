@@ -5134,7 +5134,6 @@ user_copy_file_range(struct thread *td, int infd,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
 //     "user_capabilities",
 //     "ctoptr"
 //   ]
