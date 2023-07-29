@@ -42,29 +42,6 @@
 	li	t0, SYS_ ## name;				\
 	ecall
 
-#ifdef __CHERI_PURE_CAPABILITY__
-#define _GET_FNPTR(outreg, function)	\
-	clgc CAPABILITY_REG(outreg), _C_LABEL(function)
-#define _GET_LOCAL_FNPTR(outreg, function)	\
-	cllc CAPABILITY_REG(outreg), _C_LABEL(function)
-#define _CALL_FNPTR(reg)	cjalr CAPABILITY_REG(reg)
-#define _TAILCALL_FNPTR(reg)	cjr CAPABILITY_REG(reg)
-#else
-#define _GET_LOCAL_FNPTR(outreg, function)	\
-	lla outreg, _C_LABEL(function)
-#define _GET_FNPTR(outreg, function)	\
-	la outreg, _C_LABEL(function)
-#define _CALL_FNPTR(reg)	jalr reg
-#define _TAILCALL_FNPTR(reg)	jr reg
-#endif
-
-#define ASM_LOCAL_TAILCALL(tmpreg, function)				\
-	_GET_LOCAL_FNPTR(tmpreg, function);				\
-	_TAILCALL_FNPTR(tmpreg)
-#define ASM_LOCAL_CALL(tmpreg, function)				\
-	_GET_LOCAL_FNPTR(tmpreg, function);				\
-	_CALL_FNPTR(tmpreg)
-
 #define	SYSCALL(name)						\
 ENTRY(__sys_##name);						\
 	WEAK_REFERENCE(__sys_##name, name);			\
