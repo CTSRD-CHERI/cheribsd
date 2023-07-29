@@ -287,7 +287,7 @@ struct xinpcb {
 	uint8_t		inp_ip_p;		/* (n) */
 	uint8_t		inp_ip_minttl;		/* (n) */
 	int8_t		inp_spare8[4];
-};
+} __aligned(8);
 
 struct xinpgen {
 	ksize_t	xig_len;	/* length of this structure */
@@ -296,7 +296,7 @@ struct xinpgen {
 	inp_gen_t	xig_gen;	/* generation count at this time */
 	so_gen_t	xig_sogen;	/* socket generation count this time */
 	uint64_t	_xig_spare64[4];
-} __aligned(sizeof(void *));
+} __aligned(8);
 
 struct sockopt_parameters {
 	struct in_conninfo sop_inc;
