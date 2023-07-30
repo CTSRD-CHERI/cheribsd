@@ -202,6 +202,11 @@ coresight_backend_deinit(void)
 
 	event = &cs_event[0];
 	coresight_stop(event);
+
+	for (cpu_id = 0; cpu_id < mp_ncpus; cpu_id++) {
+		event = &cs_event[cpu_id];
+		coresight_deinit_event(event);
+	}
 }
 
 static int
@@ -306,15 +311,17 @@ coresight_register(struct coresight_desc *desc)
 	cs_dev->pdata = desc->pdata;
 	cs_dev->dev_type = desc->dev_type;
 
+	if (desc->dev_type == CORESIGHT_TMC_ETR) {
+		error = hwt_backend_register(&backend);
+		if (error != 0) {
+			free(cs_dev, M_CORESIGHT);
+			return (error);
+		}
+	}
+
 	mtx_lock(&cs_mtx);
 	TAILQ_INSERT_TAIL(&cs_devs, cs_dev, link);
 	mtx_unlock(&cs_mtx);
-
-	if (desc->dev_type == CORESIGHT_TMC_ETR) {
-		error = hwt_backend_register(&backend);
-		if (error != 0)
-			return (error);
-	}
 
 	return (0);
 }

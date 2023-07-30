@@ -48,7 +48,7 @@ coresight_next_device(struct coresight_device *cs_dev,
     struct coresight_event *event)
 {
 	struct coresight_device *out;
-	struct endpoint *out_endp;
+	struct endpoint *out_endp, *src_endp;
 	struct endpoint *endp;
 
 	TAILQ_FOREACH(endp, &cs_dev->pdata->endpoints, link) {
@@ -57,10 +57,16 @@ coresight_next_device(struct coresight_device *cs_dev,
 
 		out = coresight_get_output_device(cs_dev, endp, &out_endp);
 		if (out != NULL) {
-			if (LIST_EMPTY(&event->endplist)) {
+			if (TAILQ_EMPTY(&event->endplist)) {
+
 				/* Add source device */
-				endp->cs_dev = cs_dev;
-				LIST_INSERT_HEAD(&event->endplist, endp,
+
+				src_endp = malloc(sizeof(struct endpoint),
+				    M_CORESIGHT, M_WAITOK | M_ZERO);
+				memcpy(src_endp, endp, sizeof(struct endpoint));
+
+				src_endp->cs_dev = cs_dev;
+				TAILQ_INSERT_TAIL(&event->endplist, src_endp,
 				    endplink);
 			}
 
@@ -69,7 +75,7 @@ coresight_next_device(struct coresight_device *cs_dev,
 				printf("Adding device %s to the chain\n",
 				    device_get_nameunit(out->dev));
 			out_endp->cs_dev = out;
-			LIST_INSERT_HEAD(&event->endplist, out_endp, endplink);
+			TAILQ_INSERT_TAIL(&event->endplist, out_endp, endplink);
 
 			return (out);
 		}
@@ -96,12 +102,13 @@ coresight_init_event(struct coresight_event *event, int cpu)
 {
 	struct coresight_device *cs_dev;
 	struct endpoint *endp;
+	int error;
 
 	/* Start building path from source device */
 	TAILQ_FOREACH(cs_dev, &cs_devs, link) {
 		if (cs_dev->dev_type == event->src &&
 		    cs_dev->pdata->cpu == cpu) {
-			LIST_INIT(&event->endplist);
+			TAILQ_INIT(&event->endplist);
 			coresight_build_list(cs_dev, event);
 			break;
 		}
@@ -110,17 +117,33 @@ coresight_init_event(struct coresight_event *event, int cpu)
 	/* Ensure Coresight is initialized for the CPU */
 	TAILQ_FOREACH(cs_dev, &cs_devs, link) {
 		if (cs_dev->dev_type == CORESIGHT_CPU_DEBUG &&
-		    cs_dev->pdata->cpu == cpu)
-			CORESIGHT_INIT(cs_dev->dev);
+		    cs_dev->pdata->cpu == cpu) {
+			error = CORESIGHT_INIT(cs_dev->dev);
+			if (error != ENXIO && error != 0)
+				return (error);
+		}
 	}
 
 	/* Init all devices in the path */
-	LIST_FOREACH(endp, &event->endplist, endplink) {
+	TAILQ_FOREACH(endp, &event->endplist, endplink) {
 		cs_dev = endp->cs_dev;
-		CORESIGHT_INIT(cs_dev->dev);
+		error = CORESIGHT_INIT(cs_dev->dev);
+		if (error != ENXIO && error != 0)
+			return (error);
 	}
 
 	return (0);
+}
+
+void
+coresight_deinit_event(struct coresight_event *event)
+{
+	struct endpoint *endp, *tmp;
+
+	TAILQ_FOREACH_SAFE(endp, &event->endplist, endplink, tmp) {
+		TAILQ_REMOVE(&event->endplist, endp, endplink);
+		free(endp, M_CORESIGHT);
+	}
 }
 
 int
@@ -130,7 +153,7 @@ coresight_setup(struct coresight_event *event)
 	struct endpoint *endp;
 	int error;
 
-	LIST_FOREACH(endp, &event->endplist, endplink) {
+	TAILQ_FOREACH(endp, &event->endplist, endplink) {
 		cs_dev = endp->cs_dev;
 		error = CORESIGHT_SETUP(cs_dev->dev, endp, event);
 		if (error != ENXIO && error != 0)
@@ -147,7 +170,7 @@ coresight_configure(struct coresight_event *event, struct hwt_context *ctx)
 	struct endpoint *endp;
 	int error;
 
-	LIST_FOREACH(endp, &event->endplist, endplink) {
+	TAILQ_FOREACH(endp, &event->endplist, endplink) {
 		cs_dev = endp->cs_dev;
 		error = CORESIGHT_CONFIGURE(cs_dev->dev, endp, event, ctx);
 		if (error != ENXIO && error != 0)
@@ -164,7 +187,7 @@ coresight_start(struct coresight_event *event)
 	struct endpoint *endp;
 	int error;
 
-	LIST_FOREACH(endp, &event->endplist, endplink) {
+	TAILQ_FOREACH_REVERSE(endp, &event->endplist, endplistname, endplink) {
 		cs_dev = endp->cs_dev;
 		error = CORESIGHT_START(cs_dev->dev, endp, event);
 		if (error != ENXIO && error != 0)
@@ -180,7 +203,7 @@ coresight_stop(struct coresight_event *event)
 	struct coresight_device *cs_dev;
 	struct endpoint *endp;
 
-	LIST_FOREACH(endp, &event->endplist, endplink) {
+	TAILQ_FOREACH(endp, &event->endplist, endplink) {
 		cs_dev = endp->cs_dev;
 		CORESIGHT_STOP(cs_dev->dev, endp, event);
 	}
@@ -192,7 +215,7 @@ coresight_enable(struct coresight_event *event)
 	struct coresight_device *cs_dev;
 	struct endpoint *endp;
 
-	LIST_FOREACH(endp, &event->endplist, endplink) {
+	TAILQ_FOREACH(endp, &event->endplist, endplink) {
 		cs_dev = endp->cs_dev;
 		CORESIGHT_ENABLE(cs_dev->dev, endp, event);
 	}
@@ -204,7 +227,7 @@ coresight_disable(struct coresight_event *event)
 	struct coresight_device *cs_dev;
 	struct endpoint *endp;
 
-	LIST_FOREACH(endp, &event->endplist, endplink) {
+	TAILQ_FOREACH(endp, &event->endplist, endplink) {
 		cs_dev = endp->cs_dev;
 		CORESIGHT_DISABLE(cs_dev->dev, endp, event);
 	}
@@ -216,7 +239,7 @@ coresight_dump(struct coresight_event *event)
 	struct coresight_device *cs_dev;
 	struct endpoint *endp;
 
-	LIST_FOREACH(endp, &event->endplist, endplink) {
+	TAILQ_FOREACH(endp, &event->endplist, endplink) {
 		cs_dev = endp->cs_dev;
 		CORESIGHT_DUMP(cs_dev->dev);
 	}
@@ -229,7 +252,7 @@ coresight_read(struct coresight_event *event)
 	struct endpoint *endp;
 	int error;
 
-	LIST_FOREACH(endp, &event->endplist, endplink) {
+	TAILQ_FOREACH(endp, &event->endplist, endplink) {
 		cs_dev = endp->cs_dev;
 		error = CORESIGHT_READ(cs_dev->dev, endp, event);
 		if (error != ENXIO && error != 0)

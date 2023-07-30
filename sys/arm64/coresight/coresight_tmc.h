@@ -77,6 +77,7 @@
 #define	 FFCR_FON_TRIG_EVT	(1 << 5)
 #define	 FFCR_FLUSH_MAN		(1 << 6)
 #define	 FFCR_TRIGON_TRIGIN	(1 << 8)
+#define	 FFCR_STOP_ON_FLUSH	(1 << 12)
 #define	TMC_PSCR	0x308 /* Periodic Synchronization Counter Register */
 #define	TMC_ITATBMDATA0	0xED0 /* Integration Test ATB Master Data Register 0 */
 #define	TMC_ITATBMCTR2	0xED4 /* Integration Test ATB Master Interface Control 2 Register */
@@ -125,7 +126,6 @@ struct tmc_softc {
 #define	CORESIGHT_ETR			1
 #define	CORESIGHT_ETF			2
 	uint32_t			nev;
-	boolean_t			etf_configured;
 	boolean_t			scatter_gather;
 	void				*intrhand;
 };

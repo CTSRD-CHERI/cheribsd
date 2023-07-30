@@ -77,6 +77,7 @@ debug_init(device_t dev)
 {
 	struct debug_softc *sc;
 	uint32_t reg;
+	int timeout;
 
 	sc = device_get_softc(dev);
 
@@ -95,9 +96,14 @@ debug_init(device_t dev)
 	reg |= EDPRCR_COREPURQ;
 	bus_write_4(sc->res, EDPRCR, reg);
 
+	timeout = 10000;
+
 	do {
 		reg = bus_read_4(sc->res, EDPRSR);
-	} while ((reg & EDPRCR_CORENPDRQ) == 0);
+	} while ((reg & EDPRCR_CORENPDRQ) == 0 && timeout--);
+
+	if (timeout <= 0)
+		return (EINTEGRITY);
 
 	return (0);
 }

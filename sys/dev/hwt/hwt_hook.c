@@ -89,7 +89,7 @@ hwt_switch_in(struct thread *td)
 		return;
 	}
 
-	dprintf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
+	printf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
 	    thr->thread_id, td->td_tid, cpu_id);
 
 	hwt_backend_configure(ctx, cpu_id, thr->thread_id);
@@ -124,7 +124,7 @@ hwt_switch_out(struct thread *td)
 		return;
 	}
 
-	dprintf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
+	printf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
 	    thr->thread_id, td->td_tid, cpu_id);
 
 	hwt_backend_disable(ctx, cpu_id);
@@ -159,7 +159,7 @@ hwt_thread_exit(struct thread *td)
 
 	thr->state = HWT_THREAD_STATE_EXITED;
 
-	dprintf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
+	printf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
 	    thr->thread_id, td->td_tid, cpu_id);
 
 	hwt_backend_disable(ctx, cpu_id);
