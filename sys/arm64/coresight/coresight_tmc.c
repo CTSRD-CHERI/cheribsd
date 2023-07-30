@@ -173,7 +173,7 @@ tmc_configure_etf(device_t dev)
 
 	sc = device_get_softc(dev);
 
-	printf("%s%d\n", __func__, device_get_unit(dev));
+	dprintf("%s%d\n", __func__, device_get_unit(dev));
 
 	bus_write_4(sc->res[0], TMC_MODE, MODE_HW_FIFO);
 	bus_write_4(sc->res[0], TMC_BUFWM, 0);
@@ -193,7 +193,7 @@ tmc_configure_etr(device_t dev, struct endpoint *endp,
 
 	sc = device_get_softc(dev);
 
-	printf("%s%d\n", __func__, device_get_unit(dev));
+	dprintf("%s%d\n", __func__, device_get_unit(dev));
 
 	/* Configure TMC */
 	bus_write_4(sc->res[0], TMC_MODE, MODE_CIRCULAR_BUFFER);
@@ -301,21 +301,6 @@ tmc_allocate_pgdir(struct tmc_softc *sc, vm_page_t *pages, int nentries,
 }
 
 static int
-tmc_configure(device_t dev, struct endpoint *endp,
-    struct coresight_event *event, struct hwt_context *ctx)
-{
-	struct tmc_softc *sc;
-
-	printf("%s%d\n", __func__, device_get_unit(dev));
-
-	sc = device_get_softc(dev);
-	if (sc->dev_type == CORESIGHT_ETF)
-		tmc_configure_etf(dev);
-
-	return (0);
-}
-
-static int
 tmc_setup(device_t dev, struct endpoint *endp, struct coresight_event *event)
 {
 	struct tmc_softc *sc;
@@ -374,6 +359,31 @@ tmc_setup(device_t dev, struct endpoint *endp, struct coresight_event *event)
 }
 
 static int
+tmc_enable_hw(device_t dev)
+{
+	struct tmc_softc *sc;
+
+	sc = device_get_softc(dev);
+
+	if (bus_read_4(sc->res[0], TMC_CTL) & CTL_TRACECAPTEN) {
+		printf("%s: TMC is already enabled\n", __func__);
+		return (ENXIO);
+	}
+
+	/* Enable TMC */
+	bus_write_4(sc->res[0], TMC_CTL, CTL_TRACECAPTEN);
+
+	if ((bus_read_4(sc->res[0], TMC_CTL) & CTL_TRACECAPTEN) == 0) {
+		printf("%s: could not enable TMC\n", __func__);
+		return (ENXIO);
+	}
+
+	dprintf("%s: tmc type %d enabled\n", __func__, sc->dev_type);
+
+	return (0);
+}
+
+static int
 tmc_init(device_t dev)
 {
 	struct tmc_softc *sc;
@@ -381,7 +391,7 @@ tmc_init(device_t dev)
 
 	sc = device_get_softc(dev);
 
-	printf("%s%d\n", __func__, device_get_unit(dev));
+	dprintf("%s%d\n", __func__, device_get_unit(dev));
 
 	/* Unlock Coresight */
 	bus_write_4(sc->res[0], CORESIGHT_LAR, CORESIGHT_UNLOCK);
@@ -397,6 +407,11 @@ tmc_init(device_t dev)
 		dprintf(dev, "ETR configuration found\n");
 		break;
 	case DEVID_CONFIGTYPE_ETF:
+		if (sc->etf_configured == false) {
+			tmc_configure_etf(dev);
+			tmc_enable_hw(dev);
+			sc->etf_configured = true;
+		}
 		sc->dev_type = CORESIGHT_ETF;
 		dprintf(dev, "ETF configuration found\n");
 		break;
@@ -446,30 +461,20 @@ tmc_disable_hw(device_t dev)
 
 	bus_write_4(sc->res[0], TMC_CTL, 0);
 
-	printf("%s: tmc type %d disabled\n", __func__, sc->dev_type);
+	dprintf("%s: tmc type %d disabled\n", __func__, sc->dev_type);
 }
 
 static int
-tmc_enable_hw(device_t dev)
+tmc_deinit(device_t dev)
 {
 	struct tmc_softc *sc;
 
 	sc = device_get_softc(dev);
 
-	if (bus_read_4(sc->res[0], TMC_CTL) & CTL_TRACECAPTEN) {
-		printf("%s: TMC is already enabled\n", __func__);
-		return (ENXIO);
+	if (sc->etf_configured == true) {
+		tmc_disable_hw(dev);
+		sc->etf_configured = false;
 	}
-
-	/* Enable TMC */
-	bus_write_4(sc->res[0], TMC_CTL, CTL_TRACECAPTEN);
-
-	if ((bus_read_4(sc->res[0], TMC_CTL) & CTL_TRACECAPTEN) == 0) {
-		printf("%s: could not enable TMC\n", __func__);
-		return (ENXIO);
-	}
-
-	printf("%s: tmc type %d enabled\n", __func__, sc->dev_type);
 
 	return (0);
 }
@@ -485,7 +490,7 @@ tmc_start(device_t dev, struct endpoint *endp, struct coresight_event *event)
 	if (sc->dev_type == CORESIGHT_ETF)
 		return (0);
 
-	printf("%s%d\n", __func__, device_get_unit(dev));
+	dprintf("%s%d\n", __func__, device_get_unit(dev));
 
 	timeout = 10000;
 
@@ -536,13 +541,12 @@ tmc_read(device_t dev, struct endpoint *endp, struct coresight_event *event)
 	if (found) {
 		event->etr.curpage = i;
 		event->etr.curpage_offset = ptr & 0xfff;
-		printf("CUR_PTR %lx, page %d of %d, offset %ld\n",
+		dprintf("CUR_PTR %lx, page %d of %d, offset %ld\n",
 		    ptr, i, event->etr.npages, event->etr.curpage_offset);
 
 		return (0);
-	} else {
-		printf("CUR_PTR not found\n");
-	}
+	} else
+		dprintf("CUR_PTR not found\n");
 
 	return (ENOENT);
 }
@@ -556,7 +560,7 @@ tmc_stop(device_t dev, struct endpoint *endp, struct coresight_event *event)
 	if (sc->dev_type == CORESIGHT_ETF)
 		return;
 
-	printf("%s%d\n", __func__, device_get_unit(dev));
+	dprintf("%s%d\n", __func__, device_get_unit(dev));
 
 	/* Make final readings before we stop TMC-ETR. */
 	tmc_read(dev, endp, event);
@@ -632,38 +636,12 @@ tmc_detach(device_t dev)
 	return (0);
 }
 
-static int
-tmc_enable(device_t dev, struct endpoint *endp, struct coresight_event *event)
-{
-	struct tmc_softc *sc;
-
-	sc = device_get_softc(dev);
-
-	if (sc->dev_type == CORESIGHT_ETF)
-		tmc_enable_hw(dev);
-
-	return (0);
-}
-
-static void
-tmc_disable(device_t dev, struct endpoint *endp, struct coresight_event *event)
-{
-	struct tmc_softc *sc;
-
-	sc = device_get_softc(dev);
-
-	if (sc->dev_type == CORESIGHT_ETF)
-		tmc_disable_hw(dev);
-}
-
 static device_method_t tmc_methods[] = {
 	/* Coresight interface */
 	DEVMETHOD(coresight_init,	tmc_init),
 
 	/* ETF only. */
-	DEVMETHOD(coresight_configure,	tmc_configure),
-	DEVMETHOD(coresight_enable,	tmc_enable),
-	DEVMETHOD(coresight_disable,	tmc_disable),
+	DEVMETHOD(coresight_deinit,	tmc_deinit),
 
 	/* ETR only. */
 	DEVMETHOD(coresight_setup,	tmc_setup),

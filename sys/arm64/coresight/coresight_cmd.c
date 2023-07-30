@@ -138,9 +138,13 @@ coresight_init_event(struct coresight_event *event, int cpu)
 void
 coresight_deinit_event(struct coresight_event *event)
 {
+	struct coresight_device *cs_dev;
 	struct endpoint *endp, *tmp;
 
 	TAILQ_FOREACH_SAFE(endp, &event->endplist, endplink, tmp) {
+		cs_dev = endp->cs_dev;
+		CORESIGHT_DEINIT(cs_dev->dev);
+
 		TAILQ_REMOVE(&event->endplist, endp, endplink);
 		free(endp, M_CORESIGHT);
 	}

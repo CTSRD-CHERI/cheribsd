@@ -112,8 +112,9 @@ coresight_backend_init_thread(struct hwt_context *ctx)
 			event->etr.bufsize = vm->npages * PAGE_SIZE;
 
 			/*
-			 * These methods are TMC only. We have single
-			 * TMC(ETR) per system, so call them on CPU0 only.
+			 * These methods are TMC-ETR only. We have single
+			 * TMC-ETR per system, so call them on CPU0 event
+			 * only. The request will reach destination.
 			 */
 			error = coresight_setup(event);
 			if (error)
@@ -200,6 +201,7 @@ coresight_backend_deinit(void)
 		coresight_disable(event);
 	}
 
+	/* Stop TMC-ETR. */
 	event = &cs_event[0];
 	coresight_stop(event);
 

@@ -154,9 +154,9 @@ coresight_fdt_get_platform_data(device_t dev)
 	if (child)
 		coresight_fdt_get_ports(node, child, pdata, false);
 
-	//if (bootverbose)
-	printf("Total ports: in %d out %d\n",
-	    pdata->in_ports, pdata->out_ports);
+	if (bootverbose)
+		printf("Total ports: in %d out %d\n",
+		    pdata->in_ports, pdata->out_ports);
 
 	return (pdata);
 }

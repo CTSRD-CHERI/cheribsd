@@ -38,6 +38,10 @@ METHOD int init {
 	device_t dev;
 };
 
+METHOD int deinit {
+	device_t dev;
+};
+
 METHOD int setup {
 	device_t dev;
 	struct endpoint *endp;

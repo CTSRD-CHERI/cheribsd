@@ -264,7 +264,7 @@ etm_configure(device_t dev, struct endpoint *endp,
 	struct etmv4_config *config;
 	int error;
 
-	printf("%s%d\n", __func__, device_get_unit(dev));
+	dprintf("%s%d\n", __func__, device_get_unit(dev));
 
 	if (ctx->config &&
 	    ctx->config_size == sizeof(struct etmv4_config) &&
@@ -285,7 +285,7 @@ etm_init(device_t dev)
 
 	sc = device_get_softc(dev);
 
-printf("%s%d\n", __func__, device_get_unit(dev));
+	dprintf("%s%d\n", __func__, device_get_unit(dev));
 
 	/* Unlocking Coresight */
 	bus_write_4(sc->res, CORESIGHT_LAR, CORESIGHT_UNLOCK);
@@ -310,7 +310,7 @@ etm_enable(device_t dev, struct endpoint *endp,
 
 	sc = device_get_softc(dev);
 
-	printf("%s%d\n", __func__, device_get_unit(dev));
+	dprintf("%s%d\n", __func__, device_get_unit(dev));
 
 	/* Set a value for the trace ID */
 	bus_write_4(sc->res, TRCTRACEIDR, event->etm.trace_id);
