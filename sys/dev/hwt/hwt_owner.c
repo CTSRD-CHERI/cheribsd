@@ -52,6 +52,7 @@
 #include <dev/hwt/hwt_ownerhash.h>
 #include <dev/hwt/hwt_backend.h>
 #include <dev/hwt/hwt_vm.h>
+#include <dev/hwt/hwt_record.h>
 
 #define	HWT_DEBUG
 #undef	HWT_DEBUG
@@ -208,6 +209,7 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 		else
 			hwt_owner_free_threads(ctx);
 
+		hwt_record_free_all(ctx);
 		hwt_ctx_free(ctx);
 	}
 

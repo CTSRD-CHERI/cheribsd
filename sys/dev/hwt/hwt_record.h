@@ -37,5 +37,6 @@ void hwt_record(struct thread *td, struct hwt_record_entry *ent);
 struct hwt_record_entry * hwt_record_entry_alloc(void);
 void hwt_record_entry_free(struct hwt_record_entry *entry);
 void hwt_record_kernel_objects(struct hwt_context *ctx);
+void hwt_record_free_all(struct hwt_context *ctx);
 
 #endif /* !_DEV_HWT_HWT_RECORD_H_ */

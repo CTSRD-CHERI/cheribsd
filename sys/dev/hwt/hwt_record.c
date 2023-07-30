@@ -135,6 +135,28 @@ hwt_record_grab(struct hwt_context *ctx,
 	return (i);
 }
 
+void
+hwt_record_free_all(struct hwt_context *ctx)
+{
+	struct hwt_record_entry *entry;
+
+	while (1) {
+		HWT_CTX_LOCK(ctx);
+		entry = LIST_FIRST(&ctx->records);
+		if (entry)
+			LIST_REMOVE(entry, next);
+		HWT_CTX_UNLOCK(ctx);
+
+		if (entry == NULL)
+			break;
+
+		if (entry->fullpath != NULL)
+			free(entry->fullpath, M_HWT_RECORD);
+
+		free(entry, M_HWT_RECORD);
+	}
+}
+
 int
 hwt_record_send(struct hwt_context *ctx, struct hwt_record_get *record_get)
 {
