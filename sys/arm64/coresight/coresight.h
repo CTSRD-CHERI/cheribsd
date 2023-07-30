@@ -127,6 +127,9 @@ struct etr_state {
 	int npages;
 	int curpage;
 	vm_offset_t curpage_offset;
+
+	vm_page_t *pt_dir;
+	int npt;
 };
 
 struct coresight_event {

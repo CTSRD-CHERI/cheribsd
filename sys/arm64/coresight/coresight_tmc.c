@@ -39,6 +39,7 @@
 
 #include <vm/vm.h>
 #include <vm/vm_object.h>
+#include <vm/vm_param.h>
 #include <vm/vm_page.h>
 #include <vm/vm_pageout.h>
 #include <vm/vm_extern.h>
@@ -300,6 +301,33 @@ tmc_allocate_pgdir(struct tmc_softc *sc, vm_page_t *pages, int nentries,
 	return (pt_dir);
 }
 
+static void
+tmc_deallocate_pgdir(struct coresight_event *event)
+{
+	vm_page_t *pg_dir;
+	vm_page_t m;
+	int npages;
+	int i;
+
+	pg_dir = event->etr.pt_dir;
+	npages = event->etr.npt;
+
+	for (i = 0; i < npages; i++) {
+		m = pg_dir[i];
+		if (m == NULL)
+			break;
+
+		vm_page_lock(m);
+		m->oflags |= VPO_UNMANAGED;
+		m->flags &= ~PG_FICTITIOUS;
+		vm_page_unwire_noq(m);
+		vm_page_free(m);
+		vm_page_unlock(m);
+	}
+
+	free(pg_dir, M_CORESIGHT_TMC);
+}
+
 static int
 tmc_setup(device_t dev, struct endpoint *endp, struct coresight_event *event)
 {
@@ -337,6 +365,8 @@ tmc_setup(device_t dev, struct endpoint *endp, struct coresight_event *event)
 	pt_dir = tmc_allocate_pgdir(sc, pages, nentries, npt);
 	if (pt_dir == NULL)
 		return (ENOMEM);
+	event->etr.pt_dir = pt_dir;
+	event->etr.npt = npt;
 
 #ifdef TMC_DEBUG
 	ptr = (sgte_t *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(pt_dir[0]));
@@ -471,9 +501,12 @@ tmc_deinit(device_t dev)
 
 	sc = device_get_softc(dev);
 
+	if (sc->dev_type == CORESIGHT_ETR)
+		return (0);
+
 	if (sc->etf_configured == true) {
-		tmc_disable_hw(dev);
 		sc->etf_configured = false;
+		tmc_disable_hw(dev);
 	}
 
 	return (0);
@@ -565,6 +598,7 @@ tmc_stop(device_t dev, struct endpoint *endp, struct coresight_event *event)
 	/* Make final readings before we stop TMC-ETR. */
 	tmc_read(dev, endp, event);
 	tmc_disable_hw(dev);
+	tmc_deallocate_pgdir(event);
 }
 
 static void
@@ -639,8 +673,6 @@ tmc_detach(device_t dev)
 static device_method_t tmc_methods[] = {
 	/* Coresight interface */
 	DEVMETHOD(coresight_init,	tmc_init),
-
-	/* ETF only. */
 	DEVMETHOD(coresight_deinit,	tmc_deinit),
 
 	/* ETR only. */
