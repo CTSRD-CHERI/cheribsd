@@ -59,6 +59,7 @@ hwt_record_fetch(struct trace_context *tc, int *nrecords)
 	struct pmcstat_args args;
 	unsigned long addr;
 	struct hwt_record_get record_get;
+	char imagepath[PATH_MAX];
 	int nentries;
 	int error;
 	int j;
@@ -114,7 +115,11 @@ printf("%s: error %d: nent %d\n", __func__, error, nentries);
 			hwt_mmap_received(tc, entry);
 			break;
 		case HWT_RECORD_KERNEL:
-			path = pmcstat_string_intern(entry->fullpath);
+			snprintf(imagepath, sizeof(imagepath), "%s/%s",
+			    tc->fs_root, entry->fullpath);
+			printf("  image #%d: path %s addr %lx\n", j,
+			    imagepath, (unsigned long)entry->addr);
+			path = pmcstat_string_intern(imagepath);
 			if ((image = pmcstat_image_from_path(path, 1,
 			    &args, &plugins)) == NULL)
 				return (-1);

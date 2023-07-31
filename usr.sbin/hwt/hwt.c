@@ -312,8 +312,8 @@ hwt_mode_cpu(struct trace_context *tc)
 
 	error = hwt_ctx_alloc(tc);
 	if (error) {
-		printf("%s: failed to alloc kernel-mode ctx, error %d\n",
-		    __func__, error);
+		printf("%s: failed to alloc kernel-mode ctx, error %d, errno %d\n",
+		    __func__, error, errno);
 		return (error);
 	}
 
@@ -469,12 +469,16 @@ main(int argc, char **argv, char **env)
 	}
 
 	tc->mode = HWT_MODE_THREAD;
+	tc->fs_root = "/";
 
-	while ((option = getopt(argc, argv, "gs:hc:b:rw:t:i:f:")) != -1)
+	while ((option = getopt(argc, argv, "R:gs:hc:b:rw:t:i:f:")) != -1)
 		switch (option) {
 		case 's':
 			tc->mode = HWT_MODE_CPU;
 			tc->cpu = atoi(optarg);
+			break;
+		case 'R':
+			tc->fs_root = optarg;
 			break;
 		case 'c':
 			trace_dev_name = strdup(optarg);
