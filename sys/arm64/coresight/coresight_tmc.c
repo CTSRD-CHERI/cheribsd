@@ -82,6 +82,29 @@ static struct resource_spec tmc_spec[] = {
 };
 
 static int
+tmc_wait_for_tmcready(struct tmc_softc *sc)
+{
+	uint32_t reg;
+	int timeout;
+
+	timeout = 10000;
+
+	do {
+		reg = bus_read_4(sc->res[0], TMC_STS);
+		if (reg & STS_TMCREADY)
+			break;
+	} while (timeout--);
+
+	if (timeout <= 0) {
+		printf("%s: Error: TMC type %d is running\n", __func__,
+		    sc->dev_type);
+		return (EINTEGRITY);
+	}
+
+	return (0);
+}
+
+static int
 tmc_alloc_pages(struct tmc_softc *sc, vm_page_t *pages, int npages)
 {
 	vm_paddr_t low, high, boundary;
@@ -177,9 +200,7 @@ tmc_configure_etf(device_t dev)
 	dprintf("%s%d\n", __func__, device_get_unit(dev));
 
 	bus_write_4(sc->res[0], TMC_MODE, MODE_HW_FIFO);
-	bus_write_4(sc->res[0], TMC_BUFWM, 0);
-	reg = FFCR_EN_FMT | FFCR_EN_TI | FFCR_FON_FLIN |
-	    FFCR_FON_TRIG_EVT | FFCR_TRIGON_TRIGIN;
+	reg = FFCR_EN_FMT | FFCR_EN_TI;
 	bus_write_4(sc->res[0], TMC_FFCR, reg);
 
 	return (0);
@@ -339,6 +360,7 @@ tmc_setup(device_t dev, struct endpoint *endp, struct coresight_event *event)
 	int nlinks;
 	int npages;
 	int npt;
+	int error;
 
 	sc = device_get_softc(dev);
 	if (sc->dev_type == CORESIGHT_ETF)
@@ -346,6 +368,10 @@ tmc_setup(device_t dev, struct endpoint *endp, struct coresight_event *event)
 
 	if (!sc->scatter_gather)
 		return (0);
+
+	error = tmc_wait_for_tmcready(sc);
+	if (error)
+		return (error);
 
 	npages = event->etr.npages;
 	pages = event->etr.pages;
@@ -437,13 +463,13 @@ tmc_init(device_t dev)
 		dprintf(dev, "ETR configuration found\n");
 		break;
 	case DEVID_CONFIGTYPE_ETF:
+		sc->dev_type = CORESIGHT_ETF;
+		dprintf(dev, "ETF configuration found\n");
 		if (sc->etf_configured == false) {
 			tmc_configure_etf(dev);
 			tmc_enable_hw(dev);
 			sc->etf_configured = true;
 		}
-		sc->dev_type = CORESIGHT_ETF;
-		dprintf(dev, "ETF configuration found\n");
 		break;
 	default:
 		sc->dev_type = CORESIGHT_UNKNOWN;
@@ -453,18 +479,19 @@ tmc_init(device_t dev)
 	return (0);
 }
 
-static void
-tmc_disable_hw(device_t dev)
+static int
+tmc_flush(struct tmc_softc *sc, int stop_on_flush)
 {
-	struct tmc_softc *sc;
 	uint32_t reg;
 	int timeout;
 
-	sc = device_get_softc(dev);
-
 	reg = bus_read_4(sc->res[0], TMC_FFCR);
-	reg |= FFCR_STOP_ON_FLUSH;
-	bus_write_4(sc->res[0], TMC_FFCR, reg);
+
+	if (stop_on_flush) {
+		reg |= FFCR_STOP_ON_FLUSH;
+		bus_write_4(sc->res[0], TMC_FFCR, reg);
+	}
+
 	reg |= FFCR_FLUSH_MAN;
 	bus_write_4(sc->res[0], TMC_FFCR, reg);
 
@@ -477,21 +504,48 @@ tmc_disable_hw(device_t dev)
 			break;
 	} while (timeout--);
 
-	if (timeout <= 0)
+	if (timeout <= 0) {
+		printf("%s: could not flush TMC\n", __func__);
+		return (EINTEGRITY);
+	}
+
+	return (0);
+}
+
+static void
+tmc_disable_hw(device_t dev)
+{
+	struct tmc_softc *sc;
+	int error;
+
+	sc = device_get_softc(dev);
+
+	error = tmc_flush(sc, 1);
+	if (error)
 		printf("%s: could not flush TMC\n", __func__);
 
-	timeout = 10000;
-
-	do {
-		reg = bus_read_4(sc->res[0], TMC_STS);
-	} while ((reg & STS_TMCREADY) == 0 && timeout--);
-
-	if (timeout <= 0)
+#if 1
+	error = tmc_wait_for_tmcready(sc);
+	if (error)
 		printf("%s: could not get TMC ready\n", __func__);
 
 	bus_write_4(sc->res[0], TMC_CTL, 0);
+#endif
 
 	dprintf("%s: tmc type %d disabled\n", __func__, sc->dev_type);
+}
+
+static void
+tmc_disable(device_t dev, struct endpoint *endp, struct coresight_event *event)
+{
+	struct tmc_softc *sc;
+
+	sc = device_get_softc(dev);
+
+	if (sc->dev_type == CORESIGHT_ETR)
+		return;
+
+	tmc_flush(sc, 0);
 }
 
 static int
@@ -516,25 +570,17 @@ static int
 tmc_start(device_t dev, struct endpoint *endp, struct coresight_event *event)
 {
 	struct tmc_softc *sc;
-	uint32_t reg;
-	int timeout;
+	int error;
 
 	sc = device_get_softc(dev);
 	if (sc->dev_type == CORESIGHT_ETF)
 		return (0);
 
-	dprintf("%s%d\n", __func__, device_get_unit(dev));
+	dprintf("%s%d type %d\n", __func__, device_get_unit(dev), sc->dev_type);
 
-	timeout = 10000;
-
-	do {
-		reg = bus_read_4(sc->res[0], TMC_STS);
-	} while ((reg & STS_TMCREADY) == 0 && timeout--);
-
-	if (timeout <= 0) {
-		printf("%s: could not get TMC ready\n", __func__);
-		return (EINTEGRITY);
-	}
+	error = tmc_wait_for_tmcready(sc);
+	if (error)
+		return (error);
 
 	tmc_configure_etr(dev, endp, event);
 	tmc_enable_hw(dev);
@@ -593,7 +639,7 @@ tmc_stop(device_t dev, struct endpoint *endp, struct coresight_event *event)
 	if (sc->dev_type == CORESIGHT_ETF)
 		return;
 
-	dprintf("%s%d\n", __func__, device_get_unit(dev));
+	dprintf("%s%d type %d\n", __func__, device_get_unit(dev), sc->dev_type);
 
 	/* Make final readings before we stop TMC-ETR. */
 	tmc_read(dev, endp, event);
@@ -673,7 +719,10 @@ tmc_detach(device_t dev)
 static device_method_t tmc_methods[] = {
 	/* Coresight interface */
 	DEVMETHOD(coresight_init,	tmc_init),
+
+	/* ETF only. */
 	DEVMETHOD(coresight_deinit,	tmc_deinit),
+	DEVMETHOD(coresight_disable,	tmc_disable),
 
 	/* ETR only. */
 	DEVMETHOD(coresight_setup,	tmc_setup),

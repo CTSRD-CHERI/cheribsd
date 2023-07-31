@@ -72,6 +72,10 @@ static struct hwt_backend backend = {
 };
 static struct coresight_event cs_event[MAXCPU];
 
+/*
+ * https://people.freebsd.org/~br/coresight_diagram.png
+ */
+
 static int
 coresight_backend_init_thread(struct hwt_context *ctx)
 {
@@ -103,28 +107,27 @@ coresight_backend_init_thread(struct hwt_context *ctx)
 		error = coresight_init_event(event, cpu_id);
 		if (error)
 			return (error);
-
-		if (cpu_id == 0) {
-			event->etr.low = 0;
-			event->etr.high = 0;
-			event->etr.pages = vm->pages;
-			event->etr.npages = vm->npages;
-			event->etr.bufsize = vm->npages * PAGE_SIZE;
-
-			/*
-			 * These methods are TMC-ETR only. We have single
-			 * TMC-ETR per system, so call them on CPU0 event
-			 * only. The request will reach destination.
-			 */
-			error = coresight_setup(event);
-			if (error)
-				return (error);
-
-			error = coresight_start(event);
-			if (error)
-				return (error);
-		}
 	}
+
+	/*
+	 * These methods are TMC-ETR only. We have single
+	 * TMC-ETR per system, so call them on CPU0 event
+	 * only. The request will reach destination.
+	 */
+	event = &cs_event[0];
+	event->etr.low = 0;
+	event->etr.high = 0;
+	event->etr.pages = vm->pages;
+	event->etr.npages = vm->npages;
+	event->etr.bufsize = vm->npages * PAGE_SIZE;
+
+	error = coresight_setup(event);
+	if (error)
+		return (error);
+
+	error = coresight_start(event);
+	if (error)
+		return (error);
 
 	return (0);
 }
@@ -138,9 +141,6 @@ coresight_backend_init_cpu(struct hwt_context *ctx)
 	int cpu_id;
 
 	CPU_FOREACH(cpu_id) {
-		if (!CPU_ISSET(cpu_id, &ctx->cpu_map))
-			continue;
-
 		event = &cs_event[cpu_id];
 		memset(event, 0, sizeof(struct coresight_event));
 
@@ -153,8 +153,11 @@ coresight_backend_init_cpu(struct hwt_context *ctx)
 			return (error);
 	}
 
-	/* The following is TMC (ETR) only, so pick vm from the first CPU */
-	event = &cs_event[CPU_FFS(&ctx->cpu_map) - 1];
+	/*
+	 * The following is TMC (ETR) only, so pick vm from the first CPU.
+	 */
+	event = &cs_event[0];
+
 	HWT_CTX_LOCK(ctx);
 	vm = hwt_cpu_first(ctx)->vm;
 	HWT_CTX_UNLOCK(ctx);
@@ -201,7 +204,7 @@ coresight_backend_deinit(void)
 		coresight_disable(event);
 	}
 
-	/* Stop TMC-ETR. */
+	/* Now as TMC-ETF buffers flushed, stop TMC-ETR. */
 	event = &cs_event[0];
 	coresight_stop(event);
 
