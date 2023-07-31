@@ -41,6 +41,7 @@
 #include <sys/refcount.h>
 #include <sys/rwlock.h>
 #include <sys/hwt.h>
+#include <sys/smp.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -192,6 +193,24 @@ hwt_vm_mmap_single(struct cdev *cdev, vm_ooffset_t *offset,
 	return (0);
 }
 
+static void
+hwt_vm_start_cpu_mode(struct hwt_context *ctx)
+{
+	int cpu_id;
+
+	CPU_FOREACH(cpu_id) {
+		if (!CPU_ISSET(cpu_id, &ctx->cpu_map))
+			continue;
+
+		/* Ensure CPU is not halted. */
+		if (CPU_ISSET(cpu_id, &hlt_cpus_mask))
+			return;
+
+		hwt_backend_configure(ctx, cpu_id, cpu_id);
+		hwt_backend_enable(ctx, cpu_id);
+	}
+}
+
 static int
 hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
     struct thread *td)
@@ -203,7 +222,6 @@ hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	struct hwt_context *ctx;
 	struct hwt_vm *vm;
 	struct hwt_owner *ho;
-	struct hwt_cpu *cpu;
 
 	vm_offset_t curpage_offset;
 	int cpu_id;
@@ -225,8 +243,7 @@ hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 	switch (cmd) {
 	case HWT_IOC_START:
-		/* Start tracing. */
-		dprintf("%s: start\n", __func__);
+		dprintf("%s: start tracing\n", __func__);
 
 		HWT_CTX_LOCK(ctx);
 		if (ctx->state == CTX_STATE_RUNNING) {
@@ -237,11 +254,9 @@ hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		ctx->state = CTX_STATE_RUNNING;
 		HWT_CTX_UNLOCK(ctx);
 
-		if (ctx->mode == HWT_MODE_CPU) {
-			cpu = vm->cpu;
-			hwt_backend_configure(ctx, cpu->cpu_id, cpu->cpu_id);
-			hwt_backend_enable(ctx, cpu->cpu_id);
-		} else {
+		if (ctx->mode == HWT_MODE_CPU)
+			hwt_vm_start_cpu_mode(ctx);
+		else {
 			/*
 			 * Tracing backend will be configured and enabled
 			 * during hook invocation. See hwt_hook.c.
