@@ -524,13 +524,11 @@ tmc_disable_hw(device_t dev)
 	if (error)
 		printf("%s: could not flush TMC\n", __func__);
 
-#if 1
 	error = tmc_wait_for_tmcready(sc);
 	if (error)
 		printf("%s: could not get TMC ready\n", __func__);
 
 	bus_write_4(sc->res[0], TMC_CTL, 0);
-#endif
 
 	dprintf("%s: tmc type %d disabled\n", __func__, sc->dev_type);
 }
