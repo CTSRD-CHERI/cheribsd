@@ -231,6 +231,9 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 	char path[MAXPATHLEN];
 	int error;
 	int cpu_id;
+	int cpu_count;
+
+	cpu_count = 0;
 
 	CPU_FOREACH(cpu_id) {
 		if (!CPU_ISSET(cpu_id, &halloc->cpu_map))
@@ -244,7 +247,12 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 		if (ctx)
 			return (EEXIST);
 #endif
+
+		cpu_count++;
 	}
+
+	if (cpu_count == 0)
+		return (ENODEV);
 
 	/* Allocate a new HWT context. */
 	ctx = hwt_ctx_alloc();
