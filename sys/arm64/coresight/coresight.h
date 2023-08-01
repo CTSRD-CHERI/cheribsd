@@ -132,7 +132,7 @@ struct etr_state {
 	int npt;
 };
 
-struct coresight_event {
+struct coresight_pipeline {
 	TAILQ_HEAD(endplistname, endpoint) endplist;
 
 	uint64_t addr[ETM_N_COMPRATOR];
@@ -164,22 +164,22 @@ struct coresight_device *
     struct endpoint *endp, struct endpoint **);
 int coresight_register(struct coresight_desc *desc);
 
-int coresight_init_event(struct coresight_event *event, int cpu);
-void coresight_deinit_event(struct coresight_event *event);
+int coresight_init_pipeline(struct coresight_pipeline *pipeline, int cpu);
+void coresight_deinit_pipeline(struct coresight_pipeline *pipeline);
 
-int coresight_setup(struct coresight_event *event);
-int coresight_configure(struct coresight_event *event,
+int coresight_setup(struct coresight_pipeline *pipeline);
+int coresight_configure(struct coresight_pipeline *pipeline,
     struct hwt_context *ctx);
-void coresight_deconfigure(struct coresight_event *event);
+void coresight_deconfigure(struct coresight_pipeline *pipeline);
 
-int coresight_start(struct coresight_event *event);
-void coresight_stop(struct coresight_event *event);
+int coresight_start(struct coresight_pipeline *pipeline);
+void coresight_stop(struct coresight_pipeline *pipeline);
 
-void coresight_enable(struct coresight_event *event);
-void coresight_disable(struct coresight_event *event);
+void coresight_enable(struct coresight_pipeline *pipeline);
+void coresight_disable(struct coresight_pipeline *pipeline);
 
-int coresight_read(struct coresight_event *event);
-void coresight_dump(struct coresight_event *event);
+int coresight_read(struct coresight_pipeline *pipeline);
+void coresight_dump(struct coresight_pipeline *pipeline);
 
 int coresight_unregister(device_t dev);
 

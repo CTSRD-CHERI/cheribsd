@@ -75,7 +75,7 @@ funnel_init(device_t dev)
 
 static int
 funnel_configure(device_t dev, struct endpoint *endp,
-    struct coresight_event *event, struct hwt_context *ctx)
+    struct coresight_pipeline *pipeline, struct hwt_context *ctx)
 {
 	struct funnel_softc *sc;
 	uint32_t reg;
@@ -95,7 +95,7 @@ funnel_configure(device_t dev, struct endpoint *endp,
 
 static void
 funnel_deconfigure(device_t dev, struct endpoint *endp,
-    struct coresight_event *event)
+    struct coresight_pipeline *pipeline)
 {
 	struct funnel_softc *sc;
 	uint32_t reg;

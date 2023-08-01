@@ -208,7 +208,7 @@ tmc_configure_etf(device_t dev)
 
 static int
 tmc_configure_etr(device_t dev, struct endpoint *endp,
-    struct coresight_event *event)
+    struct coresight_pipeline *pipeline)
 {
 	struct tmc_softc *sc;
 	uint32_t reg;
@@ -234,16 +234,16 @@ tmc_configure_etr(device_t dev, struct endpoint *endp,
 	bus_write_4(sc->res[0], TMC_TRG, 0x3ff);
 
 	if (sc->scatter_gather) {
-		dprintf("%s: event->etr.pages %p\n", __func__,
-		    event->etr.pages);
-		dprintf("%s: event->etr.npages %d\n", __func__,
-		    event->etr.npages);
+		dprintf("%s: pipeline->etr.pages %p\n", __func__,
+		    pipeline->etr.pages);
+		dprintf("%s: pipeline->etr.npages %d\n", __func__,
+		    pipeline->etr.npages);
 	} else {
-		bus_write_4(sc->res[0], TMC_DBALO, event->etr.low);
-		bus_write_4(sc->res[0], TMC_DBAHI, event->etr.high);
-		bus_write_4(sc->res[0], TMC_RSZ, event->etr.bufsize / 4);
-		bus_write_4(sc->res[0], TMC_RRP, event->etr.low);
-		bus_write_4(sc->res[0], TMC_RWP, event->etr.low);
+		bus_write_4(sc->res[0], TMC_DBALO, pipeline->etr.low);
+		bus_write_4(sc->res[0], TMC_DBAHI, pipeline->etr.high);
+		bus_write_4(sc->res[0], TMC_RSZ, pipeline->etr.bufsize / 4);
+		bus_write_4(sc->res[0], TMC_RRP, pipeline->etr.low);
+		bus_write_4(sc->res[0], TMC_RWP, pipeline->etr.low);
 	}
 
 	reg = bus_read_4(sc->res[0], TMC_STS);
@@ -323,15 +323,15 @@ tmc_allocate_pgdir(struct tmc_softc *sc, vm_page_t *pages, int nentries,
 }
 
 static void
-tmc_deallocate_pgdir(struct coresight_event *event)
+tmc_deallocate_pgdir(struct coresight_pipeline *pipeline)
 {
 	vm_page_t *pg_dir;
 	vm_page_t m;
 	int npages;
 	int i;
 
-	pg_dir = event->etr.pt_dir;
-	npages = event->etr.npt;
+	pg_dir = pipeline->etr.pt_dir;
+	npages = pipeline->etr.npt;
 
 	for (i = 0; i < npages; i++) {
 		m = pg_dir[i];
@@ -350,7 +350,8 @@ tmc_deallocate_pgdir(struct coresight_event *event)
 }
 
 static int
-tmc_setup(device_t dev, struct endpoint *endp, struct coresight_event *event)
+tmc_setup(device_t dev, struct endpoint *endp,
+    struct coresight_pipeline *pipeline)
 {
 	struct tmc_softc *sc;
 	vm_page_t *pt_dir;
@@ -373,8 +374,8 @@ tmc_setup(device_t dev, struct endpoint *endp, struct coresight_event *event)
 	if (error)
 		return (error);
 
-	npages = event->etr.npages;
-	pages = event->etr.pages;
+	npages = pipeline->etr.npages;
+	pages = pipeline->etr.pages;
 
 	if (npages == 0 || pages == NULL)
 		return (EINVAL);
@@ -391,8 +392,8 @@ tmc_setup(device_t dev, struct endpoint *endp, struct coresight_event *event)
 	pt_dir = tmc_allocate_pgdir(sc, pages, nentries, npt);
 	if (pt_dir == NULL)
 		return (ENOMEM);
-	event->etr.pt_dir = pt_dir;
-	event->etr.npt = npt;
+	pipeline->etr.pt_dir = pt_dir;
+	pipeline->etr.npt = npt;
 
 #ifdef TMC_DEBUG
 	ptr = (sgte_t *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(pt_dir[0]));
@@ -400,8 +401,9 @@ tmc_setup(device_t dev, struct endpoint *endp, struct coresight_event *event)
 		dprintf("%s: entry %x\n", __func__, *ptr++);
 #endif
 
-	dprintf("%s: event->etr.pages %p\n", __func__, event->etr.pages);
-	dprintf("%s: event->etr.npages %d\n", __func__, event->etr.npages);
+	dprintf("%s: pipeline->etr.pages %p\n", __func__, pipeline->etr.pages);
+	dprintf("%s: pipeline->etr.npages %d\n", __func__,
+	    pipeline->etr.npages);
 
 	pbase = (uint64_t)VM_PAGE_TO_PHYS(pt_dir[0]);
 
@@ -409,7 +411,7 @@ tmc_setup(device_t dev, struct endpoint *endp, struct coresight_event *event)
 
 	bus_write_4(sc->res[0], TMC_DBALO, pbase & 0xffffffff);
 	bus_write_4(sc->res[0], TMC_DBAHI, pbase >> 32);
-	bus_write_4(sc->res[0], TMC_RSZ, (event->etr.npages * 4096) / 4);
+	bus_write_4(sc->res[0], TMC_RSZ, (pipeline->etr.npages * 4096) / 4);
 
 	return (0);
 }
@@ -534,7 +536,8 @@ tmc_disable_hw(device_t dev)
 }
 
 static void
-tmc_disable(device_t dev, struct endpoint *endp, struct coresight_event *event)
+tmc_disable(device_t dev, struct endpoint *endp,
+    struct coresight_pipeline *pipeline)
 {
 	struct tmc_softc *sc;
 
@@ -565,7 +568,8 @@ tmc_deinit(device_t dev)
 }
 
 static int
-tmc_start(device_t dev, struct endpoint *endp, struct coresight_event *event)
+tmc_start(device_t dev, struct endpoint *endp,
+    struct coresight_pipeline *pipeline)
 {
 	struct tmc_softc *sc;
 	int error;
@@ -580,14 +584,15 @@ tmc_start(device_t dev, struct endpoint *endp, struct coresight_event *event)
 	if (error)
 		return (error);
 
-	tmc_configure_etr(dev, endp, event);
+	tmc_configure_etr(dev, endp, pipeline);
 	tmc_enable_hw(dev);
 
 	return (0);
 }
 
 static int
-tmc_read(device_t dev, struct endpoint *endp, struct coresight_event *event)
+tmc_read(device_t dev, struct endpoint *endp,
+    struct coresight_pipeline *pipeline)
 {
 	struct tmc_softc *sc;
 	vm_page_t page;
@@ -608,18 +613,18 @@ tmc_read(device_t dev, struct endpoint *endp, struct coresight_event *event)
 
 	found = false;
 
-	for (i = 0; i < event->etr.npages; i++) {
-		if (event->etr.pages[i] == page) {
+	for (i = 0; i < pipeline->etr.npages; i++) {
+		if (pipeline->etr.pages[i] == page) {
 			found = true;
 			break;
 		}
 	}
 
 	if (found) {
-		event->etr.curpage = i;
-		event->etr.curpage_offset = ptr & 0xfff;
+		pipeline->etr.curpage = i;
+		pipeline->etr.curpage_offset = ptr & 0xfff;
 		dprintf("CUR_PTR %lx, page %d of %d, offset %ld\n",
-		    ptr, i, event->etr.npages, event->etr.curpage_offset);
+		    ptr, i, pipeline->etr.npages, pipeline->etr.curpage_offset);
 
 		return (0);
 	} else
@@ -629,7 +634,8 @@ tmc_read(device_t dev, struct endpoint *endp, struct coresight_event *event)
 }
 
 static void
-tmc_stop(device_t dev, struct endpoint *endp, struct coresight_event *event)
+tmc_stop(device_t dev, struct endpoint *endp,
+    struct coresight_pipeline *pipeline)
 {
 	struct tmc_softc *sc;
 
@@ -640,9 +646,9 @@ tmc_stop(device_t dev, struct endpoint *endp, struct coresight_event *event)
 	dprintf("%s%d type %d\n", __func__, device_get_unit(dev), sc->dev_type);
 
 	/* Make final readings before we stop TMC-ETR. */
-	tmc_read(dev, endp, event);
+	tmc_read(dev, endp, pipeline);
 	tmc_disable_hw(dev);
-	tmc_deallocate_pgdir(event);
+	tmc_deallocate_pgdir(pipeline);
 }
 
 static void

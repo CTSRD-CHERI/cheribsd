@@ -70,7 +70,7 @@ static struct hwt_backend backend = {
 		.ops = &coresight_ops,
 		.name = "coresight",
 };
-static struct coresight_event cs_event[MAXCPU];
+static struct coresight_pipeline cs_pipeline[MAXCPU];
 
 /*
  * https://people.freebsd.org/~br/coresight_diagram.png
@@ -79,7 +79,7 @@ static struct coresight_event cs_event[MAXCPU];
 static int
 coresight_backend_init_thread(struct hwt_context *ctx)
 {
-	struct coresight_event *event;
+	struct coresight_pipeline *pipeline;
 	struct hwt_thread *thr;
 	struct hwt_vm *vm;
 	int cpu_id;
@@ -98,34 +98,34 @@ coresight_backend_init_thread(struct hwt_context *ctx)
 	vm = thr->vm;
 
 	for (cpu_id = 0; cpu_id < mp_ncpus; cpu_id++) {
-		event = &cs_event[cpu_id];
-		memset(event, 0, sizeof(struct coresight_event));
-		event->excp_level = 0;
-		event->src = CORESIGHT_ETMV4;
-		event->sink = CORESIGHT_TMC_ETR;
+		pipeline = &cs_pipeline[cpu_id];
+		memset(pipeline, 0, sizeof(struct coresight_pipeline));
+		pipeline->excp_level = 0;
+		pipeline->src = CORESIGHT_ETMV4;
+		pipeline->sink = CORESIGHT_TMC_ETR;
 
-		error = coresight_init_event(event, cpu_id);
+		error = coresight_init_pipeline(pipeline, cpu_id);
 		if (error)
 			return (error);
 	}
 
 	/*
 	 * These methods are TMC-ETR only. We have single
-	 * TMC-ETR per system, so call them on CPU0 event
+	 * TMC-ETR per system, so call them on first pipeline
 	 * only. The request will reach destination.
 	 */
-	event = &cs_event[0];
-	event->etr.low = 0;
-	event->etr.high = 0;
-	event->etr.pages = vm->pages;
-	event->etr.npages = vm->npages;
-	event->etr.bufsize = vm->npages * PAGE_SIZE;
+	pipeline = &cs_pipeline[0];
+	pipeline->etr.low = 0;
+	pipeline->etr.high = 0;
+	pipeline->etr.pages = vm->pages;
+	pipeline->etr.npages = vm->npages;
+	pipeline->etr.bufsize = vm->npages * PAGE_SIZE;
 
-	error = coresight_setup(event);
+	error = coresight_setup(pipeline);
 	if (error)
 		return (error);
 
-	error = coresight_start(event);
+	error = coresight_start(pipeline);
 	if (error)
 		return (error);
 
@@ -135,20 +135,20 @@ coresight_backend_init_thread(struct hwt_context *ctx)
 static int
 coresight_backend_init_cpu(struct hwt_context *ctx)
 {
-	struct coresight_event *event;
+	struct coresight_pipeline *pipeline;
 	struct hwt_vm *vm;
 	int error;
 	int cpu_id;
 
 	CPU_FOREACH(cpu_id) {
-		event = &cs_event[cpu_id];
-		memset(event, 0, sizeof(struct coresight_event));
+		pipeline = &cs_pipeline[cpu_id];
+		memset(pipeline, 0, sizeof(struct coresight_pipeline));
 
-		event->excp_level = 1;
-		event->src = CORESIGHT_ETMV4;
-		event->sink = CORESIGHT_TMC_ETR;
+		pipeline->excp_level = 1;
+		pipeline->src = CORESIGHT_ETMV4;
+		pipeline->sink = CORESIGHT_TMC_ETR;
 
-		error = coresight_init_event(event, cpu_id);
+		error = coresight_init_pipeline(pipeline, cpu_id);
 		if (error)
 			return (error);
 	}
@@ -156,24 +156,24 @@ coresight_backend_init_cpu(struct hwt_context *ctx)
 	/*
 	 * The following is TMC (ETR) only, so pick vm from the first CPU.
 	 */
-	event = &cs_event[0];
+	pipeline = &cs_pipeline[0];
 
 	HWT_CTX_LOCK(ctx);
 	vm = hwt_cpu_first(ctx)->vm;
 	HWT_CTX_UNLOCK(ctx);
 
 	/* TMC(ETR) configuration. */
-	event->etr.low = 0;
-	event->etr.high = 0;
-	event->etr.pages = vm->pages;
-	event->etr.npages = vm->npages;
-	event->etr.bufsize = vm->npages * PAGE_SIZE;
+	pipeline->etr.low = 0;
+	pipeline->etr.high = 0;
+	pipeline->etr.pages = vm->pages;
+	pipeline->etr.npages = vm->npages;
+	pipeline->etr.bufsize = vm->npages * PAGE_SIZE;
 
-	error = coresight_setup(event);
+	error = coresight_setup(pipeline);
 	if (error)
 		return (error);
 
-	error = coresight_start(event);
+	error = coresight_start(pipeline);
 	if (error)
 		return (error);
 
@@ -196,31 +196,31 @@ coresight_backend_init(struct hwt_context *ctx)
 static void
 coresight_backend_deinit(void)
 {
-	struct coresight_event *event;
+	struct coresight_pipeline *pipeline;
 	int cpu_id;
 
 	for (cpu_id = 0; cpu_id < mp_ncpus; cpu_id++) {
-		event = &cs_event[cpu_id];
-		coresight_disable(event);
+		pipeline = &cs_pipeline[cpu_id];
+		coresight_disable(pipeline);
 	}
 
 	/* Now as TMC-ETF buffers flushed, stop TMC-ETR. */
-	event = &cs_event[0];
-	coresight_stop(event);
+	pipeline = &cs_pipeline[0];
+	coresight_stop(pipeline);
 
 	for (cpu_id = 0; cpu_id < mp_ncpus; cpu_id++) {
-		event = &cs_event[cpu_id];
-		coresight_deinit_event(event);
+		pipeline = &cs_pipeline[cpu_id];
+		coresight_deinit_pipeline(pipeline);
 	}
 }
 
 static int
 coresight_backend_configure(struct hwt_context *ctx, int cpu_id, int session_id)
 {
-	struct coresight_event *event;
+	struct coresight_pipeline *pipeline;
 	int error;
 
-	event = &cs_event[cpu_id];
+	pipeline = &cs_pipeline[cpu_id];
 
 	/*
 	 * OpenCSD needs a trace ID to distinguish trace sessions
@@ -229,9 +229,9 @@ coresight_backend_configure(struct hwt_context *ctx, int cpu_id, int session_id)
 	 *
 	 * etmv4 session_id can't be 0.
 	 */
-	event->etm.trace_id = session_id + 1;
+	pipeline->etm.trace_id = session_id + 1;
 
-	error = coresight_configure(event, ctx);
+	error = coresight_configure(pipeline, ctx);
 
 	return (error);
 }
@@ -239,43 +239,43 @@ coresight_backend_configure(struct hwt_context *ctx, int cpu_id, int session_id)
 static void
 coresight_backend_enable(int cpu_id)
 {
-	struct coresight_event *event;
+	struct coresight_pipeline *pipeline;
 
-	event = &cs_event[cpu_id];
+	pipeline = &cs_pipeline[cpu_id];
 
-	coresight_enable(event);
+	coresight_enable(pipeline);
 }
 
 static void
 coresight_backend_disable(int cpu_id)
 {
-	struct coresight_event *event;
+	struct coresight_pipeline *pipeline;
 
-	event = &cs_event[cpu_id];
+	pipeline = &cs_pipeline[cpu_id];
 
-	coresight_disable(event);
+	coresight_disable(pipeline);
 }
 
 static int
 coresight_backend_read(int cpu_id, int *curpage, vm_offset_t *curpage_offset)
 {
-	struct coresight_event *event;
+	struct coresight_pipeline *pipeline;
 	int error;
 
 	/*
 	 * coresight_read() is TMC(ETR) only method. Also, we have a single
-	 * TMC(ETR) per system configured from event 0. So read data from
-	 * event 0.
+	 * TMC(ETR) per system configured from pipeline 0. So read data from
+	 * pipeline 0.
 	 */
 
-	event = &cs_event[0];
+	pipeline = &cs_pipeline[0];
 
-	KASSERT(event != NULL, ("No event found"));
+	KASSERT(pipeline != NULL, ("No pipeline found"));
 
-	error = coresight_read(event);
+	error = coresight_read(pipeline);
 	if (error == 0) {
-		*curpage = event->etr.curpage;
-		*curpage_offset = event->etr.curpage_offset;
+		*curpage = pipeline->etr.curpage;
+		*curpage_offset = pipeline->etr.curpage_offset;
 	}
 
 	return (error);
@@ -284,11 +284,11 @@ coresight_backend_read(int cpu_id, int *curpage, vm_offset_t *curpage_offset)
 static void
 coresight_backend_dump(int cpu_id)
 {
-	struct coresight_event *event;
+	struct coresight_pipeline *pipeline;
 
-	event = &cs_event[cpu_id];
+	pipeline = &cs_pipeline[cpu_id];
 
-	coresight_dump(event);
+	coresight_dump(pipeline);
 }
 
 static struct hwt_backend_ops coresight_ops = {

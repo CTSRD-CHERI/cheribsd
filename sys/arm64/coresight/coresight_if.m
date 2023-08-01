@@ -45,44 +45,44 @@ METHOD int deinit {
 METHOD int setup {
 	device_t dev;
 	struct endpoint *endp;
-	struct coresight_event *event;
+	struct coresight_pipeline *pipeline;
 };
 
 METHOD int configure {
 	device_t dev;
 	struct endpoint *endp;
-	struct coresight_event *event;
+	struct coresight_pipeline *pipeline;
 	struct hwt_context *ctx;
 };
 
 METHOD void deconfigure {
 	device_t dev;
 	struct endpoint *endp;
-	struct coresight_event *event;
+	struct coresight_pipeline *pipeline;
 };
 
 METHOD int start {
 	device_t dev;
 	struct endpoint *endp;
-	struct coresight_event *event;
+	struct coresight_pipeline *pipeline;
 };
 
 METHOD void stop {
 	device_t dev;
 	struct endpoint *endp;
-	struct coresight_event *event;
+	struct coresight_pipeline *pipeline;
 }
 
 METHOD int enable {
 	device_t dev;
 	struct endpoint *endp;
-	struct coresight_event *event;
+	struct coresight_pipeline *pipeline;
 };
 
 METHOD void disable {
 	device_t dev;
 	struct endpoint *endp;
-	struct coresight_event *event;
+	struct coresight_pipeline *pipeline;
 };
 
 METHOD void dump {
@@ -92,5 +92,5 @@ METHOD void dump {
 METHOD int read {
 	device_t dev;
 	struct endpoint *endp;
-	struct coresight_event *event;
+	struct coresight_pipeline *pipeline;
 };

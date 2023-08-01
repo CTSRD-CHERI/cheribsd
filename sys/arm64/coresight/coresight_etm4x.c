@@ -152,7 +152,7 @@ etm_configure_etmv4(device_t dev, struct etmv4_config *config)
 }
 
 static int
-etm_configure_etmv4_default(device_t dev, struct coresight_event *event)
+etm_configure_etmv4_default(device_t dev, struct coresight_pipeline *pipeline)
 {
 	struct etm_softc *sc;
 	uint32_t reg;
@@ -205,27 +205,27 @@ etm_configure_etmv4_default(device_t dev, struct coresight_event *event)
 	/* The number of the single resource used to activate the event. */
 	reg |= (1 << EVENT_SEL_S);
 
-	if (event->excp_level > 2)
+	if (pipeline->excp_level > 2)
 		return (-1);
 
 	reg |= TRCVICTLR_EXLEVEL_NS_M;
-	reg &= ~TRCVICTLR_EXLEVEL_NS(event->excp_level);
+	reg &= ~TRCVICTLR_EXLEVEL_NS(pipeline->excp_level);
 	reg |= TRCVICTLR_EXLEVEL_S_M;
-	reg &= ~TRCVICTLR_EXLEVEL_S(event->excp_level);
+	reg &= ~TRCVICTLR_EXLEVEL_S(pipeline->excp_level);
 	bus_write_4(sc->res, TRCVICTLR, reg);
 
-	for (i = 0; i < event->naddr * 2; i++) {
+	for (i = 0; i < pipeline->naddr * 2; i++) {
 		dprintf("configure range %d, address %lx\n",
-		    i, event->addr[i]);
-		bus_write_8(sc->res, TRCACVR(i), event->addr[i]);
+		    i, pipeline->addr[i]);
+		bus_write_8(sc->res, TRCACVR(i), pipeline->addr[i]);
 
 		reg = 0;
 		/* Secure state */
 		reg |= TRCACATR_EXLEVEL_S_M;
-		reg &= ~TRCACATR_EXLEVEL_S(event->excp_level);
+		reg &= ~TRCACATR_EXLEVEL_S(pipeline->excp_level);
 		/* Non-secure state */
 		reg |= TRCACATR_EXLEVEL_NS_M;
-		reg &= ~TRCACATR_EXLEVEL_NS(event->excp_level);
+		reg &= ~TRCACATR_EXLEVEL_NS(pipeline->excp_level);
 		bus_write_4(sc->res, TRCACATR(i), reg);
 
 		/* Address range is included */
@@ -240,7 +240,7 @@ etm_configure_etmv4_default(device_t dev, struct coresight_event *event)
 	/* Clear the STATUS bit to zero */
 	bus_write_4(sc->res, TRCSSCSR(0), 0);
 
-	if (event->naddr == 0) {
+	if (pipeline->naddr == 0) {
 		/* No address range filtering for ViewInst. */
 		bus_write_4(sc->res, TRCVIIECTLR, 0);
 	}
@@ -259,7 +259,7 @@ etm_configure_etmv4_default(device_t dev, struct coresight_event *event)
 
 static int
 etm_configure(device_t dev, struct endpoint *endp,
-    struct coresight_event *event, struct hwt_context *ctx)
+    struct coresight_pipeline *pipeline, struct hwt_context *ctx)
 {
 	struct etmv4_config *config;
 	int error;
@@ -272,7 +272,7 @@ etm_configure(device_t dev, struct endpoint *endp,
 		config = (struct etmv4_config *)ctx->config;
 		error = etm_configure_etmv4(dev, config);
 	} else
-		error = etm_configure_etmv4_default(dev, event);
+		error = etm_configure_etmv4_default(dev, pipeline);
 
 	return (error);
 }
@@ -303,7 +303,7 @@ etm_init(device_t dev)
 
 static int
 etm_enable(device_t dev, struct endpoint *endp,
-    struct coresight_event *event)
+    struct coresight_pipeline *pipeline)
 {
 	struct etm_softc *sc;
 	uint32_t reg;
@@ -313,7 +313,7 @@ etm_enable(device_t dev, struct endpoint *endp,
 	dprintf("%s%d\n", __func__, device_get_unit(dev));
 
 	/* Set a value for the trace ID */
-	bus_write_4(sc->res, TRCTRACEIDR, event->etm.trace_id);
+	bus_write_4(sc->res, TRCTRACEIDR, pipeline->etm.trace_id);
 
 	/* Enable the trace unit */
 	reg = bus_read_4(sc->res, TRCPRGCTLR);
@@ -337,7 +337,7 @@ etm_enable(device_t dev, struct endpoint *endp,
 
 static void
 etm_disable(device_t dev, struct endpoint *endp,
-    struct coresight_event *event)
+    struct coresight_pipeline *pipeline)
 {
 	struct etm_softc *sc;
 	uint32_t reg;
