@@ -60,7 +60,6 @@ coresight_next_device(struct coresight_device *cs_dev,
 			if (TAILQ_EMPTY(&pipeline->endplist)) {
 
 				/* Add source device */
-
 				src_endp = malloc(sizeof(struct endpoint),
 				    M_CORESIGHT, M_WAITOK | M_ZERO);
 				memcpy(src_endp, endp, sizeof(struct endpoint));
@@ -86,7 +85,7 @@ coresight_next_device(struct coresight_device *cs_dev,
 }
 
 static int
-coresight_build_list(struct coresight_device *cs_dev,
+coresight_build_pipeline(struct coresight_device *cs_dev,
     struct coresight_pipeline *pipeline)
 {
 	struct coresight_device *out;
@@ -110,7 +109,7 @@ coresight_init_pipeline(struct coresight_pipeline *pipeline, int cpu)
 		if (cs_dev->dev_type == pipeline->src &&
 		    cs_dev->pdata->cpu == cpu) {
 			TAILQ_INIT(&pipeline->endplist);
-			coresight_build_list(cs_dev, pipeline);
+			coresight_build_pipeline(cs_dev, pipeline);
 			break;
 		}
 	}
