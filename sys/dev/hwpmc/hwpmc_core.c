@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2008 Joseph Koshy
  * All rights reserved.
@@ -330,17 +330,11 @@ iaf_config_pmc(int cpu, int ri, struct pmc *pm)
 static int
 iaf_describe(int cpu, int ri, struct pmc_info *pi, struct pmc **ppmc)
 {
-	int error;
 	struct pmc_hw *phw;
-	char iaf_name[PMC_NAME_MAX];
 
 	phw = &core_pcpu[cpu]->pc_corepmcs[ri + core_iaf_ri];
 
-	(void) snprintf(iaf_name, sizeof(iaf_name), "IAF-%d", ri);
-	if ((error = copystr(iaf_name, pi->pm_name, PMC_NAME_MAX,
-	    NULL)) != 0)
-		return (error);
-
+	snprintf(pi->pm_name, sizeof(pi->pm_name), "IAF-%d", ri);
 	pi->pm_class = PMC_CLASS_IAF;
 
 	if (phw->phw_state & PMC_PHW_FLAG_IS_ENABLED) {
@@ -799,17 +793,11 @@ iap_config_pmc(int cpu, int ri, struct pmc *pm)
 static int
 iap_describe(int cpu, int ri, struct pmc_info *pi, struct pmc **ppmc)
 {
-	int error;
 	struct pmc_hw *phw;
-	char iap_name[PMC_NAME_MAX];
 
 	phw = &core_pcpu[cpu]->pc_corepmcs[ri];
 
-	(void) snprintf(iap_name, sizeof(iap_name), "IAP-%d", ri);
-	if ((error = copystr(iap_name, pi->pm_name, PMC_NAME_MAX,
-	    NULL)) != 0)
-		return (error);
-
+	snprintf(pi->pm_name, sizeof(pi->pm_name), "IAP-%d", ri);
 	pi->pm_class = PMC_CLASS_IAP;
 
 	if (phw->phw_state & PMC_PHW_FLAG_IS_ENABLED) {
@@ -1259,9 +1247,6 @@ pmc_core_initialize(struct pmc_mdep *md, int maxcpu, int version_override)
 		md->pmd_intr = core2_intr;
 	else
 		md->pmd_intr = core_intr;
-
-	md->pmd_pcpu_fini = NULL;
-	md->pmd_pcpu_init = NULL;
 
 	return (0);
 }

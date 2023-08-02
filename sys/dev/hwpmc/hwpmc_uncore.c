@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010 Fabien Thomas
  * All rights reserved.
@@ -233,17 +233,11 @@ ucf_config_pmc(int cpu, int ri, struct pmc *pm)
 static int
 ucf_describe(int cpu, int ri, struct pmc_info *pi, struct pmc **ppmc)
 {
-	int error;
 	struct pmc_hw *phw;
-	char ucf_name[PMC_NAME_MAX];
 
 	phw = &uncore_pcpu[cpu]->pc_uncorepmcs[ri + uncore_ucf_ri];
 
-	(void) snprintf(ucf_name, sizeof(ucf_name), "UCF-%d", ri);
-	if ((error = copystr(ucf_name, pi->pm_name, PMC_NAME_MAX,
-	    NULL)) != 0)
-		return (error);
-
+	snprintf(pi->pm_name, sizeof(pi->pm_name), "UCF-%d", ri);
 	pi->pm_class = PMC_CLASS_UCF;
 
 	if (phw->phw_state & PMC_PHW_FLAG_IS_ENABLED) {
@@ -545,17 +539,11 @@ ucp_config_pmc(int cpu, int ri, struct pmc *pm)
 static int
 ucp_describe(int cpu, int ri, struct pmc_info *pi, struct pmc **ppmc)
 {
-	int error;
 	struct pmc_hw *phw;
-	char ucp_name[PMC_NAME_MAX];
 
 	phw = &uncore_pcpu[cpu]->pc_uncorepmcs[ri];
 
-	(void) snprintf(ucp_name, sizeof(ucp_name), "UCP-%d", ri);
-	if ((error = copystr(ucp_name, pi->pm_name, PMC_NAME_MAX,
-	    NULL)) != 0)
-		return (error);
-
+	snprintf(pi->pm_name, sizeof(pi->pm_name), "UCP-%d", ri);
 	pi->pm_class = PMC_CLASS_UCP;
 
 	if (phw->phw_state & PMC_PHW_FLAG_IS_ENABLED) {
@@ -639,27 +627,6 @@ ucp_start_pmc(int cpu, int ri, struct pmc *pm)
 	    "ucp-start/2 cpu=%d ri=%d evselmsr=0x%x evsel=0x%x",
 	    cpu, ri, SELECTSEL(uncore_cputype) + ri, evsel);
 
-	/* Event specific configuration. */
-	switch (pm->pm_event) {
-	case PMC_EV_UCP_EVENT_0CH_04H_E:
-	case PMC_EV_UCP_EVENT_0CH_08H_E:
-		wrmsr(MSR_GQ_SNOOP_MESF,0x2);
-		break;
-	case PMC_EV_UCP_EVENT_0CH_04H_F:
-	case PMC_EV_UCP_EVENT_0CH_08H_F:
-		wrmsr(MSR_GQ_SNOOP_MESF,0x8);
-		break;
-	case PMC_EV_UCP_EVENT_0CH_04H_M:
-	case PMC_EV_UCP_EVENT_0CH_08H_M:
-		wrmsr(MSR_GQ_SNOOP_MESF,0x1);
-		break;
-	case PMC_EV_UCP_EVENT_0CH_04H_S:
-	case PMC_EV_UCP_EVENT_0CH_08H_S:
-		wrmsr(MSR_GQ_SNOOP_MESF,0x4);
-		break;
-	default:
-		break;
-	}
 	wrmsr(SELECTSEL(uncore_cputype) + ri, evsel);
 
 	cc->pc_globalctrl |= (1ULL << ri);

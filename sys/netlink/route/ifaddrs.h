@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2022 Alexander V. Chernikov <melifaro@FreeBSD.org>
  *
@@ -60,9 +60,18 @@ enum {
 	IFA_FLAGS		= 8, /* not supported */
 	IFA_RT_PRIORITY		= 9, /* not supported */
 	IFA_TARGET_NETNSID	= 10, /* not supported */
+	IFA_FREEBSD		= 11, /* nested, FreeBSD-specific */
 	__IFA_MAX,
 };
-#define IFA_MAX (__IFA_MAX - 1)
+#define IFA_MAX		(__IFA_MAX - 1)
+
+enum {
+	IFAF_UNSPEC,
+	IFAF_VHID		= 1, /* u32: carp vhid */
+	IFAF_FLAGS		= 2, /* u32: FreeBSD-specific ifa flags */
+	__IFAF_MAX,
+};
+#define IFAF_MAX	(__IFAF_MAX - 1)
 
 /* IFA_FLAGS attribute flags */
 #define IFA_F_SECONDARY		0x0001
@@ -81,10 +90,10 @@ enum {
 
 /* IFA_CACHEINFO value */
 struct ifa_cacheinfo {
-	uint32_t ifa_prefered;
-	uint32_t ifa_valid;
-	uint32_t cstamp;
-	uint32_t tstamp;
+	uint32_t ifa_prefered;	/* seconds till the end of the prefix considered preferred */
+	uint32_t ifa_valid;	/* seconds till the end of the prefix considered valid */
+	uint32_t cstamp;	/* creation time in 1ms intervals from the boot time */
+	uint32_t tstamp;	/* update time in 1ms intervals from the boot time */
 };
 
 #endif

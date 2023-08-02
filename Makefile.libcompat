@@ -3,8 +3,6 @@
 .if !targets(__<${_this:T}>__)
 __<${_this:T}>__:
 
-.include <src.libnames.mk>
-
 # Makefile for the compatibility libraries.
 # - 32-bit compat libraries on PowerPC, and AMD64.
 # - 64-bit compat on CHERI RISC-V and Morello.
@@ -18,9 +16,9 @@ __<${_this:T}>__:
 
 # Yes, the flags are redundant.
 LIB${_LIBCOMPAT}_COMPILERS= \
-		CC="${XCC} ${LIB${_LIBCOMPAT}CFLAGS:@v@${v:Q}@}" \
-		CXX="${XCXX} ${LIB${_LIBCOMPAT}CXXFLAGS:@v@${v:Q}@} ${LIB${_LIBCOMPAT}CFLAGS:@v@${v:Q}@}" \
-		CPP="${XCPP} ${LIB${_LIBCOMPAT}CFLAGS:@v@${v:Q}@}"
+		CC=${${XCC} ${LIB${_LIBCOMPAT}CFLAGS}:L:Q} \
+		CXX=${${XCXX} ${LIB${_LIBCOMPAT}CXXFLAGS} ${LIB${_LIBCOMPAT}CFLAGS}:L:Q} \
+		CPP=${${XCPP} ${LIB${_LIBCOMPAT}CFLAGS}:L:Q}
 LIB${_LIBCOMPAT}WMAKEENV+= \
 		INSTALL="${INSTALL_CMD} -U" \
 		PATH=${TMPPATH} \
@@ -59,10 +57,10 @@ LIB${_LIBCOMPAT}WMAKE+=	${TIME_ENV} ${LIB${_LIBCOMPAT}WMAKEENV} ${MAKE} \
 			OBJTOP=${LIB${_LIBCOMPAT}_OBJTOP} \
 			OBJROOT='$${OBJTOP}/' \
 			MAKEOBJDIRPREFIX= \
+			MK_INCLUDES=no \
 			MK_MAN=no MK_HTML=no
 LIB${_LIBCOMPAT}IMAKE+=	${LIB${_LIBCOMPAT}WMAKE:NINSTALL=*:NDESTDIR=*} \
 			${IMAKE_INSTALL} \
-			MK_INCLUDES=no \
 			-DLIBRARIES_ONLY
 
 # Shared logic

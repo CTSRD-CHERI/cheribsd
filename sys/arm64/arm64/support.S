@@ -61,6 +61,124 @@ fsu_fault_nopcb:
 END(fsu_fault)
 
 /*
+ * int swapueword8_llsc(volatile uint8_t * __capability, uint8_t *)
+ */
+ENTRY(swapueword8_llsc)
+	check_user_access 0, (VM_MAXUSER_ADDRESS-3), fsu_fault_nopcb
+	adr	PTR(6), fsu_fault	/* Load the fault handler */
+	SET_FAULT_HANDLER(PTR(6), PTR(4))	/* And set it */
+	ENTER_USER_ACCESS(w6, PTR(4))
+
+	ldrb	w7, [PTR(1)]
+
+	ENTER_C64
+#if __has_feature(capabilities)
+	ldxrb	w2, [c0]
+	stxrb	w3, w7, [c0]
+#else
+	ldxrb	w2, [x0]
+	stxrb	w3, w7, [x0]
+#endif
+	EXIT_C64
+	cbnz	w3, 1f
+
+	strb	w2, [PTR(1)]		/* Stash old value in *val */
+
+1:	EXIT_USER_ACCESS(w6)
+	SET_FAULT_HANDLER(xzr, PTR(6))
+	mov	w0, w3
+	ret
+END(swapueword8_llsc)
+
+/*
+ * int swapueword8_lse(volatile uint8_t * __capability, uint8_t *)
+ */
+ENTRY(swapueword8_lse)
+	check_user_access 0, (VM_MAXUSER_ADDRESS-3), fsu_fault_nopcb
+	adr	PTR(6), fsu_fault	/* Load the fault handler */
+	SET_FAULT_HANDLER(PTR(6), PTR(4))	/* And set it */
+	ENTER_USER_ACCESS(w6, PTR(4))
+
+	ldrb	w7, [PTR(1)]
+
+	.arch_extension lse
+	ENTER_C64
+#if __has_feature(capabilities)
+	swpb	w7, w2, [c0]
+#else
+	swpb	w7, w2, [x0]
+#endif
+	EXIT_C64
+	.arch_extension nolse
+
+	strb	w2, [PTR(1)]		/* Stash old value in *val */
+
+	EXIT_USER_ACCESS(w6)
+	SET_FAULT_HANDLER(xzr, PTR(6))
+	mov	w0, #0
+	ret
+END(swapueword8_lse)
+
+/*
+ * int swapueword32_llsc(volatile uint32_t * __capability, uint32_t *)
+ */
+ENTRY(swapueword32_llsc)
+	check_user_access 0, (VM_MAXUSER_ADDRESS-3), fsu_fault_nopcb
+	adr	PTR(6), fsu_fault	/* Load the fault handler */
+	SET_FAULT_HANDLER(PTR(6), PTR(4))	/* And set it */
+	ENTER_USER_ACCESS(w6, PTR(4))
+
+	ldr	w7, [PTR(1)]
+
+	ENTER_C64
+#if __has_feature(capabilities)
+	ldxr	w2, [c0]		/* Stash the old value in w2 */
+	stxr	w3, w7, [c0]		/* Store new value */
+#else
+	ldxr	w2, [x0]		/* Stash the old value in w2 */
+	stxr	w3, w7, [x0]		/* Store new value */
+#endif
+	EXIT_C64
+	cbnz	w3, 1f
+
+	str	w2, [PTR(1)]		/* Stash old value in *val */
+
+1:	EXIT_USER_ACCESS(w6)
+	SET_FAULT_HANDLER(xzr, PTR(6))
+	mov	w0, w3
+	ret
+END(swapueword32_llsc)
+
+/*
+ * int swapueword32_lse(volatile uint32_t * __capability, uint32_t *)
+ */
+ENTRY(swapueword32_lse)
+	check_user_access 0, (VM_MAXUSER_ADDRESS-3), fsu_fault_nopcb
+	adr	PTR(6), fsu_fault	/* Load the fault handler */
+	SET_FAULT_HANDLER(PTR(6), PTR(4))	/* And set it */
+	ENTER_USER_ACCESS(w6, PTR(4))
+
+	ldr	w7, [PTR(1)]
+
+	.arch_extension lse
+	ENTER_C64
+#if __has_feature(capabilities)
+	swp	w7, w2, [c0]
+#else
+	swp	w7, w2, [x0]
+#endif
+	EXIT_C64
+	.arch_extension nolse
+
+	str	w2, [PTR(1)]		/* Stash old value in *val */
+
+	EXIT_USER_ACCESS(w6)
+	SET_FAULT_HANDLER(xzr, PTR(6))
+	mov	w0, #0
+	ret
+END(swapueword32_llsc)
+
+/*
  * int casueword32_llsc(volatile uint32_t * __capability, uint32_t, uint32_t *,
  *         uint32_t)
  */

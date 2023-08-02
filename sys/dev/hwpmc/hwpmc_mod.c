@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003-2008 Joseph Koshy
  * Copyright (c) 2007 The FreeBSD Foundation
@@ -5462,6 +5462,10 @@ pmc_mdep_alloc(int nclasses)
 	    sizeof(struct pmc_classdep), M_PMC, M_WAITOK|M_ZERO);
 	md->pmd_nclass = n;
 
+	/* Default methods */
+	md->pmd_switch_in = generic_switch_in;
+	md->pmd_switch_out = generic_switch_out;
+
 	/* Add base class. */
 	pmc_soft_initialize(md);
 	return md;
@@ -5498,11 +5502,6 @@ pmc_generic_cpu_initialize(void)
 	md = pmc_mdep_alloc(0);
 
 	md->pmd_cputype    = PMC_CPU_GENERIC;
-
-	md->pmd_pcpu_init  = NULL;
-	md->pmd_pcpu_fini  = NULL;
-	md->pmd_switch_in  = generic_switch_in;
-	md->pmd_switch_out = generic_switch_out;
 
 	return (md);
 }
@@ -5643,8 +5642,6 @@ pmc_initialize(void)
 		pmc_pcpu[cpu] = malloc(sizeof(struct pmc_cpu) +
 		    md->pmd_npmc * sizeof(struct pmc_hw *), M_PMC,
 		    M_WAITOK|M_ZERO);
-		if (md->pmd_pcpu_init)
-			error = md->pmd_pcpu_init(md, cpu);
 		for (n = 0; error == 0 && n < md->pmd_nclass; n++)
 			if (md->pmd_classdep[n].pcd_num > 0)
 				error = md->pmd_classdep[n].pcd_pcpu_init(md,
@@ -5888,8 +5885,6 @@ pmc_cleanup(void)
 				if (md->pmd_classdep[c].pcd_num > 0)
 					md->pmd_classdep[c].pcd_pcpu_fini(md,
 					    cpu);
-			if (md->pmd_pcpu_fini)
-				md->pmd_pcpu_fini(md, cpu);
 		}
 
 		if (md->pmd_cputype == PMC_CPU_GENERIC)

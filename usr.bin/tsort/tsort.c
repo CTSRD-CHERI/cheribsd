@@ -197,8 +197,8 @@ main(int argc, char *argv[])
 
 	/* do the sort */
 	tsort();
-        if (ferror(stdout) != 0 || fflush(stdout) != 0)
-                err(1, "stdout");
+	if (ferror(stdout) != 0 || fflush(stdout) != 0)
+		err(1, "stdout");
 	exit(0);
 }
 
@@ -267,7 +267,7 @@ get_node(char *name)
 	n->n_arcs = NULL;
 	n->n_refcnt = 0;
 	n->n_flags = 0;
-	bcopy(name, n->n_name, strlen(name) + 1);
+	memcpy(n->n_name, name, strlen(name) + 1);
 
 	/* Add to linked list. */
 	if ((n->n_next = graph) != NULL)

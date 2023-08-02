@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003-2008, Joseph Koshy
  * Copyright (c) 2007 The FreeBSD Foundation
@@ -967,7 +967,7 @@ main(int argc, char **argv)
 	if ((args.pa_required & FLAG_HAS_PROCESS_PMCS) &&
 	    (args.pa_flags & FLAG_HAS_PROCESS_PMCS) == 0)
 		errx(EX_USAGE,
-"ERROR: options -d, -E, and -W require a process mode PMC to be specified."
+"ERROR: options -d, -E, -t, and -W require a process mode PMC to be specified."
 		    );
 
 	/* check for -c cpu with no system mode PMCs or logfile. */

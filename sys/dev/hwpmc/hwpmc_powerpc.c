@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011,2013 Justin Hibbits
  * Copyright (c) 2005, Joseph Koshy
@@ -105,36 +105,19 @@ pmc_save_kernel_callchain(uintptr_t *cc, int maxsamples,
 	return (frames);
 }
 
-static int
-powerpc_switch_in(struct pmc_cpu *pc, struct pmc_process *pp)
-{
-
-	return (0);
-}
-
-static int
-powerpc_switch_out(struct pmc_cpu *pc, struct pmc_process *pp)
-{
-
-	return (0);
-}
-
 int
 powerpc_describe(int cpu, int ri, struct pmc_info *pi, struct pmc **ppmc)
 {
-	int error;
 	struct pmc_hw *phw;
-	char powerpc_name[PMC_NAME_MAX];
 
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
 	    ("[powerpc,%d], illegal CPU %d", __LINE__, cpu));
 
 	phw = &powerpc_pcpu[cpu]->pc_ppcpmcs[ri];
-	snprintf(powerpc_name, sizeof(powerpc_name), "POWERPC-%d", ri);
-	if ((error = copystr(powerpc_name, pi->pm_name, PMC_NAME_MAX,
-	    NULL)) != 0)
-		return error;
+
+	snprintf(pi->pm_name, sizeof(pi->pm_name), "POWERPC-%d", ri);
 	pi->pm_class = powerpc_pcpu[cpu]->pc_class;
+
 	if (phw->phw_state & PMC_PHW_FLAG_IS_ENABLED) {
 		pi->pm_enabled = TRUE;
 		*ppmc          = phw->phw_pmc;
@@ -556,9 +539,6 @@ pmc_md_initialize(void)
 
 	vers = mfpvr() >> 16;
 
-	pmc_mdep->pmd_switch_in  = powerpc_switch_in;
-	pmc_mdep->pmd_switch_out = powerpc_switch_out;
-	
 	switch (vers) {
 	case MPC7447A:
 	case MPC7448:

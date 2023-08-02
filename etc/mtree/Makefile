@@ -2,6 +2,8 @@
 
 .include <src.opts.mk>
 
+.include <bsd.compat.pre.mk>
+
 PACKAGE=	mtree
 
 # NOTE: BSD.debug.dist is unconditionally installed for developer ease-of-use.
@@ -9,27 +11,25 @@ FILES=	\
 	BSD.debug.dist \
 	BSD.include.dist \
 	BSD.root.dist \
-	${_BSD.lib32.dist} \
-	${_BSD.lib64.dist} \
-	${_BSD.lib64c.dist} \
+	${_BSD.c18n.dist} \
+	${_BSD.libcompats.dist} \
 	${_BSD.sendmail.dist} \
 	${_BSD.tests.dist} \
 	BSD.usr.dist \
-	${_BSD.c18n.dist} \
 	BSD.var.dist
 
 .if ${MACHINE_ABI:Mpurecap}
 _BSD.c18n.dist=		BSD.c18n.dist
 .endif
-.if ${MK_LIB64C} != "no"
-_BSD.lib64c.dist=	BSD.lib64c.dist
+.for LIBCOMPAT libcompat in ${_ALL_LIBCOMPATS_libcompats}
+.if ${MK_LIB${LIBCOMPAT}} != "no"
+_BSD.libcompats.dist+=	BSD.lib${libcompat}.dist
+.if exists(${.CURDIR}/BSD.pkg${libcompat}.dist) && \
+    ${MK_PKGBOOTSTRAP} != "no"
+_BSD.libcompats.dist+=	BSD.pkg${libcompat}.dist
 .endif
-.if ${MK_LIB32} != "no"
-_BSD.lib32.dist=	BSD.lib32.dist
 .endif
-.if ${MK_LIB64} != "no"
-_BSD.lib64.dist=	BSD.lib64.dist
-.endif
+.endfor
 .if ${MK_SENDMAIL} != "no"
 _BSD.sendmail.dist=	BSD.sendmail.dist
 .endif
