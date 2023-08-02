@@ -165,7 +165,7 @@ elf64_register_sysvec(void *arg)
 	    sv->sv_maxuser / 8 / VM_CHERI_REVOKE_GSZ_MEM_NOMAP;
 
 	/* Land the shadow somewhere awkward but easy */
-	const vaddr_t shadow_fine_mem_top =
+	const ptraddr_t shadow_fine_mem_top =
 	    sv->sv_usrstack & ~(shadow_fine_mem_size - 1);
 
 	/*

@@ -1210,16 +1210,6 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	else
 		map->flags &= ~MAP_RESERVATIONS;
 
-#ifdef CPU_QEMU_MALTA
-	if (curthread->td_md.md_flags & MDTD_QTRACE) {
-		char buffer[128];
-
-		snprintf(buffer, sizeof(buffer), "VMMAP %d: exec",
-		    curproc->p_pid);
-		CHERI_TRACE_STRING(buffer);
-	}
-#endif
-
 	return (sv->sv_onexec != NULL ? sv->sv_onexec(p, imgp) : 0);
 }
 

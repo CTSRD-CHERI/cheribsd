@@ -89,11 +89,11 @@ typedef	__uintptr_t		uintptr_t;
 #define	_UINTPTR_T_DECLARED
 #endif
 #ifndef	_INT64PTR_T_DECLARED
-typedef	__int64ptr_t            int64ptr_t;
+typedef	__int64ptr_t		int64ptr_t;
 #define	_INT64PTR_T_DECLARED
 #endif
 #ifndef _UINT64PTR_T_DECLARED
-typedef	__uint64ptr_t           uint64ptr_t;
+typedef	__uint64ptr_t		uint64ptr_t;
 #define	_UINT64PTR_T_DECLARED
 #endif
 #ifndef _INTMAX_T_DECLARED
@@ -105,42 +105,31 @@ typedef	__uintmax_t		uintmax_t;
 #define	_UINTMAX_T_DECLARED
 #endif
 #ifndef _KINTCAP_T_DECLARED
-#ifdef _KERNEL
-typedef __intcap_t	kintcap_t;
-#else
-typedef __intptr_t	kintcap_t;
-#endif
+typedef	__kintcap_t		kintcap_t;
 #define	_KINTCAP_T_DECLARED
 #endif
 #ifndef _KUINTCAP_T_DECLARED
-#ifdef _KERNEL
-typedef __uintcap_t	kuintcap_t;
-#else
-typedef __uintptr_t	kuintcap_t;
-#endif
+typedef	__kuintcap_t		kuintcap_t;
 #define	_KUINTCAP_T_DECLARED
 #endif
 #ifndef _KUINT64CAP_T_DECLARED
 #ifdef __ILP32__
-typedef	uint64_t	kuint64cap_t;
+typedef	uint64_t		kuint64cap_t;
 #else
-typedef	kuintcap_t	kuint64cap_t;
+typedef	kuintcap_t		kuint64cap_t;
 #endif
 #define	_KUINT64CAP_T_DECLARED
 #endif
 
 #ifndef _PTRADDR_T_DECLARED
-typedef	__ptraddr_t	ptraddr_t;
+typedef	__ptraddr_t		ptraddr_t;
 #define	_PTRADDR_T_DECLARED
 #endif
 
 #ifndef _VADDR_T_DECLARED
-#ifndef __CHERI_PURE_CAPABILITY__
-typedef	__uintptr_t		vaddr_t;
-#else
-typedef	__uint64_t		vaddr_t;
-#endif
-#define _VADDR_T_DECLARED
+__attribute__((__deprecated__("use ptraddr_t instead")))
+typedef	ptraddr_t		vaddr_t;
+#define	_VADDR_T_DECLARED
 #endif
 
 #endif /* !_SYS__STDINT_H_ */

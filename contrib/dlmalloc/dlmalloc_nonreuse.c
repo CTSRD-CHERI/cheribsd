@@ -3715,7 +3715,7 @@ malloc_revoke_internal(const char *reason) {
     shadow_paint(thePtr, chunksize(thePtr));
 #else
 #ifdef CAPREVOKE
-    vaddr_t addr = __builtin_cheri_address_get(chunk2mem(thePtr));
+    ptraddr_t addr = __builtin_cheri_address_get(chunk2mem(thePtr));
     caprev_shadow_nomap_set_raw(cri->base_mem_nomap, thePtr->pad, addr,
         addr + chunksize(thePtr));
 #endif
@@ -3740,7 +3740,7 @@ malloc_revoke_internal(const char *reason) {
     shadow_clear(thePtr, theSize);
 #else
 #ifdef CAPREVOKE
-    vaddr_t addr = __builtin_cheri_address_get(chunk2mem(thePtr));
+    ptraddr_t addr = __builtin_cheri_address_get(chunk2mem(thePtr));
     caprev_shadow_nomap_clear_raw(cri->base_mem_nomap,
         thePtr->pad, addr, addr + chunksize(thePtr));
 #endif

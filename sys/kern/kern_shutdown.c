@@ -188,7 +188,7 @@ SYSCTL_INT(_kern, OID_AUTO, suspend_blocked, CTLFLAG_RW,
  * If CHERI-QEMU ISA-level tracing is enabled in buffered mode
  * we emit the trace on panic.
  */
-#if defined(CPU_QEMU_RISCV) || defined(CPU_QEMU_MALTA)
+#if defined(CPU_QEMU_RISCV)
 extern u_int qemu_trace_buffered;
 #endif
 
@@ -542,12 +542,6 @@ kern_reboot(int howto)
 		boottrace_dump_console();
 
 	EVENTHANDLER_INVOKE(shutdown_final, howto);
-#ifdef CPU_QEMU_MALTA
-	printf("%s: shutdown did not work, attempting mtc0 $zero, $23\n", __func__);
-	for (int i = 0; i < 100; i++) {
-		__asm__ volatile("li $2, 1\n\tmtc0 $2, $23");
-	}
-#endif
 
 	/*
 	 * Call this directly so that reset is attempted even if shutdown
@@ -917,7 +911,7 @@ panic(const char *fmt, ...)
 	if (nonexistent_function_so_that_panic_saves_retaddr)
 		nonexistent_function_so_that_panic_saves_retaddr();
 	va_list ap;
-#if defined(CPU_QEMU_RISCV) || defined(CPU_QEMU_MALTA)
+#if defined(CPU_QEMU_RISCV)
 	if (qemu_trace_buffered)
 		QEMU_FLUSH_TRACE_BUFFER;
 #endif

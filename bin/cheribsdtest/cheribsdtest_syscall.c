@@ -64,24 +64,8 @@
 
 CHERIBSDTEST(sig_dfl_neq_ign, "Test SIG_DFL != SIG_IGN")
 {
-	void * __capability sic = (__cheri_tocap void * __capability)SIG_IGN;
-
-	/*
-	 * This may appear redundant, but it tickles some of the optimizers
-	 * differently than the condition below, which, apparently, can get
-	 * constant-folded and DCE'd, while this does not.
-	 */
-	int eq = (SIG_IGN == SIG_DFL);
-
-	fprintf(stderr, "sic %#lp\n", sic);
-	fprintf(stderr, "IGN=%ld(%p) DFL=%ld(%p) EQ=%d(%d)\n",
-		(long)SIG_IGN, SIG_IGN,
-		(long)SIG_DFL, SIG_DFL, SIG_IGN == SIG_DFL, eq);
-
 	if (SIG_IGN == SIG_DFL)
 		cheribsdtest_failure_errx("SIG_{IGN,DFL} conflated");
-	else if (eq)
-		cheribsdtest_failure_errx("SIG_{IGN,DFL} somewhat conflated?");
 	else
 		cheribsdtest_success();
 }

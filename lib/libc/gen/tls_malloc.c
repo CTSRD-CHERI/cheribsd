@@ -498,7 +498,7 @@ paint_shadow(void *mem, size_t size)
 		    &pp->ph_shadow) != 0)
 			abort();
 	caprev_shadow_nomap_set_raw(cri->base_mem_nomap, pp->ph_shadow,
-	    (vaddr_t)mem, size);
+	    (ptraddr_t)mem, size);
 }
 
 static void
@@ -508,7 +508,7 @@ clear_shadow(void *mem, size_t size)
 
 	pp = cheri_setoffset(pp, 0);
 	caprev_shadow_nomap_clear_raw(cri->base_mem_nomap, pp->ph_shadow,
-	    (vaddr_t)mem, size);
+	    (ptraddr_t)mem, size);
 }
 
 static void

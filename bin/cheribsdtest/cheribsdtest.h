@@ -41,39 +41,13 @@
 
 #include "cheribsdtest_md.h"
 
-#define	CHERI_CAP_PRINT(cap) do {					\
-	printf("tag %ju s %ju perms %08jx type %016jx\n",		\
-	    (uintmax_t)cheri_gettag(cap),				\
-	    (uintmax_t)cheri_getsealed(cap),				\
-	    (uintmax_t)cheri_getperm(cap),				\
-	    (uintmax_t)cheri_gettype(cap));				\
-	printf("\tbase %016jx length %016jx\n",				\
-	    (uintmax_t)cheri_getbase(cap),				\
-	    (uintmax_t)cheri_getlen(cap));				\
-} while (0)
-
-#define	CHERI_CAPREG_PRINT(crn) do {					\
-	void * __capability cap;						\
-	if (crn == 0)							\
-		cap = cheri_getdefault();				\
-	else								\
-		cap = cheri_getreg(crn);				\
-	printf("C%u ", crn);						\
-	CHERI_CAP_PRINT(cap);						\
-} while (0)
-
-#define	CHERI_PCC_PRINT() do {						\
-	void * __capability cap;						\
-	cap = cheri_getpcc();						\
-	printf("PCC ");							\
-	CHERI_CAP_PRINT(cap);						\
-} while (0)
-
 /*
  * Convert a pointer to a null-derived void * with the same address. This is
  * useful for getting the correct value for ccs_si_addr_expected.
  */
 #define	NULL_DERIVED_VOIDP(x) ((void *)(uintptr_t)(ptraddr_t)(x))
+
+extern int verbose;
 
 /*
  * Shared memory interface between tests and the test controller process.

@@ -206,9 +206,8 @@ CHERIBSDTEST(vm_shm_open_anon_unix_surprise,
 						0));
 		c = *map;
 
-		fprintf(stderr, "rx cap: v:%lu b:%016jx l:%016zx o:%jx\n",
-			(unsigned long)cheri_gettag(c), cheri_getbase(c),
-			cheri_getlen(c), cheri_getoffset(c));
+		if (verbose)
+			fprintf(stderr, "rx cap: %#lp\n", c);
 
 		tag = cheri_gettag(c);
 		CHERIBSDTEST_VERIFY2(tag == 0, "tag read");
@@ -242,9 +241,8 @@ CHERIBSDTEST(vm_shm_open_anon_unix_surprise,
 		c = *map;
 		CHERIBSDTEST_VERIFY2(cheri_gettag(c) != 0, "tag written");
 
-		fprintf(stderr, "tx cap: v:%lu b:%016jx l:%016zx o:%jx\n",
-			(unsigned long)cheri_gettag(c), cheri_getbase(c),
-			cheri_getlen(c), cheri_getoffset(c));
+		if (verbose)
+			fprintf(stderr, "tx cap: %#lp\n", c);
 
 		CHERIBSDTEST_CHECK_SYSCALL(munmap(map, getpagesize()));
 
@@ -365,8 +363,6 @@ CHERIBSDTEST(vm_cap_share_fd_kqueue,
 		CHERIBSDTEST_VERIFY2(oke.ident == 0x2BAD, "Bad identifier from kqueue");
 		CHERIBSDTEST_VERIFY2(oke.filter == EVFILT_USER, "Bad filter from kqueue");
 
-		fprintf(stderr, "oke.udata %#lp\n", oke.udata);
-
 		exit(cheri_gettag(oke.udata));
 	} else {
 		int res;
@@ -435,8 +431,6 @@ CHERIBSDTEST(vm_cap_share_sigaction,
 
 		/* Read it again and check that we get the same value back. */
 		CHERIBSDTEST_CHECK_SYSCALL(__sys_sigaction(SIGUSR1, NULL, &sa));
-		fprintf(stderr, "child value read from sigaction(): ");
-		fprintf(stderr, "sa.sa_handler %#lp\n", sa.sa_handler);
 		CHERIBSDTEST_CHECK_EQ_CAP(sa.sa_handler, passme);
 
 		exit(0);
@@ -449,8 +443,6 @@ CHERIBSDTEST(vm_cap_share_sigaction,
 		sa.sa_flags = 1;
 
 		CHERIBSDTEST_CHECK_SYSCALL(__sys_sigaction(SIGUSR1, NULL, &sa));
-		fprintf(stderr, "parent sa read from sigaction(): ");
-		fprintf(stderr, "sa.sa_handler %#lp\n", sa.sa_handler);
 
 		/* Flags should be zero on read */
 		CHERIBSDTEST_CHECK_EQ_LONG(sa.sa_flags, 0);
@@ -1823,7 +1815,6 @@ enum {
 
 static void
 cheribsdtest_cheri_revoke_lib_run(
-	int verbose,
 	int paranoia,
 	int mode,
 	size_t bigblock_caps,
@@ -1833,7 +1824,7 @@ cheribsdtest_cheri_revoke_lib_run(
 )
 {
 	size_t bigblock_offset = 0;
-	const vaddr_t sbase = cri->base_mem_nomap;
+	const ptraddr_t sbase = cri->base_mem_nomap;
 
 	fprintf(stderr, "test_cheri_revoke_lib_run mode %d\n", mode);
 
@@ -1881,9 +1872,9 @@ cheribsdtest_cheri_revoke_lib_run(
 		if (verbose > 3) {
 			ptrdiff_t fwo, lwo;
 			uint64_t fwm, lwm;
-			caprev_shadow_nomap_offsets((vaddr_t)chunk,
+			caprev_shadow_nomap_offsets((ptraddr_t)chunk,
 				csz * sizeof(void * __capability), &fwo, &lwo);
-			caprev_shadow_nomap_masks((vaddr_t)chunk,
+			caprev_shadow_nomap_masks((ptraddr_t)chunk,
 				csz * sizeof(void * __capability), &fwm, &lwm);
 
 			fprintf(stderr,
@@ -1909,7 +1900,7 @@ cheribsdtest_cheri_revoke_lib_run(
 
 		if (verbose > 3) {
 			ptrdiff_t fwo, lwo;
-			caprev_shadow_nomap_offsets((vaddr_t)chunk,
+			caprev_shadow_nomap_offsets((ptraddr_t)chunk,
 				csz * sizeof(void * __capability), &fwo, &lwo);
 
 			fprintf(stderr,
@@ -2013,9 +2004,6 @@ load_split_fini:
 
 CHERIBSDTEST(cheri_revoke_lib, "Test libcheri_caprevoke internals")
 {
-		/* If debugging the revoker, some verbosity can help. 0 - 4. */
-	static const int verbose = 0;
-
 		/*
 		 * Tweaking paranoia can turn this test into more of a
 		 * benchmark than a correctness test.  At 0, no checks
@@ -2041,13 +2029,13 @@ CHERIBSDTEST(cheri_revoke_lib, "Test libcheri_caprevoke internals")
 		fprintf(stderr, "shadow: %#.16lp\n", shadow);
 	}
 
-	cheribsdtest_cheri_revoke_lib_run(verbose, paranoia, TCLR_MODE_STORE,
+	cheribsdtest_cheri_revoke_lib_run(paranoia, TCLR_MODE_STORE,
 	    bigblock_caps, bigblock, shadow, cri);
 
-	cheribsdtest_cheri_revoke_lib_run(verbose, paranoia,
+	cheribsdtest_cheri_revoke_lib_run(paranoia,
 	    TCLR_MODE_LOAD_ONCE, bigblock_caps, bigblock, shadow, cri);
 
-	cheribsdtest_cheri_revoke_lib_run(verbose, paranoia,
+	cheribsdtest_cheri_revoke_lib_run(paranoia,
 	    TCLR_MODE_LOAD_SPLIT, bigblock_caps, bigblock, shadow, cri);
 
 	munmap(bigblock, bigblock_caps * sizeof(void * __capability));
@@ -2081,13 +2069,13 @@ CHERIBSDTEST(cheri_revoke_lib_fork,
 
 	pid = fork();
 	if (pid == 0) {
-		cheribsdtest_cheri_revoke_lib_run(verbose, paranoia,
+		cheribsdtest_cheri_revoke_lib_run(paranoia,
 		    TCLR_MODE_STORE, bigblock_caps, bigblock, shadow, cri);
 
-		cheribsdtest_cheri_revoke_lib_run(verbose, paranoia,
+		cheribsdtest_cheri_revoke_lib_run(paranoia,
 		    TCLR_MODE_LOAD_ONCE, bigblock_caps, bigblock, shadow, cri);
 
-		cheribsdtest_cheri_revoke_lib_run(verbose, paranoia,
+		cheribsdtest_cheri_revoke_lib_run(paranoia,
 		    TCLR_MODE_LOAD_SPLIT, bigblock_caps, bigblock, shadow, cri);
 	} else {
 		int res;
@@ -2109,7 +2097,6 @@ CHERIBSDTEST(cheri_revoke_lib_fork,
 CHERIBSDTEST(cheri_revoke_lib_fork_split,
     "Test libcheri_caprevoke split across fork")
 {
-	static const int verbose = 0;
 	static const int paranoia = 2;
 
 	static const size_t bigblock_caps = 4096;
@@ -2131,13 +2118,13 @@ CHERIBSDTEST(cheri_revoke_lib_fork_split,
 	}
 
 	/* Open the epoch and begin revocation */
-	cheribsdtest_cheri_revoke_lib_run(verbose, paranoia,
+	cheribsdtest_cheri_revoke_lib_run(paranoia,
 	    TCLR_MODE_LOAD_SPLIT_INIT, bigblock_caps, bigblock, shadow, cri);
 
 	pid = fork();
 	if (pid == 0) {
 		/* Finish revocation */
-		cheribsdtest_cheri_revoke_lib_run(verbose, paranoia,
+		cheribsdtest_cheri_revoke_lib_run(paranoia,
 		    TCLR_MODE_LOAD_SPLIT_FINI, bigblock_caps, bigblock,
 		    shadow, cri);
 	} else {
