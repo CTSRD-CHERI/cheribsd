@@ -2945,6 +2945,84 @@ static struct syscall_helper_data mq32_syscalls[] = {
 };
 #endif
 
+#ifdef COMPAT_FREEBSD64
+#include <compat/freebsd64/freebsd64.h>
+#include <compat/freebsd64/freebsd64_proto.h>
+#include <compat/freebsd64/freebsd64_signal.h>
+#include <compat/freebsd64/freebsd64_syscall.h>
+#include <compat/freebsd64/freebsd64_util.h>
+
+int
+freebsd64_kmq_open(struct thread *td, struct freebsd64_kmq_open_args *uap)
+{
+	return (user_kmq_open(td, __USER_CAP_PATH(uap->path), uap->flags,
+	    uap->mode, __USER_CAP_OBJ(uap->attr)));
+}
+
+int
+freebsd64_kmq_unlink(struct thread *td, struct freebsd64_kmq_unlink_args *uap)
+{
+	return (kern_kmq_unlink(td, __USER_CAP_PATH(uap->path)));
+}
+
+int
+freebsd64_kmq_setattr(struct thread *td, struct freebsd64_kmq_setattr_args *uap)
+{
+	return (user_kmq_setattr(td, uap->mqd, __USER_CAP_OBJ(uap->attr),
+	    __USER_CAP_OBJ(uap->oattr)));
+}
+
+int
+freebsd64_kmq_timedsend(struct thread *td,
+    struct freebsd64_kmq_timedsend_args *uap)
+{
+	return (kern_kmq_timedsend(td, uap->mqd, __USER_CAP(uap->msg_ptr,
+	    uap->msg_len), uap->msg_len, uap->msg_prio,
+	    __USER_CAP_OBJ(uap->abs_timeout)));
+}
+
+int
+freebsd64_kmq_timedreceive(struct thread *td,
+    struct freebsd64_kmq_timedreceive_args *uap)
+{
+	return (kern_timedreceive(td, uap->mqd, __USER_CAP(uap->msg_ptr,
+	    uap->msg_len), uap->msg_len, __USER_CAP_OBJ(uap->msg_prio),
+	    __USER_CAP_OBJ(uap->abs_timeout)));
+}
+
+int
+freebsd64_kmq_notify(struct thread *td, struct freebsd64_kmq_notify_args *uap)
+{
+	struct sigevent ev, *evp;
+	struct sigevent64 ev64;
+	int error;
+
+	if (uap->sigev == NULL) {
+		evp = NULL;
+	} else {
+		error = copyin(__USER_CAP_OBJ(uap->sigev), &ev64,
+		    sizeof(ev64));
+		if (error != 0)
+			return (error);
+		error = convert_sigevent64(&ev64, &ev);
+		if (error != 0)
+			return (error);
+		evp = &ev;
+	}
+	return (kern_kmq_notify(td, uap->mqd, evp));
+}
+
+static struct syscall_helper_data mq64_syscalls[] = {
+	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_kmq_open),
+	FREEBSD64_SYSCALL_INIT_HELPER_F(freebsd64_kmq_setattr, SYF_CAPENABLED),
+	FREEBSD64_SYSCALL_INIT_HELPER_F(freebsd64_kmq_timedsend, SYF_CAPENABLED),
+	FREEBSD64_SYSCALL_INIT_HELPER_F(freebsd64_kmq_timedreceive, SYF_CAPENABLED),
+	FREEBSD64_SYSCALL_INIT_HELPER_F(freebsd64_kmq_notify, SYF_CAPENABLED),
+	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_kmq_unlink),
+	SYSCALL_INIT_LAST
+};
+#endif
+
 static int
 mqinit(void)
 {
@@ -2958,6 +3036,11 @@ mqinit(void)
 	if (error != 0)
 		return (error);
 #endif
+#ifdef COMPAT_FREEBSD64
+	error = freebsd64_syscall_helper_register(mq64_syscalls, SY_THR_STATIC_KLD);
+	if (error != 0)
+		return (error);
+#endif
 	return (0);
 }
 
@@ -2965,6 +3048,9 @@ static int
 mqunload(void)
 {
 
+#ifdef COMPAT_FREEBSD64
+	freebsd64_syscall_helper_unregister(mq64_syscalls);
+#endif
 #ifdef COMPAT_FREEBSD32
 	syscall32_helper_unregister(mq32_syscalls);
 #endif
