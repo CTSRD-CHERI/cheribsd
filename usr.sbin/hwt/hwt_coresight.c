@@ -77,7 +77,10 @@ static char packet_str[PACKET_STR_LEN];
 
 struct cs_decoder {
 	dcd_tree_handle_t dcdtree_handle;
+	struct trace_context *tc;
 	int dp_ret;
+	int cpu_id;
+	FILE *out;
 };
 
 static ocsd_err_t
@@ -268,7 +271,8 @@ create_generic_decoder(dcd_tree_handle_t handle, const char *p_name,
 }
 
 static ocsd_err_t
-create_decoder_etmv4(struct trace_context *tc, dcd_tree_handle_t dcd_tree_h)
+create_decoder_etmv4(struct trace_context *tc, dcd_tree_handle_t dcd_tree_h,
+    int thread_id)
 {
 	ocsd_etmv4_cfg trace_config;
 	ocsd_err_t ret;
@@ -278,7 +282,7 @@ create_decoder_etmv4(struct trace_context *tc, dcd_tree_handle_t dcd_tree_h)
 
 	trace_config.reg_configr = 0x00001fc6;
 	trace_config.reg_configr = 0x000000C1;
-	trace_config.reg_traceidr = tc->thread_id + 1;
+	trace_config.reg_traceidr = thread_id + 1;
 
 	trace_config.reg_idr0   = 0x28000ea1;
 	trace_config.reg_idr1   = 0x4100f424;
@@ -305,7 +309,8 @@ cs_process_chunk_raw(struct trace_context *tc, size_t start, size_t len,
 
 	base = (void *)((uintptr_t)tc->base + (uintptr_t)start);
 
-	fwrite(base, len, 1, tc->f);
+	fwrite(base, len, 1, tc->raw_f);
+	fflush(tc->raw_f);
 
 	*consumed = len;
 
@@ -319,12 +324,10 @@ cs_process_chunk(struct trace_context *tc, struct cs_decoder *dec,
 	void *base;
 	int error;
 
-	if (tc->raw) {
-		error = cs_process_chunk_raw(tc, start, len, consumed);
-		return (error);
-	}
-
+	/* Coresight data is always on first cpu cdev due to funnelling by HW.*/
 	base = (void *)((uintptr_t)tc->base + (uintptr_t)start);
+
+	dprintf("Processing data for CPU%d\n", dec->cpu_id);
 
 	error = ocsd_dt_process_data(dec->dcdtree_handle,
 	    OCSD_OP_DATA, start, len, base, consumed);
@@ -386,20 +389,19 @@ gen_trace_elem_print_lookup(const void *p_context,
     const uint8_t trc_chan_id __unused,
     const ocsd_generic_trace_elem *elem)
 {
-	const struct trace_context *tc;
+	struct trace_context *tc;
 	struct pmcstat_image *image;
 	ocsd_datapath_resp_t resp;
 	struct pmcstat_symbol *sym;
 	unsigned long offset;
+	const struct cs_decoder *dec;
 	uint64_t newpc;
 	uint64_t ip;
 	FILE *out;
 
-	tc = (const struct trace_context *)p_context;
-	if (tc->filename)
-		out = tc->f;
-	else
-		out = stdout;
+	dec = (const struct cs_decoder *)p_context;
+	tc = dec->tc;
+	out = dec->out;
 
 	resp = OCSD_RESP_CONT;
 
@@ -498,16 +500,20 @@ gen_trace_elem_print_lookup(const void *p_context,
 			/* image not found. */
 		}
 
+	fflush(dec->out);
+
 	return (resp);
 }
 
 static int
-hwt_coresight_init(struct trace_context *tc, struct cs_decoder *dec)
+hwt_coresight_init(struct trace_context *tc, struct cs_decoder *dec,
+    int thread_id)
 {
+	char filename[MAXPATHLEN];
 	int error;
 
-	ocsd_def_errlog_init(OCSD_ERR_SEV_INFO, 1);
-
+	dec->cpu_id = thread_id;
+	dec->tc = tc;
 	dec->dp_ret = OCSD_RESP_CONT;
 	dec->dcdtree_handle = ocsd_create_dcd_tree(OCSD_TRC_SRC_FRAME_FORMATTED,
 	    OCSD_DFRMTR_FRAME_MEM_ALIGN);
@@ -516,13 +522,28 @@ hwt_coresight_init(struct trace_context *tc, struct cs_decoder *dec)
 		return (-1);
 	}
 
+	if (tc->filename) {
+		if (tc->mode == HWT_MODE_CPU)
+			snprintf(filename, MAXPATHLEN, "%s%d", tc->filename,
+			    dec->cpu_id);
+		else
+			snprintf(filename, MAXPATHLEN, "%s", tc->filename);
+
+		dec->out = fopen(filename, "w");
+		if (dec->out == NULL) {
+			printf("could not open %s\n", filename);
+			return (ENXIO);
+		}
+	} else
+		dec->out = stdout;
+
 	if (tc->flag_format)
 		cs_flags |= FLAG_FORMAT;
 
 	//cs_flags |= FLAG_FRAME_RAW_UNPACKED;
 	//cs_flags |= FLAG_FRAME_RAW_PACKED;
 
-	error = create_decoder_etmv4(tc, dec->dcdtree_handle);
+	error = create_decoder_etmv4(tc, dec->dcdtree_handle, thread_id);
 	if (error != OCSD_OK) {
 		printf("can't create decoder: tc->base %#p\n", tc->base);
 		return (-2);
@@ -536,7 +557,7 @@ hwt_coresight_init(struct trace_context *tc, struct cs_decoder *dec)
 		ocsd_dt_set_gen_elem_printer(dec->dcdtree_handle);
 	else
 		ocsd_dt_set_gen_elem_outfn(dec->dcdtree_handle,
-		    gen_trace_elem_print_lookup, tc);
+		    gen_trace_elem_print_lookup, dec);
 
 	attach_raw_printers(dec->dcdtree_handle);
 
@@ -611,6 +632,65 @@ hwt_coresight_set_config(struct trace_context *tc)
 }
 
 static int
+cs_process_chunk1(struct trace_context *tc, struct cs_decoder *dec,
+    size_t cursor, size_t len, uint32_t *processed)
+{
+	int cpu_id;
+	int error;
+
+	if (tc->raw) {
+		error = cs_process_chunk_raw(tc, cursor, len, processed);
+		return (error);
+	} else if (tc->mode == HWT_MODE_CPU) {
+		CPU_FOREACH_ISSET(cpu_id, &tc->cpu_map) {
+			error = cs_process_chunk(tc, &dec[cpu_id], cursor, len,
+			    processed);
+			if (error)
+				return (error);
+		}
+	} else
+		error = cs_process_chunk(tc, dec, cursor, len, processed);
+
+	return (0);
+}
+
+static int
+hwt_coresight_init1(struct trace_context *tc, struct cs_decoder *dec)
+{
+	int cpu_id;
+	int error;
+
+	if (tc->raw) {
+		/* No decoder needed, just a file for raw data. */
+		tc->raw_f = fopen(tc->filename, "w");
+		if (tc->raw_f == NULL) {
+			printf("could not open file %s\n", tc->filename);
+			return (ENXIO);
+		}
+	} else if (tc->mode == HWT_MODE_CPU) {
+		CPU_FOREACH_ISSET(cpu_id, &tc->cpu_map) {
+			error = hwt_coresight_init(tc, &dec[cpu_id], cpu_id);
+			if (error)
+				return (error);
+		}
+	} else {
+		error = hwt_coresight_init(tc, dec, tc->thread_id);
+		if (error)
+			return (error);
+	}
+
+	return (0);
+}
+
+static void
+catch_int(int sig_num __unused)
+{
+
+	printf("Decoder stopped\n");
+	exit(0);
+}
+
+static int
 hwt_coresight_process(struct trace_context *tc)
 {
 	size_t offs;
@@ -622,12 +702,19 @@ hwt_coresight_process(struct trace_context *tc)
 	size_t cursor;
 	int len;
 	size_t totals;
+	int ncpu;
 
-	/* Coresight data is always on CPU0 due to funnelling by HW. */
+	signal(SIGINT, catch_int);
 
-	dec = malloc(sizeof(struct cs_decoder));
+	ocsd_def_errlog_init(OCSD_ERR_SEV_INFO, 1);
 
-	hwt_coresight_init(tc, dec);
+	ncpu = hwt_ncpu();
+
+	dec = malloc(sizeof(struct cs_decoder) * ncpu);
+
+	error = hwt_coresight_init1(tc, dec);
+	if (error)
+		return (error);
 
 	error = hwt_get_offs(tc, &offs);
 	if (error) {
@@ -635,16 +722,15 @@ hwt_coresight_process(struct trace_context *tc)
 		return (-1);
 	}
 
-#if 0
-	printf("data to process %ld\n", offs);
-#endif
+
+	printf("Decoder started. Press ctrl+c to stop.\n");
 
 	cursor = 0;
 	processed = 0;
 	totals = 0;
 	len = offs;
 
-	cs_process_chunk(tc, dec, cursor, len, &processed);
+	cs_process_chunk1(tc, dec, cursor, len, &processed);
 	cursor += processed;
 	totals += processed;
 
@@ -663,7 +749,7 @@ hwt_coresight_process(struct trace_context *tc)
 		} else if (new_offs > cursor) {
 			/* New entries in the trace buffer. */
 			len = new_offs - cursor;
-			cs_process_chunk(tc, dec, cursor, len, &processed);
+			cs_process_chunk1(tc, dec, cursor, len, &processed);
 			cursor += processed;
 			totals += processed;
 			t = 0;
@@ -671,13 +757,13 @@ hwt_coresight_process(struct trace_context *tc)
 		} else if (new_offs < cursor) {
 			/* New entries in the trace buffer. Buffer wrapped. */
 			len = tc->bufsize - cursor;
-			cs_process_chunk(tc, dec, cursor, len, &processed);
+			cs_process_chunk1(tc, dec, cursor, len, &processed);
 			cursor += processed;
 			totals += processed;
 
 			cursor = 0;
 			len = new_offs;
-			cs_process_chunk(tc, dec, cursor, len, &processed);
+			cs_process_chunk1(tc, dec, cursor, len, &processed);
 			cursor += processed;
 			totals += processed;
 			t = 0;

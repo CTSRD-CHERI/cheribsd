@@ -155,10 +155,8 @@ hwt_ctx_alloc(struct trace_context *tc)
 	al.mode = tc->mode;
 	if (tc->mode == HWT_MODE_THREAD)
 		al.pid = tc->pid;
-	else {
-		CPU_SET(tc->cpu, &cpu_map);
-		al.cpu_map = cpu_map;
-	}
+	else
+		al.cpu_map = tc->cpu_map;
 
 	al.bufsize = tc->bufsize;
 	al.backend_name = tc->trace_dev->name;
@@ -174,10 +172,7 @@ hwt_map_memory(struct trace_context *tc, int tid)
 {
 	char filename[32];
 
-	if (tc->mode == HWT_MODE_THREAD)
-		sprintf(filename, "/dev/hwt_%d_%d", tc->ident, tid);
-	else
-		sprintf(filename, "/dev/hwt_%d_%d", tc->ident, tc->cpu);
+	sprintf(filename, "/dev/hwt_%d_%d", tc->ident, tid);
 
 	tc->thr_fd = open(filename, O_RDONLY);
 	if (tc->thr_fd < 0) {
@@ -197,7 +192,7 @@ hwt_map_memory(struct trace_context *tc, int tid)
 	return (0);
 }
 
-static int __unused
+int
 hwt_ncpu(void)
 {
 	int ncpu;
@@ -223,7 +218,7 @@ hwt_get_offs(struct trace_context *tc, size_t *offs)
 		return (error);
 
 #if 0
-	printf("curpage %ld curpage_offset %ld\n", curpage, curpage_offset);
+	printf("curpage %d curpage_offset %ld\n", curpage, curpage_offset);
 #endif
 
 	*offs = curpage * PAGE_SIZE + curpage_offset;
@@ -317,7 +312,8 @@ hwt_mode_cpu(struct trace_context *tc)
 		return (error);
 	}
 
-	error = hwt_map_memory(tc, 0);
+	/* TODO: this is Coresight-specific to map memory from the first CPU. */
+	error = hwt_map_memory(tc, CPU_FFS(&tc->cpu_map) - 1);
 	if (error != 0) {
 		printf("can't map memory");
 		return (error);
@@ -444,6 +440,33 @@ hwt_mode_thread(struct trace_context *tc, char **cmd, char **env)
 	return (0);
 }
 
+static int
+hwt_get_cpumask(const char *arg, cpuset_t *cpumask)
+{
+	const char *start;
+	int cpu_id;
+	char *end;
+
+	CPU_ZERO(cpumask);
+
+	start = arg;
+
+	while (*start) {
+		cpu_id = strtol(start, &end, 0);
+		if (cpu_id < 0)
+			return (-1);
+
+		if (end == start)
+			return (-2);
+
+		CPU_SET(cpu_id, cpumask);
+
+		start = end + strspn(end, ", \t");
+	};
+
+	return (0);
+}
+
 int
 main(int argc, char **argv, char **env)
 {
@@ -451,8 +474,9 @@ main(int argc, char **argv, char **env)
 	char *trace_dev_name;
 	int error;
 	int option;
-	int i;
 	int found;
+	int thread_id_specified;
+	int i;
 
 	tc = &tcs;
 
@@ -470,12 +494,14 @@ main(int argc, char **argv, char **env)
 
 	tc->mode = HWT_MODE_THREAD;
 	tc->fs_root = "/";
+	tc->thread_id = 0;
+	thread_id_specified = 0;
 
 	while ((option = getopt(argc, argv, "R:gs:hc:b:rw:t:i:f:")) != -1)
 		switch (option) {
 		case 's':
 			tc->mode = HWT_MODE_CPU;
-			tc->cpu = atoi(optarg);
+			hwt_get_cpumask(optarg, &tc->cpu_map);
 			break;
 		case 'R':
 			tc->fs_root = optarg;
@@ -521,6 +547,7 @@ main(int argc, char **argv, char **env)
 			break;
 		case 't':
 			tc->thread_id = atoi(optarg);
+			thread_id_specified = 1;
 			break;
 		case 'g':
 			tc->flag_format = 1;
@@ -532,17 +559,14 @@ main(int argc, char **argv, char **env)
 			break;
 		}
 
-	if (tc->raw != 0 && tc->filename == NULL) {
-		printf("Filename must be specified for the raw data.\n");
+	if (tc->mode == HWT_MODE_CPU && thread_id_specified) {
+		printf("Thread ID to decode used in THREAD mode only.\n");
 		exit(1);
 	}
 
-	if (tc->filename != NULL) {
-		tc->f = fopen(tc->filename, "w");
-		if (tc->f == NULL) {
-			printf("could not open file %s\n", tc->filename);
-			return (ENXIO);
-		}
+	if (tc->raw != 0 && tc->filename == NULL) {
+		printf("Filename must be specified for the raw data.\n");
+		exit(1);
 	}
 
 	if ((tc->image_name == NULL && tc->func_name != NULL) ||
@@ -573,9 +597,6 @@ main(int argc, char **argv, char **env)
 	}
 
 	close(tc->fd);
-
-	if (tc->filename)
-		fclose(tc->f);
 
 	return (error);
 }

@@ -52,7 +52,7 @@ struct trace_context {
 	void *base;
 	size_t bufsize;
 	int pid;
-	int cpu;
+	cpuset_t cpu_map;
 	int fd;
 	int thr_fd;
 	int terminate;
@@ -73,13 +73,13 @@ struct trace_context {
 
 	/* Raw trace. */
 	int raw;
+	FILE *raw_f;
 
 	/* Trace file. */
 	char *filename;
-	FILE *f;
 
 	int mode;
-	char *fs_root;
+	const char *fs_root;
 };
 
 struct pmcstat_process *hwt_process_alloc(void);
@@ -94,5 +94,6 @@ int hwt_find_sym(struct trace_context *tc);
 int hwt_start_tracing(struct trace_context *tc);
 int hwt_mmap_received(struct trace_context *tc,
     struct hwt_record_user_entry *entry);
+int hwt_ncpu(void);
 
 #endif /* !_HWTVAR_H_ */
