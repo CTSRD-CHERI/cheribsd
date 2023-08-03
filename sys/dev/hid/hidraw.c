@@ -404,7 +404,7 @@ hidraw_open(struct cdev *dev, int flag, int mode, struct thread *td)
 	sc->sc_head = sc->sc_tail = 0;
 	sc->sc_fflags = flag;
 
-	hidbus_intr_start(sc->sc_dev);
+	hid_intr_start(sc->sc_dev);
 
 	return (0);
 }
@@ -417,7 +417,7 @@ hidraw_dtor(void *data)
 	DPRINTF("sc=%p\n", sc);
 
 	/* Disable interrupts. */
-	hidbus_intr_stop(sc->sc_dev);
+	hid_intr_stop(sc->sc_dev);
 
 	sc->sc_tail = sc->sc_head = 0;
 	sc->sc_async = 0;
