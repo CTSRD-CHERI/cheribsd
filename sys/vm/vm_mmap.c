@@ -2071,6 +2071,7 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
     boolean_t writecounted, struct thread *td)
 {
 	vm_pointer_t *reservp;
+	vm_offset_t default_addr;
 	int docow, error, findspace, rv;
 	bool curmap, fitit;
 
@@ -2146,10 +2147,16 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
 		else
 			findspace = VMFS_OPTIMAL_SPACE;
 		if (curmap) {
-			rv = vm_map_find_min(map, object, foff, addr, size,
+			default_addr =
 			    round_page((vm_offset_t)td->td_proc->p_vmspace->
-			    vm_daddr + lim_max(td, RLIMIT_DATA)), max_addr,
-			    findspace, prot, maxprot, docow);
+			    vm_daddr + lim_max(td, RLIMIT_DATA));
+#ifdef MAP_32BIT
+			if ((flags & MAP_32BIT) != 0)
+				default_addr = 0;
+#endif
+			rv = vm_map_find_min(map, object, foff, addr, size,
+			    default_addr, max_addr, findspace, prot, maxprot,
+			    docow);
 		} else {
 			rv = vm_map_find(map, object, foff, addr, size,
 			    max_addr, findspace, prot, maxprot, docow);
