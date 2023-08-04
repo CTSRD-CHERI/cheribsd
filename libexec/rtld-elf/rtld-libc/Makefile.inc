@@ -120,12 +120,3 @@ rtld_libc.a: ${_libc_pic_path} ${SRCTOP}/libexec/rtld-elf/rtld-libc/Makefile.inc
 CLEANFILES+=rtld_libc.a
 LDADD+=${.OBJDIR}/rtld_libc.a
 beforelinking: rtld_libc.a
-
-# Ensure that we don't end up using unsupported relocations
-.if make(all)
-_building_rtld_flag_supported!=(${LD} --building-freebsd-rtld -v > /dev/null && echo "yes") || echo "no"
-.info "    --building-freebsd-rtld supported: ${_building_rtld_flag_supported}"
-.if ${_building_rtld_flag_supported} != "no"
-LDFLAGS+=	-Wl,--building-freebsd-rtld
-.endif # _building_rtld_flag_supported == yes
-.endif
