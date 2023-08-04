@@ -121,8 +121,6 @@ SRCS+=		rtld_c18n.c rtld_c18n_machdep.c rtld_c18n_asm.S
 .PATH: ${SRCTOP}/lib/libmalloc_simple
 SRCS+=		heap.c malloc.c
 
-CFLAGS+=	-I${SRCTOP}/lib/libc/${RTLD_ARCH}
-
 SIMPLE_PRINTF_PREFIX=rtld
 .include "${SRCTOP}/lib/libsimple_printf/Makefile.inc"
 .endif
