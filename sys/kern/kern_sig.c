@@ -3725,6 +3725,7 @@ sigexit(struct thread *td, int sig)
 			break;
 		default:
 			coreinfo = " (no core dump - other error)";
+			break;
 		}
 		if (kern_logsigexit)
 			log(LOG_INFO,
