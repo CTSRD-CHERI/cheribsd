@@ -73,6 +73,7 @@ static struct hwt_backend backend = {
 static struct coresight_pipeline cs_pipeline[MAXCPU];
 
 /*
+ * Example pipeline (SoC-dependent).
  * https://people.freebsd.org/~br/coresight_diagram.png
  */
 
