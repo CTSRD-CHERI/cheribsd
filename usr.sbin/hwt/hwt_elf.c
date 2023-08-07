@@ -41,7 +41,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "hwtvar.h"
+#include "hwt.h"
 
 int
 hwt_elf_count_libs(const char *elf_path, uint32_t *nlibs0)

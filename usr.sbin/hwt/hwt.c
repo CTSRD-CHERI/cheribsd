@@ -52,7 +52,7 @@
 #include "libpmcstat_stubs.h"
 #include <libpmcstat.h>
 
-#include "hwtvar.h"
+#include "hwt.h"
 
 #if defined(__aarch64__)
 #include "hwt_coresight.h"
@@ -72,12 +72,12 @@ static struct trace_dev trace_devs[] = {
 };
 
 void
-hwt_sleep(void)
+hwt_sleep(int msec)
 {
 	struct timespec time_to_sleep;
 
 	time_to_sleep.tv_sec = 0;
-	time_to_sleep.tv_nsec = 10000000; /* 10 ms */
+	time_to_sleep.tv_nsec = msec * 1000000;
 
 	nanosleep(&time_to_sleep, &time_to_sleep);
 }
@@ -278,8 +278,9 @@ usage(void)
 {
 
 	errx(EX_USAGE,
-		"hwt [-s cpu_id] [-c devname] [-b bufsize] [-t id] [-g] [-r] [-w file] [-i name]"
-		    " [-f name] [path to executable]\n"
+		"hwt [-s cpu_id] [-c devname] [-b bufsize] [-t id] [-g]"
+			" [-r] [-w file] [-i name]"
+			" [-f name] [path to executable]\n"
 		"\t -s\tcpu_id\t\tCPU (kernel) mode.\n"
 		"\t -c\tname\t\tName of tracing device, e.g. 'coresight'.\n"
 		"\t -b\tbufsize\t\tSize of trace buffer (per each thread) in bytes.\n"
@@ -428,7 +429,7 @@ hwt_mode_thread(struct trace_context *tc, char **cmd, char **env)
 		if (error != 0)
 			return (error);
 		tot_rec += nrec;
-		hwt_sleep();
+		hwt_sleep(10);
 	} while (tot_rec < nlibs);
 
 	error = tc->trace_dev->methods->process(tc);

@@ -44,7 +44,7 @@
 #include <signal.h>
 #include <string.h>
 
-#include "hwtvar.h"
+#include "hwt.h"
 
 #include "libpmcstat_stubs.h"
 #include <libpmcstat.h>

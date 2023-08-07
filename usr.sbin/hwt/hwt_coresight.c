@@ -51,7 +51,7 @@
 #include <opencsd/c_api/ocsd_c_api_types.h>
 #include <opencsd/c_api/opencsd_c_api.h>
 
-#include "hwtvar.h"
+#include "hwt.h"
 #include "hwt_coresight.h"
 
 #include "libpmcstat_stubs.h"
@@ -745,7 +745,7 @@ hwt_coresight_process(struct trace_context *tc)
 			/* No new entries in trace. */
 			if (tc->terminate && t++ > 2)
 				break;
-			hwt_sleep();
+			hwt_sleep(10);
 		} else if (new_offs > cursor) {
 			/* New entries in the trace buffer. */
 			len = new_offs - cursor;
