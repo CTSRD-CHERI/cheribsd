@@ -38,12 +38,16 @@ ENTRY(_setjmp)
 	stp	REG(8), REG(9), [REG(0)], #(REG_WIDTH * 2)
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	/* Store Executive mode state */
+	/* Store Executive mode state and general purpose registers */
 	str	clr, [csp, #-16]!
 	bl	_rtld_setjmp
 	ldr	clr, [csp], #16
-#endif
-
+	str	clr, [c0], #16
+	/*
+	 * Callee-saved registers have to be saved by _rtld_setjmp by reading
+	 * from the current trusted frame.
+	 */
+#else
 	/* Store the general purpose registers and lr */
 	stp	REG(19), REG(20), [REG(0)], #(REG_WIDTH * 2)
 	stp	REG(21), REG(22), [REG(0)], #(REG_WIDTH * 2)
@@ -51,6 +55,7 @@ ENTRY(_setjmp)
 	stp	REG(25), REG(26), [REG(0)], #(REG_WIDTH * 2)
 	stp	REG(27), REG(28), [REG(0)], #(REG_WIDTH * 2)
 	stp	REG(29), REGN(lr), [REG(0)], #(REG_WIDTH * 2)
+#endif
 
 #ifndef _STANDALONE
 	/* Store the vfp registers */
@@ -84,6 +89,10 @@ ENTRY(_longjmp)
 	bl	_rtld_longjmp
 	/* Restore lr */
 	ldr	clr, [c0], #CAP_WIDTH
+	/*
+	 * Callee-saved registers have to be restored by _rtld_longjmp by
+	 * overwriting the current trusted frame.
+	 */
 #else
 	/* Restore the general purpose registers and lr */
 	ldp	REG(19), REG(20), [REG(0)], #(REG_WIDTH * 2)

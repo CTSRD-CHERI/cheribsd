@@ -507,8 +507,7 @@ END(_rtld_tlsdesc_dynamic)
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 ENTRY(_rtld_setjmp)
 	/*
-	 * This function MUST update c0 to point to the callee-saved registers
-	 * to be saved.
+	 * This function MUST save the callee-saved registers in the c0 buffer.
 	 *
 	 * Before setjmp is called, the top of the Executive stack contains:
 	 * 	-3.	Caller's data
@@ -567,6 +566,20 @@ ENTRY(_rtld_setjmp)
 	/* Save link to 4 for buffer */
 	mov	c4, c1
 
+	ldp	c19, c20, [c1, #((SETJMP_SHIFT + 3) * CAP_WIDTH)]
+	ldp	c21, c22, [c1, #((SETJMP_SHIFT + 5) * CAP_WIDTH)]
+	ldp	c23, c24, [c1, #((SETJMP_SHIFT + 7) * CAP_WIDTH)]
+	ldp	c25, c26, [c1, #((SETJMP_SHIFT + 9) * CAP_WIDTH)]
+	ldp	c27, c28, [c1, #((SETJMP_SHIFT + 11) * CAP_WIDTH)]
+	ldr	c29, [c1, #((SETJMP_SHIFT + 13) * CAP_WIDTH)]
+
+	stp	c19, c20, [c0, #(CAP_WIDTH * 1)]
+	stp	c21, c22, [c0, #(CAP_WIDTH * 3)]
+	stp	c23, c24, [c0, #(CAP_WIDTH * 5)]
+	stp	c25, c26, [c0, #(CAP_WIDTH * 7)]
+	stp	c27, c28, [c0, #(CAP_WIDTH * 9)]
+	str	c29, [c0, #(CAP_WIDTH * 11)]
+
 	/* Shift 4 and adjust it's cursor */
 	ldr	c2, [c1, #(SETJMP_SHIFT * CAP_WIDTH)]
 	sub	c2, c2, #(SETJMP_SHIFT * CAP_WIDTH)
@@ -608,7 +621,7 @@ ENTRY(_rtld_setjmp)
 
 	scbnds	c1, c1, #(SETJMP_SHIFT * CAP_WIDTH)
 	seal	c1, c1, c5
-	str	c1, [c0], #CAP_WIDTH
+	str	c1, [c0], #(CAP_WIDTH * 12)
 
 	mov	x6, xzr
 	mov	x5, xzr
@@ -1050,7 +1063,7 @@ TRAMP(tramp_return)
 	 * encoded as follows and stored in the flags of csp:
 	 * - None:	0b00
 	 * - c1 only:	0b01
-	 * - c1 and c2:	0b1x
+	 * - c0 and c1:	0b1x
 	 * Use comparison and csel to avoid branching.
 	 *
 	 * Use subs instead of cmp to clear a register tag.
