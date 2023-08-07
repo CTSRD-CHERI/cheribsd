@@ -35,6 +35,9 @@
 
 #include "debug.h"
 #include "rtld.h"
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#include "rtld_c18n.h"
+#endif
 
 #ifdef RTLD_HAS_CAPRELOCS
 /* The clang-provided header is not warning-clean: */

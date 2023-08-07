@@ -69,6 +69,9 @@
 #include "rtld_utrace.h"
 #include "notes.h"
 #include "rtld_libc.h"
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#include "rtld_c18n.h"
+#endif
 
 /* Types. */
 typedef void (*func_ptr_type)(void);
@@ -234,10 +237,6 @@ static const char *ld_preload_fds;/* Environment variable for libraries represen
 static const char *ld_elf_hints_path;	/* Environment variable for alternative hints path */
 static const char *ld_tracing;	/* Called from ldd to print libs */
 static const char *ld_utrace;	/* Use utrace() to log events. */
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-const char *ld_utrace_compartment;	/* Use utrace() to log compartmentalisation-related events. */
-const char *ld_compartment_overhead;	/* Simulate overhead during compartment transitions. */
-#endif
 static bool ld_skip_init_funcs = false;	/* XXXAR: debug environment variable to verify relocation processing */
 static struct obj_entry_q obj_list;	/* Queue of all loaded objects */
 static Obj_Entry *obj_main;	/* The main program shared object */
@@ -319,15 +318,6 @@ size_t tls_static_space;	/* Static TLS space allocated */
 static size_t tls_static_max_align;
 Elf_Addr tls_dtv_generation = 1;	/* Used to detect when dtv size changes */
 int tls_max_index = 1;		/* Largest module index allocated */
-
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-/*
- * Sealers for RTLD privileged information
- */
-#define RTLD_SEALER_EXE_LEN	0x200
-static uintptr_t sealer_res;
-uintptr_t sealer_pltgot, sealer_jmpbuf, sealer_tramp;
-#endif
 
 static bool ld_library_path_rpath = false;
 bool ld_fast_sigblock = false;
@@ -2291,9 +2281,6 @@ find_symdef(unsigned long symnum, const Obj_Entry *refobj,
 	req.flags = flags;
 	ve = req.ventry = fetch_ventry(refobj, symnum);
 	req.lockstate = lockstate;
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	req.sig = fetch_tramp_sig(refobj, symnum);
-#endif
 	res = symlook_default(&req, refobj);
 	if (res == 0) {
 	    def = req.sym_out;
@@ -2788,8 +2775,6 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
     sealer_pltgot = cheri_setboundsexact(sealer, 1); sealer += 1;
     sealer_jmpbuf = cheri_setboundsexact(sealer, 1); sealer += 1;
     sealer_tramp = cheri_setboundsexact(sealer, 72); sealer += 72;
-    sealer_res = cheri_setboundsexact(sealer,
-        cheri_gettop(sealer) - cheri_getoffset(sealer));
     tramp_init();
 #endif
 }
@@ -6288,20 +6273,6 @@ fetch_ventry(const Obj_Entry *obj, unsigned long symnum)
     return (NULL);
 }
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-struct tramp_sig
-fetch_tramp_sig(const Obj_Entry *obj, unsigned long symnum)
-{
-	if (obj->sigtab == NULL)
-		return ((struct tramp_sig) {});
-	else if (symnum < obj->dynsymcount)
-		return (obj->sigtab[symnum]);
-	else
-		rtld_fatal("Invalid symbol number %lu for object %s.",
-		    symnum, obj->path);
-}
-#endif
-
 int
 _rtld_get_stack_prot(void)
 {
@@ -6418,9 +6389,6 @@ symlook_init_from_req(SymLook *dst, const SymLook *src)
 	dst->hash_gnu = src->hash_gnu;
 	dst->ventry = src->ventry;
 	dst->flags = src->flags;
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	dst->sig = src->sig;
-#endif
 	dst->defobj_out = NULL;
 	dst->sym_out = NULL;
 	dst->lockstate = src->lockstate;

@@ -51,6 +51,9 @@
 
 #include "debug.h"
 #include "rtld.h"
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#include "rtld_c18n.h"
+#endif
 
 static Elf_Ehdr *get_elf_header(int, const char *, const struct stat *,
     const char*, Elf_Phdr **phdr);
@@ -635,13 +638,3 @@ convert_flags(int elfflags)
 	flags |= MAP_NOCORE;
     return flags;
 }
-
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-uint16_t allocate_compart_id(void)
-{
-	static uint16_t max_compart_id;
-	if (++max_compart_id == 0)
-		rtld_fatal("max_compart_id overflowed");
-	return (max_compart_id);
-}
-#endif
