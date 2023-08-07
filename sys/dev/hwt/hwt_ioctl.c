@@ -146,7 +146,9 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 		return (EEXIST);
 
 	/* Allocate a new HWT context. */
-	ctx = hwt_ctx_alloc();
+	error = hwt_ctx_alloc(&ctx);
+	if (error)
+		return (error);
 	ctx->bufsize = halloc->bufsize;
 	ctx->pid = halloc->pid;
 	ctx->hwt_backend = backend;
@@ -255,7 +257,9 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 		return (ENODEV);
 
 	/* Allocate a new HWT context. */
-	ctx = hwt_ctx_alloc();
+	error = hwt_ctx_alloc(&ctx);
+	if (error)
+		return (error);
 	ctx->bufsize = halloc->bufsize;
 	ctx->hwt_backend = backend;
 	ctx->hwt_owner = ho;

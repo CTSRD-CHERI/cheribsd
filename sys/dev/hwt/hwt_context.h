@@ -68,7 +68,7 @@ struct hwt_context {
 #define	HWT_CTX_UNLOCK(ctx)		mtx_unlock_spin(&(ctx)->mtx)
 #define	HWT_CTX_ASSERT_LOCKED(ctx)	mtx_assert(&(ctx)->mtx, MA_OWNED)
 
-struct hwt_context * hwt_ctx_alloc(void);
+int hwt_ctx_alloc(struct hwt_context **ctx0);
 void hwt_ctx_free(struct hwt_context *ctx);
 
 void hwt_ctx_load(void);

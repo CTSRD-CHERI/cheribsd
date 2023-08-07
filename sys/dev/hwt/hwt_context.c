@@ -88,8 +88,8 @@ hwt_ctx_ident_free(int ident)
 	mtx_unlock_spin(&ident_set_mutex);
 }
 
-struct hwt_context *
-hwt_ctx_alloc(void)
+int
+hwt_ctx_alloc(struct hwt_context **ctx0)
 {
 	struct hwt_context *ctx;
 	int error;
@@ -102,15 +102,15 @@ hwt_ctx_alloc(void)
 	TAILQ_INIT(&ctx->cpus);
 	mtx_init(&ctx->mtx, "ctx", NULL, MTX_SPIN);
 
-	hwt_ctx_ident_alloc(&ctx->ident);
-
 	error = hwt_ctx_ident_alloc(&ctx->ident);
 	if (error) {
 		printf("could not allocate ident bit str\n");
-		return (NULL);
+		return (error);
 	}
 
-	return (ctx);
+	*ctx0 = ctx;
+
+	return (0);
 }
 
 void
