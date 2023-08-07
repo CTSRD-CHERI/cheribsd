@@ -58,6 +58,15 @@
 #include "hwt_coresight.h"
 #endif
 
+#define	HWT_DEBUG
+#undef	HWT_DEBUG
+
+#ifdef	HWT_DEBUG
+#define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)
+#else
+#define	dprintf(fmt, ...)
+#endif
+
 #define	PARENTSOCKET		0
 #define	CHILDSOCKET		1
 #define	NSOCKPAIRFD		2
@@ -217,9 +226,7 @@ hwt_get_offs(struct trace_context *tc, size_t *offs)
 	if (error)
 		return (error);
 
-#if 0
-	printf("curpage %d curpage_offset %ld\n", curpage, curpage_offset);
-#endif
+	dprintf("curpage %d curpage_offset %ld\n", curpage, curpage_offset);
 
 	*offs = curpage * PAGE_SIZE + curpage_offset;
 
@@ -283,16 +290,17 @@ usage(void)
 			" [-f name] [path to executable]\n"
 		"\t -s\tcpu_id\t\tCPU (kernel) mode.\n"
 		"\t -c\tname\t\tName of tracing device, e.g. 'coresight'.\n"
-		"\t -b\tbufsize\t\tSize of trace buffer (per each thread) in bytes.\n"
+		"\t -b\tbufsize\t\tSize of trace buffer (per each thread)"
+		    " in bytes.\n"
 		"\t -t\tid\t\tThread index of application passed to decoder.\n"
 		"\t -r\t\t\tRaw flag. Do not decode results.\n"
 		"\t -w\tfilename\tStore results into file.\n"
+#if defined(__aarch64__)
 		"\t -g\t\t\tFormat flag.\n"
+#endif
 		"\t -i\tname\t\tFilter by dynamic library, executable name,\n"
 		"\t\t\t\tkernel module name or 'kernel'.\n"
 		"\t -f\tname\t\tFilter by function name."
-#if defined(__aarch64__)
-#endif
         );
 }
 
@@ -308,12 +316,14 @@ hwt_mode_cpu(struct trace_context *tc)
 
 	error = hwt_ctx_alloc(tc);
 	if (error) {
-		printf("%s: failed to alloc kernel-mode ctx, error %d, errno %d\n",
+		printf("%s: failed to alloc cpu-mode ctx, error %d errno %d\n",
 		    __func__, error, errno);
 		return (error);
 	}
 
-	/* TODO: this is Coresight-specific to map memory from the first CPU. */
+	/*
+	 * TODO: It is Coresight-specific to map memory from the first CPU.
+	 */
 	error = hwt_map_memory(tc, CPU_FFS(&tc->cpu_map) - 1);
 	if (error != 0) {
 		printf("can't map memory");

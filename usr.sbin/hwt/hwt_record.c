@@ -49,6 +49,15 @@
 #include "libpmcstat_stubs.h"
 #include <libpmcstat.h>
 
+#define	HWT_RECORD_DEBUG
+#undef	HWT_RECORD_DEBUG
+
+#ifdef	HWT_RECORD_DEBUG
+#define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)
+#else
+#define	dprintf(fmt, ...)
+#endif
+
 int
 hwt_record_fetch(struct trace_context *tc, int *nrecords)
 {
@@ -81,7 +90,7 @@ hwt_record_fetch(struct trace_context *tc, int *nrecords)
 		return (error);
 	}
 
-printf("%s: error %d: nent %d\n", __func__, error, nentries);
+	dprintf("%s: error %d: nent %d\n", __func__, error, nentries);
 
 	for (j = 0; j < nentries; j++) {
 		entry = &tc->records[j];
@@ -106,12 +115,11 @@ printf("%s: error %d: nent %d\n", __func__, error, nentries);
 			addr = (unsigned long)entry->addr & ~1;
 			addr -= (image->pi_start - image->pi_vaddr);
 			pmcstat_image_link(tc->pp, image, addr);
-#if 0
-			printf("image pi_vaddr %lx pi_start %lx pi_entry %lx\n",
+			dprintf("image pi_vaddr %lx pi_start %lx"
+			    " pi_entry %lx\n",
 			    (unsigned long)image->pi_vaddr,
 			    (unsigned long)image->pi_start,
 			    (unsigned long)image->pi_entry);
-#endif
 			hwt_mmap_received(tc, entry);
 			break;
 		case HWT_RECORD_KERNEL:

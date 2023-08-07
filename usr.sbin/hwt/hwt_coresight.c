@@ -57,10 +57,10 @@
 #include "libpmcstat_stubs.h"
 #include <libpmcstat.h>
 
-#define	PMCTRACE_CS_DEBUG
-#undef	PMCTRACE_CS_DEBUG
+#define	HWT_CORESIGHT_DEBUG
+#undef	HWT_CORESIGHT_DEBUG
 
-#ifdef	PMCTRACE_CS_DEBUG
+#ifdef	HWT_CORESIGHT_DEBUG
 #define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)
 #else
 #define	dprintf(fmt, ...)
@@ -70,7 +70,6 @@ static int cs_flags = 0;
 #define	FLAG_FORMAT			(1 << 0)
 #define	FLAG_FRAME_RAW_UNPACKED		(1 << 1)
 #define	FLAG_FRAME_RAW_PACKED		(1 << 2)
-#define	FLAG_CALLBACK_MEM_ACC		(1 << 3)
 
 #define	PACKET_STR_LEN	1024
 static char packet_str[PACKET_STR_LEN];
@@ -184,54 +183,33 @@ packet_monitor(void *context __unused,
 	}
 }
 
-#if 0
-static uint32_t
-cs_decoder__mem_access(const void *context __unused,
-    const ocsd_vaddr_t address __unused,
-    const ocsd_mem_space_acc_t mem_space __unused,
-    const uint32_t req_size __unused, uint8_t *buffer __unused)
-{
-
-	/* TODO */
-
-	return (0);
-}
-#endif
-
 static ocsd_err_t
 create_test_memory_acc(dcd_tree_handle_t handle, struct trace_context *tc)
 {
 	ocsd_vaddr_t address;
 	uint8_t *p_mem_buffer;
 	uint32_t mem_length;
+	uint64_t *t;
 	int ret;
 
 	dprintf("%s\n", __func__);
 
-#if 0
-	if (cs_flags & FLAG_CALLBACK_MEM_ACC)
-		ret = ocsd_dt_add_callback_mem_acc(handle, base + start,
-			base + end - 1, OCSD_MEM_SPACE_ANY,
-			cs_decoder__mem_access, NULL);
-	else
-#endif
-	{
-		address = (ocsd_vaddr_t)tc->base;
+	address = (ocsd_vaddr_t)tc->base;
 
-		uint64_t *t;
-		t = (uint64_t *)tc->base;
-		printf("%lx %lx %lx %lx\n", t[0], t[1], t[2], t[3]);
+	t = (uint64_t *)tc->base;
 
-		p_mem_buffer = (uint8_t *)tc->base;
-		mem_length = tc->bufsize;
+	dprintf("%lx %lx %lx %lx\n", t[0], t[1], t[2], t[3]);
 
-		ret = ocsd_dt_add_buffer_mem_acc(handle, address,
-		    OCSD_MEM_SPACE_ANY, p_mem_buffer, mem_length);
-	}
+	p_mem_buffer = (uint8_t *)tc->base;
+	mem_length = tc->bufsize;
 
-	if (ret != OCSD_OK)
+	ret = ocsd_dt_add_buffer_mem_acc(handle, address,
+	    OCSD_MEM_SPACE_ANY, p_mem_buffer, mem_length);
+	if (ret != OCSD_OK) {
 		printf("%s: can't create memory accessor: ret %d\n",
 		    __func__, ret);
+		return (ENXIO);
+	}
 
 	return (ret);
 }
@@ -253,7 +231,7 @@ create_generic_decoder(dcd_tree_handle_t handle, const char *p_name,
 	if (ret != OCSD_OK)
 		return (-1);
 
-	printf("%s: CSID %d\n", __func__, CSID);
+	printf("%s: CSID to decode: %d.\n", __func__, CSID);
 
 	if (cs_flags & FLAG_FORMAT) {
 		ret = ocsd_dt_attach_packet_callback(handle, CSID,
@@ -264,8 +242,10 @@ create_generic_decoder(dcd_tree_handle_t handle, const char *p_name,
 
 	/* attach a memory accessor */
 	ret = create_test_memory_acc(handle, tc);
-	if (ret != OCSD_OK)
+	if (ret != OCSD_OK) {
 		ocsd_dt_remove_decoder(handle, CSID);
+		return (ENXIO);
+	}
 
 	return (ret);
 }
@@ -382,6 +362,16 @@ symbol_lookup(const struct trace_context *tc, uint64_t ip,
         return (NULL);
 }
 
+static void __unused
+print_timestamp(const ocsd_generic_trace_elem *elem)
+{
+	char ts[100];
+
+	if (elem->timestamp != 0)
+		sprintf(ts, "ts %ld", elem->timestamp);
+	else
+		sprintf(ts, "                  ");
+}
 
 static ocsd_datapath_resp_t
 gen_trace_elem_print_lookup(const void *p_context,
@@ -405,19 +395,13 @@ gen_trace_elem_print_lookup(const void *p_context,
 
 	resp = OCSD_RESP_CONT;
 
-#if 0
 	dprintf("%s: Idx:%d ELEM TYPE %d, st_addr %lx, en_addr %lx\n",
 	    __func__, index_sop, elem->elem_type,
 	    elem->st_addr, elem->en_addr);
-#endif
 
-#if 0
-	if (elem->st_addr == -1)
+	if (elem->st_addr <= 0)
 		return (resp);
-#endif
 
-	if (elem->st_addr == 0)
-		return (resp);
 	ip = elem->st_addr;
 
 	sym = symbol_lookup(tc, ip, &image, &newpc);
@@ -472,15 +456,6 @@ gen_trace_elem_print_lookup(const void *p_context,
 	case OCSD_GEN_TRC_ELEM_CUSTOM:
 		return (resp);
 	};
-
-#if 0
-	char ts[100];
-
-	if (elem->timestamp != 0)
-		sprintf(ts, "ts %ld", elem->timestamp);
-	else
-		sprintf(ts, "                  ");
-#endif
 
 	if (sym) {
 		offset = newpc - (sym->ps_start + image->pi_vaddr);
@@ -549,7 +524,7 @@ hwt_coresight_init(struct trace_context *tc, struct cs_decoder *dec,
 		return (-2);
 	}
 
-#ifdef PMCTRACE_CS_DEBUG
+#ifdef HWT_CORESIGHT_DEBUG
 	ocsd_tl_log_mapped_mem_ranges(dec->dcdtree_handle);
 #endif
 
@@ -648,8 +623,10 @@ cs_process_chunk1(struct trace_context *tc, struct cs_decoder *dec,
 			if (error)
 				return (error);
 		}
-	} else
+	} else {
 		error = cs_process_chunk(tc, dec, cursor, len, processed);
+		return (error);
+	}
 
 	return (0);
 }
