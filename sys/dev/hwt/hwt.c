@@ -100,7 +100,7 @@
  *    hardware buffer of a given thread.
  * 8. User invokes trace decoder library to process available data and see the
  *    results in human readable form.
- * 9. User repeates 7 if needed.
+ * 9. User repeats 7 if needed.
  *
  * HWT context lifecycle in CPU mode of operation:
  * 1. User invokes HWT_IOC_ALLOC ioctl providing a set of CPU to trace within
