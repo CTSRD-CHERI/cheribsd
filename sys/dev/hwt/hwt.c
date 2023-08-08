@@ -47,10 +47,10 @@
  *    .ioctl:
  *        hwt_ioctl(): 
  *               a) HWT_IOC_ALLOC
- *                  Allocates kernel tracing context ctx for a given pid,
- *                  and for required mode of operation (CPU or Thread mode),
- *                  returns unique ident.
- *                  Creates a new character device for ctx management.
+ *                  Allocates kernel tracing context CTX based on requested mode
+ *                  of operation. Verifies the information that comes with the
+ *                  request (pid, cpus), allocates unique ID for the context.
+ *                  Creates a new character device for CTX management.
  *
  * /dev/hwt_%d[_%d], ident[, thread_id]
  *    .mmap
@@ -63,27 +63,27 @@
  *                  Transfers (small) record entries collected during program
  *                  execution for a given context to userspace, such as mmaping
  *                  tables of executable and dynamic libraries, interpreter,
- *                  tid of threads created, etc.
+ *                  kernel mappings, tid of threads created, etc.
  *               c) HWT_IOC_SET_CONFIG
- *                  This allows to set backend-specific configuration of the
+ *                  Allows to specify backend-specific configuration of the
  *                  trace unit.
  *               d) HWT_IOC_WAKEUP
- *                  This wakes up a thread that is currently sleeping.
+ *                  Wakes up a thread that is currently sleeping.
  *               e) HWT_IOC_BUFPTR_GET
  *                  Transfers current hardware pointer in the filling buffer
- *                  to userspace.
+ *                  to the userspace.
  *
- * HWT context lifecycle:
+ * HWT context lifecycle in THREAD mode of operation:
  * 1. User invokes HWT_IOC_ALLOC ioctl with information about pid to trace and
  *    size of the buffers for the trace data to allocate.
  *    Some architectures may have different tracing units supported, so user
  *    also provides backend name to use for this context, e.g. "coresight".
- * 2. Kernel allocates context, lookups the proc for the given pid. Creates
- *    first hwt_thread in the context and allocates trace buffers for it.
- *    Immediately, kernel initializes tracing backend.
+ * 2. Kernel allocates context, lookups the proc for the given pid. Then it
+ *    creates first hwt_thread in the context and allocates trace buffers for
+ *    it. Immediately, kernel initializes tracing backend.
  *    Kernel creates character device and returns unique identificator of
- *    trace context.
- * 3. User opens new character device to operate with the new context.
+ *    trace context to the user.
+ * 3. To manage the new context, user opens the character device created.
  *    User invokes HWT_IOC_START ioctl, kernel marks context as RUNNING.
  *    At this point any HWT hook invocation by scheduler enables/disables
  *    tracing for threads associated with the context (threads of the proc).
@@ -101,6 +101,18 @@
  * 8. User invokes trace decoder library to process available data and see the
  *    results in human readable form.
  * 9. User repeates 7 if needed.
+ *
+ * HWT context lifecycle in CPU mode of operation:
+ * 1. User invokes HWT_IOC_ALLOC ioctl providing a set of CPU to trace within
+ *    single CTX.
+ * 2. Kernel verifies the set of CPU and allocates tracing context, creates
+ *    a buffer for each CPU.
+ *    Kernel creates a character device for every CPU provided in the request.
+ *    Kernel initialized tracing backend.
+ * 3. User opens character devices of interest to map the buffers to userspace.
+ *    User can start tracing by invoking HWT_IOC_START on any of character
+ *    device within the context, entire context will be marked as RUNNING.
+ * 4. The rest is similar to the THREAD mode.
  */
 
 #include <sys/param.h>
