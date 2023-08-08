@@ -380,7 +380,7 @@ hwt_mode_thread(struct trace_context *tc, char **cmd, char **env)
 
 	error = hwt_elf_count_libs(*cmd, &nlibs);
 	if (error != 0) {
-		printf("could not count libs\n");
+		printf("Could not count libs in the executable provided.\n");
 		return (error);
 	}
 

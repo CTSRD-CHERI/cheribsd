@@ -421,7 +421,7 @@ gen_trace_elem_print_lookup(const void *p_context,
 		fprintf(out, "No sync.\n");
 		return (resp);
 	case OCSD_GEN_TRC_ELEM_TRACE_ON:
-		fprintf(out, "Trace on.\n");
+		/* fprintf(out, "Trace on.\n"); */
 		return (resp);
 	case OCSD_GEN_TRC_ELEM_EO_TRACE:
 		fprintf(out, "End of Trace.\n");
@@ -459,16 +459,13 @@ gen_trace_elem_print_lookup(const void *p_context,
 
 	if (sym) {
 		offset = newpc - (sym->ps_start + image->pi_vaddr);
-
 		fprintf(out, "pc 0x%08lx (%lx)\t%12s\t%s+0x%lx\n",
-		    //elem->elem_type,
 		    ip, newpc,
 		    pmcstat_string_unintern(image->pi_name),
 		    pmcstat_string_unintern(sym->ps_name), offset);
 	} else
 		if (image)
 			fprintf(out, "pc 0x%08lx (%lx)\t%12s\n",
-			    //elem->elem_type,
 			    ip, newpc,
 			    pmcstat_string_unintern(image->pi_name));
 		else {
@@ -515,8 +512,10 @@ hwt_coresight_init(struct trace_context *tc, struct cs_decoder *dec,
 	if (tc->flag_format)
 		cs_flags |= FLAG_FORMAT;
 
-	//cs_flags |= FLAG_FRAME_RAW_UNPACKED;
-	//cs_flags |= FLAG_FRAME_RAW_PACKED;
+#if 0
+	cs_flags |= FLAG_FRAME_RAW_UNPACKED;
+	cs_flags |= FLAG_FRAME_RAW_PACKED;
+#endif
 
 	error = create_decoder_etmv4(tc, dec->dcdtree_handle, thread_id);
 	if (error != OCSD_OK) {
