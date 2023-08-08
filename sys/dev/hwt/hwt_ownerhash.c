@@ -128,7 +128,6 @@ hwt_ownerhash_load(void)
 void
 hwt_ownerhash_unload(void)
 {
-#if 0
 	struct hwt_ownerhash *hoh;
 	struct hwt_owner *ho, *tmp;
 
@@ -137,11 +136,11 @@ hwt_ownerhash_unload(void)
 	    hoh <= &hwt_ownerhash[hwt_ownerhashmask];
 	    hoh++) {
 		LIST_FOREACH_SAFE(ho, hoh, next, tmp) {
-			LIST_REMOVE(ho, next);
+			/* TODO: module is in use ? */
 		}
 	}
 	HWT_OWNERHASH_UNLOCK();
-#endif
+
 	mtx_destroy(&hwt_ownerhash_mtx);
 	hashdestroy(hwt_ownerhash, M_HWT_OWNERHASH, hwt_ownerhashmask);
 }
