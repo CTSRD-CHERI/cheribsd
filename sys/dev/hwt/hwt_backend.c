@@ -173,13 +173,10 @@ hwt_backend_register(struct hwt_backend *backend)
 	    backend->ops == NULL)
 		return (EINVAL);
 
-#if 0
-	mtx_init(&entry->mtx, "BKND", NULL, MTX_DEF);
-#endif
- 
 	entry = malloc(sizeof(struct hwt_backend_entry), M_HWT_BACKEND,
 	    M_WAITOK | M_ZERO);
 	entry->backend = backend;
+	mtx_init(&entry->mtx, "HWT backend", NULL, MTX_DEF);
 
 	HWT_BACKEND_LOCK();
 	LIST_INSERT_HEAD(&hwt_backends, entry, next);
