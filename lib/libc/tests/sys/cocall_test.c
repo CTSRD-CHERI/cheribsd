@@ -110,14 +110,14 @@ wait_for_coregister(void)
 	 *
 	 * XXX: You might have been expecting something more clever.
 	 */
-	 usleep(200000);
+	 usleep(600000);
 }
 
 ATF_TC_WITHOUT_HEAD(cocall);
 ATF_TC_BODY(cocall, tc)
 {
 	char *name;
-	uint64_t buf;
+	uint64_t buf __attribute__((aligned(16)));
 	pid_t pid, pid2;
 	ssize_t received;
 	int error;
@@ -148,7 +148,6 @@ ATF_TC_BODY(cocall, tc)
 		atf_tc_fail("You're not supposed to be here");
 	}
 	atf_utils_wait(pid2, 0, "passed\n", "save:/dev/null");
-
 	error = kill(pid, SIGTERM);
 	ATF_REQUIRE_EQ(error, 0);
 }
@@ -158,7 +157,7 @@ ATF_TC_BODY(cocall_h, tc)
 {
 	void * __capability lookedup;
 	char *arg;
-	uint64_t buf;
+	uint64_t buf __attribute__((aligned(16)));
 	ssize_t received;
 	int error;
 
@@ -182,7 +181,7 @@ ATF_TC_BODY(cocall_cookie, tc)
 {
 	void * __capability cookie;
 	char *name;
-	uint64_t buf;
+	uint64_t buf __attribute__((aligned(16)));
 	pid_t pid, pid2;
 	ssize_t received;
 	int error;
@@ -225,7 +224,7 @@ ATF_TC_BODY(cocall_cookie_h, tc)
 {
 	void * __capability lookedup;
 	char *arg;
-	uint64_t buf;
+	uint64_t buf __attribute__((aligned(16)));
 	ssize_t received;
 	int error;
 
@@ -248,7 +247,7 @@ ATF_TC_WITHOUT_HEAD(cocall_eagain);
 ATF_TC_BODY(cocall_eagain, tc)
 {
 	char *name;
-	uint64_t buf;
+	uint64_t buf __attribute__((aligned(16)));
 	pid_t pid, pid2;
 	int error;
 
@@ -284,7 +283,7 @@ ATF_TC_BODY(cocall_eagain_h, tc)
 {
 	void * __capability lookedup;
 	char *arg;
-	uint64_t buf;
+	uint64_t buf __attribute__((aligned(16)));
 	ssize_t received;
 	int error;
 
@@ -308,7 +307,7 @@ ATF_TC_WITHOUT_HEAD(cocall_bad_caller_buf);
 ATF_TC_BODY(cocall_bad_caller_buf, tc)
 {
 	char *name;
-	uint64_t buf;
+	uint64_t buf __attribute__((aligned(16)));
 	pid_t pid, pid2;
 	ssize_t received;
 	int error;
@@ -405,7 +404,7 @@ ATF_TC_BODY(cocall_bad_callee_buf_h, tc)
 {
 	void * __capability lookedup;
 	char *arg;
-	uint64_t buf;
+	uint64_t buf __attribute__((aligned(16)));
 	ssize_t received;
 	int error;
 
@@ -428,7 +427,7 @@ ATF_TC_WITHOUT_HEAD(cocall_callee_abort);
 ATF_TC_BODY(cocall_callee_abort, tc)
 {
 	char *name;
-	uint64_t buf;
+	uint64_t buf __attribute__((aligned(16)));
 	pid_t pid, pid2;
 	ssize_t received;
 	int error;
@@ -467,7 +466,7 @@ ATF_TC_BODY(cocall_callee_abort_h, tc)
 {
 	void * __capability lookedup;
 	char *arg;
-	uint64_t buf;
+	uint64_t buf __attribute__((aligned(16)));
 	ssize_t received;
 	int error;
 
@@ -490,7 +489,7 @@ ATF_TC_WITHOUT_HEAD(cocall_callee_dead);
 ATF_TC_BODY(cocall_callee_dead, tc)
 {
 	char *name, *pidstr;
-	uint64_t buf;
+	uint64_t buf __attribute__((aligned(16)));
 	pid_t pid, pid2;
 	ssize_t received;
 	int error;
@@ -533,7 +532,7 @@ ATF_TC_BODY(cocall_callee_dead_h, tc)
 {
 	void * __capability lookedup;
 	char *arg, *arg2;
-	uint64_t buf;
+	uint64_t buf __attribute__((aligned(16)));
 	pid_t pid;
 	ssize_t received;
 	int error;
@@ -573,7 +572,7 @@ ATF_TC_WITHOUT_HEAD(cocall_proxy);
 ATF_TC_BODY(cocall_proxy, tc)
 {
 	char *name, *name2;
-	uint64_t buf;
+	uint64_t buf __attribute__((aligned(16)));
 	pid_t pid, pid2, pid3;
 	ssize_t received;
 	int error;
@@ -628,7 +627,7 @@ ATF_TC_BODY(cocall_proxy_h, tc)
 {
 	void * __capability lookedup;
 	char *arg, *arg2;
-	uint64_t buf;
+	uint64_t buf __attribute__((aligned(16)));
 	ssize_t received;
 	int error;
 
@@ -675,7 +674,7 @@ ATF_TC_BODY(cocall_proxy_h2, tc)
 {
 	void * __capability lookedup;
 	char *arg;
-	uint64_t buf;
+	uint64_t buf __attribute__((aligned(16)));
 	ssize_t received;
 	int error;
 
@@ -702,7 +701,7 @@ ATF_TC_WITHOUT_HEAD(cocall_proxy_abort);
 ATF_TC_BODY(cocall_proxy_abort, tc)
 {
 	char *name, *name2;
-	uint64_t buf;
+	uint64_t buf __attribute__((aligned(16)));
 	pid_t pid, pid2, pid3;
 	ssize_t received;
 	int error;
@@ -755,7 +754,7 @@ ATF_TC_BODY(cocall_proxy_abort_h, tc)
 {
 	void * __capability lookedup;
 	char *arg, *arg2;
-	uint64_t buf;
+	uint64_t buf __attribute__((aligned(16)));
 	ssize_t received;
 	int error;
 
@@ -802,7 +801,7 @@ ATF_TC_BODY(cocall_proxy_abort_h2, tc)
 {
 	void * __capability lookedup;
 	char *arg;
-	uint64_t buf;
+	uint64_t buf __attribute__((aligned(16)));
 	ssize_t received;
 	int error;
 

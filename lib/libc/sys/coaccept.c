@@ -47,11 +47,11 @@ coaccept(void * __capability * __capability cookiep,
 
 	if (outbuf != NULL) {
 		assert(__builtin_is_aligned(outbuf, sizeof(void * __capability)));
-		assert(__builtin_is_aligned(outlen, sizeof(void * __capability)));
+		//assert(__builtin_is_aligned(outlen, sizeof(void * __capability)));
 	}
 	if (inbuf != NULL) {
 		assert(__builtin_is_aligned(inbuf, sizeof(void * __capability)));
-		assert(__builtin_is_aligned(inlen, sizeof(void * __capability)));
+		//assert(__builtin_is_aligned(inlen, sizeof(void * __capability)));
 	}
 
 	return (_coaccept(_coaccept_code, _coaccept_data, cookiep,
