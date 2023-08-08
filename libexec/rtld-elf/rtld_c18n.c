@@ -637,15 +637,9 @@ tramp_intern(const struct tramp_data *data)
 
 	assert(data->entry == NULL);
 
-#ifndef TRAMP_LINEAR_INSERTION
 start:
-#endif
 	slot = hash;
-#ifdef TRAMP_LINEAR_INSERTION
-	wlock_acquire(rtld_tramp_lock, &lockstate);
-#else
 	rlock_acquire(rtld_tramp_lock, &lockstate);
-#endif
 	exp = tramp_table.exp;
 	do {
 		slot = nextSlot(slot, hash, exp);
@@ -653,7 +647,6 @@ start:
 		    memory_order_relaxed);
 		if (key != 0)
 			continue;
-#ifndef TRAMP_LINEAR_INSERTION
 		/*
 		 * Invariant: tramp_table.size <= tramp_table.writers
 		 *
@@ -672,7 +665,6 @@ start:
 			lock_release(rtld_tramp_lock, &lockstate);
 			goto start;
 		}
-#endif
 		/*
 		 * Invariant: writers < LOAD_FACTOR
 		 *
@@ -685,12 +677,8 @@ start:
 		    memory_order_relaxed, memory_order_relaxed))
 			goto insert;
 		else
-#ifdef TRAMP_LINEAR_INSERTION
-			rtld_fatal("tramp_intern failed to insert key");
-#else
 			atomic_fetch_sub_explicit(&tramp_table.writers, 1,
 			    memory_order_relaxed);
-#endif
 	} while (key != target);
 	/*
 	 * Load-acquire the index until it becomes available.
@@ -720,12 +708,10 @@ insert:
 	 * If tramp_table.size == LOAD_FACTOR, resize the table.
 	 */
 	if (idx + 1 == tramp_table_load_factor(exp)) {
-#ifndef TRAMP_LINEAR_INSERTION
 		/*
 		 * Wait for other readers to complete.
 		 */
 		lock_upgrade(rtld_tramp_lock, &lockstate);
-#endif
 		/*
 		 * There can be no other writer racing with us for the resize.
 		 */
