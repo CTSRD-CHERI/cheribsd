@@ -262,8 +262,6 @@ struct tda19988_softc {
 	uint32_t		sc_cec_addr;
 	uint16_t		sc_version;
 	int			sc_current_page;
-	uint8_t			*sc_edid;
-	uint32_t		sc_edid_len;
 
 	struct drm_encoder	encoder;
 	struct drm_connector	connector __subobject_use_container_bounds;
@@ -590,8 +588,10 @@ tda19988_init_encoder(struct tda19988_softc *sc)
 }
 
 static int
-tda19988_read_edid_block(struct tda19988_softc *sc, uint8_t *buf, int block)
+tda19988_read_edid_block(void *context, uint8_t *buf, unsigned int block,
+    size_t len)
 {
+	struct tda19988_softc *sc = context;
 	int attempt, err;
 	uint8_t data;
 
@@ -624,7 +624,7 @@ tda19988_read_edid_block(struct tda19988_softc *sc, uint8_t *buf, int block)
 		goto done;
 	}
 
-	if (tda19988_block_read(sc, TDA_EDID_DATA0, buf, EDID_LENGTH) != 0) {
+	if (tda19988_block_read(sc, TDA_EDID_DATA0, buf, len) != 0) {
 		err = -1;
 		goto done;
 	}
@@ -635,41 +635,21 @@ done:
 	return (err);
 }
 
-static int
+static struct edid *
 tda19988_read_edid(struct tda19988_softc *sc)
 {
-	int err;
-	int blocks, i;
-	uint8_t *buf;
+	struct edid *edid;
 
-	err = 0;
 	if (sc->sc_version == TDA19988)
 		tda19988_reg_clear(sc, TDA_TX4, TX4_PD_RAM);
 
-	err = tda19988_read_edid_block(sc, sc->sc_edid, 0);
-	if (err)
-		goto done;
-
-	blocks = sc->sc_edid[0x7e];
-	if (blocks > 0) {
-		sc->sc_edid = realloc(sc->sc_edid, 
-		    EDID_LENGTH*(blocks+1), M_DEVBUF, M_WAITOK);
-		sc->sc_edid_len = EDID_LENGTH*(blocks+1);
-		for (i = 0; i < blocks; i++) {
-			/* TODO: check validity */
-			buf = sc->sc_edid + EDID_LENGTH*(i+1);
-			err = tda19988_read_edid_block(sc, buf, i);
-			if (err)
-				goto done;
-		}
-	}
+	edid = drm_do_get_edid(&sc->connector, tda19988_read_edid_block, sc);
 
 	//EVENTHANDLER_INVOKE(hdmi_event, sc->dev, HDMI_EVENT_CONNECTED);
-done:
 	if (sc->sc_version == TDA19988)
 		tda19988_reg_set(sc, TDA_TX4, TX4_PD_RAM);
 
-	return (err);
+	return (edid);
 }
 
 static void
@@ -754,8 +734,6 @@ tda19988_attach(device_t dev)
 	sc->dev = dev;
 	sc->sc_addr = iicbus_get_addr(dev);
 	sc->sc_cec_addr = (0x34 << 1); /* hardcoded */
-	sc->sc_edid = malloc(EDID_LENGTH, M_DEVBUF, M_WAITOK | M_ZERO);
-	sc->sc_edid_len = EDID_LENGTH;
 
 	device_set_desc(dev, "NXP TDA19988 HDMI transmitter");
 
@@ -803,7 +781,7 @@ static int
 tda19988_connector_get_modes(struct drm_connector *connector)
 {
 	struct tda19988_softc *sc;
-	int error;
+	struct edid *edid;
 	int ret;
 
 	ret = 0;
@@ -819,13 +797,16 @@ tda19988_connector_get_modes(struct drm_connector *connector)
 	return (ret);
 #endif
 
-	error = tda19988_read_edid(sc);
-	if (error == 0) {
-		drm_connector_update_edid_property(connector,
-		    (struct edid *)sc->sc_edid);
-		ret = drm_add_edid_modes(connector,
-		    (struct edid *)sc->sc_edid);
+	edid = tda19988_read_edid(sc);
+	if (edid == NULL) {
+		device_printf(sc->dev, "Failed to read EDID\n");
+		return (0);
 	}
+
+	drm_connector_update_edid_property(connector, edid);
+	ret = drm_add_edid_modes(connector, edid);
+
+	kfree(edid);
 
 	return (ret);
 }
