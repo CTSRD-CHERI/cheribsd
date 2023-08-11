@@ -117,7 +117,7 @@ static void	ffs_blkfree_cg(struct ufsmount *, struct fs *,
 		    struct vnode *, ufs2_daddr_t, long, ino_t,
 		    struct workhead *);
 #ifdef INVARIANTS
-static int	ffs_checkblk(struct inode *, ufs2_daddr_t, long);
+static int	ffs_checkfreeblk(struct inode *, ufs2_daddr_t, long);
 #endif
 static ufs2_daddr_t ffs_clusteralloc(struct inode *, uint64_t, ufs2_daddr_t,
 				  int);
@@ -603,7 +603,7 @@ ffs_reallocblks_ufs1(
 	end_lbn = start_lbn + len - 1;
 #ifdef INVARIANTS
 	for (i = 0; i < len; i++)
-		if (!ffs_checkblk(ip,
+		if (!ffs_checkfreeblk(ip,
 		   dbtofsb(fs, buflist->bs_children[i]->b_blkno), fs->fs_bsize))
 			panic("ffs_reallocblks: unallocated block 1");
 	for (i = 1; i < len; i++)
@@ -724,7 +724,7 @@ ffs_reallocblks_ufs1(
 			soff = -i;
 		}
 #ifdef INVARIANTS
-		if (!ffs_checkblk(ip,
+		if (!ffs_checkfreeblk(ip,
 		   dbtofsb(fs, buflist->bs_children[i]->b_blkno), fs->fs_bsize))
 			panic("ffs_reallocblks: unallocated block 2");
 		if (dbtofsb(fs, buflist->bs_children[i]->b_blkno) != *bap)
@@ -807,7 +807,8 @@ ffs_reallocblks_ufs1(
 			    NOTRIM_KEY : SINGLETON_KEY);
 		bp->b_blkno = fsbtodb(fs, blkno);
 #ifdef INVARIANTS
-		if (!ffs_checkblk(ip, dbtofsb(fs, bp->b_blkno), fs->fs_bsize))
+		if (!ffs_checkfreeblk(ip, dbtofsb(fs, bp->b_blkno),
+		    fs->fs_bsize))
 			panic("ffs_reallocblks: unallocated block 3");
 #endif
 #ifdef DIAGNOSTIC
@@ -868,7 +869,7 @@ ffs_reallocblks_ufs2(
 	end_lbn = start_lbn + len - 1;
 #ifdef INVARIANTS
 	for (i = 0; i < len; i++)
-		if (!ffs_checkblk(ip,
+		if (!ffs_checkfreeblk(ip,
 		   dbtofsb(fs, buflist->bs_children[i]->b_blkno), fs->fs_bsize))
 			panic("ffs_reallocblks: unallocated block 1");
 	for (i = 1; i < len; i++)
@@ -988,7 +989,7 @@ ffs_reallocblks_ufs2(
 			soff = -i;
 		}
 #ifdef INVARIANTS
-		if (!ffs_checkblk(ip,
+		if (!ffs_checkfreeblk(ip,
 		   dbtofsb(fs, buflist->bs_children[i]->b_blkno), fs->fs_bsize))
 			panic("ffs_reallocblks: unallocated block 2");
 		if (dbtofsb(fs, buflist->bs_children[i]->b_blkno) != *bap)
@@ -1071,7 +1072,8 @@ ffs_reallocblks_ufs2(
 			    NOTRIM_KEY : SINGLETON_KEY);
 		bp->b_blkno = fsbtodb(fs, blkno);
 #ifdef INVARIANTS
-		if (!ffs_checkblk(ip, dbtofsb(fs, bp->b_blkno), fs->fs_bsize))
+		if (!ffs_checkfreeblk(ip, dbtofsb(fs, bp->b_blkno),
+		    fs->fs_bsize))
 			panic("ffs_reallocblks: unallocated block 3");
 #endif
 #ifdef DIAGNOSTIC
@@ -2288,7 +2290,7 @@ ffs_blkfree_cg(struct ufsmount *ump,
 		printf("dev=%s, bno = %jd, bsize = %ld, size = %ld, fs = %s\n",
 		    devtoname(dev), (intmax_t)bno, (long)fs->fs_bsize,
 		    size, fs->fs_fsmnt);
-		panic("ffs_blkfree_cg: bad size");
+		panic("ffs_blkfree_cg: invalid size");
 	}
 #endif
 	if ((uint64_t)bno >= fs->fs_size) {
@@ -2751,11 +2753,11 @@ ffs_blkfree(struct ufsmount *ump,
 
 #ifdef INVARIANTS
 /*
- * Verify allocation of a block or fragment. Returns true if block or
- * fragment is allocated, false if it is free.
+ * Verify allocation of a block or fragment.
+ * Return 1 if block or fragment is free.
  */
 static int
-ffs_checkblk(struct inode *ip,
+ffs_checkfreeblk(struct inode *ip,
 	ufs2_daddr_t bno,
 	long size)
 {
@@ -2763,34 +2765,34 @@ ffs_checkblk(struct inode *ip,
 	struct cg *cgp;
 	struct buf *bp;
 	ufs1_daddr_t cgbno;
-	int i, error, frags, free;
+	int i, error, frags, blkalloced;
 	uint8_t *blksfree;
 
 	fs = ITOFS(ip);
 	if ((uint64_t)size > fs->fs_bsize || fragoff(fs, size) != 0) {
 		printf("bsize = %ld, size = %ld, fs = %s\n",
 		    (long)fs->fs_bsize, size, fs->fs_fsmnt);
-		panic("ffs_checkblk: bad size");
+		panic("ffs_checkfreeblk: bad size");
 	}
 	if ((uint64_t)bno >= fs->fs_size)
-		panic("ffs_checkblk: bad block %jd", (intmax_t)bno);
+		panic("ffs_checkfreeblk: too big block %jd", (intmax_t)bno);
 	error = ffs_getcg(fs, ITODEVVP(ip), dtog(fs, bno), 0, &bp, &cgp);
 	if (error)
-		panic("ffs_checkblk: cylinder group read failed");
+		panic("ffs_checkfreeblk: cylinder group read failed");
 	blksfree = cg_blksfree(cgp);
 	cgbno = dtogd(fs, bno);
 	if (size == fs->fs_bsize) {
-		free = ffs_isblock(fs, blksfree, fragstoblks(fs, cgbno));
+		blkalloced = ffs_isblock(fs, blksfree, fragstoblks(fs, cgbno));
 	} else {
 		frags = numfrags(fs, size);
-		for (free = 0, i = 0; i < frags; i++)
+		for (blkalloced = 0, i = 0; i < frags; i++)
 			if (isset(blksfree, cgbno + i))
-				free++;
-		if (free != 0 && free != frags)
-			panic("ffs_checkblk: partially free fragment");
+				blkalloced++;
+		if (blkalloced != 0 && blkalloced != frags)
+			panic("ffs_checkfreeblk: partially free fragment");
 	}
 	brelse(bp);
-	return (!free);
+	return (blkalloced == 0);
 }
 #endif /* INVARIANTS */
 
