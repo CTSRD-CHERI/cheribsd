@@ -59,6 +59,7 @@ struct utrace_rtld {
 	int refcnt;			/* Used for 'mode' */
 	char name[MAXPATHLEN];
 	char symbol[128];
+	char caller[128];
 };
 
 #endif

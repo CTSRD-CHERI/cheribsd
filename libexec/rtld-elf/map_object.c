@@ -426,9 +426,6 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	obj->tlsinitsize = phtls->p_filesz;
 	obj->tlsinit = mapbase + phtls->p_vaddr;
     }
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    obj->compart_id = allocate_compart_id();
-#endif
 #ifndef __CHERI_PURE_CAPABILITY__
     obj->stack_flags = stack_flags;
 #endif

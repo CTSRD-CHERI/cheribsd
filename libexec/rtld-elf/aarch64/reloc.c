@@ -434,11 +434,11 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 			}
 			target = (uintptr_t)make_function_pointer(def, defobj);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-			target = (uintptr_t)tramp_intern(&(struct tramp_data) {
+			target = (uintptr_t)tramp_intern(obj, &(struct tramp_data) {
 				.target = (void *)target,
-				.obj = defobj,
+				.defobj = defobj,
 				.def = def,
-				.sig = fetch_tramp_sig(obj,
+				.sig = tramp_fetch_sig(obj,
 				    ELF_R_SYM(rela->r_info))
 			});
 #endif
@@ -497,9 +497,11 @@ reloc_iresolve_one(Obj_Entry *obj, const Elf_Rela *rela,
 #endif
 	lock_release(rtld_bind_lock, lockstate);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	ptr = (uintptr_t)tramp_intern(&(struct tramp_data) {
+	ptr = (uintptr_t)tramp_intern(NULL, &(struct tramp_data) {
 		.target = (void *)ptr,
-		.obj = obj
+		.defobj = obj,
+		.sig = (struct tramp_sig) { .valid = true,
+		    .reg_args = 8, .mem_args = false, .ret_args = C0 }
 	});
 #endif
 	target = call_ifunc_resolver(ptr);
@@ -586,11 +588,11 @@ reloc_gnu_ifunc(Obj_Entry *obj, int flags,
 			lock_release(rtld_bind_lock, lockstate);
 			target = (uintptr_t)rtld_resolve_ifunc(defobj, def);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-			target = (uintptr_t)tramp_intern(&(struct tramp_data) {
+			target = (uintptr_t)tramp_intern(obj, &(struct tramp_data) {
 				.target = (void *)target,
-				.obj = defobj,
+				.defobj = defobj,
 				.def = def,
-				.sig = fetch_tramp_sig(obj,
+				.sig = tramp_fetch_sig(obj,
 				    ELF_R_TYPE(rela->r_info))
 			});
 #endif

@@ -149,13 +149,13 @@ print_utrace_rtld(FILE *fp, void *p)
 		break;
 	case UTRACE_COMPARTMENT_ENTER:
 		fprintf(fp,
-		    "RTLD: c18n: enter %s on thread %p at [%zu] %s (%p)\n",
-		    ut->name, ut->mapbase, ut->mapsize, ut->symbol, ut->handle);
+		    "RTLD: c18n: enter %s from %s at [%zu] %s (%p)\n",
+		    ut->name, ut->caller, ut->mapsize, ut->symbol, ut->handle);
 		break;
 	case UTRACE_COMPARTMENT_LEAVE:
 		fprintf(fp,
-		    "RTLD: c18n: leave %s on thread %p at [%zu] %s\n",
-		    ut->name, ut->mapbase, ut->mapsize, ut->symbol);
+		    "RTLD: c18n: leave %s to %s at [%zu] %s\n",
+		    ut->name, ut->caller, ut->mapsize, ut->symbol);
 		break;
 
 	default:
