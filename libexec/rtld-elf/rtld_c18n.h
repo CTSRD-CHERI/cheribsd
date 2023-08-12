@@ -32,11 +32,34 @@
  * Global symbols
  */
 extern uintptr_t sealer_pltgot, sealer_jmpbuf, sealer_tramp;
-extern const char *ld_utrace_compartment;
+extern const char *ld_compartment_utrace;
+extern const char *ld_compartment_enable;
 extern const char *ld_compartment_overhead;
 
-uint16_t allocate_compart_id(void);
-void ld_utrace_log(int, void *, void *, size_t, int, const char *, const char *);
+void ld_utrace_log(int, void *, void *, size_t, int, const char *, const char *, const char *);
+
+/*
+ * Policies
+ */
+typedef uint16_t compart_id_t;
+
+struct compart {
+	/*
+	 * Name of the compartment
+	 */
+	const char *name;
+	/*
+	 * NULL-terminated array of libraries that belong to the compartment
+	 */
+	const char **libraries;
+};
+
+struct policy {
+	struct compart *coms;
+	size_t count;
+};
+
+compart_id_t compart_id_allocate(const char *);
 
 /*
  * Stack switching
@@ -58,30 +81,37 @@ void _rtld_get_rstk(void);
 typedef const void *tramp;
 typedef uint8_t tramp_sig_int;
 
+struct tramp_sig {
+	enum tramp_ret_args: unsigned char {
+		C0_AND_C1,
+		C0,
+		NONE,
+		INDIRECT
+	} ret_args : 2;
+	bool mem_args : 1;
+	unsigned char reg_args : 4;
+	bool valid : 1;
+};
+
 struct tramp_data {
 	void *target;
-	const Obj_Entry *obj;
+	const Obj_Entry *defobj;
 	const Elf_Sym *def;
 	tramp *entry;
-	struct tramp_sig {
-		enum tramp_ret_args: unsigned char {
-			C0_AND_C1,
-			C0,
-			NONE,
-			INDIRECT
-		} ret_args : 2;
-		bool mem_args : 1;
-		unsigned char reg_args : 4;
-		bool valid : 1;
-	} sig;
+	struct tramp_sig sig;
 };
 _Static_assert(sizeof(struct tramp_sig) == sizeof(tramp_sig_int),
     "Unexpected tramp_sig size");
 
-void tramp_init(void);
-void *tramp_intern(const struct tramp_data *);
+void *tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *);
+struct tramp_sig tramp_fetch_sig(const Obj_Entry *, unsigned long);
+
+/*
+ * APIs
+ */
 void *_rtld_sandbox_code(void *, struct tramp_sig);
 void *_rtld_safebox_code(void *, struct tramp_sig);
-struct tramp_sig fetch_tramp_sig(const Obj_Entry *, unsigned long);
 
+void tramp_init(void);
+void tramp_add_comparts(struct policy *);
 #endif

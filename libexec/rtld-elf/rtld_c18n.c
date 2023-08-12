@@ -45,18 +45,13 @@ __FBSDID("$FreeBSD$");
  */
 uintptr_t sealer_pltgot, sealer_jmpbuf, sealer_tramp;
 
-const char *ld_utrace_compartment;	/* Use utrace() to log compartmentalisation-related events. */
-const char *ld_compartment_overhead;	/* Simulate overhead during compartment transitions. */
+const char *ld_compartment_utrace;	/* Use utrace() to log compartmentalisation-related events */
+const char *ld_compartment_enable;	/* Enable compartmentalisation */
+const char *ld_compartment_overhead;	/* Simulate overhead during compartment transitions */
 
-uint16_t allocate_compart_id(void)
-{
-	static uint16_t max_compart_id;
-	if (++max_compart_id == 0)
-		rtld_fatal("max_compart_id overflowed");
-	return (max_compart_id);
-}
-
-
+/*
+ * libthr support
+ */
 void _rtld_thread_start(struct pthread *);
 void _rtld_sighandler(int, siginfo_t *, void *);
 void *get_rstk(const void *, uint32_t, tramp_stk_table_t);
@@ -71,9 +66,13 @@ _rtld_thread_start_init(void (*p)(struct pthread *))
 {
 	assert((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) == 0);
 	assert(thr_thread_start == NULL);
-	thr_thread_start = _rtld_sandbox_code(p, (struct tramp_sig) {
-		.valid = true,
-		.reg_args = 1, .mem_args = false, .ret_args = NONE
+	thr_thread_start = tramp_intern(NULL, &(struct tramp_data) {
+		.target = p,
+		.defobj = obj_from_addr(p),
+		.sig = (struct tramp_sig) {
+			.valid = true,
+			.reg_args = 1, .mem_args = false, .ret_args = NONE
+		}
 	});
 }
 
@@ -89,6 +88,14 @@ _rtld_thread_start(struct pthread *curthread)
 	asm ("msr	ctpidr_el0, %0" :: "C" (tls));
 
 	thr_thread_start(curthread);
+
+	/*
+	 * The previous call should never return, but this call is inserted so
+	 * that the compiler generates a branch-and-link instruction for the
+	 * previous call rather than a mere branch instruction. The content of
+	 * the link register is required for the trampoline to work.
+	 */
+	rtld_die();
 }
 
 void
@@ -115,9 +122,13 @@ _rtld_sighandler_init(void (*p)(int, siginfo_t *, void *))
 {
 	assert((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) == 0);
 	assert(thr_sighandler == NULL);
-	thr_sighandler = _rtld_sandbox_code(p, (struct tramp_sig) {
-		.valid = true,
-		.reg_args = 3, .mem_args = false, .ret_args = NONE
+	thr_sighandler = tramp_intern(NULL, &(struct tramp_data) {
+		.target = p,
+		.defobj = obj_from_addr(p),
+		.sig = (struct tramp_sig) {
+			.valid = true,
+			.reg_args = 3, .mem_args = false, .ret_args = NONE
+		}
 	});
 }
 
@@ -138,24 +149,204 @@ _rtld_sighandler(int sig, siginfo_t *info, void *_ucp)
 	ucp->uc_mcontext.mc_capregs.cap_sp = csp;
 }
 
+/*
+ * Policies
+ */
+typedef ssize_t string_handle;
+
+struct string_base {
+	char *buf;
+	string_handle size;
+	string_handle capacity;
+};
+
+__unused static struct string_base *
+string_base_create(string_handle capacity)
+{
+	struct string_base *sb = xmalloc(sizeof(*sb));
+	sb->buf = xmalloc(sizeof(*sb->buf) * capacity);
+	sb->size = 0;
+	sb->capacity = capacity;
+	return (sb);
+}
+
+__unused static string_handle
+string_base_push(struct string_base *sb, const char *str)
+{
+	string_handle handle = sb->size;
+	do {
+		sb->buf[sb->size++] = *str;
+		if (sb->size == sb->capacity) {
+			sb->capacity *= 2;
+			sb->buf = realloc(sb->buf,
+			    sizeof(*sb->buf) * sb->capacity);
+			if (sb->buf == NULL)
+				rtld_fatal("realloc failed");
+		}
+	} while (*str++ != '\0');
+	return (handle);
+}
+
+static string_handle
+string_base_search(const struct string_base *sb, const char *str)
+{
+	string_handle i = 0;
+	do {
+		const char *cur = str;
+		while (sb->buf[i] == *cur++)
+			if (sb->buf[i++] == '\0')
+				return (i);
+		while (sb->buf[i] != '\0') ++i;
+	} while (++i < sb->size);
+	return (-1);
+}
+
+static char trusted_globals_names[] =
+	"memset\0"
+	"memcpy\0"
+	"mempcpy\0"
+	"memccpy\0"
+	"memchr\0"
+	"memrchr\0"
+	"memmove\0"
+	"strcpy\0"
+	"strncpy\0"
+	"stpcpy\0"
+	"stpncpy\0"
+	"strcat\0"
+	"strncat\0"
+	"strlcpy\0"
+	"strlcat\0"
+	"strlen\0"
+	"strnlen\0"
+	"strcmp\0"
+	"strncmp\0"
+
+	"__libc_start1\0"
+	"setjmp\0"
+	"longjmp\0"
+	"_setjmp\0"
+	"_longjmp\0"
+	"sigsetjmp\0"
+	"siglongjmp\0"
+
+	"vfork\0"
+	"rfork\0"
+
+	/* See comment in function definition */
+	"_rtld_thread_start";
+
+static const struct string_base trusted_globals = {
+	.buf = trusted_globals_names,
+	.size = sizeof(trusted_globals_names),
+	.capacity = sizeof(trusted_globals_names)
+};
+
+static struct compart rtld_compart = {
+	.name = _BASENAME_RTLD
+};
+
+static struct {
+	const struct compart **data;
+	compart_id_t size;
+	compart_id_t capacity;
+} comparts;
+
+static void
+comparts_data_expand(compart_id_t capacity)
+{
+	const struct compart **data;
+
+	data = realloc(comparts.data, sizeof(*data) * capacity);
+	if (data == NULL)
+		rtld_fatal("realloc failed");
+	comparts.data = data;
+	comparts.capacity = capacity;
+}
+
+static bool
+string_search(const char *const strs[], const char *sym)
+{
+	if (strs != NULL)
+		for (; *strs != NULL; ++strs)
+			if (strcmp(sym, *strs) == 0)
+				return (true);
+	return (false);
+}
+
+static const struct compart *const *
+compart_get_or_create(const char *lib)
+{
+	struct {
+		const char *libraries[2];
+		struct compart com;
+	} *buf;
+	for (compart_id_t i = 1; i < comparts.size; ++i)
+		if (string_search(comparts.data[i]->libraries, lib))
+			return (&comparts.data[i]);
+	if (comparts.size == comparts.capacity)
+		comparts_data_expand(comparts.capacity * 2);
+	buf = xmalloc(sizeof(*buf));
+	buf->libraries[0] = lib;
+	buf->libraries[1] = NULL;
+	buf->com = (struct compart) {
+		.name = lib,
+		.libraries = buf->libraries
+	};
+	comparts.data[comparts.size] = &buf->com;
+	return (&comparts.data[comparts.size++]);
+}
+
+compart_id_t
+compart_id_allocate(const char *name)
+{
+	const struct compart *const *com = compart_get_or_create(name);
+	return (com - comparts.data);
+}
+
+static bool
+tramp_should_include(const Obj_Entry *reqobj, const struct tramp_data *data)
+{
+	const char *sym;
+
+	if (data->target == NULL)
+		return (false);
+
+	if (reqobj == NULL)
+		return (true);
+
+	if (reqobj->compart_id == data->defobj->compart_id)
+		return (false);
+
+	sym = strtab_value(data->defobj, data->def->st_name);
+
+	if (string_base_search(&trusted_globals, sym) != -1)
+		return (false);
+
+	return (true);
+}
+
+/*
+ * Trampolines
+ */
 void *
-get_rstk(const void *target, uint32_t index, tramp_stk_table_t table)
+get_rstk(__unused const void *target, uint32_t cid, tramp_stk_table_t table)
 {
 	size_t len = cheri_getlen(table) / sizeof(*table);
-	assert(len <= index || table[index] == NULL);
-	if (len <= index) {
-		size_t new_len = index * 2;
-		table = realloc(table, new_len * sizeof(*table));
+	assert(len <= cid || table[cid] == NULL);
+	if (len <= cid) {
+		size_t new_len = cid * 2;
+		table = realloc(table, sizeof(*table) * new_len);
 		if (table == NULL)
 			rtld_fatal("realloc failed");
-		memset(&table[len], 0, (new_len - len) * sizeof(*table));
+		memset(&table[len], 0, sizeof(*table) * (new_len - len));
 
 		asm ("msr	ctpidr_el0, %0" :: "C" (table));
 	}
-	assert(table[index] == NULL);
+	assert(table[cid] == NULL);
 
 	void **stk;
-	struct Struct_Stack_Entry *_Atomic *head, *entry;
+	__unused struct Struct_Stack_Entry *_Atomic *head, *entry;
 
 	len = DEFAULT_SANDBOX_STACK_SIZE;
 	stk = (void **)((char *)mmap(NULL,
@@ -166,11 +357,20 @@ get_rstk(const void *target, uint32_t index, tramp_stk_table_t table)
 	if (stk == MAP_FAILED)
 		rtld_fatal("mmap failed");
 	stk = cheri_clearperm(stk, CHERI_PERM_EXECUTIVE | CHERI_PERM_SW_VMEM);
-	stk[-1] = &stk[-1];
+	if (ld_compartment_utrace == NULL) {
+		stk[-1] = &stk[-1];
+	} else {
+		stk[-1] = &stk[-2];
+		stk[-2] = (void *)(uintptr_t)cid;
+	}
 
-	table[index] = stk;
+	table[cid] = stk;
 
-	head = &obj_from_addr(target)->stacks;
+	/*
+	The following code records the per-thread stacks associated with each
+	compartment in a linked-list, but the linked-list is currently unused.
+
+	head = &comparts.data[obj_from_addr(target)->compart_id]->stacks;
 	entry = xmalloc(sizeof(*entry));
 	entry->stack = stk;
 	SLIST_NEXT(entry, link) = atomic_load_explicit(head,
@@ -178,24 +378,9 @@ get_rstk(const void *target, uint32_t index, tramp_stk_table_t table)
 	while(!atomic_compare_exchange_weak_explicit(
 	    head, &SLIST_NEXT(entry, link), entry,
 	    memory_order_release, memory_order_relaxed));
+	*/
 
 	return (stk);
-}
-
-static bool
-exclude_symbol_in_lib(const char *name, const char *sym, const struct tramp_data *data)
-{
-	Name_Entry *entry;
-
-	if (data->def == NULL ||
-	    strcmp(sym, strtab_value(data->obj, data->def->st_name)) != 0)
-		return (false);
-
-	STAILQ_FOREACH(entry, &data->obj->names, link) {
-		if (strcmp(name, entry->name) == 0)
-			return (true);
-	}
-	return (false);
 }
 
 struct tramp_pg {
@@ -364,27 +549,32 @@ resizeTable(int exp)
 }
 
 static void
-tramp_hook(int event, void *target, const Obj_Entry *obj, const Elf_Sym *def)
+tramp_hook(int event, void *target, const Obj_Entry *obj, const Elf_Sym *def,
+    void *link, void *rcsp)
 {
-	Elf64_Word sym_num = def == NULL ? 0 : def->st_name;
-	const char *name = STAILQ_EMPTY(&obj->names) ? obj->path :
-	    STAILQ_FIRST(&obj->names)->name;
-	const char *sym = def == NULL ? "<unknown>" :
-	    strtab_value(obj, def->st_name);
-	void *tls;
+	Elf64_Word sym_num;
+	const char *sym;
+	const char *callee;
 
-	if (ld_utrace_compartment != NULL) {
-		asm ("mrs	%0, rctpidr_el0" : "=C" (tls));
-		if (event == 0)
-			ld_utrace_log(UTRACE_COMPARTMENT_ENTER,
-			    target, tls, sym_num, 0, name, sym);
-		else
-			ld_utrace_log(UTRACE_COMPARTMENT_LEAVE,
-			    target, tls, sym_num, 0, name, sym);
-	}
-	if (ld_compartment_overhead != NULL) {
+	compart_id_t caller_id;
+	const char *caller;
+
+	sym_num = def == NULL ? 0 : def->st_name;
+	sym = def == NULL ? "<unknown>" : strtab_value(obj, def->st_name);
+	callee = comparts.data[obj->compart_id]->name;
+
+	if ((cheri_getperm(link) & CHERI_PERM_EXECUTIVE) == 0)
+		caller_id = ((uintptr_t *)
+		    cheri_setaddress(rcsp, cheri_gettop(rcsp)))[-2];
+	else
+		caller_id = 0;
+	caller = comparts.data[caller_id]->name;
+
+	if (ld_compartment_utrace != NULL)
+		ld_utrace_log(event,
+			target, NULL, sym_num, 0, callee, sym, caller);
+	if (ld_compartment_overhead != NULL)
 		getpid();
-	}
 }
 
 static size_t
@@ -419,7 +609,7 @@ tramp_compile(tramp **entry, const struct tramp_data *data)
 	uint32_t *buf = (void *)*entry;
 	size_t size = 0;
 	bool executive = cheri_getperm(data->target) & CHERI_PERM_EXECUTIVE;
-	bool hook = ld_utrace_compartment != NULL ||
+	bool hook = ld_compartment_utrace != NULL ||
 	    ld_compartment_overhead != NULL;
 
 	for (const void *code = hook ? tramp_header_hook : tramp_header;
@@ -435,12 +625,12 @@ tramp_compile(tramp **entry, const struct tramp_data *data)
 				TO(save_caller);
 			else
 				TO(header_res);
-			*(*entry)++ = data->obj;
+			*(*entry)++ = data->defobj;
 			*(*entry)++ = data->def;
 			*(*entry)++ = tramp_hook;
 		})
 		TRANSITION(header_res, {
-			buf[-2] |= (uint32_t)data->obj->compart_id << 5;
+			buf[-2] |= (uint32_t)data->defobj->compart_id << 5;
 			TO(save_caller);
 		})
 		TRANSITION(save_caller, {
@@ -564,16 +754,6 @@ tramp_sig_compatible(struct tramp_sig lhs, struct tramp_sig rhs)
 	return (!lhs.valid || !rhs.valid || tramp_sig_equal(lhs, rhs));
 }
 
-static bool
-tramp_sig_resolve(struct tramp_sig *lhs, struct tramp_sig rhs)
-{
-	if (!lhs->valid) {
-		*lhs = rhs;
-		return (true);
-	}
-	return (!rhs.valid || tramp_sig_equal(*lhs, rhs));
-}
-
 static tramp_sig_int
 tramp_sig_to_int(struct tramp_sig sig)
 {
@@ -585,43 +765,48 @@ tramp_sig_to_int(struct tramp_sig sig)
 static void *
 tramp_get_entry(const struct tramp_data *found, const struct tramp_data *data)
 {
-	if (tramp_sig_compatible(found->sig, data->sig))
-		return (found->entry);
-	else
+	if (!tramp_sig_compatible(found->sig, data->sig))
 		rtld_fatal(
 		    "Incompatible signatures for function %s: "
-		    "%s requests %02hhX and %s provides %02hhX",
-		    strtab_value(data->obj, data->def->st_name),
-		    data->obj->path, tramp_sig_to_int(data->sig),
-		    found->obj->path, tramp_sig_to_int(found->sig));
+		    "%s requests %02hhX but %s provides %02hhX",
+		    strtab_value(data->defobj, data->def->st_name),
+		    data->defobj->path, tramp_sig_to_int(data->sig),
+		    found->defobj->path, tramp_sig_to_int(found->sig));
+
+	return (found->entry);
 }
 
 static void *
-tramp_create_entry(struct tramp_data *data)
+tramp_create_entry(struct tramp_data *found, const struct tramp_data *data)
 {
 	struct tramp_sig sig;
 
-	if (exclude_symbol_in_lib("libc.so.7", "rfork", data) ||
-	    exclude_symbol_in_lib("libc.so.7", "vfork", data)) {
-		return (data->target);
-	}
-
-	if (data->def != NULL) {
-		sig = fetch_tramp_sig(data->obj, data->def - data->obj->symtab);
-		if (!tramp_sig_resolve(&data->sig, sig))
+	*found = *data;
+	if (found->def != NULL) {
+		sig = tramp_fetch_sig(found->defobj,
+		    found->def - found->defobj->symtab);
+		if (!found->sig.valid)
+			found->sig = sig;
+		else if (!tramp_sig_compatible(found->sig, sig))
 			rtld_fatal(
 			    "Incompatible signatures for function %s: "
-			    "requests %02hhX and %s provides %02hhX",
-			    strtab_value(data->obj, data->def->st_name),
-			    tramp_sig_to_int(data->sig), data->obj->path,
+			    "requests %02hhX but %s provides %02hhX",
+			    strtab_value(found->defobj, found->def->st_name),
+			    tramp_sig_to_int(found->sig), found->defobj->path,
 			    tramp_sig_to_int(sig));
 	}
 
-	return (data->entry = tramp_pgs_append(data));
+	return (found->entry = tramp_pgs_append(found));
+}
+
+static bool
+tramp_sig_legal(struct tramp_sig sig)
+{
+	return (!sig.valid || sig.reg_args <= 8);
 }
 
 void *
-tramp_intern(const struct tramp_data *data)
+tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *data)
 {
 	void *entry;
 	RtldLockState lockstate;
@@ -631,7 +816,15 @@ tramp_intern(const struct tramp_data *data)
 	ptraddr_t key;
 	int exp;
 
-	assert(data->entry == NULL);
+	/* reqobj == NULL iff the request is by RTLD */
+	assert(
+	    (reqobj == NULL || data->def != NULL) &&
+	    data->defobj != NULL &&
+	    data->entry == NULL &&
+	    tramp_sig_legal(data->sig));
+
+	if (!tramp_should_include(reqobj, data))
+		return (data->target);
 
 start:
 	slot = hash;
@@ -693,8 +886,7 @@ insert:
 	 *
 	 * Create the data array entry.
 	 */
-	tramp_table.data[idx] = *data;
-	entry = tramp_create_entry(&tramp_table.data[idx]);
+	entry = tramp_create_entry(&tramp_table.data[idx], data);
 	/*
 	 * Store-release the index.
 	 */
@@ -718,13 +910,9 @@ end:
 	return (entry);
 }
 
-static void
-tramp_sig_validate(struct tramp_sig sig)
-{
-	if (sig.valid && sig.reg_args > 8)
-		rtld_fatal("Invalid tramp_sig.reg_args = %u", sig.reg_args);
-}
-
+/*
+ * APIs
+ */
 static long
 tramp_sig_to_otype(struct tramp_sig sig)
 {
@@ -732,51 +920,27 @@ tramp_sig_to_otype(struct tramp_sig sig)
 }
 
 void *
-_rtld_sandbox_code(void *target, struct tramp_sig sig)
-{
-	const Obj_Entry *obj;
-	void *target_unsealed;
-
-	tramp_sig_validate(sig);
-
-	if ((cheri_getperm(target) & CHERI_PERM_EXECUTIVE) != 0)
-		return (target);
-
-	obj = obj_from_addr(target);
-	if (obj == NULL)
-		rtld_fatal("%#p does not belong to any object", target);
-
-	target_unsealed = cheri_unseal(target, sealer_tramp);
-	if (cheri_gettag(target_unsealed)) {
-		if (sig.valid &&
-		    cheri_gettype(target) !=
-		    (long)cheri_getbase(sealer_tramp) + tramp_sig_to_otype(sig))
-			rtld_fatal("Signature mismatch");
-		target = cheri_sealentry(target_unsealed);
-	}
-
-	target = tramp_intern(&(struct tramp_data) {
-		.target = target,
-		.obj = obj,
-		.sig = sig
-	});
-
-	return (target);
-}
-
-void *
 _rtld_safebox_code(void *target, struct tramp_sig sig)
 {
 	const Obj_Entry *obj;
 
-	tramp_sig_validate(sig);
+	if (!tramp_sig_legal(sig)) {
+		_rtld_error(
+		    "_rtld_sandbox_code: Invalid signature %02hhX",
+		    tramp_sig_to_int(sig));
+		return (NULL);
+	}
 
 	if ((cheri_getperm(target) & CHERI_PERM_EXECUTIVE) != 0)
 		return (target);
 
 	obj = obj_from_addr(target);
-	if (obj == NULL)
-		rtld_fatal("%#p does not belong to any object", target);
+	if (obj == NULL) {
+		_rtld_error(
+		    "_rtld_sandbox_code: "
+		    "%#p does not belong to any object", target);
+		return (NULL);
+	}
 
 	if (sig.valid) {
 		asm ("chkssu	%0, %0, %1\n"
@@ -789,14 +953,80 @@ _rtld_safebox_code(void *target, struct tramp_sig sig)
 	return target;
 }
 
-struct tramp_sig
-fetch_tramp_sig(const Obj_Entry *obj, unsigned long symnum)
+void *
+_rtld_sandbox_code(void *target, struct tramp_sig sig)
 {
-	if (obj->sigtab == NULL)
-		return ((struct tramp_sig) {});
-	else if (symnum < obj->dynsymcount)
-		return (obj->sigtab[symnum]);
-	else
+	const Obj_Entry *obj;
+	void *target_unsealed;
+
+	if (!tramp_sig_legal(sig)) {
+		_rtld_error(
+		    "_rtld_sandbox_code: Invalid signature %02hhX",
+		    tramp_sig_to_int(sig));
+		return (NULL);
+	}
+
+	if ((cheri_getperm(target) & CHERI_PERM_EXECUTIVE) != 0)
+		return (target);
+
+	obj = obj_from_addr(target);
+	if (obj == NULL) {
+		_rtld_error(
+		    "_rtld_sandbox_code: "
+		    "%#p does not belong to any object", target);
+		return (NULL);
+	}
+
+	target_unsealed = cheri_unseal(target, sealer_tramp);
+	if (cheri_gettag(target_unsealed)) {
+		if (sig.valid && cheri_gettype(target) !=
+		    (long)cheri_getbase(sealer_tramp) + tramp_sig_to_otype(sig))
+			rtld_fatal("Signature mismatch");
+		target = cheri_sealentry(target_unsealed);
+	}
+
+	target = tramp_intern(NULL, &(struct tramp_data) {
+		.target = target,
+		.defobj = obj,
+		.sig = sig
+	});
+
+	return (target);
+}
+
+struct tramp_sig
+tramp_fetch_sig(const Obj_Entry *obj, unsigned long symnum)
+{
+	if (symnum >= obj->dynsymcount)
 		rtld_fatal("Invalid symbol number %lu for object %s.",
 		    symnum, obj->path);
+	else if (obj->sigtab == NULL)
+		return ((struct tramp_sig) {});
+	else
+		return (obj->sigtab[symnum]);
+}
+
+void
+tramp_init(void)
+{
+	comparts_data_expand(1);
+	comparts.data[comparts.size++] = &rtld_compart;
+
+	int exp = 9;
+	tramp_table.data = tramp_data_expand(exp);
+	tramp_table.map = tramp_map_new(exp);
+	tramp_table.exp = exp;
+
+	atomic_store_explicit(&tramp_pgs.head, tramp_pg_new(NULL),
+	    memory_order_relaxed);
+}
+
+void
+tramp_add_comparts(struct policy *pol)
+{
+	if (pol == NULL)
+		return;
+	comparts_data_expand(comparts.size + pol->count);
+	for (size_t i = 0; i < pol->count; ++i)
+		comparts.data[comparts.size++] = &pol->coms[i];
 }

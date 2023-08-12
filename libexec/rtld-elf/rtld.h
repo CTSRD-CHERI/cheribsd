@@ -293,7 +293,6 @@ typedef struct Struct_Obj_Entry {
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
     uint16_t compart_id;
-    struct Struct_Stack_Entry *_Atomic stacks; /* List of object's per-thread stacks */
     const struct tramp_sig *sigtab;
 #endif
 

@@ -120,11 +120,11 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 		/* Remove write permissions and set bounds */
 		symval = make_function_cap_with_addend(def, defobj, addend);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-		symval = tramp_intern(&(struct tramp_data) {
+		symval = tramp_intern(obj, &(struct tramp_data) {
 			.target = symval,
-			.obj = defobj,
+			.defobj = defobj,
 			.def = def,
-			.sig = fetch_tramp_sig(obj, r_symndx)
+			.sig = tramp_fetch_sig(obj, r_symndx)
 		});
 #endif
 		if (__predict_false(symval == NULL)) {
