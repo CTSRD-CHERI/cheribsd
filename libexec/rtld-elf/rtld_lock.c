@@ -428,10 +428,9 @@ _rtld_thread_init(struct RtldLockInfo *pli)
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 		tmplockinfo = *pli;
 #define wrap_with_trampoline(_target, ...)				\
-	_target = tramp_intern(						\
-	&(struct tramp_data) {						\
+	_target = tramp_intern(NULL, &(struct tramp_data) {		\
 		.target = _target,					\
-		.obj = obj,						\
+		.defobj = obj,						\
 		.sig = (struct tramp_sig) __VA_ARGS__			\
 	})
 		wrap_with_trampoline(tmplockinfo.lock_create, {

@@ -11,4 +11,5 @@ FBSDprivate_1.0 {
     _rtld_setjmp;
     _rtld_longjmp;
     _rtld_sandbox_code;
+    _rtld_safebox_code;
 };

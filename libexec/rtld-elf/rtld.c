@@ -982,6 +982,28 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	rtld_die();
     preload_tail = globallist_curr(TAILQ_LAST(&obj_list, obj_entry_q));
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+    TAILQ_FOREACH(obj, &obj_list, next) {
+	if (!object_match_name(obj, "_rtld_c18n_policy.so"))
+	    continue;
+
+	/* Horrible hacks */
+	if (relocate_object(obj, false, &obj_rtld, SYMLOOK_EARLY, NULL) == -1)
+	    rtld_die();
+	obj->versyms = NULL;
+
+	SymLook req;
+	symlook_init(&req, "_rtld_compartments");
+	req.lockstate = &lockstate;
+	if (symlook_obj(&req, obj) == 0)
+	    tramp_add_comparts(make_data_pointer(req.sym_out, req.defobj_out));
+	break;
+    }
+
+    /* Manually add name for main object after policy is loaded */
+    object_add_name(obj_main, "[main]");
+#endif
+
     dbg("loading needed objects");
     if (load_needed_objects(obj_main, ld_tracing != NULL ? RTLD_LO_TRACE :
       0) == -1)
@@ -1136,9 +1158,9 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     *objp = obj_main;
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    return ((func_ptr_type)tramp_intern(&(struct tramp_data) {
+    return ((func_ptr_type)tramp_intern(NULL, &(struct tramp_data) {
 	.target = cheri_sealentry(obj_main->entry),
-	.obj = obj_main,
+	.defobj = obj_main,
 	.sig = (struct tramp_sig) { .valid = true,
 	    .reg_args = 3, .mem_args = false, .ret_args = NONE }
     }));
@@ -1155,9 +1177,9 @@ rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def)
 
 	ptr = (void *)make_function_pointer(def, obj);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	ptr = tramp_intern(&(struct tramp_data) {
+	ptr = tramp_intern(NULL, &(struct tramp_data) {
 		.target = ptr,
-		.obj = obj,
+		.defobj = obj,
 		.def = def,
 		.sig = (struct tramp_sig) { .valid = true,
 		    .reg_args = 8, .mem_args = false, .ret_args = C0 }
@@ -1216,11 +1238,11 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
      * that the trampoline needs.
      */
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    target = (uintptr_t)tramp_intern(&(struct tramp_data) {
+    target = (uintptr_t)tramp_intern(obj, &(struct tramp_data) {
 	.target = (void *)target,
-	.obj = defobj,
+	.defobj = defobj,
 	.def = def,
-	.sig = fetch_tramp_sig(obj, ELF_R_SYM(rel->r_info))
+	.sig = tramp_fetch_sig(obj, ELF_R_SYM(rel->r_info))
     });
 #endif
     target = reloc_jmpslot(where, target, defobj, obj, rel);
@@ -1973,10 +1995,6 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
      */
     obj->text_rodata_cap = (const char *)cheri_copyaddress(entry, obj->relocbase);
     fix_obj_mapping_cap_permissions(obj, path);
-#endif
-
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    obj->compart_id = allocate_compart_id();
 #endif
 
     obj->entry = entry;
@@ -4358,9 +4376,9 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
 	    sym = __DECONST(void*, make_function_pointer(def, defobj));
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	    sym = tramp_intern(&(struct tramp_data) {
+	    sym = tramp_intern(obj, &(struct tramp_data) {
 		.target = sym,
-		.obj = defobj,
+		.defobj = defobj,
 		.def = def
 	    });
 #endif
@@ -4368,9 +4386,9 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	} else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
 	    sym = rtld_resolve_ifunc(defobj, def);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	    sym = tramp_intern(&(struct tramp_data) {
+	    sym = tramp_intern(obj, &(struct tramp_data) {
 		.target = sym,
-		.obj = defobj,
+		.defobj = defobj,
 		.def = def
 	    });
 #endif
@@ -4920,9 +4938,9 @@ get_program_var_addr(const char *name, RtldLockState *lockstate)
     if (ELF_ST_TYPE(req.sym_out->st_info) == STT_FUNC) {
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 	void *target = make_function_pointer(req.sym_out, req.defobj_out);
-	return tramp_intern(&(struct tramp_data) {
+	return tramp_intern(NULL, &(struct tramp_data) {
 		.target = target,
-		.obj = req.defobj_out,
+		.defobj = req.defobj_out,
 		.def = req.sym_out
 	});
 #else
@@ -4932,9 +4950,9 @@ get_program_var_addr(const char *name, RtldLockState *lockstate)
     } else if (ELF_ST_TYPE(req.sym_out->st_info) == STT_GNU_IFUNC) {
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 	void *target = rtld_resolve_ifunc(req.defobj_out, req.sym_out);
-	return tramp_intern(&(struct tramp_data) {
+	return tramp_intern(NULL, &(struct tramp_data) {
 		.target = target,
-		.obj = req.defobj_out,
+		.defobj = req.defobj_out,
 		.def = req.sym_out
 	});
 #else
@@ -6041,6 +6059,10 @@ object_add_name(Obj_Entry *obj, const char *name)
     if (entry != NULL) {
 	strcpy(entry->name, name);
 	STAILQ_INSERT_TAIL(&obj->names, entry, link);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	if (obj->compart_id == 0)
+	    obj->compart_id = compart_id_allocate(entry->name);
+#endif
     }
 }
 
