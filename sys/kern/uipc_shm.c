@@ -1571,11 +1571,7 @@ shm_mmap_large(struct shmfd *shmfd, vm_map_t map, vm_pointer_t *addr,
 
 	/* MAP_PRIVATE is disabled */
 	if ((flags & ~(MAP_SHARED | MAP_FIXED | MAP_EXCL |
-	    MAP_NOCORE |
-#ifdef MAP_32BIT
-	    MAP_32BIT |
-#endif
-	    MAP_ALIGNMENT_MASK |
+	    MAP_NOCORE | MAP_32BIT | MAP_ALIGNMENT_MASK |
 	    MAP_RESERVATION_CREATE)) != 0)
 		return (EINVAL);
 
