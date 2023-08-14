@@ -127,10 +127,6 @@ static int log_wxrequests = 0;
 SYSCTL_INT(_vm, OID_AUTO, log_wxrequests, CTLFLAG_RWTUN, &log_wxrequests, 0,
     "Log requests for PROT_WRITE and PROT_EXEC");
 
-#ifdef MAP_32BIT
-#define	MAP_32BIT_MAX_ADDR	((vm_offset_t)1 << 31)
-#endif
-
 _Static_assert(MAXPAGESIZES <= 4, "MINCORE_SUPER too narrow");
 
 #if __has_feature(capabilities)
