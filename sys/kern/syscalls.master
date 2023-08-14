@@ -621,7 +621,11 @@
 		    u_int to
 		);
 	}
-91	AUE_NULL	RESERVED
+91	AUE_NULL	STD|CAPENABLED {
+		int cheri_cidcap_alloc(
+		    uintcap_t *cidp
+		)
+	}
 92	AUE_FCNTL	STD|CAPENABLED|VARARG {
 		int fcntl(
 		    int fd,

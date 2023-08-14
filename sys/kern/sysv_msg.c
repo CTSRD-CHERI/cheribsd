@@ -429,7 +429,7 @@ msg_freehdr(struct msg *msghdr)
 	}
 	if (msghdr->msg_spot != -1)
 		panic("msghdr->msg_spot != -1");
-	TAILQ_INSERT_HEAD(&free_msghdrs, msghdrs, msg_queue);
+	TAILQ_INSERT_HEAD(&free_msghdrs, msghdr, msg_queue);
 #ifdef MAC
 	mac_sysvmsg_cleanup(msghdr);
 #endif

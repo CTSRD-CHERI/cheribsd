@@ -215,7 +215,7 @@ if [ -z "${svnversion}" ] && [ -x /usr/bin/svnliteversion ] ; then
 fi
 
 if findvcs .git; then
-	for dir in /usr/bin /usr/local/bin; do
+	for dir in /usr/bin /usr/local/bin /usr/local64/bin; do
 		if [ -x "${dir}/git" ] ; then
 			git_cmd="${dir}/git -c help.autocorrect=0 --git-dir=${VCSDIR}"
 			break

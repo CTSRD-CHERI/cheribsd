@@ -30,6 +30,8 @@
 #ifndef _IPFW2_H
 #define _IPFW2_H
 
+#include <sys/param.h>
+
 /*
  * The default rule number.  By the design of ip_fw, the default rule
  * is the last one, so its number can also serve as the highest number
@@ -744,13 +746,7 @@ struct _ipfw_dyn_rule {
 	u_int16_t	dyn_type;	/* rule type			*/
 	u_int16_t	count;		/* refcount			*/
 	u_int16_t	kidx;		/* index of named object */
-} __packed
-#ifndef __CHERI_PURE_CAPABILITY__
-__aligned(8)
-#else
-__aligned(sizeof(void *))
-#endif
-;
+} __packed __aligned(MAX(8, sizeof(void *)));
 
 /*
  * Definitions for IP option names.

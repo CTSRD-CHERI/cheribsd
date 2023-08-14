@@ -1155,7 +1155,7 @@ fork_return(struct thread *td, struct trapframe *frame)
 			td->td_dbgflags &= ~TDB_STOPATFORK;
 		}
 		PROC_UNLOCK(p);
-	} else if (p->p_flag & P_TRACED || td->td_dbgflags & TDB_BORN) {
+	} else if (p->p_flag & P_TRACED) {
  		/*
 		 * This is the start of a new thread in a traced
 		 * process.  Report a system call exit event.
@@ -1179,7 +1179,7 @@ fork_return(struct thread *td, struct trapframe *frame)
 
 #ifdef KTRACE
 	if (KTRPOINT(td, KTR_SYSRET))
-		ktrsysret(SYS_fork, 0, 0);
+		ktrsysret(td->td_sa.code, 0, 0);
 #endif
 }
 

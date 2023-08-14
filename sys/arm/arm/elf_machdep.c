@@ -75,7 +75,6 @@ struct sysentvec elf32_freebsd_sysvec = {
 	.sv_elf_core_osabi = ELFOSABI_FREEBSD,
 	.sv_elf_core_abi_vendor = FREEBSD_ABI_VENDOR,
 	.sv_elf_core_prepare_notes = __elfN(prepare_notes),
-	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
@@ -111,7 +110,6 @@ static Elf32_Brandinfo freebsd_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,
 	.machine	= EM_ARM,
 	.compat_3_brand	= "FreeBSD",
-	.emul_path	= NULL,
 	.interp_path	= "/libexec/ld-elf.so.1",
 	.sysvec		= &elf32_freebsd_sysvec,
 	.interp_newpath	= NULL,
@@ -185,7 +183,7 @@ store_ptr(Elf_Addr *where, Elf_Addr val)
 
 /* Process one elf relocation with addend. */
 static int
-elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
+elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
     int type, int local, elf_lookup_fn lookup)
 {
 	Elf_Addr *where;
@@ -217,7 +215,7 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 
 	if (local) {
 		if (rtype == R_ARM_RELATIVE) {	/* A + B */
-			addr = elf_relocaddr(lf, relocbase + addend);
+			addr = elf_relocaddr(lf, (Elf_Addr)relocbase + addend);
 			if (load_ptr(where) != addr)
 				store_ptr(where, addr);
 		}
@@ -264,7 +262,7 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 }
 
 int
-elf_reloc(linker_file_t lf, Elf_Addr relocbase, const void *data, int type,
+elf_reloc(linker_file_t lf, char *relocbase, const void *data, int type,
     elf_lookup_fn lookup)
 {
 
@@ -272,7 +270,7 @@ elf_reloc(linker_file_t lf, Elf_Addr relocbase, const void *data, int type,
 }
 
 int
-elf_reloc_local(linker_file_t lf, Elf_Addr relocbase, const void *data,
+elf_reloc_local(linker_file_t lf, char *relocbase, const void *data,
     int type, elf_lookup_fn lookup)
 {
 

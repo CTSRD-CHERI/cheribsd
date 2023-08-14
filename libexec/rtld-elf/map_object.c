@@ -273,7 +273,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 #endif
     }
 
-    dbg("Allocating entire object: mmap(" PTR_FMT ", 0x%lx, 0x%x, 0x%x, -1, 0)",
+    dbg("Allocating entire object: mmap(" PTR_FMT ", 0x%zx, 0x%x, 0x%x, -1, 0)",
 	    base_addr, mapsize, PROT_NONE | PROT_MAX(_PROT_ALL), base_flags);
     mapbase = mmap(base_addr, mapsize, PROT_NONE | PROT_MAX(_PROT_ALL),
 	base_flags, -1, 0);
@@ -558,7 +558,7 @@ obj_free(Obj_Entry *obj)
 {
     Objlist_Entry *elm;
 
-    if (obj->tls_done)
+    if (obj->tls_static)
 	free_tls_offset(obj);
     while (obj->needed != NULL) {
 	Needed_Entry *needed = obj->needed;

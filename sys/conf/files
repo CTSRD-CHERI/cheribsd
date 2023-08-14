@@ -326,7 +326,6 @@ contrib/openzfs/module/zfs/txg.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/uberblock.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/unique.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/vdev.c		optional zfs compile-with "${ZFS_C}"
-contrib/openzfs/module/zfs/vdev_cache.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/vdev_draid.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/vdev_draid_rand.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/vdev_indirect.c		optional zfs compile-with "${ZFS_C}"
@@ -381,6 +380,7 @@ contrib/openzfs/module/zfs/zvol.c		optional zfs compile-with "${ZFS_C}"
 
 # CHERI and CHERI-compat related files
 cheri/cheri_asserts.c			optional cpu_cheri
+cheri/cheri_cidcap.c			standard
 cheri/cheri_exec.c			optional cpu_cheri
 cheri/cheri_sysctl.c			optional cpu_cheri
 cheri/cheri_otype.c			optional cpu_cheri
@@ -394,8 +394,6 @@ vm/vm_cheri_revoke.c			optional cpu_cheri cheri_caprevoke
 # dtrace specific
 cddl/contrib/opensolaris/uts/common/dtrace/dtrace.c	optional dtrace compile-with "${DTRACE_C}" \
 							warning "kernel contains CDDL licensed DTRACE"
-cddl/contrib/opensolaris/uts/common/dtrace/fasttrap.c	optional dtrace_fasttrap | dtraceall compile-with "${FASTTRAP_C}"
-cddl/contrib/opensolaris/common/unicode/u8_textprep.c   optional dtrace_fasttrap | dtraceall compile-with "${FASTTRAP_C}"
 cddl/contrib/opensolaris/uts/common/dtrace/dtrace_xoroshiro128_plus.c	optional dtrace compile-with "${DTRACE_C}"
 cddl/dev/dtmalloc/dtmalloc.c		optional dtmalloc        | dtraceall compile-with "${CDDL_C}"
 cddl/dev/profile/profile.c		optional dtrace_profile  | dtraceall compile-with "${CDDL_C}"
@@ -411,6 +409,7 @@ compat/freebsd32/freebsd32_misc.c	optional compat_freebsd32
 compat/freebsd32/freebsd32_syscalls.c	optional compat_freebsd32
 compat/freebsd32/freebsd32_sysent.c	optional compat_freebsd32
 compat/freebsd64/freebsd64_abort2.c	optional compat_freebsd64
+compat/freebsd64/freebsd64_cheri.c	optional compat_freebsd64
 compat/freebsd64/freebsd64_generic.c	optional compat_freebsd64
 compat/freebsd64/freebsd64_jail.c		optional compat_freebsd64
 compat/freebsd64/freebsd64_mac.c		optional compat_freebsd64
@@ -1867,6 +1866,13 @@ dev/fxp/if_fxp.c		optional fxp
 dev/fxp/inphy.c			optional fxp
 dev/gem/if_gem.c		optional gem
 dev/gem/if_gem_pci.c		optional gem pci
+dev/gve/gve_adminq.c		optional gve
+dev/gve/gve_main.c		optional gve
+dev/gve/gve_qpl.c		optional gve
+dev/gve/gve_rx.c		optional gve
+dev/gve/gve_sysctl.c		optional gve
+dev/gve/gve_tx.c		optional gve
+dev/gve/gve_utils.c		optional gve
 dev/goldfish/goldfish_rtc.c	optional goldfish_rtc fdt
 dev/gpio/dwgpio/dwgpio.c	optional gpio dwgpio fdt
 dev/gpio/dwgpio/dwgpio_bus.c	optional gpio dwgpio fdt

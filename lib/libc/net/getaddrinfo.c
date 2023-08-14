@@ -1834,7 +1834,7 @@ addrinfo_marshal_func(char *buffer, size_t *buffer_size, void *retval,
 
 	memcpy(p, &ai_size, sizeof(size_t));
 	p += sizeof(size_t);
-	p = _ALIGN(p);
+	p = (char *)_ALIGN(p);
 	for (cai = ai; cai != NULL; cai = cai->ai_next) {
 		memcpy(p, cai, sizeof(struct addrinfo));
 		p += sizeof(struct addrinfo);
@@ -1850,7 +1850,7 @@ addrinfo_marshal_func(char *buffer, size_t *buffer_size, void *retval,
 			memcpy(p, cai->ai_canonname, size);
 			p += size;
 		}
-		p = _ALIGN(p);
+		p = (char *)_ALIGN(p);
 	}
 
 	return (NS_SUCCESS);
@@ -1868,7 +1868,7 @@ addrinfo_unmarshal_func(char *buffer, size_t buffer_size, void *retval,
 	p = buffer;
 	memcpy(&ai_size, p, sizeof(size_t));
 	p += sizeof(size_t);
-	p = _ALIGN(p);
+	p = (char *)_ALIGN(p);
 
 	result = NULL;
 	lasts = NULL;
@@ -1904,7 +1904,7 @@ addrinfo_unmarshal_func(char *buffer, size_t buffer_size, void *retval,
 			lasts->ai_next = sentinel;
 			lasts = sentinel;
 		}
-		p = _ALIGN(p);
+		p = (char *)_ALIGN(p);
 	}
 
 	*((struct addrinfo **)retval) = result;

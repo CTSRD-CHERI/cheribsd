@@ -2,7 +2,6 @@
  * System call prototypes.
  *
  * DO NOT EDIT-- this file is automatically @generated.
- * $FreeBSD$
  */
 
 #ifndef _SYS_SYSPROTO_H_
@@ -316,6 +315,9 @@ struct getdtablesize_args {
 struct dup2_args {
 	char from_l_[PADL_(u_int)]; u_int from; char from_r_[PADR_(u_int)];
 	char to_l_[PADL_(u_int)]; u_int to; char to_r_[PADR_(u_int)];
+};
+struct cheri_cidcap_alloc_args {
+	char cidp_l_[PADL_(uintcap_t * __capability)]; uintcap_t * __capability cidp; char cidp_r_[PADR_(uintcap_t * __capability)];
 };
 struct fcntl_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -1945,6 +1947,7 @@ int	sys_swapon(struct thread *, struct swapon_args *);
 int	sys_getitimer(struct thread *, struct getitimer_args *);
 int	sys_getdtablesize(struct thread *, struct getdtablesize_args *);
 int	sys_dup2(struct thread *, struct dup2_args *);
+int	sys_cheri_cidcap_alloc(struct thread *, struct cheri_cidcap_alloc_args *);
 int	sys_fcntl(struct thread *, struct fcntl_args *);
 int	sys_select(struct thread *, struct select_args *);
 int	sys_fsync(struct thread *, struct fsync_args *);
@@ -2854,6 +2857,7 @@ int	freebsd13_swapoff(struct thread *, struct freebsd13_swapoff_args *);
 #define	SYS_AUE_osethostname	AUE_SYSCTL
 #define	SYS_AUE_getdtablesize	AUE_GETDTABLESIZE
 #define	SYS_AUE_dup2	AUE_DUP2
+#define	SYS_AUE_cheri_cidcap_alloc	AUE_NULL
 #define	SYS_AUE_fcntl	AUE_FCNTL
 #define	SYS_AUE_select	AUE_SELECT
 #define	SYS_AUE_fsync	AUE_FSYNC

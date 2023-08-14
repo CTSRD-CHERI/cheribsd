@@ -189,8 +189,10 @@ __FBSDID("$FreeBSD$");
 
 #ifdef PV_STATS
 #define PV_STAT(x)	do { x ; } while (0)
+#define	__pv_stat_used
 #else
 #define PV_STAT(x)	do { } while (0)
+#define	__pv_stat_used	__unused
 #endif
 
 #define	pmap_l1_pindex(v)	(NUL2E + ((v) >> L1_SHIFT))
@@ -765,7 +767,7 @@ pmap_bootstrap(vm_pointer_t l1pt, vm_paddr_t kernstart, vm_size_t kernlen)
 
 	mode = 0;
 	TUNABLE_INT_FETCH("vm.pmap.mode", &mode);
-	if (mode == PMAP_MODE_SV48) {
+	if (mode == PMAP_MODE_SV48 && (mmu_caps & MMU_SV48) != 0) {
 		/*
 		 * Enable SV48 mode: allocate an L0 page and set SV48 mode in
 		 * SATP.  If the implementation does not provide SV48 mode,
@@ -4615,7 +4617,7 @@ pmap_remove_pages(pmap_t pmap)
 	struct rwlock *lock;
 	int64_t bit;
 	uint64_t inuse, bitmask;
-	int allfree, field, freed, idx;
+	int allfree, field, freed __pv_stat_used, idx;
 	bool superpage;
 
 	lock = NULL;

@@ -167,14 +167,14 @@ struct xunpcb {
 		char	xu_dummy2[256];
 	};
 	struct xsocket	xu_socket;
-} __aligned(MAX(8, sizeof(void *)));
+} __aligned(8);
 
 struct xunpgen {
 	ksize_t	xug_len;
 	u_int	xug_count;
 	unp_gen_t xug_gen;
 	so_gen_t xug_sogen;
-} __aligned(sizeof(void *));	/* Followed by struct xunpcb */
+} __aligned(8);
 #endif /* _SYS_SOCKETVAR_H_ */
 
 #if defined(_KERNEL)

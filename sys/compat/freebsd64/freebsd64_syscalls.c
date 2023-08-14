@@ -2,7 +2,6 @@
  * System call names.
  *
  * DO NOT EDIT-- this file is automatically @generated.
- * $FreeBSD$
  */
 
 const char *freebsd64_syscallnames[] = {
@@ -97,7 +96,7 @@ const char *freebsd64_syscallnames[] = {
 	"obs_osethostname",			/* 88 = obsolete osethostname */
 	"getdtablesize",			/* 89 = getdtablesize */
 	"dup2",			/* 90 = dup2 */
-	"#91",			/* 91 = reserved for local use */
+	"freebsd64_cheri_cidcap_alloc",			/* 91 = freebsd64_cheri_cidcap_alloc */
 	"freebsd64_fcntl",			/* 92 = freebsd64_fcntl */
 	"freebsd64_select",			/* 93 = freebsd64_select */
 	"#94",			/* 94 = reserved for local use */

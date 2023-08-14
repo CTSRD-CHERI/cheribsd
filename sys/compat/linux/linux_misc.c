@@ -475,7 +475,6 @@ linux_utime(struct thread *td, struct linux_utime_args *args)
 {
 	struct timeval tv[2], *tvp;
 	struct l_utimbuf lut;
-	char *fname;
 	int error;
 
 	if (args->times) {
@@ -489,16 +488,8 @@ linux_utime(struct thread *td, struct linux_utime_args *args)
 	} else
 		tvp = NULL;
 
-	if (!LUSECONVPATH(td)) {
-		error = kern_utimesat(td, AT_FDCWD, args->fname, UIO_USERSPACE,
-		    tvp, UIO_SYSSPACE);
-	} else {
-		LCONVPATHEXIST(args->fname, &fname);
-		error = kern_utimesat(td, AT_FDCWD, fname, UIO_SYSSPACE, tvp,
-		    UIO_SYSSPACE);
-		LFREEPATH(fname);
-	}
-	return (error);
+	return (kern_utimesat(td, AT_FDCWD, args->fname, UIO_USERSPACE,
+	    tvp, UIO_SYSSPACE));
 }
 #endif
 
@@ -508,7 +499,6 @@ linux_utimes(struct thread *td, struct linux_utimes_args *args)
 {
 	l_timeval ltv[2];
 	struct timeval tv[2], *tvp = NULL;
-	char *fname;
 	int error;
 
 	if (args->tptr != NULL) {
@@ -521,16 +511,8 @@ linux_utimes(struct thread *td, struct linux_utimes_args *args)
 		tvp = tv;
 	}
 
-	if (!LUSECONVPATH(td)) {
-		error = kern_utimesat(td, AT_FDCWD, args->fname, UIO_USERSPACE,
-		    tvp, UIO_SYSSPACE);
-	} else {
-		LCONVPATHEXIST(args->fname, &fname);
-		error = kern_utimesat(td, AT_FDCWD, fname, UIO_SYSSPACE,
-		    tvp, UIO_SYSSPACE);
-		LFREEPATH(fname);
-	}
-	return (error);
+	return (kern_utimesat(td, AT_FDCWD, args->fname, UIO_USERSPACE,
+	    tvp, UIO_SYSSPACE));
 }
 #endif
 
@@ -563,8 +545,7 @@ static int
 linux_common_utimensat(struct thread *td, int ldfd, const char *pathname,
     struct timespec *timesp, int lflags)
 {
-	char *path = NULL;
-	int error, dfd, flags = 0;
+	int dfd, flags = 0;
 
 	dfd = (ldfd == LINUX_AT_FDCWD) ? AT_FDCWD : ldfd;
 
@@ -585,27 +566,14 @@ linux_common_utimensat(struct thread *td, int ldfd, const char *pathname,
 	if (lflags & LINUX_AT_EMPTY_PATH)
 		flags |= AT_EMPTY_PATH;
 
-	if (!LUSECONVPATH(td)) {
-		if (pathname != NULL) {
-			return (kern_utimensat(td, dfd, pathname,
-			    UIO_USERSPACE, timesp, UIO_SYSSPACE, flags));
-		}
-	}
-
 	if (pathname != NULL)
-		LCONVPATHEXIST_AT(pathname, &path, dfd);
-	else if (lflags != 0)
+		return (kern_utimensat(td, dfd, pathname,
+		    UIO_USERSPACE, timesp, UIO_SYSSPACE, flags));
+
+	if (lflags != 0)
 		return (EINVAL);
 
-	if (path == NULL)
-		error = kern_futimens(td, dfd, timesp, UIO_SYSSPACE);
-	else {
-		error = kern_utimensat(td, dfd, path, UIO_SYSSPACE, timesp,
-			UIO_SYSSPACE, flags);
-		LFREEPATH(path);
-	}
-
-	return (error);
+	return (kern_futimens(td, dfd, timesp, UIO_SYSSPACE));
 }
 
 int
@@ -696,7 +664,6 @@ linux_futimesat(struct thread *td, struct linux_futimesat_args *args)
 {
 	l_timeval ltv[2];
 	struct timeval tv[2], *tvp = NULL;
-	char *fname;
 	int error, dfd;
 
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
@@ -711,16 +678,8 @@ linux_futimesat(struct thread *td, struct linux_futimesat_args *args)
 		tvp = tv;
 	}
 
-	if (!LUSECONVPATH(td)) {
-		error = kern_utimesat(td, dfd, args->filename, UIO_USERSPACE,
-		    tvp, UIO_SYSSPACE);
-	} else {
-		LCONVPATHEXIST_AT(args->filename, &fname, dfd);
-		error = kern_utimesat(td, dfd, fname, UIO_SYSSPACE,
-		    tvp, UIO_SYSSPACE);
-		LFREEPATH(fname);
-	}
-	return (error);
+	return (kern_utimesat(td, dfd, args->filename, UIO_USERSPACE,
+	    tvp, UIO_SYSSPACE));
 }
 #endif
 
@@ -878,30 +837,18 @@ linux_waitid(struct thread *td, struct linux_waitid_args *args)
 int
 linux_mknod(struct thread *td, struct linux_mknod_args *args)
 {
-	char *path;
 	int error;
-	enum uio_seg seg;
-	bool convpath;
-
-	convpath = LUSECONVPATH(td);
-	if (!convpath) {
-		path = args->path;
-		seg = UIO_USERSPACE;
-	} else {
-		LCONVPATHCREAT(args->path, &path);
-		seg = UIO_SYSSPACE;
-	}
 
 	switch (args->mode & S_IFMT) {
 	case S_IFIFO:
 	case S_IFSOCK:
-		error = kern_mkfifoat(td, AT_FDCWD, path, seg,
+		error = kern_mkfifoat(td, AT_FDCWD, args->path, UIO_USERSPACE,
 		    args->mode);
 		break;
 
 	case S_IFCHR:
 	case S_IFBLK:
-		error = kern_mknodat(td, AT_FDCWD, path, seg,
+		error = kern_mknodat(td, AT_FDCWD, args->path, UIO_USERSPACE,
 		    args->mode, linux_decode_dev(args->dev));
 		break;
 
@@ -913,7 +860,7 @@ linux_mknod(struct thread *td, struct linux_mknod_args *args)
 		args->mode |= S_IFREG;
 		/* FALLTHROUGH */
 	case S_IFREG:
-		error = kern_openat(td, AT_FDCWD, path, seg,
+		error = kern_openat(td, AT_FDCWD, args->path, UIO_USERSPACE,
 		    O_WRONLY | O_CREAT | O_TRUNC, args->mode);
 		if (error == 0)
 			kern_close(td, td->td_retval[0]);
@@ -923,8 +870,6 @@ linux_mknod(struct thread *td, struct linux_mknod_args *args)
 		error = EINVAL;
 		break;
 	}
-	if (convpath)
-		LFREEPATH(path);
 	return (error);
 }
 #endif
@@ -932,32 +877,21 @@ linux_mknod(struct thread *td, struct linux_mknod_args *args)
 int
 linux_mknodat(struct thread *td, struct linux_mknodat_args *args)
 {
-	char *path;
 	int error, dfd;
-	enum uio_seg seg;
-	bool convpath;
 
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
-
-	convpath = LUSECONVPATH(td);
-	if (!convpath) {
-		path = __DECONST(char *, args->filename);
-		seg = UIO_USERSPACE;
-	} else {
-		LCONVPATHCREAT_AT(args->filename, &path, dfd);
-		seg = UIO_SYSSPACE;
-	}
 
 	switch (args->mode & S_IFMT) {
 	case S_IFIFO:
 	case S_IFSOCK:
-		error = kern_mkfifoat(td, dfd, path, seg, args->mode);
+		error = kern_mkfifoat(td, dfd, args->filename, UIO_USERSPACE,
+		    args->mode);
 		break;
 
 	case S_IFCHR:
 	case S_IFBLK:
-		error = kern_mknodat(td, dfd, path, seg, args->mode,
-		    linux_decode_dev(args->dev));
+		error = kern_mknodat(td, dfd, args->filename, UIO_USERSPACE,
+		    args->mode, linux_decode_dev(args->dev));
 		break;
 
 	case S_IFDIR:
@@ -968,7 +902,7 @@ linux_mknodat(struct thread *td, struct linux_mknodat_args *args)
 		args->mode |= S_IFREG;
 		/* FALLTHROUGH */
 	case S_IFREG:
-		error = kern_openat(td, dfd, path, seg,
+		error = kern_openat(td, dfd, args->filename, UIO_USERSPACE,
 		    O_WRONLY | O_CREAT | O_TRUNC, args->mode);
 		if (error == 0)
 			kern_close(td, td->td_retval[0]);
@@ -978,8 +912,6 @@ linux_mknodat(struct thread *td, struct linux_mknodat_args *args)
 		error = EINVAL;
 		break;
 	}
-	if (convpath)
-		LFREEPATH(path);
 	return (error);
 }
 
@@ -2625,33 +2557,138 @@ linux_seccomp(struct thread *td, struct linux_seccomp_args *args)
 	}
 }
 
-#ifndef COMPAT_LINUX32
+/*
+ * Takes a pointer to a pointer an array of pointers in userspace, loads
+ * the loads the current value and updates the array pointer.
+ */
+static int
+get_argenv_ptr(l_uintptr_t * __capability *arrayp, void * __capability *ptrp)
+{
+	l_uintptr_t * __capability array;
+#ifdef COMPAT_LINUX32
+	uint32_t ptr32;
+#elif defined(COMPAT_LINUX64)
+	uint64_t ptr64;
+#else
+	uintcap_t ptr;
+#endif
+
+	array = *arrayp;
+#ifdef COMPAT_LINUX32
+	if (fueword32(array, &ptr32) == -1)
+		return (EFAULT);
+	array += sizeof(ptr32);
+	*ptrp = __USER_CAP_STR((void *)(uintptr_t)ptr32);
+#elif defined(COMPAT_LINUX64)
+	if (fueword64(array, &ptr64) == -1)
+		return (EFAULT);
+	array += sizeof(ptr64);
+	*ptrp = __USER_CAP_STR((void *)(uintptr_t)ptr64);
+#else
+	if (fueptr(array, &ptr) == -1)
+		return (EFAULT);
+	array += sizeof(ptr);
+	*ptrp = (void * __capability)ptr;
+#endif
+	*arrayp = array;
+	return (0);
+}
+
+/*
+ * Custom version of exec_copyin_args(), to copy out argument and environment
+ * strings from the old process address space into the temporary string buffer.
+ * Based on freebsd32_exec_copyin_args.
+ */
+static int
+linux_exec_copyin_args(struct image_args *args, const char * __capability fname,
+    enum uio_seg segflg, l_uintptr_t * __capability argv,
+    l_uintptr_t * __capability envv)
+{
+	void * __capability ptr;
+	int error;
+
+	bzero(args, sizeof(*args));
+	if (argv == NULL)
+		return (EFAULT);
+
+	/*
+	 * Allocate demand-paged memory for the file name, argument, and
+	 * environment strings.
+	 */
+	error = exec_alloc_args(args);
+	if (error != 0)
+		return (error);
+
+	/*
+	 * Copy the file name.
+	 */
+	error = exec_args_add_fname(args, fname, segflg);
+	if (error != 0)
+		goto err_exit;
+
+	/*
+	 * extract arguments first
+	 */
+	for (;;) {
+		error = get_argenv_ptr(&argv, &ptr);
+		if (error != 0)
+			goto err_exit;
+		if (ptr == NULL)
+			break;
+		error = exec_args_add_arg(args, ptr, UIO_USERSPACE);
+		if (error != 0)
+			goto err_exit;
+	}
+
+	/*
+	 * This comment is from Linux do_execveat_common:
+	 * When argv is empty, add an empty string ("") as argv[0] to
+	 * ensure confused userspace programs that start processing
+	 * from argv[1] won't end up walking envp.
+	 */
+	if (args->argc == 0 &&
+	    (error = exec_args_add_arg(args, "", UIO_SYSSPACE) != 0))
+		goto err_exit;
+
+	/*
+	 * extract environment strings
+	 */
+	if (envv) {
+		for (;;) {
+			error = get_argenv_ptr(&envv, &ptr);
+			if (error != 0)
+				goto err_exit;
+			if (ptr == NULL)
+				break;
+			error = exec_args_add_env(args, ptr, UIO_USERSPACE);
+			if (error != 0)
+				goto err_exit;
+		}
+	}
+
+	return (0);
+
+err_exit:
+	exec_free_args(args);
+	return (error);
+}
+
 int
 linux_execve(struct thread *td, struct linux_execve_args *args)
 {
 	struct image_args eargs;
-	char *path;
 	int error;
 
 	LINUX_CTR(execve);
 
-	if (!LUSECONVPATH(td)) {
-		error = exec_copyin_args(&eargs, __USER_CAP_PATH(args->path),
-		    UIO_USERSPACE, __USER_CAP_UNBOUND(args->argp),
-		    __USER_CAP_UNBOUND(args->envp));
-	} else {
-		LCONVPATHEXIST(args->path, &path);
-		error = exec_copyin_args(&eargs, PTR2CAP(path), UIO_SYSSPACE,
-		    __USER_CAP_UNBOUND(args->argp),
-		    __USER_CAP_UNBOUND(args->envp));
-		LFREEPATH(path);
-	}
+	error = linux_exec_copyin_args(&eargs, __USER_CAP_PATH(args->path),
+	    UIO_USERSPACE, __USER_CAP_UNBOUND(args->argp),
+	    __USER_CAP_UNBOUND(args->envp));
 	if (error == 0)
 		error = linux_common_execve(td, &eargs);
 	AUDIT_SYSCALL_EXIT(error == EJUSTRETURN ? 0 : error, td);
 	return (error);
 }
-#endif
 // CHERI CHANGES START
 // {
 //   "updated": 20230509,

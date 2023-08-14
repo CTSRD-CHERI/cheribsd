@@ -128,8 +128,6 @@ int	kern_accessat(struct thread *td, int fd, const char * __capability path,
 int	kern_acct(struct thread *td, const char * __capability path);
 int	kern_adjtime(struct thread *td, struct timeval *delta,
 	    struct timeval *olddelta);
-int	kern_alternate_path(const char *prefix, const char * __capability path,
-	    enum uio_seg pathseg, char **pathbuf, int create, int dirfd);
 int	kern_audit(struct thread *td, const void * __capability record,
 	    u_int length);
 int	kern_auditctl(struct thread *td, const char * __capability path);
@@ -149,6 +147,8 @@ int	kern_cap_rights_get(struct thread *td, int version, int fd,
 int	kern_cap_rights_limit(struct thread *td, int fd, cap_rights_t *rights);
 int	kern_chdir(struct thread *td, const char * __capability path,
 	    enum uio_seg pathseg);
+int	kern_cheri_cidcap_alloc(struct thread *td,
+	    uintcap_t * __capability cidp);
 int	kern_cheri_revoke(struct thread *td, int flags, uint64_t start,
 	    struct cheri_revoke_syscall_info * __capability srsi);
 int	kern_cheri_revoke_get_shadow(struct thread *td, int flags,

@@ -37,7 +37,7 @@ tests = ['alloc_class_001_pos', 'alloc_class_002_neg', 'alloc_class_003_pos',
     'alloc_class_004_pos', 'alloc_class_005_pos', 'alloc_class_006_pos',
     'alloc_class_007_pos', 'alloc_class_008_pos', 'alloc_class_009_pos',
     'alloc_class_010_pos', 'alloc_class_011_neg', 'alloc_class_012_pos',
-    'alloc_class_013_pos']
+    'alloc_class_013_pos', 'alloc_class_014_neg', 'alloc_class_015_pos']
 tags = ['functional', 'alloc_class']
 
 [tests/functional/append]
@@ -128,7 +128,7 @@ tests = ['zdb_002_pos', 'zdb_003_pos', 'zdb_004_pos', 'zdb_005_pos',
     'zdb_block_size_histogram', 'zdb_checksum', 'zdb_decompress',
     'zdb_display_block', 'zdb_encrypted', 'zdb_label_checksum',
     'zdb_object_range_neg', 'zdb_object_range_pos', 'zdb_objset_id',
-    'zdb_decompress_zstd', 'zdb_recover', 'zdb_recover_2']
+    'zdb_decompress_zstd', 'zdb_recover', 'zdb_recover_2', 'zdb_backup']
 pre =
 post =
 tags = ['functional', 'cli_root', 'zdb']
@@ -446,6 +446,7 @@ tests = ['zpool_initialize_attach_detach_add_remove',
     'zpool_initialize_start_and_cancel_neg',
     'zpool_initialize_start_and_cancel_pos',
     'zpool_initialize_suspend_resume',
+    'zpool_initialize_uninit',
     'zpool_initialize_unsupported_vdevs',
     'zpool_initialize_verify_checksums',
     'zpool_initialize_verify_initialized']
@@ -471,14 +472,17 @@ tests = ['zpool_replace_001_neg', 'replace-o_ashift', 'replace_prop_ashift']
 tags = ['functional', 'cli_root', 'zpool_replace']
 
 [tests/functional/cli_root/zpool_resilver]
-tests = ['zpool_resilver_bad_args', 'zpool_resilver_restart']
+tests = ['zpool_resilver_bad_args', 'zpool_resilver_restart',
+    'zpool_resilver_concurrent']
 tags = ['functional', 'cli_root', 'zpool_resilver']
 
 [tests/functional/cli_root/zpool_scrub]
 tests = ['zpool_scrub_001_neg', 'zpool_scrub_002_pos', 'zpool_scrub_003_pos',
     'zpool_scrub_004_pos', 'zpool_scrub_005_pos',
     'zpool_scrub_encrypted_unloaded', 'zpool_scrub_print_repairing',
-    'zpool_scrub_offline_device', 'zpool_scrub_multiple_copies']
+    'zpool_scrub_offline_device', 'zpool_scrub_multiple_copies',
+    'zpool_error_scrub_001_pos', 'zpool_error_scrub_002_pos',
+    'zpool_error_scrub_003_pos', 'zpool_error_scrub_004_pos']
 tags = ['functional', 'cli_root', 'zpool_scrub']
 
 [tests/functional/cli_root/zpool_set]

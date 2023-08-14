@@ -44,7 +44,7 @@ ENTRY(cerror)
 	cincoffset	csp, csp, -FRAME_SIZE
 	csc	cra, SPILLSLOT_RA(csp)
 	csd	a0, SPILLSLOT_ERRNO(csp)	# spill new errno value
-	ASM_LOCAL_CALL(t1, __error)		# locate address of errno (in ca0)
+	ccall	_C_LABEL(__error)		# locate address of errno (in ca0)
 	cld	a1, SPILLSLOT_ERRNO(csp)	# re-load new errno value
 	csw	a1, 0(ca0)			# update errno value
 	clc	cra, SPILLSLOT_RA(csp)

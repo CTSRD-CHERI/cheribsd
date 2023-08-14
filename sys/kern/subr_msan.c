@@ -196,7 +196,7 @@ kmsan_report_hook(const void *addr, size_t size, size_t off, const char *hook)
 	kmsan_md_orig_decode(*orig, &type, &ptr);
 	typename = kmsan_orig_name(type);
 
-	if (linker_ddb_search_symbol_name((caddr_t)ptr, buf,
+	if (linker_ddb_search_symbol_name((ptraddr_t)ptr, buf,
 	    sizeof(buf), &foff) == 0) {
 		REPORT("MSan: Uninitialized %s memory in %s, "
 		    "offset %zu/%zu, addr %p, from %s+%#lx",
@@ -248,7 +248,7 @@ kmsan_report_inline(msan_orig_t orig, unsigned long pc)
 	kmsan_md_orig_decode(orig, &type, &ptr);
 	typename = kmsan_orig_name(type);
 
-	if (linker_ddb_search_symbol_name((caddr_t)ptr, buf,
+	if (linker_ddb_search_symbol_name((ptraddr_t)ptr, buf,
 	    sizeof(buf), &foff) == 0) {
 		REPORT("MSan: Uninitialized %s memory from %s+%#lx",
 		    typename, buf, foff);

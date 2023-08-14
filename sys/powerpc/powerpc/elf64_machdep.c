@@ -75,7 +75,6 @@ struct sysentvec elf64_freebsd_sysvec_v1 = {
 	.sv_elf_core_osabi = ELFOSABI_FREEBSD,
 	.sv_elf_core_abi_vendor = FREEBSD_ABI_VENDOR,
 	.sv_elf_core_prepare_notes = __elfN(prepare_notes),
-	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
@@ -117,7 +116,6 @@ struct sysentvec elf64_freebsd_sysvec_v2 = {
 	.sv_elf_core_osabi = ELFOSABI_FREEBSD,
 	.sv_elf_core_abi_vendor = FREEBSD_ABI_VENDOR,
 	.sv_elf_core_prepare_notes = __elfN(prepare_notes),
-	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
@@ -156,7 +154,6 @@ static Elf64_Brandinfo freebsd_brand_info_elfv1 = {
 	.brand		= ELFOSABI_FREEBSD,
 	.machine	= EM_PPC64,
 	.compat_3_brand	= "FreeBSD",
-	.emul_path	= NULL,
 	.interp_path	= "/libexec/ld-elf.so.1",
 	.sysvec		= &elf64_freebsd_sysvec_v1,
 	.interp_newpath	= NULL,
@@ -173,7 +170,6 @@ static Elf64_Brandinfo freebsd_brand_info_elfv2 = {
 	.brand		= ELFOSABI_FREEBSD,
 	.machine	= EM_PPC64,
 	.compat_3_brand	= "FreeBSD",
-	.emul_path	= NULL,
 	.interp_path	= "/libexec/ld-elf.so.1",
 	.sysvec		= &elf64_freebsd_sysvec_v2,
 	.interp_newpath	= NULL,
@@ -190,7 +186,6 @@ static Elf64_Brandinfo freebsd_brand_oinfo = {
 	.brand		= ELFOSABI_FREEBSD,
 	.machine	= EM_PPC64,
 	.compat_3_brand	= "FreeBSD",
-	.emul_path	= NULL,
 	.interp_path	= "/usr/libexec/ld-elf.so.1",
 	.sysvec		= &elf64_freebsd_sysvec_v1,
 	.interp_newpath	= NULL,
@@ -326,7 +321,7 @@ elf_is_ifunc_reloc(Elf_Size r_info)
 
 /* Process one elf relocation with addend. */
 static int
-elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
+elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
     int type, int local, elf_lookup_fn lookup)
 {
 	Elf_Addr *where;
@@ -364,7 +359,7 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 		break;
 
 	case R_PPC_RELATIVE:	/* doubleword64 B + A */
-		*where = elf_relocaddr(lf, relocbase + addend);
+		*where = elf_relocaddr(lf, (Elf_Addr)relocbase + addend);
 		break;
 
 	case R_PPC_JMP_SLOT:	/* function descriptor copy */
@@ -378,7 +373,7 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 		break;
 
 	case R_PPC_IRELATIVE:
-		addr = relocbase + addend;
+		addr = (Elf_Addr)relocbase + addend;
 		val = ((Elf64_Addr (*)(void))addr)();
 		if (*where != val)
 			*where = val;
@@ -426,7 +421,7 @@ elf_reloc_self(Elf_Dyn *dynp, Elf_Addr relocbase)
 }
 
 int
-elf_reloc(linker_file_t lf, Elf_Addr relocbase, const void *data, int type,
+elf_reloc(linker_file_t lf, char *relocbase, const void *data, int type,
     elf_lookup_fn lookup)
 {
 
@@ -434,7 +429,7 @@ elf_reloc(linker_file_t lf, Elf_Addr relocbase, const void *data, int type,
 }
 
 int
-elf_reloc_local(linker_file_t lf, Elf_Addr relocbase, const void *data,
+elf_reloc_local(linker_file_t lf, char *relocbase, const void *data,
     int type, elf_lookup_fn lookup)
 {
 

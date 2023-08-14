@@ -84,7 +84,6 @@ static struct sysentvec elf_freebsd_sysvec = {
 	.sv_elf_core_osabi = ELFOSABI_FREEBSD,
 	.sv_elf_core_abi_vendor = FREEBSD_ABI_VENDOR,
 	.sv_elf_core_prepare_notes = __elfN(prepare_notes),
-	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= 0,	/* Filled in during boot. */
@@ -123,7 +122,6 @@ static __ElfN(Brandinfo) freebsd_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,
 	.machine	= EM_RISCV,
 	.compat_3_brand	= "FreeBSD",
-	.emul_path	= NULL,
 	.interp_path	= "/libexec/ld-elf.so.1",
 	.sysvec		= &elf_freebsd_sysvec,
 #if __has_feature(capabilities)

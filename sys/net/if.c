@@ -82,6 +82,7 @@
 #include <net/if_arp.h>
 #include <net/if_clone.h>
 #include <net/if_dl.h>
+#include <net/if_strings.h>
 #include <net/if_types.h>
 #include <net/if_var.h>
 #include <net/if_media.h>
@@ -339,7 +340,6 @@ static void	if_attachdomain1(struct ifnet *);
 static int	ifconf(u_long, struct ifconf *);
 static void	if_input_default(struct ifnet *, struct mbuf *);
 static int	if_requestencap_default(struct ifnet *, struct if_encap_req *);
-static void	if_route(struct ifnet *, int flag, int fam);
 static int	if_setflag(struct ifnet *, int, int, int *, int);
 static int	if_transmit_default(struct ifnet *ifp, struct mbuf *m);
 static void	if_unroute(struct ifnet *, int flag, int fam);
@@ -2202,26 +2202,6 @@ if_unroute(struct ifnet *ifp, int flag, int fam)
 	rt_ifmsg(ifp, IFF_UP);
 }
 
-/*
- * Mark an interface up and notify protocols of
- * the transition.
- */
-static void
-if_route(struct ifnet *ifp, int flag, int fam)
-{
-
-	KASSERT(flag == IFF_UP, ("if_route: flag != IFF_UP"));
-
-	ifp->if_flags |= flag;
-	getmicrotime(&ifp->if_lastchange);
-	if (ifp->if_carp)
-		(*carp_linkstate_p)(ifp);
-	rt_ifmsg(ifp, IFF_UP);
-#ifdef INET6
-	in6_if_up(ifp);
-#endif
-}
-
 void	(*vlan_link_state_p)(struct ifnet *);	/* XXX: private from if_vlan */
 void	(*vlan_trunk_cap_p)(struct ifnet *);		/* XXX: private from if_vlan */
 struct ifnet *(*vlan_trunkdev_p)(struct ifnet *);
@@ -2307,7 +2287,11 @@ void
 if_up(struct ifnet *ifp)
 {
 
-	if_route(ifp, IFF_UP, AF_UNSPEC);
+	ifp->if_flags |= IFF_UP;
+	getmicrotime(&ifp->if_lastchange);
+	if (ifp->if_carp)
+		(*carp_linkstate_p)(ifp);
+	rt_ifmsg(ifp, IFF_UP);
 	EVENTHANDLER_INVOKE(ifnet_event, ifp, IFNET_EVENT_UP);
 }
 
@@ -3426,13 +3410,8 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	    cmd != SIOCSIFDSTADDR && cmd != SIOCSIFNETMASK)
 		error = (*ifp->if_ioctl)(ifp, cmd, data);
 
-	if ((oif_flags ^ ifp->if_flags) & IFF_UP) {
-#ifdef INET6
-		if (ifp->if_flags & IFF_UP)
-			in6_if_up(ifp);
-#endif
-	}
-
+	if (!(oif_flags & IFF_UP) && (ifp->if_flags & IFF_UP))
+		if_up(ifp);
 out_ref:
 	if_rele(ifp);
 out_noref:
@@ -4733,6 +4712,12 @@ if_getidxgen(const if_t ifp)
 	return (ifp->if_idxgen);
 }
 
+const char *
+if_getdescr(if_t ifp)
+{
+	return (ifp->if_description);
+}
+
 void
 if_setdescr(if_t ifp, char *descrbuf)
 {
@@ -4761,6 +4746,12 @@ int
 if_getalloctype(const if_t ifp)
 {
 	return (ifp->if_alloctype);
+}
+
+void
+if_setlastchange(if_t ifp)
+{
+	getmicrotime(&ifp->if_lastchange);
 }
 
 /*
@@ -5120,6 +5111,38 @@ if_foreach_addr_type(if_t ifp, int type, if_addr_cb_t cb, void *cb_arg)
 	return (count);
 }
 
+struct ifaddr *
+ifa_iter_start(if_t ifp, struct ifa_iter *iter)
+{
+	struct ifaddr *ifa;
+
+	NET_EPOCH_ASSERT();
+
+	bzero(iter, sizeof(*iter));
+	ifa = CK_STAILQ_FIRST(&ifp->if_addrhead);
+	if (ifa != NULL)
+		iter->context[0] = CK_STAILQ_NEXT(ifa, ifa_link);
+	else
+		iter->context[0] = NULL;
+	return (ifa);
+}
+
+struct ifaddr *
+ifa_iter_next(struct ifa_iter *iter)
+{
+	struct ifaddr *ifa = iter->context[0];
+
+	if (ifa != NULL)
+		iter->context[0] = CK_STAILQ_NEXT(ifa, ifa_link);
+	return (ifa);
+}
+
+void
+ifa_iter_finish(struct ifa_iter *iter)
+{
+	/* Nothing to do here for now. */
+}
+
 int
 if_setsoftc(if_t ifp, void *softc)
 {
@@ -5229,6 +5252,12 @@ if_resolvemulti(if_t ifp, struct sockaddr **srcs, struct sockaddr *dst)
 		return (EOPNOTSUPP);
 
 	return (ifp->if_resolvemulti(ifp, srcs, dst));
+}
+
+int
+if_ioctl(if_t ifp, u_long cmd, void *data)
+{
+	return (ifp->if_ioctl(ifp, cmd, data));
 }
 
 struct mbuf *

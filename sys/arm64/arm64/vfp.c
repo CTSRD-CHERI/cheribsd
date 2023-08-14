@@ -58,7 +58,7 @@ struct fpu_kern_ctx {
 	struct vfpstate	 state;
 };
 
-static void
+void
 vfp_enable(void)
 {
 	uint32_t cpacr;
@@ -69,7 +69,7 @@ vfp_enable(void)
 	isb();
 }
 
-static void
+void
 vfp_disable(void)
 {
 	uint32_t cpacr;
@@ -100,7 +100,7 @@ vfp_discard(struct thread *td)
 	vfp_disable();
 }
 
-static void
+void
 vfp_store(struct vfpstate *state)
 {
 	__uint128_t *vfp_state;
@@ -132,7 +132,7 @@ vfp_store(struct vfpstate *state)
 	state->vfp_fpsr = fpsr;
 }
 
-static void
+void
 vfp_restore(struct vfpstate *state)
 {
 	__uint128_t *vfp_state;

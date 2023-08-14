@@ -1,6 +1,5 @@
 # FreeBSD system call object files.
 # DO NOT EDIT-- this file is automatically @generated.
-# $FreeBSD$
 MIASM =  \
 	syscall.o \
 	exit.o \
@@ -73,6 +72,7 @@ MIASM =  \
 	getitimer.o \
 	getdtablesize.o \
 	dup2.o \
+	cheri_cidcap_alloc.o \
 	fcntl.o \
 	select.o \
 	fsync.o \

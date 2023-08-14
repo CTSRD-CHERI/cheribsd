@@ -274,10 +274,13 @@ ZFS_CFLAGS+= -DBITS_PER_LONG=32
 ZFS_CFLAGS+= -DBITS_PER_LONG=64
 .endif
 
+.if ${MACHINE_ABI:Mpurecap}
+ZFS_CFLAGS+=	-Xclang -cheri-bounds=conservative
+.endif
 
 ZFS_ASM_CFLAGS= -x assembler-with-cpp -DLOCORE ${ZFS_CFLAGS}
-ZFS_C=		${CC} -c ${ZFS_CFLAGS} -Xclang -cheri-bounds=conservative ${WERROR} ${.IMPSRC}
-ZFS_RPC_C=	${CC} -c ${ZFS_CFLAGS} -DHAVE_RPC_TYPES -Xclang -cheri-bounds=conservative ${WERROR} ${.IMPSRC}
+ZFS_C=		${CC} -c ${ZFS_CFLAGS} ${WERROR} ${.IMPSRC}
+ZFS_RPC_C=	${CC} -c ${ZFS_CFLAGS} -DHAVE_RPC_TYPES ${WERROR} ${.IMPSRC}
 ZFS_S=		${CC} -c ${ZFS_ASM_CFLAGS} ${WERROR} ${.IMPSRC}
 
 # ATH driver
@@ -306,15 +309,6 @@ FBT_CFLAGS=	-DBUILDING_DTRACE -nostdinc -I$S/cddl/dev/fbt/${MACHINE_CPUARCH} -I$
 FBT_CFLAGS+=	-I$S/cddl/dev/fbt/x86
 .endif
 FBT_C=		${CC} -c ${FBT_CFLAGS}		${WERROR} ${.IMPSRC}
-
-# Special flags for managing the compat compiles for DTrace/fasttrap
-FASTTRAP_CFLAGS=	-DBUILDING_DTRACE -nostdinc \
-	-I$S/cddl/contrib/opensolaris/uts/${MACHINE_CPUARCH} \
-	-I$S/cddl/contrib/opensolaris/uts/common/sys \
-	-I$S/cddl/compat/opensolaris \
-	-I$S/cddl/contrib/opensolaris/uts/common \
-	-I$S ${CDDL_CFLAGS}
-FASTTRAP_C=		${CC} -c ${FASTTRAP_CFLAGS}		${WERROR} ${PROF} ${.IMPSRC}
 
 .if ${MK_CTF} != "no"
 NORMAL_CTFCONVERT=	${CTFCONVERT} ${CTFFLAGS} ${.TARGET}
