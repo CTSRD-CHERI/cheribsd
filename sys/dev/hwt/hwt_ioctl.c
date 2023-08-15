@@ -139,6 +139,7 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 	struct proc *p;
 	int thread_id;
 	int error;
+	struct thread **threads, *td1;
 
 	/* Check if the owner have this pid configured already. */
 	ctx = hwt_owner_lookup_ctx(ho, halloc->pid);
@@ -161,21 +162,9 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 		return (error);
 	}
 
-	thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
-
-	/* Allocate first thread and buffers. */
-	sprintf(path, "hwt_%d_%d", ctx->ident, thread_id);
-	error = hwt_thread_alloc(&thr, path, ctx->bufsize);
-	if (error) {
-		hwt_ctx_free(ctx);
-		return (error);
-	}
-	thr->vm->ctx = ctx;
-
-	/* Since we done with malloc, now get the victim proc. */
+	/* Now get the victim proc. */
 	p = pfind(halloc->pid);
 	if (p == NULL) {
-		hwt_thread_free(thr);
 		hwt_ctx_free(ctx);
 		return (ENXIO);
 	}
@@ -183,23 +172,63 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 	/* Ensure we can trace it. */
 	error = hwt_priv_check(td->td_proc, p);
 	if (error) {
-		hwt_thread_free(thr);
-		hwt_ctx_free(ctx);
 		PROC_UNLOCK(p);
+		hwt_ctx_free(ctx);
 		return (error);
 	}
-	p->p_flag2 |= P2_HWT;
-	thr->td = FIRST_THREAD_IN_PROC(p);
+
+	/* Allocate hwt threads and buffers. */
+
+	int cnt, i;
+
+	cnt = 0;
+
+	FOREACH_THREAD_IN_PROC(p, td1) {
+		cnt += 1;
+	}
+
+	KASSERT(cnt > 0, ("no threads"));
+
+	threads = malloc(sizeof(struct thread *) * cnt, M_HWT_IOCTL,
+	    M_NOWAIT | M_ZERO);
+	if (threads == NULL) {
+		PROC_UNLOCK(p);
+		hwt_ctx_free(ctx);
+		return (ENOMEM);
+	}
+
+	i = 0;
+
+	FOREACH_THREAD_IN_PROC(p, td1) {
+		threads[i++] = td1;
+	}
+
 	ctx->proc = p;
+	p->p_flag2 |= P2_HWT;
 	PROC_UNLOCK(p);
 
-	/* All good. */
-	thr->ctx = ctx;
-	thr->thread_id = thread_id;
+	for (i = 0; i < cnt; i++) {
+		thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
+		sprintf(path, "hwt_%d_%d", ctx->ident, thread_id);
 
-	HWT_CTX_LOCK(ctx);
-	hwt_thread_insert(ctx, thr);
-	HWT_CTX_UNLOCK(ctx);
+		error = hwt_thread_alloc(&thr, path, ctx->bufsize);
+		if (error) {
+			free(threads, M_HWT_IOCTL);
+			hwt_ctx_free(ctx);
+			return (error);
+		}
+
+		thr->vm->ctx = ctx;
+		thr->td = threads[i];
+		thr->ctx = ctx;
+		thr->thread_id = thread_id;
+
+		HWT_CTX_LOCK(ctx);
+		hwt_thread_insert(ctx, thr);
+		HWT_CTX_UNLOCK(ctx);
+	}
+
+	free(threads, M_HWT_IOCTL);
 
 	error = hwt_backend_init(ctx);
 	if (error) {
