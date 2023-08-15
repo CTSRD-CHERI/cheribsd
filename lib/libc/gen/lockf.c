@@ -44,11 +44,13 @@ int
 lockf(int filedes, int function, off_t size)
 {
 	struct flock fl;
+	intptr_t flip;
 	int cmd;
 
 	fl.l_start = 0;
 	fl.l_len = size;
 	fl.l_whence = SEEK_CUR;
+	flip = (intptr_t)&fl;
 
 	switch (function) {
 	case F_ULOCK:
@@ -65,8 +67,8 @@ lockf(int filedes, int function, off_t size)
 		break;
 	case F_TEST:
 		fl.l_type = F_WRLCK;
-		if (((int (*)(int, int, ...))
-		    __libc_interposing[INTERPOS_fcntl])(filedes, F_GETLK, &fl)
+		if (((int (*)(int, int, intptr_t))
+		    __libc_interposing[INTERPOS_fcntl])(filedes, F_GETLK, flip)
 		    == -1)
 			return (-1);
 		if (fl.l_type == F_UNLCK || (fl.l_sysid == 0 &&
@@ -81,6 +83,6 @@ lockf(int filedes, int function, off_t size)
 		/* NOTREACHED */
 	}
 
-	return (((int (*)(int, int, ...))
-	    __libc_interposing[INTERPOS_fcntl])(filedes, cmd, &fl));
+	return (((int (*)(int, int, intptr_t))
+	    __libc_interposing[INTERPOS_fcntl])(filedes, cmd, flip));
 }
