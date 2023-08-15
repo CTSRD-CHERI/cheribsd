@@ -2,6 +2,5 @@
 
 include "GFE"
 include "std.CHERI-PURECAP"
-include "std.CHERI-CAPREVOKE"
 
 ident CHERI-PURECAP-CAPREVOKE-GFE

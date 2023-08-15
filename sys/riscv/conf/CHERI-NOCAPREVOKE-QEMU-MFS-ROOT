@@ -2,6 +2,7 @@
 
 include "QEMU"
 include "std.CHERI"
+include "std.CHERI-NOCAPREVOKE"
 include "std.MFS-ROOT"
 
-ident CHERI-CAPREVOKE-QEMU-MFS-ROOT
+ident CHERI-NOCAPREVOKE-QEMU-MFS-ROOT
