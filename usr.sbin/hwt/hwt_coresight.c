@@ -56,6 +56,7 @@
 
 #include "libpmcstat_stubs.h"
 #include <libpmcstat.h>
+#include <libxo/xo.h>
 
 #define	HWT_CORESIGHT_DEBUG
 #undef	HWT_CORESIGHT_DEBUG
@@ -80,6 +81,7 @@ struct cs_decoder {
 	int dp_ret;
 	int cpu_id;
 	FILE *out;
+	xo_handle_t *xop;
 };
 
 static ocsd_err_t
@@ -385,6 +387,8 @@ gen_trace_elem_print_lookup(const void *p_context,
 	struct pmcstat_symbol *sym;
 	unsigned long offset;
 	const struct cs_decoder *dec;
+	const char *piname;
+	const char *psname;
 	uint64_t newpc;
 	uint64_t ip;
 	FILE *out;
@@ -457,22 +461,37 @@ gen_trace_elem_print_lookup(const void *p_context,
 		return (resp);
 	};
 
-	if (sym) {
-		offset = newpc - (sym->ps_start + image->pi_vaddr);
-		fprintf(out, "pc 0x%08lx (%lx)\t%12s\t%s+0x%lx\n",
-		    ip, newpc,
-		    pmcstat_string_unintern(image->pi_name),
-		    pmcstat_string_unintern(sym->ps_name), offset);
-	} else
-		if (image)
-			fprintf(out, "pc 0x%08lx (%lx)\t%12s\n",
-			    ip, newpc,
-			    pmcstat_string_unintern(image->pi_name));
-		else {
-			/* image not found. */
+
+	if (sym || image) {
+		xo_open_instance("entry");
+		xo_emit_h(dec->xop, "{:pc/pc 0x%08lx/%x}", ip);
+		xo_emit_h(dec->xop, " ");
+	}
+
+	if (image) {
+		if (tc->mode == HWT_MODE_THREAD) {
+			xo_emit_h(dec->xop, "{:newpc/(%lx)/%x}", newpc);
+			xo_emit_h(dec->xop, "\t");
 		}
 
-	fflush(dec->out);
+		piname = pmcstat_string_unintern(image->pi_name);
+		xo_emit_h(dec->xop, "{:piname/%12s/%s}", piname);
+	}
+
+	if (sym) {
+		psname = pmcstat_string_unintern(sym->ps_name);
+		offset = newpc - (sym->ps_start + image->pi_vaddr);
+		xo_emit_h(dec->xop, "\t");
+		xo_emit_h(dec->xop, "{:psname/%s/%s}", psname);
+		xo_emit_h(dec->xop, "{:offset/+0x%lx/%ju}", offset);
+	}
+
+	if (sym || image) {
+		xo_emit_h(dec->xop, "\n");
+		xo_close_instance("entry");
+	}
+
+	xo_flush();
 
 	return (resp);
 }
@@ -506,8 +525,11 @@ hwt_coresight_init(struct trace_context *tc, struct cs_decoder *dec,
 			printf("could not open %s\n", filename);
 			return (ENXIO);
 		}
-	} else
+		dec->xop = xo_create_to_file(dec->out, XO_STYLE_TEXT, XOF_WARN);
+	} else {
 		dec->out = stdout;
+		dec->xop = NULL;
+	}
 
 	if (tc->flag_format)
 		cs_flags |= FLAG_FORMAT;
@@ -680,6 +702,9 @@ hwt_coresight_process(struct trace_context *tc)
 	size_t totals;
 	int ncpu;
 
+	xo_open_container("trace");
+	xo_open_list("entries");
+
 	signal(SIGINT, catch_int);
 
 	ocsd_def_errlog_init(OCSD_ERR_SEV_INFO, 1);
@@ -747,6 +772,11 @@ hwt_coresight_process(struct trace_context *tc)
 	}
 
 	printf("\nBytes processed: %ld\n", totals);
+
+	xo_close_list("file");
+	xo_close_container("wc");
+	if (xo_finish() < 0)
+		xo_err(EXIT_FAILURE, "stdout");
 
 	return (0);
 }

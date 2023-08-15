@@ -36,12 +36,15 @@
 #include <sys/cpuset.h>
 #include <sys/hwt.h>
 #include <sys/hwt_record.h>
+#include <sys/stat.h>
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <sysexits.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <signal.h>
+#include <err.h>
 #include <string.h>
 
 #include "hwt.h"
@@ -69,6 +72,7 @@ hwt_record_fetch(struct trace_context *tc, int *nrecords)
 	unsigned long addr;
 	struct hwt_record_get record_get;
 	char imagepath[PATH_MAX];
+	struct stat st;
 	int nentries;
 	int error;
 	int j;
@@ -105,8 +109,9 @@ hwt_record_fetch(struct trace_context *tc, int *nrecords)
 			    (unsigned long)entry->addr);
 
 			path = pmcstat_string_intern(entry->fullpath);
-			if ((image = pmcstat_image_from_path(path, 0,
-			    &args, &plugins)) == NULL)
+			image = pmcstat_image_from_path(path, 0, &args,
+			    &plugins);
+			if (image == NULL)
 				return (-1);
 
 			if (image->pi_type == PMCSTAT_IMAGE_UNKNOWN)
@@ -125,11 +130,16 @@ hwt_record_fetch(struct trace_context *tc, int *nrecords)
 		case HWT_RECORD_KERNEL:
 			snprintf(imagepath, sizeof(imagepath), "%s/%s",
 			    tc->fs_root, entry->fullpath);
+			error = stat(imagepath, &st);
+			if (error)
+				errx(EX_OSERR, "Image \"%s\" not found\n",
+				    imagepath);
 			printf("  image #%d: path %s addr %lx\n", j,
 			    imagepath, (unsigned long)entry->addr);
 			path = pmcstat_string_intern(imagepath);
-			if ((image = pmcstat_image_from_path(path, 1,
-			    &args, &plugins)) == NULL)
+			image = pmcstat_image_from_path(path, 1, &args,
+			    &plugins);
+			if (image == NULL)
 				return (-1);
 			if (image->pi_type == PMCSTAT_IMAGE_UNKNOWN)
 				pmcstat_image_determine_type(image, &args);

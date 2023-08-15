@@ -51,6 +51,7 @@ struct trace_context {
 	struct hwt_record_user_entry *records;
 	void *base;
 	size_t bufsize;
+	int attach;
 	int pid;
 	cpuset_t cpu_map;
 	int fd;

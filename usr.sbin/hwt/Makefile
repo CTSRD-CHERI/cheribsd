@@ -5,7 +5,7 @@ MAN=
 
 CFLAGS+= -I${SRCTOP}/lib/libpmcstat
 
-LIBADD= elf pmcstat
+LIBADD= elf pmcstat xo util
 
 SRCS=	hwt.c			\
 	hwt_elf.c		\
