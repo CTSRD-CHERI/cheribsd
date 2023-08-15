@@ -116,54 +116,6 @@ hwt_owner_alloc(struct proc *p)
 	return (ho);
 }
 
-static void
-hwt_owner_free_cpus(struct hwt_context *ctx)
-{
-	struct hwt_cpu *cpu;
-
-	do {
-		HWT_CTX_LOCK(ctx);
-		cpu = TAILQ_FIRST(&ctx->cpus);
-		if (cpu)
-			TAILQ_REMOVE(&ctx->cpus, cpu, next);
-		HWT_CTX_UNLOCK(ctx);
-
-		if (cpu == NULL)
-			break;
-
-		hwt_vm_free(cpu->vm);
-		hwt_cpu_free(cpu);
-	} while (1);
-}
-
-static void
-hwt_owner_free_threads(struct hwt_context *ctx)
-{
-	struct hwt_thread *thr;
-
-	dprintf("%s: remove threads\n", __func__);
-
-	do {
-		HWT_CTX_LOCK(ctx);
-		thr = TAILQ_FIRST(&ctx->threads);
-		if (thr) {
-			TAILQ_REMOVE(&ctx->threads, thr, next);
-			HWT_THR_LOCK(thr);
-		}
-		HWT_CTX_UNLOCK(ctx);
-
-		if (thr == NULL)
-			break;
-
-		wakeup(thr);
-
-		HWT_THR_UNLOCK(thr);
-
-		if (refcount_release(&thr->refcnt))
-			hwt_thread_free(thr);
-	} while (1);
-}
-
 void
 hwt_owner_shutdown(struct hwt_owner *ho)
 {
@@ -203,12 +155,6 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 		/* Note that a thread could be still sleeping on msleep_spin. */
 
 		hwt_backend_deinit(ctx);
-
-		if (ctx->mode == HWT_MODE_CPU)
-			hwt_owner_free_cpus(ctx);
-		else
-			hwt_owner_free_threads(ctx);
-
 		hwt_record_free_all(ctx);
 		hwt_ctx_free(ctx);
 	}

@@ -39,6 +39,7 @@
 #include <sys/mman.h>
 #include <sys/module.h>
 #include <sys/mutex.h>
+#include <sys/refcount.h>
 #include <sys/rwlock.h>
 #include <sys/hwt.h>
 
@@ -47,6 +48,8 @@
 #include <dev/hwt/hwt_config.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_owner.h>
+#include <dev/hwt/hwt_vm.h>
+#include <dev/hwt/hwt_cpu.h>
 
 #define	HWT_DEBUG
 #undef	HWT_DEBUG
@@ -113,9 +116,64 @@ hwt_ctx_alloc(struct hwt_context **ctx0)
 	return (0);
 }
 
+static void
+hwt_ctx_free_cpus(struct hwt_context *ctx)
+{
+	struct hwt_cpu *cpu;
+
+	do {
+		HWT_CTX_LOCK(ctx);
+		cpu = TAILQ_FIRST(&ctx->cpus);
+		if (cpu)
+			TAILQ_REMOVE(&ctx->cpus, cpu, next);
+		HWT_CTX_UNLOCK(ctx);
+
+		if (cpu == NULL)
+			break;
+
+		/* TODO: move vm_free() to cpu_free()? */
+		hwt_vm_free(cpu->vm);
+		hwt_cpu_free(cpu);
+	} while (1);
+}
+
+static void
+hwt_ctx_free_threads(struct hwt_context *ctx)
+{
+	struct hwt_thread *thr;
+
+	dprintf("%s: remove threads\n", __func__);
+
+	do {
+		HWT_CTX_LOCK(ctx);
+		thr = TAILQ_FIRST(&ctx->threads);
+		if (thr) {
+			TAILQ_REMOVE(&ctx->threads, thr, next);
+			HWT_THR_LOCK(thr);
+		}
+		HWT_CTX_UNLOCK(ctx);
+
+		if (thr == NULL)
+			break;
+
+		wakeup(thr);
+
+		HWT_THR_UNLOCK(thr);
+
+		if (refcount_release(&thr->refcnt))
+			hwt_thread_free(thr);
+	} while (1);
+}
+
+
 void
 hwt_ctx_free(struct hwt_context *ctx)
 {
+
+	if (ctx->mode == HWT_MODE_CPU)
+		hwt_ctx_free_cpus(ctx);
+	else
+		hwt_ctx_free_threads(ctx);
 
 	hwt_config_free(ctx);
 	hwt_ctx_ident_free(ctx->ident);
