@@ -204,7 +204,6 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 	}
 
 	ctx->proc = p;
-	p->p_flag2 |= P2_HWT;
 	PROC_UNLOCK(p);
 
 	for (i = 0; i < cnt; i++) {
@@ -234,7 +233,6 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 	if (error) {
 		hwt_thread_free(thr);
 		hwt_ctx_free(ctx);
-		/* TODO: remove P2_HWT from proc, if it is still there. */
 		return (error);
 	}
 
@@ -248,6 +246,12 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 	 * state.
 	 */
 	hwt_contexthash_insert(ctx);
+
+	p = pfind(halloc->pid);
+	if (p) {
+		p->p_flag2 |= P2_HWT;
+		PROC_UNLOCK(p);
+	}
 
 	return (0);
 }
