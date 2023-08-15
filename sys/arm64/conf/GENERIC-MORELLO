@@ -25,6 +25,7 @@ ident		GENERIC-MORELLO
 makeoptions	CPUTYPE=morello
 options 	CPU_CHERI
 options 	COMPAT_FREEBSD64
+include "std.CHERI-CAPREVOKE"
 
 # Needs porting to use __USER_CAP
 nooptions 	COMPAT_FREEBSD32
