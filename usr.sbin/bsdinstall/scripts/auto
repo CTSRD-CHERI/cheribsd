@@ -49,7 +49,7 @@ msg_auto_zfs="Auto (ZFS)"
 case `uname -p` in
 aarch64*c*|riscv*c*)
 	msg_auto_zfs_desc="EXPERIMENTAL Guided Root-on-ZFS"
-	msg_auto_zfs_help="ZFS is Alpha quality and the pure-capability kernel (non-default) does not support it as a root FS. See the release notes for caveats."
+	msg_auto_zfs_help="ZFS is Alpha quality. See the release notes for caveats."
 	;;
 *)
 	msg_auto_zfs_desc="Guided Root-on-ZFS"
