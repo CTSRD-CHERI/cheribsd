@@ -107,13 +107,13 @@ for USER in $NORMAL_USERS; do
 done
 
 if [ -n "$NON_VIDEO_USERS" ]; then
-	exec 3>&1
+	exec 5>&1
 	VIDEO_ADD_USERS=$(echo $NON_VIDEO_USERS | xargs -o bsddialog \
 	    --backtitle "$OSNAME Installer" --title "CHERI Desktop" \
 	    --nocancel --separate-output --separator=, --checklist \
 	    "Users must be in the video group to log in to a desktop environment. Choose any additional users to add to the group:" \
-	    0 0 0 2>&1 1>&3)
-	exec 3>&-
+	    0 0 0 2>&1 1>&5)
+	exec 5>&-
 	VIDEO_ADD_USERS=${VIDEO_ADD_USERS%,}
 	if [ -n "$VIDEO_ADD_USERS" ]; then
 		pw -R $BSDINSTALL_CHROOT groupmod -n video -m "$VIDEO_ADD_USERS"
