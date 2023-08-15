@@ -377,9 +377,12 @@ OLD_DIRS+=usr/lib/clang/15.0.7/share
 OLD_DIRS+=usr/lib/clang/15.0.7
 
 # 20230622: new libc++ import which bumps version from 15.0.7 to 16.0.1
+.if 0
+# CHERI libc++ is still from 14.0.0
 OLD_FILES+=usr/include/c++/v1/__bits
 OLD_FILES+=usr/include/c++/v1/__tuple
 OLD_FILES+=usr/include/c++/v1/__utility/transaction.h
+.endif
 
 # 20230614: caroot bundle updated
 OLD_FILES+=usr/share/certs/trusted/Cybertrust_Global_Root.pem
