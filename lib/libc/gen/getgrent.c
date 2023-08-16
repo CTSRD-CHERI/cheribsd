@@ -45,8 +45,6 @@
  * CHERI CHANGES END
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "namespace.h"
 #include <sys/param.h>
 #ifdef YP

@@ -52,8 +52,6 @@
  */
 
 #include <sys/param.h>
-__FBSDID("$FreeBSD$");
-
 #include <errno.h>
 #include <runetype.h>
 #include <stdlib.h>

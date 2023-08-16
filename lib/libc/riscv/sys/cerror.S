@@ -34,11 +34,11 @@
 
 #include <machine/asm.h>
 #include "SYS.h"
-__FBSDID("$FreeBSD$");
 
 #define FRAME_SIZE	(2 * __SIZEOF_POINTER__) /* Always multiple of 16 */
 #define SPILLSLOT_RA	(0 * __SIZEOF_POINTER__)
 #define SPILLSLOT_ERRNO	(1 * __SIZEOF_POINTER__)
+
 ENTRY(cerror)
 #ifdef __CHERI_PURE_CAPABILITY__
 	cincoffset	csp, csp, -FRAME_SIZE
