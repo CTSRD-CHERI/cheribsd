@@ -559,13 +559,7 @@ pass:
 		xo_emit("{d:status/%s}: {d:name/%s}\n", "PASS", ctp->ct_name);
 		tests_passed++;
 	}
-	close(pipefd_stdin[1]);
-	close(pipefd_stdout[0]);
-	xo_close_instance("testcase");
-	xo_flush();
-	if (sleep_after_test)
-		sleep(1);
-	return;
+	goto do_return;
 
 fail:
 	/*
@@ -600,6 +594,8 @@ fail:
 		tests_xfailed++;
 		sl_add(cheri_xfailed_tests, failure_message);
 	}
+
+do_return:
 	xo_close_instance("testcase");
 	xo_flush();
 	close(pipefd_stdin[1]);
