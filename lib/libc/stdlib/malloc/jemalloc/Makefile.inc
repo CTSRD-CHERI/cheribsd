@@ -4,8 +4,6 @@ JEMALLOCSRCS:= jemalloc.c arena.c background_thread.c base.c bin.c bitmap.c \
 	prng.c prof.c rtree.c safety_check.c sc.c stats.c sz.c tcache.c \
 	test_hooks.c ticker.c tsd.c witness.c
 
-SYM_MAPS+=${LIBC_SRCTOP}/stdlib/jemalloc/Symbol.map
-
 CFLAGS+=-I${SRCTOP}/contrib/jemalloc/include
 
 .for src in ${JEMALLOCSRCS}
@@ -17,7 +15,6 @@ jemalloc_${src}: ${SRCTOP}/contrib/jemalloc/src/${src} .NOMETA
 CFLAGS.jemalloc_${src}+=	-Werror=cheri-bitwise-operations -Werror=cheri
 .endif
 .endfor
-MISRCS+=	malloc_revoke.c
 
 MAN+=jemalloc.3
 CLEANFILES+=jemalloc.3
