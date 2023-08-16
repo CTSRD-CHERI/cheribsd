@@ -75,7 +75,7 @@ check_fptr(uintptr_t fptr)
 CHERIBSDTEST(sentry_dlsym,
     "Check that a function pointer obtaine dfrom via dlsym is a sentry")
 {
-	unsigned int (*fptr)(unsigned int seconds);
+	double (*fptr)(double);
 	void *handle;
 	const char *libm_so;
 
@@ -96,7 +96,7 @@ CHERIBSDTEST(sentry_dlsym,
 CHERIBSDTEST(sentry_libc,
     "Check that a function pointer from libc is a sentry")
 {
-	unsigned int (*fptr)(unsigned int seconds) = sleep;
+	unsigned int (*fptr)(unsigned int) = sleep;
 
 	check_fptr((uintptr_t)fptr);
 }
