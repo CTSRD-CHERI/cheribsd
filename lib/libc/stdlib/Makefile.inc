@@ -32,6 +32,8 @@ MISRCS+=	timsort.c
 
 SYM_MAPS+= ${LIBC_SRCTOP}/stdlib/Symbol.map
 
+.include "${LIBC_SRCTOP}/stdlib/jemalloc/Makefile.inc"
+
 # machine-dependent stdlib sources
 .sinclude "${LIBC_SRCTOP}/${LIBC_ARCH}/stdlib/Makefile.inc"
 
