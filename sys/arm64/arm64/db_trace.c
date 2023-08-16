@@ -94,6 +94,14 @@ db_stack_trace_cmd(struct thread *td, struct unwind_state *frame)
 			struct trapframe *tf;
 
 			tf = (struct trapframe *)(uintptr_t)frame->fp - 1;
+#ifdef __CHERI_PURE_CAPABILITY__
+			if (!cheri_can_access(tf,
+			    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP,
+			    (ptraddr_t)tf, sizeof(*tf))) {
+				db_printf("--- invalid trapframe %#p\n", tf);
+				break;
+			}
+#endif
 			if (!kstack_contains(td, (vm_offset_t)tf,
 			    sizeof(*tf))) {
 				db_printf("--- invalid trapframe %p\n", tf);
