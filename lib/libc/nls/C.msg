@@ -1,4 +1,3 @@
-$ $FreeBSD$
 $ CHERI CHANGES START
 $ {
 $   "updated": 20221129,
