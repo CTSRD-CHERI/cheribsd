@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 # ZFS_COMMON_SRCS
 .PATH: ${ZFSTOP}/module/zfs

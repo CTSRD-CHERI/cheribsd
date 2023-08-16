@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 # thr sources
 .PATH: ${LIBTHR_SRCTOP}/thread

@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .PATH: ${ZFSTOP}/cmd/zpool_influxdb
 .PATH: ${ZFSTOP}/man/man8

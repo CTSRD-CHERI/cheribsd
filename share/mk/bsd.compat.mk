@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 # cleandir is run with the wrong context for libcompat so don't do
 # anything in that case.
