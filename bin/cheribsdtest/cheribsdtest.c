@@ -82,6 +82,8 @@ static StringList* cheri_xpassed_tests;
 /* Shared memory page with child process. */
 struct cheribsdtest_child_state *ccsp;
 
+static const struct cheri_test *running_test;
+
 static int tests_run, tests_skipped;
 static int tests_failed, tests_passed, tests_xfailed, tests_xpassed;
 static int expected_failures;
@@ -366,7 +368,9 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 		}
 
 		/* Run the actual test. */
+		running_test = ctp;
 		ctp->ct_func();
+		running_test = NULL;
 		exit(0);
 	}
 	close(pipefd_stdin[0]);
