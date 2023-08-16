@@ -366,7 +366,7 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 		}
 
 		/* Run the actual test. */
-		ctp->ct_func(ctp);
+		ctp->ct_func();
 		exit(0);
 	}
 	close(pipefd_stdin[0]);
