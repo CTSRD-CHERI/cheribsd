@@ -32,7 +32,6 @@
 
 #include <machine/asm.h>
 #include <machine/armreg.h>
-__FBSDID("$FreeBSD$");
 
 /*
  * XXX-AM: Wrap HVC and SMC calls to save caller-save capability registers.
