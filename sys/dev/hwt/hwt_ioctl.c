@@ -133,13 +133,15 @@ static int
 hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
     struct hwt_backend *backend, struct hwt_alloc *halloc)
 {
-	char path[MAXPATHLEN];
+	struct thread **threads, *td1;
 	struct hwt_context *ctx;
 	struct hwt_thread *thr;
+	char path[MAXPATHLEN];
 	struct proc *p;
 	int thread_id;
 	int error;
-	struct thread **threads, *td1;
+	int cnt;
+	int i;
 
 	/* Check if the owner have this pid configured already. */
 	ctx = hwt_owner_lookup_ctx(ho, halloc->pid);
@@ -178,8 +180,6 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 	}
 
 	/* Allocate hwt threads and buffers. */
-
-	int cnt, i;
 
 	cnt = 0;
 
