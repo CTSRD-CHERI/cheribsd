@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 SRCDIR=${ZFSTOP}/module
 INCDIR=${ZFSTOP}/include
