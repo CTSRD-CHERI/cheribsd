@@ -362,6 +362,8 @@ etm_attach(device_t dev)
 {
 	struct coresight_desc desc;
 	struct etm_softc *sc;
+	char name[16];
+	int i;
 
 	sc = device_get_softc(dev);
 
@@ -374,6 +376,15 @@ etm_attach(device_t dev)
 	desc.dev = dev;
 	desc.dev_type = CORESIGHT_ETMV4;
 	coresight_register(&desc);
+
+	for (i = 0; i < 14; i++) {
+		snprintf(name, 16, "idr%d", i);
+		sc->id_regs[i] = bus_read_4(sc->res, TRCIDR(i));
+		SYSCTL_ADD_INT(device_get_sysctl_ctx(dev),
+		    SYSCTL_CHILDREN(device_get_sysctl_tree(dev)),
+		    OID_AUTO, name, CTLFLAG_RD,
+		    &sc->id_regs[i], 0, "id register");
+	}
 
 	return (0);
 }

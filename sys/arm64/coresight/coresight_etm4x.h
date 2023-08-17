@@ -234,6 +234,7 @@ struct etmv4_config {
 struct etm_softc {
 	struct resource			*res;
 	struct coresight_platform_data	*pdata;
+	uint32_t id_regs[14];
 };
 
 int etm_attach(device_t dev);
