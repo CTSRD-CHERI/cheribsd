@@ -49,9 +49,6 @@
 #include <dev/sound/pcm/pcm.h>
 #include <dev/sound/version.h>
 
-
-SND_DECLARE_FILE("");
-
 #define	SS_TYPE_PCM		1
 #define	SS_TYPE_MIDI		2
 #define	SS_TYPE_SEQUENCER	3
@@ -1159,11 +1156,6 @@ sndstat_register(device_t dev, char *str, sndstat_handler handler)
 	return (0);
 }
 
-void
-sndstat_registerfile(void *dummy __unused)
-{
-}
-
 int
 sndstat_unregister(device_t dev)
 {
@@ -1182,11 +1174,6 @@ sndstat_unregister(device_t dev)
 	SNDSTAT_UNLOCK();
 
 	return (error);
-}
-
-void
-sndstat_unregisterfile(void *dummy __unused)
-{
 }
 
 /************************************************************************/
