@@ -38,6 +38,7 @@
 #include <sys/cpuset.h>
 #include <sys/hwt.h>
 #include <sys/wait.h>
+#include <sys/sysctl.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -256,25 +257,42 @@ static ocsd_err_t
 create_decoder_etmv4(struct trace_context *tc, dcd_tree_handle_t dcd_tree_h,
     int thread_id)
 {
+	struct etmv4_config *config;
 	ocsd_etmv4_cfg trace_config;
+	uint32_t id_regs[14];
+	size_t regsize;
 	ocsd_err_t ret;
+	char name[32];
+	int error;
+	int i;
+
+	config = tc->config;
 
 	trace_config.arch_ver = ARCH_V8;
 	trace_config.core_prof = profile_CortexA;
-
-	trace_config.reg_configr = 0x00001fc6;
-	trace_config.reg_configr = 0x000000C1;
+	trace_config.reg_configr = config->cfg;
+	/* TODO: take thread_id from config ? */
 	trace_config.reg_traceidr = thread_id + 1;
 
-	trace_config.reg_idr0   = 0x28000ea1;
-	trace_config.reg_idr1   = 0x4100f424;
-	trace_config.reg_idr2   = 0x20001088;
-	trace_config.reg_idr8   = 0x0;
-	trace_config.reg_idr9   = 0x0;
-	trace_config.reg_idr10  = 0x0;
-	trace_config.reg_idr11  = 0x0;
-	trace_config.reg_idr12  = 0x0;
-	trace_config.reg_idr13  = 0x0;
+	for (i = 0; i < 14; i++) {
+		snprintf(name, 32, "dev.coresight_etm4x.0.idr%d", i);
+		regsize = sizeof(id_regs[i]);
+		error = sysctlbyname(name, &id_regs[i], &regsize, NULL, 0);
+		if (error) {
+			printf("Error: could not query ETMv4\n");
+			return (error);
+		}
+	}
+
+	trace_config.reg_idr0 = id_regs[0];
+	trace_config.reg_idr1 = id_regs[1];
+	trace_config.reg_idr2 = id_regs[2];
+	trace_config.reg_idr8 = id_regs[8];
+	trace_config.reg_idr9 = id_regs[9];
+	trace_config.reg_idr10 = id_regs[10];
+	trace_config.reg_idr11 = id_regs[11];
+	trace_config.reg_idr12 = id_regs[12];
+	trace_config.reg_idr13 = id_regs[13];
 
 	/* Instruction decoder. */
 	ret = create_generic_decoder(dcd_tree_h, OCSD_BUILTIN_DCD_ETMV4I,
@@ -572,8 +590,7 @@ hwt_coresight_fill_config(struct trace_context *tc, struct etmv4_config *config)
 
 	reg = TRCCONFIGR_RS | TRCCONFIGR_TS;
 	reg |= TRCCONFIGR_CID | TRCCONFIGR_VMID;
-	reg |= TRCCONFIGR_INSTP0_LDRSTR;
-	reg |= TRCCONFIGR_COND_ALL;
+	reg |= TRCCONFIGR_COND_DIS;
 	config->cfg = reg;
 
 	config->ts_ctrl = 0;
