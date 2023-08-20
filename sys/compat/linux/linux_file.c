@@ -1033,7 +1033,7 @@ linux_preadv(struct thread *td, struct linux_preadv_args *uap)
 	if (offset < 0)
 		return (EINVAL);
 #ifdef COMPAT_LINUX32
-	error = linux32_copyinuio(PTRIN(uap->vec), uap->vlen, &auio);
+	error = freebsd32_copyinuio(PTRIN(uap->vec), uap->vlen, &auio);
 #else
 	error = copyinuio(uap->vec, uap->vlen, &auio);
 #endif
@@ -1060,7 +1060,7 @@ linux_pwritev(struct thread *td, struct linux_pwritev_args *uap)
 	if (offset < 0)
 		return (EINVAL);
 #ifdef COMPAT_LINUX32
-	error = linux32_copyinuio(PTRIN(uap->vec), uap->vlen, &auio);
+	error = freebsd32_copyinuio(PTRIN(uap->vec), uap->vlen, &auio);
 #else
 	error = copyinuio(uap->vec, uap->vlen, &auio);
 #endif
