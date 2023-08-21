@@ -97,8 +97,8 @@ static device_method_t funnel_acpi_methods[] = {
 	DEVMETHOD_END
 };
 
-DEFINE_CLASS_1(funnel, funnel_acpi_driver, funnel_acpi_methods,
-    sizeof(struct funnel_softc), funnel_driver);
+DEFINE_CLASS_1(coresight_funnel, coresight_funnel_acpi_driver, funnel_acpi_methods,
+    sizeof(struct funnel_softc), coresight_funnel_driver);
 
-EARLY_DRIVER_MODULE(funnel, acpi, funnel_acpi_driver, 0, 0,
+EARLY_DRIVER_MODULE(coresight_funnel, acpi, coresight_funnel_acpi_driver, 0, 0,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);

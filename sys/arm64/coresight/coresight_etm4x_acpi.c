@@ -81,8 +81,9 @@ static device_method_t etm_acpi_methods[] = {
 	DEVMETHOD_END
 };
 
-DEFINE_CLASS_1(etm, etm_acpi_driver, etm_acpi_methods,
-    sizeof(struct etm_softc), etm_driver);
+DEFINE_CLASS_1(coresight_etm4x, coresight_etm4x_acpi_driver, etm_acpi_methods,
+    sizeof(struct etm_softc), coresight_etm4x_driver);
 
-EARLY_DRIVER_MODULE(etm, acpi, etm_acpi_driver, 0, 0,
+EARLY_DRIVER_MODULE(coresight_etm4x, acpi, coresight_etm4x_acpi_driver, 0, 0,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
+

@@ -82,8 +82,8 @@ static device_method_t replicator_acpi_methods[] = {
 	DEVMETHOD_END
 };
 
-DEFINE_CLASS_1(replicator, replicator_acpi_driver, replicator_acpi_methods,
-    sizeof(struct replicator_softc), replicator_driver);
+DEFINE_CLASS_1(coresight_replicator, coresight_replicator_acpi_driver, replicator_acpi_methods,
+    sizeof(struct replicator_softc), coresight_replicator_driver);
 
-EARLY_DRIVER_MODULE(replicator, acpi, replicator_acpi_driver, 0, 0,
+EARLY_DRIVER_MODULE(coresight_replicator, acpi, coresight_replicator_acpi_driver, 0, 0,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
