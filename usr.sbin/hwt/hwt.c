@@ -56,7 +56,6 @@
 #include <libxo/xo.h>
 
 #include "hwt.h"
-#include "hwt_libxo.h"
 
 #if defined(__aarch64__)
 #include "hwt_coresight.h"
