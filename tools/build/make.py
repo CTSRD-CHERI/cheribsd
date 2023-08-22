@@ -118,6 +118,7 @@ def check_required_make_env_var(varname, binary_name, bindir):
     if parsed_args.debug:
         run([guess, "--version"])
 
+
 def check_xtool_make_env_var(varname, binary_name):
     # Avoid calling brew --prefix on macOS if all variables are already set:
     if os.getenv(varname):
@@ -127,6 +128,7 @@ def check_xtool_make_env_var(varname, binary_name):
         parsed_args.cross_bindir = default_cross_toolchain()
     return check_required_make_env_var(varname, binary_name,
                                        parsed_args.cross_bindir)
+
 
 def default_cross_toolchain():
     # default to homebrew-installed clang on MacOS if available
@@ -255,7 +257,7 @@ if __name__ == "__main__":
             and not is_make_var_set("WITHOUT_CLEAN")):
         # Avoid accidentally deleting all of the build tree and wasting lots of
         # time cleaning directories instead of just doing a rm -rf ${.OBJDIR}
-        want_clean = input("You did not set -DWITHOUT_CLEAN/--clean/--no-clean."
+        want_clean = input("You did not set -DWITHOUT_CLEAN/--(no-)clean."
                            " Did you really mean to do a clean build? y/[N] ")
         if not want_clean.lower().startswith("y"):
             bmake_args.append("-DWITHOUT_CLEAN")
