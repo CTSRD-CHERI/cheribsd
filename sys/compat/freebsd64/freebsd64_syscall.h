@@ -523,4 +523,5 @@
 #define	FREEBSD64_SYS_sched_getcpu	581
 #define	FREEBSD64_SYS_freebsd64_swapoff	582
 #define	FREEBSD64_SYS_kqueuex	583
-#define	FREEBSD64_SYS_MAXSYSCALL	584
+#define	FREEBSD64_SYS_membarrier	584
+#define	FREEBSD64_SYS_MAXSYSCALL	585

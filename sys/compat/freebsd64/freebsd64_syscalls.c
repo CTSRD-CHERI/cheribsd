@@ -589,4 +589,5 @@ const char *freebsd64_syscallnames[] = {
 	"sched_getcpu",			/* 581 = sched_getcpu */
 	"freebsd64_swapoff",			/* 582 = freebsd64_swapoff */
 	"kqueuex",			/* 583 = kqueuex */
+	"membarrier",			/* 584 = membarrier */
 };

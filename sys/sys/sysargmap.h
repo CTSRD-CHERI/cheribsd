@@ -410,6 +410,7 @@ static int sysargmask[] = {
 	[SYS_sched_getcpu] = (0x0),
 	[SYS_swapoff] = (0x0 | 0x1),
 	[SYS_kqueuex] = (0x0),
+	[SYS_membarrier] = (0x0),
 };
 
 #endif /* !_SYSARGMAP_H_ */

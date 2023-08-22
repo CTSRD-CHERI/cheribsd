@@ -633,4 +633,5 @@ struct sysent freebsd64_sysent[] = {
 	{ .sy_narg = 0, .sy_call = (sy_call_t *)sys_sched_getcpu, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 581 = sched_getcpu */
 	{ .sy_narg = AS(freebsd64_swapoff_args), .sy_call = (sy_call_t *)freebsd64_swapoff, .sy_auevent = AUE_SWAPOFF, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 582 = freebsd64_swapoff */
 	{ .sy_narg = AS(kqueuex_args), .sy_call = (sy_call_t *)sys_kqueuex, .sy_auevent = AUE_KQUEUE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 583 = kqueuex */
+	{ .sy_narg = AS(membarrier_args), .sy_call = (sy_call_t *)sys_membarrier, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 584 = membarrier */
 };
