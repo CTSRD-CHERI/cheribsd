@@ -788,13 +788,6 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	if (error != 0)
 		return (error);
 
-	/*
-	 * Allocate room for the argument and environment strings.
-	 */
-	destp -= ARG_MAX - imgp->args->stringspace;
-	destp = rounddown2(destp, sizeof(uint64_t));
-	ustringp = cheri_setbounds(destp, ARG_MAX - imgp->args->stringspace);
-
 	if (imgp->auxargs) {
 		/*
 		 * Allocate room on the stack for the ELF auxargs
@@ -802,7 +795,18 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		 */
 		destp -= AT_COUNT * sizeof(Elf64_Auxinfo);
 		destp = rounddown2(destp, sizeof(uint64_t));
+		imgp->auxv = (void * __capability)cheri_setbounds(destp,
+		    AT_COUNT * sizeof(Elf64_Auxinfo));
 	}
+
+	/*
+	 * Allocate room for the argument and environment strings.
+	 */
+	destp -= ARG_MAX - imgp->args->stringspace;
+	destp = rounddown2(destp, sizeof(uint64_t));
+	if (destp < cheri_getbase(imgp->strings))
+		return (E2BIG);
+	ustringp = cheri_setbounds(destp, ARG_MAX - imgp->args->stringspace);
 
 	vectp = (uint64_t * __capability)destp;
 
@@ -811,6 +815,8 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * terminating NULL pointers.
 	 */
 	vectp -= imgp->args->argc + 1 + imgp->args->envc + 1;
+	if ((__cheri_addr ptraddr_t)vectp < cheri_getbase(imgp->strings))
+		return (E2BIG);
 
 	/*
 	 * vectp also becomes our initial stack base
@@ -873,9 +879,6 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		return (EFAULT);
 
 	if (imgp->auxargs) {
-		vectp++;
-		imgp->auxv = cheri_setbounds(vectp,
-		    AT_COUNT * sizeof(Elf64_Auxinfo));
 		error = imgp->sysent->sv_copyout_auxargs(imgp,
 		    (uintcap_t)imgp->auxv);
 		if (error != 0)

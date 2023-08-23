@@ -3411,13 +3411,6 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		return (error);
 	imgp->pagesizeslen = sizeof(pagesizes32);
 
-	/*
-	 * Allocate room for the argument and environment strings.
-	 */
-	destp -= ARG_MAX - imgp->args->stringspace;
-	destp = rounddown2(destp, sizeof(uint32_t));
-	ustringp = destp;
-
 	if (imgp->auxargs) {
 		/*
 		 * Allocate room on the stack for the ELF auxargs
@@ -3425,7 +3418,15 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		 */
 		destp -= AT_COUNT * sizeof(Elf32_Auxinfo);
 		destp = rounddown2(destp, sizeof(uint32_t));
+		imgp->auxv = (void *)destp;
 	}
+
+	/*
+	 * Allocate room for the argument and environment strings.
+	 */
+	destp -= ARG_MAX - imgp->args->stringspace;
+	destp = rounddown2(destp, sizeof(uint32_t));
+	ustringp = destp;
 
 	vectp = (uint32_t *)destp;
 
@@ -3495,9 +3496,8 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		return (EFAULT);
 
 	if (imgp->auxargs) {
-		vectp++;
 		error = imgp->sysent->sv_copyout_auxargs(imgp,
-		    (uintptr_t)vectp);
+		    (uintptr_t)imgp->auxv);
 		if (error != 0)
 			return (error);
 	}

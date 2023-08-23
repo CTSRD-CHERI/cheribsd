@@ -1882,17 +1882,6 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	if (error != 0)
 		return (error);
 
-	/*
-	 * Allocate room for the argument and environment strings.
-	 */
-	destp -= ARG_MAX - imgp->args->stringspace;
-	destp = rounddown2(destp, sizeof(void * __capability));
-#if __has_feature(capabilities)
-	ustringp = cheri_setbounds(destp, ARG_MAX - imgp->args->stringspace);
-#else
-	ustringp = destp;
-#endif
-
 	if (imgp->auxargs) {
 		/*
 		 * Allocate room on the stack for the ELF auxargs
@@ -1900,9 +1889,32 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		 */
 		destp -= AT_COUNT * sizeof(Elf_Auxinfo);
 		destp = rounddown2(destp, sizeof(void * __capability));
+#if __has_feature(capabilities)
+		imgp->auxv = (void * __capability)cheri_setbounds(destp,
+		    AT_COUNT * sizeof(Elf_Auxinfo));
+#else
+		imgp->auxv = (void *)destp;
+#endif
 	}
 
+	/*
+	 * Allocate room for the argument and environment strings.
+	 */
+	destp -= ARG_MAX - imgp->args->stringspace;
+	destp = rounddown2(destp, sizeof(void * __capability));
+#if __has_feature(capabilities)
+	if (destp < cheri_getbase(imgp->strings))
+		return (E2BIG);
+	ustringp = cheri_setbounds(destp, ARG_MAX - imgp->args->stringspace);
+#else
+	ustringp = destp;
+#endif
+
 	vectp = (char * __capability * __capability)destp;
+#if __has_feature(capabilities)
+	if ((__cheri_addr ptraddr_t)vectp < cheri_getbase(imgp->strings))
+		return (E2BIG);
+#endif
 
 	/*
 	 * Allocate room for the argv[] and env vectors including the
@@ -1993,13 +2005,6 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		return (EFAULT);
 
 	if (imgp->auxargs) {
-		vectp++;
-#if __has_feature(capabilities)
-		imgp->auxv = cheri_setbounds(vectp,
-		    AT_COUNT * sizeof(Elf_Auxinfo));
-#else
-		imgp->auxv = vectp;
-#endif
 		error = imgp->sysent->sv_copyout_auxargs(imgp,
 		    (uintcap_t)imgp->auxv);
 		if (error != 0)
