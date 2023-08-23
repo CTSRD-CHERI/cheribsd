@@ -110,8 +110,8 @@ struct arm_tmr_softc {
 	uint32_t		clkfreq;
 	int			irq_count;
 	struct eventtimer	et;
-	bool			kern_physical;
-	bool			user_physical;
+	bool			physical_sys;
+	bool			physical_user;
 };
 
 static struct arm_tmr_softc *arm_tmr_sc = NULL;
@@ -272,7 +272,7 @@ setup_user_access(void *arg __unused)
 	/* Always enable the virtual timer */
 	cntkctl |= GT_CNTKCTL_PL0VCTEN;
 	/* Enable the physical timer if supported */
-	if (arm_tmr_sc->user_physical) {
+	if (arm_tmr_sc->physical_user) {
 		cntkctl |= GT_CNTKCTL_PL0PCTEN;
 	}
 	set_el1(cntkctl, cntkctl);
@@ -370,7 +370,7 @@ static unsigned
 arm_tmr_get_timecount(struct timecounter *tc)
 {
 
-	return (arm_tmr_sc->get_cntxct(arm_tmr_sc->user_physical));
+	return (arm_tmr_sc->get_cntxct(arm_tmr_sc->physical_sys));
 }
 
 static int
@@ -384,11 +384,11 @@ arm_tmr_start(struct eventtimer *et, sbintime_t first,
 
 	if (first != 0) {
 		counts = ((uint32_t)et->et_frequency * first) >> 32;
-		ctrl = get_ctrl(sc->kern_physical);
+		ctrl = get_ctrl(sc->physical_sys);
 		ctrl &= ~GT_CTRL_INT_MASK;
 		ctrl |= GT_CTRL_ENABLE;
-		set_tval(counts, sc->kern_physical);
-		set_ctrl(ctrl, sc->kern_physical);
+		set_tval(counts, sc->physical_sys);
+		set_ctrl(ctrl, sc->physical_sys);
 		return (0);
 	}
 
@@ -412,7 +412,7 @@ arm_tmr_stop(struct eventtimer *et)
 	struct arm_tmr_softc *sc;
 
 	sc = (struct arm_tmr_softc *)et->et_priv;
-	arm_tmr_disable(sc->kern_physical);
+	arm_tmr_disable(sc->physical_sys);
 
 	return (0);
 }
@@ -424,10 +424,10 @@ arm_tmr_intr(void *arg)
 	int ctrl;
 
 	sc = (struct arm_tmr_softc *)arg;
-	ctrl = get_ctrl(sc->kern_physical);
+	ctrl = get_ctrl(sc->physical_sys);
 	if (ctrl & GT_CTRL_INT_STAT) {
 		ctrl |= GT_CTRL_INT_MASK;
-		set_ctrl(ctrl, sc->kern_physical);
+		set_ctrl(ctrl, sc->physical_sys);
 	}
 
 	if (sc->et.et_active)
@@ -653,7 +653,7 @@ arm_tmr_attach(device_t dev)
 	phandle_t node;
 	pcell_t clock;
 #endif
-	int error;
+	int error, user_phys;
 	int i, first_timer, last_timer;
 
 	sc = device_get_softc(dev);
@@ -709,9 +709,6 @@ arm_tmr_attach(device_t dev)
 	}
 #endif
 
-	/* Use the virtual timer for userland (and eventcounter). */
-	sc->user_physical = false;
-
 #ifdef __aarch64__
 	/*
 	 * Use the virtual timer when we can't use the hypervisor.
@@ -720,17 +717,27 @@ arm_tmr_attach(device_t dev)
 	 * coordinated with the virtual machine manager.
 	 */
 	if (!HAS_PHYS) {
-		sc->kern_physical = false;
+		sc->physical_sys = false;
 		first_timer = GT_VIRT;
 		last_timer = GT_VIRT;
 	} else
 #endif
 	/* Otherwise set up the secure and non-secure physical timers. */
 	{
-		sc->kern_physical = true;
+		sc->physical_sys = true;
 		first_timer = GT_PHYS_SECURE;
 		last_timer = GT_PHYS_NONSECURE;
 	}
+
+	/*
+	 * The virtual timer is always available on arm and arm64, tell
+	 * userspace to use it.
+	 */
+	sc->physical_user = false;
+	/* Allow use of the physical counter in userspace when available */
+	if (TUNABLE_INT_FETCH("hw.userspace_allow_phys_counter", &user_phys) &&
+	    user_phys != 0)
+		sc->physical_user = sc->physical_sys;
 
 	arm_tmr_sc = sc;
 
@@ -830,10 +837,10 @@ arm_tmr_do_delay(int usec, void *arg)
 	else
 		counts = usec * counts_per_usec;
 
-	first = sc->get_cntxct(sc->kern_physical);
+	first = sc->get_cntxct(sc->physical_sys);
 
 	while (counts > 0) {
-		last = sc->get_cntxct(sc->kern_physical);
+		last = sc->get_cntxct(sc->physical_sys);
 		counts -= (int32_t)(last - first);
 		first = last;
 	}
@@ -870,7 +877,7 @@ arm_tmr_fill_vdso_timehands(struct vdso_timehands *vdso_th,
 {
 
 	vdso_th->th_algo = VDSO_TH_ALGO_ARM_GENTIM;
-	vdso_th->th_physical = arm_tmr_sc->user_physical;
+	vdso_th->th_physical = arm_tmr_sc->physical_user;
 	bzero(vdso_th->th_res, sizeof(vdso_th->th_res));
 	return (1);
 }
