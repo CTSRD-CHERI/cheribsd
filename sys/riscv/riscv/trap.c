@@ -482,15 +482,21 @@ do_trap_supervisor(struct trapframe *frame)
 		dump_regs(frame);
 		switch (exception) {
 		default:
-			panic("Fatal capability page fault %#lx: %#016lx",
+			panic("Fatal capability page fault %#016lx: %#016lx",
 			    (unsigned long)frame->tf_sepc,
 			    frame->tf_stval);
 			break;
 		case SCAUSE_CHERI:
-			panic("CHERI exception %#lx at 0x%016lx\n",
-			    TVAL_CAP_CAUSE(frame->tf_stval),
+		{
+			u_int cap_cause = TVAL_CAP_CAUSE(frame->tf_stval);
+			u_int cap_idx = TVAL_CAP_IDX(frame->tf_stval);
+
+			panic("CHERI %s for %s at %#016lx\n",
+			    cheri_exccode_string(cap_cause),
+			    cheri_cap_idx_string(cap_idx),
 			    (unsigned long)frame->tf_sepc);
 			break;
+		}
 		}
 #endif
 	default:
