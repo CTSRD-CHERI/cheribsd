@@ -1210,6 +1210,7 @@ exec_map_stack(struct image_params *imgp)
 	vm_pointer_t stack_addr, stack_top;
 #if __has_feature(capabilities)
 	vm_pointer_t strings_addr;
+	size_t strings_size;
 	register_t perms;
 #endif
 	vm_pointer_t sharedpage_addr;
@@ -1306,10 +1307,17 @@ exec_map_stack(struct image_params *imgp)
 		 * We currently place it just just below the stack as
 		 * this avoides collisions with init which is linked
 		 * near the bottom of the address space.
+		 *
+		 * The extra page beyond ARG_MAX accounts for space
+		 * needed for the ELF auxiliary, argument, and
+		 * environment vectors and other data stored in this
+		 * space other than argument and environment strings.
 		 */
+		strings_size = CHERI_REPRESENTABLE_LENGTH(ARG_MAX + PAGE_SIZE);
 		strings_addr =
-		    CHERI_REPRESENTABLE_BASE(stack_addr - ARG_MAX, ARG_MAX);
-		error = vm_mmap_object(map, &strings_addr, 0, ARG_MAX,
+		    CHERI_REPRESENTABLE_BASE(stack_addr - strings_size,
+			strings_size);
+		error = vm_mmap_object(map, &strings_addr, 0, strings_size,
 		    VM_PROT_RW_CAP, VM_PROT_RW_CAP, MAP_ANON | MAP_FIXED |
 		    MAP_RESERVATION_CREATE, NULL, 0, FALSE, curthread);
 		if (error != KERN_SUCCESS)
@@ -1318,13 +1326,14 @@ exec_map_stack(struct image_params *imgp)
 		imgp->strings = (void *)strings_addr;
 #else
 		imgp->strings = cheri_capability_build_user_data(
-		    CHERI_CAP_USER_DATA_PERMS, strings_addr, ARG_MAX, ARG_MAX);
+		    CHERI_CAP_USER_DATA_PERMS, strings_addr, strings_size, 0);
 #endif
 	} else
 		imgp->strings = imgp->stack;
 
 	if (sv->sv_flags & SV_CHERI)
-		p->p_psstrings = strings_addr + ARG_MAX - sv->sv_psstringssz;
+		p->p_psstrings = strings_addr + strings_size -
+		    sv->sv_psstringssz;
 	else
 #endif
 		p->p_psstrings = stack_top - sv->sv_psstringssz;
