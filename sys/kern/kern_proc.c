@@ -1960,8 +1960,8 @@ pargs_drop(struct pargs *pa)
 }
 
 static int
-proc_read_string(struct thread *td, struct proc *p, const char *sptr, char *buf,
-    size_t len)
+proc_read_string(struct thread *td, struct proc *p,
+    const char * __capability sptr, char *buf, size_t len)
 {
 	ssize_t n;
 
@@ -1970,7 +1970,7 @@ proc_read_string(struct thread *td, struct proc *p, const char *sptr, char *buf,
 	 * and is aligned at the end of the page, and the following page is not
 	 * mapped.
 	 */
-	n = proc_readmem(td, p, (vm_offset_t)sptr, buf, len);
+	n = proc_readmem(td, p, (__cheri_addr vm_offset_t)sptr, buf, len);
 	if (n <= 0)
 		return (ENOMEM);
 	return (0);
@@ -1986,14 +1986,15 @@ enum proc_vector_type {
 
 #ifdef COMPAT_FREEBSD32
 static int
-get_proc_vector32(struct thread *td, struct proc *p, char ***proc_vectorp,
+get_proc_vector32(struct thread *td, struct proc *p,
+    char * __capability **proc_vectorp,
     size_t *vsizep, enum proc_vector_type type)
 {
 	struct freebsd32_ps_strings pss;
 	Elf32_Auxinfo aux;
 	vm_offset_t vptr, ptr;
 	uint32_t *proc_vector32;
-	char **proc_vector;
+	char * __capability *proc_vector;
 	size_t vsize, size;
 	int i, error;
 
@@ -2044,7 +2045,7 @@ get_proc_vector32(struct thread *td, struct proc *p, char ***proc_vectorp,
 		goto done;
 	}
 	if (type == PROC_AUX) {
-		*proc_vectorp = (char **)proc_vector32;
+		*proc_vectorp = (char * __capability *)(uintptr_t)proc_vector32;
 		*vsizep = vsize;
 		return (0);
 	}
@@ -2061,7 +2062,8 @@ done:
 
 #ifdef COMPAT_FREEBSD64
 static int
-get_proc_vector64(struct thread *td, struct proc *p, char ***proc_vectorp,
+get_proc_vector64(struct thread *td, struct proc *p,
+    char * __capability **proc_vectorp,
     size_t *vsizep, enum proc_vector_type type)
 {
 	struct freebsd64_ps_strings pss;
@@ -2119,7 +2121,7 @@ get_proc_vector64(struct thread *td, struct proc *p, char ***proc_vectorp,
 		goto done;
 	}
 	if (type == PROC_AUX) {
-		*proc_vectorp = (char **)proc_vector64;
+		*proc_vectorp = (char * __capability *)(uintptr_t)proc_vector64;
 		*vsizep = vsize;
 		return (0);
 	}
@@ -2127,7 +2129,7 @@ get_proc_vector64(struct thread *td, struct proc *p, char ***proc_vectorp,
 	    M_WAITOK);
 	for (i = 0; i < (int)vsize; i++)
 		proc_vector[i] = cheri_fromint(proc_vector64[i]);
-	*proc_vectorp = (char **)proc_vector;
+	*proc_vectorp = proc_vector;
 	*vsizep = vsize;
 done:
 	free(proc_vector64, M_TEMP);
@@ -2136,13 +2138,14 @@ done:
 #endif
 
 static int
-get_proc_vector(struct thread *td, struct proc *p, char ***proc_vectorp,
+get_proc_vector(struct thread *td, struct proc *p,
+    char * __capability **proc_vectorp,
     size_t *vsizep, enum proc_vector_type type)
 {
 	struct ps_strings pss;
 	Elf_Auxinfo aux;
 	vm_offset_t vptr, ptr;
-	char **proc_vector;
+	char * __capability *proc_vector;
 	size_t vsize, size;
 	int i;
 
@@ -2234,7 +2237,7 @@ get_ps_strings(struct thread *td, struct proc *p, struct sbuf *sb,
 {
 	size_t done, len, nchr, vsize;
 	int error, i;
-	char **proc_vector, *sptr;
+	char * __capability *proc_vector, * __capability sptr;
 	char pss_string[GET_PS_STRINGS_CHUNK_SZ];
 
 	PROC_ASSERT_HELD(p);
@@ -2294,7 +2297,7 @@ int
 proc_getauxv(struct thread *td, struct proc *p, struct sbuf *sb)
 {
 	size_t vsize, size;
-	char **auxv;
+	char * __capability *auxv;
 	int error;
 
 	error = get_proc_vector(td, p, &auxv, &vsize, PROC_AUX);
