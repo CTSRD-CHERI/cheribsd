@@ -6,6 +6,7 @@
 SUBDIR=	adduser \
 	arp \
 	binmiscctl \
+	bm \
 	boottrace \
 	camdd \
 	cdcontrol \

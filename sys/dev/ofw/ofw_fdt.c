@@ -45,6 +45,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofwvar.h>
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/ofw_bus_subr.h>
+#include <dev/ofw/ofw_subr.h>
 
 #include "ofw_if.h"
 
@@ -115,6 +116,13 @@ static char fdt_model[FDT_MODEL_LEN];
 static char fdt_compatible[FDT_COMPAT_LEN];
 static char fdt_fbsd_version[FDT_FBSDVER_LEN];
 static char fdt_serial[FDT_SERIAL_LEN];
+
+void *
+ofw_fdtp(void)
+{
+
+	return (fdtp);
+}
 
 static int
 sysctl_handle_dtb(SYSCTL_HANDLER_ARGS)

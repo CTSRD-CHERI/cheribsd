@@ -1,6 +1,12 @@
 /*-
- * Copyright (c) 2015 Ian Lepore <ian@freebsd.org>
- * All rights reserved.
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright (c) 2020 Ruslan Bukin <br@bsdpad.com>
+ *
+ * This software was developed by SRI International and the University of
+ * Cambridge Computer Laboratory (Department of Computer Science and
+ * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
+ * DARPA SSITH research programme.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,27 +32,13 @@
  * $FreeBSD$
  */
 
-#ifndef	_DEV_OFW_OFW_SUBR_H_
-#define	_DEV_OFW_OFW_SUBR_H_
+#ifndef	_RISCV_IOMMU_IOMMU_H_
+#define	_RISCV_IOMMU_IOMMU_H_
 
-/*
- * Translate an address from the Nth tuple of a device node's reg properties to
- * a physical memory address, by applying the range mappings from all ancestors.
- * This assumes that all ancestor ranges are simple numerical offsets for which
- * addition and subtraction operations will perform the required mapping (the
- * bit-options in the high word of standard PCI properties are also handled).
- * After the call, *pci_hi (if non-NULL) contains the phys.hi cell of the
- * device's parent PCI bus, or OFW_PADDR_NOT_PCI if no PCI bus is involved.
- *
- * This is intended to be a helper function called by the platform-specific
- * implementation of OF_decode_addr(), and not for direct use by device drivers.
- */
-#define	OFW_PADDR_NOT_PCI	(~0)
+#define	IOMMU_PAGE_SIZE		4096
+#define	IOMMU_PAGE_MASK		(IOMMU_PAGE_SIZE - 1)
 
-int ofw_reg_to_paddr(phandle_t _dev, int _regno, bus_addr_t *_paddr,
-    bus_size_t *_size, pcell_t *_pci_hi);
+int iommu_unregister(struct iommu_unit *unit);
+int iommu_register(struct iommu_unit *unit);
 
-int ofw_parse_bootargs(void);
-void * ofw_fdtp(void);
-
-#endif
+#endif /* _RISCV_IOMMU_IOMMU_H_ */

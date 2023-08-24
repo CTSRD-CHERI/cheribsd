@@ -75,7 +75,9 @@ options 	DDB_CTF			# Kernel ELF linker loads CTF data
 options 	RACCT			# Resource accounting framework
 options 	RACCT_DEFAULT_TO_DISABLED # Set kern.racct.enable=0 by default
 options 	RCTL			# Resource limits
-options 	SMP
+#options 	SMP
+
+device      ada
 
 # RISC-V SBI console
 device		rcons
@@ -89,15 +91,25 @@ device		riscv_syscon
 
 # Bus drivers
 device		pci
+options		IOMMU
+
+# PCI/PCI-X/PCIe Ethernet NICs that use iflib infrastructure
+device		iflib
+device		em		# Intel PRO/1000 Gigabit Ethernet Family
+device		ix		# Intel 10Gb Ethernet Family
+
+# Pass capabilities in em(4) descriptor rings
+options		E1000_DESC_CAP
 
 # Block devices
+device		ahci
 device		scbus
 device		da
 
 # VirtIO support
 device		virtio			# Generic VirtIO bus (required)
 device		virtio_pci		# VirtIO PCI device
-device		vtnet			# VirtIO Ethernet device
+#device		vtnet			# VirtIO Ethernet device
 device		virtio_blk		# VirtIO Block device
 device		virtio_mmio		# VirtIO MMIO bus
 
@@ -209,6 +221,9 @@ device		bpf		# Berkeley packet filter
 
 # Flattened Device Tree
 options 	FDT
+#options 	FDT_DTB_STATIC
+#makeoptions	FDT_DTS_FILE=dm.dts
+
 makeoptions	MODULES_EXTRA+="dtb/sifive"
 
 # I2C support

@@ -296,7 +296,7 @@ static int
 generic_pcie_maxslots(device_t dev)
 {
 
-	return (31); /* max slots per bus acc. to standard */
+	return (1); /* max slots per bus acc. to standard */
 }
 
 static int
@@ -549,6 +549,7 @@ generic_pcie_adjust_resource(device_t dev, device_t child, int type,
 {
 	struct generic_pcie_core_softc *sc;
 	struct rman *rm;
+	int error;
 
 	sc = device_get_softc(dev);
 #if defined(NEW_PCIB) && defined(PCI_RES_BUS)
