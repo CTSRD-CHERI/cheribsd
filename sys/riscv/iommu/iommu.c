@@ -96,7 +96,6 @@ iommu_domain_map_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
 	struct iommu_unit *iommu;
 	vm_prot_t prot;
 	vm_offset_t va;
-	int error;
 
 	dprintf("%s: base %lx, size %lx\n", __func__, base, size);
 
@@ -110,7 +109,7 @@ iommu_domain_map_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
 
 	iommu = iodom->iommu;
 
-	error = IOMMU_MAP(iommu->dev, iodom, va, ma, size, prot);
+	/*error = */ IOMMU_MAP(iommu->dev, iodom, va, ma, size, prot);
 
 	return (0);
 }
@@ -283,16 +282,10 @@ iommu_free_ctx(struct iommu_ctx *ioctx)
 static void
 iommu_domain_free_entry(struct iommu_map_entry *entry, bool free)
 {
-	struct iommu_domain *iodom;
-
-	iodom = entry->domain;
-
-	IOMMU_DOMAIN_LOCK(iodom);
-	iommu_gas_free_space(iodom, entry);
-	IOMMU_DOMAIN_UNLOCK(iodom);
+	iommu_gas_free_space(entry);
 
 	if (free)
-		iommu_gas_free_entry(iodom, entry);
+		iommu_gas_free_entry(entry);
 	else
 		entry->flags = 0;
 }
@@ -382,7 +375,7 @@ iommu_find(device_t dev, bool verbose)
 }
 
 void
-iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free)
+iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free, bool cansleep)
 {
 
 	dprintf("%s\n", __func__);

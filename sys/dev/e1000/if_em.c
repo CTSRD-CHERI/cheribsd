@@ -2497,6 +2497,9 @@ em_flush_tx_ring(struct e1000_softc *sc)
 	struct e1000_tx_desc	*txd;
 	u32			tctl, txd_lower = E1000_TXD_CMD_IFCS;
 	u16			size = 512;
+#if defined(E1000_DESC_CAP)
+	void * __capability cap;
+#endif
 
 	tctl = E1000_READ_REG(hw, E1000_TCTL);
 	E1000_WRITE_REG(hw, E1000_TCTL, tctl | E1000_TCTL_EN);
@@ -2504,7 +2507,13 @@ em_flush_tx_ring(struct e1000_softc *sc)
 	txd = &txr->tx_base[txr->tx_cidx_processed];
 
 	/* Just use the ring as a dummy buffer addr */
+#if defined(E1000_DESC_CAP)
+	cap = cheri_getdefault();
+	cap = cheri_setoffset(cap, txr->tx_paddr);
+	txd->buffer_addr = cap;
+#else
 	txd->buffer_addr = txr->tx_paddr;
+#endif
 	txd->lower.data = htole32(txd_lower | size);
 	txd->upper.data = 0;
 

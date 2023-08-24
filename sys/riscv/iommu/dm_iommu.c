@@ -126,11 +126,11 @@ static struct resource_spec dm_iommu_spec[] = {
 static int
 dm_iommu_find(device_t dev, device_t child)
 {
-	struct dm_iommu_softc *sc;
+	/*struct dm_iommu_softc *sc;*/
 	uint16_t rid;
 	int seg;
 
-	sc = device_get_softc(dev);
+	/*sc = */ device_get_softc(dev);
 
 	rid = pci_get_rid(child);
 	seg = pci_get_domain(child);
@@ -247,10 +247,10 @@ dm_iommu_domain_alloc(device_t dev, struct iommu_unit *iommu, bool *new)
 
 	/* Initialize pmap. */
 	p = &domain->p;
-	p->pm_l1 = (pd_entry_t *)PHYS_TO_DMAP(addr);
+	p->pm_top = (pd_entry_t *)PHYS_TO_DMAP(addr);
 	p->pm_satp = satp;
 	bzero(&p->pm_stats, sizeof(p->pm_stats));
-	dprintf("%s: pm_l1 is %#lp\n", __func__, p->pm_l1);
+	dprintf("%s: pm_top is %#lp\n", __func__, p->pm_top);
 	PMAP_LOCK_INIT(p);
 
 	LIST_INIT(&domain->ctx_list);
@@ -266,9 +266,9 @@ static void
 dm_iommu_domain_free(device_t dev, struct iommu_domain *iodom)
 {
 	struct dm_iommu_domain *domain;
-	struct dm_iommu_softc *sc;
+	/*struct dm_iommu_softc *sc;*/
 
-	sc = device_get_softc(dev);
+	/*sc = */ device_get_softc(dev);
 
 	printf("%s\n", __func__);
 
@@ -287,22 +287,22 @@ dm_iommu_ctx_alloc(device_t dev, struct iommu_domain *iodom, device_t child,
     bool disabled)
 {
 	struct dm_iommu_domain *domain;
-	struct dm_iommu_softc *sc;
+	/*struct dm_iommu_softc *sc;*/
 	struct dm_iommu_ctx *ctx;
-	uint16_t rid;
 #if 0
+	uint16_t rid;
 	u_int xref, sid;
 	int err;
-#endif
 	int seg;
+#endif
 
-	sc = device_get_softc(dev);
+	/*sc = */ device_get_softc(dev);
 	domain = (struct dm_iommu_domain *)iodom;
 
+#if 0
 	seg = pci_get_domain(child);
 	rid = pci_get_rid(child);
 
-#if 0
 	err = acpi_iort_map_pci_dm_iommuv3(seg, rid, &xref, &sid);
 	if (err)
 		return (NULL);
@@ -350,14 +350,14 @@ dm_iommu_ctx_alloc(device_t dev, struct iommu_domain *iodom, device_t child,
 static void
 dm_iommu_ctx_free(device_t dev, struct iommu_ctx *ioctx)
 {
-	struct dm_iommu_softc *sc;
+	/*struct dm_iommu_softc *sc;*/
 	struct dm_iommu_ctx *ctx;
 
 	IOMMU_ASSERT_LOCKED(ioctx->domain->iommu);
 
 	printf("%s\n", __func__);
 
-	sc = device_get_softc(dev);
+	/*sc = */ device_get_softc(dev);
 	ctx = (struct dm_iommu_ctx *)ioctx;
 
 	//dm_iommu_deinit_l1_entry(sc, ctx->sid);
@@ -489,6 +489,4 @@ static driver_t dm_iommu_driver = {
 	sizeof(struct dm_iommu_softc),
 };
 
-static devclass_t dm_iommu_devclass;
-
-DRIVER_MODULE(dm_iommu, simplebus, dm_iommu_driver, dm_iommu_devclass, 0, 0);
+DRIVER_MODULE(dm_iommu, simplebus, dm_iommu_driver, 0, 0);

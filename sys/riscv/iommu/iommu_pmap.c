@@ -42,6 +42,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/ktr.h>
 #include <sys/mutex.h>
 #include <sys/rwlock.h>
+#include <sys/systm.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -92,7 +93,7 @@ static __inline pd_entry_t *
 pmap_l1(pmap_t pmap, vm_offset_t va)
 {
 
-	return (&pmap->pm_l1[iommu_l1_index(va)]);
+	return (&pmap->pm_top[iommu_l1_index(va)]);
 }
 
 static __inline pd_entry_t *
@@ -193,7 +194,7 @@ iommu_pmap_release(pmap_t pmap)
 	    ("pmap_release: pmap resident count %ld != 0",
 	    pmap->pm_stats.resident_count));
 
-	m = PHYS_TO_VM_PAGE(DMAP_TO_PHYS((vm_offset_t)pmap->pm_l1));
+	m = PHYS_TO_VM_PAGE(DMAP_TO_PHYS((vm_offset_t)pmap->pm_top));
 	vm_page_unwire_noq(m);
 	vm_page_free(m);
 }
@@ -208,15 +209,15 @@ iommu_pmap_pinit(pmap_t pmap)
 	 * allocate the l1 page
 	 */
 	while ((l1pt = vm_page_alloc(NULL, 0xdeadbeef, VM_ALLOC_NORMAL |
-	    VM_ALLOC_NOOBJ | VM_ALLOC_WIRED | VM_ALLOC_ZERO)) == NULL)
+	    VM_ALLOC_WIRED | VM_ALLOC_ZERO)) == NULL)
 		vm_wait(NULL);
 
 	l1phys = VM_PAGE_TO_PHYS(l1pt);
-	pmap->pm_l1 = (pd_entry_t *)PHYS_TO_DMAP(l1phys);
+	pmap->pm_top = (pd_entry_t *)PHYS_TO_DMAP(l1phys);
 	pmap->pm_satp = SATP_MODE_SV39 | (l1phys >> IOMMU_PAGE_SHIFT);
 
 	if ((l1pt->flags & PG_ZERO) == 0)
-		pagezero(pmap->pm_l1);
+		pagezero(pmap->pm_top);
 
 	bzero(&pmap->pm_stats, sizeof(pmap->pm_stats));
 
@@ -251,7 +252,7 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex)
 	/*
 	 * Allocate a page table page.
 	 */
-	if ((m = vm_page_alloc(NULL, ptepindex, VM_ALLOC_NOOBJ |
+	if ((m = vm_page_alloc(NULL, ptepindex, 
 	    VM_ALLOC_WIRED | VM_ALLOC_ZERO)) == NULL) {
 		/*
 		 * Indicate the need to retry.  While waiting, the page table
@@ -273,7 +274,7 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex)
 		vm_pindex_t l1index;
 
 		l1index = ptepindex - NUL1E;
-		l1 = &pmap->pm_l1[l1index];
+		l1 = &pmap->pm_top[l1index];
 
 		pn = (VM_PAGE_TO_PHYS(m) / IOMMU_PAGE_SIZE);
 		entry = (PTE_V);
@@ -284,7 +285,7 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex)
 		pd_entry_t *l1, *l2;
 
 		l1index = ptepindex >> (IOMMU_L1_SHIFT - IOMMU_L2_SHIFT);
-		l1 = &pmap->pm_l1[l1index];
+		l1 = &pmap->pm_top[l1index];
 		if (pmap_load(l1) == 0) {
 			/* recurse for allocating page dir */
 			if (_pmap_alloc_l3(pmap, NUL1E + l1index) == NULL) {
@@ -423,7 +424,7 @@ iommu_pmap_remove_pages(pmap_t pmap)
 
 	for (sva = VM_MINUSER_ADDRESS, i = iommu_l1_index(sva);
 	    (i < IOMMU_Ln_ENTRIES && sva < VM_MAXUSER_ADDRESS); i++) {
-		l1e = pmap->pm_l1[i];
+		l1e = pmap->pm_top[i];
 		if ((l1e & PTE_V) == 0) {
 			sva += IOMMU_L1_SIZE;
 			continue;
@@ -464,7 +465,7 @@ iommu_pmap_remove_pages(pmap_t pmap)
 
 		pmap_resident_count_dec(pmap, 1);
 		vm_page_free(m1);
-		pmap_clear(&pmap->pm_l1[i]);
+		pmap_clear(&pmap->pm_top[i]);
 	}
 
 	KASSERT(pmap->pm_stats.resident_count == 0,

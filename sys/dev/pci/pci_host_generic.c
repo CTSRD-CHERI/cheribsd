@@ -549,7 +549,6 @@ generic_pcie_adjust_resource(device_t dev, device_t child, int type,
 {
 	struct generic_pcie_core_softc *sc;
 	struct rman *rm;
-	int error;
 
 	sc = device_get_softc(dev);
 #if defined(NEW_PCIB) && defined(PCI_RES_BUS)

@@ -139,6 +139,7 @@ dm_release(struct berimgr_softc *sc)
 
 	addr = PHYS_TO_DMAP(0xf8000000);
 	cpu_dcache_wb_range((vm_offset_t)addr, sc->offs);
+	(void) addr;
 
 #if 0
 	/* Start secondary core. */
@@ -185,10 +186,11 @@ static int
 beri_open(struct cdev *dev, int flags __unused,
     int fmt __unused, struct thread *td __unused)
 {
+#if 0
 	struct berimgr_softc *sc;
 
 	sc = dev->si_drv1;
-
+#endif
 	return (0);
 }
 
@@ -196,10 +198,11 @@ static int
 beri_close(struct cdev *dev, int flags __unused,
     int fmt __unused, struct thread *td __unused)
 {
+#if 0
 	struct berimgr_softc *sc;
 
 	sc = dev->si_drv1;
-
+#endif
 	return (0);
 }
 
@@ -319,6 +322,6 @@ static driver_t berimgr_driver = {
 	sizeof(struct berimgr_softc),
 };
 
-static devclass_t berimgr_devclass;
+/* static devclass_t berimgr_devclass; */
 
-DRIVER_MODULE(berimgr, simplebus, berimgr_driver, berimgr_devclass, 0, 0);
+DRIVER_MODULE(berimgr, simplebus, berimgr_driver, 0, 0);
