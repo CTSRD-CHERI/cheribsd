@@ -82,6 +82,8 @@ static StringList* cheri_xpassed_tests;
 /* Shared memory page with child process. */
 struct cheribsdtest_child_state *ccsp;
 
+static const struct cheri_test *running_test;
+
 static int tests_run, tests_skipped;
 static int tests_failed, tests_passed, tests_xfailed, tests_xpassed;
 static int expected_failures;
@@ -366,7 +368,9 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 		}
 
 		/* Run the actual test. */
-		ctp->ct_func(ctp);
+		running_test = ctp;
+		ctp->ct_func();
+		running_test = NULL;
 		exit(0);
 	}
 	close(pipefd_stdin[0]);
@@ -559,13 +563,7 @@ pass:
 		xo_emit("{d:status/%s}: {d:name/%s}\n", "PASS", ctp->ct_name);
 		tests_passed++;
 	}
-	close(pipefd_stdin[1]);
-	close(pipefd_stdout[0]);
-	xo_close_instance("testcase");
-	xo_flush();
-	if (sleep_after_test)
-		sleep(1);
-	return;
+	goto do_return;
 
 fail:
 	/*
@@ -600,6 +598,8 @@ fail:
 		tests_xfailed++;
 		sl_add(cheri_xfailed_tests, failure_message);
 	}
+
+do_return:
 	xo_close_instance("testcase");
 	xo_flush();
 	close(pipefd_stdin[1]);

@@ -145,7 +145,7 @@ extern struct cheribsdtest_child_state *ccsp;
 struct cheri_test {
 	const char	*ct_name;
 	const char	*ct_desc;
-	void		(*ct_func)(const struct cheri_test *);
+	void		(*ct_func)(void);
 	const char *	(*ct_check_skip)(const char *);
 	const char *	(*ct_check_xfail)(const char *);
 	u_int		 ct_flags;
@@ -159,7 +159,7 @@ struct cheri_test {
 };
 
 #define	_CHERIBSDTEST_DECLARE(func, desc, ...)				\
-	static void func(const struct cheri_test *ctp);			\
+	static void func(void);						\
 	static struct cheri_test __CONCAT(__cheri_test, __LINE__) = {	\
 		.ct_name = #func,					\
 		.ct_desc = (desc),					\
@@ -170,7 +170,7 @@ struct cheri_test {
 
 #define	CHERIBSDTEST(func, desc, ...)					\
 	_CHERIBSDTEST_DECLARE(func, (desc), __VA_ARGS__);		\
-	static void func(const struct cheri_test * __unused ctp)
+	static void func(void)
 
 /*
  * Useful APIs for tests.  These terminate the process returning either
