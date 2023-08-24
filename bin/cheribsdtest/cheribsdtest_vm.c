@@ -467,7 +467,7 @@ CHERIBSDTEST(vm_tag_dev_zero_private,
 }
 
 static int
-create_tempfile()
+create_tempfile(void)
 {
 	char template[] = "/tmp/cheribsdtest.XXXXXXXX";
 	int fd = CHERIBSDTEST_CHECK_SYSCALL2(mkstemp(template),
@@ -676,7 +676,7 @@ CHERIBSDTEST(vm_cow_write,
 static int __used sink;
 
 static size_t
-get_unrepresentable_length()
+get_unrepresentable_length(void)
 {
 	int shift = 0;
 	size_t len;
