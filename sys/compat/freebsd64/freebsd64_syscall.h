@@ -524,4 +524,7 @@
 #define	FREEBSD64_SYS_freebsd64_swapoff	582
 #define	FREEBSD64_SYS_kqueuex	583
 #define	FREEBSD64_SYS_membarrier	584
-#define	FREEBSD64_SYS_MAXSYSCALL	585
+#define	FREEBSD64_SYS_timerfd_create	585
+#define	FREEBSD64_SYS_freebsd64_timerfd_gettime	586
+#define	FREEBSD64_SYS_freebsd64_timerfd_settime	587
+#define	FREEBSD64_SYS_MAXSYSCALL	588

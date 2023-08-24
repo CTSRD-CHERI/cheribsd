@@ -429,4 +429,7 @@ MIASM =  \
 	sched_getcpu.o \
 	freebsd64_swapoff.o \
 	kqueuex.o \
-	membarrier.o
+	membarrier.o \
+	timerfd_create.o \
+	freebsd64_timerfd_gettime.o \
+	freebsd64_timerfd_settime.o

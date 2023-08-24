@@ -590,4 +590,7 @@ const char *freebsd64_syscallnames[] = {
 	"freebsd64_swapoff",			/* 582 = freebsd64_swapoff */
 	"kqueuex",			/* 583 = kqueuex */
 	"membarrier",			/* 584 = membarrier */
+	"timerfd_create",			/* 585 = timerfd_create */
+	"freebsd64_timerfd_gettime",			/* 586 = freebsd64_timerfd_gettime */
+	"freebsd64_timerfd_settime",			/* 587 = freebsd64_timerfd_settime */
 };

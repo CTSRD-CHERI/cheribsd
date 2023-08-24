@@ -529,6 +529,11 @@ int	kern_thr_new(struct thread *td, struct thr_param *param);
 int	kern_thr_set_name(struct thread *td, lwpid_t id,
 	    const char * __capability uname);
 int	kern_thr_suspend(struct thread *td, struct timespec *tsp);
+int	kern_timerfd_create(struct thread *td, int clockid, int flags);
+int	kern_timerfd_gettime(struct thread *td, int fd,
+	    struct itimerspec *curr_value);
+int	kern_timerfd_settime(struct thread *td, int fd, int flags,
+	    const struct itimerspec *new_value, struct itimerspec *old_value);
 int	kern_truncate(struct thread *td, const char * __capability path,
 	    enum uio_seg pathseg, off_t length);
 int	kern_undelete(struct thread *td, const char * __capability path,

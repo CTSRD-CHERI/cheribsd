@@ -1520,6 +1520,16 @@ struct freebsd64_swapoff_args {
 	char name_l_[PADL_(const char *)]; const char * name; char name_r_[PADR_(const char *)];
 	char flags_l_[PADL_(u_int)]; u_int flags; char flags_r_[PADR_(u_int)];
 };
+struct freebsd64_timerfd_gettime_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char curr_value_l_[PADL_(struct itimerspec *)]; struct itimerspec * curr_value; char curr_value_r_[PADR_(struct itimerspec *)];
+};
+struct freebsd64_timerfd_settime_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char new_value_l_[PADL_(const struct itimerspec *)]; const struct itimerspec * new_value; char new_value_r_[PADR_(const struct itimerspec *)];
+	char old_value_l_[PADL_(struct itimerspec *)]; struct itimerspec * old_value; char old_value_r_[PADR_(struct itimerspec *)];
+};
 int	freebsd64_read(struct thread *, struct freebsd64_read_args *);
 int	freebsd64_write(struct thread *, struct freebsd64_write_args *);
 int	freebsd64_open(struct thread *, struct freebsd64_open_args *);
@@ -1826,6 +1836,8 @@ int	freebsd64_aio_writev(struct thread *, struct freebsd64_aio_writev_args *);
 int	freebsd64_aio_readv(struct thread *, struct freebsd64_aio_readv_args *);
 int	freebsd64_fspacectl(struct thread *, struct freebsd64_fspacectl_args *);
 int	freebsd64_swapoff(struct thread *, struct freebsd64_swapoff_args *);
+int	freebsd64_timerfd_gettime(struct thread *, struct freebsd64_timerfd_gettime_args *);
+int	freebsd64_timerfd_settime(struct thread *, struct freebsd64_timerfd_settime_args *);
 
 #ifdef COMPAT_43
 
@@ -2393,6 +2405,8 @@ int	freebsd13_freebsd64_swapoff(struct thread *, struct freebsd13_freebsd64_swap
 #define	FREEBSD64_SYS_AUE_freebsd64_aio_readv	AUE_AIO_READV
 #define	FREEBSD64_SYS_AUE_freebsd64_fspacectl	AUE_FSPACECTL
 #define	FREEBSD64_SYS_AUE_freebsd64_swapoff	AUE_SWAPOFF
+#define	FREEBSD64_SYS_AUE_freebsd64_timerfd_gettime	AUE_TIMERFD
+#define	FREEBSD64_SYS_AUE_freebsd64_timerfd_settime	AUE_TIMERFD
 
 #undef PAD_
 #undef PADL_

@@ -411,6 +411,9 @@ static int sysargmask[] = {
 	[SYS_swapoff] = (0x0 | 0x1),
 	[SYS_kqueuex] = (0x0),
 	[SYS_membarrier] = (0x0),
+	[SYS_timerfd_create] = (0x0),
+	[SYS_timerfd_gettime] = (0x0 | 0x2),
+	[SYS_timerfd_settime] = (0x0 | 0x4 | 0x8),
 };
 
 #endif /* !_SYSARGMAP_H_ */
