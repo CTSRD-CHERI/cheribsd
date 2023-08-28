@@ -1926,7 +1926,6 @@ struct pfioc_iface {
 #define DIOCGETRULE	_IOWR('D',  7, struct pfioc_rule)
 #define DIOCGETRULENV	_IOWR('D',  7, struct pfioc_nv)
 /* XXX cut 8 - 17 */
-#define DIOCCLRSTATES	_IOWR('D', 18, struct pfioc_state_kill)
 #define DIOCCLRSTATESNV	_IOWR('D', 18, struct pfioc_nv)
 #define DIOCGETSTATE	_IOWR('D', 19, struct pfioc_state)
 #define DIOCGETSTATENV	_IOWR('D', 19, struct pfioc_nv)
@@ -1945,7 +1944,6 @@ struct pfioc_iface {
 #define DIOCCLRRULECTRS	_IO  ('D', 38)
 #define DIOCGETLIMIT	_IOWR('D', 39, struct pfioc_limit)
 #define DIOCSETLIMIT	_IOWR('D', 40, struct pfioc_limit)
-#define DIOCKILLSTATES	_IOWR('D', 41, struct pfioc_state_kill)
 #define DIOCKILLSTATESNV	_IOWR('D', 41, struct pfioc_nv)
 #define DIOCSTARTALTQ	_IO  ('D', 42)
 #define DIOCSTOPALTQ	_IO  ('D', 43)
