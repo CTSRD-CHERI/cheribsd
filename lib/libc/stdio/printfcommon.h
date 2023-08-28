@@ -209,6 +209,13 @@ __ultoa(u_long val, CHAR *endp, int base, int octzero, const char *xdigs)
 		} while (sval != 0);
 		break;
 
+	case 2:
+		do {
+			*--cp = to_char(val & 1);
+			val >>= 1;
+		} while (val);
+		break;
+
 	case 8:
 		do {
 			*--cp = to_char(val & 7);
@@ -257,6 +264,13 @@ __ujtoa(uintmax_t val, CHAR *endp, int base, int octzero, const char *xdigs)
 			*--cp = to_char(sval % 10);
 			sval /= 10;
 		} while (sval != 0);
+		break;
+
+	case 2:
+		do {
+			*--cp = to_char(val & 1);
+			val >>= 1;
+		} while (val);
 		break;
 
 	case 8:
