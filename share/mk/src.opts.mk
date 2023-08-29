@@ -238,7 +238,7 @@ __SINGLE_OPTIONS = \
 	LIBC_MALLOC
 
 __LIBC_MALLOC_OPTIONS=	jemalloc snmalloc
-__LIBC_MALLOC_DEFAULT=	jemalloc
+__LIBC_MALLOC_DEFAULT=	snmalloc
 
 # MK_*_SUPPORT options which default to "yes" unless their corresponding
 # MK_* variable is set to "no".
