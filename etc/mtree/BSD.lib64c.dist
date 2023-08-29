@@ -10,7 +10,7 @@
         ..
         dtrace
         ..
-        engines
+        engines-3
         ..
         geom
         ..
@@ -19,6 +19,8 @@
         libxo
             encoder
             ..
+        ..
+        ossl-modules
         ..
         pkgconfig
         ..
