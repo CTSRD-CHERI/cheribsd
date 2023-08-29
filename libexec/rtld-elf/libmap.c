@@ -103,7 +103,7 @@ lmc_parse_file(const char *path)
 	char *lm_map;
 	struct stat st;
 	ssize_t retval;
-	int fd, saved_errno;
+	int fd, saved_errno __unused;
 
 	TAILQ_FOREACH(p, &lmc_head, next) {
 		if (strcmp(p->path, path) == 0)
