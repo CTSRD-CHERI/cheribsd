@@ -778,12 +778,7 @@ tda19988_bridge_mode_set(struct drm_bridge *bridge,
 		vs2_line_end = vs2_line_start + (mode->vsync_end - mode->vsync_start)/2;
 	}
 
-	div = 148500 / mode->crtc_clock;
-	if (div != 0) {
-		div--;
-		if (div > 3)
-			div = 3;
-	}
+	div = imin(imax(fls(160000 / (mode->crtc_clock + 1)) - 1, 0), 3);
 
 	/* set HDMI HDCP mode off */
 	tda19988_reg_set(sc, TDA_TBG_CNTRL_1, TBG_CNTRL_1_DWIN_DIS);
