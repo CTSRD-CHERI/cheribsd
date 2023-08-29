@@ -79,7 +79,10 @@ _pthread_create(pthread_t * __restrict thread,
 	struct rtprio rtp;
 	sigset_t set, oset;
 	cpuset_t *cpusetp;
-	int i, cpusetsize, create_suspended, locked, old_stack_prot, ret;
+	int i, cpusetsize, create_suspended, locked, ret;
+#ifndef __CHERI_PURE_CAPABILITY__
+	int old_stack_prot;
+#endif
 
 	cpusetp = NULL;
 	ret = cpusetsize = 0;
@@ -122,7 +125,9 @@ _pthread_create(pthread_t * __restrict thread,
 
 	new_thread->tid = TID_TERMINATED;
 
+#ifndef __CHERI_PURE_CAPABILITY__
 	old_stack_prot = _rtld_get_stack_prot();
+#endif
 	if (create_stack(&new_thread->attr) != 0) {
 		/* Insufficient memory to create a stack: */
 		_thr_free(curthread, new_thread);
