@@ -108,8 +108,10 @@ __FBSDID("$FreeBSD$");
 #define	TDA_REFLINE_LSB		MKREG(0x00, 0xa4)
 #define	TDA_NPIX_MSB		MKREG(0x00, 0xa5)
 #define	TDA_NPIX_LSB		MKREG(0x00, 0xa6)
+#define		NPIX_MAX	((1 << 13) - 1)
 #define	TDA_NLINE_MSB		MKREG(0x00, 0xa7)
 #define	TDA_NLINE_LSB		MKREG(0x00, 0xa8)
+#define		NLINE_MAX	((1 << 11) - 1)
 #define	TDA_VS_LINE_STRT_1_MSB	MKREG(0x00, 0xa9)
 #define	TDA_VS_LINE_STRT_1_LSB	MKREG(0x00, 0xaa)
 #define	TDA_VS_PIX_STRT_1_MSB	MKREG(0x00, 0xab)
@@ -841,6 +843,20 @@ static enum drm_mode_status
 tda19988_bridge_mode_valid(struct drm_bridge *bridge,
     const struct drm_display_mode *mode)
 {
+	struct tda19988_softc *sc;
+	int clock_max;
+
+	sc = container_of(bridge, struct tda19988_softc, bridge);
+
+	clock_max = sc->sc_version == TDA19988 ? 165000 : 150000;
+	if (mode->clock > clock_max)
+		return (MODE_CLOCK_HIGH);
+
+	if (mode->htotal > NPIX_MAX)
+		return (MODE_BAD_HVALUE);
+
+	if (mode->vtotal > NLINE_MAX)
+		return (MODE_BAD_VVALUE);
 
 	return (MODE_OK);
 }
