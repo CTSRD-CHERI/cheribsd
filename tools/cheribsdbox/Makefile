@@ -14,7 +14,7 @@ BINDIR?=${CHERIBSDBOX_DIR}
 CRUNCH_OBJTOP?=		${OBJTOP}
 CRUNCH_BUILDOPTS+=	-DWITHOUT_TESTS MK_TESTS=no -D_CRUNCHGEN
 # Avoid linking against libcasper for tcpdump/traceroute/kdump:
-CRUNCH_BUILDOPTS+=	-DWITHOUT_CASPER MK_CASPER=no
+CRUNCH_BUILDOPTS+=	MK_CASPER=no
 # Try to reduce size by avoiding locale support
 CRUNCH_BUILDOPTS+=	-DWITHOUT_LOCALES MK_LOCALES=no
 # Disable kerberos support
