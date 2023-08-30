@@ -46,6 +46,8 @@
 #include <netlink/netlink.h>
 #include <netlink/netlink_bitset.h>
 
+#include <cheri/cheric.h>
+
 #define _roundup2(x, y)         (((x)+((y)-1))&(~((y)-1)))
 
 #define NETLINK_ALIGN_SIZE      sizeof(uint32_t)
@@ -100,11 +102,16 @@ static inline char *
 lb_allocz(struct linear_buffer *lb, int len)
 {
 	len = roundup2(len, alignof(__max_align_t));
-	if (lb->offset + len > lb->size)
+	len = CHERI_REPRESENTABLE_LENGTH(len);
+	char *data = CHERI_REPRESENTABLE_ALIGN_UP(lb->base + lb->offset, len);
+	if (data + len > lb->base + lb->size)
 		return (NULL);
-	void *data = (void *)(lb->base + lb->offset);
-	lb->offset += len;
+	lb->offset = (data + len) - lb->base;
+#ifdef __CHERI_PURE_CAPABILITY__
+	return (cheri_setboundsexact(data, len));
+#else
 	return (data);
+#endif
 }
 
 static inline void
@@ -194,7 +201,8 @@ snl_allocz(struct snl_state *ss, int len)
 	if (data == NULL) {
 		uint32_t size = ss->lb->size * 2;
 
-		while (size < len + sizeof(struct linear_buffer))
+		while (size < CHERI_REPRESENTABLE_LENGTH(len) +
+		    sizeof(struct linear_buffer))
 			size *= 2;
 
 		struct linear_buffer *lb = lb_init(size);
