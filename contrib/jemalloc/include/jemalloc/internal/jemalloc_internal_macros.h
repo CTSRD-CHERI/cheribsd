@@ -115,10 +115,14 @@ JEMALLOC_DIAGNOSTIC_DISABLE_SPURIOUS
 #define	BOUND_PTR(ptr, size)	(ptr)
 #define	ROUND_SIZE(size)		(size)
 #else
-#define	BOUND_PTR(ptr, size)						\
-    ((ptr == NULL) ? NULL :						\
-	 cheri_andperm(cheri_setboundsexact((ptr), (size)),		\
-	     CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_SW_VMEM))
+#define	BOUND_PTR(ptr, size) ({						\
+	typeof(ptr) _ptr = (ptr);					\
+	size_t _size = (size);						\
+	(_ptr == NULL ? NULL :						\
+	 cheri_andperm(cheri_setboundsexact(_ptr,			\
+	     _size == 0 ? 1 : _size),					\
+	     CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_SW_VMEM));		\
+})
 
 /*
  * XXX-BD: In theory this poses an overflow risk.  Its overflow
