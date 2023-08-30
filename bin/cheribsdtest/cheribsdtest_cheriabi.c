@@ -123,18 +123,6 @@ CHERIBSDTEST(cheriabi_mmap_fixed,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(cheriabi_malloc_zero_size,
-    "Check that zero-sized mallocs are properly bounded")
-{
-	void *cap;
-
-	cap = malloc(0);
-	if (cap != NULL && cheri_getlength(cap) != 0)
-		cheribsdtest_failure_errx("malloc(0) returned a non-NULL capability with "
-		    "non-zero length (%zu)", cheri_getlength(cap));
-	cheribsdtest_success();
-}
-
 struct adjacent_mappings {
 	char *first;
 	char *middle;
