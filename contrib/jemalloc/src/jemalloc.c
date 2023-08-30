@@ -2366,9 +2366,6 @@ JEMALLOC_EXPORT JEMALLOC_ALLOCATOR JEMALLOC_RESTRICT_RETURN
 void JEMALLOC_NOTHROW *
 JEMALLOC_ATTR(malloc) JEMALLOC_ALLOC_SIZE(1)
 je_malloc(size_t size) {
-#ifdef __CHERI_PURE_CAPABILITY__
-	bool zero_size = (size == 0);
-#endif
 	LOG("core.malloc.entry", "size: %zu", size);
 
 	if (tsd_get_allocates() && unlikely(!malloc_initialized())) {
@@ -2431,7 +2428,7 @@ je_malloc(size_t size) {
 		LOG("core.malloc.exit", "result: %p", ret);
 
 		/* Fastpath success */
-		return BOUND_PTR(ret, zero_size ? 0 : size);
+		return BOUND_PTR(ret, size);
 	}
 
 	return malloc_default(size);

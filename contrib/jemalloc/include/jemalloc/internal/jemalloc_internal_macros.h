@@ -119,7 +119,8 @@ JEMALLOC_DIAGNOSTIC_DISABLE_SPURIOUS
 	typeof(ptr) _ptr = (ptr);					\
 	size_t _size = (size);						\
 	(_ptr == NULL ? NULL :						\
-	 cheri_andperm(cheri_setboundsexact(_ptr, _size),		\
+	 cheri_andperm(cheri_setboundsexact(_ptr,			\
+	     _size == 0 ? 1 : _size),					\
 	     CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_SW_VMEM));	\
 })
 
