@@ -151,12 +151,12 @@ int	vm_get_desc(struct vcpu *vcpu, int reg,
 		    uint64_t *base, uint32_t *limit, uint32_t *access);
 int	vm_get_seg_desc(struct vcpu *vcpu, int reg, struct seg_desc *seg_desc);
 #endif
-int	vm_set_register(struct vcpu *vcpu, int reg, uint64_t val);
-int	vm_get_register(struct vcpu *vcpu, int reg, uint64_t *retval);
+int	vm_set_register(struct vcpu *vcpu, int reg, uintcap_t val);
+int	vm_get_register(struct vcpu *vcpu, int reg, uintcap_t *retval);
 int	vm_set_register_set(struct vcpu *vcpu, unsigned int count,
-    const int *regnums, uint64_t *regvals);
+    const int *regnums, uintcap_t *regvals);
 int	vm_get_register_set(struct vcpu *vcpu, unsigned int count,
-    const int *regnums, uint64_t *regvals);
+    const int *regnums, uintcap_t *regvals);
 int	vm_run(struct vcpu *vcpu, struct vm_run *vmrun);
 int	vm_suspend(struct vmctx *ctx, enum vm_suspend_how how);
 int	vm_reinit(struct vmctx *ctx);
