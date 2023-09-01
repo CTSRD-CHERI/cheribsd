@@ -192,16 +192,19 @@ create_test_memory_acc(dcd_tree_handle_t handle, struct trace_context *tc)
 	ocsd_vaddr_t address;
 	uint8_t *p_mem_buffer;
 	uint32_t mem_length;
+#ifdef HWT_CORESIGHT_DEBUG
 	uint64_t *t;
+#endif
 	int ret;
 
 	dprintf("%s\n", __func__);
 
 	address = (ocsd_vaddr_t)tc->base;
 
+#ifdef HWT_CORESIGHT_DEBUG
 	t = (uint64_t *)tc->base;
-
-	dprintf("%lx %lx %lx %lx\n", t[0], t[1], t[2], t[3]);
+	printf("%lx %lx %lx %lx\n", t[0], t[1], t[2], t[3]);
+#endif
 
 	p_mem_buffer = (uint8_t *)tc->base;
 	mem_length = tc->bufsize;
