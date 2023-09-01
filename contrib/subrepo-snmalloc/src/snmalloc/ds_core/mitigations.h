@@ -244,6 +244,7 @@ namespace snmalloc
      * PROT_NONE sheds capability load and store permissions (while restoring
      * data read/write, for added excitement).  For the moment, just force this
      * down on CHERI.
+     * https://github.com/CTSRD-CHERI/cheribsd/issues/1818
      */
     full_checks + cheri_checks + clear_meta - freelist_forward_edge -
       pal_enforce_access :
@@ -251,6 +252,11 @@ namespace snmalloc
       * clear_meta is important on CHERI to avoid leaking capabilities.
       */
      sanity_checks + cheri_checks + clear_meta;
+#elif __has_feature(capabilities)
+    /**
+     * Hybrid CheriBSD also suffers from the above round-tripping bug.
+     */
+    CHECK_CLIENT ? full_checks - pal_enforce_access : no_checks;
 #else
     CHECK_CLIENT ? full_checks : no_checks;
 #endif
