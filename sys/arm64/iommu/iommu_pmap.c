@@ -597,7 +597,12 @@ pmap_gpu_enter(struct smmu_pmap *pmap, vm_offset_t va, vm_paddr_t pa,
 	KASSERT((va & PAGE_MASK) == 0, ("va is misaligned"));
 	KASSERT((pa & PAGE_MASK) == 0, ("pa is misaligned"));
 
-	new_l3 = (pt_entry_t)(pa | ATTR_SH(ATTR_SH_IS) | IOMMU_L3_BLOCK);
+	/*
+	 * A Mali GPU's Inner Shareable shareability domain is just the GPU
+	 * itself, so we need Outer Shareable to be coherent with the rest of
+	 * the system.
+	 */
+	new_l3 = (pt_entry_t)(pa | ATTR_SH(ATTR_SH_OS) | IOMMU_L3_BLOCK);
 
 	if ((prot & VM_PROT_WRITE) != 0)
 		new_l3 |= ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE);
