@@ -104,6 +104,10 @@ struct linker_file {
     caddr_t		exidx_addr;	/* Unwind data index table start */
     size_t		exidx_size;	/* Unwind data index table size */
 #endif
+
+#ifdef KPF_LOOKASIDE_TABLE
+    TAILQ_ENTRY(linker_file) kpf_link;  /* Linked modules with KPF tables */
+#endif
 };
 
 /*
@@ -147,6 +151,22 @@ int linker_release_module(const char *_modname, struct mod_depend *_verinfo,
  * returned by the last predicate function.
  */
 int linker_file_foreach(linker_predicate_t *_predicate, void *_context);
+
+#ifdef KPF_LOOKASIDE_TABLE
+/*
+ * Kernel Page Fault lookaside linker set entry.
+ * The layout of this structure is known to assembler in the MD code.
+ */
+struct kpf_lookaside_entry {
+	vm_offset_t epc;
+	size_t selector;
+};
+/*
+ * Iterate over all currently loaded linker files with KPF tables.  See
+ * linker_file_foreach
+ */
+int linker_kpf_lookup(vm_offset_t query, size_t *result);
+#endif
 
 /*
  * Lookup a symbol in a file.  If deps is TRUE, look in dependencies

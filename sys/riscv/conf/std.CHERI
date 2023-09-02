@@ -4,3 +4,6 @@ options 	COMPAT_FREEBSD64
 
 # DTrace doesn't work with CHERI yet
 nooptions 	KDTRACE_HOOKS		# Kernel DTrace hooks
+
+options		KPF_LOOKASIDE_TABLE
+options		FSU_CHERI_AS_USER
