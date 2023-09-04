@@ -1263,7 +1263,8 @@ exec_map_stack(struct image_params *imgp)
 		stack_top = sv->sv_usrstack;
 #if __has_feature(capabilities)
 		if (sv->sv_flags & SV_CHERI)
-			stack_top = CHERI_REPRESENTABLE_BASE(stack_top, ssiz);
+			stack_top = CHERI_REPRESENTABLE_ALIGN_DOWN(stack_top,
+			    ssiz);
 #endif
 		stack_addr = stack_top - ssiz;
 		find_space = VMFS_NO_SPACE;
@@ -1315,7 +1316,7 @@ exec_map_stack(struct image_params *imgp)
 		 */
 		strings_size = CHERI_REPRESENTABLE_LENGTH(ARG_MAX + PAGE_SIZE);
 		strings_addr =
-		    CHERI_REPRESENTABLE_BASE(stack_addr - strings_size,
+		    CHERI_REPRESENTABLE_ALIGN_DOWN(stack_addr - strings_size,
 			strings_size);
 		error = vm_mmap_object(map, &strings_addr, 0, strings_size,
 		    VM_PROT_RW_CAP, VM_PROT_RW_CAP, MAP_ANON | MAP_FIXED |

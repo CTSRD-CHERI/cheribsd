@@ -73,7 +73,8 @@ cheri_exec_pcc(struct thread *td, struct image_params *imgp)
 
 	code_length = code_end - code_start;
 	/* Check that imgact_elf enforced capability representability. */
-	MPASS(code_start == CHERI_REPRESENTABLE_BASE(code_start, code_length));
+	MPASS(code_start == CHERI_REPRESENTABLE_ALIGN_DOWN(code_start,
+	    code_length));
 	MPASS(code_length == CHERI_REPRESENTABLE_LENGTH(code_length));
 	KASSERT(code_start < code_end, ("%s: truncated PCC", __func__));
 	return (cheri_capability_build_user_code(td, CHERI_CAP_USER_CODE_PERMS,
