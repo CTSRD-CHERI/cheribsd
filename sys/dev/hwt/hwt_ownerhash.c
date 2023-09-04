@@ -122,7 +122,7 @@ hwt_ownerhash_load(void)
 
 	hwt_ownerhash = hashinit(HWT_OWNERHASH_SIZE, M_HWT_OWNERHASH,
 	    &hwt_ownerhashmask);
-        mtx_init(&hwt_ownerhash_mtx, "hwt-owner-hash", "hwt-owner", MTX_SPIN);
+        mtx_init(&hwt_ownerhash_mtx, "hwt-owner-hash", "hwt-owner", MTX_DEF);
 }
 
 void
