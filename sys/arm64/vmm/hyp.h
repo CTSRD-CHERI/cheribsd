@@ -71,6 +71,9 @@
 #define	HYP_VM_MIN_ADDRESS	0x0000000000000000
 #define	HYP_VM_MAX_ADDRESS	0x0001000000000000
 
+#define	HYP_GPA_MIN_ADDRESS	0x0000000000000000
+#define	HYP_GPA_MAX_ADDRESS	(1ul << 39)
+
 /*
  * When the vmm code is installed the following handles can be used by
  * the host to call into EL2.
