@@ -1364,13 +1364,13 @@ vgic_register_write(struct hypctx *hypctx, struct vgic_register *reg_list,
 }
 
 static int
-dist_read(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t *rval,
+dist_read(struct vcpu *vcpu, uint64_t fault_ipa, uintcap_t *rval,
     int size, void *arg)
 {
 	struct hyp *hyp;
 	struct hypctx *hypctx;
 	struct vgic_v3 *vgic;
-	uint64_t reg;
+	uint64_t reg, rval64;
 
 	hypctx = vcpu_get_cookie(vcpu);
 	hyp = hypctx->hyp;
@@ -1387,8 +1387,10 @@ dist_read(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t *rval,
 		return (EINVAL);
 
 	if (vgic_register_read(hypctx, dist_registers, nitems(dist_registers),
-	    reg, size, rval, NULL))
+	    reg, size, &rval64, NULL)) {
+		*rval = rval64;
 		return (0);
+	}
 
 	/* Reserved register addresses are RES0 so we can hardware it to 0 */
 	*rval = 0;
@@ -1397,7 +1399,7 @@ dist_read(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t *rval,
 }
 
 static int
-dist_write(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t wval,
+dist_write(struct vcpu *vcpu, uint64_t fault_ipa, uintcap_t wval,
     int size, void *arg)
 {
 	struct hyp *hyp;
@@ -1572,13 +1574,13 @@ redist_icfgr1_write(struct hypctx *hypctx, u_int reg, u_int offset, u_int size,
 }
 
 static int
-redist_read(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t *rval,
+redist_read(struct vcpu *vcpu, uint64_t fault_ipa, uintcap_t *rval,
     int size, void *arg)
 {
 	struct hyp *hyp;
 	struct hypctx *hypctx;
 	struct vgic_v3 *vgic;
-	uint64_t reg;
+	uint64_t reg, rval64;
 
 	hypctx = vcpu_get_cookie(vcpu);
 	hyp = hypctx->hyp;
@@ -1597,13 +1599,17 @@ redist_read(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t *rval,
 
 	if (reg < GICR_RD_BASE_SIZE) {
 		if (vgic_register_read(hypctx, redist_rd_registers,
-		    nitems(redist_rd_registers), reg, size, rval, NULL))
+		    nitems(redist_rd_registers), reg, size, &rval64, NULL)) {
+			*rval = rval64;
 			return (0);
+		}
 	} else if (reg < (GICR_SGI_BASE + GICR_SGI_BASE_SIZE)) {
 		if (vgic_register_read(hypctx, redist_sgi_registers,
 		    nitems(redist_sgi_registers), reg - GICR_SGI_BASE, size,
-		    rval, NULL))
+		    &rval64, NULL)) {
+			*rval = rval64;
 			return (0);
+		}
 	}
 
 	/* Reserved register addresses are RES0 so we can hardware it to 0 */
@@ -1612,7 +1618,7 @@ redist_read(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t *rval,
 }
 
 static int
-redist_write(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t wval,
+redist_write(struct vcpu *vcpu, uint64_t fault_ipa, uintcap_t wval,
     int size, void *arg)
 {
 	struct hyp *hyp;
@@ -1651,7 +1657,7 @@ redist_write(struct vcpu *vcpu, uint64_t fault_ipa, uint64_t wval,
 }
 
 static int
-vgic_v3_icc_sgi1r_read(struct vcpu *vcpu, uint64_t *rval, void *arg)
+vgic_v3_icc_sgi1r_read(struct vcpu *vcpu, uintcap_t *rval, void *arg)
 {
 	/*
 	 * TODO: Inject an unknown exception.
@@ -1661,7 +1667,7 @@ vgic_v3_icc_sgi1r_read(struct vcpu *vcpu, uint64_t *rval, void *arg)
 }
 
 static int
-vgic_v3_icc_sgi1r_write(struct vcpu *vcpu, uint64_t rval, void *arg)
+vgic_v3_icc_sgi1r_write(struct vcpu *vcpu, uintcap_t rval, void *arg)
 {
 	struct vm *vm;
 	struct hyp *hyp;

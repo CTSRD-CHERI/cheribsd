@@ -31,15 +31,15 @@
  * Callback functions to read and write memory regions.
  */
 typedef int (*mem_region_read_t)(struct vcpu *vcpu, uint64_t gpa,
-				 uint64_t *rval, int rsize, void *arg);
+				 uintcap_t *rval, int rsize, void *arg);
 typedef int (*mem_region_write_t)(struct vcpu *vcpu, uint64_t gpa,
-				  uint64_t wval, int wsize, void *arg);
+				  uintcap_t wval, int wsize, void *arg);
 
 /*
  * Callback functions to read and write registers.
  */
-typedef int (*reg_read_t)(struct vcpu *vcpu, uint64_t *rval, void *arg);
-typedef int (*reg_write_t)(struct vcpu *vcpu, uint64_t wval, void *arg);
+typedef int (*reg_read_t)(struct vcpu *vcpu, uintcap_t *rval, void *arg);
+typedef int (*reg_write_t)(struct vcpu *vcpu, uintcap_t wval, void *arg);
 
 /*
  * Emulate the decoded 'vie' instruction when it contains a memory operation.

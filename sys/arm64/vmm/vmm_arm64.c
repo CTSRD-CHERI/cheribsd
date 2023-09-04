@@ -1250,7 +1250,7 @@ vmmops_cleanup(void *vmi)
  * Return register value. Registers have different sizes and an explicit cast
  * must be made to ensure proper conversion.
  */
-static uint64_t *
+static void *
 hypctx_regptr(struct hypctx *hypctx, int reg)
 {
 	switch (reg) {
@@ -1281,9 +1281,9 @@ hypctx_regptr(struct hypctx *hypctx, int reg)
 }
 
 int
-vmmops_getreg(void *vcpui, int reg, uint64_t *retval)
+vmmops_getreg(void *vcpui, int reg, uintcap_t *retval)
 {
-	uint64_t *regp;
+	void *regp;
 	int running, hostcpu;
 	struct hypctx *hypctx = vcpui;
 
@@ -1295,15 +1295,24 @@ vmmops_getreg(void *vcpui, int reg, uint64_t *retval)
 	regp = hypctx_regptr(hypctx, reg);
 	if (regp == NULL)
 		return (EINVAL);
-
-	*retval = *regp;
+	switch (reg) {
+	case VM_REG_GUEST_PC:
+	case VM_REG_GUEST_LR:
+	case VM_REG_GUEST_SP:
+	case VM_REG_GUEST_X0 ... VM_REG_GUEST_X29:
+		*retval = *(uintcap_t *)regp;
+		break;
+	default:
+		*retval = *(uint64_t *)regp;
+		break;
+	}
 	return (0);
 }
 
 int
-vmmops_setreg(void *vcpui, int reg, uint64_t val)
+vmmops_setreg(void *vcpui, int reg, uintcap_t val)
 {
-	uint64_t *regp;
+	void *regp;
 	struct hypctx *hypctx = vcpui;
 	int running, hostcpu;
 
@@ -1315,8 +1324,9 @@ vmmops_setreg(void *vcpui, int reg, uint64_t val)
 	regp = hypctx_regptr(hypctx, reg);
 	if (regp == NULL)
 		return (EINVAL);
+	switch (reg) {
+	case VM_REG_GUEST_PC:
 #ifdef __CHERI_PURE_CAPABILITY__
-	if (reg == VM_REG_ELR_EL2) {
 		/*
 		 * This register is set by bhyve when booting and
 		 * starting secondary vCPUs.  Userspace does not hold a
@@ -1325,9 +1335,18 @@ vmmops_setreg(void *vcpui, int reg, uint64_t val)
 		 */
 		*(uintcap_t *)regp = (uintcap_t)
 		    cheri_setaddress(kernel_root_cap, val);
-	} else
+		break;
 #endif
-		*regp = val;
+	case VM_REG_GUEST_LR:
+	case VM_REG_GUEST_SP:
+	case VM_REG_GUEST_X0 ... VM_REG_GUEST_X29:
+		*(uintcap_t *)regp = val;
+		break;
+	default:
+		*(uint64_t *)regp = (uint64_t)val;
+		break;
+	}
+
 	return (0);
 }
 
