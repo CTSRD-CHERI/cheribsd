@@ -608,8 +608,7 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 	 * executable. For RTLD we also align upwards to avoid aligning
 	 * down into the memory region for the main binary.
 	 */
-	reservation = roundup2(reservation,
-	    CHERI_REPRESENTABLE_ALIGNMENT(end - start));
+	reservation = CHERI_REPRESENTABLE_ALIGN_UP(reservation, end - start);
 #endif
 	result = vm_map_reservation_create(map, &reservation, end - start,
 	    PAGE_SIZE, VM_PROT_ALL);
