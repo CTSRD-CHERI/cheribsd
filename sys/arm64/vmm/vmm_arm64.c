@@ -531,7 +531,7 @@ el2_hypctx_size(void)
 	return (round_page(sizeof(struct hypctx)));
 }
 
-static vm_offset_t
+static vm_pointer_t
 el2_map_enter(vm_offset_t data, vm_size_t size, vm_prot_t prot)
 {
 	vmem_addr_t addr;
