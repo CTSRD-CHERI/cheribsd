@@ -450,9 +450,8 @@ fake_preload_metadata(struct riscv_bootparams *rvbp)
 	dtb_size = fdt_totalsize(rvbp->dtbp_virt);
 #ifdef __CHERI_PURE_CAPABILITY__
 	lastaddr = roundup2(lastaddr, CHERI_REPRESENTABLE_ALIGNMENT(dtb_size));
-#else
-	lastaddr = roundup(lastaddr, sizeof(int));
 #endif
+	lastaddr = roundup(lastaddr, sizeof(int));
 	PRELOAD_PUSH_VALUE(uint32_t, MODINFO_METADATA | MODINFOMD_DTBP);
 	PRELOAD_PUSH_VALUE(uint32_t, sizeof(vm_offset_t));
 	PRELOAD_PUSH_VALUE(vm_offset_t, lastaddr);
