@@ -295,7 +295,8 @@ vmmops_modinit(int ipinum)
 	 * EL2 code is identity-mapped; the allocator is used to find space for
 	 * VM structures.
 	 */
-	el2_mem_alloc = vmem_create("VMM EL2", 0, 0, PAGE_SIZE, 0, M_WAITOK);
+	el2_mem_alloc = vmem_create("VMM EL2", 0, 0, PAGE_SIZE, 0, M_WAITOK,
+	    VMEM_CAPABILITY_ARENA);
 
 	/* Create the mappings for the hypervisor translation table. */
 	hyp_code_len = round_page(&vmm_hyp_code_end - &vmm_hyp_code);
