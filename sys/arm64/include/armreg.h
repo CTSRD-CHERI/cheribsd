@@ -182,7 +182,7 @@
 #define	CCTLR_PERMVCT_MASK	(0x1 << 6) /* Permit access to CNTVCT w/o System */
 #define	CCTLR_ADRDPB_MASK	(0x1 << 4) /* ADRPD base selection */
 #define	CCTLR_PCCBO_MASK	(0x1 << 3) /* PCC base offset enable */
-#define	CCTLR_DDCBO_MASK	(0x1 << 2) /* PCC base offset enable */
+#define	CCTLR_DDCBO_MASK	(0x1 << 2) /* DCC base offset enable */
 /*
  * CCTLR_EL1/2 - Capability Control Register
  * The rest of the fields mirror CCTLR_EL0
