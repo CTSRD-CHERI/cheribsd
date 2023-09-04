@@ -2130,7 +2130,7 @@ vgic_v3_init(device_t dev)
 	uint64_t ich_vtr_el2;
 	uint32_t pribits, prebits;
 
-	ich_vtr_el2 = vmm_call_hyp(HYP_READ_REGISTER, HYP_REG_ICH_VTR);
+	ich_vtr_el2 = vmm_call_hyp1(HYP_READ_REGISTER, HYP_REG_ICH_VTR);
 
 	/* TODO: These fields are common with the vgicv2 driver */
 	pribits = ICH_VTR_EL2_PRIBITS(ich_vtr_el2);

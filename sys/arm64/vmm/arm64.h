@@ -168,7 +168,14 @@ DEFINE_VMMOPS_IFUNC(int, restore_tsc, (void *vcpui, uint64_t now))
 #endif
 #endif
 
-uint64_t	vmm_call_hyp(uint64_t, ...);
+uintptr_t	vmm_call_hyp0(uint64_t);
+uintptr_t	vmm_call_hyp1(uint64_t, uintptr_t);
+uintptr_t	vmm_call_hyp2(uint64_t, uintptr_t, uintptr_t);
+uintptr_t	vmm_call_hyp3(uint64_t, uintptr_t, uintptr_t, uintptr_t);
+uintptr_t	vmm_call_hyp4(uint64_t, uintptr_t, uintptr_t, uintptr_t,
+		    uintptr_t);
+uintptr_t	vmm_call_hyp5(uint64_t, uintptr_t, uintptr_t, uintptr_t,
+		    uintptr_t, uintptr_t);
 
 #if 0
 #define	eprintf(fmt, ...)	printf("%s:%d " fmt, __func__, __LINE__, ##__VA_ARGS__)

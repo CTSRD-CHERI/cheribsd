@@ -32,7 +32,19 @@
 
 	.text
 
+EENTRY(vmm_call_hyp0)
+EENTRY(vmm_call_hyp1)
+EENTRY(vmm_call_hyp2)
+EENTRY(vmm_call_hyp3)
+EENTRY(vmm_call_hyp4)
+EENTRY(vmm_call_hyp5)
 ENTRY(vmm_call_hyp)
 	hvc	#0
 	ret
 END(vmm_call_hyp)
+EEND(vmm_call_hyp5)
+EEND(vmm_call_hyp4)
+EEND(vmm_call_hyp3)
+EEND(vmm_call_hyp2)
+EEND(vmm_call_hyp1)
+EEND(vmm_call_hyp0)
