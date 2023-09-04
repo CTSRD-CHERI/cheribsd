@@ -63,15 +63,15 @@ struct vm_register {
 struct vm_register_set {
 	int		cpuid;
 	unsigned int	count;
-	const int	*regnums;	/* enum vm_reg_name */
-	uint64_t	*regvals;
+	const int	* __kerncap regnums;	/* enum vm_reg_name */
+	uintcap_t	* __kerncap regvals;
 };
 
 struct vm_run {
 	int		cpuid;
-	cpuset_t	*cpuset;	/* CPU set storage */
+	cpuset_t	* __kerncap cpuset;	/* CPU set storage */
 	size_t		cpusetsize;
-	struct vm_exit	*vm_exit;
+	struct vm_exit	* __kerncap vm_exit;
 };
 
 struct vm_exception {
@@ -128,7 +128,7 @@ struct vm_activate_cpu {
 struct vm_cpuset {
 	int		which;
 	int		cpusetsize;
-	cpuset_t	*cpus;
+	cpuset_t	* __kerncap cpus;
 };
 #define	VM_ACTIVE_CPUS		0
 #define	VM_SUSPENDED_CPUS	1
