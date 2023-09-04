@@ -184,12 +184,13 @@
 #define	CCTLR_PCCBO_MASK	(0x1 << 3) /* PCC base offset enable */
 #define	CCTLR_DDCBO_MASK	(0x1 << 2) /* PCC base offset enable */
 /*
- * CCTLR_EL1 - Capability Control Register
+ * CCTLR_EL1/2 - Capability Control Register
  * The rest of the fields mirror CCTLR_EL0
  */
 #define	CCTLR_EL1_C64E_MASK	(0x1 << 5) /* Enable C64 mode upon exception */
 #define	CCTLR_EL1_TGEN1_MASK	(0x1 << 1) /* Page table CLG bit for TTBR1 */
 #define	CCTLR_EL1_TGEN0_MASK	(0x1 << 0) /* Page table CLG bit for TTBR0 */
+#define	CCTLR_EL2_C64E_MASK	(0x1 << 5) /* Enable C64 mode upon exception */
 #endif
 
 /* CSSELR_EL1 - Cache size selection register */
