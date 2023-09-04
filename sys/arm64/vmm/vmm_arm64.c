@@ -337,6 +337,9 @@ vmmops_modinit(int ipinum)
 #ifdef SMP
 	el2_regs.tcr_el2 |= TCR_EL2_SH0_IS;
 #endif
+#if __has_feature(capabilities)
+	el2_regs.tcr_el2 |= TCR_EL2_HWU | TCR_EL2_HPD;
+#endif
 
 	switch (el2_regs.tcr_el2 & TCR_EL2_PS_MASK) {
 	case TCR_EL2_PS_32BITS:
@@ -390,6 +393,12 @@ vmmops_modinit(int ipinum)
 #endif
 #ifdef SMP
 	el2_regs.vtcr_el2 |= VTCR_EL2_SH0_IS;
+#endif
+#if __has_feature(capabilities)
+	/*
+	 * Enable the use of SC/LC/CDBM in stage 2 translation descriptors.
+	 */
+	el2_regs.vtcr_el2 |= VTCR_EL2_HWU59 | VTCR_EL2_HWU60 | VTCR_EL2_HWU61;
 #endif
 
 	smp_rendezvous(NULL, arm_setup_vectors, NULL, &el2_regs);
