@@ -424,13 +424,13 @@ vmmpmap_remove(vm_offset_t va, vm_size_t size, bool invalidate)
 
 	if (invalidate) {
 		/* Invalidate the memory from the D-cache */
-		vmm_call_hyp(HYP_DC_CIVAC, sva, size);
+		vmm_call_hyp2(HYP_DC_CIVAC, sva, size);
 
 		for (i = 0; i < (size / PAGE_SIZE); i++) {
 			atomic_store_64(l3_list[i], 0);
 		}
 
-		vmm_call_hyp(HYP_EL2_TLBI, HYP_EL2_TLBI_VA, sva, size);
+		vmm_call_hyp3(HYP_EL2_TLBI, HYP_EL2_TLBI_VA, sva, size);
 
 		free(l3_list, M_TEMP);
 	}

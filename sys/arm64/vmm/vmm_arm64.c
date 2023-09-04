@@ -141,7 +141,7 @@ arm_setup_vectors(void *arg)
 	 * x0: the exception vector table responsible for hypervisor
 	 * initialization on the next call.
 	 */
-	vmm_call_hyp(vtophys(&vmm_hyp_code));
+	vmm_call_hyp0(vtophys(&vmm_hyp_code));
 
 	/* Create and map the hypervisor stack */
 	stack_top = stack_hyp_va[PCPU_GET(cpuid)] + VMM_STACK_SIZE;
@@ -164,7 +164,7 @@ arm_setup_vectors(void *arg)
 	sctlr_el2 &= ~SCTLR_EL2_EE;
 
 	/* Special call to initialize EL2 */
-	vmm_call_hyp(vmmpmap_to_ttbr0(), stack_top, el2_regs->tcr_el2,
+	vmm_call_hyp4(vmmpmap_to_ttbr0(), stack_top, el2_regs->tcr_el2,
 	    sctlr_el2, el2_regs->vtcr_el2);
 
 	intr_restore(daif);
@@ -191,7 +191,7 @@ arm_teardown_vectors(void *arg)
 	 */
 	daif = intr_disable();
 	/* TODO: Invalidate the cache */
-	vmm_call_hyp(HYP_CLEANUP, vtophys(hyp_stub_vectors));
+	vmm_call_hyp1(HYP_CLEANUP, vtophys(hyp_stub_vectors));
 	intr_restore(daif);
 
 	arm64_set_active_vcpu(NULL);
@@ -481,7 +481,7 @@ vmmops_modinit(int ipinum)
 		el2_vmem_add(next_hyp_va, HYP_VM_MAX_ADDRESS - next_hyp_va);
 
 	daif = intr_disable();
-	cnthctl_el2 = vmm_call_hyp(HYP_READ_REGISTER, HYP_REG_CNTHCTL);
+	cnthctl_el2 = vmm_call_hyp1(HYP_READ_REGISTER, HYP_REG_CNTHCTL);
 	intr_restore(daif);
 
 	vgic_init();
@@ -623,7 +623,7 @@ vmmops_vmspace_free(struct vmspace *vmspace)
 static void
 vmm_pmap_clean_stage2_tlbi(void)
 {
-	vmm_call_hyp(HYP_CLEAN_S2_TLBI);
+	vmm_call_hyp0(HYP_CLEAN_S2_TLBI);
 }
 
 static void
@@ -631,13 +631,13 @@ vmm_pmap_invalidate_range(uint64_t vttbr, vm_offset_t sva, vm_offset_t eva,
     bool final_only)
 {
 	MPASS(eva > sva);
-	vmm_call_hyp(HYP_S2_TLBI_RANGE, vttbr, sva, eva, final_only);
+	vmm_call_hyp4(HYP_S2_TLBI_RANGE, vttbr, sva, eva, final_only);
 }
 
 static void
 vmm_pmap_invalidate_all(uint64_t vttbr)
 {
-	vmm_call_hyp(HYP_S2_TLBI_ALL, vttbr);
+	vmm_call_hyp1(HYP_S2_TLBI_ALL, vttbr);
 }
 
 static inline void
@@ -1164,8 +1164,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 		arm64_set_active_vcpu(hypctx);
 		vgic_flush_hwstate(hypctx);
 
-		/* Call into EL2 to switch to the guest */
-		excp_type = vmm_call_hyp(HYP_ENTER_GUEST,
+		excp_type = vmm_call_hyp2(HYP_ENTER_GUEST,
 		    hyp->el2_addr, hypctx->el2_addr);
 
 		vgic_sync_hwstate(hypctx);

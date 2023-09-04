@@ -39,8 +39,8 @@
 
 struct hypctx;
 
-uint64_t vmm_hyp_enter(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
-    uint64_t, uint64_t, uint64_t);
+uint64_t vmm_hyp_enter(uint64_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t,
+    uintptr_t, uintptr_t, uintptr_t);
 uint64_t vmm_enter_guest(struct hypctx *);
 
 static void
@@ -766,8 +766,8 @@ vmm_el2_tlbi(uint64_t type, uint64_t start, uint64_t len)
 }
 
 uint64_t
-vmm_hyp_enter(uint64_t handle, uint64_t x1, uint64_t x2, uint64_t x3,
-    uint64_t x4, uint64_t x5, uint64_t x6, uint64_t x7)
+vmm_hyp_enter(uint64_t handle, uintptr_t x1, uintptr_t x2, uintptr_t x3,
+    uintptr_t x4, uintptr_t x5, uintptr_t x6, uintptr_t x7)
 {
 	uint64_t ret;
 
