@@ -5443,8 +5443,7 @@ vmspace_exec(struct proc *p, vm_offset_t minuser, vm_offset_t maxuser)
 	 */
 	user_length = MIN(maxuser - minuser,
 	    VM_MAXUSER_ADDRESS - VM_MINUSER_ADDRESS);
-	padded_minuser = rounddown2(minuser,
-	    CHERI_REPRESENTABLE_ALIGNMENT(user_length));
+	padded_minuser = CHERI_REPRESENTABLE_BASE(minuser, user_length);
 	KASSERT(padded_minuser == minuser || minuser <= PAGE_SIZE,
 	    ("Unrepresentable base for new vmspace"));
 	KASSERT(maxuser - padded_minuser ==
