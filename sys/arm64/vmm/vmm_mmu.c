@@ -344,11 +344,12 @@ vmmpmap_enter(vm_offset_t va, vm_size_t size, vm_paddr_t pa, vm_prot_t prot)
 }
 
 void
-vmmpmap_remove(vm_offset_t va, vm_size_t size, bool invalidate)
+vmmpmap_remove(vm_pointer_t va, vm_size_t size, bool invalidate)
 {
 	pt_entry_t l0e, *l1, l1e, *l2, l2e;
 	pd_entry_t *l3, l3e, **l3_list;
-	vm_offset_t eva, va_next, sva;
+	vm_pointer_t sva;
+	vm_offset_t eva, va_next;
 	size_t i;
 
 	KASSERT((va & L3_OFFSET) == 0,
