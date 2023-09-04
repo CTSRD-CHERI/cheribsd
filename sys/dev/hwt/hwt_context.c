@@ -70,14 +70,14 @@ static int
 hwt_ctx_ident_alloc(int *new_ident)
 {
  
-	mtx_lock_spin(&ident_set_mutex);
+	mtx_lock(&ident_set_mutex);
 	bit_ffc(ident_set, ident_set_size, new_ident);
 	if (*new_ident == -1) {
-		mtx_unlock_spin(&ident_set_mutex);
+		mtx_unlock(&ident_set_mutex);
 		return (ENOMEM);
 	}
 	bit_set(ident_set, *new_ident);
-	mtx_unlock_spin(&ident_set_mutex);
+	mtx_unlock(&ident_set_mutex);
 
 	return (0);
 }
@@ -86,9 +86,9 @@ static void
 hwt_ctx_ident_free(int ident)
 {
 
-	mtx_lock_spin(&ident_set_mutex);
+	mtx_lock(&ident_set_mutex);
 	bit_clear(ident_set, ident);
-	mtx_unlock_spin(&ident_set_mutex);
+	mtx_unlock(&ident_set_mutex);
 }
 
 int
@@ -186,7 +186,7 @@ hwt_ctx_load(void)
 
 	ident_set_size = (1 << 8);
 	ident_set = bit_alloc(ident_set_size, M_HWT_CTX, M_WAITOK);
-	mtx_init(&ident_set_mutex, "ident set", NULL, MTX_SPIN);
+	mtx_init(&ident_set_mutex, "ident set", NULL, MTX_DEF);
 }
 
 void
