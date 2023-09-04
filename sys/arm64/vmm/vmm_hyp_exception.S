@@ -250,7 +250,7 @@ LEND(handle_hyp_init)
 
 .macro handle_el2_excp type
 	/* Save registers before modifying so we can restore them */
-	str	x9, [sp, #-16]!
+	str	CAP(9), [PTRN(sp), #-16]!
 
 	/* Test if the exception happened when the host was running */
 	mrs	x9, vttbr_el2
@@ -258,14 +258,14 @@ LEND(handle_hyp_init)
 	beq	1f
 
 	/* We got the exception while the guest was running */
-	ldr	x9, [sp], #16
+	ldr	CAP(9), [PTRN(sp)], #16
 	do_world_switch_to_host
 	mov	x0, \type
 	ret
 
 1:
 	/* We got the exception while the host was running */
-	ldr	x9, [sp], #16
+	ldr	CAP(9), [PTRN(sp)], #16
 	mov	x0, \type
 	ERET
 .endm
@@ -287,15 +287,13 @@ LENTRY(handle_el2_el2h_error)
 	handle_el2_excp #EXCP_TYPE_EL2_ERROR
 LEND(handle_el2_el2h_error)
 
-
 LENTRY(handle_el2_el1_sync64)
 	/* Save registers before modifying so we can restore them */
-	str	x9, [sp, #-16]!
-
+	str	CAP(9), [PTRN(sp), #-16]!
 	/* Check for host hypervisor call */
 	mrs	x9, vttbr_el2
 	cmp	x9, #VTTBR_HOST
-	ldr	x9, [sp], #16 /* Restore the temp register */
+	ldr	CAP(9), [PTRN(sp)], #16 /* Restore the temp register */
 	bne	1f
 
 	/*
@@ -306,9 +304,9 @@ LENTRY(handle_el2_el1_sync64)
 	cmp	x0, #(HYP_CLEANUP)
 	b.eq	vmm_cleanup
 
-	str	lr, [sp, #-16]!
+	str	CAPN(lr), [PTRN(sp), #-16]!
 	bl	vmm_hyp_enter
-	ldr	lr, [sp], #16
+	ldr	CAPN(lr), [PTRN(sp)], #16
 	ERET
 
 1:	/* Guest exception taken to EL2 */
@@ -324,7 +322,7 @@ LEND(handle_el2_el1_sync64)
 
 LENTRY(handle_el2_el1_irq64)
 	do_world_switch_to_host
-	str	x9, [sp, #-16]!
+	str	CAP(9), [PTRN(sp), #-16]!
 	mrs	x9, ich_misr_el2
 	cmp	x9, xzr
 	beq	1f
@@ -333,7 +331,7 @@ LENTRY(handle_el2_el1_irq64)
 1:
 	mov	x0, #EXCP_TYPE_EL1_IRQ
 2:
-	ldr	x9, [sp], #16
+	ldr	CAP(9), [PTRN(sp)], #16
 	ret
 LEND(handle_el2_el1_irq)
 
@@ -359,7 +357,7 @@ LEND(handle_el2_el1_error64)
  */
 ENTRY(vmm_enter_guest)
 	/* Save hypctx address */
-	msr	tpidr_el2, x0
+	msr	PTRN(tpidr_el2), PTR(0)
 
 	save_host_registers
 	restore_guest_registers
