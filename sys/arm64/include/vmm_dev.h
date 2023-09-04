@@ -57,7 +57,7 @@ struct vm_memseg {
 struct vm_register {
 	int		cpuid;
 	int		regnum;		/* enum vm_reg_name */
-	uint64_t	regval;
+	kuintcap_t	regval;
 };
 
 struct vm_register_set {

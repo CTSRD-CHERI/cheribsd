@@ -54,7 +54,7 @@ vmm_emulate_instruction(struct vcpu *vcpu, uint64_t gpa, struct vie *vie,
     struct vm_guest_paging *paging __unused, mem_region_read_t memread,
     mem_region_write_t memwrite, void *memarg)
 {
-	uint64_t val;
+	uintcap_t val;
 	int error;
 
 	if (vie->dir == VM_DIR_READ) {
@@ -77,7 +77,7 @@ int
 vmm_emulate_register(struct vcpu *vcpu, struct vre *vre, reg_read_t regread,
     reg_write_t regwrite, void *regarg)
 {
-	uint64_t val;
+	uintcap_t val;
 	int error;
 
 	if (vre->dir == VM_DIR_READ) {

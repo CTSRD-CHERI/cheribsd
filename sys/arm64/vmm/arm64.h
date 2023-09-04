@@ -152,8 +152,8 @@ DEFINE_VMMOPS_IFUNC(void *, vcpu_init, (void *vmi, struct vcpu *vcpu,
     int vcpu_id))
 DEFINE_VMMOPS_IFUNC(void, vcpu_cleanup, (void *vcpui))
 DEFINE_VMMOPS_IFUNC(int, exception, (void *vcpui, uint64_t esr, uint64_t far))
-DEFINE_VMMOPS_IFUNC(int, getreg, (void *vcpui, int num, uint64_t *retval))
-DEFINE_VMMOPS_IFUNC(int, setreg, (void *vcpui, int num, uint64_t val))
+DEFINE_VMMOPS_IFUNC(int, getreg, (void *vcpui, int num, uintcap_t *retval))
+DEFINE_VMMOPS_IFUNC(int, setreg, (void *vcpui, int num, uintcap_t val))
 DEFINE_VMMOPS_IFUNC(int, getcap, (void *vcpui, int num, int *retval))
 DEFINE_VMMOPS_IFUNC(int, setcap, (void *vcpui, int num, int val))
 DEFINE_VMMOPS_IFUNC(struct vmspace *, vmspace_alloc, (vm_offset_t min,
