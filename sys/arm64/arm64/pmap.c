@@ -898,7 +898,7 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m,
 		 * XXX We could also conditionally set ATTR_SC if PGA_CAPDIRTY,
 		 * but it's not required.
 		 */
-		if (va < VM_MAX_USER_ADDRESS)
+		if (pmap->pm_stage == PM_STAGE1 && va < VM_MAX_USER_ADDRESS)
 			val |= ATTR_CDBM;
 		else
 			val |= ATTR_SC;
