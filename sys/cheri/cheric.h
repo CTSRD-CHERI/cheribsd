@@ -417,6 +417,13 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 #define	CHERI_REPRESENTABLE_BASE(base, len) \
 	((base) & CHERI_REPRESENTABLE_ALIGNMENT_MASK(len))
 
+#if __has_feature(capabilities)
+#define	CHERI_REPRESENTABLE_ALIGN_UP(base, len) \
+	__align_up((base), CHERI_REPRESENTABLE_ALIGNMENT(len))
+#else
+#define	CHERI_REPRESENTABLE_ALIGN_UP(base, len) (base)
+#endif
+
 /*
  * In the current encoding sealed and unsealed capabilities have the same
  * alignment constraints.
