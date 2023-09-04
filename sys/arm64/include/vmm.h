@@ -318,7 +318,7 @@ enum vm_exitcode {
 struct vm_exit {
 	enum vm_exitcode	exitcode;
 	int			inst_length;
-	uint64_t		pc;
+	uintcap_t		pc;
 	union {
 		/*
 		 * ARM specific payload.
