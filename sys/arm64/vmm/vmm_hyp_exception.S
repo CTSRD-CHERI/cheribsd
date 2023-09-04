@@ -203,11 +203,18 @@ hyp_vectors:
  */
 LENTRY(handle_hyp_init)
 	/* Install the new exception vectors */
-	adrp	x6, hyp_vectors
-	add	x6, x6, :lo12:hyp_vectors
+	adrp	PTR(6), hyp_vectors
+	add	PTR(6), PTR(6), :lo12:hyp_vectors
+#if __has_feature(capabilities)
+#ifndef __CHERI_PURE_CAPABILITY__
+	cvtp	c6, x6
+#endif
+	msr	cvbar_el2, c6
+#else
 	msr	vbar_el2, x6
+#endif
 	/* Set the stack top address */
-	mov	sp, x1
+	mov	PTRN(sp), PTR(1)
 	/* Use the host VTTBR_EL2 to tell the host and the guests apart */
 	mov	x9, #VTTBR_HOST
 	msr	vttbr_el2, x9
@@ -370,7 +377,12 @@ END(vmm_enter_guest)
  */
 LENTRY(vmm_cleanup)
 	/* Restore the stub vectors */
+#if __has_feature(capabilities)
+	cvtp	c1, x1
+	msr	cvbar_el2, c1
+#else
 	msr	vbar_el2, x1
+#endif
 
 	/* Disable the MMU */
 	dsb	sy
