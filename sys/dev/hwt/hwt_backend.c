@@ -212,7 +212,7 @@ void
 hwt_backend_load(void)
 {
 
-	mtx_init(&hwt_backend_mtx, "hwt backend", NULL, MTX_SPIN);
+	mtx_init(&hwt_backend_mtx, "hwt backend", NULL, MTX_DEF);
 	LIST_INIT(&hwt_backends);
 }
 
