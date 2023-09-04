@@ -111,7 +111,7 @@ struct hypctx {
 	uint64_t	mdcr_el2;	/* Monitor Debug Configuration Register */
 	uint64_t	vpidr_el2;	/* Virtualization Processor ID Register */
 	uint64_t	vmpidr_el2;	/* Virtualization Multiprocessor ID Register */
-	uint64_t	el2_addr;	/* The address of this in el2 space */
+	vm_pointer_t	el2_addr;	/* The address of this in el2 space */
 	struct hyp	*hyp;
 	struct vcpu	*vcpu;
 	struct {
@@ -131,7 +131,7 @@ struct hyp {
 	struct vtimer	vtimer;
 	uint64_t	vmid_generation;
 	uint64_t	vttbr_el2;
-	uint64_t	el2_addr;	/* The address of this in el2 space */
+	vm_pointer_t	el2_addr;	/* The address of this in el2 space */
 	bool		vgic_attached;
 	struct vgic_v3	*vgic;
 	struct hypctx	*ctx[];
