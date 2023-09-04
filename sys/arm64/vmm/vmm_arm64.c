@@ -609,7 +609,17 @@ arm_vmm_pinit(pmap_t pmap)
 struct vmspace *
 vmmops_vmspace_alloc(vm_offset_t min, vm_offset_t max)
 {
-	return (vmspace_alloc(min, max, arm_vmm_pinit));
+	vm_pointer_t minp, maxp;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	minp = (vm_pointer_t)cheri_setaddress(vmm_gpa_root_cap, min);
+	minp = (vm_pointer_t)cheri_setboundsexact(minp, max - min);
+	maxp = (vm_pointer_t)cheri_setaddress(minp, max);
+#else
+	minp = min;
+	maxp = max;
+#endif
+	return (vmspace_alloc(minp, maxp, arm_vmm_pinit));
 }
 
 void

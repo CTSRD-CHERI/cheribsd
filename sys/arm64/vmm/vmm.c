@@ -460,7 +460,8 @@ vm_create(const char *name, struct vm **retvm)
 	if (name == NULL || strlen(name) >= VM_MAX_NAMELEN)
 		return (EINVAL);
 
-	vmspace = vmmops_vmspace_alloc(0, 1ul << 39);
+	vmspace = vmmops_vmspace_alloc(HYP_GPA_MIN_ADDRESS,
+	    HYP_GPA_MAX_ADDRESS);
 	if (vmspace == NULL)
 		return (ENOMEM);
 
