@@ -646,7 +646,7 @@ arm64_print_hyp_regs(struct vm_exit *vme)
 	printf("esr_el2:   0x%016lx\n", vme->u.hyp.esr_el2);
 	printf("far_el2:   0x%016lx\n", vme->u.hyp.far_el2);
 	printf("hpfar_el2: 0x%016lx\n", vme->u.hyp.hpfar_el2);
-	printf("elr_el2:   0x%016lx\n", vme->pc);
+	printf("elr_el2:   0x%016lx\n", (uint64_t)vme->pc);
 }
 
 static void
@@ -1092,7 +1092,7 @@ fault:
 }
 
 int
-vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
+vmmops_run(void *vcpui, uintcap_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 {
 	uint64_t excp_type;
 	int handled;
@@ -1108,7 +1108,7 @@ vmmops_run(void *vcpui, register_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	vcpu = hypctx->vcpu;
 	vme = vm_exitinfo(vcpu);
 
-	hypctx->tf.tf_elr = (uint64_t)pc;
+	hypctx->tf.tf_elr = pc;
 
 	for (;;) {
 		if (hypctx->has_exception) {
@@ -1315,8 +1315,19 @@ vmmops_setreg(void *vcpui, int reg, uint64_t val)
 	regp = hypctx_regptr(hypctx, reg);
 	if (regp == NULL)
 		return (EINVAL);
-
-	*regp = val;
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (reg == VM_REG_ELR_EL2) {
+		/*
+		 * This register is set by bhyve when booting and
+		 * starting secondary vCPUs.  Userspace does not hold a
+		 * capability for the entire guest virtual address
+		 * space, so we must derive a capability here.
+		 */
+		*(uintcap_t *)regp = (uintcap_t)
+		    cheri_setaddress(kernel_root_cap, val);
+	} else
+#endif
+		*regp = val;
 	return (0);
 }
 

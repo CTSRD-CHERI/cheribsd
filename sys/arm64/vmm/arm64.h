@@ -145,7 +145,7 @@ DEFINE_VMMOPS_IFUNC(int, modcleanup, (void))
 DEFINE_VMMOPS_IFUNC(void *, init, (struct vm *vm, struct pmap *pmap))
 DEFINE_VMMOPS_IFUNC(int, gla2gpa, (void *vcpui, struct vm_guest_paging *paging,
     uint64_t gla, int prot, uint64_t *gpa, int *is_fault))
-DEFINE_VMMOPS_IFUNC(int, run, (void *vcpui, register_t pc, struct pmap *pmap,
+DEFINE_VMMOPS_IFUNC(int, run, (void *vcpui, uintcap_t pc, struct pmap *pmap,
     struct vm_eventinfo *info))
 DEFINE_VMMOPS_IFUNC(void, cleanup, (void *vmi))
 DEFINE_VMMOPS_IFUNC(void *, vcpu_init, (void *vmi, struct vcpu *vcpu,

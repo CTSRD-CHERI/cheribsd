@@ -79,7 +79,7 @@ vmexit_inst_emul(struct vmctx *ctx __unused, struct vcpu *vcpu,
 
 fail:
 	fprintf(stderr, "Failed to emulate instruction ");
-	FPRINTLN(stderr, "at 0x%lx", vme->pc);
+	FPRINTLN(stderr, "at 0x%lx", (uint64_t)vme->pc);
 	return (VMEXIT_ABORT);
 }
 
