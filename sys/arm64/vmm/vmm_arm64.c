@@ -886,7 +886,8 @@ ptp_hold(struct vcpu *vcpu, vm_paddr_t ptpphys, size_t len, void **cookie)
 	void *ptr;
 
 	ptp_release(cookie);
-	ptr = vm_gpa_hold(vcpu, ptpphys, len, VM_PROT_RW, cookie);
+	ptr = vm_gpa_hold(vcpu, ptpphys, len, VM_PROT_RW | VM_PROT_RW_CAP,
+	    cookie);
 	return (ptr);
 }
 
