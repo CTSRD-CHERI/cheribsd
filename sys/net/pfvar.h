@@ -1601,6 +1601,7 @@ struct pf_sctp_multihome_job {
 	struct pf_addr				 src;
 	struct pf_addr				 dst;
 	struct mbuf				*m;
+	int					 op;
 };
 
 #endif
