@@ -137,7 +137,7 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 			hwt_contexthash_remove(ctx);
 
 		/*
-		 * It could be that a hook has this ctx locked right here.
+		 * A hook could still be using the ctx right here.
 		 */
 
 		HWT_CTX_LOCK(ctx);
@@ -148,10 +148,9 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 
 		hwt_backend_deinit(ctx);
 		hwt_record_free_all(ctx);
-		hwt_ctx_free(ctx);
+		hwt_ctx_put(ctx);
 	}
 
-	/* TODO: check if hwt owner still needed. */
 	hwt_ownerhash_remove(ho);
 	free(ho, M_HWT_OWNER);
 }

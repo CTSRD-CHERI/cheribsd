@@ -161,11 +161,9 @@ hwt_ctx_free_threads(struct hwt_context *ctx)
 
 		HWT_THR_UNLOCK(thr);
 
-		if (refcount_release(&thr->refcnt))
-			hwt_thread_free(thr);
+		hwt_thr_put(thr);
 	} while (1);
 }
-
 
 void
 hwt_ctx_free(struct hwt_context *ctx)

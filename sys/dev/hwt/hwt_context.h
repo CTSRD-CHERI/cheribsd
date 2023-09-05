@@ -71,7 +71,6 @@ struct hwt_context {
 
 int hwt_ctx_alloc(struct hwt_context **ctx0);
 void hwt_ctx_free(struct hwt_context *ctx);
-
 void hwt_ctx_put(struct hwt_context *ctx);
 
 void hwt_ctx_load(void);
