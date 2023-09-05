@@ -166,31 +166,42 @@ hwt_thread_create(struct thread *td)
 	struct hwt_record_entry *entry;
 	struct hwt_context *ctx;
 	struct hwt_thread *thr;
-	struct proc *p;
 	char path[MAXPATHLEN];
-	int error;
+	size_t bufsize;
+	struct proc *p;
 	int thread_id;
+	int error;
 
 	p = td->td_proc;
 
+	/* Step 1. Get CTX and collect information needed. */
 	ctx = hwt_contexthash_lookup(p);
 	if (ctx == NULL)
 		return (ENXIO);
-
 	thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
-
+	bufsize = ctx->bufsize;
 	sprintf(path, "hwt_%d_%d", ctx->ident, thread_id);
-	error = hwt_thread_alloc(&thr, path, ctx->bufsize);
+	hwt_ctx_put(ctx);
+
+	/* Step 2. Allocate some memory without holding ctx ref. */
+	error = hwt_thread_alloc(&thr, path, bufsize);
 	if (error) {
 		printf("%s: could not allocate thread, error %d\n",
 		    __func__, error);
-		hwt_ctx_put(ctx);
 		return (error);
 	}
 
 	entry = hwt_record_entry_alloc();
 	entry->record_type = HWT_RECORD_THREAD_CREATE;
 	entry->thread_id = thread_id;
+
+	/* Step 3. Get CTX once again. */
+	ctx = hwt_contexthash_lookup(p);
+	if (ctx == NULL) {
+		hwt_record_entry_free(entry);
+		hwt_thread_free(thr);
+		/* ctx->thread_counter does not matter. */
+	}
 
 	thr->vm->ctx = ctx;
 	thr->ctx = ctx;
