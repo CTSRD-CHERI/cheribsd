@@ -81,8 +81,11 @@ hwt_record(struct thread *td, struct hwt_record_entry *ent)
 		free(entry, M_HWT_RECORD);
 		return;
 	}
+	HWT_CTX_LOCK(ctx);
 	LIST_INSERT_HEAD(&ctx->records, entry, next);
 	HWT_CTX_UNLOCK(ctx);
+
+	hwt_ctx_put(ctx);
 }
 
 struct hwt_record_entry *

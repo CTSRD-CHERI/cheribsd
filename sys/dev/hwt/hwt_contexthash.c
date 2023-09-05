@@ -33,6 +33,7 @@
 #include <sys/ioccom.h>
 #include <sys/conf.h>
 #include <sys/proc.h>
+#include <sys/refcount.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/mman.h>
@@ -88,7 +89,7 @@ hwt_contexthash_lookup(struct proc *p)
 	HWT_CTXHASH_LOCK();
 	LIST_FOREACH(ctx, hch, next_hch) {
 		if (ctx->proc == p) {
-			HWT_CTX_LOCK(ctx);
+			refcount_acquire(&ctx->refcnt);
 			HWT_CTXHASH_UNLOCK();
 			return (ctx);
 		}

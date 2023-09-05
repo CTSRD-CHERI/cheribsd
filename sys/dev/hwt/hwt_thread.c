@@ -95,15 +95,15 @@ hwt_thread_lookup(struct hwt_context *ctx, struct thread *td)
 {
 	struct hwt_thread *thr;
 
-	HWT_CTX_ASSERT_LOCKED(ctx);
-
+	HWT_CTX_LOCK(ctx);
 	TAILQ_FOREACH(thr, &ctx->threads, next) {
 		if (thr->td == td) {
-			HWT_THR_LOCK(thr);
+			refcount_acquire(&thr->refcnt);
 			HWT_CTX_UNLOCK(ctx);
 			return (thr);
 		}
 	}
+	HWT_CTX_UNLOCK(ctx);
 
 	/*
 	 * We are here because the hook on thread creation failed to allocate
@@ -149,6 +149,14 @@ hwt_thread_free(struct hwt_thread *thr)
 }
 
 void
+hwt_thr_put(struct hwt_thread *thr)
+{
+
+	if (refcount_release(&thr->refcnt))
+		hwt_thread_free(thr);
+}
+
+void
 hwt_thread_insert(struct hwt_context *ctx, struct hwt_thread *thr)
 {
 
@@ -168,27 +176,24 @@ hwt_thread_create(struct thread *td)
 	struct hwt_context *ctx;
 	struct hwt_thread *thr;
 	struct proc *p;
-	size_t bufsize;
 	char path[MAXPATHLEN];
 	int error;
 	int thread_id;
 
 	p = td->td_proc;
 
-	/* 1. First find our ctx and collect some information from it. */
 	ctx = hwt_contexthash_lookup(p);
 	if (ctx == NULL)
 		return (ENXIO);
-	bufsize = ctx->bufsize;
-	thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
-	sprintf(path, "hwt_%d_%d", ctx->ident, thread_id);
-	HWT_CTX_UNLOCK(ctx);
 
-	/* 2. Now we can allocate some memory. */
-	error = hwt_thread_alloc(&thr, path, bufsize);
+	thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
+
+	sprintf(path, "hwt_%d_%d", ctx->ident, thread_id);
+	error = hwt_thread_alloc(&thr, path, ctx->bufsize);
 	if (error) {
 		printf("%s: could not allocate thread, error %d\n",
 		    __func__, error);
+		hwt_ctx_put(ctx);
 		return (error);
 	}
 
@@ -196,20 +201,17 @@ hwt_thread_create(struct thread *td)
 	entry->record_type = HWT_RECORD_THREAD_CREATE;
 	entry->thread_id = thread_id;
 
-	/* 3. Take ctx again, as it may gone during previous step. */
-	ctx = hwt_contexthash_lookup(p);
-	if (ctx == NULL) {
-		hwt_record_entry_free(entry);
-		hwt_thread_free(thr);
-		return (ENXIO);
-	}
 	thr->vm->ctx = ctx;
 	thr->ctx = ctx;
 	thr->thread_id = thread_id;
 	thr->td = td;
+
+	HWT_CTX_LOCK(ctx);
 	TAILQ_INSERT_TAIL(&ctx->threads, thr, next);
 	LIST_INSERT_HEAD(&ctx->records, entry, next);
 	HWT_CTX_UNLOCK(ctx);
+
+	hwt_ctx_put(ctx);
 
 	return (0);
 }

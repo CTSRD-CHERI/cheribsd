@@ -120,7 +120,6 @@ void
 hwt_owner_shutdown(struct hwt_owner *ho)
 {
 	struct hwt_context *ctx;
-	struct hwt_thread *thr;
 
 	dprintf("%s: stopping hwt owner\n", __func__);
 
@@ -143,13 +142,6 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 
 		HWT_CTX_LOCK(ctx);
 		ctx->state = 0;
-		/*
-		 * Ensure hook invocation is now completed.
-		 */
-		TAILQ_FOREACH(thr, &ctx->threads, next) {
-			HWT_THR_LOCK(thr);
-			HWT_THR_UNLOCK(thr);
-		}
 		HWT_CTX_UNLOCK(ctx);
 
 		/* Note that a thread could be still sleeping on msleep_spin. */
@@ -159,6 +151,7 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 		hwt_ctx_free(ctx);
 	}
 
+	/* TODO: check if hwt owner still needed. */
 	hwt_ownerhash_remove(ho);
 	free(ho, M_HWT_OWNER);
 }

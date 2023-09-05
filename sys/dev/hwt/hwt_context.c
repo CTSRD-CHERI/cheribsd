@@ -104,6 +104,7 @@ hwt_ctx_alloc(struct hwt_context **ctx0)
 	TAILQ_INIT(&ctx->threads);
 	TAILQ_INIT(&ctx->cpus);
 	mtx_init(&ctx->mtx, "ctx", NULL, MTX_SPIN);
+	refcount_init(&ctx->refcnt, 1);
 
 	error = hwt_ctx_ident_alloc(&ctx->ident);
 	if (error) {
@@ -178,6 +179,14 @@ hwt_ctx_free(struct hwt_context *ctx)
 	hwt_config_free(ctx);
 	hwt_ctx_ident_free(ctx->ident);
 	free(ctx, M_HWT_CTX);
+}
+
+void
+hwt_ctx_put(struct hwt_context *ctx)
+{
+
+	if (refcount_release(&ctx->refcnt))
+		hwt_ctx_free(ctx);
 }
 
 void

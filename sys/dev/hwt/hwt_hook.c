@@ -79,23 +79,24 @@ hwt_switch_in(struct thread *td)
 		return;
 
 	if (ctx->state != CTX_STATE_RUNNING) {
-		HWT_CTX_UNLOCK(ctx);
+		hwt_ctx_put(ctx);
 		return;
 	}
 
 	thr = hwt_thread_lookup(ctx, td);
 	if (thr == NULL) {
-		HWT_CTX_UNLOCK(ctx);
+		hwt_ctx_put(ctx);
 		return;
 	}
 
-	dprintf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
+	printf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
 	    thr->thread_id, td->td_tid, cpu_id);
 
 	hwt_backend_configure(ctx, cpu_id, thr->thread_id);
 	hwt_backend_enable(ctx, cpu_id);
 
-	HWT_THR_UNLOCK(thr);
+	hwt_thr_put(thr);
+	hwt_ctx_put(ctx);
 }
 
 static void
@@ -115,20 +116,22 @@ hwt_switch_out(struct thread *td)
 		return;
 
 	if (ctx->state != CTX_STATE_RUNNING) {
-		HWT_CTX_UNLOCK(ctx);
+		hwt_ctx_put(ctx);
 		return;
 	}
 	thr = hwt_thread_lookup(ctx, td);
 	if (thr == NULL) {
-		HWT_CTX_UNLOCK(ctx);
+		hwt_ctx_put(ctx);
 		return;
 	}
 
-	dprintf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
+	printf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
 	    thr->thread_id, td->td_tid, cpu_id);
 
 	hwt_backend_disable(ctx, cpu_id);
-	HWT_THR_UNLOCK(thr);
+
+	hwt_thr_put(thr);
+	hwt_ctx_put(ctx);
 }
 
 static void
@@ -148,12 +151,12 @@ hwt_thread_exit(struct thread *td)
 		return;
 
 	if (ctx->state != CTX_STATE_RUNNING) {
-		HWT_CTX_UNLOCK(ctx);
+		hwt_ctx_put(ctx);
 		return;
 	}
 	thr = hwt_thread_lookup(ctx, td);
 	if (thr == NULL) {
-		HWT_CTX_UNLOCK(ctx);
+		hwt_ctx_put(ctx);
 		return;
 	}
 
@@ -163,7 +166,9 @@ hwt_thread_exit(struct thread *td)
 	    thr->thread_id, td->td_tid, cpu_id);
 
 	hwt_backend_disable(ctx, cpu_id);
-	HWT_THR_UNLOCK(thr);
+
+	hwt_thr_put(thr);
+	hwt_ctx_put(ctx);
 }
 
 static void
@@ -186,23 +191,18 @@ hwt_hook_mmap(struct thread *td)
 
 	thr = hwt_thread_lookup(ctx, td);
 	if (thr == NULL) {
-		HWT_CTX_UNLOCK(ctx);
+		hwt_ctx_put(ctx);
 		return;
 	}
 
-	/*
-	 * msleep(9) atomically releases the mtx lock, so take refcount
-	 * to ensure that thr is not destroyed.
-	 */
-	refcount_acquire(&thr->refcnt);
-
-	if (pause)
+	if (pause) {
+		HWT_THR_LOCK(thr);
 		msleep_spin(thr, &thr->mtx, "hwt-mmap", 0);
+		HWT_THR_UNLOCK(thr);
+	}
 
-	HWT_THR_UNLOCK(thr);
-
-	if (refcount_release(&thr->refcnt))
-		hwt_thread_free(thr);
+	hwt_thr_put(thr);
+	hwt_ctx_put(ctx);
 }
 
 static void
