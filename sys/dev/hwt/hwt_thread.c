@@ -201,6 +201,7 @@ hwt_thread_create(struct thread *td)
 		hwt_record_entry_free(entry);
 		hwt_thread_free(thr);
 		/* ctx->thread_counter does not matter. */
+		return (ENXIO);
 	}
 
 	thr->vm->ctx = ctx;
