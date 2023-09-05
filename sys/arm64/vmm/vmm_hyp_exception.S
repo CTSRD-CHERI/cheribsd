@@ -376,7 +376,9 @@ END(vmm_enter_guest)
 LENTRY(vmm_cleanup)
 	/* Restore the stub vectors */
 #if __has_feature(capabilities)
+#ifndef __CHERI_PURE_CAPABILITY__
 	cvtp	c1, x1
+#endif
 	msr	cvbar_el2, c1
 #else
 	msr	vbar_el2, x1

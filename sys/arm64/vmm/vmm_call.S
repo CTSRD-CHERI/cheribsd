@@ -32,6 +32,7 @@
 
 	.text
 
+EENTRY(vmm_call_hyp_init)
 EENTRY(vmm_call_hyp0)
 EENTRY(vmm_call_hyp1)
 EENTRY(vmm_call_hyp2)
@@ -48,3 +49,4 @@ EEND(vmm_call_hyp3)
 EEND(vmm_call_hyp2)
 EEND(vmm_call_hyp1)
 EEND(vmm_call_hyp0)
+EEND(vmm_call_hyp_init)

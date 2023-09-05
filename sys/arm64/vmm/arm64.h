@@ -168,6 +168,7 @@ DEFINE_VMMOPS_IFUNC(int, restore_tsc, (void *vcpui, uint64_t now))
 #endif
 #endif
 
+uintptr_t	vmm_call_hyp_init(uintcap_t);
 uintptr_t	vmm_call_hyp0(uint64_t);
 uintptr_t	vmm_call_hyp1(uint64_t, uintptr_t);
 uintptr_t	vmm_call_hyp2(uint64_t, uintptr_t, uintptr_t);
