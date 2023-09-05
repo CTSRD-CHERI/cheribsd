@@ -104,7 +104,7 @@ hwt_ctx_alloc(struct hwt_context **ctx0)
 	TAILQ_INIT(&ctx->threads);
 	TAILQ_INIT(&ctx->cpus);
 	mtx_init(&ctx->mtx, "ctx", NULL, MTX_SPIN);
-	refcount_init(&ctx->refcnt, 1);
+	refcount_init(&ctx->refcnt, 0);
 
 	error = hwt_ctx_ident_alloc(&ctx->ident);
 	if (error) {
@@ -143,25 +143,24 @@ hwt_ctx_free_threads(struct hwt_context *ctx)
 {
 	struct hwt_thread *thr;
 
-	dprintf("%s: remove threads\n", __func__);
+	printf("%s: remove threads\n", __func__);
 
 	do {
 		HWT_CTX_LOCK(ctx);
 		thr = TAILQ_FIRST(&ctx->threads);
-		if (thr) {
+		if (thr)
 			TAILQ_REMOVE(&ctx->threads, thr, next);
-			HWT_THR_LOCK(thr);
-		}
 		HWT_CTX_UNLOCK(ctx);
 
 		if (thr == NULL)
 			break;
 
+		HWT_THR_LOCK(thr);
 		wakeup(thr);
-
 		HWT_THR_UNLOCK(thr);
 
-		hwt_thr_put(thr);
+		if (refcount_release(&thr->refcnt))
+			hwt_thread_free(thr);
 	} while (1);
 }
 
@@ -183,8 +182,7 @@ void
 hwt_ctx_put(struct hwt_context *ctx)
 {
 
-	if (refcount_release(&ctx->refcnt))
-		hwt_ctx_free(ctx);
+	refcount_release(&ctx->refcnt);
 }
 
 void

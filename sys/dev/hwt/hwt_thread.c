@@ -98,7 +98,6 @@ hwt_thread_lookup(struct hwt_context *ctx, struct thread *td)
 	HWT_CTX_LOCK(ctx);
 	TAILQ_FOREACH(thr, &ctx->threads, next) {
 		if (thr->td == td) {
-			refcount_acquire(&thr->refcnt);
 			HWT_CTX_UNLOCK(ctx);
 			return (thr);
 		}
@@ -146,14 +145,6 @@ hwt_thread_free(struct hwt_thread *thr)
 	hwt_vm_free(thr->vm);
 
 	free(thr, M_HWT_THREAD);
-}
-
-void
-hwt_thr_put(struct hwt_thread *thr)
-{
-
-	if (refcount_release(&thr->refcnt))
-		hwt_thread_free(thr);
 }
 
 void

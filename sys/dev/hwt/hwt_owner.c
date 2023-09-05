@@ -137,18 +137,32 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 			hwt_contexthash_remove(ctx);
 
 		/*
-		 * A hook could still be using the ctx right here.
+		 * A hook could be still dealing with this ctx right here.
 		 */
 
 		HWT_CTX_LOCK(ctx);
 		ctx->state = 0;
 		HWT_CTX_UNLOCK(ctx);
 
-		/* Note that a thread could be still sleeping on msleep_spin. */
+		/* Wait completion of hook invocation. */
+		while (refcount_load(&ctx->refcnt) > 0) {
+			printf("?");
+			continue;
+		}
 
+#if 0
+		/* Wake up all threads. */
+		TAILQ_FOREACH(thr, &ctx->threads, next) {
+			HWT_THR_LOCK(thr);
+			wakeup(thr);
+			HWT_THR_UNLOCK(thr);
+		}
+#endif
+
+		/* Note that a thread could be still sleeping on msleep_spin. */
 		hwt_backend_deinit(ctx);
 		hwt_record_free_all(ctx);
-		hwt_ctx_put(ctx);
+		hwt_ctx_free(ctx);
 	}
 
 	hwt_ownerhash_remove(ho);

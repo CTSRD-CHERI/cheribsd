@@ -95,7 +95,6 @@ hwt_switch_in(struct thread *td)
 	hwt_backend_configure(ctx, cpu_id, thr->thread_id);
 	hwt_backend_enable(ctx, cpu_id);
 
-	hwt_thr_put(thr);
 	hwt_ctx_put(ctx);
 }
 
@@ -130,7 +129,6 @@ hwt_switch_out(struct thread *td)
 
 	hwt_backend_disable(ctx, cpu_id);
 
-	hwt_thr_put(thr);
 	hwt_ctx_put(ctx);
 }
 
@@ -150,10 +148,6 @@ hwt_thread_exit(struct thread *td)
 	if (ctx == NULL)
 		return;
 
-	if (ctx->state != CTX_STATE_RUNNING) {
-		hwt_ctx_put(ctx);
-		return;
-	}
 	thr = hwt_thread_lookup(ctx, td);
 	if (thr == NULL) {
 		hwt_ctx_put(ctx);
@@ -165,9 +159,9 @@ hwt_thread_exit(struct thread *td)
 	dprintf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
 	    thr->thread_id, td->td_tid, cpu_id);
 
-	hwt_backend_disable(ctx, cpu_id);
+	if (ctx->state == CTX_STATE_RUNNING)
+		hwt_backend_disable(ctx, cpu_id);
 
-	hwt_thr_put(thr);
 	hwt_ctx_put(ctx);
 }
 
@@ -195,14 +189,24 @@ hwt_hook_mmap(struct thread *td)
 		return;
 	}
 
+	/*
+	 * msleep(9) atomically releases the mtx lock, so take refcount
+	 * to ensure that thr is not destroyed.
+	 * It could not be destroyed prior to this could as we are holding ctx
+	 * refcnt.
+	 */
+	refcount_acquire(&thr->refcnt);
+
+	hwt_ctx_put(ctx);
+
 	if (pause) {
 		HWT_THR_LOCK(thr);
 		msleep_spin(thr, &thr->mtx, "hwt-mmap", 0);
 		HWT_THR_UNLOCK(thr);
 	}
 
-	hwt_thr_put(thr);
-	hwt_ctx_put(ctx);
+	if (refcount_release(&thr->refcnt))
+		hwt_thread_free(thr);
 }
 
 static void
