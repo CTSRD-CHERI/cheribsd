@@ -127,7 +127,7 @@ hwt_thread_alloc(struct hwt_thread **thr0, char *path, size_t bufsize)
 	    M_WAITOK | M_ZERO);
 	thr->vm = vm;
 
-	mtx_init(&thr->mtx, "thr", NULL, MTX_SPIN);
+	mtx_init(&thr->mtx, "thr", NULL, MTX_DEF);
 
 	refcount_init(&thr->refcnt, 1);
 

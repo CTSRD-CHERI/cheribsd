@@ -34,6 +34,7 @@
 #include <sys/eventhandler.h>
 #include <sys/ioccom.h>
 #include <sys/conf.h>
+#include <sys/systm.h>
 #include <sys/proc.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
@@ -200,7 +201,7 @@ hwt_hook_mmap(struct thread *td)
 
 	if (pause) {
 		HWT_THR_LOCK(thr);
-		msleep_spin(thr, &thr->mtx, "hwt-mmap", 0);
+		msleep(thr, &thr->mtx, 0, "hwt-mmap", 0);
 		HWT_THR_UNLOCK(thr);
 	}
 
