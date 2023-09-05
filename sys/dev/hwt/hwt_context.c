@@ -156,6 +156,7 @@ hwt_ctx_free_threads(struct hwt_context *ctx)
 			break;
 
 		HWT_THR_LOCK(thr);
+		/* TODO: check if thr is sleeping before waking it up.
 		wakeup(thr);
 		HWT_THR_UNLOCK(thr);
 

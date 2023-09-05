@@ -196,7 +196,6 @@ hwt_hook_mmap(struct thread *td)
 	 * refcnt.
 	 */
 	refcount_acquire(&thr->refcnt);
-
 	hwt_ctx_put(ctx);
 
 	if (pause) {
