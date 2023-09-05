@@ -547,6 +547,9 @@ LENTRY(drop_to_el1)
 	mrs	x2, cctlr_el2
 	orr	x2, x2, #(CCTLR_EL2_C64E_MASK)
 	msr	cctlr_el2, x2
+
+	/* Clear DDC_EL2 */
+	msr	ddc, czr
 #endif
 	/* Set the address to return to our return address */
 #if __has_feature(capabilities)
