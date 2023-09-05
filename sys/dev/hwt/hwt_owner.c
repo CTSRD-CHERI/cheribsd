@@ -144,22 +144,14 @@ hwt_owner_shutdown(struct hwt_owner *ho)
 		ctx->state = 0;
 		HWT_CTX_UNLOCK(ctx);
 
-		/* Wait completion of hook invocation. */
-		while (refcount_load(&ctx->refcnt) > 0) {
-			printf("?");
+		/* Ensure hooks invocation is now completed. */
+		while (refcount_load(&ctx->refcnt) > 0)
 			continue;
-		}
 
-#if 0
-		/* Wake up all threads. */
-		TAILQ_FOREACH(thr, &ctx->threads, next) {
-			HWT_THR_LOCK(thr);
-			wakeup(thr);
-			HWT_THR_UNLOCK(thr);
-		}
-#endif
+		/*
+		 * Note that a thread could be still sleeping on msleep(9).
+		 */
 
-		/* Note that a thread could be still sleeping on msleep_spin. */
 		hwt_backend_deinit(ctx);
 		hwt_record_free_all(ctx);
 		hwt_ctx_free(ctx);
