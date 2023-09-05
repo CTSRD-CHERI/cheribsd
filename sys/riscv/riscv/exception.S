@@ -65,23 +65,20 @@ __FBSDID("$FreeBSD$");
 
 	csc	cra, (TF_RA)(csp)
 	csc	ctp, (TF_TP)(csp)
+	csc	cgp, (TF_GP)(csp)
 #else
 	addi	sp, sp, -(TF_SIZE)
 
 	sd	ra, (TF_RA)(sp)
 	sd	tp, (TF_TP)(sp)
+	sd	gp, (TF_GP)(sp)
 #endif
 
 .if \mode == 0	/* We came from userspace. */
-#if __has_feature(capabilities)
-	csc	cgp, (TF_GP)(csp)
-
 	/* Load our pcpu */
+#if __has_feature(capabilities)
 	clc	ctp, (TF_SIZE)(csp)
 #else
-	sd	gp, (TF_GP)(sp)
-
-	/* Load our pcpu */
 	ld	tp, (TF_SIZE)(sp)
 #endif
 .endif
