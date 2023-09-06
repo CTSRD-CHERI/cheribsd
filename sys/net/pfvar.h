@@ -1066,10 +1066,12 @@ struct pf_kstate {
 	u_int8_t		 rt;
 };
 
+#if __SIZEOF_POINTER__ <= 8
 /*
  * Size <= fits 11 objects per page on LP64. Try to not grow the struct beyond that.
  */
 _Static_assert(sizeof(struct pf_kstate) <= 368, "pf_kstate size crosses 368 bytes");
+#endif
 #endif
 
 /*
