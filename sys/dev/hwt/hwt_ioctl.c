@@ -264,14 +264,21 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 	struct hwt_cpu *cpu;
 	struct hwt_vm *vm;
 	char path[MAXPATHLEN];
-	int error;
-	int cpu_id;
+	size_t cpusetsize;
+	cpuset_t cpu_map;
 	int cpu_count;
+	int cpu_id;
+	int error;
 
 	cpu_count = 0;
 
+	cpusetsize = min(halloc->cpusetsize, sizeof(cpuset_t));
+	error = copyin(halloc->cpu_map, &cpu_map, cpusetsize);
+	if (error)
+		return (error);
+
 	CPU_FOREACH(cpu_id) {
-		if (!CPU_ISSET(cpu_id, &halloc->cpu_map))
+		if (!CPU_ISSET(cpu_id, &cpu_map))
 			continue;
 		/* Ensure CPU is not halted. */
 		if (CPU_ISSET(cpu_id, &hlt_cpus_mask))
@@ -297,7 +304,7 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 	ctx->hwt_backend = backend;
 	ctx->hwt_owner = ho;
 	ctx->mode = HWT_MODE_CPU;
-	ctx->cpu_map = halloc->cpu_map;
+	ctx->cpu_map = cpu_map;
 
 	error = copyout(&ctx->ident, halloc->ident, sizeof(int));
 	if (error) {
@@ -306,7 +313,7 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 	}
 
 	CPU_FOREACH(cpu_id) {
-		if (!CPU_ISSET(cpu_id, &halloc->cpu_map))
+		if (!CPU_ISSET(cpu_id, &cpu_map))
 			continue;
 
 		sprintf(path, "hwt_%d_%d", ctx->ident, cpu_id);
