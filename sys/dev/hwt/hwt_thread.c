@@ -95,6 +95,8 @@ hwt_thread_lookup(struct hwt_context *ctx, struct thread *td)
 {
 	struct hwt_thread *thr;
 
+	/* Caller of this func holds ctx refcnt right here. */
+
 	HWT_CTX_LOCK(ctx);
 	TAILQ_FOREACH(thr, &ctx->threads, next) {
 		if (thr->td == td) {
