@@ -53,6 +53,7 @@
 #include <dev/hwt/hwt_owner.h>
 #include <dev/hwt/hwt_backend.h>
 #include <dev/hwt/hwt_record.h>
+#include <dev/hwt/hwt_vm.h>
 
 #define	HWT_DEBUG
 #undef	HWT_DEBUG
@@ -90,7 +91,7 @@ hwt_switch_in(struct thread *td)
 		return;
 	}
 
-	printf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
+	dprintf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
 	    thr->thread_id, td->td_tid, cpu_id);
 
 	hwt_backend_configure(ctx, cpu_id, thr->thread_id);
@@ -125,7 +126,7 @@ hwt_switch_out(struct thread *td)
 		return;
 	}
 
-	printf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
+	dprintf("%s: thr %p index %d tid %d on cpu_id %d\n", __func__, thr,
 	    thr->thread_id, td->td_tid, cpu_id);
 
 	hwt_backend_disable(ctx, cpu_id);
@@ -134,7 +135,7 @@ hwt_switch_out(struct thread *td)
 }
 
 static void
-hwt_thread_exit(struct thread *td)
+hwt_hook_thread_exit(struct thread *td)
 {
 	struct hwt_context *ctx;
 	struct hwt_thread *thr;
@@ -209,6 +210,65 @@ hwt_hook_mmap(struct thread *td)
 		hwt_thread_free(thr);
 }
 
+static int
+hwt_hook_thread_create(struct thread *td)
+{
+	struct hwt_record_entry *entry;
+	struct hwt_context *ctx;
+	struct hwt_thread *thr;
+	char path[MAXPATHLEN];
+	size_t bufsize;
+	struct proc *p;
+	int thread_id;
+	int error;
+
+	p = td->td_proc;
+
+	/* Step 1. Get CTX and collect information needed. */
+	ctx = hwt_contexthash_lookup(p);
+	if (ctx == NULL)
+		return (ENXIO);
+	thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
+	bufsize = ctx->bufsize;
+	sprintf(path, "hwt_%d_%d", ctx->ident, thread_id);
+	hwt_ctx_put(ctx);
+
+	/* Step 2. Allocate some memory without holding ctx ref. */
+	error = hwt_thread_alloc(&thr, path, bufsize);
+	if (error) {
+		printf("%s: could not allocate thread, error %d\n",
+		    __func__, error);
+		return (error);
+	}
+
+	entry = hwt_record_entry_alloc();
+	entry->record_type = HWT_RECORD_THREAD_CREATE;
+	entry->thread_id = thread_id;
+
+	/* Step 3. Get CTX once again. */
+	ctx = hwt_contexthash_lookup(p);
+	if (ctx == NULL) {
+		hwt_record_entry_free(entry);
+		hwt_thread_free(thr);
+		/* ctx->thread_counter does not matter. */
+		return (ENXIO);
+	}
+
+	thr->vm->ctx = ctx;
+	thr->ctx = ctx;
+	thr->thread_id = thread_id;
+	thr->td = td;
+
+	HWT_CTX_LOCK(ctx);
+	TAILQ_INSERT_TAIL(&ctx->threads, thr, next);
+	LIST_INSERT_HEAD(&ctx->records, entry, next);
+	HWT_CTX_UNLOCK(ctx);
+
+	hwt_ctx_put(ctx);
+
+	return (0);
+}
+
 static void
 hwt_hook_handler(struct thread *td, int func, void *arg)
 {
@@ -226,18 +286,15 @@ hwt_hook_handler(struct thread *td, int func, void *arg)
 		hwt_switch_out(td);
 		break;
 	case HWT_THREAD_CREATE:
-		hwt_thread_create(td);
+		hwt_hook_thread_create(td);
 		break;
 	case HWT_THREAD_SET_NAME:
 		/* TODO. */
 		break;
 	case HWT_THREAD_EXIT:
-		hwt_thread_exit(td);
+		hwt_hook_thread_exit(td);
 		break;
 	case HWT_EXEC:
-		hwt_record(td, arg);
-		hwt_hook_mmap(td);
-		break;
 	case HWT_MMAP:
 		hwt_record(td, arg);
 		hwt_hook_mmap(td);
