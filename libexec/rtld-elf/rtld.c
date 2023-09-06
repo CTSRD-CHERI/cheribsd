@@ -404,6 +404,7 @@ enum {
 	LD_SKIP_INIT_FUNCS,
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 	LD_UTRACE_COMPARTMENT,
+	LD_COMPARTMENT_ENABLE,
 	LD_COMPARTMENT_OVERHEAD,
 #endif
 };
@@ -445,8 +446,9 @@ static struct ld_env_var_desc ld_env_vars[] = {
 	LD_ENV_DESC(SHOW_AUXV, false),
 	LD_ENV_DESC(SKIP_INIT_FUNCS, true),
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	LD_ENV_DESC(UTRACE_COMPARTMENT, true),
-	LD_ENV_DESC(COMPARTMENT_OVERHEAD, true),
+	LD_ENV_DESC(UTRACE_COMPARTMENT, false),
+	LD_ENV_DESC(COMPARTMENT_ENABLE, false),
+	LD_ENV_DESC(COMPARTMENT_OVERHEAD, false),
 #endif
 };
 
@@ -836,6 +838,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     ld_utrace = ld_get_env_var(LD_UTRACE);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
     ld_utrace_compartment = ld_get_env_var(LD_UTRACE_COMPARTMENT);
+    ld_compartment_enable = ld_get_env_var(LD_COMPARTMENT_ENABLE);
     ld_compartment_overhead = ld_get_env_var(LD_COMPARTMENT_OVERHEAD);
 #endif
 
@@ -4629,11 +4632,13 @@ dl_iterate_phdr(__dl_iterate_hdr_callback callback, void *param)
 	error = 0;
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	callback = _rtld_sandbox_code(callback, (struct tramp_sig) {
-		.valid = true,
-		.reg_args = 3,
-		.mem_args = false,
-		.ret_args = C0
+	callback = tramp_intern(NULL, &(struct tramp_data) {
+		.target = callback,
+		.defobj = obj_from_addr(callback),
+		.sig = (struct tramp_sig) {
+			.valid = true,
+			.reg_args = 3, .mem_args = false, .ret_args = C0
+		}
 	});
 #endif
 

@@ -46,6 +46,7 @@ __FBSDID("$FreeBSD$");
 uintptr_t sealer_pltgot, sealer_jmpbuf, sealer_tramp;
 
 const char *ld_utrace_compartment;	/* Use utrace() to log compartmentalisation-related events */
+const char *ld_compartment_enable;	/* Enable compartmentalisation */
 const char *ld_compartment_overhead;	/* Simulate overhead during compartment transitions */
 
 /*
@@ -65,9 +66,13 @@ _rtld_thread_start_init(void (*p)(struct pthread *))
 {
 	assert((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) == 0);
 	assert(thr_thread_start == NULL);
-	thr_thread_start = _rtld_sandbox_code(p, (struct tramp_sig) {
-		.valid = true,
-		.reg_args = 1, .mem_args = false, .ret_args = NONE
+	thr_thread_start = tramp_intern(NULL, &(struct tramp_data) {
+		.target = p,
+		.defobj = obj_from_addr(p),
+		.sig = (struct tramp_sig) {
+			.valid = true,
+			.reg_args = 1, .mem_args = false, .ret_args = NONE
+		}
 	});
 }
 
@@ -109,9 +114,13 @@ _rtld_sighandler_init(void (*p)(int, siginfo_t *, void *))
 {
 	assert((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) == 0);
 	assert(thr_sighandler == NULL);
-	thr_sighandler = _rtld_sandbox_code(p, (struct tramp_sig) {
-		.valid = true,
-		.reg_args = 3, .mem_args = false, .ret_args = NONE
+	thr_sighandler = tramp_intern(NULL, &(struct tramp_data) {
+		.target = p,
+		.defobj = obj_from_addr(p),
+		.sig = (struct tramp_sig) {
+			.valid = true,
+			.reg_args = 3, .mem_args = false, .ret_args = NONE
+		}
 	});
 }
 
@@ -237,6 +246,9 @@ tramp_should_exclude(const Obj_Entry *reqobj, const struct tramp_data *data)
 {
 	const char *sym;
 	const struct compart *com;
+
+	if (data->target == NULL)
+		return (true);
 
 	if (data->def == NULL)
 		return (false);
@@ -728,14 +740,12 @@ tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *data)
 	ptraddr_t key;
 	int exp;
 
+	/* reqobj == NULL iff the request is by RTLD */
 	assert(
 	    (reqobj == NULL || data->def != NULL) &&
 	    data->defobj != NULL &&
 	    data->entry == NULL &&
 	    tramp_sig_legal(data->sig));
-
-	if (data->target == NULL)
-		return (NULL);
 
 	if (tramp_should_exclude(reqobj, data))
 		return (data->target);
@@ -825,15 +835,16 @@ end:
 	return (entry);
 }
 
+/*
+ * APIs
+ */
+/*
 static long
 tramp_sig_to_otype(struct tramp_sig sig)
 {
 	return (sig.ret_args | (sig.mem_args << 2) | (sig.reg_args << 3));
 }
 
-/*
- * APIs
- */
 void *
 _rtld_sandbox_code(void *target, struct tramp_sig sig)
 {
@@ -908,6 +919,7 @@ _rtld_safebox_code(void *target, struct tramp_sig sig)
 
 	return target;
 }
+*/
 
 struct tramp_sig
 tramp_fetch_sig(const Obj_Entry *obj, unsigned long symnum)
