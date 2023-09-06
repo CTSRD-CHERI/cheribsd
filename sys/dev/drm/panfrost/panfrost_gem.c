@@ -144,10 +144,10 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 		color = PANFROST_BO_NOEXEC;
 	}
 
-	mtx_lock_spin(&mapping->mmu->mm_lock);
+	mtx_lock(&mapping->mmu->mm_lock);
 	error = drm_mm_insert_node_generic(&mapping->mmu->mm, &mapping->mmnode,
 	    obj->size >> PAGE_SHIFT, align, color, 0 /* mode */);
-	mtx_unlock_spin(&mapping->mmu->mm_lock);
+	mtx_unlock(&mapping->mmu->mm_lock);
 	if (error) {
 		device_printf(sc->dev,
 		    "%s: Failed to insert: sz %d, align %d, color %d, err %d\n",
@@ -505,10 +505,10 @@ panfrost_gem_teardown_mapping(struct panfrost_gem_mapping *mapping)
 	if (mapping->active)
 		panfrost_mmu_unmap(mmu->sc, mapping);
 
-	mtx_lock_spin(&mmu->mm_lock);
+	mtx_lock(&mmu->mm_lock);
 	if (drm_mm_node_allocated(&mapping->mmnode))
 		drm_mm_remove_node(&mapping->mmnode);
-	mtx_unlock_spin(&mmu->mm_lock);
+	mtx_unlock(&mmu->mm_lock);
 }
 
 void
