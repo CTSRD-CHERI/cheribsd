@@ -194,7 +194,7 @@ hwt_hook_mmap(struct thread *td)
 	/*
 	 * msleep(9) atomically releases the mtx lock, so take refcount
 	 * to ensure that thr is not destroyed.
-	 * It could not be destroyed prior to this could as we are holding ctx
+	 * It could not be destroyed prior to this call as we are holding ctx
 	 * refcnt.
 	 */
 	refcount_acquire(&thr->refcnt);
