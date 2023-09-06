@@ -135,7 +135,7 @@ _CPUCFLAGS = -mcpu=${CPUTYPE}
 .  if ${CPUTYPE} == "e500"
 _CPUCFLAGS = -Wa,-me500 -msoft-float
 .  else
-_CPUCFLAGS = -mcpu=${CPUTYPE} -mno-powerpc64
+_CPUCFLAGS = -mcpu=${CPUTYPE}
 .  endif
 . elif ${MACHINE_ARCH:Mpowerpc64*} != ""
 _CPUCFLAGS = -mcpu=${CPUTYPE}
@@ -331,7 +331,7 @@ MACHINE_CPU += riscv
 .if ${MACHINE_CPUARCH} == "aarch64"
 . if ${MACHINE_CPU:Mcheri}
 CFLAGS+=	-march=morello
-CFLAGS+=	-Xclang -morello-vararg=new
+CFLAGS+=	-Xclang -morello-vararg=new -Xclang -morello-bounded-memargs=caller-only
 LDFLAGS+=	-march=morello
 . endif
 

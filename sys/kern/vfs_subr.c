@@ -145,7 +145,7 @@ SYSCTL_COUNTER_U64(_vfs, OID_AUTO, vnodes_created, CTLFLAG_RD, &vnodes_created,
  * Conversion tables for conversion from vnode types to inode formats
  * and back.
  */
-enum vtype iftovt_tab[16] = {
+__enum_uint8(vtype) iftovt_tab[16] = {
 	VNON, VFIFO, VCHR, VNON, VDIR, VNON, VBLK, VNON,
 	VREG, VNON, VLNK, VNON, VSOCK, VNON, VNON, VNON
 };
@@ -4288,11 +4288,9 @@ vn_printf(struct vnode *vp, const char *fmt, ...)
 		strlcat(buf, "|VV_MD", sizeof(buf));
 	if (vp->v_vflag & VV_FORCEINSMQ)
 		strlcat(buf, "|VV_FORCEINSMQ", sizeof(buf));
-	if (vp->v_vflag & VV_READLINK)
-		strlcat(buf, "|VV_READLINK", sizeof(buf));
 	flags = vp->v_vflag & ~(VV_ROOT | VV_ISTTY | VV_NOSYNC | VV_ETERNALDEV |
 	    VV_CACHEDLABEL | VV_VMSIZEVNLOCK | VV_COPYONWRITE | VV_SYSTEM |
-	    VV_PROCDEP | VV_DELETED | VV_MD | VV_FORCEINSMQ | VV_READLINK);
+	    VV_PROCDEP | VV_DELETED | VV_MD | VV_FORCEINSMQ);
 	if (flags != 0) {
 		snprintf(buf2, sizeof(buf2), "|VV(0x%lx)", flags);
 		strlcat(buf, buf2, sizeof(buf));
@@ -5299,7 +5297,7 @@ out_error:
  * Returns 0 on success, or an errno on failure.
  */
 int
-vaccess(enum vtype type, mode_t file_mode, uid_t file_uid, gid_t file_gid,
+vaccess(__enum_uint8(vtype) type, mode_t file_mode, uid_t file_uid, gid_t file_gid,
     accmode_t accmode, struct ucred *cred)
 {
 	accmode_t dac_granted;
@@ -7053,7 +7051,7 @@ vn_getsize(struct vnode *vp, off_t *size, struct ucred *cred)
 
 #ifdef INVARIANTS
 void
-vn_set_state_validate(struct vnode *vp, enum vstate state)
+vn_set_state_validate(struct vnode *vp, __enum_uint8(vstate) state)
 {
 
 	switch (vp->v_state) {

@@ -737,10 +737,12 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 		 * the hint would fall in the potential heap space,
 		 * place it after the end of the largest possible heap.
 		 *
-		 * There should really be a pmap call to determine a reasonable
-		 * location.
+		 * For anonymous mappings within the address space of the
+		 * calling process, the absence of a hint is handled at a
+		 * lower level in order to implement different clustering
+		 * strategies for ASLR.
 		 */
-		if (addr == 0 ||
+		if (((flags & MAP_ANON) == 0 && addr == 0) ||
 		    (addr >= round_page((vm_offset_t)vms->vm_taddr) &&
 		    addr < round_page((vm_offset_t)vms->vm_daddr +
 		    lim_max(td, RLIMIT_DATA))))
@@ -1272,19 +1274,43 @@ struct mincore_args {
 int
 sys_mincore(struct thread *td, struct mincore_args *uap)
 {
+	uintcap_t addr = (uintcap_t)uap->addr;
 
 #if __has_feature(capabilities)
+	vm_offset_t range_bottom_page = trunc_page(addr);
+	vm_offset_t range_top_page = round_page(addr + uap->len);
+	vm_offset_t cap_bottom_page = trunc_page(cheri_getbase(addr));
+	vm_offset_t cap_top_page = round_page(cheri_gettop(addr));
+
 	/*
-	 * Since this is a read-only query that does not modify any mappings
-	 * or raise faults, we do not require the cap to cover
-	 * the full page, just to overlap at least part of the page.
+	 * mincore(2) is a read-only, metadata operation.  Require that
+	 * the capabilty be valid and unsealed, have at least one of
+	 * execute, load, or store permissions (it's a memory capability
+	 * with permision to do *something*) and that it cover at least
+	 * one byte of every page whose status is requested.
+	 *
+	 * Note that we don't require the address to be in bounds as
+	 * portable callers will round down to page alignment.  Likewise,
+	 * we don't require that the page have the CHERI_PERM_SW_VMEM
+	 * as we're not manipulating or accessing memory and it needs to
+	 * work on stacks and malloced memory.
+	 *
+	 * XXX: disallowing sealed capabilities means users can't call
+	 * mincore() on function pointers, but that seems unlikely to
+	 * be useful and isn't portable as there's no way to round them
+	 * down without stripping the tag.
 	 */
-	if (__CAP_CHECK(uap->addr, uap->len) == 0)
+	if (!cheri_gettag(addr) || cheri_getsealed(addr) ||
+	    (cheri_getperm(addr) &
+	    (CHERI_PERM_EXECUTE | CHERI_PERM_LOAD | CHERI_PERM_STORE)) == 0 ||
+	    range_bottom_page < cap_bottom_page ||
+	    range_bottom_page >= cap_top_page ||
+	    range_top_page <= cap_bottom_page ||
+	    range_top_page > cap_top_page)
 		return (EPROT);
 #endif
 
-	return (kern_mincore(td, (uintptr_t)(uintcap_t)uap->addr, uap->len,
-	    uap->vec));
+	return (kern_mincore(td, (uintptr_t)addr, uap->len, uap->vec));
 }
 
 int

@@ -496,7 +496,8 @@ kern_shmat_locked(struct thread *td, int shmid,
 		 * extending before and after the entry to allow arbitrary
 		 * addresses (subject to available space...).
 		 */
-		if (CHERI_REPRESENTABLE_BASE(attach_va, size) != attach_va)
+		if (CHERI_REPRESENTABLE_ALIGN_DOWN(attach_va, size) !=
+		    attach_va)
 			return (EINVAL);
 		if (cheri_gettag(shmaddr)) {
 			int reqperm;

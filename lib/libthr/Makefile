@@ -70,8 +70,10 @@ SYMBOL_MAPS+=	${LIBTHR_SRCTOP}/pthread-c18n.map
 MAN=	libthr.3
 .endif
 
+.if ${MK_PTHREADS_ASSERTIONS} != "no"
 # enable extra internal consistency checks
 CFLAGS+=-D_PTHREADS_INVARIANTS
+.endif
 
 PRECIOUSLIB=
 

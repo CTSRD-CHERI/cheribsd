@@ -414,8 +414,18 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 /* Provide macros to make it easier to work with the raw CRAM/CRRL results: */
 #define	CHERI_REPRESENTABLE_ALIGNMENT(len) \
 	(~CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) + 1)
-#define	CHERI_REPRESENTABLE_BASE(base, len) \
+#define	CHERI_REPRESENTABLE_ALIGN_DOWN(base, len) \
 	((base) & CHERI_REPRESENTABLE_ALIGNMENT_MASK(len))
+
+#if __has_feature(capabilities)
+#define	CHERI_REPRESENTABLE_ALIGN_UP(base, len) \
+	__align_up((base), CHERI_REPRESENTABLE_ALIGNMENT(len))
+#else
+#define	CHERI_REPRESENTABLE_ALIGN_UP(base, len) (base)
+#endif
+
+/* Backwards compat. */
+#define	CHERI_REPRESENTABLE_BASE	CHERI_REPRESENTABLE_ALIGNMENT_DOWN
 
 /*
  * In the current encoding sealed and unsealed capabilities have the same
@@ -428,7 +438,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 #define	CHERI_SEALABLE_ALIGNMENT(len)	\
 	CHERI_REPRESENTABLE_ALIGNMENT(len)
 #define	CHERI_SEALABLE_BASE(base, len)	\
-	CHERI_REPRESENTABLE_BASE(base, len)
+	CHERI_REPRESENTABLE_ALIGN_DOWN(base, len)
 
 /* A mask for the lower bits, i.e. the negated alignment mask */
 #define	CHERI_SEAL_ALIGN_MASK(l)	~(CHERI_SEALABLE_ALIGNMENT_MASK(l))

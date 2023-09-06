@@ -608,8 +608,7 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 	 * executable. For RTLD we also align upwards to avoid aligning
 	 * down into the memory region for the main binary.
 	 */
-	reservation = roundup2(reservation,
-	    CHERI_REPRESENTABLE_ALIGNMENT(end - start));
+	reservation = CHERI_REPRESENTABLE_ALIGN_UP(reservation, end - start);
 #endif
 	result = vm_map_reservation_create(map, &reservation, end - start,
 	    PAGE_SIZE, VM_PROT_ALL);
@@ -1127,7 +1126,8 @@ __elfN(enforce_limits)(const struct image_params *imgp, const Elf_Ehdr *hdr,
 	 * Sanity check that the base address was aligned correctly so that we
 	 * can represent a capability spanning the entire executable.
 	 */
-	KASSERT(imgp->start_addr == CHERI_REPRESENTABLE_BASE(imgp->start_addr,
+	KASSERT(imgp->start_addr ==
+	    CHERI_REPRESENTABLE_ALIGN_DOWN(imgp->start_addr,
 	    imgp->end_addr - imgp->start_addr) && imgp->end_addr ==
 	    imgp->start_addr + CHERI_REPRESENTABLE_LENGTH(imgp->end_addr -
 	    imgp->start_addr), ("Image range [%#jx-%#jx] is not representable "
@@ -1251,7 +1251,7 @@ __elfN(load_interp)(struct image_params *imgp, const Elf_Brandinfo *brand_info,
 	error = __elfN(load_file)(imgp->proc, interp, addr, &end_addr, entry);
 done:
 	if (error == 0) {
-		imgp->interp_start = CHERI_REPRESENTABLE_BASE(*addr,
+		imgp->interp_start = CHERI_REPRESENTABLE_ALIGN_DOWN(*addr,
 		    end_addr - *addr);
 		imgp->interp_end = imgp->interp_start +
 		    CHERI_REPRESENTABLE_LENGTH(end_addr - *addr);
@@ -1555,7 +1555,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		goto ret;
 
 	/* Round start/end addresses to representability */
-	imgp->start_addr = CHERI_REPRESENTABLE_BASE(representable_start,
+	imgp->start_addr = CHERI_REPRESENTABLE_ALIGN_DOWN(representable_start,
 	    representable_end - representable_start);
 	imgp->end_addr = imgp->start_addr +
 	    CHERI_REPRESENTABLE_LENGTH(representable_end - representable_start);
@@ -1664,7 +1664,7 @@ prog_cap(struct image_params *imgp, uint64_t perms)
 	 * choosing a sensible start address and length.
 	 */
 	KASSERT(prog_len == CHERI_REPRESENTABLE_LENGTH(prog_len) &&
-	    prog_base == CHERI_REPRESENTABLE_BASE(prog_base, prog_len),
+	    prog_base == CHERI_REPRESENTABLE_ALIGN_DOWN(prog_base, prog_len),
 	    ("program capability [%#jx-%#jx] not representable (length=%#zx)",
 	    (uintmax_t)prog_base, (uintmax_t)imgp->end_addr, prog_len));
 
@@ -1687,7 +1687,8 @@ interp_cap(struct image_params *imgp, Elf_Auxargs *args, uint64_t perms)
 	 * choosing a sensible start address.
 	 */
 	KASSERT(interp_len == CHERI_REPRESENTABLE_LENGTH(interp_len) &&
-	    interp_base == CHERI_REPRESENTABLE_BASE(interp_base, interp_len),
+	    interp_base ==
+	    CHERI_REPRESENTABLE_ALIGN_DOWN(interp_base, interp_len),
 	    ("interp capability [%#jx-%#jx] not representable (length=%#zx)",
 	    (uintmax_t)interp_base, (uintmax_t)imgp->interp_end, interp_len));
 	MPASS(args->base >= interp_base);
@@ -1709,7 +1710,7 @@ timekeep_cap(struct image_params *imgp)
 	    sizeof(struct vdso_timehands) * VDSO_TH_NUM;
 
 	/* These are sub-page so should be representable as-is. */
-	KASSERT(timekeep_base == CHERI_REPRESENTABLE_BASE(timekeep_base,
+	KASSERT(timekeep_base == CHERI_REPRESENTABLE_ALIGN_DOWN(timekeep_base,
 	    timekeep_len), ("timekeep_base needs rounding"));
 	KASSERT(timekeep_len == CHERI_REPRESENTABLE_LENGTH(timekeep_len),
 	    ("timekeep_len needs rounding"));
@@ -2042,7 +2043,8 @@ __elfN(coredump)(struct thread *td, struct vnode *vp, off_t limit, int flags)
 #if __has_feature(capabilities)
 			section_cap = cheri_capability_build_user_data(
 			    CHERI_PERM_LOAD,
-			    CHERI_REPRESENTABLE_BASE(php->p_vaddr, php->p_filesz),
+			    CHERI_REPRESENTABLE_ALIGN_DOWN(php->p_vaddr,
+			    php->p_filesz),
 			    CHERI_REPRESENTABLE_LENGTH(php->p_filesz), 0);
 #else
 			section_cap = (char *)(uintptr_t)php->p_vaddr;

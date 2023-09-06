@@ -34,8 +34,9 @@ CFLAGS+=-DWITH_CASPER
 CFLAGS+=-DIPSEC
 LIBADD+=	ipsec
 
-# Doesn't link reliably with CheriABI
-#HAS_TESTS=
-#SUBDIR.${MK_TESTS}+= tests
+CFLAGS+=	-Wno-error=unused-but-set-variable
+
+HAS_TESTS=
+SUBDIR.${MK_TESTS}+= tests
 
 .include <bsd.prog.mk>

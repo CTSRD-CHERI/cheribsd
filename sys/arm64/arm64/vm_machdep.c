@@ -258,6 +258,8 @@ cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
 	tf->tf_elr = (uintcap_t)entry;
 #endif
 	tf->tf_x[0] = (uintcap_t)arg;
+	tf->tf_x[29] = 0;
+	tf->tf_lr = 0;
 }
 
 int

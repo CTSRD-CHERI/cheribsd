@@ -38,22 +38,38 @@
 #define	LIBSTDBUF64	"/usr/lib64/libstdbuf.so"
 #define	LIBSTDBUF64C	"/usr/lib64c/libstdbuf.so"
 
-extern char *__progname;
+static int
+appendenv(const char *key, const char *value)
+{
+	char *curval, *newpair;
+	int ret;
+
+	curval = getenv(key);
+	if (curval == NULL)
+		ret = asprintf(&newpair, "%s=%s", key, value);
+	else
+		ret = asprintf(&newpair, "%s=%s:%s", key, curval, value);
+	if (ret > 0)
+		ret = putenv(newpair);
+	if (ret < 0)
+		warn("Failed to set environment variable: %s", key);
+	return (ret);
+}
 
 static void
-usage(int s)
+usage(void)
 {
 
-	fprintf(stderr, "Usage: %s [-e 0|L|B|<sz>] [-i 0|L|B|<sz>] [-o 0|L|B|<sz>] "
-	    "<cmd> [args ...]\n", __progname);
-	exit(s);
+	fprintf(stderr,
+	    "usage: stdbuf [-e 0|L|B|<sz>] [-i 0|L|B|<sz>] [-o 0|L|B|<sz>] "
+	    "<cmd> [args ...]\n");
+	exit(1);
 }
 
 int
 main(int argc, char *argv[])
 {
 	char *ibuf, *obuf, *ebuf;
-	char *preload0, *preload1;
 	int i;
 
 	ibuf = obuf = ebuf = NULL;
@@ -68,9 +84,8 @@ main(int argc, char *argv[])
 		case 'o':
 			obuf = optarg;
 			break;
-		case '?':
 		default:
-			usage(1);
+			usage();
 			break;
 		}
 	}
@@ -89,45 +104,10 @@ main(int argc, char *argv[])
 		warn("Failed to set environment variable: %s=%s",
 		    "_STDBUF_E", ebuf);
 
-	preload0 = getenv("LD_PRELOAD");
-	if (preload0 == NULL)
-		i = asprintf(&preload1, "LD_PRELOAD=" LIBSTDBUF);
-	else
-		i = asprintf(&preload1, "LD_PRELOAD=%s:%s", preload0,
-		    LIBSTDBUF);
-
-	if (i < 0 || putenv(preload1) == -1)
-		warn("Failed to set environment variable: LD_PRELOAD");
-
-	preload0 = getenv("LD_32_PRELOAD");
-	if (preload0 == NULL)
-		i = asprintf(&preload1, "LD_32_PRELOAD=" LIBSTDBUF32);
-	else
-		i = asprintf(&preload1, "LD_32_PRELOAD=%s:%s", preload0,
-		    LIBSTDBUF32);
-
-	if (i < 0 || putenv(preload1) == -1)
-		warn("Failed to set environment variable: LD_32_PRELOAD");
-
-	preload0 = getenv("LD_64_PRELOAD");
-	if (preload0 == NULL)
-		i = asprintf(&preload1, "LD_64_PRELOAD=" LIBSTDBUF64);
-	else
-		i = asprintf(&preload1, "LD_64_PRELOAD=%s:%s", preload0,
-		    LIBSTDBUF64);
-
-	if (i < 0 || putenv(preload1) == -1)
-		warn("Failed to set environment variable: LD_64_PRELOAD");
-
-	preload0 = getenv("LD_64C_PRELOAD");
-	if (preload0 == NULL)
-		i = asprintf(&preload1, "LD_64C_PRELOAD=" LIBSTDBUF64C);
-	else
-		i = asprintf(&preload1, "LD_64C_PRELOAD=%s:%s", preload0,
-		    LIBSTDBUF64C);
-
-	if (i < 0 || putenv(preload1) == -1)
-		warn("Failed to set environment variable: LD_64C_PRELOAD");
+	appendenv("LD_PRELOAD", LIBSTDBUF);
+	appendenv("LD_32_PRELOAD", LIBSTDBUF32);
+	appendenv("LD_64_PRELOAD", LIBSTDBUF64);
+	appendenv("LD_64C_PRELOAD", LIBSTDBUF64C);
 
 	execvp(argv[0], argv);
 	err(2, "%s", argv[0]);

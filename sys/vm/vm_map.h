@@ -462,6 +462,7 @@ long vmspace_resident_count(struct vmspace *vmspace);
 /* Gap for MAP_ENTRY_SPLIT_BOUNDARY_MASK */
 
 #define	MAP_SPLIT_BOUNDARY_MASK	0x00180000
+#define	MAP_NO_HINT		0x00200000
 
 #define	MAP_SPLIT_BOUNDARY_SHIFT 19
 

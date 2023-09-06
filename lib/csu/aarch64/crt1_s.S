@@ -32,13 +32,50 @@
 #include <machine/asm.h>
 __FBSDID("$FreeBSD$");
 
+	/*
+	 * The program entry point
+	 * void _start(char **ap, void (*cleanup)(void)) __dead2
+	 */
 ENTRY(_start)
+	.cfi_undefined x30
 	mov	x3, x2		/* cleanup */
 	add	x1, x0, #8	/* load argv */
 	ldr	x0, [x0]	/* load argc */
 	add	x2, x1, x0, lsl #3 /* env is after argv */
 	add	x2, x2, #8	/* argv is null terminated */
-	b	 __start
+#if __has_feature(capabilities) && !defined(PIC)
+	mov	x19, x0		/* save argc */
+	mov	x20, x1		/* save argv */
+	mov	x21, x2		/* save env */
+	mov	x22, x3		/* save cleanup */
+	/*
+	 * __process_cap_relocs(env)
+	 */
+	mov	x0, x21
+	bl	__process_cap_relocs
+	mov	x0, x19		/* restore argc */
+	mov	x1, x20		/* restore argv */
+	mov	x2, x21		/* restore env */
+	mov	x3, x22		/* restore cleanup */
+#endif
+#ifdef PIC
+	adrp	x4, main
+	add	x4, x4, :lo12:main
+#else
+	ldr	x4, =main
+#endif
+#ifdef GCRT
+	ldr	x5, =eprol
+	ldr	x6, =etext
+	/*
+	 * __libc_start1_gcrt(argc, argv, env, cleanup, main, &eprol, &etext)
+	 */
+	bl	__libc_start1_gcrt
+eprol:
+#else
+	/* __libc_start1(argc, argv, env, cleanup, main) */
+	bl	__libc_start1
+#endif
 END(_start)
 
 	.section .note.GNU-stack,"",@progbits

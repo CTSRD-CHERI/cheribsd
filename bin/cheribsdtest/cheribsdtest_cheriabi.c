@@ -60,6 +60,82 @@
 
 #include "cheribsdtest.h"
 
+#define	MINCORE_PAGES	3
+
+CHERIBSDTEST(cheriabi_mincore,
+    "Test CheriABI mincore() with various permissions and bounds")
+{
+	char *pages, *cap;
+	size_t page_sz = getpagesize();
+	size_t pages_len = page_sz * MINCORE_PAGES;
+	char vec[MINCORE_PAGES];
+
+	pages = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, pages_len,
+	    PROT_MAX(PROT_READ | PROT_WRITE | PROT_EXEC) | PROT_NONE,
+	    MAP_ANON | MAP_PRIVATE, -1, 0));
+
+	cap = pages;
+	CHERIBSDTEST_CHECK_SYSCALL2(mincore(cap, pages_len, vec),
+	    "whole allocation from mmap");
+
+	/*
+	 * mincore(2) requires minimal permissions, the capability just
+	 * needs to be a memory capabilty that can do something useful.
+	 */
+
+	/* No VMEM */
+	cap = cheri_andperm(pages, ~CHERI_PERM_SW_VMEM);
+	CHERIBSDTEST_CHECK_SYSCALL2(mincore(cap, pages_len, vec),
+	    "whole allocation from mmap without VMEM perm");
+
+	/* Execute-only */
+	cap = cheri_andperm(pages, CHERI_PERM_EXECUTE | CHERI_PERM_GLOBAL);
+	CHERIBSDTEST_CHECK_SYSCALL2(mincore(cap, pages_len, vec),
+	    "whole allocation from mmap with only CHERI_PERM_EXECUTE");
+
+	/* Read-only */
+	cap = cheri_andperm(pages, CHERI_PERM_LOAD | CHERI_PERM_GLOBAL);
+	CHERIBSDTEST_CHECK_SYSCALL2(mincore(cap, pages_len, vec),
+	    "whole allocation from mmap with only CHERI_PERM_LOAD");
+
+	/* Write-only */
+	cap = cheri_andperm(pages, CHERI_PERM_STORE | CHERI_PERM_GLOBAL);
+	CHERIBSDTEST_CHECK_SYSCALL2(mincore(cap, pages_len, vec),
+	    "whole allocation from mmap with only CHERI_PERM_STORE");
+
+	/*
+	 * mincore(2) needs to work even if the page isn't fully covered.
+	 * Restrict bounds to cover a single byte of the first and last
+	 * pages.
+	 */
+	cap = trunc_page(cheri_setbounds(pages + page_sz - 1,
+	    pages_len - 2 * (PAGE_SIZE - 1)));
+
+	/* The whole thing */
+	CHERIBSDTEST_CHECK_SYSCALL2(mincore(cap, pages_len, vec),
+	    "whole allocation with reduced bounds");
+
+	/* 1st page */
+	CHERIBSDTEST_CHECK_SYSCALL2(mincore(cap, page_sz, vec),
+	    "first page (last byte inbounds)");
+	CHERIBSDTEST_CHECK_SYSCALL2(mincore(cap + page_sz, page_sz, vec),
+	    "second page (all in bounds)");
+	CHERIBSDTEST_CHECK_SYSCALL2(mincore(cap + pages_len - page_sz,
+	    page_sz, vec), "last page (first byte in bounds)");
+
+#ifdef __FreeBSD__
+	/*
+	 * FreeBSD (nonportably) allows under-aligned address and length.
+	 */
+	CHERIBSDTEST_CHECK_SYSCALL2(mincore(cheri_setoffset(cap, 0), 1, vec),
+	    "last byte of first page");
+	CHERIBSDTEST_CHECK_SYSCALL2(mincore(cheri_setoffset(cap, 0),
+	    cheri_getlen(cap), vec), "whole in-bounds region");
+#endif
+
+	cheribsdtest_success();
+}
+
 CHERIBSDTEST(cheriabi_mmap_unrepresentable,
     "Test CheriABI mmap() with unrepresentable lengths")
 {
@@ -120,18 +196,6 @@ CHERIBSDTEST(cheriabi_mmap_fixed,
 	    MAP_PRIVATE | MAP_FIXED | MAP_ANON, -1, 0);
 	CHERIBSDTEST_VERIFY(p1 == p2);
 
-	cheribsdtest_success();
-}
-
-CHERIBSDTEST(cheriabi_malloc_zero_size,
-    "Check that zero-sized mallocs are properly bounded")
-{
-	void *cap;
-
-	cap = malloc(0);
-	if (cap != NULL && cheri_getlength(cap) != 0)
-		cheribsdtest_failure_errx("malloc(0) returned a non-NULL capability with "
-		    "non-zero length (%zu)", cheri_getlength(cap));
 	cheribsdtest_success();
 }
 

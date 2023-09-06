@@ -1,0 +1,34 @@
+[
+    {
+        "ArchStdEvent": "CPU_CYCLES",
+        "PublicDescription": "Cycle"
+    },
+    {
+        "ArchStdEvent": "BUS_ACCESS",
+        "PublicDescription": "Bus access. This event counts for every beat of data transferred over the data channels between the core and the SCU. If both read and write data beats are transferred on a given cycle, this event is counted twice on that cycle. This event counts the sum of BUS_ACCESS_RD and BUS_ACCESS_WR"
+    },
+    {
+        "ArchStdEvent": "BUS_CYCLES",
+        "PublicDescription": "Bus cycles. This event duplicates CPU_CYCLES"
+    },
+    {
+        "ArchStdEvent": "BUS_ACCESS_RD",
+        "PublicDescription": "Bus access read. This event counts for every beat of data transferred over the read data channel between the core and the SCU"
+    },
+    {
+        "ArchStdEvent": "BUS_ACCESS_WR",
+        "PublicDescription": "Bus access write. This event counts for every beat of data transferred over the write data channel between the core and the SCU"
+    },
+    {
+        "PublicDescription": "Bus access, read, valid capability. The counter counts each access counted by BUS_ACCESS_RD where a Capability Tag was set in at least one beat of the access",
+        "EventCode": "0x22D",
+        "EventName": "BUS_ACCESS_RD_CTAG",
+        "BriefDescription": "Bus access, read, valid capability. The counter counts each access counted by BUS_ACCESS_RD where a Capability Tag was set in at least one beat of the access"
+    },
+    {
+        "PublicDescription": "Bus access, write, valid capability. The counter counts each access counted by BUS_ACCESS_WR where a Capability Tag was set in at least one beat of the access",
+        "EventCode": "0x22E",
+        "EventName": "BUS_ACCESS_WR_CTAG",
+        "BriefDescription": "Bus access, write, valid capability. The counter counts each access counted by BUS_ACCESS_WR where a Capability Tag was set in at least one beat of the access"
+    }
+]

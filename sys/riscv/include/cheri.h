@@ -45,6 +45,7 @@
 /*
  * CHERI-RISC-V-specific kernel utility functions.
  */
+const char *cheri_cap_idx_string(uint8_t cap_idx);
 void	cheri_init_capabilities(void * __capability kroot);
 int	cheri_stval_to_sicode(register_t stval);
 void	hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr);

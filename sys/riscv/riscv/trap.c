@@ -35,6 +35,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_ddb.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -75,6 +77,11 @@ __FBSDID("$FreeBSD$");
 
 #ifdef KDTRACE_HOOKS
 #include <sys/dtrace_bsd.h>
+#endif
+
+#ifdef DDB
+#include <ddb/ddb.h>
+#include <ddb/db_sym.h>
 #endif
 
 #if __has_feature(capabilities)
@@ -209,30 +216,64 @@ cpu_fetch_syscall_args(struct thread *td)
 #endif
 
 static void
+print_with_symbol(const char *name, uintcap_t value)
+{
+#ifdef DDB
+	c_db_sym_t sym;
+	db_expr_t sym_value;
+	db_expr_t offset;
+	const char *sym_name;
+#endif
+
+#if __has_feature(capabilities)
+	printf("%7s: %#.16lp", name, (void * __capability)value);
+#else
+	printf("%7s: 0x%016lx", name, value);
+#endif
+
+#ifdef DDB
+	if (value >= VM_MIN_KERNEL_ADDRESS) {
+		sym = db_search_symbol(value, DB_STGY_ANY, &offset);
+		if (sym != C_DB_SYM_NULL) {
+			db_symbol_values(sym, &sym_name, &sym_value);
+			printf(" (%s + 0x%lx)", sym_name, offset);
+		}
+	}
+#endif
+	printf("\n");
+}
+
+static void
 dump_regs(struct trapframe *frame)
 {
+	char name[6];
 	u_int i;
 
-	PRINT_REG("ra", frame->tf_ra);
-	PRINT_REG("sp", frame->tf_sp);
-	PRINT_REG("gp", frame->tf_gp);
-	PRINT_REG("tp", frame->tf_tp);
+	for (i = 0; i < nitems(frame->tf_t); i++) {
+		snprintf(name, sizeof(name), "t[%d]", i);
+		print_with_symbol(name, frame->tf_t[i]);
+	}
 
-	for (i = 0; i < nitems(frame->tf_t); i++)
-		PRINT_REG_N("t", i, frame->tf_t);
+	for (i = 0; i < nitems(frame->tf_s); i++) {
+		snprintf(name, sizeof(name), "s[%d]", i);
+		print_with_symbol(name, frame->tf_s[i]);
+	}
 
-	for (i = 0; i < nitems(frame->tf_s); i++)
-		PRINT_REG_N("s", i, frame->tf_s);
+	for (i = 0; i < nitems(frame->tf_a); i++) {
+		snprintf(name, sizeof(name), "a[%d]", i);
+		print_with_symbol(name, frame->tf_a[i]);
+	}
 
-	for (i = 0; i < nitems(frame->tf_a); i++)
-		PRINT_REG_N("a", i, frame->tf_a);
-
-	PRINT_REG("sepc", frame->tf_sepc);
+	print_with_symbol("ra", frame->tf_ra);
+	print_with_symbol("sp", frame->tf_sp);
+	print_with_symbol("gp", frame->tf_gp);
+	print_with_symbol("tp", frame->tf_tp);
+	print_with_symbol("sepc", frame->tf_sepc);
 #if __has_feature(capabilities)
-	PRINT_REG("ddc", frame->tf_ddc);
+	print_with_symbol("ddc", frame->tf_ddc);
 #endif
-	printf("sstatus == 0x%016lx\n", frame->tf_sstatus);
-	printf("stval == 0x%016lx\n", frame->tf_stval);
+	printf("sstatus: 0x%016lx\n", frame->tf_sstatus);
+	printf("stval  : 0x%016lx\n", frame->tf_stval);
 }
 
 #if __has_feature(capabilities)
@@ -508,15 +549,21 @@ do_trap_supervisor(struct trapframe *frame)
 		dump_regs(frame);
 		switch (exception) {
 		default:
-			panic("Fatal capability page fault %#lx: %#016lx",
+			panic("Fatal capability page fault %#016lx: %#016lx",
 			    (unsigned long)frame->tf_sepc,
 			    frame->tf_stval);
 			break;
 		case SCAUSE_CHERI:
-			panic("CHERI exception %#lx at 0x%016lx\n",
-			    TVAL_CAP_CAUSE(frame->tf_stval),
+		{
+			u_int cap_cause = TVAL_CAP_CAUSE(frame->tf_stval);
+			u_int cap_idx = TVAL_CAP_IDX(frame->tf_stval);
+
+			panic("CHERI %s for %s at %#016lx\n",
+			    cheri_exccode_string(cap_cause),
+			    cheri_cap_idx_string(cap_idx),
 			    (unsigned long)frame->tf_sepc);
 			break;
+		}
 		}
 #endif
 	default:

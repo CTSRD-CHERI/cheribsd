@@ -145,7 +145,7 @@ INLINE_LIMIT?=	8000
 
 .if ${MACHINE_CPU:Mcheri}
 CFLAGS+=	-march=morello
-CFLAGS+=	-Xclang -morello-vararg=new
+CFLAGS+=	-Xclang -morello-vararg=new -Xclang -morello-bounded-memargs=caller-only
 .endif
 
 .if ${MACHINE_ARCH:Maarch*c*}
@@ -319,7 +319,7 @@ PHONY_NOTMAIN = afterdepend afterinstall all beforedepend beforeinstall \
 .PHONY: ${PHONY_NOTMAIN}
 .NOTMAIN: ${PHONY_NOTMAIN}
 
-CSTD=		c99
+CSTD=		gnu99
 
 .if ${CSTD} == "k&r"
 CFLAGS+=        -traditional

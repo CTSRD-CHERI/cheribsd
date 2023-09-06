@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/Microsoft/snmalloc
+	branch = main
+	commit = 7b597335aedc2c60b0174f6e67a7f7560f841760
+	parent = ab4e67914b39995c302faa789fab0489a11ce27c
+	method = merge
+	cmdver = 0.4.3
