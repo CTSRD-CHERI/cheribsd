@@ -143,7 +143,7 @@ hwt_ctx_free_threads(struct hwt_context *ctx)
 {
 	struct hwt_thread *thr;
 
-	printf("%s: remove threads\n", __func__);
+	dprintf("%s: remove threads\n", __func__);
 
 	do {
 		HWT_CTX_LOCK(ctx);
