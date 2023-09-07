@@ -3,7 +3,7 @@
 MISRCS+=	malloc.cc
 
 # Specify the locations in contrib for headers.
-CXXFLAGS+=	-I${SRCTOP}/contrib/subrepo-snmalloc/src/snmalloc
+CXXFLAGS.malloc.cc+=	-I${SRCTOP}/contrib/subrepo-snmalloc/src/snmalloc
 
 CXXSTD?=	c++20
 
@@ -34,7 +34,7 @@ CXXFLAGS.malloc.cc+=	-DSNMALLOC_FAIL_FAST=false
 
 # Don't emit frame pointers, the fast path for malloc is sufficiently small
 # that this adds measurable overhead.
-CXXFLAGS+=	-fomit-frame-pointer
+CXXFLAGS.malloc.cc+=	-fomit-frame-pointer
 
 # Disable asserts.  There are enough of these that it hurts performance a lot
 # and doesn't help if you're debugging anything other than malloc.

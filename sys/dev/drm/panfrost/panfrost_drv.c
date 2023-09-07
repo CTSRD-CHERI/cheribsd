@@ -798,7 +798,7 @@ panfrost_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	mtx_init(&sc->as_mtx, "asid set mtx", NULL, MTX_SPIN);
+	mtx_init(&sc->as_mtx, "asid set mtx", NULL, MTX_DEF);
 
 	config_intrhook_oneshot(&panfrost_irq_hook, sc);
 

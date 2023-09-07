@@ -684,6 +684,8 @@ pmap_bootstrap(vm_pointer_t l1pt, vm_paddr_t kernstart, vm_size_t kernlen)
 	/* Set this early so we can use the pagetable walking functions */
 	kernel_pmap_store.pm_top = (pd_entry_t *)l1pt;
 	PMAP_LOCK_INIT(kernel_pmap);
+	TAILQ_INIT(&kernel_pmap->pm_pvchunk);
+	vm_radix_init(&kernel_pmap->pm_root);
 
 	rw_init(&pvh_global_lock, "pmap pv global");
 
@@ -1395,6 +1397,8 @@ pmap_pinit0(pmap_t pmap)
 	pmap->pm_satp = pmap_satp_mode() |
 	    (vtophys(pmap->pm_top) >> PAGE_SHIFT);
 	CPU_ZERO(&pmap->pm_active);
+	TAILQ_INIT(&pmap->pm_pvchunk);
+	vm_radix_init(&pmap->pm_root);
 	pmap_activate_boot(pmap);
 }
 
@@ -1436,6 +1440,7 @@ pmap_pinit(pmap_t pmap)
 		pmap->pm_top[i] = kernel_pmap->pm_top[i];
 	}
 
+	TAILQ_INIT(&pmap->pm_pvchunk);
 	vm_radix_init(&pmap->pm_root);
 
 #if __has_feature(capabilities)

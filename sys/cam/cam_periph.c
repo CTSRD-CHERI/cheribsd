@@ -1276,7 +1276,7 @@ cam_periph_runccb(union ccb *ccb,
 	 * shutdown_post_sync event will run with the scheduler stopped, but
 	 * before we're officially dumping. To avoid hanging in adashutdown
 	 * initiated commands (or other similar situations), we have to test for
-	 * either SCHEDULER_STOPPED() here as well.
+	 * either dumping or SCHEDULER_STOPPED() here.
 	 *
 	 * To avoid locking problems, dumping/polling callers must call
 	 * without a periph lock held.
@@ -1312,6 +1312,11 @@ cam_periph_runccb(union ccb *ccb,
 			if ((ccb->ccb_h.status & CAM_STATUS_MASK) == CAM_REQ_CMP)
 				error = 0;
 			else if (error_routine != NULL) {
+				/*
+				 * cbfcnp is modified by cam_periph_ccbwait so
+				 * reset it before we call the error routine
+				 * which may call xpt_done.
+				 */
 				ccb->ccb_h.cbfcnp = cam_periph_done;
 				error = (*error_routine)(ccb, camflags, sense_flags);
 			} else
@@ -2010,6 +2015,8 @@ cam_periph_error(union ccb *ccb, cam_flags camflags,
 		relsim_flags = RELSIM_RELEASE_AFTER_TIMEOUT;
 		/* FALLTHROUGH */
 	case CAM_ATA_STATUS_ERROR:
+	case CAM_NVME_STATUS_ERROR:
+	case CAM_SMP_STATUS_ERROR:
 	case CAM_REQ_CMP_ERR:
 	case CAM_CMD_TIMEOUT:
 	case CAM_UNEXP_BUSFREE:

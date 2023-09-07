@@ -4968,7 +4968,8 @@ vm_map_copy_entry(
 			    src_entry->start);
 		} else {
 			dst_entry->object.vm_object = NULL;
-			dst_entry->offset = 0;
+			if ((dst_entry->eflags & MAP_ENTRY_GUARD) == 0)
+				dst_entry->offset = 0;
 			if (src_entry->cred != NULL) {
 				dst_entry->cred = curthread->td_ucred;
 				crhold(dst_entry->cred);
@@ -5338,7 +5339,7 @@ static int
 vm_map_stack_locked(vm_map_t map, vm_pointer_t addrbos, vm_size_t max_ssize,
     vm_size_t growsize, vm_prot_t prot, vm_prot_t max, int cow)
 {
-	vm_map_entry_t new_entry, prev_entry;
+	vm_map_entry_t gap_entry, new_entry, prev_entry;
 	vm_pointer_t bot, gap_bot, gap_top, top;
 	vm_size_t init_ssize, sgp;
 	int orient, rv;
@@ -5432,11 +5433,14 @@ vm_map_stack_locked(vm_map_t map, vm_pointer_t addrbos, vm_size_t max_ssize,
 		 * read-ahead logic is never used for it.  Re-use
 		 * next_read of the gap entry to store
 		 * stack_guard_page for vm_map_growstack().
+		 * Similarly, since a gap cannot have a backing object,
+		 * store the original stack protections in the
+		 * object offset.
 		 */
-		if (orient == MAP_STACK_GROWS_DOWN)
-			vm_map_entry_pred(new_entry)->next_read = sgp;
-		else
-			vm_map_entry_succ(new_entry)->next_read = sgp;
+		gap_entry = orient == MAP_STACK_GROWS_DOWN ?
+		    vm_map_entry_pred(new_entry) : vm_map_entry_succ(new_entry);
+		gap_entry->next_read = sgp;
+		gap_entry->offset = prot;
 	} else {
 		(void)vm_map_delete(map, bot, top, false);
 	}
@@ -5456,6 +5460,7 @@ vm_map_growstack(vm_map_t map, vm_offset_t addr, vm_map_entry_t gap_entry)
 	struct ucred *cred;
 	vm_pointer_t gap_end, gap_start, grow_start;
 	vm_size_t grow_amount, guard, max_grow;
+	vm_prot_t prot;
 	rlim_t lmemlim, stacklim, vmemlim;
 	int rv, rv1 __diagused;
 	bool gap_deleted, grow_down, is_procstack;
@@ -5608,9 +5613,14 @@ retry:
 	 * in the map entry?
 	 */
 	if (grow_down) {
+		/*
+		 * The gap_entry "offset" field is overloaded.  See
+		 * vm_map_stack_locked().
+		 */
+		prot = gap_entry->offset;
+
 		stack_reservation = vm_map_buildcap(map, gap_entry->start,
-		    stack_entry->end - gap_entry->start,
-		    stack_entry->max_protection);
+		    stack_entry->end - gap_entry->start, prot);
 
 		grow_start = (vm_pointer_t)cheri_kern_setaddress(
 		    stack_reservation, gap_entry->end - grow_amount);
@@ -5634,9 +5644,8 @@ retry:
 		}
 		/* XXX-AM: Would be nice to just grow the object as below */
 		rv = vm_map_insert(map, NULL, 0, grow_start,
-		    grow_start + grow_amount,
-		    stack_entry->protection, stack_entry->max_protection,
-		    MAP_STACK_GROWS_DOWN, stack_entry->reservation);
+		    grow_start + grow_amount, prot, prot, MAP_STACK_GROWS_DOWN,
+		    stack_entry->reservation);
 		if (rv != KERN_SUCCESS) {
 			if (gap_deleted) {
 				rv1 = vm_map_insert(map, NULL, 0, gap_start,

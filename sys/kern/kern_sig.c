@@ -696,7 +696,7 @@ sigqueue_delete_set_proc(struct proc *p, const sigset_t *set)
 
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 
-	sigqueue_init(&worklist, NULL);
+	sigqueue_init(&worklist, p);
 	sigqueue_move_set(&p->p_sigqueue, &worklist, set);
 
 	FOREACH_THREAD_IN_PROC(p, td0)
@@ -2167,25 +2167,6 @@ kern_sigqueue(struct thread *td, pid_t pid, int signum, union sigval *value)
 	}
 	PROC_UNLOCK(p);
 	return (error);
-}
-
-/*
- * Send a signal to a process group.
- */
-void
-gsignal(int pgid, int sig, ksiginfo_t *ksi)
-{
-	struct pgrp *pgrp;
-
-	if (pgid != 0) {
-		sx_slock(&proctree_lock);
-		pgrp = pgfind(pgid);
-		sx_sunlock(&proctree_lock);
-		if (pgrp != NULL) {
-			pgsignal(pgrp, sig, 0, ksi);
-			PGRP_UNLOCK(pgrp);
-		}
-	}
 }
 
 /*

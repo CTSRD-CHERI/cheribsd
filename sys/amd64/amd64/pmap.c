@@ -1993,6 +1993,7 @@ pmap_bootstrap(vm_paddr_t *firstaddr)
 	kernel_pmap->pm_ucr3 = PMAP_NO_CR3;
 	TAILQ_INIT(&kernel_pmap->pm_pvchunk);
 	kernel_pmap->pm_stats.resident_count = res;
+	vm_radix_init(&kernel_pmap->pm_root);
 	kernel_pmap->pm_flags = pmap_flags;
 
 	/*
@@ -6839,7 +6840,6 @@ retry:
 	PMAP_UNLOCK(pmap);
 }
 
-#if VM_NRESERVLEVEL > 0
 static bool
 pmap_pde_ept_executable(pmap_t pmap, pd_entry_t pde)
 {
@@ -6849,6 +6849,7 @@ pmap_pde_ept_executable(pmap_t pmap, pd_entry_t pde)
 	return ((pde & EPT_PG_EXECUTE) != 0);
 }
 
+#if VM_NRESERVLEVEL > 0
 /*
  * Tries to promote the 512, contiguous 4KB page mappings that are within a
  * single page table page (PTP) to a single 2MB page mapping.  For promotion

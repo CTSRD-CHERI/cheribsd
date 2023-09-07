@@ -205,14 +205,9 @@ cpu_fetch_syscall_args(struct thread *td)
 #include "../../kern/subr_syscall.c"
 
 #if __has_feature(capabilities)
-#define PRINT_REG(name, value)	\
-	printf(name " = %#.16lp\n", (void * __capability)(value));
-#define PRINT_REG_N(name, n, array)	\
-	printf(name "[%d] = %#.16lp\n", n, (void * __capability)(array)[n]);
+#define	CREG	"c"
 #else
-#define PRINT_REG(name, value)	printf(name " = 0x%016lx\n", value)
-#define PRINT_REG_N(name, n, array)	\
-	printf(name "[%d] = 0x%016lx\n", n, (array)[n])
+#define	CREG
 #endif
 
 static void
@@ -250,25 +245,25 @@ dump_regs(struct trapframe *frame)
 	u_int i;
 
 	for (i = 0; i < nitems(frame->tf_t); i++) {
-		snprintf(name, sizeof(name), "t[%d]", i);
+		snprintf(name, sizeof(name), CREG"t[%d]", i);
 		print_with_symbol(name, frame->tf_t[i]);
 	}
 
 	for (i = 0; i < nitems(frame->tf_s); i++) {
-		snprintf(name, sizeof(name), "s[%d]", i);
+		snprintf(name, sizeof(name), CREG"s[%d]", i);
 		print_with_symbol(name, frame->tf_s[i]);
 	}
 
 	for (i = 0; i < nitems(frame->tf_a); i++) {
-		snprintf(name, sizeof(name), "a[%d]", i);
+		snprintf(name, sizeof(name), CREG"a[%d]", i);
 		print_with_symbol(name, frame->tf_a[i]);
 	}
 
-	print_with_symbol("ra", frame->tf_ra);
-	print_with_symbol("sp", frame->tf_sp);
-	print_with_symbol("gp", frame->tf_gp);
-	print_with_symbol("tp", frame->tf_tp);
-	print_with_symbol("sepc", frame->tf_sepc);
+	print_with_symbol(CREG"ra", frame->tf_ra);
+	print_with_symbol(CREG"sp", frame->tf_sp);
+	print_with_symbol(CREG"gp", frame->tf_gp);
+	print_with_symbol(CREG"tp", frame->tf_tp);
+	print_with_symbol("sepc"CREG, frame->tf_sepc);
 #if __has_feature(capabilities)
 	print_with_symbol("ddc", frame->tf_ddc);
 #endif
