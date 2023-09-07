@@ -38,20 +38,13 @@ ENTRY(_rtld_setjmp)
 	 * 	-2.	Caller's stack
 	 * 	-1.	Return address
 	 * 	0.	Link to previous frame
-	 * When setjmp is called, the following is pushed to the Executive
-	 * stack:
+	 * setjmp does not push to the Executive stack. When _rtld_setjmp is
+	 * called, the following are pushed to the Executive stack:
 	 * 	1.	Caller's data
 	 * 	2.	Caller's stack
 	 * 	3.	Return address
 	 * 	4.	Link to 0
-	 * setjmp then calls _rtld_setjmp, which pushes the following:
-	 * 	5.	Caller's data
-	 * 	6.	Caller's stack
-	 * 	7.	Return address
-	 * 	8.	Link to 4
 	 * In _rtld_setjmp, we manipulate the stack content to the following:
-	 * 	-6.	Copy of 2
-	 * 	-5.	Copy of 3
 	 * 	-4.	Link to 0
 	 * 	-3.	Caller's data
 	 * 	-2.	Caller's stack
@@ -62,96 +55,15 @@ ENTRY(_rtld_setjmp)
 	 * 	2.	Caller's stack
 	 * 	3.	Return address
 	 * 	4.	Link to 0
-	 * 	------------------------------
-	 * 	5.	Caller's data
-	 * 	6.	Caller's stack
-	 * 	7.	Return address
-	 * 	8.	Link to 4
-	 * To do this, we shift everything from -3 to 8 by 3 positions.
+	 * To do this, we shift everything from -3 to 4 by SETJMP_SHIFT
+	 * positions.
 	 */
-
-#define	SETJMP_SHIFT	3
-	/*
-	 * Move 8 and adjust it's cursor.
-	 * Also adjust csp.
-	 */
-	ldr	c2, [csp], #-(SETJMP_SHIFT * CAP_WIDTH)
-	sub	c2, c2, #(SETJMP_SHIFT * CAP_WIDTH)
-	str	c2, [csp]
-
+#define	SETJMP_SHIFT	1
+	str	c30, [csp, #-((SETJMP_SHIFT + 1) * CAP_WIDTH)]!
 	add	c1, csp, #CAP_WIDTH
+	bl	_rtld_setjmp_impl
+	ldr	c30, [csp], #CAP_WIDTH
 
-	/* Shift 5, 6, and 7 */
-1:	ldr	c3, [c1, #(SETJMP_SHIFT * CAP_WIDTH)]
-	str	c3, [c1], #CAP_WIDTH
-	cmp	x1, x2
-	b.ne	1b
-
-	/* Save link to 4 for buffer */
-	mov	c4, c1
-
-	ldp	c19, c20, [c1, #((SETJMP_SHIFT + 3) * CAP_WIDTH)]
-	ldp	c21, c22, [c1, #((SETJMP_SHIFT + 5) * CAP_WIDTH)]
-	ldp	c23, c24, [c1, #((SETJMP_SHIFT + 7) * CAP_WIDTH)]
-	ldp	c25, c26, [c1, #((SETJMP_SHIFT + 9) * CAP_WIDTH)]
-	ldp	c27, c28, [c1, #((SETJMP_SHIFT + 11) * CAP_WIDTH)]
-	ldr	c29, [c1, #((SETJMP_SHIFT + 13) * CAP_WIDTH)]
-
-	stp	c19, c20, [c0, #(CAP_WIDTH * 1)]
-	stp	c21, c22, [c0, #(CAP_WIDTH * 3)]
-	stp	c23, c24, [c0, #(CAP_WIDTH * 5)]
-	stp	c25, c26, [c0, #(CAP_WIDTH * 7)]
-	stp	c27, c28, [c0, #(CAP_WIDTH * 9)]
-	str	c29, [c0, #(CAP_WIDTH * 11)]
-
-	/* Shift 4 and adjust it's cursor */
-	ldr	c2, [c1, #(SETJMP_SHIFT * CAP_WIDTH)]
-	sub	c2, c2, #(SETJMP_SHIFT * CAP_WIDTH)
-	str	c2, [c1], #CAP_WIDTH
-
-	/* Shift 1, 2, and 3 */
-2:	ldr	c3, [c1, #(SETJMP_SHIFT * CAP_WIDTH)]
-	str	c3, [c1], #CAP_WIDTH
-	cmp	x1, x2
-	b.ne	2b
-
-	/* Shift 0 */
-	ldr	c2, [c1, #(SETJMP_SHIFT * CAP_WIDTH)]
-	str	c2, [c1], #CAP_WIDTH
-	sub	c2, c2, #(SETJMP_SHIFT * CAP_WIDTH)
-
-	/* Load RTLD sealer to detect other jump buffers */
-	ldr	c5, sealer_jmpbuf
-
-	/* Shift -3, -2, and -1 */
-3:	ldr	c3, [c1, #(SETJMP_SHIFT * CAP_WIDTH)]
-	unseal	c6, c3, c5
-	gctag	x6, c6
-	cbnz	x6, 4f
-	str	c3, [c1], #CAP_WIDTH
-	cmp	x1, x2
-	b.ne	3b
-	b	5f
-
-4:	seal	c3, c1, c5
-	str	c3, [c1, #(SETJMP_SHIFT * CAP_WIDTH)]
-
-	/* Store -4, -5, and -6 */
-5:	ldr	c2, [c4]
-	ldp	c3, c4, [c4, #CAP_WIDTH]
-	seal	c2, c2, c5
-	str	c2, [c1]
-	stp	c3, c4, [c1, #CAP_WIDTH]
-
-	scbnds	c1, c1, #(SETJMP_SHIFT * CAP_WIDTH)
-	seal	c1, c1, c5
-	str	c1, [c0], #(CAP_WIDTH * 12)
-
-	mov	x6, xzr
-	mov	x5, xzr
-	mov	x4, xzr
-	mov	x3, xzr
-	mov	x2, xzr
 	mov	x1, xzr
 	ret
 END(_rtld_setjmp)
@@ -159,39 +71,29 @@ END(_rtld_setjmp)
 ENTRY(_rtld_longjmp)
 	/*
 	 * This function MUST preserve the value of x1 and update c0 to point at
-	 * the value of lr to be restored.
+	 * the general purpose registers to be restored.
 	 *
 	 * Before longjmp is called, the top of the Executive stack contains:
 	 * 	0.	Link to previous frame
-	 * When longjmp is called, the following is pushed to the Executive
-	 * stack:
+	 * longjmp does not push to the Executive stack. When _rtld_longjmp is
+	 * called, the following are pushed to the Executive stack:
 	 * 	1.	Caller's data
 	 * 	2.	Caller's stack
 	 * 	3.	Return address
 	 * 	4.	Link to 0
-	 * longjmp then calls _rtld_longjmp, which pushes the following:
-	 * 	5.	Caller's data
-	 * 	6.	Caller's stack
-	 * 	7.	Return address
-	 * 	8.	Link to 4
 	 * In _rtld_longjmp, we manipulate the stack content to the following:
 	 * 	-n.	Link to previous frame
 	 * 	------------------------------
 	 * 	...
 	 * 	0.	Link to previous frame
 	 * 	------------------------------
-	 * 	1.	Supplied caller's data
-	 * 	2.	Supplied caller's stack
-	 * 	3.	Supplied return address
+	 * 	1.	Caller's data
+	 * 	2.	Caller's stack
+	 * 	3.	Return address
 	 * 	4.	Link to supplied Executive stack pointer (-n)
-	 * 	------------------------------
-	 * 	5.	Caller's data
-	 * 	6.	Caller's stack
-	 * 	7.	Return address
-	 * 	8.	Link to 4
-	 * When longjmp makes its final branch, it will go to the returning
-	 * phase of setjmp's trampoline, which unwinds to the frame and PC
-	 * supplied by 3.
+	 * Returning to longjmp unwinds to the Executive stack frame supplied by
+	 * 4. longjmp then restores the general purpose registers and branch to
+	 * the saved return address.
 	 */
 
 	/*
@@ -220,14 +122,8 @@ ENTRY(_rtld_longjmp)
 	gcseal	x6, c4
 	cbnz	x6, 2b
 
-	/*
-	 * Get the previous frame.
-	 * c4: Previous frame
-	 */
-	ldr	c4, [csp]
-
 	/* Unwind the frames */
-	mov	c5, c4
+	mov	c5, csp
 4:	ldr	c5, [c5]
 	cmp	c5, c3
 	b.eq	3f
@@ -235,30 +131,9 @@ ENTRY(_rtld_longjmp)
 	/* Enforce security policy here for each frame being unwound */
 	b	4b
 
-3:	ldp	c2, c5, [c2, #CAP_WIDTH]
+3:	/* Update frame */
+	str	c3, [csp]
 
-	/* Restore general purpose registers */
-	ldp	c19, c20, [c0], #(CAP_WIDTH * 2)
-	ldp	c21, c22, [c0], #(CAP_WIDTH * 2)
-	ldp	c23, c24, [c0], #(CAP_WIDTH * 2)
-	ldp	c25, c26, [c0], #(CAP_WIDTH * 2)
-	ldp	c27, c28, [c0], #(CAP_WIDTH * 2)
-	ldr	c29, [c0], #CAP_WIDTH
-
-	/* Update frame and save callee-saved registers */
-	stp	c3, c2, [c4]
-	stp	c5, c19, [c4, #(CAP_WIDTH * 2)]
-	stp	c20, c21, [c4, #(CAP_WIDTH * 4)]
-	stp	c22, c23, [c4, #(CAP_WIDTH * 6)]
-	stp	c24, c25, [c4, #(CAP_WIDTH * 8)]
-	stp	c26, c27, [c4, #(CAP_WIDTH * 10)]
-	stp	c28, c29, [c4, #(CAP_WIDTH * 12)]
-
-	mov	x6, xzr
-	mov	x5, xzr
-	mov	x4, xzr
-	mov	x3, xzr
-	mov	x2, xzr
 	ret
 
 	/* TODO: Abort */
