@@ -96,6 +96,21 @@ extern void snmalloc_print_stats(void);
 extern void snmalloc_flush_message_queue(void);
 #endif
 
+/*
+ * Different allocators give their strong symbols different names.  Hide
+ * this implementation detail being the REAL() macro.
+ */
+#define _REAL_PREPEND(f, pre)	pre##f
+#define	_REAL_EVAL(f, pre)	_REAL_PREPEND(f, pre)
+#define	REAL(f)	_REAL_EVAL(f, MRS_REAL_PREFIX)
+
+void *REAL(malloc)(size_t);
+void REAL(free)(void *);
+void *REAL(calloc)(size_t, size_t);
+void *REAL(realloc)(void *, size_t);
+int REAL(posix_memalign)(void **, size_t, size_t);
+void *REAL(aligned_alloc)(size_t, size_t);
+
 /* functions */
 
 static void *mrs_malloc(size_t);
@@ -219,13 +234,6 @@ static struct mrs_quarantine offload_quarantine; /* quarantine for the offload t
 #endif /* OFFLOAD_QUARANTINE */
 
 static void *mrs_calloc_bootstrap(size_t number, size_t size);
-
-static void *(*real_malloc) (size_t);
-static void (*real_free) (void *);
-static void *(*real_calloc) (size_t, size_t) = mrs_calloc_bootstrap; /* replaced on init */
-static void *(*real_realloc) (void *, size_t);
-static int (*real_posix_memalign) (void **, size_t, size_t);
-static void *(*real_aligned_alloc) (size_t, size_t);
 
 static inline __attribute__((always_inline)) void mrs_puts(const char *p)
 {
@@ -445,7 +453,7 @@ static inline void *validate_freed_pointer(void *ptr) {
 	/*mrs_debug_printcap("freed underlying allocation", underlying_allocation);*/
 
 #ifdef JUST_BOOKKEEPING
-	real_free(ptr);
+	REAL(free)(ptr);
 	return NULL;
 #endif /* JUST_BOOKKEEPING */
 
@@ -683,7 +691,7 @@ static inline void quarantine_flush(struct mrs_quarantine *quarantine) {
 				 * retry with snmalloc1 not doing rederivation now that we're doing
 				 * this?
 				 */
-				real_free(__builtin_cheri_perms_and(iter->slab[i].ptr, ~CHERI_PERM_SW_VMEM));
+				REAL(free)(__builtin_cheri_perms_and(iter->slab[i].ptr, ~CHERI_PERM_SW_VMEM));
 
 #ifdef OFFLOAD_QUARANTINE
 			}
@@ -850,13 +858,6 @@ static void spawn_background(void)
 
 __attribute__((constructor))
 static void init(void) {
-	real_malloc = dlsym(RTLD_NEXT, "malloc");
-	real_free = dlsym(RTLD_NEXT, "free");
-	real_calloc = dlsym(RTLD_NEXT, "calloc");
-	real_realloc = dlsym(RTLD_NEXT, "realloc");
-	real_posix_memalign = dlsym(RTLD_NEXT, "posix_memalign");
-	real_aligned_alloc = dlsym(RTLD_NEXT, "aligned_alloc");
-
 	initialize_lock(printf_lock);
 
 #ifdef OFFLOAD_QUARANTINE
@@ -923,7 +924,7 @@ static void fini(void) {
 
 static void *mrs_malloc(size_t size) {
 #ifdef JUST_INTERPOSE
-	return real_malloc(size);
+	return REAL(malloc)(size);
 #endif /* JUST_INTERPOSE */
 
 	/*mrs_debug_printf("mrs_malloc: called\n");*/
@@ -947,7 +948,7 @@ static void *mrs_malloc(size_t size) {
 	 */
 	if (size < CAPREVOKE_BITMAP_ALIGNMENT) {
 		/* use posix_memalign because unlike aligned_alloc it does not require size to be an integer multiple of alignment */
-		if (real_posix_memalign(&allocated_region, CAPREVOKE_BITMAP_ALIGNMENT, size)) {
+		if (REAL(posix_memalign)(&allocated_region, CAPREVOKE_BITMAP_ALIGNMENT, size)) {
 			mrs_debug_printf("mrs_malloc: error aligning allocation of size less than the shadow bitmap granule\n");
 			return NULL;
 		}
@@ -958,13 +959,13 @@ static void *mrs_malloc(size_t size) {
 		 * multiple of CAPREVOKE_BITMAP_ALIGNMENT (because it is possible to store a
 		 * pointer in the allocation and thus the alignment is guaranteed by malloc).
 		 */
-		allocated_region = real_malloc(size);
+		allocated_region = REAL(malloc)(size);
 		if (allocated_region == NULL) {
 			return allocated_region;
 		}
 	}
 #endif
-		allocated_region = real_malloc(size);
+		allocated_region = REAL(malloc)(size);
 		if (allocated_region == NULL) {
 			return allocated_region;
 		}
@@ -984,7 +985,7 @@ static void *mrs_malloc(size_t size) {
 /*
  * calloc is used to bootstrap various system libraries so is called before
  * even the constructor function of this library. before the initializer is
- * called and real_calloc is set appropriately, use this bootstrap function to
+ * called and REAL(calloc) is set appropriately, use this bootstrap function to
  * serve allocations.
  */
 static void *mrs_calloc_bootstrap(size_t number, size_t size) {
@@ -1003,7 +1004,7 @@ static void *mrs_calloc_bootstrap(size_t number, size_t size) {
 
 void *mrs_calloc(size_t number, size_t size) {
 #ifdef JUST_INTERPOSE
-	return real_calloc(number, size);
+	return REAL(calloc)(number, size);
 #endif /* JUST_INTERPOSE */
 
 	/* this causes problems if our library is initizlied before the thread library */
@@ -1028,7 +1029,7 @@ void *mrs_calloc(size_t number, size_t size) {
 	 */
 	if (size < CAPREVOKE_BITMAP_ALIGNMENT) {
 		/* use posix_memalign because unlike aligned_alloc it does not require size to be an integer multiple of alignment */
-		if (real_posix_memalign(&allocated_region, CAPREVOKE_BITMAP_ALIGNMENT, number * size)) {
+		if (REAL(posix_memalign)(&allocated_region, CAPREVOKE_BITMAP_ALIGNMENT, number * size)) {
 			mrs_debug_printf("mrs_calloc: error aligning allocation of size less than the shadow bitmap granule\n");
 			return NULL;
 		}
@@ -1040,13 +1041,13 @@ void *mrs_calloc(size_t number, size_t size) {
 		 * multiple of CAPREVOKE_BITMAP_ALIGNMENT (because it is possible to store a
 		 * pointer in the allocation and thus the alignment is guaranteed by calloc).
 		 */
-		allocated_region = real_calloc(number, size);
+		allocated_region = REAL(calloc)(number, size);
 		if (allocated_region == NULL) {
 			return allocated_region;
 		}
 	}
 #endif
-		allocated_region = real_calloc(number, size);
+		allocated_region = REAL(calloc)(number, size);
 		if (allocated_region == NULL) {
 			return allocated_region;
 		}
@@ -1061,7 +1062,7 @@ void *mrs_calloc(size_t number, size_t size) {
 
 static int mrs_posix_memalign(void **ptr, size_t alignment, size_t size) {
 #ifdef JUST_INTERPOSE
-	return real_posix_memalign(ptr, alignment, size);
+	return REAL(posix_memalign)(ptr, alignment, size);
 #endif /* JUST_INTERPOSE */
 
 	mrs_debug_printf("mrs_posix_memalign: called ptr %p alignment %zu size %zu\n", ptr, alignment, size);
@@ -1076,7 +1077,7 @@ static int mrs_posix_memalign(void **ptr, size_t alignment, size_t size) {
 	}
 #endif
 
-	int ret = real_posix_memalign(ptr, alignment, size);
+	int ret = REAL(posix_memalign)(ptr, alignment, size);
 	if (ret != 0) {
 		return ret;
 	}
@@ -1092,7 +1093,7 @@ static int mrs_posix_memalign(void **ptr, size_t alignment, size_t size) {
 
 static void *mrs_aligned_alloc(size_t alignment, size_t size) {
 #ifdef JUST_INTERPOSE
-	return real_aligned_alloc(alignment, size);
+	return REAL(aligned_alloc)(alignment, size);
 #endif /* JUST_INTERPOSE */
 
 	mrs_debug_printf("mrs_aligned_alloc: called alignment %zu size %zu\n", alignment, size);
@@ -1107,7 +1108,7 @@ static void *mrs_aligned_alloc(size_t alignment, size_t size) {
 	}
 #endif
 
-	void *allocated_region = real_aligned_alloc(alignment, size);
+	void *allocated_region = REAL(aligned_alloc)(alignment, size);
 	if (allocated_region == NULL) {
 	 return allocated_region;
 	}
@@ -1128,7 +1129,7 @@ static void *mrs_aligned_alloc(size_t alignment, size_t size) {
  */
 static void *mrs_realloc(void *ptr, size_t size) {
 #ifdef JUST_INTERPOSE
-	return real_realloc(ptr, size);
+	return REAL(realloc)(ptr, size);
 #endif /* JUST_INTERPOSE */
 
 	size_t old_size = cheri_getlen(ptr);
@@ -1155,7 +1156,7 @@ static void *mrs_realloc(void *ptr, size_t size) {
 
 static void mrs_free(void *ptr) {
 #ifdef JUST_INTERPOSE
-	return real_free(ptr);
+	return REAL(free)(ptr);
 #endif /* JUST_INTERPOSE */
 
 	/*mrs_debug_printf("mrs_free: called address %p\n", ptr);*/
@@ -1246,7 +1247,7 @@ static void *mrs_offload_thread(void *arg) {
 	 * Do this bypassing the quarantine logic, so that we don't get into
 	 * any stickier mess than we're already in.
 	 */
-	void *p = real_malloc(1);
+	void *p = REAL(malloc)(1);
 
 	mrs_lock(&offload_quarantine_lock);
 	for (;;) {
