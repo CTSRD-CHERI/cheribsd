@@ -880,9 +880,6 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	dbg("processing main program's program header");
 	assert(aux_info[AT_PHDR] != NULL);
 	phdr = (const Elf_Phdr *) aux_info[AT_PHDR]->a_un.a_ptr;
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	phdr = (const Elf_Phdr *) cheri_clearperm(phdr, CHERI_PERM_EXECUTIVE);
-#endif
 	assert(aux_info[AT_PHNUM] != NULL);
 	phnum = aux_info[AT_PHNUM]->a_un.a_val;
 	assert(aux_info[AT_PHENT] != NULL);
