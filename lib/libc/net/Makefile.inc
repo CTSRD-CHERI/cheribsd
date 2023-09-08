@@ -3,9 +3,9 @@
 # machine-independent net sources
 .PATH: ${LIBC_SRCTOP}/net
 
-.ifndef RTLD_SANDBOX
+# .ifndef RTLD_SANDBOX
 CONFS+=	net/hosts net/hosts.equiv net/networks net/nsswitch.conf net/protocols
-.endif
+# .endif
 SRCS+=	base64.c ether_addr.c eui64.c \
 	gai_strerror.c getaddrinfo.c \
 	gethostbydns.c gethostbyht.c gethostbynis.c gethostnamadr.c \
