@@ -229,7 +229,7 @@ struct ice_rx_queue {
  * physical function.
  */
 struct ice_softc {
-	struct ice_hw hw;
+	struct ice_hw hw __subobject_use_container_bounds;
 	struct ice_vsi pf_vsi;		/* Main PF VSI */
 
 	char admin_mtx_name[16]; /* name of the admin mutex */
@@ -237,7 +237,7 @@ struct ice_softc {
 	struct callout admin_timer; /* timer to trigger admin task */
 
 	/* iRDMA peer interface */
-	struct ice_rdma_entry rdma_entry;
+	struct ice_rdma_entry rdma_entry __subobject_use_container_bounds;
 	int irdma_vectors;
 	u16 *rdma_imap;
 

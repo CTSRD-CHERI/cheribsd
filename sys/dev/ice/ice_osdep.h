@@ -210,8 +210,8 @@ void ice_msec_spin(uint32_t time);
  * to allow that structure to be inserted into a linked list. Access to the
  * contained structure is done via __containerof
  */
-struct ice_list_node {
-	LIST_ENTRY(ice_list_node) entries;
+struct __no_subobject_bounds ice_list_node {
+	LIST_ENTRY(ice_list_node) entries __no_subobject_bounds_fp;
 };
 
 /**

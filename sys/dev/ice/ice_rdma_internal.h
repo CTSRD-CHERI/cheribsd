@@ -57,7 +57,7 @@ extern bool ice_enable_irdma;
  */
 struct ice_rdma_entry {
 	LIST_ENTRY(ice_rdma_entry) node;
-	struct ice_rdma_peer peer;
+	struct ice_rdma_peer peer __subobject_use_container_bounds;
 	bool attached;
 	bool initiated;
 };
