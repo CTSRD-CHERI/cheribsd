@@ -745,7 +745,7 @@ TEST(PrintPointerTest, NonMemberFunctionPointer) {
   // pointers to objects, and some compilers (e.g. GCC 3.4) enforce
   // this limitation.
   EXPECT_EQ(PrintPointer(reinterpret_cast<const void*>(
-                reinterpret_cast<internal::BiggestInt>(&MyFunction))),
+                reinterpret_cast<intptr_t>(&MyFunction))),
             Print(&MyFunction));
   int (*p)(bool) = NULL;  // NOLINT
   EXPECT_EQ("NULL", Print(p));
@@ -1406,7 +1406,7 @@ TEST(PrintReferenceTest, HandlesFunctionPointer) {
   // pointers to objects, and some compilers (e.g. GCC 3.4) enforce
   // this limitation.
   const std::string fp_string = PrintPointer(reinterpret_cast<const void*>(
-      reinterpret_cast<internal::BiggestInt>(fp)));
+      reinterpret_cast<intptr_t>(fp)));
   EXPECT_EQ("@" + fp_pointer_string + " " + fp_string, PrintByRef(fp));
 }
 
