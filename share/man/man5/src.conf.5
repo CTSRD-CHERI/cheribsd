@@ -110,6 +110,14 @@ Build the base system with Address Sanitizer (ASan) to detect
 memory corruption bugs such as buffer overflows or use-after-free.
 Requires that Clang be used as the base system compiler
 and that the runtime support library is available.
+When set, it enforces these options:
+.Pp
+.Bl -item -compact
+.It
+.Va WITH_LLVM_BINUTILS
+.It
+.Va WITH_LLVM_CXXFILT
+.El
 .It Va WITHOUT_ASSERT_DEBUG
 Compile programs and libraries without the
 .Xr assert 3
@@ -146,6 +154,26 @@ This library is currently only used to perform
 signature verification and related operations
 for Verified Exec and
 .Xr loader 8 .
+When set, these options are also in effect:
+.Pp
+.Bl -inset -compact
+.It Va WITH_LOADER_EFI_SECUREBOOT
+(unless
+.Va WITHOUT_LOADER_EFI_SECUREBOOT
+is set explicitly)
+.It Va WITH_LOADER_VERIEXEC
+(unless
+.Va WITHOUT_LOADER_VERIEXEC
+is set explicitly)
+.It Va WITH_LOADER_VERIEXEC_VECTX
+(unless
+.Va WITHOUT_LOADER_VERIEXEC_VECTX
+is set explicitly)
+.It Va WITH_VERIEXEC
+(unless
+.Va WITHOUT_VERIEXEC
+is set explicitly)
+.El
 .It Va WITHOUT_BHYVE
 Do not build or install
 .Xr bhyve 8 ,
@@ -176,6 +204,14 @@ Set this if you do not want to build
 .Xr blacklistd 8
 and
 .Xr blacklistctl 8 .
+When set, these options are also in effect:
+.Pp
+.Bl -inset -compact
+.It Va WITHOUT_BLACKLIST_SUPPORT
+(unless
+.Va WITH_BLACKLIST_SUPPORT
+is set explicitly)
+.El
 .It Va WITHOUT_BLACKLIST_SUPPORT
 Build some programs without
 .Xr libblacklist 3
@@ -211,6 +247,14 @@ Do not build contributed bzip2 software as a part of the base system.
 .Bf -symbolic
 The option has no effect yet.
 .Ef
+When set, these options are also in effect:
+.Pp
+.Bl -inset -compact
+.It Va WITHOUT_BZIP2_SUPPORT
+(unless
+.Va WITH_BZIP2_SUPPORT
+is set explicitly)
+.El
 .It Va WITHOUT_BZIP2_SUPPORT
 Build some programs without optional bzip2 support.
 .It Va WITHOUT_CALENDAR
@@ -271,13 +315,25 @@ Do not build code licensed under Sun's CDDL.
 .Pp
 This is a default setting on
 arm64/aarch64c and riscv/riscv64c.
+When set, it enforces these options:
+.Pp
+.Bl -item -compact
+.It
+.Va WITHOUT_CTF
+.It
+.Va WITHOUT_DTRACE
+.It
+.Va WITHOUT_LOADER_ZFS
+.It
+.Va WITHOUT_ZFS
+.El
 .It Va WITHOUT_CHERIBSDBOX
 Do not build cheribsdbox.
 .It Va WITHOUT_CHERI_CAPREVOKE
 Do not build userspace with CHERI capability revocation support.
 .Pp
 This is a default setting on
-amd64/amd64, arm/armv6, arm/armv7, arm64/aarch64, i386/i386, powerpc/powerpc, powerpc/powerpc64, powerpc/powerpc64le and riscv/riscv64.
+amd64/amd64, arm/armv7, arm64/aarch64, i386/i386, powerpc/powerpc, powerpc/powerpc64, powerpc/powerpc64le and riscv/riscv64.
 .It Va WITH_CHERI_CAPREVOKE
 Build userspace with CHERI capability revocation support.
 .Pp
@@ -313,8 +369,51 @@ This option may also be safe when the host version of
 .Fx
 is close to the sources being built, but all bets are off if there have
 been any changes to the toolchain between the versions.
+When set, it enforces these options:
+.Pp
+.Bl -item -compact
+.It
+.Va WITHOUT_ELFTOOLCHAIN_BOOTSTRAP
+.El
 .It Va WITHOUT_CRYPT
 Do not build any crypto code.
+When set, it enforces these options:
+.Pp
+.Bl -item -compact
+.It
+.Va WITHOUT_DMAGENT
+.It
+.Va WITHOUT_KERBEROS
+.It
+.Va WITHOUT_KERBEROS_SUPPORT
+.It
+.Va WITHOUT_LDNS
+.It
+.Va WITHOUT_LDNS_UTILS
+.It
+.Va WITHOUT_LOADER_ZFS
+.It
+.Va WITHOUT_OPENSSH
+.It
+.Va WITHOUT_OPENSSL
+.It
+.Va WITHOUT_OPENSSL_KTLS
+.It
+.Va WITHOUT_PKGBOOTSTRAP
+.It
+.Va WITHOUT_UNBOUND
+.It
+.Va WITHOUT_ZFS
+.El
+.Pp
+When set, these options are also in effect:
+.Pp
+.Bl -inset -compact
+.It Va WITHOUT_GSSAPI
+(unless
+.Va WITH_GSSAPI
+is set explicitly)
+.El
 .It Va WITH_CTF
 Compile with CTF (Compact C Type Format) data.
 CTF data encapsulates a reduced form of debugging information
@@ -326,7 +425,7 @@ Do not build
 .Xr cxgbetool 8
 .Pp
 This is a default setting on
-arm/armv6, arm/armv7, powerpc/powerpc, riscv/riscv64 and riscv/riscv64c.
+arm/armv7, powerpc/powerpc, riscv/riscv64 and riscv/riscv64c.
 .It Va WITH_CXGBETOOL
 Build
 .Xr cxgbetool 8
@@ -345,6 +444,12 @@ Do not build
 .Xr dpv 1 ,
 and
 .Xr dpv 3 .
+When set, it enforces these options:
+.Pp
+.Bl -item -compact
+.It
+.Va WITHOUT_BSDINSTALL
+.El
 .It Va WITHOUT_DICT
 Do not build the Webster dictionary files.
 .It Va WITH_DIRDEPS_BUILD
@@ -390,6 +495,41 @@ The implementation in
 is incomplete.
 Completion would require leaf directories for building each kernel
 and package so that their dependencies can be tracked.
+When set, it enforces these options:
+.Pp
+.Bl -item -compact
+.It
+.Va WITH_INSTALL_AS_USER
+.El
+.Pp
+When set, these options are also in effect:
+.Pp
+.Bl -inset -compact
+.It Va WITH_META_ERROR_TARGET
+(unless
+.Va WITHOUT_META_ERROR_TARGET
+is set explicitly)
+.It Va WITH_META_MODE
+(unless
+.Va WITHOUT_META_MODE
+is set explicitly)
+.It Va WITH_STAGING
+(unless
+.Va WITHOUT_STAGING
+is set explicitly)
+.It Va WITH_STAGING_MAN
+(unless
+.Va WITHOUT_STAGING_MAN
+is set explicitly)
+.It Va WITH_STAGING_PROG
+(unless
+.Va WITHOUT_STAGING_PROG
+is set explicitly)
+.It Va WITH_SYSROOT
+(unless
+.Va WITHOUT_SYSROOT
+is set explicitly)
+.El
 .Pp
 This must be set in the environment, make command line, or
 .Pa /etc/src-env.conf ,
@@ -422,6 +562,12 @@ Do not build DTrace framework kernel modules, libraries, and user commands.
 .Pp
 This is a default setting on
 arm64/aarch64c and riscv/riscv64c.
+When set, it enforces these options:
+.Pp
+.Bl -item -compact
+.It
+.Va WITHOUT_CTF
+.El
 .It Va WITH_DTRACE_ASAN
 Compile userspace DTrace code (libdtrace, dtrace(1), lockstat(1), plockstat(1))
 with address and undefined behavior sanitizers.
@@ -458,7 +604,7 @@ and
 .Xr efivar 8 .
 .Pp
 This is a default setting on
-amd64/amd64, arm/armv6, arm/armv7, arm64/aarch64 and arm64/aarch64c.
+amd64/amd64, arm/armv7, arm64/aarch64 and arm64/aarch64c.
 .It Va WITHOUT_ELFTOOLCHAIN_BOOTSTRAP
 Do not build ELF Tool Chain tools
 (addr2line, nm, size, strings and strip)
@@ -484,7 +630,7 @@ Build Flattened Device Tree support as part of the base system.
 This includes the device tree compiler (dtc) and libfdt support library.
 .Pp
 This is a default setting on
-arm/armv6, arm/armv7, arm64/aarch64, arm64/aarch64c, powerpc/powerpc, powerpc/powerpc64, powerpc/powerpc64le, riscv/riscv64 and riscv/riscv64c.
+arm/armv7, arm64/aarch64, arm64/aarch64c, powerpc/powerpc, powerpc/powerpc64, powerpc/powerpc64le, riscv/riscv64 and riscv/riscv64c.
 .It Va WITHOUT_FILE
 Do not build
 .Xr file 1
@@ -550,7 +696,7 @@ Do not build HTML docs.
 Do not build or install HyperV utilities.
 .Pp
 This is a default setting on
-arm/armv6, arm/armv7, arm64/aarch64c, powerpc/powerpc, powerpc/powerpc64, powerpc/powerpc64le, riscv/riscv64 and riscv/riscv64c.
+arm/armv7, arm64/aarch64c, powerpc/powerpc, powerpc/powerpc64, powerpc/powerpc64le, riscv/riscv64 and riscv/riscv64c.
 .It Va WITH_HYPERV
 Build or install HyperV utilities.
 .Pp
@@ -567,9 +713,21 @@ The option does not work for build targets.
 .Ef
 .It Va WITHOUT_INET
 Do not build programs and libraries related to IPv4 networking.
+When set, it enforces these options:
+.Pp
+.Bl -item -compact
+.It
+.Va WITHOUT_INET_SUPPORT
+.El
 .It Va WITHOUT_INET6
 Do not build
 programs and libraries related to IPv6 networking.
+When set, it enforces these options:
+.Pp
+.Bl -item -compact
+.It
+.Va WITHOUT_INET6_SUPPORT
+.El
 .It Va WITHOUT_INET6_SUPPORT
 Build libraries, programs, and kernel modules without IPv6 support.
 .It Va WITHOUT_INETD
@@ -629,6 +787,18 @@ and
 .Xr truss 1 .
 .It Va WITHOUT_KERBEROS
 Set this to not build Kerberos 5 (KTH Heimdal).
+When set, these options are also in effect:
+.Pp
+.Bl -inset -compact
+.It Va WITHOUT_GSSAPI
+(unless
+.Va WITH_GSSAPI
+is set explicitly)
+.It Va WITHOUT_KERBEROS_SUPPORT
+(unless
+.Va WITH_KERBEROS_SUPPORT
+is set explicitly)
+.El
 .It Va WITHOUT_KERBEROS_SUPPORT
 Build some programs without Kerberos support, like
 .Xr ssh 1 ,
@@ -648,12 +818,28 @@ library as a part of the base system.
 .Bf -symbolic
 The option has no effect yet.
 .Ef
+When set, these options are also in effect:
+.Pp
+.Bl -inset -compact
+.It Va WITHOUT_KVM_SUPPORT
+(unless
+.Va WITH_KVM_SUPPORT
+is set explicitly)
+.El
 .It Va WITHOUT_KVM_SUPPORT
 Build some programs without optional
 .Nm libkvm
 support.
 .It Va WITHOUT_LDNS
 Setting this variable will prevent the LDNS library from being built.
+When set, it enforces these options:
+.Pp
+.Bl -item -compact
+.It
+.Va WITHOUT_LDNS_UTILS
+.It
+.Va WITHOUT_UNBOUND
+.El
 .It Va WITHOUT_LDNS_UTILS
 Setting this variable will prevent building the LDNS utilities
 .Xr drill 1
@@ -670,7 +856,7 @@ On 64-bit platforms, do not build 32-bit library set and a
 runtime linker.
 .Pp
 This is a default setting on
-arm/armv6, arm/armv7, i386/i386, powerpc/powerpc, powerpc/powerpc64le, riscv/riscv64 and riscv/riscv64c.
+arm/armv7, i386/i386, powerpc/powerpc, powerpc/powerpc64le, riscv/riscv64 and riscv/riscv64c.
 .It Va WITH_LIB32
 On 64-bit platforms, build the 32-bit library set and a
 .Nm ld-elf32.so.1
@@ -684,7 +870,7 @@ On CHERI platforms, do not build the 64-bit library set and a
 runtime linker.
 .Pp
 This is a default setting on
-amd64/amd64, arm/armv6, arm/armv7, arm64/aarch64, i386/i386, powerpc/powerpc, powerpc/powerpc64, powerpc/powerpc64le and riscv/riscv64.
+amd64/amd64, arm/armv7, arm64/aarch64, i386/i386, powerpc/powerpc, powerpc/powerpc64, powerpc/powerpc64le and riscv/riscv64.
 .It Va WITH_LIB64
 On CHERI platforms, build the 64-bit library set and a
 .Nm ld-elf64.so.1
@@ -744,7 +930,7 @@ The
 option should be used rather than this in most cases.
 .Pp
 This is a default setting on
-amd64/amd64, arm/armv6, arm/armv7, i386/i386, powerpc/powerpc, powerpc/powerpc64, powerpc/powerpc64le, riscv/riscv64 and riscv/riscv64c.
+amd64/amd64, arm/armv7, i386/i386, powerpc/powerpc, powerpc/powerpc64, powerpc/powerpc64le, riscv/riscv64 and riscv/riscv64c.
 .It Va WITH_LLVM_TARGET_AARCH64
 Build LLVM target support for AArch64.
 The
@@ -757,6 +943,26 @@ arm64/aarch64 and arm64/aarch64c.
 Build support for all LLVM targets.
 This option is always applied to the bootstrap compiler for buildworld when
 LLVM is used.
+When set, these options are also in effect:
+.Pp
+.Bl -inset -compact
+.It Va WITH_LLVM_TARGET_AARCH64
+(unless
+.Va WITHOUT_LLVM_TARGET_AARCH64
+is set explicitly)
+.It Va WITH_LLVM_TARGET_ARM
+(unless
+.Va WITHOUT_LLVM_TARGET_ARM
+is set explicitly)
+.It Va WITH_LLVM_TARGET_POWERPC
+(unless
+.Va WITHOUT_LLVM_TARGET_POWERPC
+is set explicitly)
+.It Va WITH_LLVM_TARGET_RISCV
+(unless
+.Va WITHOUT_LLVM_TARGET_RISCV
+is set explicitly)
+.El
 .It Va WITHOUT_LLVM_TARGET_ARM
 Do not build LLVM target support for ARM.
 The
@@ -772,7 +978,7 @@ The
 option should be used rather than this in most cases.
 .Pp
 This is a default setting on
-arm/armv6, arm/armv7, arm64/aarch64 and arm64/aarch64c.
+arm/armv7, arm64/aarch64 and arm64/aarch64c.
 .It Va WITH_LLVM_TARGET_BPF
 Build LLVM target support for BPF.
 The
@@ -790,7 +996,7 @@ The
 option should be used rather than this in most cases.
 .Pp
 This is a default setting on
-amd64/amd64, arm/armv6, arm/armv7, arm64/aarch64, arm64/aarch64c, i386/i386, riscv/riscv64 and riscv/riscv64c.
+amd64/amd64, arm/armv7, arm64/aarch64, arm64/aarch64c, i386/i386, riscv/riscv64 and riscv/riscv64c.
 .It Va WITH_LLVM_TARGET_POWERPC
 Build LLVM target support for PowerPC.
 The
@@ -806,7 +1012,7 @@ The
 option should be used rather than this in most cases.
 .Pp
 This is a default setting on
-amd64/amd64, arm/armv6, arm/armv7, arm64/aarch64, arm64/aarch64c, i386/i386, powerpc/powerpc, powerpc/powerpc64 and powerpc/powerpc64le.
+amd64/amd64, arm/armv7, arm64/aarch64, arm64/aarch64c, i386/i386, powerpc/powerpc, powerpc/powerpc64 and powerpc/powerpc64le.
 .It Va WITH_LLVM_TARGET_RISCV
 Build LLVM target support for RISC-V.
 The
@@ -822,7 +1028,7 @@ The
 option should be used rather than this in most cases.
 .Pp
 This is a default setting on
-arm/armv6, arm/armv7, arm64/aarch64, arm64/aarch64c, powerpc/powerpc, powerpc/powerpc64, powerpc/powerpc64le, riscv/riscv64 and riscv/riscv64c.
+arm/armv7, arm64/aarch64, arm64/aarch64c, powerpc/powerpc, powerpc/powerpc64, powerpc/powerpc64le, riscv/riscv64 and riscv/riscv64c.
 .It Va WITH_LLVM_TARGET_X86
 Build LLVM target support for X86.
 The
@@ -844,12 +1050,12 @@ powerpc/powerpc, powerpc/powerpc64 and powerpc/powerpc64le.
 Build GELI bootloader support.
 .Pp
 This is a default setting on
-amd64/amd64, arm/armv6, arm/armv7, arm64/aarch64, arm64/aarch64c, i386/i386, riscv/riscv64 and riscv/riscv64c.
+amd64/amd64, arm/armv7, arm64/aarch64, arm64/aarch64c, i386/i386, riscv/riscv64 and riscv/riscv64c.
 .It Va WITHOUT_LOADER_KBOOT
 Do not build kboot, a linuxboot environment loader
 .Pp
 This is a default setting on
-arm/armv6, arm/armv7, arm64/aarch64c, i386/i386, powerpc/powerpc, powerpc/powerpc64le, riscv/riscv64 and riscv/riscv64c.
+arm/armv7, arm64/aarch64c, i386/i386, powerpc/powerpc, powerpc/powerpc64le, riscv/riscv64 and riscv/riscv64c.
 .It Va WITH_LOADER_KBOOT
 Build kboot, a linuxboot environment loader
 .Pp
@@ -864,12 +1070,12 @@ powerpc/powerpc, powerpc/powerpc64 and powerpc/powerpc64le.
 Build LUA bindings for the boot loader.
 .Pp
 This is a default setting on
-amd64/amd64, arm/armv6, arm/armv7, arm64/aarch64, arm64/aarch64c, i386/i386, riscv/riscv64 and riscv/riscv64c.
+amd64/amd64, arm/armv7, arm64/aarch64, arm64/aarch64c, i386/i386, riscv/riscv64 and riscv/riscv64c.
 .It Va WITHOUT_LOADER_OFW
 Disable building of openfirmware bootloader components.
 .Pp
 This is a default setting on
-amd64/amd64, arm/armv6, arm/armv7, arm64/aarch64, arm64/aarch64c, i386/i386, riscv/riscv64 and riscv/riscv64c.
+amd64/amd64, arm/armv7, arm64/aarch64, arm64/aarch64c, i386/i386, riscv/riscv64 and riscv/riscv64c.
 .It Va WITH_LOADER_OFW
 Build openfirmware bootloader components.
 .Pp
@@ -884,7 +1090,7 @@ amd64/amd64, arm64/aarch64, arm64/aarch64c, i386/i386, powerpc/powerpc64le, risc
 Build ubldr.
 .Pp
 This is a default setting on
-arm/armv6, arm/armv7, powerpc/powerpc and powerpc/powerpc64.
+arm/armv7, powerpc/powerpc and powerpc/powerpc64.
 .It Va WITH_LOADER_VERBOSE
 Build with extra verbose debugging in the loader.
 May explode already nearly too large loader over the limit.
@@ -896,6 +1102,18 @@ with support for verification similar to Verified Exec.
 .Pp
 Depends on
 .Va WITH_BEARSSL .
+When set, these options are also in effect:
+.Pp
+.Bl -inset -compact
+.It Va WITH_LOADER_EFI_SECUREBOOT
+(unless
+.Va WITHOUT_LOADER_EFI_SECUREBOOT
+is set explicitly)
+.It Va WITH_LOADER_VERIEXEC_VECTX
+(unless
+.Va WITHOUT_LOADER_VERIEXEC_VECTX
+is set explicitly)
+.El
 .It Va WITH_LOADER_VERIEXEC_PASS_MANIFEST
 Enable building
 .Xr loader 8
@@ -933,6 +1151,16 @@ without support for colors to distinguish file types.
 Prefer machine-independent non-assembler code in libc and libm.
 .It Va WITHOUT_MAIL
 Do not build any mail support (MUA or MTA).
+When set, it enforces these options:
+.Pp
+.Bl -item -compact
+.It
+.Va WITHOUT_DMAGENT
+.It
+.Va WITHOUT_MAILWRAPPER
+.It
+.Va WITHOUT_SENDMAIL
+.El
 .It Va WITHOUT_MAILWRAPPER
 Do not build the
 .Xr mailwrapper 8
@@ -957,6 +1185,14 @@ Disable assertions and statistics gathering in
 It also defaults the A and J runtime options to off.
 .It Va WITHOUT_MAN
 Do not build manual pages.
+When set, these options are also in effect:
+.Pp
+.Bl -inset -compact
+.It Va WITHOUT_MAN_UTILS
+(unless
+.Va WITH_MAN_UTILS
+is set explicitly)
+.El
 .It Va WITHOUT_MANCOMPRESS
 Do not install compressed man pages.
 Only the uncompressed versions will be installed.
@@ -1050,7 +1286,7 @@ Do not build
 .Xr mlx5tool 8
 .Pp
 This is a default setting on
-arm/armv6, arm/armv7, powerpc/powerpc, riscv/riscv64 and riscv/riscv64c.
+arm/armv7, powerpc/powerpc, riscv/riscv64 and riscv/riscv64c.
 .It Va WITH_MLX5TOOL
 Build
 .Xr mlx5tool 8
@@ -1064,6 +1300,21 @@ utility.
 .It Va WITHOUT_NETGRAPH
 Do not build applications to support
 .Xr netgraph 4 .
+When set, it enforces these options:
+.Pp
+.Bl -item -compact
+.It
+.Va WITHOUT_BLUETOOTH
+.El
+.Pp
+When set, these options are also in effect:
+.Pp
+.Bl -inset -compact
+.It Va WITHOUT_NETGRAPH_SUPPORT
+(unless
+.Va WITH_NETGRAPH_SUPPORT
+is set explicitly)
+.El
 .It Va WITHOUT_NETGRAPH_SUPPORT
 Build libraries, programs, and kernel modules without netgraph support.
 .It Va WITHOUT_NETLINK
@@ -1086,6 +1337,12 @@ and remove
 entries.
 .It Va WITHOUT_NLS
 Do not build NLS catalogs.
+When set, it enforces these options:
+.Pp
+.Bl -item -compact
+.It
+.Va WITHOUT_NLS_CATALOGS
+.El
 .It Va WITHOUT_NLS_CATALOGS
 Do not build NLS catalog support for
 .Xr csh 1 .
@@ -1107,7 +1364,7 @@ and related programs.
 Do not build nvme related tools and kernel modules.
 .Pp
 This is a default setting on
-arm/armv6, arm/armv7, powerpc/powerpc, riscv/riscv64 and riscv/riscv64c.
+arm/armv7, powerpc/powerpc, riscv/riscv64 and riscv/riscv64c.
 .It Va WITH_NVME
 Build nvme related tools and kernel modules.
 .Pp
@@ -1119,7 +1376,13 @@ Do not build the
 InfiniBand software stack, including kernel modules and userspace libraries.
 .Pp
 This is a default setting on
-arm/armv6, arm/armv7, arm64/aarch64c and riscv/riscv64c.
+arm/armv7, arm64/aarch64c and riscv/riscv64c.
+When set, it enforces these options:
+.Pp
+.Bl -item -compact
+.It
+.Va WITHOUT_OFED_EXTRA
+.El
 .It Va WITH_OFED
 Build the
 .Dq "OpenFabrics Enterprise Distribution"
@@ -1137,7 +1400,7 @@ Enable building LDAP support for kerberos using an openldap client from ports.
 Do not build LLVM's OpenMP runtime.
 .Pp
 This is a default setting on
-arm/armv6, arm/armv7, arm64/aarch64c, powerpc/powerpc and riscv/riscv64c.
+arm/armv7, arm64/aarch64c, powerpc/powerpc and riscv/riscv64c.
 .It Va WITH_OPENMP
 Build LLVM's OpenMP runtime.
 .Pp
@@ -1147,11 +1410,46 @@ amd64/amd64, arm64/aarch64, i386/i386, powerpc/powerpc64, powerpc/powerpc64le an
 Do not build OpenSSH.
 .It Va WITHOUT_OPENSSL
 Do not build OpenSSL.
+When set, it enforces these options:
+.Pp
+.Bl -item -compact
+.It
+.Va WITHOUT_DMAGENT
+.It
+.Va WITHOUT_KERBEROS
+.It
+.Va WITHOUT_KERBEROS_SUPPORT
+.It
+.Va WITHOUT_LDNS
+.It
+.Va WITHOUT_LDNS_UTILS
+.It
+.Va WITHOUT_LOADER_ZFS
+.It
+.Va WITHOUT_OPENSSH
+.It
+.Va WITHOUT_OPENSSL_KTLS
+.It
+.Va WITHOUT_PKGBOOTSTRAP
+.It
+.Va WITHOUT_UNBOUND
+.It
+.Va WITHOUT_ZFS
+.El
+.Pp
+When set, these options are also in effect:
+.Pp
+.Bl -inset -compact
+.It Va WITHOUT_GSSAPI
+(unless
+.Va WITH_GSSAPI
+is set explicitly)
+.El
 .It Va WITHOUT_OPENSSL_KTLS
 Do not include kernel TLS support in OpenSSL.
 .Pp
 This is a default setting on
-arm/armv6, arm/armv7, i386/i386, powerpc/powerpc, riscv/riscv64 and riscv/riscv64c.
+arm/armv7, i386/i386, powerpc/powerpc, riscv/riscv64 and riscv/riscv64c.
 .It Va WITH_OPENSSL_KTLS
 Include kernel TLS support in OpenSSL.
 .Pp
@@ -1162,6 +1460,14 @@ Do not build PAM library and modules.
 .Bf -symbolic
 This option is deprecated and does nothing.
 .Ef
+When set, these options are also in effect:
+.Pp
+.Bl -inset -compact
+.It Va WITHOUT_PAM_SUPPORT
+(unless
+.Va WITH_PAM_SUPPORT
+is set explicitly)
+.El
 .It Va WITHOUT_PAM_SUPPORT
 Build some programs without PAM support, particularly
 .Xr ftpd 8
@@ -1169,12 +1475,18 @@ and
 .Xr ppp 8 .
 .It Va WITHOUT_PF
 Do not build PF firewall package.
+When set, it enforces these options:
+.Pp
+.Bl -item -compact
+.It
+.Va WITHOUT_AUTHPF
+.El
 .It Va WITHOUT_PIE
 Do not build dynamically linked binaries as
 Position-Independent Executable (PIE).
 .Pp
 This is a default setting on
-arm/armv6, arm/armv7, i386/i386 and powerpc/powerpc.
+arm/armv7, i386/i386 and powerpc/powerpc.
 .It Va WITH_PIE
 Build dynamically linked binaries as
 Position-Independent Executable (PIE).
@@ -1278,6 +1590,14 @@ Enable threads in
 .Xr sort 1 .
 .It Va WITHOUT_SOURCELESS
 Do not build kernel modules that include sourceless code (either microcode or native code for host CPU).
+When set, it enforces these options:
+.Pp
+.Bl -item -compact
+.It
+.Va WITHOUT_SOURCELESS_HOST
+.It
+.Va WITHOUT_SOURCELESS_UCODE
+.El
 .It Va WITHOUT_SOURCELESS_HOST
 Do not build kernel modules that include sourceless native code for host CPU.
 .It Va WITHOUT_SOURCELESS_UCODE
@@ -1286,6 +1606,12 @@ Do not build kernel modules that include sourceless microcode.
 Do not build standalone kernel debug files.
 Debug data (if enabled by the kernel configuration file)
 will be included in the kernel and modules.
+When set, it enforces these options:
+.Pp
+.Bl -item -compact
+.It
+.Va WITHOUT_KERNEL_SYMBOLS
+.El
 .It Va WITHOUT_SSP
 Do not build world with propolice stack smashing protection.
 .It Va WITH_STAGING
@@ -1295,6 +1621,18 @@ This can be best thought of as auto-install to
 with some extra meta data to ensure dependencies can be tracked.
 Depends on
 .Va WITH_DIRDEPS_BUILD .
+When set, these options are also in effect:
+.Pp
+.Bl -inset -compact
+.It Va WITH_STAGING_MAN
+(unless
+.Va WITHOUT_STAGING_MAN
+is set explicitly)
+.It Va WITH_STAGING_PROG
+(unless
+.Va WITHOUT_STAGING_PROG
+is set explicitly)
+.El
 .Pp
 This must be set in the environment, make command line, or
 .Pa /etc/src-env.conf ,
@@ -1374,8 +1712,33 @@ See
 .Xr tests 7
 for more details.
 This also disables the build of all test-related dependencies, including ATF.
+When set, it enforces these options:
+.Pp
+.Bl -item -compact
+.It
+.Va WITHOUT_DTRACE_TESTS
+.El
+.Pp
+When set, these options are also in effect:
+.Pp
+.Bl -inset -compact
+.It Va WITHOUT_GOOGLETEST
+(unless
+.Va WITH_GOOGLETEST
+is set explicitly)
+.It Va WITHOUT_TESTS_SUPPORT
+(unless
+.Va WITH_TESTS_SUPPORT
+is set explicitly)
+.El
 .It Va WITHOUT_TESTS_SUPPORT
 Disable the build of all test-related dependencies, including ATF.
+When set, it enforces these options:
+.Pp
+.Bl -item -compact
+.It
+.Va WITHOUT_GOOGLETEST
+.El
 .It Va WITHOUT_TEXTPROC
 Do not build
 programs used for text processing.
@@ -1460,6 +1823,14 @@ Do not build programs used for 802.11 wireless networks; especially
 .Xr wpa_supplicant 8
 and
 .Xr hostapd 8 .
+When set, these options are also in effect:
+.Pp
+.Bl -inset -compact
+.It Va WITHOUT_WIRELESS_SUPPORT
+(unless
+.Va WITH_WIRELESS_SUPPORT
+is set explicitly)
+.El
 .It Va WITHOUT_WIRELESS_SUPPORT
 Build libraries, programs, and kernel modules without
 802.11 wireless support.
@@ -1480,6 +1851,12 @@ Also disable ZFS support in utilities and libraries which implement
 ZFS-specific functionality.
 .It Va WITHOUT_ZONEINFO
 Do not build the timezone database.
+When set, it enforces these options:
+.Pp
+.Bl -item -compact
+.It
+.Va WITHOUT_ZONEINFO_LEAPSECONDS_SUPPORT
+.El
 .It Va WITH_ZONEINFO_LEAPSECONDS_SUPPORT
 Build leapsecond information in to the timezone database.
 .El
