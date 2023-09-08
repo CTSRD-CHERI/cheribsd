@@ -331,6 +331,10 @@ tramp_should_include(const Obj_Entry *reqobj, const struct tramp_data *data)
 	if (reqobj->compart_id == data->defobj->compart_id)
 		return (false);
 
+	if (ld_compartment_enable == NULL &&
+	    (cheri_getperm(data->target) & CHERI_PERM_EXECUTIVE) == 0)
+		return (false);
+
 	sym = strtab_value(data->defobj, data->def->st_name);
 
 	if (string_base_search(&compart_uni.trusts, sym) != -1)

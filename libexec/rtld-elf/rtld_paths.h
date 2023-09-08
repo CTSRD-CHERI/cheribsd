@@ -53,14 +53,6 @@
 #endif
 #endif
 
-#ifndef _RTLD_C18N_ENV_SUFFIX
-#ifdef RTLD_SANDBOX
-#define	_RTLD_C18N_ENV_SUFFIX	"C18N_"
-#else
-#define	_RTLD_C18N_ENV_SUFFIX	""
-#endif
-#endif
-
 #ifndef __PATH_ELF_HINTS
 #define	__PATH_ELF_HINTS(_lc)	"/var/run/ld-elf" _lc ".so.hints"
 #endif
@@ -78,7 +70,7 @@
 #endif
 
 #ifndef _BASENAME_RTLD
-#define	_BASENAME_RTLD		__BASENAME_RTLD(_RTLD_COMPAT_LIB_SUFFIX _RTLD_C18N_FILE_SUFFIX)
+#define	_BASENAME_RTLD		__BASENAME_RTLD(_RTLD_COMPAT_LIB_SUFFIX)
 #endif
 
 #ifndef __PATH_RTLD
@@ -86,7 +78,7 @@
 #endif
 
 #ifndef _PATH_RTLD
-#define	_PATH_RTLD		__PATH_RTLD(_RTLD_COMPAT_LIB_SUFFIX _RTLD_C18N_FILE_SUFFIX)
+#define	_PATH_RTLD		__PATH_RTLD(_RTLD_COMPAT_LIB_SUFFIX)
 #endif
 
 #ifndef STANDARD_LIBRARY_PATH
@@ -100,7 +92,7 @@
 #endif
 
 #ifndef LD_
-#define	LD_			"LD_" _RTLD_COMPAT_ENV_SUFFIX _RTLD_C18N_ENV_SUFFIX
+#define	LD_			"LD_" _RTLD_COMPAT_ENV_SUFFIX
 #endif
 
 #ifndef TOKEN_LIB
