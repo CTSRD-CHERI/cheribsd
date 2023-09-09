@@ -31,7 +31,8 @@ __FBSDID("$FreeBSD$");
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 ENTRY(_rtld_setjmp)
 	/*
-	 * This function MUST save the callee-saved registers in the c0 buffer.
+	 * This function MUST update c0 to point at the buffer that saves the
+	 * general purpose registers.
 	 *
 	 * Before setjmp is called, the top of the Executive stack contains:
 	 * 	-3.	Caller's data
@@ -44,27 +45,13 @@ ENTRY(_rtld_setjmp)
 	 * 	2.	Caller's stack
 	 * 	3.	Return address
 	 * 	4.	Link to 0
-	 * In _rtld_setjmp, we manipulate the stack content to the following:
-	 * 	-4.	Link to 0
-	 * 	-3.	Caller's data
-	 * 	-2.	Caller's stack
-	 * 	-1.	Return address
-	 * 	0.	Link to previous frame
-	 * 	------------------------------
-	 * 	1.	Caller's data
-	 * 	2.	Caller's stack
-	 * 	3.	Return address
-	 * 	4.	Link to 0
-	 * To do this, we shift everything from -3 to 4 by SETJMP_SHIFT
-	 * positions.
+	 * We store a sealed capability to the caller's frame in the jump
+	 * buffer.
 	 */
-#define	SETJMP_SHIFT	1
-	str	c30, [csp, #-((SETJMP_SHIFT + 1) * CAP_WIDTH)]!
-	add	c1, csp, #CAP_WIDTH
-	bl	_rtld_setjmp_impl
-	ldr	c30, [csp], #CAP_WIDTH
-
-	mov	x1, xzr
+	ldr	c2, sealer_jmpbuf
+	ldr	c3, [csp]
+	seal	c3, c3, c2
+	str	c3, [c0], #CAP_WIDTH
 	ret
 END(_rtld_setjmp)
 
@@ -95,49 +82,22 @@ ENTRY(_rtld_longjmp)
 	 * 4. longjmp then restores the general purpose registers and branch to
 	 * the saved return address.
 	 */
-
-	/*
-	 * Load link to the supplied buffer
-	 * c2: Link to the supplied buffer
-	 */
-	ldr	c2, [c0], #CAP_WIDTH
-
-	/* Check that the supplied buffer is on the current Executive stack */
-	chkssu	c2, c2, csp
+	ldr	c2, sealer_jmpbuf
+	ldr	c3, [c0], #CAP_WIDTH
+	unseal	c3, c3, c2
+	chkss	c3, csp
 	b.pl	1f
 
-	/* Check that the supplied buffer is below the top of the stack */
-	cmp	sp, x2
-	b.hs	1f
+	mov	c2, csp
+2:	ldr	c2, [c2]
+	cmp	x2, x3
+	b.ne	2b
 
-	/*
-	 * All sanity checks have passed
-	 * Locate the frame of the supplied buffer
-	 * c2: Frame of the supplied buffer
-	 */
-	ldr	c4, [c2]
-	ldr	c5, sealer_jmpbuf
-2:	unseal	c3, c4, c5
-	ldr	c4, [c3]
-	gcseal	x6, c4
-	cbnz	x6, 2b
-
-	/* Unwind the frames */
-	mov	c5, csp
-4:	ldr	c5, [c5]
-	cmp	c5, c3
-	b.eq	3f
-
-	/* Enforce security policy here for each frame being unwound */
-	b	4b
-
-3:	/* Update frame */
-	str	c3, [csp]
-
+	str	c2, [csp]
 	ret
 
-	/* TODO: Abort */
-1:	ret
+1:	/* Botch */
+	ret
 END(_rtld_longjmp)
 
 ENTRY(_rtld_get_rstk)

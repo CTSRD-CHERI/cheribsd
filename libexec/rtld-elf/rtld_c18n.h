@@ -126,9 +126,4 @@ void *_rtld_safebox_code(void *, struct tramp_sig);
 
 void tramp_init(void);
 void tramp_add_comparts(struct policy *);
-
-/*
- * libc support
- */
-void *_rtld_setjmp_impl(void **restrict, void **restrict);
 #endif
