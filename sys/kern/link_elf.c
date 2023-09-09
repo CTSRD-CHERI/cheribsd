@@ -814,6 +814,7 @@ parse_vnet(elf_file_t ef)
 
 	ef->vnet_start = NULL;
 	ef->vnet_stop = NULL;
+	ef->vnet_base = NULL;
 	error = link_elf_lookup_set(&ef->lf, "vnet", (void ***)&ef->vnet_start,
 	    (void ***)&ef->vnet_stop, NULL);
 	/* Error just means there is no vnet data set to relocate. */
@@ -856,7 +857,6 @@ parse_vnet(elf_file_t ef)
 		return (ENOSPC);
 	}
 	memcpy(ef->vnet_base, ef->vnet_start, size);
-	vnet_data_copy(ef->vnet_base, size);
 	elf_set_add(&set_vnet_list, ef->vnet_start, ef->vnet_stop,
 	    ef->vnet_base);
 
