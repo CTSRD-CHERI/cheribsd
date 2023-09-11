@@ -38,6 +38,12 @@ if [ $# -eq 0 ]; then
 	set -- hybrid purecap
 
 	case `uname -p` in
+	aarch64*)
+		set -- "$@" purecap-benchmark
+		;;
+	esac
+
+	case `uname -p` in
 	aarch64c)
 		set -- "$@" c18n
 		;;
