@@ -35,6 +35,7 @@
 #define	LIBSTDBUF32	"/usr/lib32/libstdbuf.so"
 #define	LIBSTDBUF64	"/usr/lib64/libstdbuf.so"
 #define	LIBSTDBUF64C	"/usr/lib64c/libstdbuf.so"
+#define	LIBSTDBUF64CB	"/usr/lib64cb/libstdbuf.so"
 
 static int
 appendenv(const char *key, const char *value)
@@ -106,6 +107,7 @@ main(int argc, char *argv[])
 	appendenv("LD_32_PRELOAD", LIBSTDBUF32);
 	appendenv("LD_64_PRELOAD", LIBSTDBUF64);
 	appendenv("LD_64C_PRELOAD", LIBSTDBUF64C);
+	appendenv("LD_64CB_PRELOAD", LIBSTDBUF64CB);
 
 	execvp(argv[0], argv);
 	err(2, "%s", argv[0]);
