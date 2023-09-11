@@ -42,28 +42,39 @@
  * override/malloc.cc, with the double-underscore prefix.  We provide the
  * non-prefixed versions with weak linkage here.
  */
+/* malloc and variants */
 EXPOSE_WEAK_ALIAS(malloc);
 EXPOSE_WEAK_ALIAS(calloc);
-EXPOSE_WEAK_ALIAS(realloc);
-EXPOSE_WEAK_ALIAS(free);
 EXPOSE_WEAK_ALIAS(posix_memalign);
-EXPOSE_WEAK_ALIAS(malloc_usable_size);
 EXPOSE_WEAK_ALIAS(aligned_alloc);
+EXPOSE_WEAK_ALIAS(mallocx);
+EXPOSE_WEAK_ALIAS(allocm);
+
+/* realloc and variants */
+EXPOSE_WEAK_ALIAS(realloc);
+EXPOSE_WEAK_ALIAS(rallocx);
+EXPOSE_WEAK_ALIAS(rallocm);
+
+/* free and variants */
+EXPOSE_WEAK_ALIAS(free);
+EXPOSE_WEAK_ALIAS(dallocx);
+EXPOSE_WEAK_ALIAS(dallocm);
+EXPOSE_WEAK_ALIAS(sdallocx);
+
+/* Information about an allocation */
+EXPOSE_WEAK_ALIAS(malloc_usable_size);
+EXPOSE_WEAK_ALIAS(xallocx);	/* XXX: could realloc, but doesn't */
+EXPOSE_WEAK_ALIAS(sallocx);
+EXPOSE_WEAK_ALIAS(sallocm);
+
+/* Information about a prospective allocation */
+EXPOSE_WEAK_ALIAS(nallocx);
+EXPOSE_WEAK_ALIAS(nallocm);
+
+/* Unimplemented control and monitoring interfaces */
 EXPOSE_WEAK_ALIAS(mallctl);
 EXPOSE_WEAK_ALIAS(mallctlnametomib);
 EXPOSE_WEAK_ALIAS(mallctlbymib);
-EXPOSE_WEAK_ALIAS(mallocx);
-EXPOSE_WEAK_ALIAS(rallocx);
-EXPOSE_WEAK_ALIAS(xallocx);
-EXPOSE_WEAK_ALIAS(sallocx);
-EXPOSE_WEAK_ALIAS(dallocx);
-EXPOSE_WEAK_ALIAS(nallocx);
-EXPOSE_WEAK_ALIAS(allocm);
-EXPOSE_WEAK_ALIAS(rallocm);
-EXPOSE_WEAK_ALIAS(sallocm);
-EXPOSE_WEAK_ALIAS(dallocm);
-EXPOSE_WEAK_ALIAS(nallocm);
-EXPOSE_WEAK_ALIAS(sdallocx);
 
 /*
  * These are not provided by snmalloc and so are defined here as stubs.
