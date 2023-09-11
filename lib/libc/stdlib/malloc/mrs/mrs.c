@@ -196,7 +196,7 @@ static const size_t CAPREVOKE_BITMAP_ALIGNMENT = sizeof(void *); /* XXX VM_CAPRE
 static const size_t DESCRIPTOR_SLAB_ENTRIES = 10000;
 static const size_t MIN_REVOKE_HEAP_SIZE = 8 * 1024 * 1024;
 
-volatile const struct cheri_revoke_info *cri;
+static volatile const struct cheri_revoke_info *cri;
 static size_t page_size;
 static void *entire_shadow;
 
