@@ -111,6 +111,18 @@ void *REAL(realloc)(void *, size_t);
 int REAL(posix_memalign)(void **, size_t, size_t);
 void *REAL(aligned_alloc)(size_t, size_t);
 
+/* jemalloc non-standard API */
+void *REAL(mallocx)(size_t, int);
+void *REAL(rallocx)(void *, size_t, int);
+void REAL(dallocx)(void *, int);
+void REAL(sdallocx)(void *, size_t, int);
+
+/*
+ * XXX: no support for v3 API (allocm, rallocm, sallocm, dallocm, nallocm).
+ * The are provided in FreeBSD for backwards compatibility and are not
+ * declared in any public header so there should be no users.
+ */
+
 void *REAL(malloc_underlying_allocation)(void *);
 
 /* functions */
@@ -121,6 +133,11 @@ static void *mrs_calloc(size_t, size_t);
 static void *mrs_realloc(void *, size_t);
 static int mrs_posix_memalign(void **, size_t, size_t);
 static void *mrs_aligned_alloc(size_t, size_t);
+
+void *mrs_mallocx(size_t, int);
+void *mrs_rallocx(void *, size_t, int);
+void mrs_dallocx(void *, int);
+void mrs_sdallocx(void *, size_t, int);
 
 void *malloc(size_t size) {
 	return mrs_malloc(size);
@@ -139,6 +156,23 @@ int posix_memalign(void **ptr, size_t alignment, size_t size) {
 }
 void *aligned_alloc(size_t alignment, size_t size) {
 	return mrs_aligned_alloc(alignment, size);
+}
+
+void *mallocx(size_t size, int flags)
+{
+	return mrs_mallocx(size, flags);
+}
+void *rallocx(void *ptr, size_t size, int flags)
+{
+	return mrs_rallocx(ptr, size, flags);
+}
+void dallocx(void *ptr, int flags)
+{
+	return mrs_dallocx(ptr, flags);
+}
+void sdallocx(void *ptr, size_t size, int flags)
+{
+	return mrs_sdallocx(ptr, size, flags);
 }
 
 /*
@@ -1206,13 +1240,85 @@ static void mrs_free(void *ptr) {
 	}
 #endif /* BYPASS_QUARANTINE */
 
-	/* use passed-in length because, if validated it is guaranteed to be less than the allocated length */
-	/*quarantine_insert(&application_quarantine, ins, cheri_getlen(ptr));*/
-  quarantine_insert(&application_quarantine, ins, cheri_getlen(ins));
+	quarantine_insert(&application_quarantine, ins, cheri_getlen(ins));
 
 #ifdef REVOKE_ON_FREE
 	check_and_perform_flush();
 #endif /* REVOKE_ON_FREE */
+}
+
+void *mrs_mallocx(size_t size, int flags)
+{
+#ifdef JUST_INTERPOSE
+	return REAL(mallocx)(size, flags);
+#else /* !JUST_INTERPOSE */
+	/*
+	 * This API supports optional zeroing.  Since no one really uses
+	 * it, we don't care about performance and preserve the ABI by
+	 * uncontionally calling calloc.  (We should always be zeroing
+	 * for correctness anyway.)
+	 */
+	return mrs_calloc(1, size);
+#endif /* !JUST_INTERPOSE */
+}
+
+void *mrs_rallocx(void *ptr, size_t size, int flags)
+{
+#ifdef JUST_INTERPOSE
+	return REAL(rallocx)(ptr, size, flags);
+#else /* !JUST_INTERPOSE */
+
+	size_t old_size = cheri_getlen(ptr);
+	mrs_debug_printf("%s: called ptr %p ptr size %zu new size %zu\n",
+	    __func__, ptr, old_size, size);
+
+	if (size == 0) {
+		mrs_free(ptr);
+		return NULL;
+	}
+
+	/*
+	 * This API supports optional zeroing.  Since no one really uses
+	 * it, we don't care about performance and preserve the ABI by
+	 * uncontionally calling calloc.  (We should always be zeroing
+	 * for correctness anyway.)
+	 */
+	if (ptr == NULL) {
+		return mrs_calloc(1, size);
+	}
+
+	void *new_alloc = mrs_calloc(1, size);
+	/* old object is not deallocated according to the spec */
+	if (new_alloc == NULL) {
+		return NULL;
+	}
+	memcpy(new_alloc, ptr, size < old_size ? size : old_size);
+	mrs_free(ptr);
+	return new_alloc;
+#endif /* !JUST_INTERPOSE */
+}
+
+void mrs_dallocx(void *ptr, int flags)
+{
+#ifdef JUST_INTERPOSE
+	return REAL(dallocx)(ptr, flags);
+#else /* !JUST_INTERPOSE */
+	/* XXX: snmalloc just ignores flags.  */
+	mrs_free(ptr);
+#endif /* !JUST_INTERPOSE */
+}
+
+void mrs_sdallocx(void *ptr, size_t size, int flags)
+{
+#ifdef JUST_INTERPOSE
+	return REAL(sdallocx)(ptr, size, flags);
+#else /* !JUST_INTERPOSE */
+	/*
+	 * XXX: snmalloc just frees ignoring flags so do the same for
+	 * simplicity.
+	 */
+	mrs_free(ptr);
+#endif /* !JUST_INTERPOSE */
 }
 
 #ifdef OFFLOAD_QUARANTINE
