@@ -88,7 +88,7 @@ ENTRY(setjmp)
 
 	/* Return value */
 	mov	x0, #0
-	ret
+	RETURN
 	.align	3
 .Lmagic:
 	.quad	_JB_MAGIC_SETJMP
@@ -146,7 +146,7 @@ ENTRY(longjmp)
 	/* Load the return value */
 	cmp	x1, #0
 	csinc	x0, x1, xzr, ne
-	ret
+	RETURN
 
 botch:
 	bl	_C_LABEL(longjmperror)

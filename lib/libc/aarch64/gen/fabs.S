@@ -26,5 +26,5 @@
 #include <machine/asm.h>
 ENTRY(fabs)
 	fabs d0, d0
-	ret
+	RETURN
 END(fabs)
