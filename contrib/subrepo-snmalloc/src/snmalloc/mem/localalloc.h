@@ -873,5 +873,32 @@ namespace snmalloc
     {
       return local_cache;
     }
+
+#ifdef MALLOC_REVOCATION_SHIM
+    SNMALLOC_FAST_PATH void* underlying_alloc(void* p_raw)
+    {
+#ifdef __CHERI_PURE_CAPABILITY__
+      capptr::AllocWild<void> p_wild = capptr_from_client(p_raw);
+
+      capptr::Alloc<void> p_tame =
+        capptr_domesticate<Config>(core_alloc->backend_state_ptr(), p_wild);
+
+      address_t a = address_cast(p_tame);
+
+      const PagemapEntry& entry = Config::Backend::get_metaentry(a);
+
+      auto sizeclass = entry.get_sizeclass();
+
+      size_t sz = snmalloc::sizeclass_full_to_size(sizeclass);
+
+      capptr::Arena<void> amp = Config::Backend::amplify(p_tame);
+
+      return Aal::capptr_bound<void, capptr::bounds::Arena>(amp, sz)
+        .unsafe_ptr();
+#else
+      return p_raw;
+#endif
+    }
+#endif
   };
 } // namespace snmalloc

@@ -116,4 +116,12 @@ extern "C"
   SNMALLOC_EXPORT void* (*SNMALLOC_NAME_MANGLE(__memalign_hook))(
     size_t alignment, size_t size) = &SNMALLOC_NAME_MANGLE(memalign);
 #endif
+
+#ifdef MALLOC_REVOCATION_SHIM
+  SNMALLOC_EXPORT void*
+    SNMALLOC_NAME_MANGLE(malloc_underlying_allocation)(void* ptr)
+  {
+    return ThreadAlloc::get().underlying_alloc(ptr);
+  }
+#endif
 }
