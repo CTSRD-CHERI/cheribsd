@@ -798,6 +798,7 @@ typedef struct {
 #define	ELF_NOTE_NETBSD		"NetBSD"
 #define	ELF_NOTE_SOLARIS	"SUNW Solaris"
 #define	ELF_NOTE_GNU		"GNU"
+#define	ELF_NOTE_CHERI		"CHERI"
 
 /* Values for n_type used in executables. */
 #define	NT_FREEBSD_ABI_TAG	1
@@ -859,6 +860,9 @@ typedef struct {
 
 #define	GNU_PROPERTY_X86_FEATURE_1_IBT		0x00000001
 #define	GNU_PROPERTY_X86_FEATURE_1_SHSTK	0x00000002
+
+/* CHERI note types. */
+#define	NT_CHERI_MORELLO_PURECAP_BENCHMARK_ABI	0x80000000
 
 /* Symbol Binding - ELFNN_ST_BIND - st_info */
 #define	STB_LOCAL	0	/* Local symbol */
