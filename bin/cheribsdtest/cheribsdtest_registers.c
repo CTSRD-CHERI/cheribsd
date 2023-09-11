@@ -76,7 +76,7 @@ check_initreg_code(void * __capability c)
 {
 	uintmax_t v;
 
-#if defined(__CHERI_PURE_CAPABILITY__)
+#if defined(__CHERI_PURE_CAPABILITY__) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	/*
 	 * Dynamically linked pure-capability code should have a program
 	 * counter that is bounded to the current DSO/executable (or function).

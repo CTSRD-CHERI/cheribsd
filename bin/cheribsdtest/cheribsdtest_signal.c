@@ -36,6 +36,8 @@
 
 #include <sys/types.h>
 
+#include <machine/vmparam.h>
+
 #include <cheri/cheri.h>
 
 #include <errno.h>
@@ -261,7 +263,13 @@ CHERIBSDTEST(signal_returncap,
 
 	/* Length -- 256 bytes should be more than enough to cover sigcode. */
 	v = cheri_getlen(handler_returncap);
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	CHERIBSDTEST_VERIFY2(v == CHERI_CAP_USER_CODE_LENGTH,
+	    "length 0x%jx (expected <= 0x%jx)", v,
+	    (uintmax_t)CHERI_CAP_USER_CODE_LENGTH);
+#else
 	CHERIBSDTEST_VERIFY2(v <= 0x100, "length 0x%jx (expected <= 0x100)", v);
+#endif
 
 	/* Type -- should be a sentry capability. */
 	v = cheri_gettype(handler_returncap);
