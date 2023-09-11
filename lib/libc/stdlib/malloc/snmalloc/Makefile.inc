@@ -40,6 +40,13 @@ CXXFLAGS.malloc.cc+=	-fomit-frame-pointer
 # and doesn't help if you're debugging anything other than malloc.
 CXXFLAGS.malloc.cc+=	-DNDEBUG
 
+# Don't export standard names when we're building with mrs support.  Its
+# wrappers will provide this functionality.
+.if ${MK_MALLOC_REVOCATION_SHIM} == yes
+CXXFLAGS.malloc.cc+=	-DMALLOC_REVOCATION_SHIM
+MRS_REAL_PREFIX=__
+.endif
+
 # snmalloc relies a lot on inlining.  If a new version breaks, uncomment these
 # lines to make it easy to debug.
 #CXXFLAGS.malloc.cc+=	-O0 -fno-inline
