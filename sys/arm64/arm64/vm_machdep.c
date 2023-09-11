@@ -248,9 +248,13 @@ cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
 		tf->tf_sp = STACKALIGN((uintcap_t)stack->ss_sp + stack->ss_size);
 
 #if __has_feature(capabilities)
-	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
-		trapframe_set_elr(tf, (uintcap_t)entry);
-	else
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
+		if (SV_PROC_FLAG(td->td_proc, SV_UNBOUND_PCC))
+			tf->tf_elr = cheri_setaddress(tf->tf_elr,
+			    (__cheri_addr ptraddr_t)entry);
+		else
+			trapframe_set_elr(tf, (uintcap_t)entry);
+	} else
 		hybridabi_thread_setregs(td, (unsigned long)(uintcap_t)entry);
 #else
 	tf->tf_elr = (uintcap_t)entry;

@@ -176,6 +176,7 @@ struct sysentvec {
 #define	SV_SIG_DISCIGN	0x200000	/* Do not discard ignored signals */
 #define	SV_SIG_WAITNDQ	0x400000	/* Wait does not dequeue SIGCHLD */
 #define	SV_DSO_SIG	0x800000	/* Signal trampoline packed in dso */
+#define	SV_UNBOUND_PCC	0x04000000	/* Don't set PCC bounds (CheriABI-only). */
 #define	SV_CHERI	0x08000000	/* CheriABI executable. */
 
 #define	SV_ABI_MASK	0xff

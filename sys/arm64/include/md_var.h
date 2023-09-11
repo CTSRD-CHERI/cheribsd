@@ -35,6 +35,10 @@
 extern long Maxmem;
 extern char sigcode[];
 extern int szsigcode;
+#if __has_feature(capabilities)
+extern char freebsd64cb_sigcode[];
+extern int freebsd64cb_szsigcode;
+#endif
 #ifdef COMPAT_FREEBSD64
 extern char freebsd64_sigcode[];
 extern int freebsd64_szsigcode;
