@@ -217,7 +217,8 @@ __DEFAULT_NO_OPTIONS = \
 __DEFAULT_YES_OPTIONS+=	\
 	CHERI_CAPREVOKE \
 	CHERIBSDBOX \
-	LIB64C
+	LIB64C \
+	MALLOC_REVOCATION_SHIM
 
 __REQUIRED_OPTIONS = \
     CAPSICUM \
@@ -571,6 +572,10 @@ MK_${vv:H}:=	no
 MK_${vv:H}:=	${MK_${vv:T}}
 .endif
 .endfor
+
+.if !${OPT_LIBC_MALLOC:Msnmalloc}
+MK_MALLOC_REVOCATION_SHIM:=	no
+.endif
 
 #
 # Set defaults for the MK_*_SUPPORT variables.
