@@ -69,7 +69,7 @@ ENTRY(_setjmp)
 
 	/* Return value */
 	mov	x0, #0
-	ret
+	RETURN
 	.align	3
 .Lmagic:
 	.quad	_JB_MAGIC__SETJMP
@@ -115,7 +115,7 @@ ENTRY(_longjmp)
 	/* Load the return value */
 	cmp	x1, #0
 	csinc	x0, x1, xzr, ne
-	ret
+	RETURN
 
 botch:
 #ifdef _STANDALONE

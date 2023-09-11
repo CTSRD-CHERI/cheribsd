@@ -7,7 +7,7 @@ SUBDIR+=	hybrid \
 		hybrid-mt
 .endif
 
-.if ${MACHINE_ABI:Mpurecap} || ${MK_LIB64C} == "yes"
+.if (${MACHINE_ABI:Mpurecap} && !${MACHINE_ABI:Mbenchmark}) || ${MK_LIB64C} == "yes"
 SUBDIR+=	purecap \
 		purecap-dynamic \
 		purecap-dynamic-mt \
