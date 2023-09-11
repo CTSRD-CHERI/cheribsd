@@ -975,10 +975,6 @@ static void *mrs_malloc(size_t size) {
 
 	/*mrs_debug_printf("mrs_malloc: called\n");*/
 
-	if (size == 0) {
-		return NULL;
-	}
-
 #ifndef REVOKE_ON_FREE
 	check_and_perform_flush();
 #endif /* !REVOKE_ON_FREE */
@@ -1055,10 +1051,6 @@ void *mrs_calloc(size_t number, size_t size) {
 
 	/* this causes problems if our library is initizlied before the thread library */
 	/*mrs_debug_printf("mrs_calloc: called\n");*/
-
-	if (number == 0 || size == 0) {
-		return NULL;
-	}
 
 #ifndef REVOKE_ON_FREE
 	check_and_perform_flush();
