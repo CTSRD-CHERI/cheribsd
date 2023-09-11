@@ -338,6 +338,12 @@ __DEFAULT_YES_OPTIONS+=LIB64
 .else
 BROKEN_OPTIONS+=LIB64
 .endif
+# LIB64CB is supported on aarch64*c* and hybrid morello
+.if ${__C} == "morello" || ${__T:Maarch64*c*}
+__DEFAULT_YES_OPTIONS+=LIB64CB
+.else
+BROKEN_OPTIONS+=LIB64CB
+.endif
 
 .if ${__T:Maarch64*c*} || ${__T:Mriscv*c*}
 # nscd(8) caching depends on marshaling pointers to the daemon and back
