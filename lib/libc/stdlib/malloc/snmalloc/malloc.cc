@@ -42,6 +42,7 @@
  * override/malloc.cc, with the double-underscore prefix.  We provide the
  * non-prefixed versions with weak linkage here.
  */
+#ifndef MALLOC_REVOCATION_SHIM
 /* malloc and variants */
 EXPOSE_WEAK_ALIAS(malloc);
 EXPOSE_WEAK_ALIAS(calloc);
@@ -60,6 +61,7 @@ EXPOSE_WEAK_ALIAS(free);
 EXPOSE_WEAK_ALIAS(dallocx);
 EXPOSE_WEAK_ALIAS(dallocm);
 EXPOSE_WEAK_ALIAS(sdallocx);
+#endif
 
 /* Information about an allocation */
 EXPOSE_WEAK_ALIAS(malloc_usable_size);
