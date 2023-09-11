@@ -111,6 +111,8 @@ void *REAL(realloc)(void *, size_t);
 int REAL(posix_memalign)(void **, size_t, size_t);
 void *REAL(aligned_alloc)(size_t, size_t);
 
+void *REAL(malloc_underlying_allocation)(void *);
+
 /* functions */
 
 static void *mrs_malloc(size_t);
@@ -187,7 +189,6 @@ void *aligned_alloc(size_t alignment, size_t size) {
  * but this was done so that clearing on free could be evaluated easily and
  * so that allocators wouldn't have to accept revoked caps.
  */
-void *malloc_underlying_allocation(void *) __attribute__((weak));
 
 /* globals */
 
@@ -445,7 +446,7 @@ static inline void *validate_freed_pointer(void *ptr) {
     return NULL;
   }
 
-	void *underlying_allocation = malloc_underlying_allocation(ptr);
+	void *underlying_allocation = REAL(malloc_underlying_allocation)(ptr);
 	if (underlying_allocation == NULL) {
 		mrs_debug_printf("validate_freed_pointer: not allocated by underlying allocator\n");
 		return NULL;
