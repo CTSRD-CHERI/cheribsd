@@ -299,7 +299,7 @@ __DEFAULT_DEPENDENT_OPTIONS+=	LLVM_TARGET_${__llt:${__LLVM_TARGET_FILT}:tu}/LLVM
 .endfor
 
 .if ${__T:Maarch64*c*} || ${__T:Mriscv*c*}
-__LIBC_MALLOC_DEFAULT:=	dlmalloc
+__LIBC_MALLOC_DEFAULT:=	snmalloc
 .endif
 
 __DEFAULT_NO_OPTIONS+=LLVM_TARGET_BPF LLVM_TARGET_MIPS
