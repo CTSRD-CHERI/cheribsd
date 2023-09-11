@@ -55,6 +55,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "libc_private.h"
+
 /*
  * Knobs:
  *
@@ -293,6 +295,15 @@ static inline __attribute__((always_inline)) void mrs_puts(const char *p)
 		return name ## _buf; \
 	}
 int _pthread_mutex_init_calloc_cb(pthread_mutex_t *mutex, void *(calloc_cb)(size_t, size_t));
+#pragma weak _pthread_mutex_init_calloc_cb
+int
+_pthread_mutex_init_calloc_cb(pthread_mutex_t *mutex,
+    void *(calloc_cb)(size_t, size_t))
+{
+	return (((int (*)(pthread_mutex_t *, void *(*)(size_t, size_t)))
+	    __libc_interposing[INTERPOS__pthread_mutex_init_calloc_cb])(mutex,
+	    calloc_cb));
+}
 #define initialize_lock(name) \
 	_pthread_mutex_init_calloc_cb(&name, name ## _storage)
 
