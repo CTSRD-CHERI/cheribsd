@@ -99,6 +99,17 @@ struct pmap {
 	enum pmap_stage		pm_stage;
 	int			pm_levels;
 	uint64_t		pm_reserved[4];
+
+#if __has_feature(capabilities)
+	struct {
+		/*
+		 * Capability load generation bit.  The hardware kernel CLG
+		 * reflects this bit in the kernel_pmap, while the hardware
+		 * user CLG reflects this bit in the activated pmap.
+		 */
+		unsigned uclg:1;
+	} flags;
+#endif
 };
 typedef struct pmap *pmap_t;
 
@@ -184,7 +195,9 @@ extern void (*pmap_stage2_invalidate_all)(uint64_t);
 static inline int
 pmap_vmspace_copy(pmap_t dst_pmap __unused, pmap_t src_pmap __unused)
 {
-
+#if __has_feature(capabilities)
+	dst_pmap->flags.uclg = src_pmap->flags.uclg;
+#endif
 	return (0);
 }
 
