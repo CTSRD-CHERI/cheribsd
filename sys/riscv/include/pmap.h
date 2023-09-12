@@ -86,6 +86,17 @@ struct pmap {
 	TAILQ_HEAD(,pv_chunk)	pm_pvchunk;	/* list of mappings in pmap */
 	LIST_ENTRY(pmap)	pm_list;	/* List of all pmaps */
 	struct vm_radix		pm_root;
+
+#if __has_feature(capabilities)
+	struct {
+		/*
+		 * Capability load generation bit.  The hardware kernel CLG
+		 * reflects this bit in the kernel_pmap, while the hardware
+		 * user CLG reflects this bit in the activated pmap.
+		 */
+		unsigned uclg:1;
+	} flags;
+#endif
 };
 
 typedef struct pmap *pmap_t;
@@ -163,7 +174,9 @@ int	pmap_fault(pmap_t, vm_offset_t, vm_prot_t);
 static inline int
 pmap_vmspace_copy(pmap_t dst_pmap __unused, pmap_t src_pmap __unused)
 {
-
+#if __has_feature(capabilities)
+	dst_pmap->flags.uclg = src_pmap->flags.uclg;
+#endif
 	return (0);
 }
 
