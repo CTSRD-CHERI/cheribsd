@@ -119,6 +119,11 @@ int main(int, char**)
   test_is_not_signed<bool>();
   test_is_not_signed<unsigned>();
 
+  test_is_signed<intptr_t>();
+  test_is_not_signed<uintptr_t>();
+  test_is_signed<intmax_t>();
+  test_is_not_signed<uintmax_t>();
+
 #ifndef TEST_HAS_NO_INT128
     test_is_signed<__int128_t>();
     test_is_not_signed<__uint128_t>();

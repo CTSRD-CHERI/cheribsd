@@ -9,6 +9,9 @@
 // UNSUPPORTED: c++03
 // UNSUPPORTED: libcpp-no-rtti
 
+// test_memory_resource requires RTTI for dynamic_cast
+// UNSUPPORTED: no-rtti
+
 // <experimental/memory_resource>
 
 // template <class Alloc> class resource_adaptor_imp;

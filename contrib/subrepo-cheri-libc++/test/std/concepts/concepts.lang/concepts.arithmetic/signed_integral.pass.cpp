@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
-// UNSUPPORTED: libcpp-no-concepts
 
 // template<class T>
 // concept signed_integral = // see below
@@ -53,6 +52,7 @@ static_assert(CheckSignedIntegralQualifiers<short>());
 static_assert(CheckSignedIntegralQualifiers<int>());
 static_assert(CheckSignedIntegralQualifiers<long>());
 static_assert(CheckSignedIntegralQualifiers<long long>());
+static_assert(CheckSignedIntegralQualifiers<intptr_t>());
 
 // bool and character *may* be signed
 static_assert(CheckSignedIntegralQualifiers<wchar_t>() ==
@@ -72,6 +72,7 @@ static_assert(!CheckSignedIntegralQualifiers<unsigned short>());
 static_assert(!CheckSignedIntegralQualifiers<unsigned int>());
 static_assert(!CheckSignedIntegralQualifiers<unsigned long>());
 static_assert(!CheckSignedIntegralQualifiers<unsigned long long>());
+static_assert(!CheckSignedIntegralQualifiers<uintptr_t>());
 
 // extended integers
 #ifndef TEST_HAS_NO_INT128
