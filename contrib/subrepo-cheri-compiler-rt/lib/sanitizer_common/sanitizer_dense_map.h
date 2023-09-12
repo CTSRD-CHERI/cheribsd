@@ -678,7 +678,7 @@ class DenseMap : public DenseMapBase<DenseMap<KeyT, ValueT, KeyInfoT, BucketT>,
       return false;
     }
 
-    uptr Size = sizeof(BucketT) * NumBuckets;
+    usize Size = sizeof(BucketT) * NumBuckets;
     if (Size * 2 <= GetPageSizeCached()) {
       // We always allocate at least a page, so use entire space.
       unsigned Log2 = MostSignificantSetBitIndex(GetPageSizeCached() / Size);

@@ -16,7 +16,6 @@
 #define SANITIZER_COMMON_H
 
 #include "sanitizer_flags.h"
-#include "sanitizer_interface_internal.h"
 #include "sanitizer_internal_defs.h"
 #include "sanitizer_libc.h"
 #include "sanitizer_list.h"
@@ -121,6 +120,11 @@ bool MprotectReadOnly(uptr addr, usize size);
 
 void MprotectMallocZones(void *addr, int prot);
 
+#if SANITIZER_WINDOWS
+// Zero previously mmap'd memory. Currently used only on Windows.
+bool ZeroMmapFixedRegion(uptr fixed_addr, uptr size) WARN_UNUSED_RESULT;
+#endif
+
 #if SANITIZER_LINUX
 // Unmap memory. Currently only used on Linux.
 void UnmapFromTo(uptr from, uptr to);
@@ -171,8 +175,8 @@ void SetShadowRegionHugePageMode(uptr addr, usize length);
 bool DontDumpShadowMemory(uptr addr, usize length);
 // Check if the built VMA size matches the runtime one.
 void CheckVMASize();
-void RunMallocHooks(const void *ptr, usize size);
-void RunFreeHooks(const void *ptr);
+void RunMallocHooks(void *ptr, usize size);
+void RunFreeHooks(void *ptr);
 
 class ReservedAddressRange {
  public:
@@ -286,7 +290,7 @@ void SetStackSizeLimitInBytes(usize limit);
 bool AddressSpaceIsUnlimited();
 void SetAddressSpaceUnlimited();
 void AdjustStackSize(void *attr);
-void PlatformPrepareForSandboxing(__sanitizer_sandbox_arguments *args);
+void PlatformPrepareForSandboxing(void *args);
 void SetSandboxingCallback(void (*f)());
 
 void InitializeCoverage(bool enabled, const char *coverage_dir);
@@ -295,6 +299,7 @@ void InitTlsSize();
 usize GetTlsSize();
 
 // Other
+void WaitForDebugger(unsigned seconds, const char *label);
 void SleepForSeconds(unsigned seconds);
 void SleepForMillis(unsigned millis);
 u64 NanoTime();
@@ -310,6 +315,18 @@ CheckFailed(const char *file, int line, const char *cond, u64 v1, u64 v2);
 void NORETURN ReportMmapFailureAndDie(usize size, const char *mem_type,
                                       const char *mmap_type, error_t err,
                                       bool raw_report = false);
+
+// Returns true if the platform-specific error reported is an OOM error.
+bool ErrorIsOOM(error_t err);
+
+// This reports an error in the form:
+//
+//   `ERROR: {{SanitizerToolName}}: out of memory: {{err_msg}}`
+//
+// Downstream tools that read sanitizer output will know that errors starting
+// in this format are specifically OOM errors.
+#define ERROR_OOM(err_msg, ...) \
+  Report("ERROR: %s: out of memory: " err_msg, SanitizerToolName, __VA_ARGS__)
 
 // Specific tools may override behavior of "Die" function to do tool-specific
 // job.
@@ -397,10 +414,13 @@ inline usize MostSignificantSetBitIndex(usize x) {
   return up;
 }
 #ifdef __CHERI_PURE_CAPABILITY__
-usize MostSignificantSetBitIndex(uptr x) = delete;
-INLINE usize MostSignificantSetBitIndex(u64 x) {
+inline usize MostSignificantSetBitIndex(u64 x) {
   return MostSignificantSetBitIndex((usize)x);
 }
+inline usize MostSignificantSetBitIndex(u32 x) {
+  return MostSignificantSetBitIndex((usize)x);
+}
+usize MostSignificantSetBitIndex(uptr x) = delete;
 #endif
 
 inline usize LeastSignificantSetBitIndex(usize x) {
@@ -421,18 +441,12 @@ inline usize LeastSignificantSetBitIndex(usize x) {
 }
 #ifdef __CHERI_PURE_CAPABILITY__
 usize LeastSignificantSetBitIndex(uptr x) = delete;
-INLINE usize LeastSignificantSetBitIndex(u64 x) {
+inline u64 LeastSignificantSetBitIndex(u64 x) {
   return LeastSignificantSetBitIndex((usize)x);
 }
 #endif
 
 inline constexpr bool IsPowerOfTwo(u64 x) { return (x & (x - 1)) == 0; }
-#ifdef __CHERI_PURE_CAPABILITY__
-bool IsPowerOfTwo(uptr x) = delete;
-inline constexpr bool IsPowerOfTwo(usize x) {
-  return IsPowerOfTwo((u64)x);
-}
-#endif
 
 inline u64 RoundUpToPowerOfTwo(u64 size) {
   CHECK(size);
@@ -445,12 +459,15 @@ inline u64 RoundUpToPowerOfTwo(u64 size) {
 }
 #ifdef __CHERI_PURE_CAPABILITY__
 uptr RoundUpToPowerOfTwo(uptr size) = delete;
-INLINE usize RoundUpToPowerOfTwo(usize x) {
+inline u32 RoundUpToPowerOfTwo(u32 x) {
+  return (u32)RoundUpToPowerOfTwo((u64)x);
+}
+inline usize RoundUpToPowerOfTwo(usize x) {
   return (usize)RoundUpToPowerOfTwo((u64)x);
 }
 #endif
 
-inline constexpr uptr RoundUpTo(uptr p, uptr boundary) {
+inline constexpr uptr RoundUpTo(uptr p, usize boundary) {
   RAW_CHECK(IsPowerOfTwo(boundary));
 #if __has_builtin(__builtin_align_up)
   return __builtin_align_up(p, boundary);
@@ -501,12 +518,6 @@ inline u64 Log2(u64 x) {
   CHECK(IsPowerOfTwo(x));
   return LeastSignificantSetBitIndex(x);
 }
-#ifdef __CHERI_PURE_CAPABILITY__
-uptr Log2(uptr x) = delete;
-inline constexpr usize Log2(usize x) {
-  return (usize)Log2((u64)x);
-}
-#endif
 
 // Don't use std::min, std::max or std::swap, to minimize dependency
 // on libstdc++.
@@ -803,6 +814,9 @@ bool ReadFileToBuffer(const char *file_name, char **buff, usize *buff_size,
                       usize *read_len, usize max_len = kDefaultFileMaxSize,
                       error_t *errno_p = nullptr);
 
+int GetModuleAndOffsetForPc(uptr pc, char *module_name, uptr module_name_len,
+                            usize *pc_offset);
+
 // When adding a new architecture, don't forget to also update
 // script/asan_symbolize.py and sanitizer_symbolizer_libcdep.cpp.
 inline const char *ModuleArchToString(ModuleArch arch) {
@@ -844,7 +858,7 @@ class LoadedModule {
   LoadedModule()
       : full_name_(nullptr),
         base_address_(0),
-        max_executable_address_(0),
+        max_address_(0),
         arch_(kModuleArchUnknown),
         uuid_size_(0),
         instrumented_(false) {
@@ -862,7 +876,7 @@ class LoadedModule {
 
   const char *full_name() const { return full_name_; }
   vaddr base_address() const { return base_address_; }
-  vaddr max_executable_address() const { return max_executable_address_; }
+  vaddr max_address() const { return max_address_; }
   ModuleArch arch() const { return arch_; }
   const u8 *uuid() const { return uuid_; }
   uptr uuid_size() const { return uuid_size_; }
@@ -892,7 +906,7 @@ class LoadedModule {
  private:
   char *full_name_;  // Owned.
   vaddr base_address_;
-  vaddr max_executable_address_;
+  vaddr max_address_;
   ModuleArch arch_;
   uptr uuid_size_;
   u8 uuid_[kModuleUUIDSize];
@@ -952,13 +966,13 @@ void WriteToSyslog(const char *buffer);
 #define SANITIZER_WIN_TRACE 0
 #endif
 
-#if SANITIZER_MAC || SANITIZER_WIN_TRACE
+#if SANITIZER_APPLE || SANITIZER_WIN_TRACE
 void LogFullErrorReport(const char *buffer);
 #else
 inline void LogFullErrorReport(const char *buffer) {}
 #endif
 
-#if SANITIZER_LINUX || SANITIZER_MAC
+#if SANITIZER_LINUX || SANITIZER_APPLE
 void WriteOneLineToSyslog(const char *s);
 void LogMessageOnPrintf(const char *str);
 #else
@@ -1008,7 +1022,11 @@ static inline void SanitizerBreakOptimization(void *arg) {
 #if defined(_MSC_VER) && !defined(__clang__)
   _ReadWriteBarrier();
 #else
+#ifdef __CHERI_PURE_CAPABILITY__
+  __asm__ __volatile__("" : : "C" (arg) : "memory");
+#else
   __asm__ __volatile__("" : : "r" (arg) : "memory");
+#endif
 #endif
 }
 
@@ -1020,7 +1038,7 @@ struct SignalContext {
   uptr sp;
   uptr bp;
   bool is_memory_access;
-  enum WriteFlag { UNKNOWN, READ, WRITE } write_flag;
+  enum WriteFlag { Unknown, Read, Write } write_flag;
 
   // In some cases the kernel cannot provide the true faulting address; `addr`
   // will be zero then.  This field allows to distinguish between these cases
@@ -1065,7 +1083,6 @@ struct SignalContext {
 };
 
 void InitializePlatformEarly();
-void MaybeReexec();
 
 template <typename Fn>
 class RunOnDestruction {

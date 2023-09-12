@@ -73,7 +73,7 @@
 // Before Xcode 4.5, the Darwin linker doesn't reliably support undefined
 // weak symbols.  Mac OS X 10.9/Darwin 13 is the first release only supported
 // by Xcode >= 4.5.
-#elif SANITIZER_MAC && \
+#elif SANITIZER_APPLE && \
     __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ >= 1090 && !SANITIZER_GO
 # define SANITIZER_SUPPORTS_WEAK_HOOKS 1
 #else
@@ -143,7 +143,7 @@ typedef __uintcap_t uptr;
 typedef __intcap_t sptr;
 typedef unsigned long vaddr;
 #else
-#  if (SANITIZER_WORDSIZE == 64) || SANITIZER_MAC || SANITIZER_WINDOWS
+#  if (SANITIZER_WORDSIZE == 64) || SANITIZER_APPLE || SANITIZER_WINDOWS
 typedef unsigned long uptr;
 typedef signed long sptr;
 typedef unsigned long vaddr;
@@ -183,8 +183,9 @@ typedef long pid_t;
 typedef int pid_t;
 #endif
 
-#if SANITIZER_FREEBSD || SANITIZER_NETBSD || SANITIZER_MAC ||             \
+#if SANITIZER_FREEBSD || SANITIZER_NETBSD || SANITIZER_APPLE ||             \
     (SANITIZER_SOLARIS && (defined(_LP64) || _FILE_OFFSET_BITS == 64)) || \
+    (SANITIZER_LINUX && !SANITIZER_GLIBC && !SANITIZER_ANDROID) ||        \
     (SANITIZER_LINUX && (defined(__x86_64__) || defined(__hexagon__)))
 typedef u64 OFF_T;
 #else
@@ -194,7 +195,7 @@ typedef u64  OFF64_T;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 typedef __SIZE_TYPE__ operator_new_size_type;
-#elif (SANITIZER_WORDSIZE == 64) || SANITIZER_MAC
+#elif (SANITIZER_WORDSIZE == 64) || SANITIZER_APPLE
 typedef uptr operator_new_size_type;
 #else
 # if defined(__s390__) && !defined(__s390x__)
@@ -293,6 +294,8 @@ static_assert(sizeof(sptr) == sizeof(__INTPTR_TYPE__), "");
 
 #if __has_cpp_attribute(clang::fallthrough)
 #  define FALLTHROUGH [[clang::fallthrough]]
+#elif __has_cpp_attribute(fallthrough)
+#  define FALLTHROUGH [[fallthrough]]
 #else
 #  define FALLTHROUGH
 #endif

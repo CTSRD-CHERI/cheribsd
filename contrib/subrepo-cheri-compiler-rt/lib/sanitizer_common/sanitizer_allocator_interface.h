@@ -20,14 +20,14 @@ using __sanitizer::usize;
 
 extern "C" {
 SANITIZER_INTERFACE_ATTRIBUTE
-usize __sanitizer_get_estimated_allocated_size(usize size);
+uptr __sanitizer_get_estimated_allocated_size(uptr size);
 SANITIZER_INTERFACE_ATTRIBUTE int __sanitizer_get_ownership(const void *p);
-SANITIZER_INTERFACE_ATTRIBUTE usize
+SANITIZER_INTERFACE_ATTRIBUTE uptr
 __sanitizer_get_allocated_size(const void *p);
-SANITIZER_INTERFACE_ATTRIBUTE usize __sanitizer_get_current_allocated_bytes();
-SANITIZER_INTERFACE_ATTRIBUTE usize __sanitizer_get_heap_size();
-SANITIZER_INTERFACE_ATTRIBUTE usize __sanitizer_get_free_bytes();
-SANITIZER_INTERFACE_ATTRIBUTE usize __sanitizer_get_unmapped_bytes();
+SANITIZER_INTERFACE_ATTRIBUTE uptr __sanitizer_get_current_allocated_bytes();
+SANITIZER_INTERFACE_ATTRIBUTE uptr __sanitizer_get_heap_size();
+SANITIZER_INTERFACE_ATTRIBUTE uptr __sanitizer_get_free_bytes();
+SANITIZER_INTERFACE_ATTRIBUTE uptr __sanitizer_get_unmapped_bytes();
 
 SANITIZER_INTERFACE_ATTRIBUTE int __sanitizer_install_malloc_and_free_hooks(
     void (*malloc_hook)(const void *, usize),
@@ -42,7 +42,7 @@ SANITIZER_INTERFACE_ATTRIBUTE SANITIZER_WEAK_ATTRIBUTE void
 __sanitizer_purge_allocator();
 
 SANITIZER_INTERFACE_ATTRIBUTE SANITIZER_WEAK_ATTRIBUTE void
-__sanitizer_print_memory_profile(usize top_percent, usize max_number_of_contexts);
+__sanitizer_print_memory_profile(uptr top_percent, uptr max_number_of_contexts);
 }  // extern "C"
 
 #endif  // SANITIZER_ALLOCATOR_INTERFACE_H
