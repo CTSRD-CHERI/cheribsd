@@ -1,7 +1,3 @@
-/*
- * $FreeBSD$
- */
-
 FBSDprivate_1.0 {
     _rtld_thread_start_init;
     _rtld_thread_start;

@@ -1,5 +1,3 @@
-# $FreeBSD$
-
 SHLIB=	cheribsdtest_dynamic
 PRIVATELIB=
 MAN=	# No manpage; this is internal.

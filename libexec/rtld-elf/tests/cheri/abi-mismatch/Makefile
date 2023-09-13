@@ -1,5 +1,3 @@
-# $FreeBSD$
-
 TESTSDIR=	${TESTSBASE}/libexec/rtld-elf/cheri/abi-mismatch
 
 SUBDIR+=	basic_hybrid_lib basic_purecap_lib
