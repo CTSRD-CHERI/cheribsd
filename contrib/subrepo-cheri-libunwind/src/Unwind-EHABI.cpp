@@ -261,9 +261,7 @@ _Unwind_VRS_Interpret(_Unwind_Context *context, const uint32_t *data,
                       size_t offset, size_t len) {
   bool wrotePC = false;
   bool finish = false;
-#ifdef __ARM_FEATURE_PAUTH
   bool hasReturnAddrAuthCode = false;
-#endif
   while (offset < len && !finish) {
     uint8_t byte = getByte(data, offset++);
     if ((byte & 0x80) == 0) {
@@ -350,12 +348,10 @@ _Unwind_VRS_Interpret(_Unwind_Context *context, const uint32_t *data,
               break;
             }
             case 0xb4:
-#ifdef __ARM_FEATURE_PAUTH
               hasReturnAddrAuthCode = true;
               _Unwind_VRS_Pop(context, _UVRSC_PSEUDO,
                               0 /* Return Address Auth Code */, _UVRSD_UINT32);
               break;
-#endif
             case 0xb5:
             case 0xb6:
             case 0xb7:
