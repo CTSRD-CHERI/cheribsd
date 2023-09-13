@@ -26,6 +26,11 @@ makeoptions	CPUTYPE=morello
 options 	CPU_CHERI
 options 	COMPAT_FREEBSD64
 
+options		CHERI_CAPREVOKE
+options		CHERI_CAPREVOKE_STATS
+options		CHERI_CAPREVOKE_FAST_COPYIN
+options		CHERI_CAPREVOKE_CLEARTAGS
+
 # Needs porting to use __USER_CAP
 nooptions 	COMPAT_FREEBSD32
 
