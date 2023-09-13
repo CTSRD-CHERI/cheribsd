@@ -1,5 +1,3 @@
-# $FreeBSD$
-
 PROG=	ld-elf-c18n.so.1
 MAN=
 MLINKS=	rtld.1 ld-elf-c18n.so.1.1
