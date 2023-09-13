@@ -22,3 +22,4 @@ struct MaxAligned {} __attribute__((__aligned__));
 static_assert(alignof(_Unwind_Exception) == alignof(MaxAligned),
               "_Unwind_Exception must be maximally aligned");
 #endif
+int main(int, char**) { return 0;}
