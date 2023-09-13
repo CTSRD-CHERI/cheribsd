@@ -56,9 +56,8 @@
             ..
             __ranges
             ..
-# XXX: Re-enable for CHERI LLVM 15
-#            __string
-#            ..
+            __string
+            ..
             __thread
             ..
             __tuple_dir
