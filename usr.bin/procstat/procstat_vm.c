@@ -195,6 +195,10 @@ procstat_vm(struct procstat *procstat, struct kinfo_proc *kipp)
 			str = "gd";
 			lstr = "guard";
 			break;
+		case KVME_TYPE_QUARANTINED:
+			str = "qu";
+			lstr = "quarantined";
+			break;
 		case KVME_TYPE_UNKNOWN:
 		default:
 			str = "??";
