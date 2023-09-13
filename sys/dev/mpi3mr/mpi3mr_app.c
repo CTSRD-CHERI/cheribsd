@@ -42,8 +42,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <cam/cam.h>
@@ -575,7 +573,7 @@ static int mpi3mr_map_data_buffer_dma(struct mpi3mr_softc *sc,
 		memset(dma_buffers->dma_desc[i].addr, 0, sc->ioctl_sge[desc_count].size);
 
 		if (dma_buffers->data_dir == MPI3MR_APP_DDO) {
-			copyin(((U8 *)dma_buffers->user_buf + copied_len),
+			copyin(((U8 * __capability)dma_buffers->user_buf + copied_len),
 			       dma_buffers->dma_desc[i].addr,
 			       dma_buffers->dma_desc[i].size);
 			copied_len += dma_buffers->dma_desc[i].size;
@@ -839,7 +837,7 @@ mpi3mr_app_mptcmds(struct cdev *dev, u_long cmd, void *uarg,
 		rval = ENOMEM;
 		goto out;
 	}
-	if (copyin(karg->buf_entry_list, buffer_list, karg->buf_entry_list_size)) {
+	if (copyincap(karg->buf_entry_list, buffer_list, karg->buf_entry_list_size)) {
 		printf(IOCNAME "failure at %s:%d/%s()!\n", sc->name,
 		       __FILE__, __LINE__, __func__);
 		rval = EFAULT;
@@ -1155,7 +1153,7 @@ mpi3mr_app_mptcmds(struct cdev *dev, u_long cmd, void *uarg,
 			tmplen = 0;
 			for (desc_count = 0; desc_count < dma_buff->num_dma_desc; desc_count++) {
 				if (copyout(dma_buff->dma_desc[desc_count].addr,
-		                    (U8 *)dma_buff->user_buf+tmplen,
+		                    (U8 * __capability)dma_buff->user_buf+tmplen,
 				    dma_buff->dma_desc[desc_count].size)) {
 					printf(IOCNAME "failure at %s:%d/%s()!\n", sc->name,
 					       __FILE__, __LINE__, __func__);
@@ -1265,7 +1263,7 @@ mpi3mr_soft_reset_from_app(struct mpi3mr_softc *sc)
  */
 static long
 mpi3mr_adp_reset(struct mpi3mr_softc *sc,
-		 void *data_out_buf, U32 data_out_sz)
+		 void * __capability data_out_buf, U32 data_out_sz)
 {
 	long rval = EINVAL;
 	struct mpi3mr_ioctl_adpreset adpreset;
@@ -1627,7 +1625,7 @@ out_unlock:
  */
 static long
 mpi3mr_pel_enable(struct mpi3mr_softc *sc,
-		  void *data_out_buf, U32 data_out_sz)
+		  void * __capability data_out_buf, U32 data_out_sz)
 {
 	long rval = EINVAL;
 	U8 tmp_class;
@@ -1725,7 +1723,7 @@ mpi3mr_app_save_logdata(struct mpi3mr_softc *sc, char *event_data,
  */
 static long
 mpi3mr_get_logdata(struct mpi3mr_softc *sc,
-		   void *data_in_buf, U32 data_in_sz)
+		   void * __capability data_in_buf, U32 data_in_sz)
 {
 	long rval = EINVAL;
 	U16 num_entries = 0;
@@ -1760,7 +1758,7 @@ mpi3mr_get_logdata(struct mpi3mr_softc *sc,
  */
 static long
 mpi3mr_logdata_enable(struct mpi3mr_softc *sc,
-		      void *data_in_buf, U32 data_in_sz)
+		      void * __capability data_in_buf, U32 data_in_sz)
 {
 	long rval = EINVAL;
 	struct mpi3mr_ioctl_logdata_enable logdata_enable;
@@ -1809,7 +1807,7 @@ copy_data:
  */
 static long 
 mpi3mr_get_change_count(struct mpi3mr_softc *sc,
-			void *data_in_buf, U32 data_in_sz)
+			void * __capability data_in_buf, U32 data_in_sz)
 {
         long rval = EINVAL;
         struct mpi3mr_ioctl_chgcnt chg_count;
@@ -1842,7 +1840,7 @@ mpi3mr_get_change_count(struct mpi3mr_softc *sc,
  */
 static long 
 mpi3mr_get_alltgtinfo(struct mpi3mr_softc *sc,
-		      void *data_in_buf, U32 data_in_sz)
+		      void * __capability data_in_buf, U32 data_in_sz)
 {
 	long rval = EINVAL;
         U8 get_count = 0;
@@ -1851,7 +1849,8 @@ mpi3mr_get_alltgtinfo(struct mpi3mr_softc *sc,
 	struct mpi3mr_target *tgtdev = NULL;
         struct mpi3mr_device_map_info *devmap_info = NULL;
 	struct mpi3mr_cam_softc *cam_sc = sc->cam_sc;
-        struct mpi3mr_ioctl_all_tgtinfo *all_tgtinfo = (struct mpi3mr_ioctl_all_tgtinfo *)data_in_buf;
+        struct mpi3mr_ioctl_all_tgtinfo * __capability all_tgtinfo =
+	    (struct mpi3mr_ioctl_all_tgtinfo * __capability)data_in_buf;
 
         if (data_in_sz < sizeof(uint32_t)) {
                 printf(IOCNAME "failure at %s:%d/%s()!\n", sc->name, __FILE__,
@@ -2016,7 +2015,7 @@ out:
  */
 static long
 mpi3mr_get_pciinfo(struct mpi3mr_softc *sc,
-		   void *data_in_buf, U32 data_in_sz)
+		   void * __capability data_in_buf, U32 data_in_sz)
 {
 	long rval = EINVAL;
 	U8 i;
@@ -2049,7 +2048,7 @@ mpi3mr_get_pciinfo(struct mpi3mr_softc *sc,
  */
 static long
 mpi3mr_get_adpinfo(struct mpi3mr_softc *sc,
-		   void *data_in_buf, U32 data_in_sz)
+		   void * __capability data_in_buf, U32 data_in_sz)
 {
 	long rval = EINVAL;
 	struct mpi3mr_ioctl_adpinfo adpinfo;

@@ -1,5 +1,4 @@
 #
-# $FreeBSD$
 #
 
 # XXX: not at all purecap clean

@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <dev/mfi/mfireg.h>
 #ifdef COMPAT_FREEBSD32
 #include <sys/mount.h>

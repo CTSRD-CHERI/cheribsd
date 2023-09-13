@@ -54,8 +54,6 @@
  * CHERI CHANGES END
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "dhcpd.h"
 
 #include <netinet/in_systm.h>

@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 # Use the following command to build local debug version of dynamic
 # linker:
@@ -110,7 +109,7 @@ beforeinstall:
 
 .PATH: ${RTLD_ELF_DIR}/${RTLD_ARCH} ${SRCTOP}/lib/csu/common
 
-.if ${MACHINE_CPU:Mcheri}
+.if ${MACHINE_CPU:Mcheri} && ${USE_COMPAT:U} != "32"
 .PATH: ${RTLD_ELF_DIR}/cheri
 SRCS+=		cheri_reloc.c
 CFLAGS+=	-I${RTLD_ELF_DIR}/cheri

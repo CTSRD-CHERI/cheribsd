@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 LIBUNWIND_VERSION=	14
 COMPILERRTDIR=	${SRCTOP}/contrib/subrepo-cheri-compiler-rt

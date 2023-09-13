@@ -33,7 +33,6 @@
  */
 
 #include <machine/asm.h>
-__FBSDID("$FreeBSD$");
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #include <machine/riscvreg.h>

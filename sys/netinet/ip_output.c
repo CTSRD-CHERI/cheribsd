@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_inet.h"
 #include "opt_ipsec.h"
 #include "opt_kern_tls.h"
@@ -1084,33 +1082,6 @@ ip_ctloutput(struct socket *so, struct sockopt *sopt)
 		if (sopt->sopt_level == SOL_SOCKET &&
 		    sopt->sopt_dir == SOPT_SET) {
 			switch (sopt->sopt_name) {
-			case SO_REUSEADDR:
-				INP_WLOCK(inp);
-				if ((so->so_options & SO_REUSEADDR) != 0)
-					inp->inp_flags2 |= INP_REUSEADDR;
-				else
-					inp->inp_flags2 &= ~INP_REUSEADDR;
-				INP_WUNLOCK(inp);
-				error = 0;
-				break;
-			case SO_REUSEPORT:
-				INP_WLOCK(inp);
-				if ((so->so_options & SO_REUSEPORT) != 0)
-					inp->inp_flags2 |= INP_REUSEPORT;
-				else
-					inp->inp_flags2 &= ~INP_REUSEPORT;
-				INP_WUNLOCK(inp);
-				error = 0;
-				break;
-			case SO_REUSEPORT_LB:
-				INP_WLOCK(inp);
-				if ((so->so_options & SO_REUSEPORT_LB) != 0)
-					inp->inp_flags2 |= INP_REUSEPORT_LB;
-				else
-					inp->inp_flags2 &= ~INP_REUSEPORT_LB;
-				INP_WUNLOCK(inp);
-				error = 0;
-				break;
 			case SO_SETFIB:
 				INP_WLOCK(inp);
 				inp->inp_inc.inc_fibnum = so->so_fibnum;

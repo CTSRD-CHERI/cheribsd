@@ -1,6 +1,5 @@
 #!/bin/sh
 #
-# $FreeBSD$
 #
 
 # PROVIDE: ldconfig
@@ -69,7 +68,9 @@ ldconfig_start()
 			    echo '64-bit compatibility ldconfig path:' ${_LDC}
 			${ldconfig} -64 ${_ins} ${_LDC}
 			;;
-		amd64|powerpc64)
+		esac
+		case ${machine_arch} in
+		aarch64*|amd64|powerpc64)
 			for i in ${ldconfig_local32_dirs}; do
 				if [ -d "${i}" ]; then
 					_files=`find ${i} -type f`

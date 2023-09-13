@@ -24,9 +24,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
+
+#ifdef __arm__
+#include <arm/vfp.h>
+#else /* !__arm__ */
 
 #ifndef _MACHINE_VFP_H_
 #define	_MACHINE_VFP_H_
@@ -115,3 +117,5 @@ void set_fpcontext32(struct thread *td, struct __mcontext32_vfp *mcp);
 #endif
 
 #endif /* !_MACHINE_VFP_H_ */
+
+#endif /* !__arm__ */

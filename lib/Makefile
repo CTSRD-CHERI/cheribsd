@@ -1,5 +1,4 @@
 #	@(#)Makefile	8.1 (Berkeley) 6/4/93
-# $FreeBSD$
 
 .include <src.opts.mk>
 
@@ -241,7 +240,7 @@ SUBDIR.${MK_BHYVE}+=	libvmmapi
 _libstatcounters=	libstatcounters
 .endif
 
-.if ${MACHINE_ARCH} != "powerpc"
+.if ${MACHINE_ARCH} != "powerpc" && ${MACHINE_CPUARCH} != "arm"
 SUBDIR.${MK_OPENMP}+=	libomp
 .endif
 .if ${MK_USB} != "no"

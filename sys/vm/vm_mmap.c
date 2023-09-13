@@ -48,8 +48,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_hwpmc_hooks.h"
 #include "opt_ktrace.h"
 #include "opt_vm.h"
@@ -126,10 +124,6 @@ SYSCTL_INT(_vm, OID_AUTO, imply_prot_max, CTLFLAG_RWTUN, &imply_prot_max, 0,
 static int log_wxrequests = 0;
 SYSCTL_INT(_vm, OID_AUTO, log_wxrequests, CTLFLAG_RWTUN, &log_wxrequests, 0,
     "Log requests for PROT_WRITE and PROT_EXEC");
-
-#ifdef MAP_32BIT
-#define	MAP_32BIT_MAX_ADDR	((vm_offset_t)1 << 31)
-#endif
 
 _Static_assert(MAXPAGESIZES <= 4, "MINCORE_SUPER too narrow");
 
@@ -569,11 +563,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	unsigned int extra_flags =
 	    (flags & ~(MAP_SHARED | MAP_PRIVATE | MAP_FIXED | MAP_HASSEMAPHORE |
 	    MAP_STACK | MAP_NOSYNC | MAP_ANON | MAP_EXCL | MAP_NOCORE |
-	    MAP_PREFAULT_READ | MAP_GUARD |
-	    MAP_CHERI_NOSETBOUNDS |
-#ifdef MAP_32BIT
-	    MAP_32BIT |
-#endif
+	    MAP_PREFAULT_READ | MAP_GUARD | MAP_32BIT | MAP_CHERI_NOSETBOUNDS |
 	    MAP_ALIGNMENT_MASK));
 	if (extra_flags != 0) {
 		SYSERRCAUSE("%s: Unhandled flag(s) 0x%x", __func__,
@@ -598,10 +588,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	if ((flags & MAP_GUARD) != 0 && (prot != PROT_NONE || fd != -1 ||
 	    pos != 0 || (flags & ~(MAP_FIXED | MAP_GUARD | MAP_EXCL |
 	    MAP_CHERI_NOSETBOUNDS | MAP_RESERVATION_CREATE |
-#ifdef MAP_32BIT
-	    MAP_32BIT |
-#endif
-	    MAP_ALIGNMENT_MASK)) != 0)) {
+	    MAP_32BIT | MAP_ALIGNMENT_MASK)) != 0)) {
 		SYSERRCAUSE("%s: Invalid arguments with MAP_GUARD", __func__);
 		return (EINVAL);
 	}
@@ -696,7 +683,6 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 		/* Address range must be all in user VM space. */
 		if (!vm_map_range_valid(&vms->vm_map, addr, addr + size))
 			return (EINVAL);
-#ifdef MAP_32BIT
 		if (flags & MAP_32BIT) {
 			KASSERT(!SV_CURPROC_FLAG(SV_CHERI),
 			    ("MAP_32BIT on a CheriABI process"));
@@ -730,7 +716,6 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 		 */
 		if (addr + size > MAP_32BIT_MAX_ADDR)
 			addr = 0;
-#endif
 	} else {
 		/*
 		 * XXX for non-fixed mappings where no hint is provided or
@@ -1089,16 +1074,16 @@ sys_mprotect(struct thread *td, struct mprotect_args *uap)
 #endif
 
 	return (kern_mprotect(td, (uintptr_t)(uintcap_t)uap->addr, uap->len,
-	    uap->prot));
+	    uap->prot, 0));
 }
 
 int
-kern_mprotect(struct thread *td, uintptr_t addr0, size_t size, int prot)
+kern_mprotect(struct thread *td, uintptr_t addr0, size_t size, int prot,
+    int flags)
 {
 	vm_offset_t addr;
 	vm_size_t pageoff;
 	int vm_error, max_prot;
-	int flags;
 
 	addr = addr0;
 	if ((prot & ~(_PROT_ALL | PROT_MAX(_PROT_ALL))) != 0)
@@ -1122,15 +1107,14 @@ kern_mprotect(struct thread *td, uintptr_t addr0, size_t size, int prot)
 	    (vm_error = vm_wxcheck(td->td_proc, "mprotect")))
 		goto out;
 
-	flags = VM_MAP_PROTECT_SET_PROT | VM_MAP_PROTECT_KEEP_CAP;
+	flags |= VM_MAP_PROTECT_SET_PROT | VM_MAP_PROTECT_KEEP_CAP;
 	if (max_prot != 0) {
 		if ((max_prot & prot) != prot)
 			return (ENOTSUP);
 		flags |= VM_MAP_PROTECT_SET_MAXPROT;
 	}
-	if (vm_error == KERN_SUCCESS)
-		vm_error = vm_map_protect(&td->td_proc->p_vmspace->vm_map,
-		    addr, addr + size, prot, max_prot, flags);
+	vm_error = vm_map_protect(&td->td_proc->p_vmspace->vm_map,
+	    addr, addr + size, prot, max_prot, flags);
 
 out:
 	switch (vm_error) {
@@ -2072,6 +2056,7 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
     boolean_t writecounted, struct thread *td)
 {
 	vm_pointer_t *reservp;
+	vm_offset_t default_addr;
 	int docow, error, findspace, rv;
 	bool curmap, fitit;
 
@@ -2100,12 +2085,12 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
 		return (EINVAL);
 
 	if ((flags & MAP_FIXED) == 0) {
-		fitit = TRUE;
+		fitit = true;
 		*addr = round_page(*addr);
 	} else {
 		if (*addr != trunc_page(*addr))
 			return (EINVAL);
-		fitit = FALSE;
+		fitit = false;
 	}
 
 	if (flags & MAP_ANON) {
@@ -2147,10 +2132,14 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
 		else
 			findspace = VMFS_OPTIMAL_SPACE;
 		if (curmap) {
-			rv = vm_map_find_min(map, object, foff, addr, size,
+			default_addr =
 			    round_page((vm_offset_t)td->td_proc->p_vmspace->
-			    vm_daddr + lim_max(td, RLIMIT_DATA)), max_addr,
-			    findspace, prot, maxprot, docow);
+			    vm_daddr + lim_max(td, RLIMIT_DATA));
+			if ((flags & MAP_32BIT) != 0)
+				default_addr = 0;
+			rv = vm_map_find_min(map, object, foff, addr, size,
+			    default_addr, max_addr, findspace, prot, maxprot,
+			    docow);
 		} else {
 			rv = vm_map_find(map, object, foff, addr, size,
 			    max_addr, findspace, prot, maxprot, docow);

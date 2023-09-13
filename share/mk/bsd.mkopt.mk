@@ -1,5 +1,4 @@
 #
-# $FreeBSD$
 #
 # Generic mechanism to deal with WITH and WITHOUT options and turn
 # them into MK_ options.  Also turn group options into OPT_ options.

@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 # cleandir is run with the wrong context for libcompat so don't do
 # anything in that case.
@@ -69,6 +68,32 @@ LIB32_MACHINE=	powerpc
 LIB32_MACHINE_ARCH=	powerpc
 LIB32WMAKEFLAGS=	\
 		LD="${XLD} -m elf32ppc_fbsd"
+
+.elif ${COMPAT_ARCH:Maarch64*}
+HAS_COMPAT+=	32
+.if empty(LIB32CPUTYPE) || ${LIB32CPUTYPE} == "morello"
+LIB32CPUFLAGS=	-march=armv7
+.else
+LIB32CPUFLAGS=	-mcpu=${LIB32CPUTYPE}
+.endif
+.if ${COMPAT_ARCH:Maarch64*c*}
+LIB32CPUFLAGS+=	-mabi=aapcs
+.endif
+
+LIB32CPUFLAGS+=	-m32
+.if ${COMPAT_COMPILER_TYPE} == "gcc"
+.else
+LIB32CPUFLAGS+=	-target armv7-unknown-freebsd${OS_REVISION}-gnueabihf
+.endif
+
+LIB32_MACHINE=	arm
+LIB32_MACHINE_ARCH=	armv7
+LIB32WMAKEFLAGS=	\
+		LD="${XLD} -m armelf_fbsd"
+.endif
+
+.if ${MACHINE_ABI:Mpurecap}
+LIB32CPUFLAGS+=	-U__LP64__
 .endif
 
 LIB32WMAKEFLAGS+= NM="${XNM}"

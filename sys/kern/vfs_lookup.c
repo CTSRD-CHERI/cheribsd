@@ -37,8 +37,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_capsicum.h"
 #include "opt_ktrace.h"
 
@@ -70,9 +68,6 @@ __FBSDID("$FreeBSD$");
 #include <security/mac/mac_framework.h>
 
 #include <vm/uma.h>
-
-#define	NAMEI_DIAGNOSTIC 1
-#undef NAMEI_DIAGNOSTIC
 
 #ifdef INVARIANTS
 static void NDVALIDATE_impl(struct nameidata *, int);
@@ -1105,12 +1100,6 @@ dirloop:
 		error = ENAMETOOLONG;
 		goto bad;
 	}
-#ifdef NAMEI_DIAGNOSTIC
-	{ char c = *cp;
-	*cp = '\0';
-	printf("{%s}: ", cnp->cn_nameptr);
-	*cp = c; }
-#endif
 	prev_ni_pathlen = ndp->ni_pathlen;
 	ndp->ni_pathlen -= cnp->cn_namelen;
 	KASSERT(ndp->ni_pathlen <= PATH_MAX,
@@ -1257,18 +1246,12 @@ unionlookup:
 	 */
 	if (needs_exclusive_leaf(dp->v_mount, cnp->cn_flags))
 		cnp->cn_lkflags = LK_EXCLUSIVE;
-#ifdef NAMEI_DIAGNOSTIC
-	vn_printf(dp, "lookup in ");
-#endif
 	lkflags_save = cnp->cn_lkflags;
 	cnp->cn_lkflags = enforce_lkflags(dp->v_mount, cnp->cn_lkflags);
 	error = VOP_LOOKUP(dp, &ndp->ni_vp, cnp);
 	cnp->cn_lkflags = lkflags_save;
 	if (error != 0) {
 		KASSERT(ndp->ni_vp == NULL, ("leaf should be empty"));
-#ifdef NAMEI_DIAGNOSTIC
-		printf("not found\n");
-#endif
 		if ((error == ENOENT) &&
 		    (dp->v_vflag & VV_ROOT) && (dp->v_mount != NULL) &&
 		    (dp->v_mount->mnt_flag & MNT_UNION)) {
@@ -1320,9 +1303,6 @@ unionlookup:
 	}
 
 good:
-#ifdef NAMEI_DIAGNOSTIC
-	printf("found\n");
-#endif
 	dp = ndp->ni_vp;
 
 	/*
@@ -1508,12 +1488,7 @@ vfs_relookup(struct vnode *dvp, struct vnode **vpp, struct componentname *cnp,
 	 * Search a new directory.
 	 *
 	 * See a comment in vfs_lookup for cnp->cn_nameptr.
-	 */
-#ifdef NAMEI_DIAGNOSTIC
-	printf("{%s}: ", cnp->cn_nameptr);
-#endif
-
-	/*
+	 *
 	 * Check for "" which represents the root directory after slash
 	 * removal.
 	 */
@@ -1540,9 +1515,6 @@ vfs_relookup(struct vnode *dvp, struct vnode **vpp, struct componentname *cnp,
 	/*
 	 * We now have a segment name to search for, and a directory to search.
 	 */
-#ifdef NAMEI_DIAGNOSTIC
-	vn_printf(dp, "search in ");
-#endif
 	if ((error = VOP_LOOKUP(dp, vpp, cnp)) != 0) {
 		KASSERT(*vpp == NULL, ("leaf should be empty"));
 		if (error != EJUSTRETURN)

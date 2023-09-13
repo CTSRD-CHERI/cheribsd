@@ -22,9 +22,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
+
+#ifdef __arm__
+#include <arm/cpufunc.h>
+#else /* !__arm__ */
 
 #ifndef _MACHINE_CPUFUNC_H_
 #define	_MACHINE_CPUFUNC_H_
@@ -193,3 +195,5 @@ bool arm64_get_writable_addr(vm_pointer_t, vm_pointer_t *);
 
 #endif	/* _KERNEL */
 #endif	/* _MACHINE_CPUFUNC_H_ */
+
+#endif /* !__arm__ */

@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .PATH: ${ZFSTOP}/man/man4
 .PATH: ${ZFSTOP}/man/man5

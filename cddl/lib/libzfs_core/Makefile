@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .PATH: ${ZFSTOP}/lib/libzfs_core
 .PATH: ${ZFSTOP}/include

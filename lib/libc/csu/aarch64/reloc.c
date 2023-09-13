@@ -26,7 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>

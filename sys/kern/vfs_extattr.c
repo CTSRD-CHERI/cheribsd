@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/capsicum.h>
@@ -233,25 +231,35 @@ int
 sys_extattr_set_fd(struct thread *td, struct extattr_set_fd_args *uap)
 {
 
-	return (kern_extattr_set_fd(td, uap->fd, uap->attrnamespace,
+	return (user_extattr_set_fd(td, uap->fd, uap->attrnamespace,
 	    uap->attrname, uap->data, uap->nbytes));
 }
 
 int
-kern_extattr_set_fd(struct thread *td, int fd, int attrnamespace,
+user_extattr_set_fd(struct thread *td, int fd, int attrnamespace,
     const char * __capability uattrname, void * __capability data,
     size_t nbytes)
 {
-	struct file *fp;
 	char attrname[EXTATTR_MAXNAMELEN + 1];
+	int error;
+
+	error = copyinstr(uattrname, attrname, sizeof(attrname), NULL);
+	if (error)
+		return (error);
+	return (kern_extattr_set_fd(td, fd, attrnamespace, attrname, data,
+	    nbytes));
+}
+
+int
+kern_extattr_set_fd(struct thread *td, int fd, int attrnamespace,
+    const char *attrname, void * __capability data, size_t nbytes)
+{
+	struct file *fp;
 	cap_rights_t rights;
 	int error;
 
 	AUDIT_ARG_FD(fd);
 	AUDIT_ARG_VALUE(attrnamespace);
-	error = copyinstr(uattrname, attrname, sizeof(attrname), NULL);
-	if (error)
-		return (error);
 	AUDIT_ARG_TEXT(attrname);
 
 	error = getvnode_path(td, fd,
@@ -279,7 +287,7 @@ int
 sys_extattr_set_file(struct thread *td, struct extattr_set_file_args *uap)
 {
 
-	return (kern_extattr_set_path(td, uap->path, uap->attrnamespace,
+	return (user_extattr_set_path(td, uap->path, uap->attrnamespace,
 	    uap->attrname, uap->data, uap->nbytes, FOLLOW));
 }
 
@@ -296,27 +304,37 @@ int
 sys_extattr_set_link(struct thread *td, struct extattr_set_link_args *uap)
 {
 
-	return (kern_extattr_set_path(td, uap->path, uap->attrnamespace,
+	return (user_extattr_set_path(td, uap->path, uap->attrnamespace,
 	    uap->attrname, uap->data, uap->nbytes, NOFOLLOW));
 }
 
 int
-kern_extattr_set_path(struct thread *td,
-    const char * __capability path, int attrnamespace,
-    const char * __capability uattrname, void * __capability data,
-    size_t nbytes, int follow)
+user_extattr_set_path(struct thread *td, const char * __capability path,
+    int attrnamespace, const char * __capability uattrname,
+    void * __capability data, size_t nbytes, int follow)
 {
-	struct nameidata nd;
 	char attrname[EXTATTR_MAXNAMELEN + 1];
 	int error;
 
-	AUDIT_ARG_VALUE(attrnamespace);
 	error = copyinstr(uattrname, attrname, sizeof(attrname), NULL);
 	if (error)
 		return (error);
+	return (kern_extattr_set_path(td, path, attrnamespace, attrname, data,
+	    nbytes, follow, UIO_USERSPACE));
+}
+
+int
+kern_extattr_set_path(struct thread *td, const char * __capability path,
+    int attrnamespace, const char *attrname, void * __capability data,
+    size_t nbytes, int follow, enum uio_seg pathseg)
+{
+	struct nameidata nd;
+	int error;
+
+	AUDIT_ARG_VALUE(attrnamespace);
 	AUDIT_ARG_TEXT(attrname);
 
-	NDINIT(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path);
+	NDINIT(&nd, LOOKUP, follow | AUDITVNODE1, pathseg, path);
 	error = namei(&nd);
 	if (error)
 		return (error);
@@ -411,25 +429,35 @@ int
 sys_extattr_get_fd(struct thread *td, struct extattr_get_fd_args *uap)
 {
 
-	return (kern_extattr_get_fd(td, uap->fd, uap->attrnamespace,
+	return (user_extattr_get_fd(td, uap->fd, uap->attrnamespace,
 	    uap->attrname, uap->data, uap->nbytes));
 }
 
 int
-kern_extattr_get_fd(struct thread *td, int fd, int attrnamespace,
+user_extattr_get_fd(struct thread *td, int fd, int attrnamespace,
     const char * __capability uattrname, void * __capability data,
     size_t nbytes)
 {
-	struct file *fp;
 	char attrname[EXTATTR_MAXNAMELEN + 1];
+	int error;
+
+	error = copyinstr(uattrname, attrname, sizeof(attrname), NULL);
+	if (error)
+		return (error);
+	return (kern_extattr_get_fd(td, fd, attrnamespace, attrname, data,
+	    nbytes));
+}
+
+int
+kern_extattr_get_fd(struct thread *td, int fd, int attrnamespace,
+    const char *attrname, void * __capability data, size_t nbytes)
+{
+	struct file *fp;
 	cap_rights_t rights;
 	int error;
 
 	AUDIT_ARG_FD(fd);
 	AUDIT_ARG_VALUE(attrnamespace);
-	error = copyinstr(uattrname, attrname, sizeof(attrname), NULL);
-	if (error)
-		return (error);
 	AUDIT_ARG_TEXT(attrname);
 
 	error = getvnode_path(td, fd,
@@ -456,7 +484,7 @@ struct extattr_get_file_args {
 int
 sys_extattr_get_file(struct thread *td, struct extattr_get_file_args *uap)
 {
-	return (kern_extattr_get_path(td, uap->path, uap->attrnamespace,
+	return (user_extattr_get_path(td, uap->path, uap->attrnamespace,
 	    uap->attrname, uap->data, uap->nbytes, FOLLOW));
 }
 
@@ -472,26 +500,37 @@ struct extattr_get_link_args {
 int
 sys_extattr_get_link(struct thread *td, struct extattr_get_link_args *uap)
 {
-	return (kern_extattr_get_path(td, uap->path, uap->attrnamespace,
+	return (user_extattr_get_path(td, uap->path, uap->attrnamespace,
 	    uap->attrname, uap->data, uap->nbytes, NOFOLLOW));
 }
 
 int
-kern_extattr_get_path(struct thread *td, const char * __capability path,
+user_extattr_get_path(struct thread *td, const char * __capability path,
     int attrnamespace, const char * __capability uattrname,
     void * __capability data, size_t nbytes, int follow)
 {
-	struct nameidata nd;
 	char attrname[EXTATTR_MAXNAMELEN + 1];
 	int error;
 
-	AUDIT_ARG_VALUE(attrnamespace);
 	error = copyinstr(uattrname, attrname, sizeof(attrname), NULL);
 	if (error)
 		return (error);
+	return (kern_extattr_get_path(td, path, attrnamespace, attrname, data,
+	    nbytes, follow, UIO_USERSPACE));
+}
+
+int
+kern_extattr_get_path(struct thread *td, const char * __capability path,
+    int attrnamespace, const char *attrname, void * __capability data,
+    size_t nbytes, int follow, enum uio_seg pathseg)
+{
+	struct nameidata nd;
+	int error;
+
+	AUDIT_ARG_VALUE(attrnamespace);
 	AUDIT_ARG_TEXT(attrname);
 
-	NDINIT(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path);
+	NDINIT(&nd, LOOKUP, follow | AUDITVNODE1, pathseg, path);
 	error = namei(&nd);
 	if (error)
 		return (error);
@@ -557,24 +596,33 @@ int
 sys_extattr_delete_fd(struct thread *td, struct extattr_delete_fd_args *uap)
 {
 
-	return (kern_extattr_delete_fd(td, uap->fd, uap->attrnamespace,
+	return (user_extattr_delete_fd(td, uap->fd, uap->attrnamespace,
 	    uap->attrname));
 }
 
 int
-kern_extattr_delete_fd(struct thread *td, int fd, int attrnamespace,
+user_extattr_delete_fd(struct thread *td, int fd, int attrnamespace,
     const char * __capability uattrname)
 {
-	struct file *fp;
 	char attrname[EXTATTR_MAXNAMELEN + 1];
+	int error;
+
+	error = copyinstr(uattrname, attrname, sizeof(attrname), NULL);
+	if (error)
+		return (error);
+	return (kern_extattr_delete_fd(td, fd, attrnamespace, attrname));
+}
+
+int
+kern_extattr_delete_fd(struct thread *td, int fd, int attrnamespace,
+    const char *attrname)
+{
+	struct file *fp;
 	cap_rights_t rights;
 	int error;
 
 	AUDIT_ARG_FD(fd);
 	AUDIT_ARG_VALUE(attrnamespace);
-	error = copyinstr(uattrname, attrname, sizeof(attrname), NULL);
-	if (error)
-		return (error);
 	AUDIT_ARG_TEXT(attrname);
 
 	error = getvnode_path(td, fd,
@@ -599,7 +647,7 @@ int
 sys_extattr_delete_file(struct thread *td, struct extattr_delete_file_args *uap)
 {
 
-	return (kern_extattr_delete_path(td, uap->path, uap->attrnamespace,
+	return (user_extattr_delete_path(td, uap->path, uap->attrnamespace,
 	    uap->attrname, FOLLOW));
 }
 
@@ -614,25 +662,35 @@ int
 sys_extattr_delete_link(struct thread *td, struct extattr_delete_link_args *uap)
 {
 
-	return (kern_extattr_delete_path(td, uap->path, uap->attrnamespace,
+	return (user_extattr_delete_path(td, uap->path, uap->attrnamespace,
 	    uap->attrname, NOFOLLOW));
 }
 
 int
-kern_extattr_delete_path(struct thread *td, const char * __capability path,
+user_extattr_delete_path(struct thread *td, const char * __capability path,
     int attrnamespace, const char * __capability uattrname, int follow)
 {
-	struct nameidata nd;
 	char attrname[EXTATTR_MAXNAMELEN + 1];
 	int error;
 
-	AUDIT_ARG_VALUE(attrnamespace);
 	error = copyinstr(uattrname, attrname, sizeof(attrname), NULL);
 	if (error)
 		return(error);
+	return (kern_extattr_delete_path(td, path, attrnamespace,
+	    attrname, follow, UIO_USERSPACE));
+}
+
+int
+kern_extattr_delete_path(struct thread *td, const char * __capability path,
+    int attrnamespace, const char *attrname, int follow, enum uio_seg pathseg)
+{
+	struct nameidata nd;
+	int error;
+
+	AUDIT_ARG_VALUE(attrnamespace);
 	AUDIT_ARG_TEXT(attrname);
 
-	NDINIT(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path);
+	NDINIT(&nd, LOOKUP, follow | AUDITVNODE1, pathseg, path);
 	error = namei(&nd);
 	if (error)
 		return(error);
@@ -654,32 +712,19 @@ kern_extattr_delete_path(struct thread *td, const char * __capability path,
  * References: vp must be a valid reference for the duration of the call
  */
 static int
-extattr_list_vp(struct vnode *vp, int attrnamespace, void * __capability data,
-    size_t nbytes, struct thread *td)
+extattr_list_vp(struct vnode *vp, int attrnamespace, struct uio *auiop,
+    struct thread *td)
 {
-	struct uio auio, *auiop;
 	size_t size, *sizep;
-	struct iovec aiov;
 	ssize_t cnt;
 	int error;
 
-	if (nbytes > IOSIZE_MAX)
-		return (EINVAL);
-
-	auiop = NULL;
 	sizep = NULL;
 	cnt = 0;
-	if (data != NULL) {
-		IOVEC_INIT_C(&aiov, data, nbytes);
-		auio.uio_iov = &aiov;
-		auio.uio_iovcnt = 1;
-		auio.uio_offset = 0;
-		auio.uio_resid = nbytes;
-		auio.uio_rw = UIO_READ;
-		auio.uio_segflg = UIO_USERSPACE;
-		auio.uio_td = td;
-		auiop = &auio;
-		cnt = nbytes;
+	if (auiop != NULL) {
+		if (auiop->uio_resid > IOSIZE_MAX)
+			return (EINVAL);
+		cnt = auiop->uio_resid;
 	} else
 		sizep = &size;
 
@@ -698,7 +743,7 @@ extattr_list_vp(struct vnode *vp, int attrnamespace, void * __capability data,
 	VOP_UNLOCK(vp);
 
 	if (auiop != NULL) {
-		cnt -= auio.uio_resid;
+		cnt -= auiop->uio_resid;
 		td->td_retval[0] = cnt;
 	} else
 		td->td_retval[0] = size;
@@ -717,13 +762,36 @@ int
 sys_extattr_list_fd(struct thread *td, struct extattr_list_fd_args *uap)
 {
 
-	return (kern_extattr_list_fd(td, uap->fd, uap->attrnamespace,
+	return (user_extattr_list_fd(td, uap->fd, uap->attrnamespace,
 	    uap->data, uap->nbytes));
 }
 
 int
-kern_extattr_list_fd(struct thread *td, int fd, int attrnamespace,
+user_extattr_list_fd(struct thread *td, int fd, int attrnamespace,
     void * __capability data, size_t nbytes)
+{
+	struct uio auio, *auiop;
+	struct iovec aiov;
+
+	if (data != NULL) {
+		IOVEC_INIT_C(&aiov, data, nbytes);
+		auio.uio_iov = &aiov;
+		auio.uio_iovcnt = 1;
+		auio.uio_offset = 0;
+		auio.uio_resid = nbytes;
+		auio.uio_rw = UIO_READ;
+		auio.uio_segflg = UIO_USERSPACE;
+		auio.uio_td = td;
+		auiop = &auio;
+	} else
+		auiop = NULL;
+
+	return (kern_extattr_list_fd(td, fd, attrnamespace, auiop));
+}
+
+int
+kern_extattr_list_fd(struct thread *td, int fd, int attrnamespace,
+    struct uio *auiop)
 {
 	struct file *fp;
 	cap_rights_t rights;
@@ -736,7 +804,7 @@ kern_extattr_list_fd(struct thread *td, int fd, int attrnamespace,
 	if (error)
 		return (error);
 
-	error = extattr_list_vp(fp->f_vnode, attrnamespace, data, nbytes, td);
+	error = extattr_list_vp(fp->f_vnode, attrnamespace, auiop, td);
 
 	fdrop(fp, td);
 	return (error);
@@ -754,7 +822,7 @@ int
 sys_extattr_list_file(struct thread *td, struct extattr_list_file_args *uap)
 {
 
-	return (kern_extattr_list_path(td, uap->path, uap->attrnamespace,
+	return (user_extattr_list_path(td, uap->path, uap->attrnamespace,
 	    uap->data, uap->nbytes, FOLLOW));
 }
 
@@ -770,25 +838,49 @@ int
 sys_extattr_list_link(struct thread *td, struct extattr_list_link_args *uap)
 {
 
-	return (kern_extattr_list_path(td, uap->path, uap->attrnamespace,
+	return (user_extattr_list_path(td, uap->path, uap->attrnamespace,
 	    uap->data, uap->nbytes, NOFOLLOW));
 }
 
 int
-kern_extattr_list_path(struct thread *td, const char * __capability path,
+user_extattr_list_path(struct thread *td, const char * __capability path,
     int attrnamespace, void * __capability data, size_t nbytes, int follow)
+{
+	struct uio auio, *auiop;
+	struct iovec aiov;
+
+	if (data != NULL) {
+		IOVEC_INIT_C(&aiov, data, nbytes);
+		auio.uio_iov = &aiov;
+		auio.uio_iovcnt = 1;
+		auio.uio_offset = 0;
+		auio.uio_resid = nbytes;
+		auio.uio_rw = UIO_READ;
+		auio.uio_segflg = UIO_USERSPACE;
+		auio.uio_td = td;
+		auiop = &auio;
+	} else
+		auiop = NULL;
+
+	return (kern_extattr_list_path(td, path, attrnamespace,
+	    auiop, follow, UIO_USERSPACE));
+}
+
+int
+kern_extattr_list_path(struct thread *td, const char * __capability path,
+    int attrnamespace, struct uio *auiop, int follow, enum uio_seg pathseg)
 {
 	struct nameidata nd;
 	int error;
 
 	AUDIT_ARG_VALUE(attrnamespace);
-	NDINIT(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path);
+	NDINIT(&nd, LOOKUP, follow | AUDITVNODE1, pathseg, path);
 	error = namei(&nd);
 	if (error)
 		return (error);
 	NDFREE_PNBUF(&nd);
 
-	error = extattr_list_vp(nd.ni_vp, attrnamespace, data, nbytes, td);
+	error = extattr_list_vp(nd.ni_vp, attrnamespace, auiop, td);
 
 	vrele(nd.ni_vp);
 	return (error);

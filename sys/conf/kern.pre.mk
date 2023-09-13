@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 # Part of a unified Makefile for building kernels.  This part contains all
 # of the definitions that need to be before %BEFORE_DEPEND.
@@ -207,7 +206,7 @@ NORMAL_M= ${AWK} -f $S/tools/makeobjops.awk ${.IMPSRC} -c ; \
 
 NORMAL_FW= uudecode -o ${.TARGET} ${.ALLSRC}
 NORMAL_FWO= ${CC:N${CCACHE_BIN}} -c ${ASM_CFLAGS} ${WERROR} -o ${.TARGET} \
-	$S/kern/firmw.S -DFIRMW_FILE="${.ALLSRC:M*.fw}" \
+	$S/kern/firmw.S -DFIRMW_FILE=\""${.ALLSRC:M*.fw}"\" \
 	-DFIRMW_SYMBOL="${.ALLSRC:M*.fw:C/[-.\/]/_/g}"
 
 # for ZSTD in the kernel (include zstd/lib/freebsd before other CFLAGS)

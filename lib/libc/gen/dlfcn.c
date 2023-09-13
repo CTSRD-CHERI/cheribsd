@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #if !defined(IN_LIBDL) || defined(PIC)
 
 /*
@@ -215,7 +213,9 @@ _rtld_sighandler_init(void *p __unused)
 #ifndef IN_LIBDL
 static pthread_once_t dl_phdr_info_once = PTHREAD_ONCE_INIT;
 static struct dl_phdr_info phdr_info;
+#ifndef PIC
 static mutex_t dl_phdr_info_lock = MUTEX_INITIALIZER;
+#endif
 
 static void
 dl_init_phdr_info(void)
@@ -267,7 +267,16 @@ int
 dl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *) __unused,
     void *data __unused)
 {
-#ifndef IN_LIBDL
+#if defined IN_LIBDL
+	return (0);
+#elif defined PIC
+	int (*r)(int (*)(struct dl_phdr_info *, size_t, void *), void *);
+
+	r = dlsym(RTLD_DEFAULT, "dl_iterate_phdr");
+	if (r == NULL)
+		return (0);
+	return (r(callback, data));
+#else
 	tls_index ti;
 	int ret;
 
@@ -282,8 +291,6 @@ dl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *) __unused,
 	ret = callback(&phdr_info, sizeof(phdr_info), data);
 	mutex_unlock(&dl_phdr_info_lock);
 	return (ret);
-#else
-	return (0);
 #endif
 }
 

@@ -1,5 +1,4 @@
 #	From: @(#)Makefile	8.3 (Berkeley) 1/7/94
-# $FreeBSD$
 
 .include <src.opts.mk>
 
@@ -28,7 +27,6 @@ SUBDIR=	alias \
 	column \
 	comm \
 	compress \
-	cpuset \
 	csplit \
 	ctlstat \
 	cut \

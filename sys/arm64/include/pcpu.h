@@ -24,16 +24,17 @@
  * SUCH DAMAGE.
  *
  *	from: FreeBSD: src/sys/i386/include/globaldata.h,v 1.27 2001/04/27
- * $FreeBSD$
  */
+
+#ifdef __arm__
+#include <arm/pcpu.h>
+#else /* !__arm__ */
 
 #ifndef	_MACHINE_PCPU_H_
 #define	_MACHINE_PCPU_H_
 
 #include <machine/cpu.h>
 #include <machine/cpufunc.h>
-
-#define	ALT_STACK_SIZE	128
 
 typedef int (*pcpu_bp_harden)(void);
 typedef int (*pcpu_ssbd)(int);
@@ -125,6 +126,8 @@ init_cpu_pcpup(void *pcpup)
 #endif	/* _KERNEL */
 
 #endif	/* !_MACHINE_PCPU_H_ */
+
+#endif /* !__arm__ */
 // CHERI CHANGES START
 // {
 //   "updated": 20230509,

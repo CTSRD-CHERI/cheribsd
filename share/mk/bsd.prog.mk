@@ -1,5 +1,4 @@
 #	from: @(#)bsd.prog.mk	5.26 (Berkeley) 6/25/91
-# $FreeBSD$
 
 __BSD_PROG_MK=yes
 

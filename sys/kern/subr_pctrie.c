@@ -47,8 +47,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ddb.h"
 
 #include <sys/param.h>
@@ -79,14 +77,9 @@ typedef uint32_t pn_popmap_t;
 _Static_assert(sizeof(pn_popmap_t) <= sizeof(int),
     "pn_popmap_t too wide");
 
-/* Flag bits stored in node pointers. */
-#define	PCTRIE_ISLEAF	0x1
-#define	PCTRIE_FLAGS	0x1
+/* Set of all flag bits stored in node pointers. */
+#define	PCTRIE_FLAGS	(PCTRIE_ISLEAF)
 #define	PCTRIE_PAD	PCTRIE_FLAGS
-
-/* Returns one unit associated with specified level. */
-#define	PCTRIE_UNITLEVEL(lev)						\
-	((uint64_t)1 << ((lev) * PCTRIE_WIDTH))
 
 struct pctrie_node;
 typedef SMR_POINTER(struct pctrie_node *) smr_pctnode_t;
@@ -94,7 +87,7 @@ typedef SMR_POINTER(struct pctrie_node *) smr_pctnode_t;
 struct pctrie_node {
 	uint64_t	pn_owner;			/* Owner of record. */
 	pn_popmap_t	pn_popmap;			/* Valid children. */
-	uint8_t		pn_clev;			/* Current level. */
+	uint8_t		pn_clev;			/* Level * WIDTH. */
 	smr_pctnode_t	pn_child[PCTRIE_COUNT];		/* Child nodes. */
 };
 
@@ -104,19 +97,26 @@ static __inline void pctrie_node_store(smr_pctnode_t *p, void *val,
     enum pctrie_access access);
 
 /*
- * Return the position in the array for a given level.
+ * Map index to an array position for the children of node,
  */
 static __inline int
-pctrie_slot(uint64_t index, uint16_t level)
+pctrie_slot(struct pctrie_node *node, uint64_t index)
 {
-	return ((index >> (level * PCTRIE_WIDTH)) & PCTRIE_MASK);
+	return ((index >> node->pn_clev) & PCTRIE_MASK);
 }
 
-/* Computes the key (index) with the low-order 'level' radix-digits zeroed. */
-static __inline uint64_t
-pctrie_trimkey(uint64_t index, uint16_t level)
+/*
+ * Returns true if index does not belong to the specified node.  Otherwise,
+ * sets slot value, and returns false.
+ */
+static __inline bool
+pctrie_keybarr(struct pctrie_node *node, uint64_t index, int *slot)
 {
-	return (index & -PCTRIE_UNITLEVEL(level));
+	index = (index - node->pn_owner) >> node->pn_clev;
+	if (index >= PCTRIE_COUNT)
+		return (true);
+	*slot = index;
+	return (false);
 }
 
 /*
@@ -125,7 +125,7 @@ pctrie_trimkey(uint64_t index, uint16_t level)
  */
 static struct pctrie_node *
 pctrie_node_get(struct pctrie *ptree, pctrie_alloc_t allocfn, uint64_t index,
-    uint16_t clevel)
+    uint64_t newind)
 {
 	struct pctrie_node *node;
 
@@ -140,11 +140,24 @@ pctrie_node_get(struct pctrie *ptree, pctrie_alloc_t allocfn, uint64_t index,
 	 */
 	if (node->pn_popmap != 0) {
 		pctrie_node_store(&node->pn_child[ffs(node->pn_popmap) - 1],
-		    NULL, PCTRIE_UNSERIALIZED);
+		    PCTRIE_NULL, PCTRIE_UNSERIALIZED);
 		node->pn_popmap = 0;
 	}
-	node->pn_owner = pctrie_trimkey(index, clevel + 1);
-	node->pn_clev = clevel;
+
+	/*
+	 * From the highest-order bit where the indexes differ,
+	 * compute the highest level in the trie where they differ.  Then,
+	 * compute the least index of this subtrie.
+	 */
+	KASSERT(index != newind, ("%s: passing the same key value %jx",
+	    __func__, (uintmax_t)index));
+	_Static_assert(sizeof(long long) >= sizeof(uint64_t),
+	    "uint64 too wide");
+	_Static_assert(sizeof(uint64_t) * NBBY <=
+	    (1 << (sizeof(node->pn_clev) * NBBY)), "pn_clev too narrow");
+	node->pn_clev = rounddown(flsll(index ^ newind) - 1, PCTRIE_WIDTH);
+	node->pn_owner = PCTRIE_COUNT;
+	node->pn_owner = index & -(node->pn_owner << node->pn_clev);
 	return (node);
 }
 
@@ -165,7 +178,8 @@ pctrie_node_put(struct pctrie *ptree, struct pctrie_node *node,
 		if ((node->pn_popmap & (1 << slot)) != 0)
 			continue;
 		KASSERT(smr_unserialized_load(&node->pn_child[slot], true) ==
-		    NULL, ("pctrie_node_put: node %p has a child", node));
+		    PCTRIE_NULL,
+		    ("pctrie_node_put: node %p has a child", node));
 	}
 #endif
 	freefn(ptree, node);
@@ -259,50 +273,16 @@ pctrie_toval(struct pctrie_node *node)
  * Make 'child' a child of 'node'.
  */
 static __inline void
-pctrie_addnode(struct pctrie_node *node, uint64_t index, uint16_t clev,
+pctrie_addnode(struct pctrie_node *node, uint64_t index,
     struct pctrie_node *child, enum pctrie_access access)
 {
 	int slot;
 
-	slot = pctrie_slot(index, clev);
+	slot = pctrie_slot(node, index);
 	pctrie_node_store(&node->pn_child[slot], child, access);
 	node->pn_popmap ^= 1 << slot;
 	KASSERT((node->pn_popmap & (1 << slot)) != 0,
 	    ("%s: bad popmap slot %d in node %p", __func__, slot, node));
-}
-
-/*
- * Returns the level where two keys differ.
- * It cannot accept 2 equal keys.
- */
-static __inline uint16_t
-pctrie_keydiff(uint64_t index1, uint64_t index2)
-{
-
-	KASSERT(index1 != index2, ("%s: passing the same key value %jx",
-	    __func__, (uintmax_t)index1));
-	CTASSERT(sizeof(long long) >= sizeof(uint64_t));
-
-	/*
-	 * From the highest-order bit where the indexes differ,
-	 * compute the highest level in the trie where they differ.
-	 */
-	return ((flsll(index1 ^ index2) - 1) / PCTRIE_WIDTH);
-}
-
-/*
- * Returns TRUE if it can be determined that key does not belong to the
- * specified node.  Otherwise, returns FALSE.
- */
-static __inline bool
-pctrie_keybarr(struct pctrie_node *node, uint64_t idx)
-{
-
-	if (node->pn_clev < PCTRIE_LIMIT) {
-		idx = pctrie_trimkey(idx, node->pn_clev + 1);
-		return (idx != node->pn_owner);
-	}
-	return (false);
 }
 
 /*
@@ -320,12 +300,13 @@ pctrie_reclaim_allnodes_int(struct pctrie *ptree, struct pctrie_node *node,
 		slot = ffs(node->pn_popmap) - 1;
 		child = pctrie_node_load(&node->pn_child[slot], NULL,
 		    PCTRIE_UNSERIALIZED);
-		KASSERT(child != NULL, ("%s: bad popmap slot %d in node %p",
+		KASSERT(child != PCTRIE_NULL,
+		    ("%s: bad popmap slot %d in node %p",
 		    __func__, slot, node));
 		if (!pctrie_isleaf(child))
 			pctrie_reclaim_allnodes_int(ptree, child, freefn);
 		node->pn_popmap ^= 1 << slot;
-		pctrie_node_store(&node->pn_child[slot], NULL,
+		pctrie_node_store(&node->pn_child[slot], PCTRIE_NULL,
 		    PCTRIE_UNSERIALIZED);
 	}
 	pctrie_node_put(ptree, node, freefn);
@@ -341,7 +322,9 @@ pctrie_zone_init(void *mem, int size __unused, int flags __unused)
 
 	node = mem;
 	node->pn_popmap = 0;
-	memset(node->pn_child, 0, sizeof(node->pn_child));
+	for (int i = 0; i < nitems(node->pn_child); i++)
+		pctrie_node_store(&node->pn_child[i], PCTRIE_NULL,
+		    PCTRIE_UNSERIALIZED);
 	return (0);
 }
 
@@ -360,10 +343,9 @@ int
 pctrie_insert(struct pctrie *ptree, uint64_t *val, pctrie_alloc_t allocfn)
 {
 	uint64_t index, newind;
-	struct pctrie_node *leaf, *node, *tmp;
+	struct pctrie_node *leaf, *node, *parent;
 	smr_pctnode_t *parentp;
 	int slot;
-	uint16_t clev;
 
 	index = *val;
 	leaf = pctrie_toleaf(val);
@@ -373,29 +355,30 @@ pctrie_insert(struct pctrie *ptree, uint64_t *val, pctrie_alloc_t allocfn)
 	 * will never be used.
 	 */
 	node = pctrie_root_load(ptree, NULL, PCTRIE_LOCKED);
-	if (node == NULL) {
-		ptree->pt_root = (uintptr_t)leaf;
-		return (0);
-	}
-	for (parentp = (smr_pctnode_t *)&ptree->pt_root;; node = tmp) {
+	parent = NULL;
+	for (;;) {
 		if (pctrie_isleaf(node)) {
+			if (node == PCTRIE_NULL) {
+				if (parent == NULL)
+					ptree->pt_root = leaf;
+				else
+					pctrie_addnode(parent, index, leaf,
+					    PCTRIE_LOCKED);
+				return (0);
+			}
 			newind = *pctrie_toval(node);
 			if (newind == index)
 				panic("%s: key %jx is already present",
 				    __func__, (uintmax_t)index);
 			break;
-		} else if (pctrie_keybarr(node, index)) {
+		}
+		if (pctrie_keybarr(node, index, &slot)) {
 			newind = node->pn_owner;
 			break;
 		}
-		slot = pctrie_slot(index, node->pn_clev);
-		parentp = &node->pn_child[slot];
-		tmp = pctrie_node_load(parentp, NULL, PCTRIE_LOCKED);
-		if (tmp == NULL) {
-			pctrie_addnode(node, index, node->pn_clev, leaf,
-			    PCTRIE_LOCKED);
-			return (0);
-		}
+		parent = node;
+		node = pctrie_node_load(&node->pn_child[slot], NULL,
+		    PCTRIE_LOCKED);
 	}
 
 	/*
@@ -403,15 +386,16 @@ pctrie_insert(struct pctrie *ptree, uint64_t *val, pctrie_alloc_t allocfn)
 	 * Setup the new intermediate node and add the 2 children: the
 	 * new object and the older edge or object.
 	 */
-	clev = pctrie_keydiff(newind, index);
-	tmp = pctrie_node_get(ptree, allocfn, index, clev);
-	if (tmp == NULL)
+	parentp = (parent != NULL) ? &parent->pn_child[slot]:
+	    (smr_pctnode_t *)&ptree->pt_root;
+	parent = pctrie_node_get(ptree, allocfn, index, newind);
+	if (parent == NULL)
 		return (ENOMEM);
 	/* These writes are not yet visible due to ordering. */
-	pctrie_addnode(tmp, index, clev, leaf, PCTRIE_UNSERIALIZED);
-	pctrie_addnode(tmp, newind, clev, node, PCTRIE_UNSERIALIZED);
+	pctrie_addnode(parent, index, leaf, PCTRIE_UNSERIALIZED);
+	pctrie_addnode(parent, newind, node, PCTRIE_UNSERIALIZED);
 	/* Synchronize to make the above visible. */
-	pctrie_node_store(parentp, tmp, PCTRIE_LOCKED);
+	pctrie_node_store(parentp, parent, PCTRIE_LOCKED);
 	return (0);
 }
 
@@ -428,16 +412,14 @@ _pctrie_lookup(struct pctrie *ptree, uint64_t index, smr_t smr,
 	int slot;
 
 	node = pctrie_root_load(ptree, smr, access);
-	while (node != NULL) {
+	for (;;) {
 		if (pctrie_isleaf(node)) {
-			m = pctrie_toval(node);
-			if (*m == index)
+			if ((m = pctrie_toval(node)) != NULL && *m == index)
 				return (m);
 			break;
 		}
-		if (pctrie_keybarr(node, index))
+		if (pctrie_keybarr(node, index, &slot))
 			break;
-		slot = pctrie_slot(index, node->pn_clev);
 		node = pctrie_node_load(&node->pn_child[slot], smr, access);
 	}
 	return (NULL);
@@ -499,14 +481,13 @@ pctrie_lookup_ge(struct pctrie *ptree, uint64_t index)
 	 */
 	node = pctrie_root_load(ptree, NULL, PCTRIE_LOCKED);
 	succ = NULL;
-	while (node != NULL) {
+	for (;;) {
 		if (pctrie_isleaf(node)) {
-			m = pctrie_toval(node);
-			if (*m >= index)
+			if ((m = pctrie_toval(node)) != NULL && *m >= index)
 				return (m);
 			break;
 		}
-		if (pctrie_keybarr(node, index)) {
+		if (pctrie_keybarr(node, index, &slot)) {
 			/*
 			 * If all values in this subtree are > index, then the
 			 * least value in this subtree is the answer.
@@ -515,7 +496,6 @@ pctrie_lookup_ge(struct pctrie *ptree, uint64_t index)
 				succ = node;
 			break;
 		}
-		slot = pctrie_slot(index, node->pn_clev);
 
 		/*
 		 * Just in case the next search step leads to a subtree of all
@@ -540,7 +520,7 @@ pctrie_lookup_ge(struct pctrie *ptree, uint64_t index)
 		 * Take a step to the next bigger sibling of the node chosen
 		 * last time.  In that subtree, all values > index.
 		 */
-		slot = pctrie_slot(index, succ->pn_clev) + 1;
+		slot = pctrie_slot(succ, index) + 1;
 		KASSERT((succ->pn_popmap >> slot) != 0,
 		    ("%s: no popmap siblings past slot %d in node %p",
 		    __func__, slot, succ));
@@ -580,19 +560,17 @@ pctrie_lookup_le(struct pctrie *ptree, uint64_t index)
 	 */
 	node = pctrie_root_load(ptree, NULL, PCTRIE_LOCKED);
 	pred = NULL;
-	while (node != NULL) {
+	for (;;) {
 		if (pctrie_isleaf(node)) {
-			m = pctrie_toval(node);
-			if (*m <= index)
+			if ((m = pctrie_toval(node)) != NULL && *m <= index)
 				return (m);
 			break;
 		}
-		if (pctrie_keybarr(node, index)) {
+		if (pctrie_keybarr(node, index, &slot)) {
 			if (node->pn_owner < index)
 				pred = node;
 			break;
 		}
-		slot = pctrie_slot(index, node->pn_clev);
 		if ((node->pn_popmap & ((1 << slot) - 1)) != 0)
 			pred = node;
 		node = pctrie_node_load(&node->pn_child[slot], NULL,
@@ -601,7 +579,7 @@ pctrie_lookup_le(struct pctrie *ptree, uint64_t index)
 	if (pred == NULL)
 		return (NULL);
 	if (pred != node) {
-		slot = pctrie_slot(index, pred->pn_clev);
+		slot = pctrie_slot(pred, index);
 		KASSERT((pred->pn_popmap & ((1 << slot) - 1)) != 0,
 		    ("%s: no popmap siblings before slot %d in node %p",
 		    __func__, slot, pred));
@@ -626,66 +604,54 @@ pctrie_lookup_le(struct pctrie *ptree, uint64_t index)
 void
 pctrie_remove(struct pctrie *ptree, uint64_t index, pctrie_free_t freefn)
 {
-	struct pctrie_node *node, *parent, *tmp;
+	struct pctrie_node *child, *node, *parent;
 	uint64_t *m;
 	int slot;
 
-	node = pctrie_root_load(ptree, NULL, PCTRIE_LOCKED);
-	if (pctrie_isleaf(node)) {
-		m = pctrie_toval(node);
-		if (*m != index)
-			panic("%s: invalid key found", __func__);
-		pctrie_root_store(ptree, NULL, PCTRIE_LOCKED);
+	node = NULL;
+	child = pctrie_root_load(ptree, NULL, PCTRIE_LOCKED);
+	for (;;) {
+		if (pctrie_isleaf(child))
+			break;
+		parent = node;
+		node = child;
+		slot = pctrie_slot(node, index);
+		child = pctrie_node_load(&node->pn_child[slot], NULL,
+		    PCTRIE_LOCKED);
+	}
+	if ((m = pctrie_toval(child)) == NULL || *m != index)
+		panic("%s: key not found", __func__);
+	if (node == NULL) {
+		pctrie_root_store(ptree, PCTRIE_NULL, PCTRIE_LOCKED);
 		return;
 	}
-	parent = NULL;
-	for (;;) {
-		if (node == NULL)
-			panic("pctrie_remove: impossible to locate the key");
-		slot = pctrie_slot(index, node->pn_clev);
-		tmp = pctrie_node_load(&node->pn_child[slot], NULL,
+	KASSERT((node->pn_popmap & (1 << slot)) != 0,
+	    ("%s: bad popmap slot %d in node %p",
+	    __func__, slot, node));
+	node->pn_popmap ^= 1 << slot;
+	pctrie_node_store(&node->pn_child[slot], PCTRIE_NULL, PCTRIE_LOCKED);
+	if (!powerof2(node->pn_popmap))
+		return;
+	KASSERT(node->pn_popmap != 0, ("%s: bad popmap all zeroes", __func__));
+	slot = ffs(node->pn_popmap) - 1;
+	child = pctrie_node_load(&node->pn_child[slot], NULL, PCTRIE_LOCKED);
+	KASSERT(child != PCTRIE_NULL,
+	    ("%s: bad popmap slot %d in node %p", __func__, slot, node));
+	if (parent == NULL)
+		pctrie_root_store(ptree, child, PCTRIE_LOCKED);
+	else {
+		slot = pctrie_slot(parent, index);
+		KASSERT(node ==
+		    pctrie_node_load(&parent->pn_child[slot], NULL,
+		    PCTRIE_LOCKED), ("%s: invalid child value", __func__));
+		pctrie_node_store(&parent->pn_child[slot], child,
 		    PCTRIE_LOCKED);
-		if (pctrie_isleaf(tmp)) {
-			m = pctrie_toval(tmp);
-			if (*m != index)
-				panic("%s: invalid key found", __func__);
-			KASSERT((node->pn_popmap & (1 << slot)) != 0,
-			    ("%s: bad popmap slot %d in node %p",
-			    __func__, slot, node));
-			node->pn_popmap ^= 1 << slot;
-			pctrie_node_store(&node->pn_child[slot], NULL,
-			    PCTRIE_LOCKED);
-			if (!powerof2(node->pn_popmap))
-				break;
-			KASSERT(node->pn_popmap != 0,
-			    ("%s: bad popmap all zeroes", __func__));
-			slot = ffs(node->pn_popmap) - 1;
-			tmp = pctrie_node_load(&node->pn_child[slot],
-			    NULL, PCTRIE_LOCKED);
-			KASSERT(tmp != NULL,
-			    ("%s: bad popmap slot %d in node %p",
-			    __func__, slot, node));
-			if (parent == NULL)
-				pctrie_root_store(ptree, tmp, PCTRIE_LOCKED);
-			else {
-				slot = pctrie_slot(index, parent->pn_clev);
-				KASSERT(pctrie_node_load(
-					&parent->pn_child[slot], NULL,
-					PCTRIE_LOCKED) == node,
-				    ("%s: invalid child value", __func__));
-				pctrie_node_store(&parent->pn_child[slot], tmp,
-				    PCTRIE_LOCKED);
-			}
-			/*
-			 * The child is still valid and we can not zero the
-			 * pointer until all SMR references are gone.
-			 */
-			pctrie_node_put(ptree, node, freefn);
-			break;
-		}
-		parent = node;
-		node = tmp;
 	}
+	/*
+	 * The child is still valid and we can not zero the
+	 * pointer until all SMR references are gone.
+	 */
+	pctrie_node_put(ptree, node, freefn);
 }
 
 /*
@@ -699,9 +665,9 @@ pctrie_reclaim_allnodes(struct pctrie *ptree, pctrie_free_t freefn)
 	struct pctrie_node *root;
 
 	root = pctrie_root_load(ptree, NULL, PCTRIE_LOCKED);
-	if (root == NULL)
+	if (root == PCTRIE_NULL)
 		return;
-	pctrie_root_store(ptree, NULL, PCTRIE_UNSERIALIZED);
+	pctrie_root_store(ptree, PCTRIE_NULL, PCTRIE_UNSERIALIZED);
 	if (!pctrie_isleaf(root))
 		pctrie_reclaim_allnodes_int(ptree, root, freefn);
 }
@@ -721,7 +687,7 @@ DB_SHOW_COMMAND(pctrienode, db_show_pctrienode)
 	node = DB_DATA_PTR(addr, struct pctrie_node);
 	db_printf("node %p, owner %jx, children popmap %04x, level %u:\n",
 	    (void *)node, (uintmax_t)node->pn_owner, node->pn_popmap,
-	    node->pn_clev);
+	    node->pn_clev / PCTRIE_WIDTH);
 	for (popmap = node->pn_popmap; popmap != 0; popmap ^= 1 << slot) {
 		slot = ffs(popmap) - 1;
 		tmp = pctrie_node_load(&node->pn_child[slot], NULL,
@@ -729,7 +695,7 @@ DB_SHOW_COMMAND(pctrienode, db_show_pctrienode)
 		db_printf("slot: %d, val: %p, value: %p, clev: %d\n",
 		    slot, (void *)tmp,
 		    pctrie_isleaf(tmp) ? pctrie_toval(tmp) : NULL,
-		    node->pn_clev);
+		    node->pn_clev / PCTRIE_WIDTH);
 	}
 }
 #endif /* DDB */

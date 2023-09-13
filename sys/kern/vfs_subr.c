@@ -41,8 +41,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ddb.h"
 #include "opt_watchdog.h"
 
@@ -1718,6 +1716,10 @@ vtryrecycle(struct vnode *vp)
  * vnlru to clear things up, but ultimately always performs a M_WAITOK allocation.
  */
 static u_long vn_alloc_cyclecount;
+static u_long vn_alloc_sleeps;
+
+SYSCTL_ULONG(_vfs, OID_AUTO, vnode_alloc_sleeps, CTLFLAG_RD, &vn_alloc_sleeps, 0,
+    "Number of times vnode allocation blocked waiting on vnlru");
 
 static struct vnode * __noinline
 vn_alloc_hard(struct mount *mp)
@@ -1752,6 +1754,7 @@ vn_alloc_hard(struct mount *mp)
 		 * Wait for space for a new vnode.
 		 */
 		vnlru_kick();
+		vn_alloc_sleeps++;
 		msleep(&vnlruproc_sig, &vnode_list_mtx, PVFS, "vlruwk", hz);
 		if (atomic_load_long(&numvnodes) + 1 > desiredvnodes &&
 		    vnlru_read_freevnodes() > 1)

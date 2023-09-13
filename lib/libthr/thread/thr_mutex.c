@@ -39,8 +39,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "namespace.h"
 #include <stdlib.h>
 #include <errno.h>
@@ -291,8 +289,8 @@ mutex_init(pthread_mutex_t *mutex,
 		if (error != 0)
 			return (error);
 	}
-	if ((pmutex = (pthread_mutex_t)
-		calloc_cb(1, sizeof(struct pthread_mutex))) == NULL)
+	if ((pmutex = (pthread_mutex_t)calloc_cb(1,
+	    sizeof(struct pthread_mutex))) == NULL)
 		return (ENOMEM);
 	mutex_init_body(pmutex, attr);
 	*mutex = pmutex;

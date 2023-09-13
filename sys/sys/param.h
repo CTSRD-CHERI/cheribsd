@@ -34,7 +34,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)param.h	8.3 (Berkeley) 4/4/95
- * $FreeBSD$
  */
 
 #ifndef _SYS_PARAM_H_
@@ -76,7 +75,7 @@
  * cannot include sys/param.h and should only be updated here.
  */
 #undef __FreeBSD_version
-#define __FreeBSD_version 1400093
+#define __FreeBSD_version 1400094
 
 /*
  * __CheriBSD_version numbers describe CheriBSD ABIs.

@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .PATH: ${ZFSTOP}/cmd/zpool/compatibility.d
 

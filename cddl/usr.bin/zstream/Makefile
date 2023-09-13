@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .PATH: ${ZFSTOP}/cmd/zstream
 .PATH: ${ZFSTOP}/man/man8

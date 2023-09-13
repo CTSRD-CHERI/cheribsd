@@ -48,7 +48,6 @@
  * }
  * CHERI CHANGES END
  */
-/* $FreeBSD$ */
 
 #include <stdio.h>
 #include <stdlib.h>

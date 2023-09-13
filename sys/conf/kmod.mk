@@ -1,5 +1,4 @@
 #	From: @(#)bsd.prog.mk	5.26 (Berkeley) 6/25/91
-# $FreeBSD$
 #
 # The include file <bsd.kmod.mk> handles building and installing loadable
 # kernel modules.
@@ -170,6 +169,13 @@ CFLAGS+=	-fno-omit-frame-pointer -mno-omit-leaf-frame-pointer
 CFLAGS+=	-fPIC
 .endif
 
+.if ${MACHINE_CPUARCH} == "aarch64"
+# https://bugs.freebsd.org/264094
+# lld >= 14 and recent GNU ld can relax adrp+add and adrp+ldr instructions,
+# which breaks VNET.
+LDFLAGS+=	--no-relax
+.endif
+
 # XXX-AM: This is a workaround for not having full eflag support in morello lld.
 # should be removed as soon as the linker can link in capability mode based on
 # input files eflags instead.
@@ -210,7 +216,7 @@ ${_firmw:C/\:.*$/.fwo/:T}:	${_firmw:C/\:.*$//} ${SYSDIR}/kern/firmw.S
 	@${ECHO} ${_firmw:C/\:.*$//} ${.ALLSRC:M*${_firmw:C/\:.*$//}}
 	${CC:N${CCACHE_BIN}} -c -x assembler-with-cpp -DLOCORE 	\
 	    ${CFLAGS} ${WERROR} 				\
-	    -DFIRMW_FILE="${.ALLSRC:M*${_firmw:C/\:.*$//}}" 	\
+	    -DFIRMW_FILE=\""${.ALLSRC:M*${_firmw:C/\:.*$//}}"\"	\
 	    -DFIRMW_SYMBOL="${_firmw:C/\:.*$//:C/[-.\/@]/_/g}"	\
 	    ${SYSDIR}/kern/firmw.S -o ${.TARGET}
 

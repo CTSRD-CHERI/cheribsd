@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _SYS_MEMDESC_H_
@@ -154,5 +152,15 @@ memdesc_vmpages(struct vm_page **ma, size_t len, u_int ma_offset)
 
 struct memdesc	memdesc_bio(struct bio *bio);
 struct memdesc	memdesc_ccb(union ccb *ccb);
+
+/*
+ * Similar to m_copyback/data, *_copyback copy data from the 'src'
+ * buffer into the memory descriptor's data buffer while *_copydata
+ * copy data from the memory descriptor's data buffer into the the
+ * 'dst' buffer.
+ */
+void	memdesc_copyback(struct memdesc *mem, int off, int size,
+    const void *src);
+void	memdesc_copydata(struct memdesc *mem, int off, int size, void *dst);
 
 #endif /* _SYS_MEMDESC_H_ */

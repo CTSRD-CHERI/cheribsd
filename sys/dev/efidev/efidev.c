@@ -24,8 +24,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #ifdef COMPAT_FREEBSD64
 #include <sys/abi_compat.h>

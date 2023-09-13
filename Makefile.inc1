@@ -1,5 +1,4 @@
 #
-# $FreeBSD$
 #
 # Make command line options:
 #	-DNO_CLEANDIR run ${MAKE} clean, instead of ${MAKE} cleandir
@@ -75,6 +74,12 @@ TIME_ENV ?= time env
 .error CROSS_TOOLCHAIN ${CROSS_TOOLCHAIN} not found
 .endif
 CROSSENV+=CROSS_TOOLCHAIN="${CROSS_TOOLCHAIN}"
+.elif defined(UNIVERSE_TOOLCHAIN)
+UNIVERSE_TOOLCHAIN_PATH?=${HOST_OBJTOP}/tmp/usr/bin
+XCC?="${UNIVERSE_TOOLCHAIN_PATH}/cc"
+XCXX?="${UNIVERSE_TOOLCHAIN_PATH}/c++"
+XCPP?="${UNIVERSE_TOOLCHAIN_PATH}/cpp"
+XLD?="${UNIVERSE_TOOLCHAIN_PATH}/ld"
 .endif
 .if defined(CROSS_TOOLCHAIN_PREFIX)
 CROSS_COMPILER_PREFIX?=${CROSS_TOOLCHAIN_PREFIX}
@@ -154,7 +159,7 @@ _TARGET_CPUTYPE=${TARGET_CPUTYPE}
 _TARGET_CPUTYPE=dummy
 .endif
 .if ${TARGET} == "arm"
-.if ${TARGET_ARCH:Marmv[67]*} != "" && ${TARGET_CPUTYPE:M*soft*} == ""
+.if ${TARGET_CPUTYPE:M*soft*} == ""
 TARGET_TRIPLE_ABI=	gnueabihf
 .else
 TARGET_TRIPLE_ABI=	gnueabi
@@ -189,6 +194,12 @@ _t=		${TARGET_ARCH}/${TARGET}
 .error Unknown target ${TARGET_ARCH}:${TARGET}.
 .endif
 .endfor
+
+.if ${TARGET_ARCH} == "amd64"
+LIBCOMPAT_INCLUDE_DIRS+= i386
+.elif ${TARGET_ARCH:Maarch64*}
+LIBCOMPAT_INCLUDE_DIRS+= arm
+.endif
 
 .if ${.MAKE.OS} != "FreeBSD"
 CROSSBUILD_HOST=${.MAKE.OS}
@@ -773,6 +784,7 @@ BMAKEENV=	INSTALL="sh ${.CURDIR}/tools/install.sh" \
 BSARGS= 	DESTDIR= \
 		OBJTOP='${WORLDTMP}/obj-tools' \
 		OBJROOT='$${OBJTOP}/' \
+		UNIVERSE_TOOLCHAIN_PATH=${UNIVERSE_TOOLCHAIN_PATH} \
 		MAKEOBJDIRPREFIX= \
 		BOOTSTRAPPING=${BOOTSTRAPPING_OSRELDATE} \
 		BWPHASE=${.TARGET:C,^_,,} \
@@ -844,6 +856,7 @@ KTMAKE=		${TIME_ENV} \
 		DESTDIR= \
 		OBJTOP='${WORLDTMP}/obj-kernel-tools' \
 		OBJROOT='$${OBJTOP}/' \
+		UNIVERSE_TOOLCHAIN_PATH=${UNIVERSE_TOOLCHAIN_PATH} \
 		MAKEOBJDIRPREFIX= \
 		BOOTSTRAPPING=${BOOTSTRAPPING_OSRELDATE} \
 		-DNO_CPU_CFLAGS \
@@ -1161,9 +1174,9 @@ _bootstrap-tools:
 	    -p ${WORLDTMP}/usr/include >/dev/null
 	${WORLDTMP_MTREE} -f ${.CURDIR}/etc/mtree/BSD.c18n.dist \
 	    -p ${WORLDTMP} >/dev/null
-.if ${TARGET_ARCH} == "amd64"
-	mkdir -p ${WORLDTMP}/usr/include/i386
-.endif
+.for d in ${LIBCOMPAT_INCLUDE_DIRS}
+	mkdir -p ${WORLDTMP}/usr/include/${d}
+.endfor
 	ln -sf ${.CURDIR}/sys ${WORLDTMP}
 .if ${MK_DEBUG_FILES} != "no"
 	${WORLDTMP_MTREE} -f ${.CURDIR}/etc/mtree/BSD.debug.dist \
@@ -1522,9 +1535,9 @@ distributeworld installworld stageworld installsysroot: _installcheck_world .PHO
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.c18n.dist \
 	    -p ${DESTDIR}/${DISTDIR}/${dist} >/dev/null
 .endif
-.if ${TARGET_ARCH} == "amd64"
-	-mkdir ${DESTDIR}/${DISTDIR}/${dist}/usr/include/i386
-.endif
+.for d in ${LIBCOMPAT_INCLUDE_DIRS}
+	-mkdir ${DESTDIR}/${DISTDIR}/${dist}/usr/include/${d}
+.endfor
 .if ${MK_DEBUG_FILES} != "no"
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.debug.dist \
 	    -p ${DESTDIR}/${DISTDIR}/${dist}/usr/lib >/dev/null
@@ -1557,9 +1570,9 @@ distributeworld installworld stageworld installsysroot: _installcheck_world .PHO
 	${IMAKEENV} ${DISTR_MTREE} -C -f ${.CURDIR}/etc/mtree/BSD.c18n.dist | \
 	    sed -e 's#^\./#./${dist}/#' >> ${METALOG}
 .endif
-.if ${TARGET_ARCH} == "amd64"
-	echo "./${dist}/usr/include/i386 type=dir uname=root gname=wheel mode=0755" >> ${METALOG}
-.endif
+.for d in ${LIBCOMPAT_INCLUDE_DIRS}
+	echo "./${dist}/usr/include/${d} type=dir uname=root gname=wheel mode=0755" >> ${METALOG}
+.endfor
 .for libcompat in ${libcompats}
 	${IMAKEENV} ${DISTR_MTREE} -C -f ${.CURDIR}/etc/mtree/BSD.lib${libcompat}.dist | \
 	    sed -e 's#^\./#./${dist}/usr/#' >> ${METALOG}
@@ -3150,9 +3163,9 @@ native-xtools-install: .PHONY
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.c18n.dist \
 	    -p ${NXBDESTDIR} >/dev/null
 .endif
-.if ${TARGET_ARCH} == "amd64"
-	mkdir -p ${NXBDESTDIR}/usr/include/i386
-.endif
+.for d in ${LIBCOMPAT_INCLUDE_DIRS}
+	mkdir -p ${NXBDESTDIR}/usr/include/${d}
+.endfor
 	${_+_}cd ${.CURDIR}; ${NXBMAKE} \
 	    DESTDIR=${NXBDESTDIR} \
 	    -DNO_ROOT \
@@ -3852,9 +3865,9 @@ _xi-mtree: .PHONY
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.c18n.dist \
 	    -p ${XDDESTDIR} >/dev/null
 .endif
-.if ${TARGET_ARCH} == "amd64"
-	mkdir -p ${XDDESTDIR}/usr/include/i386
-.endif
+.for d in ${LIBCOMPAT_INCLUDE_DIRS}
+	mkdir -p ${XDDESTDIR}/usr/include/${d}
+.endfor
 .for libcompat in ${libcompats}
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.lib${libcompat}.dist \
 	    -p ${XDDESTDIR}/usr >/dev/null

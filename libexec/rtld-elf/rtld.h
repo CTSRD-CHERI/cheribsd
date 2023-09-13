@@ -23,8 +23,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
  /*
@@ -570,11 +568,6 @@ void init_pltgot(Obj_Entry *, uintptr_t);
 void init_pltgot(Obj_Entry *);
 #endif
 void allocate_initial_tls(Obj_Entry *);
-
-void *__crt_calloc(size_t num, size_t size);
-void __crt_free(void *cp);
-void *__crt_malloc(size_t nbytes);
-void *__crt_realloc(void *cp, size_t nbytes);
 
 #if __has_feature(capabilities)
 void process___cap_relocs(Obj_Entry*);

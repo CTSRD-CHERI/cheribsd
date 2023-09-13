@@ -23,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _SYS_SYSCALLSUBR_H_
@@ -198,28 +196,6 @@ int	kern_execve(struct thread *td, struct image_args *args,
 int	kern_extattrctl(struct thread *td, const char * __capability path,
 	    int cmd, const char * __capability filename, int attrnamespace,
 	    const char * __capability uattrname);
-int	kern_extattr_delete_fd(struct thread *td, int fd, int attrnamespace,
-	    const char * __capability uattrname);
-int	kern_extattr_delete_path(struct thread *td,
-	     const char * __capability path, int attrnamespace,
-	     const char * __capability attrname, int follow);
-int	kern_extattr_get_fd(struct thread *td, int fd, int attrnamespace,
-	    const char * __capability attrname, void * __capability data,
-	    size_t nbytes);
-int	kern_extattr_get_path(struct thread *td, const char * __capability path,
-	     int attrnamespace, const char * __capability attrname,
-	     void * __capability data, size_t nbytes, int follow);
-int	kern_extattr_list_fd(struct thread *td, int fd, int attrnamespace,
-	    void * __capability data, size_t nbytes);
-int	kern_extattr_list_path(struct thread *td,
-	    const char * __capability path, int attrnamespace,
-	    void * __capability data, size_t nbytes, int follow);
-int	kern_extattr_set_fd(struct thread *td, int fd, int attrnamespace,
-	    const char * __capability uattrname, void * __capability data,
-	    size_t nbytes);
-int	kern_extattr_set_path(struct thread *td, const char * __capability path,
-	    int attrnamespace, const char * __capability attrname,
-	    void * __capability data, size_t nbytes, int follow);
 int	kern_fchmodat(struct thread *td, int fd, const char * __capability path,
 	    enum uio_seg pathseg, mode_t mode, int flag);
 int	kern_fchownat(struct thread *td, int fd, const char * __capability path,
@@ -362,7 +338,8 @@ int	kern_mmap_racct_check(struct thread *td, struct vm_map *map,
 int	kern_modfind(struct thread *td, const char * __capability uname);
 int	kern_modstat(struct thread *td, int modid,
 	    struct module_stat * __capability stat);
-int	kern_mprotect(struct thread *td, uintptr_t addr, size_t size, int prot);
+int	kern_mprotect(struct thread *td, uintptr_t addr, size_t size,
+	    int prot, int flags);
 int	kern_msgctl(struct thread *, int, int, struct msqid_ds *);
 int	kern_msgrcv(struct thread *, int, void * __capability, size_t, long,
 	    int, long *);
@@ -619,6 +596,28 @@ int	user_cpuset_setaffinity(struct thread *td, cpulevel_t level,
 	    cpuwhich_t which, id_t id, size_t cpusetsize,
 	    const cpuset_t * __capability maskp,
 	    const struct cpuset_copy_cb *cb);
+int	user_extattr_get_fd(struct thread *td, int fd, int attrnamespace,
+	    const char * __capability uattrname, void * __capability data,
+	    size_t nbytes);
+int	user_extattr_get_path(struct thread *td, const char * __capability path,
+	    int attrnamespace, const char * __capability uattrname,
+	    void * __capability data, size_t nbytes, int follow);
+int	user_extattr_delete_fd(struct thread *td, int fd, int attrnamespace,
+	    const char * __capability uattrname);
+int	user_extattr_delete_path(struct thread *td,
+	    const char * __capability path, int attrnamespace,
+	    const char * __capability uattrname, int follow);
+int	user_extattr_list_fd(struct thread *td, int fd, int attrnamespace,
+	    void * __capability data, size_t nbytes);
+int	user_extattr_list_path(struct thread *td,
+	    const char * __capability path, int attrnamespace,
+	    void * __capability data, size_t nbytes, int follow);
+int	user_extattr_set_fd(struct thread *td, int fd, int attrnamespace,
+	    const char * __capability uattrname, void * __capability data,
+	    size_t nbytes);
+int	user_extattr_set_path(struct thread *td, const char * __capability path,
+	    int attrnamespace, const char * __capability uattrname,
+	    void * __capability data, size_t nbytes, int follow);
 int	user_fhstat(struct thread *td,
 	    const struct fhandle * __capability u_fhp,
 	    struct stat * __capability sb);

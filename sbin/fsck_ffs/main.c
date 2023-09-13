@@ -41,8 +41,6 @@ static char sccsid[] = "@(#)main.c	8.6 (Berkeley) 5/14/95";
 #endif /* not lint */
 #endif
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #define _WANT_P_OSREL
 #include <sys/param.h>
 #include <sys/file.h>
@@ -274,9 +272,16 @@ checkfilesys(char *filesys)
 	if (bkgrdcheck) {
 		if (sbreadfailed)
 			exit(3);	/* Cannot read superblock */
-		/* Earlier background failed or journaled */
-		if (sblock.fs_flags & (FS_NEEDSFSCK | FS_SUJ))
-			exit(4);
+		if ((sblock.fs_flags & FS_NEEDSFSCK) == FS_NEEDSFSCK)
+			exit(4);	/* Earlier background failed */
+		if ((sblock.fs_flags & FS_SUJ) == FS_SUJ) {
+			maxino = sblock.fs_ncg * sblock.fs_ipg;
+			maxfsblock = sblock.fs_size;
+			bufinit();
+			preen = 1;
+			if (suj_check(filesys) == 0)
+				exit(4); /* Journal good, run it now */
+		}
 		if ((sblock.fs_flags & FS_DOSOFTDEP) == 0)
 			exit(5);	/* Not running soft updates */
 		size = MIBSIZE;
@@ -350,7 +355,7 @@ checkfilesys(char *filesys)
 	/*
 	 * Determine if we can and should do journal recovery.
 	 */
-	if ((sblock.fs_flags & FS_SUJ) == FS_SUJ) {
+	if (bkgrdflag == 0 && (sblock.fs_flags & FS_SUJ) == FS_SUJ) {
 		if ((sblock.fs_flags & FS_NEEDSFSCK) != FS_NEEDSFSCK &&
 		    skipclean) {
 			sujrecovery = 1;
@@ -438,7 +443,7 @@ checkfilesys(char *filesys)
 	/*
 	 * 1: scan inodes tallying blocks used
 	 */
-	if (preen == 0) {
+	if (preen == 0 || debug) {
 		printf("** Last Mounted on %s\n", sblock.fs_fsmnt);
 		if (mntp != NULL && mntp->f_flags & MNT_ROOTFS)
 			printf("** Root file system\n");
@@ -457,7 +462,8 @@ checkfilesys(char *filesys)
 			    preen ? "-p" : "",
 			    (preen && usedsoftdep) ? " AND " : "",
 			    usedsoftdep ? "SOFTUPDATES" : "");
-		printf("** Phase 1b - Rescan For More DUPS\n");
+		if (preen == 0 || debug)
+			printf("** Phase 1b - Rescan For More DUPS\n");
 		pass1b();
 		IOstats("Pass1b");
 	}
@@ -465,7 +471,7 @@ checkfilesys(char *filesys)
 	/*
 	 * 2: traverse directories from root to mark all connected directories
 	 */
-	if (preen == 0)
+	if (preen == 0 || debug)
 		printf("** Phase 2 - Check Pathnames\n");
 	pass2();
 	IOstats("Pass2");
@@ -473,7 +479,7 @@ checkfilesys(char *filesys)
 	/*
 	 * 3: scan inodes looking for disconnected directories
 	 */
-	if (preen == 0)
+	if (preen == 0 || debug)
 		printf("** Phase 3 - Check Connectivity\n");
 	pass3();
 	IOstats("Pass3");
@@ -481,7 +487,7 @@ checkfilesys(char *filesys)
 	/*
 	 * 4: scan inodes looking for disconnected files; check reference counts
 	 */
-	if (preen == 0)
+	if (preen == 0 || debug)
 		printf("** Phase 4 - Check Reference Counts\n");
 	pass4();
 	IOstats("Pass4");
@@ -489,7 +495,7 @@ checkfilesys(char *filesys)
 	/*
 	 * 5: check and repair resource counts in cylinder groups
 	 */
-	if (preen == 0)
+	if (preen == 0 || debug)
 		printf("** Phase 5 - Check Cyl groups\n");
 	snapflush(std_checkblkavail);
 	if (cgheader_corrupt) {
@@ -616,10 +622,6 @@ setup_bkgrdchk(struct statfs *mntp, int sbreadfailed, char **filesys)
 	}
 	if ((sblock.fs_flags & FS_NEEDSFSCK) != 0) {
 		pwarn("FULL FSCK NEEDED, CANNOT RUN IN BACKGROUND\n");
-		return (0);
-	}
-	if ((sblock.fs_flags & FS_SUJ) != 0) {
-		pwarn("JOURNALED FILESYSTEM, CANNOT RUN IN BACKGROUND\n");
 		return (0);
 	}
 	if (skipclean && ckclean &&

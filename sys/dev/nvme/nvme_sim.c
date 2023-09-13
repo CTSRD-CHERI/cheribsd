@@ -24,8 +24,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
@@ -69,7 +67,9 @@ nvme_sim_nvmeio_done(void *ccb_arg, const struct nvme_completion *cpl)
 
 	/*
 	 * Let the periph know the completion, and let it sort out what
-	 * it means. Make our best guess, though for the status code.
+	 * it means. Report an error or success based on SC and SCT.
+	 * We do not try to fetch additional data from the error log,
+	 * though maybe we should in the future.
 	 */
 	memcpy(&ccb->nvmeio.cpl, cpl, sizeof(*cpl));
 	ccb->ccb_h.status &= ~CAM_SIM_QUEUED;

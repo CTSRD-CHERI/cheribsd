@@ -1,10 +1,9 @@
-# $FreeBSD$
 
 .if !targets(__<${_this:T}>__)
 __<${_this:T}>__:
 
 # Makefile for the compatibility libraries.
-# - 32-bit compat libraries on PowerPC, and AMD64.
+# - 32-bit compat libraries on some 64-bit architectures
 # - 64-bit compat on CHERI RISC-V and Morello.
 
 # XXX: bsd.compat.mk stubbed out for cleandir
@@ -26,7 +25,7 @@ LIB${_LIBCOMPAT}WMAKEENV+= \
 		LIBDIR=/usr/lib${libcompat} \
 		SHLIBDIR=/usr/lib${libcompat} \
 		LIBDATADIR=/usr/lib${libcompat} \
-		DTRACE="${LIB$COMPATDTRACE:U${DTRACE}}"
+		DTRACE="${LIB${_LIBCOMPAT}DTRACE:U${DTRACE}}"
 .if ${MK_META_MODE} != "no"
 # Don't rebuild build-tools targets during normal build.
 LIB${_LIBCOMPAT}WMAKEENV+=	BUILD_TOOLS_META=.NOMETA
@@ -56,6 +55,7 @@ LIB${_LIBCOMPAT}WMAKE+=	${TIME_ENV} ${LIB${_LIBCOMPAT}WMAKEENV} ${MAKE} \
 			${LIB${_LIBCOMPAT}WMAKEFLAGS} \
 			OBJTOP=${LIB${_LIBCOMPAT}_OBJTOP} \
 			OBJROOT='$${OBJTOP}/' \
+			UNIVERSE_TOOLCHAIN_PATH=${UNIVERSE_TOOLCHAIN_PATH} \
 			MAKEOBJDIRPREFIX= \
 			MK_INCLUDES=no \
 			MK_MAN=no MK_HTML=no

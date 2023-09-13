@@ -117,6 +117,7 @@ CRUNCH_PROGS_bin+=	cat \
 		chflags \
 		chmod \
 		cp \
+		cpuset \
 		date \
 		dd \
 		df \
@@ -228,7 +229,6 @@ CRUNCH_PROGS_usr.bin+= \
 		bintrans \
 		bmake \
 		bzip2 \
-		cpuset \
 		diff \
 		dirname \
 		du \

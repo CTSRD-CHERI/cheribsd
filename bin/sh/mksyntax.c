@@ -44,6 +44,7 @@ static char sccsid[] = "@(#)mksyntax.c	8.2 (Berkeley) 5/4/95";
 #endif /* not lint */
 #endif
 #include <sys/cdefs.h>
+
 /*
  * Allow building this build-tool with any /usr/bin/cc by providing stub
  * defintions of FreeBSD-specific macros
@@ -54,7 +55,6 @@ static char sccsid[] = "@(#)mksyntax.c	8.2 (Berkeley) 5/4/95";
 #ifndef __FBSDID
 #define __FBSDID(...)
 #endif
-__FBSDID("$FreeBSD$");
 
 /*
  * This program creates syntax.h and syntax.c.

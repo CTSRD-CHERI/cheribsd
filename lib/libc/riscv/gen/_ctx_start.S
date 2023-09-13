@@ -33,8 +33,6 @@
  */
 
 #include <machine/asm.h>
-__FBSDID("$FreeBSD$");
-
 ENTRY(_ctx_start)
 #if !__CHERI_PURE_CAPABILITY__
 	jalr	s0		/* Call func from makecontext */
