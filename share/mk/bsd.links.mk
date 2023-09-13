@@ -20,11 +20,23 @@ _installlinks:
 	if test "${DESTDIR}${t}" -ef "${DESTDIR}${s}"; then \
 		echo "Note: installing link from ${l} to ${t} on case-insensitive file system."; \
 	fi
+.if defined(LINKTAGS)
+	${INSTALL_LINK} -S ${TAG_ARGS:D${TAG_ARGS},${LINKTAGS}} ${DESTDIR}${s} ${DESTDIR}${t}
+.else
 	${INSTALL_LINK} -S ${TAG_ARGS} ${DESTDIR}${s} ${DESTDIR}${t}
+.endif
+.else
+.if defined(LINKTAGS)
+	${INSTALL_LINK} ${TAG_ARGS:D${TAG_ARGS},${LINKTAGS}} ${DESTDIR}${s} ${DESTDIR}${t}
 .else
 	${INSTALL_LINK} ${TAG_ARGS} ${DESTDIR}${s} ${DESTDIR}${t}
 .endif
+.endif
 .endfor
 .for s t in ${SYMLINKS}
+.if defined(LINKTAGS)
+	${INSTALL_SYMLINK} ${TAG_ARGS:D${TAG_ARGS},${LINKTAGS}} ${s} ${DESTDIR}${t}
+.else
 	${INSTALL_SYMLINK} ${TAG_ARGS} ${s} ${DESTDIR}${t}
+.endif
 .endfor
