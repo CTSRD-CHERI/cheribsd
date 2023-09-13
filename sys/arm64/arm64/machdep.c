@@ -92,6 +92,10 @@
 
 #if __has_feature(capabilities)
 #include <cheri/cheric.h>
+#ifdef CHERI_CAPREVOKE
+#include <cheri/revoke.h>
+#include <vm/vm_cheri_revoke.h>
+#endif
 #endif
 
 #ifdef DEV_ACPI
@@ -1210,6 +1214,63 @@ DB_SHOW_COMMAND(vtop, db_show_vtop)
 		db_printf("EL0 physical address reg (write): 0x%016lx\n", phys);
 	} else
 		db_printf("show vtop <virt_addr>\n");
+}
+#endif
+
+#ifdef CHERI_CAPREVOKE
+void
+cheri_revoke_td_frame(struct thread *td, const struct vm_cheri_revoke_cookie
+    *crc)
+{
+	CHERI_REVOKE_STATS_FOR(crst, crc);
+
+#define CHERI_REVOKE_REG(r) \
+	do { if (cheri_gettag(r)) { \
+		CHERI_REVOKE_STATS_BUMP(crst, caps_found); \
+		if (vm_cheri_revoke_test(crc, r)) { \
+			r = cheri_revoke_cap(r); \
+			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared); \
+		} \
+	    }} while(0)
+
+	CHERI_REVOKE_REG(td->td_frame->tf_sp);
+	CHERI_REVOKE_REG(td->td_frame->tf_lr);
+	CHERI_REVOKE_REG(td->td_frame->tf_elr);
+	CHERI_REVOKE_REG(td->td_frame->tf_ddc);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[0]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[1]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[2]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[3]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[4]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[5]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[6]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[7]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[8]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[9]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[10]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[11]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[12]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[13]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[14]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[15]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[16]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[17]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[18]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[19]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[20]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[21]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[22]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[23]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[24]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[25]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[26]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[27]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[28]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[29]);
+
+#undef CHERI_REVOKE_REG
+
+	return;
 }
 #endif
 // CHERI CHANGES START
