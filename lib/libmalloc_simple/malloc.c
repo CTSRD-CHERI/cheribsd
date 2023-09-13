@@ -93,17 +93,24 @@ struct overhead {
 		void	*ov_real_allocation;	/* when realigned */
 		struct {
 			u_char	ovu_magic;	/* magic number */
-			u_char	ovu_index;	/* bucket # */
+			union {
+				u_char	ovu_index;	/* bucket # */
+				size_t ovu_offset:24;	/* -ve offset of next overhead */
+			};
 		} ovu;
 	};
 #define	ov_magic	ovu.ovu_magic
 #define	ov_index	ovu.ovu_index
+#define	ov_offset	ovu.ovu_offset
 };
 SLIST_HEAD(ov_listhead, overhead);
+
+static_assert(sizeof(struct overhead) == sizeof(void *), "bad size");
 
 #define	MALLOC_ALIGNMENT	sizeof(struct overhead)
 
 #define	MAGIC		0xef		/* magic # on accounting info */
+#define	MAGIC_OFFSET	0xde		/* magic # for offset ov */
 
 /*
  * nextf[i] is the head of the list of the next free block of size
@@ -430,6 +437,13 @@ find_overhead(void * cp)
 	}
 	op--;
 
+	if (op->ov_magic == MAGIC_OFFSET
+#ifdef __CHERI_PURE_CAPABILITY__
+	    && !cheri_gettag(op->ov_real_allocation)
+#endif
+	    )
+		op = (struct overhead *)((uintptr_t)op - op->ov_offset);
+
 #ifdef __CHERI_PURE_CAPABILITY__
 	/*
 	 * In pure-capability mode our allocation might have come from
@@ -543,6 +557,7 @@ __simple_realloc(void *cp, size_t nbytes)
 }
 
 #if defined(IN_RTLD) || defined(IN_LIBTHR)
+void * __crt_aligned_alloc_offset(size_t align, size_t size, size_t offset);
 void * __crt_malloc(size_t nbytes);
 void * __crt_calloc(size_t num, size_t size);
 void * __crt_realloc(void *cp, size_t nbytes);
@@ -567,6 +582,64 @@ __crt_realloc(void *cp, size_t nbytes)
 {
 
 	return (__simple_realloc(cp, nbytes));
+}
+
+/*
+ * Allocate a buffer of size 'size' with an offset of 'offset'
+ * relative to a base address aligned to 'align'.
+ */
+void *
+__crt_aligned_alloc_offset(size_t align, size_t size, size_t offset)
+{
+	struct overhead *op;
+	char *p, *res;
+#ifdef __CHERI_PURE_CAPABILITY__
+	size_t cheri_align;
+#endif
+	size_t nbytes;
+
+	if (offset == 0) {
+#ifdef __CHERI_PURE_CAPABILITY__
+		size = CHERI_REPRESENTABLE_LENGTH(size);
+		cheri_align = CHERI_REPRESENTABLE_ALIGNMENT(size);
+		if (cheri_align > align)
+			align = cheri_align;
+#endif
+		return (__simple_malloc_aligned(size, align));
+	}
+
+	/*
+	 * Allocate an aligned buffer with room for another overhead
+	 * in the offset.  The extra overhead includes the amount of
+	 * offset so that __simple_free can find the overhead of the
+	 * aligned buffer.  Note that some portion of this offset
+	 * region (including the overhead structure) may be in the
+	 * bounds of the returned pointer for CHERI.
+	 *
+	 * If the offset is too small to hold the overhead, allocate
+	 * another "align" chunk of data in the offset.
+	 */
+	offset &= align - 1;
+	if (align < sizeof(void *))
+		align = sizeof(void *);
+	if (offset < sizeof(struct overhead))
+		offset += align;
+	ASSERT(offset < (1u << 24));
+	nbytes = size + offset;
+#ifdef __CHERI_PURE_CAPABILITY__
+	nbytes = CHERI_REPRESENTABLE_ALIGNMENT(nbytes);
+	cheri_align = CHERI_REPRESENTABLE_ALIGNMENT(nbytes);
+	if (cheri_align > align)
+		align = cheri_align;
+#endif
+	p = __simple_malloc_aligned(nbytes, align);
+	res = p + offset;
+	op = (struct overhead *)(uintptr_t)res - 1;
+
+	memset(op, 0, sizeof(*op));
+	op->ov_magic = MAGIC_OFFSET;
+	op->ov_offset = offset;
+	return (bound_ptr(res, nbytes));
 }
 
 void
