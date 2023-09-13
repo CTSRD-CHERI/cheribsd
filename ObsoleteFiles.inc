@@ -474,7 +474,7 @@ OLD_DIRS+=usr/lib/clang/15.0.7
 
 # 20230622: new libc++ import which bumps version from 15.0.7 to 16.0.1
 .if 0
-# CHERI libc++ is still from 14.0.0
+# CHERI libc++ is still from 15.0.0
 OLD_FILES+=usr/include/c++/v1/__bits
 OLD_FILES+=usr/include/c++/v1/__tuple
 OLD_FILES+=usr/include/c++/v1/__utility/transaction.h
@@ -1006,14 +1006,11 @@ OLD_DIRS+=usr/lib/clang/14.0.5/share
 OLD_DIRS+=usr/lib/clang/14.0.5
 
 # 20230208: new libc++ import which bumps version from 14.0.5 to 15.0.7
-.if 0
-# CHERI libc++ is still from 14.0.0
 OLD_FILES+=usr/include/c++/v1/__functional_base
 OLD_FILES+=usr/include/c++/v1/__libcpp_version
 OLD_FILES+=usr/include/c++/v1/__nullptr
 OLD_FILES+=usr/include/c++/v1/__string
 OLD_FILES+=usr/include/c++/v1/experimental/filesystem
-.endif
 
 # 20230203: loader help files renamed
 OLD_FILES+=boot/loader.help
