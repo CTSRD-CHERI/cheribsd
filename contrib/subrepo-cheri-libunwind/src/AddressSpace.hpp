@@ -27,7 +27,7 @@
 template<typename T> T uw_min(T a, T b) { return a < b ? a : b; }
 
 #ifndef _LIBUNWIND_USE_DLADDR
-  #if !defined(_LIBUNWIND_IS_BAREMETAL) && !defined(_WIN32)
+  #if !(defined(_LIBUNWIND_IS_BAREMETAL) || defined(_WIN32) || defined(_AIX))
     #define _LIBUNWIND_USE_DLADDR 1
   #else
     #define _LIBUNWIND_USE_DLADDR 0
@@ -46,6 +46,13 @@ struct EHABIIndexEntry {
   uint32_t functionOffset;
   uint32_t data;
 };
+#endif
+
+#if defined(_AIX)
+namespace libunwind {
+char *getFuncNameFromTBTable(uintptr_t pc, uint16_t &NameLen,
+                             unw_word_t *offset);
+}
 #endif
 
 #ifdef __APPLE__
@@ -871,6 +878,7 @@ inline bool LocalAddressSpace::findUnwindSections(pc_t targetAddr,
     DWORD err = GetLastError();
     _LIBUNWIND_TRACE_UNWINDING("findUnwindSections: EnumProcessModules failed, "
                                "returned error %d", (int)err);
+    (void)err;
     return false;
   }
 
@@ -907,6 +915,11 @@ inline bool LocalAddressSpace::findUnwindSections(pc_t targetAddr,
   (void)targetAddr;
   (void)info;
   return true;
+#elif defined(_LIBUNWIND_SUPPORT_TBTAB_UNWIND)
+  // The traceback table is used for unwinding.
+  (void)targetAddr;
+  (void)info;
+  return true;
 #elif defined(_LIBUNWIND_USE_DL_UNWIND_FIND_EXIDX)
   int length = 0;
   info.arm_section =
@@ -923,7 +936,6 @@ inline bool LocalAddressSpace::findUnwindSections(pc_t targetAddr,
 
   return false;
 }
-
 
 inline bool LocalAddressSpace::findOtherFDE(addr_t targetAddr, pint_t &fde) {
   // TO DO: if OS has way to dynamically register FDEs, check that.
@@ -949,6 +961,13 @@ inline bool LocalAddressSpace::findFunctionName(pc_t ip, char *buf,
       *offset = ip.address() - (__cheri_addr addr_t)dyldInfo.dli_fbase;
       return true;
     }
+  }
+#elif defined(_AIX)
+  uint16_t nameLen;
+  char *funcName = getFuncNameFromTBTable(addr, nameLen, offset);
+  if (funcName != NULL) {
+    snprintf(buf, bufLen, "%.*s", nameLen, funcName);
+    return true;
   }
 #else
   (void)ip;
