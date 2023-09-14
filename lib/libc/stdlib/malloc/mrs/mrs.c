@@ -86,7 +86,6 @@
  * QUARANTINE_HIGHWATER: limit the quarantine size to QUARANTINE_HIGHWATER number of bytes
  * QUARANTINE_RATIO: limit the quarantine size to 1 / QUARANTINE_RATIO times the size of the heap (default 4)
  * CONCURRENT_REVOCATION_PASSES: number of concurrent revocation pass before the stop-the-world pass
- * LOAD_SIDE_REVOCATION: use Reloaded, not Cornucopia
  *
  */
 
@@ -635,68 +634,23 @@ static inline void quarantine_flush(struct mrs_quarantine *quarantine) {
 		    CHERI_REVOKE_TAKE_STATS, 0, &crsi);
 		print_caprevoke_stats("prior", &crsi, 0);
 #endif
-		
 
-#  if !defined(LOAD_SIDE_REVOCATION)
-#   if CONCURRENT_REVOCATION_PASSES > 0
-		/* Run all concurrent passes as their own syscalls so we can report accurately */
-		for (int i = 0; i < CONCURRENT_REVOCATION_PASSES; i++) {
-			cyc_init = cheri_revoke_get_cyc();
-			cheri_revoke(CHERI_REVOKE_FORCE_STORE_SIDE | CHERI_REVOKE_EARLY_SYNC |
-			    CHERI_REVOKE_TAKE_STATS, start_epoch, &crsi);
-			cyc_fini = cheri_revoke_get_cyc();
-			print_cheri_revoke_stats("store-concurrent", &crsi, cyc_fini - cyc_init);
-		}
 		cyc_init = cheri_revoke_get_cyc();
-		cheri_revoke(CHERI_REVOKE_FORCE_STORE_SIDE | CHERI_REVOKE_LAST_PASS |
-		    CHERI_REVOKE_LAST_NO_EARLY | CHERI_REVOKE_TAKE_STATS,
-		    start_epoch, &crsi);
-		cyc_fini = cheri_revoke_get_cyc();
-		print_cheri_revoke_stats("store-final", &crsi, cyc_fini - cyc_init);
-#   else /* CONCURRENT_REVOCATION_PASSES */
-		cyc_init = cheri_revoke_get_cyc();
-		cheri_revoke(CHERI_REVOKE_FORCE_STORE_SIDE | CHERI_REVOKE_LAST_PASS |
-		    CHERI_REVOKE_LAST_NO_EARLY | CHERI_REVOKE_TAKE_STATS,
-		    start_epoch, &crsi);
-		cyc_fini = cheri_revoke_get_cyc();
-		print_cheri_revoke_stats("store-oneshot", &crsi, cyc_fini - cyc_init);
-#   endif /* !CONCURRENT_REVOCATION_PASSES */
-#  else /* LOAD_SIDE_REVOCATION */
-		cyc_init = cheri_revoke_get_cyc();
-		cheri_revoke(CHERI_REVOKE_FORCE_LOAD_SIDE | CHERI_REVOKE_TAKE_STATS,
-		    start_epoch, &crsi);
+		cheri_revoke(CHERI_REVOKE_TAKE_STATS, start_epoch, &crsi);
 		cyc_fini = cheri_revoke_get_cyc();
 		print_cheri_revoke_stats("load-barrier", &crsi, cyc_fini - cyc_init);
 
 		cyc_init = cheri_revoke_get_cyc();
-		cheri_revoke(CHERI_REVOKE_FORCE_LOAD_SIDE | CHERI_REVOKE_LAST_PASS |
-		    CHERI_REVOKE_TAKE_STATS, start_epoch, &crsi);
+		cheri_revoke(CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_TAKE_STATS,
+		    start_epoch, &crsi);
 		cyc_fini = cheri_revoke_get_cyc();
 		print_cheri_revoke_stats("load-final", &crsi, cyc_fini - cyc_init);
-#  endif
 
 # else /* PRINT_CAPREVOKE */
 
-#  if !defined(LOAD_SIDE_REVOCATION)
-#   if CONCURRENT_REVOCATION_PASSES > 0
-		/* Bundle the last concurrent pass with the last pass */
-		for (int i = 0; i < CONCURRENT_REVOCATION_PASSES - 1; i++) {
-			cheri_revoke(CHERI_REVOKE_FORCE_STORE_SIDE | CHERI_REVOKE_EARLY_SYNC |
-			    CHERI_REVOKE_TAKE_STATS, start_epoch, NULL);
-		}
-		cheri_revoke(CHERI_REVOKE_FORCE_STORE_SIDE | CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_EARLY_SYNC |
-		    CHERI_REVOKE_TAKE_STATS, start_epoch, NULL);
-#   else
-		cheri_revoke(CHERI_REVOKE_FORCE_STORE_SIDE | CHERI_REVOKE_LAST_PASS |
-		    CHERI_REVOKE_LAST_NO_EARLY | CHERI_REVOKE_TAKE_STATS,
+		cheri_revoke(CHERI_REVOKE_TAKE_STATS, start_epoch, NULL);
+		cheri_revoke(CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_TAKE_STATS,
 		    start_epoch, NULL);
-#   endif
-#  else /* LOAD_SIDE_REVOCATION */
-		cheri_revoke(CHERI_REVOKE_FORCE_LOAD_SIDE | CHERI_REVOKE_TAKE_STATS,
-		    start_epoch, NULL);
-		cheri_revoke(CHERI_REVOKE_FORCE_LOAD_SIDE | CHERI_REVOKE_LAST_PASS |
-		    CHERI_REVOKE_TAKE_STATS, start_epoch, NULL);
-#  endif /* LOAD_SIDE_REVOCATION */
 
 # endif /* !PRINT_CAPREVOKE */
 
