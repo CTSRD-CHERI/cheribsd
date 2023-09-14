@@ -1294,13 +1294,14 @@ vnlru_free_impl(int count, struct vfsops *mnt_op, struct vnode *mvp)
 	mtx_assert(&vnode_list_mtx, MA_OWNED);
 	if (count > max_vnlru_free)
 		count = max_vnlru_free;
+	if (count == 0) {
+		mtx_unlock(&vnode_list_mtx);
+		return (0);
+	}
 	ocount = count;
 	retried = false;
 	vp = mvp;
 	for (;;) {
-		if (count == 0) {
-			break;
-		}
 		vp = TAILQ_NEXT(vp, v_vnodelist);
 		if (__predict_false(vp == NULL)) {
 			/*
@@ -1323,6 +1324,7 @@ vnlru_free_impl(int count, struct vfsops *mnt_op, struct vnode *mvp)
 			 */
 			TAILQ_REMOVE(&vnode_list, mvp, v_vnodelist);
 			TAILQ_INSERT_TAIL(&vnode_list, mvp, v_vnodelist);
+			mtx_unlock(&vnode_list_mtx);
 			break;
 		}
 		if (__predict_false(vp->v_type == VMARKER))
@@ -1370,18 +1372,28 @@ vnlru_free_impl(int count, struct vfsops *mnt_op, struct vnode *mvp)
 		 */
 		vtryrecycle(vp);
 		count--;
+		if (count == 0) {
+			break;
+		}
 		mtx_lock(&vnode_list_mtx);
 		vp = mvp;
 	}
+	mtx_assert(&vnode_list_mtx, MA_NOTOWNED);
 	return (ocount - count);
 }
 
+/*
+ * XXX: returns without vnode_list_mtx locked!
+ */
 static int
 vnlru_free_locked(int count)
 {
+	int ret;
 
 	mtx_assert(&vnode_list_mtx, MA_OWNED);
-	return (vnlru_free_impl(count, NULL, vnode_list_free_marker));
+	ret = vnlru_free_impl(count, NULL, vnode_list_free_marker);
+	mtx_assert(&vnode_list_mtx, MA_NOTOWNED);
+	return (ret);
 }
 
 void
@@ -1393,7 +1405,7 @@ vnlru_free_vfsops(int count, struct vfsops *mnt_op, struct vnode *mvp)
 	VNPASS(mvp->v_type == VMARKER, mvp);
 	mtx_lock(&vnode_list_mtx);
 	vnlru_free_impl(count, mnt_op, mvp);
-	mtx_unlock(&vnode_list_mtx);
+	mtx_assert(&vnode_list_mtx, MA_NOTOWNED);
 }
 
 struct vnode *
@@ -1538,7 +1550,7 @@ vnlru_under_unlocked(u_long rnumvnodes, u_long limit)
 }
 
 static void
-vnlru_kick(void)
+vnlru_kick_locked(void)
 {
 
 	mtx_assert(&vnode_list_mtx, MA_OWNED);
@@ -1546,6 +1558,15 @@ vnlru_kick(void)
 		vnlruproc_sig = 1;
 		wakeup(vnlruproc);
 	}
+}
+
+static void
+vnlru_kick(void)
+{
+
+	mtx_lock(&vnode_list_mtx);
+	vnlru_kick_locked();
+	mtx_unlock(&vnode_list_mtx);
 }
 
 static void
@@ -1578,6 +1599,7 @@ vnlru_proc(void)
 		 */
 		if (rnumvnodes > desiredvnodes) {
 			vnlru_free_locked(rnumvnodes - desiredvnodes);
+			mtx_lock(&vnode_list_mtx);
 			rnumvnodes = atomic_load_long(&numvnodes);
 		}
 		/*
@@ -1755,6 +1777,7 @@ vn_alloc_hard(struct mount *mp)
 	rnumvnodes = atomic_load_long(&numvnodes);
 	if (rnumvnodes + 1 < desiredvnodes) {
 		vn_alloc_cyclecount = 0;
+		mtx_unlock(&vnode_list_mtx);
 		goto alloc;
 	}
 	rfreevnodes = vnlru_read_freevnodes();
@@ -1774,22 +1797,26 @@ vn_alloc_hard(struct mount *mp)
 	 */
 	if (vnlru_free_locked(1) > 0)
 		goto alloc;
+	mtx_assert(&vnode_list_mtx, MA_NOTOWNED);
 	if (mp == NULL || (mp->mnt_kern_flag & MNTK_SUSPEND) == 0) {
 		/*
 		 * Wait for space for a new vnode.
 		 */
-		vnlru_kick();
+		mtx_lock(&vnode_list_mtx);
+		vnlru_kick_locked();
 		vn_alloc_sleeps++;
 		msleep(&vnlruproc_sig, &vnode_list_mtx, PVFS, "vlruwk", hz);
 		if (atomic_load_long(&numvnodes) + 1 > desiredvnodes &&
 		    vnlru_read_freevnodes() > 1)
 			vnlru_free_locked(1);
+		else
+			mtx_unlock(&vnode_list_mtx);
 	}
 alloc:
+	mtx_assert(&vnode_list_mtx, MA_NOTOWNED);
 	rnumvnodes = atomic_fetchadd_long(&numvnodes, 1) + 1;
 	if (vnlru_under(rnumvnodes, vlowat))
 		vnlru_kick();
-	mtx_unlock(&vnode_list_mtx);
 	return (uma_zalloc_smr(vnode_zone, M_WAITOK));
 }
 
