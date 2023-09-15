@@ -129,6 +129,7 @@ extern int __isthreaded;
 #undef je_realloc
 #undef je_free
 #undef je_malloc_usable_size
+#undef je_malloc_underlying_allocation
 #undef je_mallocx
 #undef je_rallocx
 #undef je_xallocx
@@ -152,6 +153,7 @@ extern int __isthreaded;
 #define	je_realloc		__realloc
 #define	je_free			__free
 #define	je_malloc_usable_size	__malloc_usable_size
+#define	je_malloc_underlying_allocation	__malloc_underlying_allocation
 #define	je_mallocx		__mallocx
 #define	je_rallocx		__rallocx
 #define	je_xallocx		__xallocx

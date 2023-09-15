@@ -71,6 +71,7 @@ extern "C" {
 #  define je_malloc_message malloc_message
 #  define je_malloc_stats_print malloc_stats_print
 #  define je_malloc_usable_size malloc_usable_size
+#  define je_malloc_underlying_allocation malloc_underlying_allocation
 #  define je_mallocx mallocx
 #  define je_smallocx_ea6b3e973b477b8061e0076bb257dbd7f3faa756 smallocx_ea6b3e973b477b8061e0076bb257dbd7f3faa756
 #  define je_nallocx nallocx
@@ -269,6 +270,8 @@ JEMALLOC_EXPORT void JEMALLOC_NOTHROW	je_malloc_stats_print(
     const char *opts);
 JEMALLOC_EXPORT size_t JEMALLOC_NOTHROW	je_malloc_usable_size(
     JEMALLOC_USABLE_SIZE_CONST void *ptr) JEMALLOC_CXX_THROW;
+JEMALLOC_EXPORT void JEMALLOC_NOTHROW	*je_malloc_underlying_allocation(
+    void *ptr) JEMALLOC_CXX_THROW;
 
 #ifdef JEMALLOC_OVERRIDE_MEMALIGN
 JEMALLOC_EXPORT JEMALLOC_ALLOCATOR JEMALLOC_RESTRICT_RETURN
@@ -383,6 +386,7 @@ struct extent_hooks_s {
 #  define malloc_message je_malloc_message
 #  define malloc_stats_print je_malloc_stats_print
 #  define malloc_usable_size je_malloc_usable_size
+#  define malloc_underlying_allocation je_malloc_underlying_allocation
 #  define mallocx je_mallocx
 #  define smallocx_ea6b3e973b477b8061e0076bb257dbd7f3faa756 je_smallocx_ea6b3e973b477b8061e0076bb257dbd7f3faa756
 #  define nallocx je_nallocx
@@ -415,6 +419,7 @@ struct extent_hooks_s {
 #  undef je_malloc_message
 #  undef je_malloc_stats_print
 #  undef je_malloc_usable_size
+#  undef je_malloc_underlying_allocation
 #  undef je_mallocx
 #  undef je_smallocx_ea6b3e973b477b8061e0076bb257dbd7f3faa756
 #  undef je_nallocx
