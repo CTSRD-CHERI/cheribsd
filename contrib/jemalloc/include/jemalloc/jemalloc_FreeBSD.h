@@ -191,27 +191,35 @@ extern int __isthreaded;
  * Define 'weak' symbols so that an application can have its own versions
  * of malloc, calloc, realloc, free, et al.
  */
+#ifndef MALLOC_REVOCATION_SHIM
 __weak_reference(__malloc, malloc);
 __weak_reference(__calloc, calloc);
 __weak_reference(__posix_memalign, posix_memalign);
 __weak_reference(__aligned_alloc, aligned_alloc);
 __weak_reference(__realloc, realloc);
 __weak_reference(__free, free);
+#endif
 __weak_reference(__malloc_usable_size, malloc_usable_size);
+#ifndef MALLOC_REVOCATION_SHIM
 __weak_reference(__mallocx, mallocx);
 __weak_reference(__rallocx, rallocx);
+#endif
 __weak_reference(__xallocx, xallocx);
 __weak_reference(__sallocx, sallocx);
+#ifndef MALLOC_REVOCATION_SHIM
 __weak_reference(__dallocx, dallocx);
 __weak_reference(__sdallocx, sdallocx);
+#endif
 __weak_reference(__nallocx, nallocx);
 __weak_reference(__mallctl, mallctl);
 __weak_reference(__mallctlnametomib, mallctlnametomib);
 __weak_reference(__mallctlbymib, mallctlbymib);
 __weak_reference(__malloc_stats_print, malloc_stats_print);
+#ifndef __CHERI_PURE_CAPABILITY__
 __weak_reference(__allocm, allocm);
 __weak_reference(__rallocm, rallocm);
 __weak_reference(__sallocm, sallocm);
 __weak_reference(__dallocm, dallocm);
 __weak_reference(__nallocm, nallocm);
+#endif
 #endif
