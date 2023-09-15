@@ -169,7 +169,7 @@
  * Size class N + (1 << SC_LG_NGROUP) twice the size of size class N.
  */
 #define SC_LG_NGROUP 2
-#define SC_LG_TINY_MIN 3
+#define SC_LG_TINY_MIN 4
 
 #if SC_LG_TINY_MIN == 0
 /* The div module doesn't support division by 1, which this would require. */
