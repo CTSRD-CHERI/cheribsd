@@ -216,7 +216,8 @@ IPFILTERDIR=	${INCLUDEDIR}/netinet
 .PATH: ${SRCTOP}/sys/netpfil/pf
 PF=		pf.h \
 		pf_altq.h \
-		pf_mtag.h
+		pf_mtag.h \
+		pf_nl.h
 PFPACKAGE=	pf
 PFDIR=	${INCLUDEDIR}/netpfil/pf
 
