@@ -390,6 +390,10 @@ BROKEN_OPTIONS+=MLX5TOOL
 BROKEN_OPTIONS+=CHERI_CAPREVOKE
 .endif
 
+.if !${__T:Maarch64*c*} && !${__T:Mriscv64*c*}
+BROKEN_OPTIONS+=MALLOC_REVOCATION_SHIM
+.endif
+
 # We'd really like this to be:
 #    !${MACHINE_CPU:Mcheri} || ${MACHINE_ABI:Mpurecap}
 # but that logic doesn't work in Makefile.inc1...
@@ -572,10 +576,6 @@ MK_${vv:H}:=	no
 MK_${vv:H}:=	${MK_${vv:T}}
 .endif
 .endfor
-
-.if !${OPT_LIBC_MALLOC:Msnmalloc}
-MK_MALLOC_REVOCATION_SHIM:=	no
-.endif
 
 #
 # Set defaults for the MK_*_SUPPORT variables.
