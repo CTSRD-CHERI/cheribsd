@@ -6,6 +6,10 @@ JEMALLOCSRCS:= jemalloc.c arena.c background_thread.c base.c bin.c bitmap.c \
 
 CFLAGS+=-I${SRCTOP}/contrib/jemalloc/include
 
+.if ${MK_MALLOC_REVOCATION_SHIM} == yes
+MRS_REAL_PREFIX=__
+.endif
+
 .for src in ${JEMALLOCSRCS}
 MISRCS+=jemalloc_${src}
 CLEANFILES+=jemalloc_${src}
@@ -13,6 +17,9 @@ jemalloc_${src}: ${SRCTOP}/contrib/jemalloc/src/${src} .NOMETA
 	ln -sf ${.ALLSRC} ${.TARGET}
 .if ${MACHINE_ABI:Mpurecap}
 CFLAGS.jemalloc_${src}+=	-Werror=cheri-bitwise-operations -Werror=cheri
+.endif
+.if ${MK_MALLOC_REVOCATION_SHIM} == yes
+CFLAGS.jemalloc_${src}+=	-DMALLOC_REVOCATION_SHIM
 .endif
 .endfor
 
