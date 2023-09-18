@@ -519,7 +519,7 @@ tda19988_start(struct tda19988_softc *sc)
 
 	tda19988_cec_write(sc, TDA_CEC_ENAMODS, ENAMODS_RXSENS | ENAMODS_HDMI);
 	DELAY(1000);
-	tda19988_cec_read(sc, 0xfe, &data);
+	tda19988_cec_read(sc, TDA_CEC_RXSHPDLEV, &data);
 
 	/* Reset core */
 	tda19988_reg_set(sc, TDA_SOFTRESET, 3);
