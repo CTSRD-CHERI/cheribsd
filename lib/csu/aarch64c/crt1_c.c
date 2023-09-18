@@ -76,6 +76,7 @@ _start(void *auxv,
 	void (*cleanup)(void),			/* from shared loader */
 	struct Struct_Obj_Entry *obj)		/* from shared loader */
 {
+	__asm__ volatile(".cfi_undefined c30");
 	int argc = 0;
 	char **argv = NULL;
 	char **env = NULL;
