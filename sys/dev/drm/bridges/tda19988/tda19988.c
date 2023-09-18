@@ -221,7 +221,8 @@
 #define	TDA_CURPAGE_ADDR	0xff
 
 #define	TDA_CEC_RXSHPDLEV	0xfe
-#define		RXSHPDLEV_HPD	(1 << 1)
+#define		RXSHPDLEV_RXSENS	(1 << 0)
+#define		RXSHPDLEV_HPD		(1 << 1)
 #define	TDA_CEC_ENAMODS		0xff
 #define		ENAMODS_RXSENS		(1 << 2)
 #define		ENAMODS_HDMI		(1 << 1)
@@ -258,6 +259,23 @@
 #else
 #define	dprintf(fmt, ...)
 #endif
+
+static SYSCTL_NODE(_hw, OID_AUTO, tda19988, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "TDA19988 driver parameters");
+
+/*
+ * The TDA19988 transmitter in Morello SoC r0p0 and r0p1 might not correctly
+ * detect hot-plugging due to incorrect voltage levels on the HPD pin.
+ *
+ * As a workaround for this issue, a user can set hw.tda19988.broken_hpd to
+ * enforce using a screen if the transmitter only receives an RxSense packet
+ * indicating a screen is attached, ignoring if it's actually able to receive
+ * HDMI input.
+ */
+static int tda19988_broken_hpd;
+SYSCTL_INT(_hw_tda19988, OID_AUTO, broken_hpd, CTLFLAG_RDTUN,
+    &tda19988_broken_hpd, 0,
+    "Disable Hot-Plug Detect and use RxSense to detect if a screen is connected instead");
 
 struct tda19988_softc {
 	device_t		dev;
@@ -613,12 +631,17 @@ static enum drm_connector_status
 tda19988_connector_detect(struct drm_connector *connector, bool force)
 {
 	struct tda19988_softc *sc;
-	uint8_t data;
+	uint8_t data, flag;
 
 	sc = container_of(connector, struct tda19988_softc, connector);
 
 	tda19988_cec_read(sc, TDA_CEC_RXSHPDLEV, &data);
-	if (data & RXSHPDLEV_HPD)
+	if (unlikely(tda19988_broken_hpd))
+		flag = RXSHPDLEV_RXSENS;
+	else
+		flag = RXSHPDLEV_HPD;
+
+	if (data & flag)
 		return (connector_status_connected);
 
 	return (connector_status_disconnected);
