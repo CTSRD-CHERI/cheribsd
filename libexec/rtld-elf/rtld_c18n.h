@@ -119,10 +119,8 @@ struct tramp_sig tramp_fetch_sig(const Obj_Entry *, unsigned long);
 /*
  * APIs
  */
-/*
 void *_rtld_sandbox_code(void *, struct tramp_sig);
 void *_rtld_safebox_code(void *, struct tramp_sig);
-*/
 
 void tramp_init(void);
 void tramp_add_comparts(struct policy *);

@@ -88,6 +88,14 @@ _rtld_thread_start(struct pthread *curthread)
 	asm ("msr	ctpidr_el0, %0" :: "C" (tls));
 
 	thr_thread_start(curthread);
+
+	/*
+	 * The previous call should never return, but this call is inserted so
+	 * that the compiler generates a branch-and-link instruction for the
+	 * previous call rather than a mere branch instruction. The content of
+	 * the link register is required for the trampoline to work.
+	 */
+	rtld_die();
 }
 
 void
@@ -177,6 +185,9 @@ static struct compart com_null = {
 
 		"vfork",
 		"rfork",
+
+		/* See comment in function definition */
+		"_rtld_thread_start",
 		NULL
 	}
 };
@@ -846,7 +857,6 @@ end:
 /*
  * APIs
  */
-/*
 static long
 tramp_sig_to_otype(struct tramp_sig sig)
 {
@@ -927,7 +937,6 @@ _rtld_safebox_code(void *target, struct tramp_sig sig)
 
 	return target;
 }
-*/
 
 struct tramp_sig
 tramp_fetch_sig(const Obj_Entry *obj, unsigned long symnum)
