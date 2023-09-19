@@ -69,3 +69,16 @@ u_int	security_cheri_bound_legacy_capabilities;
 SYSCTL_INT(_security_cheri, OID_AUTO, bound_legacy_capabilities,
     CTLFLAG_RWTUN, &security_cheri_bound_legacy_capabilities, 0,
     "Set bounds on userspace capabilities created by legacy ABIs.");
+
+#ifdef CHERI_CAPREVOKE
+/*
+ * Set (indirectly) the default state of revocation in userspace.
+ * Libc/rtld query this sysctl to determined if the revoker should be
+ * used by default.  Ultimately, this is purely advisory and exists in
+ * the kernel so that the default can impact programs starting from
+ * init(8).
+ */
+static int runtime_default = 1;
+SYSCTL_INT(_security_cheri, OID_AUTO, runtime_quarantine_default, CTLFLAG_RWTUN,
+    &runtime_default, 0, "Userspace runtime quarantine default");
+#endif  /* CHERI_CAPREVOKE */
