@@ -252,20 +252,17 @@ try_revoke(int target_bucket)
 		return;
 
 	if (cri == NULL) {
-		int error;
-
-		error = cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT,
-		    NULL, (void **)&cri);
-
-		if (error == ENOSYS) {
-			/*
-			 * Revocation is not supported; this is the baseline.
-			 * Just pretend like it worked.
-			 */
-			goto dequarantine;
+		if (cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT,
+		    NULL, (void **)&cri) != 0) {
+			if (errno == ENOSYS) {
+				/*
+				 * Revocation is not supported.
+				 * Just pretend like it worked.
+				 */
+				goto dequarantine;
+			} else
+				abort();
 		}
-
-		assert(error == 0);
 	}
 
 
