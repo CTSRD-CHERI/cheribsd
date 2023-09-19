@@ -30,6 +30,7 @@
  * SUCH DAMAGE.
  */
 
+#include <stdbool.h>
 #include <stdlib.h>
 
 /*
@@ -39,4 +40,11 @@
 void
 malloc_revoke(void)
 {
+}
+
+bool malloc_is_quarantining(void);
+bool
+malloc_is_quarantining(void)
+{
+	return (false);
 }
