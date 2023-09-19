@@ -33,6 +33,7 @@
 #include <sys/tree.h>
 #include <sys/resource.h>
 #include <sys/cpuset.h>
+#include <sys/sysctl.h>
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
@@ -89,6 +90,7 @@
  * QUARANTINE_RATIO: limit the quarantine size to 1 / QUARANTINE_RATIO times the size of the heap (default 4)
  * CONCURRENT_REVOCATION_PASSES: number of concurrent revocation pass before the stop-the-world pass
  *
+ * OPTIONAL_QUARANTINING: allow quarantining to be enabled/disabled at runtime and for mrs to fall back to not quarantining if cheri_revoke_get_shadow(2) is unimplemented (ENOSYS).
  */
 
 #ifdef SNMALLOC_PRINT_STATS
@@ -97,6 +99,9 @@ extern void snmalloc_print_stats(void);
 #ifdef SNMALLOC_FLUSH
 extern void snmalloc_flush_message_queue(void);
 #endif
+
+#define	MALLOC_QUARANTINE_DISABLE_ENV	"_RUNTIME_REVOCATION_DISABLE"
+#define	MALLOC_QUARANTINE_ENABLE_ENV	"_RUNTIME_REVOCATION_ENABLE"
 
 /*
  * Different allocators give their strong symbols different names.  Hide
@@ -236,6 +241,9 @@ static const size_t MIN_REVOKE_HEAP_SIZE = 8 * 1024 * 1024;
 static volatile const struct cheri_revoke_info *cri;
 static size_t page_size;
 static void *entire_shadow;
+#ifdef OPTIONAL_QUARANTINING
+static bool quarantining = true;
+#endif
 
 struct mrs_descriptor_slab_entry {
 	void *ptr;
@@ -762,6 +770,10 @@ static inline void quarantine_flush(struct mrs_quarantine *quarantine) {
 
 void malloc_revoke()
 {
+#ifdef OPTIONAL_QUARANTINING
+	if (!quarantining)
+		return;
+#endif
 #ifdef OFFLOAD_QUARANTINE
 
 #ifdef PRINT_CAPREVOKE_MRS
@@ -821,6 +833,12 @@ void malloc_revoke()
 #endif
 
 #endif /* OFFLOAD_QUARANTINE */
+}
+
+bool
+malloc_is_quarantining(void)
+{
+	return quarantining;
 }
 
 /*
@@ -937,20 +955,51 @@ static void init(void) {
 		exit(7);
 	}
 
-	int res = cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
-	    (void **)&cri);
-	if (res != 0) {
+#ifdef OPTIONAL_QUARANTINING
+	int runtime_quarantine_default;
+	size_t runtime_quarantine_default_sz =
+	    sizeof(runtime_quarantine_default);
+
+	if (sysctlbyname("security.cheri.runtime_quarantine_default",
+	    &runtime_quarantine_default,
+	    &runtime_quarantine_default_sz, NULL, 0) == 0) {
+		quarantining = (runtime_quarantine_default != 0);
+	} else {
+		quarantining = false;
+	}
+
+	if (!issetugid()) {
+		if (getenv(MALLOC_QUARANTINE_DISABLE_ENV) != NULL) {
+			quarantining = false;
+		} else if (getenv(MALLOC_QUARANTINE_ENABLE_ENV) != NULL) {
+			quarantining = true;
+		}
+	}
+#endif /* OPTIONAL_QUARANTINING */
+
+	if (cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
+	    (void **)&cri) != 0) {
+#ifdef OPTIONAL_QUARANTINING
+		if (errno == ENOSYS) {
+			quarantining = false;
+#if defined(PRINT_CAPREVOKE) || defined(PRINT_CAPREVOKE_MRS) || defined(PRINT_STATS)
+			goto nosys;
+#endif
+			return;
+		}
+#endif
 		mrs_puts("error getting kernel caprevoke counters\n");
 		exit(7);
 	}
 
 	if (cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMMAP_ENTIRE, NULL,
-	    &entire_shadow)) {
+	    &entire_shadow) != 0) {
 		mrs_puts("error getting entire shadow cap\n");
 		exit(7);
 	}
 
 #if defined(PRINT_CAPREVOKE) || defined(PRINT_CAPREVOKE_MRS) || defined(PRINT_STATS)
+nosys:
 	mrs_puts(VERSION_STRING);
 #endif
 }
@@ -972,6 +1021,11 @@ static void *mrs_malloc(size_t size) {
 #ifdef JUST_INTERPOSE
 	return REAL(malloc)(size);
 #endif /* JUST_INTERPOSE */
+
+#ifdef OPTIONAL_QUARANTINING
+	if (!quarantining)
+		return REAL(malloc)(size);
+#endif
 
 	/*mrs_debug_printf("mrs_malloc: called\n");*/
 
@@ -1049,6 +1103,11 @@ void *mrs_calloc(size_t number, size_t size) {
 	return REAL(calloc)(number, size);
 #endif /* JUST_INTERPOSE */
 
+#ifdef OPTIONAL_QUARANTINING
+	if (!quarantining)
+		return REAL(calloc)(number, size);
+#endif
+
 	/* this causes problems if our library is initizlied before the thread library */
 	/*mrs_debug_printf("mrs_calloc: called\n");*/
 
@@ -1103,6 +1162,11 @@ static int mrs_posix_memalign(void **ptr, size_t alignment, size_t size) {
 	return REAL(posix_memalign)(ptr, alignment, size);
 #endif /* JUST_INTERPOSE */
 
+#ifdef OPTIONAL_QUARANTINING
+	if (!quarantining)
+		return REAL(posix_memalign)(ptr, alignment, size);
+#endif
+
 	mrs_debug_printf("mrs_posix_memalign: called ptr %p alignment %zu size %zu\n", ptr, alignment, size);
 
 #ifndef REVOKE_ON_FREE
@@ -1133,6 +1197,11 @@ static void *mrs_aligned_alloc(size_t alignment, size_t size) {
 #ifdef JUST_INTERPOSE
 	return REAL(aligned_alloc)(alignment, size);
 #endif /* JUST_INTERPOSE */
+
+#ifdef OPTIONAL_QUARANTINING
+	if (!quarantining)
+		return REAL(aligned_alloc)(alignment, size);
+#endif
 
 	mrs_debug_printf("mrs_aligned_alloc: called alignment %zu size %zu\n", alignment, size);
 
@@ -1170,6 +1239,11 @@ static void *mrs_realloc(void *ptr, size_t size) {
 	return REAL(realloc)(ptr, size);
 #endif /* JUST_INTERPOSE */
 
+#ifdef OPTIONAL_QUARANTINING
+	if (!quarantining)
+		return REAL(realloc)(ptr, size);
+#endif
+
 	size_t old_size = cheri_getlen(ptr);
 	mrs_debug_printf("mrs_realloc: called ptr %p ptr size %zu new size %zu\n", ptr, old_size, size);
 
@@ -1196,6 +1270,11 @@ static void mrs_free(void *ptr) {
 #ifdef JUST_INTERPOSE
 	return REAL(free)(ptr);
 #endif /* JUST_INTERPOSE */
+
+#ifdef OPTIONAL_QUARANTINING
+	if (!quarantining)
+		return REAL(free)(ptr);
+#endif
 
 	/*mrs_debug_printf("mrs_free: called address %p\n", ptr);*/
 
@@ -1255,6 +1334,11 @@ void *mrs_mallocx(size_t size, int flags)
 #ifdef JUST_INTERPOSE
 	return REAL(mallocx)(size, flags);
 #else /* !JUST_INTERPOSE */
+#ifdef OPTIONAL_QUARANTINING
+	if (!quarantining)
+		return REAL(mallocx)(size, flags);
+#endif
+
 	/*
 	 * This API supports optional zeroing.  Since no one really uses
 	 * it, we don't care about performance and preserve the ABI by
@@ -1270,6 +1354,10 @@ void *mrs_rallocx(void *ptr, size_t size, int flags)
 #ifdef JUST_INTERPOSE
 	return REAL(rallocx)(ptr, size, flags);
 #else /* !JUST_INTERPOSE */
+#ifdef OPTIONAL_QUARANTINING
+	if (!quarantining)
+		return REAL(rallocx)(ptr, size, flags);
+#endif
 
 	size_t old_size = cheri_getlen(ptr);
 	mrs_debug_printf("%s: called ptr %p ptr size %zu new size %zu\n",
