@@ -48,6 +48,11 @@ append_perf_warnings()
 			esac
 		done
 	fi
+	runtime_quarantine_default=`sysctl -n security.cheri.runtime_quarantine_default 2> /dev/null`
+	if [ "${runtime_quarantine_default}" = "1" ]; then
+		echo -n " CHERI_CAPREVOKE"
+		echo "WARNING: capability revocation enabled by default, this may effect performance" >> $_t
+	fi
 }
 
 motd_start()
