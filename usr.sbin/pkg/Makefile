@@ -3,9 +3,12 @@
 
 PACKAGE=	pkg-bootstrap
 
-PKGCONF?=	CheriBSD.conf
-CONFS=		${PKGCONF}
-CONFSNAME_${PKGCONF}=	${PKGCONF:C/\.conf.+$/.conf/}
+CONFS=		CheriBSD.conf
+.if ${MACHINE_ABI:Mpurecap} && !defined(PKG_SUFFIX)
+# Install a configuration file for a pkg repository with debug packages for use
+# with the default package manager only if the world is compiled for CheriABI.
+CONFS+=		CheriBSD-debug.conf
+.endif
 CONFSDIR=	/etc/pkg${PKG_SUFFIX}
 CONFSMODE=	644
 PROG?=	pkg${PKG_SUFFIX}
