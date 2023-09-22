@@ -1005,8 +1005,8 @@ struct drm_mode_atomic {
 	kuint64cap_t count_props_ptr;
 	kuint64cap_t props_ptr;
 	kuint64cap_t prop_values_ptr;
-	__u64 reserved;
-	__u64 user_data;
+	kuint64cap_t reserved;
+	kuint64cap_t user_data;
 };
 
 struct drm_format_modifier_blob {
