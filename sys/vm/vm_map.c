@@ -219,7 +219,7 @@ quarantine_cmp(struct vm_map_entry *e1, struct vm_map_entry *e2)
 	KASSERT(e1->reservation != e2->reservation,
 	    ("two quarantined entries %p %p with the same reservation %zu",
 	     e1, e2, e1->reservation));
-	return (e1->reservation > e2->reservation ? -1 : 0);
+	return (e1->reservation > e2->reservation ? -1 : 1);
 }
 
 RB_GENERATE_STATIC(vm_map_quarantine, vm_map_entry, quarantine, quarantine_cmp)
