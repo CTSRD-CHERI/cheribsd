@@ -398,7 +398,11 @@ struct thread {
 
 struct thread0_storage {
 	struct thread t0st_thread;
+#ifdef __CHERI_PURE_CAPABILITY__
+	uint64_t t0st_sched[11];
+#else
 	uint64_t t0st_sched[10];
+#endif
 } __no_subobject_bounds;
 
 struct mtx *thread_lock_block(struct thread *);
