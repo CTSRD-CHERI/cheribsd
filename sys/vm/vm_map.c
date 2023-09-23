@@ -2883,6 +2883,10 @@ vm_map_entry_clone(vm_map_t map, vm_map_entry_t entry)
 	vm_map_entry_t new_entry;
 
 	VM_MAP_ASSERT_LOCKED(map);
+#ifdef CHERI_CAPREVOKE
+	KASSERT(entry->inheritance != VM_INHERIT_QUARANTINE,
+	    ("%s: cloning quarantine map entry", __func__));
+#endif
 
 	/*
 	 * Create a backing object now, if none exists, so that more individual
