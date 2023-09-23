@@ -307,7 +307,6 @@ virtdone:
 	/*
 	 * Convert modulep into a capability
 	 * XXX-AM: can we set bounds on this?
-	 * TODO: clear perms
 	 */
 	cvtd	c19, x19
 #endif

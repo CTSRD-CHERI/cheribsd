@@ -181,6 +181,8 @@ linux_parse_boot_param(struct arm64_bootparams *abp)
 		return (0);
 	/* Test if modulep point to valid DTB. */
 	dtb_ptr = (struct fdt_header *)abp->modulep;
+	dtb_ptr = cheri_kern_andperm(dtb_ptr,
+	    CHERI_PERMS_KERNEL_RODATA & CHERI_PERMS_KERNEL_DATA_NOCAP);
 	if (fdt_check_header(dtb_ptr) != 0)
 		return (0);
 	dtb_size = fdt_totalsize(dtb_ptr);
@@ -204,6 +206,8 @@ freebsd_parse_boot_param(struct arm64_bootparams *abp)
 		return (0);
 
 	preload_metadata = (caddr_t)(uintptr_t)(abp->modulep);
+	preload_metadata = cheri_kern_andperm(preload_metadata,
+	    CHERI_PERMS_KERNEL_RODATA & CHERI_PERMS_KERNEL_DATA_NOCAP);
 	kmdp = preload_search_by_type("elf kernel");
 	if (kmdp == NULL)
 		return (0);
