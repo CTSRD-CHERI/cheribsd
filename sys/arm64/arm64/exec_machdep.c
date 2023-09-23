@@ -945,7 +945,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	onstack = sigonstack(tf->tf_sp);
 
 	CTR4(KTR_SIG, "sendsig: td=%p (%s) catcher=%p sig=%d", td, p->p_comm,
-	    catcher, sig);
+	    (__cheri_fromcap void *)catcher, sig);
 
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !onstack &&
@@ -977,7 +977,8 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* Copy the sigframe out to the user's stack. */
 	if (copyoutcap(&frame, fp, sizeof(*fp)) != 0) {
 		/* Process has trashed its stack. Kill it. */
-		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td, fp);
+		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td,
+		    (__cheri_fromcap void *)fp);
 		PROC_LOCK(p);
 		sigexit(td, SIGILL);
 	}

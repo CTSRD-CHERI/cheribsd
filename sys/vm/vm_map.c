@@ -1639,9 +1639,8 @@ vm_map_entry_quarantine(vm_map_t map, vm_map_entry_t entry)
 
 	KASSERT((entry->eflags & MAP_ENTRY_UNMAPPED) != 0,
 	    ("Can only quarantine unmappled pages %x\n", entry->eflags));
-	CTR3(KTR_VM,
-	    __func__ ": map %p, nentries %d, entry %p", map, map->nentries,
-	    entry);
+	CTR(KTR_VM, "%s: map %p, nentries %d, entry %p", __func__, map,
+	    map->nentries, entry);
 	VM_MAP_ASSERT_LOCKED(map);
 	entry->inheritance = VM_INHERIT_QUARANTINE;
 	RB_INSERT(vm_map_quarantine, &map->quarantine, entry);
