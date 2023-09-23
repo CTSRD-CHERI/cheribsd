@@ -130,7 +130,7 @@ static void
 usage(void)
 {
 	fprintf(stderr,
-	    "usage: ldconfig [-32] [-elf] [-Rimrv] [-f hints_file] "
+	    "usage: ldconfig [-32|-64] [-elf] [-Rimrv] [-f hints_file] "
 	    "[directory | file ...]\n");
 	exit(1);
 }
