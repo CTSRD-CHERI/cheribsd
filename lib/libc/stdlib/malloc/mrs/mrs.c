@@ -975,6 +975,12 @@ static void init(void) {
 			quarantining = true;
 		}
 	}
+	if (!quarantining)
+#if defined(PRINT_CAPREVOKE) || defined(PRINT_CAPREVOKE_MRS) || defined(PRINT_STATS)
+		goto nosys;
+#else
+		return;
+#endif
 #endif /* OPTIONAL_QUARANTINING */
 
 	if (cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
