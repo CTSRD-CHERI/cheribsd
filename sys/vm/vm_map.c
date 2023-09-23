@@ -1648,16 +1648,12 @@ vm_map_entry_quarantine(vm_map_t map, vm_map_entry_t entry)
 
 	prev_entry = vm_map_entry_pred(entry);
 	if (prev_entry->inheritance == VM_INHERIT_QUARANTINE &&
-	    prev_entry != map->rev_entry) {
+	    prev_entry != map->rev_entry)
 		vm_map_try_merge_entries(map, prev_entry, entry);
-		RB_REINSERT(vm_map_quarantine, &map->quarantine, entry);
-	}
 	next_entry = vm_map_entry_succ(entry);
 	if (next_entry->inheritance == VM_INHERIT_QUARANTINE &&
-	    next_entry != map->rev_entry) {
+	    next_entry != map->rev_entry)
 		vm_map_try_merge_entries(map, entry, next_entry);
-		RB_REINSERT(vm_map_quarantine, &map->quarantine, next_entry);
-	}
 }
 
 bool
@@ -1695,7 +1691,6 @@ vm_map_entry_start_revocation(vm_map_t map, vm_map_entry_t *entry)
 
 		vm_map_entry_resize(map, prev_entry, gap);
 		vm_map_try_merge_entries(map, prev_entry, rev_entry);
-		RB_REINSERT(vm_map_quarantine, &map->quarantine, rev_entry);
 		prev_entry = vm_map_entry_pred(rev_entry);
 	}
 	next_entry = vm_map_entry_succ(rev_entry);
@@ -1707,7 +1702,6 @@ vm_map_entry_start_revocation(vm_map_t map, vm_map_entry_t *entry)
 
 		vm_map_entry_resize(map, rev_entry, gap);
 		vm_map_try_merge_entries(map, rev_entry, next_entry);
-		RB_REINSERT(vm_map_quarantine, &map->quarantine, next_entry);
 		rev_entry = next_entry;
 		next_entry = vm_map_entry_succ(rev_entry);
 	}
@@ -2817,6 +2811,10 @@ vm_map_try_merge_entries(vm_map_t map, vm_map_entry_t prev_entry,
 	    vm_map_mergeable_neighbors(map, prev_entry, entry)) {
 		vm_map_entry_unlink(map, prev_entry, UNLINK_MERGE_NEXT);
 		vm_map_merged_neighbor_dispose(map, prev_entry);
+#ifdef CHERI_CAPREVOKE
+		if (entry->inheritance == VM_INHERIT_QUARANTINE)
+			RB_REINSERT(vm_map_quarantine, &map->quarantine, entry);
+#endif
 		return (entry);
 	}
 	return (prev_entry);
