@@ -1597,8 +1597,8 @@ vm_map_entry_unlink(vm_map_t map, vm_map_entry_t entry,
 		rlist->offset = root->offset;
 		/*
 		 * Either both are part of the same reservation or they
-		 * are quarantined, adjacent neighbors being combined
-		 * and thus will take on the previous entries's resevation.
+		 * are adjacent quarantined neighbors being combined
+		 * and thus will take on the previous entry's reservation.
 		 */
 		rlist->reservation = root->reservation;
 	}
