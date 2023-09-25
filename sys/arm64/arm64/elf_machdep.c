@@ -105,7 +105,7 @@ static struct sysentvec elf64_freebsd_sysvec = {
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
 	.sv_flags	= SV_SHP | SV_TIMEKEEP | SV_ABI_FREEBSD | SV_LP64 |
-	    SV_RNG_SEED_VER |
+	    SV_RNG_SEED_VER | SV_SIGSYS |
 #if __has_feature(capabilities)
 	    SV_CHERI,
 #else
