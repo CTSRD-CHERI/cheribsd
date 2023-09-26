@@ -7,9 +7,4 @@ NEED_COMPAT=	64C
 
 CHERI_C_TESTS=	yes
 
-.if ${MK_CHERI_CAPREVOKE} == "yes"
-LIBADD+=cheri_caprevoke
-CFLAGS+=-DCHERI_REVOKE
-.endif
-
 .include "${.PARSEDIR}/Makefile.cheribsdtest"
