@@ -1610,7 +1610,8 @@ cheribsdtest_cheri_revoke_lib_run(int paranoia, int mode, size_t bigblock_caps,
 	size_t bigblock_offset = 0;
 	const ptraddr_t sbase = cri->base_mem_nomap;
 
-	fprintf(stderr, "test_cheri_revoke_lib_run mode %d\n", mode);
+	if (verbose > 1)
+		fprintf(stderr, "test_cheri_revoke_lib_run mode %d\n", mode);
 
 	while (bigblock_offset < bigblock_caps) {
 		struct cheri_revoke_syscall_info crsi;
