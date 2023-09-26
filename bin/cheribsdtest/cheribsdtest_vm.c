@@ -848,16 +848,6 @@ reservations_are_quarantined(void)
 	return (quarantine_unmapped_reservations != 0);
 }
 
-
-static const char *
-skip_need_quarantine_unmapped_reservations(const char *name __unused)
-{
-	if (reservations_are_quarantined())
-		return (NULL);
-	else
-		return ("unmapped reservations are not being quarantined");
-}
-
 /*
  * Check that after a reservation is unmapped, it is not possible to
  * reuse the old capability to create new fixed mappings.
@@ -1300,6 +1290,15 @@ CHERIBSDTEST(vm_capdirty, "verify capdirty marking and mincore")
 /*
  * Revocation tests
  */
+
+static const char *
+skip_need_quarantine_unmapped_reservations(const char *name __unused)
+{
+	if (reservations_are_quarantined())
+		return (NULL);
+	else
+		return ("unmapped reservations are not being quarantined");
+}
 
 static int
 check_revoked(void *r)
