@@ -1286,7 +1286,7 @@ CHERIBSDTEST(vm_capdirty, "verify capdirty marking and mincore")
 #undef CHERIBSDTEST_VM_CAPDIRTY_NPG
 }
 
-#ifdef CHERI_REVOKE
+#ifdef CHERIBSDTEST_CHERI_REVOKE_TESTS
 /*
  * Revocation tests
  */
@@ -2064,6 +2064,6 @@ CHERIBSDTEST(revoke_merge_quarantined,
 	cheribsdtest_success();
 }
 #undef NRES
-#endif /* CHERI_REVOKE */
+#endif /* CHERIBSDTEST_CHERI_REVOKE_TESTS */
 
 #endif /* __CHERI_PURE_CAPABILITY__ */
