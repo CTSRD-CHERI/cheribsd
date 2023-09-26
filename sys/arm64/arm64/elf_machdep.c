@@ -66,6 +66,10 @@ u_long __read_frequently elf_hwcap2;
 
 struct arm64_addr_mask elf64_addr_mask;
 
+#ifdef CHERI_CAPREVOKE
+static void	caprevoke_sysvec_init(void *arg);
+#endif
+
 static struct sysentvec elf64_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
@@ -116,6 +120,28 @@ static struct sysentvec elf64_freebsd_sysvec = {
 	.sv_regset_end	= SET_LIMIT(__elfN(regset)),
 };
 INIT_SYSENTVEC(elf64_sysvec, &elf64_freebsd_sysvec);
+#ifdef CHERI_CAPREVOKE
+SYSINIT(caprevoke_elf64, SI_SUB_VM, SI_ORDER_ANY, caprevoke_sysvec_init,
+    &elf64_freebsd_sysvec);
+#endif
+
+static __ElfN(Brandinfo) freebsd_brand_info = {
+	.brand		= ELFOSABI_FREEBSD,
+	.machine	= EM_AARCH64,
+	.compat_3_brand	= "FreeBSD",
+	.interp_path	= "/libexec/ld-elf.so.1",
+	.sysvec		= &elf64_freebsd_sysvec,
+#if __has_feature(capabilities)
+	.interp_newpath	= "/libexec/ld-elf64c.so.1",
+#else
+	.interp_newpath	= NULL,
+#endif
+	.brand_note	= &__elfN(freebsd_brandnote),
+	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE
+};
+
+SYSINIT(elf64, SI_SUB_EXEC, SI_ORDER_FIRST,
+    (sysinit_cfunc_t)__elfN(insert_brand_entry), &freebsd_brand_info);
 
 #ifdef CHERI_CAPREVOKE
 static void
@@ -163,27 +189,7 @@ caprevoke_sysvec_init(void *arg)
 	sv->sv_cheri_revoke_info_page =
 	    sv->sv_cheri_revoke_shadow_base - PAGE_SIZE;
 }
-SYSINIT(caprevoke_sysvec, SI_SUB_VM, SI_ORDER_ANY, caprevoke_sysvec_init,
-    &elf64_freebsd_sysvec);
 #endif
-
-static __ElfN(Brandinfo) freebsd_brand_info = {
-	.brand		= ELFOSABI_FREEBSD,
-	.machine	= EM_AARCH64,
-	.compat_3_brand	= "FreeBSD",
-	.interp_path	= "/libexec/ld-elf.so.1",
-	.sysvec		= &elf64_freebsd_sysvec,
-#if __has_feature(capabilities)
-	.interp_newpath	= "/libexec/ld-elf64c.so.1",
-#else
-	.interp_newpath	= NULL,
-#endif
-	.brand_note	= &__elfN(freebsd_brandnote),
-	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE
-};
-
-SYSINIT(elf64, SI_SUB_EXEC, SI_ORDER_FIRST,
-    (sysinit_cfunc_t)__elfN(insert_brand_entry), &freebsd_brand_info);
 
 static bool
 get_arm64_addr_mask(struct regset *rs, struct thread *td, void *buf,
