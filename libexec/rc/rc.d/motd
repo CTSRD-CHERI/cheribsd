@@ -51,7 +51,7 @@ append_perf_warnings()
 	runtime_quarantine_default=`sysctl -n security.cheri.runtime_quarantine_default 2> /dev/null`
 	if [ "${runtime_quarantine_default}" = "1" ]; then
 		echo -n " CHERI_CAPREVOKE"
-		echo "WARNING: capability revocation enabled by default, this may effect performance" >> $_t
+		echo "WARNING: capability revocation enabled by default, this may affect performance" >> $_t
 	fi
 }
 
