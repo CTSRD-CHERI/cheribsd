@@ -195,7 +195,7 @@ coresight_backend_init(struct hwt_context *ctx)
 }
 
 static void
-coresight_backend_deinit(void)
+coresight_backend_deinit(struct hwt_context *ctx)
 {
 	struct coresight_pipeline *pipeline;
 	int cpu_id;

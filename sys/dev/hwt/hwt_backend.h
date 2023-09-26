@@ -33,7 +33,7 @@
 
 struct hwt_backend_ops {
 	int (*hwt_backend_init)(struct hwt_context *);
-	void (*hwt_backend_deinit)(void);
+	void (*hwt_backend_deinit)(struct hwt_context *);
 	int (*hwt_backend_configure)(struct hwt_context *, int cpu_id,
 	    int thread_id);
 	void (*hwt_backend_enable)(int cpu_id);

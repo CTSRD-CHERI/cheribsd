@@ -87,7 +87,7 @@ hwt_backend_deinit(struct hwt_context *ctx)
 
 	dprintf("%s\n", __func__);
 
-	ctx->hwt_backend->ops->hwt_backend_deinit();
+	ctx->hwt_backend->ops->hwt_backend_deinit(ctx);
 }
 
 int
