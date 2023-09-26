@@ -103,7 +103,10 @@ komeda_convert_format(uint32_t format)
 
 	switch (format) {
 	case DRM_FORMAT_ARGB2101010:
-		return (0);
+	/*
+	 * Documentation states this should be 0, but it works better with 1.
+	 * FALLTHROUGH
+	 */
 	case DRM_FORMAT_ABGR2101010:
 		return (1);
 	case DRM_FORMAT_RGBA1010102:
