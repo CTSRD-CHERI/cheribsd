@@ -45,6 +45,11 @@ SRCS+=	cheribsdtest_cheriabi_libc.c
 SRCS+=	cheribsdtest_cheriabi_open.c
 .endif
 
+.if ${MACHINE_ABI:Mpurecap} && ${MK_CHERI_CAPREVOKE} == "yes"
+LIBADD+=	cheri_caprevoke
+CFLAGS+=	-DCHERIBSDTEST_CHERI_REVOKE_TESTS
+.endif
+
 # This test is broken as written
 #SRCS+=	cheribsdtest_vm_swap.c
 #CFLAGS.cheribsdtest_vm_swap.c+=-Wno-cheri-capability-misuse
