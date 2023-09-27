@@ -75,7 +75,7 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 	assert(ELF_ST_TYPE(def->st_info) != STT_GNU_IFUNC &&
 	    "IFUNC not implemented!");
 
-	const void * __capability symval = NULL;
+	void * __capability symval = NULL;
 	bool is_undef_weak = false;
 	if (def->st_shndx == SHN_UNDEF) {
 		/* Verify that we are resolving a weak symbol */
@@ -116,6 +116,13 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 		}
 		/* Remove write permissions and set bounds */
 		symval = make_function_cap_with_addend(def, defobj, addend);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+		symval = tramp_intern(&(struct tramp_data) {
+			.target = symval,
+			.obj = defobj,
+			.def = def
+		});
+#endif
 		if (__predict_false(symval == NULL)) {
 			_rtld_error("Could not create function pointer for %s "
 				    "(in %s)\n",
@@ -143,10 +150,10 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 		    obj->path, symname(obj, r_symndx), symval);
 		return -1;
 	}
-	*((const void * __capability *)where) = symval;
+	*((void * __capability *)where) = symval;
 #if defined(DEBUG_VERBOSE) && DEBUG_VERBOSE >= 2
 	dbg("CAP(%p/0x%lx) %s in %s --> %#lp in %s", where,
-	    (const char *)where - (const char *)obj->relocbase,
+	    (char *)where - obj->relocbase,
 	    symname(obj, r_symndx), obj->path,
 	    *((void * __capability *)where), defobj->path);
 #endif
