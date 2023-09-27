@@ -434,7 +434,12 @@ void (*pmap_stage2_invalidate_all)(uint64_t);
 #define	TLBI_VA(addr)			(((addr) >> TLBI_VA_SHIFT) & TLBI_VA_MASK)
 #define	TLBI_VA_L3_INCR			(L3_SIZE >> TLBI_VA_SHIFT)
 
+#ifdef CHERI_CAPREVOKE
+/* XXX: CLG managment issue leads to load tag page faults. */
+static int __read_frequently superpages_enabled = 0;
+#else
 static int __read_frequently superpages_enabled = 1;
+#endif
 SYSCTL_INT(_vm_pmap, OID_AUTO, superpages_enabled,
     CTLFLAG_RDTUN | CTLFLAG_NOFETCH, &superpages_enabled, 0,
     "Are large page mappings enabled?");
