@@ -507,3 +507,8 @@ ${_tgt}: ${META_DEPS}
 .endif
 .endfor
 .endif
+
+# we are generally the last makefile read
+CFLAGS+= ${CFLAGS_LAST}
+CXXFLAGS+= ${CXXFLAGS_LAST}
+LDFLAGS+= ${LDFLAGS_LAST}
