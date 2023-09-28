@@ -169,6 +169,11 @@ Substring commands are accepted.
 Display command line arguments for the process.
 .Pp
 Substring commands are accepted.
+.It Ar cheri
+Display CHERI-specific information about the process.
+If the
+.Fl v
+flag is passed then extra information is shown.
 .It Ar environment | Fl e
 Display environment variables for the process.
 .Pp
@@ -285,6 +290,58 @@ process ID
 command
 .It ARGS
 command line arguments (if available)
+.El
+.Ss CHERI information
+Display the process ID, command, and CHERI-specific information:
+.Pp
+.Bl -tag -width "RSTATE" -compact
+.It PID
+process ID
+.It COMM
+command
+.It C
+CHERI support in the process ABI
+.It QUAR
+quarantining status
+.It RSTATE
+in-kernel revoker state
+.It EPOCH
+in-kernel revoker epoch
+.El
+.Pp
+The following values indicate the support for CHERI in the process ABI:
+.Pp
+.Bl -tag -width XX -compact
+.It H
+hybrid ABI with integer system call arguments
+.It P
+pure-capability ABI with capability system call arguments
+.It !
+CHERI not supported
+.It ?
+Unknown ABI
+.El
+.Pp
+The following quarantining status types may be displayed:
+.Pp
+.Bl -tag -width nosup -compact
+.It yes
+address space is quarantining fully unmapped reservations
+.It no
+address space is not quarantining fully unmapped reservations
+.El
+.Pp
+The following revoker state values may be displayed:
+.Pp
+.Bl -tag -width initing -compact
+.It none
+revoker not active
+.It initint
+revoker being initialized
+.It inited
+revoker initialized, epoch open
+.It closing
+revoker finishing an epoch
 .El
 .Ss Environment Variables
 Display the process ID, command, and environment variables:
