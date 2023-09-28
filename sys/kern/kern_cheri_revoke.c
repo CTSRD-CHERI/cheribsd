@@ -200,6 +200,58 @@ static SYSCTL_NODE(_kern_proc, KERN_PROC_REVOKER_STATE, revoker_state,
     CTLFLAG_RD | CTLFLAG_MPSAFE, sysctl_kern_proc_revoker_state,
     "state of the in-kernel revoker");
 
+static int
+sysctl_kern_proc_revoker_epoch(SYSCTL_HANDLER_ARGS)
+{
+	struct vmspace *vm;
+	int *name = (int *)arg1;
+	u_int namelen = arg2;
+	struct proc *p;
+	int error = 0;
+	pid_t pid;
+	uint64_t epoch;
+
+	if (namelen != 1)
+		return (EINVAL);
+
+	pid = (pid_t)name[0];
+	if (pid == curproc->p_pid || pid == 0) {
+		if (SV_CURPROC_FLAG(SV_CHERI))
+			epoch = cheri_revoke_st_get_epoch(
+			    curproc->p_vmspace->vm_map.vm_cheri_revoke_st);
+		else
+			epoch = -1;
+
+		goto out;
+	}
+
+	error = pget(pid, PGET_WANTREAD, &p);
+	if (error != 0)
+		return (error);
+
+	if (SV_PROC_FLAG(p, SV_CHERI)) {
+		vm = vmspace_acquire_ref(p);
+		if (vm == NULL)
+			error = ESRCH;
+		else {
+			epoch = cheri_revoke_st_get_epoch(
+			    vm->vm_map.vm_cheri_revoke_st);
+			vmspace_free(vm);
+		}
+	} else
+		epoch = -1;
+
+	PRELE(p);
+out:
+	if (error == 0)
+		error = SYSCTL_OUT(req, &epoch, sizeof(epoch));
+	return (error);
+}
+
+static SYSCTL_NODE(_kern_proc, KERN_PROC_REVOKER_EPOCH, revoker_epoch,
+    CTLFLAG_RD | CTLFLAG_MPSAFE, sysctl_kern_proc_revoker_epoch,
+    "in-kernel revoker epoch");
+
 #ifdef CHERI_CAPREVOKE_STATS
 /* Here seems about as good a place as any */
 _Static_assert(sizeof(struct cheri_revoke_stats) ==
