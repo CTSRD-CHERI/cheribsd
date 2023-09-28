@@ -1057,6 +1057,8 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 #define	KERN_PROC_SIGFASTBLK	44	/* address of fastsigblk magic word */
 #define	KERN_PROC_VM_LAYOUT	45	/* virtual address space layout info */
 
+#define	KERN_PROC_QUARANTINING	46	/* is this process quarantining? */
+
 /*
  * KERN_IPC identifiers
  */
