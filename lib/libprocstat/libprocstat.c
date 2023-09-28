@@ -2171,6 +2171,117 @@ procstat_getumask(struct procstat *procstat, struct kinfo_proc *kp,
 }
 
 static int
+procstat_getquarantining_sysctl(pid_t pid, int *quarantiningp)
+{
+	int error, name[4];
+	size_t len;
+
+	name[0] = CTL_KERN;
+	name[1] = KERN_PROC;
+	name[2] = KERN_PROC_QUARANTINING;
+	name[3] = pid;
+	len = sizeof(*quarantiningp);
+	error = sysctl(name, nitems(name), quarantiningp, &len, NULL, 0);
+	if (error != 0 && errno != ESRCH)
+		warn("sysctl: kern.proc.quarantining: %d", pid);
+	return (error);
+}
+
+int
+procstat_getquarantining(struct procstat *procstat, struct kinfo_proc *kp,
+    int *quarantiningp)
+{
+	switch (procstat->type) {
+	case PROCSTAT_CORE:
+		warnx("%s: PROCSTAT_CORE not supported", __func__);
+		return (-1);
+	case PROCSTAT_KVM:
+		warnx("%s: PROCSTAT_KVM not supported", __func__);
+		return (-1);
+	case PROCSTAT_SYSCTL:
+		return (procstat_getquarantining_sysctl(kp->ki_pid,
+		    quarantiningp));
+	default:
+		warnx("unknown access method: %d", procstat->type);
+		return (-1);
+	}
+}
+
+static int
+procstat_get_revoker_epoch_sysctl(pid_t pid, uint64_t *revoker_epochp)
+{
+	int error, name[4];
+	size_t len;
+
+	name[0] = CTL_KERN;
+	name[1] = KERN_PROC;
+	name[2] = KERN_PROC_REVOKER_EPOCH;
+	name[3] = pid;
+	len = sizeof(*revoker_epochp);
+	error = sysctl(name, nitems(name), revoker_epochp, &len, NULL, 0);
+	if (error != 0 && errno != ESRCH)
+		warn("sysctl: kern.proc.revoker_epoch: %d", pid);
+	return (error);
+}
+
+int
+procstat_get_revoker_epoch(struct procstat *procstat, struct kinfo_proc *kp,
+    uint64_t *revoker_epochp)
+{
+	switch (procstat->type) {
+	case PROCSTAT_CORE:
+		warnx("%s: PROCSTAT_CORE not supported", __func__);
+		return (-1);
+	case PROCSTAT_KVM:
+		warnx("%s: PROCSTAT_KVM not supported", __func__);
+		return (-1);
+	case PROCSTAT_SYSCTL:
+		return (procstat_get_revoker_epoch_sysctl(kp->ki_pid,
+		    revoker_epochp));
+	default:
+		warnx("unknown access method: %d", procstat->type);
+		return (-1);
+	}
+}
+
+static int
+procstat_get_revoker_state_sysctl(pid_t pid, int *revoker_statep)
+{
+	int error, name[4];
+	size_t len;
+
+	name[0] = CTL_KERN;
+	name[1] = KERN_PROC;
+	name[2] = KERN_PROC_REVOKER_STATE;
+	name[3] = pid;
+	len = sizeof(*revoker_statep);
+	error = sysctl(name, nitems(name), revoker_statep, &len, NULL, 0);
+	if (error != 0 && errno != ESRCH)
+		warn("sysctl: kern.proc.revoker_state: %d", pid);
+	return (error);
+}
+
+int
+procstat_get_revoker_state(struct procstat *procstat, struct kinfo_proc *kp,
+    int *revoker_statep)
+{
+	switch (procstat->type) {
+	case PROCSTAT_CORE:
+		warnx("%s: PROCSTAT_CORE not supported", __func__);
+		return (-1);
+	case PROCSTAT_KVM:
+		warnx("%s: PROCSTAT_KVM not supported", __func__);
+		return (-1);
+	case PROCSTAT_SYSCTL:
+		return (procstat_get_revoker_state_sysctl(kp->ki_pid,
+		    revoker_statep));
+	default:
+		warnx("unknown access method: %d", procstat->type);
+		return (-1);
+	}
+}
+
+static int
 procstat_getrlimit_kvm(kvm_t *kd, struct kinfo_proc *kp, int which,
     struct rlimit* rlimit)
 {

@@ -94,6 +94,8 @@ static const struct procstat_cmd cmd_table[] = {
 	    PS_CMP_NORMAL },
 	{ "binary", "binary", NULL, &procstat_bin, &cmdopt_none,
 	    PS_CMP_SUBSTR },
+	{ "cheri", "cheri", "[-v]", &procstat_cheri, &cmdopt_verbose,
+	    PS_CMP_NORMAL },
 	{ "cpuset", "cs", NULL, &procstat_cs, &cmdopt_cpuset, PS_CMP_NORMAL },
 	{ "cs", "cs", NULL, &procstat_cs, &cmdopt_cpuset, PS_CMP_NORMAL },
 	{ "credential", "credentials", NULL, &procstat_cred, &cmdopt_none,
