@@ -141,6 +141,9 @@ kern_cheri_revoke(struct thread *td, int flags,
 		    CHERI_REVOKE_IGNORE_START | CHERI_REVOKE_LAST_NO_EARLY;
 		int ires = 0;
 
+		if (!vmm->vm_cheri_revoke_quarantining)
+			vmm->vm_cheri_revoke_quarantining = true;
+
 		epoch = cheri_revoke_st_get_epoch(vmm->vm_cheri_revoke_st);
 		entryst = cheri_revoke_st_get_state(vmm->vm_cheri_revoke_st);
 
@@ -509,14 +512,19 @@ static int
 kern_cheri_revoke_get_shadow(struct thread *td, int flags,
     void * __capability arena, void * __capability * __capability shadow)
 {
-	int arena_perms, error;
+	struct vmspace *vm;
+	vm_map_t vmm;
 	void * __capability cres;
 	vm_offset_t base, size;
+	int arena_perms, error;
 	int sel = flags & CHERI_REVOKE_SHADOW_SPACE_MASK;
 
 	if (!SV_CURPROC_FLAG(SV_CHERI)) {
 		return (ENOSYS);
 	}
+
+	KASSERT(td == curthread, ("%s: called for other than curthread",
+	    __func__));
 
 	switch (sel) {
 	case CHERI_REVOKE_SHADOW_NOVMMAP:
@@ -573,6 +581,14 @@ kern_cheri_revoke_get_shadow(struct thread *td, int flags,
 
 	if (!cheri_gettag(cres))
 		return (EINVAL);
+
+	vm = td->td_proc->p_vmspace;
+	vmm = &vm->vm_map;
+	vm_map_lock(vmm);
+	if (!vmm->vm_cheri_revoke_quarantining) {
+		vmm->vm_cheri_revoke_quarantining = true;
+	}
+	vm_map_unlock(vmm);
 
 	error = copyoutcap(&cres, shadow, sizeof(cres));
 
