@@ -571,6 +571,9 @@ kern_cheri_revoke_get_shadow(struct thread *td, int flags,
 		return (EINVAL);
 	}
 
+	if (!cheri_gettag(cres))
+		return (EINVAL);
+
 	error = copyoutcap(&cres, shadow, sizeof(cres));
 
 	return (error);
