@@ -1058,6 +1058,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 #define	KERN_PROC_VM_LAYOUT	45	/* virtual address space layout info */
 
 #define	KERN_PROC_QUARANTINING	46	/* is this process quarantining? */
+#define	KERN_PROC_REVOKER_STATE	47	/* revoker state */
 
 /*
  * KERN_IPC identifiers
