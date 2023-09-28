@@ -1,11 +1,15 @@
-/*
- * Copyright (c) 2021 Peter S. Blandford-Baker
+/*-
+ * Copyright (c) 2020, 2021 Edward Tomasz Napierala <trasz@FreeBSD.org>
+ * Copyright (C) 2023 Peter S Blandford-Baker
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
- * Cambridge Computer Laboratory (Department of Computer Science and
- * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
- * DARPA SSITH research programme.
+ * Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
+ * ("CTSRD"), as part of the DARPA CRASH research programme.
+ *
+ * This software was developed by the University of Cambridge Computer
+ * Laboratory as part of the CHERI for Hypervisors and Operating Systems
+ * (CHaOS) project, funded by EPSRC grant EP/V000292/1.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,16 +33,13 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
+#include <machine/asm.h>
 __FBSDID("$FreeBSD$");
+#include "SYS.h"
 
-#include "namespace.h"
-#include <unistd.h>
-#include "cheri_private.h"
-#include "un-namespace.h"
-
-int
-cogetpid2(void)
-{
-	return (_cogetpid2(_cogetpid2_code, _cogetpid2_data));
-}
+ENTRY(_cogetpid2)
+	stp     c29, c30, [csp, #-32]!
+	blrs	c29, c0, c1
+	ldp     c29, c30, [csp], #32
+	ret
+END(_cogetpid2)

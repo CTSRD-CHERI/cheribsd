@@ -66,5 +66,6 @@
 #define	SCB_TLS(X)		[X, #29*CHERICAP_SIZE]
 #define	SCB_FPCR(X)		[X, #30*CHERICAP_SIZE]
 #define	SCB_FPSR(X)		[X, #31*CHERICAP_SIZE]
+#define SCB_PID(X)      [X, #32*CHERICAP_SIZE]
 
 #endif /* !_MACHINE_SWITCHER_H_ */

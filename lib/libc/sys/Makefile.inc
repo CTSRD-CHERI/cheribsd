@@ -42,7 +42,7 @@ PSEUDO+= _sched_getcpu.o
 SRCS+= brk.c
 .endif
 .if ${MACHINE_ABI:Mpurecap}
-SRCS+= coaccept.c cocall.c cosetup.c cogetpid2.c cogettid.c
+SRCS+= coaccept.c cocall.c cosetup.c cogetpid2.c
 .endif
 SRCS+= closefrom.c
 SRCS+= pipe.c

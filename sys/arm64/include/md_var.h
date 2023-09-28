@@ -55,6 +55,8 @@ extern	char	switcher_cocall_copy_onfault[];
 extern	int	szswitcher_cocall;
 extern	char	switcher_coaccept[];
 extern	int	szswitcher_coaccept;
+extern	char	switcher_cogetpid[];
+extern	int	szswitcher_cogetpid;
 
 struct dumperinfo;
 struct minidumpstate;

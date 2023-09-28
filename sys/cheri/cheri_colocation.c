@@ -518,8 +518,9 @@ setup_scb(struct thread *td)
 	scb.scb_borrower_td = NULL;
 	scb.scb_caller_scb = cheri_capability_build_user_data(0, 0, 0, EAGAIN);
 	scb.scb_pid = td->td_proc->p_pid;
+#if   defined(__riscv)
 	scb.scb_tid = td->td_tid;
-
+#endif
 	colocation_store_scb(td, &scb);
 
 	return (0);

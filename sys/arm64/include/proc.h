@@ -143,7 +143,11 @@ struct switchercb {
 
 	void * __capability			scb_fpcr;
 	void * __capability			scb_fpsr;
-
+	
+	/*
+	 * XXX-PBB
+	 */
+	pid_t scb_pid;
 };
 #endif
 

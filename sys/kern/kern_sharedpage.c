@@ -384,10 +384,11 @@ exec_sysvec_init(void *param)
 		sv->sv_cogetpid_base = sv->sv_shared_page_base +
 		    shared_page_fill(szswitcher_cogetpid, 16, switcher_cogetpid);
 		sv->sv_cogetpid_len = szswitcher_cogetpid;
+#if   defined(__riscv)
 		sv->sv_cogettid_base = sv->sv_shared_page_base +
 		    shared_page_fill(szswitcher_cogettid, 16, switcher_cogettid);
 		sv->sv_cogettid_len = szswitcher_cogettid;
-
+#endif
 	}
 #endif
 }
