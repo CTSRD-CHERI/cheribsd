@@ -9,7 +9,9 @@ MAN=	arch.7 \
 	bsd.snmpmod.mk.7 \
 	build.7 \
 	c.7 \
+	capv.7 \
 	clocks.7 \
+	colocation.7 \
 	compartmentalization.7 \
 	crypto.7 \
 	development.7 \
@@ -46,6 +48,7 @@ MLINKS+= c.7 c99.7
 MLINKS+= c.7 c11.7
 MLINKS+= c.7 c17.7
 MLINKS+= c.7 c2x.7
+MLINKS+= colocation.7 switcher.7
 MLINKS+= compartmentalization.7 c18n.7
 
 .if ${MK_TESTS} != "no"

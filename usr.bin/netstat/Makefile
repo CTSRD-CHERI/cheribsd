@@ -6,7 +6,6 @@
 PROG=	netstat
 SRCS=	if.c inet.c main.c mbuf.c mroute.c netisr.c nl_symbols.c route.c \
 	unix.c mroute6.c ipsec.c bpf.c pfkey.c sctp.c common.c nhops.c nhgrp.c \
-	route_netlink.c \
 	nl_defs.h
 
 nl_symbols.c: nlist_symbols
@@ -66,6 +65,12 @@ LD_FATAL_WARNINGS=no
 SRCS+=	netgraph.c
 LIBADD+=	netgraph
 CFLAGS+=-DNETGRAPH
+.endif
+
+.if ${MK_NETLINK_SUPPORT} != "no"
+SRCS+=	route_netlink.c
+.else
+CFLAGS+=-DWITHOUT_NETLINK
 .endif
 
 .include <bsd.prog.mk>

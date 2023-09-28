@@ -113,3 +113,14 @@ freebsd64_jail(struct thread *td, struct freebsd64_jail_args *uap)
 		return (EINVAL);
 	}
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

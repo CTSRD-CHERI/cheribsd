@@ -929,7 +929,7 @@ _db_show_mesh(const struct ieee80211_mesh_state *ms)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "kdb"

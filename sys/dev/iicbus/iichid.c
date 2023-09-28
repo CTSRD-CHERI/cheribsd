@@ -1328,3 +1328,14 @@ MODULE_DEPEND(iichid, hid, 1, 1, 1);
 MODULE_DEPEND(iichid, hidbus, 1, 1, 1);
 MODULE_VERSION(iichid, 1);
 IICBUS_ACPI_PNP_INFO(iichid_ids);
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

@@ -40,6 +40,7 @@
 #include <sys/wait.h>
 
 #ifdef __CHERI__
+#include <sys/auxv.h>
 #include <cheri/cheri.h>
 #endif
 
@@ -249,28 +250,34 @@ test_clock_gettime(uintmax_t num, uintmax_t int_arg __unused, const char *path _
 static uintmax_t
 test_coping(uintmax_t num, uintmax_t int_arg, const char *path)
 {
-	char buf[int_arg];
-	void * __capability lookedup;
+	void * __capability buf[int_arg / 16 /* XXX */ + 2];
+	void * __capability *capv, *target;
+	char *tmp;
 	uintmax_t i;
-	int error;
+	ssize_t received;
+	int capc, entry, error;
+
+	capvfetch(&capc, &capv);
+	if (capc <= 0)
+		errx(1, "no capability vector");
+
+	entry = strtol(path, &tmp, 10);
+	if (*tmp != '\0' || entry < 0)
+		errx(1, "-n requires a natural number");
+	if (entry >= capc)
+		errx(1, "entry %d >= capc %d", entry, capc);
+	target = capv[entry];
 
 	error = cosetup(COSETUP_COCALL);
 	if (error != 0)
 		err(1, "cosetup");
 
-	error = colookup(path, &lookedup);
-	if (error != 0) {
-		if (errno == ESRCH) {
-			warnx("received ESRCH; this usually means there's nothing coregistered for \"%s\"", path);
-			warnx("use coexec(1) to colocate; you might also find \"ps aux -o vmaddr\" useful");
-		}
-		err(1, "colookup");
-	}
-
 	benchmark_start();
 	BENCHMARK_FOREACH(i, num) {
-		error = cocall(lookedup, buf, int_arg, buf, int_arg);
-		if (error != 0)
+		buf[0] = (void * __capability)(uintcap_t)int_arg;
+		buf[1] = NULL;
+		received = cocall(target, buf, int_arg, buf, int_arg);
+		if (received < 0)
 			err(1, "cocall");
 	}
 	benchmark_stop();
@@ -280,29 +287,31 @@ test_coping(uintmax_t num, uintmax_t int_arg, const char *path)
 static uintmax_t
 test_coping_slow(uintmax_t num, uintmax_t int_arg, const char *path)
 {
-	char buf[int_arg];
-	void * __capability lookedup;
+	void * __capability buf[int_arg / 16 /* XXX */ + 2];
+	void * __capability *capv, *target;
+	char *tmp;
 	uintmax_t i;
-	int error;
+	ssize_t received;
+	int capc, entry;
 
-	error = cosetup(COSETUP_COCALL);
-	if (error != 0)
-		err(1, "cosetup");
+	capvfetch(&capc, &capv);
+	if (capc <= 0)
+		errx(1, "no capability vector");
 
-	error = colookup(path, &lookedup);
-	if (error != 0) {
-		if (errno == ESRCH) {
-			warnx("received ESRCH; this usually means there's nothing coregistered for \"%s\"", path);
-			warnx("use coexec(1) to colocate; you might also find \"ps aux -o vmaddr\" useful");
-		}
-		err(1, "colookup");
-	}
+	entry = strtol(path, &tmp, 10);
+	if (*tmp != '\0' || entry < 0)
+		errx(1, "-n requires a natural number");
+	if (entry >= capc)
+		errx(1, "entry %d >= capc %d", entry, capc);
+	target = capv[entry];
 
 	benchmark_start();
 	BENCHMARK_FOREACH(i, num) {
-		error = cocall_slow(lookedup, buf, int_arg, buf, int_arg);
-		if (error != 0)
-			err(1, "cocall");
+		buf[0] = (void * __capability)(uintcap_t)int_arg;
+		buf[1] = NULL;
+		received = cocall_slow(target, buf, int_arg, buf, int_arg);
+		if (received < 0)
+			err(1, "cocall_slow");
 	}
 	benchmark_stop();
 	return (i);

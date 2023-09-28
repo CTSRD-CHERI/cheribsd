@@ -657,7 +657,7 @@ iov2physical(struct datalink *dl, struct iovec *iov, int *niov, int maxiov,
 }
 
 unsigned
-physical_MaxDeviceSize()
+physical_MaxDeviceSize(void)
 {
   unsigned biggest, sz, n;
 

@@ -219,6 +219,12 @@ static const struct syscall_decode decoded_syscalls[] = {
 	{ .name = "execve", .ret_type = 1, .nargs = 3,
 	  .args = { { Name | IN, 0 }, { ExecArgs | IN, 1 },
 		    { ExecEnv | IN, 2 } } },
+	{ .name = "coexecve", .ret_type = 1, .nargs = 4,
+	  .args = { { Int, 0 }, { Name | IN, 1 }, { ExecArgs | IN, 2 },
+		    { ExecEnv | IN, 3 } } },
+	{ .name = "coexecvec", .ret_type = 1, .nargs = 6,
+	  .args = { { Int, 0 }, { Name | IN, 1 }, { ExecArgs | IN, 2 },
+		    { ExecEnv | IN, 3 }, { Ptr, 4 }, { Int, 5 } } },
 	{ .name = "exit", .ret_type = 0, .nargs = 1,
 	  .args = { { Hex, 0 } } },
 	{ .name = "extattr_delete_fd", .ret_type = 1, .nargs = 3,
@@ -582,11 +588,6 @@ static const struct syscall_decode decoded_syscalls[] = {
 	  .args = { { Long, 0 }, { Name, 1 } } },
 	{ .name = "truncate", .ret_type = 1, .nargs = 2,
 	  .args = { { Name | IN, 0 }, { QuadHex | IN, 1 } } },
-#if 0
-	/* Does not exist */
-	{ .name = "umount", .ret_type = 1, .nargs = 2,
-	  .args = { { Name, 0 }, { Int, 2 } } },
-#endif
 	{ .name = "unlink", .ret_type = 1, .nargs = 1,
 	  .args = { { Name, 0 } } },
 	{ .name = "unlinkat", .ret_type = 1, .nargs = 3,

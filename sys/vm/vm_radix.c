@@ -910,7 +910,7 @@ DB_SHOW_COMMAND(radixnode, db_show_radixnode)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20221212,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "kdb"

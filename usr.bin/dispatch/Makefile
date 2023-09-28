@@ -1,0 +1,16 @@
+# $FreeBSD$
+
+.include <src.opts.mk>
+
+.PATH: ${SRCTOP}/sys/${MACHINE}/cheri
+
+PROG=	dispatch
+SRCS=	dispatch.c eprototype.S cheri_cocall.S cheri_coaccept.S
+
+# XXX this is required to make the *.S build
+CFLAGS.cheri_cocall.S+=	-D_KERNEL
+CFLAGS.cheri_coaccept.S+= -D_KERNEL
+
+WARNS?=	5
+
+.include <bsd.prog.mk>

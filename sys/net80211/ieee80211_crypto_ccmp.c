@@ -377,8 +377,9 @@ ccmp_init_blocks(rijndael_ctx *ctx, struct ieee80211_frame *wh,
 	/* NB: aad[1] set below */
 	aad[2] = wh->i_fc[0] & 0x8f;	/* XXX magic #s */
 	aad[3] = wh->i_fc[1] & 0xc7;	/* XXX magic #s */
-	/* NB: we know 3 addresses are contiguous */
-	memcpy(aad + 4, wh->i_addr1, 3 * IEEE80211_ADDR_LEN);
+	memcpy(aad + 4, wh->i_addr1, IEEE80211_ADDR_LEN);
+	memcpy(aad + 10, wh->i_addr2, IEEE80211_ADDR_LEN);
+	memcpy(aad + 16, wh->i_addr3, IEEE80211_ADDR_LEN);
 	aad[22] = wh->i_seq[0] & IEEE80211_SEQ_FRAG_MASK;
 	aad[23] = 0; /* all bits masked */
 	/*
@@ -681,3 +682,12 @@ ccmp_decrypt(struct ieee80211_key *key, u_int64_t pn, struct mbuf *m, int hdrlen
  * Module glue.
  */
 IEEE80211_CRYPTO_MODULE(ccmp, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20230509,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

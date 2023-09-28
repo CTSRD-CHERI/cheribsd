@@ -42,6 +42,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_page.h>
+#include <vm/vm_param.h>
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
@@ -83,7 +84,11 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 			/* If the address is in the DMAP just copy it */
 			if (VIRT_IN_DMAP(v)) {
 #ifdef __CHERI_PURE_CAPABILITY__
-				error = uiomove(cheri_setbounds(
+				/*
+				 * Note that cnt <= PAGE_SIZE, exact setbounds
+				 * is guaranteed to work.
+				 */
+				error = uiomove(cheri_setboundsexact(
 				    cheri_setaddress(dmap_capability, v), cnt),
 				    cnt, uio);
 #else
@@ -110,8 +115,8 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 			/* If within the DMAP use this to copy from */
 			if (PHYS_IN_DMAP(v)) {
 #ifdef __CHERI_PURE_CAPABILITY__
-				error = uiomove(cheri_setbounds(
-				    (void *)PHYS_TO_DMAP(v), cnt), cnt, uio);
+				error = uiomove((void *)PHYS_TO_DMAP_LEN(v, cnt),
+				    cnt, uio);
 #else
 				v = PHYS_TO_DMAP(v);
 				error = uiomove((void *)v, cnt, uio);
@@ -160,7 +165,7 @@ memioctl_md(struct cdev *dev __unused, u_long cmd __unused,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",

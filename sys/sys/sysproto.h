@@ -485,6 +485,7 @@ struct coexecvec_args {
 	char argv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability argv; char argv_r_[PADR_(char * __capability * __capability)];
 	char envv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability envv; char envv_r_[PADR_(char * __capability * __capability)];
 	char capv_l_[PADL_(char * __capability __capability * __capability)]; char * __capability __capability * __capability capv; char capv_r_[PADR_(char * __capability __capability * __capability)];
+	char capc_l_[PADL_(int)]; int capc; char capc_r_[PADR_(int)];
 };
 struct nlm_syscall_args {
 	char debug_level_l_[PADL_(int)]; int debug_level; char debug_level_r_[PADR_(int)];
@@ -512,6 +513,14 @@ struct rtprio_args {
 	char function_l_[PADL_(int)]; int function; char function_r_[PADR_(int)];
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
 	char rtp_l_[PADL_(struct rtprio * __capability)]; struct rtprio * __capability rtp; char rtp_r_[PADR_(struct rtprio * __capability)];
+};
+struct capfromfd_args {
+	char capp_l_[PADL_(void * __capability __capability * __capability)]; void * __capability __capability * __capability capp; char capp_r_[PADR_(void * __capability __capability * __capability)];
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+};
+struct captofd_args {
+	char cap_l_[PADL_(void * __capability __capability)]; void * __capability __capability cap; char cap_r_[PADR_(void * __capability __capability)];
+	char fdp_l_[PADL_(int * __capability)]; int * __capability fdp; char fdp_r_[PADR_(int * __capability)];
 };
 struct semsys_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
@@ -1921,6 +1930,9 @@ struct swapoff_args {
 	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
 	char flags_l_[PADL_(u_int)]; u_int flags; char flags_r_[PADR_(u_int)];
 };
+struct kqueuex_args {
+	char flags_l_[PADL_(u_int)]; u_int flags; char flags_r_[PADR_(u_int)];
+};
 int	sys_exit(struct thread *, struct exit_args *);
 int	sys_fork(struct thread *, struct fork_args *);
 int	sys_read(struct thread *, struct read_args *);
@@ -2028,6 +2040,8 @@ int	sys_lgetfh(struct thread *, struct lgetfh_args *);
 int	sys_getfh(struct thread *, struct getfh_args *);
 int	sysarch(struct thread *, struct sysarch_args *);
 int	sys_rtprio(struct thread *, struct rtprio_args *);
+int	sys_capfromfd(struct thread *, struct capfromfd_args *);
+int	sys_captofd(struct thread *, struct captofd_args *);
 int	sys_semsys(struct thread *, struct semsys_args *);
 int	sys_msgsys(struct thread *, struct msgsys_args *);
 int	sys_shmsys(struct thread *, struct shmsys_args *);
@@ -2329,6 +2343,7 @@ int	sys_aio_readv(struct thread *, struct aio_readv_args *);
 int	sys_fspacectl(struct thread *, struct fspacectl_args *);
 int	sys_sched_getcpu(struct thread *, struct sched_getcpu_args *);
 int	sys_swapoff(struct thread *, struct swapoff_args *);
+int	sys_kqueuex(struct thread *, struct kqueuex_args *);
 
 #ifdef COMPAT_43
 
@@ -2973,6 +2988,8 @@ int	freebsd13_swapoff(struct thread *, struct freebsd13_swapoff_args *);
 #define	SYS_AUE_freebsd4_uname	AUE_NULL
 #define	SYS_AUE_sysarch	AUE_SYSARCH
 #define	SYS_AUE_rtprio	AUE_RTPRIO
+#define	SYS_AUE_capfromfd	AUE_NULL
+#define	SYS_AUE_captofd	AUE_NULL
 #define	SYS_AUE_semsys	AUE_SEMSYS
 #define	SYS_AUE_msgsys	AUE_MSGSYS
 #define	SYS_AUE_shmsys	AUE_SHMSYS
@@ -3311,6 +3328,7 @@ int	freebsd13_swapoff(struct thread *, struct freebsd13_swapoff_args *);
 #define	SYS_AUE_fspacectl	AUE_FSPACECTL
 #define	SYS_AUE_sched_getcpu	AUE_NULL
 #define	SYS_AUE_swapoff	AUE_SWAPOFF
+#define	SYS_AUE_kqueuex	AUE_KQUEUE
 
 #undef PAD_
 #undef PADL_

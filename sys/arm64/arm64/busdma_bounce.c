@@ -975,7 +975,7 @@ bounce_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map)
 }
 
 static void
-dma_preread_safe(vm_offset_t va, vm_size_t size)
+dma_preread_safe(vm_pointer_t va, vm_size_t size)
 {
 	/*
 	 * Write back any partial cachelines immediately before and

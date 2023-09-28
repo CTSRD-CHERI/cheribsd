@@ -461,11 +461,13 @@ _thr_attr_setguardsize(pthread_attr_t *attr, size_t guardsize __unused)
 	/* Check for invalid arguments. */
 	if (attr == NULL || *attr == NULL)
 		ret = EINVAL;
+#ifdef __CHERI_PURE_CAPABILITY__
+	else if (guardsize != 0)
+		ret = EINVAL;
+#endif
 	else {
-#ifndef __CHERI_PURE_CAPABILITY__
 		/* Save the stack size. */
 		(*attr)->guardsize_attr = guardsize;
-#endif
 		ret = 0;
 	}
 	return (ret);

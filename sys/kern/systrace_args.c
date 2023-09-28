@@ -828,7 +828,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		uarg[a++] = (intptr_t)p->argv; /* char * __capability * __capability */
 		uarg[a++] = (intptr_t)p->envv; /* char * __capability * __capability */
 		uarg[a++] = (intptr_t)p->capv; /* char * __capability __capability * __capability */
-		*n_args = 5;
+		iarg[a++] = p->capc; /* int */
+		*n_args = 6;
 		break;
 	}
 	/* nlm_syscall */
@@ -880,6 +881,22 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[a++] = p->pid; /* pid_t */
 		uarg[a++] = (intptr_t)p->rtp; /* struct rtprio * __capability */
 		*n_args = 3;
+		break;
+	}
+	/* capfromfd */
+	case 167: {
+		struct capfromfd_args *p = params;
+		uarg[a++] = (intptr_t)p->capp; /* void * __capability __capability * __capability */
+		iarg[a++] = p->fd; /* int */
+		*n_args = 2;
+		break;
+	}
+	/* captofd */
+	case 168: {
+		struct captofd_args *p = params;
+		uarg[a++] = (intptr_t)p->cap; /* void * __capability __capability */
+		uarg[a++] = (intptr_t)p->fdp; /* int * __capability */
+		*n_args = 2;
 		break;
 	}
 	/* semsys */
@@ -3533,6 +3550,13 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
+	/* kqueuex */
+	case 583: {
+		struct kqueuex_args *p = params;
+		uarg[a++] = p->flags; /* u_int */
+		*n_args = 1;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -4861,6 +4885,9 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		case 4:
 			p = "userland char * __capability __capability * __capability";
 			break;
+		case 5:
+			p = "int";
+			break;
 		default:
 			break;
 		};
@@ -4947,6 +4974,32 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 2:
 			p = "userland struct rtprio * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* capfromfd */
+	case 167:
+		switch (ndx) {
+		case 0:
+			p = "userland void * __capability __capability * __capability";
+			break;
+		case 1:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* captofd */
+	case 168:
+		switch (ndx) {
+		case 0:
+			p = "userland void * __capability __capability";
+			break;
+		case 1:
+			p = "userland int * __capability";
 			break;
 		default:
 			break;
@@ -9454,6 +9507,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* kqueuex */
+	case 583:
+		switch (ndx) {
+		case 0:
+			p = "u_int";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -9963,6 +10026,16 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* rtprio */
 	case 166:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* capfromfd */
+	case 167:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* captofd */
+	case 168:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
@@ -11300,12 +11373,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* cocall_slow */
 	case 548:
 		if (ndx == 0 || ndx == 1)
-			p = "int";
+			p = "ssize_t";
 		break;
 	/* coaccept_slow */
 	case 549:
 		if (ndx == 0 || ndx == 1)
-			p = "int";
+			p = "ssize_t";
 		break;
 	/* fdatasync */
 	case 550:
@@ -11466,6 +11539,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 581:
 	/* swapoff */
 	case 582:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* kqueuex */
+	case 583:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

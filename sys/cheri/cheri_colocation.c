@@ -34,9 +34,13 @@ __FBSDID("$FreeBSD$");
 #include "opt_ddb.h"
 
 #include <sys/param.h>
+#include <sys/capsicum.h>
+#include <sys/file.h>
+#include <sys/filedesc.h>
 #include <sys/kernel.h>
 #include <sys/mman.h>
 #include <sys/proc.h>
+#include <sys/priv.h>
 #include <sys/sx.h>
 #include <sys/syscall.h>
 #include <sys/syscallsubr.h>
@@ -56,6 +60,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_pageout.h>
 #include <vm/vm_map.h>
 
+#include <machine/pcb.h>
+
 #ifdef DDB
 #include <ddb/ddb.h>
 #include <sys/kdb.h>
@@ -71,6 +77,11 @@ void * __capability	switcher_sealcap = (void * __capability)-1;
  */
 void * __capability	switcher_sealcap2 = (void * __capability)-1;
 
+/*
+ * Capability used to seal capabilities returned by capfromfd(2).
+ */
+void * __capability	capfd_sealcap = (void * __capability)-1;
+
 struct sx		switcher_lock;
 
 #define	SWITCHER_LOCK()		sx_xlock(&switcher_lock)
@@ -82,6 +93,11 @@ SYSCTL_INT(_debug, OID_AUTO, colocation_debug, CTLFLAG_RWTUN,
 static int counregister_on_exit = 1;
 SYSCTL_INT(_debug, OID_AUTO, counregister_on_exit, CTLFLAG_RWTUN,
     &counregister_on_exit, 0, "Remove dead conames on thread exit");
+
+bool allow_colookup = true;
+SYSCTL_BOOL(_security_bsd, OID_AUTO, allow_colookup, CTLFLAG_RWTUN,
+    &allow_colookup, 0,
+    "Deny colookup(2) use by returning ENOSYS");
 
 #ifdef DDB
 static int kdb_on_switcher_trap;
@@ -263,7 +279,7 @@ colocation_get_peer(struct thread *td, struct thread **peertdp)
 		return;
 	}
 
-	*peertdp = scb.scb_borrower_td;
+	*peertdp = (__cheri_fromcap struct thread *)scb.scb_borrower_td;
 }
 
 void
@@ -308,7 +324,7 @@ colocation_thread_exit(struct thread *td)
 	 * Set scb_caller_scb to a special "null" capability, so that cocall(2)
 	 * can see the callee thread is dead.
 	 */
-	scb.scb_caller_scb = cheri_capability_build_user_data(0, 0, 0, EPIPE);
+	scb.scb_caller_scb = cheri_capability_build_user_data(0, 0, 0, ENOLINK);
 	scb.scb_td = NULL;
 	scb.scb_borrower_td = NULL;
 
@@ -329,16 +345,13 @@ colocation_unborrow(struct thread *td)
 	struct switchercb scb;
 	struct thread *peertd;
 	struct trapframe peertrapframe;
-#ifdef __aarch64__
-	uintcap_t peertpidr;
-#endif
 	bool have_scb;
 
 	have_scb = colocation_fetch_scb(td, &scb);
 	if (!have_scb)
 		return;
 
-	peertd = scb.scb_borrower_td;
+	peertd = (__cheri_fromcap struct thread *)scb.scb_borrower_td;
 	if (peertd == NULL) {
 		/*
 		 * Nothing borrowed yet.
@@ -362,8 +375,8 @@ colocation_unborrow(struct thread *td)
 #error "what architecture is this?"
 #endif
 
-	KASSERT(td == scb.scb_td,
-	    ("%s: td %p != scb_td %p\n", __func__, td, scb.scb_td));
+	KASSERT(td == (__cheri_fromcap struct thread *)scb.scb_td,
+	    ("%s: td %p != scb_td %p\n", __func__, td, (__cheri_fromcap struct thread *)scb.scb_td));
 	KASSERT(peertd != td,
 	    ("%s: peertd %p == td %p\n", __func__, peertd, td));
 
@@ -378,14 +391,16 @@ colocation_unborrow(struct thread *td)
 		kdb_enter(KDB_WHY_CHERI, "unborrow");
 #endif
 
-
 #ifdef __aarch64__
 	/*
-	 * On aarch64, the TLS pointer is in TPC, not in td_frame.
+	 * Because this thread was borrowed by a callee coprocess this
+	 * register contains the starting address of the thread local storage
+	 * (TLS) of another thread. This overwrites this address with the
+	 * TLS starting address that actually belongs to this thread.
+	 * We have to do this here because the value in this register is written
+	 * to kernel data structures when we execute copark later on.
 	 */
-	peertpidr = peertd->td_pcb->pcb_tpidr_el0;
-	peertd->td_pcb->pcb_tpidr_el0 = td->td_pcb->pcb_tpidr_el0;
-	td->td_pcb->pcb_tpidr_el0 = peertpidr;
+	WRITE_SPECIALREG_CAP(ctpidr_el0, scb.scb_tls);
 #endif
 
 	memcpy(&peertrapframe, peertd->td_frame, sizeof(struct trapframe));
@@ -514,7 +529,7 @@ setup_scb(struct thread *td)
 	//printf("%s: scb at %p, td %p\n", __func__, (void *)addr, td);
 	memset(&scb, 0, sizeof(scb));
 	scb.scb_unsealcap = switcher_sealcap2;
-	scb.scb_td = td;
+	scb.scb_td = (__cheri_tocap void * __capability)td;
 	scb.scb_borrower_td = NULL;
 	scb.scb_caller_scb = cheri_capability_build_user_data(0, 0, 0, EAGAIN);
 	scb.scb_pid = td->td_proc->p_pid;
@@ -554,7 +569,21 @@ switcher_code_cap(struct thread *td, ptraddr_t base, size_t length)
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
 		codecap = cheri_capmode(codecap);
 #endif
-	return (cheri_seal(codecap, switcher_sealcap));
+	return (codecap);
+}
+
+static void * __capability
+rederive(const void * __capability from)
+{
+	void * __capability codecap;
+
+	codecap = cheri_capability_build_inexact_user_rwx(CHERI_CAP_USER_CODE_PERMS,
+	    cheri_getbase(from) + cheri_getoffset(from), cheri_getlength(from) - cheri_getoffset(from), 0);
+	if (SV_PROC_FLAG(curthread->td_proc, SV_CHERI))
+		codecap = cheri_capmode(codecap);
+
+	//printf("%s: %#lp -> %#lp\n", __func__, from, codecap);
+	return (codecap);
 }
 
 int
@@ -564,6 +593,7 @@ kern_cosetup(struct thread *td, int what,
 {
 	void * __capability codecap;
 	void * __capability datacap;
+	struct vmspace *vmspace;
 	int error;
 
 	KASSERT(switcher_sealcap != (void * __capability)-1,
@@ -579,30 +609,44 @@ kern_cosetup(struct thread *td, int what,
 			return (error);
 	}
 
+	vmspace = td->td_proc->p_vmspace;
+
 	switch (what) {
 	case COSETUP_COCALL:
-		codecap = switcher_code_cap(td,
-		    td->td_proc->p_sysent->sv_cocall_base,
-		    td->td_proc->p_sysent->sv_cocall_len);
-		error = sucap(codep, (intcap_t)codecap);
+		if (vmspace->vm_cocall_codecap != NULL) {
+			codecap = vmspace->vm_cocall_codecap;
+			codecap = cheri_capmode(codecap);
+		} else {
+			codecap = switcher_code_cap(td,
+			    td->td_proc->p_sysent->sv_cocall_base,
+			    td->td_proc->p_sysent->sv_cocall_len);
+		}
+		codecap = cheri_seal(codecap, switcher_sealcap);
+		error = sucap(codep, (intcap_t)codecap) == 0 ? 0 : EFAULT;
 		if (error != 0)
 			return (error);
 
 		datacap = cheri_seal(td->td_scb, switcher_sealcap);
-		error = sucap(datap, (intcap_t)datacap);
+		error = sucap(datap, (intcap_t)datacap) == 0 ? 0 : EFAULT;
 		return (error);
 
 
 	case COSETUP_COACCEPT:
-		codecap = switcher_code_cap(td,
-		    td->td_proc->p_sysent->sv_coaccept_base,
-		    td->td_proc->p_sysent->sv_coaccept_len);
-		error = sucap(codep, (intcap_t)codecap);
+		if (vmspace->vm_coaccept_codecap != NULL) {
+			codecap = vmspace->vm_coaccept_codecap;
+			codecap = cheri_capmode(codecap);
+		} else {
+			codecap = switcher_code_cap(td,
+			    td->td_proc->p_sysent->sv_coaccept_base,
+			    td->td_proc->p_sysent->sv_coaccept_len);
+		}
+		codecap = cheri_seal(codecap, switcher_sealcap);
+		error = sucap(codep, (intcap_t)codecap) == 0 ? 0 : EFAULT;
 		if (error != 0)
 			return (error);
 
 		datacap = cheri_seal(td->td_scb, switcher_sealcap);
-		error = sucap(datap, (intcap_t)datacap);
+		error = sucap(datap, (intcap_t)datacap) == 0 ? 0 : EFAULT;
 		return (error);
 		break;
 
@@ -630,6 +674,31 @@ kern_cosetup(struct thread *td, int what,
 		error = sucap(datap, (intcap_t)datacap);
 		return (error);
 
+	case COSETUP_TAKEOVER:
+		error = priv_check(td, PRIV_KMEM_WRITE);
+		if (error != 0) {
+			COLOCATION_DEBUG("COSETUP_TAKEOVER failing with error %d", error);
+			return (error);
+		}
+
+		if (vmspace->vm_cocall_codecap != NULL || vmspace->vm_coaccept_codecap != NULL)
+			return (EBUSY);
+
+		error = fuecap(codep, (intcap_t *)&codecap);
+		if (error != 0) {
+			COLOCATION_DEBUG("COSETUP_TAKEOVER: failed to fetch cocall cap from %#lp, error %d", codep, error);
+			return (error);
+		}
+		error = fuecap(datap, (intcap_t *)&datacap);
+		if (error != 0) {
+			COLOCATION_DEBUG("COSETUP_TAKEOVER: failed to fetch coaccept cap from %#lp, error %d", datap, error);
+			return (error);
+		}
+
+		vmspace->vm_cocall_codecap = rederive(codecap);
+		vmspace->vm_coaccept_codecap = rederive(datacap);
+
+		return (0);
 	default:
 		return (EINVAL);
 	}
@@ -663,7 +732,7 @@ kern_coregister(struct thread *td, const char * __capability namep,
 	cap = cheri_seal(td->td_scb, switcher_sealcap2);
 
 	if (capp != NULL) {
-		error = sucap(capp, (intcap_t)cap);
+		error = sucap(capp, (intcap_t)cap) == 0 ? 0 : EFAULT;
 		if (error != 0)
 			return (error);
 	}
@@ -714,6 +783,9 @@ kern_colookup(struct thread *td, const char * __capability namep,
 	char name[PATH_MAX];
 	int error;
 
+	if (!allow_colookup)
+		return (ENOSYS);
+
 	vmspace = td->td_proc->p_vmspace;
 
 	error = copyinstr(namep, name, sizeof(name), NULL);
@@ -733,7 +805,7 @@ kern_colookup(struct thread *td, const char * __capability namep,
 
 	cap = (intcap_t)con->c_value;
 	vm_map_unlock_read(&vmspace->vm_map);
-	error = sucap(capp, cap);
+	error = sucap(capp, cap) == 0 ? 0 : EFAULT;
 	return (error);
 }
 
@@ -764,7 +836,6 @@ kern_cogetpid(struct thread *td, pid_t * __capability pidp)
 int
 sys_copark(struct thread *td, struct copark_args *uap)
 {
-
 	return (kern_copark(td));
 }
 
@@ -801,31 +872,17 @@ kern_cocall_slow(void * __capability target,
 	struct switchercb scb, calleescb;
 	struct switchercb * __capability targetscb;
 	struct thread *calleetd __diagused;
+	ssize_t received;
 	int error;
 	bool have_scb;
 
-	if (outbuf == NULL) {
-		if (outlen != 0) {
-			COLOCATION_DEBUG("outbuf == NULL, but outlen != 0, returning EINVAL");
-			return (EINVAL);
-		}
-	} else {
-		if (outlen == 0) {
-			COLOCATION_DEBUG("outbuf != NULL, but outlen == 0, returning EINVAL");
-			return (EINVAL);
-		}
+	if (outbuf == NULL && outlen != 0) {
+		COLOCATION_DEBUG("outbuf == NULL, but outlen != 0, returning EINVAL");
+		return (EINVAL);
 	}
-
-	if (inbuf == NULL) {
-		if (inlen != 0) {
-			COLOCATION_DEBUG("inbuf == NULL, but inlen != 0, returning EINVAL");
-			return (EINVAL);
-		}
-	} else {
-		if (inlen == 0) {
-			COLOCATION_DEBUG("inbuf != NULL, but inlen == 0, returning EINVAL");
-			return (EINVAL);
-		}
+	if (inbuf == NULL && inlen != 0) {
+		COLOCATION_DEBUG("inbuf == NULL, but inlen != 0, returning EINVAL");
+		return (EINVAL);
 	}
 
 	have_scb = colocation_fetch_scb(curthread, &scb);
@@ -834,11 +891,28 @@ kern_cocall_slow(void * __capability target,
 		return (EINVAL);
 	}
 
+	curproc->p_cocall_received = 0;
+
 	/*
 	 * Unseal the capability to the callee control block and load it.
 	 *
-	 * XXX: How to detect unsealing failure?  Would it trap?
+	 * XXX: We could drop those three checks once we have a non-trapping unseal.
 	 */
+	if (cheri_gettag(target) == 0) {
+		COLOCATION_DEBUG("untagged target %#lp; returning EINVAL", target);
+		return (EINVAL);
+	}
+	if (cheri_getsealed(target) == 0) {
+		COLOCATION_DEBUG("unsealed target %#lp; returning EINVAL", target);
+		return (EINVAL);
+	}
+	if (cheri_gettype(target) == cheri_gettype(switcher_sealcap2)) {
+		COLOCATION_DEBUG("target %#lp type %lu != %#lp type %lu; returning EINVAL",
+		    target, cheri_gettype(target),
+		    switcher_sealcap2, cheri_gettype(switcher_sealcap2));
+		return (EINVAL);
+	}
+
 	targetscb = cheri_unseal(target, switcher_sealcap2);
 
 	SWITCHER_LOCK();
@@ -900,7 +974,7 @@ again:
 	 */
 	colocation_store_scb(curthread, &scb);
 
-	calleetd = calleescb.scb_td;
+	calleetd = (__cheri_fromcap struct thread *)calleescb.scb_td;
 	KASSERT(calleetd != NULL, ("%s: NULL calleetd?\n", __func__));
 
 	// XXX: What happens when the callee thread dies while we are here?
@@ -930,11 +1004,15 @@ again:
 	SWITCHER_UNLOCK();
 
 	/*
-	 * XXX: There is currently no way to return an error to the caller,
-	 *      should the copyuser() fail.
+	 * Return the error stored by the callee.
 	 */
+	received = curproc->p_cocall_received;
+	if (received >= 0) {
+		curthread->td_retval[0] = received;
+		return (0);
+	}
 
-	return (error);
+	return (-received);
 }
 
 int
@@ -952,31 +1030,17 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 {
 	struct switchercb scb, callerscb;
 	void * __capability cookie;
+	size_t copied;
 	int error;
 	bool have_scb, is_callee;
 
-	if (outbuf == NULL) {
-		if (outlen != 0) {
-			COLOCATION_DEBUG("outbuf != NULL, but outlen != 0, returning EINVAL");
-			return (EINVAL);
-		}
-	} else {
-		if (outlen == 0) {
-			COLOCATION_DEBUG("outbuf != NULL, but outlen == 0, returning EINVAL");
-			return (EINVAL);
-		}
+	if (outbuf == NULL && outlen != 0) {
+		COLOCATION_DEBUG("outbuf == NULL, but outlen != 0, returning EINVAL");
+		return (EINVAL);
 	}
-
-	if (inbuf == NULL) {
-		if (inlen != 0) {
-			COLOCATION_DEBUG("inbuf != NULL, but inlen != 0, returning EINVAL");
-			return (EINVAL);
-		}
-	} else {
-		if (inlen == 0) {
-			COLOCATION_DEBUG("inbuf != NULL, but inlen == 0, returning EINVAL");
-			return (EINVAL);
-		}
+	if (inbuf == NULL && inlen != 0) {
+		COLOCATION_DEBUG("inbuf == NULL, but inlen != 0, returning EINVAL");
+		return (EINVAL);
 	}
 
 	SWITCHER_LOCK();
@@ -1011,16 +1075,20 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 
 		/*
 		 * Move data from callee to caller.
+		 *
+		 * XXX MOVE THIS SOMEWHERE FFS
 		 */
-		error = copyuser(outbuf, callerscb.scb_inbuf,
-		    MIN(outlen, callerscb.scb_inlen));
+		copied = MIN(outlen, callerscb.scb_inlen);
+		error = copyuser(outbuf, callerscb.scb_inbuf, copied);
 		if (error != 0) {
+			callerscb.scb_td->td_proc->p_cocall_received = -error;
 			SWITCHER_UNLOCK();
 			COLOCATION_DEBUG("copyuser error %d, waking up %lp",
 			    error, callerscb.scb_td->td_scb);
 			wakeupself();
 			return (error);
 		}
+		callerscb.scb_td->td_proc->p_cocall_received = copied;
 
 		wakeupself();
 	}
@@ -1053,8 +1121,8 @@ again:
 	/*
 	 * Move data from caller to callee.
 	 */
-	error = copyuser(callerscb.scb_outbuf, inbuf,
-	    MIN(inlen, callerscb.scb_outlen));
+	copied = MIN(inlen, callerscb.scb_outlen); // XXX
+	error = copyuser(callerscb.scb_outbuf, inbuf, copied);
 	if (error != 0) {
 		COLOCATION_DEBUG("copyuser error %d", error);
 		wakeupself();
@@ -1066,7 +1134,7 @@ again:
 	 */
 	if (cookiep != NULL) {
 		cookie = cheri_cleartag(scb.scb_caller_scb);
-		error = sucap(cookiep, (intcap_t)cookie);
+		error = sucap(cookiep, (intcap_t)cookie) == 0 ? 0 : EFAULT;
 		if (error != 0) {
 			COLOCATION_DEBUG("sucap error %d", error);
 			wakeupself();
@@ -1074,6 +1142,7 @@ again:
 		}
 	}
 
+	curthread->td_retval[0] = copied;
 	return (0);
 }
 
@@ -1083,6 +1152,103 @@ sys_coaccept_slow(struct thread *td, struct coaccept_slow_args *uap)
 
 	return (kern_coaccept_slow(uap->cookiep,
 	    uap->outbuf, uap->outlen, uap->inbuf, uap->inlen));
+}
+
+/*
+ * XXX: Twose two seem a bit... too simple.  Proceed with caution.
+ *
+ * XXX: Perhaps we should make sure that both sides are running
+ *      in the same address space.  But if they're not, then
+ *      there is no way to pass the capability in the first place.
+ */
+int
+sys_capfromfd(struct thread *td, struct capfromfd_args *uap)
+{
+	void * __capability fcap;
+	struct file *fp;
+	cap_rights_t rights;
+	int error;
+
+	KASSERT(capfd_sealcap != (void * __capability)-1,
+             ("%s: uninitialized capfd_sealcap", __func__));
+	KASSERT(capfd_sealcap != switcher_sealcap,
+             ("%s: capfd_sealcap == switcher_sealcap", __func__));
+	KASSERT(capfd_sealcap != switcher_sealcap2,
+             ("%s: capfd_sealcap == switcher_sealcap2", __func__));
+
+	error = fget(curthread, uap->fd, cap_rights_init_one(&rights, CAP_SOCK_CLIENT), &fp);
+	if (error != 0) {
+		COLOCATION_DEBUG("fget error %d", error);
+		return (error);
+	}
+	if (!(fp->f_ops->fo_flags & DFLAG_PASSABLE)) {
+		COLOCATION_DEBUG("DFLAG_PASSABLE set; returning EOPNOTSUPP");
+		fdrop(fp, curthread);
+		return (EOPNOTSUPP);
+	}
+
+	fcap = (void * __capability)fp;
+	fcap = cheri_seal(fcap, capfd_sealcap);
+	error = sucap(uap->capp, (intcap_t)fcap) == 0 ? 0 : EFAULT;
+	if (error != 0)
+		COLOCATION_DEBUG("sucap error %d", error);
+
+	/*
+	 * XXX: We never free that fp.  Plan is to use garbage collection
+	 *      to reclaim the sealed cap.  In the meantime we could call
+	 *      fdrop(9) when the calling process exits, but we would still
+	 *      need a mechanism to prevent address reuse for the sealed cap.
+	 */
+
+	return (error);
+}
+
+int
+sys_captofd(struct thread *td, struct captofd_args *uap)
+{
+	void * __capability fcap;
+	struct file *fp;
+	int error, fd;
+
+	fcap = uap->cap;
+
+	/*
+	 * XXX: We could drop those three checks once we have a non-trapping unseal.
+	 */
+	if (cheri_gettag(fcap) == 0) {
+		COLOCATION_DEBUG("untagged fcap %#lp; returning EINVAL", fcap);
+		return (EINVAL);
+	}
+	if (cheri_getsealed(fcap) == 0) {
+		COLOCATION_DEBUG("unsealed fcap %#lp; returning EINVAL", fcap);
+		return (EINVAL);
+	}
+	if (cheri_gettype(fcap) == cheri_gettype(capfd_sealcap)) {
+		COLOCATION_DEBUG("fcap %#lp type %lu != %#lp type %lu; returning EINVAL",
+		    fcap, cheri_gettype(fcap),
+		    capfd_sealcap, cheri_gettype(capfd_sealcap));
+		return (EINVAL);
+	}
+
+	fcap = cheri_unseal(fcap, capfd_sealcap);
+	if (fcap == NULL) {
+		/*
+		 * XXX: This code path is completely untested
+		 *      due to cheri_unseal() trapping.
+		 */
+		COLOCATION_DEBUG("cheri_unseal failed");
+		return (EINVAL);
+	}
+
+	fp = (__cheri_fromcap struct file *)fcap;
+	error = finstall(td, fp, &fd, 0, NULL);
+	if (error != 0) {
+		COLOCATION_DEBUG("finstall error %d", error);
+		return (error);
+	}
+
+	error = copyout(&fd, uap->fdp, sizeof(fd));
+	return (0);
 }
 
 #ifdef DDB
@@ -1097,8 +1263,8 @@ db_print_scb(struct thread *td, struct switchercb *scb)
 		db_print_cap(td, "    scb_caller_scb:    ", scb->scb_caller_scb);
 	}
 	db_print_cap(td, "    scb_callee_scb:    ", scb->scb_callee_scb);
-	db_printf(       "    scb_td:            %p\n", scb->scb_td);
-	db_printf(       "    scb_borrower_td:   %p\n", scb->scb_borrower_td);
+	db_print_cap(td, "    scb_td:            ", scb->scb_td);
+	db_print_cap(td, "    scb_borrower_td:   ", scb->scb_borrower_td);
 	db_print_cap(td, "    scb_unsealcap:     ", scb->scb_unsealcap);
 	db_print_cap(td, "    scb_csp:           ", scb->scb_csp);
 	db_print_cap(td, "    scb_cra:           ", scb->scb_cra);
@@ -1205,13 +1371,13 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 		    td->td_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
 		db_print_scb_td(td);
 
-		borrowertd = scb.scb_borrower_td;
+		borrowertd = (__cheri_fromcap struct thread *)scb.scb_borrower_td;
 		shown_borrowertd = false;
 
 		have_scb = colocation_fetch_caller_scb(td, &scb);
 		if (have_scb) {
-			if (borrowertd != scb.scb_td) {
-				td = scb.scb_td;
+			if (borrowertd != (__cheri_fromcap struct thread *)scb.scb_td) {
+				td = (__cheri_fromcap struct thread *)scb.scb_td;
 				p = td->td_proc;
 				db_printf(" caller's SCB %#lp owned by thread %p, pid %d (%s), stack owned by %d:\n",
 				    td->td_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
@@ -1228,8 +1394,8 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 		td = curthread;
 		have_scb = colocation_fetch_callee_scb(td, &scb);
 		if (have_scb) {
-			if (borrowertd != scb.scb_td) {
-				td = scb.scb_td;
+			if (borrowertd != (__cheri_fromcap struct thread *)scb.scb_td) {
+				td = (__cheri_fromcap struct thread *)scb.scb_td;
 				p = td->td_proc;
 				db_printf(" callee's SCB %#lp owned by thread %p, pid %d (%s), stack owned by %d:\n",
 				    td->td_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
@@ -1291,6 +1457,18 @@ sys_cocall_slow(struct thread *td, struct cocall_slow_args *uap)
 
 int
 sys_coaccept_slow(struct thread *td, struct coaccept_slow_args *uap)
+{
+	return (ENOSYS);
+}
+
+int
+sys_capfromfd(struct thread *td, struct capfromfd_args *uap)
+{
+	return (ENOSYS);
+}
+
+int
+sys_captofd(struct thread *td, struct captofd_args *uap)
 {
 	return (ENOSYS);
 }

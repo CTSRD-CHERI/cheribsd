@@ -2058,7 +2058,7 @@ gicv3_its_acpi_attach(device_t dev)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",

@@ -272,7 +272,7 @@ static int rtw_ops_change_interface(struct ieee80211_hw *hw,
 static void rtw_ops_configure_filter(struct ieee80211_hw *hw,
 				     unsigned int changed_flags,
 				     unsigned int *new_flags,
-				     u64 multicast)
+				     uintptr_t multicast)
 {
 	struct rtw_dev *rtwdev = hw->priv;
 
@@ -941,3 +941,12 @@ const struct ieee80211_ops rtw_ops = {
 #endif
 };
 EXPORT_SYMBOL(rtw_ops);
+// CHERI CHANGES START
+// {
+//   "updated": 20230509,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

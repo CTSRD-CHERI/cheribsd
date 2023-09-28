@@ -467,7 +467,7 @@ int  smb_iod_removerq(struct smb_rq *rqp);
 #endif /* _KERNEL */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "subobject_bounds"

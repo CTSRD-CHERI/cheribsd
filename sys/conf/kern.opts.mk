@@ -62,7 +62,8 @@ __DEFAULT_NO_OPTIONS = \
     INIT_ALL_ZERO \
     KERNEL_RETPOLINE \
     RATELIMIT \
-    REPRODUCIBLE_BUILD
+    REPRODUCIBLE_BUILD \
+    VERIEXEC
 
 # Some options are totally broken on some architectures. We disable
 # them. If you need to enable them on an experimental basis, you
@@ -99,9 +100,11 @@ __DEFAULT_NO_OPTIONS += FDT
 __DEFAULT_YES_OPTIONS += FDT
 .endif
 
-# Broken post OpenZFS import
 .if ${MACHINE_CPU:Mcheri}
+# Broken post OpenZFS import
 BROKEN_OPTIONS+=CDDL
+# iw_cxgbe fails to build
+BROKEN_OPTIONS+=OFED
 .endif
 
 # expanded inline from bsd.mkopt.mk to avoid share/mk dependency

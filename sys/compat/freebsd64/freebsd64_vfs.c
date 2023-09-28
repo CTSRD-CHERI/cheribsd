@@ -215,7 +215,7 @@ freebsd11_freebsd64_stat(struct thread *td,
 	int error;
 
 	error = kern_statat(td, 0, AT_FDCWD, __USER_CAP_STR(uap->path),
-	    UIO_USERSPACE, &sb, NULL);
+	    UIO_USERSPACE, &sb);
 	if (error != 0)
 		return (error);
 	error = freebsd11_freebsd64_cvtstat(&sb, &osb);
@@ -483,7 +483,7 @@ freebsd11_freebsd64_lstat(struct thread *td,
 	int error;
 
 	error = kern_statat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD,
-	    __USER_CAP_STR(uap->path), UIO_USERSPACE, &sb, NULL);
+	    __USER_CAP_STR(uap->path), UIO_USERSPACE, &sb);
 	if (error != 0)
 		return (error);
 	error = freebsd11_freebsd64_cvtstat(&sb, &osb);
@@ -522,7 +522,7 @@ freebsd11_freebsd64_fstatat(struct thread *td,
 	int error;
 
 	error = kern_statat(td, uap->flag, uap->fd, __USER_CAP_STR(uap->path),
-	    UIO_USERSPACE, &sb, NULL);
+	    UIO_USERSPACE, &sb);
 	if (error != 0)
 		return (error);
 	error = freebsd11_freebsd64_cvtstat(&sb, &osb);
@@ -582,7 +582,7 @@ freebsd11_freebsd64_nstat(struct thread *td,
 	int error;
 
 	error = kern_statat(td, 0, AT_FDCWD, __USER_CAP_STR(uap->path),
-	    UIO_USERSPACE, &sb, NULL);
+	    UIO_USERSPACE, &sb);
 	if (error != 0)
 		return (error);
 	freebsd11_freebsd64_cvtnstat(&sb, &nsb);
@@ -601,7 +601,7 @@ freebsd11_freebsd64_nlstat(struct thread *td,
 	int error;
 
 	error = kern_statat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD,
-	    __USER_CAP_STR(uap->path), UIO_USERSPACE, &sb, NULL);
+	    __USER_CAP_STR(uap->path), UIO_USERSPACE, &sb);
 	if (error != 0)
 		return (error);
 	freebsd11_freebsd64_cvtnstat(&sb, &nsb);
@@ -1249,3 +1249,15 @@ freebsd64_copy_file_range(struct thread *td,
 	    __USER_CAP_OBJ(uap->inoffp), uap->outfd,
 	    __USER_CAP_OBJ(uap->outoffp), uap->len, uap->flags));
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "support",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

@@ -29,7 +29,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd November 19, 2020
+.Dd July 2, 2022
 .Dt COCALL 2
 .Os
 .Sh NAME
@@ -39,8 +39,9 @@
 .Lb libc
 .Sh SYNOPSIS
 .In unistd.h
-.Ft int
+.Ft ssize_t
 .Fn cocall "void * __capability target" "const void * __capability outbuf" "size_t outlen" "void * __capability inbuf" "size_t inlen"
+.Ft ssize_t
 .Fn cocall_slow "void * __capability target" "const void * __capability outbuf" "size_t outlen" "void * __capability inbuf" "size_t inlen"
 .Sh DESCRIPTION
 The
@@ -57,10 +58,23 @@ Before returning, at most
 .Fa inlen
 bytes will be copied from the callee's output buffer into
 .Fa inbuf .
-Any capabilities copied will have their tag bits cleared.
-The
+Any capabilities copied will have their tag bits preserved.
+.Pp
+When the callee is already busy with another caller,
+.Fn cocall 2
+will spin retrying.
+If you are observing this, it usually means the service should keep
+separate threads - and thus separate targets - for each caller.
+.Pp
+.Fn cocall 2
+attempts to use the switcher-based
+.Fn _cocall 2
+fast path first, transparently falling back to
 .Fn cocall_slow 2
-provides the same semantics, but implemented as a traditional system call.
+if required.
+.Fn cocall_slow 2
+can be used to force the slow syscall path; it provides
+the same semantic otherwise.
 .Pp
 The
 .Ar target
@@ -80,7 +94,12 @@ with
 .Dv COSETUP_COCALL
 argument.
 .Sh RETURN VALUES
-.Rv -std cocall
+Upon successful completion the number of bytes copied into
+.Fa inbuf
+is returned.
+Otherwise a -1 is returned and the global variable
+.Va errno
+is set to indicate the error.
 .Sh ERRORS
 The
 .Fn cocall
@@ -90,7 +109,7 @@ function will fail if:
 The callee has not called
 .Xr coaccept 2
 yet.
-.It Bq Er EPIPE
+.It Bq Er ENOLINK
 The callee is no longer available, usually because it exited.
 .It Bq Er EPROTOTYPE
 Used
@@ -119,6 +138,7 @@ Basic usage example:
 .Bd -literal
 	void * __capability lookedup;
 	uint64_t buf[MAXBSIZE];
+	ssize_t received;
 
 	error = cosetup(COSETUP_COCALL);
 	if (error != 0)
@@ -128,8 +148,10 @@ Basic usage example:
 	if (error != 0)
 		err(1, "colookup");
 
-	error = cocall(lookedup, buf, sizeof(buf), buf, sizeof(buf));
-	if (error != 0)
+	memset(buf, 0, sizeof(buf);
+
+	received = cocall(lookedup, buf, sizeof(buf), buf, sizeof(buf));
+	if (received < 0)
 		err(1, "cocall");
 .Ed
 .Sh SEE ALSO

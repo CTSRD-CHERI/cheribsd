@@ -5,11 +5,8 @@
 PROG=	syscall_timing
 MAN=
 
-#LIBADD=		statcounters
+#LIBADD=	statcounters
 #CFLAGS+=	-DWITH_LIBSTATCOUNTERS
-CFLAGS+=	-fPIE -pie -Wno-error=deprecated-declarations -fuse-ld=lld
-NEED_CHERI=	hybrid
-MK_CHERI_SHARED_PROG:=yes
 
 WARNS=	6
 

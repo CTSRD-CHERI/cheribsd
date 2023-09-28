@@ -1716,7 +1716,7 @@ mb_mapped_to_unmapped(struct mbuf *mp, int len, int mlen, int how,
 	m = mout = mb_alloc_ext_plus_pages(mbufsiz, how);
 	if (m == NULL)
 		return (m);
-	pgpos = (char *)(void *)PHYS_TO_DMAP(m->m_epg_pa[0]);
+	pgpos = (char *)(void *)PHYS_TO_DMAP_PAGE(m->m_epg_pa[0]);
 	pglen = PAGE_SIZE;
 	mblen = 0;
 	i = 0;
@@ -1734,7 +1734,7 @@ mb_mapped_to_unmapped(struct mbuf *mp, int len, int mlen, int how,
 				}
 				i = 0;
 			}
-			pgpos = (char *)(void *)PHYS_TO_DMAP(m->m_epg_pa[i]);
+			pgpos = (char *)(void *)PHYS_TO_DMAP_PAGE(m->m_epg_pa[i]);
 			pglen = PAGE_SIZE;
 		}
 		while (mblen == 0) {
@@ -1764,7 +1764,7 @@ mb_mapped_to_unmapped(struct mbuf *mp, int len, int mlen, int how,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "support"

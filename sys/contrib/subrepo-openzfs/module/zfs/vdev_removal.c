@@ -1168,11 +1168,11 @@ spa_vdev_copy_segment(vdev_t *vd, range_tree_t *segs,
 	metaslab_class_t *mc = mg->mg_class;
 	if (mc->mc_groups == 0)
 		mc = spa_normal_class(spa);
-	int error = metaslab_alloc_dva(spa, mc, size, &dst, 0, NULL, txg, 0,
-	    zal, 0);
+	int error = metaslab_alloc_dva(spa, mc, size, &dst, 0, NULL, txg,
+	    METASLAB_DONT_THROTTLE, zal, 0);
 	if (error == ENOSPC && mc != spa_normal_class(spa)) {
 		error = metaslab_alloc_dva(spa, spa_normal_class(spa), size,
-		    &dst, 0, NULL, txg, 0, zal, 0);
+		    &dst, 0, NULL, txg, METASLAB_DONT_THROTTLE, zal, 0);
 	}
 	if (error != 0)
 		return (error);
@@ -2414,7 +2414,7 @@ spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 		 * in this pool.
 		 */
 		if (vd == NULL || unspare) {
-			char *type;
+			const char *type;
 			boolean_t draid_spare = B_FALSE;
 
 			if (nvlist_lookup_string(nv, ZPOOL_CONFIG_TYPE, &type)

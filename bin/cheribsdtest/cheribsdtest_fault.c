@@ -62,11 +62,9 @@
  */
 
 #if CHERI_SEAL_VIOLATION_EXCEPTION
-#define	CT_SEAL_VIOLATION_EXCEPTION					\
-    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,	\
-    .ct_signum = SIGPROT,						\
-    .ct_si_code = PROT_CHERI_PERM,					\
-    .ct_si_trapno = TRAPNO_CHERI
+#define	CT_SEAL_VIOLATION_EXCEPTION	\
+    .ct_flags = CT_FLAG_SIGNAL,		\
+    .ct_signum = SIGPROT,
 #else
 #define	CT_SEAL_VIOLATION_EXCEPTION
 #endif
@@ -131,10 +129,19 @@ CHERIBSDTEST(illegal_perm_seal,
 		cheribsdtest_failure_err("sysctlbyname(security.cheri.sealcap)");
 	sealcap = cheri_andperm(sealcap, ~CHERI_PERM_SEAL);
 	sealed = cheri_seal(ip, sealcap);
-#if !CHERI_SEAL_VIOLATION_EXCEPTION
-	if (!cheri_gettag(sealed))
-		cheribsdtest_success();
+	/* cheri_seal() should tag-clear on failure on all architectures. */
+	if (!cheri_gettag(sealed)) {
+#if CHERI_SEAL_VIOLATION_EXCEPTION
+		/*
+		 * For the transition period from trapping to tag-clearing
+		 * semantics for CHERI-RISC-V, we report a SIGPROT here for CI.
+		 * TODO: remove this once we require tag-clearing.
+		 */
+		if (csr_read(uccsr) & SCCSR_TAG_CLEARING)
+			raise(SIGPROT);
 #endif
+		cheribsdtest_success();
+	}
 	cheribsdtest_failure_errx("cheri_seal() performed successfully "
 	    "%#lp with bad sealcap %#lp", sealed, sealcap);
 }
@@ -181,10 +188,19 @@ CHERIBSDTEST(illegal_perm_unseal,
 	sealed = cheri_seal(ip, sealcap);
 	sealcap = cheri_andperm(sealcap, ~CHERI_PERM_UNSEAL);
 	unsealed = cheri_unseal(sealed, sealcap);
-#if !CHERI_SEAL_VIOLATION_EXCEPTION
-	if (!cheri_gettag(unsealed))
-		cheribsdtest_success();
+	/* cheri_unseal() should tag-clear on failure on all architectures. */
+	if (!cheri_gettag(unsealed)) {
+#if CHERI_SEAL_VIOLATION_EXCEPTION
+		/*
+		 * For the transition period from trapping to tag-clearing
+		 * semantics for CHERI-RISC-V, we report a SIGPROT here for CI.
+		 * TODO: remove this once we require tag-clearing.
+		 */
+		if (csr_read(uccsr) & SCCSR_TAG_CLEARING)
+			raise(SIGPROT);
 #endif
+		cheribsdtest_success();
+	}
 	cheribsdtest_failure_errx("cheri_unseal() performed successfully "
 	    "%#lp with bad unsealcap %#lp", unsealed, sealcap);
 }

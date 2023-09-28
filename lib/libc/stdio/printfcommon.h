@@ -297,8 +297,8 @@ __ujtoa(uintmax_t val, CHAR *endp, int base, int octzero, const char *xdigs)
  * 'x' (EXECUTE), 'R' (LOAD_CAP), and 'W' (STORE_CAP).
  *
  * The attributes are a comma-separated list of "invalid", "sentry",
- * or "sealed" (sealed but not a sentry) enclosed in ()'s.  If no
- * attributes are true, the ()'s are omitted.
+ * "sealed" (sealed but not a sentry), or "capmode" enclosed in ()'s.
+ * If no attributes are true, the ()'s are omitted.
  */
 
 static CHAR *
@@ -307,37 +307,62 @@ __cheri_ptr_alt(void * __capability pointer, CHAR *cp, const char *xdigs,
 {
 	uintmax_t ujval;
 	CHAR *scp;
-	const char *p;
 	int padding, size;
+#ifdef CHERI_FLAGS_CAP_MODE
+	bool capmode;
+#endif
+	bool have_attributes, tagged;
 
 	/* Skip attributes if NULL-derived. */
 	if (cheri_is_null_derived(pointer))
 		goto address;
 
-	/* tag and sealing */
-	switch (cheri_gettype(pointer)) {
-	case CHERI_OTYPE_UNSEALED:
-		if (cheri_gettag(pointer))
-			p = NULL;
-		else
-			p = "(invalid)";
-		break;
-	case CHERI_OTYPE_SENTRY:
-		if (cheri_gettag(pointer))
-			p = "(sentry)";
-		else
-			p = "(invalid,sentry)";
-		break;
-	default:
-		if (cheri_gettag(pointer))
-			p = "(sealed)";
-		else
-			p = "(invalid,sealed)";
-		break;
+	tagged = cheri_gettag(pointer);
+	have_attributes = !tagged;
+	if (cheri_gettype(pointer) != CHERI_OTYPE_UNSEALED)
+		have_attributes = true;
+
+#ifdef CHERI_FLAGS_CAP_MODE
+	capmode = false;
+	if ((cheri_getperm(pointer) & CHERI_PERM_EXECUTE) != 0 &&
+	    cheri_getflags(pointer) == CHERI_FLAGS_CAP_MODE) {
+		capmode = true;
+		have_attributes = true;
 	}
-	if (p != NULL) {
-		cp -= strlen(p);
-		memcpy(cp, p, strlen(p));
+#endif
+
+	/* attributes */
+	if (have_attributes) {
+		*--cp = ')';
+
+#define	PREPEND_ATTR(cp, str) do {					\
+	(cp) -= strlen((str));						\
+	memcpy((cp), (str), strlen((str)));				\
+	*--(cp) = ',';							\
+} while (0)
+
+#ifdef __riscv
+		if (capmode)
+			PREPEND_ATTR(cp, "capmode");
+#endif
+		switch (cheri_gettype(pointer)) {
+		case CHERI_OTYPE_UNSEALED:
+			break;
+		case CHERI_OTYPE_SENTRY:
+			PREPEND_ATTR(cp, "sentry");
+			break;
+		default:
+			PREPEND_ATTR(cp, "sealed");
+			break;
+		}
+		if (!tagged)
+			PREPEND_ATTR(cp, "invalid");
+
+#undef PREPEND_ATTR
+
+		/* Replace first ',' with '('. */
+		*cp = '(';
+
 		*--cp = ' ';
 	}
 

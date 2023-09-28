@@ -3005,7 +3005,8 @@ err:
 //   "updated": 20910259,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros"
+//     "iovec-macros",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

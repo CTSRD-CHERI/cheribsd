@@ -167,10 +167,15 @@ SYSCTL_INT(_kern, OID_AUTO, core_dump_can_intr, CTLFLAG_RWTUN,
     &core_dump_can_intr, 0,
     "Core dumping interruptible with SIGKILL");
 
-int opportunistic_coexecve = 0;
+int opportunistic_coexecve = 1;
 SYSCTL_INT(_kern, OID_AUTO, opportunistic_coexecve, CTLFLAG_RW,
     &opportunistic_coexecve, 0,
     "Try to colocate binaries on execve(2)");
+
+static int opportunistic_capv = 1;
+SYSCTL_INT(_kern, OID_AUTO, opportunistic_capv, CTLFLAG_RW,
+    &opportunistic_capv, 0,
+    "Inherit the capability vector by default");
 
 static int
 sysctl_kern_ps_strings(SYSCTL_HANDLER_ARGS)
@@ -278,7 +283,7 @@ sys_coexecvec(struct thread *td, struct coexecvec_args *uap)
 		return (error);
 	}
 	error = exec_copyin_args_capv(&args, uap->fname,
-	    UIO_USERSPACE, uap->argv, uap->envv, uap->capv);
+	    UIO_USERSPACE, uap->argv, uap->envv, uap->capv, uap->capc);
 	if (error == 0)
 		error = kern_coexecve(td, &args, NULL, oldvmspace, p, false);
 	post_execve(td, error, oldvmspace);
@@ -455,10 +460,15 @@ kern_execve(struct thread *td, struct image_args *args,
 	}
 
 	if (opportunistic_coexecve != 0) {
-#ifdef OPPORTUNISTIC_USE_PARENTS
+#ifndef OPPORTUNISTIC_USE_SID
 		sx_slock(&proctree_lock);
 		cop = proc_realparent(p);
 		PROC_LOCK(cop);
+		if (cop->p_flag2 & P2_NOCOLOCATE) {
+			PROC_UNLOCK(cop);
+			sx_sunlock(&proctree_lock);
+			goto fallback;
+		}
 #else
 		/*
 		 * If we're the session leader and we're executing something,
@@ -476,13 +486,18 @@ kern_execve(struct thread *td, struct image_args *args,
 			goto fallback;
 		}
 #endif
+		if ((cop->p_flag & P_WEXIT) != 0) {
+			PROC_UNLOCK(cop);
+			sx_sunlock(&proctree_lock);
+			goto fallback;
+		}
 		if (p_cancolocate(td, cop, true) != 0) {
 			PROC_UNLOCK(cop);
 			sx_sunlock(&proctree_lock);
 			goto fallback;
 		}
+		_PHOLD(cop);
 		PROC_UNLOCK(cop);
-		PHOLD(cop);
 		sx_sunlock(&proctree_lock);
 		error = kern_coexecve(td, args, mac_p, oldvmspace, cop, true);
 		PRELE(cop);
@@ -899,6 +914,27 @@ interpret:
 	}
 
 	/*
+	 * Copy out the inherited capability vector, unless we got explicitly
+	 * passed a new one, or the inherited one came from a different
+	 * vmspace, or it's globally disabled.
+	 *
+	 * XXX security policy goes here
+	 *
+	 * ... to decide which capabilities can be allowed through,
+	 * and which need to be invalidated; currently we allow all
+	 * of them, similar to what we do with colookup(2).
+	 */
+	if (imgp->args->capc <= 0 && p->p_capc > 0 &&
+	    p->p_capv_vmspace == p->p_vmspace &&
+	    opportunistic_capv) {
+		imgp->args->capc = p->p_capc;
+		imgp->args->capv = p->p_capv;
+		p->p_capc = 0;
+		p->p_capv = NULL;
+		p->p_capv_vmspace = NULL;
+	}
+
+	/*
 	 * Copy out strings (args and env) and initialize stack base.
 	 */
 	error = (*p->p_sysent->sv_copyout_strings)(imgp, &stack_base);
@@ -979,6 +1015,7 @@ interpret:
 		p->p_flag2 &= ~P2_NOTRACE;
 	if ((p->p_flag2 & P2_STKGAP_DISABLE_EXEC) == 0)
 		p->p_flag2 &= ~P2_STKGAP_DISABLE;
+	p->p_flag2 &= ~P2_NOCOLOCATE;
 	if (p->p_flag & P_PPWAIT) {
 		p->p_flag &= ~(P_PPWAIT | P_PPTRACE);
 		cv_broadcast(&p->p_pwait);
@@ -1091,7 +1128,8 @@ interpret:
 	if (PMC_SYSTEM_SAMPLING_ACTIVE() || PMC_PROC_IS_USING_PMCS(p)) {
 		VOP_UNLOCK(imgp->vp);
 		pe.pm_credentialschanged = credential_changing;
-		pe.pm_entryaddr = imgp->entry_addr;
+		pe.pm_baseaddr = imgp->reloc_base;
+		pe.pm_dynaddr = imgp->et_dyn_addr;
 
 		PMC_CALL_HOOK_X(td, PMC_FN_PROCESS_EXEC, (void *) &pe);
 		vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
@@ -1178,6 +1216,18 @@ exec_fail:
 		sigacts_free(oldsigacts);
 	if (euip != NULL)
 		uifree(euip);
+
+	/*
+	 * Save capv, so it can get implicitly passed on to descendants.
+	 */
+	if (error == 0 && imgp->args->capc > 0) {
+		free(p->p_capv, M_CAPV);
+		p->p_capc = imgp->args->capc;
+		p->p_capv = imgp->args->capv;
+		p->p_capv_vmspace = p->p_vmspace;
+		imgp->args->capc = 0;
+		imgp->args->capv = NULL;
+	}
 
 	if (error && imgp->vmspace_destroyed) {
 		if (opportunistic) {
@@ -1676,34 +1726,11 @@ get_argenv_ptr(void * __capability *arrayp, void * __capability *ptrp)
 	return (0);
 }
 
-#if __has_feature(capabilities)
-static int
-get_argcap_ptr(void * __capability *arrayp, void * __capability *ptrp)
-{
-	uintcap_t ptr;
-	char * __capability array;
-
-	array = *arrayp;
-
-	KASSERT(SV_CURPROC_FLAG(SV_LP64 | SV_CHERI) == (SV_LP64 | SV_CHERI),
-	    ("%s: not cheri?", __func__));
-
-	if (fuecap(array, &ptr) == -1)
-		return (EFAULT);
-	array += sizeof(ptr);
-	*ptrp = (void * __capability)ptr;
-
-	*arrayp = array;
-
-	return (0);
-}
-#endif
-
 int
 exec_copyin_args(struct image_args *args, const char * __capability fname,
     enum uio_seg segflg, void * __capability argv, void * __capability envv)
 {
-	return (exec_copyin_args_capv(args, fname, segflg, argv, envv, NULL));
+	return (exec_copyin_args_capv(args, fname, segflg, argv, envv, NULL, 0));
 }
 
 /*
@@ -1713,7 +1740,7 @@ exec_copyin_args(struct image_args *args, const char * __capability fname,
 int
 exec_copyin_args_capv(struct image_args *args, const char * __capability fname,
     enum uio_seg segflg, void * __capability argv, void * __capability envv,
-    void * __capability capv)
+    void * __capability capv, int capc)
 {
 	void * __capability ptr;
 	int error;
@@ -1772,16 +1799,9 @@ exec_copyin_args_capv(struct image_args *args, const char * __capability fname,
 	 * extract capability vector
 	 */
 	if (capv) {
-		for (;;) {
-			error = get_argcap_ptr(&capv, &ptr);
-			if (error != 0)
-				goto err_exit;
-			error = exec_args_add_cap(args, ptr);
-			if (error != 0)
-				goto err_exit;
-			if (ptr == NULL)
-				break;
-		}
+		error = exec_args_add_capv(args, capv, capc);
+		if (error != 0)
+			goto err_exit;
 	}
 #endif
 
@@ -1928,6 +1948,11 @@ exec_free_args(struct image_args *args)
 		free(args->fname_buf, M_TEMP);
 		args->fname_buf = NULL;
 	}
+	if (args->capv != NULL) {
+		free(args->capv, M_CAPV);
+		args->capc = 0;
+		args->capv = NULL;
+	}
 }
 
 /*
@@ -2027,15 +2052,29 @@ exec_args_add_env(struct image_args *args, const char * __capability envp,
 
 #if __has_feature(capabilities)
 int
-exec_args_add_cap(struct image_args *args, void * __capability cap)
+exec_args_add_capv(struct image_args *args, void * __capability capv, int capc)
 {
+	size_t capvlen;
+	int error;
 
-	if (args->capc >= nitems(args->capv))
+	KASSERT(args->capv == NULL, ("capv %p not NULL", args->capv));
+	KASSERT(args->capc == 0, ("capc %d not 0", args->capc));
+
+	if (capc < 0)
+		return (EINVAL);
+
+	if (capc == 0)
+		return (0);
+
+	if (capc >= 42 /* XXX */)
 		return (E2BIG);
 
-	args->capv[args->capc++] = cap;
+	capvlen = capc * sizeof(void * __capability);
+	args->capv = malloc(capvlen, M_CAPV, M_WAITOK);
+	error = copyincap(capv, args->capv, capvlen);
+	args->capc = capc;
 
-	return (0);
+	return (error);
 }
 #endif
 
@@ -2691,11 +2730,12 @@ sbuf_drain_core_output(void *arg, const char *data, int len)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "integer_provenance",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ],
 //   "changes_purecap": [
 //     "pointer_as_integer",

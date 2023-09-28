@@ -42,7 +42,7 @@
 .Ft int
 .Fn coexecve "pid_t pid" "const char *path" "char *const argv[]" "char *const envp[]"
 .Ft int
-.Fn coexecvec "pid_t pid" "const char *path" "char *const argv[]" "char *const envp[]" "char *const capv[]"
+.Fn coexecvec "pid_t pid" "const char *path" "char *const argv[]" "char *const envp[]" "char *const capv[]" "int capc"
 .Ft int
 .Fn execve "const char *path" "char *const argv[]" "char *const envp[]"
 .Ft int
@@ -250,12 +250,34 @@ The
 .Fn coexecvec
 is equivalent to
 .Fn coexecve ,
-except it also takes a NULL-terminated capability vector, which
-can be retrieved in the child process using
+except it also takes a capability vector, which
+can then be retrieved using
 .Xr elf_aux_info 3
-with the
+with
+.Dv AT_CAPC
+and
 .Dv AT_CAPV
-argument.
+arguments.
+The
+.Fa capv
+argument points to the capability vector, while the
+.Fa capc
+is the number of entries in the vector (and not its length in bytes).
+Passing
+.Dv NULL
+as
+.Fa capv
+and
+.Dv 0
+for
+.Fa capc
+results in inheriting the vector.
+Other values result in the indicated vector replacing the inherited one.
+To force passing an empty vector, pass one with a single, NULL entry.
+The vector will not be made accessible unless the
+.Fa pid
+argument points to a process colocated in the address space the vector
+originated from.
 .Sh RETURN VALUES
 As the
 .Fn execve
@@ -351,9 +373,11 @@ In addition, the
 will fail and return to the calling process if:
 .Bl -tag -width Er
 .It Bq Er EPROT
-Attempt to pass the capability vector across address spaces,
+Attempt to pass explicitly specified capability vector across address spaces,
 usually caused by an attempt to call
 .Fn coexecvec
+with non-NULL
+.Ar capv
 after
 .Xr fork 2
 instead of
@@ -375,6 +399,7 @@ argument is not a valid file descriptor open for executing.
 .Xr _exit 2 ,
 .Xr fork 2 ,
 .Xr open 2 ,
+.Xr coexecvpc 3 ,
 .Xr elf_aux_info 3 ,
 .Xr execl 3 ,
 .Xr exit 3 ,

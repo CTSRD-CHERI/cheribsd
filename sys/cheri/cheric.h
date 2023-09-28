@@ -34,6 +34,9 @@
 
 #include <sys/cdefs.h>
 #include <sys/types.h>
+#if !defined(_KERNEL) && !defined(_STANDALONE)
+#include <stdbool.h>
+#endif
 
 #if __has_feature(capabilities)
 #include <cheri/cherireg.h>	/* Permission definitions. */
@@ -96,11 +99,7 @@
  * Return whether the two pointers are equal, including capability metadata if
  * in purecap mode.
  */
-#ifdef __cplusplus
 static inline bool
-#else
-static inline _Bool
-#endif
 cheri_ptr_equal_exact(void *x, void *y)
 {
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -140,14 +139,23 @@ cheri_ptr_equal_exact(void *x, void *y)
 })
 
 /* Check if the address is between cap.base and cap.top, i.e. in bounds */
-#ifdef __cplusplus
 static inline bool
-#else
-static inline _Bool
-#endif
 cheri_is_address_inbounds(const void * __capability cap, ptraddr_t addr)
 {
 	return (addr >= cheri_getbase(cap) && addr < cheri_gettop(cap));
+}
+
+/*
+ * Check if the capability is valid, unsealed, has the given permissions and
+ * grants access to length bytes at address base.
+ */
+static inline bool
+cheri_can_access(const void * __capability cap, ptraddr_t perms, ptraddr_t base,
+    size_t length)
+{
+	return (cheri_gettag(cap) && !cheri_getsealed(cap) &&
+	    (cheri_getperm(cap) & perms) == perms &&
+	    base >= cheri_getbase(cap) && base + length <= cheri_gettop(cap));
 }
 
 /*
@@ -438,8 +446,12 @@ ssize_t	strfcap(char * __restrict buf, size_t maxsize,
 #endif /* _SYS_CHERIC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "header",
+//   "changes": [
+//     "support",
+//     "ctoptr"
+//   ],
 //   "changes_purecap": [
 //     "support"
 //   ]

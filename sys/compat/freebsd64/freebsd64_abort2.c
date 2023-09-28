@@ -68,3 +68,14 @@ freebsd64_abort2(struct thread *td, struct freebsd64_abort2_args *uap)
 	}
 	return (kern_abort2(td, __USER_CAP_STR(uap->why), nargs, uargsp));
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

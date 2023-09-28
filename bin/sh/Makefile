@@ -40,15 +40,18 @@ CFLAGS+=	-DSHELL -I. -I${SRCDIR}
 CLEANFILES+= mknodes mksyntax
 CLEANFILES+= ${GENSRCS} ${GENHDRS}
 
+.if ${MACHINE} == "host" || ${MK_DIRDEPS_BUILD} == "no"
 build-tools: mknodes mksyntax
+
+DEPENDOBJS+= mknodes mksyntax
+mknodes mksyntax: ${BUILD_TOOLS_META}
+.endif
 
 .ORDER: builtins.c builtins.h
 builtins.h: .NOMETA
 builtins.c builtins.h: mkbuiltins builtins.def
 	sh ${SRCDIR}/mkbuiltins ${SRCDIR}
 
-DEPENDOBJS+= mknodes mksyntax
-mknodes mksyntax: ${BUILD_TOOLS_META}
 
 .ORDER: nodes.c nodes.h
 nodes.h: .NOMETA

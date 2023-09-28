@@ -31,7 +31,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include <machine/sysarch.h>
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -41,9 +40,8 @@ __FBSDID("$FreeBSD$");
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
-
-static long long buf[MAXBSIZE / sizeof(long long)];
 
 static void
 usage(void)
@@ -56,10 +54,13 @@ usage(void)
 int
 main(int argc, char **argv)
 {
+	char inout[BUFSIZ];
 	void * __capability cookie;
 	void * __capability *lookedup;
 	char *registered, *tmp;
 	uint64_t *halfcookie;
+	ssize_t received, outlen;
+	pid_t pid;
 	float dt = 0.0;
 	bool kflag = false, vflag = false, xflag = false;
 	int c, ch, error;
@@ -141,33 +142,45 @@ main(int argc, char **argv)
 	if (vflag)
 		fprintf(stderr, "%s: %s: coaccepting...\n", getprogname(), registered);
 
+	memset(inout, 0, sizeof(*inout));
+	received = 0; /* Nothing to send back at this point. */
+
 	for (;;) {
 		if (kflag)
-			error = coaccept_slow(&cookie, buf, sizeof(buf), buf, sizeof(buf));
+			received = coaccept_slow(&cookie, inout, received, inout, sizeof(inout));
 		else
-			error = coaccept(&cookie, buf, sizeof(buf), buf, sizeof(buf));
-		if (error != 0)
-			warn("coaccept");
+			received = coaccept(&cookie, inout, received, inout, sizeof(inout));
+		if (received < 0) {
+			warn("%s", kflag ? "coaccept_slow" : "coaccept");
+			received = 0;
+			continue;
+		}
 		if (vflag) {
 			halfcookie = (uint64_t *)&cookie;
-			printf("%s: %s: coaccepted, pid %d, cookie %#lx%lx, buf[0] is %lld\n",
-			    getprogname(), registered, getpid(), halfcookie[0], halfcookie[1], buf[0]);
+			error = cocachedpid(&pid, cookie);
+			if (error != 0)
+				warn("cogetpid");
+			printf("%s: %s: coaccepted, pid %d, caller pid %d, cookie %#lx%lx\n",
+			    getprogname(), registered, getpid(), pid, halfcookie[0], halfcookie[1]);
 		}
-		buf[0]++;
 
+		/*
+		 * XXX: Obviously only one of those responses will make it back to our caller.
+		 */
+		outlen = received;
 		for (c = 0; c < argc; c++) {
 			if (vflag)
 				fprintf(stderr, "%s: %s: cocalling \"%s\"...\n",
 				    getprogname(), registered, argv[c]);
 			if (kflag)
-				error = cocall_slow(lookedup[c], buf, sizeof(buf), buf, sizeof(buf));
+				received = cocall_slow(lookedup[c], inout, outlen, inout, sizeof(inout));
 			else
-				error = cocall(lookedup[c], buf, sizeof(buf), buf, sizeof(buf));
-			if (error != 0)
+				received = cocall(lookedup[c], inout, outlen, inout, sizeof(inout));
+			if (received < 0)
 				warn("cocall");
 			if (vflag)
-				printf("%s: %s: returned from \"%s\", pid %d, buf[0] is %lld\n",
-				    getprogname(), registered, argv[c], getpid(), buf[0]);
+				printf("%s: %s: returned from \"%s\", pid %d\n",
+				    getprogname(), registered, argv[c], getpid());
 		}
 
 		if (dt > 0)

@@ -261,7 +261,7 @@ struct efirt_callinfo;
 /* Internal MD EFI functions */
 int efi_arch_enter(void);
 void efi_arch_leave(void);
-vm_pointer_t efi_phys_to_kva(vm_paddr_t);
+vm_pointer_t efi_phys_to_kva(vm_paddr_t, vm_size_t);
 int efi_rt_arch_call(struct efirt_callinfo *);
 #ifdef __CHERI_PURE_CAPABILITY__
 int efi_rt_arch_call_nofault(struct efirt_callinfo *);
@@ -282,6 +282,9 @@ struct efi_ops {
 	int 	(*get_time_capabilities)(struct efi_tmcap *);
 	int	(*reset_system)(enum efi_reset);
 	int 	(*set_time)(struct efi_tm *);
+	int 	(*get_waketime)(uint8_t *enabled, uint8_t *pending,
+	    struct efi_tm *tm);
+	int 	(*set_waketime)(uint8_t enable, struct efi_tm *tm);
 	int 	(*var_get)(uint16_t *, struct uuid *, uint32_t *, size_t *,
     void *);
 	int 	(*var_nextname)(size_t *, uint16_t *, struct uuid *);
@@ -347,6 +350,21 @@ static inline int efi_set_time(struct efi_tm *tm)
 	return (active_efi_ops->set_time(tm));
 }
 
+static inline int efi_get_waketime(uint8_t *enabled, uint8_t *pending,
+    struct efi_tm *tm)
+{
+	if (active_efi_ops->get_waketime == NULL)
+		return (ENXIO);
+	return (active_efi_ops->get_waketime(enabled, pending, tm));
+}
+
+static inline int efi_set_waketime(uint8_t enable, struct efi_tm *tm)
+{
+	if (active_efi_ops->set_waketime == NULL)
+		return (ENXIO);
+	return (active_efi_ops->set_waketime(enable, tm));
+}
+
 static inline int efi_var_get(uint16_t *name, struct uuid *vendor,
     uint32_t *attrib, size_t *datasize, void *data)
 {
@@ -381,7 +399,7 @@ int efi_status_to_errno(efi_status status);
 #endif /* _SYS_EFI_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "pointer_as_integer",

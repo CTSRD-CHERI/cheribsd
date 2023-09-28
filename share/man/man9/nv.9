@@ -339,6 +339,11 @@ The following flag can be provided:
 Perform case-insensitive lookups of provided names.
 .It Dv NV_FLAG_NO_UNIQUE
 Names in the nvlist do not have to be unique.
+.It Dv NV_FLAG_MEMALIGN
+Make
+.Fn nvlist_pack
+allocate memory aligned to 16 bytes; useful for
+.Xr cocall 2 .
 .El
 .Pp
 The

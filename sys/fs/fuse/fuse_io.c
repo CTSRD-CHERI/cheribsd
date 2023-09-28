@@ -974,7 +974,7 @@ fuse_io_invalbuf(struct vnode *vp, struct thread *td)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros"

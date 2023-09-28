@@ -254,6 +254,16 @@ exit1(struct thread *td, int rval, int signo)
 	}
 
 	/*
+	 * Free the capability vector.
+	 */
+	if (p->p_capc > 0) {
+		free(p->p_capv, M_CAPV);
+		p->p_capc = 0;
+		p->p_capv = NULL;
+		p->p_capv_vmspace = NULL;
+	}
+
+	/*
 	 * Process deferred operations, designated with ASTF_KCLEAR.
 	 * For instance, we need to deref SU mp, since the thread does
 	 * not return to userspace, and wait for geom to stabilize.
@@ -485,9 +495,11 @@ exit1(struct thread *td, int rval, int signo)
 	sx_xunlock(&allproc_lock);
 
 	sx_xlock(&proctree_lock);
-	PROC_LOCK(p);
-	p->p_flag &= ~(P_TRACED | P_PPWAIT | P_PPTRACE);
-	PROC_UNLOCK(p);
+	if ((p->p_flag & (P_TRACED | P_PPWAIT | P_PPTRACE)) != 0) {
+		PROC_LOCK(p);
+		p->p_flag &= ~(P_TRACED | P_PPWAIT | P_PPTRACE);
+		PROC_UNLOCK(p);
+	}
 
 	/*
 	 * killjobc() might drop and re-acquire proctree_lock to
@@ -1320,6 +1332,15 @@ kern_wait6(struct thread *td, idtype_t idtype, id_t id, int *status,
 
 	q = td->td_proc;
 
+	/*
+	 * In capsicum(4) capability mode we only allow waiting for process'
+	 * own children.
+	 */
+	if (IN_CAPABILITY_MODE(td)) {
+		if (idtype != P_ALL || id != 0)
+			return (ECAPMODE);
+	}
+
 	if ((pid_t)id == WAIT_MYPGRP && (idtype == P_PID || idtype == P_PGID)) {
 		PROC_LOCK(q);
 		id = (id_t)q->p_pgid;
@@ -1359,6 +1380,18 @@ loop_locked:
 		else if (ret != 1) {
 			td->td_retval[0] = pid;
 			return (0);
+		}
+
+		/*
+		 * When running in capsicum(4) mode, make wait(2) ignore
+		 * processes created with pdfork(2).  This is because one can
+		 * disown them - by passing their process descriptor to another
+		 * process - which needs to prevent it from touching them
+		 * afterwards.
+		 */
+		if (IN_CAPABILITY_MODE(td) && p->p_procdesc != NULL) {
+			printf("%s: pid %d (%s) has procdesc\n", __func__, p->p_pid, p->p_comm);
+			continue;
 		}
 
 		nfound++;
@@ -1500,10 +1533,11 @@ proc_reparent(struct proc *child, struct proc *parent, bool set_oppid)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

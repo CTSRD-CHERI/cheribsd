@@ -218,7 +218,7 @@ gfpflags_allow_blocking(const gfp_t gfp_flags)
 #endif	/* _LINUXKPI_LINUX_GFP_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "pointer_as_integer"

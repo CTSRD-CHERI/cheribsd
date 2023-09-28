@@ -123,6 +123,7 @@ kvm_t	 *kvm_open2
 ssize_t	  kvm_read(kvm_t *, unsigned long, void *, size_t);
 ssize_t	  kvm_read_zpcpu(kvm_t *, unsigned long, void *, size_t, int);
 ssize_t	  kvm_read2(kvm_t *, kvaddr_t, void *, size_t);
+ssize_t   kvm_readcap(kvm_t *, kvaddr_t, void *, size_t);
 ssize_t	  kvm_write(kvm_t *, unsigned long, const void *, size_t);
 kssize_t  kvm_kerndisp(kvm_t *);
 

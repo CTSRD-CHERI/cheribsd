@@ -106,7 +106,7 @@ struct priv_fw {
 	 * Use PRIV_FW(fw) to get a pointer to the cointainer of fw.
 	 * Beware, PRIV_FW does not work for a NULL pointer.
 	 */
-	struct firmware	fw;	/* externally visible information */
+	struct firmware	fw __subobject_use_container_bounds; /* externally visible information */
 };
 
 /*
@@ -506,3 +506,12 @@ static moduledata_t firmware_mod = {
 };
 DECLARE_MODULE(firmware, firmware_mod, SI_SUB_DRIVERS, SI_ORDER_FIRST);
 MODULE_VERSION(firmware, 1);
+// CHERI CHANGES START
+// {
+//   "updated": 20230509,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

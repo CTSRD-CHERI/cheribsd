@@ -51,9 +51,13 @@
  *
  */
 
-.text
-.globl _C_LABEL(switcher_coaccept)
-_C_LABEL(switcher_coaccept):
+#define	SIGCODE(sym)						\
+	.section .rodata; .globl sym; .type sym,@object; .align 4; sym: .cfi_startproc
+
+#define CSYM(x)							\
+	.globl x; .type x,@object; x:
+
+SIGCODE(switcher_coaccept)
 	/*
 	 * Save the callee's CPU context in the callee's control block.
 	 *
@@ -212,6 +216,7 @@ _C_LABEL(switcher_coaccept):
 	 */
 	sub	x11, x4, x13
 	cmp	x11, #0
+	mov	x14, x13
 	bge	2f
 	mov	x13, x4
 	mov x11, 0
@@ -233,8 +238,9 @@ _C_LABEL(switcher_coaccept):
 	/*
 	 * Return success; clear the carry flag.
 	 */
-	adds	x0, x0, x0
 	mov	x0, 0
+	adds	x0, x0, x0
+	mov	x0, x14
 3:
 	/* Preserve x0, which is our return value. */
 	mov	x1, 0
@@ -262,10 +268,14 @@ _C_LABEL(switcher_coaccept):
 	 * Bye!
 	 */
 	rets	c30
-.globl _C_LABEL(eswitcher_coaccept)
-_C_LABEL(eswitcher_coaccept):
+END(switcher_coaccept)
 
-.data
-.globl szswitcher_coaccept
+eswitcher_coaccept:
+
+	.data
+	.align	3
+	.globl szswitcher_coaccept
+	.type szswitcher_coaccept,@object
 szswitcher_coaccept:
-.long eswitcher_coaccept-switcher_coaccept
+	.long eswitcher_coaccept - switcher_coaccept
+	.size szswitcher_coaccept, . - szswitcher_coaccept

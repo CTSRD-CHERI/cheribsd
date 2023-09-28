@@ -83,11 +83,20 @@ Pointer to VDSO timehands (for library internal use,
 Top of the user stack for main thread.
 .It AT_USRSTACKLIM
 Limit for grow of the user stack for main thread.
-.It AT_CAPV
-Pointer to a NULL-terminated capability vector passed to the
+.It AT_CAPC
+Number of entries in the capability vector passed to the
 .Xr coexecvec 2
 syscall
-.Dv (sizeof(void *)).
+.Dv (sizeof(int)).
+.It AT_CAPV
+Pointer to the capability vector
+.Dv (sizeof(void * __capability)).
+Note that this vector will not be available in the child process after
+.Xr fork 2 ,
+until that child gets colocated again with the parent.
+Use
+.Xr vfork 2
+instead.
 .El
 .Sh RETURN VALUES
 Returns zero on success, or an error number on failure.

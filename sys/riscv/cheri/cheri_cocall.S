@@ -33,30 +33,17 @@
 #include <machine/cherireg.h>
 #include <machine/switcher.h>
 
-#define	idc ct6
-
 .option capmode
 
 /*
  * Register usage: we save and restore csp and cra.  The rest gets zeroed;
  * the libc wrappers are responsible for saving and restoring the context.
  *
- * Layout of struct switchercb, pointed to by idc (caller)
- * and, later on, ct0 (callee):
- *
- * scb_caller_scb:	0(idc)
- * scb_callee_scb:	1*CHERICAP_SIZE(idc)
- * scb_td:		2*CHERICAP_SIZE(idc)
- * scb_borrower_td:	2*CHERICAP_SIZE+8(idc)
- * scb_unsealcap:	3*CHERICAP_SIZE(idc)
- * scb_csp:		4*CHERICAP_SIZE(idc)
- * scb_cra:		5*CHERICAP_SIZE(idc)
- * scb_outbuf (ca3):	6*CHERICAP_SIZE(idc)
- * scb_outlen (a4):	7*CHERICAP_SIZE(idc)
- * scb_inbuf (ca3):	8*CHERICAP_SIZE(idc)
- * scb_inlen (a4):	9*CHERICAP_SIZE(idc)
- * scb_cookiep (ca2):	10*CHERICAP_SIZE(idc)
+ * Layout of 'struct switchercb', pointed to by ct6/idc (caller) and,
+ * later on, ct0 (callee), is described in sys/riscv/include/switcher.h.
  */
+#define	caller	ct6
+#define	callee	ct0
 
 #define	SIGCODE(sym)						\
 	.text; .globl sym; .type sym,@object; .align 4; sym: .cfi_startproc
@@ -71,32 +58,37 @@ SIGCODE(switcher_cocall)
 	 *
 	 * XXX: Make sure the IDC is cleared if we get a signal while here.
 	 */
-	csc	csp, SCB_CSP(idc)
-	csc	cra, SCB_CRA(idc)
+	csc	csp, SCB_CSP(caller)
+	csc	cra, SCB_CRA(caller)
 
 	/*
 	 * Save the data transfer args.
 	 */
-	csc	ca3, SCB_OUTBUF(idc)
-	csd	a4, SCB_OUTLEN(idc)
-	csc	ca5, SCB_INBUF(idc)
-	csd	a6, SCB_INLEN(idc)
+	csc	ca3, SCB_OUTBUF(caller)
+	csd	a4, SCB_OUTLEN(caller)
+	csc	ca5, SCB_INBUF(caller)
+	csd	a6, SCB_INLEN(caller)
 
 	/*
 	 * Unseal the callee's control block.
 	 */
-	clc	ct0, SCB_UNSEALCAP(idc)	/* Load the unsealing capability */
-	cunseal	ct0, ca2, ct0		/* Unseal the callee control block */
+	clc	callee, SCB_UNSEALCAP(caller)	/* Load the unsealing capability */
+	cunseal	callee, ca2, callee		/* Unseal the callee control block */
 
+	/*
+	 * Save the capability to the callee's control block in the caller
+	 * context.
+	 */
+	csc	callee, SCB_CALLEE_SCB(caller)
 1:
 	/*
 	 * Save the capability to the caller's control block in the callee
 	 * context.  This also serves as the callee's spinlock.
 	 */
-	clr.c.aqrl	ct1, SCB_CALLER_SCB(ct0)
+	clr.c.aqrl	ct1, SCB_CALLER_SCB(callee)
 	cgettag		t2, ct1
 	bnez		t2, 10f
-	csc.c.aqrl	t3, idc, SCB_CALLER_SCB(ct0)
+	csc.c.aqrl	ct3, caller, SCB_CALLER_SCB(callee)
 	bnez		t3, 1b
 
 	/*
@@ -114,20 +106,20 @@ SIGCODE(switcher_cocall)
 	 * is returning to the callee and scb_borrower_thread
 	 * needs to be set to NULL in the callee's scb.
 	 */
-	clc	ct1, SCB_BORROWER_TD(ct0)
+	clc	ct1, SCB_BORROWER_TD(callee)
 	bnez	t1, 5f
-	clc	ct4, SCB_TD(ct0)
-	csc	ct4, SCB_BORROWER_TD(idc)
+	clc	ct4, SCB_TD(callee)
+	csc	ct4, SCB_BORROWER_TD(caller)
 	j	6f
 5:
-	csc	cnull, SCB_BORROWER_TD(ct0)
+	csc	cnull, SCB_BORROWER_TD(callee)
 6:
 
 	/*
 	 * Put the caller cookie (caller's data capability with the tag
 	 * stripped off) where the callee wants it.
 	 */
-	clc	ct5, SCB_COOKIEP(ct0)
+	clc	ct5, SCB_COOKIEP(callee)
 	beqz	t5, 2f
 	ccleartag	ca1, ca1
 	csc	ca1, 0(ct5)
@@ -136,21 +128,25 @@ SIGCODE(switcher_cocall)
 	/*
 	 * Restore the callee's context.
 	 */
-	clc	csp, SCB_CSP(ct0)
-	clc	cra, SCB_CRA(ct0)
+	clc	csp, SCB_CSP(callee)
+	clc	cra, SCB_CRA(callee)
 
 	/*
 	 * Do the data transfer.
+	 *
+	 * XXX: Could use some optimization.
 	 */
-	clc	ct4, SCB_INBUF(ct0)
-	cld	t5, SCB_INLEN(ct0)
+	clc	ct4, SCB_INBUF(callee)
+	cld	t5, SCB_INLEN(callee)
 
 	/*
 	 * Compare buffer sizes, put the smaller one into t5.
 	 */
 	sub	t3, a4, t5
+	mv	a0, t5
 	bgez	t3, 3f
 	mv	t5, a4
+	mv	a0, a4
 
 CSYM(switcher_cocall_copy_start)
 3:
@@ -163,7 +159,6 @@ CSYM(switcher_cocall_copy_start)
 CSYM(switcher_cocall_copy_end)
 
 	li	t0, 0
-	li	a0, 0
 
 4:
 	/*
@@ -230,10 +225,10 @@ CSYM(switcher_cocall_copy_end)
 	j	4b
 
 CSYM(switcher_cocall_copy_onfault)
-	/* Assumes a0 holds errno and that 'idc' points to caller's scb. */
+	/* Assumes a0 holds errno. */
 
 	/* Clear state in the callee's scb. */
-	clc	ct1, SCB_CALLEE_SCB(idc)
+	clc	ct1, SCB_CALLEE_SCB(caller)
 	clc	ct2, SCB_COOKIEP(ct1)
 	beqz	t2, 5f
 	csc	cnull, (ct2)
@@ -241,18 +236,18 @@ CSYM(switcher_cocall_copy_onfault)
 	csc	cnull, SCB_CALLER_SCB(ct1)
 
 	/* Clear state in the caller's scb. */
-	csc	cnull, SCB_BORROWER_TD(idc)
-	csc	cnull, SCB_CALLEE_SCB(idc)
+	csc	cnull, SCB_BORROWER_TD(caller)
+	csc	cnull, SCB_CALLEE_SCB(caller)
 
-	clc	csp, SCB_CSP(idc)
-	clc	cra, SCB_CRA(idc)
+	clc	csp, SCB_CSP(caller)
+	clc	cra, SCB_CRA(caller)
 
 	li	t0, 1
 	j	4b
 
 END(switcher_cocall)
-eswitcher_cocall:
 
+eswitcher_cocall:
 	.data
 	.align	3
 	.globl szswitcher_cocall

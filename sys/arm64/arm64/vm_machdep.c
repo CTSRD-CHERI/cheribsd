@@ -357,3 +357,15 @@ cpu_procctl(struct thread *td __unused, int idtype __unused, id_t id __unused,
 
 	return (EINVAL);
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "user_capabilities",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

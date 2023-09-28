@@ -78,6 +78,11 @@ cheri_init_capabilities(void * __capability kroot)
 	ctemp = cheri_andperm(ctemp, CHERI_SEALCAP_SWITCHER2_PERMS);
 	switcher_sealcap2 = ctemp;
 
+	ctemp = cheri_setaddress(kroot, CHERI_SEALCAP_CAPFD_BASE);
+	ctemp = cheri_setbounds(ctemp, CHERI_SEALCAP_CAPFD_LENGTH);
+	ctemp = cheri_andperm(ctemp, CHERI_SEALCAP_CAPFD_PERMS);
+	capfd_sealcap = ctemp;
+
 	swap_restore_cap = kroot;
 
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -112,7 +117,7 @@ hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "support"

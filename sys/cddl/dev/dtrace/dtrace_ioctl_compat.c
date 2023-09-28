@@ -262,3 +262,15 @@ dtrace_copy_fmtdesc(const dtrace_fmtdesc_t *fmtdesc, caddr_t to)
 #endif
 	bcopy(fmtdesc, (void *)to, sizeof (dtrace_fmtdesc_t));
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "support",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

@@ -179,6 +179,8 @@ MAN+=	abort2.2 \
 	bind.2 \
 	bindat.2 \
 	brk.2 \
+	capfromfd.2 \
+	captofd.2 \
 	cap_enter.2 \
 	cap_fcntls_limit.2 \
 	cap_ioctls_limit.2 \
@@ -456,6 +458,7 @@ MLINKS+=jail.2 jail_attach.2 \
 	jail.2 jail_set.2
 MLINKS+=kldunload.2 kldunloadf.2
 MLINKS+=kqueue.2 kevent.2 \
+	kqueue.2 kqueuex.2 \
 	kqueue.2 EV_SET.3
 MLINKS+=link.2 linkat.2
 MLINKS+=madvise.2 posix_madvise.2

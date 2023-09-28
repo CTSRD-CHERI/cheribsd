@@ -124,7 +124,8 @@ The
 .Ux Ns -domain
 sockets support the communication of
 .Ux
-file descriptors and process credentials through the use of the
+file descriptors, process credentials,
+and memory capabilities through the use of the
 .Va msg_control
 field in the
 .Fa msg
@@ -193,6 +194,17 @@ should not be looked up (such as via the
 sysctl) for making security decisions.
 The sending process could have exited and its process ID already been
 reused for a new process.
+.Pp
+To send CHERI capabilities, the type of the message is
+.Dv SCM_CAPS ,
+and the data portion of the messages is an array of memory capabilities.
+The number of descriptors being passed is defined
+by the length field of the message;
+the length field is the sum of the size of the header
+plus the size of the array of capabilities.
+.Pp
+Capabilities can only be received by a process colocated with
+the sending process.
 .Sh SOCKET OPTIONS
 .Tn UNIX
 domain sockets support a number of socket options for the options level

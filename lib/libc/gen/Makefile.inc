@@ -31,6 +31,7 @@ SRCS+=	__getosreldate.c \
 	basename.c \
 	basename_compat.c \
 	cap_sandboxed.c \
+	capv.c \
 	check_utility_compat.c \
 	clock.c \
 	clock_getcpuclockid.c \
@@ -97,6 +98,7 @@ SRCS+=	__getosreldate.c \
 	isinf.c \
 	isnan.c \
 	jrand48.c \
+	kqueue1.c \
 	lcong48.c \
 	libc_dlopen.c \
 	lockf.c \

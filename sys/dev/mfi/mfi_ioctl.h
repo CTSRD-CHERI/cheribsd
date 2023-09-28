@@ -243,11 +243,13 @@ struct mfi_query_disk {
 #define MFI_LINUX_SET_AEN_2	0x400c4d04
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes": [
 //     "integer_provenance",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "pointer_shape",
+//     "ioctl:misc"
 //   ]
 // }
 // CHERI CHANGES END

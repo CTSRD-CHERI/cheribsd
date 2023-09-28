@@ -268,6 +268,7 @@ errout:
 // CHERI CHANGES START
 // {
 //   "updated": 20180907,
+//   "target_type": "lib",
 //   "changes": [
 //     "pointer_alignment"
 //   ]

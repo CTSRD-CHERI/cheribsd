@@ -79,6 +79,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_pageout.h>
 #include <vm/vm_page.h>
 #include <vm/vm_pagequeue.h>
+#include <vm/vm_param.h>
 
 struct ktls_wq {
 	struct mtx	mtx;
@@ -354,6 +355,7 @@ ktls_buffer_import(void *arg, void **store, int count, int domain, int flags)
 		if (m == NULL)
 			break;
 		store[i] = (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
+		store[i] = cheri_kern_setbounds(store[i], ktls_maxlen);
 	}
 	return (i);
 }
@@ -376,8 +378,11 @@ ktls_buffer_release(void *arg __unused, void **store, int count)
 static void
 ktls_free_mext_contig(struct mbuf *m)
 {
+	void *epg;
+
 	M_ASSERTEXTPG(m);
-	uma_zfree(ktls_buffer_zone, (void *)PHYS_TO_DMAP(m->m_epg_pa[0]));
+	epg = (void *)PHYS_TO_DMAP(m->m_epg_pa[0]);
+	uma_zfree(ktls_buffer_zone, cheri_kern_setbounds(epg, ktls_maxlen));
 }
 
 static int
@@ -2746,7 +2751,8 @@ ktls_encrypt_record(struct ktls_wq *wq, struct mbuf *m,
 			len = m_epg_pagelen(m, i, off);
 			state->parray[i] = VM_PAGE_TO_PHYS(pg);
 			IOVEC_INIT(&state->dst_iov[i],
-			    (char *)PHYS_TO_DMAP(state->parray[i]) + off, len);
+			    (char *)PHYS_TO_DMAP_PAGE(state->parray[i]) + off,
+			    len);
 		}
 	}
 	KASSERT(i + 1 <= nitems(state->dst_iov), ("dst_iov is too small"));

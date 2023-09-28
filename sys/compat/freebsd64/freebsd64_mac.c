@@ -226,3 +226,14 @@ freebsd64___mac_execve(struct thread *td,
 }
 
 #endif /* !MAC */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

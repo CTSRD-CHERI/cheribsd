@@ -36,7 +36,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd February 17, 2023
+.Dd June 6, 2023
 .Dt STRFCAP 3
 .Os
 .Sh NAME
@@ -90,7 +90,7 @@ as follows:
 .It Cm \&%a
 is replaced by address of the capability.
 .It Cm \&%A
-is replaced by a textual representation of capablity attributes
+is replaced by a textual representation of capability attributes
 enclosed in parentheses.
 Zero or more of the following attributes are included:
 .Pp
@@ -101,11 +101,13 @@ Capability's tag is clear.
 Capability is a sealed entry.
 .It sealed
 Capability is sealed but not a sealed entry.
+.It capmode
+Executable capability uses capability mode. (RISC-V only)
 .El
 .Pp
 If no attributes are present, the field is omitted.
 .It Cm \&%b
-is replaced by the base address of the capablity.
+is replaced by the base address of the capability.
 .It Cm \&%B
 is replaced by the binary representation of the capability (excluding
 the tag) in hexadecimal form.
@@ -209,7 +211,7 @@ Print the number in hexadecimal with lowercase letters.
 Print the number in hexadecimal with uppercase letters.
 .El
 .Pp
-Additionally, an optional decimal string field with may be specifided as
+Additionally, an optional decimal string field with may be specified as
 well as a minimum precision starting with a period
 .Cm \&.
 followed by a decimal digit string.
@@ -226,7 +228,7 @@ The
 function returns the number of characters that would have been printed
 if the
 .Fa size
-were unlimted
+were unlimited
 (not including the trailing
 .Ql \e0
 used to end output to strings).
@@ -242,4 +244,4 @@ contract
 .Pq Do ECATS Dc ,
 as part of the DARPA SSITH research programme.
 .Sh BUGS
-Not all possible erronious input patterns are detected.
+Not all possible erroneous input patterns are detected.

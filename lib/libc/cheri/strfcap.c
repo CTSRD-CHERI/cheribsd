@@ -50,6 +50,10 @@ _strfcap(char * __restrict buf, size_t maxsize, const char * __restrict format,
 	long number;
 	int width = 1, precision = 1;
 	bool alt = false, right_pad = false;
+	bool comma, have_attributes;
+#ifdef CHERI_FLAGS_CAP_MODE
+	bool capmode = false;
+#endif
 
 #define	_OUT(str, len)							\
 	do {								\
@@ -74,6 +78,14 @@ _strfcap(char * __restrict buf, size_t maxsize, const char * __restrict format,
 	} while (0)
 
 	orig_buf = buf;
+	have_attributes = !tag || cheri_getsealed(cap);
+#ifdef CHERI_FLAGS_CAP_MODE
+	if ((cheri_getperm(cap) & CHERI_PERM_EXECUTE) != 0 &&
+	    cheri_getflags(cap) == CHERI_FLAGS_CAP_MODE) {
+		capmode = true;
+		have_attributes = true;
+	}
+#endif
 
 	for (; *format; ++format) {
 		if (*format != '%') {
@@ -117,23 +129,36 @@ more_spec:
 			break;
 
 		case 'A':
-			if (!tag || cheri_getsealed(cap)) {
+			if (have_attributes) {
 				OUT("(");
+				comma = false;
 				if (!tag) {
 					OUT("invalid");
-					if (cheri_getsealed(cap))
-						OUT(",");
+					comma = true;
 				}
 				switch cheri_gettype(cap) {
 				case CHERI_OTYPE_UNSEALED:
 					break;
 				case CHERI_OTYPE_SENTRY:
+					if (comma)
+						OUT(",");
 					OUT("sentry");
+					comma = true;
 					break;
 				default:
+					if (comma)
+						OUT(",");
 					OUT("sealed");
+					comma = true;
 					break;
 				}
+#ifdef CHERI_FLAGS_CAP_MODE
+				if (capmode) {
+					if (comma)
+						OUT(",");
+					OUT("capmode");
+				}
+#endif
 				OUT(")");
 			} else
 				opt_start = NULL;

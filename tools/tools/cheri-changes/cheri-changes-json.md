@@ -105,6 +105,10 @@ values are:
    types and changes to copyin/out calls etc.
  * `virtual_address` - Need to work with the virtual address (not the
    offset) of capabilities.
+ * `ctoptr` - Need to cast using __cheri_addr or __cheri_to/from_cap
+ * `intcap_arithmetic` - Need to explicitly cast to virtual address type
+   or otherwise ensure that the provenance for intcap arithmetic is
+   propagated from the correct operand.
  * `other` - Other unrelated changes.
 
 `change_comment`: Optional comment describing changes.

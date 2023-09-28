@@ -1001,9 +1001,10 @@ typedef struct {
 #define	AT_KPRELOAD	34	/* Base of vdso, preloaded by rtld */
 #define	AT_USRSTACKBASE	35	/* Top of user stack */
 #define	AT_USRSTACKLIM	36	/* Grow limit of user stack */
-#define	AT_CAPV		37	/* Capability vector passed to coexecvec(2) */
+#define	AT_CAPC		37	/* Number of entries in capability vector */
+#define	AT_CAPV		38	/* Capability vector passed to coexecvec(2) */
 
-#define	AT_COUNT	38	/* Count of defined aux entry types. */
+#define	AT_COUNT	39	/* Count of defined aux entry types. */
 
 /*
  * Relocation types.
@@ -1544,7 +1545,7 @@ typedef struct {
 #endif /* !_SYS_ELF_COMMON_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

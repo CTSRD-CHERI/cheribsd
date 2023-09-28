@@ -82,7 +82,7 @@ linux_getcwd(struct thread *td, struct linux_getcwd_args *uap)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221129,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

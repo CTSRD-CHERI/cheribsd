@@ -113,6 +113,8 @@ MIASM =  \
 	getfh.o \
 	sysarch.o \
 	rtprio.o \
+	capfromfd.o \
+	captofd.o \
 	semsys.o \
 	msgsys.o \
 	shmsys.o \
@@ -438,4 +440,5 @@ MIASM =  \
 	aio_readv.o \
 	fspacectl.o \
 	sched_getcpu.o \
-	swapoff.o
+	swapoff.o \
+	kqueuex.o

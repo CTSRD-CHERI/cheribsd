@@ -417,7 +417,7 @@ copyinuio(const struct iovec * __capability iovp, u_int iovcnt,
 		free(uio, M_IOV);
 		return (error);
 	}
-	uio->uio_iov = iov;
+	uio->uio_iov = cheri_kern_setbounds(iov, iovlen);
 	uio->uio_iovcnt = iovcnt;
 	uio->uio_segflg = UIO_USERSPACE;
 	uio->uio_offset = -1;
@@ -569,7 +569,7 @@ casuword(volatile u_long * __capability addr, u_long old, u_long new)
 
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

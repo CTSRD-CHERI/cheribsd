@@ -568,6 +568,7 @@ interface_set_mtu_priv(char *ifname, u_int16_t mtu)
 // CHERI CHANGES START
 // {
 //   "updated": 20221129,
+//    "target_type": "prog",
 //   "changes": [
 //     "pointer_alignment"
 //   ]

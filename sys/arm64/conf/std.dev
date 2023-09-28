@@ -50,6 +50,7 @@ device		vt
 device		kbdmux
 
 device		vt_efifb
+device		vt_simplefb
 
 # DRM Support
 options 	COMPAT_DRMCOMPAT

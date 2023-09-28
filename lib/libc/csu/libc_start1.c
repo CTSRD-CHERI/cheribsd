@@ -109,7 +109,6 @@ process_irelocs(void)
 #error "Define platform reloc type"
 #endif
 
-#ifndef CRT_ATEXIT_SUPPRESS
 static void
 finalizer(void)
 {
@@ -127,7 +126,6 @@ finalizer(void)
 	_fini();
 #endif
 }
-#endif
 
 static void
 handle_static_init(int argc, char **argv, char **env)
@@ -139,9 +137,7 @@ handle_static_init(int argc, char **argv, char **env)
 	if (&_DYNAMIC != NULL)
 		return;
 
-#ifndef CRT_ATEXIT_SUPPRESS
 	atexit(finalizer);
-#endif
 
 	array_size = __preinit_array_end - __preinit_array_start;
 	for (n = 0; n < array_size; n++) {

@@ -252,18 +252,23 @@ dpcpu_free(void *s, int size)
 void
 dpcpu_copy(void *s, int size)
 {
+	ptraddr_t offs;
 #ifdef SMP
 	uintptr_t dpcpu;
 	int i;
+#endif
 
+	offs = (ptraddr_t)s - (ptraddr_t)DPCPU_START;
+
+#ifdef SMP
 	CPU_FOREACH(i) {
 		dpcpu = dpcpu_off[i];
 		if (dpcpu == 0)
 			continue;
-		memcpy((void *)(dpcpu + (ptraddr_t)s), s, size);
+		memcpy((void *)(dpcpu - DPCPU_BIAS + offs), s, size);
 	}
 #else
-	memcpy((void *)(dpcpu_off[0] + (ptraddr_t)s), s, size);
+	memcpy((void *)(dpcpu_off[0] - DPCPU_BIAS + offs), s, size);
 #endif
 }
 
@@ -431,12 +436,13 @@ DB_SHOW_ALIAS_FLAGS(allpcpu, db_show_cpu_all, DB_CMD_MEMSAFE);
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "bounds_compression",
 //     "pointer_provenance",
-//     "kdb"
+//     "kdb",
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

@@ -1962,7 +1962,7 @@ MAC_POLICY_SET(&stub_ops, mac_stub, "TrustedBSD MAC/Stub",
     MPC_LOADTIME_FLAG_UNLOADOK, NULL);
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

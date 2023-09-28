@@ -102,6 +102,7 @@ init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
 	cap = perms == MORELLO_FRAG_EXECUTABLE ?
 	    (uintcap_t)text_rodata_cap : (uintcap_t)data_cap;
 	cap = cheri_setaddress(cap, base_addr + address);
+	cap = cheri_clearperm(cap, CAP_RELOC_REMOVE_PERMS);
 
 	if (perms == MORELLO_FRAG_EXECUTABLE || perms == MORELLO_FRAG_RODATA) {
 		cap = cheri_clearperm(cap, FUNC_PTR_REMOVE_PERMS);

@@ -45,7 +45,7 @@
  */
 
 #define	SIGCODE(sym)						\
-	.text; .globl sym; .type sym,@object; .align 4; sym: .cfi_startproc
+	.section .rodata; .globl sym; .type sym,@object; .align 4; sym: .cfi_startproc
 
 #define CSYM(x)							\
 	.globl x; .type x,@object; x:
@@ -219,8 +219,10 @@ SIGCODE(switcher_cocall)
 	 */
 	sub	x11, x4, x13
 	cmp	x11, #0
+	mov	x14, x13
 	bge	3f
 	mov	x13, x4
+	mov	x14, x13
 
 CSYM(switcher_cocall_copy_start)
 3:
@@ -237,6 +239,7 @@ CSYM(switcher_cocall_copy_end)
 	 */
 	mov	x0, 0
 	adds	x0, x0, x0
+	mov	x0, x14
 4:
 	/* Preserve x0, which is our return value. */
 	mov	x1, 0
@@ -308,6 +311,7 @@ CSYM(switcher_cocall_copy_onfault)
 	b	4b
 
 END(switcher_cocall)
+
 eswitcher_cocall:
 
 	.data

@@ -47,10 +47,6 @@
 #include <sys/stdint.h>		/* for people using printf mainly */
 #include <machine/atomic.h>
 #include <machine/cpufunc.h>
-
-#include <machine/atomic.h>
-#include <machine/cpufunc.h>
-#include <machine/pcb.h>
 #if __has_feature(capabilities)
 #include <machine/vmparam.h>
 #endif
@@ -693,7 +689,7 @@ __NULLABILITY_PRAGMA_POP
 #endif /* !_SYS_SYSTM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"

@@ -84,6 +84,11 @@ cheri_init_capabilities(void * __capability kroot)
 	ctemp = cheri_andperm(ctemp, CHERI_SEALCAP_SWITCHER2_PERMS);
 	switcher_sealcap2 = ctemp;
 
+	ctemp = cheri_setaddress(kroot, CHERI_SEALCAP_CAPFD_BASE);
+	ctemp = cheri_setbounds(ctemp, CHERI_SEALCAP_CAPFD_LENGTH);
+	ctemp = cheri_andperm(ctemp, CHERI_SEALCAP_CAPFD_PERMS);
+	capfd_sealcap = ctemp;
+
 	smccc_ddc_el0 = kroot;
 
 	swap_restore_cap = kroot;

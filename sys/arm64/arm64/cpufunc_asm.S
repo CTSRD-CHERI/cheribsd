@@ -55,8 +55,10 @@ __FBSDID("$FreeBSD$");
  */
 .macro cache_handle_range dcop = 0, ic = 0, icop = 0
 #ifdef __CHERI_PURE_CAPABILITY__
-	mov	c6, c0
-	gcvalue	x0, c6
+	/* Ensure that the capability allows access to the range
+	 * [address, address + x1)
+	 */
+	scbnds	c6, c0, x1
 #endif
 .if \ic == 0
 	/* Load the D cache line size */
@@ -70,7 +72,23 @@ __FBSDID("$FreeBSD$");
 	add	x1, x1, x2		/* Add these to the size */
 	bic	x0, x0, x4		/* Clear the low bit of the address */
 #ifdef __CHERI_PURE_CAPABILITY__
-	scvalue	c0, c6, x0
+	/*
+	 * There is no guarantee that the capability given here has
+	 * sufficient bounds for the whole cache line.
+	 * Re-derive the capability from the kernel root if the addr capability
+	 * is valid within the target range of cache lines, otherwise strip the
+	 * tag and let the dc/ic instruction fail.
+	 */
+	LDR_LABEL(c2, c2, kernel_root_cap)
+	scvalue c0, c2, x0
+	add	x2, x1, x3
+	bic	x2, x2, x4
+	scbnds	c0, c0, x2
+	chkss	c6, c0
+	b.mi	3f
+	/* Use c6 as the source here for more informative debug info */
+	clrtag	c0, c6
+3:
 #endif
 .if \ic != 0
 	mov	PTR(2), PTR(0)		/* Save the address */

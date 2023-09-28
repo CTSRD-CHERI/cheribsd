@@ -303,7 +303,7 @@ fget_noref(struct filedesc *fdp, int fd)
 
 	FILEDESC_LOCK_ASSERT(fdp);
 
-	if (__predict_false((u_int)fd >= fdp->fd_nfiles))
+	if (__predict_false((u_int)fd >= (u_int)fdp->fd_nfiles))
 		return (NULL);
 
 	return (fdp->fd_ofiles[fd].fde_file);
@@ -316,7 +316,7 @@ fdeget_noref(struct filedesc *fdp, int fd)
 
 	FILEDESC_LOCK_ASSERT(fdp);
 
-	if (__predict_false((u_int)fd >= fdp->fd_nfiles))
+	if (__predict_false((u_int)fd >= (u_int)fdp->fd_nfiles))
 		return (NULL);
 
 	fde = &fdp->fd_ofiles[fd];
@@ -366,7 +366,7 @@ pwd_set(struct pwddesc *pdp, struct pwd *newpwd)
 #endif /* !_SYS_FILEDESC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "subobject_bounds"

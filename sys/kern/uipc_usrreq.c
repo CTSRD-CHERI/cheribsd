@@ -127,6 +127,14 @@ static int unp_defers_count;
 static const struct sockaddr	sun_noname = { sizeof(sun_noname), AF_LOCAL };
 
 /*
+ * This structure is only being used internally by the kernel.
+ */
+struct cmsgcaps {
+	const void		*cmcaps_vmspace;
+	void * __capability	cmcaps_cap;
+};
+
+/*
  * Garbage collection of cyclic file descriptor/socket references occurs
  * asynchronously in a taskqueue context in order to avoid recursion and
  * reentrance in the UNIX domain socket, file descriptor, and socket layer
@@ -2409,6 +2417,7 @@ unp_externalize(struct mbuf *control, struct mbuf **controlp, int flags)
 {
 	struct thread *td = curthread;		/* XXX */
 	struct cmsghdr *cm = mtod(control, struct cmsghdr *);
+	struct cmsgcaps *cmcaps;
 	int i;
 	int *fdp;
 	struct filedesc *fdesc = td->td_proc->p_fd;
@@ -2476,13 +2485,44 @@ unp_externalize(struct mbuf *control, struct mbuf **controlp, int flags)
 			m_chtype(*controlp, MT_EXTCONTROL);
 			FILEDESC_XUNLOCK(fdesc);
 			free(fdep[0], M_FILECAPS);
+		} else if (cm->cmsg_level == SOL_SOCKET
+		    && cm->cmsg_type == SCM_CAPS) {
+#if __has_feature(capabilities)
+			/*
+			 * XXX: Security policy goes here.
+			 */
+			if (error || controlp == NULL)
+				goto next;
+			*controlp = sbcreatecontrol(NULL, sizeof(void * __capability) /* XXX: why not datalen? */,
+			    cm->cmsg_type, cm->cmsg_level, M_WAITOK);
+
+			/*
+			 * Copy the capabilities, but only if they came from the same address space.
+			 */
+			cmcaps = data;
+			if (td->td_proc->p_vmspace != cmcaps->cmcaps_vmspace) {
+				printf("%s: originating vmspace %p, recipient vmspace %p; returning EPROT\n",
+				    __func__, cmcaps->cmcaps_vmspace, td->td_proc->p_vmspace);
+				error = EPROT;
+				goto next;
+			}
+
+			//printf("%s: cmcaps_cap %#lp\n", __func__, cmcaps->cmcaps_cap);
+			bcopy(&cmcaps->cmcaps_cap,
+			    CMSG_DATA(mtod(*controlp, struct cmsghdr *)),
+			    sizeof(void * __capability));
+#else /* !__has_feature(capabilities) */
+			printf("%s: SCM_CAPS with non-purecap kernel, returning EOPNOTSUPP\n", __func__);
+			error = EOPNOTSUPP;
+			goto next;
+#endif /* !__has_feature(capabilities) */
 		} else {
 			/* We can just copy anything else across. */
 			if (error || controlp == NULL)
 				goto next;
 			*controlp = sbcreatecontrol(NULL, datalen,
 			    cm->cmsg_type, cm->cmsg_level, M_WAITOK);
-			bcopy(data,
+			bcopynocap(data,
 			    CMSG_DATA(mtod(*controlp, struct cmsghdr *)),
 			    datalen);
 		}
@@ -2587,6 +2627,7 @@ unp_internalize(struct mbuf **controlp, struct thread *td,
 	struct bintime *bt;
 	struct cmsghdr *cm;
 	struct cmsgcred *cmcred;
+	struct cmsgcaps *cmcaps;
 	struct filedescent *fde, **fdep, *fdev;
 	struct file *fp;
 	struct timeval *tv;
@@ -2617,6 +2658,43 @@ unp_internalize(struct mbuf **controlp, struct thread *td,
 	    data = CMSG_DATA(cm)) {
 		datalen = (char *)cm + cm->cmsg_len - (char *)data;
 		switch (cm->cmsg_type) {
+		case SCM_CAPS:
+#if __has_feature(capabilities)
+			//printf("%s: data %p, datalen %u, caps[0] %#lp\n", __func__, data, datalen, *(void * __capability *)data);
+			/*
+			 * XXX: Make it possible to copy more than one capability.
+			 *      Should be trivial, but needs test case.
+			 */
+			if (datalen != sizeof(void * __capability)) {
+				printf("%s: got length %u, expected %zd, returning EDOOFUS\n",
+				    __func__, datalen, sizeof(void * __capability));
+				error = EDOOFUS;
+				goto out;
+			}
+			*controlp = sbcreatecontrol(NULL, sizeof(*cmcaps),
+			    SCM_CAPS, SOL_SOCKET, M_WAITOK);
+			if (*controlp == NULL) {
+				error = ENOBUFS;
+				goto out;
+			}
+			cmcaps = (struct cmsgcaps *)
+			    CMSG_DATA(mtod(*controlp, struct cmcaps *));
+			/*
+			 * XXX: There's a race here, in that vmspace could be freed
+			 *      and then reused.  We'd need some kind of generation counter.
+			 */
+			cmcaps->cmcaps_vmspace = td->td_proc->p_vmspace;
+			cmcaps->cmcaps_cap = * (void * __capability *)data;
+			break;
+#else /* !__has_feature(capabilities) */
+			printf("%s: SCM_CAPS with non-purecap kernel, returning EOPNOTSUPP\n", __func__);
+			error = EOPNOTSUPP;
+			goto out;
+#endif /* !__has_feature(capabilities) */
+
+		/*
+		 * Fill in credential information.
+		 */
 		case SCM_CREDS:
 			*controlp = sbcreatecontrol(NULL, sizeof(*cmcred),
 			    SCM_CREDS, SOL_SOCKET, M_WAITOK);
@@ -3569,7 +3647,7 @@ DB_SHOW_COMMAND(unpcb, db_show_unpcb)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "user_capabilities",

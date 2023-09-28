@@ -601,8 +601,7 @@ parse_dir_md(char **conf)
 		return (error);
 
 	/* Get file status. */
-	error = kern_statat(td, 0, AT_FDCWD, PTR2CAP(path), UIO_SYSSPACE, &sb,
-	    NULL);
+	error = kern_statat(td, 0, AT_FDCWD, PTR2CAP(path), UIO_SYSSPACE, &sb);
 	if (error)
 		goto out;
 

@@ -2268,7 +2268,7 @@ sys_shm_open2(struct thread *td, struct shm_open2_args *uap)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

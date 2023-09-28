@@ -2262,11 +2262,12 @@ t4_ddp_mod_unload(void)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

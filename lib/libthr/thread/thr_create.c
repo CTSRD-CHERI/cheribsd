@@ -158,12 +158,14 @@ _pthread_create(pthread_t * __restrict thread,
 	new_thread->refcount = 1;
 	_thr_link(curthread, new_thread);
 
+#ifndef __CHERI_PURE_CAPABILITY__
 	/*
 	 * Handle the race between __pthread_map_stacks_exec and
 	 * thread linkage.
 	 */
 	if (old_stack_prot != _rtld_get_stack_prot())
 		_thr_stack_fix_protection(new_thread);
+#endif
 
 	/* Return thread pointer eariler so that new thread can use it. */
 	(*thread) = new_thread;

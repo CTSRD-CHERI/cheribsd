@@ -680,7 +680,9 @@ __thr_interpose_libc(void)
 	SLOT(kevent);
 	SLOT(wait6);
 	SLOT(ppoll);
+#ifndef __CHERI_PURE_CAPABILITY__
 	SLOT(map_stacks_exec);
+#endif
 	SLOT(fdatasync);
 	SLOT(clock_nanosleep);
 	SLOT(pdfork);

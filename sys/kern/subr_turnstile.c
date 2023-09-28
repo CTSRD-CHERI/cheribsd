@@ -1328,12 +1328,11 @@ DB_SHOW_COMMAND(locktree, db_show_locktree)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "kdb",
-//     "pointer_provenance",
-//     "virtual_address"
+//     "pointer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

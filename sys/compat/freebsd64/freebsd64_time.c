@@ -331,3 +331,14 @@ freebsd64_ktimer_gettime(struct thread *td,
 		error = copyout(&val, __USER_CAP_OBJ(uap->value), sizeof(val));
 	return (error);
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

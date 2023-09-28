@@ -67,6 +67,8 @@ process___cap_relocs(Obj_Entry* obj)
 	 */
 	void * __capability data_base = get_datasegment_cap(obj);
 	const void * __capability code_base = get_codesegment_cap(obj);
+	data_base = cheri_clearperm(data_base, CAP_RELOC_REMOVE_PERMS);
+	code_base = cheri_clearperm(code_base, CAP_RELOC_REMOVE_PERMS);
 
 	dbg("Processing %lu __cap_relocs for %s (code base = %#lp, data base = %#lp)\n",
 	    (end_relocs - start_relocs), obj->path, code_base, data_base);

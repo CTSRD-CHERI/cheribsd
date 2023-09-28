@@ -105,3 +105,14 @@ int	freebsd64_get_mcontext(struct thread *td, mcontext64_t *mcp, int flags);
 int	freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp);
 
 #endif /* !_COMPAT_FREEBSD64_FREEBSD64_UTIL_H_ */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "header",
+ *   "changes": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

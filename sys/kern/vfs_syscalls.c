@@ -107,7 +107,7 @@ static int kern_readlink_vp(struct vnode *vp, char * __capability buf,
 static int kern_linkat_vp(struct thread *td, struct vnode *vp, int fd,
     const char * __capability path, enum uio_seg segflag);
 
-static uint64_t
+uint64_t
 at2cnpflags(u_int at_flags, u_int mask)
 {
 	uint64_t res;
@@ -2241,8 +2241,7 @@ ostat(struct thread *td, struct ostat_args *uap)
 	struct ostat osb;
 	int error;
 
-	error = kern_statat(td, 0, AT_FDCWD, uap->path, UIO_USERSPACE,
-	    &sb, NULL);
+	error = kern_statat(td, 0, AT_FDCWD, uap->path, UIO_USERSPACE, &sb);
 	if (error != 0)
 		return (error);
 	cvtstat(&sb, &osb);
@@ -2266,7 +2265,7 @@ olstat(struct thread *td, struct olstat_args *uap)
 	int error;
 
 	error = kern_statat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD, uap->path,
-	    UIO_USERSPACE, &sb, NULL);
+	    UIO_USERSPACE, &sb);
 	if (error != 0)
 		return (error);
 	cvtstat(&sb, &osb);
@@ -2384,8 +2383,7 @@ freebsd11_stat(struct thread *td, struct freebsd11_stat_args* uap)
 	struct freebsd11_stat osb;
 	int error;
 
-	error = kern_statat(td, 0, AT_FDCWD, uap->path, UIO_USERSPACE, &sb,
-	    NULL);
+	error = kern_statat(td, 0, AT_FDCWD, uap->path, UIO_USERSPACE, &sb);
 	if (error != 0)
 		return (error);
 	error = freebsd11_cvtstat(&sb, &osb);
@@ -2401,8 +2399,8 @@ freebsd11_lstat(struct thread *td, struct freebsd11_lstat_args* uap)
 	struct freebsd11_stat osb;
 	int error;
 
-	error = kern_statat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD,
-	    uap->path, UIO_USERSPACE, &sb, NULL);
+	error = kern_statat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD, uap->path,
+	    UIO_USERSPACE, &sb);
 	if (error != 0)
 		return (error);
 	error = freebsd11_cvtstat(&sb, &osb);
@@ -2438,8 +2436,8 @@ freebsd11_fstatat(struct thread *td, struct freebsd11_fstatat_args* uap)
 	struct freebsd11_stat osb;
 	int error;
 
-	error = kern_statat(td, uap->flag, uap->fd, uap->path, UIO_USERSPACE,
-	    &sb, NULL);
+	error = kern_statat(td, uap->flag, uap->fd, uap->path,
+	    UIO_USERSPACE, &sb);
 	if (error != 0)
 		return (error);
 	error = freebsd11_cvtstat(&sb, &osb);
@@ -2474,8 +2472,7 @@ user_fstatat(struct thread *td, int fd, const char * __capability path,
 	struct stat sb;
 	int error;
 
-	error = kern_statat(td, flag, fd, path, UIO_USERSPACE,
-	    &sb, NULL);
+	error = kern_statat(td, flag, fd, path, UIO_USERSPACE, &sb);
 	if (error == 0)
 		error = copyout(&sb, buf, sizeof (sb));
 	return (error);
@@ -2483,8 +2480,7 @@ user_fstatat(struct thread *td, int fd, const char * __capability path,
 
 int
 kern_statat(struct thread *td, int flag, int fd, const char * __capability path,
-    enum uio_seg pathseg, struct stat *sbp,
-    void (*hook)(struct vnode *vp, struct stat *sbp))
+    enum uio_seg pathseg, struct stat *sbp)
 {
 	struct nameidata nd;
 	int error;
@@ -2497,18 +2493,9 @@ kern_statat(struct thread *td, int flag, int fd, const char * __capability path,
 	    AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH) | LOCKSHARED | LOCKLEAF |
 	    AUDITVNODE1, pathseg, path, fd, &cap_fstat_rights);
 
-	if ((error = namei(&nd)) != 0) {
-		if (error == ENOTDIR &&
-		    (nd.ni_resflags & NIRES_EMPTYPATH) != 0)
-			error = kern_fstat(td, fd, sbp);
+	if ((error = namei(&nd)) != 0)
 		return (error);
-	}
 	error = VOP_STAT(nd.ni_vp, sbp, td->td_ucred, NOCRED);
-	if (__predict_false(hook != NULL)) {
-		if (error == 0) {
-			hook(nd.ni_vp, sbp);
-		}
-	}
 	NDFREE_PNBUF(&nd);
 	vput(nd.ni_vp);
 #ifdef __STAT_TIME_T_EXT
@@ -2571,8 +2558,7 @@ freebsd11_nstat(struct thread *td, struct freebsd11_nstat_args *uap)
 	struct nstat nsb;
 	int error;
 
-	error = kern_statat(td, 0, AT_FDCWD, uap->path,
-	    UIO_USERSPACE, &sb, NULL);
+	error = kern_statat(td, 0, AT_FDCWD, uap->path, UIO_USERSPACE, &sb);
 	if (error != 0)
 		return (error);
 	error = freebsd11_cvtnstat(&sb, &nsb);
@@ -2597,8 +2583,8 @@ freebsd11_nlstat(struct thread *td, struct freebsd11_nlstat_args *uap)
 	struct nstat nsb;
 	int error;
 
-	error = kern_statat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD,
-	    uap->path, UIO_USERSPACE, &sb, NULL);
+	error = kern_statat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD, uap->path,
+	    UIO_USERSPACE, &sb);
 	if (error != 0)
 		return (error);
 	error = freebsd11_cvtnstat(&sb, &nsb);
@@ -5140,12 +5126,13 @@ user_copy_file_range(struct thread *td, int infd,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "kiovec_t",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ]
 // }
 // CHERI CHANGES END

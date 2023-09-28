@@ -75,6 +75,9 @@ uintptr_t reloc_jmpslot(uintptr_t *where, uintptr_t target,
 #define	DATA_PTR_REMOVE_PERMS						\
 	(CHERI_PERM_SEAL | CHERI_PERM_EXECUTE)
 
+#define	CAP_RELOC_REMOVE_PERMS						\
+	(CHERI_PERM_SW_VMEM)
+
 #ifdef __CHERI_PURE_CAPABILITY__
 /* TODO: ABIs with tight bounds */
 #define can_use_tight_pcc_bounds(obj) ((void)(obj), false)

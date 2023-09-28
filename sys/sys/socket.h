@@ -628,6 +628,7 @@ struct sockcred2 {
 #define	SCM_MONOTONIC	0x06		/* timestamp (struct timespec) */
 #define	SCM_TIME_INFO	0x07		/* timestamp info */
 #define	SCM_CREDS2	0x08		/* process creds (struct sockcred2) */
+#define	SCM_CAPS	0x10		/* (array of void * __capability) */
 
 struct sock_timestamp_info {
 	__uint32_t	st_info_flags;
@@ -795,11 +796,12 @@ void so_unlock(struct socket *so);
 #endif /* !_SYS_SOCKET_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes": [
 //     "pointer_alignment",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ],
 //   "changes_purecap": [
 //     "subobject_bounds"

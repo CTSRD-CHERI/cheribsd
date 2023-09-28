@@ -63,6 +63,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/ucontext.h>
 
 #include <machine/md_var.h>
+#include <machine/pcb.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -377,3 +378,15 @@ elf64_dump_thread(struct thread *td __unused, void *dst __unused,
     size_t *off __unused)
 {
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "support",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

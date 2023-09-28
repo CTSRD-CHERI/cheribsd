@@ -3401,7 +3401,7 @@ bnxt_get_wol_settings(struct bnxt_softc *softc)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

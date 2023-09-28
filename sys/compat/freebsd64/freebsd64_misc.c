@@ -1894,3 +1894,15 @@ freebsd64_syscall_helper_unregister(struct syscall_helper_data *sd)
 {
 	return (kern_syscall_helper_unregister(freebsd64_sysent, sd));
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "support",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

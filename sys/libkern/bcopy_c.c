@@ -147,3 +147,15 @@ memcpynocap_c(void * __capability dst, const void *  __capability src,
 }
 
 __strong_reference(memcpynocap_c, memmovenocap_c);
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "support",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

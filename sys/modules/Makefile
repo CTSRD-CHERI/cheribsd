@@ -215,8 +215,9 @@ SUBDIR=	\
 	libiconv \
 	libmchain \
 	lindebugfs \
-	${_linuxkpi} \
-	${_linuxkpi_wlan} \
+	linuxkpi \
+	linuxkpi_hdmi \
+	linuxkpi_wlan \
 	${_lio} \
 	lpt \
 	${_mac_biba} \
@@ -234,6 +235,11 @@ SUBDIR=	\
 	${_mac_seeotheruids} \
 	${_mac_stub} \
 	${_mac_test} \
+	${_mac_veriexec} \
+	${_mac_veriexec_sha1} \
+	${_mac_veriexec_sha256} \
+	${_mac_veriexec_sha384} \
+	${_mac_veriexec_sha512} \
 	${_malo} \
 	${_mana} \
 	md \
@@ -553,11 +559,9 @@ _mlx5ib=	mlx5ib
 .if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
     ${MACHINE_CPUARCH} == "i386"
 _ena=		ena
-.if !${MACHINE_CPU:Mcheri}
 _iwlwifi=	iwlwifi
 .if ${MK_SOURCELESS_UCODE} != "no"
 _iwlwififw=	iwlwififw
-.endif
 .endif
 .if !${MACHINE_ABI:Mpurecap}
 _ossl=		ossl
@@ -588,6 +592,13 @@ _mac_priority=	mac_priority
 _mac_seeotheruids= mac_seeotheruids
 _mac_stub=	mac_stub
 _mac_test=	mac_test
+.if ${MK_VERIEXEC} != "no" || defined(ALL_MODULES)
+_mac_veriexec=	mac_veriexec
+_mac_veriexec_sha1= mac_veriexec_sha1
+_mac_veriexec_sha256= mac_veriexec_sha256
+_mac_veriexec_sha384= mac_veriexec_sha384
+_mac_veriexec_sha512= mac_veriexec_sha512
+.endif
 .endif
 
 .if ${MK_NETGRAPH} != "no" || defined(ALL_MODULES)
@@ -648,6 +659,7 @@ _mpr=		mpr
 .endif
 
 .if ${MK_TESTS} != "no" || defined(ALL_MODULES)
+SUBDIR+=	ktest
 SUBDIR+=	tests
 .endif
 
@@ -878,11 +890,6 @@ _bcm283x_pwm=  bcm283x_pwm
 # LLVM 10 crashes when building if_malo_pci.c, fixed in LLVM11:
 # https://bugs.llvm.org/show_bug.cgi?id=44351
 _malo=	malo
-.endif
-
-.if !${MACHINE_CPU:Mcheri}
-_linuxkpi=	linuxkpi
-_linuxkpi_wlan=	linuxkpi_wlan
 .endif
 
 # Some of these work in hybrid kernels but we disable them for consistency

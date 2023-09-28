@@ -37,6 +37,18 @@
 .Nd colocated ping
 .Sh SYNOPSIS
 .Nm
+.Fl a
+.Op Fl c Ar count
+.Op Fl k
+.Op Fl s Ar time
+.Op Fl v
+.Nm
+.Fl i Ar index
+.Op Fl c Ar count
+.Op Fl k
+.Op Fl s Ar time
+.Op Fl v
+.Nm
 .Op Fl c Ar count
 .Op Fl k
 .Op Fl s Ar time
@@ -50,16 +62,24 @@ utility is used to send colocated pings; usually used with
 .Xr copong 1 .
 .Pp
 The following options are available:
-.Bl -tag -width ".Fl c Ar count"
+.Bl -tag -width "c Ar count"
+.It Fl a
+Ping all services found in the capability vector inherited
+from the parent process.
 .It Fl c Ar count
 Exit after
 .Ar count
 iterations.
+.It Fl i
+Ping service found at offset
+.Ar index
+in the capability vector inherited from the parent process.
 .It Fl k
 Use
 .Xr cocall_slow 2
-instead of
-.Xr cocall 2 .
+instead of trying
+.Xr cocall 2
+first.
 .It Fl s Ar time
 Number of seconds to pause between iterations; can be zero.
 .It Fl v
@@ -70,14 +90,16 @@ The
 .Nm
 utility exits 0 on success, and >0 if an error occurs.
 .Sh EXAMPLES
-Execute within the address space of the current
-shell process:
-.Dl coexec Ar $$ Ar /usr/bin/coping target-name
+Measure the time for 1000 pings to each service found in
+.Xr capv 7 :
+.Pp
+.Dl coping -ac 1000
 .Pp
 .Sh SEE ALSO
-.Xr coexec 1 ,
+.Xr capv 1 ,
 .Xr copong 1 ,
-.Xr cocall 2
+.Xr cocall 2 ,
+.Xr colocation 7
 .Sh HISTORY
 The
 .Nm

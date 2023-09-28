@@ -435,7 +435,10 @@ FBSD_1.7 {
 	cheri_revoke;
 	cheri_revoke_get_shadow;
 	fspacectl;
+	kqueuex;
 	swapoff;
+	capfromfd;
+	captofd;
 };
 
 FBSDprivate_1.0 {

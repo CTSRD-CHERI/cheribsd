@@ -33,8 +33,6 @@
 #include <machine/cherireg.h>
 #include <machine/switcher.h>
 
-#define	idc ct6
-
 .option capmode
 
 /*
@@ -49,61 +47,54 @@
  * Note that this code executes while ignoring all the signals - a trapping
  * instruction will just get skipped over.
  *
- * Layout of struct switchercb, pointed to by idc (callee side)
- * and, later on, ct0 (caller side):
- *
- * scb_caller_scb:	0(idc)
- * scb_callee_scb:	1*CHERICAP_SIZE(idc)
- * scb_td:		2*CHERICAP_SIZE(idc)
- * scb_borrower_td:	2*CHERICAP_SIZE+8(idc)
- * scb_unsealcap:	3*CHERICAP_SIZE(idc)
- * scb_csp:		4*CHERICAP_SIZE(idc)
- * scb_cra:		5*CHERICAP_SIZE(idc)
- * scb_outbuf (ca3):	6*CHERICAP_SIZE(idc)
- * scb_outlen (a4):	7*CHERICAP_SIZE(idc)
- * scb_inbuf (ca3):	8*CHERICAP_SIZE(idc)
- * scb_inlen (a4):	9*CHERICAP_SIZE(idc)
- * scb_cookiep (ca2):	10*CHERICAP_SIZE(idc)
+ * Layout of 'struct switchercb', pointed to by ct6/idc (callee side) and,
+ * later on, ct0 (caller side), is described in sys/riscv/include/switcher.h.
  */
+#define	caller	ct0
+#define	callee	ct6
 
-.text
-.globl _C_LABEL(switcher_coaccept)
-_C_LABEL(switcher_coaccept):
+#define	SIGCODE(sym)						\
+	.text; .globl sym; .type sym,@object; .align 4; sym: .cfi_startproc
+
+#define CSYM(x)							\
+	.globl x; .type x,@object; x:
+
+SIGCODE(switcher_coaccept)
 	/*
 	 * Save the callee's stack pointer and return address (PCC)
 	 * in the callee's control block.
 	 *
 	 * XXX: Make sure the IDC is cleared if we get a signal while here.
 	 */
-	csc	csp, SCB_CSP(idc)
-	csc	cra, SCB_CRA(idc)
+	csc	csp, SCB_CSP(callee)
+	csc	cra, SCB_CRA(callee)
 
 	/*
 	 * Save the pointer to the cookie.
 	 */
-	csc	ca2, SCB_COOKIEP(idc)
+	csc	ca2, SCB_COOKIEP(callee)
 
 	/*
 	 * Save the data transfer args.
 	 */
-	csc	ca3, SCB_OUTBUF(idc)
-	csd	a4, SCB_OUTLEN(idc)
-	csc	ca5, SCB_INBUF(idc)
-	csd	a6, SCB_INLEN(idc)
+	csc	ca3, SCB_OUTBUF(callee)
+	csd	a4, SCB_OUTLEN(callee)
+	csc	ca5, SCB_INBUF(callee)
+	csd	a6, SCB_INLEN(callee)
 
 	/*
 	 * Load the capability to the caller's control block.
 	 */
 6:
-	clr.c.aqrl	ct0, SCB_CALLER_SCB(idc)
+	clr.c.aqrl	caller, SCB_CALLER_SCB(callee)
 
 	/*
 	 * Is this the first invocation of coaccept, or rather a response
 	 * for a ccall()?  If the former - call copark(2).
 	 */
-	cgetlen	t1, ct0
+	cgetlen	t1, caller
 	bnez	t1, 1f
-	csc.c.aqrl	t1, cnull, SCB_CALLER_SCB(idc)
+	csc.c.aqrl	t1, cnull, SCB_CALLER_SCB(callee)
 	bnez	t1, 6b
 	li	t0, SYS_copark
 	ecall
@@ -131,27 +122,20 @@ _C_LABEL(switcher_coaccept):
 	 * is returning to the caller and scb_borrower_thread
 	 * needs to be set to NULL in the caller's scb.
 	 */
-	clc	ct1, SCB_BORROWER_TD(ct0)
+	clc	ct1, SCB_BORROWER_TD(caller)
 	bnez	t1, 4f
-	clc	ct3, SCB_TD(ct0)
-	csc	ct3, SCB_BORROWER_TD(idc)
-	/*
-	 * Immediately swap back.
-	 */
-	cmove cs0, ct0
-	li	t0, SYS_getpid
-	ecall
-	cmove ct0, cs0
+	clc	ct3, SCB_TD(caller)
+	csc	ct3, SCB_BORROWER_TD(callee)
 	j	5f
 4:
-	csc	cnull, SCB_BORROWER_TD(ct0)
+	csd	zero, SCB_BORROWER_TD(caller)
 5:
 
 	/*
 	 * Restore the caller's context.
 	 */
-	clc	csp, SCB_CSP(ct0)
-	clc	cra, SCB_CRA(ct0)
+	clc	csp, SCB_CSP(caller)
+	clc	cra, SCB_CRA(caller)
 
 	/*
 	 * Do the data transfer back to the caller.  The reason
@@ -159,15 +143,17 @@ _C_LABEL(switcher_coaccept):
 	 * is doing - it transfers the data there and back, both
 	 * sides.
 	 */
-	clc	ct4, SCB_INBUF(ct0)
-	cld	t5, SCB_INLEN(ct0)
+	clc	ct4, SCB_INBUF(caller)
+	cld	t5, SCB_INLEN(caller)
 
 	/*
 	 * Compare buffer sizes, put the smaller one into t5.
 	 */
 	sub	t3, a4, t5
+	mv	a0, t5
 	bgez	t3, 2f
 	mv	t5, a4
+	mv	a0, a4
 
 2:
 	clc	ct2, 0(ca3)
@@ -181,11 +167,10 @@ _C_LABEL(switcher_coaccept):
 	 * Zero out the scb_peer_scb variables, releasing the spinlock.
 	 */
 	cmove	ct2, cnull
-	csc		cnull, SCB_CALLEE_SCB(ct0)
-	camoswap.c.aqrl	ct4, ct2, SCB_CALLER_SCB(idc)
+	csc		cnull, SCB_CALLEE_SCB(caller)
+	camoswap.c.aqrl	ct4, ct2, SCB_CALLER_SCB(callee)
 
 	li	t0, 0
-	li	a0, 0
 
 3:
 	/*
@@ -226,10 +211,14 @@ _C_LABEL(switcher_coaccept):
 	 * Bye!
 	 */
 	cret
-.globl _C_LABEL(eswitcher_coaccept)
-_C_LABEL(eswitcher_coaccept):
+END(switcher_coaccept)
 
-.data
-.globl szswitcher_coaccept
+eswitcher_coaccept:
+
+	.data
+	.align	3
+	.globl szswitcher_coaccept
+	.type szswitcher_coaccept,@object
 szswitcher_coaccept:
-.long eswitcher_coaccept-switcher_coaccept
+	.long eswitcher_coaccept - switcher_coaccept
+	.size szswitcher_coaccept, . - szswitcher_coaccept

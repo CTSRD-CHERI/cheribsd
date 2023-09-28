@@ -31,6 +31,7 @@
   * CHERI CHANGES START
   * {
   *   "updated": 20221129,
+  *    "target_type": "lib",
   *   "changes": [
   *     "pointer_alignment"
   *   ],

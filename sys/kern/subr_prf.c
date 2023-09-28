@@ -833,6 +833,10 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 			}
 			if (sharpflag) {
 				int orig_dwidth;
+#ifdef CHERI_FLAGS_CAP_MODE
+				bool capmode;
+#endif
+				bool comma, have_attributes, tagged;
 
 				orig_dwidth = dwidth;
 
@@ -897,32 +901,59 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 
 				PCHAR(']');
 
-				/* tag and sealing */
+				/* attributes */
+				tagged = cheri_gettag(cap);
+				have_attributes = !tagged;
+				if (cheri_gettype(cap) != CHERI_OTYPE_UNSEALED)
+					have_attributes = true;
+
+#ifdef CHERI_FLAGS_CAP_MODE
+				capmode = false;
+				if ((cheri_getperm(cap) &
+				    CHERI_PERM_EXECUTE) != 0 &&
+				    cheri_getflags(cap) ==
+				    CHERI_FLAGS_CAP_MODE) {
+					capmode = true;
+					have_attributes = true;
+				}
+#endif
+
+				if (!have_attributes)
+					break;
+
+				comma = false;
+				PCHAR(' ');
+				PCHAR('(');
+
+#define PATTR(str) do {							\
+	if (comma)							\
+		PCHAR(',');						\
+	p = (str);							\
+	while (*p)							\
+		PCHAR(*p++);						\
+	comma = true;							\
+} while (0)
+
+				if (!tagged)
+					PATTR("invalid");
 				switch (cheri_gettype(cap)) {
 				case CHERI_OTYPE_UNSEALED:
-					if (cheri_gettag(cap))
-						p = NULL;
-					else
-						p = "(invalid)";
 					break;
 				case CHERI_OTYPE_SENTRY:
-					if (cheri_gettag(cap))
-						p = "(sentry)";
-					else
-						p = "(invalid,sentry)";
+					PATTR("sentry");
 					break;
 				default:
-					if (cheri_gettag(cap))
-						p = "(sealed)";
-					else
-						p = "(invalid,sealed)";
+					PATTR("sealed");
 					break;
 				}
-				if (p != NULL) {
-					PCHAR(' ');
-					while (*p)
-						PCHAR(*p++);
-				}
+#ifdef __riscv
+				if (capmode)
+					PATTR("capmode");
+#endif
+
+#undef PATRR
+
+				PCHAR(')');
 				break;
 			}
 #else
@@ -1449,7 +1480,7 @@ sbuf_printf_drain(void *arg, const char *data, int len)
 
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "support"

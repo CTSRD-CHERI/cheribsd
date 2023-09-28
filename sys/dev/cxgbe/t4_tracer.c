@@ -389,7 +389,8 @@ t4_set_tracer(struct adapter *sc, struct t4_tracer *t)
 			goto done;
 		}
 		tp.port = sc->port[t->tp.port - 4]->tx_chan + 4;
-	}
+	} else
+		tp.port = t->tp.port;
 	tpp = &tp;
 done:
 	if (rc == 0) {
@@ -532,7 +533,7 @@ tracer_media_status(if_t ifp, struct ifmediareq *ifmr)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

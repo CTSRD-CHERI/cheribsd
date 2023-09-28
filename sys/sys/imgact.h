@@ -56,7 +56,7 @@ struct image_args {
 	int envc;		/* count of environment strings */
 	int fd;			/* file descriptor of the executable */
 	int capc;		/* number of capabilities passed to coexecvec(2) */
-	void * __capability capv[42];	/* capabilities passed to coexecvec(2) */
+	void * __capability *capv;	/* capabilities passed to coexecvec(2) */
 };
 
 struct image_params {
@@ -71,6 +71,7 @@ struct image_params {
 	unsigned long start_addr;	/* start of mapped image (including bss) */
 	unsigned long end_addr;		/* end of mapped image (including bss) */
 	unsigned long reloc_base;	/* load address of image */
+	unsigned long et_dyn_addr;	/* PIE load base */
 	unsigned long interp_start;	/* start of RTLD mapping (or zero) */
 	unsigned long interp_end;	/* end of RTLD mapping (or zero) */
 	char *interpreter_name;		/* name of the interpreter */
@@ -119,7 +120,8 @@ int	exec_args_add_arg(struct image_args *args,
 	    const char * __capability argp, enum uio_seg segflg);
 int	exec_args_add_env(struct image_args *args,
 	    const char * __capability envp, enum uio_seg segflg);
-int	exec_args_add_cap(struct image_args *args, void * __capability cap);
+int	exec_args_add_capv(struct image_args *args,
+	    void * __capability capv, int capc);
 int	exec_args_add_fname(struct image_args *args,
 	    const char *__capability fname, enum uio_seg segflg);
 int	exec_args_adjust_args(struct image_args *args, size_t consume,
@@ -137,7 +139,11 @@ int	exec_copyin_args(struct image_args *, const char * __capability,
 	    enum uio_seg, void * __capability, void * __capability);
 int	exec_copyin_args_capv(struct image_args *, const char * __capability,
 	    enum uio_seg, void * __capability, void * __capability,
-	    void * __capability);
+	    void * __capability, int);
+int	exec_copyin_data_fds(struct thread *, struct image_args *,
+	    const void * __capability, size_t, const int * __capability,
+	    size_t);
+void	exec_stackgap(struct image_params *imgp, uintcap_t *dp);
 int	pre_execve(struct thread *td, struct vmspace **oldvmspace);
 void	post_execve(struct thread *td, int error, struct vmspace *oldvmspace);
 #endif
@@ -145,7 +151,7 @@ void	post_execve(struct thread *td, int error, struct vmspace *oldvmspace);
 #endif /* !_SYS_IMGACT_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

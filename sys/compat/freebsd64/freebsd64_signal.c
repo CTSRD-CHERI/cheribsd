@@ -236,3 +236,15 @@ int freebsd64_sigfastblock(struct thread *td,
 {
 	return (kern_sigfastblock(td, uap->cmd, __USER_CAP_OBJ(uap->ptr)));
 }
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20230509,
+ *   "target_type": "kernel",
+ *   "changes": [
+ *     "support",
+ *     "ctoptr"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

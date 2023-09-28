@@ -649,11 +649,12 @@ vm_cap_allows_prot(const void * __capability cap, vm_prot_t prot)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "ctoptr"
 //   ],
 //   "changes_purecap": [
 //     "support",

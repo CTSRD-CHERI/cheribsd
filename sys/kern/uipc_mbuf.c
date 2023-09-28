@@ -1335,6 +1335,7 @@ m_apply_extpg_one(struct mbuf *m, int off, int len,
 		if (off < pglen) {
 			count = min(pglen - off, len);
 			p = (void *)PHYS_TO_DMAP(m->m_epg_pa[i] + pgoff + off);
+			p = cheri_kern_setboundsexact(p, count);
 			rval = f(arg, p, count);
 			if (rval)
 				return (rval);

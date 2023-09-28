@@ -141,7 +141,7 @@
 #define	SYS_mkdir	136
 #define	SYS_rmdir	137
 #define	SYS_utimes	138
-				/* 139 is obsolete 4.2 sigreturn */
+				/* 139 is obsolete sigreturn */
 #define	SYS_adjtime	140
 				/* 141 is old getpeername */
 				/* 142 is old gethostid */
@@ -167,6 +167,8 @@
 				/* 164 is freebsd4 uname */
 #define	SYS_sysarch	165
 #define	SYS_rtprio	166
+#define	SYS_capfromfd	167
+#define	SYS_captofd	168
 #define	SYS_semsys	169
 #define	SYS_msgsys	170
 #define	SYS_shmsys	171
@@ -531,4 +533,5 @@
 #define	SYS_fspacectl	580
 #define	SYS_sched_getcpu	581
 #define	SYS_swapoff	582
-#define	SYS_MAXSYSCALL	583
+#define	SYS_kqueuex	583
+#define	SYS_MAXSYSCALL	584

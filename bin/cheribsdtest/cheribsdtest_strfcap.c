@@ -161,6 +161,19 @@ test_strfcap_C_cap_one(void * __capability p, int expected_tokens,
 			    "sentry for %s", descr);
 		break;
 	}
+
+#ifdef CHERI_FLAGS_CAP_MODE
+	if ((cheri_getperm(p) & CHERI_PERM_EXECUTE) != 0 &&
+	    cheri_getflags(p) == CHERI_FLAGS_CAP_MODE) {
+		if (strstr(attr, "capmode") == NULL)
+			cheribsdtest_failure_errx("Capability mode code cap "
+			    "not marked capmode for %s", descr);
+	} else {
+		if (strstr(attr, "capmode") != NULL)
+			cheribsdtest_failure_errx("Non-capability mode code "
+			    "cap marked capmode for %s", descr);
+	}
+#endif
 }
 
 static void
@@ -332,6 +345,9 @@ CHERIBSDTEST(strfcap_C, "Various checks of %C (%A and %P indirectly)")
 	char data[64];
 	uintcap_t scalar = (uintcap_t)4;
 	char * __capability datap = data;
+#ifdef CHERI_FLAGS_CAP_MODE
+	void * __capability pcc_alt = __builtin_cheri_program_counter_get();
+#endif
 
 	strfcap(data, sizeof(data), "%#C", scalar);
 	if (strcmp(data, "0x4") != 0)
@@ -360,6 +376,16 @@ CHERIBSDTEST(strfcap_C, "Various checks of %C (%A and %P indirectly)")
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	test_strfcap_C_cap_one(__builtin_return_address(0), 5, "return address");
+#endif
+
+#ifdef CHERI_FLAGS_CAP_MODE
+#ifdef __CHERI_PURE_CAPABILITY__
+	pcc_alt = cheri_setflags(pcc_alt, 0);
+	test_strfcap_C_cap_one(pcc_alt, 4, "non-capability mode PCC");
+#else
+	pcc_alt = cheri_setflags(pcc_alt, CHERI_FLAGS_CAP_MODE);
+	test_strfcap_C_cap_one(pcc_alt, 5, "capability mode PCC");
+#endif
 #endif
 
 	test_strfcap_C_cap_one(datap, 4, "stack array");

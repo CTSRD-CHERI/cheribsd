@@ -91,12 +91,13 @@ nfs_init_tmpfile(const char *prefix, const char *mdir, struct tmpfile *tmpf)
 	    mkdir(mdir, 0755) < 0 &&
 	    errno != EEXIST) {
 		fprintf(stderr, "failed to create %s: %s\n",
+		// cppcheck-suppress uninitvar
 		    mdir, strerror(errno));
 		return (B_FALSE);
 	}
 
 	strlcpy(tmpf->name, prefix, sizeof (tmpf->name));
-	strlcat(tmpf->name, ".XXXXXXXX", sizeof (tmpf->name) - strlen(prefix));
+	strlcat(tmpf->name, ".XXXXXXXX", sizeof (tmpf->name));
 
 	int fd = mkostemp(tmpf->name, O_CLOEXEC);
 	if (fd == -1) {

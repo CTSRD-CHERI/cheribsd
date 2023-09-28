@@ -184,9 +184,7 @@ static void *dlhandle;
 #define LIBCRYPTO "libcrypto.so.2"
 #endif
 
-void load_des(warn, libpath)
-	int warn;
-	char *libpath;
+void load_des(int warn, char *libpath)
 {
 	char dlpath[MAXPATHLEN];
 

@@ -208,8 +208,9 @@
 #if __has_feature(capabilities)
 #define	COSETUP_COCALL		0
 #define	COSETUP_COACCEPT	1
-#define	COSETUP_COGETPID	2
-#define	COSETUP_COGETTID	3
+#define	COSETUP_TAKEOVER	2
+#define	COSETUP_COGETPID	3
+#define	COSETUP_COGETTID	4
 #endif
 
 #endif /* __BSD_VISIBLE */

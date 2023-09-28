@@ -119,7 +119,7 @@ extern epoch_t net_epoch_preempt;
 #endif	/* _SYS_EPOCH_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20221205,
+//   "updated": 20230509,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "subobject_bounds"

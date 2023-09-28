@@ -60,8 +60,9 @@ KERNEL_C = \
 	bplist.c \
 	bpobj.c \
 	bptree.c \
-	btree.c \
 	bqueue.c \
+	btree.c \
+	brt.c \
 	cityhash.c \
 	dbuf.c \
 	dbuf_stats.c \
@@ -115,7 +116,7 @@ KERNEL_C = \
 	refcount.c \
 	rrwlock.c \
 	sa.c \
-	sha256.c \
+	sha2_zfs.c \
 	skein_zfs.c \
 	spa.c \
 	spa_checkpoint.c \

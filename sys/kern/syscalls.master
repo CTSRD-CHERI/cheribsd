@@ -110,7 +110,9 @@
 ;	timet_	Object contains a time_t and varies between i386 and other
 ;		ABIs.
 
-; #ifdef's, etc. may be included, and are copied to the output files.
+; #include's, #defines's, etc. may be included, and are copied to the output
+; files. However, #ifdef, etc will be copied, but any lines that don't start
+; with # will not. Caveat Emptor.
 
 #include <sys/param.h>
 #include <sys/sysent.h>
@@ -157,7 +159,7 @@
 		    int fd
 		);
 	}
-7	AUE_WAIT4	STD {
+7	AUE_WAIT4	STD|CAPENABLED {
 		int wait4(
 		    int pid,
 		    _Out_opt_ int *status,
@@ -913,7 +915,7 @@
 		    _In_ _Contains_long_timet_ const struct timeval *tptr
 		);
 	}
-139	AUE_NULL	OBSOL	4.2 sigreturn
+139	AUE_NULL	OBSOL	sigreturn
 140	AUE_ADJTIME	STD {
 		int adjtime(
 		    _In_ _Contains_long_timet_ const struct timeval *delta,
@@ -989,6 +991,7 @@
 		    _In_z_ char **argv,
 		    _In_z_ char **envv,
 		    _In_z_ char * __capability *capv,
+		    int capc
 		);
 	}
 153	AUE_NULL	RESERVED
@@ -1071,7 +1074,19 @@
 		    _Inout_ struct rtprio *rtp
 		);
 	}
-167-168	AUE_NULL	RESERVED
+167	AUE_NULL	STD|CAPENABLED {
+		int capfromfd(
+		    _Out_ void * __capability *capp,
+		    int fd
+		);
+	}
+168	AUE_NULL	STD|CAPENABLED {
+		int captofd(
+		    _In_ void * __capability cap,
+		    int *fdp
+		);
+	}
+
 169	AUE_SEMSYS	NOSTD|VARARG4 {
 		int semsys(
 		    int which,
@@ -1128,7 +1143,7 @@
 		    _Inout_ _Contains_long_ struct timex *tp
 		);
 	}
-177	AUE_NULL	STD	{
+177	AUE_NULL	STD|CAPENABLED {
 		int _cosetup(
 		    int what,
 		    _Out_ void * __capability *code,
@@ -1147,7 +1162,7 @@
 		    _Out_ void * __capability *cap
 		);
 	}
-180	AUE_NULL	STD	{
+180	AUE_NULL	STD|CAPENABLED	{
 		int copark(void);
 	}
 181	AUE_SETGID	STD|CAPENABLED {
@@ -1199,7 +1214,7 @@
 		    int name
 		);
 	}
-193	AUE_NULL        STD     {
+193	AUE_NULL        STD|CAPENABLED {
 		int cogetpid(
 		    _Out_ pid_t *pidp
 		);
@@ -3127,8 +3142,8 @@
 		    int flag
 		);
 	}
-548	AUE_NULL	STD {
-		int cocall_slow(
+548	AUE_NULL	STD|CAPENABLED {
+		ssize_t cocall_slow(
 		    _In_ void * __capability target,
 		    _In_reads_bytes_(outlen) const void * __capability outbuf,
 		    size_t outlen,
@@ -3136,15 +3151,15 @@
 		    size_t inlen
 		);
 	}
-549	AUE_NULL	STD {
-		int coaccept_slow(
+549	AUE_NULL	STD|CAPENABLED {
+		ssize_t coaccept_slow(
 		    _Inout_ void * __capability *cookiep,
 		    _In_reads_bytes_(outlen) const void * __capability outbuf,
 		    size_t outlen,
 		    _Out_writes_bytes_(inlen) void * __capability inbuf,
 		    size_t inlen
 		);
-}
+	}
 550	AUE_FSYNC	STD|CAPENABLED {
 		int fdatasync(
 		    int fd
@@ -3383,6 +3398,11 @@
 		int swapoff(
 		    _In_z_ const char *name,
 		    u_int flags,
+		);
+	}
+583	AUE_KQUEUE	STD|CAPENABLED {
+		int kqueuex(
+		    u_int flags
 		);
 	}
 
