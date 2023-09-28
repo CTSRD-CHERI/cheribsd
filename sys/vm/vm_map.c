@@ -1029,6 +1029,7 @@ _vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min, vm_pointer_t max)
 
 #ifdef CHERI_CAPREVOKE
 	map->vm_cheri_revoke_st = CHERI_REVOKE_ST_NONE; /* and epoch 0 */
+	map->vm_cheri_revoke_quarantining = false;
 	RB_INIT(&map->quarantine);
 #endif
 }
@@ -3752,7 +3753,7 @@ vm_map_inherit(vm_map_t map, vm_offset_t start, vm_offset_t end,
 			goto unlock;
 	}
 #ifdef CHERI_CAPREVOKE
-	if (quarantine_unmapped_reservations) {
+	if (map->vm_cheri_revoke_quarantining) {
 		for (entry = start_entry; entry->start < end;
 		    prev_entry = entry, entry = vm_map_entry_succ(entry)) {
 			if (entry->inheritance == VM_INHERIT_QUARANTINE) {
@@ -4792,6 +4793,7 @@ vm_map_remove_locked(vm_map_t map, vm_offset_t start, vm_offset_t end)
 	if (vm_map_reservation_is_unmapped(map, reservation)) {
 #ifdef CHERI_CAPREVOKE
 		if (quarantine_unmapped_reservations &&
+		    map->vm_cheri_revoke_quarantining &&
 		    start < VM_MAXUSER_ADDRESS) {
 			/*
 			 * If we're here, [start, end) was the last mapped
@@ -4804,6 +4806,11 @@ vm_map_remove_locked(vm_map_t map, vm_offset_t start, vm_offset_t end)
 			    ("entry doesn't cover removed range"));
 			vm_map_entry_quarantine(map, entry);
 		} else
+			/*
+			 * XXX: Should we track how much we've skipped
+			 * due to !map->vm_cheri_revoke_quarantining in
+			 * order to warn if we later start revoking?
+			 */
 #endif
 			vm_map_reservation_delete_locked(map, reservation);
 	}
@@ -5146,6 +5153,8 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 	 */
 	vm2->vm_map.vm_cheri_revoke_st = vm1->vm_map.vm_cheri_revoke_st;
 	vm2->vm_map.vm_cheri_revoke_test = vm1->vm_map.vm_cheri_revoke_test;
+	vm2->vm_map.vm_cheri_revoke_quarantining =
+	    vm1->vm_map.vm_cheri_revoke_quarantining;
 #endif
 
 	error = pmap_vmspace_copy(new_map->pmap, old_map->pmap);

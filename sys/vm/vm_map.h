@@ -252,6 +252,7 @@ struct vm_map {
 	 * Tree of map entries awaiting revocation, ordered by size and
 	 * virtual address.
 	 */
+	bool vm_cheri_revoke_quarantining;	/* map is quarantining */
 	RB_HEAD(vm_map_quarantine, vm_map_entry) quarantine;
 	struct vm_map_entry *rev_entry;	/* entry being revoked */
 #ifdef CHERI_CAPREVOKE_STATS
