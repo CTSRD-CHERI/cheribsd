@@ -214,11 +214,14 @@ _C_LABEL(switcher_coaccept):
 	cmp	x11, #0
 	bge	2f
 	mov	x13, x4
+	mov x11, 0
 
 2:
-	add	x13, x13, #-8
-	ldr	x11, [c3, x13]
-	str	x11, [c12, x13]
+	ldr	c11, [c3, 0]
+	str	c11, [c12, 0]
+	add c3, c3, #CHERICAP_SIZE
+	add c12, c12, #CHERICAP_SIZE
+	add	x13, x13, #-CHERICAP_SIZE
 	cbnz	x13, 2b
 
 	/*

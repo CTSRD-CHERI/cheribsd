@@ -224,9 +224,11 @@ SIGCODE(switcher_cocall)
 
 CSYM(switcher_cocall_copy_start)
 3:
-	add	x13, x13, #-8
-	ldr	x11, [c3, x13]
-	str	x11, [c12, x13]
+	ldr	c11, [c3, 0]
+	str	c11, [c12, 0]
+	add c3, c3, #CHERICAP_SIZE
+	add c12, c12, #CHERICAP_SIZE
+	add	x13, x13, #-CHERICAP_SIZE
 	cbnz	x13, 3b
 CSYM(switcher_cocall_copy_end)
 
@@ -293,7 +295,7 @@ CSYM(switcher_cocall_copy_onfault)
 	str	czr, SCB_CALLER_SCB(c9)
 
 	/* Clear state in the caller's scb. */
-	str	czr, SCB_BORROWER_TD(c29)
+	str	xzr, SCB_BORROWER_TD(c29)
 	str	czr, SCB_CALLEE_SCB(c29)
 
 	ldr	c8, SCB_CSP(c29)
