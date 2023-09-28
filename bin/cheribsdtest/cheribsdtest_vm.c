@@ -860,6 +860,12 @@ CHERIBSDTEST(vm_reservation_mmap_after_free_fixed,
     "after the reservation has been deleted")
 {
 	void *map;
+	const volatile struct cheri_revoke_info *cri;
+
+	/* Make sure this process is revoking */
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke_get_shadow(
+	    CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL, __DEQUALIFY(void **, &cri)));
+
 	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, PAGE_SIZE,
 	    PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
 
@@ -1945,8 +1951,13 @@ CHERIBSDTEST(revoke_largest_quarantined_reservation,
 	struct procstat *psp;
 	struct kinfo_proc *kipp;
 	struct kinfo_vmentry *kivp;
+	const volatile struct cheri_revoke_info *cri;
 	uint pcnt, vmcnt;
 	bool found_res;
+
+	/* Make sure this process is revoking */
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke_get_shadow(
+	    CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL, __DEQUALIFY(void **, &cri)));
 
 	res = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, res_size, PROT_READ,
 	    MAP_ANON, -1, 0));
@@ -2028,8 +2039,13 @@ CHERIBSDTEST(revoke_merge_quarantined,
 	struct procstat *psp;
 	struct kinfo_proc *kipp;
 	struct kinfo_vmentry *kivp;
+	const volatile struct cheri_revoke_info *cri;
 	uint pcnt, vmcnt;
 	bool found_res[NRES] = {};
+
+	/* Make sure this process is revoking */
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke_get_shadow(
+	    CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL, __DEQUALIFY(void **, &cri)));
 
 	/*
 	 * Create a single large quarantined reservation with three
