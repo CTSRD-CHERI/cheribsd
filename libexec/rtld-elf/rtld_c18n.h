@@ -36,7 +36,16 @@ extern const char *ld_compartment_utrace;
 extern const char *ld_compartment_enable;
 extern const char *ld_compartment_overhead;
 
-void ld_utrace_log(int, void *, void *, size_t, int, const char *, const char *, const char *);
+void ld_utrace_log(int, void *, void *, size_t, int, const char *, const char *,
+    const char *);
+
+void tramp_init(void);
+
+/*
+ * libthr support
+ */
+extern void (*thr_thread_start)(struct pthread *);
+extern void (*thr_sighandler)(int, siginfo_t *, void *);
 
 /*
  * Policies
@@ -59,6 +68,7 @@ struct policy {
 	size_t count;
 };
 
+void tramp_add_comparts(struct policy *);
 compart_id_t compart_id_allocate(const char *);
 
 /*
@@ -103,15 +113,34 @@ struct tramp_data {
 _Static_assert(sizeof(struct tramp_sig) == sizeof(tramp_sig_int),
     "Unexpected tramp_sig size");
 
+void tramp_hook(int, void *, const Obj_Entry *, const Elf_Sym *, void *, void *);
+size_t tramp_compile(tramp **, const struct tramp_data *);
 void *tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *);
 struct tramp_sig tramp_fetch_sig(const Obj_Entry *, unsigned long);
+
+static inline long
+tramp_sig_to_otype(struct tramp_sig sig)
+{
+	return (sig.ret_args | (sig.mem_args << 2) | (sig.reg_args << 3));
+}
+
+static inline tramp_sig_int
+tramp_sig_to_int(struct tramp_sig sig)
+{
+	tramp_sig_int ret;
+	memcpy(&ret, &sig, sizeof(tramp_sig_int));
+	return ret;
+}
+
+static inline bool
+tramp_sig_legal(struct tramp_sig sig)
+{
+	return (!sig.valid || sig.reg_args <= 8);
+}
 
 /*
  * APIs
  */
 void *_rtld_sandbox_code(void *, struct tramp_sig);
 void *_rtld_safebox_code(void *, struct tramp_sig);
-
-void tramp_init(void);
-void tramp_add_comparts(struct policy *);
 #endif
