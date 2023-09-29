@@ -210,7 +210,9 @@
 #define	COSETUP_COACCEPT	1
 #define	COSETUP_TAKEOVER	2
 #define	COSETUP_COGETPID	3
+#if defined(__riscv)
 #define	COSETUP_COGETTID	4
+#endif
 #endif
 
 #endif /* __BSD_VISIBLE */

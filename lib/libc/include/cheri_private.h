@@ -54,8 +54,10 @@ extern _Thread_local void * __capability _coaccept_data;
 
 extern _Thread_local void * __capability _cogetpid2_code;
 extern _Thread_local void * __capability _cogetpid2_data;
+#ifdef COSETUP_COGETTID
 extern _Thread_local void * __capability _cogettid_code;
 extern _Thread_local void * __capability _cogettid_data;
+#endif
 
 void _trace_cocall(ptraddr_t target, size_t outlen, size_t inlen);
 #endif /* __has_feature(capabilities) */

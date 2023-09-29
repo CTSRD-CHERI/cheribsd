@@ -97,8 +97,10 @@ cosetup(int what)
 		return (_cosetup(what, &_cocall_code, &_cocall_data));
 	case COSETUP_COGETPID:
 		return (_cosetup(what, &_cogetpid2_code, &_cogetpid2_data));
+#ifdef COSETUP_COGETTID
 	case COSETUP_COGETTID:
 		return (_cosetup(what, &_cogettid_code, &_cogettid_data));
+#endif
 	default:
 		return (EINVAL);
 	}

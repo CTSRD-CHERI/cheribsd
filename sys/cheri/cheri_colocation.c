@@ -649,31 +649,37 @@ kern_cosetup(struct thread *td, int what,
 		error = sucap(datap, (intcap_t)datacap) == 0 ? 0 : EFAULT;
 		return (error);
 		break;
-
 	case COSETUP_COGETPID:
-		codecap = switcher_code_cap(td,
-			td->td_proc->p_sysent->sv_cogetpid_base,
-			td->td_proc->p_sysent->sv_cogetpid_len);
-		error = sucap(codep, (intcap_t)codecap);
+		if (vmspace->vm_cogetpid_codecap != NULL) {
+			codecap = vmspace->vm_cogetpid_codecap;
+			codecap = cheri_capmode(codecap);
+		} else {
+			codecap = switcher_code_cap(td,
+				td->td_proc->p_sysent->sv_cogetpid_base,
+				td->td_proc->p_sysent->sv_cogetpid_len);
+		}
+		codecap = cheri_seal(codecap, switcher_sealcap);
+		error = sucap(codep, (intcap_t)codecap) == 0 ? 0 : EFAULT;
 		if (error != 0)
 			return (error);
 
 		datacap = cheri_seal(td->td_scb, switcher_sealcap);
-		error = sucap(datap, (intcap_t)datacap);
+		error = sucap(datap, (intcap_t)datacap) == 0 ? 0 : EFAULT;
 		return (error);
-
+		break;
+#ifdef COSETUP_COGETTID
 	case COSETUP_COGETTID:
 		codecap = switcher_code_cap(td,
 			td->td_proc->p_sysent->sv_cogettid_base,
 			td->td_proc->p_sysent->sv_cogettid_len);
-		error = sucap(codep, (intcap_t)codecap);
+		error = sucap(codep, (intcap_t)codecap) == 0 ? 0 : EFAULT;
 		if (error != 0)
 			return (error);
 
 		datacap = cheri_seal(td->td_scb, switcher_sealcap);
-		error = sucap(datap, (intcap_t)datacap);
+		error = sucap(datap, (intcap_t)datacap) == 0 ? 0 : EFAULT;
 		return (error);
-
+#endif
 	case COSETUP_TAKEOVER:
 		error = priv_check(td, PRIV_KMEM_WRITE);
 		if (error != 0) {

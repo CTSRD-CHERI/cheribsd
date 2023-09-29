@@ -326,6 +326,7 @@ struct vmspace {
 	struct pmap vm_pmap;	/* private physical map */
 	void * __capability vm_cocall_codecap;
 	void * __capability vm_coaccept_codecap;
+	void * __capability vm_cogetpid_codecap;
 };
 
 #ifdef	_KERNEL
