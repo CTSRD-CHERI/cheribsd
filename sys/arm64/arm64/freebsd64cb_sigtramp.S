@@ -1,5 +1,8 @@
 /*-
- * Copyright (c) 2014 Andrew Turner
+ * Copyright (c) 2014 The FreeBSD Foundation
+ *
+ * This software was developed by Andrew Turner under sponsorship from
+ * the FreeBSD Foundation.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -21,20 +24,52 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
  */
 
+#include "assym.inc"
+#include <sys/syscall.h>
 #include <machine/asm.h>
-#include "SYS.h"
 
-ENTRY(__sys_vfork)
-	WEAK_REFERENCE(__sys_vfork, vfork)
-	WEAK_REFERENCE(__sys_vfork, _vfork)
-	mov	REG(2), REGN(lr)
-	_SYSCALL(vfork)
-	b.cs	cerror
-	sub	x1, x1, #1
-	and	x0, x0, x1
-	mov	REGN(lr), REG(2)
-	RETURN
-END(__sys_vfork)
+/*
+ * sigcode has to be labeled as an #object type so that the symbols
+ * resolve to the correct address as a source for copies.  This also
+ * ensures that captable pointers to it will be able to read it.  This
+ * is fine as the code is never executed directly in the kernel, just
+ * copied to places for userland to execute.
+ */
+#define	SIGCODE(sym)						\
+	.section .rodata; .globl sym; .align 2; .type sym,#object; sym:	\
+	.cfi_startproc
+
+SIGCODE(freebsd64cb_sigcode)
+#ifndef __CHERI_PURE_CAPABILITY__
+	.arch_extension c64
+#endif
+	blr	x8
+	add	c0, csp, #SF_UC
+
+1:
+	mov	x8, #SYS_sigreturn
+	svc	0
+
+	/* sigreturn failed, exit */
+	mov	x8, #SYS_exit
+	svc	0
+
+	b	1b
+#ifndef __CHERI_PURE_CAPABILITY__
+	.arch_extension noc64
+	.arch_extension a64c
+#endif
+	/* This may be copied to the stack, keep it 16-byte aligned */
+	.align	3
+END(freebsd64cb_sigcode)
+freebsd64cb_esigcode:
+
+	.data
+	.align	3
+	.global	freebsd64cb_szsigcode
+	.type	freebsd64cb_szsigcode,#object
+	.size	freebsd64cb_szsigcode, 8
+freebsd64cb_szsigcode:
+	.quad	freebsd64cb_esigcode - freebsd64cb_sigcode

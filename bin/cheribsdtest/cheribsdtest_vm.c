@@ -848,16 +848,6 @@ reservations_are_quarantined(void)
 	return (quarantine_unmapped_reservations != 0);
 }
 
-
-static const char *
-skip_need_quarantine_unmapped_reservations(const char *name __unused)
-{
-	if (reservations_are_quarantined())
-		return (NULL);
-	else
-		return ("unmapped reservations are not being quarantined");
-}
-
 /*
  * Check that after a reservation is unmapped, it is not possible to
  * reuse the old capability to create new fixed mappings.
@@ -1296,10 +1286,19 @@ CHERIBSDTEST(vm_capdirty, "verify capdirty marking and mincore")
 #undef CHERIBSDTEST_VM_CAPDIRTY_NPG
 }
 
-#ifdef CHERI_REVOKE
+#ifdef CHERIBSDTEST_CHERI_REVOKE_TESTS
 /*
  * Revocation tests
  */
+
+static const char *
+skip_need_quarantine_unmapped_reservations(const char *name __unused)
+{
+	if (reservations_are_quarantined())
+		return (NULL);
+	else
+		return ("unmapped reservations are not being quarantined");
+}
 
 static int
 check_revoked(void *r)
@@ -1308,10 +1307,18 @@ check_revoked(void *r)
 	    ((cheri_gettype(r) == -1L) && (cheri_getperm(r) == 0));
 }
 
+/*
+ * Install a couple of knotes into the queue, one identified by a file
+ * descriptor and one not, to exercise different code paths in the kernel.
+ * The knotes will contain a user capability which should be detected and
+ * handled by the kernel's caprevoke machinery.
+ */
 static void
-install_kqueue_cap(int kq, void *revme)
+install_kqueue_cap(int kq, int pfd[2], void *revme)
 {
 	struct kevent ike;
+	ssize_t rv;
+	char b;
 
 	EV_SET(&ike, (uintptr_t)&install_kqueue_cap,
 	    EVFILT_USER, EV_ADD | EV_ONESHOT | EV_DISABLE, NOTE_FFNOP, 0,
@@ -1320,12 +1327,21 @@ install_kqueue_cap(int kq, void *revme)
 	EV_SET(&ike, (uintptr_t)&install_kqueue_cap, EVFILT_USER, EV_KEEPUDATA,
 	    NOTE_FFNOP | NOTE_TRIGGER, 0, NULL);
 	CHERIBSDTEST_CHECK_SYSCALL(kevent(kq, &ike, 1, NULL, 0, NULL));
+
+	EV_SET(&ike, (uintptr_t)pfd[0], EVFILT_READ, EV_ADD | EV_DISABLE, 0, 0,
+	    revme);
+	CHERIBSDTEST_CHECK_SYSCALL(kevent(kq, &ike, 1, NULL, 0, NULL));
+	b = 42;
+	rv = CHERIBSDTEST_CHECK_SYSCALL(write(pfd[1], &b, sizeof(b)));
+	CHERIBSDTEST_VERIFY(rv == 1);
 }
 
 static void
-check_kqueue_cap(int kq, unsigned int valid)
+check_kqueue_cap(int kq, int pfd[2], unsigned int valid)
 {
 	struct kevent ike, oke = { 0 };
+	ssize_t rv;
+	char b;
 
 	EV_SET(&ike, (uintptr_t)&install_kqueue_cap,
 	    EVFILT_USER, EV_ENABLE|EV_KEEPUDATA, NOTE_FFNOP, 0, NULL);
@@ -1337,7 +1353,21 @@ check_kqueue_cap(int kq, unsigned int valid)
 	CHERIBSDTEST_VERIFY2(oke.filter == EVFILT_USER,
 	    "Bad filter from kqueue");
 	CHERIBSDTEST_VERIFY2(check_revoked(oke.udata) == !valid,
-				"kqueue-held cap not as expected");
+	    "kqueue-held cap not as expected");
+
+	memset(&oke, 0, sizeof(0));
+	EV_SET(&ike, pfd[0], EVFILT_READ, EV_ENABLE | EV_KEEPUDATA, 0, 0, NULL);
+	CHERIBSDTEST_CHECK_SYSCALL(kevent(kq, &ike, 1, NULL, 0, NULL));
+	CHERIBSDTEST_CHECK_SYSCALL(kevent(kq, NULL, 0, &oke, 1, NULL));
+	CHERIBSDTEST_VERIFY2(oke.ident == (uintptr_t)pfd[0],
+	    "Bad identifier from kqueue");
+	CHERIBSDTEST_VERIFY2(oke.filter == EVFILT_READ,
+	    "Bad filter from kqueue");
+	CHERIBSDTEST_VERIFY2(check_revoked(oke.udata) == !valid,
+	    "kqueue-held cap not as expected");
+	rv = CHERIBSDTEST_CHECK_SYSCALL(read(pfd[0], &b, sizeof(b)));
+	CHERIBSDTEST_VERIFY(rv == 1);
+	CHERIBSDTEST_VERIFY(b == 42);
 }
 
 CHERIBSDTEST(cheri_revoke_lightly, "A gentle test of capability revocation")
@@ -1347,9 +1377,16 @@ CHERIBSDTEST(cheri_revoke_lightly, "A gentle test of capability revocation")
 	const volatile struct cheri_revoke_info *cri;
 	void *revme;
 	struct cheri_revoke_syscall_info crsi;
-	int kq;
+	int ekq, kq, pfd[2];
 
+	/*
+	 * Set up our descriptors.  Keep an empty kqueue around to help exercise
+	 * extra code paths in the kernel.
+	 */
+	ekq = CHERIBSDTEST_CHECK_SYSCALL(kqueue());
 	kq = CHERIBSDTEST_CHECK_SYSCALL(kqueue());
+	CHERIBSDTEST_CHECK_SYSCALL(pipe(pfd));
+
 	mb = CHERIBSDTEST_CHECK_SYSCALL(
 	    mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
 	CHERIBSDTEST_CHECK_SYSCALL(
@@ -1365,7 +1402,7 @@ CHERIBSDTEST(cheri_revoke_lightly, "A gentle test of capability revocation")
 	 */
 	revme = cheri_andperm(mb, ~CHERI_PERM_SW_VMEM);
 	((void **)mb)[1] = revme;
-	install_kqueue_cap(kq, revme);
+	install_kqueue_cap(kq, pfd, revme);
 
 	((uint8_t *)sh)[0] = 1;
 
@@ -1381,7 +1418,7 @@ CHERIBSDTEST(cheri_revoke_lightly, "A gentle test of capability revocation")
 	    "Bad shared clock");
 
 	CHERIBSDTEST_VERIFY2(check_revoked(mb[1]), "Memory tag persists");
-	check_kqueue_cap(kq, 0);
+	check_kqueue_cap(kq, pfd, 0);
 
 	/* Clear the revocation bit and do that again */
 	((uint8_t *)sh)[0] = 0;
@@ -1395,7 +1432,7 @@ CHERIBSDTEST(cheri_revoke_lightly, "A gentle test of capability revocation")
 	revme = cheri_andperm(mb + 1, ~CHERI_PERM_SW_VMEM);
 	CHERIBSDTEST_VERIFY2(!check_revoked(revme), "Tag clear on 2nd revme?");
 	((void **)mb)[1] = revme;
-	install_kqueue_cap(kq, revme);
+	install_kqueue_cap(kq, pfd, revme);
 
 	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(CHERI_REVOKE_IGNORE_START |
 	    CHERI_REVOKE_TAKE_STATS, 0, &crsi));
@@ -1418,10 +1455,13 @@ CHERIBSDTEST(cheri_revoke_lightly, "A gentle test of capability revocation")
 
 	CHERIBSDTEST_VERIFY2(!check_revoked(mb[1]), "Memory tag cleared");
 
-	check_kqueue_cap(kq, 1);
+	check_kqueue_cap(kq, pfd, 1);
 
 	munmap(mb, PAGE_SIZE);
 	close(kq);
+	close(ekq);
+	close(pfd[0]);
+	close(pfd[1]);
 
 	cheribsdtest_success();
 }
@@ -1611,7 +1651,8 @@ cheribsdtest_cheri_revoke_lib_run(int paranoia, int mode, size_t bigblock_caps,
 	size_t bigblock_offset = 0;
 	const ptraddr_t sbase = cri->base_mem_nomap;
 
-	fprintf(stderr, "test_cheri_revoke_lib_run mode %d\n", mode);
+	if (verbose > 1)
+		fprintf(stderr, "test_cheri_revoke_lib_run mode %d\n", mode);
 
 	while (bigblock_offset < bigblock_caps) {
 		struct cheri_revoke_syscall_info crsi;
@@ -2065,6 +2106,6 @@ CHERIBSDTEST(revoke_merge_quarantined,
 	cheribsdtest_success();
 }
 #undef NRES
-#endif /* CHERI_REVOKE */
+#endif /* CHERIBSDTEST_CHERI_REVOKE_TESTS */
 
 #endif /* __CHERI_PURE_CAPABILITY__ */

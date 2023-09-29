@@ -1,10 +1,8 @@
 .include <src.opts.mk>
 
-.if !${MACHINE_ABI:Mpurecap}
-NEED_COMPAT=	64C
+.if !${MACHINE_ABI:Mpurecap} || !${MACHINE_ABI:Mbenchmark}
+NEED_COMPAT=	64CB
 .include <bsd.compat.mk>
 .endif
-
-CHERI_C_TESTS=	yes
 
 .include "${.PARSEDIR}/Makefile.cheribsdtest"

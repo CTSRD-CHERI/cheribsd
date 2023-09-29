@@ -81,6 +81,7 @@ arm64/arm64/ptrauth.c				optional pac \
 arm64/arm64/pmap.c				standard
 arm64/arm64/ptrace_machdep.c			standard
 arm64/arm64/sigtramp.S				standard
+arm64/arm64/freebsd64cb_sigtramp.S		optional cpu_cheri
 arm64/arm64/stack_machdep.c			optional ddb | stack
 arm64/arm64/strcmp.S				optional !cheri_purecap_kernel
 arm64/arm64/strncmp.S				optional !cheri_purecap_kernel

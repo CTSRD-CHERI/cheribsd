@@ -166,13 +166,14 @@ TARGET_TRIPLE_ABI=	gnueabi
 .endif
 .endif
 MACHINE_TRIPLE_ABI?=	unknown
-MACHINE_TRIPLE_MACHINE=${MACHINE_ARCH:S/aarch64c/aarch64/:S/amd64/x86_64/:S/riscv64c/riscv64/}
+MACHINE_TRIPLE_MACHINE=${MACHINE_ARCH:S/aarch64cb?/aarch64/:S/amd64/x86_64/:S/riscv64c/riscv64/}
 MACHINE_TRIPLE?=${MACHINE_TRIPLE_MACHINE}-${MACHINE_TRIPLE_ABI}-freebsd${OS_REVISION}
 TARGET_TRIPLE_ABI?=	unknown
-TARGET_TRIPLE_MACHINE=	${TARGET_ARCH:S/aarch64c/aarch64/:S/amd64/x86_64/:S/riscv64c/riscv64/}
+TARGET_TRIPLE_MACHINE=	${TARGET_ARCH:S/aarch64cb?/aarch64/:S/amd64/x86_64/:S/riscv64c/riscv64/}
 TARGET_TRIPLE?=	${TARGET_TRIPLE_MACHINE}-${TARGET_TRIPLE_ABI}-freebsd${OS_REVISION}
 KNOWN_ARCHES?=	aarch64/arm64 \
 		aarch64c/arm64 \
+		aarch64cb/arm64 \
 		amd64 \
 		armv6/arm \
 		armv7/arm \
@@ -1713,9 +1714,15 @@ restage reinstall reinstallsysroot: .MAKE .PHONY
 	@echo ">>> Adding symlinks for native ABI libdir: ${MACHINE_ABI}"
 	@echo "--------------------------------------------------------------"
 .if ${MACHINE_ABI:Mpurecap}
+.if ${MACHINE_ABI:Mbenchmark}
+	@echo "Benchmark ABI: creating lib64cb links"
+	ln -sfnv lib ${DESTDIR}/lib64cb
+	ln -sfnv lib ${DESTDIR}/usr/lib64cb
+.else
 	@echo "Purecap ABI: creating lib64c links"
 	ln -sfnv lib ${DESTDIR}/lib64c
 	ln -sfnv lib ${DESTDIR}/usr/lib64c
+.endif
 .elif ${MACHINE_ABI:Mptr64}
 	@echo "64-bit ABI: creating lib64 links"
 	ln -sfnv lib ${DESTDIR}/lib64

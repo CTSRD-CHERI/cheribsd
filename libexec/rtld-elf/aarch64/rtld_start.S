@@ -76,6 +76,8 @@ ENTRY(.rtld_start)
 	mov	csp, c20			/* Restore the stack pointer */
 #ifdef RTLD_SANDBOX
 	blr	c8				/* Jump to the entry point */
+#elif defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
+	br	x8				/* Jump to the entry point */
 #else
 	br	c8				/* Jump to the entry point */
 #endif
@@ -206,6 +208,8 @@ ENTRY(_rtld_bind_start)
 	/* Call into the correct function */
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 	brr	PTR(16)
+#elif defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
+	br	x16
 #else
 	br	PTR(16)
 #endif
@@ -229,7 +233,7 @@ ENTRY(_rtld_tlsdesc_static)
 #ifdef RTLD_SANDBOX
 	retr	c30
 #else
-	ret
+	RETURN
 #endif
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
 	ldr	x0, [x0, #8]
@@ -248,7 +252,7 @@ ENTRY(_rtld_tlsdesc_undef)
 #ifdef RTLD_SANDBOX
 	retr	c30
 #else
-	ret
+	RETURN
 #endif
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
 	str	x1, [sp, #-16]!
@@ -301,7 +305,7 @@ ENTRY(_rtld_tlsdesc_dynamic)
 #ifdef RTLD_SANDBOX
 	retr	c30
 #else
-	ret
+	RETURN
 #endif
 
 	/*
@@ -375,7 +379,7 @@ ENTRY(_rtld_tlsdesc_dynamic)
 #ifdef RTLD_SANDBOX
 	retr	c30
 #else
-	ret
+	RETURN
 #endif
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
 	/* Save registers used in fast path */

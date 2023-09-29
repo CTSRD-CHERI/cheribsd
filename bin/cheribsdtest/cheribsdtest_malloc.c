@@ -1,5 +1,12 @@
 /*-
- * Copyright (c) 2014 Andrew Turner
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright (c) 2023 SRI International
+ *
+ * This software was developed by SRI International, the University of
+ * Cambridge Computer Laboratory (Department of Computer Science and
+ * Technology), and Capabilities Limited under Defense Advanced Research
+ * Projects Agency (DARPA) Contract No. HR001122S0003 ("MTSS").
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -21,20 +28,46 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
  */
 
-#include <machine/asm.h>
-#include "SYS.h"
+#include <stdlib.h>
 
-ENTRY(__sys_vfork)
-	WEAK_REFERENCE(__sys_vfork, vfork)
-	WEAK_REFERENCE(__sys_vfork, _vfork)
-	mov	REG(2), REGN(lr)
-	_SYSCALL(vfork)
-	b.cs	cerror
-	sub	x1, x1, #1
-	and	x0, x0, x1
-	mov	REGN(lr), REG(2)
-	RETURN
-END(__sys_vfork)
+#include "cheribsdtest.h"
+
+bool malloc_is_quarantining(void);
+
+static const char *
+skip_malloc_not_quarantining(const char *name __unused)
+{
+	if (malloc_is_quarantining())
+		return (NULL);
+	return ("malloc is not quarantining");
+}
+
+CHERIBSDTEST(malloc_revoke_basic,
+    "verify that a free'd pointer is revoked by malloc_revoke",
+    .ct_check_skip = skip_malloc_not_quarantining)
+{
+	volatile void *ptr __unused;
+
+	ptr = malloc(1);
+
+	free(__DEVOLATILE(void *, ptr));
+
+	malloc_revoke();
+
+	/* XXX: ask kernel what the revocation method is? */
+	CHERIBSDTEST_VERIFY2(!cheri_gettag(ptr),
+	    "free'd pointer not revoked %#lp", ptr);
+
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(malloc_revoke_twice, "revoke twice back to back",
+    .ct_check_skip = skip_malloc_not_quarantining)
+{
+	malloc_revoke();
+	malloc_revoke();
+
+	cheribsdtest_success();
+}

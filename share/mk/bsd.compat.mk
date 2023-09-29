@@ -210,6 +210,43 @@ LIB64CCFLAGS+=	-mllvm -cheri-subobject-bounds-clear-swperm=2
 .endif
 
 # -------------------------------------------------------------------
+# CHERI benchmarking world
+.if ${MK_LIB64CB} != "no"
+.if ${COMPAT_ARCH:Maarch64*}
+HAS_COMPAT+=	64CB
+LIB64CB_MACHINE=	arm64
+LIB64CB_MACHINE_ARCH=aarch64cb
+LIB64CBCPUFLAGS=	-target aarch64-unknown-freebsd13.0
+LIB64CBCPUFLAGS+=	-march=morello -mabi=purecap-benchmark
+LIB64CB_MACHINE_ABI=	${MACHINE_ABI:Nptr*:Npurecap} purecap ptr128c benchmark
+
+# This duplicates some logic in bsd.cpu.mk that is needed for the
+# WANT_COMPAT/NEED_COMPAT case.
+LIB64CBCFLAGS+=	-D__LP64__=1
+
+LIB64CBCFLAGS+=	-Werror=implicit-function-declaration
+
+.ifdef CHERI_USE_CAP_TABLE
+LIB64CBCFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
+.endif
+
+.if defined(CHERI_SUBOBJECT_BOUNDS)
+# Allow per-subdirectory overrides if we know that there is maximum that works
+.if defined(CHERI_SUBOBJECT_BOUNDS_MAX)
+LIB64CBCFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS_MAX}
+.else
+LIB64CBCFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS}
+.endif # CHERI_SUBOBJECT_BOUNDS_MAX
+CHERI_SUBOBJECT_BOUNDS_DEBUG?=yes
+.if ${CHERI_SUBOBJECT_BOUNDS_DEBUG} == "yes"
+# If debugging is enabled, clear SW permission bit 2 when the bounds are reduced
+LIB64CBCFLAGS+=	-mllvm -cheri-subobject-bounds-clear-swperm=2
+.endif # CHERI_SUBOBJECT_BOUNDS_DEBUG
+.endif # CHERI_SUBOBJECT_BOUNDS
+.endif # ${COMPAT_ARCH:Maarch64*}
+.endif # ${MK_LIB64CB} != "no"
+
+# -------------------------------------------------------------------
 # In the program linking case, select LIBCOMPAT
 .if defined(NEED_COMPAT)
 .ifndef HAS_COMPAT

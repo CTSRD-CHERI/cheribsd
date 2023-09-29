@@ -7,7 +7,7 @@ SUBDIR+=	hybrid \
 		hybrid-mt
 .endif
 
-.if ${MACHINE_ABI:Mpurecap} || ${MK_LIB64C} == "yes"
+.if (${MACHINE_ABI:Mpurecap} && !${MACHINE_ABI:Mbenchmark}) || ${MK_LIB64C} == "yes"
 SUBDIR+=	purecap \
 		purecap-dynamic \
 		purecap-dynamic-mt \
@@ -16,6 +16,13 @@ SUBDIR+=	purecap \
 .if ${MACHINE_CPUARCH} == "aarch64" && ${MK_LIB64C} == "no"
 SUBDIR+=	mt-c18n
 .endif
+.endif
+
+.if (${MACHINE_ABI:Mpurecap} && ${MACHINE_ABI:Mbenchmark}) || ${MK_LIB64CB} == "yes"
+SUBDIR+=	purecap-benchmark \
+		purecap-benchmark-dynamic \
+		purecap-benchmark-dynamic-mt \
+		purecap-benchmark-mt
 .endif
 
 SUBDIR_PARALLEL=
