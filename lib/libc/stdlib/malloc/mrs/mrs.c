@@ -754,17 +754,19 @@ static inline void quarantine_flush(struct mrs_quarantine *quarantine) {
 		prev = iter;
 	}
 
-	/* free the quarantined descriptors */
-	prev->next = free_descriptor_slabs;
+	if (prev != NULL) {
+		/* free the quarantined descriptors */
+		prev->next = free_descriptor_slabs;
 #ifdef OFFLOAD_QUARANTINE
-	while (!atomic_compare_exchange_weak(&free_descriptor_slabs, &prev->next, quarantine->list));
+		while (!atomic_compare_exchange_weak(&free_descriptor_slabs, &prev->next, quarantine->list));
 #else /* OFFLOAD_QUARANTINE */
-	free_descriptor_slabs = quarantine->list;
+		free_descriptor_slabs = quarantine->list;
 #endif /* !OFFLOAD_QUARANTINE */
 
-	quarantine->list = NULL;
-	allocated_size -= quarantine->size;
-	quarantine->size = 0;
+		quarantine->list = NULL;
+		allocated_size -= quarantine->size;
+		quarantine->size = 0;
+	}
 	mrs_debug_printf("quarantine_flush: flushed, allocated_size %zu quarantine->size %zu\n", allocated_size, quarantine->size);
 }
 
