@@ -2876,8 +2876,7 @@ knote_cheri_revoke_epoch_next(struct knote *kn)
 
 static int
 kqueue_cheri_revoke_note(const struct vm_cheri_revoke_cookie *crc,
-    struct kqueue *kq, struct klist *list, struct knote *kn,
-    uintcap_t id, uintcap_t ud)
+    struct kqueue *kq, struct knote *kn, uintcap_t id, uintcap_t ud)
 {
 	CHERI_REVOKE_STATS_FOR(crst, crc);
 	int res = 1;
@@ -2914,7 +2913,7 @@ kqueue_cheri_revoke_list(struct kqueue *kq,
 	struct knote *kn;
 	CHERI_REVOKE_STATS_FOR(crst, crc);
 
-	SLIST_FOREACH (kn, list, kn_link) {
+	SLIST_FOREACH(kn, list, kn_link) {
 		/* Skip notes with matching epochs */
 		if (!(kn->kn_status & KN_CAPREV_EPOCH) ==
 		    !(kq->kq_state & KQ_CAPREV_EPOCH)) {
@@ -2951,14 +2950,10 @@ kqueue_cheri_revoke_list(struct kqueue *kq,
 		}
 
 		KQ_LOCK(kq);
-		if (kqueue_cheri_revoke_note(crc, kq, list, kn, id, ud) != 0) {
+		if (kqueue_cheri_revoke_note(crc, kq, kn, id, ud) != 0) {
 			kn->kn_status ^= KN_CAPREV_EPOCH;
 		}
-		KQ_UNLOCK(kq);
-
 		knote_free(kn);
-
-		KQ_LOCK(kq);
 		return (1);
 	}
 
@@ -2978,8 +2973,7 @@ kqueue_cheri_revoke(struct filedesc *fdp,
 	struct kqueue *kq;
 
 	FILEDESC_SLOCK(fdp);
-	TAILQ_FOREACH (kq, &fdp->fd_kqlist, kq_list) {
-
+	TAILQ_FOREACH(kq, &fdp->fd_kqlist, kq_list) {
 		KQ_LOCK(kq);
 again:
 		for (ix = 0; ix < kq->kq_knlistsize; ix++) {
