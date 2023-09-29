@@ -30,6 +30,7 @@ SRCS+=	cheribsdtest_bounds_globals.c					\
 .if ${MACHINE_ABI:Mpurecap}
 SRCS+=	cheribsdtest_bounds_subobject.c					\
 	cheribsdtest_bounds_varargs.c					\
+	cheribsdtest_malloc.c						\
 	cheribsdtest_sentries.c
 .endif
 
