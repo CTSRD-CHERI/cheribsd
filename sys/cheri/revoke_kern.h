@@ -33,6 +33,10 @@
 #ifndef __SYS_CHERI_REVOKE_KERN_H__
 #define	__SYS_CHERI_REVOKE_KERN_H__
 
+#ifndef _KERNEL
+#include <stdbool.h>
+#endif
+
 /*
  * The outermost capability revocation state machine.
  *
@@ -121,6 +125,8 @@ struct cheri_revoke_info_page {
 	 */
 };
 
+#ifdef _KERNEL
 SYSCTL_DECL(_vm_cheri_revoke);
+#endif
 
 #endif
