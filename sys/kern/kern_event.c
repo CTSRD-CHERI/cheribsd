@@ -2938,6 +2938,16 @@ kqueue_cheri_revoke_list(struct kqueue *kq,
 			}
 		}
 
+		/*
+		 * Make sure that the knote doesn't get freed out from under us.
+		 * We don't care about whether the knote is in flux since the
+		 * only fields we're modifying are either owned by userspace or
+		 * are synchronized by the kqueue lock.
+		 *
+		 * Currently we synchronize with kn_fork() by virtue of the fact
+		 * that the revoker single-threads the target process before
+		 * scanning kernel hoards.
+		 */
 		refcount_acquire(&kn->kn_refcount);
 		KQ_UNLOCK(kq);
 
