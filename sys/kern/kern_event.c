@@ -2981,10 +2981,12 @@ again:
 			    &kq->kq_knlist[ix]))
 				goto again;
 		}
-		for (ix = 0; ix <= kq->kq_knhashmask; ix++) {
-			if (kqueue_cheri_revoke_list(kq, crc,
-			    &kq->kq_knhash[ix]))
-				goto again;
+		if (kq->kq_knhashmask != 0) {
+			for (ix = 0; ix <= kq->kq_knhashmask; ix++) {
+				if (kqueue_cheri_revoke_list(kq, crc,
+				    &kq->kq_knhash[ix]))
+					goto again;
+			}
 		}
 
 		kq->kq_state ^= KQ_CAPREV_EPOCH;
