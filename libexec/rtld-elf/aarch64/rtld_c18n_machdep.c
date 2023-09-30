@@ -100,6 +100,14 @@ _rtld_sighandler(int sig, siginfo_t *info, void *_ucp)
 	csp = ucp->uc_mcontext.mc_capregs.cap_sp;
 	asm ("mrs	%0, rcsp_el0" : "=C" (rcsp));
 	ucp->uc_mcontext.mc_capregs.cap_sp = rcsp;
+	/*
+	 * If the program is interrupted while in Restricted mode, the value
+	 * saved at the bottom of rcsp might not be the actual top of the stack.
+	 * Thus, if the signal handler transitions to the compartment of the
+	 * interrupted code, it would corrupt the stack.
+	 */
+	if (cheri_gettag(rcsp))
+		((uintptr_t *)cheri_setaddress(rcsp, cheri_gettop(rcsp)))[-1] = rcsp;
 
 	thr_sighandler(sig, info, ucp);
 
