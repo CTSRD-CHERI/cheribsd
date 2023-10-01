@@ -427,52 +427,36 @@ _rtld_thread_init(struct RtldLockInfo *pli)
 		}
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 		tmplockinfo = *pli;
-#define wrap_with_trampoline(_target, ...)				\
-	_target = tramp_intern(NULL, &(struct tramp_data) {		\
-		.target = _target,					\
-		.defobj = obj,						\
-		.sig = (struct tramp_sig) __VA_ARGS__			\
+#define wrap_with_trampoline(_target, _valid, _reg_args, _mem_args, _ret_args)	\
+	_target = tramp_intern(NULL, &(struct tramp_data) {			\
+		.target = _target,						\
+		.defobj = obj,							\
+		.sig = (struct tramp_sig) {					\
+			.valid = _valid,					\
+			.reg_args = _reg_args, .mem_args = _mem_args,		\
+			.ret_args = _ret_args					\
+		}								\
 	})
-		wrap_with_trampoline(tmplockinfo.lock_create, {
-			.valid = true,
-			.reg_args = 0, .mem_args = false, .ret_args = C0
-		});
-		wrap_with_trampoline(tmplockinfo.lock_destroy, {
-			.valid = true,
-			.reg_args = 1, .mem_args = false, .ret_args = NONE
-		});
-		wrap_with_trampoline(tmplockinfo.rlock_acquire, {
-			.valid = true,
-			.reg_args = 1, .mem_args = false, .ret_args = NONE
-		});
-		wrap_with_trampoline(tmplockinfo.wlock_acquire, {
-			.valid = true,
-			.reg_args = 1, .mem_args = false, .ret_args = NONE
-		});
-		wrap_with_trampoline(tmplockinfo.lock_release, {
-			.valid = true,
-			.reg_args = 1, .mem_args = false, .ret_args = NONE
-		});
-		wrap_with_trampoline(tmplockinfo.thread_set_flag, {
-			.valid = true,
-			.reg_args = 1, .mem_args = false, .ret_args = C0
-		});
-		wrap_with_trampoline(tmplockinfo.thread_clr_flag, {
-			.valid = true,
-			.reg_args = 1, .mem_args = false, .ret_args = C0
-		});
-		wrap_with_trampoline(tmplockinfo.at_fork, {
-			.valid = true,
-			.reg_args = 0, .mem_args = false, .ret_args = NONE
-		});
-		wrap_with_trampoline(tmplockinfo.dlerror_loc, {
-			.valid = true,
-			.reg_args = 0, .mem_args = false, .ret_args = C0
-		});
-		wrap_with_trampoline(tmplockinfo.dlerror_seen, {
-			.valid = true,
-			.reg_args = 0, .mem_args = false, .ret_args = C0
-		});
+		wrap_with_trampoline(tmplockinfo.lock_create,
+			true, 0, false, C0);
+		wrap_with_trampoline(tmplockinfo.lock_destroy,
+			true, 1, false, NONE);
+		wrap_with_trampoline(tmplockinfo.rlock_acquire,
+			true, 1, false, NONE);
+		wrap_with_trampoline(tmplockinfo.wlock_acquire,
+			true, 1, false, NONE);
+		wrap_with_trampoline(tmplockinfo.lock_release,
+			true, 1, false, NONE);
+		wrap_with_trampoline(tmplockinfo.thread_set_flag,
+			true, 1, false, C0);
+		wrap_with_trampoline(tmplockinfo.thread_clr_flag,
+			true, 1, false, C0);
+		wrap_with_trampoline(tmplockinfo.at_fork,
+			true, 0, false, NONE);
+		wrap_with_trampoline(tmplockinfo.dlerror_loc,
+			true, 0, false, C0);
+		wrap_with_trampoline(tmplockinfo.dlerror_seen,
+			true, 0, false, C0);
 #undef wrap_with_trampoline
 		pli = &tmplockinfo;
 #endif
