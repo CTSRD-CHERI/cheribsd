@@ -855,7 +855,7 @@ allocate_initial_tls(Obj_Entry *objs)
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 	tramp_stk_table_t tls = xcalloc(DEFAULT_STACK_TABLE_SIZE, sizeof(*tls));
 	tls[0] = _rtld_get_rstk;
-	asm ("msr	ctpidr_el0, %0\n" :: "C" (tls));
+	asm ("msr	ctpidr_el0, %0" :: "C" (tls));
 #endif
 
 	/*
