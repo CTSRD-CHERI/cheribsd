@@ -167,17 +167,6 @@ tramp_compile(tramp **entry, const struct tramp_data *data)
 	extern const uint32_t tramp_##template[]; \
 	extern const size_t size_tramp_##template
 
-#define TRANSITION(template, ...) \
-	if (code == tramp_##template) { \
-		buf = mempcpy(buf, tramp_##template, size_tramp_##template); \
-		size += size_tramp_##template; \
-		__VA_ARGS__ \
-		continue; \
-	}
-
-#define TO(template) \
-	code = tramp_##template
-
 	IMPORT(header);
 	IMPORT(header_hook);
 	IMPORT(header_res);
@@ -189,91 +178,70 @@ tramp_compile(tramp **entry, const struct tramp_data *data)
 	IMPORT(return_hook);
 	IMPORT(return);
 
+#undef	IMPORT
+
 	uint32_t *buf = (void *)*entry;
 	size_t size = 0;
 	bool executive = cheri_getperm(data->target) & CHERI_PERM_EXECUTIVE;
 	bool hook = ld_compartment_utrace != NULL ||
 	    ld_compartment_overhead != NULL;
 
-	for (const void *code = hook ? tramp_header_hook : tramp_header;
-	    code != NULL; ) {
-		TRANSITION(header, {
-			if (executive)
-				TO(save_caller);
-			else
-				TO(header_res);
-		})
-		TRANSITION(header_hook, {
-			if (executive)
-				TO(save_caller);
-			else
-				TO(header_res);
-			*(*entry)++ = data->defobj;
-			*(*entry)++ = data->def;
-			*(*entry)++ = tramp_hook;
-		})
-		TRANSITION(header_res, {
-			buf[-2] |= (uint32_t)data->defobj->compart_id << 5;
-			TO(save_caller);
-		})
-		TRANSITION(save_caller, {
-			if (data->sig.valid)
-				buf[-2] |= (uint32_t)data->sig.ret_args << 5;
-			if (executive)
-				TO(invoke_exe);
-			else
-				TO(switch_stack);
-		})
-		TRANSITION(switch_stack, {
-			TO(clear_regs);
-		})
-		if (code == tramp_clear_regs) {
-			if (data->sig.valid) {
-				if (!data->sig.mem_args) {
-					buf = mempcpy(buf, tramp_clear_regs,
-					    sizeof(*tramp_clear_regs));
-					size += sizeof(*tramp_clear_regs);
-				}
-				if (data->sig.ret_args != INDIRECT) {
-					buf = mempcpy(buf, tramp_clear_regs + 1,
-					    sizeof(*tramp_clear_regs));
-					size += sizeof(*tramp_clear_regs);
-				}
-				int to_clear = 8 - data->sig.reg_args;
-				buf = mempcpy(buf, tramp_clear_regs + 2,
-				    sizeof(*tramp_clear_regs) * to_clear);
-				size += sizeof(*tramp_clear_regs) * to_clear;
-			}
-			TO(invoke_res);
-			continue;
-		}
-		TRANSITION(invoke_res, {
-			if (hook)
-				TO(return_hook);
-			else
-				TO(return);
-		})
-		TRANSITION(invoke_exe, {
-			if (hook)
-				TO(return_hook);
-			else
-				TO(return);
-		})
-		TRANSITION(return_hook, {
-			TO(return);
-		})
-		TRANSITION(return, {
-			code = NULL;
-		})
-	}
+#define	COPY(template) \
+	do { \
+		buf = mempcpy(buf, tramp_##template, size_tramp_##template); \
+		size += size_tramp_##template; \
+	} while(0)
+
+	if (hook) {
+		COPY(header_hook);
+		*(*entry)++ = data->defobj;
+		*(*entry)++ = data->def;
+		*(*entry)++ = tramp_hook;
+	} else
+		COPY(header);
 
 	*(*entry)++ = data->target;
 
-	return (size);
+	if (!executive) {
+		COPY(header_res);
+		buf[-2] |= (uint32_t)data->defobj->compart_id << 5;
+	}
 
-#undef IMPORT
-#undef TRANSITION
-#undef TO
+	COPY(save_caller);
+	if (data->sig.valid)
+		buf[-2] |= (uint32_t)data->sig.ret_args << 5;
+
+	if (executive)
+		COPY(invoke_exe);
+	else {
+		COPY(switch_stack);
+		if (data->sig.valid) {
+			if (!data->sig.mem_args) {
+				buf = mempcpy(buf, tramp_clear_regs,
+					sizeof(*tramp_clear_regs));
+				size += sizeof(*tramp_clear_regs);
+			}
+			if (data->sig.ret_args != INDIRECT) {
+				buf = mempcpy(buf, tramp_clear_regs + 1,
+					sizeof(*tramp_clear_regs));
+				size += sizeof(*tramp_clear_regs);
+			}
+			int to_clear = 8 - data->sig.reg_args;
+			buf = mempcpy(buf, tramp_clear_regs + 2,
+				sizeof(*tramp_clear_regs) * to_clear);
+			size += sizeof(*tramp_clear_regs) * to_clear;
+		}
+		COPY(invoke_res);
+	}
+
+	if (hook)
+		COPY(return_hook);
+
+	COPY(return);
+
+#undef	COPY
+
+	return (size);
 }
 
 /*
