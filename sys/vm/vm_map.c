@@ -4739,9 +4739,6 @@ vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end,
 			cloned_entry->end = entry->end;
 			cloned_entry->reservation = entry->reservation;
 			cloned_entry->next_read = entry->start;
-
-			/* XXX: Is this the right max-prot to use? */
-			cloned_entry->max_protection = entry->max_protection;
 		}
 
 		/*
