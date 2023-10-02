@@ -2019,6 +2019,7 @@ OLD_DIRS+=usr/share/examples/ypldap
 .endif
 
 .if ${MK_FDT} == no
+OLD_FILES+=usr/sbin/ofwdump
 OLD_FILES+=usr/share/man/man8/ofwdump.8.gz
 .endif
 
