@@ -955,6 +955,8 @@ vm_fault_trap(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
 		case KERN_PROTECTION_FAILURE:
 			if ((fault_type & VM_PROT_WRITE_CAP) != 0)
 				segv_ucode = SEGV_STORETAG;
+			else if ((fault_type & VM_PROT_READ_CAP) != 0)
+				segv_ucode = SEGV_LOADTAG;
 			else
 				segv_ucode = SEGV_ACCERR;
 
