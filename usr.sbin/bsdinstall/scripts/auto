@@ -399,76 +399,8 @@ esac
 [ -n "$HAVE_CHERI_DESKTOP" ] && [ -z "$BSDINSTALL_SKIP_CHERI_DESKTOP" ] && bsdinstall cheri-desktop
 [ -n "$HAVE_CHERI_VM_SUPPORT" ] && [ -z "$BSDINSTALL_SKIP_CHERI_VM_SUPPORT" ] && bsdinstall cheri-vm-support
 
-finalconfig() {
-	if [ -n "$HAVE_CHERI_DESKTOP" ]; then
-		CHERI_DESKTOP_REVISIT='"CHERI Desktop" "Install the CHERI desktop environment (requires network)"'
-		CHERI_VM_SUPPORT_REVISIT='"CHERI VM Support" "Install CHERI virtual machine support (requires network)"'
-	else
-		CHERI_DESKTOP_REVISIT=
-		CHERI_VM_SUPPORT_REVISIT=
-	fi
-	exec 5>&1
-	REVISIT=$(echo $CHERI_DESKTOP_REVISIT $CHERI_VM_SUPPORT_REVISIT | \
-	    xargs bsddialog --backtitle "$OSNAME Installer" \
-	    --title "Final Configuration" --no-cancel --menu \
-	    "Setup of your $OSNAME system is nearly complete. You can now modify your configuration choices. After this screen, you will have an opportunity to make more complex changes using a shell." 0 0 0 \
-		"Exit" "Apply configuration and exit installer" \
-		"Add User" "Add a user to the system" \
-		"Root Password" "Change root password" \
-		"Hostname" "Set system hostname" \
-		"Network" "Networking configuration" \
-		"Services" "Set daemons to run on startup" \
-		"System Hardening" "Set security options" \
-		"Time Zone" "Set system timezone" \
-		"Handbook" "Install $OSNAME Handbook (requires network)" 2>&1 1>&5)
-	exec 5>&-
-
-	case "$REVISIT" in
-	"Add User")
-		bsdinstall adduser
-		finalconfig
-		;;
-	"Root Password")
-		bsdinstall rootpass
-		finalconfig
-		;;
-	"Hostname")
-		bsdinstall hostname
-		finalconfig
-		;;
-	"Network")
-		bsdinstall netconfig
-		finalconfig
-		;;
-	"Services")
-		bsdinstall services
-		finalconfig
-		;;
-	"System Hardening")
-		bsdinstall hardening
-		finalconfig
-		;;
-	"Time Zone")
-		bsdinstall time
-		finalconfig
-		;;
-	"Handbook")
-		bsdinstall docsinstall
-		finalconfig
-		;;
-	"CHERI Desktop")
-		bsdinstall cheri-desktop
-		finalconfig
-		;;
-	"CHERI VM Support")
-		bsdinstall cheri-vm-support
-		finalconfig
-		;;
-	esac
-}
-
 # Allow user to change his mind
-[ -z "$BSDINSTALL_SKIP_FINALCONFIG" ] && finalconfig
+[ -z "$BSDINSTALL_SKIP_FINALCONFIG" ] && bsdinstall finalconfig
 
 trap error SIGINT	# SIGINT is bad again
 bsdinstall config  || error "Failed to save config"
