@@ -301,9 +301,6 @@ kern_cheri_revoke(struct thread *td, int flags,
 		if (!vmm->vm_cheri_revoke_quarantining)
 			vmm->vm_cheri_revoke_quarantining = true;
 
-		epoch = cheri_revoke_st_get_epoch(vmm->vm_cheri_revoke_st);
-		entryst = cheri_revoke_st_get_state(vmm->vm_cheri_revoke_st);
-
 		if ((flags & (fast_out_flags | CHERI_REVOKE_LAST_PASS)) ==
 		    fast_out_flags) {
 			/* Apparently they really just wanted the time. */
@@ -311,6 +308,9 @@ kern_cheri_revoke(struct thread *td, int flags,
 		}
 
 reentry:
+		epoch = cheri_revoke_st_get_epoch(vmm->vm_cheri_revoke_st);
+		entryst = cheri_revoke_st_get_state(vmm->vm_cheri_revoke_st);
+
 		if (cheri_revoke_epoch_clears(epoch, start_epoch)) {
 			/*
 			 * An entire epoch has come and gone since the
@@ -392,8 +392,6 @@ fast_out:
 				return (ires);
 			}
 
-			epoch = cheri_revoke_st_get_epoch(
-			    vmm->vm_cheri_revoke_st);
 			goto reentry;
 		}
 
