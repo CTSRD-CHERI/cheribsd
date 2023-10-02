@@ -36,7 +36,7 @@
 
 #include <sys/cdefs.h>
 
-#if defined(COMPAT_LIB64)
+#if defined(COMPAT_LIB64) || defined(COMPAT_LIB64CB)
 #define	_PATH_LOCALBASE	"/usr/local" COMPAT_libcompat
 #else
 #define	_PATH_LOCALBASE	"/usr/local"
@@ -45,6 +45,7 @@
 /* Default search path. */
 #define	_PATH_DEFPATH	"/sbin:/bin:/usr/sbin:/usr/bin:" \
 			"/usr/local/sbin:/usr/local/bin:" \
+			"/usr/local64cb/sbin:/usr/local64cb/bin:" \
 			"/usr/local64/sbin:/usr/local64/bin"
 /* All standard utilities path. */
 #define	_PATH_STDPATH	"/usr/bin:/bin:/usr/sbin:/sbin"
