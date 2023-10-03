@@ -254,6 +254,8 @@ ENTRY(_start)
 	enter_kern_vaddr 15, 7, 8, virtdone
 
 virtdone:
+	BTI_J
+
 	/* Set up the stack */
 	mov	x7, #(PAGE_SIZE * KSTACK_PAGES)
 	buildptr 25, initstack, x7
@@ -409,6 +411,8 @@ ENTRY(mpentry)
 	enter_kern_vaddr 15, 7, 8, mp_virtdone
 
 mp_virtdone:
+	BTI_J
+
 	/* Start using the AP boot stack */
 	LDR_LABEL(PTR(4), PTR(4), bootstack)
 	mov	PTRN(sp), PTR(4)
