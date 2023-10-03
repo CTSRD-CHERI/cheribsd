@@ -920,6 +920,9 @@ LENTRY(build_l2_block_pagetable)
 #endif
 	orr	x12, x12, #(ATTR_DEFAULT)
 	orr	x12, x12, #(ATTR_S1_UXN)
+#ifdef __ARM_FEATURE_BTI_DEFAULT
+	orr	x12, x12, #(ATTR_S1_GP)
+#endif
 
 	/* Only use the output address bits */
 	lsr	x9, x9, #L2_SHIFT
@@ -992,6 +995,9 @@ LENTRY(build_l3_page_pagetable)
 #endif
 	orr	x12, x12, #(ATTR_DEFAULT)
 	orr	x12, x12, #(ATTR_S1_UXN)
+#ifdef __ARM_FEATURE_BTI_DEFAULT
+	orr	x12, x12, #(ATTR_S1_GP)
+#endif
 
 	/* Only use the output address bits */
 	lsr	x9, x9, #L3_SHIFT
