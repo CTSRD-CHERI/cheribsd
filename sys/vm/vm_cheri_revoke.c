@@ -24,8 +24,6 @@ __FBSDID("$FreeBSD$");
 #include <cheri/revoke_kern.h>
 #include <vm/vm_cheri_revoke.h>
 
-// XXX This is very much a work in progress!
-
 /***************************** PAGE VISITS ******************************/
 
 static inline int
@@ -38,7 +36,7 @@ vm_cheri_revoke_should_visit_page(vm_page_t m, int flags)
 	 * this should catch a superset of the pages we need to visit.
 	 */
 	if (mas.flags & PGA_CAPDIRTY)
-		return 1;
+		return (1);
 
 	/*
 	 * XXX: we used to bail here on incremental runs on store side.
@@ -50,9 +48,9 @@ vm_cheri_revoke_should_visit_page(vm_page_t m, int flags)
 	 * that may have had capabilities, not just recently.
 	 */
 	if (mas.flags & PGA_CAPSTORE)
-		return 1;
+		return (1);
 
-	return 0;
+	return (0);
 }
 
 enum vm_cro_visit {
@@ -64,8 +62,8 @@ enum vm_cro_visit {
  * Given a writable, xbusy page, visit it as part of the background scan, RW.
  */
 static void
-vm_cheri_revoke_visit_rw(
-    const struct vm_cheri_revoke_cookie *crc, int flags, vm_page_t m, bool *cap)
+vm_cheri_revoke_visit_rw(const struct vm_cheri_revoke_cookie *crc, int flags,
+    vm_page_t m, bool *cap)
 {
 	int hascaps;
 	CHERI_REVOKE_STATS_FOR(crst, crc);
@@ -129,7 +127,7 @@ vm_cheri_revoke_visit_rw(
 		vm_page_capdirty(m);
 	}
 
-	*cap = !!(hascaps & VM_CHERI_REVOKE_PAGE_HASCAPS);
+	*cap = (hascaps & VM_CHERI_REVOKE_PAGE_HASCAPS) != 0;
 }
 
 /*
@@ -141,8 +139,8 @@ vm_cheri_revoke_visit_rw(
  * is clear to advance and carry on.
  */
 static enum vm_cro_visit
-vm_cheri_revoke_visit_ro(
-    const struct vm_cheri_revoke_cookie *crc, int flags, vm_page_t m, bool *cap)
+vm_cheri_revoke_visit_ro(const struct vm_cheri_revoke_cookie *crc, int flags,
+    vm_page_t m, bool *cap)
 {
 	CHERI_REVOKE_STATS_FOR(crst, crc);
 	int hascaps;
@@ -161,17 +159,17 @@ vm_cheri_revoke_visit_ro(
 	hascaps = vm_cheri_revoke_page_ro(crc, m);
 
 	KASSERT(!(hascaps & VM_CHERI_REVOKE_PAGE_HASCAPS) ||
-		((mas.flags & PGA_CAPSTORE) || (mas.flags & PGA_CAPDIRTY)),
+	    ((mas.flags & PGA_CAPSTORE) || (mas.flags & PGA_CAPDIRTY)),
 	    ("cap-bearing RO page without h/r capdirty?"
 	     " hc=%x m=%p, m->of=%x, m->af=%x",
-		hascaps, m, m->oflags, vm_page_astate_load(m).flags));
+	     hascaps, m, m->oflags, vm_page_astate_load(m).flags));
 
 	if (hascaps & VM_CHERI_REVOKE_PAGE_DIRTY) {
-		return VM_CHERI_REVOKE_VIS_DIRTY;
+		return (VM_CHERI_REVOKE_VIS_DIRTY);
 	}
 
-	*cap = !!(hascaps & VM_CHERI_REVOKE_PAGE_HASCAPS);
-	return VM_CHERI_REVOKE_VIS_DONE;
+	*cap = (hascaps & VM_CHERI_REVOKE_PAGE_HASCAPS) != 0;
+	return (VM_CHERI_REVOKE_VIS_DONE);
 }
 
 enum vm_cheri_revoke_fault_res
@@ -198,9 +196,9 @@ vm_cheri_revoke_fault_visit(struct vmspace *uvms, vm_offset_t va)
 
 again:
 	pres = pmap_caploadgen_update(upmap, va, &m,
-	    PMAP_CAPLOADGEN_UPDATETLB
-	    | (xbusied ? PMAP_CAPLOADGEN_XBUSIED : 0)
-	    | (hascap ? PMAP_CAPLOADGEN_HASCAPS : 0));
+	    PMAP_CAPLOADGEN_UPDATETLB |
+	    (xbusied ? PMAP_CAPLOADGEN_XBUSIED : 0) |
+	    (hascap ? PMAP_CAPLOADGEN_HASCAPS : 0));
 
 	switch (pres) {
 	case PMAP_CAPLOADGEN_OK:
@@ -230,7 +228,7 @@ again:
 	if (!hascookie) {
 		vres = vm_cheri_revoke_cookie_init(&uvms->vm_map, &crc);
 		KASSERT(vres == 0,
-		    ("vm_cheri_revoke_cooke_init failure in fault_visit"));
+		    ("vm_cheri_revoke_cookie_init failure in fault_visit"));
 		hascookie = true;
 	}
 
@@ -292,7 +290,7 @@ out:
 	if (!hascookie) {
 		vres = vm_cheri_revoke_cookie_init(&uvms->vm_map, &crc);
 		KASSERT(vres == 0,
-		    ("vm_caprevoke_cooke_init failure in fault_visit"));
+		    ("vm_cheri_revoke_cookie_init failure in fault_visit"));
 		hascookie = true;
 	}
 
@@ -309,7 +307,7 @@ out:
 	if (hascookie)
 		vm_cheri_revoke_cookie_rele(&crc);
 
-	return res;
+	return (res);
 }
 
 /******************************* VM ITERATION *******************************/
@@ -354,6 +352,8 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 	vm_pindex_t ipi = OFF_TO_IDX(ioff);
 	vm_offset_t addr = ioff - entry->offset + entry->start;
 	vm_page_t m = NULL;
+	int res;
+	unsigned int last_timestamp;
 	bool mwired = false;
 	bool mxbusy = false;
 	bool mdidvm = false;
@@ -393,7 +393,7 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 		case PMAP_CAPLOADGEN_ALREADY:
 		case PMAP_CAPLOADGEN_CLEAN:
 			*ooff = ioff + PAGE_SIZE;
-			return VM_CHERI_REVOKE_AT_OK;
+			return (VM_CHERI_REVOKE_AT_OK);
 
 		case PMAP_CAPLOADGEN_UNABLE:
 			/*
@@ -424,7 +424,7 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 			goto visit_rw;
 		}
 	}
-	// XXX else pmap_extract_and_hold?
+	/* XXX else pmap_extract_and_hold? */
 
 	KASSERT(m == NULL, ("Load side bad state arc"));
 	/*
@@ -465,13 +465,12 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 				CHERI_REVOKE_STATS_INC(crst, pages_skip_fast,
 				    obj_next_pg->pindex - ipi);
 			}
-			return VM_CHERI_REVOKE_AT_OK;
+			return (VM_CHERI_REVOKE_AT_OK);
 		}
 
 		CHERI_REVOKE_STATS_BUMP(crst, pages_faulted_ro);
 
-		int res;
-		unsigned int last_timestamp = map->timestamp;
+		last_timestamp = map->timestamp;
 
 		VM_OBJECT_WUNLOCK(obj);
 
@@ -488,18 +487,18 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 			CHERI_REVOKE_STATS_BUMP(crst, pages_skip_nofill);
 			*ooff = ioff + PAGE_SIZE;
 			VM_OBJECT_WLOCK(obj);
-			return VM_CHERI_REVOKE_AT_OK;
+			return (VM_CHERI_REVOKE_AT_OK);
 		}
 		if (res != KERN_SUCCESS) {
 			*vmres = res;
-			return VM_CHERI_REVOKE_AT_VMERR;
+			return (VM_CHERI_REVOKE_AT_VMERR);
 		}
 		if (last_timestamp != map->timestamp) {
 			/*
 			 * The map has changed out from under us; bail and
 			 * the caller will look up the new map entry.
 			 */
-			return VM_CHERI_REVOKE_AT_TICK;
+			return (VM_CHERI_REVOKE_AT_TICK);
 		}
 
 		/*
@@ -561,8 +560,7 @@ visit_ro:
 visit_rw_fault:
 	CHERI_REVOKE_STATS_BUMP(crst, pages_faulted_rw);
 
-	int res;
-	unsigned int last_timestamp = map->timestamp;
+	last_timestamp = map->timestamp;
 
 	if (mwired) {
 		mwired = false;
@@ -583,12 +581,12 @@ visit_rw_fault:
 	if (res != KERN_SUCCESS) {
 		*vmres = res;
 		VM_OBJECT_ASSERT_UNLOCKED(obj);
-		return VM_CHERI_REVOKE_AT_VMERR;
+		return (VM_CHERI_REVOKE_AT_VMERR);
 	}
 	if (last_timestamp != map->timestamp) {
 		vm_page_unwire(m, PQ_INACTIVE);
 		VM_OBJECT_ASSERT_UNLOCKED(obj);
-		return VM_CHERI_REVOKE_AT_TICK;
+		return (VM_CHERI_REVOKE_AT_TICK);
 	}
 
 	mwired = true;
@@ -640,12 +638,12 @@ ok:
 	 * of the VM, and so the CLG should be absent or up to date.
 	 */
 	if (mdidvm) {
-		int pmres;
 		vm_page_t m2 = m;
+		int pmres;
 
 		pmres = pmap_caploadgen_update(crc->map->pmap, addr, &m2,
 		    (mxbusy ? PMAP_CAPLOADGEN_XBUSIED : 0));
-		switch(pmres) {
+		switch (pmres) {
 		case PMAP_CAPLOADGEN_UNABLE:
 		case PMAP_CAPLOADGEN_ALREADY:
 			break;
@@ -662,8 +660,8 @@ ok:
 	}
 
 	mas = vm_page_astate_load(m);
-	KASSERT(((mas.flags & PGA_CAPDIRTY) == 0) ||
-		!(flags & VM_CHERI_REVOKE_BARRIERED),
+	KASSERT((mas.flags & PGA_CAPDIRTY) == 0 ||
+	    (flags & VM_CHERI_REVOKE_BARRIERED) == 0,
 	    ("Capdirty page after visit with world stopped?"));
 #endif
 
@@ -675,7 +673,7 @@ ok:
 
 	VM_OBJECT_WLOCK(obj);
 
-	return VM_CHERI_REVOKE_AT_OK;
+	return (VM_CHERI_REVOKE_AT_OK);
 }
 
 /*
@@ -745,10 +743,10 @@ vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc, int flags,
 
 		switch (res) {
 		case VM_CHERI_REVOKE_AT_VMERR:
-			return vmres;
+			return (vmres);
 		case VM_CHERI_REVOKE_AT_TICK:
 			/* Have the caller retranslate the map */
-			return KERN_SUCCESS;
+			return (KERN_SUCCESS);
 		case VM_CHERI_REVOKE_AT_OK:
 			break;
 		}
@@ -759,7 +757,7 @@ fini:
 		VM_OBJECT_WUNLOCK(objlocked);
 
 	*addr = entry->end;
-	return KERN_SUCCESS;
+	return (KERN_SUCCESS);
 }
 
 /*
@@ -831,7 +829,7 @@ vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *crc, int flags)
 	 * increment the CLG for the *next* pass (while we've got the world
 	 * stopped.)
 	 *
-	pmap_invalidate_all(pmap);
+	 *   pmap_invalidate_all(pmap);
 	 */
 
 out:
@@ -843,7 +841,7 @@ out:
 	vm_map_unbusy(map);
 	vm_map_unlock(map);
 
-	return res;
+	return (res);
 }
 
 void
@@ -880,7 +878,7 @@ vm_cheri_revoke_cookie_init(vm_map_t map, struct vm_cheri_revoke_cookie *crc)
 	    ("cheri revoke does not support foreign maps (yet)"));
 
 	if (!SV_CURPROC_FLAG(SV_CHERI))
-		return KERN_INVALID_ARGUMENT;
+		return (KERN_INVALID_ARGUMENT);
 
 	crc->map = map;
 
@@ -902,13 +900,12 @@ vm_cheri_revoke_cookie_init(vm_map_t map, struct vm_cheri_revoke_cookie *crc)
 	    curproc->p_sysent->sv_cheri_revoke_shadow_length,
 	    curproc->p_sysent->sv_cheri_revoke_shadow_offset);
 
-	return KERN_SUCCESS;
+	return (KERN_SUCCESS);
 }
 
 void
-vm_cheri_revoke_cookie_rele(struct vm_cheri_revoke_cookie *crc)
+vm_cheri_revoke_cookie_rele(struct vm_cheri_revoke_cookie *crc __unused)
 {
-	(void)crc;
 	return;
 }
 
@@ -943,50 +940,44 @@ vm_map_install_cheri_revoke_shadow(struct vm_map *map, struct sysentvec *sv)
 	start = start_addr; /* upcast to NULL-derived cap */
 
 	error = vm_map_reservation_create_locked(map, &start,
-		    end_addr - start_addr,
-		    VM_PROT_READ | VM_PROT_WRITE);
+	    end_addr - start_addr, VM_PROT_READ | VM_PROT_WRITE);
 
 	KASSERT((ptraddr_t)start == start_addr,
-		("vm_map_reservation_create_locked moved revocation's cheese"));
+	    ("vm_map_reservation_create_locked moved revocation's cheese"));
 
-	if (error != KERN_SUCCESS) {
+	if (error != KERN_SUCCESS)
 		goto out;
-	}
+
 	reserved_shadow = true;
 
 	error = vm_map_insert(map, vmo_shadow, 0, start, end_addr,
-				VM_PROT_READ | VM_PROT_WRITE,
-				VM_PROT_READ | VM_PROT_WRITE,
-				cow, start_addr);
+	    VM_PROT_READ | VM_PROT_WRITE, VM_PROT_READ | VM_PROT_WRITE,
+	    cow, start_addr);
 
-	if (error != KERN_SUCCESS) {
+	if (error != KERN_SUCCESS)
 		goto out;
-	}
 
 	/* Now do the same thing for the info page */
 	start_addr = start = sv->sv_cheri_revoke_info_page;
 	end_addr = sv->sv_cheri_revoke_info_page + PAGE_SIZE;
 
 	error = vm_map_reservation_create_locked(map, &start,
-		    end_addr - start_addr,
-		    VM_PROT_READ | VM_PROT_WRITE);
+	    end_addr - start_addr,
+	    VM_PROT_READ | VM_PROT_WRITE);
 	reserved_info = true;
 
 	KASSERT((ptraddr_t)start == start_addr,
-		("vm_map_reservation_create_locked moved revocation's cheese"));
+	    ("vm_map_reservation_create_locked moved revocation's cheese"));
 
-	if (error != KERN_SUCCESS) {
+	if (error != KERN_SUCCESS)
 		goto out;
-	}
 
 	error = vm_map_insert(map, vmo_info, 0, start, end_addr,
-				VM_PROT_READ | VM_PROT_WRITE,
-				VM_PROT_READ | VM_PROT_WRITE,
-				cow, start_addr);
+	    VM_PROT_READ | VM_PROT_WRITE, VM_PROT_READ | VM_PROT_WRITE,
+	    cow, start_addr);
 
-	if (error != KERN_SUCCESS) {
+	if (error != KERN_SUCCESS)
 		goto out;
-	}
 
 	/*
 	 * XXX We should probably be tracking the shadow object in the map,
@@ -995,7 +986,7 @@ vm_map_install_cheri_revoke_shadow(struct vm_map *map, struct sysentvec *sv)
 
 out:
 	if (error != KERN_SUCCESS) {
-		int error2;
+		int error2 __diagused;
 
 		if (reserved_info) {
 			error2 = vm_map_reservation_delete_locked(map,
@@ -1009,8 +1000,6 @@ out:
 			KASSERT(error2 == KERN_SUCCESS,
 			    ("vm_map_install_cheri_revoke_shadow can't undo"));
 		}
-
-		(void) error2; /* Placate !INVARIANTS build */
 	}
 
 	vm_map_unlock(map);
@@ -1032,12 +1021,13 @@ out:
 
 		error = copyout(&initinfo, infopage, sizeof(initinfo));
 		KASSERT(error == 0,
-			("vm_map_install_cheri_revoke_shadow copyout"));
+		    ("vm_map_install_cheri_revoke_shadow copyout"));
 	} else {
 		vm_object_deallocate(vmo_shadow);
 		vm_object_deallocate(vmo_info);
 	}
-	return error;
+
+	return (error);
 }
 
 void
@@ -1047,9 +1037,10 @@ vm_cheri_revoke_publish_epochs(
 {
 	struct cheri_revoke_epochs * __capability target =
 	    &info_page->pub.epochs;
-	int res = copyoutcap(ip, target, sizeof(*target));
-	KASSERT(res == 0, ("vm_cheri_revoke_publish: bad copyout %d\n", res));
-	(void)res;
+	int res __diagused;
+
+	res = copyoutcap(ip, target, sizeof(*target));
+	KASSERT(res == 0, ("%s: bad copyout %d\n", __func__, res));
 }
 
 /*
@@ -1059,7 +1050,7 @@ void * __capability
 vm_cheri_revoke_shadow_cap(struct sysentvec *sv, int sel, vm_offset_t base,
     vm_offset_t size, int pmask)
 {
-	switch(sel) {
+	switch (sel) {
 	/* Accessible to userspace */
 	case CHERI_REVOKE_SHADOW_NOVMMAP: {
 		vm_offset_t shadow_base, shadow_size;
@@ -1070,15 +1061,15 @@ vm_cheri_revoke_shadow_cap(struct sysentvec *sv, int sel, vm_offset_t base,
 		if ((size & ((VM_CHERI_REVOKE_GSZ_MEM_NOMAP * 8) - 1)) != 0)
 			return (void * __capability)(uintptr_t)EINVAL;
 
-		shadow_base = sv->sv_cheri_revoke_shadow_base
-		            + sv->sv_cheri_revoke_shadow_offset
-		            + (base / VM_CHERI_REVOKE_GSZ_MEM_NOMAP / 8);
+		shadow_base = sv->sv_cheri_revoke_shadow_base +
+		    sv->sv_cheri_revoke_shadow_offset +
+		    (base / VM_CHERI_REVOKE_GSZ_MEM_NOMAP / 8);
 		shadow_size = size / VM_CHERI_REVOKE_GSZ_MEM_NOMAP / 8;
 
-		return cheri_capability_build_user_data(
-			(pmask & (CHERI_PERM_LOAD | CHERI_PERM_STORE)) |
-			    CHERI_PERM_GLOBAL,
-			shadow_base, shadow_size, 0);
+		return (cheri_capability_build_user_data(
+		    (pmask & (CHERI_PERM_LOAD | CHERI_PERM_STORE)) |
+		    CHERI_PERM_GLOBAL,
+		    shadow_base, shadow_size, 0));
 	}
 	case CHERI_REVOKE_SHADOW_OTYPE: {
 		vm_offset_t shadow_base, shadow_size;
@@ -1089,42 +1080,36 @@ vm_cheri_revoke_shadow_cap(struct sysentvec *sv, int sel, vm_offset_t base,
 		if ((size & ((VM_CHERI_REVOKE_GSZ_OTYPE * 8) - 1)) != 0)
 			return (void * __capability)(uintptr_t)EINVAL;
 
-		shadow_base = sv->sv_cheri_revoke_shadow_base
-		            + sv->sv_cheri_revoke_shadow_offset
-		            - VM_CHERI_REVOKE_BSZ_OTYPE
-		            + (base / VM_CHERI_REVOKE_GSZ_OTYPE / 8);
+		shadow_base = sv->sv_cheri_revoke_shadow_base +
+		    sv->sv_cheri_revoke_shadow_offset -
+		    VM_CHERI_REVOKE_BSZ_OTYPE +
+		    (base / VM_CHERI_REVOKE_GSZ_OTYPE / 8);
 		shadow_size = size / VM_CHERI_REVOKE_GSZ_OTYPE / 8;
 
-		return cheri_capability_build_user_data(
-			CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_GLOBAL,
-			shadow_base, shadow_size, 0);
+		return (cheri_capability_build_user_data(
+		    CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_GLOBAL,
+		    shadow_base, shadow_size, 0));
 	}
 	case CHERI_REVOKE_SHADOW_INFO_STRUCT: {
-		return cheri_capability_build_user_data(
-			CHERI_PERM_LOAD
-			| CHERI_PERM_LOAD_CAP
-			| CHERI_PERM_GLOBAL,
-			sv->sv_cheri_revoke_info_page,
-			sizeof(struct cheri_revoke_info),
-			0);
+		return (cheri_capability_build_user_data(
+		    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP | CHERI_PERM_GLOBAL,
+		    sv->sv_cheri_revoke_info_page,
+		    sizeof(struct cheri_revoke_info), 0));
 	}
 	case CHERI_REVOKE_SHADOW_NOVMMAP_ENTIRE: {
 		vm_offset_t shadow_base, shadow_size;
 
-		shadow_base = sv->sv_cheri_revoke_shadow_base
-		            + sv->sv_cheri_revoke_shadow_offset;
-		shadow_size = sv->sv_cheri_revoke_shadow_length
-		            - sv->sv_cheri_revoke_shadow_offset;
+		shadow_base = sv->sv_cheri_revoke_shadow_base +
+		    sv->sv_cheri_revoke_shadow_offset;
+		shadow_size = sv->sv_cheri_revoke_shadow_length -
+		    sv->sv_cheri_revoke_shadow_offset;
 
-		return cheri_capability_build_user_data(
+		return (cheri_capability_build_user_data(
 		    CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_GLOBAL,
-		    shadow_base, shadow_size, 0);
+		    shadow_base, shadow_size, 0));
 	}
-	/* Kernel-only */
-	// XXX CHERI_REVOKE_SHADOW_MAP:
-	//
 	default:
-		return (void * __capability)(uintptr_t)EINVAL;
+		return ((void * __capability)(uintptr_t)EINVAL);
 	}
 }
 
@@ -1134,7 +1119,7 @@ vm_cheri_revoke_info_page(struct vm_map *map, struct sysentvec *sv,
 {
 	/* XXX In prinicple, it could work cross-process, but not yet */
 	KASSERT(map == &curthread->td_proc->p_vmspace->vm_map,
-		("vm_cheri_revoke_page_info req. intraprocess work right now"));
+	    ("vm_cheri_revoke_page_info req. intraprocess work right now"));
 
 	*ifp = cheri_capability_build_user_data(CHERI_PERM_LOAD |
 	    CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |

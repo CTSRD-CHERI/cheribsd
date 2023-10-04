@@ -179,8 +179,8 @@ again:
 			 * nor 1, which means that the stxr wasn't executed and
 			 * so the capability at cutp has changed.
 			 */
-			*res |= VM_CHERI_REVOKE_PAGE_DIRTY
-				| VM_CHERI_REVOKE_PAGE_HASCAPS ;
+			*res |= VM_CHERI_REVOKE_PAGE_DIRTY |
+			    VM_CHERI_REVOKE_PAGE_HASCAPS;
 		}
 	} else {
 		CHERI_REVOKE_STATS_BUMP(crst, caps_found);
@@ -241,6 +241,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 
 	for (; cheri_getaddress(mvu) < mve; mvu++) {
 		uintcap_t cut = *mvu;
+
 		if (cheri_gettag(cut)) {
 			if (cb(&res, crc, crshadow, ctp, mvu, cut, start, end))
 				goto out;
@@ -279,7 +280,7 @@ vm_cheri_revoke_test(const struct vm_cheri_revoke_cookie *crc, uintcap_t cut)
 		disable_user_memory_access();
 		curthread->td_pcb->pcb_onfault = 0;
 #endif
-		return res;
+		return (res);
 	}
 
 	return (0);
@@ -349,15 +350,15 @@ vm_cheri_revoke_page_ro_adapt(int *res,
 
 	/* If the thing has no permissions, we don't need to scan it later */
 	if ((cheri_gettag(cut) == 0) || (cheri_getperm(cut) == 0))
-		return 0;
+		return (0);
 
 	*res |= VM_CHERI_REVOKE_PAGE_HASCAPS;
 
 	if (ctp(crshadow, cut, cheri_getperm(cut), start, end)) {
 		*res |= VM_CHERI_REVOKE_PAGE_DIRTY;
 
-		/* One dirty answer is as good as any other; stop eary */
-		return 1;
+		/* One dirty answer is as good as any other; stop early */
+		return (1);
 	}
 
 	return (0);
