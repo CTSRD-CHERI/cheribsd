@@ -54,9 +54,8 @@ vm_cheri_revoke_test_mem_map(const uint8_t * __capability crshadow,
 
 	ptraddr_t va = cheri_getbase(cut);
 
-	bmloc = crshadow
-	    - VM_CHERI_REVOKE_BSZ_OTYPE
-	    - (va / VM_CHERI_REVOKE_GSZ_MEM_MAP / 8);
+	bmloc = crshadow - VM_CHERI_REVOKE_BSZ_OTYPE -
+	    (va / VM_CHERI_REVOKE_GSZ_MEM_MAP / 8);
 
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
 	/* XXX This is terribly, terribly unsafe and should go away. */
@@ -167,8 +166,7 @@ vm_cheri_revoke_test_just_mem_fine(const uint8_t * __capability crshadow,
 
 static unsigned long
 vm_cheri_revoke_test_mem_fine_range(const uint8_t * __capability crshadow,
-		      uintcap_t cut, unsigned long perms,
-		      vm_offset_t start, vm_offset_t end)
+    uintcap_t cut, unsigned long perms, vm_offset_t start, vm_offset_t end)
 {
 	/*
 	 * Only check the capability if it has some memory permissions.
@@ -185,9 +183,6 @@ vm_cheri_revoke_test_mem_fine_range(const uint8_t * __capability crshadow,
 	return (0);
 }
 
-/*
- *
- */
 void
 vm_cheri_revoke_set_test(vm_map_t map, int flags)
 {
@@ -218,5 +213,3 @@ vm_cheri_revoke_set_test(vm_map_t map, int flags)
 		panic("Bad cheri_revoke cookie flags 0x%x\n", flags);
 	}
 }
-
-
