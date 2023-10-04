@@ -3208,6 +3208,12 @@ bpfdetach(struct ifnet *ifp)
 {
 }
 
+bool
+bpf_peers_present_if(struct ifnet *ifp)
+{
+	return (false);
+}
+
 u_int
 bpf_filter(const struct bpf_insn *pc, u_char *p, u_int wirelen, u_int buflen)
 {
