@@ -31,6 +31,8 @@
  */
 
 #include <stdlib.h>
+#include <errno.h>
+#include <malloc_np.h>
 
 #include "cheribsdtest.h"
 
@@ -68,6 +70,50 @@ CHERIBSDTEST(malloc_revoke_twice, "revoke twice back to back",
 {
 	malloc_revoke();
 	malloc_revoke();
+
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(malloc_zero_size,
+    "Check that allocators return non-NULL for size=0")
+{
+	void *ptr, *ptr2;
+
+	CHERIBSDTEST_VERIFY((ptr = malloc(0)) != NULL);
+	free(ptr);
+
+	CHERIBSDTEST_VERIFY((ptr = calloc(0, 1)) != NULL);
+	free(ptr);
+	CHERIBSDTEST_VERIFY((ptr = calloc(1, 0)) != NULL);
+	free(ptr);
+	CHERIBSDTEST_VERIFY((ptr = calloc(0, 0)) != NULL);
+	free(ptr);
+
+	CHERIBSDTEST_VERIFY((ptr = realloc(NULL, 0)) != NULL);
+	CHERIBSDTEST_VERIFY((ptr2 = realloc(ptr, 0)) != NULL);
+	/*
+	 * XXX: POSIX requires that: "A pointer to the allocated space
+	 * shall be returned, and the memory object pointed to by ptr
+	 * shall be freed."  Unfortunately that's impractical to check as
+	 * even with revocation the same storage could be allocated if
+	 * revocation is triggered internally.
+	 */
+	free(ptr2);
+
+	/*
+	 * C/POSIX require that aligned_alloc/posix_memalign take
+	 * alignements that are a power-of-2 multiple of sizeof(void *).
+	 */
+	CHERIBSDTEST_VERIFY((ptr = aligned_alloc(sizeof(void *), 0)) != NULL);
+	free(ptr);
+
+	CHERIBSDTEST_VERIFY2(posix_memalign(&ptr, sizeof(void *), 0) == 0,
+	    "posix_memalign failed, errno %d", errno);
+	CHERIBSDTEST_VERIFY2(ptr != NULL, "posix_memalign returned NULL");
+	free(ptr);
+
+	CHERIBSDTEST_VERIFY((ptr = memalign(sizeof(void *), 0)) != NULL);
+	free(ptr);
 
 	cheribsdtest_success();
 }
