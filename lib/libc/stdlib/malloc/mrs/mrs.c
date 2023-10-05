@@ -1152,10 +1152,10 @@ void *mrs_calloc(size_t number, size_t size) {
 		}
 	}
 #endif
-		allocated_region = REAL(calloc)(number, size);
-		if (allocated_region == NULL) {
-			return allocated_region;
-		}
+	allocated_region = REAL(calloc)(number, size);
+	if (allocated_region == NULL) {
+		return allocated_region;
+	}
 
 	increment_allocated_size(allocated_region);
 
