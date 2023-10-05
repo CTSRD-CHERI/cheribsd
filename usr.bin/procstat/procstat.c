@@ -89,7 +89,7 @@ static const struct procstat_cmd cmd_table[] = {
 	    PS_CMP_PLURAL | PS_CMP_SUBSTR | PS_MODE_NO_KINFO_PROC },
 	{ "argument", "arguments", NULL, &procstat_args, &cmdopt_none,
 	    PS_CMP_PLURAL | PS_CMP_SUBSTR },
-	{ "auxv", "auxv", NULL, &procstat_auxv, &cmdopt_none, PS_CMP_NORMAL },
+	{ "auxv", "auxv", "[-v]", &procstat_auxv, &cmdopt_verbose, PS_CMP_NORMAL },
 	{ "basic", "basic", NULL, &procstat_basic, &cmdopt_none,
 	    PS_CMP_NORMAL },
 	{ "binary", "binary", NULL, &procstat_bin, &cmdopt_none,
