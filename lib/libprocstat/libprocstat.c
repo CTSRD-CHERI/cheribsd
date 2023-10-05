@@ -2590,6 +2590,76 @@ out:
 }
 #endif /* PS_ARCH_HAS_FREEBSD32 */
 
+#ifdef __CHERI_PURE_CAPABILITY__
+static const char *elf64_sv_names[] = {
+	"Linux ELF64",
+	"FreeBSD ELF64",
+};
+
+static int
+is_elf64_sysctl(pid_t pid)
+{
+	int error, name[4];
+	size_t len, i;
+	char sv_name[32];
+
+	name[0] = CTL_KERN;
+	name[1] = KERN_PROC;
+	name[2] = KERN_PROC_SV_NAME;
+	name[3] = pid;
+	len = sizeof(sv_name);
+	error = sysctl(name, nitems(name), sv_name, &len, NULL, 0);
+	if (error != 0 || len == 0)
+		return (0);
+	for (i = 0; i < nitems(elf64_sv_names); i++) {
+		if (strncmp(sv_name, elf64_sv_names[i], sizeof(sv_name)) == 0)
+			return (1);
+	}
+	return (0);
+}
+
+static Elf_Auxinfo *
+procstat_getauxv64_sysctl(pid_t pid, unsigned int *cntp)
+{
+	Elf_Auxinfo *auxv;
+	Elf64_Auxinfo *auxv64;
+	size_t len;
+	unsigned int i, count;
+	int name[4];
+
+	name[0] = CTL_KERN;
+	name[1] = KERN_PROC;
+	name[2] = KERN_PROC_AUXV;
+	name[3] = pid;
+	len = PROC_AUXV_MAX * sizeof(Elf64_Auxinfo);
+	auxv = NULL;
+	auxv64 = malloc(len);
+	if (auxv64 == NULL) {
+		warn("malloc(%zu)", len);
+		goto out;
+	}
+	if (sysctl(name, nitems(name), auxv64, &len, NULL, 0) == -1) {
+		if (errno != ESRCH && errno != EPERM)
+			warn("sysctl: kern.proc.auxv: %d: %d", pid, errno);
+		goto out;
+	}
+	count = len / sizeof(Elf64_Auxinfo);
+	auxv = malloc(count * sizeof(Elf_Auxinfo));
+	if (auxv == NULL) {
+		warn("malloc(%zu)", count * sizeof(Elf_Auxinfo));
+		goto out;
+	}
+	for (i = 0; i < count; i++) {
+		auxv[i].a_type = auxv64[i].a_type;
+		auxv[i].a_un.a_val = auxv64[i].a_un.a_val;
+	}
+	*cntp = count;
+out:
+	free(auxv64);
+	return (auxv);
+}
+#endif /* __CHERI_PURE_CAPABILITY__ */
+
 static Elf_Auxinfo *
 procstat_getauxv_sysctl(pid_t pid, unsigned int *cntp)
 {
@@ -2600,6 +2670,10 @@ procstat_getauxv_sysctl(pid_t pid, unsigned int *cntp)
 #ifdef PS_ARCH_HAS_FREEBSD32
 	if (is_elf32_sysctl(pid))
 		return (procstat_getauxv32_sysctl(pid, cntp));
+#endif
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (is_elf64_sysctl(pid))
+		return (procstat_getauxv64_sysctl(pid, cntp));
 #endif
 	name[0] = CTL_KERN;
 	name[1] = KERN_PROC;
