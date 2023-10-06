@@ -302,6 +302,10 @@ proc_machine_arch(struct proc *p)
 	if (!SV_PROC_FLAG(p, SV_CHERI))
 		return (MACHINE_ARCH64);
 #endif
+#ifdef MACHINE_ARCH64CB
+	if (SV_PROC_FLAG(p, SV_CHERI) && SV_PROC_FLAG(p, SV_UNBOUND_PCC))
+		return (MACHINE_ARCH64CB);
+#endif
 	return (MACHINE_ARCH);
 }
 
