@@ -1255,11 +1255,6 @@ static void *mrs_realloc(void *ptr, size_t size) {
 	size_t old_size = cheri_getlen(ptr);
 	mrs_debug_printf("mrs_realloc: called ptr %p ptr size %zu new size %zu\n", ptr, old_size, size);
 
-	if (size == 0) {
-		mrs_free(ptr);
-		return NULL;
-	}
-
 	if (ptr == NULL) {
 		return mrs_malloc(size);
 	}
