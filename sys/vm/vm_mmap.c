@@ -339,8 +339,10 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 			return (EPROT);
 		else if ((cheri_getperm(uap->addr) & CHERI_PERM_SW_VMEM))
 			source_cap = uap->addr;
-		else
+		else {
+			SYSERRCAUSE("MAP_FIXED without CHERI_PERM_SW_VMEM");
 			return (EACCES);
+		}
 	} else {
 		if (!cheri_is_null_derived(uap->addr))
 			return (EINVAL);
@@ -366,7 +368,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	    ("td->td_cheri_mmap_cap is untagged!"));
 
 	/*
-	 * If MAP_FIXED is specified, make sure that that the reqested
+	 * If MAP_FIXED is specified, make sure that the requested
 	 * address range fits within the source capability.
 	 */
 	if ((flags & MAP_FIXED) &&
