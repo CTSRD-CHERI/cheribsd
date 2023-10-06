@@ -569,7 +569,7 @@ _iwlwififw=	iwlwififw
 .if !${MACHINE_ABI:Mpurecap}
 _ossl=		ossl
 .endif
-#_rtw88=		rtw88
+_rtw88=		rtw88
 _vmware=	vmware
 .endif
 
