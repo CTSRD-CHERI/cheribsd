@@ -26,6 +26,7 @@
  */
 
 #include "opt_acpi.h"
+#include "opt_kstack_pages.h"
 #include "opt_platform.h"
 #include "opt_ddb.h"
 
@@ -404,7 +405,7 @@ init_proc0(vm_pointer_t kstack)
 	/* XXX-AM: We need to set bounds on pcb and kstack here as in MIPS */
 	proc_linkup0(&proc0, &thread0);
 	thread0.td_kstack = cheri_kern_andperm(kstack, CHERI_PERMS_KERNEL_DATA);
-	thread0.td_kstack_pages = kstack_pages;
+	thread0.td_kstack_pages = KSTACK_PAGES;
 #if defined(PERTHREAD_SSP)
 	thread0.td_md.md_canary = boot_canary;
 #endif
