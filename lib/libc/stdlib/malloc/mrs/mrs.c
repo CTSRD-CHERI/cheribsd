@@ -1255,17 +1255,15 @@ static void *mrs_realloc(void *ptr, size_t size) {
 	size_t old_size = cheri_getlen(ptr);
 	mrs_debug_printf("mrs_realloc: called ptr %p ptr size %zu new size %zu\n", ptr, old_size, size);
 
-	if (ptr == NULL) {
-		return mrs_malloc(size);
-	}
-
 	void *new_alloc = mrs_malloc(size);
-	/* old object is not deallocated according to the spec */
-	if (new_alloc == NULL) {
-		return NULL;
+	/*
+	 * per the C standard, copy and free IFF the old pointer is valid
+	 * and allocation succeeds.
+	 */
+	if (ptr != NULL && new_alloc != NULL) {
+		memcpy(new_alloc, ptr, size < old_size ? size : old_size);
+		mrs_free(ptr);
 	}
-	memcpy(new_alloc, ptr, size < old_size ? size : old_size);
-	mrs_free(ptr);
 	return new_alloc;
 }
 
