@@ -590,11 +590,6 @@ tda19988_start(struct tda19988_softc *sc)
 
 	tda19988_cec_write(sc, TDA_CEC_FRO_IM_CLK_CTRL,
 	    CEC_FRO_IM_CLK_CTRL_GHOST_DIS | CEC_FRO_IM_CLK_CTRL_IMCLK_SEL);
-
-	/* Default values for RGB 4:4:4 mapping */
-	tda19988_reg_write(sc, TDA_VIP_CNTRL_0, 0x23);
-	tda19988_reg_write(sc, TDA_VIP_CNTRL_1, 0x01);
-	tda19988_reg_write(sc, TDA_VIP_CNTRL_2, 0x45);
 }
 
 static int
