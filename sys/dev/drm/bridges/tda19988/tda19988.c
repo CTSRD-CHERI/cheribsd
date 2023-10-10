@@ -283,6 +283,7 @@ struct tda19988_softc {
 	uint32_t		sc_cec_addr;
 	uint16_t		sc_version;
 	int			sc_current_page;
+	uint8_t			sc_vip_cntrl[3];
 
 	struct drm_encoder	encoder;
 	struct drm_connector	connector __subobject_use_container_bounds;
@@ -591,17 +592,18 @@ tda19988_start(struct tda19988_softc *sc)
 	tda19988_cec_write(sc, TDA_CEC_FRO_IM_CLK_CTRL,
 	    CEC_FRO_IM_CLK_CTRL_GHOST_DIS | CEC_FRO_IM_CLK_CTRL_IMCLK_SEL);
 
-	/* Default values for RGB 4:4:4 mapping */
-	tda19988_reg_write(sc, TDA_VIP_CNTRL_0, 0x23);
-	tda19988_reg_write(sc, TDA_VIP_CNTRL_1, 0x01);
-	tda19988_reg_write(sc, TDA_VIP_CNTRL_2, 0x45);
+	tda19988_reg_write(sc, TDA_VIP_CNTRL_0, sc->sc_vip_cntrl[0]);
+	tda19988_reg_write(sc, TDA_VIP_CNTRL_1, sc->sc_vip_cntrl[1]);
+	tda19988_reg_write(sc, TDA_VIP_CNTRL_2, sc->sc_vip_cntrl[2]);
 }
 
 static int
 tda19988_attach(device_t dev)
 {
 	struct tda19988_softc *sc;
+	uint32_t video_ports;
 	phandle_t node;
+	int i;
 
 	sc = device_get_softc(dev);
 
@@ -613,6 +615,13 @@ tda19988_attach(device_t dev)
 
 	node = ofw_bus_get_node(dev);
 	OF_device_register_xref(OF_xref_from_node(node), dev);
+
+	if (OF_getencprop(node, "video-ports", &video_ports,
+	    sizeof(video_ports)) != sizeof(video_ports))
+		video_ports = 0x230145; /* binding default */
+
+	for (i = 0; i < 3; video_ports >>= 8, ++i)
+		sc->sc_vip_cntrl[2 - i] = (uint8_t)video_ports;
 
 	tda19988_start(sc);
 
