@@ -109,6 +109,7 @@ main(int argc, char *argv[])
 	appendenv("LD_64C_PRELOAD", LIBSTDBUF64C);
 	appendenv("LD_64CB_PRELOAD", LIBSTDBUF64CB);
 	appendenv("LD_C18N_PRELOAD", LIBSTDBUF);
+	appendenv("LD_64CB_C18N_PRELOAD", LIBSTDBUF64CB);
 
 	execvp(argv[0], argv);
 	err(2, "%s", argv[0]);
