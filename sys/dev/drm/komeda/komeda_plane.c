@@ -119,10 +119,7 @@ komeda_convert_format(uint32_t format)
 	case DRM_FORMAT_BGRA8888:
 		return (11);
 	case DRM_FORMAT_XRGB8888:
-	/*
-	 * Documentation states this should be 16, but it works better with 17.
-	 * FALLTHROUGH
-	 */
+		return (16);
 	case DRM_FORMAT_XBGR8888:
 		return (17);
 	case DRM_FORMAT_RGBX8888:
