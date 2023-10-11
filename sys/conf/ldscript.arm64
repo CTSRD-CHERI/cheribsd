@@ -33,6 +33,9 @@ SECTIONS
     *(.note.gnu.build-id)
     PROVIDE (__build_id_end = .);
   }
+  .note.cheri : {
+    *(.note.cheri)
+  }
   .rel.text      :
     { *(.rel.text) *(.rel.gnu.linkonce.t*) }
   .rela.text     :
