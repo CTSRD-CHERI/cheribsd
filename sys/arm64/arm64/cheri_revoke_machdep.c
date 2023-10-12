@@ -197,14 +197,14 @@ again:
 }
 
 static inline void
-enable_user_memory_access()
+enable_user_memory_access(void)
 {
 	/* Set PSTATE.PAN to 0 */
 	__asm __volatile("msr pan, #0");
 }
 
 static inline void
-disable_user_memory_access()
+disable_user_memory_access(void)
 {
 	/* Set PSTATE.PAN to 1 */
 	__asm __volatile("msr pan, #1");

@@ -177,7 +177,7 @@ again:
 }
 
 static inline void
-enable_user_memory_access()
+enable_user_memory_access(void)
 {
 	uint64_t tmp;
 
@@ -194,7 +194,7 @@ enable_user_memory_access()
 }
 
 static inline void
-disable_user_memory_access()
+disable_user_memory_access(void)
 {
 	uint64_t tmp;
 
