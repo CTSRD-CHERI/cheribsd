@@ -520,14 +520,18 @@ tramp_pg_new(struct tramp_pg *next)
 static void *
 tramp_pg_push(struct tramp_pg *pg, size_t len)
 {
-	void *tramp;
+	char *tramp;
 	size_t n_size;
 	size_t size = atomic_load_explicit(&pg->size, memory_order_relaxed);
 
 	do {
-		n_size = roundup2(size, _Alignof(void *));
-		tramp = pg->trampolines + n_size;
-		n_size += len;
+		/*
+		 * Align the trampoline to two capabilities so that the first
+		 * instruction and the capability preceding it reside on the
+		 * same cache line.
+		 */
+		tramp = roundup2(pg->trampolines + size, 2 * _Alignof(void *));
+		n_size = tramp + len - pg->trampolines;
 		if (n_size > pg->capacity)
 			return (NULL);
 	} while (!atomic_compare_exchange_weak_explicit(&pg->size,
@@ -546,20 +550,20 @@ tramp_pg_push(struct tramp_pg *pg, size_t len)
 typedef ssize_t slot_idx_t;
 
 static struct {
+	_Alignas(CACHE_LINE_SIZE) _Atomic(slot_idx_t) size;
+	size_t back;
+	int exp;
 	struct tramp_data *data;
 	struct tramp_map_kv {
 		_Atomic(ptraddr_t) key;
 		_Atomic(slot_idx_t) index;
 	} *map;
-	_Atomic(slot_idx_t) size;
-	_Atomic(slot_idx_t) writers;
-	size_t back;
-	int exp;
+	_Alignas(CACHE_LINE_SIZE) _Atomic(slot_idx_t) writers;
 } tramp_table;
 
 static struct {
-	_Atomic(struct tramp_pg *) head;
-	atomic_flag lock;
+	_Alignas(CACHE_LINE_SIZE) _Atomic(struct tramp_pg *) head;
+	_Alignas(CACHE_LINE_SIZE) atomic_flag lock;
 } tramp_pgs = {
 	.lock = ATOMIC_FLAG_INIT
 };
