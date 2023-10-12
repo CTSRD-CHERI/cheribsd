@@ -28,6 +28,8 @@
  */
 
 #include <machine/asm.h>
+#include <sys/elf_common.h>
+
 
 /*
  * Pure-capability:
@@ -551,3 +553,5 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	ret
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(_rtld_tlsdesc_dynamic)
+
+GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)
