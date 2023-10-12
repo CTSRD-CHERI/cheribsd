@@ -25,6 +25,8 @@
  */
 
 #include <machine/asm.h>
+#include <sys/elf_common.h>
+
 ENTRY(cerror)
 	.hidden	cerror
 	sub	REGN(sp), REGN(sp), #(REG_WIDTH * 2)
@@ -37,3 +39,5 @@ ENTRY(cerror)
 	add	REGN(sp), REGN(sp), #(REG_WIDTH * 2)
 	RETURN
 END(cerror)
+
+GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)

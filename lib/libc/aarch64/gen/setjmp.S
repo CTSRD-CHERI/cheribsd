@@ -30,6 +30,7 @@
 
 #include <machine/asm.h>
 #include <machine/setjmp.h>
+#include <sys/elf_common.h>
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 .weak _rtld_setjmp;
@@ -160,3 +161,5 @@ botch:
 	bl	_C_LABEL(longjmperror)
 	bl	_C_LABEL(abort)
 END(longjmp)
+
+GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)
