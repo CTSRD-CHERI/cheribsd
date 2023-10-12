@@ -1093,13 +1093,9 @@ CHERIBSDTEST(vm_reservation_mmap_insert_null_derived,
 	cheribsdtest_success();
 }
 
-/*
- * Check that we can add a fixed mapping into an existing
- * reservation using a VM_MAP bearing capability.
- */
 CHERIBSDTEST(vm_reservation_mmap_fixed_insert,
     "check mmap MAP_FIXED into an existing reservation with a "
-    "VM_MAP perm capability")
+    "SW_VMEM perm capability")
 {
 	void *map;
 
@@ -1118,13 +1114,9 @@ CHERIBSDTEST(vm_reservation_mmap_fixed_insert,
 	cheribsdtest_success();
 }
 
-/*
- * Check that attempting to add a fixed mapping into an existing
- * reservation using a capability without VM_MAP permission fails.
- */
 CHERIBSDTEST(vm_reservation_mmap_fixed_insert_noperm,
     "check that mmap MAP_FIXED into an existing reservation "
-    "with a capability missing VM_MAP permission fails")
+    "with a capability missing SW_VMEM permission fails")
 {
 	void *map;
 	void *map2;
