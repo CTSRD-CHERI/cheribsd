@@ -455,6 +455,11 @@ static inline void quarantine_insert(struct mrs_quarantine *quarantine, void *pt
 		quarantine->list = ins;
 	}
 
+	if ((__builtin_cheri_perms_get(ptr) & CHERI_PERM_SW_VMEM) == 0) {
+		mrs_printf("fatal error: can't insert pointer without SW_VMEM");
+		exit(7);
+	}
+
 	quarantine->list->slab[quarantine->list->num_descriptors].ptr = ptr;
 	quarantine->list->slab[quarantine->list->num_descriptors].size = size;
 
