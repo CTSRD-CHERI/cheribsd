@@ -30,6 +30,8 @@
  */
 
 #include <machine/asm.h>
+#include <sys/elf_common.h>
+
 	/*
 	 * The program entry point
 	 * void _start(char **ap, void (*cleanup)(void)) __dead2
@@ -77,3 +79,5 @@ eprol:
 END(_start)
 
 	.section .note.GNU-stack,"",@progbits
+
+GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)
