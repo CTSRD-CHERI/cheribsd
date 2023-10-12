@@ -13,7 +13,7 @@ SUBDIR+=	purecap \
 		purecap-dynamic-mt \
 		purecap-mt
 
-.if ${MACHINE_CPUARCH} == "aarch64" && ${MK_LIB64C} == "no"
+.if ${MACHINE_CPUARCH} == "aarch64" && ${MACHINE_ABI:Mpurecap}
 SUBDIR+=	mt-c18n
 .endif
 .endif
@@ -23,6 +23,10 @@ SUBDIR+=	purecap-benchmark \
 		purecap-benchmark-dynamic \
 		purecap-benchmark-dynamic-mt \
 		purecap-benchmark-mt
+
+.if ${MACHINE_CPUARCH} == "aarch64" && ${MACHINE_ABI:Mpurecap}
+SUBDIR+=	benchmark-mt-c18n
+.endif
 .endif
 
 SUBDIR_PARALLEL=

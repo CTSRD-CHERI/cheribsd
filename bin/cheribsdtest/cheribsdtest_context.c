@@ -90,7 +90,7 @@ swapcontext_func(int arg1)
 }
 
 CHERIBSDTEST(swapcontext_basic, "Check that swapcontext works",
-    .ct_xfail_reason = XFAIL_FLAKY_C18N_CONTEXT)
+    .ct_flaky_reason = XFAIL_FLAKY_C18N_CONTEXT)
 {
 	ucontext_t uc, uc_link;
 	int ret;
