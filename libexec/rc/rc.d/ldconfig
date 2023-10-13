@@ -65,6 +65,10 @@ ldconfig_start()
 			    "${ldconfig64cb_paths}" "" "")
 			startmsg 'Benchmark ABI ldconfig path:' ${_LDC}
 			${ldconfig} -f /var/run/ld-elf64cb.so.hints ${_ins} ${_LDC}
+
+			_LDC="/usr/lib64cb/c18n ${_LDC}"
+			startmsg 'Library-based compartmentalization (benchmark ABI) ldconfig path:' ${_LDC}
+			${ldconfig} -f /var/run/ld-elf64cb-c18n.so.hints ${_ins} ${_LDC}
 			;&
 			# FALLTHROUGH
 		riscv64c)
