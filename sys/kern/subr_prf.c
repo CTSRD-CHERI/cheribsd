@@ -426,8 +426,10 @@ static void
 prf_putchar(int c, int flags, int pri)
 {
 
-	if (flags & TOLOG)
+	if (flags & TOLOG) {
 		msglogchar(c, pri);
+		msgbuftrigger = 1;
+	}
 
 	if (flags & TOCONS) {
 		if ((!KERNEL_PANICKED()) && (constty != NULL))
@@ -442,8 +444,10 @@ static void
 prf_putbuf(char *bufr, int flags, int pri)
 {
 
-	if (flags & TOLOG)
+	if (flags & TOLOG) {
 		msglogstr(bufr, pri, /*filter_cr*/1);
+		msgbuftrigger = 1;
+	}
 
 	if (flags & TOCONS) {
 		if ((!KERNEL_PANICKED()) && (constty != NULL))
