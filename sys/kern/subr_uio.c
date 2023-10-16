@@ -249,6 +249,8 @@ uiomove_flags(void *cp, int n, struct uio *uio, bool nofault,
 	    ("uiomove: mode"));
 	KASSERT(uio->uio_segflg != UIO_USERSPACE || uio->uio_td == curthread,
 	    ("uiomove proc"));
+	KASSERT(uio->uio_resid >= 0,
+	    ("%s: uio %p resid underflow", __func__, uio));
 
 	if (uio->uio_segflg == UIO_USERSPACE) {
 		newflags = TDP_DEADLKTREAT;
@@ -267,6 +269,9 @@ uiomove_flags(void *cp, int n, struct uio *uio, bool nofault,
 	}
 
 	while (n > 0 && uio->uio_resid) {
+		KASSERT(uio->uio_iovcnt > 0,
+		    ("%s: uio %p iovcnt underflow", __func__, uio));
+
 		iov = uio->uio_iov;
 		cnt = iov->iov_len;
 		if (cnt == 0) {
