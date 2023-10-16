@@ -1636,6 +1636,7 @@ cheribsdtest_cheri_revoke_lib_init(size_t bigblock_caps, void *** obigblock,
 }
 
 enum {
+	TCLR_MODE_NONE = 0,
 	TCLR_MODE_LOAD_ONCE = 1,
 	TCLR_MODE_LOAD_SPLIT = 2,
 	TCLR_MODE_LOAD_SPLIT_INIT = 3,
@@ -1931,6 +1932,182 @@ CHERIBSDTEST(cheri_revoke_lib_fork_split,
 	munmap(bigblock, bigblock_caps * sizeof(void *));
 
 	cheribsdtest_success();
+}
+
+/*
+ * cheri_revoke_lib_child_* - test that execed children can revoke
+ *
+ * We selectively test along three axes:
+ *   spawn method: fork+execve, rfork+execve, vfork+execve, posix_spawn
+ *   pre-fork revoke: none, once, opened
+ *   revoke type: once, split
+ *
+ * Testing all 24 cases is seems excessive so we limit rfork+execve to a
+ * single test (posix_spawn being built on rfork) and alternate between
+ * once and split as the difference has not previously resulted in bugs.
+ */
+
+static void
+cheri_revoke_lib_child_spawn_common(enum spawn_child_mode sc_mode, int pre_fork_tclr_mode)
+{
+	static const int paranoia = 2;
+	static const size_t bigblock_caps = 4096;
+	void **bigblock;
+	void *shadow;
+	const volatile struct cheri_revoke_info *cri;
+	int res;
+	pid_t pid;
+
+	/*
+	 * Optionally exercise the revocation machinery before spawing a
+	 * child process.
+	 */
+	if (pre_fork_tclr_mode != TCLR_MODE_NONE) {
+		srand(1337);
+
+		cheribsdtest_cheri_revoke_lib_init(bigblock_caps, &bigblock,
+		    &shadow, &cri);
+		cheribsdtest_cheri_revoke_lib_run(paranoia, pre_fork_tclr_mode,
+		    bigblock_caps, bigblock, shadow, cri);
+	}
+
+	pid = cheribsdtest_spawn_child(sc_mode);
+
+	CHERIBSDTEST_VERIFY2(pid > 0, "spawning child process failed");
+	waitpid(pid, &res, 0);
+	if (res != 0)
+		cheribsdtest_failure_errx("Bad child process exit");
+
+	cheribsdtest_success();
+}
+
+
+static void
+cheri_revoke_lib_child_common(int tclr_mode)
+{
+	static const int paranoia = 2;
+	static const size_t bigblock_caps = 4096;
+	void **bigblock;
+	void *shadow;
+	const volatile struct cheri_revoke_info *cri;
+
+	srand(1337);
+
+	cheribsdtest_cheri_revoke_lib_init(bigblock_caps, &bigblock, &shadow,
+	    &cri);
+
+	/*
+	 * Technically the epoch doesn't have to be 0 when a new vmspace is
+	 * created, but that's the most logical init value so assert it.
+	 *
+	 * XXX: check the state
+	 */
+	CHERIBSDTEST_VERIFY(cri->epochs.enqueue == 0);
+	CHERIBSDTEST_VERIFY(cri->epochs.dequeue == 0);
+
+	if (verbose > 0) {
+		fprintf(stderr, "bigblock: %#.16lp\n", bigblock);
+		fprintf(stderr, "shadow: %#.16lp\n", shadow);
+	}
+
+	cheribsdtest_cheri_revoke_lib_run(paranoia, tclr_mode, bigblock_caps,
+	    bigblock, shadow, cri);
+
+	munmap(bigblock, bigblock_caps * sizeof(void *));
+
+	exit(0);
+}
+
+static void
+cheri_revoke_lib_child_once(void)
+{
+	cheri_revoke_lib_child_common(TCLR_MODE_LOAD_ONCE);
+}
+
+static void
+cheri_revoke_lib_child_split(void)
+{
+	cheri_revoke_lib_child_common(TCLR_MODE_LOAD_SPLIT);
+}
+
+CHERIBSDTEST(cheri_revoke_lib_child_fork_exec_once,
+    "revoke in a fork+exec'd child",
+    .ct_child_func = cheri_revoke_lib_child_once)
+{
+	cheri_revoke_lib_child_spawn_common(SC_MODE_FORK,
+	    TCLR_MODE_NONE);
+}
+
+CHERIBSDTEST(cheri_revoke_lib_child_fork_exec_split_prior,
+    "split revoke in a fork+exec'd child after revoking once",
+    .ct_child_func = cheri_revoke_lib_child_split)
+{
+	cheri_revoke_lib_child_spawn_common(SC_MODE_FORK,
+	    TCLR_MODE_LOAD_ONCE);
+}
+
+CHERIBSDTEST(cheri_revoke_lib_child_fork_exec_once_opened,
+    "revoke in a fork+exec'd child after opening epoch",
+    .ct_child_func = cheri_revoke_lib_child_once)
+{
+	cheri_revoke_lib_child_spawn_common(SC_MODE_FORK,
+	    TCLR_MODE_LOAD_SPLIT_INIT);
+}
+
+CHERIBSDTEST(cheri_revoke_lib_child_rfork_exec_split,
+    "split revoke in a rfork+exec'd child",
+    .ct_child_func = cheri_revoke_lib_child_split)
+{
+	cheri_revoke_lib_child_spawn_common(SC_MODE_RFORK,
+	    TCLR_MODE_NONE);
+}
+
+CHERIBSDTEST(cheri_revoke_lib_child_vfork_exec_once,
+    "revoke in a vfork+exec'd child",
+    .ct_child_func = cheri_revoke_lib_child_once)
+{
+	cheri_revoke_lib_child_spawn_common(SC_MODE_VFORK,
+	    TCLR_MODE_NONE);
+}
+
+CHERIBSDTEST(cheri_revoke_lib_child_vfork_exec_split_prior,
+    "split revoke in a vfork+exec'd child after revoking once",
+    .ct_child_func = cheri_revoke_lib_child_split)
+{
+	cheri_revoke_lib_child_spawn_common(SC_MODE_VFORK,
+	    TCLR_MODE_LOAD_ONCE);
+}
+
+CHERIBSDTEST(cheri_revoke_lib_child_vfork_exec_once_opened,
+    "revoke in a vfork+exec'd child after opening epoch",
+    .ct_child_func = cheri_revoke_lib_child_once)
+{
+	cheri_revoke_lib_child_spawn_common(SC_MODE_VFORK,
+	    TCLR_MODE_LOAD_SPLIT_INIT);
+}
+
+CHERIBSDTEST(cheri_revoke_lib_child_posix_spawn_split,
+    "split revoke in a posix_spawn'd child",
+    .ct_child_func = cheri_revoke_lib_child_split)
+{
+	cheri_revoke_lib_child_spawn_common(SC_MODE_POSIX_SPAWN,
+	    TCLR_MODE_NONE);
+}
+
+CHERIBSDTEST(cheri_revoke_lib_child_posix_spawn_once_prior,
+    "revoke in a posix_spawn'd child after revoking once",
+    .ct_child_func = cheri_revoke_lib_child_once)
+{
+	cheri_revoke_lib_child_spawn_common(SC_MODE_POSIX_SPAWN,
+	    TCLR_MODE_LOAD_ONCE);
+}
+
+CHERIBSDTEST(cheri_revoke_lib_child_posix_spawn_split_opened,
+    "split revoke in a posix_spawn'd child after revoking once",
+    .ct_child_func = cheri_revoke_lib_child_split)
+{
+	cheri_revoke_lib_child_spawn_common(SC_MODE_POSIX_SPAWN,
+	    TCLR_MODE_LOAD_SPLIT_INIT);
 }
 
 CHERIBSDTEST(revoke_largest_quarantined_reservation,
