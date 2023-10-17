@@ -893,6 +893,11 @@ struct proc {
 						   permitted */
 #define	P2_REAPKILLED		0x00080000
 
+#define	P2_CHERI_REVOKE_ENABLE	0x40000000	/* Force enable revocation */
+#define	P2_CHERI_REVOKE_DISABLE	0x80000000	/* Force disable revocation */
+#define	P2_CHERI_REVOKE_MASK \
+	(P2_CHERI_REVOKE_ENABLE | P2_CHERI_REVOKE_DISABLE)
+
 /* Flags protected by proctree_lock, kept in p_treeflags. */
 #define	P_TREE_ORPHANED		0x00000001	/* Reparented, on orphan list */
 #define	P_TREE_FIRST_ORPHAN	0x00000002	/* First element of orphan
