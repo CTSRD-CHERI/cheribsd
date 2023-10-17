@@ -57,6 +57,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <sys/elf.h>
+
 #include "libc_private.h"
 #include "mrs_utrace.h"
 
@@ -1159,14 +1161,10 @@ init(void)
 	}
 
 #ifdef OPTIONAL_QUARANTINING
-	int runtime_quarantine_default;
-	size_t runtime_quarantine_default_sz =
-	    sizeof(runtime_quarantine_default);
+	int bsdflags;
 
-	if (sysctlbyname("security.cheri.runtime_quarantine_default",
-	    &runtime_quarantine_default,
-	    &runtime_quarantine_default_sz, NULL, 0) == 0) {
-		quarantining = (runtime_quarantine_default != 0);
+	if (_elf_aux_info(AT_BSDFLAGS, &bsdflags, sizeof(bsdflags)) == 0) {
+		quarantining = ((bsdflags & ELF_BSDF_CHERI_REVOKE) != 0);
 	} else {
 		quarantining = false;
 	}
