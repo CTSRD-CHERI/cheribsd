@@ -302,21 +302,14 @@ struct mrs_quarantine {
 	struct mrs_descriptor_slab *list;
 };
 
-#ifndef OFFLOAD_QUARANTINE
-static struct mrs_descriptor_slab *free_descriptor_slabs;
-#else /* !OFFLOAD_QUARANTINE */
 /* XXX ABA and other issues ... should switch to atomics library */
 static struct mrs_descriptor_slab * _Atomic free_descriptor_slabs;
-#endif /* OFFLOAD_QUARANTINE */
 
 /*
  * amount of memory that the allocator views as allocated (includes
  * quarantine)
- *
- * XXX allocated_size has races in the offload case that are probably
- * harmless.
  */
-static size_t allocated_size;
+static _Atomic size_t allocated_size;
 static size_t max_allocated_size;
 
 /* quarantine for the application thread */
@@ -381,6 +374,8 @@ _pthread_mutex_init_calloc_cb(pthread_mutex_t *mutex,
 
 #define initialize_lock(name)					\
 	_pthread_mutex_init_calloc_cb(&name, name ## _storage)
+
+create_lock(application_quarantine_lock);
 
 /* quarantine offload support */
 #ifdef OFFLOAD_QUARANTINE
@@ -471,13 +466,9 @@ alloc_descriptor_slab(void)
 		mrs_debug_printf("alloc_descriptor_slab: reusing memory\n");
 		struct mrs_descriptor_slab *ret = free_descriptor_slabs;
 
-#ifdef OFFLOAD_QUARANTINE
 		while (!atomic_compare_exchange_weak(&free_descriptor_slabs,
 		    &ret, ret->next))
 			;
-#else /* OFFLOAD_QUARANTINE */
-		free_descriptor_slabs = free_descriptor_slabs->next;
-#endif /* !OFFLOAD_QUARANTINE */
 
 		ret->num_descriptors = 0;
 		return (ret);
@@ -918,13 +909,9 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 	if (prev != NULL) {
 		/* Free the quarantined descriptors. */
 		prev->next = free_descriptor_slabs;
-#ifdef OFFLOAD_QUARANTINE
 		while (!atomic_compare_exchange_weak(&free_descriptor_slabs,
 		    &prev->next, quarantine->list))
 			;
-#else /* OFFLOAD_QUARANTINE */
-		free_descriptor_slabs = quarantine->list;
-#endif /* !OFFLOAD_QUARANTINE */
 
 		quarantine->list = NULL;
 		allocated_size -= quarantine->size;
@@ -934,14 +921,19 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 	    allocated_size, quarantine->size);
 }
 
-void
-malloc_revoke(void)
+static void
+quarantine_move(struct mrs_quarantine *dst, struct mrs_quarantine *src)
 {
-#ifdef OPTIONAL_QUARANTINING
-	if (!quarantining)
-		return;
-#endif
-	MRS_UTRACE(UTRACE_MRS_MALLOC_REVOKE, NULL, 0, 0, NULL);
+	dst->list = src->list;
+	dst->size = src->size;
+	dst->max_size = src->max_size;
+	src->list = NULL;
+	src->size = 0;
+}
+
+static void
+_internal_malloc_revoke(struct mrs_quarantine *quarantine)
+{
 #ifdef OFFLOAD_QUARANTINE
 
 #ifdef PRINT_CAPREVOKE_MRS
@@ -977,11 +969,7 @@ malloc_revoke(void)
 	snmalloc_print_stats();
 #endif
 
-	offload_quarantine.list = application_quarantine.list;
-	offload_quarantine.size = application_quarantine.size;
-	offload_quarantine.max_size = application_quarantine.max_size;
-	application_quarantine.list = NULL;
-	application_quarantine.size = 0;
+	quarantine_move(&offload_quarantine, quarantine);
 
 	mrs_unlock(&offload_quarantine_lock);
 	if (pthread_cond_signal(&offload_quarantine_ready)) {
@@ -994,7 +982,7 @@ malloc_revoke(void)
 #ifdef PRINT_CAPREVOKE_MRS
 	mrs_puts("malloc_revoke\n");
 #endif
-	quarantine_flush(&application_quarantine);
+	quarantine_flush(quarantine);
 #ifdef SNMALLOC_FLUSH
 	/* Consume pending messages now in our queue. */
 	snmalloc_flush_message_queue();
@@ -1004,6 +992,23 @@ malloc_revoke(void)
 #endif
 
 #endif /* OFFLOAD_QUARANTINE */
+}
+
+void
+malloc_revoke(void)
+{
+	struct mrs_quarantine local_quarantine;
+
+#ifdef OPTIONAL_QUARANTINING
+	if (!quarantining)
+		return;
+#endif
+	MRS_UTRACE(UTRACE_MRS_MALLOC_REVOKE, NULL, 0, 0, NULL);
+
+	mrs_lock(&application_quarantine_lock);
+	quarantine_move(&local_quarantine, &application_quarantine);
+	mrs_unlock(&application_quarantine_lock);
+	_internal_malloc_revoke(&local_quarantine);
 }
 
 bool
@@ -1026,13 +1031,9 @@ malloc_is_quarantining(void)
 static inline void
 check_and_perform_flush(void)
 {
-#ifdef OFFLOAD_QUARANTINE
-	/*
-	 * TODO: Perhaps allow the application to continue when we are
-	 * past the high water mark instead of blocking for the
-	 * offload thread to finish flushing.
-	 */
+	struct mrs_quarantine local_quarantine;
 
+#ifdef OFFLOAD_QUARANTINE
 	/*
 	 * We trigger a revocation pass when the unvalidated
 	 * quarantine hits the highwater mark because if we waited
@@ -1046,30 +1047,44 @@ check_and_perform_flush(void)
 	 * global then processed in place (list entries that fail
 	 * validation are not processed).
 	 */
-	if (quarantine_should_flush(&application_quarantine)) {
+#endif
+
+	/*
+	 * Do an unlocked check and bail quickly if the quarantine
+	 * does not require flushing.
+	 */
+	if (!quarantine_should_flush(&application_quarantine))
+		return;
+
+	/* Recheck with the lock held. */
+	mrs_lock(&application_quarantine_lock);
+	if (!quarantine_should_flush(&application_quarantine)) {
+		mrs_unlock(&application_quarantine_lock);
+		return;
+	}
+
+	/*
+	 * A flush is needed, move the state into local_quarantine to
+	 * avoid holding the lock for all of the revocation.
+	 */
+#ifdef OFFLOAD_QUARANTINE
 #ifdef PRINT_CAPREVOKE
-		mrs_printf("check_and_perform_flush (offload): passed application_quarantine threshold, offloading: allocated size %zu quarantine size %zu\n",
-		    allocated_size, application_quarantine.size);
+	mrs_printf("check_and_perform_flush (offload): passed application_quarantine threshold, offloading: allocated size %zu quarantine size %zu\n",
+	    allocated_size, application_quarantine.size);
 #endif
 #ifdef PRINT_CAPREVOKE_MRS
-		mrs_printf("check_and_perform flush: cycle count before waiting on offload %" PRIu64 "\n",
-		    cheri_revoke_get_cyc());
+	mrs_printf("check_and_perform flush: cycle count before waiting on offload %" PRIu64 "\n",
+	    cheri_revoke_get_cyc());
 #endif
-
-		malloc_revoke();
-	}
-
 #else /* OFFLOAD_QUARANTINE */
-
-	if (quarantine_should_flush(&application_quarantine)) {
 #ifdef PRINT_CAPREVOKE
-		mrs_printf("check_and_perform_flush (no offload): passed application_quarantine threshold, revoking: allocated size %zu quarantine size %zu\n",
-		    allocated_size, application_quarantine.size);
+	mrs_printf("check_and_perform_flush (no offload): passed application_quarantine threshold, revoking: allocated size %zu quarantine size %zu\n",
+	    allocated_size, application_quarantine.size);
 #endif
-		malloc_revoke();
-	}
-
 #endif /* !OFFLOAD_QUARANTINE */
+	quarantine_move(&local_quarantine, &application_quarantine);
+	mrs_unlock(&application_quarantine_lock);
+	_internal_malloc_revoke(&local_quarantine);
 }
 
 /* constructor and destructor */
@@ -1105,6 +1120,7 @@ __attribute__((constructor))
 static void
 init(void)
 {
+	initialize_lock(application_quarantine_lock);
 	initialize_lock(printf_lock);
 
 #ifdef OFFLOAD_QUARANTINE
@@ -1577,7 +1593,9 @@ mrs_free(void *ptr)
 	}
 #endif /* BYPASS_QUARANTINE */
 
+	mrs_lock(&application_quarantine_lock);
 	quarantine_insert(&application_quarantine, ins, cheri_getlen(ins));
+	mrs_unlock(&application_quarantine_lock);
 
 #ifdef REVOKE_ON_FREE
 	check_and_perform_flush();
