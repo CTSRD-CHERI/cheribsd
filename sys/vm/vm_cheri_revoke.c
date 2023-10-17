@@ -1052,7 +1052,7 @@ vm_cheri_revoke_shadow_cap(struct sysentvec *sv, int sel, vm_offset_t base,
 {
 	switch (sel) {
 	/* Accessible to userspace */
-	case CHERI_REVOKE_SHADOW_NOVMMAP: {
+	case CHERI_REVOKE_SHADOW_NOVMEM: {
 		vm_offset_t shadow_base, shadow_size;
 
 		/* Require at least byte granularity in the shadow space */
@@ -1096,7 +1096,7 @@ vm_cheri_revoke_shadow_cap(struct sysentvec *sv, int sel, vm_offset_t base,
 		    sv->sv_cheri_revoke_info_page,
 		    sizeof(struct cheri_revoke_info), 0));
 	}
-	case CHERI_REVOKE_SHADOW_NOVMMAP_ENTIRE: {
+	case CHERI_REVOKE_SHADOW_NOVMEM_ENTIRE: {
 		vm_offset_t shadow_base, shadow_size;
 
 		shadow_base = sv->sv_cheri_revoke_shadow_base +

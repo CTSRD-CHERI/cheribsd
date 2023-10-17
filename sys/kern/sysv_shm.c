@@ -401,7 +401,7 @@ sys_shmdt(struct thread *td, struct shmdt_args *uap)
 
 #if __has_feature(capabilities)
 	/*
-	 * Require a valid, unsealed, VMMAP bearing capability or NULL.
+	 * Require a valid, unsealed, SW_VMEM bearing capability or NULL.
 	 * length is checked after we find our mapping.
 	 */
 	if (shmaddr != NULL &&
@@ -627,7 +627,7 @@ sys_shmat(struct thread *td, struct shmat_args *uap)
 #if __has_feature(capabilities)
 	/*
 	 * Require that shmaddr be NULL-derived or a valid, unsealed,
-	 * VMMAP bearing capability.
+	 * SW_VMEM bearing capability.
 	 */
 	if (!cheri_is_null_derived(shmaddr) &&
 	    (!cheri_gettag(shmaddr) || cheri_getsealed(shmaddr) ||

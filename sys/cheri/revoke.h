@@ -307,14 +307,14 @@ struct cheri_revoke_syscall_info {
 	struct cheri_revoke_stats	stats;
 };
 
-#define	CHERI_REVOKE_SHADOW_NOVMMAP		0x00	/* The ordinary shadow space */
+#define	CHERI_REVOKE_SHADOW_NOVMEM		0x00	/* The ordinary shadow space */
 #define	CHERI_REVOKE_SHADOW_OTYPE		0x01	/* The otype shadow space */
 /*
  * It is not possible to ask for the _MEM_MAP bitmask, as we intend that one
  * to be used by the kernel internally for munmap().  Maybe that's wrong?
  *
  * XXX Do we want a madvise mode to allow userspace to request revocation
- * of vm objects that we aren't deleting?  They *can* use the NOVMMAP
+ * of vm objects that we aren't deleting?  They *can* use the NOVMEM
  * bitmask, but it's 256 times as many bits to flip.
  */
 
@@ -325,7 +325,7 @@ struct cheri_revoke_syscall_info {
  * or come to depend on CHERI+MTE, whichever happens first.  However, the
  * minimal-bookkeeping version of libmrs uses this, and that's very convenient.
  */
-#define	CHERI_REVOKE_SHADOW_NOVMMAP_ENTIRE	0x07	/* The entire shadow region */
+#define	CHERI_REVOKE_SHADOW_NOVMEM_ENTIRE	0x07	/* The entire shadow region */
 
 #define	CHERI_REVOKE_SHADOW_SPACE_MASK		0x07	/* Flag bits for shadow index */
 

@@ -1388,7 +1388,7 @@ CHERIBSDTEST(cheri_revoke_lightly, "A gentle test of capability revocation")
 	mb = CHERIBSDTEST_CHECK_SYSCALL(
 	    mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
 	CHERIBSDTEST_CHECK_SYSCALL(
-	    cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, mb, &sh));
+	    cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMEM, mb, &sh));
 
 	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke_get_shadow(
 	    CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL, __DEQUALIFY(void **, &cri)));
@@ -1480,7 +1480,7 @@ CHERIBSDTEST(cheri_revoke_loadside, "Test load-side revoker")
 	mb = CHERIBSDTEST_CHECK_SYSCALL(
 	    mmap(0, asz, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
 	CHERIBSDTEST_CHECK_SYSCALL(
-	    cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, mb, &sh));
+	    cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMEM, mb, &sh));
 
 	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke_get_shadow(
 	    CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
@@ -1619,7 +1619,7 @@ cheribsdtest_cheri_revoke_lib_init(size_t bigblock_caps, void *** obigblock,
 	    MAP_ANON, -1, 0));
 
 	for (size_t ix = 0; ix < bigblock_caps; ix++) {
-		/* Create self-referential VMMAP-free capabilities */
+		/* Create self-referential SW_VMEM-free capabilities */
 
 		bigblock[ix] = cheri_andperm(cheri_setbounds(&bigblock[ix], 16),
 		    ~CHERI_PERM_SW_VMEM);
@@ -1627,7 +1627,7 @@ cheribsdtest_cheri_revoke_lib_init(size_t bigblock_caps, void *** obigblock,
 	*obigblock = bigblock;
 
 	CHERIBSDTEST_CHECK_SYSCALL(
-	    cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, bigblock,
+	    cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMEM, bigblock,
 	    oshadow));
 
 	CHERIBSDTEST_CHECK_SYSCALL(

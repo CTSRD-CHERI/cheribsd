@@ -1746,7 +1746,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	/*
 	 * AT_ENTRY gives an executable capability for the whole
 	 * program and AT_PHDR a writable one.  RTLD is responsible for
-	 * setting bounds.  Needs VMMAP so relro pages can be made RO.
+	 * setting bounds.  Needs SW_VMEM so relro pages can be made RO.
 	 */
 	AUXARGS_ENTRY_PTR(pos, AT_PHDR, cheri_setaddress(prog_cap(imgp,
 	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM),
