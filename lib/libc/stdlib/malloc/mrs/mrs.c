@@ -28,7 +28,8 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/types.h>
+#include <sys/param.h>
+#include <sys/ktrace.h>
 #include <sys/mman.h>
 #include <sys/tree.h>
 #include <sys/resource.h>
@@ -57,6 +58,7 @@
 #include <unistd.h>
 
 #include "libc_private.h"
+#include "mrs_utrace.h"
 
 /*
  * Knobs:
@@ -367,6 +369,30 @@ static void mrs_printf(char *fmt, ...)
 #define mrs_debug_printcap(name, cap)
 #endif /* !DEBUG */
 
+#define	MRS_UTRACE_ENV	"_MRS_UTRACE"
+
+static bool mrs_utrace;
+
+static void
+mrs_utrace_log(int event, void *p, size_t s, size_t n, void *r)
+{
+	struct utrace_mrs ut;
+	static const char mrs_utrace_sig[MRS_UTRACE_SIG_SZ] = MRS_UTRACE_SIG;
+
+	memcpy(ut.sig, mrs_utrace_sig, sizeof(ut.sig));
+	ut.event = event;
+	ut.s = s;
+	ut.p = __builtin_cheri_tag_clear(p);
+	ut.r = __builtin_cheri_tag_clear(r);
+	ut.n = n;
+	utrace(&ut, sizeof(ut));
+}
+
+#define	MRS_UTRACE(...) do {					\
+	if (mrs_utrace)						\
+		mrs_utrace_log(__VA_ARGS__);			\
+} while (0)
+
 /* utilities */
 
 static struct mrs_descriptor_slab *alloc_descriptor_slab() {
@@ -445,6 +471,7 @@ static inline void quarantine_insert(struct mrs_quarantine *quarantine, void *pt
   /*if (!cheri_gettag(ptr))*/
     /*return;*/
 
+	MRS_UTRACE(UTRACE_MRS_QUARANTINE_INSERT, ptr, size, 0, NULL);
 	if (quarantine->list == NULL || quarantine->list->num_descriptors == DESCRIPTOR_SLAB_ENTRIES) {
 		struct mrs_descriptor_slab *ins = alloc_descriptor_slab();
 		if (ins == NULL) {
@@ -685,6 +712,7 @@ print_cheri_revoke_stats(char *what, struct cheri_revoke_syscall_info *crsi,
  * supports ablation study knobs.
  */
 static inline void quarantine_flush(struct mrs_quarantine *quarantine) {
+	MRS_UTRACE(UTRACE_MRS_QUARANTINE_FLUSH, NULL, 0, 0, NULL);
 #if !defined(JUST_QUARANTINE) && !defined(JUST_PAINT_BITMAP)
 	atomic_thread_fence(memory_order_acq_rel); /* don't read epoch until all bitmap painting is done */
 	cheri_revoke_epoch_t start_epoch = cri->epochs.enqueue;
@@ -781,6 +809,7 @@ void malloc_revoke()
 	if (!quarantining)
 		return;
 #endif
+	MRS_UTRACE(UTRACE_MRS_MALLOC_REVOKE, NULL, 0, 0, NULL);
 #ifdef OFFLOAD_QUARANTINE
 
 #ifdef PRINT_CAPREVOKE_MRS
@@ -962,6 +991,10 @@ static void init(void) {
 		exit(7);
 	}
 
+	if (!issetugid()) {
+		mrs_utrace = (getenv(MRS_UTRACE_ENV) != NULL);
+	}
+
 #ifdef OPTIONAL_QUARANTINING
 	int runtime_quarantine_default;
 	size_t runtime_quarantine_default_sz =
@@ -1059,6 +1092,7 @@ static void *mrs_malloc(size_t size) {
 		/* use posix_memalign because unlike aligned_alloc it does not require size to be an integer multiple of alignment */
 		if (REAL(posix_memalign)(&allocated_region, CAPREVOKE_BITMAP_ALIGNMENT, size)) {
 			mrs_debug_printf("mrs_malloc: error aligning allocation of size less than the shadow bitmap granule\n");
+			MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0, NULL);
 			return NULL;
 		}
 	} else {
@@ -1070,12 +1104,16 @@ static void *mrs_malloc(size_t size) {
 		 */
 		allocated_region = REAL(malloc)(size);
 		if (allocated_region == NULL) {
+			MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0,
+			    allocated_region);
 			return allocated_region;
 		}
 	}
 #endif
 		allocated_region = REAL(malloc)(size);
 		if (allocated_region == NULL) {
+			MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0,
+			    allocated_region);
 			return allocated_region;
 		}
 
@@ -1088,6 +1126,7 @@ static void *mrs_malloc(size_t size) {
 	/*mrs_debug_printf("mrs_malloc: called size 0x%zx\n", size);*/
 	/*mrs_debug_printcap("allocation", allocated_region);*/
 
+	MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0, allocated_region);
 	return allocated_region;
 }
 
@@ -1141,6 +1180,7 @@ void *mrs_calloc(size_t number, size_t size) {
 		/* use posix_memalign because unlike aligned_alloc it does not require size to be an integer multiple of alignment */
 		if (REAL(posix_memalign)(&allocated_region, CAPREVOKE_BITMAP_ALIGNMENT, number * size)) {
 			mrs_debug_printf("mrs_calloc: error aligning allocation of size less than the shadow bitmap granule\n");
+			MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number, NULL);
 			return NULL;
 		}
 		memset(allocated_region, 0, cheri_getlen(allocated_region));
@@ -1153,12 +1193,16 @@ void *mrs_calloc(size_t number, size_t size) {
 		 */
 		allocated_region = REAL(calloc)(number, size);
 		if (allocated_region == NULL) {
+			MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number,
+			    allocated_region);
 			return allocated_region;
 		}
 	}
 #endif
 	allocated_region = REAL(calloc)(number, size);
 	if (allocated_region == NULL) {
+		MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number,
+		    allocated_region);
 		return allocated_region;
 	}
 
@@ -1167,6 +1211,7 @@ void *mrs_calloc(size_t number, size_t size) {
 	/* this causes problems if our library is initizlied before the thread library */
 	/*mrs_debug_printf("mrs_calloc: exit called %d size 0x%zx address %p\n", number, size, allocated_region);*/
 
+	MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number, allocated_region);
 	return allocated_region;
 }
 
@@ -1203,6 +1248,7 @@ static int mrs_posix_memalign(void **ptr, size_t alignment, size_t size) {
 
 	increment_allocated_size(*ptr);
 
+	MRS_UTRACE(UTRACE_MRS_POSIX_MEMALIGN, NULL, size, alignment, *ptr);
 	return ret;
 }
 
@@ -1230,7 +1276,9 @@ static void *mrs_aligned_alloc(size_t alignment, size_t size) {
 
 	void *allocated_region = REAL(aligned_alloc)(alignment, size);
 	if (allocated_region == NULL) {
-	 return allocated_region;
+		MRS_UTRACE(UTRACE_MRS_ALIGNED_ALLOC, NULL, size, alignment,
+		    allocated_region);
+		return allocated_region;
 	}
 
 #ifdef CLEAR_ON_ALLOC
@@ -1239,6 +1287,8 @@ static void *mrs_aligned_alloc(size_t alignment, size_t size) {
 
 	increment_allocated_size(allocated_region);
 
+	MRS_UTRACE(UTRACE_MRS_ALIGNED_ALLOC, NULL, size, alignment,
+	    allocated_region);
 	return allocated_region;
 }
 
@@ -1269,6 +1319,7 @@ static void *mrs_realloc(void *ptr, size_t size) {
 		memcpy(new_alloc, ptr, size < old_size ? size : old_size);
 		mrs_free(ptr);
 	}
+	MRS_UTRACE(UTRACE_MRS_REALLOC, ptr, size, 0, new_alloc);
 	return new_alloc;
 }
 
@@ -1283,6 +1334,7 @@ static void mrs_free(void *ptr) {
 #endif
 
 	/*mrs_debug_printf("mrs_free: called address %p\n", ptr);*/
+	MRS_UTRACE(UTRACE_MRS_FREE, ptr, 0, 0, 0);
 
 	void *ins = ptr;
 

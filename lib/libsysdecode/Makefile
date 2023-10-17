@@ -13,6 +13,7 @@ INCS=	sysdecode.h
 CFLAGS+= -I${.OBJDIR}
 CFLAGS+= -I${SRCTOP}/sys
 CFLAGS+= -I${SRCTOP}/libexec/rtld-elf
+CFLAGS+= -I${SRCTOP}/lib/libc/stdlib/malloc/mrs
 
 MAN=	sysdecode.3 \
 	sysdecode_abi_to_freebsd_errno.3 \
