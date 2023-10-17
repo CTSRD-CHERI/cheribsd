@@ -1201,7 +1201,7 @@ init(void)
 		exit(7);
 	}
 
-	if (cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMMAP_ENTIRE, NULL,
+	if (cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMEM_ENTIRE, NULL,
 	    &entire_shadow) != 0) {
 		mrs_puts("error getting entire shadow cap\n");
 		exit(7);

@@ -316,7 +316,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	/*
 	 * Allow existing mapping to be replaced using the MAP_FIXED
 	 * flag IFF the addr argument is a valid capability with the
-	 * VMMAP user permission.  In this case, the new capability is
+	 * SW_VMEM user permission.  In this case, the new capability is
 	 * derived from the passed capability.  In all other cases, the
 	 * new capability is derived from the per-thread mmap capability.
 	 *
@@ -325,7 +325,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	 * page contents without permission.
 	 *
 	 * XXXBD: The fact that using valid a capability to a currently
-	 * unmapped region with and without the VMMAP permission will
+	 * unmapped region with and without the SW_VMEM permission will
 	 * yield different results (and even failure modes) is potentially
 	 * confusing and incompatible with non-CHERI code.  One could
 	 * potentially check if the region contains any mappings and

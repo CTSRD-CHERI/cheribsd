@@ -714,7 +714,7 @@ kern_cheri_revoke_get_shadow(struct thread *td, int flags,
 	    __func__));
 
 	switch (sel) {
-	case CHERI_REVOKE_SHADOW_NOVMMAP:
+	case CHERI_REVOKE_SHADOW_NOVMEM:
 
 		if (cheri_gettag(arena) == 0)
 			return (EINVAL);
@@ -739,7 +739,7 @@ kern_cheri_revoke_get_shadow(struct thread *td, int flags,
 		if (cheri_gettag(arena) == 0)
 			return (EINVAL);
 
-		/* XXX Require all of VMMAP, SEAL, and UNSEAL permissions? */
+		/* XXX Require all of SW_VMEM, SEAL, and UNSEAL permissions? */
 		reqperms = CHERI_PERM_SEAL | CHERI_PERM_UNSEAL |
 		    CHERI_PERM_SW_VMEM;
 		arena_perms = cheri_getperm(arena);
@@ -755,7 +755,7 @@ kern_cheri_revoke_get_shadow(struct thread *td, int flags,
 		break;
 	    }
 	case CHERI_REVOKE_SHADOW_INFO_STRUCT:
-	case CHERI_REVOKE_SHADOW_NOVMMAP_ENTIRE: // XXX
+	case CHERI_REVOKE_SHADOW_NOVMEM_ENTIRE: // XXX
 	    {
 		/* Anyone's allowed to ask, I guess; ->arena ignored. */
 		cres = vm_cheri_revoke_shadow_cap(curproc->p_sysent,

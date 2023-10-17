@@ -147,7 +147,7 @@ vm_cheri_revoke_test_just_mem_fine(const uint8_t * __capability crshadow,
 {
 	/*
 	 * Most capabilities are memory capabilities, most are unrevoked,
-	 * and comparatively few are VMMAP-bearing.... so do the load
+	 * and comparatively few are SW_VMEM-bearing.... so do the load
 	 * first and only then do the permissions checks.
 	 */
 
