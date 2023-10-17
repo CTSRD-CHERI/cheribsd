@@ -1620,28 +1620,23 @@ mrs_rallocx(void *ptr, size_t size, int flags)
 	mrs_debug_printf("%s: called ptr %p ptr size %zu new size %zu\n",
 	    __func__, ptr, old_size, size);
 
-	if (size == 0) {
-		mrs_free(ptr);
-		return (NULL);
-	}
-
 	/*
 	 * This API supports optional zeroing.  Since no one really uses
 	 * it, we don't care about performance and preserve the ABI by
 	 * unconditionally calling calloc.  (We should always be zeroing
 	 * for correctness anyway.)
 	 */
-	if (ptr == NULL) {
-		return (mrs_calloc(1, size));
-	}
-
 	void *new_alloc = mrs_calloc(1, size);
-	/* old object is not deallocated according to the spec */
-	if (new_alloc == NULL) {
-		return (NULL);
+
+	/*
+	 * Per the C standard, copy and free IFF the old pointer is valid
+	 * and allocation succeeds.
+	 */
+	if (ptr != NULL && new_alloc != NULL) {
+		memcpy(new_alloc, ptr, size < old_size ? size : old_size);
+		mrs_free(ptr);
 	}
-	memcpy(new_alloc, ptr, size < old_size ? size : old_size);
-	mrs_free(ptr);
+	MRS_UTRACE(UTRACE_MRS_REALLOC, ptr, size, 0, new_alloc);
 	return (new_alloc);
 #endif /* !JUST_INTERPOSE */
 }
