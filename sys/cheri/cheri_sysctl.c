@@ -78,7 +78,8 @@ SYSCTL_INT(_security_cheri, OID_AUTO, bound_legacy_capabilities,
  * the kernel so that the default can impact programs starting from
  * init(8).
  */
-static int runtime_quarantine_default = 0;
-SYSCTL_INT(_security_cheri, OID_AUTO, runtime_quarantine_default, CTLFLAG_RWTUN,
-    &runtime_quarantine_default, 0, "Userspace runtime quarantine default");
+int security_cheri_runtime_revocation_default = 0;
+SYSCTL_INT(_security_cheri, OID_AUTO, runtime_revocation_default, CTLFLAG_RWTUN,
+    &security_cheri_runtime_revocation_default, 0,
+    "Userspace runtime revocation default");
 #endif  /* CHERI_CAPREVOKE */

@@ -1838,6 +1838,14 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	oc = atomic_load_int(&vm_overcommit);
 	bsdflags |= (oc & (SWAP_RESERVE_FORCE_ON | SWAP_RESERVE_RLIMIT_ON)) !=
 	    0 ? ELF_BSDF_VMNOOVERCOMMIT : 0;
+#if defined(__ELF_CHERI) && defined(CHERI_CAPREVOKE)
+	/*
+	 * ELF_BSDF_CHERI_REVOKE tells the runtime it should enable
+	 * quarantining of pages and revoke them as required.
+	 */
+	if (security_cheri_runtime_revocation_default != 0)
+		bsdflags |= ELF_BSDF_CHERI_REVOKE;
+#endif
 	AUXARGS_ENTRY(pos, AT_BSDFLAGS, bsdflags);
 	AUXARGS_ENTRY(pos, AT_ARGC, imgp->args->argc);
 	AUXARGS_ENTRY_PTR(pos, AT_ARGV, imgp->argv);
