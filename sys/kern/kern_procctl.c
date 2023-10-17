@@ -929,6 +929,70 @@ wxmap_status(struct thread *td, struct proc *p, void *data)
 	return (0);
 }
 
+#ifdef CHERI_CAPREVOKE
+static int
+cheri_revoke_ctl(struct thread *td, struct proc *p, void *data)
+{
+	int state;
+
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+	state = *(int *)data;
+
+	switch (state) {
+	case PROC_CHERI_REVOKE_FORCE_ENABLE:
+		p->p_flag2 &= ~P2_CHERI_REVOKE_DISABLE;
+		p->p_flag2 |= P2_CHERI_REVOKE_ENABLE;
+		break;
+	case PROC_CHERI_REVOKE_FORCE_DISABLE:
+		p->p_flag2 |= P2_CHERI_REVOKE_DISABLE;
+		p->p_flag2 &= ~P2_CHERI_REVOKE_ENABLE;
+		break;
+	case PROC_CHERI_REVOKE_NOFORCE:
+		p->p_flag2 &=
+		    ~(P2_CHERI_REVOKE_ENABLE | P2_CHERI_REVOKE_DISABLE);
+		break;
+	default:
+		return (EINVAL);
+	}
+	return (0);
+}
+
+static int
+cheri_revoke_status(struct thread *td, struct proc *p, void *data)
+{
+	struct vmspace *vm;
+	int d;
+
+	switch (p->p_flag2 &
+	    (P2_CHERI_REVOKE_ENABLE | P2_CHERI_REVOKE_DISABLE)) {
+	case 0:
+		d = PROC_CHERI_REVOKE_NOFORCE;
+		break;
+	case P2_CHERI_REVOKE_ENABLE:
+		d = PROC_CHERI_REVOKE_FORCE_ENABLE;
+		break;
+	case P2_CHERI_REVOKE_DISABLE:
+		d = PROC_CHERI_REVOKE_FORCE_DISABLE;
+		break;
+	default:
+		panic("impossible P2_CHERI_REVOKE flags %x", p->p_flag2 &
+		    (P2_CHERI_REVOKE_ENABLE | P2_CHERI_REVOKE_DISABLE));
+	}
+	_PHOLD(p);
+	PROC_UNLOCK(p);
+	vm = vmspace_acquire_ref(p);
+	if (vm != NULL) {
+		if (vm->vm_map.vm_cheri_revoke_quarantining)
+			d |= PROC_CHERI_REVOKE_ACTIVE;
+		vmspace_free(vm);
+	}
+	PROC_LOCK(p);
+	_PRELE(p);
+	*(int *)data = d;
+	return (0);
+}
+#endif	/* CHERI_CAPREVOKE */
+
 static int
 pdeathsig_ctl(struct thread *td, struct proc *p, void *data)
 {
@@ -1107,6 +1171,20 @@ static const struct procctl_cmd_info procctl_cmds_info[] = {
 	      .need_candebug = false,
 	      .copyin_sz = 0, .copyout_sz = sizeof(int),
 	      .exec = wxmap_status, .copyout_on_error = false, },
+#ifdef CHERI_CAPREVOKE
+	[PROC_CHERI_REVOKE_CTL] =
+	    { .lock_tree = PCTL_UNLOCKED, .one_proc = true,
+	      .esrch_is_einval = false, .no_nonnull_data = false,
+	      .need_candebug = true,
+	      .copyin_sz = sizeof(int), .copyout_sz = 0,
+	      .exec = cheri_revoke_ctl, .copyout_on_error = false, },
+	[PROC_CHERI_REVOKE_STATUS] =
+	    { .lock_tree = PCTL_UNLOCKED, .one_proc = true,
+	      .esrch_is_einval = false, .no_nonnull_data = false,
+	      .need_candebug = false,
+	      .copyin_sz = 0, .copyout_sz = sizeof(int),
+	      .exec = cheri_revoke_status, .copyout_on_error = false, },
+#endif
 };
 
 int

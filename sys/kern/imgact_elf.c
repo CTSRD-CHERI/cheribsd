@@ -1481,7 +1481,8 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	if (imgp->credential_setid) {
 		PROC_LOCK(imgp->proc);
 		imgp->proc->p_flag2 &= ~(P2_ASLR_ENABLE | P2_ASLR_DISABLE |
-		    P2_WXORX_DISABLE | P2_WXORX_ENABLE_EXEC);
+		    P2_WXORX_DISABLE | P2_WXORX_ENABLE_EXEC |
+		    P2_CHERI_REVOKE_MASK);
 		PROC_UNLOCK(imgp->proc);
 	}
 	if ((sv->sv_flags & SV_ASLR) == 0 ||
@@ -1843,10 +1844,14 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	 * ELF_BSDF_CHERI_REVOKE tells the runtime it should enable
 	 * quarantining of pages and revoke them as required.
 	 *
-	 * Precedence: ELF note, system default.
+	 * Precedence: procctl, ELF note, system default.
 	 * In case of conflicting flags, disable wins.
 	 */
-	if ((imgp->proc->p_fctl0 & NT_FREEBSD_FCTL_CHERI_REVOKE_MASK) != 0) {
+	if ((imgp->proc->p_flag2 & P2_CHERI_REVOKE_MASK) != 0) {
+		if ((imgp->proc->p_flag2 & P2_CHERI_REVOKE_DISABLE) == 0)
+			bsdflags |= ELF_BSDF_CHERI_REVOKE;
+	} else if ((imgp->proc->p_fctl0 &
+	    NT_FREEBSD_FCTL_CHERI_REVOKE_MASK) != 0) {
 		if ((imgp->proc->p_fctl0 &
 		    NT_FREEBSD_FCTL_CHERI_REVOKE_DISABLE) == 0)
 			bsdflags |= ELF_BSDF_CHERI_REVOKE;
