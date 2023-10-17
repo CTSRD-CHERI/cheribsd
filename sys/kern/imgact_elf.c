@@ -1842,8 +1842,15 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	/*
 	 * ELF_BSDF_CHERI_REVOKE tells the runtime it should enable
 	 * quarantining of pages and revoke them as required.
+	 *
+	 * Precedence: ELF note, system default.
+	 * In case of conflicting flags, disable wins.
 	 */
-	if (security_cheri_runtime_revocation_default != 0)
+	if ((imgp->proc->p_fctl0 & NT_FREEBSD_FCTL_CHERI_REVOKE_MASK) != 0) {
+		if ((imgp->proc->p_fctl0 &
+		    NT_FREEBSD_FCTL_CHERI_REVOKE_DISABLE) == 0)
+			bsdflags |= ELF_BSDF_CHERI_REVOKE;
+	} else if (security_cheri_runtime_revocation_default != 0)
 		bsdflags |= ELF_BSDF_CHERI_REVOKE;
 #endif
 	AUXARGS_ENTRY(pos, AT_BSDFLAGS, bsdflags);
