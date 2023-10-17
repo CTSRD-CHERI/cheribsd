@@ -356,17 +356,12 @@ static void mrs_printf(char *fmt, ...)
 	mrs_unlock(&printf_lock);
 }
 
-#define mrs_printcap(name, cap) \
-	mrs_printf("capability %s: v:%u s:%u p:%08lx b:%016lx l:%016lx, o:%lx t:%ld\n", (name), cheri_gettag((cap)), cheri_getsealed((cap)), cheri_getperm((cap)), cheri_getbase((cap)), cheri_getlen((cap)), cheri_getoffset((cap)), cheri_gettype((cap)))
-
 /* debugging */
 
 #ifdef DEBUG
 #define mrs_debug_printf(fmt, ...) mrs_printf(fmt, ##__VA_ARGS__)
-#define mrs_debug_printcap(name, cap) mrs_printcap(name, cap)
 #else /* DEBUG */
 #define mrs_debug_printf(fmt, ...)
-#define mrs_debug_printcap(name, cap)
 #endif /* !DEBUG */
 
 #define	MRS_UTRACE_ENV	"_MRS_UTRACE"
@@ -501,8 +496,7 @@ static inline void quarantine_insert(struct mrs_quarantine *quarantine, void *pt
 #if 0
 	if (quarantine->size > allocated_size) {
 		mrs_printf("fatal error: quarantine size %zu exceeded allocated_size %zu "
-		    "inserting the following cap\n", quarantine->size, allocated_size);
-		mrs_printcap("inserted", ptr);
+		    "inserting %#p\n", quarantine->size, allocated_size, ptr);
 		exit(7);
 	}
 #endif
@@ -536,7 +530,7 @@ static inline void *validate_freed_pointer(void *ptr) {
 		mrs_debug_printf("validate_freed_pointer: not allocated by underlying allocator\n");
 		return NULL;
 	}
-	/*mrs_debug_printcap("freed underlying allocation", underlying_allocation);*/
+	/*mrs_debug_printf("freed underlying allocation %#p\n", underlying_allocation);*/
 
 #ifdef JUST_BOOKKEEPING
 	REAL(free)(ptr);
@@ -1123,8 +1117,8 @@ static void *mrs_malloc(size_t size) {
 
 	increment_allocated_size(allocated_region);
 
-	/*mrs_debug_printf("mrs_malloc: called size 0x%zx\n", size);*/
-	/*mrs_debug_printcap("allocation", allocated_region);*/
+	/*mrs_debug_printf("mrs_malloc: called size 0x%zx, allocation %#p\n",
+	    size, allocated_region);*/
 
 	MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0, allocated_region);
 	return allocated_region;
