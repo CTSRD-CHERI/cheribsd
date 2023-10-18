@@ -58,6 +58,7 @@
 #include <fcntl.h>
 #include <fnmatch.h>
 #include <inttypes.h>
+#include <malloc_np.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -95,6 +96,11 @@ static int qtrace_user_mode_only;
 static int sleep_after_test;
 static int coredump_enabled;
 static int debugger_enabled;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+/* Ask MRS to quarantine despite the system default. */
+const int malloc_revocation = MR_ENABLE;
+#endif
 
 int verbose;
 
