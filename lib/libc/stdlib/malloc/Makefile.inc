@@ -2,9 +2,9 @@
 
 SYM_MAPS+=${LIBC_SRCTOP}/stdlib/malloc/Symbol.map
 
+.if ${MK_MALLOC_REVOCATION_SHIM} == no || !${MACHINE_ABI:Mpurecap}
 MAN+=		malloc_revoke.3
 
-.if ${MK_MALLOC_REVOCATION_SHIM} == no || !${MACHINE_ABI:Mpurecap}
 MISRCS+=	malloc_revoke.c
 .endif
 

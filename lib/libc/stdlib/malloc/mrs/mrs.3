@@ -1,0 +1,278 @@
+.\"-
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.\" Copyright (c) 2023 SRI International
+.\"
+.\" This software was developed by SRI International, the University of
+.\" Cambridge Computer Laboratory (Department of Computer Science and
+.\" Technology), and Capabilities Limited under Defense Advanced Research
+.\" Projects Agency (DARPA) Contract No. HR001122S0003 ("MTSS").
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.Dd October 19, 2023
+.Dt MRS 3
+.Os
+.Sh NAME
+.Nm MRS
+.Nd Malloc Revocation Shim
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In stdlib.h
+.Ft void *
+.Fn malloc "size_t size"
+.Ft void *
+.Fn calloc "size_t number, size_t size"
+.Ft int
+.Fn posix_memalign "void **ptr, size_t alignment, size_t size"
+.Ft void *
+.Fn aligned_alloc "size_t alignment, size_t size"
+.Ft void *
+.Fn realloc "void *ptr, size_t size"
+.Ft void
+.Fn free "void *ptr"
+.Ft void
+.Fn malloc_revoke "void"
+.In malloc_np.h
+.Ft bool
+.Fn malloc_is_revoking "void"
+.Vt const int
+.Va malloc_revocation ;
+.Sh DESCRIPTION
+The Malloc Revocation Shim (MRS) extends a CHERI-aware malloc implemention
+with revocation support, providing heap temporal safety.
+.Nm
+wraps the underlying allocator and manages quarantine queues which are revoked
+by
+.Xr cheri_revoke 2 .
+.Pp
+.Nm
+implements all standard malloc interfaces.
+For detailed documentation of those interfaces see
+.Xr jemalloc 3 .
+It also provides partial implementations of the non-standard
+.Xr jemalloc 3
+interfaces
+.Fn mallocx ,
+.Fn rallocx ,
+.Fn dallocx ,
+and
+.Fn sdallocx .
+These differ from the underlying implementations in that they always zero
+the returned allocation, ignoring passed flags.
+The undocumented
+.Xr jemalloc 3
+3.0 interfaces are not implemented by
+.Nm
+because no CheriABI program should have ever used them.
+.Pp
+The
+.Fn malloc_revoke
+function triggers a full revocation pass, returning when the pass is
+complete.
+This results in the revocation of all pointers staged for quarantine by
+.Fn free
+or
+.Fn realloc .
+.Sh ENABLING REVOCATION
+Because heap temporal safety is an experimental feature with performance
+impacts that are not fully characterized,
+.Nm
+provides a number of policy mechanisms to control
+.Nm
+revocation.
+When a program using
+.Nm
+starts up, an array of parameters are evaluated to determine if free'd
+objects should be quarantined and revoked or if the underlying
+implementations should be exposed directly.
+.Nm
+considers two sources of information:
+.Bl -bullet
+.It
+The
+.Dv ELF_BSDF_CHERI_REVOKE
+and
+.Dv ELF_BSDF_CHERI_REVOKE_FORCED
+flags of the
+.Dv AT_BSDFLAGS
+ELF auxiliary argument variable convey information about the
+administratively configured preferences
+(if
+.Dv ELF_BSDF_CHERI_REVOKE_FORCED
+is set)
+or system-wide defaults.
+.It
+The value of the
+.Va malloc_revocation
+variable.
+.Va malloc_revocation
+is a weak symbol in libc which can be provided by the program to override
+the system default or prevent administrative overrides.
+If it is set to one of
+.Dv MR_ENABLE
+or
+.Dv MR_DISABLE
+then it overrides the system default, but usually configured
+preferences expressed by
+.Dv AT_BSDFLAGS
+take precedence.
+If it is set to one of
+.Dv MR_ENABLE_FORCED
+or
+.Dv MR_DISABLE_FORCED
+then
+.Dv AT_BSDFLAGS
+is ignored.
+.El
+.Pp
+.\" XXX: this is not tied to mrs and probably belongs somewhere else
+The kernel considers the following factors in order of decreasing precedence
+when setting
+.Dv AT_BSDFLAGS
+flags:
+.Bl -bullet
+.It
+The presence of
+.Dv P2_CHERI_REVOKE_ENABLE
+or
+.Dv P2_CHERI_REVOKE_DISABLE
+in the process flags as controlled by
+the
+.Xr procctl 2
+.Dv PROC_CHERI_REVOKE_CTL
+command which is administrativly set by
+.Xr proccontrol 1 .
+If either is set then
+.Dv ELF_BSDF_CHERI_REVOKE_FORCED
+is set and
+.Dv ELF_BSDF_CHERI_REVOKE
+is set if
+.Dv P2_CHERI_REVOKE_DISABLE
+is not present.
+.It
+The presence of
+.Dv NT_FREEBSD_FCTL_CHERI_REVOKE_DISABLE
+or
+.Dv NT_FREEBSD_FCTL_CHERI_REVOKE_ENABLE
+in the FreeBSD feature control ELF note as set by
+.Xr elfctl 1 .
+If either is set then
+.Dv ELF_BSDF_CHERI_REVOKE_FORCED
+is set and
+.Dv ELF_BSDF_CHERI_REVOKE
+is set if
+.Dv NT_FREEBSD_FCTL_CHERI_REVOKE_DISABLE
+is not present.
+.It
+The value of the
+.Dv security.cheri.runtime_revocation_default
+sysctl value.
+If this is non-zero then
+.Dv ELF_BSDF_CHERI_REVOKE
+is set.
+.El
+.Pp
+A program can determine at runtime if
+.Nm
+revocation is enabled by checking the return value of
+.Fn malloc_is_revoking .
+.Sh TRACING
+.Nm
+supports
+.Xr utrace 2
+event logging which can be enabled by setting the
+.Ev _MRS_UTRACE
+environmental variable, collected by
+.Xr ktrace 1
+and viewed by
+.Xr kdump 1 .
+This produces output like:
+.Pp
+.Dl $ kdump -H -t u
+.Dl  21593 101243 git      USER  0x45e00000 = malloc(50708)
+.Dl  21593 101243 git      USER  0x45e00000 = mrs_malloc(50708)
+.Dl  21593 101243 git      USER  mrs_free(0x45e00000)
+.Dl  21593 101243 git      USER  quarantine_insert(0x45e00000, 57344)
+.Dl  21593 101242 git      USER  quarantine_flush()
+.Sh IMPLEMENTATION NOTES
+.Nm
+requires that allocators be extended to provide a
+.Ft void *
+.Fn malloc_underlying_allocation "void *"
+interface which takes a capability passed to
+.Fn free
+or
+.Fn realloc
+and returns a capability to the underlying allocator bearing the
+.Dt CHERI_PERM_SW_VMEM
+permission.
+This capability will not be revoked and thus can be stored in the quarantine
+structure.
+This interface must not be exported outside the implementation.
+.Sh EXAMPLES
+If a program linked with
+.Nm
+allocator wishes to use revocation even if the system-wide default is to
+disable it, the programmer can add the following global declaration:
+.Pp
+.Dl const int malloc_revocation = MR_ENABLED;
+.Pp
+Note that even if
+.Dv MR_ENABLED_FORCED
+is used, revocation depends on the kernel providing support and
+.Nm
+may silently not use revocation if it is not supported.
+.Pp
+To alter a binary to disable use of revocation, use:
+.Pp
+.Dl elfctl -e +nocherirevoke <program>
+.Pp
+To override the system default and binary settings (other than
+.Va malloc_revocation
+being set to
+.Dv MR_ENABLE_FORCED )
+run the program as follows:
+.Pp
+.Dl proccontrol -m cherirevoke -s enable <program>
+.Sh SEE ALSO
+.Xr elfctl 1 ,
+.Xr kdump 1 ,
+.Xr ktrace 1 ,
+.Xr proccontrol 1 ,
+.Xr jemalloc 3 ,
+.Xr malloc_revoke 3 ,
+.Xr sysctl 8
+.Sh BUGS
+.Nm
+currently has a single quarantine queue protected by a mutex.
+For multi-threaded applications where concurent
+.Xr malloc 3
+performance is important, this will be a significant bottleneck.
+.Sh AUTHORS
+This software and this manual page were
+developed by SRI International, the University of Cambridge Computer
+Laboratory (Department of Computer Science and Technology), and
+Capabilities Limited under contract
+.Pq HR001122S0003
+.Pq Do MTSS Dc .
