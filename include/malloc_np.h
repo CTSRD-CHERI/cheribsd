@@ -70,6 +70,17 @@ struct extent_hooks_s {
 	extent_merge_t		*merge;
 };
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	MR_SYSTEM_DEFAULT	0x0
+#define	MR_DISABLE		0x1
+#define	MR_ENABLE		0x2
+#define	_MR_FORCED		0x4
+#define	MR_DISABLE_FORCED	(MR_DISABLE | _MR_FORCED)
+#define	MR_ENABLE_FORCED	(MR_ENABLE | _MR_FORCED)
+
+extern const int malloc_revocation;
+#endif
+
 size_t	malloc_usable_size(const void *ptr);
 
 void	malloc_stats_print(void (*write_cb)(void *, const char *),
