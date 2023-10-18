@@ -63,36 +63,47 @@
 /*
  * Knobs:
  *
- * BYPASS_QUARANTINE: MADV_FREE page-multiple allocations and never free them back to the allocator
- * OFFLOAD_QUARANTINE: process full quarantines in a separate thread
- * MRS_PINNED_CPUSET: notch out CPU 2 for the offload thread's use
- *   The background thread notches out CPU 3 from its affinity, leaving it wholely for the application.
- *   Both threads are, by default, willing to run on CPUs 0 and 1, but we expect that the environment
- *   has restricted the default CPU set to only 0 and 1 and left 2 and 3 available for the program
- *   under test and its revoker thread.
+ * BYPASS_QUARANTINE: MADV_FREE page-multiple allocations and never
+ *   free them back to the allocator.
+ * OFFLOAD_QUARANTINE: Process full quarantines in a separate thread.
+ * MRS_PINNED_CPUSET: Prefer CPU 2 for the application thread and CPU
+ *   3 for the offload thread.  Both threads are, by default, willing
+ *   to run on CPUs 0 and 1, but we expect that the environment has
+ *   restricted the default CPU set to only 0 and 1 and left 2 and 3
+ *   available for the program under test and its revoker thread.
  *
- *   If !OFFLOAD_QUARANTINE, this still prevents the application from using CPU 2.
- * DEBUG: print debug statements
- * PRINT_STATS: print statistics on exit
- * PRINT_CAPREVOKE: print stats for each CHERI revocation
- * PRINT_CAPREVOKE_MRS: print details of MRS operation around revocations
- * CLEAR_ON_ALLOC: zero allocated regions as they are allocated (for non-calloc allocation functions)
- * CLEAR_ON_RETURN: zero allocated regions as they come out of quarantine
- * CLEAR_ON_FREE: zero allocated regions as they are given to us
- * REVOKE_ON_FREE: perform revocation on free rather than during allocation routines
+ *   If !OFFLOAD_QUARANTINE, this still prevents the application from
+ *   using CPU 3.
+ * DEBUG: Print debug statements.
+ * PRINT_STATS: Print statistics on exit.
+ * PRINT_CAPREVOKE: Print stats for each CHERI revocation.
+ * PRINT_CAPREVOKE_MRS: Print details of MRS operation around revocations.
+ * CLEAR_ON_ALLOC: Zero allocated regions as they are allocated (for
+ *   non-calloc allocation functions).
+ * CLEAR_ON_RETURN: Zero allocated regions as they come out of quarantine.
+ * CLEAR_ON_FREE: Zero allocated regions as they are given to us.
+ * REVOKE_ON_FREE: Perform revocation on free rather than during
+ *   allocation routines.
  *
- * JUST_INTERPOSE: just call the real functions
- * JUST_BOOKKEEPING: just update data structures then call the real functions
- * JUST_QUARANTINE: just do bookkeeping and quarantining (no bitmap painting or revocation)
- * JUST_PAINT_BITMAP: do bookkeeping, quarantining, and bitmap painting but no revocation
+ * JUST_INTERPOSE: Just call the real functions.
+ * JUST_BOOKKEEPING: Just update data structures then call the real functions.
+ * JUST_QUARANTINE: Just do bookkeeping and quarantining (no bitmap
+ *   painting or revocation)
+ * JUST_PAINT_BITMAP: Do bookkeeping, quarantining, and bitmap
+ *   painting but no revocation.
  *
  * Values:
  *
- * QUARANTINE_HIGHWATER: limit the quarantine size to QUARANTINE_HIGHWATER number of bytes
- * QUARANTINE_RATIO: limit the quarantine size to 1 / QUARANTINE_RATIO times the size of the heap (default 4)
- * CONCURRENT_REVOCATION_PASSES: number of concurrent revocation pass before the stop-the-world pass
+ * QUARANTINE_HIGHWATER: Limit the quarantine size to
+ *   QUARANTINE_HIGHWATER number of bytes.
+ * QUARANTINE_RATIO: Limit the quarantine size to 1 / QUARANTINE_RATIO
+ *   times the size of the heap (default 4).
+ * CONCURRENT_REVOCATION_PASSES: Number of concurrent revocation pass
+ *   before the stop-the-world pass.
  *
- * OPTIONAL_QUARANTINING: allow quarantining to be enabled/disabled at runtime and for mrs to fall back to not quarantining if cheri_revoke_get_shadow(2) is unimplemented (ENOSYS).
+ * OPTIONAL_QUARANTINING: Allow quarantining to be enabled/disabled at
+ *   runtime and for mrs to fall back to not quarantining if
+ *   cheri_revoke_get_shadow(2) is unimplemented (ENOSYS).
  */
 
 #ifdef SNMALLOC_PRINT_STATS
@@ -131,8 +142,6 @@ void REAL(sdallocx)(void *, size_t, int);
  * The are provided in FreeBSD for backwards compatibility and are not
  * declared in any public header so there should be no users.
  */
-
-void *REAL(malloc_underlying_allocation)(void *);
 
 /* functions */
 
@@ -208,43 +217,43 @@ sdallocx(void *ptr, size_t size, int flags)
 }
 
 /*
- * defined by CHERIfied mallocs for use with mrs - given a capability returned
+ * Defined by CHERIfied mallocs for use with mrs - given a capability returned
  * by the malloc that may have had its bounds shrunk, rederive and return a
  * capability with bounds corresponding to the original allocation.
  *
- * if the passed-in capability is tagged/permissioned and corresponds to some
+ * If the passed-in capability is tagged/permissioned and corresponds to some
  * allocation, give back a pointer with that same base whose length corresponds
- * to the underlying allocation size. otherwise return NULL.
+ * to the underlying allocation size; otherwise return NULL.
  *
- * (for corespondence, check that its base matches the base of an allocation.
- * in practice, check that the offset is zero, which is necessary for the base
+ * (For correspondence, check that its base matches the base of an allocation.
+ * In practice, check that the offset is zero, which is necessary for the base
  * to match the base of any allocation, and then it is fine to compare the
  * address of the passed-in thing (which is the base) to whatever is necessary.
- * note that the length of the passed-in capability doesn't matter as long as
- * the allocator uses the underlying size for rederivation or revocation.
+ * Note that the length of the passed-in capability doesn't matter as long as
+ * the allocator uses the underlying size for rederivation or revocation.)
  *
- * this function will give back a pointer with VMMAP permissions, so mrs can
- * clear its memory and free it back post revocation. with mrs we assume the
+ * This function will give back a pointer with SW_VMEM permission, so mrs can
+ * clear its memory and free it back after revocation.  With mrs we assume the
  * attacker can't access this function, and in the post-mrs world it is
  * unnecessary.
  *
- * NB that as long as an allocator's allocations are naturally aligned
+ * NB: As long as an allocator's allocations are naturally aligned
  * according to their size, as is the case for most slab/bibop allocators, it
  * is possible to check this condition by verifying that the passed-in
  * base/address is contained in the heap and is aligned to the size of
- * allocations in that heap region (power of 2 size or otherwise). it may be
- * necessary to do something verly slightly more complicated, like checking
- * offset from the end of a slab in snmalloc. in traditional free list
+ * allocations in that heap region (power of 2 size or otherwise).  It may be
+ * necessary to do something slightly more complicated, like checking
+ * offset from the end of a slab in snmalloc.  In traditional free list
  * allocators, allocation metadata can be used to verify that the passed-in
  * pointer is legit.
  *
- * (writeup needs more detail about exactly what alloctors
+ * (Writeup needs more detail about exactly what allocators
  * will give back and expect in terms of base offset etc.)
  *
- * in an allocator that is not using mrs, similar logic should be used to
+ * In an allocator that is not using mrs, similar logic should be used to
  * validate and/or rederive pointers and take actions accordingly on the free
- * path and any other function that accepts application pointers. a pointer
- * passed to free must correspond appropriately as described above. if it
+ * path and any other function that accepts application pointers.  A pointer
+ * passed to free must correspond appropriately as described above.  If it
  * doesn't then no action can be taken or you can abort.
  *
  * malloc_usable_size() and any other function taking in pointers similarly
@@ -255,11 +264,17 @@ sdallocx(void *ptr, size_t size, int flags)
  * but this was done so that clearing on free could be evaluated easily and
  * so that allocators wouldn't have to accept revoked caps.
  */
+void *REAL(malloc_underlying_allocation)(void *);
 
 /* globals */
 
-/* alignment requirement for allocations so they can be painted in the caprevoke bitmap */
-static const size_t CAPREVOKE_BITMAP_ALIGNMENT = sizeof(void *); /* XXX VM_CAPREVOKE_GSZ_MEM_NOMAP from machine/vmparam.h */
+/*
+ * Alignment requirement for allocations so they can be painted in the
+ * caprevoke bitmap.
+ *
+ * XXX VM_CAPREVOKE_GSZ_MEM_NOMAP from machine/vmparam.h
+ */
+static const size_t CAPREVOKE_BITMAP_ALIGNMENT = sizeof(void *);
 static const size_t DESCRIPTOR_SLAB_ENTRIES = 10000;
 static const size_t MIN_REVOKE_HEAP_SIZE = 8 * 1024 * 1024;
 
@@ -294,13 +309,21 @@ static struct mrs_descriptor_slab *free_descriptor_slabs;
 static struct mrs_descriptor_slab * _Atomic free_descriptor_slabs;
 #endif /* OFFLOAD_QUARANTINE */
 
-/* XXX allocated_size has races in the offload case that are probably harmless */
-static size_t allocated_size; /* amount of memory that the allocator views as allocated (includes quarantine) */
+/*
+ * amount of memory that the allocator views as allocated (includes
+ * quarantine)
+ *
+ * XXX allocated_size has races in the offload case that are probably
+ * harmless.
+ */
+static size_t allocated_size;
 static size_t max_allocated_size;
 
-static struct mrs_quarantine application_quarantine; /* quarantine for the application thread */
+/* quarantine for the application thread */
+static struct mrs_quarantine application_quarantine;
 #ifdef OFFLOAD_QUARANTINE
-static struct mrs_quarantine offload_quarantine; /* quarantine for the offload thread */
+/* quarantine for the offload thread */
+static struct mrs_quarantine offload_quarantine;
 #endif /* OFFLOAD_QUARANTINE */
 
 static void *mrs_calloc_bootstrap(size_t number, size_t size);
@@ -329,8 +352,8 @@ mrs_puts(const char *p)
 } while (0)
 
 /*
- * hack to initialize mutexes without calling malloc. without this, locking
- * operations in allocation functions would cause an infinite loop. the buf
+ * Hack to initialize mutexes without calling malloc.  Without this, locking
+ * operations in allocation functions would cause an infinite loop.  The buf
  * size should be at least sizeof(struct pthread_mutex) from thr_private.h
  */
 #define create_lock(name)						\
@@ -363,7 +386,10 @@ _pthread_mutex_init_calloc_cb(pthread_mutex_t *mutex,
 #ifdef OFFLOAD_QUARANTINE
 static void *mrs_offload_thread(void *);
 create_lock(offload_quarantine_lock);
-/* no hack for these because condition variables are not used in allocation routines */
+/*
+ * No hack needed for these because condition variables are not used
+ * in allocation routines.
+ */
 pthread_cond_t offload_quarantine_empty = PTHREAD_COND_INITIALIZER;
 pthread_cond_t offload_quarantine_ready = PTHREAD_COND_INITIALIZER;
 #endif /* OFFLOAD_QUARANTINE */
@@ -459,30 +485,30 @@ alloc_descriptor_slab(void)
 }
 
 /*
- * we assume that the consumer of this shim can issue arbitrary malicious
- * malloc/free calls. to track the total allocated size effectively, we
+ * We assume that the consumer of this shim can issue arbitrary malicious
+ * malloc/free calls.  To track the total allocated size effectively, we
  * accumulate the length of capabilities as they are returned by mrs_malloc.
- * for the quarantine size, tracking is different in the offload and
- * non-offload cases. in the non-offload case, capabilities passed in to
+ * For the quarantine size, tracking is different in the offload and
+ * non-offload cases.  In the non-offload case, capabilities passed in to
  * mrs_free are validated and replaced with a rederived capability to the
  * entire allocation (obtained by calling the underlying allocator's
  * malloc_underlying_allocation() function) before being added to quarantine,
  * so we accumulate the length of capabilities in quarantine post-validation.
- * the result is that for each allocation, the same number is added to the
- * allocated size total and the quarantine size total. when the quarantine is
+ * The result is that for each allocation, the same number is added to the
+ * allocated size total and the quarantine size total.  When the quarantine is
  * flushed, the allocated size is reduced by the quarantine size and the
  * quarantine size is reset to zero.
  *
- * in the offload case, the application thread fills a quarantine with
+ * In the offload case, the application thread fills a quarantine with
  * unvalidated capabilities passed in to mrs_free() (which may be untagged,
- * duplicates, have shrunk bounds, etc.). the lengths of these capabilities are
+ * duplicates, have shrunk bounds, etc.).  The lengths of these capabilities are
  * accumulated into the quarantine size, which is an approximation and only
- * used to trigger offload processing. in the offload thread, a separate
+ * used to trigger offload processing.  In the offload thread, a separate
  * accumulation is performed using only validated capabilities, and that is used
  * to reduce the allocated size after flushing.
  *
- * sometimes malloc implementations are recursive in which case we leak some
- * space. this was observed in snmalloc for allocations of size 0x20.
+ * Sometimes malloc implementations are recursive in which case we leak some
+ * space.  This was observed in snmalloc for allocations of size 0x20.
  */
 static inline void
 increment_allocated_size(void *allocated)
@@ -499,12 +525,15 @@ clear_region(void *mem, size_t len)
 	static const size_t ZERO_THRESHOLD = 64;
 
 	/*
-	 * for small regions that are qword-multiple-sized, use writes to avoid
-	 * memset call. alignment should be good in normal cases
+	 * For small regions that are qword-multiple-sized, use writes to avoid
+	 * memset call.  Alignment should be good in normal cases.
 	 */
 	if ((len <= ZERO_THRESHOLD) && (len % sizeof(uint64_t) == 0)) {
 		for (size_t i = 0; i < (len / sizeof(uint64_t)); i++) {
-			/* volatile needed to avoid memset call compiler "optimization" */
+			/*
+			 * volatile needed to avoid memset call by
+			 * compiler "optimization"
+			 */
 			((volatile uint64_t *)mem)[i] = 0;
 		}
 	} else {
@@ -513,8 +542,8 @@ clear_region(void *mem, size_t len)
 }
 
 /*
- * just insert a freed allocation into a quarantine, minimal validation, increase
- * quarantine size by the length of the allocation's capability
+ * Insert a freed allocation into a quarantine with minimal validation; increase
+ * quarantine size by the length of the allocation's capability.
  */
 static inline void
 quarantine_insert(struct mrs_quarantine *quarantine, void *ptr, size_t size)
@@ -560,24 +589,24 @@ quarantine_insert(struct mrs_quarantine *quarantine, void *ptr, size_t size)
 }
 
 /*
- * given a pointer freed by the application, validate it by (1) checking that
+ * Given a pointer freed by the application, validate it by (1) checking that
  * the pointer has an underlying allocation (was actually allocated by the
  * allocator) and (2) using the bitmap painting function to make sure this
  * pointer is valid and hasn't already been freed or revoked.
  *
- * returns a capability to the underlying allocation if validation was successful,
- * NULL otherwise.
+ * Returns a capability to the underlying allocation if validation was
+ * successful, NULL otherwise.
  *
- * supports ablation study knobs, returning NULL in case of a short circuit.
- *
+ * Supports ablation study knobs, returning NULL in case of a short circuit.
  */
 static inline void *
 validate_freed_pointer(void *ptr)
 {
 
 	/*
-	 * untagged check before malloc_underlying_allocation() catches NULL and other invalid
-	 * caps that may cause a rude implementation of malloc_underlying_allocation() to crash.
+	 * Untagged check before malloc_underlying_allocation()
+	 * catches NULL and other invalid caps that may cause a rude
+	 * implementation of malloc_underlying_allocation() to crash.
 	 */
 	if (!cheri_gettag(ptr)) {
 		mrs_debug_printf("validate_freed_pointer: untagged capability addr %p\n",
@@ -598,56 +627,65 @@ validate_freed_pointer(void *ptr)
 #endif /* JUST_BOOKKEEPING */
 
 	/*
-	 * here we use the bitmap to synchronize and make sure that our guarantee is
-	 * upheld in multithreaded environments. we paint the bitmap to signal to the
-	 * kernel what needs to be revoked, but we also gate the operation of bitmap
-	 * painting, so that we can only successfully paint the bitmap for some freed
-	 * allocation (and let that allocation pass onto the quarantine list) if it
-	 * is legitimately allocated on the heap, not revoked, and not previously
-	 * queued for revocation, at the time of painting.
+	 * Here we use the bitmap to synchronize and make sure that
+	 * our guarantee is upheld in multithreaded environments.  We
+	 * paint the bitmap to signal to the kernel what needs to be
+	 * revoked, but we also gate the operation of bitmap painting,
+	 * so that we can only successfully paint the bitmap for some
+	 * freed allocation (and let that allocation pass onto the
+	 * quarantine list) if it is legitimately allocated on the
+	 * heap, not revoked, and not previously queued for
+	 * revocation, at the time of painting.
 	 *
-	 * essentially at this point we don't want something to end up on the
-	 * quarantine list twice. if that were to happen, we wouldn't be upholding
-	 * the principle that prevents heap aliasing.
+	 * Essentially at this point we don't want something to end up
+	 * on the quarantine list twice.  If that were to happen, we
+	 * wouldn't be upholding the principle that prevents heap
+	 * aliasing.
 	 *
-	 * we can't allow a capability to pass painting and end up on the quarantine
-	 * list if its region of the bitmap is already painted. if that were to
-	 * happen, the two quarantine list entries corresponding to that region would
-	 * be freed non-atomically, such that we could observe one being freed, the
-	 * allocator reallocating the region, then the other being freed <! ERROR !>
+	 * We can't allow a capability to pass painting and end up on
+	 * the quarantine list if its region of the bitmap is already
+	 * painted.  If that were to happen, the two quarantine list
+	 * entries corresponding to that region would be freed
+	 * non-atomically, such that we could observe one being freed,
+	 * the allocator reallocating the region, then the other being
+	 * freed <! ERROR !>.
 	 *
-	 * we also can't allow a previously revoked capability to pass painting and
-	 * end up on the quarantine list. if that were to happen, we could observe:
+	 * We also can't allow a previously revoked capability to pass
+	 * painting and end up on the quarantine list.  If that were to
+	 * happen, we could observe:
 	 *
-	 * ptr mrs_freed -> painted in bitmap -> added to quarantine -> revoked ->
-	 * cleared in bitmap -> /THREAD SWITCH/ revoked ptr mrs_freed -> painted in
-	 * bitmap -> revoked again -> cleared in bitmap -> freed back to allocator ->
+	 * ptr mrs_freed -> painted in bitmap -> added to quarantine ->
+	 * revoked -> cleared in bitmap ->
+	 * /THREAD SWITCH/ revoked ptr mrs_freed -> painted in bitmap ->
+	 * revoked again -> cleared in bitmap -> freed back to allocator ->
 	 * reused /THREAD SWITCH BACK/ -> freed back to allocator <! ERROR !>
 	 *
-	 * similarly for untagged capabilities, because then a malicious user could
-	 * just construct a capability that takes the place of revoked ptr (i.e. same
-	 * address) above.
+	 * Similarly for untagged capabilities, because then a
+	 * malicious user could just construct a capability that takes
+	 * the place of revoked ptr (i.e. same address) above.
 	 *
-	 * we block these behaviors with a bitmap painting function that takes in a
-	 * user pointer and the full length of the allocation. it will only succeed
-	 * if, atomically at the time of painting, (1) the bitmap region is not
-	 * painted (2) the user pointer is tagged (3) the user pointer is not
-	 * revoked. if the painting function fails, we short-circuit and do not add
-	 * allocation to quarantine.
+	 * We block these behaviors with a bitmap painting function
+	 * that takes in a user pointer and the full length of the
+	 * allocation.  It will only succeed if, atomically at the
+	 * time of painting, (1) the bitmap region is not painted, (2)
+	 * the user pointer is tagged, and (3) the user pointer is not
+	 * revoked.  If the painting function fails, we short-circuit
+	 * and do not add allocation to quarantine.
 	 *
-	 * we can clear the bitmap after revocation and before freeing back to the
-	 * allocator, which "opens" the gate for revocation of that region to occur
-	 * again. it's fine for clearing not to be atomic with freeing back to the
-	 * allocator, though, because between revocation and the allocator
-	 * reallocating the region, the user does not have any valid capabilities to
-	 * the region by definition.
+	 * We can clear the bitmap after revocation and before freeing
+	 * back to the allocator, which "opens" the gate for
+	 * revocation of that region to occur again.  It's fine for
+	 * clearing not to be atomic with freeing back to the
+	 * allocator, though, because between revocation and the
+	 * allocator reallocating the region, the user does not have
+	 * any valid capabilities to the region by definition.
 	 */
 
 #if !defined(JUST_QUARANTINE)
 	/*
-	 * doesn't matter whether or not the len of underlying_allocation is
+	 * Doesn't matter whether or not the len of underlying_allocation is
 	 * actually a 16-byte multiple because all allocations will be 16-byte
-	 * aligned
+	 * aligned.
 	 */
 	if (caprev_shadow_nomap_set_len(cri->base_mem_nomap, entire_shadow,
 	    cheri_getbase(ptr),
@@ -761,18 +799,19 @@ print_cheri_revoke_stats(char *what, struct cheri_revoke_syscall_info *crsi,
 #endif /* PRINT_CAPREVOKE */
 
 /*
- * perform revocation then iterate through the quarantine and free entries with
+ * Perform revocation then iterate through the quarantine and free entries with
  * non-zero underlying size (offload thread sets unvalidated caps to have zero
  * size).
  *
- * supports ablation study knobs.
+ * Supports ablation study knobs.
  */
 static inline void
 quarantine_flush(struct mrs_quarantine *quarantine)
 {
 	MRS_UTRACE(UTRACE_MRS_QUARANTINE_FLUSH, NULL, 0, 0, NULL);
 #if !defined(JUST_QUARANTINE) && !defined(JUST_PAINT_BITMAP)
-	atomic_thread_fence(memory_order_acq_rel); /* don't read epoch until all bitmap painting is done */
+	/* Don't read epoch until all bitmap painting is done. */
+	atomic_thread_fence(memory_order_acq_rel);
 	cheri_revoke_epoch_t start_epoch = cri->epochs.enqueue;
 
 	while (!cheri_revoke_epoch_clears(cri->epochs.dequeue, start_epoch)) {
@@ -816,20 +855,34 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 	for (struct mrs_descriptor_slab *iter = quarantine->list; iter != NULL;
 	     iter = iter->next) {
 		for (int i = 0; i < iter->num_descriptors; i++) {
-			/* in the offload case, only clear the bitmap for validated descriptors (cap != NULL) */
 #ifdef OFFLOAD_QUARANTINE
+			/*
+			 * In the offload case, only clear the bitmap
+			 * for validated descriptors (cap != NULL).
+			 */
 			if (iter->slab[i].ptr != NULL) {
 #endif /* OFFLOAD_QUARANTINE */
 
 #if !defined(JUST_QUARANTINE)
+				/*
+				 * Doesn't matter if the underlying
+				 * size isn't a 16-byte multiple
+				 * because all allocations will be
+				 * 16-byte aligned.
+				 */
 				size_t len = __builtin_align_up(
 				    cheri_getlen(iter->slab[i].ptr),
 				    CAPREVOKE_BITMAP_ALIGNMENT);
-				/* doesn't matter if underlying_size isn't a 16-byte multiple because all allocations will be 16-byte aligned */
 				caprev_shadow_nomap_clear_len(
 				    cri->base_mem_nomap, entire_shadow,
 				    cheri_getbase(iter->slab[i].ptr), len);
-				atomic_thread_fence(memory_order_release); /* don't construct a pointer to a previously revoked region until the bitmap is cleared. */
+
+				/*
+				 * Don't construct a pointer to a
+				 * previously revoked region until the
+				 * bitmap is cleared.
+				 */
+				atomic_thread_fence(memory_order_release);
 #endif /* !JUST_QUARANTINE */
 
 #ifdef CLEAR_ON_RETURN
@@ -837,12 +890,18 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 				    cheri_getlen(iter->slab[i].ptr));
 #endif /* CLEAR_ON_RETURN */
 
-				/* we have a VMEM-bearing cap from malloc_underlying_allocation */
 				/*
-				 * XXX: We used to rely on the underlying allocator to rederive caps
-				 * but snmalloc2's CHERI support doesn't do that by default, so we'll
-				 * clear VMEM here.  This feels wrong, somehow; perhaps we want to
-				 * retry with snmalloc1 not doing rederivation now that we're doing
+				 * We have a VMEM-bearing cap from
+				 * malloc_underlying_allocation.
+				 *
+				 * XXX: We used to rely on the
+				 * underlying allocator to rederive
+				 * caps but snmalloc2's CHERI support
+				 * doesn't do that by default, so
+				 * we'll clear VMEM here.  This feels
+				 * wrong, somehow; perhaps we want to
+				 * retry with snmalloc1 not doing
+				 * rederivation now that we're doing
 				 * this?
 				 */
 				REAL(free)(
@@ -857,7 +916,7 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 	}
 
 	if (prev != NULL) {
-		/* free the quarantined descriptors */
+		/* Free the quarantined descriptors. */
 		prev->next = free_descriptor_slabs;
 #ifdef OFFLOAD_QUARANTINE
 		while (!atomic_compare_exchange_weak(&free_descriptor_slabs,
@@ -905,7 +964,7 @@ malloc_revoke(void)
 #endif /* PRINT_CAPREVOKE_MRS */
 
 #ifdef SNMALLOC_FLUSH
-	/* Consume pending messages now in our queue */
+	/* Consume pending messages now in our queue. */
 	snmalloc_flush_message_queue();
 #endif
 
@@ -937,7 +996,7 @@ malloc_revoke(void)
 #endif
 	quarantine_flush(&application_quarantine);
 #ifdef SNMALLOC_FLUSH
-	/* Consume pending messages now in our queue */
+	/* Consume pending messages now in our queue. */
 	snmalloc_flush_message_queue();
 #endif
 #if defined(SNMALLOC_PRINT_STATS)
@@ -954,10 +1013,10 @@ malloc_is_quarantining(void)
 }
 
 /*
- * check whether we should flush based on the quarantine policy and perform the
- * flush if so.  takes into account whether offload is enabled or not.
+ * Check whether we should flush based on the quarantine policy and perform the
+ * flush if so.  Takes into account whether offload is enabled or not.
  *
- * in the wrapper, we perform these checks at the beginning of allocation
+ * In the wrapper, we perform these checks at the beginning of allocation
  * routines (so that the allocation routines might use the revoked memory in
  * the non-offload edge case where this could happen) rather than during an
  * mmap call - it might be better to perform this check just as the allocator
@@ -968,19 +1027,23 @@ static inline void
 check_and_perform_flush(void)
 {
 #ifdef OFFLOAD_QUARANTINE
-
-	// TODO perhaps allow the application to continue when we are past the high
-	// water mark instead of blocking for the offload thread to finish flushing
+	/*
+	 * TODO: Perhaps allow the application to continue when we are
+	 * past the high water mark instead of blocking for the
+	 * offload thread to finish flushing.
+	 */
 
 	/*
-	 * we trigger a revocation pass when the unvalidated quarantine hits the
-	 * highwater mark because if we waited until the validated queue passed the
-	 * highwater mark, the allocated size might increase (allocations made) between
-	 * the unvalidated queue and validated queue filling such that the high water
-	 * mark is no longer hit. this function just fills up the unvalidated
-	 * quarantine and passes it off when it's full. with offload enabled,
-	 * the "quarantine" global is unvalidated and passed off to the
-	 * "offload_quarantine" global then processed in place (list entries that fail
+	 * We trigger a revocation pass when the unvalidated
+	 * quarantine hits the highwater mark because if we waited
+	 * until the validated queue passed the highwater mark, the
+	 * allocated size might increase (allocations made) between
+	 * the unvalidated queue and validated queue filling such that
+	 * the high water mark is no longer hit.  This function just
+	 * fills up the unvalidated quarantine and passes it off when
+	 * it's full.  With offload enabled, the "quarantine" global
+	 * is unvalidated and passed off to the "offload_quarantine"
+	 * global then processed in place (list entries that fail
 	 * validation are not processed).
 	 */
 	if (quarantine_should_flush(&application_quarantine)) {
@@ -1175,13 +1238,18 @@ mrs_malloc(size_t size)
 
 #if 0
 	/*
-	 * ensure that all allocations less than the shadow bitmap granule size are
-	 * aligned to that granule size, so that no two allocations will be governed
-	 * by the same shadow bit. allocators may implement alignment incorrectly,
-	 * this doesn't allow UAF bugs but may cause faults.
+	 * Ensure that all allocations less than the shadow bitmap
+	 * granule size are aligned to that granule size, so that no
+	 * two allocations will be governed by the same shadow bit.
+	 * Allocators may implement alignment incorrectly, this
+	 * doesn't allow UAF bugs but may cause faults.
 	 */
 	if (size < CAPREVOKE_BITMAP_ALIGNMENT) {
-		/* use posix_memalign because unlike aligned_alloc it does not require size to be an integer multiple of alignment */
+		/*
+		 * Use posix_memalign because unlike aligned_alloc it
+		 * does not require size to be an integer multiple of
+		 * alignment.
+		 */
 		if (REAL(posix_memalign)(&allocated_region,
 		    CAPREVOKE_BITMAP_ALIGNMENT, size)) {
 			mrs_debug_printf("mrs_malloc: error aligning allocation of size less than the shadow bitmap granule\n");
@@ -1190,10 +1258,13 @@ mrs_malloc(size_t size)
 		}
 	} else {
 		/*
-		 * currently, sizeof(void *) == CAPREVOKE_BITMAP_ALIGNMENT == 16, which means
-		 * that if size >= CAPREVOKE_BITMAP_ALIGNMENT it should be aligned to a
-		 * multiple of CAPREVOKE_BITMAP_ALIGNMENT (because it is possible to store a
-		 * pointer in the allocation and thus the alignment is guaranteed by malloc).
+		 * Currently, sizeof(void *) ==
+		 * CAPREVOKE_BITMAP_ALIGNMENT == 16, which means that
+		 * if size >= CAPREVOKE_BITMAP_ALIGNMENT it should be
+		 * aligned to a multiple of CAPREVOKE_BITMAP_ALIGNMENT
+		 * (because it is possible to store a pointer in the
+		 * allocation and thus the alignment is guaranteed by
+		 * malloc).
 		 */
 		allocated_region = REAL(malloc)(size);
 		if (allocated_region == NULL) {
@@ -1225,7 +1296,7 @@ mrs_malloc(size_t size)
 
 /*
  * calloc is used to bootstrap various system libraries so is called before
- * even the constructor function of this library. before the initializer is
+ * even the constructor function of this library.  Before the initializer is
  * called and REAL(calloc) is set appropriately, use this bootstrap function to
  * serve allocations.
  */
@@ -1257,7 +1328,10 @@ mrs_calloc(size_t number, size_t size)
 		return (REAL(calloc)(number, size));
 #endif
 
-	/* this causes problems if our library is initialized before the thread library */
+	/*
+	 * This causes problems if our library is initialized before
+	 * the thread library.
+	 */
 	/*mrs_debug_printf("mrs_calloc: called\n");*/
 
 #ifndef REVOKE_ON_FREE
@@ -1268,13 +1342,18 @@ mrs_calloc(size_t number, size_t size)
 
 #if 0
 	/*
-	 * ensure that all allocations less than the shadow bitmap granule size are
-	 * aligned to that granule size, so that no two allocations will be governed
-	 * by the same shadow bit. allocators may implement alignment incorrectly,
-	 * this doesn't allow UAF bugs but may cause faults.
+	 * Ensure that all allocations less than the shadow bitmap
+	 * granule size are aligned to that granule size, so that no
+	 * two allocations will be governed by the same shadow bit.
+	 * Allocators may implement alignment incorrectly, this
+	 * doesn't allow UAF bugs but may cause faults.
 	 */
 	if (size < CAPREVOKE_BITMAP_ALIGNMENT) {
-		/* use posix_memalign because unlike aligned_alloc it does not require size to be an integer multiple of alignment */
+		/*
+		 * Use posix_memalign because unlike aligned_alloc it
+		 * does not require size to be an integer multiple of
+		 * alignment.
+		 */
 		if (REAL(posix_memalign)(&allocated_region,
 		    CAPREVOKE_BITMAP_ALIGNMENT, number * size)) {
 			mrs_debug_printf("mrs_calloc: error aligning allocation of size less than the shadow bitmap granule\n");
@@ -1284,10 +1363,13 @@ mrs_calloc(size_t number, size_t size)
 		memset(allocated_region, 0, cheri_getlen(allocated_region));
 	} else {
 		/*
-		 * currently, sizeof(void *) == CAPREVOKE_BITMAP_ALIGNMENT == 16, which means
-		 * that if size >= CAPREVOKE_BITMAP_ALIGNMENT it should be aligned to a
-		 * multiple of CAPREVOKE_BITMAP_ALIGNMENT (because it is possible to store a
-		 * pointer in the allocation and thus the alignment is guaranteed by calloc).
+		 * Currently, sizeof(void *) ==
+		 * CAPREVOKE_BITMAP_ALIGNMENT == 16, which means that
+		 * if size >= CAPREVOKE_BITMAP_ALIGNMENT it should be
+		 * aligned to a multiple of CAPREVOKE_BITMAP_ALIGNMENT
+		 * (because it is possible to store a pointer in the
+		 * allocation and thus the alignment is guaranteed by
+		 * calloc).
 		 */
 		allocated_region = REAL(calloc)(number, size);
 		if (allocated_region == NULL) {
@@ -1306,7 +1388,10 @@ mrs_calloc(size_t number, size_t size)
 
 	increment_allocated_size(allocated_region);
 
-	/* this causes problems if our library is initizlied before the thread library */
+	/*
+	 * This causes problems if our library is initialized before
+	 * the thread library.
+	 */
 	/*mrs_debug_printf("mrs_calloc: exit called %d size 0x%zx address %p\n", number, size, allocated_region);*/
 
 	MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number, allocated_region);
@@ -1397,9 +1482,10 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 }
 
 /*
- * replace realloc with a malloc and free to avoid dangling pointers in case of
- * in-place realloc that shrinks the buffer. if ptr is not a real allocation,
- * its buffer will still get copied into a new allocation.
+ * Replace realloc with a malloc and free to avoid dangling pointers
+ * in case of in-place realloc that shrinks the buffer.  If ptr is not
+ * a real allocation, its buffer will still get copied into a new
+ * allocation.
  */
 static void *
 mrs_realloc(void *ptr, size_t size)
@@ -1420,7 +1506,7 @@ mrs_realloc(void *ptr, size_t size)
 	void *new_alloc = mrs_malloc(size);
 
 	/*
-	 * per the C standard, copy and free IFF the old pointer is valid
+	 * Per the C standard, copy and free IFF the old pointer is valid
 	 * and allocation succeeds.
 	 */
 	if (ptr != NULL && new_alloc != NULL) {
@@ -1449,8 +1535,8 @@ mrs_free(void *ptr)
 	void *ins = ptr;
 
 	/*
-	 * if not offloading, validate the passed-in cap here and replace it with the
-	 * cap to its underlying allocation
+	 * If not offloading, validate the passed-in cap here and
+	 * replace it with the cap to its underlying allocation.
 	 */
 #ifdef OFFLOAD_QUARANTINE
 	if (ins == NULL) {
@@ -1468,17 +1554,18 @@ mrs_free(void *ptr)
 	bzero(cheri_setoffset(ptr, 0), cheri_getlen(ptr));
 #endif
 
-	// TODO revisit coalescing/bypass
+	/* TODO revisit coalescing/bypass */
 #ifdef BYPASS_QUARANTINE
 	/*
-	 * if this is a full-page(s) allocation, bypass the quarantine by
+	 * If this is a full-page(s) allocation, bypass the quarantine by
 	 * MADV_FREEing it and never actually freeing it back to the allocator.
-	 * because we don't know allocator internals, the allocated size must
+	 * Because we don't know allocator internals, the allocated size must
 	 * actually be a multiple of the page size.
 	 *
-	 * we can't actually do this in the slimmed-down shim layer because we don't
-	 * have the vmmap-bearing capability. coalescing in quarntine is perhaps less
-	 * useful to the shim because we may not know about allocator metadata.
+	 * We can't actually do this in the slimmed-down shim layer
+	 * because we don't have the VMEM-bearing capability.
+	 * Coalescing in quarantine is perhaps less useful to the shim
+	 * because we may not know about allocator metadata.
 	 */
 	vaddr_t base = cheri_getbase(ptr);
 	size_t region_size = cheri_getlen(ptr);
@@ -1637,9 +1724,16 @@ mrs_offload_thread(void *arg)
 		mrs_debug_printf("mrs_offload_thread: offload_quarantine ready\n");
 #endif /* PRINT_CAPREVOKE_MRS */
 
-		/* re-calculate the quarantine's size using only valid descriptors. */
+		/*
+		 * Re-calculate the quarantine's size using only valid
+		 * descriptors.
+		 */
 		offload_quarantine.size = 0;
-		/* iterate through the quarantine validating the freed pointers. */
+
+		/*
+		 * Iterate through the quarantine validating the freed
+		 * pointers.
+		 */
 		for (struct mrs_descriptor_slab *iter = offload_quarantine.list;
 		     iter != NULL; iter = iter->next) {
 			for (int i = 0; i < iter->num_descriptors; i++) {
