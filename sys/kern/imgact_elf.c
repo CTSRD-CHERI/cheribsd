@@ -1848,10 +1848,12 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	 * In case of conflicting flags, disable wins.
 	 */
 	if ((imgp->proc->p_flag2 & P2_CHERI_REVOKE_MASK) != 0) {
+		bsdflags |= ELF_BSDF_CHERI_REVOKE_FORCED;
 		if ((imgp->proc->p_flag2 & P2_CHERI_REVOKE_DISABLE) == 0)
 			bsdflags |= ELF_BSDF_CHERI_REVOKE;
 	} else if ((imgp->proc->p_fctl0 &
 	    NT_FREEBSD_FCTL_CHERI_REVOKE_MASK) != 0) {
+		bsdflags |= ELF_BSDF_CHERI_REVOKE_FORCED;
 		if ((imgp->proc->p_fctl0 &
 		    NT_FREEBSD_FCTL_CHERI_REVOKE_DISABLE) == 0)
 			bsdflags |= ELF_BSDF_CHERI_REVOKE;

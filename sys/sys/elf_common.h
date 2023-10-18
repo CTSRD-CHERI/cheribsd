@@ -1545,6 +1545,7 @@ typedef struct {
 
 #define	ELF_BSDF_SIGFASTBLK	0x0001	/* Kernel supports fast sigblock */
 #define	ELF_BSDF_VMNOOVERCOMMIT	0x0002
+#define	ELF_BSDF_CHERI_REVOKE_FORCED	0x40000000
 #define	ELF_BSDF_CHERI_REVOKE	0x80000000	/* Process should quarantine */
 
 #endif /* !_SYS_ELF_COMMON_H_ */
