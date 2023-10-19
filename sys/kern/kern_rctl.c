@@ -28,6 +28,8 @@
  * SUCH DAMAGE.
  */
 
+#ifdef RCTL
+
 #include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/devctl.h>
@@ -57,7 +59,6 @@
 #include <sys/tree.h>
 #include <vm/uma.h>
 
-#ifdef RCTL
 #ifndef RACCT
 #error "The RCTL option requires the RACCT option"
 #endif
@@ -2252,6 +2253,9 @@ rctl_init(void)
 
 #else /* !RCTL */
 
+#include <sys/types.h>
+#include <sys/sysproto.h>
+
 int
 sys_rctl_get_racct(struct thread *td, struct rctl_get_racct_args *uap)
 {
@@ -2287,7 +2291,7 @@ sys_rctl_remove_rule(struct thread *td, struct rctl_remove_rule_args *uap)
 	return (ENOSYS);
 }
 
-#endif /* !RCTL */
+#endif /* RCTL */
 // CHERI CHANGES START
 // {
 //   "updated": 20230509,
