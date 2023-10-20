@@ -81,6 +81,8 @@ struct extent_hooks_s {
 extern const int malloc_revocation;
 #endif
 
+__MyBool malloc_is_revoking(void);
+
 size_t	malloc_usable_size(const void *ptr);
 
 void	malloc_stats_print(void (*write_cb)(void *, const char *),

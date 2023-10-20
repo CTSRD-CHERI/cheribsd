@@ -36,19 +36,17 @@
 
 #include "cheribsdtest.h"
 
-bool malloc_is_quarantining(void);
-
 static const char *
-skip_malloc_not_quarantining(const char *name __unused)
+skip_malloc_not_revoking(const char *name __unused)
 {
-	if (malloc_is_quarantining())
+	if (malloc_is_revoking())
 		return (NULL);
-	return ("malloc is not quarantining");
+	return ("malloc is not revoking");
 }
 
 CHERIBSDTEST(malloc_revoke_basic,
     "verify that a free'd pointer is revoked by malloc_revoke",
-    .ct_check_skip = skip_malloc_not_quarantining)
+    .ct_check_skip = skip_malloc_not_revoking)
 {
 	volatile void *ptr __unused;
 
@@ -66,7 +64,7 @@ CHERIBSDTEST(malloc_revoke_basic,
 }
 
 CHERIBSDTEST(malloc_revoke_twice, "revoke twice back to back",
-    .ct_check_skip = skip_malloc_not_quarantining)
+    .ct_check_skip = skip_malloc_not_revoking)
 {
 	malloc_revoke();
 	malloc_revoke();

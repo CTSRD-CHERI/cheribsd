@@ -11,7 +11,7 @@ FBSD_1.0 {
 	free;
 	malloc_usable_size;
 	malloc_revoke;
-	malloc_is_quarantining;
+	malloc_is_revoking;
 };
 
 FBSD_1.3 {
