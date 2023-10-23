@@ -123,7 +123,8 @@ administratively configured preferences
 is set)
 or system-wide defaults.
 .It
-The value of the
+.Sy For stically linked programs,
+the value of the
 .Va malloc_revocation
 variable.
 .Va malloc_revocation
@@ -144,6 +145,8 @@ or
 then
 .Dv AT_BSDFLAGS
 is ignored.
+.Pp
+.Sy This does not work for dynamically linked programs.
 .El
 .Pp
 .\" XXX: this is not tied to mrs and probably belongs somewhere else
