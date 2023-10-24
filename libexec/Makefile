@@ -132,6 +132,10 @@ _atf=		atf
 _tests=		tests
 .endif
 
+.if ${MACHINE_CPU:Mcheri}
+SUBDIR+=	malloc_is_revoking
+.endif
+
 .include <bsd.arch.inc.mk>
 
 .include <bsd.subdir.mk>
