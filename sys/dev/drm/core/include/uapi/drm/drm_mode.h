@@ -898,12 +898,22 @@ struct hdr_output_metadata {
  * The reserved field must be zero.
  */
 
-struct drm_mode_crtc_page_flip {
+#ifdef _KERNEL
+struct drm_mode_crtc_page_flip64 {
 	__u32 crtc_id;
 	__u32 fb_id;
 	__u32 flags;
 	__u32 reserved;
 	__u64 user_data;
+};
+#endif
+
+struct drm_mode_crtc_page_flip {
+	__u32 crtc_id;
+	__u32 fb_id;
+	__u32 flags;
+	__u32 reserved;
+	kuint64cap_t user_data;
 };
 
 /*
