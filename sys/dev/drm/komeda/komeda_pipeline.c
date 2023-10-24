@@ -141,6 +141,140 @@ static const struct drm_crtc_funcs komeda_pipeline_funcs = {
 	.gamma_set		= drm_atomic_helper_legacy_gamma_set,
 };
 
+void
+dou_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m)
+{
+	uint32_t reg;
+
+	reg = DPU_RD4(sc, CU0_OUTPUT_ID0);
+	DPU_WR4(sc, DOU0_IPS_INPUT_ID0, reg);
+
+	reg = m->hdisplay << IPS_SIZE_HSIZE_S;
+	reg |= m->vdisplay << IPS_SIZE_VSIZE_S;
+	DPU_WR4(sc, DOU0_IPS_SIZE, reg);
+	DPU_WR4(sc, DOU0_IPS_DEPTH, IPS_OUT_DEPTH_10);
+	DPU_WR4(sc, DOU0_IPS_CONTROL, 0);
+}
+
+void
+dou_ds_timing_setup(struct komeda_drm_softc *sc, struct drm_display_mode *m)
+{
+	uint32_t hactive, hfront_porch, hback_porch, hsync_len;
+	uint32_t vactive, vfront_porch, vback_porch, vsync_len;
+	uint32_t reg;
+
+	hactive = m->crtc_hdisplay;
+	hfront_porch = m->crtc_hsync_start - m->crtc_hdisplay;
+	hsync_len = m->crtc_hsync_end - m->crtc_hsync_start;
+	hback_porch = m->crtc_htotal - m->crtc_hsync_end;
+
+	vactive = m->crtc_vdisplay;
+	vfront_porch = m->crtc_vsync_start - m->crtc_vdisplay;
+	vsync_len = m->crtc_vsync_end - m->crtc_vsync_start;
+	vback_porch = m->crtc_vtotal - m->crtc_vsync_end;
+
+	reg = hactive << ACTIVESIZE_HACTIVE_S;
+	reg |= vactive << ACTIVESIZE_VACTIVE_S;
+	DPU_WR4(sc, BS_ACTIVESIZE, reg);
+
+	reg = hfront_porch << HINTERVALS_HFRONTPORCH_S;
+	reg |= hback_porch << HINTERVALS_HBACKPORCH_S;
+	DPU_WR4(sc, BS_HINTERVALS, reg);
+
+	reg = vfront_porch << VINTERVALS_VFRONTPORCH_S;
+	reg |= vback_porch << VINTERVALS_VBACKPORCH_S;
+	DPU_WR4(sc, BS_VINTERVALS, reg);
+
+	reg = vsync_len << SYNC_VSYNCWIDTH_S;
+	reg |= hsync_len << SYNC_HSYNCWIDTH_S;
+	reg |= m->flags & DRM_MODE_FLAG_PVSYNC ? SYNC_VSP : 0;
+	reg |= m->flags & DRM_MODE_FLAG_PHSYNC ? SYNC_HSP : 0;
+	DPU_WR4(sc, BS_SYNC, reg);
+
+	DPU_WR4(sc, BS_PROG_LINE, D71_DEFAULT_PREPRETCH_LINE - 1);
+	DPU_WR4(sc, BS_PREFETCH_LINE, D71_DEFAULT_PREPRETCH_LINE);
+
+	reg = BS_CONTROL_EN | BS_CONTROL_VM;
+	DPU_WR4(sc, BS_CONTROL, reg);
+}
+
+void
+dou_intr(struct komeda_drm_softc *sc)
+{
+	struct komeda_pipeline *pipeline;
+	uint32_t reg;
+
+	reg = DPU_RD4(sc, DOU0_IRQ_STATUS);
+
+	pipeline = &sc->pipelines[0];	/* TODO */
+
+	if ((reg & DOU_IRQ_PL0) != reg)
+		printf("%s: reg %x\n", __func__, reg);
+
+	if (reg & DOU_IRQ_PL0) {
+		atomic_add_32(&pipeline->vbl_counter, 1);
+		drm_crtc_handle_vblank(&pipeline->crtc);
+	}
+
+	DPU_WR4(sc, DOU0_IRQ_CLEAR, reg);
+}
+
+void
+gcu_intr(struct komeda_drm_softc *sc)
+{
+	uint32_t reg;
+	int mask;
+
+	reg = DPU_RD4(sc, GCU_IRQ_STATUS);
+
+	mask = GCU_IRQ_CVAL0;
+
+	if ((reg & mask) != reg)
+		printf("%s: reg %x\n", __func__, reg);
+
+	DPU_WR4(sc, GCU_IRQ_CLEAR, reg);
+}
+
+static int
+gcu_enable(struct komeda_drm_softc *sc, bool enable)
+{
+	uint32_t reg, mode;
+	int timeout;
+
+	timeout = 10000;
+
+	if (enable)
+		mode = CONTROL_MODE_DO0_ACTIVE;
+	else
+		mode = CONTROL_MODE_INACTIVE;
+
+	DPU_WR4(sc, GCU_CONTROL, mode);
+	do {
+		reg = DPU_RD4(sc, GCU_CONTROL);
+		if ((reg & CONTROL_MODE_M) == mode)
+			break;
+	} while (timeout--);
+
+	if (timeout <= 0) {
+		printf("%s: Failed to set mode\n", __func__);
+		return (-1);
+	}
+
+	if (enable)
+		DPU_WR4(sc, GCU_IRQ_MASK, GCU_IRQ_ERR | GCU_IRQ_MODE |
+		    GCU_IRQ_CVAL0);
+	else
+		DPU_WR4(sc, GCU_IRQ_MASK, 0);
+
+	return (0);
+}
+
+static void
+gcu_flush(struct komeda_drm_softc *sc)
+{
+	DPU_WR4(sc, GCU_CONFIG_VALID0, CONFIG_VALID0_CVAL);
+}
+
 static int
 komeda_crtc_atomic_check(struct drm_crtc *crtc, struct drm_crtc_state *state)
 {
@@ -154,22 +288,7 @@ static void
 komeda_crtc_atomic_begin(struct drm_crtc *crtc,
     struct drm_crtc_state *old_state)
 {
-	unsigned long flags;
-
 	dprintf("%s\n", __func__);
-
-	if (crtc->state->event == NULL)
-		return;
-
-	spin_lock_irqsave(&crtc->dev->event_lock, flags);
-
-	if (drm_crtc_vblank_get(crtc) != 0)
-		drm_crtc_send_vblank_event(crtc, crtc->state->event);
-	else
-		drm_crtc_arm_vblank_event(crtc, crtc->state->event);
-
-	crtc->state->event = NULL;
-	spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
 }
 
 static void
@@ -186,6 +305,8 @@ komeda_crtc_atomic_flush(struct drm_crtc *crtc,
 
 	pipeline = container_of(crtc, struct komeda_pipeline, crtc);
 	sc = pipeline->sc;
+
+	gcu_flush(sc);
 
 	if (event) {
 		crtc->state->event = NULL;
@@ -221,6 +342,8 @@ komeda_crtc_atomic_enable(struct drm_crtc *crtc,
 	dou_configure(sc, adj);
 	dou_ds_timing_setup(sc, adj);
 
+	gcu_enable(sc, true);
+
 	/* Enable VBLANK events */
 	drm_crtc_vblank_on(crtc);
 }
@@ -229,21 +352,19 @@ static void
 komeda_crtc_atomic_disable(struct drm_crtc *crtc,
     struct drm_crtc_state *old_state)
 {
-	uint32_t irqflags;
+	struct komeda_drm_softc *sc;
+	struct komeda_pipeline *pipeline;
 
 	dprintf("%s\n", __func__);
+
+	pipeline = container_of(crtc, struct komeda_pipeline, crtc);
+	sc = pipeline->sc;
 
 	/* Disable VBLANK events */
 	drm_crtc_vblank_off(crtc);
 
-	spin_lock_irqsave(&crtc->dev->event_lock, irqflags);
-
-	if (crtc->state->event) {
-		drm_crtc_send_vblank_event(crtc, crtc->state->event);
-		crtc->state->event = NULL;
-	}
-
-	spin_unlock_irqrestore(&crtc->dev->event_lock, irqflags);
+	gcu_enable(sc, false);
+	gcu_flush(sc);
 }
 
 static void

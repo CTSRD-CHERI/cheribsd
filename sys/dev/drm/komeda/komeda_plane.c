@@ -168,93 +168,6 @@ komeda_plane_atomic_check(struct drm_plane *plane,
 	    true, true));
 }
 
-static void
-komeda_plane_atomic_disable(struct drm_plane *plane,
-    struct drm_plane_state *old_state)
-{
-
-	dprintf("%s\n", __func__);
-}
-
-void
-dou_ds_timing_setup(struct komeda_drm_softc *sc, struct drm_display_mode *m)
-{
-	uint32_t hactive, hfront_porch, hback_porch, hsync_len;
-	uint32_t vactive, vfront_porch, vback_porch, vsync_len;
-	uint32_t reg;
-
-	hactive = m->crtc_hdisplay;
-	hfront_porch = m->crtc_hsync_start - m->crtc_hdisplay;
-	hsync_len = m->crtc_hsync_end - m->crtc_hsync_start;
-	hback_porch = m->crtc_htotal - m->crtc_hsync_end;
-
-	vactive = m->crtc_vdisplay;
-	vfront_porch = m->crtc_vsync_start - m->crtc_vdisplay;
-	vsync_len = m->crtc_vsync_end - m->crtc_vsync_start;
-	vback_porch = m->crtc_vtotal - m->crtc_vsync_end;
-
-	reg = hactive << ACTIVESIZE_HACTIVE_S;
-	reg |= vactive << ACTIVESIZE_VACTIVE_S;
-	DPU_WR4(sc, BS_ACTIVESIZE, reg);
-
-	reg = hfront_porch << HINTERVALS_HFRONTPORCH_S;
-	reg |= hback_porch << HINTERVALS_HBACKPORCH_S;
-	DPU_WR4(sc, BS_HINTERVALS, reg);
-
-	reg = vfront_porch << VINTERVALS_VFRONTPORCH_S;
-	reg |= vback_porch << VINTERVALS_VBACKPORCH_S;
-	DPU_WR4(sc, BS_VINTERVALS, reg);
-
-	reg = vsync_len << SYNC_VSYNCWIDTH_S;
-	reg |= hsync_len << SYNC_HSYNCWIDTH_S;
-	reg |= m->flags & DRM_MODE_FLAG_PVSYNC ? SYNC_VSP : 0;
-	reg |= m->flags & DRM_MODE_FLAG_PHSYNC ? SYNC_HSP : 0;
-	DPU_WR4(sc, BS_SYNC, reg);
-
-	DPU_WR4(sc, BS_PROG_LINE, D71_DEFAULT_PREPRETCH_LINE - 1);
-	DPU_WR4(sc, BS_PREFETCH_LINE, D71_DEFAULT_PREPRETCH_LINE);
-
-	reg = BS_CONTROL_EN | BS_CONTROL_VM;
-	DPU_WR4(sc, BS_CONTROL, reg);
-}
-
-void
-dou_intr(struct komeda_drm_softc *sc)
-{
-	struct komeda_pipeline *pipeline;
-	uint32_t reg;
-
-	reg = DPU_RD4(sc, DOU0_IRQ_STATUS);
-
-	pipeline = &sc->pipelines[0];	/* TODO */
-
-	if ((reg & DOU_IRQ_PL0) != reg)
-		printf("%s: reg %x\n", __func__, reg);
-
-	if (reg & DOU_IRQ_PL0) {
-		atomic_add_32(&pipeline->vbl_counter, 1);
-		drm_crtc_handle_vblank(&pipeline->crtc);
-	}
-
-	DPU_WR4(sc, DOU0_IRQ_CLEAR, reg);
-}
-
-void
-gcu_intr(struct komeda_drm_softc *sc)
-{
-	uint32_t reg;
-	int mask;
-
-	reg = DPU_RD4(sc, GCU_IRQ_STATUS);
-
-	mask = GCU_IRQ_CVAL0;
-
-	if ((reg & mask) != reg)
-		printf("%s: reg %x\n", __func__, reg);
-
-	DPU_WR4(sc, GCU_IRQ_CLEAR, reg);
-}
-
 void
 cu_intr(struct komeda_drm_softc *sc)
 {
@@ -277,48 +190,6 @@ lpu_intr(struct komeda_drm_softc *sc)
 	printf("%s: reg %x\n", __func__, reg);
 
 	DPU_WR4(sc, LPU0_IRQ_CLEAR, reg);
-}
-
-static int
-gcu_configure(struct komeda_drm_softc *sc)
-{
-	uint32_t reg;
-	int timeout;
-
-	timeout = 10000;
-
-	DPU_WR4(sc, GCU_CONTROL, CONTROL_MODE_DO0_ACTIVE);
-	do {
-		reg = DPU_RD4(sc, GCU_CONTROL);
-		if ((reg & CONTROL_MODE_M) == CONTROL_MODE_DO0_ACTIVE)
-			break;
-	} while (timeout--);
-
-	if (timeout <= 0) {
-		printf("%s: Failed to set DO0 active\n", __func__);
-		return (-1);
-	}
-
-	DPU_WR4(sc, GCU_CONFIG_VALID0, CONFIG_VALID0_CVAL);
-
-	dprintf("%s: GCU initialized\n", __func__);
-
-	return (0);
-}
-
-void
-dou_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m)
-{
-	uint32_t reg;
-
-	reg = DPU_RD4(sc, CU0_OUTPUT_ID0);
-	DPU_WR4(sc, DOU0_IPS_INPUT_ID0, reg);
-
-	reg = m->hdisplay << IPS_SIZE_HSIZE_S;
-	reg |= m->vdisplay << IPS_SIZE_VSIZE_S;
-	DPU_WR4(sc, DOU0_IPS_SIZE, reg);
-	DPU_WR4(sc, DOU0_IPS_DEPTH, IPS_OUT_DEPTH_10);
-	DPU_WR4(sc, DOU0_IPS_CONTROL, 0);
 }
 
 static void
@@ -381,7 +252,6 @@ cu_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m,
 {
 	uint32_t dst_w, dst_h;
 	struct drm_rect *dst;
-	uint32_t ctrl;
 	uint32_t reg;
 
 	dst = &state->dst;
@@ -401,21 +271,48 @@ cu_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m,
 	reg = dst_w << INPUT0_SIZE_HSIZE_S;
 	reg |= dst_h << INPUT0_SIZE_VSIZE_S;
 
-	ctrl = INPUT0_CONTROL_LALPHA_MAX | INPUT0_CONTROL_EN;
-
 	if (id == 0) {
 		DPU_WR4(sc, CU0_INPUT0_SIZE, reg);
 		DPU_WR4(sc, CU0_INPUT0_OFFSET, 0);
-		DPU_WR4(sc, CU0_INPUT0_CONTROL, ctrl);
-		/* Disable cursor plane, it will be enabled if needed. */
-		DPU_WR4(sc, CU0_INPUT1_CONTROL, 0);
 	} else {
 		DPU_WR4(sc, CU0_INPUT1_SIZE, reg);
 		reg = dst->x1 << INPUT0_OFFSET_HOFFSET_S;
 		reg |= dst->y1 << INPUT0_OFFSET_VOFFSET_S;
 		DPU_WR4(sc, CU0_INPUT1_OFFSET, reg);
-		DPU_WR4(sc, CU0_INPUT1_CONTROL, ctrl);
 	}
+}
+
+static void
+cu_enable(struct komeda_drm_softc *sc, int id, bool enable)
+{
+	uint32_t ctrl;
+
+	dprintf("%s\n", __func__);
+
+	if (enable)
+		ctrl = INPUT0_CONTROL_LALPHA_MAX | INPUT0_CONTROL_EN;
+	else
+		ctrl = 0;
+
+	if (id == 0)
+		DPU_WR4(sc, CU0_INPUT0_CONTROL, ctrl);
+	else
+		DPU_WR4(sc, CU0_INPUT1_CONTROL, ctrl);
+}
+
+static void
+komeda_plane_atomic_disable(struct drm_plane *plane,
+    struct drm_plane_state *old_state __unused)
+{
+	struct komeda_plane *komeda_plane;
+	struct komeda_drm_softc *sc;
+
+	dprintf("%s\n", __func__);
+
+	komeda_plane = container_of(plane, struct komeda_plane, plane);
+	sc = komeda_plane->sc;
+
+	cu_enable(sc, komeda_plane->id, false);
 }
 
 static void
@@ -446,9 +343,6 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 
 	dprintf("%s: Clock freq needed: %d\n", __func__, m->crtc_clock);
 
-	/* Enable IRQs */
-	DPU_WR4(sc, GCU_IRQ_MASK, GCU_IRQ_ERR | GCU_IRQ_MODE | GCU_IRQ_CVAL0);
-
 	reg = DPU_RD4(sc, DOU0_IRQ_MASK);
 	reg |= DOU_IRQ_ERR | DOU_IRQ_UND;
 	DPU_WR4(sc, DOU0_IRQ_MASK, reg);
@@ -459,7 +353,7 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 
 	lpu_configure(sc, fb, state, komeda_plane->id);
 	cu_configure(sc, m, state, komeda_plane->id);
-	gcu_configure(sc);
+	cu_enable(sc, komeda_plane->id, true);
 
 	dprintf("%s: GCU_STATUS %x\n", __func__, DPU_RD4(sc, GCU_STATUS));
 	dprintf("%s: LPU0_IRQ_RAW_STATUS %x\n", __func__,
