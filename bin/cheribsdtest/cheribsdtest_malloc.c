@@ -30,9 +30,14 @@
  * SUCH DAMAGE.
  */
 
-#include <stdlib.h>
+#include <sys/procctl.h>
+#include <sys/wait.h>
+
 #include <errno.h>
 #include <malloc_np.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #include "cheribsdtest.h"
 
@@ -114,4 +119,137 @@ CHERIBSDTEST(malloc_zero_size,
 	free(ptr);
 
 	cheribsdtest_success();
+}
+
+static bool
+child_is_revoking(int pid)
+{
+	int res;
+
+	waitpid(pid, &res, 0);
+	if (WIFEXITED(res)) {
+		if (WEXITSTATUS(res) == 0)
+			return (true);
+		else
+			return (false);
+	} else
+		cheribsdtest_failure_errx("child exec failed");
+}
+
+static void
+malloc_revocation_ctl_common_procctl(const char *progname,
+    bool should_be_revoking, int *procctl_arg)
+{
+	int pid;
+
+	pid = fork();
+	CHERIBSDTEST_VERIFY(pid >= 0);
+	if (pid == 0) {
+		char *progpath;
+		char *argv[2];
+
+		if (procctl_arg != NULL)
+			CHERIBSDTEST_CHECK_SYSCALL(procctl(P_PID, getpid(),
+			    PROC_CHERI_REVOKE_CTL, procctl_arg));
+
+		asprintf(&progpath, "/usr/libexec/%s", progname);
+		argv[0] = progpath;
+		argv[1] = NULL;
+		execve(argv[0], argv, NULL);
+		abort();
+	} else {
+		if (child_is_revoking(pid) == should_be_revoking)
+			cheribsdtest_success();
+		else {
+			if (should_be_revoking)
+				cheribsdtest_failure_errx(
+				    "child is not revoking and should be");
+			else
+				cheribsdtest_failure_errx(
+				    "child is revoking and should not be");
+		}
+	}
+}
+
+static void
+malloc_revocation_ctl_common(const char *progname, bool should_be_revoking)
+{
+	malloc_revocation_ctl_common_procctl(progname, should_be_revoking,
+	    NULL);
+}
+
+CHERIBSDTEST(malloc_revocation_ctl_baseline,
+    "A base binary reports revocation is enabled")
+{
+	malloc_revocation_ctl_common("malloc_is_revoking", true);
+}
+
+CHERIBSDTEST(malloc_revocation_ctl_elfnote_disable,
+    "A binary with elfnote disabling reports revocation is disable")
+{
+	malloc_revocation_ctl_common("malloc_is_revoking_elfnote_disable",
+	    false);
+}
+
+CHERIBSDTEST(malloc_revocation_ctl_elfnote_enable,
+    "A binary with elfnote enabling reports revocation is enabled")
+{
+	malloc_revocation_ctl_common("malloc_is_revoking_elfnote_enable",
+	    true);
+}
+
+CHERIBSDTEST(malloc_revocation_ctl_elfnote_disable_protctl_enable,
+    "A binary with elfnote disabling reports revocation is disable")
+{
+	int arg = PROC_CHERI_REVOKE_FORCE_ENABLE;
+
+	malloc_revocation_ctl_common_procctl(
+	    "malloc_is_revoking_elfnote_disable", true, &arg);
+}
+
+CHERIBSDTEST(malloc_revocation_ctl_elfnote_enable_protctl_disable,
+    "A binary with elfnote enabling reports revocation is enabled")
+{
+	int arg = PROC_CHERI_REVOKE_FORCE_DISABLE;
+
+	malloc_revocation_ctl_common_procctl(
+	    "malloc_is_revoking_elfnote_enable", false, &arg);
+}
+
+CHERIBSDTEST(malloc_revocation_ctl_suid_baseline,
+    "A suid binary reports revocation is enabled")
+{
+	malloc_revocation_ctl_common("malloc_is_revoking_suid", true);
+}
+
+CHERIBSDTEST(malloc_revocation_ctl_suid_elfnote_disable,
+    "A suid binary with elfnote disabling reports revocation is disable")
+{
+	malloc_revocation_ctl_common("malloc_is_revoking_elfnote_disable",
+	    false);
+}
+
+CHERIBSDTEST(malloc_revocation_ctl_suid_elfnote_enable,
+    "A suid binary with elfnote enabling reports revocation is enabled")
+{
+	malloc_revocation_ctl_common("malloc_is_revoking_elfnote_enable",
+	    true);
+}
+
+CHERIBSDTEST(malloc_revocation_ctl_suid_elfnote_disable_protctl_enable,
+    "A binary with elfnote disabling reports revocation is disable")
+{
+	int arg = PROC_CHERI_REVOKE_FORCE_ENABLE;
+
+	malloc_revocation_ctl_common_procctl(
+	    "malloc_is_revoking_suid_elfnote_disable", false, &arg);
+}
+
+CHERIBSDTEST(malloc_revocation_ctl_suid_elfnote_enable_protctl_disable,
+    "A binary with elfnote enabling reports revocation is enabled")
+{
+	int arg = PROC_CHERI_REVOKE_FORCE_DISABLE;
+
+	malloc_revocation_ctl_common_procctl(
+	    "malloc_is_revoking_suid_elfnote_enable", true, &arg);
 }
