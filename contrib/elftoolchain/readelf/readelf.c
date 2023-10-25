@@ -370,9 +370,10 @@ static void load_sections(struct readelf *re);
 static int loc_at_comparator(const void *la1, const void *la2);
 static const char *mips_abi_fp(uint64_t fp);
 static const char *note_type(const char *note_name, unsigned int et,
-    unsigned int nt);
+    unsigned int em, unsigned int nt);
 static const char *note_type_freebsd(unsigned int nt);
 static const char *note_type_freebsd_core(unsigned int nt);
+static const char *note_type_cheri(unsigned int em, unsigned int nt);
 static const char *note_type_cheribsd(unsigned int nt);
 static const char *note_type_go(unsigned int nt);
 static const char *note_type_gnu(unsigned int nt);
@@ -1154,7 +1155,7 @@ static struct {
 };
 
 static const char *
-note_type(const char *name, unsigned int et, unsigned int nt)
+note_type(const char *name, unsigned int et, unsigned int em, unsigned int nt)
 {
 	if ((strcmp(name, "CORE") == 0 || strcmp(name, "LINUX") == 0) &&
 	    et == ET_CORE)
@@ -1164,6 +1165,8 @@ note_type(const char *name, unsigned int et, unsigned int nt)
 			return note_type_freebsd_core(nt);
 		else
 			return note_type_freebsd(nt);
+	else if (strcmp(name, "CHERI") == 0 && et != ET_CORE)
+		return note_type_cheri(em, nt);
 	else if (strcmp(name, "CheriBSD") == 0 && et != ET_CORE)
 		return note_type_cheribsd(nt);
 	else if (strcmp(name, "GNU") == 0 && et != ET_CORE)
@@ -1177,6 +1180,20 @@ note_type(const char *name, unsigned int et, unsigned int nt)
 	else if (strcmp(name, "Xen") == 0 && et != ET_CORE)
 		return note_type_xen(nt);
 	return note_type_unknown(nt);
+}
+
+static const char *
+note_type_cheri(unsigned int em, unsigned int nt)
+{
+	switch (nt) {
+	case 0: return "NT_CHERI_GLOBALS_ABI";
+	case 1: return "NT_CHERI_TLS_ABI";
+	case 0x80000000:
+		if (em != EM_AARCH64)
+			return (note_type_unknown(nt));
+		return "NT_CHERI_MORELLO_PURECAP_BENCHMARK_ABI";
+	default: return (note_type_unknown(nt));
+	}
 }
 
 static const char *
@@ -3865,6 +3882,46 @@ dump_notes_data(struct readelf *re, const char *name, uint32_t type,
 			dump_flags(note_feature_ctl_flags, ubuf[0]);
 			return;
 		}
+	} else if (strcmp(name, "CHERI") == 0) {
+		if (sz != 4)
+			goto unknown;
+		switch (type) {
+		case 0: /* NT_CHERI_GLOBALS_ABI */
+			switch (ubuf[0]) {
+			case 0: /* CHERI_GLOBALS_ABI_PCREL */
+				printf("   Globals ABI: PC-relative\n");
+				return;
+			case 1: /* CHERI_GLOBALS_ABI_PLT_FPTR */
+				printf("   Globals ABI: PLT-based\n");
+				return;
+			case 2: /* CHERI_GLOBALS_ABI_FDESC */
+				printf("   Globals ABI: function"
+				        " descriptor-based\n");
+				return;
+			}
+			break;
+		case 1: /* NT_CHERI_TLS_ABI */
+			switch (ubuf[0]) {
+			case 0: /* CHERI_TLS_ABI_TRAD */
+				printf("   TLS ABI: traditional\n");
+				return;
+			}
+			break;
+		case 0x80000000: /* NT_CHERI_MORELLO_PURECAP_BENCHMARK_ABI */
+			if (re->ehdr.e_machine != EM_AARCH64)
+				break;
+			switch (ubuf[0]) {
+			case 0:
+				printf("   Purecap benchmark ABI enabled:"
+				    " no\n");
+				return;
+			case 1:
+				printf("   Purecap benchmark ABI enabled:"
+				    " yes\n");
+				return;
+			}
+			break;
+		}
 	} else if (strcmp(name, "CheriBSD") == 0) {
 		if (type == NT_CHERIBSD_ABI_TAG) {
 			if (sz != 4)
@@ -3954,7 +4011,7 @@ dump_notes_content(struct readelf *re, const char *buf, size_t sz, off_t off)
 			name = "<invalid>";
 		printf("  %-13s %#010jx", name, (uintmax_t) note->n_descsz);
 		printf("      %s\n", note_type(name, re->ehdr.e_type,
-		    note->n_type));
+		    re->ehdr.e_machine, note->n_type));
 		dump_notes_data(re, name, note->n_type, buf, note->n_descsz);
 		buf += descsz;
 	}
