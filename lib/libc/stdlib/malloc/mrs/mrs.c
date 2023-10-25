@@ -1286,12 +1286,24 @@ mrs_malloc(size_t size)
 		}
 	}
 #endif
+	/*
+	 * Round up here to make sure there is only one allocation per
+	 * granule without requiring modifications to the underlying
+	 * allocator.
+	 *
+	 * XXX: If an allocator produced special, non-writable capabilities
+	 * for size=0 we might want to pass those calls through, but none
+	 * of the currently supported allocators do.
+	 */
+	if (size < CAPREVOKE_BITMAP_ALIGNMENT)
+		allocated_region = REAL(malloc)(CAPREVOKE_BITMAP_ALIGNMENT);
+	else
 		allocated_region = REAL(malloc)(size);
-		if (allocated_region == NULL) {
-			MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0,
-			    allocated_region);
-			return (allocated_region);
-		}
+	if (allocated_region == NULL) {
+		MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0,
+		    allocated_region);
+		return (allocated_region);
+	}
 
 #ifdef CLEAR_ON_ALLOC
 	clear_region(allocated_region, cheri_getlen(allocated_region));
@@ -1333,7 +1345,8 @@ mrs_calloc(size_t number, size_t size)
 {
 #ifdef JUST_INTERPOSE
 	return (REAL(calloc)(number, size));
-#endif /* JUST_INTERPOSE */
+#else /* !JUST_INTERPOSE */
+	size_t tmpsize;
 
 #ifdef OPTIONAL_QUARANTINING
 	if (!quarantining)
@@ -1391,7 +1404,20 @@ mrs_calloc(size_t number, size_t size)
 		}
 	}
 #endif
-	allocated_region = REAL(calloc)(number, size);
+	/*
+	 * Round up here to make sure there is only one allocation per
+	 * granule without requiring modifications to the underlying
+	 * allocator.
+	 *
+	 * XXX: it's conceviable the underlying allocator could reduce
+	 * the alignment requirement for small sizes but that seems like an
+	 * extraordinarily unlikely and highly questionable optimization.
+	 */
+	if (!__builtin_mul_overflow(number, size, &tmpsize) &&
+	    tmpsize < CAPREVOKE_BITMAP_ALIGNMENT)
+		allocated_region = REAL(calloc)(1, CAPREVOKE_BITMAP_ALIGNMENT);
+	else
+		allocated_region = REAL(calloc)(number, size);
 	if (allocated_region == NULL) {
 		MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number,
 		    allocated_region);
@@ -1408,6 +1434,7 @@ mrs_calloc(size_t number, size_t size)
 
 	MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number, allocated_region);
 	return (allocated_region);
+#endif /* !JUST_INTERPOSE */
 }
 
 static int
@@ -1429,11 +1456,8 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 	check_and_perform_flush();
 #endif /* !REVOKE_ON_FREE */
 
-#if 0
-	if (alignment < CAPREVOKE_BITMAP_ALIGNMENT) {
+	if (alignment < CAPREVOKE_BITMAP_ALIGNMENT)
 		alignment = CAPREVOKE_BITMAP_ALIGNMENT;
-	}
-#endif
 
 	int ret = REAL(posix_memalign)(ptr, alignment, size);
 	if (ret != 0) {
@@ -1469,11 +1493,8 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 	check_and_perform_flush();
 #endif /* !REVOKE_ON_FREE */
 
-#if 0
-	if (alignment < CAPREVOKE_BITMAP_ALIGNMENT) {
+	if (alignment < CAPREVOKE_BITMAP_ALIGNMENT)
 		alignment = CAPREVOKE_BITMAP_ALIGNMENT;
-	}
-#endif
 
 	void *allocated_region = REAL(aligned_alloc)(alignment, size);
 	if (allocated_region == NULL) {
