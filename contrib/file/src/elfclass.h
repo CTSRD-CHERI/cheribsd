@@ -43,7 +43,8 @@
 		if (dophn_core(ms, clazz, swap, fd,
 		    CAST(off_t, elf_getu(swap, elfhdr.e_phoff)), phnum,
 		    CAST(size_t, elf_getu16(swap, elfhdr.e_phentsize)),
-		    fsize, &flags, &notecount) == -1)
+		    fsize, elf_getu16(swap, elfhdr.e_machine), &flags,
+		    &notecount) == -1)
 			return -1;
 		break;
 #endif
@@ -58,7 +59,8 @@
 		if (dophn_exec(ms, clazz, swap, fd,
 		    CAST(off_t, elf_getu(swap, elfhdr.e_phoff)), phnum,
 		    CAST(size_t, elf_getu16(swap, elfhdr.e_phentsize)),
-		    fsize, shnum, &flags, &notecount) == -1)
+		    fsize, elf_getu16(swap, elfhdr.e_machine), shnum,
+		    &flags, &notecount) == -1)
 			return -1;
 		/*FALLTHROUGH*/
 	case ET_REL:
