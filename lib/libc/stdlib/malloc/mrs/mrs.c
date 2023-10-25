@@ -313,8 +313,6 @@ static struct mrs_quarantine application_quarantine;
 static struct mrs_quarantine offload_quarantine;
 #endif /* OFFLOAD_QUARANTINE */
 
-static void *mrs_calloc_bootstrap(size_t number, size_t size);
-
 static inline __attribute__((always_inline)) void
 mrs_puts(const char *p)
 {
@@ -1247,28 +1245,6 @@ mrs_malloc(size_t size)
 
 	MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0, allocated_region);
 	return (allocated_region);
-}
-
-/*
- * calloc is used to bootstrap various system libraries so is called before
- * even the constructor function of this library.  Before the initializer is
- * called and REAL(calloc) is set appropriately, use this bootstrap function to
- * serve allocations.
- */
-static void *
-mrs_calloc_bootstrap(size_t number, size_t size)
-{
-	const size_t BOOTSTRAP_CALLOC_SIZE = 1024 * 1024 * 4;
-	static char mem[BOOTSTRAP_CALLOC_SIZE] __attribute((aligned(16))) = {0};
-	static size_t offset = 0;
-
-	size_t old_offset = offset;
-	offset += (number * size);
-	if (offset > BOOTSTRAP_CALLOC_SIZE) {
-		mrs_puts("mrs_calloc_bootstrap: ran out of memory\n");
-		exit(7);
-	}
-	return (&mem[old_offset]);
 }
 
 void *
