@@ -277,9 +277,7 @@ static const size_t MIN_REVOKE_HEAP_SIZE = 8 * 1024 * 1024;
 static volatile const struct cheri_revoke_info *cri;
 static size_t page_size;
 static void *entire_shadow;
-#ifdef OPTIONAL_QUARANTINING
 static bool quarantining = true;
-#endif
 
 struct mrs_descriptor_slab_entry {
 	void *ptr;
@@ -984,10 +982,9 @@ malloc_revoke(void)
 {
 	struct mrs_quarantine local_quarantine;
 
-#ifdef OPTIONAL_QUARANTINING
 	if (!quarantining)
 		return;
-#endif
+
 	MRS_UTRACE(UTRACE_MRS_MALLOC_REVOKE, NULL, 0, 0, NULL);
 
 	mrs_lock(&application_quarantine_lock);
@@ -1143,7 +1140,6 @@ init(void)
 		mrs_utrace = (getenv(MRS_UTRACE_ENV) != NULL);
 	}
 
-#ifdef OPTIONAL_QUARANTINING
 	uint32_t bsdflags;
 
 	if (_elf_aux_info(AT_BSDFLAGS, &bsdflags, sizeof(bsdflags)) == 0)
@@ -1162,11 +1158,9 @@ init(void)
 #else
 		return;
 #endif
-#endif /* OPTIONAL_QUARANTINING */
 
 	if (cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
 	    (void **)&cri) != 0) {
-#ifdef OPTIONAL_QUARANTINING
 		if (errno == ENOSYS) {
 			quarantining = false;
 #if defined(PRINT_CAPREVOKE) || defined(PRINT_CAPREVOKE_MRS) || defined(PRINT_STATS)
@@ -1174,7 +1168,6 @@ init(void)
 #endif
 			return;
 		}
-#endif
 		mrs_puts("error getting kernel caprevoke counters\n");
 		exit(7);
 	}
@@ -1213,10 +1206,8 @@ fini(void)
 static void *
 mrs_malloc(size_t size)
 {
-#ifdef OPTIONAL_QUARANTINING
 	if (!quarantining)
 		return (REAL(malloc)(size));
-#endif
 
 	/*mrs_debug_printf("mrs_malloc: called\n");*/
 
@@ -1285,10 +1276,8 @@ mrs_calloc(size_t number, size_t size)
 {
 	size_t tmpsize;
 
-#ifdef OPTIONAL_QUARANTINING
 	if (!quarantining)
 		return (REAL(calloc)(number, size));
-#endif
 
 	/*
 	 * This causes problems if our library is initialized before
@@ -1337,10 +1326,8 @@ mrs_calloc(size_t number, size_t size)
 static int
 mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 {
-#ifdef OPTIONAL_QUARANTINING
 	if (!quarantining)
 		return (REAL(posix_memalign)(ptr, alignment, size));
-#endif
 
 	mrs_debug_printf("mrs_posix_memalign: called ptr %p alignment %zu size %zu\n",
 	    ptr, alignment, size);
@@ -1370,10 +1357,8 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 static void *
 mrs_aligned_alloc(size_t alignment, size_t size)
 {
-#ifdef OPTIONAL_QUARANTINING
 	if (!quarantining)
 		return (REAL(aligned_alloc)(alignment, size));
-#endif
 
 	mrs_debug_printf("mrs_aligned_alloc: called alignment %zu size %zu\n",
 	    alignment, size);
@@ -1412,10 +1397,8 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 static void *
 mrs_realloc(void *ptr, size_t size)
 {
-#ifdef OPTIONAL_QUARANTINING
 	if (!quarantining)
 		return (REAL(realloc)(ptr, size));
-#endif
 
 	size_t old_size = cheri_getlen(ptr);
 	mrs_debug_printf("mrs_realloc: called ptr %p ptr size %zu new size %zu\n",
@@ -1438,12 +1421,11 @@ mrs_realloc(void *ptr, size_t size)
 static void
 mrs_free(void *ptr)
 {
-#ifdef OPTIONAL_QUARANTINING
 	if (!quarantining)
 		return (REAL(free)(ptr));
-#endif
 
 	/*mrs_debug_printf("mrs_free: called address %p\n", ptr);*/
+
 	MRS_UTRACE(UTRACE_MRS_FREE, ptr, 0, 0, 0);
 
 	void *ins = ptr;
@@ -1503,10 +1485,8 @@ mrs_free(void *ptr)
 void *
 mrs_mallocx(size_t size, int flags)
 {
-#ifdef OPTIONAL_QUARANTINING
 	if (!quarantining)
 		return (REAL(mallocx)(size, flags));
-#endif
 
 	/*
 	 * This API supports optional zeroing.  Since no one really uses
@@ -1520,10 +1500,8 @@ mrs_mallocx(size_t size, int flags)
 void *
 mrs_rallocx(void *ptr, size_t size, int flags)
 {
-#ifdef OPTIONAL_QUARANTINING
 	if (!quarantining)
 		return (REAL(rallocx)(ptr, size, flags));
-#endif
 
 	size_t old_size = cheri_getlen(ptr);
 	mrs_debug_printf("%s: called ptr %p ptr size %zu new size %zu\n",
