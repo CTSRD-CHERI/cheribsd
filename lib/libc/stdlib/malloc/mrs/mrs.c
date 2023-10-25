@@ -287,8 +287,6 @@ static void *entire_shadow;
 #ifdef OPTIONAL_QUARANTINING
 static bool quarantining = true;
 #endif
-const int __malloc_revocation = MR_SYSTEM_DEFAULT;
-__weak_reference(__malloc_revocation, malloc_revocation);
 
 struct mrs_descriptor_slab_entry {
 	void *ptr;
@@ -1164,36 +1162,10 @@ init(void)
 	}
 
 #ifdef OPTIONAL_QUARANTINING
+	uint32_t bsdflags;
 
-	switch (malloc_revocation) {
-	case MR_SYSTEM_DEFAULT:
-	case MR_ENABLE:
-	case MR_DISABLE: {
-		uint32_t flags;
-
-		if (_elf_aux_info(AT_BSDFLAGS, &flags, sizeof(flags)) == 0 &&
-		    ((flags & ELF_BSDF_CHERI_REVOKE_FORCED) != 0 ||
-		    malloc_revocation == MR_SYSTEM_DEFAULT))
-			quarantining =
-			    ((flags & ELF_BSDF_CHERI_REVOKE) != 0);
-		else if (malloc_revocation == MR_ENABLE)
-			quarantining = true;
-		else
-			quarantining = false;
-		break;
-	}
-	case MR_ENABLE_FORCED:
-		quarantining = true;
-		break;
-	case MR_DISABLE_FORCED:
-		quarantining = false;
-		break;
-	default:
-		mrs_printf("invalid malloc_revocation %d (%s)\n",
-		    malloc_revocation,
-		    quarantining ? "enabled" : "disabled");
-		break;
-	}
+	if (_elf_aux_info(AT_BSDFLAGS, &bsdflags, sizeof(bsdflags)) == 0)
+		quarantining = ((bsdflags & ELF_BSDF_CHERI_REVOKE) != 0);
 
 	if (!issetugid()) {
 		if (getenv(MALLOC_QUARANTINE_DISABLE_ENV) != NULL) {

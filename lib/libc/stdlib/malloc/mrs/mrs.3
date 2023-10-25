@@ -56,8 +56,6 @@
 .In malloc_np.h
 .Ft bool
 .Fn malloc_is_revoking "void"
-.Vt const int
-.Va malloc_revocation ;
 .Sh DESCRIPTION
 The Malloc Revocation Shim (MRS) extends a CHERI-aware malloc implemention
 with revocation support, providing heap temporal safety.
@@ -107,10 +105,7 @@ starts up, an array of parameters are evaluated to determine if free'd
 objects should be quarantined and revoked or if the underlying
 implementations should be exposed directly.
 .Nm
-considers two sources of information:
-.Bl -bullet
-.It
-The
+considers the
 .Dv ELF_BSDF_CHERI_REVOKE
 and
 .Dv ELF_BSDF_CHERI_REVOKE_FORCED
@@ -122,32 +117,6 @@ administratively configured preferences
 .Dv ELF_BSDF_CHERI_REVOKE_FORCED
 is set)
 or system-wide defaults.
-.It
-.Sy For stically linked programs,
-the value of the
-.Va malloc_revocation
-variable.
-.Va malloc_revocation
-is a weak symbol in libc which can be provided by the program to override
-the system default or prevent administrative overrides.
-If it is set to one of
-.Dv MR_ENABLE
-or
-.Dv MR_DISABLE
-then it overrides the system default, but usually configured
-preferences expressed by
-.Dv AT_BSDFLAGS
-take precedence.
-If it is set to one of
-.Dv MR_ENABLE_FORCED
-or
-.Dv MR_DISABLE_FORCED
-then
-.Dv AT_BSDFLAGS
-is ignored.
-.Pp
-.Sy This does not work for dynamically linked programs.
-.El
 .Pp
 .\" XXX: this is not tied to mrs and probably belongs somewhere else
 The kernel considers the following factors in order of decreasing precedence
@@ -234,28 +203,11 @@ This capability will not be revoked and thus can be stored in the quarantine
 structure.
 This interface must not be exported outside the implementation.
 .Sh EXAMPLES
-If a program linked with
-.Nm
-allocator wishes to use revocation even if the system-wide default is to
-disable it, the programmer can add the following global declaration:
-.Pp
-.Dl const int malloc_revocation = MR_ENABLED;
-.Pp
-Note that even if
-.Dv MR_ENABLED_FORCED
-is used, revocation depends on the kernel providing support and
-.Nm
-may silently not use revocation if it is not supported.
-.Pp
 To alter a binary to disable use of revocation, use:
 .Pp
 .Dl elfctl -e +nocherirevoke <program>
 .Pp
-To override the system default and binary settings (other than
-.Va malloc_revocation
-being set to
-.Dv MR_ENABLE_FORCED )
-run the program as follows:
+To override the system default and binary settings run the program as follows:
 .Pp
 .Dl proccontrol -m cherirevoke -s enable <program>
 .Sh SEE ALSO

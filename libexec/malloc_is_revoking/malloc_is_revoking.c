@@ -33,9 +33,6 @@
 #include <stdlib.h>
 #include <malloc_np.h>
 
-/* Ignore the system default.  In the steady state if will be enabled. */
-const int malloc_revocation = MR_ENABLE;
-
 int
 main(void)
 {
