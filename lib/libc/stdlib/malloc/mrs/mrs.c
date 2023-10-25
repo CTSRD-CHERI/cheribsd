@@ -1248,44 +1248,6 @@ mrs_malloc(size_t size)
 
 	void *allocated_region;
 
-#if 0
-	/*
-	 * Ensure that all allocations less than the shadow bitmap
-	 * granule size are aligned to that granule size, so that no
-	 * two allocations will be governed by the same shadow bit.
-	 * Allocators may implement alignment incorrectly, this
-	 * doesn't allow UAF bugs but may cause faults.
-	 */
-	if (size < CAPREVOKE_BITMAP_ALIGNMENT) {
-		/*
-		 * Use posix_memalign because unlike aligned_alloc it
-		 * does not require size to be an integer multiple of
-		 * alignment.
-		 */
-		if (REAL(posix_memalign)(&allocated_region,
-		    CAPREVOKE_BITMAP_ALIGNMENT, size)) {
-			mrs_debug_printf("mrs_malloc: error aligning allocation of size less than the shadow bitmap granule\n");
-			MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0, NULL);
-			return (NULL);
-		}
-	} else {
-		/*
-		 * Currently, sizeof(void *) ==
-		 * CAPREVOKE_BITMAP_ALIGNMENT == 16, which means that
-		 * if size >= CAPREVOKE_BITMAP_ALIGNMENT it should be
-		 * aligned to a multiple of CAPREVOKE_BITMAP_ALIGNMENT
-		 * (because it is possible to store a pointer in the
-		 * allocation and thus the alignment is guaranteed by
-		 * malloc).
-		 */
-		allocated_region = REAL(malloc)(size);
-		if (allocated_region == NULL) {
-			MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0,
-			    allocated_region);
-			return (allocated_region);
-		}
-	}
-#endif
 	/*
 	 * Round up here to make sure there is only one allocation per
 	 * granule without requiring modifications to the underlying
@@ -1365,45 +1327,6 @@ mrs_calloc(size_t number, size_t size)
 
 	void *allocated_region;
 
-#if 0
-	/*
-	 * Ensure that all allocations less than the shadow bitmap
-	 * granule size are aligned to that granule size, so that no
-	 * two allocations will be governed by the same shadow bit.
-	 * Allocators may implement alignment incorrectly, this
-	 * doesn't allow UAF bugs but may cause faults.
-	 */
-	if (size < CAPREVOKE_BITMAP_ALIGNMENT) {
-		/*
-		 * Use posix_memalign because unlike aligned_alloc it
-		 * does not require size to be an integer multiple of
-		 * alignment.
-		 */
-		if (REAL(posix_memalign)(&allocated_region,
-		    CAPREVOKE_BITMAP_ALIGNMENT, number * size)) {
-			mrs_debug_printf("mrs_calloc: error aligning allocation of size less than the shadow bitmap granule\n");
-			MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number, NULL);
-			return (NULL);
-		}
-		memset(allocated_region, 0, cheri_getlen(allocated_region));
-	} else {
-		/*
-		 * Currently, sizeof(void *) ==
-		 * CAPREVOKE_BITMAP_ALIGNMENT == 16, which means that
-		 * if size >= CAPREVOKE_BITMAP_ALIGNMENT it should be
-		 * aligned to a multiple of CAPREVOKE_BITMAP_ALIGNMENT
-		 * (because it is possible to store a pointer in the
-		 * allocation and thus the alignment is guaranteed by
-		 * calloc).
-		 */
-		allocated_region = REAL(calloc)(number, size);
-		if (allocated_region == NULL) {
-			MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number,
-			    allocated_region);
-			return (allocated_region);
-		}
-	}
-#endif
 	/*
 	 * Round up here to make sure there is only one allocation per
 	 * granule without requiring modifications to the underlying
