@@ -377,22 +377,24 @@ reloc_instr_imm(Elf32_Addr *where, Elf_Addr val, u_int msb, u_int lsb)
 }
 
 #if __has_feature(capabilities)
-static uintcap_t __nosanitizecoverage
-build_cap_from_fragment(Elf_Addr *fragment, Elf_Addr relocbase,
-    Elf_Addr offset, void * __capability data_cap,
-    const void * __capability code_cap)
+static void __nosanitizecoverage
+decode_fragment(Elf_Addr *fragment, Elf_Addr relocbase, Elf_Addr *addrp,
+    Elf_Addr *sizep, uint8_t *permsp)
 {
-	Elf_Addr addr, size;
-	uint8_t perms;
-	uintcap_t cap;
+	*addrp = relocbase + fragment[0];
+	*sizep = fragment[1] & ((1UL << (8 * sizeof(Elf_Addr) - 8)) - 1);
+	*permsp = fragment[1] >> (8 * sizeof(Elf_Addr) - 8);
+}
 
-	addr = fragment[0];
-	size = fragment[1] & ((1UL << (8 * sizeof(Elf_Addr) - 8)) - 1);
-	perms = fragment[1] >> (8 * sizeof(Elf_Addr) - 8);
+static uintcap_t __nosanitizecoverage
+build_reloc_cap(Elf_Addr addr, Elf_Addr size, uint8_t perms, Elf_Addr offset,
+    void * __capability data_cap, const void * __capability code_cap)
+{
+	uintcap_t cap;
 
 	cap = perms == MORELLO_FRAG_EXECUTABLE ?
 	    (uintcap_t)code_cap : (uintcap_t)data_cap;
-	cap = cheri_setaddress(cap, relocbase + addr);
+	cap = cheri_setaddress(cap, addr);
 
 	if (perms == MORELLO_FRAG_EXECUTABLE ||
 	    perms == MORELLO_FRAG_RODATA) {
@@ -415,6 +417,19 @@ build_cap_from_fragment(Elf_Addr *fragment, Elf_Addr relocbase,
 	    (void * __capability)cap));
 	return (cap);
 }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+static uintcap_t __nosanitizecoverage
+build_cap_from_fragment(Elf_Addr *fragment, Elf_Addr relocbase, Elf_Addr offset,
+    void * __capability data_cap, const void * __capability code_cap)
+{
+	Elf_Addr addr, size;
+	uint8_t perms;
+
+	decode_fragment(fragment, relocbase, &addr, &size, &perms);
+	return (build_reloc_cap(addr, size, perms, offset, data_cap, code_cap));
+}
+#endif
 #endif
 
 /*
@@ -428,10 +443,9 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 #define	ARM64_ELF_RELOC_LOCAL		(1 << 0)
 #define	ARM64_ELF_RELOC_LATE_IFUNC	(1 << 1)
 	Elf_Addr *where, addr, addend;
-#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
 	uintcap_t cap;
-#endif
-#ifndef __CHERI_PURE_CAPABILITY__
+#else
 	Elf_Addr val;
 #endif
 	Elf_Word rtype, symidx;
@@ -476,11 +490,26 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 			*where = elf_relocaddr(lf, (Elf_Addr)relocbase + addend);
 #if __has_feature(capabilities)
 		else if (rtype == R_MORELLO_RELATIVE) {
-			cap = build_cap_from_fragment(where,
-			    (Elf_Addr)relocbase, addend,
-			    (__cheri_tocap void * __capability)relocbase,
-			    (__cheri_tocap void * __capability)relocbase);
-			*(uintcap_t *)(void *)where = cap;
+			void * __capability base;
+			Elf_Addr addr1, size;
+			uint8_t perms;
+
+			decode_fragment(where, (Elf_Addr)relocbase, &addr,
+			    &size, &perms);
+
+			/*
+			 * Handle relocations against magic DPCPU and VNET
+			 * symbols: the address is transformed to refer to a
+			 * segment in the base kernel's DPCPU/VNET segments.
+			 * In this case we must use the kernel's base
+			 * capability.
+			 */
+			addr1 = elf_relocaddr(lf, addr + addend) - addend;
+			base = (__cheri_tocap void * __capability)
+			    (addr == addr1 ? relocbase :
+			    linker_kernel_file->address);
+			*(uintcap_t *)(void *)where = build_reloc_cap(addr1,
+			    size, perms, addend, base, base);
 		}
 #endif
 		return (0);
