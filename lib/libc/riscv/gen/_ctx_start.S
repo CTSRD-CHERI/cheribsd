@@ -34,17 +34,15 @@
 
 #include <machine/asm.h>
 ENTRY(_ctx_start)
-#if !__CHERI_PURE_CAPABILITY__
+#ifndef __CHERI_PURE_CAPABILITY__
 	jalr	s0		/* Call func from makecontext */
 	mv	a0, s1		/* Load ucp saved in makecontext */
 	call	_C_LABEL(ctx_done)
 	call	_C_LABEL(abort)
 #else
-	cjalr	cra, cs0	/* Call func from makecontext */
+	cjalr	cs0		/* Call func from makecontext */
 	cmove	ca0, cs1	/* Load ucp saved in makecontext */
-	clgc	ct0, ctx_done
-	cjalr	cra, ct0
-	clgc	ct0, abort
-	cjalr	cra, ct0
+	ccall	_C_LABEL(ctx_done)
+	ccall	_C_LABEL(abort)
 #endif
 END(_ctx_start)
