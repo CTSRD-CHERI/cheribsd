@@ -62,7 +62,7 @@ vmmpmap_init(void)
 		return (false);
 
 	l0_paddr = VM_PAGE_TO_PHYS(m);
-	l0 = (pd_entry_t *)PHYS_TO_DMAP(l0_paddr);
+	l0 = (pd_entry_t *)PHYS_TO_DMAP_PAGE(l0_paddr);
 
 	mtx_init(&vmmpmap_mtx, "vmm pmap", NULL, MTX_DEF);
 
@@ -76,7 +76,7 @@ vmmpmap_release_l3(pd_entry_t l2e)
 	vm_page_t m;
 	int i;
 
-	l3 = (pd_entry_t *)PHYS_TO_DMAP(l2e & ~ATTR_MASK);
+	l3 = (pt_entry_t *)PHYS_TO_DMAP_PAGE(l2e & ~ATTR_MASK);
 	for (i = 0; i < Ln_ENTRIES; i++) {
 		KASSERT(l3[i] == 0, ("%s: l3 still mapped: %p %lx", __func__,
 		    &l3[i], l3[i]));
@@ -94,7 +94,7 @@ vmmpmap_release_l2(pd_entry_t l1e)
 	vm_page_t m;
 	int i;
 
-	l2 = (pd_entry_t *)PHYS_TO_DMAP(l1e & ~ATTR_MASK);
+	l2 = (pd_entry_t *)PHYS_TO_DMAP_PAGE(l1e & ~ATTR_MASK);
 	for (i = 0; i < Ln_ENTRIES; i++) {
 		if (l2[i] != 0) {
 			vmmpmap_release_l3(l2[i]);
@@ -113,7 +113,7 @@ vmmpmap_release_l1(pd_entry_t l0e)
 	vm_page_t m;
 	int i;
 
-	l1 = (pd_entry_t *)PHYS_TO_DMAP(l0e & ~ATTR_MASK);
+	l1 = (pd_entry_t *)PHYS_TO_DMAP_PAGE(l0e & ~ATTR_MASK);
 	for (i = 0; i < Ln_ENTRIES; i++) {
 		if (l1[i] != 0) {
 			vmmpmap_release_l2(l1[i]);
@@ -188,7 +188,7 @@ again:
 		vm_page_free_zero(m);
 	}
 
-	l1 = (pd_entry_t *)PHYS_TO_DMAP(l0e & ~ATTR_MASK);
+	l1 = (pd_entry_t *)PHYS_TO_DMAP_PAGE(l0e & ~ATTR_MASK);
 	return (l1);
 }
 
@@ -231,7 +231,7 @@ again:
 		vm_page_free_zero(m);
 	}
 
-	l2 = (pd_entry_t *)PHYS_TO_DMAP(l1e & ~ATTR_MASK);
+	l2 = (pd_entry_t *)PHYS_TO_DMAP_PAGE(l1e & ~ATTR_MASK);
 	return (l2);
 }
 
@@ -274,7 +274,7 @@ again:
 		vm_page_free_zero(m);
 	}
 
-	l3 = (pt_entry_t *)PHYS_TO_DMAP(l2e & ~ATTR_MASK);
+	l3 = (pt_entry_t *)PHYS_TO_DMAP_PAGE(l2e & ~ATTR_MASK);
 	return (l3);
 }
 
@@ -375,7 +375,7 @@ vmmpmap_remove(vm_pointer_t va, vm_size_t size, bool invalidate)
 		}
 		MPASS((l0e & ATTR_DESCR_MASK) == L0_TABLE);
 
-		l1 = (pd_entry_t *)PHYS_TO_DMAP(l0e & ~ATTR_MASK);
+		l1 = (pd_entry_t *)PHYS_TO_DMAP_PAGE(l0e & ~ATTR_MASK);
 		l1e = atomic_load_64(&l1[pmap_l1_index(va)]);
 		if (l1e == 0) {
 			va_next = (va + L1_SIZE) & ~L1_OFFSET;
@@ -385,7 +385,7 @@ vmmpmap_remove(vm_pointer_t va, vm_size_t size, bool invalidate)
 		}
 		MPASS((l1e & ATTR_DESCR_MASK) == L1_TABLE);
 
-		l2 = (pd_entry_t *)PHYS_TO_DMAP(l1e & ~ATTR_MASK);
+		l2 = (pd_entry_t *)PHYS_TO_DMAP_PAGE(l1e & ~ATTR_MASK);
 		l2e = atomic_load_64(&l2[pmap_l2_index(va)]);
 		if (l2e == 0) {
 			va_next = (va + L2_SIZE) & ~L2_OFFSET;
@@ -395,7 +395,7 @@ vmmpmap_remove(vm_pointer_t va, vm_size_t size, bool invalidate)
 		}
 		MPASS((l2e & ATTR_DESCR_MASK) == L2_TABLE);
 
-		l3 = (pd_entry_t *)PHYS_TO_DMAP(l2e & ~ATTR_MASK);
+		l3 = (pt_entry_t *)PHYS_TO_DMAP_PAGE(l2e & ~ATTR_MASK);
 		if (invalidate) {
 			l3e = atomic_load_64(&l3[pmap_l3_index(va)]);
 			MPASS(l3e != 0);
