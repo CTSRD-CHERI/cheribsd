@@ -7,6 +7,7 @@ SRCS+=	cheribsdtest_bounds_globals.c					\
 	cheribsdtest_bounds_heap.c					\
 	cheribsdtest_bounds_stack.c					\
 	cheribsdtest_cidcap.c						\
+	cheribsdtest_context.c						\
 	cheribsdtest_fault.c						\
 	cheribsdtest_flag_captured.c					\
 	cheribsdtest_fs.c						\
