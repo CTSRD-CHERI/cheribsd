@@ -142,6 +142,15 @@ extern struct cheribsdtest_child_state *ccsp;
 #endif
 #endif
 
+#ifndef XFAIL_FLAKY_C18N_CONTEXT
+#ifdef CHERIBSD_C18N_TESTS
+#define	XFAIL_FLAKY_C18N_CONTEXT \
+    "setcontext and swapcontext are currently unsupported by library-based compartmentalisation"
+#else
+#define	XFAIL_FLAKY_C18N_CONTEXT	NULL
+#endif
+#endif
+
 struct cheri_test {
 	const char	*ct_name;
 	const char	*ct_desc;
