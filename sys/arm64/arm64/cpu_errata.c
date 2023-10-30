@@ -40,6 +40,7 @@
 
 #include <machine/cpu.h>
 
+#include <dev/psci/psci.h>
 #include <dev/psci/smccc.h>
 
 typedef void (cpu_quirk_install)(void);
@@ -113,6 +114,9 @@ static struct cpu_quirks cpu_quirks[] = {
 static void
 install_psci_bp_hardening(void)
 {
+	/* SMCCC depends on PSCI. If PSCI is missing so is SMCCC */
+	if (!psci_present)
+		return;
 
 	if (smccc_arch_features(SMCCC_ARCH_WORKAROUND_1) != SMCCC_RET_SUCCESS)
 		return;
@@ -135,6 +139,10 @@ install_ssbd_workaround(void)
 			}
 		}
 	}
+
+	/* SMCCC depends on PSCI. If PSCI is missing so is SMCCC */
+	if (!psci_present)
+		return;
 
 	/* Enable the workaround on this CPU if it's enabled in the firmware */
 	if (smccc_arch_features(SMCCC_ARCH_WORKAROUND_2) != SMCCC_RET_SUCCESS)
