@@ -179,27 +179,31 @@ malloc_revocation_ctl_common(const char *progname, bool should_be_revoking)
 }
 
 CHERIBSDTEST(malloc_revocation_ctl_baseline,
-    "A base binary reports revocation is enabled")
+    "A base binary reports revocation is enabled",
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	malloc_revocation_ctl_common("malloc_is_revoking", true);
 }
 
 CHERIBSDTEST(malloc_revocation_ctl_elfnote_disable,
-    "A binary with elfnote disabling reports revocation is disable")
+    "A binary with elfnote disabling reports revocation is disable",
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	malloc_revocation_ctl_common("malloc_is_revoking_elfnote_disable",
 	    false);
 }
 
 CHERIBSDTEST(malloc_revocation_ctl_elfnote_enable,
-    "A binary with elfnote enabling reports revocation is enabled")
+    "A binary with elfnote enabling reports revocation is enabled",
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	malloc_revocation_ctl_common("malloc_is_revoking_elfnote_enable",
 	    true);
 }
 
 CHERIBSDTEST(malloc_revocation_ctl_elfnote_disable_protctl_enable,
-    "A binary with elfnote disabling reports revocation is disable")
+    "A binary with elfnote disabling reports revocation is disable",
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	int arg = PROC_CHERI_REVOKE_FORCE_ENABLE;
 
@@ -208,7 +212,8 @@ CHERIBSDTEST(malloc_revocation_ctl_elfnote_disable_protctl_enable,
 }
 
 CHERIBSDTEST(malloc_revocation_ctl_elfnote_enable_protctl_disable,
-    "A binary with elfnote enabling reports revocation is enabled")
+    "A binary with elfnote enabling reports revocation is enabled",
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	int arg = PROC_CHERI_REVOKE_FORCE_DISABLE;
 
@@ -217,27 +222,31 @@ CHERIBSDTEST(malloc_revocation_ctl_elfnote_enable_protctl_disable,
 }
 
 CHERIBSDTEST(malloc_revocation_ctl_suid_baseline,
-    "A suid binary reports revocation is enabled")
+    "A suid binary reports revocation is enabled",
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	malloc_revocation_ctl_common("malloc_is_revoking_suid", true);
 }
 
 CHERIBSDTEST(malloc_revocation_ctl_suid_elfnote_disable,
-    "A suid binary with elfnote disabling reports revocation is disable")
+    "A suid binary with elfnote disabling reports revocation is disable",
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	malloc_revocation_ctl_common("malloc_is_revoking_elfnote_disable",
 	    false);
 }
 
 CHERIBSDTEST(malloc_revocation_ctl_suid_elfnote_enable,
-    "A suid binary with elfnote enabling reports revocation is enabled")
+    "A suid binary with elfnote enabling reports revocation is enabled",
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	malloc_revocation_ctl_common("malloc_is_revoking_elfnote_enable",
 	    true);
 }
 
 CHERIBSDTEST(malloc_revocation_ctl_suid_elfnote_disable_protctl_enable,
-    "A binary with elfnote disabling reports revocation is disable")
+    "A binary with elfnote disabling reports revocation is disable",
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	int arg = PROC_CHERI_REVOKE_FORCE_ENABLE;
 
@@ -246,7 +255,8 @@ CHERIBSDTEST(malloc_revocation_ctl_suid_elfnote_disable_protctl_enable,
 }
 
 CHERIBSDTEST(malloc_revocation_ctl_suid_elfnote_enable_protctl_disable,
-    "A binary with elfnote enabling reports revocation is enabled")
+    "A binary with elfnote enabling reports revocation is enabled",
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	int arg = PROC_CHERI_REVOKE_FORCE_DISABLE;
 
