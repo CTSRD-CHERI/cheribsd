@@ -88,13 +88,6 @@
  * REVOKE_ON_FREE: Perform revocation on free rather than during
  *   allocation routines.
  *
- * JUST_INTERPOSE: Just call the real functions.
- * JUST_BOOKKEEPING: Just update data structures then call the real functions.
- * JUST_QUARANTINE: Just do bookkeeping and quarantining (no bitmap
- *   painting or revocation)
- * JUST_PAINT_BITMAP: Do bookkeeping, quarantining, and bitmap
- *   painting but no revocation.
- *
  * Values:
  *
  * QUARANTINE_HIGHWATER: Limit the quarantine size to
@@ -615,11 +608,6 @@ validate_freed_pointer(void *ptr)
 	}
 	/*mrs_debug_printf("freed underlying allocation %#p\n", underlying_allocation);*/
 
-#ifdef JUST_BOOKKEEPING
-	REAL(free)(ptr);
-	return (NULL);
-#endif /* JUST_BOOKKEEPING */
-
 	/*
 	 * Here we use the bitmap to synchronize and make sure that
 	 * our guarantee is upheld in multithreaded environments.  We
@@ -675,7 +663,6 @@ validate_freed_pointer(void *ptr)
 	 * any valid capabilities to the region by definition.
 	 */
 
-#if !defined(JUST_QUARANTINE)
 	/*
 	 * Doesn't matter whether or not the len of underlying_allocation is
 	 * actually a 16-byte multiple because all allocations will be 16-byte
@@ -688,7 +675,6 @@ validate_freed_pointer(void *ptr)
 		mrs_debug_printf("validate_freed_pointer: setting bitmap failed\n");
 		return (NULL);
 	}
-#endif /* !JUST_QUARANTINE */
 
 	return (underlying_allocation);
 }
@@ -803,7 +789,6 @@ static inline void
 quarantine_flush(struct mrs_quarantine *quarantine)
 {
 	MRS_UTRACE(UTRACE_MRS_QUARANTINE_FLUSH, NULL, 0, 0, NULL);
-#if !defined(JUST_QUARANTINE) && !defined(JUST_PAINT_BITMAP)
 	/* Don't read epoch until all bitmap painting is done. */
 	atomic_thread_fence(memory_order_acq_rel);
 	cheri_revoke_epoch_t start_epoch = cri->epochs.enqueue;
@@ -843,7 +828,6 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 # endif /* !PRINT_CAPREVOKE */
 
 	}
-#endif /* !JUST_QUARANTINE && !JUST_PAINT_BITMAP */
 
 	struct mrs_descriptor_slab *prev = NULL;
 	for (struct mrs_descriptor_slab *iter = quarantine->list; iter != NULL;
@@ -857,7 +841,6 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 			if (iter->slab[i].ptr != NULL) {
 #endif /* OFFLOAD_QUARANTINE */
 
-#if !defined(JUST_QUARANTINE)
 				/*
 				 * Doesn't matter if the underlying
 				 * size isn't a 16-byte multiple
@@ -877,7 +860,6 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 				 * bitmap is cleared.
 				 */
 				atomic_thread_fence(memory_order_release);
-#endif /* !JUST_QUARANTINE */
 
 #ifdef CLEAR_ON_RETURN
 				clear_region(iter->slab[i].ptr,
@@ -1231,10 +1213,6 @@ fini(void)
 static void *
 mrs_malloc(size_t size)
 {
-#ifdef JUST_INTERPOSE
-	return (REAL(malloc)(size));
-#endif /* JUST_INTERPOSE */
-
 #ifdef OPTIONAL_QUARANTINING
 	if (!quarantining)
 		return (REAL(malloc)(size));
@@ -1305,9 +1283,6 @@ mrs_calloc_bootstrap(size_t number, size_t size)
 void *
 mrs_calloc(size_t number, size_t size)
 {
-#ifdef JUST_INTERPOSE
-	return (REAL(calloc)(number, size));
-#else /* !JUST_INTERPOSE */
 	size_t tmpsize;
 
 #ifdef OPTIONAL_QUARANTINING
@@ -1357,16 +1332,11 @@ mrs_calloc(size_t number, size_t size)
 
 	MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number, allocated_region);
 	return (allocated_region);
-#endif /* !JUST_INTERPOSE */
 }
 
 static int
 mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 {
-#ifdef JUST_INTERPOSE
-	return (REAL(posix_memalign)(ptr, alignment, size));
-#endif /* JUST_INTERPOSE */
-
 #ifdef OPTIONAL_QUARANTINING
 	if (!quarantining)
 		return (REAL(posix_memalign)(ptr, alignment, size));
@@ -1400,10 +1370,6 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 static void *
 mrs_aligned_alloc(size_t alignment, size_t size)
 {
-#ifdef JUST_INTERPOSE
-	return (REAL(aligned_alloc)(alignment, size));
-#endif /* JUST_INTERPOSE */
-
 #ifdef OPTIONAL_QUARANTINING
 	if (!quarantining)
 		return (REAL(aligned_alloc)(alignment, size));
@@ -1446,10 +1412,6 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 static void *
 mrs_realloc(void *ptr, size_t size)
 {
-#ifdef JUST_INTERPOSE
-	return (REAL(realloc)(ptr, size));
-#endif /* JUST_INTERPOSE */
-
 #ifdef OPTIONAL_QUARANTINING
 	if (!quarantining)
 		return (REAL(realloc)(ptr, size));
@@ -1476,10 +1438,6 @@ mrs_realloc(void *ptr, size_t size)
 static void
 mrs_free(void *ptr)
 {
-#ifdef JUST_INTERPOSE
-	return (REAL(free)(ptr));
-#endif /* JUST_INTERPOSE */
-
 #ifdef OPTIONAL_QUARANTINING
 	if (!quarantining)
 		return (REAL(free)(ptr));
@@ -1545,9 +1503,6 @@ mrs_free(void *ptr)
 void *
 mrs_mallocx(size_t size, int flags)
 {
-#ifdef JUST_INTERPOSE
-	return (REAL(mallocx)(size, flags));
-#else /* !JUST_INTERPOSE */
 #ifdef OPTIONAL_QUARANTINING
 	if (!quarantining)
 		return (REAL(mallocx)(size, flags));
@@ -1560,15 +1515,11 @@ mrs_mallocx(size_t size, int flags)
 	 * for correctness anyway.)
 	 */
 	return (mrs_calloc(1, size));
-#endif /* !JUST_INTERPOSE */
 }
 
 void *
 mrs_rallocx(void *ptr, size_t size, int flags)
 {
-#ifdef JUST_INTERPOSE
-	return (REAL(rallocx)(ptr, size, flags));
-#else /* !JUST_INTERPOSE */
 #ifdef OPTIONAL_QUARANTINING
 	if (!quarantining)
 		return (REAL(rallocx)(ptr, size, flags));
@@ -1596,39 +1547,29 @@ mrs_rallocx(void *ptr, size_t size, int flags)
 	}
 	MRS_UTRACE(UTRACE_MRS_REALLOC, ptr, size, 0, new_alloc);
 	return (new_alloc);
-#endif /* !JUST_INTERPOSE */
 }
 
 void
 mrs_dallocx(void *ptr, int flags)
 {
-#ifdef JUST_INTERPOSE
-	return (REAL(dallocx)(ptr, flags));
-#else /* !JUST_INTERPOSE */
 	/* XXX: snmalloc just ignores flags.  */
 	mrs_free(ptr);
-#endif /* !JUST_INTERPOSE */
 }
 
 void
 mrs_sdallocx(void *ptr, size_t size, int flags)
 {
-#ifdef JUST_INTERPOSE
-	return (REAL(sdallocx)(ptr, size, flags));
-#else /* !JUST_INTERPOSE */
 	/*
 	 * XXX: snmalloc just frees ignoring flags so do the same for
 	 * simplicity.
 	 */
 	mrs_free(ptr);
-#endif /* !JUST_INTERPOSE */
 }
 
 #ifdef OFFLOAD_QUARANTINE
 static void *
 mrs_offload_thread(void *arg)
 {
-
 #ifdef PRINT_CAPREVOKE_MRS
 	mrs_printf("offload thread spawned: %d\n", pthread_getthreadid_np());
 #endif
