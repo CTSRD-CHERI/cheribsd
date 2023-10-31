@@ -66,8 +66,6 @@
 /*
  * Knobs:
  *
- * BYPASS_QUARANTINE: MADV_FREE page-multiple allocations and never
- *   free them back to the allocator.
  * OFFLOAD_QUARANTINE: Process full quarantines in a separate thread.
  * MRS_PINNED_CPUSET: Prefer CPU 2 for the application thread and CPU
  *   3 for the offload thread.  Both threads are, by default, willing
@@ -1425,29 +1423,6 @@ mrs_free(void *ptr)
 #ifdef CLEAR_ON_FREE
 	bzero(cheri_setoffset(ptr, 0), cheri_getlen(ptr));
 #endif
-
-	/* TODO revisit coalescing/bypass */
-#ifdef BYPASS_QUARANTINE
-	/*
-	 * If this is a full-page(s) allocation, bypass the quarantine by
-	 * MADV_FREEing it and never actually freeing it back to the allocator.
-	 * Because we don't know allocator internals, the allocated size must
-	 * actually be a multiple of the page size.
-	 *
-	 * We can't actually do this in the slimmed-down shim layer
-	 * because we don't have the VMEM-bearing capability.
-	 * Coalescing in quarantine is perhaps less useful to the shim
-	 * because we may not know about allocator metadata.
-	 */
-	vaddr_t base = cheri_getbase(ptr);
-	size_t region_size = cheri_getlen(ptr);
-	if (((base & (page_size - 1)) == 0) &&
-	    ((region_size & (page_size - 1)) == 0)) {
-		mrs_debug_printf("mrs_free: page-multiple free, bypassing quarantine\n");
-		/*real_madvise(alloc_desc->vmmap_cap, region_size, MADV_FREE);*/
-		return;
-	}
-#endif /* BYPASS_QUARANTINE */
 
 	mrs_lock(&application_quarantine_lock);
 	quarantine_insert(&application_quarantine, ins, cheri_getlen(ins));
