@@ -167,8 +167,10 @@ hwt_ctx_alloc(struct trace_context *tc)
 	al.mode = tc->mode;
 	if (tc->mode == HWT_MODE_THREAD)
 		al.pid = tc->pid;
-	else
-		al.cpu_map = tc->cpu_map;
+	else {
+		al.cpu_map = &tc->cpu_map;
+		al.cpusetsize = sizeof(cpuset_t);
+	}
 
 	al.bufsize = tc->bufsize;
 	al.backend_name = tc->trace_dev->name;
