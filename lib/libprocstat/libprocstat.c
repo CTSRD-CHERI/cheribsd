@@ -2182,7 +2182,7 @@ procstat_getquarantining_sysctl(pid_t pid, int *quarantiningp)
 	name[3] = pid;
 	len = sizeof(*quarantiningp);
 	error = sysctl(name, nitems(name), quarantiningp, &len, NULL, 0);
-	if (error != 0 && errno != ESRCH)
+	if (error != 0 && errno != ESRCH && feature_present("cheri_revoke"))
 		warn("sysctl: kern.proc.quarantining: %d", pid);
 	return (error);
 }
@@ -2219,7 +2219,7 @@ procstat_get_revoker_epoch_sysctl(pid_t pid, uint64_t *revoker_epochp)
 	name[3] = pid;
 	len = sizeof(*revoker_epochp);
 	error = sysctl(name, nitems(name), revoker_epochp, &len, NULL, 0);
-	if (error != 0 && errno != ESRCH)
+	if (error != 0 && errno != ESRCH && feature_present("cheri_revoke"))
 		warn("sysctl: kern.proc.revoker_epoch: %d", pid);
 	return (error);
 }
@@ -2256,7 +2256,7 @@ procstat_get_revoker_state_sysctl(pid_t pid, int *revoker_statep)
 	name[3] = pid;
 	len = sizeof(*revoker_statep);
 	error = sysctl(name, nitems(name), revoker_statep, &len, NULL, 0);
-	if (error != 0 && errno != ESRCH)
+	if (error != 0 && errno != ESRCH && feature_present("cheri_revoke"))
 		warn("sysctl: kern.proc.revoker_state: %d", pid);
 	return (error);
 }
