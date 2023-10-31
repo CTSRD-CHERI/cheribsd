@@ -86,11 +86,12 @@ _tftp-proxy=	tftp-proxy
 .if !defined(NO_PIC) && !defined(NO_RTLD)
 _rtld-elf=	rtld-elf rtld-elf-debug
 .if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
-SUBDIR+=	rtld-elf-c18n
+SUBDIR+=	rtld-elf-c18n rtld-elf64cb-c18n
 .endif
 # rtld.1 needs to be installed before the cross-dir MLINKS can work.
 SUBDIR_INSTALL_USE_DEPENDS=
 SUBDIR_DEPEND_rtld-elf-c18n=	rtld-elf
+SUBDIR_DEPEND_rtld-elf64cb-c18n=	rtld-elf
 SUBDIR_DEPEND_rtld-elf-debug=	rtld-elf
 .for LIBCOMPAT libcompat in ${_ALL_LIBCOMPATS_libcompats}
 SUBDIR.${MK_LIB${LIBCOMPAT}}+=	rtld-elf${libcompat}

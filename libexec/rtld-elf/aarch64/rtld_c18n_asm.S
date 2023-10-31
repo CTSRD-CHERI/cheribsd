@@ -33,7 +33,12 @@ ENTRY(_rtld_setjmp)
 	 * This function MUST update c0 to point at the buffer that saves the
 	 * general purpose registers.
 	 */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mrs	c18, rcsp_el0
+#define	TRUSTED_STACK	c18
+#else
 #define	TRUSTED_STACK	csp
+#endif
 	mov	c2, TRUSTED_STACK
 	b	_rtld_setjmp_impl
 #undef	TRUSTED_STACK
@@ -44,38 +49,63 @@ ENTRY(_rtld_longjmp)
 	 * This function MUST preserve the value of x1 and update c0 to point at
 	 * the general purpose registers to be restored.
 	 */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mrs	c18, rcsp_el0
+#define	TRUSTED_STACK	c18
+#else
 #define	TRUSTED_STACK	csp
+#endif
 
 	mov	c2, TRUSTED_STACK
 
 	str	c30, [TRUSTED_STACK, #-CAP_WIDTH]!
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	msr	rcsp_el0, TRUSTED_STACK
+#endif
 
 	bl	_rtld_longjmp_impl
 
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mrs	TRUSTED_STACK, rcsp_el0
+#endif
 	ldr	c30, [TRUSTED_STACK], #CAP_WIDTH
 
 	ldr	x3, [TRUSTED_STACK]
 	scvalue	TRUSTED_STACK, TRUSTED_STACK, x3
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	msr	rcsp_el0, TRUSTED_STACK
+#endif
 
 	RETURN
 #undef	TRUSTED_STACK
 END(_rtld_longjmp)
 
 ENTRY(_rtld_thread_start)
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mov	c10, csp
+	msr	rcsp_el0, c10
+#else
 	/*
 	 * Move the Executive mode thread pointer to Restricted mode.
 	 */
 	mrs	c10, ctpidr_el0
 	msr	rctpidr_el0, c10
+#endif
 	b	_rtld_thread_start_impl
 END(_rtld_thread_start)
 
 ENTRY(_rtld_thr_exit)
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mrs	c10, rcsp_el0
+	mov	csp, c10
+#endif
 	b	_rtld_thr_exit_impl
 END(_rtld_thr_exit)
 
 ENTRY(_rtld_sighandler)
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	mov	c3, csp
+#endif
 	b	_rtld_sighandler_impl
 END(_rtld_sighandler)
 
@@ -160,7 +190,11 @@ ENTRY(_rtld_tramp_hook)
 	mov	c2, c12
 	mov	c3, c13
 	mov	c4, c14
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mov	c5, csp
+#else
 	mrs	c5, rcsp_el0
+#endif
 
 	stp	c18, c30, [csp, #-(CAP_WIDTH * 2)]!
 	bl	tramp_hook
@@ -179,7 +213,11 @@ ENTRY(_rtld_tramp_hook)
 	ldp	c2, c3, [csp, #(CAP_WIDTH * 2)]
 	ldp	c0, c1, [csp], #(CAP_WIDTH * 10)
 
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	RETURN
+#else
 	retr	c30
+#endif
 END(_rtld_tramp_hook)
 
 /*
@@ -204,9 +242,15 @@ END(_rtld_tramp_hook)
 
 TRAMP(tramp_save_caller)
 1:	ldr	c18, #0		/* To be patched at runtime */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mov	c17, csp
+	mrs	c10, rcsp_el0
+#define	TRUSTED_STACK	c10
+#else
 	mrs	c17, rcsp_el0
 	mov	x10, sp
 #define	TRUSTED_STACK	csp
+#endif
 
 	/*
 	 * Maintain consistency of rcsp by saving it at the bottom of itself.
@@ -219,7 +263,12 @@ TRAMP(tramp_save_caller)
 	str	c17, [c16, #-CAP_WIDTH]
 
 	/* Push frame */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mov	x11, x10
+	stp	x11, x12, [TRUSTED_STACK, #-(CAP_WIDTH * 14)]!
+#else
 	stp	x10, x12, [TRUSTED_STACK, #-(CAP_WIDTH * 14)]!
+#endif
 	str	c16, [TRUSTED_STACK, #(CAP_WIDTH * 1)]
 	stp	c30, c19, [TRUSTED_STACK, #(CAP_WIDTH * 2)]
 	stp	c20, c21, [TRUSTED_STACK, #(CAP_WIDTH * 4)]
@@ -233,6 +282,9 @@ TRAMP(tramp_save_caller)
 	 */
 2:	movz	x13, #0		/* To be patched at runtime */
 	scflgs	TRUSTED_STACK, TRUSTED_STACK, x13
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	msr	rcsp_el0, TRUSTED_STACK
+#endif
 #undef	TRUSTED_STACK
 TRAMPEND(tramp_save_caller)
 
@@ -248,7 +300,11 @@ TRAMP(tramp_call_hook)
 5:	ldr	c13, #0		/* To be patched at runtime */
 	mov	c14, c30
 
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	blr	x17
+#else
 	blr	c17
+#endif
 TRAMPEND(tramp_call_hook)
 
 PATCH_POINT(tramp_call_hook, function, 1b)
@@ -258,7 +314,11 @@ PATCH_POINT(tramp_call_hook, obj, 4b)
 PATCH_POINT(tramp_call_hook, def, 5b)
 
 TRAMP(tramp_switch_stack)
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mrs	c30, rctpidr_el0	/* c30 = table */
+#else
 	mrs	c30, ctpidr_el0		/* c30 = table */
+#endif
 1:	movz	w14, #0		/* w14 = cid, to be patched at runtime */
 	gclen	x15, c30	/* x15 = len(table) */
 
@@ -279,7 +339,12 @@ TRAMP(tramp_switch_stack)
 	 * implications of re-entrancy must be carefully addressed.
 	 */
 2:
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	ldr	c11, [c30]
+	blr	x11
+#else
 	blr	[c30, #0]			/* get_rstk() */
+#endif
 3:	ldr	c17, [c17, #-CAP_WIDTH]
 
 	/* Move the c9 buffer to the target stack */
@@ -308,7 +373,11 @@ TRAMPEND(tramp_switch_stack)
 PATCH_POINT(tramp_switch_stack, cid, 1b)
 
 TRAMP(tramp_invoke_exe)
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	blr	x18
+#else
 	blr	c18
+#endif
 TRAMPEND(tramp_invoke_exe)
 
 TRAMP(tramp_clear_mem_args)
@@ -357,12 +426,22 @@ TRAMP(tramp_invoke_res)
 	 * - c18: Callee's code
 	 */
 
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mov	csp, c17
+	blr	x18
+#else
 	msr	rcsp_el0, c17
 	blrr	c18
+#endif
 TRAMPEND(tramp_invoke_res)
 
 TRAMP(tramp_pop_frame)
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mrs	c18, rcsp_el0
+#define	TRUSTED_STACK	c18
+#else
 #define	TRUSTED_STACK	csp
+#endif
 	/* Restore callee-saved registers */
 	ldp	c28, c29, [TRUSTED_STACK, #(CAP_WIDTH * 12)]
 	ldp	c26, c27, [TRUSTED_STACK, #(CAP_WIDTH * 10)]
@@ -404,6 +483,10 @@ TRAMP(tramp_pop_frame)
 	mov	x3, xzr
 	mov	x2, xzr
 
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	msr	rcsp_el0, TRUSTED_STACK
+#endif
+
 	/*
 	 * Clear temporary registers, except
 	 * - c10: Link to previous frame (scalar)
@@ -421,12 +504,20 @@ TRAMP(tramp_pop_frame)
 	 * Restore caller's saved rcsp (has no effect if the caller is
 	 * Executive).
 	 */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mov	csp, c13
+#else
 	msr	rcsp_el0, c13
+#endif
 #undef	TRUSTED_STACK
 TRAMPEND(tramp_pop_frame)
 
 TRAMP(tramp_return)
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	RETURN
+#else
 	retr	c30
+#endif
 TRAMPEND(tramp_return)
 
 TRAMP(tramp_return_hook)
@@ -439,7 +530,11 @@ TRAMP(tramp_return_hook)
 4:	ldr	c13, #0			/* To be patched at runtime */
 	mov	c14, c30
 
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	br	x18
+#else
 	br	c18
+#endif
 TRAMPEND(tramp_return_hook)
 
 PATCH_POINT(tramp_return_hook, function, 1b)

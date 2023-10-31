@@ -113,8 +113,10 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	ncurses \
 	nss_tacplus
 
-.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64" && !defined(COMPAT_LIBCOMPAT)
+.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
+.if !defined(COMPAT_LIBCOMPAT) || ${COMPAT_LIBCOMPAT} == "64CB"
 SUBDIR+=	libc_c18n libthr_c18n
+.endif
 .endif
 
 .if !${MACHINE_ABI:Mpurecap}

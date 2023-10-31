@@ -241,11 +241,13 @@ tramp_should_include(const Obj_Entry *reqobj, const struct tramp_data *data)
  */
 #define	C18N_INIT_COMPART_COUNT	8
 
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 /*
  * Set a dummy Restricted stack so that trampolines do not need to test if the
  * Restricted stack is valid.
  */
 static void *dummy_stack[1] = { &dummy_stack[0] };
+#endif
 
 static _Atomic(struct stk_table *) free_stk_tables;
 
@@ -755,7 +757,10 @@ tramp_pgs_append(const struct tramp_data *data)
 	    cheri_copyaddress(pg, tramp + len));
 
 	entry = cheri_clearperm(entry, FUNC_PTR_REMOVE_PERMS);
-	return (cheri_sealentry(cheri_capmode(entry)));
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	entry = cheri_capmode(entry);
+#endif
+	return (cheri_sealentry(entry));
 }
 
 static bool
@@ -976,7 +981,18 @@ tramp_init(void)
 	 */
 	stk_table_set(stk_table_expand(NULL, C18N_INIT_COMPART_COUNT, false));
 
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	/*
+	 * Under the benchmark ABI, the trusted stack is a pure data structure
+	 * that does not simultaneously serve as RTLD's execution stack. Create
+	 * an execution stack to be used as the trusted stack while RTLD is
+	 * bootstrapping.
+	 */
+	void **stk = get_rstk(compart_id_to_index(C18N_RTLD_COMPARTMENT_ID));
+	trusted_stk_set(stk[-1]);
+#else
 	untrusted_stk_set(&dummy_stack);
+#endif
 
 	/*
 	 * Initialise trampoline table
@@ -1023,7 +1039,9 @@ void
 _rtld_thread_start_impl(struct pthread *curthread)
 {
 	stk_table_set(pop_stk_table(&free_stk_tables));
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	untrusted_stk_set(&dummy_stack);
+#endif
 	thr_thread_start(curthread);
 }
 
@@ -1071,11 +1089,14 @@ _rtld_sighandler_init(void (*p)(int, siginfo_t *, void *))
 void _rtld_sighandler_impl(int, siginfo_t *, void *, ptraddr_t *);
 
 void
-_rtld_sighandler_impl(int sig, siginfo_t *info, void *_ucp, ptraddr_t *frame)
+_rtld_sighandler_impl(int sig, siginfo_t *info, void *_ucp,
+    ptraddr_t *frame __unused)
 {
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	ucontext_t *ucp = _ucp;
 
 	*frame = (ptraddr_t)ucp->uc_mcontext.mc_capregs.cap_sp;
+#endif
 
 	thr_sighandler(sig, info, _ucp);
 }

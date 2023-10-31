@@ -46,7 +46,11 @@ void tramp_init(void);
 /*
  * Policies
  */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+#define	C18N_RTLD_COMPARTMENT_ID	1
+#else
 #define	C18N_RTLD_COMPARTMENT_ID	0
+#endif
 #define	C18N_COMPARTMENT_ID_MAX	(UINT16_MAX >> 1)
 
 typedef uint16_t compart_id_t;
@@ -106,18 +110,30 @@ stk_table_get(void)
 {
 	struct stk_table *table;
 
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	asm ("mrs	%0, rctpidr_el0" : "=C" (table));
+#else
 	asm ("mrs	%0, ctpidr_el0" : "=C" (table));
+#endif
 	return (table);
 }
 
 static inline void
 stk_table_set(struct stk_table *table)
 {
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	asm ("msr	rctpidr_el0, %0" :: "C" (table));
+#else
 	asm ("msr	ctpidr_el0, %0" :: "C" (table));
+#endif
 }
 
 static inline void
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+trusted_stk_set(void *sp)
+#else
 untrusted_stk_set(void *sp)
+#endif
 {
 	asm ("msr	rcsp_el0, %0" :: "C" (sp));
 }

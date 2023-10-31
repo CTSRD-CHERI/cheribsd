@@ -34,12 +34,14 @@
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 .weak _rtld_setjmp;
 LENTRY(_rtld_setjmp)
-	ret
+	/* Should never be called */
+	RETURN
 LEND(_rtld_setjmp)
 
 .weak _rtld_longjmp;
 LENTRY(_rtld_longjmp)
-	ret
+	/* Should never be called */
+	RETURN
 LEND(_rtld_longjmp)
 #endif
 

@@ -75,6 +75,11 @@ ENTRY(.rtld_start)
 	mov	c0, c19				/* Restore aux */
 	mov	csp, c20			/* Restore the stack pointer */
 #if defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	mrs	c10, rcsp_el0
+	mov	csp, c10
+	msr	rcsp_el0, c20
+#endif
 	br	x8				/* Jump to the entry point */
 #else
 	br	c8				/* Jump to the entry point */
@@ -105,7 +110,7 @@ END(.rtld_start)
  * x17 = &_rtld_bind_start
  */
 ENTRY(_rtld_bind_start)
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	/*
 	 * Maintain consistency of rcsp.
 	 */
@@ -119,7 +124,7 @@ ENTRY(_rtld_bind_start)
 #endif
 
 	/* Save frame pointer and SP */
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	stp	PTR(29), PTR(10), [PTRN(sp), #-(PTR_WIDTH * 2)]!
 	mov	PTR(29), PTRN(sp)
 	.cfi_def_cfa PTR(29), (PTR_WIDTH * 2)
@@ -185,14 +190,14 @@ ENTRY(_rtld_bind_start)
 	ldp	CAP(0), CAP(1), [PTRN(sp)], #(CAP_WIDTH * 2)
 
 	/* Restore frame pointer */
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	ldp	PTR(29), PTR(10), [PTRN(sp)], #(PTR_WIDTH * 2)
 #else
 	ldp	PTR(29), PTR(zr), [PTRN(sp)], #(PTR_WIDTH * 2)
 #endif
 
 	 /* Restore link register saved by the plt code */
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	gclim	x17, c10
 	sub	x17, x17, #CAP_WIDTH
 	scvalue	c17, c10, x17
@@ -204,10 +209,10 @@ ENTRY(_rtld_bind_start)
 #endif
 
 	/* Call into the correct function */
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	brr	PTR(16)
-#elif defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
+#if defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	br	x16
+#elif defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	brr	PTR(16)
 #else
 	br	PTR(16)
 #endif
@@ -228,7 +233,7 @@ ENTRY(_rtld_tlsdesc_static)
 	ldp	x0, x1, [c0, #16]
 	add	c0, c2, x0
 	scbnds	c0, c0, x1
-#ifdef RTLD_SANDBOX
+#if defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	retr	c30
 #else
 	RETURN
@@ -247,7 +252,7 @@ END(_rtld_tlsdesc_static)
 ENTRY(_rtld_tlsdesc_undef)
 #ifdef __CHERI_PURE_CAPABILITY__
 	ldr	x0, [c0, #16]
-#ifdef RTLD_SANDBOX
+#if defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	retr	c30
 #else
 	RETURN
@@ -300,7 +305,7 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	/* Restore registers and return */
 	ldp	 c3,  c4, [csp], #32
 	.cfi_adjust_cfa_offset 	-2 * 16
-#ifdef RTLD_SANDBOX
+#if defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	retr	c30
 #else
 	RETURN
@@ -329,7 +334,7 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	stp	c15, c16, [csp, #(7 * 32)]
 	stp	c17, c18, [csp, #(8 * 32)]
 	str	c19,	  [csp, #(9 * 32)]
-#if defined(RTLD_SANDBOX)
+#if defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	/*
 	 * Maintain consistency of rcsp. This step is only needed for
 	 * _rtld_tlsdesc_dynamic because it might call external functions.
@@ -369,7 +374,7 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	scbnds	c0, c0, x19
 
 	/* Restore slow path registers */
-#if defined(RTLD_SANDBOX)
+#if defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	ldr	c3, [csp, #(9 * 32 + 16)]
 	gclim	x4, c3
 	sub	x4, x4, #CAP_WIDTH
@@ -394,7 +399,7 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	/* Restore fast path registers and return */
 	ldp	 c3,  c4, [csp], #32
 	.cfi_adjust_cfa_offset 	-2 * 16
-#ifdef RTLD_SANDBOX
+#if defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	retr	c30
 #else
 	RETURN
