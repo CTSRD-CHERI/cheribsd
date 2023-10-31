@@ -127,3 +127,11 @@ cheribsdtest_set_expected_si_addr(void *addr)
 
 	ccsp->ccs_si_addr_expected = addr;
 }
+
+const char *
+skip_need_cheri_revoke(const char *name __unused)
+{
+	if (!feature_present("cheri_revoke"))
+		return ("Kernel does not support revocation");
+	return (NULL);
+}

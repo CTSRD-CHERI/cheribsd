@@ -321,4 +321,6 @@ extern ptraddr_t find_address_space_gap(size_t len, size_t align);
  */
 extern pid_t cheribsdtest_spawn_child(enum spawn_child_mode mode);
 
+const char *skip_need_cheri_revoke(const char *name);
+
 #endif /* !_CHERIBSDTEST_H_ */

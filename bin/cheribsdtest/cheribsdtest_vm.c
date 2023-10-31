@@ -857,7 +857,8 @@ reservations_are_quarantined(void)
  */
 CHERIBSDTEST(vm_reservation_mmap_after_free_fixed,
     "check that an old capability can not be used to mmap with MAP_FIXED "
-    "after the reservation has been deleted")
+    "after the reservation has been deleted",
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	void *map;
 	const volatile struct cheri_revoke_info *cri;
@@ -903,7 +904,8 @@ CHERIBSDTEST(vm_reservation_mmap_after_free_fixed,
  */
 CHERIBSDTEST(vm_reservation_mmap_after_free,
     "check that an old capability can not be used to mmap after the "
-    "reservation has been deleted")
+    "reservation has been deleted",
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	void *map;
 	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, PAGE_SIZE,
@@ -1292,10 +1294,11 @@ CHERIBSDTEST(vm_capdirty, "verify capdirty marking and mincore")
 static const char *
 skip_need_quarantine_unmapped_reservations(const char *name __unused)
 {
-	if (reservations_are_quarantined())
-		return (NULL);
-	else
+	if (!feature_present("cheri_revoke"))
+		return ("Kernel does not support revocation");
+	if (!reservations_are_quarantined())
 		return ("unmapped reservations are not being quarantined");
+	return (NULL);
 }
 
 static int
@@ -1368,7 +1371,8 @@ check_kqueue_cap(int kq, int pfd[2], unsigned int valid)
 	CHERIBSDTEST_VERIFY(b == 42);
 }
 
-CHERIBSDTEST(cheri_revoke_lightly, "A gentle test of capability revocation")
+CHERIBSDTEST(cheri_revoke_lightly, "A gentle test of capability revocation",
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	void **mb;
 	void *sh;
@@ -1464,7 +1468,8 @@ CHERIBSDTEST(cheri_revoke_lightly, "A gentle test of capability revocation")
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(cheri_revoke_loadside, "Test load-side revoker")
+CHERIBSDTEST(cheri_revoke_loadside, "Test load-side revoker",
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 #define CHERIBSDTEST_VM_CHERI_REVOKE_LOADSIDE_NPG	3
 
@@ -1799,7 +1804,8 @@ load_split_fini:
 	}
 }
 
-CHERIBSDTEST(cheri_revoke_lib, "Test libcheri_caprevoke internals")
+CHERIBSDTEST(cheri_revoke_lib, "Test libcheri_caprevoke internals",
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	/*
 	 * Tweaking paranoia can turn this test into more of a
@@ -1837,8 +1843,8 @@ CHERIBSDTEST(cheri_revoke_lib, "Test libcheri_caprevoke internals")
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(cheri_revoke_lib_fork,
-    "Test libcheri_caprevoke with fork")
+CHERIBSDTEST(cheri_revoke_lib_fork, "Test libcheri_caprevoke with fork",
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	static const int paranoia = 2;
 
@@ -1885,7 +1891,8 @@ CHERIBSDTEST(cheri_revoke_lib_fork,
 }
 
 CHERIBSDTEST(cheri_revoke_lib_fork_split,
-    "Test libcheri_caprevoke split across fork")
+    "Test libcheri_caprevoke split across fork",
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	static const int paranoia = 2;
 
@@ -1948,7 +1955,8 @@ CHERIBSDTEST(cheri_revoke_lib_fork_split,
  */
 
 static void
-cheri_revoke_lib_child_spawn_common(enum spawn_child_mode sc_mode, int pre_fork_tclr_mode)
+cheri_revoke_lib_child_spawn_common(enum spawn_child_mode sc_mode,
+    int pre_fork_tclr_mode)
 {
 	static const int paranoia = 2;
 	static const size_t bigblock_caps = 4096;
@@ -2032,7 +2040,8 @@ cheri_revoke_lib_child_split(void)
 
 CHERIBSDTEST(cheri_revoke_lib_child_fork_exec_once,
     "revoke in a fork+exec'd child",
-    .ct_child_func = cheri_revoke_lib_child_once)
+    .ct_child_func = cheri_revoke_lib_child_once,
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	cheri_revoke_lib_child_spawn_common(SC_MODE_FORK,
 	    TCLR_MODE_NONE);
@@ -2040,7 +2049,8 @@ CHERIBSDTEST(cheri_revoke_lib_child_fork_exec_once,
 
 CHERIBSDTEST(cheri_revoke_lib_child_fork_exec_split_prior,
     "split revoke in a fork+exec'd child after revoking once",
-    .ct_child_func = cheri_revoke_lib_child_split)
+    .ct_child_func = cheri_revoke_lib_child_split,
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	cheri_revoke_lib_child_spawn_common(SC_MODE_FORK,
 	    TCLR_MODE_LOAD_ONCE);
@@ -2048,7 +2058,8 @@ CHERIBSDTEST(cheri_revoke_lib_child_fork_exec_split_prior,
 
 CHERIBSDTEST(cheri_revoke_lib_child_fork_exec_once_opened,
     "revoke in a fork+exec'd child after opening epoch",
-    .ct_child_func = cheri_revoke_lib_child_once)
+    .ct_child_func = cheri_revoke_lib_child_once,
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	cheri_revoke_lib_child_spawn_common(SC_MODE_FORK,
 	    TCLR_MODE_LOAD_SPLIT_INIT);
@@ -2056,7 +2067,8 @@ CHERIBSDTEST(cheri_revoke_lib_child_fork_exec_once_opened,
 
 CHERIBSDTEST(cheri_revoke_lib_child_rfork_exec_split,
     "split revoke in a rfork+exec'd child",
-    .ct_child_func = cheri_revoke_lib_child_split)
+    .ct_child_func = cheri_revoke_lib_child_split,
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	cheri_revoke_lib_child_spawn_common(SC_MODE_RFORK,
 	    TCLR_MODE_NONE);
@@ -2064,7 +2076,8 @@ CHERIBSDTEST(cheri_revoke_lib_child_rfork_exec_split,
 
 CHERIBSDTEST(cheri_revoke_lib_child_vfork_exec_once,
     "revoke in a vfork+exec'd child",
-    .ct_child_func = cheri_revoke_lib_child_once)
+    .ct_child_func = cheri_revoke_lib_child_once,
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	cheri_revoke_lib_child_spawn_common(SC_MODE_VFORK,
 	    TCLR_MODE_NONE);
@@ -2072,7 +2085,8 @@ CHERIBSDTEST(cheri_revoke_lib_child_vfork_exec_once,
 
 CHERIBSDTEST(cheri_revoke_lib_child_vfork_exec_split_prior,
     "split revoke in a vfork+exec'd child after revoking once",
-    .ct_child_func = cheri_revoke_lib_child_split)
+    .ct_child_func = cheri_revoke_lib_child_split,
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	cheri_revoke_lib_child_spawn_common(SC_MODE_VFORK,
 	    TCLR_MODE_LOAD_ONCE);
@@ -2080,7 +2094,8 @@ CHERIBSDTEST(cheri_revoke_lib_child_vfork_exec_split_prior,
 
 CHERIBSDTEST(cheri_revoke_lib_child_vfork_exec_once_opened,
     "revoke in a vfork+exec'd child after opening epoch",
-    .ct_child_func = cheri_revoke_lib_child_once)
+    .ct_child_func = cheri_revoke_lib_child_once,
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	cheri_revoke_lib_child_spawn_common(SC_MODE_VFORK,
 	    TCLR_MODE_LOAD_SPLIT_INIT);
@@ -2088,7 +2103,8 @@ CHERIBSDTEST(cheri_revoke_lib_child_vfork_exec_once_opened,
 
 CHERIBSDTEST(cheri_revoke_lib_child_posix_spawn_split,
     "split revoke in a posix_spawn'd child",
-    .ct_child_func = cheri_revoke_lib_child_split)
+    .ct_child_func = cheri_revoke_lib_child_split,
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	cheri_revoke_lib_child_spawn_common(SC_MODE_POSIX_SPAWN,
 	    TCLR_MODE_NONE);
@@ -2096,7 +2112,8 @@ CHERIBSDTEST(cheri_revoke_lib_child_posix_spawn_split,
 
 CHERIBSDTEST(cheri_revoke_lib_child_posix_spawn_once_prior,
     "revoke in a posix_spawn'd child after revoking once",
-    .ct_child_func = cheri_revoke_lib_child_once)
+    .ct_child_func = cheri_revoke_lib_child_once,
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	cheri_revoke_lib_child_spawn_common(SC_MODE_POSIX_SPAWN,
 	    TCLR_MODE_LOAD_ONCE);
@@ -2104,7 +2121,8 @@ CHERIBSDTEST(cheri_revoke_lib_child_posix_spawn_once_prior,
 
 CHERIBSDTEST(cheri_revoke_lib_child_posix_spawn_split_opened,
     "split revoke in a posix_spawn'd child after revoking once",
-    .ct_child_func = cheri_revoke_lib_child_split)
+    .ct_child_func = cheri_revoke_lib_child_split,
+    .ct_check_skip = skip_need_cheri_revoke)
 {
 	cheri_revoke_lib_child_spawn_common(SC_MODE_POSIX_SPAWN,
 	    TCLR_MODE_LOAD_SPLIT_INIT);
