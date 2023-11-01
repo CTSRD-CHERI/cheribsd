@@ -25,8 +25,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-
 #ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
 

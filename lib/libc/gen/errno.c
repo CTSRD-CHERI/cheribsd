@@ -26,6 +26,5 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 extern int errno;
 int errno;

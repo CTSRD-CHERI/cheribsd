@@ -44,7 +44,6 @@
  * runtime from ld-elf.so.1.
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 
 #ifdef __CHERI_PURE_CAPABILITY__
