@@ -65,7 +65,7 @@ field of an executable, although it is reportedly unreliable at times.
 .Pp
 Environment variables recognized by
 .Xr rtld 1
-should adopt the prefix LD_C18N_ when compartmentalization is enabled.
+adopt the prefix LD_C18N_ when compartmentalization is enabled.
 For example, LD_LIBRARY_PATH becomes LD_C18N_LIBRARY_PATH.
 .Pp
 Compartmentalization currently depends on modified versions of
@@ -100,18 +100,28 @@ system call.
 Compartment transition overhead simulation is only intended for performance
 analysis purposes.
 Turning it on will reduce security.
+.Ss BENCHMARK ABI VARIANT
+A variant of the runtime linker that uses the benchmark ABI is provided at
+.Pa /libexec/ld-elf64cb-c18n.so.1 .
+Environment variables recognized by this variant need to be prefixed with
+LD_64CB_C18N_.
+.Pp
+.Sy NOTE:
+The current implementation is not fully optmized for performance, nor is it
+tested as extensively as the normal variant and may thus contain subtle bugs.
+Compartment transition tracing is unreliable under the benchmark ABI.
+Please report any bug to help improve the implementation.
 .Sh LIMITATIONS
-This work is of a experimental nature.
+This work is of an experimental nature.
 The author has tested it on applications such as
 .Xr tmux 1 ,
 but instabilities might occur when running complex pieces of software.
 .Pp
-The current prototype only contains a set of
-.Em mechanisms
-for implementing library-based compartmentalization.
-No
-.Em policy
-has been enforced yet.
+Importantly, this prototype
+.Em does not
+provide complete isolation between compartments.
+For example, they are allowed to make arbitrary system calls to obtain
+privileges.
 .Pp
 Below is a list of known limitations and problems.
 For more up-to-date information, visit
