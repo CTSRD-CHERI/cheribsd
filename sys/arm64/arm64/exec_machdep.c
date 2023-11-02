@@ -426,6 +426,15 @@ fill_capregs(struct thread *td, struct capreg *regs)
 	struct trapframe *frame;
 	int i;
 
+	if (td == curthread) {
+		td->td_pcb->pcb_tpidr_el0 = READ_SPECIALREG_CAP(ctpidr_el0);
+		td->td_pcb->pcb_tpidrro_el0 = READ_SPECIALREG_CAP(ctpidrro_el0);
+		td->td_pcb->pcb_cid_el0 = READ_SPECIALREG_CAP(cid_el0);
+		td->td_pcb->pcb_rcsp_el0 = READ_SPECIALREG_CAP(rcsp_el0);
+		td->td_pcb->pcb_rddc_el0 = READ_SPECIALREG_CAP(rddc_el0);
+		td->td_pcb->pcb_rctpidr_el0 = READ_SPECIALREG_CAP(rctpidr_el0);
+	}
+
 	frame = td->td_frame;
 	regs->csp = frame->tf_sp;
 	regs->clr = frame->tf_lr;
