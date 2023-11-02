@@ -223,3 +223,11 @@ fi
 
 # 20231101  1163a20cb6ad    New c18n ABI
 clean_dep   lib/libc_c18n   thr_exit S
+
+# 20231031  0527c9bdc718    Remove forward compat ino64 stuff
+clean_dep   lib/libc        fstat         c
+clean_dep   lib/libc        fstatat       c
+clean_dep   lib/libc        fstatfs       c
+clean_dep   lib/libc        getdirentries c
+clean_dep   lib/libc        getfsstat     c
+clean_dep   lib/libc        statfs        c
