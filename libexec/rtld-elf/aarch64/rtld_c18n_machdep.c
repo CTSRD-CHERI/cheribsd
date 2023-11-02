@@ -42,33 +42,48 @@
  * Trampolines
  */
 size_t
-tramp_compile(char **entry, const struct tramp_data *data)
+tramp_compile(void **entry, const struct tramp_data *data)
 {
 #define IMPORT(template)				\
 	extern const uint32_t tramp_##template[];	\
 	extern const size_t size_tramp_##template
 
-	IMPORT(header);
-	IMPORT(header_hook);
+	struct {
+		void *target;
+	} header;
+
+	struct {
+		const Obj_Entry *defobj;
+		const Elf_Sym *def;
+		void *function;
+	} header_hook;
+
 	IMPORT(save_caller);
+	IMPORT(call_hook);
 	IMPORT(switch_stack);
-	IMPORT(pre_invoke);
+	IMPORT(invoke_exe);
 	IMPORT(clear_mem_args);
 	IMPORT(clear_ret_args_indirect);
 	IMPORT(clear_ret_args);
 	IMPORT(invoke_res);
-	IMPORT(invoke_exe);
-	IMPORT(return_hook);
+	IMPORT(pop_frame);
 	IMPORT(return);
+	IMPORT(return_hook);
 
 #undef	IMPORT
 
-	uint32_t *buf = (void *)*entry;
+	uint32_t *buf = *entry;
 	size_t size = 0;
 	int to_clear;
 	bool executive = cheri_getperm(data->target) & CHERI_PERM_EXECUTIVE;
 	bool hook = ld_compartment_utrace != NULL ||
 	    ld_compartment_overhead != NULL;
+
+#define	COPY_DATA(s)					\
+	do {						\
+		buf = mempcpy(buf, &(s), sizeof(s));	\
+		size += sizeof(s);			\
+	} while (0)
 
 #define	COPY(template)					\
 	do {						\
@@ -96,30 +111,37 @@ tramp_compile(char **entry, const struct tramp_data *data)
 		    sizeof(void *)) & 0x1ffff0) << 1;			\
 	} while(0)
 
-	COPY(header);
-	*(*(const void ***)entry)++ = data->target;
+	header.target = data->target;
+	COPY_DATA(header);
 
 	if (hook) {
-		COPY(header_hook);
-		PATCH_MOV(header_hook, event, UTRACE_COMPARTMENT_ENTER);
-		PATCH_LDR_IMM(header_hook, target, 0);
-		*(*(const void ***)entry)++ = data->defobj;
-		*(*(const void ***)entry)++ = data->def;
-		*(*(const void ***)entry)++ = _rtld_tramp_hook;
+		header_hook.defobj = data->defobj;
+		header_hook.def = data->def;
+		header_hook.function = _rtld_tramp_hook;
+		COPY_DATA(header_hook);
 	}
+
+	*entry = buf;
 
 	COPY(save_caller);
 	PATCH_LDR_IMM(save_caller, target, 0);
+	if (data->sig.valid)
+		PATCH_MOV(save_caller, ret_args, data->sig.ret_args);
+
+	if (hook) {
+		COPY(call_hook);
+		PATCH_MOV(call_hook, event, UTRACE_COMPARTMENT_ENTER);
+		PATCH_LDR_IMM(call_hook, target, 0);
+		PATCH_LDR_IMM(call_hook, obj, 1);
+		PATCH_LDR_IMM(call_hook, def, 2);
+		PATCH_LDR_IMM(call_hook, function, 3);
+	}
 
 	if (!executive) {
 		COPY(switch_stack);
 		PATCH_MOV(switch_stack, cid,
 		    compart_id_to_index(data->defobj->compart_id));
 	}
-
-	COPY(pre_invoke);
-	if (data->sig.valid)
-		PATCH_MOV(pre_invoke, ret_args, data->sig.ret_args);
 
 	if (executive)
 		COPY(invoke_exe);
@@ -137,15 +159,16 @@ tramp_compile(char **entry, const struct tramp_data *data)
 		COPY(invoke_res);
 	}
 
+	COPY(pop_frame);
+
 	if (hook) {
 		COPY(return_hook);
 		PATCH_MOV(return_hook, event, UTRACE_COMPARTMENT_LEAVE);
 		PATCH_LDR_IMM(return_hook, obj, 1);
 		PATCH_LDR_IMM(return_hook, def, 2);
 		PATCH_LDR_IMM(return_hook, function, 3);
-	}
-
-	COPY(return);
+	} else
+		COPY(return);
 
 #undef	COPY
 #undef	PATCH_POINT

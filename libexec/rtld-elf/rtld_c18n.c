@@ -141,8 +141,8 @@ static struct compart rtld_compart = {
 	.name = _BASENAME_RTLD
 };
 
-static struct compart libthr_compart = {
-	.name = "libthr.so.3",
+static struct compart tcb_compart = {
+	.name = "[TCB]",
 	.libraries = (const char *[]) {
 		"libc.so.7",
 		"libthr.so.3",
@@ -245,7 +245,7 @@ tramp_should_include(const Obj_Entry *reqobj, const struct tramp_data *data)
  * Set a dummy Restricted stack so that trampolines do not need to test if the
  * Restricted stack is valid.
  */
-static void *dummy_stack = &dummy_stack;
+static void *dummy_stack[1] = { &dummy_stack[0] };
 
 static _Atomic(struct stk_table *) free_stk_tables;
 
@@ -666,10 +666,10 @@ resize_table(int exp)
 	}
 }
 
-void *
+void
 tramp_hook(int, void *, const Obj_Entry *, const Elf_Sym *, void *, void *);
 
-void *
+void
 tramp_hook(int event, void *target, const Obj_Entry *obj, const Elf_Sym *def,
     void *link, void *rcsp)
 {
@@ -707,7 +707,6 @@ tramp_hook(int event, void *target, const Obj_Entry *obj, const Elf_Sym *def,
 	}
 	if (ld_compartment_overhead != NULL)
 		getpid();
-	return (link);
 }
 
 #define	C18N_MAX_TRAMPOLINE_SIZE	768
@@ -722,7 +721,7 @@ tramp_pgs_append(const struct tramp_data *data)
 	struct tramp_pg *pg;
 
 	/* Fill a temporary buffer with the trampoline and obtain its length */
-	len = tramp_compile(&entry, data);
+	len = tramp_compile((void **)&entry, data);
 
 	pg = atomic_load_explicit(&tramp_pgs.head, memory_order_acquire);
 	tramp = tramp_pg_push(pg, len);
@@ -970,7 +969,7 @@ tramp_init(void)
 	while (comparts.size < C18N_RTLD_COMPARTMENT_ID)
 		comparts.data[comparts.size++] = NULL;
 	comparts.data[comparts.size++] = &rtld_compart;
-	comparts.data[comparts.size++] = &libthr_compart;
+	comparts.data[comparts.size++] = &tcb_compart;
 
 	/*
 	 * Initialise stack table

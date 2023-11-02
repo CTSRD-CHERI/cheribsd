@@ -161,7 +161,7 @@ _Static_assert(sizeof(struct func_sig) == sizeof(func_sig_int),
 
 void *_rtld_tramp_hook(int, void *, const Obj_Entry *, const Elf_Sym *, void *,
     void *);
-size_t tramp_compile(char **, const struct tramp_data *);
+size_t tramp_compile(void **, const struct tramp_data *);
 void *tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *);
 struct func_sig tramp_fetch_sig(const Obj_Entry *, unsigned long);
 

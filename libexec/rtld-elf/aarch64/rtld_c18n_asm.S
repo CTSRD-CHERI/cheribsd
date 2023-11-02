@@ -81,14 +81,23 @@ END(_rtld_sighandler)
 
 ENTRY(_rtld_get_rstk)
 	/*
-	 * This function MUST preserve all caller-saved registers except:
-	 * - c11: Target restricted stack
-	 * - c18: Will be overwritten later in the trampoline
+	 * NON-STANDARD CALLING CONVENTION
+	 *
+	 * This function is only called from trampolines when lazily allocating
+	 * a restricted stack for the callee compartment.
+	 *
+	 * Upon entry, w14 holds the compartment ID of the callee compartment.
+	 *
+	 * Upon return, c17 holds the allocated stack.
+	 *
+	 * All caller-saved registers must be preserved except c17.
 	 */
+
 	stp	c18, c30, [csp, #-(CAP_WIDTH * 2)]!
-	stp	c15, c16, [csp, #-(CAP_WIDTH * 2)]!
-	stp	c13, c14, [csp, #-(CAP_WIDTH * 2)]!
-	stp	c10, c12, [csp, #-(CAP_WIDTH * 2)]!
+	str	c16, [csp, #-(CAP_WIDTH * 2)]!
+	stp	c14, c15, [csp, #-(CAP_WIDTH * 2)]!
+	stp	c12, c13, [csp, #-(CAP_WIDTH * 2)]!
+	stp	c10, c11, [csp, #-(CAP_WIDTH * 2)]!
 	stp	c8, c9, [csp, #-(CAP_WIDTH * 2)]!
 	stp	c6, c7, [csp, #-(CAP_WIDTH * 2)]!
 	stp	c4, c5, [csp, #-(CAP_WIDTH * 2)]!
@@ -101,35 +110,61 @@ ENTRY(_rtld_get_rstk)
 
 	mov	w0, w14					/* w0 = cid */
 	bl	get_rstk
-	mov	c11, c0
+	mov	c17, c0
 
 	ldp	q6, q7, [csp, #(16 * 6)]
 	ldp	q4, q5, [csp, #(16 * 4)]
 	ldp	q2, q3, [csp, #(16 * 2)]
 	ldp	q0, q1, [csp], #(16 * 8)
-	ldp	c18, c30, [csp, #(CAP_WIDTH * 16)]
-	ldp	c15, c16, [csp, #(CAP_WIDTH * 14)]
-	ldp	c13, c14, [csp, #(CAP_WIDTH * 12)]
-	ldp	c10, c12, [csp, #(CAP_WIDTH * 10)]
+	ldp	c18, c30, [csp, #(CAP_WIDTH * 18)]
+	ldr	c16, [csp, #(CAP_WIDTH * 16)]
+	ldp	c14, c15, [csp, #(CAP_WIDTH * 14)]
+	ldp	c12, c13, [csp, #(CAP_WIDTH * 12)]
+	ldp	c10, c11, [csp, #(CAP_WIDTH * 10)]
 	ldp	c8, c9, [csp, #(CAP_WIDTH * 8)]
 	ldp	c6, c7, [csp, #(CAP_WIDTH * 6)]
 	ldp	c4, c5, [csp, #(CAP_WIDTH * 4)]
 	ldp	c2, c3, [csp, #(CAP_WIDTH * 2)]
-	ldp	c0, c1, [csp], #(CAP_WIDTH * 18)
+	ldp	c0, c1, [csp], #(CAP_WIDTH * 20)
 
 	RETURN
 END(_rtld_get_rstk)
 
 ENTRY(_rtld_tramp_hook)
+	/*
+	 * NON-STANDARD CALLING CONVENTION
+	 *
+	 * This function is only called from trampolines when tracing
+	 * compartment transitions.
+	 *
+	 * Upon entry, c10-c14 hold the first arguments of tramp_hook.
+	 *
+	 * All argument registers must be preserved.
+	 */
+
+	/* Save argument registers */
+	stp	c0, c1, [csp, #-(CAP_WIDTH * 10)]!
+	stp	c2, c3, [csp, #(CAP_WIDTH * 2)]
+	stp	c4, c5, [csp, #(CAP_WIDTH * 4)]
+	stp	c6, c7, [csp, #(CAP_WIDTH * 6)]
+	stp	c8, c9, [csp, #(CAP_WIDTH * 8)]
+
 	/* Save floating point registers */
 	stp	q0, q1, [csp, #-(16 * 8)]!
 	stp	q2, q3, [csp, #(16 * 2)]
 	stp	q4, q5, [csp, #(16 * 4)]
 	stp	q6, q7, [csp, #(16 * 6)]
 
-	str	c30, [csp, #-CAP_WIDTH]!
+	mov	c0, c10
+	mov	c1, c11
+	mov	c2, c12
+	mov	c3, c13
+	mov	c4, c14
+	mrs	c5, rcsp_el0
+
+	stp	c18, c30, [csp, #-(CAP_WIDTH * 2)]!
 	bl	tramp_hook
-	ldr	c30, [csp], #CAP_WIDTH
+	ldp	c18, c30, [csp], #(CAP_WIDTH * 2)
 
 	/* Restore floating point registers */
 	ldp	q6, q7, [csp, #(16 * 6)]
@@ -137,7 +172,14 @@ ENTRY(_rtld_tramp_hook)
 	ldp	q2, q3, [csp, #(16 * 2)]
 	ldp	q0, q1, [csp], #(16 * 8)
 
-	RETURN
+	/* Restore argument registers */
+	ldp	c8, c9, [csp, #(CAP_WIDTH * 8)]
+	ldp	c6, c7, [csp, #(CAP_WIDTH * 6)]
+	ldp	c4, c5, [csp, #(CAP_WIDTH * 4)]
+	ldp	c2, c3, [csp, #(CAP_WIDTH * 2)]
+	ldp	c0, c1, [csp], #(CAP_WIDTH * 10)
+
+	retr	c30
 END(_rtld_tramp_hook)
 
 /*
@@ -160,47 +202,6 @@ END(_rtld_tramp_hook)
 	.size patch_##tramp##_##name, 4; patch_##tramp##_##name:	\
 	.word	label - end_##tramp
 
-TRAMP(tramp_header)
-tramp_header_target:
-	.chericap	0
-TRAMPEND(tramp_header)
-
-TRAMP(tramp_header_hook)
-tramp_header_hook_obj:
-	.chericap	0
-tramp_header_hook_def:
-	.chericap	0
-tramp_header_hook_function:
-	.chericap	0
-	/* Save argument registers */
-	stp	c0, c1, [csp, #-(CAP_WIDTH * 10)]!
-	stp	c2, c3, [csp, #(CAP_WIDTH * 2)]
-	stp	c4, c5, [csp, #(CAP_WIDTH * 4)]
-	stp	c6, c7, [csp, #(CAP_WIDTH * 6)]
-	stp	c8, c9, [csp, #(CAP_WIDTH * 8)]
-
-	ldr	c10, tramp_header_hook_function
-
-1:	mov	w0, #0		/* To be patched at runtime */
-2:	ldr	c1, #0		/* To be patched at runtime */
-	ldr	c2, tramp_header_hook_obj
-	ldr	c3, tramp_header_hook_def
-	mov	c4, c30
-	mrs	c5, rcsp_el0
-	blr	c10
-	mov	c30, c0
-
-	/* Restore argument registers */
-	ldp	c8, c9, [csp, #(CAP_WIDTH * 8)]
-	ldp	c6, c7, [csp, #(CAP_WIDTH * 6)]
-	ldp	c4, c5, [csp, #(CAP_WIDTH * 4)]
-	ldp	c2, c3, [csp, #(CAP_WIDTH * 2)]
-	ldp	c0, c1, [csp], #(CAP_WIDTH * 10)
-TRAMPEND(tramp_header_hook)
-
-PATCH_POINT(tramp_header_hook, event, 1b)
-PATCH_POINT(tramp_header_hook, target, 2b)
-
 TRAMP(tramp_save_caller)
 1:	ldr	c18, #0		/* To be patched at runtime */
 	mrs	c17, rcsp_el0
@@ -214,11 +215,11 @@ TRAMP(tramp_save_caller)
 	 */
 	gclim	x11, c17
 	scvalue	c16, c17, x11
-	ldr	x13, [c16, #-CAP_WIDTH]
+	ldr	x12, [c16, #-CAP_WIDTH]
 	str	c17, [c16, #-CAP_WIDTH]
 
 	/* Push frame */
-	stp	x10, x13, [TRUSTED_STACK, #-(CAP_WIDTH * 14)]!
+	stp	x10, x12, [TRUSTED_STACK, #-(CAP_WIDTH * 14)]!
 	str	c16, [TRUSTED_STACK, #(CAP_WIDTH * 1)]
 	stp	c30, c19, [TRUSTED_STACK, #(CAP_WIDTH * 2)]
 	stp	c20, c21, [TRUSTED_STACK, #(CAP_WIDTH * 4)]
@@ -226,10 +227,35 @@ TRAMP(tramp_save_caller)
 	stp	c24, c25, [TRUSTED_STACK, #(CAP_WIDTH * 8)]
 	stp	c26, c27, [TRUSTED_STACK, #(CAP_WIDTH * 10)]
 	stp	c28, c29, [TRUSTED_STACK, #(CAP_WIDTH * 12)]
+
+	/*
+	 * Save the number of unused return value registers in the flags of csp.
+	 */
+2:	movz	x13, #0		/* To be patched at runtime */
+	scflgs	TRUSTED_STACK, TRUSTED_STACK, x13
 #undef	TRUSTED_STACK
 TRAMPEND(tramp_save_caller)
 
 PATCH_POINT(tramp_save_caller, target, 1b)
+PATCH_POINT(tramp_save_caller, ret_args, 2b)
+
+TRAMP(tramp_call_hook)
+1:	ldr	c17, #0		/* To be patched at runtime */
+
+2:	mov	w10, #0		/* To be patched at runtime */
+3:	ldr	c11, #0		/* To be patched at runtime */
+4:	ldr	c12, #0		/* To be patched at runtime */
+5:	ldr	c13, #0		/* To be patched at runtime */
+	mov	c14, c30
+
+	blr	c17
+TRAMPEND(tramp_call_hook)
+
+PATCH_POINT(tramp_call_hook, function, 1b)
+PATCH_POINT(tramp_call_hook, event, 2b)
+PATCH_POINT(tramp_call_hook, target, 3b)
+PATCH_POINT(tramp_call_hook, obj, 4b)
+PATCH_POINT(tramp_call_hook, def, 5b)
 
 TRAMP(tramp_switch_stack)
 	mrs	c30, ctpidr_el0		/* c30 = table */
@@ -244,8 +270,8 @@ TRAMP(tramp_switch_stack)
 	 */
 	subs	x16, x15, x14, lsl #4		/* if (len(table) <= cid) */
 	b.ls	2f				/* goto 2f */
-	ldr	c11, [c30, w14, uxtw #4]	/* c11 = table[cid] */
-	cbnz	x11, 3f
+	ldr	c17, [c30, w14, uxtw #4]	/* c17 = table[cid] */
+	cbnz	x17, 3f
 
 	/*
 	 * Call get_rstk(), which may invoke Restricted code (e.g. locking
@@ -254,44 +280,32 @@ TRAMP(tramp_switch_stack)
 	 */
 2:
 	blr	[c30, #0]			/* get_rstk() */
-3:	ldr	c11, [c11, #-CAP_WIDTH]
+3:	ldr	c17, [c17, #-CAP_WIDTH]
 
 	/* Move the c9 buffer to the target stack */
 	cbz	x9, 6f
-	gclen	x16, c9
-	add	c17, c9, x16
-	lsr	x16, x16, #4
-	tst	x17, #0xf
+	gclen	x11, c9
+	add	c30, c9, x11
+	lsr	x11, x11, #4
+	tst	x30, #0xf
 	b.eq	5f
 
-	orr	x30, x17, #0xfffffffffffffff0
-	add	c11, c11, x30
-7:	ldrb	w30, [c17, #-1]!
-	strb	w30, [c11, #-1]!
-	tst	x17, #0xf
+	orr	x12, x30, #0xfffffffffffffff0
+	add	c17, c17, x12
+7:	ldrb	w12, [c30, #-1]!
+	strb	w12, [c17, #-1]!
+	tst	x30, #0xf
 	b.ne	7b
 
-4:	cbz	x16, 6f
-5:	ldr	c30, [c17, #-CAP_WIDTH]!
-	str	c30, [c11, #-CAP_WIDTH]!
-	sub	x16, x16, #1
+4:	cbz	x11, 6f
+5:	ldr	c12, [c30, #-CAP_WIDTH]!
+	str	c12, [c17, #-CAP_WIDTH]!
+	sub	x11, x11, #1
 	b	4b
 6:
 TRAMPEND(tramp_switch_stack)
 
 PATCH_POINT(tramp_switch_stack, cid, 1b)
-
-TRAMP(tramp_pre_invoke)
-#define	TRUSTED_STACK	csp
-	/*
-	 * Save the number of unused return value registers in the flags of csp.
-	 */
-1:	movz	x17, #0		/* To be patched at runtime */
-	scflgs	TRUSTED_STACK, TRUSTED_STACK, x17
-#undef	TRUSTED_STACK
-TRAMPEND(tramp_pre_invoke)
-
-PATCH_POINT(tramp_pre_invoke, ret_args, 1b)
 
 TRAMP(tramp_invoke_exe)
 	blr	c18
@@ -333,44 +347,21 @@ TRAMP(tramp_invoke_res)
 	/*
 	 * Clear temporary registers, except
 	 * - c10: Link to previous frame (scalar)
-	 * - c11: Callee's stack
-	 * - c12: Tag of csp (scalar)
-	 * - c13: Old top of caller's stack (scalar)
+	 * - c11: Top of caller's stack (scalar)
+	 * - c12: Old top of caller's stack (scalar)
+	 * - c13: Flags of csp (scalar)
 	 * - c14: Callee's compartment ID (scalar)
 	 * - c15: Length of stack table (scalar)
 	 * - c16: Comparison result (scalar)
-	 * - c17: Flags of csp (scalar)
+	 * - c17: Callee's stack
 	 * - c18: Callee's code
 	 */
 
-	msr	rcsp_el0, c11
+	msr	rcsp_el0, c17
 	blrr	c18
 TRAMPEND(tramp_invoke_res)
 
-TRAMP(tramp_return_hook)
-	/* Save return value registers */
-	stp	c0, c1, [csp, #-(CAP_WIDTH * 2)]!
-
-1:	ldr	c10, #0			/* To be patched at runtime */
-
-2:	mov	w0, #0			/* To be patched at runtime */
-	mov	x1, xzr
-3:	ldr	c2, #0			/* To be patched at runtime */
-4:	ldr	c3, #0			/* To be patched at runtime */
-	mov	c4, c30
-	mrs	c5, rcsp_el0
-	blr	c10
-
-	/* Restore return value registers */
-	ldp	c0, c1, [csp], #(CAP_WIDTH * 2)
-TRAMPEND(tramp_return_hook)
-
-PATCH_POINT(tramp_return_hook, function, 1b)
-PATCH_POINT(tramp_return_hook, event, 2b)
-PATCH_POINT(tramp_return_hook, obj, 3b)
-PATCH_POINT(tramp_return_hook, def, 4b)
-
-TRAMP(tramp_return)
+TRAMP(tramp_pop_frame)
 #define	TRUSTED_STACK	csp
 	/* Restore callee-saved registers */
 	ldp	c28, c29, [TRUSTED_STACK, #(CAP_WIDTH * 12)]
@@ -431,7 +422,28 @@ TRAMP(tramp_return)
 	 * Executive).
 	 */
 	msr	rcsp_el0, c13
-	retr	c30
 #undef	TRUSTED_STACK
+TRAMPEND(tramp_pop_frame)
+
+TRAMP(tramp_return)
+	retr	c30
 TRAMPEND(tramp_return)
+
+TRAMP(tramp_return_hook)
+	/* Save return value registers */
+1:	ldr	c18, #0			/* To be patched at runtime */
+
+2:	mov	w10, #0			/* To be patched at runtime */
+	mov	x11, xzr
+3:	ldr	c12, #0			/* To be patched at runtime */
+4:	ldr	c13, #0			/* To be patched at runtime */
+	mov	c14, c30
+
+	br	c18
+TRAMPEND(tramp_return_hook)
+
+PATCH_POINT(tramp_return_hook, function, 1b)
+PATCH_POINT(tramp_return_hook, event, 2b)
+PATCH_POINT(tramp_return_hook, obj, 3b)
+PATCH_POINT(tramp_return_hook, def, 4b)
 #endif
