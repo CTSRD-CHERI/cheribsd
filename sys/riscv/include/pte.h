@@ -101,11 +101,8 @@ typedef	uint64_t	pn_t;			/* page number */
 #define	PTE_RX		(PTE_R | PTE_X)
 #define	PTE_KERN	(PTE_V | PTE_R | PTE_W | PTE_A | PTE_D)
 #define	PTE_KERN_CAP	(PTE_KERN | PTE_KERN_CHERI)
-#define	PTE_PROMOTE	(PTE_V | PTE_RWX | PTE_D | PTE_A | PTE_G | PTE_U | \
+#define	PTE_PROMOTE	(PTE_V | PTE_RWX | PTE_D | PTE_G | PTE_U | \
 			 PTE_SW_MANAGED | PTE_SW_WIRED | PTE_PROMOTE_CHERI)
-
-/* Bits 63 - 54 are reserved for future use. */
-#define PTE_HI_MASK	0xFFC0000000000000ULL
 
 /* Bits 63 - 54 are reserved for future use. */
 #define PTE_HI_MASK	0xFFC0000000000000ULL
