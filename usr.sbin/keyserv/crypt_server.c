@@ -209,8 +209,6 @@ void load_des(int warn, char *libpath)
 			printf ("Using %s shared object.\n", dlpath);
 		}
 	}
-
-	return;
 }
 
 desresp *
