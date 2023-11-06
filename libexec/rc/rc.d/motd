@@ -48,7 +48,7 @@ append_perf_warnings()
 			esac
 		done
 	fi
-	runtime_revocation_default=`sysctl -n security.cheri.runtime_quarantine_default 2> /dev/null`
+	runtime_revocation_default=`sysctl -n security.cheri.runtime_revocation_default 2> /dev/null`
 	if [ "${runtime_revocation_default}" = "1" ]; then
 		echo -n " CHERI_CAPREVOKE"
 		echo "WARNING: capability revocation enabled by default, this may affect performance" >> $_t
