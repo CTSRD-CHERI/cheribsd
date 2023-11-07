@@ -464,6 +464,7 @@ vm_object_allocate_anon(vm_pindex_t size, vm_object_t backing_object,
     struct ucred *cred, vm_size_t charge)
 {
 	vm_object_t handle, object;
+	int capflag = OBJ_HASCAP;
 
 	if (backing_object == NULL)
 		handle = NULL;
@@ -471,9 +472,12 @@ vm_object_allocate_anon(vm_pindex_t size, vm_object_t backing_object,
 		handle = backing_object->handle;
 	else
 		handle = backing_object;
+	if (backing_object != NULL &&
+	    (backing_object->flags & OBJ_NOCAP) != 0)
+		capflag = OBJ_NOCAP;
 	object = uma_zalloc(obj_zone, M_WAITOK);
 	_vm_object_allocate(OBJT_SWAP, size,
-	    OBJ_ANON | OBJ_ONEMAPPING | OBJ_HASCAP | OBJ_SWAP, object, handle);
+	    OBJ_ANON | OBJ_ONEMAPPING | capflag | OBJ_SWAP, object, handle);
 	object->cred = cred;
 	object->charge = cred != NULL ? charge : 0;
 	return (object);

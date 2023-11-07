@@ -1294,11 +1294,15 @@ vm_fault_cow(struct faultstate *fs)
 		 * an assertion that the source page has no tags
 		 * instead if OBJ_HASCAP is not set.
 		 *
+		 * XXXBD: it is no longer the case that the all anonymous
+		 * objects are OBJ_HASCAP as OBJ_NOCAP supresses the addition
+		 * of OBJ_HASCAP
+		 *
 		 * Preserve tags if the source page contains tags.
 		 * The destination page will always belong to a
 		 * tag-bearing VM object.
 		 */
-		KASSERT(fs->first_object->flags & OBJ_HASCAP,
+		KASSERT(fs->first_object->flags & (OBJ_HASCAP | OBJ_NOCAP),
 		    ("%s: destination object %p doesn't have OBJ_HASCAP",
 		    __func__, fs->first_object));
 		if (fs->object->flags & OBJ_HASCAP) {
