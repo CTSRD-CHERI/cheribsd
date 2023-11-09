@@ -122,12 +122,8 @@
  *
  * MAP_ALIGNED_CHERI returns memory aligned appropriately for the requested
  * length or fails.  Passing an under-rounded length fails.
- *
- * MAP_ALIGNED_CHERI_SEAL returns memory aligned to allow sealing given the
- * requested length or fails.  Passing an under-rounded length fails.
  */
 #define	MAP_ALIGNED_CHERI	MAP_ALIGNED(2)	/* align for CHERI data */
-#define	MAP_ALIGNED_CHERI_SEAL	MAP_ALIGNED(3)	/* align for sealing on CHERI */
 
 /*
  * Flags provided to shm_rename
