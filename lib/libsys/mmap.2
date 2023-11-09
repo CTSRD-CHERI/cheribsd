@@ -215,19 +215,6 @@ On architectures without CHERI support or where all capabilities are
 precise,
 .Dv MAP_ALIGNED_CHERI
 has no effect.
-.It Dv MAP_ALIGNED_CHERI_SEAL
-Align the region as required to allow a CHERI capability to be sealed.
-If a suitable region cannot be found or the address of
-.Fa addr
-or the length in
-.Fa len
-is not representable as a precise, sealable capability,
-.Fn mmap
-will fail.
-On architectures without CHERI support or where all capabilities are
-precise,
-.Dv MAP_ALIGNED_CHERI_SEAL
-has no effect.
 .It Dv MAP_ALIGNED_SUPER
 Align the region to maximize the potential use of large
 .Pq Dq super
@@ -608,8 +595,6 @@ was not.
 .It Bq Er EINVAL
 .Dv MAP_ALIGNED_CHERI
 (implied on CheriABI)
-or
-.Dv MAP_ALIGNED_CHERI_SEAL
 was specified and
 .Fa addr
 or
