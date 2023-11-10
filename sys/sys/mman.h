@@ -118,14 +118,6 @@
 #define	MAP_ALIGNED_SUPER	MAP_ALIGNED(1) /* align on a superpage */
 
 /*
- * CHERI specific flags and alignment constraints.
- *
- * MAP_ALIGNED_CHERI returns memory aligned appropriately for the requested
- * length or fails.  Passing an under-rounded length fails.
- */
-#define	MAP_ALIGNED_CHERI	MAP_ALIGNED(2)	/* align for CHERI data */
-
-/*
  * Flags provided to shm_rename
  */
 /* Don't overwrite dest, if it exists */

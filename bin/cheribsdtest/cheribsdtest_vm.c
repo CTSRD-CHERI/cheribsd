@@ -815,13 +815,6 @@ CHERIBSDTEST(vm_reservation_align,
 	    "mmap failed to align representable region with requested "
 	    "alignment %lx for %p", align_shift + 1, map);
 
-	/* Explicit cheri alignment */
-	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, len,
-	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_ALIGNED_CHERI, -1, 0));
-	CHERIBSDTEST_VERIFY2(((ptraddr_t)(map) & align_mask) == 0,
-	    "mmap failed to align representable region with requested "
-	    "cheri alignment for %p", map);
-
 	cheribsdtest_success();
 }
 
