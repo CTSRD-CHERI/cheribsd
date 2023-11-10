@@ -882,8 +882,8 @@ start:
 	 * Load-acquire the index until it becomes available.
 	 */
 	do
-	        idx = atomic_load_explicit(&tramp_table.map[slot].index,
-	            memory_order_acquire);
+		idx = atomic_load_explicit(&tramp_table.map[slot].index,
+		    memory_order_acquire);
 	while (idx == -1);
 
 	entry = tramp_get_entry(&tramp_table.data[idx], data);
