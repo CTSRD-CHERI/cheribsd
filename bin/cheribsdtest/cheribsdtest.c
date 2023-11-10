@@ -500,12 +500,16 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 		if (ccsp->ccs_testresult == TESTRESULT_UNKNOWN) {
 			snprintf(reason, sizeof(reason),
 			    "Test failed to set a success/failure status");
+			/* Test harness error, always fatal */
+			xfail_reason = flaky_reason = NULL;
 			goto fail;
 		}
 		if (ccsp->ccs_testresult != TESTRESULT_SUCCESS) {
 			snprintf(reason, sizeof(reason),
 			    "Test returned unexpected result (%d)",
 			    ccsp->ccs_testresult);
+			/* Test harness error, always fatal */
+			xfail_reason = flaky_reason = NULL;
 			goto fail;
 		}
 	}
