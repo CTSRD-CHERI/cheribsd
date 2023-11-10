@@ -491,6 +491,12 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 	 * an expected/desired fault don't undergo these checks.
 	 */
 	if (!(ctp->ct_flags & CT_FLAG_SIGNAL)) {
+		if (ccsp->ccs_signum != 0) {
+			snprintf(reason, sizeof(reason),
+			    "Test received unexpected signal %d",
+			    ccsp->ccs_signum);
+			goto fail;
+		}
 		if (ccsp->ccs_testresult == TESTRESULT_UNKNOWN) {
 			snprintf(reason, sizeof(reason),
 			    "Test failed to set a success/failure status");
