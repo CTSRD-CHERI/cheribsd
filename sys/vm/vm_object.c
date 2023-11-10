@@ -1939,6 +1939,9 @@ vm_object_collapse(vm_object_t object)
 		    ("vm_object_collapse: Backing object already collapsing."));
 		KASSERT((object->flags & (OBJ_COLLAPSING | OBJ_DEAD)) == 0,
 		    ("vm_object_collapse: object is already collapsing."));
+		KASSERT((object->flags & OBJ_HASCAP) != 0 ||
+		    (backing_object->flags & OBJ_HASCAP) == 0,
+		    ("vm_object_collapse: shadow does not bear capabilities"));
 
 		/*
 		 * We know that we can either collapse the backing object if
