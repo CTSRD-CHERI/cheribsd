@@ -98,11 +98,6 @@ void vm_cheri_revoke_cookie_rele(struct vm_cheri_revoke_cookie *cookie);
 void vm_cheri_revoke_info_page(struct vm_map *map, struct sysentvec *,
     struct cheri_revoke_info_page * __capability *);
 
-enum {
-	/* Set externally, checked per page */
-	VM_CHERI_REVOKE_BARRIERED   = 0x01, /* world is stopped (debug) */
-};
-
 int vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *, int);
 
 void vm_cheri_assert_consistent_clg(struct vm_map *map);

@@ -351,9 +351,6 @@ static enum vm_cro_at
 vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
     vm_map_entry_t entry, vm_offset_t ioff, vm_offset_t *ooff, int *vmres)
 {
-#ifdef INVARIANTS
-	vm_page_astate_t mas;
-#endif
 	CHERI_REVOKE_STATS_FOR(crst, crc);
 	vm_map_t map = crc->map;
 	vm_object_t obj = entry->object.vm_object;
@@ -668,10 +665,8 @@ ok:
 		mxbusy = false;
 	}
 
-	mas = vm_page_astate_load(m);
-	KASSERT((mas.flags & PGA_CAPDIRTY) == 0 ||
-	    (flags & VM_CHERI_REVOKE_BARRIERED) == 0,
-	    ("Capdirty page after visit with world stopped?"));
+	KASSERT((vm_page_astate_load(m).flags & PGA_CAPDIRTY) == 0,
+	    ("Capdirty page after visit?"));
 #endif
 
 	*ooff = ioff + PAGE_SIZE;
