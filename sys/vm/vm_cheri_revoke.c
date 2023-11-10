@@ -922,7 +922,7 @@ vm_map_install_cheri_revoke_shadow(struct vm_map *map, struct sysentvec *sv)
 	vm_offset_t start_addr = sv->sv_cheri_revoke_shadow_base;
 	vm_offset_t end_addr = start_addr + sv->sv_cheri_revoke_shadow_length;
 
-	vmo_shadow = vm_object_allocate(OBJT_DEFAULT, end_addr - start_addr);
+	vmo_shadow = vm_object_allocate(OBJT_SWAP, end_addr - start_addr);
 	/*
 	 * The shadow bitmap can never contain capabilities so mark it as
 	 * such to ensure it doesn't need to be scanned for them (e.g.,
@@ -931,7 +931,7 @@ vm_map_install_cheri_revoke_shadow(struct vm_map *map, struct sysentvec *sv)
 	 */
 	vm_object_set_flag(vmo_shadow, OBJ_NOCAP);
 
-	vmo_info = vm_object_allocate(OBJT_DEFAULT, PAGE_SIZE);
+	vmo_info = vm_object_allocate(OBJT_SWAP, PAGE_SIZE);
 
 	vm_map_lock(map);
 
