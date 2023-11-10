@@ -1,11 +1,10 @@
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_vm.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
+#include <sys/pctrie.h>
 #include <sys/proc.h>
 #include <sys/rwlock.h>
 #include <sys/sched.h>
@@ -315,7 +314,16 @@ out:
 static bool cheri_revoke_avoid_faults = 1;
 SYSCTL_BOOL(_vm_cheri_revoke, OID_AUTO, avoid_faults, CTLFLAG_RW,
     &cheri_revoke_avoid_faults, 0,
-    "XXX");
+    "Avoid faulting when the pager is known not to contain the page");
+
+static bool
+vm_cheri_revoke_skip_fault(vm_object_t object)
+{
+	return (cheri_revoke_avoid_faults && (object->flags == OBJ_SWAP) != 0 &&
+	    pctrie_is_empty(&object->un_pager.swp.swp_blks) &&
+	    (object->backing_object == NULL ||
+	    (object->backing_object->flags & OBJ_HASCAP) == 0));
+}
 
 enum vm_cro_at {
 	VM_CHERI_REVOKE_AT_OK    = 0,
@@ -445,7 +453,8 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 	(void)vm_page_grab_valid(&m, obj, ipi, VM_ALLOC_NOZERO);
 
 	if (m == NULL) {
-		if (flags & VM_CHERI_REVOKE_QUICK_SUCCESSOR) {
+		/* Can we avoid calling vm_fault() when the page is not resident? */
+		if (vm_cheri_revoke_skip_fault(obj)) {
 			/* Look forward in the object's collection of pages */
 			vm_page_t obj_next_pg = vm_page_find_least(obj, ipi);
 
@@ -691,7 +700,6 @@ vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc, int flags,
 	int res;
 	vm_offset_t ooffset;
 	vm_object_t obj;
-	vm_object_t objlocked = NULL;
 
 	KASSERT(!(entry->eflags & MAP_ENTRY_IS_SUB_MAP),
 	    ("cheri_revoke SUB_MAP"));
@@ -706,23 +714,7 @@ vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc, int flags,
 	if ((entry->max_protection & VM_PROT_READ_CAP) == 0)
 		goto fini;
 
-	if (cheri_revoke_avoid_faults) {
-		if ((obj->type == OBJT_DEFAULT) &&
-		    ((obj->backing_object == NULL) ||
-		     ((obj->backing_object->flags & OBJ_HASCAP) == 0)))
-			flags |= VM_CHERI_REVOKE_QUICK_SUCCESSOR;
-
-		/*
-		 * XXX How do to QUICK_SUCCESSOR for OBJT_SWAP?
-		 * MJ: this could be extended to swap objects by additionally
-		 * querying the pager for a copy of non-resident pages.
-		 * swap_pager_find_least() would be the main vehicle for that.
-		 */
-	}
-
-	objlocked = obj;
 	VM_OBJECT_WLOCK(obj);
-
 	while (*addr < entry->end) {
 		int vmres;
 #ifdef INVARIANTS
@@ -751,11 +743,9 @@ vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc, int flags,
 			break;
 		}
 	}
+	VM_OBJECT_WUNLOCK(obj);
 
 fini:
-	if (objlocked)
-		VM_OBJECT_WUNLOCK(objlocked);
-
 	*addr = entry->end;
 	return (KERN_SUCCESS);
 }

@@ -101,9 +101,6 @@ void vm_cheri_revoke_info_page(struct vm_map *map, struct sysentvec *,
 enum {
 	/* Set externally, checked per page */
 	VM_CHERI_REVOKE_BARRIERED   = 0x01, /* world is stopped (debug) */
-
-	/* Set internally, checked per page */
-	VM_CHERI_REVOKE_QUICK_SUCCESSOR = 0x02,
 };
 
 int vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *, int);
