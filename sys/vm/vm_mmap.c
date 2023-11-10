@@ -390,33 +390,6 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 		return (EPROT);
 	}
 
-	if ((flags & MAP_ALIGNMENT_MASK) == MAP_ALIGNED_SUPER) {
-#if VM_NRESERVLEVEL > 0
-		/*
-		 * pmap_align_superpage() is a no-op for allocations
-		 * less than a super page so request data alignment
-		 * in that case.
-		 *
-		 * In practice this is a no-op as super-pages are
-		 * precisely representable.
-		 */
-		if (uap->len < (1UL << (VM_LEVEL_0_ORDER + PAGE_SHIFT)) &&
-		    CHERI_REPRESENTABLE_ALIGNMENT(uap->len) > (1UL << PAGE_SHIFT)) {
-			flags &= ~MAP_ALIGNMENT_MASK;
-			flags |= MAP_ALIGNED_CHERI;
-		}
-#endif
-	}
-	else if ((flags & MAP_ALIGNMENT_MASK) != MAP_ALIGNED(0) &&
-	    (flags & MAP_ALIGNMENT_MASK) != MAP_ALIGNED(3) && /* MAP_ALIGNED_CHERI_SEAL */
-	    (flags & MAP_ALIGNMENT_MASK) != MAP_ALIGNED_CHERI) {
-		/* Reject nonsensical sub-page alignment requests */
-		if ((flags >> MAP_ALIGNMENT_SHIFT) < PAGE_SHIFT) {
-			SYSERRCAUSE("subpage alignment request");
-			return (EINVAL);
-		}
-	}
-
 	/*
 	 * NOTE: If this architecture requires an alignment constraint, it is
 	 * set at this point.  A simple assert is not easy to contruct...
@@ -626,37 +599,8 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	if (len > size)
 		return (ENOMEM);
 
-	align = flags & MAP_ALIGNMENT_MASK;
-#if !__has_feature(capabilities)
-	/* In the non-CHERI case, remove the alignment request. */
-	if (align == MAP_ALIGNED_CHERI) {
-		flags &= ~MAP_ALIGNMENT_MASK;
-		align = 0;
-	}
-#else /* __has_feature(capabilities) */
-	/*
-	 * Convert MAP_ALIGNED_CHERI into explicit alignment
-	 * requests and pad lengths.  The combination of alignment (via
-	 * the updated, explicit alignment flags) and padding is required
-	 * for any request that would otherwise be unrepresentable due
-	 * to compressed capability bounds.
-	 */
-	if (align == MAP_ALIGNED_CHERI) {
-		flags &= ~MAP_ALIGNMENT_MASK;
-		if (CHERI_REPRESENTABLE_ALIGNMENT(size) > PAGE_SIZE) {
-			flags |= MAP_ALIGNED(CHERI_ALIGN_SHIFT(size));
-
-			if (size != CHERI_REPRESENTABLE_LENGTH(size))
-				size = CHERI_REPRESENTABLE_LENGTH(size);
-
-			if (CHERI_ALIGN_MASK(size) != 0)
-				addr_mask = CHERI_ALIGN_MASK(size);
-		}
-		align = flags & MAP_ALIGNMENT_MASK;
-	}
-#endif
-
 	/* Ensure alignment is at least a page and fits in a pointer. */
+	align = flags & MAP_ALIGNMENT_MASK;
 	if (align != 0 && align != MAP_ALIGNED_SUPER &&
 	    (align >> MAP_ALIGNMENT_SHIFT >= sizeof(void *) * NBBY ||
 	    align >> MAP_ALIGNMENT_SHIFT < PAGE_SHIFT)) {

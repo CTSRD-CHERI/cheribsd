@@ -198,23 +198,6 @@ will fail.
 The
 .Fa n
 argument specifies the binary logarithm of the desired alignment.
-.It Dv MAP_ALIGNED_CHERI
-Align the region as required to allow a CHERI capability to be created.
-If a suitable region cannot be found or the address of
-.Fa addr
-or the length in
-.Fa len
-is not representable as a precise capability,
-.Fn mmap
-will fail.
-The
-.Dv MAP_ALIGNED_CHERI
-flag is assumed for CheriABI programs when address space is being
-reserved.
-On architectures without CHERI support or where all capabilities are
-precise,
-.Dv MAP_ALIGNED_CHERI
-has no effect.
 .It Dv MAP_ALIGNED_SUPER
 Align the region to maximize the potential use of large
 .Pq Dq super
@@ -592,14 +575,6 @@ were specified, but the requested region is already used by a mapping.
 was specified, but
 .Dv MAP_FIXED
 was not.
-.It Bq Er EINVAL
-.Dv MAP_ALIGNED_CHERI
-(implied on CheriABI)
-was specified and
-.Fa addr
-or
-.Fa size
-was not sufficently aligned for the current architecture.
 .It Bq Er EINVAL
 .Dv MAP_GUARD
 was specified, but the
