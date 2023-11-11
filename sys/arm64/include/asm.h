@@ -129,8 +129,8 @@
 	ldr	reg, [tmpptr]
 #else
 #define	LDR_LABEL(reg, tmpptr, label)			\
-	ldr	tmpptr, =##label;			\
-	ldr	reg, [tmpptr]
+	adrp	tmpptr, ##label;			\
+	ldr	reg, [tmpptr, :lo12:##label]
 #endif
 
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
