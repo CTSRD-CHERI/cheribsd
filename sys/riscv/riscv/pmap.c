@@ -3693,6 +3693,7 @@ pmap_caploadgen_test_all_clean(vm_page_t m)
 
 	KASSERT((m->flags & PG_FICTITIOUS) == 0,
 	    ("fictitious page in pmap_caploadgen_test_all_clean"));
+	vm_page_assert_busied(m);
 
 	rv = true;
 	rw_rlock(&pvh_global_lock);
@@ -3755,9 +3756,8 @@ out:
 	 * we've looked at all the PTEs: we might have raced a removal of a PTE
 	 * that had PTE_SCI clear.
 	 *
-	 * Despite not holding a pmap LOCKed right now, something is preventing
-	 * new mappings (PMAP_CAPLOADGEN_NONEWMAPS) and so we don't need to
-	 * worry that we're missing something here.
+	 * The page is busy, ensuring that new, writeable mappings cannot be
+	 * created.
 	 */
 	if (rv && !(vm_page_astate_load(m).flags & PGA_CAPDIRTY)) {
 		vm_page_aflag_clear(m, PGA_CAPSTORE);

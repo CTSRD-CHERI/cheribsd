@@ -5386,9 +5386,13 @@ pmap_caploadgen_test_all_clean(vm_page_t m)
 	pt_entry_t pte;
 	pmap_t pmap;
 	int lvl, md_gen, pvh_gen;
-	boolean_t rv;
+	bool rv;
 
-	rv = TRUE;
+	KASSERT((m->flags & PG_FICTITIOUS) == 0,
+	    ("fictitious page in pmap_caploadgen_test_all_clean"));
+	vm_page_assert_busied(m);
+
+	rv = true;
 	lock = VM_PAGE_TO_PV_LIST_LOCK(m);
 	rw_rlock(lock);
 restart:
@@ -5410,7 +5414,7 @@ restart:
 		KASSERT(lvl == 3,
 		    ("pmap_page_test_mappings: Invalid level %d", lvl));
 		if (pte & ATTR_CDBM) {
-			rv = FALSE;
+			rv = false;
 			goto out;
 		}
 		KASSERT((pte & ATTR_SC) == 0, ("ATTR_SC without ATTR_CDBM"));
@@ -5437,7 +5441,7 @@ restart:
 			KASSERT(lvl == 2,
 			    ("pmap_page_test_mappings: Invalid level %d", lvl));
 			if (pte & ATTR_CDBM) {
-				rv = FALSE;
+				rv = false;
 				goto out;
 			}
 			KASSERT((pte & ATTR_SC) == 0,
@@ -5446,14 +5450,14 @@ restart:
 	}
 out:
 	rw_runlock(lock);
+
 	/*
 	 * It's important that we test the PGA_CAPDIRTY flag again *after*
 	 * we've looked at all the PTEs: we might have raced a removal of a PTE
 	 * that had ATTR_CDBM set.
 	 *
-	 * Despite not holding a pmap LOCKed right now, something is preventing
-	 * new mappings (PMAP_CAPLOADGEN_NONEWMAPS) and so we don't need to
-	 * worry that we're missing something here.
+	 * The page is busy, ensuring that new, writeable mappings cannot be
+	 * created.
 	 */
 	if (rv && !(vm_page_astate_load(m).flags & PGA_CAPDIRTY)) {
 		vm_page_aflag_clear(m, PGA_CAPSTORE);
