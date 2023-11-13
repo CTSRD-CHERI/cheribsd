@@ -500,10 +500,9 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 
 		CHERI_REVOKE_STATS_BUMP(crst, pages_faulted_ro);
 
-		last_timestamp = map->timestamp;
-
 		VM_OBJECT_WUNLOCK(obj);
 
+		last_timestamp = map->timestamp;
 		vm_map_unlock_read(map);
 		res = vm_fault(map, addr, VM_PROT_READ | VM_PROT_READ_CAP,
 		    VM_FAULT_NOFILL, &m);
@@ -590,8 +589,6 @@ visit_ro:
 visit_rw_fault:
 	CHERI_REVOKE_STATS_BUMP(crst, pages_faulted_rw);
 
-	last_timestamp = map->timestamp;
-
 	if (mwired) {
 		mwired = false;
 		vm_page_unwire_in_situ(m);
@@ -601,6 +598,7 @@ visit_rw_fault:
 		vm_page_xunbusy(m);
 	}
 
+	last_timestamp = map->timestamp;
 	vm_map_unlock_read(map);
 	VM_OBJECT_ASSERT_UNLOCKED(obj);
 	m = NULL;
