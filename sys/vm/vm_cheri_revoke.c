@@ -342,7 +342,7 @@ out:
 /******************************* VM ITERATION *******************************/
 
 static bool cheri_revoke_avoid_faults = 1;
-SYSCTL_BOOL(_vm_cheri_revoke, OID_AUTO, avoid_faults, CTLFLAG_RW,
+SYSCTL_BOOL(_vm_cheri_revoke, OID_AUTO, avoid_faults, CTLFLAG_RWTUN,
     &cheri_revoke_avoid_faults, 0,
     "Avoid faulting when the pager is known not to contain the page");
 
