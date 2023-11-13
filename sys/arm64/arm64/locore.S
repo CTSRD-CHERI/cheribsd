@@ -425,6 +425,14 @@ mp_virtdone:
 
 	clear_capregs
 
+	/*
+	 * Initialize the per-CPU pointer before calling into C code, for the
+	 * benefit of kernel sanitizers.
+	 */
+	adrp	PTR(18), bootpcpu
+	ldr	PTR(18), [PTR(18), :lo12:bootpcpu]
+	msr	PTRN(tpidr_el1), PTR(18)
+
 	b	init_secondary
 END(mpentry)
 #endif

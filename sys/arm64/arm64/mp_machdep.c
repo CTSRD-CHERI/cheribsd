@@ -134,6 +134,9 @@ void init_secondary(uint64_t);
 /* Synchronize AP startup. */
 static struct mtx ap_boot_mtx;
 
+/* Used to initialize the PCPU ahead of calling init_secondary(). */
+void *bootpcpu;
+
 /* Stacks for AP initialization, discarded once idle threads are started. */
 void *bootstack;
 static void *bootstacks[MAXCPU];
@@ -227,9 +230,6 @@ init_secondary(uint64_t cpu)
 			panic("MPIDR for this CPU is not in pcpu table");
 	}
 
-	pcpup = cpuid_to_pcpu[cpu];
-	init_cpu_pcpup(pcpup);
-
 	/*
 	 * Identify current CPU. This is necessary to setup
 	 * affinity registers and to provide support for
@@ -238,6 +238,7 @@ init_secondary(uint64_t cpu)
 	 * We need this before signalling the CPU is ready to
 	 * let the boot CPU use the results.
 	 */
+	pcpup = cpuid_to_pcpu[cpu];
 	pcpup->pc_midr = get_midr();
 	identify_cpu(cpu);
 
@@ -551,6 +552,7 @@ start_cpu(u_int cpuid, uint64_t target_cpu, int domain, vm_paddr_t release_addr)
 	pmap_disable_promotion((vm_offset_t)pcpup, size);
 	pcpu_init(pcpup, cpuid, sizeof(struct pcpu));
 	pcpup->pc_mpidr = target_cpu & CPU_AFF_MASK;
+	bootpcpu = pcpup;
 
 	dpcpu[cpuid - 1] = (void *)(pcpup + 1);
 	dpcpu_init(dpcpu[cpuid - 1], cpuid);
