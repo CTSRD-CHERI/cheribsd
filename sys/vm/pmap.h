@@ -137,8 +137,8 @@ enum pmap_caploadgen_res {
 	PMAP_CAPLOADGEN_SCAN_RO_XBUSIED = 6, /* mapped RO and xbusy */
 	PMAP_CAPLOADGEN_SCAN_RW_XBUSIED = 7, /* mapped RW and xbusy */
 };
-int		 pmap_caploadgen_update(pmap_t, vm_offset_t, vm_page_t *,
-		    int flags);
+enum pmap_caploadgen_res pmap_caploadgen_update(pmap_t, vm_offset_t,
+		    vm_page_t *, int flags);
 void		 pmap_caploadgen_next(pmap_t pmap);
 void		 pmap_assert_consistent_clg(pmap_t, vm_offset_t);
 #endif

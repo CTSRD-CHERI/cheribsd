@@ -3807,7 +3807,7 @@ pmap_caploadgen_update_clear_cw(pt_entry_t *pte, pt_entry_t oldpte)
 
 }
 
-int
+enum pmap_caploadgen_res
 pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 {
 	enum pmap_caploadgen_res res;

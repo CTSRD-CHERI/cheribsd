@@ -252,9 +252,6 @@ again:
 	case PMAP_CAPLOADGEN_SCAN_RW_XBUSIED:
 		xbusied = true;
 		break;
-
-	default:
-		panic("Bad pmap_caploadgen_fault_user return");
 	}
 
 	if (!hascookie) {
@@ -390,6 +387,7 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 	vm_pindex_t ipi = OFF_TO_IDX(ioff);
 	vm_offset_t addr = ioff - entry->offset + entry->start;
 	vm_page_t m = NULL;
+	enum pmap_caploadgen_res pres;
 	int res;
 	unsigned int last_timestamp;
 	bool mwired = false;
@@ -417,54 +415,47 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 	 *    immediate fallback to the VM (vm_page_grab_valid or vm_fault).
 	 *
 	 */
-	{
-		int pmres;
+	pres = pmap_caploadgen_update(crc->map->pmap, addr, &m, 0);
+	switch (pres) {
+	case PMAP_CAPLOADGEN_OK:
+	case PMAP_CAPLOADGEN_TEARDOWN:
+		panic("Bad first return %d from pmap_caploadgen_update", pres);
 
-		pmres = pmap_caploadgen_update(crc->map->pmap, addr, &m, 0);
+	case PMAP_CAPLOADGEN_ALREADY:
+	case PMAP_CAPLOADGEN_CLEAN:
+		*ooff = ioff + PAGE_SIZE;
+		return (VM_CHERI_REVOKE_AT_OK);
 
-		switch (pmres) {
-		default:
-		case PMAP_CAPLOADGEN_OK:
-		case PMAP_CAPLOADGEN_TEARDOWN:
-			panic("Bad first return from pmap_caploadgen_update");
+	case PMAP_CAPLOADGEN_UNABLE:
+		/*
+		 * Fall back to VM lookup.  We either could not resolve
+		 * the page at this address (perhaps because there isn't
+		 * one) or we couldn't wire something being torn down.
+		 *
+		 * XXX In some eventuality it might be nice to have the
+		 * pmap able to definitely answer "there isn't a page
+		 * here even if you go ask the VM", a sort of analogy
+		 * to skipping to the next VM map entry.
+		 */
+		break;
 
-		case PMAP_CAPLOADGEN_ALREADY:
-		case PMAP_CAPLOADGEN_CLEAN:
-			*ooff = ioff + PAGE_SIZE;
-			return (VM_CHERI_REVOKE_AT_OK);
+	case PMAP_CAPLOADGEN_SCAN_RO_WIRED:
+		VM_OBJECT_WUNLOCK(obj);
+		mwired = true;
+		goto visit_ro;
 
-		case PMAP_CAPLOADGEN_UNABLE:
-			/*
-			 * Fall back to VM lookup.  We either could not resolve
-			 * the page at this address (perhaps because there isn't
-			 * one) or we couldn't wire something being torn down.
-			 *
-			 * XXX In some eventuality it might be nice to have the
-			 * pmap able to definitely answer "there isn't a page
-			 * here even if you go ask the VM", a sort of analogy
-			 * to skipping to the next VM map entry.
-			 */
-			break;
+	case PMAP_CAPLOADGEN_SCAN_RO_XBUSIED:
+		VM_OBJECT_WUNLOCK(obj);
+		mxbusy = true;
+		goto visit_ro;
 
-		case PMAP_CAPLOADGEN_SCAN_RO_WIRED:
-			VM_OBJECT_WUNLOCK(obj);
-			mwired = true;
-			goto visit_ro;
-
-		case PMAP_CAPLOADGEN_SCAN_RO_XBUSIED:
-			VM_OBJECT_WUNLOCK(obj);
-			mxbusy = true;
-			goto visit_ro;
-
-		case PMAP_CAPLOADGEN_SCAN_RW_XBUSIED:
-			VM_OBJECT_WUNLOCK(obj);
-			mxbusy = true;
-			goto visit_rw;
-		}
+	case PMAP_CAPLOADGEN_SCAN_RW_XBUSIED:
+		VM_OBJECT_WUNLOCK(obj);
+		mxbusy = true;
+		goto visit_rw;
 	}
-	/* XXX else pmap_extract_and_hold? */
-
 	KASSERT(m == NULL, ("Load side bad state arc"));
+
 	/*
 	 * Try to grab the page out of the VM, walking the shadow chain to find
 	 * the source of CoW, if any.  Do not materialize a (CoW or otherwise)
@@ -642,14 +633,13 @@ ok:
 	 */
 	if (!mdidvm) {
 		vm_page_t m2 = m;
-		int pmres;
 
-		pmres = pmap_caploadgen_update(crc->map->pmap, addr, &m2,
+		pres = pmap_caploadgen_update(crc->map->pmap, addr, &m2,
 		    (mxbusy ? PMAP_CAPLOADGEN_XBUSIED : 0) |
 		    (mxbusy ? PMAP_CAPLOADGEN_NONEWMAPS : 0) |
 		    (viscap ? PMAP_CAPLOADGEN_HASCAPS : 0));
 
-		switch (pmres) {
+		switch (pres) {
 		case PMAP_CAPLOADGEN_OK:
 			/* Update applied */
 			break;
@@ -663,7 +653,7 @@ ok:
 
 		default:
 			panic("Bad second return from caploadgen update: %d",
-			    pmres);
+			    pres);
 		}
 
 		/* pmap_caploadgen_page will have unwired for us */
@@ -678,18 +668,17 @@ ok:
 	 */
 	if (mdidvm) {
 		vm_page_t m2 = m;
-		int pmres;
 
-		pmres = pmap_caploadgen_update(crc->map->pmap, addr, &m2,
+		pres = pmap_caploadgen_update(crc->map->pmap, addr, &m2,
 		    (mxbusy ? PMAP_CAPLOADGEN_XBUSIED : 0));
-		switch (pmres) {
+		switch (pres) {
 		case PMAP_CAPLOADGEN_UNABLE:
 		case PMAP_CAPLOADGEN_ALREADY:
 			break;
 
 		default:
 			panic("Bad return from didvm caploadgen update: %d",
-			    pmres);
+			    pres);
 		}
 
 		/* pmap_caploadgen_page will have unwired/unbusied for us */
