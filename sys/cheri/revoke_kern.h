@@ -33,7 +33,11 @@
 #ifndef __SYS_CHERI_REVOKE_KERN_H__
 #define	__SYS_CHERI_REVOKE_KERN_H__
 
-#ifndef _KERNEL
+#include <sys/types.h>
+
+#ifdef _KERNEL
+#include <sys/sysctl.h>
+#else
 #include <stdbool.h>
 #endif
 
@@ -86,12 +90,14 @@ enum cheri_revoke_state {
 #define CHERI_REVOKE_ST_EPOCH_SHIFT	2
 
 static inline enum cheri_revoke_state
-cheri_revoke_st_get_state(cheri_revoke_state_t st) {
+cheri_revoke_st_get_state(cheri_revoke_state_t st)
+{
 	return (st & CHERI_REVOKE_ST_ST_MASK);
 }
 
 static inline cheri_revoke_epoch_t
-cheri_revoke_st_get_epoch(cheri_revoke_state_t st) {
+cheri_revoke_st_get_epoch(cheri_revoke_state_t st)
+{
 	return (st >> CHERI_REVOKE_ST_EPOCH_SHIFT);
 }
 
@@ -103,14 +109,15 @@ cheri_revoke_st_set(cheri_revoke_state_t *st, cheri_revoke_epoch_t epoch,
 }
 
 static inline bool
-cheri_revoke_st_is_revoking(cheri_revoke_state_t st) {
+cheri_revoke_st_is_revoking(cheri_revoke_state_t st)
+{
 	switch (cheri_revoke_st_get_state(st)) {
 	case CHERI_REVOKE_ST_INITING:
 	case CHERI_REVOKE_ST_INITED:
 	case CHERI_REVOKE_ST_CLOSING:
-		return true;
+		return (true);
 	case CHERI_REVOKE_ST_NONE:
-		return false;
+		return (false);
 	}
 }
 
@@ -131,4 +138,4 @@ SYSCTL_DECL(_vm_cheri_revoke);
 extern int security_cheri_runtime_revocation_default;
 #endif
 
-#endif
+#endif /* !__SYS_CHERI_REVOKE_KERN_H__ */
