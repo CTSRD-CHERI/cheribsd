@@ -573,21 +573,13 @@ LEND(drop_to_el1)
  * Get the physical address the kernel was loaded at.
  */
 LENTRY(get_load_phys_addr)
+	/* Load the offset of get_load_phys_addr from KERNBASE */
+	ldr	x28, =(get_load_phys_addr - KERNBASE)
 	/* Load the physical address of virt_map */
-	adrp	PTR(29), virt_map
-	add	PTR(29), PTR(29), :lo12:virt_map
-	/* Load the virtual address of virt_map stored in virt_map */
-	ldr	x28, [PTR(29)]
-	/* Find PA - VA as PA' = VA' - VA + PA = VA' + (PA - VA) = VA' + x29 */
-	sub	x29, x29, x28
-	/* Find the load address for the kernel */
-	mov	x28, #(KERNBASE)
-	add	x28, x28, x29
+	adr	PTR(29), get_load_phys_addr
+	/* Find the physical address of KERNBASE, i.e. our load address */
+	sub	x28, x29, x28
 	ret
-
-	.align 3
-virt_map:
-	.quad	virt_map
 LEND(get_load_phys_addr)
 
 /*
