@@ -388,24 +388,19 @@ vm_cheri_revoke_page_rw(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 	CHERI_REVOKE_STATS_FOR(crst, crc);
 	uint32_t cyc_start = get_cyclecount();
 #endif
-
 	vm_offset_t mva;
 	vm_offset_t mve;
 	uintcap_t * __capability mvu;
-
 	/*
 	 * XXX NWF
 	 * This isn't what we really want, but we want to be able to fake up a
 	 * a capability to the DMAP area somehow.
 	 */
 	void * __capability kdc = swap_restore_cap;
+	int res;
 
-	int res = 0;
+	vm_page_assert_busied(m);
 
-	/*
-	 * m is xbusy, which means it's not about to be reclaimed under us.  Go
-	 * sweep via the DMAP.
-	 */
 	mva = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 	mve = mva + PAGE_SIZE;
 
