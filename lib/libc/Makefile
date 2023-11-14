@@ -4,8 +4,12 @@ SHLIBDIR?= /lib
 
 .include <src.opts.mk>
 
-LIBC_SRCTOP?= ${.CURDIR}
-LIBSYS_SRCTOP?=	${.CURDIR:H}/libsys
+.if !defined(LIBC_SRCTOP)
+LIBC_SRCTOP:= ${.PARSEDIR}
+.endif
+.if !defined(LIBSYS_SRCTOP)
+LIBSYS_SRCTOP?=	${LIBC_SRCTOP:H}/libsys
+.endif
 
 # Pick the current architecture directory for libc. In general, this is named
 # MACHINE_CPUARCH, but some ABIs are different enough to require their own libc,
@@ -128,8 +132,7 @@ NOASM=
 .include "${LIBC_SRCTOP}/stdlib/Makefile.inc"
 .include "${LIBC_SRCTOP}/stdtime/Makefile.inc"
 .include "${LIBC_SRCTOP}/string/Makefile.inc"
-.include "${LIBC_SRCTOP}/sys/Makefile.inc"
-
+.include "${LIBSYS_SRCTOP}/Makefile.sys"
 .if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap}
 .include "${LIBC_SRCTOP}/secure/Makefile.inc"
 .endif
