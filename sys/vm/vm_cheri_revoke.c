@@ -190,8 +190,8 @@ vm_cheri_revoke_visit_ro(const struct vm_cheri_revoke_cookie *crc, int flags,
 	vm_page_aflag_clear(m, PGA_CAPDIRTY);
 	hascaps = vm_cheri_revoke_page_ro(crc, m);
 
-	KASSERT(!(hascaps & VM_CHERI_REVOKE_PAGE_HASCAPS) ||
-	    ((mas.flags & PGA_CAPSTORE) || (mas.flags & PGA_CAPDIRTY)),
+	KASSERT((hascaps & VM_CHERI_REVOKE_PAGE_HASCAPS) == 0 ||
+	    (mas.flags & PGA_CAPSTORE) != 0,
 	    ("cap-bearing RO page without h/r capdirty?"
 	     " hc=%x m=%p, m->of=%x, m->af=%x",
 	     hascaps, m, m->oflags, vm_page_astate_load(m).flags));
