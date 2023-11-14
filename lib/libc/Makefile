@@ -134,14 +134,7 @@ NOASM=
 .include "${LIBC_SRCTOP}/stdlib/Makefile.inc"
 .include "${LIBC_SRCTOP}/stdtime/Makefile.inc"
 .include "${LIBC_SRCTOP}/string/Makefile.inc"
-.if !defined(NO_SYSCALLS)
-.include "${LIBC_SRCTOP}/sys/Makefile.inc"
-.else
-.PATH: ${LIBC_SRCTOP}/sys
-SRCS+=	interposing_table.c
-CFLAGS+=	-DNO_SYSCALLS
-.endif
-
+.include "${LIBSYS_SRCTOP}/Makefile.sys"
 .if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap}
 .include "${LIBC_SRCTOP}/secure/Makefile.inc"
 .endif
