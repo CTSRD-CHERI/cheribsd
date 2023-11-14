@@ -3912,9 +3912,14 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 				if (mas.flags & PGA_CAPDIRTY) {
 					/* Page-level cleaning: -?> VACANT */
 					vm_page_aflag_clear(m, PGA_CAPDIRTY);
+				} else if (__predict_false(
+				    (mas.flags & PGA_CAPSTORE) == 0)) {
+					/*
+					 * We raced with another revoker, simply
+					 * update the LCLG and keep going.
+					 */
+					;
 				} else {
-					KASSERT(mas.flags & PGA_CAPSTORE,
-					    ("Page already CAP-CLEAN?"));
 					/* PTE CAP-CLEAN; page -?> IDLE */
 
 					/*
