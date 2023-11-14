@@ -888,6 +888,9 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m,
 
 	VM_PAGE_ASSERT_PGA_CAPMETA_PMAP_ENTER(m, prot);
 	if ((prot & VM_PROT_WRITE_CAP) != 0) {
+		KASSERT((vm_page_astate_load(m).flags & PGA_CAPSTORE) != 0,
+		    ("%s: page %p does not have CAPSTORE set", __func__, m));
+
 		/*
 		 * The page is CAPSTORE and this mapping is VM_PROT_WRITE_CAP.
 		 * Always set ATTR_CDBM for userspace.
