@@ -1,7 +1,8 @@
 #	@(#)Makefile.inc	8.3 (Berkeley) 10/24/94
 
 # sys sources
-.PATH: ${LIBC_SRCTOP}/${LIBC_ARCH}/sys ${LIBC_SRCTOP}/sys
+.PATH: ${LIBC_SRCTOP}/${LIBC_ARCH}/sys
+.PATH: ${LIBSYS_SRCTOP}/${LIBC_ARCH} ${LIBSYS_SRCTOP}
 
 # Include the generated makefile containing the *complete* list
 # of syscall names in MIASM.
@@ -124,7 +125,7 @@ SPSEUDO= ${PSEUDO:S/.o/.S/}
 
 SRCS+=	${SASM} ${SPSEUDO}
 
-SYM_MAPS+=	${LIBC_SRCTOP}/sys/Symbol.map
+SYM_MAPS+=	${LIBSYS_SRCTOP}/Symbol.sys.map
 
 # Generated files
 CLEANFILES+=	${SASM} ${SPSEUDO}
