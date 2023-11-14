@@ -202,7 +202,7 @@ struct vm_object {
 #define	OBJ_PAGERPRIV1	0x4000		/* Pager private */
 #define	OBJ_PAGERPRIV2	0x8000		/* Pager private */
 #define	OBJ_HASCAP	0x10000		/* object can store capabilities */
-#define	OBJ_NOCAP	0x20000		/* object and allow shadow objects can
+#define	OBJ_NOCAP	0x20000		/* object and all shadow objects can
 					   not store capabilities */
 
 /*
