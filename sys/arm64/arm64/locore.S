@@ -306,8 +306,6 @@ virtdone:
 	sub	PTRN(sp), PTRN(sp), #BOOTPARAMS_SIZE
 	mov	PTR(0), PTRN(sp)
 
-	/* Negate the delta so it is VA -> PA */
-
 	str	PTR(19), [PTR(0), #BP_MODULEP]
 	str	PTR(25), [PTR(0), #BP_KERN_STACK]
 	str	x27, [PTR(0), #BP_KERN_TTBR0]
