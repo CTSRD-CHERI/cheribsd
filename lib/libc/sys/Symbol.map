@@ -33,6 +33,7 @@ FBSD_1.0 {
 	__setugid;
 	__syscall;
 	__sysctl;
+	_exit;
 	_umtx_op;
 	abort2;
 	accept;
@@ -286,6 +287,7 @@ FBSD_1.0 {
 	utrace;
 	uuidgen;
 	vadvise;
+	vfork;
 	wait4;
 	write;
 	writev;
