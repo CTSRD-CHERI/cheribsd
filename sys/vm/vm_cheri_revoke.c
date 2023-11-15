@@ -654,22 +654,33 @@ ok:
 			/* Page not installed in the pmap; that's fine */
 			break;
 
-		default:
-			panic("Bad second return from caploadgen update: %d",
-			    pres);
+		case PMAP_CAPLOADGEN_SCAN_RO_WIRED:
+			vm_page_unwire_in_situ(m2);
+			break;
+
+		case PMAP_CAPLOADGEN_SCAN_RW_XBUSIED:
+		case PMAP_CAPLOADGEN_SCAN_RO_XBUSIED:
+			vm_page_xunbusy(m2);
+			break;
+
+		case PMAP_CAPLOADGEN_TEARDOWN:
+			break;
 		}
 
-		/* pmap_caploadgen_page will have unwired for us */
-		KASSERT(m2 == NULL, ("LS !didvm upd !NULL?"));
+		/*
+		 * If the page wasn't busy, it's possible that its mapping was
+		 * replaced while servicing a page fault.  In this case,
+		 * however, the new page should have been scanned by the page
+		 * fault handler.
+		 */
+		KASSERT(m2 == NULL || !mxbusy,
+		    ("mapping of %p was replaced by a mapping of %p", m, m2));
+
+		/* pmap_caploadgen_update() will have released the page. */
 		mwired = false;
 		mxbusy = false;
-	}
+	} else {
 #ifdef INVARIANTS
-	/*
-	 * Even if the page has been replaced, it must have been by another act
-	 * of the VM, and so the CLG should be absent or up to date.
-	 */
-	if (mdidvm) {
 		vm_page_t m2 = m;
 
 		pres = pmap_caploadgen_update(crc->map->pmap, addr, &m2,
@@ -679,26 +690,43 @@ ok:
 		case PMAP_CAPLOADGEN_ALREADY:
 			break;
 
+		case PMAP_CAPLOADGEN_SCAN_RO_WIRED:
+			vm_page_unwire_in_situ(m2);
+			break;
+
+		case PMAP_CAPLOADGEN_SCAN_RW_XBUSIED:
+		case PMAP_CAPLOADGEN_SCAN_RO_XBUSIED:
+			vm_page_xunbusy(m2);
+			break;
+
+		case PMAP_CAPLOADGEN_TEARDOWN:
+			break;
+
 		default:
 			panic("Bad return from didvm caploadgen update: %d",
 			    pres);
 		}
 
-		/* pmap_caploadgen_page will have unwired/unbusied for us */
-		KASSERT(m2 == NULL, ("LS didvm upd !NULL?"));
+		/*
+		 * If the page wasn't busy, it's possible that its mapping was
+		 * replaced while servicing a page fault.  In this case,
+		 * however, the new page should have been scanned by the page
+		 * fault handler.
+		 */
+		KASSERT(m2 == NULL || !mxbusy,
+		    ("mapping of %p was replaced by a mapping of %p", m, m2));
+
+		/* pmap_caploadgen_update() will have released the page. */
 		mwired = false;
 		mxbusy = false;
-	}
-
-	KASSERT((vm_page_astate_load(m).flags & PGA_CAPDIRTY) == 0,
-	    ("Capdirty page after visit?"));
 #endif
-
-	*ooff = ioff + PAGE_SIZE;
+	}
 	if (mwired)
 		vm_page_unwire_in_situ(m);
 	if (mxbusy)
 		vm_page_xunbusy(m);
+
+	*ooff = ioff + PAGE_SIZE;
 
 	VM_OBJECT_WLOCK(obj);
 
