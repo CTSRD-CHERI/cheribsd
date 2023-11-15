@@ -21,7 +21,6 @@ FBSD_1.0 {
 	htons;
 	ntohl;
 	ntohs;
-	vfork;
 	makecontext;
 };
 
