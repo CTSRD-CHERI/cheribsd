@@ -41,7 +41,7 @@ THIS SOFTWARE.
 #include "awk.h"
 #include "awkgram.tab.h"
 
-Node *nodealloc(size_t n)
+Node *nodealloc(int n)
 {
 	Node *x;
 
