@@ -102,6 +102,8 @@ vm_cheri_revoke_visit_rw(const struct vm_cheri_revoke_cookie *crc, int flags,
 
 	CHERI_REVOKE_STATS_BUMP(crst, pages_scan_rw);
 
+	vm_page_assert_xbusied(m);
+
 	/*
 	 * In the Cornucopia story, we want to consider the page no longer dirty
 	 * just before we visit it.  We're interlocked against ourselves here,
@@ -148,8 +150,10 @@ vm_cheri_revoke_visit_rw(const struct vm_cheri_revoke_cookie *crc, int flags,
 	vm_page_aflag_clear(m, PGA_CAPDIRTY);
 
 	hascaps = vm_cheri_revoke_page_rw(crc, m);
-
 	if (hascaps & VM_CHERI_REVOKE_PAGE_DIRTY) {
+		KASSERT((hascaps & VM_CHERI_REVOKE_PAGE_HASCAPS) != 0,
+		    ("cap-dirty page without caps"));
+
 		/*
 		 * Load-side visits might see new capabilities being written
 		 * concurrently, but by construction any such must have already
@@ -157,9 +161,10 @@ vm_cheri_revoke_visit_rw(const struct vm_cheri_revoke_cookie *crc, int flags,
 		 * the MI layer is too cheap to worry about.
 		 */
 		vm_page_capdirty(m);
+		*cap = true;
+	} else {
+		*cap = (hascaps & VM_CHERI_REVOKE_PAGE_HASCAPS) != 0;
 	}
-
-	*cap = (hascaps & VM_CHERI_REVOKE_PAGE_HASCAPS) != 0;
 }
 
 /*
