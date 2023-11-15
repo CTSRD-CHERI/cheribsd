@@ -219,3 +219,6 @@ if [ -e "$OBJTOP"/tests/sys/fs/fusefs/mockfs.o ] && \
 	echo "Removing stale fusefs GoogleTest objects"
 	run rm -rf "$OBJTOP"/tests/sys/fs/fusefs
 fi
+
+# 20231101  1163a20cb6ad    New c18n ABI
+clean_dep   lib/libc_c18n   thr_exit S
