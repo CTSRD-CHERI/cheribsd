@@ -59,8 +59,8 @@ procstat_cheri(struct procstat *procstat, struct kinfo_proc *kipp)
 
 	if ((procstat_opts & PS_OPT_NOHEADER) == 0) {
 		if ((procstat_opts & PS_OPT_VERBOSE) == 0)
-			xo_emit("{T:/%5s %-19s %c %4s %7s}\n",
-			    "PID", "COMM", 'C', "QUAR", "RSTATE");
+			xo_emit("{T:/%5s %-19s %c %4s}\n",
+			    "PID", "COMM", 'C', "QUAR");
 		else
 			xo_emit("{T:/%5s %-19s %c %4s %7s %34s}\n",
 			    "PID", "COMM", 'C', "QUAR", "RSTATE", "EPOCH");
@@ -70,17 +70,13 @@ procstat_cheri(struct procstat *procstat, struct kinfo_proc *kipp)
 	xo_emit(" {:command/%-19s/%s}", kipp->ki_comm);
 	abi_cheri = get_abi_cheri(kipp);
 	xo_emit(" {:abi_cheri_support/%c/%c}", abi_cheri);
-	/* Don't print CHERI-specific things for non-CheriABI ABIs */
-	switch (abi_cheri) {
-	case 'P':
-		xo_emit(" {:quarantining/%4s}",
-		    get_quarantining(procstat, kipp));
-		xo_emit(" {:revoker_state/%7s}",
-		    get_revoker_state(procstat, kipp));
-		if ((procstat_opts & PS_OPT_VERBOSE) != 0)
-			xo_emit(" {:revoker_epoch/%34s}",
-			    get_revoker_epoch(procstat, kipp));
-		break;
+	xo_emit(" {:quarantining/%4s/%s}", abi_cheri == 'P' ?
+	    get_quarantining(procstat, kipp) : "-");
+	if ((procstat_opts & PS_OPT_VERBOSE) != 0) {
+		xo_emit(" {:revoker_state/%7s/%s}", abi_cheri == 'P' ?
+		    get_revoker_state(procstat, kipp) : "-");
+		xo_emit(" {:revoker_epoch/%34s/%s}", abi_cheri == 'P' ?
+		    get_revoker_epoch(procstat, kipp) : "-");
 	}
 	xo_emit("\n");
 }
