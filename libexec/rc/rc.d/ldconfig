@@ -83,7 +83,11 @@ ldconfig_start()
 		aarch64*|amd64|powerpc64)
 			_LDC=""
 			if [ -x /libexec/ld-elf32.so.1 ]; then
-				_LDC=$(/libexec/ld-elf32.so.1 -v | sed -n -e '/^Default lib path /s///p' | tr : ' ')
+				for x in $(/libexec/ld-elf32.so.1 -v | sed -n -e '/^Default lib path /s///p' | tr : ' '); do
+					if [ -d "${x}" ]; then
+						_LDC="${_LDC} ${x}"
+					fi
+				done
 			fi
 			_LDC=$(ldconfig_paths "${ldconfig_local32_dirs}" \
 			    "${ldconfig32_paths}" "$_LDC" "")
