@@ -325,9 +325,7 @@ SYSCTL_PROC(_hw, HW_MACHINE_ARCH, machine_arch, CTLTYPE_STRING | CTLFLAG_RD |
     "System architecture");
 
 #ifndef MACHINE_ARCHES
-#if defined(COMPAT_FREEBSD32)
-#define	MACHINE_ARCHES	MACHINE_ARCH " " MACHINE_ARCH32
-#elif defined(MACHINE_ARCH64CB) && defined(COMPAT_FREEBSD64)
+#if defined(MACHINE_ARCH64CB) && defined(COMPAT_FREEBSD64)
 #define	MACHINE_ARCHES	MACHINE_ARCH " " MACHINE_ARCH64CB " " MACHINE_ARCH64
 #elif defined(MACHINE_ARCH64CB)
 #define	MACHINE_ARCHES	MACHINE_ARCH " " MACHINE_ARCH64CB
@@ -338,8 +336,25 @@ SYSCTL_PROC(_hw, HW_MACHINE_ARCH, machine_arch, CTLTYPE_STRING | CTLFLAG_RD |
 #endif
 #endif
 
-SYSCTL_STRING(_kern, OID_AUTO, supported_archs, CTLFLAG_RD | CTLFLAG_MPSAFE,
-    MACHINE_ARCHES, 0, "Supported architectures for binaries");
+#ifdef COMPAT_FREEBSD32
+#include <compat/freebsd32/freebsd32_util.h>
+#endif
+
+static int
+sysctl_kern_supported_archs(SYSCTL_HANDLER_ARGS)
+{
+	const char *supported_archs;
+
+	supported_archs =
+#ifdef COMPAT_FREEBSD32
+	    compat_freebsd_32bit ? MACHINE_ARCHES " " MACHINE_ARCH32 :
+#endif
+	    MACHINE_ARCHES;
+	return (SYSCTL_OUT(req, supported_archs, strlen(supported_archs) + 1));
+}
+SYSCTL_PROC(_kern, OID_AUTO, supported_archs, CTLFLAG_RD | CTLFLAG_MPSAFE |
+    CTLFLAG_CAPRD | CTLTYPE_STRING, NULL, 0, sysctl_kern_supported_archs, "A",
+    "Supported architectures for binaries");
 
 static int
 sysctl_hostname(SYSCTL_HANDLER_ARGS)
