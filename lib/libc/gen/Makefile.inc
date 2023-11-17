@@ -79,8 +79,6 @@ SRCS+=	__getosreldate.c \
 	getmntinfo.c \
 	getnetgrent.c \
 	getosreldate.c \
-	getpagesize.c \
-	getpagesizes.c \
 	getpeereid.c \
 	getprogname.c \
 	getpwent.c \
@@ -258,8 +256,6 @@ MAN+=	alarm.3 \
 	getmntinfo.3 \
 	getnetgrent.3 \
 	getosreldate.3 \
-	getpagesize.3 \
-	getpagesizes.3 \
 	getpass.3 \
 	getpeereid.3 \
 	getprogname.3 \

@@ -101,6 +101,7 @@ FBSD_1.0 {
 	getgid;
 	getgroups;
 	getitimer;
+	getpagesize;
 	getpeername;
 	getpgid;
 	getpgrp;
@@ -334,6 +335,7 @@ FBSD_1.2 {
 	cap_enter;
 	cap_getmode;
 	getloginclass;
+	getpagesizes;
 	pdfork;
 	pdgetpid;
 	pdkill;
