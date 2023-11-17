@@ -12,7 +12,7 @@ CONFSMODE_master.passwd=	600
 CONFSPACKAGE=   runtime
 .endif
 
-SRCS+=	__getosreldate.c \
+SRCS+= \
 	__pthread_mutex_init_calloc_cb_stub.c \
 	__xuname.c \
 	_pthread_stubs.c \
