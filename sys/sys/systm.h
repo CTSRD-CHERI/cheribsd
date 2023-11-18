@@ -45,6 +45,7 @@
 #include <machine/atomic.h>
 #include <machine/cpufunc.h>
 #if __has_feature(capabilities)
+#include <machine/param.h>
 #include <machine/vmparam.h>
 #endif
 
