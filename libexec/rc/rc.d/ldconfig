@@ -79,8 +79,8 @@ ldconfig_start()
 			${ldconfig} -64 ${_ins} ${_LDC}
 			;;
 		esac
-		case ${machine_arch} in
-		aarch64*|amd64|powerpc64)
+
+		if check_kern_features compat_freebsd32; then
 			_LDC=""
 			if [ -x /libexec/ld-elf32.so.1 ]; then
 				for x in $(/libexec/ld-elf32.so.1 -v | sed -n -e '/^Default lib path /s///p' | tr : ' '); do
@@ -94,7 +94,7 @@ ldconfig_start()
 			startmsg '32-bit compatibility ldconfig path:' ${_LDC}
 			${ldconfig} -32 ${_ins} ${_LDC}
 			;;
-		esac
+		fi
 
 	fi
 }
