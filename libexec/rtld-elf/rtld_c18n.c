@@ -344,8 +344,8 @@ stk_table_expand(struct stk_table *table, size_t n_capacity, bool lock)
 	    (cheri_getlen(table) - offsetof(typeof(*table), stacks)) /
 	    sizeof(*table->stacks);
 
-	memset(&table->stacks[o_capacity], 0,
-	    sizeof(*table->stacks) * (table->capacity - o_capacity));
+	for (size_t i = o_capacity; i < table->capacity; ++i)
+		table->stacks[i].bottom = _rtld_get_rstk;
 
 	return (table);
 }
@@ -431,7 +431,7 @@ get_rstk(unsigned index)
 		table = stk_table_expand(table, capacity, true);
 		stk_table_set(table);
 	}
-	assert(table->stacks[cid_off].bottom == NULL);
+	assert(table->stacks[cid_off].size == 0);
 
 	size = C18N_STACK_SIZE;
 	stk = stk_create(size);
@@ -448,8 +448,12 @@ get_rstk(unsigned index)
 
 struct trusted_frame {
 	ptraddr_t next;
-	ptraddr_t o_stack;
-	void **stack;
+	ptraddr_t reserved;
+	/*
+	 * INVARIANT: This field contains the top of the caller's stack when the
+	 * caller was last entered.
+	 */
+	void **o_stack;
 	void *ret_addr;
 };
 
@@ -494,6 +498,7 @@ _rtld_longjmp_impl(void **buf, void *val, struct trusted_frame *csp)
 	 */
 
 	struct trusted_frame *target, *cur = csp;
+	void **stack;
 
 	target = cheri_unseal(*buf++, sealer_jmpbuf);
 
@@ -506,7 +511,9 @@ _rtld_longjmp_impl(void **buf, void *val, struct trusted_frame *csp)
 	 */
 	while (cur->next < (ptraddr_t)target) {
 		cur = cheri_setaddress(cur, cur->next);
-		cur->stack[-1] = cheri_setaddress(cur->stack, cur->o_stack);
+		stack = cur->o_stack;
+		stack = cheri_setoffset(stack, cheri_getlen(stack));
+		stack[-1] = cur->o_stack;
 	}
 
 	*cur = *csp;
@@ -697,11 +704,11 @@ resize_table(int exp)
 }
 
 void
-tramp_hook(int, void *, const Obj_Entry *, const Elf_Sym *, void *, void *);
+tramp_hook(void *, int, void *, const Obj_Entry *, const Elf_Sym *, void *);
 
 void
-tramp_hook(int event, void *target, const Obj_Entry *obj, const Elf_Sym *def,
-    void *link, void *rcsp)
+tramp_hook(void *rcsp, int event, void *target, const Obj_Entry *obj,
+    const Elf_Sym *def, void *link)
 {
 	Elf_Word sym_num;
 	const char *sym;
@@ -739,7 +746,7 @@ tramp_hook(int event, void *target, const Obj_Entry *obj, const Elf_Sym *def,
 		getpid();
 }
 
-#define	C18N_MAX_TRAMPOLINE_SIZE	768
+#define	C18N_MAX_TRAMPOLINE_SIZE	512
 
 static void *
 tramp_pgs_append(const struct tramp_data *data)
