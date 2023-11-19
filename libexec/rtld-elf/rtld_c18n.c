@@ -241,7 +241,35 @@ tramp_should_include(const Obj_Entry *reqobj, const struct tramp_data *data)
  */
 #define	C18N_INIT_COMPART_COUNT	8
 
-#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+static compart_id_t
+stack_index_to_compart_id(unsigned index)
+{
+	struct stk_table dummy;
+
+	return (sizeof(dummy.stacks->bottom) * index / sizeof(*dummy.stacks));
+}
+
+static size_t
+compart_id_to_stack_index(compart_id_t cid)
+{
+	struct stk_table dummy;
+
+	return (cid - offsetof(typeof(dummy), stacks) / sizeof(*dummy.stacks));
+}
+
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+/*
+ * Save the initial stack (either at program launch or at thread start) in the
+ * stack table.
+ */
+static void
+init_stk_table(struct stk_table *table)
+{
+	void *sp = cheri_getstack();
+	table->stacks[compart_id_to_stack_index(C18N_RTLD_COMPART_ID)].bottom =
+	    cheri_setoffset(sp, cheri_getlen(sp));
+}
+#else
 /*
  * Set a dummy Restricted stack so that trampolines do not need to test if the
  * Restricted stack is valid.
@@ -365,16 +393,22 @@ free_stk_table(struct stk_table *table)
 	atomic_fetch_add_explicit(&free_stk_table_cnt, 1, memory_order_release);
 }
 
-static compart_id_t
-table_index_to_compart_id(unsigned index)
-{
-	struct stk_table dummy;
-
-	return (sizeof(dummy.stacks->bottom) * index / sizeof(*dummy.stacks));
-}
-
 /* Default stack size in libthr */
 #define	C18N_STACK_SIZE	(sizeof(void *) / 4 * 1024 * 1024)
+
+static void *
+stk_create(size_t size)
+{
+	char *stk;
+
+	stk = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_STACK, -1, 0);
+	if (stk == MAP_FAILED)
+		rtld_fatal("mmap failed");
+
+	stk = cheri_clearperm(stk + size, CHERI_PERM_EXECUTIVE);
+
+	return (stk);
+}
 
 void *get_rstk(unsigned);
 
@@ -388,9 +422,8 @@ get_rstk(unsigned index)
 
 	table = stk_table_get();
 
-	cid = table_index_to_compart_id(index);
-	cid_off = cid -
-	    offsetof(typeof(*table), stacks) / sizeof(*table->stacks);
+	cid = stack_index_to_compart_id(index);
+	cid_off = compart_id_to_stack_index(cid);
 
 	capacity = table->capacity;
 	if (capacity <= cid_off) {
@@ -401,12 +434,7 @@ get_rstk(unsigned index)
 	assert(table->stacks[cid_off].bottom == NULL);
 
 	size = C18N_STACK_SIZE;
-	stk = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_STACK, -1, 0);
-	if (stk == MAP_FAILED)
-		rtld_fatal("mmap failed");
-
-	stk = (void **)((char *)stk + size);
-	stk = cheri_clearperm(stk, CHERI_PERM_EXECUTIVE);
+	stk = stk_create(size);
 
 	stk[-1] = cheri_clearperm(stk - 1, CHERI_PERM_SW_VMEM);
 	if (ld_compartment_utrace != NULL)
@@ -692,7 +720,7 @@ tramp_hook(int event, void *target, const Obj_Entry *obj, const Elf_Sym *def,
 	if (cheri_gettag(link) &&
 	    (cheri_getperm(link) & CHERI_PERM_EXECUTIVE) == 0)
 		caller_id = ((uintptr_t *)
-		    cheri_setaddress(rcsp, cheri_gettop(rcsp)))[-2];
+		    cheri_setoffset(rcsp, cheri_getlen(rcsp)))[-2];
 	else
 		caller_id = C18N_RTLD_COMPART_ID;
 	caller = comparts.data[caller_id]->name;
@@ -950,6 +978,7 @@ c18n_init(void)
 {
 	int exp = 9;
 	uintptr_t sealer;
+	struct stk_table *table;
 
 	/*
 	 * Allocate otypes for RTLD use
@@ -979,20 +1008,21 @@ c18n_init(void)
 	/*
 	 * Initialise stack table
 	 */
-	stk_table_set(stk_table_expand(NULL, C18N_INIT_COMPART_COUNT, false));
+	table = stk_table_expand(NULL, C18N_INIT_COMPART_COUNT, false);
 
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	/*
 	 * Under the benchmark ABI, the trusted stack is a pure data structure
 	 * that does not simultaneously serve as RTLD's execution stack. Create
-	 * an execution stack to be used as the trusted stack while RTLD is
-	 * bootstrapping.
+	 * a trusted stack while RTLD is bootstrapping.
 	 */
-	void **stk = get_rstk(compart_id_to_index(C18N_RTLD_COMPART_ID));
-	trusted_stk_set(stk[-1]);
+	trusted_stk_set(stk_create(C18N_STACK_SIZE));
+	init_stk_table(table);
 #else
 	untrusted_stk_set(&dummy_stack);
 #endif
+
+	stk_table_set(table);
 
 	/*
 	 * Initialise trampoline table
@@ -1038,33 +1068,55 @@ void _rtld_thread_start_impl(struct pthread *);
 void
 _rtld_thread_start_impl(struct pthread *curthread)
 {
-	stk_table_set(pop_stk_table(&free_stk_tables));
-#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	struct stk_table *table = pop_stk_table(&free_stk_tables);
+
+	/* See c18n_init */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	trusted_stk_set(stk_create(C18N_STACK_SIZE));
+	init_stk_table(table);
+#else
 	untrusted_stk_set(&dummy_stack);
 #endif
+
+	stk_table_set(table);
+
 	thr_thread_start(curthread);
 }
 
-void _rtld_thr_exit_impl(long *);
+void _rtld_thr_exit(long *);
 
 void
-_rtld_thr_exit_impl(long *state)
+_rtld_thr_exit(long *state)
 {
 	char *stk;
 	size_t size;
 	struct stk_table *table = stk_table_get();
 
-	for (size_t i = 0; i < table->capacity; ++i) {
-		stk = table->stacks[i].bottom;
-		if (stk != NULL) {
-			size = table->stacks[i].size;
+	for (size_t i = C18N_RTLD_COMPART_ID; i < table->capacity; ++i) {
+		size = table->stacks[i].size;
+		if (size != 0) {
+			stk = table->stacks[i].bottom;
 			if (munmap(stk - size, size) != 0)
-				rtld_fatal("munmap failed");
-			table->stacks[i] = (struct stk_table_stack) {};
+				_exit(2);
+			table->stacks[i] = (struct stk_table_stack) {
+				.bottom = _rtld_get_rstk,
+				.size = 0
+			};
 		}
 	}
 
 	free_stk_table(table);
+
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	/*
+	 * A trusted stack is created upon program start and thread creation.
+	 * Unmap the stack here.
+	 */
+	void *trusted_stk = trusted_stk_get();
+	trusted_stk = cheri_setoffset(trusted_stk, 0);
+	if (munmap(trusted_stk, cheri_getlen(trusted_stk)) != 0)
+		_exit(2);
+#endif
 
 	__sys_thr_exit(state);
 }
@@ -1089,10 +1141,11 @@ _rtld_sighandler_init(void (*p)(int, siginfo_t *, void *))
 void _rtld_sighandler_impl(int, siginfo_t *, void *, ptraddr_t *);
 
 void
-_rtld_sighandler_impl(int sig, siginfo_t *info, void *_ucp,
-    ptraddr_t *frame __unused)
+_rtld_sighandler_impl(int sig, siginfo_t *info, void *_ucp, ptraddr_t *frame)
 {
-#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	(void)frame;
+#else
 	ucontext_t *ucp = _ucp;
 
 	*frame = (ptraddr_t)ucp->uc_mcontext.mc_capregs.cap_sp;

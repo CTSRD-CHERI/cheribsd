@@ -34,14 +34,11 @@ ENTRY(_rtld_setjmp)
 	 * general purpose registers.
 	 */
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	mrs	c18, rcsp_el0
-#define	TRUSTED_STACK	c18
+	mrs	c2, rcsp_el0
 #else
-#define	TRUSTED_STACK	csp
+	mov	c2, csp
 #endif
-	mov	c2, TRUSTED_STACK
 	b	_rtld_setjmp_impl
-#undef	TRUSTED_STACK
 END(_rtld_setjmp)
 
 ENTRY(_rtld_longjmp)
@@ -50,40 +47,35 @@ ENTRY(_rtld_longjmp)
 	 * the general purpose registers to be restored.
 	 */
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	mrs	c18, rcsp_el0
-#define	TRUSTED_STACK	c18
+	mrs	c2, rcsp_el0
+#else
+	mov	c2, csp
+#endif
+
+	str	c30, [csp, #-CAP_WIDTH]!
+	bl	_rtld_longjmp_impl
+	ldr	c30, [csp], #CAP_WIDTH
+
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mrs	c10, rcsp_el0
+#define	TRUSTED_STACK	c10
 #else
 #define	TRUSTED_STACK	csp
 #endif
-
-	mov	c2, TRUSTED_STACK
-
-	str	c30, [TRUSTED_STACK, #-CAP_WIDTH]!
+	ldr	x2, [TRUSTED_STACK]
+	scvalue	TRUSTED_STACK, TRUSTED_STACK, x2
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	msr	rcsp_el0, TRUSTED_STACK
 #endif
-
-	bl	_rtld_longjmp_impl
-
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	mrs	TRUSTED_STACK, rcsp_el0
-#endif
-	ldr	c30, [TRUSTED_STACK], #CAP_WIDTH
-
-	ldr	x3, [TRUSTED_STACK]
-	scvalue	TRUSTED_STACK, TRUSTED_STACK, x3
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	msr	rcsp_el0, TRUSTED_STACK
-#endif
+#undef	TRUSTED_STACK
 
 	RETURN
-#undef	TRUSTED_STACK
 END(_rtld_longjmp)
 
 ENTRY(_rtld_thread_start)
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	mov	c10, csp
-	msr	rcsp_el0, c10
+	sub	c10, csp, #CAP_WIDTH
+	str	c10, [csp, #-CAP_WIDTH]!
 #else
 	/*
 	 * Move the Executive mode thread pointer to Restricted mode.
@@ -93,14 +85,6 @@ ENTRY(_rtld_thread_start)
 #endif
 	b	_rtld_thread_start_impl
 END(_rtld_thread_start)
-
-ENTRY(_rtld_thr_exit)
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	mrs	c10, rcsp_el0
-	mov	csp, c10
-#endif
-	b	_rtld_thr_exit_impl
-END(_rtld_thr_exit)
 
 ENTRY(_rtld_sighandler)
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
@@ -374,6 +358,7 @@ PATCH_POINT(tramp_switch_stack, cid, 1b)
 
 TRAMP(tramp_invoke_exe)
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mov	csp, c17
 	blr	x18
 #else
 	blr	c18
