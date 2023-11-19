@@ -128,6 +128,19 @@ stk_table_set(struct stk_table *table)
 #endif
 }
 
+static inline void *
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+trusted_stk_get(void)
+#else
+untrusted_stk_get(void)
+#endif
+{
+	void *sp;
+
+	asm ("mrs	%0, rcsp_el0" : "=C" (sp));
+	return (sp);
+}
+
 static inline void
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 trusted_stk_set(void *sp)

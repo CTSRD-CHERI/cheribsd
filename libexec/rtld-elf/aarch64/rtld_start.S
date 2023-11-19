@@ -52,6 +52,11 @@ ENTRY(.rtld_start)
 	mov	c19, c0				/* Put aux in a callee-saved register */
 	mov	c20, csp			/* And the stack pointer */
 
+#if defined(RTLD_SANDBOX) && defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
+	sub	c20, c20, #CAP_WIDTH
+	str	c20, [csp, #-CAP_WIDTH]!
+#endif
+
 	sub	csp, csp, #32			/* Make room for obj_main & exit proc */
 
 	adrp	c0, _DYNAMIC
@@ -75,11 +80,6 @@ ENTRY(.rtld_start)
 	mov	c0, c19				/* Restore aux */
 	mov	csp, c20			/* Restore the stack pointer */
 #if defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	mrs	c10, rcsp_el0
-	mov	csp, c10
-	msr	rcsp_el0, c20
-#endif
 	br	x8				/* Jump to the entry point */
 #else
 	br	c8				/* Jump to the entry point */
@@ -110,31 +110,43 @@ END(.rtld_start)
  * x17 = &_rtld_bind_start
  */
 ENTRY(_rtld_bind_start)
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 	/*
-	 * Maintain consistency of rcsp.
+	 * Maintain consistency of caller's stack.
 	 */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mov	c17, csp
+#else
 	mrs	c17, rcsp_el0
+#endif
 	gclim	x10, c17
-	sub	x10, x10, #CAP_WIDTH
 	scvalue c10, c17, x10
-	swp	c17, c10, [c10]
+	ldr	c18, [c10, #-CAP_WIDTH]
+	str	c17, [c10, #-CAP_WIDTH]
+
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	/*
+	 * Switch to RTLD stack.
+	 */
+	mrs	c10, rctpidr_el0
+	ldr	c10, [c10, #(CAP_WIDTH * 2)]
+	ldr	c10, [c10, #-CAP_WIDTH]
+	mov	csp, c10
+#endif
+
+	/*
+	 * Save old top of caller's stack.
+	 */
+	str	c18, [csp, #-CAP_WIDTH]!
 #else
 	mov	PTR(17), PTRN(sp)
 #endif
 
 	/* Save frame pointer and SP */
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
-	stp	PTR(29), PTR(10), [PTRN(sp), #-(PTR_WIDTH * 2)]!
-	mov	PTR(29), PTRN(sp)
-	.cfi_def_cfa PTR(29), (PTR_WIDTH * 2)
-	.cfi_offset PTR(10), -(PTR_WIDTH * 1)
-#else
 	stp	PTR(29), PTR(30), [PTRN(sp), #-(PTR_WIDTH * 2)]!
 	mov	PTR(29), PTRN(sp)
 	.cfi_def_cfa PTR(29), (PTR_WIDTH * 2)
 	.cfi_offset PTR(30), -(PTR_WIDTH * 1)
-#endif
 	.cfi_offset PTR(29), -(PTR_WIDTH * 2)
 
 	/* Save the arguments */
@@ -190,20 +202,33 @@ ENTRY(_rtld_bind_start)
 	ldp	CAP(0), CAP(1), [PTRN(sp)], #(CAP_WIDTH * 2)
 
 	/* Restore frame pointer */
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
-	ldp	PTR(29), PTR(10), [PTRN(sp)], #(PTR_WIDTH * 2)
-#else
 	ldp	PTR(29), PTR(zr), [PTRN(sp)], #(PTR_WIDTH * 2)
+
+	/* Restore link register saved by the plt code */
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	ldr	c18, [csp], #CAP_WIDTH
+	gclim	x10, c18
+	scvalue	c11, c18, x10
+	ldr	c17, [c11, #-CAP_WIDTH]
+	str	c18, [c11, #-CAP_WIDTH]
+
+	ldp	czr, c30, [c17], #(PTR_WIDTH * 2)
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mov	csp, c17
+#else
+	msr	rcsp_el0, c17
 #endif
 
-	 /* Restore link register saved by the plt code */
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
-	gclim	x17, c10
-	sub	x17, x17, #CAP_WIDTH
-	scvalue	c17, c10, x17
-	swp	c10, c17, [c17]
-	ldp	czr, c30, [c17], #(PTR_WIDTH * 2)
-	msr	rcsp_el0, c17
+	/*
+	 * Clear temporary registers that might contain RTLD-privileged
+	 * capabilities. Typically, the resolver returns a trampoline which will
+	 * clear them, but if the resolved function is trusted, then no such
+	 * clearing would be performed.
+	 */
+	mov	x12, xzr
+	mov	x13, xzr
+	mov	x14, xzr
+	mov	x15, xzr
 #else
 	ldp	PTR(zr), PTR(30), [PTRN(sp)], #(PTR_WIDTH * 2)
 #endif
@@ -336,15 +361,33 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	str	c19,	  [csp, #(9 * 32)]
 #if defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	/*
-	 * Maintain consistency of rcsp. This step is only needed for
+	 * Maintain consistency of caller's stack. This step is only needed for
 	 * _rtld_tlsdesc_dynamic because it might call external functions.
 	 */
-	mrs	c3, rcsp_el0
-	gclim	x4, c3
-	sub	x4, x4, #CAP_WIDTH
-	scvalue	c4, c3, x4
-	swp	c3, c3, [c4]
-	str	c3, [csp, #(9 * 32 + 16)]
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mov	c17, csp
+#else
+	mrs	c17, rcsp_el0
+#endif
+	gclim	x10, c17
+	scvalue	c10, c17, x10
+	ldr	c18, [c10, #-CAP_WIDTH]
+	str	c17, [c10, #-CAP_WIDTH]
+
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	/*
+	 * Switch to RTLD stack.
+	 */
+	mrs	c10, rctpidr_el0
+	ldr	c10, [c10, #(CAP_WIDTH * 2)]
+	ldr	c10, [c10, #-CAP_WIDTH]
+	mov	csp, c10
+#endif
+
+	/*
+	 * Save old top of caller's stack.
+	 */
+	str	c18, [csp, #-CAP_WIDTH]!
 #endif
 	.cfi_rel_offset		 c1, 32
 	.cfi_rel_offset		 c2, 48
@@ -374,13 +417,18 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	scbnds	c0, c0, x19
 
 	/* Restore slow path registers */
-#if defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
-	ldr	c3, [csp, #(9 * 32 + 16)]
-	gclim	x4, c3
-	sub	x4, x4, #CAP_WIDTH
-	scvalue	c4, c3, x4
-	swp	c3, c3, [c4]
-	msr	rcsp_el0, c3
+#ifdef RTLD_SANDBOX
+	ldr	c18, [csp], #CAP_WIDTH
+	gclim	x10, c18
+	scvalue	c11, c18, x10
+	ldr	c17, [c11, #-CAP_WIDTH]
+	str	c18, [c11, #-CAP_WIDTH]
+
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mov	csp, c17
+#else
+	msr	rcsp_el0, c17
+#endif
 #endif
 	ldr	c19,	  [csp, #(9 * 32)]
 	ldp	c17, c18, [csp, #(8 * 32)]

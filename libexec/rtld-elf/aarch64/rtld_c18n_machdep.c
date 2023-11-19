@@ -137,11 +137,18 @@ tramp_compile(void **entry, const struct tramp_data *data)
 		PATCH_LDR_IMM(call_hook, function, 3);
 	}
 
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	COPY(switch_stack);
+	PATCH_MOV(switch_stack, cid,
+	    compart_id_to_index(executive ? C18N_RTLD_COMPART_ID :
+	        data->defobj->compart_id));
+#else
 	if (!executive) {
 		COPY(switch_stack);
 		PATCH_MOV(switch_stack, cid,
 		    compart_id_to_index(data->defobj->compart_id));
 	}
+#endif
 
 	if (executive)
 		COPY(invoke_exe);
