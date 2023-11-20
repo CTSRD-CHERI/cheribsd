@@ -136,6 +136,7 @@ struct cheri_revoke_info_page {
 SYSCTL_DECL(_vm_cheri_revoke);
 
 extern int security_cheri_runtime_revocation_default;
+extern int security_cheri_runtime_revocation_every_free_default;
 #endif
 
 #endif /* !__SYS_CHERI_REVOKE_KERN_H__ */

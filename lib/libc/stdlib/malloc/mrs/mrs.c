@@ -110,6 +110,11 @@ extern void snmalloc_flush_message_queue(void);
 #define	MALLOC_QUARANTINE_DISABLE_ENV	"_RUNTIME_REVOCATION_DISABLE"
 #define	MALLOC_QUARANTINE_ENABLE_ENV	"_RUNTIME_REVOCATION_ENABLE"
 
+#define	MALLOC_REVOKE_EVERY_FREE_DISABLE_ENV \
+	"_RUNTIME_REVOCATION_EVERY_FREE_DISABLE"
+#define	MALLOC_REVOKE_EVERY_FREE_ENABLE_ENV \
+	"_RUNTIME_REVOCATION_EVERY_FREE_ENABLE"
+
 /*
  * Different allocators give their strong symbols different names.  Hide
  * this implementation detail being the REAL() macro.
@@ -276,6 +281,7 @@ static volatile const struct cheri_revoke_info *cri;
 static size_t page_size;
 static void *entire_shadow;
 static bool quarantining = true;
+static bool revoke_every_free = false;
 
 struct mrs_descriptor_slab_entry {
 	void *ptr;
@@ -676,6 +682,9 @@ validate_freed_pointer(void *ptr)
 static inline bool
 quarantine_should_flush(struct mrs_quarantine *quarantine, bool is_free)
 {
+	if (is_free && revoke_every_free)
+		return true;
+
 #ifdef REVOKE_ON_FREE
 	if (!is_free)
 		return false;
@@ -1146,8 +1155,11 @@ init(void)
 
 	uint32_t bsdflags;
 
-	if (_elf_aux_info(AT_BSDFLAGS, &bsdflags, sizeof(bsdflags)) == 0)
+	if (_elf_aux_info(AT_BSDFLAGS, &bsdflags, sizeof(bsdflags)) == 0) {
 		quarantining = ((bsdflags & ELF_BSDF_CHERI_REVOKE) != 0);
+		revoke_every_free =
+		    ((bsdflags & ELF_BSDF_CHERI_REVOKE_EVERY_FREE) != 0);
+	}
 
 	if (!issetugid()) {
 		if (getenv(MALLOC_QUARANTINE_DISABLE_ENV) != NULL) {
@@ -1155,6 +1167,11 @@ init(void)
 		} else if (getenv(MALLOC_QUARANTINE_ENABLE_ENV) != NULL) {
 			quarantining = true;
 		}
+
+		if (getenv(MALLOC_REVOKE_EVERY_FREE_DISABLE_ENV) != NULL)
+			revoke_every_free = false;
+		else if (getenv(MALLOC_REVOKE_EVERY_FREE_ENABLE_ENV) != NULL)
+			revoke_every_free = true;
 	}
 	if (!quarantining)
 #if defined(PRINT_CAPREVOKE) || defined(PRINT_CAPREVOKE_MRS) || defined(PRINT_STATS)
