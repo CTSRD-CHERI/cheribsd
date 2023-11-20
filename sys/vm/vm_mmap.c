@@ -2149,7 +2149,7 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
 	} else {
 		if (max_addr != 0 && *addr + size > max_addr)
 			return (ENOMEM);
-		if (docow & MAP_GUARD)
+		if (docow & MAP_CREATE_GUARD)
 			maxprot = PROT_NONE;
 		if ((flags & MAP_RESERVATION_CREATE) != 0)
 			reservp = addr;
