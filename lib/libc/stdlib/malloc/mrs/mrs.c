@@ -674,8 +674,16 @@ validate_freed_pointer(void *ptr)
 }
 
 static inline bool
-quarantine_should_flush(struct mrs_quarantine *quarantine)
+quarantine_should_flush(struct mrs_quarantine *quarantine, bool is_free)
 {
+#ifdef REVOKE_ON_FREE
+	if (!is_free)
+		return false;
+#else
+	if (is_free)
+		return false;
+#endif
+
 #if defined(QUARANTINE_HIGHWATER)
 
 	return (quarantine->size >= QUARANTINE_HIGHWATER);
@@ -1007,7 +1015,7 @@ malloc_is_revoking(void)
  * the wrapper.
  */
 static inline void
-check_and_perform_flush(void)
+check_and_perform_flush(bool is_free)
 {
 	struct mrs_quarantine local_quarantine;
 
@@ -1031,12 +1039,12 @@ check_and_perform_flush(void)
 	 * Do an unlocked check and bail quickly if the quarantine
 	 * does not require flushing.
 	 */
-	if (!quarantine_should_flush(&application_quarantine))
+	if (!quarantine_should_flush(&application_quarantine, is_free))
 		return;
 
 	/* Recheck with the lock held. */
 	mrs_lock(&application_quarantine_lock);
-	if (!quarantine_should_flush(&application_quarantine)) {
+	if (!quarantine_should_flush(&application_quarantine, is_free)) {
 		mrs_unlock(&application_quarantine_lock);
 		return;
 	}
@@ -1207,9 +1215,7 @@ mrs_malloc(size_t size)
 
 	/*mrs_debug_printf("mrs_malloc: called\n");*/
 
-#ifndef REVOKE_ON_FREE
-	check_and_perform_flush();
-#endif /* !REVOKE_ON_FREE */
+	check_and_perform_flush(false);
 
 	void *allocated_region;
 
@@ -1259,9 +1265,7 @@ mrs_calloc(size_t number, size_t size)
 	 */
 	/*mrs_debug_printf("mrs_calloc: called\n");*/
 
-#ifndef REVOKE_ON_FREE
-	check_and_perform_flush();
-#endif /* !REVOKE_ON_FREE */
+	check_and_perform_flush(false);
 
 	void *allocated_region;
 
@@ -1306,9 +1310,7 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 	mrs_debug_printf("mrs_posix_memalign: called ptr %p alignment %zu size %zu\n",
 	    ptr, alignment, size);
 
-#ifndef REVOKE_ON_FREE
-	check_and_perform_flush();
-#endif /* !REVOKE_ON_FREE */
+	check_and_perform_flush(false);
 
 	if (alignment < CAPREVOKE_BITMAP_ALIGNMENT)
 		alignment = CAPREVOKE_BITMAP_ALIGNMENT;
@@ -1337,9 +1339,7 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 	mrs_debug_printf("mrs_aligned_alloc: called alignment %zu size %zu\n",
 	    alignment, size);
 
-#ifndef REVOKE_ON_FREE
-	check_and_perform_flush();
-#endif /* !REVOKE_ON_FREE */
+	check_and_perform_flush(false);
 
 	if (alignment < CAPREVOKE_BITMAP_ALIGNMENT)
 		alignment = CAPREVOKE_BITMAP_ALIGNMENT;
@@ -1428,9 +1428,7 @@ mrs_free(void *ptr)
 	quarantine_insert(&application_quarantine, ins, cheri_getlen(ins));
 	mrs_unlock(&application_quarantine_lock);
 
-#ifdef REVOKE_ON_FREE
-	check_and_perform_flush();
-#endif /* REVOKE_ON_FREE */
+	check_and_perform_flush(true);
 }
 
 void *
