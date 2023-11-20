@@ -241,7 +241,7 @@ coresight_backend_configure(struct hwt_context *ctx, int cpu_id, int session_id)
 }
 
 static void
-coresight_backend_enable(int cpu_id)
+coresight_backend_enable(struct hwt_context *ctx, int cpu_id)
 {
 	struct coresight_pipeline *pipeline;
 
@@ -251,7 +251,7 @@ coresight_backend_enable(int cpu_id)
 }
 
 static void
-coresight_backend_disable(int cpu_id)
+coresight_backend_disable(struct hwt_context *ctx, int cpu_id)
 {
 	struct coresight_pipeline *pipeline;
 

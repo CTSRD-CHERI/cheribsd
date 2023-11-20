@@ -36,8 +36,8 @@ struct hwt_backend_ops {
 	void (*hwt_backend_deinit)(struct hwt_context *);
 	int (*hwt_backend_configure)(struct hwt_context *, int cpu_id,
 	    int thread_id);
-	void (*hwt_backend_enable)(int cpu_id);
-	void (*hwt_backend_disable)(int cpu_id);
+	void (*hwt_backend_enable)(struct hwt_context *, int cpu_id);
+	void (*hwt_backend_disable)(struct hwt_context *, int cpu_id);
 	int (*hwt_backend_read)(int cpu_id, int *curpage,
 	    vm_offset_t *curpage_offset);
 

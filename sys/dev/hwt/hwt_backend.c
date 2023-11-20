@@ -109,7 +109,7 @@ hwt_backend_enable(struct hwt_context *ctx, int cpu_id)
 
 	dprintf("%s\n", __func__);
 
-	ctx->hwt_backend->ops->hwt_backend_enable(cpu_id);
+	ctx->hwt_backend->ops->hwt_backend_enable(ctx, cpu_id);
 }
 
 void
@@ -118,7 +118,7 @@ hwt_backend_disable(struct hwt_context *ctx, int cpu_id)
 
 	dprintf("%s\n", __func__);
 
-	ctx->hwt_backend->ops->hwt_backend_disable(cpu_id);
+	ctx->hwt_backend->ops->hwt_backend_disable(ctx, cpu_id);
 }
 
 void __unused
