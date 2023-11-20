@@ -80,4 +80,13 @@ int security_cheri_runtime_revocation_default = 1;
 SYSCTL_INT(_security_cheri, OID_AUTO, runtime_revocation_default, CTLFLAG_RWTUN,
     &security_cheri_runtime_revocation_default, 0,
     "Userspace runtime revocation default");
+
+/*
+ * Set the default policy for revocation in userspace.  This is used to
+ * compute the revocation policy flag in AT_BSDFLAGS.
+ */
+int security_cheri_runtime_revocation_every_free_default = 0;
+SYSCTL_INT(_security_cheri, OID_AUTO, runtime_revocation_every_free_default,
+    CTLFLAG_RWTUN, &security_cheri_runtime_revocation_every_free_default, 0,
+    "Userspace runtime revocation on every free for debugging default");
 #endif  /* CHERI_CAPREVOKE */

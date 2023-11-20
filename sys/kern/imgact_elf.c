@@ -1857,6 +1857,15 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 			bsdflags |= ELF_BSDF_CHERI_REVOKE;
 	} else if (security_cheri_runtime_revocation_default != 0)
 		bsdflags |= ELF_BSDF_CHERI_REVOKE;
+	/*
+	 * ELF_BSDF_CHERI_REVOKE tells the runtime whether to enable the
+	 * revoke every free debug policy if revocation is otherwise enabled.
+	 *
+	 * No procctl/ELF note, only system default (and environment variable in
+	 * userspace).
+	 */
+	if (security_cheri_runtime_revocation_every_free_default != 0)
+		bsdflags |= ELF_BSDF_CHERI_REVOKE_EVERY_FREE;
 #endif
 	AUXARGS_ENTRY(pos, AT_BSDFLAGS, bsdflags);
 	AUXARGS_ENTRY(pos, AT_ARGC, imgp->args->argc);
