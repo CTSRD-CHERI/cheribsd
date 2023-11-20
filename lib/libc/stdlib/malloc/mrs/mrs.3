@@ -104,19 +104,11 @@ When a program using
 starts up, an array of parameters are evaluated to determine if free'd
 objects should be quarantined and revoked or if the underlying
 implementations should be exposed directly.
-.Nm
-considers the
+If the
 .Dv ELF_BSDF_CHERI_REVOKE
-and
-.Dv ELF_BSDF_CHERI_REVOKE_FORCED
-flags of the
+flag of the
 .Dv AT_BSDFLAGS
-ELF auxiliary argument variable convey information about the
-administratively configured preferences
-(if
-.Dv ELF_BSDF_CHERI_REVOKE_FORCED
-is set)
-or system-wide defaults.
+ELF auxiliary argument variable is set then the program will revoke.
 .Pp
 .\" XXX: this is not tied to mrs and probably belongs somewhere else
 The kernel considers the following factors in order of decreasing precedence
