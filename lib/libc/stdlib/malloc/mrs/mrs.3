@@ -128,12 +128,10 @@ the
 command which is administratively set by
 .Xr proccontrol 1 .
 If either is set then
-.Dv ELF_BSDF_CHERI_REVOKE_FORCED
-is set and
 .Dv ELF_BSDF_CHERI_REVOKE
 is set if
 .Dv P2_CHERI_REVOKE_DISABLE
-is not present.
+is not present and further factors are not considered.
 .It
 The presence of
 .Dv NT_FREEBSD_FCTL_CHERI_REVOKE_DISABLE
@@ -142,12 +140,10 @@ or
 in the FreeBSD feature control ELF note as set by
 .Xr elfctl 1 .
 If either is set then
-.Dv ELF_BSDF_CHERI_REVOKE_FORCED
-is set and
 .Dv ELF_BSDF_CHERI_REVOKE
 is set if
 .Dv NT_FREEBSD_FCTL_CHERI_REVOKE_DISABLE
-is not present.
+is not present and further factors are not considered.
 .It
 The value of the
 .Dv security.cheri.runtime_revocation_default
