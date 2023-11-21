@@ -44,6 +44,8 @@
 #include <sys/smp.h>
 
 #include <vm/vm.h>
+#include <vm/pmap.h>
+#include <vm/vm_extern.h>
 #include <vm/vm_param.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_page.h>
@@ -125,6 +127,10 @@ hwt_vm_alloc_pages(struct hwt_vm *vm)
 	    VM_ALLOC_ZERO;
 	memattr = VM_MEMATTR_DEVICE;
 
+	/* TODO: Coresight doesn't require VAs */
+	if ((vm->kvaddr = kva_alloc(vm->npages * PAGE_SIZE)) == 0)
+		return (ENOMEM);
+
 	vm->obj = cdev_pager_allocate(vm, OBJT_MGTDEVICE,
 	    &hwt_vm_pager_ops, vm->npages * PAGE_SIZE, PROT_READ, 0,
 	    curthread->td_ucred);
@@ -162,6 +168,7 @@ retry:
 
 		VM_OBJECT_WLOCK(vm->obj);
 		vm_page_insert(m, vm->obj, i);
+		pmap_qenter(vm->kvaddr + i * PAGE_SIZE, &m, 1);
 		VM_OBJECT_WUNLOCK(vm->obj);
 	}
 
@@ -377,6 +384,10 @@ hwt_vm_destroy_buffers(struct hwt_vm *vm)
 	vm_page_t m;
 	int i;
 
+	if (vm->kvaddr != 0) {
+		pmap_qremove(vm->kvaddr, vm->npages);
+		kva_free(vm->kvaddr, vm->npages * PAGE_SIZE);
+	}
 	VM_OBJECT_WLOCK(vm->obj);
 	for (i = 0; i < vm->npages; i++) {
 		m = vm->pages[i];
