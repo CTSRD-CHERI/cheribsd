@@ -2309,6 +2309,164 @@ CHERIBSDTEST(revoke_merge_quarantined,
 	cheribsdtest_success();
 }
 #undef NRES
+
+/*
+ * A simple test to confirm that revocation of a capability in a COW mapping
+ * affects only the caller's mapping.
+ */
+CHERIBSDTEST(cheri_revoke_cow_mapping,
+    "verify that revocation of a COW page triggers a copy",
+    .ct_check_skip = skip_need_cheri_revoke)
+{
+	void **block, **cap1, **cap2;
+	void *shadow, *torev;
+	ssize_t n;
+	size_t blocksz;
+	pid_t child;
+	int pd[2], res;
+	char ch, st[2];
+
+	/*
+	 * Use three pages for our heap.  The last page will be revoked.  The
+	 * first two pages contain a pointer into the third page; the first
+	 * page will be unmapped before revocation, while the second will remain
+	 * mapped.  This difference exercises different code paths in the
+	 * revoker.
+	 */
+	blocksz = 3 * PAGE_SIZE;
+	block = mmap(NULL, blocksz, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0);
+	CHERIBSDTEST_VERIFY(block != MAP_FAILED);
+
+	torev = cheri_setbounds(block + 2 * PAGE_SIZE / sizeof(void *),
+	    PAGE_SIZE);
+	cap1 = cheri_setbounds(&block[0], PAGE_SIZE);
+	cap2 = cheri_setbounds(&block[PAGE_SIZE / sizeof(void *)], PAGE_SIZE);
+	*cap1 = *cap2 = cheri_andperm(torev, ~CHERI_PERM_SW_VMEM);
+
+	child = fork();
+	if (child == -1)
+		cheribsdtest_failure_errx("Fork failed; errno=%d", errno);
+	if (child == 0) {
+		/*
+		 * Quarantine the third page.
+		 */
+		if (cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMEM,
+		    torev, &shadow) != 0)
+			_exit(1);
+		memset(shadow, 0xff, cheri_getlen(shadow));
+
+		/*
+		 * Remove the first page from our page tables without modifying
+		 * the logical mapping (i.e., without using munmap(2)).  This
+		 * means that the revoker will visit the page, but cannot use
+		 * the page tables to find it, so helps exercise different code
+		 * paths.
+		 */
+		if (msync(cap1, PAGE_SIZE, MS_INVALIDATE) != 0)
+			_exit(2);
+		if (mincore(block, 2 * PAGE_SIZE, st) != 0)
+			_exit(3);
+		if ((st[0] & MINCORE_INCORE) != 0)
+			_exit(4);
+
+		/*
+		 * Revoke the third page of our heap.
+		 */
+		if (cheri_revoke(CHERI_REVOKE_IGNORE_START |
+		    CHERI_REVOKE_LAST_PASS, 0, NULL) != 0)
+			_exit(6);
+
+		if (!check_revoked(*cap1))
+			_exit(7);
+		if (!check_revoked(*cap2))
+			_exit(8);
+		_exit(0);
+	}
+
+	waitpid(child, &res, 0);
+	if (!WIFEXITED(res) || WEXITSTATUS(res) != 0) {
+		cheribsdtest_failure_errx("Bad child process exit: %d",
+		    WEXITSTATUS(res));
+	}
+
+	/*
+	 * Make sure our copies of the capability were preserved.
+	 */
+	CHERIBSDTEST_VERIFY(!check_revoked(*cap1));
+	CHERIBSDTEST_VERIFY(!check_revoked(*cap2));
+
+	/*
+	 * Repeat the test, this time revoking in the parent.
+	 */
+	CHERIBSDTEST_CHECK_SYSCALL(pipe(pd));
+	child = fork();
+	if (child == -1)
+		cheribsdtest_failure_errx("Fork failed; errno=%d", errno);
+	if (child == 0) {
+		/*
+		 * Block until the parent revokes the capability.
+		 */
+		n = read(pd[0], &ch, 1);
+		if (n != 1)
+			_exit(1);
+
+		/*
+		 * Make sure the child's copies of the capability were
+		 * preserved.
+		 */
+		if (check_revoked(*cap1))
+			_exit(5);
+		if (check_revoked(*cap2))
+			_exit(6);
+		_exit(0);
+	}
+
+	/*
+	 * Quarantine the third page.
+	 */
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke_get_shadow(
+	    CHERI_REVOKE_SHADOW_NOVMEM, torev, &shadow));
+	memset(shadow, 0xff, cheri_getlen(shadow));
+
+	/*
+	 * Remove the first page from our page tables without modifying the
+	 * logical mapping (i.e., without using munmap(2)).  This means that the
+	 * revoker will visit the page, but cannot use the page tables to find
+	 * it, so helps exercise different code paths.
+	 */
+	CHERIBSDTEST_CHECK_SYSCALL(msync(cap1, PAGE_SIZE, MS_INVALIDATE));
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(block, 2 * PAGE_SIZE, st));
+	CHERIBSDTEST_VERIFY((st[0] & MINCORE_INCORE) == 0);
+	CHERIBSDTEST_VERIFY((st[1] & MINCORE_INCORE) != 0);
+
+	/*
+	 * Revoke the third page of our heap.
+	 */
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(
+	    CHERI_REVOKE_IGNORE_START | CHERI_REVOKE_LAST_PASS, 0, NULL));
+
+	CHERIBSDTEST_VERIFY(check_revoked(*cap1));
+	CHERIBSDTEST_VERIFY(check_revoked(*cap2));
+
+	/*
+	 * Wake up our child and wait for it to verify its copy of the
+	 * capability.
+	 */
+	n = write(pd[1], &ch, 1);
+	CHERIBSDTEST_VERIFY(n == 1);
+
+	waitpid(child, &res, 0);
+	if (!WIFEXITED(res) || WEXITSTATUS(res) != 0) {
+		cheribsdtest_failure_errx("Bad child 2 process exit: %d",
+		    WEXITSTATUS(res));
+	}
+
+	CHERIBSDTEST_CHECK_SYSCALL(munmap(block, blocksz));
+	CHERIBSDTEST_CHECK_SYSCALL(close(pd[0]));
+	CHERIBSDTEST_CHECK_SYSCALL(close(pd[1]));
+
+	cheribsdtest_success();
+}
 #endif /* CHERIBSDTEST_CHERI_REVOKE_TESTS */
 
 #endif /* __CHERI_PURE_CAPABILITY__ */
