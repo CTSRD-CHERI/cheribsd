@@ -219,7 +219,7 @@ hwt_hook_thread_create(struct thread *td)
 	char path[MAXPATHLEN];
 	size_t bufsize;
 	struct proc *p;
-	int thread_id;
+	int thread_id, kva_req;
 	int error;
 
 	p = td->td_proc;
@@ -230,11 +230,12 @@ hwt_hook_thread_create(struct thread *td)
 		return (ENXIO);
 	thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
 	bufsize = ctx->bufsize;
+	kva_req = ctx->kva_req;
 	sprintf(path, "hwt_%d_%d", ctx->ident, thread_id);
 	hwt_ctx_put(ctx);
 
 	/* Step 2. Allocate some memory without holding ctx ref. */
-	error = hwt_thread_alloc(&thr, path, bufsize);
+	error = hwt_thread_alloc(&thr, path, bufsize, kva_req);
 	if (error) {
 		printf("%s: could not allocate thread, error %d\n",
 		    __func__, error);

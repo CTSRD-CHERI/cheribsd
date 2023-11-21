@@ -99,6 +99,7 @@ hwt_ctx_alloc(struct hwt_context **ctx0)
 
 	ctx = malloc(sizeof(struct hwt_context), M_HWT_CTX, M_WAITOK | M_ZERO);
 	ctx->thread_counter = 0;
+	ctx->kva_req = 1; /* default require kern VAs */
 
 	LIST_INIT(&ctx->records);
 	TAILQ_INIT(&ctx->threads);

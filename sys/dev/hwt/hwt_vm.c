@@ -108,7 +108,7 @@ static struct cdev_pager_ops hwt_vm_pager_ops = {
 }; 
 
 static int
-hwt_vm_alloc_pages(struct hwt_vm *vm)
+hwt_vm_alloc_pages(struct hwt_vm *vm, int kva_req)
 {
 	vm_paddr_t low, high, boundary;
 	vm_memattr_t memattr;
@@ -127,9 +127,10 @@ hwt_vm_alloc_pages(struct hwt_vm *vm)
 	    VM_ALLOC_ZERO;
 	memattr = VM_MEMATTR_DEVICE;
 
-	/* TODO: Coresight doesn't require VAs */
-	if ((vm->kvaddr = kva_alloc(vm->npages * PAGE_SIZE)) == 0)
-		return (ENOMEM);
+	if (kva_req) {
+		if ((vm->kvaddr = kva_alloc(vm->npages * PAGE_SIZE)) == 0)
+			return (ENOMEM);
+	}
 
 	vm->obj = cdev_pager_allocate(vm, OBJT_MGTDEVICE,
 	    &hwt_vm_pager_ops, vm->npages * PAGE_SIZE, PROT_READ, 0,
@@ -168,7 +169,8 @@ retry:
 
 		VM_OBJECT_WLOCK(vm->obj);
 		vm_page_insert(m, vm->obj, i);
-		pmap_qenter(vm->kvaddr + i * PAGE_SIZE, &m, 1);
+		if (kva_req)
+			pmap_qenter(vm->kvaddr + i * PAGE_SIZE, &m, 1);
 		VM_OBJECT_WUNLOCK(vm->obj);
 	}
 
@@ -362,14 +364,14 @@ hwt_vm_create_cdev(struct hwt_vm *vm, char *path)
 }
 
 static int
-hwt_vm_alloc_buffers(struct hwt_vm *vm)
+hwt_vm_alloc_buffers(struct hwt_vm *vm, int kva_req)
 {
 	int error;
 
 	vm->pages = malloc(sizeof(struct vm_page *) * vm->npages,
 	    M_HWT_VM, M_WAITOK | M_ZERO);
 
-	error = hwt_vm_alloc_pages(vm);
+	error = hwt_vm_alloc_pages(vm, kva_req);
 	if (error) {
 		printf("%s: could not alloc pages\n", __func__);
 		return (error);
@@ -384,7 +386,7 @@ hwt_vm_destroy_buffers(struct hwt_vm *vm)
 	vm_page_t m;
 	int i;
 
-	if (vm->kvaddr != 0) {
+	if (vm->ctx->kva_req && vm->kvaddr != 0) {
 		pmap_qremove(vm->kvaddr, vm->npages);
 		kva_free(vm->kvaddr, vm->npages * PAGE_SIZE);
 	}
@@ -418,7 +420,7 @@ hwt_vm_free(struct hwt_vm *vm)
 }
 
 int
-hwt_vm_alloc(size_t bufsize, char *path, struct hwt_vm **vm0)
+hwt_vm_alloc(size_t bufsize, int kva_req, char *path, struct hwt_vm **vm0)
 {
 	struct hwt_vm *vm;
 	int error;
@@ -426,7 +428,7 @@ hwt_vm_alloc(size_t bufsize, char *path, struct hwt_vm **vm0)
 	vm = malloc(sizeof(struct hwt_vm), M_HWT_VM, M_WAITOK | M_ZERO);
 	vm->npages = bufsize / PAGE_SIZE;
 
-	error = hwt_vm_alloc_buffers(vm);
+	error = hwt_vm_alloc_buffers(vm, kva_req);
 	if (error) {
 		free(vm, M_HWT_VM);
 		return (error);

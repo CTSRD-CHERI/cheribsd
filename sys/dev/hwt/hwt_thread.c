@@ -115,13 +115,14 @@ hwt_thread_lookup(struct hwt_context *ctx, struct thread *td)
 }
 
 int
-hwt_thread_alloc(struct hwt_thread **thr0, char *path, size_t bufsize)
+hwt_thread_alloc(struct hwt_thread **thr0, char *path, size_t bufsize,
+    int kva_req)
 {
 	struct hwt_thread *thr;
 	struct hwt_vm *vm;
 	int error;
 
-	error = hwt_vm_alloc(bufsize, path, &vm);
+	error = hwt_vm_alloc(bufsize, kva_req, path, &vm);
 	if (error)
 		return (error);
 

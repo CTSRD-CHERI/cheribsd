@@ -210,7 +210,8 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 		thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
 		sprintf(path, "hwt_%d_%d", ctx->ident, thread_id);
 
-		error = hwt_thread_alloc(&thr, path, ctx->bufsize);
+		error = hwt_thread_alloc(&thr, path, ctx->bufsize,
+		    ctx->kva_req);
 		if (error) {
 			free(threads, M_HWT_IOCTL);
 			hwt_ctx_free(ctx);
@@ -317,7 +318,7 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 			continue;
 
 		sprintf(path, "hwt_%d_%d", ctx->ident, cpu_id);
-		error = hwt_vm_alloc(ctx->bufsize, path, &vm);
+		error = hwt_vm_alloc(ctx->bufsize, ctx->kva_req, path, &vm);
 		if (error) {
 			/* TODO: remove all allocated cpus. */
 			hwt_ctx_free(ctx);
