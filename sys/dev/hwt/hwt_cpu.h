@@ -41,6 +41,7 @@ struct hwt_cpu * hwt_cpu_alloc(void);
 void hwt_cpu_free(struct hwt_cpu *cpu);
 
 struct hwt_cpu * hwt_cpu_first(struct hwt_context *ctx);
+struct hwt_cpu * hwt_cpu_get(struct hwt_context *ctx, int cpu_id);
 void hwt_cpu_insert(struct hwt_context *ctx, struct hwt_cpu *cpu);
 
 #endif /* !_DEV_HWT_HWT_CPU_H_ */

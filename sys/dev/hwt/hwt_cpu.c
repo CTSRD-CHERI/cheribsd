@@ -88,6 +88,23 @@ hwt_cpu_first(struct hwt_context *ctx)
 	return (cpu);
 }
 
+struct hwt_cpu *
+hwt_cpu_get(struct hwt_context *ctx, int cpu_id)
+{
+	struct hwt_cpu *cpu, *tcpu;
+
+	HWT_CTX_ASSERT_LOCKED(ctx);
+
+	TAILQ_FOREACH_SAFE(cpu, &ctx->cpus, next, tcpu) {
+		KASSERT(cpu != NULL, ("cpu is NULL"));
+		if (cpu->cpu_id == cpu_id) {
+			return cpu;
+		}
+	}
+
+	return (NULL);
+}
+
 void
 hwt_cpu_insert(struct hwt_context *ctx, struct hwt_cpu *cpu)
 {
