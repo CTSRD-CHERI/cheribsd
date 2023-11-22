@@ -804,14 +804,14 @@ kern_abort2(struct thread *td, const char * __capability why, int nargs,
 		if (error < 0)
 			goto out;
 	} else {
-		sbuf_printf(sb, "(null)");
+		sbuf_cat(sb, "(null)");
 	}
 	if (nargs > 0) {
-		sbuf_printf(sb, "(");
+		sbuf_putc(sb, '(');
 		for (i = 0;i < nargs; i++)
 			sbuf_printf(sb, "%s%p", i == 0 ? "" : ", ",
 			    (__cheri_fromcap void *)uargs[i]);
-		sbuf_printf(sb, ")");
+		sbuf_putc(sb, ')');
 	}
 	/*
 	 * Final stage: arguments were proper, string has been
@@ -822,7 +822,7 @@ kern_abort2(struct thread *td, const char * __capability why, int nargs,
 out:
 	if (sig == SIGKILL) {
 		sbuf_trim(sb);
-		sbuf_printf(sb, " (Reason text inaccessible)");
+		sbuf_cat(sb, " (Reason text inaccessible)");
 	}
 	sbuf_cat(sb, "\n");
 	sbuf_finish(sb);
