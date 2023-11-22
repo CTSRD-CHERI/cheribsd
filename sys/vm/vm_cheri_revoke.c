@@ -554,11 +554,11 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 	}
 
 	/*
-	 * Because we hold the page xbusy, we can let PGA_WRITEABLE tell us if
-	 * there are any writeable mappings, and so the page is OK to mutate,
-	 * or not.
+	 * The page isn't mapped but we may need to modify it.  Use the map
+	 * entry's state to decide whether we can bypass the page fault handler.
 	 */
-	if (pmap_page_is_write_mapped(m)) {
+	if ((entry->eflags & MAP_ENTRY_NEEDS_COPY) == 0 &&
+	    (entry->protection & VM_PROT_WRITE) != 0) {
 visit_rw:
 		KASSERT(vm_page_all_valid(m), ("Page grab valid invalid?"));
 		vm_page_assert_xbusied(m);
