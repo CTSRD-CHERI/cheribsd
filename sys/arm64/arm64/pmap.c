@@ -5665,10 +5665,10 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 		res = PMAP_CAPLOADGEN_CLEAN;
 	} else if (vm_page_tryxbusy(m)) {
 		/*
-		 * OK, have page xbusy'd and so PGA_WRITEABLE is stable, so
-		 * report how aggressively it can be swept.
+		 * OK, we have the page xbusy'd and so new writeable mappings
+		 * will not appear.
 		 */
-		if (pmap_page_is_write_mapped(m)) {
+		if ((tpte & ATTR_DBM) != 0) {
 			res = PMAP_CAPLOADGEN_SCAN_RW_XBUSIED;
 		} else {
 			res = PMAP_CAPLOADGEN_SCAN_RO_XBUSIED;
@@ -5685,7 +5685,6 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 		m = NULL;
 		res = PMAP_CAPLOADGEN_TEARDOWN;
 	}
-
 
 out:
 #if VM_NRESERVLEVEL > 0
