@@ -45,9 +45,6 @@
  * CHERI CHANGES END
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static char sccsid[] = "@(#)svc_auth.c 1.26 89/02/07 Copyr 1984 Sun Micro";
-#endif
 /*
  * svc_auth.c, Server-side rpc authenticator interface.
  *

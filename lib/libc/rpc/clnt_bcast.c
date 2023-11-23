@@ -45,9 +45,6 @@
  * CHERI CHANGES END
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static char sccsid[] = "@(#)clnt_bcast.c 1.15 89/04/21 Copyr 1988 Sun Micro";
-#endif
 /*
  * clnt_bcast.c
  * Client interface to broadcast service.

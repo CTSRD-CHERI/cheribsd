@@ -45,9 +45,6 @@
  * CHERI CHANGES END
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static char sccsid[] = "@(#)clnt_dg.c 1.19 89/03/16 Copyr 1988 Sun Micro";
-#endif
 /*
  * Implements a connectionless client side RPC.
  */
