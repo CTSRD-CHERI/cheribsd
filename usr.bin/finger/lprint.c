@@ -44,10 +44,6 @@
  * CHERI CHANGES END
  */
 
-#if 0
-#endif
-
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
