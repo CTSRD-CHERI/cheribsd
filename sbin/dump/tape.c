@@ -40,9 +40,6 @@
  * CHERI CHANGES END
  */
 
-#ifndef lint
-#endif /* not lint */
-
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
