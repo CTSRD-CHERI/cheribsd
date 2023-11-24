@@ -48,7 +48,6 @@
  * CHERI CHANGES END
  */
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 
 #include <stdlib.h>

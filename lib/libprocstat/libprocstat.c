@@ -46,7 +46,6 @@
  * CHERI CHANGES END
  */
 
-#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/elf.h>
 #include <sys/time.h>

@@ -46,8 +46,6 @@
  * CHERI CHANGES END
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-#endif
 /*
  * svc_dg.c, Server side for connectionless RPC.
  *

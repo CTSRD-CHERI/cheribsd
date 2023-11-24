@@ -51,8 +51,6 @@
  * CHERI CHANGES END
  */
 
-#if 0
-#endif
 #include "namespace.h"
 #include <ctype.h>
 #include <inttypes.h>

@@ -48,8 +48,6 @@
  * CHERI CHANGES END
  */
 
-#if 0
-#endif
 /*
  * Actual wprintf innards.
  *
