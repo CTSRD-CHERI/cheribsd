@@ -93,7 +93,6 @@ ldconfig_start()
 			    "${ldconfig32_paths}" "$_LDC" "")
 			startmsg '32-bit compatibility ldconfig path:' ${_LDC}
 			${ldconfig} -32 ${_ins} ${_LDC}
-			;;
 		fi
 
 	fi
