@@ -157,6 +157,8 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 	ctx->hwt_backend = backend;
 	ctx->hwt_owner = ho;
 	ctx->mode = HWT_MODE_THREAD;
+	ctx->hwt_td = td;
+	ctx->kqueue_fd = halloc->kqueue_fd;
 
 	error = copyout(&ctx->ident, halloc->ident, sizeof(int));
 	if (error) {
@@ -306,6 +308,8 @@ hwt_ioctl_alloc_mode_cpu(struct thread *td, struct hwt_owner *ho,
 	ctx->hwt_owner = ho;
 	ctx->mode = HWT_MODE_CPU;
 	ctx->cpu_map = cpu_map;
+	ctx->hwt_td = td;
+	ctx->kqueue_fd = halloc->kqueue_fd;
 
 	error = copyout(&ctx->ident, halloc->ident, sizeof(int));
 	if (error) {

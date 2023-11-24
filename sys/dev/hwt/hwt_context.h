@@ -40,6 +40,9 @@ struct hwt_context {
 	int				mode;
 	int				ident;
 
+	int				kqueue_fd;
+	struct thread			*hwt_td;
+
 	/* CPU mode. */
 	cpuset_t			cpu_map;
 	TAILQ_HEAD(, hwt_cpu)		cpus;

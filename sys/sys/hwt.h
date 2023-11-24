@@ -60,6 +60,7 @@ struct hwt_alloc {
 	size_t		cpusetsize;
 	const char	*backend_name;
 	int		*ident;
+	int		kqueue_fd;
 } __aligned(16);
 
 struct hwt_start {
