@@ -774,13 +774,6 @@ vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc, int flags,
 
 		res = vm_cheri_revoke_object_at(
 		    crc, flags, entry, ooffset, &ooffset, &vmres);
-
-		/* How far did we get? */
-		*addr = ooffset - entry->offset + entry->start;
-		KASSERT(*addr <= entry->end,
-		    ("vm_cheri_revoke post past entry end: %lx > %lx (was %lx)",
-			entry->end, *addr, oaddr));
-
 		switch (res) {
 		case VM_CHERI_REVOKE_AT_VMERR:
 			return (vmres);
@@ -790,6 +783,13 @@ vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc, int flags,
 		case VM_CHERI_REVOKE_AT_OK:
 			break;
 		}
+
+		/* How far did we get? */
+		*addr = ooffset - entry->offset + entry->start;
+		KASSERT(*addr <= entry->end,
+		    ("vm_cheri_revoke post past entry end: %lx > %lx (was %lx)",
+			entry->end, *addr, oaddr));
+
 	}
 	VM_OBJECT_WUNLOCK(obj);
 
