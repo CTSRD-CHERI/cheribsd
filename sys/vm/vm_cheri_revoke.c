@@ -745,9 +745,9 @@ static int
 vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc, int flags,
     vm_map_entry_t entry, vm_offset_t *addr)
 {
-	int res;
 	vm_offset_t ooffset;
 	vm_object_t obj;
+	enum vm_cro_at res;
 
 	KASSERT(!(entry->eflags & MAP_ENTRY_IS_SUB_MAP),
 	    ("cheri_revoke SUB_MAP"));
