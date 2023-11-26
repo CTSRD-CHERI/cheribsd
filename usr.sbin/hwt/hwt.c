@@ -180,6 +180,7 @@ hwt_ctx_alloc(struct trace_context *tc)
 	al.bufsize = tc->bufsize;
 	al.backend_name = tc->trace_dev->name;
 	al.ident = &tc->ident;
+	al.kqueue_fd = tc->kqueue_fd;
 
 	error = ioctl(tc->fd, HWT_IOC_ALLOC, &al);
 

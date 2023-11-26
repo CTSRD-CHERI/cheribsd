@@ -59,6 +59,7 @@ struct trace_context {
 	int fd;
 	int thr_fd;
 	int terminate;
+	int kqueue_fd;
 
 	int thread_id;
 	int ident;
