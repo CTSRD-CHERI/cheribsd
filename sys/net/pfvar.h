@@ -1067,13 +1067,15 @@ struct pf_kstate {
 	struct pf_rule_actions	 act;
 	u_int16_t		 tag;
 	u_int8_t		 rt;
+	u_int16_t		 if_index_in;
+	u_int16_t		 if_index_out;
 };
 
 #if __SIZEOF_POINTER__ <= 8
 /*
  * Size <= fits 11 objects per page on LP64. Try to not grow the struct beyond that.
  */
-_Static_assert(sizeof(struct pf_kstate) <= 368, "pf_kstate size crosses 368 bytes");
+_Static_assert(sizeof(struct pf_kstate) <= 372, "pf_kstate size crosses 372 bytes");
 #endif
 #endif
 
