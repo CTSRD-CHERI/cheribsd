@@ -162,6 +162,9 @@ nbufp(unsigned i)
 }
 
 caddr_t __read_mostly unmapped_buf;
+#ifdef INVARIANTS
+caddr_t	poisoned_buf = (void *)-1;
+#endif
 
 /* Used below and for softdep flushing threads in ufs/ffs/ffs_softdep.c */
 struct proc *bufdaemonproc;
@@ -1222,6 +1225,9 @@ bufinit(void)
 	mtx_init(&bdirtylock, "dirty buf lock", NULL, MTX_DEF);
 
 	unmapped_buf = (caddr_t)kva_alloc(maxphys);
+#ifdef INVARIANTS
+	poisoned_buf = unmapped_buf;
+#endif
 
 	/* finally, initialize each buffer header and stick on empty q */
 	for (i = 0; i < nbuf; i++) {
