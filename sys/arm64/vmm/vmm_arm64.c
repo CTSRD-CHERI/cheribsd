@@ -1407,6 +1407,7 @@ vmmops_exception(void *vcpui, uint64_t esr, uint64_t far)
 int
 vmmops_getcap(void *vcpui, int num, int *retval)
 {
+	struct hypctx *hypctx = vcpui;
 	int ret;
 
 	ret = ENOENT;
@@ -1414,6 +1415,10 @@ vmmops_getcap(void *vcpui, int num, int *retval)
 	switch (num) {
 	case VM_CAP_UNRESTRICTED_GUEST:
 		*retval = 1;
+		ret = 0;
+		break;
+	case VM_CAP_BPT_EXIT:
+		*retval = (hypctx->mdcr_el2 & MDCR_EL2_TDE) != 0;
 		ret = 0;
 		break;
 	default:
@@ -1426,6 +1431,20 @@ vmmops_getcap(void *vcpui, int num, int *retval)
 int
 vmmops_setcap(void *vcpui, int num, int val)
 {
+	struct hypctx *hypctx = vcpui;
+	int ret;
 
-	return (ENOENT);
+	ret = ENOENT;
+
+	switch (num) {
+	case VM_CAP_BPT_EXIT:
+		if (val != 0)
+			hypctx->mdcr_el2 |= MDCR_EL2_TDE;
+		else
+			hypctx->mdcr_el2 &= ~MDCR_EL2_TDE;
+		ret = 0;
+		break;
+	}
+
+	return (ret);
 }
