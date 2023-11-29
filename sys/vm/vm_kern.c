@@ -149,7 +149,8 @@ kva_alloc(vm_size_t size)
 
 	TSENTER();
 	size = round_page(size);
-	if (vmem_alloc(kernel_arena, size, M_BESTFIT | M_NOWAIT, &addr))
+	if (vmem_xalloc(kernel_arena, size, 0, 0, 0, VMEM_ADDR_MIN,
+	    VMEM_ADDR_MAX, M_BESTFIT | M_NOWAIT, &addr))
 		return (0);
 	addr = cheri_kern_andperm(addr, CHERI_PERMS_KERNEL_DATA);
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -174,7 +175,7 @@ kva_free(vm_pointer_t addr, vm_size_t size)
 {
 
 	size = round_page(size);
-	vmem_free(kernel_arena, addr, size);
+	vmem_xfree(kernel_arena, addr, size);
 }
 
 /*
