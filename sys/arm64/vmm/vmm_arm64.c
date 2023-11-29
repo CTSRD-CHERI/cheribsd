@@ -1048,6 +1048,10 @@ vmmops_gla2gpa(void *vcpui, struct vm_guest_paging *paging, uint64_t gla,
 		/* TODO: ptp_hold works on host pages */
 		ptep = ptp_hold(hypctx->vcpu, pte_addr, 1 << granule_shift,
 		    &cookie);
+		if (ptep == NULL) {
+			*is_fault = 1;
+			return (EINVAL);
+		}
 		pte_shift = (levels - 1) * (granule_shift - PTE_SHIFT) +
 		    granule_shift;
 		idx = (gla >> pte_shift) &
