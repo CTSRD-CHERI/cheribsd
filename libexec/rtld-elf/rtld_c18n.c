@@ -694,7 +694,7 @@ tramp_hook(int event, void *target, const Obj_Entry *obj, const Elf_Sym *def,
 		caller_id = ((uintptr_t *)
 		    cheri_setaddress(rcsp, cheri_gettop(rcsp)))[-2];
 	else
-		caller_id = C18N_RTLD_COMPARTMENT_ID;
+		caller_id = C18N_RTLD_COMPART_ID;
 	caller = comparts.data[caller_id]->name;
 
 	if (ld_compartment_utrace != NULL) {
@@ -799,7 +799,7 @@ tramp_create_entry(struct tramp_data *found, const struct tramp_data *data)
 
 	*found = *data;
 	if (found->def != NULL) {
-		sig = tramp_fetch_sig(found->defobj,
+		sig = c18n_fetch_sig(found->defobj,
 		    found->def - found->defobj->symtab);
 		if (!found->sig.valid)
 			found->sig = sig;
@@ -934,7 +934,7 @@ end:
  * APIs
  */
 struct func_sig
-tramp_fetch_sig(const Obj_Entry *obj, unsigned long symnum)
+c18n_fetch_sig(const Obj_Entry *obj, unsigned long symnum)
 {
 	if (symnum >= obj->dynsymcount)
 		rtld_fatal("Invalid symbol number %lu for object %s.",
@@ -946,7 +946,7 @@ tramp_fetch_sig(const Obj_Entry *obj, unsigned long symnum)
 }
 
 void
-tramp_init(void)
+c18n_init(void)
 {
 	int exp = 9;
 	uintptr_t sealer;
@@ -971,7 +971,7 @@ tramp_init(void)
 	 * Initialise compartment database
 	 */
 	comparts_data_expand(C18N_INIT_COMPART_COUNT);
-	while (comparts.size < C18N_RTLD_COMPARTMENT_ID)
+	while (comparts.size < C18N_RTLD_COMPART_ID)
 		comparts.data[comparts.size++] = NULL;
 	comparts.data[comparts.size++] = &rtld_compart;
 	comparts.data[comparts.size++] = &tcb_compart;
@@ -988,7 +988,7 @@ tramp_init(void)
 	 * an execution stack to be used as the trusted stack while RTLD is
 	 * bootstrapping.
 	 */
-	void **stk = get_rstk(compart_id_to_index(C18N_RTLD_COMPARTMENT_ID));
+	void **stk = get_rstk(compart_id_to_index(C18N_RTLD_COMPART_ID));
 	trusted_stk_set(stk[-1]);
 #else
 	untrusted_stk_set(&dummy_stack);
@@ -1004,7 +1004,7 @@ tramp_init(void)
 }
 
 void
-tramp_add_comparts(struct policy *pol)
+c18n_add_comparts(struct policy *pol)
 {
 	if (pol == NULL)
 		return;

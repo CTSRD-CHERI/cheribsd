@@ -41,15 +41,15 @@ extern const char *ld_compartment_enable;
 extern const char *ld_compartment_overhead;
 extern const char *ld_compartment_sig;
 
-void tramp_init(void);
+void c18n_init(void);
 
 /*
  * Policies
  */
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-#define	C18N_RTLD_COMPARTMENT_ID	1
+#define	C18N_RTLD_COMPART_ID	1
 #else
-#define	C18N_RTLD_COMPARTMENT_ID	0
+#define	C18N_RTLD_COMPART_ID	0
 #endif
 #define	C18N_COMPARTMENT_ID_MAX	(UINT16_MAX >> 1)
 
@@ -71,7 +71,7 @@ struct policy {
 	size_t count;
 };
 
-void tramp_add_comparts(struct policy *);
+void c18n_add_comparts(struct policy *);
 compart_id_t compart_id_allocate(const char *);
 
 /*
@@ -179,7 +179,7 @@ void *_rtld_tramp_hook(int, void *, const Obj_Entry *, const Elf_Sym *, void *,
     void *);
 size_t tramp_compile(void **, const struct tramp_data *);
 void *tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *);
-struct func_sig tramp_fetch_sig(const Obj_Entry *, unsigned long);
+struct func_sig c18n_fetch_sig(const Obj_Entry *, unsigned long);
 
 static inline long
 func_sig_to_otype(struct func_sig sig)
