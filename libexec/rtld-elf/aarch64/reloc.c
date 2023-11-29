@@ -438,7 +438,7 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 				.target = (void *)target,
 				.defobj = defobj,
 				.def = def,
-				.sig = tramp_fetch_sig(obj,
+				.sig = c18n_fetch_sig(obj,
 				    ELF_R_SYM(rela->r_info))
 			});
 #endif
@@ -592,7 +592,7 @@ reloc_gnu_ifunc(Obj_Entry *obj, int flags,
 				.target = (void *)target,
 				.defobj = defobj,
 				.def = def,
-				.sig = tramp_fetch_sig(obj,
+				.sig = c18n_fetch_sig(obj,
 				    ELF_R_TYPE(rela->r_info))
 			});
 #endif

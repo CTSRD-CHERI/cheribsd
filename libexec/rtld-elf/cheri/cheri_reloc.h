@@ -124,7 +124,7 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 			.target = __DECONST(void *, symval),
 			.defobj = defobj,
 			.def = def,
-			.sig = tramp_fetch_sig(obj, r_symndx)
+			.sig = c18n_fetch_sig(obj, r_symndx)
 		});
 #endif
 		if (__predict_false(symval == NULL)) {

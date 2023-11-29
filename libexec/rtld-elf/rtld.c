@@ -998,7 +998,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	symlook_init(&req, "_rtld_compartments");
 	req.lockstate = &lockstate;
 	if (symlook_obj(&req, obj) == 0)
-	    tramp_add_comparts(make_data_pointer(req.sym_out, req.defobj_out));
+	    c18n_add_comparts(make_data_pointer(req.sym_out, req.defobj_out));
 	break;
     }
 
@@ -1258,7 +1258,7 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
 	.target = (void *)target,
 	.defobj = defobj,
 	.def = def,
-	.sig = tramp_fetch_sig(obj, ELF_R_SYM(rel->r_info))
+	.sig = c18n_fetch_sig(obj, ELF_R_SYM(rel->r_info))
     });
 #endif
     target = reloc_jmpslot(where, target, defobj, obj, rel);
@@ -2801,8 +2801,8 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
     r_debug.r_ldbase = obj_rtld.relocbase;
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    obj_rtld.compart_id = C18N_RTLD_COMPARTMENT_ID;
-    tramp_init();
+    obj_rtld.compart_id = C18N_RTLD_COMPART_ID;
+    c18n_init();
 #endif
 }
 
