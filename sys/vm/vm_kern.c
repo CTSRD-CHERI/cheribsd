@@ -162,6 +162,31 @@ kva_alloc(vm_size_t size)
 }
 
 /*
+ *	kva_alloc_aligned:
+ *
+ *	Allocate a virtual address range as in kva_alloc where the base
+ *	address is aligned to align.
+ */
+vm_pointer_t
+kva_alloc_aligned(vm_size_t size, vm_size_t align)
+{
+	vmem_addr_t addr;
+
+	TSENTER();
+	size = round_page(size);
+	if (vmem_xalloc(kernel_arena, size, align, 0, 0, VMEM_ADDR_MIN,
+	    VMEM_ADDR_MAX, M_BESTFIT | M_NOWAIT, &addr))
+		return (0);
+	addr = cheri_kern_andperm(addr, CHERI_PERMS_KERNEL_DATA);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
+#endif
+	TSEXIT();
+
+	return (addr);
+}
+
+/*
  *	kva_free:
  *
  *	Release a region of kernel virtual memory allocated
