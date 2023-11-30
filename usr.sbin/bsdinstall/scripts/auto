@@ -389,21 +389,26 @@ fi
 case `uname -p` in
 aarch64c)
 	HAVE_CHERI_DESKTOP=yes
+	HAVE_CHERI_VM_SUPPORT=yes
 	;;
 *)
 	HAVE_CHERI_DESKTOP=
+	HAVE_CHERI_VM_SUPPORT=
 	;;
 esac
 [ -n "$HAVE_CHERI_DESKTOP" ] && [ -z "$BSDINSTALL_SKIP_CHERI_DESKTOP" ] && bsdinstall cheri-desktop
+[ -n "$HAVE_CHERI_VM_SUPPORT" ] && [ -z "$BSDINSTALL_SKIP_CHERI_VM_SUPPORT" ] && bsdinstall cheri-vm-support
 
 finalconfig() {
 	if [ -n "$HAVE_CHERI_DESKTOP" ]; then
 		CHERI_DESKTOP_REVISIT='"CHERI Desktop" "Install the CHERI desktop environment (requires network)"'
+		CHERI_VM_SUPPORT_REVISIT='"CHERI VM Support" "Install CHERI virtual machine support (requires network)"'
 	else
 		CHERI_DESKTOP_REVISIT=
+		CHERI_VM_SUPPORT_REVISIT=
 	fi
 	exec 3>&1
-	REVISIT=$(echo $CHERI_DESKTOP_REVISIT | \
+	REVISIT=$(echo $CHERI_DESKTOP_REVISIT $CHERI_VM_SUPPORT_REVISIT | \
 	    xargs dialog --backtitle "$OSNAME Installer" \
 	    --title "Final Configuration" --no-cancel --menu \
 	    "Setup of your $OSNAME system is nearly complete. You can now modify your configuration choices. After this screen, you will have an opportunity to make more complex changes using a shell." 0 0 0 \
@@ -453,6 +458,10 @@ finalconfig() {
 		;;
 	"CHERI Desktop")
 		bsdinstall cheri-desktop
+		finalconfig
+		;;
+	"CHERI VM Support")
+		bsdinstall cheri-vm-support
 		finalconfig
 		;;
 	esac

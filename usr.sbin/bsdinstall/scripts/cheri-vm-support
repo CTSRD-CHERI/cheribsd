@@ -1,0 +1,70 @@
+#!/bin/sh
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+# Copyright (c) 2023 Jessica Clarke <jrtc27@FreeBSD.org>
+#
+# This software was developed by the University of Cambridge Computer
+# Laboratory (Department of Computer Science and Technology) under Innovate
+# UK project 105694, "Digital Security by Design (DSbD) Technology Platform
+# Prototype".
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+#
+
+############################################################ INCLUDES
+
+BSDCFG_SHARE="/usr/share/bsdconfig"
+. $BSDCFG_SHARE/common.subr || exit 1
+f_dprintf "%s: loading_includes..." "$0"
+f_include $BSDCFG_SHARE/dialog.subr
+
+############################################################ MAIN
+
+: ${BSDDIALOG_OK=0}
+: ${BSDDIALOG_CANCEL=1}
+
+error()
+{
+	bsddialog --backtitle "$OSNAME Installer" --title "Error" --msgbox "$1" 0 0
+	exit 1
+}
+
+bsddialog --backtitle "$OSNAME Installer" --title "CHERI VM Support" --yesno \
+    "Would you like to install CHERI virtual machine support (requires network)?" 0 0
+if [ $? -ne $BSDDIALOG_OK ]; then
+	exit 0
+fi
+
+# Running before config stage so make sure chroot has working DNS
+f_quietly cp -f $BSDINSTALL_TMPETC/resolv.conf $BSDINSTALL_CHROOT/etc/
+
+clear
+echo "$OSNAME Installer"
+echo "========================"
+echo "CHERI VM Support"
+echo
+
+ASSUME_ALWAYS_YES=YES chroot $BSDINSTALL_CHROOT pkg64c install cheri-vm-support
+if [ $? -ne 0 ]; then
+	error "Failed to install cheri-vm-support"
+fi
