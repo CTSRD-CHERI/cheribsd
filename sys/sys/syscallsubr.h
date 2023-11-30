@@ -263,8 +263,7 @@ int	kern_getlogin(struct thread *td, char * __capability namebuf,
 int	kern_getloginclass(struct thread *td, char * __capability namebuf,
 	    size_t namelen);
 int	kern_getppid(struct thread *);
-int	kern_getpeername(struct thread *td, int fd, struct sockaddr **sa,
-	    socklen_t *alen);
+int	kern_getpeername(struct thread *td, int fd, struct sockaddr *sa);
 int	kern_getpriority(struct thread *td, int which, int who);
 int	kern_getrandom(struct thread *td, void * __capability user_buf,
 	    size_t buflen, unsigned int flags);
@@ -274,8 +273,7 @@ int	kern_getresuid(struct thread *td, uid_t * __capability ruid,
 	    uid_t * __capability euid, uid_t * __capability suid);
 int	kern_getrusage(struct thread *td, int who, struct rusage *rup);
 int	kern_getsid(struct thread *td, pid_t pid);
-int	kern_getsockname(struct thread *td, int fd, struct sockaddr **sa,
-	    socklen_t *alen);
+int	kern_getsockname(struct thread *td, int fd, struct sockaddr *sa);
 int	kern_getsockopt(struct thread *td, int s, int level, int name,
 	    void * __capability val, enum uio_seg valseg, socklen_t *valsize);
 int	kern_gettimeofday(struct thread *td,
