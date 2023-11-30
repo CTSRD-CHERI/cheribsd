@@ -1022,7 +1022,7 @@ vm_map_install_cheri_revoke_shadow(struct vm_map *map, struct sysentvec *sv)
 
 	error = vm_map_insert(map, vmo_info, 0, start, end_addr,
 	    VM_PROT_READ | VM_PROT_WRITE, VM_PROT_READ | VM_PROT_WRITE,
-	    cow, start_addr);
+	    0, start_addr);
 
 	if (error != KERN_SUCCESS)
 		goto out;
