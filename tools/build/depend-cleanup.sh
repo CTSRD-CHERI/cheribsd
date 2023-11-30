@@ -199,10 +199,11 @@ clean_dep   lib/libc        kqueue1 S
 # 20230623  b077aed33b7b    OpenSSL 3.0 update
 if [ -f "$OBJTOP"/secure/lib/libcrypto/aria.o ]; then
 	echo "Removing old OpenSSL 1.1.1 tree"
-	rm -rf "$OBJTOP"/secure/lib/libcrypto \
-	    "$OBJTOP"/secure/lib/libssl \
-	    "$OBJTOP"/obj-lib32/secure/lib/libcrypto \
-	    "$OBJTOP"/obj-lib32/secure/lib/libssl
+	for libcompat in "" $ALL_libcompats; do
+		dirprfx=${libcompat:+obj-lib${libcompat}/}
+		run rm -rf "$OBJTOP"/${dirprfx}secure/lib/libcrypto \
+		    "$OBJTOP"/${dirprfx}secure/lib/libssl
+	done
 fi
 
 # 20230714  ee8b0c436d72    replace ffs/fls implementations with clang builtins
