@@ -567,11 +567,15 @@ _iwlwifi=	iwlwifi
 .if ${MK_SOURCELESS_UCODE} != "no"
 _iwlwififw=	iwlwififw
 .endif
+_rtw88=		rtw88
+_vmware=	vmware
+.endif
+
+.if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
+    ${MACHINE_CPUARCH} == "i386" || ${MACHINE_ARCH} == "armv7"
 .if !${MACHINE_ABI:Mpurecap}
 _ossl=		ossl
 .endif
-_rtw88=		rtw88
-_vmware=	vmware
 .endif
 
 # MAC framework
