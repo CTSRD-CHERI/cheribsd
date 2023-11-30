@@ -537,9 +537,12 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	 * pos.
 	 */
 	if (!SV_CURPROC_FLAG(SV_AOUT)) {
-		if ((len == 0 && p->p_osrel >= P_OSREL_MAP_ANON) ||
-		    ((flags & MAP_ANON) != 0 && (fd != -1 || pos != 0))) {
+		if (len == 0 && p->p_osrel >= P_OSREL_MAP_ANON) {
 			SYSERRCAUSE("%s: len == 0", __func__);
+			return (EINVAL);
+		}
+		if ((flags & MAP_ANON) != 0 && (fd != -1 || pos != 0)) {
+			SYSERRCAUSE("%s: MAP_ANON with fd or offset", __func__);
 			return (EINVAL);
 		}
 	} else {
