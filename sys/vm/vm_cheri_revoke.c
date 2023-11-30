@@ -962,7 +962,8 @@ SYSCTL_BOOL(_vm_cheri_revoke, OID_AUTO, core_shadow, CTLFLAG_RW,
 int
 vm_map_install_cheri_revoke_shadow(struct vm_map *map, struct sysentvec *sv)
 {
-	int cow = cheri_revoke_core_shadow ? 0 : MAP_DISABLE_COREDUMP;
+	int cow = MAP_CREATE_SHADOW |
+	    (cheri_revoke_core_shadow ? 0 : MAP_DISABLE_COREDUMP);
 	int error = KERN_SUCCESS;
 	bool reserved_shadow = false;
 	bool reserved_info = false;

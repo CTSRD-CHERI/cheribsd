@@ -1959,6 +1959,8 @@ vm_map_insert1(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		inheritance = VM_INHERIT_SHARE;
 	else
 		inheritance = VM_INHERIT_DEFAULT;
+	if ((cow & MAP_CREATE_SHADOW) != 0)
+		protoeflags |= MAP_ENTRY_SHADOW;
 	if ((cow & MAP_SPLIT_BOUNDARY_MASK) != 0) {
 		/* This magically ignores index 0, for usual page size. */
 		bidx = (cow & MAP_SPLIT_BOUNDARY_MASK) >>
@@ -2045,7 +2047,8 @@ charged:
 			    prev_entry));
 			KASSERT((prev_entry->eflags & MAP_ENTRY_UNMAPPED) == 0,
 			    ("prev_entry %p is unmapped", prev_entry));
-			if ((prev_entry->eflags & MAP_ENTRY_GUARD) == 0)
+			if ((prev_entry->eflags &
+			    (MAP_ENTRY_GUARD | MAP_ENTRY_SHADOW)) == 0)
 				map->size += end - prev_entry->end;
 
 			/*
@@ -2115,7 +2118,7 @@ charged:
 		vm_map_entry_link(map, new_entry);
 	KASSERT((new_entry->eflags & MAP_ENTRY_UNMAPPED) == 0,
 	    ("vm_map_insert: new entry %p is unmapped", new_entry));
-	if ((new_entry->eflags & MAP_ENTRY_GUARD) == 0)
+	if ((new_entry->eflags & (MAP_ENTRY_GUARD | MAP_ENTRY_SHADOW)) == 0)
 		map->size += new_entry->end - new_entry->start;
 
 	vm_map_log("insert", new_entry);
@@ -4572,7 +4575,8 @@ vm_map_entry_delete(vm_map_t map, vm_map_entry_t entry)
 	}
 
 	size = entry->end - entry->start;
-	map->size -= size;
+	if ((entry->eflags & MAP_ENTRY_SHADOW) == 0)
+		map->size -= size;
 
 	if (entry->cred != NULL) {
 		swap_release_by_cred(size, entry->cred);
@@ -5074,7 +5078,8 @@ vmspace_map_entry_forked(const struct vmspace *vm1, struct vmspace *vm2,
 	vm_size_t entrysize;
 	vm_offset_t newend;
 
-	if ((entry->eflags & (MAP_ENTRY_GUARD | MAP_ENTRY_UNMAPPED)) != 0)
+	if ((entry->eflags & (MAP_ENTRY_GUARD | MAP_ENTRY_UNMAPPED |
+	    MAP_ENTRY_SHADOW)) != 0)
 		return;
 	entrysize = entry->end - entry->start;
 	vm2->vm_map.size += entrysize;
