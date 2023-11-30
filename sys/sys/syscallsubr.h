@@ -116,10 +116,10 @@ int	kern___realpathat(struct thread *td, int fd,
 	    size_t size, int flags, enum uio_seg pathseg);
 int	kern_abort2(struct thread *td, const char * __capability why,
             int nargs, void * __capability *uargs);
-int	kern_accept(struct thread *td, int s, struct sockaddr **name,
-	    socklen_t *namelen, struct file **fp);
-int	kern_accept4(struct thread *td, int s, struct sockaddr **name,
-	    socklen_t *namelen, int flags, struct file **fp);
+int	kern_accept(struct thread *td, int s, struct sockaddr *sa,
+	    struct file **fp);
+int	kern_accept4(struct thread *td, int s, struct sockaddr *sa,
+	    int flags, struct file **fp);
 int	kern_accessat(struct thread *td, int fd, const char * __capability path,
 	    enum uio_seg pathseg, int flags, int mode);
 int	kern_acct(struct thread *td, const char * __capability path);
