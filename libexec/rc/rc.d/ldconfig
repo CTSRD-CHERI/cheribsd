@@ -32,9 +32,7 @@ ldconfig_paths()
 		fi
 	done
 	for _ii in ${_paths} ${_soconf}; do
-		if [ -r "${_ii}" ]; then
-			_ldpaths="${_ldpaths} ${_ii}"
-		fi
+		_ldpaths="${_ldpaths} ${_ii}"
 	done
 
 	echo "${_ldpaths}"
