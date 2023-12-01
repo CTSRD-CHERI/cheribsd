@@ -124,6 +124,9 @@ typedef	__ptraddr_t		ptraddr_t;
 #define	_PTRADDR_T_DECLARED
 #endif
 
+/* Limits of ptraddr_t. */
+#define	PTRADDR_MAX		SIZE_MAX
+
 #ifndef _VADDR_T_DECLARED
 __attribute__((__deprecated__("use ptraddr_t instead")))
 typedef	ptraddr_t		vaddr_t;
