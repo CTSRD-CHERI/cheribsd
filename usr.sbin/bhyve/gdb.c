@@ -369,7 +369,7 @@ guest_paging_info(struct vcpu *vcpu, struct vm_guest_paging *paging)
 static int
 guest_paging_info(struct vcpu *vcpu, struct vm_guest_paging *paging)
 {
-	uint64_t regs[5];
+	uintcap_t regs[5];
 	const int regset[5] = {
 		VM_REG_GUEST_TTBR0_EL1,
 		VM_REG_GUEST_TTBR1_EL1,
@@ -1129,7 +1129,7 @@ gdb_resume_vcpus(void)
 static void
 gdb_read_regs(void)
 {
-	uint64_t regvals[nitems(gdb_regset)];
+	uintcap_t regvals[nitems(gdb_regset)];
 
 	if (vm_get_register_set(vcpus[cur_vcpu], nitems(gdb_regset),
 	    gdb_regset, regvals) == -1) {
