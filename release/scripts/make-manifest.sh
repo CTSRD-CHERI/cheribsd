@@ -24,6 +24,10 @@ desc_kernel="${kernel} (MANDATORY)"
 desc_kernel_dbg="${kernel} (Debugging)"
 desc_kernel_purecap="Pure-capability ${kernel}"
 desc_kernel_purecap_dbg="Pure-capability ${kernel} (Debugging)"
+desc_kernel_nocaprevoke="${kernel} without revocation"
+desc_kernel_nocaprevoke_dbg="${kernel} without revocation (Debugging)"
+desc_kernel_purecap_nocaprevoke="Pure-capability ${kernel} without revocation"
+desc_kernel_purecap_nocaprevoke_dbg="Pure-capability ${kernel} without revocation (Debugging)"
 desc_kernel_alt="Alternate ${kernel}"
 desc_kernel_alt_dbg="Alternate ${kernel} (Debugging)"
 desc_lib32="${lib32}"
@@ -68,6 +72,26 @@ for i in ${*}; do
 			;;
 		kernel-dbg.txz)
 			desc="${desc_kernel_dbg}"
+			;;
+		kernel.*PURECAP-NOCAPREVOKE*-dbg.txz)
+			desc="$(eval echo \"${desc_kernel_purecap_nocaprevoke_dbg}\")"
+			desc="${desc}: $(eval echo ${i%%-dbg.txz} | cut -f 2 -d '.')"
+			default="$(eval echo \"${default_kernel_purecap_nocaprevoke_dbg}\")"
+			;;
+		kernel.*PURECAP-NOCAPREVOKE*.txz)
+			desc="$(eval echo \"${desc_kernel_purecap_nocaprevoke}\")"
+			desc="${desc}: $(eval echo ${i%%.txz} | cut -f 2 -d '.')"
+			default="$(eval echo \"${default_kernel_purecap_nocaprevoke}\")"
+			;;
+		kernel.*NOCAPREVOKE*-dbg.txz)
+			desc="$(eval echo \"${desc_kernel_nocaprevoke_dbg}\")"
+			desc="${desc}: $(eval echo ${i%%-dbg.txz} | cut -f 2 -d '.')"
+			default="$(eval echo \"${default_kernel_nocaprevoke_dbg}\")"
+			;;
+		kernel.*NOCAPREVOKE*.txz)
+			desc="$(eval echo \"${desc_kernel_nocaprevoke}\")"
+			desc="${desc}: $(eval echo ${i%%.txz} | cut -f 2 -d '.')"
+			default="$(eval echo \"${default_kernel_nocaprevoke}\")"
 			;;
 		kernel.*PURECAP*-dbg.txz)
 			desc="$(eval echo \"${desc_kernel_purecap_dbg}\")"
