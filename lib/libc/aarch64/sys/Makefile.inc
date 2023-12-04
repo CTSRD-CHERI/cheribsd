@@ -8,8 +8,7 @@ MDASM=	cerror.S \
 	vfork.S
 
 # Don't generate default code for these syscalls:
-NOASM+=	sbrk.o \
-	vfork.o
+NOASM+=	vfork.o
 
 .ifdef RTLD_SANDBOX
 SRCS+=	thr_exit.c
