@@ -351,7 +351,7 @@ struct mbuf {
 		STAILQ_ENTRY(mbuf)	m_stailq;
 	};
 	union {	/* next chain in queue/record */
-		struct mbuf		*m_nextpkt;
+		struct mbuf		*m_nextpkt __subobject_use_container_bounds;
 		SLIST_ENTRY(mbuf)	m_slistpkt;
 		STAILQ_ENTRY(mbuf)	m_stailqpkt;
 	};
