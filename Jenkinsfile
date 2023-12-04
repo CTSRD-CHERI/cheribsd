@@ -291,6 +291,7 @@ selectedArchitectures.each { suffix ->
                 '--cheribsd/build-lib32',
                 '--cheribsd/build-tests',
                 '--cheribsd/build-bench-kernels',
+                '--cheribsd/build-nocaprevoke-kernels',
                 '--cheribsd/with-manpages',
                 '--cheribsd/debug-info',
                 '--cheribsd/debug-files',
