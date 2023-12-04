@@ -2068,6 +2068,12 @@ int	freebsd13_freebsd64_swapoff(struct thread *, struct freebsd13_freebsd64_swap
 
 #endif /* COMPAT_FREEBSD13 */
 
+
+#ifdef COMPAT_FREEBSD14
+
+
+#endif /* COMPAT_FREEBSD14 */
+
 #define	FREEBSD64_SYS_AUE_freebsd64_read	AUE_READ
 #define	FREEBSD64_SYS_AUE_freebsd64_write	AUE_WRITE
 #define	FREEBSD64_SYS_AUE_freebsd64_open	AUE_OPEN_RWTC

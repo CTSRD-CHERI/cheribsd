@@ -56,8 +56,6 @@ MIASM =  \
 	freebsd64_chroot.o \
 	freebsd64_msync.o \
 	vfork.o \
-	sbrk.o \
-	sstk.o \
 	freebsd11_vadvise.o \
 	freebsd64_munmap.o \
 	freebsd64_mprotect.o \

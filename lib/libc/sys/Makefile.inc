@@ -18,7 +18,6 @@
 NOASM=	exit.o \
 	flag_captured.o \
 	getlogin.o \
-	sstk.o \
 	yield.o
 PSEUDO=	_exit.o \
 	_getlogin.o
