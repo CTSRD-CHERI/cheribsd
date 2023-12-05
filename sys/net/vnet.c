@@ -543,11 +543,13 @@ vnet_register_sysinit(void *arg)
 	 * Invoke the constructor on all the existing vnets when it is
 	 * registered.
 	 */
+	VNET_LIST_RLOCK();
 	VNET_FOREACH(vnet) {
 		CURVNET_SET_QUIET(vnet);
 		vs->func(vs->arg);
 		CURVNET_RESTORE();
 	}
+	VNET_LIST_RUNLOCK();
 	VNET_SYSINIT_WUNLOCK();
 }
 
@@ -599,6 +601,7 @@ vnet_deregister_sysuninit(void *arg)
 	 * deregistered.
 	 */
 	VNET_SYSINIT_WLOCK();
+	VNET_LIST_RLOCK();
 	VNET_FOREACH(vnet) {
 		CURVNET_SET_QUIET(vnet);
 		vs->func(vs->arg);
@@ -608,6 +611,7 @@ vnet_deregister_sysuninit(void *arg)
 	/* Remove the destructor from the global list of vnet destructors. */
 	TAILQ_REMOVE(&vnet_destructors, vs, link);
 	VNET_SYSINIT_WUNLOCK();
+	VNET_LIST_RUNLOCK();
 }
 
 /*
