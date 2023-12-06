@@ -46,6 +46,7 @@ for dist in $DISTRIBUTIONS; do
 		items="$items $i `eval echo \\\${$(dist_to_statusvar $i):--11}`"
 	done
 	bsddialog --backtitle "$OSNAME Installer" --title "Checksum Verification" \
+	    --auto-truncate \
 	    --mixedgauge "\nVerifying checksums of selected distributions.\n" \
 	    0 0 $percentage  -- $items
 
