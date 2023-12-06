@@ -143,6 +143,31 @@ unsigned int strcols(const char *mbstring)
 	return (ncol);
 }
 
+char *strcolseek(const char *mbstring, unsigned int ncol)
+{
+	int w;
+	size_t charlen, mb_cur_max;
+	wchar_t wch;
+	mbstate_t mbs;
+
+	mb_cur_max = MB_CUR_MAX;
+	memset(&mbs, 0, sizeof(mbs));
+	while ((charlen = mbrlen(mbstring, mb_cur_max, &mbs)) != 0 &&
+	    charlen != (size_t)-1 && charlen != (size_t)-2) {
+		if (mbtowc(&wch, mbstring, mb_cur_max) < 0)
+			return (NULL);
+		w = (wch == L'\t') ? TABSIZE : wcwidth(wch);
+		if (w < 0)
+			w = 0;
+		if (ncol < (unsigned int)w)
+			return (__DECONST(char *, mbstring));
+		ncol -= w;
+		mbstring += charlen;
+	}
+
+	return (NULL);
+}
+
 /* Clear */
 int hide_widget(int y, int x, int h, int w, bool withshadow)
 {
