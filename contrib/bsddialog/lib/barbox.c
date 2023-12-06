@@ -214,6 +214,8 @@ do_mixedgauge(struct bsddialog_conf *conf, const char *text, int rows, int cols,
 	int i, miniperc, max_minibarlen;
 	int ystext, htext;
 	int minicolor, red, green;
+	int hnotext, label_len_cap, maxh, maxw;
+	bool hiddenminibars;
 	struct bar b;
 	struct dialog d;
 
@@ -232,8 +234,25 @@ do_mixedgauge(struct bsddialog_conf *conf, const char *text, int rows, int cols,
 
 	if (prepare_dialog(conf, text, rows, cols, &d) != 0)
 		return (BSDDIALOG_ERROR);
-	if (dialog_size_position(&d, nminibars + HBOX, max_minibarlen,
-	    &htext) != 0)
+
+	label_len_cap = -1;
+	hiddenminibars = false;
+	hnotext = nminibars + HBOX;
+	if (conf->auto_truncate) {
+		if (dialog_maxsize(&d, &maxh, &maxw) != 0)
+			return (BSDDIALOG_ERROR);
+		if (maxh < hnotext) {
+			nminibars = maxh - HBOX - 1; /* "..." */
+			hiddenminibars = true;
+			hnotext = maxh;
+		}
+		if (maxw < max_minibarlen) {
+			label_len_cap = maxw - (3 + 16); /* seps + [...] */
+			max_minibarlen = maxw;
+		}
+	}
+
+	if (dialog_size_position(&d, hnotext, max_minibarlen, &htext) != 0)
 		return (BSDDIALOG_ERROR);
 	if (draw_dialog(&d) != 0)
 		return (BSDDIALOG_ERROR);
@@ -249,7 +268,21 @@ do_mixedgauge(struct bsddialog_conf *conf, const char *text, int rows, int cols,
 		/* label */
 		if (color && miniperc >= 0)
 			wattron(d.widget, A_BOLD);
-		mvwaddstr(d.widget, i+1, 2, CHECK_STR(minilabels[i]));
+		if (label_len_cap > 0 &&
+		    (int)strcols(CHECK_STR(minilabels[i])) > label_len_cap) {
+			char *trunclabel, *seeklabel;
+
+			trunclabel = strdup(minilabels[i]);
+			if (trunclabel == NULL)
+				RETURN_ERROR("Could not copy label");
+			seeklabel = strcolseek(trunclabel, label_len_cap - 3);
+			if (seeklabel == NULL)
+				RETURN_ERROR("Could not seek to column limit");
+			memcpy(seeklabel, "...", 4);
+			mvwaddstr(d.widget, i+1, 2, trunclabel);
+			free(trunclabel);
+		} else
+			mvwaddstr(d.widget, i+1, 2, CHECK_STR(minilabels[i]));
 		if (color && miniperc >= 0)
 			wattroff(d.widget, A_BOLD);
 		/* perc */
@@ -273,6 +306,10 @@ do_mixedgauge(struct bsddialog_conf *conf, const char *text, int rows, int cols,
 			mvwaddstr(d.widget, i+1, 1+d.w-2-15, states[miniperc]);
 			wattroff(d.widget, minicolor);
 		}
+	}
+	if (hiddenminibars) {
+		++nminibars;
+		mvwaddstr(d.widget, nminibars, 2, "...");
 	}
 	wnoutrefresh(d.widget);
 

@@ -212,6 +212,31 @@ unsigned int strcols(const char *mbstring)
 	return (ncol);
 }
 
+char *strcolseek(const char *mbstring, unsigned int ncol)
+{
+	int w;
+	size_t charlen, mb_cur_max;
+	wchar_t wch;
+	mbstate_t mbs;
+
+	mb_cur_max = MB_CUR_MAX;
+	memset(&mbs, 0, sizeof(mbs));
+	while ((charlen = mbrlen(mbstring, mb_cur_max, &mbs)) != 0 &&
+	    charlen != (size_t)-1 && charlen != (size_t)-2) {
+		if (mbtowc(&wch, mbstring, mb_cur_max) < 0)
+			return (NULL);
+		w = (wch == L'\t') ? TABSIZE : wcwidth(wch);
+		if (w < 0)
+			w = 0;
+		if (ncol < (unsigned int)w)
+			return (__DECONST(char *, mbstring));
+		ncol -= w;
+		mbstring += charlen;
+	}
+
+	return (NULL);
+}
+
 /*
  * -3- Buttons
  */
@@ -854,6 +879,41 @@ set_widget_autosize(struct bsddialog_conf *conf, int rows, int cols, int *h,
 	return (0);
 }
 
+int widget_maxsize(struct bsddialog_conf *conf, int rows, int cols, int *maxh,
+    int *maxw, const char *text, struct buttons *bs)
+{
+	int htext, wtext, h, w;
+	int minheight, minwidth;
+
+	if (rows == BSDDIALOG_AUTOSIZE)
+		rows = BSDDIALOG_FULLSCREEN;
+	if (cols == BSDDIALOG_AUTOSIZE)
+		cols = BSDDIALOG_FULLSCREEN;
+
+	if (set_widget_size(conf, rows, cols, &h, &w) != 0)
+		return (BSDDIALOG_ERROR);
+	if (text_size(conf, rows, cols, text, bs, 0, 0, &htext, &wtext) != 0)
+		return (BSDDIALOG_ERROR);
+
+	/*
+	 * XXX: Should possibly clear conf->auto_min{height,width}
+	 * temporarily.
+	 */
+	minheight = widget_min_height(conf, htext, 0, bs->nbuttons > 0);
+	if (h < minheight)
+		RETURN_FMTERROR("Current rows: %d, needed at least: %d",
+		    h, minheight);
+	*maxh = h - minheight;
+
+	minwidth = widget_min_width(conf, wtext, 0, bs);
+	if (w < minwidth)
+		RETURN_FMTERROR("Current cols: %d, needed at least %d",
+		    w, minwidth);
+	*maxw = w - minwidth;
+
+	return (0);
+}
+
 int widget_checksize(int h, int w, struct buttons *bs, int hnotext, int minw)
 {
 	int minheight, minwidth;
@@ -916,6 +976,13 @@ set_widget_position(struct bsddialog_conf *conf, int *y, int *x, int h, int w)
 		    "(begin X + width (+ shadow) > terminal cols)");
 
 	return (0);
+}
+
+int dialog_maxsize(struct dialog *d, int *maxh, int *maxw)
+{
+
+	return  (widget_maxsize(d->conf, d->rows, d->cols, maxh, maxw, d->text,
+	    &d->bs));
 }
 
 int dialog_size_position(struct dialog *d, int hnotext, int minw, int *htext)

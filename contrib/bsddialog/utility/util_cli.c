@@ -43,6 +43,7 @@ enum OPTS {
 	ALTERNATE_SCREEN = '?' + 1,
 	AND_DIALOG,
 	ASCII_LINES,
+	AUTO_TRUNCATE,
 	BACKTITLE,
 	BEGIN_X,
 	BEGIN_Y,
@@ -86,6 +87,7 @@ enum OPTS {
 	LEFT3_EXIT_CODE,
 	LOAD_THEME,
 	MAX_INPUT,
+	NO_AUTO_TRUNCATE,
 	NO_CANCEL,
 	NO_DESCRIPTIONS,
 	NO_LINES,
@@ -153,6 +155,7 @@ static struct option longopts[] = {
 	{"and-dialog",        no_argument,       NULL, AND_DIALOG},
 	{"and-widget",        no_argument,       NULL, AND_DIALOG},
 	{"ascii-lines",       no_argument,       NULL, ASCII_LINES},
+	{"auto-truncate",     no_argument,       NULL, AUTO_TRUNCATE},
 	{"backtitle",         required_argument, NULL, BACKTITLE},
 	{"begin-x",           required_argument, NULL, BEGIN_X},
 	{"begin-y",           required_argument, NULL, BEGIN_Y},
@@ -203,6 +206,7 @@ static struct option longopts[] = {
 	{"left3-exit-code",   required_argument, NULL, LEFT3_EXIT_CODE},
 	{"load-theme",        required_argument, NULL, LOAD_THEME},
 	{"max-input",         required_argument, NULL, MAX_INPUT},
+	{"no-auto-truncate",  no_argument,       NULL, NO_AUTO_TRUNCATE},
 	{"no-cancel",         no_argument,       NULL, NO_CANCEL},
 	{"nocancel",          no_argument,       NULL, NO_CANCEL},
 	{"no-descriptions",   no_argument,       NULL, NO_DESCRIPTIONS},
@@ -390,6 +394,9 @@ parseargs(int argc, char **argv, struct bsddialog_conf *conf,
 		case ASCII_LINES:
 			conf->ascii_lines = true;
 			break;
+		case AUTO_TRUNCATE:
+			conf->auto_truncate = true;
+			break;
 		case BACKTITLE:
 			opt->backtitle = optarg;
 			if (conf->y == BSDDIALOG_CENTER)
@@ -548,6 +555,9 @@ parseargs(int argc, char **argv, struct bsddialog_conf *conf,
 			break;
 		case MAX_INPUT:
 			opt->max_input_form = (u_int)strtoul(optarg, NULL, 10);
+			break;
+		case NO_AUTO_TRUNCATE:
+			conf->auto_truncate = false;
 			break;
 		case NO_CANCEL:
 			conf->button.without_cancel = true;

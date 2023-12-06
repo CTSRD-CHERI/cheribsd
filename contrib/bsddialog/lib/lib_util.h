@@ -110,6 +110,7 @@ void set_fmt_error_string(const char *fmt, ...);
 
 /* multicolumn character string */
 unsigned int strcols(const char *mbstring);
+char *strcolseek(const char *mbstring, unsigned int ncol);
 int str_props(const char *mbstring, unsigned int *cols, bool *has_multi_col);
 void mvwaddwch(WINDOW *w, int y, int x, wchar_t wch);
 wchar_t* alloc_mbstows(const char *mbstring);
@@ -145,10 +146,15 @@ set_widget_autosize(struct bsddialog_conf *conf, int rows, int cols, int *h,
     int *w, const char *text, int *rowstext, struct buttons *bs, int hnotext,
     int minw);
 
+int widget_maxsize(struct bsddialog_conf *conf, int rows, int cols, int *maxh,
+    int *maxw, const char *text, struct buttons *bs);
+
 int widget_checksize(int h, int w, struct buttons *bs, int hnotext, int minw);
 
 int
 set_widget_position(struct bsddialog_conf *conf, int *y, int *x, int h, int w);
+
+int dialog_maxsize(struct dialog *d, int *maxh, int *maxw);
 
 int dialog_size_position(struct dialog *d, int hnotext, int minw, int *htext);
 
