@@ -81,6 +81,12 @@ vgic_vmcleanup(struct hyp *hyp)
 	VGIC_VMCLEANUP(vgic_dev, hyp);
 }
 
+int
+vgic_max_cpu_count(struct hyp *hyp)
+{
+	return (VGIC_MAX_CPU_COUNT(vgic_dev, hyp));
+}
+
 bool
 vgic_has_pending_irq(struct hypctx *hypctx)
 {

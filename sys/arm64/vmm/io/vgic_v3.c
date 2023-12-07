@@ -149,6 +149,8 @@ struct vgic_v3_cpu {
 static vgic_inject_irq_t vgic_v3_inject_irq;
 static vgic_inject_msi_t vgic_v3_inject_msi;
 
+static int vgic_v3_max_cpu_count(device_t dev, struct hyp *hyp);
+
 #define	INJECT_IRQ(hyp, vcpuid, irqid, level)			\
     vgic_v3_inject_irq(NULL, (hyp), (vcpuid), (irqid), (level))
 
@@ -471,8 +473,10 @@ vgic_v3_cpuinit(device_t dev, struct hypctx *hypctx)
 	    M_VGIC_V3, M_WAITOK | M_ZERO);
 	vgic_cpu = hypctx->vgic_cpu;
 
-	last_vcpu =
-	    vcpu_vcpuid(hypctx->vcpu) == (vm_get_maxcpus(hypctx->hyp->vm) - 1);
+	last_vcpu = false;
+	if (vcpu_vcpuid(hypctx->vcpu) ==
+	    (vgic_v3_max_cpu_count(dev, hypctx->hyp) - 1))
+		last_vcpu = true;
 
 	vmpidr_el2 = hypctx->vmpidr_el2;
 	KASSERT(vmpidr_el2 != 0,
@@ -579,6 +583,33 @@ vgic_v3_vmcleanup(device_t dev, struct hyp *hyp)
 {
 	mtx_destroy(&hyp->vgic->dist_mtx);
 	free(hyp->vgic, M_VGIC_V3);
+}
+
+static int
+vgic_v3_max_cpu_count(device_t dev, struct hyp *hyp)
+{
+	struct vgic_v3 *vgic;
+	size_t count;
+	int16_t max_count;
+
+	vgic = hyp->vgic;
+	max_count = vm_get_maxcpus(hyp->vm);
+
+	/* No registers, assume the maximum CPUs */
+	if (vgic->redist_start == 0 && vgic->redist_end == 0)
+		return (max_count);
+
+	count = (vgic->redist_end - vgic->redist_start) /
+	    (GICR_RD_BASE_SIZE + GICR_SGI_BASE_SIZE);
+
+	/*
+	 * max_count is smaller than INT_MAX so will also limit count
+	 * to a positive integer value.
+	 */
+	if (count > max_count)
+		return (max_count);
+
+	return (count);
 }
 
 static bool
@@ -1310,7 +1341,7 @@ vgic_register_read(struct hypctx *hypctx, struct vgic_register *reg_list,
 
 	for (i = 0; i < reg_list_size; i++) {
 		if (reg_list[i].start <= reg && reg_list[i].end >= reg + size) {
-			offset = reg & reg_list[i].size - 1;
+			offset = reg & (reg_list[i].size - 1);
 			reg -= offset;
 			if ((reg_list[i].flags & size) != 0) {
 				reg_list[i].read(hypctx, reg, rval, NULL);
@@ -1345,7 +1376,7 @@ vgic_register_write(struct hypctx *hypctx, struct vgic_register *reg_list,
 
 	for (i = 0; i < reg_list_size; i++) {
 		if (reg_list[i].start <= reg && reg_list[i].end >= reg + size) {
-			offset = reg & reg_list[i].size - 1;
+			offset = reg & (reg_list[i].size - 1);
 			reg -= offset;
 			if ((reg_list[i].flags & size) != 0) {
 				reg_list[i].write(hypctx, reg, offset,
@@ -1561,7 +1592,7 @@ redist_ipriorityr_write(struct hypctx *hypctx, u_int reg, u_int offset,
 static void
 redist_icfgr1_read(struct hypctx *hypctx, u_int reg, uint64_t *rval, void *arg)
 {
-	*rval = read_config(hypctx, 0);
+	*rval = read_config(hypctx, 1);
 }
 
 static void
@@ -1570,7 +1601,7 @@ redist_icfgr1_write(struct hypctx *hypctx, u_int reg, u_int offset, u_int size,
 {
 	MPASS(offset == 0);
 	MPASS(size == 4);
-	write_config(hypctx, 0, wval);
+	write_config(hypctx, 1, wval);
 }
 
 static int
@@ -1578,10 +1609,12 @@ redist_read(struct vcpu *vcpu, uint64_t fault_ipa, uintcap_t *rval,
     int size, void *arg)
 {
 	struct hyp *hyp;
-	struct hypctx *hypctx;
+	struct hypctx *hypctx, *target_hypctx;
 	struct vgic_v3 *vgic;
 	uint64_t reg, rval64;
+	int vcpuid;
 
+	/* Find the current vcpu ctx to get the vgic struct */
 	hypctx = vcpu_get_cookie(vcpu);
 	hyp = hypctx->hyp;
 	vgic = hyp->vgic;
@@ -1592,19 +1625,32 @@ redist_read(struct vcpu *vcpu, uint64_t fault_ipa, uintcap_t *rval,
 		return (EINVAL);
 	}
 
-	reg = fault_ipa - vgic->redist_start;
+	vcpuid = (fault_ipa - vgic->redist_start) /
+	    (GICR_RD_BASE_SIZE + GICR_SGI_BASE_SIZE);
+	if (vcpuid >= vm_get_maxcpus(hyp->vm)) {
+		/* Unused registers are RES0 */
+		*rval = 0;
+		return (0);
+	}
+
+	reg = (fault_ipa - vgic->redist_start) %
+	    (GICR_RD_BASE_SIZE + GICR_SGI_BASE_SIZE);
+
+	/* Find the target vcpu ctx for the access */
+	target_hypctx = hyp->ctx[vcpuid];
+
 	/* Check the register is correctly aligned */
 	if ((reg & (size - 1)) != 0)
 		return (EINVAL);
 
 	if (reg < GICR_RD_BASE_SIZE) {
-		if (vgic_register_read(hypctx, redist_rd_registers,
+		if (vgic_register_read(target_hypctx, redist_rd_registers,
 		    nitems(redist_rd_registers), reg, size, &rval64, NULL)) {
 			*rval = rval64;
 			return (0);
 		}
 	} else if (reg < (GICR_SGI_BASE + GICR_SGI_BASE_SIZE)) {
-		if (vgic_register_read(hypctx, redist_sgi_registers,
+		if (vgic_register_read(target_hypctx, redist_sgi_registers,
 		    nitems(redist_sgi_registers), reg - GICR_SGI_BASE, size,
 		    &rval64, NULL)) {
 			*rval = rval64;
@@ -1622,10 +1668,12 @@ redist_write(struct vcpu *vcpu, uint64_t fault_ipa, uintcap_t wval,
     int size, void *arg)
 {
 	struct hyp *hyp;
-	struct hypctx *hypctx;
+	struct hypctx *hypctx, *target_hypctx;
 	struct vgic_v3 *vgic;
 	uint64_t reg;
+	int vcpuid;
 
+	/* Find the current vcpu ctx to get the vgic struct */
 	hypctx = vcpu_get_cookie(vcpu);
 	hyp = hypctx->hyp;
 	vgic = hyp->vgic;
@@ -1636,17 +1684,29 @@ redist_write(struct vcpu *vcpu, uint64_t fault_ipa, uintcap_t wval,
 		return (EINVAL);
 	}
 
-	reg = fault_ipa - vgic->redist_start;
+	vcpuid = (fault_ipa - vgic->redist_start) /
+	    (GICR_RD_BASE_SIZE + GICR_SGI_BASE_SIZE);
+	if (vcpuid >= vm_get_maxcpus(hyp->vm)) {
+		/* Unused registers are write ignore */
+		return (0);
+	}
+
+	reg = (fault_ipa - vgic->redist_start) %
+	    (GICR_RD_BASE_SIZE + GICR_SGI_BASE_SIZE);
+
+	/* Find the target vcpu ctx for the access */
+	target_hypctx = hyp->ctx[vcpuid];
+
 	/* Check the register is correctly aligned */
 	if ((reg & (size - 1)) != 0)
 		return (EINVAL);
 
 	if (reg < GICR_RD_BASE_SIZE) {
-		if (vgic_register_write(hypctx, redist_rd_registers,
+		if (vgic_register_write(target_hypctx, redist_rd_registers,
 		    nitems(redist_rd_registers), reg, size, wval, NULL))
 			return (0);
 	} else if (reg < (GICR_SGI_BASE + GICR_SGI_BASE_SIZE)) {
-		if (vgic_register_write(hypctx, redist_sgi_registers,
+		if (vgic_register_write(target_hypctx, redist_sgi_registers,
 		    nitems(redist_sgi_registers), reg - GICR_SGI_BASE, size,
 		    wval, NULL))
 			return (0);
@@ -1766,24 +1826,36 @@ vgic_v3_attach_to_vm(device_t dev, struct hyp *hyp, struct vm_vgic_descr *descr)
 {
 	struct vm *vm;
 	struct vgic_v3 *vgic;
+	size_t cpu_count;
 
 	if (descr->ver.version != 3)
 		return (EINVAL);
 
-	/* The register bases need to be 64k aligned */
+	/*
+	 * The register bases need to be 64k aligned
+	 * The redist register space is the RD + SGI size
+	 */
 	if (!__is_aligned(descr->v3_regs.dist_start, PAGE_SIZE_64K) ||
-	    !__is_aligned(descr->v3_regs.redist_start, PAGE_SIZE_64K))
+	    !__is_aligned(descr->v3_regs.redist_start, PAGE_SIZE_64K) ||
+	    !__is_aligned(descr->v3_regs.redist_size,
+	     GICR_RD_BASE_SIZE + GICR_SGI_BASE_SIZE))
 		return (EINVAL);
 
 	/* The dist register space is 1 64k block */
 	if (descr->v3_regs.dist_size != PAGE_SIZE_64K)
 		return (EINVAL);
 
-	/* The redist register space is 2 64k blocks */
-	if (descr->v3_regs.redist_size != PAGE_SIZE_64K * 2)
+	vm = hyp->vm;
+
+	/*
+	 * Return an error if the redist space is too large for the maximum
+	 * number of CPUs we support.
+	 */
+	cpu_count = descr->v3_regs.redist_size /
+	    (GICR_RD_BASE_SIZE + GICR_SGI_BASE_SIZE);
+	if (cpu_count > vm_get_maxcpus(vm))
 		return (EINVAL);
 
-	vm = hyp->vm;
 	vgic = hyp->vgic;
 
 	/* Set the distributor address and size for trapping guest access. */
@@ -2215,7 +2287,7 @@ static device_method_t vgic_v3_methods[] = {
 	DEVMETHOD(vgic_cpuinit,		vgic_v3_cpuinit),
 	DEVMETHOD(vgic_cpucleanup,	vgic_v3_cpucleanup),
 	DEVMETHOD(vgic_vmcleanup,	vgic_v3_vmcleanup),
-
+	DEVMETHOD(vgic_max_cpu_count,	vgic_v3_max_cpu_count),
 	DEVMETHOD(vgic_has_pending_irq,	vgic_v3_has_pending_irq),
 	DEVMETHOD(vgic_inject_irq,	vgic_v3_inject_irq),
 	DEVMETHOD(vgic_inject_msi,	vgic_v3_inject_msi),
