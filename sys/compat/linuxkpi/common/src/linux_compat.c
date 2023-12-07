@@ -574,7 +574,7 @@ linux_file_alloc(void)
 {
 	struct linux_file *filp;
 
-	filp = kzalloc(sizeof(*filp), M_WAITOK);
+	filp = kzalloc(sizeof(*filp), GFP_KERNEL);
 
 	/* set initial refcount */
 	filp->f_count = 1;
@@ -1410,9 +1410,6 @@ linux_file_mmap_single(struct file *fp, const struct file_operations *fop,
 		return (EINVAL);
 
 	vmap = kzalloc(sizeof(*vmap), GFP_KERNEL);
-	if (vmap == NULL)
-		return (ENOMEM);
-
 	vmap->vm_start = 0;
 	vmap->vm_end = size;
 	vmap->vm_pgoff = *offset / PAGE_SIZE;
@@ -1940,7 +1937,7 @@ vmmap_add(void *addr, unsigned long size)
 {
 	struct vmmap *vmmap;
 
-	vmmap = kmalloc(sizeof(*vmmap), M_WAITOK);
+	vmmap = kmalloc(sizeof(*vmmap), GFP_KERNEL);
 	mtx_lock(&vmmaplock);
 	vmmap->vm_size = size;
 	vmmap->vm_addr = addr;
