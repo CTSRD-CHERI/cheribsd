@@ -62,6 +62,8 @@
 #define	GIC_DIST_SIZE	0x10000
 #define	GIC_REDIST_BASE	0x2f100000
 #define	GIC_REDIST_SIZE	0x20000
+/* 2 * 64K * 120 vCPUs */
+#define	GIC_REDIST_MAX	0xf00000
 
 #define	PCIE_INTR	33
 
@@ -293,7 +295,7 @@ int
 bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 {
 	const char *bootrom;
-	uint64_t elr;
+	uint64_t elr, redist_size;
 	int error;
 
 	bootrom = get_config_value("bootrom");
@@ -312,10 +314,16 @@ bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 	if (error != 0)
 		return (error);
 
+	redist_size = GIC_REDIST_SIZE * guest_ncpus;
+	if (redist_size > GIC_REDIST_MAX) {
+		warnx("too many vCPUs for GIC redistributor");
+		return (EINVAL);
+	}
+
 	fdt_add_gic(GIC_DIST_BASE, GIC_DIST_SIZE, GIC_REDIST_BASE,
-	    GIC_REDIST_SIZE);
+	    redist_size);
 	error = vm_attach_vgic(ctx, GIC_DIST_BASE, GIC_DIST_SIZE,
-	    GIC_REDIST_BASE, GIC_REDIST_SIZE);
+	    GIC_REDIST_BASE, redist_size);
 	if (error != 0) {
 		warn("vm_attach_vgic()");
 		return (error);
