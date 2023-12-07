@@ -414,6 +414,10 @@ vm_alloc_vcpu(struct vm *vm, int vcpuid)
 	if (vcpuid < 0 || vcpuid >= vm_get_maxcpus(vm))
 		return (NULL);
 
+	/* Some interrupt controllers may have a CPU limit */
+	if (vcpuid >= vgic_max_cpu_count(vm->cookie))
+		return (NULL);
+
 	vcpu = atomic_load_ptr(&vm->vcpu[vcpuid]);
 	if (__predict_true(vcpu != NULL))
 		return (vcpu);
@@ -477,7 +481,7 @@ vm_create(const char *name, struct vm **retvm)
 	vm->sockets = 1;
 	vm->cores = 1;			/* XXX backwards compatibility */
 	vm->threads = 1;		/* XXX backwards compatibility */
-	vm->maxcpus = VM_MAXCPU;	/* XXX temp to keep code working */
+	vm->maxcpus = vm_maxcpu;
 
 	vm->vcpu = malloc(sizeof(*vm->vcpu) * vm->maxcpus, M_VMM,
 	    M_WAITOK | M_ZERO);

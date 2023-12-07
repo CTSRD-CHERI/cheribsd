@@ -40,6 +40,7 @@ void vgic_vminit(struct hyp *hyp);
 void vgic_cpuinit(struct hypctx *hypctx);
 void vgic_cpucleanup(struct hypctx *hypctx);
 void vgic_vmcleanup(struct hyp *hyp);
+int vgic_max_cpu_count(struct hyp *hyp);
 bool vgic_has_pending_irq(struct hypctx *hypctx);
 int vgic_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level);
 int vgic_inject_msi(struct hyp *hyp, uint64_t msg, uint64_t addr);

@@ -66,6 +66,9 @@ vmm_emulate_instruction(struct vcpu *vcpu, uint64_t gpa, struct vie *vie,
 		error = vm_get_register(vcpu, vie->reg, &val);
 		if (error)
 			goto out;
+		/* Mask any unneeded bits from the register */
+		if (vie->access_size < 8)
+			val &= (1ul << (vie->access_size * 8)) - 1;
 		error = memwrite(vcpu, gpa, val, vie->access_size, memarg);
 	}
 

@@ -66,6 +66,11 @@ METHOD void vmcleanup {
 	struct hyp *hyp;
 }
 
+METHOD int max_cpu_count {
+	device_t dev;
+	struct hyp *hyp;
+}
+
 METHOD bool has_pending_irq {
 	device_t dev;
 	struct hypctx *hypctx;
