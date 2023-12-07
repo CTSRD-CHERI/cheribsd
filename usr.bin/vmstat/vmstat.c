@@ -1417,11 +1417,11 @@ domemstat_malloc(void)
 	}
 	xo_open_container("malloc-statistics");
 #if __has_feature(capabilities)
-	xo_emit("{T:/%13s} {T:/%5s} {T:/%6s} {T:/%8s} {T:/%8s}  {T:Size(s)}\n",
-	    "Type", "InUse", "MemUse", "Requests", "ReservUse");
+	xo_emit("{T:/%16s} {T:/%4s} {T:/%5s} {T:/%3s} {T:/%5s} {T:Size(s)}\n",
+	    "Type", "Use", "Memory", "Req", "Resrv");
 #else
-	xo_emit("{T:/%13s} {T:/%5s} {T:/%6s} {T:/%8s}  {T:Size(s)}\n",
-	    "Type", "InUse", "MemUse", "Requests");
+	xo_emit("{T:/%16s} {T:/%4s} {T:/%5s} {T:/%3s} {T:Size(s)}\n",
+	    "Type", "Use", "Memory", "Req");
 #endif
 	xo_open_list("memory");
 	zones = memstat_malloc_zone_get_count();
@@ -1431,28 +1431,28 @@ domemstat_malloc(void)
 		    memstat_get_count(mtp) == 0)
 			continue;
 		xo_open_instance("memory");
+		xo_emit("{k:type/%16s/%s} "
+		    "{[:4}{h,hn-decimal,hn-1000:in-use/%ju}{]:} "
+		    "{[:5}{h,hn-decimal:memory-use/%ju}{]:} "
+		    "{[:4}{h,hn-decimal,hn-1000:requests/%ju}{]:} "
 #if __has_feature(capabilities)
-		xo_emit("{k:type/%13s/%s} {:in-use/%5ju} "
-		    "{:memory-use/%5ju}{U:K} {:high-use/%7s} "
-		    "{:requests/%8ju} {:reservation-use/%8ju}{U:K}  ",
-		    memstat_get_name(mtp), (uintmax_t)memstat_get_count(mtp),
-		    ((uintmax_t)memstat_get_bytes(mtp) + 1023) / 1024, "-",
-		    (uintmax_t)memstat_get_numallocs(mtp),
-		    ((uintmax_t)memstat_get_reserved_bytes(mtp) + 1023) / 1024);
-#else
-		xo_emit("{k:type/%13s/%s} {:in-use/%5ju} "
-		    "{:memory-use/%5ju}{U:K} {:requests/%8ju}  ",
-		    memstat_get_name(mtp), (uintmax_t)memstat_get_count(mtp),
-		    ((uintmax_t)memstat_get_bytes(mtp) + 1023) / 1024,
-		    (uintmax_t)memstat_get_numallocs(mtp));
+		    "{[:5}{h,hn-decimal:reservation-use/%ju}{]:} "
 #endif
+		    ,
+		    memstat_get_name(mtp), (uintmax_t)memstat_get_count(mtp),
+		    (uintmax_t)memstat_get_bytes(mtp),
+		    (uintmax_t)memstat_get_numallocs(mtp)
+#if __has_feature(capabilities)
+		    , (uintmax_t)memstat_get_reserved_bytes(mtp)
+#endif
+		    );
 		first = 1;
 		xo_open_list("size");
 		for (i = 0; i < zones; i++) {
 			if (memstat_malloc_zone_used(mtp, i)) {
 				if (!first)
 					xo_emit(",");
-				xo_emit("{l:size/%d}", memstat_malloc_zone_get_size(i));
+				xo_emit("{lh:size/%d}", memstat_malloc_zone_get_size(i));
 				first = 0;
 			}
 		}
