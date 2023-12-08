@@ -154,6 +154,8 @@ kobject_uevent_env(struct kobject *kobj, int action, char *envp[])
 	 */
 }
 
+void linux_kobject_kfree_name(struct kobject *kobj);
+
 #endif /* _LINUXKPI_LINUX_KOBJECT_H_ */
 // CHERI CHANGES START
 // {
