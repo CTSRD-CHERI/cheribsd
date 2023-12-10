@@ -1639,6 +1639,10 @@ redist_read(struct vcpu *vcpu, uint64_t fault_ipa, uintcap_t *rval,
 	/* Find the target vcpu ctx for the access */
 	target_hypctx = hyp->ctx[vcpuid];
 
+	/* Require all vcpus to be initialised */
+	if (target_hypctx == NULL)
+		return (EINVAL);
+
 	/* Check the register is correctly aligned */
 	if ((reg & (size - 1)) != 0)
 		return (EINVAL);
@@ -1696,6 +1700,10 @@ redist_write(struct vcpu *vcpu, uint64_t fault_ipa, uintcap_t wval,
 
 	/* Find the target vcpu ctx for the access */
 	target_hypctx = hyp->ctx[vcpuid];
+
+	/* Require all vcpus to be initialised */
+	if (target_hypctx == NULL)
+		return (EINVAL);
 
 	/* Check the register is correctly aligned */
 	if ((reg & (size - 1)) != 0)
