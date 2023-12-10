@@ -137,8 +137,6 @@ struct vgic_v3_cpu {
 	struct vgic_v3_irq private_irqs[VGIC_PRV_I_NUM];
 	TAILQ_HEAD(, vgic_v3_irq) irq_act_pend;
 	u_int		ich_lr_used;
-
-	uint64_t	gicr_typer;	/* Redistributor Type Register */
 };
 
 /* How many IRQs we support (SGIs + PPIs + SPIs). Not including LPIs */
@@ -465,39 +463,14 @@ vgic_v3_cpuinit(device_t dev, struct hypctx *hypctx)
 {
 	struct vgic_v3_cpu *vgic_cpu;
 	struct vgic_v3_irq *irq;
-	uint64_t aff, vmpidr_el2;
 	int i, irqid;
-	bool last_vcpu;
 
 	hypctx->vgic_cpu = malloc(sizeof(*hypctx->vgic_cpu),
 	    M_VGIC_V3, M_WAITOK | M_ZERO);
 	vgic_cpu = hypctx->vgic_cpu;
 
-	last_vcpu = false;
-	if (vcpu_vcpuid(hypctx->vcpu) ==
-	    (vgic_v3_max_cpu_count(dev, hypctx->hyp) - 1))
-		last_vcpu = true;
-
-	vmpidr_el2 = hypctx->vmpidr_el2;
-	KASSERT(vmpidr_el2 != 0,
+	KASSERT(hypctx->vmpidr_el2 != 0,
 	    ("Trying to init this CPU's vGIC before the vCPU"));
-	/*
-	 * Get affinity for the current CPU. The guest CPU affinity is taken
-	 * from VMPIDR_EL2. The Redistributor corresponding to this CPU is
-	 * the Redistributor with the same affinity from GICR_TYPER.
-	 */
-	aff = (CPU_AFF3(vmpidr_el2) << 24) | (CPU_AFF2(vmpidr_el2) << 16) |
-	    (CPU_AFF1(vmpidr_el2) << 8) | CPU_AFF0(vmpidr_el2);
-
-	/* Set up GICR_TYPER. */
-	vgic_cpu->gicr_typer = aff << GICR_TYPER_AFF_SHIFT;
-	/* Set the vcpu as the processsor ID */
-	vgic_cpu->gicr_typer |=
-	    (uint64_t)vcpu_vcpuid(hypctx->vcpu) << GICR_TYPER_CPUNUM_SHIFT;
-
-	if (last_vcpu)
-		/* Mark the last Redistributor */
-		vgic_cpu->gicr_typer |= GICR_TYPER_LAST;
 
 	mtx_init(&vgic_cpu->lr_mtx, "VGICv3 ICH_LR_EL2 lock", NULL, MTX_SPIN);
 
@@ -586,7 +559,7 @@ vgic_v3_vmcleanup(device_t dev, struct hyp *hyp)
 }
 
 static int
-vgic_v3_max_cpu_count(device_t dev, struct hyp *hyp)
+_vgic_v3_max_cpu_count(struct hyp *hyp)
 {
 	struct vgic_v3 *vgic;
 	size_t count;
@@ -610,6 +583,12 @@ vgic_v3_max_cpu_count(device_t dev, struct hyp *hyp)
 		return (max_count);
 
 	return (count);
+}
+
+static int
+vgic_v3_max_cpu_count(device_t dev, struct hyp *hyp)
+{
+	return (_vgic_v3_max_cpu_count(hyp));
 }
 
 static bool
@@ -1484,7 +1463,34 @@ redist_iidr_read(struct hypctx *hypctx, u_int reg, uint64_t *rval, void *arg)
 static void
 redist_typer_read(struct hypctx *hypctx, u_int reg, uint64_t *rval, void *arg)
 {
-	*rval = hypctx->vgic_cpu->gicr_typer;
+	uint64_t aff, typer, vmpidr_el2;
+	bool last_vcpu;
+
+	last_vcpu = false;
+	if (vcpu_vcpuid(hypctx->vcpu) ==
+	    (_vgic_v3_max_cpu_count(hypctx->hyp) - 1))
+		last_vcpu = true;
+
+	/*
+	 * Get affinity for the current CPU. The guest CPU affinity is taken
+	 * from VMPIDR_EL2. The Redistributor corresponding to this CPU is
+	 * the Redistributor with the same affinity from GICR_TYPER.
+	 */
+	vmpidr_el2 = hypctx->vmpidr_el2;
+	aff = (CPU_AFF3(vmpidr_el2) << 24) | (CPU_AFF2(vmpidr_el2) << 16) |
+	    (CPU_AFF1(vmpidr_el2) << 8) | CPU_AFF0(vmpidr_el2);
+
+	/* Set up GICR_TYPER. */
+	typer = aff << GICR_TYPER_AFF_SHIFT;
+	/* Set the vcpu as the processsor ID */
+	typer |=
+	    (uint64_t)vcpu_vcpuid(hypctx->vcpu) << GICR_TYPER_CPUNUM_SHIFT;
+
+	if (last_vcpu)
+		/* Mark the last Redistributor */
+		typer |= GICR_TYPER_LAST;
+
+	*rval = typer;
 }
 
 /*
