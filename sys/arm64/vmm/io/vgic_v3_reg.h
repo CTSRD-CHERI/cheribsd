@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
  * Copyright (C) 2018 The FreeBSD Foundation
  *
  * This software was developed by Alexandru Elisei under sponsorship

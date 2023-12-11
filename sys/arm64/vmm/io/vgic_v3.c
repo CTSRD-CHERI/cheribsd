@@ -1,6 +1,7 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
  * Copyright (C) 2018 Alexandru Elisei <alexandru.elisei@gmail.com>
- * All rights reserved.
  * Copyright (C) 2020-2022 Andrew Turner
  * Copyright (C) 2023 Arm Ltd
  *
