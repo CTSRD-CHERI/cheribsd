@@ -57,7 +57,6 @@
 
 static uint64_t cnthctl_el2_reg;
 static uint32_t tmr_frq;
-static bool have_vtimer = false;
 
 #define timer_condition_met(ctl)	((ctl) & CNTP_CTL_ISTATUS)
 
@@ -69,11 +68,6 @@ vtimer_virtual_timer_intr(void *arg)
 	struct hypctx *hypctx;
 	uint64_t cntpct_el0;
 	uint32_t cntv_ctl;
-
-	/*
-	 * TODO everything here is very strange. The relantionship between the
-	 * hardware value and the value in memory is not clear at all.
-	 */
 
 	hypctx = arm64_get_active_vcpu();
 	cntv_ctl = READ_SPECIALREG(cntv_ctl_el0);
@@ -491,7 +485,6 @@ vtimer_attach(device_t dev)
 	bus_setup_intr(dev, sc->res, INTR_TYPE_CLK, vtimer_virtual_timer_intr,
 	    NULL, NULL, &sc->ihl);
 
-	have_vtimer = true;
 	return (0);
 }
 
