@@ -192,6 +192,7 @@ fdt_add_gic(uint64_t dist_base, uint64_t dist_size,
 	    &prop);
 	SET_PROP_U32(prop, 0, 256);
 	SET_PROP_U32(prop, 1, 64);
+	fdt_property(fdt, "msi-controller", NULL, 0);
 
 	fdt_end_node(fdt);
 
