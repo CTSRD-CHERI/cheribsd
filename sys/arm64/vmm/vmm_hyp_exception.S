@@ -1,6 +1,7 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
  * Copyright (C) 2017 Alexandru Elisei <alexandru.elisei@gmail.com>
- * All rights reserved.
  * Copyright (c) 2021 Andrew Turner
  *
  * This software was developed by Alexandru Elisei under sponsorship
