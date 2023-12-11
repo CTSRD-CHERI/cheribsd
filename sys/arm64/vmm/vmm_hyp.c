@@ -625,26 +625,11 @@ vmm_hyp_read_reg(uint64_t reg)
 	return (0);
 }
 
-static bool
-vmm_is_vpipt_cache(void)
-{
-	/* TODO: Implement */
-	return (0);
-}
-
 static int
 vmm_clean_s2_tlbi(void)
 {
 	dsb(ishst);
 	__asm __volatile("tlbi alle1is");
-
-	/*
-	 * If we have a VPIPT icache it will use the VMID to tag cachelines.
-	 * As we are changing the allocated VMIDs we need to invalidate the
-	 * icache lines containing all old values.
-	 */
-	if (vmm_is_vpipt_cache())
-		__asm __volatile("ic ialluis");
 	dsb(ish);
 
 	return (0);
