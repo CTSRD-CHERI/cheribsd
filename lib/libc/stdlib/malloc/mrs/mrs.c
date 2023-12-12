@@ -94,10 +94,6 @@
  *   times the size of the heap (default 4).
  * CONCURRENT_REVOCATION_PASSES: Number of concurrent revocation pass
  *   before the stop-the-world pass.
- *
- * OPTIONAL_QUARANTINING: Allow quarantining to be enabled/disabled at
- *   runtime and for mrs to fall back to not quarantining if
- *   cheri_revoke_get_shadow(2) is unimplemented (ENOSYS).
  */
 
 #ifdef SNMALLOC_PRINT_STATS
