@@ -30,6 +30,7 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/param.h>
 #include <sys/procctl.h>
 #include <sys/wait.h>
 
@@ -262,4 +263,53 @@ CHERIBSDTEST(malloc_revocation_ctl_suid_elfnote_enable_protctl_disable,
 
 	malloc_revocation_ctl_common_procctl(
 	    "malloc_is_revoking_suid_elfnote_enable", true, &arg);
+}
+
+static void
+check_mallocx(size_t size)
+{
+	void *data;
+
+	data = mallocx(size, MALLOCX_ALIGN(size));
+	CHERIBSDTEST_VERIFY2(__builtin_is_aligned(data, size),
+	    "mallocx(%#zx, MALLOCX_ALIGN(%#zx (%#x))) -> %#lp: "
+	    "Not correctly aligned! offset: %#zx\n",
+	    size, size, MALLOCX_ALIGN(size), data, (ptraddr_t)data -
+	    (ptraddr_t)__builtin_align_down(data, size));
+	free(data);
+}
+
+CHERIBSDTEST(mallocx_alignment, "Check that mallocx aligns allocations")
+{
+	size_t sizes[] = {0x400, 0x800, 0x1000, 0x2000, 0x4000, 0x8000,
+	    0x10000};
+
+	for (size_t i = 0; i < nitems(sizes); i++)
+		check_mallocx(sizes[i]);
+
+	cheribsdtest_success();
+}
+
+static void
+check_rallocx(size_t size)
+{
+	static void *data = NULL;
+
+	data = rallocx(data, size, MALLOCX_ALIGN(size));
+	CHERIBSDTEST_VERIFY2(__builtin_is_aligned(data, size),
+	    "rallocx(%#zx, MALLOCX_ALIGN(%#zx (%#x))) -> %#lp: "
+	    "Not correctly aligned! offset: %#zx\n",
+	    size, size, MALLOCX_ALIGN(size), data, (ptraddr_t)data -
+	    (ptraddr_t)__builtin_align_down(data, size));
+}
+
+CHERIBSDTEST(rallocx_alignment, "Check that rallocx aligns allocations")
+{
+	size_t sizes[] = {0x400, 0x800, 0x1000, 0x2000, 0x4000, 0x8000,
+	    0x10000};
+
+	for (size_t i = 0; i < nitems(sizes); i++)
+		check_rallocx(sizes[i]);
+
+	cheribsdtest_success();
 }
