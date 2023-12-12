@@ -59,7 +59,7 @@ SRCS+= \
 .endif
 MAN?=		rtld.1
 ACFLAGS+=	-DLOCORE
-CFLAGS+=	-Wall -DFREEBSD_ELF -DIN_RTLD -ffreestanding
+CFLAGS+=	-Wall -DIN_RTLD -ffreestanding
 CFLAGS+=	-I${SRCTOP}/lib/csu/common
 .if exists(${RTLD_ELF_DIR}/${MACHINE_ARCH:S/powerpc64le/powerpc64/})
 RTLD_ARCH=	${MACHINE_ARCH:S/powerpc64le/powerpc64/}
