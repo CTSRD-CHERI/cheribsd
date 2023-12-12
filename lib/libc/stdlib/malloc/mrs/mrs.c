@@ -96,6 +96,14 @@
  *   before the stop-the-world pass.
  */
 
+#define	MALLOCX_LG_ALIGN_BITS	6
+#define	MALLOCX_LG_ALIGN_MASK	((1 << MALLOCX_LG_ALIGN_BITS) - 1)
+/* Use MALLOCX_ALIGN_GET() if alignment may not be specified in flags. */
+#define	MALLOCX_ALIGN_GET_SPECIFIED(flags)				\
+    ((size_t)1 << (flags & MALLOCX_LG_ALIGN_MASK))
+#define	MALLOCX_ALIGN_GET(flags)					\
+    (MALLOCX_ALIGN_GET_SPECIFIED(flags) & (SIZE_T_MAX - 1))
+
 #ifdef SNMALLOC_PRINT_STATS
 extern void snmalloc_print_stats(void);
 #endif
@@ -1447,35 +1455,46 @@ mrs_free(void *ptr)
 void *
 mrs_mallocx(size_t size, int flags)
 {
+	size_t align = MALLOCX_ALIGN_GET(flags);
+	void *ret;
+
 	if (!quarantining)
 		return (REAL(mallocx)(size, flags));
 
-	/*
-	 * This API supports optional zeroing.  Since no one really uses
-	 * it, we don't care about performance and preserve the ABI by
-	 * unconditionally calling calloc.  (We should always be zeroing
-	 * for correctness anyway.)
-	 */
-	return (mrs_calloc(1, size));
+	if (align <= CAPREVOKE_BITMAP_ALIGNMENT)
+		ret = mrs_malloc(size);
+	else if (mrs_posix_memalign(&ret, size, align) != 0)
+		ret = NULL;
+
+#ifndef CLEAR_ON_ALLOC
+	/* Clear if requested and we aren't clearing above. */
+	if (ret != NULL && (flags & MALLOCX_ZERO) != 0)
+		clear_region(ret, cheri_getlen(ret));
+#endif
+	return (ret);
 }
 
 void *
 mrs_rallocx(void *ptr, size_t size, int flags)
 {
+	void *new_alloc;
+	size_t old_size;
+
 	if (!quarantining)
 		return (REAL(rallocx)(ptr, size, flags));
 
-	size_t old_size = cheri_getlen(ptr);
+	old_size = cheri_getlen(ptr);
+
 	mrs_debug_printf("%s: called ptr %p ptr size %zu new size %zu\n",
 	    __func__, ptr, old_size, size);
 
 	/*
-	 * This API supports optional zeroing.  Since no one really uses
-	 * it, we don't care about performance and preserve the ABI by
-	 * unconditionally calling calloc.  (We should always be zeroing
-	 * for correctness anyway.)
+	 * Allocate an appropriately-aligned, potentially-zeroed space.
+	 * In principle might be more efficent to only zero the end, but
+	 * this isn't a widly used API so just waste a little memory
+	 * bandwidth to make things similar.
 	 */
-	void *new_alloc = mrs_calloc(1, size);
+	new_alloc = mrs_mallocx(size, flags);
 
 	/*
 	 * Per the C standard, copy and free IFF the old pointer is valid
