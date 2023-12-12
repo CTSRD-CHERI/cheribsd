@@ -66,6 +66,7 @@ struct devmem_softc {
 struct vmmdev_softc {
 	struct vm	*vm;		/* vm instance cookie */
 	struct cdev	*cdev;
+	struct ucred	*ucred;
 	SLIST_ENTRY(vmmdev_softc) link;
 	SLIST_HEAD(, devmem_softc) devmem;
 	int		flags;
@@ -179,6 +180,12 @@ vmmdev_lookup(const char *name)
 		if (strcmp(name, vm_name(sc->vm)) == 0)
 			break;
 	}
+
+	if (sc == NULL)
+		return (NULL);
+
+	if (cr_cansee(curthread->td_ucred, sc->ucred))
+		return (NULL);
 
 	return (sc);
 }
@@ -776,6 +783,9 @@ vmmdev_destroy(void *arg)
 	if (sc->vm != NULL)
 		vm_destroy(sc->vm);
 
+	if (sc->ucred != NULL)
+		crfree(sc->ucred);
+
 	if ((sc->flags & VSC_LINKED) != 0) {
 		mtx_lock(&vmmdev_mtx);
 		SLIST_REMOVE(&head, sc, vmmdev_softc, link);
@@ -888,6 +898,7 @@ sysctl_vmm_create(SYSCTL_HANDLER_ARGS)
 		goto out;
 
 	sc = malloc(sizeof(struct vmmdev_softc), M_VMMDEV, M_WAITOK | M_ZERO);
+	sc->ucred = crhold(curthread->td_ucred);
 	sc->vm = vm;
 	SLIST_INIT(&sc->devmem);
 
@@ -909,8 +920,8 @@ sysctl_vmm_create(SYSCTL_HANDLER_ARGS)
 		goto out;
 	}
 
-	error = make_dev_p(MAKEDEV_CHECKNAME, &cdev, &vmmdevsw, NULL,
-			   UID_ROOT, GID_WHEEL, 0600, "vmm/%s", buf);
+	error = make_dev_p(MAKEDEV_CHECKNAME, &cdev, &vmmdevsw, sc->ucred,
+	    UID_ROOT, GID_WHEEL, 0600, "vmm/%s", buf);
 	if (error != 0) {
 		vmmdev_destroy(sc);
 		goto out;
