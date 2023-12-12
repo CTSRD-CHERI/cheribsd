@@ -25,15 +25,11 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/types.h>
-#include <machine/elf.h>
-#if __has_feature(capabilities)
-#include <cheri/cheric.h>
-#endif
+#include <sys/endian.h>
 
 #include <err.h>
 #include <errno.h>
-#include <string.h>
+#include <gelf.h>
 
 #include "ef.h"
 
@@ -42,47 +38,44 @@
  * target relocation address of the section, and `dataoff/len' is the region
  * that is to be relocated, and has been copied to *dest
  */
-int
-ef_reloc(struct elf_file *ef, const void *reldata, int reltype, Elf_Off relbase,
-    Elf_Off dataoff, size_t len, void *dest)
+static int
+ef_aarch64_reloc(struct elf_file *ef, const void *reldata, Elf_Type reltype,
+    GElf_Addr relbase, GElf_Addr dataoff, size_t len, void *dest)
 {
-	void *where;
-	Elf_Addr addend;
-	Elf_Size rtype;
-	const Elf_Rela *rela;
-#if __has_feature(capabilities)
-	Elf_Addr *fragment;
-#endif
+	char *where;
+	Elf64_Addr addend;
+	GElf_Size rtype;
+	const GElf_Rela *rela;
+	Elf64_Addr *fragment;
 
-	if (reltype != EF_RELOC_RELA)
+	if (reltype != ELF_T_RELA)
 		return (EINVAL);
 
-	rela = (const Elf_Rela *)reldata;
-	where = (void *) ((uintptr_t)dest - dataoff + rela->r_offset);
+	rela = (const GElf_Rela *)reldata;
+	where = (char *)dest - dataoff + rela->r_offset;
 	addend = rela->r_addend;
-	rtype = ELF_R_TYPE(rela->r_info);
+	rtype = GELF_R_TYPE(rela->r_info);
 
-	if ((char *)where < (char *)dest || (char *)where >= (char *)dest + len)
+	if (where < (char *)dest || where >= (char *)dest + len)
 		return (0);
 
 	switch(rtype) {
 	case R_AARCH64_RELATIVE:
-		*((Elf_Addr *)where) = relbase + addend;
+		le64enc(where, relbase + addend);
 		break;
 	case R_AARCH64_ABS64:
 		break;
-#if __has_feature(capabilities)
 	case R_MORELLO_RELATIVE:
-		fragment = (Elf_Addr *)where;
-		*((void * __capability *)where) = cheri_fromint(fragment[0] +
-		    relbase + addend);
+		fragment = (Elf64_Addr *)where;
+		le64enc(where, fragment[0] + relbase + addend);
 		break;
 	case R_MORELLO_CAPINIT:
 		break;
-#endif
 	default:
 		warnx("unhandled relocation type %lu", rtype);
 		break;
 	}
 	return (0);
 }
+
+ELF_RELOC(ELFCLASS64, ELFDATA2LSB, EM_AARCH64, ef_aarch64_reloc);
