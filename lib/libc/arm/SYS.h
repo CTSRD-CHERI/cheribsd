@@ -46,7 +46,6 @@
 			mov r7, ip
 
 #define	CERROR		_C_LABEL(cerror)
-#define	CURBRK		_C_LABEL(curbrk)
 
 #define _SYSCALL_NOERROR(x)						\
 	ENTRY(__CONCAT(__sys_, x));					\
