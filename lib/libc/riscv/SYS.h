@@ -40,30 +40,27 @@
 	li	t0, SYS_ ## name;				\
 	ecall
 
-#define	PSEUDO(name)						\
-ENTRY(__sys_##name);						\
-	WEAK_REFERENCE(__sys_##name, _##name);			\
+#define	_SYSCALL_BODY(name)					\
 	_SYSCALL(name);						\
 	bnez	t0, 1f; 					\
 	RETURN;							\
-1:	_TAIL	cerror@plt;					\
+1:	_TAIL	cerror@plt
+
+#define	PSEUDO(name)						\
+ENTRY(__sys_##name);						\
+	WEAK_REFERENCE(__sys_##name, _##name);			\
+	_SYSCALL_BODY(name);					\
 END(__sys_##name)
 
 #define	RSYSCALL(name)						\
 ENTRY(__sys_##name);						\
 	WEAK_REFERENCE(__sys_##name, name);			\
 	WEAK_REFERENCE(__sys_##name, _##name);			\
-	_SYSCALL(name);						\
-	bnez	t0, 1f; 					\
-	RETURN;							\
-1:	_TAIL	cerror@plt;					\
+	_SYSCALL_BODY(name);					\
 END(__sys_##name)
 
 /* Do a system call where the _x() is also custom (e.g. fcntl, ioctl) */
 #define NO_UNDERSCORE(name)					\
 ENTRY(__sys_##name);						\
-	_SYSCALL(name);						\
-	bnez	t0, 1f; 					\
-	RETURN;							\
-1:	_TAIL	cerror@plt;					\
+	_SYSCALL_BODY(name);					\
 END(__sys_##name)
