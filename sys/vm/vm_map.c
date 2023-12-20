@@ -4791,6 +4791,9 @@ vm_map_remove_locked(vm_map_t map, vm_offset_t start, vm_offset_t end)
 	}
 
 	result = vm_map_delete(map, start, end, true);
+	if (result != KERN_SUCCESS)
+		return (result);
+
 	if (vm_map_reservation_is_unmapped(map, reservation)) {
 #ifdef CHERI_CAPREVOKE
 		if (quarantine_unmapped_reservations &&
