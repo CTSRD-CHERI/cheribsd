@@ -6333,6 +6333,8 @@ vm_map_reservation_get(vm_map_t map, vm_offset_t start, vm_size_t length,
 	MPASS((map->flags & MAP_RESERVATIONS));
 
 	if (vm_map_lookup_entry(map, start, &entry)) {
+	        if (entry->inheritance == VM_INHERIT_QUARANTINE)
+			return (KERN_NO_SPACE);
 		reservation = entry->reservation;
 		while (entry->end < end) {
 			next_entry = vm_map_entry_succ(entry);
