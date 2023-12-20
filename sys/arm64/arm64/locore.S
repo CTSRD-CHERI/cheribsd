@@ -74,6 +74,21 @@
 #endif
 .endmacro
 
+.macro buildptr_stack dregn, bootparamsn, sym
+	mov	x\dregn, #(PAGE_SIZE * KSTACK_PAGES)
+	buildptr \bootparamsn, \sym, x\dregn
+	add	PTR(\dregn), PTR(\bootparamsn), x\dregn
+	/*
+	 * Can not yet enforce bounds between PCB and KSTACK as we have
+	 * no place to store the PCB pointer here.
+	 * XXX-AM: It could be another bootparam if needed
+	 */
+	/*
+	 * TODO: Is the PCB pointer used in the executive or restricted mode?
+	 */
+	sub	PTRN(\dregn), PTRN(\dregn), #PCB_SIZE
+.endmacro
+
 .macro buildptr_range sregn, eregn, start_sym, end_sym, clrperm = x
 	ldr	x\sregn, =\start_sym
 	ldr	x\eregn, =\end_sym
@@ -247,17 +262,20 @@ ENTRY(_start)
 virtdone:
 	BTI_J
 
-	/* Set up the stack */
-	mov	x7, #(PAGE_SIZE * KSTACK_PAGES)
-	buildptr 25, initstack, x7
-	/* Preserve initstack in x/c25 for bootparams */
-	add	PTR(7), PTR(25), x7
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	/*
-	 * Can not yet enforce bounds between PCB and KSTACK as we have
-	 * no place to store the PCB pointer here.
-	 * XXX-AM: It could be another bootparam if needed
+	 * Set up the compartment stack
 	 */
-	sub	PTRN(sp), PTR(7), #PCB_SIZE
+	buildptr_stack 7, 25, rinitstack
+	msr	rcsp_el0, c7
+#endif
+	/*
+	 * Set up the stack
+	 *
+	 * Preserve the stack pointer in x/c25 for bootparams.
+	 */
+	buildptr_stack 7, 25, initstack
+	mov	PTRN(sp), PTR(7)
 
 	/* Zero the BSS */
 	buildptr_range 15, 14, _bss_start, _end
@@ -1148,6 +1166,11 @@ initstack:
 	.space	(PAGE_SIZE * KSTACK_PAGES)
 initstack_end:
 	.size	initstack, initstack_end - initstack
+	.type	rinitstack,#object
+rinitstack:
+	.space	(PAGE_SIZE * KSTACK_PAGES)
+rinitstack_end:
+	.size	rinitstack, rinitstack_end - rinitstack
 
 	.section .init_pagetable, "aw", %nobits
 	.align PAGE_SHIFT
