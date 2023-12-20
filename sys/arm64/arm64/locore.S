@@ -120,6 +120,28 @@
 	br	PTR(\regn)
 .endmacro
 
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+/*
+ * Use the linker-based compartmentalization model.
+ *
+ * TODO: Use the compartment API to allocate and call a trampoline.
+ */
+.macro enter_kern_compartment scratch1n, scratch2n, dstsym
+	/* Set up the compartment entry. */
+	ldr	x\scratch2n, =\dstsym
+	orr	x\scratch2n, x\scratch2n, #1
+	adr	c\scratch1n, #0
+	scvalue	c\scratch1n, c\scratch1n, x\scratch2n
+	/* Clear the Executive permission bit to use the Restricted mode. */
+	mov	x\scratch2n, #CHERI_PERM_EXECUTIVE
+	clrperm	c\scratch1n, c\scratch1n, x\scratch2n
+	seal	c\scratch1n, c\scratch1n, rb
+
+	/* Branch into the compartment. */
+	brr	c\scratch1n
+.endmacro
+#endif
+
 /*
  * Helper to clear ddc and all other general-purpose capability registers,
  * except c0.
@@ -358,6 +380,11 @@ virtdone:
 	 * disabled.
 	 */
 	bl	ptrauth_start
+#endif
+
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	enter_kern_compartment 15, 7, compartment
+compartment:
 #endif
 
 	bl	mi_startup
