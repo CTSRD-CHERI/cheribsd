@@ -1697,10 +1697,14 @@ ATF_TC_BODY(largepage_mprotect, tc)
 		largepage_protect(addr, ps[i], PROT_READ, 0);
 		largepage_protect(addr, ps[0], PROT_NONE, EINVAL);
 		largepage_protect(addr, ps[i], PROT_NONE, 0);
+#ifdef __CHERI_PURE_CAPABILITY__
+		largepage_protect(addr, ps[i], PROT_READ | PROT_WRITE, 0);
+#else
 		largepage_protect(addr, ps[0],
 		    PROT_READ | PROT_WRITE | PROT_EXEC, EINVAL);
 		largepage_protect(addr, ps[i],
 		    PROT_READ | PROT_WRITE | PROT_EXEC, 0);
+#endif
 
 		/* Trigger creation of a mapping and try again. */
 		*(volatile char *)addr = 0;
@@ -1708,10 +1712,14 @@ ATF_TC_BODY(largepage_mprotect, tc)
 		largepage_protect(addr, ps[i], PROT_READ, 0);
 		largepage_protect(addr, ps[0], PROT_NONE, EINVAL);
 		largepage_protect(addr, ps[i], PROT_NONE, 0);
+#ifdef __CHERI_PURE_CAPABILITY__
+		largepage_protect(addr, ps[i], PROT_READ | PROT_WRITE, 0);
+#else
 		largepage_protect(addr, ps[0],
 		    PROT_READ | PROT_WRITE | PROT_EXEC, EINVAL);
 		largepage_protect(addr, ps[i],
 		    PROT_READ | PROT_WRITE | PROT_EXEC, 0);
+#endif
 
 		memset(addr, 0, ps[i]);
 
