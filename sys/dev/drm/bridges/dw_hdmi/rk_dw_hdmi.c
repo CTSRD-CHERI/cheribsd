@@ -39,7 +39,7 @@
 #include <dev/ofw/ofw_bus_subr.h>
 
 #include <dev/clk/clk.h>
-#include <dev/extres/syscon/syscon.h>
+#include <dev/syscon/syscon.h>
 #include <dev/hwreset/hwreset.h>
 
 #include <drm/drm_atomic_helper.h>
