@@ -715,9 +715,9 @@ mpr_user_command(struct mpr_softc *sc, struct mpr_usr_command *cmd)
 	}	
 
 	mpr_unlock(sc);
-	copyout(rpl, cmd->rpl, sz);
-	if (buf != NULL)
-		copyout(buf, cmd->buf, cmd->len);
+	err = copyout(rpl, cmd->rpl, sz);
+	if (buf != NULL && err == 0)
+		err = copyout(buf, cmd->buf, cmd->len);
 	mpr_dprint(sc, MPR_USER, "%s: reply size %d\n", __func__, sz);
 
 RetFreeUnlocked:
@@ -851,7 +851,7 @@ mpr_user_pass_thru(struct mpr_softc *sc, mpr_pass_thru_t *data)
 		/*
 		 * Copy the reply data and sense data to user space.
 		 */
-		if ((cm != NULL) && (cm->cm_reply != NULL)) {
+		if (err == 0 && cm != NULL && cm->cm_reply != NULL) {
 			rpl = (MPI2_DEFAULT_REPLY *)cm->cm_reply;
 			sz = rpl->MsgLength * 4;
 
@@ -861,7 +861,7 @@ mpr_user_pass_thru(struct mpr_softc *sc, mpr_pass_thru_t *data)
 				    __func__, data->ReplySize, sz);
 			}
 			mpr_unlock(sc);
-			copyout(cm->cm_reply, data->PtrReply,
+			err = copyout(cm->cm_reply, data->PtrReply,
 			    MIN(sz, data->ReplySize));
 			mpr_lock(sc);
 		}
@@ -1076,7 +1076,7 @@ mpr_user_pass_thru(struct mpr_softc *sc, mpr_pass_thru_t *data)
 	/*
 	 * Copy the reply data and sense data to user space.
 	 */
-	if (cm->cm_reply != NULL) {
+	if (err == 0 && cm->cm_reply != NULL) {
 		rpl = (MPI2_DEFAULT_REPLY *)cm->cm_reply;
 		sz = rpl->MsgLength * 4;
 
@@ -1086,12 +1086,16 @@ mpr_user_pass_thru(struct mpr_softc *sc, mpr_pass_thru_t *data)
 			    data->ReplySize, sz);
 		}
 		mpr_unlock(sc);
-		copyout(cm->cm_reply, data->PtrReply,
+		err = copyout(cm->cm_reply, data->PtrReply,
 		    MIN(sz, data->ReplySize));
+		if (err != 0)
+			mpr_dprint(sc, MPR_FAULT, "%s: failed to copy "
+			    "IOCTL data to user space\n", __func__);
 		mpr_lock(sc);
 
-		if ((function == MPI2_FUNCTION_SCSI_IO_REQUEST) ||
-		    (function == MPI2_FUNCTION_RAID_SCSI_IO_PASSTHROUGH)) {
+		if (err == 0 &&
+		    (function == MPI2_FUNCTION_SCSI_IO_REQUEST ||
+		    function == MPI2_FUNCTION_RAID_SCSI_IO_PASSTHROUGH)) {
 			if (((MPI2_SCSI_IO_REPLY *)rpl)->SCSIState &
 			    MPI2_SCSI_STATE_AUTOSENSE_VALID) {
 				sense_len =
@@ -1099,8 +1103,13 @@ mpr_user_pass_thru(struct mpr_softc *sc, mpr_pass_thru_t *data)
 				    SenseCount)), sizeof(struct
 				    scsi_sense_data));
 				mpr_unlock(sc);
-				copyout(cm->cm_sense, (char * __capability)data->PtrReply +
+				err = copyout(cm->cm_sense,
+				    (char * __capability)data->PtrReply +
 				    sizeof(MPI2_SCSI_IO_REPLY), sense_len);
+				if (err != 0)
+					mpr_dprint(sc, MPR_FAULT,
+					    "%s: failed to copy IOCTL data to "
+					    "user space\n", __func__);
 				mpr_lock(sc);
 			}
 		}
@@ -1119,7 +1128,7 @@ mpr_user_pass_thru(struct mpr_softc *sc, mpr_pass_thru_t *data)
 		 * the same IOCTL structure and sense buffers can be used for
 		 * NVMe.
 		 */
-		if (function == MPI2_FUNCTION_NVME_ENCAPSULATED) {
+		if (err == 0 && function == MPI2_FUNCTION_NVME_ENCAPSULATED) {
 			if (cm->nvme_error_response == NULL) {
 				mpr_dprint(sc, MPR_INFO, "NVMe Error Response "
 				    "buffer is NULL. Response data will not be "
@@ -1133,9 +1142,13 @@ mpr_user_pass_thru(struct mpr_softc *sc, mpr_pass_thru_t *data)
 			sz = MIN(le32toh(nvme_error_reply->ErrorResponseCount),
 			    NVME_ERROR_RESPONSE_SIZE);
 			mpr_unlock(sc);
-			copyout(cm->cm_sense,
+			err = copyout(cm->cm_sense,
 			    (char * __capability)data->PtrReply +
 			    sizeof(MPI2_SCSI_IO_REPLY), sz);
+			if (err != 0)
+				mpr_dprint(sc, MPR_FAULT,
+				    "%s: failed to copy IOCTL data to "
+				    "user space\n", __func__);
 			mpr_lock(sc);
 		}
 	}
