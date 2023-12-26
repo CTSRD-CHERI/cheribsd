@@ -232,7 +232,7 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
  * Set that machine state for performing an upcall that starts
  * the entry function with the given argument.
  */
-void
+int
 cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
     void * __capability arg, stack_t *stack)
 {
@@ -263,6 +263,7 @@ cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
 	tf->tf_x[0] = (uintcap_t)arg;
 	tf->tf_x[29] = 0;
 	tf->tf_lr = 0;
+	return (0);
 }
 
 int

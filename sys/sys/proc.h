@@ -1271,7 +1271,7 @@ void	cpu_fork_kthread_handler(struct thread *, void (*)(void *), void *);
 int	cpu_procctl(struct thread *td, int idtype, id_t id, int com,
 	    void * __capability data);
 void	cpu_set_syscall_retval(struct thread *, int);
-void	cpu_set_upcall(struct thread *, void (* __capability)(void *),
+int	cpu_set_upcall(struct thread *, void (* __capability)(void *),
 	    void * __capability, stack_t *);
 int	cpu_set_user_tls(struct thread *, void * __capability tls_base);
 void	cpu_thread_alloc(struct thread *);
