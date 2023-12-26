@@ -61,7 +61,7 @@
 
 #include <dev/hwreset/hwreset.h>
 #include <dev/clk/clk.h>
-#include <dev/extres/phy/phy.h>
+#include <dev/phy/phy.h>
 
 #include <dev/videomode/videomode.h>
 #include <dev/videomode/edidvar.h>
