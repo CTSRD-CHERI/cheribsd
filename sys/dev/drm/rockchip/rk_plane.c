@@ -62,7 +62,7 @@
 #include <drm/drm_vblank.h>
 
 #include <dev/extres/hwreset/hwreset.h>
-#include <dev/extres/clk/clk.h>
+#include <dev/clk/clk.h>
 #include <dev/extres/phy/phy.h>
 
 #include <dev/videomode/videomode.h>

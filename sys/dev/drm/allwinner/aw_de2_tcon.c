@@ -37,7 +37,7 @@
 #include <dev/ofw/ofw_bus_subr.h>
 #include <dev/ofw/ofw_graph.h>
 
-#include <dev/extres/clk/clk.h>
+#include <dev/clk/clk.h>
 #include <dev/extres/hwreset/hwreset.h>
 
 #include <drm/drm_atomic_helper.h>

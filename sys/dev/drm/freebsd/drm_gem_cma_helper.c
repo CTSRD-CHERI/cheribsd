@@ -40,7 +40,7 @@
 
 #include <machine/bus.h>
 
-#include <dev/extres/clk/clk.h>
+#include <dev/clk/clk.h>
 
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_gem.h>
