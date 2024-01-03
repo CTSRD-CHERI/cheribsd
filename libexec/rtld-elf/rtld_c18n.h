@@ -37,6 +37,7 @@
 extern uintptr_t sealer_pltgot, sealer_tramp;
 extern const char *ld_compartment_utrace;
 extern const char *ld_compartment_enable;
+extern const char *ld_compartment_policy;
 extern const char *ld_compartment_overhead;
 extern const char *ld_compartment_sig;
 
@@ -52,23 +53,6 @@ extern const char *ld_compartment_sig;
 
 typedef uint16_t compart_id_t;
 
-struct compart {
-	/*
-	 * Name of the compartment
-	 */
-	const char *name;
-	/*
-	 * NULL-terminated array of libraries that belong to the compartment
-	 */
-	const char **libraries;
-};
-
-struct policy {
-	struct compart *coms;
-	size_t count;
-};
-
-void c18n_add_comparts(struct policy *);
 compart_id_t compart_id_allocate(const char *);
 
 /*
