@@ -52,6 +52,9 @@ const char *ld_compartment_utrace;
 /* Enable compartmentalisation */
 const char *ld_compartment_enable;
 
+/* Path of the compartmentalisation policy */
+const char *ld_compartment_policy;
+
 /* Simulate overhead during compartment transitions */
 const char *ld_compartment_overhead;
 
@@ -61,6 +64,8 @@ const char *ld_compartment_sig;
 /*
  * Policies
  */
+#define	C18N_STRING_BASE_INIT	32
+
 typedef ssize_t string_handle;
 
 struct string_base {
@@ -69,89 +74,145 @@ struct string_base {
 	string_handle capacity;
 };
 
+static void
+string_base_expand(struct string_base *sb, size_t capacity)
+{
+	sb->buf = realloc(sb->buf, capacity);
+	if (sb->buf == NULL)
+		rtld_fatal("realloc failed");
+	sb->capacity = capacity;
+}
+
+static string_handle
+string_base_push(struct string_base *sb, const char *str)
+{
+	string_handle i = sb->size;
+
+	do {
+		if (sb->size == sb->capacity)
+			string_base_expand(sb,
+			    MAX(C18N_STRING_BASE_INIT, sb->capacity * 2));
+		sb->buf[sb->size++] = *str;
+	} while (*str++ != '\0');
+
+	return (i);
+}
+
 static string_handle
 string_base_search(const struct string_base *sb, const char *str)
 {
 	const char *cur;
 	string_handle i = 0, s;
 
-	do {
+	while (i < sb->size) {
 		s = i;
 		cur = str;
 		while (sb->buf[i] == *cur++)
 			if (sb->buf[i++] == '\0')
 				return (s);
 		while (sb->buf[i] != '\0') ++i;
-	} while (++i < sb->size);
+		++i;
+	}
 
 	return (-1);
 }
 
-static char trusted_globals_names[] =
-	"memset\0"
-	"memcpy\0"
-	"mempcpy\0"
-	"memccpy\0"
-	"memchr\0"
-	"memrchr\0"
-	"memmem\0"
-	"memmove\0"
-	"strcpy\0"
-	"strncpy\0"
-	"stpcpy\0"
-	"stpncpy\0"
-	"strcat\0"
-	"strncat\0"
-	"strlcpy\0"
-	"strlcat\0"
-	"strlen\0"
-	"strnlen\0"
-	"strcmp\0"
-	"strncmp\0"
-	"strchr\0"
-	"strrchr\0"
-	"strchrnul\0"
-	"strspn\0"
-	"strcspn\0"
-	"strpbrk\0"
-	"strsep\0"
-	"strstr\0"
-	"strnstr\0"
+static char default_policy[] =
+	"Version 1\n"
+	"\n"
 
-	"__libc_start1\0"
-	"setjmp\0"
-	"longjmp\0"
-	"_setjmp\0"
-	"_longjmp\0"
-	"sigsetjmp\0"
-	"siglongjmp\0"
+	/* RTLD must be the first compartment defined */
+	"compartment " _BASENAME_RTLD "\n"
+	"\n"
 
-	"vfork\0"
-	"rfork\0"
+	/* TCB must be the second compartment defined */
+	"compartment [TCB]\n"
+		"\tlibc.so.7\n"
+		"\tlibthr.so.3\n"
+	"\n"
 
-	"_rtld_thread_start";
+	"caller *\n"
+	"trust\n"
+		"\tmemset\n"
+		"\tmemcpy\n"
+		"\tmempcpy\n"
+		"\tmemccpy\n"
+		"\tmemchr\n"
+		"\tmemrchr\n"
+		"\tmemmem\n"
+		"\tmemmove\n"
+		"\tstrcpy\n"
+		"\tstrncpy\n"
+		"\tstpcpy\n"
+		"\tstpncpy\n"
+		"\tstrcat\n"
+		"\tstrncat\n"
+		"\tstrlcpy\n"
+		"\tstrlcat\n"
+		"\tstrlen\n"
+		"\tstrnlen\n"
+		"\tstrcmp\n"
+		"\tstrncmp\n"
+		"\tstrchr\n"
+		"\tstrrchr\n"
+		"\tstrchrnul\n"
+		"\tstrspn\n"
+		"\tstrcspn\n"
+		"\tstrpbrk\n"
+		"\tstrsep\n"
+		"\tstrstr\n"
+		"\tstrnstr\n"
 
-static const struct string_base trusted_globals = {
-	.buf = trusted_globals_names,
-	.size = sizeof(trusted_globals_names),
-	.capacity = sizeof(trusted_globals_names)
+		"\t__libc_start1\n"
+		"\tsetjmp\n"
+		"\tlongjmp\n"
+		"\t_setjmp\n"
+		"\t_longjmp\n"
+		"\tsigsetjmp\n"
+		"\tsiglongjmp\n"
+
+		"\tvfork\n"
+		"\trfork\n"
+
+		"\t_rtld_thread_start\n"
+
+	"callee " _BASENAME_RTLD "\n"
+	"export to [TCB]\n"
+		"\t_rtld_thread_start_init\n"
+		"\t_rtld_thread_start\n"
+		"\t_rtld_thr_exit\n"
+		"\t_rtld_sighandler_init\n"
+		"\t_rtld_sighandler\n"
+		"\t_rtld_setjmp\n"
+		"\t_rtld_longjmp\n";
+
+struct compart {
+	/*
+	 * Name of the compartment
+	 */
+	const char *name;
+	/*
+	 * Names of libraries that belong to the compartment
+	 */
+	struct string_base libs;
+	/*
+	 * Symbols that the library is allowed to import, if restrict_imports is
+	 * true.
+	 */
+	struct string_base imports;
+	/*
+	 * Symbols trusted by the library.
+	 */
+	struct string_base trusts;
+	bool restrict_imports;
 };
 
-static struct compart rtld_compart = {
-	.name = _BASENAME_RTLD
-};
-
-static struct compart tcb_compart = {
-	.name = "[TCB]",
-	.libraries = (const char *[]) {
-		"libc.so.7",
-		"libthr.so.3",
-		NULL
-	}
+static struct compart compart_uni = {
+	.name = "[Universal]"
 };
 
 static struct {
-	const struct compart **data;
+	struct compart *data;
 	compart_id_t size;
 	compart_id_t capacity;
 } comparts;
@@ -159,7 +220,7 @@ static struct {
 static void
 comparts_data_expand(compart_id_t capacity)
 {
-	const struct compart **data;
+	struct compart *data;
 
 	data = realloc(comparts.data, sizeof(*data) * capacity);
 	if (data == NULL)
@@ -168,50 +229,92 @@ comparts_data_expand(compart_id_t capacity)
 	comparts.capacity = capacity;
 }
 
-static bool
-string_search(const char * const strs[], const char *sym)
+static compart_id_t
+compart_name_to_id(const char *name)
 {
-	if (strs != NULL)
-		for (; *strs != NULL; ++strs)
-			if (strcmp(sym, *strs) == 0)
-				return (true);
-	return (false);
+	compart_id_t i;
+
+	/* Start searching from RTLD's compartment */
+	for (i = C18N_RTLD_COMPART_ID; i < comparts.size; ++i)
+		if (strcmp(comparts.data[i].name, name) == 0)
+			return (i);
+
+	rtld_fatal("c18n: Cannot find compartment ID for name %s", name);
 }
 
-static const struct compart * const *
-compart_get_or_create(const char *lib)
+static struct compart *
+compart_allocate(const char *name)
 {
-	struct {
-		const char *libraries[2];
-		struct compart com;
-	} *buf;
+	struct compart *com;
 
-	for (compart_id_t i = 1; i < comparts.size; ++i)
-		if (string_search(comparts.data[i]->libraries, lib))
-			return (&comparts.data[i]);
+	if (comparts.size > C18N_COMPARTMENT_ID_MAX)
+		rtld_fatal("Cannot allocate compartment ID");
+
 	if (comparts.size == comparts.capacity)
 		comparts_data_expand(comparts.capacity * 2);
-	buf = xmalloc(sizeof(*buf));
-	buf->libraries[0] = lib;
-	buf->libraries[1] = NULL;
-	buf->com = (struct compart) {
-		.name = lib,
-		.libraries = buf->libraries
+
+	com = &comparts.data[comparts.size++];
+	*com = (struct compart) {
+		.name = name
 	};
-	comparts.data[comparts.size] = &buf->com;
-	return (&comparts.data[comparts.size++]);
+
+	return (com);
 }
 
 compart_id_t
-compart_id_allocate(const char *name)
+compart_id_allocate(const char *lib)
 {
-	size_t index;
+	compart_id_t i;
+	struct compart *com;
 
-	index = compart_get_or_create(name) - comparts.data;
-	if (index > C18N_COMPARTMENT_ID_MAX)
-		rtld_fatal("Cannot allocate compartment ID");
+	/* Start searching after RTLD's compartment */
+	for (i = C18N_RTLD_COMPART_ID + 1; i < comparts.size; ++i)
+		if (string_base_search(&comparts.data[i].libs, lib) != -1)
+			return (i);
 
-	return (index);
+	com = compart_allocate(lib);
+
+	string_base_push(&com->libs, lib);
+
+	return (i);
+}
+
+struct rule_action {
+	compart_id_t caller;
+	SLIST_ENTRY(rule_action) link;
+};
+
+struct rule {
+	compart_id_t callee;
+	struct string_base symbols;
+	SLIST_HEAD(, rule_action) action;
+	SLIST_ENTRY(rule) link;
+};
+
+static SLIST_HEAD(, rule) rules = SLIST_HEAD_INITIALIZER(rules);
+
+static bool
+evaluate_rules(compart_id_t caller, compart_id_t callee, const char *sym)
+{
+	struct rule *cur;
+	struct rule_action *act;
+
+	if (comparts.data[caller].restrict_imports &&
+	    string_base_search(&comparts.data[caller].imports, sym) == -1)
+		return (false);
+
+	SLIST_FOREACH(cur, &rules, link) {
+		if ((cur->callee != callee) ||
+		    (string_base_search(&cur->symbols, sym) == -1))
+			continue;
+		SLIST_FOREACH(act, &cur->action, link) {
+			if (act->caller == caller)
+				return (true);
+		}
+		return (false);
+	}
+
+	return (true);
 }
 
 static bool
@@ -230,17 +333,203 @@ tramp_should_include(const Obj_Entry *reqobj, const struct tramp_data *data)
 
 	sym = strtab_value(data->defobj, data->def->st_name);
 
-	if (string_base_search(&trusted_globals, sym) != -1)
+	if (string_base_search(&compart_uni.trusts, sym) != -1)
 		return (false);
 
+	if (string_base_search(&comparts.data[reqobj->compart_id].trusts, sym)
+	    != -1)
+		return (false);
+
+	if (evaluate_rules(reqobj->compart_id, data->defobj->compart_id, sym))
+		return (true);
+
+	rtld_fatal("c18n: Policy violation: %s is not allowed to access symbol "
+	    "%s defined by %s",
+	    comparts.data[reqobj->compart_id].name, sym,
+	    comparts.data[data->defobj->compart_id].name);
+}
+
+static bool
+consume_until(const char **input, char delim, char *buf, size_t size)
+{
+	const char *cur = *input;
+
+	while (1) {
+		if (size == 0)
+			return (false);
+		if (*cur == delim)
+			break;
+		if (*cur == '\0')
+			return (false);
+		*buf++ = *cur++;
+		--size;
+	}
+
+	*buf = '\0';
+	*input = cur + 1;
+
 	return (true);
+}
+
+static bool
+consume_token(const char **input, const char *token)
+{
+	const char *str = *input;
+
+	while (*token != '\0')
+		if (*str++ != *token++)
+			return (false);
+
+	*input = str;
+
+	return (true);
+}
+
+static void
+policy_error(const char *pol, const char *cur)
+{
+	size_t li = 1;
+	size_t ch = 1;
+
+	while (pol != cur)
+		if (*pol++ == '\n') {
+			++li;
+			ch = 1;
+		} else
+			++ch;
+
+	rtld_fatal("c18n: Bad policy file at line %lu, character %lu", li, ch);
+}
+
+#define	C18N_POLICY_IDENT_MAX	128
+
+static void
+parse_policy(const char *pol)
+{
+	compart_id_t id;
+	const char *cur = pol;
+	struct rule_action *act;
+	struct rule *rule;
+	struct compart *com;
+	struct string_base *symbols;
+	char buf[C18N_POLICY_IDENT_MAX];
+
+	if (!consume_token(&cur, "Version 1\n"))
+		policy_error(pol, cur);
+
+	while (*cur != '\0') {
+		while (consume_token(&cur, "\n"));
+
+		if (consume_token(&cur, "compartment ")) {
+
+			if (consume_until(&cur, '\n', buf, sizeof(buf)))
+				com = compart_allocate(strdup(buf));
+			else
+				policy_error(pol, cur);
+
+			while (consume_token(&cur, "\t"))
+				if (consume_until(&cur, '\n', buf, sizeof(buf)))
+					string_base_push(&com->libs, buf);
+				else
+					policy_error(pol, cur);
+
+		} else if (consume_token(&cur, "caller ")) {
+
+			if (consume_token(&cur, "*\n"))
+				com = &compart_uni;
+			else if (consume_until(&cur, '\n', buf, sizeof(buf))) {
+				id = compart_name_to_id(buf);
+				if (id < comparts.size)
+					com = &comparts.data[id];
+				else
+					policy_error(pol, cur);
+			} else
+				policy_error(pol, cur);
+
+			if (consume_token(&cur, "trust\n"))
+				symbols = &com->trusts;
+			else if (consume_token(&cur, "import\n"))
+				symbols = &com->imports;
+			else
+				policy_error(pol, cur);
+
+			while (consume_token(&cur, "\t"))
+				if (consume_until(&cur, '\n', buf, sizeof(buf)))
+					string_base_push(symbols, buf);
+				else
+					policy_error(pol, cur);
+
+		} else if (consume_token(&cur, "callee ")) {
+
+			if (consume_until(&cur, '\n', buf, sizeof(buf))) {
+				rule = xmalloc(sizeof(*rule));
+				*rule = (struct rule) {
+					.callee = compart_name_to_id(buf),
+					.action = SLIST_HEAD_INITIALIZER()
+				};
+			} else
+				policy_error(pol, cur);
+
+			while (consume_token(&cur, "export to "))
+				if (consume_until(&cur, '\n', buf, sizeof(buf))) {
+					act = xmalloc(sizeof(*act));
+					*act = (struct rule_action) {
+						.caller = compart_name_to_id(buf),
+					};
+					SLIST_INSERT_HEAD(&rule->action, act, link);
+				} else
+					policy_error(pol, cur);
+
+			while (consume_token(&cur, "\t"))
+				if (consume_until(&cur, '\n', buf, sizeof(buf)))
+					string_base_push(&rule->symbols, buf);
+				else
+					policy_error(pol, cur);
+
+			SLIST_INSERT_HEAD(&rules, rule, link);
+		} else
+			policy_error(pol, cur);
+	}
+}
+
+#define	C18N_INIT_COMPART_COUNT	8
+
+void
+c18n_init_policy(void)
+{
+	int fd;
+	char *file;
+
+	/*
+	 * Initialise compartment database
+	 */
+	comparts_data_expand(C18N_INIT_COMPART_COUNT);
+	comparts.size = C18N_RTLD_COMPART_ID;
+
+	/* Load the default policy */
+	parse_policy(default_policy);
+
+	if (ld_compartment_policy != NULL) {
+		if ((fd = open(ld_compartment_policy, O_RDONLY)) == -1)
+			rtld_fatal("c18n: Cannot open policy file");
+
+		file = mmap(NULL, page_size, PROT_READ, MAP_PRIVATE, fd, 0);
+		if (file == MAP_FAILED)
+			rtld_fatal("c18n: Cannot mmap policy file");
+
+		parse_policy(file);
+
+		if (munmap(file, page_size) != 0)
+			rtld_fatal("c18n: Cannot munmap policy file");
+
+		if (close(fd) != 0)
+			rtld_fatal("c18n: Cannot close policy file");
+	}
 }
 
 /*
  * Stack switching
  */
-#define	C18N_INIT_COMPART_COUNT	8
-
 static compart_id_t
 stack_index_to_compart_id(unsigned index)
 {
@@ -740,7 +1029,7 @@ tramp_hook(void *rcsp, int event, void *target, const Obj_Entry *obj,
 
 	sym_num = def == NULL ? 0 : def->st_name;
 	sym = def == NULL ? "<unknown>" : strtab_value(obj, def->st_name);
-	callee = comparts.data[obj->compart_id]->name;
+	callee = comparts.data[obj->compart_id].name;
 
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	caller_id =
@@ -757,7 +1046,7 @@ tramp_hook(void *rcsp, int event, void *target, const Obj_Entry *obj,
 	if (caller_id < C18N_RTLD_COMPART_ID)
 		caller = "<unknown>";
 	else
-		caller = comparts.data[caller_id]->name;
+		caller = comparts.data[caller_id].name;
 
 	if (ld_compartment_utrace != NULL) {
 		memcpy(ut.sig, rtld_utrace_sig, sizeof(ut.sig));
@@ -1031,15 +1320,6 @@ c18n_init(void)
 	sealer += C18N_FUNC_SIG_COUNT;
 
 	/*
-	 * Initialise compartment database
-	 */
-	comparts_data_expand(C18N_INIT_COMPART_COUNT);
-	while (comparts.size < C18N_RTLD_COMPART_ID)
-		comparts.data[comparts.size++] = NULL;
-	comparts.data[comparts.size++] = &rtld_compart;
-	comparts.data[comparts.size++] = &tcb_compart;
-
-	/*
 	 * Initialise stack table
 	 */
 	table = stk_table_expand(NULL, C18N_INIT_COMPART_COUNT, false);
@@ -1065,16 +1345,6 @@ c18n_init(void)
 
 	atomic_store_explicit(&tramp_pgs.head, tramp_pg_new(NULL),
 	    memory_order_relaxed);
-}
-
-void
-c18n_add_comparts(struct policy *pol)
-{
-	if (pol == NULL)
-		return;
-	comparts_data_expand(comparts.size + pol->count);
-	for (size_t i = 0; i < pol->count; ++i)
-		comparts.data[comparts.size++] = &pol->coms[i];
 }
 
 /*

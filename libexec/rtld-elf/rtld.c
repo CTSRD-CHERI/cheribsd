@@ -397,6 +397,7 @@ enum {
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 	LD_UTRACE_COMPARTMENT,
 	LD_COMPARTMENT_ENABLE,
+	LD_COMPARTMENT_POLICY,
 	LD_COMPARTMENT_OVERHEAD,
 	LD_COMPARTMENT_SIG,
 #endif
@@ -441,6 +442,7 @@ static struct ld_env_var_desc ld_env_vars[] = {
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 	LD_ENV_DESC(UTRACE_COMPARTMENT, false),
 	LD_ENV_DESC(COMPARTMENT_ENABLE, false),
+	LD_ENV_DESC(COMPARTMENT_POLICY, false),
 	LD_ENV_DESC(COMPARTMENT_OVERHEAD, false),
 	LD_ENV_DESC(COMPARTMENT_SIG, false),
 #endif
@@ -833,6 +835,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
     ld_compartment_utrace = ld_get_env_var(LD_UTRACE_COMPARTMENT);
     ld_compartment_enable = ld_get_env_var(LD_COMPARTMENT_ENABLE);
+    ld_compartment_policy = ld_get_env_var(LD_COMPARTMENT_POLICY);
     ld_compartment_overhead = ld_get_env_var(LD_COMPARTMENT_OVERHEAD);
     ld_compartment_sig = ld_get_env_var(LD_COMPARTMENT_SIG);
 #endif
@@ -961,6 +964,14 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     if (!libmap_disable)
         libmap_disable = (bool)lm_init(libmap_override);
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+    /* Load the policy file before any libraries are loaded */
+    c18n_init_policy();
+
+    /* Manually add name for main object after policy is loaded */
+    object_add_name(obj_main, "[main]");
+#endif
+
     if (aux_info[AT_KPRELOAD] != NULL &&
       aux_info[AT_KPRELOAD]->a_un.a_ptr != NULL) {
 	dbg("loading kernel vdso");
@@ -976,35 +987,6 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     if (load_preload_objects(ld_preload, false) == -1)
 	rtld_die();
     preload_tail = globallist_curr(TAILQ_LAST(&obj_list, obj_entry_q));
-
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    /*
-     * XXX: This block of code looks for a preloaded library named
-     * _rtld_c18n_policy.so that contains user-defined compartment policies.
-     * This will be replaced with a proper policy-loading mechanism in the
-     * future.
-     */
-    TAILQ_FOREACH(obj, &obj_list, next) {
-	SymLook req;
-
-	if (!object_match_name(obj, "_rtld_c18n_policy.so"))
-	    continue;
-
-	/* Horrible hacks */
-	if (relocate_object(obj, false, &obj_rtld, SYMLOOK_EARLY, NULL) == -1)
-	    rtld_die();
-	obj->versyms = NULL;
-
-	symlook_init(&req, "_rtld_compartments");
-	req.lockstate = &lockstate;
-	if (symlook_obj(&req, obj) == 0)
-	    c18n_add_comparts(make_data_pointer(req.sym_out, req.defobj_out));
-	break;
-    }
-
-    /* Manually add name for main object after policy is loaded */
-    object_add_name(obj_main, "[main]");
-#endif
 
     dbg("loading needed objects");
     if (load_needed_objects(obj_main, ld_tracing != NULL ? RTLD_LO_TRACE :
