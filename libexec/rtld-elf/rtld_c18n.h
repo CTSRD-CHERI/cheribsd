@@ -37,6 +37,7 @@
 extern uintptr_t sealer_pltgot, sealer_tramp;
 extern const char *ld_compartment_utrace;
 extern const char *ld_compartment_enable;
+extern const char *ld_compartment_policy;
 extern const char *ld_compartment_overhead;
 extern const char *ld_compartment_sig;
 extern const char *ld_compartment_unwind;
@@ -44,32 +45,9 @@ extern const char *ld_compartment_unwind;
 /*
  * Policies
  */
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-#define	C18N_RTLD_COMPART_ID	1
-#else
-#define	C18N_RTLD_COMPART_ID	0
-#endif
+typedef uint16_t compart_id_t;
 #define	C18N_COMPARTMENT_ID_MAX	(UINT16_MAX >> 1)
 
-typedef uint16_t compart_id_t;
-
-struct compart {
-	/*
-	 * Name of the compartment
-	 */
-	const char *name;
-	/*
-	 * NULL-terminated array of libraries that belong to the compartment
-	 */
-	const char **libraries;
-};
-
-struct policy {
-	struct compart *coms;
-	size_t count;
-};
-
-void c18n_add_comparts(struct policy *);
 compart_id_t compart_id_allocate(const char *);
 
 /*
@@ -95,11 +73,26 @@ struct Struct_Stack_Entry {
 void allocate_stk_table(void);
 
 static inline unsigned
-compart_id_to_index(compart_id_t cid)
+cid_to_table_index(compart_id_t cid)
 {
-	struct stk_table dummy;
+	/*
+	 * Under the purecap ABI, cid is never zero, so it is possible to save
+	 * some space by subtracting one.
+	 */
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	--cid;
+#endif
+	return (cid);
+}
 
-	return (sizeof(*dummy.stacks) * cid / sizeof(dummy.stacks->bottom));
+static inline unsigned
+cid_to_index(compart_id_t cid)
+{
+	struct stk_table_stack dummy;
+	unsigned index = cid_to_table_index(cid);
+
+	return (offsetof(struct stk_table, stacks[index].bottom) /
+	    sizeof(dummy.bottom));
 }
 
 static inline struct stk_table *
