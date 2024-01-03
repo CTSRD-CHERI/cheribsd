@@ -1,0 +1,57 @@
+Version 1
+
+compartment [TCB]
+	libc.so.7
+	libthr.so.3
+
+caller *
+trust
+	memset
+	memcpy
+	mempcpy
+	memccpy
+	memchr
+	memrchr
+	memmem
+	memmove
+	strcpy
+	strncpy
+	stpcpy
+	stpncpy
+	strcat
+	strncat
+	strlcpy
+	strlcat
+	strlen
+	strnlen
+	strcmp
+	strncmp
+	strchr
+	strrchr
+	strchrnul
+	strspn
+	strcspn
+	strpbrk
+	strsep
+	strstr
+	strnstr
+	__libc_start1
+	setjmp
+	longjmp
+	_setjmp
+	_longjmp
+	sigsetjmp
+	siglongjmp
+	vfork
+	rfork
+	_rtld_thread_start
+
+callee [RTLD]
+export to [TCB]
+	_rtld_thread_start_init
+	_rtld_thread_start
+	_rtld_thr_exit
+	_rtld_sighandler_init
+	_rtld_sighandler
+	_rtld_setjmp
+	_rtld_longjmp
