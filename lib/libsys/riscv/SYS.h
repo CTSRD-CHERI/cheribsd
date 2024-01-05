@@ -40,11 +40,13 @@
 	li	t0, SYS_ ## name;				\
 	ecall
 
+#ifndef _SYSCALL_BODY
 #define	_SYSCALL_BODY(name)					\
 	_SYSCALL(name);						\
 	bnez	t0, 1f; 					\
 	RETURN;							\
 1:	_TAIL	cerror@plt
+#endif
 
 #define	PSEUDO(name)						\
 ENTRY(__sys_##name);						\
