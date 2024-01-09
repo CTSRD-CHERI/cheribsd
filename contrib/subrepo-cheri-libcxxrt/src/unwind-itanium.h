@@ -79,7 +79,7 @@ struct _Unwind_Exception
     uint64_t exception_class;
     _Unwind_Exception_Cleanup_Fn exception_cleanup;
     unsigned long private_1;
-#ifdef __CHERI_PURE_CAPABILITY__
+#if defined(__CHERI_PURE_CAPABILITY__) || defined(__ILP128__)
     void *private_2;
 #else
     unsigned long private_2;

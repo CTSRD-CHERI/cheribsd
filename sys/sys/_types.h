@@ -76,6 +76,13 @@ typedef	__intptr_t	__int64ptr_t;
 typedef	__uintcap_t	__uintptr_t;
 typedef	__uintcap_t	__uintfptr_t;
 typedef	__uintptr_t	__uint64ptr_t;
+#elif defined(__ILP128__)
+typedef	__intfat_t	__intptr_t;
+typedef	__intfat_t	__intfptr_t;
+typedef	__intptr_t	__int64ptr_t;
+typedef	__uintfat_t	__uintptr_t;
+typedef	__uintfat_t	__uintfptr_t;
+typedef	__uintptr_t	__uint64ptr_t;
 #elif __SIZEOF_POINTER__ == 8
 typedef	__int64_t	__intptr_t;
 typedef	__int64_t	__intfptr_t;

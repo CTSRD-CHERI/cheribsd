@@ -61,9 +61,15 @@ struct Struct_Obj_Entry;
 })
 #endif
 
+#ifdef __ILP128__
+uintptr_t reloc_jmpslot(Elf_Addr *where, uintptr_t target,
+    const struct Struct_Obj_Entry *defobj, const struct Struct_Obj_Entry *obj,
+    const Elf_Rel *rel);
+#else
 uintptr_t reloc_jmpslot(uintptr_t *where, uintptr_t target,
     const struct Struct_Obj_Entry *defobj, const struct Struct_Obj_Entry *obj,
     const Elf_Rel *rel);
+#endif
 
 #if __has_feature(capabilities)
 

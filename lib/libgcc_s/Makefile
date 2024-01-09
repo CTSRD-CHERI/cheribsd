@@ -14,13 +14,17 @@ WARNS?=	2
 LDFLAGS+=	-nodefaultlibs
 LIBADD+=	c
 
-VERSION_DEF=	${.CURDIR}/Versions.def
-SYMBOL_MAPS=	${.CURDIR}/Symbol.map
+.if !defined(LIBGCC_S_SRCTOP)
+LIBGCC_S_SRCTOP:=	${.PARSEDIR}
+.endif
+
+VERSION_DEF=	${LIBGCC_S_SRCTOP}/Versions.def
+SYMBOL_MAPS=	${LIBGCC_S_SRCTOP}/Symbol.map
 # Export ARM AEABI unwind routines needed by libc and libthr.
-.if exists(${.CURDIR}/${MACHINE_CPUARCH}/Symbol.map)
-SYMBOL_MAPS+=	${.CURDIR}/${MACHINE_CPUARCH}/Symbol.map
+.if exists(${LIBGCC_S_SRCTOP}/${MACHINE_CPUARCH}/Symbol.map)
+SYMBOL_MAPS+=	${LIBGCC_S_SRCTOP}/${MACHINE_CPUARCH}/Symbol.map
 .else
-SYMBOL_MAPS+=	${.CURDIR}/SymbolDefault.map
+SYMBOL_MAPS+=	${LIBGCC_S_SRCTOP}/SymbolDefault.map
 .endif
 
 .include "../libcompiler_rt/Makefile.inc"

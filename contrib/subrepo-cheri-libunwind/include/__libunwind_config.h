@@ -87,6 +87,8 @@
 #    define _LIBUNWIND_CONTEXT_SIZE 66
 #    if defined(__SEH__)
 #      define _LIBUNWIND_CURSOR_SIZE 164
+#    elif defined(__ILP128__)
+#      define _LIBUNWIND_CURSOR_SIZE 90
 #    else
 #      define _LIBUNWIND_CURSOR_SIZE 78
 #    endif

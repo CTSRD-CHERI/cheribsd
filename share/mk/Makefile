@@ -43,6 +43,7 @@ FILES=	\
 	bsd.obj.mk \
 	bsd.opts.mk \
 	bsd.own.mk \
+	bsd.p128.mk \
 	bsd.port.mk \
 	bsd.port.options.mk \
 	bsd.port.post.mk \

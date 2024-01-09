@@ -73,6 +73,7 @@
 	setenv("LD_64CB_" name, value, overwrite);	\
 	setenv("LD_C18N_" name, value, overwrite);	\
 	setenv("LD_64CB_C18N_" name, value, overwrite);	\
+	setenv("LD_128_" name, value, overwrite);	\
 } while (0)
 
 #define	LDD_UNSETENV(name) do {		\
@@ -83,6 +84,7 @@
 	unsetenv("LD_64CB_" name);	\
 	unsetenv("LD_C18N_" name);	\
 	unsetenv("LD_64CB_C18N_" name);	\
+	unsetenv("LD_128_" name);	\
 } while (0)
 
 static int	is_executable(const char *fname, int fd, int *is_shlib,

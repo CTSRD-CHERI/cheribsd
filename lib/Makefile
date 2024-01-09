@@ -24,6 +24,25 @@ SUBDIR_BOOTSTRAP= \
 	libssp_nonshared \
 	msun
 
+.if !${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
+SUBDIR_BOOTSTRAP+= \
+	libc_p128 \
+	libc_nonshared_p128 \
+	libcompiler_rt_p128 \
+	cheri-libc++_p128 \
+	cheri-libc++experimental_p128 \
+	libcxxrt_p128 \
+	msun_p128
+SUBDIR_BOOTSTRAP+= \
+	libc_p128g \
+	libc_nonshared_p128g \
+	libcompiler_rt_p128g \
+	cheri-libc++_p128g \
+	cheri-libc++experimental_p128g \
+	libcxxrt_p128g \
+	msun_p128g
+.endif
+
 # The main list; please keep these sorted alphabetically.
 # The only exception is sqlite3: we place it at the start of the list since it
 # takes a long time to build and starting it first improves parallelism.
@@ -119,6 +138,17 @@ SUBDIR+=	libc_c18n libthr_c18n
 .endif
 .endif
 
+.if !${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
+SUBDIR+= \
+	libgcc_eh_p128 \
+	libgcc_s_p128 \
+	libthr_p128
+SUBDIR+= \
+	libgcc_eh_p128g \
+	libgcc_s_p128g \
+	libthr_p128g
+.endif
+
 .if !${MACHINE_ABI:Mpurecap}
 # Needs changes to be useful for purecap and not used by anything (yet)
 SUBDIR+=	libthread_db
@@ -136,9 +166,13 @@ SUBDIR_DEPEND_libauditdm= libbsm
 SUBDIR_DEPEND_libbsddialog= ncurses
 SUBDIR_DEPEND_libbsnmp= ${_libnetgraph}
 SUBDIR_DEPEND_cheri-libc++:= libcxxrt
+SUBDIR_DEPEND_cheri-libc++_p128:= libcxxrt_p128
+SUBDIR_DEPEND_cheri-libc++_p128g:= libcxxrt_p128g
 # libssp_nonshared doesn't need to be linked into libc on every arch, but it is
 # small enough to build that this bit of serialization is likely insignificant.
 SUBDIR_DEPEND_libc= libcompiler_rt libssp_nonshared
+SUBDIR_DEPEND_libc_p128= libcompiler_rt_p128
+SUBDIR_DEPEND_libc_p128g= libcompiler_rt_p128g
 SUBDIR_DEPEND_libcam= libsbuf
 SUBDIR_DEPEND_libcasper= libnv
 SUBDIR_DEPEND_libdevstat= libkvm

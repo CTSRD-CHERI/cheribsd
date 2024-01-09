@@ -234,7 +234,11 @@ typedef struct Struct_Obj_Entry {
     size_t relro_size;
 
     /* Items from the dynamic section. */
+#ifdef __ILP128__
+    Elf_Addr *pltgot;		/* PLT or GOT, depending on architecture */
+#else
     uintptr_t *pltgot;		/* PLT or GOT, depending on architecture */
+#endif
     const Elf_Rel *rel;		/* Relocation entries */
     unsigned long relsize;	/* Size in bytes of relocation info */
     const Elf_Rela *rela;	/* Relocation entries with addend */
@@ -528,7 +532,11 @@ void _rtld_bind_start(void);
 void *rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def);
 void symlook_init(SymLook *, const char *);
 int symlook_obj(SymLook *, const Obj_Entry *);
+#ifdef __ILP128__
+void *tls_get_addr_common(ptraddr_t *dtvp, int index, size_t offset);
+#else
 void *tls_get_addr_common(uintptr_t **dtvp, int index, size_t offset);
+#endif
 void *allocate_tls(Obj_Entry *, void *, size_t, size_t);
 void free_tls(void *, size_t, size_t);
 void *allocate_module_tls(int index);

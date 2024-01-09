@@ -115,11 +115,23 @@ LIB32_MACHINE_ABI+=	time64
 HAS_COMPAT+=	64
 LIB64_MACHINE=	arm64
 LIB64_MACHINE_ARCH=aarch64
+.if !defined(ABI_P128)
 LIB64_MACHINE_CPU=	arm64 cheri
+.else
+LIB64_MACHINE_CPU=	arm64
+.endif
 LIB64WMAKEFLAGS= LD="${XLD}" CPUTYPE=morello
 # XXX: clang specific
 LIB64CPUFLAGS=	-target aarch64-unknown-freebsd13.0
+.if defined(ABI_P128)
+.if defined(P128_FORCED_GOT)
+LIB64CPUFLAGS+=	-march=morello+noa64c -mabi=ilp128-forced-got
+.else
+LIB64CPUFLAGS+=	-march=morello+noa64c -mabi=ilp128
+.endif
+.else
 LIB64CPUFLAGS+=	-march=morello -mabi=aapcs
+.endif
 .endif
 
 .if ${COMPAT_ARCH:Mriscv*c*}

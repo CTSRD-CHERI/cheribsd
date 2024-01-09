@@ -30,6 +30,9 @@ template <> struct __libcpp_is_signed_integer<__int128_t>       : public true_ty
 #if __has_feature(capabilities)
 template <> struct __libcpp_is_signed_integer<__intcap>         : public true_type {};
 #endif
+#ifdef __ILP128__
+template <> struct __libcpp_is_signed_integer<__intfat>         : public true_type {};
+#endif
 
 _LIBCPP_END_NAMESPACE_STD
 

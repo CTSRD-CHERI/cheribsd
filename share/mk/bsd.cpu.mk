@@ -288,7 +288,7 @@ MACHINE_CPU = sse3
 MACHINE_CPU += amd64 sse2 sse mmx
 ########## arm64
 . elif ${MACHINE_CPUARCH} == "aarch64"
-.  if ${CPUTYPE} == "morello"
+.  if ${CPUTYPE} == "morello" && !defined(ABI_P128)
 MACHINE_CPU = cheri morello
 .  endif
 MACHINE_CPU += arm64
@@ -328,7 +328,10 @@ MACHINE_CPU += riscv
 .endif
 
 .if ${MACHINE_CPUARCH} == "aarch64"
-. if ${MACHINE_CPU:Mcheri}
+. if defined(ABI_P128)
+CFLAGS+=	-march=morello+noa64c
+LDFLAGS+=	-march=morello+noa64c
+. elif ${MACHINE_CPU:Mcheri}
 CFLAGS+=	-march=morello
 CFLAGS+=	-Xclang -morello-vararg=new -Xclang -morello-bounded-memargs=caller-only
 LDFLAGS+=	-march=morello
@@ -340,6 +343,14 @@ LDFLAGS+=	-mabi=purecap-benchmark
 . elif ${MACHINE_ARCH:Maarch64*c*}
 CFLAGS+=	-mabi=purecap
 LDFLAGS+=	-mabi=purecap
+. elif defined(ABI_P128)
+.  if defined(P128_FORCED_GOT)
+CFLAGS+=	-mabi=ilp128-forced-got
+LDFLAGS+=	-mabi=ilp128-forced-got
+.  else
+CFLAGS+=	-mabi=ilp128
+LDFLAGS+=	-mabi=ilp128
+.  endif
 . else
 CFLAGS+=	-mabi=aapcs
 LDFLAGS+=	-mabi=aapcs

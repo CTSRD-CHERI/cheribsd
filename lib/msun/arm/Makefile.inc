@@ -1,6 +1,6 @@
 
 LDBL_PREC = 53
-SYM_MAPS += ${.CURDIR}/arm/Symbol.map
+SYM_MAPS += ${MSUN_SRCTOP}/arm/Symbol.map
 
 .if defined(CPUTYPE) && ${CPUTYPE:M*soft*} != ""
 ARCH_SRCS = fenv-softfp.c fenv-vfp.c

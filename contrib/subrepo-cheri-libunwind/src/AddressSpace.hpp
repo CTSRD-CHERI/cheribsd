@@ -397,11 +397,15 @@ PC_T_COMPARATOR(==)
 PC_T_COMPARATOR(!=)
 
 inline uintptr_t LocalAddressSpace::getP(pint_t addr) {
+#ifdef __ILP128__
+  return get<uint64_t>(addr);
+#else
   return get<uintptr_t>(addr);
+#endif
 }
 
 inline uint64_t LocalAddressSpace::getRegister(pint_t addr) {
-#if __SIZEOF_POINTER__ == 8 || defined(__mips64)
+#if __SIZEOF_POINTER__ == 8 || defined(__ILP128__) || defined(__mips64)
   return get64(addr);
 #else
   return get32(addr);

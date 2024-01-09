@@ -38,8 +38,13 @@
 struct pthread;
 
 struct tcb {
+#ifdef __ILP128__
+	ptraddr_t		tcb_dtv;	/* required by rtld */
+	ptraddr_t		tcb_thread;
+#else
 	uintptr_t		* __kerncap tcb_dtv;	/* required by rtld */
 	struct pthread		* __kerncap tcb_thread;
+#endif
 };
 
 #define	TLS_TCB_SIZE	sizeof(struct tcb)

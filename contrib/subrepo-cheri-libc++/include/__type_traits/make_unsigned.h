@@ -37,8 +37,14 @@ typedef
 #if __has_feature(capabilities)
     __type_list<__uintcap_t,
 #endif
+#ifdef __ILP128__
+    __type_list<__uintfat_t,
+#endif
     __nat
 #ifndef _LIBCPP_HAS_NO_INT128
+    >
+#endif
+#ifdef __ILP128__
     >
 #endif
 #if __has_feature(capabilities)
@@ -71,6 +77,10 @@ template <> struct __make_unsigned<__uint128_t,        true> {typedef __uint128_
 #if __has_feature(capabilities)
 template <> struct __make_unsigned<  signed __intcap,  true> {typedef unsigned __intcap type;};
 template <> struct __make_unsigned<unsigned __intcap,  true> {typedef unsigned __intcap type;};
+#endif
+#ifdef __ILP128__
+template <> struct __make_unsigned<  signed __intfat,  true> {typedef unsigned __intfat type;};
+template <> struct __make_unsigned<unsigned __intfat,  true> {typedef unsigned __intfat type;};
 #endif
 
 template <class _Tp>

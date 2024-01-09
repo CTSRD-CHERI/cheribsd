@@ -82,6 +82,10 @@
         ossl-modules
         ..
     ..
+    lib128
+    ..
+    lib128g
+    ..
     libdata
         gcc
         ..

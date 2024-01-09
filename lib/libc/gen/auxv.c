@@ -67,9 +67,9 @@ init_aux_vector_once(void)
 #if defined(__CHERI_PURE_CAPABILITY__)
 	__elf_aux_vector = __auxargs;
 #else
-	Elf_Addr *sp;
+	uintptr_t *sp;
 
-	sp = (Elf_Addr *)environ;
+	sp = (uintptr_t *)environ;
 	while (*sp++ != 0)
 		;
 	__elf_aux_vector = (Elf_Auxinfo *)sp;

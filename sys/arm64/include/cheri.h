@@ -33,6 +33,9 @@
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	ASM_PTR_CONSTR "C"
+#elif defined(__ILP128__)
+/* XXX: Hack to shut up Clang's operand size mismatch */
+#define	ASM_PTR_CONSTR(x) "r" ((__ptraddr_t)(__uintptr_t)(x))
 #else
 #define	ASM_PTR_CONSTR "r"
 #endif

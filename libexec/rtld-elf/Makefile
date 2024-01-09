@@ -33,7 +33,7 @@ MK_UBSAN=	no
 CFLAGS+=-DRTLD_SANDBOX
 .endif
 
-.if !defined(NEED_COMPAT) && !defined(RTLD_SANDBOX)
+.if !defined(NEED_COMPAT) && !defined(RTLD_SANDBOX) && !defined(ABI_P128)
 CONFS=		libmap.conf
 .endif
 PROG?=		ld-elf.so.1

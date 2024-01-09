@@ -1,7 +1,7 @@
 #	@(#)Makefile    5.11 (Berkeley) 9/6/90
 
 .PATH: ${LIBC_SRCTOP}/rpc ${LIBC_SRCTOP}/.
-.ifndef RTLD_SANDBOX
+.if !defined(RTLD_SANDBOX) && !defined(ABI_P128)
 CONFS+=	rpc/netconfig rpc/rpc
 .endif
 SRCS+=	auth_none.c auth_unix.c authunix_prot.c bindresvport.c clnt_bcast.c \

@@ -1,3 +1,3 @@
 
 LDBL_PREC = 113
-SYM_MAPS += ${.CURDIR}/riscv/Symbol.map
+SYM_MAPS += ${MSUN_SRCTOP}/riscv/Symbol.map

@@ -208,12 +208,12 @@ libkern.${LIBC_ARCH}:: ${KMSRCS}
 	${CP} ${.ALLSRC} ${DESTDIR}/sys/libkern/${LIBC_ARCH}
 .endif
 
-.if !defined(NO_SYSCALLS) && !defined(RTLD_SANDBOX)
+.if !defined(NO_SYSCALLS) && !defined(RTLD_SANDBOX) && !defined(ABI_P128)
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
 .endif
 
-.if defined(NO_SYSCALLS) || defined(RTLD_SANDBOX)
+.if defined(NO_SYSCALLS) || defined(RTLD_SANDBOX) || defined(ABI_P128)
 MAN:=
 MLINKS:=
 NLS:=

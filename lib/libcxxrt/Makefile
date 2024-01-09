@@ -20,9 +20,11 @@ SRCS+=		stdexcept.cc
 SRCS+=		terminate.cc
 SRCS+=		typeinfo.cc
 
+LIBCXXRT_SRCTOP:=	${.PARSEDIR}
+
 WARNS?=		0
 CFLAGS+=	-isystem ${SRCDIR} -nostdinc++
 CXXSTD?=	c++14
-VERSION_MAP=	${.CURDIR}/Version.map
+VERSION_MAP=	${LIBCXXRT_SRCTOP}/Version.map
 
 .include <bsd.lib.mk>

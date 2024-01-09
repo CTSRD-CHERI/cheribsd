@@ -14,24 +14,26 @@
 PACKAGE=	clibs
 ARCH_SUBDIR=	${MACHINE_CPUARCH:S/i386/i387/}
 
+MSUN_SRCTOP:=	${.PARSEDIR}
+
 .include "${ARCH_SUBDIR}/Makefile.inc"
 
-.PATH:	${.CURDIR}/${ARCH_SUBDIR}
+.PATH:	${MSUN_SRCTOP}/${ARCH_SUBDIR}
 .if ${MACHINE_CPUARCH} == "i386" || ${MACHINE_CPUARCH} == "amd64"
-.PATH:	${.CURDIR}/x86
-CFLAGS+=	-I${.CURDIR}/x86
+.PATH:	${MSUN_SRCTOP}/x86
+CFLAGS+=	-I${MSUN_SRCTOP}/x86
 .endif
 
 # long double format
 .if ${LDBL_PREC} == 64
-.PATH:  ${.CURDIR}/ld80
-CFLAGS+=	-I${.CURDIR}/ld80
+.PATH:  ${MSUN_SRCTOP}/ld80
+CFLAGS+=	-I${MSUN_SRCTOP}/ld80
 .elif ${LDBL_PREC} == 113
-.PATH:  ${.CURDIR}/ld128
-CFLAGS+=	-I${.CURDIR}/ld128
+.PATH:  ${MSUN_SRCTOP}/ld128
+CFLAGS+=	-I${MSUN_SRCTOP}/ld128
 .endif
 
-CFLAGS+=	-I${.CURDIR}/${ARCH_SUBDIR}
+CFLAGS+=	-I${MSUN_SRCTOP}/${ARCH_SUBDIR}
 
 .include <bsd.compiler.mk>
 .if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 100000 && \
@@ -49,9 +51,9 @@ CFLAGS+=	-ffp-exception-behavior=maytrap
 # a builtin in the implementation
 CFLAGS+=	-fno-math-errno
 
-.PATH:	${.CURDIR}/bsdsrc
-.PATH:	${.CURDIR}/src
-.PATH:	${.CURDIR}/man
+.PATH:	${MSUN_SRCTOP}/bsdsrc
+.PATH:	${MSUN_SRCTOP}/src
+.PATH:	${MSUN_SRCTOP}/man
 
 LIB=	m
 SHLIBDIR?= /lib
@@ -103,9 +105,9 @@ LIBC_ARCH=${MACHINE_ARCH}
 .else
 LIBC_ARCH=${MACHINE_CPUARCH}
 .endif
-CFLAGS+=	-I${.CURDIR}/src -I${LIBCSRCDIR}/include \
+CFLAGS+=	-I${MSUN_SRCTOP}/src -I${LIBCSRCDIR}/include \
 	-I${LIBCSRCDIR}/${LIBC_ARCH}
-SYM_MAPS+=	${.CURDIR}/Symbol.map
+SYM_MAPS+=	${MSUN_SRCTOP}/Symbol.map
 
 VERSION_DEF=	${LIBCSRCDIR}/Versions.def
 SYMBOL_MAPS=	${SYM_MAPS}

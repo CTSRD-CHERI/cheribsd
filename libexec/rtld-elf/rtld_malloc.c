@@ -92,8 +92,15 @@ static int morepages(int n);
  * (FIRST_BUCKET_SIZE << i).  The overhead information precedes the data
  * area returned to the user.
  */
+#ifdef __ILP128__
+#define	FIRST_BUCKET_SIZE	16
+#define	NBUCKETS 29
+#else
 #define	FIRST_BUCKET_SIZE	8
 #define	NBUCKETS 30
+#endif
+_Static_assert(FIRST_BUCKET_SIZE >= sizeof(union overhead),
+    "overhead must fit in first bucket");
 static	union overhead *nextf[NBUCKETS];
 
 static	int pagesz;			/* page size */

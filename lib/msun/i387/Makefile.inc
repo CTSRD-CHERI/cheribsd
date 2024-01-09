@@ -18,4 +18,4 @@ ARCH_SRCS+= e_fmodl.S \
 	    s_logbl.S s_lrintl.S s_remquol.S s_rintl.S s_scalbnl.S s_truncl.S
 
 LDBL_PREC = 64	# XXX 64-bit format, but truncated to 53 bits
-SYM_MAPS += ${.CURDIR}/i387/Symbol.map
+SYM_MAPS += ${MSUN_SRCTOP}/i387/Symbol.map

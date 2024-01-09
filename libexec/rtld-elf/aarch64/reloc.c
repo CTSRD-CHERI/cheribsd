@@ -415,9 +415,18 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 	relalim = (const Elf_Rela *)((const char *)obj->pltrela +
 	    obj->pltrelasize);
 	for (rela = obj->pltrela; rela < relalim; rela++) {
-		uintptr_t *where, target;
+#ifdef __ILP128__
+		Elf_Addr *where;
+#else
+		uintptr_t *where;
+#endif
+		uintptr_t target;
 
+#ifdef __ILP128__
+		where = (Elf_Addr *)(obj->relocbase + rela->r_offset);
+#else
 		where = (uintptr_t *)(obj->relocbase + rela->r_offset);
+#endif
 		switch(ELF_R_TYPE(rela->r_info)) {
 #ifdef __CHERI_PURE_CAPABILITY__
 		case R_MORELLO_JUMP_SLOT:
@@ -456,12 +465,21 @@ static void
 reloc_iresolve_one(Obj_Entry *obj, const Elf_Rela *rela,
     RtldLockState *lockstate)
 {
-	uintptr_t *where, target, ptr;
+#ifdef __ILP128__
+	Elf_Addr *where;
+#else
+	uintptr_t *where;
+#endif
+	uintptr_t target, ptr;
 #ifdef __CHERI_PURE_CAPABILITY__
 	Elf_Addr *fragment;
 #endif
 
+#ifdef __ILP128__
+	where = (Elf_Addr *)(obj->relocbase + rela->r_offset);
+#else
 	where = (uintptr_t *)(obj->relocbase + rela->r_offset);
+#endif
 #ifdef __CHERI_PURE_CAPABILITY__
 	fragment = (Elf_Addr *)where;
 	/*
@@ -564,7 +582,12 @@ reloc_gnu_ifunc(Obj_Entry *obj, int flags,
 {
 	const Elf_Rela *relalim;
 	const Elf_Rela *rela;
-	uintptr_t *where, target;
+#ifdef __ILP128__
+	Elf_Addr *where;
+#else
+	uintptr_t *where;
+#endif
+	uintptr_t target;
 	const Elf_Sym *def;
 	const Obj_Entry *defobj;
 
@@ -572,7 +595,11 @@ reloc_gnu_ifunc(Obj_Entry *obj, int flags,
 		return (0);
 	relalim = (const Elf_Rela *)((const char *)obj->pltrela + obj->pltrelasize);
 	for (rela = obj->pltrela;  rela < relalim;  rela++) {
+#ifdef __ILP128__
+		where = (Elf_Addr *)(obj->relocbase + rela->r_offset);
+#else
 		where = (uintptr_t *)(obj->relocbase + rela->r_offset);
+#endif
 		switch (ELF_R_TYPE(rela->r_info)) {
 #ifdef __CHERI_PURE_CAPABILITY__
 		case R_MORELLO_JUMP_SLOT:
@@ -605,10 +632,17 @@ reloc_gnu_ifunc(Obj_Entry *obj, int flags,
 	return (0);
 }
 
+#ifdef __ILP128__
+uintptr_t
+reloc_jmpslot(Elf_Addr *where, uintptr_t target,
+    const Obj_Entry *defobj __unused, const Obj_Entry *obj __unused,
+    const Elf_Rel *rel)
+#else
 uintptr_t
 reloc_jmpslot(uintptr_t *where, uintptr_t target,
     const Obj_Entry *defobj __unused, const Obj_Entry *obj __unused,
     const Elf_Rel *rel)
+#endif
 {
 
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -866,7 +900,11 @@ allocate_initial_tls(Obj_Entry *objs)
 void *
 __tls_get_addr(tls_index* ti)
 {
+#ifdef __ILP128__
+	ptraddr_t *dtvp;
+#else
 	uintptr_t **dtvp;
+#endif
 
 	dtvp = &_tcb_get()->tcb_dtv;
 	return (tls_get_addr_common(dtvp, ti->ti_module, ti->ti_offset));

@@ -30,18 +30,34 @@
 #undef _PATH_ELF_HINTS
 
 #ifndef _RTLD_COMPAT_LIB_SUFFIX
+#ifdef __ILP128__
+#ifdef __FORCED_GOT__
+#define	_RTLD_COMPAT_LIB_SUFFIX	"128g"
+#else
+#define	_RTLD_COMPAT_LIB_SUFFIX	"128"
+#endif
+#else
 #ifdef COMPAT_libcompat
 #define	_RTLD_COMPAT_LIB_SUFFIX	COMPAT_libcompat
 #else
 #define	_RTLD_COMPAT_LIB_SUFFIX	""
 #endif
 #endif
+#endif
 
 #ifndef _RTLD_COMPAT_ENV_SUFFIX
+#ifdef __ILP128__
+#ifdef __FORCED_GOT__
+#define	_RTLD_COMPAT_ENV_SUFFIX	"128G_"
+#else
+#define	_RTLD_COMPAT_ENV_SUFFIX	"128_"
+#endif
+#else
 #ifdef COMPAT_LIBCOMPAT
 #define	_RTLD_COMPAT_ENV_SUFFIX	COMPAT_LIBCOMPAT "_"
 #else
 #define	_RTLD_COMPAT_ENV_SUFFIX	""
+#endif
 #endif
 #endif
 

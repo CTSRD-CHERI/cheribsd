@@ -1877,11 +1877,19 @@ public:
 
 private:
   struct GPRs {
+#if defined(__ILP128__)
+    uint64_t __x[29]; // r0-r28
+    uint64_t __fp;    // Frame pointer r29
+    uint64_t __lr;    // Link register r30
+    uint64_t __sp;    // Stack pointer r31
+    uint64_t __pc;    // Program counter
+#else
     uintptr_t __x[29]; // r0-r28
     uintptr_t __fp;    // Frame pointer r29
     uintptr_t __lr;    // Link register r30
     uintptr_t __sp;    // Stack pointer r31
     uintptr_t __pc;    // Program counter
+#endif
     uint64_t __ra_sign_state; // RA sign state register
   };
 

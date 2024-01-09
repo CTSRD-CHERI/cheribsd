@@ -187,7 +187,11 @@ static int symlook_list(SymLook *, const Objlist *, DoneList *);
 static int symlook_needed(SymLook *, const Needed_Entry *, DoneList *);
 static int symlook_obj1_sysv(SymLook *, const Obj_Entry *);
 static int symlook_obj1_gnu(SymLook *, const Obj_Entry *);
+#ifdef __ILP128__
+static void *tls_get_addr_slow(ptraddr_t *, int, size_t, bool) __noinline;
+#else
 static void *tls_get_addr_slow(uintptr_t **, int, size_t, bool) __noinline;
+#endif
 static void trace_loaded_objects(Obj_Entry *, bool);
 static void unlink_object(Obj_Entry *);
 static void unload_object(Obj_Entry *, RtldLockState *lockstate);
@@ -278,7 +282,7 @@ int __getosreldate(void);
 #ifdef __CHERI_PURE_CAPABILITY__
 func_ptr_type _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp);
 #else
-func_ptr_type _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp);
+func_ptr_type _rtld(uintptr_t *sp, func_ptr_type *exit_proc, Obj_Entry **objp);
 #endif
 uintptr_t _rtld_bind(Obj_Entry *obj, Elf_Size reloff);
 
@@ -570,7 +574,7 @@ func_ptr_type
 #ifdef __CHERI_PURE_CAPABILITY__
 _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
 #else
-_rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
+_rtld(uintptr_t *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 #endif
 {
     Elf_Auxinfo *aux_info[AT_COUNT], *auxp;
@@ -583,7 +587,11 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     Objlist initlist;
     RtldLockState lockstate;
     struct stat st;
+#ifdef __CHERI_PURE_CAPABILITY__
     Elf_Addr *argcp;
+#else
+    uintptr_t *argcp;
+#endif
     char **argv, **env, *kexecpath;
     const char *argv0, *binpath, *library_path_rpath;
     struct ld_env_var_desc *lvd;
@@ -924,7 +932,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
       aux_info[AT_STACKPROT]->a_un.a_val != 0)
 	    stack_prot = aux_info[AT_STACKPROT]->a_un.a_val;
 
-#ifndef COMPAT_libcompat
+#if !defined(COMPAT_libcompat) || defined(__ILP128__)
     /*
      * Get the actual dynamic linker pathname from the executable if
      * possible.  (It should always be possible.)  That ensures that
@@ -1210,7 +1218,11 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
     const Elf_Rel *rel;
     const Elf_Sym *def;
     const Obj_Entry *defobj;
+#ifdef __ILP128__
+    Elf_Addr *where;
+#else
     uintptr_t *where;
+#endif
     uintptr_t target;
     RtldLockState lockstate;
 
@@ -1226,7 +1238,11 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
     else
 	rel = (const Elf_Rel *)((const char *)obj->pltrela + reloff);
 
+#ifdef __ILP128__
+    where = (Elf_Addr *)(obj->relocbase + rel->r_offset);
+#else
     where = (uintptr_t *)(obj->relocbase + rel->r_offset);
+#endif
     def = find_symdef(ELF_R_SYM(rel->r_info), obj, &defobj, SYMLOOK_IN_PLT,
 	NULL, &lockstate);
     if (def == NULL)
@@ -1647,7 +1663,11 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	    break;
 
 	case DT_PLTGOT:
+#ifdef __ILP128__
+	    obj->pltgot = (Elf_Addr *)(obj->relocbase + dynp->d_un.d_ptr);
+#else
 	    obj->pltgot = (uintptr_t *)(obj->relocbase + dynp->d_un.d_ptr);
+#endif
 	    break;
 
 	case DT_TEXTREL:
@@ -4624,7 +4644,11 @@ dlinfo(void *handle, int request, void *p)
 static void
 rtld_fill_dl_phdr_info(const Obj_Entry *obj, struct dl_phdr_info *phdr_info)
 {
+#ifdef __ILP128__
+	ptraddr_t *dtvp;
+#else
 	uintptr_t **dtvp;
+#endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	phdr_info->dlpi_addr = (uintptr_t)cheri_andperm(obj->relocbase,
@@ -5653,14 +5677,23 @@ unref_dag(Obj_Entry *root)
 /*
  * Common code for MD __tls_get_addr().
  */
+#ifdef __ILP128__
+static void *
+tls_get_addr_slow(ptraddr_t *dtvp, int index, size_t offset, bool locked)
+#else
 static void *
 tls_get_addr_slow(uintptr_t **dtvp, int index, size_t offset, bool locked)
+#endif
 {
 	uintptr_t *newdtv, *dtv;
 	RtldLockState lockstate;
 	int to_copy;
 
+#ifdef __ILP128__
+	dtv = (uintptr_t *)(uintptr_t)*dtvp;
+#else
 	dtv = *dtvp;
+#endif
 	/* Check dtv generation in case new modules have arrived */
 	if (dtv[0] != tls_dtv_generation) {
 		if (!locked)
@@ -5675,7 +5708,12 @@ tls_get_addr_slow(uintptr_t **dtvp, int index, size_t offset, bool locked)
 		free(dtv);
 		if (!locked)
 			lock_release(rtld_bind_lock, &lockstate);
+#ifdef __ILP128__
+		dtv = (uintptr_t *)(uintptr_t)(*dtvp =
+		    (ptraddr_t)(uintptr_t)newdtv);
+#else
 		dtv = *dtvp = newdtv;
+#endif
 	}
 
 	/* Dynamically allocate module TLS if necessary */
@@ -5691,12 +5729,21 @@ tls_get_addr_slow(uintptr_t **dtvp, int index, size_t offset, bool locked)
 	return ((void *)(dtv[index + 1] + offset));
 }
 
+#ifdef __ILP128__
+void *
+tls_get_addr_common(ptraddr_t *dtvp, int index, size_t offset)
+#else
 void *
 tls_get_addr_common(uintptr_t **dtvp, int index, size_t offset)
+#endif
 {
 	uintptr_t *dtv;
 
+#ifdef __ILP128__
+	dtv = (uintptr_t *)(uintptr_t)*dtvp;
+#else
 	dtv = *dtvp;
+#endif
 	/* Check dtv generation in case new modules have arrived */
 	if (__predict_true(dtv[0] == tls_dtv_generation &&
 	    dtv[index + 1] != 0))

@@ -97,7 +97,11 @@ __libc_tls_get_addr(void *vti)
 	uintptr_t *dtv;
 	tls_index *ti;
 
+#ifdef __ILP128__
+	dtv = (uintptr_t *)(uintptr_t)_tcb_get()->tcb_dtv;
+#else
 	dtv = _tcb_get()->tcb_dtv;
+#endif
 	ti = vti;
 	return ((char *)(dtv[ti->ti_module + 1] + ti->ti_offset) +
 	    TLS_DTV_OFFSET);
@@ -216,7 +220,13 @@ __libc_free_tls(void *tcb, size_t tcbsize, size_t tcbalign __unused)
 void *
 __libc_allocate_tls(void *oldtcb, size_t tcbsize, size_t tcbalign)
 {
-	intptr_t *dtv, **tcb;
+	intptr_t *dtv;
+#ifdef __ILP128__
+	/* Linker assumes 64-bit integers in TCB */
+	ptraddr_t *tcb; /* intptr_t * __integer * */
+#else
+	intptr_t **tcb;
+#endif
 	char *tls_block, *tls;
 	size_t extra_size, maxalign, post_size, pre_size, tls_block_size;
 
@@ -245,7 +255,7 @@ __libc_allocate_tls(void *oldtcb, size_t tcbsize, size_t tcbalign)
 		abort();
 	}
 	memset(tls_block, 0, tls_block_size);
-	tcb = (intptr_t **)(tls_block + pre_size + extra_size);
+	tcb = (void *)(tls_block + pre_size + extra_size);
 	tls = (char *)tcb + TLS_TCB_SIZE + post_size;
 
 	if (oldtcb != NULL) {
@@ -254,7 +264,11 @@ __libc_allocate_tls(void *oldtcb, size_t tcbsize, size_t tcbalign)
 		tls_free_aligned(oldtcb);
 
 		/* Adjust the DTV. */
+#ifdef __ILP128__
+		dtv = (intptr_t *)(uintptr_t)tcb[0];
+#else
 		dtv = tcb[0];
+#endif
 		dtv[2] = (intptr_t)(tls + TLS_DTV_OFFSET);
 	} else {
 		dtv = tls_malloc(3 * sizeof(void *));
@@ -263,7 +277,11 @@ __libc_allocate_tls(void *oldtcb, size_t tcbsize, size_t tcbalign)
 			abort();
 		}
 		/* Build the DTV. */
+#ifdef __ILP128__
+		tcb[0] = (ptraddr_t)(uintptr_t)dtv;
+#else
 		tcb[0] = dtv;
+#endif
 		dtv[0] = 1;		/* Generation. */
 		dtv[1] = 1;		/* Segments count. */
 		dtv[2] = (intptr_t)(tls + TLS_DTV_OFFSET);
@@ -391,7 +409,7 @@ _init_tls(void)
 {
 #ifndef PIC
 #ifndef __CHERI_PURE_CAPABILITY__
-	Elf_Addr *sp;
+	uintptr_t *sp;
 #endif
 	Elf_Auxinfo *aux, *auxp;
 	Elf_Phdr *phdr;
@@ -400,7 +418,7 @@ _init_tls(void)
 	void *tls;
 
 #ifndef __CHERI_PURE_CAPABILITY__
-	sp = (Elf_Addr *) environ;
+	sp = (uintptr_t *) environ;
 	while (*sp++ != 0)
 		;
 	aux = (Elf_Auxinfo *) sp;

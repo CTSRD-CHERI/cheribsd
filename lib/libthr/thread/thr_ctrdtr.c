@@ -54,7 +54,11 @@ _tcb_ctor(struct pthread *thread, int initial)
 	else
 		tcb = _rtld_allocate_tls(NULL, TLS_TCB_SIZE, TLS_TCB_ALIGN);
 	if (tcb)
+#ifdef __ILP128__
+		tcb->tcb_thread = (ptraddr_t)(uintptr_t)thread;
+#else
 		tcb->tcb_thread = thread;
+#endif
 	return (tcb);
 }
 

@@ -236,6 +236,7 @@ struct __type_info_implementations {
 
 // XXXAR: this implementation cannot work for pure-capability CHERI
 #ifndef __CHERI_PURE_CAPABILITY__
+#ifndef __ILP128__
   struct __non_unique_arm_rtti_bit_impl {
     typedef uintptr_t __type_name_t;
 
@@ -283,6 +284,7 @@ struct __type_info_implementations {
       return !(__lhs & __non_unique_rtti_bit::value);
     }
   };
+#endif // __ILP128__
 #endif // __CHERI_PURE_CAPABILITY__
 
   typedef

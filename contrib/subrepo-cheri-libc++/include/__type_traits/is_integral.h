@@ -48,6 +48,10 @@ template <>          struct __libcpp_is_integral<__uint128_t>        { enum { va
 template <>          struct __libcpp_is_integral<__intcap_t>         { enum { value = 1 }; };
 template <>          struct __libcpp_is_integral<__uintcap_t>        { enum { value = 1 }; };
 #endif
+#ifdef __ILP128__
+template <>          struct __libcpp_is_integral<__intfat_t>         { enum { value = 1 }; };
+template <>          struct __libcpp_is_integral<__uintfat_t>        { enum { value = 1 }; };
+#endif
 
 #if __has_builtin(__is_integral)
 

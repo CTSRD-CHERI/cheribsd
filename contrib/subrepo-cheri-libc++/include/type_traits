@@ -769,6 +769,14 @@ inline _LIBCPP_INLINE_VISIBILITY _LIBCPP_CONSTEXPR
 unsigned __intcap __convert_to_integral(unsigned __intcap __val) { return __val; }
 #endif
 
+#ifdef __ILP128__
+inline _LIBCPP_INLINE_VISIBILITY _LIBCPP_CONSTEXPR
+__intfat __convert_to_integral(__intfat __val) { return __val; }
+
+inline _LIBCPP_INLINE_VISIBILITY _LIBCPP_CONSTEXPR
+unsigned __intfat __convert_to_integral(unsigned __intfat __val) { return __val; }
+#endif
+
 template <class _Tp>
 inline _LIBCPP_INLINE_VISIBILITY _LIBCPP_CONSTEXPR
 typename __sfinae_underlying_type<_Tp>::__promoted_type

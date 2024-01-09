@@ -66,7 +66,7 @@ SYMBOL_MAPS=${LIBTHR_SRCTOP}/pthread.map
 SYMBOL_MAPS+=	${LIBTHR_SRCTOP}/pthread-c18n.map
 .endif
 
-.ifndef RTLD_SANDBOX
+.if !defined(RTLD_SANDBOX) && !defined(ABI_P128)
 MAN=	libthr.3
 .endif
 
@@ -107,7 +107,9 @@ SYMLINKS+=lib${LIB}.so ${LIBDIR}/libpthread.so
 .if ${MK_PROFILE} != "no"
 SYMLINKS+=lib${LIB}_p.a ${LIBDIR}/libpthread_p.a
 .endif
+.endif
 
+.if !defined(RTLD_SANDBOX) && !defined(ABI_P128)
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
 .endif

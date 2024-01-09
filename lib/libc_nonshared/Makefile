@@ -14,6 +14,8 @@ LIB=	c_nonshared
 
 LIBC_NONSHARED_SRCS=
 
+.PATH: ${.PARSEDIR}
+
 # So that an empty .a file doesn't cause errors.
 SRCS=	__stub.c
 

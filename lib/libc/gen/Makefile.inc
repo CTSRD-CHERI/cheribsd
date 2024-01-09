@@ -7,7 +7,7 @@
 CFLAGS+=	-DNO_COMPAT7
 .endif
 
-.ifndef RTLD_SANDBOX
+.if !defined(RTLD_SANDBOX) && !defined(ABI_P128)
 CONFS+=	group master.passwd shells
 CONFSMODE_master.passwd=	600
 CONFSPACKAGE=   runtime

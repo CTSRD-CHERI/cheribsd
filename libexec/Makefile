@@ -88,11 +88,17 @@ _rtld-elf=	rtld-elf rtld-elf-debug
 .if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
 SUBDIR+=	rtld-elf-c18n rtld-elf64cb-c18n
 .endif
+.if ${MACHINE_CPUARCH} == "aarch64"
+SUBDIR+=	rtld-elf128
+SUBDIR+=	rtld-elf128g
+.endif
 # rtld.1 needs to be installed before the cross-dir MLINKS can work.
 SUBDIR_INSTALL_USE_DEPENDS=
 SUBDIR_DEPEND_rtld-elf-c18n=	rtld-elf
 SUBDIR_DEPEND_rtld-elf64cb-c18n=	rtld-elf
 SUBDIR_DEPEND_rtld-elf-debug=	rtld-elf
+SUBDIR_DEPEND_rtld-elf128=	rtld-elf
+SUBDIR_DEPEND_rtld-elf128g=	rtld-elf
 .for LIBCOMPAT libcompat in ${_ALL_LIBCOMPATS_libcompats}
 SUBDIR.${MK_LIB${LIBCOMPAT}}+=	rtld-elf${libcompat}
 SUBDIR_DEPEND_rtld-elf${libcompat}=	rtld-elf

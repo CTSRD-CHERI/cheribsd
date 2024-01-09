@@ -46,7 +46,11 @@ static __inline struct pthread *
 _get_curthread(void)
 {
 
+#ifdef __ILP128__
+	return ((struct pthread *)(uintptr_t)_tcb_get()->tcb_thread);
+#else
 	return (_tcb_get()->tcb_thread);
+#endif
 }
 
 #endif /* _PTHREAD_MD_H_ */

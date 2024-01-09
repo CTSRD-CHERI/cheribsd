@@ -30,6 +30,9 @@ template <> struct __libcpp_is_unsigned_integer<__uint128_t>        : public tru
 #if __has_feature(capabilities)
 template <> struct __libcpp_is_unsigned_integer<unsigned __intcap>  : public true_type {};
 #endif
+#ifdef __ILP128__
+template <> struct __libcpp_is_unsigned_integer<unsigned __intfat>  : public true_type {};
+#endif
 
 _LIBCPP_END_NAMESPACE_STD
 

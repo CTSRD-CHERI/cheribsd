@@ -52,6 +52,9 @@ static char sccsid[] = "@(#)bcopy.c	8.1 (Berkeley) 6/4/93";
 
 #if __has_feature(capabilities)
 typedef	__intcap_t word;	/* "word" used for optimal copy speed */
+#elif defined(__ILP128__)
+/* Top half of __intfat is never actually loaded/stored so can't use */
+typedef long word;		/* "word" used for optimal copy speed */
 #else
 typedef	intptr_t word;		/* "word" used for optimal copy speed */
 #endif

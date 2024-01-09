@@ -86,16 +86,63 @@ ENTRY(.rtld_start)
 #endif
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
 	.cfi_undefined	x30
+
+#ifdef __ILP128__
+	/*
+	 * Convert argc, argv, env and auxv to use 128-bit pointers
+	 * since the kernel ABI is still 64-bit.
+	 */
+	add	x2, x0, #8	/* load argv */
+	ldr	x4, [x0]	/* load argc */
+	add	x2, x2, x4, lsl #3 /* env is after argv */
+	add	x2, x2, #8	/* argv is null terminated */
+1:
+	ldr	x4, [x2], #8	/* load env[i++] */
+	cbnz	x4, 1b		/* check if terminator */
+1:
+	ldr	x4, [x2], #16	/* load auxv[i++] */
+	cbnz	x4, 1b		/* check if terminator */
+
+	sub	x4, x2, x0	/* calculate current space used */
+	sub	x5, x0, x4	/* calculate new start address */
+	and	x5, x5, #~15	/* aligned to pointer alignment */
+	add	x4, x4, #15	/* round up to multiple of stack alignment */
+	and	x4, x4, #~15
+	sub	sp, sp, x4	/* account for space being on stack */
+	mov	x4, x0		/* get original base address */
+	mov	x0, x5		/* save new base address */
+
+1:
+	ldr	x6, [x4], #8	/* load entry */
+	stp	x6, xzr, [x5], #16 /* store padded entry */
+	cmp	x4, x2		/* repeat until end */
+	b.ne	1b
+#endif
+
 	mov	x19, x0		/* Put ps_strings in a callee-saved register */
 
+#ifdef __ILP128__
+	sub	sp, sp, #32	/* Make room for obj_main & exit proc */
+	.cfi_adjust_cfa_offset	32
+#else
 	sub	sp, sp, #16	/* Make room for obj_main & exit proc */
 	.cfi_adjust_cfa_offset	16
+#endif
 
 	mov	x1, sp		/* exit_proc */
+#ifdef __ILP128__
+	add	x2, x1, #16	/* obj_main */
+#else
 	add	x2, x1, #8	/* obj_main */
+#endif
 	bl	_rtld		/* Call the loader */
 	mov	x8, x0		/* Backup the entry point */
+#ifdef __ILP128__
+	ldr	x2, [sp], #16 /* Load cleanup */
+	ldr	x1, [sp], #16 /* Load obj_main */
+#else
 	ldp	x2, x1, [sp], #16 /* Load cleanup, obj_main */
+#endif
 	.cfi_adjust_cfa_offset	0
 
 	mov	x0, x19		/* Restore ps_strings */

@@ -1,3 +1,3 @@
 
 LDBL_PREC = 53
-SYM_MAPS += ${.CURDIR}/powerpc/Symbol.map
+SYM_MAPS += ${MSUN_SRCTOP}/powerpc/Symbol.map
