@@ -130,6 +130,7 @@ struct elf_file {
 	bool ef_cheriabi;
 };
 
+#define	elf_machine(ef)		((ef)->ef_hdr.e_machine)
 #define	elf_class(ef)		((ef)->ef_hdr.e_ident[EI_CLASS])
 #define	elf_encoding(ef)	((ef)->ef_hdr.e_ident[EI_DATA])
 #define	elf_machine(ef)		((ef)->ef_hdr.e_machine)
