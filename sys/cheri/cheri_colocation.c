@@ -562,14 +562,13 @@ switcher_code_cap(struct thread *td, ptraddr_t base, size_t length)
 	 */
 	codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
 	    base, length, 0);
-#ifndef __aarch64__
 	/*
 	 * XXX: Somehow makes every attempt at ldr/str in the switcher
 	 *      fail with capability fault.
 	 */
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
 		codecap = cheri_capmode(codecap);
-#endif
+
 	return (codecap);
 }
 
@@ -596,9 +595,6 @@ kern_cosetup(struct thread *td, int what,
 	void * __capability datacap;
 	struct vmspace *vmspace;
 	int error;
-#ifdef __CHERI_PURE_CAPABILITY__
-	uint64_t codecap_addr = 0;
-#endif
 
 	KASSERT(switcher_sealcap != (void * __capability)-1,
              ("%s: uninitialized switcher_sealcap", __func__));
@@ -625,17 +621,7 @@ kern_cosetup(struct thread *td, int what,
 			    td->td_proc->p_sysent->sv_cocall_base,
 			    td->td_proc->p_sysent->sv_cocall_len);
 		}
-#ifdef __CHERI_PURE_CAPABILITY__
-		/*
-		 * The least significant bit of the code capability needs to be set.
-		 * Otherwise, the CPU leaves C64 mode after the BLRS instruction that
-		 * is used to jump into the switcher code. The switcher code provided
-		 * by purecap kernels uses capabilities and so fails if it is not
-		 * executed in C64 mode.
-		 */
-		codecap_addr = cheri_getaddress(codecap);
-		codecap = cheri_setaddress(codecap, codecap_addr + 1);
-#endif
+
 		codecap = cheri_seal(codecap, switcher_sealcap);
 		error = sucap(codep, (intcap_t)codecap) == 0 ? 0 : EFAULT;
 		if (error != 0)
@@ -654,11 +640,7 @@ kern_cosetup(struct thread *td, int what,
 			    td->td_proc->p_sysent->sv_coaccept_base,
 			    td->td_proc->p_sysent->sv_coaccept_len);
 		}
-#ifdef __CHERI_PURE_CAPABILITY__
-		// See comment above in the "COSETUP_COCALL" case.
-		codecap_addr = cheri_getaddress(codecap);
-		codecap = cheri_setaddress(codecap, codecap_addr + 1);
-#endif
+
 		codecap = cheri_seal(codecap, switcher_sealcap);
 		error = sucap(codep, (intcap_t)codecap) == 0 ? 0 : EFAULT;
 		if (error != 0)
