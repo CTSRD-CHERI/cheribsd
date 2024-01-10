@@ -351,7 +351,11 @@ colocation_unborrow(struct thread *td)
 	if (!have_scb)
 		return;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	peertd = scb.scb_borrower_td;
+#else
 	peertd = (__cheri_fromcap struct thread *)scb.scb_borrower_td;
+#endif
 	if (peertd == NULL) {
 		/*
 		 * Nothing borrowed yet.
@@ -375,10 +379,13 @@ colocation_unborrow(struct thread *td)
 #error "what architecture is this?"
 #endif
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(td == scb.scb_td, ("%s: td %p != scb_td %p\n", __func__, td, (__cheri_fromcap struct thread *)scb.scb_td));
+#else
 	KASSERT(td == (__cheri_fromcap struct thread *)scb.scb_td,
 	    ("%s: td %p != scb_td %p\n", __func__, td, (__cheri_fromcap struct thread *)scb.scb_td));
-	KASSERT(peertd != td,
-	    ("%s: peertd %p == td %p\n", __func__, peertd, td));
+#endif
+	KASSERT(peertd != td, ("%s: peertd %p == td %p\n", __func__, peertd, td));
 
 	COLOCATION_DEBUG("replacing current td %p, pid %d (%s), switchercb %lp, "
 	    "with td %p, pid %d (%s), switchercb %lp",
@@ -539,7 +546,6 @@ setup_scb(struct thread *td)
 int
 sys__cosetup(struct thread *td, struct _cosetup_args *uap)
 {
-
 	return (kern_cosetup(td, uap->what, uap->code, uap->data));
 }
 
@@ -556,14 +562,13 @@ switcher_code_cap(struct thread *td, ptraddr_t base, size_t length)
 	 */
 	codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
 	    base, length, 0);
-#ifndef __aarch64__
 	/*
 	 * XXX: Somehow makes every attempt at ldr/str in the switcher
 	 *      fail with capability fault.
 	 */
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
 		codecap = cheri_capmode(codecap);
-#endif
+
 	return (codecap);
 }
 
@@ -616,6 +621,7 @@ kern_cosetup(struct thread *td, int what,
 			    td->td_proc->p_sysent->sv_cocall_base,
 			    td->td_proc->p_sysent->sv_cocall_len);
 		}
+
 		codecap = cheri_seal(codecap, switcher_sealcap);
 		error = sucap(codep, (intcap_t)codecap) == 0 ? 0 : EFAULT;
 		if (error != 0)
@@ -634,6 +640,7 @@ kern_cosetup(struct thread *td, int what,
 			    td->td_proc->p_sysent->sv_coaccept_base,
 			    td->td_proc->p_sysent->sv_coaccept_len);
 		}
+
 		codecap = cheri_seal(codecap, switcher_sealcap);
 		error = sucap(codep, (intcap_t)codecap) == 0 ? 0 : EFAULT;
 		if (error != 0)

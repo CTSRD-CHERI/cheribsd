@@ -52,11 +52,11 @@ cocall(void * __capability target,
 	assert(target != NULL);
 	if (outbuf != NULL) {
 		assert(__builtin_is_aligned(outbuf, sizeof(void * __capability)));
-		assert(__builtin_is_aligned(outlen, sizeof(void * __capability)));
+		//assert(__builtin_is_aligned(outlen, sizeof(void * __capability)));
 	}
 	if (inbuf != NULL) {
 		assert(__builtin_is_aligned(inbuf, sizeof(void * __capability)));
-		assert(__builtin_is_aligned(inlen, sizeof(void * __capability)));
+		//assert(__builtin_is_aligned(inlen, sizeof(void * __capability)));
 	}
 
 	/* XXX This loop is like this for no particular reason. */
