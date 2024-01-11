@@ -432,6 +432,7 @@ FBSD_1.7 {
 };
 
 FBSDprivate_1.0 {
+	/* System call stubs */
 	___acl_aclcheck_fd;
 	__sys___acl_aclcheck_fd;
 	___acl_aclcheck_file;
@@ -543,8 +544,12 @@ FBSDprivate_1.0 {
 	__sys_connect;
 	_cpuset;
 	__sys_cpuset;
+	_cpuset_getdomain;
+	__sys_cpuset_getdomain;
 	_cpuset_getid;
 	__sys_cpuset_getid;
+	_cpuset_setdomain;
+	__sys_cpuset_setdomain;
 	_cpuset_setid;
 	__sys_cpuset_setid;
 	_cpuset_getaffinity;
@@ -973,7 +978,6 @@ FBSDprivate_1.0 {
 	_sigtimedwait;
 	__sys_sigtimedwait;
 	_sigwait;
-	__sigwait;
 	__sys_sigwait;
 	_sigwaitinfo;
 	__sys_sigwaitinfo;
@@ -1047,15 +1051,13 @@ FBSDprivate_1.0 {
 	__sys_write;
 	_writev;
 	__sys_writev;
-	__set_error_selector;
-	nlm_syscall;
-	gssd_syscall;
+
+	/* Things that aren't system calls (in sort(1) order) */
 	__libc_interposing_slot;
 	__libc_sigwait;
-	_cpuset_getdomain;
-	__sys_cpuset_getdomain;
-	_cpuset_setdomain;
-	__sys_cpuset_setdomain;
-	__sys_break;
+	__set_error_selector;
+	__sigwait;
+	gssd_syscall;
+	nlm_syscall;
 	rpctls_syscall;
 };
