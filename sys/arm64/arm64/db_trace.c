@@ -100,7 +100,7 @@ db_stack_trace_cmd(struct thread *td, struct unwind_state *frame)
 				break;
 			}
 #endif
-			if (!__is_aligned(tf, _Alignof(*tf)) ||
+			if (!__is_aligned(tf, _Alignof(struct trapframe)) ||
 			    !kstack_contains(td, (vm_offset_t)tf,
 			    sizeof(*tf))) {
 				db_printf("--- invalid trapframe %p\n", tf);
