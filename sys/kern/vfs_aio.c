@@ -235,6 +235,9 @@ typedef struct oaiocb {
 #define	KAIOCB_FINISHED		0x20
 #define	KAIOCB_CAPREV_EPOCH	0x40
 
+/* ioflags */
+#define	KAIOCB_IO_FOFFSET	0x01
+
 /*
  * AIO process info
  */
@@ -801,12 +804,14 @@ aio_process_rw(struct kaiocb *job)
 		if (job->uiop->uio_resid == 0)
 			error = 0;
 		else
-			error = fo_read(fp, job->uiop, fp->f_cred, FOF_OFFSET,
-			    td);
+			error = fo_read(fp, job->uiop, fp->f_cred,
+			    (job->ioflags & KAIOCB_IO_FOFFSET) != 0 ? 0 :
+			    FOF_OFFSET, td);
 	} else {
 		if (fp->f_type == DTYPE_VNODE)
 			bwillwrite();
-		error = fo_write(fp, job->uiop, fp->f_cred, FOF_OFFSET, td);
+		error = fo_write(fp, job->uiop, fp->f_cred, (job->ioflags &
+		    KAIOCB_IO_FOFFSET) != 0 ? 0 : FOF_OFFSET, td);
 	}
 	msgrcv_end = td->td_ru.ru_msgrcv;
 	msgsnd_end = td->td_ru.ru_msgsnd;
@@ -1596,13 +1601,15 @@ aio_aqueue(struct thread *td, struct aiocb * __capability ujob,
 
 	/* Get the opcode. */
 	if (type == LIO_NOP) {
-		switch (job->uaiocb.aio_lio_opcode) {
+		switch (job->uaiocb.aio_lio_opcode & ~LIO_FOFFSET) {
 		case LIO_WRITE:
 		case LIO_WRITEV:
 		case LIO_NOP:
 		case LIO_READ:
 		case LIO_READV:
-			opcode = job->uaiocb.aio_lio_opcode;
+			opcode = job->uaiocb.aio_lio_opcode & ~LIO_FOFFSET;
+			if ((job->uaiocb.aio_lio_opcode & LIO_FOFFSET) != 0)
+				job->ioflags |= KAIOCB_IO_FOFFSET;
 			break;
 		default:
 			error = EINVAL;
