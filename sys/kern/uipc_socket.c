@@ -2965,13 +2965,10 @@ soreceive(struct socket *so, struct sockaddr **psa, struct uio *uio,
 }
 
 int
-soshutdown(struct socket *so, int how)
+soshutdown(struct socket *so, enum shutdown_how how)
 {
 	struct protosw *pr;
 	int error, soerror_enotconn;
-
-	if (!(how == SHUT_RD || how == SHUT_WR || how == SHUT_RDWR))
-		return (EINVAL);
 
 	soerror_enotconn = 0;
 	SOCK_LOCK(so);
