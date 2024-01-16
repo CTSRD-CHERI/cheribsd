@@ -5,8 +5,10 @@ SHLIBDIR?= /lib
 
 .include <src.opts.mk>
 
-LIBC_SRCTOP?= ${.CURDIR}
-LIBSYS_SRCTOP?=	${.CURDIR:H}/libsys
+.if !defined(LIBC_SRCTOP)
+LIBC_SRCTOP:= ${.PARSEDIR}
+.endif
+LIBSYS_SRCTOP?=	${LIBC_SRCTOP:H}/libsys
 
 # Pick the current architecture directory for libc. In general, this is named
 # MACHINE_CPUARCH, but some ABIs are different enough to require their own libc,
