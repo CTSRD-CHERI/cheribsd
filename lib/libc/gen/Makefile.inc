@@ -99,6 +99,7 @@ SRCS+=	__getosreldate.c \
 	kqueue1.c \
 	lcong48.c \
 	libc_dlopen.c \
+	libc_interposing_table.c  \
 	lockf.c \
 	lrand48.c \
 	memalign.c \
