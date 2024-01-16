@@ -640,6 +640,18 @@ __thr_interpose_libc(void)
 #define	SLOT(name)					\
 	*(__libc_interposing_slot(INTERPOS_##name)) =	\
 	    (interpos_func_t)__thr_##name;
+	SLOT(system);
+	SLOT(tcdrain);
+	SLOT(spinlock);
+	SLOT(spinunlock);
+#ifndef __CHERI_PURE_CAPABILITY__
+	SLOT(map_stacks_exec);
+#endif
+#undef SLOT
+
+#define	SLOT(name)					\
+	*(__libsys_interposing_slot(INTERPOS_##name)) =	\
+	    (interpos_func_t)__thr_##name;
 	SLOT(accept);
 	SLOT(accept4);
 	SLOT(aio_suspend);
@@ -668,19 +680,12 @@ __thr_interpose_libc(void)
 	SLOT(sigtimedwait);
 	SLOT(sigwaitinfo);
 	SLOT(swapcontext);
-	SLOT(system);
-	SLOT(tcdrain);
 	SLOT(wait4);
 	SLOT(write);
 	SLOT(writev);
-	SLOT(spinlock);
-	SLOT(spinunlock);
 	SLOT(kevent);
 	SLOT(wait6);
 	SLOT(ppoll);
-#ifndef __CHERI_PURE_CAPABILITY__
-	SLOT(map_stacks_exec);
-#endif
 	SLOT(fdatasync);
 	SLOT(clock_nanosleep);
 	SLOT(pdfork);

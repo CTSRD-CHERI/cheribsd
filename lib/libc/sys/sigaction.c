@@ -53,7 +53,6 @@ sigaction_c18n(int sig, const struct sigaction *act, struct sigaction *oact)
 int
 sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
 {
-
 	return (((int (*)(int, const struct sigaction *, struct sigaction *))
-	    __libc_interposing[INTERPOS_sigaction])(sig, act, oact));
+	    __libsys_interposing[INTERPOS_sigaction])(sig, act, oact));
 }
