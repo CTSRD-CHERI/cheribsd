@@ -386,7 +386,7 @@ copyiniov(const struct iovec* __capability iovp, u_int iovcnt, struct iovec **io
 	*iov = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (error);
-	iovlen = iovcnt * sizeof (struct iovec);
+	iovlen = iovcnt * sizeof(struct iovec);
 	iovs = malloc(iovlen, M_IOV, M_WAITOK);
 	error = copyincap(iovp, iovs, iovlen);
 	if (error != 0)
@@ -407,7 +407,7 @@ copyinuio(const struct iovec * __capability iovp, u_int iovcnt,
 	*uiop = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (EINVAL);
-	iovlen = iovcnt * sizeof (struct iovec);
+	iovlen = iovcnt * sizeof(struct iovec);
 	uio = malloc(iovlen + sizeof *uio, M_IOV, M_WAITOK);
 	iov = (struct iovec *)(uio + 1);
 	error = copyincap(iovp, iov, iovlen);
@@ -455,8 +455,8 @@ cloneuio(struct uio *uiop)
 	struct uio *uio;
 	int iovlen;
 
-	iovlen = uiop->uio_iovcnt * sizeof (struct iovec);
-	uio = malloc(iovlen + sizeof *uio, M_IOV, M_WAITOK);
+	iovlen = uiop->uio_iovcnt * sizeof(struct iovec);
+	uio = malloc(iovlen + sizeof(*uio), M_IOV, M_WAITOK);
 	*uio = *uiop;
 	uio->uio_iov = (struct iovec *)(uio + 1);
 	bcopy(uiop->uio_iov, uio->uio_iov, iovlen);
