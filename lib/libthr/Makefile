@@ -21,6 +21,9 @@ SHLIB=thr
 LIB=thr
 .endif
 SHLIB_MAJOR= 3
+
+LIBADD=	sys
+
 NO_WTHREAD_SAFETY=1
 NO_WCAST_ALIGN.gcc=1    # for gcc 4.2
 CFLAGS+=-DPTHREAD_KERNEL
@@ -92,6 +95,14 @@ CFLAGS.heap.c+=	-DIN_LIBTHR
 .else
 SRCS+= rtld_malloc.c
 .endif
+
+LIBSYS_SRCTOP=	${.CURDIR:H}/libsys
+.if exists(${LIBSYS_SRCTOP}/${MACHINE_CPUARCH}/_umtx_op_err.S)
+.PATH: ${LIBSYS_SRCTOP}/${MACHINE_CPUARCH}
+.else
+.PATH: ${LIBSYS_SRCTOP}
+.endif
+STATICOBJS+=	_umtx_op_err.o
 
 .ifndef CHERI_LIB_C18N
 .if ${MK_INSTALLLIB} != "no"
