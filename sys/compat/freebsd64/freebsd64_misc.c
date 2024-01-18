@@ -410,7 +410,6 @@ freebsd64_copyinuio(const struct iovec * __capability cb_arg, u_int iovcnt,
 		IOVEC_INIT_C(&iov[i], __USER_CAP(iov64.iov_base, iov64.iov_len),
 		    iov64.iov_len);
 	}
-	uio->uio_iov = iov;
 	uio->uio_iovcnt = iovcnt;
 	uio->uio_segflg = UIO_USERSPACE;
 	uio->uio_offset = -1;
