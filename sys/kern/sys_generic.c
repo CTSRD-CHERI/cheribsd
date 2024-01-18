@@ -282,7 +282,7 @@ user_readv(struct thread *td, int fd, struct iovec * __capability iovp,
 	if (error)
 		return (error);
 	error = kern_readv(td, fd, auio);
-	free(auio, M_IOV);
+	freeuio(auio);
 	return (error);
 }
 
@@ -330,7 +330,7 @@ user_preadv(struct thread *td, int fd, struct iovec * __capability iovp,
 	if (error)
 		return (error);
 	error = kern_preadv(td, fd, auio, offset);
-	free(auio, M_IOV);
+	freeuio(auio);
 	return (error);
 }
 
@@ -507,7 +507,7 @@ user_writev(struct thread *td, int fd, struct iovec * __capability iovp,
 	if (error)
 		return (error);
 	error = kern_writev(td, fd, auio);
-	free(auio, M_IOV);
+	freeuio(auio);
 	return (error);
 }
 
@@ -555,7 +555,7 @@ user_pwritev(struct thread *td, int fd, struct iovec * __capability iovp,
 	if (error)
 		return (error);
 	error = kern_pwritev(td, fd, auio, offset);
-	free(auio, M_IOV);
+	freeuio(auio);
 	return (error);
 }
 
