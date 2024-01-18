@@ -69,8 +69,18 @@
 SYSCTL_INT(_kern, KERN_IOV_MAX, iov_max, CTLFLAG_RD, SYSCTL_NULL_INT_PTR, UIO_MAXIOV,
 	"Maximum number of elements in an I/O vector; sysconf(_SC_IOV_MAX)");
 
+static uma_zone_t uio_zone;
+
 static int uiomove_flags(void *cp, int n, struct uio *uio, bool nofault,
     bool preserve_tags);
+
+static void
+uio_init(void *arg __unused)
+{
+	uio_zone = uma_zcreate("UIO", sizeof(struct uio),
+	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, 0);
+}
+SYSINIT(uio_init, SI_SUB_SYSCALLS, SI_ORDER_ANY, uio_init, NULL);
 
 int
 copyin_nofault(const void * __capability udaddr, void *kaddr, size_t len)
@@ -452,13 +462,27 @@ struct uio *
 allocuio(u_int iovcnt)
 {
 	struct uio *uio;
-	int iovlen;
 
 	KASSERT(iovcnt <= UIO_MAXIOV,
 	    ("Requested %u iovecs exceed UIO_MAXIOV", iovcnt));
-	iovlen = iovcnt * sizeof(struct iovec);
-	uio = malloc(iovlen + sizeof(*uio), M_IOV, M_WAITOK);
-	uio->uio_iov = (struct iovec *)(uio + 1);
+	uio = uma_zalloc_arg(uio_zone, (void *)(uintptr_t)iovcnt, M_WAITOK);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(__CHERI_SUBOBJECT_BOUNDS__)
+	KASSERT(cheri_getlen(uio->uio_inline_iov) ==
+	    UIO_INLINE_IOV * sizeof(struct iovec),
+	    ("Malformed UIO structure, uio_inline_iov is not representable"));
+#endif
+	uio->uio_iov = uio->uio_inline_iov;
+	uio->uio_flags = 0;
+	if (iovcnt > UIO_INLINE_IOV) {
+		uio->uio_ext_iov = malloc(iovcnt * sizeof(struct iovec), M_IOV,
+		    M_WAITOK);
+		uio->uio_iov = uio->uio_ext_iov;
+		uio->uio_flags |= UIO_EXT_IOVEC;
+	} else {
+		uio->uio_iov = cheri_kern_setboundsexact(uio->uio_iov,
+		    iovcnt * sizeof(struct iovec));
+	}
+	uio->uio_iovcnt = iovcnt;
 
 	return (uio);
 }
@@ -466,21 +490,27 @@ allocuio(u_int iovcnt)
 void
 freeuio(struct uio *uio)
 {
-	free(uio, M_IOV);
+	if (uio->uio_flags & UIO_EXT_IOVEC) {
+#ifdef __CHERI_PURE_CAPABILITY__
+		KASSERT(cheri_is_address_inbounds(uio->uio_ext_iov,
+		    (ptraddr_t)uio->uio_iov),
+		    ("IOV pointer is not within the external iov allocation"));
+#endif
+		free(uio->uio_ext_iov, M_IOV);
+	}
+	uma_zfree(uio_zone, uio);
 }
 
 struct uio *
 cloneuio(struct uio *uiop)
 {
-	struct iovec *iov;
 	struct uio *uio;
 	int iovlen;
 
+	uio = allocuio(uiop->uio_iovcnt);
+	bcopy(&uiop->uio_startcopy, &uio->uio_startcopy,
+	    __rangeof(struct uio, uio_startcopy, uio_endcopy));
 	iovlen = uiop->uio_iovcnt * sizeof(struct iovec);
-	uio = allocuio(iovcnt);
-	iov = uio->uio_iov;
-	*uio = *uiop;
-	uio->uio_iov = iov;
 	bcopy(uiop->uio_iov, uio->uio_iov, iovlen);
 	return (uio);
 }
@@ -597,7 +627,8 @@ casuword(volatile u_long * __capability addr, u_long old, u_long new)
 //   ],
 //   "changes_purecap": [
 //     "support",
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "bounds_compression"
 //   ]
 // }
 // CHERI CHANGES END

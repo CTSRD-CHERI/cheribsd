@@ -50,15 +50,40 @@ typedef	__off_t	off_t;
 #endif
 
 #ifdef _KERNEL
+/*
+ * The number of inlined iovecs can be measured by looking at the
+ * distribution of M_IOV allocations with dtrace.
+ * The number of inlined iovecs is tuned to capture the majority of
+ * allocations during a kernel build, measured using the dtrace dtmalloc
+ * provider as in
+ * dtrace -n 'dtmalloc::iov:malloc {@ = lquantize(args[3], 16, 4096, 8);}'
+ *
+ * It is possible to check whethe this value is well-tuned by computing the
+ * ratio of M_IOV allocations over the number of uio_zone allocations.
+ * This ratio should be << 1, if not this value may require tuning.
+ */
+#define	UIO_INLINE_IOV	2
+/*
+ * Mark an UIO with an externally allocated iovec array.
+ */
+#define	UIO_EXT_IOVEC	1
 
 struct uio {
 	struct iovec	*uio_iov;	/* scatter/gather list */
+	int	uio_flags;		/* uio iovec buffer flags */
+#define	uio_startcopy uio_iovcnt
 	int	uio_iovcnt;		/* length of scatter/gather list */
 	off_t	uio_offset;		/* offset in target object */
 	ssize_t	uio_resid;		/* remaining bytes to process */
 	enum	uio_seg uio_segflg;	/* address space */
 	enum	uio_rw uio_rw;		/* operation */
 	struct	thread *uio_td;		/* owner */
+#define	uio_endcopy uio_ext_iov
+	union {
+		struct iovec	uio_inline_iov[UIO_INLINE_IOV];	/* inline iovec
+								   array */
+		struct iovec	*uio_ext_iov;	/* external iovec array */
+	};
 } __aligned(sizeof(void * __capability));
 
 /*
@@ -125,7 +150,8 @@ __END_DECLS
 //   ],
 //   "changes_purecap": [
 //     "pointer_as_integer",
-//     "pointer_shape"
+//     "pointer_shape",
+//     "bounds_compression"
 //   ]
 // }
 // CHERI CHANGES END
