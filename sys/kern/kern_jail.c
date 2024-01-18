@@ -542,7 +542,7 @@ user_jail_set(struct thread *td, struct iovec * __capability iovp,
 	if (error)
 		return (error);
 	error = kern_jail_set(td, auio, flags);
-	free(auio, M_IOV);
+	freeuio(auio);
 	return (error);
 }
 
@@ -2283,7 +2283,7 @@ user_jail_get(struct thread *td, struct iovec * __capability iovp,
 	error = kern_jail_get(td, auio, flags);
 	if (error == 0)
 		error = updateiov_f(auio, iovp);
-	free(auio, M_IOV);
+	freeuio(auio);
 	return (error);
 }
 

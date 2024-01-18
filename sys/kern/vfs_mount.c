@@ -483,7 +483,7 @@ kern_nmount(struct thread *td, struct iovec * __capability iovp, u_int iovcnt,
 	}
 	error = vfs_donmount(td, flags, auio);
 
-	free(auio, M_IOV);
+	freeuio(auio);
 	return (error);
 }
 

@@ -1115,7 +1115,6 @@ freebsd32_copyinuio(const struct iovec * __capability cb_arg, u_int iovcnt,
 	struct iovec32 iov32;
 	struct iovec *iov;
 	struct uio *uio;
-	u_int iovlen;
 	int error, i;
 	/*
 	 * The first argument is not actually a struct iovec *, but C's type
@@ -1127,25 +1126,23 @@ freebsd32_copyinuio(const struct iovec * __capability cb_arg, u_int iovcnt,
 	*uiop = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (EINVAL);
-	iovlen = iovcnt * sizeof(struct iovec);
-	uio = malloc(iovlen + sizeof *uio, M_IOV, M_WAITOK);
-	iov = (struct iovec *)(uio + 1);
+	uio = allocuio(iovcnt);
+	iov = uio->uio_iov;
 	for (i = 0; i < iovcnt; i++) {
 		error = copyin(&iovp[i], &iov32, sizeof(struct iovec32));
 		if (error) {
-			free(uio, M_IOV);
+			freeuio(uio);
 			return (error);
 		}
 		IOVEC_INIT(&iov[i], PTRIN(iov32.iov_base), iov32.iov_len);
 	}
-	uio->uio_iov = iov;
 	uio->uio_iovcnt = iovcnt;
 	uio->uio_segflg = UIO_USERSPACE;
 	uio->uio_offset = -1;
 	uio->uio_resid = 0;
 	for (i = 0; i < iovcnt; i++) {
 		if (iov->iov_len > INT_MAX - uio->uio_resid) {
-			free(uio, M_IOV);
+			freeuio(uio);
 			return (EINVAL);
 		}
 		uio->uio_resid += iov->iov_len;
