@@ -591,7 +591,7 @@ datetime::delta
 datetime::timestamp::operator-(const datetime::timestamp& other) const
 {
     /*
-     * XXX-BD: gettimeofday isn't necessicarily monotonic so return the
+     * XXX-BD: gettimeofday isn't necessarily monotonic so return the
      * smallest non-zero delta if time went backwards.
      */
     if ((*this) < other)
