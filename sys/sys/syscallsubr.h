@@ -288,6 +288,8 @@ int	kern_jail(struct thread *td, const char * __capability path,
 	    enum uio_seg ipseg);
 int	kern_jail_get(struct thread *td, struct uio *options, int flags);
 int	kern_jail_set(struct thread *td, struct uio *options, int flags);
+int	kern_kcmp(struct thread *td, pid_t pid1, pid_t pid2, int type,
+	    uintptr_t idx1, uintptr_t idx2);
 int	kern_kenv(struct thread *td, int what, const char * __capability namep,
 	    char * __capability val, int vallen);
 int	kern_kevent(struct thread *td, int fd, int nchanges, int nevents,
