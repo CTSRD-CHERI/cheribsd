@@ -77,6 +77,17 @@ compart_id_t compart_id_allocate(const char *);
 /*
  * Stack switching
  */
+struct trusted_frame {
+	ptraddr_t next;
+	ptraddr_t reserved;
+	/*
+	 * INVARIANT: This field contains the top of the caller's stack when the
+	 * caller was last entered.
+	 */
+	void **o_stack;
+	void *ret_addr;
+};
+
 struct stk_table {
 	union {
 		void *(*resolver)(unsigned);

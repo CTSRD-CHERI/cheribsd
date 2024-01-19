@@ -446,17 +446,6 @@ get_rstk(unsigned index)
 	return (stk);
 }
 
-struct trusted_frame {
-	ptraddr_t next;
-	ptraddr_t reserved;
-	/*
-	 * INVARIANT: This field contains the top of the caller's stack when the
-	 * caller was last entered.
-	 */
-	void **o_stack;
-	void *ret_addr;
-};
-
 struct jmp_args { void **buf; void *val; };
 
 struct jmp_args _rtld_setjmp_impl(void **, void *, struct trusted_frame *);

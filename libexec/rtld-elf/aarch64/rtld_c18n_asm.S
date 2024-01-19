@@ -402,6 +402,11 @@ TRAMP(tramp_invoke_exe)
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	blr	x19
 #else
+	/*
+	 * Save the address of the current frame to c29 so that RTLD functions
+	 * can locate it. c29 will be restored after the function call returns.
+	 */
+	mov	c29, csp
 	blr	c19
 #endif
 TRAMPEND(tramp_invoke_exe)

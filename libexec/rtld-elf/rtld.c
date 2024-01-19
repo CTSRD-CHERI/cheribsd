@@ -4454,8 +4454,24 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 void *
 dlsym(void *handle, const char *name)
 {
-	return (do_dlsym(handle, name, __builtin_return_address(0), NULL,
-	    SYMLOOK_DLSYM));
+	void *retaddr;
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	struct trusted_frame *tframe;
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	tframe = trusted_stk_get();
+#else
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wframe-address"
+	tframe = __builtin_frame_address(1);
+#pragma clang diagnostic pop
+#endif
+	retaddr = tframe->ret_addr;
+#else
+	retaddr = __builtin_return_address(0);
+#endif
+
+	return (do_dlsym(handle, name, retaddr, NULL, SYMLOOK_DLSYM));
 }
 
 dlfunc_t
@@ -4465,9 +4481,24 @@ dlfunc(void *handle, const char *name)
 		void *d;
 		dlfunc_t f;
 	} rv;
+	void *retaddr;
 
-	rv.d = do_dlsym(handle, name, __builtin_return_address(0), NULL,
-	    SYMLOOK_DLSYM);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	struct trusted_frame *tframe;
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	tframe = trusted_stk_get();
+#else
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wframe-address"
+	tframe = __builtin_frame_address(1);
+#pragma clang diagnostic pop
+#endif
+	retaddr = tframe->ret_addr;
+#else
+	retaddr = __builtin_return_address(0);
+#endif
+
+	rv.d = do_dlsym(handle, name, retaddr, NULL, SYMLOOK_DLSYM);
 	return (rv.f);
 }
 
@@ -4475,13 +4506,29 @@ void *
 dlvsym(void *handle, const char *name, const char *version)
 {
 	Ver_Entry ventry;
+	void *retaddr;
 
 	ventry.name = version;
 	ventry.file = NULL;
 	ventry.hash = elf_hash(version);
 	ventry.flags= 0;
-	return (do_dlsym(handle, name, __builtin_return_address(0), &ventry,
-	    SYMLOOK_DLSYM));
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	struct trusted_frame *tframe;
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	tframe = trusted_stk_get();
+#else
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wframe-address"
+	tframe = __builtin_frame_address(1);
+#pragma clang diagnostic pop
+#endif
+	retaddr = tframe->ret_addr;
+#else
+	retaddr = __builtin_return_address(0);
+#endif
+
+	return (do_dlsym(handle, name, retaddr, &ventry, SYMLOOK_DLSYM));
 }
 
 int
@@ -4587,7 +4634,20 @@ dlinfo(void *handle, int request, void *p)
     if (handle == NULL || handle == RTLD_SELF) {
 	void *retaddr;
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	struct trusted_frame *tframe;
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	tframe = trusted_stk_get();
+#else
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wframe-address"
+	tframe = __builtin_frame_address(1);
+#pragma clang diagnostic pop
+#endif
+	retaddr = tframe->ret_addr;
+#else
 	retaddr = __builtin_return_address(0);	/* __GNUC__ only */
+#endif
 	if ((obj = obj_from_addr(retaddr)) == NULL)
 	    _rtld_error("Cannot determine caller's shared object");
     } else
