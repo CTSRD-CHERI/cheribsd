@@ -527,4 +527,5 @@
 #define	FREEBSD64_SYS_timerfd_create	585
 #define	FREEBSD64_SYS_freebsd64_timerfd_gettime	586
 #define	FREEBSD64_SYS_freebsd64_timerfd_settime	587
-#define	FREEBSD64_SYS_MAXSYSCALL	588
+#define	FREEBSD64_SYS_freebsd64_kcmp	588
+#define	FREEBSD64_SYS_MAXSYSCALL	589

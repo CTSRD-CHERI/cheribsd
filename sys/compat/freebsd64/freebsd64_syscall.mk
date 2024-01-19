@@ -430,4 +430,5 @@ MIASM =  \
 	membarrier.o \
 	timerfd_create.o \
 	freebsd64_timerfd_gettime.o \
-	freebsd64_timerfd_settime.o
+	freebsd64_timerfd_settime.o \
+	freebsd64_kcmp.o

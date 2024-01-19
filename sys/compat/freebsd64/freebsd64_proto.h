@@ -1530,6 +1530,13 @@ struct freebsd64_timerfd_settime_args {
 	char new_value_l_[PADL_(const struct itimerspec *)]; const struct itimerspec * new_value; char new_value_r_[PADR_(const struct itimerspec *)];
 	char old_value_l_[PADL_(struct itimerspec *)]; struct itimerspec * old_value; char old_value_r_[PADR_(struct itimerspec *)];
 };
+struct freebsd64_kcmp_args {
+	char pid1_l_[PADL_(pid_t)]; pid_t pid1; char pid1_r_[PADR_(pid_t)];
+	char pid2_l_[PADL_(pid_t)]; pid_t pid2; char pid2_r_[PADR_(pid_t)];
+	char type_l_[PADL_(int)]; int type; char type_r_[PADR_(int)];
+	char idx1_l_[PADL_(uintptr_t)]; uintptr_t idx1; char idx1_r_[PADR_(uintptr_t)];
+	char idx2_l_[PADL_(uintptr_t)]; uintptr_t idx2; char idx2_r_[PADR_(uintptr_t)];
+};
 int	freebsd64_read(struct thread *, struct freebsd64_read_args *);
 int	freebsd64_write(struct thread *, struct freebsd64_write_args *);
 int	freebsd64_open(struct thread *, struct freebsd64_open_args *);
@@ -1838,6 +1845,7 @@ int	freebsd64_fspacectl(struct thread *, struct freebsd64_fspacectl_args *);
 int	freebsd64_swapoff(struct thread *, struct freebsd64_swapoff_args *);
 int	freebsd64_timerfd_gettime(struct thread *, struct freebsd64_timerfd_gettime_args *);
 int	freebsd64_timerfd_settime(struct thread *, struct freebsd64_timerfd_settime_args *);
+int	freebsd64_kcmp(struct thread *, struct freebsd64_kcmp_args *);
 
 #ifdef COMPAT_43
 
@@ -2413,6 +2421,7 @@ int	freebsd13_freebsd64_swapoff(struct thread *, struct freebsd13_freebsd64_swap
 #define	FREEBSD64_SYS_AUE_freebsd64_swapoff	AUE_SWAPOFF
 #define	FREEBSD64_SYS_AUE_freebsd64_timerfd_gettime	AUE_TIMERFD
 #define	FREEBSD64_SYS_AUE_freebsd64_timerfd_settime	AUE_TIMERFD
+#define	FREEBSD64_SYS_AUE_freebsd64_kcmp	AUE_NULL
 
 #undef PAD_
 #undef PADL_

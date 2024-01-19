@@ -809,4 +809,6 @@ FBSDprivate_1.0 {
 	__sys_timerfd_gettime;
 	_timerfd_settime;
 	__sys_timerfd_settime;
+	_kcmp;
+	__sys_kcmp;
 };
