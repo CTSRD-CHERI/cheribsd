@@ -212,4 +212,6 @@ func_sig_legal(struct func_sig sig)
 void *_rtld_sandbox_code(void *, struct func_sig);
 void *_rtld_safebox_code(void *, struct func_sig);
 
+void *c18n_return_address(void);
+
 #endif

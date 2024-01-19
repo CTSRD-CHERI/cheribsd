@@ -365,6 +365,11 @@ TRAMP(tramp_invoke_exe)
 	mov	csp, c17
 	blr	x18
 #else
+	/*
+	 * Save the address of the current frame to c29 so that RTLD functions
+	 * can locate it. c29 will be restored after the function call returns.
+	 */
+	mov	c29, csp
 	blr	c18
 #endif
 TRAMPEND(tramp_invoke_exe)

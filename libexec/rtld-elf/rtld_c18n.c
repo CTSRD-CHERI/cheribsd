@@ -1084,6 +1084,23 @@ c18n_add_comparts(struct policy *pol)
 		comparts.data[comparts.size++] = &pol->coms[i];
 }
 
+void *
+c18n_return_address(void)
+{
+	struct trusted_frame *tframe;
+
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	tframe = trusted_stk_get();
+#else
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wframe-address"
+	tframe = __builtin_frame_address(2);
+#pragma clang diagnostic pop
+#endif
+
+	return (tframe->ret_addr);
+}
+
 /*
  * libthr support
  */
