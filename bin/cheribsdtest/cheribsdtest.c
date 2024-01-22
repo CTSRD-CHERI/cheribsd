@@ -653,9 +653,8 @@ cheribsdtest_run_child_name(const char *name)
 
 	SET_FOREACH(ctpp, cheri_tests_set) {
 		ctp = *ctpp;
-		if (strcmp(name, ctp->ct_name) == 0) {
+		if (strcmp(name, ctp->ct_name) == 0)
 			cheribsdtest_run_child(ctp);
-		}
 	}
 	errx(EX_USAGE, "unknown test: %s", name);
 }
@@ -677,7 +676,7 @@ mk_exec_args(const struct cheri_test *ctp)
 	/*
 	 * XXXBD: it would be nice if there was a way to say "coexecve
 	 * myself".
-	 * 
+	 *
 	 * XXX: This won't work for direct exec as an rtld argument.
 	 * (e.g., /libexec/ld-elf.so.1 /bin/cheribsdtest-purecap-dynamic)
 	 * If this becomes an issue we could alter rtld to update
