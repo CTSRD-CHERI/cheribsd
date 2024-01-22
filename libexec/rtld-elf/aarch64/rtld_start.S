@@ -50,12 +50,12 @@ ENTRY(.rtld_start)
 #ifdef __CHERI_PURE_CAPABILITY__
 	.cfi_undefined	c30
 	mov	c19, c0				/* Put aux in a callee-saved register */
-	mov	c20, csp			/* And the stack pointer */
-
 #if defined(RTLD_SANDBOX) && defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
-	sub	c20, c20, #CAP_WIDTH
-	str	c20, [csp, #-CAP_WIDTH]!
+	mov	c1, csp
+	sub	csp, csp, #(CAP_WIDTH * 2)
+	bl	c18n_init_rtld_stack
 #endif
+	mov	c20, csp			/* And the stack pointer */
 
 	sub	csp, csp, #32			/* Make room for obj_main & exit proc */
 
