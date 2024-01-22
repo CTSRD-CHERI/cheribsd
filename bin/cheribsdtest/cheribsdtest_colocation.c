@@ -94,7 +94,7 @@ is_colocated_with_parent(void)
 
 #ifdef CHERIBSD_DYNAMIC_TESTS
 static void
-coexec_child_cf(const struct cheri_test * __unused ctp)
+coexec_child_cf(void)
 {
 	if (is_colocated_with_parent())
 		exit (0);
@@ -112,7 +112,7 @@ CHERIBSDTEST(colocation_coexec_child,
 		cheribsdtest_failure_err("Fork failed");
 
 	if (pid == 0) {
-		cheribsdtest_coexec_child(ctp);
+		cheribsdtest_coexec_child();
 	} else {
 		int res;
 
@@ -132,7 +132,7 @@ CHERIBSDTEST(colocation_coexec_child,
 #endif
 
 static void
-exec_child_cf(const struct cheri_test * __unused ctp)
+exec_child_cf(void)
 {
 	if (!is_colocated_with_parent())
 		exit (0);
@@ -154,7 +154,7 @@ CHERIBSDTEST(colocation_exec_child,
 		cheribsdtest_failure_err("Fork failed");
 
 	if (pid == 0) {
-		cheribsdtest_exec_child(ctp);
+		cheribsdtest_exec_child();
 	} else {
 		int res;
 

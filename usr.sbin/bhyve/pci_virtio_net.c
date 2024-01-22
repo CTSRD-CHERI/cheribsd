@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
@@ -24,13 +24,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/linker_set.h>
 #include <sys/select.h>
@@ -787,7 +783,7 @@ pci_vtnet_snapshot(void *vsc, struct vm_snapshot_meta *meta)
 	SNAPSHOT_VAR_OR_LEAVE(sc->vsc_features, meta, ret, done);
 	SNAPSHOT_VAR_OR_LEAVE(sc->features_negotiated, meta, ret, done);
 
-	/* Force reapply negociated features at restore time */
+	/* Force reapply negotiated features at restore time */
 	if (meta->op == VM_SNAPSHOT_RESTORE &&
 	    sc->features_negotiated) {
 		pci_vtnet_neg_features(sc, sc->vsc_features);

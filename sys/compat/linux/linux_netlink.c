@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2022 Alexander V. Chernikov
  *
@@ -24,9 +24,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include "opt_inet.h"
 #include "opt_inet6.h"
@@ -57,7 +54,7 @@ __FBSDID("$FreeBSD$");
 #define	DEBUG_MOD_NAME	nl_linux
 #define	DEBUG_MAX_LEVEL	LOG_DEBUG3
 #include <netlink/netlink_debug.h>
-_DECLARE_DEBUG(LOG_DEBUG);
+_DECLARE_DEBUG(LOG_INFO);
 
 static bool
 valid_rta_size(const struct rtattr *rta, int sz)
@@ -325,7 +322,6 @@ rtnl_if_flags_to_linux(unsigned int if_flags)
 		case IFF_STICKYARP:
 		case IFF_DYING:
 		case IFF_RENAMING:
-		case IFF_NOGROUP:
 			/* No Linux analogue */
 			break;
 		case IFF_MULTICAST:

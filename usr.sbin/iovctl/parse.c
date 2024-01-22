@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/iov.h>
 #include <sys/nv.h>
@@ -164,8 +162,8 @@ add_unicast_mac_config(const char *key, const ucl_object_t *obj, nvlist_t *confi
 }
 
 /*
- * Validates that the given configuation value has the right type as specified
- * in the schema, and then adds the value to the configuation node.
+ * Validates that the given configuration value has the right type as specified
+ * in the schema, and then adds the value to the configuration node.
  */
 static void
 add_config(const char *key, const ucl_object_t *obj, nvlist_t *config,

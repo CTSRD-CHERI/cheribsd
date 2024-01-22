@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .if ${MACHINE_CPUARCH} == "amd64"
 SFX= 32
@@ -34,6 +33,7 @@ SRCS=	linux${SFX}_dummy_machdep.c \
 	linux_timer.c \
 	linux_uid16.c \
 	linux_vdso.c \
+	linux_xattr.c \
 	opt_inet6.h \
 	opt_ktrace.h \
 	opt_posix.h \
@@ -76,7 +76,6 @@ SRCS+=	imgact_linux.c \
 
 .if ${MACHINE_CPUARCH} == "i386"
 EXPORT_SYMS=
-EXPORT_SYMS+=	linux_emul_path
 EXPORT_SYMS+=	linux_get_osname
 EXPORT_SYMS+=	linux_get_osrelease
 EXPORT_SYMS+=	linux_ioctl_register_handler

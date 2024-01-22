@@ -33,8 +33,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #define	__ELF_WORD_SIZE 32
 
 #include <sys/param.h>
@@ -94,7 +92,6 @@ static struct sysentvec elf32_freebsd_sysvec = {
 	.sv_elf_core_osabi = ELFOSABI_FREEBSD,
 	.sv_elf_core_abi_vendor = FREEBSD_ABI_VENDOR,
 	.sv_elf_core_prepare_notes = elf32_prepare_notes,
-	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
 	.sv_minuser	= FREEBSD32_MINUSER,
 	.sv_maxuser	= FREEBSD32_MAXUSER,
@@ -129,7 +126,6 @@ static Elf32_Brandinfo freebsd32_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,
 	.machine	= EM_ARM,
 	.compat_3_brand	= "FreeBSD",
-	.emul_path	= NULL,
 	.interp_path	= "/libexec/ld-elf.so.1",
 	.sysvec		= &elf32_freebsd_sysvec,
 	.interp_newpath	= "/libexec/ld-elf32.so.1",
@@ -150,7 +146,7 @@ elf32_arm_abi_supported(const struct image_params *imgp,
 	/* Check if we support AArch32 */
 	if (ID_AA64PFR0_EL0_VAL(READ_SPECIALREG(id_aa64pfr0_el1)) !=
 	    ID_AA64PFR0_EL0_64_32)
-		return (FALSE);
+		return (false);
 
 #define	EF_ARM_EABI_FREEBSD_MIN	EF_ARM_EABI_VER4
 	hdr = (const Elf32_Ehdr *)imgp->image_header;
@@ -160,10 +156,10 @@ elf32_arm_abi_supported(const struct image_params *imgp,
 			    "(rev %d) image %s",
 			    EF_ARM_EABI_VERSION(hdr->e_flags),
 			    imgp->args->fname);
-		return (FALSE);
+		return (false);
         }
 
-	return (TRUE);
+	return (true);
 }
 
 static int

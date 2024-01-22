@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 # Part of a unified Makefile for building kernels.  This part contains all
 # of the definitions that need to be before %BEFORE_DEPEND.
@@ -207,7 +206,7 @@ NORMAL_M= ${AWK} -f $S/tools/makeobjops.awk ${.IMPSRC} -c ; \
 
 NORMAL_FW= uudecode -o ${.TARGET} ${.ALLSRC}
 NORMAL_FWO= ${CC:N${CCACHE_BIN}} -c ${ASM_CFLAGS} ${WERROR} -o ${.TARGET} \
-	$S/kern/firmw.S -DFIRMW_FILE="${.ALLSRC:M*.fw}" \
+	$S/kern/firmw.S -DFIRMW_FILE=\""${.ALLSRC:M*.fw}"\" \
 	-DFIRMW_SYMBOL="${.ALLSRC:M*.fw:C/[-.\/]/_/g}"
 
 # for ZSTD in the kernel (include zstd/lib/freebsd before other CFLAGS)
@@ -259,8 +258,7 @@ CDDL_C=		${CC} -c ${CDDL_CFLAGS} ${WERROR} ${.IMPSRC}
 # Special flags for managing the compat compiles for ZFS
 ZFS_CFLAGS+=	-I$S/contrib/openzfs/module/icp/include \
 	${CDDL_CFLAGS} -DBUILDING_ZFS -DHAVE_UIO_ZEROCOPY \
-	-DWITH_NETDUMP -D__KERNEL__ -D_SYS_CONDVAR_H_ -DSMP \
-	-DIN_FREEBSD_BASE
+	-DWITH_NETDUMP -D__KERNEL__ -D_SYS_CONDVAR_H_ -DSMP
 
 .if ${MACHINE_ARCH} == "amd64"
 ZFS_CFLAGS+= -D__x86_64 -DHAVE_SSE2 -DHAVE_SSSE3 -DHAVE_SSE4_1 -DHAVE_SSE4_2 \
@@ -274,10 +272,13 @@ ZFS_CFLAGS+= -DBITS_PER_LONG=32
 ZFS_CFLAGS+= -DBITS_PER_LONG=64
 .endif
 
+.if ${MACHINE_ABI:Mpurecap}
+ZFS_CFLAGS+=	-Xclang -cheri-bounds=conservative
+.endif
 
 ZFS_ASM_CFLAGS= -x assembler-with-cpp -DLOCORE ${ZFS_CFLAGS}
-ZFS_C=		${CC} -c ${ZFS_CFLAGS} -Xclang -cheri-bounds=conservative ${WERROR} ${.IMPSRC}
-ZFS_RPC_C=	${CC} -c ${ZFS_CFLAGS} -DHAVE_RPC_TYPES -Xclang -cheri-bounds=conservative ${WERROR} ${.IMPSRC}
+ZFS_C=		${CC} -c ${ZFS_CFLAGS} ${WERROR} ${.IMPSRC}
+ZFS_RPC_C=	${CC} -c ${ZFS_CFLAGS} -DHAVE_RPC_TYPES ${WERROR} ${.IMPSRC}
 ZFS_S=		${CC} -c ${ZFS_ASM_CFLAGS} ${WERROR} ${.IMPSRC}
 
 # ATH driver
@@ -306,15 +307,6 @@ FBT_CFLAGS=	-DBUILDING_DTRACE -nostdinc -I$S/cddl/dev/fbt/${MACHINE_CPUARCH} -I$
 FBT_CFLAGS+=	-I$S/cddl/dev/fbt/x86
 .endif
 FBT_C=		${CC} -c ${FBT_CFLAGS}		${WERROR} ${.IMPSRC}
-
-# Special flags for managing the compat compiles for DTrace/fasttrap
-FASTTRAP_CFLAGS=	-DBUILDING_DTRACE -nostdinc \
-	-I$S/cddl/contrib/opensolaris/uts/${MACHINE_CPUARCH} \
-	-I$S/cddl/contrib/opensolaris/uts/common/sys \
-	-I$S/cddl/compat/opensolaris \
-	-I$S/cddl/contrib/opensolaris/uts/common \
-	-I$S ${CDDL_CFLAGS}
-FASTTRAP_C=		${CC} -c ${FASTTRAP_CFLAGS}		${WERROR} ${PROF} ${.IMPSRC}
 
 .if ${MK_CTF} != "no"
 NORMAL_CTFCONVERT=	${CTFCONVERT} ${CTFFLAGS} ${.TARGET}

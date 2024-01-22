@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: BSD-3-Clause 
-#  Copyright (c) 2022, Intel Corporation
+#  Copyright (c) 2023, Intel Corporation
 #  All rights reserved.
 #
 #  Redistribution and use in source and binary forms, with or without
@@ -27,7 +27,6 @@
 #  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 #  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 #  POSSIBILITY OF SUCH DAMAGE.
-# $FreeBSD$
 
 /**
  * @file irdma_if.m

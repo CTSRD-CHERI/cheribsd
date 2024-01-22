@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
+#include "opt_ddb.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -60,11 +60,12 @@ __FBSDID("$FreeBSD$");
 #if __has_feature(capabilities)
 #include <sys/sysargmap.h>
 #include <cheri/cheric.h>
+#ifdef CHERI_CAPREVOKE
+#include <vm/vm_cheri_revoke.h>
+#endif
 #endif
 
-#ifdef FPE
 #include <machine/fpe.h>
-#endif
 #include <machine/frame.h>
 #include <machine/pcb.h>
 #include <machine/pcpu.h>
@@ -74,6 +75,11 @@ __FBSDID("$FreeBSD$");
 
 #ifdef KDTRACE_HOOKS
 #include <sys/dtrace_bsd.h>
+#endif
+
+#ifdef DDB
+#include <ddb/ddb.h>
+#include <ddb/db_sym.h>
 #endif
 
 #if __has_feature(capabilities)
@@ -197,41 +203,70 @@ cpu_fetch_syscall_args(struct thread *td)
 #include "../../kern/subr_syscall.c"
 
 #if __has_feature(capabilities)
-#define PRINT_REG(name, value)	\
-	printf(name " = %#.16lp\n", (void * __capability)(value));
-#define PRINT_REG_N(name, n, array)	\
-	printf(name "[%d] = %#.16lp\n", n, (void * __capability)(array)[n]);
+#define	CREG	"c"
 #else
-#define PRINT_REG(name, value)	printf(name " = 0x%016lx\n", value)
-#define PRINT_REG_N(name, n, array)	\
-	printf(name "[%d] = 0x%016lx\n", n, (array)[n])
+#define	CREG
 #endif
+
+static void
+print_with_symbol(const char *name, uintcap_t value)
+{
+#ifdef DDB
+	c_db_sym_t sym;
+	db_expr_t sym_value;
+	db_expr_t offset;
+	const char *sym_name;
+#endif
+
+#if __has_feature(capabilities)
+	printf("%7s: %#.16lp", name, (void * __capability)value);
+#else
+	printf("%7s: 0x%016lx", name, value);
+#endif
+
+#ifdef DDB
+	if (value >= VM_MIN_KERNEL_ADDRESS) {
+		sym = db_search_symbol(value, DB_STGY_ANY, &offset);
+		if (sym != C_DB_SYM_NULL) {
+			db_symbol_values(sym, &sym_name, &sym_value);
+			printf(" (%s + 0x%lx)", sym_name, offset);
+		}
+	}
+#endif
+	printf("\n");
+}
 
 static void
 dump_regs(struct trapframe *frame)
 {
+	char name[6];
 	u_int i;
 
-	PRINT_REG("ra", frame->tf_ra);
-	PRINT_REG("sp", frame->tf_sp);
-	PRINT_REG("gp", frame->tf_gp);
-	PRINT_REG("tp", frame->tf_tp);
+	for (i = 0; i < nitems(frame->tf_t); i++) {
+		snprintf(name, sizeof(name), CREG"t[%d]", i);
+		print_with_symbol(name, frame->tf_t[i]);
+	}
 
-	for (i = 0; i < nitems(frame->tf_t); i++)
-		PRINT_REG_N("t", i, frame->tf_t);
+	for (i = 0; i < nitems(frame->tf_s); i++) {
+		snprintf(name, sizeof(name), CREG"s[%d]", i);
+		print_with_symbol(name, frame->tf_s[i]);
+	}
 
-	for (i = 0; i < nitems(frame->tf_s); i++)
-		PRINT_REG_N("s", i, frame->tf_s);
+	for (i = 0; i < nitems(frame->tf_a); i++) {
+		snprintf(name, sizeof(name), CREG"a[%d]", i);
+		print_with_symbol(name, frame->tf_a[i]);
+	}
 
-	for (i = 0; i < nitems(frame->tf_a); i++)
-		PRINT_REG_N("a", i, frame->tf_a);
-
-	PRINT_REG("sepc", frame->tf_sepc);
+	print_with_symbol(CREG"ra", frame->tf_ra);
+	print_with_symbol(CREG"sp", frame->tf_sp);
+	print_with_symbol(CREG"gp", frame->tf_gp);
+	print_with_symbol(CREG"tp", frame->tf_tp);
+	print_with_symbol("sepc"CREG, frame->tf_sepc);
 #if __has_feature(capabilities)
-	PRINT_REG("ddc", frame->tf_ddc);
+	print_with_symbol("ddc", frame->tf_ddc);
 #endif
-	printf("sstatus == 0x%016lx\n", frame->tf_sstatus);
-	printf("stval == 0x%016lx\n", frame->tf_stval);
+	printf("sstatus: 0x%016lx\n", frame->tf_sstatus);
+	printf("stval  : 0x%016lx\n", frame->tf_stval);
 }
 
 #if __has_feature(capabilities)
@@ -348,10 +383,35 @@ page_fault_handler(struct trapframe *frame, int usermode)
 
 	va = trunc_page(stval);
 
+#ifdef CHERI_CAPREVOKE
+	if ((frame->tf_scause == SCAUSE_LOAD_CAP_PAGE_FAULT) &&
+	    (va < VM_MAX_USER_ADDRESS)) {
+		if (vm_cheri_revoke_fault_visit(p->p_vmspace, va) ==
+		    VM_CHERI_REVOKE_FAULT_RESOLVED)
+			goto done;
+		else {
+			/*
+			 * vm_cheri_revoke_fault_visit calls
+			 * pmap_caploadgen_update, so if it's left us
+			 * UNRESOLVED, then there's no point in trying the pmap
+			 * again.
+			 */
+			ftype = VM_PROT_READ | VM_PROT_READ_CAP;
+			goto skip_pmap;
+		}
+	}
+#endif
+
 	if (frame->tf_scause == SCAUSE_STORE_PAGE_FAULT) {
 		ftype = VM_PROT_WRITE;
 	} else if (frame->tf_scause == SCAUSE_INST_PAGE_FAULT) {
 		ftype = VM_PROT_EXECUTE;
+#if __has_feature(capabilities)
+	} else if (frame->tf_scause == SCAUSE_STORE_AMO_CAP_PAGE_FAULT) {
+		ftype = VM_PROT_WRITE | VM_PROT_WRITE_CAP;
+	} else if (frame->tf_scause == SCAUSE_LOAD_CAP_PAGE_FAULT) {
+		ftype = VM_PROT_READ | VM_PROT_READ_CAP;
+#endif
 	} else {
 		ftype = VM_PROT_READ;
 	}
@@ -359,6 +419,9 @@ page_fault_handler(struct trapframe *frame, int usermode)
 	if (VIRT_IS_VALID(va) && pmap_fault(map->pmap, va, ftype))
 		goto done;
 
+#ifdef CHERI_CAPREVOKE
+skip_pmap:
+#endif
 	error = vm_fault_trap(map, va, ftype, VM_FAULT_NORMAL, &sig, &ucode);
 	if (error != KERN_SUCCESS) {
 		if (usermode) {
@@ -423,8 +486,8 @@ do_trap_supervisor(struct trapframe *frame)
 		return;
 #endif
 
-	CTR3(KTR_TRAP, "do_trap_supervisor: curthread: %p, sepc: %lx, frame: %p",
-	    curthread, (unsigned long)frame->tf_sepc, frame);
+	CTR4(KTR_TRAP, "%s: exception=%lu, sepc=%lx, stval=%lx", __func__,
+	    exception, (unsigned long)frame->tf_sepc, frame->tf_stval);
 
 	switch (exception) {
 	case SCAUSE_LOAD_ACCESS_FAULT:
@@ -445,6 +508,9 @@ do_trap_supervisor(struct trapframe *frame)
 	case SCAUSE_STORE_PAGE_FAULT:
 	case SCAUSE_LOAD_PAGE_FAULT:
 	case SCAUSE_INST_PAGE_FAULT:
+#if __has_feature(capabilities)
+	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
+#endif
 		page_fault_handler(frame, 0);
 		break;
 	case SCAUSE_BREAKPOINT:
@@ -466,8 +532,6 @@ do_trap_supervisor(struct trapframe *frame)
 		    (unsigned long)frame->tf_sepc);
 		break;
 #if __has_feature(capabilities)
-	case SCAUSE_LOAD_CAP_PAGE_FAULT:
-	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
 	case SCAUSE_CHERI:
 		if (curthread->td_pcb->pcb_onfault != 0) {
 			frame->tf_a[0] = EPROT;
@@ -478,15 +542,21 @@ do_trap_supervisor(struct trapframe *frame)
 		dump_regs(frame);
 		switch (exception) {
 		default:
-			panic("Fatal capability page fault %#lx: %#016lx",
+			panic("Fatal capability page fault %#016lx: %#016lx",
 			    (unsigned long)frame->tf_sepc,
 			    frame->tf_stval);
 			break;
 		case SCAUSE_CHERI:
-			panic("CHERI exception %#lx at 0x%016lx\n",
-			    TVAL_CAP_CAUSE(frame->tf_stval),
+		{
+			u_int cap_cause = TVAL_CAP_CAUSE(frame->tf_stval);
+			u_int cap_idx = TVAL_CAP_IDX(frame->tf_stval);
+
+			panic("CHERI %s for %s at %#016lx\n",
+			    cheri_exccode_string(cap_cause),
+			    cheri_cap_idx_string(cap_idx),
 			    (unsigned long)frame->tf_sepc);
 			break;
+		}
 		}
 #endif
 	default:
@@ -524,8 +594,8 @@ do_trap_user(struct trapframe *frame)
 	}
 	intr_enable();
 
-	CTR3(KTR_TRAP, "do_trap_user: curthread: %p, sepc: %lx, frame: %p",
-	    curthread, (unsigned long)frame->tf_sepc, frame);
+	CTR4(KTR_TRAP, "%s: exception=%lu, sepc=%lx, stval=%lx", __func__,
+	    exception, (unsigned long)frame->tf_sepc, frame->tf_stval);
 
 	switch (exception) {
 	case SCAUSE_LOAD_ACCESS_FAULT:
@@ -545,6 +615,10 @@ do_trap_user(struct trapframe *frame)
 	case SCAUSE_STORE_PAGE_FAULT:
 	case SCAUSE_LOAD_PAGE_FAULT:
 	case SCAUSE_INST_PAGE_FAULT:
+#if __has_feature(capabilities)
+	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
+	case SCAUSE_LOAD_CAP_PAGE_FAULT:
+#endif
 		page_fault_handler(frame, 1);
 		break;
 	case SCAUSE_ECALL_USER:
@@ -552,7 +626,6 @@ do_trap_user(struct trapframe *frame)
 		ecall_handler();
 		break;
 	case SCAUSE_ILLEGAL_INSTRUCTION:
-#ifdef FPE
 		if ((pcb->pcb_fpflags & PCB_FP_STARTED) == 0) {
 			/*
 			 * May be a FPE trap. Enable FPE usage
@@ -564,7 +637,6 @@ do_trap_user(struct trapframe *frame)
 			pcb->pcb_fpflags |= PCB_FP_STARTED;
 			break;
 		}
-#endif
 		call_trapsignal(td, SIGILL, ILL_ILLTRP, frame->tf_sepc,
 		    exception, 0);
 		userret(td, frame);
@@ -575,20 +647,6 @@ do_trap_user(struct trapframe *frame)
 		userret(td, frame);
 		break;
 #if __has_feature(capabilities)
-	case SCAUSE_LOAD_CAP_PAGE_FAULT:
-		if (log_user_cheri_exceptions)
-			dump_cheri_exception(frame);
-		call_trapsignal(td, SIGSEGV, SEGV_LOADTAG,
-		    (uintcap_t)frame->tf_stval, exception, 0);
-		userret(td, frame);
-		break;
-	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
-		if (log_user_cheri_exceptions)
-			dump_cheri_exception(frame);
-		call_trapsignal(td, SIGSEGV, SEGV_STORETAG,
-		    (uintcap_t)frame->tf_stval, exception, 0);
-		userret(td, frame);
-		break;
 	case SCAUSE_CHERI:
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);

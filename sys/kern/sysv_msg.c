@@ -17,7 +17,7 @@
  * This software is provided ``AS IS'' without any warranties of any kind.
  */
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003-2005 McAfee, Inc.
  * Copyright (c) 2016-2017 Robert N. M. Watson
@@ -56,8 +56,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_sysvipc.h"
 
 #include <sys/param.h>
@@ -429,7 +427,7 @@ msg_freehdr(struct msg *msghdr)
 	}
 	if (msghdr->msg_spot != -1)
 		panic("msghdr->msg_spot != -1");
-	TAILQ_INSERT_HEAD(&free_msghdrs, msghdrs, msg_queue);
+	TAILQ_INSERT_HEAD(&free_msghdrs, msghdr, msg_queue);
 #ifdef MAC
 	mac_sysvmsg_cleanup(msghdr);
 #endif

@@ -34,7 +34,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD$
  */
 
 #ifndef _NETINET_IN_PCB_H_
@@ -287,7 +286,7 @@ struct xinpcb {
 	uint8_t		inp_ip_p;		/* (n) */
 	uint8_t		inp_ip_minttl;		/* (n) */
 	int8_t		inp_spare8[4];
-};
+} __aligned(8);
 
 struct xinpgen {
 	ksize_t	xig_len;	/* length of this structure */
@@ -296,7 +295,7 @@ struct xinpgen {
 	inp_gen_t	xig_gen;	/* generation count at this time */
 	so_gen_t	xig_sogen;	/* socket generation count this time */
 	uint64_t	_xig_spare64[4];
-} __aligned(sizeof(void *));
+} __aligned(8);
 
 struct sockopt_parameters {
 	struct in_conninfo sop_inc;
@@ -490,7 +489,6 @@ struct tcpcb *
 	inp_inpcbtotcpcb(struct inpcb *inp);
 void 	inp_4tuple_get(struct inpcb *inp, uint32_t *laddr, uint16_t *lp,
 		uint32_t *faddr, uint16_t *fp);
-int	inp_so_options(const struct inpcb *inp);
 
 #endif /* _KERNEL */
 
@@ -575,6 +573,7 @@ int	inp_so_options(const struct inpcb *inp);
 #define	IN6P_RTHDRDSTOPTS	0x00200000 /* receive dstoptions before rthdr */
 #define	IN6P_TCLASS		0x00400000 /* receive traffic class value */
 #define	IN6P_AUTOFLOWLABEL	0x00800000 /* attach flowlabel automatically */
+/*	INP_INLBGROUP		0x01000000 private to in_pcb.c */
 #define	INP_ONESBCAST		0x02000000 /* send all-ones broadcast */
 #define	INP_DROPPED		0x04000000 /* protocol drop flag */
 #define	INP_SOCKREF		0x08000000 /* strong socket reference */
@@ -596,9 +595,9 @@ int	inp_so_options(const struct inpcb *inp);
 /*				0x00000001 */
 /*				0x00000002 */
 /*				0x00000004 */
-#define	INP_REUSEPORT		0x00000008 /* SO_REUSEPORT option is set */
+/*				0x00000008 */
 /*				0x00000010 */
-#define	INP_REUSEADDR		0x00000020 /* SO_REUSEADDR option is set */
+/*				0x00000020 */
 /*				0x00000040 */
 /*				0x00000080 */
 #define	INP_RECVFLOWID		0x00000100 /* populate recv datagram with flow info */
@@ -606,7 +605,7 @@ int	inp_so_options(const struct inpcb *inp);
 #define	INP_RATE_LIMIT_CHANGED	0x00000400 /* rate limit needs attention */
 #define	INP_ORIGDSTADDR		0x00000800 /* receive IP dst address/port */
 /*				0x00001000 */
-#define	INP_REUSEPORT_LB	0x00002000 /* SO_REUSEPORT_LB option is set */
+/*				0x00002000 */
 /*				0x00004000 */
 /*				0x00008000 */
 /*				0x00010000 */

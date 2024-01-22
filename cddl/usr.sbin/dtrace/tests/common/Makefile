@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 # We exclude several subdirectories: nfs and sysevent do not compile on
 # FreeBSD, and docsExamples doesn't seem amenable to automated testing.
@@ -32,6 +31,7 @@ TESTS_SUBDIRS+= aggs \
 		ip \
 		java_api \
 		json \
+		kinst \
 		lexer \
 		llquantize \
 		mdb \

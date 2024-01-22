@@ -1041,8 +1041,6 @@ zfs_prop_align_right(zfs_prop_t prop)
 
 #if defined(_KERNEL)
 
-#include <sys/simd.h>
-
 #if defined(HAVE_KERNEL_FPU_INTERNAL)
 uint8_t **zfs_kfpu_fpregs;
 EXPORT_SYMBOL(zfs_kfpu_fpregs);

@@ -41,7 +41,6 @@ ATF_TC_BODY(execve, tc)
 {
 	char *new_argv[2], *new_env[1];
 	pid_t pid;
-	int error;
 
 	new_argv[0] = "/usr/bin/true";
 	new_argv[1] = NULL;
@@ -50,7 +49,7 @@ ATF_TC_BODY(execve, tc)
 
 	pid = atf_utils_fork();
 	if (pid == 0) {
-		error = execve("/usr/bin/true", new_argv, new_env);
+		execve("/usr/bin/true", new_argv, new_env);
 		atf_tc_fail("You're not supposed to be here");
 	} else {
 		atf_utils_wait(pid, 0, "", "");
@@ -85,7 +84,6 @@ ATF_TC_BODY(coexecve_right_pid, tc)
 {
 	char *new_argv[2], *new_env[1];
 	pid_t pid;
-	int error;
 
 	new_argv[0] = "/usr/bin/true";
 	new_argv[1] = NULL;
@@ -94,7 +92,7 @@ ATF_TC_BODY(coexecve_right_pid, tc)
 
 	pid = atf_utils_fork();
 	if (pid == 0) {
-		error = coexecve(getpid(), "/usr/bin/true", new_argv, new_env);
+		coexecve(getpid(), "/usr/bin/true", new_argv, new_env);
 		atf_tc_fail("You're not supposed to be here");
 	} else {
 		atf_utils_wait(pid, 0, "", "");

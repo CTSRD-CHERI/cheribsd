@@ -40,8 +40,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ddb.h"
 #include "opt_syscons.h"
 
@@ -64,6 +62,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/reboot.h>
 #include <sys/sysctl.h>
 #include <sys/sbuf.h>
+#include <sys/tslog.h>
 #include <sys/tty.h>
 #include <sys/uio.h>
 #include <sys/vnode.h>
@@ -134,6 +133,7 @@ cninit(void)
 {
 	struct consdev *best_cn, *cn, **list;
 
+	TSENTER();
 	/*
 	 * Check if we should mute the console (for security reasons perhaps)
 	 * It can be changes dynamically using sysctl kern.consmute
@@ -195,6 +195,7 @@ cninit(void)
 	 */
 	early_putc = NULL;
 #endif
+	TSEXIT();
 }
 
 void

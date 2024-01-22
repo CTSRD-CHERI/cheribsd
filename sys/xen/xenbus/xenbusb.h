@@ -1,9 +1,7 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
- *
  * Core definitions and data structures shareable across OS platforms.
  *
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010 Spectra Logic Corporation
  * Copyright (C) 2008 Doug Rabson
@@ -33,8 +31,6 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
- *
- * $FreeBSD$
  */
 #ifndef _XEN_XENBUS_XENBUSB_H
 #define _XEN_XENBUS_XENBUSB_H

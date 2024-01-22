@@ -2,7 +2,6 @@
  * System call names.
  *
  * DO NOT EDIT-- this file is automatically @generated.
- * $FreeBSD$
  */
 
 const char *syscallnames[] = {
@@ -97,7 +96,7 @@ const char *syscallnames[] = {
 	"compat.sethostname",		/* 88 = old sethostname */
 	"getdtablesize",			/* 89 = getdtablesize */
 	"dup2",			/* 90 = dup2 */
-	"#91",			/* 91 = reserved for local use */
+	"cheri_cidcap_alloc",			/* 91 = cheri_cidcap_alloc */
 	"fcntl",			/* 92 = fcntl */
 	"select",			/* 93 = select */
 	"#94",			/* 94 = reserved for local use */

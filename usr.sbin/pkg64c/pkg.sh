@@ -30,10 +30,11 @@
 
 cat >&2 <<EOF
 Please use the ABI-specific pkg variant:
- * pkg64c for experimental software built for CheriABI;
+ * pkg64c for experimental software built for the pure-capability ABI (CheriABI);
+ * pkg64cb for experimental software built for the pure-capability benchmark ABI;
  * pkg64 for stable software built for the hybrid ABI.
 
-Replace pkg with pkg64c or pkg64 in your command and try again.
+Replace pkg with pkg64c, pkg64cb or pkg64 in your command and try again.
 EOF
 
 # Exit with an error to inform a user that pkg isn't a valid command.

@@ -26,8 +26,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _SYS_IMGACT_ELF_H_
@@ -85,14 +83,13 @@ typedef struct {
 	int brand;
 	int machine;
 	const char *compat_3_brand;	/* pre Binutils 2.10 method (FBSD 3) */
-	const char *emul_path;
 	const char *interp_path;
 	struct sysentvec *sysvec;
 	const char *interp_newpath;
 	int flags;
 	Elf_Brandnote *brand_note;
-	bool (*header_supported)(const struct image_params *, const int32_t *,
-	    const uint32_t *);
+	bool		(*header_supported)(const struct image_params *,
+	    const int32_t *, const uint32_t *);
 		/* High 8 bits of flags is private to the ABI */
 #define	BI_CAN_EXEC_DYN		0x0001
 #define	BI_BRAND_NOTE		0x0002	/* May have note.ABI-tag section. */
@@ -127,6 +124,9 @@ void	__elfN(prepare_notes)(struct thread *, struct note_info_list *,
 void	__elfN(size_segments)(struct thread *, struct sseg_closure *, int);
 size_t	__elfN(register_note)(struct thread *, struct note_info_list *,
 	    int, outfunc_t, void *);
+bool	__elfN(parse_notes)(const struct image_params *, Elf_Note *,
+	    const char *, const Elf_Phdr *,
+	    bool (*)(const Elf_Note *, void *, bool *), void *);
 
 /* Machine specific function to dump per-thread information. */
 void	__elfN(dump_thread)(struct thread *, void *, size_t *);

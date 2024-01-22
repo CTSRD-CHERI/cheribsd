@@ -63,7 +63,11 @@ cheri_exec_pcc(struct thread *td, struct image_params *imgp)
 	 * use interp_end.  If we are executing rtld directly we can
 	 * use end_addr to find the end of the rtld mapping.
 	 */
-	if (imgp->interp_end != 0) {
+	if (SV_PROC_FLAG(td->td_proc, SV_UNBOUND_PCC)) {
+		code_start = CHERI_CAP_USER_CODE_BASE;
+		code_end = CHERI_CAP_USER_CODE_BASE +
+		    CHERI_CAP_USER_CODE_LENGTH;
+	} else if (imgp->interp_end != 0) {
 		code_start = imgp->interp_start;
 		code_end = imgp->interp_end;
 	} else {
@@ -73,7 +77,8 @@ cheri_exec_pcc(struct thread *td, struct image_params *imgp)
 
 	code_length = code_end - code_start;
 	/* Check that imgact_elf enforced capability representability. */
-	MPASS(code_start == CHERI_REPRESENTABLE_BASE(code_start, code_length));
+	MPASS(code_start == CHERI_REPRESENTABLE_ALIGN_DOWN(code_start,
+	    code_length));
 	MPASS(code_length == CHERI_REPRESENTABLE_LENGTH(code_length));
 	KASSERT(code_start < code_end, ("%s: truncated PCC", __func__));
 	return (cheri_capability_build_user_code(td, CHERI_CAP_USER_CODE_PERMS,
@@ -90,6 +95,12 @@ cheri_sigcode_capability(struct thread *td)
 	sv = p->p_sysent;
 	KASSERT(PROC_HAS_SHP(p),
 	    ("CheriABI requires shared page for sigcode"));
+
+	if (SV_PROC_FLAG(td->td_proc, SV_UNBOUND_PCC))
+		return (cheri_capability_build_user_code(td,
+		    CHERI_CAP_USER_CODE_PERMS, CHERI_CAP_USER_CODE_BASE,
+		    CHERI_CAP_USER_CODE_LENGTH,
+		    PROC_SIGCODE(p) - CHERI_CAP_USER_CODE_BASE));
 
 	tmpcap = (void * __capability)cheri_setboundsexact(
 	    cheri_andperm(PROC_SIGCODE(p), CHERI_CAP_USER_CODE_PERMS),

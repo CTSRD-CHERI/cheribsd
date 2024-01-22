@@ -43,14 +43,14 @@ FILE_RCSID("@(#)$File: readelf.c,v 1.182 2022/07/31 16:01:01 christos Exp $")
 
 #ifdef	ELFCORE
 private int dophn_core(struct magic_set *, int, int, int, off_t, int, size_t,
-    off_t, int *, uint16_t *);
+    off_t, int, int *, uint16_t *);
 #endif
 private int dophn_exec(struct magic_set *, int, int, int, off_t, int, size_t,
-    off_t, int, int *, uint16_t *);
+    off_t, int, int, int *, uint16_t *);
 private int doshn(struct magic_set *, int, int, int, off_t, int, size_t,
     off_t, int, int, int *, uint16_t *);
 private size_t donote(struct magic_set *, void *, size_t, size_t, int,
-    int, size_t, int *, uint16_t *, int, off_t, int, off_t);
+    int, size_t, int *, uint16_t *, int, off_t, int, off_t, int);
 
 #define	ELF_ALIGN(a)	((((a) + align - 1) / align) * align)
 
@@ -345,10 +345,12 @@ private const char os_style_names[][8] = {
 #define FLAGS_DID_NETBSD_UNKNOWN	0x0400
 #define FLAGS_IS_CORE			0x0800
 #define FLAGS_DID_AUXV			0x1000
+#define FLAGS_DID_BENCHMARK_ABI		0x40000000
 
 private int
 dophn_core(struct magic_set *ms, int clazz, int swap, int fd, off_t off,
-    int num, size_t size, off_t fsize, int *flags, uint16_t *notecount)
+    int num, size_t size, off_t fsize, int mach, int *flags,
+    uint16_t *notecount)
 {
 	Elf32_Phdr ph32;
 	Elf64_Phdr ph64;
@@ -412,7 +414,7 @@ dophn_core(struct magic_set *ms, int clazz, int swap, int fd, off_t off,
 				break;
 			offset = donote(ms, nbuf, offset, CAST(size_t, bufsize),
 			    clazz, swap, 4, flags, notecount, fd, ph_off,
-			    ph_num, fsize);
+			    ph_num, fsize, mach);
 			if (offset == 0)
 				break;
 
@@ -1155,7 +1157,7 @@ dodynamic(struct magic_set *ms, void *vbuf, size_t offset, size_t size,
 private size_t
 donote(struct magic_set *ms, void *vbuf, size_t offset, size_t size,
     int clazz, int swap, size_t align, int *flags, uint16_t *notecount,
-    int fd, off_t ph_off, int ph_num, off_t fsize)
+    int fd, off_t ph_off, int ph_num, off_t fsize, int mach)
 {
 	Elf32_Nhdr nh32;
 	Elf64_Nhdr nh64;
@@ -1290,6 +1292,34 @@ donote(struct magic_set *ms, void *vbuf, size_t offset, size_t size,
 		file_printf(ms, ", %s: %s", tag,
 		    file_copystr(buf, sizeof(buf), descw, str));
 		return offset;
+	}
+
+	if (namesz == 6 && strcmp(RCAST(char *, &nbuf[noff]), "CHERI") == 0) {
+		if (descsz == 4 && mach == EM_AARCH64 &&
+		    xnh_type == NT_CHERI_MORELLO_PURECAP_BENCHMARK_ABI) {
+			uint32_t desc;
+			if ((*flags & FLAGS_DID_BENCHMARK_ABI) != 0)
+				return offset;
+			*flags |= FLAGS_DID_BENCHMARK_ABI;
+			memcpy(&desc, &nbuf[doff], sizeof(desc));
+			desc = elf_getu32(swap, desc);
+			switch (desc) {
+			case 0:
+				break;
+			case 1:
+				if (file_printf(ms,
+				    ", pure-capability benchmark ABI") == -1)
+					return offset;
+				break;
+			default:
+				if (file_printf(ms,
+				    ", unknown pure-capability benchmark"
+				    " ABI %u", desc) == -1)
+					return offset;
+				break;
+			}
+			return offset;
+		}
 	}
 
 	return offset;
@@ -1478,7 +1508,7 @@ doshn(struct magic_set *ms, int clazz, int swap, int fd, off_t off, int num,
 					break;
 				noff = donote(ms, nbuf, CAST(size_t, noff),
 				    xsh_size, clazz, swap, 4, flags, notecount,
-				    fd, 0, 0, 0);
+				    fd, 0, 0, 0, mach);
 				if (noff == 0)
 					break;
 			}
@@ -1653,7 +1683,7 @@ doshn(struct magic_set *ms, int clazz, int swap, int fd, off_t off, int num,
  */
 private int
 dophn_exec(struct magic_set *ms, int clazz, int swap, int fd, off_t off,
-    int num, size_t size, off_t fsize, int sh_num, int *flags,
+    int num, size_t size, off_t fsize, int mach, int sh_num, int *flags,
     uint16_t *notecount)
 {
 	Elf32_Phdr ph32;
@@ -1779,7 +1809,7 @@ dophn_exec(struct magic_set *ms, int clazz, int swap, int fd, off_t off,
 					break;
 				offset = donote(ms, nbuf, offset,
 				    CAST(size_t, bufsize), clazz, swap, align,
-				    flags, notecount, fd, 0, 0, 0);
+				    flags, notecount, fd, 0, 0, 0, mach);
 				if (offset == 0)
 					break;
 			}

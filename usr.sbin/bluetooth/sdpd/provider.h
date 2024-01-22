@@ -1,7 +1,7 @@
 /*-
  * provider.h
  *
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
@@ -28,7 +28,6 @@
  * SUCH DAMAGE.
  *
  * $Id: provider.h,v 1.6 2004/01/13 01:54:39 max Exp $
- * $FreeBSD$
  */
 
 #ifndef _PROVIDER_H_

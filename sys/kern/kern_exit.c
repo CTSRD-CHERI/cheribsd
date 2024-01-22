@@ -37,8 +37,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ddb.h"
 #include "opt_ktrace.h"
 
@@ -239,10 +237,11 @@ exit1(struct thread *td, int rval, int signo)
 
 	p = td->td_proc;
 	/*
-	 * XXX in case we're rebooting we just let init die in order to
-	 * work around an unsolved stack overflow seen very late during
-	 * shutdown on sparc64 when the gmirror worker process exists.
-	 * XXX what to do now that sparc64 is gone... remove if?
+	 * In case we're rebooting we just let init die in order to
+	 * work around an issues where pid 1 might get a fatal signal.
+	 * For instance, if network interface serving NFS root is
+	 * going down due to reboot, page-in requests for text are
+	 * failing.
 	 */
 	if (p == initproc && rebooting == 0) {
 		printf("init died (signal %d, exit %d)\n", signo, rval);
@@ -691,7 +690,7 @@ exit1(struct thread *td, int rval, int signo)
 	prison_proc_free(p->p_ucred->cr_prison);
 
 	/*
-	 * The state PRS_ZOMBIE prevents other proesses from sending
+	 * The state PRS_ZOMBIE prevents other processes from sending
 	 * signal to the process, to avoid memory leak, we free memory
 	 * for signal queue at the time when the state is set.
 	 */

@@ -7,7 +7,6 @@
 # The output file looks like this (tab-delimited):
 #  foo1.txz SHA256-checksum Number-of-files foo1 Description Install-by-default
 #
-# $FreeBSD$
 
 base="Base system"
 kernel="Kernel"
@@ -16,6 +15,7 @@ src="System source tree"
 lib32="32-bit compatibility libraries"
 lib64="64-bit compatibility libraries"
 lib64c="CheriABI compatibility libraries"
+lib64cb="CheriABI benchmark libraries"
 tests="Test suite"
 
 desc_base="${base} (MANDATORY)"
@@ -24,6 +24,10 @@ desc_kernel="${kernel} (MANDATORY)"
 desc_kernel_dbg="${kernel} (Debugging)"
 desc_kernel_purecap="Pure-capability ${kernel}"
 desc_kernel_purecap_dbg="Pure-capability ${kernel} (Debugging)"
+desc_kernel_nocaprevoke="${kernel} without revocation"
+desc_kernel_nocaprevoke_dbg="${kernel} without revocation (Debugging)"
+desc_kernel_purecap_nocaprevoke="Pure-capability ${kernel} without revocation"
+desc_kernel_purecap_nocaprevoke_dbg="Pure-capability ${kernel} without revocation (Debugging)"
 desc_kernel_alt="Alternate ${kernel}"
 desc_kernel_alt_dbg="Alternate ${kernel} (Debugging)"
 desc_lib32="${lib32}"
@@ -32,6 +36,8 @@ desc_lib64="${lib64}"
 desc_lib64_dbg="${lib64} (Debugging)"
 desc_lib64c="${lib64c}"
 desc_lib64c_dbg="${lib64c} (Debugging)"
+desc_lib64cb="${lib64cb}"
+desc_lib64cb_dbg="${lib64cb} (Debugging)"
 desc_ports="${ports}"
 desc_src="${src}"
 desc_tests="${tests}"
@@ -43,6 +49,7 @@ default_base_dbg=off
 default_lib32_dbg=off
 default_lib64_dbg=off
 default_lib64c_dbg=off
+default_lib64cb_dbg=off
 default_kernel_purecap=on
 default_kernel_alt=off
 default_kernel_dbg=on
@@ -65,6 +72,26 @@ for i in ${*}; do
 			;;
 		kernel-dbg.txz)
 			desc="${desc_kernel_dbg}"
+			;;
+		kernel.*PURECAP-NOCAPREVOKE*-dbg.txz)
+			desc="$(eval echo \"${desc_kernel_purecap_nocaprevoke_dbg}\")"
+			desc="${desc}: $(eval echo ${i%%-dbg.txz} | cut -f 2 -d '.')"
+			default="$(eval echo \"${default_kernel_purecap_nocaprevoke_dbg}\")"
+			;;
+		kernel.*PURECAP-NOCAPREVOKE*.txz)
+			desc="$(eval echo \"${desc_kernel_purecap_nocaprevoke}\")"
+			desc="${desc}: $(eval echo ${i%%.txz} | cut -f 2 -d '.')"
+			default="$(eval echo \"${default_kernel_purecap_nocaprevoke}\")"
+			;;
+		kernel.*NOCAPREVOKE*-dbg.txz)
+			desc="$(eval echo \"${desc_kernel_nocaprevoke_dbg}\")"
+			desc="${desc}: $(eval echo ${i%%-dbg.txz} | cut -f 2 -d '.')"
+			default="$(eval echo \"${default_kernel_nocaprevoke_dbg}\")"
+			;;
+		kernel.*NOCAPREVOKE*.txz)
+			desc="$(eval echo \"${desc_kernel_nocaprevoke}\")"
+			desc="${desc}: $(eval echo ${i%%.txz} | cut -f 2 -d '.')"
+			default="$(eval echo \"${default_kernel_nocaprevoke}\")"
 			;;
 		kernel.*PURECAP*-dbg.txz)
 			desc="$(eval echo \"${desc_kernel_purecap_dbg}\")"

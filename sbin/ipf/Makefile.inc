@@ -1,10 +1,8 @@
-#	$FreeBSD$
 
 .include <src.opts.mk>
 
 WARNS?=		2
 NO_WFORMAT=
-NO_WARRAY_BOUNDS=
 
 CFLAGS+=	-I${SRCTOP}/sys
 CFLAGS+=	-I${SRCTOP}/sys/netpfil/ipfilter

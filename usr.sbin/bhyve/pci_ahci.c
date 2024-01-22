@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013  Zhixiang Yu <zcore@freebsd.org>
  * Copyright (c) 2015-2016 Alexander Motin <mav@FreeBSD.org>
@@ -25,13 +25,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/linker_set.h>
 #include <sys/stat.h>
@@ -2477,6 +2473,13 @@ pci_ahci_init(struct pci_devinst *pi, nvlist_t *nvl)
 			ret = 1;
 			goto open_fail;
 		}
+
+		ret = blockif_add_boot_device(pi, bctxt);
+		if (ret) {
+			sc->ports = p;
+			goto open_fail;
+		}
+
 		sc->port[p].bctx = bctxt;
 		sc->port[p].pr_sc = sc;
 		sc->port[p].port = p;

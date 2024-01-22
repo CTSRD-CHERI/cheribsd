@@ -1,7 +1,7 @@
 /*-
  * search.c
  *
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001-2003 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
@@ -28,7 +28,6 @@
  * SUCH DAMAGE.
  *
  * $Id: search.c,v 1.2 2003/09/08 17:35:15 max Exp $
- * $FreeBSD$
  */
 
 #include <netinet/in.h>

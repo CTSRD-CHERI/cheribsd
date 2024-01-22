@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Implementation of Utility functions for all SCSI device types.
  *
@@ -32,9 +32,6 @@
  */
 
 #include <sys/param.h>
-
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #ifdef _KERNEL
 #include <sys/systm.h>

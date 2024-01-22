@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021 Beckhoff Automation GmbH & Co. KG
  * Author: Corvin Köhne <c.koehne@beckhoff.com>
@@ -7,18 +7,25 @@
 
 #include <sys/param.h>
 #include <sys/endian.h>
+#include <sys/queue.h>
+#include <sys/stat.h>
 
 #include <machine/vmm.h>
 
 #include <err.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "acpi_device.h"
 #include "bhyverun.h"
-#include "inout.h"
-#include "pci_lpc.h"
+#ifdef __amd64__
+#include "amd64/inout.h"
+#include "amd64/pci_lpc.h"
+#endif
 #include "qemu_fwcfg.h"
 
 #define QEMU_FWCFG_ACPI_DEVICE_NAME "FWCF"
@@ -98,6 +105,16 @@ struct qemu_fwcfg_softc {
 
 static struct qemu_fwcfg_softc fwcfg_sc;
 
+struct qemu_fwcfg_user_file {
+	STAILQ_ENTRY(qemu_fwcfg_user_file) chain;
+	uint8_t name[QEMU_FWCFG_MAX_NAME];
+	uint32_t size;
+	void *data;
+};
+static STAILQ_HEAD(qemu_fwcfg_user_file_list,
+    qemu_fwcfg_user_file) user_files = STAILQ_HEAD_INITIALIZER(user_files);
+
+#ifdef __amd64__
 static int
 qemu_fwcfg_selector_port_handler(struct vmctx *const ctx __unused, const int in,
     const int port __unused, const int bytes, uint32_t *const eax,
@@ -165,6 +182,7 @@ qemu_fwcfg_data_port_handler(struct vmctx *const ctx __unused, const int in,
 
 	return (0);
 }
+#endif
 
 static int
 qemu_fwcfg_add_item(const uint16_t architecture, const uint16_t index,
@@ -279,6 +297,7 @@ qemu_fwcfg_add_item_signature(void)
 	    (uint8_t *)fwcfg_signature));
 }
 
+#ifdef __amd64__
 static int
 qemu_fwcfg_register_port(const char *const name, const int port, const int size,
     const int flags, const inout_func_t handler)
@@ -294,6 +313,7 @@ qemu_fwcfg_register_port(const char *const name, const int port, const int size,
 
 	return (register_inout(&iop));
 }
+#endif
 
 int
 qemu_fwcfg_add_file(const char *name, const uint32_t size, void *const data)
@@ -384,6 +404,22 @@ qemu_fwcfg_add_file(const char *name, const uint32_t size, void *const data)
 	return (0);
 }
 
+static int
+qemu_fwcfg_add_user_files(void)
+{
+	const struct qemu_fwcfg_user_file *fwcfg_file;
+	int error;
+
+	STAILQ_FOREACH(fwcfg_file, &user_files, chain) {
+		error = qemu_fwcfg_add_file(fwcfg_file->name, fwcfg_file->size,
+		    fwcfg_file->data);
+		if (error)
+			return (error);
+	}
+
+	return (0);
+}
+
 static const struct acpi_device_emul qemu_fwcfg_acpi_device_emul = {
 	.name = QEMU_FWCFG_ACPI_DEVICE_NAME,
 	.hid = QEMU_FWCFG_ACPI_HARDWARE_ID,
@@ -393,6 +429,18 @@ int
 qemu_fwcfg_init(struct vmctx *const ctx)
 {
 	int error;
+	bool fwcfg_enabled;
+
+	/*
+	 * The fwcfg implementation currently only provides an I/O port
+	 * interface and thus is amd64-specific for now.  An MMIO interface is
+	 * required for other platforms.
+	 */
+#ifdef __amd64__
+	fwcfg_enabled = strcmp(lpc_fwcfg(), "qemu") == 0;
+#else
+	fwcfg_enabled = false;
+#endif
 
 	/*
 	 * Bhyve supports fwctl (bhyve) and fwcfg (qemu) as firmware interfaces.
@@ -400,7 +448,7 @@ qemu_fwcfg_init(struct vmctx *const ctx)
 	 * interfaces at the same time to the guest. Therefore, only create acpi
 	 * tables and register io ports for fwcfg, if it's used.
 	 */
-	if (strcmp(lpc_fwcfg(), "qemu") == 0) {
+	if (fwcfg_enabled) {
 		error = acpi_device_create(&fwcfg_sc.acpi_dev, &fwcfg_sc, ctx,
 		    &qemu_fwcfg_acpi_device_emul);
 		if (error) {
@@ -417,7 +465,7 @@ qemu_fwcfg_init(struct vmctx *const ctx)
 			goto done;
 		}
 
-		/* add handlers for fwcfg ports */
+#ifdef __amd64__
 		if ((error = qemu_fwcfg_register_port("qemu_fwcfg_selector",
 		    QEMU_FWCFG_SELECTOR_PORT_NUMBER,
 		    QEMU_FWCFG_SELECTOR_PORT_SIZE,
@@ -437,6 +485,7 @@ qemu_fwcfg_init(struct vmctx *const ctx)
 			    __func__, QEMU_FWCFG_DATA_PORT_NUMBER);
 			goto done;
 		}
+#endif
 	}
 
 	/* add common fwcfg items */
@@ -458,6 +507,11 @@ qemu_fwcfg_init(struct vmctx *const ctx)
 	}
 	if ((error = qemu_fwcfg_add_item_file_dir()) != 0) {
 		warnx("%s: Unable to add file_dir item", __func__);
+	}
+
+	/* add user defined fwcfg files */
+	if ((error = qemu_fwcfg_add_user_files()) != 0) {
+		warnx("%s: Unable to add user files", __func__);
 		goto done;
 	}
 
@@ -467,4 +521,114 @@ done:
 	}
 
 	return (error);
+}
+
+static void
+qemu_fwcfg_usage(const char *opt)
+{
+	warnx("Invalid fw_cfg option \"%s\"", opt);
+	warnx("-f [name=]<name>,(string|file)=<value>");
+}
+
+/*
+ * Parses the cmdline argument for user defined fw_cfg items. The cmdline
+ * argument has the format:
+ * "-f [name=]<name>,(string|file)=<value>"
+ *
+ * E.g.: "-f opt/com.page/example,string=Hello"
+ */
+int
+qemu_fwcfg_parse_cmdline_arg(const char *opt)
+{
+	struct qemu_fwcfg_user_file *fwcfg_file;
+	struct stat sb;
+	const char *opt_ptr, *opt_end;
+	ssize_t bytes_read;
+	int fd;
+	
+	fwcfg_file = malloc(sizeof(*fwcfg_file));
+	if (fwcfg_file == NULL) {
+		warnx("Unable to allocate fw_cfg_user_file");
+		return (ENOMEM);
+	}
+
+	/* get pointer to <name> */
+	opt_ptr = opt;
+	/* If [name=] is specified, skip it */
+	if (strncmp(opt_ptr, "name=", sizeof("name=") - 1) == 0) {
+		opt_ptr += sizeof("name=") - 1;
+	}
+
+	/* get the end of <name> */
+	opt_end = strchr(opt_ptr, ',');
+	if (opt_end == NULL) {
+		qemu_fwcfg_usage(opt);
+		return (EINVAL);
+	}
+
+	/* check if <name> is too long */
+	if (opt_end - opt_ptr >= QEMU_FWCFG_MAX_NAME) {
+		warnx("fw_cfg name too long: \"%s\"", opt);
+		return (EINVAL);
+	}
+
+	/* save <name> */
+	strncpy(fwcfg_file->name, opt_ptr, opt_end - opt_ptr);
+	fwcfg_file->name[opt_end - opt_ptr] = '\0';
+
+	/* set opt_ptr and opt_end to <value> */
+	opt_ptr = opt_end + 1;
+	opt_end = opt_ptr + strlen(opt_ptr);
+
+	if (strncmp(opt_ptr, "string=", sizeof("string=") - 1) == 0) {
+		opt_ptr += sizeof("string=") - 1;
+		fwcfg_file->data = strdup(opt_ptr);
+		if (fwcfg_file->data == NULL) {
+			warnx("Can't duplicate fw_cfg_user_file string \"%s\"",
+			    opt_ptr);
+			return (ENOMEM);
+		}
+		fwcfg_file->size = strlen(opt_ptr) + 1;
+	} else if (strncmp(opt_ptr, "file=", sizeof("file=") - 1) == 0) {
+		opt_ptr += sizeof("file=") - 1;
+
+		fd = open(opt_ptr, O_RDONLY);
+		if (fd < 0) {
+			warn("Can't open fw_cfg_user_file file \"%s\"",
+			    opt_ptr);
+			return (EINVAL);
+		}
+
+		if (fstat(fd, &sb) < 0) {
+			warn("Unable to get size of file \"%s\"", opt_ptr);
+			close(fd);
+			return (-1);
+		}
+
+		fwcfg_file->data = malloc(sb.st_size);
+		if (fwcfg_file->data == NULL) {
+			warnx(
+			    "Can't allocate fw_cfg_user_file file \"%s\" (size: 0x%16lx)",
+			    opt_ptr, sb.st_size);
+			close(fd);
+			return (ENOMEM);
+		}
+		bytes_read = read(fd, fwcfg_file->data, sb.st_size);
+		if (bytes_read < 0 || bytes_read != sb.st_size) {
+			warn("Unable to read file \"%s\"", opt_ptr);
+			free(fwcfg_file->data);
+			close(fd);
+			return (-1);
+		}
+		fwcfg_file->size = bytes_read;
+
+		close(fd);
+	} else {
+		qemu_fwcfg_usage(opt);
+		return (EINVAL);
+	}
+
+	STAILQ_INSERT_TAIL(&user_files, fwcfg_file, chain);
+
+	return (0);
 }

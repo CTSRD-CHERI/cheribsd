@@ -43,10 +43,11 @@ static char sccsid[] = "@(#)ctags.c	8.4 (Berkeley) 2/7/95";
 
 #include <sys/cdefs.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
-__FBSDID("$FreeBSD$");
 
 #include <err.h>
+#include <errno.h>
 #include <limits.h>
 #include <locale.h>
 #include <regex.h>
@@ -84,7 +85,7 @@ char	lbuf[LINE_MAX];
 
 void	init(void);
 void	find_entries(char *);
-static void usage(void);
+static void usage(void) __dead2;
 
 int
 main(int argc, char **argv)
@@ -143,6 +144,9 @@ main(int argc, char **argv)
 	if (!argc)
 		usage();
 
+	if (strcmp(outfile, "-") == 0)
+		outfile = "/dev/stdout";
+
 	if (!xflag)
 		setlocale(LC_COLLATE, "C");
 
@@ -164,11 +168,23 @@ main(int argc, char **argv)
 			put_entries(head);
 		else {
 			if (uflag) {
+				struct stat sb;
 				FILE *oldf;
 				regex_t *regx;
 
-				if ((oldf = fopen(outfile, "r")) == NULL)
+				if ((oldf = fopen(outfile, "r")) == NULL) {
+					if (errno == ENOENT) {
+						uflag = 0;
+						goto udone;
+					}
 					err(1, "opening %s", outfile);
+				}
+				if (fstat(fileno(oldf), &sb) != 0 ||
+				    !S_ISREG(sb.st_mode)) {
+					fclose(oldf);
+					uflag = 0;
+					goto udone;
+				}
 				if (unlink(outfile))
 					err(1, "unlinking %s", outfile);
 				if ((outf = fopen(outfile, "w")) == NULL)
@@ -198,6 +214,7 @@ nextline:
 				fclose(outf);
 				++aflag;
 			}
+udone:
 			if (!(outf = fopen(outfile, aflag ? "a" : "w")))
 				err(1, "%s", outfile);
 			put_entries(head);
@@ -218,6 +235,8 @@ nextline:
 			}
 		}
 	}
+	if (ferror(stdout) != 0 || fflush(stdout) != 0)
+		err(1, "stdout");
 	exit(exit_val);
 }
 

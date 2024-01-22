@@ -47,9 +47,6 @@
 
 #define __ELF_WORD_SIZE 64
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/imgact.h>
@@ -97,7 +94,6 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_elf_core_osabi = ELFOSABI_FREEBSD,
 	.sv_elf_core_abi_vendor = FREEBSD_ABI_VENDOR,
 	.sv_elf_core_prepare_notes = __elfN(prepare_notes),
-	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
@@ -132,7 +128,6 @@ static Elf64_Brandinfo freebsd_freebsd64_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,
 	.machine	= EM_AARCH64,
 	.compat_3_brand	= "FreeBSD",
-	.emul_path	= NULL,
 	.interp_path	= "/libexec/ld-elf.so.1",
 	.sysvec		= &elf_freebsd_freebsd64_sysvec,
 	.interp_newpath = "/libexec/ld-elf64.so.1",
@@ -199,6 +194,7 @@ freebsd64_get_mcontext(struct thread *td, mcontext64_t *mcp, int flags)
 	mcontext_t mc;
 	int error;
 
+	memset(&mc, 0, sizeof(mc));
 	error = get_mcontext(td, &mc, flags);
 	if (error != 0)
 		return (error);

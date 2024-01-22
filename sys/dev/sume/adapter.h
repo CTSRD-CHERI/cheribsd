@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2015 Bjoern A. Zeeb
  * Copyright (c) 2020 Denis Salopek
@@ -30,7 +30,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* $FreeBSD$ */
 
 #define	DEFAULT_ETHER_ADDRESS		"\02SUME\00"
 #define	SUME_ETH_DEVICE_NAME		"sume"

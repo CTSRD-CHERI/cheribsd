@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 - 2021 Alstom Group.
  * Copyright (c) 2020 - 2021 Semihalf.
@@ -29,8 +29,6 @@
 /* eSDHC controller driver for NXP QorIQ Layerscape SoCs. */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/endian.h>
 #include <sys/kernel.h>

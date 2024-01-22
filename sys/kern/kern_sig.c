@@ -37,8 +37,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_capsicum.h"
 #include "opt_ktrace.h"
 
@@ -56,6 +54,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/event.h>
 #include <sys/fcntl.h>
 #include <sys/imgact.h>
+#include <sys/jail.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/ktrace.h>
@@ -90,8 +89,13 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
 #include <vm/uma.h>
-
-#include <sys/jail.h>
+#ifdef CHERI_CAPREVOKE
+#include <vm/vm_cheri_revoke.h>
+#ifdef CHERI_CAPREVOKE_STATS
+#include <vm/pmap.h>
+#include <vm/vm_map.h>
+#endif
+#endif
 
 #include <machine/cpu.h>
 
@@ -225,7 +229,7 @@ SYSCTL_INT(_kern, OID_AUTO, coredump_devctl, CTLFLAG_RW, &coredump_devctl,
 #define	SIGPROP_IGNORE		0x10	/* ignore by default */
 #define	SIGPROP_CONT		0x20	/* continue if suspended */
 
-static int sigproptbl[NSIG] = {
+static const int sigproptbl[NSIG] = {
 	[SIGHUP] =	SIGPROP_KILL,
 	[SIGINT] =	SIGPROP_KILL,
 	[SIGQUIT] =	SIGPROP_KILL | SIGPROP_CORE,
@@ -1836,6 +1840,26 @@ kern_sigaltstack(struct thread *td, stack_t *ss, stack_t *oss)
 	return (0);
 }
 
+#ifdef CHERI_CAPREVOKE
+void
+sigaltstack_cheri_revoke(struct thread *td,
+    const struct vm_cheri_revoke_cookie *crc)
+{
+	CHERI_REVOKE_STATS_FOR(crst, crc);
+
+	uintcap_t sp = (uintcap_t)td->td_sigstk.ss_sp;
+
+	if (cheri_gettag(sp)) {
+		CHERI_REVOKE_STATS_BUMP(crst, caps_found);
+		if (vm_cheri_revoke_test(crc, sp)) {
+			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
+			td->td_sigstk.ss_sp =
+			    (void * __capability)cheri_revoke_cap(sp);
+		}
+	}
+}
+#endif
+
 struct killpg1_ctx {
 	struct thread *td;
 	ksiginfo_t *ksi;
@@ -1888,7 +1912,7 @@ kill_processes_prison_cb(struct proc *p, void *arg)
 
 /*
  * Common code for kill process group/broadcast kill.
- * cp is calling process.
+ * td is the calling thread, as usual.
  */
 static int
 killpg1(struct thread *td, int sig, int pgid, int all, ksiginfo_t *ksi)
@@ -1910,6 +1934,7 @@ killpg1(struct thread *td, int sig, int pgid, int all, ksiginfo_t *ksi)
 		prison_proc_iterate(td->td_ucred->cr_prison,
 		    kill_processes_prison_cb, &arg);
 	} else {
+again:
 		sx_slock(&proctree_lock);
 		if (pgid == 0) {
 			/*
@@ -1925,10 +1950,17 @@ killpg1(struct thread *td, int sig, int pgid, int all, ksiginfo_t *ksi)
 			}
 		}
 		sx_sunlock(&proctree_lock);
+		if (!sx_try_xlock(&pgrp->pg_killsx)) {
+			PGRP_UNLOCK(pgrp);
+			sx_xlock(&pgrp->pg_killsx);
+			sx_xunlock(&pgrp->pg_killsx);
+			goto again;
+		}
 		LIST_FOREACH(p, &pgrp->pg_members, p_pglist) {
 			killpg1_sendsig(p, false, &arg);
 		}
 		PGRP_UNLOCK(pgrp);
+		sx_xunlock(&pgrp->pg_killsx);
 	}
 	MPASS(arg.ret != 0 || arg.found || !arg.sent);
 	if (arg.ret == 0 && !arg.sent)
@@ -2119,25 +2151,6 @@ kern_sigqueue(struct thread *td, pid_t pid, int signum, union sigval *value)
 }
 
 /*
- * Send a signal to a process group.
- */
-void
-gsignal(int pgid, int sig, ksiginfo_t *ksi)
-{
-	struct pgrp *pgrp;
-
-	if (pgid != 0) {
-		sx_slock(&proctree_lock);
-		pgrp = pgfind(pgid);
-		sx_sunlock(&proctree_lock);
-		if (pgrp != NULL) {
-			pgsignal(pgrp, sig, 0, ksi);
-			PGRP_UNLOCK(pgrp);
-		}
-	}
-}
-
-/*
  * Send a signal to a process group.  If checktty is 1,
  * limit to members which have a controlling terminal.
  */
@@ -2252,14 +2265,18 @@ sigtd(struct proc *p, int sig, bool fast_sigblock)
 	if (curproc == p && !SIGISMEMBER(curthread->td_sigmask, sig) &&
 	    (!fast_sigblock || curthread->td_sigblock_val == 0))
 		return (curthread);
+
+	/* Find a non-stopped thread that does not mask the signal. */
 	signal_td = NULL;
 	FOREACH_THREAD_IN_PROC(p, td) {
 		if (!SIGISMEMBER(td->td_sigmask, sig) && (!fast_sigblock ||
-		    td != curthread || td->td_sigblock_val == 0)) {
+		    td != curthread || td->td_sigblock_val == 0) &&
+		    (td->td_flags & TDF_BOUNDARY) == 0) {
 			signal_td = td;
 			break;
 		}
 	}
+	/* Select random (first) thread if no better match was found. */
 	if (signal_td == NULL)
 		signal_td = FIRST_THREAD_IN_PROC(p);
 	return (signal_td);
@@ -3690,6 +3707,8 @@ void
 sigexit(struct thread *td, int sig)
 {
 	struct proc *p = td->td_proc;
+	const char *coreinfo;
+	int rv;
 
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	proc_set_p2_wexit(p);
@@ -3714,16 +3733,32 @@ sigexit(struct thread *td, int sig)
 		 * XXX : Todo, as well as euid, write out ruid too
 		 * Note that coredump() drops proc lock.
 		 */
-		if (coredump(td) == 0)
+		rv = coredump(td);
+		switch (rv) {
+		case 0:
 			sig |= WCOREFLAG;
+			coreinfo = " (core dumped)";
+			break;
+		case EFAULT:
+			coreinfo = " (no core dump - bad address)";
+			break;
+		case EINVAL:
+			coreinfo = " (no core dump - invalid argument)";
+			break;
+		case EFBIG:
+			coreinfo = " (no core dump - too large)";
+			break;
+		default:
+			coreinfo = " (no core dump - other error)";
+			break;
+		}
 		if (kern_logsigexit)
 			log(LOG_INFO,
 			    "pid %d (%s), jid %d, uid %d: exited on "
 			    "signal %d%s\n", p->p_pid, p->p_comm,
 			    p->p_ucred->cr_prison->pr_id,
 			    td->td_ucred->cr_uid,
-			    sig &~ WCOREFLAG,
-			    sig & WCOREFLAG ? " (core dumped)" : "");
+			    sig &~ WCOREFLAG, coreinfo);
 	} else
 		PROC_UNLOCK(p);
 	exit1(td, 0, sig);

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 Adam Fenn <adam@fenn.io>
  *
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <machine/vmm.h>
@@ -45,7 +43,9 @@ __FBSDID("$FreeBSD$");
 #include <vmmapi.h>
 
 #include "debug.h"
-#include "inout.h"
+#ifdef __amd64__
+#include "amd64/inout.h"
+#endif
 #include "mem.h"
 #include "pctestdev.h"
 

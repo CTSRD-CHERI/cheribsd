@@ -236,7 +236,7 @@ tarfs_checksum(struct ustar_header *hdrp)
 		checksum += *ptr;
 	for (idx = 0; idx < sizeof(hdrp->checksum); idx++)
 		checksum += 0x20;
-	for (ptr = (const unsigned char *)hdrp->typeflag;
+	for (ptr = (const unsigned char *)&__builtin_no_change_bounds(hdrp->typeflag);
 	     ptr < (const unsigned char *)(hdrp + 1); ptr++)
 		checksum += *ptr;
 	TARFS_DPF(CHECKSUM, "%s: calc unsigned checksum %lx\n", __func__,
@@ -254,7 +254,7 @@ tarfs_checksum(struct ustar_header *hdrp)
 		checksum += *((const signed char *)ptr);
 	for (idx = 0; idx < sizeof(hdrp->checksum); idx++)
 		checksum += 0x20;
-	for (ptr = (const unsigned char *)&hdrp->typeflag;
+	for (ptr = (const unsigned char *)&__builtin_no_change_bounds(hdrp->typeflag);
 	     ptr < (const unsigned char *)(hdrp + 1); ptr++)
 		checksum += *((const signed char *)ptr);
 	TARFS_DPF(CHECKSUM, "%s: calc signed checksum %lx\n", __func__,

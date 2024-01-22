@@ -24,8 +24,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _LINUXKPI_LINUX_KTIME_H
@@ -190,6 +188,7 @@ timespec64_to_ns(struct timespec64 *ts)
 #define	ktime_get_ts(ts)		getnanouptime(ts)
 #define	ktime_get_ts64(ts)		getnanouptime(ts)
 #define	ktime_get_raw_ts64(ts)		getnanouptime(ts)
+#define	ktime_get_real_ts64(ts)		getnanotime(ts)
 #define	getrawmonotonic64(ts)		getnanouptime(ts)
 
 static inline int64_t

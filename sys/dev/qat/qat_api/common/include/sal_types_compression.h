@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /* Copyright(c) 2007-2022 Intel Corporation */
-/* $FreeBSD$ */
 /**
  ***************************************************************************
  * @file sal_types_compression.h
@@ -23,7 +22,7 @@
 #include "icp_adf_transport.h"
 
 #define DC_NUM_RX_RINGS (1)
-#define DC_NUM_COMPRESSION_LEVELS (CPA_DC_L9)
+#define DC_NUM_COMPRESSION_LEVELS (CPA_DC_L12)
 
 /**
  *****************************************************************************
@@ -73,6 +72,9 @@ typedef struct sal_compression_device_data {
 
 	/* Flag to indicate CompressAndVerifyAndRecover feature support */
 	CpaBoolean cnvnrSupported;
+
+	/* When set, implies device supports ASB_ENABLE */
+	CpaBoolean asbEnableSupport;
 } sal_compression_device_data_t;
 
 /**

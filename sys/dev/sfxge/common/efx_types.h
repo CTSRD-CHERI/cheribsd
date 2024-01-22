@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2007-2016 Solarflare Communications Inc.
  * All rights reserved.
@@ -30,8 +30,6 @@
  * policies, either expressed or implied, of the FreeBSD Project.
  *
  * Ackowledgement to Fen Systems Ltd.
- *
- * $FreeBSD$
  */
 
 #ifndef	_SYS_EFX_TYPES_H

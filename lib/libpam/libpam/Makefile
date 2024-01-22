@@ -33,7 +33,6 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD$
 
 OPENPAM=	${SRCTOP}/contrib/openpam
 .PATH: ${OPENPAM}/include ${OPENPAM}/lib/libpam ${OPENPAM}/doc/man
@@ -163,9 +162,6 @@ CFLAGS+= -DHAVE_FDLOPEN=1
 CFLAGS+= -DHAVE_FPURGE=1
 CFLAGS+= -DHAVE_STRLCAT=1
 CFLAGS+= -DHAVE_STRLCPY=1
-.ifdef COMPAT_CHERI
-CFLAGS+= -DCOMPAT_CHERI=1
-.endif
 
 HEADERS=	security/openpam.h \
 		security/openpam_attr.h \

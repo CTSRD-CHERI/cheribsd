@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1996, by Steve Passe
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_mptable_force_htt.h"
 #include "opt_mptable_linux_bug_compat.h"
 #include <sys/param.h>
@@ -1264,7 +1262,7 @@ mptable_host_res_handler(ext_entry_ptr entry, void *arg)
 			break;
 		default:
 			printf(
-    "MPTable: Unknown compatiblity address space range for bus %u: %d\n",
+    "MPTable: Unknown compatibility address space range for bus %u: %d\n",
 			    cbasm->bus_id, cbasm->predefined_range);
 			return;
 		}

@@ -1,6 +1,6 @@
 /*-
  *
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright  2020 Michal Meloun <mmel@FreeBSD.org>
  *
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Thermometer driver for QorIQ  SoCs.
  */

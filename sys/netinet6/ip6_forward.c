@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
@@ -198,9 +196,12 @@ again:
 
 	if (nh->nh_flags & (NHF_BLACKHOLE | NHF_REJECT)) {
 		IP6STAT_INC(ip6s_cantforward);
-		if ((nh->nh_flags & NHF_REJECT) && (mcopy != NULL)) {
-			icmp6_error(mcopy, ICMP6_DST_UNREACH,
-			    ICMP6_DST_UNREACH_REJECT, 0);
+		if (mcopy != NULL) {
+			if (nh->nh_flags & NHF_REJECT) {
+				icmp6_error(mcopy, ICMP6_DST_UNREACH,
+				    ICMP6_DST_UNREACH_REJECT, 0);
+			} else
+				m_freem(mcopy);
 		}
 		goto bad;
 	}

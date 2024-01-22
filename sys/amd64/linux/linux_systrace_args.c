@@ -2,7 +2,6 @@
  * System call argument to DTrace register array converstion.
  *
  * DO NOT EDIT-- this file is automatically @generated.
- * $FreeBSD$
  * This file is part of the DTrace syscall provider.
  */
 
@@ -531,8 +530,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 59: {
 		struct linux_execve_args *p = params;
 		uarg[a++] = (intptr_t)p->path; /* char * */
-		uarg[a++] = (intptr_t)p->argp; /* char ** */
-		uarg[a++] = (intptr_t)p->envp; /* char ** */
+		uarg[a++] = (intptr_t)p->argp; /* l_uintptr_t * */
+		uarg[a++] = (intptr_t)p->envp; /* l_uintptr_t * */
 		*n_args = 3;
 		break;
 	}
@@ -1437,7 +1436,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct linux_setxattr_args *p = params;
 		uarg[a++] = (intptr_t)p->path; /* const char * */
 		uarg[a++] = (intptr_t)p->name; /* const char * */
-		uarg[a++] = (intptr_t)p->value; /* const char * */
+		uarg[a++] = (intptr_t)p->value; /* void * */
 		iarg[a++] = p->size; /* l_size_t */
 		iarg[a++] = p->flags; /* l_int */
 		*n_args = 5;
@@ -1448,7 +1447,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct linux_lsetxattr_args *p = params;
 		uarg[a++] = (intptr_t)p->path; /* const char * */
 		uarg[a++] = (intptr_t)p->name; /* const char * */
-		uarg[a++] = (intptr_t)p->value; /* const char * */
+		uarg[a++] = (intptr_t)p->value; /* void * */
 		iarg[a++] = p->size; /* l_size_t */
 		iarg[a++] = p->flags; /* l_int */
 		*n_args = 5;
@@ -1459,7 +1458,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct linux_fsetxattr_args *p = params;
 		iarg[a++] = p->fd; /* l_int */
 		uarg[a++] = (intptr_t)p->name; /* const char * */
-		uarg[a++] = (intptr_t)p->value; /* const char * */
+		uarg[a++] = (intptr_t)p->value; /* void * */
 		iarg[a++] = p->size; /* l_size_t */
 		iarg[a++] = p->flags; /* l_int */
 		*n_args = 5;
@@ -1470,7 +1469,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct linux_getxattr_args *p = params;
 		uarg[a++] = (intptr_t)p->path; /* const char * */
 		uarg[a++] = (intptr_t)p->name; /* const char * */
-		uarg[a++] = (intptr_t)p->value; /* char * */
+		uarg[a++] = (intptr_t)p->value; /* void * */
 		iarg[a++] = p->size; /* l_size_t */
 		*n_args = 4;
 		break;
@@ -1480,7 +1479,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct linux_lgetxattr_args *p = params;
 		uarg[a++] = (intptr_t)p->path; /* const char * */
 		uarg[a++] = (intptr_t)p->name; /* const char * */
-		uarg[a++] = (intptr_t)p->value; /* char * */
+		uarg[a++] = (intptr_t)p->value; /* void * */
 		iarg[a++] = p->size; /* l_size_t */
 		*n_args = 4;
 		break;
@@ -1490,7 +1489,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct linux_fgetxattr_args *p = params;
 		iarg[a++] = p->fd; /* l_int */
 		uarg[a++] = (intptr_t)p->name; /* const char * */
-		uarg[a++] = (intptr_t)p->value; /* char * */
+		uarg[a++] = (intptr_t)p->value; /* void * */
 		iarg[a++] = p->size; /* l_size_t */
 		*n_args = 4;
 		break;
@@ -1499,7 +1498,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 194: {
 		struct linux_listxattr_args *p = params;
 		uarg[a++] = (intptr_t)p->path; /* const char * */
-		uarg[a++] = (intptr_t)p->list; /* const char * */
+		uarg[a++] = (intptr_t)p->list; /* char * */
 		iarg[a++] = p->size; /* l_size_t */
 		*n_args = 3;
 		break;
@@ -1508,7 +1507,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 195: {
 		struct linux_llistxattr_args *p = params;
 		uarg[a++] = (intptr_t)p->path; /* const char * */
-		uarg[a++] = (intptr_t)p->list; /* const char * */
+		uarg[a++] = (intptr_t)p->list; /* char * */
 		iarg[a++] = p->size; /* l_size_t */
 		*n_args = 3;
 		break;
@@ -1517,7 +1516,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 196: {
 		struct linux_flistxattr_args *p = params;
 		iarg[a++] = p->fd; /* l_int */
-		uarg[a++] = (intptr_t)p->list; /* const char * */
+		uarg[a++] = (intptr_t)p->list; /* char * */
 		iarg[a++] = p->size; /* l_size_t */
 		*n_args = 3;
 		break;
@@ -1897,12 +1896,19 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	}
 	/* linux_ioprio_set */
 	case 251: {
-		*n_args = 0;
+		struct linux_ioprio_set_args *p = params;
+		iarg[a++] = p->which; /* l_int */
+		iarg[a++] = p->who; /* l_int */
+		iarg[a++] = p->ioprio; /* l_int */
+		*n_args = 3;
 		break;
 	}
 	/* linux_ioprio_get */
 	case 252: {
-		*n_args = 0;
+		struct linux_ioprio_get_args *p = params;
+		iarg[a++] = p->which; /* l_int */
+		iarg[a++] = p->who; /* l_int */
+		*n_args = 2;
 		break;
 	}
 	/* linux_inotify_init */
@@ -3651,10 +3657,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland char *";
 			break;
 		case 1:
-			p = "userland char **";
+			p = "userland l_uintptr_t *";
 			break;
 		case 2:
-			p = "userland char **";
+			p = "userland l_uintptr_t *";
 			break;
 		default:
 			break;
@@ -5040,7 +5046,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const char *";
 			break;
 		case 2:
-			p = "userland const char *";
+			p = "userland void *";
 			break;
 		case 3:
 			p = "l_size_t";
@@ -5062,7 +5068,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const char *";
 			break;
 		case 2:
-			p = "userland const char *";
+			p = "userland void *";
 			break;
 		case 3:
 			p = "l_size_t";
@@ -5084,7 +5090,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const char *";
 			break;
 		case 2:
-			p = "userland const char *";
+			p = "userland void *";
 			break;
 		case 3:
 			p = "l_size_t";
@@ -5106,7 +5112,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const char *";
 			break;
 		case 2:
-			p = "userland char *";
+			p = "userland void *";
 			break;
 		case 3:
 			p = "l_size_t";
@@ -5125,7 +5131,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const char *";
 			break;
 		case 2:
-			p = "userland char *";
+			p = "userland void *";
 			break;
 		case 3:
 			p = "l_size_t";
@@ -5144,7 +5150,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const char *";
 			break;
 		case 2:
-			p = "userland char *";
+			p = "userland void *";
 			break;
 		case 3:
 			p = "l_size_t";
@@ -5160,7 +5166,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland const char *";
+			p = "userland char *";
 			break;
 		case 2:
 			p = "l_size_t";
@@ -5176,7 +5182,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland const char *";
+			p = "userland char *";
 			break;
 		case 2:
 			p = "l_size_t";
@@ -5192,7 +5198,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "l_int";
 			break;
 		case 1:
-			p = "userland const char *";
+			p = "userland char *";
 			break;
 		case 2:
 			p = "l_size_t";
@@ -5768,9 +5774,32 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* linux_ioprio_set */
 	case 251:
+		switch (ndx) {
+		case 0:
+			p = "l_int";
+			break;
+		case 1:
+			p = "l_int";
+			break;
+		case 2:
+			p = "l_int";
+			break;
+		default:
+			break;
+		};
 		break;
 	/* linux_ioprio_get */
 	case 252:
+		switch (ndx) {
+		case 0:
+			p = "l_int";
+			break;
+		case 1:
+			p = "l_int";
+			break;
+		default:
+			break;
+		};
 		break;
 	/* linux_inotify_init */
 	case 253:
@@ -8226,8 +8255,14 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 250:
 	/* linux_ioprio_set */
 	case 251:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
 	/* linux_ioprio_get */
 	case 252:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
 	/* linux_inotify_init */
 	case 253:
 	/* linux_inotify_add_watch */

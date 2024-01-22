@@ -1,5 +1,4 @@
 /*	$OpenBSD: yp.c,v 1.14 2015/02/11 01:26:00 pelikan Exp $ */
-/*	$FreeBSD$ */
 /*
  * Copyright (c) 2008 Pierre-Yves Ritschard <pyr@openbsd.org>
  *
@@ -268,9 +267,6 @@ yp_dispatch(struct svc_req *req, SVCXPRT *trans)
 int
 yp_check(struct svc_req *req)
 {
-	struct sockaddr_in	*caller;
-
-	caller = svc_getcaller(req->rq_xprt);
 	/*
 	 * We might want to know who we allow here.
 	 */

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000 Orion Hodson <O.Hodson@cs.ucl.ac.uk>
  * All rights reserved.
@@ -60,8 +60,6 @@
 
 #include "mixer_if.h"
 #include "mpufoi_if.h"
-
-SND_DECLARE_FILE("$FreeBSD$");
 
 /* Supported chip ID's */
 #define CMI8338A_PCI_ID   0x010013f6

@@ -1,5 +1,4 @@
 #	From: @(#)Makefile	8.1 (Berkeley) 6/5/93
-# $FreeBSD$
 
 .include <src.opts.mk>
 
@@ -71,6 +70,12 @@ LIBADD+=	jail
 .endif
 LIBADD+=	nv
 
+.if ${MK_NETLINK_SUPPORT} != "no"
+SRCS+=	ifconfig_netlink.c
+.else
+CFLAGS+=-DWITHOUT_NETLINK
+.endif
+
 # ld.lld: error: could not determine size of cap reloc against local object nla_p_donemsg
 # >>> defined in libifconfig_carp.c (libifconfig_carp.pieo:(.rodata+0x8A10)
 LD_FATAL_WARNINGS=no
@@ -78,7 +83,6 @@ LD_FATAL_WARNINGS=no
 MAN=	ifconfig.8
 
 CFLAGS+= -Wall -Wmissing-prototypes -Wcast-qual -Wwrite-strings -Wnested-externs
-WARNS?=	2
 
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests

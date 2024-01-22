@@ -34,8 +34,6 @@
 
 #include <machine/asm.h>
 
-__FBSDID("$FreeBSD$");
-
 #ifdef __CHERI_PURE_CAPABILITY__
 ENTRY(generic_bs_r_1)
 	cincoffset ca3, ca1, a2

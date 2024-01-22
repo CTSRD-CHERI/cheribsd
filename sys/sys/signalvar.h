@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)signalvar.h	8.6 (Berkeley) 2/19/95
- * $FreeBSD$
  */
 
 #ifndef _SYS_SIGNALVAR_H_
@@ -385,7 +384,6 @@ sigallowstop(int prev)
 
 int	cursig(struct thread *td);
 void	execsigs(struct proc *p);
-void	gsignal(int pgid, int sig, ksiginfo_t *ksi);
 void	killproc(struct proc *p, const char *why);
 ksiginfo_t *ksiginfo_alloc(int mwait);
 void	ksiginfo_free(ksiginfo_t *ksi);
@@ -422,6 +420,12 @@ int	tdsendsignal(struct proc *p, struct thread *td, int sig,
 void	tdsigcleanup(struct thread *td);
 void	tdsignal(struct thread *td, int sig);
 void	trapsignal(struct thread *td, ksiginfo_t *ksi);
+
+#ifdef CHERI_CAPREVOKE
+struct vm_cheri_revoke_cookie;
+void sigaltstack_cheri_revoke(struct thread *,
+    const struct vm_cheri_revoke_cookie *);
+#endif
 
 #endif /* _KERNEL */
 

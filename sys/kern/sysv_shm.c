@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-4-Clause AND BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-4-Clause AND BSD-2-Clause
  *
  * Copyright (c) 1994 Adam Glass and Charles Hannum.  All rights reserved.
  *
@@ -69,8 +69,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_sysvipc.h"
 
 #include <sys/param.h>
@@ -351,7 +349,7 @@ kern_shmdt_locked(struct thread *td, const void * __capability shmaddr)
 {
 	struct proc *p = td->td_proc;
 	struct shmmap_state *shmmap_s;
-	static struct shmid_kernel *shmseg;
+	static struct shmid_kernel *shmseg __unused;
 #ifdef MAC
 	int error;
 #endif
@@ -403,7 +401,7 @@ sys_shmdt(struct thread *td, struct shmdt_args *uap)
 
 #if __has_feature(capabilities)
 	/*
-	 * Require a valid, unsealed, VMMAP bearing capability or NULL.
+	 * Require a valid, unsealed, SW_VMEM bearing capability or NULL.
 	 * length is checked after we find our mapping.
 	 */
 	if (shmaddr != NULL &&
@@ -496,7 +494,8 @@ kern_shmat_locked(struct thread *td, int shmid,
 		 * extending before and after the entry to allow arbitrary
 		 * addresses (subject to available space...).
 		 */
-		if (CHERI_REPRESENTABLE_BASE(attach_va, size) != attach_va)
+		if (CHERI_REPRESENTABLE_ALIGN_DOWN(attach_va, size) !=
+		    attach_va)
 			return (EINVAL);
 		if (cheri_gettag(shmaddr)) {
 			int reqperm;
@@ -628,7 +627,7 @@ sys_shmat(struct thread *td, struct shmat_args *uap)
 #if __has_feature(capabilities)
 	/*
 	 * Require that shmaddr be NULL-derived or a valid, unsealed,
-	 * VMMAP bearing capability.
+	 * SW_VMEM bearing capability.
 	 */
 	if (!cheri_is_null_derived(shmaddr) &&
 	    (!cheri_gettag(shmaddr) || cheri_getsealed(shmaddr) ||

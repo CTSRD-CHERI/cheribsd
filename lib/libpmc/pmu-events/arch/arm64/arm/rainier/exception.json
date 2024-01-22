@@ -1,0 +1,62 @@
+[
+    {
+        "ArchStdEvent": "EXC_TAKEN",
+        "PublicDescription": "Exception taken"
+    },
+    {
+        "ArchStdEvent": "MEMORY_ERROR",
+        "PublicDescription": "Local memory error. This event counts any correctable or uncorrectable memory error (ECC or parity) in the protected core RAMs"
+    },
+    {
+        "ArchStdEvent": "EXC_UNDEF",
+        "PublicDescription": "Counts the number of undefined exceptions taken locally"
+    },
+    {
+        "ArchStdEvent": "EXC_SVC",
+        "PublicDescription": "Exception taken locally, Supervisor Call"
+    },
+    {
+        "ArchStdEvent": "EXC_PABORT",
+        "PublicDescription": "Exception taken locally, Instruction Abort"
+    },
+    {
+        "ArchStdEvent": "EXC_DABORT",
+        "PublicDescription": "Exception taken locally, Data Abort and SError"
+    },
+    {
+        "ArchStdEvent": "EXC_IRQ",
+        "PublicDescription": "Exception taken locally, IRQ"
+    },
+    {
+        "ArchStdEvent": "EXC_FIQ",
+        "PublicDescription": "Exception taken locally, FIQ"
+    },
+    {
+        "ArchStdEvent": "EXC_SMC",
+        "PublicDescription": "Exception taken locally, Secure Monitor Call"
+    },
+    {
+        "ArchStdEvent": "EXC_HVC",
+        "PublicDescription": "Exception taken locally, Hypervisor Call"
+    },
+    {
+        "ArchStdEvent": "EXC_TRAP_PABORT",
+        "PublicDescription": "Exception taken, Instruction Abort not taken locally"
+    },
+    {
+        "ArchStdEvent": "EXC_TRAP_DABORT",
+        "PublicDescription": "Exception taken, Data Abort or SError not taken locally"
+    },
+    {
+        "ArchStdEvent": "EXC_TRAP_OTHER",
+        "PublicDescription": "Exception taken, Other traps not taken locally"
+    },
+    {
+        "ArchStdEvent": "EXC_TRAP_IRQ",
+        "PublicDescription": "Exception taken, IRQ not taken locally"
+    },
+    {
+        "ArchStdEvent": "EXC_TRAP_FIQ",
+        "PublicDescription": "Exception taken, FIQ not taken locally"
+    }
+]

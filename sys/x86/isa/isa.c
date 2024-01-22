@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: (BSD-2-Clause-FreeBSD AND ISC)
+ * SPDX-License-Identifier: (BSD-2-Clause AND ISC)
  *
  * Copyright (c) 1998 Doug Rabson
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*-
  * Modifications for Intel architecture by Garrett A. Wollman.
  * Copyright 1998 Massachusetts Institute of Technology

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004 John Birrell
  * All rights reserved.
@@ -33,8 +33,6 @@
  * described in that document. The overall structure size must be 4096
  * bytes. Ignore fields with the 'pad' prefix - they are only present for
  * alignment purposes.
- *
- * $FreeBSD$
  */
 
 #ifndef _MACHINE_ELAN_MMCR_H_

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2006 Jason Evans <jasone@FreeBSD.org>.
  * All rights reserved.
@@ -27,8 +27,6 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _MALLOC_NP_H_
@@ -71,6 +69,8 @@ struct extent_hooks_s {
 	extent_split_t		*split;
 	extent_merge_t		*merge;
 };
+
+__MyBool malloc_is_revoking(void);
 
 size_t	malloc_usable_size(const void *ptr);
 

@@ -1,7 +1,7 @@
 /*-
  * Core definitions and data structures shareable across OS platforms.
  *
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010 Spectra Logic Corporation
  * All rights reserved.
@@ -30,8 +30,6 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
- *
- * $FreeBSD$
  */
 
 /* Used by the XenStore character device to borrow kernel's store connection. */

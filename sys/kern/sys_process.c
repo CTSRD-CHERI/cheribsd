@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ktr.h>
@@ -384,6 +382,7 @@ proc_rwmem(struct proc *p, struct uio *uio)
 	writing = uio->uio_rw == UIO_WRITE;
 	reqprot = writing ? VM_PROT_COPY | VM_PROT_READ : VM_PROT_READ;
 	fault_flags = writing ? VM_FAULT_DIRTY : VM_FAULT_NORMAL;
+	fault_flags |= VM_FAULT_NOPMAP;
 
 	/*
 	 * Only map in one page at a time.  We don't have to, but it
@@ -1536,24 +1535,27 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 				p->p_ptevents |= PTRACE_SCE;
 				CTR4(KTR_PTRACE,
 		    "PT_TO_SCE: pid %d, events = %#x, PC = %#lx, sig = %d",
-				    p->p_pid, p->p_ptevents, (u_long)addr, data);
+				    p->p_pid, p->p_ptevents,
+				    (__cheri_addr u_long)addr, data);
 				break;
 			case PT_TO_SCX:
 				p->p_ptevents |= PTRACE_SCX;
 				CTR4(KTR_PTRACE,
 		    "PT_TO_SCX: pid %d, events = %#x, PC = %#lx, sig = %d",
-				    p->p_pid, p->p_ptevents, (u_long)addr, data);
+				    p->p_pid, p->p_ptevents,
+				    (__cheri_addr u_long)addr, data);
 				break;
 			case PT_SYSCALL:
 				p->p_ptevents |= PTRACE_SYSCALL;
 				CTR4(KTR_PTRACE,
 		    "PT_SYSCALL: pid %d, events = %#x, PC = %#lx, sig = %d",
-				    p->p_pid, p->p_ptevents, (u_long)addr, data);
+				    p->p_pid, p->p_ptevents,
+				    (__cheri_addr u_long)addr, data);
 				break;
 			case PT_CONTINUE:
 				CTR3(KTR_PTRACE,
 				    "PT_CONTINUE: pid %d, PC = %#lx, sig = %d",
-				    p->p_pid, (u_long)addr, data);
+				    p->p_pid, (__cheri_addr u_long)addr, data);
 				break;
 			}
 			break;
@@ -1593,7 +1595,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 					    SIGSTOP);
 				}
 				td3->td_dbgflags &= ~(TDB_XSIG | TDB_FSTP |
-				    TDB_SUSPEND);
+				    TDB_SUSPEND | TDB_BORN);
 			}
 
 			if ((p->p_flag2 & P2_PTRACE_FSTP) != 0) {
@@ -1654,7 +1656,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			error = ENOMEM;
 		else
 			CTR3(KTR_PTRACE, "PT_WRITE: pid %d: %lx <= %#x",
-			    p->p_pid, (u_long)addr, data);
+			    p->p_pid, (__cheri_addr u_long)addr, data);
 		PROC_LOCK(p);
 		break;
 
@@ -1667,7 +1669,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			error = ENOMEM;
 		else
 			CTR3(KTR_PTRACE, "PT_READ: pid %d: %lx >= %#x",
-			    p->p_pid, (u_long)addr, tmp);
+			    p->p_pid, (__cheri_addr u_long)addr, tmp);
 		td->td_retval[0] = tmp;
 		PROC_LOCK(p);
 		break;

@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /* Copyright(c) 2007-2022 Intel Corporation */
-/* $FreeBSD$ */
 #include "qat_freebsd.h"
 #include "adf_common_drv.h"
 
@@ -13,6 +12,9 @@ qat_common_register(void)
 	if (adf_init_fatal_error_wq())
 		return EFAULT;
 
+	if (adf_register_ctl_device_driver())
+		return EFAULT;
+
 	return 0;
 }
 
@@ -22,7 +24,7 @@ qat_common_unregister(void)
 	adf_exit_vf_wq();
 	adf_exit_aer();
 	adf_exit_fatal_error_wq();
-	adf_clean_vf_map(false);
+	adf_unregister_ctl_device_driver();
 }
 
 static int

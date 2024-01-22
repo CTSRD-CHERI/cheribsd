@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .include <src.opts.mk>
 
@@ -11,9 +10,9 @@ SRCS= 	crypto.c kod_management.c log.c main.c networking.c \
 
 CFLAGS+= -I${SRCTOP}/contrib/ntp/include \
 	-I${SRCTOP}/contrib/ntp/include \
-	-I${SRCTOP}/contrib/ntp/lib/isc/include \
-	-I${SRCTOP}/contrib/ntp/lib/isc/unix/include \
-	-I${SRCTOP}/contrib/ntp/lib/isc/pthreads/include \
+	-I${SRCTOP}/contrib/ntp/libntp/lib/isc/include \
+	-I${SRCTOP}/contrib/ntp/libntp/lib/isc/unix/include \
+	-I${SRCTOP}/contrib/ntp/libntp/lib/isc/pthreads/include \
 	-I${SRCTOP}/contrib/ntp/sntp \
 	-I${SRCTOP}/contrib/ntp/sntp/libopts \
 	-I${SRCTOP}/contrib/ntp/sntp/libevent/include \

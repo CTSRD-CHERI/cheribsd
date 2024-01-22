@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/types.h>
@@ -297,7 +295,7 @@ volume_cache(int ac, char **av)
 		return (EINVAL);
 	}
 
-	fd = mfi_open(mfi_unit, O_RDWR);
+	fd = mfi_open(mfi_device, O_RDWR);
 	if (fd < 0) {
 		error = errno;
 		warn("mfi_open");
@@ -319,7 +317,7 @@ volume_cache(int ac, char **av)
 	}
 
 	if (ac == 2) {
-		printf("mfi%u volume %s cache settings:\n", mfi_unit,
+		printf("%s volume %s cache settings:\n", mfi_device,
 		    mfi_volume_name(fd, target_id));
 		printf("             I/O caching: ");
 		switch (props.default_cache_policy &
@@ -406,7 +404,7 @@ volume_name(int ac, char **av)
 		return (ENOSPC);
 	}
 
-	fd = mfi_open(mfi_unit, O_RDWR);
+	fd = mfi_open(mfi_device, O_RDWR);
 	if (fd < 0) {
 		error = errno;
 		warn("mfi_open");
@@ -427,7 +425,7 @@ volume_name(int ac, char **av)
 		return (error);
 	}
 
-	printf("mfi%u volume %s name changed from \"%s\" to \"%s\"\n", mfi_unit,
+	printf("%s volume %s name changed from \"%s\" to \"%s\"\n", mfi_device,
 	    mfi_volume_name(fd, target_id), props.name, av[2]);
 	bzero(props.name, sizeof(props.name));
 	strcpy(props.name, av[2]);
@@ -457,7 +455,7 @@ volume_progress(int ac, char **av)
 		return (EINVAL);
 	}
 
-	fd = mfi_open(mfi_unit, O_RDONLY);
+	fd = mfi_open(mfi_device, O_RDONLY);
 	if (fd < 0) {
 		error = errno;
 		warn("mfi_open");

@@ -1,5 +1,4 @@
 #	@(#)Makefile	8.2 (Berkeley) 1/4/94
-# $FreeBSD$
 #
 # Doing a "make install" builds /usr/include.
 
@@ -9,8 +8,14 @@ PACKAGE=runtime
 CLEANFILES= osreldate.h version
 SUBDIR= arpa protocols rpcsvc rpc xlocale
 .if ${MACHINE_CPUARCH} == "amd64"
-SUBDIR+=	i386
+SUBDIR+=		i386
+INCLUDE_SUBDIRS+=	i386
 .endif
+.if ${MACHINE_CPUARCH} == "aarch64"
+SUBDIR+=		arm
+INCLUDE_SUBDIRS+=	arm
+.endif
+SUBDIR.${MK_LIB64C}+=	lib64c
 SUBDIR_PARALLEL=
 INCS=	a.out.h ar.h assert.h bitstring.h byteswap.h \
 	complex.h cpio.h _ctype.h ctype.h \
@@ -48,7 +53,7 @@ LDIRS=	cheri geom net net80211 netgraph netinet netinet6 \
 
 LSUBDIRS=	dev/acpica dev/agp dev/ciss dev/filemon dev/firewire \
 	dev/hwpmc dev/hyperv \
-	dev/ic dev/iicbus dev/io dev/mfi dev/mmc dev/nvme \
+	dev/ic dev/iicbus dev/io dev/mfi dev/mmc \
 	dev/ofw dev/pbio dev/pci ${_dev_powermac_nvram} dev/ppbus dev/pwm \
 	dev/smbus dev/speaker dev/tcp_log dev/veriexec dev/vkbd dev/wg \
 	fs/devfs fs/fdescfs fs/msdosfs fs/nfs fs/nullfs \
@@ -174,6 +179,10 @@ HYPERVDIR=	${INCLUDEDIR}/dev/hyperv
 OPENCRYPTO=	cryptodev.h
 OPENCRYPTODIR=	${INCLUDEDIR}/crypto
 
+.PATH: ${SRCTOP}/sys/dev/nvme
+NVME=		nvme.h
+NVMEDIR=	${INCLUDEDIR}/dev/nvme
+
 .PATH: ${SRCTOP}/sys/dev/pci
 PCI=		pcireg.h
 PCIDIR=		${INCLUDEDIR}/dev/pci
@@ -245,6 +254,7 @@ INCSGROUPS=	INCS \
 		HID \
 		HYPERV \
 		OPENCRYPTO \
+		NVME \
 		PCI \
 		RPC \
 		SECAUDIT \
@@ -348,16 +358,16 @@ compat:
 	mtree -deU ${NO_ROOT:D-W} ${MTREE_FOLLOWS_SYMLINKS} \
 	    -f ${SRCTOP}/etc/mtree/BSD.include.dist \
 	    -p ${SDESTDIR}${INCLUDEDIR} > /dev/null
-.if ${MACHINE_CPUARCH} == "amd64"
+.for d in ${INCLUDE_SUBDIRS}
 	${INSTALL} -d ${TAG_ARGS} -o ${BINOWN} -g ${BINGRP} -m 755 \
-	    ${SDESTDIR}${INCLUDEDIR}/i386
-.endif
+	    ${SDESTDIR}${INCLUDEDIR}/${d}
+.endfor
 
 copies: .PHONY .META
 	cd ${SDESTDIR}${INCLUDEDIR}; find ${LDIRS} ${LSUBDIRS} ${LSUBSUBDIRS} crypto \
 	    machine machine/pc ${_MARCHS} -maxdepth 1 -mindepth 1 -type l \
 	    -name "*.h" -print -delete || true
-.for i in ${LDIRS} ${LSUBDIRS:Ndev/agp:Ndev/acpica:Ndev/evdev:Ndev/hid:Ndev/hyperv:Ndev/pci:Ndev/veriexec} ${LSUBSUBDIRS}
+.for i in ${LDIRS} ${LSUBDIRS:Ndev/agp:Ndev/acpica:Ndev/evdev:Ndev/hid:Ndev/hyperv:Ndev/pci:Ndev/veriexec:Ndev/wg} ${LSUBSUBDIRS}
 	cd ${SRCTOP}/sys; \
 	${INSTALL} -C ${TAG_ARGS:D${TAG_ARGS},dev} -o ${BINOWN} -g ${BINGRP} -m 444 $i/*.h \
 	    ${SDESTDIR}${INCLUDEDIR}/$i
@@ -393,7 +403,7 @@ symlinks: .PHONY .META
 	cd ${SRCTOP}; ${INSTALL_SYMLINK} ${TAG_ARGS:D${TAG_ARGS},dev} \
 	    $$(printf '../../../%s ' sys/$i/*.h) ${SDESTDIR}${INCLUDEDIR}/$i
 .endfor
-.for i in ${LSUBDIRS:Ndev/agp:Ndev/acpica:Ndev/evdev:Ndev/hid:Ndev/hyperv:Ndev/pci:Ndev/veriexec}
+.for i in ${LSUBDIRS:Ndev/agp:Ndev/acpica:Ndev/evdev:Ndev/hid:Ndev/hyperv:Ndev/pci:Ndev/veriexec:Ndev/wg}
 	cd ${SRCTOP}; ${INSTALL_SYMLINK} ${TAG_ARGS:D${TAG_ARGS},dev} \
 	    $$(printf '../../../../%s ' sys/$i/*.h) ${SDESTDIR}${INCLUDEDIR}/$i
 .endfor

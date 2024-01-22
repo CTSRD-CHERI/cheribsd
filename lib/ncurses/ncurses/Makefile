@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 PACKAGE=	clibs
 SHLIBDIR?=	/lib
@@ -146,6 +145,8 @@ DBGSRCS= \
 	varargs.c
 
 CLEANFILES=	${GENSRCS}
+
+CWARNFLAGS.lib_set_term.c= ${NO_WUNUSED_BUT_SET_VARIABLE}
 
 .if ${MK_INSTALLLIB} != "no"
 SYMLINKS+=	libncursesw.a ${LIBDIR}/libcursesw.a

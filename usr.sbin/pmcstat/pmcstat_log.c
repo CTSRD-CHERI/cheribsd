@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2005-2007, Joseph Koshy
  * Copyright (c) 2007 The FreeBSD Foundation
@@ -47,8 +47,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/endian.h>
 #include <sys/cpuset.h>
@@ -738,7 +736,7 @@ pmcstat_display_log(void)
 
 	pmcstat_refresh_top();
 
-	/* Reset everythings if delta mode. */
+	/* Reset everything if delta mode. */
 	if (args.pa_topmode == PMCSTAT_TOP_DELTA) {
 		if (plugins[args.pa_plugin].pl_shutdown != NULL)
 			plugins[args.pa_plugin].pl_shutdown(NULL);

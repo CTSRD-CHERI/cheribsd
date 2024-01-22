@@ -1,4 +1,3 @@
-# $FreeBSD$
 # Use this to help generate the asm *.S files after an import.  It is not
 # perfect by any means, but does what is needed.
 # Do a 'make -f Makefile.asm all' and it will generate *.S.  Move them
@@ -35,7 +34,7 @@ SRCS+=	chacha-armv8.pl
 SRCS+=	ecp_nistz256-armv8.pl
 
 # modes
-SRCS+=	ghashv8-armx.pl
+SRCS+=	ghashv8-armx.pl aes-gcm-armv8_64.S
 
 # poly1305
 SRCS+=	poly1305-armv8.pl
@@ -79,15 +78,15 @@ sha256-armv8.S:	sha512-armv8.pl
 	${LCRYPTO_SRC}/engines/asm
 
 # cpuid
-SRCS+=	x86_64cpuid.pl
+SRCS=	x86_64cpuid.pl
 
 # aes
-SRCS=	aesni-mb-x86_64.pl aesni-sha1-x86_64.pl aesni-sha256-x86_64.pl \
+SRCS+=	aesni-mb-x86_64.pl aesni-sha1-x86_64.pl aesni-sha256-x86_64.pl \
 	aesni-x86_64.pl vpaes-x86_64.pl
 
 # bn
-SRCS+=	rsaz-avx2.pl rsaz-x86_64.pl x86_64-gf2m.pl x86_64-mont.pl \
-	x86_64-mont5.pl
+SRCS+=	rsaz-avx2.pl rsaz-avx512.S rsaz-x86_64.pl x86_64-gf2m.pl \
+	x86_64-mont.pl x86_64-mont5.pl
 
 # camellia
 SRCS+=	cmll-x86_64.pl
@@ -329,12 +328,18 @@ SRCS+=	chacha-ppc.pl
 #poly1305
 SRCS+=	poly1305-ppc.pl poly1305-ppcfp.pl
 
-ASM=	${SRCS:R:S/$/.S/} sha256-ppc.S sha256p8-ppc.S
+ASM=	${SRCS:R:S/$/.S/} bn-ppc.S sha256-ppc.S sha256p8-ppc.S
 
 all:	${ASM}
 
 CLEANFILES=	${ASM}
 .SUFFIXES:	.pl
+
+bn-ppc.S:	ppc.pl
+	env CC=cc perl ${.ALLSRC} linux32 ${.TARGET:R:S/$/.s/}
+	( echo '/* $$'FreeBSD'$$ */' ;\
+	echo '/* Do not modify. This file is auto-generated from ${.ALLSRC:T:R:S/$/.pl/}. */' ;\
+	cat ${.TARGET:R:S/$/.s/}) > ${.TARGET}
 
 sha256-ppc.S:	sha512-ppc.pl
 	env CC=cc perl ${.ALLSRC} linux32 ${.TARGET:R:S/$/.s/}
@@ -389,17 +394,23 @@ SRCS+=	chacha-ppc.pl
 SRCS+=	poly1305-ppc.pl poly1305-ppcfp.pl
 
 #ec
-SRCS+=	ecp_nistz256-ppc64.pl x25519-ppc64.pl
+SRCS+=	ecp_nistp521-ppc64.pl ecp_nistz256-ppc64.pl x25519-ppc64.pl
 
 #keccak1600
 SRCS+=	keccak1600-ppc64.pl
 
-ASM=	${SRCS:R:S/$/.S/} sha256-ppc.S sha256p8-ppc.S
+ASM=	${SRCS:R:S/$/.S/} bn-ppc.S sha256-ppc.S sha256p8-ppc.S
 
 all:	${ASM}
 
 CLEANFILES=	${ASM}
 .SUFFIXES:	.pl
+
+bn-ppc.S:	ppc.pl
+	env CC=cc perl ${.ALLSRC} linux64v2 ${.TARGET:R:S/$/.s/}
+	( echo '/* $$'FreeBSD'$$ */' ;\
+	echo '/* Do not modify. This file is auto-generated from ${.ALLSRC:T:R:S/$/.pl/}. */' ;\
+	cat ${.TARGET:R:S/$/.s/}) > ${.TARGET}
 
 sha256-ppc.S:	sha512-ppc.pl
 	env CC=cc perl ${.ALLSRC} linux64v2 ${.TARGET:R:S/$/.s/}
@@ -454,17 +465,23 @@ SRCS+=	chacha-ppc.pl
 SRCS+=	poly1305-ppc.pl poly1305-ppcfp.pl
 
 #ec
-SRCS+=	ecp_nistz256-ppc64.pl x25519-ppc64.pl
+SRCS+=	ecp_nistp521-ppc64.pl ecp_nistz256-ppc64.pl x25519-ppc64.pl
 
 #keccak1600
 SRCS+=	keccak1600-ppc64.pl
 
-ASM=	${SRCS:R:S/$/.S/} sha256-ppc.S sha256p8-ppc.S
+ASM=	${SRCS:R:S/$/.S/} bn-ppc.S sha256-ppc.S sha256p8-ppc.S
 
 all:	${ASM}
 
 CLEANFILES=	${ASM}
 .SUFFIXES:	.pl
+
+bn-ppc.S:	ppc.pl
+	env CC=cc perl ${.ALLSRC} linux64le ${.TARGET:R:S/$/.s/}
+	( echo '/* $$'FreeBSD'$$ */' ;\
+	echo '/* Do not modify. This file is auto-generated from ${.ALLSRC:T:R:S/$/.pl/}. */' ;\
+	cat ${.TARGET:R:S/$/.s/}) > ${.TARGET}
 
 sha256-ppc.S:	sha512-ppc.pl
 	env CC=cc perl ${.ALLSRC} linux64le ${.TARGET:R:S/$/.s/}

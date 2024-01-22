@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) September 1995-2022 Wolfram Schneider <wosch@FreeBSD.org>
 # All rights reserved.
@@ -30,7 +30,6 @@
 # 
 # usage: mklocatedb [-presort] < filelist > database
 #
-# $FreeBSD$
 
 # stop on first error
 set -e

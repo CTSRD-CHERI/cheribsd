@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/pmc.h>
@@ -370,9 +368,7 @@ armv7_intr(struct trapframe *tf)
 static int
 armv7_describe(int cpu, int ri, struct pmc_info *pi, struct pmc **ppmc)
 {
-	char armv7_name[PMC_NAME_MAX];
 	struct pmc_hw *phw;
-	int error;
 
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
 	    ("[armv7,%d], illegal CPU %d", __LINE__, cpu));
@@ -380,11 +376,10 @@ armv7_describe(int cpu, int ri, struct pmc_info *pi, struct pmc **ppmc)
 	    ("[armv7,%d] row-index %d out of range", __LINE__, ri));
 
 	phw = &armv7_pcpu[cpu]->pc_armv7pmcs[ri];
-	snprintf(armv7_name, sizeof(armv7_name), "ARMV7-%d", ri);
-	if ((error = copystr(armv7_name, pi->pm_name, PMC_NAME_MAX,
-	    NULL)) != 0)
-		return error;
+
+	snprintf(pi->pm_name, sizeof(pi->pm_name), "ARMV7-%d", ri);
 	pi->pm_class = PMC_CLASS_ARMV7;
+
 	if (phw->phw_state & PMC_PHW_FLAG_IS_ENABLED) {
 		pi->pm_enabled = TRUE;
 		*ppmc = phw->phw_pmc;
@@ -405,23 +400,6 @@ armv7_get_config(int cpu, int ri, struct pmc **ppm)
 	return 0;
 }
 
-/*
- * XXX don't know what we should do here.
- */
-static int
-armv7_switch_in(struct pmc_cpu *pc, struct pmc_process *pp)
-{
-
-	return 0;
-}
-
-static int
-armv7_switch_out(struct pmc_cpu *pc, struct pmc_process *pp)
-{
-
-	return 0;
-}
-
 static int
 armv7_pcpu_init(struct pmc_mdep *md, int cpu)
 {
@@ -434,7 +412,7 @@ armv7_pcpu_init(struct pmc_mdep *md, int cpu)
 
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
 	    ("[armv7,%d] wrong cpu number %d", __LINE__, cpu));
-	PMCDBG1(MDP, INI, 1, "armv7-init cpu=%d", cpu);
+	PMCDBG0(MDP, INI, 1, "armv7-pcpu-init");
 
 	armv7_pcpu[cpu] = pac = malloc(sizeof(struct armv7_cpu), M_PMC,
 	    M_WAITOK|M_ZERO);
@@ -470,6 +448,8 @@ armv7_pcpu_fini(struct pmc_mdep *md, int cpu)
 {
 	uint32_t pmnc;
 
+	PMCDBG0(MDP, INI, 1, "armv7-pcpu-fini");
+
 	pmnc = cp15_pmcr_get();
 	pmnc &= ~ARMV7_PMNC_ENABLE;
 	cp15_pmcr_set(pmnc);
@@ -478,6 +458,10 @@ armv7_pcpu_fini(struct pmc_mdep *md, int cpu)
 	cp15_pmcnten_clr(pmnc);
 	cp15_pminten_clr(pmnc);
 	cp15_pmovsr_set(pmnc);
+
+	free(armv7_pcpu[cpu]->pc_armv7pmcs, M_PMC);
+	free(armv7_pcpu[cpu], M_PMC);
+	armv7_pcpu[cpu] = NULL;
 
 	return 0;
 }
@@ -540,11 +524,8 @@ pmc_armv7_initialize(void)
 	pcd->pcd_stop_pmc       = armv7_stop_pmc;
 	pcd->pcd_write_pmc      = armv7_write_pmc;
 
-	pmc_mdep->pmd_intr       = armv7_intr;
-	pmc_mdep->pmd_switch_in  = armv7_switch_in;
-	pmc_mdep->pmd_switch_out = armv7_switch_out;
-	
-	pmc_mdep->pmd_npmc   += armv7_npmcs;
+	pmc_mdep->pmd_intr = armv7_intr;
+	pmc_mdep->pmd_npmc += armv7_npmcs;
 
 	return (pmc_mdep);
 }
@@ -552,5 +533,7 @@ pmc_armv7_initialize(void)
 void
 pmc_armv7_finalize(struct pmc_mdep *md)
 {
+	PMCDBG0(MDP, INI, 1, "armv7-finalize");
 
+	free(armv7_pcpu, M_PMC);
 }

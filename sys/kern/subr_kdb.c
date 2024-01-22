@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004 The FreeBSD Project
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_kdb.h"
 #include "opt_stack.h"
 
@@ -46,6 +44,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/smp.h>
 #include <sys/stack.h>
 #include <sys/sysctl.h>
+#include <sys/tslog.h>
 
 #include <machine/kdb.h>
 #include <machine/pcb.h>
@@ -502,11 +501,19 @@ kdb_dbbe_select(const char *name)
 }
 
 static bool
-kdb_backend_permitted(struct kdb_dbbe *be, struct ucred *cred)
+kdb_backend_permitted(struct kdb_dbbe *be, struct thread *td)
 {
+	struct ucred *cred;
 	int error;
 
-	error = securelevel_gt(cred, kdb_enter_securelevel);
+	cred = td->td_ucred;
+	if (cred == NULL) {
+		KASSERT(td == &thread0 && cold,
+		    ("%s: missing cred for %p", __func__, td));
+		error = 0;
+	} else {
+		error = securelevel_gt(cred, kdb_enter_securelevel);
+	}
 #ifdef MAC
 	/*
 	 * Give MAC a chance to weigh in on the policy: if the securelevel is
@@ -559,6 +566,7 @@ kdb_init(void)
 	struct kdb_dbbe *be, **iter;
 	int cur_pri, pri;
 
+	TSENTER();
 	kdb_active = 0;
 	kdb_dbbe = NULL;
 	cur_pri = -1;
@@ -582,6 +590,7 @@ kdb_init(void)
 		printf("KDB: current backend: %s\n",
 		    kdb_dbbe->dbbe_name);
 	}
+	TSEXIT();
 }
 
 /*
@@ -627,18 +636,18 @@ kdb_reenter_silent(void)
 struct pcb *
 kdb_thr_ctx(struct thread *thr)
 {
-#if defined(SMP) && defined(KDB_STOPPEDPCB)
+#ifdef SMP
 	struct pcpu *pc;
 #endif
 
 	if (thr == curthread)
 		return (&kdb_pcb);
 
-#if defined(SMP) && defined(KDB_STOPPEDPCB)
+#ifdef SMP
 	STAILQ_FOREACH(pc, &cpuhead, pc_allcpu)  {
 		if (pc->pc_curthread == thr &&
 		    CPU_ISSET(pc->pc_cpuid, &stopped_cpus))
-			return (KDB_STOPPEDPCB(pc));
+			return (&stoppcbs[pc->pc_cpuid]);
 	}
 #endif
 	return (thr->td_pcb);
@@ -773,7 +782,7 @@ kdb_trap(int type, int code, struct trapframe *tf)
 	cngrab();
 
 	for (;;) {
-		if (!kdb_backend_permitted(be, curthread->td_ucred)) {
+		if (!kdb_backend_permitted(be, curthread)) {
 			/* Unhandled breakpoint traps are fatal. */
 			handled = 1;
 			break;

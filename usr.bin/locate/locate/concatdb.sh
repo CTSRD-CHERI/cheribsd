@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) September 1995-2022 Wolfram Schneider <wosch@FreeBSD.org>
 # All rights reserved.
@@ -32,7 +32,6 @@
 #
 # Please note: the sequence of databases is important.
 #
-# $FreeBSD$
 
 # stop on first error
 set -e

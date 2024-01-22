@@ -33,8 +33,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 
 #include <machine/riscvreg.h>
@@ -105,6 +103,6 @@ __makecontext(ucontext_t *ucp, void (*func)(void), int argc, ...)
 #else
 	gp->gp_sepc = (__register_t)_ctx_start;
 #endif
-	CTX_REG(gp, s[0]) = (__register_t)func;
-	CTX_REG(gp, s[1]) = (__register_t)ucp;
+	CTX_REG(gp, s[0]) = (uintptr_t)func;
+	CTX_REG(gp, s[1]) = (uintptr_t)ucp;
 }

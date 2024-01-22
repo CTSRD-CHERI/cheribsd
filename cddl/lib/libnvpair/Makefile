@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .PATH: ${ZFSTOP}/module/nvpair
 .PATH: ${ZFSTOP}/lib/libnvpair

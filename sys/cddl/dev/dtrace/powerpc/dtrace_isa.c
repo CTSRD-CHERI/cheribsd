@@ -20,8 +20,6 @@
  * CDDL HEADER END
  *
  * Portions Copyright 2012,2013 Justin Hibbits <jhibbits@freebsd.org>
- *
- * $FreeBSD$
  */
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
@@ -530,26 +528,26 @@ dtrace_getstackdepth(int aframes)
 }
 
 ulong_t
-dtrace_getreg(struct trapframe *rp, uint_t reg)
+dtrace_getreg(struct trapframe *frame, uint_t reg)
 {
 	if (reg < 32)
-		return (rp->fixreg[reg]);
+		return (frame->fixreg[reg]);
 
 	switch (reg) {
 	case 32:
-		return (rp->lr);
+		return (frame->lr);
 	case 33:
-		return (rp->cr);
+		return (frame->cr);
 	case 34:
-		return (rp->xer);
+		return (frame->xer);
 	case 35:
-		return (rp->ctr);
+		return (frame->ctr);
 	case 36:
-		return (rp->srr0);
+		return (frame->srr0);
 	case 37:
-		return (rp->srr1);
+		return (frame->srr1);
 	case 38:
-		return (rp->exc);
+		return (frame->exc);
 	default:
 		DTRACE_CPUFLAG_SET(CPU_DTRACE_ILLOP);
 		return (0);

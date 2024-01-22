@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /* Routines for mapping device memory. */
 
 #include "opt_ddb.h"
@@ -161,12 +159,14 @@ devmap_add_entry(vm_paddr_t pa, vm_size_t sz)
 	KASSERT(sz == CHERI_REPRESENTABLE_LENGTH(sz),
 	    ("%s: devmap entry is not representable [0x%08jx, 0x%08jx]",
 	    __func__, (uintmax_t)va, (uintmax_t)va + sz));
-	KASSERT(va == CHERI_REPRESENTABLE_BASE(va, sz),
+	KASSERT(va == CHERI_REPRESENTABLE_ALIGN_DOWN(va, sz),
 	    ("%s: devmap entry is not representable [0x%08jx, 0x%08jx]",
 	     __func__, (uintmax_t)va, (uintmax_t)va + sz));
 #endif
+#ifndef __arm__
 	KASSERT(va >= VM_MAX_KERNEL_ADDRESS - PMAP_MAPDEV_EARLY_SIZE,
 	    ("%s: early devmap too small", __func__));
+#endif
 	akva_devmap_vaddr = va;
 
 	m = &akva_devmap_entries[akva_devmap_idx++];
@@ -308,8 +308,8 @@ pmap_mapdev(vm_paddr_t pa, vm_size_t size)
 		vm_pointer_t oldva = akva_devmap_vaddr;
 #endif
 		akva_devmap_vaddr -= CHERI_REPRESENTABLE_LENGTH(size);
-		akva_devmap_vaddr = CHERI_REPRESENTABLE_BASE(akva_devmap_vaddr,
-		    size);
+		akva_devmap_vaddr =
+		    CHERI_REPRESENTABLE_ALIGN_DOWN(akva_devmap_vaddr, size);
 		akva_devmap_vaddr = trunc_page(akva_devmap_vaddr);
 		va = (vm_pointer_t)cheri_setboundsexact(cheri_setaddress(
 		    devmap_capability, akva_devmap_vaddr), size);
@@ -354,8 +354,8 @@ pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma)
 		vm_pointer_t oldva = akva_devmap_vaddr;
 #endif
 		akva_devmap_vaddr -= CHERI_REPRESENTABLE_LENGTH(size);
-		akva_devmap_vaddr = CHERI_REPRESENTABLE_BASE(akva_devmap_vaddr,
-		    size);
+		akva_devmap_vaddr =
+		    CHERI_REPRESENTABLE_ALIGN_DOWN(akva_devmap_vaddr, size);
 		akva_devmap_vaddr = trunc_page(akva_devmap_vaddr);
 		va = (vm_pointer_t)cheri_setboundsexact(cheri_setaddress(
 		    devmap_capability, akva_devmap_vaddr), size);

@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)namei.h	8.5 (Berkeley) 1/9/95
- * $FreeBSD$
  */
 
 #ifndef _SYS_NAMEI_H_
@@ -158,7 +157,7 @@ int	cache_fplookup(struct nameidata *ndp, enum cache_fpl_status *status,
  * Namei parameter descriptors.
  */
 #define	RDONLY		0x00000200 /* lookup with read-only semantics */
-/* UNUSED		0x00000400 */
+#define	ISRESTARTED	0x00000400 /* restarted namei */
 /* UNUSED		0x00000800 */
 #define	ISWHITEOUT	0x00001000 /* found whiteout */
 #define	DOWHITEOUT	0x00002000 /* do whiteouts */
@@ -186,7 +185,7 @@ int	cache_fplookup(struct nameidata *ndp, enum cache_fpl_status *status,
  */
 #define NAMEI_INTERNAL_FLAGS	\
 	(NOEXECCHECK | MAKEENTRY | ISSYMLINK | ISLASTCN | ISDOTDOT | \
-	 TRAILINGSLASH)
+	 TRAILINGSLASH | ISRESTARTED)
 
 /*
  * Namei results flags
@@ -267,15 +266,6 @@ do {										\
 	(ndp)->ni_vp_seqc = SEQC_MOD;						\
 } while (0)
 
-#define NDF_NO_DVP_RELE		0x00000001
-#define NDF_NO_DVP_UNLOCK	0x00000002
-#define NDF_NO_DVP_PUT		0x00000003
-#define NDF_NO_VP_RELE		0x00000004
-#define NDF_NO_VP_UNLOCK	0x00000008
-#define NDF_NO_VP_PUT		0x0000000c
-#define NDF_NO_STARTDIR_RELE	0x00000010
-#define NDF_NO_FREE_PNBUF	0x00000020
-
 #define NDFREE_IOCTLCAPS(ndp) do {						\
 	struct nameidata *_ndp = (ndp);						\
 	filecaps_free(&_ndp->ni_filecaps);					\
@@ -292,6 +282,13 @@ int	namei(struct nameidata *ndp);
 int	vfs_lookup(struct nameidata *ndp);
 int	vfs_relookup(struct vnode *dvp, struct vnode **vpp,
 	    struct componentname *cnp, bool refstart);
+
+#define namei_setup_rootdir(ndp, cnp, pwd) do {					\
+	if (__predict_true((cnp->cn_flags & ISRESTARTED) == 0))			\
+		ndp->ni_rootdir = pwd->pwd_adir;				\
+	else									\
+		ndp->ni_rootdir = pwd->pwd_rdir;				\
+} while (0)
 #endif
 
 /*

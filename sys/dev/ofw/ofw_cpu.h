@@ -24,14 +24,12 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _DEV_OFW_OFW_CPU_H_
 #define _DEV_OFW_OFW_CPU_H_
 
-typedef boolean_t (*ofw_cpu_foreach_cb)(u_int, phandle_t, u_int, pcell_t *);
+typedef bool (*ofw_cpu_foreach_cb)(u_int, phandle_t, u_int, pcell_t *);
 int ofw_cpu_early_foreach(ofw_cpu_foreach_cb, boolean_t);
 
 #endif /* _DEV_OFW_OFW_CPU_H_ */

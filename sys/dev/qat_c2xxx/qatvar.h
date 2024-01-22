@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: BSD-2-Clause-NetBSD AND BSD-3-Clause */
+/* SPDX-License-Identifier: BSD-2-Clause AND BSD-3-Clause */
 /*	$NetBSD: qatvar.h,v 1.2 2020/03/14 18:08:39 ad Exp $	*/
 
 /*
@@ -57,7 +57,6 @@
  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* $FreeBSD$ */
 
 #ifndef _DEV_PCI_QATVAR_H_
 #define _DEV_PCI_QATVAR_H_

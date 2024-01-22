@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .include "Makefile.inc"
 
@@ -19,6 +18,9 @@ SUBDIR+=	fasttrap systrace_linux
 .endif
 .if ${MACHINE_CPUARCH} == "amd64"
 SUBDIR+=	systrace_linux32
+SUBDIR+=	kinst
+.endif
+.if ${MACHINE_CPUARCH} == "riscv" || ${MACHINE_CPUARCH} == "aarch64"
 SUBDIR+=	kinst
 .endif
 .if ${MACHINE_CPUARCH} == "powerpc"

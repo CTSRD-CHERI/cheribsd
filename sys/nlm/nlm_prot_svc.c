@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2008 Isilon Inc http://www.isilon.com/
  * Authors: Doug Rabson <dfr@rabson.org>
@@ -39,8 +39,6 @@
 /*static char sccsid[] = "from: * @(#)nlm_prot.x	2.1 88/08/01 4.0 RPCSRC";*/
 __RCSID("$NetBSD: nlm_prot.x,v 1.6 2000/06/07 14:30:15 bouyer Exp $");
 #endif /* not lint */
-__FBSDID("$FreeBSD$");
-
 void nlm_prog_0(struct svc_req *rqstp, SVCXPRT *transp);
 void nlm_prog_1(struct svc_req *rqstp, SVCXPRT *transp);
 void nlm_prog_3(struct svc_req *rqstp, SVCXPRT *transp);

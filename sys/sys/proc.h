@@ -34,7 +34,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)proc.h	8.15 (Berkeley) 5/19/95
- * $FreeBSD$
  */
 
 #ifndef _SYS_PROC_H_
@@ -113,6 +112,8 @@ struct pgrp {
 	pid_t		pg_id;		/* (c) Process group id. */
 	struct mtx	pg_mtx;		/* Mutex to protect members */
 	int		pg_flags;	/* (m) PGRP_ flags */
+	struct sx	pg_killsx;	/* Mutual exclusion between group member
+					 * fork() and killpg() */
 };
 
 #define	PGRP_ORPHANED	0x00000001	/* Group is orphaned */
@@ -271,11 +272,11 @@ struct thread {
 	const char	*td_wmesg;	/* (t) Reason for sleep. */
 	volatile u_char td_owepreempt;  /* (k*) Preempt on last critical_exit */
 	u_char		td_tsqueue;	/* (t) Turnstile queue blocked on. */
-	short		td_locks;	/* (k) Debug: count of non-spin locks */
-	short		td_rw_rlocks;	/* (k) Count of rwlock read locks. */
-	short		td_sx_slocks;	/* (k) Count of sx shared locks. */
-	short		td_lk_slocks;	/* (k) Count of lockmgr shared locks. */
-	short		td_stopsched;	/* (k) Scheduler stopped. */
+	u_char		td_stopsched;	/* (k) Scheduler stopped. */
+	int		td_locks;	/* (k) Debug: count of non-spin locks */
+	int		td_rw_rlocks;	/* (k) Count of rwlock read locks. */
+	int		td_sx_slocks;	/* (k) Count of sx shared locks. */
+	int		td_lk_slocks;	/* (k) Count of lockmgr shared locks. */
 	struct turnstile *td_blocked;	/* (t) Lock thread is blocked on. */
 	const char	*td_lockname;	/* (t) Name of lock blocked on. */
 	LIST_HEAD(, turnstile) td_contested;	/* (q) Contested locks. */
@@ -397,7 +398,11 @@ struct thread {
 
 struct thread0_storage {
 	struct thread t0st_thread;
+#ifdef __CHERI_PURE_CAPABILITY__
+	uint64_t t0st_sched[11];
+#else
 	uint64_t t0st_sched[10];
+#endif
 } __no_subobject_bounds;
 
 struct mtx *thread_lock_block(struct thread *);
@@ -434,7 +439,7 @@ do {									\
 #define	TD_LOCKS_INC(td)	((td)->td_locks++)
 #define	TD_LOCKS_DEC(td) do {						\
 	KASSERT(SCHEDULER_STOPPED_TD(td) || (td)->td_locks > 0,		\
-	    ("thread %p owns no locks", (td)));				\
+	    ("Thread %p owns no locks", (td)));				\
 	(td)->td_locks--;						\
 } while (0)
 #else
@@ -889,7 +894,13 @@ struct proc {
 #define	P2_WEXIT		0x00040000	/* exit just started, no
 						   external thread_single() is
 						   permitted */
-#define	P2_NOCOLOCATE		0x00080000
+#define	P2_REAPKILLED		0x00080000
+#define	P2_NOCOLOCATE		0x00100000
+
+#define	P2_CHERI_REVOKE_ENABLE	0x40000000	/* Force enable revocation */
+#define	P2_CHERI_REVOKE_DISABLE	0x80000000	/* Force disable revocation */
+#define	P2_CHERI_REVOKE_MASK \
+	(P2_CHERI_REVOKE_ENABLE | P2_CHERI_REVOKE_DISABLE)
 
 /* Flags protected by proctree_lock, kept in p_treeflags. */
 #define	P_TREE_ORPHANED		0x00000001	/* Reparented, on orphan list */
@@ -1290,6 +1301,12 @@ void	thread_suspend_one(struct thread *td);
 void	thread_unlink(struct thread *td);
 void	thread_unsuspend(struct proc *p);
 void	thread_wait(struct proc *p);
+
+#ifdef CHERI_CAPREVOKE
+struct vm_cheri_revoke_cookie;
+void cheri_revoke_td_frame(struct thread *td,
+    const struct vm_cheri_revoke_cookie *);
+#endif
 
 bool	stop_all_proc_block(void);
 void	stop_all_proc_unblock(void);

@@ -1,11 +1,9 @@
-# $FreeBSD$
 
 BINDIR= ${LIBEXECDIR}/bsdinstall
 PROG=	partedit
 LINKS= ${BINDIR}/partedit ${BINDIR}/autopart \
        ${BINDIR}/partedit ${BINDIR}/scriptedpart
 SYMLINKS= ../libexec/bsdinstall/partedit /usr/sbin/sade
-CFLAGS+=	-I${SRCTOP}/contrib/bsddialog/lib -I${.OBJDIR}/../distextract
 LIBADD+=	geom util bsddialog
 
 PARTEDIT_ARCH= ${MACHINE}

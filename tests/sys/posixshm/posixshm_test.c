@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
@@ -1410,7 +1408,7 @@ ATF_TC_BODY(largepage_mmap, tc)
 		ATF_REQUIRE(munmap(addr, ps[i] == 0));
 
 		/* Clobber an anonymous mapping with a superpage. */
-		addr1 = mmap(NULL, ps[0], PROT_READ | PROT_WRITE,
+		addr1 = mmap(NULL, ps[i], PROT_READ | PROT_WRITE,
 		    MAP_ANON | MAP_PRIVATE | MAP_ALIGNED(ffsl(ps[i]) - 1), -1,
 		    0);
 		ATF_REQUIRE_MSG(addr1 != MAP_FAILED,
@@ -1669,7 +1667,7 @@ largepage_protect(char *addr, size_t sz, int prot, int error)
 ATF_TC_WITHOUT_HEAD(largepage_mprotect);
 ATF_TC_BODY(largepage_mprotect, tc)
 {
-	char *addr, *addr1;
+	char *addr, *addr1, *res;
 	size_t ps[MAXPAGESIZES];
 	int fd, pscnt;
 
@@ -1679,14 +1677,14 @@ ATF_TC_BODY(largepage_mprotect, tc)
 		 * Reserve a contiguous region in the address space to avoid
 		 * spurious failures in the face of ASLR.
 		 */
-		addr = mmap(NULL, ps[i] * 2, PROT_NONE,
+		res = mmap(NULL, ps[i] * 2,
+		    PROT_NONE | PROT_MAX(PROT_READ | PROT_WRITE),
 		    MAP_ANON | MAP_ALIGNED(ffsl(ps[i]) - 1), -1, 0);
-		ATF_REQUIRE_MSG(addr != MAP_FAILED,
+		ATF_REQUIRE_MSG(res != MAP_FAILED,
 		    "mmap(%zu bytes) failed; error=%d", ps[i], errno);
-		ATF_REQUIRE(munmap(addr, ps[i] * 2) == 0);
 
 		fd = shm_open_large(i, SHM_LARGEPAGE_ALLOC_DEFAULT, ps[i]);
-		addr = mmap(addr, ps[i], PROT_READ | PROT_WRITE,
+		addr = mmap(res, ps[i], PROT_READ | PROT_WRITE,
 		    MAP_SHARED | MAP_FIXED, fd, 0);
 		ATF_REQUIRE_MSG(addr != MAP_FAILED,
 		    "mmap(%zu bytes) failed; error=%d", ps[i], errno);
@@ -1699,10 +1697,14 @@ ATF_TC_BODY(largepage_mprotect, tc)
 		largepage_protect(addr, ps[i], PROT_READ, 0);
 		largepage_protect(addr, ps[0], PROT_NONE, EINVAL);
 		largepage_protect(addr, ps[i], PROT_NONE, 0);
+#ifdef __CHERI_PURE_CAPABILITY__
+		largepage_protect(addr, ps[i], PROT_READ | PROT_WRITE, 0);
+#else
 		largepage_protect(addr, ps[0],
 		    PROT_READ | PROT_WRITE | PROT_EXEC, EINVAL);
 		largepage_protect(addr, ps[i],
 		    PROT_READ | PROT_WRITE | PROT_EXEC, 0);
+#endif
 
 		/* Trigger creation of a mapping and try again. */
 		*(volatile char *)addr = 0;
@@ -1710,24 +1712,28 @@ ATF_TC_BODY(largepage_mprotect, tc)
 		largepage_protect(addr, ps[i], PROT_READ, 0);
 		largepage_protect(addr, ps[0], PROT_NONE, EINVAL);
 		largepage_protect(addr, ps[i], PROT_NONE, 0);
+#ifdef __CHERI_PURE_CAPABILITY__
+		largepage_protect(addr, ps[i], PROT_READ | PROT_WRITE, 0);
+#else
 		largepage_protect(addr, ps[0],
 		    PROT_READ | PROT_WRITE | PROT_EXEC, EINVAL);
 		largepage_protect(addr, ps[i],
 		    PROT_READ | PROT_WRITE | PROT_EXEC, 0);
+#endif
 
 		memset(addr, 0, ps[i]);
 
 		/* Map two contiguous large pages and merge map entries. */
-		addr1 = mmap(addr + ps[i], ps[i], PROT_READ | PROT_WRITE,
-		    MAP_SHARED | MAP_FIXED | MAP_EXCL, fd, 0);
+		addr1 = mmap(res + ps[i], ps[i], PROT_READ | PROT_WRITE,
+		    MAP_SHARED | MAP_FIXED, fd, 0);
 		ATF_REQUIRE_MSG(addr1 != MAP_FAILED,
 		    "mmap(%zu bytes) failed; error=%d", ps[i], errno);
 
-		largepage_protect(addr1 - ps[0], ps[0] * 2,
+		largepage_protect(res + ps[i] - ps[0], ps[0] * 2,
 		    PROT_READ | PROT_WRITE, EINVAL);
-		largepage_protect(addr, ps[i] * 2, PROT_READ | PROT_WRITE, 0);
+		largepage_protect(res, ps[i] * 2, PROT_READ | PROT_WRITE, 0);
 
-		memset(addr, 0, ps[i] * 2);
+		memset(res, 0, ps[i] * 2);
 
 		ATF_REQUIRE(munmap(addr, ps[i]) == 0);
 		ATF_REQUIRE(munmap(addr1, ps[i]) == 0);

@@ -1,4 +1,3 @@
-/*	$FreeBSD$	*/
 /*	$KAME: key.c,v 1.191 2001/06/27 10:46:49 sakane Exp $	*/
 
 /*-
@@ -583,7 +582,7 @@ struct sadb_msghdr {
 	int extlen[SADB_EXT_MAX + 1];
 };
 
-static struct supported_ealgs {
+static const struct supported_ealgs {
 	int sadb_alg;
 	const struct enc_xform *xform;
 } supported_ealgs[] = {
@@ -595,7 +594,7 @@ static struct supported_ealgs {
 	{ SADB_X_EALG_CHACHA20POLY1305,	&enc_xform_chacha20_poly1305 },
 };
 
-static struct supported_aalgs {
+static const struct supported_aalgs {
 	int sadb_alg;
 	const struct auth_hash *xform;
 } supported_aalgs[] = {
@@ -610,7 +609,7 @@ static struct supported_aalgs {
 	{ SADB_X_AALG_CHACHA20POLY1305,	&auth_hash_poly1305 },
 };
 
-static struct supported_calgs {
+static const struct supported_calgs {
 	int sadb_alg;
 	const struct comp_algo *xform;
 } supported_calgs[] = {

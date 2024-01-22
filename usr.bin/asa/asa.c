@@ -38,15 +38,14 @@
 __RCSID("$NetBSD: asa.c,v 1.11 1997/09/20 14:55:00 lukem Exp $");
 #endif
 #endif
-__FBSDID("$FreeBSD$");
-
 #include <err.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 static void asa(FILE *);
-static void usage(void);
+static void usage(void) __dead2;
 
 int
 main(int argc, char *argv[])
@@ -71,15 +70,22 @@ main(int argc, char *argv[])
 		asa(stdin);
 	else {
 		while ((fn = *argv++) != NULL) {
-                        if ((fp = fopen(fn, "r")) == NULL) {
-				warn("%s", fn);
-				exval = 1;
-				continue;
-                        }
-			asa(fp);
-			fclose(fp);
+			if (strcmp(fn, "-") == 0) {
+				asa(stdin);
+			} else {
+				if ((fp = fopen(fn, "r")) == NULL) {
+					warn("%s", fn);
+					exval = 1;
+					continue;
+				}
+				asa(fp);
+				fclose(fp);
+			}
 		}
 	}
+
+	if (fflush(stdout) != 0)
+		err(1, "stdout");
 
 	exit(exval);
 }
@@ -140,4 +146,7 @@ asa(FILE *f)
 
 		putchar('\n');
 	}
+
+	if (ferror(stdout) != 0)
+		err(1, "stdout");
 }

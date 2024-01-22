@@ -25,7 +25,6 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD$
 #
 
 import argparse
@@ -168,7 +167,7 @@ def main():
 		sys.exit(1)
 
 	# Wait for expiry from first test run.
-	sleep(75)
+	sleep(3)
 	sniffer2.setEnd()
 	sniffer2.join()
 	if not sniffer2.foundCorrectPacket:

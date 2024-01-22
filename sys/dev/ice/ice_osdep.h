@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/*  Copyright (c) 2022, Intel Corporation
+/*  Copyright (c) 2023, Intel Corporation
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -28,7 +28,6 @@
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-/*$FreeBSD$*/
 
 /**
  * @file ice_osdep.h
@@ -71,6 +70,8 @@ void ice_debug_array(struct ice_hw *hw, uint64_t mask, uint32_t rowsize,
 		     uint32_t groupsize, uint8_t *buf, size_t len);
 void ice_info_fwlog(struct ice_hw *hw, uint32_t rowsize, uint32_t groupsize,
 		    uint8_t *buf, size_t len);
+
+#define ice_fls(_n) flsl(_n)
 
 #define ice_info(_hw, _fmt, args...) \
 	device_printf(ice_hw_to_dev(_hw), (_fmt), ##args)
@@ -208,8 +209,8 @@ void ice_msec_spin(uint32_t time);
  * to allow that structure to be inserted into a linked list. Access to the
  * contained structure is done via __containerof
  */
-struct ice_list_node {
-	LIST_ENTRY(ice_list_node) entries;
+struct __no_subobject_bounds ice_list_node {
+	LIST_ENTRY(ice_list_node) entries __no_subobject_bounds_fp;
 };
 
 /**

@@ -29,7 +29,6 @@
 # * Author : David C Somayajulu, Cavium, Inc., San Jose, CA 95131.
 # */
 #
-# $FreeBSD$
 #
 
 .PATH: ${SRCTOP}/sys/dev/qlnx/qlnxe
@@ -65,7 +64,6 @@ SRCS+=	${LINUXKPI_GENSRCS}
 .include <bsd.kmod.mk>
 
 #CFLAGS += -DQLNX_DEBUG
-CFLAGS += -DECORE_PACKAGE
 CFLAGS += -DCONFIG_ECORE_L2
 CFLAGS += -DECORE_CONFIG_DIRECT_HWFN
 
@@ -90,5 +88,3 @@ CFLAGS += -DCONFIG_ECORE_IWARP
 CFLAGS += -DCONFIG_ECORE_RDMA
 CFLAGS += -DQLNX_ENABLE_IWARP
 
-CWARNFLAGS+= -Wno-cast-qual
-CWARNFLAGS.ecore_ll2.c+= ${NO_WUNUSED_BUT_SET_VARIABLE}

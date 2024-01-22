@@ -26,12 +26,7 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -157,7 +152,7 @@ panfrost_mmu_find_mapping(struct panfrost_softc *sc, int as, uint64_t addr)
 
 	mapping = NULL;
 
-	mtx_lock_spin(&sc->as_mtx);
+	mtx_lock(&sc->as_mtx);
 
 	/* Find mmu first */
 	TAILQ_FOREACH(mmu, &sc->mmu_in_use, next) {
@@ -167,7 +162,7 @@ panfrost_mmu_find_mapping(struct panfrost_softc *sc, int as, uint64_t addr)
 	goto out;
 
 found:
-	mtx_lock_spin(&mmu->mm_lock);
+	mtx_lock(&mmu->mm_lock);
 
 	offset = addr >> PAGE_SHIFT;
 	drm_mm_for_each_node(node, &mmu->mm) {
@@ -180,10 +175,10 @@ found:
 		};
 	};
 
-	mtx_unlock_spin(&mmu->mm_lock);
+	mtx_unlock(&mmu->mm_lock);
 
 out:
-	mtx_unlock_spin(&sc->as_mtx);
+	mtx_unlock(&sc->as_mtx);
 
 	return (mapping);
 }
@@ -228,15 +223,31 @@ lock_region(struct panfrost_softc *sc, uint32_t as, vm_offset_t va,
 	uint8_t region_width;
 	uint64_t region;
 
-	/* Note: PAGE_PASK here includes ~ from linuxkpi */
-	region = va & PAGE_MASK;
+	if (size == 0)
+		return;
 
-	size = round_up(size, PAGE_SIZE);
+	region = va;
 
-	region_width = 10 + fls(size >> PAGE_SHIFT);
-	if ((size >> PAGE_SHIFT) != (1ul << (region_width - 11)))
-		region_width += 1;
-	region |= region_width;
+	/*
+	 * Region must be a naturally aligned power of 2 sized block. Find the
+	 * top bit that differs between region's start and end (inclusive)
+	 * addresses (NB: counts from 1).
+	 */
+	region_width = flsll(region ^ (region + (size - 1)));
+
+	/* Region must be at least 32K big */
+	if (region_width < 15)
+		region_width = 15;
+
+	/*
+	 * Mask out offset within block; we need to encode the width in the
+	 * very low bits, and the middle bits supposedly don't matter but are
+	 * recommended to be set to 0.
+	 */
+	region &= (~(uint64_t)0) << region_width;
+
+	/* Encoded width is log2 - 1 */
+	region |= region_width - 1;
 
 	GPU_WRITE(sc, AS_LOCKADDR_LO(as), region & 0xFFFFFFFFUL);
 	GPU_WRITE(sc, AS_LOCKADDR_HI(as), (region >> 32) & 0xFFFFFFFFUL);
@@ -266,9 +277,9 @@ mmu_hw_do_operation(struct panfrost_softc *sc,
 {
 	int error;
 
-	mtx_lock_spin(&sc->as_mtx);
+	mtx_lock(&sc->as_mtx);
 	error = mmu_hw_do_operation_locked(sc, mmu->as, va, size, op);
-	mtx_unlock_spin(&sc->as_mtx);
+	mtx_unlock(&sc->as_mtx);
 
 	return (error);
 }
@@ -464,10 +475,10 @@ panfrost_mmu_as_get(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 	bool found;
 	int as;
 
-	mtx_lock_spin(&sc->as_mtx);
+	mtx_lock(&sc->as_mtx);
 	if (mmu->as >= 0) {
 		atomic_add_int(&mmu->as_count, 1);
-		mtx_unlock_spin(&sc->as_mtx);
+		mtx_unlock(&sc->as_mtx);
 		return (mmu->as);
 	}
 
@@ -497,7 +508,7 @@ panfrost_mmu_as_get(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 	TAILQ_INSERT_TAIL(&sc->mmu_in_use, mmu, next);
 
 	panfrost_mmu_enable(sc, mmu);
-	mtx_unlock_spin(&sc->as_mtx);
+	mtx_unlock(&sc->as_mtx);
 
 	return (as);
 }
@@ -507,14 +518,14 @@ panfrost_mmu_reset(struct panfrost_softc *sc)
 {
 	struct panfrost_mmu *mmu, *tmp;
 
-	mtx_lock_spin(&sc->as_mtx);
+	mtx_lock(&sc->as_mtx);
 	TAILQ_FOREACH_SAFE(mmu, &sc->mmu_in_use, next, tmp) {
 		mmu->as = -1;
 		mmu->as_count = 0;
 		TAILQ_REMOVE(&sc->mmu_in_use, mmu, next);
 	}
 	sc->as_alloc_set = 0;
-	mtx_unlock_spin(&sc->as_mtx);
+	mtx_unlock(&sc->as_mtx);
 
 	GPU_WRITE(sc, MMU_INT_CLEAR, ~0);
 	GPU_WRITE(sc, MMU_INT_MASK, ~0);
@@ -634,12 +645,12 @@ panfrost_mmu_release_ctx(struct panfrost_mmu *mmu)
 	smmu_pmap_remove_pages(&mmu->p);
 	smmu_pmap_release(&mmu->p);
 
-	mtx_lock_spin(&sc->as_mtx);
+	mtx_lock(&sc->as_mtx);
 	if (mmu->as >= 0) {
 		sc->as_alloc_set &= ~(1 << mmu->as);
 		TAILQ_REMOVE(&sc->mmu_in_use, mmu, next);
 	}
-	mtx_unlock_spin(&sc->as_mtx);
+	mtx_unlock(&sc->as_mtx);
 
 	drm_mm_takedown(&mmu->mm);
 
@@ -689,7 +700,7 @@ panfrost_mmu_ctx_create(struct panfrost_softc *sc)
 	mmu = malloc(sizeof(*mmu), M_PANFROST, M_WAITOK | M_ZERO);
 	mmu->sc = sc;
 
-	mtx_init(&mmu->mm_lock, "mm", NULL, MTX_SPIN);
+	mtx_init(&mmu->mm_lock, "mm", NULL, MTX_DEF);
 
 	drm_mm_init(&mmu->mm, SZ_32MB >> PAGE_SHIFT,
 	    (SZ_4GB - SZ_32MB) >> PAGE_SHIFT);

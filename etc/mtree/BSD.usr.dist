@@ -1,4 +1,3 @@
-# $FreeBSD$
 #
 # Please see the file src/etc/mtree/README before making changes to this file.
 #
@@ -37,7 +36,7 @@
     ..
     lib
         clang
-            15.0.7
+            16
                 include
                     cuda_wrappers
                     ..
@@ -46,6 +45,8 @@
                     hlsl
                     ..
                     openmp_wrappers
+                    ..
+                    orc_rt
                     ..
                     ppc_wrappers
                     ..
@@ -68,7 +69,7 @@
         ..
         dtrace
         ..
-        engines
+        engines-3
         ..
         flua
         ..
@@ -77,6 +78,8 @@
         libxo
             encoder
             ..
+        ..
+        ossl-modules
         ..
     ..
     libdata
@@ -152,6 +155,8 @@
         ..
         dwatch
         ..
+        fwget
+        ..
         hyperv
         ..
         lpr
@@ -195,26 +200,6 @@
             ..
         ..
         calendar
-            de_AT.ISO_8859-15
-            ..
-            de_DE.ISO8859-1
-            ..
-            fr_FR.ISO8859-1
-            ..
-            hr_HR.ISO8859-2
-            ..
-            hu_HU.ISO8859-2
-            ..
-            pt_BR.ISO8859-1
-            ..
-            pt_BR.UTF-8
-            ..
-            ru_RU.KOI8-R
-            ..
-            ru_RU.UTF-8
-            ..
-            uk_UA.KOI8-U
-            ..
         ..
         certs
             trusted tags=package=caroot
@@ -272,6 +257,8 @@
             bootforth
             ..
             bsdconfig
+            ..
+            cheribsdtest
             ..
             csh
             ..

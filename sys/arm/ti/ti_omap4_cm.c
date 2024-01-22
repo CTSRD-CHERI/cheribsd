@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 Emmanuel Vadot <manu@FreeBSD.org>
  * Copyright (c) 2020 Oskar Holmlund <oskar.holmlund@ohdata.se>
@@ -26,13 +26,9 @@
  * SUCH DAMAGE.
  *
  * Based on sys/arm/ti/ti_sysc.c
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>

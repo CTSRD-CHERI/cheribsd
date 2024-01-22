@@ -37,8 +37,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_quota.h"
 #include "opt_ufs.h"
 
@@ -110,7 +108,7 @@ ufs_quotactl(struct mount *mp, int cmds, uid_t id, void * __capability arg,
 			return (EINVAL);
 		}
 	}
-	if ((u_int)type >= MAXQUOTAS)
+	if ((uint64_t)type >= MAXQUOTAS)
 		return (EINVAL);
 
 	switch (cmd) {

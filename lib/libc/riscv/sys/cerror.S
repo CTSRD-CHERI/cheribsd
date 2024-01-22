@@ -34,17 +34,17 @@
 
 #include <machine/asm.h>
 #include "SYS.h"
-__FBSDID("$FreeBSD$");
 
 #define FRAME_SIZE	(2 * __SIZEOF_POINTER__) /* Always multiple of 16 */
 #define SPILLSLOT_RA	(0 * __SIZEOF_POINTER__)
 #define SPILLSLOT_ERRNO	(1 * __SIZEOF_POINTER__)
+
 ENTRY(cerror)
 #ifdef __CHERI_PURE_CAPABILITY__
 	cincoffset	csp, csp, -FRAME_SIZE
 	csc	cra, SPILLSLOT_RA(csp)
 	csd	a0, SPILLSLOT_ERRNO(csp)	# spill new errno value
-	ASM_LOCAL_CALL(t1, __error)		# locate address of errno (in ca0)
+	ccall	_C_LABEL(__error)		# locate address of errno (in ca0)
 	cld	a1, SPILLSLOT_ERRNO(csp)	# re-load new errno value
 	csw	a1, 0(ca0)			# update errno value
 	clc	cra, SPILLSLOT_RA(csp)

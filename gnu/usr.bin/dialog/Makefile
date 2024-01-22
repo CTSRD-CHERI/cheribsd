@@ -1,6 +1,3 @@
-# $FreeBSD$
-
-.include <src.opts.mk>
 
 DIALOG=	${SRCTOP}/contrib/dialog
 PROG=   dialog

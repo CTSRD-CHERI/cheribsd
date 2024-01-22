@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * ------+---------+---------+---------+---------+---------+---------+---------*
  * Copyright (c) 2001  - Garance Alistair Drosehn <gad@FreeBSD.org>.
@@ -34,8 +34,6 @@
  */
 
 #include "lp.cdefs.h"		/* A cross-platform version of <sys/cdefs.h> */
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 
 #include <ctype.h>

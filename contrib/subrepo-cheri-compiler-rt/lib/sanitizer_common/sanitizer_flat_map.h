@@ -85,8 +85,8 @@ class TwoLevelMap {
     Init();
   }
 
-  uptr MemoryUsage() const {
-    uptr res = 0;
+  usize MemoryUsage() const {
+    usize res = 0;
     for (uptr i = 0; i < kSize1; i++) {
       T *p = Get(i);
       if (!p)
@@ -96,9 +96,9 @@ class TwoLevelMap {
     return res;
   }
 
-  constexpr uptr size() const { return kSize1 * kSize2; }
-  constexpr uptr size1() const { return kSize1; }
-  constexpr uptr size2() const { return kSize2; }
+  constexpr usize size() const { return kSize1 * kSize2; }
+  constexpr usize size1() const { return kSize1; }
+  constexpr usize size2() const { return kSize2; }
 
   bool contains(uptr idx) const {
     CHECK_LT(idx, kSize1 * kSize2);

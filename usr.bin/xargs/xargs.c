@@ -46,8 +46,6 @@ static char sccsid[] = "@(#)xargs.c	8.1 (Berkeley) 6/6/93";
 #endif /* not lint */
 #endif
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/time.h>
@@ -124,7 +122,6 @@ main(int argc, char *argv[])
 	int ch, Jflag, nargs, nflag, nline;
 	size_t linelen;
 	struct rlimit rl;
-	char *endptr;
 	const char *errstr;
 
 	inpline = replstr = NULL;
@@ -175,23 +172,23 @@ main(int argc, char *argv[])
 			replstr = optarg;
 			break;
 		case 'L':
-			Lflag = strtonum(optarg, 0, INT_MAX, &errstr);
+			Lflag = (int)strtonum(optarg, 1, INT_MAX, &errstr);
 			if (errstr)
-				errx(1, "-L %s: %s", optarg, errstr);
+				errx(1, "-%c %s: %s", ch, optarg, errstr);
 			break;
 		case 'n':
 			nflag = 1;
-			nargs = strtonum(optarg, 1, INT_MAX, &errstr);
+			nargs = (int)strtonum(optarg, 1, INT_MAX, &errstr);
 			if (errstr)
-				errx(1, "-n %s: %s", optarg, errstr);
+				errx(1, "-%c %s: %s", ch, optarg, errstr);
 			break;
 		case 'o':
 			oflag = 1;
 			break;
 		case 'P':
-			maxprocs = strtonum(optarg, 0, INT_MAX, &errstr);
+			maxprocs = (int)strtonum(optarg, 0, INT_MAX, &errstr);
 			if (errstr)
-				errx(1, "-P %s: %s", optarg, errstr);
+				errx(1, "-%c %s: %s", ch, optarg, errstr);
 			if (getrlimit(RLIMIT_NPROC, &rl) != 0)
 				errx(1, "getrlimit failed");
 			if (maxprocs == 0 || maxprocs > rl.rlim_cur)
@@ -201,22 +198,24 @@ main(int argc, char *argv[])
 			pflag = 1;
 			break;
 		case 'R':
-			Rflag = strtol(optarg, &endptr, 10);
-			if (*endptr != '\0')
-				errx(1, "replacements must be a number");
+			Rflag = (int)strtonum(optarg, INT_MIN, INT_MAX, &errstr);
+			if (errstr)
+				errx(1, "-%c %s: %s", ch, optarg, errstr);
+			if (!Rflag)
+				errx(1, "-%c %s: %s", ch, optarg, "must be non-zero");
 			break;
 		case 'r':
 			/* GNU compatibility */
 			break;
 		case 'S':
-			Sflag = strtoul(optarg, &endptr, 10);
-			if (*endptr != '\0')
-				errx(1, "replsize must be a number");
+			Sflag = (int)strtonum(optarg, 0, INT_MAX, &errstr);
+			if (errstr)
+				errx(1, "-%c %s: %s", ch, optarg, errstr);
 			break;
 		case 's':
-			nline = strtonum(optarg, 0, INT_MAX, &errstr);
+			nline = (int)strtonum(optarg, 0, INT_MAX, &errstr);
 			if (errstr)
-				errx(1, "-s %s: %s", optarg, errstr);
+				errx(1, "-%c %s: %s", ch, optarg, errstr);
 			break;
 		case 't':
 			tflag = 1;
@@ -256,7 +255,7 @@ main(int argc, char *argv[])
 	 * the maximum arguments to be read from stdin and the trailing
 	 * NULL.
 	 */
-	linelen = 1 + argc + nargs + 1;
+	linelen = 1 + argc + (size_t)nargs + 1;
 	if ((av = bxp = malloc(linelen * sizeof(char *))) == NULL)
 		errx(1, "malloc failed");
 
@@ -526,7 +525,7 @@ prerun(int argc, char *argv[])
 		*tmp = *avj++;
 		if (repls && strstr(*tmp, replstr) != NULL) {
 			if (strnsubst(tmp++, replstr, inpline, (size_t)Sflag)) {
-				warnx("comamnd line cannot be assembled, too long");
+				warnx("command line cannot be assembled, too long");
 				xexit(*argv, 1);
 			}
 			if (repls > 0)

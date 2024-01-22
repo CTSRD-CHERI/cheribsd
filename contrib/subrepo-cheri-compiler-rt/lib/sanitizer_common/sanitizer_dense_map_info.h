@@ -189,6 +189,21 @@ struct DenseMapInfo<unsigned long long> {
   }
 };
 
+#ifdef __CHERI_PURE_CAPABILITY__
+template <>
+struct DenseMapInfo<uptr> {
+  static constexpr uptr Log2MaxAlign = DenseMapInfo<void *>::Log2MaxAlign;
+  static constexpr uptr getEmptyKey() { return ~0ULL; }
+  static constexpr uptr getTombstoneKey() { return ~0ULL - 1ULL; }
+  static constexpr unsigned getHashValue(const uptr &Val) {
+    return unsigned(Val >> 4) ^ unsigned(Val >> 9);
+  }
+  static constexpr bool isEqual(const uptr &LHS, const uptr &RHS) {
+    return LHS == RHS;
+  }
+};
+#endif
+
 // Provide DenseMapInfo for shorts.
 template <>
 struct DenseMapInfo<short> {

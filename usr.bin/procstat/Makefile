@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .include <src.opts.mk>
 
@@ -10,6 +9,7 @@ SRCS=	procstat.c		\
 	procstat_auxv.c		\
 	procstat_basic.c	\
 	procstat_bin.c		\
+	procstat_cheri.c	\
 	procstat_cred.c		\
 	procstat_cs.c		\
 	procstat_files.c	\

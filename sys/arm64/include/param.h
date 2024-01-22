@@ -27,8 +27,11 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)param.h	5.8 (Berkeley) 6/28/91
- * $FreeBSD$
  */
+
+#ifdef __arm__
+#include <arm/param.h>
+#else /* !__arm__ */
 
 #ifndef _MACHINE_PARAM_H_
 #define	_MACHINE_PARAM_H_
@@ -52,6 +55,9 @@
 # ifndef MACHINE_ARCH
 #  define	MACHINE_ARCH	"aarch64c"
 # endif
+# ifndef MACHINE_ARCH64CB
+#  define	MACHINE_ARCH64CB	"aarch64cb"
+# endif
 # ifndef MACHINE_ARCH64
 #  define	MACHINE_ARCH64	"aarch64"
 # endif
@@ -66,7 +72,7 @@
 
 #ifdef SMP
 #ifndef MAXCPU
-#define	MAXCPU		256
+#define	MAXCPU		1024
 #endif
 #else
 #define	MAXCPU		1
@@ -134,3 +140,5 @@
 #define	arm64_ptob(x)		((unsigned long)(x) << PAGE_SHIFT)
 
 #endif /* !_MACHINE_PARAM_H_ */
+
+#endif /* !__arm__ */

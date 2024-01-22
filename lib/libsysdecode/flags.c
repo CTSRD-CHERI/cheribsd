@@ -24,8 +24,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #define L2CAP_SOCKET_CHECKED
 
 #include <sys/types.h>
@@ -47,6 +45,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/stat.h>
 #include <sys/thr.h>
 #include <sys/umtx.h>
+#include <cheri/revoke.h>
 #include <machine/sysarch.h>
 #include <netinet/in.h>
 #include <netinet/sctp.h>
@@ -241,6 +240,18 @@ sysdecode_cap_fcntlrights(FILE *fp, uint32_t rights, uint32_t *rem)
 {
 
 	return (print_mask_int(fp, capfcntl, rights, rem));
+}
+
+bool
+sysdecode_cr_flags(FILE *fp, int flags, int *rem)
+{
+	return (print_mask_int(fp, cr_flags, flags, rem));
+}
+
+bool
+sysdecode_cr_get_shadow_flags(FILE *fp, int flags, int *rem)
+{
+	return (print_mask_int(fp, cr_get_shadow_flags, flags, rem));
 }
 
 bool
@@ -920,20 +931,11 @@ sysdecode_mmap_flags(FILE *fp, int flags, int *rem)
 
 	/*
 	 * MAP_ALIGNED can't be handled directly by print_mask_int().
-	 * MAP_32BIT is also problematic since it isn't defined for
-	 * all platforms.
 	 */
 	printed = false;
 	align = flags & MAP_ALIGNMENT_MASK;
 	val = (unsigned)flags & ~MAP_ALIGNMENT_MASK;
 	print_mask_part(fp, mmapflags, &val, &printed);
-#ifdef MAP_32BIT
-	if (val & MAP_32BIT) {
-		fprintf(fp, "%sMAP_32BIT", printed ? "|" : "");
-		printed = true;
-		val &= ~MAP_32BIT;
-	}
-#endif
 	if (align != 0) {
 		if (printed)
 			fputc('|', fp);

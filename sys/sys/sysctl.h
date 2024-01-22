@@ -32,7 +32,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)sysctl.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD$
  */
 
 #ifndef _SYS_SYSCTL_H_
@@ -60,7 +59,7 @@
 
 #define	CTL_MAXNAME	24	/* largest number of components supported */
 
-#define	CTLTYPE		0xf	/* mask for the type */
+#define	CTLTYPE		0x1f	/* mask for the type */
 #define	CTLTYPE_NODE	1	/* name is a node */
 #define	CTLTYPE_INT	2	/* name describes an integer */
 #define	CTLTYPE_STRING	3	/* name describes a string */
@@ -77,6 +76,7 @@
 #define	CTLTYPE_S16	0xd	/* name describes a signed 16-bit number */
 #define	CTLTYPE_S32	0xe	/* name describes a signed 32-bit number */
 #define	CTLTYPE_U32	0xf	/* name describes an unsigned 32-bit number */
+#define	CTLTYPE_CAP	0x10	/* name describes a CHERI capability */
 
 #define	CTLFLAG_RD	0x80000000	/* Allow reads of variable */
 #define	CTLFLAG_WR	0x40000000	/* Allow writes to the variable */
@@ -239,6 +239,7 @@ int sysctl_handle_string(SYSCTL_HANDLER_ARGS);
 int sysctl_handle_opaque(SYSCTL_HANDLER_ARGS);
 int sysctl_handle_counter_u64(SYSCTL_HANDLER_ARGS);
 int sysctl_handle_counter_u64_array(SYSCTL_HANDLER_ARGS);
+int sysctl_handle_cap(SYSCTL_HANDLER_ARGS);
 
 int sysctl_handle_uma_zone_max(SYSCTL_HANDLER_ARGS);
 int sysctl_handle_uma_zone_cur(SYSCTL_HANDLER_ARGS);
@@ -926,6 +927,16 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 	    NULL);							\
 })
 
+#if __has_feature(capabilities)
+#define	SYSCTL_CAPABILITY(parent, nbr, name, access, ptr, val, descr)	\
+	SYSCTL_OID(parent, nbr, name,				\
+	    CTLTYPE_CAP | CTLFLAG_MPSAFE | (access),		\
+	    ptr, val, sysctl_handle_cap, "P", descr);		\
+	CTASSERT((((access) & CTLTYPE) == 0 ||			\
+	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_CAP) && \
+	    sizeof(uintcap_t) == sizeof(*(ptr)))
+#endif
+
 #define	SYSCTL_FOREACH(oidp, list) \
 	RB_FOREACH(oidp, sysctl_oid_list, list)
 
@@ -1045,6 +1056,10 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 #define	KERN_PROC_NFDS		43	/* number of open file descriptors */
 #define	KERN_PROC_SIGFASTBLK	44	/* address of fastsigblk magic word */
 #define	KERN_PROC_VM_LAYOUT	45	/* virtual address space layout info */
+
+#define	KERN_PROC_QUARANTINING	46	/* is this process quarantining? */
+#define	KERN_PROC_REVOKER_STATE	47	/* revoker state */
+#define	KERN_PROC_REVOKER_EPOCH	48	/* revoker epoch */
 
 /*
  * KERN_IPC identifiers

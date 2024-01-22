@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997 Berkeley Software Design, Inc. All rights reserved.
  *
@@ -28,7 +28,6 @@
  * SUCH DAMAGE.
  *
  *	from BSDI Id: mutex.h,v 2.7.2.35 2000/04/27 03:10:26 cp
- * $FreeBSD$
  */
 
 #ifndef _SYS_LOCK_H_
@@ -182,7 +181,7 @@ extern u_short locks_delay_loops;
 
 struct lock_delay_arg {
 	struct lock_delay_config *config;
-	u_short delay;
+	u_int delay;
 	u_int spin_cnt;
 };
 

@@ -25,8 +25,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef _LINUXKPI_LINUX_LIST_H_
 #define _LINUXKPI_LINUX_LIST_H_
@@ -464,6 +462,20 @@ static inline int list_is_last(const struct list_head *list,
 				const struct list_head *head)
 {
 	return list->next == head;
+}
+
+static inline size_t
+list_count_nodes(const struct list_head *list)
+{
+	const struct list_head *lh;
+	size_t count;
+
+	count = 0;
+	list_for_each(lh, list) {
+		count++;
+	}
+
+	return (count);
 }
 
 #define	hlist_entry(ptr, type, field)	container_of(ptr, type, field)

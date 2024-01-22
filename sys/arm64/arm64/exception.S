@@ -27,8 +27,6 @@
 
 #include <machine/asm.h>
 #include <machine/armreg.h>
-__FBSDID("$FreeBSD$");
-
 #include "assym.inc"
 
 	.text
@@ -81,6 +79,7 @@ __FBSDID("$FreeBSD$");
 .endm
 
 .macro	save_registers el
+	add	PTR(29), PTRN(sp), #(TF_SIZE)
 .if \el == 0
 #if defined(PERTHREAD_SSP)
 	/* Load the SSP canary to sp_el0 */

@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_var.h	8.2 (Berkeley) 1/9/95
- * $FreeBSD$
  */
 
 #ifndef _NETINET_IP_VAR_H_
@@ -254,6 +253,10 @@ ipproto_ctlinput_t	rip_ctlinput;
 VNET_DECLARE(struct pfil_head *, inet_pfil_head);
 #define	V_inet_pfil_head	VNET(inet_pfil_head)
 #define	PFIL_INET_NAME		"inet"
+
+VNET_DECLARE(struct pfil_head *, inet_local_pfil_head);
+#define	V_inet_local_pfil_head	VNET(inet_local_pfil_head)
+#define	PFIL_INET_LOCAL_NAME	"inet-local"
 
 void	in_delayed_cksum(struct mbuf *m);
 

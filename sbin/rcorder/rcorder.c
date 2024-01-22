@@ -3,7 +3,7 @@
 #endif
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998, 1999 Matthew R. Green
  * All rights reserved.
@@ -40,8 +40,6 @@
  */
 
 #include <sys/types.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/stat.h>
 
 #include <err.h>

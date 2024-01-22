@@ -26,7 +26,6 @@
  * SUCH DAMAGE.
  *
  * $Id: hccontrol.c,v 1.5 2003/09/05 00:38:24 max Exp $
- * $FreeBSD$
  */
 
 #include <sys/types.h>
@@ -1365,4 +1364,7 @@ struct hci_command le_commands[] = {
 	  "Generate 64 bits of random data",
 	  &le_rand
   },
+  {
+	  NULL,
+  }
 };

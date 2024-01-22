@@ -33,8 +33,6 @@
 #include "opt_platform.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -126,8 +124,6 @@ static void ipi_preempt(void *);
 static void ipi_rendezvous(void *);
 static void ipi_stop(void *);
 
-struct pcb stoppcbs[MAXCPU];
-
 #ifdef FDT
 static u_int fdt_cpuid;
 #endif
@@ -149,7 +145,7 @@ static volatile int aps_started;
 static volatile int aps_ready;
 
 /* Temporary variables for init_secondary()  */
-void *dpcpu[MAXCPU - 1];
+static void *dpcpu[MAXCPU - 1];
 
 static bool
 is_boot_cpu(uint64_t target_cpu)
@@ -272,7 +268,7 @@ init_secondary(uint64_t cpu)
 	cpu_initclocks_ap();
 
 #ifdef VFP
-	vfp_init();
+	vfp_init_secondary();
 #endif
 
 	dbg_init();
@@ -683,7 +679,7 @@ populate_release_addr(phandle_t node, vm_paddr_t *release_addr)
 	*release_addr = (((uintptr_t)buf[0] << 32) | buf[1]);
 }
 
-static boolean_t
+static bool
 start_cpu_fdt(u_int id, phandle_t node, u_int addr_size, pcell_t *reg)
 {
 	uint64_t target_cpu;
@@ -712,11 +708,11 @@ start_cpu_fdt(u_int id, phandle_t node, u_int addr_size, pcell_t *reg)
 	if (!psci_present && cpuid != 0) {
 		if (OF_getprop_alloc(node, "enable-method",
 		    (void **)&enable_method) <= 0)
-			return (FALSE);
+			return (false);
 
 		if (strcmp(enable_method, "spin-table") != 0) {
 			OF_prop_free(enable_method);
-			return (FALSE);
+			return (false);
 		}
 
 		OF_prop_free(enable_method);
@@ -724,12 +720,12 @@ start_cpu_fdt(u_int id, phandle_t node, u_int addr_size, pcell_t *reg)
 		if (release_addr == 0) {
 			printf("Failed to fetch release address for CPU %u",
 			    cpuid);
-			return (FALSE);
+			return (false);
 		}
 	}
 
 	if (!start_cpu(cpuid, target_cpu, 0, release_addr))
-		return (FALSE);
+		return (false);
 
 	/*
 	 * Don't increment for the boot CPU, its CPU ID is reserved.
@@ -744,7 +740,7 @@ start_cpu_fdt(u_int id, phandle_t node, u_int addr_size, pcell_t *reg)
 	cpuid_to_pcpu[cpuid]->pc_domain = domain;
 	if (domain < MAXMEMDOM)
 		CPU_SET(cpuid, &cpuset_domain[domain]);
-	return (TRUE);
+	return (true);
 }
 static void
 cpu_init_fdt(void)
@@ -776,6 +772,8 @@ cpu_mp_start(void)
 	CPU_SET(0, &all_cpus);
 	mpidr = READ_SPECIALREG(mpidr_el1) & CPU_AFF_MASK;
 	cpuid_to_pcpu[0]->pc_mpidr = mpidr;
+
+	cpu_desc_init();
 
 	switch(arm64_bus_method) {
 #ifdef DEV_ACPI

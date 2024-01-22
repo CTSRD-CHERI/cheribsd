@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright 1998, 2000 Marshall Kirk McKusick. All Rights Reserved.
  *
@@ -38,7 +38,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)softdep.h	9.7 (McKusick) 6/21/00
- * $FreeBSD$
  */
 
 #include <sys/queue.h>
@@ -562,7 +561,7 @@ struct freefrag {
 	ufs2_daddr_t ff_blkno;		/* fragment physical block number */
 	long	ff_fragsize;		/* size of fragment being deleted */
 	ino_t	ff_inum;		/* owning inode number */
-	enum	vtype ff_vtype;		/* owning inode's file type */
+	__enum_uint8(vtype) ff_vtype;	/* owning inode's file type */
 	int	ff_key;			/* trim key when deleted */
 };
 
@@ -590,7 +589,7 @@ struct freeblks {
 	off_t	fb_len;			/* Length we're truncating to. */
 	ufs2_daddr_t fb_chkcnt;		/* Blocks released. */
 	ino_t	fb_inum;		/* inode owner of blocks */
-	enum	vtype fb_vtype;		/* inode owner's file type */
+	__enum_uint8(vtype) fb_vtype;	/* inode owner's file type */
 	uid_t	fb_uid;			/* uid of previous owner of blocks */
 	int	fb_ref;			/* Children outstanding. */
 	int	fb_cgwait;		/* cg writes outstanding. */
@@ -1065,7 +1064,7 @@ struct mount_softdeps {
 	struct	bmsafemap_hashhead *sd_bmhash;	/* bmsafemap hash table */
 	u_long	sd_bmhashsize;			/* bmsafemap hash table size-1*/
 	struct	indir_hashhead *sd_indirhash;	/* indir hash table */
-	u_long	sd_indirhashsize;		/* indir hash table size-1 */
+	uint64_t sd_indirhashsize;		/* indir hash table size-1 */
 	int	sd_on_journal;			/* Items on the journal list */
 	int	sd_on_worklist;			/* Items on the worklist */
 	int	sd_deps;			/* Total dependency count */
@@ -1076,7 +1075,7 @@ struct mount_softdeps {
 	struct	thread *sd_flushtd;		/* thread handling flushing */
 	TAILQ_ENTRY(mount_softdeps) sd_next;	/* List of softdep filesystem */
 	struct	ufsmount *sd_ump;		/* our ufsmount structure */
-	u_long	sd_curdeps[D_LAST + 1];		/* count of current deps */
+	uint64_t sd_curdeps[D_LAST + 1];	/* count of current deps */
 	struct	workhead sd_alldeps[D_LAST + 1];/* Lists of all deps */
 };
 /*

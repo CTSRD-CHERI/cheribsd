@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright 1996-1998 John D. Polstra.
  * All rights reserved.
@@ -23,8 +23,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 /*
  * CHERI CHANGES START
@@ -53,6 +51,9 @@
 
 #include "debug.h"
 #include "rtld.h"
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#include "rtld_c18n.h"
+#endif
 
 static Elf_Ehdr *get_elf_header(int, const char *, const struct stat *,
     const char*, Elf_Phdr **phdr);
@@ -273,7 +274,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 #endif
     }
 
-    dbg("Allocating entire object: mmap(" PTR_FMT ", 0x%lx, 0x%x, 0x%x, -1, 0)",
+    dbg("Allocating entire object: mmap(" PTR_FMT ", 0x%zx, 0x%x, 0x%x, -1, 0)",
 	    base_addr, mapsize, PROT_NONE | PROT_MAX(_PROT_ALL), base_flags);
     mapbase = mmap(base_addr, mapsize, PROT_NONE | PROT_MAX(_PROT_ALL),
 	base_flags, -1, 0);
@@ -425,9 +426,6 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	obj->tlsinitsize = phtls->p_filesz;
 	obj->tlsinit = mapbase + phtls->p_vaddr;
     }
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    obj->compart_id = ++compart_max_index;
-#endif
 #ifndef __CHERI_PURE_CAPABILITY__
     obj->stack_flags = stack_flags;
 #endif
@@ -509,12 +507,6 @@ get_elf_header(int fd, const char *path, const struct stat *sbp,
 	if (!check_elf_headers(hdr, path))
 		goto error;
 
-#ifndef ELF_IS_CHERI
-#if __has_feature(capabilities)
-#error "Must have ELF_IS_CHERI for CHERI architectures"
-#endif
-#define ELF_IS_CHERI(hdr) false
-#endif
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (!ELF_IS_CHERI(hdr))
 #else
@@ -564,7 +556,7 @@ obj_free(Obj_Entry *obj)
 {
     Objlist_Entry *elm;
 
-    if (obj->tls_done)
+    if (obj->tls_static)
 	free_tls_offset(obj);
     while (obj->needed != NULL) {
 	Needed_Entry *needed = obj->needed;
@@ -610,10 +602,6 @@ obj_new(void)
     STAILQ_INIT(&obj->dldags);
     STAILQ_INIT(&obj->dagmembers);
     STAILQ_INIT(&obj->names);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    SLIST_INIT(&obj->stacks);
-    obj->stackslock = lockinfo.lock_create();
-#endif
     return obj;
 }
 

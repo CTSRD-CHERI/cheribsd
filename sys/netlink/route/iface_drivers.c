@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2022 Alexander V. Chernikov <melifaro@FreeBSD.org>
  *
@@ -27,7 +27,6 @@
 
 #include "opt_netlink.h"
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include <sys/types.h>
@@ -57,7 +56,7 @@ __FBSDID("$FreeBSD$");
 #define	DEBUG_MOD_NAME	nl_iface_drivers
 #define	DEBUG_MAX_LEVEL	LOG_DEBUG3
 #include <netlink/netlink_debug.h>
-_DECLARE_DEBUG(LOG_DEBUG);
+_DECLARE_DEBUG(LOG_INFO);
 
 /*
  * Generic modification interface handler.
@@ -77,7 +76,7 @@ _nl_modify_ifp_generic(struct ifnet *ifp, struct nl_parsed_link *lattrs,
 
 			memcpy(buf, lattrs->ifla_ifalias, len);
 			if_setdescr(ifp, buf);
-			getmicrotime(&ifp->if_lastchange);
+			if_setlastchange(ifp);
 		} else {
 			nlmsg_report_err_msg(npt, "Not enough privileges to set descr");
 			return (EPERM);
@@ -122,7 +121,7 @@ void
 _nl_store_ifp_cookie(struct nl_pstate *npt, struct ifnet *ifp)
 {
 	int ifname_len = strlen(if_name(ifp));
-	uint32_t ifindex = (uint32_t)ifp->if_index;
+	uint32_t ifindex = (uint32_t)if_getindex(ifp);
 
 	int nla_len = sizeof(struct nlattr) * 3 +
 		sizeof(ifindex) + NL_ITEM_ALIGN(ifname_len + 1);

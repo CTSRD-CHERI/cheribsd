@@ -1,4 +1,3 @@
-/* $FreeBSD$ */
 
 #ifndef _MACHINE_SMP_H_
 #define _MACHINE_SMP_H_
@@ -28,8 +27,5 @@ void	ipi_selected(cpuset_t cpus, u_int ipi);
 /* Platform interface */
 void	platform_mp_setmaxid(void);
 void	platform_mp_start_ap(void);
-
-/* global data in mp_machdep.c */
-extern struct pcb               stoppcbs[];
 
 #endif /* !_MACHINE_SMP_H_ */

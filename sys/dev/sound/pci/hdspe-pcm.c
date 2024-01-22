@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012-2021 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
@@ -39,8 +39,6 @@
 #include <dev/pci/pcivar.h>
 
 #include <mixer_if.h>
-
-SND_DECLARE_FILE("$FreeBSD$");
 
 struct hdspe_latency {
 	uint32_t n;

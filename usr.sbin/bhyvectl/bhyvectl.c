@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
@@ -24,13 +24,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/cpuset.h>
@@ -190,6 +186,7 @@ usage(bool cpu_intel)
 	"       [--set-rtc-nvram=<val>]\n"
 	"       [--rtc-nvram-offset=<offset>]\n"
 	"       [--get-active-cpus]\n"
+	"       [--get-debug-cpus]\n"
 	"       [--get-suspended-cpus]\n"
 	"       [--get-intinfo]\n"
 	"       [--get-eptp]\n"
@@ -265,7 +262,7 @@ static int force_reset, force_poweroff;
 static const char *capname;
 static int create, destroy, get_memmap, get_memseg;
 static int get_intinfo;
-static int get_active_cpus, get_suspended_cpus;
+static int get_active_cpus, get_debug_cpus, get_suspended_cpus;
 static uint64_t memsize;
 static int set_cr0, get_cr0, set_cr2, get_cr2, set_cr3, get_cr3;
 static int set_cr4, get_cr4;
@@ -1450,6 +1447,7 @@ setup_options(bool cpu_intel)
 		{ "force-reset",	NO_ARG,	&force_reset,		1 },
 		{ "force-poweroff", 	NO_ARG,	&force_poweroff, 	1 },
 		{ "get-active-cpus", 	NO_ARG,	&get_active_cpus, 	1 },
+		{ "get-debug-cpus",	NO_ARG,	&get_debug_cpus,	1 },
 		{ "get-suspended-cpus", NO_ARG,	&get_suspended_cpus, 	1 },
 		{ "get-intinfo", 	NO_ARG,	&get_intinfo,		1 },
 		{ "get-cpu-topology",	NO_ARG, &get_cpu_topology,	1 },
@@ -1751,7 +1749,7 @@ main(int argc, char *argv[])
 	char *vmname;
 	int error, ch, vcpuid, ptenum;
 	vm_paddr_t gpa_pmap;
-	struct vm_exit vmexit;
+	struct vm_run vmrun;
 	uint64_t rax, cr0, cr2, cr3, cr4, dr0, dr1, dr2, dr3, dr6, dr7;
 	uint64_t rsp, rip, rflags, efer, pat;
 	uint64_t eptp, bm, addr, u64, pteval[4], *pte, info[2];
@@ -2347,6 +2345,12 @@ main(int argc, char *argv[])
 			print_cpus("active cpus", &cpus);
 	}
 
+	if (!error && (get_debug_cpus || get_all)) {
+		error = vm_debug_cpus(ctx, &cpus);
+		if (!error)
+			print_cpus("debug cpus", &cpus);
+	}
+
 	if (!error && (get_suspended_cpus || get_all)) {
 		error = vm_suspended_cpus(ctx, &cpus);
 		if (!error)
@@ -2386,7 +2390,13 @@ main(int argc, char *argv[])
 	}
 
 	if (!error && run) {
-		error = vm_run(vcpu, &vmexit);
+		struct vm_exit vmexit;
+		cpuset_t cpuset;
+
+		vmrun.vm_exit = &vmexit;
+		vmrun.cpuset = &cpuset;
+		vmrun.cpusetsize = sizeof(cpuset);
+		error = vm_run(vcpu, &vmrun);
 		if (error == 0)
 			dump_vm_run_exitcode(&vmexit, vcpuid);
 		else

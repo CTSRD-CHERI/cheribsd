@@ -1,6 +1,5 @@
-# $FreeBSD$
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2018 Orange Business Services
 #
@@ -87,7 +86,7 @@ common_body()
 	sleep 2
 
 	if ! jexec two pfctl -s states | grep icmp | grep 198.51.100.1 | \
-	    grep 198.51.100.2 ; then
+	    grep 198.51.100.254 ; then
 		atf_fail "state not found on synced host"
 	fi
 }
@@ -125,10 +124,6 @@ defer_body()
 {
 	pfsynct_init
 
-	if [ "$(atf_config_get ci false)" = "true" ]; then
-		atf_skip "Skip know failing test (likely related to https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=260460)"
-	fi
-
 	epair_sync=$(vnet_mkepair)
 	epair_in=$(vnet_mkepair)
 	epair_out=$(vnet_mkepair)
@@ -140,6 +135,9 @@ defer_body()
 	jexec alcatraz ifconfig ${epair_in}a 203.0.113.1/24 up
 	jexec alcatraz arp -s 203.0.113.2 00:01:02:03:04:05
 	jexec alcatraz sysctl net.inet.ip.forwarding=1
+
+	# Set a long defer delay
+	jexec alcatraz sysctl net.pfsync.defer_delay=2500
 
 	jexec alcatraz ifconfig pfsync0 \
 		syncdev ${epair_sync}a \
@@ -153,6 +151,7 @@ defer_body()
 	route add -net 203.0.113.0/24 198.51.100.1
 
 	# Enable pf
+	jexec alcatraz sysctl net.pf.filter_local=0
 	jexec alcatraz pfctl -e
 	pft_set_rules alcatraz \
 		"set skip on ${epair_sync}a" \
@@ -702,6 +701,130 @@ timeout_cleanup()
 	pft_cleanup
 }
 
+atf_test_case "basic_ipv6_unicast" "cleanup"
+basic_ipv6_unicast_head()
+{
+	atf_set descr 'Basic pfsync test (IPv6)'
+	atf_set require.user root
+}
+
+basic_ipv6_unicast_body()
+{
+	pfsynct_init
+
+	epair_sync=$(vnet_mkepair)
+	epair_one=$(vnet_mkepair)
+	epair_two=$(vnet_mkepair)
+
+	vnet_mkjail one ${epair_one}a ${epair_sync}a
+	vnet_mkjail two ${epair_two}a ${epair_sync}b
+
+	# pfsync interface
+	jexec one ifconfig ${epair_sync}a inet6 fd2c::1/64 no_dad up
+	jexec one ifconfig ${epair_one}a inet6 fd2b::1/64 no_dad up
+	jexec one ifconfig pfsync0 \
+		syncdev ${epair_sync}a \
+		syncpeer fd2c::2 \
+		maxupd 1 \
+		up
+	jexec two ifconfig ${epair_two}a inet6 fd2b::2/64 no_dad up
+	jexec two ifconfig ${epair_sync}b inet6 fd2c::2/64 no_dad up
+	jexec two ifconfig pfsync0 \
+		syncdev ${epair_sync}b \
+		syncpeer fd2c::1 \
+		maxupd 1 \
+		up
+
+	# Enable pf!
+	jexec one pfctl -e
+	pft_set_rules one \
+		"block on ${epair_sync}a inet" \
+		"pass out keep state"
+	jexec two pfctl -e
+	pft_set_rules two \
+		"block on ${epair_sync}b inet" \
+		"pass out keep state"
+
+	ifconfig ${epair_one}b inet6 fd2b::f0/64 no_dad up
+
+	ping6 -c 1 -S fd2b::f0 fd2b::1
+
+	# Give pfsync time to do its thing
+	sleep 2
+
+	if ! jexec two pfctl -s states | grep icmp | grep fd2b::1 | \
+	    grep fd2b::f0 ; then
+		atf_fail "state not found on synced host"
+	fi
+}
+
+basic_ipv6_unicast_cleanup()
+{
+	pfsynct_cleanup
+}
+
+atf_test_case "basic_ipv6" "cleanup"
+basic_ipv6_head()
+{
+	atf_set descr 'Basic pfsync test (IPv6)'
+	atf_set require.user root
+}
+
+basic_ipv6_body()
+{
+	pfsynct_init
+
+	epair_sync=$(vnet_mkepair)
+	epair_one=$(vnet_mkepair)
+	epair_two=$(vnet_mkepair)
+
+	vnet_mkjail one ${epair_one}a ${epair_sync}a
+	vnet_mkjail two ${epair_two}a ${epair_sync}b
+
+	# pfsync interface
+	jexec one ifconfig ${epair_sync}a inet6 fd2c::1/64 no_dad up
+	jexec one ifconfig ${epair_one}a inet6 fd2b::1/64 no_dad up
+	jexec one ifconfig pfsync0 \
+		syncdev ${epair_sync}a \
+		syncpeer ff12::f0 \
+		maxupd 1 \
+		up
+	jexec two ifconfig ${epair_two}a inet6 fd2b::2/64 no_dad up
+	jexec two ifconfig ${epair_sync}b inet6 fd2c::2/64 no_dad up
+	jexec two ifconfig pfsync0 \
+		syncdev ${epair_sync}b \
+		syncpeer ff12::f0 \
+		maxupd 1 \
+		up
+
+	# Enable pf!
+	jexec one pfctl -e
+	pft_set_rules one \
+		"block on ${epair_sync}a inet" \
+		"pass out keep state"
+	jexec two pfctl -e
+	pft_set_rules two \
+		"block on ${epair_sync}b inet" \
+		"pass out keep state"
+
+	ifconfig ${epair_one}b inet6 fd2b::f0/64 no_dad up
+
+	ping6 -c 1 -S fd2b::f0 fd2b::1
+
+	# Give pfsync time to do its thing
+	sleep 2
+
+	if ! jexec two pfctl -s states | grep icmp | grep fd2b::1 | \
+	    grep fd2b::f0 ; then
+		atf_fail "state not found on synced host"
+	fi
+}
+
+basic_ipv6_cleanup()
+{
+	pfsynct_cleanup
+}
+
 atf_init_test_cases()
 {
 	atf_add_test_case "basic"
@@ -712,4 +835,6 @@ atf_init_test_cases()
 	atf_add_test_case "pfsync_pbr"
 	atf_add_test_case "ipsec"
 	atf_add_test_case "timeout"
+	atf_add_test_case "basic_ipv6_unicast"
+	atf_add_test_case "basic_ipv6"
 }

@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2021 The FreeBSD Foundation
+ * Copyright (c) 2021,2023 The FreeBSD Foundation
  *
  * This software was developed by Björn Zeeb under sponsorship from
  * the FreeBSD Foundation.
@@ -26,12 +26,12 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef	_LINUXKPI_LINUX_UUID_H
 #define	_LINUXKPI_LINUX_UUID_H
+
+#include <linux/random.h>
 
 #define	UUID_STRING_LEN	36
 
@@ -58,5 +58,20 @@
 typedef struct {
 	char	x[16];
 } guid_t;
+
+static inline void
+guid_gen(guid_t *g)
+{
+
+	get_random_bytes(g, 16);
+	g->x[7] = (g->x[7] & 0x0f) | 0x40;
+	g->x[8] = (g->x[8] & 0x3f) | 0x80;
+}
+
+static inline void
+guid_copy(guid_t *dst, const guid_t *src)
+{
+	memcpy(dst, src, sizeof(*dst));
+}
 
 #endif	/* _LINUXKPI_LINUX_UUID_H */

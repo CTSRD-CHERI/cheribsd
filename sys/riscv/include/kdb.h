@@ -22,16 +22,12 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _MACHINE_KDB_H_
 #define _MACHINE_KDB_H_
 
 #include <machine/cpufunc.h>
-
-#define	KDB_STOPPEDPCB(pc)	&stoppcbs[pc->pc_cpuid]
 
 static __inline void
 kdb_cpu_clear_singlestep(void)

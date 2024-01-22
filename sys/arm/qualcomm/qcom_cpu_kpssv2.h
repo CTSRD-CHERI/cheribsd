@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021 Adrian Chadd <adrian@FreeBSD.org>
  *
@@ -23,13 +23,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef	__QCOM_CPU_KPSSV2_H__
 #define	__QCOM_CPU_KPSSV2_H__
 
-extern	boolean_t qcom_cpu_kpssv2_regulator_start(u_int id, phandle_t node);
+extern	bool qcom_cpu_kpssv2_regulator_start(u_int id, phandle_t node);
 
 #endif	/* __QCOM_CPU_KPSSV2_H__ */

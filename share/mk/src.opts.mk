@@ -1,4 +1,3 @@
-# $FreeBSD$
 #
 # Option file for FreeBSD /usr/src builds, at least the userland and boot loader
 # portions of the tree. These options generally chose what parts of the tree to
@@ -53,6 +52,9 @@ __<src.opts.mk>__:
 # BROKEN was selected as the least imperfect one considered at the
 # time. Options are added to BROKEN_OPTIONS list on a per-arch basis.
 # At this time, there's no provision for mutually incompatible options.
+# Options listed in 'REQUIRED_OPTIONS' will be hard-wired to 'yes'; this
+# is intended as a transitional measure while options are in the process
+# of being removed.
 
 __DEFAULT_YES_OPTIONS = \
     ACCT \
@@ -73,9 +75,7 @@ __DEFAULT_YES_OPTIONS = \
     BSNMP \
     BZIP2 \
     CALENDAR \
-    CAPSICUM \
     CAROOT \
-    CASPER \
     CCD \
     CDDL \
     CLANG \
@@ -145,6 +145,7 @@ __DEFAULT_YES_OPTIONS = \
     MLX5TOOL \
     NETCAT \
     NETGRAPH \
+    NETLINK \
     NETLINK_SUPPORT \
     NLS_CATALOGS \
     NS_CACHING \
@@ -157,6 +158,7 @@ __DEFAULT_YES_OPTIONS = \
     PKGBOOTSTRAP \
     PMC \
     PPP \
+    PTHREADS_ASSERTIONS \
     QUOTAS \
     RADIUS_SUPPORT \
     RBOOTD \
@@ -165,7 +167,6 @@ __DEFAULT_YES_OPTIONS = \
     SENDMAIL \
     SERVICESDB \
     SETUID_LOGIN \
-    SHARED_TOOLCHAIN \
     SHAREDOCS \
     SOURCELESS \
     SOURCELESS_HOST \
@@ -198,6 +199,7 @@ __DEFAULT_NO_OPTIONS = \
     CLANG_FORMAT \
     DETECT_TZ_CHANGES \
     DISK_IMAGE_TOOLS_BOOTSTRAP \
+    DTRACE_ASAN \
     DTRACE_TESTS \
     EXPERIMENTAL \
     HESIOD \
@@ -213,9 +215,14 @@ __DEFAULT_NO_OPTIONS = \
     ZONEINFO_LEAPSECONDS_SUPPORT \
 
 __DEFAULT_YES_OPTIONS+=	\
-	CHERI \
+	CHERI_CAPREVOKE \
 	CHERIBSDBOX \
-	LIB64C
+	LIB64C \
+	MALLOC_REVOCATION_SHIM
+
+__REQUIRED_OPTIONS = \
+    CAPSICUM \
+    CASPER
 
 # LEFT/RIGHT. Left options which default to "yes" unless their corresponding
 # RIGHT option is disabled.
@@ -226,6 +233,12 @@ __DEFAULT_DEPENDENT_OPTIONS= \
 	LOADER_EFI_SECUREBOOT/LOADER_VERIEXEC \
 	LOADER_VERIEXEC_VECTX/LOADER_VERIEXEC \
 	VERIEXEC/BEARSSL \
+
+__SINGLE_OPTIONS = \
+	LIBC_MALLOC
+
+__LIBC_MALLOC_OPTIONS=	jemalloc snmalloc
+__LIBC_MALLOC_DEFAULT=	jemalloc
 
 # MK_*_SUPPORT options which default to "yes" unless their corresponding
 # MK_* variable is set to "no".
@@ -271,7 +284,7 @@ __LLVM_TARGETS= \
 		powerpc \
 		riscv \
 		x86
-__LLVM_TARGET_FILT=	C/(amd64|i386)/x86/:C/powerpc.*/powerpc/:C/armv[67]/arm/:C/riscv.*/riscv/
+__LLVM_TARGET_FILT=	C/(amd64|i386)/x86/:C/powerpc.*/powerpc/:C/armv[67]/arm/:C/aarch64c/aarch64/:C/riscv.*/riscv/
 .for __llt in ${__LLVM_TARGETS}
 # Default enable the given TARGET's LLVM_TARGET support
 .if ${__T:${__LLVM_TARGET_FILT}} == ${__llt}
@@ -292,7 +305,7 @@ __DEFAULT_NO_OPTIONS+=LLVM_TARGET_BPF LLVM_TARGET_MIPS
 # Never use in-tree LLVM for CheriBSD
 BROKEN_OPTIONS+=CLANG LLD LLDB CLANG_BOOTSTRAP LLD_BOOTSTRAP
 
-.ifdef COMPAT_64BIT
+.if ${COMPAT_LIBCOMPAT:U} == "64"
 # ofed needs to be part of the default build for headers to be available.
 # Since it isn't yet working under purecap, disable it here.
 BROKEN_OPTIONS+=OFED
@@ -309,8 +322,8 @@ __DEFAULT_YES_OPTIONS+=LLDB
 .else
 __DEFAULT_NO_OPTIONS+=LLDB
 .endif
-# LIB32 is supported on amd64 and powerpc64
-.if (${__T} == "amd64" || ${__T} == "powerpc64")
+# LIB32 is not supported on all 64-bit architectures.
+.if (${__T} == "amd64" || ${__T:Maarch64*} != "" || ${__T} == "powerpc64")
 __DEFAULT_YES_OPTIONS+=LIB32
 .else
 BROKEN_OPTIONS+=LIB32
@@ -320,6 +333,12 @@ BROKEN_OPTIONS+=LIB32
 __DEFAULT_YES_OPTIONS+=LIB64
 .else
 BROKEN_OPTIONS+=LIB64
+.endif
+# LIB64CB is supported on aarch64*c* and hybrid morello
+.if ${__C} == "morello" || ${__T:Maarch64*c*}
+__DEFAULT_YES_OPTIONS+=LIB64CB
+.else
+BROKEN_OPTIONS+=LIB64CB
 .endif
 
 .if ${__T:Maarch64*c*} || ${__T:Mriscv*c*}
@@ -335,8 +354,8 @@ BROKEN_OPTIONS+=OFED
 BROKEN_OPTIONS+=DTRACE
 .endif
 
-# EFI doesn't exist on powerpc (well, officially)
-.if ${__T:Mpowerpc*}
+# EFI doesn't exist on powerpc (well, officially) and doesn't work on i386
+.if ${__T:Mpowerpc*} || ${__T} == "i386"
 BROKEN_OPTIONS+=EFI
 .endif
 # OFW is only for powerpc, exclude others
@@ -374,8 +393,11 @@ BROKEN_OPTIONS+=MLX5TOOL
 
 .if (${__C} != "cheri" && ${__C} != "morello" && \
     !${__T:Maarch64*c*} && !${__T:Mriscv64*c*})
-BROKEN_OPTIONS+=CHERI
 BROKEN_OPTIONS+=CHERI_CAPREVOKE
+.endif
+
+.if !${__T:Maarch64*c*} && !${__T:Mriscv64*c*}
+BROKEN_OPTIONS+=MALLOC_REVOCATION_SHIM
 .endif
 
 # We'd really like this to be:
@@ -384,11 +406,6 @@ BROKEN_OPTIONS+=CHERI_CAPREVOKE
 .if (${__C} != "cheri" && ${__C} != "morello") || \
     (${__T:Maarch64*c*} || ${__T:Mriscv64*c*})
 BROKEN_OPTIONS+=LIB64C
-.endif
-
-.if ${.MAKE.OS} != "FreeBSD"
-# tablegen will not build on non-FreeBSD so also disable target clang and lld
-BROKEN_OPTIONS+=CLANG LLD
 .endif
 
 .if ${__T} != "amd64" && ${__T} != "i386" && ${__T} != "aarch64"
@@ -428,17 +445,6 @@ BROKEN_OPTIONS+= TESTS
 .-include <site.src.opts.mk>
 
 .include <bsd.mkopt.mk>
-
-.if ${.MAKE.OS} != "FreeBSD"
-# Building on a Linux/Mac requires an external toolchain to be specified
-# since clang/gcc will not build there using the FreeBSD makefiles
-MK_BINUTILS_BOOTSTRAP:=no
-MK_CLANG_BOOTSTRAP:=no
-MK_LLD_BOOTSTRAP:=no
-MK_GCC_BOOTSTRAP:=no
-# However, the elftoolchain tools build and should be used
-# MK_ELFTOOLCHAIN_BOOTSTRAP:=	yes
-.endif
 
 #
 # Force some options off if their dependencies are off.
@@ -534,7 +540,6 @@ MK_LLD_BOOTSTRAP:= no
 
 .if ${MK_TOOLCHAIN} == "no"
 MK_CLANG:=	no
-MK_INCLUDES:=	no
 MK_LLD:=	no
 MK_LLDB:=	no
 MK_LLVM_BINUTILS:=	no

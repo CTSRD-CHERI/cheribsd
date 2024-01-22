@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #ifdef NEW_PCIB
 #include "opt_acpi.h"
 
@@ -77,7 +75,6 @@ __FBSDID("$FreeBSD$");
 #include <dev/acpica/acpi_pcibvar.h>
 #endif
 #include <dev/hyperv/include/hyperv.h>
-#include <dev/hyperv/include/hyperv_busdma.h>
 #include <dev/hyperv/include/vmbus_xact.h>
 #include <dev/hyperv/vmbus/vmbus_reg.h>
 #include <dev/hyperv/vmbus/vmbus_chanvar.h>

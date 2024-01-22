@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
@@ -517,9 +515,9 @@ nd6_ns_output_fib(struct ifnet *ifp, const struct in6_addr *saddr6,
 			 */
 			if (ifa != NULL && ifa->ifa_carp != NULL &&
 			    !(*carp_master_p)(ifa)) {
-				log(LOG_DEBUG,
+				nd6log((LOG_DEBUG,
 				    "nd6_ns_output: NS from BACKUP CARP address %s\n",
-				    ip6_sprintf(ip6buf, &ip6->ip6_src));
+				    ip6_sprintf(ip6buf, &ip6->ip6_src)));
 				ifa_free(ifa);
 				goto bad;
 			}
@@ -742,9 +740,9 @@ nd6_na_input(struct mbuf *m, int off, int icmp6len)
 		 * the CARP master.
 		 */
 		if (!(*carp_master_p)(ifa)) {
-			log(LOG_DEBUG,
+			nd6log((LOG_DEBUG,
 			    "nd6_na_input: NA for BACKUP CARP address %s\n",
-			    ip6_sprintf(ip6bufs, &taddr6));
+			    ip6_sprintf(ip6bufs, &taddr6)));
 			ifa_free(ifa);
 			goto freeit;
 		}

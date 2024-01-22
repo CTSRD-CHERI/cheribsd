@@ -1,5 +1,4 @@
 #	from: @(#)bsd.prog.mk	5.26 (Berkeley) 6/25/91
-# $FreeBSD$
 
 __BSD_PROG_MK=yes
 
@@ -76,23 +75,27 @@ LDFLAGS+= -Wl,-zretpolineplt
 .warning Retpoline requested but not supported by compiler or linker
 .endif
 .endif
+# LLD sensibly defaults to -znoexecstack, so do the same for BFD
+LDFLAGS.bfd+= -Wl,-znoexecstack
 
 # Initialize stack variables on function entry
 .if ${MK_INIT_ALL_ZERO} == "yes"
 .if ${COMPILER_FEATURES:Minit-all}
-CFLAGS+= -ftrivial-auto-var-init=zero \
-    -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang
-CXXFLAGS+= -ftrivial-auto-var-init=zero \
-    -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang
+CFLAGS+= -ftrivial-auto-var-init=zero
+CXXFLAGS+= -ftrivial-auto-var-init=zero
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} < 160000
+CFLAGS+= -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang
+CXXFLAGS+= -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang
+.endif
 .else
-.warning InitAll (zeros) requested but not support by compiler
+.warning InitAll (zeros) requested but not supported by compiler
 .endif
 .elif ${MK_INIT_ALL_PATTERN} == "yes"
 .if ${COMPILER_FEATURES:Minit-all}
 CFLAGS+= -ftrivial-auto-var-init=pattern
 CXXFLAGS+= -ftrivial-auto-var-init=pattern
 .else
-.warning InitAll (pattern) requested but not support by compiler
+.warning InitAll (pattern) requested but not supported by compiler
 .endif
 .endif
 

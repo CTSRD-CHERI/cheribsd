@@ -65,8 +65,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_vm.h"
 
 #include <sys/param.h>
@@ -286,6 +284,7 @@ vm_object_init(void)
 	mtx_init(&vm_object_list_mtx, "vm object_list", NULL, MTX_DEF);
 
 	rw_init(&kernel_object->lock, "kernel vm object");
+	vm_radix_init(&kernel_object->rtree);
 	_vm_object_allocate(OBJT_PHYS, atop(VM_MAX_KERNEL_ADDRESS -
 	    VM_MIN_KERNEL_ADDRESS), OBJ_UNMANAGED, kernel_object, NULL);
 #if VM_NRESERVLEVEL > 0
@@ -465,6 +464,7 @@ vm_object_allocate_anon(vm_pindex_t size, vm_object_t backing_object,
     struct ucred *cred, vm_size_t charge)
 {
 	vm_object_t handle, object;
+	int capflag = OBJ_HASCAP;
 
 	if (backing_object == NULL)
 		handle = NULL;
@@ -472,9 +472,12 @@ vm_object_allocate_anon(vm_pindex_t size, vm_object_t backing_object,
 		handle = backing_object->handle;
 	else
 		handle = backing_object;
+	if (backing_object != NULL &&
+	    (backing_object->flags & OBJ_NOCAP) != 0)
+		capflag = OBJ_NOCAP;
 	object = uma_zalloc(obj_zone, M_WAITOK);
 	_vm_object_allocate(OBJT_SWAP, size,
-	    OBJ_ANON | OBJ_ONEMAPPING | OBJ_HASCAP | OBJ_SWAP, object, handle);
+	    OBJ_ANON | OBJ_ONEMAPPING | capflag | OBJ_SWAP, object, handle);
 	object->cred = cred;
 	object->charge = cred != NULL ? charge : 0;
 	return (object);
@@ -1936,6 +1939,9 @@ vm_object_collapse(vm_object_t object)
 		    ("vm_object_collapse: Backing object already collapsing."));
 		KASSERT((object->flags & (OBJ_COLLAPSING | OBJ_DEAD)) == 0,
 		    ("vm_object_collapse: object is already collapsing."));
+		KASSERT((object->flags & OBJ_HASCAP) != 0 ||
+		    (backing_object->flags & OBJ_HASCAP) == 0,
+		    ("vm_object_collapse: shadow does not bear capabilities"));
 
 		/*
 		 * We know that we can either collapse the backing object if

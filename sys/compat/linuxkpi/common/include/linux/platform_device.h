@@ -23,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef	_LINUXKPI_LINUX_PLATFORM_DEVICE_H
@@ -34,6 +32,9 @@
 #include <linux/device.h>
 
 struct platform_device {
+	const char			*name;
+	int				id;
+	bool				id_auto;
 	struct device			dev;
 };
 
@@ -76,6 +77,13 @@ platform_driver_unregister(struct platform_driver *pdrv)
 
 	pr_debug("%s: TODO\n", __func__);
 	return;
+}
+
+static __inline int
+platform_device_register(struct platform_device *pdev)
+{
+	pr_debug("%s: TODO\n", __func__);
+	return (0);
 }
 
 static __inline void

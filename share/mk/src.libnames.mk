@@ -1,4 +1,3 @@
-# $FreeBSD$
 #
 # The include file <src.libnames.mk> define library names suitable
 # for INTERNALLIB and PRIVATELIB definition
@@ -45,6 +44,7 @@ _INTERNALLIBS=	\
 		c_nossp_pic \
 		cron \
 		elftc \
+		fdt \
 		fifolog \
 		ifconfig \
 		ipf \
@@ -413,7 +413,7 @@ _DP_c_nosyscalls+=		ssp_nonshared
 .endif
 _DP_stats=	sbuf pthread
 _DP_stdthreads=	pthread
-_DP_tacplus=	md
+_DP_tacplus=	md pam
 _DP_ncursesw=	tinfow
 _DP_formw=	ncursesw
 _DP_nvpair=	spl
@@ -544,6 +544,9 @@ _LIB_OBJTOP?=	${OBJTOP}
 # INTERNALLIB definitions.
 LIBELFTCDIR=	${_LIB_OBJTOP}/lib/libelftc
 LIBELFTC?=	${LIBELFTCDIR}/libelftc${PIE_SUFFIX}.a
+
+LIBFDTDIR=	${_LIB_OBJTOP}/lib/libfdt
+LIBFDT?=	${LIBFDTDIR}/libfdt${PIE_SUFFIX}.a
 
 LIBLUADIR=	${_LIB_OBJTOP}/lib/liblua
 LIBLUA?=	${LIBLUADIR}/liblua${PIE_SUFFIX}.a

@@ -48,6 +48,7 @@ extern bool hastermcolors;
 
 /* unicode */
 unsigned int strcols(const char *mbstring);
+char *strcolseek(const char *mbstring, unsigned int ncol);
 int str_props(const char *mbstring, unsigned int *cols, bool *has_multi_col);
 void mvwaddwch(WINDOW *w, int y, int x, wchar_t wch);
 wchar_t* alloc_mbstows(const char *mbstring);

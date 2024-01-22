@@ -59,15 +59,79 @@ static const char *cheri_exccode_descr[] = {
 	[CHERI_EXCCODE_PERM_SET_CID] = "permit CSetCID violation",
 };
 
+static const char *cheri_cap_idx_descr[] = {
+	[0] = "cnull",
+	[1] = "cra",
+	[2] = "csp",
+	[3] = "cgp",
+	[4] = "ctp",
+	[5] = "ct0",
+	[6] = "ct1",
+	[7] = "ct2",
+	[8] = "cs0",
+	[9] = "cs1",
+	[10] = "ca0",
+	[11] = "ca1",
+	[12] = "ca2",
+	[13] = "ca3",
+	[14] = "ca4",
+	[15] = "ca5",
+	[16] = "ca6",
+	[17] = "ca7",
+	[18] = "cs2",
+	[19] = "cs3",
+	[20] = "cs4",
+	[21] = "cs5",
+	[22] = "cs6",
+	[23] = "cs7",
+	[24] = "cs8",
+	[25] = "cs9",
+	[26] = "cs10",
+	[27] = "cs11",
+	[28] = "ct3",
+	[29] = "ct4",
+	[30] = "ct5",
+	[31] = "ct6",
+	[32 + 0] = "pcc",
+	[32 + 1] = "ddc",
+	[32 + 4] = "utcc",
+	[32 + 5] = "utdc",
+	[32 + 6] = "uscratchc",
+	[32 + 7] = "uepcc",
+	[32 + 12] = "stcc",
+	[32 + 13] = "stdc",
+	[32 + 14] = "sscratchc",
+	[32 + 15] = "sepcc",
+	[32 + 28] = "mtcc",
+	[32 + 29] = "mtdc",
+	[32 + 30] = "mscratchc",
+	[32 + 31] = "mepcc",
+};
+
 const char *
 cheri_exccode_string(uint8_t exccode)
 {
+	static char buf[16];
 
 	if (exccode >= nitems(cheri_exccode_descr) ||
 	    cheri_exccode_descr[exccode] == NULL) {
-		return ("unknown ISA exception");
+		snprintf(buf, sizeof(buf), "exception %#x", exccode);
+		return (buf);
 	}
 	return (cheri_exccode_descr[exccode]);
+}
+
+const char *
+cheri_cap_idx_string(uint8_t cap_idx)
+{
+	static char buf[16];
+
+	if (cap_idx >= nitems(cheri_cap_idx_descr) ||
+	    cheri_cap_idx_descr[cap_idx] == NULL) {
+		snprintf(buf, sizeof(buf), "unknown SCR %u", cap_idx - 32);
+		return (buf);
+	}
+	return (cheri_cap_idx_descr[cap_idx]);
 }
 
 int

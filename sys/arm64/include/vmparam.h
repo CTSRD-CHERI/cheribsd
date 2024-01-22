@@ -33,8 +33,11 @@
  *
  *	from: @(#)vmparam.h     5.9 (Berkeley) 5/12/91
  *	from: FreeBSD: src/sys/i386/include/vmparam.h,v 1.33 2000/03/30
- * $FreeBSD$
  */
+
+#ifdef __arm__
+#include <arm/vmparam.h>
+#else /* !__arm__ */
 
 #ifndef	_MACHINE_VMPARAM_H_
 #define	_MACHINE_VMPARAM_H_
@@ -89,14 +92,15 @@
 #define	VM_FREELIST_DEFAULT	0
 
 /*
- * An allocation size of 16MB is supported in order to optimize the
- * use of the direct map by UMA.  Specifically, a cache line contains
- * at most four TTEs, collectively mapping 16MB of physical memory.
- * By reducing the number of distinct 16MB "pages" that are used by UMA,
- * the physical memory allocator reduces the likelihood of both 4MB
- * page TLB misses and cache misses caused by 4MB page TLB misses.
+ * When PAGE_SIZE is 4KB, an allocation size of 16MB is supported in order
+ * to optimize the use of the direct map by UMA.  Specifically, a 64-byte
+ * cache line contains at most 8 L2 BLOCK entries, collectively mapping 16MB
+ * of physical memory.  By reducing the number of distinct 16MB "pages" that
+ * are used by UMA, the physical memory allocator reduces the likelihood of
+ * both 2MB page TLB misses and cache misses during the page table walk when
+ * a 2MB page TLB miss does occur.
  */
-#define	VM_NFREEORDER		12
+#define	VM_NFREEORDER		13
 
 /*
  * Enable superpage reservations: 1 level.
@@ -292,3 +296,5 @@ extern vm_offset_t vm_max_kernel_address;
 #define MINIDUMP_PAGE_TRACKING	1
 
 #endif /* !_MACHINE_VMPARAM_H_ */
+
+#endif /* !__arm__ */

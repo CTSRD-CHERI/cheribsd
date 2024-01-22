@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 Vincenzo Maffione <vmaffione@FreeBSD.org>
  *
@@ -23,14 +23,16 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef __NET_BACKENDS_H__
 #define __NET_BACKENDS_H__
 
-#include <stdint.h>
+#include <sys/nv.h>
+#include <sys/time.h>
+#include <sys/uio.h>
+
+#include "mevent.h"
 
 /* Opaque type representing a network backend. */
 typedef struct net_backend net_backend_t;
@@ -55,7 +57,7 @@ void	netbe_rx_enable(net_backend_t *be);
 
 /*
  * Network device capabilities taken from the VirtIO standard.
- * Despite the name, these capabilities can be used by different frontents
+ * Despite the name, these capabilities can be used by different frontends
  * (virtio-net, ptnet) and supported by different backends (netmap, tap, ...).
  */
 #define	VIRTIO_NET_F_CSUM	(1 <<  0) /* host handles partial cksum */
@@ -92,5 +94,6 @@ struct virtio_net_rxhdr {
 	uint16_t	vrh_csum_offset;
 	uint16_t	vrh_bufs;
 } __packed;
+#define VNET_HDR_LEN	sizeof(struct virtio_net_rxhdr)
 
 #endif /* __NET_BACKENDS_H__ */

@@ -129,13 +129,14 @@ typedef struct {
 #define	ET_DYN		3
 #define	ET_CORE		4
 
-/* e_machine (used only for SunOS 5.x hardware capabilities) */
+/* e_machine (used only for SunOS 5.x hardware capabilities and CHERI notes) */
 #define	EM_SPARC	2
 #define	EM_386		3
 #define	EM_SPARC32PLUS	18
 #define	EM_SPARCV9	43
 #define	EM_IA_64	50
 #define	EM_AMD64	62
+#define	EM_AARCH64	183
 
 /* sh_type */
 #define	SHT_SYMTAB	2
@@ -368,6 +369,11 @@ typedef struct {
  * FreeBSD specific notes
  */
 #define NT_FREEBSD_PROCSTAT_AUXV	16
+
+/*
+ * CHERI-specific notes
+ */
+#define NT_CHERI_MORELLO_PURECAP_BENCHMARK_ABI	0x80000000
 
 #if !defined(ELFSIZE) && defined(ARCH_ELFSIZE)
 #define ELFSIZE ARCH_ELFSIZE

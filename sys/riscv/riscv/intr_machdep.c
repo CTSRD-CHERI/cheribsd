@@ -33,8 +33,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -162,6 +160,9 @@ riscv_cpu_intr(struct trapframe *frame)
 		("riscv_cpu_intr: wrong frame passed"));
 
 	active_irq = frame->tf_scause & SCAUSE_CODE;
+
+	CTR3(KTR_TRAP, "%s: irq=%d, umode=%d", __func__, active_irq,
+	    TRAPF_USERMODE(frame));
 
 	switch (active_irq) {
 	case IRQ_SOFTWARE_USER:

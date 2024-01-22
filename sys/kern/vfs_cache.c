@@ -35,8 +35,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ddb.h"
 #include "opt_ktrace.h"
 
@@ -70,8 +68,6 @@ __FBSDID("$FreeBSD$");
 #ifdef INVARIANTS
 #include <machine/_inttypes.h>
 #endif
-
-#include <sys/capsicum.h>
 
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
@@ -3662,7 +3658,7 @@ vn_fullpath_hardlink(struct vnode *vp, struct vnode *dvp,
 	struct pwd *pwd;
 	size_t addend;
 	int error;
-	enum vtype type;
+	__enum_uint8(vtype) type;
 
 	if (*buflen < 2)
 		return (EINVAL);
@@ -3684,15 +3680,8 @@ vn_fullpath_hardlink(struct vnode *vp, struct vnode *dvp,
 	 * before we get to evaluate the condition. If this happens, we will
 	 * populate part of the buffer and descend to vn_fullpath_dir with
 	 * vp == vp_crossmp. Prevent the problem by checking for VBAD.
-	 *
-	 * This should be atomic_load(&vp->v_type) but it is illegal to take
-	 * an address of a bit field, even if said field is sized to char.
-	 * Work around the problem by reading the value into a full-sized enum
-	 * and then re-reading it with atomic_load which will still prevent
-	 * the compiler from re-reading down the road.
 	 */
-	type = vp->v_type;
-	type = atomic_load_int(&type);
+	type = atomic_load_8(&vp->v_type);
 	if (type == VBAD) {
 		error = ENOENT;
 		goto out_bad;
@@ -3870,12 +3859,13 @@ vn_path_to_global_path_hardlink(struct thread *td, struct vnode *vp,
 	 * name.
 	 */
 	VOP_UNLOCK(vp);
+	len = pathlen;
 	error = vn_fullpath_hardlink(vp, dvp, leaf_name, leaf_length,
 	    &rpath, &fbuf, &len);
 
 	if (error != 0) {
 		vrele(vp);
-		goto out;
+		return (error);
 	}
 
 	if (strlen(rpath) >= pathlen) {
@@ -4357,7 +4347,7 @@ cache_fpl_terminated(struct cache_fpl *fpl)
 
 #define CACHE_FPL_SUPPORTED_CN_FLAGS \
 	(NC_NOMAKEENTRY | NC_KEEPPOSENTRY | LOCKLEAF | LOCKPARENT | WANTPARENT | \
-	 FAILIFEXISTS | FOLLOW | EMPTYPATH | LOCKSHARED | WILLBEDIR | \
+	 FAILIFEXISTS | FOLLOW | EMPTYPATH | LOCKSHARED | ISRESTARTED | WILLBEDIR | \
 	 ISOPEN | NOMACCHECK | AUDITVNODE1 | AUDITVNODE2 | NOCAPCHECK | OPENREAD | \
 	 OPENWRITE | WANTIOCTLCAPS)
 
@@ -6248,7 +6238,7 @@ cache_fplookup(struct nameidata *ndp, enum cache_fpl_status *status,
 	fpl.pwd = pwdp;
 	pwd = pwd_get_smr();
 	*(fpl.pwd) = pwd;
-	ndp->ni_rootdir = pwd->pwd_rdir;
+	namei_setup_rootdir(ndp, cnp, pwd);
 	ndp->ni_topdir = pwd->pwd_jdir;
 
 	if (cnp->cn_pnbuf[0] == '/') {

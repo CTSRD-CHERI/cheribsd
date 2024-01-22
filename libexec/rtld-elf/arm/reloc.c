@@ -1,7 +1,6 @@
 /*	$NetBSD: mdreloc.c,v 1.23 2003/07/26 15:04:38 mrg Exp $	*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -91,7 +90,6 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Addr relocbase)
 	const Elf_Rel *rel = NULL, *rellim;
 	Elf_Addr relsz = 0;
 	Elf_Addr *where;
-	uint32_t size;
 
 	for (; dynp->d_tag != DT_NULL; dynp++) {
 		switch (dynp->d_tag) {
@@ -104,7 +102,6 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Addr relocbase)
 		}
 	}
 	rellim = (const Elf_Rel *)((const char *)rel + relsz);
-	size = (rellim - 1)->r_offset - rel->r_offset;
 	for (; rel < rellim; rel++) {
 		where = (Elf_Addr *)(relocbase + rel->r_offset);
 		
@@ -279,7 +276,7 @@ reloc_nonplt_object(Obj_Entry *obj, const Elf_Rel *rel, SymCache *cache,
 			if (def == NULL)
 				return -1;
 
-			if (!defobj->tls_done && !allocate_tls_offset(obj))
+			if (!defobj->tls_static && !allocate_tls_offset(obj))
 				return -1;
 
 			tmp = (Elf_Addr)def->st_value + defobj->tlsoffset;

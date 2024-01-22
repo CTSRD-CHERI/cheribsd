@@ -59,7 +59,9 @@
 #include <fcntl.h>
 #include <fnmatch.h>
 #include <inttypes.h>
+#include <malloc_np.h>
 #include <signal.h>
+#include <spawn.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -84,20 +86,24 @@ static StringList* cheri_xpassed_tests;
 struct cheribsdtest_child_state *ccsp;
 
 static char *argv0;
+static const struct cheri_test *running_test;
 
 static int tests_run, tests_skipped;
 static int tests_failed, tests_passed, tests_xfailed, tests_xpassed;
-static int execed;
 static int expected_failures;
+static int is_execed_child;
 static int list;
 static int run_all;
 static int fast_tests_only;
 static int qtrace;
 static int qtrace_user_mode_only;
 static int sleep_after_test;
-static int verbose;
 static int coredump_enabled;
 static int debugger_enabled;
+
+int verbose;
+
+extern char **environ;
 
 static void
 usage(void)
@@ -366,7 +372,9 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 		}
 
 		/* Run the actual test. */
-		ctp->ct_func(ctp);
+		running_test = ctp;
+		ctp->ct_func();
+		running_test = NULL;
 		exit(0);
 	}
 	close(pipefd_stdin[0]);
@@ -431,6 +439,11 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 		 */
 		goto pass;
 	}
+	if (WIFSIGNALED(status)) {
+		snprintf(reason, sizeof(reason), "Child exited with signal %d",
+		    WTERMSIG(status));
+		goto fail;
+	}
 	if (!WIFEXITED(status)) {
 		snprintf(reason, sizeof(reason), "Child exited abnormally");
 		goto fail;
@@ -479,15 +492,25 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 	 * an expected/desired fault don't undergo these checks.
 	 */
 	if (!(ctp->ct_flags & CT_FLAG_SIGNAL)) {
+		if (ccsp->ccs_signum != 0) {
+			snprintf(reason, sizeof(reason),
+			    "Test received unexpected signal %d",
+			    ccsp->ccs_signum);
+			goto fail;
+		}
 		if (ccsp->ccs_testresult == TESTRESULT_UNKNOWN) {
 			snprintf(reason, sizeof(reason),
 			    "Test failed to set a success/failure status");
+			/* Test harness error, always fatal */
+			xfail_reason = flaky_reason = NULL;
 			goto fail;
 		}
 		if (ccsp->ccs_testresult != TESTRESULT_SUCCESS) {
 			snprintf(reason, sizeof(reason),
 			    "Test returned unexpected result (%d)",
 			    ccsp->ccs_testresult);
+			/* Test harness error, always fatal */
+			xfail_reason = flaky_reason = NULL;
 			goto fail;
 		}
 	}
@@ -554,13 +577,7 @@ pass:
 		xo_emit("{d:status/%s}: {d:name/%s}\n", "PASS", ctp->ct_name);
 		tests_passed++;
 	}
-	close(pipefd_stdin[1]);
-	close(pipefd_stdout[0]);
-	xo_close_instance("testcase");
-	xo_flush();
-	if (sleep_after_test)
-		sleep(1);
-	return;
+	goto do_return;
 
 fail:
 	/*
@@ -595,6 +612,8 @@ fail:
 		tests_xfailed++;
 		sl_add(cheri_xfailed_tests, failure_message);
 	}
+
+do_return:
 	xo_close_instance("testcase");
 	xo_flush();
 	close(pipefd_stdin[1]);
@@ -623,7 +642,7 @@ cheribsdtest_run_child(struct cheri_test *ctp)
 {
 	if (ctp->ct_child_func == NULL)
 		errx(EX_SOFTWARE, "%s has no child function", ctp->ct_name);
-	ctp->ct_child_func(ctp);
+	ctp->ct_child_func();
 	errx(EX_SOFTWARE, "%s child function returned", ctp->ct_name);
 }
 
@@ -658,6 +677,12 @@ mk_exec_args(const struct cheri_test *ctp)
 	/*
 	 * XXXBD: it would be nice if there was a way to say "coexecve
 	 * myself".
+	 * 
+	 * XXX: This won't work for direct exec as an rtld argument.
+	 * (e.g., /libexec/ld-elf.so.1 /bin/cheribsdtest-purecap-dynamic)
+	 * If this becomes an issue we could alter rtld to update
+	 * AT_EXECPATH or add some sort of execve_self(3) implemented
+	 * by rtld for dynamic binaries and libc for static.
 	 */
 	error = elf_aux_info(AT_EXECPATH, execpath, MAXPATHLEN);
 	if (error != 0)
@@ -666,6 +691,8 @@ mk_exec_args(const struct cheri_test *ctp)
 	exec_args[argc++] = "-E";
 	if (coredump_enabled)
 		exec_args[argc++] = "-c";
+	if (verbose)
+		exec_args[argc++] = "-v";
 	exec_args[argc++] = ctp->ct_name;
 	exec_args[argc++] = NULL;
 
@@ -673,23 +700,63 @@ mk_exec_args(const struct cheri_test *ctp)
 }
 
 void
-cheribsdtest_coexec_child(const struct cheri_test *ctp)
+cheribsdtest_coexec_child(void)
 {
 	char **exec_args;
 
-	exec_args = mk_exec_args(ctp);
+	exec_args = mk_exec_args(running_test);
 	coexecve(getppid(), exec_args[0], exec_args, NULL);
 	err(EX_OSERR, "%s: coexecve", __func__);
 }
 
 void
-cheribsdtest_exec_child(const struct cheri_test *ctp)
+cheribsdtest_exec_child(void)
 {
 	char **exec_args;
 
-	exec_args = mk_exec_args(ctp);
+	exec_args = mk_exec_args(running_test);
 	execve(exec_args[0], exec_args, NULL);
 	err(EX_OSERR, "%s: execve", __func__);
+}
+
+pid_t
+cheribsdtest_spawn_child(enum spawn_child_mode mode)
+{
+	char **exec_args;
+	int error;
+	pid_t pid;
+
+	exec_args = mk_exec_args(running_test);
+
+	switch (mode) {
+	case SC_MODE_POSIX_SPAWN:
+		error = posix_spawn(&pid, exec_args[0], NULL, NULL, exec_args,
+		    environ);
+		if (error != 0) {
+			errno = error;
+			pid = -1;
+		}
+		break;
+	case SC_MODE_FORK:
+		pid = fork();
+		break;
+	case SC_MODE_RFORK:
+		pid = rfork(RFPROC);
+		break;
+	case SC_MODE_VFORK:
+		pid = vfork();
+		break;
+	default:
+		errno = EDOOFUS;
+		pid = -1;
+		break;
+	}
+
+	if (pid == -1)
+		err(EX_OSERR, "%s: fork/spawn error (mode = %d)", __func__, mode);
+	if (mode != SC_MODE_POSIX_SPAWN && pid == 0)
+		execve(exec_args[0], exec_args, NULL);
+	return (pid);
 }
 
 __noinline void *
@@ -733,7 +800,7 @@ main(int argc, char *argv[])
 			debugger_enabled = 1;
 			break;
 		case 'E':
-			execed = 1;
+			is_execed_child = 1;
 			break;
 		case 'f':
 			fast_tests_only = 1;
@@ -777,9 +844,9 @@ main(int argc, char *argv[])
 	}
 	argc -= optind;
 	argv += optind;
-	if (execed) {
+	if (is_execed_child) {
 		if (run_all || glob || list) {
-			warnx("-E is incompatbile with -a, -g, and -l");
+			warnx("-E is incompatible with -a, -g, and -l");
 			usage();
 		}
 		if (argc != 1) {
@@ -827,7 +894,7 @@ main(int argc, char *argv[])
 	/*
 	 * We've been (co)execed so look up our child function and run it.
 	 */
-	if (execed)
+	if (is_execed_child)
 		cheribsdtest_run_child_name(argv[0]);
 
 	/*

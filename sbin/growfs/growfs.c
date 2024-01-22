@@ -53,8 +53,6 @@ All rights reserved.\n";
 #endif /* not lint */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
@@ -342,7 +340,7 @@ initcg(int cylno, time_t modtime, int fso, unsigned int Nflag)
 	acg.cg_ndblk = dmax - cbase;
 	if (sblock.fs_contigsumsize > 0)
 		acg.cg_nclusterblks = acg.cg_ndblk / sblock.fs_frag;
-	start = &acg.cg_space[0] - (u_char *)(&acg.cg_firstfield);
+	start = sizeof(acg);
 	if (sblock.fs_magic == FS_UFS2_MAGIC) {
 		acg.cg_iusedoff = start;
 	} else {

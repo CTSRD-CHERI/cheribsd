@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .include <src.opts.mk>
 
@@ -22,3 +21,5 @@ HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
 
 .include <bsd.prog.mk>
+
+CWARNFLAGS+=	${NO_WUNUSED_BUT_SET_VARIABLE}

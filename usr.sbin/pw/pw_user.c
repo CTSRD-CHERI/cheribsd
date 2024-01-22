@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 1996
  *	David L. Nugent.  All rights reserved.
@@ -50,6 +50,7 @@ static const char rcsid[] =
 #include <sysexits.h>
 #include <termios.h>
 #include <unistd.h>
+#include <spawn.h>
 
 #include "pw.h"
 #include "bitmap.h"
@@ -57,6 +58,7 @@ static const char rcsid[] =
 
 #define LOGNAMESIZE (MAXLOGNAME-1)
 
+extern char **environ;
 static		char locked_str[] = "*LOCKED*";
 
 static struct passwd fakeuser = {
@@ -112,36 +114,20 @@ mkdir_home_parents(int dfd, const char *dir)
 	}
 	tmp[0] = '\0';
 
-	/*
-	 * This is a kludge especially for Joerg :)
-	 * If the home directory would be created in the root partition, then
-	 * we really create it under /usr which is likely to have more space.
-	 * But we create a symlink from cnf->home -> "/usr" -> cnf->home
-	 */
-	if (strchr(dirs, '/') == NULL) {
-		asprintf(&tmp, "usr/%s", dirs);
-		if (tmp == NULL)
-			errx(EX_UNAVAILABLE, "out of memory");
-		if (mkdirat(dfd, tmp, _DEF_DIRMODE) != -1 || errno == EEXIST) {
-			fchownat(dfd, tmp, 0, 0, 0);
-			symlinkat(tmp, dfd, dirs);
-		}
-		free(tmp);
-	}
 	tmp = dirs;
 	if (fstatat(dfd, dirs, &st, 0) == -1) {
 		while ((tmp = strchr(tmp + 1, '/')) != NULL) {
 			*tmp = '\0';
 			if (fstatat(dfd, dirs, &st, 0) == -1) {
 				if (mkdirat(dfd, dirs, _DEF_DIRMODE) == -1)
-					err(EX_OSFILE,  "'%s' (root home parent) is not a directory", dirs);
+					err(EX_OSFILE,  "'%s' (home parent) is not a directory", dirs);
 			}
 			*tmp = '/';
 		}
 	}
 	if (fstatat(dfd, dirs, &st, 0) == -1) {
 		if (mkdirat(dfd, dirs, _DEF_DIRMODE) == -1)
-			err(EX_OSFILE,  "'%s' (root home parent) is not a directory", dirs);
+			err(EX_OSFILE,  "'%s' (home parent) is not a directory", dirs);
 		fchownat(dfd, dirs, 0, 0, 0);
 	}
 
@@ -392,8 +378,7 @@ pw_gidpolicy(struct userconf *cnf, char *grname, char *nam, gid_t prefer, bool d
 			grp = GETGRGID(gid);
 		}
 		gid = grp->gr_gid;
-	} else if ((grp = GETGRNAM(nam)) != NULL &&
-	    (grp->gr_mem == NULL || grp->gr_mem[0] == NULL)) {
+	} else if ((grp = GETGRNAM(nam)) != NULL) {
 		gid = grp->gr_gid;  /* Already created? Use it anyway... */
 	} else {
 		intmax_t		grid = -1;
@@ -634,7 +619,7 @@ pw_checkname(char *name, int gecos)
 		showtype = "gecos field";
 	} else {
 		/* See if the name is valid as a userid or group. */
-		badchars = " ,\t:+&#%$^()!@~*?<>=|\\/\"";
+		badchars = " ,\t:+&#%$^()!@~*?<>=|\\/\";";
 		showtype = "userid/group name";
 		/* Userids and groups can not have a leading '-'. */
 		if (*ch == '-')
@@ -694,11 +679,16 @@ rmat(uid_t uid)
 			    stat(e->d_name, &st) == 0 &&
 			    !S_ISDIR(st.st_mode) &&
 			    st.st_uid == uid) {
-				char            tmp[MAXPATHLEN];
-
-				snprintf(tmp, sizeof(tmp), "/usr/bin/atrm %s",
-				    e->d_name);
-				system(tmp);
+				const char *argv[] = {
+					"/usr/sbin/atrm",
+					e->d_name,
+					NULL
+				};
+				if (posix_spawn(NULL, argv[0], NULL, NULL,
+				    (char *const *) argv, environ)) {
+					warn("Failed to execute '%s %s'",
+					    argv[0], argv[1]);
+				}
 			}
 		}
 		closedir(d);
@@ -915,9 +905,18 @@ pw_user_del(int argc, char **argv, char *arg1)
 		/* Remove crontabs */
 		snprintf(file, sizeof(file), "/var/cron/tabs/%s", pwd->pw_name);
 		if (access(file, F_OK) == 0) {
-			snprintf(file, sizeof(file), "crontab -u %s -r",
-			    pwd->pw_name);
-			system(file);
+			const char *argv[] = {
+				"crontab",
+				"-u",
+				pwd->pw_name,
+				"-r",
+				NULL
+			};
+			if (posix_spawnp(NULL, argv[0], NULL, NULL,
+						(char *const *) argv, environ)) {
+				warn("Failed to execute '%s %s'",
+						argv[0], argv[1]);
+			}
 		}
 	}
 
@@ -1408,6 +1407,9 @@ pw_user_add(int argc, char **argv, char *arg1)
 	if (cmdcnf->groups != NULL) {
 		for (i = 0; i < cmdcnf->groups->sl_cur; i++) {
 			grp = GETGRNAM(cmdcnf->groups->sl_str[i]);
+			/* gr_add doesn't check if new member is already in group */
+			if (grp_has_member(grp, pwd->pw_name))
+				continue;
 			grp = gr_add(grp, pwd->pw_name);
 			/*
 			 * grp can only be NULL in 2 cases:

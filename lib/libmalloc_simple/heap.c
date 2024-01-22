@@ -186,11 +186,11 @@ __paint_shadow(void *mem, size_t size)
 	 * need it.
 	 */
 	if (pp->ph_shadow == NULL)
-		if (cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, pp,
+		if (cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMEM, pp,
 		    &pp->ph_shadow) != 0)
 			abort();
 	caprev_shadow_nomap_set_raw(cri->base_mem_nomap, pp->ph_shadow,
-	    (vaddr_t)mem, size);
+	    (ptraddr_t)mem, size);
 }
 
 void
@@ -200,7 +200,7 @@ __clear_shadow(void *mem, size_t size)
 
 	pp = cheri_setoffset(mem, 0);
 	caprev_shadow_nomap_clear_raw(cri->base_mem_nomap,
-	    pp->ph_shadow, (vaddr_t)mem, size);
+	    pp->ph_shadow, (ptraddr_t)mem, size);
 }
 
 void

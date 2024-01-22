@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 
 #include <sys/event.h>
@@ -139,7 +137,6 @@ send_credentials(struct nscd_connection_ *connection, int type)
 	struct kevent eventlist;
 	int nevents;
 	ssize_t result;
-	int res;
 
 	TRACE_IN(send_credentials);
 	memset(&cmsg, 0, sizeof(cmsg));
@@ -158,7 +155,7 @@ send_credentials(struct nscd_connection_ *connection, int type)
 
 	EV_SET(&eventlist, connection->sockfd, EVFILT_WRITE, EV_ADD,
 	    NOTE_LOWAT, sizeof(int), NULL);
-	res = kevent(connection->write_queue, &eventlist, 1, NULL, 0, NULL);
+	kevent(connection->write_queue, &eventlist, 1, NULL, 0, NULL);
 
 	nevents = kevent(connection->write_queue, NULL, 0, &eventlist, 1, NULL);
 	if ((nevents == 1) && (eventlist.filter == EVFILT_WRITE)) {

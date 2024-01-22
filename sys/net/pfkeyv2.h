@@ -1,4 +1,3 @@
-/*	$FreeBSD$	*/
 /*	$KAME: pfkeyv2.h,v 1.37 2003/09/06 05:15:43 itojun Exp $	*/
 
 /*-
@@ -433,7 +432,7 @@ _Static_assert(sizeof(struct sadb_x_sa_replay) == 8, "struct size mismatch");
 /* SPI size for PF_KEYv2 */
 #define PFKEY_SPI_SIZE	sizeof(u_int32_t)
 
-/* Identifier for menber of lifetime structure */
+/* Identifier for member of lifetime structure */
 #define SADB_X_LIFETIME_ALLOCATIONS	0
 #define SADB_X_LIFETIME_BYTES		1
 #define SADB_X_LIFETIME_ADDTIME		2

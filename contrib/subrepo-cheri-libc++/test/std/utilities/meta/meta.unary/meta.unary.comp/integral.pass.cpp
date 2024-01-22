@@ -50,6 +50,8 @@ int main(int, char**)
     test_integral<unsigned long>();
     test_integral<long long>();
     test_integral<unsigned long long>();
+    test_integral<intptr_t>();
+    test_integral<uintptr_t>();
 #ifndef TEST_HAS_NO_INT128
     test_integral<__int128_t>();
     test_integral<__uint128_t>();

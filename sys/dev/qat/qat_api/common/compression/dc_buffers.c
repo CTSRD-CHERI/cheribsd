@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /* Copyright(c) 2007-2022 Intel Corporation */
-/* $FreeBSD$ */
 /**
  *****************************************************************************
  * @file dc_buffers.c
@@ -171,4 +170,20 @@ cpaDcDeflateCompressBound(const CpaInstanceHandle dcInstance,
 	} else {
 		return dcDeflateBoundGen2(huffType, inputSize, outputSize);
 	}
+}
+
+CpaStatus
+cpaDcLZ4CompressBound(const CpaInstanceHandle dcInstance,
+		      Cpa32U inputSize,
+		      Cpa32U *outputSize)
+{
+	return CPA_STATUS_UNSUPPORTED;
+}
+
+CpaStatus
+cpaDcLZ4SCompressBound(const CpaInstanceHandle dcInstance,
+		       Cpa32U inputSize,
+		       Cpa32U *outputSize)
+{
+	return CPA_STATUS_UNSUPPORTED;
 }

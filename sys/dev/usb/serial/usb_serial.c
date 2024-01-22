@@ -1,7 +1,7 @@
 /*	$NetBSD: ucom.c,v 1.40 2001/11/13 06:24:54 lukem Exp $	*/
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001-2003, 2005, 2008
  *	Shunsuke Akiyama <akiyama@jp.FreeBSD.org>.
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*-
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -132,7 +130,7 @@ static unsigned ucom_cons_tx_high = 0;
 
 static int ucom_cons_unit = -1;
 static int ucom_cons_subunit = 0;
-static int ucom_cons_baud = 9600;
+static int ucom_cons_baud = 115200;
 static struct ucom_softc *ucom_cons_softc = NULL;
 
 SYSCTL_INT(_hw_usb_ucom, OID_AUTO, cons_unit, CTLFLAG_RWTUN,

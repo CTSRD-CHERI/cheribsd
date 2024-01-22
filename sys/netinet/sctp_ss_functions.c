@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010-2012, by Michael Tuexen. All rights reserved.
  * Copyright (c) 2010-2012, by Randall Stewart. All rights reserved.
@@ -28,9 +28,7 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
+#include <netinet/sctp_os.h>
 #include <netinet/sctp_pcb.h>
 
 /*

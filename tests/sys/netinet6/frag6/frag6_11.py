@@ -25,7 +25,6 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD$
 #
 
 import argparse
@@ -75,7 +74,7 @@ def main():
 
 	# Wait for expiration to happen.  We will not see an ICMPv6 as there
 	# is no frag with offset=0.
-	sleep(75)
+	sleep(3)
 
 	sys.exit(0)
 

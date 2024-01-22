@@ -36,8 +36,6 @@
 static char sccsid[] = "@(#)wbuf.c	8.1 (Berkeley) 6/4/93";
 #endif /* LIBC_SCCS and not lint */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <errno.h>
 #include <stdio.h>
 #include "local.h"
@@ -52,7 +50,6 @@ __FBSDID("$FreeBSD$");
 int
 __swbuf(int c, FILE *fp)
 {
-	unsigned char *old_p;
 	int n;
 
 	/*
@@ -88,15 +85,8 @@ __swbuf(int c, FILE *fp)
 	}
 	fp->_w--;
 	*fp->_p++ = c;
-	old_p = fp->_p;
-	if (++n == fp->_bf._size || (fp->_flags & __SLBF && c == '\n')) {
-		if (__fflush(fp) != 0) {
-			if (fp->_p == old_p && errno == EINTR) {
-				fp->_p--;
-				fp->_w++;
-			}
+	if (++n == fp->_bf._size || (fp->_flags & __SLBF && c == '\n'))
+		if (__fflush(fp) != 0)
 			return (EOF);
-		}
-	}
 	return (c);
 }

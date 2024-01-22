@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013 EMC Corp.
  * All rights reserved.
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/ioccom.h>
 
@@ -811,7 +809,7 @@ logpage(const struct cmd *f, int argc, char *argv[])
 		NVME_CTRLR_DATA_LPA_NS_SMART_MASK;
 
 	/*
-	 * The log page attribtues indicate whether or not the controller
+	 * The log page attributes indicate whether or not the controller
 	 * supports the SMART/Health information log page on a per
 	 * namespace basis.
 	 */

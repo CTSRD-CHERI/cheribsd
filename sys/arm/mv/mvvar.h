@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2002, 2003 Wasabi Systems, Inc.
  * All rights reserved.
@@ -35,8 +35,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  * from: FreeBSD: //depot/projects/arm/src/sys/arm/xscale/pxa2x0/pxa2x0var.h, rev 1
- *
- * $FreeBSD$
  */
 
 #ifndef _MVVAR_H_
