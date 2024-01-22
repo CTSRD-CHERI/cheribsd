@@ -257,7 +257,39 @@ compart_id_to_stack_index(compart_id_t cid)
 	return (cid - offsetof(typeof(dummy), stacks) / sizeof(*dummy.stacks));
 }
 
+static void init_compart_stack(void **, compart_id_t);
+
+static void
+init_compart_stack(void **stk, compart_id_t cid)
+{
+	/*
+	 * INVARIANT: The bottom of a compartment's stack contains a capability
+	 * to the top of the stack either when the compartment was last entered
+	 * or when it was last exited from, which ever occured later.
+	 */
+	stk[-1] = cheri_clearperm(stk - 1, CHERI_PERM_SW_VMEM);
+	if (
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	    /*
+	     * Do not check whether tracing is enabled if initialising the RTLD
+	     * stack because the global variable might not have been relocated
+	     * yet. This is only needed under the benchmark ABI, which has the
+	     * concept of an RTLD stack.
+	     */
+	    cid == C18N_RTLD_COMPART_ID ||
+#endif
+	    ld_compartment_utrace != NULL)
+		*--((uintptr_t **)stk)[-1] = cid;
+}
+
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+void c18n_init_rtld_stack(void **);
+
+void
+c18n_init_rtld_stack(void **csp)
+{
+	init_compart_stack(csp, C18N_RTLD_COMPART_ID);
+}
 /*
  * Save the initial stack (either at program launch or at thread start) in the
  * stack table.
@@ -415,7 +447,7 @@ void *get_rstk(unsigned);
 void *
 get_rstk(unsigned index)
 {
-	void **stk;
+	void *stk;
 	size_t capacity, size;
 	compart_id_t cid, cid_off;
 	struct stk_table *table;
@@ -435,10 +467,7 @@ get_rstk(unsigned index)
 
 	size = C18N_STACK_SIZE;
 	stk = stk_create(size);
-
-	stk[-1] = cheri_clearperm(stk - 1, CHERI_PERM_SW_VMEM);
-	if (ld_compartment_utrace != NULL)
-		*--((uintptr_t **)stk)[-1] = cid;
+	init_compart_stack(stk, cid);
 
 	table->stacks[cid_off].bottom = stk;
 	table->stacks[cid_off].size = size;
@@ -713,13 +742,22 @@ tramp_hook(void *rcsp, int event, void *target, const Obj_Entry *obj,
 	sym = def == NULL ? "<unknown>" : strtab_value(obj, def->st_name);
 	callee = comparts.data[obj->compart_id]->name;
 
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	caller_id =
+	    ((uintptr_t *)cheri_setoffset(rcsp, cheri_getlen(rcsp)))[-2];
+	(void)link;
+#else
 	if (cheri_gettag(link) &&
 	    (cheri_getperm(link) & CHERI_PERM_EXECUTIVE) == 0)
 		caller_id = ((uintptr_t *)
 		    cheri_setoffset(rcsp, cheri_getlen(rcsp)))[-2];
 	else
 		caller_id = C18N_RTLD_COMPART_ID;
-	caller = comparts.data[caller_id]->name;
+#endif
+	if (caller_id < C18N_RTLD_COMPART_ID)
+		caller = "<unknown>";
+	else
+		caller = comparts.data[caller_id]->name;
 
 	if (ld_compartment_utrace != NULL) {
 		memcpy(ut.sig, rtld_utrace_sig, sizeof(ut.sig));

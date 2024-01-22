@@ -74,8 +74,11 @@ END(_rtld_longjmp)
 
 ENTRY(_rtld_thread_start)
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	sub	c10, csp, #CAP_WIDTH
-	str	c10, [csp, #-CAP_WIDTH]!
+	mov	c19, c0
+	mov	c0, csp
+	sub	csp, csp, #(CAP_WIDTH * 2)
+	bl	c18n_init_rtld_stack
+	mov	c0, c19
 #else
 	/*
 	 * Move the Executive mode thread pointer to Restricted mode.
