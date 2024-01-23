@@ -1,3 +1,5 @@
+.include <src.opts.mk>
+
 PACKAGE=	bhyve
 FILESDIR=	${SHAREDIR}/bhyve/gdb
 
@@ -6,9 +8,12 @@ FILES+=		target.xml
 .if ${MACHINE_ARCH} == "amd64"
 XMLARCH=	i386:x86-64
 FILES+=		amd64.xml
-.elif ${MACHINE_ARCH} == "aarch64"
+.elif ${MACHINE_ARCH} == "aarch64" || ${MACHINE_ARCH} == "aarch64c"
 XMLARCH=	aarch64
 FILES+=		aarch64-core.xml
+.if ${MACHINE_ARCH} == "aarch64c"
+FILES+=		aarch64-capability.xml
+.endif
 .endif
 
 .if !make(install*)

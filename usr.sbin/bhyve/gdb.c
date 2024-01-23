@@ -65,6 +65,8 @@
 #include <unistd.h>
 #include <vmmapi.h>
 
+#include <cheri/cheric.h>
+
 #include "bhyverun.h"
 #include "config.h"
 #include "debug.h"
@@ -247,6 +249,49 @@ static const gdb_regset[] = {
 	{ .id = VM_REG_GUEST_SP, .size = 8 },
 	{ .id = VM_REG_GUEST_PC, .size = 8 },
 	{ .id = VM_REG_GUEST_CPSR, .size = 8 },
+#if __has_feature(capabilities)
+#define	GDB_REG_FIRST_EXT	VM_REG_GUEST_C0
+	{ .id = VM_REG_GUEST_C0, .size = 16 },
+	{ .id = VM_REG_GUEST_C1, .size = 16 },
+	{ .id = VM_REG_GUEST_C2, .size = 16 },
+	{ .id = VM_REG_GUEST_C3, .size = 16 },
+	{ .id = VM_REG_GUEST_C4, .size = 16 },
+	{ .id = VM_REG_GUEST_C5, .size = 16 },
+	{ .id = VM_REG_GUEST_C6, .size = 16 },
+	{ .id = VM_REG_GUEST_C7, .size = 16 },
+	{ .id = VM_REG_GUEST_C8, .size = 16 },
+	{ .id = VM_REG_GUEST_C9, .size = 16 },
+	{ .id = VM_REG_GUEST_C10, .size = 16 },
+	{ .id = VM_REG_GUEST_C11, .size = 16 },
+	{ .id = VM_REG_GUEST_C12, .size = 16 },
+	{ .id = VM_REG_GUEST_C13, .size = 16 },
+	{ .id = VM_REG_GUEST_C14, .size = 16 },
+	{ .id = VM_REG_GUEST_C15, .size = 16 },
+	{ .id = VM_REG_GUEST_C16, .size = 16 },
+	{ .id = VM_REG_GUEST_C17, .size = 16 },
+	{ .id = VM_REG_GUEST_C18, .size = 16 },
+	{ .id = VM_REG_GUEST_C19, .size = 16 },
+	{ .id = VM_REG_GUEST_C20, .size = 16 },
+	{ .id = VM_REG_GUEST_C21, .size = 16 },
+	{ .id = VM_REG_GUEST_C22, .size = 16 },
+	{ .id = VM_REG_GUEST_C23, .size = 16 },
+	{ .id = VM_REG_GUEST_C24, .size = 16 },
+	{ .id = VM_REG_GUEST_C25, .size = 16 },
+	{ .id = VM_REG_GUEST_C26, .size = 16 },
+	{ .id = VM_REG_GUEST_C27, .size = 16 },
+	{ .id = VM_REG_GUEST_C28, .size = 16 },
+	{ .id = VM_REG_GUEST_C29, .size = 16 },
+	{ .id = VM_REG_GUEST_C30, .size = 16 },
+	{ .id = VM_REG_GUEST_CSP, .size = 16 },
+	{ .id = VM_REG_GUEST_PCC, .size = 16 },
+	{ .id = VM_REG_GUEST_DDC, .size = 16 },
+	{ .id = VM_REG_GUEST_CTPIDR, .size = 16 },
+	{ .id = VM_REG_GUEST_RCSP, .size = 16 },
+	{ .id = VM_REG_GUEST_RDDC, .size = 16 },
+	{ .id = VM_REG_GUEST_RCTPIDR, .size = 16 },
+	{ .id = VM_REG_GUEST_CID, .size = 16 },
+	{ .id = VM_REG_GUEST_CCTLR, .size = 8 },
+#endif
 };
 #endif
 
@@ -676,6 +721,20 @@ append_unsigned_native(uintmax_t value, size_t len)
 		append_byte(value);
 		value >>= 8;
 	}
+}
+
+static void
+append_cap_native(uintcap_t value)
+{
+#if __has_feature(capabilities)
+	uint8_t tag;
+
+	tag = cheri_gettag(value);
+
+	append_byte(tag);
+#endif
+	for (size_t i = 0; i < sizeof(value); i++)
+		append_byte(((uint8_t *)&value)[i]);
 }
 
 static void
@@ -1174,7 +1233,10 @@ gdb_read_regs(void)
 		if (gdb_regset[i].id == GDB_REG_FIRST_EXT)
 			break;
 #endif
-		append_unsigned_native(regvals[i], gdb_regset[i].size);
+		if (gdb_regset[i].size <= 8)
+			append_unsigned_native(regvals[i], gdb_regset[i].size);
+		else
+			append_cap_native(regvals[i]);
 	}
 	finish_packet();
 }
@@ -1198,7 +1260,10 @@ gdb_read_one_reg(const uint8_t *data, size_t len)
 	}
 
 	start_packet();
-	append_unsigned_native(regval, gdb_regset[reg].size);
+	if (gdb_regset[reg].size <= 8)
+		append_unsigned_native(regval, gdb_regset[reg].size);
+	else
+		append_cap_native(regval);
 	finish_packet();
 }
 
