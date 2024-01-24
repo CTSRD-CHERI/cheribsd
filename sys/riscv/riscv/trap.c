@@ -89,6 +89,8 @@ SYSCTL_INT(_machdep, OID_AUTO, log_user_cheri_exceptions, CTLFLAG_RWTUN,
     "Print registers and process details on user CHERI exceptions");
 #endif
 
+void intr_irq_handler(struct trapframe *tf);
+
 int (*dtrace_invop_jump_addr)(struct trapframe *);
 
 #ifdef CPU_QEMU_RISCV
@@ -480,7 +482,7 @@ do_trap_supervisor(struct trapframe *frame)
 	exception = frame->tf_scause & SCAUSE_CODE;
 	if ((frame->tf_scause & SCAUSE_INTR) != 0) {
 		/* Interrupt */
-		riscv_cpu_intr(frame);
+		intr_irq_handler(frame);
 		return;
 	}
 
@@ -592,7 +594,7 @@ do_trap_user(struct trapframe *frame)
 	exception = frame->tf_scause & SCAUSE_CODE;
 	if ((frame->tf_scause & SCAUSE_INTR) != 0) {
 		/* Interrupt */
-		riscv_cpu_intr(frame);
+		intr_irq_handler(frame);
 		return;
 	}
 	intr_enable();
