@@ -51,6 +51,9 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20240122: callout_async_drain() removed
+OLD_FILES+=usr/share/man/man9/callout_async_drain.9.gz
+
 # 20240411: Removal of ld-elf*-c18n.so.1
 OLD_FILES+=libexec/ld-elf-c18n.so.1
 OLD_FILES+=libexec/ld-elf64cb-c18n.so.1
