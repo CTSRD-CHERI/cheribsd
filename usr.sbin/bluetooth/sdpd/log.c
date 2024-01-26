@@ -1,7 +1,7 @@
 /*-
  * log.c
  *
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
@@ -28,7 +28,6 @@
  * SUCH DAMAGE.
  *
  * $Id: log.c,v 1.1 2004/01/07 23:15:00 max Exp $
- * $FreeBSD$
  */
 
 #include <sys/types.h>

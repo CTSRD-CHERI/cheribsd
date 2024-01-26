@@ -27,7 +27,6 @@
  * SUCH DAMAGE.
  *
  *	from: FreeBSD: src/sys/i386/include/md_var.h,v 1.40 2001/07/12
- * $FreeBSD$
  */
 
 #ifndef	_MACHINE_MD_VAR_H_
@@ -51,6 +50,11 @@ extern u_long elf_hwcap;
 extern register_t mvendorid;
 extern register_t marchid;
 extern register_t mimpid;
+extern u_int mmu_caps;
+
+/* Supervisor-mode extension support */
+extern bool has_sstc;
+extern bool has_sscofpmf;
 
 struct dumperinfo;
 struct minidumpstate;

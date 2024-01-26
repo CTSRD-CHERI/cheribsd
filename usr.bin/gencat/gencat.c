@@ -4,7 +4,7 @@
 /*	$NetBSD: gencat.c,v 1.18 2003/10/27 00:12:43 lukem Exp $	*/
 
 /*-
- * SPDX-License-Identifier: (BSD-2-Clause-NetBSD AND ISC)
+ * SPDX-License-Identifier: (BSD-2-Clause AND ISC)
  *
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -67,8 +67,6 @@ up-to-date.  Many thanks.
 ******************************************************************/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #define _NLS_PRIVATE
 
 #include <sys/types.h>

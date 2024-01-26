@@ -25,8 +25,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef	_LINUXKPI_LINUX_IO_H_
 #define	_LINUXKPI_LINUX_IO_H_
@@ -402,6 +400,13 @@ _ioremap_attr(vm_paddr_t _phys_addr, unsigned long _size, int _attr)
 	return (NULL);
 }
 #endif
+
+struct device;
+static inline void *
+devm_ioremap(struct device *dev, resource_size_t offset, resource_size_t size)
+{
+	return (NULL);
+}
 
 #ifdef VM_MEMATTR_DEVICE
 #define	ioremap_nocache(addr, size)					\

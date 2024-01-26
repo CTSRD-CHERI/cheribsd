@@ -1,5 +1,4 @@
 /*
- * $FreeBSD$
  */
 
 /*
@@ -434,6 +433,7 @@ FBSD_1.7 {
 	_Fork;
 	cheri_revoke;
 	cheri_revoke_get_shadow;
+	cheri_cidcap_alloc;
 	fspacectl;
 	kqueuex;
 	swapoff;

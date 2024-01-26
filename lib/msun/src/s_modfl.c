@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2007 David Schultz <das@FreeBSD.ORG>
  * All rights reserved.
@@ -34,8 +34,6 @@
  * software is freely granted, provided that this notice
  * is preserved.
  * ====================================================
- *
- * $FreeBSD$
  */
 
 #include <float.h>

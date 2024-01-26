@@ -726,7 +726,7 @@ zcp_lua_alloc(void *ud, void *ptr, size_t osize, size_t nsize)
 
 	if (nsize == 0) {
 		if (ptr != NULL) {
-			int64_t *allocbuf = (int64_t *)ptr - 1;
+			int64ptr_t *allocbuf = (int64ptr_t *)ptr - 1;
 			int64_t allocsize = *allocbuf;
 			ASSERT3S(allocsize, >, 0);
 			ASSERT3S(allocargs->aa_alloc_remaining + allocsize, <=,
@@ -736,8 +736,8 @@ zcp_lua_alloc(void *ud, void *ptr, size_t osize, size_t nsize)
 		}
 		return (NULL);
 	} else if (ptr == NULL) {
-		int64_t *allocbuf;
-		int64_t allocsize = nsize + sizeof (int64_t);
+		int64ptr_t *allocbuf;
+		int64_t allocsize = nsize + sizeof (int64ptr_t);
 
 		if (!allocargs->aa_must_succeed &&
 		    (allocsize <= 0 ||

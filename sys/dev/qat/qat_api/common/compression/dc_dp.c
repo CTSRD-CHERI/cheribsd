@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /* Copyright(c) 2007-2022 Intel Corporation */
-/* $FreeBSD$ */
 /**
  *****************************************************************************
  * @file dc_dp.c
@@ -271,6 +270,14 @@ cpaDcDpRemoveSession(const CpaInstanceHandle dcInstance,
 		     CpaDcSessionHandle pSessionHandle)
 {
 	return cpaDcRemoveSession(dcInstance, pSessionHandle);
+}
+
+CpaStatus
+cpaDcDpUpdateSession(const CpaInstanceHandle dcInstance,
+		     CpaDcSessionHandle pSessionHandle,
+		     CpaDcSessionUpdateData *pUpdateSessionData)
+{
+	return CPA_STATUS_UNSUPPORTED;
 }
 
 CpaStatus

@@ -1,8 +1,7 @@
 /*	$NetBSD: netconfig.h,v 1.6 2008/04/28 20:22:54 martin Exp $	*/
-/*	$FreeBSD$ */
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004 The NetBSD Foundation, Inc.
  * All rights reserved.

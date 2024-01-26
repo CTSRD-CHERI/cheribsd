@@ -29,8 +29,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 struct script_msg {
@@ -75,6 +73,7 @@ struct ifinfo {
 				 * configuration */
 	int otherconfig;	/* need a separate protocol for the "other"
 				 * configuration */
+	int alwaysconfig;	/* Have we called the 'always' script? */
 	int state;
 	int probes;
 	int dadcount;
@@ -160,6 +159,7 @@ extern int Fflag;
 extern int uflag;
 extern const char *managedconf_script;
 extern const char *otherconf_script;
+extern const char *alwaysconf_script;
 extern const char *resolvconf_script;
 extern struct cap_channel *capllflags, *capscript, *capsendmsg, *capsyslog;
 

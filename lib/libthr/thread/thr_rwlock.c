@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998 Alex Nash
  * All rights reserved.
@@ -27,11 +27,10 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "namespace.h"
 #include <pthread.h>
@@ -102,9 +101,11 @@ rwlock_init(pthread_rwlock_t *rwlock, const pthread_rwlockattr_t *attr)
 
 	if (attr == NULL || *attr == NULL ||
 	    (*attr)->pshared == PTHREAD_PROCESS_PRIVATE) {
-		prwlock = calloc(1, sizeof(struct pthread_rwlock));
+		prwlock = aligned_alloc(CACHE_LINE_SIZE,
+		    roundup(sizeof(struct pthread_rwlock), CACHE_LINE_SIZE));
 		if (prwlock == NULL)
 			return (ENOMEM);
+		memset(prwlock, 0, sizeof(struct pthread_rwlock));
 		*rwlock = prwlock;
 	} else {
 		prwlock = __thr_pshared_offpage(rwlock, 1);
@@ -160,6 +161,7 @@ int
 _thr_rwlock_init(pthread_rwlock_t *rwlock, const pthread_rwlockattr_t *attr)
 {
 
+	_thr_check_init();
 	*rwlock = NULL;
 	return (rwlock_init(rwlock, attr));
 }
@@ -228,6 +230,7 @@ rwlock_rdlock_common(pthread_rwlock_t *rwlock, const struct timespec *abstime)
 int
 _Tthr_rwlock_rdlock(pthread_rwlock_t *rwlock)
 {
+	_thr_check_init();
 	return (rwlock_rdlock_common(rwlock, NULL));
 }
 
@@ -235,21 +238,24 @@ int
 _pthread_rwlock_timedrdlock(pthread_rwlock_t * __restrict rwlock,
     const struct timespec * __restrict abstime)
 {
+	_thr_check_init();
 	return (rwlock_rdlock_common(rwlock, abstime));
 }
 
 int
 _Tthr_rwlock_tryrdlock(pthread_rwlock_t *rwlock)
 {
-	struct pthread *curthread = _get_curthread();
+	struct pthread *curthread;
 	pthread_rwlock_t prwlock;
 	int flags;
 	int ret;
 
+	_thr_check_init();
 	ret = check_and_init_rwlock(rwlock, &prwlock);
 	if (ret != 0)
 		return (ret);
 
+	curthread = _get_curthread();
 	if (curthread->rdlock_count) {
 		/*
 		 * To avoid having to track all the rdlocks held by
@@ -277,14 +283,16 @@ _Tthr_rwlock_tryrdlock(pthread_rwlock_t *rwlock)
 int
 _Tthr_rwlock_trywrlock(pthread_rwlock_t *rwlock)
 {
-	struct pthread *curthread = _get_curthread();
+	struct pthread *curthread;
 	pthread_rwlock_t prwlock;
 	int ret;
 
+	_thr_check_init();
 	ret = check_and_init_rwlock(rwlock, &prwlock);
 	if (ret != 0)
 		return (ret);
 
+	curthread = _get_curthread();
 	ret = _thr_rwlock_trywrlock(&prwlock->lock);
 	if (ret == 0)
 		prwlock->owner = TID(curthread);
@@ -340,14 +348,16 @@ rwlock_wrlock_common(pthread_rwlock_t *rwlock, const struct timespec *abstime)
 int
 _Tthr_rwlock_wrlock(pthread_rwlock_t *rwlock)
 {
-	return (rwlock_wrlock_common (rwlock, NULL));
+	_thr_check_init();
+	return (rwlock_wrlock_common(rwlock, NULL));
 }
 
 int
 _pthread_rwlock_timedwrlock(pthread_rwlock_t * __restrict rwlock,
     const struct timespec * __restrict abstime)
 {
-	return (rwlock_wrlock_common (rwlock, abstime));
+	_thr_check_init();
+	return (rwlock_wrlock_common(rwlock, abstime));
 }
 
 int

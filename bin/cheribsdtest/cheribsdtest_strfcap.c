@@ -206,7 +206,7 @@ test_strfcap_number_one_cap(uintcap_t cap, const char *cap_desc)
 		{"%#16XS", "%#16lX", "uppercase, right align padding"},
 		{"%#16.4XS", "%#16.4lX", "uppercase, padding and precision"},
 	};
-	ssize_t ret_s, ret_p;
+	ssize_t ret_s;
 	size_t value;
 
 	for (size_t s = 0; s < nitems(formats); s++) {
@@ -236,7 +236,7 @@ test_strfcap_number_one_cap(uintcap_t cap, const char *cap_desc)
 			    value == (size_t)CHERI_OTYPE_SENTRY)
 				strcpy(str_p, "<sentry>");
 			else
-				ret_p = snprintf(str_p, sizeof(str_p),
+				snprintf(str_p, sizeof(str_p),
 				    formats[s].printf_format, value);
 			if (strcmp(str_s, str_p) != 0) {
 				cheribsdtest_failure_errx("strfcap (%s) and "

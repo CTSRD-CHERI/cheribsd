@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <libc_private.h>
 
 int	*__error(void);
@@ -54,7 +52,7 @@ __set_error_selector(int *(*arg)(void))
 	__error_selector = arg;
 }
 
-__attribute__((visibility("protected"))) int *
+int *
 __error(void)
 {
 

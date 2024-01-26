@@ -41,39 +41,13 @@
 
 #include "cheribsdtest_md.h"
 
-#define	CHERI_CAP_PRINT(cap) do {					\
-	printf("tag %ju s %ju perms %08jx type %016jx\n",		\
-	    (uintmax_t)cheri_gettag(cap),				\
-	    (uintmax_t)cheri_getsealed(cap),				\
-	    (uintmax_t)cheri_getperm(cap),				\
-	    (uintmax_t)cheri_gettype(cap));				\
-	printf("\tbase %016jx length %016jx\n",				\
-	    (uintmax_t)cheri_getbase(cap),				\
-	    (uintmax_t)cheri_getlen(cap));				\
-} while (0)
-
-#define	CHERI_CAPREG_PRINT(crn) do {					\
-	void * __capability cap;						\
-	if (crn == 0)							\
-		cap = cheri_getdefault();				\
-	else								\
-		cap = cheri_getreg(crn);				\
-	printf("C%u ", crn);						\
-	CHERI_CAP_PRINT(cap);						\
-} while (0)
-
-#define	CHERI_PCC_PRINT() do {						\
-	void * __capability cap;						\
-	cap = cheri_getpcc();						\
-	printf("PCC ");							\
-	CHERI_CAP_PRINT(cap);						\
-} while (0)
-
 /*
  * Convert a pointer to a null-derived void * with the same address. This is
  * useful for getting the correct value for ccs_si_addr_expected.
  */
 #define	NULL_DERIVED_VOIDP(x) ((void *)(uintptr_t)(ptraddr_t)(x))
+
+extern int verbose;
 
 /*
  * Shared memory interface between tests and the test controller process.
@@ -168,11 +142,20 @@ extern struct cheribsdtest_child_state *ccsp;
 #endif
 #endif
 
+#ifndef XFAIL_FLAKY_C18N_CONTEXT
+#ifdef CHERIBSD_C18N_TESTS
+#define	XFAIL_FLAKY_C18N_CONTEXT \
+    "setcontext and swapcontext are currently unsupported by library-based compartmentalisation"
+#else
+#define	XFAIL_FLAKY_C18N_CONTEXT	NULL
+#endif
+#endif
+
 struct cheri_test {
 	const char	*ct_name;
 	const char	*ct_desc;
-	void		(*ct_func)(const struct cheri_test *);
-	void		(*ct_child_func)(const struct cheri_test *);
+	void		(*ct_func)(void);
+	void		(*ct_child_func)(void);
 	const char *	(*ct_check_skip)(const char *);
 	const char *	(*ct_check_xfail)(const char *);
 	u_int		 ct_flags;
@@ -186,7 +169,7 @@ struct cheri_test {
 };
 
 #define	_CHERIBSDTEST_DECLARE(func, desc, ...)				\
-	static void func(const struct cheri_test *ctp);			\
+	static void func(void);						\
 	static struct cheri_test __CONCAT(__cheri_test, __LINE__) = {	\
 		.ct_name = #func,					\
 		.ct_desc = (desc),					\
@@ -197,7 +180,15 @@ struct cheri_test {
 
 #define	CHERIBSDTEST(func, desc, ...)					\
 	_CHERIBSDTEST_DECLARE(func, (desc), __VA_ARGS__);		\
-	static void func(const struct cheri_test * __unused ctp)
+	static void func(void)
+
+/* Enum for different modes of spawning a child process */
+enum spawn_child_mode {
+	SC_MODE_POSIX_SPAWN,
+	SC_MODE_FORK,
+	SC_MODE_VFORK,
+	SC_MODE_RFORK,
+};
 
 /*
  * Useful APIs for tests.  These terminate the process returning either
@@ -337,7 +328,14 @@ extern ptraddr_t find_address_space_gap(size_t len, size_t align);
  * (co)exec a new copy of cheribsdtest and run the test's associated child
  * function.
  */
-extern void cheribsdtest_coexec_child(const struct cheri_test *ctp);
-extern void cheribsdtest_exec_child(const struct cheri_test *ctp);
+extern void cheribsdtest_coexec_child(void);
+extern void cheribsdtest_exec_child(void);
+/*
+ * Spawn a new copy of cheribsdtest and run the test's associated child
+ * function.
+ */
+extern pid_t cheribsdtest_spawn_child(enum spawn_child_mode mode);
+
+const char *skip_need_cheri_revoke(const char *name);
 
 #endif /* !_CHERIBSDTEST_H_ */

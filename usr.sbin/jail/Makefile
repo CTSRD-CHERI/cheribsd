@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .include <src.opts.mk>
 
@@ -11,6 +10,7 @@ LIBADD=	jail kvm util
 PACKAGE=jail
 
 NO_WMISSING_VARIABLE_DECLARATIONS=
+CWARNFLAGS.jailparse.c=	${NO_WUNUSED_BUT_SET_VARIABLE}
 
 YFLAGS+=-v
 CFLAGS+=-I. -I${.CURDIR}

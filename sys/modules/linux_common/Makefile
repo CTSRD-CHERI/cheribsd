@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .PATH: ${SRCTOP}/sys/compat/linux
 .if ${MACHINE_CPUARCH} == "amd64"
@@ -16,7 +15,6 @@ SRCS+=	linux_x86.c linux_vdso_selector_x86.c
 .endif
 
 EXPORT_SYMS=
-EXPORT_SYMS+=	linux_emul_path
 EXPORT_SYMS+=	linux_get_osname
 EXPORT_SYMS+=	linux_get_osrelease
 EXPORT_SYMS+=	linux_use_real_ifname

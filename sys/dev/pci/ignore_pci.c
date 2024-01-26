@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000 Michael Smith <msmith@freebsd.org>
  * Copyright (c) 2000 BSDi
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * 'Ignore' driver - eats devices that show up errnoeously on PCI
  * but shouldn't ever be listed or handled by a driver.

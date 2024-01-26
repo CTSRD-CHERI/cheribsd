@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2001 Eduardo Horvath.
  * All rights reserved.
@@ -27,8 +27,6 @@
  * SUCH DAMAGE.
  *
  *	from: NetBSD: gemreg.h,v 1.9 2006/11/24 13:01:07 martin Exp
- *
- * $FreeBSD$
  */
 
 #ifndef	_IF_GEMREG_H

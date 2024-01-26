@@ -38,8 +38,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_posix.h"
 #include "opt_config.h"
 
@@ -304,6 +302,10 @@ proc_machine_arch(struct proc *p)
 	if (!SV_PROC_FLAG(p, SV_CHERI))
 		return (MACHINE_ARCH64);
 #endif
+#ifdef MACHINE_ARCH64CB
+	if (SV_PROC_FLAG(p, SV_CHERI) && SV_PROC_FLAG(p, SV_UNBOUND_PCC))
+		return (MACHINE_ARCH64CB);
+#endif
 	return (MACHINE_ARCH);
 }
 
@@ -325,6 +327,10 @@ SYSCTL_PROC(_hw, HW_MACHINE_ARCH, machine_arch, CTLTYPE_STRING | CTLFLAG_RD |
 #ifndef MACHINE_ARCHES
 #if defined(COMPAT_FREEBSD32)
 #define	MACHINE_ARCHES	MACHINE_ARCH " " MACHINE_ARCH32
+#elif defined(MACHINE_ARCH64CB) && defined(COMPAT_FREEBSD64)
+#define	MACHINE_ARCHES	MACHINE_ARCH " " MACHINE_ARCH64CB " " MACHINE_ARCH64
+#elif defined(MACHINE_ARCH64CB)
+#define	MACHINE_ARCHES	MACHINE_ARCH " " MACHINE_ARCH64CB
 #elif defined(COMPAT_FREEBSD64)
 #define	MACHINE_ARCHES	MACHINE_ARCH " " MACHINE_ARCH64
 #else

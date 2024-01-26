@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 Nathan Whitehorn
  * Copyright (c) 2014 Devin Teske <dteske@FreeBSD.org>
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 
 #include <archive.h>
@@ -142,6 +140,7 @@ main(void)
 
 	conf.title = "Archive Extraction";
 	conf.auto_minwidth = 40;
+	conf.auto_truncate = true;
 	pvconf.callback	= extract_files;
 	pvconf.refresh = 1;
 	pvconf.fmtbottomstr = "%10lli files read @ %'9.1f files/sec.";

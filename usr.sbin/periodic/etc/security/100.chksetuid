@@ -24,7 +24,6 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD$
 #
 
 # If there is a global system configuration file, suck it in.
@@ -54,7 +53,7 @@ then
 		}'`
 	find -sx $MP /dev/null \( ! -fstype local \) -prune -o -type f \
 	    \( -perm -u+x -or -perm -g+x -or -perm -o+x \) \
-	    \( -perm -u+s -or -perm -g+s \) -exec ls -liTd \{\} \+ |
+	    \( -perm -u+s -or -perm -g+s \) -exec ls -lid -D "%FT%T" \{\} \+ |
 	check_diff setuid - "${host} setuid diffs:"
 	rc=$?
 fi

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1994-1996 Søren Schmidt
  * Copyright (c) 2006 Roman Divacky
@@ -27,9 +27,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/fcntl.h>
@@ -147,7 +144,7 @@ linux_proc_init(struct thread *td, struct thread *newtd, bool init_thread)
 		p = newtd->td_proc;
 
 		/* non-exec call */
-		em = malloc(sizeof(*em), M_TEMP, M_WAITOK | M_ZERO);
+		em = malloc(sizeof(*em), M_LINUX, M_WAITOK | M_ZERO);
 		if (init_thread) {
 			LINUX_CTR1(proc_init, "thread newtd(%d)",
 			    newtd->td_tid);
@@ -211,41 +208,6 @@ linux_on_exit(struct proc *p)
 	free(pem, M_LINUX);
 }
 
-/*
- * If a Linux binary is exec'ing something, try this image activator
- * first.  We override standard shell script execution in order to
- * be able to modify the interpreter path.  We only do this if a Linux
- * binary is doing the exec, so we do not create an EXEC module for it.
- */
-int
-linux_exec_imgact_try(struct image_params *imgp)
-{
-	const char *head = (const char *)imgp->image_header;
-	char *rpath;
-	int error = -1;
-
-	/*
-	 * The interpreter for shell scripts run from a Linux binary needs
-	 * to be located in /compat/linux if possible in order to recursively
-	 * maintain Linux path emulation.
-	 */
-	if (((const short *)head)[0] == SHELLMAGIC) {
-		/*
-		 * Run our normal shell image activator.  If it succeeds attempt
-		 * to use the alternate path for the interpreter.  If an
-		 * alternate path is found, use our stringspace to store it.
-		 */
-		if ((error = exec_shell_imgact(imgp)) == 0) {
-			linux_emul_convpath(imgp->interpreter_name, UIO_SYSSPACE,
-			    &rpath, 0, AT_FDCWD);
-			if (rpath != NULL)
-				imgp->args->fname_buf =
-				    imgp->interpreter_name = rpath;
-		}
-	}
-	return (error);
-}
-
 int
 linux_common_execve(struct thread *td, struct image_args *eargs)
 {
@@ -271,6 +233,10 @@ linux_common_execve(struct thread *td, struct image_args *eargs)
 	 * FreeBSD binary we destroy Linux emuldata thread & proc entries.
 	 */
 	if (SV_CURPROC_ABI() != SV_ABI_LINUX) {
+
+		/* Clear ABI root directory if set. */
+		linux_pwd_onexec_native(td);
+
 		PROC_LOCK(p);
 		em = em_find(td);
 		KASSERT(em != NULL, ("proc_exec: thread emuldata not found.\n"));
@@ -281,13 +247,13 @@ linux_common_execve(struct thread *td, struct image_args *eargs)
 		p->p_emuldata = NULL;
 		PROC_UNLOCK(p);
 
-		free(em, M_TEMP);
+		free(em, M_LINUX);
 		free(pem, M_LINUX);
 	}
 	return (EJUSTRETURN);
 }
 
-void
+int
 linux_on_exec(struct proc *p, struct image_params *imgp)
 {
 	struct thread *td;
@@ -295,6 +261,7 @@ linux_on_exec(struct proc *p, struct image_params *imgp)
 #if defined(__amd64__)
 	struct linux_pemuldata *pem;
 #endif
+	int error;
 
 	td = curthread;
 	MPASS((imgp->sysent->sv_flags & SV_ABI_MASK) == SV_ABI_LINUX);
@@ -327,6 +294,10 @@ linux_on_exec(struct proc *p, struct image_params *imgp)
 				continue;
 			linux_proc_init(td, othertd, true);
 		}
+
+		/* Set ABI root directory. */
+		if ((error = linux_pwd_onexec(td)) != 0)
+			return (error);
 	}
 #if defined(__amd64__)
 	/*
@@ -339,6 +310,7 @@ linux_on_exec(struct proc *p, struct image_params *imgp)
 		pem->persona |= LINUX_READ_IMPLIES_EXEC;
 	}
 #endif
+	return (0);
 }
 
 void
@@ -353,7 +325,7 @@ linux_thread_dtor(struct thread *td)
 
 	LINUX_CTR1(thread_dtor, "thread(%d)", em->em_tid);
 
-	free(em, M_TEMP);
+	free(em, M_LINUX);
 }
 
 void

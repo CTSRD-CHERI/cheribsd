@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
  * Copyright (c) 2021 Dmitry Chagin <dchagin@FreeBSD.org>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _LINUX_FORK_H_
@@ -62,6 +62,7 @@
 
 #define	LINUX_CSIGNAL			0x000000ff
 
+#if defined(_KERNEL)
 /*
  * User-space clone3 args layout.
  */
@@ -97,5 +98,6 @@ struct l_clone_args {
 int linux_set_upcall(struct thread *, register_t);
 int linux_set_cloned_tls(struct thread *, void *);
 void linux_thread_detach(struct thread *);
+#endif /* defined(_KERNEL) */
 
 #endif /* _LINUX_FORK_H_ */

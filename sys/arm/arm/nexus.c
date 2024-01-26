@@ -40,8 +40,6 @@
 #include "opt_platform.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -256,7 +254,7 @@ nexus_alloc_resource(device_t bus, device_t child, int type, int *rid,
 	if (needactivate) {
 		if (bus_activate_resource(child, type, *rid, rv)) {
 			rman_release_resource(rv);
-			return (0);
+			return (NULL);
 		}
 	}
 

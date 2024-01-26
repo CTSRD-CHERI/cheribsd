@@ -41,6 +41,8 @@ usize GetMmapGranularity() {
   return GetPageSize();
 }
 
+bool ErrorIsOOM(error_t err) { return err == ENOMEM; }
+
 void *MmapOrDie(usize size, const char *mem_type, bool raw_report) {
   size = RoundUpTo(size, GetPageSizeCached());
   uptr res = MmapNamed(nullptr, size, PROT_READ | PROT_WRITE,
@@ -96,6 +98,7 @@ void *MmapAlignedOrDieOnFatalError(usize size, usize alignment,
     UnmapOrDie((void *)map_res, (char *)res - (char *)map_res);
   }
   uptr end = res + size;
+  end = RoundUpTo(end, GetPageSizeCached());
   if (end != map_end)
     UnmapOrDie((void *)end, (char *)map_end - (char *)end);
   return (void*)res;
@@ -147,7 +150,7 @@ bool MprotectReadOnly(uptr addr, usize size) {
   return 0 == internal_mprotect((void *)addr, size, PROT_READ);
 }
 
-#if !SANITIZER_MAC
+#if !SANITIZER_APPLE
 void MprotectMallocZones(void *addr, int prot) {}
 #endif
 
@@ -240,7 +243,7 @@ bool MemoryRangeIsAvailable(uptr range_start, uptr range_end) {
   return true;
 }
 
-#if !SANITIZER_MAC
+#if !SANITIZER_APPLE
 void DumpProcessMap() {
   MemoryMappingLayout proc_maps(/*cache_enabled*/true);
   const sptr kBufSize = 4095;

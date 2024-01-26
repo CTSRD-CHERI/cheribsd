@@ -25,7 +25,6 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD$
 #
 
 import argparse
@@ -132,7 +131,7 @@ def main():
 	sp.sendp(ip6f02, iface=args.sendif[0], verbose=False)
 
 	# Wait for expiry.
-	sleep(75)
+	sleep(3)
 	sys.exit(0)
 
 if __name__ == '__main__':

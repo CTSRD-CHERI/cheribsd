@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2007-2008 Semihalf, Rafal Jaworowski
  * Copyright (C) 2006-2007 Semihalf, Piotr Kruszynski
@@ -32,8 +32,6 @@
  * FDT 'simple-bus' attachment for Freescale TSEC controller.
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/endian.h>

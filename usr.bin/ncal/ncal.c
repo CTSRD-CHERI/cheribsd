@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997 Wolfgang Helbig
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <calendar.h>
 #include <ctype.h>
 #include <err.h>
@@ -497,6 +495,8 @@ main(int argc, char *argv[])
 			monthrangeb(y, m, flag_julian_day, before, after);
 		else
 			monthranger(y, m, flag_julian_day, before, after);
+	if (ferror(stdout) != 0 || fflush(stdout) != 0)
+		err(1, "stdout");
 	return (0);
 }
 

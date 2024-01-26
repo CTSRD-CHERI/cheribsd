@@ -26,8 +26,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _MACHINE_CHERI_H_
@@ -66,6 +64,8 @@ struct thread;
 
 /* Used to set DDC_EL0 in psci call functions. */
 extern void * __capability smccc_ddc_el0;
+
+extern uintcap_t userspace_root_cidcap;
 
 /*
  * Morello specific kernel utility functions.

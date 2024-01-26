@@ -22,8 +22,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _VMBUS_VAR_H_
@@ -34,7 +32,6 @@
 #include <sys/taskqueue.h>
 #include <sys/rman.h>
 
-#include <dev/hyperv/include/hyperv_busdma.h>
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcib_private.h>
 
@@ -74,8 +71,6 @@ struct vmbus_pcpu_data {
 	struct vmbus_evtflags	*event_flags;	/* event flags from host */
 
 	/* Rarely used fields */
-	struct hyperv_dma	message_dma;	/* busdma glue */
-	struct hyperv_dma	event_flags_dma;/* busdma glue */
 	struct taskqueue	*event_tq;	/* event taskq */
 	struct taskqueue	*message_tq;	/* message taskq */
 	struct task		message_task;	/* message task */
@@ -105,11 +100,8 @@ struct vmbus_softc {
 
 	/* Shared memory for vmbus_{rx,tx}_evtflags */
 	void			*vmbus_evtflags;
-	struct hyperv_dma	vmbus_evtflags_dma;
 
 	void			*vmbus_mnf1;	/* monitored by VM, unused */
-	struct hyperv_dma	vmbus_mnf1_dma;
-	struct hyperv_dma	vmbus_mnf2_dma;
 
 	bool			vmbus_scandone;
 	struct task		vmbus_scandone_task;

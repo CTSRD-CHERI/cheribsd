@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "libc_private.h"
 #include "csu_common.h"
 
@@ -59,6 +57,7 @@ void __start(int argc, char **argv, char **env, void (*cleanup)(void)) __dead2;
 void
 __start(int argc, char **argv, char **env, void (*cleanup)(void))
 {
+	__asm__ volatile(".cfi_undefined ra");
 #ifdef SHOULD_PROCESS_CAP_RELOCS
 	/*
 	 * Initialize __cap_relocs for static executables. The run-time linker

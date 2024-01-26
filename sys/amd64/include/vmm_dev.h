@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef	_VMM_DEV_H_
@@ -89,7 +87,9 @@ struct vm_register_set {
 
 struct vm_run {
 	int		cpuid;
-	struct vm_exit	vm_exit;
+	cpuset_t	*cpuset;	/* CPU set storage */
+	size_t		cpusetsize;
+	struct vm_exit	*vm_exit;
 };
 
 struct vm_exception {
@@ -349,7 +349,7 @@ enum {
 };
 
 #define	VM_RUN		\
-	_IOWR('v', IOCNUM_RUN, struct vm_run)
+	_IOW('v', IOCNUM_RUN, struct vm_run)
 #define	VM_SUSPEND	\
 	_IOW('v', IOCNUM_SUSPEND, struct vm_suspend)
 #define	VM_REINIT	\

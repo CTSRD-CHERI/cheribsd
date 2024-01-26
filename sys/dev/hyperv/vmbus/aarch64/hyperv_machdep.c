@@ -1,4 +1,4 @@
-/*- SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+/*- SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2016-2017,2022 Microsoft Corp.
  *
@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <dev/hyperv/include/hyperv.h>
 #include <dev/hyperv/include/hyperv_busdma.h>
 #include <dev/hyperv/vmbus/aarch64/hyperv_machdep.h>

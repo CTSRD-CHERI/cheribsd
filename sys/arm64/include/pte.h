@@ -26,9 +26,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
+
+#ifdef __arm__
+#include <arm/pte.h>
+#else /* !__arm__ */
 
 #ifndef _MACHINE_PTE_H_
 #define	_MACHINE_PTE_H_
@@ -53,12 +55,22 @@ typedef	uint64_t	pt_entry_t;		/* page table entry */
 #define	ATTR_MASK		(ATTR_MASK_H | ATTR_MASK_L)
 #if __has_feature(capabilities)
 #define	ATTR_LC_MASK		(3UL << 61)
+#define	ATTR_LC_GEN_MASK	(1UL << 61)
 #define	ATTR_LC_DISABLED	(0UL << 61)
 #define	ATTR_LC_ENABLED		(1UL << 61)
 #define	ATTR_LC_GEN0		(2UL << 61)
 #define	ATTR_LC_GEN1		(3UL << 61)
 #define	ATTR_SC			(1UL << 60)
+#define	ATTR_CDBM		(1UL << 59)
 #endif
+
+#define BASE_MASK		~ATTR_MASK
+#define BASE_ADDR(x)		((x) & BASE_MASK)
+
+#define PTE_TO_PHYS(pte)	BASE_ADDR(pte)
+/* Convert a phys addr to the output address field of a PTE */
+#define PHYS_TO_PTE(pa)		(pa)
+
 /* Bits 58:55 are reserved for software */
 #define	ATTR_SW_UNUSED1		(1UL << 58)
 #define	ATTR_SW_NO_PROMOTE	(1UL << 57)
@@ -196,3 +208,5 @@ typedef	uint64_t	pt_entry_t;		/* page table entry */
 #endif /* !_MACHINE_PTE_H_ */
 
 /* End of pte.h */
+
+#endif /* !__arm__ */

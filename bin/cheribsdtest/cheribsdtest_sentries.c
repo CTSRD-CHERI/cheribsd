@@ -75,12 +75,12 @@ check_fptr(uintptr_t fptr)
 CHERIBSDTEST(sentry_dlsym,
     "Check that a function pointer obtaine dfrom via dlsym is a sentry")
 {
-	unsigned int (*fptr)(unsigned int seconds);
+	double (*fptr)(double);
 	void *handle;
 	const char *libm_so;
 
-#if defined(COMPAT_CHERI)
-	libm_so = "/usr/lib64c/" LIBM_SONAME;
+#ifdef COMPAT_libcompat
+	libm_so = "/usr/lib" COMPAT_libcompat "/" LIBM_SONAME;
 #else
 	libm_so = "/lib/" LIBM_SONAME;
 #endif
@@ -96,7 +96,7 @@ CHERIBSDTEST(sentry_dlsym,
 CHERIBSDTEST(sentry_libc,
     "Check that a function pointer from libc is a sentry")
 {
-	unsigned int (*fptr)(unsigned int seconds) = sleep;
+	unsigned int (*fptr)(unsigned int) = sleep;
 
 	check_fptr((uintptr_t)fptr);
 }
@@ -104,6 +104,7 @@ CHERIBSDTEST(sentry_libc,
 CHERIBSDTEST(sentry_static,
     "Check that a statically initialized function pointer is a sentry")
 {
+	static unsigned int (*volatile fptr)(unsigned int) = sleep;
 
-	check_fptr((uintptr_t)ctp->ct_func);
+	check_fptr((uintptr_t)fptr);
 }

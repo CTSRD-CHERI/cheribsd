@@ -26,12 +26,7 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #ifdef COMPAT_FREEBSD64
 #include <sys/abi_compat.h>
@@ -798,7 +793,7 @@ panfrost_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	mtx_init(&sc->as_mtx, "asid set mtx", NULL, MTX_SPIN);
+	mtx_init(&sc->as_mtx, "asid set mtx", NULL, MTX_DEF);
 
 	config_intrhook_oneshot(&panfrost_irq_hook, sc);
 

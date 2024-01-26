@@ -2,7 +2,7 @@
 /*	NetBSD: lxtphy.c,v 1.19 2000/02/02 23:34:57 thorpej Exp 	*/
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -58,8 +58,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * driver for Level One's LXT-970 ethernet 10/100 PHY
  * datasheet from www.level1.com

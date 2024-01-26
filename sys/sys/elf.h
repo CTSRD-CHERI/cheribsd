@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001 David E. O'Brien.
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -39,5 +37,12 @@
 #include <machine/elf.h>
 #include <sys/elf32.h>
 #include <sys/elf64.h>
+
+#ifndef ELF_IS_CHERI
+#if __has_feature(capabilities)
+#error "Must have ELF_IS_CHERI for CHERI architectures"
+#endif
+#define ELF_IS_CHERI(hdr) false
+#endif
 
 #endif /* !_SYS_ELF_H_ */

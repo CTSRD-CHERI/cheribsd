@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2017-2018 Chelsio Communications, Inc.
  * All rights reserved.
@@ -31,8 +31,6 @@
 #include "opt_kern_tls.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #ifdef KERN_TLS
 #include <sys/param.h>
 #include <sys/ktr.h>

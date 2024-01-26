@@ -26,8 +26,6 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
 .Dd September 2, 2021
 .Dt PROCCONTROL 1
 .Os
@@ -79,6 +77,8 @@ Controls the KPTI enable, AMD64 only.
 .It Ar la48
 Control limiting usermode process address space to 48 bits of address,
 AMD64 only, on machines capable of 57-bit addressing.
+.It Ar cherirevoke
+Control the use of CHERI revocation in the process.
 .El
 .Pp
 The

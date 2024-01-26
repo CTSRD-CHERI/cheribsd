@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 # Set default CPU compile flags and baseline CPUTYPE for each arch.  The
 # compile flags must support the minimum CPU type for each architecture but
@@ -17,8 +16,12 @@ MACHINE_CPU = amd64 sse2 sse mmx
 MACHINE_CPU = arm
 . elif ${MACHINE_CPUARCH} == "i386"
 MACHINE_CPU = i486
-. elif ${MACHINE_CPUARCH} == "powerpc"
+. elif ${MACHINE_ARCH} == "powerpc"
 MACHINE_CPU = aim
+. elif ${MACHINE_ARCH} == "powerpc64"
+MACHINE_CPU = aim altivec
+. elif ${MACHINE_ARCH} == "powerpc64le"
+MACHINE_CPU = aim altivec vsx vsx2
 . elif ${MACHINE_CPUARCH} == "riscv"
 .  if ${MACHINE_ARCH:Mriscv*c*}
 MACHINE_CPU = cheri
@@ -131,7 +134,7 @@ _CPUCFLAGS = -mcpu=${CPUTYPE}
 .  if ${CPUTYPE} == "e500"
 _CPUCFLAGS = -Wa,-me500 -msoft-float
 .  else
-_CPUCFLAGS = -mcpu=${CPUTYPE} -mno-powerpc64
+_CPUCFLAGS = -mcpu=${CPUTYPE}
 .  endif
 . elif ${MACHINE_ARCH:Mpowerpc64*} != ""
 _CPUCFLAGS = -mcpu=${CPUTYPE}
@@ -293,6 +296,27 @@ MACHINE_CPU += arm64
 . elif ${MACHINE_ARCH} == "powerpc"
 .  if ${CPUTYPE} == "e500"
 MACHINE_CPU = booke softfp
+.  elif ${CPUTYPE} == "g4"
+MACHINE_CPU = aim altivec
+.  else
+MACHINE_CPU= aim
+.  endif
+. elif ${MACHINE_ARCH} == "powerpc64"
+.  if ${CPUTYPE} == "e5500"
+MACHINE_CPU = booke
+.  elif ${CPUTYPE} == power7
+MACHINE_CPU = altivec vsx
+.  elif ${CPUTYPE} == power8
+MACHINE_CPU = altivec vsx vsx2
+.  elif ${CPUTYPE} == power9
+MACHINE_CPU = altivec vsx vsx2 vsx3
+.  else
+MACHINE_CPU = aim altivec
+.  endif
+. elif ${MACHINE_ARCH} == "powerpc64le"
+MACHINE_CPU = aim altivec vsx vsx2
+.  if ${CPUTYPE} == power9
+MACHINE_CPU += vsx3
 .  endif
 ########## riscv
 . elif ${MACHINE_CPUARCH} == "riscv"
@@ -306,11 +330,14 @@ MACHINE_CPU += riscv
 .if ${MACHINE_CPUARCH} == "aarch64"
 . if ${MACHINE_CPU:Mcheri}
 CFLAGS+=	-march=morello
-CFLAGS+=	-Xclang -morello-vararg=new
+CFLAGS+=	-Xclang -morello-vararg=new -Xclang -morello-bounded-memargs=caller-only
 LDFLAGS+=	-march=morello
 . endif
 
-. if ${MACHINE_ARCH:Maarch64*c*}
+. if ${MACHINE_ARCH:Maarch64*cb*}
+CFLAGS+=	-mabi=purecap-benchmark
+LDFLAGS+=	-mabi=purecap-benchmark
+. elif ${MACHINE_ARCH:Maarch64*c*}
 CFLAGS+=	-mabi=purecap
 LDFLAGS+=	-mabi=purecap
 . else
@@ -410,6 +437,7 @@ CXXFLAGS += ${CXXFLAGS.${MACHINE_ARCH}}
 # Pointer type:			ptr32, ptr64, ptr128c
 # Size of time_t:		time32, time64
 # Capability ABI:		purecap
+# Benchmark ABI:		benchmark
 #
 .if (${MACHINE} == "arm" && (defined(CPUTYPE) && ${CPUTYPE:M*soft*})) || \
     (${MACHINE_ARCH} == "powerpc" && (defined(CPUTYPE) && ${CPUTYPE} == "e500"))
@@ -425,6 +453,9 @@ MACHINE_ABI+=  long32
 .endif
 .if (${MACHINE_ARCH:Maarch64*c*} || ${MACHINE_ARCH:Mriscv*c*})
 MACHINE_ABI+=	purecap ptr128c
+.if ${MACHINE_ARCH:Maarch64*cb*}
+MACHINE_ABI+=	benchmark
+.endif
 .else
 .if ${MACHINE_ABI:Mlong64}
 MACHINE_ABI+=	ptr64

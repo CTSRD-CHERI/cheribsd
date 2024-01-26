@@ -1,0 +1,134 @@
+[
+    {
+        "PublicDescription": "Branch mispredict restricted. The counter counts each correction to the predicted program flow that occurs because of a misprediction or no prediction, and relates to switches between Restricted and Executive",
+        "EventCode": "0x200",
+        "EventName": "BR_MIS_PRED_RS",
+        "BriefDescription": "Branch mispredict restricted. The counter counts each correction to the predicted program flow that occurs because of a misprediction or no prediction, and relates to switches between Restricted and Executive"
+    },
+    {
+        "PublicDescription": "Branch mispredict C64. The counter counts each correction to the predicted program flow that occurs because of a misprediction or no prediction, and relates to switches between A64 and C64",
+        "EventCode": "0x201",
+        "EventName": "BR_MIS_PRED_C64",
+        "BriefDescription": "Branch mispredict C64. The counter counts each correction to the predicted program flow that occurs because of a misprediction or no prediction, and relates to switches between A64 and C64"
+    },
+    {
+        "PublicDescription": "Branch mispredict system permission. The counter counts each correction to the predicted program flow that occurs because of a misprediction or no prediction, and relates to System permission",
+        "EventCode": "0x202",
+        "EventName": "BR_MIS_PRED_SYS",
+        "BriefDescription": "Branch mispredict system permission. The counter counts each correction to the predicted program flow that occurs because of a misprediction or no prediction, and relates to System permission"
+    },
+    {
+        "PublicDescription": "PCC register file full. The counter counts every cycle counted by the CPU_CYCLES event on which no operation was issued because the PCC write tracking register file was full",
+        "EventCode": "0x203",
+        "EventName": "PCCRF_FULL",
+        "BriefDescription": "PCC register file full. The counter counts every cycle counted by the CPU_CYCLES event on which no operation was issued because the PCC write tracking register file was full"
+    },
+    {
+        "PublicDescription": "Entry to Executive, Operations Speculatively Executed. The counter counts speculatively executed operations that cause an entry into Executive",
+        "EventCode": "0x204",
+        "EventName": "EXECUTIVE_ENTRY",
+        "BriefDescription": "Entry to Executive, Operations Speculatively Executed. The counter counts speculatively executed operations that cause an entry into Executive"
+    },
+    {
+        "PublicDescription": "Exit from Executive, Operations Speculatively Executed. The counter counts speculatively executed operations that cause an exit from Executive",
+        "EventCode": "0x205",
+        "EventName": "EXECUTIVE_EXIT",
+        "BriefDescription": "Exit from Executive, Operations Speculatively Executed. The counter counts speculatively executed operations that cause an exit from Executive"
+    },
+    {
+        "PublicDescription": "Instructions in A64, Operations Speculatively Executed. The counter counts speculatively executed operations due to all instructions in A64",
+        "EventCode": "0x206",
+        "EventName": "INST_SPEC_A64",
+        "BriefDescription": "Instructions in A64, Operations Speculatively Executed. The counter counts speculatively executed operations due to all instructions in A64"
+    },
+    {
+        "PublicDescription": "Instructions in C64, Operations Speculatively Executed. The counter counts speculatively executed operations due to all instructions in C64",
+        "EventCode": "0x207",
+        "EventName": "INST_SPEC_C64",
+        "BriefDescription": "Instructions in C64, Operations Speculatively Executed. The counter counts speculatively executed operations due to all instructions in C64"
+    },
+    {
+        "PublicDescription": "CVTD Instructions, Operations Speculatively Executed. The counter counts speculatively executed operations due to the following instructions:\nCVTD (not flag setting): Convert pointer to capability offset from DDC.\nCVTD (flag setting): Convert capability to pointer offset from DDC, setting flags.\nCVTDZ: Convert pointer to capability offset from DDC, with null capability from zero semantics",
+        "EventCode": "0x20B",
+        "EventName": "INST_SPEC_CVTD",
+        "BriefDescription": "CVTD Instructions, Operations Speculatively Executed. The counter counts speculatively executed operations due to the following instructions:\nCVTD (not flag setting): Convert pointer to capability offset from DDC.\nCVTD (flag setting): Convert capability to pointer offset from DDC, setting flags.\nCVTDZ: Convert pointer to capability offset from DDC, with null capability from zero semantics"
+    },
+    {
+        "PublicDescription": "SCBNDS or SCBNDSE Instructions which do not set exact bounds, Operations Speculatively Executed. The counter counts speculatively executed operations due to any of the following instructions not succeeding in setting the requested bounds exactly:\nSCBNDS (register): Set Bounds (register).\nSCBNDS (immediate): Set Bounds (immediate).\nSCBNDSE: Set Bounds Exact",
+        "EventCode": "0x20E",
+        "EventName": "INST_SPEC_SCBNDS_NONEXACT",
+        "BriefDescription": "SCBNDS or SCBNDSE Instructions which do not set exact bounds, Operations Speculatively Executed. The counter counts speculatively executed operations due to any of the following instructions not succeeding in setting the requested bounds exactly:\nSCBNDS (register): Set Bounds (register).\nSCBNDS (immediate): Set Bounds (immediate).\nSCBNDSE: Set Bounds Exact"
+    },
+    {
+        "PublicDescription": "SC set due to CDBM. The counter counts each setting of the permission bit to write Capability Tags to memory in a translation table entry which is due to the CDBM bit being set",
+        "EventCode": "0x20F",
+        "EventName": "CDBM_SET_SC",
+        "BriefDescription": "SC set due to CDBM. The counter counts each setting of the permission bit to write Capability Tags to memory in a translation table entry which is due to the CDBM bit being set"
+    },
+    {
+        "PublicDescription": "Data Cache Zero. The counter counts architecturally executed DC ZVA instructions",
+        "EventCode": "0x218",
+        "EventName": "DC_ZVA_RET",
+        "BriefDescription": "Data Cache Zero. The counter counts architecturally executed DC ZVA instructions"
+    },
+    {
+        "PublicDescription": "Data cache refill due to LDCT, Operations Speculatively Executed. The counter counts each access counted by L1D_CACHE that causes a demand refill of any cache due to execution of an LDCT instruction",
+        "EventCode": "0x21A",
+        "EventName": "LDCT_REFILL",
+        "BriefDescription": "Data cache refill due to LDCT, Operations Speculatively Executed. The counter counts each access counted by L1D_CACHE that causes a demand refill of any cache due to execution of an LDCT instruction"
+    },
+    {
+        "PublicDescription": "Data cache refill due to STCT, Operations Speculatively Executed. The counter counts each access counted by L1D_CACHE that causes a demand refill of any cache due to execution of an STCT instruction",
+        "EventCode": "0x21B",
+        "EventName": "STCT_REFILL",
+        "BriefDescription": "Data cache refill due to STCT, Operations Speculatively Executed. The counter counts each access counted by L1D_CACHE that causes a demand refill of any cache due to execution of an STCT instruction"
+    },
+    {
+        "PublicDescription": "Store of zeros. In combination with the CNT_ST_ZERO_16TH_BYTE, the counter counts the number of bytes written by architecturally executed store instructions, not including DC ZVA where only zeros are stored and not including stores which store 16 bytes of zero",
+        "EventCode": "0x22F",
+        "EventName": "CNT_ST_ZERO_BYTE",
+        "BriefDescription": "Store of zeros. In combination with the CNT_ST_ZERO_16TH_BYTE, the counter counts the number of bytes written by architecturally executed store instructions, not including DC ZVA where only zeros are stored and not including stores which store 16 bytes of zero"
+    },
+    {
+        "PublicDescription": "Store of zeros, 16 byte stores. The counter counts when 16 bytes of zero are written by an architecturally executed store instruction",
+        "EventCode": "0x230",
+        "EventName": "CNT_ST_ZERO_16_BYTES",
+        "BriefDescription": "Store of zeros, 16 byte stores. The counter counts when 16 bytes of zero are written by an architecturally executed store instruction"
+    },
+    {
+        "PublicDescription": "Data memory access, read, valid capability. The counter counts each access counted by MEM_ACCESS_RD where a Capability Tag was set in at least one part of the access",
+        "EventCode": "0x233",
+        "EventName": "MEM_ACCESS_RD_CTAG",
+        "BriefDescription": "Data memory access, read, valid capability. The counter counts each access counted by MEM_ACCESS_RD where a Capability Tag was set in at least one part of the access"
+    },
+    {
+        "PublicDescription": "Data memory access, write, valid capability. The counter counts each access counted by MEM_ACCESS_WR where a Capability Tag was set in at least one part of the access",
+        "EventCode": "0x234",
+        "EventName": "MEM_ACCESS_WR_CTAG",
+        "BriefDescription": "Data memory access, write, valid capability. The counter counts each access counted by MEM_ACCESS_WR where a Capability Tag was set in at least one part of the access"
+    },
+    {
+        "PublicDescription": "Data memory access, read, capability. The counter counts each access counted by MEM_ACCESS_RD due to an instruction which loads a capability. It is not sensitive to the validity of the capability",
+        "EventCode": "0x235",
+        "EventName": "CAP_MEM_ACCESS_RD",
+        "BriefDescription": "Data memory access, read, capability. The counter counts each access counted by MEM_ACCESS_RD due to an instruction which loads a capability. It is not sensitive to the validity of the capability"
+    },
+    {
+        "PublicDescription": "Data memory access, write, capability. The counter counts each access counted by MEM_ACCESS_WR due to an instruction which stores a capability. It is not sensitive to the validity of the capability",
+        "EventCode": "0x236",
+        "EventName": "CAP_MEM_ACCESS_WR",
+        "BriefDescription": "Data memory access, write, capability. The counter counts each access counted by MEM_ACCESS_WR due to an instruction which stores a capability. It is not sensitive to the validity of the capability"
+    },
+    {
+        "PublicDescription": "Instructions in Restricted, Operations Speculatively Executed. The counter counts speculatively executed operations due to all instructions in Restricted",
+        "EventCode": "0x237",
+        "EventName": "INST_SPEC_RESTRICTED",
+        "BriefDescription": "Instructions in Restricted, Operations Speculatively Executed. The counter counts speculatively executed operations due to all instructions in Restricted"
+    },
+    {
+        "PublicDescription": "Load permission cleared, Operations Speculatively Executed. The counter counts speculatively executed operations due to load instructions where the capability tag is cleared due to the operation having been performed without LoadCap permission",
+        "EventCode": "0x238",
+        "EventName": "LD_CAP_PERM_CLR_CTAG",
+        "BriefDescription": "Load permission cleared, Operations Speculatively Executed. The counter counts speculatively executed operations due to load instructions where the capability tag is cleared due to the operation having been performed without LoadCap permission"
+    }
+]

@@ -22,8 +22,6 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _MACHINE_PMC_MDEP_H_
@@ -66,12 +64,11 @@ union pmc_md_pmc {
 	struct pmc_md_dmc620_pmc	pm_dmc620;
 };
 
-#define	PMC_IN_KERNEL_STACK(S,START,END)		\
-	((S) >= (START) && (S) < (END))
+#define	PMC_IN_KERNEL_STACK(va)	kstack_contains(curthread, (va), sizeof(va))
 #define	PMC_IN_KERNEL(va)	INKERNEL((va))
-#define	PMC_IN_USERSPACE(va) ((va) <= VM_MAXUSER_ADDRESS)
-#define	PMC_TRAPFRAME_TO_PC(TF)		((TF)->tf_elr)
-#define	PMC_TRAPFRAME_TO_FP(TF)		((TF)->tf_x[29])
+#define	PMC_IN_USERSPACE(va)	((va) <= VM_MAXUSER_ADDRESS)
+#define	PMC_TRAPFRAME_TO_PC(TF)	((TF)->tf_elr)
+#define	PMC_TRAPFRAME_TO_FP(TF)	((TF)->tf_x[29])
 
 /*
  * Prototypes

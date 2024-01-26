@@ -24,8 +24,6 @@
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD$
- *
  */
 
 /*
@@ -89,12 +87,6 @@
 #include <sys/libkern.h>
 #include <sys/smp.h>
 #include <sys/sched.h>
-
-#ifdef CONFIG_ECORE_SRIOV
-#include <sys/nv.h>
-#include <sys/iov_schema.h>
-#include <dev/pci/pci_iov.h>
-#endif /* #ifdef CONFIG_ECORE_SRIOV */
 
 static __inline int qlnx_ms_to_hz(int ms)
 {

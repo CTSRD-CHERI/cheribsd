@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 Mikolaj Golub
  * Copyright (c) 2015 Allan Jude <allanjude@freebsd.org>
@@ -39,14 +39,14 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/elf.h>
 #include <sys/sysctl.h>
 #include <sys/user.h>
 
 #include <vm/vm.h>
+
+#include <cheri/cheric.h>
 
 #include <err.h>
 #include <errno.h>
@@ -58,6 +58,20 @@ __FBSDID("$FreeBSD$");
 
 #include "procstat.h"
 
+static const char *
+fmt_ptr(void *ptr)
+{
+	static char ptrstr[128];
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	if ((procstat_opts & PS_OPT_VERBOSE) != 0)
+		strfcap(ptrstr, sizeof(ptrstr), "%T%C", (uintcap_t)ptr);
+	else
+#endif
+		snprintf(ptrstr, sizeof(ptrstr), "%p", ptr);
+	return (ptrstr);
+}
+
 void
 procstat_auxv(struct procstat *procstat, struct kinfo_proc *kipp)
 {
@@ -66,16 +80,16 @@ procstat_auxv(struct procstat *procstat, struct kinfo_proc *kipp)
 	static char prefix[256];
 
 	if ((procstat_opts & PS_OPT_NOHEADER) == 0)
-		xo_emit("{T:/%5s %-16s %-16s %-16s}\n", "PID", "COMM", "AUXV",
+		xo_emit("{T:/%5s %-19s %-16s %-16s}\n", "PID", "COMM", "AUXV",
 		    "VALUE");
 
 	auxv = procstat_getauxv(procstat, kipp, &count);
 	if (auxv == NULL)
 		return;
-        snprintf(prefix, sizeof(prefix), "%5d %-16s", kipp->ki_pid,
-            kipp->ki_comm);
+	snprintf(prefix, sizeof(prefix), "%5d %-19s", kipp->ki_pid,
+	    kipp->ki_comm);
 
-	xo_emit("{e:process_id/%5d/%d}{e:command/%-16s/%s}", kipp->ki_pid,
+	xo_emit("{e:process_id/%5d/%d}{e:command/%-19s/%s}", kipp->ki_pid,
 	    kipp->ki_comm);
 
 	for (i = 0; i < count; i++) {
@@ -89,8 +103,8 @@ procstat_auxv(struct procstat *procstat, struct kinfo_proc *kipp)
 			    prefix, "AT_EXECFD", (long)auxv[i].a_un.a_val);
 			break;
 		case AT_PHDR:
-			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_PHDR/%p}\n",
-			    prefix, "AT_PHDR", auxv[i].a_un.a_ptr);
+			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_PHDR/%s}\n",
+			    prefix, "AT_PHDR", fmt_ptr(auxv[i].a_un.a_ptr));
 			break;
 		case AT_PHENT:
 			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_PHENT/%ld}\n",
@@ -105,16 +119,16 @@ procstat_auxv(struct procstat *procstat, struct kinfo_proc *kipp)
 			    prefix, "AT_PAGESZ", (long)auxv[i].a_un.a_val);
 			break;
 		case AT_BASE:
-			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_BASE/%p}\n",
-			    prefix, "AT_BASE", auxv[i].a_un.a_ptr);
+			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_BASE/%s}\n",
+			    prefix, "AT_BASE", fmt_ptr(auxv[i].a_un.a_ptr));
 			break;
 		case AT_FLAGS:
 			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_FLAGS/%#lx}\n",
 			    prefix, "AT_FLAGS", (u_long)auxv[i].a_un.a_val);
 			break;
 		case AT_ENTRY:
-			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_ENTRY/%p}\n",
-			    prefix, "AT_ENTRY", auxv[i].a_un.a_ptr);
+			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_ENTRY/%s}\n",
+			    prefix, "AT_ENTRY", fmt_ptr(auxv[i].a_un.a_ptr));
 			break;
 #ifdef AT_NOTELF
 		case AT_NOTELF:
@@ -147,12 +161,12 @@ procstat_auxv(struct procstat *procstat, struct kinfo_proc *kipp)
 			break;
 #endif
 		case AT_EXECPATH:
-			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_EXECPATH/%p}\n",
-			    prefix, "AT_EXECPATH", auxv[i].a_un.a_ptr);
+			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_EXECPATH/%s}\n",
+			    prefix, "AT_EXECPATH", fmt_ptr(auxv[i].a_un.a_ptr));
 			break;
 		case AT_CANARY:
-			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_CANARY/%p}\n",
-			    prefix, "AT_CANARY", auxv[i].a_un.a_ptr);
+			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_CANARY/%s}\n",
+			    prefix, "AT_CANARY", fmt_ptr(auxv[i].a_un.a_ptr));
 			break;
 		case AT_CANARYLEN:
 			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_CANARYLEN/%ld}\n",
@@ -167,8 +181,8 @@ procstat_auxv(struct procstat *procstat, struct kinfo_proc *kipp)
 			    prefix, "AT_NCPUS", (long)auxv[i].a_un.a_val);
 			break;
 		case AT_PAGESIZES:
-			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_PAGESIZES/%p}\n",
-			    prefix, "AT_PAGESIZES", auxv[i].a_un.a_ptr);
+			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_PAGESIZES/%s}\n",
+			    prefix, "AT_PAGESIZES", fmt_ptr(auxv[i].a_un.a_ptr));
 			break;
 		case AT_PAGESIZESLEN:
 			xo_emit("{dw:/%s}{Lw:/%-16s/%s}"
@@ -187,8 +201,8 @@ procstat_auxv(struct procstat *procstat, struct kinfo_proc *kipp)
 			break;
 #ifdef AT_TIMEKEEP
 		case AT_TIMEKEEP:
-			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_TIMEKEEP/%p}\n",
-			    prefix, "AT_TIMEKEEP", auxv[i].a_un.a_ptr);
+			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_TIMEKEEP/%s}\n",
+			    prefix, "AT_TIMEKEEP", fmt_ptr(auxv[i].a_un.a_ptr));
 			break;
 #endif
 #ifdef AT_EHDRFLAGS
@@ -223,8 +237,8 @@ procstat_auxv(struct procstat *procstat, struct kinfo_proc *kipp)
 #endif
 #ifdef AT_ARGV
 		case AT_ARGV:
-			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_ARGV/%p}\n",
-			    prefix, "AT_ARGV", auxv[i].a_un.a_ptr);
+			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_ARGV/%s}\n",
+			    prefix, "AT_ARGV", fmt_ptr(auxv[i].a_un.a_ptr));
 			break;
 #endif
 #ifdef AT_ENVC
@@ -235,26 +249,26 @@ procstat_auxv(struct procstat *procstat, struct kinfo_proc *kipp)
 #endif
 #ifdef AT_ENVV
 		case AT_ENVV:
-			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_ENVV/%p}\n",
-			    prefix, "AT_ENVV", auxv[i].a_un.a_ptr);
+			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_ENVV/%s}\n",
+			    prefix, "AT_ENVV", fmt_ptr(auxv[i].a_un.a_ptr));
 			break;
 #endif
 #ifdef AT_PS_STRINGS
 		case AT_PS_STRINGS:
-			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_PS_STRINGS/%p}\n",
-			    prefix, "AT_PS_STRINGS", auxv[i].a_un.a_ptr);
+			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_PS_STRINGS/%s}\n",
+			    prefix, "AT_PS_STRINGS", fmt_ptr(auxv[i].a_un.a_ptr));
 			break;
 #endif
 #ifdef AT_FXRNG
 		case AT_FXRNG:
-			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_FXRNG/%p}\n",
-			    prefix, "AT_FXRNG", auxv[i].a_un.a_ptr);
+			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_FXRNG/%s}\n",
+			    prefix, "AT_FXRNG", fmt_ptr(auxv[i].a_un.a_ptr));
 			break;
 #endif
 #ifdef AT_KPRELOAD
 		case AT_KPRELOAD:
-			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_KPRELOAD/%p}\n",
-			    prefix, "AT_KPRELOAD", auxv[i].a_un.a_ptr);
+			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_KPRELOAD/%s}\n",
+			    prefix, "AT_KPRELOAD", fmt_ptr(auxv[i].a_un.a_ptr));
 			break;
 #endif
 #ifdef AT_USRSTACKBASE

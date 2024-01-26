@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2008, 2009 Silicon Graphics International Corp.
  * Copyright (c) 2014-2015 Alexander Motin <mav@FreeBSD.org>
@@ -39,8 +39,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/queue.h>
 #include <sys/systm.h>
@@ -669,7 +667,7 @@ ctlfecleanup(struct cam_periph *periph)
 static void
 ctlfedata(struct ctlfe_lun_softc *softc, union ctl_io *io,
     ccb_flags *flags, uint8_t **data_ptr, uint32_t *dxfer_len,
-    u_int16_t *sglist_cnt)
+    uint16_t *sglist_cnt)
 {
 	struct ctlfe_softc *bus_softc;
 	struct ctlfe_cmd_info *cmd_info;

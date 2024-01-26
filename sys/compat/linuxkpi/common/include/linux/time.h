@@ -22,8 +22,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef _LINUXKPI_LINUX_TIME_H_
 #define	_LINUXKPI_LINUX_TIME_H_
@@ -120,6 +118,8 @@ ns_to_timespec(const int64_t nsec)
 	ts.tv_nsec = rem;
 	return (ts);
 }
+
+#define	ns_to_timespec64(_x)	ns_to_timespec(_x)
 
 static inline int
 timespec_valid(const struct timespec *ts)

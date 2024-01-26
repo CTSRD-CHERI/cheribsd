@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 PACKAGE=	kerberos-lib
 
@@ -216,6 +215,7 @@ CFLAGS+=-I${KRB5DIR}/lib/wind
 CFLAGS+=-I${KRB5DIR}/lib/roken
 CFLAGS+=-I${SRCTOP}/contrib/com_err
 CFLAGS+=-I.
+CFLAGS+=-DOPENSSL_API_COMPAT=0x10100000L
 
 GEN_OCSP= \
 	asn1_OCSPBasicOCSPResponse.x \

@@ -1,7 +1,7 @@
 /*-
  * sdpcontrol.c
  *
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001-2003 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
@@ -28,7 +28,6 @@
  * SUCH DAMAGE.
  *
  * $Id: sdpcontrol.c,v 1.1 2003/09/08 02:27:27 max Exp $
- * $FreeBSD$
  */
 
 #include <assert.h>

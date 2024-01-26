@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2020 Justin Hibbits
  * Copyright (C) 2007-2009 Semihalf, Rafal Jaworowski <raj@semihalf.com>
@@ -46,8 +46,6 @@
   */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ddb.h"
 #include "opt_kstack_pages.h"
 

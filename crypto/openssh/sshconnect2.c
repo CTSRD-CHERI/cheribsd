@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect2.c,v 1.366 2023/03/09 07:11:05 dtucker Exp $ */
+/* $OpenBSD: sshconnect2.c,v 1.367 2023/08/01 08:15:04 dtucker Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Damien Miller.  All rights reserved.
@@ -358,7 +358,6 @@ struct cauthmethod {
 };
 
 static int input_userauth_service_accept(int, u_int32_t, struct ssh *);
-static int input_userauth_ext_info(int, u_int32_t, struct ssh *);
 static int input_userauth_success(int, u_int32_t, struct ssh *);
 static int input_userauth_failure(int, u_int32_t, struct ssh *);
 static int input_userauth_banner(int, u_int32_t, struct ssh *);
@@ -472,7 +471,7 @@ ssh_userauth2(struct ssh *ssh, const char *local_user,
 
 	ssh->authctxt = &authctxt;
 	ssh_dispatch_init(ssh, &input_userauth_error);
-	ssh_dispatch_set(ssh, SSH2_MSG_EXT_INFO, &input_userauth_ext_info);
+	ssh_dispatch_set(ssh, SSH2_MSG_EXT_INFO, kex_input_ext_info);
 	ssh_dispatch_set(ssh, SSH2_MSG_SERVICE_ACCEPT, &input_userauth_service_accept);
 	ssh_dispatch_run_fatal(ssh, DISPATCH_BLOCK, &authctxt.success);	/* loop until success */
 	pubkey_cleanup(ssh);
@@ -521,12 +520,6 @@ input_userauth_service_accept(int type, u_int32_t seq, struct ssh *ssh)
 	r = 0;
  out:
 	return r;
-}
-
-static int
-input_userauth_ext_info(int type, u_int32_t seqnr, struct ssh *ssh)
-{
-	return kex_input_ext_info(type, seqnr, ssh);
 }
 
 void
@@ -607,6 +600,7 @@ input_userauth_success(int type, u_int32_t seq, struct ssh *ssh)
 	free(authctxt->methoddata);
 	authctxt->methoddata = NULL;
 	authctxt->success = 1;			/* break out */
+	ssh_dispatch_set(ssh, SSH2_MSG_EXT_INFO, dispatch_protocol_error);
 	return 0;
 }
 
@@ -1868,12 +1862,10 @@ userauth_pubkey(struct ssh *ssh)
 		 * private key instead
 		 */
 		if (id->key != NULL) {
-			if (id->key != NULL) {
-				ident = format_identity(id);
-				debug("Offering public key: %s", ident);
-				free(ident);
-				sent = send_pubkey_test(ssh, id);
-			}
+			ident = format_identity(id);
+			debug("Offering public key: %s", ident);
+			free(ident);
+			sent = send_pubkey_test(ssh, id);
 		} else {
 			debug("Trying private key: %s", id->filename);
 			id->key = load_identity_file(id);

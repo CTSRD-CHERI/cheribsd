@@ -133,7 +133,7 @@
 .\" ========================================================================
 .\"
 .IX Title "SSL_GET_VERIFY_RESULT 3"
-.TH SSL_GET_VERIFY_RESULT 3 "2023-02-07" "1.1.1t" "OpenSSL"
+.TH SSL_GET_VERIFY_RESULT 3 "2023-08-01" "3.0.10" "OpenSSL"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
@@ -158,6 +158,13 @@ of a certificate can fail because of many reasons at the same time. Only
 the last verification error that occurred during the processing is available
 from \fBSSL_get_verify_result()\fR.
 .PP
+Sometimes there can be a sequence of errors leading to the verification
+failure as reported by \fBSSL_get_verify_result()\fR.
+To get the errors, it is necessary to setup a verify callback via
+\&\fBSSL_CTX_set_verify\fR\|(3) or \fBSSL_set_verify\fR\|(3) and retrieve the errors
+from the error stack there, because once \fBSSL_connect\fR\|(3) returns,
+these errors may no longer be available.
+.PP
 The verification result is part of the established session and is restored
 when a session is reused.
 .SH "BUGS"
@@ -174,17 +181,17 @@ The following return values can currently occur:
 The verification succeeded or no peer certificate was presented.
 .IP "Any other value" 4
 .IX Item "Any other value"
-Documented in \fBverify\fR\|(1).
+Documented in \fBopenssl\-verify\fR\|(1).
 .SH "SEE ALSO"
 .IX Header "SEE ALSO"
 \&\fBssl\fR\|(7), \fBSSL_set_verify_result\fR\|(3),
 \&\fBSSL_get_peer_certificate\fR\|(3),
-\&\fBverify\fR\|(1)
+\&\fBopenssl\-verify\fR\|(1)
 .SH "COPYRIGHT"
 .IX Header "COPYRIGHT"
-Copyright 2000\-2016 The OpenSSL Project Authors. All Rights Reserved.
+Copyright 2000\-2023 The OpenSSL Project Authors. All Rights Reserved.
 .PP
-Licensed under the OpenSSL license (the \*(L"License\*(R").  You may not use
+Licensed under the Apache License 2.0 (the \*(L"License\*(R").  You may not use
 this file except in compliance with the License.  You can obtain a copy
 in the file \s-1LICENSE\s0 in the source distribution or at
 <https://www.openssl.org/source/license.html>.

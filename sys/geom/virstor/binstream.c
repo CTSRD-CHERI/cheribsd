@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2005 Ivan Voras <ivoras@gmail.com>
  * All rights reserved.
@@ -29,8 +29,6 @@
 // $Id: binstream.c,v 1.1 2006/07/05 10:47:54 ivoras Exp $
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/endian.h>
 #include <sys/param.h>
 

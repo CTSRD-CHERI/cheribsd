@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 include LINT
 ident LINT-NOIP
@@ -13,6 +12,7 @@ nodevice ale
 nodevice bxe
 nodevice em
 nodevice fxp
+nodevice gve
 nodevice jme
 nodevice lio
 nodevice msk

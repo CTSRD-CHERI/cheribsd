@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013-2014 Qlogic Corporation
  * All rights reserved.
@@ -31,8 +31,6 @@
  * Author : David C Somayajulu, Qlogic Corporation, Aliso Viejo, CA 92656.
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "qls_os.h"
 #include "qls_hw.h"
 #include "qls_def.h"

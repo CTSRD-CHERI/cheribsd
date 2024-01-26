@@ -1,5 +1,4 @@
 #	@(#)Makefile	8.1 (Berkeley) 6/18/93
-# $FreeBSD$
 
 .include <src.opts.mk>
 
@@ -55,9 +54,7 @@ MAN=	aac.4 \
 	at45d.4 \
 	ata.4 \
 	ath.4 \
-	ath_ahb.4 \
 	ath_hal.4 \
-	ath_pci.4 \
 	atkbd.4 \
 	atkbdc.4 \
 	atp.4 \
@@ -177,6 +174,7 @@ MAN=	aac.4 \
 	geom_map.4 \
 	geom_uzip.4 \
 	gif.4 \
+	${_gve.4} \
 	gpio.4 \
 	gpioiic.4 \
 	gpiokeys.4 \
@@ -292,6 +290,7 @@ MAN=	aac.4 \
 	mac_bsdextended.4 \
 	mac_ddb.4 \
 	mac_ifoff.4 \
+	mac_ipacl.4 \
 	mac_lomac.4 \
 	mac_mls.4 \
 	mac_none.4 \
@@ -320,6 +319,7 @@ MAN=	aac.4 \
 	mod_cc.4 \
 	mos.4 \
 	mouse.4 \
+	mpi3mr.4 \
 	mpr.4 \
 	mps.4 \
 	mpt.4 \
@@ -571,6 +571,7 @@ MAN=	aac.4 \
 	virtio_balloon.4 \
 	virtio_blk.4 \
 	virtio_console.4 \
+	virtio_gpu.4 \
 	virtio_random.4 \
 	virtio_scsi.4 \
 	${_vmci.4} \
@@ -622,7 +623,6 @@ MLINKS+=altera_atse.4 atse.4
 MLINKS+=altera_sdcard.4 altera_sdcardc.4
 MLINKS+=altq.4 ALTQ.4
 MLINKS+=ath.4 if_ath.4
-MLINKS+=ath_pci.4 if_ath_pci.4
 MLINKS+=aue.4 if_aue.4
 MLINKS+=axe.4 if_axe.4
 MLINKS+=bce.4 if_bce.4
@@ -660,7 +660,9 @@ MLINKS+=disc.4 if_disc.4
 MLINKS+=edsc.4 if_edsc.4
 MLINKS+=em.4 if_em.4 \
 	em.4 igb.4 \
-	em.4 if_igb.4
+	em.4 if_igb.4 \
+	em.4 lem.4 \
+	em.4 if_lem.4
 MLINKS+=enc.4 if_enc.4
 MLINKS+=epair.4 if_epair.4
 MLINKS+=et.4 if_et.4
@@ -766,6 +768,7 @@ MLINKS+=vte.4 if_vte.4
 MLINKS+=vtnet.4 if_vtnet.4
 MLINKS+=watchdog.4 SW_WATCHDOG.4
 MLINKS+=wg.4 if_wg.4
+MLINKS+=wlan.4 wifi.4
 MLINKS+=${_wpi.4} ${_if_wpi.4}
 MLINKS+=xl.4 if_xl.4
 
@@ -890,6 +893,7 @@ _nvme.4=	nvme.4
 
 .if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386" || \
 	 ${MACHINE_CPUARCH} == "aarch64"
+_gve.4=		gve.4
 _ipmi.4=	ipmi.4
 _linux.4=	linux.4
 _ossl.4=	ossl.4

@@ -1,0 +1,168 @@
+[
+    {
+        "ArchStdEvent": "SW_INCR",
+        "PublicDescription": "Software increment. Instruction architecturally executed (condition code check pass)"
+    },
+    {
+        "ArchStdEvent": "INST_RETIRED",
+        "PublicDescription": "Instruction architecturally executed. This event counts all retired instructions, including those that fail their condition check"
+    },
+    {
+        "ArchStdEvent": "EXC_RETURN",
+        "PublicDescription": "Instruction architecturally executed, condition code check pass, exception return"
+    },
+    {
+        "ArchStdEvent": "CID_WRITE_RETIRED",
+        "PublicDescription": "Instruction architecturally executed, condition code check pass, write to CONTEXTIDR. This event only counts writes to CONTEXTIDR in AArch32 state, and via the CONTEXTIDR_EL1 mnemonic in AArch64 state. The following instructions are not counted:\nWrites to CONTEXTIDR_EL12 and CONTEXTIDR_EL2"
+    },
+    {
+        "ArchStdEvent": "INST_SPEC",
+        "PublicDescription": "Operation speculatively executed"
+    },
+    {
+        "ArchStdEvent": "TTBR_WRITE_RETIRED",
+        "PublicDescription": "Instruction architecturally executed, condition code check pass, write to TTBR.This event only counts writes to TTBR0/TTBR1 in AArch32 state and TTBR0_EL1/TTBR1_EL1 in AArch64 state. The following instructions are not counted:\nAccesses to TTBR0_EL12/TTBR1_EL12 or TTBR0_EL2/ TTBR1_EL2"
+    },
+    {
+        "ArchStdEvent": "BR_RETIRED",
+        "PublicDescription": "Instruction architecturally executed, branch. This event counts all branches, taken or not. This excludes exception entries, debug entries and CCFAIL branches"
+    },
+    {
+        "ArchStdEvent": "BR_MIS_PRED_RETIRED",
+        "PublicDescription": "Instruction architecturally executed, mispredicted branch. This event counts any branch counted by BR_RETIRED which is not correctly predicted and causes a pipeline flush"
+    },
+    {
+        "ArchStdEvent": "LDREX_SPEC",
+        "PublicDescription": "Exclusive operation speculatively executed, LDREX or LDX"
+    },
+    {
+        "ArchStdEvent": "STREX_PASS_SPEC",
+        "PublicDescription": "Exclusive operation speculatively executed, STREX or STX pass"
+    },
+    {
+        "ArchStdEvent": "STREX_FAIL_SPEC",
+        "PublicDescription": "Exclusive operation speculatively executed, STREX or STX fail"
+    },
+    {
+        "ArchStdEvent": "STREX_SPEC",
+        "PublicDescription": "Exclusive operation speculatively executed, STREX or STX"
+    },
+    {
+        "ArchStdEvent": "LD_SPEC",
+        "PublicDescription": "Operation speculatively executed, load"
+    },
+    {
+        "ArchStdEvent": "ST_SPEC",
+        "PublicDescription": "Operation speculatively executed, store"
+    },
+    {
+        "ArchStdEvent": "LDST_SPEC",
+        "PublicDescription": "Operation speculatively executed, load or store. This event counts the sum of LD_SPEC and ST_SPEC"
+    },
+    {
+        "ArchStdEvent": "DP_SPEC",
+        "PublicDescription": "Operation speculatively executed, integer data-processing"
+    },
+    {
+        "ArchStdEvent": "ASE_SPEC",
+        "PublicDescription": "Operation speculatively executed, Advanced SIMD instruction"
+    },
+    {
+        "ArchStdEvent": "VFP_SPEC",
+        "PublicDescription": "Operation speculatively executed, floating-point instruction"
+    },
+    {
+        "ArchStdEvent": "PC_WRITE_SPEC",
+        "PublicDescription": "Operation speculatively executed, software change of the PC"
+    },
+    {
+        "ArchStdEvent": "CRYPTO_SPEC",
+        "PublicDescription": "Operation speculatively executed, Cryptographic instruction"
+    },
+    {
+        "ArchStdEvent": "ISB_SPEC",
+        "PublicDescription": "Barrier speculatively executed, ISB"
+    },
+    {
+        "ArchStdEvent": "DSB_SPEC",
+        "PublicDescription": "Barrier speculatively executed, DSB"
+    },
+    {
+        "ArchStdEvent": "DMB_SPEC",
+        "PublicDescription": "Barrier speculatively executed, DMB"
+    },
+    {
+        "ArchStdEvent": "RC_LD_SPEC",
+        "PublicDescription": "Release consistency operation speculatively executed, load-acquire"
+    },
+    {
+        "ArchStdEvent": "RC_ST_SPEC",
+        "PublicDescription": "Release consistency operation speculatively executed, store-release"
+    },
+    {
+        "PublicDescription": "Instruction architecturally executed, Write to CID_EL0. The counter counts architecturally executed instructions which write to the Compartment ID Register",
+        "EventCode": "0x208",
+        "EventName": "CID_EL0_WRITE_RETIRED",
+        "BriefDescription": "Instruction architecturally executed, Write to CID_EL0. The counter counts architecturally executed instructions which write to the Compartment ID Register"
+    },
+    {
+        "PublicDescription": "Instruction architecturally executed, Write to DDC_ELx, RDDC_EL0. The counter counts architecturally executed instructions which write to any Default Data Capability",
+        "EventCode": "0x209",
+        "EventName": "DDC_WRITE_RETIRED",
+        "BriefDescription": "Instruction architecturally executed, Write to DDC_ELx, RDDC_EL0. The counter counts architecturally executed instructions which write to any Default Data Capability"
+    },
+    {
+        "PublicDescription": "Read from DDC_ELx, RDDC_EL0, Operations Speculatively Executed. The counter counts speculatively executed operations which read from any Default Data Capability",
+        "EventCode": "0x20A",
+        "EventName": "DDC_READ_SPEC",
+        "BriefDescription": "Read from DDC_ELx, RDDC_EL0, Operations Speculatively Executed. The counter counts speculatively executed operations which read from any Default Data Capability"
+    },
+    {
+        "PublicDescription": "Capability Load Instructions, Operations Speculatively Executed. The counter counts speculatively executed operations due to Capability load instructions",
+        "EventCode": "0x210",
+        "EventName": "CAP_LD_SPEC",
+        "BriefDescription": "Capability Load Instructions, Operations Speculatively Executed. The counter counts speculatively executed operations due to Capability load instructions"
+    },
+    {
+        "PublicDescription": "Capability Store Instructions, Operations Speculatively Executed. The counter counts speculatively executed operations due to Capability store instructions",
+        "EventCode": "0x211",
+        "EventName": "CAP_ST_SPEC",
+        "BriefDescription": "Capability Store Instructions, Operations Speculatively Executed. The counter counts speculatively executed operations due to Capability store instructions"
+    },
+    {
+        "PublicDescription": "Alternate Base Capability Load Instructions, Operations Speculatively Executed. The counter counts speculatively executed operations due to Alternate Base Capability load instructions",
+        "EventCode": "0x212",
+        "EventName": "CAP_ALT_LD_SPEC",
+        "BriefDescription": "Alternate Base Capability Load Instructions, Operations Speculatively Executed. The counter counts speculatively executed operations due to Alternate Base Capability load instructions"
+    },
+    {
+        "PublicDescription": "Alternate Base Capability Store Instructions, Operations Speculatively Executed. The counter counts speculatively executed operations due to Alternate Base Capability store instructions",
+        "EventCode": "0x213",
+        "EventName": "CAP_ALT_ST_SPEC",
+        "BriefDescription": "Alternate Base Capability Store Instructions, Operations Speculatively Executed. The counter counts speculatively executed operations due to Alternate Base Capability store instructions"
+    },
+    {
+        "PublicDescription": "Alternate Base Load Instructions, Operations Speculatively Executed. The counter counts speculatively executed operations due to Alternate Base load instructions",
+        "EventCode": "0x214",
+        "EventName": "ALT_LD_SPEC",
+        "BriefDescription": "Alternate Base Load Instructions, Operations Speculatively Executed. The counter counts speculatively executed operations due to Alternate Base load instructions"
+    },
+    {
+        "PublicDescription": "Alternate Base Store Instructions, Operations Speculatively Executed. The counter counts speculatively executed operations due to Alternate Base store instructions",
+        "EventCode": "0x215",
+        "EventName": "ALT_ST_SPEC",
+        "BriefDescription": "Alternate Base Store Instructions, Operations Speculatively Executed. The counter counts speculatively executed operations due to Alternate Base store instructions"
+    },
+    {
+        "PublicDescription": "LDCT Instructions, Operations Speculatively Executed. The counter counts speculatively executed operations due to Load Tags instructions",
+        "EventCode": "0x216",
+        "EventName": "LDCT_SPEC",
+        "BriefDescription": "LDCT Instructions, Operations Speculatively Executed. The counter counts speculatively executed operations due to Load Tags instructions"
+    },
+    {
+        "PublicDescription": "LDCT Instructions When Capability Tags are Zero, Operations Speculatively Executed. The counter counts speculatively executed operations due to Load Capability Tags instructions where the Capability Tags to be loaded are all zero",
+        "EventCode": "0x217",
+        "EventName": "LDCT_NO_CAP_SPEC",
+        "BriefDescription": "LDCT Instructions When Capability Tags are Zero, Operations Speculatively Executed. The counter counts speculatively executed operations due to Load Capability Tags instructions where the Capability Tags to be loaded are all zero"
+    }
+]

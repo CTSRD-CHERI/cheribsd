@@ -194,7 +194,7 @@ usize internal_readlink(const char *path, char *buf, usize bufsize) {
   return (uptr)_sys_readlink(path, buf, bufsize);
 }
 
-uptr internal_unlink(const char *path) {
+usize internal_unlink(const char *path) {
   DEFINE__REAL(int, unlink, const char *a);
   return _REAL(unlink, path);
 }

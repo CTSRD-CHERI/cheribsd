@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/_unrhdr.h>
 #include <sys/systm.h>
@@ -415,8 +413,22 @@ reap_kill_subtree_once(struct thread *td, struct proc *p, struct proc *reaper,
 				continue;
 			if ((p2->p_treeflag & P_TREE_REAPER) != 0)
 				reap_kill_sched(&tracker, p2);
-			if (alloc_unr_specific(pids, p2->p_pid) != p2->p_pid)
+
+			/*
+			 * Handle possible pid reuse.  If we recorded
+			 * p2 as killed but its p_flag2 does not
+			 * confirm it, that means that the process
+			 * terminated and its id was reused by other
+			 * process in the reaper subtree.
+			 *
+			 * Unlocked read of p2->p_flag2 is fine, it is
+			 * our thread that set the tested flag.
+			 */
+			if (alloc_unr_specific(pids, p2->p_pid) != p2->p_pid &&
+			    (atomic_load_int(&p2->p_flag2) &
+			    (P2_REAPKILLED | P2_WEXIT)) != 0)
 				continue;
+
 			if (p2 == td->td_proc) {
 				if ((p2->p_flag & P_HADTHREADS) != 0 &&
 				    (p2->p_flag2 & P2_WEXIT) == 0) {
@@ -427,6 +439,11 @@ reap_kill_subtree_once(struct thread *td, struct proc *p, struct proc *reaper,
 					st = false;
 				}
 				PROC_LOCK(p2);
+				/*
+				 * sapblk ensures that only one thread
+				 * in the system sets this flag.
+				 */
+				p2->p_flag2 |= P2_REAPKILLED;
 				if (st)
 					r = thread_single(p2, SINGLE_NO_EXIT);
 				(void)pksignal(p2, w->rk->rk_sig, w->ksi);
@@ -444,6 +461,7 @@ reap_kill_subtree_once(struct thread *td, struct proc *p, struct proc *reaper,
 				PROC_LOCK(p2);
 				if ((p2->p_flag2 & P2_WEXIT) == 0) {
 					_PHOLD_LITE(p2);
+					p2->p_flag2 |= P2_REAPKILLED;
 					PROC_UNLOCK(p2);
 					w->target = p2;
 					taskqueue_enqueue(taskqueue_thread,
@@ -470,6 +488,9 @@ reap_kill_subtree(struct thread *td, struct proc *p, struct proc *reaper,
     struct reap_kill_proc_work *w)
 {
 	struct unrhdr pids;
+	void *ihandle;
+	struct proc *p2;
+	int pid;
 
 	/*
 	 * pids records processes which were already signalled, to
@@ -485,6 +506,17 @@ reap_kill_subtree(struct thread *td, struct proc *p, struct proc *reaper,
 	PROC_UNLOCK(td->td_proc);
 	while (reap_kill_subtree_once(td, p, reaper, &pids, w))
 	       ;
+
+	ihandle = create_iter_unr(&pids);
+	while ((pid = next_iter_unr(ihandle)) != -1) {
+		p2 = pfind(pid);
+		if (p2 != NULL) {
+			p2->p_flag2 &= ~P2_REAPKILLED;
+			PROC_UNLOCK(p2);
+		}
+	}
+	free_iter_unr(ihandle);
+
 out:
 	clean_unrhdr(&pids);
 	clear_unrhdr(&pids);
@@ -897,6 +929,70 @@ wxmap_status(struct thread *td, struct proc *p, void *data)
 	return (0);
 }
 
+#ifdef CHERI_CAPREVOKE
+static int
+cheri_revoke_ctl(struct thread *td, struct proc *p, void *data)
+{
+	int state;
+
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+	state = *(int *)data;
+
+	switch (state) {
+	case PROC_CHERI_REVOKE_FORCE_ENABLE:
+		p->p_flag2 &= ~P2_CHERI_REVOKE_DISABLE;
+		p->p_flag2 |= P2_CHERI_REVOKE_ENABLE;
+		break;
+	case PROC_CHERI_REVOKE_FORCE_DISABLE:
+		p->p_flag2 |= P2_CHERI_REVOKE_DISABLE;
+		p->p_flag2 &= ~P2_CHERI_REVOKE_ENABLE;
+		break;
+	case PROC_CHERI_REVOKE_NOFORCE:
+		p->p_flag2 &=
+		    ~(P2_CHERI_REVOKE_ENABLE | P2_CHERI_REVOKE_DISABLE);
+		break;
+	default:
+		return (EINVAL);
+	}
+	return (0);
+}
+
+static int
+cheri_revoke_status(struct thread *td, struct proc *p, void *data)
+{
+	struct vmspace *vm;
+	int d;
+
+	switch (p->p_flag2 &
+	    (P2_CHERI_REVOKE_ENABLE | P2_CHERI_REVOKE_DISABLE)) {
+	case 0:
+		d = PROC_CHERI_REVOKE_NOFORCE;
+		break;
+	case P2_CHERI_REVOKE_ENABLE:
+		d = PROC_CHERI_REVOKE_FORCE_ENABLE;
+		break;
+	case P2_CHERI_REVOKE_DISABLE:
+		d = PROC_CHERI_REVOKE_FORCE_DISABLE;
+		break;
+	default:
+		panic("impossible P2_CHERI_REVOKE flags %x", p->p_flag2 &
+		    (P2_CHERI_REVOKE_ENABLE | P2_CHERI_REVOKE_DISABLE));
+	}
+	_PHOLD(p);
+	PROC_UNLOCK(p);
+	vm = vmspace_acquire_ref(p);
+	if (vm != NULL) {
+		if (vm->vm_map.vm_cheri_revoke_quarantining)
+			d |= PROC_CHERI_REVOKE_ACTIVE;
+		vmspace_free(vm);
+	}
+	PROC_LOCK(p);
+	_PRELE(p);
+	*(int *)data = d;
+	return (0);
+}
+#endif	/* CHERI_CAPREVOKE */
+
 static int
 pdeathsig_ctl(struct thread *td, struct proc *p, void *data)
 {
@@ -1075,6 +1171,20 @@ static const struct procctl_cmd_info procctl_cmds_info[] = {
 	      .need_candebug = false,
 	      .copyin_sz = 0, .copyout_sz = sizeof(int),
 	      .exec = wxmap_status, .copyout_on_error = false, },
+#ifdef CHERI_CAPREVOKE
+	[PROC_CHERI_REVOKE_CTL] =
+	    { .lock_tree = PCTL_UNLOCKED, .one_proc = true,
+	      .esrch_is_einval = false, .no_nonnull_data = false,
+	      .need_candebug = true,
+	      .copyin_sz = sizeof(int), .copyout_sz = 0,
+	      .exec = cheri_revoke_ctl, .copyout_on_error = false, },
+	[PROC_CHERI_REVOKE_STATUS] =
+	    { .lock_tree = PCTL_UNLOCKED, .one_proc = true,
+	      .esrch_is_einval = false, .no_nonnull_data = false,
+	      .need_candebug = false,
+	      .copyin_sz = 0, .copyout_sz = sizeof(int),
+	      .exec = cheri_revoke_status, .copyout_on_error = false, },
+#endif
 };
 
 int

@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /* Copyright(c) 2007-2022 Intel Corporation */
-/* $FreeBSD$ */
 /**
  *****************************************************************************
  * @file dc_session.c
@@ -65,14 +64,13 @@ dcCheckSessionData(const CpaDcSessionSetupData *pSessionData,
 	cpaDcQueryCapabilities(dcInstance, &instanceCapabilities);
 
 	if ((pSessionData->compLevel < CPA_DC_L1) ||
-	    (pSessionData->compLevel > CPA_DC_L9)) {
+	    (pSessionData->compLevel > CPA_DC_L12)) {
 		QAT_UTILS_LOG("Invalid compLevel value\n");
 		return CPA_STATUS_INVALID_PARAM;
 	}
 
 	if ((pSessionData->autoSelectBestHuffmanTree < CPA_DC_ASB_DISABLED) ||
-	    (pSessionData->autoSelectBestHuffmanTree >
-	     CPA_DC_ASB_UNCOMP_STATIC_DYNAMIC_WITH_NO_HDRS)) {
+	    (pSessionData->autoSelectBestHuffmanTree > CPA_DC_ASB_ENABLED)) {
 		QAT_UTILS_LOG("Invalid autoSelectBestHuffmanTree value\n");
 		return CPA_STATUS_INVALID_PARAM;
 	}
@@ -869,6 +867,13 @@ dcInitSession(CpaInstanceHandle dcInstance,
 		disableType0EnhancedAutoSelectBest =
 		    ICP_QAT_FW_COMP_DISABLE_TYPE0_ENH_AUTO_SELECT_BEST;
 		break;
+	case CPA_DC_ASB_ENABLED:
+		if (pService->comp_device_data.asbEnableSupport == CPA_FALSE) {
+			autoSelectBest = ICP_QAT_FW_COMP_AUTO_SELECT_BEST;
+			enhancedAutoSelectBest =
+			    ICP_QAT_FW_COMP_ENH_AUTO_SELECT_BEST;
+		}
+		break;
 	default:
 		break;
 	}
@@ -1086,6 +1091,21 @@ cpaDcResetSession(const CpaInstanceHandle dcInstance,
 			     sizeof(pSessionDesc->stateRegistersDecomp));
 	}
 	return status;
+}
+
+CpaStatus
+cpaDcResetXXHashState(const CpaInstanceHandle dcInstance,
+		      CpaDcSessionHandle pSessionHandle)
+{
+	return CPA_STATUS_UNSUPPORTED;
+}
+
+CpaStatus
+cpaDcUpdateSession(const CpaInstanceHandle dcInstance,
+		   CpaDcSessionHandle pSessionHandle,
+		   CpaDcSessionUpdateData *pUpdateSessionData)
+{
+	return CPA_STATUS_UNSUPPORTED;
 }
 
 CpaStatus

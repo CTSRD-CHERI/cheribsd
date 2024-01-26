@@ -1,7 +1,7 @@
 /*-
  * hccontrol.h
  *
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001-2002 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
@@ -28,7 +28,6 @@
  * SUCH DAMAGE.
  *
  * $Id: hccontrol.h,v 1.2 2003/05/19 17:29:29 max Exp $
- * $FreeBSD$
  */
 
 #ifndef _HCCONTROL_H_

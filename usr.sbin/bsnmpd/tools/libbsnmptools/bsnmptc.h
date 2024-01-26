@@ -27,8 +27,6 @@
  * SUCH DAMAGE.
  *
  * Textual conventions for snmp
- *
- * $FreeBSD$
  */
 
 #ifndef	_BSNMP_TEXT_CONV_H_
@@ -39,14 +37,14 @@
 
 /*
  * 11 bytes - octets that represent DateAndTime Textual convention
- * and the size of string used to diplay that.
+ * and the size of string used to display that.
  */
 #define	SNMP_DATETIME_OCTETS	11
 #define	SNMP_DATETIME_STRSZ	32
 
 /*
  * 6 bytes - octets that represent PhysAddress Textual convention
- * and the size of string used to diplay that.
+ * and the size of string used to display that.
  */
 #define	SNMP_PHYSADDR_OCTETS	6
 #define	SNMP_PHYSADDR_STRSZ	19

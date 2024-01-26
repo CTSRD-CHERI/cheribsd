@@ -1,7 +1,7 @@
 /*	$NetBSD: bnep.h,v 1.1 2008/08/17 13:20:57 plunky Exp $	*/
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2008 Iain Hibbert
  * All rights reserved.
@@ -27,7 +27,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* $FreeBSD$ */
 
 /*
  * Constants defined in the Bluetooth Network Encapsulation

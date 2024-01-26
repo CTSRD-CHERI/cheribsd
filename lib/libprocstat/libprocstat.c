@@ -47,8 +47,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/elf.h>
 #include <sys/time.h>
@@ -2173,6 +2171,120 @@ procstat_getumask(struct procstat *procstat, struct kinfo_proc *kp,
 }
 
 static int
+procstat_getquarantining_sysctl(pid_t pid, int *quarantiningp)
+{
+	int error, name[4];
+	size_t len;
+
+	name[0] = CTL_KERN;
+	name[1] = KERN_PROC;
+	name[2] = KERN_PROC_QUARANTINING;
+	name[3] = pid;
+	len = sizeof(*quarantiningp);
+	error = sysctl(name, nitems(name), quarantiningp, &len, NULL, 0);
+	if (error != 0 && errno != ESRCH && errno != EPERM &&
+	    feature_present("cheri_revoke"))
+		warn("sysctl: kern.proc.quarantining: %d", pid);
+	return (error);
+}
+
+int
+procstat_getquarantining(struct procstat *procstat, struct kinfo_proc *kp,
+    int *quarantiningp)
+{
+	switch (procstat->type) {
+	case PROCSTAT_CORE:
+		warnx("%s: PROCSTAT_CORE not supported", __func__);
+		return (-1);
+	case PROCSTAT_KVM:
+		warnx("%s: PROCSTAT_KVM not supported", __func__);
+		return (-1);
+	case PROCSTAT_SYSCTL:
+		return (procstat_getquarantining_sysctl(kp->ki_pid,
+		    quarantiningp));
+	default:
+		warnx("unknown access method: %d", procstat->type);
+		return (-1);
+	}
+}
+
+static int
+procstat_get_revoker_epoch_sysctl(pid_t pid, uint64_t *revoker_epochp)
+{
+	int error, name[4];
+	size_t len;
+
+	name[0] = CTL_KERN;
+	name[1] = KERN_PROC;
+	name[2] = KERN_PROC_REVOKER_EPOCH;
+	name[3] = pid;
+	len = sizeof(*revoker_epochp);
+	error = sysctl(name, nitems(name), revoker_epochp, &len, NULL, 0);
+	if (error != 0 && errno != ESRCH && errno != EPERM &&
+	    feature_present("cheri_revoke"))
+		warn("sysctl: kern.proc.revoker_epoch: %d", pid);
+	return (error);
+}
+
+int
+procstat_get_revoker_epoch(struct procstat *procstat, struct kinfo_proc *kp,
+    uint64_t *revoker_epochp)
+{
+	switch (procstat->type) {
+	case PROCSTAT_CORE:
+		warnx("%s: PROCSTAT_CORE not supported", __func__);
+		return (-1);
+	case PROCSTAT_KVM:
+		warnx("%s: PROCSTAT_KVM not supported", __func__);
+		return (-1);
+	case PROCSTAT_SYSCTL:
+		return (procstat_get_revoker_epoch_sysctl(kp->ki_pid,
+		    revoker_epochp));
+	default:
+		warnx("unknown access method: %d", procstat->type);
+		return (-1);
+	}
+}
+
+static int
+procstat_get_revoker_state_sysctl(pid_t pid, int *revoker_statep)
+{
+	int error, name[4];
+	size_t len;
+
+	name[0] = CTL_KERN;
+	name[1] = KERN_PROC;
+	name[2] = KERN_PROC_REVOKER_STATE;
+	name[3] = pid;
+	len = sizeof(*revoker_statep);
+	error = sysctl(name, nitems(name), revoker_statep, &len, NULL, 0);
+	if (error != 0 && errno != ESRCH && errno != EPERM &&
+	    feature_present("cheri_revoke"))
+		warn("sysctl: kern.proc.revoker_state: %d", pid);
+	return (error);
+}
+
+int
+procstat_get_revoker_state(struct procstat *procstat, struct kinfo_proc *kp,
+    int *revoker_statep)
+{
+	switch (procstat->type) {
+	case PROCSTAT_CORE:
+		warnx("%s: PROCSTAT_CORE not supported", __func__);
+		return (-1);
+	case PROCSTAT_KVM:
+		warnx("%s: PROCSTAT_KVM not supported", __func__);
+		return (-1);
+	case PROCSTAT_SYSCTL:
+		return (procstat_get_revoker_state_sysctl(kp->ki_pid,
+		    revoker_statep));
+	default:
+		warnx("unknown access method: %d", procstat->type);
+		return (-1);
+	}
+}
+
+static int
 procstat_getrlimit_kvm(kvm_t *kd, struct kinfo_proc *kp, int which,
     struct rlimit* rlimit)
 {
@@ -2396,7 +2508,7 @@ procstat_getosrel(struct procstat *procstat, struct kinfo_proc *kp, int *osrelp)
 
 #define PROC_AUXV_MAX	256
 
-#if __ELF_WORD_SIZE == 64
+#ifdef PS_ARCH_HAS_FREEBSD32
 static const char *elf32_sv_names[] = {
 	"Linux ELF32",
 	"FreeBSD ELF32",
@@ -2407,7 +2519,7 @@ is_elf32_sysctl(pid_t pid)
 {
 	int error, name[4];
 	size_t len, i;
-	static char sv_name[256];
+	char sv_name[32];
 
 	name[0] = CTL_KERN;
 	name[1] = KERN_PROC;
@@ -2429,7 +2541,6 @@ procstat_getauxv32_sysctl(pid_t pid, unsigned int *cntp)
 {
 	Elf_Auxinfo *auxv;
 	Elf32_Auxinfo *auxv32;
-	void *ptr;
 	size_t len;
 	unsigned int i, count;
 	int name[4];
@@ -2450,8 +2561,8 @@ procstat_getauxv32_sysctl(pid_t pid, unsigned int *cntp)
 			warn("sysctl: kern.proc.auxv: %d: %d", pid, errno);
 		goto out;
 	}
-	count = len / sizeof(Elf_Auxinfo);
-	auxv = malloc(count  * sizeof(Elf_Auxinfo));
+	count = len / sizeof(Elf32_Auxinfo);
+	auxv = malloc(count * sizeof(Elf_Auxinfo));
 	if (auxv == NULL) {
 		warn("malloc(%zu)", count * sizeof(Elf_Auxinfo));
 		goto out;
@@ -2463,15 +2574,94 @@ procstat_getauxv32_sysctl(pid_t pid, unsigned int *cntp)
 		 * necessarily true.
 		 */
 		auxv[i].a_type = auxv32[i].a_type;
-		ptr = &auxv32[i].a_un;
-		auxv[i].a_un.a_val = *((uint32_t *)ptr);
+		/*
+		 * Don't sign extend values.  Existing entries are positive
+		 * integers or pointers.  Under freebsd32, programs typically
+		 * have a full [0, 2^32) address space (perhaps minus the last
+		 * page) and treating this as a signed integer would be
+		 * confusing since these are not kernel pointers.
+		 *
+		 * XXX: A more complete translation would be ABI and
+		 * type-aware.
+		 */
+		auxv[i].a_un.a_val = (uint32_t)auxv32[i].a_un.a_val;
 	}
 	*cntp = count;
 out:
 	free(auxv32);
 	return (auxv);
 }
-#endif /* __ELF_WORD_SIZE == 64 */
+#endif /* PS_ARCH_HAS_FREEBSD32 */
+
+#ifdef __CHERI_PURE_CAPABILITY__
+static const char *elf64_sv_names[] = {
+	"Linux ELF64",
+	"FreeBSD ELF64",
+};
+
+static int
+is_elf64_sysctl(pid_t pid)
+{
+	int error, name[4];
+	size_t len, i;
+	char sv_name[32];
+
+	name[0] = CTL_KERN;
+	name[1] = KERN_PROC;
+	name[2] = KERN_PROC_SV_NAME;
+	name[3] = pid;
+	len = sizeof(sv_name);
+	error = sysctl(name, nitems(name), sv_name, &len, NULL, 0);
+	if (error != 0 || len == 0)
+		return (0);
+	for (i = 0; i < nitems(elf64_sv_names); i++) {
+		if (strncmp(sv_name, elf64_sv_names[i], sizeof(sv_name)) == 0)
+			return (1);
+	}
+	return (0);
+}
+
+static Elf_Auxinfo *
+procstat_getauxv64_sysctl(pid_t pid, unsigned int *cntp)
+{
+	Elf_Auxinfo *auxv;
+	Elf64_Auxinfo *auxv64;
+	size_t len;
+	unsigned int i, count;
+	int name[4];
+
+	name[0] = CTL_KERN;
+	name[1] = KERN_PROC;
+	name[2] = KERN_PROC_AUXV;
+	name[3] = pid;
+	len = PROC_AUXV_MAX * sizeof(Elf64_Auxinfo);
+	auxv = NULL;
+	auxv64 = malloc(len);
+	if (auxv64 == NULL) {
+		warn("malloc(%zu)", len);
+		goto out;
+	}
+	if (sysctl(name, nitems(name), auxv64, &len, NULL, 0) == -1) {
+		if (errno != ESRCH && errno != EPERM)
+			warn("sysctl: kern.proc.auxv: %d: %d", pid, errno);
+		goto out;
+	}
+	count = len / sizeof(Elf64_Auxinfo);
+	auxv = malloc(count * sizeof(Elf_Auxinfo));
+	if (auxv == NULL) {
+		warn("malloc(%zu)", count * sizeof(Elf_Auxinfo));
+		goto out;
+	}
+	for (i = 0; i < count; i++) {
+		auxv[i].a_type = auxv64[i].a_type;
+		auxv[i].a_un.a_val = auxv64[i].a_un.a_val;
+	}
+	*cntp = count;
+out:
+	free(auxv64);
+	return (auxv);
+}
+#endif /* __CHERI_PURE_CAPABILITY__ */
 
 static Elf_Auxinfo *
 procstat_getauxv_sysctl(pid_t pid, unsigned int *cntp)
@@ -2480,9 +2670,13 @@ procstat_getauxv_sysctl(pid_t pid, unsigned int *cntp)
 	int name[4];
 	size_t len;
 
-#if __ELF_WORD_SIZE == 64
+#ifdef PS_ARCH_HAS_FREEBSD32
 	if (is_elf32_sysctl(pid))
 		return (procstat_getauxv32_sysctl(pid, cntp));
+#endif
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (is_elf64_sysctl(pid))
+		return (procstat_getauxv64_sysctl(pid, cntp));
 #endif
 	name[0] = CTL_KERN;
 	name[1] = KERN_PROC;

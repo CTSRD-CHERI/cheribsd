@@ -1,4 +1,3 @@
-# $FreeBSD$
 cddl/dev/dtrace/riscv/dtrace_asm.S			optional dtrace compile-with "${DTRACE_S}"
 cddl/dev/dtrace/riscv/dtrace_subr.c			optional dtrace compile-with "${DTRACE_C}"
 cddl/dev/dtrace/riscv/instr_size.c			optional dtrace compile-with "${DTRACE_C}"
@@ -26,12 +25,6 @@ cheri/cheri_cap_relocs.c	optional cheri_purecap_kernel \
 	compile-with	"${CC} -c ${CFLAGS:N-nostdinc} ${WERROR} ${PROF} ${.IMPSRC}"
 libkern/bcopy.c			standard
 libkern/bcopy_c.c		optional	cpu_cheri !cheri_purecap_kernel
-libkern/ffs.c			standard
-libkern/ffsl.c			standard
-libkern/ffsll.c			standard
-libkern/fls.c			standard
-libkern/flsl.c			standard
-libkern/flsll.c			standard
 libkern/memcmp.c		standard
 libkern/memset.c		standard
 libkern/memset_c.c		optional	cpu_cheri !cheri_purecap_kernel
@@ -88,3 +81,8 @@ riscv/riscv/vm_machdep.c	standard
 
 # Zstd
 contrib/zstd/lib/freebsd/zstd_kfreebsd.c		optional zstdio compile-with ${ZSTD_C}
+
+# Caprevoke
+riscv/riscv/cheri_revoke_machdep.c		optional	cpu_cheri cheri_caprevoke
+riscv/riscv/cheri_revoke_machdep_tests.c	optional	cpu_cheri cheri_caprevoke \
+	compile-with "${NORMAL_C} -fomit-frame-pointer"

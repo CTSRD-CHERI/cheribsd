@@ -30,8 +30,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef	_LINUXKPI_LINUX_NETDEVICE_H
 #define	_LINUXKPI_LINUX_NETDEVICE_H
@@ -339,10 +337,18 @@ ether_setup(struct net_device *ndev)
 }
 
 static __inline void
-dev_net_set(struct net_device *dev, void *p)
+dev_net_set(struct net_device *ndev, void *p)
 {
 
 	pr_debug("%s: TODO\n", __func__);
+}
+
+static __inline int
+dev_set_threaded(struct net_device *ndev, bool threaded)
+{
+
+	pr_debug("%s: TODO\n", __func__);
+	return (-ENODEV);
 }
 
 /* -------------------------------------------------------------------------- */

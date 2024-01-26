@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)paths.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD$
  */
 
 #ifndef _PATHS_H_
@@ -37,8 +36,8 @@
 
 #include <sys/cdefs.h>
 
-#ifdef COMPAT_64BIT
-#define	_PATH_LOCALBASE	"/usr/local64"
+#if defined(COMPAT_LIB64) || defined(COMPAT_LIB64CB)
+#define	_PATH_LOCALBASE	"/usr/local" COMPAT_libcompat
 #else
 #define	_PATH_LOCALBASE	"/usr/local"
 #endif
@@ -46,6 +45,7 @@
 /* Default search path. */
 #define	_PATH_DEFPATH	"/sbin:/bin:/usr/sbin:/usr/bin:" \
 			"/usr/local/sbin:/usr/local/bin:" \
+			"/usr/local64cb/sbin:/usr/local64cb/bin:" \
 			"/usr/local64/sbin:/usr/local64/bin"
 /* All standard utilities path. */
 #define	_PATH_STDPATH	"/usr/bin:/bin:/usr/sbin:/sbin"
@@ -72,12 +72,8 @@
 #define	_PATH_GBDE	"/sbin/gbde"
 #define	_PATH_GELI	"/sbin/geli"
 #define	_PATH_HALT	"/sbin/halt"
-#if defined(COMPAT_CHERI)
-#define	_PATH_I18NMODULE	"/usr/lib64c/i18n"
-#elif defined(COMPAT_32BIT)
-#define	_PATH_I18NMODULE	"/usr/lib32/i18n"
-#elif defined(COMPAT_64BIT)
-#define	_PATH_I18NMODULE	"/usr/lib64/i18n"
+#ifdef COMPAT_libcompat
+#define	_PATH_I18NMODULE	"/usr/lib" COMPAT_libcompat "/i18n"
 #else
 #define	_PATH_I18NMODULE	"/usr/lib/i18n"
 #endif

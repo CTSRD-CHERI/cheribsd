@@ -25,8 +25,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -56,7 +54,7 @@
 #include "hostres_oid.h"
 #include "hostres_tree.h"
 
-/* maximum length for descritpion string according to MIB */
+/* maximum length for description string according to MIB */
 #define	SE_DESC_MLEN	(255 + 1)
 
 /*

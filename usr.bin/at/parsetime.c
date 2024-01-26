@@ -1,7 +1,7 @@
 /*-
  *  parsetime.c - parse time for at(1)
  *
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  *  Copyright (C) 1993, 1994  Thomas Koenig
  *
@@ -37,8 +37,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /* System Headers */
 
 #include <sys/types.h>

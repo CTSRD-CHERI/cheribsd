@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001 Jens Schweikhardt
  * All rights reserved.
@@ -27,7 +27,6 @@
  */
 
 #if 0
-__FBSDID("$FreeBSD$");
 #endif
 
 void	add_typename(const char *);

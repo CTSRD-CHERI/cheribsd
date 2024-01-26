@@ -54,7 +54,11 @@ static pthread_key_t emutls_pthread_key;
 static bool emutls_key_created = false;
 
 typedef unsigned int gcc_word __attribute__((mode(word)));
+#ifdef __CHERI_PURE_CAPABILITY__
+typedef unsigned __intcap gcc_pointer __attribute__((mode(pointer)));
+#else
 typedef unsigned int gcc_pointer __attribute__((mode(pointer)));
+#endif
 
 // Default is not to use posix_memalign, so systems like Android
 // can use thread local data without heavier POSIX memory allocators.
@@ -97,7 +101,7 @@ static __inline void emutls_setspecific(emutls_address_array *value) {
   pthread_setspecific(emutls_pthread_key, (void *)value);
 }
 
-static __inline emutls_address_array *emutls_getspecific() {
+static __inline emutls_address_array *emutls_getspecific(void) {
   return (emutls_address_array *)pthread_getspecific(emutls_pthread_key);
 }
 
@@ -129,9 +133,9 @@ static __inline void emutls_init_once(void) {
   pthread_once(&once, emutls_init);
 }
 
-static __inline void emutls_lock() { pthread_mutex_lock(&emutls_mutex); }
+static __inline void emutls_lock(void) { pthread_mutex_lock(&emutls_mutex); }
 
-static __inline void emutls_unlock() { pthread_mutex_unlock(&emutls_mutex); }
+static __inline void emutls_unlock(void) { pthread_mutex_unlock(&emutls_mutex); }
 
 #else // _WIN32
 
@@ -213,16 +217,16 @@ static __inline void emutls_init_once(void) {
   InitOnceExecuteOnce(&once, emutls_init, NULL, NULL);
 }
 
-static __inline void emutls_lock() { EnterCriticalSection(emutls_mutex); }
+static __inline void emutls_lock(void) { EnterCriticalSection(emutls_mutex); }
 
-static __inline void emutls_unlock() { LeaveCriticalSection(emutls_mutex); }
+static __inline void emutls_unlock(void) { LeaveCriticalSection(emutls_mutex); }
 
 static __inline void emutls_setspecific(emutls_address_array *value) {
   if (TlsSetValue(emutls_tls_index, (LPVOID)value) == 0)
     win_abort(GetLastError(), "TlsSetValue");
 }
 
-static __inline emutls_address_array *emutls_getspecific() {
+static __inline emutls_address_array *emutls_getspecific(void) {
   LPVOID value = TlsGetValue(emutls_tls_index);
   if (value == NULL) {
     const DWORD err = GetLastError();

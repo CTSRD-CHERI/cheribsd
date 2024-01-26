@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2002-2009 Luigi Rizzo, Universita` di Pisa
  *
@@ -23,12 +23,12 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _IPFW2_H
 #define _IPFW2_H
+
+#include <sys/param.h>
 
 /*
  * The default rule number.  By the design of ip_fw, the default rule
@@ -744,13 +744,7 @@ struct _ipfw_dyn_rule {
 	u_int16_t	dyn_type;	/* rule type			*/
 	u_int16_t	count;		/* refcount			*/
 	u_int16_t	kidx;		/* index of named object */
-} __packed
-#ifndef __CHERI_PURE_CAPABILITY__
-__aligned(8)
-#else
-__aligned(sizeof(void *))
-#endif
-;
+} __packed __aligned(MAX(8, sizeof(void *)));
 
 /*
  * Definitions for IP option names.

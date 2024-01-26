@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright © 2002, Jörg Wunsch
  *
@@ -33,9 +33,6 @@
  */
 
 #include <sys/types.h>
-
-__FBSDID("$FreeBSD$");
-
 #include <sys/stat.h>
 #include <sys/sysctl.h>
 

@@ -30,8 +30,6 @@
 #include "opt_gdb.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/kdb.h>
@@ -61,6 +59,11 @@ static int dbg_breakpoint_num;
 static struct debug_monitor_state kernel_monitor = {
 	.dbg_flags = DBGMON_KERNEL
 };
+
+static int dbg_setup_watchpoint(struct debug_monitor_state *, vm_offset_t,
+    vm_size_t, enum dbg_access_t);
+static int dbg_remove_watchpoint(struct debug_monitor_state *, vm_offset_t,
+    vm_size_t);
 
 /* Called from the exception handlers */
 void dbg_monitor_enter(struct thread *);
@@ -380,7 +383,7 @@ dbg_find_slot(struct debug_monitor_state *monitor, enum dbg_t type,
 	return (-1);
 }
 
-int
+static int
 dbg_setup_watchpoint(struct debug_monitor_state *monitor, vm_offset_t addr,
     vm_size_t size, enum dbg_access_t access)
 {
@@ -447,7 +450,7 @@ dbg_setup_watchpoint(struct debug_monitor_state *monitor, vm_offset_t addr,
 	return (0);
 }
 
-int
+static int
 dbg_remove_watchpoint(struct debug_monitor_state *monitor, vm_offset_t addr,
     vm_size_t size)
 {

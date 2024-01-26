@@ -65,8 +65,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_vm.h"
 
 #include <sys/param.h>
@@ -154,6 +152,7 @@ kva_alloc(vm_size_t size)
 	size = round_page(size);
 	if (vmem_alloc(kernel_arena, size, M_BESTFIT | M_NOWAIT, &addr))
 		return (0);
+	addr = cheri_kern_andperm(addr, CHERI_PERMS_KERNEL_DATA);
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
 #endif
@@ -258,6 +257,11 @@ kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	offset = addr - VM_MIN_KERNEL_ADDRESS;
 	pflags = malloc2vm_flags(flags) | VM_ALLOC_WIRED;
 	prot = (flags & M_EXEC) != 0 ? VM_PROT_RWX : VM_PROT_RW;
+	if ((flags & M_EXEC) == 0)
+		addr = cheri_kern_andperm(addr, CHERI_PERMS_KERNEL_DATA);
+	else
+		addr = cheri_kern_andperm(addr, CHERI_PERMS_KERNEL_CODE |
+		    CHERI_PERMS_KERNEL_DATA);
 
 	/* XXX: Do we want a M_CAP? */
 	prot |= VM_PROT_CAP;
@@ -278,6 +282,8 @@ kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 			pmap_zero_page(m);
 		vm_page_valid(m);
 		VM_OBJECT_ASSERT_CAP(object, prot);
+		if (prot & VM_PROT_WRITE_CAP)
+			vm_page_aflag_set(m, PGA_CAPSTORE | PGA_CAPDIRTY);
 		pmap_enter(kernel_pmap, addr + i, m, prot,
 		    prot | PMAP_ENTER_WIRED, 0);
 	}
@@ -350,6 +356,7 @@ kmem_alloc_contig_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	vmem = vm_dom[domain].vmd_kernel_arena;
 	if (vmem_alloc(vmem, asize, flags | M_BESTFIT, &addr))
 		return (NULL);
+	addr = cheri_kern_andperm(addr, CHERI_PERMS_KERNEL_DATA);
 	offset = addr - VM_MIN_KERNEL_ADDRESS;
 	pflags = malloc2vm_flags(flags) | VM_ALLOC_WIRED;
 	npages = atop(asize);
@@ -371,6 +378,7 @@ kmem_alloc_contig_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 			pmap_zero_page(m);
 		vm_page_valid(m);
 		VM_OBJECT_ASSERT_CAP(object, VM_PROT_RW_CAP);
+		vm_page_aflag_set(m, PGA_CAPSTORE | PGA_CAPDIRTY);
 		pmap_enter(kernel_pmap, tmp, m, VM_PROT_RW_CAP,
 		    VM_PROT_RW_CAP | PMAP_ENTER_WIRED, 0);
 		tmp += PAGE_SIZE;
@@ -475,6 +483,11 @@ kmem_malloc_domain(int domain, vm_size_t size, int flags)
 	asize = round_page(size);
 	if (vmem_alloc(arena, asize, flags | M_BESTFIT, &addr))
 		return (0);
+	if ((flags & M_EXEC) == 0)
+		addr = cheri_kern_andperm(addr, CHERI_PERMS_KERNEL_DATA);
+	else
+		addr = cheri_kern_andperm(addr, CHERI_PERMS_KERNEL_CODE |
+		    CHERI_PERMS_KERNEL_DATA);
 
 	rv = kmem_back_domain(domain, kernel_object, addr, asize, flags);
 	if (rv != KERN_SUCCESS) {
@@ -491,8 +504,12 @@ kmem_malloc_domain(int domain, vm_size_t size, int flags)
 void *
 kmem_malloc(vm_size_t size, int flags)
 {
+	void * p;
 
-	return (kmem_malloc_domainset(DOMAINSET_RR(), size, flags));
+	TSENTER();
+	p = kmem_malloc_domainset(DOMAINSET_RR(), size, flags);
+	TSEXIT();
+	return (p);
 }
 
 void *
@@ -576,6 +593,8 @@ retry:
 		    ("kmem_malloc: page %p is managed", m));
 		vm_page_valid(m);
 		VM_OBJECT_ASSERT_CAP(object, prot);
+		if (prot & VM_PROT_WRITE_CAP)
+			vm_page_aflag_set(m, PGA_CAPSTORE | PGA_CAPDIRTY);
 		pmap_enter(kernel_pmap, addr + i, m, prot,
 		    prot | PMAP_ENTER_WIRED, 0);
 		if (__predict_false((prot & VM_PROT_EXECUTE) != 0))
@@ -801,17 +820,21 @@ kva_import(void *unused, vmem_size_t size, int flags, vmem_addr_t *addrp)
 	vm_pointer_t addr;
 	int result;
 
+	TSENTER();
 	KASSERT((size % KVA_QUANTUM) == 0,
 	    ("kva_import: Size %jd is not a multiple of %d",
 	    (intmax_t)size, (int)KVA_QUANTUM));
 	addr = vm_map_min(kernel_map);
 	result = vm_map_find(kernel_map, NULL, 0, &addr, size, 0,
 	    VMFS_SUPER_SPACE, VM_PROT_ALL, VM_PROT_ALL, MAP_NOFAULT);
-	if (result != KERN_SUCCESS)
+	if (result != KERN_SUCCESS) {
+		TSEXIT();
                 return (ENOMEM);
+	}
 
 	*addrp = addr;
 
+	TSEXIT();
 	return (0);
 }
 
@@ -872,7 +895,7 @@ kmem_init(vm_pointer_t start, vm_pointer_t end)
 	 * for that kva range.
 	 */
 	size = CHERI_REPRESENTABLE_LENGTH((ptraddr_t)start - (ptraddr_t)addr);
-	start = roundup2(start, CHERI_REPRESENTABLE_ALIGNMENT(size));
+	start = CHERI_REPRESENTABLE_ALIGN_UP(start, size);
 	(void)vm_map_reservation_create_locked(kernel_map, &addr, size,
 	    VM_PROT_ALL);
 	(void)vm_map_insert(kernel_map, NULL, 0, addr, start, VM_PROT_ALL,

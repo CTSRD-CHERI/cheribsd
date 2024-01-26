@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001 Michael Smith
  * Copyright (c) 2004 Paul Saab
@@ -25,8 +25,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD$
  */
 
 /*
@@ -279,7 +277,7 @@ TUNABLE_INT("hw.ciss.force_interrupt", &ciss_force_interrupt);
  * stick with matching against subvendor/subdevice, and thus have to
  * be updated for every new CISS adapter that appears.
  */
-#define CISS_BOARD_UNKNWON	0
+#define CISS_BOARD_UNKNOWN	0
 #define CISS_BOARD_SA5		1
 #define CISS_BOARD_SA5B		2
 #define CISS_BOARD_NOMSI	(1<<4)

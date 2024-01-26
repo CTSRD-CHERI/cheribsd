@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2007-2008
  *	Swinburne University of Technology, Melbourne, Australia.
@@ -49,7 +49,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 #include <opt_cc.h>
 #include <sys/param.h>
 #include <sys/kernel.h>

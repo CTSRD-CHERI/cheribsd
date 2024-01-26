@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000,2004
  *	Poul-Henning Kamp.  All rights reserved.
@@ -26,8 +26,6 @@
  * SUCH DAMAGE.
  *
  * From: FreeBSD: src/sys/miscfs/kernfs/kernfs_vfsops.c 1.36
- *
- * $FreeBSD$
  */
 
 #include <sys/param.h>

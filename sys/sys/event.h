@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1999,2000,2001 Jonathan Lemon <jlemon@FreeBSD.org>
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _SYS_EVENT_H_
@@ -320,6 +318,7 @@ struct knote {
 #define KN_DETACHED	0x08			/* knote is detached */
 #define KN_MARKER	0x20			/* ignore this knote */
 #define KN_KQUEUE	0x40			/* this knote belongs to a kq */
+#define KN_CAPREV_EPOCH	0x80			/* revocation epoch */
 #define	KN_SCAN		0x100			/* flux set in kqueue_scan() */
 	int			kn_influx;
 	int			kn_sfflags;	/* saved filter flags */
@@ -331,7 +330,8 @@ struct knote {
 		struct		aioliojob *p_lio;	/* LIO job pointer */
 		void		*p_v;		/* generic other pointer */
 	} kn_ptr;
-	struct			filterops *kn_fop;
+	const struct		filterops *kn_fop;
+	volatile u_int		kn_refcount;
 
 #define kn_id		kn_kevent.ident
 #define kn_filter	kn_kevent.filter
@@ -373,9 +373,16 @@ void	knlist_cleardel(struct knlist *knl, struct thread *td,
 void	knote_fdclose(struct thread *p, int fd);
 int 	kqfd_register(int fd, struct kevent *kev, struct thread *p,
 	    int mflag, void *kn_ptr_data);
-int	kqueue_add_filteropts(int filt, struct filterops *filtops);
+int	kqueue_add_filteropts(int filt, const struct filterops *filtops);
 int	kqueue_del_filteropts(int filt);
 void	kqueue_drain_schedtask(void);
+
+#ifdef CHERI_CAPREVOKE
+struct filedesc;
+struct vm_cheri_revoke_cookie;
+void kqueue_cheri_revoke(struct filedesc *,
+    const struct vm_cheri_revoke_cookie *);
+#endif
 
 #else 	/* !_KERNEL */
 

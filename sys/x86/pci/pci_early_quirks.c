@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 Johannes Lundberg
  *
@@ -26,13 +26,12 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
 #include <sys/sysctl.h>
+#include <sys/tslog.h>
 
 #include <vm/vm.h>
 /* XXX: enable this once the KPI is available */
@@ -317,5 +316,7 @@ void
 pci_early_quirks(void)
 {
 
+	TSENTER();
 	intel_graphics_stolen();
+	TSEXIT();
 }

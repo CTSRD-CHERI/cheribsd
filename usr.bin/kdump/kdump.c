@@ -46,8 +46,6 @@ static char sccsid[] = "@(#)kdump.c	8.1 (Berkeley) 6/6/93";
 #endif
 #endif /* not lint */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #define _WANT_KERNEL_ERRNO
 #ifdef __LP64__
 #define	_WANT_KEVENT32
@@ -717,6 +715,9 @@ dumpheader(struct ktr_header *kth, u_int sv_flags)
 		break;
 	case KTR_FAULTEND:
 		type = "PRET";
+		break;
+	case KTR_SYSERRCAUSE:
+		type = "ERR ";
 		break;
 	default:
 		sprintf(unknown, "UNKNOWN(%d)", kth->ktr_type);
@@ -1605,6 +1606,21 @@ ktrsyscall_freebsd(struct ktr_syscall *ktr, register_t **resip,
 			case SYS_setitimer:
 				putchar('(');
 				print_integer_arg(sysdecode_itimer, *ip);
+				ip++;
+				narg--;
+				c = ',';
+				break;
+			case SYS_cheri_revoke:
+				putchar('(');
+				print_mask_arg(sysdecode_cr_flags, *ip);
+				ip++;
+				narg--;
+				c = ',';
+				break;
+			case SYS_cheri_revoke_get_shadow:
+				putchar('(');
+				print_mask_arg(sysdecode_cr_get_shadow_flags,
+				    *ip);
 				ip++;
 				narg--;
 				c = ',';

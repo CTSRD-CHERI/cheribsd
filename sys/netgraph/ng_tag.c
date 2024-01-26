@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006 Vadim Goncharov <vadimnuclight@tpu.ru>
  * All rights reserved.
@@ -28,8 +28,6 @@
  *
  * Portions Copyright (c) 1999 Whistle Communications, Inc.
  * (ng_bpf by Archie Cobbs <archie@freebsd.org>)
- *
- * $FreeBSD$
  */
 
 /*

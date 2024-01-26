@@ -1,10 +1,12 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /* Copyright(c) 2007 - 2022 Intel Corporation */
-/* $FreeBSD$ */
 #ifndef ADF_4XXX_HW_DATA_H_
 #define ADF_4XXX_HW_DATA_H_
 
 #include <adf_accel_devices.h>
+
+#define DEFAULT_4XXX_ASYM_AE_MASK 0x03
+#define DEFAULT_401XX_ASYM_AE_MASK 0x3F
 
 /* PCIe configuration space */
 #define ADF_4XXX_SRAM_BAR 0
@@ -56,6 +58,7 @@
 #define ADF_4XXX_ERRMSK3 (0x41A21C)
 
 #define ADF_4XXX_VFLNOTIFY BIT(7)
+#define ADF_4XXX_DEF_ASYM_MASK 0x1
 
 /* Arbiter configuration */
 #define ADF_4XXX_ARB_CONFIG (BIT(31) | BIT(6) | BIT(0))
@@ -105,7 +108,7 @@ enum icp_qat_4xxx_slice_mask {
 	ICP_ACCEL_4XXX_MASK_SMX_SLICE = BIT(6),
 };
 
-void adf_init_hw_data_4xxx(struct adf_hw_device_data *hw_data);
+void adf_init_hw_data_4xxx(struct adf_hw_device_data *hw_data, u32 id);
 void adf_clean_hw_data_4xxx(struct adf_hw_device_data *hw_data);
 
 #endif

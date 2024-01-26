@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021 Adrian Chadd <adrian@FreeBSD.org>
  *
@@ -28,8 +28,6 @@
 #include "opt_platform.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -75,7 +73,7 @@ ipq4018_mp_setmaxid(platform_t plat)
 	printf("SMP: ncpu=%d\n", ncpu);
 }
 
-static boolean_t
+static bool
 ipq4018_start_ap(u_int id, phandle_t node, u_int addr_cells, pcell_t *arg)
 {
 

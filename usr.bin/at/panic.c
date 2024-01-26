@@ -1,7 +1,7 @@
 /*-
  *  panic.c - terminate fast in case of error
  *
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  *  Copyright (C) 1993  Thomas Koenig
  *
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /* System Headers */
 
 #include <err.h>

@@ -22,9 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd March 11, 2023
+.Dd November 13, 2023
 .Dt RC.CONF 5
 .Os
 .Sh NAME
@@ -197,6 +195,14 @@ services are enabled that utilize the force_depend check.
 .Pq Vt str
 .Xr chroot 8
 to this directory before running the service.
+.It Ao Ar name Ac Ns Va _cpuset
+.Pq Vt str
+A list of CPUs to run the service on.
+Passed to
+.Xr cpuset 1
+using the
+.Fl l
+flag.
 .It Ao Ar name Ac Ns Va _fib
 .Pq Vt int
 The
@@ -2307,6 +2313,12 @@ If set to
 run the
 .Xr syslogd 8
 daemon.
+Note, the
+.Va syslogd_oomprotect
+variable is set to
+.Dq Li YES
+by default in
+.Pa /etc/defaults/rc.conf .
 .It Va syslogd_program
 .Pq Vt str
 Path to
@@ -2370,6 +2382,12 @@ If set to
 run the
 .Xr unbound 8
 daemon as a local caching DNS resolver.
+Note, the
+.Va local_unbound_oomprotect
+variable is set to
+.Dq Li YES
+by default in
+.Pa /etc/defaults/rc.conf .
 .It Va nscd_enable
 .Pq Vt bool
 Set to
@@ -3837,6 +3855,12 @@ Set to
 to start
 .Xr sshd 8
 at system boot time.
+Note, the
+.Va sshd_oomprotect
+variable is set to
+.Dq Li YES
+by default in
+.Pa /etc/defaults/rc.conf .
 .It Va sshd_flags
 .Pq Vt str
 If
@@ -4930,6 +4954,7 @@ these are the flags to pass to the
 .El
 .Sh SEE ALSO
 .Xr chmod 1 ,
+.Xr cpuset 1 ,
 .Xr gdb 1 Pq Pa ports/devel/gdb ,
 .Xr kbdcontrol 1 ,
 .Xr limits 1 ,

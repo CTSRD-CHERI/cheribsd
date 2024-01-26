@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004 Marcel Moolenaar
  * All rights reserved.
@@ -24,8 +24,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _MACHINE_KDB_H_
@@ -35,8 +33,6 @@
 #include <machine/db_machdep.h>
 #include <machine/frame.h>
 #include <machine/psl.h>
-
-#define	KDB_STOPPEDPCB(pc)	&stoppcbs[pc->pc_cpuid]
 
 extern void kdb_cpu_clear_singlestep(void);
 extern void kdb_cpu_set_singlestep(void);

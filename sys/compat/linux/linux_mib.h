@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1999 Marcel Moolenaar
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _LINUX_MIB_H_
@@ -57,7 +55,6 @@ int	linux_kernver(struct thread *td);
 #define	LINUX_XKERNVERSTR(x)	LINUX_KERNVERSTR(x)
 #define	LINUX_VERSION_STR	LINUX_XKERNVERSTR(LINUX_KVERSION.LINUX_KPATCHLEVEL.LINUX_KSUBLEVEL)
 
-extern int linux_debug;
 extern int linux_default_openfiles;
 extern int linux_default_stacksize;
 extern int linux_dummy_rlimits;

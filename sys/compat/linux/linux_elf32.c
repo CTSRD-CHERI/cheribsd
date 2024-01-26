@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021 Edward Tomasz Napierala <trasz@FreeBSD.org>
  * Copyright (c) 2002 Doug Rabson
@@ -30,9 +30,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #define __ELF_WORD_SIZE 32
 #include <compat/linux/linux_elf.c>

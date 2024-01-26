@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013 Adrian Chadd <adrian@freebsd.org>
  * Copyright (c) 2019 Vladimir Kondratyev <wulf@FreeBSD.org>
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/types.h>
@@ -50,7 +48,6 @@ iwmbt_fw_read(struct iwmbt_firmware *fw, const char *fwname)
 	struct stat sb;
 	unsigned char *buf;
 	ssize_t r;
-	int i;
 
 	fd = open(fwname, O_RDONLY);
 	if (fd < 0) {
@@ -71,7 +68,6 @@ iwmbt_fw_read(struct iwmbt_firmware *fw, const char *fwname)
 		return (0);
 	}
 
-	i = 0;
 	/* XXX handle partial reads */
 	r = read(fd, buf, sb.st_size);
 	if (r < 0) {

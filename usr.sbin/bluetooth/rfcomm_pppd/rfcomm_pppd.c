@@ -3,7 +3,7 @@
  */
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001-2008 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
@@ -30,7 +30,6 @@
  * SUCH DAMAGE.
  *
  * $Id: rfcomm_pppd.c,v 1.5 2003/09/07 18:32:11 max Exp $
- * $FreeBSD$
  */
 #define L2CAP_SOCKET_CHECKED
 #include <bluetooth.h>

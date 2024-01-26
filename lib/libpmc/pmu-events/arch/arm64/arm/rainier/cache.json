@@ -1,0 +1,280 @@
+[
+    {
+        "ArchStdEvent": "L1I_CACHE_REFILL",
+        "PublicDescription": "L1 instruction cache refill. This event counts any instruction fetch which misses in the cache. The following instructions are not counted:\nCache maintenance instructions.\nNon-cacheable accesses"
+    },
+    {
+        "ArchStdEvent": "L1I_TLB_REFILL",
+        "PublicDescription": "L1 instruction TLB refill. This event counts any refill of the instruction L1 TLB from the L2 TLB. This includes refills that result in a translation fault. The following instructions are not counted:\nTLB maintenance instructions. This event counts regardless of whether the MMU is enabled"
+    },
+    {
+        "ArchStdEvent": "L1D_CACHE_REFILL",
+        "PublicDescription": "L1 data cache refill. This event counts any load or store operation or page table walk access which causes data to be read from outside the L1, including accesses which do not allocate into L1. The following instructions are not counted:\nCache maintenance instructions and prefetches.\nStores of an entire cache line, even if they make a coherency request outside the L1.\nPartial cache line writes which do not allocate into the L1 cache.\nNon-cacheable accesses. This event counts the sum of L1D_CACHE_REFILL_RD and L1D_CACHE_REFILL_WR"
+    },
+    {
+        "ArchStdEvent": "L1D_CACHE",
+        "PublicDescription": "L1 data cache access. This event counts any load or store operation or page table walk access which looks up in the L1 data cache. In particular, any access which could count the L1D_CACHE_REFILL event causes this event to count. The following instructions are not counted:\nCache maintenance instructions and prefetches.\nNon-cacheable accesses. This event counts the sum of L1D_CACHE_RD and L1D_CACHE_WR"
+    },
+    {
+        "ArchStdEvent": "L1D_TLB_REFILL",
+        "PublicDescription": "L1 data TLB refill. This event counts any refill of the data L1 TLB from the L2 TLB. This includes refills that result in a translation fault. The following instructions are not counted:\nTLB maintenance instructions. This event counts regardless of whether the MMU is enabled"
+    },
+    {
+        "ArchStdEvent": "L1I_CACHE",
+        "PublicDescription": "Level 1 instruction cache access or Level 0 Macro-op cache access. This event counts any instruction fetch which accesses the L1 instruction cache or L0 Macro-op cache. The following instructions are not counted:\nCache maintenance instructions.\nNon-cacheable accesses"
+    },
+    {
+        "ArchStdEvent": "L1D_CACHE_WB",
+        "PublicDescription": "L1 data cache Write-Back. This event counts any write-back of data from the L1 data cache to L2 or L3. This counts both victim line evictions and snoops, including cache maintenance operations. The following instructions are not counted:\nInvalidations which do not result in data being transferred out of the L1.\nFull-line writes which write to L2 without writing L1, such as write streaming mode"
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE",
+        "PublicDescription": "L2 data cache access. This event counts any transaction from L1 which looks up in the L2 cache, and any write-back from the L1 to the L2. Snoops from outside the core and cache maintenance operations are not counted"
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_REFILL",
+        "PublicDescription": "L2 data cache refill. This event counts any cacheable transaction from L1 which causes data to be read from outside the core. L2 refills caused by stashes into L2 should not be counted"
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_WB",
+        "PublicDescription": "L2 data cache write-back. This event counts any write-back of data from the L2 cache to outside the core. This includes snoops to the L2 which return data, regardless of whether they cause an invalidation. Invalidations from the L2 which do not write data outside of the core and snoops which return data from the L1 are not counted"
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_ALLOCATE",
+        "PublicDescription": "L2 data cache allocation without refill. This event counts any full cache line write into the L2 cache which does not cause a linefill, including write-backs from L1 to L2 and full-line writes which do not allocate into L1"
+    },
+    {
+        "ArchStdEvent": "L1D_TLB",
+        "PublicDescription": "Level 1 data TLB access. This event counts any load or store operation which accesses the data L1 TLB. If both a load and a store are executed on a cycle, this event counts twice. This event counts regardless of whether the MMU is enabled"
+    },
+    {
+        "ArchStdEvent": "L1I_TLB",
+        "PublicDescription": "Level 1 instruction TLB access. This event counts any instruction fetch which accesses the instruction L1 TLB.This event counts regardless of whether the MMU is enabled"
+    },
+    {
+        "ArchStdEvent": "L3D_CACHE_ALLOCATE",
+        "PublicDescription": "Attributable L3 data or unified cache allocation without refill. This event counts any full cache line write into the L3 cache which does not cause a linefill, including write-backs from L2 to L3 and full-line writes which do not allocate into L2"
+    },
+    {
+        "ArchStdEvent": "L3D_CACHE_REFILL",
+        "PublicDescription": "Attributable Level 3 unified cache refill. This event counts for any cacheable read transaction returning data from the SCU for which the data source was outside the cluster. Transactions such as ReadUnique are counted here as 'read' transactions, even though they can be generated by store instructions"
+    },
+    {
+        "ArchStdEvent": "L3D_CACHE",
+        "PublicDescription": "Attributable Level 3 unified cache access. This event counts for any cacheable read transaction returning data from the SCU, or for any cacheable write to the SCU"
+    },
+    {
+        "ArchStdEvent": "L2D_TLB_REFILL",
+        "PublicDescription": "Attributable L2 data or unified TLB refill. This event counts on any refill of the L2 TLB, caused by either an instruction or data access. This event does not count if the MMU is disabled"
+    },
+    {
+        "ArchStdEvent": "L2D_TLB",
+        "PublicDescription": "Attributable L2 data or unified TLB access. This event counts on any access to the L2 TLB (caused by a refill of any of the L1 TLBs). This event does not count if the MMU is disabled"
+    },
+    {
+        "ArchStdEvent": "DTLB_WALK",
+        "PublicDescription": "Access to data TLB that caused a page table walk. This event counts on any data access which causes L2D_TLB_REFILL to count"
+    },
+    {
+        "ArchStdEvent": "ITLB_WALK",
+        "PublicDescription": "Access to instruction TLB that caused a page table walk. This event counts on any instruction access which causes L2D_TLB_REFILL to count"
+    },
+    {
+        "ArchStdEvent": "LL_CACHE_RD",
+        "PublicDescription": "Last level cache access, read.\nIf CPUECTLR.EXTLLC is set: This event counts any cacheable read transaction which returns a data source of 'interconnect cache'.\nIf CPUECTLR.EXTLLC is not set: This event is a duplicate of the L*D_CACHE_RD event corresponding to the last level of cache implemented - L3D_CACHE_RD if both per-core L2 and cluster L3 are implemented, L2D_CACHE_RD if only one is implemented, or L1D_CACHE_RD if neither is implemented"
+    },
+    {
+        "ArchStdEvent": "LL_CACHE_MISS_RD",
+        "PublicDescription": "Last level cache miss, read.\nIf CPUECTLR.EXTLLC is set: This event counts any cacheable read transaction which returns a data source of 'DRAM', 'remote' or 'inter-cluster peer'.\nIf CPUECTLR.EXTLLC is not set: This event is a duplicate of the L*D_CACHE_REFILL_RD event corresponding to the last level of cache implemented - L3D_CACHE_REFILL_RD if both percore L2 and cluster L3 are implemented, L2D_CACHE_REFILL_RD if only one is implemented, or L1D_CACHE_REFILL_RD if neither is implemented"
+    },
+    {
+        "ArchStdEvent": "L1D_CACHE_RD",
+        "PublicDescription": "L1 data cache access, read. This event counts any load operation or page table walk access which looks up in the L1 data cache. In particular, any access which could count the L1D_CACHE_REFILL_RD event causes this event to count. The following instructions are not counted:\nCache maintenance instructions and prefetches.\nNon-cacheable accesses"
+    },
+    {
+        "ArchStdEvent": "L1D_CACHE_WR",
+        "PublicDescription": "L1 data cache access, write. This event counts any store operation which looks up in the L1 data cache. In particular, any access which could count the L1D_CACHE_REFILL_WR event causes this event to count. The following instructions are not counted:\nCache maintenance instructions and prefetches.\nNon-cacheable accesses"
+    },
+    {
+        "ArchStdEvent": "L1D_CACHE_REFILL_RD",
+        "PublicDescription": "L1 data cache refill, read. This event counts any load operation or page table walk access which causes data to be read from outside the L1, including accesses which do not allocate into L1. The following instructions are not counted:\nCache maintenance instructions and prefetches.\nNon-cacheable accesses"
+    },
+    {
+        "ArchStdEvent": "L1D_CACHE_REFILL_WR",
+        "PublicDescription": "L1 data cache refill, write. This event counts any store operation which causes data to be read from outside the L1, including accesses which do not allocate into L1. The following instructions are not counted:\nCache maintenance instructions and prefetches.\nStores of an entire cache line, even if they make a coherency request outside the L1.\nPartial cache line writes which do not allocate into the L1 cache.\nNon-cacheable accesses"
+    },
+    {
+        "ArchStdEvent": "L1D_CACHE_REFILL_INNER",
+        "PublicDescription": "L1 data cache refill, inner. This event counts any L1 D-cache linefill (as counted by L1D_CACHE_REFILL) which hits in the L2 cache, L3 cache or another core in the cluster"
+    },
+    {
+        "ArchStdEvent": "L1D_CACHE_REFILL_OUTER",
+        "PublicDescription": "L1 data cache refill, outer. This event counts any L1 D-cache linefill (as counted by L1D_CACHE_REFILL) which does not hit in the L2 cache, L3 cache or another core in the cluster, and instead obtains data from outside the cluster"
+    },
+    {
+        "ArchStdEvent": "L1D_CACHE_WB_VICTIM",
+        "PublicDescription": "L1 data cache write-back, victim"
+    },
+    {
+        "ArchStdEvent": "L1D_CACHE_WB_CLEAN",
+        "PublicDescription": "L1 data cache write-back cleaning and coherency"
+    },
+    {
+        "ArchStdEvent": "L1D_CACHE_INVAL",
+        "PublicDescription": "L1 data cache invalidate"
+    },
+    {
+        "ArchStdEvent": "L1D_TLB_REFILL_RD",
+        "PublicDescription": "L1 data TLB refill, read"
+    },
+    {
+        "ArchStdEvent": "L1D_TLB_REFILL_WR",
+        "PublicDescription": "L1 data TLB refill, write"
+    },
+    {
+        "ArchStdEvent": "L1D_TLB_RD",
+        "PublicDescription": "L1 data TLB access, read"
+    },
+    {
+        "ArchStdEvent": "L1D_TLB_WR",
+        "PublicDescription": "L1 data TLB access, write"
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_RD",
+        "PublicDescription": "L2 data cache access, read. This event counts any read transaction from L1 which looks up in the L2 cache. Snoops from outside the core are not counted"
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_WR",
+        "PublicDescription": "L2 data cache access, write. This event counts any write transaction from L1 which looks up in the L2 cache or any write-back from L1 which allocates into the L2 cache. Snoops from outside the core are not counted"
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_REFILL_RD",
+        "PublicDescription": "L2 data cache refill, read. This event counts any cacheable read transaction from L1 which causes data to be read from outside the core. L2 refills caused by stashes into L2 should not be counted. Transactions such as ReadUnique are counted here as 'read' transactions, even though they can be generated by store instructions"
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_REFILL_WR",
+        "PublicDescription": "L2 data cache refill, write. This event counts any write transaction from L1 which causes data to be read from outside the core. L2 refills caused by stashes into L2 should not be counted. Transactions such as ReadUnique are not counted as write transactions"
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_WB_VICTIM",
+        "PublicDescription": "L2 data cache write-back, victim"
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_WB_CLEAN",
+        "PublicDescription": "L2 data cache write-back, cleaning and coherency"
+    },
+    {
+        "ArchStdEvent": "L2D_CACHE_INVAL",
+        "PublicDescription": "L2 data cache invalidate"
+    },
+    {
+        "ArchStdEvent": "L2D_TLB_REFILL_RD",
+        "PublicDescription": "L2 data or unified TLB refill, read"
+    },
+    {
+        "ArchStdEvent": "L2D_TLB_REFILL_WR",
+        "PublicDescription": "L2 data or unified TLB refill, write"
+    },
+    {
+        "ArchStdEvent": "L2D_TLB_RD",
+        "PublicDescription": "L2 data or unified TLB access, read"
+    },
+    {
+        "ArchStdEvent": "L2D_TLB_WR",
+        "PublicDescription": "L2 data or unified TLB access, write"
+    },
+    {
+        "ArchStdEvent": "L3D_CACHE_RD",
+        "PublicDescription": "L3 cache read"
+    },
+    {
+        "PublicDescription": "Attributable Level 1 data cache access, read, valid capability. The counter counts each access counted by L1D_CACHE_RD which loaded a valid capability",
+        "EventCode": "0x21C",
+        "EventName": "L1D_CACHE_RD_CTAG",
+        "BriefDescription": "Attributable Level 1 data cache access, read, valid capability. The counter counts each access counted by L1D_CACHE_RD which loaded a valid capability"
+    },
+    {
+        "PublicDescription": "Attributable Level 1 data cache access, write, valid capability. The counter counts each access counted by L1D_CACHE_WR which stored a valid capability",
+        "EventCode": "0x21D",
+        "EventName": "L1D_CACHE_WR_CTAG",
+        "BriefDescription": "Attributable Level 1 data cache access, write, valid capability. The counter counts each access counted by L1D_CACHE_WR which stored a valid capability"
+    },
+    {
+        "PublicDescription": "Attributable Level 1 data cache write-back, valid capability. The counter counts each access counted by L1D_CACHE_WB where at least one valid capability was present in the cache line",
+        "EventCode": "0x21E",
+        "EventName": "L1D_CACHE_WB_CTAG",
+        "BriefDescription": "Attributable Level 1 data cache write-back, valid capability. The counter counts each access counted by L1D_CACHE_WB where at least one valid capability was present in the cache line"
+    },
+    {
+        "PublicDescription": "Attributable Level 1 data cache refill, capability. The counter counts each access counted by L1D_CACHE_REFILL_RD where at least one valid capability was present in the cache line",
+        "EventCode": "0x21F",
+        "EventName": "L1D_CACHE_REFILL_RD_CTAG",
+        "BriefDescription": "Attributable Level 1 data cache refill, capability. The counter counts each access counted by L1D_CACHE_REFILL_RD where at least one valid capability was present in the cache line"
+    },
+    {
+        "PublicDescription": "Attributable Level 1 data cache refill, capability. The counter counts each access counted by L1D_CACHE_REFILL_WR where at least one valid capability was present in the cache line",
+        "EventCode": "0x220",
+        "EventName": "L1D_CACHE_REFILL_WR_CTAG",
+        "BriefDescription": "Attributable Level 1 data cache refill, capability. The counter counts each access counted by L1D_CACHE_REFILL_WR where at least one valid capability was present in the cache line"
+    },
+    {
+        "PublicDescription": "Attributable Level 1 data cache refill, inner, valid capability. The counter counts each access counted by L1D_CACHE_REFILL_INNER where at least one valid capability was present in the cache line",
+        "EventCode": "0x221",
+        "EventName": "L1D_CACHE_REFILL_INNER_CTAG",
+        "BriefDescription": "Attributable Level 1 data cache refill, inner, valid capability. The counter counts each access counted by L1D_CACHE_REFILL_INNER where at least one valid capability was present in the cache line"
+    },
+    {
+        "PublicDescription": "Attributable Level 1 data cache refill, outer, valid capability. The counter counts each access counted by L1D_CACHE_REFILL_OUTER where at least one valid capability was present in the cache line",
+        "EventCode": "0x222",
+        "EventName": "L1D_CACHE_REFILL_OUTER_CTAG",
+        "BriefDescription": "Attributable Level 1 data cache refill, outer, valid capability. The counter counts each access counted by L1D_CACHE_REFILL_OUTER where at least one valid capability was present in the cache line"
+    },
+    {
+        "PublicDescription": "Attributable Level 1 data cache Write-Back, victim, valid capability. The counter counts each access counted by L1D_CACHE_WB_VICTIM where at least one valid capability was present in the cache line",
+        "EventCode": "0x223",
+        "EventName": "L1D_CACHE_WB_VICTIM_CTAG",
+        "BriefDescription": "Attributable Level 1 data cache Write-Back, victim, valid capability. The counter counts each access counted by L1D_CACHE_WB_VICTIM where at least one valid capability was present in the cache line"
+    },
+    {
+        "PublicDescription": "Attributable Level 1 data cache Write-Back, cleaning, and coherency, valid capability. The counter counts each access counted by L1D_CACHE_WB_CLEAN where at least one valid capability was present in the cache line",
+        "EventCode": "0x224",
+        "EventName": "L1D_CACHE_WB_CLEAN_CTAG",
+        "BriefDescription": "Attributable Level 1 data cache Write-Back, cleaning, and coherency, valid capability. The counter counts each access counted by L1D_CACHE_WB_CLEAN where at least one valid capability was present in the cache line"
+    },
+    {
+        "PublicDescription": "Attributable Level 2 data cache access, read, valid capability. The counter counts each access counted by L2D_CACHE_RD which loaded a valid Capability",
+        "EventCode": "0x226",
+        "EventName": "L2D_CACHE_RD_CTAG",
+        "BriefDescription": "Attributable Level 2 data cache access, read, valid capability. The counter counts each access counted by L2D_CACHE_RD which loaded a valid Capability"
+    },
+    {
+        "PublicDescription": "Attributable Level 2 data cache access, write, valid capability. The counter counts each access counted by L2D_CACHE_WR which stored a valid Capability",
+        "EventCode": "0x227",
+        "EventName": "L2D_CACHE_WR_CTAG",
+        "BriefDescription": "Attributable Level 2 data cache access, write, valid capability. The counter counts each access counted by L2D_CACHE_WR which stored a valid Capability"
+    },
+    {
+        "PublicDescription": "Attributable Level 2 data cache refill, valid capability. The counter counts each access counted by L2D_CACHE_REFILL_RD where at least one valid capability was present in the cache line",
+        "EventCode": "0x228",
+        "EventName": "L2D_CACHE_REFILL_RD_CTAG",
+        "BriefDescription": "Attributable Level 2 data cache refill, valid capability. The counter counts each access counted by L2D_CACHE_REFILL_RD where at least one valid capability was present in the cache line"
+    },
+    {
+        "PublicDescription": "Attributable Level 2 data cache Write-Back, victim, valid capability. The counter counts each access counted by L2D_CACHE_WB_VICTIM where at least one valid capability was present in the cache line",
+        "EventCode": "0x22A",
+        "EventName": "L2D_CACHE_WB_VICTIM_CTAG",
+        "BriefDescription": "Attributable Level 2 data cache Write-Back, victim, valid capability. The counter counts each access counted by L2D_CACHE_WB_VICTIM where at least one valid capability was present in the cache line"
+    },
+    {
+        "PublicDescription": "Attributable Level 2 data cache Write-Back, cleaning and coherency, valid capability. The counter counts each access counted by L2D_CACHE_WB_CLEAN where at least one valid capability was present in the cache line",
+        "EventCode": "0x22B",
+        "EventName": "L2D_CACHE_WB_CLEAN_CTAG",
+        "BriefDescription": "Attributable Level 2 data cache Write-Back, cleaning and coherency, valid capability. The counter counts each access counted by L2D_CACHE_WB_CLEAN where at least one valid capability was present in the cache line"
+    },
+    {
+        "PublicDescription": "Attributable Level 2 data cache invalidate, valid capability. The counter counts each access counted by L2D_CACHE_INVAL where at least one valid capability was present in the cache line",
+        "EventCode": "0x22C",
+        "EventName": "L2D_CACHE_INVAL_CTAG",
+        "BriefDescription": "Attributable Level 2 data cache invalidate, valid capability. The counter counts each access counted by L2D_CACHE_INVAL where at least one valid capability was present in the cache line"
+    }
+]

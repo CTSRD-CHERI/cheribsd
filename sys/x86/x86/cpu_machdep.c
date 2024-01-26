@@ -39,8 +39,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_acpi.h"
 #include "opt_atpic.h"
 #include "opt_cpu.h"
@@ -719,9 +717,9 @@ cpu_idle_wakeup(int cpu)
 /*
  * Ordered by speed/power consumption.
  */
-static struct {
+static const struct {
 	void	*id_fn;
-	char	*id_name;
+	const char *id_name;
 	int	id_cpuid2_flag;
 } idle_tbl[] = {
 	{ .id_fn = cpu_idle_spin, .id_name = "spin" },
@@ -785,7 +783,8 @@ cpu_idle_selector(const char *new_idle_name)
 static int
 cpu_idle_sysctl(SYSCTL_HANDLER_ARGS)
 {
-	char buf[16], *p;
+	char buf[16];
+	const char *p;
 	int error, i;
 
 	p = "unknown";

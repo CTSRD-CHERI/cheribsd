@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2022 Adrian Chadd <adrian@FreeBSD.org>
  *
@@ -272,6 +272,9 @@ static device_method_t qcom_mdio_ipq4018_methods[] = {
 	DEVMETHOD(device_probe, qcom_mdio_ipq4018_probe),
 	DEVMETHOD(device_attach, qcom_mdio_ipq4018_attach),
 	DEVMETHOD(device_detach, qcom_mdio_ipq4018_detach),
+
+	/* Bus interface */
+	DEVMETHOD(bus_add_child, bus_generic_add_child),
 
 	/* MDIO interface */
 	DEVMETHOD(mdio_readreg, qcom_mdio_ipq4018_readreg),

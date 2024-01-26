@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .PATH: ${ZFSTOP}/cmd/zfs
 .PATH: ${ZFSTOP}/man/man7

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000 Orion Hodson <O.Hodson@cs.ucl.ac.uk>
  * All rights reserved.
@@ -44,8 +44,6 @@
 #include <dev/pci/pcivar.h>
 
 #include <dev/sound/pci/cs4281.h>
-
-SND_DECLARE_FILE("$FreeBSD$");
 
 #define CS4281_DEFAULT_BUFSZ 16384
 

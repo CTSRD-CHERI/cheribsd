@@ -44,8 +44,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_inet.h"
 #include "opt_inet6.h"
 
@@ -338,12 +336,13 @@ sys_setsid(struct thread *td, struct setsid_args *uap)
 	struct pgrp *newpgrp;
 	struct session *newsess;
 
-	error = 0;
 	pgrp = NULL;
 
 	newpgrp = uma_zalloc(pgrp_zone, M_WAITOK);
 	newsess = malloc(sizeof(struct session), M_SESSION, M_WAITOK | M_ZERO);
 
+again:
+	error = 0;
 	sx_xlock(&proctree_lock);
 
 	if (p->p_pgid == p->p_pid || (pgrp = pgfind(p->p_pid)) != NULL) {
@@ -351,7 +350,10 @@ sys_setsid(struct thread *td, struct setsid_args *uap)
 			PGRP_UNLOCK(pgrp);
 		error = EPERM;
 	} else {
-		(void)enterpgrp(p, p->p_pid, newpgrp, newsess);
+		error = enterpgrp(p, p->p_pid, newpgrp, newsess);
+		if (error == ERESTART)
+			goto again;
+		MPASS(error == 0);
 		td->td_retval[0] = p->p_pid;
 		newpgrp = NULL;
 		newsess = NULL;
@@ -397,9 +399,10 @@ sys_setpgid(struct thread *td, struct setpgid_args *uap)
 	if (uap->pgid < 0)
 		return (EINVAL);
 
-	error = 0;
-
 	newpgrp = uma_zalloc(pgrp_zone, M_WAITOK);
+
+again:
+	error = 0;
 
 	sx_xlock(&proctree_lock);
 	if (uap->pid != 0 && uap->pid != curp->p_pid) {
@@ -459,9 +462,11 @@ sys_setpgid(struct thread *td, struct setpgid_args *uap)
 		error = enterthispgrp(targp, pgrp);
 	}
 done:
-	sx_xunlock(&proctree_lock);
-	KASSERT((error == 0) || (newpgrp != NULL),
+	KASSERT(error == 0 || newpgrp != NULL,
 	    ("setpgid failed and newpgrp is NULL"));
+	if (error == ERESTART)
+		goto again;
+	sx_xunlock(&proctree_lock);
 	uma_zfree(pgrp_zone, newpgrp);
 	return (error);
 }

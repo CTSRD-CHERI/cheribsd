@@ -35,8 +35,11 @@
  *
  *	from: @(#)cpu.h 5.4 (Berkeley) 5/9/91
  *	from: FreeBSD: src/sys/i386/include/cpu.h,v 1.62 2001/06/29
- * $FreeBSD$
  */
+
+#ifdef __arm__
+#include <arm/cpu.h>
+#else /* !__arm__ */
 
 #ifndef _MACHINE_CPU_H_
 #define	_MACHINE_CPU_H_
@@ -217,6 +220,9 @@ void	ptrauth_mp_start(uint64_t);
 void	update_special_regs(u_int);
 bool	extract_user_id_field(u_int, u_int, uint8_t *);
 bool	get_kernel_reg(u_int, uint64_t *);
+bool	get_kernel_reg_masked(u_int, uint64_t *, uint64_t);
+
+void	cpu_desc_init(void);
 
 #define	CPU_AFFINITY(cpu)	__cpu_affinity[(cpu)]
 #define	CPU_CURRENT_SOCKET				\
@@ -254,3 +260,5 @@ ADDRESS_TRANSLATE_FUNC(s1e1w)
 #endif
 
 #endif /* !_MACHINE_CPU_H_ */
+
+#endif /* !__arm__ */

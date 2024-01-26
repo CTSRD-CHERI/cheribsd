@@ -4,7 +4,6 @@
 # This file contains machine dependent kernel configuration notes.  For
 # machine independent notes, look in /sys/conf/NOTES.
 #
-# $FreeBSD$
 #
 
 #
@@ -700,6 +699,9 @@ device		virtio_console	# VirtIO Console device
 
 # Linux KVM paravirtualization support
 device 		kvm_clock	# KVM paravirtual clock driver
+
+# Google Virtual NIC
+device		gve		# Google Virtual NIC (gVNIC) driver
 
 options 	HYPERV
 device		hyperv		# HyperV drivers

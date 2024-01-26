@@ -1,4 +1,3 @@
-# $FreeBSD$
 #
 # All library objects contain FreeBSD revision strings by default; they may be
 # excluded as a space-saving measure.  To produce a library that does
@@ -44,7 +43,8 @@ CFLAGS.thr_symbols.c+=	-Wno-missing-variable-declarations
 CFLAGS.thr_sig.c+=	-fno-sanitize=address
 .endif
 
-.if ${MACHINE_CPUARCH} == "arm"
+.if ${MACHINE_CPUARCH} == "arm" || defined(RTLD_SANDBOX)
+# XXX: RTLD_SANDBOX currently does not support stack unwinding.
 NO_THREAD_UNWIND_STACK= yes
 .endif
 
@@ -70,8 +70,10 @@ SYMBOL_MAPS+=	${LIBTHR_SRCTOP}/pthread-c18n.map
 MAN=	libthr.3
 .endif
 
+.if ${MK_PTHREADS_ASSERTIONS} != "no"
 # enable extra internal consistency checks
 CFLAGS+=-D_PTHREADS_INVARIANTS
+.endif
 
 PRECIOUSLIB=
 

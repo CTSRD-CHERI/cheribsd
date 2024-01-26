@@ -37,7 +37,11 @@
  */
 .macro vector_stub_el1h_sync
 	.align 7
+#if __has_feature(capabilities)
+	msr	cvbar_el2, c0
+#else
 	msr	vbar_el2, x0
+#endif
 	ERET
 .endm
 

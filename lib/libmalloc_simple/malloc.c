@@ -197,31 +197,35 @@ try_revoke(int target_bucket)
 		return;
 
 	if (cri == NULL) {
-		error = cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT,
-		    NULL, __DECONST(void **, &cri));
+		if (cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT,
+		    NULL, __DECONST(void **, &cri)) != 0) {
+			if (errno == ENOSYS) {
+				assert(cri == NULL);
+				/*
+				 * Revocation is not supported.
+				 * Just pretend like it succeeded and transfer
+				 * all the * quarantined buffers to the free
+				 * buffers.
+				 */
 
-		if (error == ENOSYS) {
-			assert(cri == NULL);
-			/*
-			 * Revocation is not supported; this is the baseline.
-			 * Just pretend like it succeeded and transfer all the
-			 * quarantined buffers to the free buffers.
-			 */
-
-			for (bucket = 0; bucket < NBUCKETS; bucket++) {
-				while (!SLIST_EMPTY(&quarantine_bufs[bucket])) {
-					op = SLIST_FIRST(
-					    &quarantine_bufs[bucket]);
-					SLIST_REMOVE_HEAD(
-					    &quarantine_bufs[bucket], ov_next);
-					SLIST_INSERT_HEAD(&nextf[bucket], op,
-					    ov_next);
+				for (bucket = 0; bucket < NBUCKETS; bucket++) {
+					while (!SLIST_EMPTY(
+					    &quarantine_bufs[bucket])) {
+						op = SLIST_FIRST(
+						    &quarantine_bufs[bucket]);
+						SLIST_REMOVE_HEAD(
+						    &quarantine_bufs[bucket],
+						    ov_next);
+						SLIST_INSERT_HEAD(
+						    &nextf[bucket], op,
+						    ov_next);
+					}
 				}
-			}
 
-			return;
+				return;
+			} else
+				abort();
 		}
-		assert (error == 0);
 	}
 
 	/* Paint all buffers in quarantine */

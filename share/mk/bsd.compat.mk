@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 # cleandir is run with the wrong context for libcompat so don't do
 # anything in that case.
@@ -8,7 +7,7 @@ __<${_this:T}>__:
 
 .include <src.opts.mk>
 
-_ALL_LIBCOMPATS:=	32 64 64C
+.include <bsd.compat.pre.mk>
 
 .if defined(_LIBCOMPATS)
 COMPAT_ARCH?=	${TARGET_ARCH}
@@ -49,7 +48,6 @@ LIB32_MACHINE=	i386
 LIB32_MACHINE_ARCH=	i386
 LIB32WMAKEENV=	MACHINE_CPU="i686 mmx sse sse2"
 LIB32WMAKEFLAGS=	\
-		AS="${XAS} --32" \
 		LD="${XLD} -m elf_i386_fbsd"
 
 .elif ${COMPAT_ARCH} == "powerpc64"
@@ -70,14 +68,38 @@ LIB32_MACHINE=	powerpc
 LIB32_MACHINE_ARCH=	powerpc
 LIB32WMAKEFLAGS=	\
 		LD="${XLD} -m elf32ppc_fbsd"
+
+.elif ${COMPAT_ARCH:Maarch64*}
+HAS_COMPAT+=	32
+.if empty(LIB32CPUTYPE) || ${LIB32CPUTYPE} == "morello"
+LIB32CPUFLAGS=	-march=armv7
+.else
+LIB32CPUFLAGS=	-mcpu=${LIB32CPUTYPE}
+.endif
+.if ${COMPAT_ARCH:Maarch64*c*}
+LIB32CPUFLAGS+=	-mabi=aapcs
+.endif
+
+LIB32CPUFLAGS+=	-m32
+.if ${COMPAT_COMPILER_TYPE} == "gcc"
+.else
+LIB32CPUFLAGS+=	-target armv7-unknown-freebsd${OS_REVISION}-gnueabihf
+.endif
+
+LIB32_MACHINE=	arm
+LIB32_MACHINE_ARCH=	armv7
+LIB32WMAKEFLAGS=	\
+		LD="${XLD} -m armelf_fbsd"
+.endif
+
+.if ${MACHINE_ABI:Mpurecap}
+LIB32CPUFLAGS+=	-U__LP64__
 .endif
 
 LIB32WMAKEFLAGS+= NM="${XNM}"
 LIB32WMAKEFLAGS+= OBJCOPY="${XOBJCOPY}"
 
-LIB32CFLAGS=	-DCOMPAT_32BIT
 LIB32DTRACE=	${DTRACE} -32
-LIB32WMAKEFLAGS+=	-DCOMPAT_32BIT
 LIB32_MACHINE_ABI=	${MACHINE_ABI:N*64:Nptr*:Npurecap} long32 ptr32
 .if ${COMPAT_ARCH} == "amd64"
 LIB32_MACHINE_ABI+=	time32
@@ -117,9 +139,7 @@ LIB64CPUFLAGS+=	-march=${LIB64_RISCV_MARCH} -mabi=${LIB64_RISCV_ABI}
 
 LIB64WMAKEFLAGS+= NM="${XNM}" OBJCOPY="${XOBJCOPY}"
 
-LIB64CFLAGS=	-DCOMPAT_64BIT
 LIB64DTRACE=	${DTRACE} -64
-LIB64WMAKEFLAGS+=	-DCOMPAT_64BIT
 LIB64_MACHINE_ABI=	${MACHINE_ABI:Npurecap:Nptr*} ptr64
 .endif # ${MK_LIB64} != "no"
 
@@ -162,8 +182,6 @@ LIB${_LIBCOMPAT}_RISCV_MARCH:=	${LIB${_LIBCOMPAT}_RISCV_MARCH}xcheri
 
 # Common CHERI flags
 .if defined(HAS_COMPAT) && ${HAS_COMPAT:M64C}
-LIB64CCFLAGS+=	-DCOMPAT_CHERI
-LIB64CWMAKEFLAGS+=	COMPAT_CHERI=yes
 LIB64C_MACHINE_ABI=	${MACHINE_ABI:Nptr*} purecap ptr128c
 
 # This duplicates some logic in bsd.cpu.mk that is needed for the
@@ -190,6 +208,43 @@ LIB64CCFLAGS+=	-mllvm -cheri-subobject-bounds-clear-swperm=2
 .endif # CHERI_SUBOBJECT_BOUNDS_DEBUG
 .endif # CHERI_SUBOBJECT_BOUNDS
 .endif
+
+# -------------------------------------------------------------------
+# CHERI benchmarking world
+.if ${MK_LIB64CB} != "no"
+.if ${COMPAT_ARCH:Maarch64*}
+HAS_COMPAT+=	64CB
+LIB64CB_MACHINE=	arm64
+LIB64CB_MACHINE_ARCH=aarch64cb
+LIB64CBCPUFLAGS=	-target aarch64-unknown-freebsd13.0
+LIB64CBCPUFLAGS+=	-march=morello -mabi=purecap-benchmark
+LIB64CB_MACHINE_ABI=	${MACHINE_ABI:Nptr*:Npurecap} purecap ptr128c benchmark
+
+# This duplicates some logic in bsd.cpu.mk that is needed for the
+# WANT_COMPAT/NEED_COMPAT case.
+LIB64CBCFLAGS+=	-D__LP64__=1
+
+LIB64CBCFLAGS+=	-Werror=implicit-function-declaration
+
+.ifdef CHERI_USE_CAP_TABLE
+LIB64CBCFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
+.endif
+
+.if defined(CHERI_SUBOBJECT_BOUNDS)
+# Allow per-subdirectory overrides if we know that there is maximum that works
+.if defined(CHERI_SUBOBJECT_BOUNDS_MAX)
+LIB64CBCFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS_MAX}
+.else
+LIB64CBCFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS}
+.endif # CHERI_SUBOBJECT_BOUNDS_MAX
+CHERI_SUBOBJECT_BOUNDS_DEBUG?=yes
+.if ${CHERI_SUBOBJECT_BOUNDS_DEBUG} == "yes"
+# If debugging is enabled, clear SW permission bit 2 when the bounds are reduced
+LIB64CBCFLAGS+=	-mllvm -cheri-subobject-bounds-clear-swperm=2
+.endif # CHERI_SUBOBJECT_BOUNDS_DEBUG
+.endif # CHERI_SUBOBJECT_BOUNDS
+.endif # ${COMPAT_ARCH:Maarch64*}
+.endif # ${MK_LIB64CB} != "no"
 
 # -------------------------------------------------------------------
 # In the program linking case, select LIBCOMPAT
@@ -233,10 +288,16 @@ WORLDTMP?=		${SYSROOT}
 LIB${_LIBCOMPAT}_OBJTOP?=	${OBJTOP}/obj-lib${_libcompat}
 
 LIB${_LIBCOMPAT}CFLAGS+=	${LIB${_LIBCOMPAT}CPUFLAGS} \
-			--sysroot=${WORLDTMP} \
-			${BFLAGS}
+				-DCOMPAT_LIBCOMPAT=\"${_LIBCOMPAT}\" \
+				-DCOMPAT_libcompat=\"${_libcompat}\" \
+				-DCOMPAT_LIB${_LIBCOMPAT} \
+				--sysroot=${WORLDTMP} \
+				${BFLAGS}
 
 LIB${_LIBCOMPAT}LDFLAGS+=	-L${WORLDTMP}/usr/lib${_libcompat}
+
+LIB${_LIBCOMPAT}WMAKEFLAGS+=	COMPAT_LIBCOMPAT=${_LIBCOMPAT} \
+				COMPAT_libcompat=${_libcompat}
 
 LIB${_LIBCOMPAT}WMAKEENV+=	MACHINE=${LIB${_LIBCOMPAT}_MACHINE}
 LIB${_LIBCOMPAT}WMAKEENV+=	MACHINE_ARCH=${LIB${_LIBCOMPAT}_MACHINE_ARCH}

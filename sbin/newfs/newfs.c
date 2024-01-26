@@ -50,8 +50,6 @@ static char sccsid[] = "@(#)newfs.c	8.13 (Berkeley) 5/1/95";
 #endif /* not lint */
 #endif
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * newfs: friendly front end to mkfs
  */
@@ -124,7 +122,7 @@ static char	*disktype;
 
 static void getfssize(intmax_t *, const char *p, intmax_t, intmax_t);
 static struct disklabel *getdisklabel(void);
-static void usage(void);
+static void usage(void) __dead2;
 static int expand_number_int(const char *buf, int *num);
 
 ufs2_daddr_t part_ofs; /* partition offset in blocks, used with files */
@@ -137,7 +135,8 @@ main(int argc, char *argv[])
 	struct stat st;
 	char *cp, *special;
 	intmax_t reserved;
-	int ch, i, rval;
+	int ch, rval;
+	size_t i;
 	char part_name;		/* partition name, default to full disk */
 
 	part_name = 'c';
@@ -153,9 +152,10 @@ main(int argc, char *argv[])
 			break;
 		case 'L':
 			volumelabel = optarg;
-			i = -1;
-			while (isalnum(volumelabel[++i]) ||
-			    volumelabel[i] == '_' || volumelabel[i] == '-');
+			for (i = 0; isalnum(volumelabel[i]) ||
+			    volumelabel[i] == '_' || volumelabel[i] == '-';
+			    i++)
+				continue;
 			if (volumelabel[i] != '\0') {
 				errx(1, "bad volume label. Valid characters "
 				    "are alphanumerics, dashes, and underscores.");

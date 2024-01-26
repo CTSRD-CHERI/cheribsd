@@ -30,8 +30,6 @@
 #include "opt_ddb.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/asan.h>
@@ -94,6 +92,10 @@ __FBSDID("$FreeBSD$");
 
 #if __has_feature(capabilities)
 #include <cheri/cheric.h>
+#ifdef CHERI_CAPREVOKE
+#include <cheri/revoke.h>
+#include <vm/vm_cheri_revoke.h>
+#endif
 #endif
 
 #ifdef DEV_ACPI
@@ -380,11 +382,14 @@ makectx(struct trapframe *tf, struct pcb *pcb)
 {
 	int i;
 
-	for (i = 0; i < nitems(pcb->pcb_x); i++)
-		pcb->pcb_x[i] = tf->tf_x[i + PCB_X_START];
-
 	/* NB: pcb_x[PCB_LR] is the PC, see PC_REGS() in db_machdep.h */
-	pcb->pcb_x[PCB_LR] = tf->tf_elr;
+	for (i = 0; i < nitems(pcb->pcb_x); i++) {
+		if (i == PCB_LR)
+			pcb->pcb_x[i] = tf->tf_elr;
+		else
+			pcb->pcb_x[i] = tf->tf_x[i + PCB_X_START];
+	}
+
 	pcb->pcb_sp = tf->tf_sp;
 }
 
@@ -398,7 +403,7 @@ init_proc0(vm_pointer_t kstack)
 
 	/* XXX-AM: We need to set bounds on pcb and kstack here as in MIPS */
 	proc_linkup0(&proc0, &thread0);
-	thread0.td_kstack = kstack;
+	thread0.td_kstack = cheri_kern_andperm(kstack, CHERI_PERMS_KERNEL_DATA);
 	thread0.td_kstack_pages = kstack_pages;
 #if defined(PERTHREAD_SSP)
 	thread0.td_md.md_canary = boot_canary;
@@ -1209,6 +1214,63 @@ DB_SHOW_COMMAND(vtop, db_show_vtop)
 		db_printf("EL0 physical address reg (write): 0x%016lx\n", phys);
 	} else
 		db_printf("show vtop <virt_addr>\n");
+}
+#endif
+
+#ifdef CHERI_CAPREVOKE
+void
+cheri_revoke_td_frame(struct thread *td, const struct vm_cheri_revoke_cookie
+    *crc)
+{
+	CHERI_REVOKE_STATS_FOR(crst, crc);
+
+#define CHERI_REVOKE_REG(r) \
+	do { if (cheri_gettag(r)) { \
+		CHERI_REVOKE_STATS_BUMP(crst, caps_found); \
+		if (vm_cheri_revoke_test(crc, r)) { \
+			r = cheri_revoke_cap(r); \
+			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared); \
+		} \
+	    }} while(0)
+
+	CHERI_REVOKE_REG(td->td_frame->tf_sp);
+	CHERI_REVOKE_REG(td->td_frame->tf_lr);
+	CHERI_REVOKE_REG(td->td_frame->tf_elr);
+	CHERI_REVOKE_REG(td->td_frame->tf_ddc);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[0]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[1]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[2]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[3]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[4]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[5]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[6]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[7]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[8]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[9]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[10]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[11]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[12]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[13]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[14]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[15]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[16]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[17]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[18]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[19]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[20]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[21]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[22]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[23]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[24]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[25]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[26]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[27]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[28]);
+	CHERI_REVOKE_REG(td->td_frame->tf_x[29]);
+
+#undef CHERI_REVOKE_REG
+
+	return;
 }
 #endif
 // CHERI CHANGES START

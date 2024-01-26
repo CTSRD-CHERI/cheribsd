@@ -27,7 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -42,7 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/smp.h>
 #include <machine/fdt.h>
 #include <machine/intr.h>
-#include <machine/cpu-v6.h>
+#include <machine/cpu.h>
 #include <machine/platformvar.h>
 
 #include <dev/fdt/fdt_common.h>
@@ -80,9 +79,9 @@ extern void mpentry(void);
 static int platform_mp_get_core_cnt(void);
 static int alpine_get_cpu_resume_base(u_long *pbase, u_long *psize);
 static int alpine_get_nb_base(u_long *pbase, u_long *psize);
-static boolean_t alpine_validate_cpu(u_int, phandle_t, u_int, pcell_t *);
+static bool alpine_validate_cpu(u_int, phandle_t, u_int, pcell_t *);
 
-static boolean_t
+static bool
 alpine_validate_cpu(u_int id, phandle_t child, u_int addr_cell, pcell_t *reg)
 {
 	return ofw_bus_node_is_compatible(child, "arm,cortex-a15");

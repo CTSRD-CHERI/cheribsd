@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .PATH:	 ${LIBTHR_SRCTOP}/sys
 

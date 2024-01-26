@@ -1,0 +1,30 @@
+[
+    {
+        "ArchStdEvent": "MEM_ACCESS",
+        "PublicDescription": "Data memory access. This event counts memory accesses due to load or store instructions. The following instructions are not counted:\nInstruction fetches.\nCache maintenance instructions.\nTranslation table walks or prefetches. This event counts the sum of MEM_ACCESS_RD and MEM_ACCESS_WR"
+    },
+    {
+        "ArchStdEvent": "REMOTE_ACCESS",
+        "PublicDescription": "Access to another socket in a multi-socket system"
+    },
+    {
+        "ArchStdEvent": "MEM_ACCESS_RD",
+        "PublicDescription": "Data memory access, read. This event counts memory accesses due to load instructions. The following instructions are not counted:\nInstruction fetches.\nCache maintenance instructions.\nTranslation table walks.\nPrefetches"
+    },
+    {
+        "ArchStdEvent": "MEM_ACCESS_WR",
+        "PublicDescription": "Data memory access, write. This event counts memory accesses due to store instructions. The following instructions are not counted:\nInstruction fetches.\nCache maintenance instructions.\nTranslation table walks.\nPrefetches"
+    },
+    {
+        "ArchStdEvent": "UNALIGNED_LD_SPEC",
+        "PublicDescription": "Unaligned access, read"
+    },
+    {
+        "ArchStdEvent": "UNALIGNED_ST_SPEC",
+        "PublicDescription": "Unaligned access, write"
+    },
+    {
+        "ArchStdEvent": "UNALIGNED_LDST_SPEC",
+        "PublicDescription": "Unaligned access"
+    }
+]

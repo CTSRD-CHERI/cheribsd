@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013 Sandvine Inc.
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -134,7 +132,7 @@ start_bbu_learn(int ac, char **av __unused)
 		return (EINVAL);
 	}
 
-	fd = mfi_open(mfi_unit, O_RDWR);
+	fd = mfi_open(mfi_device, O_RDWR);
 	if (fd < 0) {
 		error = errno;
 		warn("mfi_open");
@@ -171,7 +169,7 @@ update_bbu_props(int ac, char **av)
 		return (EINVAL);
 	}
 
-	fd = mfi_open(mfi_unit, O_RDWR);
+	fd = mfi_open(mfi_device, O_RDWR);
 	if (fd < 0) {
 		error = errno;
 		warn("mfi_open");

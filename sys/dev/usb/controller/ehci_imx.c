@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010-2012 Semihalf
  * Copyright (c) 2012 The FreeBSD Foundation
@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * EHCI driver for Freescale i.MX SoCs which incorporate the USBOH3 controller.
  */

@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/queue.h>
 #include <sys/sysctl.h>
@@ -283,7 +281,7 @@ update_sensors(void)
 			free(oid);
 			return (0);
 		}
-		/* Alocate and read the next mib. */
+		/* Allocate and read the next mib. */
 		next = (int *)malloc(nextlen);
 		if (next == NULL) {
 			syslog(LOG_ERR,

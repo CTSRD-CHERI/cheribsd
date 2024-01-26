@@ -1,7 +1,7 @@
 /*	$NetBSD: icsphy.c,v 1.41 2006/11/16 21:24:07 christos Exp $	*/
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -57,8 +57,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * driver for Integrated Circuit Systems' ICS1889-1893 ethernet 10/100 PHY
  * datasheet from www.icst.com

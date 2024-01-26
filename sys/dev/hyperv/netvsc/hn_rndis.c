@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_inet6.h"
 #include "opt_inet.h"
 
@@ -50,7 +48,6 @@ __FBSDID("$FreeBSD$");
 #include <netinet/tcp_lro.h>
 
 #include <dev/hyperv/include/hyperv.h>
-#include <dev/hyperv/include/hyperv_busdma.h>
 #include <dev/hyperv/include/vmbus.h>
 #include <dev/hyperv/include/vmbus_xact.h>
 

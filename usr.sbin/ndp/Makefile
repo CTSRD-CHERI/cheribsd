@@ -11,19 +11,16 @@
 # AND WITHOUT ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, WITHOUT
 # LIMITATION, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
 # A PARTICULAR PURPOSE.
-# $FreeBSD$
 
 .include <src.opts.mk>
 
-.PATH: ${SRCTOP}/contrib/tcpdump
-
 PROG=	ndp
 MAN=	ndp.8
-SRCS=	ndp.c gmt2local.c
+SRCS=	ndp.c
 
 LIBADD=	xo
 
-CFLAGS+= -I. -I${.CURDIR} -I${SRCTOP}/contrib/tcpdump
+CFLAGS+= -I. -I${.CURDIR}
 CFLAGS+= -D_U_=""
 
 .if ${MK_EXPERIMENTAL} != "no"

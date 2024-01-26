@@ -61,23 +61,30 @@ typedef struct {	/* Auxiliary vector entry on initial stack */
 
 extern struct sysent freebsd64_sysent[];
 
-#define FREEBSD64_SYSCALL_INIT_HELPER(syscallname) {			\
+#define FREEBSD64_SYSCALL_INIT_HELPER_F(syscallname, flags) {		\
 	.new_sysent = {							\
-	.sy_narg = (sizeof(struct syscallname ## _args )		\
-		/ sizeof(syscallarg_t)),				\
-	.sy_call = (sy_call_t *)& syscallname,				\
+		.sy_narg = (sizeof(struct syscallname ## _args)		\
+		    / sizeof(syscallarg_t)),				\
+		.sy_call = (sy_call_t *)& syscallname,			\
+		.sy_flags = (flags)					\
 	},								\
 	.syscall_no = FREEBSD64_SYS_##syscallname			\
 }
 
-#define FREEBSD64_SYSCALL_INIT_HELPER_COMPAT(syscallname) {		\
+#define FREEBSD64_SYSCALL_INIT_HELPER_COMPAT_F(syscallname, flags) {	\
 	.new_sysent = {							\
-	.sy_narg = (sizeof(struct syscallname ## _args )		\
-		/ sizeof(syscallarg_t)),				\
-	.sy_call = (sy_call_t *)& sys_ ## syscallname,			\
+		.sy_narg = (sizeof(struct syscallname ## _args)		\
+		    / sizeof(syscallarg_t)),				\
+		.sy_call = (sy_call_t *)& sys_ ## syscallname,		\
+		.sy_flags = (flags)					\
 	},								\
 	.syscall_no = FREEBSD64_SYS_##syscallname			\
 }
+
+#define FREEBSD64_SYSCALL_INIT_HELPER(syscallname)			\
+    FREEBSD64_SYSCALL_INIT_HELPER_F(syscallname, 0)
+#define FREEBSD64_SYSCALL_INIT_HELPER_COMPAT(syscallname)		\
+    FREEBSD64_SYSCALL_INIT_HELPER_COMPAT_F(syscallname, 0)
 
 #define FREEBSD64_SYSCALL_NOT_PRESENT_GEN(SC)				\
 int freebsd64_ ## SC (struct thread *td,				\

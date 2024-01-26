@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001 McAfee, Inc.
  * Copyright (c) 2006,2013 Andre Oppermann, Internet Business Solutions AG
@@ -33,8 +33,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
@@ -90,6 +88,9 @@ __FBSDID("$FreeBSD$");
 #include <netinet/tcp_var.h>
 #include <netinet/tcp_syncache.h>
 #include <netinet/tcp_ecn.h>
+#ifdef TCP_BLACKBOX
+#include <netinet/tcp_log_buf.h>
+#endif
 #ifdef TCP_OFFLOAD
 #include <netinet/toecore.h>
 #endif
@@ -621,18 +622,6 @@ syncache_chkrst(struct in_conninfo *inc, struct tcphdr *th, struct mbuf *m,
 	SCH_LOCK_ASSERT(sch);
 
 	/*
-	 * Any RST to our SYN|ACK must not carry ACK, SYN or FIN flags.
-	 * See RFC 793 page 65, section SEGMENT ARRIVES.
-	 */
-	if (tcp_get_flags(th) & (TH_ACK|TH_SYN|TH_FIN)) {
-		if ((s = tcp_log_addrs(inc, th, NULL, NULL)))
-			log(LOG_DEBUG, "%s; %s: Spurious RST with ACK, SYN or "
-			    "FIN flag set, segment ignored\n", s, __func__);
-		TCPSTAT_INC(tcps_badrst);
-		goto done;
-	}
-
-	/*
 	 * No corresponding connection was found in syncache.
 	 * If syncookies are enabled and possibly exclusively
 	 * used, or we are under memory pressure, a valid RST
@@ -1012,6 +1001,20 @@ syncache_socket(struct syncache *sc, struct socket *lso, struct mbuf *m)
 		struct toedev *tod = sc->sc_tod;
 
 		tod->tod_offload_socket(tod, sc->sc_todctx, so);
+	}
+#endif
+#ifdef TCP_BLACKBOX
+	/*
+	 * Inherit the log state from the listening socket, if
+	 * - the log state of the listening socket is not off and
+	 * - the listening socket was not auto selected from all sessions and
+	 * - a log id is not set on the listening socket.
+	 * This avoids inheriting a log state which was automatically set.
+	 */
+	if ((tcp_get_bblog_state(sototcpcb(lso)) != TCP_LOG_STATE_OFF) &&
+	    ((sototcpcb(lso)->t_flags2 & TF2_LOG_AUTO) == 0) &&
+	    (sototcpcb(lso)->t_lib == NULL)) {
+		tcp_log_state_change(tp, tcp_get_bblog_state(sototcpcb(lso)));
 	}
 #endif
 	/*

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997 Robert Nordier
  * All rights reserved.
@@ -86,7 +86,7 @@ static const char *stripath(const char *path);
 static int distfile(const char *path);
 static int disttype(const char *name);
 static int fail(const char *path, const char *msg);
-static void usage(void);
+static void usage(void) __dead2;
 
 int
 main(int argc, char *argv[])

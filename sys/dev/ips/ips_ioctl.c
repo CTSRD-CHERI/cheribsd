@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Written by: David Jeffery
  * Copyright (c) 2002 Adaptec Inc.
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <dev/ips/ipsreg.h>
 #include <dev/ips/ips.h>
 #include <dev/ips/ips_ioctl.h>

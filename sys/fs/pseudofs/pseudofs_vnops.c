@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-3-Clause
  *
- * Copyright (c) 2001 Dag-Erling Coïdan Smørgrav
+ * Copyright (c) 2001 Dag-Erling Smørgrav
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_pseudofs.h"
 
 #include <sys/param.h>
@@ -537,8 +535,8 @@ pfs_lookup(struct vop_cachedlookup_args *va)
 	for (pn = pd->pn_nodes; pn != NULL; pn = pn->pn_next)
 		if (pn->pn_type == pfstype_procdir)
 			pdn = pn;
-		else if (pn->pn_name[namelen] == '\0' &&
-		    bcmp(pname, pn->pn_name, namelen) == 0) {
+		else if (strncmp(pname, pn->pn_name, namelen) == 0 &&
+		    pn->pn_name[namelen] == '\0') {
 			pfs_unlock(pd);
 			goto got_pnode;
 		}

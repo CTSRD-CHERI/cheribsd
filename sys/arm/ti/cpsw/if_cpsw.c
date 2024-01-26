@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 Damjan Marion <dmarion@Freebsd.org>
  * Copyright (c) 2016 Rubicon Communications, LLC (Netgate)
@@ -47,8 +47,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_cpsw.h"
 
 #include <sys/param.h>

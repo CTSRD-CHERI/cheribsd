@@ -1,7 +1,7 @@
 #!/usr/bin/awk -f
 
 #-
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2006 Max Laier.
 # All rights reserved.
@@ -27,7 +27,6 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD$
 
 #
 # Script to generate module .c file from a list of firmware images
@@ -126,8 +125,7 @@ gsub(/[-\.]/, "_", modname);
 # Avoid a literal generated file tag here.
 generated = "@" "generated";
 printc("/*\
- * Automatically " generated " by:\
- * $FreeBSD$\
+ * Automatically " generated "\
  */");
 printc("#include <sys/param.h>");
 printc("#include <sys/errno.h>");

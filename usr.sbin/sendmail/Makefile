@@ -1,5 +1,4 @@
 #	@(#)Makefile	8.8 (Berkeley) 3/28/97
-# $FreeBSD$
 
 .include <src.opts.mk>
 
@@ -74,7 +73,3 @@ sm_os.h: ${SENDMAIL_DIR}/include/sm/os/sm_os_freebsd.h .NOMETA
 	ln -sf ${.ALLSRC} ${.TARGET}
 
 .include <bsd.prog.mk>
-.if ${MK_CHERI} != "no"
-# This code is completely broken
-CFLAGS+=	-Wno-error=cheri-prototypes
-.endif

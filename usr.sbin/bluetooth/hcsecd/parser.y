@@ -2,7 +2,7 @@
 /*-
  * parser.y
  *
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001-2002 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  *
  * $Id: parser.y,v 1.5 2003/06/07 21:22:30 max Exp $
- * $FreeBSD$
  */
 
 #include <sys/fcntl.h>

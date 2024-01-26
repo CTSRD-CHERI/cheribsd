@@ -25,7 +25,6 @@
  */
 
 #include <machine/asm.h>
-__FBSDID("$FreeBSD$");
 #include "SYS.h"
 
 ENTRY(__sys_vfork)
@@ -37,5 +36,5 @@ ENTRY(__sys_vfork)
 	sub	x1, x1, #1
 	and	x0, x0, x1
 	mov	REGN(lr), REG(2)
-	ret
+	RETURN
 END(__sys_vfork)

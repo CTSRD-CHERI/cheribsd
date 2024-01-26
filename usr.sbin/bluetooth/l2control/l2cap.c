@@ -1,7 +1,7 @@
 /*-
  * l2cap.c
  *
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001-2002 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
@@ -28,7 +28,6 @@
  * SUCH DAMAGE.
  *
  * $Id: l2cap.c,v 1.5 2003/05/16 19:52:37 max Exp $
- * $FreeBSD$
  */
 
 #include <sys/ioctl.h>

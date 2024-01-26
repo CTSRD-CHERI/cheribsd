@@ -76,7 +76,7 @@ find_address_space_gap(size_t len, size_t align)
 
 	if (align == 0) {
 		len = CHERI_REPRESENTABLE_LENGTH(len);
-		align = CHERI_REPRESENTABLE_ALIGNMENT(len) + 1;
+		align = CHERI_REPRESENTABLE_ALIGNMENT(len);
 	}
 
 	for (u_int i = 1; i < vmcnt; i++) {

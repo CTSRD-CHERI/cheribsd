@@ -29,8 +29,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef	_LINUXKPI_LINUX_PCI_H_
 #define	_LINUXKPI_LINUX_PCI_H_
@@ -112,6 +110,7 @@ MODULE_PNP_INFO("U32:vendor;U32:device;V32:subvendor;V32:subdevice",	\
 #define	PCI_DEVICE_ID		PCIR_DEVICE
 #define	PCI_COMMAND		PCIR_COMMAND
 #define	PCI_COMMAND_INTX_DISABLE	PCIM_CMD_INTxDIS
+#define	PCI_COMMAND_MEMORY	PCIM_CMD_MEMEN
 #define	PCI_EXP_DEVCTL		PCIER_DEVICE_CTL		/* Device Control */
 #define	PCI_EXP_LNKCTL		PCIER_LINK_CTL			/* Link Control */
 #define	PCI_EXP_LNKCTL_ASPM_L0S	PCIEM_LINK_CTL_ASPMC_L0S
@@ -145,6 +144,8 @@ MODULE_PNP_INFO("U32:vendor;U32:device;V32:subvendor;V32:subdevice",	\
 #define	PCI_EXP_TYPE_DOWNSTREAM PCIEM_TYPE_DOWNSTREAM_PORT	/* Downstream Port */
 #define	PCI_EXP_FLAGS_SLOT	PCIEM_FLAGS_SLOT		/* Slot implemented */
 #define	PCI_EXP_TYPE_RC_EC	PCIEM_TYPE_ROOT_EC		/* Root Complex Event Collector */
+#define	PCI_EXP_LNKSTA_CLS	PCIEM_LINK_STA_SPEED
+#define	PCI_EXP_LNKSTA_CLS_8_0GB	0x0003	/* Current Link Speed 8.0GT/s */
 #define	PCI_EXP_LNKCAP_SLS_2_5GB 0x01	/* Supported Link Speed 2.5GT/s */
 #define	PCI_EXP_LNKCAP_SLS_5_0GB 0x02	/* Supported Link Speed 5.0GT/s */
 #define	PCI_EXP_LNKCAP_SLS_8_0GB 0x03	/* Supported Link Speed 8.0GT/s */
@@ -260,6 +261,7 @@ struct pci_driver {
 
 struct pci_bus {
 	struct pci_dev	*self;
+	/* struct pci_bus	*parent */
 	int		domain;
 	int		number;
 };
@@ -293,11 +295,15 @@ struct msi_msg {
 	uint32_t			data;
 };
 
-struct msi_desc {
-	struct msi_msg			msg;
+struct pci_msi_desc {
 	struct {
 		bool			is_64;
 	} msi_attrib;
+};
+
+struct msi_desc {
+	struct msi_msg			msg;
+	struct pci_msi_desc		pci;
 };
 
 /*
@@ -1409,6 +1415,29 @@ pci_unlock_rescan_remove(void)
 static __inline void
 pci_stop_and_remove_bus_device(struct pci_dev *pdev)
 {
+}
+
+static inline int
+pci_rescan_bus(struct pci_bus *pbus)
+{
+	device_t *devlist, parent;
+	int devcount, error;
+
+	if (!device_is_attached(pbus->self->dev.bsddev))
+		return (0);
+	/* pci_rescan_method() will work on the pcib (parent). */
+	error = BUS_RESCAN(pbus->self->dev.bsddev);
+	if (error != 0)
+		return (0);
+
+	parent = device_get_parent(pbus->self->dev.bsddev);
+	error = device_get_children(parent, &devlist, &devcount);
+	if (error != 0)
+		return (0);
+	if (devcount != 0)
+		free(devlist, M_TEMP);
+
+	return (devcount);
 }
 
 /*

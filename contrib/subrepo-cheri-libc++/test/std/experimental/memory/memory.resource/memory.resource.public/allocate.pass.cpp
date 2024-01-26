@@ -6,10 +6,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-// <experimental/memory_resource>
-
 // UNSUPPORTED: c++03
 // UNSUPPORTED: libcpp-no-rtti
+
+// test_memory_resource requires RTTI for dynamic_cast
+// UNSUPPORTED: no-rtti
+
+// <experimental/memory_resource>
 
 //------------------------------------------------------------------------------
 // TESTING void * memory_resource::allocate(size_t, size_t = max_align)

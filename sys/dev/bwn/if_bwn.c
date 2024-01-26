@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009-2010 Weongyo Jeong <weongyo@freebsd.org>
  * Copyright (c) 2016 Landon Fuller <landonf@FreeBSD.org>
@@ -35,8 +35,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * The Broadcom Wireless LAN controller driver.
  */

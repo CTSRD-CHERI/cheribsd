@@ -1,5 +1,5 @@
 .\"
-.\" SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+.\" SPDX-License-Identifier: BSD-2-Clause
 .\"
 .\" Copyright (c) [year] [your name]
 .\"
@@ -33,6 +33,4 @@
 .\" The Open Group Standard, the original IEEE and The Open Group Standard is
 .\" the referee document.  The original Standard can be obtained online at
 .\"	http://www.opengroup.org/unix/online.html.
-.\"
-.\" $FreeBSD$
 .\"

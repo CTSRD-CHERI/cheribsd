@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006 Semihalf, Rafal Jaworowski <raj@semihalf.com>
  * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #define	KTR_BE_IO	0
 #define	KTR_LE_IO	0
 

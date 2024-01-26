@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: BSD-2-Clause-NetBSD AND BSD-3-Clause */
+/* SPDX-License-Identifier: BSD-2-Clause AND BSD-3-Clause */
 /*	$NetBSD: qat_aevar.h,v 1.1 2019/11/20 09:37:46 hikaru Exp $	*/
 
 /*
@@ -57,7 +57,6 @@
  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* $FreeBSD$ */
 
 #ifndef _DEV_PCI_QAT_AEVAR_H_
 #define _DEV_PCI_QAT_AEVAR_H_

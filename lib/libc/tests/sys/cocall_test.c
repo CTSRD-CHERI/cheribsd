@@ -244,7 +244,6 @@ ATF_TC_WITHOUT_HEAD(cocall_eagain);
 ATF_TC_BODY(cocall_eagain, tc)
 {
 	char *name;
-	uint64_t buf;
 	pid_t pid, pid2;
 	int error;
 
@@ -258,7 +257,6 @@ ATF_TC_BODY(cocall_eagain, tc)
 		error = coregister(name, NULL);
 		ATF_REQUIRE_EQ(error, 0);
 
-		buf = 42;
 		for (;;)
 			sched_yield();
 		atf_tc_fail("You're not supposed to be here");

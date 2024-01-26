@@ -23,8 +23,6 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
 .Dd September 1, 2020
 .Dt SYSCTL 9
 .Os
@@ -577,6 +575,10 @@ Current formats:
 node
 .It Cm A
 .Li "char *"
+.It Cm C
+.Li "int8_t"
+.It Cm CU
+.Li "uint8_t"
 .It Cm I
 .Li "int"
 .It Cm IK Ns Op Ar n
@@ -593,6 +595,10 @@ gives milliKelvin
 .Li "quad_t"
 .It Cm QU
 .Li "u_quad_t"
+.It Cm S
+.Li "int16_t"
+.It Cm SU
+.Li "uint16_t"
 .It Cm "S,TYPE"
 .Li "struct TYPE"
 structures

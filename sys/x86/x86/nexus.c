@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * This code implements a `root nexus' for Intel Architecture
  * machines.  The function of the root nexus is to serve as an
@@ -388,13 +386,13 @@ nexus_alloc_resource(device_t bus, device_t child, int type, int *rid,
 
 	rv = rman_reserve_resource(rm, start, end, count, flags, child);
 	if (rv == NULL)
-		return (0);
+		return (NULL);
 	rman_set_rid(rv, *rid);
 
 	if (needactivate) {
 		if (bus_activate_resource(child, type, *rid, rv)) {
 			rman_release_resource(rv);
-			return (0);
+			return (NULL);
 		}
 	}
 
@@ -615,7 +613,12 @@ nexus_resume_intr(device_t dev, device_t child, struct resource *irq)
 static int
 nexus_bind_intr(device_t dev, device_t child, struct resource *irq, int cpu)
 {
-	return (intr_bind(rman_get_start(irq), cpu));
+	struct intsrc *isrc;
+
+	isrc = intr_lookup_source(rman_get_start(irq));
+	if (isrc == NULL)
+		return (EINVAL);
+	return (intr_event_bind(isrc->is_event, cpu));
 }
 #endif
 

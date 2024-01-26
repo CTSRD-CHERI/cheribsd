@@ -1,7 +1,7 @@
 /*	$NetBSD: mii.c,v 1.12 1999/08/03 19:41:49 drochner Exp $	*/
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -33,8 +33,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * MII bus layer, glues MII-capable network interface drivers to sharable
  * PHY drivers.  This exports an interface compatible with BSD/OS 3.0's,

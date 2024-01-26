@@ -1,6 +1,5 @@
-/* $FreeBSD$ */
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  *  Copyright (c) 1997-2009 by Matthew Jacob
  *  All rights reserved.
@@ -71,7 +70,7 @@ typedef struct isp_notify {
 } isp_notify_t;
 
 /*
- * Special Constatns
+ * Special Constants
  */
 #define INI_ANY			((uint64_t) -1)
 #define VALID_INI(ini)		(ini != INI_NONE && ini != INI_ANY)

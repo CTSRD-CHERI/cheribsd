@@ -2,7 +2,6 @@
  * System call numbers.
  *
  * DO NOT EDIT-- this file is automatically @generated.
- * $FreeBSD$
  */
 
 #define	SYS_syscall	0
@@ -96,6 +95,7 @@
 				/* 88 is old sethostname */
 #define	SYS_getdtablesize	89
 #define	SYS_dup2	90
+#define	SYS_cheri_cidcap_alloc	91
 #define	SYS_fcntl	92
 #define	SYS_select	93
 #define	SYS_fsync	95

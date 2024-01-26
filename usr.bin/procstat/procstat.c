@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2007, 2011 Robert N. M. Watson
  * Copyright (c) 2015 Allan Jude <allanjude@freebsd.org>
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/sysctl.h>
 #include <sys/user.h>
@@ -91,11 +89,13 @@ static const struct procstat_cmd cmd_table[] = {
 	    PS_CMP_PLURAL | PS_CMP_SUBSTR | PS_MODE_NO_KINFO_PROC },
 	{ "argument", "arguments", NULL, &procstat_args, &cmdopt_none,
 	    PS_CMP_PLURAL | PS_CMP_SUBSTR },
-	{ "auxv", "auxv", NULL, &procstat_auxv, &cmdopt_none, PS_CMP_NORMAL },
+	{ "auxv", "auxv", "[-v]", &procstat_auxv, &cmdopt_verbose, PS_CMP_NORMAL },
 	{ "basic", "basic", NULL, &procstat_basic, &cmdopt_none,
 	    PS_CMP_NORMAL },
 	{ "binary", "binary", NULL, &procstat_bin, &cmdopt_none,
 	    PS_CMP_SUBSTR },
+	{ "cheri", "cheri", "[-v]", &procstat_cheri, &cmdopt_verbose,
+	    PS_CMP_NORMAL },
 	{ "cpuset", "cs", NULL, &procstat_cs, &cmdopt_cpuset, PS_CMP_NORMAL },
 	{ "cs", "cs", NULL, &procstat_cs, &cmdopt_cpuset, PS_CMP_NORMAL },
 	{ "credential", "credentials", NULL, &procstat_cred, &cmdopt_none,
@@ -128,7 +128,7 @@ static const struct procstat_cmd cmd_table[] = {
 	    PS_CMP_PLURAL },
 	{ "tsignal", "thread_signals", "[-n]", &procstat_threads_sigs,
 	    &cmdopt_signals, PS_CMP_PLURAL | PS_CMP_SUBSTR },
-	{ "vm", "vm", NULL, &procstat_vm, &cmdopt_verbose, PS_CMP_NORMAL }
+	{ "vm", "vm", "[-v]", &procstat_vm, &cmdopt_verbose, PS_CMP_NORMAL }
 };
 
 static void

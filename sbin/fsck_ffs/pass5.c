@@ -35,8 +35,6 @@ static const char sccsid[] = "@(#)pass5.c	8.9 (Berkeley) 4/28/95";
 #endif /* not lint */
 #endif
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/sysctl.h>
 
@@ -116,7 +114,7 @@ pass5(void)
 			}
 		}
 	}
-	basesize = &newcg->cg_space[0] - (u_char *)(&newcg->cg_firstfield);
+	basesize = sizeof(*newcg);
 	if (sblock.fs_magic == FS_UFS2_MAGIC) {
 		newcg->cg_iusedoff = basesize;
 	} else {
@@ -131,7 +129,7 @@ pass5(void)
 		    fs->fs_old_cpg * sizeof(int32_t);
 		newcg->cg_iusedoff = newcg->cg_old_boff +
 		    fs->fs_old_cpg * fs->fs_old_nrpos * sizeof(u_int16_t);
-		memset(&newcg->cg_space[0], 0, newcg->cg_iusedoff - basesize);
+		memset(&newcg[1], 0, newcg->cg_iusedoff - basesize);
 	}
 	inomapsize = howmany(fs->fs_ipg, CHAR_BIT);
 	newcg->cg_freeoff = newcg->cg_iusedoff + inomapsize;
@@ -411,43 +409,53 @@ pass5(void)
 				printf("adjndir by %+" PRIi64 "\n", (int64_t)cmd.value);
 			if (bkgrdsumadj == 0 || sysctl(adjndir, MIBSIZE, 0, 0,
 			    &cmd, sizeof cmd) == -1)
-				rwerror("ADJUST NUMBER OF DIRECTORIES", cmd.value);
+				rwerror("ADJUST NUMBER OF DIRECTORIES",
+				    cmd.value);
 		}
 
 		cmd.value = cstotal.cs_nbfree - fs->fs_cstotal.cs_nbfree;
 		if (cmd.value != 0) {
 			if (debug)
-				printf("adjnbfree by %+" PRIi64 "\n", (int64_t)cmd.value);
+				printf("adjnbfree by %+" PRIi64 "\n",
+				    (int64_t)cmd.value);
 			if (bkgrdsumadj == 0 || sysctl(adjnbfree, MIBSIZE, 0, 0,
 			    &cmd, sizeof cmd) == -1)
-				rwerror("ADJUST NUMBER OF FREE BLOCKS", cmd.value);
+				rwerror("ADJUST NUMBER OF FREE BLOCKS",
+				    cmd.value);
 		}
 
 		cmd.value = cstotal.cs_nifree - fs->fs_cstotal.cs_nifree;
 		if (cmd.value != 0) {
 			if (debug)
-				printf("adjnifree by %+" PRIi64 "\n", (int64_t)cmd.value);
+				printf("adjnifree by %+" PRIi64 "\n",
+				    (int64_t)cmd.value);
 			if (bkgrdsumadj == 0 || sysctl(adjnifree, MIBSIZE, 0, 0,
 			    &cmd, sizeof cmd) == -1)
-				rwerror("ADJUST NUMBER OF FREE INODES", cmd.value);
+				rwerror("ADJUST NUMBER OF FREE INODES",
+				    cmd.value);
 		}
 
 		cmd.value = cstotal.cs_nffree - fs->fs_cstotal.cs_nffree;
 		if (cmd.value != 0) {
 			if (debug)
-				printf("adjnffree by %+" PRIi64 "\n", (int64_t)cmd.value);
+				printf("adjnffree by %+" PRIi64 "\n",
+				    (int64_t)cmd.value);
 			if (bkgrdsumadj == 0 || sysctl(adjnffree, MIBSIZE, 0, 0,
 			    &cmd, sizeof cmd) == -1)
-				rwerror("ADJUST NUMBER OF FREE FRAGS", cmd.value);
+				rwerror("ADJUST NUMBER OF FREE FRAGS",
+				    cmd.value);
 		}
 
-		cmd.value = cstotal.cs_numclusters - fs->fs_cstotal.cs_numclusters;
+		cmd.value = cstotal.cs_numclusters -
+		    fs->fs_cstotal.cs_numclusters;
 		if (cmd.value != 0) {
 			if (debug)
-				printf("adjnumclusters by %+" PRIi64 "\n", (int64_t)cmd.value);
-			if (bkgrdsumadj == 0 || sysctl(adjnumclusters, MIBSIZE, 0, 0,
-			    &cmd, sizeof cmd) == -1)
-				rwerror("ADJUST NUMBER OF FREE CLUSTERS", cmd.value);
+				printf("adjnumclusters by %+" PRIi64 "\n",
+				    (int64_t)cmd.value);
+			if (bkgrdsumadj == 0 || sysctl(adjnumclusters, MIBSIZE,
+			    0, 0, &cmd, sizeof cmd) == -1)
+				rwerror("ADJUST NUMBER OF FREE CLUSTERS",
+				    cmd.value);
 		}
 	}
 }

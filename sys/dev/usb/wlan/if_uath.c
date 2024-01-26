@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: (BSD-2-Clause-FreeBSD AND BSD-1-Clause)
+ * SPDX-License-Identifier: (BSD-2-Clause AND BSD-1-Clause)
  *
  * Copyright (c) 2006 Sam Leffler, Errno Consulting
  * Copyright (c) 2008-2009 Weongyo Jeong <weongyo@freebsd.org>
@@ -51,8 +51,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*-
  * Driver for Atheros AR5523 USB parts.
  *

@@ -23,9 +23,9 @@ changes where the contributor already has a GitHub account.
 Presently, GitHub 'freebsd-src' repository is one of the publish-only services
 for the FreeBSD 'src' repository the project uses to promote collaboration and
 contribution.  Pull requests that need little developer time, are generally
-small, and have limited scope should be submitted. Do not submit pull request
-that are a problem reports, works in progress, changes that are controversial
-and need discussion, changes require specialize review, or are security related.
+small, and have limited scope should be submitted. Do not submit pull requests
+that are security-related, problem reports, works in progress, changes that are controversial
+and need discussion, or changes that require specialized review.
 
 A pull request will be considered if:
 
@@ -34,15 +34,15 @@ A pull request will be considered if:
 * You can respond to feedback quickly.
 * It touches fewer than about 10 files and the changes are less than about 200 lines. Changes larger than this may be OK, or you may be asked to submit multiple pull requests of a more manageable size.
 * Each logical change is a separate commit within the pull request. Commit messages for each change should follow the [commit log message guide](https://docs.freebsd.org/en/articles/committers-guide/#commit-log-message).
-* All commits have your name and valid email address as you would like to see them in the FreeBSD repository as the author. Fake github.com addresses cannot be used.
+* All commits have, as the author, your name and valid email address as you would like to see them in the FreeBSD repository. Fake github.com addresses cannot be used.
 * The scope of the pull request should not change during review. If the review suggests changes that expand the scope, please create an independent pull request.
 * Fixup commits should be squashed with the commit they are fixing. Each commit in your branch should be suitable for FreeBSD's repository.
 * Commits should include one or more `Signed-off-by:` lines with full name and email address certifying [Developer Certificate of Origin](https://developercertificate.org/).
 * The commits follow FreeBSD's style guide. See [Style](#Style).
-* Run tools/build/checkstyle9.pl on your git branch and eliminate all errors
-* The commits should not introduce trailing white space.
-* If the commmit fixes a bug, please add 'PR: <bugnumber>' to the comment message.
-* If there's a code review in phabricator, please include a link as a 'Differential Revision: ' line.
+* Run tools/build/checkstyle9.pl on your Git branch and eliminate all errors
+* The commits do not introduce trailing white space.
+* If the commmit fixes a bug, please add 'PR: \<bugnumber\>' to the commit message.
+* If there's a code review in Phabricator, please include a link as a 'Differential Revision: ' line.
 
 When updating your pull request, please rebase with a forced push rather than a
 merge commit.
@@ -72,7 +72,7 @@ project. The guidelines are streamlined for quick decisions about each pull
 request. Unless explicitly stated, rejection here as "not ready" or "too large"
 does not mean the project is uninterested in the work, it just means the
 submission does not meet the limited scope for pull requests accepted
-here. Sometimes it is easier to review a GihHub pull request than to do the
+here. Sometimes it is easier to review a GitHub pull request than to do the
 review in Phabricator, so that's also allowed.
 
 ## Style
@@ -91,13 +91,13 @@ comments on your pull requests.
 
 For Makefiles changes, see
 [style.Makefile(5)](https://man.freebsd.org/cgi/man.cgi?query=style.Makefile&sektion=5)
-for details. FreeBSD's base system uses the in-tree make, not GNU Make, so 
+for details. FreeBSD's base system uses the in-tree make, not GNU Make, so
 [make(1)](https://man.freebsd.org/cgi/man.cgi?query=make&sektion=1) is another useful
 resource.
 
 The project uses mdoc for all its man pages. Changes should pass `mandoc -Tlint` and igor (install the latter with `pkg install igor`).
 Please be sure to observe the one-sentence-per-line rule so manual pages properly render. Any semantic changes to the manual pages should bump the date.
-[style.mdoc(5)](https://man.freebsd.org/cgi/man.cgi?query=style.mdoc&sektion=5) has the all details. 
+[style.mdoc(5)](https://man.freebsd.org/cgi/man.cgi?query=style.mdoc&sektion=5) has the all details.
 
 For [Lua](https://www.lua.org), please see
 [style.lua(9)](https://man.freebsd.org/cgi/man.cgi?query=style.lua&sektion=9)

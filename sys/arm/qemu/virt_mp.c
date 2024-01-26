@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -49,7 +47,7 @@ __FBSDID("$FreeBSD$");
 
 static int running_cpus;
 
-static boolean_t
+static bool
 virt_start_ap(u_int id, phandle_t node, u_int addr_cells, pcell_t *reg)
 {
 	int err;

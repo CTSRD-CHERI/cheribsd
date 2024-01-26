@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1994-1996 Søren Schmidt
  * All rights reserved.
@@ -25,9 +25,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #define __ELF_WORD_SIZE	32
 
@@ -144,6 +141,7 @@ linux32_arch_copyout_auxargs(struct image_params *imgp, Elf_Auxinfo **pos)
 	AUXARGS_ENTRY((*pos), LINUX_AT_SYSINFO_EHDR, linux_vdso_base);
 	AUXARGS_ENTRY((*pos), LINUX_AT_SYSINFO, __kernel_vsyscall);
 	AUXARGS_ENTRY((*pos), LINUX_AT_HWCAP, cpu_feature);
+	AUXARGS_ENTRY((*pos), LINUX_AT_HWCAP2, linux_x86_elf_hwcap2());
 	AUXARGS_ENTRY((*pos), LINUX_AT_PLATFORM, PTROUT(linux_platform));
 }
 
@@ -583,7 +581,6 @@ struct sysentvec linux_sysvec = {
 	.sv_szsigcode	= &linux_szsigcode,
 	.sv_name	= "Linux a.out",
 	.sv_coredump	= NULL,
-	.sv_imgact_try	= linux_exec_imgact_try,
 	.sv_minsigstksz	= LINUX_MINSIGSTKSZ,
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
@@ -624,7 +621,6 @@ struct sysentvec elf_linux_sysvec = {
 	.sv_elf_core_osabi = ELFOSABI_NONE,
 	.sv_elf_core_abi_vendor = LINUX_ABI_VENDOR,
 	.sv_elf_core_prepare_notes = __linuxN(prepare_notes),
-	.sv_imgact_try	= linux_exec_imgact_try,
 	.sv_minsigstksz	= LINUX_MINSIGSTKSZ,
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
@@ -664,7 +660,7 @@ linux_on_exec_vmspace(struct proc *p, struct image_params *imgp)
 		error = linux_map_vdso(p, linux_vdso_obj,
 		    linux_vdso_base, LINUX_VDSOPAGE_SIZE, imgp);
 	if (error == 0)
-		linux_on_exec(p, imgp);
+		error = linux_on_exec(p, imgp);
 	return (error);
 }
 
@@ -803,7 +799,6 @@ static Elf32_Brandinfo linux_brand = {
 	.brand		= ELFOSABI_LINUX,
 	.machine	= EM_386,
 	.compat_3_brand	= "Linux",
-	.emul_path	= linux_emul_path,
 	.interp_path	= "/lib/ld-linux.so.1",
 	.sysvec		= &elf_linux_sysvec,
 	.interp_newpath	= NULL,
@@ -815,7 +810,6 @@ static Elf32_Brandinfo linux_glibc2brand = {
 	.brand		= ELFOSABI_LINUX,
 	.machine	= EM_386,
 	.compat_3_brand	= "Linux",
-	.emul_path	= linux_emul_path,
 	.interp_path	= "/lib/ld-linux.so.2",
 	.sysvec		= &elf_linux_sysvec,
 	.interp_newpath	= NULL,
@@ -827,7 +821,6 @@ static Elf32_Brandinfo linux_muslbrand = {
 	.brand		= ELFOSABI_LINUX,
 	.machine	= EM_386,
 	.compat_3_brand	= "Linux",
-	.emul_path	= linux_emul_path,
 	.interp_path	= "/lib/ld-musl-i386.so.1",
 	.sysvec		= &elf_linux_sysvec,
 	.interp_newpath	= NULL,

@@ -30,9 +30,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <machine/elf.h>
 
@@ -76,6 +73,7 @@ _start(void *auxv,
 	void (*cleanup)(void),			/* from shared loader */
 	struct Struct_Obj_Entry *obj)		/* from shared loader */
 {
+	__asm__ volatile(".cfi_undefined cra");
 	int argc = 0;
 	char **argv = NULL;
 	char **env = NULL;

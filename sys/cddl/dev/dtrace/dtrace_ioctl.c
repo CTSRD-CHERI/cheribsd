@@ -18,8 +18,6 @@
  *
  * CDDL HEADER END
  *
- * $FreeBSD$
- *
  */
 
 #include <dtrace_ioctl_compat.c>

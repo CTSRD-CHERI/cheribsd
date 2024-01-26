@@ -32,9 +32,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/mman.h>
 #include <sys/proc.h>
@@ -139,7 +136,8 @@ freebsd64_munmap(struct thread *td, struct freebsd64_munmap_args *uap)
 int
 freebsd64_mprotect(struct thread *td, struct freebsd64_mprotect_args *uap)
 {
-	return (kern_mprotect(td, (uintptr_t)uap->addr, uap->len, uap->prot));
+	return (kern_mprotect(td, (uintptr_t)uap->addr, uap->len, uap->prot,
+	    0));
 }
 
 int

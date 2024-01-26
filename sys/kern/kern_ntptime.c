@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ntp.h"
 
 #include <sys/param.h>
@@ -73,7 +71,13 @@ typedef int64_t l_fp;
 #define L_MPY(v, a)	((v) *= (a))
 #define L_CLR(v)	((v) = 0)
 #define L_ISNEG(v)	((v) < 0)
-#define L_LINT(v, a)	((v) = (int64_t)(a) << 32)
+#define L_LINT(v, a) \
+	do { \
+		if ((a) < 0) \
+			((v) = -((int64_t)(-(a)) << 32)); \
+		else \
+			((v) = (int64_t)(a) << 32); \
+	} while (0)
 #define L_GINT(v)	((v) < 0 ? -(-(v) >> 32) : (v) >> 32)
 
 /*

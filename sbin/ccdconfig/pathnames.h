@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -29,7 +29,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  * $NetBSD: pathnames.h,v 1.4 2008/04/28 20:23:07 martin Exp $
- * $FreeBSD$
  */
 
 #define _PATH_CCDCONF		"/etc/ccd.conf"

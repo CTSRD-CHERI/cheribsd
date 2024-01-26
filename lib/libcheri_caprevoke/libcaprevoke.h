@@ -67,10 +67,10 @@ void caprev_shadow_nomap_clear_raw(ptraddr_t sbase, uint64_t * __capability sb,
     ptraddr_t heap_start, ptraddr_t heap_end);
 
 /* Utility functions for testing */
-void caprev_shadow_nomap_offsets(
-    ptraddr_t ob, size_t len, ptrdiff_t *fwo, ptrdiff_t *lwo);
+void caprev_shadow_nomap_offsets(ptraddr_t ob, size_t len, ptrdiff_t *fwo,
+    ptrdiff_t *lwo);
 
-void caprev_shadow_nomap_masks(
-    ptraddr_t ob, size_t len, uint64_t *fwm, uint64_t *lwm);
+void caprev_shadow_nomap_masks(ptraddr_t ob, size_t len, uint64_t *fwm,
+    uint64_t *lwm);
 
 #endif

@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * These functions support the macros and help fiddle mbuf chains for
  * the nfs op functions. They do things like create the rpc header and
@@ -62,8 +60,8 @@ u_int32_t newnfs_true, newnfs_false, newnfs_xdrneg1;
 /* And other global data */
 nfstype nfsv34_type[9] = { NFNON, NFREG, NFDIR, NFBLK, NFCHR, NFLNK, NFSOCK,
 		      NFFIFO, NFNON };
-enum vtype newnv2tov_type[8] = { VNON, VREG, VDIR, VBLK, VCHR, VLNK, VNON, VNON };
-enum vtype nv34tov_type[8]={ VNON, VREG, VDIR, VBLK, VCHR, VLNK, VSOCK, VFIFO };
+__enum_uint8(vtype) newnv2tov_type[8] = { VNON, VREG, VDIR, VBLK, VCHR, VLNK, VNON, VNON };
+__enum_uint8(vtype) nv34tov_type[8]={ VNON, VREG, VDIR, VBLK, VCHR, VLNK, VSOCK, VFIFO };
 struct timeval nfsboottime;	/* Copy boottime once, so it never changes */
 int nfscl_ticks;
 int nfsrv_useacl = 1;

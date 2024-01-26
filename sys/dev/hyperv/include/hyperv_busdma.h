@@ -22,8 +22,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _HYPERV_BUSDMA_H_
@@ -41,9 +39,5 @@ struct hyperv_dma {
 
 void		hyperv_dma_map_paddr(void *arg, bus_dma_segment_t *segs,
 		    int nseg, int error);
-void		*hyperv_dmamem_alloc(bus_dma_tag_t parent_dtag,
-		    bus_size_t alignment, bus_addr_t boundary, bus_size_t size,
-		    struct hyperv_dma *dma, int flags);
-void		hyperv_dmamem_free(struct hyperv_dma *dma, void *ptr);
 
 #endif	/* !_HYPERV_BUSDMA_H_ */

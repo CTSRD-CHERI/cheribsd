@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1994 Christopher G. Demetriou
  * Copyright (c) 1994 Simon J. Gerraty
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/queue.h>
 #include <sys/time.h>
 
@@ -408,17 +406,15 @@ ac(const char *file)
 	struct utmpx *usr, usht;
 	struct tm *ltm;
 	struct timeval prev_secs, ut_timecopy, secs, clock_shift, now;
-	int day, rfound;
+	int day;
 
 	day = -1;
 	timerclear(&prev_secs);	/* Minimum acceptable date == 1970. */
 	timerclear(&secs);
 	timerclear(&clock_shift);
-	rfound = 0;
 	if (setutxdb(UTXDB_LOG, file) != 0)
 		err(1, "%s", file);
 	while ((usr = getutxent()) != NULL) {
-		rfound++;
 		ut_timecopy = usr->ut_tv;
 		/* Don't let the time run backwards. */
 		if (timercmp(&ut_timecopy, &prev_secs, <))

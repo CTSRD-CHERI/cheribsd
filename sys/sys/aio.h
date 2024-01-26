@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997 John S. Dyson.  All rights reserved.
  *
@@ -14,8 +14,6 @@
  * DISCLAIMER:  This code isn't warranted to do anything useful.  Anything
  * bad that happens because of using this software isn't the responsibility
  * of the author.  This software is distributed AS-IS.
- *
- * $FreeBSD$
  */
 
 #ifndef _SYS_AIO_H_
@@ -149,6 +147,7 @@ struct kaiocb {
 	uint64_t seqno;			/* (*) job number */
 	aio_cancel_fn_t *cancel_fn;	/* (a) backend cancel function */
 	aio_handle_fn_t *handle_fn;	/* (c) backend handle function */
+	volatile u_int refcount;
 	union {				/* Backend-specific data fields */
 		struct {		/* BIO backend */
 			volatile u_int nbio; /* Number of remaining bios */
@@ -210,6 +209,11 @@ void	aio_complete(struct kaiocb *job, long status, int error);
 void	aio_schedule(struct kaiocb *job, aio_handle_fn_t *func);
 bool	aio_set_cancel_function(struct kaiocb *job, aio_cancel_fn_t *func);
 void	aio_switch_vmspace(struct kaiocb *job);
+
+#ifdef CHERI_CAPREVOKE
+struct vm_cheri_revoke_cookie;
+void aio_cheri_revoke(struct proc *, const struct vm_cheri_revoke_cookie *);
+#endif
 
 #else /* !_KERNEL */
 

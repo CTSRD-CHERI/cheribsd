@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/cdio.h>
 #include <sys/cdrio.h>
 #include <sys/file.h>
@@ -520,7 +518,7 @@ play(char *arg)
 		/*
 		 * Play MSF m1:s1 [ .f1 ] [ m2:s2 [ .f2 ] ]
 		 *
-		 * Will now also undestand timed addresses relative
+		 * Will now also understand timed addresses relative
 		 * to the beginning of a track in the form...
 		 *
 		 *      tr1 m1:s1[.f1] [[tr2] [m2:s2[.f2]]]

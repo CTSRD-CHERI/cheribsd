@@ -1,4 +1,3 @@
-# $FreeBSD$
 #
 # Option file for bmake builds. These options are available to all users of
 # bmake (including the source tree userland and kernel builds). They generally
@@ -86,7 +85,6 @@ __DEFAULT_NO_OPTIONS = \
     UBSAN
 
 __DEFAULT_DEPENDENT_OPTIONS = \
-    CHERI_CAPREVOKE/CHERI \
     MAKE_CHECK_USE_SANDBOX/TESTS \
     STAGING_MAN/STAGING \
     STAGING_PROG/STAGING \

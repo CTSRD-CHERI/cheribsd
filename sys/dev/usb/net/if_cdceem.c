@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2012 Ben Gray <bgray@freebsd.org>.
  * Copyright (C) 2018 The FreeBSD Foundation.
@@ -38,8 +38,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/gsb_crc32.h>
 #include <sys/eventhandler.h>
 #include <sys/stdint.h>

@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .include <src.opts.mk>
 
@@ -19,7 +18,5 @@ SRCS+=		SourceCoverageViewText.cpp
 SRCS+=		TestingSupport.cpp
 SRCS+=		gcov.cpp
 SRCS+=		llvm-cov.cpp
-
-LIBADD+=	z
 
 .include "../llvm.prog.mk"

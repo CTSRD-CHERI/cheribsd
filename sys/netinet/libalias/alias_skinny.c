@@ -1,7 +1,7 @@
 /*-
  * alias_skinny.c
  *
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2002, 2003 MarcusCom, Inc.
  * All rights reserved.
@@ -28,8 +28,6 @@
  * SUCH DAMAGE.
  *
  * Author: Joe Marcus Clarke <marcus@FreeBSD.org>
- *
- * $FreeBSD$
  */
 
 #ifdef _KERNEL

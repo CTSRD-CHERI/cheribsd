@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2001 Eduardo Horvath.
  * All rights reserved.
@@ -26,8 +26,6 @@
  * SUCH DAMAGE.
  *
  *	from: NetBSD: gemvar.h,v 1.8 2002/05/15 02:36:12 matt Exp
- *
- * $FreeBSD$
  */
 
 #ifndef	_IF_GEMVAR_H

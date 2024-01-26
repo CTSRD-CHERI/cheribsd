@@ -28,8 +28,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _AMD64_LINUX_H_
@@ -431,6 +429,10 @@ struct reg32;
 
 void	bsd_to_linux_regset32(const struct reg32 *b_reg,
 	    struct linux_pt_regset32 *l_regset);
+int	linux_ptrace_peekuser(struct thread *td, pid_t pid,
+	    void *addr, void *data);
+int	linux_ptrace_pokeuser(struct thread *td, pid_t pid,
+	    void *addr, void *data);
 
 extern bool linux32_emulate_i386;
 #endif /* _KERNEL */

@@ -32,13 +32,12 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_capsicum.h"
 
 #include <sys/param.h>
 #include <sys/capsicum.h>
 #include <sys/compressor.h>
+#include <sys/elf.h>
 #include <sys/exec.h>
 #include <sys/fcntl.h>
 #include <sys/imgact.h>
@@ -88,7 +87,6 @@ __FBSDID("$FreeBSD$");
 #endif
 #include <cheri/cheric.h>
 
-#include <machine/elf.h>
 #include <machine/md_var.h>
 
 #define ELF_NOTE_ROUNDSIZE	4
@@ -531,23 +529,13 @@ __elfN(check_header)(const Elf_Ehdr *hdr)
 	    hdr->e_ident[EI_DATA] != ELF_TARG_DATA ||
 	    hdr->e_ident[EI_VERSION] != EV_CURRENT ||
 	    hdr->e_phentsize != sizeof(Elf_Phdr) ||
+#ifdef __ELF_CHERI
+	    !ELF_IS_CHERI(hdr) ||
+#else
+	    ELF_IS_CHERI(hdr) ||
+#endif
 	    hdr->e_version != ELF_TARG_VER)
 		return (ENOEXEC);
-
-	/*
-	 * imgact_elf64c.c will "claim" non-CHERI binaries only to
-	 * choke on them later without trying imgact_elf64.c (and vice
-	 * versa).  We have to reject an ABI mismatch early so that
-	 * the imgact hook returns -1 instead of ENOXEC which means
-	 * doing it here.
-	 */
-#ifdef __ELF_CHERI
-	if (!ELF_IS_CHERI(hdr))
-		return (ENOEXEC);
-#elif __has_feature(capabilities)
-	if (ELF_IS_CHERI(hdr))
-		return (ENOEXEC);
-#endif
 
 	/*
 	 * Make sure we have at least one brand for this machine.
@@ -578,15 +566,18 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 	    CHERI_PERM_STORE_CAP;
 	vm_offset_t start = (vm_offset_t)-1;
 	vm_offset_t end = 0;
-	vm_offset_t alignment, load_addr, seg_addr;
-	vm_size_t seg_size, size;
-	int i, result;
+	vm_offset_t seg_addr;
+	vm_size_t seg_size;
+	int i;
 	vm_pointer_t reservation;
 	void * __capability reservation_cap;
-	vm_map_t map;
 	Elf_Addr rbase = *preferred_rbase;
-
-	map = &imgp->proc->p_vmspace->vm_map;
+#ifdef __ELF_CHERI
+	int result;
+	vm_offset_t alignment, load_addr;
+	vm_size_t size;
+	vm_map_t map;
+#endif
 
 	for (i = 0; i < hdr->e_phnum; i++) {
 		if (phdr[i].p_type != PT_LOAD || phdr[i].p_memsz == 0)
@@ -599,11 +590,14 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 		end = MAX(end, seg_addr + seg_size);
 	}
 
-	if (hdr->e_type == ET_EXEC && !is_aligned(start + rbase,
+	reservation = start + rbase;
+#ifdef __ELF_CHERI
+	if (hdr->e_type == ET_EXEC && !is_aligned(reservation,
 	    CHERI_REPRESENTABLE_ALIGNMENT(end - start))) {
 		/*
-		 * We can't change the load address for position dependent
-		 *  executables, so we have to give up and report an error.
+		 * We can't change the load address for position
+		 * dependent executables, so we have to give up and
+		 * report an error.
 		 */
 		uprintf("Warning: Attempted to load position-dependent "
 		    "executable with non-representable base: %s\n",
@@ -632,6 +626,7 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 	alignment = MAX(CHERI_REPRESENTABLE_ALIGNMENT(end - start), PAGE_SIZE);
 	size = CHERI_REPRESENTABLE_LENGTH(end - start);
 	load_addr = roundup2(start + rbase, alignment);
+	map = &imgp->proc->p_vmspace->vm_map;
 	vm_map_lock(map);
 	if (imgp->cop != NULL) {
 		/*
@@ -651,6 +646,7 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 	vm_map_unlock(map);
 	if (result != KERN_SUCCESS)
 		return (vm_mmap_to_errno(result));
+#endif
 
 	*preferred_rbase = reservation - start;
 
@@ -1164,7 +1160,8 @@ __elfN(enforce_limits)(const struct image_params *imgp, const Elf_Ehdr *hdr,
 	 * Sanity check that the base address was aligned correctly so that we
 	 * can represent a capability spanning the entire executable.
 	 */
-	KASSERT(imgp->start_addr == CHERI_REPRESENTABLE_BASE(imgp->start_addr,
+	KASSERT(imgp->start_addr ==
+	    CHERI_REPRESENTABLE_ALIGN_DOWN(imgp->start_addr,
 	    imgp->end_addr - imgp->start_addr) && imgp->end_addr ==
 	    imgp->start_addr + CHERI_REPRESENTABLE_LENGTH(imgp->end_addr -
 	    imgp->start_addr), ("Image range [%#jx-%#jx] is not representable "
@@ -1273,21 +1270,8 @@ static int
 __elfN(load_interp)(struct image_params *imgp, const Elf_Brandinfo *brand_info,
     const char *interp, u_long *addr, u_long *entry)
 {
-	char *path;
 	int error;
 	u_long end_addr;
-
-	if (brand_info->emul_path != NULL &&
-	    brand_info->emul_path[0] != '\0') {
-		path = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-		snprintf(path, MAXPATHLEN, "%s%s",
-		    brand_info->emul_path, interp);
-		error = __elfN(load_file)(imgp->proc, path, addr, &end_addr,
-		    entry, imgp->cop);
-		free(path, M_TEMP);
-		if (error == 0)
-			goto done;
-	}
 
 	if (brand_info->interp_newpath != NULL &&
 	    (brand_info->interp_path == NULL ||
@@ -1303,7 +1287,7 @@ __elfN(load_interp)(struct image_params *imgp, const Elf_Brandinfo *brand_info,
 	    imgp->cop);
 done:
 	if (error == 0) {
-		imgp->interp_start = CHERI_REPRESENTABLE_BASE(*addr,
+		imgp->interp_start = CHERI_REPRESENTABLE_ALIGN_DOWN(*addr,
 		    end_addr - *addr);
 		imgp->interp_end = imgp->interp_start +
 		    CHERI_REPRESENTABLE_LENGTH(end_addr - *addr);
@@ -1564,7 +1548,8 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	if (imgp->credential_setid) {
 		PROC_LOCK(imgp->proc);
 		imgp->proc->p_flag2 &= ~(P2_ASLR_ENABLE | P2_ASLR_DISABLE |
-		    P2_WXORX_DISABLE | P2_WXORX_ENABLE_EXEC);
+		    P2_WXORX_DISABLE | P2_WXORX_ENABLE_EXEC |
+		    P2_CHERI_REVOKE_MASK);
 		PROC_UNLOCK(imgp->proc);
 	}
 	if ((sv->sv_flags & SV_ASLR) == 0 ||
@@ -1639,7 +1624,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		goto ret;
 
 	/* Round start/end addresses to representability */
-	imgp->start_addr = CHERI_REPRESENTABLE_BASE(representable_start,
+	imgp->start_addr = CHERI_REPRESENTABLE_ALIGN_DOWN(representable_start,
 	    representable_end - representable_start);
 	imgp->end_addr = imgp->start_addr +
 	    CHERI_REPRESENTABLE_LENGTH(representable_end - representable_start);
@@ -1748,7 +1733,7 @@ prog_cap(struct image_params *imgp, uint64_t perms)
 	 * choosing a sensible start address and length.
 	 */
 	KASSERT(prog_len == CHERI_REPRESENTABLE_LENGTH(prog_len) &&
-	    prog_base == CHERI_REPRESENTABLE_BASE(prog_base, prog_len),
+	    prog_base == CHERI_REPRESENTABLE_ALIGN_DOWN(prog_base, prog_len),
 	    ("program capability [%#jx-%#jx] not representable (length=%#zx)",
 	    (uintmax_t)prog_base, (uintmax_t)imgp->end_addr, prog_len));
 
@@ -1771,7 +1756,8 @@ interp_cap(struct image_params *imgp, Elf_Auxargs *args, uint64_t perms)
 	 * choosing a sensible start address.
 	 */
 	KASSERT(interp_len == CHERI_REPRESENTABLE_LENGTH(interp_len) &&
-	    interp_base == CHERI_REPRESENTABLE_BASE(interp_base, interp_len),
+	    interp_base ==
+	    CHERI_REPRESENTABLE_ALIGN_DOWN(interp_base, interp_len),
 	    ("interp capability [%#jx-%#jx] not representable (length=%#zx)",
 	    (uintmax_t)interp_base, (uintmax_t)imgp->interp_end, interp_len));
 	MPASS(args->base >= interp_base);
@@ -1793,7 +1779,7 @@ timekeep_cap(struct image_params *imgp)
 	    sizeof(struct vdso_timehands) * VDSO_TH_NUM;
 
 	/* These are sub-page so should be representable as-is. */
-	KASSERT(timekeep_base == CHERI_REPRESENTABLE_BASE(timekeep_base,
+	KASSERT(timekeep_base == CHERI_REPRESENTABLE_ALIGN_DOWN(timekeep_base,
 	    timekeep_len), ("timekeep_base needs rounding"));
 	KASSERT(timekeep_len == CHERI_REPRESENTABLE_LENGTH(timekeep_len),
 	    ("timekeep_len needs rounding"));
@@ -1817,7 +1803,8 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	void * __capability entry;
 #endif
 	rlim_t stacksz;
-	int error, bsdflags, oc;
+	int error, oc;
+	uint32_t bsdflags;
 
 	argarray = pos = malloc(AT_COUNT * sizeof(*pos), M_TEMP,
 	    M_WAITOK | M_ZERO);
@@ -1830,7 +1817,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	/*
 	 * AT_ENTRY gives an executable capability for the whole
 	 * program and AT_PHDR a writable one.  RTLD is responsible for
-	 * setting bounds.  Needs VMMAP so relro pages can be made RO.
+	 * setting bounds.  Needs SW_VMEM so relro pages can be made RO.
 	 */
 	AUXARGS_ENTRY_PTR(pos, AT_PHDR, cheri_setaddress(prog_cap(imgp,
 	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM),
@@ -1922,6 +1909,34 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	oc = atomic_load_int(&vm_overcommit);
 	bsdflags |= (oc & (SWAP_RESERVE_FORCE_ON | SWAP_RESERVE_RLIMIT_ON)) !=
 	    0 ? ELF_BSDF_VMNOOVERCOMMIT : 0;
+#if defined(__ELF_CHERI) && defined(CHERI_CAPREVOKE)
+	/*
+	 * ELF_BSDF_CHERI_REVOKE tells the runtime it should enable
+	 * quarantining of pages and revoke them as required.
+	 *
+	 * Precedence: procctl, ELF note, system default.
+	 * In case of conflicting flags, disable wins.
+	 */
+	if ((imgp->proc->p_flag2 & P2_CHERI_REVOKE_MASK) != 0) {
+		if ((imgp->proc->p_flag2 & P2_CHERI_REVOKE_DISABLE) == 0)
+			bsdflags |= ELF_BSDF_CHERI_REVOKE;
+	} else if ((imgp->proc->p_fctl0 &
+	    NT_FREEBSD_FCTL_CHERI_REVOKE_MASK) != 0) {
+		if ((imgp->proc->p_fctl0 &
+		    NT_FREEBSD_FCTL_CHERI_REVOKE_DISABLE) == 0)
+			bsdflags |= ELF_BSDF_CHERI_REVOKE;
+	} else if (security_cheri_runtime_revocation_default != 0)
+		bsdflags |= ELF_BSDF_CHERI_REVOKE;
+	/*
+	 * ELF_BSDF_CHERI_REVOKE tells the runtime whether to enable the
+	 * revoke every free debug policy if revocation is otherwise enabled.
+	 *
+	 * No procctl/ELF note, only system default (and environment variable in
+	 * userspace).
+	 */
+	if (security_cheri_runtime_revocation_every_free_default != 0)
+		bsdflags |= ELF_BSDF_CHERI_REVOKE_EVERY_FREE;
+#endif
 	AUXARGS_ENTRY(pos, AT_BSDFLAGS, bsdflags);
 	AUXARGS_ENTRY(pos, AT_ARGC, imgp->args->argc);
 	AUXARGS_ENTRY_PTR(pos, AT_ARGV, imgp->argv);
@@ -2129,7 +2144,8 @@ __elfN(coredump)(struct thread *td, struct vnode *vp, off_t limit, int flags)
 #if __has_feature(capabilities)
 			section_cap = cheri_capability_build_user_data(
 			    CHERI_PERM_LOAD,
-			    CHERI_REPRESENTABLE_BASE(php->p_vaddr, php->p_filesz),
+			    CHERI_REPRESENTABLE_ALIGN_DOWN(php->p_vaddr,
+			    php->p_filesz),
 			    CHERI_REPRESENTABLE_LENGTH(php->p_filesz), 0);
 #else
 			section_cap = (char *)(uintptr_t)php->p_vaddr;
@@ -3286,7 +3302,7 @@ __elfN(note_procstat_auxv)(void *arg, struct sbuf *sb, size_t *sizep)
 	}
 }
 
-static bool
+bool
 __elfN(parse_notes)(const struct image_params *imgp,
     Elf_Note *checknote, const char *note_vendor, const Elf_Phdr *pnote,
     bool (*cb)(const Elf_Note *, void *, bool *), void *cb_arg)

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2007 Eric Anderson <anderson@FreeBSD.org>
  * Copyright (c) 2007 Pawel Jakub Dawidek <pjd@FreeBSD.org>
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <ctype.h>
 #include <errno.h>
@@ -76,11 +74,25 @@ expand_number(const char *buf, uint64_t *num)
 		shift = 10;
 		break;
 	case 'b':
+		shift = 0;
+		break;
 	case '\0': /* No unit. */
 		*num = number;
 		return (0);
 	default:
 		/* Unrecognized unit. */
+		errno = EINVAL;
+		return (-1);
+	}
+
+	/*
+	 * Treat 'b' as an ignored suffix for all unit except 'b',
+	 * otherwise there should be no remaining character(s).
+	 */
+	endptr++;
+	if (shift != 0 && tolower((unsigned char)*endptr) == 'b')
+		endptr++;
+	if (*endptr != '\0') {
 		errno = EINVAL;
 		return (-1);
 	}

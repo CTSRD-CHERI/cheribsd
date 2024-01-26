@@ -37,8 +37,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_capsicum.h"
 #include "opt_ddb.h"
 #include "opt_ktrace.h"
@@ -495,7 +493,7 @@ kern_fcntl(struct thread *td, int fd, int cmd, intptr_t arg)
 	struct vnode *vp;
 	struct mount *mp;
 	struct kinfo_file *kif;
-	int error, flg, kif_sz, seals, tmp;
+	int error, flg, kif_sz, seals, tmp, got_set, got_cleared;
 	uint64_t bsize;
 	off_t foffset;
 
@@ -573,12 +571,12 @@ kern_fcntl(struct thread *td, int fd, int cmd, intptr_t arg)
 			tmp &= ~FCNTLFLAGS;
 			tmp |= FFLAGS(arg & ~O_ACCMODE) & FCNTLFLAGS;
 		} while (atomic_cmpset_int(&fp->f_flag, flg, tmp) == 0);
+		got_set = tmp & ~flg;
+		got_cleared = flg & ~tmp;
 		tmp = fp->f_flag & FNONBLOCK;
 		error = fo_ioctl(fp, FIONBIO, &tmp, td->td_ucred, td);
-		if (error != 0) {
-			fdrop(fp, td);
-			break;
-		}
+		if (error != 0)
+			goto revert_f_setfl;
 		tmp = fp->f_flag & FASYNC;
 		error = fo_ioctl(fp, FIOASYNC, &tmp, td->td_ucred, td);
 		if (error == 0) {
@@ -588,6 +586,13 @@ kern_fcntl(struct thread *td, int fd, int cmd, intptr_t arg)
 		atomic_clear_int(&fp->f_flag, FNONBLOCK);
 		tmp = 0;
 		(void)fo_ioctl(fp, FIONBIO, &tmp, td->td_ucred, td);
+revert_f_setfl:
+		do {
+			tmp = flg = fp->f_flag;
+			tmp &= ~FCNTLFLAGS;
+			tmp |= got_cleared;
+			tmp &= ~got_set;
+		} while (atomic_cmpset_int(&fp->f_flag, flg, tmp) == 0);
 		fdrop(fp, td);
 		break;
 
@@ -3848,6 +3853,11 @@ pwd_fill(struct pwd *oldpwd, struct pwd *newpwd)
 		vrefact(oldpwd->pwd_jdir);
 		newpwd->pwd_jdir = oldpwd->pwd_jdir;
 	}
+
+	if (newpwd->pwd_adir == NULL && oldpwd->pwd_adir != NULL) {
+		vrefact(oldpwd->pwd_adir);
+		newpwd->pwd_adir = oldpwd->pwd_adir;
+	}
 }
 
 struct pwd *
@@ -3939,6 +3949,8 @@ pwd_drop(struct pwd *pwd)
 		vrele(pwd->pwd_rdir);
 	if (pwd->pwd_jdir != NULL)
 		vrele(pwd->pwd_jdir);
+	if (pwd->pwd_adir != NULL)
+		vrele(pwd->pwd_adir);
 	uma_zfree_smr(pwd_zone, pwd);
 }
 
@@ -3976,6 +3988,8 @@ pwd_chroot(struct thread *td, struct vnode *vp)
 
 	vrefact(vp);
 	newpwd->pwd_rdir = vp;
+	vrefact(vp);
+	newpwd->pwd_adir = vp;
 	if (oldpwd->pwd_jdir == NULL) {
 		vrefact(vp);
 		newpwd->pwd_jdir = vp;
@@ -4000,6 +4014,40 @@ pwd_chdir(struct thread *td, struct vnode *vp)
 	PWDDESC_XLOCK(pdp);
 	oldpwd = PWDDESC_XLOCKED_LOAD_PWD(pdp);
 	newpwd->pwd_cdir = vp;
+	pwd_fill(oldpwd, newpwd);
+	pwd_set(pdp, newpwd);
+	PWDDESC_XUNLOCK(pdp);
+	pwd_drop(oldpwd);
+}
+
+/*
+ * Process is transitioning to/from a non-native ABI.
+ */
+void
+pwd_altroot(struct thread *td, struct vnode *altroot_vp)
+{
+	struct pwddesc *pdp;
+	struct pwd *newpwd, *oldpwd;
+
+	newpwd = pwd_alloc();
+	pdp = td->td_proc->p_pd;
+	PWDDESC_XLOCK(pdp);
+	oldpwd = PWDDESC_XLOCKED_LOAD_PWD(pdp);
+	if (altroot_vp != NULL) {
+		/*
+		 * Native process to a non-native ABI.
+		 */
+
+		vrefact(altroot_vp);
+		newpwd->pwd_adir = altroot_vp;
+	} else {
+		/*
+		 * Non-native process to the native ABI.
+		 */
+
+		vrefact(oldpwd->pwd_rdir);
+		newpwd->pwd_adir = oldpwd->pwd_rdir;
+	}
 	pwd_fill(oldpwd, newpwd);
 	pwd_set(pdp, newpwd);
 	PWDDESC_XUNLOCK(pdp);
@@ -4039,6 +4087,8 @@ pwd_chroot_chdir(struct thread *td, struct vnode *vp)
 		vrefact(vp);
 		newpwd->pwd_jdir = vp;
 	}
+	vrefact(vp);
+	newpwd->pwd_adir = vp;
 	pwd_fill(oldpwd, newpwd);
 	pwd_set(pdp, newpwd);
 	PWDDESC_XUNLOCK(pdp);
@@ -4055,7 +4105,8 @@ pwd_ensure_dirs(void)
 	pdp = curproc->p_pd;
 	PWDDESC_XLOCK(pdp);
 	oldpwd = PWDDESC_XLOCKED_LOAD_PWD(pdp);
-	if (oldpwd->pwd_cdir != NULL && oldpwd->pwd_rdir != NULL) {
+	if (oldpwd->pwd_cdir != NULL && oldpwd->pwd_rdir != NULL &&
+	    oldpwd->pwd_adir != NULL) {
 		PWDDESC_XUNLOCK(pdp);
 		return;
 	}
@@ -4072,6 +4123,10 @@ pwd_ensure_dirs(void)
 	if (newpwd->pwd_rdir == NULL) {
 		vrefact(rootvnode);
 		newpwd->pwd_rdir = rootvnode;
+	}
+	if (newpwd->pwd_adir == NULL) {
+		vrefact(rootvnode);
+		newpwd->pwd_adir = rootvnode;
 	}
 	pwd_set(pdp, newpwd);
 	PWDDESC_XUNLOCK(pdp);
@@ -4093,6 +4148,8 @@ pwd_set_rootvnode(void)
 	newpwd->pwd_cdir = rootvnode;
 	vrefact(rootvnode);
 	newpwd->pwd_rdir = rootvnode;
+	vrefact(rootvnode);
+	newpwd->pwd_adir = rootvnode;
 	pwd_fill(oldpwd, newpwd);
 	pwd_set(pdp, newpwd);
 	PWDDESC_XUNLOCK(pdp);
@@ -4128,7 +4185,8 @@ mountcheckdirs(struct vnode *olddp, struct vnode *newdp)
 		if (oldpwd == NULL ||
 		    (oldpwd->pwd_cdir != olddp &&
 		    oldpwd->pwd_rdir != olddp &&
-		    oldpwd->pwd_jdir != olddp)) {
+		    oldpwd->pwd_jdir != olddp &&
+		    oldpwd->pwd_adir != olddp)) {
 			PWDDESC_XUNLOCK(pdp);
 			pddrop(pdp);
 			continue;
@@ -4144,6 +4202,10 @@ mountcheckdirs(struct vnode *olddp, struct vnode *newdp)
 		if (oldpwd->pwd_jdir == olddp) {
 			vrefact(newdp);
 			newpwd->pwd_jdir = newdp;
+		}
+		if (oldpwd->pwd_adir == olddp) {
+			vrefact(newdp);
+			newpwd->pwd_adir = newdp;
 		}
 		pwd_fill(oldpwd, newpwd);
 		pwd_set(pdp, newpwd);

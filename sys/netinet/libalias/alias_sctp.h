@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2008
  * 	Swinburne University of Technology, Melbourne, Australia.
@@ -47,7 +47,6 @@
  *
  */
 
-/* $FreeBSD$ */
 
 #ifndef _ALIAS_SCTP_H_
 #define _ALIAS_SCTP_H_

@@ -1,5 +1,4 @@
 #	From: @(#)Makefile	8.3 (Berkeley) 1/7/94
-# $FreeBSD$
 
 .include <src.opts.mk>
 
@@ -29,7 +28,6 @@ SUBDIR=	alias \
 	column \
 	comm \
 	compress \
-	cpuset \
 	csplit \
 	ctlstat \
 	cut \
@@ -194,12 +192,12 @@ SUBDIR+= \
 	stevie
 .endif
 
-.if ${MACHINE_ARCH:Mriscv64*}
+.if ${MACHINE_CPUARCH} == "riscv"
 SUBDIR+=	minimal_count_stats
 .endif
 
-# Tracing currently only implemented for CHERI-QEMU architectures
-.if ${MACHINE} == "riscv"
+# Tracing currently only implemented for some CHERI-QEMU architectures
+.if ${MACHINE_CPUARCH} == "riscv"
 SUBDIR+=	qtrace
 .endif
 
@@ -256,6 +254,7 @@ SUBDIR.${MK_MAIL}+=	msgs
 SUBDIR.${MK_MAKE}+=	bmake
 SUBDIR.${MK_MAN_UTILS}+=	man
 SUBDIR.${MK_NETCAT}+=	nc
+SUBDIR.${MK_NETLINK}+=	genl
 SUBDIR.${MK_NIS}+=	ypcat
 SUBDIR.${MK_NIS}+=	ypmatch
 SUBDIR.${MK_NIS}+=	ypwhich

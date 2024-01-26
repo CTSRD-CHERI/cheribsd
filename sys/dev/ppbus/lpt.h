@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
@@ -35,8 +35,6 @@
  *	@(#)lptreg.h      1.1 (Berkeley) 12/19/90
  *	Id: lptreg.h,v 1.6 1997/02/22 09:36:52 peter Exp
  *	From Id: nlpt.h,v 1.3 1999/01/10 12:04:54 nsouch Exp
- *
- * $FreeBSD$
  */
 
 /*
