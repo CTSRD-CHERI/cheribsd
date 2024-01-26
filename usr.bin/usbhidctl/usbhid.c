@@ -1,8 +1,7 @@
 /*	$NetBSD: usbhid.c,v 1.14 2000/07/03 02:51:37 matt Exp $	*/
-/*	$FreeBSD$ */
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -58,7 +57,7 @@ static int hexdump = 0;
 static int wflag = 0;
 static int zflag = 0;
 
-static void usage(void);
+static void usage(void) __dead2;
 static void dumpitem(const char *label, struct hid_item *h);
 static void dumpitems(report_desc_t r);
 static void prdata(u_char *buf, struct hid_item *h);

@@ -1,4 +1,3 @@
-$FreeBSD$
 
 Please note that the content of this file is strictly advisory.
 No locks listed here are valid.  The only strict review requirements
@@ -97,6 +96,7 @@ share/mk/*.test.mk	imp,bapt,bdrewery,	Pre-commit review requested.
 			emaste,ngie,sjg,#test
 stand/forth		dteske	Pre-commit review requested.
 stand/lua		kevans	Pre-commit review requested
+stand			imp	Pre-commit review strongly requested.
 sys/compat/linuxkpi	hselasky		If in doubt, ask.
 			zeising, johalun	pre-commit review requested via
 						#x11 phabricator group.

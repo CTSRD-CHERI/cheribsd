@@ -119,6 +119,11 @@ int main(int, char**)
   test_is_unsigned<bool>();
   test_is_unsigned<unsigned>();
 
+  test_is_unsigned<uintptr_t>();
+  test_is_not_unsigned<intptr_t>();
+  test_is_unsigned<uintmax_t>();
+  test_is_not_unsigned<intmax_t>();
+
 #ifndef TEST_HAS_NO_INT128
     test_is_unsigned<__uint128_t>();
     test_is_not_unsigned<__int128_t>();

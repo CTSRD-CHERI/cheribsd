@@ -25,7 +25,6 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD$
 #
 
 import argparse
@@ -75,7 +74,7 @@ def main():
 
 	# We do not generate ICMPv6 for non-off=0-segments.
 	# Wait for expiry.
-	sleep(75)
+	sleep(3)
 
 	sys.exit(0)
 

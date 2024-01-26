@@ -30,8 +30,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef _ARM64_INCLUDE_CHERIREG_H_
 #define	_ARM64_INCLUDE_CHERIREG_H_
@@ -84,6 +82,23 @@
 	CHERI_PERM_LOAD)
 
 /*
+ * Hardware defines a kind of tripartite taxonomy: memory, type, and CID.
+ * They're all squished together in the permission bits, so define masks
+ * that give us a kind of "kind" for capabilities.  A capability may belong
+ * to zero, one, or more than one of these.
+ */
+
+#define CHERI_PERMS_HWALL_MEMORY                                        \
+	(CHERI_PERM_EXECUTE | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |   \
+		CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |               \
+		CHERI_PERM_STORE_LOCAL_CAP | CHERI_PERM_MUTABLE_LOAD |  \
+		CHERI_PERM_INVOKE | CHERI_PERM_BRANCH_SEALED_PAIR)
+
+#define CHERI_PERMS_HWALL_OTYPE	(CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
+
+/* TODO #define CHERI_PERMS_HWALL_CID	(CHERI_PERM_SETCID) */
+
+/*
  * vm_prot_t to capability permission bits
  */
 #define	CHERI_PERMS_PROT2PERM_READ					\
@@ -104,6 +119,9 @@
 	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |	\
 	CHERI_PERM_BRANCH_SEALED_PAIR |					\
 	(CHERI_PERMS_SWALL & ~CHERI_PERM_SW_VMEM))
+
+#define	CHERI_PERMS_USERSPACE_CIDCAP					\
+	(CHERI_PERM_COMPARTMENT_ID)
 
 #define	CHERI_PERMS_USERSPACE_CODE					\
 	(CHERI_PERMS_USERSPACE | CHERI_PERM_EXECUTE |			\
@@ -128,6 +146,9 @@
 #define	CHERI_PERMS_KERNEL						\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |	\
 		CHERI_PERM_MUTABLE_LOAD)
+
+#define	CHERI_PERMS_KERNEL_CIDCAP					\
+	(CHERI_PERM_COMPARTMENT_ID)
 
 #define	CHERI_PERMS_KERNEL_CODE						\
 	(CHERI_PERMS_KERNEL | CHERI_PERM_EXECUTE |			\
@@ -168,5 +189,15 @@
 /* Reserved CHERI object types: */
 #define	CHERI_OTYPE_UNSEALED	(0l)
 #define	CHERI_OTYPE_SENTRY	(1l)
+
+/*
+ * Root compartment ID capablity for userspace.
+ *
+ * XXX: move these to sys/cheri/cherireg.h if another platform implements CIDs.
+ */
+#define	CHERI_COMPARTMENT_ID_USERSPACE_PERMS	CHERI_PERMS_USERSPACE_CIDCAP
+#define	CHERI_COMPARTMENT_ID_USERSPACE_BASE	0x0
+#define	CHERI_COMPARTMENT_ID_USERSPACE_LENGTH	0x8000000000000000UL
+#define	CHERI_COMPARTMENT_ID_USERSPACE_OFFSET	0x0
 
 #endif /* _ARM64_INCLUDE_CHERIREG_H_ */

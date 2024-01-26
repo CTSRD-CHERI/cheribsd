@@ -46,8 +46,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "namespace.h"
 #include <sys/param.h>
 #include <sys/auxv.h>
@@ -465,7 +463,7 @@ __thr_get_main_stack_base(char **base)
 	 * there.
 	 */
 	char *sp = (char *)cheri_getstack();
-	*base = sp + cheri_getlen(sp);
+	*base = cheri_setoffset(sp, cheri_getlen(sp));
 	return (true);
 #else
 	size_t len;

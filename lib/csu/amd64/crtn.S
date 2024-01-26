@@ -24,14 +24,12 @@
  */
 
 #include <machine/asm.h>
-__FBSDID("$FreeBSD$");
-
 	.section .init,"ax",@progbits
-	addq	$8,%rsp
+	popq	%rbp
 	ret
 
 	.section .fini,"ax",@progbits
-	addq	$8,%rsp
+	popq	%rbp
 	ret
 
 	.section .note.GNU-stack,"",%progbits

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009 Stanislav Sedov <stas@FreeBSD.org>
  * Copyright (c) 2017 Dell EMC
@@ -25,8 +25,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _LIBPROCSTAT_H_
@@ -103,6 +101,11 @@
 #define	PS_FST_FFLAG_DIRECT	0x1000
 #define	PS_FST_FFLAG_EXEC	0x2000
 #define	PS_FST_FFLAG_HASLOCK	0x4000
+
+#if !defined(__ILP32__) && !defined(__riscv)
+/* Target architecture supports 32-bit compat */
+#define	PS_ARCH_HAS_FREEBSD32	1
+#endif
 
 struct kinfo_kstack;
 struct kinfo_proc;
@@ -220,6 +223,10 @@ int	procstat_get_pipe_info(struct procstat *procstat, struct filestat *fst,
     struct pipestat *pipe, char *errbuf);
 int	procstat_get_pts_info(struct procstat *procstat, struct filestat *fst,
     struct ptsstat *pts, char *errbuf);
+int	procstat_get_revoker_epoch(struct procstat *procstat,
+    struct kinfo_proc *kp, uint64_t *revoker_epoch);
+int	procstat_get_revoker_state(struct procstat *procstat,
+    struct kinfo_proc *kp, int *revoker_state);
 int	procstat_get_sem_info(struct procstat *procstat, struct filestat *fst,
     struct semstat *sem, char *errbuf);
 int	procstat_get_shm_info(struct procstat *procstat, struct filestat *fst,
@@ -246,6 +253,8 @@ int	procstat_getosrel(struct procstat *procstat, struct kinfo_proc *kp,
     int *osrelp);
 int	procstat_getpathname(struct procstat *procstat, struct kinfo_proc *kp,
     char *pathname, size_t maxlen);
+int	procstat_getquarantining(struct procstat *procstat,
+    struct kinfo_proc *kp, int *quarantining);
 int	procstat_getrlimit(struct procstat *procstat, struct kinfo_proc *kp,
     int which, struct rlimit* rlimit);
 int	procstat_getumask(struct procstat *procstat, struct kinfo_proc *kp,

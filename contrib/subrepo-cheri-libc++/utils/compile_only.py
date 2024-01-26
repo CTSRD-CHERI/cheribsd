@@ -37,7 +37,8 @@ def main():
     # Extract environment variables into a dictionary
     env = {k : v  for (k, v) in map(lambda s: s.split('=', 1), args.env)}
     # Run the command line with the given environment in the execution directory.
-    print("Would have run", subprocess.list2cmdline(commandLine), "in", args.execdir, "with env=", env)
+    print("Would have run", subprocess.list2cmdline(commandLine), "in",
+          args.execdir, "with env=", env, file=sys.stderr)
 
 
 if __name__ == '__main__':

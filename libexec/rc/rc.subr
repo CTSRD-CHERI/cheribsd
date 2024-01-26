@@ -1,5 +1,4 @@
 # $NetBSD: rc.subr,v 1.67 2006/10/07 11:25:15 elad Exp $
-# $FreeBSD$
 #
 # Copyright (c) 1997-2004 The NetBSD Foundation, Inc.
 # All rights reserved.
@@ -52,6 +51,8 @@ ID="/usr/bin/id"
 IDCMD="if [ -x $ID ]; then $ID -un; fi"
 PS="/bin/ps -ww"
 JID=0
+CPUSET="/bin/cpuset"
+
 # rc_service provides the path to the service script that we are executing.
 # This is not being set here in an execution context, necessarily, so it's
 # really just a reasonable guess, and it will get overwritten later if
@@ -67,7 +68,7 @@ rc_service="$0"
 
 # list_vars pattern
 #	List variables matching glob pattern.
-# 
+#
 list_vars()
 {
 	# Localize 'set' option below.
@@ -442,7 +443,7 @@ sort_lite()
 	local curitem curitem_orig curitem_mod curitem_haskey
 	local dest dest_orig dest_mod dest_haskey
 	local d gt n
-	local i=1 
+	local i=1
 	while [ $i -le $nitems ]; do
 		curitem_haskey=1 # Assume sort field (-k POS) exists
 		eval curitem=\"\$src_$i\"
@@ -777,6 +778,9 @@ startmsg()
 #	${name}_chdir	n	Directory to cd to before running ${command}
 #				(if not using ${name}_chroot).
 #
+#	${name}_cpuset	n	A list of CPUs to run ${command} on.
+#				Requires /usr to be mounted.
+#
 #	${name}_flags	n	Arguments to call ${command} with.
 #				NOTE:	$flags from the parent environment
 #					can be used to override this.
@@ -963,6 +967,23 @@ run_rc_command()
 	_pidcmd=
 	_procname=${procname:-${command}}
 
+	eval _cpuset=\$${name}_cpuset
+
+	# Loose validation of the configured cpuset; just make sure it starts
+	# with a number.  There have also been cases in the past where a hyphen
+	# in a service name has caused eval errors, which trickle down into
+	# various variables; don't let a situation like that break a bunch of
+	# services just because of cpuset(1).
+	case "$_cpuset" in
+	[0-9]*)	;;
+	*)	_cpuset="" ;;
+	esac
+
+	_cpusetcmd=
+	if [ -n "$_cpuset" ]; then
+		_cpusetcmd="$CPUSET -l $_cpuset"
+	fi
+
 					# setup pid check command
 	if [ -n "$_procname" ]; then
 		if [ -n "$pidfile" ]; then
@@ -1059,7 +1080,7 @@ run_rc_command()
 				eval "export -- $_env"
 			fi
 			_run_rc_precmd || return 1
-			_run_rc_doit "$_cmd $rc_extra_args" || return 1
+			_run_rc_doit "$_cpusetcmd $_cmd $rc_extra_args" || return 1
 			_run_rc_postcmd
 			return $_return
 		fi
@@ -1071,19 +1092,19 @@ run_rc_command()
 				echo "$desc"
 			fi
 			;;
-	
+
 		extracommands)
 			echo "$extra_commands"
 			;;
 
 		enable)
 			_out=$(/usr/sbin/sysrc -vs "$name" "$rcvar=YES") &&
-				echo "$name enabled in ${_out%%:*}"	
+				echo "$name enabled in ${_out%%:*}"
 			;;
 
 		disable)
 			_out=$(/usr/sbin/sysrc -vs "$name" "$rcvar=NO") &&
-				echo "$name disabled in ${_out%%:*}"	
+				echo "$name disabled in ${_out%%:*}"
 			;;
 
 		delete)
@@ -1130,6 +1151,7 @@ run_rc_command()
 				_cd=
 				_doit="\
 ${_nice:+nice -n $_nice }\
+$_cpusetcmd \
 ${_fib:+setfib -F $_fib }\
 ${_env:+env $_env }\
 chroot ${_user:+-u $_user }${_group:+-g $_group }${_groups:+-G $_groups }\
@@ -1139,7 +1161,7 @@ $_chroot $command $rc_flags $command_args"
 				_doit="\
 ${_fib:+setfib -F $_fib }\
 ${_env:+env $_env }\
-$command $rc_flags $command_args"
+$_cpusetcmd $command $rc_flags $command_args"
 				if [ -n "$_user" ]; then
 				    _doit="su -m $_user -c 'sh -c \"$_doit\"'"
 				fi
@@ -1947,6 +1969,9 @@ load_kld()
 			return 1
 		else
 			info "$1 kernel module loaded."
+			if [ -f "/etc/sysctl.kld.d/$1.conf" ]; then
+				sysctl -f "/etc/sysctl.kld.d/$1.conf"
+			fi
 		fi
 	else
 		debug "load_kld: $1 kernel module already loaded."

@@ -28,8 +28,6 @@
 #include "opt_platform.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/limits.h>
@@ -122,7 +120,11 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	bcopy(td1->td_frame, tf, sizeof(*tf));
 	tf->tf_x[0] = 0;
 	tf->tf_x[1] = 0;
-	tf->tf_spsr = td1->td_frame->tf_spsr & (PSR_M_32 | PSR_DAIF);
+	tf->tf_spsr = td1->td_frame->tf_spsr & (PSR_M_32 | PSR_DAIF
+#if __has_feature(capabilities)
+	    | PSR_C64
+#endif
+	    );
 
 	td2->td_frame = tf;
 
@@ -247,14 +249,20 @@ cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
 		tf->tf_sp = STACKALIGN((uintcap_t)stack->ss_sp + stack->ss_size);
 
 #if __has_feature(capabilities)
-	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
-		trapframe_set_elr(tf, (uintcap_t)entry);
-	else
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
+		if (SV_PROC_FLAG(td->td_proc, SV_UNBOUND_PCC))
+			tf->tf_elr = cheri_setaddress(tf->tf_elr,
+			    (__cheri_addr ptraddr_t)entry);
+		else
+			trapframe_set_elr(tf, (uintcap_t)entry);
+	} else
 		hybridabi_thread_setregs(td, (unsigned long)(uintcap_t)entry);
 #else
 	tf->tf_elr = (uintcap_t)entry;
 #endif
 	tf->tf_x[0] = (uintcap_t)arg;
+	tf->tf_x[29] = 0;
+	tf->tf_lr = 0;
 }
 
 int

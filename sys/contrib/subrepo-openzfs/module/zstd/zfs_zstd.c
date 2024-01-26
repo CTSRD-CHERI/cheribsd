@@ -50,9 +50,11 @@
 #include "lib/zstd.h"
 #include "lib/common/zstd_errors.h"
 
+#ifndef IN_LIBSA
 static uint_t zstd_earlyabort_pass = 1;
 static int zstd_cutoff_level = ZIO_ZSTD_LEVEL_3;
 static unsigned int zstd_abort_size = (128 * 1024);
+#endif
 
 static kstat_t *zstd_ksp = NULL;
 
@@ -180,16 +182,20 @@ struct zstd_levelmap {
  *
  * The ZSTD handlers were split up for the most simplified implementation.
  */
+#ifndef IN_LIBSA
 static void *zstd_alloc(void *opaque, size_t size);
+#endif
 static void *zstd_dctx_alloc(void *opaque, size_t size);
 static void zstd_free(void *opaque, void *ptr);
 
+#ifndef IN_LIBSA
 /* Compression memory handler */
 static const ZSTD_customMem zstd_malloc = {
 	zstd_alloc,
 	zstd_free,
 	NULL,
 };
+#endif
 
 /* Decompression memory handler */
 static const ZSTD_customMem zstd_dctx_malloc = {
@@ -429,7 +435,7 @@ zstd_enum_to_level(enum zio_zstd_levels level, int16_t *zstd_level)
 	return (1);
 }
 
-
+#ifndef IN_LIBSA
 size_t
 zfs_zstd_compress_wrap(void *s_start, void *d_start, size_t s_len, size_t d_len,
     int level)
@@ -593,6 +599,7 @@ zfs_zstd_compress(void *s_start, void *d_start, size_t s_len, size_t d_len,
 
 	return (c_len + sizeof (*hdr));
 }
+#endif
 
 /* Decompress block using zstd and return its stored level */
 int
@@ -680,6 +687,7 @@ zfs_zstd_decompress(void *s_start, void *d_start, size_t s_len, size_t d_len,
 	    NULL));
 }
 
+#ifndef IN_LIBSA
 /* Allocator for zstd compression context using mempool_allocator */
 static void *
 zstd_alloc(void *opaque __maybe_unused, size_t size)
@@ -696,6 +704,7 @@ zstd_alloc(void *opaque __maybe_unused, size_t size)
 
 	return ((void*)z + (sizeof (struct zstd_kmem)));
 }
+#endif
 
 /*
  * Allocator for zstd decompression context using mempool_allocator with
@@ -844,6 +853,13 @@ zstd_mempool_deinit(void)
 void
 zfs_zstd_cache_reap_now(void)
 {
+
+	/*
+	 * Short-circuit if there are no buffers to begin with.
+	 */
+	if (ZSTDSTAT(zstd_stat_buffers) == 0)
+		return;
+
 	/*
 	 * calling alloc with zero size seeks
 	 * and releases old unused objects

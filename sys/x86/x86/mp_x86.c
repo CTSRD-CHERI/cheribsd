@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_acpi.h"
 #ifdef __i386__
 #include "opt_apic.h"
@@ -99,7 +97,6 @@ int bootAP;
 void *bootstacks[MAXCPU];
 void *dpcpu;
 
-struct pcb stoppcbs[MAXCPU];
 struct susppcb **susppcbs;
 
 #ifdef COUNT_IPIS

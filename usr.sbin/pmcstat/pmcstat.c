@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003-2008, Joseph Koshy
  * Copyright (c) 2007 The FreeBSD Foundation
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/cpuset.h>
 #include <sys/event.h>
@@ -96,7 +94,7 @@ __FBSDID("$FreeBSD$");
  *
  *   /Parent/				/Child/
  *
- *   - Wait for childs token.
+ *   - Wait for child's token.
  *					- Sends token.
  *					- Awaits signal to start.
  *  - Attaches PMCs to the child's pid
@@ -967,7 +965,7 @@ main(int argc, char **argv)
 	if ((args.pa_required & FLAG_HAS_PROCESS_PMCS) &&
 	    (args.pa_flags & FLAG_HAS_PROCESS_PMCS) == 0)
 		errx(EX_USAGE,
-"ERROR: options -d, -E, and -W require a process mode PMC to be specified."
+"ERROR: options -d, -E, -t, and -W require a process mode PMC to be specified."
 		    );
 
 	/* check for -c cpu with no system mode PMCs or logfile. */

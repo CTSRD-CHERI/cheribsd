@@ -28,6 +28,10 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef __arm__
+#include <arm/tls.h>
+#else /* !__arm__ */
+
 #ifndef _MACHINE_TLS_H_
 #define	_MACHINE_TLS_H_
 
@@ -41,7 +45,7 @@ static __inline void
 _tcb_set(struct tcb *tcb)
 {
 #ifdef __CHERI_PURE_CAPABILITY__
-#if defined(IN_RTLD) && defined(RTLD_SANDBOX)
+#if defined(IN_RTLD) && defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	__asm __volatile("msr	rctpidr_el0, %0" :: "C" (tcb));
 #else
 	__asm __volatile("msr	ctpidr_el0, %0" :: "C" (tcb));
@@ -57,7 +61,7 @@ _tcb_get(void)
 	struct tcb *tcb;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#if defined(IN_RTLD) && defined(RTLD_SANDBOX)
+#if defined(IN_RTLD) && defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	__asm __volatile("mrs	%0, rctpidr_el0" : "=C" (tcb));
 #else
 	__asm __volatile("mrs	%0, ctpidr_el0" : "=C" (tcb));
@@ -69,3 +73,5 @@ _tcb_get(void)
 }
 
 #endif /* !_MACHINE_TLS_H_ */
+
+#endif /* !__arm__ */

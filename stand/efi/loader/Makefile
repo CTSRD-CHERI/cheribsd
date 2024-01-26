@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 LOADER_NET_SUPPORT?=	yes
 LOADER_MSDOS_SUPPORT?=	yes
@@ -110,7 +109,7 @@ LDFLAGS+=	-Wl,--no-dynamic-linker
 CLEANFILES+=	${LOADER}.efi
 
 ${LOADER}.efi: ${PROG}
-	if ${NM} ${.ALLSRC} | grep ' U '; then \
+	@if ${NM} ${.ALLSRC} | grep ' U '; then \
 		echo "Undefined symbols in ${.ALLSRC}"; \
 		exit 1; \
 	fi
@@ -123,7 +122,7 @@ ${LOADER}.efi: ${PROG}
 
 LIBEFI=		${BOOTOBJ}/efi/libefi/libefi.a
 
-DPADD=		${LDR_INTERP} ${LIBEFI} ${LIBFDT} ${LIBEFI_FDT} ${LIBSA} ${LDSCRIPT}
-LDADD=		${LDR_INTERP} ${LIBEFI} ${LIBFDT} ${LIBEFI_FDT} ${LIBSA}
+DPADD=		${LDR_INTERP} ${LIBEFI} ${LIBSAFDT} ${LIBEFI_FDT} ${LIBSA} ${LDSCRIPT}
+LDADD=		${LDR_INTERP} ${LIBEFI} ${LIBSAFDT} ${LIBEFI_FDT} ${LIBSA}
 
 .include <bsd.prog.mk>

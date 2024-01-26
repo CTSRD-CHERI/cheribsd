@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w 
 
-#$FreeBSD$
-
 if ($#ARGV != 1) {
   print "bin2h.pl <firmware> <headername>\n";
   exit 1;
@@ -22,7 +20,7 @@ unless ($success) {
 my $license = <<END;
 /**************************************************************************
 
-SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+SPDX-License-Identifier: BSD-2-Clause
 
 Copyright (c) 2007-2009, Chelsio Inc.
 All rights reserved.

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998 John D. Polstra
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #if !defined(IN_LIBDL) || defined(PIC)
 
 /*
@@ -47,6 +45,7 @@ __FBSDID("$FreeBSD$");
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "namespace.h"
 #include <pthread.h>
 #include "un-namespace.h"
@@ -62,7 +61,7 @@ void _rtld_atfork_post(int *);
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 void _rtld_thread_start_init(void (*)(struct pthread *));
-void _rtld_sighandler_init(void *);
+void _rtld_sighandler_init(void (*)(int, siginfo_t *, void *));
 #endif
 
 /*
@@ -206,7 +205,7 @@ _rtld_thread_start_init(void (*p)(struct pthread *) __unused)
 
 #pragma weak _rtld_sighandler_init
 void
-_rtld_sighandler_init(void *p __unused)
+_rtld_sighandler_init(void (*p)(int, siginfo_t *, void *) __unused)
 {
 }
 #endif
@@ -214,7 +213,9 @@ _rtld_sighandler_init(void *p __unused)
 #ifndef IN_LIBDL
 static pthread_once_t dl_phdr_info_once = PTHREAD_ONCE_INIT;
 static struct dl_phdr_info phdr_info;
+#ifndef PIC
 static mutex_t dl_phdr_info_lock = MUTEX_INITIALIZER;
+#endif
 
 static void
 dl_init_phdr_info(void)
@@ -266,7 +267,16 @@ int
 dl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *) __unused,
     void *data __unused)
 {
-#ifndef IN_LIBDL
+#if defined IN_LIBDL
+	return (0);
+#elif defined PIC
+	int (*r)(int (*)(struct dl_phdr_info *, size_t, void *), void *);
+
+	r = dlsym(RTLD_DEFAULT, "dl_iterate_phdr");
+	if (r == NULL)
+		return (0);
+	return (r(callback, data));
+#else
 	tls_index ti;
 	int ret;
 
@@ -281,8 +291,6 @@ dl_iterate_phdr(int (*callback)(struct dl_phdr_info *, size_t, void *) __unused,
 	ret = callback(&phdr_info, sizeof(phdr_info), data);
 	mutex_unlock(&dl_phdr_info_lock);
 	return (ret);
-#else
-	return (0);
 #endif
 }
 
@@ -307,13 +315,48 @@ _rtld_atfork_post(int *locks __unused)
 {
 }
 
+#ifndef IN_LIBDL
+struct _rtld_addr_phdr_cb_data {
+	const void *addr;
+	struct dl_phdr_info *dli;
+};
+
+static int
+_rtld_addr_phdr_cb(struct dl_phdr_info *dli, size_t sz, void *arg)
+{
+	struct _rtld_addr_phdr_cb_data *rd;
+	const Elf_Phdr *ph;
+	unsigned i;
+
+	rd = arg;
+	for (i = 0; i < dli->dlpi_phnum; i++) {
+		ph = &dli->dlpi_phdr[i];
+		if (ph->p_type == PT_LOAD &&
+		    dli->dlpi_addr + ph->p_vaddr <= (uintptr_t)rd->addr &&
+		    (uintptr_t)rd->addr < dli->dlpi_addr + ph->p_vaddr +
+		    ph->p_memsz) {
+			memcpy(rd->dli, dli, sz);
+			return (1);
+		}
+	}
+	return (0);
+}
+#endif
+
 #pragma weak _rtld_addr_phdr
 int
 _rtld_addr_phdr(const void *addr __unused,
     struct dl_phdr_info *phdr_info_a __unused)
 {
+#ifndef IN_LIBDL
+	struct _rtld_addr_phdr_cb_data rd;
 
+	rd.addr = addr;
+	rd.dli = phdr_info_a;
+	return (dl_iterate_phdr(_rtld_addr_phdr_cb, &rd));
+#else
 	return (0);
+#endif
 }
 
 #pragma weak _rtld_get_stack_prot

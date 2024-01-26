@@ -24,8 +24,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/ioccom.h>
 
@@ -137,7 +135,8 @@ power_show(int fd)
 	if (nvme_completion_is_error(&pt.cpl))
 		errx(EX_IOERR, "set feature power mgmt request returned error");
 
-	printf("Current Power Mode is %d\n", pt.cpl.cdw0);
+	printf("Current Power State is %d\n", pt.cpl.cdw0 & 0x1F);
+	printf("Current Workload Hint is %d\n", pt.cpl.cdw0 >> 5);
 }
 
 static void
@@ -189,7 +188,7 @@ static const struct opts power_opts[] = {
 	OPT("power", 'p', arg_uint32, opt, power,
 	    "Set the power state"),
 	OPT("workload", 'w', arg_uint32, opt, workload,
-	    "Set the workload"),
+	    "Set the workload hint"),
 	{ NULL, 0, arg_none, NULL, NULL }
 };
 #undef OPT

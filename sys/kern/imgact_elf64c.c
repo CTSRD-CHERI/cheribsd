@@ -26,9 +26,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /* This implements 64-bit CheriABI. */
 
 #define __ELF_WORD_SIZE 64

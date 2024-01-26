@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -29,8 +29,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  *	from NetBSD: bmtphyreg.h,v 1.1 2001/06/02 21:42:10 thorpej Exp
- *
- * $FreeBSD$
  */
 
 #ifndef _DEV_MII_BMTPHYREG_H_

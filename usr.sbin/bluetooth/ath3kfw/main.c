@@ -25,8 +25,6 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGES.
- *
- * $FreeBSD$
  */
 
 #include <stdio.h>
@@ -155,7 +153,7 @@ ath3k_init_ar3012(libusb_device_handle *hdl, const char *fw_path)
 	ret = ath3k_load_patch(hdl, fw_path);
 	if (ret < 0) {
 		ath3k_err("Loading patch file failed\n");
-	return (ret);
+		return (ret);
 	}
 
 	ret = ath3k_load_syscfg(hdl, fw_path);
@@ -199,7 +197,7 @@ ath3k_init_firmware(libusb_device_handle *hdl, const char *file_prefix)
 	/* free it */
 	ath3k_fw_free(&fw);
 
-	return (0);
+	return (ret);
 }
 
 /*

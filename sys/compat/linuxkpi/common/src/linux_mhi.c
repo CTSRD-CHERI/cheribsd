@@ -23,13 +23,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/kernel.h>
@@ -60,7 +56,7 @@ linuxkpi_mhi_free_controller(struct mhi_controller *mhi_ctrl)
 
 int
 linuxkpi_mhi_register_controller(struct mhi_controller *mhi_ctrl,
-    struct mhi_controller_config *cfg)
+    const struct mhi_controller_config *cfg)
 {
 
 	if (mhi_ctrl == NULL || cfg == NULL)

@@ -2366,7 +2366,6 @@ JEMALLOC_EXPORT JEMALLOC_ALLOCATOR JEMALLOC_RESTRICT_RETURN
 void JEMALLOC_NOTHROW *
 JEMALLOC_ATTR(malloc) JEMALLOC_ALLOC_SIZE(1)
 je_malloc(size_t size) {
-	bool zero_size;
 	LOG("core.malloc.entry", "size: %zu", size);
 
 	if (tsd_get_allocates() && unlikely(!malloc_initialized())) {
@@ -2384,10 +2383,6 @@ je_malloc(size_t size) {
 		return malloc_default(size);
 	}
 
-	zero_size = false;
-	if (size == 0) {
-		zero_size = true;
-	}
 	size = ROUND_SIZE(size);
 	szind_t ind = sz_size2index_lookup(size);
 	size_t usize;
@@ -2433,7 +2428,7 @@ je_malloc(size_t size) {
 		LOG("core.malloc.exit", "result: %p", ret);
 
 		/* Fastpath success */
-		return BOUND_PTR(ret, zero_size ? 0 : size);
+		return BOUND_PTR(ret, size);
 	}
 
 	return malloc_default(size);
@@ -3785,6 +3780,44 @@ je_malloc_usable_size(JEMALLOC_USABLE_SIZE_CONST void *ptr) {
 	LOG("core.malloc_usable_size.exit", "result: %zu", ret);
 	return ret;
 }
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(MALLOC_REVOCATION_SHIM)
+JEMALLOC_EXPORT void JEMALLOC_NOTHROW *
+je_malloc_underlying_allocation(void *ptr) {
+	void *ret;
+	tsdn_t *tsdn;
+
+	assert(malloc_initialized() || IS_INITIALIZER);
+
+	tsdn = tsdn_fetch();
+	check_entry_exit_locking(tsdn);
+
+	if (unlikely(ptr == NULL)) {
+		ret = NULL;
+	} else {
+		size_t underlying_size = ivsalloc(tsdn, ptr);
+		if (underlying_size == 0) {
+			ret = NULL;
+		} else {
+			/*
+			 * XXX unbound_ptr will actually work if this isn't
+			 * a pointer to an original allocation but is
+			 * contained within an extent - we can
+			 * probably fix this in rtree functions.
+			 */
+			ret = unbound_ptr(tsdn, ptr);
+			/* Bounds as with BOUND_PTR, but preserve SW_VMEM */
+			if (ret != NULL)
+				ret = cheri_andperm(
+				    cheri_setbounds(ret, underlying_size),
+				    CHERI_PERMS_USERSPACE_DATA | CHERI_PERM_SW_VMEM);
+		}
+	}
+
+	check_entry_exit_locking(tsdn);
+	return (ret);
+}
+#endif
 
 /*
  * End non-standard functions.

@@ -1,5 +1,3 @@
-# $FreeBSD$
-
 .include <src.opts.mk>
 
 .if !${MACHINE_ABI:Mpurecap}

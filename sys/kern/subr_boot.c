@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998 Michael Smith <msmith@freebsd.org>
  * All Rights Reserved.
@@ -36,8 +36,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /* Note: This is compiled in both the kernel and boot loader contexts */
 
 #include <sys/param.h>
@@ -48,6 +46,7 @@ __FBSDID("$FreeBSD$");
 #endif
 #include <sys/reboot.h>
 #include <sys/boot.h>
+#include <sys/tslog.h>
 
 #ifdef _KERNEL
 #define SETENV(k, v)	kern_setenv(k, v)
@@ -95,12 +94,14 @@ boot_env_to_howto(void)
 	int i, howto;
 	char *val;
 
+	TSENTER();
 	for (howto = 0, i = 0; howto_names[i].ev != NULL; i++) {
 		val = GETENV(howto_names[i].ev);
 		if (val != NULL && strcasecmp(val, "no") != 0)
 			howto |= howto_names[i].mask;
 		FREE(val);
 	}
+	TSEXIT();
 	return (howto);
 }
 
@@ -196,12 +197,14 @@ boot_parse_cmdline_delim(char *cmdline, const char *delim)
 	char *v;
 	int howto;
 
+	TSENTER();
 	howto = 0;
 	while ((v = strsep(&cmdline, delim)) != NULL) {
 		if (*v == '\0')
 			continue;
 		howto |= boot_parse_arg(v);
 	}
+	TSEXIT();
 	return (howto);
 }
 

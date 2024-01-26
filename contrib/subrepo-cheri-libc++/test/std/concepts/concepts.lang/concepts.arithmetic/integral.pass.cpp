@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
-// UNSUPPORTED: libcpp-no-concepts
 
 // template<class T>
 // concept integral = // see below
@@ -58,6 +57,8 @@ static_assert(CheckIntegralQualifiers<long>());
 static_assert(CheckIntegralQualifiers<unsigned long>());
 static_assert(CheckIntegralQualifiers<long long>());
 static_assert(CheckIntegralQualifiers<unsigned long long>());
+static_assert(CheckIntegralQualifiers<intptr_t>());
+static_assert(CheckIntegralQualifiers<uintptr_t>());
 
 // extended integers
 #ifndef TEST_HAS_NO_INT128

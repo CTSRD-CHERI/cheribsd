@@ -95,7 +95,7 @@ is_colocated_with_parent(void)
 
 #ifdef CHERIBSD_DYNAMIC_TESTS
 static void
-coexec_child_cf(const struct cheri_test * __unused ctp)
+coexec_child_cf(void)
 {
 	if (is_colocated_with_parent())
 		exit (0);
@@ -113,7 +113,7 @@ CHERIBSDTEST(colocation_coexec_child,
 		cheribsdtest_failure_err("Fork failed");
 
 	if (pid == 0) {
-		cheribsdtest_coexec_child(ctp);
+		cheribsdtest_coexec_child();
 	} else {
 		int res;
 
@@ -140,7 +140,7 @@ CHERIBSDTEST(colocation_coexec_child,
  * Both send their own pid and validate what they recieve.
  */
 static void
-coaccept_slow_cf(const struct cheri_test *ctp)
+coaccept_slow_cf(void)
 {
 	pid_t caller_pid, my_pid, parent_pid, recvd_pid;
 	int error;
@@ -155,7 +155,7 @@ coaccept_slow_cf(const struct cheri_test *ctp)
 	if (error != 0)
 		err(EX_OSERR, "cosetup");
 
-	error = coregister(ctp->ct_name, NULL);
+	error = coregister(/* ctp->ct_name */ "XXX", NULL);
 	if (error != 0)
 		err(EX_OSERR, "coregister");
 
@@ -200,7 +200,7 @@ CHERIBSDTEST(colocation_coaccept_slow,
 		cheribsdtest_failure_err("Fork failed");
 
 	if (fork_pid == 0) {
-		cheribsdtest_coexec_child(ctp);
+		cheribsdtest_coexec_child();
 	} else {
 		void *target;
 		int error;
@@ -217,7 +217,7 @@ CHERIBSDTEST(colocation_coaccept_slow,
 		 *
 		 * XXX: set a timeout?
 		 */
-		while ((error = colookup(ctp->ct_name, &target)) != 0 &&
+		while ((error = colookup(/* ctp->ct_name */ "XXX", &target)) != 0 &&
 		    errno == ESRCH && waitpid(fork_pid, &res, WNOHANG) == 0)
 			;
 		if (error != 0)
@@ -262,7 +262,7 @@ CHERIBSDTEST(colocation_coaccept_slow,
 #endif
 
 static void
-exec_child_cf(const struct cheri_test * __unused ctp)
+exec_child_cf(void)
 {
 	if (!is_colocated_with_parent())
 		exit (0);
@@ -284,7 +284,7 @@ CHERIBSDTEST(colocation_exec_child,
 		cheribsdtest_failure_err("Fork failed");
 
 	if (pid == 0) {
-		cheribsdtest_exec_child(ctp);
+		cheribsdtest_exec_child();
 	} else {
 		int res;
 

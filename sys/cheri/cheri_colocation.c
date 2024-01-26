@@ -267,6 +267,13 @@ wakeupself(void)
 	wakeup(chan);
 }
 
+static void * __capability
+errno_cap(int error)
+{
+
+	return (cheri_capability_build_user_rwx_unchecked(0, 0, 0, error));
+}
+
 void
 colocation_get_peer(struct thread *td, struct thread **peertdp)
 {
@@ -324,7 +331,7 @@ colocation_thread_exit(struct thread *td)
 	 * Set scb_caller_scb to a special "null" capability, so that cocall(2)
 	 * can see the callee thread is dead.
 	 */
-	scb.scb_caller_scb = cheri_capability_build_user_data(0, 0, 0, ENOLINK);
+	scb.scb_caller_scb = errno_cap(ENOLINK);
 	scb.scb_td = NULL;
 	scb.scb_borrower_td = NULL;
 
@@ -530,7 +537,7 @@ setup_scb(struct thread *td)
 	scb.scb_unsealcap = switcher_sealcap2;
 	scb.scb_td = (__cheri_tocap void * __capability)td;
 	scb.scb_borrower_td = NULL;
-	scb.scb_caller_scb = cheri_capability_build_user_data(0, 0, 0, EAGAIN);
+	scb.scb_caller_scb = errno_cap(EAGAIN);
 	colocation_store_scb(td, &scb);
 
 	return (0);
@@ -964,8 +971,7 @@ again:
 		COLOCATION_DEBUG("msleep failed with error %d", error);
 	}
 
-	colocation_store_caller_scb(targetscb,
-	    cheri_capability_build_user_data(0, 0, 0, EPROTOTYPE));
+	colocation_store_caller_scb(targetscb, errno_cap(EPROTOTYPE));
 
 	/*
 	 * Wake up other callers that might be waiting in kern_cocall_slow().
@@ -1033,8 +1039,7 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 		 * couldn't have raced with coaccept(2), because a thread cannot
 		 * call coaccept_slow(2) and coaccept(2) at the same time.
 		 */
-		colocation_store_caller_scb(curthread->td_scb,
-		    cheri_capability_build_user_data(0, 0, 0, EPROTOTYPE));
+		colocation_store_caller_scb(curthread->td_scb, errno_cap(EPROTOTYPE));
 	} else {
 		/*
 		 * There's a caller waiting for us, get them their data

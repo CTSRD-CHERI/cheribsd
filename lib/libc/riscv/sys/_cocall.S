@@ -118,5 +118,5 @@ ENTRY(_cocall)
 	bnez	t0, 2f
 	cret
 2:
-	ASM_LOCAL_TAILCALL(t1, cerror)
+	_TAIL	cerror@plt
 END(_cocall)

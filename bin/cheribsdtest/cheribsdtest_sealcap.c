@@ -28,33 +28,29 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-
-#if !__has_feature(capabilities)
-#error "This code requires a CHERI-aware compiler"
-#endif
-
-#include <sys/types.h>
 #include <sys/sysctl.h>
 
-#include <cheri/cheri.h>
-#include <cheri/cheric.h>
-
-#include <err.h>
-#include <stddef.h>
-
 #include "cheribsdtest.h"
+
+static void * __capability
+get_sealcap(void)
+{
+	void * __capability sealcap;
+	size_t sealcap_size;
+
+	sealcap_size = sizeof(sealcap);
+	CHERIBSDTEST_CHECK_SYSCALL(sysctlbyname("security.cheri.sealcap",
+	    &sealcap, &sealcap_size, NULL, 0));
+
+	return (sealcap);
+}
 
 CHERIBSDTEST(sealcap_sysctl, "Retrieve sealcap using sysctl(3)")
 {
 	void * __capability sealcap;
-	size_t sealcap_size;
 	u_register_t v;
 
-	sealcap_size = sizeof(sealcap);
-	if (sysctlbyname("security.cheri.sealcap", &sealcap, &sealcap_size,
-	    NULL, 0) < 0)
-		cheribsdtest_failure_err("sysctlbyname(security.cheri.sealcap)");
+	sealcap = get_sealcap();
 
 	/* Base. */
 	v = cheri_getbase(sealcap);
@@ -154,13 +150,9 @@ CHERIBSDTEST(sealcap_seal, "Use sealcap to seal a capability")
 	void * __capability sealdatap;
 	void * __capability sealcap;
 	void * __capability sealed;
-	size_t sealcap_size;
 	u_register_t v;
 
-	sealcap_size = sizeof(sealcap);
-	if (sysctlbyname("security.cheri.sealcap", &sealcap, &sealcap_size,
-	    NULL, 0) < 0)
-		cheribsdtest_failure_err("sysctlbyname(security.cheri.sealcap)");
+	sealcap = get_sealcap();
 
 	sealdatap = &sealdata;
 	sealed = cheri_seal(sealdatap, sealcap);
@@ -215,13 +207,9 @@ CHERIBSDTEST(sealcap_seal_unseal,
 	void * __capability sealcap;
 	void * __capability sealed;
 	void * __capability unsealed;
-	size_t sealcap_size;
 	u_register_t v;
 
-	sealcap_size = sizeof(sealcap);
-	if (sysctlbyname("security.cheri.sealcap", &sealcap, &sealcap_size,
-	    NULL, 0) < 0)
-		cheribsdtest_failure_err("sysctlbyname(security.cheri.sealcap)");
+	sealcap = get_sealcap();
 
 	sealdatap = &sealdata;
 	sealed = cheri_seal(sealdatap, sealcap);

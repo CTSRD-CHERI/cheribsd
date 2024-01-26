@@ -21,8 +21,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 	.text
@@ -30,14 +28,18 @@
 	.globl	.rtld_start
 	.type	.rtld_start,@function
 .rtld_start:
+	.cfi_startproc
+	.cfi_undefined %rip
 	xorq	%rbp,%rbp		# Clear frame pointer for good form
 	subq	$24,%rsp		# A place to store exit procedure addr
+	.cfi_def_cfa_offset 32
 	movq	%rdi,%r12
 	movq	%rsp,%rsi		# save address of exit proc
 	movq	%rsp,%rdx		# construct address of obj_main
 	addq	$8,%rdx
 	call	_rtld			# Call rtld(sp); returns entry point
 	popq	%rsi			# Get exit procedure address
+	.cfi_def_cfa_offset 24
 	movq	%r12,%rdi		# *ap
 /*
  * At this point, %rax contains the entry point of the main program, and
@@ -47,6 +49,7 @@
 .globl .rtld_goto_main
 .rtld_goto_main:	# This symbol exists just to make debugging easier.
 	jmp	*%rax			# Enter main program
+	.cfi_endproc
 
 
 /*

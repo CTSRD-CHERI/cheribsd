@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2005, Bosko Milekic <bmilekic@FreeBSD.org>.
  * Copyright (c) 2010 Isilon Systems, Inc. (http://www.isilon.com/)
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * MemGuard is a simple replacement allocator for debugging only
  * which provides ElectricFence-style memory barrier protection on
@@ -260,7 +258,7 @@ v2sizep(vm_pointer_t va)
 
 	pa = pmap_kextract(va);
 	if (pa == 0)
-		panic("MemGuard detected double-free of %#p", (void *)va);
+		panic("MemGuard detected double-free of %p", (void *)va);
 	p = PHYS_TO_VM_PAGE(pa);
 	KASSERT(vm_page_wired(p) && p->a.queue == PQ_NONE,
 	    ("MEMGUARD: Expected wired page %p in vtomgfifo!", p));

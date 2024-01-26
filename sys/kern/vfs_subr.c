@@ -41,8 +41,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ddb.h"
 #include "opt_watchdog.h"
 
@@ -145,7 +143,7 @@ SYSCTL_COUNTER_U64(_vfs, OID_AUTO, vnodes_created, CTLFLAG_RD, &vnodes_created,
  * Conversion tables for conversion from vnode types to inode formats
  * and back.
  */
-enum vtype iftovt_tab[16] = {
+__enum_uint8(vtype) iftovt_tab[16] = {
 	VNON, VFIFO, VCHR, VNON, VDIR, VNON, VBLK, VNON,
 	VREG, VNON, VLNK, VNON, VSOCK, VNON, VNON, VNON
 };
@@ -1718,6 +1716,10 @@ vtryrecycle(struct vnode *vp)
  * vnlru to clear things up, but ultimately always performs a M_WAITOK allocation.
  */
 static u_long vn_alloc_cyclecount;
+static u_long vn_alloc_sleeps;
+
+SYSCTL_ULONG(_vfs, OID_AUTO, vnode_alloc_sleeps, CTLFLAG_RD, &vn_alloc_sleeps, 0,
+    "Number of times vnode allocation blocked waiting on vnlru");
 
 static struct vnode * __noinline
 vn_alloc_hard(struct mount *mp)
@@ -1752,6 +1754,7 @@ vn_alloc_hard(struct mount *mp)
 		 * Wait for space for a new vnode.
 		 */
 		vnlru_kick();
+		vn_alloc_sleeps++;
 		msleep(&vnlruproc_sig, &vnode_list_mtx, PVFS, "vlruwk", hz);
 		if (atomic_load_long(&numvnodes) + 1 > desiredvnodes &&
 		    vnlru_read_freevnodes() > 1)
@@ -5299,7 +5302,7 @@ out_error:
  * Returns 0 on success, or an errno on failure.
  */
 int
-vaccess(enum vtype type, mode_t file_mode, uid_t file_uid, gid_t file_gid,
+vaccess(__enum_uint8(vtype) type, mode_t file_mode, uid_t file_uid, gid_t file_gid,
     accmode_t accmode, struct ucred *cred)
 {
 	accmode_t dac_granted;
@@ -7053,7 +7056,7 @@ vn_getsize(struct vnode *vp, off_t *size, struct ucred *cred)
 
 #ifdef INVARIANTS
 void
-vn_set_state_validate(struct vnode *vp, enum vstate state)
+vn_set_state_validate(struct vnode *vp, __enum_uint8(vstate) state)
 {
 
 	switch (vp->v_state) {

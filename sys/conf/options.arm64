@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 ARM64				opt_global.h		# for cpu ARM64 to work
 INTRNG				opt_global.h
@@ -17,9 +16,21 @@ PAC				opt_global.h
 # Binary compatibility
 COMPAT_FREEBSD32		opt_global.h
 COMPAT_FREEBSD64		opt_global.h
+# Emulate SWP/SWPB for COMPAT_FREEBSD32
+EMUL_SWP			opt_global.h
+
+# Capability revocation
+CHERI_CAPREVOKE			opt_global.h
+CHERI_CAPREVOKE_CLEARTAGS	opt_global.h
+CHERI_CAPREVOKE_CLOADTAGS	opt_global.h
+CHERI_CAPREVOKE_FAST_COPYIN	opt_global.h
+CHERI_CAPREVOKE_STATS		opt_global.h
 
 # EFI Runtime services support
 EFIRT				opt_efirt.h
+
+# Bhyve
+VMM				opt_global.h
 
 # SoC Support
 SOC_ALLWINNER_A64		opt_soc.h

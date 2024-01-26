@@ -1,0 +1,22 @@
+[
+    {
+        "ArchStdEvent": "BR_MIS_PRED",
+        "PublicDescription": "Mispredicted or not predicted branch speculatively executed. This event counts any predictable branch instruction which is mispredicted either due to dynamic misprediction or because the MMU is off and the branches are statically predicted not taken"
+    },
+    {
+        "ArchStdEvent": "BR_PRED",
+        "PublicDescription": "Predictable branch speculatively executed. This event counts all predictable branches"
+    },
+    {
+        "ArchStdEvent": "BR_IMMED_SPEC",
+        "PublicDescription": "Branch speculatively executed, immediate branch"
+    },
+    {
+        "ArchStdEvent": "BR_RETURN_SPEC",
+        "PublicDescription": "Branch speculatively executed, procedure return"
+    },
+    {
+        "ArchStdEvent": "BR_INDIRECT_SPEC",
+        "PublicDescription": "Branch speculatively executed, indirect branch"
+    }
+]

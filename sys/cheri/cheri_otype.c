@@ -28,9 +28,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
@@ -39,6 +36,11 @@ __FBSDID("$FreeBSD$");
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
+#ifdef CHERI_CAPREVOKE
+#include <cheri/revoke.h>
+
+#include <vm/vm_cheri_revoke.h>
+#endif
 
 static struct mtx cheri_otype_lock;
 static struct unrhdr *cheri_otypes;
@@ -80,3 +82,18 @@ cheri_otype_free(otype_t cap)
 	type = cheri_getbase(cap);
 	free_unr(cheri_otypes, type);
 }
+
+#ifdef CHERI_CAPREVOKE
+#ifndef CHERI_CAPREVOKE_CLEARTAGS
+
+/* If this changes, make the comment in sys/cheri/revoke.h match! */
+uintcap_t
+cheri_revoke_sealed(uintcap_t c)
+{
+	c = cheri_unseal(c, kernel_root_sealcap);
+	c = cheri_andperm(c, 0);
+	return c;
+}
+
+#endif
+#endif

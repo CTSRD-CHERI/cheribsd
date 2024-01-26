@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (C) 2008 The FreeBSD Project. All rights reserved.
 #
@@ -25,7 +25,6 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD$ 
 #
 # Embed an MFS image into the kernel body or the loader body (expects space
 # reserved via MD_ROOT_SIZE (kernel) or MD_IMAGE_SIZE (loader))

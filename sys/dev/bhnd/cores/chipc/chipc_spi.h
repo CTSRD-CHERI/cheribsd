@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2016 Michael Zhilin <mizhka@gmail.com>
  * All rights reserved.
@@ -30,7 +30,6 @@
  */
 
 /*
- * $FreeBSD$
  */
 
 #ifndef _BHND_CORES_CHIPC_CHIPC_SPI_H_

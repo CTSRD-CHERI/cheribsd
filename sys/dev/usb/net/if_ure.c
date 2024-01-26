@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -106,6 +104,7 @@ static const STRUCT_USB_HOST_ID ure_devs[] = {
 	URE_DEV(LENOVO, RTL8153_04, URE_FLAG_8153),
 	URE_DEV(LENOVO, USBCLAN, 0),
 	URE_DEV(LENOVO, USBCLANGEN2, 0),
+	URE_DEV(LENOVO, USBCLANHYBRID, 0),
 	URE_DEV(MICROSOFT, WINDEVETH, 0),
 	URE_DEV(NVIDIA, RTL8153, URE_FLAG_8153),
 	URE_DEV(REALTEK, RTL8152, URE_FLAG_8152),

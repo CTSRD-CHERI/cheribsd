@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1994, 1995, 1996, 1998 Peter Wemm <peter@netplex.com.au>
  * All rights reserved.
@@ -50,7 +50,7 @@ static const char rcsid[] =
 	"$FreeBSD$";
 #endif /* not lint */
 
-static void usage(void);
+static void usage(void) __dead2;
 
 static const struct option long_opts[] = {
 	{"directory",	no_argument,	NULL,	'd'},

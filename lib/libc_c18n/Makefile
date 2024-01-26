@@ -1,5 +1,5 @@
 RTLD_SANDBOX=yes
-SHLIBDIR=	/usr/lib/c18n
-LIBDIR=		/usr/lib/c18n
+SHLIBDIR=	/usr/lib${COMPAT_libcompat:U}/c18n
+LIBDIR=		/usr/lib${COMPAT_libcompat:U}/c18n
 
 .include "${SRCTOP}/lib/libc/Makefile"

@@ -33,11 +33,9 @@
  */
 
 #include <machine/asm.h>
-__FBSDID("$FreeBSD$");
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #include <machine/riscvreg.h>
-#include "SYS.h"
 #endif
 
 /*
@@ -66,7 +64,7 @@ ENTRY(.rtld_start)
 
 	cllc	ca0, _DYNAMIC				/* dynp */
 	cmove	ca1, cs0				/* aux */
-	ASM_LOCAL_CALL(ra, _rtld_relocate_nonplt_self)	/* Relocate ourselves early, including __cap_relocs */
+	cjal	_rtld_relocate_nonplt_self		/* Relocate ourselves early, including __cap_relocs */
 
 #if __CHERI_CAPABILITY_TABLE__ != 3
 	/* TODO: CGP for PLT and FNDESC ABIs */
@@ -77,7 +75,7 @@ ENTRY(.rtld_start)
 	csetbounds	ca1, csp, CLEN			/* exit_proc */
 	cincoffset	ca2, csp, CLEN
 	csetbounds	ca2, ca2, CLEN			/* obj_main */
-	ASM_LOCAL_CALL(ra, _rtld)			/* Call the loader */
+	cjal	_rtld					/* Call the loader */
 	cmove	ct0, ca0				/* Backup the entry point */
 
 	clc	ca1, (CLEN * 0)(csp)			/* Load cleanup */

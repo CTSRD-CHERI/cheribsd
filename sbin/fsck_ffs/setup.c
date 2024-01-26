@@ -35,8 +35,6 @@ static const char sccsid[] = "@(#)setup.c	8.10 (Berkeley) 5/9/95";
 #endif /* not lint */
 #endif
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/disk.h>
 #include <sys/stat.h>
@@ -88,8 +86,12 @@ setup(char *dev)
 	 * We are expected to have an open file descriptor and a superblock.
 	 */
 	if (fsreadfd < 0 || havesb == 0) {
-		if (debug)
-			printf("setup: bad fsreadfd or missing superblock\n");
+		if (debug) {
+			if (fsreadfd < 0)
+				printf("setup: missing fsreadfd\n");
+			else
+				printf("setup: missing superblock\n");
+		}
 		return (0);
 	}
 	if (preen == 0)

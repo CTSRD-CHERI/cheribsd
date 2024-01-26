@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * ------+---------+---------+---------+---------+---------+---------+---------*
  * Copyright (c) 2001,2011  - Garance Alistair Drosehn <gad@FreeBSD.org>.
@@ -34,8 +34,6 @@
  */
 
 #include "lp.cdefs.h"		/* A cross-platform version of <sys/cdefs.h> */
-__FBSDID("$FreeBSD$");
-
 /*
  * ctlinfo - This collection of routines will know everything there is to
  * know about the information inside a control file ('cf*') which is used

@@ -1,3 +1,12 @@
+// -*- C++ -*-
+//===----------------------------------------------------------------------===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+
 // The other libunwind tests don't test internal interfaces, so the include path
 // is a little wonky.
 #include "../src/config.h"
@@ -53,7 +62,7 @@ int main(int, char**) {
     abort();
 
   FHC.add(&UIS);
-  CBData.targetAddr = pc_t(kBaseAddr - 1);
+  CBData.targetAddr = pc_t((uintptr_t)kBaseAddr - 1);
   // Shouldn't find something outside of the addresses.
   if (FHC.find(&PInfo, 0, &CBData))
     abort();
@@ -62,7 +71,7 @@ int main(int, char**) {
     UIS.dso_base = kBaseAddr + (kTextSegmentLength * i);
     FHC.add(&UIS);
   }
-  CBData.targetAddr = pc_t(kBaseAddr);
+  CBData.targetAddr = pc_t((uintptr_t)kBaseAddr);
   // Should have been evicted.
   if (FHC.find(&PInfo, 0, &CBData))
     abort();

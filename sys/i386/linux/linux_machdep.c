@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000 Marcel Moolenaar
  * All rights reserved.
@@ -25,9 +25,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include "opt_posix.h"
 
@@ -519,7 +516,7 @@ linux_set_thread_area(struct thread *td, struct linux_set_thread_area_args *args
 	/*
 	 * Semantics of Linux version: every thread in the system has array of
 	 * 3 tls descriptors. 1st is GLIBC TLS, 2nd is WINE, 3rd unknown. This
-	 * syscall loads one of the selected tls decriptors with a value and
+	 * syscall loads one of the selected tls descriptors with a value and
 	 * also loads GDT descriptors 6, 7 and 8 with the content of the
 	 * per-thread descriptors.
 	 *
@@ -715,7 +712,6 @@ linux_uselib(struct thread *td, struct linux_uselib_args *args)
 	vm_offset_t vmaddr;
 	unsigned long file_offset;
 	unsigned long bss_size;
-	char *library;
 	ssize_t aresid;
 	int error;
 	bool locked, opened, textset;
@@ -726,17 +722,9 @@ linux_uselib(struct thread *td, struct linux_uselib_args *args)
 	textset = false;
 	opened = false;
 
-	if (!LUSECONVPATH(td)) {
-		NDINIT(&ni, LOOKUP, ISOPEN | FOLLOW | LOCKLEAF | AUDITVNODE1,
-		    UIO_USERSPACE, args->library);
-		error = namei(&ni);
-	} else {
-		LCONVPATHEXIST(args->library, &library);
-		NDINIT(&ni, LOOKUP, ISOPEN | FOLLOW | LOCKLEAF | AUDITVNODE1,
-		    UIO_SYSSPACE, library);
-		error = namei(&ni);
-		LFREEPATH(library);
-	}
+	NDINIT(&ni, LOOKUP, ISOPEN | FOLLOW | LOCKLEAF | AUDITVNODE1,
+	    UIO_USERSPACE, args->library);
+	error = namei(&ni);
 	if (error)
 		goto cleanup;
 

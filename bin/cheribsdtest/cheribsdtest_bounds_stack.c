@@ -70,14 +70,11 @@
 static void
 test_bounds_precise(void * __capability c, size_t expected_len)
 {
-	size_t len, offset;
+#ifndef __CHERI_PURE_CAPABILITY__
+	size_t len;
 
-	offset = cheri_getoffset(c);
 	len = cheri_getlen(c);
 
-#ifdef __CHERI_PURE_CAPABILITY__
-	CHERIBSDTEST_CHECK_CAP_BOUNDS_PRECISE(c, expected_len);
-#else
 	/*
 	 * In hybrid mode we do not set bounds on capabilities created
 	 * via casts from integer pointers so just check that we haven't
@@ -86,6 +83,8 @@ test_bounds_precise(void * __capability c, size_t expected_len)
 	CHERIBSDTEST_VERIFY2(len >= expected_len,
 	    "length (%jd) smaller than expected lower bound %jd: %#lp",
 	    len, expected_len, c);
+#else
+	CHERIBSDTEST_CHECK_CAP_BOUNDS_PRECISE(c, expected_len);
 #endif
 	cheribsdtest_success();
 }

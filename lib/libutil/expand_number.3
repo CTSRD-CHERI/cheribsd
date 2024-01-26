@@ -23,9 +23,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd July 20, 2019
+.Dd June 13, 2023
 .Dt EXPAND_NUMBER 3
 .Os
 .Sh NAME
@@ -63,6 +61,15 @@ The suffixes are:
 .It Li P Ta No peta Ta 1125899906842624
 .It Li E Ta No exa  Ta 1152921504606846976
 .El
+.Pp
+For historical reasons, the
+.Fn expand_number
+function accepts and ignores a single
+.Dq B
+suffix at the end of the
+.Fa buf
+string.
+However, the usage of this suffix is discouraged.
 .Sh RETURN VALUES
 .Rv -std
 .Sh ERRORS

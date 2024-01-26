@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2002-2009 Luigi Rizzo, Universita` di Pisa
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * The FreeBSD IP packet firewall, main file
  */
@@ -69,6 +67,7 @@ __FBSDID("$FreeBSD$");
 #include <net/route/nhop.h>
 #include <net/pfil.h>
 #include <net/vnet.h>
+#include <net/if_pfsync.h>
 
 #include <netpfil/pf/pf_mtag.h>
 
@@ -1718,6 +1717,10 @@ do {								\
 				PULLUP_TO(hlen, ulp, struct ip);
 				break;
 
+			case IPPROTO_PFSYNC:
+				PULLUP_TO(hlen, ulp, struct pfsync_header);
+				break;
+
 			default:
 				if (V_fw_verbose)
 					printf("IPFW2: IPV6 - Unknown "
@@ -2002,7 +2005,7 @@ do {								\
 					    >> 8) | (offset != 0));
 				} else {
 					/*
-					 * Compatiblity: historically bare
+					 * Compatibility: historically bare
 					 * "frag" would match IPv6 fragments.
 					 */
 					match = (cmd->arg1 == 0x1 &&

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2005 Doug Rabson
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD$
  */
 
 #include <gssapi/gssapi.h>
@@ -41,7 +39,6 @@ gss_delete_sec_context(OM_uint32 *minor_status,
     gss_ctx_id_t *context_handle,
     gss_buffer_t output_token)
 {
-	OM_uint32 major_status;
 	struct _gss_context *ctx = (struct _gss_context *) *context_handle;
 
 	if (output_token)
@@ -54,7 +51,7 @@ gss_delete_sec_context(OM_uint32 *minor_status,
 		 * otherwise fake an empty token.
 		 */
 		if (ctx->gc_ctx) {
-			major_status = ctx->gc_mech->gm_delete_sec_context(
+			(void) ctx->gc_mech->gm_delete_sec_context(
 				minor_status, &ctx->gc_ctx, output_token);
 		}
 		free(ctx);

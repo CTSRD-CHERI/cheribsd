@@ -1,12 +1,12 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /* Copyright(c) 2007-2022 Intel Corporation */
-/* $FreeBSD$ */
 #ifndef ADF_CFG_STRINGS_H_
 #define ADF_CFG_STRINGS_H_
 
 #define ADF_GENERAL_SEC "GENERAL"
 #define ADF_KERNEL_SEC "KERNEL"
 #define ADF_ACCEL_SEC "Accelerator"
+#define ADF_SAL_SEC "SSL"
 #define ADF_NUM_CY "NumberCyInstances"
 #define ADF_NUM_DC "NumberDcInstances"
 #define ADF_RING_SYM_SIZE "NumConcurrentSymRequests"
@@ -55,6 +55,11 @@
 #define ADF_CFG_DC "dc"
 #define ADF_CFG_ASYM "asym"
 #define ADF_CFG_SYM "sym"
+#define ADF_CFG_SYM_ASYM "sym;asym"
+#define ADF_CFG_SYM_DC "sym;dc"
+#define ADF_CFG_KERNEL_USER "ks;us"
+#define ADF_CFG_KERNEL "ks"
+#define ADF_CFG_USER "us"
 #define ADF_SERVICE_INLINE "inline"
 #define ADF_SERVICES_ENABLED "ServicesEnabled"
 #define ADF_SERVICES_SEPARATOR ";"

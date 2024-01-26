@@ -24,8 +24,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <stand.h>
 #include <string.h>
 #include <efi.h>
@@ -537,7 +535,7 @@ efi_print_global(const CHAR16 *varnamearg, uint8_t *data, UINTN datasz)
 		goto done;
 	}
 	if (strncmp("Boot", var, 4) == 0 ||
-	    strncmp("Driver", var, 5) == 0 ||
+	    strncmp("Driver", var, 6) == 0 ||
 	    strncmp("SysPrep", var, 7) == 0 ||
 	    strncmp("OsRecovery", var, 10) == 0) {
 		UINT16 filepathlistlen;

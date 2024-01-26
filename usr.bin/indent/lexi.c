@@ -41,8 +41,6 @@ static char sccsid[] = "@(#)lexi.c	8.1 (Berkeley) 6/6/93";
 #endif /* not lint */
 #endif
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Here we have the token scanner for indent.  It scans off one token and puts
  * it in the global variable "token".  It returns a code, indicating the type
@@ -492,9 +490,11 @@ stop_lit:
 	else if (*buf_ptr == '>') {
 	    /* check for operator -> */
 	    *e_token++ = *buf_ptr++;
-	    unary_delim = false;
-	    code = unary_op;
-	    state->want_blank = false;
+	    if (!opt.pointer_as_binop) {
+		unary_delim = false;
+		code = unary_op;
+		state->want_blank = false;
+	    }
 	}
 	break;			/* buffer overflow will be checked at end of
 				 * switch */

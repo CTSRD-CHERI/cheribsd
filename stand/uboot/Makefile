@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 LOADER_UFS_SUPPORT?=	yes
 LOADER_CD9660_SUPPORT?=	no
@@ -79,7 +78,7 @@ OBJS+=  ${SRCS:N*.h:R:S/$/.o/g}
 ubldr ubldr.bin ubldr.pie: ${OBJS}
 .endif
 
-DPADD=		${LDR_INTERP} ${LIBFDT} ${LIBSA}
-LDADD=		${LDR_INTERP} ${LIBFDT} ${LIBSA}
+DPADD=		${LDR_INTERP} ${LIBSAFDT} ${LIBSA}
+LDADD=		${LDR_INTERP} ${LIBSAFDT} ${LIBSA}
 
 .include <bsd.prog.mk>

@@ -22,7 +22,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 # THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $FreeBSD$
 #
 
 # PROVIDE: netif
@@ -215,7 +214,7 @@ netif_common()
 		esac
 		if ${_func} ${ifn} $2; then
 			_ok="${_ok} ${ifn}"
-			if ipv6if ${ifn}; then
+			if ipv6if ${ifn} && [ "${ifn}" != "lo0" ]; then
 				_dadwait=1
 			fi
 		else

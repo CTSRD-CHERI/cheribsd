@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2017 Edward Tomasz Napierala <trasz@FreeBSD.org>
  *
@@ -28,9 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/lock.h>
@@ -99,11 +96,6 @@ __FBSDID("$FreeBSD$");
 #define	LINUX_PTRACE_SYSCALL_INFO_NONE	0
 #define	LINUX_PTRACE_SYSCALL_INFO_ENTRY	1
 #define	LINUX_PTRACE_SYSCALL_INFO_EXIT	2
-
-#define LINUX_PTRACE_PEEKUSER_ORIG_RAX	120
-#define LINUX_PTRACE_PEEKUSER_RIP	128
-#define LINUX_PTRACE_PEEKUSER_CS	136
-#define LINUX_PTRACE_PEEKUSER_DS	184
 
 static int
 map_signum(int lsig, int *bsigp)
@@ -177,52 +169,6 @@ linux_ptrace_peek(struct thread *td, pid_t pid, void *addr, void *data)
 	td->td_retval[0] = error;
 
 	return (error);
-}
-
-static int
-linux_ptrace_peekuser(struct thread *td, pid_t pid, void *addr, void *data)
-{
-	struct reg b_reg;
-	uint64_t val;
-	int error;
-
-	error = kern_ptrace(td, PT_GETREGS, pid, &b_reg, 0);
-	if (error != 0)
-		return (error);
-
-	switch ((uintptr_t)addr) {
-#ifdef __amd64__
-	case LINUX_PTRACE_PEEKUSER_ORIG_RAX:
-		val = b_reg.r_rax;
-		break;
-	case LINUX_PTRACE_PEEKUSER_RIP:
-		val = b_reg.r_rip;
-		break;
-	case LINUX_PTRACE_PEEKUSER_CS:
-		val = b_reg.r_cs;
-		break;
-	case LINUX_PTRACE_PEEKUSER_DS:
-		val = b_reg.r_ds;
-		break;
-#endif /* __amd64__ */
-	default:
-		linux_msg(td, "PTRACE_PEEKUSER offset %ld not implemented; "
-		    "returning EINVAL", (uintptr_t)addr);
-		return (EINVAL);
-	}
-
-	error = copyout(&val, data, sizeof(val));
-	td->td_retval[0] = error;
-
-	return (error);
-}
-
-static int
-linux_ptrace_pokeuser(struct thread *td, pid_t pid, void *addr, void *data)
-{
-
-	linux_msg(td, "PTRACE_POKEUSER not implemented; returning EINVAL");
-	return (EINVAL);
 }
 
 static int

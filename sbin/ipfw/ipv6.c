@@ -17,8 +17,6 @@
  *
  * NEW command line interface for IP firewall facility
  *
- * $FreeBSD$
- *
  * ipv6 support
  */
 
@@ -55,8 +53,8 @@ static struct _s_x icmp6codes[] = {
 	{ NULL, 0 }
 };
 
-void
-fill_unreach6_code(u_short *codep, char *str)
+uint16_t
+get_unreach6_code(const char *str)
 {
 	int val;
 	char *s;
@@ -66,8 +64,7 @@ fill_unreach6_code(u_short *codep, char *str)
 		val = match_token(icmp6codes, str);
 	if (val < 0)
 		errx(EX_DATAERR, "unknown ICMPv6 unreachable code ``%s''", str);
-	*codep = val;
-	return;
+	return (val);
 }
 
 void

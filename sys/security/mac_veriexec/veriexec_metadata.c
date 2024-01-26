@@ -516,9 +516,9 @@ mac_veriexec_metadata_fetch_fingerprint_status(struct vnode *vp,
 	status = mac_veriexec_get_fingerprint_status(vp);
 	if (status == FINGERPRINT_INVALID || status == FINGERPRINT_NODEV) {
 		found_dev = 0;
-		error = mac_veriexec_metadata_get_file_info(vap->va_fsid,
-		    vap->va_fileid, vap->va_gen, &found_dev, &ip, check_files);
-		if (error != 0) {
+		if (mac_veriexec_metadata_get_file_info(vap->va_fsid,
+		    vap->va_fileid, vap->va_gen, &found_dev, &ip,
+		    check_files) != 0) {
 			status = (found_dev) ? FINGERPRINT_NOENTRY :
 			    FINGERPRINT_NODEV;
 			VERIEXEC_DEBUG(3,
@@ -732,14 +732,12 @@ search:
 	ip->ops = fpops;
 	ip->fileid = fileid;
 	ip->gen = gen;
+	ip->label = NULL;
+	ip->labellen = 0;
 	memcpy(ip->fingerprint, fingerprint, fpops->digest_len);
 	if (flags & VERIEXEC_LABEL)
 		ip->labellen = mac_veriexec_init_label(&ip->label,
 		    ip->labellen, label, labellen);
-	else {
-		ip->label = NULL;
-		ip->labellen = 0;
-	}
 
 	VERIEXEC_DEBUG(3, ("add file %ju.%lu (files=%d)\n",
 	    (uintmax_t)ip->fileid,

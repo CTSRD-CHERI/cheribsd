@@ -25,8 +25,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/syscall.h>
@@ -41,7 +39,7 @@ ENTRY(__sys_##name);						\
 	WEAK_REFERENCE(__sys_##name, name);			\
 	WEAK_REFERENCE(__sys_##name, _##name);			\
 	_SYSCALL(name);						\
-	ret;							\
+	RETURN;							\
 END(__sys_##name)
 
 /*
@@ -55,7 +53,7 @@ ENTRY(__sys_##name);						\
 	WEAK_REFERENCE(__sys_##name, _##name);			\
 	_SYSCALL(name);						\
 	b.cs	1f;						\
-	ret;							\
+	RETURN;							\
 1:	b	cerror;						\
 END(__sys_##name)
 
@@ -65,7 +63,7 @@ ENTRY(__sys_##name);						\
 	WEAK_REFERENCE(__sys_##name, _##name);			\
 	_SYSCALL(name);						\
 	b.cs	1f;						\
-	ret;							\
+	RETURN;							\
 1:	b	cerror;						\
 END(__sys_##name)
 
@@ -74,6 +72,6 @@ END(__sys_##name)
 ENTRY(__sys_##name);						\
 	_SYSCALL(name);						\
 	b.cs	1f;						\
-	ret;							\
+	RETURN;							\
 1:	b	cerror;						\
 END(__sys_##name)

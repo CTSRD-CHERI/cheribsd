@@ -252,20 +252,17 @@ try_revoke(int target_bucket)
 		return;
 
 	if (cri == NULL) {
-		int error;
-
-		error = cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT,
-		    NULL, (void **)&cri);
-
-		if (error == ENOSYS) {
-			/*
-			 * Revocation is not supported; this is the baseline.
-			 * Just pretend like it worked.
-			 */
-			goto dequarantine;
+		if (cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT,
+		    NULL, (void **)&cri) != 0) {
+			if (errno == ENOSYS) {
+				/*
+				 * Revocation is not supported.
+				 * Just pretend like it worked.
+				 */
+				goto dequarantine;
+			} else
+				abort();
 		}
-
-		assert(error == 0);
 	}
 
 
@@ -454,7 +451,7 @@ find_overhead(void * cp)
 	 * __tls_malloc_aligned.  In that case we need to get back to the
 	 * real overhead pointer.  To make sure we aren't tricked, the
 	 * pointer must:
-	 *  - Be an internal allocator pointer (have the VMMAP permision).
+	 *  - Be an internal allocator pointer (have the SW_VMEM permision).
 	 *  - Point somewhere before us and within the current pagepool.
 	 */
 	if (cheri_gettag(op->ov_real_allocation) &&
@@ -494,11 +491,11 @@ paint_shadow(void *mem, size_t size)
 	 * need it.
 	 */
 	if (pp->ph_shadow == NULL)
-		if (cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, pp,
+		if (cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMEM, pp,
 		    &pp->ph_shadow) != 0)
 			abort();
 	caprev_shadow_nomap_set_raw(cri->base_mem_nomap, pp->ph_shadow,
-	    (vaddr_t)mem, size);
+	    (ptraddr_t)mem, size);
 }
 
 static void
@@ -508,7 +505,7 @@ clear_shadow(void *mem, size_t size)
 
 	pp = cheri_setoffset(pp, 0);
 	caprev_shadow_nomap_clear_raw(cri->base_mem_nomap, pp->ph_shadow,
-	    (vaddr_t)mem, size);
+	    (ptraddr_t)mem, size);
 }
 
 static void

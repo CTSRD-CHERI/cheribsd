@@ -30,9 +30,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/fcntl.h>
 #include <sys/imgact.h>
@@ -112,30 +109,6 @@ linux_copyout_rusage(struct rusage *ru, void *uaddr)
 	bsd_to_linux_rusage(ru, &lru);
 
 	return (copyout(&lru, uaddr, sizeof(struct l_rusage)));
-}
-
-int
-linux_execve(struct thread *td, struct linux_execve_args *args)
-{
-	struct image_args eargs;
-	char *path;
-	int error;
-
-	if (!LUSECONVPATH(td)) {
-		error = exec_copyin_args(&eargs, __USER_CAP_PATH(args->path),
-		    UIO_USERSPACE, __USER_CAP_UNBOUND(args->argp),
-		    __USER_CAP_UNBOUND(args->envp));
-	} else {
-		LCONVPATHEXIST(args->path, &path);
-		error = exec_copyin_args(&eargs, PTR2CAP(path), UIO_SYSSPACE,
-		    __USER_CAP_UNBOUND(args->argp),
-		    __USER_CAP_UNBOUND(args->envp));
-		LFREEPATH(path);
-	}
-	if (error == 0)
-		error = linux_common_execve(td, &eargs);
-	AUDIT_SYSCALL_EXIT(error == EJUSTRETURN ? 0 : error, td);
-	return (error);
 }
 
 CTASSERT(sizeof(struct l_iovec32) == 8);
@@ -625,7 +598,7 @@ linux_set_thread_area(struct thread *td,
 	/*
 	 * Semantics of Linux version: every thread in the system has array
 	 * of three TLS descriptors. 1st is GLIBC TLS, 2nd is WINE, 3rd unknown.
-	 * This syscall loads one of the selected TLS decriptors with a value
+	 * This syscall loads one of the selected TLS descriptors with a value
 	 * and also loads GDT descriptors 6, 7 and 8 with the content of
 	 * the per-thread descriptors.
 	 *
@@ -741,6 +714,24 @@ DEFINE_IFUNC(, int, futex_xorl, (int, uint32_t *, int *))
 
 	return ((cpu_stdext_feature & CPUID_STDEXT_SMAP) != 0 ?
 	    futex_xorl_smap : futex_xorl_nosmap);
+}
+
+int
+linux_ptrace_peekuser(struct thread *td, pid_t pid, void *addr, void *data)
+{
+
+	LINUX_RATELIMIT_MSG_OPT1("PTRACE_PEEKUSER offset %ld not implemented; "
+	    "returning EINVAL", (uintptr_t)addr);
+	return (EINVAL);
+}
+
+int
+linux_ptrace_pokeuser(struct thread *td, pid_t pid, void *addr, void *data)
+{
+
+	LINUX_RATELIMIT_MSG_OPT1("PTRACE_POKEUSER offset %ld "
+	    "not implemented; returning EINVAL", (uintptr_t)addr);
+	return (EINVAL);
 }
 // CHERI CHANGES START
 // {

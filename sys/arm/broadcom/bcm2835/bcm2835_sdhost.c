@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 Klaus P. Ohrhallinger <k@7he.at>
  * All rights reserved.
@@ -31,8 +31,6 @@
  *
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * pin 48-53 - card slot
  * pin 34-39 - radio module

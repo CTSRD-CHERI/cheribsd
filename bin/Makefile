@@ -1,5 +1,4 @@
 #	From: @(#)Makefile	8.1 (Berkeley) 5/31/93
-# $FreeBSD$
 
 .include <src.opts.mk>
 
@@ -8,6 +7,7 @@ SUBDIR= cat \
 	chio \
 	chmod \
 	cp \
+	cpuset \
 	date \
 	dd \
 	df \
@@ -44,13 +44,13 @@ SUBDIR= cat \
 
 # Small cheri programs
 .if ${MACHINE_ABI:Mpurecap} || ${MK_LIB64C} == "yes"
-SUBDIR.${MK_CHERI}+=	cheri_minimal_dynamic_exe
-SUBDIR.${MK_CHERI}+=	cheri_minimal_pie_exe
-SUBDIR.${MK_CHERI}+=	helloworld
-SUBDIR.${MK_CHERI}+=	helloworld_cxx
-SUBDIR.${MK_CHERI}+=	helloworld_static
-
-SUBDIR.${MK_CHERI}+=	cheribsdtest
+SUBDIR+= \
+	cheri_minimal_dynamic_exe \
+	cheri_minimal_pie_exe \
+	cheribsdtest \
+	helloworld \
+	helloworld_cxx \
+	helloworld_static
 .endif  # ${MACHINE_ABI:Mpurecap} || ${MK_LIB64C} == "yes"
 
 

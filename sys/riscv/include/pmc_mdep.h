@@ -22,8 +22,6 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _MACHINE_PMC_MDEP_H_
@@ -48,12 +46,11 @@ union pmc_md_pmc {
 	struct pmc_md_riscv_pmc		pm_riscv;
 };
 
-#define	PMC_IN_KERNEL_STACK(S,START,END)		\
-	((S) >= (START) && (S) < (END))
-#define	PMC_IN_KERNEL(va)		INKERNEL((va))
-#define	PMC_IN_USERSPACE(va)		((va) <= VM_MAXUSER_ADDRESS)
-#define	PMC_TRAPFRAME_TO_PC(TF)		((TF)->tf_ra)
-#define	PMC_TRAPFRAME_TO_FP(TF)		(0)	/* stub */
+#define	PMC_IN_KERNEL_STACK(va)	kstack_contains(curthread, (va), sizeof(va))
+#define	PMC_IN_KERNEL(va)	INKERNEL((va))
+#define	PMC_IN_USERSPACE(va)	((va) <= VM_MAXUSER_ADDRESS)
+#define	PMC_TRAPFRAME_TO_PC(TF)	((TF)->tf_ra)
+#define	PMC_TRAPFRAME_TO_FP(TF)	(0)	/* stub */
 
 /*
  * Prototypes

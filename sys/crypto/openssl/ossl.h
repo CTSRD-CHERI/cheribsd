@@ -24,8 +24,6 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGES.
- *
- * $FreeBSD$
  */
 
 #ifndef __OSSL_H__
@@ -48,15 +46,16 @@ void ossl_cpuid(struct ossl_softc *sc);
 struct ossl_softc {
 	int32_t sc_cid;
 	bool has_aes;
+	bool has_aes_gcm;
 };
 
 /* Needs to be big enough to hold any hash context. */
 struct ossl_hash_context {
-	uint32_t	dummy[61];
+	uint32_t	dummy[196];
 } __aligned(32);
 
 struct ossl_cipher_context {
-	uint32_t	dummy[61];
+	uint32_t	dummy[196];
 } __aligned(32);
 
 struct ossl_session_hash {
@@ -85,6 +84,7 @@ extern struct auth_hash ossl_hash_sha384;
 extern struct auth_hash ossl_hash_sha512;
 
 extern struct ossl_cipher ossl_cipher_aes_cbc;
+extern struct ossl_cipher ossl_cipher_aes_gcm;
 extern struct ossl_cipher ossl_cipher_chacha20;
 
 #endif /* !__OSSL_H__ */

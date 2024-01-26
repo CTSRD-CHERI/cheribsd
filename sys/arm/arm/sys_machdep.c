@@ -32,13 +32,13 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_capsicum.h"
+#include "opt_ktrace.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/capsicum.h>
+#include <sys/ktrace.h>
 #include <sys/proc.h>
 #include <sys/sysproto.h>
 #include <sys/syscall.h>

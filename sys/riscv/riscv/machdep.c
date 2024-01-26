@@ -37,8 +37,6 @@
 #include "opt_platform.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/boot.h>
@@ -82,6 +80,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_pager.h>
 
 #include <machine/cpu.h>
+#include <machine/fpe.h>
 #include <machine/intr.h>
 #include <machine/kdb.h>
 #include <machine/machdep.h>
@@ -93,10 +92,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/trap.h>
 #include <machine/vmparam.h>
 
-#ifdef FPE
-#include <machine/fpe.h>
-#endif
-
 #ifdef DDB
 #include <ddb/ddb.h>
 #endif
@@ -104,6 +99,10 @@ __FBSDID("$FreeBSD$");
 #if __has_feature(capabilities)
 #include <machine/cheri.h>
 #include <cheri/cheric.h>
+#ifdef CHERI_CAPREVOKE
+#include <cheri/revoke.h>
+#include <vm/vm_cheri_revoke.h>
+#endif
 #endif
 
 #ifdef FDT
@@ -185,7 +184,7 @@ cpu_startup(void *dummy)
 {
 
 	sbi_print_version();
-	identify_cpu();
+	printcpuinfo(0);
 
 	printf("real memory  = %ju (%ju MB)\n", ptoa((uintmax_t)realmem),
 	    ptoa((uintmax_t)realmem) / (1024 * 1024));
@@ -451,11 +450,8 @@ fake_preload_metadata(struct riscv_bootparams *rvbp)
 
 	/* Copy the DTB to KVA space. */
 	dtb_size = fdt_totalsize(rvbp->dtbp_virt);
-#ifdef __CHERI_PURE_CAPABILITY__
-	lastaddr = roundup2(lastaddr, CHERI_REPRESENTABLE_ALIGNMENT(dtb_size));
-#else
+	lastaddr = CHERI_REPRESENTABLE_ALIGN_UP(lastaddr, dtb_size);
 	lastaddr = roundup(lastaddr, sizeof(int));
-#endif
 	PRELOAD_PUSH_VALUE(uint32_t, MODINFO_METADATA | MODINFOMD_DTBP);
 	PRELOAD_PUSH_VALUE(uint32_t, sizeof(vm_offset_t));
 	PRELOAD_PUSH_VALUE(vm_offset_t, lastaddr);
@@ -625,6 +621,11 @@ initriscv(struct riscv_bootparams *rvbp)
 	physmem_hardware_regions(mem_regions, mem_regions_sz);
 #endif
 
+	/*
+	 * Identify CPU/ISA features.
+	 */
+	identify_cpu(0);
+
 	/* Do basic tuning, hz etc */
 	init_param1();
 
@@ -699,6 +700,63 @@ initriscv(struct riscv_bootparams *rvbp)
 
 	TSEXIT();
 }
+
+#ifdef CHERI_CAPREVOKE
+void
+cheri_revoke_td_frame(struct thread *td,
+    const struct vm_cheri_revoke_cookie *crc)
+{
+	CHERI_REVOKE_STATS_FOR(crst, crc);
+
+#define CHERI_REVOKE_REG(r) \
+	do { if (cheri_gettag(r)) { \
+		CHERI_REVOKE_STATS_BUMP(crst, caps_found); \
+		if (vm_cheri_revoke_test(crc, r)) { \
+			r = cheri_revoke_cap(r); \
+			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared); \
+		} \
+	    }} while(0)
+
+	CHERI_REVOKE_REG(td->td_frame->tf_ra);
+	CHERI_REVOKE_REG(td->td_frame->tf_sp);
+	CHERI_REVOKE_REG(td->td_frame->tf_gp);
+	CHERI_REVOKE_REG(td->td_frame->tf_tp);
+	CHERI_REVOKE_REG(td->td_frame->tf_t[0]);
+	CHERI_REVOKE_REG(td->td_frame->tf_t[1]);
+	CHERI_REVOKE_REG(td->td_frame->tf_t[2]);
+	CHERI_REVOKE_REG(td->td_frame->tf_t[3]);
+	CHERI_REVOKE_REG(td->td_frame->tf_t[4]);
+	CHERI_REVOKE_REG(td->td_frame->tf_t[5]);
+	CHERI_REVOKE_REG(td->td_frame->tf_t[6]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[0]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[1]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[2]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[3]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[4]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[5]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[6]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[7]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[8]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[9]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[10]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[11]);
+	CHERI_REVOKE_REG(td->td_frame->tf_a[0]);
+	CHERI_REVOKE_REG(td->td_frame->tf_a[1]);
+	CHERI_REVOKE_REG(td->td_frame->tf_a[2]);
+	CHERI_REVOKE_REG(td->td_frame->tf_a[3]);
+	CHERI_REVOKE_REG(td->td_frame->tf_a[4]);
+	CHERI_REVOKE_REG(td->td_frame->tf_a[5]);
+	CHERI_REVOKE_REG(td->td_frame->tf_a[6]);
+	CHERI_REVOKE_REG(td->td_frame->tf_a[7]);
+	CHERI_REVOKE_REG(td->td_frame->tf_sepc); /* This could be real exciting! */
+	CHERI_REVOKE_REG(td->td_frame->tf_ddc);
+
+#undef CHERI_REVOKE_REG
+
+	return;
+}
+#endif
+
 // CHERI CHANGES START
 // {
 //   "updated": 20230509,

@@ -50,7 +50,7 @@
 #include "ldconfig.h"
 #include "rtld_paths.h"
 
-static void usage(void);
+static void usage(void) __dead2;
 
 int
 main(int argc, char **argv)
@@ -81,9 +81,9 @@ main(int argc, char **argv)
 	}
 
 	if (is_32)
-		hints_file = _PATH_ELF32_HINTS;
+		hints_file = __PATH_ELF_HINTS("32");
 	else if (is_64)
-		hints_file = _PATH_ELF64_HINTS;
+		hints_file = __PATH_ELF_HINTS("64");
 	else
 		hints_file = _PATH_ELF_HINTS;
 	while((c = getopt(argc, argv, "Rf:imrsv")) != -1) {
@@ -130,7 +130,7 @@ static void
 usage(void)
 {
 	fprintf(stderr,
-	    "usage: ldconfig [-32] [-elf] [-Rimrv] [-f hints_file] "
+	    "usage: ldconfig [-32|-64] [-elf] [-Rimrv] [-f hints_file] "
 	    "[directory | file ...]\n");
 	exit(1);
 }

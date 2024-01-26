@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 PACKAGE=	clibs
 SHLIBDIR?=	/lib
@@ -166,6 +165,9 @@ CLEANFILES=	${GENSRCS} ${GENHDRS} keys.list make_hash term.h.new \
 		make_keys MKterm.h.awk comp_captab.c curses.head
 
 CFLAGS+=	-DTERMIOS
+
+CWARNFLAGS.comp_parse.c= ${NO_WUNUSED_BUT_SET_VARIABLE}
+CWARNFLAGS.read_entry.c= ${NO_WUNUSED_BUT_SET_VARIABLE}
 
 # Installed
 HEADERS=	curses.h term.h termcap.h unctrl.h

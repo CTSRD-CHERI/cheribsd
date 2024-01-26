@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004 Marcel Moolenaar
  * All rights reserved.
@@ -24,8 +24,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _SYS_KDB_H_
@@ -122,7 +120,7 @@ extern const char * volatile kdb_why;
 #define	KDB_WHY_UNIONFS		"unionfs"	/* Unionfs bug. */
 #define	KDB_WHY_DTRACE		"dtrace"	/* DTrace action entered debugger. */
 #define	KDB_WHY_REBOOT		"reboot"	/* reboot was requested. */
-#define	KDB_WHY_CHERI		"cheri"		/* CHERI MIPS coprocessor. */
+#define	KDB_WHY_CHERI		"cheri"		/* CHERI. */
 
 /* Return values for kdb_alt_break */
 #define	KDB_REQ_DEBUGGER	1	/* User requested Debugger */

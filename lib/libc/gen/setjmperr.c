@@ -31,8 +31,6 @@
 
 #include <sys/cdefs.h>
 __SCCSID("@(#)setjmperr.c	8.1 (Berkeley) 6/4/93");
-__FBSDID("$FreeBSD$");
-
 /*
  * This routine is called from longjmp() when an error occurs.
  * Programs that wish to exit gracefully from this error may
@@ -45,7 +43,7 @@ __FBSDID("$FreeBSD$");
 #include <unistd.h>
 #include "un-namespace.h"
 
-__attribute__((visibility("protected"))) void
+void
 longjmperror(void)
 {
 #define	ERRMSG	"longjmp botch.\n"

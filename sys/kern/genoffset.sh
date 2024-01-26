@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2000, Bruce Evans <bde@freebsd.org>
 # Copyright (c) 2018, Jeff Roberson <jeff@freebsd.org>
@@ -26,7 +26,6 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD$
 
 usage()
 {

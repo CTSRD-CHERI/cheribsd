@@ -23,9 +23,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <drm/drm_device.h>
 #include <drm/drm_connector.h>
 #include <drm/drm_sysfs.h>

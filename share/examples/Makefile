@@ -1,4 +1,3 @@
-# $FreeBSD$
 #
 # Doing a make install builds /usr/share/examples
 
@@ -71,6 +70,10 @@ SE_BOOTFORTH= \
 	menu.4th \
 	menuconf.4th \
 	screen.4th
+
+.if ${MACHINE_ABI:Mpurecap} || ${MK_LIB64C} == "yes"
+SUBDIR+=	cheribsdtest
+.endif
 
 SE_DIRS+=	csh
 SE_CSH=	dot.cshrc

@@ -29,19 +29,14 @@
  */
 
 #include <machine/asm.h>
-__FBSDID("$FreeBSD$");
-
 #include <machine/setjmp.h>
 
 ENTRY(_setjmp)
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	stp	REG(0), REGN(lr), [REGN(sp), #-(REG_WIDTH * 2)]!
-
 	/* Store Executive mode state */
+	str	REGN(lr), [REGN(sp), #-REG_WIDTH]!
 	bl	_rtld_setjmp
-	mov	c1, c0
-
-	ldp	REG(0), REGN(lr), [REGN(sp)], #(REG_WIDTH * 2)
+	ldr	REGN(lr), [REGN(sp)], #REG_WIDTH
 #endif
 
 	/* Store the magic value and stack pointer */
@@ -65,19 +60,20 @@ ENTRY(_setjmp)
 	stp	d14, d15, [REG(0)], #16
 #endif
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	str	c1, [REG(0)], #16
-#endif
-
 	/* Return value */
 	mov	x0, #0
-	ret
+	RETURN
 	.align	3
 .Lmagic:
 	.quad	_JB_MAGIC__SETJMP
 END(_setjmp)
 
 ENTRY(_longjmp)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	/* Restore Executive mode state */
+	bl	_rtld_longjmp
+#endif
+
 	/* Check the magic value */
 	ldr	REG(8), [REG(0)], #(REG_WIDTH)
 	ldr	x9, .Lmagic
@@ -104,20 +100,10 @@ ENTRY(_longjmp)
 	ldp	d14, d15, [REG(0)], #16
 #endif
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	/* Restore Executive mode state */
-	stp	REG(1), REGN(lr), [REGN(sp), #-(REG_WIDTH * 2)]!
-
-	ldr	c0, [c0], #16
-	bl	_rtld_longjmp
-
-	ldp	REG(1), REGN(lr), [REGN(sp)], #(REG_WIDTH * 2)
-#endif
-
 	/* Load the return value */
 	cmp	x1, #0
 	csinc	x0, x1, xzr, ne
-	ret
+	RETURN
 
 botch:
 #ifdef _STANDALONE

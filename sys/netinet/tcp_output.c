@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
@@ -1766,7 +1764,7 @@ tcp_setpersist(struct tcpcb *tp)
 			tt = maxunacktime;
 	}
 	tcp_timer_activate(tp, TT_PERSIST, tt);
-	if (tp->t_rxtshift < TCP_MAXRXTSHIFT)
+	if (tp->t_rxtshift < V_tcp_retries)
 		tp->t_rxtshift++;
 }
 

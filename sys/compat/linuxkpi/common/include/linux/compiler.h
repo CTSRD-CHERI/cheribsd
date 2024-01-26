@@ -26,8 +26,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef	_LINUXKPI_LINUX_COMPILER_H_
 #define	_LINUXKPI_LINUX_COMPILER_H_
@@ -88,11 +86,9 @@
 #define	___PASTE(a,b) a##b
 #define	__PASTE(a,b) ___PASTE(a,b)
 
-#define	ACCESS_ONCE(x)			(*(volatile __typeof(x) *)&(x))
-
 #define	WRITE_ONCE(x,v) do {		\
 	barrier();			\
-	ACCESS_ONCE(x) = (v);		\
+	(*(volatile __typeof(x) *)(uintptr_t)&(x)) = (v); \
 	barrier();			\
 } while (0)
 

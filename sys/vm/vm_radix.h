@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013 EMC Corp.
  * Copyright (c) 2011 Jeffrey Roberson <jeff@freebsd.org>
@@ -26,8 +26,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _VM_RADIX_H_
@@ -39,7 +37,6 @@
 
 int		vm_radix_insert(struct vm_radix *rtree, vm_page_t page);
 void		vm_radix_wait(void);
-boolean_t	vm_radix_is_singleton(struct vm_radix *rtree);
 vm_page_t	vm_radix_lookup(struct vm_radix *rtree, vm_pindex_t index);
 vm_page_t	vm_radix_lookup_ge(struct vm_radix *rtree, vm_pindex_t index);
 vm_page_t	vm_radix_lookup_le(struct vm_radix *rtree, vm_pindex_t index);
@@ -49,18 +46,24 @@ vm_page_t	vm_radix_remove(struct vm_radix *rtree, vm_pindex_t index);
 vm_page_t	vm_radix_replace(struct vm_radix *rtree, vm_page_t newpage);
 void		vm_radix_zinit(void);
 
+/*
+ * Each search path in the trie terminates at a leaf, which is a pointer to a
+ * page marked with a set 1-bit.  A leaf may be associated with a null pointer
+ * to indicate no page there.
+ */
+#define	VM_RADIX_ISLEAF	0x1
+#define VM_RADIX_NULL (struct vm_radix_node *)VM_RADIX_ISLEAF
+
 static __inline void
 vm_radix_init(struct vm_radix *rtree)
 {
-
-	rtree->rt_root = 0;
+	rtree->rt_root = VM_RADIX_NULL;
 }
 
-static __inline boolean_t
+static __inline bool
 vm_radix_is_empty(struct vm_radix *rtree)
 {
-
-	return (rtree->rt_root == 0);
+	return (rtree->rt_root == VM_RADIX_NULL);
 }
 
 #endif /* _KERNEL */

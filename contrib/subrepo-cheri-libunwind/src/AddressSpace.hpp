@@ -27,7 +27,7 @@
 template<typename T> T uw_min(T a, T b) { return a < b ? a : b; }
 
 #ifndef _LIBUNWIND_USE_DLADDR
-  #if !defined(_LIBUNWIND_IS_BAREMETAL) && !defined(_WIN32)
+  #if !(defined(_LIBUNWIND_IS_BAREMETAL) || defined(_WIN32) || defined(_AIX))
     #define _LIBUNWIND_USE_DLADDR 1
   #else
     #define _LIBUNWIND_USE_DLADDR 0
@@ -46,6 +46,13 @@ struct EHABIIndexEntry {
   uint32_t functionOffset;
   uint32_t data;
 };
+#endif
+
+#if defined(_AIX)
+namespace libunwind {
+char *getFuncNameFromTBTable(uintptr_t pc, uint16_t &NameLen,
+                             unw_word_t *offset);
+}
 #endif
 
 #ifdef __APPLE__
@@ -671,6 +678,7 @@ static bool checkAddrInSegment(const Elf_Phdr *phdr, uintptr_t image_base,
   ((pinfo->dlpi_name && pinfo->dlpi_name[0] != '\0') ? pinfo->dlpi_name        \
                                                      : "<self>")
 
+#if defined(_LIBUNWIND_SUPPORT_DWARF_UNWIND)
 static bool boundEhFrameFromPhdr(struct dl_phdr_info *pinfo,
                                  uintptr_t image_base,
                                  dl_iterate_cb_data *cbdata) {
@@ -694,6 +702,7 @@ static bool boundEhFrameFromPhdr(struct dl_phdr_info *pinfo,
   CHERI_DBG("Could not find PT_LOAD of .eh_frame in %s\n", PINFO_NAME(pinfo));
   return false;
 }
+#endif
 
 static bool checkForUnwindInfoSegment(const Elf_Phdr *phdr, uintptr_t image_base,
                                       dl_iterate_cb_data *cbdata) {
@@ -808,10 +817,12 @@ static int findUnwindSectionsByPhdr(struct dl_phdr_info *pinfo,
   }
 
   CHERI_DBG("found_text && found_unwind in %s\n", PINFO_NAME(pinfo));
+#if defined(_LIBUNWIND_SUPPORT_DWARF_UNWIND)
   // Find the PT_LOAD containing .eh_frame.
   if (!boundEhFrameFromPhdr(pinfo, image_base, cbdata)) {
     return 0;
   }
+#endif
 #if defined(_LIBUNWIND_USE_FRAME_HEADER_CACHE)
   TheFrameHeaderCache.add(cbdata->sects);
 #endif
@@ -836,17 +847,18 @@ inline bool LocalAddressSpace::findUnwindSections(pc_t targetAddr,
     return true;
   }
 #elif defined(_LIBUNWIND_SUPPORT_DWARF_UNWIND) && defined(_LIBUNWIND_IS_BAREMETAL)
+  (void)targetAddr;
   info.dso_base = 0;
   // Bare metal is statically linked, so no need to ask the dynamic loader
   info.dwarf_section_length = (size_t)(&__eh_frame_end - &__eh_frame_start);
-  info.dwarf_section =        (uintptr_t)(&__eh_frame_start);
+  info.set_dwarf_section((uintptr_t)(&__eh_frame_start));
   _LIBUNWIND_TRACE_UNWINDING("findUnwindSections: section %p length %p",
-                             (void *)info.dwarf_section, (void *)info.dwarf_section_length);
+                             (void *)info.dwarf_section(), (void *)info.dwarf_section_length);
 #if defined(_LIBUNWIND_SUPPORT_DWARF_INDEX)
-  info.dwarf_index_section =        (uintptr_t)(&__eh_frame_hdr_start);
+  info.set_dwarf_index_section((uintptr_t)(&__eh_frame_hdr_start));
   info.dwarf_index_section_length = (size_t)(&__eh_frame_hdr_end - &__eh_frame_hdr_start);
   _LIBUNWIND_TRACE_UNWINDING("findUnwindSections: index section %p length %p",
-                             (void *)info.dwarf_index_section, (void *)info.dwarf_index_section_length);
+                             (void *)info.dwarf_index_section(), (void *)info.dwarf_index_section_length);
 #endif
   if (info.dwarf_section_length)
     return true;
@@ -867,6 +879,7 @@ inline bool LocalAddressSpace::findUnwindSections(pc_t targetAddr,
     DWORD err = GetLastError();
     _LIBUNWIND_TRACE_UNWINDING("findUnwindSections: EnumProcessModules failed, "
                                "returned error %d", (int)err);
+    (void)err;
     return false;
   }
 
@@ -903,6 +916,11 @@ inline bool LocalAddressSpace::findUnwindSections(pc_t targetAddr,
   (void)targetAddr;
   (void)info;
   return true;
+#elif defined(_LIBUNWIND_SUPPORT_TBTAB_UNWIND)
+  // The traceback table is used for unwinding.
+  (void)targetAddr;
+  (void)info;
+  return true;
 #elif defined(_LIBUNWIND_USE_DL_UNWIND_FIND_EXIDX)
   int length = 0;
   info.arm_section =
@@ -919,7 +937,6 @@ inline bool LocalAddressSpace::findUnwindSections(pc_t targetAddr,
 
   return false;
 }
-
 
 inline bool LocalAddressSpace::findOtherFDE(addr_t targetAddr, pint_t &fde) {
   // TO DO: if OS has way to dynamically register FDEs, check that.
@@ -945,6 +962,13 @@ inline bool LocalAddressSpace::findFunctionName(pc_t ip, char *buf,
       *offset = ip.address() - (__cheri_addr addr_t)dyldInfo.dli_fbase;
       return true;
     }
+  }
+#elif defined(_AIX)
+  uint16_t nameLen;
+  char *funcName = getFuncNameFromTBTable(addr, nameLen, offset);
+  if (funcName != NULL) {
+    snprintf(buf, bufLen, "%.*s", nameLen, funcName);
+    return true;
   }
 #else
   (void)ip;

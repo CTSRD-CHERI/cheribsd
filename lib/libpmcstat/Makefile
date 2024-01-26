@@ -1,5 +1,3 @@
-# $FreeBSD$
-
 # XXX: not at all purecap clean, but we need the headers...
 MK_WERROR=	no
 

@@ -22,8 +22,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _BOOT_MODULE_H_
@@ -94,6 +92,9 @@ typedef struct boot_module_t
 
 	/* valid devices as found by probe. */
 	dev_info_t *(*devices)(void);
+
+	/* return any environment variables to pass to next stage */
+	const char *(*extra_env)(void);
 } boot_module_t;
 
 extern const boot_module_t *boot_modules[];

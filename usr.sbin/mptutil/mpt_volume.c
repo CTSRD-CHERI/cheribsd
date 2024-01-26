@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__RCSID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <err.h>
@@ -219,7 +217,8 @@ volume_cache(int ac, char **av)
                 *s1 = tolower(*s1);
 	if ((strcmp(av[2], "enable")) && (strcmp(av[2], "enabled")) &&
 	    (strcmp(av[2], "disable")) && (strcmp(av[2], "disabled"))) {
-		warnx("volume cache: invalid flag, must be 'enable' or 'disable'\n");
+		warnx("volume cache: invalid flag; "
+		    "must be 'enable', 'enabled', 'disable', or 'disabled'");
 		return (EINVAL);
 	}
 
@@ -246,9 +245,9 @@ volume_cache(int ac, char **av)
 	Settings = volume->VolumeSettings.Settings;
 
 	NewSettings = Settings;
-	if (strncmp(av[2], "enable", sizeof("enable")) == 0)
+	if (strncmp(av[2], "enable", strlen("enable")) == 0)
 		NewSettings |= 0x01;
-	if (strncmp(av[2], "disable", sizeof("disable")) == 0)
+	else if (strncmp(av[2], "disable", strlen("disable")) == 0)
 		NewSettings &= ~0x01;
 
 	if (NewSettings == Settings) {

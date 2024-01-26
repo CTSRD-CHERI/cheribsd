@@ -1,7 +1,7 @@
 /*	$NetBSD: humanize_number.c,v 1.14 2008/04/28 20:22:59 martin Exp $	*/
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997, 1998, 1999, 2002 The NetBSD Foundation, Inc.
  * Copyright 2013 John-Mark Gurney <jmg@FreeBSD.org>
@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <assert.h>
 #include <inttypes.h>

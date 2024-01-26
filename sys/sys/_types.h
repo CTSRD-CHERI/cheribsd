@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2002 Mike Barcroft <mike@FreeBSD.org>
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _SYS__TYPES_H_
@@ -171,9 +169,11 @@ typedef	__uintptr_t	__uintcap_t;
 #endif
 
 #ifdef _KERNEL
-typedef __uintcap_t	__kuintcap_t;
+typedef	__intcap_t	__kintcap_t;
+typedef	__uintcap_t	__kuintcap_t;
 #else
-typedef __uintptr_t	__kuintcap_t;
+typedef	__intptr_t	__kintcap_t;
+typedef	__uintptr_t	__kuintcap_t;
 #endif
 
 /*

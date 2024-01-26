@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2014-2016 Ilya Bakulin.  All rights reserved.
  *
@@ -52,8 +52,6 @@
  *
  * Inspired coded in sys/dev/mmc. Thanks to Warner Losh <imp@FreeBSD.org>,
  * Bernd Walter <tisco@FreeBSD.org>, and other authors.
- *
- * $FreeBSD$
  */
 
 #ifndef CAM_MMC_H
@@ -64,7 +62,7 @@
  * This structure describes an MMC/SD card
  */
 struct mmc_params {
-        u_int8_t	model[40]; /* Card model */
+        uint8_t	model[40]; /* Card model */
 
         /* Card OCR */
         uint32_t card_ocr;

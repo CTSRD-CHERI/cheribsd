@@ -2,7 +2,7 @@
 #	$NetBSD: devlist2h.awk,v 1.2 1998/09/05 14:42:06 christos Exp $
 
 #-
-# SPDX-License-Identifier: BSD-2-Clause-NetBSD AND BSD-4-Clause
+# SPDX-License-Identifier: BSD-2-Clause AND BSD-4-Clause
 #
 # Copyright (c) 1998 The NetBSD Foundation, Inc.
 # All rights reserved.
@@ -60,7 +60,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 # THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $FreeBSD$
 #
 function collectline(f, line) {
 	oparen = 0
@@ -93,16 +92,9 @@ BEGIN {
 	hfile="miidevs.h"
 }
 NR == 1 {
-	VERSION = $0
-	gsub("\\$", "", VERSION)
-
-	printf("/* \$FreeBSD\$ */\n\n") > hfile
 	printf("/*\n") > hfile
 	printf(" * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.\n") \
 	    > hfile
-	printf(" *\n") > hfile
-	printf(" * generated from:\n") > hfile
-	printf(" *\t%s\n", VERSION) > hfile
 	printf(" */\n") > hfile
 
 	next

@@ -1,7 +1,7 @@
 /*-
  *  at.c : Put file into atrun queue
  *
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  *  Copyright (C) 1993, 1994 Thomas Koenig
  *
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #define _USE_BSD 1
 
 /* System Headers */

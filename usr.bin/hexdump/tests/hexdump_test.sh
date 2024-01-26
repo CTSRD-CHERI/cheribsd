@@ -1,5 +1,5 @@
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2017 Kyle Evans <kevans@FreeBSD.org>
 #
@@ -24,7 +24,6 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD$
 
 ENDIAN=el
 ret=$(echo I | tr -d "[:space:]" | od -to2 | head -n1 | awk '{print $2}' | cut -c6)
@@ -75,6 +74,10 @@ C_flag_body()
 	    hexdump -C "$(atf_get_srcdir)/d_hexdump_b.in"
 	atf_check -o file:"$(atf_get_srcdir)/d_hexdump_UCflag_c.out" \
 	    hexdump -C "$(atf_get_srcdir)/d_hexdump_c.in"
+	atf_check -o file:"$(atf_get_srcdir)/d_hexdump_UCflag_bug118723.out" \
+	    hexdump -C "$(atf_get_srcdir)/d_hexdump_bug118723.in"
+	atf_check -o file:"$(atf_get_srcdir)/d_hexdump_UCvflag_bug118723.out" \
+	    hexdump -Cv "$(atf_get_srcdir)/d_hexdump_bug118723.in"
 }
 
 atf_test_case hd_name
@@ -90,6 +93,10 @@ hd_name_body()
 	    hd "$(atf_get_srcdir)/d_hexdump_b.in"
 	atf_check -o file:"$(atf_get_srcdir)/d_hexdump_UCflag_c.out" \
 	    hd "$(atf_get_srcdir)/d_hexdump_c.in"
+	atf_check -o file:"$(atf_get_srcdir)/d_hexdump_UCflag_bug118723.out" \
+	    hd "$(atf_get_srcdir)/d_hexdump_bug118723.in"
+	atf_check -o file:"$(atf_get_srcdir)/d_hexdump_UCvflag_bug118723.out" \
+	    hd -v "$(atf_get_srcdir)/d_hexdump_bug118723.in"
 }
 
 atf_test_case d_flag

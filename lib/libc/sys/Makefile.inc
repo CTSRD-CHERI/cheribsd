@@ -1,5 +1,4 @@
 #	@(#)Makefile.inc	8.3 (Berkeley) 10/24/94
-# $FreeBSD$
 
 # sys sources
 .PATH: ${LIBC_SRCTOP}/${LIBC_ARCH}/sys ${LIBC_SRCTOP}/sys
@@ -186,6 +185,7 @@ MAN+=	abort2.2 \
 	cap_ioctls_limit.2 \
 	cap_rights_limit.2 \
 	chdir.2 \
+	cheri_cidcap_alloc.2 \
 	chflags.2 \
 	chmod.2 \
 	chown.2 \
@@ -435,6 +435,7 @@ MLINKS+=ffclock.2 ffclock_getcounter.2 \
 	ffclock.2 ffclock_setestimate.2
 MLINKS+=fhlink.2 fhlinkat.2
 MLINKS+=fhopen.2 fhstat.2 fhopen.2 fhstatfs.2
+MLINKS+=fork.2 _Fork.2
 MLINKS+=fsync.2 fdatasync.2
 MLINKS+=getdirentries.2 getdents.2
 MLINKS+=getfh.2 lgetfh.2 \

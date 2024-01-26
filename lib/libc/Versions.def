@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 #
 # Note: Whenever bumping the FBSD version, always make
@@ -35,6 +34,7 @@ FBSD_1.5 {
 FBSD_1.6 {
 } FBSD_1.5;
 
+# This version was first added to 14.0-current.
 FBSD_1.7 {
 } FBSD_1.6;
 

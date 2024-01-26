@@ -23,8 +23,6 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
 .Dd July 16, 2005
 .Dt BFE 4
 .Os
@@ -46,6 +44,13 @@ module at boot time, place the following line in
 .Bd -literal -offset indent
 if_bfe_load="YES"
 .Ed
+.Sh DEPRECATION NOTICE
+The
+.Nm
+driver is unmaintained and may be removed from
+.Fx
+in a future release.
+.Fx .
 .Sh DESCRIPTION
 The
 .Nm

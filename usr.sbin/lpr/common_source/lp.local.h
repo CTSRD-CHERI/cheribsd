@@ -27,7 +27,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)lp.local.h	8.1 (Berkeley) 6/6/93
- * $FreeBSD$
  */
 
 /*
@@ -67,7 +66,7 @@
 #define DROP	3		/* offset to drop characters with descenders */
 
 /*
- * Define TERMCAP if the terminal capabilites are to be used for lpq.
+ * Define TERMCAP if the terminal capabilities are to be used for lpq.
  */
 #define TERMCAP
 

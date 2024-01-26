@@ -1,5 +1,17 @@
-// TODO: Investigate these failures on x86_64 macOS back deployment
-// UNSUPPORTED: target=x86_64-apple-darwin{{.+}}
+// -*- C++ -*-
+//===----------------------------------------------------------------------===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+
+// TODO: Investigate this failure on x86_64 macOS back deployment
+// XFAIL: use_system_cxx_lib && target=x86_64-apple-macosx{{10.9|10.10|10.11|10.12|10.13|10.14|10.15|11.0|12.0}}
+
+// TODO: Figure out why this fails with Memory Sanitizer.
+// XFAIL: msan
 
 #include <libunwind.h>
 #include <stdlib.h>
@@ -17,10 +29,10 @@ void backtrace(int lower_bound) {
   unw_word_t offset = 0;
 
   int n = 0;
-  while (1) {
+  do {
     n++;
     if (unw_get_proc_name(&cursor, buffer, sizeof(buffer), &offset) == 0) {
-      fprintf(stderr, "Frame %d: %s+%p\n", n, buffer, (void*)(intptr_t)offset);
+      fprintf(stderr, "Frame %d: %s+%p\n", n, buffer, (void*)offset);
     } else {
       fprintf(stderr, "Frame %d: Could not get name for cursor\n", n);
     }
@@ -28,15 +40,7 @@ void backtrace(int lower_bound) {
       fprintf(stderr, "ERROR: Got %d frames, but expected at most 100\n", n);
       abort();
     }
-    int error = unw_step(&cursor);
-    if (error == 0) {
-      fprintf(stderr, "Note: Reached final frame after %d steps\n", n);
-      break;
-    } else if (error < 0) {
-      fprintf(stderr, "ERROR: Got error in unw_step: %d\n", error);
-      abort();
-    }
-  };
+  } while (unw_step(&cursor) > 0);
 
   if (n < lower_bound) {
     fprintf(stderr, "ERROR: Got %d frames, but expected at least %d\n", n, lower_bound);

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009 The FreeBSD Foundation
  * Copyright (c) 2010-2011 Pawel Jakub Dawidek <pawel@dawidek.net>
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/bio.h>
@@ -101,7 +99,7 @@ struct hio {
 	 */
 	refcnt_t		 hio_writecount;
 	/*
-	 * Memsync request was acknowleged by remote.
+	 * Memsync request was acknowledged by remote.
 	 */
 	bool			 hio_memsyncacked;
 	/*

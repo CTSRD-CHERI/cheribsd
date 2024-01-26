@@ -65,8 +65,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/domainset.h>
 #include <sys/kernel.h>
@@ -159,6 +157,7 @@ vm_ksubmap_init(struct kva_md_info *kmi)
 	vm_pointer_t minaddr;
 	vm_pointer_t maxaddr;
 
+	TSENTER();
 	/*
 	 * Allocate space for system data structures.
 	 * The first available kernel virtual address is in "v".
@@ -270,6 +269,7 @@ again:
 	    exec_map_entries * exec_map_entry_size + 64 * PAGE_SIZE, false);
 	kmem_subinit(pipe_map, kernel_map, &minaddr, &maxaddr, maxpipekva,
 	    false);
+	TSEXIT();
 }
 // CHERI CHANGES START
 // {

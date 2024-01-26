@@ -29,8 +29,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _MACHINE_PMAP_H_
@@ -88,6 +86,17 @@ struct pmap {
 	TAILQ_HEAD(,pv_chunk)	pm_pvchunk;	/* list of mappings in pmap */
 	LIST_ENTRY(pmap)	pm_list;	/* List of all pmaps */
 	struct vm_radix		pm_root;
+
+#if __has_feature(capabilities)
+	struct {
+		/*
+		 * Capability load generation bit.  The hardware kernel CLG
+		 * reflects this bit in the kernel_pmap, while the hardware
+		 * user CLG reflects this bit in the activated pmap.
+		 */
+		unsigned uclg:1;
+	} flags;
+#endif
 };
 
 typedef struct pmap *pmap_t;
@@ -154,8 +163,8 @@ void	*pmap_mapbios(vm_paddr_t, vm_size_t);
 void	pmap_unmapdev(void *, vm_size_t);
 void	pmap_unmapbios(void *, vm_size_t);
 
-boolean_t pmap_map_io_transient(vm_page_t *, vm_pointer_t *, int, boolean_t);
-void	pmap_unmap_io_transient(vm_page_t *, vm_pointer_t *, int, boolean_t);
+bool	pmap_map_io_transient(vm_page_t *, vm_pointer_t *, int, bool);
+void	pmap_unmap_io_transient(vm_page_t *, vm_pointer_t *, int, bool);
 
 bool	pmap_get_tables(pmap_t, vm_offset_t, pd_entry_t **, pd_entry_t **,
     pt_entry_t **);
@@ -165,7 +174,9 @@ int	pmap_fault(pmap_t, vm_offset_t, vm_prot_t);
 static inline int
 pmap_vmspace_copy(pmap_t dst_pmap __unused, pmap_t src_pmap __unused)
 {
-
+#if __has_feature(capabilities)
+	dst_pmap->flags.uclg = src_pmap->flags.uclg;
+#endif
 	return (0);
 }
 

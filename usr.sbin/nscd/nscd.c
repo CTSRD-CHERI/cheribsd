@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/event.h>
 #include <sys/socket.h>
@@ -85,7 +83,7 @@ static void process_socket_event(struct kevent *, struct runtime_env *,
 static void process_timer_event(struct kevent *, struct runtime_env *,
 	struct configuration *);
 static void *processing_thread(void *);
-static void usage(void);
+static void usage(void) __dead2;
 
 void get_time_func(struct timeval *);
 
@@ -105,7 +103,6 @@ init_cache_(struct configuration *config)
 
 	struct configuration_entry *config_entry;
 	size_t	size, i;
-	int res;
 
 	TRACE_IN(init_cache_);
 
@@ -120,14 +117,14 @@ init_cache_(struct configuration *config)
 	    	 * We should register common entries now - multipart entries
 	    	 * would be registered automatically during the queries.
 	    	 */
-		res = register_cache_entry(retval, (struct cache_entry_params *)
+		register_cache_entry(retval, (struct cache_entry_params *)
 			&config_entry->positive_cache_params);
 		config_entry->positive_cache_entry = find_cache_entry(retval,
 			config_entry->positive_cache_params.cep.entry_name);
 		assert(config_entry->positive_cache_entry !=
 			INVALID_CACHE_ENTRY);
 
-		res = register_cache_entry(retval, (struct cache_entry_params *)
+		register_cache_entry(retval, (struct cache_entry_params *)
 			&config_entry->negative_cache_params);
 		config_entry->negative_cache_entry = find_cache_entry(retval,
 			config_entry->negative_cache_params.cep.entry_name);

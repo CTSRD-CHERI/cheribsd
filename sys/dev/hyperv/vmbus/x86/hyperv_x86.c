@@ -1,4 +1,4 @@
-/*- SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+/*- SPDX-License-Identifier: BSD-2-Clause
  * Copyright (c) 2009-2012,2016-2017, 2022 Microsoft Corp.
  * Copyright (c) 2012 NetApp Inc.
  * Copyright (c) 2012 Citrix Inc.
@@ -30,8 +30,6 @@
  * Implements low-level interactions with Hyper-V/Azure
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>

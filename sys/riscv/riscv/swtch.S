@@ -39,10 +39,6 @@
 #include <machine/asm.h>
 #include <machine/riscvreg.h>
 #include <machine/pte.h>
-
-__FBSDID("$FreeBSD$");
-
-#ifdef FPE
 .macro __fpe_state_save p
 	/*
 	 * Enable FPE usage in supervisor mode,
@@ -286,8 +282,7 @@ ENTRY(fpe_state_clear)
 
 	RETURN
 END(fpe_state_clear)
-#endif /* FPE */
-	
+
 /*
  * void cpu_throw(struct thread *old __unused, struct thread *new)
  */
@@ -357,7 +352,6 @@ ENTRY(cpu_throw)
 	ld	s11, (PCB_S + 11 * 8)(x13)
 #endif
 
-#ifdef FPE
 	/* Is FPE enabled for new thread? */
 #ifdef __CHERI_PURE_CAPABILITY__
 	clc	ct0, TD_FRAME(ca0)
@@ -377,8 +371,6 @@ ENTRY(cpu_throw)
 	__fpe_state_load x13
 #endif
 1:
-#endif
-
 	RETURN
 END(cpu_throw)
 
@@ -449,7 +441,6 @@ ENTRY(cpu_switch)
 	sd	s11, (PCB_S + 11 * 8)(x13)
 #endif
 
-#ifdef FPE
 	/*
 	 * Is FPE enabled and is it in dirty state
 	 * for the old thread?
@@ -483,7 +474,6 @@ ENTRY(cpu_switch)
 	__fpe_state_save x13
 #endif
 1:
-#endif
 
 	/* Activate the new thread's pmap */
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -605,7 +595,6 @@ ENTRY(cpu_switch)
 	ld	s11, (PCB_S + 11 * 8)(x13)
 #endif
 
-#ifdef FPE
 	/* Is FPE enabled for new thread? */
 #ifdef __CHERI_PURE_CAPABILITY__
 	clc	ct0, TD_FRAME(ca1)
@@ -625,11 +614,7 @@ ENTRY(cpu_switch)
 	__fpe_state_load x13
 #endif
 1:
-#endif
-
 	RETURN
-.Lcpu_switch_panic_str:
-	.asciz "cpu_switch: %p\0"
 END(cpu_switch)
 
 /*
@@ -873,12 +858,10 @@ ENTRY(savectx)
 	sd	s11, (PCB_S + 11 * 8)(a0)
 #endif
 
-#ifdef FPE
 #ifdef __CHERI_PURE_CAPABILITY__
 	__fpe_state_save ca0
 #else
 	__fpe_state_save a0
-#endif
 #endif
 	RETURN
 END(savectx)

@@ -56,8 +56,6 @@
  *
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
- *
- * $FreeBSD$
  */
 
 #ifndef VM_H
@@ -71,6 +69,7 @@ typedef char vm_inherit_t;	/* inheritance codes */
 #define	VM_INHERIT_COPY		((vm_inherit_t) 1)
 #define	VM_INHERIT_NONE		((vm_inherit_t) 2)
 #define	VM_INHERIT_ZERO		((vm_inherit_t) 3)
+#define	VM_INHERIT_QUARANTINE	((vm_inherit_t) 4)
 #define	VM_INHERIT_DEFAULT	VM_INHERIT_COPY
 
 typedef u_char vm_prot_t;	/* protection codes */
@@ -96,6 +95,13 @@ typedef u_char vm_prot_t;	/* protection codes */
 #define	VM_PROT_ADD_CAP(prot)						\
 	((prot) | (((prot) & VM_PROT_READ) != 0 ? VM_PROT_READ_CAP : 0) | \
 	    (((prot) & VM_PROT_WRITE) != 0 ? VM_PROT_WRITE_CAP : 0))
+
+#define	VM_PROT_EXTRACT(prot)	((prot) & VM_PROT_ALL)
+
+#define	VM_PROT_MAX_SHIFT	16
+#define	VM_PROT_MAX(prot)	((prot) << VM_PROT_MAX_SHIFT)
+#define	VM_PROT_MAX_EXTRACT(prot)					\
+	(((prot) >> VM_PROT_MAX_SHIFT) & VM_PROT_ALL)
 
 enum obj_type {
 	OBJT_RESERVED = 0,	/* was OBJT_DEFAULT */

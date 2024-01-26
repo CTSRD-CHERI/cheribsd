@@ -24,9 +24,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
+
+#ifdef __arm__
+#include <arm/vfp.h>
+#else /* !__arm__ */
 
 #ifndef _MACHINE_VFP_H_
 #define	_MACHINE_VFP_H_
@@ -66,8 +68,12 @@ struct vfpstate {
 struct pcb;
 struct thread;
 
-void	vfp_init(void);
+void	vfp_init_secondary(void);
+void	vfp_enable(void);
+void	vfp_disable(void);
 void	vfp_discard(struct thread *);
+void	vfp_store(struct vfpstate *);
+void	vfp_restore(struct vfpstate *);
 void	vfp_new_thread(struct thread *, struct thread *, bool);
 void	vfp_reset_state(struct thread *, struct pcb *);
 void	vfp_restore_state(void);
@@ -90,6 +96,10 @@ int fpu_kern_leave(struct thread *, struct fpu_kern_ctx *);
 int fpu_kern_thread(u_int);
 int is_fpu_kern_thread(u_int);
 
+struct vfpstate *fpu_save_area_alloc(void);
+void fpu_save_area_free(struct vfpstate *fsa);
+void fpu_save_area_reset(struct vfpstate *fsa);
+
 /* Convert to and from Aarch32 FPSCR to Aarch64 FPCR/FPSR */
 #define VFP_FPSCR_FROM_SRCR(vpsr, vpcr) ((vpsr) | ((vpcr) & 0x7c00000))
 #define VFP_FPSR_FROM_FPSCR(vpscr) ((vpscr) &~ 0x7c00000)
@@ -107,3 +117,5 @@ void set_fpcontext32(struct thread *td, struct __mcontext32_vfp *mcp);
 #endif
 
 #endif /* !_MACHINE_VFP_H_ */
+
+#endif /* !__arm__ */

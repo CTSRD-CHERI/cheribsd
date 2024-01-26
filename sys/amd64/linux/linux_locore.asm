@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2015-2022 Dmitry Chagin <dchagin@freeBSD.org>
  *
@@ -23,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include "linux_assym.h"			/* system definitions */
@@ -60,8 +58,6 @@ ENTRY(linux_rt_sigcode)
 	.cfi_offset	%rax, L_SC_RAX
 	.cfi_offset	%rcx, L_SC_RCX
 	.cfi_offset	%rip, L_SC_RIP
-	.cfi_offset	49, L_SC_RFLAGS
-	.cfi_offset	%cs, L_SC_CS
 	.cfi_offset	%rsp, L_SC_RSP
 
 	movq	%rsp, %rbx			/* rt_sigframe for rt_sigreturn */

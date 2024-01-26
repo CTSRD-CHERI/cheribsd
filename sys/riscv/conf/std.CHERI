@@ -2,5 +2,11 @@ makeoptions	CPUTYPE=cheri
 options 	CPU_CHERI
 options 	COMPAT_FREEBSD64
 
+options		CHERI_CAPREVOKE
+options		CHERI_CAPREVOKE_STATS
+options		CHERI_CAPREVOKE_FAST_COPYIN
+options		CHERI_CAPREVOKE_CLOADTAGS
+options 	CHERI_CAPREVOKE_CLEARTAGS
+
 # DTrace doesn't work with CHERI yet
 nooptions 	KDTRACE_HOOKS		# Kernel DTrace hooks

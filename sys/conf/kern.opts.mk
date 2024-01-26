@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 # Options set in the build system which affect the building of kernel
 # modules. These select which parts to compile in or out (eg INET) or which
@@ -89,8 +88,8 @@ BROKEN_OPTIONS+= OFED
 BROKEN_OPTIONS+= KERNEL_RETPOLINE
 .endif
 
-# EFI doesn't exist on powerpc, or riscv
-.if ${MACHINE:Mpowerpc} || ${MACHINE:Mriscv}
+# EFI doesn't exist on powerpc or riscv and is broken on i386
+.if ${MACHINE:Mpowerpc} || ${MACHINE:Mriscv} || ${MACHINE} == "i386"
 BROKEN_OPTIONS+=EFI
 .endif
 
@@ -149,6 +148,33 @@ MK_${var}:=	no
 MK_${var}:=	no
 .endfor
 .undef BROKEN_OPTIONS
+
+#
+# Group options set an OPT_FOO variable for each option.
+#
+.for opt in ${__SINGLE_OPTIONS}
+.if !defined(__${opt}_OPTIONS) || empty(__${opt}_OPTIONS)
+.error __${opt}_OPTIONS not defined or empty
+.endif
+.if !defined(__${opt}_DEFAULT) || empty(__${opt}_DEFAULT)
+.error __${opt}_DEFAULT undefined or empty
+.endif
+.if defined(${opt})
+OPT_${opt}:=	${${opt}}
+.else
+OPT_${opt}:=	${__${opt}_DEFAULT}
+.endif
+.if empty(OPT_${opt}) || ${__${opt}_OPTIONS:M${OPT_${opt}}} != ${OPT_${opt}}
+.error Invalid option OPT_${opt} (${OPT_${opt}}), must be one of: ${__${opt}_OPTIONS}
+.endif
+.endfor
+.undef __SINGLE_OPTIONS
+
+.for opt val rep in ${BROKEN_SINGLE_OPTIONS}
+.if ${OPT_${opt}} == ${val}
+OPT_${opt}:=	${rep}
+.endif
+.endfor
 #end of bsd.mkopt.mk expanded inline.
 
 #

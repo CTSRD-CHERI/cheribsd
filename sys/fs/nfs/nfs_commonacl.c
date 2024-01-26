@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009 Rick Macklem, University of Guelph
  * All rights reserved.
@@ -28,14 +28,12 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <fs/nfs/nfsport.h>
 
 extern int nfsrv_useacl;
 
 static int nfsrv_acemasktoperm(u_int32_t acetype, u_int32_t mask, int owner,
-    enum vtype type, acl_perm_t *permp);
+    __enum_uint8(vtype) type, acl_perm_t *permp);
 
 /*
  * Handle xdr for an ace.
@@ -188,7 +186,7 @@ nfsmout:
  */
 static int
 nfsrv_acemasktoperm(u_int32_t acetype, u_int32_t mask, int owner,
-    enum vtype type, acl_perm_t *permp)
+    __enum_uint8(vtype) type, acl_perm_t *permp)
 {
 	acl_perm_t perm = 0x0;
 	int error = 0;
@@ -278,14 +276,14 @@ out:
 
 /* local functions */
 static int nfsrv_buildace(struct nfsrv_descript *, u_char *, int,
-    enum vtype, int, int, struct acl_entry *);
+    __enum_uint8(vtype), int, int, struct acl_entry *);
 
 /*
  * This function builds an NFS ace.
  */
 static int
 nfsrv_buildace(struct nfsrv_descript *nd, u_char *name, int namelen,
-    enum vtype type, int group, int owner, struct acl_entry *ace)
+    __enum_uint8(vtype) type, int group, int owner, struct acl_entry *ace)
 {
 	u_int32_t *tl, aceflag = 0x0, acemask = 0x0, acetype;
 	int full_len;
@@ -393,7 +391,7 @@ nfsrv_buildace(struct nfsrv_descript *nd, u_char *name, int namelen,
  * Build an NFSv4 ACL.
  */
 int
-nfsrv_buildacl(struct nfsrv_descript *nd, NFSACL_T *aclp, enum vtype type,
+nfsrv_buildacl(struct nfsrv_descript *nd, NFSACL_T *aclp, __enum_uint8(vtype) type,
     NFSPROC_T *p)
 {
 	int i, entrycnt = 0, retlen;

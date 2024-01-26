@@ -24,8 +24,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -783,6 +781,18 @@ ATF_TC_BODY(capnet__limits_name2addr_hosts, tc)
 
 	/* Unable to set empty limits. Empty limits means full access. */
 	limit = cap_net_limit_init(capnet, CAPNET_NAME2ADDR);
+	ATF_REQUIRE(cap_net_limit(limit) != 0);
+
+	/* Try to extend the limit. */
+	limit = cap_net_limit_init(capnet, CAPNET_NAME2ADDR);
+	ATF_REQUIRE(limit != NULL);
+	cap_net_limit_name2addr(limit, TEST_DOMAIN_1, NULL);
+	ATF_REQUIRE(cap_net_limit(limit) != 0);
+
+	limit = cap_net_limit_init(capnet, CAPNET_NAME2ADDR);
+	ATF_REQUIRE(limit != NULL);
+	cap_net_limit_name2addr(limit, TEST_DOMAIN_0, NULL);
+	cap_net_limit_name2addr(limit, TEST_DOMAIN_1, NULL);
 	ATF_REQUIRE(cap_net_limit(limit) != 0);
 
 	cap_close(capnet);

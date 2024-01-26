@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 # Use the following command to build local debug version of dynamic
 # linker:
@@ -28,6 +27,8 @@ MK_ASAN=	no
 MK_SSP=		no
 MK_UBSAN=	no
 
+.include <bsd.compat.pre.mk>
+
 .ifdef RTLD_SANDBOX
 CFLAGS+=-DRTLD_SANDBOX
 .endif
@@ -36,13 +37,11 @@ CFLAGS+=-DRTLD_SANDBOX
 CONFS=		libmap.conf
 .endif
 PROG?=		ld-elf.so.1
-.if (${PROG:M*ld-elf32*} != "")
-TAGS+=		lib32
+.for _libcompat in ${_ALL_libcompats}
+.if ${PROG:M*ld-elf${_libcompat}[-.]*} != ""
+TAGS+=		lib${_libcompat}
 .endif
-.if (${PROG:M*ld-elf64*} != "")
-TAGS+=		lib64
-.endif
-.PATH: ${RTLD_ELF_DIR}
+.endfor
 SRCS= \
 	crtbrand.S \
 	rtld_start.S \
@@ -84,9 +83,6 @@ MK_PIE:=	no
 LDFLAGS+=	-shared -Wl,-Bsymbolic -Wl,-z,defs -nostdlib -e ${RTLD_ENTRY}
 # Pull in the dependencies that we use from libc
 .include "rtld-libc/Makefile.inc"
-.if ${MK_TOOLCHAIN} == "no"
-LDFLAGS+=	-L${LIBCDIR}
-.endif
 
 VERSION_DEF=	${LIBCSRCDIR}/Versions.def
 SYMBOL_MAPS=	${RTLD_ELF_DIR}/Symbol.map
@@ -113,10 +109,14 @@ beforeinstall:
 
 .PATH: ${RTLD_ELF_DIR}/${RTLD_ARCH} ${SRCTOP}/lib/csu/common
 
-.if ${MACHINE_CPU:Mcheri}
+.if ${MACHINE_CPU:Mcheri} && ${USE_COMPAT:U} != "32"
 .PATH: ${RTLD_ELF_DIR}/cheri
 SRCS+=		cheri_reloc.c
 CFLAGS+=	-I${RTLD_ELF_DIR}/cheri
+.endif
+
+.ifdef RTLD_SANDBOX
+SRCS+=		rtld_c18n.c rtld_c18n_machdep.c rtld_c18n_asm.S
 .endif
 
 .if ${MACHINE_ABI:Mpurecap}

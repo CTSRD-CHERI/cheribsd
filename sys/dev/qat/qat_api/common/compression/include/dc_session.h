@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /* Copyright(c) 2007-2022 Intel Corporation */
-/* $FreeBSD$ */
 /**
  *****************************************************************************
  * @file dc_session.h
@@ -208,8 +207,6 @@ typedef struct dc_session_desc_s {
 	/**< Session direction */
 	CpaDcSessionState sessState;
 	/**< Session state */
-	Cpa32U deflateWindowSize;
-	/**< Window size */
 	CpaDcCompLvl compLevel;
 	/**< Compression level */
 	CpaDcCallbackFn pCompressionCb;

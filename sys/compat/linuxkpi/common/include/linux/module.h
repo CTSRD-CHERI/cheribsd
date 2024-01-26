@@ -25,8 +25,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef	_LINUXKPI_LINUX_MODULE_H_
 #define	_LINUXKPI_LINUX_MODULE_H_
@@ -75,7 +73,8 @@ _module_run(void *arg)
 	long offset;
 
 	pc = (caddr_t)arg;
-	if (linker_search_symbol_name(pc, name, sizeof(name), &offset) != 0)
+	if (linker_search_symbol_name((ptraddr_t)pc, name, sizeof(name),
+	    &offset) != 0)
 		printf("Running ??? (%p)\n", pc);
 	else
 		printf("Running %s (%p)\n", name, pc);

@@ -22,8 +22,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #include <stddef.h>
 #include <stdarg.h>
@@ -39,6 +37,8 @@
 #include "zfsimpl.c"
 
 static dev_info_t *devices;
+
+static char zfs_bootonce[VDEV_PAD_SIZE];
 
 uint64_t
 ldi_get_size(void *priv)
@@ -142,6 +142,7 @@ load(const char *filepath, dev_info_t *devinfo, void **bufp, size_t *bufsize)
 	struct zfsmount zmount;
 	dnode_phys_t dn;
 	struct stat st;
+	uint64_t rootobj;
 	int err;
 	void *buf;
 
@@ -160,8 +161,47 @@ load(const char *filepath, dev_info_t *devinfo, void **bufp, size_t *bufsize)
 		return (EFI_NOT_FOUND);
 	}
 
-	if ((err = zfs_mount_impl(spa, 0, &zmount)) != 0) {
-		DPRINTF("Failed to mount pool '%s' (%d)\n", spa->spa_name, err);
+	if (zfs_get_bootonce_spa(spa, OS_BOOTONCE, zfs_bootonce,
+	    sizeof(zfs_bootonce)) == 0) {
+		/*
+		 * If bootonce attribute is present, use it as root dataset.
+		 * Any attempt to use it should clear the 'once' flag.  Prior
+		 * to now, we'd not be able to clear it anyway.  We don't care
+		 * if we can't find the files to boot, or if there's a problem
+		 * with it: we've tried to use it once we're able to mount the
+		 * ZFS dataset.
+		 *
+		 * Note: the attribute is prefixed with "zfs:" and suffixed
+		 * with ":".
+		 */
+		char *dname, *end;
+
+		if (zfs_bootonce[0] != 'z' || zfs_bootonce[1] != 'f' ||
+		    zfs_bootonce[2] != 's' || zfs_bootonce[3] != ':' ||
+		    (dname = strchr(&zfs_bootonce[4], '/')) == NULL ||
+		    (end = strrchr(&zfs_bootonce[4], ':')) == NULL) {
+			printf("INVALID zfs bootonce: %s\n", zfs_bootonce);
+			*zfs_bootonce = '\0';
+			rootobj = 0;
+		} else {
+			dname += 1;
+			*end = '\0';
+			if (zfs_lookup_dataset(spa, dname, &rootobj) != 0) {
+				printf("zfs bootonce dataset %s NOT FOUND\n",
+				    dname);
+				*zfs_bootonce = '\0';
+				rootobj = 0;
+			} else
+				printf("zfs bootonce: %s\n", zfs_bootonce);
+			*end = ':';
+		}
+	} else {
+		*zfs_bootonce = '\0';
+		rootobj = 0;
+	}
+
+	if ((err = zfs_mount_impl(spa, rootobj, &zmount)) != 0) {
+		printf("Failed to mount pool '%s' (%d)\n", spa->spa_name, err);
 		return (EFI_NOT_FOUND);
 	}
 
@@ -220,6 +260,18 @@ status(void)
 	printf("\n");
 }
 
+static const char *
+extra_env(void)
+{
+	char *rv = NULL;	/* So we return NULL if asprintf fails */
+
+	if (*zfs_bootonce == '\0')
+		return NULL;
+	asprintf(&rv, "zfs-bootonce=%s", zfs_bootonce);
+	return (rv);
+}
+
+
 static void
 init(void)
 {
@@ -241,5 +293,6 @@ const boot_module_t zfs_module =
 	.probe = probe,
 	.load = load,
 	.status = status,
-	.devices = _devices
+	.devices = _devices,
+	.extra_env = extra_env,
 };

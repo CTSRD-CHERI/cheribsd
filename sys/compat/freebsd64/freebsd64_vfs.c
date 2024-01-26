@@ -32,9 +32,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/fcntl.h>
 #include <sys/namei.h>
@@ -369,7 +366,7 @@ int
 freebsd64_extattr_set_fd(struct thread *td,
     struct freebsd64_extattr_set_fd_args *uap)
 {
-	return (kern_extattr_set_fd(td, uap->fd, uap->attrnamespace,
+	return (user_extattr_set_fd(td, uap->fd, uap->attrnamespace,
 	    __USER_CAP_STR(uap->attrname), __USER_CAP(uap->data, uap->nbytes),
 	    uap->nbytes));
 }
@@ -378,7 +375,7 @@ int
 freebsd64_extattr_set_file(struct thread *td,
     struct freebsd64_extattr_set_file_args *uap)
 {
-	return (kern_extattr_set_path(td, __USER_CAP_STR(uap->path),
+	return (user_extattr_set_path(td, __USER_CAP_STR(uap->path),
 	    uap->attrnamespace, __USER_CAP_STR(uap->attrname),
 	    __USER_CAP(uap->data, uap->nbytes), uap->nbytes, FOLLOW));
 }
@@ -387,7 +384,7 @@ int
 freebsd64_extattr_set_link(struct thread *td,
     struct freebsd64_extattr_set_link_args *uap)
 {
-	return (kern_extattr_set_path(td, __USER_CAP_STR(uap->path),
+	return (user_extattr_set_path(td, __USER_CAP_STR(uap->path),
 	    uap->attrnamespace, __USER_CAP_STR(uap->attrname),
 	    __USER_CAP(uap->data, uap->nbytes), uap->nbytes, NOFOLLOW));
 }
@@ -396,7 +393,7 @@ int
 freebsd64_extattr_get_fd(struct thread *td,
     struct freebsd64_extattr_get_fd_args *uap)
 {
-	return (kern_extattr_get_fd(td, uap->fd, uap->attrnamespace,
+	return (user_extattr_get_fd(td, uap->fd, uap->attrnamespace,
 	    __USER_CAP_STR(uap->attrname),
 	    __USER_CAP(uap->data, uap->nbytes), uap->nbytes));
 }
@@ -405,7 +402,7 @@ int
 freebsd64_extattr_get_file(struct thread *td,
     struct freebsd64_extattr_get_file_args *uap)
 {
-	return (kern_extattr_get_path(td, __USER_CAP_STR(uap->path),
+	return (user_extattr_get_path(td, __USER_CAP_STR(uap->path),
 	    uap->attrnamespace, __USER_CAP_STR(uap->attrname),
 	    __USER_CAP(uap->data, uap->nbytes), uap->nbytes, FOLLOW));
 }
@@ -414,7 +411,7 @@ int
 freebsd64_extattr_get_link(struct thread *td,
     struct freebsd64_extattr_get_link_args *uap)
 {
-	return (kern_extattr_get_path(td, __USER_CAP_STR(uap->path),
+	return (user_extattr_get_path(td, __USER_CAP_STR(uap->path),
 	    uap->attrnamespace, __USER_CAP_STR(uap->attrname),
 	    __USER_CAP(uap->data, uap->nbytes), uap->nbytes, NOFOLLOW));
 }
@@ -423,7 +420,7 @@ int
 freebsd64_extattr_delete_fd(struct thread *td,
     struct freebsd64_extattr_delete_fd_args *uap)
 {
-	return (kern_extattr_delete_fd(td, uap->fd, uap->attrnamespace,
+	return (user_extattr_delete_fd(td, uap->fd, uap->attrnamespace,
 	    __USER_CAP_STR(uap->attrname)));
 }
 
@@ -431,7 +428,7 @@ int
 freebsd64_extattr_delete_file(struct thread *td,
     struct freebsd64_extattr_delete_file_args *uap)
 {
-	return (kern_extattr_delete_path(td, __USER_CAP_STR(uap->path),
+	return (user_extattr_delete_path(td, __USER_CAP_STR(uap->path),
 	    uap->attrnamespace, __USER_CAP_STR(uap->attrname), FOLLOW));
 }
 
@@ -439,7 +436,7 @@ int
 freebsd64_extattr_delete_link(struct thread *td,
     struct freebsd64_extattr_delete_link_args *uap)
 {
-	return (kern_extattr_delete_path(td, __USER_CAP_STR(uap->path),
+	return (user_extattr_delete_path(td, __USER_CAP_STR(uap->path),
 	    uap->attrnamespace, __USER_CAP_STR(uap->attrname), NOFOLLOW));
 }
 
@@ -447,7 +444,7 @@ int
 freebsd64_extattr_list_fd(struct thread *td,
     struct freebsd64_extattr_list_fd_args *uap)
 {
-	return (kern_extattr_list_fd(td, uap->fd, uap->attrnamespace,
+	return (user_extattr_list_fd(td, uap->fd, uap->attrnamespace,
 	    __USER_CAP(uap->data, uap->nbytes), uap->nbytes));
 }
 
@@ -455,7 +452,7 @@ int
 freebsd64_extattr_list_file(struct thread *td,
     struct freebsd64_extattr_list_file_args *uap)
 {
-	return (kern_extattr_list_path(td, __USER_CAP_STR(uap->path),
+	return (user_extattr_list_path(td, __USER_CAP_STR(uap->path),
 	    uap->attrnamespace, __USER_CAP(uap->data, uap->nbytes),
 	    uap->nbytes, FOLLOW));
 }
@@ -464,7 +461,7 @@ int
 freebsd64_extattr_list_link(struct thread *td,
     struct freebsd64_extattr_list_link_args *uap)
 {
-	return (kern_extattr_list_path(td, __USER_CAP_STR(uap->path),
+	return (user_extattr_list_path(td, __USER_CAP_STR(uap->path),
 	    uap->attrnamespace, __USER_CAP(uap->data, uap->nbytes),
 	    uap->nbytes, NOFOLLOW));
 }

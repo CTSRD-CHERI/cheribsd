@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright 1996, 1997, 1998, 1999, 2000 John D. Polstra.
  * All rights reserved.
@@ -23,8 +23,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
  /*
@@ -84,10 +82,6 @@ extern size_t tls_static_space;
 extern Elf_Addr tls_dtv_generation;
 extern int tls_max_index;
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-extern uint32_t compart_max_index;
-#endif
-
 extern int npagesizes;
 extern size_t *pagesizes;
 extern size_t page_size;
@@ -142,13 +136,6 @@ typedef struct Struct_Name_Entry {
     STAILQ_ENTRY(Struct_Name_Entry) link;
     char   name[1];
 } Name_Entry;
-
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-struct Struct_Stack_Entry {
-    SLIST_ENTRY(Struct_Stack_Entry) link;
-    void *stack;
-};
-#endif
 
 /* Lock object */
 typedef struct Struct_LockInfo {
@@ -305,9 +292,8 @@ typedef struct Struct_Obj_Entry {
     int vernum;			/* Number of entries in vertab */
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    SLIST_HEAD(, Struct_Stack_Entry) stacks; /* List of object's per-thread stacks */
-    void *stackslock;
-    uint32_t compart_id;
+    uint16_t compart_id;
+    const struct func_sig *sigtab;
 #endif
 
     void* init_ptr;		/* Initialization function to call */
@@ -332,7 +318,8 @@ typedef struct Struct_Obj_Entry {
     bool traced : 1;		/* Already printed in ldd trace output */
     bool jmpslots_done : 1;	/* Already have relocated the jump slots */
     bool init_done : 1;		/* Already have added object to init list */
-    bool tls_done : 1;		/* Already allocated offset for static TLS */
+    bool tls_static : 1;	/* Already allocated offset for static TLS */
+    bool tls_dynamic : 1;	/* A non-static DTV entry has been allocated */
     bool phdr_alloc : 1;	/* Phdr is allocated and needs to be freed. */
     bool z_origin : 1;		/* Process rpath and soname tokens */
     bool z_nodelete : 1;	/* Do not unload the object and dependencies */
@@ -563,17 +550,8 @@ int reloc_iresolve(Obj_Entry *, struct Struct_RtldLockState *);
 int reloc_iresolve_nonplt(Obj_Entry *, struct Struct_RtldLockState *);
 int reloc_gnu_ifunc(Obj_Entry *, int flags, struct Struct_RtldLockState *);
 void ifunc_init(Elf_Auxinfo[__min_size(AT_COUNT)]);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-void init_pltgot(Obj_Entry *, uintptr_t);
-#else
 void init_pltgot(Obj_Entry *);
-#endif
 void allocate_initial_tls(Obj_Entry *);
-
-void *__crt_calloc(size_t num, size_t size);
-void __crt_free(void *cp);
-void *__crt_malloc(size_t nbytes);
-void *__crt_realloc(void *cp, size_t nbytes);
 
 #if __has_feature(capabilities)
 void process___cap_relocs(Obj_Entry*);

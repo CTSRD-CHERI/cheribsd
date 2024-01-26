@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2022 Alexander V. Chernikov <melifaro@FreeBSD.org>
  *
@@ -31,6 +31,7 @@
 #ifdef _KERNEL
 
 #include <sys/bitset.h>
+#include <cheri/cheric.h>
 
 /*
  * It is not meant to be included directly
@@ -41,17 +42,22 @@ struct linear_buffer {
 	char		*base;	/* Base allocated memory pointer */
 	uint32_t	offset;	/* Currently used offset */
 	uint32_t	size;	/* Total buffer size */
-};
+} __aligned(_Alignof(__max_align_t));
 
 static inline void *
 lb_alloc(struct linear_buffer *lb, int len)
 {
-	len = roundup2(len, sizeof(uint64_t));
-	if (lb->offset + len > lb->size)
+	len = roundup2(len, _Alignof(__max_align_t));
+	len = CHERI_REPRESENTABLE_LENGTH(len);
+	char *data = CHERI_REPRESENTABLE_ALIGN_UP(lb->base + lb->offset, len);
+	if (data + len > lb->base + lb->size)
 		return (NULL);
-	void *data = (void *)(lb->base + lb->offset);
-	lb->offset += len;
+	lb->offset = (data + len) - lb->base;
+#ifdef __CHERI_PURE_CAPABILITY__
+	return (cheri_setboundsexact(data, len));
+#else
 	return (data);
+#endif
 }
 
 static inline void
@@ -110,6 +116,7 @@ struct nlattr_parser {
 };
 
 typedef bool strict_parser_f(void *hdr, struct nl_pstate *npt);
+typedef bool post_parser_f(void *parsed_attrs, struct nl_pstate *npt);
 
 struct nlhdr_parser {
 	int				nl_hdr_off; /* aligned netlink header size */
@@ -118,27 +125,26 @@ struct nlhdr_parser {
 	int				np_size;
 	const struct nlfield_parser	*fp; /* array of header field parsers */
 	const struct nlattr_parser	*np; /* array of attribute parsers */
-	strict_parser_f			*sp; /* Parser function */
+	strict_parser_f			*sp; /* Pre-parse strict validation function */
+	post_parser_f			*post_parse;
 };
 
-#define	NL_DECLARE_PARSER(_name, _t, _fp, _np)		\
-static const struct nlhdr_parser _name = {		\
-	.nl_hdr_off = sizeof(_t),			\
-	.fp = &((_fp)[0]),				\
-	.np = &((_np)[0]),				\
-	.fp_size = NL_ARRAY_LEN(_fp),			\
-	.np_size = NL_ARRAY_LEN(_np),			\
+#define	NL_DECLARE_PARSER_EXT(_name, _t, _sp, _fp, _np, _pp)	\
+static const struct nlhdr_parser _name = {			\
+	.nl_hdr_off = sizeof(_t),				\
+	.fp = &((_fp)[0]),					\
+	.np = &((_np)[0]),					\
+	.fp_size = NL_ARRAY_LEN(_fp),				\
+	.np_size = NL_ARRAY_LEN(_np),				\
+	.sp = _sp,						\
+	.post_parse = _pp,					\
 }
 
-#define	NL_DECLARE_STRICT_PARSER(_name, _t, _sp, _fp, _np)\
-static const struct nlhdr_parser _name = {		\
-	.nl_hdr_off = sizeof(_t),			\
-	.fp = &((_fp)[0]),				\
-	.np = &((_np)[0]),				\
-	.fp_size = NL_ARRAY_LEN(_fp),			\
-	.np_size = NL_ARRAY_LEN(_np),			\
-	.sp = _sp,					\
-}
+#define	NL_DECLARE_PARSER(_name, _t, _fp, _np)			\
+	NL_DECLARE_PARSER_EXT(_name, _t, NULL, _fp, _np, NULL)
+
+#define	NL_DECLARE_STRICT_PARSER(_name, _t, _sp, _fp, _np)	\
+	NL_DECLARE_PARSER_EXT(_name, _t, _sp, _fp, _np, NULL)
 
 #define	NL_DECLARE_ARR_PARSER(_name, _t, _o, _fp, _np)	\
 static const struct nlhdr_parser _name = {		\
@@ -251,6 +257,11 @@ nl_parse_header(void *hdr, int len, const struct nlhdr_parser *parser,
 	struct nlattr *nla_head = (struct nlattr *)((char *)hdr + parser->nl_hdr_off);
 	error = nl_parse_attrs_raw(nla_head, len - parser->nl_hdr_off, parser->np,
 	    parser->np_size, npt, target);
+
+	if (parser->post_parse != NULL && error == 0) {
+		if (!parser->post_parse(target, npt))
+			return (EINVAL);
+	}
 
 	return (error);
 }

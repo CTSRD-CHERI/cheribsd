@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .PATH: ${ZFSTOP}/lib/libzutil
 .PATH: ${ZFSTOP}/lib/libzutil/os/freebsd

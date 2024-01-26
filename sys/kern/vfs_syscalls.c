@@ -37,8 +37,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_capsicum.h"
 #include "opt_ktrace.h"
 
@@ -2493,8 +2491,12 @@ kern_statat(struct thread *td, int flag, int fd, const char * __capability path,
 	    AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH) | LOCKSHARED | LOCKLEAF |
 	    AUDITVNODE1, pathseg, path, fd, &cap_fstat_rights);
 
-	if ((error = namei(&nd)) != 0)
+	if ((error = namei(&nd)) != 0) {
+		if (error == ENOTDIR &&
+		    (nd.ni_resflags & NIRES_EMPTYPATH) != 0)
+			error = kern_fstat(td, fd, sbp);
 		return (error);
+	}
 	error = VOP_STAT(nd.ni_vp, sbp, td->td_ucred, NOCRED);
 	NDFREE_PNBUF(&nd);
 	vput(nd.ni_vp);
@@ -5130,7 +5132,6 @@ user_copy_file_range(struct thread *td, int infd,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
 //     "user_capabilities",
 //     "ctoptr"
 //   ]

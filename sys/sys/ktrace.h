@@ -29,13 +29,14 @@
  * SUCH DAMAGE.
  *
  *	@(#)ktrace.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD$
  */
 
 #ifndef _SYS_KTRACE_H_
 #define _SYS_KTRACE_H_
 
 #include <sys/caprights.h>
+#include <sys/signal.h>
+#include <sys/_uio.h>
 
 /*
  * operations to ktrace system call  (KTROP(op))

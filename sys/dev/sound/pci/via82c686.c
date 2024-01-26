@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000 David Jones <dej@ox.org>
  * All rights reserved.
@@ -38,8 +38,6 @@
 #include <sys/sysctl.h>
 
 #include <dev/sound/pci/via82c686.h>
-
-SND_DECLARE_FILE("$FreeBSD$");
 
 #define VIA_PCI_ID 0x30581106
 #define	NSEGS		4	/* Number of segments in SGD table */

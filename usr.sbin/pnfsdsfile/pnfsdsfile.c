@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2017 Rick Macklem
  *
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <err.h>
 #include <getopt.h>
 #include <netdb.h>
@@ -46,7 +44,7 @@ __FBSDID("$FreeBSD$");
 #include <fs/nfs/nfs.h>
 #include <fs/nfs/nfsrvstate.h>
 
-static void usage(void);
+static void usage(void) __dead2;
 
 static struct option longopts[] = {
 	{ "changeds",	required_argument,	NULL,	'c'	},

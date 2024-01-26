@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1993, David Greenman
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_capsicum.h"
 #include "opt_hwpmc_hooks.h"
 #include "opt_ktrace.h"
@@ -83,6 +81,9 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 #include <vm/vm_page.h>
 #include <vm/vm_map.h>
+#ifdef CHERI_CAPREVOKE
+#include <vm/vm_cheri_revoke.h>
+#endif
 #include <vm/vm_kern.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_object.h>
@@ -556,7 +557,6 @@ do_execve(struct thread *td, struct image_args *args,
 	uintcap_t stack_base;
 	struct image_params image_params, *imgp;
 	struct vattr attr;
-	int (*img_first)(struct image_params *);
 	struct pargs *oldargs = NULL, *newargs = NULL;
 	struct sigacts *oldsigacts = NULL, *newsigacts = NULL;
 #ifdef KTRACE
@@ -821,24 +821,14 @@ interpret:
 	/* The new credentials are installed into the process later. */
 
 	/*
-	 *	If the current process has a special image activator it
-	 *	wants to try first, call it.   For example, emulating shell
-	 *	scripts differently.
-	 */
-	error = -1;
-	if ((img_first = imgp->proc->p_sysent->sv_imgact_try) != NULL)
-		error = img_first(imgp);
-
-	/*
 	 *	Loop through the list of image activators, calling each one.
 	 *	An activator returns -1 if there is no match, 0 on success,
 	 *	and an error otherwise.
 	 */
+	error = -1;
 	for (i = 0; error == -1 && execsw[i]; ++i) {
-		if (execsw[i]->ex_imgact == NULL ||
-		    execsw[i]->ex_imgact == img_first) {
+		if (execsw[i]->ex_imgact == NULL)
 			continue;
-		}
 		error = (*execsw[i]->ex_imgact)(imgp);
 	}
 
@@ -1410,21 +1400,15 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		vmspace = p->p_vmspace;
 		map = &vmspace->vm_map;
 	}
+#ifdef CHERI_CAPREVOKE
+	KASSERT(map->vm_cheri_revoke_st == CHERI_REVOKE_ST_NONE,
+	    ("vm_map still revoking"));
+#endif
 	map->flags |= imgp->map_flags;
 	if (sv->sv_flags & SV_CHERI)
 		map->flags |= MAP_RESERVATIONS;
 	else
 		map->flags &= ~MAP_RESERVATIONS;
-
-#ifdef CPU_QEMU_MALTA
-	if (curthread->td_md.md_flags & MDTD_QTRACE) {
-		char buffer[128];
-
-		snprintf(buffer, sizeof(buffer), "VMMAP %d: exec",
-		    curproc->p_pid);
-		CHERI_TRACE_STRING(buffer);
-	}
-#endif
 
 	return (sv->sv_onexec != NULL ? sv->sv_onexec(p, imgp) : 0);
 }
@@ -1444,6 +1428,7 @@ exec_map_stack(struct image_params *imgp)
 	vm_pointer_t stack_addr, stack_top;
 #if __has_feature(capabilities)
 	vm_pointer_t strings_addr;
+	size_t strings_size;
 	register_t perms;
 #endif
 	vm_pointer_t sharedpage_addr;
@@ -1500,8 +1485,7 @@ exec_map_stack(struct image_params *imgp)
 		do {
 			p->p_vm_stacktop -= MAXSSIZ;
 #if __has_feature(capabilities)
-			p->p_vm_stacktop = CHERI_REPRESENTABLE_BASE(p->p_vm_stacktop,
-			    ssiz);
+			p->p_vm_stacktop = CHERI_REPRESENTABLE_ALIGN_DOWN(p->p_vm_stacktop, ssiz);
 #endif
 			stack_addr = p->p_vm_stacktop - ssiz;
 			if (stack_addr < VM_MINUSER_ADDRESS ||
@@ -1534,7 +1518,8 @@ exec_map_stack(struct image_params *imgp)
 		stack_top = sv->sv_usrstack;
 #if __has_feature(capabilities)
 		if (sv->sv_flags & SV_CHERI)
-			stack_top = CHERI_REPRESENTABLE_BASE(stack_top, ssiz);
+			stack_top = CHERI_REPRESENTABLE_ALIGN_DOWN(stack_top,
+			    ssiz);
 #endif
 		stack_addr = stack_top - ssiz;
 		find_space = VMFS_NO_SPACE;
@@ -1578,10 +1563,17 @@ exec_map_stack(struct image_params *imgp)
 		 * We currently place it just just below the stack as
 		 * this avoides collisions with init which is linked
 		 * near the bottom of the address space.
+		 *
+		 * The extra page beyond ARG_MAX accounts for space
+		 * needed for the ELF auxiliary, argument, and
+		 * environment vectors and other data stored in this
+		 * space other than argument and environment strings.
 		 */
+		strings_size = CHERI_REPRESENTABLE_LENGTH(ARG_MAX + PAGE_SIZE);
 		strings_addr =
-		    CHERI_REPRESENTABLE_BASE(stack_addr - ARG_MAX, ARG_MAX);
-		error = vm_mmap_object(map, &strings_addr, 0, ARG_MAX,
+		    CHERI_REPRESENTABLE_ALIGN_DOWN(stack_addr - strings_size,
+			strings_size);
+		error = vm_mmap_object(map, &strings_addr, 0, strings_size,
 		    VM_PROT_RW_CAP, VM_PROT_RW_CAP, MAP_ANON | MAP_FIXED |
 		    MAP_RESERVATION_CREATE, NULL, 0, FALSE, curthread);
 		if (error != KERN_SUCCESS)
@@ -1590,16 +1582,33 @@ exec_map_stack(struct image_params *imgp)
 		imgp->strings = (void *)strings_addr;
 #else
 		imgp->strings = cheri_capability_build_user_data(
-		    CHERI_CAP_USER_DATA_PERMS, strings_addr, ARG_MAX, ARG_MAX);
+		    CHERI_CAP_USER_DATA_PERMS, strings_addr, strings_size, 0);
 #endif
 	} else
 		imgp->strings = imgp->stack;
 
 	if (sv->sv_flags & SV_CHERI)
-		p->p_psstrings = strings_addr + ARG_MAX - sv->sv_psstringssz;
+		p->p_psstrings = strings_addr + strings_size -
+		    sv->sv_psstringssz;
 	else
 #endif
 		p->p_psstrings = stack_top - sv->sv_psstringssz;
+
+#ifdef CHERI_CAPREVOKE
+	/*
+	 * For CheriABI, create an anonymous, CoW mapping for the revocation
+	 * bitmaps.
+	 *
+	 * XXX This almost surely belongs elsewhere, but I don't immediately
+	 * see a per-sv hook here.
+	 */
+	if (sv->sv_flags & SV_CHERI) {
+		error = vm_map_install_cheri_revoke_shadow(map, sv);
+
+		if (error != KERN_SUCCESS)
+			return (vm_mmap_to_errno(error));
+	}
+#endif
 
 	/* Map a shared page */
 	obj = sv->sv_shared_page_obj;

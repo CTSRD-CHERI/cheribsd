@@ -248,7 +248,6 @@ ATF_TC_WITHOUT_HEAD(cocall_eagain);
 ATF_TC_BODY(cocall_eagain, tc)
 {
 	char *name;
-	uint64_t buf;
 	pid_t pid, pid2;
 	int error;
 
@@ -262,7 +261,6 @@ ATF_TC_BODY(cocall_eagain, tc)
 		error = coregister(name, NULL);
 		ATF_REQUIRE_EQ(error, 0);
 
-		buf = 42;
 		for (;;)
 			sched_yield();
 		atf_tc_fail("You're not supposed to be here");
@@ -430,7 +428,6 @@ ATF_TC_BODY(cocall_callee_abort, tc)
 	char *name;
 	uint64_t buf;
 	pid_t pid, pid2;
-	ssize_t received;
 	int error;
 
 	name = random_string();
@@ -445,7 +442,7 @@ ATF_TC_BODY(cocall_callee_abort, tc)
 
 		buf = 42;
 		for (;;) {
-			received = coaccept(NULL, &buf, sizeof(buf), &buf, sizeof(buf));
+			coaccept(NULL, &buf, sizeof(buf), &buf, sizeof(buf));
 			abort();
 		}
 		atf_tc_fail("You're not supposed to be here");
@@ -704,7 +701,6 @@ ATF_TC_BODY(cocall_proxy_abort, tc)
 	char *name, *name2;
 	uint64_t buf;
 	pid_t pid, pid2, pid3;
-	ssize_t received;
 	int error;
 
 	/*
@@ -724,7 +720,7 @@ ATF_TC_BODY(cocall_proxy_abort, tc)
 
 		buf = 42;
 		for (;;) {
-			received = coaccept(NULL, &buf, sizeof(buf), &buf, sizeof(buf));
+			coaccept(NULL, &buf, sizeof(buf), &buf, sizeof(buf));
 			abort();
 		}
 		atf_tc_fail("You're not supposed to be here");

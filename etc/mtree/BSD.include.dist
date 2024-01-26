@@ -1,4 +1,3 @@
-# $FreeBSD$
 #
 # Please see the file src/etc/mtree/README before making changes to this file.
 #
@@ -33,6 +32,8 @@
             ..
             __debug_utils
             ..
+            __expected
+            ..
             __filesystem
             ..
             __format
@@ -47,16 +48,19 @@
             ..
             __memory
             ..
+            __memory_resource
+            ..
             __numeric
             ..
             __random
             ..
             __ranges
             ..
-# XXX: Re-enable for CHERI LLVM 15
-#            __string
-#            ..
+            __string
+            ..
             __thread
+            ..
+            __tuple_dir
             ..
             __type_traits
             ..
@@ -184,10 +188,6 @@
         udf
         ..
         unionfs
-        ..
-    ..
-    gcc
-        4.2
         ..
     ..
     geom

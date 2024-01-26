@@ -9,18 +9,18 @@
 
 namespace std {
 
-_LIBCPP_SAFE_STATIC static _Atomic(std::new_handler) __new_handler;
+static constinit std::new_handler __new_handler = nullptr;
 
 new_handler
 set_new_handler(new_handler handler) noexcept
 {
-    return __c11_atomic_exchange(&__new_handler, handler, __ATOMIC_SEQ_CST);
+    return __libcpp_atomic_exchange(&__new_handler, handler);
 }
 
 new_handler
 get_new_handler() noexcept
 {
-    return __c11_atomic_load(&__new_handler, __ATOMIC_SEQ_CST);
+    return __libcpp_atomic_load(&__new_handler);
 }
 
 } // namespace std

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2008 Joseph Koshy
  * All rights reserved.
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/pmc.h>
 #include <sys/pmckern.h>
@@ -99,7 +97,7 @@ pmc_intel_initialize(void)
 	    family, model, stepping);
 
 	switch (cpu_id & 0xF00) {
-	case 0x600:		/* Pentium Pro, Celeron, Pentium II & III */
+	case 0x600:
 		switch (model) {
 		case 0xE:
 			cputype = PMC_CPU_INTEL_CORE;

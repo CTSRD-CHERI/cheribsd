@@ -27,10 +27,12 @@
  */
 
 #include <machine/asm.h>
-__FBSDID("$FreeBSD$");
-
 ENTRY(_ctx_start)
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	blr	x19		/* Call func from makecontext */
+#else
 	blr	REG(19)		/* Call func from makecontext */
+#endif
 	mov	REG(0), REG(20)	/* Load ucp saved in makecontext */
 	bl	_C_LABEL(ctx_done)
 	bl	_C_LABEL(abort)

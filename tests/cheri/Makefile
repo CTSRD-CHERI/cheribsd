@@ -1,5 +1,3 @@
-# $FreeBSD$
-
 .include <bsd.own.mk>
 
 TESTSDIR=	${TESTSBASE}/cheri

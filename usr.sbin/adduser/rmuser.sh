@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2002, 2003 Michael Telahun Makonnen. All rights reserved.
 #
@@ -26,7 +26,6 @@
 #
 #	Email: Mike Makonnen <mtm@FreeBSD.Org>
 #
-# $FreeBSD$
 #
 
 ATJOBDIR="/var/at/jobs"

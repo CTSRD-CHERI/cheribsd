@@ -69,3 +69,24 @@ u_int	security_cheri_bound_legacy_capabilities;
 SYSCTL_INT(_security_cheri, OID_AUTO, bound_legacy_capabilities,
     CTLFLAG_RWTUN, &security_cheri_bound_legacy_capabilities, 0,
     "Set bounds on userspace capabilities created by legacy ABIs.");
+
+#ifdef CHERI_CAPREVOKE
+/*
+ * Set the default state of revocation in userspace.  This is used to
+ * compute the revocation flags in AT_BSDFLAGS but can be overridden
+ * by elfctl(1) flags and procctl(2).
+ */
+int security_cheri_runtime_revocation_default = 1;
+SYSCTL_INT(_security_cheri, OID_AUTO, runtime_revocation_default, CTLFLAG_RWTUN,
+    &security_cheri_runtime_revocation_default, 0,
+    "Userspace runtime revocation default");
+
+/*
+ * Set the default policy for revocation in userspace.  This is used to
+ * compute the revocation policy flag in AT_BSDFLAGS.
+ */
+int security_cheri_runtime_revocation_every_free_default = 0;
+SYSCTL_INT(_security_cheri, OID_AUTO, runtime_revocation_every_free_default,
+    CTLFLAG_RWTUN, &security_cheri_runtime_revocation_every_free_default, 0,
+    "Userspace runtime revocation on every free for debugging default");
+#endif  /* CHERI_CAPREVOKE */

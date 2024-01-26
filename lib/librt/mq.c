@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006 David Xu <davidxu@freebsd.org>
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
@@ -35,7 +33,9 @@
 
 #include "namespace.h"
 #include <errno.h>
+#include <fcntl.h>
 #include <pthread.h>
+#include <stdarg.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -82,11 +82,23 @@ __weak_reference(__mq_receive_cancel, mq_receive);
 __weak_reference(__mq_receive, _mq_receive);
 
 mqd_t
-__mq_open(const char *name, int oflag, mode_t mode,
-	const struct mq_attr *attr)
+__mq_open(const char *name, int oflag, ...)
 {
+	const struct mq_attr *attr;
 	struct __mq *mq;
+	mode_t mode;
+	va_list ap;
 	int err;
+
+	if ((oflag & O_CREAT) != 0) {
+		va_start(ap, oflag);
+		mode = va_arg(ap, int);
+		attr = va_arg(ap, const struct mq_attr *);
+		va_end(ap);
+	} else {
+		mode = 0;
+		attr = NULL;
+	}
 
 	mq = malloc(sizeof(struct __mq));
 	if (mq == NULL)

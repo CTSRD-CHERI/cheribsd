@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright 1996-1998 John D. Polstra.
  * All rights reserved.
@@ -23,8 +23,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -102,7 +100,6 @@ struct sysentvec elf32_freebsd_sysvec = {
 	.sv_elf_core_osabi = ELFOSABI_FREEBSD,
 	.sv_elf_core_abi_vendor = FREEBSD_ABI_VENDOR,
 	.sv_elf_core_prepare_notes = __elfN(prepare_notes),
-	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_stackprot	= VM_PROT_ALL,
@@ -146,7 +143,6 @@ static Elf32_Brandinfo freebsd_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,
 	.machine	= EM_PPC,
 	.compat_3_brand	= "FreeBSD",
-	.emul_path	= NULL,
 	.interp_path	= "/libexec/ld-elf.so.1",
 	.sysvec		= &elf32_freebsd_sysvec,
 #ifdef __powerpc64__
@@ -166,7 +162,6 @@ static Elf32_Brandinfo freebsd_brand_oinfo = {
 	.brand		= ELFOSABI_FREEBSD,
 	.machine	= EM_PPC,
 	.compat_3_brand	= "FreeBSD",
-	.emul_path	= NULL,
 	.interp_path	= "/usr/libexec/ld-elf.so.1",
 	.sysvec		= &elf32_freebsd_sysvec,
 	.interp_newpath	= NULL,
@@ -236,7 +231,7 @@ elf_is_ifunc_reloc(Elf_Size r_info)
 
 /* Process one elf relocation with addend. */
 static int
-elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
+elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
     int type, int local, elf_lookup_fn lookup)
 {
 	Elf_Addr *where;
@@ -253,8 +248,8 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 		break;
 	case ELF_RELOC_RELA:
 		rela = (const Elf_Rela *)data;
-		where = (Elf_Addr *) ((uintptr_t)relocbase + rela->r_offset);
-		hwhere = (Elf_Half *) ((uintptr_t)relocbase + rela->r_offset);
+		where = (Elf_Addr *) (relocbase + rela->r_offset);
+		hwhere = (Elf_Half *) (relocbase + rela->r_offset);
 		addend = rela->r_addend;
 		rtype = ELF_R_TYPE(rela->r_info);
 		symidx = ELF_R_SYM(rela->r_info);
@@ -283,8 +278,9 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 		 * (i.e. .rodata) in rela, where in reality they
 		 * are relative to relocbase. Detect this condition.
 		 */
-		if (addr > relocbase && addr <= (relocbase + addend))
-			addr = relocbase;
+		if (addr > (Elf_Addr)relocbase &&
+		    addr <= ((Elf_Addr)relocbase + addend))
+			addr = (Elf_Addr)relocbase;
 		addr = elf_relocaddr(lf, addr + addend);
 		*hwhere = addr & 0xffff;
 		break;
@@ -298,15 +294,16 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 		 * (i.e. .rodata) in rela, where in reality they
 		 * are relative to relocbase. Detect this condition.
 		 */
-		if (addr > relocbase && addr <= (relocbase + addend))
-			addr = relocbase;
+		if (addr > (Elf_Addr)relocbase &&
+		    addr <= ((Elf_Addr)relocbase + addend))
+			addr = (Elf_Addr)relocbase;
 		addr = elf_relocaddr(lf, addr + addend);
 		*hwhere = ((addr >> 16) + ((addr & 0x8000) ? 1 : 0))
 		    & 0xffff;
 		break;
 
 	case R_PPC_RELATIVE: /* word32 B + A */
-		*where = elf_relocaddr(lf, relocbase + addend);
+		*where = elf_relocaddr(lf, (Elf_Addr)relocbase + addend);
 		break;
 
 	case R_PPC_JMP_SLOT: /* PLT jump slot entry */
@@ -324,7 +321,7 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 		break;
 
 	case R_PPC_IRELATIVE:
-		addr = relocbase + addend;
+		addr = (Elf_Addr)relocbase + addend;
 		val = ((Elf32_Addr (*)(void))addr)();
 		if (*where != val)
 			*where = val;
@@ -372,7 +369,7 @@ elf_reloc_self(Elf_Dyn *dynp, Elf_Addr relocbase)
 }
 
 int
-elf_reloc(linker_file_t lf, Elf_Addr relocbase, const void *data, int type,
+elf_reloc(linker_file_t lf, char *relocbase, const void *data, int type,
     elf_lookup_fn lookup)
 {
 
@@ -380,7 +377,7 @@ elf_reloc(linker_file_t lf, Elf_Addr relocbase, const void *data, int type,
 }
 
 int
-elf_reloc_local(linker_file_t lf, Elf_Addr relocbase, const void *data,
+elf_reloc_local(linker_file_t lf, char *relocbase, const void *data,
     int type, elf_lookup_fn lookup)
 {
 

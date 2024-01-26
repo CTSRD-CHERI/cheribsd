@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Various setup functions for truss.  Not the cleanest-written code,
  * I'm afraid.
@@ -129,6 +127,9 @@ static struct procabi linux32 = {
 static struct procabi_table abis[] = {
 #if __has_feature(capabilities)
 	{ "FreeBSD ELF64C", &freebsd },
+#if defined(__aarch64__)
+	{ "FreeBSD ELF64CB", &freebsd },
+#endif
 	{ "FreeBSD ELF64", &freebsd64 },
 	{ "FreeBSD ELF32", &freebsd32 },
 #elif __SIZEOF_POINTER__ == 4

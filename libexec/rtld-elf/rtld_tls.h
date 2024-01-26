@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004 Doug Rabson
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD$
  */
 
 /*
@@ -58,7 +56,7 @@
  * The value returned from this function is suitable for installing
  * directly into the thread pointer register.
  */
-void *_rtld_allocate_tls(void* oldtls, size_t tcbsize, size_t tcbalign)
+void *_rtld_allocate_tls(void *oldtls, size_t tcbsize, size_t tcbalign)
     __exported;
 
 /*

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-3-Clause and BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-3-Clause and BSD-2-Clause
  *
  * Copyright (c) 2002 Networks Associates Technology, Inc.
  * All rights reserved.
@@ -59,7 +59,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)fsck.h	8.4 (Berkeley) 5/9/95
- * $FreeBSD$
  */
 
 #ifndef _FSCK_H_
@@ -112,7 +111,7 @@ struct inostat {
 #define	FSTATE	0x2		/* inode is file */
 #define	FZLINK	0x3		/* inode is file with a link count of zero */
 #define	DSTATE	0x4		/* inode is directory */
-#define	DZLINK	0x5		/* inode is directory with a zero link count  */
+#define	DZLINK	0x5		/* inode is directory with a zero link count */
 #define	DFOUND	0x6		/* directory found during descent */
 /*     		0x7		   UNUSED - see S_IS_DVALID() definition */
 #define	DCLEAR	0x8		/* directory is to be cleared */
@@ -297,8 +296,8 @@ struct dups {
 	struct dups *next;
 	ufs2_daddr_t dup;
 };
-extern struct dups *duplist;		/* head of dup list */
-extern struct dups *muldup;		/* end of unique duplicate dup block numbers */
+extern struct dups *duplist;	/* head of dup list */
+extern struct dups *muldup;	/* end of unique duplicate dup block numbers */
 
 /*
  * Inode cache data structures.
@@ -333,6 +332,7 @@ extern int adjnbfree[MIBSIZE];	/* MIB cmd to adjust number of free blocks */
 extern int adjnifree[MIBSIZE];	/* MIB cmd to adjust number of free inodes */
 extern int adjnffree[MIBSIZE];	/* MIB cmd to adjust number of free frags */
 extern int adjnumclusters[MIBSIZE]; /* MIB cmd adjust number of free clusters */
+extern int adjdepth[MIBSIZE];	/* MIB cmd to adjust directory depth count */
 extern int freefiles[MIBSIZE];	/* MIB cmd to free a set of files */
 extern int freedirs[MIBSIZE];	/* MIB cmd to free a set of directories */
 extern int freeblks[MIBSIZE];	/* MIB cmd to free a set of data blocks */
@@ -466,8 +466,10 @@ void		cgdirty(struct bufarea *);
 struct bufarea *cglookup(int cg);
 int		changeino(ino_t dir, const char *name, ino_t newnum, int depth);
 void		check_blkcnt(struct inode *ip);
-int		check_cgmagic(int cg, struct bufarea *cgbp, int requestrebuild);
+int		check_cgmagic(int cg, struct bufarea *cgbp);
+void		rebuild_cg(int cg, struct bufarea *cgbp);
 void		check_dirdepth(struct inoinfo *inp);
+int		chkfilesize(mode_t mode, u_int64_t filesize);
 int		chkrange(ufs2_daddr_t blk, int cnt);
 void		ckfini(int markclean);
 int		ckinode(union dinode *dp, struct inodesc *);

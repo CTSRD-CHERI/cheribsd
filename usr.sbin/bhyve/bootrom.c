@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2015 Neel Natu <neel@freebsd.org>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/param.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -120,12 +118,15 @@ bootrom_var_mem_handler(struct vcpu *vcpu __unused, int dir, uint64_t addr,
 void
 init_bootrom(struct vmctx *ctx)
 {
+	vm_paddr_t highmem;
+
 	romptr = vm_create_devmem(ctx, VM_BOOTROM, "bootrom", BOOTROM_SIZE);
 	if (romptr == MAP_FAILED)
 		err(4, "%s: vm_create_devmem", __func__);
-	gpa_base = (1ULL << 32) - BOOTROM_SIZE;
+	highmem = vm_get_highmem_base(ctx);
+	gpa_base = highmem - BOOTROM_SIZE;
 	gpa_allocbot = gpa_base;
-	gpa_alloctop = (1ULL << 32) - 1;
+	gpa_alloctop = highmem - 1;
 }
 
 int

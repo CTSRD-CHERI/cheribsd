@@ -1,7 +1,7 @@
 /*-
  *  perm.c - check user permission for at(1)
  *
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  *  Copyright (C) 1994  Thomas Koenig
  *
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /* System Headers */
 
 #include <sys/types.h>

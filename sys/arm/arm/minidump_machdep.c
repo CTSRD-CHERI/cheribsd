@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006 Peter Wemm
  * Copyright (c) 2008 Semihalf, Grzegorz Bernacki
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_watchdog.h"
 
 #include <sys/param.h>
@@ -223,7 +221,7 @@ cpu_minidumpsys(struct dumperinfo *di, const struct minidumpstate *state)
 	if (error != 0)
 		goto fail;
 
-	printf("Physical memory: %u MB\n", ptoa((uintmax_t)physmem) / 1048576);
+	printf("Physical memory: %ju MB\n", ptoa((uintmax_t)physmem) / 1048576);
 	printf("Dumping %llu MB:", (long long)dumpsize >> 20);
 
 	/* Dump my header */

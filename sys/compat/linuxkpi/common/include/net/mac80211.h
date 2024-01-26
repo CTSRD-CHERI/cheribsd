@@ -25,8 +25,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef	_LINUXKPI_NET_MAC80211_H
@@ -755,7 +753,7 @@ struct ieee80211_tx_info {
 			bool				is_valid_ack_signal;
 			void				*status_driver_data[MAX(16 / sizeof(void *), 2)];		/* XXX TODO */
 		} status;
-#define	IEEE80211_TX_INFO_DRIVER_DATA_SIZE	(5 * sizeof(void *))			/* XXX TODO 5? */
+#define	IEEE80211_TX_INFO_DRIVER_DATA_SIZE	40
 		void					*driver_data[IEEE80211_TX_INFO_DRIVER_DATA_SIZE / sizeof(void *)];
 	};
 };

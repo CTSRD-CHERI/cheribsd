@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1994-1995 Søren Schmidt
  * All rights reserved.
@@ -25,9 +25,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/capsicum.h>
@@ -1009,8 +1006,12 @@ linux_ioctl_termio(struct thread *td, struct linux_ioctl_args *args)
 		error = ENOIOCTL;
 		break;
 	case LINUX_TIOCSPTLCK:
-		/* Our unlockpt() does nothing. */
-		error = 0;
+		/*
+		 * Our unlockpt() does nothing. Check that fd refers
+		 * to a pseudo-terminal master device.
+		 */
+		args->cmd = TIOCPTMASTER;
+		error = (sys_ioctl(td, (struct ioctl_args *)args));
 		break;
 	default:
 		error = ENOIOCTL;
@@ -2270,6 +2271,12 @@ linux_ioctl_socket_ifreq(struct thread *td, int fd, u_int cmd,
 	case LINUX_SIOCGIFHWADDR:
 		cmd = SIOCGHWADDR;
 		break;
+	case LINUX_SIOCGIFMETRIC:
+		cmd = SIOCGIFMETRIC;
+		break;
+	case LINUX_SIOCSIFMETRIC:
+		cmd = SIOCSIFMETRIC;
+		break;
 	/*
 	 * XXX This is slightly bogus, but these ioctls are currently
 	 * XXX only used by the aironet (if_an) network driver.
@@ -2281,6 +2288,9 @@ linux_ioctl_socket_ifreq(struct thread *td, int fd, u_int cmd,
 		cmd = SIOCGPRIVATE_1;
 		break;
 	default:
+		LINUX_RATELIMIT_MSG_OPT2(
+		    "ioctl_socket_ifreq fd=%d, cmd=0x%x is not implemented",
+		    fd, cmd);
 		return (ENOIOCTL);
 	}
 

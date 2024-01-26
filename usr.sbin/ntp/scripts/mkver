@@ -1,6 +1,5 @@
 #!/bin/sh
 #
-# $FreeBSD$
 #
 PROG=${1-UNKNOWN}
 
@@ -8,7 +7,7 @@ PROG=${1-UNKNOWN}
 
 ConfStr="$PROG"
 
-ConfStr="$ConfStr 4.2.8p15"
+ConfStr="$ConfStr 4.2.8p16"
 
 case "$CSET" in
  '') ;;

@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 PROG_CXX=	bugpoint
 
@@ -12,7 +11,5 @@ SRCS+=		Miscompilation.cpp
 SRCS+=		OptimizerDriver.cpp
 SRCS+=		ToolRunner.cpp
 SRCS+=		bugpoint.cpp
-
-LIBADD+=	z
 
 .include "../llvm.prog.mk"

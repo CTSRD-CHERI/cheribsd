@@ -1,5 +1,3 @@
-# $FreeBSD$
-
 NEED_COMPAT=	64
 .include <bsd.compat.mk>
 

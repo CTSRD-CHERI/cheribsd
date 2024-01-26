@@ -24,8 +24,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 /*
 * NXP TDA19988 HDMI encoder
 */
@@ -78,6 +76,9 @@ __FBSDID("$FreeBSD$");
 #define	 CTRL_INTR_EN_GLO_MASK		0x04
 #define	TDA_INT_FLAGS_2		MKREG(0x00, 0x11)
 #define		INT_FLAGS_2_EDID_BLK_RD	(1 << 1)
+#define	TDA_ENA_VP_0		MKREG(0x00, 0x18)
+#define	TDA_ENA_VP_1		MKREG(0x00, 0x19)
+#define	TDA_ENA_VP_2		MKREG(0x00, 0x1a)
 
 #define	TDA_VIP_CNTRL_0		MKREG(0x00, 0x20)
 #define	TDA_VIP_CNTRL_1		MKREG(0x00, 0x21)
@@ -108,8 +109,10 @@ __FBSDID("$FreeBSD$");
 #define	TDA_REFLINE_LSB		MKREG(0x00, 0xa4)
 #define	TDA_NPIX_MSB		MKREG(0x00, 0xa5)
 #define	TDA_NPIX_LSB		MKREG(0x00, 0xa6)
+#define		NPIX_MAX	((1 << 13) - 1)
 #define	TDA_NLINE_MSB		MKREG(0x00, 0xa7)
 #define	TDA_NLINE_LSB		MKREG(0x00, 0xa8)
+#define		NLINE_MAX	((1 << 11) - 1)
 #define	TDA_VS_LINE_STRT_1_MSB	MKREG(0x00, 0xa9)
 #define	TDA_VS_LINE_STRT_1_LSB	MKREG(0x00, 0xaa)
 #define	TDA_VS_PIX_STRT_1_MSB	MKREG(0x00, 0xab)
@@ -218,7 +221,8 @@ __FBSDID("$FreeBSD$");
 #define	TDA_CURPAGE_ADDR	0xff
 
 #define	TDA_CEC_RXSHPDLEV	0xfe
-#define		RXSHPDLEV_HPD	(1 << 1)
+#define		RXSHPDLEV_RXSENS	(1 << 0)
+#define		RXSHPDLEV_HPD		(1 << 1)
 #define	TDA_CEC_ENAMODS		0xff
 #define		ENAMODS_RXSENS		(1 << 2)
 #define		ENAMODS_HDMI		(1 << 1)
@@ -256,19 +260,34 @@ __FBSDID("$FreeBSD$");
 #define	dprintf(fmt, ...)
 #endif
 
+static SYSCTL_NODE(_hw, OID_AUTO, tda19988, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "TDA19988 driver parameters");
+
+/*
+ * The TDA19988 transmitter in Morello SoC r0p0 and r0p1 might not correctly
+ * detect hot-plugging due to incorrect voltage levels on the HPD pin.
+ *
+ * As a workaround for this issue, a user can set hw.tda19988.broken_hpd to
+ * enforce using a screen if the transmitter only receives an RxSense packet
+ * indicating a screen is attached, ignoring if it's actually able to receive
+ * HDMI input.
+ */
+static int tda19988_broken_hpd;
+SYSCTL_INT(_hw_tda19988, OID_AUTO, broken_hpd, CTLFLAG_RDTUN,
+    &tda19988_broken_hpd, 0,
+    "Disable Hot-Plug Detect and use RxSense to detect if a screen is connected instead");
+
 struct tda19988_softc {
 	device_t		dev;
 	uint32_t		sc_addr;
 	uint32_t		sc_cec_addr;
 	uint16_t		sc_version;
 	int			sc_current_page;
-	uint8_t			*sc_edid;
-	uint32_t		sc_edid_len;
+	uint8_t			sc_vip_cntrl[3];
 
 	struct drm_encoder	encoder;
 	struct drm_connector	connector __subobject_use_container_bounds;
 	struct drm_bridge	bridge __subobject_use_container_bounds;
-	struct drm_display_mode	mode;
 };
 
 static int
@@ -443,10 +462,297 @@ tda19988_probe(device_t dev)
 	return (BUS_PROBE_DEFAULT);
 }
 
-static void
-tda19988_init_encoder(struct tda19988_softc *sc)
+static int
+tda19988_read_edid_block(void *context, uint8_t *buf, unsigned int block,
+    size_t len)
 {
-	const struct drm_display_mode *mode;
+	struct tda19988_softc *sc = context;
+	int attempt, err;
+	uint8_t data;
+
+	err = 0;
+
+	tda19988_reg_set(sc, TDA_INT_FLAGS_2, INT_FLAGS_2_EDID_BLK_RD);
+
+	/* gl int en */
+	tda19988_reg_set(sc, TDA_CTRL_INTR_CTRL_REG, CTRL_INTR_EN_GLO_MASK);
+
+	/* Block 0 */
+	tda19988_reg_write(sc, TDA_DDC_ADDR, 0xa0);
+	tda19988_reg_write(sc, TDA_DDC_OFFS, (block % 2) ? 128 : 0);
+	tda19988_reg_write(sc, TDA_DDC_SEGM_ADDR, 0x60);
+	tda19988_reg_write(sc, TDA_DDC_SEGM, block / 2);
+
+	tda19988_reg_write(sc, TDA_EDID_CTRL, 1);
+	tda19988_reg_write(sc, TDA_EDID_CTRL, 0);
+
+	data = 0;
+	for (attempt = 0; attempt < MAX_READ_ATTEMPTS; attempt++) {
+		tda19988_reg_read(sc, TDA_INT_FLAGS_2, &data);
+		if (data & INT_FLAGS_2_EDID_BLK_RD)
+			break;
+		pause("EDID", 1);
+	}
+
+	if (attempt == MAX_READ_ATTEMPTS) {
+		err = -1;
+		goto done;
+	}
+
+	if (tda19988_block_read(sc, TDA_EDID_DATA0, buf, len) != 0) {
+		err = -1;
+		goto done;
+	}
+
+done:
+	tda19988_reg_clear(sc, TDA_INT_FLAGS_2, INT_FLAGS_2_EDID_BLK_RD);
+
+	return (err);
+}
+
+static struct edid *
+tda19988_read_edid(struct tda19988_softc *sc)
+{
+	struct edid *edid;
+
+	if (sc->sc_version == TDA19988)
+		tda19988_reg_clear(sc, TDA_TX4, TX4_PD_RAM);
+
+	edid = drm_do_get_edid(&sc->connector, tda19988_read_edid_block, sc);
+
+	//EVENTHANDLER_INVOKE(hdmi_event, sc->dev, HDMI_EVENT_CONNECTED);
+	if (sc->sc_version == TDA19988)
+		tda19988_reg_set(sc, TDA_TX4, TX4_PD_RAM);
+
+	return (edid);
+}
+
+static void
+tda19988_start(struct tda19988_softc *sc)
+{
+	device_t dev;
+	uint8_t data;
+	uint16_t version;
+
+	dev = sc->dev;
+
+	tda19988_cec_write(sc, TDA_CEC_ENAMODS, ENAMODS_RXSENS | ENAMODS_HDMI);
+	DELAY(1000);
+	tda19988_cec_read(sc, TDA_CEC_RXSHPDLEV, &data);
+
+	/* Reset core */
+	tda19988_reg_set(sc, TDA_SOFTRESET, 3);
+	DELAY(100);
+	tda19988_reg_clear(sc, TDA_SOFTRESET, 3);
+	DELAY(100);
+
+	/* reset transmitter: */
+	tda19988_reg_set(sc, TDA_MAIN_CNTRL0, MAIN_CNTRL0_SR);
+	tda19988_reg_clear(sc, TDA_MAIN_CNTRL0, MAIN_CNTRL0_SR);
+
+	/* PLL registers common configuration */
+	tda19988_reg_write(sc, TDA_PLL_SERIAL_1, 0x00);
+	tda19988_reg_write(sc, TDA_PLL_SERIAL_2, PLL_SERIAL_2_SRL_NOSC(1));
+	tda19988_reg_write(sc, TDA_PLL_SERIAL_3, 0x00);
+	tda19988_reg_write(sc, TDA_SERIALIZER, 0x00);
+	tda19988_reg_write(sc, TDA_BUFFER_OUT, 0x00);
+	tda19988_reg_write(sc, TDA_PLL_SCG1, 0x00);
+	tda19988_reg_write(sc, TDA_SEL_CLK, SEL_CLK_SEL_CLK1 | SEL_CLK_ENA_SC_CLK);
+	tda19988_reg_write(sc, TDA_PLL_SCGN1, 0xfa);
+	tda19988_reg_write(sc, TDA_PLL_SCGN2, 0x00);
+	tda19988_reg_write(sc, TDA_PLL_SCGR1, 0x5b);
+	tda19988_reg_write(sc, TDA_PLL_SCGR2, 0x00);
+	tda19988_reg_write(sc, TDA_PLL_SCG2, 0x10);
+
+	/* Write the default value MUX register */
+	tda19988_reg_write(sc, TDA_MUX_VP_VIP_OUT, 0x24);
+
+	version = 0;
+	tda19988_reg_read(sc, TDA_VERSION, &data);
+	version |= data;
+	tda19988_reg_read(sc, TDA_VERSION_MSB, &data);
+	version |= (data << 8);
+
+	/* Clear feature bits */
+	sc->sc_version = version & ~0x30;
+	switch (sc->sc_version) {
+		case TDA19988:
+			device_printf(dev, "TDA19988\n");
+			break;
+		default:
+			device_printf(dev, "Unknown device: %04x\n", sc->sc_version);
+			return;
+	}
+
+	tda19988_reg_write(sc, TDA_DDC_CTRL, DDC_ENABLE);
+	tda19988_reg_write(sc, TDA_CCLK, CCLK_ENABLE);
+
+	tda19988_reg_write(sc, TDA_TX3, 39);
+
+	tda19988_cec_write(sc, TDA_CEC_FRO_IM_CLK_CTRL,
+	    CEC_FRO_IM_CLK_CTRL_GHOST_DIS | CEC_FRO_IM_CLK_CTRL_IMCLK_SEL);
+
+	tda19988_reg_write(sc, TDA_VIP_CNTRL_0, sc->sc_vip_cntrl[0]);
+	tda19988_reg_write(sc, TDA_VIP_CNTRL_1, sc->sc_vip_cntrl[1]);
+	tda19988_reg_write(sc, TDA_VIP_CNTRL_2, sc->sc_vip_cntrl[2]);
+}
+
+static int
+tda19988_attach(device_t dev)
+{
+	struct tda19988_softc *sc;
+	uint32_t video_ports;
+	phandle_t node;
+	int i;
+
+	sc = device_get_softc(dev);
+
+	sc->dev = dev;
+	sc->sc_addr = iicbus_get_addr(dev);
+	sc->sc_cec_addr = (0x34 << 1); /* hardcoded */
+
+	device_set_desc(dev, "NXP TDA19988 HDMI transmitter");
+
+	node = ofw_bus_get_node(dev);
+	OF_device_register_xref(OF_xref_from_node(node), dev);
+
+	if (OF_getencprop(node, "video-ports", &video_ports,
+	    sizeof(video_ports)) != sizeof(video_ports))
+		video_ports = 0x230145; /* binding default */
+
+	for (i = 0; i < 3; video_ports >>= 8, ++i)
+		sc->sc_vip_cntrl[2 - i] = (uint8_t)video_ports;
+
+	tda19988_start(sc);
+
+	return (0);
+}
+
+static int
+tda19988_detach(device_t dev)
+{
+
+	/* XXX: Do not let unload drive */
+	return (EBUSY);
+}
+
+static enum drm_connector_status
+tda19988_connector_detect(struct drm_connector *connector, bool force)
+{
+	struct tda19988_softc *sc;
+	uint8_t data, flag;
+
+	sc = container_of(connector, struct tda19988_softc, connector);
+
+	tda19988_cec_read(sc, TDA_CEC_RXSHPDLEV, &data);
+	if (unlikely(tda19988_broken_hpd))
+		flag = RXSHPDLEV_RXSENS;
+	else
+		flag = RXSHPDLEV_HPD;
+
+	if (data & flag)
+		return (connector_status_connected);
+
+	return (connector_status_disconnected);
+}
+
+static const struct drm_connector_funcs tda19988_connector_funcs = {
+	.fill_modes = drm_helper_probe_single_connector_modes,
+	.detect = tda19988_connector_detect,
+	.destroy = drm_connector_cleanup,
+	.reset = drm_atomic_helper_connector_reset,
+	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
+	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
+};
+
+static int
+tda19988_connector_get_modes(struct drm_connector *connector)
+{
+	struct tda19988_softc *sc;
+	struct edid *edid;
+	int ret;
+
+	ret = 0;
+
+	sc = container_of(connector, struct tda19988_softc, connector);
+
+#ifdef STATIC_EDID
+	ret = drm_add_modes_noedid(connector, TDA19988_XRES_MAX,
+	    TDA19988_YRES_MAX);
+	if (ret)
+		drm_set_preferred_mode(connector, TDA19988_XRES_MAX,
+		    TDA19988_YRES_MAX);
+	return (ret);
+#endif
+
+	edid = tda19988_read_edid(sc);
+	if (edid == NULL) {
+		device_printf(sc->dev, "Failed to read EDID\n");
+		return (0);
+	}
+
+	drm_connector_update_edid_property(connector, edid);
+	ret = drm_add_edid_modes(connector, edid);
+
+	kfree(edid);
+
+	return (ret);
+}
+
+static const struct drm_connector_helper_funcs
+    tda19988_connector_helper_funcs = {
+	.get_modes = tda19988_connector_get_modes,
+};
+
+static int
+tda19988_bridge_attach(struct drm_bridge *bridge,
+    enum drm_bridge_attach_flags flags)
+{
+	struct tda19988_softc *sc;
+
+	sc = container_of(bridge, struct tda19988_softc, bridge);
+
+	sc->connector.polled = DRM_CONNECTOR_POLL_CONNECT | \
+	    DRM_CONNECTOR_POLL_DISCONNECT;
+	drm_connector_helper_add(&sc->connector,
+	    &tda19988_connector_helper_funcs);
+
+	drm_connector_init(bridge->dev, &sc->connector,
+	    &tda19988_connector_funcs, DRM_MODE_CONNECTOR_HDMIA);
+
+	drm_connector_attach_encoder(&sc->connector, &sc->encoder);
+
+	return (0);
+}
+
+static enum drm_mode_status
+tda19988_bridge_mode_valid(struct drm_bridge *bridge,
+    const struct drm_display_mode *mode)
+{
+	struct tda19988_softc *sc;
+	int clock_max;
+
+	sc = container_of(bridge, struct tda19988_softc, bridge);
+
+	clock_max = sc->sc_version == TDA19988 ? 165000 : 150000;
+	if (mode->clock > clock_max)
+		return (MODE_CLOCK_HIGH);
+
+	if (mode->htotal > NPIX_MAX)
+		return (MODE_BAD_HVALUE);
+
+	if (mode->vtotal > NLINE_MAX)
+		return (MODE_BAD_VVALUE);
+
+	return (MODE_OK);
+}
+
+static void
+tda19988_bridge_mode_set(struct drm_bridge *bridge,
+    const struct drm_display_mode *mode,
+    const struct drm_display_mode *adjusted_mode)
+{
+	struct tda19988_softc *sc;
 	uint16_t ref_pix, ref_line, n_pix, n_line;
 	uint16_t hs_pix_start, hs_pix_stop;
 	uint16_t vs1_pix_start, vs1_pix_stop;
@@ -458,7 +764,7 @@ tda19988_init_encoder(struct tda19988_softc *sc)
 	uint16_t de_start, de_stop;
 	uint8_t reg, div;
 
-	mode = &sc->mode;
+	sc = container_of(bridge, struct tda19988_softc, bridge);
 
 	n_pix = mode->htotal;
 	n_line = mode->vtotal;
@@ -470,8 +776,8 @@ tda19988_init_encoder(struct tda19988_softc *sc)
 	de_start = mode->htotal - mode->hdisplay;
 	ref_pix = hs_pix_start + 3;
 
-	if (mode->flags & DRM_MODE_FLAG_HSKEW)
-		ref_pix += mode->hskew;
+	if (adjusted_mode->flags & DRM_MODE_FLAG_HSKEW)
+		ref_pix += adjusted_mode->hskew;
 
 	if ((mode->flags & DRM_MODE_FLAG_INTERLACE) == 0) {
 		ref_line = 1 + mode->vsync_start - mode->vdisplay;
@@ -502,12 +808,7 @@ tda19988_init_encoder(struct tda19988_softc *sc)
 		vs2_line_end = vs2_line_start + (mode->vsync_end - mode->vsync_start)/2;
 	}
 
-	div = 148500 / mode->crtc_clock;
-	if (div != 0) {
-		div--;
-		if (div > 3)
-			div = 3;
-	}
+	div = imin(imax(fls(160000 / (mode->crtc_clock + 1)) - 1, 0), 3);
 
 	/* set HDMI HDCP mode off */
 	tda19988_reg_set(sc, TDA_TBG_CNTRL_1, TBG_CNTRL_1_DWIN_DIS);
@@ -589,297 +890,19 @@ tda19988_init_encoder(struct tda19988_softc *sc)
 	tda19988_reg_clear(sc, TDA_TBG_CNTRL_0, TBG_CNTRL_0_SYNC_ONCE);
 }
 
-static int
-tda19988_read_edid_block(struct tda19988_softc *sc, uint8_t *buf, int block)
-{
-	int attempt, err;
-	uint8_t data;
-
-	err = 0;
-
-	tda19988_reg_set(sc, TDA_INT_FLAGS_2, INT_FLAGS_2_EDID_BLK_RD);
-
-	/* gl int en */
-	tda19988_reg_set(sc, TDA_CTRL_INTR_CTRL_REG, CTRL_INTR_EN_GLO_MASK);
-
-	/* Block 0 */
-	tda19988_reg_write(sc, TDA_DDC_ADDR, 0xa0);
-	tda19988_reg_write(sc, TDA_DDC_OFFS, (block % 2) ? 128 : 0);
-	tda19988_reg_write(sc, TDA_DDC_SEGM_ADDR, 0x60);
-	tda19988_reg_write(sc, TDA_DDC_SEGM, block / 2);
-
-	tda19988_reg_write(sc, TDA_EDID_CTRL, 1);
-	tda19988_reg_write(sc, TDA_EDID_CTRL, 0);
-
-	data = 0;
-	for (attempt = 0; attempt < MAX_READ_ATTEMPTS; attempt++) {
-		tda19988_reg_read(sc, TDA_INT_FLAGS_2, &data);
-		if (data & INT_FLAGS_2_EDID_BLK_RD)
-			break;
-		pause("EDID", 1);
-	}
-
-	if (attempt == MAX_READ_ATTEMPTS) {
-		err = -1;
-		goto done;
-	}
-
-	if (tda19988_block_read(sc, TDA_EDID_DATA0, buf, EDID_LENGTH) != 0) {
-		err = -1;
-		goto done;
-	}
-
-done:
-	tda19988_reg_clear(sc, TDA_INT_FLAGS_2, INT_FLAGS_2_EDID_BLK_RD);
-
-	return (err);
-}
-
-static int
-tda19988_read_edid(struct tda19988_softc *sc)
-{
-	int err;
-	int blocks, i;
-	uint8_t *buf;
-
-	err = 0;
-	if (sc->sc_version == TDA19988)
-		tda19988_reg_clear(sc, TDA_TX4, TX4_PD_RAM);
-
-	err = tda19988_read_edid_block(sc, sc->sc_edid, 0);
-	if (err)
-		goto done;
-
-	blocks = sc->sc_edid[0x7e];
-	if (blocks > 0) {
-		sc->sc_edid = realloc(sc->sc_edid, 
-		    EDID_LENGTH*(blocks+1), M_DEVBUF, M_WAITOK);
-		sc->sc_edid_len = EDID_LENGTH*(blocks+1);
-		for (i = 0; i < blocks; i++) {
-			/* TODO: check validity */
-			buf = sc->sc_edid + EDID_LENGTH*(i+1);
-			err = tda19988_read_edid_block(sc, buf, i);
-			if (err)
-				goto done;
-		}
-	}
-
-	//EVENTHANDLER_INVOKE(hdmi_event, sc->dev, HDMI_EVENT_CONNECTED);
-done:
-	if (sc->sc_version == TDA19988)
-		tda19988_reg_set(sc, TDA_TX4, TX4_PD_RAM);
-
-	return (err);
-}
-
-static void
-tda19988_start(struct tda19988_softc *sc)
-{
-	device_t dev;
-	uint8_t data;
-	uint16_t version;
-
-	dev = sc->dev;
-
-	tda19988_cec_write(sc, TDA_CEC_ENAMODS, ENAMODS_RXSENS | ENAMODS_HDMI);
-	DELAY(1000);
-	tda19988_cec_read(sc, 0xfe, &data);
-
-	/* Reset core */
-	tda19988_reg_set(sc, TDA_SOFTRESET, 3);
-	DELAY(100);
-	tda19988_reg_clear(sc, TDA_SOFTRESET, 3);
-	DELAY(100);
-
-	/* reset transmitter: */
-	tda19988_reg_set(sc, TDA_MAIN_CNTRL0, MAIN_CNTRL0_SR);
-	tda19988_reg_clear(sc, TDA_MAIN_CNTRL0, MAIN_CNTRL0_SR);
-
-	/* PLL registers common configuration */
-	tda19988_reg_write(sc, TDA_PLL_SERIAL_1, 0x00);
-	tda19988_reg_write(sc, TDA_PLL_SERIAL_2, PLL_SERIAL_2_SRL_NOSC(1));
-	tda19988_reg_write(sc, TDA_PLL_SERIAL_3, 0x00);
-	tda19988_reg_write(sc, TDA_SERIALIZER, 0x00);
-	tda19988_reg_write(sc, TDA_BUFFER_OUT, 0x00);
-	tda19988_reg_write(sc, TDA_PLL_SCG1, 0x00);
-	tda19988_reg_write(sc, TDA_SEL_CLK, SEL_CLK_SEL_CLK1 | SEL_CLK_ENA_SC_CLK);
-	tda19988_reg_write(sc, TDA_PLL_SCGN1, 0xfa);
-	tda19988_reg_write(sc, TDA_PLL_SCGN2, 0x00);
-	tda19988_reg_write(sc, TDA_PLL_SCGR1, 0x5b);
-	tda19988_reg_write(sc, TDA_PLL_SCGR2, 0x00);
-	tda19988_reg_write(sc, TDA_PLL_SCG2, 0x10);
-
-	/* Write the default value MUX register */
-	tda19988_reg_write(sc, TDA_MUX_VP_VIP_OUT, 0x24);
-
-	version = 0;
-	tda19988_reg_read(sc, TDA_VERSION, &data);
-	version |= data;
-	tda19988_reg_read(sc, TDA_VERSION_MSB, &data);
-	version |= (data << 8);
-
-	/* Clear feature bits */
-	sc->sc_version = version & ~0x30;
-	switch (sc->sc_version) {
-		case TDA19988:
-			device_printf(dev, "TDA19988\n");
-			break;
-		default:
-			device_printf(dev, "Unknown device: %04x\n", sc->sc_version);
-			return;
-	}
-
-	tda19988_reg_write(sc, TDA_DDC_CTRL, DDC_ENABLE);
-	tda19988_reg_write(sc, TDA_CCLK, CCLK_ENABLE);
-
-	tda19988_reg_write(sc, TDA_TX3, 39);
-
-	tda19988_cec_write(sc, TDA_CEC_FRO_IM_CLK_CTRL,
-	    CEC_FRO_IM_CLK_CTRL_GHOST_DIS | CEC_FRO_IM_CLK_CTRL_IMCLK_SEL);
-
-	/* Default values for RGB 4:4:4 mapping */
-	tda19988_reg_write(sc, TDA_VIP_CNTRL_0, 0x23);
-	tda19988_reg_write(sc, TDA_VIP_CNTRL_1, 0x01);
-	tda19988_reg_write(sc, TDA_VIP_CNTRL_2, 0x45);
-}
-
-static int
-tda19988_attach(device_t dev)
-{
-	struct tda19988_softc *sc;
-	phandle_t node;
-
-	sc = device_get_softc(dev);
-
-	sc->dev = dev;
-	sc->sc_addr = iicbus_get_addr(dev);
-	sc->sc_cec_addr = (0x34 << 1); /* hardcoded */
-	sc->sc_edid = malloc(EDID_LENGTH, M_DEVBUF, M_WAITOK | M_ZERO);
-	sc->sc_edid_len = EDID_LENGTH;
-
-	device_set_desc(dev, "NXP TDA19988 HDMI transmitter");
-
-	node = ofw_bus_get_node(dev);
-	OF_device_register_xref(OF_xref_from_node(node), dev);
-
-	tda19988_start(sc);
-
-	return (0);
-}
-
-static int
-tda19988_detach(device_t dev)
-{
-
-	/* XXX: Do not let unload drive */
-	return (EBUSY);
-}
-
-static enum drm_connector_status
-tda19988_connector_detect(struct drm_connector *connector, bool force)
-{
-	struct tda19988_softc *sc;
-	uint8_t data;
-
-	sc = container_of(connector, struct tda19988_softc, connector);
-
-	tda19988_cec_read(sc, TDA_CEC_RXSHPDLEV, &data);
-	if (data & RXSHPDLEV_HPD)
-		return (connector_status_connected);
-
-	return (connector_status_disconnected);
-}
-
-static const struct drm_connector_funcs tda19988_connector_funcs = {
-	.fill_modes = drm_helper_probe_single_connector_modes,
-	.detect = tda19988_connector_detect,
-	.destroy = drm_connector_cleanup,
-	.reset = drm_atomic_helper_connector_reset,
-	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
-	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
-};
-
-static int
-tda19988_connector_get_modes(struct drm_connector *connector)
-{
-	struct tda19988_softc *sc;
-	int error;
-	int ret;
-
-	ret = 0;
-
-	sc = container_of(connector, struct tda19988_softc, connector);
-
-#ifdef STATIC_EDID
-	ret = drm_add_modes_noedid(connector, TDA19988_XRES_MAX,
-	    TDA19988_YRES_MAX);
-	if (ret)
-		drm_set_preferred_mode(connector, TDA19988_XRES_MAX,
-		    TDA19988_YRES_MAX);
-	return (ret);
-#endif
-
-	error = tda19988_read_edid(sc);
-	if (error == 0) {
-		drm_connector_update_edid_property(connector,
-		    (struct edid *)sc->sc_edid);
-		ret = drm_add_edid_modes(connector,
-		    (struct edid *)sc->sc_edid);
-	}
-
-	return (ret);
-}
-
-static const struct drm_connector_helper_funcs
-    tda19988_connector_helper_funcs = {
-	.get_modes = tda19988_connector_get_modes,
-};
-
-static int
-tda19988_bridge_attach(struct drm_bridge *bridge,
-    enum drm_bridge_attach_flags flags)
-{
-	struct tda19988_softc *sc;
-
-	sc = container_of(bridge, struct tda19988_softc, bridge);
-
-	sc->connector.polled = DRM_CONNECTOR_POLL_CONNECT | \
-	    DRM_CONNECTOR_POLL_DISCONNECT;
-	drm_connector_helper_add(&sc->connector,
-	    &tda19988_connector_helper_funcs);
-
-	drm_connector_init(bridge->dev, &sc->connector,
-	    &tda19988_connector_funcs, DRM_MODE_CONNECTOR_HDMIA);
-
-	drm_connector_attach_encoder(&sc->connector, &sc->encoder);
-
-	return (0);
-}
-
-static enum drm_mode_status
-tda19988_bridge_mode_valid(struct drm_bridge *bridge,
-    const struct drm_display_mode *mode)
-{
-
-	return (MODE_OK);
-}
-
-static void
-tda19988_bridge_mode_set(struct drm_bridge *bridge,
-    const struct drm_display_mode *orig_mode,
-    const struct drm_display_mode *mode)
-{
-	struct tda19988_softc *sc;
-
-	sc = container_of(bridge, struct tda19988_softc, bridge);
-
-	memcpy(&sc->mode, mode, sizeof(struct drm_display_mode));
-}
-
 static void
 tda19988_bridge_disable(struct drm_bridge *bridge)
 {
+	struct tda19988_softc *sc;
 
+	sc = container_of(bridge, struct tda19988_softc, bridge);
+
+	/* Disable Video Ports */
+	tda19988_reg_write(sc, TDA_ENA_VP_0, 0);
+	tda19988_reg_write(sc, TDA_ENA_VP_1, 0);
+	tda19988_reg_write(sc, TDA_ENA_VP_2, 0);
+
+	tda19988_reg_write(sc, TDA_BUFFER_OUT, 0x8);
 }
 
 static void
@@ -889,25 +912,12 @@ tda19988_bridge_enable(struct drm_bridge *bridge)
 
 	sc = container_of(bridge, struct tda19988_softc, bridge);
 
-	dprintf(sc->dev, "Mode information:\n"
-	    "hdisplay: %d\n"
-	    "vdisplay: %d\n"
-	    "htotal: %d\n"
-	    "vtotal: %d\n"
-	    "hsync_start: %d\n"
-	    "hsync_end: %d\n"
-	    "vsync_start: %d\n"
-	    "vsync_end: %d\n",
-	    sc->mode.hdisplay,
-	    sc->mode.vdisplay,
-	    sc->mode.htotal,
-	    sc->mode.vtotal,
-	    sc->mode.hsync_start,
-	    sc->mode.hsync_end,
-	    sc->mode.vsync_start,
-	    sc->mode.vsync_end);
+	/* Enable Video Ports */
+	tda19988_reg_write(sc, TDA_ENA_VP_0, 0xff);
+	tda19988_reg_write(sc, TDA_ENA_VP_1, 0xff);
+	tda19988_reg_write(sc, TDA_ENA_VP_2, 0xff);
 
-	tda19988_init_encoder(sc);
+	tda19988_reg_write(sc, TDA_BUFFER_OUT, 0);
 }
 
 static const struct drm_bridge_funcs tda19988_bridge_funcs = {

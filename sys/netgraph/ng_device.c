@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2002 Mark Santcroos <marks@ripe.net>
  * Copyright (c) 2004-2005 Gleb Smirnoff <glebius@FreeBSD.org>
@@ -28,8 +28,6 @@
  *
  * This node presents a /dev/ngd%d device that interfaces to an other
  * netgraph node.
- *
- * $FreeBSD$
  *
  */
 

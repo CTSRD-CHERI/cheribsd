@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright 2003 Alexander Kabaev.
  * All rights reserved.
@@ -23,14 +23,16 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _RTLD_LOCK_H_
 #define	_RTLD_LOCK_H_
 
 #include <sys/cdefs.h>
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#include <signal.h>
+#endif
 
 __BEGIN_DECLS
 
@@ -78,7 +80,7 @@ void _rtld_atfork_post(int *) __exported;
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 void _rtld_thread_start_init(void (*)(struct pthread *));
-void _rtld_sighandler_init(void *);
+void _rtld_sighandler_init(void (*)(int, siginfo_t *, void *));
 #endif
 
 #ifdef IN_RTLD

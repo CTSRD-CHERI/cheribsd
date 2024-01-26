@@ -1,6 +1,5 @@
 #!/bin/sh
 #
-# $FreeBSD$
 #
 
 # PROVIDE: zfsbe
@@ -57,7 +56,7 @@ activate_bootonce()
 	_dev=$1
 	_be=${_dev##*/}
 
-	_bootonce="`kenv -q zfs-bootonce`"
+	_bootonce=$(kenv -q zfs-bootonce)
 	if [ "$_bootonce" = "zfs:${_dev}:" ] ; then
 		bectl activate $_be
 	fi

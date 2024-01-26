@@ -100,14 +100,22 @@ ofw_firmware_add_device(device_t dev, phandle_t node, u_int order,
 static int
 ofw_firmware_probe(device_t dev)
 {
-	const char *name;
+	const char *name, *compat;
+	phandle_t root, parent;
 
 	name = ofw_bus_get_name(dev);
 	if (name == NULL || strcmp(name, "firmware") != 0)
 		return (ENXIO);
+	parent = OF_parent(ofw_bus_get_node(dev));
+	root = OF_finddevice("/");
+	if (parent != root)
+		return (ENXIO);
+	compat = ofw_bus_get_compat(dev);
+	if (compat != NULL)
+		return (ENXIO);
 
 	device_set_desc(dev, "OFW Firmware Group");
-	return (0);
+	return (BUS_PROBE_GENERIC);
 }
 
 static int

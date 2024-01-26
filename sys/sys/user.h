@@ -31,7 +31,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)user.h	8.2 (Berkeley) 9/23/93
- * $FreeBSD$
  */
 
 #ifndef _SYS_USER_H_
@@ -498,6 +497,7 @@ struct kinfo_lockf {
 #define	KVME_TYPE_SG		7
 #define	KVME_TYPE_MGTDEVICE	8
 #define	KVME_TYPE_GUARD		9
+#define	KVME_TYPE_QUARANTINED	10
 #define	KVME_TYPE_UNKNOWN	255
 
 #define	KVME_PROT_READ		0x00000001
@@ -515,6 +515,7 @@ struct kinfo_lockf {
 #define	KVME_FLAG_USER_WIRED	0x00000040
 #define	KVME_FLAG_GUARD		0x00000080
 #define	KVME_FLAG_UNMAPPED	0x00000100
+#define	KVME_FLAG_HASCAP	0x00000200
 
 #if defined(__amd64__)
 #define	KINFO_OVMENTRY_SIZE	1168

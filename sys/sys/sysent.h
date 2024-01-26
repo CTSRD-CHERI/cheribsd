@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _SYS_SYSENT_H_
@@ -117,13 +115,18 @@ struct sysentvec {
 	const char	*sv_elf_core_abi_vendor;
 	void		(*sv_elf_core_prepare_notes)(struct thread *,
 			    struct note_info_list *, size_t *);
-	int		(*sv_imgact_try)(struct image_params *);
 	int		(*sv_copyout_auxargs)(struct image_params *,
 			    uintcap_t);
 	int		sv_minsigstksz;	/* minimum signal stack size */
 	vm_offset_t	sv_minuser;	/* VM_MIN_ADDRESS */
 	vm_offset_t	sv_maxuser;	/* VM_MAXUSER_ADDRESS */
 	vm_offset_t	sv_usrstack;	/* USRSTACK */
+#ifdef CHERI_CAPREVOKE
+	vm_offset_t	sv_cheri_revoke_shadow_base;
+	vm_offset_t	sv_cheri_revoke_shadow_offset;
+	vm_offset_t	sv_cheri_revoke_shadow_length;
+	vm_offset_t	sv_cheri_revoke_info_page;
+#endif
 	size_t		sv_psstringssz;	/* PS_STRINGS size */
 	int		sv_stackprot;	/* vm protection for stack */
 	int		(*sv_copyout_strings)(struct image_params *,
@@ -177,6 +180,7 @@ struct sysentvec {
 #define	SV_SIG_DISCIGN	0x200000	/* Do not discard ignored signals */
 #define	SV_SIG_WAITNDQ	0x400000	/* Wait does not dequeue SIGCHLD */
 #define	SV_DSO_SIG	0x800000	/* Signal trampoline packed in dso */
+#define	SV_UNBOUND_PCC	0x04000000	/* Don't set PCC bounds (CheriABI-only). */
 #define	SV_CHERI	0x08000000	/* CheriABI executable. */
 
 #define	SV_ABI_MASK	0xff

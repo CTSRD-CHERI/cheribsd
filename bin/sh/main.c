@@ -44,8 +44,6 @@ static char sccsid[] = "@(#)main.c	8.6 (Berkeley) 5/28/95";
 #endif
 #endif /* not lint */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <stdio.h>
 #include <signal.h>
 #include <sys/stat.h>
@@ -100,7 +98,13 @@ static char *find_dot_file(char *);
 int
 main(int argc, char *argv[])
 {
-	struct stackmark smark, smark2;
+	/*
+	 * As smark is accessed after a longjmp, it cannot be a local in main().
+	 * The C standard specifies that the values of non-volatile local
+	 * variables are unspecified after a jump if modified between the
+	 * setjmp and longjmp.
+	 */
+	static struct stackmark smark, smark2;
 	volatile int state;
 	char *shinit;
 
