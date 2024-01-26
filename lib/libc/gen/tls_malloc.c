@@ -337,21 +337,6 @@ __tls_malloc(size_t nbytes)
 	op = SLIST_FIRST(bucketp);
 	SLIST_REMOVE_HEAD(bucketp, ov_next);
 	TLS_MALLOC_UNLOCK;
-	/*
-	 * XXXQEMU: Clear the overhead struct to remove any capability
-	 * permissions in ov_real_allocation.
-	 *
-	 * Based on a tag and permissions of ov_real_allocation, find_overhead()
-	 * determines if an allocation is aligned. The QEMU user mode for
-	 * CheriABI doesn't implement tagged memory and find_overhead() might
-	 * incorrectly assume the allocation is aligned because of a
-	 * non-cleared tag. Having the permissions cleared, find_overhead()
-	 * behaves as expected under the user mode.
-	 *
-	 * This is a workaround and should be reverted once the user mode
-	 * implements tagged memory.
-	 */
-	memset(op, 0, sizeof(*op));
 	op->ov_magic = MAGIC;
 	op->ov_index = bucket;
 	return (op + 1);
