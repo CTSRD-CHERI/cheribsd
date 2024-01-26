@@ -350,12 +350,14 @@
 #define	howmany(x, y)	(((x)+((y)-1))/(y))
 #endif
 #define	nitems(x)	(sizeof((x)) / sizeof((x)[0]))
-#define	is_aligned(x, y) __builtin_is_aligned(x, y)
 #define	rounddown(x, y)	(((x)/(y))*(y))
 #define	rounddown2(x, y) __align_down(x, y) /* if y is power of two */
 #define	roundup(x, y)	((((x)+((y)-1))/(y))*(y))  /* to any y */
 #define	roundup2(x, y)	__align_up(x, y) /* if y is powers of two */
 #define powerof2(x)	((((x)-1)&(x))==0)
+#ifdef _KERNEL
+#define	is_aligned(x, y) __is_aligned(x, y)
+#endif
 
 /* Macros for min/max. */
 #define	MIN(a,b) (((a)<(b))?(a):(b))
