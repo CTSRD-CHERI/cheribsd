@@ -122,9 +122,6 @@ _cheri_capability_build_user_rwx(uint32_t perms, ptraddr_t basep, size_t length,
 	vm_map_t map;
 	vm_offset_t reservation;
 
-#if 0
-	if (SV_CURPROC_FLAG(SV_CHERI) && length != 0) {
-#else
 	/*
 	 * NB: Check skipped for unbounded PCC processes if attempting to
 	 * derive a code capability for the whole user address space, since
@@ -135,7 +132,6 @@ _cheri_capability_build_user_rwx(uint32_t perms, ptraddr_t basep, size_t length,
 	      (perms & CHERI_CAP_USER_CODE_PERMS) == perms &&
 	      basep == CHERI_CAP_USER_CODE_BASE &&
 	      length == CHERI_CAP_USER_CODE_LENGTH)) {
-#endif
 		map = &curproc->p_vmspace->vm_map;
 		vm_map_lock_read(map);
 		KASSERT(vm_map_lookup_entry(map, basep, &entry),

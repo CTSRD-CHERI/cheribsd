@@ -379,7 +379,6 @@ contrib/openzfs/module/zfs/zvol.c		optional zfs compile-with "${ZFS_C}"
 
 # CHERI and CHERI-compat related files
 cheri/cheri_asserts.c			optional cpu_cheri
-# Contains stub syscall implementations
 cheri/cheri_cidcap.c			standard
 cheri/cheri_colocation.c		standard
 cheri/cheri_exec.c			optional cpu_cheri
