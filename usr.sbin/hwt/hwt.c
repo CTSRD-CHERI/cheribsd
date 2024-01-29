@@ -158,12 +158,13 @@ hwt_ctx_alloc(struct trace_context *tc)
 {
 	struct hwt_alloc al;
 	cpuset_t cpu_map;
-	int error = 0;
-	
-	if (tc->trace_dev->methods->init != NULL)
+	int error;
+
+	if (tc->trace_dev->methods->init != NULL) {
 		error = tc->trace_dev->methods->init(tc);
-	if (error)
-		return (error);
+		if (error)
+			return (error);
+	}
 
 	CPU_ZERO(&cpu_map);
 
