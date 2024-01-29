@@ -59,10 +59,10 @@ The
 .Fa flags
 argument governs the behavior of the call:
 .Bl -tag
-.It Bq CHERI_REVOKE_SHADOW_NOVMMAP
+.It Bq CHERI_REVOKE_SHADOW_NOVMEM
 .Fa arena
 should be a capability bearing the
-.Dv VMMAP
+.Dv SW_VMEM
 software permission,
 as returned by, for example,
 .Xr mmap 2 ,
@@ -73,7 +73,7 @@ argument a capability authorizing access to the shadow of the
 A bit set in the region authorized by
 .Fa shadow
 corresponds to a request for revocation of capabilities lacking the
-.Dv VMMAP
+.Dv SW_VMEM
 permission and whose
 .Em base
 points to the granule corresponding to that bit.
@@ -139,7 +139,7 @@ it suffices to collect
 .Fn free
 memory into quarantine and then revoke it all at once:
 .Bd -literal
-    cheri_revoke_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, arena, &shadow);
+    cheri_revoke_shadow(CHERI_REVOKE_SHADOW_NOVMEM, arena, &shadow);
     /* elided: set bits in shadow corresponding to quarantine */
 
     atomic_thread_fence(memory_order_acq_rel);
@@ -167,7 +167,7 @@ also obtain access to the shadow space:
     struct arena_meta *meta = // ...
     meta->ptr = mmap(/* ... */);
 
-    int res = cheri_revoke_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, meta->ptr,
+    int res = cheri_revoke_shadow(CHERI_REVOKE_SHADOW_NOVMEM, meta->ptr,
                                &meta->caprev_sh);
     assert(res == 0);
 .Ed
@@ -223,7 +223,7 @@ if the
 for
 .DV CHERI_REVOKE_SHADOW_MEM
 does not cary the
-.Dv VMMAP
+.Dv SW_VMEM
 permission.
 .It Bq Er EINVAL
 if the

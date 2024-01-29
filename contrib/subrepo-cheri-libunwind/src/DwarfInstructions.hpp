@@ -84,7 +84,7 @@ private:
       *success = false;
       return (pint_t)-1;
     }
-    if (!is_pointer_in_bounds(result)) {
+    if (!is_pointer_in_bounds(result, true)) {
       _LIBUNWIND_LOG("evaluated out-of-bounds/invalid CFA "
                      "expression for pc %#tx: " _LIBUNWIND_FMT_PTR "\n",
                      (ptrdiff_t)pc.address(), (void *)result);

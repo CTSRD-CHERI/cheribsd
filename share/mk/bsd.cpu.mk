@@ -334,7 +334,10 @@ CFLAGS+=	-Xclang -morello-vararg=new -Xclang -morello-bounded-memargs=caller-onl
 LDFLAGS+=	-march=morello
 . endif
 
-. if ${MACHINE_ARCH:Maarch64*c*}
+. if ${MACHINE_ARCH:Maarch64*cb*}
+CFLAGS+=	-mabi=purecap-benchmark
+LDFLAGS+=	-mabi=purecap-benchmark
+. elif ${MACHINE_ARCH:Maarch64*c*}
 CFLAGS+=	-mabi=purecap
 LDFLAGS+=	-mabi=purecap
 . else
@@ -434,6 +437,7 @@ CXXFLAGS += ${CXXFLAGS.${MACHINE_ARCH}}
 # Pointer type:			ptr32, ptr64, ptr128c
 # Size of time_t:		time32, time64
 # Capability ABI:		purecap
+# Benchmark ABI:		benchmark
 #
 .if (${MACHINE} == "arm" && (defined(CPUTYPE) && ${CPUTYPE:M*soft*})) || \
     (${MACHINE_ARCH} == "powerpc" && (defined(CPUTYPE) && ${CPUTYPE} == "e500"))
@@ -449,6 +453,9 @@ MACHINE_ABI+=  long32
 .endif
 .if (${MACHINE_ARCH:Maarch64*c*} || ${MACHINE_ARCH:Mriscv*c*})
 MACHINE_ABI+=	purecap ptr128c
+.if ${MACHINE_ARCH:Maarch64*cb*}
+MACHINE_ABI+=	benchmark
+.endif
 .else
 .if ${MACHINE_ABI:Mlong64}
 MACHINE_ABI+=	ptr64

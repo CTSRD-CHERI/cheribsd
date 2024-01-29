@@ -61,7 +61,7 @@ void _rtld_atfork_post(int *);
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 void _rtld_thread_start_init(void (*)(struct pthread *));
-void _rtld_sighandler_init(void *);
+void _rtld_sighandler_init(void (*)(int, siginfo_t *, void *));
 #endif
 
 /*
@@ -205,7 +205,7 @@ _rtld_thread_start_init(void (*p)(struct pthread *) __unused)
 
 #pragma weak _rtld_sighandler_init
 void
-_rtld_sighandler_init(void *p __unused)
+_rtld_sighandler_init(void (*p)(int, siginfo_t *, void *) __unused)
 {
 }
 #endif

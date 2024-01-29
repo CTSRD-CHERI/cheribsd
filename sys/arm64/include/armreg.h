@@ -182,14 +182,15 @@
 #define	CCTLR_PERMVCT_MASK	(0x1 << 6) /* Permit access to CNTVCT w/o System */
 #define	CCTLR_ADRDPB_MASK	(0x1 << 4) /* ADRPD base selection */
 #define	CCTLR_PCCBO_MASK	(0x1 << 3) /* PCC base offset enable */
-#define	CCTLR_DDCBO_MASK	(0x1 << 2) /* PCC base offset enable */
+#define	CCTLR_DDCBO_MASK	(0x1 << 2) /* DCC base offset enable */
 /*
- * CCTLR_EL1 - Capability Control Register
+ * CCTLR_EL1/2 - Capability Control Register
  * The rest of the fields mirror CCTLR_EL0
  */
 #define	CCTLR_EL1_C64E_MASK	(0x1 << 5) /* Enable C64 mode upon exception */
 #define	CCTLR_EL1_TGEN1_MASK	(0x1 << 1) /* Page table CLG bit for TTBR1 */
 #define	CCTLR_EL1_TGEN0_MASK	(0x1 << 0) /* Page table CLG bit for TTBR0 */
+#define	CCTLR_EL2_C64E_MASK	(0x1 << 5) /* Enable C64 mode upon exception */
 #endif
 
 /* CSSELR_EL1 - Cache size selection register */
@@ -398,6 +399,12 @@
 #define	 ISS_MSR_REG_MASK	\
     (ISS_MSR_OP0_MASK | ISS_MSR_OP2_MASK | ISS_MSR_OP1_MASK | 	\
      ISS_MSR_CRn_MASK | ISS_MSR_CRm_MASK)
+#define	 ISS_MSR_REG(reg)				\
+    (((reg ## _op0) << ISS_MSR_OP0_SHIFT) |		\
+     ((reg ## _op1) << ISS_MSR_OP1_SHIFT) |		\
+     ((reg ## _CRn) << ISS_MSR_CRn_SHIFT) |		\
+     ((reg ## _CRm) << ISS_MSR_CRm_SHIFT) |		\
+     ((reg ## _op2) << ISS_MSR_OP2_SHIFT))
 
 #define	 ISS_DATA_ISV_SHIFT	24
 #define	 ISS_DATA_ISV		(0x01 << ISS_DATA_ISV_SHIFT)
@@ -2189,7 +2196,7 @@
 #define	TCR_TBI1_SHIFT		38
 #define	TCR_TBI1		(1UL << TCR_TBI1_SHIFT)
 #define	TCR_TBI0_SHIFT		37
-#define	TCR_TBI0		(1U << TCR_TBI0_SHIFT)
+#define	TCR_TBI0		(1UL << TCR_TBI0_SHIFT)
 #define	TCR_ASID_SHIFT		36
 #define	TCR_ASID_WIDTH		1
 #define	TCR_ASID_16		(1UL << TCR_ASID_SHIFT)
@@ -2203,6 +2210,7 @@
 #define	TCR_IPS_44BIT		(4UL << TCR_IPS_SHIFT)
 #define	TCR_IPS_48BIT		(5UL << TCR_IPS_SHIFT)
 #define	TCR_TG1_SHIFT		30
+#define	TCR_TG1_MASK		(3UL << TCR_TG1_SHIFT)
 #define	TCR_TG1_16K		(1UL << TCR_TG1_SHIFT)
 #define	TCR_TG1_4K		(2UL << TCR_TG1_SHIFT)
 #define	TCR_TG1_64K		(3UL << TCR_TG1_SHIFT)
@@ -2217,8 +2225,10 @@
 #define	TCR_A1_SHIFT		22
 #define	TCR_A1			(0x1UL << TCR_A1_SHIFT)
 #define	TCR_T1SZ_SHIFT		16
+#define	TCR_T1SZ_MASK		(0x3fUL << TCR_T1SZ_SHIFT)
 #define	TCR_T1SZ(x)		((x) << TCR_T1SZ_SHIFT)
 #define	TCR_TG0_SHIFT		14
+#define	TCR_TG0_MASK		(3UL << TCR_TG0_SHIFT)
 #define	TCR_TG0_4K		(0UL << TCR_TG0_SHIFT)
 #define	TCR_TG0_64K		(1UL << TCR_TG0_SHIFT)
 #define	TCR_TG0_16K		(2UL << TCR_TG0_SHIFT)
@@ -2229,10 +2239,10 @@
 #define	TCR_IRGN0_SHIFT		8
 #define	TCR_IRGN0_WBWA		(1UL << TCR_IRGN0_SHIFT)
 #define	TCR_EPD0_SHIFT		7
-#define	TCR_EPD0		(1UL << TCR_EPD1_SHIFT)
+#define	TCR_EPD0		(1UL << TCR_EPD0_SHIFT)
 /* Bit 6 is reserved */
 #define	TCR_T0SZ_SHIFT		0
-#define	TCR_T0SZ_MASK		0x3f
+#define	TCR_T0SZ_MASK		(0x3fUL << TCR_T0SZ_SHIFT)
 #define	TCR_T0SZ(x)		((x) << TCR_T0SZ_SHIFT)
 #define	TCR_TxSZ(x)		(TCR_T1SZ(x) | TCR_T0SZ(x))
 

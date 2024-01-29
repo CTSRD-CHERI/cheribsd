@@ -3781,6 +3781,44 @@ je_malloc_usable_size(JEMALLOC_USABLE_SIZE_CONST void *ptr) {
 	return ret;
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(MALLOC_REVOCATION_SHIM)
+JEMALLOC_EXPORT void JEMALLOC_NOTHROW *
+je_malloc_underlying_allocation(void *ptr) {
+	void *ret;
+	tsdn_t *tsdn;
+
+	assert(malloc_initialized() || IS_INITIALIZER);
+
+	tsdn = tsdn_fetch();
+	check_entry_exit_locking(tsdn);
+
+	if (unlikely(ptr == NULL)) {
+		ret = NULL;
+	} else {
+		size_t underlying_size = ivsalloc(tsdn, ptr);
+		if (underlying_size == 0) {
+			ret = NULL;
+		} else {
+			/*
+			 * XXX unbound_ptr will actually work if this isn't
+			 * a pointer to an original allocation but is
+			 * contained within an extent - we can
+			 * probably fix this in rtree functions.
+			 */
+			ret = unbound_ptr(tsdn, ptr);
+			/* Bounds as with BOUND_PTR, but preserve SW_VMEM */
+			if (ret != NULL)
+				ret = cheri_andperm(
+				    cheri_setbounds(ret, underlying_size),
+				    CHERI_PERMS_USERSPACE_DATA | CHERI_PERM_SW_VMEM);
+		}
+	}
+
+	check_entry_exit_locking(tsdn);
+	return (ret);
+}
+#endif
+
 /*
  * End non-standard functions.
  */

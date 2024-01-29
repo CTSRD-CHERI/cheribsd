@@ -43,7 +43,8 @@ CFLAGS.thr_symbols.c+=	-Wno-missing-variable-declarations
 CFLAGS.thr_sig.c+=	-fno-sanitize=address
 .endif
 
-.if ${MACHINE_CPUARCH} == "arm"
+.if ${MACHINE_CPUARCH} == "arm" || defined(RTLD_SANDBOX)
+# XXX: RTLD_SANDBOX currently does not support stack unwinding.
 NO_THREAD_UNWIND_STACK= yes
 .endif
 

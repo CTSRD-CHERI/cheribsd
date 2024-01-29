@@ -35,10 +35,18 @@
 #include <sys/mman.h>
 #include <sys/queue.h>
 #include <sys/socket.h>
+
 #include <machine/atomic.h>
+#ifdef __amd64__
 #include <machine/specialreg.h>
+#endif
+#ifdef __aarch64__
+#include <machine/armreg.h>
+#endif
 #include <machine/vmm.h>
+
 #include <netinet/in.h>
+
 #include <assert.h>
 #ifndef WITHOUT_CAPSICUM
 #include <capsicum_helpers.h>
@@ -69,6 +77,20 @@
  */
 #define	GDB_SIGNAL_TRAP		5
 
+#if defined(__amd64__)
+#define	GDB_BP_SIZE		1
+#define	GDB_BP_INSTR		(uint8_t []){0xcc}
+#define	GDB_PC_REGNAME		VM_REG_GUEST_RIP
+#elif defined(__aarch64__)
+#define	GDB_BP_SIZE		4
+#define	GDB_BP_INSTR		(uint8_t []){0x00, 0x00, 0x20, 0xd4}
+#define	GDB_PC_REGNAME		VM_REG_GUEST_PC
+#else
+#error "Unsupported architecture"
+#endif
+_Static_assert(sizeof(GDB_BP_INSTR) == GDB_BP_SIZE,
+    "GDB_BP_INSTR has wrong size");
+
 static void gdb_resume_vcpus(void);
 static void check_command(int fd);
 
@@ -95,7 +117,7 @@ struct io_buffer {
 
 struct breakpoint {
 	uint64_t gpa;
-	uint8_t shadow_inst;
+	uint8_t shadow_inst[GDB_BP_SIZE];
 	TAILQ_ENTRY(breakpoint) link;
 };
 
@@ -134,6 +156,7 @@ static struct vcpu **vcpus;
 static int cur_vcpu, stopped_vcpu;
 static bool gdb_active = false;
 
+#ifdef __amd64__
 static const int gdb_regset[] = {
 	VM_REG_GUEST_RAX,
 	VM_REG_GUEST_RBX,
@@ -187,6 +210,86 @@ static const int gdb_regsize[] = {
 	4,
 	4
 };
+#endif
+
+#ifdef __aarch64__
+static const int gdb_regset[] = {
+	VM_REG_GUEST_X0,
+	VM_REG_GUEST_X1,
+	VM_REG_GUEST_X2,
+	VM_REG_GUEST_X3,
+	VM_REG_GUEST_X4,
+	VM_REG_GUEST_X5,
+	VM_REG_GUEST_X6,
+	VM_REG_GUEST_X7,
+	VM_REG_GUEST_X8,
+	VM_REG_GUEST_X9,
+	VM_REG_GUEST_X10,
+	VM_REG_GUEST_X11,
+	VM_REG_GUEST_X12,
+	VM_REG_GUEST_X13,
+	VM_REG_GUEST_X14,
+	VM_REG_GUEST_X15,
+	VM_REG_GUEST_X16,
+	VM_REG_GUEST_X17,
+	VM_REG_GUEST_X18,
+	VM_REG_GUEST_X19,
+	VM_REG_GUEST_X20,
+	VM_REG_GUEST_X21,
+	VM_REG_GUEST_X22,
+	VM_REG_GUEST_X23,
+	VM_REG_GUEST_X24,
+	VM_REG_GUEST_X25,
+	VM_REG_GUEST_X26,
+	VM_REG_GUEST_X27,
+	VM_REG_GUEST_X28,
+	VM_REG_GUEST_X29,
+	VM_REG_GUEST_LR,
+	VM_REG_GUEST_SP,
+	VM_REG_GUEST_PC,
+	VM_REG_GUEST_CPSR,
+};
+
+static const int gdb_regsize[] = {
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	8,
+	4,
+};
+#endif
+
+_Static_assert(nitems(gdb_regset) == nitems(gdb_regsize),
+    "gdb_regset and gdb_regsize have different sizes");
 
 #ifdef GDB_LOG
 #include <stdarg.h>
@@ -221,6 +324,7 @@ debug(const char *fmt, ...)
 
 static void	remove_all_sw_breakpoints(void);
 
+#ifdef __amd64__
 static int
 guest_paging_info(struct vcpu *vcpu, struct vm_guest_paging *paging)
 {
@@ -259,6 +363,36 @@ guest_paging_info(struct vcpu *vcpu, struct vm_guest_paging *paging)
 		paging->paging_mode = PAGING_MODE_PAE;
 	return (0);
 }
+#endif
+
+#ifdef __aarch64__
+static int
+guest_paging_info(struct vcpu *vcpu, struct vm_guest_paging *paging)
+{
+	uintcap_t regs[5];
+	const int regset[5] = {
+		VM_REG_GUEST_TTBR0_EL1,
+		VM_REG_GUEST_TTBR1_EL1,
+		VM_REG_GUEST_TCR_EL1,
+		VM_REG_GUEST_TCR2_EL1,
+		VM_REG_GUEST_SCTLR_EL1,
+	};
+
+	if (vm_get_register_set(vcpu, nitems(regset), regset, regs) == -1)
+		return (-1);
+
+	memset(paging, 0, sizeof(*paging));
+	paging->ttbr0_addr = regs[0];
+	paging->ttbr1_addr = regs[1];
+	paging->tcr_el1 = regs[2];
+	paging->tcr2_el1 = regs[3];
+	paging->flags = PSR_M_EL1h;
+	if ((regs[4] & SCTLR_M) != 0)
+		paging->flags |= VM_GP_MMU_ENABLED;
+
+	return (0);
+}
+#endif
 
 /*
  * Map a guest virtual address to a physical address (for a given vcpu).
@@ -285,6 +419,16 @@ guest_vaddr2paddr(struct vcpu *vcpu, uint64_t vaddr, uint64_t *paddr)
 	if (fault)
 		return (0);
 	return (1);
+}
+
+static uint64_t
+guest_pc(struct vm_exit *vme)
+{
+#ifdef __amd64__
+	return (vme->rip);
+#else
+	return (vme->pc);
+#endif
 }
 
 static void
@@ -763,7 +907,7 @@ gdb_cpu_add(struct vcpu *vcpu)
 	CPU_SET(vcpuid, &vcpus_active);
 	if (!TAILQ_EMPTY(&breakpoints)) {
 		vm_set_capability(vcpu, VM_CAP_BPT_EXIT, 1);
-		debug("$vCPU %d enabled breakpoint exits\n", vcpu);
+		debug("$vCPU %d enabled breakpoint exits\n", vcpuid);
 	}
 
 	/*
@@ -797,11 +941,16 @@ gdb_cpu_resume(struct vcpu *vcpu)
 	assert(vs->hit_swbreak == false);
 	assert(vs->stepped == false);
 	if (vs->stepping) {
+#ifdef __amd64__
 		error = vm_set_capability(vcpu, VM_CAP_MTRAP_EXIT, 1);
 		assert(error == 0);
-
 		error = vm_set_capability(vcpu, VM_CAP_MASK_HWINTR, 1);
 		assert(error == 0);
+#else
+		(void)error;
+		printf("%s:%d\n", __func__, __LINE__);
+		abort();
+#endif
 	}
 }
 
@@ -853,8 +1002,13 @@ gdb_cpu_mtrap(struct vcpu *vcpu)
 	if (vs->stepping) {
 		vs->stepping = false;
 		vs->stepped = true;
+#ifdef __amd64__
 		vm_set_capability(vcpu, VM_CAP_MTRAP_EXIT, 0);
 		vm_set_capability(vcpu, VM_CAP_MASK_HWINTR, 0);
+#else
+		printf("%s:%d\n", __func__, __LINE__);
+		abort();
+#endif
 
 		while (vs->stepped) {
 			if (stopped_vcpu == -1) {
@@ -895,7 +1049,7 @@ gdb_cpu_breakpoint(struct vcpu *vcpu, struct vm_exit *vmexit)
 	}
 	vcpuid = vcpu_id(vcpu);
 	pthread_mutex_lock(&gdb_lock);
-	error = guest_vaddr2paddr(vcpu, vmexit->rip, &gpa);
+	error = guest_vaddr2paddr(vcpu, guest_pc(vmexit), &gpa);
 	assert(error == 1);
 	bp = find_breakpoint(gpa);
 	if (bp != NULL) {
@@ -904,11 +1058,11 @@ gdb_cpu_breakpoint(struct vcpu *vcpu, struct vm_exit *vmexit)
 		assert(vs->stepped == false);
 		assert(vs->hit_swbreak == false);
 		vs->hit_swbreak = true;
-		vm_set_register(vcpu, VM_REG_GUEST_RIP, vmexit->rip);
+		vm_set_register(vcpu, GDB_PC_REGNAME, guest_pc(vmexit));
 		for (;;) {
 			if (stopped_vcpu == -1) {
-				debug("$vCPU %d reporting breakpoint at rip %#lx\n",
-				    vcpuid, vmexit->rip);
+				debug("$vCPU %d reporting breakpoint at pc %#lx\n",
+				    vcpuid, guest_pc(vmexit));
 				stopped_vcpu = vcpuid;
 				gdb_suspend_vcpus();
 			}
@@ -926,13 +1080,18 @@ gdb_cpu_breakpoint(struct vcpu *vcpu, struct vm_exit *vmexit)
 		}
 		gdb_cpu_resume(vcpu);
 	} else {
-		debug("$vCPU %d injecting breakpoint at rip %#lx\n", vcpuid,
-		    vmexit->rip);
+		debug("$vCPU %d injecting breakpoint at PC %#lx\n", vcpuid,
+		    guest_pc(vmexit));
+#ifdef __amd64__
 		error = vm_set_register(vcpu, VM_REG_GUEST_ENTRY_INST_LENGTH,
 		    vmexit->u.bpt.inst_length);
 		assert(error == 0);
 		error = vm_inject_exception(vcpu, IDT_BP, 0, 0, 0);
 		assert(error == 0);
+#else
+		printf("%s:%d\n", __func__, __LINE__);
+		abort();
+#endif
 	}
 	pthread_mutex_unlock(&gdb_lock);
 }
@@ -970,7 +1129,7 @@ gdb_resume_vcpus(void)
 static void
 gdb_read_regs(void)
 {
-	uint64_t regvals[nitems(gdb_regset)];
+	uintcap_t regvals[nitems(gdb_regset)];
 
 	if (vm_get_register_set(vcpus[cur_vcpu], nitems(gdb_regset),
 	    gdb_regset, regvals) == -1) {
@@ -1235,7 +1394,7 @@ remove_all_sw_breakpoints(void)
 	TAILQ_FOREACH_SAFE(bp, &breakpoints, link, nbp) {
 		debug("remove breakpoint at %#lx\n", bp->gpa);
 		cp = paddr_guest2host(ctx, bp->gpa, 1);
-		*cp = bp->shadow_inst;
+		memcpy(cp, bp->shadow_inst, sizeof(bp->shadow_inst));
 		TAILQ_REMOVE(&breakpoints, bp, link);
 		free(bp);
 	}
@@ -1251,10 +1410,15 @@ update_sw_breakpoint(uint64_t gva, int kind, bool insert)
 	uint8_t *cp;
 	int error;
 
-	if (kind != 1) {
+	if (kind != GDB_BP_SIZE) {
 		send_error(EINVAL);
 		return;
 	}
+
+#ifdef __aarch64__
+	send_error(EOPNOTSUPP);
+	return;
+#endif
 
 	error = guest_vaddr2paddr(vcpus[cur_vcpu], gva, &gpa);
 	if (error == -1) {
@@ -1290,15 +1454,15 @@ update_sw_breakpoint(uint64_t gva, int kind, bool insert)
 			}
 			bp = malloc(sizeof(*bp));
 			bp->gpa = gpa;
-			bp->shadow_inst = *cp;
-			*cp = 0xcc;	/* INT 3 */
+			memcpy(bp->shadow_inst, cp, sizeof(bp->shadow_inst));
+			memcpy(cp, GDB_BP_INSTR, GDB_BP_SIZE);
 			TAILQ_INSERT_TAIL(&breakpoints, bp, link);
 			debug("new breakpoint at %#lx\n", gpa);
 		}
 	} else {
 		if (bp != NULL) {
 			debug("remove breakpoint at %#lx\n", gpa);
-			*cp = bp->shadow_inst;
+			memcpy(cp, bp->shadow_inst, sizeof(bp->shadow_inst));
 			TAILQ_REMOVE(&breakpoints, bp, link);
 			free(bp);
 			if (TAILQ_EMPTY(&breakpoints))

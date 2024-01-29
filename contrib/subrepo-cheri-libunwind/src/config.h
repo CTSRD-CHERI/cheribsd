@@ -194,23 +194,26 @@
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
-static inline bool is_pointer_in_bounds(uintptr_t value) {
+static inline bool is_pointer_in_bounds(uintptr_t value, bool include_top) {
   ptraddr_t addr = (ptraddr_t)value;
   ptraddr_t base = __builtin_cheri_base_get(value);
   ptraddr_t top = base + __builtin_cheri_length_get(value);
-  return __builtin_cheri_tag_get(value) && addr >= base && addr < top;
+  return __builtin_cheri_tag_get(value) && addr >= base &&
+         (include_top ? addr <= top : addr < top);
 }
 
 static inline uintptr_t assert_pointer_in_bounds(uintptr_t value) {
-  if (!is_pointer_in_bounds(value)) {
+  // XXX: Should some callers include the top?
+  if (!is_pointer_in_bounds(value, false)) {
     _LIBUNWIND_ABORT_FMT(
         "Out-of-bounds/invalid value used: " _LIBUNWIND_FMT_PTR, (void *)value);
   }
   return value;
 }
 #else
-static inline bool is_pointer_in_bounds(uintptr_t value) {
+static inline bool is_pointer_in_bounds(uintptr_t value, bool include_top) {
   (void)value;
+  (void)include_top;
   return true;
 }
 static inline uintptr_t assert_pointer_in_bounds(uintptr_t value) {

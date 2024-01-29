@@ -888,6 +888,9 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m,
 
 	VM_PAGE_ASSERT_PGA_CAPMETA_PMAP_ENTER(m, prot);
 	if ((prot & VM_PROT_WRITE_CAP) != 0) {
+		KASSERT((vm_page_astate_load(m).flags & PGA_CAPSTORE) != 0,
+		    ("%s: page %p does not have CAPSTORE set", __func__, m));
+
 		/*
 		 * The page is CAPSTORE and this mapping is VM_PROT_WRITE_CAP.
 		 * Always set ATTR_CDBM for userspace.
@@ -898,7 +901,7 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m,
 		 * XXX We could also conditionally set ATTR_SC if PGA_CAPDIRTY,
 		 * but it's not required.
 		 */
-		if (va < VM_MAX_USER_ADDRESS)
+		if (pmap->pm_stage == PM_STAGE1 && va < VM_MAX_USER_ADDRESS)
 			val |= ATTR_CDBM;
 		else
 			val |= ATTR_SC;
@@ -4374,19 +4377,19 @@ pmap_promote_l2(pmap_t pmap, pd_entry_t *l2, vm_offset_t va, vm_page_t mpte,
 	 */
 setl2:
 #if __has_feature(capabilities)
-		/*
-		 * Prohibit superpages involving CDBM-set SC-clear PTEs.  The
-		 * revoker creates these without TLB shootdown, and so there
-		 * may be a SC-set TLBE still in the system.  Thankfully,
-		 * these are ephemera: either they'll transition to CD-set
-		 * or CW-clear in the next revocation epoch.
-		 */
-		if ((newl2 & (ATTR_CDBM | ATTR_SC)) == ATTR_CDBM) {
-			atomic_add_long(&pmap_l2_p_failures, 1);
-			CTR2(KTR_PMAP, "pmap_promote_l2: CDBM failure for va "
-			    "%#lx in pmap %p", va, pmap);
-			return (false);
-		}
+	/*
+	 * Prohibit superpages involving CDBM-set SC-clear PTEs.  The
+	 * revoker creates these without TLB shootdown, and so there
+	 * may be a SC-set TLBE still in the system.  Thankfully,
+	 * these are ephemera: either they'll transition to CD-set
+	 * or CW-clear in the next revocation epoch.
+	 */
+	if ((newl2 & (ATTR_CDBM | ATTR_SC)) == ATTR_CDBM) {
+		atomic_add_long(&pmap_l2_p_failures, 1);
+		CTR2(KTR_PMAP, "pmap_promote_l2: CDBM failure for va "
+		    "%#lx in pmap %p", va, pmap);
+		return (false);
+	}
 #endif
 
 	if ((newl2 & (ATTR_S1_AP_RW_BIT | ATTR_SW_DBM)) ==
@@ -5386,9 +5389,13 @@ pmap_caploadgen_test_all_clean(vm_page_t m)
 	pt_entry_t pte;
 	pmap_t pmap;
 	int lvl, md_gen, pvh_gen;
-	boolean_t rv;
+	bool rv;
 
-	rv = TRUE;
+	KASSERT((m->flags & PG_FICTITIOUS) == 0,
+	    ("fictitious page in pmap_caploadgen_test_all_clean"));
+	vm_page_assert_busied(m);
+
+	rv = true;
 	lock = VM_PAGE_TO_PV_LIST_LOCK(m);
 	rw_rlock(lock);
 restart:
@@ -5410,7 +5417,7 @@ restart:
 		KASSERT(lvl == 3,
 		    ("pmap_page_test_mappings: Invalid level %d", lvl));
 		if (pte & ATTR_CDBM) {
-			rv = FALSE;
+			rv = false;
 			goto out;
 		}
 		KASSERT((pte & ATTR_SC) == 0, ("ATTR_SC without ATTR_CDBM"));
@@ -5437,7 +5444,7 @@ restart:
 			KASSERT(lvl == 2,
 			    ("pmap_page_test_mappings: Invalid level %d", lvl));
 			if (pte & ATTR_CDBM) {
-				rv = FALSE;
+				rv = false;
 				goto out;
 			}
 			KASSERT((pte & ATTR_SC) == 0,
@@ -5446,21 +5453,21 @@ restart:
 	}
 out:
 	rw_runlock(lock);
+
 	/*
 	 * It's important that we test the PGA_CAPDIRTY flag again *after*
 	 * we've looked at all the PTEs: we might have raced a removal of a PTE
 	 * that had ATTR_CDBM set.
 	 *
-	 * Despite not holding a pmap LOCKed right now, something is preventing
-	 * new mappings (PMAP_CAPLOADGEN_NONEWMAPS) and so we don't need to
-	 * worry that we're missing something here.
+	 * The page is busy, ensuring that new, writeable mappings cannot be
+	 * created.
 	 */
 	if (rv && !(vm_page_astate_load(m).flags & PGA_CAPDIRTY)) {
 		vm_page_aflag_clear(m, PGA_CAPSTORE);
 	}
 }
 
-int
+enum pmap_caploadgen_res
 pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 {
 	enum pmap_caploadgen_res res;
@@ -5583,9 +5590,14 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 				if (mas.flags & PGA_CAPDIRTY) {
 					/* Page-level cleaning: -?> VACANT */
 					vm_page_aflag_clear(m, PGA_CAPDIRTY);
+				} else if (__predict_false(
+				    (mas.flags & PGA_CAPSTORE) == 0)) {
+					/*
+					 * We raced with another revoker, simply
+					 * update the LCLG and keep going.
+					 */
+					;
 				} else {
-					KASSERT(mas.flags & PGA_CAPSTORE,
-					    ("Page already CAP-CLEAN?"));
 					/* PTE CAP-CLEAN; page -?> IDLE */
 
 					/*
@@ -5653,10 +5665,10 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 		res = PMAP_CAPLOADGEN_CLEAN;
 	} else if (vm_page_tryxbusy(m)) {
 		/*
-		 * OK, have page xbusy'd and so PGA_WRITEABLE is stable, so
-		 * report how aggressively it can be swept.
+		 * OK, we have the page xbusy'd and so new writeable mappings
+		 * will not appear.
 		 */
-		if (pmap_page_is_write_mapped(m)) {
+		if ((tpte & ATTR_DBM) != 0) {
 			res = PMAP_CAPLOADGEN_SCAN_RW_XBUSIED;
 		} else {
 			res = PMAP_CAPLOADGEN_SCAN_RO_XBUSIED;
@@ -5673,7 +5685,6 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 		m = NULL;
 		res = PMAP_CAPLOADGEN_TEARDOWN;
 	}
-
 
 out:
 #if VM_NRESERVLEVEL > 0

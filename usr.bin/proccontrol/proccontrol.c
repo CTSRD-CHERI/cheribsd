@@ -52,6 +52,9 @@ enum {
 	MODE_LA57,
 	MODE_LA48,
 #endif
+#if __has_feature(capabilities)
+	MODE_CHERI_REVOKE,
+#endif
 };
 
 static pid_t
@@ -78,14 +81,19 @@ str2pid(const char *str)
 #else
 #define	LA_USAGE
 #endif
+#if __has_feature(capabilities)
+#define	CHERI_REVOKE_USAGE "|cherirevoke"
+#else
+#define	CHERI_REVOKE_USAGE
+#endif
 
 static void __dead2
 usage(void)
 {
 
 	fprintf(stderr, "Usage: proccontrol -m (aslr|protmax|trace|trapcap|"
-	    "stackgap|nonewprivs|wxmap"KPTI_USAGE LA_USAGE") [-q] "
-	    "[-s (enable|disable)] [-p pid | command]\n");
+	    "stackgap|nonewprivs|wxmap"KPTI_USAGE LA_USAGE CHERI_REVOKE_USAGE
+	    ") [-q] [-s (enable|disable)] [-p pid | command]\n");
 	exit(1);
 }
 
@@ -126,6 +134,10 @@ main(int argc, char *argv[])
 				mode = MODE_LA57;
 			else if (strcmp(optarg, "la48") == 0)
 				mode = MODE_LA48;
+#endif
+#if __has_feature(capabilities)
+			else if (strcmp(optarg, "cherirevoke") == 0)
+				mode = MODE_CHERI_REVOKE;
 #endif
 			else
 				usage();
@@ -194,6 +206,12 @@ main(int argc, char *argv[])
 		case MODE_LA57:
 		case MODE_LA48:
 			error = procctl(P_PID, pid, PROC_LA_STATUS, &arg);
+			break;
+#endif
+#if __has_feature(capabilities)
+		case MODE_CHERI_REVOKE:
+			error = procctl(P_PID, pid, PROC_CHERI_REVOKE_STATUS,
+			    &arg);
 			break;
 #endif
 		default:
@@ -333,6 +351,25 @@ main(int argc, char *argv[])
 				printf(", la57 active\n");
 			break;
 #endif
+#if __has_feature(capabilities)
+		case MODE_CHERI_REVOKE:
+			switch (arg & ~PROC_CHERI_REVOKE_ACTIVE) {
+			case PROC_CHERI_REVOKE_FORCE_ENABLE:
+				printf("force enabled");
+				break;
+			case PROC_CHERI_REVOKE_FORCE_DISABLE:
+				printf("force disabled");
+				break;
+			case PROC_CHERI_REVOKE_NOFORCE:
+				printf("not forced");
+				break;
+			}
+			if ((arg & PROC_CHERI_REVOKE_ACTIVE) != 0)
+				printf(", active\n");
+			else
+				printf(", not active\n");
+			break;
+#endif
 		}
 	} else {
 		switch (mode) {
@@ -390,6 +427,13 @@ main(int argc, char *argv[])
 			arg = enable ? PROC_LA_CTL_LA48_ON_EXEC :
 			    PROC_LA_CTL_DEFAULT_ON_EXEC;
 			error = procctl(P_PID, pid, PROC_LA_CTL, &arg);
+			break;
+#endif
+#if __has_feature(capabilities)
+		case MODE_CHERI_REVOKE:
+			arg = enable ? PROC_CHERI_REVOKE_FORCE_ENABLE :
+			    PROC_CHERI_REVOKE_FORCE_DISABLE;
+			error = procctl(P_PID, pid, PROC_CHERI_REVOKE_CTL, &arg);
 			break;
 #endif
 		default:

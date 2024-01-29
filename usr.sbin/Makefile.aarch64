@@ -2,5 +2,8 @@
 .if ${MK_ACPI} != "no"
 SUBDIR+=	acpi
 .endif
+.if ${MK_BHYVE} != "no"
+SUBDIR+=	bhyve
+.endif
 SUBDIR+=	ofwdump
 SUBDIR+=	hwt

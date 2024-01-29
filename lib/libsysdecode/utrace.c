@@ -34,7 +34,52 @@
 #include <stdio.h>
 #include <string.h>
 #include <sysdecode.h>
+
+#include "mrs_utrace.h"
 #include "rtld_utrace.h"
+
+#ifdef __CHERI_PURE_CAPABILITY__
+static int
+print_utrace_mrs(FILE *fp, void *p)
+{
+	const struct utrace_mrs *ut = p;
+
+	switch (ut->event) {
+	case UTRACE_MRS_MALLOC:
+		fprintf(fp, "%p = mrs_malloc(%zu)", ut->r, ut->s);
+		break;
+	case UTRACE_MRS_CALLOC:
+		fprintf(fp, "%p = mrs_calloc(%zu, %zu)", ut->r, ut->n, ut->s);
+		break;
+	case UTRACE_MRS_POSIX_MEMALIGN:
+		fprintf(fp, "%p = mrs_posix_memalign(%zu, %zu)", ut->r, ut->n,
+		    ut->s);
+		break;
+	case UTRACE_MRS_ALIGNED_ALLOC:
+		fprintf(fp, "%p = mrs_aligned_alloc(%zu, %zu)", ut->r, ut->n,
+		    ut->s);
+		break;
+	case UTRACE_MRS_REALLOC:
+		fprintf(fp, "%p = mrs_realloc(%p, %zu)", ut->r, ut->p, ut->s);
+		break;
+	case UTRACE_MRS_FREE:
+		fprintf(fp, "mrs_free(%p)", ut->p);
+		break;
+	case UTRACE_MRS_QUARANTINE_INSERT:
+		fprintf(fp, "quarantine_insert(%p, %zu)", ut->p, ut->s);
+		break;
+	case UTRACE_MRS_MALLOC_REVOKE:
+		fprintf(fp, "malloc_revoke()");
+		break;
+	case UTRACE_MRS_QUARANTINE_FLUSH:
+		fprintf(fp, "quarantine_flush()");
+		break;
+	default:
+		return (0);
+	}
+	return (1);
+}
+#endif
 
 #ifdef __LP64__
 struct utrace_rtld32 {
@@ -147,6 +192,16 @@ print_utrace_rtld(FILE *fp, void *p)
 	case UTRACE_RTLD_ERROR:
 		fprintf(fp, "RTLD: error: %s\n", ut->name);
 		break;
+	case UTRACE_COMPARTMENT_ENTER:
+		fprintf(fp,
+		    "RTLD: c18n: enter %s from %s at [%zu] %s (%p)",
+		    ut->callee, ut->caller, ut->mapsize, ut->symbol, ut->handle);
+		break;
+	case UTRACE_COMPARTMENT_LEAVE:
+		fprintf(fp,
+		    "RTLD: c18n: leave %s to %s at [%zu] %s",
+		    ut->callee, ut->caller, ut->mapsize, ut->symbol);
+		break;
 
 	default:
 		return (0);
@@ -214,6 +269,13 @@ sysdecode_utrace(FILE *fp, void *p, size_t len)
 #endif
 #endif
 	static const char rtld_utrace_sig[RTLD_UTRACE_SIG_SZ] = RTLD_UTRACE_SIG;
+#ifdef __CHERI_PURE_CAPABILITY__
+	static const char mrs_utrace_sig[MRS_UTRACE_SIG_SZ] = MRS_UTRACE_SIG;
+
+	if (len == sizeof(struct utrace_mrs) && bcmp(p, mrs_utrace_sig,
+	    sizeof(mrs_utrace_sig)) == 0)
+		return (print_utrace_mrs(fp, p));
+#endif
 
 	if (len == sizeof(struct utrace_rtld) && bcmp(p, rtld_utrace_sig,
 	    sizeof(rtld_utrace_sig)) == 0)

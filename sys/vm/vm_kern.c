@@ -152,6 +152,7 @@ kva_alloc(vm_size_t size)
 	size = round_page(size);
 	if (vmem_alloc(kernel_arena, size, M_BESTFIT | M_NOWAIT, &addr))
 		return (0);
+	addr = cheri_kern_andperm(addr, CHERI_PERMS_KERNEL_DATA);
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
 #endif
@@ -256,6 +257,11 @@ kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	offset = addr - VM_MIN_KERNEL_ADDRESS;
 	pflags = malloc2vm_flags(flags) | VM_ALLOC_WIRED;
 	prot = (flags & M_EXEC) != 0 ? VM_PROT_RWX : VM_PROT_RW;
+	if ((flags & M_EXEC) == 0)
+		addr = cheri_kern_andperm(addr, CHERI_PERMS_KERNEL_DATA);
+	else
+		addr = cheri_kern_andperm(addr, CHERI_PERMS_KERNEL_CODE |
+		    CHERI_PERMS_KERNEL_DATA);
 
 	/* XXX: Do we want a M_CAP? */
 	prot |= VM_PROT_CAP;
@@ -350,6 +356,7 @@ kmem_alloc_contig_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	vmem = vm_dom[domain].vmd_kernel_arena;
 	if (vmem_alloc(vmem, asize, flags | M_BESTFIT, &addr))
 		return (NULL);
+	addr = cheri_kern_andperm(addr, CHERI_PERMS_KERNEL_DATA);
 	offset = addr - VM_MIN_KERNEL_ADDRESS;
 	pflags = malloc2vm_flags(flags) | VM_ALLOC_WIRED;
 	npages = atop(asize);
@@ -476,6 +483,11 @@ kmem_malloc_domain(int domain, vm_size_t size, int flags)
 	asize = round_page(size);
 	if (vmem_alloc(arena, asize, flags | M_BESTFIT, &addr))
 		return (0);
+	if ((flags & M_EXEC) == 0)
+		addr = cheri_kern_andperm(addr, CHERI_PERMS_KERNEL_DATA);
+	else
+		addr = cheri_kern_andperm(addr, CHERI_PERMS_KERNEL_CODE |
+		    CHERI_PERMS_KERNEL_DATA);
 
 	rv = kmem_back_domain(domain, kernel_object, addr, asize, flags);
 	if (rv != KERN_SUCCESS) {

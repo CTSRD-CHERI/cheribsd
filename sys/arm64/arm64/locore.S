@@ -307,7 +307,6 @@ virtdone:
 	/*
 	 * Convert modulep into a capability
 	 * XXX-AM: can we set bounds on this?
-	 * TODO: clear perms
 	 */
 	cvtd	c19, x19
 #endif
@@ -543,6 +542,15 @@ LENTRY(drop_to_el1)
 	msr	icc_sre_el2, x2
 2:
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Enter exception handlers in C64 mode */
+	mrs	x2, cctlr_el2
+	orr	x2, x2, #(CCTLR_EL2_C64E_MASK)
+	msr	cctlr_el2, x2
+
+	/* Clear DDC_EL2 */
+	msr	ddc, czr
+#endif
 	/* Set the address to return to our return address */
 #if __has_feature(capabilities)
 	cvtp	c30, x30

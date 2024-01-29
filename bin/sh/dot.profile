@@ -1,7 +1,7 @@
 #
 HOME=/root
 export HOME
-PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/local64/sbin:/usr/local64/bin:~/bin
+PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/local64cb/sbin:/usr/local64cb/bin:/usr/local64/sbin:/usr/local64/bin:~/bin
 export PATH
 TERM=${TERM:-xterm}
 export TERM

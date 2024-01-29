@@ -133,6 +133,15 @@
 	ldr	reg, [tmpptr]
 #endif
 
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+#define	RETURN							\
+	and	x30, x30, #~1;					\
+	ret	x30
+#else
+#define	RETURN							\
+	ret
+#endif
+
 /*
  * Sets the trap fault handler. The exception handler will return to the
  * address in the handler register on a data abort or the xzr register to

@@ -320,7 +320,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	/*
 	 * Allow existing mapping to be replaced using the MAP_FIXED
 	 * flag IFF the addr argument is a valid capability with the
-	 * VMMAP user permission.  In this case, the new capability is
+	 * SW_VMEM user permission.  In this case, the new capability is
 	 * derived from the passed capability.  In all other cases, the
 	 * new capability is derived from the per-thread mmap capability.
 	 *
@@ -329,7 +329,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	 * page contents without permission.
 	 *
 	 * XXXBD: The fact that using valid a capability to a currently
-	 * unmapped region with and without the VMMAP permission will
+	 * unmapped region with and without the SW_VMEM permission will
 	 * yield different results (and even failure modes) is potentially
 	 * confusing and incompatible with non-CHERI code.  One could
 	 * potentially check if the region contains any mappings and
@@ -343,8 +343,10 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 			return (EPROT);
 		else if ((cheri_getperm(uap->addr) & CHERI_PERM_SW_VMEM))
 			source_cap = uap->addr;
-		else
+		else {
+			SYSERRCAUSE("MAP_FIXED without CHERI_PERM_SW_VMEM");
 			return (EACCES);
+		}
 	} else {
 		if (!cheri_is_null_derived(uap->addr))
 			return (EINVAL);
@@ -370,7 +372,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	    ("td->td_cheri_mmap_cap is untagged!"));
 
 	/*
-	 * If MAP_FIXED is specified, make sure that that the reqested
+	 * If MAP_FIXED is specified, make sure that the requested
 	 * address range fits within the source capability.
 	 */
 	if ((flags & MAP_FIXED) &&
@@ -539,9 +541,12 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	 * pos.
 	 */
 	if (!SV_CURPROC_FLAG(SV_AOUT)) {
-		if ((len == 0 && p->p_osrel >= P_OSREL_MAP_ANON) ||
-		    ((flags & MAP_ANON) != 0 && (fd != -1 || pos != 0))) {
+		if (len == 0 && p->p_osrel >= P_OSREL_MAP_ANON) {
 			SYSERRCAUSE("%s: len == 0", __func__);
+			return (EINVAL);
+		}
+		if ((flags & MAP_ANON) != 0 && (fd != -1 || pos != 0)) {
+			SYSERRCAUSE("%s: MAP_ANON with fd or offset", __func__);
 			return (EINVAL);
 		}
 	} else {
@@ -2161,7 +2166,7 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
 	} else {
 		if (max_addr != 0 && *addr + size > max_addr)
 			return (ENOMEM);
-		if (docow & MAP_GUARD)
+		if (docow & MAP_CREATE_GUARD)
 			maxprot = PROT_NONE;
 		if ((flags & MAP_RESERVATION_CREATE) != 0)
 			reservp = addr;

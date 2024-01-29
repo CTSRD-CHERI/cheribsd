@@ -47,4 +47,7 @@ FBSD_1.6 {
 FBSD_1.7 {
 	 procstat_getadvlock;
 	 procstat_freeadvlock;
+	 procstat_getquarantining;
+	 procstat_get_revoker_epoch;
+	 procstat_get_revoker_state;
 };

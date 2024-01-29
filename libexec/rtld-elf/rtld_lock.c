@@ -66,6 +66,9 @@
 #include "rtld.h"
 #include "rtld_machdep.h"
 #include "rtld_libc.h"
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#include "rtld_c18n.h"
+#endif
 
 void _rtld_thread_init(struct RtldLockInfo *) __exported;
 void _rtld_atfork_pre(int *) __exported;
@@ -424,18 +427,27 @@ _rtld_thread_init(struct RtldLockInfo *pli)
 		}
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 		tmplockinfo = *pli;
-#define wrap_with_trampoline(target) target = tramp_pgs_append(target, obj, NULL)
-		wrap_with_trampoline(tmplockinfo.lock_create);
-		wrap_with_trampoline(tmplockinfo.lock_destroy);
-		wrap_with_trampoline(tmplockinfo.rlock_acquire);
-		wrap_with_trampoline(tmplockinfo.wlock_acquire);
-		wrap_with_trampoline(tmplockinfo.lock_release);
-		wrap_with_trampoline(tmplockinfo.thread_set_flag);
-		wrap_with_trampoline(tmplockinfo.thread_clr_flag);
-		wrap_with_trampoline(tmplockinfo.at_fork);
-		wrap_with_trampoline(tmplockinfo.dlerror_loc);
-		wrap_with_trampoline(tmplockinfo.dlerror_seen);
-#undef wrap_with_trampoline
+#define WRAP(_target, _valid, _reg_args, _mem_args, _ret_args)	\
+	_target = tramp_intern(NULL, &(struct tramp_data) {			\
+		.target = _target,						\
+		.defobj = obj,							\
+		.sig = (struct func_sig) {					\
+			.valid = _valid,					\
+			.reg_args = _reg_args, .mem_args = _mem_args,		\
+			.ret_args = _ret_args					\
+		}								\
+	})
+		WRAP(tmplockinfo.lock_create,		true, 0, false, ONE);
+		WRAP(tmplockinfo.lock_destroy,		true, 1, false, NONE);
+		WRAP(tmplockinfo.rlock_acquire,		true, 1, false, NONE);
+		WRAP(tmplockinfo.wlock_acquire,		true, 1, false, NONE);
+		WRAP(tmplockinfo.lock_release,		true, 1, false, NONE);
+		WRAP(tmplockinfo.thread_set_flag,	true, 1, false, ONE);
+		WRAP(tmplockinfo.thread_clr_flag,	true, 1, false, ONE);
+		WRAP(tmplockinfo.at_fork,		true, 0, false, NONE);
+		WRAP(tmplockinfo.dlerror_loc,		true, 0, false, ONE);
+		WRAP(tmplockinfo.dlerror_seen,		true, 0, false, ONE);
+#undef WRAP
 		pli = &tmplockinfo;
 #endif
 	}

@@ -151,13 +151,21 @@ make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
 
 /* TODO: Per-function captable/PLT/FNDESC support */
 #ifdef RTLD_SANDBOX
-#define make_rtld_function_pointer(target_func)	(tramp_pgs_append((target_func), NULL, NULL))
+#define call_init_array_pointer(_obj, _target)				\
+	(((InitArrFunc)tramp_intern(NULL, &(struct tramp_data) {	\
+		.target = (void *)(_target).value,			\
+		.defobj = _obj,						\
+		.sig = (struct func_sig) { .valid = true,		\
+		    .reg_args = 3, .mem_args = false, .ret_args = NONE }\
+	}))(main_argc, main_argv, environ))
 
-#define call_init_array_pointer(obj, target)				\
-	(((InitArrFunc)tramp_pgs_append((void *)(target).value, obj, NULL))(main_argc, main_argv, environ))
-
-#define call_fini_array_pointer(obj, target)				\
-	(((InitFunc)tramp_pgs_append((void *)(target).value, obj, NULL))())
+#define call_fini_array_pointer(_obj, _target)				\
+	(((InitFunc)tramp_intern(NULL, &(struct tramp_data) {		\
+		.target = (void *)(_target).value,			\
+		.defobj = _obj,						\
+		.sig = (struct func_sig) { .valid = true,		\
+		    .reg_args = 0, .mem_args = false, .ret_args = NONE }\
+	}))())
 #else
 #define call_init_array_pointer(obj, target)				\
 	(((InitArrFunc)(target).value)(main_argc, main_argv, environ))
@@ -207,10 +215,6 @@ typedef struct {
 extern void *__tls_get_addr(tls_index *ti);
 
 #define md_abi_variant_hook(x)
-
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-void *tramp_pgs_append(void *, const Obj_Entry *, const Elf_Sym *);
-#endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
 static inline void

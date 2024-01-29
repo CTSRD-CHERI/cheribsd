@@ -159,8 +159,8 @@ again:
 			goto again;
 		} else {
 			/* An unexpected capability */
-			*res |= VM_CHERI_REVOKE_PAGE_DIRTY
-				| VM_CHERI_REVOKE_PAGE_HASCAPS ;
+			*res |= VM_CHERI_REVOKE_PAGE_DIRTY |
+			    VM_CHERI_REVOKE_PAGE_HASCAPS;
 		}
 	} else {
 		CHERI_REVOKE_STATS_BUMP(crst, caps_found);
@@ -177,7 +177,7 @@ again:
 }
 
 static inline void
-enable_user_memory_access()
+enable_user_memory_access(void)
 {
 	uint64_t tmp;
 
@@ -194,7 +194,7 @@ enable_user_memory_access()
 }
 
 static inline void
-disable_user_memory_access()
+disable_user_memory_access(void)
 {
 	uint64_t tmp;
 
@@ -215,10 +215,8 @@ uint8_t cloadtags_stride;
 SYSCTL_U8(_vm, OID_AUTO, cloadtags_stride, 0, &cloadtags_stride, 0, "XXX");
 
 static void
-measure_cloadtags_stride(void *ignored)
+measure_cloadtags_stride(void *ignored __unused)
 {
-	(void)ignored;
-
 	/* A 256-byte cache-line is probably beyond the pale, so use that */
 	void * __capability buf[16] __attribute__((aligned(256)));
 	int i;
@@ -322,6 +320,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 	/* And the last line */
 	{
 		uintcap_t * __capability mvt = mvu;
+
 		for (; tags != 0; (tags >>= 1), mvt += 1) {
 			if (!(tags & 1))
 				continue;
@@ -336,6 +335,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 
 	for (; cheri_getaddress(mvu) < mve; mvu++) {
 		uintcap_t cut = *mvu;
+
 		if (cheri_gettag(cut)) {
 			if (cb(&res, crc, crshadow, ctp, mvu, cut, start, end))
 				goto out;
@@ -388,24 +388,19 @@ vm_cheri_revoke_page_rw(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 	CHERI_REVOKE_STATS_FOR(crst, crc);
 	uint32_t cyc_start = get_cyclecount();
 #endif
-
 	vm_offset_t mva;
 	vm_offset_t mve;
 	uintcap_t * __capability mvu;
-
 	/*
 	 * XXX NWF
 	 * This isn't what we really want, but we want to be able to fake up a
 	 * a capability to the DMAP area somehow.
 	 */
 	void * __capability kdc = swap_restore_cap;
+	int res;
 
-	int res = 0;
+	vm_page_assert_busied(m);
 
-	/*
-	 * m is xbusy, which means it's not about to be reclaimed under us.  Go
-	 * sweep via the DMAP.
-	 */
 	mva = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 	mve = mva + PAGE_SIZE;
 
@@ -431,14 +426,12 @@ static inline int
 vm_cheri_revoke_page_ro_adapt(int *res,
     const struct vm_cheri_revoke_cookie *vmcrc,
     const uint8_t * __capability crshadow, vm_cheri_revoke_test_fn ctp,
-    uintcap_t * __capability cutp, uintcap_t cut, vm_offset_t start,
+    uintcap_t * __capability cutp __unused, uintcap_t cut, vm_offset_t start,
     vm_offset_t end)
 {
-	(void)cutp;
-
 	/* If the thing has no permissions, we don't need to scan it later */
 	if ((cheri_gettag(cut) == 0) || (cheri_getperm(cut) == 0))
-		return 0;
+		return (0);
 
 	*res |= VM_CHERI_REVOKE_PAGE_HASCAPS;
 
@@ -446,7 +439,7 @@ vm_cheri_revoke_page_ro_adapt(int *res,
 		*res |= VM_CHERI_REVOKE_PAGE_DIRTY;
 
 		/* One dirty answer is as good as any other; stop eary */
-		return 1;
+		return (1);
 	}
 
 	return (0);

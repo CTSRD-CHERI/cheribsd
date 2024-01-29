@@ -51,6 +51,9 @@
 
 #include "debug.h"
 #include "rtld.h"
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#include "rtld_c18n.h"
+#endif
 
 static Elf_Ehdr *get_elf_header(int, const char *, const struct stat *,
     const char*, Elf_Phdr **phdr);
@@ -423,9 +426,6 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	obj->tlsinitsize = phtls->p_filesz;
 	obj->tlsinit = mapbase + phtls->p_vaddr;
     }
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    obj->compart_id = ++compart_max_index;
-#endif
 #ifndef __CHERI_PURE_CAPABILITY__
     obj->stack_flags = stack_flags;
 #endif
@@ -602,10 +602,6 @@ obj_new(void)
     STAILQ_INIT(&obj->dldags);
     STAILQ_INIT(&obj->dagmembers);
     STAILQ_INIT(&obj->names);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    SLIST_INIT(&obj->stacks);
-    obj->stackslock = lockinfo.lock_create();
-#endif
     return obj;
 }
 

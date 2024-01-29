@@ -42,9 +42,9 @@ malloc_revoke(void)
 {
 }
 
-bool malloc_is_quarantining(void);
+bool malloc_is_revoking(void);
 bool
-malloc_is_quarantining(void)
+malloc_is_revoking(void)
 {
 	return (false);
 }

@@ -179,8 +179,8 @@ again:
 			 * nor 1, which means that the stxr wasn't executed and
 			 * so the capability at cutp has changed.
 			 */
-			*res |= VM_CHERI_REVOKE_PAGE_DIRTY
-				| VM_CHERI_REVOKE_PAGE_HASCAPS ;
+			*res |= VM_CHERI_REVOKE_PAGE_DIRTY |
+			    VM_CHERI_REVOKE_PAGE_HASCAPS;
 		}
 	} else {
 		CHERI_REVOKE_STATS_BUMP(crst, caps_found);
@@ -197,14 +197,14 @@ again:
 }
 
 static inline void
-enable_user_memory_access()
+enable_user_memory_access(void)
 {
 	/* Set PSTATE.PAN to 0 */
 	__asm __volatile("msr pan, #0");
 }
 
 static inline void
-disable_user_memory_access()
+disable_user_memory_access(void)
 {
 	/* Set PSTATE.PAN to 1 */
 	__asm __volatile("msr pan, #1");
@@ -241,6 +241,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 
 	for (; cheri_getaddress(mvu) < mve; mvu++) {
 		uintcap_t cut = *mvu;
+
 		if (cheri_gettag(cut)) {
 			if (cb(&res, crc, crshadow, ctp, mvu, cut, start, end))
 				goto out;
@@ -279,7 +280,7 @@ vm_cheri_revoke_test(const struct vm_cheri_revoke_cookie *crc, uintcap_t cut)
 		disable_user_memory_access();
 		curthread->td_pcb->pcb_onfault = 0;
 #endif
-		return res;
+		return (res);
 	}
 
 	return (0);
@@ -292,29 +293,23 @@ vm_cheri_revoke_page_rw(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 	CHERI_REVOKE_STATS_FOR(crst, crc);
 	uint32_t cyc_start = get_cyclecount();
 #endif
-
 	vm_offset_t mva;
 	vm_offset_t mve;
 	uintcap_t * __capability mvu;
-
 	/*
 	 * XXX NWF
 	 * This isn't what we really want, but we want to be able to fake up a
 	 * a capability to the DMAP area somehow.
 	 */
 	void * __capability kdc = swap_restore_cap;
+	int res;
 
-	int res = 0;
+	vm_page_assert_busied(m);
 
-	/*
-	 * XXX NWF
-	 * Hopefully m being xbusy'd means it's not about to go away on us.
-	 * I don't yet understand all the interlocks in the vm subsystem.
-	 */
 	mva = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
-	mve = mva + pagesizes[0];
+	mve = mva + PAGE_SIZE;
 
-	mvu = cheri_setbounds(cheri_setaddress(kdc, mva), pagesizes[0]);
+	mvu = cheri_setbounds(cheri_setaddress(kdc, mva), PAGE_SIZE);
 
 	res = vm_cheri_revoke_page_iter(crc, vm_do_cheri_revoke, mvu, mve);
 
@@ -349,15 +344,15 @@ vm_cheri_revoke_page_ro_adapt(int *res,
 
 	/* If the thing has no permissions, we don't need to scan it later */
 	if ((cheri_gettag(cut) == 0) || (cheri_getperm(cut) == 0))
-		return 0;
+		return (0);
 
 	*res |= VM_CHERI_REVOKE_PAGE_HASCAPS;
 
 	if (ctp(crshadow, cut, cheri_getperm(cut), start, end)) {
 		*res |= VM_CHERI_REVOKE_PAGE_DIRTY;
 
-		/* One dirty answer is as good as any other; stop eary */
-		return 1;
+		/* One dirty answer is as good as any other; stop early */
+		return (1);
 	}
 
 	return (0);

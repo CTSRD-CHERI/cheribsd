@@ -3693,6 +3693,7 @@ pmap_caploadgen_test_all_clean(vm_page_t m)
 
 	KASSERT((m->flags & PG_FICTITIOUS) == 0,
 	    ("fictitious page in pmap_caploadgen_test_all_clean"));
+	vm_page_assert_busied(m);
 
 	rv = true;
 	rw_rlock(&pvh_global_lock);
@@ -3755,9 +3756,8 @@ out:
 	 * we've looked at all the PTEs: we might have raced a removal of a PTE
 	 * that had PTE_SCI clear.
 	 *
-	 * Despite not holding a pmap LOCKed right now, something is preventing
-	 * new mappings (PMAP_CAPLOADGEN_NONEWMAPS) and so we don't need to
-	 * worry that we're missing something here.
+	 * The page is busy, ensuring that new, writeable mappings cannot be
+	 * created.
 	 */
 	if (rv && !(vm_page_astate_load(m).flags & PGA_CAPDIRTY)) {
 		vm_page_aflag_clear(m, PGA_CAPSTORE);
@@ -3807,7 +3807,7 @@ pmap_caploadgen_update_clear_cw(pt_entry_t *pte, pt_entry_t oldpte)
 
 }
 
-int
+enum pmap_caploadgen_res
 pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 {
 	enum pmap_caploadgen_res res;
@@ -3912,9 +3912,14 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 				if (mas.flags & PGA_CAPDIRTY) {
 					/* Page-level cleaning: -?> VACANT */
 					vm_page_aflag_clear(m, PGA_CAPDIRTY);
+				} else if (__predict_false(
+				    (mas.flags & PGA_CAPSTORE) == 0)) {
+					/*
+					 * We raced with another revoker, simply
+					 * update the LCLG and keep going.
+					 */
+					;
 				} else {
-					KASSERT(mas.flags & PGA_CAPSTORE,
-					    ("Page already CAP-CLEAN?"));
 					/* PTE CAP-CLEAN; page -?> IDLE */
 
 					/*
@@ -3994,10 +3999,10 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 		res = PMAP_CAPLOADGEN_CLEAN;
 	} else if (vm_page_tryxbusy(m)) {
 		/*
-		 * OK, have page xbusy'd and so PGA_WRITEABLE is stable, so
-		 * report how aggressively it can be swept.
+		 * OK, we have the page xbusy'd and so new writeable mappings
+		 * will not appear.
 		 */
-		if (pmap_page_is_write_mapped(m)) {
+		if ((oldpte & PTE_W) != 0) {
 			res = PMAP_CAPLOADGEN_SCAN_RW_XBUSIED;
 		} else {
 			res = PMAP_CAPLOADGEN_SCAN_RO_XBUSIED;

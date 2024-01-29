@@ -194,6 +194,7 @@ freebsd64_get_mcontext(struct thread *td, mcontext64_t *mcp, int flags)
 	mcontext_t mc;
 	int error;
 
+	memset(&mc, 0, sizeof(mc));
 	error = get_mcontext(td, &mc, flags);
 	if (error != 0)
 		return (error);

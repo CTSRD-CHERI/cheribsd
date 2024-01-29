@@ -113,8 +113,10 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	ncurses \
 	nss_tacplus
 
-.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64" && !defined(COMPAT_LIBCOMPAT)
+.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
+.if !defined(COMPAT_LIBCOMPAT) || ${COMPAT_LIBCOMPAT} == "64CB"
 SUBDIR+=	libc_c18n libthr_c18n
+.endif
 .endif
 
 .if !${MACHINE_ABI:Mpurecap}
@@ -203,6 +205,7 @@ SUBDIR+=	clang
 SUBDIR.${MK_CUSE}+= 	libcuse
 SUBDIR.${MK_TOOLCHAIN}+=libpe
 SUBDIR.${MK_DIALOG}+=	libdpv libfigpar
+SUBDIR.${MK_FDT}+=	libfdt
 SUBDIR.${MK_FILE}+=	libmagic
 SUBDIR.${MK_GPIO}+=	libgpio
 SUBDIR.${MK_GSSAPI}+=	libgssapi librpcsec_gss
@@ -233,6 +236,10 @@ SUBDIR.${MK_PMC}+=	libopencsd
 
 .if ${MACHINE_CPUARCH} == "amd64"
 SUBDIR.${MK_PMC}+=	libipt
+.endif
+
+.if (${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "aarch64") && \
+    !defined(COMPAT_LIBCOMPAT)
 SUBDIR.${MK_BHYVE}+=	libvmmapi
 .endif
 

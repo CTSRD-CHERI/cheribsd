@@ -798,6 +798,7 @@ typedef struct {
 #define	ELF_NOTE_NETBSD		"NetBSD"
 #define	ELF_NOTE_SOLARIS	"SUNW Solaris"
 #define	ELF_NOTE_GNU		"GNU"
+#define	ELF_NOTE_CHERI		"CHERI"
 
 /* Values for n_type used in executables. */
 #define	NT_FREEBSD_ABI_TAG	1
@@ -814,7 +815,11 @@ typedef struct {
 #define	NT_FREEBSD_FCTL_STKGAP_DISABLE	0x00000004
 #define	NT_FREEBSD_FCTL_WXNEEDED	0x00000008
 #define	NT_FREEBSD_FCTL_LA48		0x00000010
-/* was ASG_DISABLE, do not reuse	0x00000020 */
+#define	NT_FREEBSD_FCTL_CHERI_REVOKE_DISABLE	0x00000020 /* was ASG_DISABLE */
+#define	NT_FREEBSD_FCTL_CHERI_REVOKE_ENABLE	0x80000000
+
+#define NT_FREEBSD_FCTL_CHERI_REVOKE_MASK \
+    (NT_FREEBSD_FCTL_CHERI_REVOKE_DISABLE | NT_FREEBSD_FCTL_CHERI_REVOKE_ENABLE)
 
 /* Values for n_type.  Used in core files. */
 #define	NT_PRSTATUS	1	/* Process status. */
@@ -859,6 +864,9 @@ typedef struct {
 
 #define	GNU_PROPERTY_X86_FEATURE_1_IBT		0x00000001
 #define	GNU_PROPERTY_X86_FEATURE_1_SHSTK	0x00000002
+
+/* CHERI note types. */
+#define	NT_CHERI_MORELLO_PURECAP_BENCHMARK_ABI	0x80000000
 
 /* Symbol Binding - ELFNN_ST_BIND - st_info */
 #define	STB_LOCAL	0	/* Local symbol */
@@ -1537,6 +1545,8 @@ typedef struct {
 
 #define	ELF_BSDF_SIGFASTBLK	0x0001	/* Kernel supports fast sigblock */
 #define	ELF_BSDF_VMNOOVERCOMMIT	0x0002
+#define	ELF_BSDF_CHERI_REVOKE_EVERY_FREE	0x40000000
+#define	ELF_BSDF_CHERI_REVOKE	0x80000000	/* Process should quarantine */
 
 #endif /* !_SYS_ELF_COMMON_H_ */
 // CHERI CHANGES START

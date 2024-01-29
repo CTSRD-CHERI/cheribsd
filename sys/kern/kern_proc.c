@@ -2908,6 +2908,8 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 				if (tobj != obj && tobj != lobj)
 					VM_OBJECT_RUNLOCK(tobj);
 			}
+			if ((obj->flags & OBJ_HASCAP) != 0)
+				kve->kve_flags |= KVME_FLAG_HASCAP;
 		} else {
 			lobj = NULL;
 		}

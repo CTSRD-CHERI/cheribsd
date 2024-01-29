@@ -756,7 +756,12 @@ DEFINE_LIBUNWIND_FUNCTION(__libunwind_Registers_arm64_jumpto)
   ldr    c16,     [c0, #0x1f0]
   ldp    c0, c1,  [c0, #0x000]  // restore c0,c1
   mov    csp,c16                // restore csp
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+  and    x30, x30, #~1
+  ret    x30                    // jump to pc
+#else
   ret                           // jump to pcc
+#endif
 #else
   // skip restore of x0,x1 for now
   ldp    x2, x3,  [x0, #0x010]

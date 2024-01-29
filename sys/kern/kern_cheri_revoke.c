@@ -1,3 +1,35 @@
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright (c) 2019 Nathaniel Filardo
+ * Copyright (c) 2020-2022 Microsoft Corp.
+ *
+ * This software was developed by SRI International and the University of
+ * Cambridge Computer Laboratory (Department of Computer Science and
+ * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
+ * DARPA SSITH research programme.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/systm.h>
@@ -95,6 +127,163 @@ cheri_revoke_fini(struct cheri_revoke_syscall_info * __capability crsi,
 	return (res3);
 }
 
+static int
+sysctl_kern_proc_quarantining(SYSCTL_HANDLER_ARGS)
+{
+	struct vmspace *vm;
+	int *name = (int *)arg1;
+	u_int namelen = arg2;
+	struct proc *p;
+	int error = 0;
+	pid_t pid;
+	int is_quarantining;
+
+	if (namelen != 1)
+		return (EINVAL);
+
+	pid = (pid_t)name[0];
+	if (pid == curproc->p_pid || pid == 0) {
+		if (SV_CURPROC_FLAG(SV_CHERI))
+			is_quarantining = curproc->p_vmspace->
+			    vm_map.vm_cheri_revoke_quarantining;
+		else
+			is_quarantining = -1;
+
+		goto out;
+	}
+
+	error = pget(pid, PGET_WANTREAD, &p);
+	if (error != 0)
+		return (error);
+
+	if (SV_PROC_FLAG(p, SV_CHERI)) {
+		vm = vmspace_acquire_ref(p);
+		if (vm == NULL)
+			error = ESRCH;
+		else {
+			is_quarantining =
+			     vm->vm_map.vm_cheri_revoke_quarantining;
+			vmspace_free(vm);
+		}
+	} else
+		is_quarantining = -1;
+
+	PRELE(p);
+out:
+	if (error == 0)
+		error = SYSCTL_OUT(req, &is_quarantining,
+		    sizeof(is_quarantining));
+	return (error);
+}
+
+static SYSCTL_NODE(_kern_proc, KERN_PROC_QUARANTINING, quarantining,
+    CTLFLAG_RD | CTLFLAG_MPSAFE, sysctl_kern_proc_quarantining,
+    "is this process quarantining for temporal safety");
+
+static int
+sysctl_kern_proc_revoker_state(SYSCTL_HANDLER_ARGS)
+{
+	struct vmspace *vm;
+	int *name = (int *)arg1;
+	u_int namelen = arg2;
+	struct proc *p;
+	int error = 0;
+	pid_t pid;
+	int state;
+
+	if (namelen != 1)
+		return (EINVAL);
+
+	pid = (pid_t)name[0];
+	if (pid == curproc->p_pid || pid == 0) {
+		if (SV_CURPROC_FLAG(SV_CHERI))
+			state = cheri_revoke_st_get_state(
+			    curproc->p_vmspace->vm_map.vm_cheri_revoke_st);
+		else
+			state = -1;
+
+		goto out;
+	}
+
+	error = pget(pid, PGET_WANTREAD, &p);
+	if (error != 0)
+		return (error);
+
+	if (SV_PROC_FLAG(p, SV_CHERI)) {
+		vm = vmspace_acquire_ref(p);
+		if (vm == NULL)
+			error = ESRCH;
+		else {
+			state = cheri_revoke_st_get_state(
+			    vm->vm_map.vm_cheri_revoke_st);
+			vmspace_free(vm);
+		}
+	} else
+		state = -1;
+
+	PRELE(p);
+out:
+	if (error == 0)
+		error = SYSCTL_OUT(req, &state, sizeof(state));
+	return (error);
+}
+
+static SYSCTL_NODE(_kern_proc, KERN_PROC_REVOKER_STATE, revoker_state,
+    CTLFLAG_RD | CTLFLAG_MPSAFE, sysctl_kern_proc_revoker_state,
+    "state of the in-kernel revoker");
+
+static int
+sysctl_kern_proc_revoker_epoch(SYSCTL_HANDLER_ARGS)
+{
+	struct vmspace *vm;
+	int *name = (int *)arg1;
+	u_int namelen = arg2;
+	struct proc *p;
+	int error = 0;
+	pid_t pid;
+	uint64_t epoch;
+
+	if (namelen != 1)
+		return (EINVAL);
+
+	pid = (pid_t)name[0];
+	if (pid == curproc->p_pid || pid == 0) {
+		if (SV_CURPROC_FLAG(SV_CHERI))
+			epoch = cheri_revoke_st_get_epoch(
+			    curproc->p_vmspace->vm_map.vm_cheri_revoke_st);
+		else
+			epoch = -1;
+
+		goto out;
+	}
+
+	error = pget(pid, PGET_WANTREAD, &p);
+	if (error != 0)
+		return (error);
+
+	if (SV_PROC_FLAG(p, SV_CHERI)) {
+		vm = vmspace_acquire_ref(p);
+		if (vm == NULL)
+			error = ESRCH;
+		else {
+			epoch = cheri_revoke_st_get_epoch(
+			    vm->vm_map.vm_cheri_revoke_st);
+			vmspace_free(vm);
+		}
+	} else
+		epoch = -1;
+
+	PRELE(p);
+out:
+	if (error == 0)
+		error = SYSCTL_OUT(req, &epoch, sizeof(epoch));
+	return (error);
+}
+
+static SYSCTL_NODE(_kern_proc, KERN_PROC_REVOKER_EPOCH, revoker_epoch,
+    CTLFLAG_RD | CTLFLAG_MPSAFE, sysctl_kern_proc_revoker_epoch,
+    "in-kernel revoker epoch");
+
 #ifdef CHERI_CAPREVOKE_STATS
 /* Here seems about as good a place as any */
 _Static_assert(sizeof(struct cheri_revoke_stats) ==
@@ -141,8 +330,8 @@ kern_cheri_revoke(struct thread *td, int flags,
 		    CHERI_REVOKE_IGNORE_START | CHERI_REVOKE_LAST_NO_EARLY;
 		int ires = 0;
 
-		epoch = cheri_revoke_st_get_epoch(vmm->vm_cheri_revoke_st);
-		entryst = cheri_revoke_st_get_state(vmm->vm_cheri_revoke_st);
+		if (!vmm->vm_cheri_revoke_quarantining)
+			vmm->vm_cheri_revoke_quarantining = true;
 
 		if ((flags & (fast_out_flags | CHERI_REVOKE_LAST_PASS)) ==
 		    fast_out_flags) {
@@ -151,6 +340,9 @@ kern_cheri_revoke(struct thread *td, int flags,
 		}
 
 reentry:
+		epoch = cheri_revoke_st_get_epoch(vmm->vm_cheri_revoke_st);
+		entryst = cheri_revoke_st_get_state(vmm->vm_cheri_revoke_st);
+
 		if (cheri_revoke_epoch_clears(epoch, start_epoch)) {
 			/*
 			 * An entire epoch has come and gone since the
@@ -232,8 +424,6 @@ fast_out:
 				return (ires);
 			}
 
-			epoch = cheri_revoke_st_get_epoch(
-			    vmm->vm_cheri_revoke_st);
 			goto reentry;
 		}
 
@@ -509,17 +699,22 @@ static int
 kern_cheri_revoke_get_shadow(struct thread *td, int flags,
     void * __capability arena, void * __capability * __capability shadow)
 {
-	int arena_perms, error;
+	struct vmspace *vm;
+	vm_map_t vmm;
 	void * __capability cres;
 	vm_offset_t base, size;
+	int arena_perms, error;
 	int sel = flags & CHERI_REVOKE_SHADOW_SPACE_MASK;
 
 	if (!SV_CURPROC_FLAG(SV_CHERI)) {
 		return (ENOSYS);
 	}
 
+	KASSERT(td == curthread, ("%s: called for other than curthread",
+	    __func__));
+
 	switch (sel) {
-	case CHERI_REVOKE_SHADOW_NOVMMAP:
+	case CHERI_REVOKE_SHADOW_NOVMEM:
 
 		if (cheri_gettag(arena) == 0)
 			return (EINVAL);
@@ -544,7 +739,7 @@ kern_cheri_revoke_get_shadow(struct thread *td, int flags,
 		if (cheri_gettag(arena) == 0)
 			return (EINVAL);
 
-		/* XXX Require all of VMMAP, SEAL, and UNSEAL permissions? */
+		/* XXX Require all of SW_VMEM, SEAL, and UNSEAL permissions? */
 		reqperms = CHERI_PERM_SEAL | CHERI_PERM_UNSEAL |
 		    CHERI_PERM_SW_VMEM;
 		arena_perms = cheri_getperm(arena);
@@ -560,7 +755,7 @@ kern_cheri_revoke_get_shadow(struct thread *td, int flags,
 		break;
 	    }
 	case CHERI_REVOKE_SHADOW_INFO_STRUCT:
-	case CHERI_REVOKE_SHADOW_NOVMMAP_ENTIRE: // XXX
+	case CHERI_REVOKE_SHADOW_NOVMEM_ENTIRE: // XXX
 	    {
 		/* Anyone's allowed to ask, I guess; ->arena ignored. */
 		cres = vm_cheri_revoke_shadow_cap(curproc->p_sysent,
@@ -570,6 +765,17 @@ kern_cheri_revoke_get_shadow(struct thread *td, int flags,
 	default:
 		return (EINVAL);
 	}
+
+	if (!cheri_gettag(cres))
+		return (EINVAL);
+
+	vm = td->td_proc->p_vmspace;
+	vmm = &vm->vm_map;
+	vm_map_lock(vmm);
+	if (!vmm->vm_cheri_revoke_quarantining) {
+		vmm->vm_cheri_revoke_quarantining = true;
+	}
+	vm_map_unlock(vmm);
 
 	error = copyoutcap(&cres, shadow, sizeof(cres));
 

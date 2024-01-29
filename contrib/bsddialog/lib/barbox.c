@@ -220,6 +220,8 @@ do_mixedgauge(struct bsddialog_conf *conf, const char *text, int rows, int cols,
 	int i, retval, miniperc, y, x, h, w, ypad, max_minbarlen;
 	int htextpad, htext, wtext;
 	int colorperc, red, green;
+	int label_len_cap;
+	bool hiddenminibars;
 	WINDOW *widget, *textpad, *bar, *shadow;
 	char states[12][14] = {
 		"  Succeeded  ", /* -1  */
@@ -260,10 +262,19 @@ do_mixedgauge(struct bsddialog_conf *conf, const char *text, int rows, int cols,
 		h = widget_min_height(conf, htext, nminibars + 3, false);
 
 	/* mixedgauge checksize */
-	if (w < max_minbarlen + 2)
-		RETURN_ERROR("Few cols for this mixedgauge");
-	if (h < 5 + (int)nminibars)
-		RETURN_ERROR("Few rows for this mixedgauge");
+	if (w < max_minbarlen + 2) {
+		if (!conf->auto_truncate || w <= 2 + 3 + 16 + 3)
+			RETURN_ERROR("Few cols for this mixedgauge");
+		label_len_cap = w - 2 - 3 - 16;
+	} else
+		label_len_cap = -1;
+	if (h < 5 + (int)nminibars + htext) {
+		if (!conf->auto_truncate || h <= 5 + htext)
+			RETURN_ERROR("Few rows for this mixedgauge");
+		nminibars = h - 5 - htext - 1;
+		hiddenminibars = true;
+	} else
+		hiddenminibars = false;
 
 	if (set_widget_position(conf, &y, &x, h, w) != 0)
 		return (BSDDIALOG_ERROR);
@@ -281,7 +292,21 @@ do_mixedgauge(struct bsddialog_conf *conf, const char *text, int rows, int cols,
 		/* label */
 		if (color && (miniperc >= 0))
 			wattron(widget, A_BOLD);
-		mvwaddstr(widget, i+1, 2, minilabels[i]);
+		if (label_len_cap > 0 &&
+		    (int)strcols(minilabels[i]) > label_len_cap) {
+			char *trunclabel, *seeklabel;
+
+			trunclabel = strdup(minilabels[i]);
+			if (trunclabel == NULL)
+				RETURN_ERROR("Could not copy label");
+			seeklabel = strcolseek(trunclabel, label_len_cap - 3);
+			if (seeklabel == NULL)
+				RETURN_ERROR("Could not seek to column limit");
+			memcpy(seeklabel, "...", 4);
+			mvwaddstr(widget, i+1, 2, trunclabel);
+			free(trunclabel);
+		} else
+			mvwaddstr(widget, i+1, 2, minilabels[i]);
 		if (color && (miniperc >= 0))
 			wattroff(widget, A_BOLD);
 		/* perc */
@@ -308,6 +333,11 @@ do_mixedgauge(struct bsddialog_conf *conf, const char *text, int rows, int cols,
 			draw_bar(widget, i+1, 1+w-2-15, 13, miniperc, false,
 			    -1 /*unused*/);
 		}
+	}
+
+	if (hiddenminibars) {
+		++nminibars;
+		mvwaddstr(widget, nminibars, 2, "...");
 	}
 
 	wrefresh(widget);

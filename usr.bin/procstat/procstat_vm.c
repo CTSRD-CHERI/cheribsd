@@ -57,11 +57,11 @@ procstat_vm(struct procstat *procstat, struct kinfo_proc *kipp)
 #endif
 	if ((procstat_opts & PS_OPT_NOHEADER) == 0) {
 		if ((procstat_opts & PS_OPT_VERBOSE) == 0)
-			xo_emit("{T:/%5s %*s %*s %-5s %4s %4s %3s %3s %-5s %-2s %-s}\n",
+			xo_emit("{T:/%5s %*s %*s %-5s %4s %4s %3s %3s %-6s %-2s %-s}\n",
 			    "PID", ptrwidth, "START", ptrwidth, "END", "PRT",
 			    "RES", "PRES", "REF", "SHD", "FLAG", "TP", "PATH");
 		else
-			xo_emit("{T:/%5s %*s %*s %*s %-5s %4s %4s %3s %3s %-5s %-2s %-s}\n",
+			xo_emit("{T:/%5s %*s %*s %*s %-5s %4s %4s %3s %3s %-6s %-2s %-s}\n",
 			    "PID", ptrwidth, "START", ptrwidth, "END",
 			    ptrwidth, "RESERV", "PRT",
 			    "RES", "PRES", "REF", "SHD", "FLAG", "TP", "PATH");
@@ -134,8 +134,10 @@ procstat_vm(struct procstat *procstat, struct kinfo_proc *kipp)
 		xo_emit("{d:grows_down/%-1s}", kve->kve_flags &
 		    KVME_FLAG_GROWS_UP ? "U" : kve->kve_flags &
 		    KVME_FLAG_GROWS_DOWN ? "D" : "-");
-		xo_emit("{d:wired/%-1s} ", kve->kve_flags &
+		xo_emit("{d:wired/%-1s}", kve->kve_flags &
 		    KVME_FLAG_USER_WIRED ? "W" : "-");
+		xo_emit("{d:hascap/%-1s} ", kve->kve_flags &
+		    KVME_FLAG_HASCAP ? "c" : "-");
 		xo_open_container("kve_flags");
 		xo_emit("{en:copy_on_write/%s}", kve->kve_flags &
 		    KVME_FLAG_COW ? "true" : "false");
@@ -153,6 +155,8 @@ procstat_vm(struct procstat *procstat, struct kinfo_proc *kipp)
 		    KVME_FLAG_GROWS_DOWN ? "true" : "false");
 		xo_emit("{en:wired/%s}", kve->kve_flags &
 		    KVME_FLAG_USER_WIRED ? "true" : "false");
+		xo_emit("{en:hascap/%s}", kve->kve_flags &
+		    KVME_FLAG_HASCAP ? "true" : "false");
 		xo_close_container("kve_flags");
 		switch (kve->kve_type) {
 		case KVME_TYPE_NONE:

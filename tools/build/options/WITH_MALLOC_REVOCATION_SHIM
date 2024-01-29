@@ -1,2 +1,1 @@
-Enable the malloc revocation shim (mrs) wrapper for allocators that
-support it (currently snmalloc).
+Enable the malloc revocation shim (mrs) wrapper.

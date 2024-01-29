@@ -55,6 +55,9 @@
 # ifndef MACHINE_ARCH
 #  define	MACHINE_ARCH	"aarch64c"
 # endif
+# ifndef MACHINE_ARCH64CB
+#  define	MACHINE_ARCH64CB	"aarch64cb"
+# endif
 # ifndef MACHINE_ARCH64
 #  define	MACHINE_ARCH64	"aarch64"
 # endif

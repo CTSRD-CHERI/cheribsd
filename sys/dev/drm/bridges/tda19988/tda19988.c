@@ -221,7 +221,8 @@
 #define	TDA_CURPAGE_ADDR	0xff
 
 #define	TDA_CEC_RXSHPDLEV	0xfe
-#define		RXSHPDLEV_HPD	(1 << 1)
+#define		RXSHPDLEV_RXSENS	(1 << 0)
+#define		RXSHPDLEV_HPD		(1 << 1)
 #define	TDA_CEC_ENAMODS		0xff
 #define		ENAMODS_RXSENS		(1 << 2)
 #define		ENAMODS_HDMI		(1 << 1)
@@ -259,12 +260,30 @@
 #define	dprintf(fmt, ...)
 #endif
 
+static SYSCTL_NODE(_hw, OID_AUTO, tda19988, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "TDA19988 driver parameters");
+
+/*
+ * The TDA19988 transmitter in Morello SoC r0p0 and r0p1 might not correctly
+ * detect hot-plugging due to incorrect voltage levels on the HPD pin.
+ *
+ * As a workaround for this issue, a user can set hw.tda19988.broken_hpd to
+ * enforce using a screen if the transmitter only receives an RxSense packet
+ * indicating a screen is attached, ignoring if it's actually able to receive
+ * HDMI input.
+ */
+static int tda19988_broken_hpd;
+SYSCTL_INT(_hw_tda19988, OID_AUTO, broken_hpd, CTLFLAG_RDTUN,
+    &tda19988_broken_hpd, 0,
+    "Disable Hot-Plug Detect and use RxSense to detect if a screen is connected instead");
+
 struct tda19988_softc {
 	device_t		dev;
 	uint32_t		sc_addr;
 	uint32_t		sc_cec_addr;
 	uint16_t		sc_version;
 	int			sc_current_page;
+	uint8_t			sc_vip_cntrl[3];
 
 	struct drm_encoder	encoder;
 	struct drm_connector	connector __subobject_use_container_bounds;
@@ -519,7 +538,7 @@ tda19988_start(struct tda19988_softc *sc)
 
 	tda19988_cec_write(sc, TDA_CEC_ENAMODS, ENAMODS_RXSENS | ENAMODS_HDMI);
 	DELAY(1000);
-	tda19988_cec_read(sc, 0xfe, &data);
+	tda19988_cec_read(sc, TDA_CEC_RXSHPDLEV, &data);
 
 	/* Reset core */
 	tda19988_reg_set(sc, TDA_SOFTRESET, 3);
@@ -573,17 +592,18 @@ tda19988_start(struct tda19988_softc *sc)
 	tda19988_cec_write(sc, TDA_CEC_FRO_IM_CLK_CTRL,
 	    CEC_FRO_IM_CLK_CTRL_GHOST_DIS | CEC_FRO_IM_CLK_CTRL_IMCLK_SEL);
 
-	/* Default values for RGB 4:4:4 mapping */
-	tda19988_reg_write(sc, TDA_VIP_CNTRL_0, 0x23);
-	tda19988_reg_write(sc, TDA_VIP_CNTRL_1, 0x01);
-	tda19988_reg_write(sc, TDA_VIP_CNTRL_2, 0x45);
+	tda19988_reg_write(sc, TDA_VIP_CNTRL_0, sc->sc_vip_cntrl[0]);
+	tda19988_reg_write(sc, TDA_VIP_CNTRL_1, sc->sc_vip_cntrl[1]);
+	tda19988_reg_write(sc, TDA_VIP_CNTRL_2, sc->sc_vip_cntrl[2]);
 }
 
 static int
 tda19988_attach(device_t dev)
 {
 	struct tda19988_softc *sc;
+	uint32_t video_ports;
 	phandle_t node;
+	int i;
 
 	sc = device_get_softc(dev);
 
@@ -595,6 +615,13 @@ tda19988_attach(device_t dev)
 
 	node = ofw_bus_get_node(dev);
 	OF_device_register_xref(OF_xref_from_node(node), dev);
+
+	if (OF_getencprop(node, "video-ports", &video_ports,
+	    sizeof(video_ports)) != sizeof(video_ports))
+		video_ports = 0x230145; /* binding default */
+
+	for (i = 0; i < 3; video_ports >>= 8, ++i)
+		sc->sc_vip_cntrl[2 - i] = (uint8_t)video_ports;
 
 	tda19988_start(sc);
 
@@ -613,12 +640,17 @@ static enum drm_connector_status
 tda19988_connector_detect(struct drm_connector *connector, bool force)
 {
 	struct tda19988_softc *sc;
-	uint8_t data;
+	uint8_t data, flag;
 
 	sc = container_of(connector, struct tda19988_softc, connector);
 
 	tda19988_cec_read(sc, TDA_CEC_RXSHPDLEV, &data);
-	if (data & RXSHPDLEV_HPD)
+	if (unlikely(tda19988_broken_hpd))
+		flag = RXSHPDLEV_RXSENS;
+	else
+		flag = RXSHPDLEV_HPD;
+
+	if (data & flag)
 		return (connector_status_connected);
 
 	return (connector_status_disconnected);

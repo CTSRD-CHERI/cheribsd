@@ -76,7 +76,7 @@ check_initreg_code(void * __capability c)
 {
 	uintmax_t v;
 
-#if defined(__CHERI_PURE_CAPABILITY__)
+#if defined(__CHERI_PURE_CAPABILITY__) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	/*
 	 * Dynamically linked pure-capability code should have a program
 	 * counter that is bounded to the current DSO/executable (or function).
@@ -172,7 +172,7 @@ check_initreg_code(void * __capability c)
 		    (CHERI_PERMS_SWALL & ~CHERI_PERM_SW_VMEM));
 
 	/* Check that the raw permission bits match the kernel header: */
-#ifdef CHERIBSD_C18N_TESTS
+#if defined(CHERIBSD_C18N_TESTS) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	if (v != (CHERI_CAP_USER_CODE_PERMS & ~CHERI_PERM_EXECUTIVE))
 		cheribsdtest_failure_errx("perms %jx (expected %jx)", v,
 		    (uintmax_t)(CHERI_CAP_USER_CODE_PERMS & ~CHERI_PERM_EXECUTIVE));

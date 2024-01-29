@@ -27,7 +27,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd April 15, 2023
+.Dd October 17, 2023
 .Dt PROCCTL 2
 .Os
 .Sh NAME
@@ -712,6 +712,50 @@ following statuses:
 The status is or-ed with the
 .Va PROC_KPTI_STATUS_ACTIVE
 in case KPTI is active for the current address space of the process.
+.Sh CHERI SPECIFIC REQUESTS
+.Bl -tag -width PROC_CHERI_REVOKE_STATUS
+.It Dv PROC_CHERI_REVOKE_CTL
+Controls the runtime hint to enable or disable heap temporal safety in
+the program images created
+by
+.Xr execve 2
+in the specified process or its descendants that did not either change
+the control or modify it by other means.
+The default value is controlled by the
+.Dv security.cheri.runtime_revocation_default
+sysctl,
+and the corresponding bit in the ELF control note, see
+.Xr elfctl 1 .
+The
+.Fa data
+parameter must point to the integer variable holding one of the following
+values:
+.Bl -tag -width PROC_CHERI_REVOKE_FORCE_DISABLE
+.It Dv PROC_CHERI_REVOKE_FORCE_ENABLE
+Request that revocation is enabled by the runtime of newly executed
+processes, even if it defaults to disabled system-wide.
+.It Dv PROC_CHERI_REVOKE_FORCE_DISABLE
+Request that revocation is disabled by the runtime of newly executed
+processes, even if it defaults to enabled system-wide.
+.It Dv PROC_CHERI_REVOKE_NOFORCE
+Use the system-wide configured policy for revocation.
+.El
+.It Dv PROC_CHERI_REVOKE_STATUS
+Returns the current status of revocation enablement for the target process.
+The
+.Fa data
+parameter must point to the integer variable, where one of the
+following values is written:
+.Bl -tag -width PROC_CHERI_REVOKE_FORCE_DISABLE
+.It Dv PROC_CHERI_REVOKE_FORCE_ENABLE
+.It Dv PROC_CHERI_REVOKE_FORCE_DISABLE
+.It Dv PROC_CHERI_REVOKE_NOFORCE
+.El
+.Pp
+If the currently executed image in the process itself has revocation enabled,
+the
+.Dv PROC_CHERI_REVOKE_ACTIVE
+flag is or-ed with the value listed above.
 .Sh NOTES
 Disabling tracing on a process should not be considered a security
 feature, as it is bypassable both by the kernel and privileged processes,

@@ -38,8 +38,14 @@ if [ $# -eq 0 ]; then
 	set -- hybrid purecap
 
 	case `uname -p` in
+	aarch64*)
+		set -- "$@" purecap-benchmark
+		;;
+	esac
+
+	case `uname -p` in
 	aarch64c)
-		set -- "$@" c18n
+		set -- "$@" c18n benchmark-c18n
 		;;
 	esac
 fi
@@ -52,8 +58,8 @@ fi
 suffixes=
 for abi in "$@"; do
 	case "$abi" in
-	c18n)
-		suffixes="$suffixes mt-c18n"
+	c18n|benchmark-c18n)
+		suffixes="$suffixes ${abi%c18n}mt-c18n"
 		;;
 	*)
 		for dyn in '' -dynamic; do

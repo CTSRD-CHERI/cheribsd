@@ -1486,7 +1486,8 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	if (imgp->credential_setid) {
 		PROC_LOCK(imgp->proc);
 		imgp->proc->p_flag2 &= ~(P2_ASLR_ENABLE | P2_ASLR_DISABLE |
-		    P2_WXORX_DISABLE | P2_WXORX_ENABLE_EXEC);
+		    P2_WXORX_DISABLE | P2_WXORX_ENABLE_EXEC |
+		    P2_CHERI_REVOKE_MASK);
 		PROC_UNLOCK(imgp->proc);
 	}
 	if ((sv->sv_flags & SV_ASLR) == 0 ||
@@ -1759,7 +1760,8 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	void * __capability entry;
 #endif
 	rlim_t stacksz;
-	int error, bsdflags, oc;
+	int error, oc;
+	uint32_t bsdflags;
 
 	argarray = pos = malloc(AT_COUNT * sizeof(*pos), M_TEMP,
 	    M_WAITOK | M_ZERO);
@@ -1772,7 +1774,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	/*
 	 * AT_ENTRY gives an executable capability for the whole
 	 * program and AT_PHDR a writable one.  RTLD is responsible for
-	 * setting bounds.  Needs VMMAP so relro pages can be made RO.
+	 * setting bounds.  Needs SW_VMEM so relro pages can be made RO.
 	 */
 	AUXARGS_ENTRY_PTR(pos, AT_PHDR, cheri_setaddress(prog_cap(imgp,
 	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM),
@@ -1864,6 +1866,34 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	oc = atomic_load_int(&vm_overcommit);
 	bsdflags |= (oc & (SWAP_RESERVE_FORCE_ON | SWAP_RESERVE_RLIMIT_ON)) !=
 	    0 ? ELF_BSDF_VMNOOVERCOMMIT : 0;
+#if defined(__ELF_CHERI) && defined(CHERI_CAPREVOKE)
+	/*
+	 * ELF_BSDF_CHERI_REVOKE tells the runtime it should enable
+	 * quarantining of pages and revoke them as required.
+	 *
+	 * Precedence: procctl, ELF note, system default.
+	 * In case of conflicting flags, disable wins.
+	 */
+	if ((imgp->proc->p_flag2 & P2_CHERI_REVOKE_MASK) != 0) {
+		if ((imgp->proc->p_flag2 & P2_CHERI_REVOKE_DISABLE) == 0)
+			bsdflags |= ELF_BSDF_CHERI_REVOKE;
+	} else if ((imgp->proc->p_fctl0 &
+	    NT_FREEBSD_FCTL_CHERI_REVOKE_MASK) != 0) {
+		if ((imgp->proc->p_fctl0 &
+		    NT_FREEBSD_FCTL_CHERI_REVOKE_DISABLE) == 0)
+			bsdflags |= ELF_BSDF_CHERI_REVOKE;
+	} else if (security_cheri_runtime_revocation_default != 0)
+		bsdflags |= ELF_BSDF_CHERI_REVOKE;
+	/*
+	 * ELF_BSDF_CHERI_REVOKE tells the runtime whether to enable the
+	 * revoke every free debug policy if revocation is otherwise enabled.
+	 *
+	 * No procctl/ELF note, only system default (and environment variable in
+	 * userspace).
+	 */
+	if (security_cheri_runtime_revocation_every_free_default != 0)
+		bsdflags |= ELF_BSDF_CHERI_REVOKE_EVERY_FREE;
+#endif
 	AUXARGS_ENTRY(pos, AT_BSDFLAGS, bsdflags);
 	AUXARGS_ENTRY(pos, AT_ARGC, imgp->args->argc);
 	AUXARGS_ENTRY_PTR(pos, AT_ARGV, imgp->argv);
@@ -3216,7 +3246,7 @@ __elfN(note_procstat_auxv)(void *arg, struct sbuf *sb, size_t *sizep)
 	}
 }
 
-static bool
+bool
 __elfN(parse_notes)(const struct image_params *imgp,
     Elf_Note *checknote, const char *note_vendor, const Elf_Phdr *pnote,
     bool (*cb)(const Elf_Note *, void *, bool *), void *cb_arg)

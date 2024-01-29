@@ -140,6 +140,7 @@ main(void)
 
 	conf.title = "Archive Extraction";
 	conf.auto_minwidth = 40;
+	conf.auto_truncate = true;
 	pvconf.callback	= extract_files;
 	pvconf.refresh = 1;
 	pvconf.fmtbottomstr = "%10lli files read @ %'9.1f files/sec.";

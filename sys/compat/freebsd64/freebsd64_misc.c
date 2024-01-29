@@ -555,8 +555,7 @@ freebsd64_setcontext(struct thread *td, struct freebsd64_setcontext_args *uap)
 		return (ret);
 	if ((ret = freebsd64_set_mcontext(td, &uc.uc_mcontext)) != 0)
 		return (ret);
-	kern_sigprocmask(td, SIG_SETMASK,
-	    &uc.uc_sigmask, NULL, 0);
+	kern_sigprocmask(td, SIG_SETMASK, &uc.uc_sigmask, NULL, 0);
 
 	return (EJUSTRETURN);
 }

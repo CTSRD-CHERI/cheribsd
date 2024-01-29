@@ -716,6 +716,9 @@ dumpheader(struct ktr_header *kth, u_int sv_flags)
 	case KTR_FAULTEND:
 		type = "PRET";
 		break;
+	case KTR_SYSERRCAUSE:
+		type = "ERR ";
+		break;
 	default:
 		sprintf(unknown, "UNKNOWN(%d)", kth->ktr_type);
 		type = unknown;

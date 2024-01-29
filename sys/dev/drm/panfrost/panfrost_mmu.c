@@ -223,15 +223,31 @@ lock_region(struct panfrost_softc *sc, uint32_t as, vm_offset_t va,
 	uint8_t region_width;
 	uint64_t region;
 
-	/* Note: PAGE_PASK here includes ~ from linuxkpi */
-	region = va & PAGE_MASK;
+	if (size == 0)
+		return;
 
-	size = round_up(size, PAGE_SIZE);
+	region = va;
 
-	region_width = 10 + fls(size >> PAGE_SHIFT);
-	if ((size >> PAGE_SHIFT) != (1ul << (region_width - 11)))
-		region_width += 1;
-	region |= region_width;
+	/*
+	 * Region must be a naturally aligned power of 2 sized block. Find the
+	 * top bit that differs between region's start and end (inclusive)
+	 * addresses (NB: counts from 1).
+	 */
+	region_width = flsll(region ^ (region + (size - 1)));
+
+	/* Region must be at least 32K big */
+	if (region_width < 15)
+		region_width = 15;
+
+	/*
+	 * Mask out offset within block; we need to encode the width in the
+	 * very low bits, and the middle bits supposedly don't matter but are
+	 * recommended to be set to 0.
+	 */
+	region &= (~(uint64_t)0) << region_width;
+
+	/* Encoded width is log2 - 1 */
+	region |= region_width - 1;
 
 	GPU_WRITE(sc, AS_LOCKADDR_LO(as), region & 0xFFFFFFFFUL);
 	GPU_WRITE(sc, AS_LOCKADDR_HI(as), (region >> 32) & 0xFFFFFFFFUL);

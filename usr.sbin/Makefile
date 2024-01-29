@@ -189,6 +189,7 @@ SUBDIR.${MK_PF}+=	ftp-proxy
 # Install pkg64 and pkg64c with pkg.sh instead of pkg if world is purecap.
 SUBDIR.${MK_PKGBOOTSTRAP}.${MK_LIB64}+=	pkg64
 SUBDIR.${MK_PKGBOOTSTRAP}+=	pkg64c
+SUBDIR.${MK_PKGBOOTSTRAP}.${MK_LIB64CB}+=	pkg64cb
 .else
 SUBDIR.${MK_PKGBOOTSTRAP}+=	pkg
 .endif

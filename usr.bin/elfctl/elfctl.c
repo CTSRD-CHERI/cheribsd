@@ -68,6 +68,10 @@ static struct ControlFeatures featurelist[] = {
 	{ "nostackgap",	NT_FREEBSD_FCTL_STKGAP_DISABLE, "Disable stack gap" },
 	{ "wxneeded",	NT_FREEBSD_FCTL_WXNEEDED, "Requires W+X mappings" },
 	{ "la48",	NT_FREEBSD_FCTL_LA48, "amd64: Limit user VA to 48bit" },
+	{ "cherirevoke", NT_FREEBSD_FCTL_CHERI_REVOKE_ENABLE,
+	    "Force Enable CHERI revocation" },
+	{ "nocherirevoke", NT_FREEBSD_FCTL_CHERI_REVOKE_DISABLE,
+	    "Force Disable CHERI revocation" },
 };
 
 static struct option long_opts[] = {

@@ -298,10 +298,6 @@ __DEFAULT_DEPENDENT_OPTIONS+=	LLVM_TARGET_${__llt:${__LLVM_TARGET_FILT}:tu}/LLVM
 .endif
 .endfor
 
-.if ${__T:Maarch64*c*} || ${__T:Mriscv*c*}
-__LIBC_MALLOC_DEFAULT:=	snmalloc
-.endif
-
 __DEFAULT_NO_OPTIONS+=LLVM_TARGET_BPF LLVM_TARGET_MIPS
 
 .include <bsd.compiler.mk>
@@ -337,6 +333,12 @@ BROKEN_OPTIONS+=LIB32
 __DEFAULT_YES_OPTIONS+=LIB64
 .else
 BROKEN_OPTIONS+=LIB64
+.endif
+# LIB64CB is supported on aarch64*c* and hybrid morello
+.if ${__C} == "morello" || ${__T:Maarch64*c*}
+__DEFAULT_YES_OPTIONS+=LIB64CB
+.else
+BROKEN_OPTIONS+=LIB64CB
 .endif
 
 .if ${__T:Maarch64*c*} || ${__T:Mriscv*c*}
@@ -392,6 +394,10 @@ BROKEN_OPTIONS+=MLX5TOOL
 .if (${__C} != "cheri" && ${__C} != "morello" && \
     !${__T:Maarch64*c*} && !${__T:Mriscv64*c*})
 BROKEN_OPTIONS+=CHERI_CAPREVOKE
+.endif
+
+.if !${__T:Maarch64*c*} && !${__T:Mriscv64*c*}
+BROKEN_OPTIONS+=MALLOC_REVOCATION_SHIM
 .endif
 
 # We'd really like this to be:
@@ -576,10 +582,6 @@ MK_${vv:H}:=	no
 MK_${vv:H}:=	${MK_${vv:T}}
 .endif
 .endfor
-
-.if !${OPT_LIBC_MALLOC:Msnmalloc}
-MK_MALLOC_REVOCATION_SHIM:=	no
-.endif
 
 #
 # Set defaults for the MK_*_SUPPORT variables.

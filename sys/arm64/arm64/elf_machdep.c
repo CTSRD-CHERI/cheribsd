@@ -66,6 +66,17 @@ u_long __read_frequently elf_hwcap2;
 
 struct arm64_addr_mask elf64_addr_mask;
 
+#if __has_feature(capabilities)
+static bool	elf64c_header_supported(const struct image_params *imgp,
+    const int32_t *osrel, const uint32_t *fctl0);
+static bool	elf64cb_header_supported(const struct image_params *imgp,
+    const int32_t *osrel, const uint32_t *fctl0);
+#endif
+
+#ifdef CHERI_CAPREVOKE
+static void	caprevoke_sysvec_init(void *arg);
+#endif
+
 static struct sysentvec elf64_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
@@ -116,6 +127,173 @@ static struct sysentvec elf64_freebsd_sysvec = {
 	.sv_regset_end	= SET_LIMIT(__elfN(regset)),
 };
 INIT_SYSENTVEC(elf64_sysvec, &elf64_freebsd_sysvec);
+#ifdef CHERI_CAPREVOKE
+SYSINIT(caprevoke_elf64, SI_SUB_VM, SI_ORDER_ANY, caprevoke_sysvec_init,
+    &elf64_freebsd_sysvec);
+#endif
+
+static __ElfN(Brandinfo) freebsd_brand_info = {
+	.brand		= ELFOSABI_FREEBSD,
+	.machine	= EM_AARCH64,
+	.compat_3_brand	= "FreeBSD",
+	.interp_path	= "/libexec/ld-elf.so.1",
+	.sysvec		= &elf64_freebsd_sysvec,
+#if __has_feature(capabilities)
+	.interp_newpath	= "/libexec/ld-elf64c.so.1",
+#else
+	.interp_newpath	= NULL,
+#endif
+	.brand_note	= &__elfN(freebsd_brandnote),
+	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE,
+#if __has_feature(capabilities)
+	.header_supported = &elf64c_header_supported,
+#endif
+};
+
+SYSINIT(elf64, SI_SUB_EXEC, SI_ORDER_FIRST,
+    (sysinit_cfunc_t)__elfN(insert_brand_entry), &freebsd_brand_info);
+
+#if __has_feature(capabilities)
+static __ElfN(Brandinfo) freebsd_c18n_brand_info = {
+	.brand		= ELFOSABI_FREEBSD,
+	.machine	= EM_AARCH64,
+	.compat_3_brand	= "FreeBSD",
+	.interp_path	= "/libexec/ld-elf-c18n.so.1",
+	.sysvec		= &elf64_freebsd_sysvec,
+	.interp_newpath	= NULL,
+	.brand_note	= &__elfN(freebsd_brandnote),
+	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE,
+	.header_supported = &elf64c_header_supported,
+};
+
+SYSINIT(elf64_c18n, SI_SUB_EXEC, SI_ORDER_FIRST,
+    (sysinit_cfunc_t)__elfN(insert_brand_entry), &freebsd_c18n_brand_info);
+
+static struct sysentvec elf64cb_freebsd_sysvec = {
+	.sv_size	= SYS_MAXSYSCALL,
+	.sv_table	= sysent,
+	.sv_fixup	= __elfN(freebsd_fixup),
+	.sv_sendsig	= sendsig,
+	.sv_sigcode	= freebsd64cb_sigcode,
+	.sv_szsigcode	= &freebsd64cb_szsigcode,
+	.sv_name	= "FreeBSD ELF64CB",
+	.sv_coredump	= __elfN(coredump),
+	.sv_elf_core_osabi = ELFOSABI_FREEBSD,
+	.sv_elf_core_abi_vendor = FREEBSD_ABI_VENDOR,
+	.sv_elf_core_prepare_notes = __elfN(prepare_notes),
+	.sv_minsigstksz	= MINSIGSTKSZ,
+	.sv_minuser	= VM_MIN_ADDRESS,
+	.sv_maxuser	= VM_MAXUSER_ADDRESS,
+	.sv_usrstack	= USRSTACK,
+	.sv_psstringssz	= sizeof(struct ps_strings),
+	.sv_stackprot	= VM_PROT_RW_CAP,
+	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
+	.sv_copyout_strings = exec_copyout_strings,
+	.sv_setregs	= exec_setregs,
+	.sv_fixlimit	= NULL,
+	.sv_maxssiz	= NULL,
+	.sv_flags	= SV_SHP | SV_TIMEKEEP | SV_ABI_FREEBSD | SV_LP64 |
+	    SV_RNG_SEED_VER | SV_CHERI | SV_UNBOUND_PCC,
+	.sv_set_syscall_retval = cpu_set_syscall_retval,
+	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
+	.sv_syscallnames = syscallnames,
+	.sv_shared_page_base = SHAREDPAGE,
+	.sv_shared_page_len = PAGE_SIZE,
+	.sv_schedtail	= NULL,
+	.sv_thread_detach = NULL,
+	.sv_trap	= NULL,
+	.sv_hwcap	= &elf_hwcap,
+	.sv_hwcap2	= &elf_hwcap2,
+	.sv_onexec_old	= exec_onexec_old,
+	.sv_onexit	= exit_onexit,
+	.sv_regset_begin = SET_BEGIN(__elfN(regset)),
+	.sv_regset_end	= SET_LIMIT(__elfN(regset)),
+};
+INIT_SYSENTVEC(elf64cb_sysvec, &elf64cb_freebsd_sysvec);
+#ifdef CHERI_CAPREVOKE
+SYSINIT(caprevoke_elf64cb, SI_SUB_VM, SI_ORDER_ANY, caprevoke_sysvec_init,
+    &elf64cb_freebsd_sysvec);
+#endif
+
+static __ElfN(Brandinfo) elf64cb_freebsd_brand_info = {
+	.brand		= ELFOSABI_FREEBSD,
+	.machine	= EM_AARCH64,
+	.compat_3_brand	= "FreeBSD",
+	.interp_path	= "/libexec/ld-elf.so.1",
+	.sysvec		= &elf64cb_freebsd_sysvec,
+	.interp_newpath	= "/libexec/ld-elf64cb.so.1",
+	.brand_note	= &__elfN(freebsd_brandnote),
+	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE,
+#if __has_feature(capabilities)
+	.header_supported = &elf64cb_header_supported,
+#endif
+};
+
+SYSINIT(elf64cb, SI_SUB_EXEC, SI_ORDER_FIRST,
+    (sysinit_cfunc_t)__elfN(insert_brand_entry), &elf64cb_freebsd_brand_info);
+
+static Elf_Note benchmark_abi_note = {
+	.n_namesz = sizeof(ELF_NOTE_CHERI),
+	.n_descsz = sizeof(uint32_t),
+	.n_type = NT_CHERI_MORELLO_PURECAP_BENCHMARK_ABI
+};
+
+static bool
+benchmark_abi_note_cb(const Elf_Note *note, void *arg0, bool *res)
+{
+	uint32_t *arg;
+	const char *p;
+
+	arg = arg0;
+	p = (const char *)(note + 1);
+	p += roundup2(note->n_namesz, 4);
+	*arg = *(const uint32_t *)p;
+	*res = true;
+	return (true);
+}
+
+static bool
+get_benchmark_abi_note(const struct image_params *imgp, uint32_t *res)
+{
+	const __ElfN(Phdr) *phdr;
+	const __ElfN(Ehdr) *hdr;
+	int i;
+
+	hdr = (const Elf_Ehdr *)imgp->image_header;
+	phdr = (const Elf_Phdr *)(imgp->image_header + hdr->e_phoff);
+	for (i = 0; i < hdr->e_phnum; i++)
+		if (phdr[i].p_type == PT_NOTE && __elfN(parse_notes)(imgp,
+		    &benchmark_abi_note, ELF_NOTE_CHERI, &phdr[i],
+		    benchmark_abi_note_cb, res))
+			return (true);
+
+	return (false);
+}
+
+static bool
+elf64c_header_supported(const struct image_params *imgp,
+    const int32_t *osrel __unused, const uint32_t *fctl0 __unused)
+{
+	uint32_t note_value;
+
+	if (get_benchmark_abi_note(imgp, &note_value))
+		return (note_value == 0);
+
+	return (true);
+}
+
+static bool
+elf64cb_header_supported(const struct image_params *imgp,
+    const int32_t *osrel __unused, const uint32_t *fctl0 __unused)
+{
+	uint32_t note_value;
+
+	if (get_benchmark_abi_note(imgp, &note_value))
+		return (note_value == 1);
+
+	return (false);
+}
+#endif
 
 #ifdef CHERI_CAPREVOKE
 static void
@@ -163,27 +341,7 @@ caprevoke_sysvec_init(void *arg)
 	sv->sv_cheri_revoke_info_page =
 	    sv->sv_cheri_revoke_shadow_base - PAGE_SIZE;
 }
-SYSINIT(caprevoke_sysvec, SI_SUB_VM, SI_ORDER_ANY, caprevoke_sysvec_init,
-    &elf64_freebsd_sysvec);
 #endif
-
-static __ElfN(Brandinfo) freebsd_brand_info = {
-	.brand		= ELFOSABI_FREEBSD,
-	.machine	= EM_AARCH64,
-	.compat_3_brand	= "FreeBSD",
-	.interp_path	= "/libexec/ld-elf.so.1",
-	.sysvec		= &elf64_freebsd_sysvec,
-#if __has_feature(capabilities)
-	.interp_newpath	= "/libexec/ld-elf64c.so.1",
-#else
-	.interp_newpath	= NULL,
-#endif
-	.brand_note	= &__elfN(freebsd_brandnote),
-	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE
-};
-
-SYSINIT(elf64, SI_SUB_EXEC, SI_ORDER_FIRST,
-    (sysinit_cfunc_t)__elfN(insert_brand_entry), &freebsd_brand_info);
 
 static bool
 get_arm64_addr_mask(struct regset *rs, struct thread *td, void *buf,
@@ -234,22 +392,24 @@ reloc_instr_imm(Elf32_Addr *where, Elf_Addr val, u_int msb, u_int lsb)
 }
 
 #if __has_feature(capabilities)
-static uintcap_t __nosanitizecoverage
-build_cap_from_fragment(Elf_Addr *fragment, Elf_Addr relocbase,
-    Elf_Addr offset, void * __capability data_cap,
-    const void * __capability code_cap)
+static void __nosanitizecoverage
+decode_fragment(Elf_Addr *fragment, Elf_Addr relocbase, Elf_Addr *addrp,
+    Elf_Addr *sizep, uint8_t *permsp)
 {
-	Elf_Addr addr, size;
-	uint8_t perms;
-	uintcap_t cap;
+	*addrp = relocbase + fragment[0];
+	*sizep = fragment[1] & ((1UL << (8 * sizeof(Elf_Addr) - 8)) - 1);
+	*permsp = fragment[1] >> (8 * sizeof(Elf_Addr) - 8);
+}
 
-	addr = fragment[0];
-	size = fragment[1] & ((1UL << (8 * sizeof(Elf_Addr) - 8)) - 1);
-	perms = fragment[1] >> (8 * sizeof(Elf_Addr) - 8);
+static uintcap_t __nosanitizecoverage
+build_reloc_cap(Elf_Addr addr, Elf_Addr size, uint8_t perms, Elf_Addr offset,
+    void * __capability data_cap, const void * __capability code_cap)
+{
+	uintcap_t cap;
 
 	cap = perms == MORELLO_FRAG_EXECUTABLE ?
 	    (uintcap_t)code_cap : (uintcap_t)data_cap;
-	cap = cheri_setaddress(cap, relocbase + addr);
+	cap = cheri_setaddress(cap, addr);
 
 	if (perms == MORELLO_FRAG_EXECUTABLE ||
 	    perms == MORELLO_FRAG_RODATA) {
@@ -272,6 +432,19 @@ build_cap_from_fragment(Elf_Addr *fragment, Elf_Addr relocbase,
 	    (void * __capability)cap));
 	return (cap);
 }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+static uintcap_t __nosanitizecoverage
+build_cap_from_fragment(Elf_Addr *fragment, Elf_Addr relocbase, Elf_Addr offset,
+    void * __capability data_cap, const void * __capability code_cap)
+{
+	Elf_Addr addr, size;
+	uint8_t perms;
+
+	decode_fragment(fragment, relocbase, &addr, &size, &perms);
+	return (build_reloc_cap(addr, size, perms, offset, data_cap, code_cap));
+}
+#endif
 #endif
 
 /*
@@ -285,10 +458,9 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 #define	ARM64_ELF_RELOC_LOCAL		(1 << 0)
 #define	ARM64_ELF_RELOC_LATE_IFUNC	(1 << 1)
 	Elf_Addr *where, addr, addend;
-#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
 	uintcap_t cap;
-#endif
-#ifndef __CHERI_PURE_CAPABILITY__
+#else
 	Elf_Addr val;
 #endif
 	Elf_Word rtype, symidx;
@@ -333,11 +505,26 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 			*where = elf_relocaddr(lf, (Elf_Addr)relocbase + addend);
 #if __has_feature(capabilities)
 		else if (rtype == R_MORELLO_RELATIVE) {
-			cap = build_cap_from_fragment(where,
-			    (Elf_Addr)relocbase, addend,
-			    (__cheri_tocap void * __capability)relocbase,
-			    (__cheri_tocap void * __capability)relocbase);
-			*(uintcap_t *)(void *)where = cap;
+			void * __capability base;
+			Elf_Addr addr1, size;
+			uint8_t perms;
+
+			decode_fragment(where, (Elf_Addr)relocbase, &addr,
+			    &size, &perms);
+
+			/*
+			 * Handle relocations against magic DPCPU and VNET
+			 * symbols: the address is transformed to refer to a
+			 * segment in the base kernel's DPCPU/VNET segments.
+			 * In this case we must use the kernel's base
+			 * capability.
+			 */
+			addr1 = elf_relocaddr(lf, addr + addend) - addend;
+			base = (__cheri_tocap void * __capability)
+			    (addr == addr1 ? relocbase :
+			    linker_kernel_file->address);
+			*(uintcap_t *)(void *)where = build_reloc_cap(addr1,
+			    size, perms, addend, base, base);
 		}
 #endif
 		return (0);

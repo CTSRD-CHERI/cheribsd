@@ -6,6 +6,10 @@ JEMALLOCSRCS:= jemalloc.c arena.c background_thread.c base.c bin.c bitmap.c \
 
 CFLAGS+=-I${SRCTOP}/contrib/jemalloc/include
 
+.if ${MK_MALLOC_REVOCATION_SHIM} == yes
+MRS_REAL_PREFIX=__
+.endif
+
 .for src in ${JEMALLOCSRCS}
 MISRCS+=jemalloc_${src}
 CLEANFILES+=jemalloc_${src}
@@ -14,6 +18,9 @@ jemalloc_${src}: ${SRCTOP}/contrib/jemalloc/src/${src} .NOMETA
 .if ${MACHINE_ABI:Mpurecap}
 CFLAGS.jemalloc_${src}+=	-Werror=cheri-bitwise-operations -Werror=cheri
 .endif
+.if ${MK_MALLOC_REVOCATION_SHIM} == yes
+CFLAGS.jemalloc_${src}+=	-DMALLOC_REVOCATION_SHIM
+.endif
 .endfor
 
 MAN+=jemalloc.3
@@ -21,13 +28,17 @@ CLEANFILES+=jemalloc.3
 jemalloc.3: ${SRCTOP}/contrib/jemalloc/doc/jemalloc.3 .NOMETA
 	ln -sf ${.ALLSRC} ${.TARGET}
 
+.if ${MK_MALLOC_REVOCATION_SHIM} == no || !${MACHINE_ABI:Mpurecap}
 MLINKS+= \
 	jemalloc.3 malloc.3 \
 	jemalloc.3 calloc.3 \
 	jemalloc.3 posix_memalign.3 \
 	jemalloc.3 aligned_alloc.3 \
 	jemalloc.3 realloc.3 \
-	jemalloc.3 free.3 \
+	jemalloc.3 free.3
+.endif
+
+MLINKS+= \
 	jemalloc.3 malloc_usable_size.3 \
 	jemalloc.3 malloc_stats_print.3 \
 	jemalloc.3 mallctl.3 \

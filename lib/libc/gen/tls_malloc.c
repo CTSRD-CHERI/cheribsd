@@ -337,21 +337,6 @@ __tls_malloc(size_t nbytes)
 	op = SLIST_FIRST(bucketp);
 	SLIST_REMOVE_HEAD(bucketp, ov_next);
 	TLS_MALLOC_UNLOCK;
-	/*
-	 * XXXQEMU: Clear the overhead struct to remove any capability
-	 * permissions in ov_real_allocation.
-	 *
-	 * Based on a tag and permissions of ov_real_allocation, find_overhead()
-	 * determines if an allocation is aligned. The QEMU user mode for
-	 * CheriABI doesn't implement tagged memory and find_overhead() might
-	 * incorrectly assume the allocation is aligned because of a
-	 * non-cleared tag. Having the permissions cleared, find_overhead()
-	 * behaves as expected under the user mode.
-	 *
-	 * This is a workaround and should be reverted once the user mode
-	 * implements tagged memory.
-	 */
-	memset(op, 0, sizeof(*op));
 	op->ov_magic = MAGIC;
 	op->ov_index = bucket;
 	return (op + 1);
@@ -451,7 +436,7 @@ find_overhead(void * cp)
 	 * __tls_malloc_aligned.  In that case we need to get back to the
 	 * real overhead pointer.  To make sure we aren't tricked, the
 	 * pointer must:
-	 *  - Be an internal allocator pointer (have the VMMAP permision).
+	 *  - Be an internal allocator pointer (have the SW_VMEM permision).
 	 *  - Point somewhere before us and within the current pagepool.
 	 */
 	if (cheri_gettag(op->ov_real_allocation) &&
@@ -491,7 +476,7 @@ paint_shadow(void *mem, size_t size)
 	 * need it.
 	 */
 	if (pp->ph_shadow == NULL)
-		if (cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, pp,
+		if (cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMEM, pp,
 		    &pp->ph_shadow) != 0)
 			abort();
 	caprev_shadow_nomap_set_raw(cri->base_mem_nomap, pp->ph_shadow,

@@ -426,6 +426,15 @@ fill_capregs(struct thread *td, struct capreg *regs)
 	struct trapframe *frame;
 	int i;
 
+	if (td == curthread) {
+		td->td_pcb->pcb_tpidr_el0 = READ_SPECIALREG_CAP(ctpidr_el0);
+		td->td_pcb->pcb_tpidrro_el0 = READ_SPECIALREG_CAP(ctpidrro_el0);
+		td->td_pcb->pcb_cid_el0 = READ_SPECIALREG_CAP(cid_el0);
+		td->td_pcb->pcb_rcsp_el0 = READ_SPECIALREG_CAP(rcsp_el0);
+		td->td_pcb->pcb_rddc_el0 = READ_SPECIALREG_CAP(rddc_el0);
+		td->td_pcb->pcb_rctpidr_el0 = READ_SPECIALREG_CAP(rctpidr_el0);
+	}
+
 	frame = td->td_frame;
 	regs->csp = frame->tf_sp;
 	regs->clr = frame->tf_lr;
@@ -762,7 +771,11 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 
 	tf->tf_sp = mcp->mc_capregs.cap_sp;
 	tf->tf_lr = mcp->mc_capregs.cap_lr;
-	tf->tf_elr = mcp->mc_capregs.cap_elr;
+	if (SV_PROC_FLAG(td->td_proc, SV_UNBOUND_PCC))
+		tf->tf_elr = cheri_setaddress(tf->tf_elr,
+		    (__cheri_addr ptraddr_t)mcp->mc_capregs.cap_elr);
+	else
+		trapframe_set_elr(tf, mcp->mc_capregs.cap_elr);
 	tf->tf_ddc = mcp->mc_capregs.cap_ddc;
 	tf->tf_spsr = mcp->mc_spsr;
 	set_fpcontext(td, mcp);
@@ -996,6 +1009,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	tf->tf_x[8] = (uintcap_t)catcher;
 	tf->tf_sp = (uintcap_t)fp;
 #if __has_feature(capabilities)
+	tf->tf_x[9] = 0;
 	trapframe_set_elr(tf, (uintcap_t)p->p_md.md_sigcode);
 #else
 	tf->tf_elr = (register_t)PROC_SIGCODE(p);
