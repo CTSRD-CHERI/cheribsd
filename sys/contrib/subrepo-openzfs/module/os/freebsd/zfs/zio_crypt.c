@@ -1359,8 +1359,8 @@ zio_crypt_init_uios_zil(boolean_t encrypt, uint8_t *plainbuf,
 		} else if (txtype == TX_CLONE_RANGE) {
 			const size_t o = offsetof(lr_clone_range_t, lr_nbps);
 			crypt_len = o - sizeof (lr_t);
-			IOVEC_INIT(&dst_iovecs[vec],
-			    (char *)dlrp + sizeof (lr_t), crypt_len);
+			IOVEC_INIT(&dst_iovecs[vec], (void *)
+			    ((uintptr_t)dlrp + sizeof (lr_t)), crypt_len);
 
 			/* copy the bps now since they will not be encrypted */
 			memcpy(dlrp + o, slrp + o, lr_len - o);
