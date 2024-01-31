@@ -5767,7 +5767,7 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign)
 
     if (oldtcb != NULL) {
 	memcpy(tls_block, get_tls_block_ptr(oldtcb, tcbsize),
-	    tls_block_size);
+	    tls_static_space);
 	free(get_tls_block_ptr(oldtcb, tcbsize));
 
 	/* Adjust the DTV. */
