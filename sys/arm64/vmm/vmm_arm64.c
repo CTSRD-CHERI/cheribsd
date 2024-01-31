@@ -1310,9 +1310,19 @@ hypctx_regptr(struct hypctx *hypctx, int reg)
 	switch (reg) {
 	case VM_REG_GUEST_X0 ... VM_REG_GUEST_X29:
 		return (&hypctx->tf.tf_x[reg]);
+#if __has_feature(capabilities)
+	case VM_REG_GUEST_C0 ... VM_REG_GUEST_C29:
+		return (&hypctx->tf.tf_x[reg - VM_REG_GUEST_C0]);
+#endif
 	case VM_REG_GUEST_LR:
+#if __has_feature(capabilities)
+	case VM_REG_GUEST_C30:
+#endif
 		return (&hypctx->tf.tf_lr);
 	case VM_REG_GUEST_SP:
+#if __has_feature(capabilities)
+	case VM_REG_GUEST_CSP:
+#endif
 		return (&hypctx->tf.tf_sp);
 	case VM_REG_GUEST_CPSR:
 		return (&hypctx->tf.tf_spsr);
@@ -1328,6 +1338,24 @@ hypctx_regptr(struct hypctx *hypctx, int reg)
 		return (&hypctx->tcr_el1);
 	case VM_REG_GUEST_TCR2_EL1:
 		return (&hypctx->tcr2_el1);
+#if __has_feature(capabilities)
+	case VM_REG_GUEST_PCC:
+		return (&hypctx->tf.tf_elr); /* XXX-MJ */
+	case VM_REG_GUEST_DDC:
+		return (&hypctx->tf.tf_ddc);
+	case VM_REG_GUEST_CTPIDR:
+		return (&hypctx->tpidr_el0);
+	case VM_REG_GUEST_RCSP:
+		return (&hypctx->rcsp_el0);
+	case VM_REG_GUEST_RDDC:
+		return (&hypctx->rddc_el0);
+	case VM_REG_GUEST_RCTPIDR:
+		return (&hypctx->rctpidr_el0);
+	case VM_REG_GUEST_CID:
+		return (&hypctx->cid_el0);
+	case VM_REG_GUEST_CCTLR:
+		return (&hypctx->cctlr_el1);
+#endif
 	default:
 		break;
 	}
@@ -1354,6 +1382,9 @@ vmmops_getreg(void *vcpui, int reg, uintcap_t *retval)
 	case VM_REG_GUEST_LR:
 	case VM_REG_GUEST_SP:
 	case VM_REG_GUEST_X0 ... VM_REG_GUEST_X29:
+#if __has_feature(capabilities)
+	case VM_REG_GUEST_C0 ... VM_REG_GUEST_C30:
+#endif
 		*retval = *(uintcap_t *)regp;
 		break;
 	default:
@@ -1394,6 +1425,16 @@ vmmops_setreg(void *vcpui, int reg, uintcap_t val)
 	case VM_REG_GUEST_LR:
 	case VM_REG_GUEST_SP:
 	case VM_REG_GUEST_X0 ... VM_REG_GUEST_X29:
+#if __has_feature(capabilities)
+	case VM_REG_GUEST_CSP:
+	case VM_REG_GUEST_PCC:
+	case VM_REG_GUEST_DDC:
+	case VM_REG_GUEST_CTPIDR:
+	case VM_REG_GUEST_RCSP:
+	case VM_REG_GUEST_RCTPIDR:
+	case VM_REG_GUEST_CID:
+	case VM_REG_GUEST_C0 ... VM_REG_GUEST_C30:
+#endif
 		*(uintcap_t *)regp = val;
 		break;
 	default:
