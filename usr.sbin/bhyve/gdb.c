@@ -1744,6 +1744,7 @@ check_features(const uint8_t *data, size_t len)
 	append_string("PacketSize=4096");
 	append_string(";swbreak+");
 	append_string(";qXfer:features:read+");
+	append_string(";qXfer:capa:read+");
 	finish_packet();
 }
 
@@ -1880,6 +1881,76 @@ gdb_query(const uint8_t *data, size_t len)
 		}
 		finish_packet();
 		(void)munmap(__DECONST(void *, xml), xmllen);
+	} else if (command_equals(data, len, "qXfer:capa:read:")) {
+#if __has_feature(capabilities)
+		uintcap_t *cap;
+		uint64_t gpa, gva;
+		char capbuf[sizeof(uintcap_t) + 1], buf[64];
+		unsigned int doff, dlen;
+		int error;
+		uint8_t *cp;
+
+		data += strlen("qXfer:capa:read:");
+		len -= strlen("qXfer:capa:read:");
+
+		cp = memchr(data, ':', len);
+		if (cp == NULL || cp == data) {
+			send_error(EINVAL);
+			return;
+		}
+
+		gva = parse_integer(data, cp - data);
+		if (gva % sizeof(uintcap_t) != 0) {
+			send_error(EINVAL);
+			return;
+		}
+
+		data += (cp - data) + 1;
+		len -= (cp - data) + 1;
+		if (len > sizeof(buf) - 1) {
+			send_error(EINVAL);
+			return;
+		}
+		memcpy(buf, data, len);
+		buf[len] = '\0';
+		if (sscanf(buf, "%x,%x", &doff, &dlen) != 2) {
+			send_error(EINVAL);
+			return;
+		}
+
+		error = guest_vaddr2paddr(vcpus[cur_vcpu], gva, &gpa);
+		if (error == -1) {
+			send_error(errno);
+			return;
+		}
+		if (error == 0) {
+			send_error(EFAULT);
+			return;
+		}
+
+		cap = paddr_guest2host(ctx, gpa, sizeof(uintcap_t));
+		if (cap == NULL) {
+			send_error(EFAULT);
+			return;
+		}
+		capbuf[0] = cheri_gettag(*cap);
+		memcpy(&capbuf[1], cap, sizeof(uintcap_t));
+
+		start_packet();
+		if (doff >= sizeof(capbuf)) {
+			append_char('l');
+		} else if (doff + dlen >= sizeof(capbuf)) {
+			append_char('l');
+			append_packet_data(capbuf + doff,
+			    sizeof(capbuf) - doff);
+		} else {
+			append_char('m');
+			append_packet_data(capbuf + doff, dlen);
+		}
+		finish_packet();
+#else
+		send_error(EOPNOTSUPP);
+#endif
 	} else
 		send_empty_response();
 }
