@@ -526,9 +526,9 @@ struct tramp_pg {
 };
 
 /*
-* 64K is the largest size such that any capability-aligned proper
-* sub-range can be exactly bounded by a Morello capability.
-*/
+ * 64K is the largest size such that any capability-aligned proper
+ * sub-range can be exactly bounded by a Morello capability.
+ */
 #define	C18N_TRAMPOLINE_PAGE_SIZE	64 * 1024
 
 static struct tramp_pg *
