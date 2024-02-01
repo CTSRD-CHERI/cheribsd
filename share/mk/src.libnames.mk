@@ -2,7 +2,7 @@
 # The include file <src.libnames.mk> define library names suitable
 # for INTERNALLIB and PRIVATELIB definition
 
-.if !target(__<bsd.init.mk>__) && !target(__<Makefile.libcompat>__)
+.if !target(__<bsd.init.mk>__)
 .error src.libnames.mk cannot be included directly.
 .endif
 
@@ -41,6 +41,7 @@ _PRIVATELIBS+=	${LOCAL_PRIVATELIBS}
 
 _INTERNALLIBS=	\
 		amu \
+		bsnmptools \
 		c_nossp_pic \
 		cron \
 		elftc \
@@ -82,10 +83,6 @@ _INTERNALLIBS=	\
 		wpatls \
 		wpautils \
 		wpawps
-
-.if ${MK_BSNMP} == "yes"
-_INTERNALLIBS+=	bsnmptools
-.endif
 
 # Let projects based on FreeBSD append to _INTERNALLIBS
 # by maintaining their own LOCAL_INTERNALLIBS list.
@@ -289,7 +286,7 @@ _DP_9p+=	casper cap_pwd cap_grp
 .if ${.MAKE.OS} == "FreeBSD" || !defined(BOOTSTRAPPING)
 _DP_archive=	z bz2 lzma bsdxml zstd
 .endif
-_DP_avl=	nvpair spl
+_DP_avl=	spl
 _DP_bsddialog=	formw ncursesw tinfow
 _DP_zstd=	pthread
 .if ${MK_BLACKLIST} != "no"
@@ -424,7 +421,7 @@ _DP_ulog=	md
 _DP_fifolog=	z
 _DP_ipf=	kvm
 _DP_tpool=	spl
-_DP_uutil=	avl nvpair spl
+_DP_uutil=	avl spl
 _DP_zfs=	md pthread rt umem util uutil m avl bsdxml crypto geom nvpair \
 	z zfs_core zutil
 _DP_zfsbootenv= zfs nvpair
@@ -449,8 +446,8 @@ _DP_mlx4=	ibverbs pthread
 _DP_mlx5=	ibverbs pthread
 _DP_rdmacm=	ibverbs
 _DP_osmcomp=	pthread
-_DP_opensm=	pthread osmcomp
-_DP_osmvendor=	ibumad pthread osmcomp
+_DP_opensm=	pthread
+_DP_osmvendor=	ibumad pthread
 .endif
 
 # Define special cases
@@ -620,7 +617,6 @@ LIBFIFOLOG?=	${LIBFIFOLOGDIR}/libfifolog${PIE_SUFFIX}.a
 LIBBSNMPTOOLSDIR=	${_LIB_OBJTOP}/usr.sbin/bsnmpd/tools/libbsnmptools
 LIBBSNMPTOOLS?=	${LIBBSNMPTOOLSDIR}/libbsnmptools${PIE_SUFFIX}.a
 
-LIBBEDIR=	${_LIB_OBJTOP}/lib/libbe
 LIBBE?=		${LIBBEDIR}/libbe${PIE_SUFFIX}.a
 
 LIBPMCSTATDIR=	${_LIB_OBJTOP}/lib/libpmcstat
@@ -798,8 +794,8 @@ _BADLIBADD+= ${_l}
 .endif
 # Note that OBJTOP is not yet defined here but for the purpose of the check
 # it is fine as it resolves to the SRC directory.
-.if !defined(LIB${LIB:tu}DIR) || !exists(${SRCTOP}/${LIB${LIB:tu}DIR:S,^${_LIB_OBJTOP}/,,})
-.error ${.CURDIR}: Missing or incorrect value for LIB${LIB:tu}DIR in ${_this:T}: ${LIB${LIB:tu}DIR:S,^${_LIB_OBJTOP}/,,}
+.if !defined(LIB${LIB:tu}DIR) || !exists(${SRCTOP}/${LIB${LIB:tu}DIR:S,^${OBJTOP}/,,})
+.error ${.CURDIR}: Missing or incorrect value for LIB${LIB:tu}DIR in ${_this:T}: ${LIB${LIB:tu}DIR:S,^${OBJTOP}/,,}
 .endif
 .if ${_INTERNALLIBS:M${LIB}} != "" && !defined(LIB${LIB:tu})
 .error ${.CURDIR}: Missing value for LIB${LIB:tu} in ${_this:T}.  Likely should be: LIB${LIB:tu}?= $${LIB${LIB:tu}DIR}/lib${LIB}.a
