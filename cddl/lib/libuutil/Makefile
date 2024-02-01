@@ -22,10 +22,4 @@ CFLAGS+= -include ${ZFSTOP}/include/os/freebsd/spl/sys/ccompile.h
 
 LIBADD= avl spl
 
-# The aok vairable used by assert() is defined in
-# sys/cddl/contrib/opensolaris/common/nvpair/opensolaris_nvpair.c so we need
-# to link against nvpair in order to get size information for that file
-# (at least for purecap)
-LIBADD+=	nvpair
-
 .include <bsd.lib.mk>

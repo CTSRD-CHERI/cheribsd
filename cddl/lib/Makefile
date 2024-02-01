@@ -28,7 +28,7 @@ SUBDIR.${MK_ZFS}+= \
 
 SUBDIR.${MK_ZFS}.${MK_OPENSSL} = pam_zfs_key
 
-SUBDIR_DEPEND_libavl=		libnvpair libspl
+SUBDIR_DEPEND_libavl=		libspl
 SUBDIR_DEPEND_libctf=		libspl
 SUBDIR_DEPEND_libdtrace=	libctf
 SUBDIR_DEPEND_libnvpair=	libspl

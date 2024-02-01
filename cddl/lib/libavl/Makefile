@@ -3,8 +3,7 @@
 
 PACKAGE=	zfs
 LIB=	avl
-# The assert macro needs `int aok` (which is in nvpair)
-LIBADD=	nvpair spl
+LIBADD=	spl
 SRCS=	avl.c
 WARNS?=	3
 CFLAGS+= -DIN_BASE
