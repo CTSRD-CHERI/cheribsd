@@ -499,7 +499,6 @@ SUBDIR+=	tools/cheribsdbox
 # installed.
 .if make(installworld) || make(install) || make(installsysroot)
 SUBDIR+=.WAIT
-SUBDIR_INSTALL_USE_DEPENDS=
 .endif
 .if !defined(SYSROOT_ONLY)
 SUBDIR+=etc
