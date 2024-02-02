@@ -537,7 +537,7 @@ void ifunc_init(Elf_Auxinfo[__min_size(AT_COUNT)]);
 void init_pltgot(Obj_Entry *);
 void allocate_initial_tls(Obj_Entry *);
 
-#if __has_feature(capabilities)
+#ifdef RTLD_HAS_CAPRELOCS
 void process___cap_relocs(Obj_Entry*);
 #endif
 
