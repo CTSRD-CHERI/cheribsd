@@ -92,19 +92,6 @@ extern char **environ;
 
 struct stat;
 struct Struct_Obj_Entry;
-struct CheriExports;
-struct CheriPlt;
-/* Instead of using void** to get warnings on casts */
-struct CheriCapTableEntry {
-	void *value;
-};
-
-struct CheriCapTableMappingEntry {
-  uint64_t func_start;       // virtual address relative to base address
-  uint64_t func_end;         // virtual address relative to base address
-  uint32_t cap_table_offset; // offset in bytes into captable
-  uint32_t sub_table_size;   // size in bytes of this sub-table
-};
 
 /* Lists of shared objects */
 typedef struct Struct_Objlist_Entry {
@@ -207,9 +194,7 @@ typedef struct Struct_Obj_Entry {
      */
     Elf_Addr text_rodata_start_offset;
     Elf_Addr text_rodata_end_offset;
-    const char* text_rodata_cap;	/* Capability for the executable mapping */
-    struct CheriExports *cheri_exports;	/* Unique thunks for function pointers */
-    struct CheriPlt *cheri_plt_stubs;	/* PLT stubs for external calls */
+    const char *text_rodata_cap;	/* Capability for the executable mapping */
 #endif
     caddr_t relocbase;		/* Relocation constant = mapbase - vaddrbase */
     const Elf_Dyn *dynamic;	/* Dynamic section */
