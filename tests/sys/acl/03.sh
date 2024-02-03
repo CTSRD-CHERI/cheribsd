@@ -44,10 +44,6 @@ if [ ! -c /dev/mdctl ]; then
 	echo "1..0 # SKIP no /dev/mdctl to create md devices"
 	exit 0
 fi
-if [ -z "$(which perl)" ]; then
-	echo "1..0 # SKIP perl must be installed"
-	exit 0
-fi
 
 echo "1..5"
 
