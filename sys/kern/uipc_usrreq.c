@@ -3218,6 +3218,7 @@ unp_dispose(struct socket *so)
 	struct sockbuf *sb;
 	struct unpcb *unp;
 	struct mbuf *m;
+	int error __diagused;
 
 	MPASS(!SOLISTENING(so));
 
@@ -3229,6 +3230,8 @@ unp_dispose(struct socket *so)
 	/*
 	 * Grab our special mbufs before calling sbrelease().
 	 */
+	error = SOCK_IO_RECV_LOCK(so, SBL_WAIT | SBL_NOINTR);
+	MPASS(!error);
 	SOCK_RECVBUF_LOCK(so);
 	switch (so->so_type) {
 	case SOCK_DGRAM:
@@ -3280,8 +3283,7 @@ unp_dispose(struct socket *so)
 		break;
 	}
 	SOCK_RECVBUF_UNLOCK(so);
-	if (SOCK_IO_RECV_OWNED(so))
-		SOCK_IO_RECV_UNLOCK(so);
+	SOCK_IO_RECV_UNLOCK(so);
 
 	if (m != NULL) {
 		unp_scan(m, unp_freerights);
