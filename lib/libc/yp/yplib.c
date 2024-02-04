@@ -91,19 +91,7 @@ struct dom_binding {
 
 bool_t xdr_ypresp_all_seq(XDR *xdrs, u_long *objp);
 
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20221129,
- *   "target_type": "lib",
- *   "changes": [
- *     "calling_convention"
- *   ],
- *   "comment": "Fixed using a function pointer without prototypes"
- * }
- * CHERI CHANGES END
- */
-int (*ypresp_allfn)(u_long, char *, int, char *, int, void *);
+int (*ypresp_allfn)(unsigned long, char *, int, char *, int, void *);
 void *ypresp_data;
 
 static void _yp_unbind(struct dom_binding *);
