@@ -73,7 +73,6 @@
 
 struct bsddialog_conf {
 	bool ascii_lines;
-	bool auto_truncate;
 	unsigned int auto_minheight;
 	unsigned int auto_minwidth;
 	unsigned int auto_topmargin;
