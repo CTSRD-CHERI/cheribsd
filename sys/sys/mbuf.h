@@ -924,6 +924,7 @@ m_extaddref(struct mbuf *m, char *buf, u_int size, u_int *ref_cnt,
 
 	atomic_add_int(ref_cnt, 1);
 	m->m_flags |= M_EXT;
+	/* XXX-AM: Should we have an option to warn when these are not exact? */
 	m->m_ext.ext_buf = cheri_kern_setbounds(buf, size);
 	m->m_ext.ext_cnt = ref_cnt;
 	m->m_data = m->m_ext.ext_buf;
@@ -1081,6 +1082,7 @@ m_cljset(struct mbuf *m, void *cl, int type)
 		break;
 	}
 
+	/* XXX-AM: It would be nice to guarantee setboundsexact */
 	m->m_data = m->m_ext.ext_buf = cheri_kern_setbounds(cl, size);
 	m->m_ext.ext_free = m->m_ext.ext_arg1 = m->m_ext.ext_arg2 = NULL;
 	m->m_ext.ext_size = size;
