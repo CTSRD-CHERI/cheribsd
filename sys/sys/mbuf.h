@@ -419,7 +419,8 @@ struct mbuf {
 				char		m_pktdat[0];
 			};
 		};
-		char	m_dat[0] __no_subobject_bounds;	/* !M_PKTHDR, !M_EXT */
+		/* !M_PKTHDR, !M_EXT */
+		char	m_dat[0] __subobject_use_remaining_size;
 	};
 };
 
