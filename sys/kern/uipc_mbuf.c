@@ -53,6 +53,7 @@
 #include <vm/vm.h>
 #include <vm/vm_pageout.h>
 #include <vm/vm_page.h>
+#include <vm/vm_param.h>
 
 #include <cheri/cheric.h>
 
@@ -1337,8 +1338,8 @@ m_apply_extpg_one(struct mbuf *m, int off, int len,
 		pglen = m_epg_pagelen(m, i, pgoff);
 		if (off < pglen) {
 			count = min(pglen - off, len);
-			p = (void *)PHYS_TO_DMAP(m->m_epg_pa[i] + pgoff + off);
-			p = cheri_kern_setboundsexact(p, count);
+			p = (void *)PHYS_TO_DMAP_LEN(
+			    m->m_epg_pa[i] + pgoff + off, count);
 			rval = f(arg, p, count);
 			if (rval)
 				return (rval);
