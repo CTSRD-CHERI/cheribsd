@@ -1328,8 +1328,7 @@ its_device_alloc(struct gicv3_its_softc *sc, int devid)
 	    ptable->ptab_page_size, 0);
 
 	if (!shareable)
-		cpu_dcache_wb_range(l2_table,
-		    ptable->ptab_l2_size);
+		cpu_dcache_wb_range(l2_table, ptable->ptab_l2_size);
 
 	table[index] = vtophys(l2_table) | GITS_BASER_VALID;
 	if (!shareable)
