@@ -1269,7 +1269,7 @@ static bool
 its_device_alloc(struct gicv3_its_softc *sc, int devid)
 {
 	struct its_ptable *ptable;
-	vm_offset_t l2_table;
+	vm_pointer_t l2_table;
 	uint64_t *table;
 	uint32_t index;
 	bool shareable;
@@ -1324,17 +1324,17 @@ its_device_alloc(struct gicv3_its_softc *sc, int devid)
 	if ((ptable->ptab_share & GITS_BASER_SHARE_MASK) == GITS_BASER_SHARE_NS)
 		shareable = false;
 
-	l2_table = (vm_offset_t)contigmalloc_domainset(ptable->ptab_l2_size,
+	l2_table = (vm_pointer_t)contigmalloc_domainset(ptable->ptab_l2_size,
 	    M_GICV3_ITS, sc->sc_ds, M_WAITOK | M_ZERO, 0, (1ul << 48) - 1,
 	    ptable->ptab_page_size, 0);
 
 	if (!shareable)
-		cpu_dcache_wb_range((vm_offset_t)l2_table,
+		cpu_dcache_wb_range(l2_table,
 		    ptable->ptab_l2_size);
 
 	table[index] = vtophys(l2_table) | GITS_BASER_VALID;
 	if (!shareable)
-		cpu_dcache_wb_range((vm_offset_t)&table[index],
+		cpu_dcache_wb_range((vm_pointer_t)&table[index],
 		    sizeof(table[index]));
 
 	dsb(sy);
