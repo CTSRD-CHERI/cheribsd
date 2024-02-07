@@ -29,8 +29,6 @@ LIB=thr
 .endif
 SHLIB_MAJOR= 3
 
-LIBADD=	sys
-
 NO_WTHREAD_SAFETY=1
 NO_WCAST_ALIGN.gcc=1    # for gcc 4.2
 CFLAGS+=-DPTHREAD_KERNEL
@@ -68,6 +66,7 @@ CFLAGS+=-DCHERI_LIB_C18N
 .endif
 
 LDFLAGS+=-Wl,-znodelete
+LDFLAGS+=-Wl,--auxiliary,libsys.so.7
 
 VERSION_DEF=${SRCTOP}/lib/libc/Versions.def
 SYMBOL_MAPS=${LIBTHR_SRCTOP}/pthread.map
@@ -109,7 +108,7 @@ LIBSYS_SRCTOP=	${.CURDIR:H}/libsys
 .else
 .PATH: ${LIBSYS_SRCTOP}
 .endif
-STATICOBJS+=	_umtx_op_err.o
+OBJS+=	_umtx_op_err.o
 
 .ifndef CHERI_LIB_C18N
 .if ${MK_INSTALLLIB} != "no"
