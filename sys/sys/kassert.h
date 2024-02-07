@@ -134,6 +134,18 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
 	KASSERT((ex), ("Assertion %s failed at %s:%d", what, file, line))
 
 /*
+ * CHERI Sub-object bounds assertions
+ */
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(__CHERI_SUBOBJECT_BOUNDS__)
+#define	KASSERT_SUBOBJECT_BOUNDS(cap, len)				\
+	KASSERT((cheri_getlen((cap)) == (len)),				\
+	    ("%s:%d %s: Unexpected sub-object bounds",			\
+		__FILE__, __LINE__, __func__))
+#else
+#define	KASSERT_SUBOBJECT_BOUNDS(cap, len)
+#endif
+
+/*
  * Assert that a pointer can be loaded from memory atomically.
  *
  * This assertion enforces stronger alignment than necessary.  For example,
