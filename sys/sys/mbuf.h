@@ -972,9 +972,10 @@ m_init(struct mbuf *m, int how, short type, int flags)
 {
 	int error;
 
+	KASSERT_SUBOBJECT_BOUNDS(m->m_dat, MLEN);
 	m->m_next = NULL;
 	m->m_nextpkt = NULL;
-	m->m_data = cheri_kern_setbounds(m->m_dat, MLEN);
+	m->m_data = m->m_dat;
 	m->m_len = 0;
 	m->m_flags = flags;
 	m->m_type = type;
