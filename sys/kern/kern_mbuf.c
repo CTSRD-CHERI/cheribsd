@@ -148,6 +148,13 @@ static counter_u64_t snd_tag_count;
 SYSCTL_COUNTER_U64(_kern_ipc, OID_AUTO, num_snd_tags, CTLFLAG_RW,
     &snd_tag_count, "# of active mbuf send tags");
 
+#ifdef __CHERI_PURE_CAPABILITY__
+counter_u64_t cheri_imprecise_extbuf_count;
+SYSCTL_COUNTER_U64(_security_cheri, OID_AUTO, mbuf_imprecise_extbuf, CTLFLAG_RD,
+    &cheri_imprecise_extbuf_count, "Number of imprecise mbuf external buffers");
+#endif
+
+
 /*
  * tunable_mbinit() has to be run before any mbuf allocations are done.
  */
@@ -398,6 +405,9 @@ mbuf_init(void *dummy)
 	uma_zone_set_maxaction(zone_jumbo16, mb_reclaim);
 
 	snd_tag_count = counter_u64_alloc(M_WAITOK);
+#ifdef __CHERI_PURE_CAPABILITY__
+	cheri_imprecise_extbuf_count = counter_u64_alloc(M_WAITOK);
+#endif
 }
 SYSINIT(mbuf, SI_SUB_MBUF, SI_ORDER_FIRST, mbuf_init, NULL);
 
@@ -1543,7 +1553,7 @@ m_extadd(struct mbuf *mb, char *buf, u_int size, m_ext_free_t freef,
 	KASSERT(type != EXT_CLUSTER, ("%s: EXT_CLUSTER not allowed", __func__));
 
 	mb->m_flags |= (M_EXT | flags);
-	/* XXX-AM: Should we have an option to warn when these are not exact? */
+	cheri_check_representable_ext_buf(buf, size);
 	mb->m_ext.ext_buf = cheri_kern_setbounds(buf, size);
 	mb->m_data = mb->m_ext.ext_buf;
 	mb->m_ext.ext_size = size;

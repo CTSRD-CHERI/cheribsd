@@ -38,6 +38,7 @@
 /* XXX: These includes suck. Sorry! */
 #include <sys/queue.h>
 #ifdef _KERNEL
+#include <sys/counter.h>
 #include <sys/systm.h>
 #include <sys/refcount.h>
 #include <vm/uma.h>
@@ -118,6 +119,21 @@ struct mb_args {
 	int	flags;	/* Flags for mbuf being allocated */
 	short	type;	/* Type of mbuf being allocated */
 };
+
+#ifdef __CHERI_PURE_CAPABILITY__
+extern counter_u64_t cheri_imprecise_extbuf_count;
+static inline void
+cheri_check_representable_ext_buf(void *buf, u_int size)
+{
+
+	if (CHERI_REPRESENTABLE_LENGTH(size) != size ||
+	    !is_aligned(buf, CHERI_REPRESENTABLE_ALIGNMENT(size))) {
+		counter_u64_add(cheri_imprecise_extbuf_count, 1);
+	}
+}
+#else /* !__CHERI_PURE_CAPABILITY__ */
+#define	cheri_check_representable_ext_buf(buf, size)
+#endif /* !__CHERI_PURE_CAPABILITY__ */
 #endif /* _KERNEL */
 
 /*
@@ -925,7 +941,7 @@ m_extaddref(struct mbuf *m, char *buf, u_int size, u_int *ref_cnt,
 
 	atomic_add_int(ref_cnt, 1);
 	m->m_flags |= M_EXT;
-	/* XXX-AM: Should we have an option to warn when these are not exact? */
+	cheri_check_representable_ext_buf(buf, size);
 	m->m_ext.ext_buf = cheri_kern_setbounds(buf, size);
 	m->m_ext.ext_cnt = ref_cnt;
 	m->m_data = m->m_ext.ext_buf;
@@ -1083,7 +1099,7 @@ m_cljset(struct mbuf *m, void *cl, int type)
 		break;
 	}
 
-	/* XXX-AM: It would be nice to guarantee setboundsexact */
+	cheri_check_representable_ext_buf(cl, size);
 	m->m_data = m->m_ext.ext_buf = cheri_kern_setbounds(cl, size);
 	m->m_ext.ext_free = m->m_ext.ext_arg1 = m->m_ext.ext_arg2 = NULL;
 	m->m_ext.ext_size = size;
