@@ -15,6 +15,9 @@ CFLAGS+= -I${SRCTOP}/lib/libpfctl -I${OBJTOP}/lib/libpfctl
 
 LIBADD=	m util pfctl
 
+# ld.lld: error: could not determine size of cap reloc against local object nla_p_donemsg
+LD_FATAL_WARNINGS=no
+
 WARNS?=	3
 
 LINKS=	${BINDIR}/authpf ${BINDIR}/authpf-noip
