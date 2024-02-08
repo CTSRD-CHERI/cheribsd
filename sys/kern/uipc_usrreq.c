@@ -291,8 +291,7 @@ static int	unp_connect(struct socket *, struct sockaddr *,
 		    struct thread *);
 static int	unp_connectat(int, struct socket *, struct sockaddr *,
 		    struct thread *, bool);
-typedef enum { PRU_CONNECT, PRU_CONNECT2 } conn2_how;
-static void	unp_connect2(struct socket *so, struct socket *so2, conn2_how);
+static void	unp_connect2(struct socket *so, struct socket *so2);
 static void	unp_disconnect(struct unpcb *unp, struct unpcb *unp2);
 static void	unp_dispose(struct socket *so);
 static void	unp_shutdown(struct unpcb *);
@@ -705,7 +704,7 @@ uipc_connect2(struct socket *so1, struct socket *so2)
 	unp2 = so2->so_pcb;
 	KASSERT(unp2 != NULL, ("uipc_connect2: unp2 == NULL"));
 	unp_pcb_lock_pair(unp, unp2);
-	unp_connect2(so1, so2, PRU_CONNECT2);
+	unp_connect2(so1, so2);
 	unp_pcb_unlock_pair(unp, unp2);
 
 	return (0);
@@ -1785,12 +1784,6 @@ uipc_ctloutput(struct socket *so, struct sockopt *sopt)
 			error = sooptcopyout(sopt, &optval, sizeof(optval));
 			break;
 
-		case LOCAL_CONNWAIT:
-			/* Unlocked read. */
-			optval = unp->unp_flags & UNP_CONNWAIT ? 1 : 0;
-			error = sooptcopyout(sopt, &optval, sizeof(optval));
-			break;
-
 		default:
 			error = EOPNOTSUPP;
 			break;
@@ -1801,7 +1794,6 @@ uipc_ctloutput(struct socket *so, struct sockopt *sopt)
 		switch (sopt->sopt_name) {
 		case LOCAL_CREDS:
 		case LOCAL_CREDS_PERSISTENT:
-		case LOCAL_CONNWAIT:
 			error = sooptcopyin(sopt, &optval, sizeof(optval),
 					    sizeof(optval));
 			if (error)
@@ -1828,10 +1820,6 @@ uipc_ctloutput(struct socket *so, struct sockopt *sopt)
 
 			case LOCAL_CREDS_PERSISTENT:
 				OPTSET(UNP_WANTCRED_ALWAYS, UNP_WANTCRED_ONESHOT);
-				break;
-
-			case LOCAL_CONNWAIT:
-				OPTSET(UNP_CONNWAIT, 0);
 				break;
 
 			default:
@@ -2007,7 +1995,7 @@ unp_connectat(int fd, struct socket *so, struct sockaddr *nam,
 	KASSERT(unp2 != NULL && so2 != NULL && unp2->unp_socket == so2 &&
 	    sotounpcb(so2) == unp2,
 	    ("%s: unp2 %p so2 %p", __func__, unp2, so2));
-	unp_connect2(so, so2, PRU_CONNECT);
+	unp_connect2(so, so2);
 	KASSERT((unp->unp_flags & UNP_CONNECTING) != 0,
 	    ("%s: unp %p has UNP_CONNECTING clear", __func__, unp));
 	unp->unp_flags &= ~UNP_CONNECTING;
@@ -2058,7 +2046,7 @@ unp_copy_peercred(struct thread *td, struct unpcb *client_unp,
 }
 
 static void
-unp_connect2(struct socket *so, struct socket *so2, conn2_how req)
+unp_connect2(struct socket *so, struct socket *so2)
 {
 	struct unpcb *unp;
 	struct unpcb *unp2;
@@ -2090,11 +2078,7 @@ unp_connect2(struct socket *so, struct socket *so2, conn2_how req)
 		KASSERT(unp2->unp_conn == NULL,
 		    ("%s: socket %p is already connected", __func__, unp2));
 		unp2->unp_conn = unp;
-		if (req == PRU_CONNECT &&
-		    ((unp->unp_flags | unp2->unp_flags) & UNP_CONNWAIT))
-			soisconnecting(so);
-		else
-			soisconnected(so);
+		soisconnected(so);
 		soisconnected(so2);
 		break;
 
@@ -3492,10 +3476,6 @@ db_print_unpflags(int unp_flags)
 	}
 	if (unp_flags & UNP_WANTCRED_ONESHOT) {
 		db_printf("%sUNP_WANTCRED_ONESHOT", comma ? ", " : "");
-		comma = 1;
-	}
-	if (unp_flags & UNP_CONNWAIT) {
-		db_printf("%sUNP_CONNWAIT", comma ? ", " : "");
 		comma = 1;
 	}
 	if (unp_flags & UNP_CONNECTING) {
