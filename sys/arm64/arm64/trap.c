@@ -33,6 +33,7 @@
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/lock.h>
+#include <sys/msan.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/ptrace.h>
@@ -631,6 +632,8 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 	int dfsc;
 
 	kasan_mark(frame, sizeof(*frame), sizeof(*frame), 0);
+	kmsan_mark(frame, sizeof(*frame), KMSAN_STATE_INITED);
+
 	far = frame->tf_far;
 	/* Read the esr register to get the exception details */
 	esr = frame->tf_esr;
@@ -744,6 +747,8 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 	     get_pcpu(), READ_SPECIALREG(tpidr_el1)));
 
 	kasan_mark(frame, sizeof(*frame), sizeof(*frame), 0);
+	kmsan_mark(frame, sizeof(*frame), KMSAN_STATE_INITED);
+
 	far = frame->tf_far;
 	esr = frame->tf_esr;
 	exception = ESR_ELx_EXCEPTION(esr);
@@ -890,6 +895,8 @@ do_serror(struct trapframe *frame)
 	uint64_t esr, far;
 
 	kasan_mark(frame, sizeof(*frame), sizeof(*frame), 0);
+	kmsan_mark(frame, sizeof(*frame), KMSAN_STATE_INITED);
+
 	far = frame->tf_far;
 	esr = frame->tf_esr;
 
@@ -905,6 +912,8 @@ unhandled_exception(struct trapframe *frame)
 	uint64_t esr, far;
 
 	kasan_mark(frame, sizeof(*frame), sizeof(*frame), 0);
+	kmsan_mark(frame, sizeof(*frame), KMSAN_STATE_INITED);
+
 	far = frame->tf_far;
 	esr = frame->tf_esr;
 
