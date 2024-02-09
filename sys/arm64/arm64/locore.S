@@ -194,11 +194,11 @@
 #endif
 .endmacro
 
-ENTRY(_start)
 #ifdef __CHERI_PURE_CAPABILITY__
 	.arch_extension noc64
 	.arch_extension a64c
 #endif
+ENTRY(_start)
 
 	/*
 	 * Drop to EL1
@@ -376,11 +376,11 @@ END(_start)
  * Called by a core when it is being brought online.
  * The data in x0 is passed straight to init_secondary.
  */
-ENTRY(mpentry)
 #ifdef __CHERI_PURE_CAPABILITY__
 	.arch_extension noc64
 	.arch_extension a64c
 #endif
+ENTRY(mpentry)
 	/* Disable interrupts */
 	msr	daifset, #DAIF_INTR
 
@@ -443,11 +443,11 @@ END(mpentry)
  * If we are started in EL2, configure the required hypervisor
  * registers and drop to EL1.
  */
-LENTRY(drop_to_el1)
 #ifdef __CHERI_PURE_CAPABILITY__
 	.arch_extension noc64
 	.arch_extension a64c
 #endif
+LENTRY(drop_to_el1)
 	mrs	x23, CurrentEL
 	lsr	x23, x23, #2
 	cmp	x23, #0x2
@@ -565,14 +565,14 @@ LENTRY(drop_to_el1)
 	isb
 
 	eret
-#ifdef __CHERI_PURE_CAPABILITY__
-	.arch_extension c64
-#endif
 
 	.align 3
 .Lsctlr_res1:
 	.quad SCTLR_RES1
 LEND(drop_to_el1)
+#ifdef __CHERI_PURE_CAPABILITY__
+	.arch_extension c64
+#endif
 
 /*
  * Get the delta between the physical address we were loaded to and the
