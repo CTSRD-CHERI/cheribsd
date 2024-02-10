@@ -28,8 +28,6 @@
 #
 #
 
-LOADER=/usr/sbin/bhyveload
-BHYVECTL=/usr/sbin/bhyvectl
 FBSDRUN=/usr/sbin/bhyve
 
 DEFAULT_MEMSIZE=512M
@@ -42,10 +40,6 @@ DEFAULT_DISK=virtio-blk
 DEFAULT_VIRTIO_DISK="./diskdev"
 DEFAULT_ISOFILE="./release.iso"
 
-DEFAULT_VNCHOST="127.0.0.1"
-DEFAULT_VNCPORT=5900
-DEFAULT_VNCSIZE="w=1024,h=768"
-
 errmsg() {
 	echo "*** $1"
 }
@@ -53,47 +47,30 @@ errmsg() {
 usage() {
 	local msg=$1
 
-	echo "Usage: vmrun.sh [-aAEhiTv] [-c <CPUs>] [-C <console>]" \
+	echo "Usage: vmrun.sh [-AhiTv] [-c <CPUs>] [-C <console>]" \
 	    "[-d <disk file>]"
-	echo "                [-e <name=value>] [-f <path of firmware>]" \
+	echo "                [-f <path of firmware>]" \
 	    "[-F <size>]"
 	echo "                [-G [w][address:]port] [-H <directory>]"
-	echo "                [-I <location of installation iso>] [-l <loader>]"
-	echo "                [-L <VNC IP for UEFI framebuffer>]"
+	echo "                [-I <location of installation iso>]"
 	echo "                [-m <memsize>]" \
 	    "[-n <network adapter emulation type>]"
 	echo "                [-P <port>] [-t <tapdev>] <vmname>"
 	echo ""
 	echo "       -h: display this help message"
-	echo "       -a: force memory mapped local APIC access"
 	echo "       -A: use AHCI disk emulation instead of ${DEFAULT_DISK}"
 	echo "       -c: number of virtual cpus (default: ${DEFAULT_CPUS})"
 	echo "       -C: console device (default: ${DEFAULT_CONSOLE})"
 	echo "       -d: virtio diskdev file (default: ${DEFAULT_VIRTIO_DISK})"
-	echo "       -e: set FreeBSD loader environment variable"
-	echo "       -E: Use UEFI mode"
-	echo "       -f: Use a specific UEFI firmware"
-	echo "       -F: Use a custom UEFI GOP framebuffer size" \
-	    "(default: ${DEFAULT_VNCSIZE})"
+	echo "       -f: Use a specific firmware"
 	echo "       -G: bind the GDB stub to the specified address"
-	echo "       -H: host filesystem to export to the loader"
 	echo "       -i: force boot of the Installation CDROM image"
 	echo "       -I: Installation CDROM image location" \
 	    "(default: ${DEFAULT_ISOFILE})"
-	echo "       -l: the OS loader to use (default: /boot/userboot.so)"
-	echo "       -L: IP address for UEFI GOP VNC server" \
-	    "(default: ${DEFAULT_VNCHOST})"
 	echo "       -m: memory size (default: ${DEFAULT_MEMSIZE})"
 	echo "       -n: network adapter emulation type" \
 	    "(default: ${DEFAULT_NIC})"
-	echo "       -p: pass-through a host PCI device at bus/slot/func" \
-	    "(e.g. 10/0/0)"
-	echo "       -P: UEFI GOP VNC port (default: ${DEFAULT_VNCPORT})"
 	echo "       -t: tap device for virtio-net (default: $DEFAULT_TAPDEV)"
-	echo "       -T: Enable tablet device (for UEFI GOP)"
-	echo "       -u: RTC keeps UTC time"
-	echo "       -v: Wait for VNC client connection before booting VM"
-	echo "       -w: ignore unimplemented MSRs"
 	echo ""
 	[ -n "$msg" ] && errmsg "$msg"
 	exit 1
@@ -119,24 +96,13 @@ nic=${DEFAULT_NIC}
 tap_total=0
 disk_total=0
 disk_emulation=${DEFAULT_DISK}
-loader_opt=""
-bhyverun_opt="-H -A -P"
-pass_total=0
+bhyverun_opt=""
 
 # EFI-specific options
-efi_mode=0
-efi_firmware="/usr/local/share/uefi-firmware/BHYVE_UEFI.fd"
-vncwait=""
-vnchost=${DEFAULT_VNCHOST}
-vncport=${DEFAULT_VNCPORT}
-vncsize=${DEFAULT_VNCSIZE}
-tablet=""
+firmware="/usr/local64/share/u-boot/u-boot-bhyve-arm64/u-boot.bin"
 
-while getopts aAc:C:d:e:Ef:F:G:hH:iI:l:L:m:n:p:P:t:Tuvw c ; do
+while getopts Ac:C:d:f:G:hH:iI:m:n:t: c ; do
 	case $c in
-	a)
-		bhyverun_opt="${bhyverun_opt} -a"
-		;;
 	A)
 		disk_emulation="ahci-hd"
 		;;
@@ -153,23 +119,11 @@ while getopts aAc:C:d:e:Ef:F:G:hH:iI:l:L:m:n:p:P:t:Tuvw c ; do
 		eval "disk_opts${disk_total}=\"${disk_opts}\""
 		disk_total=$(($disk_total + 1))
 		;;
-	e)
-		loader_opt="${loader_opt} -e ${OPTARG}"
-		;;
-	E)
-		efi_mode=1
-		;;
 	f)
-		efi_firmware="${OPTARG}"
-		;;
-	F)
-		vncsize="${OPTARG}"
+		firmware="${OPTARG}"
 		;;
 	G)
 		bhyverun_opt="${bhyverun_opt} -G ${OPTARG}"
-		;;
-	H)
-		host_base=`realpath ${OPTARG}`
 		;;
 	i)
 		force_install=1
@@ -177,40 +131,15 @@ while getopts aAc:C:d:e:Ef:F:G:hH:iI:l:L:m:n:p:P:t:Tuvw c ; do
 	I)
 		isofile=${OPTARG}
 		;;
-	l)
-		loader_opt="${loader_opt} -l ${OPTARG}"
-		;;
-	L)
-		vnchost="${OPTARG}"
-		;;
 	m)
 		memsize=${OPTARG}
 		;;
 	n)
 		nic=${OPTARG}
 		;;
-	p)
-		eval "pass_dev${pass_total}=\"${OPTARG}\""
-		pass_total=$(($pass_total + 1))
-		;;
-	P)
-		vncport="${OPTARG}"
-		;;
 	t)
 		eval "tap_dev${tap_total}=\"${OPTARG}\""
 		tap_total=$(($tap_total + 1))
-		;;
-	T)
-		tablet="-s 30,xhci,tablet"
-		;;
-	u)	
-		bhyverun_opt="${bhyverun_opt} -u"
-		;;
-	v)
-		vncwait=",wait"
-		;;
-	w)
-		bhyverun_opt="${bhyverun_opt} -w"
 		;;
 	*)
 		usage
@@ -235,22 +164,11 @@ if [ $# -ne 1 ]; then
 fi
 
 vmname="$1"
-if [ -n "${host_base}" ]; then
-	loader_opt="${loader_opt} -h ${host_base}"
-fi
 
-# If PCI passthru devices are configured then guest memory must be wired
-if [ ${pass_total} -gt 0 ]; then
-	loader_opt="${loader_opt} -S"
-	bhyverun_opt="${bhyverun_opt} -S"
-fi
-
-if [ ${efi_mode} -gt 0 ]; then
-	if [ ! -f ${efi_firmware} ]; then
-		echo "Error: EFI Firmware ${efi_firmware} doesn't exist." \
-		    "Try: pkg install edk2-bhyve"
-		exit 1
-	fi
+if [ ! -f ${firmware} ]; then
+	echo "Error: Firmware ${firmware} doesn't exist." \
+	    "Try: pkg64 install u-boot-bhyve-arm64"
+	exit 1
 fi
 
 make_and_check_diskdev()
@@ -278,7 +196,7 @@ echo "Launching virtual machine \"$vmname\" ..."
 
 first_diskdev="$disk_dev0"
 
-${BHYVECTL} --vm=${vmname} --destroy > /dev/null 2>&1
+sysctl hw.vmm.destroy="${vmname}" > /dev/null 2>&1
 
 while [ 1 ]; do
 
@@ -297,38 +215,24 @@ while [ 1 ]; do
 
 	if [ $force_install -eq 1 -o $need_install -eq 1 ]; then
 		if [ ! -r ${isofile} ]; then
-			echo -n "Installation CDROM image \"${isofile}\" "
+			echo -n "Installation image \"${isofile}\" "
 			echo    "is not readable"
 			exit 1
 		fi
-		BOOTDISKS="-d ${isofile}"
-		installer_opt="-s 31:0,ahci-cd,${isofile}"
+		installer_opt="-s 1:0,virtio-blk,${isofile}"
 	else
-		BOOTDISKS=""
 		i=0
 		while [ $i -lt $disk_total ] ; do
 			eval "disk=\$disk_dev${i}"
-			if [ -r ${disk} ] ; then
-				BOOTDISKS="$BOOTDISKS -d ${disk} "
-			fi
 			i=$(($i + 1))
 		done
 		installer_opt=""
 	fi
 
-	if [ ${efi_mode} -eq 0 ]; then
-		${LOADER} -c ${console} -m ${memsize} ${BOOTDISKS} \
-		    ${loader_opt} ${vmname}
-		bhyve_exit=$?
-		if [ $bhyve_exit -ne 0 ]; then
-			break
-		fi
-	fi
-
 	#
 	# Build up args for additional tap and disk devices now.
 	#
-	nextslot=2  # slot 0 is hostbridge, slot 1 is lpc
+	nextslot=2  # slot 0 is hostbridge, slot 1 is ISO
 	devargs=""  # accumulate disk/tap args here
 	i=0
 	while [ $i -lt $tap_total ] ; do
@@ -348,28 +252,11 @@ while [ 1 ]; do
 	    i=$(($i + 1))
 	done
 
-	i=0
-	while [ $i -lt $pass_total ] ; do
-	    eval "pass=\$pass_dev${i}"
-	    devargs="$devargs -s $nextslot:0,passthru,${pass} "
-	    nextslot=$(($nextslot + 1))
-	    i=$(($i + 1))
-        done
-
-	efiargs=""
-	if [ ${efi_mode} -gt 0 ]; then
-		efiargs="-s 29,fbuf,tcp=${vnchost}:${vncport},"
-		efiargs="${efiargs}${vncsize}${vncwait}"
-		efiargs="${efiargs} -l bootrom,${efi_firmware}"
-		efiargs="${efiargs} ${tablet}"
-	fi
-
 	${FBSDRUN} -c ${cpus} -m ${memsize} ${bhyverun_opt}		\
 		-s 0:0,hostbridge					\
-		-s 1:0,lpc						\
-		${efiargs}						\
 		${devargs}						\
-		-l com1,${console}					\
+		-o bootrom=${firmware}					\
+		-o console=${console}					\
 		${installer_opt}					\
 		${vmname}
 
@@ -391,7 +278,7 @@ case $bhyve_exit in
 	0|1|2)
 		# Cleanup /dev/vmm entry when bhyve did not exit
 		# due to an error.
-		${BHYVECTL} --vm=${vmname} --destroy > /dev/null 2>&1
+		sysctl hw.vmm.destroy="${vmname}" > /dev/null 2>&1
 		;;
 esac
 
