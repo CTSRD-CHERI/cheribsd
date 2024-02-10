@@ -46,9 +46,13 @@
 
 #include <sys/cdefs.h>
 
+#ifndef __THROW
+#define	__THROW
+#endif
+
 __BEGIN_DECLS
-size_t strlcpy(char *dst, const char *src, size_t siz);
-size_t strlcat(char *dst, const char *src, size_t siz);
+size_t strlcpy(char *dst, const char *src, size_t siz) __THROW;
+size_t strlcat(char *dst, const char *src, size_t siz) __THROW;
 char *strnstr(const char *str, const char *find, size_t str_len);
 void strmode(mode_t mode, char *str);
 
