@@ -208,7 +208,6 @@ _LIBRARIES=	\
 		statcounters \
 		stdthreads \
 		supcplusplus \
-		syscalls \
 		sysdecode \
 		tacplus \
 		termcapw \
