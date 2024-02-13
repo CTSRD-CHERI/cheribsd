@@ -159,42 +159,10 @@ static const size_t VM_CHERI_REVOKE_BSZ_OTYPE =
 #define	CHERI_REVOKE_LAST_PASS		0x0001
 
 /*
- * If this bit is set, the kernel is free to return without making progress.
- */
-#define	CHERI_REVOKE_NO_WAIT_OK		0x0002
-
-/*
  * Ignore the given epoch argument and always attempt to advance the epoch
  * clock relative to its value "at the time of the call".
  */
 #define	CHERI_REVOKE_IGNORE_START	0x0004
-
-/*
- * Do a pass only if an epoch is open after synchronization.
- *
- * XXX This has probably lost any utility it may ever have had.
- */
-#define	CHERI_REVOKE_ONLY_IF_OPEN	0x0008
-
-/*
- * Ordinarily, cheri_revoke with CHERI_REVOKE_LAST_PASS attempts to minimize
- * the amount of work it does with the world held in single-threaded state.  It
- * will do up to two passes:
- *
- *   * an opening/incremental pass with the world running
- *
- *   * a pass with the world stopped, which visits kernel hoarders and
- *     recently-dirty pages (since the above pass)
- *
- * The first may be disabled by passing CHERI_REVOKE_LAST_NO_EARLY, causing
- * more work to be pushed into the world-stopped phase.
- *
- * Setting CHERI_REVOKE_LAST_NO_EARLY when not setting CHERI_REVOKE_LAST_PASS
- * will cause no passes to be performed.
- *
- * XXX This has probably lost any utility it may ever have had.
- */
-#define	CHERI_REVOKE_LAST_NO_EARLY	0x0010
 
 /*
  * Reset the stats counters to zero "after" reporting
