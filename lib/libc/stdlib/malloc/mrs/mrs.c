@@ -813,14 +813,6 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 		struct cheri_revoke_syscall_info crsi = { 0 };
 		uint64_t cyc_init, cyc_fini;
 
-#if 0
-		// XXX Take the stats structure prior to doing anything else
-		cheri_revoke(CHERI_REVOKE_ONLY_IF_OPEN |
-		    CHERI_REVOKE_IGNORE_START |
-		    CHERI_REVOKE_TAKE_STATS, 0, &crsi);
-		print_caprevoke_stats("prior", &crsi, 0);
-#endif
-
 		cyc_init = cheri_revoke_get_cyc();
 		cheri_revoke(CHERI_REVOKE_TAKE_STATS, start_epoch, &crsi);
 		cyc_fini = cheri_revoke_get_cyc();

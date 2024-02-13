@@ -326,18 +326,10 @@ kern_cheri_revoke(struct thread *td, int flags,
 	/* Serialize and figure out what we're supposed to do */
 	vm_map_lock(vmm);
 	{
-		static const int fast_out_flags = CHERI_REVOKE_NO_WAIT_OK |
-		    CHERI_REVOKE_IGNORE_START | CHERI_REVOKE_LAST_NO_EARLY;
 		int ires = 0;
 
 		if (!vmm->vm_cheri_revoke_quarantining)
 			vmm->vm_cheri_revoke_quarantining = true;
-
-		if ((flags & (fast_out_flags | CHERI_REVOKE_LAST_PASS)) ==
-		    fast_out_flags) {
-			/* Apparently they really just wanted the time. */
-			goto fast_out;
-		}
 
 reentry:
 		epoch = cheri_revoke_st_get_epoch(vmm->vm_cheri_revoke_st);
@@ -402,17 +394,8 @@ fast_out:
 			}
 			break;
 		case CHERI_REVOKE_ST_CLOSING:
-			/* There is another revoker in progress.  Wait? */
-			if ((flags & CHERI_REVOKE_ONLY_IF_OPEN) != 0) {
-				goto fast_out;
-			}
-			/* FALLTHROUGH */
 		case CHERI_REVOKE_ST_INITING:
 			KASSERT(vmm->system_map == 0, ("System map?"));
-
-			if ((flags & CHERI_REVOKE_NO_WAIT_OK) != 0) {
-				goto fast_out;
-			}
 
 			/* There is another revoker in progress.  Wait. */
 			ires = cv_wait_sig(&vmm->vm_cheri_revoke_cv,
@@ -433,15 +416,6 @@ fast_out:
 		KASSERT((myst == CHERI_REVOKE_ST_INITING) ||
 			(myst == CHERI_REVOKE_ST_CLOSING),
 		    ("Beginning revocation with bad current state"));
-
-		if (((flags & CHERI_REVOKE_ONLY_IF_OPEN) != 0) &&
-		    ((epoch & 1) == 0)) {
-			/*
-			 * If we're requesting work only if an epoch is open
-			 * and one isn't, then there's only one thing to do!
-			 */
-			goto fast_out;
-		}
 
 		if (entryst == CHERI_REVOKE_ST_NONE) {
 			vm_map_entry_t entry;
