@@ -310,7 +310,9 @@ kern_cheri_revoke(struct thread *td, int flags,
 	struct vm_cheri_revoke_cookie vmcrc;
 	struct cheri_revoke_info_page * __capability info_page;
 
-	vm = vmspace_acquire_ref(td->td_proc);
+	KASSERT(td == curthread, ("%s: td is not curthread", __func__));
+
+	vm = td->td_proc->p_vmspace;
 	vmm = &vm->vm_map;
 
 	/* Serialize and figure out what we're supposed to do */
@@ -361,7 +363,6 @@ fast_out:
 #endif
 			vm_map_unlock(vmm);
 			cv_signal(&vmm->vm_cheri_revoke_cv);
-			vmspace_free(vm);
 
 			return (cheri_revoke_fini(crsi, ires, crstp,
 			    &crepochs));
@@ -403,7 +404,6 @@ fast_out:
 			if (ires != 0) {
 				vm_map_unlock(vmm);
 				cv_signal(&vmm->vm_cheri_revoke_cv);
-				vmspace_free(vm);
 				return (ires);
 			}
 
@@ -436,7 +436,6 @@ fast_out:
 		res = vm_cheri_revoke_cookie_init(&vm->vm_map, &vmcrc);
 		if (res != KERN_SUCCESS) {
 			vm_map_unlock(vmm);
-			vmspace_free(vm);
 			return (cheri_revoke_fini(crsi, vm_mmap_to_errno(res),
 			    crstp, &crepochs));
 		}
@@ -498,7 +497,6 @@ fast_out:
 				/* XXX Don't signal other would-be revokers? */
 
 				vm_cheri_revoke_cookie_rele(&vmcrc);
-				vmspace_free(vm);
 
 				/* XXX Don't copy out the stat structure? */
 
@@ -643,7 +641,6 @@ close_already_inited:	/* (entryst == CHERI_REVOKE_ST_INITED) above */
 	cv_broadcast(&vmm->vm_cheri_revoke_cv);
 
 	vm_cheri_revoke_cookie_rele(&vmcrc);
-	vmspace_free(vm);
 
 	return (cheri_revoke_fini(crsi, vm_mmap_to_errno(res), crstp,
 	    &crepochs));
