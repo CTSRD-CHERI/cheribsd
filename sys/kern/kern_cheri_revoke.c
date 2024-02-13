@@ -313,20 +313,20 @@ kern_cheri_revoke(struct thread *td, int flags,
 	vm = vmspace_acquire_ref(td->td_proc);
 	vmm = &vm->vm_map;
 
-	/*
-	 * We need some value that's more or less "now", but we don't have
-	 * to be too picky about it.  This value is not reported to
-	 * userland, just used to guide the interlocking below.
-	 */
-	if ((flags & CHERI_REVOKE_IGNORE_START) != 0) {
-		start_epoch = cheri_revoke_st_get_epoch(
-		    vmm->vm_cheri_revoke_st);
-	}
-
 	/* Serialize and figure out what we're supposed to do */
 	vm_map_lock(vmm);
 	{
 		int ires = 0;
+
+		/*
+		 * We need some value that's more or less "now", but we don't have
+		 * to be too picky about it.  This value is not reported to
+		 * userland, just used to guide the interlocking below.
+		 */
+		if ((flags & CHERI_REVOKE_IGNORE_START) != 0) {
+			start_epoch = cheri_revoke_st_get_epoch(
+			    vmm->vm_cheri_revoke_st);
+		}
 
 		if (!vmm->vm_cheri_revoke_quarantining)
 			vmm->vm_cheri_revoke_quarantining = true;
