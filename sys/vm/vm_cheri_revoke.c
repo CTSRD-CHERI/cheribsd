@@ -59,7 +59,7 @@
 /***************************** PAGE VISITS ******************************/
 
 static inline int
-vm_cheri_revoke_should_visit_page(vm_page_t m, int flags)
+vm_cheri_revoke_should_visit_page(vm_page_t m)
 {
 	vm_page_astate_t mas = vm_page_astate_load(m);
 
@@ -94,8 +94,8 @@ enum vm_cro_visit {
  * Given a writable, xbusy page, visit it as part of the background scan, RW.
  */
 static void
-vm_cheri_revoke_visit_rw(const struct vm_cheri_revoke_cookie *crc, int flags,
-    vm_page_t m, bool *cap)
+vm_cheri_revoke_visit_rw(const struct vm_cheri_revoke_cookie *crc, vm_page_t m,
+    bool *cap)
 {
 	int hascaps;
 	CHERI_REVOKE_STATS_FOR(crst, crc);
@@ -176,8 +176,8 @@ vm_cheri_revoke_visit_rw(const struct vm_cheri_revoke_cookie *crc, int flags,
  * is clear to advance and carry on.
  */
 static enum vm_cro_visit
-vm_cheri_revoke_visit_ro(const struct vm_cheri_revoke_cookie *crc, int flags,
-    vm_page_t m, bool *cap)
+vm_cheri_revoke_visit_ro(const struct vm_cheri_revoke_cookie *crc, vm_page_t m,
+    bool *cap)
 {
 	CHERI_REVOKE_STATS_FOR(crst, crc);
 	int hascaps;
@@ -385,7 +385,7 @@ enum vm_cro_at {
  * caller should just repeat the call.  On failure, *ooff will not be modified.
  */
 static enum vm_cro_at
-vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
+vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc,
     vm_map_entry_t entry, vm_offset_t ioff, vm_offset_t *ooff, int *vmres)
 {
 	CHERI_REVOKE_STATS_FOR(crst, crc);
@@ -550,7 +550,7 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 	mxbusy = true;
 	VM_OBJECT_WUNLOCK(obj);
 
-	if (!vm_cheri_revoke_should_visit_page(m, flags)) {
+	if (!vm_cheri_revoke_should_visit_page(m)) {
 		CHERI_REVOKE_STATS_BUMP(crst, pages_skip);
 		goto ok;
 	}
@@ -567,7 +567,7 @@ visit_rw:
 
 		if (m->object == obj) {
 			/* Visit the page RW in place */
-			vm_cheri_revoke_visit_rw(crc, flags, m, &viscap);
+			vm_cheri_revoke_visit_rw(crc, m, &viscap);
 			goto ok;
 		}
 
@@ -582,7 +582,7 @@ visit_rw:
 visit_ro:
 	KASSERT(mxbusy || mwired, ("RO visit !busy !wired?"));
 
-	switch (vm_cheri_revoke_visit_ro(crc, flags, m, &viscap)) {
+	switch (vm_cheri_revoke_visit_ro(crc, m, &viscap)) {
 	case VM_CHERI_REVOKE_VIS_DONE:
 		/* We were able to conclude that the page was clean while RO*/
 		goto ok;
@@ -744,7 +744,7 @@ ok:
  * held across invocation.
  */
 static int
-vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc, int flags,
+vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc,
     vm_map_entry_t entry, vm_offset_t *addr)
 {
 	vm_offset_t ooffset;
@@ -774,8 +774,8 @@ vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc, int flags,
 		/* Find ourselves in this object */
 		ooffset = *addr - entry->start + entry->offset;
 
-		res = vm_cheri_revoke_object_at(
-		    crc, flags, entry, ooffset, &ooffset, &vmres);
+		res = vm_cheri_revoke_object_at(crc, entry, ooffset, &ooffset,
+		    &vmres);
 		switch (res) {
 		case VM_CHERI_REVOKE_AT_VMERR:
 			return (vmres);
@@ -812,7 +812,7 @@ SYSCTL_BOOL(_vm_cheri_revoke, OID_AUTO, pin_cpu, CTLFLAG_RWTUN,
  * embedded.
  */
 int
-vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *crc, int flags)
+vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *crc)
 {
 	int res = KERN_SUCCESS;
 	const vm_map_t map = crc->map;
@@ -849,7 +849,7 @@ vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *crc, int flags)
 		 * XXX Somewhere around here we should be resetting
 		 * MPROT_QUARANTINE'd map entries to be usable again, yes?
 		 */
-		res = vm_cheri_revoke_map_entry(crc, flags, entry, &addr);
+		res = vm_cheri_revoke_map_entry(crc, entry, &addr);
 
 		/*
 		 * We might be bailing out because a page fault failed for

@@ -628,7 +628,7 @@ fast_out:
 close_already_inited:	/* (entryst == CHERI_REVOKE_ST_INITED) above */
 
 			/* Walk the VM */
-			res = vm_cheri_revoke_pass(&vmcrc, 0);
+			res = vm_cheri_revoke_pass(&vmcrc);
 		}
 	}
 
