@@ -801,11 +801,10 @@ fini:
 }
 
 /*
- * Do a sweep through all mapped objects, hunting for revoked capabilities,
- * as defined by the machdep vm_cheri_revoke_page.
+ * Do a sweep through all mapped objects, hunting for revoked capabilities.
  *
- * For simplicity, the proc must be held on entry and will be held
- * throughout.  XXX Would we rather do something else?
+ * The caller must hold a reference on the vmspace into which this map is
+ * embedded.
  */
 int
 vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *crc, int flags)
@@ -813,36 +812,32 @@ vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *crc, int flags)
 	int res = KERN_SUCCESS;
 	const vm_map_t map = crc->map;
 	vm_map_entry_t entry;
-	vm_offset_t addr;
 
-	addr = 0;
-
-	/* Acquire the address space map write-locked and not busy */
+	/*
+	 * Interlock with fork(): we'll block on the map lock if a concurrent
+	 * fork is in progress, and once we acquire the lock, the busy state
+	 * ensures that subsequent calls to vmspace_fork() will block until
+	 * we're done.
+	 *
+	 * The revocation scan triggers copy-on-write faults, and we're not
+	 * ready to consider all of the implications of a concurrent fork (and
+	 * pmap_copy() call) just yet.
+	 */
 	vm_map_lock(map);
 	if (map->busy)
 		vm_map_wait_busy(map);
+	vm_map_busy(map);
+	vm_map_lock_downgrade(map);
 
 	/* Stay on this core for the duration */
 	sched_pin();
 
-	/*
-	 * Downgrade VM map locks to read-locked but busy to guard against
-	 * a racing fork (see vmspace_fork).
-	 */
-	vm_map_busy(map);
-	vm_map_lock_downgrade(map);
-
 	entry = vm_map_entry_first(map);
-
-	if (entry != &map->header)
-		addr = entry->start;
-
-	while (entry != &map->header) {
+	for (vm_offset_t addr = entry->start; entry != &map->header;) {
 		/*
 		 * XXX Somewhere around here we should be resetting
 		 * MPROT_QUARANTINE'd map entries to be usable again, yes?
 		 */
-
 		res = vm_cheri_revoke_map_entry(crc, flags, entry, &addr);
 
 		/*
@@ -854,6 +849,10 @@ vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *crc, int flags)
 			goto out;
 		}
 
+		/*
+		 * The map lock may have been dropped, so we need to re-lookup
+		 * the current entry.
+		 */
 		if (!vm_map_lookup_entry(map, addr, &entry)) {
 			entry = vm_map_entry_succ(entry);
 			if (entry != &map->header)
