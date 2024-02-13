@@ -800,6 +800,11 @@ fini:
 	return (KERN_SUCCESS);
 }
 
+static bool cheri_revoke_pin_cpu = false;
+SYSCTL_BOOL(_vm_cheri_revoke, OID_AUTO, pin_cpu, CTLFLAG_RWTUN,
+    &cheri_revoke_pin_cpu, 0,
+    "Pin the revoker to a single CPU when scanning");
+
 /*
  * Do a sweep through all mapped objects, hunting for revoked capabilities.
  *
@@ -812,6 +817,7 @@ vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *crc, int flags)
 	int res = KERN_SUCCESS;
 	const vm_map_t map = crc->map;
 	vm_map_entry_t entry;
+	bool pinned;
 
 	/*
 	 * Interlock with fork(): we'll block on the map lock if a concurrent
@@ -829,8 +835,13 @@ vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *crc, int flags)
 	vm_map_busy(map);
 	vm_map_lock_downgrade(map);
 
-	/* Stay on this core for the duration */
-	sched_pin();
+	/*
+	 * Pinning the revoker helps improve determinism and so is useful for
+	 * benchmarking, but might be a liability under load.
+	 */
+	pinned = atomic_load_bool(&cheri_revoke_pin_cpu);
+	if (pinned)
+		sched_pin();
 
 	entry = vm_map_entry_first(map);
 	for (vm_offset_t addr = entry->start; entry != &map->header;) {
@@ -874,7 +885,8 @@ vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *crc, int flags)
 out:
 	vm_map_unlock_read(map);
 
-	sched_unpin();
+	if (pinned)
+		sched_unpin();
 
 	vm_map_lock(map);
 	vm_map_unbusy(map);
