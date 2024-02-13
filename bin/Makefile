@@ -45,8 +45,6 @@ SUBDIR= cat \
 # Small cheri programs
 .if ${MACHINE_ABI:Mpurecap} || ${MK_LIB64C} == "yes"
 SUBDIR+= \
-	cheri_minimal_dynamic_exe \
-	cheri_minimal_pie_exe \
 	cheribsdtest \
 	helloworld \
 	helloworld_cxx \
