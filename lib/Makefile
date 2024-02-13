@@ -174,12 +174,6 @@ SUBDIR.${MK_BLACKLIST}+=libblacklist
 SUBDIR.${MK_BLUETOOTH}+=libbluetooth libsdp
 SUBDIR.${MK_BSNMP}+=	libbsnmp
 
-.if ${MACHINE_CPU:Mcheri}
-# XXX: should build on all architectures, but only needed for CHERI
-# right now and broken on amd64.
-SUBDIR+=	libsyscalls
-.endif
-
 .if ${MACHINE_ABI:Mpurecap} && ${MK_CHERI_CAPREVOKE} == "yes"
 SUBDIR+=	libcheri_caprevoke
 SUBDIR_DEPEND_libc+=	libcheri_caprevoke
