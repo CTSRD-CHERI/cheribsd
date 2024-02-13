@@ -42,7 +42,6 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libbsdstat \
 	libbsm \
 	libbz2 \
-	libc_nosyscalls \
 	libcalendar \
 	libcam \
 	libcapsicum \
