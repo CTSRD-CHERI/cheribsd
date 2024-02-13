@@ -568,9 +568,9 @@ fast_out:
 	/* Per-process kernel hoarders */
 	cheri_revoke_hoarders(td->td_proc, &vmcrc);
 
-	switch(myst) {
+	switch (myst) {
 	default:
-		panic("impossible");
+		__assert_unreachable();
 	case CHERI_REVOKE_ST_CLOSING:
 	case CHERI_REVOKE_ST_INITING:
 		if (entryst == CHERI_REVOKE_ST_NONE) {
@@ -603,7 +603,6 @@ fast_out:
 			pmap_activate(td);
 			vm_map_unlock(&vm->vm_map);
 		}
-		res = KERN_SUCCESS;
 		break;
 	}
 
@@ -612,30 +611,15 @@ fast_out:
 	if ((td->td_proc->p_flag & P_HADTHREADS) != 0) {
 		thread_single_end(td->td_proc, SINGLE_BOUNDARY);
 	}
+	PROC_UNLOCK(td->td_proc);
 
 	/* Post barrier phase! */
-
-	if (res != KERN_SUCCESS) {
-		PROC_UNLOCK(td->td_proc);
-
-		vm_map_lock(vmm);
-		cheri_revoke_st_set(&vmm->vm_cheri_revoke_st, epoch, entryst);
-		vm_map_unlock(vmm);
-
-		cv_signal(&vmm->vm_cheri_revoke_cv);
-
-		vm_cheri_revoke_cookie_rele(&vmcrc);
-		vmspace_free(vm);
-
-		return (cheri_revoke_fini(crsi, vm_mmap_to_errno(res), crstp,
-		    &crepochs));
-	}
-	PROC_UNLOCK(td->td_proc);
 
 	/*
 	 * If we came in with no epoch open, we have just opened one.
 	 * Bump the epoch count we will report to userland below.
 	 */
+	res = KERN_SUCCESS;
 	if (entryst == CHERI_REVOKE_ST_NONE) {
 		epoch++;
 
