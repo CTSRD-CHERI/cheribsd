@@ -12,6 +12,8 @@ ATF_TESTS_C+=	ld_preload_fds
 SRCS.$t=	$t.c common.c
 .endfor
 
+ATF_TESTS_C+=	dlopen_test
+
 WARNS?=		3
 
 .if ${MACHINE_ABI:Mpurecap}
