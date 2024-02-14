@@ -540,9 +540,6 @@ clear_region(void *mem, size_t len)
 static inline void
 quarantine_insert(struct mrs_quarantine *quarantine, void *ptr, size_t size)
 {
-  /*if (!cheri_gettag(ptr))*/
-    /*return;*/
-
 	MRS_UTRACE(UTRACE_MRS_QUARANTINE_INSERT, ptr, size, 0, NULL);
 	if (quarantine->list == NULL ||
 	    quarantine->list->num_descriptors == DESCRIPTOR_SLAB_ENTRIES) {
@@ -562,22 +559,12 @@ quarantine_insert(struct mrs_quarantine *quarantine, void *ptr, size_t size)
 
 	quarantine->list->slab[quarantine->list->num_descriptors].ptr = ptr;
 	quarantine->list->slab[quarantine->list->num_descriptors].size = size;
-
 	quarantine->list->num_descriptors++;
 
 	quarantine->size += size;
-  /*mrs_printf("qins %zu addr %p\n", size, ptr);*/
 	if (quarantine->size > quarantine->max_size) {
 		quarantine->max_size = quarantine->size;
 	}
-
-#if 0
-	if (quarantine->size > allocated_size) {
-		mrs_printf("fatal error: quarantine size %zu exceeded allocated_size %zu "
-		    "inserting %#p\n", quarantine->size, allocated_size, ptr);
-		exit(7);
-	}
-#endif
 }
 
 /*
