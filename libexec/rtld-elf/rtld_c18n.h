@@ -40,6 +40,8 @@ extern const char *ld_compartment_policy;
 extern const char *ld_compartment_overhead;
 extern const char *ld_compartment_sig;
 extern const char *ld_compartment_unwind;
+extern const char *ld_compartment_stats;
+extern struct rtld_c18n_stats *c18n_stats;
 
 /*
  * Policies

@@ -70,6 +70,9 @@
 
 #include <machine/sigframe.h>
 
+#include <cheri/c18n.h>
+
+#include <errno.h>
 #include <signal.h>
 #include <stdatomic.h>
 #include <stdlib.h>
@@ -140,6 +143,47 @@ const char *ld_compartment_sig;
 /* Expose tagged frame pointers to trusted frames */
 const char *ld_compartment_unwind;
 
+/* Export compartmentalisation statistics to a file */
+const char *ld_compartment_stats;
+
+struct rtld_c18n_stats *c18n_stats;
+
+#define	INC_NUM_COMPART		(c18n_stats->rcs_compart++, comparts.size++)
+#define	INC_NUM_BYTES(n)						\
+	atomic_fetch_add_explicit(&c18n_stats->rcs_bytes_total, (n),	\
+	    memory_order_relaxed)
+
+static void *
+c18n_malloc(size_t n)
+{
+	void *buf = xmalloc(n);
+
+	INC_NUM_BYTES(cheri_getlen(buf));
+	return (buf);
+}
+
+static void *
+c18n_realloc(void *buf, size_t new)
+{
+	size_t old = buf == NULL ? 0 : cheri_getlen(buf);
+
+	buf = realloc(buf, new);
+	if (buf == NULL)
+		rtld_fatal("realloc failed");
+	new = cheri_getlen(buf);
+	INC_NUM_BYTES(new - old);
+	return (buf);
+}
+
+static void
+c18n_free(void *buf)
+{
+	size_t old = buf == NULL ? 0 : cheri_getlen(buf);
+
+	free(buf);
+	INC_NUM_BYTES(-old);
+}
+
 /*
  * Policies
  */
@@ -156,9 +200,7 @@ struct string_base {
 static void
 string_base_expand(struct string_base *sb, size_t capacity)
 {
-	sb->buf = realloc(sb->buf, capacity);
-	if (sb->buf == NULL)
-		rtld_fatal("realloc failed");
+	sb->buf = c18n_realloc(sb->buf, capacity);
 	sb->capacity = capacity;
 }
 
@@ -252,9 +294,7 @@ expand_comparts_data(compart_id_t capacity)
 {
 	struct compart *data;
 
-	data = realloc(comparts.data, sizeof(*data) * capacity);
-	if (data == NULL)
-		rtld_fatal("realloc failed");
+	data = c18n_realloc(comparts.data, sizeof(*data) * capacity);
 	comparts.data = r_debug.r_comparts = data;
 	comparts.capacity = capacity;
 }
@@ -271,7 +311,7 @@ add_comparts_data(const char *name)
 		expand_comparts_data(comparts.capacity * 2);
 
 	GDB_COMPARTS_STATE(RCT_ADD, NULL);
-	com = &comparts.data[comparts.size++];
+	com = &comparts.data[INC_NUM_COMPART];
 	*com = (struct compart) {
 		.name = name
 	};
@@ -447,7 +487,7 @@ parse_policy(const char *pol, size_t size)
 		} else if (eat(&cur, "callee ")) {
 			if (eat_token(&cur, '\n', buf, sizeof(buf))) {
 				id = compart_name_to_id(buf);
-				rule = xmalloc(sizeof(*rule));
+				rule = c18n_malloc(sizeof(*rule));
 				*rule = (struct rule) {
 					.callee = id,
 					.action = SLIST_HEAD_INITIALIZER()
@@ -458,7 +498,7 @@ parse_policy(const char *pol, size_t size)
 			while (eat(&cur, "export to "))
 				if (eat_token(&cur, '\n', buf, sizeof(buf))) {
 					id = compart_name_to_id(buf);
-					act = xmalloc(sizeof(*act));
+					act = c18n_malloc(sizeof(*act));
 					*act = (struct rule_action) {
 						.caller = id,
 					};
@@ -597,16 +637,15 @@ expand_stk_table(struct stk_table *table, size_t capacity)
 	size_t o_capacity;
 	bool create = table == NULL;
 
-	table = realloc(table,
+	table = c18n_realloc(table,
 	    sizeof(*table) + sizeof(*table->entries) * capacity);
-	if (table == NULL)
-		rtld_fatal("realloc failed");
 
 	if (create)
 		table->meta = NULL;
 
-	table->meta = realloc(table->meta,
-	    sizeof(*table->meta) + sizeof(*table->meta->compart_stk) * capacity);
+	table->meta = c18n_realloc(table->meta,
+	    sizeof(*table->meta) +
+	    sizeof(*table->meta->compart_stk) * capacity);
 	if (table->meta == NULL)
 		rtld_fatal("realloc failed");
 
@@ -640,7 +679,7 @@ c18n_allocate_tcb(struct tcb *tcb)
 
 	table = expand_stk_table(NULL, comparts.size);
 
-	wrap = xmalloc(sizeof(*wrap));
+	wrap = c18n_malloc(sizeof(*wrap));
 	*wrap = (struct tcb_wrapper) {
 		.header = *tcb,
 		.tcb = cheri_seal(tcb, sealer_tcb),
@@ -657,9 +696,9 @@ c18n_free_tcb(void)
 
 	table = pop_stk_table(&dead_stk_tables);
 
-	free(table->meta->wrap);
-	free(table->meta);
-	free(table);
+	c18n_free(table->meta->wrap);
+	c18n_free(table->meta);
+	c18n_free(table);
 }
 
 static void *
@@ -769,6 +808,9 @@ get_or_create_untrusted_stk(compart_id_t cid, struct stk_table **tablep)
 		.begin = stk - size
 	};
 	table->entries[cid].stack = cheri_clearperm(stk, CHERI_PERM_SW_VMEM);
+
+	atomic_fetch_add_explicit(&c18n_stats->rcs_ustack, 1,
+	    memory_order_relaxed);
 
 	return (stk);
 }
@@ -1027,6 +1069,10 @@ tramp_pg_new(struct tramp_pg *next)
 	SLIST_NEXT(pg, link) = next;
 	atomic_store_explicit(&pg->size, 0, memory_order_relaxed);
 	pg->capacity = capacity - offsetof(typeof(*pg), trampolines);
+
+	atomic_fetch_add_explicit(&c18n_stats->rcs_tramp_page, 1,
+	    memory_order_relaxed);
+
 	return (pg);
 }
 
@@ -1092,15 +1138,15 @@ expand_tramp_table(int exp)
 	 */
 	assert(3 <= exp && exp <= 31);
 
-	free(tramp_table.map);
+	c18n_free(tramp_table.map);
 
 	tramp_table.exp = exp;
 	/*
 	 * The data array only needs to be as large as the maximum load.
 	 */
-	tramp_table.data = realloc(tramp_table.data,
+	tramp_table.data = c18n_realloc(tramp_table.data,
 	    sizeof(*tramp_table.data) * tramp_table_max_load(exp));
-	tramp_table.map = xmalloc(sizeof(*tramp_table.map) << exp);
+	tramp_table.map = c18n_malloc(sizeof(*tramp_table.map) << exp);
 
 	for (size_t i = 0; i < (1 << exp); ++i)
 		tramp_table.map[i] = (struct tramp_map_kv) {
@@ -1406,6 +1452,8 @@ start:
 insert:
 	idx = atomic_fetch_add_explicit(&tramp_table.size, 1,
 	    memory_order_relaxed);
+	atomic_fetch_add_explicit(&c18n_stats->rcs_tramp, 1,
+	    memory_order_relaxed);
 
 	/*
 	 * Invariant: tramp_table.size <= MAX_LOAD
@@ -1516,6 +1564,29 @@ c18n_init(Obj_Entry *obj_rtld)
 	int fd;
 	char *file;
 	struct stat st;
+
+	/*
+	 * Create memory mapping for compartmentalisation statistics.
+	 */
+	if (ld_compartment_stats == NULL)
+		fd = -1;
+	else {
+		fd = open(ld_compartment_stats, O_RDWR | O_TRUNC | O_CREAT,
+		    0666);
+		if (fd == -1)
+			rtld_fatal("c18n: Cannot open file (%s)",
+			    rtld_strerror(errno));
+		if (ftruncate(fd, sizeof(*c18n_stats)) == -1)
+			rtld_fatal("c18n: Cannot truncate file (%s)",
+			    rtld_strerror(errno));
+	}
+
+	c18n_stats = mmap(NULL, sizeof(*c18n_stats), PROT_READ | PROT_WRITE,
+	    fd == -1 ? MAP_ANON : MAP_SHARED, fd, 0);
+	if (c18n_stats == MAP_FAILED)
+		rtld_fatal("c18n: Cannot mmap file (%s)", rtld_strerror(errno));
+	atomic_store_explicit(&c18n_stats->version, RTLD_C18N_STATS_VERSION,
+	    memory_order_release);
 
 	/*
 	 * Initialise compartment table, add the RTLD compartment, load the
