@@ -34,6 +34,7 @@ libkern/strncmp.c		standard
 riscv/cheri/cheri_debug.c	optional	cpu_cheri ddb
 riscv/cheri/cheri_exception.c	optional	cpu_cheri
 riscv/cheri/cheri_machdep.c	optional	cpu_cheri
+riscv/riscv/aplic.c		standard
 riscv/riscv/autoconf.c		standard
 riscv/riscv/bus_machdep.c	standard
 riscv/riscv/bus_space_asm.S	standard
