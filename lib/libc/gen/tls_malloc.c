@@ -151,7 +151,7 @@ static caddr_t	pagepool_start, pagepool_end;
 static SLIST_HEAD(, pagepool_header) curpp = SLIST_HEAD_INITIALIZER(curpp);
 
 #ifdef CAPREVOKE
-volatile const struct cheri_revoke_info *cri;
+static volatile const struct cheri_revoke_info *cri;
 
 static void paint_shadow(void *mem, size_t size);
 static void clear_shadow(void *mem, size_t size);
