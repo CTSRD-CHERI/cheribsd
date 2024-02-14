@@ -166,7 +166,8 @@ malloc(size_t size)
 	return (mrs_malloc(size));
 }
 
-void free(void *ptr)
+void
+free(void *ptr)
 {
 	return (mrs_free(ptr));
 }
