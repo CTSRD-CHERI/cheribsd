@@ -781,6 +781,83 @@ print_cheri_revoke_stats(char *what, struct cheri_revoke_syscall_info *crsi,
 }
 #endif /* PRINT_CAPREVOKE */
 
+static void
+quarantine_flush(struct mrs_quarantine *quarantine)
+{
+	struct mrs_descriptor_slab *prev = NULL;
+
+	for (struct mrs_descriptor_slab *iter = quarantine->list; iter != NULL;
+	     iter = iter->next) {
+		for (int i = 0; i < iter->num_descriptors; i++) {
+#ifdef OFFLOAD_QUARANTINE
+			/*
+			 * In the offload case, only clear the bitmap
+			 * for validated descriptors (cap != NULL).
+			 */
+			if (iter->slab[i].ptr == NULL)
+				continue;
+#endif
+
+			/*
+			 * Doesn't matter if the underlying
+			 * size isn't a 16-byte multiple
+			 * because all allocations will be
+			 * 16-byte aligned.
+			 */
+			size_t len = __builtin_align_up(
+			    cheri_getlen(iter->slab[i].ptr),
+			    CAPREVOKE_BITMAP_ALIGNMENT);
+			caprev_shadow_nomap_clear_len(
+			    cri->base_mem_nomap, entire_shadow,
+			    cheri_getbase(iter->slab[i].ptr), len);
+
+			/*
+			 * Don't construct a pointer to a
+			 * previously revoked region until the
+			 * bitmap is cleared.
+			 */
+			atomic_thread_fence(memory_order_release);
+
+#ifdef CLEAR_ON_RETURN
+			clear_region(iter->slab[i].ptr,
+			    cheri_getlen(iter->slab[i].ptr));
+#endif /* CLEAR_ON_RETURN */
+
+			/*
+			 * We have a VMEM-bearing cap from
+			 * malloc_underlying_allocation.
+			 *
+			 * XXX: We used to rely on the
+			 * underlying allocator to rederive
+			 * caps but snmalloc2's CHERI support
+			 * doesn't do that by default, so
+			 * we'll clear VMEM here.  This feels
+			 * wrong, somehow; perhaps we want to
+			 * retry with snmalloc1 not doing
+			 * rederivation now that we're doing
+			 * this?
+			 */
+			REAL(free)(__builtin_cheri_perms_and(iter->slab[i].ptr,
+			    ~CHERI_PERM_SW_VMEM));
+		}
+		prev = iter;
+	}
+
+	if (prev != NULL) {
+		/* Free the quarantined descriptors. */
+		prev->next = free_descriptor_slabs;
+		while (!atomic_compare_exchange_weak(&free_descriptor_slabs,
+		    &prev->next, quarantine->list))
+			;
+
+		quarantine->list = NULL;
+		allocated_size -= quarantine->size;
+		quarantine->size = 0;
+	}
+	mrs_debug_printf("quarantine_flush: flushed, allocated_size %zu quarantine->size %zu\n",
+	    allocated_size, quarantine->size);
+}
+
 /*
  * Perform revocation then iterate through the quarantine and free entries with
  * non-zero underlying size (offload thread sets unvalidated caps to have zero
@@ -789,7 +866,7 @@ print_cheri_revoke_stats(char *what, struct cheri_revoke_syscall_info *crsi,
  * Supports ablation study knobs.
  */
 static inline void
-quarantine_flush(struct mrs_quarantine *quarantine)
+quarantine_revoke(struct mrs_quarantine *quarantine)
 {
 	MRS_UTRACE(UTRACE_MRS_QUARANTINE_FLUSH, NULL, 0, 0, NULL);
 	/* Don't read epoch until all bitmap painting is done. */
@@ -824,81 +901,7 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 
 	}
 
-	struct mrs_descriptor_slab *prev = NULL;
-	for (struct mrs_descriptor_slab *iter = quarantine->list; iter != NULL;
-	     iter = iter->next) {
-		for (int i = 0; i < iter->num_descriptors; i++) {
-#ifdef OFFLOAD_QUARANTINE
-			/*
-			 * In the offload case, only clear the bitmap
-			 * for validated descriptors (cap != NULL).
-			 */
-			if (iter->slab[i].ptr != NULL) {
-#endif /* OFFLOAD_QUARANTINE */
-
-				/*
-				 * Doesn't matter if the underlying
-				 * size isn't a 16-byte multiple
-				 * because all allocations will be
-				 * 16-byte aligned.
-				 */
-				size_t len = __builtin_align_up(
-				    cheri_getlen(iter->slab[i].ptr),
-				    CAPREVOKE_BITMAP_ALIGNMENT);
-				caprev_shadow_nomap_clear_len(
-				    cri->base_mem_nomap, entire_shadow,
-				    cheri_getbase(iter->slab[i].ptr), len);
-
-				/*
-				 * Don't construct a pointer to a
-				 * previously revoked region until the
-				 * bitmap is cleared.
-				 */
-				atomic_thread_fence(memory_order_release);
-
-#ifdef CLEAR_ON_RETURN
-				clear_region(iter->slab[i].ptr,
-				    cheri_getlen(iter->slab[i].ptr));
-#endif /* CLEAR_ON_RETURN */
-
-				/*
-				 * We have a VMEM-bearing cap from
-				 * malloc_underlying_allocation.
-				 *
-				 * XXX: We used to rely on the
-				 * underlying allocator to rederive
-				 * caps but snmalloc2's CHERI support
-				 * doesn't do that by default, so
-				 * we'll clear VMEM here.  This feels
-				 * wrong, somehow; perhaps we want to
-				 * retry with snmalloc1 not doing
-				 * rederivation now that we're doing
-				 * this?
-				 */
-				REAL(free)(
-				    __builtin_cheri_perms_and(iter->slab[i].ptr,
-				    ~CHERI_PERM_SW_VMEM));
-
-#ifdef OFFLOAD_QUARANTINE
-			}
-#endif /* OFFLOAD_QUARANTINE */
-		}
-		prev = iter;
-	}
-
-	if (prev != NULL) {
-		/* Free the quarantined descriptors. */
-		prev->next = free_descriptor_slabs;
-		while (!atomic_compare_exchange_weak(&free_descriptor_slabs,
-		    &prev->next, quarantine->list))
-			;
-
-		quarantine->list = NULL;
-		allocated_size -= quarantine->size;
-		quarantine->size = 0;
-	}
-	mrs_debug_printf("quarantine_flush: flushed, allocated_size %zu quarantine->size %zu\n",
-	    allocated_size, quarantine->size);
+	quarantine_flush(quarantine);
 }
 
 static void
@@ -962,7 +965,7 @@ _internal_malloc_revoke(struct mrs_quarantine *quarantine)
 #ifdef PRINT_CAPREVOKE_MRS
 	mrs_puts("malloc_revoke\n");
 #endif
-	quarantine_flush(quarantine);
+	quarantine_revoke(quarantine);
 #ifdef SNMALLOC_FLUSH
 	/* Consume pending messages now in our queue. */
 	snmalloc_flush_message_queue();
@@ -1582,7 +1585,7 @@ mrs_offload_thread(void *arg)
 
 		mrs_debug_printf("mrs_offload_thread: flushing validated quarantine size %zu\n", offload_quarantine.size);
 
-		quarantine_flush(&offload_quarantine);
+		quarantine_revoke(&offload_quarantine);
 
 #ifdef PRINT_CAPREVOKE_MRS
 		mrs_printf("mrs_offload_thread: application quarantine's (unvalidated) size "
