@@ -786,6 +786,7 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 {
 	struct mrs_descriptor_slab *prev = NULL;
 
+	MRS_UTRACE(UTRACE_MRS_QUARANTINE_FLUSH, NULL, 0, 0, NULL);
 	for (struct mrs_descriptor_slab *iter = quarantine->list; iter != NULL;
 	     iter = iter->next) {
 		for (int i = 0; i < iter->num_descriptors; i++) {
@@ -843,6 +844,7 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 		prev = iter;
 	}
 
+	size_t utrace_allocated_size = 0;
 	if (prev != NULL) {
 		/* Free the quarantined descriptors. */
 		prev->next = free_descriptor_slabs;
@@ -852,10 +854,12 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 
 		quarantine->list = NULL;
 		allocated_size -= quarantine->size;
+		utrace_allocated_size += quarantine->size;
 		quarantine->size = 0;
 	}
 	mrs_debug_printf("quarantine_flush: flushed, allocated_size %zu quarantine->size %zu\n",
 	    allocated_size, quarantine->size);
+	MRS_UTRACE(UTRACE_MRS_QUARANTINE_FLUSH_DONE, NULL, utrace_allocated_size, 0, NULL);
 }
 
 /*
@@ -868,11 +872,11 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 static inline void
 quarantine_revoke(struct mrs_quarantine *quarantine)
 {
-	MRS_UTRACE(UTRACE_MRS_QUARANTINE_FLUSH, NULL, 0, 0, NULL);
 	/* Don't read epoch until all bitmap painting is done. */
 	atomic_thread_fence(memory_order_acq_rel);
 	cheri_revoke_epoch_t start_epoch = cri->epochs.enqueue;
 
+	MRS_UTRACE(UTRACE_MRS_QUARANTINE_REVOKE, NULL, 0, 0, NULL);
 	while (!cheri_revoke_epoch_clears(cri->epochs.dequeue, start_epoch)) {
 # ifdef PRINT_CAPREVOKE
 		struct cheri_revoke_syscall_info crsi = { 0 };
@@ -898,8 +902,8 @@ quarantine_revoke(struct mrs_quarantine *quarantine)
 		    start_epoch, NULL);
 
 # endif /* !PRINT_CAPREVOKE */
-
 	}
+	MRS_UTRACE(UTRACE_MRS_QUARANTINE_REVOKE_DONE, NULL, 0, 0, NULL);
 
 	quarantine_flush(quarantine);
 }

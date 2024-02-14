@@ -73,6 +73,15 @@ print_utrace_mrs(FILE *fp, void *p)
 	case UTRACE_MRS_QUARANTINE_FLUSH:
 		fprintf(fp, "quarantine_flush()");
 		break;
+	case UTRACE_MRS_QUARANTINE_FLUSH_DONE:
+		fprintf(fp, "quarantine_flush(%zu) done", ut->s);
+		break;
+	case UTRACE_MRS_QUARANTINE_REVOKE:
+		fprintf(fp, "quarantine_revoke()");
+		break;
+	case UTRACE_MRS_QUARANTINE_REVOKE_DONE:
+		fprintf(fp, "quarantine_revoke() done");
+		break;
 	default:
 		return (0);
 	}
