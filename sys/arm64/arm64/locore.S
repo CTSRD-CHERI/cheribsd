@@ -196,11 +196,9 @@
 	.arch_extension a64c
 #endif
 ENTRY(_start)
-	/*
-	 * Drop to EL1
-	 * Note: this is done while still in A64 mode.
-	 */
-	bl	drop_to_el1
+	/* Enter the kernel exception level */
+	/* Note: this is done while still in A64 mode. */
+	bl	enter_kernel_el
 
 	/* Initialize morello capability ISA and switch to C64 if needed */
 	morello_cpu_init
@@ -376,8 +374,8 @@ ENTRY(mpentry)
 	/* Disable interrupts */
 	msr	daifset, #DAIF_INTR
 
-	/* Drop to EL1 */
-	bl	drop_to_el1
+	/* Enter the kernel exception level */
+	bl	enter_kernel_el
 
 	/* Initialize morello capability ISA and switch to C64 if needed */
 	morello_cpu_init
@@ -447,7 +445,7 @@ END(mpentry)
 	.arch_extension noc64
 	.arch_extension a64c
 #endif
-LENTRY(drop_to_el1)
+LENTRY(enter_kernel_el)
 	mrs	x23, CurrentEL
 	and	x23, x23, #(CURRENTEL_EL_MASK)
 	cmp	x23, #(CURRENTEL_EL_EL2)
@@ -569,7 +567,7 @@ LENTRY(drop_to_el1)
 	.align 3
 .Lsctlr_res1:
 	.quad SCTLR_RES1
-LEND(drop_to_el1)
+LEND(enter_kernel_el)
 #ifdef __CHERI_PURE_CAPABILITY__
 	.arch_extension c64
 #endif
