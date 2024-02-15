@@ -1,20 +1,13 @@
-#
-#
-
-# XXX: not at all purecap clean
-MK_WERROR=	no
-
 .include <src.opts.mk>
+
 PROG_CXX=	pmc
 MAN=	
-WARNS?=	3
-CXXFLAGS+= -O0
 CXXSTD= c++14
 CWARNFLAGS.gcc+= -Wno-redundant-decls
 CFLAGS+= -I${SRCTOP}/lib/libpmcstat
 
-# Does not link when built position-independent.
-MK_PIE=no
+# XXX: not at all purecap clean
+MK_WERROR=	no
 
 LIBADD=	pmc m pmcstat elf
 
