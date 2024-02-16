@@ -60,7 +60,6 @@ ENTRY(_setjmp)
 #endif
 	mov	x0, #0
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	mov	x9, xzr
 	/*
 	 * Tail-call to save Executive mode state
 	 */
@@ -112,7 +111,6 @@ ENTRY(_longjmp)
 	csinc	x0, x1, xzr, ne
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 	mov	c1, c4
-	mov	x9, xzr
 	/*
 	 * Tail-call to restore Executive mode state
 	 */
