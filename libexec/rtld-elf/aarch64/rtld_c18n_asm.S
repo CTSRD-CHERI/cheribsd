@@ -29,47 +29,29 @@
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 ENTRY(_rtld_setjmp)
-	/*
-	 * This function MUST update c0 to point at the buffer that saves the
-	 * general purpose registers.
-	 */
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	mrs	c2, rcsp_el0
 #else
 	mov	c2, csp
 #endif
+	/*
+	 * This function MUST preserve the value of c0 and clear unused return
+	 * value registers.
+	 */
 	b	_rtld_setjmp_impl
 END(_rtld_setjmp)
 
 ENTRY(_rtld_longjmp)
-	/*
-	 * This function MUST preserve the value of x1 and update c0 to point at
-	 * the general purpose registers to be restored.
-	 */
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	mrs	c2, rcsp_el0
 #else
 	mov	c2, csp
 #endif
-
-	str	c30, [csp, #-CAP_WIDTH]!
-	bl	_rtld_longjmp_impl
-	ldr	c30, [csp], #CAP_WIDTH
-
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	mrs	c10, rcsp_el0
-#define	TRUSTED_STACK	c10
-#else
-#define	TRUSTED_STACK	csp
-#endif
-	ldr	x2, [TRUSTED_STACK]
-	scvalue	TRUSTED_STACK, TRUSTED_STACK, x2
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	msr	rcsp_el0, TRUSTED_STACK
-#endif
-#undef	TRUSTED_STACK
-
-	RETURN
+	/*
+	 * This function MUST preserve the value of c0 and clear unused return
+	 * value registers.
+	 */
+	b	_rtld_longjmp_impl
 END(_rtld_longjmp)
 
 ENTRY(_rtld_thread_start)
@@ -89,13 +71,6 @@ ENTRY(_rtld_thread_start)
 #endif
 	b	_rtld_thread_start_impl
 END(_rtld_thread_start)
-
-ENTRY(_rtld_sighandler)
-#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	mov	c3, csp
-#endif
-	b	_rtld_sighandler_impl
-END(_rtld_sighandler)
 
 ENTRY(_rtld_get_rstk)
 	/*
@@ -436,14 +411,14 @@ TRAMP(tramp_pop_frame)
 #define	TRUSTED_STACK	csp
 #endif
 	/* Restore callee-saved registers */
-	ldp	c28, c29, [TRUSTED_STACK, #(CAP_WIDTH * 12)]
-	ldp	c26, c27, [TRUSTED_STACK, #(CAP_WIDTH * 10)]
-	ldp	c24, c25, [TRUSTED_STACK, #(CAP_WIDTH * 8)]
-	ldp	c22, c23, [TRUSTED_STACK, #(CAP_WIDTH * 6)]
-	ldp	c20, c21, [TRUSTED_STACK, #(CAP_WIDTH * 4)]
-	ldp	c30, c19, [TRUSTED_STACK, #(CAP_WIDTH * 2)]
+	ldp	x10, x11, [TRUSTED_STACK]
 	ldr	c12, [TRUSTED_STACK, #(CAP_WIDTH * 1)]
-	ldp	x10, x11, [TRUSTED_STACK], #(CAP_WIDTH * 14)
+	ldp	c30, c19, [TRUSTED_STACK, #(CAP_WIDTH * 2)]
+	ldp	c20, c21, [TRUSTED_STACK, #(CAP_WIDTH * 4)]
+	ldp	c22, c23, [TRUSTED_STACK, #(CAP_WIDTH * 6)]
+	ldp	c24, c25, [TRUSTED_STACK, #(CAP_WIDTH * 8)]
+	ldp	c26, c27, [TRUSTED_STACK, #(CAP_WIDTH * 10)]
+	ldp	c28, c29, [TRUSTED_STACK, #(CAP_WIDTH * 12)]
 
 	/*
 	 * Restore caller's saved rcsp.
@@ -467,6 +442,7 @@ TRAMP(tramp_pop_frame)
 	csel	c0, czr, c0, hi
 	csel	c1, czr, c1, hs
 
+	scvalue	TRUSTED_STACK, TRUSTED_STACK, x10
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	msr	rcsp_el0, TRUSTED_STACK
 #endif

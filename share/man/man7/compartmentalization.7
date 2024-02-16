@@ -131,14 +131,7 @@ For more up-to-date information, visit
 .It
 Calling
 .Xr longjmp 3
-in a signal handler does not work if the
-.Lb libthr
-is not linked to the application.
-This happens in
-.Xr sh 1 ,
-for example.
-A workaround is to PRELOAD
-.Lb libthr .
+in a signal handler is unsupported.
 .It
 Stack unwinding is not expected to work.
 This includes C++ exceptions, stack tracing in debuggers, and usage of

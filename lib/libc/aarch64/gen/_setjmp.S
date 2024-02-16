@@ -32,13 +32,6 @@
 #include <machine/setjmp.h>
 
 ENTRY(_setjmp)
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	/* Store Executive mode state */
-	str	REGN(lr), [REGN(sp), #-REG_WIDTH]!
-	bl	_rtld_setjmp
-	ldr	REGN(lr), [REGN(sp)], #REG_WIDTH
-#endif
-
 	/* Store the magic value and stack pointer */
 	ldr	x8, .Lmagic
 	mov	REG(9), REGN(sp)
@@ -61,19 +54,25 @@ ENTRY(_setjmp)
 #endif
 
 	/* Return value */
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	mov	c1, c0
+#endif
 	mov	x0, #0
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	mov	x9, xzr
+	/*
+	 * Tail-call to save Executive mode state
+	 */
+	b	_rtld_setjmp
+#else
 	RETURN
+#endif
 	.align	3
 .Lmagic:
 	.quad	_JB_MAGIC__SETJMP
 END(_setjmp)
 
 ENTRY(_longjmp)
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	/* Restore Executive mode state */
-	bl	_rtld_longjmp
-#endif
-
 	/* Check the magic value */
 	ldr	REG(8), [REG(0)], #(REG_WIDTH)
 	ldr	x9, .Lmagic
@@ -82,7 +81,11 @@ ENTRY(_longjmp)
 
 	/* Restore the stack pointer */
 	ldr	REG(8), [REG(0)], #(REG_WIDTH)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	mov	c3, c8
+#else
 	mov	REGN(sp), REG(8)
+#endif
 
 	/* Restore the general purpose registers and lr */
 	ldp	REG(19), REG(20), [REG(0)], #(REG_WIDTH * 2)
@@ -101,9 +104,21 @@ ENTRY(_longjmp)
 #endif
 
 	/* Load the return value */
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	mov	c4, c0
+#endif
 	cmp	x1, #0
 	csinc	x0, x1, xzr, ne
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	mov	c1, c4
+	mov	x9, xzr
+	/*
+	 * Tail-call to restore Executive mode state
+	 */
+	b	_rtld_longjmp
+#else
 	RETURN
+#endif
 
 botch:
 #ifdef _STANDALONE

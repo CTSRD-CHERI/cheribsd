@@ -489,12 +489,16 @@ struct trusted_frame {
 	void *ret_addr;
 };
 
-struct jmp_args { void **buf; void *val; };
+/*
+ * Returning this struct allows us to control the content of unused return value
+ * registers.
+ */
+struct jmp_args { uintptr_t ret; uintptr_t dummy; };
 
-struct jmp_args _rtld_setjmp_impl(void **, void *, struct trusted_frame *);
+struct jmp_args _rtld_setjmp_impl(uintptr_t, void **, struct trusted_frame *);
 
 struct jmp_args
-_rtld_setjmp_impl(void **buf, void *val, struct trusted_frame *csp)
+_rtld_setjmp_impl(uintptr_t ret, void **buf, struct trusted_frame *csp)
 {
 	/*
 	 * Before setjmp is called, the top of the Executive stack contains:
@@ -507,15 +511,17 @@ _rtld_setjmp_impl(void **buf, void *val, struct trusted_frame *csp)
 	 * buffer.
 	 */
 
-	*buf++ = cheri_seal(cheri_setaddress(csp, csp->next), sealer_jmpbuf);
+	*buf = cheri_seal(cheri_setaddress(csp, csp->next), sealer_jmpbuf);
 
-	return ((struct jmp_args) { .buf = buf, .val = val });
+	return ((struct jmp_args) { .ret = ret });
 }
 
-struct jmp_args _rtld_longjmp_impl(void **, void *, struct trusted_frame *);
+struct jmp_args _rtld_longjmp_impl(uintptr_t, void **, struct trusted_frame *,
+    void **);
 
 struct jmp_args
-_rtld_longjmp_impl(void **buf, void *val, struct trusted_frame *csp)
+_rtld_longjmp_impl(uintptr_t ret, void **buf, struct trusted_frame *csp,
+    void **rcsp)
 {
 	/*
 	 * Before longjmp is called, the top of the Executive stack contains:
@@ -532,26 +538,38 @@ _rtld_longjmp_impl(void **buf, void *val, struct trusted_frame *csp)
 	struct trusted_frame *target, *cur = csp;
 	void **stack;
 
-	target = cheri_unseal(*buf++, sealer_jmpbuf);
+	target = cheri_unseal(*buf, sealer_jmpbuf);
 
 	if (!cheri_is_subset(cur, target) || cur->next > (ptraddr_t)target)
 		rtld_fatal("longjmp: Bad target");
 
 	/*
-	 * Skip the first frame because it will be unwinded when this call
-	 * returns.
+	 * Unwind each frame before the target frame.
 	 */
-	while (cur->next < (ptraddr_t)target) {
-		cur = cheri_setaddress(cur, cur->next);
+	while (cur < target) {
 		stack = cur->o_stack;
 		stack = cheri_setoffset(stack, cheri_getlen(stack));
 		stack[-1] = cur->o_stack;
+		cur = cheri_setaddress(cur, cur->next);
 	}
 
-	*cur = *csp;
+	if (cur != target)
+		rtld_fatal("longjmp: Bad target");
+
+	/*
+	 * Set the next frame to the target frame.
+	 */
 	csp->next = (ptraddr_t)cur;
 
-	return ((struct jmp_args) { .buf = buf, .val = val });
+	/*
+	 * Maintain the invariant of the trusted frame and the invariant of the
+	 * bottom of the target compartment's stack.
+	 */
+	stack = cheri_setoffset(rcsp, cheri_getlen(rcsp));
+	csp->o_stack = stack[-1];
+	stack[-1] = rcsp;
+
+	return ((struct jmp_args) { .ret = ret });
 }
 
 /*
@@ -1203,18 +1221,10 @@ _rtld_sighandler_init(void (*p)(int, siginfo_t *, void *))
 	});
 }
 
-void _rtld_sighandler_impl(int, siginfo_t *, void *, ptraddr_t *);
+void _rtld_sighandler(int, siginfo_t *, void *);
 
 void
-_rtld_sighandler_impl(int sig, siginfo_t *info, void *_ucp, ptraddr_t *frame)
+_rtld_sighandler(int sig, siginfo_t *info, void *_ucp)
 {
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	(void)frame;
-#else
-	ucontext_t *ucp = _ucp;
-
-	*frame = (ptraddr_t)ucp->uc_mcontext.mc_capregs.cap_sp;
-#endif
-
 	thr_sighandler(sig, info, _ucp);
 }
