@@ -188,7 +188,7 @@ struct tramp_data {
 _Static_assert(sizeof(struct func_sig) == sizeof(func_sig_int),
     "Unexpected func_sig size");
 
-void *_rtld_tramp_hook(int, void *, const Obj_Entry *, const Elf_Sym *, void *,
+void *_rtld_tramp_hook(void *, int, void *, const Obj_Entry *, const Elf_Sym *,
     void *);
 size_t tramp_compile(void **, const struct tramp_data *);
 void *tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *);

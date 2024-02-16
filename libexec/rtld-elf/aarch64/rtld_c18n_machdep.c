@@ -131,7 +131,6 @@ tramp_compile(void **entry, const struct tramp_data *data)
 	if (hook) {
 		COPY(call_hook);
 		PATCH_MOV(call_hook, event, UTRACE_COMPARTMENT_ENTER);
-		PATCH_LDR_IMM(call_hook, target, 0);
 		PATCH_LDR_IMM(call_hook, obj, 1);
 		PATCH_LDR_IMM(call_hook, def, 2);
 		PATCH_LDR_IMM(call_hook, function, 3);

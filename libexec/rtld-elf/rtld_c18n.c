@@ -480,8 +480,12 @@ get_rstk(unsigned index)
 
 struct trusted_frame {
 	ptraddr_t next;
-	ptraddr_t o_stack;
-	void **stack;
+	ptraddr_t reserved;
+	/*
+	 * INVARIANT: This field contains the top of the caller's stack when the
+	 * caller was last entered.
+	 */
+	void **o_stack;
 	void *ret_addr;
 };
 
@@ -526,6 +530,7 @@ _rtld_longjmp_impl(void **buf, void *val, struct trusted_frame *csp)
 	 */
 
 	struct trusted_frame *target, *cur = csp;
+	void **stack;
 
 	target = cheri_unseal(*buf++, sealer_jmpbuf);
 
@@ -538,7 +543,9 @@ _rtld_longjmp_impl(void **buf, void *val, struct trusted_frame *csp)
 	 */
 	while (cur->next < (ptraddr_t)target) {
 		cur = cheri_setaddress(cur, cur->next);
-		cur->stack[-1] = cheri_setaddress(cur->stack, cur->o_stack);
+		stack = cur->o_stack;
+		stack = cheri_setoffset(stack, cheri_getlen(stack));
+		stack[-1] = cur->o_stack;
 	}
 
 	*cur = *csp;
@@ -729,11 +736,11 @@ resize_table(int exp)
 }
 
 void
-tramp_hook(int, void *, const Obj_Entry *, const Elf_Sym *, void *, void *);
+tramp_hook(void *, int, void *, const Obj_Entry *, const Elf_Sym *, void *);
 
 void
-tramp_hook(int event, void *target, const Obj_Entry *obj, const Elf_Sym *def,
-    void *link, void *rcsp)
+tramp_hook(void *rcsp, int event, void *target, const Obj_Entry *obj,
+    const Elf_Sym *def, void *link)
 {
 	Elf_Word sym_num;
 	const char *sym;

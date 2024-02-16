@@ -155,7 +155,7 @@ ENTRY(_rtld_tramp_hook)
 	 * This function is only called from trampolines when tracing
 	 * compartment transitions.
 	 *
-	 * Upon entry, c10-c14 hold the first arguments of tramp_hook.
+	 * Upon entry, c10-c15 hold the first arguments of tramp_hook.
 	 *
 	 * All argument registers must be preserved.
 	 */
@@ -167,7 +167,7 @@ ENTRY(_rtld_tramp_hook)
 	stp	c6, c7, [csp, #(CAP_WIDTH * 6)]
 	stp	c8, c9, [csp, #(CAP_WIDTH * 8)]
 
-	/* Save floating point registers */
+	/* Save floating point arguments */
 	stp	q0, q1, [csp, #-(16 * 8)]!
 	stp	q2, q3, [csp, #(16 * 2)]
 	stp	q4, q5, [csp, #(16 * 4)]
@@ -178,17 +178,13 @@ ENTRY(_rtld_tramp_hook)
 	mov	c2, c12
 	mov	c3, c13
 	mov	c4, c14
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	mov	c5, csp
-#else
-	mrs	c5, rcsp_el0
-#endif
+	mov	c5, c15
 
-	stp	c18, c30, [csp, #-(CAP_WIDTH * 2)]!
+	str	c30, [csp, #-CAP_WIDTH]!
 	bl	tramp_hook
-	ldp	c18, c30, [csp], #(CAP_WIDTH * 2)
+	ldr	c30, [csp], #CAP_WIDTH
 
-	/* Restore floating point registers */
+	/* Restore floating point arguments */
 	ldp	q6, q7, [csp, #(16 * 6)]
 	ldp	q4, q5, [csp, #(16 * 4)]
 	ldp	q2, q3, [csp, #(16 * 2)]
@@ -229,15 +225,10 @@ END(_rtld_tramp_hook)
 	.word	label - end_##tramp
 
 TRAMP(tramp_save_caller)
-1:	ldr	c18, #0		/* To be patched at runtime */
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	mov	c17, csp
-	mrs	c10, rcsp_el0
-#define	TRUSTED_STACK	c10
+	mov	c10, csp
 #else
-	mrs	c17, rcsp_el0
-	mov	x10, sp
-#define	TRUSTED_STACK	csp
+	mrs	c10, rcsp_el0
 #endif
 
 	/*
@@ -245,61 +236,65 @@ TRAMP(tramp_save_caller)
 	 * This step must be done before the table lookup so that
 	 * same-compartment switches get the correct stack.
 	 */
-	gclim	x11, c17
-	scvalue	c16, c17, x11
-	ldr	x12, [c16, #-CAP_WIDTH]
-	str	c17, [c16, #-CAP_WIDTH]
+	gclim	x11, c10
+	scvalue	c18, c10, x11
+	ldr	c17, [c18, #-CAP_WIDTH]
+	str	c10, [c18, #-CAP_WIDTH]
+
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mrs	c18, rcsp_el0
+#define	TRUSTED_STACK	c18
+	mov	x12, x18
+#else
+	mov	x12, sp
+#define	TRUSTED_STACK	csp
+#endif
+
+	/*
+	 * Save the number of unused return value registers.
+	 */
+1:	movz	x13, #0		/* To be patched at runtime */
 
 	/* Push frame */
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	mov	x11, x10
-	stp	x11, x12, [TRUSTED_STACK, #-(CAP_WIDTH * 14)]!
-#else
-	stp	x10, x12, [TRUSTED_STACK, #-(CAP_WIDTH * 14)]!
-#endif
-	str	c16, [TRUSTED_STACK, #(CAP_WIDTH * 1)]
+	stp	x12, x13, [TRUSTED_STACK, #-(CAP_WIDTH * 14)]!
+	str	c17, [TRUSTED_STACK, #(CAP_WIDTH * 1)]
 	stp	c30, c19, [TRUSTED_STACK, #(CAP_WIDTH * 2)]
 	stp	c20, c21, [TRUSTED_STACK, #(CAP_WIDTH * 4)]
 	stp	c22, c23, [TRUSTED_STACK, #(CAP_WIDTH * 6)]
 	stp	c24, c25, [TRUSTED_STACK, #(CAP_WIDTH * 8)]
 	stp	c26, c27, [TRUSTED_STACK, #(CAP_WIDTH * 10)]
 	stp	c28, c29, [TRUSTED_STACK, #(CAP_WIDTH * 12)]
-
-	/*
-	 * Save the number of unused return value registers in the flags of csp.
-	 */
-2:	movz	x13, #0		/* To be patched at runtime */
-	scflgs	TRUSTED_STACK, TRUSTED_STACK, x13
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	msr	rcsp_el0, TRUSTED_STACK
 #endif
 #undef	TRUSTED_STACK
+
+2:	ldr	c19, #0		/* To be patched at runtime */
 TRAMPEND(tramp_save_caller)
 
-PATCH_POINT(tramp_save_caller, target, 1b)
-PATCH_POINT(tramp_save_caller, ret_args, 2b)
+PATCH_POINT(tramp_save_caller, ret_args, 1b)
+PATCH_POINT(tramp_save_caller, target, 2b)
 
 TRAMP(tramp_call_hook)
-1:	ldr	c17, #0		/* To be patched at runtime */
+1:	ldr	c18, #0		/* To be patched at runtime */
 
-2:	mov	w10, #0		/* To be patched at runtime */
-3:	ldr	c11, #0		/* To be patched at runtime */
-4:	ldr	c12, #0		/* To be patched at runtime */
-5:	ldr	c13, #0		/* To be patched at runtime */
-	mov	c14, c30
+2:	mov	w11, #0		/* To be patched at runtime */
+	mov	c12, c19
+3:	ldr	c13, #0		/* To be patched at runtime */
+4:	ldr	c14, #0		/* To be patched at runtime */
+	mov	c15, c30
 
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	blr	x17
+	blr	x18
 #else
-	blr	c17
+	blr	c18
 #endif
 TRAMPEND(tramp_call_hook)
 
 PATCH_POINT(tramp_call_hook, function, 1b)
 PATCH_POINT(tramp_call_hook, event, 2b)
-PATCH_POINT(tramp_call_hook, target, 3b)
-PATCH_POINT(tramp_call_hook, obj, 4b)
-PATCH_POINT(tramp_call_hook, def, 5b)
+PATCH_POINT(tramp_call_hook, obj, 3b)
+PATCH_POINT(tramp_call_hook, def, 4b)
 
 TRAMP(tramp_switch_stack)
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
@@ -363,14 +358,14 @@ PATCH_POINT(tramp_switch_stack, cid, 1b)
 TRAMP(tramp_invoke_exe)
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	mov	csp, c17
-	blr	x18
+	blr	x19
 #else
 	/*
 	 * Save the address of the current frame to c29 so that RTLD functions
 	 * can locate it. c29 will be restored after the function call returns.
 	 */
 	mov	c29, csp
-	blr	c18
+	blr	c19
 #endif
 TRAMPEND(tramp_invoke_exe)
 
@@ -394,38 +389,42 @@ TRAMP(tramp_clear_ret_args)
 TRAMPEND(tramp_clear_ret_args)
 
 TRAMP(tramp_invoke_res)
-	/* Clear callee-saved registers */
-	mov	x29, xzr
-	mov	x28, xzr
-	mov	x27, xzr
-	mov	x26, xzr
-	mov	x25, xzr
-	mov	x24, xzr
-	mov	x23, xzr
-	mov	x22, xzr
-	mov	x21, xzr
+	/*
+	 * Clear callee-saved registers, except
+	 * - c19: Callee's code
+	 */
 	mov	x20, xzr
-	mov	x19, xzr
+	mov	x21, xzr
+	mov	x22, xzr
+	mov	x23, xzr
+	mov	x24, xzr
+	mov	x25, xzr
+	mov	x26, xzr
+	mov	x27, xzr
+	mov	x28, xzr
+	mov	x29, xzr
 
 	/*
 	 * Clear temporary registers, except
-	 * - c10: Link to previous frame (scalar)
+	 */
+	mov	x10, xzr
+	/*
 	 * - c11: Top of caller's stack (scalar)
-	 * - c12: Old top of caller's stack (scalar)
-	 * - c13: Flags of csp (scalar)
+	 * - c12: Link to previous frame (scalar)
+	 * - c13: Number of unused return argument registers (scalar)
 	 * - c14: Callee's compartment ID (scalar)
 	 * - c15: Length of stack table (scalar)
 	 * - c16: Comparison result (scalar)
 	 * - c17: Callee's stack
-	 * - c18: Callee's code
 	 */
+	mov	x18, xzr
 
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	mov	csp, c17
-	blr	x18
+	blr	x19
 #else
 	msr	rcsp_el0, c17
-	blrr	c18
+	blrr	c19
 #endif
 TRAMPEND(tramp_invoke_res)
 
@@ -449,9 +448,10 @@ TRAMP(tramp_pop_frame)
 	/*
 	 * Restore caller's saved rcsp.
 	 */
-	ldr	c13, [c12, #-CAP_WIDTH]
-	scvalue	c14, c12, x11
-	str	c14, [c12, #-CAP_WIDTH]
+	gclim	x13, c12
+	scvalue	c14, c12, x13
+	ldr	c15, [c14, #-CAP_WIDTH]
+	str	c12, [c14, #-CAP_WIDTH]
 
 	/*
 	 * Clear unused return value registers. The registers to clear is
@@ -463,32 +463,32 @@ TRAMP(tramp_pop_frame)
 	 *
 	 * Use subs instead of cmp to clear a register tag.
 	 */
-	gcflgs	x15, TRUSTED_STACK
-	subs	x16, x15, #0b01
-	csel	c1, czr, c1, hs
+	subs	x16, x11, #0b01
 	csel	c0, czr, c0, hi
-
-	mov	x9, xzr
-	mov	x8, xzr
-	mov	x7, xzr
-	mov	x6, xzr
-	mov	x5, xzr
-	mov	x4, xzr
-	mov	x3, xzr
-	mov	x2, xzr
+	csel	c1, czr, c1, hs
 
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	msr	rcsp_el0, TRUSTED_STACK
 #endif
+#undef	TRUSTED_STACK
+
+	mov	x2, xzr
+	mov	x3, xzr
+	mov	x4, xzr
+	mov	x5, xzr
+	mov	x6, xzr
+	mov	x7, xzr
+	mov	x8, xzr
+	mov	x9, xzr
 
 	/*
 	 * Clear temporary registers, except
 	 * - c10: Link to previous frame (scalar)
-	 * - c11: Old top of caller's stack (scalar)
-	 * - c12: Bottom of caller's stack
-	 * - c13: Current top of caller's stack
-	 * - c14: Old top of caller's stack
-	 * - c15: Flags of csp (scalar)
+	 * - c11: Number of unused return argument registers (scalar)
+	 * - c12: Old top of caller's stack
+	 * - c13: Bottom of caller's stack (scalar)
+	 * - c14: Bottom of caller's stack
+	 * - c15: Current top of caller's stack
 	 * - c16: Comparison result (scalar)
 	 */
 	mov	x17, xzr
@@ -499,11 +499,10 @@ TRAMP(tramp_pop_frame)
 	 * Executive).
 	 */
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	mov	csp, c13
+	mov	csp, c15
 #else
-	msr	rcsp_el0, c13
+	msr	rcsp_el0, c15
 #endif
-#undef	TRUSTED_STACK
 TRAMPEND(tramp_pop_frame)
 
 TRAMP(tramp_return)
@@ -518,11 +517,12 @@ TRAMP(tramp_return_hook)
 	/* Save return value registers */
 1:	ldr	c18, #0			/* To be patched at runtime */
 
-2:	mov	w10, #0			/* To be patched at runtime */
-	mov	x11, xzr
-3:	ldr	c12, #0			/* To be patched at runtime */
-4:	ldr	c13, #0			/* To be patched at runtime */
-	mov	c14, c30
+	mov	c10, c15
+2:	mov	w11, #0			/* To be patched at runtime */
+	mov	x12, xzr
+3:	ldr	c13, #0			/* To be patched at runtime */
+4:	ldr	c14, #0			/* To be patched at runtime */
+	mov	c15, c30
 
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	br	x18
