@@ -332,7 +332,10 @@ init_stk_table(struct stk_table *table)
  * Set a dummy Restricted stack so that trampolines do not need to test if the
  * Restricted stack is valid.
  */
-static void *dummy_stack[1] = { &dummy_stack[0] };
+extern struct stk_bottom dummy_stack;
+struct stk_bottom dummy_stack = {
+	.top = &dummy_stack
+};
 #endif
 
 static _Atomic(struct stk_table *) free_stk_tables;
@@ -402,8 +405,11 @@ stk_table_expand(struct stk_table *table, size_t n_capacity, bool lock)
 	    (cheri_getlen(table) - offsetof(typeof(*table), stacks)) /
 	    sizeof(*table->stacks);
 
-	memset(&table->stacks[o_capacity], 0,
-	    sizeof(*table->stacks) * (table->capacity - o_capacity));
+	for (size_t i = o_capacity; i < table->capacity; ++i)
+		table->stacks[i] = (struct stk_table_stack) {
+			.bottom = allocate_rstk,
+			.size = 0
+		};
 
 	return (table);
 }
@@ -489,7 +495,7 @@ allocate_rstk_impl(unsigned index)
 		table = stk_table_expand(table, capacity, true);
 		stk_table_set(table);
 	}
-	assert(table->stacks[cid_off].bottom == NULL);
+	assert(table->stacks[cid_off].size == 0);
 
 	size = C18N_STACK_SIZE;
 	stk = stk_create(size);
