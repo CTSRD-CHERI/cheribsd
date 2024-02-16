@@ -45,9 +45,13 @@ esac
 
 if [ -n "$HAVE_CHERI_DESKTOP" ]; then
 	CHERI_DESKTOP_REVISIT='"CHERI Desktop" "Install the CHERI desktop environment (requires network)"'
-	CHERI_VM_SUPPORT_REVISIT='"CHERI VM Support" "Install CHERI virtual machine support (requires network)"'
 else
 	CHERI_DESKTOP_REVISIT=
+fi
+
+if [ -n "$HAVE_CHERI_VM_SUPPORT" ]; then
+	CHERI_VM_SUPPORT_REVISIT='"CHERI VM Support" "Install CHERI virtual machine support (requires network)"'
+else
 	CHERI_VM_SUPPORT_REVISIT=
 fi
 
