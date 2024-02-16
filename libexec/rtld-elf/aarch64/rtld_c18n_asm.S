@@ -388,28 +388,6 @@ TRAMP(tramp_switch_stack)
 	blr	[c30, #0]			/* allocate_rstk() */
 #endif
 3:	ldr	c17, [c17, #-CAP_WIDTH]
-
-	/* Move the c9 buffer to the target stack */
-	cbz	x9, 6f
-	gclen	x11, c9
-	add	c30, c9, x11
-	lsr	x11, x11, #4
-	tst	x30, #0xf
-	b.eq	5f
-
-	orr	x12, x30, #0xfffffffffffffff0
-	add	c17, c17, x12
-7:	ldrb	w12, [c30, #-1]!
-	strb	w12, [c17, #-1]!
-	tst	x30, #0xf
-	b.ne	7b
-
-4:	cbz	x11, 6f
-5:	ldr	c12, [c30, #-CAP_WIDTH]!
-	str	c12, [c17, #-CAP_WIDTH]!
-	sub	x11, x11, #1
-	b	4b
-6:
 TRAMPEND(tramp_switch_stack)
 
 PATCH_POINT(tramp_switch_stack, cid, 1b)

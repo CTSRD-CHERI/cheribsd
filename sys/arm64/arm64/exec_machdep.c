@@ -1008,7 +1008,6 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	tf->tf_x[8] = (uintcap_t)catcher;
 	tf->tf_sp = (uintcap_t)fp;
 #if __has_feature(capabilities)
-	tf->tf_x[9] = 0;
 	trapframe_set_elr(tf, (uintcap_t)p->p_md.md_sigcode);
 #else
 	tf->tf_elr = (register_t)PROC_SIGCODE(p);
