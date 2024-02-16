@@ -480,7 +480,8 @@ get_rstk(unsigned index)
 
 struct trusted_frame {
 	ptraddr_t next;
-	ptraddr_t reserved;
+	uint8_t ret_args : 2;
+	ptraddr_t cookie : 62;
 	/*
 	 * INVARIANT: This field contains the top of the caller's stack when the
 	 * caller was last entered.

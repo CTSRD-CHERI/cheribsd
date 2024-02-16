@@ -226,9 +226,14 @@ TRAMP(tramp_save_caller)
 #endif
 
 	/*
-	 * Save the number of unused return value registers.
+	 * Save the address that the callee should return to.
 	 */
-1:	movz	x13, #0		/* To be patched at runtime */
+1:	adr	c13, #0		/* To be patched at runtime */
+	/*
+	 * Save the number of unused return value registers in the 2 least
+	 * significant bits of the register.
+	 */
+2:	add	x13, x13, #0	/* To be patched at runtime */
 
 	/* Push frame */
 	stp	x12, x13, [TRUSTED_STACK, #-(CAP_WIDTH * 14)]!
@@ -244,11 +249,12 @@ TRAMP(tramp_save_caller)
 #endif
 #undef	TRUSTED_STACK
 
-2:	ldr	c19, #0		/* To be patched at runtime */
+3:	ldr	c19, #0		/* To be patched at runtime */
 TRAMPEND(tramp_save_caller)
 
-PATCH_POINT(tramp_save_caller, ret_args, 1b)
-PATCH_POINT(tramp_save_caller, target, 2b)
+PATCH_POINT(tramp_save_caller, cookie, 1b)
+PATCH_POINT(tramp_save_caller, ret_args, 2b)
+PATCH_POINT(tramp_save_caller, target, 3b)
 
 TRAMP(tramp_call_hook)
 1:	ldr	c18, #0		/* To be patched at runtime */
@@ -438,7 +444,8 @@ TRAMP(tramp_pop_frame)
 	 *
 	 * Use subs instead of cmp to clear a register tag.
 	 */
-	subs	x16, x11, #0b01
+	and	x16, x11, #0b11
+	subs	x17, x16, #0b01
 	csel	c0, czr, c0, hi
 	csel	c1, czr, c1, hs
 
@@ -465,9 +472,9 @@ TRAMP(tramp_pop_frame)
 	 * - c13: Bottom of caller's stack (scalar)
 	 * - c14: Bottom of caller's stack
 	 * - c15: Current top of caller's stack
-	 * - c16: Comparison result (scalar)
+	 * - c16: Logical operation result (scalar)
+	 * - c17: Comparison result (scalar)
 	 */
-	mov	x17, xzr
 	mov	x18, xzr
 
 	/*

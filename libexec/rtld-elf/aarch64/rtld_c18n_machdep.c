@@ -73,6 +73,7 @@ tramp_compile(void **entry, const struct tramp_data *data)
 #undef	IMPORT
 
 	uint32_t *buf = *entry;
+	uint32_t *cookie_patch;
 	size_t size = 0;
 	int to_clear;
 	bool executive = cheri_getperm(data->target) & CHERI_PERM_EXECUTIVE;
@@ -99,7 +100,16 @@ tramp_compile(void **entry, const struct tramp_data *data)
 
 #define PATCH_MOV(tramp, name, value)					\
 	do {								\
-		*PATCH_POINT(tramp, name) |= ((uint16_t)value) << 5;	\
+		uint32_t _value = (value);				\
+		_value = ((_value & 0xffff) << 5);			\
+		*PATCH_POINT(tramp, name) |= _value;			\
+	} while (0)
+
+#define	PATCH_ADD(tramp, name, value)					\
+	do {								\
+		uint32_t _value = (value);				\
+		_value = ((_value & 0xfff) << 10);			\
+		*PATCH_POINT(tramp, name) |= _value;			\
 	} while (0)
 
 #define	PATCH_LDR_IMM(tramp, name, offset)				\
@@ -110,6 +120,16 @@ tramp_compile(void **entry, const struct tramp_data *data)
 		    patch_tramp_##tramp##_##name - size,		\
 		    sizeof(void *)) & 0x1ffff0) << 1;			\
 	} while(0)
+
+#define	PATCH_ADR(point, target)					\
+	do {								\
+		uint32_t _offset =					\
+		    (ptraddr_t)(target) - (ptraddr_t)(point);		\
+		_offset =						\
+		    ((_offset & 0x3) << 29) |				\
+		    ((_offset & 0x1ffffc) << 3);			\
+		*(point) |= _offset;					\
+	} while (0)
 
 	header.target = data->target;
 	COPY_DATA(header);
@@ -124,9 +144,10 @@ tramp_compile(void **entry, const struct tramp_data *data)
 	*entry = buf;
 
 	COPY(save_caller);
+	cookie_patch = PATCH_POINT(save_caller, cookie);
 	PATCH_LDR_IMM(save_caller, target, 0);
 	if (data->sig.valid)
-		PATCH_MOV(save_caller, ret_args, data->sig.ret_args);
+		PATCH_ADD(save_caller, ret_args, data->sig.ret_args);
 
 	if (hook) {
 		COPY(call_hook);
@@ -165,6 +186,7 @@ tramp_compile(void **entry, const struct tramp_data *data)
 		COPY(invoke_res);
 	}
 
+	PATCH_ADR(cookie_patch, buf);
 	COPY(pop_frame);
 
 	if (hook) {
