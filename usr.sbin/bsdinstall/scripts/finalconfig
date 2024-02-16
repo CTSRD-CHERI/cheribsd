@@ -54,7 +54,7 @@ fi
 while true; do
 	exec 5>&1
 	REVISIT=$(echo $CHERI_DESKTOP_REVISIT $CHERI_VM_SUPPORT_REVISIT | \
-	    xargs bsddialog --backtitle "$OSNAME Installer" \
+	    xargs -o bsddialog --backtitle "$OSNAME Installer" \
 	    --title "Final Configuration" --ok-label "Select" \
 	    --cancel-label "Finish" --default-no --menu \
 	    "Setup of your $OSNAME system is nearly complete. You can now modify your configuration choices. After this screen, you will have an opportunity to make more complex changes using a shell." 0 0 0 \
