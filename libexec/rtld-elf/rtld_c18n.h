@@ -35,9 +35,11 @@
  * Global symbols
  */
 extern uintptr_t sealer_pltgot, sealer_tramp;
+
+extern size_t c18n_code_perm_clear;
+
 extern const char *ld_compartment_utrace;
 extern bool ld_compartment_utrace_verbose;
-extern const char *ld_compartment_enable;
 extern const char *ld_compartment_policy;
 extern const char *ld_compartment_overhead;
 extern const char *ld_compartment_sig;
@@ -208,10 +210,27 @@ func_sig_legal(struct func_sig sig)
 /*
  * APIs
  */
+#define	c18n_return_address()	({					\
+		void *pc;						\
+		if (C18N_ENABLED) {					\
+			_Pragma("clang diagnostic push");		\
+			_Pragma("clang diagnostic ignored		\
+			    \"-Wframe-address\"");			\
+			pc = ((struct trusted_frame *)			\
+			    __builtin_frame_address(1))->pc;		\
+			_Pragma("clang diagnostic pop");		\
+		} else							\
+			pc = __builtin_return_address(0);		\
+		pc;							\
+	})
+
 void *_rtld_sandbox_code(void *, struct func_sig);
 void *_rtld_safebox_code(void *, struct func_sig);
 
-void c18n_init(void);
-void *c18n_return_address(void);
+void _rtld_bind_start_c18n(void);
+void *_rtld_tlsdesc_static_c18n(void *);
+void *_rtld_tlsdesc_undef_c18n(void *);
+void *_rtld_tlsdesc_dynamic_c18n(void *);
 
+void c18n_init(void);
 #endif

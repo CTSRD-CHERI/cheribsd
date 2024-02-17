@@ -66,11 +66,18 @@ init_pltgot(Obj_Entry *obj)
 
 	if (obj->pltgot != NULL) {
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-		obj->pltgot[1] = (uintptr_t) cheri_seal(obj, sealer_pltgot);
-#else
-		obj->pltgot[1] = (uintptr_t) obj;
+		if (C18N_ENABLED)
+			obj->pltgot[1] = (uintptr_t)cheri_seal(obj,
+			    sealer_pltgot);
+		else
 #endif
-		obj->pltgot[2] = (uintptr_t) &_rtld_bind_start;
+			obj->pltgot[1] = (uintptr_t)obj;
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+		if (C18N_ENABLED)
+			obj->pltgot[2] = (uintptr_t)&_rtld_bind_start_c18n;
+		else
+#endif
+			obj->pltgot[2] = (uintptr_t)&_rtld_bind_start;
 	}
 }
 
@@ -297,7 +304,12 @@ reloc_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela, Elf_Addr *where,
 		if (def->st_shndx == SHN_UNDEF) {
 			/* Weak undefined thread variable */
 #ifdef __CHERI_PURE_CAPABILITY__
-			wherec[0] = _rtld_tlsdesc_undef;
+#ifdef RTLD_SANDBOX
+			if (C18N_ENABLED)
+				wherec[0] = _rtld_tlsdesc_undef_c18n;
+			else
+#endif
+				wherec[0] = _rtld_tlsdesc_undef;
 			where[2] = rela->r_addend;
 #else
 			where[0] = (Elf_Addr)_rtld_tlsdesc_undef;
@@ -311,7 +323,12 @@ reloc_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela, Elf_Addr *where,
 	if (obj->tlsoffset != 0) {
 		/* Variable is in initially allocated TLS segment */
 #ifdef __CHERI_PURE_CAPABILITY__
-		wherec[0] = _rtld_tlsdesc_static;
+#ifdef RTLD_SANDBOX
+		if (C18N_ENABLED)
+			wherec[0] = _rtld_tlsdesc_static_c18n;
+		else
+#endif
+			wherec[0] = _rtld_tlsdesc_static;
 		where[2] = obj->tlsoffset + offs;
 		where[3] = size;
 #else
@@ -321,7 +338,12 @@ reloc_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela, Elf_Addr *where,
 	} else {
 		/* TLS offset is unknown at load time, use dynamic resolving */
 #ifdef __CHERI_PURE_CAPABILITY__
-		wherec[0] = _rtld_tlsdesc_dynamic;
+#ifdef RTLD_SANDBOX
+		if (C18N_ENABLED)
+			wherec[0] = _rtld_tlsdesc_dynamic_c18n;
+		else
+#endif
+			wherec[0] = _rtld_tlsdesc_dynamic;
 		wherec[1] = reloc_tlsdesc_alloc(obj->tlsindex, offs, size);
 #else
 		where[0] = (Elf_Addr)_rtld_tlsdesc_dynamic;
