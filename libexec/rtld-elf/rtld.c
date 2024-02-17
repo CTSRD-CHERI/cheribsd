@@ -398,7 +398,10 @@ enum {
 	LD_SKIP_INIT_FUNCS,
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 	LD_UTRACE_COMPARTMENT,
+#ifndef RTLD_SANDBOX_ALWAYS
 	LD_COMPARTMENT_ENABLE,
+	LD_COMPARTMENT_DISABLE,
+#endif
 	LD_COMPARTMENT_POLICY,
 	LD_COMPARTMENT_OVERHEAD,
 	LD_COMPARTMENT_SIG,
@@ -445,7 +448,10 @@ static struct ld_env_var_desc ld_env_vars[] = {
 	LD_ENV_DESC(SKIP_INIT_FUNCS, true),
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 	LD_ENV_DESC(UTRACE_COMPARTMENT, false),
+#ifndef RTLD_SANDBOX_ALWAYS
 	LD_ENV_DESC(COMPARTMENT_ENABLE, false),
+	LD_ENV_DESC(COMPARTMENT_DISABLE, false),
+#endif
 	LD_ENV_DESC(COMPARTMENT_POLICY, false),
 	LD_ENV_DESC(COMPARTMENT_OVERHEAD, false),
 	LD_ENV_DESC(COMPARTMENT_SIG, false),
@@ -845,11 +851,25 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     ld_utrace = ld_get_env_var(LD_UTRACE);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
     ld_compartment_utrace = ld_get_env_var(LD_UTRACE_COMPARTMENT);
-    ld_compartment_enable = ld_get_env_var(LD_COMPARTMENT_ENABLE);
     ld_compartment_policy = ld_get_env_var(LD_COMPARTMENT_POLICY);
     ld_compartment_overhead = ld_get_env_var(LD_COMPARTMENT_OVERHEAD);
     ld_compartment_sig = ld_get_env_var(LD_COMPARTMENT_SIG);
     ld_compartment_unwind = ld_get_env_var(LD_COMPARTMENT_UNWIND);
+#ifndef RTLD_SANDBOX_ALWAYS
+    /*
+     * DISABLE takes precedence over ENABLE.
+     */
+    if (ld_get_env_var(LD_COMPARTMENT_DISABLE) != NULL)
+	ld_compartment_enable = false;
+    else if (ld_get_env_var(LD_COMPARTMENT_ENABLE) != NULL)
+	ld_compartment_enable = true;
+#endif
+    if (C18N_ENABLED) {
+	ld_elf_hints_default = _PATH_ELF_HINTS_C18N;
+	ld_path_libmap_conf = _PATH_LIBMAP_CONF_C18N;
+	ld_standard_library_path = STANDARD_LIBRARY_PATH_C18N;
+	c18n_code_perm_clear = CHERI_PERM_EXECUTIVE;
+    }
 #endif
 
     set_ld_elf_hints_path();
@@ -897,7 +917,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	assert(aux_info[AT_ENTRY] != NULL);
 	imgentry = (dlfunc_t) aux_info[AT_ENTRY]->a_un.a_ptr;
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	imgentry = (dlfunc_t) cheri_clearperm(imgentry, CHERI_PERM_EXECUTIVE);
+	imgentry = (dlfunc_t) cheri_clearperm(imgentry, c18n_code_perm_clear);
 #endif
 	dbg("Values from kernel:\n\tAT_PHDR=" PTR_FMT "\n"
 	    "\tAT_BASE=" PTR_FMT "\n\tAT_ENTRY=" PTR_FMT "\n",
@@ -964,12 +984,14 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     linkmap_add(&obj_rtld);
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    c18n_init();
+    if (C18N_ENABLED) {
+	c18n_init();
 
-    /*
-     * Manually register the main object after the policy is loaded.
-     */
-    object_add_name(obj_main, "[main]");
+	/*
+	* Manually register the main object after the policy is loaded.
+	*/
+	object_add_name(obj_main, "[main]");
+    }
 #endif
 
     /* Link the main program into the list of objects. */
@@ -1210,7 +1232,8 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
     RtldLockState lockstate;
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    obj = cheri_unseal(obj, sealer_pltgot);
+    if (C18N_ENABLED)
+	obj = cheri_unseal(obj, sealer_pltgot);
 #endif
 
     rlock_acquire(rtld_bind_lock, &lockstate);
@@ -6081,7 +6104,8 @@ _rtld_allocate_tls(void *oldtls, size_t tcbsize, size_t tcbalign)
     ret = allocate_tls(globallist_curr(TAILQ_FIRST(&obj_list)), oldtls,
       tcbsize, tcbalign);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    allocate_stk_table();
+    if (C18N_ENABLED)
+	allocate_stk_table();
 #endif
     lock_release(rtld_bind_lock, &lockstate);
     return (ret);
@@ -6110,7 +6134,7 @@ object_add_name(Obj_Entry *obj, const char *name)
 	strcpy(entry->name, name);
 	STAILQ_INSERT_TAIL(&obj->names, entry, link);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	if (obj->compart_id == 0)
+	if (C18N_ENABLED && obj->compart_id == 0)
 	    obj->compart_id = compart_id_allocate(entry->name);
 #endif
     }
