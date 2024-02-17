@@ -705,9 +705,7 @@ quarantine_should_flush(struct mrs_quarantine *quarantine, bool is_free)
 static inline uint64_t
 cheri_revoke_get_cyc(void)
 {
-#if defined(__mips__)
-	return (cheri_get_cyclecount());
-#elif defined(__riscv)
+#if defined(__riscv)
 	return (__builtin_readcyclecounter());
 #elif defined(__aarch64__)
 	uint64_t _val;
