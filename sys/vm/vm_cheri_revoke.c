@@ -338,9 +338,6 @@ out:
 	sx_sunlock(&uvms->vm_map.vm_cheri_revoke_stats_sx);
 #endif
 
-	if (hascookie)
-		vm_cheri_revoke_cookie_rele(&crc);
-
 	return (res);
 }
 
@@ -952,12 +949,6 @@ vm_cheri_revoke_cookie_init(vm_map_t map, struct vm_cheri_revoke_cookie *crc)
 	    curproc->p_sysent->sv_cheri_revoke_shadow_offset);
 
 	return (KERN_SUCCESS);
-}
-
-void
-vm_cheri_revoke_cookie_rele(struct vm_cheri_revoke_cookie *crc __unused)
-{
-	return;
 }
 
 /******************************* VM & SHADOW *******************************/

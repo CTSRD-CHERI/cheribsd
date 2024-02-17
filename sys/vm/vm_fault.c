@@ -416,8 +416,6 @@ vm_fault_cheri_revoke(struct faultstate *fs, vm_page_t m, bool canwrite)
 		hascaps = vm_cheri_revoke_page_ro(&crc, m);
 	}
 
-	vm_cheri_revoke_cookie_rele(&crc);
-
 	/*
 	 * TODO: Well, this is kind of awkward.  We should, on the load side, be
 	 * leaving pages marked capdirty if VM_CHERI_REVOKE_PAGE_HASCAPS here.
