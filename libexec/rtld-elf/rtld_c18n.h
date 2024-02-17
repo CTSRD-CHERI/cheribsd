@@ -35,9 +35,9 @@
  * Global symbols
  */
 extern Obj_Entry *obj_rtld_p;
+extern size_t c18n_code_perm_clear;
 extern uintptr_t sealer_pltgot, sealer_tramp;
 extern const char *ld_compartment_utrace;
-extern const char *ld_compartment_enable;
 extern const char *ld_compartment_policy;
 extern const char *ld_compartment_overhead;
 extern const char *ld_compartment_sig;
@@ -225,7 +225,7 @@ func_sig_legal(struct func_sig sig)
  */
 #define	c18n_return_address()	({					\
 		void *_pc;						\
-		if (ld_compartment_enable)				\
+		if (C18N_ENABLED)					\
 			_pc = get_trusted_frame()->pc;			\
 		else							\
 			_pc = __builtin_return_address(0);		\
@@ -234,6 +234,11 @@ func_sig_legal(struct func_sig sig)
 
 void *_rtld_sandbox_code(void *, struct func_sig);
 void *_rtld_safebox_code(void *, struct func_sig);
+
+void _rtld_bind_start_c18n(void);
+void *_rtld_tlsdesc_static_c18n(void *);
+void *_rtld_tlsdesc_undef_c18n(void *);
+void *_rtld_tlsdesc_dynamic_c18n(void *);
 
 void c18n_init(void);
 #endif

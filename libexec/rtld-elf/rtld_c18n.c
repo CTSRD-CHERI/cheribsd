@@ -48,11 +48,14 @@ static uintptr_t sealer_jmpbuf;
 
 uintptr_t sealer_pltgot, sealer_tramp;
 
+/* Enable compartmentalisation */
+bool ld_compartment_enable;
+
+/* Permission bit to be cleared for user code */
+uint64_t c18n_code_perm_clear;
+
 /* Use utrace() to log compartmentalisation-related events */
 const char *ld_compartment_utrace;
-
-/* Enable compartmentalisation */
-const char *ld_compartment_enable;
 
 /* Path of the compartmentalisation policy */
 const char *ld_compartment_policy;
@@ -1177,6 +1180,9 @@ tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *data)
 	slot_idx_t slot, idx, writers;
 	ptraddr_t key;
 	int exp;
+
+	if (!C18N_ENABLED)
+		return (data->target);
 
 	/*
 	 * INVARIANT: The defobj of each trampoline is tagged.

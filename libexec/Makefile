@@ -84,9 +84,6 @@ _tftp-proxy=	tftp-proxy
 
 .if !defined(NO_PIC) && !defined(NO_RTLD)
 _rtld-elf=	rtld-elf rtld-elf-debug
-.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
-SUBDIR+=	rtld-elf-c18n rtld-elf64cb-c18n
-.endif
 .for LIBCOMPAT libcompat in ${_ALL_LIBCOMPATS_libcompats}
 SUBDIR.${MK_LIB${LIBCOMPAT}}+=	rtld-elf${libcompat}
 .if exists(${.CURDIR}/rtld-elf${libcompat}-debug)

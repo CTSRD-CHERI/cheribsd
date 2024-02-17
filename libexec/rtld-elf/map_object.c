@@ -279,7 +279,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     mapbase = mmap(base_addr, mapsize, PROT_NONE | PROT_MAX(_PROT_ALL),
 	base_flags, -1, 0);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    mapbase = cheri_clearperm(mapbase, CHERI_PERM_EXECUTIVE);
+    mapbase = cheri_clearperm(mapbase, c18n_code_perm_clear);
 #endif
     if (mapbase == MAP_FAILED) {
 	_rtld_error("%s: mmap of entire address space failed: %s",

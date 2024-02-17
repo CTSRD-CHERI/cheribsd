@@ -28,6 +28,7 @@
  */
 
 #include <machine/asm.h>
+#include <sys/cdefs.h>
 #include <sys/elf_common.h>
 
 
@@ -47,6 +48,8 @@
  * func_ptr_type
  * _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
  */
+
+#ifndef C18N_VARIANT
 
 ENTRY(.rtld_start)
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -106,13 +109,19 @@ ENTRY(.rtld_start)
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(.rtld_start)
 
+#define	C18N_VARIANT
+#undef	RTLD_SANDBOX
+#endif /* C18N_VARIANT */
+
+#define	C18N_SYM(name)		__CONCAT(name, C18N_VARIANT)
+
 /*
  * sp + 0 = &GOT[x + 3]
  * sp + 8 = RA
  * x16 = &GOT[2]
  * x17 = &_rtld_bind_start
  */
-ENTRY(_rtld_bind_start)
+ENTRY(C18N_SYM(_rtld_bind_start))
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 	/*
 	 * Maintain consistency of caller's stack.
@@ -244,7 +253,7 @@ ENTRY(_rtld_bind_start)
 #else
 	br	PTR(16)
 #endif
-END(_rtld_bind_start)
+END(C18N_SYM(_rtld_bind_start))
 
 /*
  * struct rel_tlsdesc {
@@ -256,7 +265,7 @@ END(_rtld_bind_start)
  *
  * Resolver function for TLS symbols resolved at load time
  */
-ENTRY(_rtld_tlsdesc_static)
+ENTRY(C18N_SYM(_rtld_tlsdesc_static))
 #ifdef __CHERI_PURE_CAPABILITY__
 	ldp	x0, x1, [c0, #16]
 	add	c0, c2, x0
@@ -270,14 +279,14 @@ ENTRY(_rtld_tlsdesc_static)
 	ldr	x0, [x0, #8]
 	ret
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
-END(_rtld_tlsdesc_static)
+END(C18N_SYM(_rtld_tlsdesc_static))
 
 /*
  * uint64_t _rtld_tlsdesc_undef(void);
  *
  * Resolver function for weak and undefined TLS symbols
  */
-ENTRY(_rtld_tlsdesc_undef)
+ENTRY(C18N_SYM(_rtld_tlsdesc_undef))
 #ifdef __CHERI_PURE_CAPABILITY__
 	ldr	x0, [c0, #16]
 #if defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
@@ -297,14 +306,14 @@ ENTRY(_rtld_tlsdesc_undef)
 	.cfi_adjust_cfa_offset 	-16
 	ret
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
-END(_rtld_tlsdesc_undef)
+END(C18N_SYM(_rtld_tlsdesc_undef))
 
 /*
  * uint64_t _rtld_tlsdesc_dynamic(struct rel_tlsdesc *);
  *
  * Resolver function for TLS symbols from dlopen()
  */
-ENTRY(_rtld_tlsdesc_dynamic)
+ENTRY(C18N_SYM(_rtld_tlsdesc_dynamic))
 #ifdef __CHERI_PURE_CAPABILITY__
 	stp	c3, c4, [csp, #-32]!
 	.cfi_adjust_cfa_offset	2 * 16
@@ -553,6 +562,6 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	.cfi_adjust_cfa_offset	-2 * 16
 	ret
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
-END(_rtld_tlsdesc_dynamic)
+END(C18N_SYM(_rtld_tlsdesc_dynamic))
 
 GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)

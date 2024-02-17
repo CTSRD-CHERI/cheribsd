@@ -46,10 +46,11 @@ _tcb_set(struct tcb *tcb)
 {
 #ifdef __CHERI_PURE_CAPABILITY__
 #if defined(IN_RTLD) && defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
-	__asm __volatile("msr	rctpidr_el0, %0" :: "C" (tcb));
-#else
-	__asm __volatile("msr	ctpidr_el0, %0" :: "C" (tcb));
+	if (C18N_ENABLED)
+		__asm __volatile("msr	rctpidr_el0, %0" :: "C" (tcb));
+	else
 #endif
+		__asm __volatile("msr	ctpidr_el0, %0" :: "C" (tcb));
 #else
 	__asm __volatile("msr	tpidr_el0, %x0" :: "r" (tcb));
 #endif
@@ -62,10 +63,11 @@ _tcb_get(void)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #if defined(IN_RTLD) && defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
-	__asm __volatile("mrs	%0, rctpidr_el0" : "=C" (tcb));
-#else
-	__asm __volatile("mrs	%0, ctpidr_el0" : "=C" (tcb));
+	if (C18N_ENABLED)
+		__asm __volatile("mrs	%0, rctpidr_el0" : "=C" (tcb));
+	else
 #endif
+		__asm __volatile("mrs	%0, ctpidr_el0" : "=C" (tcb));
 #else
 	__asm __volatile("mrs	%x0, tpidr_el0" : "=r" (tcb));
 #endif
