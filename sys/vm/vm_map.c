@@ -1664,7 +1664,7 @@ vm_map_entry_start_revocation(vm_map_t map, vm_map_entry_t *entry)
 	   ("an entry %p is already being revoked", map->rev_entry));
 	VM_MAP_ASSERT_LOCKED(map);
 	if (RB_EMPTY(&map->quarantine))
-		return (FALSE);
+		return (false);
 	rev_entry = RB_MAX(vm_map_quarantine, &map->quarantine);
 
 	/*
@@ -1708,7 +1708,7 @@ vm_map_entry_start_revocation(vm_map_t map, vm_map_entry_t *entry)
 	if (entry != NULL)
 		*entry = map->rev_entry;
 	/* XXX stats */
-	return (TRUE);
+	return (true);
 }
 
 void
