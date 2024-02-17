@@ -320,6 +320,8 @@ kern_cheri_revoke(struct thread *td, int flags,
 	{
 		int ires = 0;
 
+		KASSERT(!vmm->system_map, ("%s: system map?", __func__));
+
 		/*
 		 * We need some value that's more or less "now", but we don't have
 		 * to be too picky about it.  This value is not reported to
@@ -396,8 +398,6 @@ fast_out:
 			break;
 		case CHERI_REVOKE_ST_CLOSING:
 		case CHERI_REVOKE_ST_INITING:
-			KASSERT(vmm->system_map == 0, ("System map?"));
-
 			/* There is another revoker in progress.  Wait. */
 			ires = cv_wait_sig(&vmm->vm_cheri_revoke_cv,
 			    &vmm->lock);
