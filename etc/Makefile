@@ -140,6 +140,7 @@ DISTRIB_CLEANUP_FILES+=	${INCLUDEDIR}/c++/v1/__string
 # CHERI libc++ is still from 15.0.0
 DISTRIB_CLEANUP_FILES+=	${INCLUDEDIR}/c++/v1/__tuple
 .endif
+DISTRIB_CLEANUP_FILES+=	${LIBEXECDIR}/kgdb
 distrib-cleanup: .PHONY
 	for file in ${DISTRIB_CLEANUP_FILES}; do \
 		if [ -f ${DESTDIR}/$${file} ]; then \
