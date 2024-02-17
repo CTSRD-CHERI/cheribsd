@@ -495,9 +495,6 @@ fast_out:
 				vm_map_unlock(vmm);
 
 				/* XXX Don't signal other would-be revokers? */
-
-				vm_cheri_revoke_cookie_rele(&vmcrc);
-
 				/* XXX Don't copy out the stat structure? */
 
 				return (ERESTART);
@@ -639,8 +636,6 @@ close_already_inited:	/* (entryst == CHERI_REVOKE_ST_INITED) above */
 
 	/* Broadcast here: some sleepers may be able to take the fast out */
 	cv_broadcast(&vmm->vm_cheri_revoke_cv);
-
-	vm_cheri_revoke_cookie_rele(&vmcrc);
 
 	return (cheri_revoke_fini(crsi, vm_mmap_to_errno(res), crstp,
 	    &crepochs));

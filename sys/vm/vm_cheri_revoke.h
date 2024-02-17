@@ -93,7 +93,6 @@ struct vm_cheri_revoke_cookie {
 
 int vm_cheri_revoke_cookie_init(struct vm_map *map,
     struct vm_cheri_revoke_cookie *baked);
-void vm_cheri_revoke_cookie_rele(struct vm_cheri_revoke_cookie *cookie);
 
 void vm_cheri_revoke_info_page(struct vm_map *map, struct sysentvec *,
     struct cheri_revoke_info_page * __capability *);
