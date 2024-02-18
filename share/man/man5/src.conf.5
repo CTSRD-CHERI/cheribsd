@@ -1029,6 +1029,10 @@ option should be used rather than this in most cases.
 .Pp
 This is a default setting on
 amd64/amd64 and i386/i386.
+.It Va WITH_LOADER_BIOS_TEXTONLY
+Use the old, FreeBSD 12 vidconsole.c.
+This only supports text mode without teken, without any graphics, font or video mode support.
+This setting only affects the i386 and amd64 BIOS boot loader.
 .It Va WITH_LOADER_EFI_SECUREBOOT
 Enable building
 .Xr loader 8
