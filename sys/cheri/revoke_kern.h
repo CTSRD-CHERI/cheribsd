@@ -72,9 +72,31 @@
  *   Absent concurrent calls to cheri_revoke(2) we will always enter
  *   with the state CHERI_REVOKE_ST_NONE or CHERI_REVOKE_ST_INITED.
  *
- * The state and epoch counter are stored in the same per-process word,
- * vm_caprev_st.  There is, at present, at most one thread actively engaged
- * in revocation per process.
+ * The state and epoch counter are stored in the same per-address space word,
+ * vm_cheri_revoke_st, in the VM map.
+ *
+ * To implement asynchronous revocation, vm_cheri_revoke_pass_async() signals a
+ * kernel worker process, which maintains its own state in the
+ * vm_cheri_async_revoke_st field of the VM map.  The states have similar
+ * meanings:
+ *
+ *   CHERI_REVOKE_ST_NONE: No revocation is scheduled.
+ *
+ *   CHERI_REVOKE_ST_INITING: An asynchronous revocation request is pending but
+ *   has not yet been observed by a worker thread.
+ *
+ *   CHERI_REVOKE_ST_INITED: A worker thread is currently processing the
+ *   request and will update the state once it's finished.
+ *
+ *   CHERI_REVOKE_ST_CLOSING: A worker thread has finished the revocation pass.
+ *   If it was successful, the epoch is advanced.  The return value of the
+ *   vm_cheri_revoke_pass() call is stored in the VM map for consumption by the
+ *   application.
+ *
+ * While an asynchronous revocation pass is pending, the main state is
+ * CHERI_REVOKE_ST_INITED.  Once the async state has transitioned to
+ * CHERI_REVOKE_ST_CLOSING, a subsequent call to cheri_revoke() will change the
+ * main state to CHERI_REVOKE_ST_CLOSING if the pass was successful.
  */
 
 typedef uint64_t cheri_revoke_state_t;

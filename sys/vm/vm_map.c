@@ -1029,6 +1029,7 @@ _vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min, vm_pointer_t max)
 
 #ifdef CHERI_CAPREVOKE
 	map->vm_cheri_revoke_st = CHERI_REVOKE_ST_NONE; /* and epoch 0 */
+	map->vm_cheri_async_revoke_st = CHERI_REVOKE_ST_NONE; /* and epoch 0 */
 	map->vm_cheri_revoke_quarantining = false;
 	RB_INIT(&map->quarantine);
 #endif
@@ -4856,6 +4857,7 @@ vm_map_clear(vm_map_t map)
 	 * no capabilities).  Clear revocation state.
 	 */
 	map->vm_cheri_revoke_st = CHERI_REVOKE_ST_NONE;
+	map->vm_cheri_async_revoke_st = CHERI_REVOKE_ST_NONE;
 	/* quarantine is drained below. */
 	map->rev_entry = NULL;
 #ifdef CHERI_CAPREVOKE_STATS
