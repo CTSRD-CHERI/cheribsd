@@ -98,6 +98,8 @@ void vm_cheri_revoke_info_page(struct vm_map *map, struct sysentvec *,
     struct cheri_revoke_info_page * __capability *);
 
 int vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *);
+void vm_cheri_revoke_pass_async(struct vmspace *,
+    const struct vm_cheri_revoke_cookie *);
 
 void vm_cheri_assert_consistent_clg(struct vm_map *map);
 

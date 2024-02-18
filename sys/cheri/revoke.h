@@ -165,6 +165,12 @@ static const size_t VM_CHERI_REVOKE_BSZ_OTYPE =
 #define	CHERI_REVOKE_IGNORE_START	0x0004
 
 /*
+ * Use a worker thread to perform the vmspace scan.  If this flag is not
+ * specified, the invoking thread will perform the scan.
+ */
+#define	CHERI_REVOKE_ASYNC		0x0020
+
+/*
  * Reset the stats counters to zero "after" reporting
  */
 #define	CHERI_REVOKE_TAKE_STATS		0x1000

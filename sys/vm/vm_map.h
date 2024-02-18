@@ -241,7 +241,9 @@ struct vm_map {
 #ifdef CHERI_CAPREVOKE
 	struct cv vm_cheri_revoke_cv;	/* (c) Cap. rev. is single file */
 	cheri_revoke_state_t vm_cheri_revoke_st;	/* Cap. rev. state */
-
+	cheri_revoke_state_t vm_cheri_async_revoke_st;
+	int vm_cheri_async_revoke_status;
+	const uint8_t * __capability vm_cheri_async_revoke_shadow;
 	/*
 	 * If revocation is in progress (as determined by vm_cheri_revoke_st,
 	 * this holds our current test predicate.

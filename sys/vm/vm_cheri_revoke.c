@@ -35,13 +35,19 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/kernel.h>
+#include <sys/kthread.h>
 #include <sys/lock.h>
+#include <sys/malloc.h>
 #include <sys/mutex.h>
 #include <sys/pctrie.h>
 #include <sys/proc.h>
+#include <sys/queue.h>
+#include <sys/refcount.h>
 #include <sys/rwlock.h>
 #include <sys/sched.h>
 #include <sys/sysent.h>
+#include <sys/unistd.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -55,6 +61,144 @@
 #include <cheri/revoke.h>
 #include <cheri/revoke_kern.h>
 #include <vm/vm_cheri_revoke.h>
+
+static void vm_cheri_revoke_pass_pre(vm_map_t);
+static void vm_cheri_revoke_pass_post(vm_map_t);
+static int vm_cheri_revoke_pass_locked(const struct vm_cheri_revoke_cookie *);
+
+/***************************** KERNEL THREADS ***************************/
+
+static MALLOC_DEFINE(M_REVOKE, "cheri_revoke", "cheri_revoke temporary data");
+
+struct async_revoke_cookie {
+	struct vmspace	*vm;
+	struct vm_cheri_revoke_cookie cookie;
+	TAILQ_ENTRY(async_revoke_cookie) link;
+};
+
+static struct mtx async_revoke_mtx;
+MTX_SYSINIT(async_revoke_mtx, &async_revoke_mtx, "async revoke", MTX_DEF);
+static TAILQ_HEAD(, async_revoke_cookie) async_revoke_work =
+    TAILQ_HEAD_INITIALIZER(async_revoke_work);
+
+static void
+vm_cheri_revoke_pass_async_pre(vm_map_t map, struct vm_cheri_revoke_cookie *crc)
+{
+	cheri_revoke_epoch_t epoch;
+	enum cheri_revoke_state state __diagused;
+
+	vm_cheri_revoke_pass_pre(map);
+	epoch = cheri_revoke_st_get_epoch(map->vm_cheri_async_revoke_st);
+	state = cheri_revoke_st_get_state(map->vm_cheri_async_revoke_st);
+
+	KASSERT((epoch & 1) == 0,
+	    ("unexpected async revoke epoch %lu (state %d)", epoch, state));
+	KASSERT(state == CHERI_REVOKE_ST_INITING,
+	    ("unexpected async revoke state %d (epoch %lu)", state, epoch));
+
+	cheri_revoke_st_set(&map->vm_cheri_async_revoke_st, epoch + 1,
+	    CHERI_REVOKE_ST_INITED);
+	map->vm_cheri_async_revoke_shadow = crc->crshadow;
+}
+
+static void
+vm_cheri_revoke_pass_async_post(vm_map_t map, int error)
+{
+	cheri_revoke_epoch_t epoch;
+	enum cheri_revoke_state state __diagused;
+
+	epoch = cheri_revoke_st_get_epoch(map->vm_cheri_async_revoke_st);
+	state = cheri_revoke_st_get_state(map->vm_cheri_async_revoke_st);
+
+	KASSERT((epoch & 1) == 1,
+	    ("unexpected post-async revoke epoch %lu (state %d)", epoch, state));
+	KASSERT(state == CHERI_REVOKE_ST_INITED,
+	    ("unexpected post-async revoke state %d (epoch %lu)", state, epoch));
+
+	map->vm_cheri_async_revoke_status = error;
+	if (error == KERN_SUCCESS)
+		epoch++;
+	cheri_revoke_st_set(&map->vm_cheri_async_revoke_st, epoch,
+	    CHERI_REVOKE_ST_CLOSING);
+	map->vm_cheri_async_revoke_shadow = NULL;
+	vm_cheri_revoke_pass_post(map);
+}
+
+static void
+vm_cheri_revoke_kproc(void *arg __unused)
+{
+	struct vmspace *myvm;
+
+	/*
+	 * Make sure that our own vmspace doesn't go away when we switch.
+	 */
+	myvm = vmspace_acquire_ref(curproc);
+
+	for (;;) {
+		struct async_revoke_cookie *arc;
+		vm_map_t map;
+		int error;
+
+		mtx_lock(&async_revoke_mtx);
+		if ((arc = TAILQ_FIRST(&async_revoke_work)) == NULL) {
+			if (curproc->p_vmspace != myvm) {
+				mtx_unlock(&async_revoke_mtx);
+				vmspace_switch_aio(myvm);
+				continue;
+			}
+			msleep(&async_revoke_work, &async_revoke_mtx, PDROP,
+			    "rvkslp", 0);
+			continue;
+		}
+
+		TAILQ_REMOVE(&async_revoke_work, arc, link);
+		mtx_unlock(&async_revoke_mtx);
+
+		vmspace_switch_aio(arc->vm);
+
+		/*
+		 * Advance the async state machine.
+		 */
+		map = &arc->vm->vm_map;
+		vm_cheri_revoke_pass_async_pre(map, &arc->cookie);
+
+		/*
+		 * Do the actual revocation pass.
+		 */
+		error = vm_cheri_revoke_pass_locked(&arc->cookie);
+
+		/*
+		 * A revocation pass is done.  Advance the state machine again
+		 * so that the application can see the result.
+		 */
+		vm_cheri_revoke_pass_async_post(map, error);
+
+		vmspace_free(arc->vm);
+		free(arc, M_REVOKE);
+	}
+
+	vmspace_free(myvm);
+	kproc_exit(0);
+}
+
+static int vm_cheri_revoke_nkproc = 1;
+SYSCTL_INT(_vm_cheri_revoke, OID_AUTO, nkproc, CTLFLAG_RDTUN,
+    &vm_cheri_revoke_nkproc, 0, "Number of revocation worker processes");
+
+static void
+vm_cheri_revoke_kproc_init(void *arg __unused)
+{
+	int error;
+
+	for (int i = 0; i < vm_cheri_revoke_nkproc; i++) {
+		error = kproc_create(vm_cheri_revoke_kproc, NULL, NULL, RFNOWAIT,
+		    0, "cheri_revoke");
+		if (error != 0)
+			panic("%s: failed to create worker process", __func__);
+	}
+}
+SYSINIT(vm_cheri_revoke_kproc, SI_SUB_KTHREAD_INIT, SI_ORDER_ANY,
+    vm_cheri_revoke_kproc_init, NULL);
 
 /***************************** PAGE VISITS ******************************/
 
@@ -802,20 +946,9 @@ SYSCTL_BOOL(_vm_cheri_revoke, OID_AUTO, pin_cpu, CTLFLAG_RWTUN,
     &cheri_revoke_pin_cpu, 0,
     "Pin the revoker to a single CPU when scanning");
 
-/*
- * Do a sweep through all mapped objects, hunting for revoked capabilities.
- *
- * The caller must hold a reference on the vmspace into which this map is
- * embedded.
- */
-int
-vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *crc)
+static void
+vm_cheri_revoke_pass_pre(vm_map_t map)
 {
-	int res = KERN_SUCCESS;
-	const vm_map_t map = crc->map;
-	vm_map_entry_t entry;
-	bool pinned;
-
 	/*
 	 * Interlock with fork(): we'll block on the map lock if a concurrent
 	 * fork is in progress, and once we acquire the lock, the busy state
@@ -830,6 +963,32 @@ vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *crc)
 	if (map->busy)
 		vm_map_wait_busy(map);
 	vm_map_busy(map);
+}
+
+static void
+vm_cheri_revoke_pass_post(vm_map_t map)
+{
+	vm_map_unbusy(map);
+	vm_map_unlock(map);
+}
+
+/*
+ * Do a sweep through all mapped objects, hunting for revoked capabilities.
+ *
+ * The caller must hold a reference on the vmspace into which this map is
+ * embedded.
+ *
+ * The map lock must be held upon entry, and will be reacquired before
+ * returning.
+ */
+static int
+vm_cheri_revoke_pass_locked(const struct vm_cheri_revoke_cookie *crc)
+{
+	int res = KERN_SUCCESS;
+	const vm_map_t map = crc->map;
+	vm_map_entry_t entry;
+	bool pinned;
+
 	vm_map_lock_downgrade(map);
 
 	/*
@@ -885,11 +1044,41 @@ out:
 	if (pinned)
 		sched_unpin();
 
-	vm_map_lock(map);
-	vm_map_unbusy(map);
-	vm_map_unlock(map);
+	vm_map_lock(crc->map);
 
 	return (res);
+}
+
+int
+vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *crc)
+{
+	int res;
+
+	vm_cheri_revoke_pass_pre(crc->map);
+	res = vm_cheri_revoke_pass_locked(crc);
+	vm_cheri_revoke_pass_post(crc->map);
+
+	return (res);
+}
+
+void
+vm_cheri_revoke_pass_async(struct vmspace *vm,
+    const struct vm_cheri_revoke_cookie *crc)
+{
+	struct async_revoke_cookie *arc;
+	unsigned int old __diagused;
+
+	old = refcount_acquire(&vm->vm_refcnt);
+	KASSERT(old > 0, ("%s: vm %p refcount 0", __func__, vm));
+
+	arc = malloc(sizeof(*arc), M_REVOKE, M_WAITOK);
+	arc->vm = vm;
+	arc->cookie = *crc;
+
+	mtx_lock(&async_revoke_mtx);
+	TAILQ_INSERT_TAIL(&async_revoke_work, arc, link);
+	wakeup_one(&async_revoke_work);
+	mtx_unlock(&async_revoke_mtx);
 }
 
 void
@@ -922,13 +1111,19 @@ vm_cheri_assert_consistent_clg(struct vm_map *map)
 int
 vm_cheri_revoke_cookie_init(vm_map_t map, struct vm_cheri_revoke_cookie *crc)
 {
-	KASSERT(map == &curproc->p_vmspace->vm_map,
+	KASSERT(map == &curproc->p_vmspace->vm_map || map->size == 0,
 	    ("cheri revoke does not support foreign maps (yet)"));
 
-	if (!SV_CURPROC_FLAG(SV_CHERI))
+	if (!SV_CURPROC_FLAG(SV_CHERI) && (curproc->p_flag & P_SYSTEM) == 0)
 		return (KERN_INVALID_ARGUMENT);
 
 	crc->map = map;
+	if ((curproc->p_flag & P_SYSTEM) != 0) {
+		KASSERT(map->vm_cheri_async_revoke_shadow != NULL,
+		    ("cheri_revoke_shadow not installed in kernel map"));
+		crc->crshadow = map->vm_cheri_async_revoke_shadow;
+		return (KERN_SUCCESS);
+	}
 
 	/*
 	 * Build the capability to the shadow bitmap that we will use for probes
@@ -1168,7 +1363,6 @@ void
 vm_cheri_revoke_info_page(struct vm_map *map, struct sysentvec *sv,
     struct cheri_revoke_info_page * __capability *ifp)
 {
-	/* XXX In prinicple, it could work cross-process, but not yet */
 	KASSERT(map == &curthread->td_proc->p_vmspace->vm_map,
 	    ("vm_cheri_revoke_page_info req. intraprocess work right now"));
 
