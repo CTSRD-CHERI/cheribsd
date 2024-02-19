@@ -48,8 +48,6 @@ SRCS+=	recv.c recvmmsg.c send.c sendmmsg.c
 NOASM+=  sched_getcpu.o
 PSEUDO+= _sched_getcpu.o
 
-SRCS+= auxv.c
-
 .if !${MACHINE_ABI:Mpurecap}
 SRCS+= brk.c
 .endif
@@ -60,6 +58,14 @@ SRCS+= vadvise.c
 SRCS+= POSIX2x_Fork.c
 
 SRCS+=	compat-stub.c
+
+.if ${LIB} == "c"
+# Trapping stubs in dynamic libc to be filtered by libsys.
+SOBJS+=	libc_stubs.pico
+
+# Link the full implementation of ELF auxargs for static libc.
+STATICOBJS+=	auxv.o
+.endif
 
 INTERPOSED = \
 	accept \
