@@ -179,14 +179,20 @@ LIBCHERI_CAPREVOKE?=	${DESTDIR}${LIBDIR_BASE}/libcheri_caprevoke.a
 LIBMALLOC_SIMPLE=	${DESTDIR}${LIBDIR_BASE}/libmalloc_simple.a
 LIBSYSCALLS?=	${DESTDIR}${LIBDIR_BASE}/libsyscalls.a
 
-# enforce that -lpthread, -lc, and -lmalloc_simple to always be the
-# last in that exact order
+# enforce that the following libraries are last in this exact order:
+#	-lpthread
+#	-lc
+#	-lsys
+#	-lmalloc_simple
 .if defined(LDADD)
 .if ${LDADD:M-lpthread}
 LDADD:=	${LDADD:N-lpthread} -lpthread
 .endif
 .if ${LDADD:M-lc}
 LDADD:=	${LDADD:N-lc} -lc
+.endif
+.if ${LDADD:M-lsys}
+LDADD:=	${LDADD:N-lsys} -lsys
 .endif
 .if ${LDADD:M-lmalloc_simple}
 LDADD:=	${LDADD:N-lmalloc_simple} -lmalloc_simple
