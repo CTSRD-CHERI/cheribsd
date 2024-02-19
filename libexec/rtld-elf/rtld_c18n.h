@@ -33,15 +33,11 @@
 /*
  * Global symbols
  */
-#define	C18N_FUNC_SIG_COUNT	72
-
 extern uintptr_t sealer_pltgot, sealer_tramp;
 extern const char *ld_compartment_utrace;
 extern const char *ld_compartment_enable;
 extern const char *ld_compartment_overhead;
 extern const char *ld_compartment_sig;
-
-void c18n_init(void);
 
 /*
  * Policies
@@ -95,7 +91,6 @@ struct Struct_Stack_Entry {
 };
 
 void allocate_stk_table(void);
-void *_rtld_get_rstk(unsigned);
 
 static inline unsigned
 compart_id_to_index(compart_id_t cid)
@@ -188,11 +183,12 @@ struct tramp_data {
 _Static_assert(sizeof(struct func_sig) == sizeof(func_sig_int),
     "Unexpected func_sig size");
 
-void *_rtld_tramp_hook(void *, int, void *, const Obj_Entry *, const Elf_Sym *,
+void *tramp_hook(void *, int, void *, const Obj_Entry *, const Elf_Sym *,
     void *);
 size_t tramp_compile(void **, const struct tramp_data *);
 void *tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *);
-struct func_sig c18n_fetch_sig(const Obj_Entry *, unsigned long);
+
+struct func_sig sigtab_get(const Obj_Entry *, unsigned long);
 
 static inline long
 func_sig_to_otype(struct func_sig sig)
@@ -212,6 +208,7 @@ func_sig_legal(struct func_sig sig)
 void *_rtld_sandbox_code(void *, struct func_sig);
 void *_rtld_safebox_code(void *, struct func_sig);
 
+void c18n_init(void);
 void *c18n_return_address(void);
 
 #endif

@@ -27,7 +27,6 @@
 
 #include <machine/asm.h>
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 ENTRY(_rtld_setjmp)
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	mrs	c2, rcsp_el0
@@ -72,7 +71,7 @@ ENTRY(_rtld_thread_start)
 	b	_rtld_thread_start_impl
 END(_rtld_thread_start)
 
-ENTRY(_rtld_get_rstk)
+ENTRY(allocate_rstk)
 	/*
 	 * NON-STANDARD CALLING CONVENTION
 	 *
@@ -102,7 +101,7 @@ ENTRY(_rtld_get_rstk)
 	stp	q0, q1, [csp, #-(16 * 2)]!
 
 	mov	w0, w14					/* w0 = cid */
-	bl	get_rstk
+	bl	allocate_rstk_impl
 	mov	c17, c0
 
 	ldp	q6, q7, [csp, #(16 * 6)]
@@ -121,9 +120,9 @@ ENTRY(_rtld_get_rstk)
 	ldp	c0, c1, [csp], #(CAP_WIDTH * 20)
 
 	RETURN
-END(_rtld_get_rstk)
+END(allocate_rstk)
 
-ENTRY(_rtld_tramp_hook)
+ENTRY(tramp_hook)
 	/*
 	 * NON-STANDARD CALLING CONVENTION
 	 *
@@ -156,7 +155,7 @@ ENTRY(_rtld_tramp_hook)
 	mov	c5, c15
 
 	str	c30, [csp, #-CAP_WIDTH]!
-	bl	tramp_hook
+	bl	tramp_hook_impl
 	ldr	c30, [csp], #CAP_WIDTH
 
 	/* Restore floating point arguments */
@@ -177,7 +176,7 @@ ENTRY(_rtld_tramp_hook)
 #else
 	retr	c30
 #endif
-END(_rtld_tramp_hook)
+END(tramp_hook)
 
 /*
  * Trampoline templates are code but reside in rodata. Hence a new macro is
@@ -298,7 +297,7 @@ TRAMP(tramp_switch_stack)
 	cbnz	x17, 3f
 
 	/*
-	 * Call get_rstk(), which may invoke Restricted code (e.g. locking
+	 * Call allocate_rstk(), which may invoke Restricted code (e.g. locking
 	 * procedures in libthr), causing another trampoline to run. The
 	 * implications of re-entrancy must be carefully addressed.
 	 */
@@ -307,7 +306,7 @@ TRAMP(tramp_switch_stack)
 	ldr	c11, [c30]
 	blr	x11
 #else
-	blr	[c30, #0]			/* get_rstk() */
+	blr	[c30, #0]			/* allocate_rstk() */
 #endif
 3:	ldr	c17, [c17, #-CAP_WIDTH]
 
@@ -518,4 +517,3 @@ PATCH_POINT(tramp_return_hook, function, 1b)
 PATCH_POINT(tramp_return_hook, event, 2b)
 PATCH_POINT(tramp_return_hook, obj, 3b)
 PATCH_POINT(tramp_return_hook, def, 4b)
-#endif

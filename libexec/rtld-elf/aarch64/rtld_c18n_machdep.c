@@ -137,7 +137,7 @@ tramp_compile(void **entry, const struct tramp_data *data)
 	if (hook) {
 		header_hook.defobj = data->defobj;
 		header_hook.def = data->def;
-		header_hook.function = _rtld_tramp_hook;
+		header_hook.function = tramp_hook;
 		COPY_DATA(header_hook);
 	}
 

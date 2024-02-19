@@ -436,8 +436,7 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 				.target = (void *)target,
 				.defobj = defobj,
 				.def = def,
-				.sig = c18n_fetch_sig(obj,
-				    ELF_R_SYM(rela->r_info))
+				.sig = sigtab_get(obj, ELF_R_SYM(rela->r_info))
 			});
 #endif
 			reloc_jmpslot(where, target, defobj, obj,
@@ -590,8 +589,7 @@ reloc_gnu_ifunc(Obj_Entry *obj, int flags,
 				.target = (void *)target,
 				.defobj = defobj,
 				.def = def,
-				.sig = c18n_fetch_sig(obj,
-				    ELF_R_TYPE(rela->r_info))
+				.sig = sigtab_get(obj, ELF_R_TYPE(rela->r_info))
 			});
 #endif
 			wlock_acquire(rtld_bind_lock, lockstate);

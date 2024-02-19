@@ -239,7 +239,7 @@ tramp_should_include(const Obj_Entry *reqobj, const struct tramp_data *data)
 /*
  * Stack switching
  */
-#define	C18N_INIT_COMPART_COUNT	8
+void *allocate_rstk(unsigned);
 
 static compart_id_t
 stack_index_to_compart_id(unsigned index)
@@ -348,7 +348,7 @@ pop_stk_table(_Atomic(struct stk_table *) *head)
 	     */
 	    memory_order_acquire, memory_order_acquire));
 
-	table->resolver = _rtld_get_rstk;
+	table->resolver = allocate_rstk;
 
 	return (table);
 }
@@ -370,7 +370,7 @@ stk_table_expand(struct stk_table *table, size_t n_capacity, bool lock)
 		rtld_fatal("realloc failed");
 
 	if (create) {
-		table->resolver = _rtld_get_rstk;
+		table->resolver = allocate_rstk;
 		o_capacity = 0;
 	} else
 		o_capacity = table->capacity;
@@ -428,9 +428,6 @@ free_stk_table(struct stk_table *table)
 	atomic_fetch_add_explicit(&free_stk_table_cnt, 1, memory_order_release);
 }
 
-/* Default stack size in libthr */
-#define	C18N_STACK_SIZE	(sizeof(void *) / 4 * 1024 * 1024)
-
 static void *
 stk_create(size_t size)
 {
@@ -445,10 +442,13 @@ stk_create(size_t size)
 	return (stk);
 }
 
-void *get_rstk(unsigned);
+/* Default stack size in libthr */
+#define	C18N_STACK_SIZE	(sizeof(void *) / 4 * 1024 * 1024)
+
+void *allocate_rstk_impl(unsigned);
 
 void *
-get_rstk(unsigned index)
+allocate_rstk_impl(unsigned index)
 {
 	void *stk;
 	size_t capacity, size;
@@ -755,10 +755,11 @@ resize_table(int exp)
 }
 
 void
-tramp_hook(void *, int, void *, const Obj_Entry *, const Elf_Sym *, void *);
+tramp_hook_impl(void *, int, void *, const Obj_Entry *, const Elf_Sym *,
+    void *);
 
 void
-tramp_hook(void *rcsp, int event, void *target, const Obj_Entry *obj,
+tramp_hook_impl(void *rcsp, int event, void *target, const Obj_Entry *obj,
     const Elf_Sym *def, void *link)
 {
 	Elf_Word sym_num;
@@ -894,7 +895,7 @@ tramp_create_entry(struct tramp_data *found, const struct tramp_data *data)
 
 	*found = *data;
 	if (found->def != NULL) {
-		sig = c18n_fetch_sig(found->defobj,
+		sig = sigtab_get(found->defobj,
 		    found->def - found->defobj->symtab);
 		if (!found->sig.valid)
 			found->sig = sig;
@@ -1025,11 +1026,8 @@ end:
 	return (entry);
 }
 
-/*
- * APIs
- */
 struct func_sig
-c18n_fetch_sig(const Obj_Entry *obj, unsigned long symnum)
+sigtab_get(const Obj_Entry *obj, unsigned long symnum)
 {
 	if (symnum >= obj->dynsymcount)
 		rtld_fatal("Invalid symbol number %lu for object %s.",
@@ -1039,6 +1037,12 @@ c18n_fetch_sig(const Obj_Entry *obj, unsigned long symnum)
 		return ((struct func_sig) {});
 	return (obj->sigtab[symnum]);
 }
+
+/*
+ * APIs
+ */
+#define	C18N_FUNC_SIG_COUNT	72
+#define	C18N_INIT_COMPART_COUNT	8
 
 void
 c18n_init(void)
@@ -1183,7 +1187,7 @@ _rtld_thr_exit(long *state)
 			if (munmap(stk - size, size) != 0)
 				_exit(2);
 			table->stacks[i] = (struct stk_table_stack) {
-				.bottom = _rtld_get_rstk,
+				.bottom = allocate_rstk,
 				.size = 0
 			};
 		}

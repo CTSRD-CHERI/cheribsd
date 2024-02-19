@@ -1267,7 +1267,7 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
 	.target = (void *)target,
 	.defobj = defobj,
 	.def = def,
-	.sig = c18n_fetch_sig(obj, ELF_R_SYM(rel->r_info))
+	.sig = sigtab_get(obj, ELF_R_SYM(rel->r_info))
     });
 #endif
     target = reloc_jmpslot(where, target, defobj, obj, rel);
