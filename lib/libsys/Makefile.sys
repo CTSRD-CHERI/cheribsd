@@ -34,7 +34,6 @@ PSEUDO+= _clock_gettime.o _gettimeofday.o
 SRCS+=	\
 	__error.c \
 	__getosreldate.c \
-	_once_stub.c \
 	getpagesize.c \
 	getpagesizes.c \
 	interposing_table.c
