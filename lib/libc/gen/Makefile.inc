@@ -51,7 +51,6 @@ SRCS+= \
 	erand48.c \
 	err.c \
 	errlst.c \
-	errno.c \
 	eventfd.c \
 	exec.c \
 	exect.c \

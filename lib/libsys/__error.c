@@ -34,7 +34,7 @@
 
 int	*__error(void);
 
-extern int errno;
+int errno;
 
 static int *
 __error_unthreaded(void)
