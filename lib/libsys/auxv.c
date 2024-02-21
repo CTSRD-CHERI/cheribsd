@@ -50,6 +50,7 @@
 #include <sys/auxv.h>
 #include "un-namespace.h"
 #include "libc_private.h"
+#include <machine/atomic.h>
 
 extern int _DYNAMIC __no_subobject_bounds;
 #pragma weak _DYNAMIC
@@ -90,7 +91,7 @@ __init_elf_aux_vector(void)
 }
 #endif
 
-static bool aux_once = false;
+static int aux_once;
 static int pagesize, osreldate, canary_len, ncpus, pagesizes_len, bsdflags;
 static int hwcap_present, hwcap2_present;
 static char *canary, *pagesizes, *execpath;
@@ -116,7 +117,7 @@ init_aux(void)
 {
 	Elf_Auxinfo *aux;
 
-	if (aux_once)
+	if (atomic_load_acq_int(&aux_once))
 		return;
 	for (aux = __elf_aux_vector; aux->a_type != AT_NULL; aux++) {
 		switch (aux->a_type) {
@@ -203,7 +204,7 @@ init_aux(void)
 		_init_aux_powerpc_fixup();
 #endif
 
-	aux_once = true;
+	atomic_store_rel_int(&aux_once, 1);
 }
 
 #ifdef __powerpc__
