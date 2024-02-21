@@ -2143,8 +2143,15 @@
 #define	PSR_DAIF	(PSR_D | PSR_A | PSR_I | PSR_F)
 /* The default DAIF mask. These bits are valid in spsr_el1 and daif */
 #define	PSR_DAIF_DEFAULT (PSR_F)
+#define	PSR_BTYPE	0x00000c00UL
+#define	PSR_SSBS	0x00001000UL
+#define	PSR_ALLINT	0x00002000UL
 #define	PSR_IL		0x00100000UL
 #define	PSR_SS		0x00200000UL
+#define	PSR_PAN		0x00400000UL
+#define	PSR_UAO		0x00800000UL
+#define	PSR_DIT		0x01000000UL
+#define	PSR_TCO		0x02000000UL
 #if __has_feature(capabilities)
 #define	PSR_C64		0x04000000UL
 #endif
