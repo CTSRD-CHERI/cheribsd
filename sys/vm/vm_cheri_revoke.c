@@ -35,6 +35,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/counter.h>
 #include <sys/kernel.h>
 #include <sys/kthread.h>
 #include <sys/lock.h>
@@ -46,6 +47,7 @@
 #include <sys/refcount.h>
 #include <sys/rwlock.h>
 #include <sys/sched.h>
+#include <sys/sysctl.h>
 #include <sys/sysent.h>
 #include <sys/unistd.h>
 
@@ -65,6 +67,20 @@
 static void vm_cheri_revoke_pass_pre(vm_map_t);
 static void vm_cheri_revoke_pass_post(vm_map_t);
 static int vm_cheri_revoke_pass_locked(const struct vm_cheri_revoke_cookie *);
+
+static SYSCTL_NODE(_vm_stats, OID_AUTO, cheri_revoke,
+    CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "CHERI revocation statistics");
+
+static COUNTER_U64_DEFINE_EARLY(cheri_revoke_errors);
+SYSCTL_COUNTER_U64(_vm_stats_cheri_revoke, OID_AUTO, errors, CTLFLAG_RD,
+    &cheri_revoke_errors,
+    "Number of error returns from the page fault handler");
+
+static COUNTER_U64_DEFINE_EARLY(cheri_revoke_restarts);
+SYSCTL_COUNTER_U64(_vm_stats_cheri_revoke, OID_AUTO, restarts, CTLFLAG_RD,
+    &cheri_revoke_restarts,
+    "Number of VM map re-lookups");
 
 /***************************** KERNEL THREADS ***************************/
 
@@ -919,8 +935,10 @@ vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc,
 		    &vmres);
 		switch (res) {
 		case VM_CHERI_REVOKE_AT_VMERR:
+			counter_u64_add(cheri_revoke_errors, 1);
 			return (vmres);
 		case VM_CHERI_REVOKE_AT_TICK:
+			counter_u64_add(cheri_revoke_restarts, 1);
 			/* Have the caller retranslate the map */
 			return (KERN_SUCCESS);
 		case VM_CHERI_REVOKE_AT_OK:
