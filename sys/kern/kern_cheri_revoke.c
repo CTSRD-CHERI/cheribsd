@@ -103,6 +103,21 @@ cheri_revoke_hoarders(struct proc *p, struct vm_cheri_revoke_cookie *crc)
 	kqueue_cheri_revoke(p->p_fd, crc);
 }
 
+void
+cheri_revoke_vmspace_fork(struct vmspace *dst, struct vmspace *src)
+{
+	/*
+	 * Revocation holds the map busy, so if we're here, there isn't a state
+	 * transition in progress (but an epoch might be open).
+	 *
+	 * XXX NWF We should probably go around again to force the epoch closed.
+	 */
+	dst->vm_map.vm_cheri_revoke_st = src->vm_map.vm_cheri_revoke_st;
+	dst->vm_map.vm_cheri_revoke_test = src->vm_map.vm_cheri_revoke_test;
+	dst->vm_map.vm_cheri_revoke_quarantining =
+	    src->vm_map.vm_cheri_revoke_quarantining;
+}
+
 static int
 cheri_revoke_fini(struct cheri_revoke_syscall_info * __capability crsi,
     int res, struct cheri_revoke_stats *crst,
