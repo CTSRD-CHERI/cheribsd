@@ -111,6 +111,7 @@ SUBDIR=	alias \
 	pathchk \
 	perror \
 	pie \
+	posixmqcontrol \
 	posixshmcontrol \
 	pr \
 	printenv \
