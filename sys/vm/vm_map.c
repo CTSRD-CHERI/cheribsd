@@ -5146,16 +5146,7 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 	KASSERT(locked, ("vmspace_fork: lock failed"));
 
 #ifdef CHERI_CAPREVOKE
-	/*
-	 * Revocation holds the map busy, so if we're here, there isn't a state
-	 * transition in progress (but an epoch might be open).
-	 *
-	 * XXX NWF We should probably go around again to force the epoch closed.
-	 */
-	vm2->vm_map.vm_cheri_revoke_st = vm1->vm_map.vm_cheri_revoke_st;
-	vm2->vm_map.vm_cheri_revoke_test = vm1->vm_map.vm_cheri_revoke_test;
-	vm2->vm_map.vm_cheri_revoke_quarantining =
-	    vm1->vm_map.vm_cheri_revoke_quarantining;
+	cheri_revoke_vmspace_fork(vm2, vm1);
 #endif
 
 	error = pmap_vmspace_copy(new_map->pmap, old_map->pmap);
