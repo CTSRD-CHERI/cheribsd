@@ -68,7 +68,7 @@ CFLAGS+=	-DCHERIBSD_THREAD_TESTS
 
 MAN=
 
-LIBADD+=	procstat util xo z
+LIBADD+=	procstat pthread util xo z
 
 .ifdef CHERIBSD_DYNAMIC_TESTS
 CFLAGS+=	-DCHERIBSD_DYNAMIC_TESTS
@@ -85,7 +85,6 @@ SRCS+=		cheribsdtest_ifunc.c
 .endif
 
 .ifdef CHERIBSD_THREAD_TESTS
-LIBADD+=	pthread
 SRCS+=		cheribsdtest_tls_threads.c
 .endif
 

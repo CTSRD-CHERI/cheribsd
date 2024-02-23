@@ -66,7 +66,9 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <libprocstat.h>
+#include <pthread.h>
 #include <signal.h>
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1601,6 +1603,157 @@ CHERIBSDTEST(cheri_revoke_loadside, "Test load-side revoker",
 	cheribsdtest_success();
 
 #undef CHERIBSDTEST_VM_CHERI_REVOKE_LOADSIDE_NPG
+}
+
+CHERIBSDTEST(cheri_revoke_async,
+    "A gentle test of asynchronous capability revocation",
+    .ct_check_skip = skip_need_cheri_revoke)
+{
+	struct cheri_revoke_syscall_info crsi;
+	const volatile struct cheri_revoke_info *cri;
+	cheri_revoke_epoch_t epoch;
+	void **mb;
+	void *sh;
+
+	mb = CHERIBSDTEST_CHECK_SYSCALL(
+	    mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMEM, mb, &sh));
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke_get_shadow(
+	    CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL, __DEQUALIFY(void **, &cri)));
+
+	mb[1] = cheri_andperm(mb, ~CHERI_PERM_SW_VMEM);
+	((uint8_t *)sh)[0] = 1;
+	epoch = cri->epochs.dequeue;
+
+	memset(&crsi, 0, sizeof(crsi));
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke(CHERI_REVOKE_ASYNC | CHERI_REVOKE_IGNORE_START, 0,
+	    &crsi));
+
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.enqueue == crsi.epochs.enqueue,
+	    "Bad shared enqueue clock (%lu %lu)",
+	    cri->epochs.enqueue, crsi.epochs.enqueue);
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.dequeue == crsi.epochs.dequeue,
+	    "Bad shared dequeue clock (%lu %lu)",
+	    cri->epochs.dequeue, crsi.epochs.dequeue);
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.enqueue == cri->epochs.dequeue + 1,
+	    "Bad shared clock (%lu %lu)",
+	    cri->epochs.enqueue, cri->epochs.dequeue);
+
+	while (!cheri_revoke_epoch_clears(cri->epochs.dequeue, epoch)) {
+		CHERIBSDTEST_CHECK_SYSCALL(
+		    cheri_revoke(CHERI_REVOKE_ASYNC | CHERI_REVOKE_IGNORE_START,
+		    0, NULL));
+		usleep(1000);
+	}
+
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.enqueue == cri->epochs.dequeue,
+	    "Bad shared post-revocation clock (%lu %lu)",
+	    cri->epochs.enqueue, cri->epochs.dequeue);
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.dequeue == crsi.epochs.dequeue + 2,
+	    "Unexpected clock jump (%lu %lu)",
+	    cri->epochs.dequeue, crsi.epochs.dequeue);
+
+	CHERIBSDTEST_VERIFY2(check_revoked(mb[1]), "Memory tag persists");
+
+	cheribsdtest_success();
+}
+
+static void *
+forker(void *arg)
+{
+	atomic_int *p = arg;
+
+	while (*p == 0) {
+		pid_t child = fork();
+		CHERIBSDTEST_VERIFY2(child > 0, "fork failed");
+		if (child == 0)
+			_exit(0);
+		(void)waitpid(child, NULL, 0);
+	}
+
+	return (NULL);
+}
+
+CHERIBSDTEST(cheri_revoke_async_fork,
+    "A test of asynchronous capability revocation with concurrent forks",
+    .ct_check_skip = skip_need_cheri_revoke)
+{
+	struct cheri_revoke_syscall_info crsi;
+	const volatile struct cheri_revoke_info *cri;
+	cheri_revoke_epoch_t epoch;
+	pthread_t thr;
+	void **mb;
+	void *sh;
+	atomic_int forker_res;
+	int error;
+
+	forker_res = 0;
+	error = pthread_create(&thr, NULL, forker, &forker_res);
+	if (error != 0)
+		cheribsdtest_failure_errc(error, "pthread_create");
+
+	mb = CHERIBSDTEST_CHECK_SYSCALL(
+	    mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMEM, mb, &sh));
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke_get_shadow(
+	    CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL, __DEQUALIFY(void **, &cri)));
+
+	mb[1] = cheri_andperm(mb, ~CHERI_PERM_SW_VMEM);
+	((uint8_t *)sh)[0] = 1;
+	epoch = cri->epochs.dequeue;
+
+	memset(&crsi, 0, sizeof(crsi));
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke(CHERI_REVOKE_ASYNC | CHERI_REVOKE_IGNORE_START, 0,
+	    &crsi));
+
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.enqueue == crsi.epochs.enqueue,
+	    "Bad shared enqueue clock (%lu %lu)",
+	    cri->epochs.enqueue, crsi.epochs.enqueue);
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.dequeue == crsi.epochs.dequeue,
+	    "Bad shared dequeue clock (%lu %lu)",
+	    cri->epochs.dequeue, crsi.epochs.dequeue);
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.enqueue == cri->epochs.dequeue + 1,
+	    "Bad shared clock (%lu %lu)",
+	    cri->epochs.enqueue, cri->epochs.dequeue);
+
+	while (!cheri_revoke_epoch_clears(cri->epochs.dequeue, epoch)) {
+		CHERIBSDTEST_CHECK_SYSCALL(
+		    cheri_revoke(CHERI_REVOKE_ASYNC | CHERI_REVOKE_IGNORE_START,
+		    0, NULL));
+		usleep(1000);
+	}
+
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.enqueue == cri->epochs.dequeue,
+	    "Bad shared post-revocation clock (%lu %lu)",
+	    cri->epochs.enqueue, cri->epochs.dequeue);
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.dequeue == crsi.epochs.dequeue + 2,
+	    "Unexpected clock jump (%lu %lu)",
+	    cri->epochs.dequeue, crsi.epochs.dequeue);
+
+	CHERIBSDTEST_VERIFY2(check_revoked(mb[1]), "Memory tag persists");
+
+	forker_res = 1;
+	error = pthread_join(thr, NULL);
+	if (error != 0)
+		cheribsdtest_failure_errc(error, "pthread_join");
+
+	cheribsdtest_success();
 }
 
 /*
