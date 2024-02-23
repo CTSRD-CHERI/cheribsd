@@ -132,6 +132,7 @@ SRCS+= \
 	siglist.c \
 	signal.c \
 	sigsetops.c \
+	sleep.c \
 	srand48.c \
 	statvfs.c \
 	stringlist.c \
@@ -155,6 +156,7 @@ SRCS+= \
 	ualarm.c \
 	ulimit.c \
 	uname.c \
+	usleep.c \
 	utime.c \
 	utxdb.c \
 	valloc.c \
