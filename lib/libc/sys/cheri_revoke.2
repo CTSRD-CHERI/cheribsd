@@ -99,30 +99,39 @@ Its
 argument is used for relaxed synchronization
 between multiple users of the revocation service.
 If the epoch clock has advanced beyond the provided value,
-the function will generally return immediately.
+the function will return immediately.
 The
 .Fa crsi
 argument is provided mostly for experimentation
 and may be
 .Dv NULL .
-The
+The following flags may be specified in the
 .Fa flags
-argument to
-.Fn cheri_revoke
-is, for the moment,
-mostly reserved for experimentation.
-The sole value that may be of interest is
-.Dv CHERI_REVOKE_IGNORE_START
-which causes the
+argument:
+.Bl -tag
+.It CHERI_REVOKE_IGNORE_START
+Causes the
 .Fa start
-argument to be ignored
-and the epoch counter
-obtained by synchronizing with the revocation service
-to be used instead.
-Callers should always pass
-.Dv CHERI_REVOKE_LAST_PASS
-as well unless they are engaging in multi-pass experiments;
-see the source.
+argument to be ignored and the epoch counter obtained by synchronizing with the
+revocation service to be used instead.
+.It CHERI_REVOKE_LAST_PASS
+Ensure that the current epoch is closed before returning.
+In general this means that the
+.Fn cheri_revoke
+call will perform a revocation scan of the address space of the calling process.
+.It CHERI_REVOKE_ASYNC
+Rather than performing the revocation scan in the context of the calling thread,
+specifying this flag will cause the scan to be performed asynchronously.
+A subsequent call to
+.Fn cheri_revoke ,
+with
+.Dv CHERI_REVOKE_ASYNC
+specified, will check the status of the scan and update the current epoch if it had
+completed successfully.
+If not, the scan will be retried.
+This flag may not be specified together with
+.Dv CHERI_REVOKE_LAST_PASS .
+.El
 .Sh EXAMPLES
 .Pp
 At allocator startup or upon first need, obtain a capability to the global
