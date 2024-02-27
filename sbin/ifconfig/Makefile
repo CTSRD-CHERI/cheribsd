@@ -76,10 +76,6 @@ SRCS+=	ifconfig_netlink.c
 CFLAGS+=-DWITHOUT_NETLINK
 .endif
 
-# ld.lld: error: could not determine size of cap reloc against local object nla_p_donemsg
-# >>> defined in libifconfig_carp.c (libifconfig_carp.pieo:(.rodata+0x8A10)
-LD_FATAL_WARNINGS=no
-
 MAN=	ifconfig.8
 
 CFLAGS+= -Wall -Wmissing-prototypes -Wcast-qual -Wwrite-strings -Wnested-externs
