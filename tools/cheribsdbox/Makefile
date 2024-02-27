@@ -83,10 +83,6 @@ CRUNCH_LIBS+=	-lsysdecode
 CRUNCH_LIBS+=	-l80211
 CRUNCH_LIBS+=		${CRUNCH_OBJTOP}/lib/libifconfig/libifconfig.a
 CRUNCH_BUILDOPTS+=	CRUNCH_CFLAGS+=-I${CRUNCH_OBJTOP}/lib/libifconfig
-# ld.lld: error: could not determine size of cap reloc against local object nla_p_donemsg
-# >>> defined in libifconfig_carp.c (libifconfig_carp.o:(.rodata+0xE76D0)
-LD_FATAL_WARNINGS=no
-
 # needed by fetch:
 CRUNCH_LIBS+= -lfetch
 # devinfo

@@ -10,9 +10,6 @@ SRCS=	arp.c
 
 .if ${MK_NETLINK_SUPPORT} != "no"
 SRCS+=	arp_netlink.c
-
-# ld.lld: error: could not determine size of cap reloc against local object nla_p_donemsg
-LD_FATAL_WARNINGS=no
 .else
 CFLAGS+=-DWITHOUT_NETLINK
 .endif

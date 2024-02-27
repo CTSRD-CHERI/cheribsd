@@ -29,9 +29,6 @@ YFLAGS=
 
 LIBADD=	m md pfctl
 
-# ld.lld: error: could not determine size of cap reloc against local object nla_p_donemsg
-LD_FATAL_WARNINGS=no
-
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
 
