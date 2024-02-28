@@ -57,9 +57,9 @@ main(int argc, char **argv)
 {
 	const char *hints_file;
 	int c;
-	bool is_32, is_64, justread, merge, rescan, verbose;
+	bool is_32, is_64, justread, merge, rescan, force_be, verbose;
 
-	is_32 = is_64 = justread = merge = rescan = verbose = false;
+	force_be = is_32 = is_64 = justread = merge = rescan = verbose = false;
 
 	while (argc > 1) {
 		if (strcmp(argv[1], "-aout") == 0) {
@@ -86,8 +86,11 @@ main(int argc, char **argv)
 		hints_file = __PATH_ELF_HINTS("64");
 	else
 		hints_file = _PATH_ELF_HINTS;
-	while((c = getopt(argc, argv, "Rf:imrsv")) != -1) {
+	while((c = getopt(argc, argv, "BRf:imrsv")) != -1) {
 		switch (c) {
+		case 'B':
+			force_be = true;
+			break;
 		case 'R':
 			rescan = true;
 			break;
@@ -121,7 +124,7 @@ main(int argc, char **argv)
 		if (argc == optind)
 			rescan = true;
 		update_elf_hints(hints_file, argc - optind,
-		    argv + optind, merge || rescan);
+		    argv + optind, merge || rescan, force_be);
 	}
 	exit(0);
 }
@@ -130,7 +133,7 @@ static void
 usage(void)
 {
 	fprintf(stderr,
-	    "usage: ldconfig [-32|-64] [-elf] [-Rimrv] [-f hints_file] "
+	    "usage: ldconfig [-32|-64] [-elf] [-BRimrv] [-f hints_file] "
 	    "[directory | file ...]\n");
 	exit(1);
 }
