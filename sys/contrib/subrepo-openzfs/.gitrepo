@@ -6,7 +6,7 @@
 [subrepo]
 	remote = https://github.com/CTSRD-CHERI/zfs.git
 	branch = cheri-hybrid
-	commit = 76e7797aa85db1c3a81282e31e2b22a425fd7be7
-	parent = 78995e1c88a5f4d568bcf02c106952a0ea40c763
+	commit = c873e91631ea6182e776bab32cef2ca3efcfdf2f
+	parent = 02ed641345988d1ed42220f3bf67fcf22d1278be
 	method = merge
 	cmdver = 0.4.3
