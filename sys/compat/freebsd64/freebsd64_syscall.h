@@ -73,8 +73,8 @@
 #define	FREEBSD64_SYS_vfork	66
 				/* 67 is obsolete vread */
 				/* 68 is obsolete vwrite */
-#define	FREEBSD64_SYS_sbrk	69
-#define	FREEBSD64_SYS_sstk	70
+				/* 69 is obsolete sbrk */
+				/* 70 is obsolete sstk */
 				/* 71 is obsolete ommap */
 #define	FREEBSD64_SYS_freebsd11_vadvise	72
 #define	FREEBSD64_SYS_freebsd64_munmap	73

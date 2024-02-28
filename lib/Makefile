@@ -22,6 +22,7 @@ SUBDIR_BOOTSTRAP= \
 	libelf \
 	libssp \
 	libssp_nonshared \
+	libsys \
 	msun
 
 # The main list; please keep these sorted alphabetically.
@@ -42,7 +43,6 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libbsdstat \
 	libbsm \
 	libbz2 \
-	libc_nosyscalls \
 	libcalendar \
 	libcam \
 	libcapsicum \
@@ -138,7 +138,7 @@ SUBDIR_DEPEND_libbsnmp= ${_libnetgraph}
 SUBDIR_DEPEND_cheri-libc++:= libcxxrt
 # libssp_nonshared doesn't need to be linked into libc on every arch, but it is
 # small enough to build that this bit of serialization is likely insignificant.
-SUBDIR_DEPEND_libc= libcompiler_rt libssp_nonshared
+SUBDIR_DEPEND_libc= libsys libcompiler_rt libssp_nonshared
 SUBDIR_DEPEND_libcam= libsbuf
 SUBDIR_DEPEND_libcasper= libnv
 SUBDIR_DEPEND_libdevstat= libkvm
@@ -153,6 +153,8 @@ SUBDIR_DEPEND_libpjdlog= libutil
 SUBDIR_DEPEND_libprocstat= libkvm libutil
 SUBDIR_DEPEND_libradius= libmd
 SUBDIR_DEPEND_libsmb= libkiconv
+# See comment above about libssp_nonshared
+SUBDIR_DEPEND_libsys= libcompiler_rt libssp_nonshared
 SUBDIR_DEPEND_libtacplus= libmd
 SUBDIR_DEPEND_libulog= libmd
 SUBDIR_DEPEND_libunbound= ${_libldns}
@@ -173,12 +175,6 @@ SUBDIR.${MK_BEARSSL}+=	libbearssl libsecureboot
 SUBDIR.${MK_BLACKLIST}+=libblacklist
 SUBDIR.${MK_BLUETOOTH}+=libbluetooth libsdp
 SUBDIR.${MK_BSNMP}+=	libbsnmp
-
-.if ${MACHINE_CPU:Mcheri}
-# XXX: should build on all architectures, but only needed for CHERI
-# right now and broken on amd64.
-SUBDIR+=	libsyscalls
-.endif
 
 .if ${MACHINE_ABI:Mpurecap} && ${MK_CHERI_CAPREVOKE} == "yes"
 SUBDIR+=	libcheri_caprevoke
