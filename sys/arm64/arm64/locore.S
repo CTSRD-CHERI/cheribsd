@@ -63,14 +63,6 @@
  */
 
 /*
- * Relocate kernel vaddr to the boot identity mapping
- */
-.macro early_idmap_addr dreg, sym, delta
-	ldr	\dreg, =\sym
-	add	\dreg, \dreg, \delta
-.endmacro
-
-/*
  * Build kernel pointer for the given data symbol
  * assuming the kernel mmu mapping is enabled
  */
@@ -248,7 +240,8 @@ ENTRY(_start)
 	bl	start_mmu
 
 	/* Load the new ttbr0 pagetable */
-	early_idmap_addr x27, pagetable_l0_ttbr0, x29
+	adrp	PTR(27), pagetable_l0_ttbr0
+	add	x27, x27, :lo12:pagetable_l0_ttbr0
 
 	/* Jump to the virtual address space */
 	enter_kern_vaddr 15, 7, 8, virtdone
@@ -392,19 +385,19 @@ ENTRY(mpentry)
 	/* Set the context id */
 	msr	contextidr_el1, xzr
 
-	/* Get the virt -> phys offset */
-	bl	get_virt_delta
-
 	/* Load the kernel page table */
-	early_idmap_addr x24, pagetable_l0_ttbr1, x29
+	adrp	PTR(24), pagetable_l0_ttbr1
+	add	x24, x24, :lo12:pagetable_l0_ttbr1
 	/* Load the identity page table */
-	early_idmap_addr x27, pagetable_l0_ttbr0_bootstrap, x29
+	adrp	PTR(27), pagetable_l0_ttbr0_bootstrap
+	add	x27, x27, :lo12:pagetable_l0_ttbr0_bootstrap
 
 	/* Enable the mmu */
 	bl	start_mmu
 
 	/* Load the new ttbr0 pagetable */
-	early_idmap_addr x27, pagetable_l0_ttbr0, x29
+	adrp	PTR(27), pagetable_l0_ttbr0
+	add	x27, x27, :lo12:pagetable_l0_ttbr0
 
 	/* Jump to the virtual address space */
 	enter_kern_vaddr 15, 7, 8, mp_virtdone
@@ -604,7 +597,6 @@ LEND(get_virt_delta)
  *  We were loaded to an address that is on a 2MiB boundary
  *  All the memory must not cross a 1GiB boundaty
  *  x28 contains the physical address we were loaded from
- *  x29 contains the load address delta (PA - VA)
  *
  * Returns:
  *  x27 TTBR0 table phys addr
@@ -625,15 +617,10 @@ LENTRY(create_pagetables)
 	mov	PTR(5), PTR(30)
 
 	/* Clean the page table */
-	/*
-	 * Get pointer to the pagetable in the .init_pagetable section
-	 * We need to manually relocate the address to access it using
-	 * the boot identity map
-	 */
-	ldr	x6, =pagetable
-	add	x6, x6, x29
-	ldr	x27, =pagetable_end
-	add	x27, x27, x29
+	adrp	PTR(6), pagetable
+	add	x6, x6, :lo12:pagetable
+	adrp	PTR(27), pagetable_end
+	add	x27, x27, :lo12:pagetable_end
 #ifdef __CHERI_PURE_CAPABILITY__
 	sub	x7, x27, x6
 	cvtd	c6, x6
