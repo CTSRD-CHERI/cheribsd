@@ -15,9 +15,7 @@
 # While historically machine dependent, all architectures have the following
 # declarations in common:
 #
-NOASM=	exit.o \
-	flag_captured.o \
-	getlogin.o \
+NOASM=	flag_captured.o \
 	yield.o
 PSEUDO=	_exit.o \
 	_getlogin.o
@@ -43,7 +41,6 @@ SRCS+=	creat.c
 SRCS+=	lockf.c wait.c wait3.c waitpid.c waitid.c
 SRCS+=	recv.c recvmmsg.c send.c sendmmsg.c
 
-NOASM+=  sched_getcpu.o
 PSEUDO+= _sched_getcpu.o
 
 .if !${MACHINE_ABI:Mpurecap}
@@ -132,11 +129,11 @@ NOASM+=	${PSEUDO:S/^_//}
 SRCS+=${MDASM}
 
 # Look though the complete list of syscalls (MIASM) for names that are
-# not defined with machine dependent implementations (MDASM) and are
-# not declared for no generation of default code (NOASM).  Add each
-# syscall that satisfies these conditions to the ASM list.
+# not defined with machine dependent implementations (MDASM), not declared
+# without a trival <sys> symbol (PSEUDO).  Add each syscall that satisfies
+# these conditions to the ASM list.
 .for _asm in ${MIASM}
-.if !${MDASM:R:M${_asm:R}} && !${NOASM:R:M${_asm:R}}
+.if !${MDASM:R:M${_asm:R}} && !${NOASM:R:M${_asm:R}} && !${PSEUDO:R:M_${_asm:R}}
 ASM+=$(_asm)
 .endif
 .endfor
