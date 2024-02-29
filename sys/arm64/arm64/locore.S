@@ -191,7 +191,6 @@
 	.arch_extension a64c
 #endif
 ENTRY(_start)
-
 	/*
 	 * Drop to EL1
 	 * Note: this is done while still in A64 mode.
@@ -331,7 +330,6 @@ virtdone:
 
 	/* trace back starts here */
 	mov	fp, #0
-
 	/* Branch to C code */
 	clear_capregs
 	bl	initarm
@@ -1145,7 +1143,6 @@ ENTRY(abort)
 END(abort)
 
 .bss
-
 	.align	PAGE_SHIFT
 	.type	initstack,#object
 initstack:
@@ -1223,7 +1220,6 @@ SIGCODE(freebsd64_sigcode)
 	.align	3
 END(freebsd64_sigcode)
 freebsd64_esigcode:
-
 	.data
 	.align	3
 	.global	freebsd64_szsigcode
@@ -1246,7 +1242,6 @@ SIGCODE(aarch32_sigcode)
 	.align	3
 END(aarch32_sigcode)
 aarch32_esigcode:
-
 	.data
 	.global sz_aarch32_sigcode
 	.type	sz_aarch32_sigcode,#object
