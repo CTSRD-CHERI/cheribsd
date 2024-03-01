@@ -444,7 +444,9 @@ fill_capregs(struct thread *td, struct capreg *regs)
 	regs->cid = td->td_pcb->pcb_cid_el0;
 	regs->rcsp = td->td_pcb->pcb_rcsp_el0;
 	regs->rddc = td->td_pcb->pcb_rddc_el0;
+#ifndef CHERI_COMPARTMENTALIZE_KERNEL
 	regs->rctpidr = td->td_pcb->pcb_rctpidr_el0;
+#endif
 
 	for (i = 0; i < nitems(frame->tf_x); i++) {
 		regs->c[i] = frame->tf_x[i];
@@ -478,8 +480,10 @@ fill_capregs(struct thread *td, struct capreg *regs)
 	if (cheri_gettag((void * __capability)regs->rddc))
 		regs->tagmask |= (uint64_t)1 << i;
 	i++;
+#ifndef CHERI_COMPARTMENTALIZE_KERNEL
 	if (cheri_gettag((void * __capability)regs->rctpidr))
 		regs->tagmask |= (uint64_t)1 << i;
+#endif
 
 	return (0);
 }
@@ -624,10 +628,12 @@ set_capregs(struct thread *td, struct capreg *regs)
 	if (!set_capreg(td, i, regs->tagmask, td->td_pcb->pcb_rddc_el0,
 	    regs->rddc, &tempregs.rddc))
 		goto fail;
+#ifndef CHERI_COMPARTMENTALIZE_KERNEL
 	i++;
 	if (!set_capreg(td, i, regs->tagmask, td->td_pcb->pcb_rctpidr_el0,
 	    regs->rctpidr, &tempregs.rctpidr))
 		goto fail;
+#endif
 
 	PROC_LOCK(p);
 	memcpy(frame->tf_x, tempregs.c, sizeof(frame->tf_x));
@@ -640,7 +646,9 @@ set_capregs(struct thread *td, struct capreg *regs)
 	td->td_pcb->pcb_cid_el0 = tempregs.cid;
 	td->td_pcb->pcb_rcsp_el0 = tempregs.rcsp;
 	td->td_pcb->pcb_rddc_el0 = tempregs.rddc;
+#ifndef CHERI_COMPARTMENTALIZE_KERNEL
 	td->td_pcb->pcb_rctpidr_el0 = tempregs.rctpidr;
+#endif
 
 	return (0);
 
@@ -692,11 +700,15 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 	td->td_pcb->pcb_cid_el0 = 0;
 	td->td_pcb->pcb_rcsp_el0 = 0;
 	td->td_pcb->pcb_rddc_el0 = 0;
+#ifndef CHERI_COMPARTMENTALIZE_KERNEL
 	td->td_pcb->pcb_rctpidr_el0 = 0;
+#endif
 	WRITE_SPECIALREG_CAP(cid_el0, 0);
 	WRITE_SPECIALREG_CAP(rcsp_el0, 0);
 	WRITE_SPECIALREG_CAP(rddc_el0, 0);
+#ifndef CHERI_COMPARTMENTALIZE_KERNEL
 	WRITE_SPECIALREG_CAP(rctpidr_el0, 0);
+#endif
 #endif
 
 #ifdef VFP
