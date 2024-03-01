@@ -64,7 +64,11 @@ interpos_func_t __libc_interposing[INTERPOS_MAX] = {
 	SLOT_SYS(sendmsg)
 	SLOT_SYS(sendto)
 	SLOT_SYS(setcontext)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	SLOT_LIBC(sigaction)
+#else
 	SLOT_SYS(sigaction)
+#endif
 	SLOT_SYS(sigprocmask)
 	SLOT_SYS(sigsuspend)
 	SLOT_LIBC(sigwait)

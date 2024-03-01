@@ -71,6 +71,86 @@ ENTRY(_rtld_thread_start)
 	b	_rtld_thread_start_impl
 END(_rtld_thread_start)
 
+/*
+ * void _rtld_sighandler(int, siginfo_t *, void *);
+ *
+ * This function clobbers some callee-saved registers. This is fine because it
+ * is only ever invoked via a trampoline by the kernel when a signal is
+ * delivered.
+ */
+ENTRY(_rtld_sighandler)
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	/*
+	 * The sigframe is pushed onto the trusted stack, disrupting the linked-
+	 * list. Repair the link by pointing it to the pre-signal top of the
+	 * trusted stack.
+	 */
+	mov	c19, c30
+	mov	c20, c0
+	mov	c21, c1
+	mov	c22, c2
+
+	mov	c0, csp
+	mov	c1, c2
+	bl	sighandler_fix_link
+	mov	x23, x0
+
+	mov	c0, c20
+	mov	c1, c21
+	mov	c2, c22
+#endif
+
+	ldr	c3, signal_dispatcher
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	br	x3
+#else
+	blr	c3
+
+	/*
+	 * Restore the link to its original value.
+	 */
+	mov	c0, csp
+	mov	x1, x23
+	mov	c30, c19
+	b	sighandler_unfix_link
+#endif
+END(_rtld_sighandler)
+
+/*
+ * void _rtld_dispatch_signal(int, siginfo_t *, void *);
+ *
+ * This function clobbers some callee-saved registers. This is fine because it
+ * is only ever invoked by either RTLD code that is aware of this behaviour or
+ * external code via a trampoline.
+ */
+ENTRY(_rtld_dispatch_signal)
+	mov	c24, c30
+	mov	w25, w0
+	mov	c26, c1
+	mov	c27, c2
+	bl	dispatch_signal_get
+	mov	c28, c0
+
+	mov	c1, c26
+	mov	c2, c27
+	bl	dispatch_signal_begin
+	mov	c26, c1
+
+	mov	c2, c1
+	mov	c1, c0
+	mov	w0, w25
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	blr	x28
+#else
+	blr	c28
+#endif
+
+	mov	c0, c26
+	mov	c1, c27
+	mov	c30, c24
+	b	dispatch_signal_end
+END(_rtld_dispatch_signal)
+
 ENTRY(allocate_rstk)
 	/*
 	 * NON-STANDARD CALLING CONVENTION

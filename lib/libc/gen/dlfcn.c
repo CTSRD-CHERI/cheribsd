@@ -207,6 +207,13 @@ void
 _rtld_sighandler_init(void (*p)(int, siginfo_t *, void *) __unused)
 {
 }
+
+#pragma weak _rtld_dispatch_signal
+void
+_rtld_dispatch_signal(int sig __unused, siginfo_t *info __unused,
+    void *_ucp __unused)
+{
+}
 #endif
 
 #ifndef IN_LIBDL

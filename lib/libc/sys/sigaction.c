@@ -34,7 +34,52 @@
 #include "libc_private.h"
 
 __weak_reference(__sys_sigaction, __sigaction);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#pragma weak _rtld_sighandler
+void _rtld_sighandler(int sig __unused, siginfo_t *info __unused,
+    void *_ucp __unused)
+{
+}
+
+#pragma weak _rtld_sigaction_begin
+void *_rtld_sigaction_begin(int sig __unused, struct sigaction *act __unused)
+{
+	return (0);
+}
+
+#pragma weak _rtld_sigaction_end
+void _rtld_sigaction_end(int sig __unused, void *context __unused,
+    const struct sigaction *act __unused, struct sigaction *oldact __unused)
+{
+}
+
+int
+__libc_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
+{
+	int ret;
+	void *context = 0;
+	struct sigaction newact;
+	const struct sigaction *newactp = act;
+
+	if (act &&
+	    act->sa_handler != SIG_DFL && act->sa_handler != SIG_IGN) {
+		newact = *act;
+		newactp = &newact;
+
+		context = _rtld_sigaction_begin(sig, &newact);
+		newact.sa_sigaction = _rtld_sighandler;
+	}
+
+	ret = __sys_sigaction(sig, newactp, oact);
+
+	if (ret == 0)
+		_rtld_sigaction_end(sig, context, act, oact);
+
+	return (ret);
+}
+#else
 __weak_reference(sigaction, __libc_sigaction);
+#endif
 
 #pragma weak sigaction
 int

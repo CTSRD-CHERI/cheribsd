@@ -75,6 +75,11 @@ __weak_reference(thr_sighandler, _thr_sighandler);
 void _thr_sighandler(int, siginfo_t *, void *);
 __weak_reference(thr_sighandler, _rtld_sighandler);
 void _rtld_sighandler(int, siginfo_t *, void *);
+
+void _rtld_dispatch_signal(int, siginfo_t *, void *);
+void *_rtld_sigaction_begin(int, struct sigaction *);
+void _rtld_sigaction_end(int, void *, const struct sigaction *,
+    struct sigaction *);
 #endif
 
 int	_sigtimedwait(const sigset_t *set, siginfo_t *info,
@@ -598,6 +603,9 @@ __thr_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
 	sigset_t oldset;
 	struct usigaction *usa;
 	int ret, err;
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	void *context = NULL;
+#endif
 
 	if (!_SIG_VALID(sig) || sig == SIGCANCEL) {
 		errno = EINVAL;
@@ -624,6 +632,10 @@ __thr_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
 		 */
 		if (newact.sa_handler != SIG_DFL &&
 		    newact.sa_handler != SIG_IGN) {
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+			context = _rtld_sigaction_begin(sig, &newact);
+			newact.sa_sigaction = _rtld_dispatch_signal;
+#endif
 			usa->sigact = newact;
 			remove_thr_signals(&usa->sigact.sa_mask);
 			newact.sa_flags &= ~SA_NODEFER;
@@ -651,6 +663,11 @@ __thr_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
 		else if (oact != NULL)
 			oldact = usa->sigact;
 	}
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	if (ret == 0)
+		_rtld_sigaction_end(sig, context, act, &oldact);
+#endif
 
 	_thr_rwl_unlock(&usa->lock);
 	__sys_sigprocmask(SIG_SETMASK, &oldset, NULL);

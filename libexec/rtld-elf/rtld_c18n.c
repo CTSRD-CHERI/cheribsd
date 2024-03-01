@@ -1245,14 +1245,110 @@ _rtld_thr_exit(long *state)
 	__sys_thr_exit(state);
 }
 
-static void (*thr_sighandler)(int, siginfo_t *, void *);
+/*
+ * Signal support
+ */
+void _rtld_dispatch_signal(int, siginfo_t *, void *);
+
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+ptraddr_t sighandler_fix_link(struct trusted_frame *, ucontext_t *);
+
+ptraddr_t
+sighandler_fix_link(struct trusted_frame *csp, ucontext_t *ucp)
+{
+	ptraddr_t ret = csp->next;
+
+	csp->next = ucp->uc_mcontext.mc_capregs.cap_sp;
+
+	return (ret);
+}
+
+void sighandler_unfix_link(struct trusted_frame *, ptraddr_t);
+
+void sighandler_unfix_link(struct trusted_frame *csp, ptraddr_t link)
+{
+	csp->next = link;
+}
+#endif
+
+static struct sigaction_map {
+	void *o_handler;
+	__siginfohandler_t *n_handler;
+} sigaction_map[_SIG_MAXSIG];
+
+struct dispatch_signal_ret {
+	siginfo_t *info;
+	ucontext_t *ucp;
+};
+
+__siginfohandler_t *dispatch_signal_get(int);
+
+__siginfohandler_t *
+dispatch_signal_get(int sig)
+{
+	return (sigaction_map[sig - 1].n_handler);
+}
+
+struct dispatch_signal_ret dispatch_signal_begin(__siginfohandler_t,
+    siginfo_t *, void *);
+
+struct dispatch_signal_ret
+dispatch_signal_begin(__siginfohandler_t sigfunc, siginfo_t *info,
+    void *_ucp)
+{
+	compart_id_t cid = tramp_reflect(sigfunc)->defobj->compart_id;
+	struct stk_table *table = stk_table_get();
+	struct stk_table_stack stack;
+	ucontext_t *ucp = _ucp;
+	char **stk_bot;
+	void *stk_top;
+
+	stack = table->stacks[compart_id_to_stack_index(cid)];
+
+	if (stack.size == 0)
+		stk_bot = allocate_rstk_impl(compart_id_to_index(cid));
+	else
+		stk_bot = stack.bottom;
+
+	stk_top = stk_bot[-1];
+
+	stk_bot[-1] -= sizeof(*ucp);
+	ucp = memcpy(stk_bot[-1], ucp, sizeof(*ucp));
+
+	stk_bot[-1] -= sizeof(*info);
+	info = memcpy(stk_bot[-1], info, sizeof(*info));
+
+	ucp->uc_mcontext.mc_capregs.cap_sp = (uintptr_t)stk_top;
+
+	return (struct dispatch_signal_ret) {
+		.info = info,
+		.ucp = ucp
+	};
+}
+
+void dispatch_signal_end(ucontext_t *, ucontext_t *);
+
+void
+dispatch_signal_end(ucontext_t *new, ucontext_t *old __unused)
+{
+	void *top = (void **)new->uc_mcontext.mc_capregs.cap_sp;
+	void **bot = cheri_setoffset(top, cheri_getlen(top));
+
+	memset(new, 0, sizeof(*new));
+
+	bot[-1] = top;
+}
+
+extern void (*signal_dispatcher)(int, siginfo_t *, void *);
+
+void (*signal_dispatcher)(int, siginfo_t *, void *) = _rtld_dispatch_signal;
 
 void
 _rtld_sighandler_init(void (*p)(int, siginfo_t *, void *))
 {
-	assert((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) == 0);
-	assert(thr_sighandler == NULL);
-	thr_sighandler = tramp_intern(NULL, &(struct tramp_data) {
+	assert(signal_dispatcher == _rtld_dispatch_signal &&
+	    (cheri_getperm(p) & CHERI_PERM_EXECUTIVE) == 0);
+	signal_dispatcher = tramp_intern(NULL, &(struct tramp_data) {
 		.target = p,
 		.defobj = obj_from_addr(p),
 		.sig = (struct func_sig) {
@@ -1262,10 +1358,76 @@ _rtld_sighandler_init(void (*p)(int, siginfo_t *, void *))
 	});
 }
 
-void _rtld_sighandler(int, siginfo_t *, void *);
+void *_rtld_sigaction_begin(int, struct sigaction *);
 
-void
-_rtld_sighandler(int sig, siginfo_t *info, void *_ucp)
+void *
+_rtld_sigaction_begin(int sig, struct sigaction *act)
 {
-	thr_sighandler(sig, info, _ucp);
+	struct func_sig fsig;
+	void *context = act->sa_sigaction;
+	struct tramp_header *header = tramp_reflect(context);
+	const Obj_Entry *defobj;
+
+	/*
+	 * If the signal handler is not already wrapped by a trampoline, wrap it
+	 * in one.
+	 */
+	if (header == NULL) {
+		defobj = obj_from_addr(context);
+
+		/*
+		 * If SA_SIGINFO is not set, the signal handler can have one of
+		 * two possible signatures.
+		 */
+		if ((act->sa_flags & SA_SIGINFO) == 0)
+			fsig = (struct func_sig) { .valid = false };
+		else
+			fsig = (struct func_sig) {
+				.valid = true,
+				.reg_args = 3, .mem_args = false,
+				.ret_args = NONE
+			};
+
+		context = tramp_intern(NULL, &(struct tramp_data) {
+		    .target = context,
+		    .defobj = defobj,
+		    .sig = fsig
+		});
+	} else
+		defobj = header->defobj;
+
+	/*
+	 * XXX: Enforce signal handling policy. We need to determine who is
+	 * registering the signal, who is handling the signal, and ensure both
+	 * are allowed.
+	 */
+	(void)sig;
+	if (defobj->compart_id == C18N_RTLD_COMPART_ID)
+		rtld_fatal("c18n: Attempting to register an RTLD function as "
+		    "a signal handler");
+
+	act->sa_flags |= SA_SIGINFO;
+
+	return (context);
+}
+
+void _rtld_sigaction_end(int, void *, const struct sigaction *,
+    struct sigaction *);
+
+void _rtld_sigaction_end(int sig, void *context, const struct sigaction *act,
+    struct sigaction *oact)
+{
+	struct sigaction_map *slot = &sigaction_map[sig - 1];
+
+	/*
+	 * If o_handler == NULL, then we must have oact->sa_sigaction == NULL
+	 */
+	if (oact != NULL && slot->o_handler != NULL)
+		oact->sa_sigaction = slot->o_handler;
+
+	if (act != NULL) {
+		slot->o_handler = act->sa_sigaction;
+		if (context != NULL)
+			slot->n_handler = context;
+	}
 }
