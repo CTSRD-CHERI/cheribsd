@@ -111,6 +111,7 @@ compartment_entry_stackptr_func:
 	ldr	c19, [csp], #CAP_WIDTH
 	ldr	c30, [csp], #CAP_WIDTH
 	ret	c30
+	.align	3
 EEND(compartment_entry_trampoline)
 ecompartment_entry_trampoline:
 
@@ -140,6 +141,7 @@ compartment_jump_func:
 	ldr	c10, [csp], #CAP_WIDTH
 	ldr	c30, [csp], #CAP_WIDTH
 	retr	c30
+	.align	3
 EEND(compartment_jump_trampoline)
 ecompartment_jump_trampoline:
 
