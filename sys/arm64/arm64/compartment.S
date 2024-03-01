@@ -124,6 +124,7 @@ szcompartment_entry_trampoline:
 
 TRAMPOLINECODE(compartment_jump_trampoline)
 	.word		0
+	.word		0
 	.p2align	4
 compartment_jump_func:
 	.chericap	0
