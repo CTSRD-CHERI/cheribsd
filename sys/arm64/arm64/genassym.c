@@ -50,6 +50,7 @@ ASSYM(BP_HCR_EL2, offsetof(struct arm64_bootparams, hcr_el2));
 ASSYM(PCPU_SIZE, sizeof(struct pcpu));
 ASSYM(PC_CURPCB, offsetof(struct pcpu, pc_curpcb));
 ASSYM(PC_CURTHREAD, offsetof(struct pcpu, pc_curthread));
+ASSYM(PC_CURTHREAD_SIZE, sizeof(((struct pcpu *)0)->pc_curthread));
 ASSYM(PC_SSBD, offsetof(struct pcpu, pc_ssbd));
 
 /* Size of pcb, rounded to keep stack alignment */

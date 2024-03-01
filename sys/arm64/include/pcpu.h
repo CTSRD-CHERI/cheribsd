@@ -65,6 +65,10 @@ struct pcb;
 struct pcpu;
 
 #ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * XXXKW: pcpu should be stored in ctpidr_el1 but rctpidr_el0 should hold a
+ * capability to pcpu with bounds narrowed to pc_curthread.
+ */
 register struct pcpu *pcpup __asm ("c18");
 #else
 register struct pcpu *pcpup __asm ("x18");
@@ -96,23 +100,7 @@ get_curthread(void)
 	return (td);
 }
 
-/*
- * Set the pcpu pointer with a backup in tpidr_el1 to be
- * loaded when entering the kernel from userland.
- */
-static inline void
-init_cpu_pcpup(void *pcpup)
-{
-#ifdef __CHERI_PURE_CAPABILITY__
-	__asm __volatile(
-	    "mov c18, %0 \n"
-	    "msr ctpidr_el1, %0" :: "C"(pcpup));
-#else
-	__asm __volatile(
-	    "mov x18, %0 \n"
-	    "msr tpidr_el1, %0" :: "r"(pcpup));
-#endif
-}
+void init_cpu_pcpup(void *pcpup);
 
 #define	curthread get_curthread()
 

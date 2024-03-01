@@ -88,6 +88,9 @@
 
 .macro	save_registers el
 	mrs	PTR(18), PTRN(tpidr_el1)
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	scbnds	PTR(18), PTR(18), #(PC_CURTHREAD_SIZE)
+#endif
 	add	PTR(29), PTRN(sp), #(TF_SIZE)
 .if \el == 0
 #if defined(PERTHREAD_SSP)
@@ -212,6 +215,9 @@
 .else
 	add	PTRN(sp), PTRN(sp), #(128 + TF_SIZE)
 	mrs	PTR(18), PTRN(tpidr_el1)
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	scbnds	PTR(18), PTR(18), #(PC_CURTHREAD_SIZE)
+#endif
 .endif
 .endm
 
