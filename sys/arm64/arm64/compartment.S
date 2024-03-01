@@ -30,10 +30,31 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+
 #include <machine/asm.h>
+#include <machine/param.h>
 __FBSDID("$FreeBSD$");
 
 #ifdef __CHERI_PURE_CAPABILITY__
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	/*
+	 * Root compartment entries.
+	 */
+	.bss
+	.type	compartment_entries,#object
+	.global	compartment_entries
+	.p2align	4
+compartment_entries:
+	.space	(PAGE_SIZE * COMPARTMENT_ENTRY_PAGES)
+	.size	compartment_entries, . - compartment_entries
+	.global	compartment_entries_length
+	.type	compartment_entries_length,#object
+	.size	compartment_entries_length, 8
+compartment_entries_length:
+	.quad	0
+#endif
+
 #define	TRAMPOLINECODE(sym)					\
 	.section .rodata; .globl sym; .p2align 4; .type sym,#object; sym:
 

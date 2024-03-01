@@ -122,6 +122,11 @@
 #endif
 #endif
 
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+#define	COMPARTMENT_ENTRY_LIMIT	120000
+#define	COMPARTMENT_ENTRY_PAGES	7500	/* pages of compartment entries */
+#endif
+
 #define	KSTACK_GUARD_PAGES	1	/* pages of kstack guard; 0 disables */
 #define	PCPU_PAGES		1
 
