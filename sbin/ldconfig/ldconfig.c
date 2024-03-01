@@ -57,9 +57,9 @@ main(int argc, char **argv)
 {
 	const char *hints_file;
 	int c;
-	bool is_32, is_64, justread, merge, rescan, force_be, verbose;
+	bool is_32, is_64, justread, merge, rescan, force_be;
 
-	force_be = is_32 = is_64 = justread = merge = rescan = verbose = false;
+	force_be = is_32 = is_64 = justread = merge = rescan = false;
 
 	while (argc > 1) {
 		if (strcmp(argv[1], "-aout") == 0) {
@@ -110,7 +110,7 @@ main(int argc, char **argv)
 			/* was nostd */
 			break;
 		case 'v':
-			verbose = true;
+			/* was verbose */
 			break;
 		default:
 			usage();
@@ -133,7 +133,7 @@ static void
 usage(void)
 {
 	fprintf(stderr,
-	    "usage: ldconfig [-32|-64] [-elf] [-BRimrv] [-f hints_file] "
+	    "usage: ldconfig [-32|-64] [-BRimr] [-f hints_file]"
 	    "[directory | file ...]\n");
 	exit(1);
 }
