@@ -104,7 +104,8 @@
 #endif
 
 	/* Apply the SSBD (CVE-2018-3639) workaround if needed */
-	ldr	PTR(1), [PTR(18), #PC_SSBD]
+	mrs	PTR(1), PTRN(tpidr_el1)
+	ldr	PTR(1), [PTR(1), #PC_SSBD]
 	cbz	x1, 2f
 	mov	w0, #1
 #ifdef __ASM_MORELLO_PURECAP_BENCHMARK_ABI
@@ -151,7 +152,8 @@
 #endif
 
 	/* Remove the SSBD (CVE-2018-3639) workaround if needed */
-	ldr	PTR(1), [PTR(18), #PC_SSBD]
+	mrs	PTR(1), PTRN(tpidr_el1)
+	ldr	PTR(1), [PTR(1), #PC_SSBD]
 	cbz	x1, 1f
 	mov	w0, #0
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
