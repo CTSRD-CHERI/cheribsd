@@ -49,6 +49,15 @@ struct trapframe {
 	uintcap_t tf_lr;
 	uintcap_t tf_elr;
 	uintcap_t tf_ddc;
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	/*
+	 * Restricted capability registers to be restored on return to the user
+	 * space.
+	 */
+	uintcap_t tf_rcsp;
+	uintcap_t tf_rddc;
+	uintcap_t tf_rctpidr;
+#endif
 #else
 	uint64_t tf_sp;
 	uint64_t tf_lr;

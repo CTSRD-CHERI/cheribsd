@@ -70,6 +70,9 @@
 1:
 .endif
 #if __has_feature(capabilities)
+	/*
+	 * TODO: store and restore restricted registers in a trapframe.
+	 */
 	mrs	c9, ddc_el0
 #endif
 	mrs	CAP(10), CAPN(elr_el1)
@@ -92,6 +95,16 @@
 	scbnds	PTR(18), PTR(18), #(PC_CURTHREAD_SIZE)
 #endif
 	add	PTR(29), PTRN(sp), #(TF_SIZE)
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	mrs	CAP(0), rcsp_el0
+	mrs	CAP(1), rddc_el0
+	mrs	CAP(2), rctpidr_el0
+	stp	CAP(0), CAP(1), [PTRN(sp), #(TF_RCSP)]
+	str	CAP(2), [PTRN(sp), #(TF_RCTPIDR)]
+	/*
+	 * TODO: Clear capability registers (or tags)?
+	 */
+#endif
 .if \el == 0
 #if defined(PERTHREAD_SSP)
 	/* Load the SSP canary to sp_el0 */
@@ -164,6 +177,10 @@
 #if __has_feature(capabilities)
 	ldr	w11, [PTRN(sp), #(TF_SPSR)]
 	ldp	c10, c9, [PTRN(sp), #(TF_ELR)]
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	ldp	c14, c15, [PTRN(sp), #(TF_RCSP)]
+	ldr	c16, [PTRN(sp), #(TF_RCTPIDR)]
+#endif
 #else
 	ldp	x10, x11, [sp, #(TF_ELR)]
 #endif
@@ -182,6 +199,11 @@
 	msr	CAPN(elr_el1), CAP(10)
 #if __has_feature(capabilities)
 	msr	ddc_el0, c9
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	msr	rcsp_el0, c14
+	msr	rddc_el0, c15
+	msr	rctpidr_el0, c16
+#endif
 #endif
 	ldp	CAP(0),  CAP(1),  [PTRN(sp), #(TF_X + 0  * CAP_WIDTH)]
 	ldp	CAP(2),  CAP(3),  [PTRN(sp), #(TF_X + 2  * CAP_WIDTH)]

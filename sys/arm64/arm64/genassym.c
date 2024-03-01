@@ -88,6 +88,10 @@ ASSYM(TF_LR, offsetof(struct trapframe, tf_lr));
 ASSYM(TF_ELR, offsetof(struct trapframe, tf_elr));
 #if __has_feature(capabilities)
 ASSYM(TF_DDC, offsetof(struct trapframe, tf_ddc));
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+ASSYM(TF_RCSP, offsetof(struct trapframe, tf_rcsp));
+ASSYM(TF_RCTPIDR, offsetof(struct trapframe, tf_rctpidr));
+#endif
 #endif
 ASSYM(TF_SPSR, offsetof(struct trapframe, tf_spsr));
 ASSYM(TF_ESR, offsetof(struct trapframe, tf_esr));
