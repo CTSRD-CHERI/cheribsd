@@ -133,6 +133,15 @@
 	ldr	reg, [tmpptr, :lo12:##label]
 #endif
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	LDR_HAS_PAN(reg, ptmp)				\
+	LDR_LABEL(reg, ptmp, has_pan)
+#else
+#define	LDR_HAS_PAN(reg, ptmp)				\
+	ldr	ptmp, =has_pan;				\
+	ldr	reg, [ptmp]
+#endif
+
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 #define	RETURN							\
 	and	x30, x30, #~1;					\
@@ -154,7 +163,7 @@
 	str	handler, [ptmp, #PCB_ONFAULT]	/* Set the handler */
 
 #define	ENTER_USER_ACCESS(reg, ptmp)					\
-	LDR_LABEL(reg, ptmp, has_pan);		/* Get has_pan */	\
+	LDR_HAS_PAN(reg, ptmp);			/* Get has_pan */	\
 	cbz	reg, 997f;			/* If no PAN skip */	\
 	.inst	0xd500409f | (0 << 8);		/* Clear PAN */		\
 	997:
@@ -165,7 +174,7 @@
 	998:
 
 #define	EXIT_USER_ACCESS_CHECK(reg, ptmp)				\
-	LDR_LABEL(reg, ptmp, has_pan);		/* Get has_pan */	\
+	LDR_HAS_PAN(reg, ptmp);			/* Get has_pan */	\
 	cbz	reg, 999f;			/* If no PAN skip */	\
 	.inst	0xd500409f | (1 << 8);		/* Set PAN */		\
 	999:
