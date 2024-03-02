@@ -59,10 +59,10 @@
 #endif
 .if \ic == 0
 	/* Load the D cache line size */
-	LDR_LABEL(x3, PTR(4), dcache_line_size)
+	LDR_LABEL(x3, PTR(3), dcache_line_size)
 .else
 	/* Load the I & D cache line size */
-	LDR_LABEL(x3, PTR(4), idcache_line_size)
+	LDR_LABEL(x3, PTR(3), idcache_line_size)
 .endif
 	sub	x4, x3, #1		/* Get the address mask */
 	and	x2, x0, x4		/* Get the low bits of the address */
