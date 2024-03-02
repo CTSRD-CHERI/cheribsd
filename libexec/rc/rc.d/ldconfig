@@ -16,12 +16,11 @@ stop_cmd=":"
 
 ldconfig_paths()
 {
-	local _dirs _files _ii _ldconf _ldpaths _paths
+	local _dirs _files _ii _ldpaths _paths
 
 	_dirs="${1}"
 	_paths="${2}"
 	_ldpaths="${3}"
-	_ldconf="${4}"
 
 	for _ii in ${_dirs}; do
 		if [ -d "${_ii}" ]; then
@@ -50,7 +49,7 @@ ldconfig_start()
 	if [ -x "${ldconfig_command}" ]; then
 		_LDC=$(/libexec/ld-elf.so.1 -v | sed -n -e '/^Default lib path /s///p' | tr : ' ')
 		_LDC=$(ldconfig_paths "${ldconfig_local_dirs}" \
-		    "${ldconfig_paths}" "$_LDC" "/etc/ld-elf.so.conf")
+		    "${ldconfig_paths}" "$_LDC")
 		startmsg 'ELF ldconfig path:' ${_LDC}
 		${ldconfig} -elf ${_ins} ${_LDC}
 
@@ -63,7 +62,7 @@ ldconfig_start()
 			${ldconfig} -f /var/run/ld-elf-c18n.so.hints ${_ins} ${_LDC}
 
 			_LDC=$(ldconfig_paths "${ldconfig_local64cb_dirs}" \
-			    "${ldconfig64cb_paths}" "" "")
+			    "${ldconfig64cb_paths}" "")
 			startmsg 'Benchmark ABI ldconfig path:' ${_LDC}
 			${ldconfig} -f /var/run/ld-elf64cb.so.hints ${_ins} ${_LDC}
 
@@ -74,7 +73,7 @@ ldconfig_start()
 			# FALLTHROUGH
 		riscv64c)
 			_LDC=$(ldconfig_paths "${ldconfig_local64_dirs}" \
-			    "${ldconfig64_paths}" "" "")
+			    "${ldconfig64_paths}" "")
 			startmsg '64-bit compatibility ldconfig path:' ${_LDC}
 			${ldconfig} -64 ${_ins} ${_LDC}
 			;;
@@ -86,7 +85,7 @@ ldconfig_start()
 				_LDC=$(/libexec/ld-elf32.so.1 -v | sed -n -e '/^Default lib path /s///p' | tr : ' ')
 			fi
 			_LDC=$(ldconfig_paths "${ldconfig_local32_dirs}" \
-			    "${ldconfig32_paths}" "$_LDC" "")
+			    "${ldconfig32_paths}" "$_LDC")
 			startmsg '32-bit compatibility ldconfig path:' ${_LDC}
 			${ldconfig} -32 ${_ins} ${_LDC}
 			;;
