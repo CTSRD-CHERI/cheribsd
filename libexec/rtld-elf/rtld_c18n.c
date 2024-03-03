@@ -219,7 +219,7 @@ tramp_should_include(const Obj_Entry *reqobj, const struct tramp_data *data)
 {
 	const char *sym;
 
-	if (data->target == NULL)
+	if (!cheri_gettag(data->target))
 		return (false);
 
 	if (reqobj == NULL)
@@ -1035,6 +1035,43 @@ sigtab_get(const Obj_Entry *obj, unsigned long symnum)
 		return ((struct func_sig) { .valid = false });
 
 	return (obj->sigtab[symnum]);
+}
+
+static struct tramp_header *
+tramp_reflect(void *entry)
+{
+	struct tramp_pg *page = atomic_load_explicit(&tramp_pgs.head,
+	    memory_order_acquire);
+	uintptr_t data = (uintptr_t)entry;
+	struct tramp_header *ret;
+
+	if (!cheri_gettag(data))
+		return (NULL);
+
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	data -= 1;
+#endif
+	data = (uintptr_t)__containerof((void *)data, struct tramp_header,
+	    entry);
+
+	while (page != NULL) {
+		ret = cheri_buildcap(page, data);
+		if (cheri_gettag(ret)) {
+			if (cheri_gettag(ret->target))
+				/*
+				 * At this point, the provided data must have
+				 * been (a) tagged and (b) pointing to the entry
+				 * point of a trampoline.
+				 */
+				return (ret);
+			else
+				rtld_fatal("c18n: A return capability to a "
+				    "trampoline is passed to tramp_reflect");
+		}
+		page = SLIST_NEXT(page, link);
+	}
+
+	return (NULL);
 }
 
 /*
