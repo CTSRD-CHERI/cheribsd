@@ -613,19 +613,14 @@ tramp_pg_push(struct tramp_pg *pg, size_t len)
 	size_t size = atomic_load_explicit(&pg->size, memory_order_relaxed);
 
 	do {
-		/*
-		 * Align the trampoline to two capabilities so that the first
-		 * instruction and the capability preceding it reside on the
-		 * same cache line.
-		 */
-		tramp = roundup2(pg->trampolines + size, 2 * _Alignof(void *));
+		tramp = roundup2(pg->trampolines + size,
+		    _Alignof(struct tramp_header));
 		n_size = tramp + len - pg->trampolines;
 		if (n_size > pg->capacity)
 			return (NULL);
 	} while (!atomic_compare_exchange_weak_explicit(&pg->size,
 	    /*
-	     * Relaxed ordering is sufficient because there are no
-	     * side-effects.
+	     * Relaxed ordering is sufficient because there are no side-effects.
 	     */
 	    &size, n_size, memory_order_relaxed, memory_order_relaxed));
 
@@ -641,7 +636,7 @@ static struct {
 	_Alignas(CACHE_LINE_SIZE) _Atomic(slot_idx_t) size;
 	size_t back;
 	int exp;
-	struct tramp_data *data;
+	struct tramp_header **data;
 	struct tramp_map_kv {
 		_Atomic(ptraddr_t) key;
 		_Atomic(slot_idx_t) index;
@@ -738,7 +733,7 @@ resize_table(int exp)
 	size = atomic_load_explicit(&tramp_table.size, memory_order_relaxed);
 
 	for (slot_idx_t idx = 0; idx < size; ++idx) {
-		key = (ptraddr_t)tramp_table.data[idx].target;
+		key = (ptraddr_t)tramp_table.data[idx]->target;
 		hash = pointer_hash(key);
 		slot = hash;
 
@@ -807,19 +802,22 @@ tramp_hook_impl(void *rcsp, int event, void *target, const Obj_Entry *obj,
 		getpid();
 }
 
-#define	C18N_MAX_TRAMPOLINE_SIZE	768
+#define	C18N_MAX_TRAMP_SIZE	768
 
-static void *
+static struct tramp_header *
 tramp_pgs_append(const struct tramp_data *data)
 {
 	size_t len;
 	/* A capability-aligned buffer large enough to hold a trampoline */
-	_Alignas(_Alignof(void *)) char tmp[C18N_MAX_TRAMPOLINE_SIZE];
-	char *tramp, *entry = tmp;
+	_Alignas(_Alignof(struct tramp_header)) char buf[C18N_MAX_TRAMP_SIZE];
+	char *bufp = buf;
+	struct tramp_header **headerp = (struct tramp_header **)&bufp;
+
+	char *tramp;
 	struct tramp_pg *pg;
 
 	/* Fill a temporary buffer with the trampoline and obtain its length */
-	len = tramp_compile((void **)&entry, data);
+	len = tramp_compile(headerp, data);
 
 	pg = atomic_load_explicit(&tramp_pgs.head, memory_order_acquire);
 	tramp = tramp_pg_push(pg, len);
@@ -840,23 +838,18 @@ tramp_pgs_append(const struct tramp_data *data)
 	}
 	assert(cheri_gettag(tramp));
 
-	entry = tramp + (entry - tmp);
-	memcpy(tramp, tmp, len);
+	bufp = tramp + (bufp - buf);
+	memcpy(tramp, buf, len);
 
 	/*
 	 * Ensure i- and d-cache coherency after writing executable code. The
 	 * __clear_cache procedure rounds the addresses to cache-line-aligned
-	 * addresses. Derive the start/end addresses from pg so that they have
+	 * addresses. Derive the start address from pg so that it has
 	 * sufficiently large bounds to contain these rounded addresses.
 	 */
-	__clear_cache(cheri_copyaddress(pg, entry),
-	    cheri_copyaddress(pg, tramp + len));
+	__clear_cache(cheri_copyaddress(pg, (*headerp)->entry), tramp + len);
 
-	entry = cheri_clearperm(entry, FUNC_PTR_REMOVE_PERMS);
-#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	entry = cheri_capmode(entry);
-#endif
-	return (cheri_sealentry(entry));
+	return (*headerp);
 }
 
 static bool
@@ -867,55 +860,55 @@ func_sig_equal(struct func_sig lhs, struct func_sig rhs)
 		lhs.ret_args == rhs.ret_args);
 }
 
-static bool
-func_sig_compatible(struct func_sig lhs, struct func_sig rhs)
-{
-	return (!lhs.valid || !rhs.valid || func_sig_equal(lhs, rhs));
-}
-
-static void *
-tramp_get_entry(const struct tramp_data *found, const struct tramp_data *data)
-{
-	if (!func_sig_compatible(found->sig, data->sig))
-		rtld_fatal(
-		    "Incompatible signatures for function %s: "
-		    "%s requests " C18N_SIG_FORMAT_STRING " but %s provides "
-		    C18N_SIG_FORMAT_STRING,
-		    strtab_value(data->defobj, data->def->st_name),
-		    data->defobj->path, C18N_SIG_FORMAT(data->sig),
-		    found->defobj->path, C18N_SIG_FORMAT(found->sig));
-
-	return (found->entry);
-}
-
-static void *
-tramp_create_entry(struct tramp_data *found, const struct tramp_data *data)
+static void
+tramp_check_sig(struct tramp_header *found, const Obj_Entry *reqobj,
+    const struct tramp_data *data)
 {
 	struct func_sig sig;
 
-	*found = *data;
-	if (found->def != NULL) {
+	if (data->sig.valid && found->def != NULL) {
 		sig = sigtab_get(found->defobj,
 		    found->def - found->defobj->symtab);
-		if (!found->sig.valid)
-			found->sig = sig;
-		else if (!func_sig_compatible(found->sig, sig))
-			rtld_fatal(
-			    "Incompatible signatures for function %s: "
-			    "requests " C18N_SIG_FORMAT_STRING
-			    " but %s provides " C18N_SIG_FORMAT_STRING,
-			    strtab_value(found->defobj, found->def->st_name),
-			    C18N_SIG_FORMAT(found->sig), found->defobj->path,
-			    C18N_SIG_FORMAT(sig));
-	}
 
-	return (found->entry = tramp_pgs_append(found));
+		rtld_require(!sig.valid || func_sig_equal(data->sig, sig),
+		    "Incompatible signatures for function %s: "
+		    "%s requests " C18N_SIG_FORMAT_STRING " but "
+		    "%s provides " C18N_SIG_FORMAT_STRING,
+		    strtab_value(found->defobj, found->def->st_name),
+		    reqobj->path, C18N_SIG_FORMAT(data->sig),
+		    found->defobj->path, C18N_SIG_FORMAT(sig));
+	}
+}
+
+static struct tramp_header *
+tramp_create(const struct tramp_data *data)
+{
+	struct tramp_data newdata = *data;
+
+	if (!newdata.sig.valid && newdata.def != NULL)
+		newdata.sig = sigtab_get(newdata.defobj,
+		    newdata.def - newdata.defobj->symtab);
+
+	return (tramp_pgs_append(&newdata));
+}
+
+static void *
+tramp_make_entry(struct tramp_header *header)
+{
+	void *entry = header->entry;
+
+	entry = cheri_clearperm(entry, FUNC_PTR_REMOVE_PERMS);
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	entry = cheri_capmode(entry);
+#endif
+
+	return (cheri_sealentry(entry));
 }
 
 void *
 tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *data)
 {
-	void *entry;
+	struct tramp_header *header;
 	RtldLockState lockstate;
 	ptraddr_t target = (ptraddr_t)data->target;
 	const uint32_t hash = pointer_hash(target);
@@ -924,9 +917,8 @@ tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *data)
 	int exp;
 
 	/* reqobj == NULL iff the request is by RTLD */
-	assert((reqobj == NULL || data->def != NULL) &&
-	    data->defobj != NULL && data->entry == NULL &&
-	    func_sig_legal(data->sig));
+	assert((reqobj == NULL || data->def != NULL) && data->defobj != NULL
+	    && func_sig_legal(data->sig));
 
 	if (!tramp_should_include(reqobj, data))
 		return (data->target);
@@ -986,7 +978,10 @@ start:
 		    memory_order_acquire);
 	while (idx == -1);
 
-	entry = tramp_get_entry(&tramp_table.data[idx], data);
+	/*
+	 * Load the data array entry and exit the critical region.
+	 */
+	header = tramp_table.data[idx];
 	goto end;
 
 insert:
@@ -998,7 +993,7 @@ insert:
 	 *
 	 * Create the data array entry.
 	 */
-	entry = tramp_create_entry(&tramp_table.data[idx], data);
+	header = tramp_table.data[idx] = tramp_create(data);
 
 	/*
 	 * Store-release the index.
@@ -1023,7 +1018,10 @@ insert:
 	}
 end:
 	lock_release(rtld_tramp_lock, &lockstate);
-	return (entry);
+
+	tramp_check_sig(header, reqobj, data);
+
+	return (tramp_make_entry(header));
 }
 
 struct func_sig
@@ -1034,7 +1032,8 @@ sigtab_get(const Obj_Entry *obj, unsigned long symnum)
 		    symnum, obj->path);
 
 	if (obj->sigtab == NULL)
-		return ((struct func_sig) {});
+		return ((struct func_sig) { .valid = false });
+
 	return (obj->sigtab[symnum]);
 }
 

@@ -42,21 +42,11 @@
  * Trampolines
  */
 size_t
-tramp_compile(void **entry, const struct tramp_data *data)
+tramp_compile(struct tramp_header **entry, const struct tramp_data *data)
 {
 #define IMPORT(template)				\
 	extern const uint32_t tramp_##template[];	\
 	extern const size_t size_tramp_##template
-
-	struct {
-		void *target;
-	} header;
-
-	struct {
-		const Obj_Entry *defobj;
-		const Elf_Sym *def;
-		void *function;
-	} header_hook;
 
 	IMPORT(save_caller);
 	IMPORT(call_hook);
@@ -72,7 +62,15 @@ tramp_compile(void **entry, const struct tramp_data *data)
 
 #undef	IMPORT
 
-	uint32_t *buf = *entry;
+	void *header_hook = tramp_hook;
+
+	struct tramp_header header = {
+		.target = data->target,
+		.defobj = data->defobj,
+		.def = data->def
+	};
+
+	void *buf = *entry;
 	uint32_t *cookie_patch;
 	size_t size = 0;
 	int to_clear;
@@ -95,7 +93,8 @@ tramp_compile(void **entry, const struct tramp_data *data)
 
 #define	PATCH_POINT(tramp, name) ({					\
 		extern const int32_t patch_tramp_##tramp##_##name;	\
-		&buf[patch_tramp_##tramp##_##name / sizeof(*buf)];	\
+		&((uint32_t *)buf)					\
+		    [patch_tramp_##tramp##_##name / sizeof(uint32_t)];	\
 	})
 
 #define PATCH_MOV(tramp, name, value)					\
@@ -131,30 +130,24 @@ tramp_compile(void **entry, const struct tramp_data *data)
 		*(point) |= _offset;					\
 	} while (0)
 
-	header.target = data->target;
-	COPY_DATA(header);
-
-	if (hook) {
-		header_hook.defobj = data->defobj;
-		header_hook.def = data->def;
-		header_hook.function = tramp_hook;
+	if (hook)
 		COPY_DATA(header_hook);
-	}
 
 	*entry = buf;
+	COPY_DATA(header);
 
 	COPY(save_caller);
 	cookie_patch = PATCH_POINT(save_caller, cookie);
-	PATCH_LDR_IMM(save_caller, target, 0);
+	PATCH_LDR_IMM(save_caller, target, hook ? 1 : 0);
 	if (data->sig.valid)
 		PATCH_ADD(save_caller, ret_args, data->sig.ret_args);
 
 	if (hook) {
 		COPY(call_hook);
 		PATCH_MOV(call_hook, event, UTRACE_COMPARTMENT_ENTER);
-		PATCH_LDR_IMM(call_hook, obj, 1);
-		PATCH_LDR_IMM(call_hook, def, 2);
-		PATCH_LDR_IMM(call_hook, function, 3);
+		PATCH_LDR_IMM(call_hook, function, 0);
+		PATCH_LDR_IMM(call_hook, obj, 2);
+		PATCH_LDR_IMM(call_hook, def, 3);
 	}
 
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
@@ -192,9 +185,9 @@ tramp_compile(void **entry, const struct tramp_data *data)
 	if (hook) {
 		COPY(return_hook);
 		PATCH_MOV(return_hook, event, UTRACE_COMPARTMENT_LEAVE);
-		PATCH_LDR_IMM(return_hook, obj, 1);
-		PATCH_LDR_IMM(return_hook, def, 2);
-		PATCH_LDR_IMM(return_hook, function, 3);
+		PATCH_LDR_IMM(return_hook, function, 0);
+		PATCH_LDR_IMM(return_hook, obj, 2);
+		PATCH_LDR_IMM(return_hook, def, 3);
 	} else
 		COPY(return);
 

@@ -172,20 +172,26 @@ struct func_sig {
 	unsigned char reg_args : 4;
 	unsigned char valid : 1;
 };
+_Static_assert(sizeof(struct func_sig) == sizeof(func_sig_int),
+    "Unexpected func_sig size");
 
 struct tramp_data {
 	void *target;
 	const Obj_Entry *defobj;
 	const Elf_Sym *def;
-	void *entry;
 	struct func_sig sig;
 };
-_Static_assert(sizeof(struct func_sig) == sizeof(func_sig_int),
-    "Unexpected func_sig size");
+
+struct tramp_header {
+	void *target;
+	const Obj_Entry *defobj;
+	const Elf_Sym *def;
+	uint32_t entry[];
+};
 
 void *tramp_hook(void *, int, void *, const Obj_Entry *, const Elf_Sym *,
     void *);
-size_t tramp_compile(void **, const struct tramp_data *);
+size_t tramp_compile(struct tramp_header **, const struct tramp_data *);
 void *tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *);
 
 struct func_sig sigtab_get(const Obj_Entry *, unsigned long);
