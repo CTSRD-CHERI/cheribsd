@@ -375,7 +375,8 @@ kern_sys_sctp_generic_sendmsg(struct thread *td, int sd,
 		td->td_retval[0] = len - auio.uio_resid;
 #ifdef KTRACE
 	if (ktruio != NULL) {
-		ktruio->uio_resid = td->td_retval[0];
+		if (error == 0)
+			ktruio->uio_resid = td->td_retval[0];
 		ktrgenio(sd, UIO_WRITE, ktruio, error);
 	}
 #endif /* KTRACE */
@@ -533,7 +534,8 @@ kern_sctp_generic_sendmsg_iov(struct thread *td, int sd,
 		td->td_retval[0] = len - auio.uio_resid;
 #ifdef KTRACE
 	if (ktruio != NULL) {
-		ktruio->uio_resid = td->td_retval[0];
+		if (error == 0)
+			ktruio->uio_resid = td->td_retval[0];
 		ktrgenio(sd, UIO_WRITE, ktruio, error);
 	}
 #endif /* KTRACE */
