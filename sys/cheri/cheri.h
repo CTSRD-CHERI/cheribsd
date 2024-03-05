@@ -106,6 +106,7 @@ extern void * __capability swap_restore_cap;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 /* Root kernel capability */
+extern void * __capability kernel_executive_root_cap;
 extern void * __capability kernel_root_cap;
 #endif
 

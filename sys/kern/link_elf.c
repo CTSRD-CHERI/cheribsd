@@ -2236,7 +2236,7 @@ link_elf_ireloc(caddr_t kmdp)
 	 * It is sad that this needs to be a root capability,
 	 * as in link_elf_init().
 	 */
-	ef->address = cheri_setaddress(kernel_root_cap, 0);
+	ef->address = cheri_setaddress(kernel_executive_root_cap, 0);
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif
 	parse_dynamic(ef);
