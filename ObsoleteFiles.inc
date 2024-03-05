@@ -430,6 +430,8 @@ OLD_DIRS+=usr/lib/clang/16/share
 OLD_DIRS+=usr/lib/clang/16
 
 # 20231208: new libc++ import which bumps version from 16 to 17
+.if 0
+# CHERI libc++ is still from 15.0.0
 OLD_FILES+=usr/include/c++/v1/__bsd_locale_defaults.h
 OLD_FILES+=usr/include/c++/v1/__bsd_locale_fallbacks.h
 OLD_FILES+=usr/include/c++/v1/__debug
@@ -452,6 +454,7 @@ OLD_DIRS+=usr/include/c++/v1/__tuple_dir
 OLD_FILES+=usr/include/c++/v1/experimental/algorithm
 OLD_FILES+=usr/include/c++/v1/experimental/coroutine
 OLD_FILES+=usr/include/c++/v1/experimental/functional
+.endif
 
 # 20231117: libufs version bumped to 8
 OLD_LIBS+=lib/libufs.so.7
