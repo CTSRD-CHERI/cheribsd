@@ -58,6 +58,11 @@ SYSCTL_NODE(_security, OID_AUTO, compartment, CTLFLAG_RD, 0,
 SYSCTL_NODE(_security_compartment, OID_AUTO, counters, CTLFLAG_RD, 0,
     "Counters for compartment trampolines");
 
+/*
+ * A compartment identifier for the kernel itself.
+ */
+#define	COMPARTMENT_KERNEL_ID			MODULE_KERNEL_ID
+
 #define	COMPARTMENT_TRAMPOLINE_TYPE_ENTRY	0
 #define	COMPARTMENT_TRAMPOLINE_TYPE_JUMP	1
 #define	COMPARTMENT_TRAMPOLINE_TYPE_MAX		COMPARTMENT_TRAMPOLINE_TYPE_JUMP
@@ -80,6 +85,28 @@ struct compartment_trampoline {
 	char		ct_code[] __subobject_use_container_bounds;
 };
 
+static void
+compartment_linkup(struct compartment *compartment, int id, struct thread *td)
+{
+
+	compartment->c_id = id;
+	compartment->c_thread = td;
+
+	TAILQ_INSERT_HEAD(&compartment->c_thread->td_compartments, compartment,
+	    c_next);
+}
+
+void
+compartment_linkup0(struct compartment *compartment, vm_pointer_t stack,
+    struct thread *td)
+{
+
+	compartment->c_kstack = stack;
+	compartment->c_kstackptr = stack + kstack_pages * PAGE_SIZE;
+
+	compartment_linkup(compartment, COMPARTMENT_KERNEL_ID, td);
+}
+
 static struct compartment *
 compartment_create(int id)
 {
@@ -87,15 +114,13 @@ compartment_create(int id)
 
 	compartment = malloc(sizeof(*compartment), M_COMPARTMENT, M_WAITOK |
 	    M_ZERO);
-	compartment->c_id = id;
-	compartment->c_thread = curthread;
 
 	if (!vm_compartment_new(compartment)) {
 		panic("compartment_create unable to allocate stack");
 	}
 
-	TAILQ_INSERT_HEAD(&compartment->c_thread->td_compartments, compartment,
-	    c_next);
+	compartment_linkup(compartment, id, curthread);
+
 	return (compartment);
 }
 
