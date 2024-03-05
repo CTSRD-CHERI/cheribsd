@@ -392,7 +392,11 @@ decode_fragment(Elf_Addr *fragment, Elf_Addr relocbase, Elf_Addr *addrp,
 static uintcap_t __nosanitizecoverage
 build_reloc_cap(Elf_Addr addr, Elf_Addr size, uint8_t perms, Elf_Addr offset,
     void * __capability data_cap, const void * __capability code_cap,
-    bool compartment)
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+    const void *stackptr_func,
+#endif
+    bool intercall
+    )
 {
 	uintcap_t cap;
 
@@ -414,10 +418,21 @@ build_reloc_cap(Elf_Addr addr, Elf_Addr size, uint8_t perms, Elf_Addr offset,
 	}
 	cap += offset;
 	if (perms == MORELLO_FRAG_EXECUTABLE) {
-		if (compartment)
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+		if (intercall && stackptr_func != NULL) {
+			cap = (uintptr_t)compartment_entry_for_kernel(
+			    stackptr_func, (uintptr_t)cap);
+		} else
+#endif
+		if (intercall) {
+			cap = (uintptr_t)compartment_entry_for_module(NULL,
+			    (uintptr_t)cap);
+#if 0
 			cap = (uintcap_t)compartment_call((uintptr_t)cap);
-		else
+#endif
+		} else {
 			cap = cheri_sealentry(cap);
+		}
 	}
 	KASSERT(cheri_gettag(cap) != 0,
 	    ("Relocation produce invalid capability %#lp",
@@ -429,14 +444,14 @@ build_reloc_cap(Elf_Addr addr, Elf_Addr size, uint8_t perms, Elf_Addr offset,
 static uintcap_t __nosanitizecoverage
 build_cap_from_fragment(Elf_Addr *fragment, Elf_Addr relocbase, Elf_Addr offset,
     void * __capability data_cap, const void * __capability code_cap,
-    bool compartment)
+    bool intercall)
 {
 	Elf_Addr addr, size;
 	uint8_t perms;
 
 	decode_fragment(fragment, relocbase, &addr, &size, &perms);
 	return (build_reloc_cap(addr, size, perms, offset, data_cap, code_cap,
-	    compartment));
+	    NULL, intercall));
 }
 #endif
 #endif
@@ -521,8 +536,15 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 			 * NB: we do not seal cap as it's sealed when relocating
 			 * external relocations.
 			 */
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+			/*
+			 * NB: do not construct a trampoline for
+			 * intra-compartment calls.
+			 */
+#endif
 			*(uintcap_t *)(void *)where = build_reloc_cap(addr1,
-			    size, perms, addend, base, base, lf->compartment);
+			    size, perms, addend, base, base, NULL,
+			    lf->compartment);
 		}
 #endif
 		return (0);
@@ -587,6 +609,12 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		oldcap = *(uintcap_t *)where;
 		KASSERT(cheri_gettag(oldcap) != 0,
 		    ("R_MORELLO_RELATIVE relocation wasn't processed with ARM64_ELF_RELOC_LOCAL"));
+#if 0
+		/*
+		 * XXXKW: We shouldn't have to do this if the relocbase included
+		 * the correct permissions at the stage of relocating local
+		 * relocations.
+		 */
 		if ((cheri_getperm(oldcap) & CHERI_PERM_EXECUTE) != 0 &&
 		    lf->compartment) {
 			cap = (uintcap_t)relocbase;
@@ -595,6 +623,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 			cap = (uintcap_t)compartment_call((uintptr_t)cap);
 			*(uintcap_t *)where = cap;
 		}
+#endif
 		break;
 #ifdef __CHERI_PURE_CAPABILITY__
 	case R_MORELLO_CAPINIT:
@@ -637,7 +666,8 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		} else {
 			cap = build_cap_from_fragment(where,
 			    (Elf_Addr)relocbase, rela->r_addend,
-			    relocbase, relocbase, lf->compartment);
+			    relocbase, relocbase,
+			    elf_get_compartment_ifunc(lf));
 		}
 		cap = ((uintptr_t (*)(void))cap)();
 		*(uintcap_t *)where = cap;
@@ -706,13 +736,15 @@ elf_cpu_parse_dynamic(caddr_t loadbase __unused, Elf_Dyn *dynamic __unused)
 /*
  * Handle boot-time kernel relocations, this is called by locore.
  */
-void __nosanitizecoverage
-elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap)
+static void __nosanitizecoverage
+elf_reloc_self_perms(const Elf_Dyn *dynp, void *data_cap, const void *code_cap,
+    const void *stackptr_func, uint8_t permsmask)
 {
 	const Elf_Rela *rela = NULL, *rela_end;
-	Elf_Addr *fragment;
+	Elf_Addr addr, *fragment, size;
 	uintptr_t cap;
 	size_t rela_size = 0;
+	uint8_t perms;
 
 	for (; dynp->d_tag != DT_NULL; dynp++) {
 		switch (dynp->d_tag) {
@@ -735,11 +767,37 @@ elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap)
 			continue;
 
 		fragment = (Elf_Addr *)((char *)data_cap + rela->r_offset);
-		cap = build_cap_from_fragment(fragment, 0, rela->r_addend,
-		    data_cap, code_cap, false);
+		decode_fragment(fragment, 0, &addr, &size, &perms);
+		if ((perms & permsmask) != perms)
+			continue;
+
+		cap = build_reloc_cap(addr, size, perms, rela->r_addend,
+		    data_cap, code_cap,
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+		    stackptr_func, true
+#else
+		    false
+#endif
+		    );
 		*((uintptr_t *)fragment) = cap;
 	}
 }
+
+void __nosanitizecoverage
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap,
+    const void *stackptr_func)
+#else
+elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap)
+#endif
+{
+
+	elf_reloc_self_perms(dynp, data_cap, code_cap, stackptr_func,
+	    MORELLO_FRAG_RODATA | MORELLO_FRAG_RWDATA);
+	elf_reloc_self_perms(dynp, data_cap, code_cap, stackptr_func,
+	    MORELLO_FRAG_EXECUTABLE);
+}
+
 #endif
 // CHERI CHANGES START
 // {

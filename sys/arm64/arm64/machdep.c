@@ -998,6 +998,10 @@ initarm(struct arm64_bootparams *abp)
 
 	update_special_regs(0);
 
+	/*
+	 * XXXKW: Must be executed in the Executive mode to construct
+	 * trampolines.
+	 */
 	link_elf_ireloc(kmdp);
 #ifdef FDT
 	try_load_dtb(kmdp);

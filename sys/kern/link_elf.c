@@ -1466,6 +1466,22 @@ elf_relocaddr(linker_file_t lf, Elf_Addr x)
 	return (x);
 }
 
+bool
+elf_get_compartment_ifunc(linker_file_t lf)
+{
+	elf_file_t ef = (elf_file_t)lf;
+
+	/*
+	 * Use trampolines for ifuncs if a linker file is compartmentalized
+	 * but not if it was pre-loaded.
+	 *
+	 * Pre-loaded linker files, including the kernel, are allowed to run
+	 * ifunc resolvers without restrictions to construct trampolines
+	 * themselves.
+	 */
+	return ((ef->preloaded && lf->compartment) ? false : lf->compartment);
+}
+
 static void
 link_elf_unload_file(linker_file_t file)
 {
