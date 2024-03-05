@@ -33,6 +33,10 @@
 #define	_MACHINE_MD_VAR_H_
 
 extern long Maxmem;
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+extern char compartment_entries[];
+extern int compartment_entries_length;
+#endif
 extern char compartment_entry_trampoline[];
 extern int szcompartment_entry_trampoline;
 extern char compartment_jump_trampoline[];
