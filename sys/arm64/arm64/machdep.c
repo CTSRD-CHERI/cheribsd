@@ -35,6 +35,7 @@
 #include <sys/asan.h>
 #include <sys/buf.h>
 #include <sys/bus.h>
+#include <sys/compartment.h>
 #include <sys/cons.h>
 #include <sys/cpu.h>
 #include <sys/csan.h>
@@ -446,7 +447,11 @@ makectx(struct trapframe *tf, struct pcb *pcb)
 }
 
 static void
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+init_proc0(vm_pointer_t kstack, vm_pointer_t compartmentstack)
+#else
 init_proc0(vm_pointer_t kstack)
+#endif
 {
 	struct pcpu *pcpup;
 
@@ -457,6 +462,9 @@ init_proc0(vm_pointer_t kstack)
 	proc_linkup0(&proc0, &thread0);
 	thread0.td_kstack = cheri_kern_andperm(kstack, CHERI_PERMS_KERNEL_DATA);
 	thread0.td_kstack_pages = KSTACK_PAGES;
+	/*
+	 * TODO: create the very first compartment for thread0.
+	 */
 #if defined(PERTHREAD_SSP)
 	thread0.td_md.md_canary = boot_canary;
 #endif
@@ -467,6 +475,9 @@ init_proc0(vm_pointer_t kstack)
 	thread0.td_pcb->pcb_fpusaved = &thread0.td_pcb->pcb_fpustate;
 	thread0.td_pcb->pcb_vfpcpu = UINT_MAX;
 	thread0.td_frame = &proc0_tf;
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	compartment_linkup0(&compartment0, compartmentstack, &thread0);
+#endif
 #ifdef PAC
 	ptrauth_thread0(&thread0);
 #endif
@@ -1087,7 +1098,11 @@ initarm(struct arm64_bootparams *abp)
 	if (getenv_is_true("debug.dump_modinfo_at_boot"))
 		preload_dump();
 
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	init_proc0(abp->kern_stack, abp->compartment_stack);
+#else
 	init_proc0(abp->kern_stack);
+#endif
 	msgbufinit(msgbufp, msgbufsize);
 	mutex_init();
 	init_param2(physmem);

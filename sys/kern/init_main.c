@@ -108,6 +108,9 @@ static struct session session0;
 static struct pgrp pgrp0;
 struct	proc proc0;
 struct thread0_storage thread0_st __aligned(32);
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+struct compartment compartment0;
+#endif
 struct	vmspace vmspace0;
 struct	proc *initproc;
 

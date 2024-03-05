@@ -286,9 +286,11 @@ virtdone:
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	/*
-	 * Set up the compartment stack
+	 * Set up the compartment stack for thread0
+	 *
+	 * Preserve the stack pointer in x/c26 for bootparams.
 	 */
-	buildptr_stack 7, 25, rinitstack
+	buildptr_stack 7, 26, rinitstack
 	msr	rcsp_el0, c7
 #endif
 	/*
@@ -348,6 +350,9 @@ virtdone:
 
 	str	PTR(19), [PTR(0), #BP_MODULEP]
 	str	PTR(25), [PTR(0), #BP_KERN_STACK]
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	str	PTR(26), [PTR(0), #BP_COMPARTMENT_STACK]
+#endif
 	str	x27, [PTR(0), #BP_KERN_TTBR0]
 	str	x23, [PTR(0), #BP_BOOT_EL]
 	str	x4,  [PTR(0), #BP_HCR_EL2]
