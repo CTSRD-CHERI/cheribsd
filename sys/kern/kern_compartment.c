@@ -165,9 +165,13 @@ compartment_entry_stackptr(int id, int type)
 
 static struct compartment_trampoline *
 compartment_trampoline_create(const module_t mod, int type, void *data,
-    size_t size, uintcap_t func)
+    size_t size, const void *stackptr_func, uintcap_t func)
 {
 	struct compartment_trampoline *trampoline;
+
+	KASSERT((cheri_getperm(cheri_getpcc()) & CHERI_PERM_EXECUTIVE) != 0,
+	    ("compartment_trampoline_create: PCC %#lp has invalid permissions",
+	    (void *)cheri_getpcc()));
 
 	/*
 	 * TODO: Free the trampoline.
@@ -179,17 +183,35 @@ compartment_trampoline_create(const module_t mod, int type, void *data,
 	cpu_dcache_wb_range((vm_pointer_t)trampoline, (vm_size_t)size);
 	cpu_icache_sync_range((vm_pointer_t)trampoline, (vm_size_t)size);
 
-	trampoline->ct_compartment_id = module_getid(mod);
+	if (mod != NULL) {
+		trampoline->ct_compartment_id = module_getid(mod);
+		trampoline->ct_compartment_func = module_capability(mod, func);
+	} else {
+		trampoline->ct_compartment_id = COMPARTMENT_KERNEL_ID;
+		trampoline->ct_compartment_func = (uintcap_t)cheri_sealentry(
+		    cheri_capmode(cheri_setaddress(cheri_getpcc(), func)));
+	}
 	trampoline->ct_type = type;
-	trampoline->ct_compartment_func = module_capability(mod, func);
-	if (trampoline->ct_compartment_id == 1) {
-		trampoline->ct_compartment_stackptr_func = 0;
+	if (stackptr_func != NULL) {
+		trampoline->ct_compartment_stackptr_func =
+		    (uintcap_t)stackptr_func;
 	} else {
 		trampoline->ct_compartment_stackptr_func =
 		    (uintcap_t)compartment_entry_stackptr;
 	}
 
-	return ((void *)cheri_sealentry(cheri_capmode(&trampoline->ct_code)));
+	func = (intcap_t)cheri_kern_setaddress(cheri_getpcc(),
+	    (intptr_t)trampoline);
+	/*
+	 * XXXKW: The bounds cover both metadata and code of the trampoline to
+	 * allow the code to access the metadata.
+	 */
+	func = cheri_kern_setbounds(func, size);
+	func = (intcap_t)cheri_kern_setaddress(func,
+	    (intptr_t)&trampoline->ct_code);
+	func = cheri_capmode(func);
+	func = cheri_sealentry(func);
+	return ((void *)func);
 }
 
 void
@@ -211,13 +233,23 @@ compartment_call(uintptr_t func)
 }
 
 void *
+compartment_entry_for_kernel(const void *stackptr_func, uintptr_t func)
+{
+
+	func = cheri_clearperm(func, CHERI_PERM_EXECUTIVE);
+	return (compartment_trampoline_create(NULL,
+	    COMPARTMENT_TRAMPOLINE_TYPE_ENTRY, compartment_entry_trampoline,
+	    szcompartment_entry_trampoline, stackptr_func, func));
+}
+
+void *
 compartment_entry_for_module(const module_t mod, uintptr_t func)
 {
 
 	func = cheri_clearperm(func, CHERI_PERM_EXECUTIVE);
 	return (compartment_trampoline_create(mod,
 	    COMPARTMENT_TRAMPOLINE_TYPE_ENTRY, compartment_entry_trampoline,
-	    szcompartment_entry_trampoline, func));
+	    szcompartment_entry_trampoline, NULL, func));
 }
 
 void *
@@ -239,14 +271,22 @@ compartment_entry(uintptr_t func)
 }
 
 void *
-compartment_jump(uintptr_t func)
+compartment_jump_for_module(const module_t mod, uintptr_t func)
 {
-	void *codeptr;
-	module_t mod;
 
 	KASSERT((cheri_getperm(func) & CHERI_PERM_EXECUTIVE) != 0,
 	    ("Compartment jump capability %#lp has invalid permissions",
 	    (void *)func));
+	return (compartment_trampoline_create(mod,
+	    COMPARTMENT_TRAMPOLINE_TYPE_JUMP, compartment_jump_trampoline,
+	    szcompartment_jump_trampoline, NULL, func));
+}
+
+void *
+compartment_jump(uintptr_t func)
+{
+	void *codeptr;
+	module_t mod;
 
 	MOD_SLOCK;
 
@@ -254,9 +294,7 @@ compartment_jump(uintptr_t func)
 	if (mod == NULL)
 		panic("compartment_jump: unable to find module");
 
-	codeptr = compartment_trampoline_create(mod,
-	    COMPARTMENT_TRAMPOLINE_TYPE_JUMP, compartment_jump_trampoline,
-	    szcompartment_jump_trampoline, func);
+	codeptr = compartment_jump_for_module(mod, func);
 
 	MOD_SUNLOCK;
 	return (codeptr);
