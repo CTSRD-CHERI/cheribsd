@@ -113,7 +113,11 @@
 
 #include <dev/smbios/smbios.h>
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#if defined(CHERI_COMPARTMENTALIZE_KERNEL)
+/*
+ * TODO: define the size and offsets.
+ */
+#elif defined(__CHERI_PURE_CAPABILITY__)
 _Static_assert(sizeof(struct pcb) == 1456, "struct pcb is incorrect size");
 _Static_assert(offsetof(struct pcb, pcb_fpusaved) == 336,
     "pcb_fpusaved changed offset");
