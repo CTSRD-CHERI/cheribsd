@@ -3243,8 +3243,8 @@ __elfN(note_procstat_auxv)(void *arg, struct sbuf *sb, size_t *sizep)
 
 #define	MAX_NOTES_LOOP	4096
 bool
-__elfN(parse_notes)(const struct image_params *imgp,
-    Elf_Note *checknote, const char *note_vendor, const Elf_Phdr *pnote,
+__elfN(parse_notes)(const struct image_params *imgp, Elf_Note *checknote,
+    const char *note_vendor, const Elf_Phdr *pnote,
     bool (*cb)(const Elf_Note *, void *, bool *), void *cb_arg)
 {
 	const Elf_Note *note, *note0, *note_end;
