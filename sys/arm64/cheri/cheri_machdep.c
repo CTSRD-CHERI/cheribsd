@@ -48,6 +48,7 @@ void * __capability smccc_ddc_el0;
 void * __capability vmm_gva_root_cap = (void * __capability)(intcap_t)-1;
 void * __capability vmm_gpa_root_cap = (void * __capability)(intcap_t)-1;
 #ifdef __CHERI_PURE_CAPABILITY__
+void *kernel_executive_root_cap = (void *)(intcap_t)-1;
 void *kernel_root_cap = (void *)(intcap_t)-1;
 void *vmm_el2_root_cap = (void *)(intcap_t)-1;
 #endif
@@ -100,8 +101,18 @@ cheri_init_capabilities(void * __capability kroot)
 	ctemp = cheri_andperm(ctemp, CHERI_PERMS_KERNEL_DATA);
 	devmap_init_capability(ctemp);
 
-	kernel_root_cap = cheri_andperm(kroot,
-	    ~(CHERI_PERM_SEAL | CHERI_PERM_UNSEAL));
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	kernel_executive_root_cap =
+#else
+	kernel_root_cap =
+#endif
+	    cheri_andperm(kroot, ~(
+	    CHERI_PERM_SEAL | CHERI_PERM_UNSEAL
+	    ));
+#endif
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	kernel_root_cap = cheri_andperm(kernel_executive_root_cap,
+	    ~CHERI_PERM_EXECUTIVE);
 
 	vmm_el2_root_cap = cheri_setaddress(kroot, HYP_VM_MIN_ADDRESS);
 	vmm_el2_root_cap = cheri_setbounds(vmm_el2_root_cap,
