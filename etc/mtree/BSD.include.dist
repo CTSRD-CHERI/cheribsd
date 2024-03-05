@@ -17,12 +17,6 @@
     c++
         v1
             __algorithm
-                pstl_backends
-                    cpu_backends
-                    ..
-                ..
-            ..
-            __atomic
             ..
             __bit
             ..
@@ -34,13 +28,9 @@
             ..
             __concepts
             ..
-            __condition_variable
-            ..
             __coroutine
             ..
             __debug_utils
-            ..
-            __exception
             ..
             __expected
             ..
@@ -56,39 +46,21 @@
             ..
             __iterator
             ..
-            __locale_dir
-                locale_base_api
-                ..
-            ..
-            __mdspan
-            ..
             __memory
             ..
             __memory_resource
             ..
-            __mutex
-            ..
             __numeric
-            ..
-            __pstl
-                internal
-                    omp
-                    ..
-                ..
             ..
             __random
             ..
             __ranges
             ..
-            __stop_token
-            ..
             __string
-            ..
-            __system_error
             ..
             __thread
             ..
-            __tuple
+            __tuple_dir
             ..
             __type_traits
             ..
