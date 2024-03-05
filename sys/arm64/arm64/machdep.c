@@ -1021,6 +1021,10 @@ initarm(struct arm64_bootparams *abp)
 	PCPU_SET(curthread, &thread0);
 	PCPU_SET(midr, get_midr());
 
+	/*
+	 * XXXKW: Must be executed in the Executive mode to construct
+	 * trampolines.
+	 */
 	link_elf_ireloc(kmdp);
 #ifdef FDT
 	try_load_dtb(kmdp);
