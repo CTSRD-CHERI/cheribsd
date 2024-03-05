@@ -1349,11 +1349,17 @@ initstack:
 	.space	BOOT_STACK_SIZE
 initstack_end:
 	.size	initstack, initstack_end - initstack
+
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	/*
+	 * Root compartment stack.
+	 */
 	.type	rinitstack,#object
 rinitstack:
 	.space	(PAGE_SIZE * KSTACK_PAGES)
 rinitstack_end:
 	.size	rinitstack, rinitstack_end - rinitstack
+#endif
 
 	.section .init_pagetable, "aw", %nobits
 	.align PAGE_SHIFT
