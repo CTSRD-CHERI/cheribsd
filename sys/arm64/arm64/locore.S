@@ -330,6 +330,8 @@ virtdone:
 	/* Assume can we reach _DYNAMIC from PCC */
 	adrp	c0, _DYNAMIC
 	add	c0, c0, :lo12:_DYNAMIC
+	adrp	c3, compartment_entry_stackptr
+	add	c3, c3, :lo12:compartment_entry_stackptr
 	bl	elf_reloc_self
 #endif
 	/* Initialize capabilities. */
