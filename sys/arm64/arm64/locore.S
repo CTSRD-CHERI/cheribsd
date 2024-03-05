@@ -372,8 +372,17 @@ virtdone:
 
 	/* trace back starts here */
 	mov	fp, #0
-	/* Branch to C code */
+
+	/* Clear registers before branching into C code */
 	clear_capregs
+
+	/* Branch to C code */
+	/*
+	 * XXXKW: There are C functions called earlier:
+	 * - elf_reloc_self()
+	 * - cheri_init_capabilities()
+	 * - pmap_san_bootstrap()
+	 */
 	bl	initarm
 	/* We are done with the boot params */
 	add	PTRN(sp), PTRN(sp), #BOOTPARAMS_SIZE
@@ -390,6 +399,18 @@ virtdone:
 #endif
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	/*
+	 * TODO:
+	 * - Move before cheri_init_capabilities()?
+	 * - Move before initarm()?
+	 * - Move after initarm() to allow relocations to be executed in the
+	 *   Executive mode?
+	 */
+	/*
+	 * XXXKW: Ideally, we would enter the root compartment before branching
+	 * into any C code to allow static analysis of the assembly executed
+	 * before entering the root compartment.
+	 */
 	enter_kern_compartment 15, 7, compartment
 compartment:
 #endif
