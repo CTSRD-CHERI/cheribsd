@@ -51,6 +51,7 @@
 #include <sys/ktrace.h>
 #include <sys/mman.h>
 #include <sys/ioctl.h>
+#include <sys/poll.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/sysent.h>
@@ -115,6 +116,7 @@ void ktrcapfail(struct ktr_cap_fail *);
 void ktrfault(struct ktr_fault *);
 void ktrfaultend(struct ktr_faultend *);
 void ktrkevent(struct kevent *);
+void ktrpollfd(struct pollfd *);
 void ktrstructarray(struct ktr_struct_array *, size_t);
 void ktrbitset(char *, struct bitset *, size_t);
 void ktrsyscall_freebsd(struct ktr_syscall *ktr, register_t **resip,
@@ -2241,9 +2243,22 @@ ktrkevent(struct kevent *kev)
 }
 
 void
+ktrpollfd(struct pollfd *pfd)
+{
+
+	printf("{ fd=%d", pfd->fd);
+	printf(", events=");
+	print_mask_arg0(sysdecode_pollfd_events, pfd->events);
+	printf(", revents=");
+	print_mask_arg0(sysdecode_pollfd_events, pfd->revents);
+	printf("}");
+}
+
+void
 ktrstructarray(struct ktr_struct_array *ksa, size_t buflen)
 {
 	struct kevent kev;
+	struct pollfd pfd;
 	char *name, *data;
 	size_t namelen, datalen;
 	int i;
@@ -2325,6 +2340,11 @@ ktrstructarray(struct ktr_struct_array *ksa, size_t buflen)
 			kev.udata = (void *)(uintptr_t)kev32.udata;
 			ktrkevent(&kev);
 #endif
+		} else if (strcmp(name, "pollfd") == 0) {
+			if (ksa->struct_size != sizeof(pfd))
+				goto bad_size;
+			memcpy(&pfd, data, sizeof(pfd));
+			ktrpollfd(&pfd);
 		} else {
 			printf("<unknown structure> }\n");
 			return;
