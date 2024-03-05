@@ -535,6 +535,14 @@ link_elf_init(void* arg)
 	    linker_kernel_file->address, linker_kernel_file->size);
 	(void)link_elf_preload_parse_symbols(ef);
 
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	/*
+	 * Use the kernel linker-based compartmentalization model for the kernel
+	 * itself.
+	 */
+	linker_kernel_file->compartment = true;
+#endif
+
 #ifdef GDB
 	r_debug.r_map = NULL;
 	r_debug.r_brk = r_debug_state;
@@ -1038,6 +1046,14 @@ link_elf_link_preload_finish(linker_file_t lf)
 {
 	elf_file_t ef;
 	int error;
+
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	/*
+	 * Apply the kernel linker-based compartmentalization model to
+	 * a pre-loaded kernel module before relocating the linker file.
+	 */
+	lf->compartment = true;
+#endif
 
 	ef = (elf_file_t) lf;
 	error = relocate_file(ef);
@@ -2241,6 +2257,28 @@ link_elf_ireloc(caddr_t kmdp)
 
 	ef->modptr = kmdp;
 	ef->dynamic = (Elf_Dyn *)&_DYNAMIC;
+	/*
+	 * Indicate that a linker file for the kernel is pre-loaded to correctly
+	 * relocate ifunc resolvers if they must be compartmentalized.
+	 */
+	ef->preloaded = true;
+
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	/*
+	 * Use the kernel linker-based compartmentalization model for the kernel
+	 * itself.
+	 *
+	 * This is repeated for the kernel in link_elf_init() when handling
+	 * SYSINT() for the kernel linker. link_elf_init() registers the kernel
+	 * as a pre-loaded kernel but does not relocate its symbols as we are
+	 * relocating them in link_elf_ireloc() below.
+	 *
+	 * Note that the rest of the elf->lf object remains zeroed within
+	 * link_elf_ireloc() as other fields than linker_file.compartment are
+	 * never used by its callees.
+	 */
+	ef->lf.compartment = true;
+#endif
 
 #ifdef RELOCATABLE_KERNEL
 	ef->address = (caddr_t) (__startkernel - KERNBASE);
