@@ -37,7 +37,6 @@
  * CHERI CHANGES END
  */
 
-#include <sys/cdefs.h>
 #include <stdlib.h>
 #include "thr_private.h"
 

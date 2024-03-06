@@ -105,7 +105,6 @@
  * CHERI CHANGES END
  */
 
-#include <sys/cdefs.h>
 #include "namespace.h"
 #include <errno.h>
 #include <pthread.h>
