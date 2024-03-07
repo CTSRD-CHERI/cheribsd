@@ -49,6 +49,8 @@ tramp_compile(struct tramp_header **entry, const struct tramp_data *data)
 	extern const size_t size_tramp_##template
 
 	IMPORT(save_caller);
+	IMPORT(update_fp_exe);
+	IMPORT(update_fp_res);
 	IMPORT(call_hook);
 	IMPORT(switch_stack);
 	IMPORT(invoke_exe);
@@ -141,6 +143,11 @@ tramp_compile(struct tramp_header **entry, const struct tramp_data *data)
 	PATCH_LDR_IMM(save_caller, target, hook ? 1 : 0);
 	if (data->sig.valid)
 		PATCH_ADD(save_caller, ret_args, data->sig.ret_args);
+
+	if (executive)
+		COPY(update_fp_exe);
+	else
+		COPY(update_fp_res);
 
 	if (hook) {
 		COPY(call_hook);

@@ -478,18 +478,9 @@ allocate_rstk_impl(unsigned index)
 	return (stk);
 }
 
-struct trusted_frame {
-	ptraddr_t next;
-	uint8_t ret_args : 2;
-	ptraddr_t cookie : 62;
-	/*
-	 * INVARIANT: This field contains the top of the caller's stack when the
-	 * caller was last entered.
-	 */
-	void **o_stack;
-	void *ret_addr;
-};
-
+/*
+ * Stack unwinding
+ */
 /*
  * Returning this struct allows us to control the content of unused return value
  * registers.
@@ -512,7 +503,13 @@ _rtld_setjmp_impl(uintptr_t ret, void **buf, struct trusted_frame *csp)
 	 * buffer.
 	 */
 
-	*buf = cheri_seal(cheri_setaddress(csp, csp->next), sealer_jmpbuf);
+	/*
+	 * Defensive reduction of privileges.
+	 */
+	csp = cheri_setaddress(csp, csp->next);
+	csp = cheri_setboundsexact(csp, 0);
+	csp = cheri_andperm(csp, 0);
+	*buf = cheri_seal(csp, sealer_jmpbuf);
 
 	return ((struct jmp_args) { .ret = ret });
 }
@@ -1155,16 +1152,15 @@ c18n_return_address(void)
 {
 	struct trusted_frame *tframe;
 
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	tframe = trusted_stk_get();
-#else
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wframe-address"
+	/*
+	 * Unwind twice to locate the trusted frame.
+	 */
 	tframe = __builtin_frame_address(2);
 #pragma clang diagnostic pop
-#endif
 
-	return (tframe->ret_addr);
+	return (tframe->pc);
 }
 
 /*

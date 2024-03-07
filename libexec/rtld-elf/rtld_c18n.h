@@ -29,6 +29,7 @@
 #define RTLD_C18N_H
 
 #include <stdint.h>
+#include "rtld_c18n_machdep.h"
 
 /*
  * Global symbols
