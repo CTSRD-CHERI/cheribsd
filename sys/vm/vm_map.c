@@ -3281,26 +3281,6 @@ again:
 	 */
 	vm_map_wait_busy(map);
 
-#ifdef CHERI_CAPREVOKE
-	if (cheri_revoke_st_is_revoking(map->vm_cheri_revoke_st)) {
-		if (map == &curthread->td_proc->p_vmspace->vm_map) {
-			/* Push our revocation along */
-			vm_map_unlock(map);
-
-			// XXX!
-
-			goto again;
-		} else {
-			/* It's hard to push on another thread; wait */
-			rv = cv_wait_sig(&map->vm_cheri_revoke_cv, &map->lock);
-			if (rv != 0) {
-				return rv;
-			}
-			goto again;
-		}
-	}
-#endif
-
 	VM_MAP_RANGE_CHECK(map, start, end);
 
 	if (!vm_map_lookup_entry(map, start, &first_entry))
