@@ -568,42 +568,38 @@ fast_out:
 	/* Per-process kernel hoarders */
 	cheri_revoke_hoarders(td->td_proc, &vmcrc);
 
-	switch (myst) {
-	default:
-		__assert_unreachable();
-	case CHERI_REVOKE_ST_CLOSING:
-	case CHERI_REVOKE_ST_INITING:
-		if (entryst == CHERI_REVOKE_ST_NONE) {
-			/*
-			 * Increment the GCLG.  Immediately install for the
-			 * current thread; any others are currently off-core
-			 * and will be switched back to and so will call
-			 * pmap_activate themselves.
-			 *
-			 * pmap_caploadgen_next also shoots down all TLBs
-			 * with this AS possibly cached, ensuring that
-			 * nobody continues to see a stale LCLG (from two
-			 * epochs ago) as now suddenly valid again.
-			 *
-			 * Take a write lock on the address space around this
-			 * so that we don't race any page faults from kernel
-			 * worker threads; we won't race any page faults from
-			 * userspace already since we're single-threaded.
-			 *
-			 * XXXMJ this statement is not quite true.  The map lock
-			 * is acquired during page fault handing but may be
-			 * dropped (and re-acquired) around calls into the
-			 * pager.  In other words, it appears to be possible to
-			 * increment the GCLG after a (kernel) thread has
-			 * faulted but before it has installed a PTE for the new
-			 * mapping.
-			 */
-			vm_map_lock(&vm->vm_map);
-			pmap_caploadgen_next(vmm->pmap);
-			pmap_activate(td);
-			vm_map_unlock(&vm->vm_map);
-		}
-		break;
+	KASSERT(myst == CHERI_REVOKE_ST_INITING ||
+	    myst == CHERI_REVOKE_ST_CLOSING,
+	    ("unexpected state %d in revoker", myst));
+	if (entryst == CHERI_REVOKE_ST_NONE) {
+		/*
+		 * Increment the GCLG.  Immediately install for the
+		 * current thread; any others are currently off-core
+		 * and will be switched back to and so will call
+		 * pmap_activate themselves.
+		 *
+		 * pmap_caploadgen_next also shoots down all TLBs
+		 * with this AS possibly cached, ensuring that
+		 * nobody continues to see a stale LCLG (from two
+		 * epochs ago) as now suddenly valid again.
+		 *
+		 * Take a write lock on the address space around this
+		 * so that we don't race any page faults from kernel
+		 * worker threads; we won't race any page faults from
+		 * userspace already since we're single-threaded.
+		 *
+		 * XXXMJ this statement is not quite true.  The map lock
+		 * is acquired during page fault handing but may be
+		 * dropped (and re-acquired) around calls into the
+		 * pager.  In other words, it appears to be possible to
+		 * increment the GCLG after a (kernel) thread has
+		 * faulted but before it has installed a PTE for the new
+		 * mapping.
+		 */
+		vm_map_lock(&vm->vm_map);
+		pmap_caploadgen_next(vmm->pmap);
+		pmap_activate(td);
+		vm_map_unlock(&vm->vm_map);
 	}
 
 	PROC_LOCK(td->td_proc);
