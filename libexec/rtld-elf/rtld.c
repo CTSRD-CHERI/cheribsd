@@ -401,6 +401,7 @@ enum {
 	LD_COMPARTMENT_ENABLE,
 	LD_COMPARTMENT_OVERHEAD,
 	LD_COMPARTMENT_SIG,
+	LD_COMPARTMENT_UNWIND,
 #endif
 };
 
@@ -446,6 +447,7 @@ static struct ld_env_var_desc ld_env_vars[] = {
 	LD_ENV_DESC(COMPARTMENT_ENABLE, false),
 	LD_ENV_DESC(COMPARTMENT_OVERHEAD, false),
 	LD_ENV_DESC(COMPARTMENT_SIG, false),
+	LD_ENV_DESC(COMPARTMENT_UNWIND, false),
 #endif
 };
 
@@ -844,6 +846,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     ld_compartment_enable = ld_get_env_var(LD_COMPARTMENT_ENABLE);
     ld_compartment_overhead = ld_get_env_var(LD_COMPARTMENT_OVERHEAD);
     ld_compartment_sig = ld_get_env_var(LD_COMPARTMENT_SIG);
+    ld_compartment_unwind = ld_get_env_var(LD_COMPARTMENT_UNWIND);
 #endif
 
     set_ld_elf_hints_path();
