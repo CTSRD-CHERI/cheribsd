@@ -52,7 +52,7 @@ ENTRY(.rtld_start)
 #ifdef __CHERI_PURE_CAPABILITY__
 	.cfi_undefined	c30
 	mov	c19, c0				/* Put aux in a callee-saved register */
-#if defined(RTLD_SANDBOX) && defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
+#ifdef RTLD_SANDBOX
 	mov	c1, csp
 	sub	csp, csp, #(CAP_WIDTH * 2)
 	bl	c18n_init_rtld_stack
