@@ -33,17 +33,8 @@
 #include <sys/elf_common.h>
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-.weak _rtld_setjmp;
-LENTRY(_rtld_setjmp)
-	/* Should never be called */
-	RETURN
-LEND(_rtld_setjmp)
-
-.weak _rtld_longjmp;
-LENTRY(_rtld_longjmp)
-	/* Should never be called */
-	RETURN
-LEND(_rtld_longjmp)
+.weak _rtld_setjmp
+.weak _rtld_longjmp
 #endif
 
 ENTRY(setjmp)

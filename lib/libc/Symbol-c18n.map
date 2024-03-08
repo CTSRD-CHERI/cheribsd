@@ -1,9 +1,0 @@
-FBSDprivate_1.0 {
-	_rtld_setjmp;
-	_rtld_longjmp;
-	_rtld_thread_start_init;
-	_rtld_sighandler_init;
-	_rtld_dispatch_signal;
-	_rtld_sigaction_begin;
-	_rtld_sigaction_end;
-};

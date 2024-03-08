@@ -62,7 +62,6 @@ CFLAGS+=${CANCELPOINTS_CFLAGS}
 
 .ifdef RTLD_SANDBOX
 CFLAGS+=-DRTLD_SANDBOX
-SYM_MAPS+=${LIBC_SRCTOP}/Symbol-c18n.map
 .endif
 
 # Use a more efficient TLS model for libc since we can reasonably assume that

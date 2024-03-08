@@ -58,11 +58,6 @@ void _rtld_thread_init(void *);
 void _rtld_atfork_pre(int *);
 void _rtld_atfork_post(int *);
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-void _rtld_thread_start_init(void (*)(struct pthread *));
-void _rtld_sighandler_init(void (*)(int, siginfo_t *, void *));
-#endif
-
 /*
  * For ELF, the dynamic linker directly resolves references to its
  * services to functions inside the dynamic linker itself.  These
@@ -194,27 +189,6 @@ _rtld_thread_init(void *li __unused)
 
 	/* Do nothing when linked statically. */
 }
-
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-#pragma weak _rtld_thread_start_init
-void
-_rtld_thread_start_init(void (*p)(struct pthread *) __unused)
-{
-}
-
-#pragma weak _rtld_sighandler_init
-void
-_rtld_sighandler_init(void (*p)(int, siginfo_t *, void *) __unused)
-{
-}
-
-#pragma weak _rtld_dispatch_signal
-void
-_rtld_dispatch_signal(int sig __unused, siginfo_t *info __unused,
-    void *_ucp __unused)
-{
-}
-#endif
 
 #ifndef IN_LIBDL
 static pthread_once_t dl_phdr_info_once = PTHREAD_ONCE_INIT;
