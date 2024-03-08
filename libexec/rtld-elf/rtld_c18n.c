@@ -1313,36 +1313,40 @@ struct dispatch_signal_ret dispatch_signal_begin(__siginfohandler_t,
     siginfo_t *, void *);
 
 struct dispatch_signal_ret
-dispatch_signal_begin(__siginfohandler_t sigfunc, siginfo_t *info,
-    void *_ucp)
+dispatch_signal_begin(__siginfohandler_t sigfunc, siginfo_t *info, void *_ucp)
 {
 	compart_id_t cid = tramp_reflect(sigfunc)->defobj->compart_id;
-	struct stk_table *table = stk_table_get();
-	struct stk_table_stack stack;
+	struct stk_table_stack *entry;
 	ucontext_t *ucp = _ucp;
-	char **stk_bot;
-	void *stk_top;
+	struct sigframe {
+		siginfo_t info;
+		ucontext_t context;
+	} *ntop, *otop, **bot;
 
-	stack = table->stacks[compart_id_to_stack_index(cid)];
-
-	if (stack.size == 0)
-		stk_bot = allocate_rstk_impl(compart_id_to_index(cid));
+	entry = &stk_table_get()->stacks[compart_id_to_stack_index(cid)];
+	if (entry->size == 0)
+		bot = allocate_rstk_impl(compart_id_to_index(cid));
 	else
-		stk_bot = stack.bottom;
+		bot = entry->bottom;
 
-	stk_top = stk_bot[-1];
+	otop = bot[-1];
+	ntop = bot[-1] = otop - 1;
 
-	stk_bot[-1] -= sizeof(*ucp);
-	ucp = memcpy(stk_bot[-1], ucp, sizeof(*ucp));
+	assert(__is_aligned(ntop, _Alignof(typeof(*ntop))));
+	*ntop = (struct sigframe) {
+		.info = *info,
+		.context = *ucp
+	};
 
-	stk_bot[-1] -= sizeof(*info);
-	info = memcpy(stk_bot[-1], info, sizeof(*info));
-
-	ucp->uc_mcontext.mc_capregs.cap_sp = (uintptr_t)stk_top;
+	/*
+	 * Provide the original top of the target compartment's stack in the
+	 * copy of the context.
+	 */
+	ntop->context.uc_mcontext.mc_capregs.cap_sp = (uintptr_t)otop;
 
 	return (struct dispatch_signal_ret) {
-		.info = info,
-		.ucp = ucp
+		.info = &ntop->info,
+		.ucp = &ntop->context
 	};
 }
 
@@ -1351,11 +1355,15 @@ void dispatch_signal_end(ucontext_t *, ucontext_t *);
 void
 dispatch_signal_end(ucontext_t *new, ucontext_t *old __unused)
 {
-	void *top = (void **)new->uc_mcontext.mc_capregs.cap_sp;
-	void **bot = cheri_setoffset(top, cheri_getlen(top));
+	void *top, **bot;
 
-	memset(new, 0, sizeof(*new));
+	top = (void *)new->uc_mcontext.mc_capregs.cap_sp;
+	bot = cheri_setoffset(top, cheri_getlen(top));
 
+	/*
+	 * Restore the top of the target compartment's stack to the value in the
+	 * context.
+	 */
 	bot[-1] = top;
 }
 
@@ -1429,6 +1437,10 @@ _rtld_sigaction_begin(int sig, struct sigaction *act)
 		    "a signal handler");
 
 	act->sa_flags |= SA_SIGINFO;
+	/*
+	 * XXX: Ignore sigaltstack for now.
+	 */
+	act->sa_flags &= ~SA_ONSTACK;
 
 	return (context);
 }
