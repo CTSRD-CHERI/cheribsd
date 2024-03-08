@@ -35,6 +35,7 @@
 #include <sys/param.h>
 #include <sys/endian.h>
 
+#include <assert.h>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -60,6 +61,18 @@ elf_find_reloc(const GElf_Ehdr *hdr)
 			return ((*erd)->reloc);
 	}
 	return (NULL);
+}
+
+static bool
+elf_is_cheriabi(const GElf_Ehdr *hdr)
+{
+	if (hdr->e_machine == EM_AARCH64 &&
+	    (hdr->e_flags & EF_AARCH64_CHERI_PURECAP) != 0)
+		return (true);
+	if (hdr->e_machine == EM_RISCV &&
+	    (hdr->e_flags & EF_RISCV_CHERIABI) != 0)
+		return (true);
+	return (false);
 }
 
 int
@@ -118,7 +131,10 @@ elf_open_file(struct elf_file *efile, const char *filename, int verbose)
 		}
 	}
 
+	efile->ef_cheriabi = elf_is_cheriabi(&efile->ef_hdr);
 	efile->ef_pointer_size = elf_object_size(efile, ELF_T_ADDR);
+	if (efile->ef_cheriabi)
+		efile->ef_pointer_size *= 2;
 
 	return (0);
 }
@@ -145,6 +161,8 @@ elf_compatible(struct elf_file *efile, const GElf_Ehdr *hdr)
 	if (efile->ef_hdr.e_ident[EI_CLASS] != hdr->e_ident[EI_CLASS] ||
 	    efile->ef_hdr.e_ident[EI_DATA] != hdr->e_ident[EI_DATA] ||
 	    efile->ef_hdr.e_machine != hdr->e_machine)
+		return (false);
+	if (efile->ef_cheriabi != elf_is_cheriabi(hdr))
 		return (false);
 	return (true);
 }
@@ -506,6 +524,12 @@ elf_int(struct elf_file *efile, const void *p)
 GElf_Addr
 elf_address_from_pointer(struct elf_file *efile, const void *p)
 {
+	/*
+	 * For big-endian CHERI architectures p would need to be
+	 * advanced to the address field.
+	 */
+	if (efile->ef_cheriabi)
+		assert(elf_encoding(efile) == ELFDATA2LSB);
 	switch (elf_class(efile)) {
 	case ELFCLASS32:
 		if (elf_encoding(efile) == ELFDATA2LSB)
