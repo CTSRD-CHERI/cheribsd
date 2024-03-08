@@ -283,17 +283,34 @@ init_compart_stack(void **stk, compart_id_t cid)
 		*--((uintptr_t **)stk)[-1] = cid;
 }
 
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 uintptr_t c18n_init_rtld_stack(uintptr_t, void **);
 
 uintptr_t
 c18n_init_rtld_stack(uintptr_t ret, void **csp)
 {
+	/*
+	 * This function does very different things under the two ABIs.
+	 */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	/*
+	 * Under the benchmark ABI, it initialises RTLD's stack as a regular
+	 * compartment's stack.
+	 */
 	init_compart_stack(csp, C18N_RTLD_COMPART_ID);
+#else
+	/*
+	 * Under the purecap ABI, it repurposes the trusted stack into a dummy
+	 * stack to be filled in the Restricted stack register when running
+	 * Executive mode code. The reduction of bounds is merely defensive. It
+	 * should in theory be unnecessary.
+	 */
+	csp[-1] = cheri_setboundsexact(&csp[-1], sizeof(csp[-1]));
+#endif
 
 	return (ret);
 }
 
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 /*
  * Save the initial stack (either at program launch or at thread start) in the
  * stack table.
@@ -503,10 +520,10 @@ struct jmp_args
 _rtld_setjmp_impl(uintptr_t ret, void **buf, struct trusted_frame *csp)
 {
 	/*
-	 * Before setjmp is called, the top of the Executive stack contains:
+	 * Before setjmp is called, the top of the trusted stack contains:
 	 * 	0.	Link to previous frame
-	 * setjmp does not push to the Executive stack. When _rtld_setjmp is
-	 * called, the following are pushed to the Executive stack:
+	 * setjmp does not push to the trusted stack. When _rtld_setjmp is
+	 * called, the following are pushed to the trusted stack:
 	 * 	1.	Caller's data
 	 * 	2.	Link to 0
 	 * We store a sealed capability to the caller's frame in the jump
@@ -526,15 +543,15 @@ _rtld_longjmp_impl(uintptr_t ret, void **buf, struct trusted_frame *csp,
     void **rcsp)
 {
 	/*
-	 * Before longjmp is called, the top of the Executive stack contains:
+	 * Before longjmp is called, the top of the trusted stack contains:
 	 * 	0.	Link to previous frame
-	 * longjmp does not push to the Executive stack. When _rtld_longjmp is
-	 * called, the following are pushed to the Executive stack:
+	 * longjmp does not push to the trusted stack. When _rtld_longjmp is
+	 * called, the following are pushed to the trusted stack:
 	 * 	1.	Caller's data
 	 * 	2.	Link to 0
-	 * _rtld_longjmp traverses down the Executive stack from 0 and unwinds
-	 * the Restricted stack of each intermediate compartment until reaching
-	 * the target frame.
+	 * _rtld_longjmp traverses down the trusted stack from 0 and unwinds
+	 * the stack of each intermediate compartment until reaching the target
+	 * frame.
 	 */
 
 	struct trusted_frame *target, *cur = csp;
