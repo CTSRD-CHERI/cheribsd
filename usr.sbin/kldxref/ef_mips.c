@@ -29,25 +29,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20200507,
- *   "target_type": "prog",
- *   "changes": [
- *     "bounds_compression"
- *   ]
- * }
- * CHERI CHANGES END
- */
 
 #include <sys/types.h>
-#include <cheri/cheric.h>
 #include <machine/elf.h>
 
 #include <err.h>
 #include <errno.h>
-#include <stddef.h>
 
 #include "ef.h"
 
@@ -65,21 +52,20 @@ ef_reloc(struct elf_file *ef, const void *reldata, int reltype, Elf_Off relbase,
 	const Elf_Rela *rela;
 	Elf_Addr addend, addr;
 	Elf_Size rtype, symidx;
-	ptrdiff_t dest_offset;
 
 	switch (reltype) {
 	case EF_RELOC_REL:
 		rel = (const Elf_Rel *)reldata;
-		dest_offset = relbase + rel->r_offset - dataoff;
-		where = (Elf_Addr *)((char *)dest + dest_offset);
+		where = (Elf_Addr *)((char *)dest + relbase + rel->r_offset -
+		    dataoff);
 		addend = 0;
 		rtype = ELF_R_TYPE(rel->r_info);
 		symidx = ELF_R_SYM(rel->r_info);
 		break;
 	case EF_RELOC_RELA:
 		rela = (const Elf_Rela *)reldata;
-		dest_offset = relbase + rela->r_offset - dataoff;
-		where = (Elf_Addr *)((char *)dest + dest_offset);
+		where = (Elf_Addr *)((char *)dest + relbase + rela->r_offset -
+		    dataoff);
 		addend = rela->r_addend;
 		rtype = ELF_R_TYPE(rela->r_info);
 		symidx = ELF_R_SYM(rela->r_info);
@@ -109,20 +95,3 @@ ef_reloc(struct elf_file *ef, const void *reldata, int reltype, Elf_Off relbase,
 	}
 	return (0);
 }
-
-#if __has_feature(capabilities)
-int
-ef_capreloc(struct elf_file *ef, const struct capreloc *cr, Elf_Off relbase,
-    Elf_Off dataoff, size_t len, void *dest)
-{
-	void * __capability *where;
-
-	where = (void * __capability *)((char *)dest + relbase +
-	    cr->capability_location - dataoff);
-
-	if ((char *)where < (char *)dest || (char *)where >= (char *)dest + len)
-		return (0);
-	*where = cheri_fromint(relbase + cr->object + cr->offset);
-	return (0);
-}
-#endif

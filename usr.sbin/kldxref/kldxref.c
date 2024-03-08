@@ -42,7 +42,6 @@
 #include <sys/linker.h>
 #include <sys/stat.h>
 #include <sys/module.h>
-#include <sys/abi_compat.h>
 #define FREEBSD_ELF
 
 #include <ctype.h>
@@ -229,7 +228,7 @@ typedef TAILQ_HEAD(pnp_head, pnp_elt) pnp_list;
  * sign extension to uint32_t to simplify parsing downstream.
  */
 static int
-parse_pnp_list(const char *desc, char **new_desc, pnp_list *list, size_t ptrsz)
+parse_pnp_list(const char *desc, char **new_desc, pnp_list *list)
 {
 	const char *walker, *ep;
 	const char *colon, *semi;
@@ -275,7 +274,7 @@ parse_pnp_list(const char *desc, char **new_desc, pnp_list *list, size_t ptrsz)
 			printf("Found type %s for name %s\n", type, key);
 		/* Skip pointer place holders */
 		if (strcmp(type, "P") == 0) {
-			off += ptrsz;
+			off += sizeof(void *);
 			continue;
 		}
 
@@ -334,8 +333,8 @@ parse_pnp_list(const char *desc, char **new_desc, pnp_list *list, size_t ptrsz)
 			/* doesn't actually consume space in the table */
 			off = elt->pe_offset;
 		} else {
-			elt->pe_offset = roundup2(elt->pe_offset, ptrsz);
-			off = elt->pe_offset + ptrsz;
+			elt->pe_offset = roundup2(elt->pe_offset, sizeof(void *));
+			off = elt->pe_offset + sizeof(void *);
 		}
 		if (elt->pe_kind & TYPE_PAIRED) {
 			char *word, *ctx, newtype;
@@ -381,120 +380,19 @@ err:
 	errx(1, "Parse error of description string %s", desc);
 }
 
-#ifdef KLD_COMPAT_FREEBSD64
-
-struct mod_metadata64 {
-	int		md_version;	/* structure version MDTV_* */
-	int		md_type;	/* type of entry MDT_* */
-	uint64_t	md_data;	/* (const void *) specific data */
-	uint64_t	md_cval;	/* (const char *) common string label */
-};
-
-struct mod_pnp_match_info64 {
-	uint64_t	descr;		/* (const char *) Description of the table */
-	uint64_t	bus;		/* (const char *) Name of the bus for this table */
-	uint64_t	table;		/* (const void *) Pointer to pnp table */
-	int		entry_len;	/* Length of each entry in the table (may be */
-					/*   longer than descr describes). */
-	int		num_entry;	/* Number of entries in the table */
-};
-
-static void convert_mod_metadata64(struct mod_metadata64 *md64,
-    struct mod_metadata *md)
-{
-
-	CP(*md64, *md, md_version);
-	CP(*md64, *md, md_type);
-	PTRIN_CP(*md64, *md, md_data);
-	PTRIN_CP(*md64, *md, md_cval);
-}
-
-static void convert_mod_pnp_match_info64(struct mod_pnp_match_info64 *pnp64,
-    struct mod_pnp_match_info *pnp)
-{
-
-	PTRIN_CP(*pnp64, *pnp, descr);
-	PTRIN_CP(*pnp64, *pnp, bus);
-	PTRIN_CP(*pnp64, *pnp, table);
-	CP(*pnp64, *pnp, entry_len);
-	CP(*pnp64, *pnp, num_entry);
-}
-
-#endif
-
-#ifdef KLD_COMPAT_CHERIABI
-
-struct mod_metadata_c {
-	int		md_version;	/* structure version MDTV_* */
-	int		md_type;	/* type of entry MDT_* */
-	uintcap_t	md_data;	/* (const void *) specific data */
-	uintcap_t	md_cval;	/* (const char *) common string label */
-};
-
-struct mod_pnp_match_info_c {
-	uintcap_t	descr;		/* (const char *) Description of the table */
-	uintcap_t	bus;		/* (const char *) Name of the bus for this table */
-	uintcap_t	table;		/* (const void *) Pointer to pnp table */
-	int		entry_len;	/* Length of each entry in the table (may be */
-					/*   longer than descr describes). */
-	int		num_entry;	/* Number of entries in the table */
-};
-
-static void convert_mod_metadata_c(struct mod_metadata_c *md_c,
-    struct mod_metadata *md)
-{
-
-	CP(*md_c, *md, md_version);
-	CP(*md_c, *md, md_type);
-	PTRIN_CP(*md_c, *md, md_data);
-	PTRIN_CP(*md_c, *md, md_cval);
-}
-
-static void convert_mod_pnp_match_info_c(struct mod_pnp_match_info_c *pnp_c,
-    struct mod_pnp_match_info *pnp)
-{
-
-	PTRIN_CP(*pnp_c, *pnp, descr);
-	PTRIN_CP(*pnp_c, *pnp, bus);
-	PTRIN_CP(*pnp_c, *pnp, table);
-	CP(*pnp_c, *pnp, entry_len);
-	CP(*pnp_c, *pnp, num_entry);
-}
-
-#endif
-
 static int
 parse_entry(struct mod_metadata *md, const char *cval,
-    struct elf_file *ef, int eftype, const char *kldname)
+    struct elf_file *ef, const char *kldname)
 {
 	struct mod_depend mdp;
 	struct mod_version mdv;
 	struct mod_pnp_match_info pnp;
-#ifdef KLD_COMPAT_FREEBSD64
-	struct mod_pnp_match_info64 pnp64;
-#endif
-#ifdef KLD_COMPAT_CHERIABI
-	struct mod_pnp_match_info_c pnp_c;
-#endif
 	char descr[1024];
 	Elf_Off data;
 	int error, i;
 	size_t len;
 	char *walker;
 	void *table;
-	size_t ptrsz;
-
-#ifdef KLD_COMPAT_FREEBSD64
-	if (!(eftype & EFT_CHERI)) {
-		ptrsz = sizeof(uint64_t);
-	} else
-#endif
-#ifdef KLD_COMPAT_CHERIABI
-	if (eftype & EFT_CHERI) {
-		ptrsz = sizeof(uintcap_t);
-	} else
-#endif
-		ptrsz = sizeof(void *);
 
 	data = (Elf_Off)md->md_data;
 	error = 0;
@@ -528,19 +426,7 @@ parse_entry(struct mod_metadata *md, const char *cval,
 		}
 		break;
 	case MDT_PNP_INFO:
-#ifdef KLD_COMPAT_FREEBSD64
-		if (!(eftype & EFT_CHERI)) {
-			check(EF_SEG_READ_REL(ef, data, sizeof(pnp64), &pnp64));
-			convert_mod_pnp_match_info64(&pnp64, &pnp);
-		} else
-#endif
-#ifdef KLD_COMPAT_CHERIABI
-		if (eftype & EFT_CHERI) {
-			check(EF_SEG_READ_REL(ef, data, sizeof(pnp_c), &pnp_c));
-			convert_mod_pnp_match_info_c(&pnp_c, &pnp);
-		} else
-#endif
-			check(EF_SEG_READ_REL(ef, data, sizeof(pnp), &pnp));
+		check(EF_SEG_READ_REL(ef, data, sizeof(pnp), &pnp));
 		check(EF_SEG_READ_STRING(ef, (Elf_Off)pnp.descr, sizeof(descr), descr));
 		descr[sizeof(descr) - 1] = '\0';
 		if (dflag) {
@@ -559,7 +445,7 @@ parse_entry(struct mod_metadata *md, const char *cval,
 			 * of offsets to output.
 			 */
 			TAILQ_INIT(&list);
-			parse_pnp_list(descr, &new_descr, &list, ptrsz);
+			parse_pnp_list(descr, &new_descr, &list);
 			record_int(MDT_PNP_INFO);
 			record_string(cval);
 			record_string(new_descr);
@@ -626,23 +512,12 @@ parse_entry(struct mod_metadata *md, const char *cval,
 							memcpy(&v4, walker + elt->pe_offset, sizeof(v4));
 							strcpy(buffer, pnp_eisaformat(v4));
 						} else {
-							Elf_Off off;
+							char *ptr;
 
-#ifdef KLD_COMPAT_FREEBSD64
-							if (!(eftype & EFT_CHERI)) {
-								off = (Elf_Off)*(uint64_t *)(walker + elt->pe_offset);
-							} else
-#endif
-#ifdef KLD_COMPAT_CHERIABI
-							if (eftype & EFT_CHERI) {
-								off = (Elf_Off)*(uintcap_t *)(walker + elt->pe_offset);
-							} else
-#endif
-								off = (Elf_Off)*(char **)(walker + elt->pe_offset);
-
+							ptr = *(char **)(walker + elt->pe_offset);
 							buffer[0] = '\0';
-							if (off != 0) {
-								EF_SEG_READ_STRING(ef, off,
+							if (ptr != NULL) {
+								EF_SEG_READ_STRING(ef, (Elf_Off)ptr,
 								    sizeof(buffer), buffer);
 								buffer[sizeof(buffer) - 1] = '\0';
 							}
@@ -681,14 +556,6 @@ read_kld(char *filename, char *kldname)
 	int error, eftype;
 	long start, finish, entries, i;
 	char cval[MAXMODNAME + 1];
-#ifdef KLD_COMPAT_FREEBSD64
-	uint64_t *p64;
-	struct mod_metadata64 md64;
-#endif
-#ifdef KLD_COMPAT_CHERIABI
-	uintcap_t *p_c;
-	struct mod_metadata_c md_c;
-#endif
 
 	if (verbose || dflag)
 		printf("%s\n", filename);
@@ -702,37 +569,15 @@ read_kld(char *filename, char *kldname)
 		}
 	}
 	eftype = EF_GET_TYPE(&ef);
-	switch (eftype) {
-#if !defined(__CHERI_PURE_CAPABILITY__) || defined(KLD_COMPAT_FREEBSD64)
-	case EFT_KLD:
-	case EFT_KERNEL:
-#endif
-#if defined(__CHERI_PURE_CAPABILITY__) || defined(KLD_COMPAT_CHERIABI)
-	case EFT_KLD | EFT_CHERI:
-	case EFT_KERNEL | EFT_CHERI:
-#endif
-		break;
-	default:
+	if (eftype != EFT_KLD && eftype != EFT_KERNEL)  {
 		EF_CLOSE(&ef);
 		return (0);
 	}
 	do {
 		check(EF_LOOKUP_SET(&ef, MDT_SETNAME, &start, &finish,
 		    &entries));
-#ifdef KLD_COMPAT_FREEBSD64
-		if (!(eftype & EFT_CHERI)) {
-			check(EF_SEG_READ_ENTRY_REL(&ef, start,
-			    sizeof(*p64) * entries, (void *)&p64));
-		} else
-#endif
-#ifdef KLD_COMPAT_CHERIABI
-		if (eftype & EFT_CHERI) {
-			check(EF_SEG_READ_ENTRY_REL(&ef, start,
-			    sizeof(*p_c) * entries, (void *)&p_c));
-		} else
-#endif
-			check(EF_SEG_READ_ENTRY_REL(&ef, start,
-			    sizeof(*p) * entries, (void *)&p));
+		check(EF_SEG_READ_ENTRY_REL(&ef, start, sizeof(*p) * entries,
+		    (void *)&p));
 		/*
 		 * Do a first pass to find MDT_MODULE.  It is required to be
 		 * ordered first in the output linker.hints stream because it
@@ -752,26 +597,12 @@ read_kld(char *filename, char *kldname)
 		 * in the same kld.
 		 */
 		for (i = 0; i < entries; i++) {
-#ifdef KLD_COMPAT_FREEBSD64
-			if (!(eftype & EFT_CHERI)) {
-				check(EF_SEG_READ_REL(&ef, (Elf_Off)p64[i],
-				    sizeof(md64), &md64));
-				convert_mod_metadata64(&md64, &md);
-			} else
-#endif
-#ifdef KLD_COMPAT_CHERIABI
-			if (eftype & EFT_CHERI) {
-				check(EF_SEG_READ_REL(&ef, (Elf_Off)p_c[i],
-				    sizeof(md_c), &md_c));
-				convert_mod_metadata_c(&md_c, &md);
-			} else
-#endif
-				check(EF_SEG_READ_REL(&ef, (Elf_Off)p[i],
-				    sizeof(md), &md));
+			check(EF_SEG_READ_REL(&ef, (Elf_Off)p[i], sizeof(md),
+			    &md));
 			check(EF_SEG_READ_STRING(&ef, (Elf_Off)md.md_cval,
 			    sizeof(cval), cval));
 			if (md.md_type == MDT_MODULE) {
-				parse_entry(&md, cval, &ef, eftype, kldname);
+				parse_entry(&md, cval, &ef, kldname);
 				break;
 			}
 		}
@@ -784,26 +615,12 @@ read_kld(char *filename, char *kldname)
 		 * Second pass for all !MDT_MODULE entries.
 		 */
 		for (i = 0; i < entries; i++) {
-#ifdef KLD_COMPAT_FREEBSD64
-			if (!(eftype & EFT_CHERI)) {
-				check(EF_SEG_READ_REL(&ef, (Elf_Off)p64[i],
-				    sizeof(md64), &md64));
-				convert_mod_metadata64(&md64, &md);
-			} else
-#endif
-#ifdef KLD_COMPAT_CHERIABI
-			if (eftype & EFT_CHERI) {
-				check(EF_SEG_READ_REL(&ef, (Elf_Off)p_c[i],
-				    sizeof(md_c), &md_c));
-				convert_mod_metadata_c(&md_c, &md);
-			} else
-#endif
-				check(EF_SEG_READ_REL(&ef, (Elf_Off)p[i],
-				    sizeof(md), &md));
+			check(EF_SEG_READ_REL(&ef, (Elf_Off)p[i], sizeof(md),
+			    &md));
 			check(EF_SEG_READ_STRING(&ef, (Elf_Off)md.md_cval,
 			    sizeof(cval), cval));
 			if (md.md_type != MDT_MODULE)
-				parse_entry(&md, cval, &ef, eftype, kldname);
+				parse_entry(&md, cval, &ef, kldname);
 		}
 		if (error != 0)
 			warnc(error, "error while reading %s", filename);
