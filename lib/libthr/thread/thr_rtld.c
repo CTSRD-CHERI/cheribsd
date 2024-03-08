@@ -55,6 +55,15 @@ static void	_thr_rtld_wlock_acquire(void *);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 void _thread_start(struct pthread *);
 void _thr_sighandler(int, siginfo_t *, void *);
+
+/*
+ * These weak symbols will always be resolved at runtime.
+ */
+#pragma weak _rtld_thread_start_init
+void _rtld_thread_start_init(void (*)(struct pthread *));
+
+#pragma weak _rtld_sighandler_init
+void _rtld_sighandler_init(void (*)(int, siginfo_t *, void *));
 #endif
 
 struct rtld_lock {

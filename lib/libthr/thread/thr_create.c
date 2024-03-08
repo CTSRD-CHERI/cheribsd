@@ -58,9 +58,12 @@
 static int  create_stack(struct pthread_attr *pattr);
 static void thread_start(struct pthread *curthread) __used;
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-__weak_reference(thread_start, _thread_start);
-void _thread_start(struct pthread *curthread);
-__weak_reference(thread_start, _rtld_thread_start);
+#pragma weak _thread_start = thread_start
+
+/*
+ * This weak symbol will always be resolved at runtime.
+ */
+#pragma weak _rtld_thread_start
 void _rtld_thread_start(struct pthread *);
 #endif
 

@@ -30,8 +30,9 @@
 #include <sys/mman.h>
 #include <sys/sysctl.h>
 
-#include <stdlib.h>
+#include <signal.h>
 #include <stdatomic.h>
+#include <stdlib.h>
 
 #include "debug.h"
 #include "rtld.h"
@@ -1452,6 +1453,8 @@ c18n_return_address(void)
  */
 static void (*thr_thread_start)(struct pthread *);
 
+void _rtld_thread_start_init(void (*)(struct pthread *));
+
 void
 _rtld_thread_start_init(void (*p)(struct pthread *))
 {
@@ -1619,12 +1622,14 @@ dispatch_signal_end(ucontext_t *new, ucontext_t *old __unused)
 	bot[-1] = top;
 }
 
-extern void (*signal_dispatcher)(int, siginfo_t *, void *);
+extern __siginfohandler_t *signal_dispatcher;
 
-void (*signal_dispatcher)(int, siginfo_t *, void *) = _rtld_dispatch_signal;
+__siginfohandler_t *signal_dispatcher = _rtld_dispatch_signal;
+
+void _rtld_sighandler_init(__siginfohandler_t *);
 
 void
-_rtld_sighandler_init(void (*p)(int, siginfo_t *, void *))
+_rtld_sighandler_init(__siginfohandler_t *p)
 {
 	assert(signal_dispatcher == _rtld_dispatch_signal &&
 	    (cheri_getperm(p) & CHERI_PERM_EXECUTIVE) == 0);

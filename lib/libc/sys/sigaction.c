@@ -35,23 +35,18 @@
 
 __weak_reference(__sys_sigaction, __sigaction);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+/*
+ * These weak symbols will always be resolved at runtime.
+ */
 #pragma weak _rtld_sighandler
-void _rtld_sighandler(int sig __unused, siginfo_t *info __unused,
-    void *_ucp __unused)
-{
-}
+void _rtld_sighandler(int, siginfo_t *, void *);
 
 #pragma weak _rtld_sigaction_begin
-void *_rtld_sigaction_begin(int sig __unused, struct sigaction *act __unused)
-{
-	return (0);
-}
+void *_rtld_sigaction_begin(int, struct sigaction *);
 
 #pragma weak _rtld_sigaction_end
-void _rtld_sigaction_end(int sig __unused, void *context __unused,
-    const struct sigaction *act __unused, struct sigaction *oldact __unused)
-{
-}
+void _rtld_sigaction_end(int, void *, const struct sigaction *,
+    struct sigaction *);
 
 int
 __libc_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
