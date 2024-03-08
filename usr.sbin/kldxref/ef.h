@@ -98,6 +98,7 @@ struct elf_file {
 	GElf_Ehdr ef_hdr;
 	size_t ef_pointer_size;
 	int ef_fd;
+	bool ef_cheriabi;
 };
 
 #define	elf_class(ef)		((ef)->ef_hdr.e_ident[EI_CLASS])
