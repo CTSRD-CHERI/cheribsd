@@ -1,6 +1,4 @@
 
-.include <src.opts.mk>
-
 PACKAGE=	runtime
 PROG=	kldxref
 MAN=	kldxref.8
@@ -12,14 +10,6 @@ WARNS?=	2
 SRCS+=	ef_${MACHINE_CPUARCH}.c
 .else
 SRCS+=	ef_nop.c
-.endif
-
-.if ${MACHINE_CPU:Mcheri}
-.if ${MACHINE_ABI:Mpurecap}
-CFLAGS+=	-DKLD_COMPAT_FREEBSD64
-.else
-CFLAGS+=	-DKLD_COMPAT_CHERIABI
-.endif
 .endif
 
 .include <bsd.prog.mk>
