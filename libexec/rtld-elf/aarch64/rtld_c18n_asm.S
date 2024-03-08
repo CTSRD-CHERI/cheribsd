@@ -54,14 +54,13 @@ ENTRY(_rtld_longjmp)
 END(_rtld_longjmp)
 
 ENTRY(_rtld_thread_start)
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	mov	c1, csp
 	sub	csp, csp, #(CAP_WIDTH * 2)
 	/*
 	 * This function MUST preserve the value of c0.
 	 */
 	bl	c18n_init_rtld_stack
-#else
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	/*
 	 * Move the Executive mode thread pointer to Restricted mode.
 	 */
@@ -425,6 +424,16 @@ TRAMP(tramp_invoke_exe)
 	 * can locate it. c29 will be restored after the function call returns.
 	 */
 	mov	c29, csp
+
+	/*
+	 * Set the Restricted stack to a dummy stack located at the bottom of
+	 * the trusted stack.
+	 */
+	gclim	x30, csp
+	scvalue	c30, csp, x30
+	ldr	c30, [c30, #-CAP_WIDTH]
+	msr	rcsp_el0, c30
+
 	blr	c19
 #endif
 TRAMPEND(tramp_invoke_exe)
