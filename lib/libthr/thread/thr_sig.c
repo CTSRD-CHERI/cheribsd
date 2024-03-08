@@ -71,13 +71,21 @@ static void check_deferred_signal(struct pthread *);
 static void check_suspend(struct pthread *);
 static void check_cancel(struct pthread *curthread, ucontext_t *ucp);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-__weak_reference(thr_sighandler, _thr_sighandler);
-void _thr_sighandler(int, siginfo_t *, void *);
-__weak_reference(thr_sighandler, _rtld_sighandler);
+#pragma weak _thr_sighandler = thr_sighandler
+
+/*
+ * These weak symbols will always be resolved at runtime.
+ */
+#pragma weak _rtld_sighandler
 void _rtld_sighandler(int, siginfo_t *, void *);
 
+#pragma weak _rtld_dispatch_signal
 void _rtld_dispatch_signal(int, siginfo_t *, void *);
+
+#pragma weak _rtld_sigaction_begin
 void *_rtld_sigaction_begin(int, struct sigaction *);
+
+#pragma weak _rtld_sigaction_end
 void _rtld_sigaction_end(int, void *, const struct sigaction *,
     struct sigaction *);
 #endif
