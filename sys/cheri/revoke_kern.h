@@ -159,6 +159,7 @@ SYSCTL_DECL(_vm_cheri_revoke);
 
 extern int security_cheri_runtime_revocation_default;
 extern int security_cheri_runtime_revocation_every_free_default;
+extern int security_cheri_runtime_revocation_async;
 
 struct vmspace;
 void cheri_revoke_vmspace_fork(struct vmspace *dst, struct vmspace *src);

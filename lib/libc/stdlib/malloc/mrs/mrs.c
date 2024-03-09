@@ -120,6 +120,8 @@ extern void snmalloc_flush_message_queue(void);
 	"_RUNTIME_REVOCATION_EVERY_FREE_DISABLE"
 #define	MALLOC_REVOKE_EVERY_FREE_ENABLE_ENV \
 	"_RUNTIME_REVOCATION_EVERY_FREE_ENABLE"
+#define	MALLOC_REVOKE_SYNC_ENV \
+	"_RUNTIME_REVOCATION_SYNC_REVOKE"
 #define	MALLOC_REVOKE_ASYNC_ENV \
 	"_RUNTIME_REVOCATION_ASYNC_REVOKE"
 
@@ -1260,6 +1262,7 @@ init(void)
 		quarantining = ((bsdflags & ELF_BSDF_CHERI_REVOKE) != 0);
 		revoke_every_free =
 		    ((bsdflags & ELF_BSDF_CHERI_REVOKE_EVERY_FREE) != 0);
+		revoke_async = ((bsdflags & ELF_BSDF_CHERI_REVOKE_ASYNC) != 0);
 	}
 
 	if (!issetugid()) {
@@ -1275,7 +1278,9 @@ init(void)
 			revoke_every_free = true;
 
 #ifndef OFFLOAD_QUARANTINE
-		if (getenv(MALLOC_REVOKE_ASYNC_ENV) != NULL)
+		if (getenv(MALLOC_REVOKE_SYNC_ENV) != NULL)
+			revoke_async = false;
+		else if (getenv(MALLOC_REVOKE_ASYNC_ENV) != NULL)
 			revoke_async = true;
 #endif
 	}

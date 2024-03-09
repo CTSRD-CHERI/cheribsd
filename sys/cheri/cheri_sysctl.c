@@ -89,4 +89,13 @@ int security_cheri_runtime_revocation_every_free_default = 0;
 SYSCTL_INT(_security_cheri, OID_AUTO, runtime_revocation_every_free_default,
     CTLFLAG_RWTUN, &security_cheri_runtime_revocation_every_free_default, 0,
     "Userspace runtime revocation on every free for debugging default");
+
+/*
+ * Set the default policy for synchronous vs. asynchronous revocation.  This is
+ * used to compute the revocation policy flag in AT_BSDFLAGS.
+ */
+int security_cheri_runtime_revocation_async = 0;
+SYSCTL_INT(_security_cheri, OID_AUTO, runtime_revocation_async,
+    CTLFLAG_RWTUN, &security_cheri_runtime_revocation_async, 0,
+    "Userspace requests (a)synchronous revocation by default");
 #endif  /* CHERI_CAPREVOKE */
