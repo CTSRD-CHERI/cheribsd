@@ -73,6 +73,8 @@ ef_aarch64_reloc(struct elf_file *ef, const void *reldata, Elf_Type reltype,
 		le64enc(where, fragment[0] + relbase + addend);
 		break;
 	case R_MORELLO_CAPINIT:
+		addr = EF_SYMADDR(ef, symidx) + addend;
+		le64enc(where, addr);
 		break;
 	default:
 		warnx("unhandled relocation type %d", (int)rtype);
