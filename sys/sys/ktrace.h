@@ -346,8 +346,10 @@ void	ktrsyserrcause(const char *format, ...) __printflike(1, 2);
 extern u_int ktr_geniosize;
 #ifdef	KTRACE
 extern int ktr_filesize_limit_signal;
+#define	__ktrace_used
 #else
 #define	ktr_filesize_limit_signal 0
+#define	__ktrace_used	__unused
 #endif
 
 #ifdef KTRACE
