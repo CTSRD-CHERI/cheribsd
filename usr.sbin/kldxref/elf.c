@@ -48,6 +48,7 @@
 #include "ef.h"
 
 SET_DECLARE(elf_reloc, struct elf_reloc_data);
+SET_DECLARE(elf_capreloc, struct elf_capreloc_data);
 
 static elf_reloc_t *
 elf_find_reloc(const GElf_Ehdr *hdr)
@@ -59,6 +60,20 @@ elf_find_reloc(const GElf_Ehdr *hdr)
 		    hdr->e_ident[EI_DATA] == (*erd)->data &&
 		    hdr->e_machine == (*erd)->machine)
 			return ((*erd)->reloc);
+	}
+	return (NULL);
+}
+
+static elf_capreloc_t *
+elf_find_capreloc(const GElf_Ehdr *hdr)
+{
+	struct elf_capreloc_data **ecd;
+
+	SET_FOREACH(ecd, elf_capreloc) {
+		if (hdr->e_ident[EI_CLASS] == (*ecd)->class &&
+		    hdr->e_ident[EI_DATA] == (*ecd)->data &&
+		    hdr->e_machine == (*ecd)->machine)
+			return ((*ecd)->capreloc);
 	}
 	return (NULL);
 }
@@ -118,6 +133,7 @@ elf_open_file(struct elf_file *efile, const char *filename, int verbose)
 		elf_close_file(efile);
 		return (EFTYPE);
 	}
+	efile->ef_capreloc = elf_find_capreloc(&efile->ef_hdr);
 
 	error = ef_open(efile, verbose);
 	if (error != 0) {
@@ -506,6 +522,73 @@ elf_read_rela(struct elf_file *efile, int section_index, long *nrelap,
 	return (0);
 }
 
+int
+elf_read_capreloc(struct elf_file *efile, off_t offset, size_t len,
+    long *ncaprelocp, Gcapreloc **caprelocp)
+{
+	void *data;
+	Gcapreloc *capreloc;
+	long i, ncapreloc;
+	size_t capsize;
+	int error;
+
+	/*
+	 * NB: A capreloc is effectively a struct of 5 ELF_T_ADDR
+	 * objects.
+	 */
+	capsize = 5 * elf_object_size(efile, ELF_T_ADDR);
+	if (len % capsize != 0)
+		return (EINVAL);
+
+	error = elf_read_data(efile, ELF_T_ADDR, offset, len, &data);
+	if (error != 0)
+		return (error);
+
+	ncapreloc = len / capsize;
+	capreloc = calloc(ncapreloc, sizeof(*capreloc));
+	if (capreloc == NULL) {
+		free(data);
+		return (ENOMEM);
+	}
+
+	switch (elf_class(efile)) {
+	case ELFCLASS32:
+	{
+		Elf32_Addr *buf = data;
+
+		for (i = 0; i < ncapreloc; i++) {
+			capreloc[i].capability_location = buf[0];
+			capreloc[i].object = buf[1];
+			capreloc[i].offset = buf[2];
+			capreloc[i].size = buf[3];
+			capreloc[i].permissions = buf[4];
+			buf += 5;
+		}
+		break;
+	}
+	case ELFCLASS64:
+	{
+		Elf64_Addr *buf = data;
+
+		for (i = 0; i < ncapreloc; i++) {
+			capreloc[i].capability_location = buf[0];
+			capreloc[i].object = buf[1];
+			capreloc[i].offset = buf[2];
+			capreloc[i].size = buf[3];
+			capreloc[i].permissions = buf[4];
+			buf += 5;
+		}
+		break;
+	}
+	default:
+		__builtin_unreachable();
+	}
+
+	*ncaprelocp = ncapreloc;
+	*caprelocp = capreloc;
+	return (0);
+}
+
 size_t
 elf_pointer_size(struct elf_file *efile)
 {
@@ -694,5 +777,14 @@ elf_reloc(struct elf_file *efile, const void *reldata, Elf_Type reltype,
     GElf_Addr relbase, GElf_Addr dataoff, size_t len, void *dest)
 {
 	return (efile->ef_reloc(efile, reldata, reltype, relbase, dataoff, len,
+	    dest));
+}
+
+int
+elf_capreloc(struct elf_file *efile, const Gcapreloc *capreloc,
+    GElf_Addr relbase, GElf_Addr dataoff, size_t len, void *dest)
+{
+	assert (efile->ef_capreloc != NULL);
+	return (efile->ef_capreloc(efile, capreloc, relbase, dataoff, len,
 	    dest));
 }

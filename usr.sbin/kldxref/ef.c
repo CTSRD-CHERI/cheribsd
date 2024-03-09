@@ -65,6 +65,8 @@ struct ef_file {
 	long		ef_relsz;		/* number of entries */
 	GElf_Rela	*ef_rela;		/* relocation table */
 	long		ef_relasz;		/* number of entries */
+	Gcapreloc	*ef_capreloc;		/* capreloc table */
+	long		ef_caprelocsz;		/* number of entries */
 };
 
 static void	ef_print_phdr(GElf_Phdr *);
@@ -227,8 +229,10 @@ ef_parse_dynamic(elf_file_t ef, const GElf_Phdr *phdyn)
 	GElf_Off hash_off, sym_off, str_off;
 	GElf_Off rel_off;
 	GElf_Off rela_off;
+	GElf_Off caprelocs_off;
 	int rel_sz;
 	int rela_sz;
+	int caprelocs_sz;
 	int dynamic_idx;
 
 	/*
@@ -269,6 +273,8 @@ ef_parse_dynamic(elf_file_t ef, const GElf_Phdr *phdyn)
 
 	hash_off = rel_off = rela_off = sym_off = str_off = 0;
 	rel_sz = rela_sz = 0;
+	caprelocs_off = 0;
+	caprelocs_sz = 0;
 	for (i = 0; i < ndyn; i++) {
 		dp = &dyn[i];
 		if (dp->d_tag == DT_NULL)
@@ -337,6 +343,23 @@ ef_parse_dynamic(elf_file_t ef, const GElf_Phdr *phdyn)
 				error = EFTYPE;
 				goto out;
 			}
+			break;
+		case DT_RISCV_CHERI___CAPRELOCS:
+			if (elf_machine(ef->ef_efile) != EM_RISCV)
+				break;
+			if (caprelocs_off != 0)
+				warnx("second DT_RISCV_CHERI___CAPRELOCS entry ignored");
+			else
+				caprelocs_off = ef_get_offset(ef,
+				    dp->d_un.d_ptr);
+			break;
+		case DT_RISCV_CHERI___CAPRELOCSSZ:
+			if (elf_machine(ef->ef_efile) != EM_RISCV)
+				break;
+			if (caprelocs_sz != 0)
+				warnx("second DT_RISCV_CHERI___CAPRELOCSSZ entry ignored");
+			else
+				caprelocs_sz = dp->d_un.d_val;
 			break;
 		}
 	}
@@ -494,6 +517,25 @@ ef_parse_dynamic(elf_file_t ef, const GElf_Phdr *phdyn)
 		goto out;
 	}
 
+	if (caprelocs_off != 0) {
+		if (caprelocs_sz == 0) {
+			warnx("%s: no DT_CAPRELOCSSZ for DT_CAPRELOCS",
+			    ef->ef_name);
+			error = EFTYPE;
+			goto out;
+		}
+		error = elf_read_capreloc(ef->ef_efile, caprelocs_off,
+		    caprelocs_sz, &ef->ef_caprelocsz, &ef->ef_capreloc);
+		if (error != 0) {
+			warnx("%s: cannot load DT_CAPRELOCS section",
+			    ef->ef_name);
+			goto out;
+		}
+		if (ef->ef_verbose)
+			warnx("%s: %ld CAPRELOC entries", ef->ef_name,
+			    ef->ef_caprelocsz);
+	}
+
 	error = 0;
 out:
 	free(dyn);
@@ -507,6 +549,7 @@ ef_seg_read_rel(elf_file_t ef, GElf_Addr address, size_t len, void *dest)
 	GElf_Off ofs;
 	const GElf_Rela *a;
 	const GElf_Rel *r;
+	const Gcapreloc *cr;
 	int error;
 
 	ofs = ef_get_offset(ef, address);
@@ -529,6 +572,12 @@ ef_seg_read_rel(elf_file_t ef, GElf_Addr address, size_t len, void *dest)
 	for (a = ef->ef_rela; a < &ef->ef_rela[ef->ef_relasz]; a++) {
 		error = elf_reloc(ef->ef_efile, a, ELF_T_RELA, 0, address,
 		    len, dest);
+		if (error != 0)
+			return (error);
+	}
+	for (cr = ef->ef_capreloc; cr < &ef->ef_capreloc[ef->ef_caprelocsz];
+	     cr++) {
+		error = elf_capreloc(ef->ef_efile, cr, 0, address, len, dest);
 		if (error != 0)
 			return (error);
 	}
@@ -636,6 +685,7 @@ out:
 static void
 ef_close(elf_file_t ef)
 {
+	free(ef->ef_capreloc);
 	free(ef->ef_rela);
 	free(ef->ef_rel);
 	free(ef->ef_strtab);
