@@ -56,6 +56,15 @@ typedef struct ef_file *elf_file_t;
 typedef Elf64_Size GElf_Size;
 typedef Elf64_Hashelt GElf_Hashelt;
 
+/* libelf doesn't know about struct capreloc */
+typedef struct {
+	GElf_Addr capability_location;
+	GElf_Size object;
+	GElf_Size offset;
+	GElf_Size size;
+	GElf_Size permissions;
+} Gcapreloc;
+
 struct elf_file;
 
 struct elf_file_ops {
@@ -73,11 +82,21 @@ typedef int (elf_reloc_t)(struct elf_file *ef, const void *reldata,
     Elf_Type reltype, GElf_Addr relbase, GElf_Addr dataoff, size_t len,
     void *dest);
 
+typedef int (elf_capreloc_t)(struct elf_file *ef, const Gcapreloc *cr,
+    GElf_Addr relbase, GElf_Addr dataoff, size_t len, void *dest);
+
 struct elf_reloc_data {
 	unsigned char class;
 	unsigned char data;
 	GElf_Half machine;
 	elf_reloc_t *reloc;
+};
+
+struct elf_capreloc_data {
+	unsigned char class;
+	unsigned char data;
+	GElf_Half machine;
+	elf_capreloc_t *capreloc;
 };
 
 #define	ELF_RELOC(_class, _data, _machine, _reloc)			\
@@ -89,12 +108,22 @@ struct elf_reloc_data {
 	};								\
 	DATA_SET(elf_reloc, __CONCAT(elf_reloc_data_, __LINE__))
 
+#define	ELF_CAPRELOC(_class, _data, _machine, _capreloc)		\
+	static struct elf_capreloc_data __CONCAT(elf_capreloc_data_, __LINE__) = { \
+	    .class = (_class),						\
+	    .data = (_data),						\
+	    .machine = (_machine),					\
+	    .capreloc = (_capreloc)					\
+	};								\
+	DATA_SET(elf_capreloc, __CONCAT(elf_capreloc_data_, __LINE__))
+
 struct elf_file {
 	elf_file_t ef_ef;
 	struct elf_file_ops *ef_ops;
 	const char *ef_filename;
 	Elf *ef_elf;
 	elf_reloc_t *ef_reloc;
+	elf_capreloc_t *ef_capreloc;
 	GElf_Ehdr ef_hdr;
 	size_t ef_pointer_size;
 	int ef_fd;
@@ -103,6 +132,7 @@ struct elf_file {
 
 #define	elf_class(ef)		((ef)->ef_hdr.e_ident[EI_CLASS])
 #define	elf_encoding(ef)	((ef)->ef_hdr.e_ident[EI_DATA])
+#define	elf_machine(ef)		((ef)->ef_hdr.e_machine)
 
 /*
  * "Generic" versions of module metadata structures.
@@ -251,6 +281,13 @@ int	elf_read_rela(struct elf_file *efile, int section_index, long *nrelap,
     GElf_Rela **relap);
 
 /*
+ * Read a table of capreloc objects from an offset in an ELF file into
+ * a dynamically-allocated array of Gcapreloc objects.
+ */
+int	elf_read_capreloc(struct elf_file *efile, off_t offset, size_t len,
+    long *ncaprelocp, Gcapreloc **caprelocp);
+
+/*
  * Read a string from an ELF file and return it in the provided
  * buffer.  If the string is longer than the buffer, this fails with
  * EFAULT.  The address parameter gives the address of the data buffer
@@ -304,6 +341,9 @@ int	elf_read_mod_pnp_match_info(struct elf_file *efile, GElf_Addr addr,
  * that is to be relocated, and has been copied to *dest
  */
 int	elf_reloc(struct elf_file *ef, const void *reldata, Elf_Type reltype,
+    GElf_Addr relbase, GElf_Addr dataoff, size_t len, void *dest);
+
+int	elf_capreloc(struct elf_file *ef, const Gcapreloc *cr,
     GElf_Addr relbase, GElf_Addr dataoff, size_t len, void *dest);
 
 __END_DECLS
