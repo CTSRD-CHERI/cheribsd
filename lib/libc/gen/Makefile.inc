@@ -323,7 +323,6 @@ MAN+=	alarm.3 \
 	times.3 \
 	timespec_get.3 \
 	timespec_getres.3 \
-	timezone.3 \
 	ttyname.3 \
 	tzset.3 \
 	ualarm.3 \
@@ -551,6 +550,8 @@ MLINKS+=tcsetattr.3 cfgetispeed.3 \
 	tcsetattr.3 tcgetattr.3
 MLINKS+=ttyname.3 isatty.3 \
 	ttyname.3 ttyname_r.3
+MLINKS+=tzset.3 daylight.3 \
+	tzset.3 timezone.3
 MLINKS+=unvis.3 strunvis.3 \
 	unvis.3 strunvisx.3
 MLINKS+=vis.3 nvis.3 \
