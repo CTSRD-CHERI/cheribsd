@@ -606,7 +606,8 @@ proc_read_cheri_cap_page(vm_map_t map, vm_offset_t va, struct uio *uio)
 	todo = MIN(todo, uio->uio_resid);
 	va = trunc_page(va);
 
-	error = vm_fault(map, va, VM_PROT_READ, VM_FAULT_NOFILL, &m);
+	error = vm_fault(map, va, VM_PROT_READ,
+	    VM_FAULT_NOFILL | VM_FAULT_NOPMAP, &m);
 	if (error == KERN_PAGE_NOT_FILLED) {
 		memset(capbuf, 0, sizeof(capbuf));
 		while (todo > 0) {
@@ -683,7 +684,8 @@ proc_write_cheri_cap_page(struct proc *p, vm_map_t map, vm_offset_t va,
 	todo = MIN(todo, uio->uio_resid);
 	va = trunc_page(va);
 
-	error = vm_fault(map, va, VM_PROT_WRITE | VM_PROT_WRITE_CAP, 0, &m);
+	error = vm_fault(map, va, VM_PROT_WRITE | VM_PROT_WRITE_CAP,
+	    VM_FAULT_NOPMAP, &m);
 	if (error != KERN_SUCCESS)
 		return (EFAULT);
 
