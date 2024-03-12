@@ -50,30 +50,60 @@ skip_malloc_not_revoking(const char *name __unused)
 	return ("malloc is not revoking");
 }
 
+extern volatile void *eptr;
+volatile void *eptr;
+
 CHERIBSDTEST(malloc_revoke_basic,
     "verify that a free'd pointer is revoked by malloc_revoke",
     .ct_check_skip = skip_malloc_not_revoking)
 {
 	volatile void *ptr __unused;
 
-	ptr = malloc(1);
+	/*
+	 * Try to get the compiler to spill the pointer to memory.
+	 */
+	eptr = ptr = malloc(1);
 
 	free(__DEVOLATILE(void *, ptr));
 
 	malloc_revoke();
-
-	/* XXX: ask kernel what the revocation method is? */
 	CHERIBSDTEST_VERIFY2(!cheri_gettag(ptr),
-	    "free'd pointer not revoked %#lp", ptr);
+	    "revoked ptr not revoked %#lp", ptr);
+	CHERIBSDTEST_VERIFY2(!cheri_gettag(eptr),
+	    "revoked eptr not revoked %#lp", eptr);
 
 	cheribsdtest_success();
 }
 
+extern volatile void *eptr1, *eptr2;
+volatile void *eptr1, *eptr2;
+
 CHERIBSDTEST(malloc_revoke_twice, "revoke twice back to back",
     .ct_check_skip = skip_malloc_not_revoking)
 {
+	volatile void *ptr1, *ptr2;
+
+	/*
+	 * Try to get the compiler to spill the pointers to memory.
+	 */
+	eptr1 = ptr1 = malloc(1);
+	eptr2 = ptr2 = malloc(1);
+
+	free(__DEVOLATILE(void *, ptr1));
+
 	malloc_revoke();
+	CHERIBSDTEST_VERIFY2(!cheri_gettag(ptr1),
+	    "revoked ptr1 not revoked %#lp", ptr1);
+	CHERIBSDTEST_VERIFY2(!cheri_gettag(eptr1),
+	    "revoked eptr1 not revoked %#lp", eptr1);
+
+	free(__DEVOLATILE(void *, ptr2));
+
 	malloc_revoke();
+	CHERIBSDTEST_VERIFY2(!cheri_gettag(ptr2),
+	    "revoked ptr2 not revoked %#lp", ptr2);
+	CHERIBSDTEST_VERIFY2(!cheri_gettag(eptr2),
+	    "revoked eptr2 not revoked %#lp", eptr2);
 
 	cheribsdtest_success();
 }
