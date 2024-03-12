@@ -779,6 +779,7 @@ tramp_hook_impl(void *rcsp, int event, void *target, const Obj_Entry *obj,
 	const char *sym;
 	const char *callee;
 
+	uintptr_t *stack;
 	compart_id_t caller_id;
 	const char *caller;
 
@@ -792,14 +793,16 @@ tramp_hook_impl(void *rcsp, int event, void *target, const Obj_Entry *obj,
 		callee = comparts.data[obj->compart_id]->name;
 
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-		caller_id =
-		    ((uintptr_t *)cheri_setoffset(rcsp, cheri_getlen(rcsp)))[-2];
 		(void)link;
 #else
 		if (cheri_gettag(link) &&
 		    (cheri_getperm(link) & CHERI_PERM_EXECUTIVE) == 0)
-			caller_id = ((uintptr_t *)
-			    cheri_setoffset(rcsp, cheri_getlen(rcsp)))[-2];
+#endif
+		{
+			stack = cheri_setoffset(rcsp, cheri_getlen(rcsp));
+		        caller_id = stack[-2];
+		}
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 		else
 			caller_id = C18N_RTLD_COMPART_ID;
 #endif
