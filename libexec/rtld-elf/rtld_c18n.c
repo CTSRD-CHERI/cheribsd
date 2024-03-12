@@ -785,28 +785,30 @@ tramp_hook_impl(void *rcsp, int event, void *target, const Obj_Entry *obj,
 	struct utrace_rtld ut;
 	static const char rtld_utrace_sig[RTLD_UTRACE_SIG_SZ] = RTLD_UTRACE_SIG;
 
-	sym_num = def == NULL ? 0 : def->st_name;
-	sym = def == NULL ? "<unknown>" : strtab_value(obj, def->st_name);
-	callee = comparts.data[obj->compart_id]->name;
+	if (ld_compartment_utrace != NULL) {
+		sym_num = def == NULL ? 0 : def - obj->symtab;
+		sym = def == NULL ? "<unknown>" :
+		    strtab_value(obj, def->st_name);
+		callee = comparts.data[obj->compart_id]->name;
 
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	caller_id =
-	    ((uintptr_t *)cheri_setoffset(rcsp, cheri_getlen(rcsp)))[-2];
-	(void)link;
+		caller_id =
+		    ((uintptr_t *)cheri_setoffset(rcsp, cheri_getlen(rcsp)))[-2];
+		(void)link;
 #else
-	if (cheri_gettag(link) &&
-	    (cheri_getperm(link) & CHERI_PERM_EXECUTIVE) == 0)
-		caller_id = ((uintptr_t *)
-		    cheri_setoffset(rcsp, cheri_getlen(rcsp)))[-2];
-	else
-		caller_id = C18N_RTLD_COMPART_ID;
+		if (cheri_gettag(link) &&
+		    (cheri_getperm(link) & CHERI_PERM_EXECUTIVE) == 0)
+			caller_id = ((uintptr_t *)
+			    cheri_setoffset(rcsp, cheri_getlen(rcsp)))[-2];
+		else
+			caller_id = C18N_RTLD_COMPART_ID;
 #endif
-	if (caller_id < C18N_RTLD_COMPART_ID)
-		caller = "<unknown>";
-	else
-		caller = comparts.data[caller_id]->name;
 
-	if (ld_compartment_utrace != NULL) {
+		if (caller_id < C18N_RTLD_COMPART_ID)
+			caller = "<unknown>";
+		else
+			caller = comparts.data[caller_id]->name;
+
 		memcpy(ut.sig, rtld_utrace_sig, sizeof(ut.sig));
 		ut.event = event;
 		ut.handle = target;
