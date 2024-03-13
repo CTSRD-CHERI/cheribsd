@@ -77,7 +77,8 @@ ef_riscv_reloc(struct elf_file *ef, const void *reldata, Elf_Type reltype,
 		le64enc(where, addr);
 		break;
 	case R_RISCV_CHERI_CAPABILITY:
-		warnx("unhandled R_RISCV_CHERI_CAPABILITY relocation");
+		addr = EF_SYMADDR(ef, symidx) + addend;
+		le64enc(where, addr);
 		break;
 	default:
 		warnx("unhandled relocation type %d", (int)rtype);
