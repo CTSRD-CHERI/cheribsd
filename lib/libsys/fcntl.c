@@ -80,7 +80,7 @@ fcntl(int fd, int cmd, ...)
 	va_end(args);
 
 	return (((int (*)(int, int, intptr_t))
-	    __libsys_interposing[INTERPOS_fcntl])(fd, cmd, arg));
+	    *(__libc_interposing_slot(INTERPOS_fcntl)))(fd, cmd, arg));
 }
 
 #ifdef __CHERI_PURE_CAPABILITY__
