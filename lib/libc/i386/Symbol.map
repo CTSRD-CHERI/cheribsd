@@ -6,8 +6,10 @@
 FBSD_1.0 {
 	.mcount;
 	alloca;
+	brk;
 	__flt_rounds;
 	___tls_get_addr;
+	sbrk;
 };
 
 FBSDprivate_1.0 {
@@ -16,4 +18,5 @@ FBSDprivate_1.0 {
 	__signalcontext;
 	signalcontext;
 	__siglongjmp;
+	_brk;
 };

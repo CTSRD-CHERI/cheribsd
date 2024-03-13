@@ -42,28 +42,6 @@ SRCS+=	\
 	interposing_table.c \
 	libsys_sigwait.c
 
-SRCS+= getdents.c lstat.c mknod.c stat.c
-
-SRCS+=	creat.c
-SRCS+=	lockf.c wait.c wait3.c waitpid.c waitid.c
-SRCS+=	recv.c recvmmsg.c send.c sendmmsg.c
-
-.if !${MACHINE_ABI:Mpurecap}
-SRCS+= brk.c
-.endif
-SRCS+= closefrom.c
-SRCS+= pipe.c
-SRCS+= shm_open.c
-SRCS+= vadvise.c
-SRCS+= POSIX2x_Fork.c
-
-SRCS+=	compat-stub.c
-
-.ifdef CHERI_LIB_C18N
-SRCS+=	thr_exit_c18n.c	vfork_c18n.c	rfork_c18n.c
-NOASM+=	thr_exit.o	vfork.o
-.endif
-
 .if ${LIB:U${SHLIB}} == "c"
 # Trapping stubs in dynamic libc to be filtered by libsys.
 SOBJS+=	libc_stubs.pico
@@ -124,6 +102,14 @@ INTERPOSED = \
 	write \
 	writev
 
+.ifdef CHERI_LIB_C18N
+PSEUDO+= \
+	rfork
+NOASM+=	\
+	thr_exit.o \
+	vfork.o
+.endif
+
 .if ${MACHINE_ABI:Mpurecap}
 # Var-args calling convention different for purecap
 NO_UNDERSCORE=	fcntl ioctl open openat
@@ -135,7 +121,6 @@ SRCS+=		${NO_UNDERSCORE:S/$/.c/} ${S_NU}
 NOASM+=		${NO_UNDERSCORE:S/$/.o/}
 .endif
 
-SRCS+=	${INTERPOSED:S/$/.c/}
 PSEUDO+=	${INTERPOSED}
 
 # Don't generate default assembly for PSEUDOs
