@@ -1596,8 +1596,9 @@ freebsd64_thr_exit(struct thread *td, struct freebsd64_thr_exit_args *uap)
 
 	/* Signal userland that it can free the stack. */
 	if (uap->state != NULL) {
-		suword(__USER_CAP_OBJ(uap->state), 1);
-		kern_umtx_wake(td, __USER_CAP_OBJ(uap->state), INT_MAX, 0);
+		(void)suword(__USER_CAP_OBJ(uap->state), 1);
+		(void)kern_umtx_wake(td, __USER_CAP_OBJ(uap->state), INT_MAX,
+		    0);
 	}
 
 	return (kern_thr_exit(td));
