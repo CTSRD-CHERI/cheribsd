@@ -360,7 +360,6 @@ int		__libc_sigsuspend(const __sigset_t *) __hidden;
 int		__libsys_sigwait(const __sigset_t *, int *) __hidden;
 int		__libc_system(const char *);
 int		__libc_tcdrain(int);
-int		__fcntl_compat(int fd, int cmd, ...);
 
 int _elf_aux_info(int aux, void *buf, int buflen);
 struct dl_phdr_info;
