@@ -492,6 +492,8 @@ allocuio(u_int iovcnt)
 void
 freeuio(struct uio *uio)
 {
+	if (uio == NULL)
+		return;
 	if (uio->uio_flags & UIO_EXT_IOVEC) {
 #ifdef __CHERI_PURE_CAPABILITY__
 		KASSERT(cheri_is_address_inbounds(uio->uio_ext_iov,
