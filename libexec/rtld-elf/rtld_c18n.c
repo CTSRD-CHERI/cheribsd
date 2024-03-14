@@ -830,14 +830,14 @@ tramp_pgs_append(const struct tramp_data *data)
 	size_t len;
 	/* A capability-aligned buffer large enough to hold a trampoline */
 	_Alignas(_Alignof(struct tramp_header)) char buf[C18N_MAX_TRAMP_SIZE];
+	struct tramp_header *header;
 	char *bufp = buf;
-	struct tramp_header **headerp = (struct tramp_header **)&bufp;
 
 	char *tramp;
 	struct tramp_pg *pg;
 
 	/* Fill a temporary buffer with the trampoline and obtain its length */
-	len = tramp_compile(headerp, data);
+	len = tramp_compile(&bufp, data);
 
 	pg = atomic_load_explicit(&tramp_pgs.head, memory_order_acquire);
 	tramp = tramp_pg_push(pg, len);
@@ -858,8 +858,8 @@ tramp_pgs_append(const struct tramp_data *data)
 	}
 	assert(cheri_gettag(tramp));
 
-	bufp = tramp + (bufp - buf);
 	memcpy(tramp, buf, len);
+	header = (struct tramp_header *)(tramp + (bufp - buf));
 
 	/*
 	 * Ensure i- and d-cache coherency after writing executable code. The
@@ -867,9 +867,9 @@ tramp_pgs_append(const struct tramp_data *data)
 	 * addresses. Derive the start address from pg so that it has
 	 * sufficiently large bounds to contain these rounded addresses.
 	 */
-	__clear_cache(cheri_copyaddress(pg, (*headerp)->entry), tramp + len);
+	__clear_cache(cheri_copyaddress(pg, header->entry), tramp + len);
 
-	return (*headerp);
+	return (header);
 }
 
 static bool
