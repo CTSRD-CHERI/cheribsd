@@ -465,6 +465,10 @@ tramp_should_include(const Obj_Entry *reqobj, const struct tramp_data *data)
 struct stk_bottom {
 	compart_id_t compart_id;
 	/*
+	 * Store an integer address of the compartment's name for debuggers.
+	 */
+	ptraddr_t compart_name;
+	/*
 	 * INVARIANT: The bottom of a compartment's stack contains a capability
 	 * to the top of the stack either when the compartment was last entered
 	 * or when it was last exited from, which ever occured later.
@@ -504,6 +508,7 @@ init_compart_stack(void *base, compart_id_t cid)
 	memset(stk, 0, sizeof(*stk));
 	*stk = (struct stk_bottom) {
 		.compart_id = cid,
+		.compart_name = (ptraddr_t)comparts.data[cid].name,
 		.top = cheri_clearperm(stk, CHERI_PERM_SW_VMEM)
 	};
 }
