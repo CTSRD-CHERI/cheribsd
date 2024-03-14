@@ -42,7 +42,7 @@
  * Trampolines
  */
 size_t
-tramp_compile(struct tramp_header **entry, const struct tramp_data *data)
+tramp_compile(char **entry, const struct tramp_data *data)
 {
 #define IMPORT(template)				\
 	extern const uint32_t tramp_##template[];	\

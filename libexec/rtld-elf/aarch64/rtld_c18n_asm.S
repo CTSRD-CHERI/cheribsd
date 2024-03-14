@@ -262,7 +262,7 @@ END(tramp_hook)
  * defined to describe them.
  */
 #define TRAMP(sym)							\
-	.section .rodata; .globl sym; .align 4; .type sym,#object; sym:
+	.section .rodata; .globl sym; .type sym,#object; sym:
 
 #define TRAMPEND(sym)							\
 	end_##sym:							\
@@ -272,7 +272,7 @@ END(tramp_hook)
 	.quad	end_##sym - sym
 
 #define	PATCH_POINT(tramp, name, label)					\
-	.section .rodata; .globl patch_##tramp##_##name; .align 3;	\
+	.section .rodata; .globl patch_##tramp##_##name; .align 2;	\
 	.type patch_##tramp##_##name,#object;				\
 	.size patch_##tramp##_##name, 4; patch_##tramp##_##name:	\
 	.word	label - end_##tramp
