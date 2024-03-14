@@ -52,23 +52,24 @@ ENTRY(.rtld_start)
 #ifdef __CHERI_PURE_CAPABILITY__
 	.cfi_undefined	c30
 	mov	c19, c0				/* Put aux in a callee-saved register */
-#ifdef RTLD_SANDBOX
-	mov	c1, csp
-	sub	csp, csp, #(CAP_WIDTH * 2)
-	bl	c18n_init_rtld_stack
-#endif
-	mov	c20, csp			/* And the stack pointer */
-
-	sub	csp, csp, #32			/* Make room for obj_main & exit proc */
 
 	adrp	c0, _DYNAMIC
 	add	c0, c0, :lo12:_DYNAMIC		/* dynp */
 	mov	c1, c19				/* aux */
 	bl	_rtld_relocate_nonplt_self	/* Relocate ourselves early */
 
+#ifdef RTLD_SANDBOX
+	mov	c1, csp
+	sub	csp, csp, #(CAP_WIDTH * 2)
+	bl	c18n_init_rtld_stack
+#endif
+
 #if __CHERI_CAPABILITY_TABLE__ != 3
 #error "Only the PC-relative ABI is currently supported"
 #endif
+
+	mov	c20, csp			/* Save the stack pointer */
+	sub	csp, csp, #32			/* Make room for obj_main & exit proc */
 
 	mov	c0, c19				/* Restore aux */
 	scbnds	c1, csp, #16			/* exit_proc */
