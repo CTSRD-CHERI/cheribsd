@@ -898,6 +898,11 @@ struct proc {
 #define	P2_MEMBAR_GLOBE		0x00400000	/* membar global expedited
 						   registered */
 
+#define	P2_CHERI_C18N_ENABLE	0x10000000	/* Force enable compartmentalisation */
+#define	P2_CHERI_C18N_DISABLE	0x20000000	/* Force disable compartmentalisation */
+#define	P2_CHERI_C18N_MASK \
+	(P2_CHERI_C18N_ENABLE | P2_CHERI_C18N_DISABLE)
+
 #define	P2_CHERI_REVOKE_ENABLE	0x40000000	/* Force enable revocation */
 #define	P2_CHERI_REVOKE_DISABLE	0x80000000	/* Force disable revocation */
 #define	P2_CHERI_REVOKE_MASK \
