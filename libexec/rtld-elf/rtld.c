@@ -679,9 +679,14 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     main_argc = argc;
     main_argv = argv;
 
-    if (aux_info[AT_BSDFLAGS] != NULL &&
-	(aux_info[AT_BSDFLAGS]->a_un.a_val & ELF_BSDF_SIGFASTBLK) != 0)
+    if (aux_info[AT_BSDFLAGS] != NULL) {
+	if ((aux_info[AT_BSDFLAGS]->a_un.a_val & ELF_BSDF_SIGFASTBLK) != 0)
 	    ld_fast_sigblock = true;
+#if defined(RTLD_SANDBOX) && !defined(RTLD_SANDBOX_ALWAYS)
+	if ((aux_info[AT_BSDFLAGS]->a_un.a_val & ELF_BSDF_CHERI_C18N) != 0)
+	    ld_compartment_enable = true;
+#endif
+    }
 
     trust = !issetugid();
     direct_exec = false;

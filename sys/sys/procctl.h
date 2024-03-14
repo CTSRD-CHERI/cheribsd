@@ -67,6 +67,10 @@
 #define	PROC_WXMAP_STATUS	22	/* query W^X */
 #define	PROC_CHERI_REVOKE_CTL	1001	/* en/dis CHERI revocation */
 #define	PROC_CHERI_REVOKE_STATUS 1002	/* query CHERI revocation status */
+#if __has_feature(capabilities) && defined(__aarch64__)
+#define	PROC_CHERI_C18N_CTL	1003	/* en/dis CHERI compartmentalisation */
+#define	PROC_CHERI_C18N_STATUS	1004	/* query CHERI compartmentalisation status */
+#endif
 
 /* Operations for PROC_SPROTECT (passed in integer arg). */
 #define	PPROT_OP(x)	((x) & 0xf)
@@ -159,6 +163,12 @@ struct procctl_reaper_kill {
 #define	PROC_CHERI_REVOKE_FORCE_DISABLE	2
 #define	PROC_CHERI_REVOKE_NOFORCE	3
 #define	PROC_CHERI_REVOKE_ACTIVE	0x80000000
+
+#ifdef PROC_CHERI_C18N_CTL
+#define	PROC_CHERI_C18N_ENABLE		1
+#define	PROC_CHERI_C18N_DISABLE		2
+#define	PROC_CHERI_C18N_NOFORCE		3
+#endif
 
 #ifndef _KERNEL
 __BEGIN_DECLS
