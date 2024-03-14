@@ -756,6 +756,42 @@ If the currently executed image in the process itself has revocation enabled,
 the
 .Dv PROC_CHERI_REVOKE_ACTIVE
 flag is or-ed with the value listed above.
+.It Dv PROC_CHERI_C18N_CTL
+Controls the runtime hint to enable or disable library-based
+compartmentalisation in the program images created by
+.Xr execve 2
+in the specified process or its descendants that did not either change the
+control or modify it by other means.
+The default value is controlled by the
+.Dv security.cheri.lib_based_c18n_default
+sysctl and the corresponding bit in the ELF control note, see
+.Xr elfctl 1 .
+The
+.Fa data
+parameter must point to the integer variable holding one of the following
+values:
+.Bl -tag -width PROC_CHERI_C18N_FORCE_DISABLE
+.It Dv PROC_CHERI_C18N_FORCE_ENABLE
+Request that library-based compartmentalisation is enabled by the runtime of
+newly executed processes, even if it defaults to disabled system-wide.
+.It Dv PROC_CHERI_C18N_FORCE_DISABLE
+Request that library-based compartmentalisation is disabled by the runtime of
+newly executed processes, even if it defaults to enabled system-wide.
+.It Dv PROC_CHERI_C18N_NOFORCE
+Use the system-wide configured policy for library-based compartmentalisation.
+.El
+.It Dv PROC_CHERI_C18N_STATUS
+Returns the current status of library-based compartmentalisation enablement for
+the target process.
+The
+.Fa data
+parameter must point to the integer variable, where one of the
+following values is written:
+.Bl -tag -width PROC_CHERI_C18N_FORCE_DISABLE
+.It Dv PROC_CHERI_C18N_FORCE_ENABLE
+.It Dv PROC_CHERI_C18N_FORCE_DISABLE
+.It Dv PROC_CHERI_C18N_NOFORCE
+.El
 .Sh NOTES
 Disabling tracing on a process should not be considered a security
 feature, as it is bypassable both by the kernel and privileged processes,
