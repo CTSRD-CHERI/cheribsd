@@ -155,8 +155,7 @@ int
 db_write_bytes(vm_offset_t addr, size_t size, char *data)
 {
 	jmp_buf jb;
-	void *prev_jb;
-	vm_pointer_t kaddr;
+	void *prev_jb, *kaddr;
 	char *dst;
 	size_t i;
 	int ret;
@@ -164,7 +163,7 @@ db_write_bytes(vm_offset_t addr, size_t size, char *data)
 	prev_jb = kdb_jmpbuf(jb);
 	ret = setjmp(jb);
 	if (ret == 0) {
-		kaddr = (vm_pointer_t)DB_DATA_PTR_LEN(addr, char, size);
+		kaddr = DB_DATA_PTR_LEN(addr, char, size);
 		if (!arm64_get_writable_addr(kaddr, &kaddr)) {
 			ret = 1;
 		} else {
@@ -177,7 +176,7 @@ db_write_bytes(vm_offset_t addr, size_t size, char *data)
 			 * Ensure the I & D cache are in sync if we wrote
 			 * to executable memory.
 			 */
-			cpu_icache_sync_range((void *)kaddr, (vm_size_t)size);
+			cpu_icache_sync_range(kaddr, size);
 		}
 	}
 	(void)kdb_jmpbuf(prev_jb);

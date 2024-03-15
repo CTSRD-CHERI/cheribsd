@@ -450,12 +450,12 @@ init_proc0(vm_pointer_t kstack)
  * read-only, e.g. to patch kernel code.
  */
 bool
-arm64_get_writable_addr(vm_pointer_t addr, vm_pointer_t *out)
+arm64_get_writable_addr(void *addr, void **out)
 {
 	vm_paddr_t pa;
 
 	/* Check if the page is writable */
-	if (PAR_SUCCESS(arm64_address_translate_s1e1w(addr))) {
+	if (PAR_SUCCESS(arm64_address_translate_s1e1w((vm_offset_t)addr))) {
 		*out = addr;
 		return (true);
 	}
@@ -463,7 +463,7 @@ arm64_get_writable_addr(vm_pointer_t addr, vm_pointer_t *out)
 	/*
 	 * Find the physical address of the given page.
 	 */
-	if (!pmap_klookup(addr, &pa)) {
+	if (!pmap_klookup((vm_offset_t)addr, &pa)) {
 		return (false);
 	}
 
@@ -471,8 +471,9 @@ arm64_get_writable_addr(vm_pointer_t addr, vm_pointer_t *out)
 	 * If it is within the DMAP region and is writable use that.
 	 */
 	if (PHYS_IN_DMAP(pa)) {
-		addr = PHYS_TO_DMAP_PAGE(pa);
-		if (PAR_SUCCESS(arm64_address_translate_s1e1w(addr))) {
+		addr = (void *)PHYS_TO_DMAP_PAGE(pa);
+		if (PAR_SUCCESS(arm64_address_translate_s1e1w(
+		    (vm_offset_t)addr))) {
 			*out = addr;
 			return (true);
 		}
