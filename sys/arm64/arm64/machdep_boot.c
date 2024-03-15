@@ -236,8 +236,9 @@ freebsd_parse_boot_param(struct arm64_bootparams *abp)
 #ifdef DDB
 	ksym_start = MD_FETCH(kmdp, MODINFOMD_SSYM, vm_offset_t);
 	ksym_end = MD_FETCH(kmdp, MODINFOMD_ESYM, vm_offset_t);
-#ifdef __CHERI_PURECAP_KERNEL__
-	ksym_start = cheri_setaddress(kernel_root_cap, ksym_start);
+#ifdef __CHERI_PURE_CAPABILITY__
+	ksym_start = (vm_pointer_t)cheri_setaddress(kernel_root_cap,
+	    ksym_start);
 	ksym_start = cheri_setbounds(ksym_start,
 	    (ptraddr_t)ksym_end - (ptraddr_t)ksym_start);
 	ksym_start = cheri_andperm(ksym_start,
