@@ -1849,10 +1849,16 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	 * ELF_BSDF_CHERI_C18N tells the runtime linker to enable library-based
 	 * compartmentalisation.
 	 *
+	 * Precedence: procctl, ELF note.
 	 * In case of conflicting flags, disable wins.
 	 */
 	if ((imgp->proc->p_flag2 & P2_CHERI_C18N_MASK) != 0) {
 		if ((imgp->proc->p_flag2 & P2_CHERI_C18N_DISABLE) == 0)
+			bsdflags |= ELF_BSDF_CHERI_C18N;
+	} else if ((imgp->proc->p_fctl0 &
+	    NT_FREEBSD_FCTL_CHERI_C18N_MASK) != 0) {
+		if ((imgp->proc->p_fctl0 &
+		    NT_FREEBSD_FCTL_CHERI_C18N_DISABLE) == 0)
 			bsdflags |= ELF_BSDF_CHERI_C18N;
 	}
 #endif
