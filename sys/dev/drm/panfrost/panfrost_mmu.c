@@ -421,7 +421,7 @@ panfrost_mmu_pgtable_alloc(struct panfrost_mmu *mmu)
 	smmu_pmap_pinit(p);
 
 	/* Ensure root directory is visible to GPU. */
-	cpu_dcache_wbinv_range((vm_pointer_t)p->sp_l0, sizeof(pd_entry_t));
+	cpu_dcache_wbinv_range(p->sp_l0, sizeof(pd_entry_t));
 
 	mmu->as = -1;
 }

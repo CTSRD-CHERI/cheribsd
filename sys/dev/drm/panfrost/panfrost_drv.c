@@ -617,7 +617,7 @@ panfrost_ioctl_madvise(struct drm_device *dev, void *data,
 				vm_page_lock(m);
 				pmap_zero_page(m);
 				va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
-				cpu_dcache_wb_range(va, PAGE_SIZE);
+				cpu_dcache_wb_range((void *)va, PAGE_SIZE);
 				vm_page_unlock(m);
 			}
 		}
