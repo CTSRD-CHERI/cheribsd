@@ -14,3 +14,5 @@
 # https://github.com/CTSRD-CHERI/cheribsd/commit/fbbed9d1eb296c1a38c8be1f627aede717da6dfe
 # https://github.com/CTSRD-CHERI/cheribsd/commit/6d95323f57bc4def4fadc889e766a0c08ffe5994
 20220512  # TLS and varargs ABI changes on Morello
+# https://github.com/CTSRD-CHERI/cheribsd/commit/6a6e2329153bab6126dc36d3c74871ca75b0c75f
+20240315  # Switch to final ABI for passing memory arguments on Morello
