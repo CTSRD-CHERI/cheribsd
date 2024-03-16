@@ -58,89 +58,84 @@ tramp_compile(char **entry, const struct tramp_data *data)
 	IMPORT(clear_ret_args_indirect);
 	IMPORT(clear_ret_args);
 	IMPORT(invoke_res);
-	IMPORT(pop_frame);
-	IMPORT(return);
 	IMPORT(return_hook);
+	IMPORT(return);
 
-#undef	IMPORT
-
-	void *header_hook = tramp_hook;
-
-	struct tramp_header header = {
-		.target = data->target,
-		.defobj = data->defobj,
-		.def = data->def
-	};
-
-	void *buf = *entry;
-	uint32_t *cookie_patch;
 	size_t size = 0;
-	int to_clear;
+	char *buf = *entry;
+	size_t hook_off, header_off, target_off, cookie_off, unused_regs;
 	bool executive = cheri_getperm(data->target) & CHERI_PERM_EXECUTIVE;
 	bool hook = ld_compartment_utrace != NULL ||
 	    ld_compartment_overhead != NULL;
 
-#define	COPY_DATA(s)					\
-	do {						\
-		buf = mempcpy(buf, &(s), sizeof(s));	\
-		size += sizeof(s);			\
-	} while (0)
-
 #define	COPY(template)					\
 	do {						\
-		buf = mempcpy(buf, tramp_##template,	\
+		memcpy(buf + size, tramp_##template,	\
 		    size_tramp_##template);		\
 		size += size_tramp_##template;		\
 	} while(0)
 
-#define	PATCH_POINT(tramp, name) ({					\
+#define	PATCH_INS(offset)	((uint32_t *)(buf + (offset)))		\
+
+#define	PATCH_OFF(tramp, name)	({					\
 		extern const int32_t patch_tramp_##tramp##_##name;	\
-		&((uint32_t *)buf)					\
-		    [patch_tramp_##tramp##_##name / sizeof(uint32_t)];	\
+		size + patch_tramp_##tramp##_##name;			\
 	})
 
 #define PATCH_MOV(tramp, name, value)					\
 	do {								\
 		uint32_t _value = (value);				\
 		_value = ((_value & 0xffff) << 5);			\
-		*PATCH_POINT(tramp, name) |= _value;			\
+		*PATCH_INS(PATCH_OFF(tramp, name)) |= _value;		\
 	} while (0)
 
 #define	PATCH_ADD(tramp, name, value)					\
 	do {								\
 		uint32_t _value = (value);				\
 		_value = ((_value & 0xfff) << 10);			\
-		*PATCH_POINT(tramp, name) |= _value;			\
+		*PATCH_INS(PATCH_OFF(tramp, name)) |= _value;		\
 	} while (0)
 
-#define	PATCH_LDR_IMM(tramp, name, offset)				\
+#define	PATCH_LDR_IMM(tramp, name, target)				\
 	do {								\
-		extern const int32_t patch_tramp_##tramp##_##name;	\
-		*PATCH_POINT(tramp, name) |= (roundup2(			\
-		    sizeof(void *) * (offset) -				\
-		    patch_tramp_##tramp##_##name - size,		\
-		    sizeof(void *)) & 0x1ffff0) << 1;			\
+		int32_t _offset = PATCH_OFF(tramp, name);		\
+		int32_t _value = (target) - _offset;			\
+		_value =						\
+		    (roundup2(_value, sizeof(void *)) & 0x1ffff0) << 1;	\
+		*PATCH_INS(_offset) |= _value;				\
 	} while(0)
 
-#define	PATCH_ADR(point, target)					\
+#define	PATCH_ADR(offset, target)					\
 	do {								\
-		uint32_t _offset =					\
-		    (ptraddr_t)(target) - (ptraddr_t)(point);		\
-		_offset =						\
-		    ((_offset & 0x3) << 29) |				\
-		    ((_offset & 0x1ffffc) << 3);			\
-		*(point) |= _offset;					\
+		int32_t _offset = (offset);				\
+		int32_t _value = (target) - _offset;			\
+		_value =						\
+		    ((_value & 0x3) << 29) |				\
+		    ((_value & 0x1ffffc) << 3);				\
+		*PATCH_INS(_offset) |= _value;				\
 	} while (0)
 
-	if (hook)
-		COPY_DATA(header_hook);
+	if (hook) {
+		*(void **)(buf + size) = tramp_hook;
+		hook_off = size;
+		size += sizeof(void *);
+	}
 
-	*entry = buf;
-	COPY_DATA(header);
+	*(struct tramp_header *)(buf + size) = (struct tramp_header) {
+		.target = data->target,
+		.defobj = data->defobj,
+		.symnum = data->def == NULL ?
+		    0 : data->def - data->defobj->symtab,
+		.sig = data->sig
+	};
+	header_off = size;
+	target_off = size + offsetof(struct tramp_header, target);
+	*entry = buf + size;
+	size += offsetof(struct tramp_header, entry);
 
 	COPY(save_caller);
-	cookie_patch = PATCH_POINT(save_caller, cookie);
-	PATCH_LDR_IMM(save_caller, target, hook ? 1 : 0);
+	cookie_off = PATCH_OFF(save_caller, cookie);
+	PATCH_LDR_IMM(save_caller, target, target_off);
 	if (data->sig.valid)
 		PATCH_ADD(save_caller, ret_args, data->sig.ret_args);
 
@@ -151,10 +146,9 @@ tramp_compile(char **entry, const struct tramp_data *data)
 
 	if (hook) {
 		COPY(call_hook);
+		PATCH_LDR_IMM(call_hook, function, hook_off);
 		PATCH_MOV(call_hook, event, UTRACE_COMPARTMENT_ENTER);
-		PATCH_LDR_IMM(call_hook, function, 0);
-		PATCH_LDR_IMM(call_hook, obj, 2);
-		PATCH_LDR_IMM(call_hook, def, 3);
+		PATCH_ADR(PATCH_OFF(call_hook, header), header_off);
 	}
 
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
@@ -172,32 +166,28 @@ tramp_compile(char **entry, const struct tramp_data *data)
 		if (data->sig.valid) {
 			if (!data->sig.mem_args)
 				COPY(clear_mem_args);
+
 			if (data->sig.ret_args != INDIRECT)
 				COPY(clear_ret_args_indirect);
-			to_clear = 8 - data->sig.reg_args;
-			buf = mempcpy(buf, tramp_clear_ret_args,
-			    sizeof(*tramp_clear_ret_args) * to_clear);
-			size += sizeof(*tramp_clear_ret_args) * to_clear;
+
+			unused_regs = sizeof(*tramp_clear_ret_args) *
+			    (8 - data->sig.reg_args);
+
+			memcpy(buf + size, tramp_clear_ret_args, unused_regs);
+			size += unused_regs;
 		}
 		COPY(invoke_res);
 	}
-
-	PATCH_ADR(cookie_patch, buf);
-	COPY(pop_frame);
+	PATCH_ADR(cookie_off, size);
 
 	if (hook) {
 		COPY(return_hook);
+		PATCH_LDR_IMM(return_hook, function, hook_off);
 		PATCH_MOV(return_hook, event, UTRACE_COMPARTMENT_LEAVE);
-		PATCH_LDR_IMM(return_hook, function, 0);
-		PATCH_LDR_IMM(return_hook, obj, 2);
-		PATCH_LDR_IMM(return_hook, def, 3);
-	} else
-		COPY(return);
+		PATCH_ADR(PATCH_OFF(return_hook, header), header_off);
+	}
 
-#undef	COPY
-#undef	PATCH_POINT
-#undef	PATCH_MOV
-#undef	PATCH_LDR_IMM
+	COPY(return);
 
 	return (size);
 }

@@ -896,7 +896,7 @@ static struct {
 	_Alignas(CACHE_LINE_SIZE) _Atomic(slot_idx_t) size;
 	size_t back;
 	int exp;
-	struct tramp_header **data;
+	const struct tramp_header **data;
 	struct tramp_map_kv {
 		_Atomic(ptraddr_t) key;
 		_Atomic(slot_idx_t) index;
@@ -1010,18 +1010,16 @@ resize_table(int exp)
 }
 
 void
-tramp_hook_impl(void *, int, void *, const Obj_Entry *, const Elf_Sym *,
-    void *);
+tramp_hook_impl(int, const struct tramp_header *, const struct trusted_frame *);
 
 void
-tramp_hook_impl(void *rcsp, int event, void *target, const Obj_Entry *obj,
-    const Elf_Sym *def, void *link)
+tramp_hook_impl(int event, const struct tramp_header *hdr,
+    const struct trusted_frame *tf)
 {
-	Elf_Word sym_num;
 	const char *sym;
 	const char *callee;
 
-	struct stk_bottom *stack;
+	struct stk_bottom *stk;
 	compart_id_t caller_id;
 	const char *caller;
 
@@ -1029,21 +1027,21 @@ tramp_hook_impl(void *rcsp, int event, void *target, const Obj_Entry *obj,
 	static const char rtld_utrace_sig[RTLD_UTRACE_SIG_SZ] = RTLD_UTRACE_SIG;
 
 	if (ld_compartment_utrace != NULL) {
-		sym_num = def == NULL ? 0 : def - obj->symtab;
-		sym = def == NULL ? "<unknown>" :
-		    strtab_value(obj, def->st_name);
-		callee = comparts.data[obj->compart_id].name;
+		if (hdr->symnum == 0)
+			sym = "<unknown>";
+		else
+			sym = symname(hdr->defobj, hdr->symnum);
 
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-		(void)link;
-#else
-		if (cheri_gettag(link) &&
-		    (cheri_getperm(link) & CHERI_PERM_EXECUTIVE) == 0)
+		callee = comparts.data[hdr->defobj->compart_id].name;
+
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+		if (cheri_gettag(tf->pc) &&
+		    (cheri_getperm(tf->pc) & CHERI_PERM_EXECUTIVE) == 0)
 #endif
 		{
-			stack = cheri_setoffset(rcsp, cheri_getlen(rcsp));
-			--stack;
-		        caller_id = stack->compart_id;
+			stk = cheri_setoffset(tf->n_sp, cheri_getlen(tf->n_sp));
+			--stk;
+		        caller_id = stk->compart_id;
 		}
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 		else
@@ -1053,8 +1051,8 @@ tramp_hook_impl(void *rcsp, int event, void *target, const Obj_Entry *obj,
 
 		memcpy(ut.sig, rtld_utrace_sig, sizeof(ut.sig));
 		ut.event = event;
-		ut.handle = target;
-		ut.mapsize = sym_num;
+		ut.handle = hdr->target;
+		ut.mapsize = hdr->symnum;
 		strlcpy(ut.symbol, sym, sizeof(ut.symbol));
 		strlcpy(ut.callee, callee, sizeof(ut.callee));
 		strlcpy(ut.caller, caller, sizeof(ut.caller));
@@ -1066,7 +1064,7 @@ tramp_hook_impl(void *rcsp, int event, void *target, const Obj_Entry *obj,
 
 #define	C18N_MAX_TRAMP_SIZE	768
 
-static struct tramp_header *
+static const struct tramp_header *
 tramp_pgs_append(const struct tramp_data *data)
 {
 	size_t len;
@@ -1123,26 +1121,25 @@ func_sig_equal(struct func_sig lhs, struct func_sig rhs)
 }
 
 static void
-tramp_check_sig(struct tramp_header *found, const Obj_Entry *reqobj,
+tramp_check_sig(const struct tramp_header *found, const Obj_Entry *reqobj,
     const struct tramp_data *data)
 {
 	struct func_sig sig;
 
-	if (data->sig.valid && found->def != NULL) {
-		sig = sigtab_get(found->defobj,
-		    found->def - found->defobj->symtab);
+	if (data->sig.valid && found->symnum != 0) {
+		sig = sigtab_get(found->defobj, found->symnum);
 
 		rtld_require(!sig.valid || func_sig_equal(data->sig, sig),
 		    "Incompatible signatures for function %s: "
 		    "%s requests " C18N_SIG_FORMAT_STRING " but "
 		    "%s provides " C18N_SIG_FORMAT_STRING,
-		    strtab_value(found->defobj, found->def->st_name),
+		    symname(found->defobj, found->symnum),
 		    reqobj->path, C18N_SIG_FORMAT(data->sig),
 		    found->defobj->path, C18N_SIG_FORMAT(sig));
 	}
 }
 
-static struct tramp_header *
+static const struct tramp_header *
 tramp_create(const struct tramp_data *data)
 {
 	struct tramp_data newdata = *data;
@@ -1154,10 +1151,10 @@ tramp_create(const struct tramp_data *data)
 	return (tramp_pgs_append(&newdata));
 }
 
-static void *
-tramp_make_entry(struct tramp_header *header)
+static const void *
+tramp_make_entry(const struct tramp_header *header)
 {
-	void *entry = header->entry;
+	const void *entry = header->entry;
 
 	entry = cheri_clearperm(entry, FUNC_PTR_REMOVE_PERMS);
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
@@ -1170,8 +1167,8 @@ tramp_make_entry(struct tramp_header *header)
 void *
 tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *data)
 {
-	struct tramp_header *header;
 	RtldLockState lockstate;
+	const struct tramp_header *header;
 	ptraddr_t target = (ptraddr_t)data->target;
 	const uint32_t hash = pointer_hash(target);
 	slot_idx_t slot, idx, writers;
@@ -1283,7 +1280,10 @@ end:
 
 	tramp_check_sig(header, reqobj, data);
 
-	return (tramp_make_entry(header));
+	/*
+	 * Most consumers use type (void *) for function pointers.
+	 */
+	return (__DECONST(void *, tramp_make_entry(header)));
 }
 
 struct func_sig
