@@ -180,7 +180,8 @@ struct tramp_data {
 struct tramp_header {
 	void *target;
 	const Obj_Entry *defobj;
-	const Elf_Sym *def;
+	size_t symnum;
+	struct func_sig sig;
 	uint32_t entry[];
 };
 

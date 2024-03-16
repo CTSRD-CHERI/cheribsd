@@ -254,7 +254,7 @@ ENTRY(tramp_hook)
 	 * This function is only called from trampolines when tracing
 	 * compartment transitions.
 	 *
-	 * Upon entry, c10-c15 hold the first arguments of tramp_hook.
+	 * Upon entry, c10-c12 hold the first arguments of tramp_hook.
 	 *
 	 * All argument registers must be preserved.
 	 */
@@ -275,9 +275,6 @@ ENTRY(tramp_hook)
 	mov	c0, c10
 	mov	c1, c11
 	mov	c2, c12
-	mov	c3, c13
-	mov	c4, c14
-	mov	c5, c15
 
 	str	c30, [csp, #-CAP_WIDTH]!
 	bl	tramp_hook_impl
@@ -396,25 +393,21 @@ TRAMP(tramp_update_fp_untagged)
 TRAMPEND(tramp_update_fp_untagged)
 
 TRAMP(tramp_call_hook)
-1:	ldr	c18, #0		/* To be patched at runtime */
+1:	ldr	c13, #0		/* To be patched at runtime */
 
-2:	mov	w11, #0		/* To be patched at runtime */
-	mov	c12, c19
-3:	ldr	c13, #0		/* To be patched at runtime */
-4:	ldr	c14, #0		/* To be patched at runtime */
-	mov	c15, c30
-
+2:	mov	w10, #0		/* To be patched at runtime */
+3:	adr	c11, #0		/* To be patched at runtime */
+	mov	c12, TRUSTED_STACK
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	blr	x18
+	blr	x13
 #else
-	blr	c18
+	blr	c13
 #endif
 TRAMPEND(tramp_call_hook)
 
 PATCH_POINT(tramp_call_hook, function, 1b)
 PATCH_POINT(tramp_call_hook, event, 2b)
-PATCH_POINT(tramp_call_hook, obj, 3b)
-PATCH_POINT(tramp_call_hook, def, 4b)
+PATCH_POINT(tramp_call_hook, header, 3b)
 
 TRAMP(tramp_switch_stack)
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
@@ -556,7 +549,25 @@ TRAMP(tramp_invoke_res)
 #endif
 TRAMPEND(tramp_invoke_res)
 
-TRAMP(tramp_pop_frame)
+TRAMP(tramp_return_hook)
+1:	ldr	c13, #0			/* To be patched at runtime */
+
+2:	mov	w10, #0			/* To be patched at runtime */
+3:	adr	c11, #0			/* To be patched at runtime */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mrs	c12, rcsp_el0
+	blr	x13
+#else
+	mov	c12, csp
+	blr	c13
+#endif
+TRAMPEND(tramp_return_hook)
+
+PATCH_POINT(tramp_return_hook, function, 1b)
+PATCH_POINT(tramp_return_hook, event, 2b)
+PATCH_POINT(tramp_return_hook, header, 3b)
+
+TRAMP(tramp_return)
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	mrs	TRUSTED_STACK, rcsp_el0
 #endif
@@ -626,38 +637,9 @@ TRAMP(tramp_pop_frame)
 	 */
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	mov	csp, c15
-#else
-	msr	rcsp_el0, c15
-#endif
-TRAMPEND(tramp_pop_frame)
-
-TRAMP(tramp_return)
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	RETURN
 #else
+	msr	rcsp_el0, c15
 	retr	c30
 #endif
 TRAMPEND(tramp_return)
-
-TRAMP(tramp_return_hook)
-	/* Save return value registers */
-1:	ldr	c18, #0			/* To be patched at runtime */
-
-	mov	c10, c15
-2:	mov	w11, #0			/* To be patched at runtime */
-	mov	x12, xzr
-3:	ldr	c13, #0			/* To be patched at runtime */
-4:	ldr	c14, #0			/* To be patched at runtime */
-	mov	c15, c30
-
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	br	x18
-#else
-	br	c18
-#endif
-TRAMPEND(tramp_return_hook)
-
-PATCH_POINT(tramp_return_hook, function, 1b)
-PATCH_POINT(tramp_return_hook, event, 2b)
-PATCH_POINT(tramp_return_hook, obj, 3b)
-PATCH_POINT(tramp_return_hook, def, 4b)
