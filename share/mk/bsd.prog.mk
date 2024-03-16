@@ -184,6 +184,9 @@ ${PROG_FULL}: ${OBJS}
 .if ${MK_CTF} != "no"
 	${CTFMERGE} ${CTFFLAGS} -o ${.TARGET} ${OBJS}
 .endif
+.if defined(ELF_FEATURES)
+	${ELFCTL} -i -e ${ELF_FEATURES:ts,} ${.TARGET}
+.endif
 
 .else	# !defined(SRCS)
 

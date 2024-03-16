@@ -332,6 +332,10 @@ DPADD		Additional dependencies for the program.  Usually used for
 		shared libraries should be only on the library version
 		numbers.
 
+ELF_FEATURES	A list of elf features to be set on the program by
+		elfctl(1).  If multiple words are present they are
+		joined by commas when invoking elfctl.
+
 FILES		A list of non-executable files.
 		The installation is controlled by the FILESNAME, FILESOWN,
 		FILESGRP, FILESMODE, FILESDIR variables that can be
