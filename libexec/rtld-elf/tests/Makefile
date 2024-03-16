@@ -18,7 +18,7 @@ SRCS.$t=	$t.c common.c
 WARNS?=		3
 
 .if ${MACHINE_ABI:Mpurecap}
-SUBDIR+=	cheri
+TESTS_SUBDIRS+=	cheri
 .endif
 
 .include <bsd.test.mk>
