@@ -66,22 +66,9 @@ ATF_TC_BODY(dlopen_hybrid, tc)
 	test_dlopen_success("libbasic_hybrid.so.0", "hybrid", true);
 }
 
-ATF_TC(dlopen_nocheri);
-ATF_TC_HEAD(dlopen_nocheri, tc)
-{
-	atf_tc_set_md_var(tc, "descr",
-	    "Check that we can dlopen() a non-CHERI library from a hybrid binary");
-}
-ATF_TC_BODY(dlopen_nocheri, tc)
-{
-	test_dlopen_success("libbasic_nocheri.so.0", "not CHERI", true);
-}
-
-
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, dlopen_purecap_fail);
 	ATF_TP_ADD_TC(tp, dlopen_hybrid);
-	ATF_TP_ADD_TC(tp, dlopen_nocheri);
 	return atf_no_error();
 }

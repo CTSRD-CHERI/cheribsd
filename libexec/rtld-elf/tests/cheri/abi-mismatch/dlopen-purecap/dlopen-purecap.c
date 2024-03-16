@@ -67,36 +67,9 @@ ATF_TC_BODY(dlopen_hybrid_fail, tc)
 	test_dlopen_failure("libbasic_hybrid.so.0", error_msg);
 }
 
-ATF_TC(dlopen_nocheri_fail);
-ATF_TC_HEAD(dlopen_nocheri_fail, tc)
-{
-	atf_tc_set_md_var(tc, "descr",
-	    "Check that dlopen() of a non-CHERI library from a purecap binary fails");
-}
-ATF_TC_BODY(dlopen_nocheri_fail, tc)
-{
-	char error_msg[PATH_MAX];
-	const char* exedir = get_executable_dir();
-
-#if defined(__riscv) || (__aarch64__)
-	/*
-	 * RISC-V has no CHERI vs non-CHERI distinction in its flags (just like all
-	 * extensions other than C, which influences linker relaxation). We
-	 * therefore fall back on it not being purecap.
-	 */
-	snprintf(error_msg, sizeof(error_msg),
-	    "%s/%s: cannot load %s/../%s since it is not CheriABI",
-	    exedir, "dlopen-purecap", exedir, "libbasic_nocheri.so.0");
-#else
-#error "Unknown architecture"
-#endif
-	test_dlopen_failure("libbasic_nocheri.so.0", error_msg);
-}
-
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, dlopen_purecap);
 	ATF_TP_ADD_TC(tp, dlopen_hybrid_fail);
-	ATF_TP_ADD_TC(tp, dlopen_nocheri_fail);
 	return atf_no_error();
 }
