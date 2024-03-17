@@ -797,6 +797,12 @@ _rtld_longjmp_impl(uintptr_t ret, void **buf, struct trusted_frame *csp,
 	do {
 		stk = cheri_setoffset(cur->o_sp, cheri_getlen(cur->o_sp));
 		--stk;
+
+		rtld_require(stk->top <= cur->o_sp,
+		    "c18n: Cannot unwind %s from %#p to %#p\n"
+		    "csp: %#p -> %#p", comparts.data[stk->compart_id].name,
+		    stk->top, cur->o_sp, csp, target);
+
 		stk->top = cur->o_sp;
 		cur = cheri_setaddress(cur, cur->next);
 	} while (cur < target);
@@ -815,6 +821,12 @@ _rtld_longjmp_impl(uintptr_t ret, void **buf, struct trusted_frame *csp,
 	 */
 	stk = cheri_setoffset(rcsp, cheri_getlen(rcsp));
 	--stk;
+
+	rtld_require(rcsp <= stk->top,
+	    "c18n: Cannot complete unwind %s from %#p to %#p\n"
+	    "csp: %#p -> %#p", comparts.data[stk->compart_id].name,
+	    rcsp, stk->top, csp, target);
+
 	csp->o_sp = stk->top;
 	stk->top = rcsp;
 

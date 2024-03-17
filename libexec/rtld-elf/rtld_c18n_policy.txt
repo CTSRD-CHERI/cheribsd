@@ -44,6 +44,16 @@ trust
 	siglongjmp
 	vfork
 	rfork
+	execve
+	fxecve
+	execl
+	execlp
+	execle
+	exect
+	execv
+	execvp
+	execvpe
+	execvP
 	_rtld_thread_start
 
 callee [RTLD]
