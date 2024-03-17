@@ -50,6 +50,7 @@ uintptr_t sealer_pltgot, sealer_tramp;
 
 /* Use utrace() to log compartmentalisation-related events */
 const char *ld_compartment_utrace;
+bool ld_compartment_utrace_verbose;
 
 /* Enable compartmentalisation */
 const char *ld_compartment_enable;
@@ -1010,29 +1011,36 @@ resize_table(int exp)
 }
 
 void
-tramp_hook_impl(int, const struct tramp_header *, const struct trusted_frame *);
+tramp_hook_impl(uint8_t, const struct tramp_header *,
+    const struct trusted_frame *);
 
 void
-tramp_hook_impl(int event, const struct tramp_header *hdr,
+tramp_hook_impl(uint8_t event, const struct tramp_header *hdr,
     const struct trusted_frame *tf)
 {
-	const char *sym;
-	const char *callee;
-
+	struct utrace_c18n ut;
 	struct stk_bottom *stk;
 	compart_id_t caller_id;
-	const char *caller;
-
-	struct utrace_rtld ut;
-	static const char rtld_utrace_sig[RTLD_UTRACE_SIG_SZ] = RTLD_UTRACE_SIG;
+	const char *sym, *callee, *caller;
 
 	if (ld_compartment_utrace != NULL) {
+		memcpy(ut.sig, C18N_UTRACE_SIG, C18N_UTRACE_SIG_SZ);
+		ut.event = event;
+		ut.verbose = ld_compartment_utrace_verbose;
+		memcpy(&ut.fsig, &hdr->sig, sizeof(ut.fsig));
+		ut.symnum = hdr->symnum;
+		ut.csp = tf;
+		ut.fp = tf->fp;
+		ut.pc = tf->pc;
+
 		if (hdr->symnum == 0)
 			sym = "<unknown>";
 		else
 			sym = symname(hdr->defobj, hdr->symnum);
+		strlcpy(ut.symbol, sym, sizeof(ut.symbol));
 
 		callee = comparts.data[hdr->defobj->compart_id].name;
+		strlcpy(ut.callee, callee, sizeof(ut.callee));
 
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 		if (cheri_gettag(tf->pc) &&
@@ -1042,20 +1050,21 @@ tramp_hook_impl(int event, const struct tramp_header *hdr,
 			stk = cheri_setoffset(tf->n_sp, cheri_getlen(tf->n_sp));
 			--stk;
 		        caller_id = stk->compart_id;
+
+			ut.o_sp = (void *)(uintptr_t)tf->o_sp;
+			ut.n_sp = tf->n_sp;
 		}
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-		else
+		else {
 			caller_id = C18N_RTLD_COMPART_ID;
+
+			ut.o_sp = NULL;
+			ut.n_sp = NULL;
+		}
 #endif
 		caller = comparts.data[caller_id].name;
-
-		memcpy(ut.sig, rtld_utrace_sig, sizeof(ut.sig));
-		ut.event = event;
-		ut.handle = hdr->target;
-		ut.mapsize = hdr->symnum;
-		strlcpy(ut.symbol, sym, sizeof(ut.symbol));
-		strlcpy(ut.callee, callee, sizeof(ut.callee));
 		strlcpy(ut.caller, caller, sizeof(ut.caller));
+
 		utrace(&ut, sizeof(ut));
 	}
 	if (ld_compartment_overhead != NULL)
