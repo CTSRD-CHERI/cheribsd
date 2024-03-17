@@ -44,8 +44,6 @@
 #define	UTRACE_DLSYM_START		11
 #define	UTRACE_DLSYM_STOP		12
 #define	UTRACE_RTLD_ERROR		13
-#define	UTRACE_COMPARTMENT_ENTER	14
-#define	UTRACE_COMPARTMENT_LEAVE	15
 
 #define	RTLD_UTRACE_SIG_SZ		4
 #define	RTLD_UTRACE_SIG			"RTLD"
@@ -57,14 +55,31 @@ struct utrace_rtld {
 	void *mapbase;			/* Used for 'parent' and 'init/fini' */
 	size_t mapsize;
 	int refcnt;			/* Used for 'mode' */
-	union {
-		char name[MAXPATHLEN];
-		struct {
-			char symbol[MAXPATHLEN / 2];
-			char callee[MAXPATHLEN / 4];
-			char caller[MAXPATHLEN / 4];
-		};
-	};
+	char name[MAXPATHLEN];
 };
+
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	UTRACE_COMPARTMENT_ENTER	1
+#define	UTRACE_COMPARTMENT_LEAVE	2
+
+#define	C18N_UTRACE_SIG_SZ		4
+#define	C18N_UTRACE_SIG			"C18N"
+
+struct utrace_c18n {
+	char sig[C18N_UTRACE_SIG_SZ];
+	uint8_t event;
+	bool verbose;
+	uint8_t fsig;
+	size_t symnum;
+	const void *csp;
+	void *fp;
+	void *pc;
+	void *o_sp;
+	void *n_sp;
+	char symbol[256];
+	char callee[128];
+	char caller[128];
+};
+#endif
 
 #endif

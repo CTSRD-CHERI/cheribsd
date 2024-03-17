@@ -36,6 +36,7 @@
  */
 extern uintptr_t sealer_pltgot, sealer_tramp;
 extern const char *ld_compartment_utrace;
+extern bool ld_compartment_utrace_verbose;
 extern const char *ld_compartment_enable;
 extern const char *ld_compartment_policy;
 extern const char *ld_compartment_overhead;

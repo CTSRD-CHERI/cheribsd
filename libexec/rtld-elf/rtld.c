@@ -845,6 +845,9 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     ld_utrace = ld_get_env_var(LD_UTRACE);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
     ld_compartment_utrace = ld_get_env_var(LD_UTRACE_COMPARTMENT);
+    if (ld_compartment_utrace != NULL)
+	ld_compartment_utrace_verbose =
+	    strcmp(ld_compartment_utrace, "verbose") == 0;
     ld_compartment_enable = ld_get_env_var(LD_COMPARTMENT_ENABLE);
     ld_compartment_policy = ld_get_env_var(LD_COMPARTMENT_POLICY);
     ld_compartment_overhead = ld_get_env_var(LD_COMPARTMENT_OVERHEAD);
