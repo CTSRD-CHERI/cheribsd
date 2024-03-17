@@ -198,8 +198,11 @@ struct tramp_header {
 	uint32_t entry[];
 };
 
-void *tramp_hook(void *, int, void *, const Obj_Entry *, const Elf_Sym *,
-    void *);
+/*
+ * Assembly function with non-standard ABI.
+ */
+void tramp_hook(void);
+
 size_t tramp_compile(char **, const struct tramp_data *);
 void *tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *);
 struct tramp_header *tramp_reflect(const void *);

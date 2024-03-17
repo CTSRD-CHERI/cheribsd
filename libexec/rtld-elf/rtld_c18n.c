@@ -1025,23 +1025,31 @@ void
 tramp_hook_impl(int event, const struct tramp_header *hdr,
     const struct trusted_frame *tf)
 {
-	const char *sym;
-	const char *callee;
-
+	struct utrace_c18n ut;
 	struct stk_bottom *stk;
 	compart_id_t caller_id;
-	const char *caller;
-
-	struct utrace_rtld ut;
-	static const char rtld_utrace_sig[RTLD_UTRACE_SIG_SZ] = RTLD_UTRACE_SIG;
+	const char *sym, *callee, *caller;
 
 	if (ld_compartment_utrace != NULL) {
+		memcpy(ut.sig, C18N_UTRACE_SIG, C18N_UTRACE_SIG_SZ);
+		ut.event = event;
+		ut.symnum = hdr->symnum;
+		ut.fp = tf->fp;
+		ut.pc = tf->pc;
+		ut.next = tf->next;
+		ut.o_sp = tf->o_sp;
+		ut.n_sp = tf->n_sp;
+		ut.csp = tf;
+		memcpy(&ut.fsig, &hdr->sig, sizeof(ut.fsig));
+
 		if (hdr->symnum == 0)
 			sym = "<unknown>";
 		else
 			sym = symname(hdr->defobj, hdr->symnum);
+		strlcpy(ut.symbol, sym, sizeof(ut.symbol));
 
 		callee = comparts.data[hdr->defobj->compart_id].name;
+		strlcpy(ut.callee, callee, sizeof(ut.callee));
 
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 		if (cheri_gettag(tf->pc) &&
@@ -1057,14 +1065,8 @@ tramp_hook_impl(int event, const struct tramp_header *hdr,
 			caller_id = C18N_RTLD_COMPART_ID;
 #endif
 		caller = comparts.data[caller_id].name;
-
-		memcpy(ut.sig, rtld_utrace_sig, sizeof(ut.sig));
-		ut.event = event;
-		ut.handle = hdr->target;
-		ut.mapsize = hdr->symnum;
-		strlcpy(ut.symbol, sym, sizeof(ut.symbol));
-		strlcpy(ut.callee, callee, sizeof(ut.callee));
 		strlcpy(ut.caller, caller, sizeof(ut.caller));
+
 		utrace(&ut, sizeof(ut));
 	}
 	if (ld_compartment_overhead != NULL)
