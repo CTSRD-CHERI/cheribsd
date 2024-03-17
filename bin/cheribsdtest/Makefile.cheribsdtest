@@ -90,11 +90,7 @@ SRCS+=		cheribsdtest_tls_threads.c
 
 .ifdef CHERIBSD_C18N_TESTS
 CFLAGS+=	-DCHERIBSD_C18N_TESTS
-.if ${MACHINE_ABI:Mbenchmark}
-LDFLAGS+=	-Wl,--dynamic-linker=/libexec/ld-elf64cb-c18n.so.1
-.else
-LDFLAGS+=	-Wl,--dynamic-linker=/libexec/ld-elf-c18n.so.1
-.endif
+ELF_FEATURES+=	+cheric18n
 .endif
 
 .include <bsd.prog.mk>
