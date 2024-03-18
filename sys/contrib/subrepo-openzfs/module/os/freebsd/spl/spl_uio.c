@@ -77,7 +77,7 @@ zfs_uiocopy(void *p, size_t n, zfs_uio_rw_t rw, zfs_uio_t *uio, size_t *cbytes)
 	error = vn_io_fault_uiomove(p, n, uio_clone);
 	*cbytes = zfs_uio_resid(uio) - uio_clone->uio_resid;
 	if (uio_clone != &small_uio_clone)
-		free(uio_clone, M_IOV);
+		freeuio(uio_clone);
 	return (error);
 }
 
