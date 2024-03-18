@@ -30,32 +30,6 @@
 #include "rtld_c18n_machdep.h"
 #undef IN_ASM
 
-ENTRY(_rtld_setjmp)
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	mrs	c2, rcsp_el0
-#else
-	mov	c2, csp
-#endif
-	/*
-	 * This function MUST preserve the value of c0 and clear unused return
-	 * value registers.
-	 */
-	b	_rtld_setjmp_impl
-END(_rtld_setjmp)
-
-ENTRY(_rtld_longjmp)
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	mrs	c2, rcsp_el0
-#else
-	mov	c2, csp
-#endif
-	/*
-	 * This function MUST preserve the value of c0 and clear unused return
-	 * value registers.
-	 */
-	b	_rtld_longjmp_impl
-END(_rtld_longjmp)
-
 ENTRY(_rtld_thread_start)
 	mov	c1, csp
 	sub	csp, csp, #(CAP_WIDTH * 2)

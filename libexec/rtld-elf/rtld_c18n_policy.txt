@@ -37,11 +37,10 @@ trust
 	strnstr
 	__libc_start1
 	setjmp
-	longjmp
 	_setjmp
-	_longjmp
 	sigsetjmp
-	siglongjmp
+	unw_getcontext
+	unw_getcontext_unsealed
 	_rtld_thread_start
 
 callee [RTLD]
