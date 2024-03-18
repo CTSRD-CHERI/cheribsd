@@ -304,6 +304,54 @@ ENTRY(tramp_hook)
 #endif
 END(tramp_hook)
 
+ENTRY(_rtld_unw_getcontext)
+	/*
+	 * This function MUST preserve the value of c0.
+	 */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mrs	c2, rcsp_el0
+#else
+	mov	c2, csp
+#endif
+	b	_rtld_unw_getcontext_impl
+END(_rtld_unw_getcontext)
+
+ENTRY(_rtld_unw_setcontext)
+	/*
+	 * This function MUST preserve the value of c0, c1.
+	 */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mrs	c2, rcsp_el0
+#else
+	mov	c2, csp
+#endif
+	b	_rtld_unw_resume
+END(_rtld_unw_setcontext)
+
+ENTRY(_rtld_unw_getcontext_unsealed)
+	/*
+	 * This function MUST preserve the value of c0.
+	 */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mrs	c2, rcsp_el0
+#else
+	mov	c2, csp
+#endif
+	b	_rtld_unw_getcontext_impl_unsealed
+END(_rtld_unw_getcontext)
+
+ENTRY(_rtld_unw_setcontext_unsealed)
+	/*
+	 * This function MUST preserve the value of c0, c1.
+	 */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mrs	c2, rcsp_el0
+#else
+	mov	c2, csp
+#endif
+	b	_rtld_unw_resume_unsealed
+END(_rtld_unw_setcontext)
+
 /*
  * Trampoline templates are code but reside in rodata. Hence a new macro is
  * defined to describe them.

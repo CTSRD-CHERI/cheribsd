@@ -45,6 +45,7 @@
  * Sealers for RTLD privileged information
  */
 static uintptr_t sealer_jmpbuf;
+static uintptr_t sealer_unwbuf;
 
 uintptr_t sealer_pltgot, sealer_tramp;
 
@@ -736,7 +737,7 @@ allocate_rstk_impl(unsigned index)
  * Returning this struct allows us to control the content of unused return value
  * registers.
  */
-struct jmp_args { uintptr_t ret; uintptr_t dummy; };
+struct jmp_args { uintptr_t ret1; uintptr_t ret2; };
 
 struct jmp_args _rtld_setjmp_impl(uintptr_t, void **, struct trusted_frame *);
 
@@ -756,8 +757,29 @@ _rtld_setjmp_impl(uintptr_t ret, void **buf, struct trusted_frame *csp)
 
 	*buf = cheri_seal(cheri_setaddress(csp, csp->next), sealer_jmpbuf);
 
-	return ((struct jmp_args) { .ret = ret });
+	return ((struct jmp_args) { .ret1 = ret });
 }
+
+#define UNWIND_EXEC_STACK(cur, target)                          \
+	{                                                       \
+		struct stk_bottom *stk;                         \
+		do {                                            \
+			stk = cheri_setoffset(cur->o_sp,        \
+			    cheri_getlen(cur->o_sp));           \
+			--stk;                                  \
+			stk->top = cur->o_sp;                   \
+			cur = cheri_setaddress(cur, cur->next); \
+		} while (cur < target);                         \
+	}
+
+#define UNWIND_STORE_RCSP(csp, rcsp)                             \
+	{                                                        \
+		struct stk_bottom *stk;                          \
+		stk = cheri_setoffset(rcsp, cheri_getlen(rcsp)); \
+		--stk;                                           \
+		csp->o_sp = stk->top;                            \
+		stk->top = rcsp;                                 \
+	}
 
 struct jmp_args _rtld_longjmp_impl(uintptr_t, void **, struct trusted_frame *,
     void *);
@@ -779,7 +801,6 @@ _rtld_longjmp_impl(uintptr_t ret, void **buf, struct trusted_frame *csp,
 	 */
 
 	struct trusted_frame *target, *cur = csp;
-	struct stk_bottom *stk;
 
 	target = cheri_unseal(*buf, sealer_jmpbuf);
 	rtld_require(cheri_is_subset(cur, target) && cur < target,
@@ -788,19 +809,7 @@ _rtld_longjmp_impl(uintptr_t ret, void **buf, struct trusted_frame *csp,
 	/*
 	 * Unwind each frame before the target frame.
 	 */
-	do {
-		stk = cheri_setoffset(cur->n_sp, cheri_getlen(cur->n_sp));
-		--stk;
-
-		rtld_require((ptraddr_t)stk->top <= cur->o_sp,
-		    "c18n: Cannot unwind %s from %#p to %p\n"
-		    "csp: %#p -> %#p", comparts.data[stk->compart_id].name,
-		    stk->top, (void *)(uintptr_t)cur->o_sp, csp, target);
-
-		stk->top = cheri_setaddress(cur->n_sp, cur->o_sp);
-		cur = cheri_setaddress(cur, cur->next);
-	} while (cur < target);
-
+	UNWIND_EXEC_STACK(cur, target);
 	rtld_require(cur == target,
 	    "c18n: Illegal longjmp from %#p to %#p", cur, target);
 
@@ -813,18 +822,103 @@ _rtld_longjmp_impl(uintptr_t ret, void **buf, struct trusted_frame *csp,
 	 * Maintain the invariant of the trusted frame and the invariant of the
 	 * bottom of the target compartment's stack.
 	 */
-	stk = cheri_setoffset(rcsp, cheri_getlen(rcsp));
-	--stk;
+	UNWIND_STORE_RCSP(csp, rcsp);
+	return ((struct jmp_args) { .ret1 = ret });
+}
 
-	rtld_require(rcsp <= stk->top,
-	    "c18n: Cannot complete unwind %s from %#p to %#p\n"
-	    "csp: %#p -> %#p", comparts.data[stk->compart_id].name,
-	    rcsp, stk->top, csp, target);
+uintptr_t _rtld_unw_getsealer(void);
+uintptr_t
+_rtld_unw_getsealer(void)
+{
 
-	csp->n_sp = rcsp;
-	csp->o_sp = (ptraddr_t)stk->top;
+	return (sealer_unwbuf);
+}
 
-	return ((struct jmp_args) { .ret = ret });
+struct jmp_args _rtld_unw_getcontext_impl(uintptr_t, void **,
+    struct trusted_frame *);
+struct jmp_args _rtld_unw_getcontext_impl_unsealed(uintptr_t, void **,
+    struct trusted_frame *);
+
+struct jmp_args
+_rtld_unw_getcontext_impl(uintptr_t ret, void **buf, struct trusted_frame *csp)
+{
+	*buf = cheri_seal(cheri_setaddress(csp, csp->next), sealer_unwbuf);
+	return ((struct jmp_args) { .ret1 = ret });
+}
+
+struct jmp_args
+_rtld_unw_getcontext_impl_unsealed(uintptr_t ret, void **buf,
+    struct trusted_frame *csp)
+{
+	*buf = cheri_setaddress(csp, csp->next);
+	return ((struct jmp_args) { .ret1 = ret });
+}
+
+struct jmp_args _rtld_unw_resume(uintptr_t, uintptr_t, struct trusted_frame *,
+    void **, void **);
+struct jmp_args _rtld_unw_resume_unsealed(uintptr_t, uintptr_t,
+    struct trusted_frame *, void **, void **);
+
+struct jmp_args
+_rtld_unw_resume(uintptr_t ret1, uintptr_t ret2, struct trusted_frame *csp,
+    void **rcsp, void **buf)
+{
+	struct trusted_frame *target, *cur = csp;
+	target = cheri_unseal(*buf, sealer_unwbuf);
+
+	rtld_require(cheri_is_subset(cur, target) &&
+		cur->next < (ptraddr_t)target,
+	    "c18n: Illegal unw_resume from %#p to %#p", cur, target);
+
+	/*
+	 * Unwind each frame before the target frame.
+	 */
+	UNWIND_EXEC_STACK(cur, target);
+	rtld_require(cur == target, "c18n: Illegal unw_resume from %#p to %#p",
+	    cur, target);
+
+	/*
+	 * Set the next frame to the target frame.
+	 */
+	csp->next = (ptraddr_t)cur;
+
+	/*
+	 * Maintain the invariant of the trusted frame and the invariant of the
+	 * bottom of the target compartment's stack.
+	 */
+	UNWIND_STORE_RCSP(csp, rcsp);
+	return ((struct jmp_args) { .ret1 = ret1, .ret2 = ret2 });
+}
+
+struct jmp_args
+_rtld_unw_resume_unsealed(uintptr_t ret1, uintptr_t ret2,
+    struct trusted_frame *csp, void **rcsp, void **buf)
+{
+	struct trusted_frame *target, *cur = csp;
+	target = *buf;
+
+	rtld_require(cheri_is_subset(cur, target) &&
+		cur->next < (ptraddr_t)target,
+	    "c18n: Illegal unw_resume from %#p to %#p", cur, target);
+
+	/*
+	 * Unwind each frame before the target frame.
+	 */
+	UNWIND_EXEC_STACK(cur, target);
+	rtld_require(cur == target, "c18n: Illegal unw_resume from %#p to %#p",
+	    cur, target);
+
+	/*
+	 * Set the next frame to the target frame.
+	 */
+	csp->next = (ptraddr_t)cur;
+
+	/*
+	 * Maintain the invariant of the trusted frame and the invariant of the
+	 * bottom of the target compartment's stack.
+	 */
+	UNWIND_STORE_RCSP(csp, rcsp);
+	return ((struct jmp_args) { .ret1 = ret1, .ret2 = ret2 });
 }
 
 /*
@@ -1360,6 +1454,9 @@ c18n_init(void)
 	sealer += 1;
 
 	sealer_jmpbuf = cheri_setboundsexact(sealer, 1);
+	sealer += 1;
+
+	sealer_unwbuf = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
 
 	sealer_tramp = cheri_setboundsexact(sealer, C18N_FUNC_SIG_COUNT);
