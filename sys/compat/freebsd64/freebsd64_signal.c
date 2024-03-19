@@ -231,7 +231,8 @@ freebsd64_sigqueue(struct thread *td, struct freebsd64_sigqueue_args *uap)
 int freebsd64_sigfastblock(struct thread *td,
     struct freebsd64_sigfastblock_args *uap)
 {
-	return (kern_sigfastblock(td, uap->cmd, __USER_CAP_OBJ(uap->ptr)));
+	return (kern_sigfastblock(td, uap->cmd,
+	    __USER_CAP(uap->ptr, sizeof(uint32_t))));
 }
 /*
  * CHERI CHANGES START
