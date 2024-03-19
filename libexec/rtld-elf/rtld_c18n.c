@@ -567,9 +567,9 @@ _rtld_longjmp_impl(uintptr_t ret, void **buf, struct trusted_frame *csp,
 	 * Unwind each frame before the target frame.
 	 */
 	do {
-		stk = cheri_setoffset(cur->o_sp, cheri_getlen(cur->o_sp));
+		stk = cheri_setoffset(cur->n_sp, cheri_getlen(cur->n_sp));
 		--stk;
-		stk->top = cur->o_sp;
+		stk->top = cheri_setaddress(cur->n_sp, cur->o_sp);
 		cur = cheri_setaddress(cur, cur->next);
 	} while (cur < target);
 
@@ -587,8 +587,8 @@ _rtld_longjmp_impl(uintptr_t ret, void **buf, struct trusted_frame *csp,
 	 */
 	stk = cheri_setoffset(rcsp, cheri_getlen(rcsp));
 	--stk;
-	csp->o_sp = stk->top;
-	stk->top = rcsp;
+	csp->n_sp = rcsp;
+	csp->o_sp = (ptraddr_t)stk->top;
 
 	return ((struct jmp_args) { .ret = ret });
 }

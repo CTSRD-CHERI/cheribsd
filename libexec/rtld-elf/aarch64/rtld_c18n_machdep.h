@@ -28,20 +28,50 @@
 #ifndef RTLD_C18N_MACHDEP_H
 #define RTLD_C18N_MACHDEP_H
 
+#define	C18N_TRUSTED_FRAME_SIZE		15
+
+#ifndef IN_ASM
 /*
  * Stack unwinding
  */
 struct trusted_frame {
 	void *fp;
 	void *pc;
+	/*
+	 * Address of the next trusted frame
+	 */
 	ptraddr_t next;
+	/*
+	 * Number of return value registers, encoded in enum tramp_ret_args
+	 */
 	uint8_t ret_args : 2;
+	/*
+	 * This field contains the code address in the trampoline that the
+	 * callee should return to. This is only used by unwinders to detect
+	 * compartment boundaries.
+	 */
 	ptraddr_t cookie : 62;
+	/*
+	 * INVARIANT: This field contains the top of the caller's stack when the
+	 * caller made the call.
+	 */
+	void *n_sp;
 	/*
 	 * INVARIANT: This field contains the top of the caller's stack when the
 	 * caller was last entered.
 	 */
-	void *o_sp;
+	ptraddr_t o_sp;
+	/*
+	 * Only used by unwinders
+	 */
+	ptraddr_t csp;
+	/*
+	 * c19 to c28
+	 */
+	void *regs[10];
 };
-
+_Static_assert(
+    sizeof(struct trusted_frame) == sizeof(uintptr_t) * C18N_TRUSTED_FRAME_SIZE,
+    "Unexpected struct trusted_frame size");
+#endif
 #endif
