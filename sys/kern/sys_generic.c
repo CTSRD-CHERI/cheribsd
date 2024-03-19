@@ -265,12 +265,11 @@ struct readv_args {
 int
 sys_readv(struct thread *td, struct readv_args *uap)
 {
-
 	return (user_readv(td, uap->fd, uap->iovp, uap->iovcnt, copyinuio));
 }
 
 int
-user_readv(struct thread *td, int fd, struct iovec * __capability iovp,
+user_readv(struct thread *td, int fd, const struct iovec * __capability iovp,
     u_int iovcnt, copyinuio_t *copyinuio_f)
 {
 	struct uio *auio;
@@ -490,12 +489,11 @@ struct writev_args {
 int
 sys_writev(struct thread *td, struct writev_args *uap)
 {
-
 	return (user_writev(td, uap->fd, uap->iovp, uap->iovcnt, copyinuio));
 }
 
 int
-user_writev(struct thread *td, int fd, struct iovec * __capability iovp,
+user_writev(struct thread *td, int fd, const struct iovec * __capability iovp,
     u_int iovcnt, copyinuio_t *copyinuio_f)
 {
 	struct uio *auio;
