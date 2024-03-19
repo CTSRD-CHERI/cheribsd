@@ -359,7 +359,6 @@ int		__sys_clock_nanosleep(__clockid_t, int,
 int		__sys_close(int);
 int		__sys_close_range(unsigned, unsigned, int);
 int		__sys_connect(int, const struct sockaddr *, __socklen_t);
-		/* fcntl declared to match the kernel so we can call directly */
 int		__sys_fcntl(int, int, __intptr_t);
 int		__sys_fdatasync(int);
 int		__sys_fstatat(int, const char *, struct stat *, int);
