@@ -26,6 +26,9 @@
  */
 
 #include <machine/asm.h>
+#define	IN_ASM
+#include "rtld_c18n_machdep.h"
+#undef IN_ASM
 
 ENTRY(_rtld_setjmp)
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
@@ -345,7 +348,7 @@ TRAMP(tramp_save_caller)
 	 */
 	gclim	x11, c10
 	scvalue	c18, c10, x11
-	ldr	c17, [c18, #-CAP_WIDTH]
+	ldr	x17, [c18, #-CAP_WIDTH]
 	str	c10, [c18, #-CAP_WIDTH]
 
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
@@ -364,14 +367,15 @@ TRAMP(tramp_save_caller)
 2:	add	x13, x13, #0	/* To be patched at runtime */
 
 	/* Push frame */
-	stp	c29, c30, [TRUSTED_STACK, #-(CAP_WIDTH * 14)]!
+	stp	c29, c30, [TRUSTED_STACK, #-(CAP_WIDTH * C18N_TRUSTED_FRAME_SIZE)]!
 	stp	x12, x13, [TRUSTED_STACK, #(CAP_WIDTH * 2)]
-	stp	c17, c19, [TRUSTED_STACK, #(CAP_WIDTH * 3)]
-	stp	c20, c21, [TRUSTED_STACK, #(CAP_WIDTH * 5)]
-	stp	c22, c23, [TRUSTED_STACK, #(CAP_WIDTH * 7)]
-	stp	c24, c25, [TRUSTED_STACK, #(CAP_WIDTH * 9)]
-	stp	c26, c27, [TRUSTED_STACK, #(CAP_WIDTH * 11)]
-	str	c28, [TRUSTED_STACK, #(CAP_WIDTH * 13)]
+	str	c10, [TRUSTED_STACK, #(CAP_WIDTH * 3)]
+	stp	x17, x12, [TRUSTED_STACK, #(CAP_WIDTH * 4)]
+	stp	c19, c20, [TRUSTED_STACK, #(CAP_WIDTH * 5)]
+	stp	c21, c22, [TRUSTED_STACK, #(CAP_WIDTH * 7)]
+	stp	c23, c24, [TRUSTED_STACK, #(CAP_WIDTH * 9)]
+	stp	c25, c26, [TRUSTED_STACK, #(CAP_WIDTH * 11)]
+	stp	c27, c28, [TRUSTED_STACK, #(CAP_WIDTH * 13)]
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	msr	rcsp_el0, TRUSTED_STACK
 #endif
@@ -435,12 +439,12 @@ TRAMP(tramp_switch_stack)
 	/*
 	 * If the stack table index is out-of-bounds, set it to zero.
 	 */
-	csel	w17, w14, wzr, hi
+	csel	w26, w14, wzr, hi
 	/*
 	 * Load the callee's stack if the stack table index is within bounds.
 	 * Otherwise the resolver will be loaded.
 	 */
-	ldr	c20, [c30, w17, uxtw #4]
+	ldr	c20, [c30, w26, uxtw #4]
 	/*
 	 * If the resolver has been loaded, set the branch target to it.
 	 */
@@ -529,8 +533,8 @@ TRAMP(tramp_invoke_res)
 	mov	x23, xzr
 	mov	x24, xzr
 	mov	x25, xzr
-	mov	x26, xzr
 	/*
+	 * - c26: Stack table index (scalar)
 	 * - c27: Test result (scalar)
 	 * - c28: Permission bits (scalar)
 	 * - c29: Frame pointer (scalar)
@@ -539,13 +543,13 @@ TRAMP(tramp_invoke_res)
 	/*
 	 * Clear temporary registers, except
 	 * - c10: Callee's stack
-	 * - c11: Top of caller's stack (scalar)
-	 * - c12: Link to previous frame (scalar)
-	 * - c13: Number of unused return argument registers (scalar)
+	 * - c11: Limit of caller's stack (scalar)
+	 * - c12: Old trusted stack (scalar)
+	 * - c13: Cookie and number of unused return argument registers (scalar)
 	 * - c14: Callee's compartment ID (scalar)
 	 * - c15: Length of stack table (scalar)
 	 * - c16: Comparison result (scalar)
-	 * - c17: Stack table index (scalar)
+	 * - c17: Old bottom of caller's stack (scalar)
 	 * - c18: CHERI_PERM_EXECUTE (scalar)
 	 */
 
@@ -563,20 +567,20 @@ TRAMP(tramp_pop_frame)
 	/* Restore callee-saved registers */
 	ldp	c29, c30, [TRUSTED_STACK]
 	ldp	x10, x11, [TRUSTED_STACK, #(CAP_WIDTH * 2)]
-	ldp	c12, c19, [TRUSTED_STACK, #(CAP_WIDTH * 3)]
-	ldp	c20, c21, [TRUSTED_STACK, #(CAP_WIDTH * 5)]
-	ldp	c22, c23, [TRUSTED_STACK, #(CAP_WIDTH * 7)]
-	ldp	c24, c25, [TRUSTED_STACK, #(CAP_WIDTH * 9)]
-	ldp	c26, c27, [TRUSTED_STACK, #(CAP_WIDTH * 11)]
-	ldr	c28, [TRUSTED_STACK, #(CAP_WIDTH * 13)]
+	ldp	c15, c12, [TRUSTED_STACK, #(CAP_WIDTH * 3)]
+	ldp	c19, c20, [TRUSTED_STACK, #(CAP_WIDTH * 5)]
+	ldp	c21, c22, [TRUSTED_STACK, #(CAP_WIDTH * 7)]
+	ldp	c23, c24, [TRUSTED_STACK, #(CAP_WIDTH * 9)]
+	ldp	c25, c26, [TRUSTED_STACK, #(CAP_WIDTH * 11)]
+	ldp	c27, c28, [TRUSTED_STACK, #(CAP_WIDTH * 13)]
 
 	/*
 	 * Restore caller's saved rcsp.
 	 */
-	gclim	x13, c12
-	scvalue	c14, c12, x13
-	ldr	c15, [c14, #-CAP_WIDTH]
-	str	c12, [c14, #-CAP_WIDTH]
+	gclim	x13, c15
+	scvalue	c14, c15, x13
+	scvalue	c2, c15, x12
+	str	c2, [c14, #-CAP_WIDTH]
 
 	/*
 	 * Clear unused return value registers. The registers to clear is
@@ -598,7 +602,10 @@ TRAMP(tramp_pop_frame)
 	msr	rcsp_el0, TRUSTED_STACK
 #endif
 
-	mov	x2, xzr
+	/*
+	 * Clear temporary registers, except
+	 * - c2: Old bottom of caller's stack
+	 */
 	mov	x3, xzr
 	mov	x4, xzr
 	mov	x5, xzr
@@ -610,10 +617,10 @@ TRAMP(tramp_pop_frame)
 	/*
 	 * Clear temporary registers, except
 	 * - c10: Link to previous frame (scalar)
-	 * - c11: Number of unused return argument registers (scalar)
-	 * - c12: Old top of caller's stack
-	 * - c13: Bottom of caller's stack (scalar)
-	 * - c14: Bottom of caller's stack
+	 * - c11: Cookie and number of unused return argument registers (scalar)
+	 * - c12: Old bottom of caller's stack (scalar)
+	 * - c13: Limit of caller's stack (scalar)
+	 * - c14: Limit of caller's stack
 	 * - c15: Current top of caller's stack
 	 * - c16: Logical operation result (scalar)
 	 * - c17: Comparison result (scalar)
