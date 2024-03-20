@@ -460,11 +460,6 @@ constexpr int check_same_type() {
   return 0;
 }
 
-#ifdef __CHERI_PURE_CAPABILITY__
-__attribute__((weak)) extern "C" Elf_Dyn _DYNAMIC[];
-// #pragma weak _DYNAMIC
-#endif
-
 inline LocalAddressSpace::pint_t
 LocalAddressSpace::getEncodedP(pint_t &addr, pint_t end, uint8_t encoding,
                                pint_t datarelBase) {
@@ -586,6 +581,13 @@ typedef ElfW(Phdr) Elf_Phdr;
 #endif
 #if !defined(Elf_Addr)
 typedef ElfW(Addr) Elf_Addr;
+#endif
+
+#ifdef __CHERI_PURE_CAPABILITY__
+#if !defined(Elf_Dyn)
+typedef ElfW(Dyn) Elf_Dyn;
+#endif
+__attribute__((weak)) extern "C" Elf_Dyn _DYNAMIC[];
 #endif
 
 static uintptr_t calculateImageBase(struct dl_phdr_info *pinfo) {
@@ -852,13 +854,13 @@ inline bool LocalAddressSpace::findUnwindSections(pc_t targetAddr,
   // Bare metal is statically linked, so no need to ask the dynamic loader
   info.dwarf_section_length = (size_t)(&__eh_frame_end - &__eh_frame_start);
   info.set_dwarf_section((uintptr_t)(&__eh_frame_start));
-  _LIBUNWIND_TRACE_UNWINDING("findUnwindSections: section %p length %p",
-                             (void *)info.dwarf_section(), (void *)info.dwarf_section_length);
+  _LIBUNWIND_TRACE_UNWINDING("findUnwindSections: section %p length %#zx",
+                             (void *)info.dwarf_section(), info.dwarf_section_length);
 #if defined(_LIBUNWIND_SUPPORT_DWARF_INDEX)
   info.set_dwarf_index_section((uintptr_t)(&__eh_frame_hdr_start));
   info.dwarf_index_section_length = (size_t)(&__eh_frame_hdr_end - &__eh_frame_hdr_start);
-  _LIBUNWIND_TRACE_UNWINDING("findUnwindSections: index section %p length %p",
-                             (void *)info.dwarf_index_section(), (void *)info.dwarf_index_section_length);
+  _LIBUNWIND_TRACE_UNWINDING("findUnwindSections: index section %p length %#zx",
+                             (void *)info.dwarf_index_section(), info.dwarf_index_section_length);
 #endif
   if (info.dwarf_section_length)
     return true;
@@ -866,8 +868,8 @@ inline bool LocalAddressSpace::findUnwindSections(pc_t targetAddr,
   // Bare metal is statically linked, so no need to ask the dynamic loader
   info.arm_section =        (uintptr_t)(&__exidx_start);
   info.arm_section_length = (size_t)(&__exidx_end - &__exidx_start);
-  _LIBUNWIND_TRACE_UNWINDING("findUnwindSections: section %p length %p",
-                             (void *)info.arm_section, (void *)info.arm_section_length);
+  _LIBUNWIND_TRACE_UNWINDING("findUnwindSections: section %p length %#zx",
+                             (void *)info.arm_section, info.arm_section_length);
   if (info.arm_section && info.arm_section_length)
     return true;
 #elif defined(_LIBUNWIND_SUPPORT_DWARF_UNWIND) && defined(_WIN32)

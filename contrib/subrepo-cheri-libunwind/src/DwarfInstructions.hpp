@@ -165,9 +165,10 @@ typename A::capability_t DwarfInstructions<A, R>::getSavedCapabilityRegister(
 #else
     break;
 #endif
+  case CFI_Parser<A>::kRegisterUndefined:
+    return addressSpace.to_capability_t(0);
 
   case CFI_Parser<A>::kRegisterInCFADecrypt: // sparc64 specific
-  case CFI_Parser<A>::kRegisterUndefined:
   case CFI_Parser<A>::kRegisterUnused:
   case CFI_Parser<A>::kRegisterOffsetFromCFA:
     // FIX ME
