@@ -34,6 +34,7 @@
 #include "libc_private.h"
 
 __weak_reference(__sys_sigaction, __sigaction);
+__weak_reference(sigaction, __libc_sigaction);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 /*
  * These weak symbols will always be resolved at runtime.
@@ -49,7 +50,7 @@ void _rtld_sigaction_end(int, void *, const struct sigaction *,
     struct sigaction *);
 
 int
-__libc_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
+sigaction_c18n(int sig, const struct sigaction *act, struct sigaction *oact)
 {
 	int ret;
 	void *context = 0;
@@ -72,8 +73,6 @@ __libc_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
 
 	return (ret);
 }
-#else
-__weak_reference(sigaction, __libc_sigaction);
 #endif
 
 #pragma weak sigaction

@@ -461,4 +461,8 @@ struct _xlocale;
 struct __nl_cat_d *__catopen_l(const char *name, int type,
 	    struct _xlocale *locale);
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+int	sigaction_c18n(int, const struct sigaction *, struct sigaction *);
+#endif
+
 #endif /* _LIBC_PRIVATE_H_ */
