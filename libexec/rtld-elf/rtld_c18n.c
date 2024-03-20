@@ -520,24 +520,27 @@ c18n_init_rtld_stack(uintptr_t ret, void *base)
 {
 	/*
 	 * This function does very different things under the two ABIs.
-	 */
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	/*
+	 *
+	 * Under the purecap ABI, it repurposes the bottom of the trusted stack
+	 * into a dummy stack that is installed in the Restricted stack register
+	 * when running Executive mode code so that trampolines do not need to
+	 * test if the Restricted stack is valid. The reduction of bounds is
+	 * merely defensive. It should in theory be unnecessary.
+	 *
 	 * Under the benchmark ABI, it initialises RTLD's stack as a regular
 	 * compartment's stack.
 	 */
-	init_compart_stack(base, C18N_RTLD_COMPART_ID);
-#else
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	struct stk_bottom *stk = base;
 	--stk;
-	/*
-	 * Under the purecap ABI, it repurposes the trusted stack into a dummy
-	 * stack to be filled in the Restricted stack register when running
-	 * Executive mode code. The reduction of bounds is merely defensive. It
-	 * should in theory be unnecessary.
-	 */
-	stk->top = cheri_setboundsexact(&stk->top, sizeof(stk->top));
+
+	stk = cheri_setboundsexact(stk, sizeof(*stk));
+	untrusted_stk_set(stk);
+
+	base = stk + 1;
 #endif
+
+	init_compart_stack(base, C18N_RTLD_COMPART_ID);
 
 	return (ret);
 }
@@ -554,15 +557,6 @@ init_stk_table(struct stk_table *table)
 	table->stacks[cid_to_table_index(C18N_RTLD_COMPART_ID)].bottom =
 	    cheri_setoffset(sp, cheri_getlen(sp));
 }
-#else
-/*
- * Set a dummy Restricted stack so that trampolines do not need to test if the
- * Restricted stack is valid.
- */
-extern struct stk_bottom dummy_stack;
-struct stk_bottom dummy_stack = {
-	.top = &dummy_stack
-};
 #endif
 
 static _Atomic(struct stk_table *) free_stk_tables;
@@ -1414,8 +1408,6 @@ c18n_init(void)
 	 */
 	trusted_stk_set(stk_create(C18N_STACK_SIZE));
 	init_stk_table(table);
-#else
-	untrusted_stk_set(&dummy_stack);
 #endif
 
 	stk_table_set(table);
@@ -1478,8 +1470,6 @@ _rtld_thread_start_impl(struct pthread *curthread)
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	trusted_stk_set(stk_create(C18N_STACK_SIZE));
 	init_stk_table(table);
-#else
-	untrusted_stk_set(&dummy_stack);
 #endif
 
 	stk_table_set(table);

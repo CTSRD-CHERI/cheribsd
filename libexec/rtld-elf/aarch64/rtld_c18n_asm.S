@@ -171,7 +171,8 @@ ENTRY(allocate_rstk)
 	 */
 
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	adr	c20, (dummy_stack + CAP_WIDTH * 2)
+	gclim	x20, csp
+	scvalue	c20, csp, x20
 #endif
 	ldr	c20, [c20, #-CAP_WIDTH]
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
