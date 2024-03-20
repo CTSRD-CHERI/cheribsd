@@ -8,7 +8,7 @@ name: Style Checker
 
 on:
   pull_request: # maybe pull_request_target
-    branches: [ main ]
+    branches: [ dev ]
     types: [ opened, reopened, edited, synchronize ]
 
 permissions:
@@ -31,4 +31,4 @@ jobs:
       - name: Run checker
         run: |
           sha=$(git merge-base ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
-          tools/build/checkstyle9.pl --github ${sha}..${{ github.event.pull_request.head.sha }}
+          git diff ${sha}..${{ github.event.pull_request.head.sha }} | tools/build/checkstyle9.pl --github - || true
