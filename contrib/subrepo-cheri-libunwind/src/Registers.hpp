@@ -2042,7 +2042,6 @@ inline bool Registers_arm64::validCapabilityRegister(int regNum) const {
 #ifdef _LIBUNWIND_SANDBOX_OTYPES
 inline uintcap_t
 Registers_arm64::getUnsealedECSP(uintcap_t sealer) const {
-  assert(sealer != (uintcap_t)-1 && "Sealer not initialized");
   uintcap_t csp = _registers.__csp;
 #ifdef _LIBUNWIND_SANDBOX_HARDENED
   if (__builtin_cheri_sealed_get(csp))

@@ -282,7 +282,8 @@ size_t restoreCalleeSavedRegisters(uintcap_t csp, A &addressSpace,
        ++i, offset += CI.kCalleeSavedSize) {
     uintcap_t regValue = addressSpace.getCapability(csp + offset);
 #ifdef _LIBUNWIND_SANDBOX_HARDENED
-    if (sealer != (uintcap_t)-1 && !__builtin_cheri_sealed_get(regValue))
+    if (addressSpace.isValidSealer(sealer) &&
+        !__builtin_cheri_sealed_get(regValue))
       regValue = __builtin_cheri_seal(regValue, sealer);
 #endif
     newRegisters.setCapabilityRegister(UNW_ARM64_C19 + i, regValue);
@@ -422,7 +423,7 @@ int DwarfInstructions<A, R>::stepWithDwarf(A &addressSpace, pc_t pc,
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(_LIBUNWIND_SANDBOX_OTYPES)
       uintcap_t sealer = addressSpace.getUnwindSealer();
 #ifdef _LIBUNWIND_SANDBOX_HARDENED
-      if (sealer != (uintcap_t)-1)
+      if (addressSpace.isValidSealer(sealer))
         newSP = __builtin_cheri_seal(newSP, sealer);
 #endif // _LIBUNWIND_SANDBOX_HARDENED
 #endif // __CHERI_PURE_CAPABILITY__ && _LIBUNWIND_SANDBOX_OTYPES
@@ -460,7 +461,7 @@ int DwarfInstructions<A, R>::stepWithDwarf(A &addressSpace, pc_t pc,
             // Seal all the capability registers. This enforces the invariant
             // that unsealed capabilities are never stored in the context that
             // aren't explicitly set through unw_set_reg() by a consumer.
-            if (sealer != (uintcap_t)-1 &&
+            if (addressSpace.isValidSealer(sealer) &&
                 !__builtin_cheri_sealed_get(savedReg))
               savedReg = __builtin_cheri_seal(savedReg, sealer);
 #endif // __CHERI_PURE_CAPABILITY__ && _LIBUNWIND_SANDBOX_OTYPES &&
@@ -573,7 +574,7 @@ int DwarfInstructions<A, R>::stepWithDwarf(A &addressSpace, pc_t pc,
       // should be calling into the c18n RTLD as this is a compartment boundary.
       // We need to restore registers from the executive stack and ask rtld for
       // it.
-      if (sealer != (uintcap_t)-1) {
+      if (addressSpace.isValidSealer(sealer)) {
         // Iteratively unwind all the executive mode return addresses. This is
         // necessary to support tail calls to trampolines.
         uintcap_t csp = registers.getUnsealedECSP(sealer);

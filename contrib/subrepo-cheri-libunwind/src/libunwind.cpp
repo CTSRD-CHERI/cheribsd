@@ -226,8 +226,9 @@ _LIBUNWIND_HIDDEN int __unw_resume(unw_cursor_t *cursor) {
 #endif
   AbstractUnwindCursor *co = (AbstractUnwindCursor *)cursor;
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(_LIBUNWIND_SANDBOX_OTYPES)
-  uintcap_t sealer = LocalAddressSpace::sThisAddressSpace.getUnwindSealer();
-  if (sealer != (uintcap_t)-1) {
+  LocalAddressSpace &addressSpace = LocalAddressSpace::sThisAddressSpace;
+  uintcap_t sealer = addressSpace.getUnwindSealer();
+  if (addressSpace.isValidSealer(sealer)) {
 #ifdef _LIBUNWIND_SANDBOX_HARDENED
     co->unsealSP(sealer);
     co->unsealFP(sealer);

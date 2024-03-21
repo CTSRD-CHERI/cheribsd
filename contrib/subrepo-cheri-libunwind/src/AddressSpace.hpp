@@ -323,6 +323,9 @@ public:
   capability_t     getCapability(pint_t addr) { return get<capability_t>(addr); }
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(_LIBUNWIND_SANDBOX_OTYPES)
   static uintcap_t getUnwindSealer();
+  static bool isValidSealer(uintcap_t sealer) {
+    return __builtin_cheri_tag_get(sealer);
+  }
 #endif // __CHERI_PURE_CAPABILITY__ && _LIBUNWIND_SANDBOX_OTYPES
   __attribute__((always_inline))
   uintptr_t       getP(pint_t addr);
@@ -420,7 +423,7 @@ extern "C" {
 uintptr_t _rtld_unw_getsealer(void);
 uintptr_t __rtld_unw_getsealer();
 _LIBUNWIND_HIDDEN uintptr_t __rtld_unw_getsealer() {
-  return (uintptr_t)-1;
+  return (uintptr_t)0;
 }
 _LIBUNWIND_WEAK_ALIAS(__rtld_unw_getsealer, _rtld_unw_getsealer)
 }

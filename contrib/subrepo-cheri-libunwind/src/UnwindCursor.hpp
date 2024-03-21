@@ -476,13 +476,13 @@ public:
 
 #if defined(__CHERI_PURE_CAPABILITY__) &&                                      \
     defined(_LIBUNWIND_SANDBOX_OTYPES) && defined(_LIBUNWIND_SANDBOX_HARDENED)
-  virtual void unsealSP(uintcap_t = -1) {
+  virtual void unsealSP(uintcap_t) {
     _LIBUNWIND_ABORT("unsealSP not implemented");
   }
-  virtual void unsealFP(uintcap_t = -1) {
+  virtual void unsealFP(uintcap_t) {
     _LIBUNWIND_ABORT("unsealFP not implemented");
   }
-  virtual void unsealCalleeSavedRegisters(uintcap_t = -1) {
+  virtual void unsealCalleeSavedRegisters(uintcap_t) {
     _LIBUNWIND_ABORT("unsealCalleeSavedRegisters not implemented");
   }
 #endif
@@ -956,9 +956,9 @@ public:
   virtual const char *getRegisterName(int num);
 #if defined(__CHERI_PURE_CAPABILITY__) &&                                      \
     defined(_LIBUNWIND_SANDBOX_OTYPES) && defined(_LIBUNWIND_SANDBOX_HARDENED)
-  virtual void       unsealSP(uintcap_t sealer = -1);
-  virtual void       unsealFP(uintcap_t sealer = -1);
-  virtual void       unsealCalleeSavedRegisters(uintcap_t sealer = -1);
+  virtual void       unsealSP(uintcap_t sealer);
+  virtual void       unsealFP(uintcap_t sealer);
+  virtual void       unsealCalleeSavedRegisters(uintcap_t sealer);
 #endif
 #ifdef __arm__
   virtual void        saveVFPAsX();
