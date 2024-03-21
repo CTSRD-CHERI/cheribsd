@@ -810,8 +810,12 @@ int
 set_mcontext(struct thread *td, mcontext_t *mcp)
 {
 #define	PSR_13_MASK	0xfffffffful
+	struct arm64_reg_context ctx;
 	struct trapframe *tf = td->td_frame;
 	uint64_t spsr;
+	vm_offset_t addr;
+	int error;
+	bool done;
 
 	spsr = mcp->mc_gpregs.gp_spsr;
 #ifdef COMPAT_FREEBSD13
@@ -850,7 +854,34 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 		    READ_SPECIALREG(mdscr_el1) | MDSCR_SS);
 		isb();
 	}
+
 	set_fpcontext(td, mcp);
+
+	/* Read any register contexts we find */
+	if (mcp->mc_ptr != 0) {
+		addr = mcp->mc_ptr;
+
+		done = false;
+		do {
+			if (!__is_aligned(addr,
+			    _Alignof(struct arm64_reg_context)))
+				return (EINVAL);
+
+			error = copyin((const void *)addr, &ctx, sizeof(ctx));
+			if (error != 0)
+				return (error);
+
+			switch (ctx.ctx_id) {
+			case ARM64_CTX_END:
+				done = true;
+				break;
+			default:
+				return (EINVAL);
+			}
+
+			addr += ctx.ctx_size;
+		} while (!done);
+	}
 
 	return (0);
 #undef PSR_13_MASK
@@ -935,6 +966,31 @@ sys_sigreturn(struct thread *td, struct sigreturn_args *uap)
 	return (EJUSTRETURN);
 }
 
+static bool
+sendsig_ctx_end(struct thread *td, uintcap_t *addrp)
+{
+	struct arm64_reg_context end_ctx;
+	uintcap_t ctx_addr;
+
+	*addrp -= sizeof(end_ctx);
+	ctx_addr = *addrp;
+
+	memset(&end_ctx, 0, sizeof(end_ctx));
+	end_ctx.ctx_id = ARM64_CTX_END;
+	end_ctx.ctx_size = sizeof(end_ctx);
+
+	if (copyout(&end_ctx, (void * __capability)ctx_addr, sizeof(end_ctx)) != 0)
+		return (false);
+
+	return (true);
+}
+
+typedef bool(*ctx_func)(struct thread *, uintcap_t *);
+static const ctx_func ctx_funcs[] = {
+	sendsig_ctx_end,	/* Must be first to end the linked list */
+	NULL,
+};
+
 void
 sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
@@ -943,6 +999,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	struct trapframe *tf;
 	struct sigframe * __capability fp, frame;
 	struct sigacts *psp;
+	uintcap_t addr;
 	int onstack, sig;
 
 	td = curthread;
@@ -962,18 +1019,14 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !onstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		fp = (struct sigframe * __capability)((uintcap_t)td->td_sigstk.ss_sp +
+		addr = ((uintcap_t)td->td_sigstk.ss_sp +
 		    td->td_sigstk.ss_size);
 #if defined(COMPAT_43)
 		td->td_sigstk.ss_flags |= SS_ONSTACK;
 #endif
 	} else {
-		fp = (struct sigframe * __capability)td->td_frame->tf_sp;
+		addr = td->td_frame->tf_sp;
 	}
-
-	/* Make room, keeping the stack aligned */
-	fp--;
-	fp = (struct sigframe * __capability)STACKALIGN(fp);
 
 	/* Fill in the frame to copy out */
 	bzero(&frame, sizeof(frame));
@@ -985,6 +1038,26 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	    (onstack ? SS_ONSTACK : 0) : SS_DISABLE;
 	mtx_unlock(&psp->ps_mtx);
 	PROC_UNLOCK(td->td_proc);
+
+	for (int i = 0; ctx_funcs[i] != NULL; i++) {
+		if (!ctx_funcs[i](td, &addr)) {
+			/* Process has trashed its stack. Kill it. */
+			CTR4(KTR_SIG,
+			    "sendsig: frame sigexit td=%p fp=%#lx func[%d]=%p",
+			    td, addr, i, ctx_funcs[i]);
+			PROC_LOCK(p);
+			sigexit(td, SIGILL);
+			/* NOTREACHED */
+		}
+	}
+
+	/* Point at the first context */
+	frame.sf_uc.uc_mcontext.mc_ptr = addr;
+
+	/* Make room, keeping the stack aligned */
+	fp = (struct sigframe * __capability)addr;
+	fp--;
+	fp = (struct sigframe * __capability)STACKALIGN(fp);
 
 	/* Copy the sigframe out to the user's stack. */
 	if (copyoutcap(&frame, fp, sizeof(*fp)) != 0) {

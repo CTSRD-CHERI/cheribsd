@@ -61,6 +61,18 @@ struct capregs {
 };
 #endif
 
+/*
+ * Support for registers that don't fit into gpregs or fpregs, e.g. SVE.
+ * There are some registers that have been added so are optional. To support
+ * these create an array of headers that point at the register data.
+ */
+struct arm64_reg_context {
+	__uint32_t	ctx_id;
+	__uint32_t	ctx_size;
+};
+
+#define	ARM64_CTX_END		0xa5a5a5a5
+
 struct __mcontext {
 #if __CHERI_USER_ABI
 	struct capregs	mc_capregs;
@@ -73,13 +85,17 @@ struct __mcontext {
 #define	_MC_CAP_VALID	(1u<<31)	/* Set when mc_capregs has valid data */
 #if __CHERI_USER_ABI
 	__uint32_t	mc_spsr;
-	__uint64_t	mc_spare[8];	/* Space for expansion, set to zero */
+	__uint64_t	mc_pad;		/* Padding */
+	__uintcap_t	mc_ptr;		/* Address of extra_regs struct */
+	__uint64_t	mc_spare[5];	/* Space for expansion, set to zero */
 #else
 	int		mc_pad;		/* Padding */
-	__uint64_t	mc_spare[7];	/* Space for expansion, set to zero */
+	__uint64_t	mc_ptr;		/* Address of extra_regs struct */
+	__uint64_t	mc_spare[6];	/* Space for expansion, set to zero */
 	__uint64_t	mc_capregs;
 #endif
 };
+
 
 typedef struct __mcontext mcontext_t;
 
