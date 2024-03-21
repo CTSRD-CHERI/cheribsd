@@ -29,7 +29,7 @@
 #if !defined(__USING_SJLJ_EXCEPTIONS__)
 #include "AddressSpace.hpp"
 #include "UnwindCursor.hpp"
-
+#include "CompartmentInfo.hpp"
 
 template<size_t A, size_t B>
 constexpr bool check_less_eq_than() {
@@ -41,6 +41,9 @@ using namespace libunwind;
 
 /// internal object to represent this processes address space
 LocalAddressSpace LocalAddressSpace::sThisAddressSpace;
+
+/// internal object to represent this processes compartment information
+CompartmentInfo CompartmentInfo::sThisCompartmentInfo;
 
 _LIBUNWIND_EXPORT unw_addr_space_t unw_local_addr_space =
     (unw_addr_space_t)&LocalAddressSpace::sThisAddressSpace;
@@ -108,7 +111,6 @@ _LIBUNWIND_HIDDEN int __unw_init_local(unw_cursor_t *cursor,
 #undef REGISTER_KIND
   AbstractUnwindCursor *co = (AbstractUnwindCursor *)cursor;
   co->setInfoBasedOnIPRegister();
-
   return UNW_ESUCCESS;
 }
 _LIBUNWIND_WEAK_ALIAS(__unw_init_local, unw_init_local)
@@ -223,6 +225,16 @@ _LIBUNWIND_HIDDEN int __unw_resume(unw_cursor_t *cursor) {
   __asan_handle_no_return();
 #endif
   AbstractUnwindCursor *co = (AbstractUnwindCursor *)cursor;
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(_LIBUNWIND_SANDBOX_OTYPES)
+  uintcap_t sealer = LocalAddressSpace::sThisAddressSpace.getUnwindSealer();
+  if (sealer != (uintcap_t)-1) {
+#ifdef _LIBUNWIND_SANDBOX_HARDENED
+    co->unsealSP(sealer);
+    co->unsealFP(sealer);
+    co->unsealCalleeSavedRegisters(sealer);
+#endif // _LIBUNWIND_SANDBOX_HARDENED
+  }
+#endif // __CHERI_PURE_CAPABILITY__ && _LIBUNWIND_SANDBOX_OTYPES
   co->jumpto();
   return UNW_EUNSPEC;
 }

@@ -18,6 +18,7 @@
 #include "cet_unwind.h"
 #include "config.h"
 #include "libunwind.h"
+#include "unwind_cheri.h"
 
 namespace libunwind {
 
@@ -1851,6 +1852,43 @@ public:
   void        setVectorRegister(int num, v128 value);
   static const char *getRegisterName(int num);
   void        jumpto() { __libunwind_Registers_arm64_jumpto(this); }
+#if defined(__CHERI_PURE_CAPABILITY__) &&                                      \
+    defined(_LIBUNWIND_SANDBOX_OTYPES) && defined(_LIBUNWIND_SANDBOX_HARDENED)
+  void        unsealSP(uintcap_t sealer) {
+    assert(__builtin_cheri_sealed_get(_registers.__sp) && "Value must be sealed");
+    _registers.__sp = __builtin_cheri_unseal(_registers.__sp, sealer);
+  }
+  void        unsealFP(uintcap_t sealer) {
+    assert(__builtin_cheri_sealed_get(_registers.__fp) && "Value must be sealed");
+    _registers.__fp = __builtin_cheri_unseal(_registers.__fp, sealer);
+  }
+  void        unsealCalleeSavedRegisters(uintcap_t sealer) {
+    for (auto i = 0; i < 10; ++i) {
+      uintcap_t sealedValue = getRegister(UNW_ARM64_C19 + i);
+      // FIXME: Would be nice to enforce this invariant, but right now
+      // unw_set_reg() gets called to set what ends up in private_1, and it
+      // would require breaking libunwind's public API to seal registers through
+      // that particular path, and therefore we can't assert this.
+#if 0
+      assert((!__builtin_cheri_tag_get(sealedValue) ||
+              __builtin_cheri_sealed_get(sealedValue)) &&
+             "Value must be sealed");
+#endif
+      uintcap_t unsealedValue = sealedValue;
+      if (__builtin_cheri_sealed_get(sealedValue))
+        unsealedValue = __builtin_cheri_unseal(sealedValue, sealer);
+      // If the tag gets cleared when we attempt to unseal our value, that means
+      // that we either have a capability that was sealed to begin with, and
+      // therefore we should just return it that way, or we have a sentry which
+      // we cannot unseal.
+      if (!__builtin_cheri_tag_get(unsealedValue) &&
+          __builtin_cheri_tag_get(sealedValue))
+        unsealedValue = sealedValue;
+      setCapabilityRegister(UNW_ARM64_C19 + i, unsealedValue);
+    }
+  }
+#endif // __CHERI_PURE_CAPABILITY__ && _LIBUNWIND_SANDBOX_OTYPES &&
+       // _LIBUNWIND_SANDBOX_HARDENED
   static constexpr int lastDwarfRegNum() {
 #ifdef __CHERI_PURE_CAPABILITY__
     return _LIBUNWIND_HIGHEST_DWARF_REGISTER_MORELLO;
@@ -1863,10 +1901,13 @@ public:
 #ifdef __CHERI_PURE_CAPABILITY__
   bool        validCapabilityRegister(int num) const;
   uintcap_t   getCapabilityRegister(int num) const;
+#ifdef _LIBUNWIND_SANDBOX_OTYPES
+  uintcap_t   getUnsealedECSP(uintcap_t sealer) const;
+#endif
   void        setCapabilityRegister(int num, uintcap_t value);
 #else
   CAPABILITIES_NOT_SUPPORTED
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
 
   uintptr_t  getSP() const          { return _registers.__sp; }
   void       setSP(uintptr_t value) { _registers.__sp = value; }
@@ -1874,6 +1915,9 @@ public:
   void       setIP(uintptr_t value) { _registers.__pc = value; }
   uintptr_t  getFP() const          { return _registers.__fp; }
   void       setFP(uintptr_t value) { _registers.__fp = value; }
+#ifdef __CHERI_PURE_CAPABILITY__
+  void       setECSP(uintptr_t value) { _registers.__csp = value; }
+#endif
 
 private:
   struct GPRs {
@@ -1882,6 +1926,9 @@ private:
     uintptr_t __lr;    // Link register r30
     uintptr_t __sp;    // Stack pointer r31
     uintptr_t __pc;    // Program counter
+#ifdef __CHERI_PURE_CAPABILITY__
+    uintptr_t __csp; // Executive stack pointer.
+#endif
     uint64_t __ra_sign_state; // RA sign state register
   };
 
@@ -1898,8 +1945,8 @@ inline Registers_arm64::Registers_arm64(const void *registers) {
                 "arm64 registers do not fit into unw_context_t");
   memcpy(&_registers, registers, sizeof(_registers));
 #ifdef __CHERI_PURE_CAPABILITY__
-  static_assert(sizeof(GPRs) == 0x220,
-                "expected VFP registers to be at offset 544");
+  static_assert(sizeof(GPRs) == 0x230,
+                "expected VFP registers to be at offset 560");
 #else
   static_assert(sizeof(GPRs) == 0x110,
                 "expected VFP registers to be at offset 272");
@@ -1923,6 +1970,8 @@ inline bool Registers_arm64::validRegister(int regNum) const {
     return false;
 #ifdef __CHERI_PURE_CAPABILITY__
   if ((regNum >= UNW_ARM64_C0) && (regNum <= UNW_ARM64_C31))
+    return true;
+  if (regNum == UNW_ARM64_ECSP)
     return true;
 #endif
   if (regNum > 95)
@@ -1970,6 +2019,8 @@ inline void Registers_arm64::setRegister(int regNum, uintptr_t value) {
 #ifdef __CHERI_PURE_CAPABILITY__
   else if ((regNum >= UNW_ARM64_C0) && (regNum <= UNW_ARM64_C31))
     _registers.__x[regNum - UNW_ARM64_C0] = value;
+  else if (regNum == UNW_ARM64_ECSP)
+    _registers.__csp = value;
 #endif
   else
     _LIBUNWIND_ABORT("unsupported arm64 register");
@@ -1983,8 +2034,24 @@ inline bool Registers_arm64::validCapabilityRegister(int regNum) const {
     return true;
   if ((regNum >= UNW_ARM64_C0) && (regNum <= UNW_ARM64_C31))
     return true;
+  if (regNum == UNW_ARM64_ECSP)
+    return true;
   return false;
 }
+
+#ifdef _LIBUNWIND_SANDBOX_OTYPES
+inline uintcap_t
+Registers_arm64::getUnsealedECSP(uintcap_t sealer) const {
+  assert(sealer != (uintcap_t)-1 && "Sealer not initialized");
+  uintcap_t csp = _registers.__csp;
+#ifdef _LIBUNWIND_SANDBOX_HARDENED
+  if (__builtin_cheri_sealed_get(csp))
+    return __builtin_cheri_unseal(csp, sealer);
+  else
+#endif // _LIBUNWIND_SANDBOX_HARDENED
+    return csp;
+}
+#endif // _LIBUNWIND_SANDBOX_OTYPES
 
 inline uintcap_t Registers_arm64::getCapabilityRegister(int regNum) const {
   assert(validCapabilityRegister(regNum));
@@ -2198,6 +2265,8 @@ inline const char *Registers_arm64::getRegisterName(int regNum) {
     return "clr";
   case UNW_ARM64_C31:
     return "csp";
+  case UNW_ARM64_ECSP:
+    return "ecsp";
   default:
     return "unknown register";
   }

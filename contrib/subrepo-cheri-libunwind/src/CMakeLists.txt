@@ -80,6 +80,7 @@ set(LIBUNWIND_HEADERS
     Registers.hpp
     RWMutex.hpp
     Unwind-EHABI.h
+    unwind_cheri.h
     UnwindCursor.hpp
     ../include/libunwind.h
     ../include/unwind.h

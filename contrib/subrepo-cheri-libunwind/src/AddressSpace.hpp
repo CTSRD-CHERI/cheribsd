@@ -22,6 +22,7 @@
 #include "dwarf2.h"
 #include "EHHeaderParser.hpp"
 #include "Registers.hpp"
+#include "unwind_cheri.h"
 
 // We can no longer include C++ headers so duplicate std::min() here
 template<typename T> T uw_min(T a, T b) { return a < b ? a : b; }
@@ -320,6 +321,9 @@ public:
     return get<v128>(addr);
   }
   capability_t     getCapability(pint_t addr) { return get<capability_t>(addr); }
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(_LIBUNWIND_SANDBOX_OTYPES)
+  static uintcap_t getUnwindSealer();
+#endif // __CHERI_PURE_CAPABILITY__ && _LIBUNWIND_SANDBOX_OTYPES
   __attribute__((always_inline))
   uintptr_t       getP(pint_t addr);
   uint64_t        getRegister(pint_t addr);
@@ -407,6 +411,25 @@ inline uint64_t LocalAddressSpace::getRegister(pint_t addr) {
   return get32(addr);
 #endif
 }
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(_LIBUNWIND_SANDBOX_OTYPES)
+extern "C" {
+/// Call into the RTLD to get a sealer capability. This sealer will be used to
+/// seal information in the unwinding context if _LIBUNWIND_SANDBOX_HARDENED is
+/// specified.
+uintptr_t _rtld_unw_getsealer(void);
+uintptr_t __rtld_unw_getsealer();
+_LIBUNWIND_HIDDEN uintptr_t __rtld_unw_getsealer() {
+  return (uintptr_t)-1;
+}
+_LIBUNWIND_WEAK_ALIAS(__rtld_unw_getsealer, _rtld_unw_getsealer)
+}
+
+/// C++ wrapper for calling into RTLD.
+inline uintcap_t LocalAddressSpace::getUnwindSealer() {
+  return _rtld_unw_getsealer();
+}
+#endif // __CHERI_PURE_CAPABILITY__ && _LIBUNWIND_SANDBOX_OTYPES
 
 /// Read a ULEB128 into a 64-bit word.
 inline uint64_t LocalAddressSpace::getULEB128(pint_t &addr, pint_t end) {
@@ -932,7 +955,8 @@ inline bool LocalAddressSpace::findUnwindSections(pc_t targetAddr,
     return true;
 #elif defined(_LIBUNWIND_USE_DL_ITERATE_PHDR)
   dl_iterate_cb_data cb_data = {this, &info, targetAddr};
-  CHERI_DBG("Calling dl_iterate_phdr()\n");
+  CHERI_DBG("Calling dl_iterate_phdr(0x%jx)\n",
+            (uintmax_t)targetAddr.address());
   int found = dl_iterate_phdr(findUnwindSectionsByPhdr, &cb_data);
   return static_cast<bool>(found);
 #endif

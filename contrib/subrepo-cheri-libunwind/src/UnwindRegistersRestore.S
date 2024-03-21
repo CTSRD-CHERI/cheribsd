@@ -703,6 +703,20 @@ Lnovec:
 
 #elif defined(__aarch64__)
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+DEFINE_LIBUNWIND_FUNCTION(__rtld_unw_setcontext)
+  mov    c16, c3
+  ldp    c3, c4,  [c4, #0x030]
+  mov    csp, c16
+  ret
+END_LIBUNWIND_FUNCTION(__rtld_unw_setcontext)
+#ifdef _LIBUNWIND_SANDBOX_HARDENED
+WEAK_ALIAS(__rtld_unw_setcontext, _rtld_unw_setcontext)
+#else
+WEAK_ALIAS(__rtld_unw_setcontext, _rtld_unw_setcontext_unsealed)
+#endif
+#endif
+
 //
 // extern "C" void __libunwind_Registers_arm64_jumpto(Registers_arm64 *);
 //
@@ -729,8 +743,8 @@ DEFINE_LIBUNWIND_FUNCTION(__libunwind_Registers_arm64_jumpto)
   ldp    c26,c27, [c0, #0x1a0]
   ldp    c28,c29, [c0, #0x1c0]
   ldr    c30,     [c0, #0x200]  // restore pcc into clr
+  add    c16,c0,  #0x230
 
-  add    c16,c0, #0x220
   ldp    d0, d1,  [c16, #0x000]
   ldp    d2, d3,  [c16, #0x010]
   ldp    d4, d5,  [c16, #0x020]
@@ -753,14 +767,13 @@ DEFINE_LIBUNWIND_FUNCTION(__libunwind_Registers_arm64_jumpto)
   // context struct, because it is allocated on the stack, and an exception
   // could clobber the de-allocated portion of the stack after csp has been
   // restored.
-  ldr    c16,     [c0, #0x1f0]
-  ldp    c0, c1,  [c0, #0x000]  // restore c0,c1
-  mov    csp,c16                // restore csp
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-  and    x30, x30, #~1
-  ret    x30                    // jump to pc
+  ldr    c3,      [c0, #0x1f0]
+  add    c4, c0,  #0x210
+  ldp    c0, c1,  [c0, #0x000]
+#ifdef _LIBUNWIND_SANDBOX_HARDENED
+  b      _rtld_unw_setcontext
 #else
-  ret                           // jump to pcc
+  b      _rtld_unw_setcontext_unsealed
 #endif
 #else
   // skip restore of x0,x1 for now
