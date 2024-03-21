@@ -733,19 +733,12 @@ allocate_rstk_impl(unsigned index)
 /*
  * Stack unwinding
  */
-/*
- * Returning this struct allows us to control the content of unused return value
- * registers.
- */
-struct jmp_args { uintptr_t ret1; uintptr_t ret2; };
-
-struct jmp_args _rtld_setjmp_impl(uintptr_t, void **, struct trusted_frame *);
-
-struct jmp_args
-_rtld_setjmp_impl(uintptr_t ret, void **buf, struct trusted_frame *csp)
+static void *
+unwind_cursor(struct trusted_frame *tf)
 {
 	/*
-	 * Before setjmp is called, the top of the trusted stack contains:
+	 * This helper is used by functions like setjmp. Before setjmp is
+	 * called, the top of the trusted stack contains:
 	 * 	0.	Link to previous frame
 	 * setjmp does not push to the trusted stack. When _rtld_setjmp is
 	 * called, the following are pushed to the trusted stack:
@@ -755,41 +748,47 @@ _rtld_setjmp_impl(uintptr_t ret, void **buf, struct trusted_frame *csp)
 	 * buffer.
 	 */
 
-	*buf = cheri_seal(cheri_setaddress(csp, csp->next), sealer_jmpbuf);
-
-	return ((struct jmp_args) { .ret1 = ret });
+	return (cheri_setaddress(tf, tf->next));
 }
 
-#define UNWIND_EXEC_STACK(cur, target)                          \
-	{                                                       \
-		struct stk_bottom *stk;                         \
-		do {                                            \
-			stk = cheri_setoffset(cur->o_sp,        \
-			    cheri_getlen(cur->o_sp));           \
-			--stk;                                  \
-			stk->top = cur->o_sp;                   \
-			cur = cheri_setaddress(cur, cur->next); \
-		} while (cur < target);                         \
-	}
+uintptr_t _rtld_setjmp(uintptr_t, void **);
+uintptr_t _rtld_unw_getcontext(uintptr_t, void **);
+uintptr_t _rtld_unw_getcontext_unsealed(uintptr_t, void **);
 
-#define UNWIND_STORE_RCSP(csp, rcsp)                             \
-	{                                                        \
-		struct stk_bottom *stk;                          \
-		stk = cheri_setoffset(rcsp, cheri_getlen(rcsp)); \
-		--stk;                                           \
-		csp->o_sp = stk->top;                            \
-		stk->top = rcsp;                                 \
-	}
+uintptr_t
+_rtld_setjmp(uintptr_t ret, void **buf)
+{
+	*buf = cheri_seal(unwind_cursor(get_trusted_frame()), sealer_jmpbuf);
+	return (ret);
+}
 
-struct jmp_args _rtld_longjmp_impl(uintptr_t, void **, struct trusted_frame *,
-    void *);
+uintptr_t
+_rtld_unw_getcontext(uintptr_t ret, void **buf)
+{
+	*buf = cheri_seal(unwind_cursor(get_trusted_frame()), sealer_unwbuf);
+	return (ret);
+}
 
-struct jmp_args
-_rtld_longjmp_impl(uintptr_t ret, void **buf, struct trusted_frame *csp,
-    void *rcsp)
+uintptr_t
+_rtld_unw_getcontext_unsealed(uintptr_t ret, void **buf)
+{
+	*buf = unwind_cursor(get_trusted_frame());
+	return (ret);
+}
+
+/*
+ * Returning this struct allows us to control the content of unused return value
+ * registers.
+ */
+struct jmp_args { uintptr_t ret1; uintptr_t ret2; };
+
+static struct jmp_args
+unwind_stack(struct jmp_args ret, void *rcsp, struct trusted_frame *target,
+    struct trusted_frame *tf)
 {
 	/*
-	 * Before longjmp is called, the top of the trusted stack contains:
+	 * Thie helper is used by functions like longjmp. Before longjmp is
+	 * called, the top of the trusted stack contains:
 	 * 	0.	Link to previous frame
 	 * longjmp does not push to the trusted stack. When _rtld_longjmp is
 	 * called, the following are pushed to the trusted stack:
@@ -800,125 +799,83 @@ _rtld_longjmp_impl(uintptr_t ret, void **buf, struct trusted_frame *csp,
 	 * frame.
 	 */
 
-	struct trusted_frame *target, *cur = csp;
+	struct stk_bottom *stk;
+	struct trusted_frame *cur = tf;
 
-	target = cheri_unseal(*buf, sealer_jmpbuf);
 	rtld_require(cheri_is_subset(cur, target) && cur < target,
-	    "c18n: Illegal longjmp from %#p to %#p", cur, target);
+	    "c18n: Illegal unwind from %#p to %#p", cur, target);
 
 	/*
 	 * Unwind each frame before the target frame.
 	 */
-	UNWIND_EXEC_STACK(cur, target);
+	do {
+		stk = cheri_setoffset(cur->n_sp, cheri_getlen(cur->n_sp));
+		--stk;
+
+		rtld_require((ptraddr_t)stk->top <= cur->o_sp,
+		    "c18n: Cannot unwind %s from %#p to %p\n"
+		    "tf: %#p -> %#p", comparts.data[stk->compart_id].name,
+		    stk->top, (void *)(uintptr_t)cur->o_sp, tf, target);
+
+		stk->top = cheri_setaddress(cur->n_sp, cur->o_sp);
+		cur = cheri_setaddress(cur, cur->next);
+	} while (cur < target);
+
 	rtld_require(cur == target,
-	    "c18n: Illegal longjmp from %#p to %#p", cur, target);
+	    "c18n: Illegal unwind from %#p to %#p", cur, target);
 
 	/*
 	 * Set the next frame to the target frame.
 	 */
-	csp->next = (ptraddr_t)cur;
+	tf->next = (ptraddr_t)cur;
 
 	/*
 	 * Maintain the invariant of the trusted frame and the invariant of the
 	 * bottom of the target compartment's stack.
 	 */
-	UNWIND_STORE_RCSP(csp, rcsp);
-	return ((struct jmp_args) { .ret1 = ret });
+	stk = cheri_setoffset(rcsp, cheri_getlen(rcsp));
+	--stk;
+
+	rtld_require(rcsp <= stk->top,
+	    "c18n: Cannot complete unwind %s from %#p to %#p\n"
+	    "tf: %#p -> %#p", comparts.data[stk->compart_id].name,
+	    rcsp, stk->top, tf, target);
+
+	tf->n_sp = rcsp;
+	tf->o_sp = (ptraddr_t)stk->top;
+
+	return (ret);
+}
+
+struct jmp_args _rtld_longjmp(struct jmp_args, void *, void **);
+struct jmp_args _rtld_unw_setcontext(struct jmp_args, void *, void **);
+struct jmp_args _rtld_unw_setcontext_unsealed(struct jmp_args, void *, void **);
+
+struct jmp_args
+_rtld_longjmp(struct jmp_args ret, void *rcsp, void **buf)
+{
+	return (unwind_stack(ret, rcsp, cheri_unseal(*buf, sealer_jmpbuf),
+	    get_trusted_frame()));
+}
+
+struct jmp_args
+_rtld_unw_setcontext(struct jmp_args ret, void *rcsp, void **buf)
+{
+	return (unwind_stack(ret, rcsp, cheri_unseal(*buf, sealer_unwbuf),
+	    get_trusted_frame()));
+}
+
+struct jmp_args
+_rtld_unw_setcontext_unsealed(struct jmp_args ret, void *rcsp, void **buf)
+{
+	return (unwind_stack(ret, rcsp, *buf, get_trusted_frame()));
 }
 
 uintptr_t _rtld_unw_getsealer(void);
 uintptr_t
 _rtld_unw_getsealer(void)
 {
-
 	return (sealer_unwbuf);
-}
-
-struct jmp_args _rtld_unw_getcontext_impl(uintptr_t, void **,
-    struct trusted_frame *);
-struct jmp_args _rtld_unw_getcontext_impl_unsealed(uintptr_t, void **,
-    struct trusted_frame *);
-
-struct jmp_args
-_rtld_unw_getcontext_impl(uintptr_t ret, void **buf, struct trusted_frame *csp)
-{
-	*buf = cheri_seal(cheri_setaddress(csp, csp->next), sealer_unwbuf);
-	return ((struct jmp_args) { .ret1 = ret });
-}
-
-struct jmp_args
-_rtld_unw_getcontext_impl_unsealed(uintptr_t ret, void **buf,
-    struct trusted_frame *csp)
-{
-	*buf = cheri_setaddress(csp, csp->next);
-	return ((struct jmp_args) { .ret1 = ret });
-}
-
-struct jmp_args _rtld_unw_resume(uintptr_t, uintptr_t, struct trusted_frame *,
-    void **, void **);
-struct jmp_args _rtld_unw_resume_unsealed(uintptr_t, uintptr_t,
-    struct trusted_frame *, void **, void **);
-
-struct jmp_args
-_rtld_unw_resume(uintptr_t ret1, uintptr_t ret2, struct trusted_frame *csp,
-    void **rcsp, void **buf)
-{
-	struct trusted_frame *target, *cur = csp;
-	target = cheri_unseal(*buf, sealer_unwbuf);
-
-	rtld_require(cheri_is_subset(cur, target) &&
-		cur->next < (ptraddr_t)target,
-	    "c18n: Illegal unw_resume from %#p to %#p", cur, target);
-
-	/*
-	 * Unwind each frame before the target frame.
-	 */
-	UNWIND_EXEC_STACK(cur, target);
-	rtld_require(cur == target, "c18n: Illegal unw_resume from %#p to %#p",
-	    cur, target);
-
-	/*
-	 * Set the next frame to the target frame.
-	 */
-	csp->next = (ptraddr_t)cur;
-
-	/*
-	 * Maintain the invariant of the trusted frame and the invariant of the
-	 * bottom of the target compartment's stack.
-	 */
-	UNWIND_STORE_RCSP(csp, rcsp);
-	return ((struct jmp_args) { .ret1 = ret1, .ret2 = ret2 });
-}
-
-struct jmp_args
-_rtld_unw_resume_unsealed(uintptr_t ret1, uintptr_t ret2,
-    struct trusted_frame *csp, void **rcsp, void **buf)
-{
-	struct trusted_frame *target, *cur = csp;
-	target = *buf;
-
-	rtld_require(cheri_is_subset(cur, target) &&
-		cur->next < (ptraddr_t)target,
-	    "c18n: Illegal unw_resume from %#p to %#p", cur, target);
-
-	/*
-	 * Unwind each frame before the target frame.
-	 */
-	UNWIND_EXEC_STACK(cur, target);
-	rtld_require(cur == target, "c18n: Illegal unw_resume from %#p to %#p",
-	    cur, target);
-
-	/*
-	 * Set the next frame to the target frame.
-	 */
-	csp->next = (ptraddr_t)cur;
-
-	/*
-	 * Maintain the invariant of the trusted frame and the invariant of the
-	 * bottom of the target compartment's stack.
-	 */
-	UNWIND_STORE_RCSP(csp, rcsp);
-	return ((struct jmp_args) { .ret1 = ret1, .ret2 = ret2 });
 }
 
 /*
