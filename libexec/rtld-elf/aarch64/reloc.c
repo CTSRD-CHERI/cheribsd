@@ -611,7 +611,7 @@ reloc_gnu_ifunc(Obj_Entry *obj, int flags,
 				.target = (void *)target,
 				.defobj = defobj,
 				.def = def,
-				.sig = sigtab_get(obj, ELF_R_TYPE(rela->r_info))
+				.sig = sigtab_get(obj, ELF_R_SYM(rela->r_info))
 			});
 #endif
 			wlock_acquire(rtld_bind_lock, lockstate);
