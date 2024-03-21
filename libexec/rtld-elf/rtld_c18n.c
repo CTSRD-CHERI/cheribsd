@@ -763,14 +763,7 @@ unwind_cursor(struct trusted_frame *tf)
 	 * buffer.
 	 */
 
-	/*
-	 * Defensive reduction of privileges.
-	 */
-	tf = cheri_setaddress(tf, tf->next);
-	tf = cheri_setboundsexact(tf, 0);
-	tf = cheri_andperm(tf, 0);
-
-	return (tf);
+	return (cheri_setaddress(tf, tf->next));
 }
 
 uintptr_t _rtld_setjmp(uintptr_t, void **);
