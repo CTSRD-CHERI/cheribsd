@@ -429,21 +429,21 @@ tramp_should_include(const Obj_Entry *reqobj, const struct tramp_data *data)
 {
 	const char *sym;
 
-	/*
-	 * INVARIANT: The target of each trampoline is tagged.
-	 */
-	if (!cheri_gettag(data->target))
+	if (data->def == NULL)
+		return (true);
+
+	if (data->def == &sym_zero)
+		return (false);
+
+	sym = strtab_value(data->defobj, data->def->st_name);
+
+	if (string_base_search(&uni_compart.trusts, sym) != -1)
 		return (false);
 
 	if (reqobj == NULL)
 		return (true);
 
 	if (reqobj->compart_id == data->defobj->compart_id)
-		return (false);
-
-	sym = strtab_value(data->defobj, data->def->st_name);
-
-	if (string_base_search(&uni_compart.trusts, sym) != -1)
 		return (false);
 
 	if (string_base_search(&comparts.data[reqobj->compart_id].trusts, sym)
@@ -1169,9 +1169,28 @@ tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *data)
 	ptraddr_t key;
 	int exp;
 
-	/* reqobj == NULL iff the request is by RTLD */
-	assert((reqobj == NULL || data->def != NULL) && data->defobj != NULL
-	    && func_sig_legal(data->sig));
+	/*
+	 * INVARIANT: The defobj of each trampoline is tagged.
+	 */
+	assert(cheri_gettag(data->defobj));
+	if (data->def == NULL)
+		/*
+		 * XXX-DG: reqobj != NULL causes policies to be evaluated which
+		 * might result in a trampoline being elided. This is only safe
+		 * to do for jump slot relocations.
+		 *
+		 * Currently, the decision to elide the trampoline or not is
+		 * coupled with the decision of whether the symbol should be
+		 * made accesible to the requesting object. This is insecure.
+		 */
+		assert(reqobj == NULL);
+	else if (data->def == &sym_zero)
+		assert(data->target == NULL);
+	else
+		assert(data->defobj->symtab <= data->def &&
+		    data->def < data->defobj->symtab +
+		    data->defobj->dynsymcount);
+	assert(func_sig_legal(data->sig));
 
 	if (!tramp_should_include(reqobj, data))
 		return (data->target);
@@ -1283,9 +1302,12 @@ end:
 struct func_sig
 sigtab_get(const Obj_Entry *obj, unsigned long symnum)
 {
-	if (symnum >= obj->dynsymcount)
-		rtld_fatal("Invalid symbol number %lu for object %s.",
+	if (symnum >= obj->dynsymcount) {
+		rtld_fdprintf(STDERR_FILENO,
+		    "c18n: Invalid symbol number %lu for %s\n",
 		    symnum, obj->path);
+		abort();
+	}
 
 	if (obj->sigtab == NULL)
 		return ((struct func_sig) { .valid = false });
@@ -1313,7 +1335,7 @@ tramp_reflect(void *entry)
 	while (page != NULL) {
 		ret = cheri_buildcap(page, data);
 		if (cheri_gettag(ret)) {
-			if (cheri_gettag(ret->target))
+			if (cheri_gettag(ret->defobj))
 				/*
 				 * At this point, the provided data must have
 				 * been (a) tagged and (b) pointing to the entry
