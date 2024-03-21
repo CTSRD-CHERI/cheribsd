@@ -1259,7 +1259,7 @@ tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *data)
 	else if (data->def == &sym_zero)
 		assert(data->target == NULL);
 	else
-		assert(data->defobj->symtab <= data->def ||
+		assert(data->defobj->symtab <= data->def &&
 		    data->def < data->defobj->symtab +
 		    data->defobj->dynsymcount);
 	assert(func_sig_legal(data->sig));
