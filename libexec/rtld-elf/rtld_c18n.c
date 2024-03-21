@@ -870,8 +870,9 @@ unwind_stack(struct jmp_args ret, void *rcsp, struct trusted_frame *target,
 }
 
 struct jmp_args _rtld_longjmp(struct jmp_args, void *, void **);
-struct jmp_args _rtld_unw_setcontext(struct jmp_args, void *, void **);
-struct jmp_args _rtld_unw_setcontext_unsealed(struct jmp_args, void *, void **);
+struct jmp_args _rtld_unw_setcontext(struct jmp_args, void *, void *, void **);
+struct jmp_args _rtld_unw_setcontext_unsealed(struct jmp_args, void *, void *,
+    void **);
 
 struct jmp_args
 _rtld_longjmp(struct jmp_args ret, void *rcsp, void **buf)
@@ -881,14 +882,16 @@ _rtld_longjmp(struct jmp_args ret, void *rcsp, void **buf)
 }
 
 struct jmp_args
-_rtld_unw_setcontext(struct jmp_args ret, void *rcsp, void **buf)
+_rtld_unw_setcontext(struct jmp_args ret, void *p __unused, void *rcsp,
+    void **buf)
 {
 	return (unwind_stack(ret, rcsp, cheri_unseal(*buf, sealer_unwbuf),
 	    get_trusted_frame()));
 }
 
 struct jmp_args
-_rtld_unw_setcontext_unsealed(struct jmp_args ret, void *rcsp, void **buf)
+_rtld_unw_setcontext_unsealed(struct jmp_args ret, void *p __unused, void *rcsp,
+    void **buf)
 {
 	return (unwind_stack(ret, rcsp, *buf, get_trusted_frame()));
 }
