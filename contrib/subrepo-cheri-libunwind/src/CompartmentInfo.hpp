@@ -34,8 +34,6 @@ public:
   // kCalleeSavedCount - 1 because kCalleeSavedOffset is the first one.
   static const uint32_t kTrustedFrameSize =
       kCalleeSavedOffset + (kCalleeSavedCount - 1) * kCalleeSavedSize;
-#else
-#error "Unsupported architecture for compartmentalization"
 #endif // _LIBUNWIND_TARGET_AARCH64
 #endif // __CHERI_PURE_CAPABILITY__
 };
