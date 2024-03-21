@@ -535,8 +535,6 @@ c18n_init_rtld_stack(uintptr_t ret, void *base)
 	--stk;
 
 	stk = cheri_setboundsexact(stk, sizeof(*stk));
-	untrusted_stk_set(stk);
-
 	base = stk + 1;
 #endif
 
@@ -556,6 +554,18 @@ init_stk_table(struct stk_table *table)
 	void *sp = cheri_getstack();
 	table->stacks[cid_to_table_index(C18N_RTLD_COMPART_ID)].bottom =
 	    cheri_setoffset(sp, cheri_getlen(sp));
+}
+#else
+void install_dummy_stack(void);
+
+void
+install_dummy_stack(void)
+{
+	struct stk_bottom *stk = cheri_getstack();
+	stk = cheri_setoffset(stk, cheri_getlen(stk));
+	--stk;
+
+	untrusted_stk_set(stk->top);
 }
 #endif
 
@@ -1408,6 +1418,8 @@ c18n_init(void)
 	 */
 	trusted_stk_set(stk_create(C18N_STACK_SIZE));
 	init_stk_table(table);
+#else
+	install_dummy_stack();
 #endif
 
 	stk_table_set(table);
@@ -1470,6 +1482,8 @@ _rtld_thread_start_impl(struct pthread *curthread)
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	trusted_stk_set(stk_create(C18N_STACK_SIZE));
 	init_stk_table(table);
+#else
+	install_dummy_stack();
 #endif
 
 	stk_table_set(table);
