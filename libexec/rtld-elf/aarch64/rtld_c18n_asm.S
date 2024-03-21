@@ -127,6 +127,16 @@ ENTRY(_rtld_dispatch_signal_unsafe)
 	b	dispatch_signal_end
 END(_rtld_dispatch_signal_unsafe)
 
+ENTRY(_rtld_unw_setcontext_epilogue)
+	/*
+	 * FIXME: llvm-libunwind specific ABI. This should be better specified.
+	 */
+	mov	c16, c2
+	ldp	c2, c3, [c3, #(-0x210 + 0x20)]
+	mov	csp, c16
+	RETURN
+END(_rtld_unw_setcontext_epilogue)
+
 ENTRY(allocate_rstk)
 	/*
 	 * NON-STANDARD CALLING CONVENTION
