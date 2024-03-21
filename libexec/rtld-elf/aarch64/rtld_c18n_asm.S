@@ -127,6 +127,13 @@ ENTRY(_rtld_dispatch_signal)
 	b	dispatch_signal_end
 END(_rtld_dispatch_signal)
 
+ENTRY(_rtld_unw_setcontext_epilogue)
+	mov	c16, c3
+	ldp	c3, c4, [c4, #-0x030]
+	mov	csp, c16
+	ret
+END(_rtld_unw_setcontext_epilogue)
+
 ENTRY(allocate_rstk)
 	/*
 	 * NON-STANDARD CALLING CONVENTION

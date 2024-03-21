@@ -874,10 +874,17 @@ _rtld_longjmp(struct jmp_args ret, void *rcsp, void **buf)
 	    get_trusted_frame()));
 }
 
+struct jmp_args _rtld_unw_setcontext_epilogue(struct jmp_args ret, void *p,
+    void *rcsp, void **buf);
+
 struct jmp_args
 _rtld_unw_setcontext(struct jmp_args ret, void *p __unused, void *rcsp,
     void **buf)
 {
+	if (!C18N_ENABLED) {
+		__attribute__((musttail)) return (
+		    _rtld_unw_setcontext_epilogue(ret, p, rcsp, buf));
+	}
 	return (unwind_stack(ret, rcsp, cheri_unseal(*buf, sealer_unwbuf),
 	    get_trusted_frame()));
 }
@@ -886,6 +893,10 @@ struct jmp_args
 _rtld_unw_setcontext_unsealed(struct jmp_args ret, void *p __unused, void *rcsp,
     void **buf)
 {
+	if (!C18N_ENABLED) {
+		__attribute__((musttail)) return (
+		    _rtld_unw_setcontext_epilogue(ret, p, rcsp, buf));
+	}
 	return (unwind_stack(ret, rcsp, *buf, get_trusted_frame()));
 }
 
