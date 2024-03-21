@@ -435,10 +435,7 @@ tramp_should_include(const Obj_Entry *reqobj, const struct tramp_data *data)
 {
 	const char *sym;
 
-	/*
-	 * INVARIANT: The target of each trampoline is tagged.
-	 */
-	if (!cheri_gettag(data->target))
+	if (data->def == &sym_zero)
 		return (false);
 
 	if (reqobj == NULL)
@@ -1252,9 +1249,20 @@ tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *data)
 	if (!C18N_ENABLED)
 		return (data->target);
 
-	/* reqobj == NULL iff the request is by RTLD */
-	assert((reqobj == NULL || data->def != NULL) && data->defobj != NULL
-	    && func_sig_legal(data->sig));
+	/*
+	 * INVARIANT: The defobj of each trampoline is tagged.
+	 */
+	assert(cheri_gettag(data->defobj));
+	if (data->def == NULL)
+		/* reqobj == NULL iff the request is by RTLD */
+		assert(reqobj == NULL);
+	else if (data->def == &sym_zero)
+		assert(data->target == NULL);
+	else
+		assert(data->defobj->symtab <= data->def ||
+		    data->def < data->defobj->symtab +
+		    data->defobj->dynsymcount);
+	assert(func_sig_legal(data->sig));
 
 	if (!tramp_should_include(reqobj, data))
 		return (data->target);
@@ -1366,9 +1374,8 @@ end:
 struct func_sig
 sigtab_get(const Obj_Entry *obj, unsigned long symnum)
 {
-	if (symnum >= obj->dynsymcount)
-		rtld_fatal("Invalid symbol number %lu for object %s.",
-		    symnum, obj->path);
+	rtld_require(symnum < obj->dynsymcount,
+	    "c18n: Invalid symbol number %lu for object %s", symnum, obj->path);
 
 	if (obj->sigtab == NULL)
 		return ((struct func_sig) { .valid = false });
@@ -1381,7 +1388,7 @@ tramp_reflect(void *entry)
 {
 	struct tramp_pg *page = atomic_load_explicit(&tramp_pgs.head,
 	    memory_order_acquire);
-	uintptr_t data = (uintptr_t)entry;
+	char *data = entry;
 	struct tramp_header *ret;
 
 	if (!cheri_gettag(data))
@@ -1390,13 +1397,12 @@ tramp_reflect(void *entry)
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	data -= 1;
 #endif
-	data = (uintptr_t)__containerof((void *)data, struct tramp_header,
-	    entry);
+	data = (char *)__containerof((void *)data, struct tramp_header, entry);
 
 	while (page != NULL) {
-		ret = cheri_buildcap(page, data);
+		ret = cheri_buildcap(page, (uintptr_t)data);
 		if (cheri_gettag(ret)) {
-			if (cheri_gettag(ret->target))
+			if (cheri_gettag(ret->defobj))
 				/*
 				 * At this point, the provided data must have
 				 * been (a) tagged and (b) pointing to the entry
