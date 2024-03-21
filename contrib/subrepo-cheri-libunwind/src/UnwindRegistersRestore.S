@@ -706,7 +706,7 @@ Lnovec:
 #if defined(__CHERI_PURE_CAPABILITY__)
 DEFINE_LIBUNWIND_FUNCTION(__rtld_unw_setcontext)
   mov    c16, c3
-  ldp    c3, c4,  [c4, #0x030]
+  ldp    c3, c4,  [c4, #-0x030]
   mov    csp, c16
   ret
 END_LIBUNWIND_FUNCTION(__rtld_unw_setcontext)
