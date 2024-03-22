@@ -120,7 +120,7 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 		/* Remove write permissions and set bounds */
 		symval = make_function_cap_with_addend(def, defobj, addend);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-		symval = tramp_intern(obj, &(struct tramp_data) {
+		symval = tramp_intern(NULL, &(struct tramp_data) {
 			.target = __DECONST(void *, symval),
 			.defobj = defobj,
 			.def = def,

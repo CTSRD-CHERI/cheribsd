@@ -4423,7 +4423,7 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
 	    sym = __DECONST(void*, make_function_pointer(def, defobj));
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	    sym = tramp_intern(obj, &(struct tramp_data) {
+	    sym = tramp_intern(NULL, &(struct tramp_data) {
 		.target = sym,
 		.defobj = defobj,
 		.def = def
@@ -4433,7 +4433,7 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	} else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
 	    sym = rtld_resolve_ifunc(defobj, def);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	    sym = tramp_intern(obj, &(struct tramp_data) {
+	    sym = tramp_intern(NULL, &(struct tramp_data) {
 		.target = sym,
 		.defobj = defobj,
 		.def = def
