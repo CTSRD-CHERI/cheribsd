@@ -1254,7 +1254,15 @@ tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *data)
 	 */
 	assert(cheri_gettag(data->defobj));
 	if (data->def == NULL)
-		/* reqobj == NULL iff the request is by RTLD */
+		/*
+		 * XXX-DG: reqobj != NULL causes policies to be evaluated which
+		 * might result in a trampoline being elided. This is only safe
+		 * to do for jump slot relocations.
+		 *
+		 * Currently, the decision to elide the trampoline or not is
+		 * coupled with the decision of whether the symbol should be
+		 * made accesible to the requesting object. This is insecure.
+		 */
 		assert(reqobj == NULL);
 	else if (data->def == &sym_zero)
 		assert(data->target == NULL);
