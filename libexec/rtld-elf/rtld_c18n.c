@@ -435,18 +435,21 @@ tramp_should_include(const Obj_Entry *reqobj, const struct tramp_data *data)
 {
 	const char *sym;
 
+	if (data->def == NULL)
+		return (true);
+
 	if (data->def == &sym_zero)
+		return (false);
+
+	sym = strtab_value(data->defobj, data->def->st_name);
+
+	if (string_base_search(&uni_compart.trusts, sym) != -1)
 		return (false);
 
 	if (reqobj == NULL)
 		return (true);
 
 	if (reqobj->compart_id == data->defobj->compart_id)
-		return (false);
-
-	sym = strtab_value(data->defobj, data->def->st_name);
-
-	if (string_base_search(&uni_compart.trusts, sym) != -1)
 		return (false);
 
 	if (string_base_search(&comparts.data[reqobj->compart_id].trusts, sym)
