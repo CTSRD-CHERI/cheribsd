@@ -55,7 +55,6 @@ trust
 	execvpe
 	execvP
 	unw_getcontext
-	_rtld_thread_start
 
 callee [RTLD]
 export to [TCB]

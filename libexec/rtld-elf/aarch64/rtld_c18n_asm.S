@@ -54,7 +54,7 @@ END(_rtld_thread_start)
  * is only ever invoked via a trampoline by the kernel when a signal is
  * delivered.
  */
-ENTRY(_rtld_sighandler)
+ENTRY(_rtld_sighandler_unsafe)
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	/*
 	 * The sigframe is pushed onto the trusted stack, disrupting the linked-
@@ -90,7 +90,7 @@ ENTRY(_rtld_sighandler)
 	mov	c30, c19
 	b	sighandler_unfix_link
 #endif
-END(_rtld_sighandler)
+END(_rtld_sighandler_unsafe)
 
 /*
  * void _rtld_dispatch_signal(int, siginfo_t *, void *);
@@ -99,7 +99,7 @@ END(_rtld_sighandler)
  * is only ever invoked by either RTLD code that is aware of this behaviour or
  * external code via a trampoline.
  */
-ENTRY(_rtld_dispatch_signal)
+ENTRY(_rtld_dispatch_signal_unsafe)
 	mov	c24, c30
 	mov	w25, w0
 	mov	c26, c1
@@ -125,7 +125,7 @@ ENTRY(_rtld_dispatch_signal)
 	mov	c1, c27
 	mov	c30, c24
 	b	dispatch_signal_end
-END(_rtld_dispatch_signal)
+END(_rtld_dispatch_signal_unsafe)
 
 ENTRY(_rtld_unw_setcontext_epilogue)
 	mov	c16, c3

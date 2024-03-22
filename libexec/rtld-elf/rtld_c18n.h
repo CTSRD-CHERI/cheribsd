@@ -34,6 +34,8 @@
 /*
  * Global symbols
  */
+extern Obj_Entry obj_rtld;
+
 extern uintptr_t sealer_pltgot, sealer_tramp;
 
 extern size_t c18n_code_perm_clear;

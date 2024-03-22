@@ -652,7 +652,7 @@ ifunc_init(Elf_Auxinfo aux_info[__min_size(AT_COUNT)] __unused)
  * Process non-PLT relocations
  */
 int
-reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
+reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld_p, int flags,
     RtldLockState *lockstate)
 {
 	const Obj_Entry *defobj;
@@ -671,7 +671,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 	 * The dynamic linker should only have R_MORELLO_RELATIVE (local)
 	 * relocations, which were processed in _rtld_relocate_nonplt_self.
 	 */
-	if (obj == obj_rtld)
+	if (obj == obj_rtld_p)
 		return (0);
 #endif
 
@@ -687,7 +687,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 	 * The dynamic loader may be called from a thread, we have
 	 * limited amounts of stack available so we cannot use alloca().
 	 */
-	if (obj == obj_rtld)
+	if (obj == obj_rtld_p)
 		cache = NULL;
 	else
 		cache = calloc(obj->dynsymcount, sizeof(SymCache));
