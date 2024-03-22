@@ -34,6 +34,8 @@
 /*
  * Global symbols
  */
+extern Obj_Entry *obj_rtld_p;
+
 extern uintptr_t sealer_pltgot, sealer_tramp;
 extern const char *ld_compartment_utrace;
 extern const char *ld_compartment_enable;
