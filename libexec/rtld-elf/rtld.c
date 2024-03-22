@@ -238,6 +238,9 @@ static bool ld_skip_init_funcs = false;	/* XXXAR: debug environment variable to 
 static struct obj_entry_q obj_list;	/* Queue of all loaded objects */
 static Obj_Entry *obj_main;	/* The main program shared object */
 static Obj_Entry obj_rtld;	/* The dynamic linker shared object */
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+Obj_Entry *obj_rtld_p = &obj_rtld;
+#endif
 static unsigned int obj_count;	/* Number of objects in obj_list */
 static unsigned int obj_loads;	/* Number of loads of objects (gen count) */
 size_t ld_static_tls_extra =	/* Static TLS extra space (bytes) */
@@ -1228,12 +1231,21 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
 	rtld_die();
     if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC)
 	target = (uintptr_t)rtld_resolve_ifunc(defobj, def);
-    else
+    else {
 #ifdef __CHERI_PURE_CAPABILITY__
 	target = (uintptr_t)make_function_pointer(def, defobj);
+#ifdef RTLD_SANDBOX
+	target = (uintptr_t)tramp_intern(obj, &(struct tramp_data) {
+	    .target = (void *)target,
+	    .defobj = defobj,
+	    .def = def,
+	    .sig = sigtab_get(obj, ELF_R_SYM(rel->r_info))
+	});
+#endif
 #else
 	target = (uintptr_t)(defobj->relocbase + def->st_value);
 #endif
+    }
 
     dbg("\"%s\" in \"%s\" ==> %p in \"%s\"",
       defobj->strtab + def->st_name,
@@ -1248,14 +1260,6 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
      * address. The value returned from reloc_jmpslot() is the value
      * that the trampoline needs.
      */
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    target = (uintptr_t)tramp_intern(obj, &(struct tramp_data) {
-	.target = (void *)target,
-	.defobj = defobj,
-	.def = def,
-	.sig = sigtab_get(obj, ELF_R_SYM(rel->r_info))
-    });
-#endif
     target = reloc_jmpslot(where, target, defobj, obj, rel);
     lock_release(rtld_bind_lock, &lockstate);
     return (target);
@@ -4394,23 +4398,9 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	 */
 	if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
 	    sym = __DECONST(void*, make_function_pointer(def, defobj));
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	    sym = tramp_intern(obj, &(struct tramp_data) {
-		.target = sym,
-		.defobj = defobj,
-		.def = def
-	    });
-#endif
 	    dbg("dlsym(%s) is function: " PTR_FMT, name, sym);
 	} else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
 	    sym = rtld_resolve_ifunc(defobj, def);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	    sym = tramp_intern(obj, &(struct tramp_data) {
-		.target = sym,
-		.defobj = defobj,
-		.def = def
-	    });
-#endif
 	    dbg("dlsym(%s) is ifunc. Resolved to: " PTR_FMT, name, sym);
 	} else if (ELF_ST_TYPE(def->st_info) == STT_TLS) {
 	    ti.ti_module = defobj->tlsindex;

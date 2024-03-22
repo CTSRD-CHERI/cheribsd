@@ -1351,6 +1351,15 @@ tramp_reflect(void *entry)
 /*
  * APIs
  */
+/*
+ * XXX: Explicit function pointer used so that RTLD can wrap it in trampoline.
+ */
+extern void (*_rtld_sighandler)(int, siginfo_t *, void *);
+extern void (*_rtld_dispatch_signal)(int, siginfo_t *, void *);
+
+void _rtld_sighandler_unsafe(int, siginfo_t *, void *);
+void _rtld_dispatch_signal_unsafe(int, siginfo_t *, void *);
+
 #define	C18N_FUNC_SIG_COUNT	72
 
 void
@@ -1437,6 +1446,26 @@ c18n_init(void)
 
 	atomic_store_explicit(&tramp_pgs.head, tramp_pg_new(NULL),
 	    memory_order_relaxed);
+
+	/*
+	 * Wrap the hooks used by external libraries in trampolines.
+	 */
+	_rtld_sighandler = tramp_intern(NULL, &(struct tramp_data) {
+		.target = _rtld_sighandler_unsafe,
+		.defobj = obj_rtld_p,
+		.sig = (struct func_sig) {
+			.valid = true,
+			.reg_args = 3, .mem_args = false, .ret_args = NONE
+		}
+	});
+	_rtld_dispatch_signal = tramp_intern(NULL, &(struct tramp_data) {
+		.target = _rtld_dispatch_signal_unsafe,
+		.defobj = obj_rtld_p,
+		.sig = (struct func_sig) {
+			.valid = true,
+			.reg_args = 3, .mem_args = false, .ret_args = NONE
+		}
+	});
 }
 
 void *
@@ -1537,7 +1566,8 @@ _rtld_thr_exit(long *state)
 /*
  * Signal support
  */
-void _rtld_dispatch_signal(int, siginfo_t *, void *);
+void (*_rtld_sighandler)(int, siginfo_t *, void *);
+void (*_rtld_dispatch_signal)(int, siginfo_t *, void *);
 
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 ptraddr_t sighandler_fix_link(struct trusted_frame *, ucontext_t *);
@@ -1642,14 +1672,14 @@ dispatch_signal_end(ucontext_t *new, ucontext_t *old __unused)
 
 extern __siginfohandler_t *signal_dispatcher;
 
-__siginfohandler_t *signal_dispatcher = _rtld_dispatch_signal;
+__siginfohandler_t *signal_dispatcher = _rtld_dispatch_signal_unsafe;
 
 void _rtld_sighandler_init(__siginfohandler_t *);
 
 void
 _rtld_sighandler_init(__siginfohandler_t *p)
 {
-	assert(signal_dispatcher == _rtld_dispatch_signal &&
+	assert(signal_dispatcher == _rtld_dispatch_signal_unsafe &&
 	    (cheri_getperm(p) & CHERI_PERM_EXECUTIVE) == 0);
 	signal_dispatcher = tramp_intern(NULL, &(struct tramp_data) {
 		.target = p,
