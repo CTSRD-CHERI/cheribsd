@@ -1311,25 +1311,29 @@ sigtab_get(const Obj_Entry *obj, unsigned long symnum)
 	return (obj->sigtab[symnum]);
 }
 
-static struct tramp_header *
+struct tramp_header *
 tramp_reflect(void *entry)
 {
-	struct tramp_pg *page = atomic_load_explicit(&tramp_pgs.head,
-	    memory_order_acquire);
-	uintptr_t data = (uintptr_t)entry;
 	struct tramp_header *ret;
+	struct tramp_pg *page;
+	char *data = entry;
 
-	if (!cheri_gettag(data))
+	if (!cheri_gettag(data) || !cheri_getsealed(data) ||
+	    cheri_gettype(data) != CHERI_OTYPE_SENTRY ||
+	    (cheri_getperm(data) & CHERI_PERM_LOAD) == 0 ||
+	    (cheri_getperm(data) & CHERI_PERM_EXECUTE) == 0 ||
+	    (cheri_getperm(data) & CHERI_PERM_EXECUTIVE) == 0)
 		return (NULL);
 
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	data -= 1;
 #endif
-	data = (uintptr_t)__containerof((void *)data, struct tramp_header,
-	    entry);
+	data = (char *)__containerof((void *)data, struct tramp_header, entry);
+
+	page = atomic_load_explicit(&tramp_pgs.head, memory_order_acquire);
 
 	while (page != NULL) {
-		ret = cheri_buildcap(page, data);
+		ret = cheri_buildcap(page, (uintptr_t)data);
 		if (cheri_gettag(ret)) {
 			if (cheri_gettag(ret->defobj))
 				/*
