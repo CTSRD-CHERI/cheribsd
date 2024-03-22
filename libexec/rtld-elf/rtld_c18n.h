@@ -230,6 +230,8 @@ func_sig_legal(struct func_sig sig)
 		pc;							\
 	})
 
+struct tramp_header *tramp_reflect(void *);
+
 void *_rtld_sandbox_code(void *, struct func_sig);
 void *_rtld_safebox_code(void *, struct func_sig);
 

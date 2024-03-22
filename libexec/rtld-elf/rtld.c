@@ -3321,6 +3321,15 @@ Obj_Entry *
 obj_from_addr(const void *addr)
 {
     Obj_Entry *obj;
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+    struct tramp_header *header;
+
+    if (C18N_ENABLED) {
+	header = tramp_reflect(addr);
+	if (header != NULL)
+	    return (header->defobj);
+    }
+#endif
 
     TAILQ_FOREACH(obj, &obj_list, next) {
 	if (obj->marker)
