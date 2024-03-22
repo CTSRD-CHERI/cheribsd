@@ -1863,10 +1863,13 @@ public:
 #ifdef __CHERI_PURE_CAPABILITY__
   bool        validCapabilityRegister(int num) const;
   uintcap_t   getCapabilityRegister(int num) const;
+#ifdef _LIBUNWIND_SANDBOX_OTYPES
+  uintptr_t   getUnsealedTrustedStack(uintptr_t sealer) const;
+#endif
   void        setCapabilityRegister(int num, uintcap_t value);
 #else
   CAPABILITIES_NOT_SUPPORTED
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
 
   uintptr_t  getSP() const          { return _registers.__sp; }
   void       setSP(uintptr_t value) { _registers.__sp = value; }
@@ -1874,6 +1877,9 @@ public:
   void       setIP(uintptr_t value) { _registers.__pc = value; }
   uintptr_t  getFP() const          { return _registers.__fp; }
   void       setFP(uintptr_t value) { _registers.__fp = value; }
+#ifdef __CHERI_PURE_CAPABILITY__
+  void       setTrustedStack(uintptr_t value) { _registers.__ecsp = value; }
+#endif
 
 private:
   struct GPRs {
@@ -1882,6 +1888,9 @@ private:
     uintptr_t __lr;    // Link register r30
     uintptr_t __sp;    // Stack pointer r31
     uintptr_t __pc;    // Program counter
+#ifdef __CHERI_PURE_CAPABILITY__
+    uintptr_t __ecsp;  // Executive stack pointer.
+#endif
     uint64_t __ra_sign_state; // RA sign state register
   };
 
@@ -1898,8 +1907,8 @@ inline Registers_arm64::Registers_arm64(const void *registers) {
                 "arm64 registers do not fit into unw_context_t");
   memcpy(&_registers, registers, sizeof(_registers));
 #ifdef __CHERI_PURE_CAPABILITY__
-  static_assert(sizeof(GPRs) == 0x220,
-                "expected VFP registers to be at offset 544");
+  static_assert(sizeof(GPRs) == 0x230,
+                "expected VFP registers to be at offset 560");
 #else
   static_assert(sizeof(GPRs) == 0x110,
                 "expected VFP registers to be at offset 272");
@@ -1985,6 +1994,16 @@ inline bool Registers_arm64::validCapabilityRegister(int regNum) const {
     return true;
   return false;
 }
+
+#ifdef _LIBUNWIND_SANDBOX_OTYPES
+inline uintptr_t
+Registers_arm64::getUnsealedTrustedStack(uintptr_t sealer) const {
+  uintptr_t csp = _registers.__ecsp;
+  if (__builtin_cheri_sealed_get(csp))
+    csp = __builtin_cheri_unseal(csp, sealer);
+  return csp;
+}
+#endif // _LIBUNWIND_SANDBOX_OTYPES
 
 inline uintcap_t Registers_arm64::getCapabilityRegister(int regNum) const {
   assert(validCapabilityRegister(regNum));
@@ -2198,6 +2217,8 @@ inline const char *Registers_arm64::getRegisterName(int regNum) {
     return "clr";
   case UNW_ARM64_C31:
     return "csp";
+  case UNW_ARM64_ECSP:
+    return "ecsp";
   default:
     return "unknown register";
   }
@@ -4544,6 +4565,9 @@ public:
   void        setSP(reg_t value) { _registers[2] = value; }
   reg_t       getIP() const { return _registers[0]; }
   void        setIP(reg_t value) { _registers[0] = value; }
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(_LIBUNWIND_SANDBOX_OTYPES)
+  reg_t       getUnsealedTrustedStack(uintptr_t sealer) { return getSP(); }
+#endif // __CHERI_PURE_CAPABILITY__ && _LIBUNWIND_SANDBOX_OTYPES &&
 
 private:
   // _registers[0] holds the pc

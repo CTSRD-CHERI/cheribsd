@@ -20,6 +20,7 @@
 #include "Registers.hpp"
 #include "DwarfParser.hpp"
 #include "config.h"
+#include "CompartmentInfo.hpp"
 
 
 namespace libunwind {
@@ -54,6 +55,17 @@ private:
   typedef typename CFI_Parser<A>::FDE_Info          FDE_Info;
   typedef typename CFI_Parser<A>::CIE_Info          CIE_Info;
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(_LIBUNWIND_SANDBOX_OTYPES)
+  static size_t restoreCalleeSavedRegisters(pint_t csp, A &addressSpace,
+                                            R &newRegisters,
+                                            CompartmentInfo &CI);
+  static pint_t restoreRegistersFromSandbox(pint_t csp, A &addressSpace,
+                                            R &newRegisters,
+                                            CompartmentInfo &CI, pint_t sealer);
+  static bool isCompartmentTransitionTrampoline(pint_t ecsp, A &addressSpace,
+                                                CompartmentInfo &CI,
+                                                pint_t returnAddress);
+#endif
   static pint_t evaluateExpression(pint_t expression, A &addressSpace,
                                    const R &registers,
                                    pint_t initialStackValue);
@@ -72,9 +84,8 @@ private:
     *success = true;
     pint_t result = (pint_t)-1;
     if (prolog.cfaRegister != 0) {
-      result =
-          (pint_t)((sint_t)registers.getRegister((int)prolog.cfaRegister) +
-                   prolog.cfaRegisterOffset);
+      result = registers.getRegister((int)prolog.cfaRegister);
+      result = (pint_t)((sint_t)result + prolog.cfaRegisterOffset);
     } else  if (prolog.cfaExpression != 0) {
       result = evaluateExpression((pint_t)prolog.cfaExpression,
                                          addressSpace, registers, 0);
@@ -246,6 +257,93 @@ bool DwarfInstructions<A, R>::getRA_SIGN_STATE(A &addressSpace, R registers,
 }
 #endif
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(_LIBUNWIND_SANDBOX_OTYPES)
+#if defined(_LIBUNWIND_TARGET_AARCH64)
+template <typename A, typename R>
+size_t DwarfInstructions<A, R>::restoreCalleeSavedRegisters(
+    pint_t csp, A &addressSpace, R &newRegisters, CompartmentInfo &CI) {
+  // Restore callee-saved registers
+  size_t i;
+  size_t offset;
+  // Restore: c19-c28
+  for (i = 0, offset = CI.kCalleeSavedOffset; i < CI.kCalleeSavedCount;
+       ++i, offset += CI.kCalleeSavedSize) {
+    pint_t regValue = addressSpace.getCapability(csp + offset);
+    newRegisters.setCapabilityRegister(UNW_ARM64_C19 + i, regValue);
+    CHERI_DBG("SETTING CALLEE SAVED CAPABILITY REGISTER: %lu (%s): %#p "
+              "(offset=%zu)\n",
+              UNW_ARM64_C19 + i,
+              newRegisters.getRegisterName(UNW_ARM64_C19 + i), (void *)regValue,
+              offset);
+  }
+
+  return offset;
+}
+
+template <typename A, typename R>
+typename A::pint_t DwarfInstructions<A, R>::restoreRegistersFromSandbox(
+    pint_t csp, A &addressSpace, R &newRegisters, CompartmentInfo &CI,
+    pint_t sealer) {
+  // Get the unsealed executive CSP
+  assert(__builtin_cheri_tag_get((void *)csp) &&
+         "Executive stack should be tagged!");
+  // Derive the new executive CSP
+  pint_t nextCSP = addressSpace.getCapability(csp + CI.kNextOffset);
+  // Seal ECSP
+  nextCSP = __builtin_cheri_seal(nextCSP, sealer);
+  assert(__builtin_cheri_tag_get((void *)nextCSP) &&
+         "Next executive stack should be tagged!");
+  CHERI_DBG("SANDBOX: SETTING EXECUTIVE CSP %#p\n", (void *)nextCSP);
+  newRegisters.setTrustedStack(nextCSP);
+  // Restore the next RCSP
+  pint_t nextRCSP = addressSpace.getCapability(csp + CI.kNewSPOffset);
+  newRegisters.setSP(nextRCSP);
+  CHERI_DBG("SANDBOX: SETTING RESTRICTED CSP: %#p\n",
+            (void *)newRegisters.getSP());
+  size_t offset =
+      restoreCalleeSavedRegisters(csp, addressSpace, newRegisters, CI);
+  // Restore the frame pointer
+  pint_t newFP = addressSpace.getCapability(csp);
+  CHERI_DBG("SANDBOX: SETTING CFP %#p (offset=%zu)\n", (void *)newFP, offset);
+  newRegisters.setFP(newFP);
+  // Get the new return address.
+  return addressSpace.getCapability(csp + CI.kPCOffset);
+}
+
+template <typename A, typename R>
+bool DwarfInstructions<A, R>::isCompartmentTransitionTrampoline(
+    pint_t ecsp, A &addressSpace, CompartmentInfo &CI, pint_t returnAddress) {
+  // TODO(cheri): Use a cfp-based approach rather than the cookie.
+  ptraddr_t expectedReturnAddress =
+      addressSpace.get64(ecsp + CI.kReturnAddressOffset);
+  CHERI_DBG(
+      "isCompartmentTransitionTrampoline(): expectedReturnAddress: 0x%lx\n",
+      expectedReturnAddress);
+  return expectedReturnAddress == returnAddress;
+}
+#else // _LIBUNWIND_TARGET_AARCH64
+template <typename A, typename R>
+size_t DwarfInstructions<A, R>::restoreCalleeSavedRegisters(
+    pint_t csp, A &addressSpace, R &newRegisters, CompartmentInfo &CI) {
+  assert(0 && "not implemented on this architecture");
+  return 0;
+}
+template <typename A, typename R>
+typename A::pint_t DwarfInstructions<A, R>::restoreRegistersFromSandbox(
+    pint_t csp, A &addressSpace, R &newRegisters, CompartmentInfo &CI,
+    pint_t sealer) {
+  assert(0 && "not implemented on this architecture");
+  return (pint_t)0;
+}
+template <typename A, typename R>
+bool DwarfInstructions<A, R>::isCompartmentTransitionTrampoline(
+    pint_t ecsp, A &addressSpace, CompartmentInfo &CI, pint_t returnAddress) {
+  assert(0 && "not implemented on this architecture");
+  return false;
+}
+#endif // _LIBUNWIND_TARGET_AARCH64
+#endif // __CHERI_PURE_CAPABILITY__ && _LIBUNWIND_SANDBOX_OTYPES
+
 template <typename A, typename R>
 int DwarfInstructions<A, R>::stepWithDwarf(A &addressSpace, pc_t pc,
                                            pint_t fdeStart, R &registers,
@@ -274,7 +372,9 @@ int DwarfInstructions<A, R>::stepWithDwarf(A &addressSpace, pc_t pc,
       //
       // We set the SP here to the CFA, allowing for it to be overridden
       // by a CFI directive later on.
-      newRegisters.setSP(cfa);
+      pint_t newSP = cfa;
+      CHERI_DBG("SETTING SP: %#p\n", (void *)newSP);
+      newRegisters.setSP(newSP);
 
       pint_t returnAddress = 0;
       constexpr int lastReg = R::lastDwarfRegNum();
@@ -297,15 +397,14 @@ int DwarfInstructions<A, R>::stepWithDwarf(A &addressSpace, pc_t pc,
           else if (i == (int)cieInfo.returnAddressRegister) {
             returnAddress = getSavedRegister(i, addressSpace, registers, cfa,
                                              prolog.savedRegisters[i]);
-            CHERI_DBG("SETTING RETURN REGISTER %d (%s): %#p \n",
-                      i, newRegisters.getRegisterName(i), (void*)returnAddress);
+            CHERI_DBG("GETTING RETURN ADDRESS (saved) %d (%s): %#p \n", i,
+                      newRegisters.getRegisterName(i), (void *)returnAddress);
           } else if (registers.validCapabilityRegister(i)) {
-            newRegisters.setCapabilityRegister(
-                i, getSavedCapabilityRegister(addressSpace, registers, cfa,
-                                              prolog.savedRegisters[i]));
-            CHERI_DBG("SETTING CAPABILITY REGISTER %d (%s): %#p \n",
-                      i, newRegisters.getRegisterName(i),
-                      (void*)A::to_pint_t(newRegisters.getCapabilityRegister(i)));
+            capability_t savedReg = getSavedCapabilityRegister(
+                addressSpace, registers, cfa, prolog.savedRegisters[i]);
+            newRegisters.setCapabilityRegister(i, savedReg);
+            CHERI_DBG("SETTING CAPABILITY REGISTER %d (%s): %#p \n", i,
+                      newRegisters.getRegisterName(i), (void *)savedReg);
           } else if (registers.validRegister(i))
             newRegisters.setRegister(
                 i, getSavedRegister(i, addressSpace, registers, cfa,
@@ -313,9 +412,11 @@ int DwarfInstructions<A, R>::stepWithDwarf(A &addressSpace, pc_t pc,
           else
             return UNW_EBADREG;
         } else if (i == (int)cieInfo.returnAddressRegister) {
-            // Leaf function keeps the return address in register and there is no
-            // explicit intructions how to restore it.
-            returnAddress = registers.getRegister(cieInfo.returnAddressRegister);
+          // Leaf function keeps the return address in register and there is no
+          // explicit intructions how to restore it.
+          returnAddress = registers.getRegister(cieInfo.returnAddressRegister);
+          CHERI_DBG("GETTING RETURN ADDRESS (leaf) %d (%s): %#p \n", i,
+                    registers.getRegisterName(i), (void *)returnAddress);
         }
       }
 
@@ -403,9 +504,30 @@ int DwarfInstructions<A, R>::stepWithDwarf(A &addressSpace, pc_t pc,
       }
 #endif
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(_LIBUNWIND_SANDBOX_OTYPES)
+      // If the sealer is not valid (only the case when we're running with
+      // c18n), check if the return address has the executive mode bit set.
+      // If so, we should be calling into the c18n RTLD as this is a
+      // compartment boundary. We need to restore registers from the executive
+      // stack and ask rtld for it.
+      uintptr_t sealer = addressSpace.getUnwindSealer();
+      if (addressSpace.isValidSealer(sealer)) {
+        pint_t csp = registers.getUnsealedTrustedStack(sealer);
+        CompartmentInfo &CI = CompartmentInfo::sThisCompartmentInfo;
+        if (csp != 0 && isCompartmentTransitionTrampoline(csp, addressSpace, CI,
+                                                          returnAddress)) {
+          CHERI_DBG("%#p: detected a trampoline, unwinding from sandbox\n",
+                    (void *)returnAddress);
+          returnAddress = restoreRegistersFromSandbox(
+              csp, addressSpace, newRegisters, CI, sealer);
+        }
+      }
+#endif
+
       // Return address is address after call site instruction, so setting IP to
       // that does simualates a return.
       newRegisters.setIP(returnAddress);
+      CHERI_DBG("SETTING RETURN ADDRESS %#p\n", (void *)returnAddress);
 
       // Simulate the step by replacing the register set with the new ones.
       registers = newRegisters;

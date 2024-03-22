@@ -1294,7 +1294,7 @@ private:
   }
 #endif // defined(_LIBUNWIND_SUPPORT_TBTAB_UNWIND)
 
-  A               &_addressSpace;
+  A                &_addressSpace;
   R                _registers;
   unw_proc_info_t  _info;
   bool             _unwindInfoMissing;
