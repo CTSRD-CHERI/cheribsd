@@ -4612,6 +4612,14 @@ public:
   void        setSP(reg_t value) { _registers[2] = value; }
   reg_t       getIP() const { return _registers[0]; }
   void        setIP(reg_t value) { _registers[0] = value; }
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(_LIBUNWIND_SANDBOX_OTYPES)
+  reg_t       getUnsealedECSP(uintcap_t sealer) { return getSP(); }
+#ifdef _LIBUNWIND_SANDBOX_HARDENED
+  void        unsealSP(uintcap_t sealer) {}
+  void        unsealFP(uintcap_t sealer) {}
+  void        unsealCalleeSavedRegisters(uintcap_t sealer) {}
+#endif // _LIBUNWIND_SANDBOX_HARDENED
+#endif // __CHERI_PURE_CAPABILITY__ && _LIBUNWIND_SANDBOX_OTYPES &&
 
 private:
   // _registers[0] holds the pc
