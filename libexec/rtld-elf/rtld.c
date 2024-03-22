@@ -3325,9 +3325,9 @@ obj_from_addr(const void *addr)
     struct tramp_header *header;
 
     if (C18N_ENABLED) {
-	header = tramp_reflect(addr);
+	header = tramp_reflect(__DECONST(void *, addr));
 	if (header != NULL)
-	    return (header->defobj);
+	    return (__DECONST(Obj_Entry *, header->defobj));
     }
 #endif
 
