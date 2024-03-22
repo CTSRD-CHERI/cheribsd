@@ -320,6 +320,12 @@ public:
     return get<v128>(addr);
   }
   capability_t     getCapability(pint_t addr) { return get<capability_t>(addr); }
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(_LIBUNWIND_CHERI_C18N_SUPPORT)
+  static pint_t getUnwindSealer();
+  static bool isValidSealer(pint_t sealer) {
+    return __builtin_cheri_tag_get(sealer);
+  }
+#endif // __CHERI_PURE_CAPABILITY__ && _LIBUNWIND_CHERI_C18N_SUPPORT
   __attribute__((always_inline))
   uintptr_t       getP(pint_t addr);
   uint64_t        getRegister(pint_t addr);
@@ -407,6 +413,24 @@ inline uint64_t LocalAddressSpace::getRegister(pint_t addr) {
   return get32(addr);
 #endif
 }
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(_LIBUNWIND_CHERI_C18N_SUPPORT)
+extern "C" {
+/// Call into the RTLD to get a sealer capability. This sealer will be used to
+/// seal information in the unwinding context.
+uintptr_t _rtld_unw_getsealer();
+uintptr_t __rtld_unw_getsealer();
+_LIBUNWIND_HIDDEN uintptr_t __rtld_unw_getsealer() {
+  return (uintptr_t)0;
+}
+_LIBUNWIND_WEAK_ALIAS(__rtld_unw_getsealer, _rtld_unw_getsealer)
+}
+
+/// C++ wrapper for calling into RTLD.
+inline LocalAddressSpace::pint_t LocalAddressSpace::getUnwindSealer() {
+  return _rtld_unw_getsealer();
+}
+#endif // __CHERI_PURE_CAPABILITY__ && _LIBUNWIND_CHERI_C18N_SUPPORT
 
 /// Read a ULEB128 into a 64-bit word.
 inline uint64_t LocalAddressSpace::getULEB128(pint_t &addr, pint_t end) {
@@ -932,7 +956,8 @@ inline bool LocalAddressSpace::findUnwindSections(pc_t targetAddr,
     return true;
 #elif defined(_LIBUNWIND_USE_DL_ITERATE_PHDR)
   dl_iterate_cb_data cb_data = {this, &info, targetAddr};
-  CHERI_DBG("Calling dl_iterate_phdr()\n");
+  CHERI_DBG("Calling dl_iterate_phdr(0x%jx)\n",
+            (uintmax_t)targetAddr.address());
   int found = dl_iterate_phdr(findUnwindSectionsByPhdr, &cb_data);
   return static_cast<bool>(found);
 #endif

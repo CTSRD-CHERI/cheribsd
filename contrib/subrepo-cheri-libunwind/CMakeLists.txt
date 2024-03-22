@@ -50,6 +50,7 @@ option(LIBUNWIND_IS_BAREMETAL "Build libunwind for baremetal targets." OFF)
 option(LIBUNWIND_USE_FRAME_HEADER_CACHE "Cache frame headers for unwinding. Requires locking dl_iterate_phdr." OFF)
 option(LIBUNWIND_REMEMBER_HEAP_ALLOC "Use heap instead of the stack for .cfi_remember_state." OFF)
 option(LIBUNWIND_INSTALL_HEADERS "Install the libunwind headers." OFF)
+option(LIBUNWIND_CHERI_C18N_SUPPORT "Use a libunwind implementation that supports a CHERI c18n RTLD." OFF)
 
 set(LIBUNWIND_LIBDIR_SUFFIX "${LLVM_LIBDIR_SUFFIX}" CACHE STRING
     "Define suffix of library directory name (32/64)")
@@ -291,6 +292,14 @@ endif()
 # Threading-support
 if (NOT LIBUNWIND_ENABLE_THREADS)
   add_compile_flags(-D_LIBUNWIND_HAS_NO_THREADS)
+endif()
+
+# Sandboxing and c18n support
+if (LIBUNWIND_CHERI_C18N_SUPPORT)
+  if (NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64c" OR NOT CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
+    message(FATAL_ERROR "LIBUNWIND_CHERI_C18N_SUPPORT is not supported for ${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
+  endif()
+  add_compile_flags(-D_LIBUNWIND_CHERI_C18N_SUPPORT)
 endif()
 
 # ARM WMMX register support

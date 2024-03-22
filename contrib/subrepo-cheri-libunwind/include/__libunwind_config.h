@@ -76,11 +76,11 @@
 # elif defined(__aarch64__)
 #  define _LIBUNWIND_TARGET_AARCH64 1
 #  if defined(__CHERI_PURE_CAPABILITY__)
-#    define _LIBUNWIND_CONTEXT_SIZE 100
+#    define _LIBUNWIND_CONTEXT_SIZE 102
 #    if defined(__SEH__)
 #      error "Pure-capability aarch64 SEH not supported"
 #    else
-#      define _LIBUNWIND_CURSOR_SIZE 124
+#      define _LIBUNWIND_CURSOR_SIZE 126
 #    endif
 #    define _LIBUNWIND_HIGHEST_DWARF_REGISTER _LIBUNWIND_HIGHEST_DWARF_REGISTER_MORELLO
 #  else
@@ -234,5 +234,10 @@
 # define _LIBUNWIND_CURSOR_SIZE _LIBUNWIND_MAX_CURSOR_SIZE
 # define _LIBUNWIND_HIGHEST_DWARF_REGISTER 287
 #endif // _LIBUNWIND_IS_NATIVE_ONLY
+
+#if defined(_LIBUNWIND_CHERI_C18N_SUPPORT) &&                                  \
+    !defined(_LIBUNWIND_TARGET_AARCH64)
+# error "LIBUNWIND_CHERI_C18N_SUPPORT is only supported on Morello"
+#endif
 
 #endif // ____LIBUNWIND_CONFIG_H__

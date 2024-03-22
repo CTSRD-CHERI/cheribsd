@@ -678,7 +678,11 @@ enum {
   UNW_ARM64_C30 = 228,
   UNW_ARM64_CLR = 228,
   UNW_ARM64_C31 = 229,
-  UNW_ARM64_CSP = 229
+  UNW_ARM64_CSP = 229,
+  // Use 240 for ECSP (executive stack pointer). ECSP is not a real DWARF
+  // register, but we need it to implemented c18n-aware unwinding. We pick 240
+  // because it is far enough away from the range of reserved registers on Arm.
+  UNW_ARM64_ECSP = 240,
 };
 
 // 32-bit ARM registers. Numbers match DWARF for ARM spec #3.1 Table 1.
