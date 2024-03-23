@@ -37,8 +37,7 @@
 #include "cheribsdtest.h"
 
 CHERIBSDTEST(fptr_canon_cross,
-    "Check that function pointers are canonical across objects",
-    .ct_xfail_reason = XFAIL_C18N_FPTR_CANON)
+    "Check that function pointers are canonical across objects")
 {
 	void (* volatile fptr_inside)(void);
 	void (* volatile fptr_outside)(void);
@@ -53,8 +52,7 @@ CHERIBSDTEST(fptr_canon_cross,
 }
 
 CHERIBSDTEST(fptr_canon_dlsym,
-    "Check that function pointers are canonical for dlsym",
-    .ct_xfail_reason = XFAIL_C18N_FPTR_CANON)
+    "Check that function pointers are canonical for dlsym")
 {
 	void (* volatile fptr_inside)(void);
 	void (* volatile fptr_dlsym)(void);
@@ -70,8 +68,7 @@ CHERIBSDTEST(fptr_canon_dlsym,
 }
 
 CHERIBSDTEST(fptr_canon_dlfunc,
-    "Check that function pointers are canonical for dlfunc",
-    .ct_xfail_reason = XFAIL_C18N_FPTR_CANON)
+    "Check that function pointers are canonical for dlfunc")
 {
 	void (* volatile fptr_inside)(void);
 	void (* volatile fptr_dlfunc)(void);

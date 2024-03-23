@@ -151,15 +151,6 @@ extern struct cheribsdtest_child_state *ccsp;
 #endif
 #endif
 
-#ifndef XFAIL_C18N_FPTR_CANON
-#ifdef CHERIBSD_C18N_TESTS
-#define	XFAIL_C18N_FPTR_CANON \
-    "function pointers are currently non-canonical with library-based compartmentalisation"
-#else
-#define	XFAIL_C18N_FPTR_CANON	NULL
-#endif
-#endif
-
 struct cheri_test {
 	const char	*ct_name;
 	const char	*ct_desc;
