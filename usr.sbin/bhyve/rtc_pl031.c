@@ -275,7 +275,6 @@ rtc_pl031_init(rtc_pl031_intr_func_t intr_assert,
 	sc->intr_assert = intr_assert;
 	sc->intr_deassert = intr_deassert;
 
-	rtc_pl031_update_timer(sc);
 	sc->mevp = mevent_add(rtc_pl031_next_timer_msecs(sc), EVF_TIMER,
 	    rtc_pl031_callback, sc);
 
