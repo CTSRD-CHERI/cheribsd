@@ -75,7 +75,8 @@ CFLAGS+=	-DCHERIBSD_DYNAMIC_TESTS
 CFLAGS+=	'-DLIBM_SONAME="libm.so.5"'
 CFLAGS+=	-I${SRCTOP}/lib/libcheribsdtest_dynamic
 LIBADD+=	cheribsdtest_dynamic
-SRCS+=		cheribsdtest_lazy_bind.c
+SRCS+=		cheribsdtest_fptr_canon.c				\
+		cheribsdtest_lazy_bind.c
 .else
 NO_SHARED?=	YES
 .endif
