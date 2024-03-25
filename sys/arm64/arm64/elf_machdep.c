@@ -156,21 +156,6 @@ SYSINIT(elf64, SI_SUB_EXEC, SI_ORDER_FIRST,
     (sysinit_cfunc_t)__elfN(insert_brand_entry), &freebsd_brand_info);
 
 #if __has_feature(capabilities)
-static __ElfN(Brandinfo) freebsd_c18n_brand_info = {
-	.brand		= ELFOSABI_FREEBSD,
-	.machine	= EM_AARCH64,
-	.compat_3_brand	= "FreeBSD",
-	.interp_path	= "/libexec/ld-elf-c18n.so.1",
-	.sysvec		= &elf64_freebsd_sysvec,
-	.interp_newpath	= NULL,
-	.brand_note	= &__elfN(freebsd_brandnote),
-	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE,
-	.header_supported = &elf64c_header_supported,
-};
-
-SYSINIT(elf64_c18n, SI_SUB_EXEC, SI_ORDER_FIRST,
-    (sysinit_cfunc_t)__elfN(insert_brand_entry), &freebsd_c18n_brand_info);
-
 static struct sysentvec elf64cb_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
