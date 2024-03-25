@@ -23,7 +23,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd October 26 2022
+.Dd March 22 2024
 .Dt COMPARTMENTALIZATION 7
 .Os
 .Sh NAME
@@ -34,53 +34,48 @@
 This document contains instructions for using the library-based
 compartmentalization (c18n) prototype.
 .Pp
-To launch a dynamically-linked pure-capability application with library-based
-compartmentalization, use the special runtime linker located at
-.Pa /libexec/ld-elf-c18n.so.1 .
-This can be done either explicitly, by invoking
-.Pp
-.Dl /libexec/ld-elf-c18n.so.1 Ar executable
-.Pp
-or implicitly, by setting the
-.Sy INTERP
-field of the program header of the target executable to the special linker's
-path.
-Said
-.Sy INTERP
-field can be inspected by invoking
-.Pp
-.Dl readelf -l Ar executable
-.Pp
-and can be set during the linking phase of compilation, typically by supplying
-the following option
-.Pp
-.Dl -Wl,--dynamic-linker=/libexec/ld-elf-c18n.so.1
-.Pp
-to the compiler.
-Alternatively, use the
-.Sy patchelf
-utility to directly modify the
-.Sy INTERP
-field of an executable, although it is reportedly unreliable at times.
-.Pp
-Environment variables recognized by
+Library-based compartmentalization contains a set of features provided by
 .Xr rtld 1
-adopt the prefix LD_C18N_ when compartmentalization is enabled.
-For example, LD_LIBRARY_PATH becomes LD_C18N_LIBRARY_PATH.
+and other system libraries that enhances the security of existing
+dynamically-linked pure-capability programs.
 .Pp
-Compartmentalization currently depends on modified versions of
+A new process inherits the compartmentalization setting of its parent.
+To enable c18n for all new processes across the entire system, run
+.Dl sysctl security.cheri.lib_based_c18n_default=1
+.Pp
+To override this and permanently enable or disable c18n for a particular
+executable, use the
+.Xr elfctl 1
+tool to write the setting into the executable.
+.Pp
+To override this and temporarily enable or disable c18n for a particular
+executable, run
+.Dl proccontrol -m cheric18n -s enable Ar executable
+or
+.Dl proccontrol -m cheric18n -s disable Ar executable
+as appropriate.
+.Pp
+Overriding this still are the environment variables
+.Ev LD_COMPARTMENT_ENABLE
+and
+.Ev LD_COMPARTMENT_DISABLE .
+If both environtment variables are set, c18n is disabled.
+Note that environment variables are not reliable inherited when processes fork.
+.Pp
+Compartmentalization depends on modified versions of
 .Lb libc
 and
 .Lb libthr .
 These are located in
 .Pa /usr/lib/c18n .
-The modified runtime linker automatically searches from these paths first so
-that modified libraries are used.
+.Xr rtld 1
+automatically searches from this path first when c18n is enabled.
 .Ss COMPARTMENT TRANSITION TRACING
 Compartment transitions can be traced with the
 .Xr ktrace 1
 facility.
-To generate a trace, set the environment variable LD_C18N_UTRACE_COMPARTMENT
+To generate a trace, set the environment variable
+.Ev LD_UTRACE_COMPARTMENT
 and invoke the executable with
 .Xr ktrace 1 .
 .Pp
@@ -90,8 +85,9 @@ purposes.
 Turning it on will reduce security.
 .Ss COMPARTMENT TRANSITION OVERHEAD SIMULATION
 To simulate the overhead of making a system call during each compartment
-transition, set the environment variable LD_C18N_COMPARTMENT_OVERHEAD and invoke
-the executable.
+transition, set the environment variable
+.Ev LD_COMPARTMENT_OVERHEAD
+and invoke the executable.
 Each compartment transition will then make a
 .Xr getpid 2
 system call.
@@ -101,37 +97,34 @@ Compartment transition overhead simulation is only intended for performance
 analysis purposes.
 Turning it on will reduce security.
 .Ss BENCHMARK ABI VARIANT
-A variant of the runtime linker that uses the benchmark ABI is provided at
-.Pa /libexec/ld-elf64cb-c18n.so.1 .
-Environment variables recognized by this variant need to be prefixed with
-LD_64CB_C18N_.
+The benchmark ABI variant of the runtime linker also supports c18n.
+Note that environment variables recognized by this variant need to be prefixed
+with LD_64CB_ instead of LD_.
 .Pp
 .Sy NOTE:
 Because the purecap variant uses some of Morello's architectural features that
-are unavailable under the benchmark ABI, the benchmark ABI variant is not a mere
-translation of the purecap variant but has a slightly different implementation.
-The best effort has been made to ensure that such a divergence does not bias
-performance estimates under almost all circumstances.
-.Sh LIMITATIONS
-This work is of an experimental nature.
-The author has tested it on applications such as
-.Xr tmux 1 ,
-but instabilities might occur when running complex pieces of software.
-.Pp
-Importantly, this prototype
-.Em does not
-provide complete isolation between compartments.
-For example, they are allowed to make arbitrary system calls to obtain
-privileges.
-.Pp
-Below is a list of known limitations and problems.
-For more up-to-date information, visit
-.Lk https://github.com/CTSRD-CHERI/cheripedia/wiki/Library-based-Compartmentalisation .
+are unavailable under the benchmark ABI, the benchmark ABI variant is not a
+mere translation of the purecap variant but has a slightly different
+implementation.
+The best effort has been made to ensure that such a divergence
+does not bias performance estimates under almost all circumstances.
+.Sh COMPATIBILITY
 .Bl -bullet
 .It
-Stack unwinding is not expected to work.
-This includes C++ exceptions, stack tracing in debuggers, and usage of
-.Lb libunwind .
+Calling
+.Xr vfork 2
+is identical to calling
+.Xr fork 2 ,
+that is, no memory sharing will take place between the parent and child
+processes.
+.It
+Calling
+.Xr rfork 2
+with flags
+.Dv RFMEM
+or
+.Dv RFSIGSHARE
+will return -1.
 .It
 .Xr sigaltstack 2
 does not work as expected.
@@ -143,5 +136,15 @@ stack-overflow exceptions.
 and related functions do not work as expected.
 This impacts certain threading and coroutine libraries.
 .El
+.Sh SECURITY
+This work is of an experimental nature.
+It
+.Em does not
+provide complete isolation between compartments.
+For example, they are allowed to make arbitrary system calls to obtain
+privileges and access other compartments' thread local data even when said data
+has static linkage.
+Calling function pointers in other compartments may also unexpectedly leak
+capabilities.
 .Sh AUTHORS
 .An Dapeng Gao Aq Mt dapeng.gao@cl.cam.ac.uk
