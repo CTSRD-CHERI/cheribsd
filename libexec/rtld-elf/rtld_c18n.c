@@ -484,27 +484,6 @@ struct stk_bottom {
 	void *top;
 };
 
-static compart_id_t
-index_to_cid(unsigned index)
-{
-	struct stk_table_stack dummy;
-
-	index *= sizeof(dummy.bottom);
-	index -= offsetof(struct stk_table, stacks);
-	index -= offsetof(struct stk_table_stack, bottom);
-	index /= sizeof(dummy);
-
-	/*
-	 * Reverse the transform done in cid_to_table_index.
-	 */
-#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	++index;
-#endif
-	return (index);
-}
-
-static void init_compart_stack(void *, compart_id_t);
-
 static void
 init_compart_stack(void *base, compart_id_t cid)
 {
