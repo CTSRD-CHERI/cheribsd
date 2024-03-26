@@ -34,6 +34,8 @@
 /*
  * Global symbols
  */
+extern Obj_Entry *obj_rtld_p;
+
 extern uintptr_t sealer_pltgot, sealer_tramp;
 extern const char *ld_compartment_utrace;
 extern const char *ld_compartment_enable;
@@ -191,6 +193,8 @@ size_t tramp_compile(char **, const struct tramp_data *);
 void *tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *);
 
 struct func_sig sigtab_get(const Obj_Entry *, unsigned long);
+
+struct tramp_header *tramp_reflect(void *);
 
 static inline long
 func_sig_to_otype(struct func_sig sig)

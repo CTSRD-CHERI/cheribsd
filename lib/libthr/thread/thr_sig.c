@@ -76,11 +76,15 @@ static void check_cancel(struct pthread *curthread, ucontext_t *ucp);
 /*
  * These weak symbols will always be resolved at runtime.
  */
-#pragma weak _rtld_sighandler
-void _rtld_sighandler(int, siginfo_t *, void *);
+/*
+ * XXX: Explicit function pointer used so that RTLD can wrap it in trampoline.
+ */
+extern void (*_rtld_sighandler)(int, siginfo_t *, void *);
 
-#pragma weak _rtld_dispatch_signal
-void _rtld_dispatch_signal(int, siginfo_t *, void *);
+/*
+ * XXX: Explicit function pointer used so that RTLD can wrap it in trampoline.
+ */
+extern void (*_rtld_dispatch_signal)(int, siginfo_t *, void *);
 
 #pragma weak _rtld_sigaction_begin
 void *_rtld_sigaction_begin(int, struct sigaction *);

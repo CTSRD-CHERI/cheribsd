@@ -429,21 +429,21 @@ tramp_should_include(const Obj_Entry *reqobj, const struct tramp_data *data)
 {
 	const char *sym;
 
-	/*
-	 * INVARIANT: The target of each trampoline is tagged.
-	 */
-	if (!cheri_gettag(data->target))
+	if (data->def == NULL)
+		return (true);
+
+	if (data->def == &sym_zero)
+		return (false);
+
+	sym = strtab_value(data->defobj, data->def->st_name);
+
+	if (string_base_search(&uni_compart.trusts, sym) != -1)
 		return (false);
 
 	if (reqobj == NULL)
 		return (true);
 
 	if (reqobj->compart_id == data->defobj->compart_id)
-		return (false);
-
-	sym = strtab_value(data->defobj, data->def->st_name);
-
-	if (string_base_search(&uni_compart.trusts, sym) != -1)
 		return (false);
 
 	if (string_base_search(&comparts.data[reqobj->compart_id].trusts, sym)
@@ -1169,9 +1169,28 @@ tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *data)
 	ptraddr_t key;
 	int exp;
 
-	/* reqobj == NULL iff the request is by RTLD */
-	assert((reqobj == NULL || data->def != NULL) && data->defobj != NULL
-	    && func_sig_legal(data->sig));
+	/*
+	 * INVARIANT: The defobj of each trampoline is tagged.
+	 */
+	assert(cheri_gettag(data->defobj));
+	if (data->def == NULL)
+		/*
+		 * XXX-DG: reqobj != NULL causes policies to be evaluated which
+		 * might result in a trampoline being elided. This is only safe
+		 * to do for jump slot relocations.
+		 *
+		 * Currently, the decision to elide the trampoline or not is
+		 * coupled with the decision of whether the symbol should be
+		 * made accesible to the requesting object. This is insecure.
+		 */
+		assert(reqobj == NULL);
+	else if (data->def == &sym_zero)
+		assert(data->target == NULL);
+	else
+		assert(data->defobj->symtab <= data->def &&
+		    data->def < data->defobj->symtab +
+		    data->defobj->dynsymcount);
+	assert(func_sig_legal(data->sig));
 
 	if (!tramp_should_include(reqobj, data))
 		return (data->target);
@@ -1283,9 +1302,8 @@ end:
 struct func_sig
 sigtab_get(const Obj_Entry *obj, unsigned long symnum)
 {
-	if (symnum >= obj->dynsymcount)
-		rtld_fatal("Invalid symbol number %lu for object %s.",
-		    symnum, obj->path);
+	rtld_require(symnum < obj->dynsymcount,
+	    "c18n: Invalid symbol number %lu for object %s", symnum, obj->path);
 
 	if (obj->sigtab == NULL)
 		return ((struct func_sig) { .valid = false });
@@ -1293,27 +1311,31 @@ sigtab_get(const Obj_Entry *obj, unsigned long symnum)
 	return (obj->sigtab[symnum]);
 }
 
-static struct tramp_header *
+struct tramp_header *
 tramp_reflect(void *entry)
 {
-	struct tramp_pg *page = atomic_load_explicit(&tramp_pgs.head,
-	    memory_order_acquire);
-	uintptr_t data = (uintptr_t)entry;
 	struct tramp_header *ret;
+	struct tramp_pg *page;
+	char *data = entry;
 
-	if (!cheri_gettag(data))
+	if (!cheri_gettag(data) || !cheri_getsealed(data) ||
+	    cheri_gettype(data) != CHERI_OTYPE_SENTRY ||
+	    (cheri_getperm(data) & CHERI_PERM_LOAD) == 0 ||
+	    (cheri_getperm(data) & CHERI_PERM_EXECUTE) == 0 ||
+	    (cheri_getperm(data) & CHERI_PERM_EXECUTIVE) == 0)
 		return (NULL);
 
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	data -= 1;
 #endif
-	data = (uintptr_t)__containerof((void *)data, struct tramp_header,
-	    entry);
+	data = (char *)__containerof((void *)data, struct tramp_header, entry);
+
+	page = atomic_load_explicit(&tramp_pgs.head, memory_order_acquire);
 
 	while (page != NULL) {
-		ret = cheri_buildcap(page, data);
+		ret = cheri_buildcap(page, (uintptr_t)data);
 		if (cheri_gettag(ret)) {
-			if (cheri_gettag(ret->target))
+			if (cheri_gettag(ret->defobj))
 				/*
 				 * At this point, the provided data must have
 				 * been (a) tagged and (b) pointing to the entry
@@ -1333,6 +1355,15 @@ tramp_reflect(void *entry)
 /*
  * APIs
  */
+/*
+ * XXX: Explicit function pointer used so that RTLD can wrap it in trampoline.
+ */
+extern void (*_rtld_sighandler)(int, siginfo_t *, void *);
+extern void (*_rtld_dispatch_signal)(int, siginfo_t *, void *);
+
+void _rtld_sighandler_unsafe(int, siginfo_t *, void *);
+void _rtld_dispatch_signal_unsafe(int, siginfo_t *, void *);
+
 #define	C18N_FUNC_SIG_COUNT	72
 
 void
@@ -1419,6 +1450,26 @@ c18n_init(void)
 
 	atomic_store_explicit(&tramp_pgs.head, tramp_pg_new(NULL),
 	    memory_order_relaxed);
+
+	/*
+	 * Wrap the hooks used by external libraries in trampolines.
+	 */
+	_rtld_sighandler = tramp_intern(NULL, &(struct tramp_data) {
+		.target = _rtld_sighandler_unsafe,
+		.defobj = obj_rtld_p,
+		.sig = (struct func_sig) {
+			.valid = true,
+			.reg_args = 3, .mem_args = false, .ret_args = NONE
+		}
+	});
+	_rtld_dispatch_signal = tramp_intern(NULL, &(struct tramp_data) {
+		.target = _rtld_dispatch_signal_unsafe,
+		.defobj = obj_rtld_p,
+		.sig = (struct func_sig) {
+			.valid = true,
+			.reg_args = 3, .mem_args = false, .ret_args = NONE
+		}
+	});
 }
 
 void *
@@ -1519,7 +1570,8 @@ _rtld_thr_exit(long *state)
 /*
  * Signal support
  */
-void _rtld_dispatch_signal(int, siginfo_t *, void *);
+void (*_rtld_sighandler)(int, siginfo_t *, void *);
+void (*_rtld_dispatch_signal)(int, siginfo_t *, void *);
 
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 ptraddr_t sighandler_fix_link(struct trusted_frame *, ucontext_t *);
@@ -1624,14 +1676,14 @@ dispatch_signal_end(ucontext_t *new, ucontext_t *old __unused)
 
 extern __siginfohandler_t *signal_dispatcher;
 
-__siginfohandler_t *signal_dispatcher = _rtld_dispatch_signal;
+__siginfohandler_t *signal_dispatcher = _rtld_dispatch_signal_unsafe;
 
 void _rtld_sighandler_init(__siginfohandler_t *);
 
 void
 _rtld_sighandler_init(__siginfohandler_t *p)
 {
-	assert(signal_dispatcher == _rtld_dispatch_signal &&
+	assert(signal_dispatcher == _rtld_dispatch_signal_unsafe &&
 	    (cheri_getperm(p) & CHERI_PERM_EXECUTIVE) == 0);
 	signal_dispatcher = tramp_intern(NULL, &(struct tramp_data) {
 		.target = p,
