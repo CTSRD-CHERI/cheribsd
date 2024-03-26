@@ -42,6 +42,7 @@
 #include <sys/signal.h>
 #include <sys/sysctl.h>
 #include <sys/time.h>
+#include <sys/wait.h>
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
@@ -427,4 +428,80 @@ CHERIBSDTEST(cheriabi_shmdt_invalid_ptr,
 	/* Unmapping the original capabilities should succeed. */
 	free_adjacent_mappings_shm(&mappings);
 	cheribsdtest_success();
+}
+
+CHERIBSDTEST(cheriabi_pipe_oob_write,
+    "Check that writes to a pipe obey bounds")
+{
+	char buf[8192];
+	int fds[2], res;
+	pid_t pid;
+
+	CHERIBSDTEST_CHECK_SYSCALL(pipe(fds));
+	memset(buf, '.', sizeof(buf));
+
+	CHERIBSDTEST_CHECK_SYSCALL(pid = fork());
+	if (pid != 0) {
+		close(fds[1]);
+		CHERIBSDTEST_CHECK_SYSCALL(write(fds[0], buf, sizeof(buf)));
+		CHERIBSDTEST_CHECK_CALL_ERROR(
+		    write(fds[0], buf, sizeof(buf) + 1), EFAULT);
+		close(fds[0]);
+
+		waitpid(pid, &res, 0);
+		CHERIBSDTEST_CHECK_EQ_BOOL(WIFEXITED(res), true);
+		CHERIBSDTEST_CHECK_EQ_INT(WEXITSTATUS(res), 0);
+		cheribsdtest_success();
+	} else {
+		close(fds[0]);
+		if (read(fds[1], buf, sizeof(buf)) != sizeof(buf))
+			exit(1);
+		/*
+		 * Block on a read to keep the fd open.  After the second
+		 * write above fails, the parent should close the fd so
+		 * this read will return 0.
+		 */
+		if (read(fds[1], buf, sizeof(buf)) != 0)
+			exit (1);
+		close(fds[1]);
+		exit(0);
+	}
+}
+
+CHERIBSDTEST(cheriabi_pipe_no_perm_write,
+    "Check that writes to a pipe obey permissions")
+{
+	char buf[8192];
+	int fds[2], res;
+	pid_t pid;
+
+	CHERIBSDTEST_CHECK_SYSCALL(pipe(fds));
+	memset(buf, '.', sizeof(buf));
+
+	CHERIBSDTEST_CHECK_SYSCALL(pid = fork());
+	if (pid != 0) {
+		close(fds[1]);
+		CHERIBSDTEST_CHECK_SYSCALL(write(fds[0], buf, sizeof(buf)));
+		CHERIBSDTEST_CHECK_CALL_ERROR(write(fds[0],
+		    cheri_andperm(buf, ~CHERI_PERM_LOAD), sizeof(buf)), EFAULT);
+		close(fds[0]);
+
+		waitpid(pid, &res, 0);
+		CHERIBSDTEST_CHECK_EQ_BOOL(WIFEXITED(res), true);
+		CHERIBSDTEST_CHECK_EQ_INT(WEXITSTATUS(res), 0);
+		cheribsdtest_success();
+	} else {
+		close(fds[0]);
+		if (read(fds[1], buf, sizeof(buf)) != sizeof(buf))
+			exit(1);
+		/*
+		 * Block on a read to keep the fd open.  After the second
+		 * write above fails, the parent should close the fd so
+		 * this read will return 0.
+		 */
+		if (read(fds[1], buf, sizeof(buf)) != 0)
+			exit (1);
+		close(fds[1]);
+		exit(0);
+	}
 }
