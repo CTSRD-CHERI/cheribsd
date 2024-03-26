@@ -68,7 +68,7 @@ compart_id_t compart_id_allocate(const char *);
 
 struct stk_table {
 	union {
-		void *(*resolver)(unsigned);
+		void (*resolver)(void);
 		SLIST_ENTRY(stk_table) next;
 	};
 	size_t capacity;

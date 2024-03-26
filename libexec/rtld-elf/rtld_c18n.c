@@ -465,6 +465,11 @@ tramp_should_include(const Obj_Entry *reqobj, const struct tramp_data *data)
 /*
  * Stack switching
  */
+/*
+ * Assembly function with non-standard ABI.
+ */
+void allocate_rstk(void);
+
 struct stk_bottom {
 	compart_id_t compart_id;
 	/*
@@ -478,8 +483,6 @@ struct stk_bottom {
 	 */
 	void *top;
 };
-
-void *allocate_rstk(unsigned);
 
 static compart_id_t
 index_to_cid(unsigned index)
@@ -1510,12 +1513,22 @@ _rtld_thread_start_init(void (*p)(struct pthread *))
 	});
 }
 
-void _rtld_thread_start_impl(struct pthread *);
-
+void thread_start_2(struct pthread *);
 void
-_rtld_thread_start_impl(struct pthread *curthread)
+thread_start_2(struct pthread *curthread)
 {
-	struct stk_table *table = pop_stk_table(&free_stk_tables);
+	struct stk_table *table;
+
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	/*
+	 * When a new thread is created, the kernel stores the TCB in the
+	 * Executive mode thread pointer register. Here, move the TCB to the
+	 * Restricted mode thread pointer register.
+	 */
+	_tcb_set((struct tcb *)stk_table_get());
+#endif
+
+	table = pop_stk_table(&free_stk_tables);
 
 	/* See c18n_init */
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
@@ -1527,11 +1540,11 @@ _rtld_thread_start_impl(struct pthread *curthread)
 
 	stk_table_set(table);
 
-	thr_thread_start(curthread);
+	__attribute__((musttail))
+	return (thr_thread_start(curthread));
 }
 
 void _rtld_thr_exit(long *);
-
 void
 _rtld_thr_exit(long *state)
 {
@@ -1566,7 +1579,8 @@ _rtld_thr_exit(long *state)
 		_exit(2);
 #endif
 
-	__sys_thr_exit(state);
+	__attribute__((musttail))
+	return (__sys_thr_exit(state));
 }
 
 /*
@@ -1575,24 +1589,34 @@ _rtld_thr_exit(long *state)
 void (*_rtld_sighandler)(int, siginfo_t *, void *);
 void (*_rtld_dispatch_signal)(int, siginfo_t *, void *);
 
-#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-ptraddr_t sighandler_fix_link(struct trusted_frame *, ucontext_t *);
+void sighandler_2(int, siginfo_t *, void *);
+void dispatch_signal_3(int, siginfo_t *, void *, __siginfohandler_t);
 
-ptraddr_t
-sighandler_fix_link(struct trusted_frame *csp, ucontext_t *ucp)
+void _rtld_sighandler_unsafe(int sig, siginfo_t *info, void *_ucp)
 {
-	ptraddr_t ret = csp->next;
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	/*
+	 * The sigframe is pushed onto the trusted stack, disrupting the linked-
+	 * list. Repair the link by pointing it to the pre-signal top of the
+	 * trusted stack.
+	 */
+	ucontext_t *ucp = _ucp;
+	struct trusted_frame *tf = get_trusted_frame();
 
-	csp->next = ucp->uc_mcontext.mc_capregs.cap_sp;
+	tf->next = ucp->uc_mcontext.mc_capregs.cap_sp;
+#endif
 
-	return (ret);
+	__attribute__((musttail))
+	return (sighandler_2(sig, info, _ucp));
 }
 
-void sighandler_unfix_link(struct trusted_frame *, ptraddr_t);
-
-void sighandler_unfix_link(struct trusted_frame *csp, ptraddr_t link)
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+void sighandler_3(void);
+void sighandler_3(void)
 {
-	csp->next = link;
+	struct trusted_frame *tf = get_trusted_frame();
+
+	tf->next = tf->csp;
 }
 #endif
 
@@ -1601,26 +1625,12 @@ static struct sigaction_map {
 	__siginfohandler_t *n_handler;
 } sigaction_map[_SIG_MAXSIG];
 
-struct dispatch_signal_ret {
-	siginfo_t *info;
-	ucontext_t *ucp;
-};
-
-__siginfohandler_t *dispatch_signal_get(int);
-
-__siginfohandler_t *
-dispatch_signal_get(int sig)
+void dispatch_signal_2(int, siginfo_t *, void *, __siginfohandler_t);
+void
+dispatch_signal_2(int sig, siginfo_t *info, void *_ucp,
+    __siginfohandler_t sigfunc)
 {
-	return (sigaction_map[sig - 1].n_handler);
-}
-
-struct dispatch_signal_ret dispatch_signal_begin(__siginfohandler_t,
-    siginfo_t *, void *);
-
-struct dispatch_signal_ret
-dispatch_signal_begin(__siginfohandler_t sigfunc, siginfo_t *info, void *_ucp)
-{
-	compart_id_t cid = tramp_reflect(sigfunc)->defobj->compart_id;
+	compart_id_t cid;
 	struct stk_table_stack *entry;
 	ucontext_t *ucp = _ucp;
 	struct sigframe {
@@ -1628,6 +1638,10 @@ dispatch_signal_begin(__siginfohandler_t sigfunc, siginfo_t *info, void *_ucp)
 		ucontext_t context;
 	} *ntop, *otop;
 	struct stk_bottom *stack;
+
+	sigfunc = sigaction_map[sig - 1].n_handler;
+
+	cid = tramp_reflect(sigfunc)->defobj->compart_id;
 
 	entry = &stk_table_get()->stacks[cid_to_table_index(cid)];
 	if (entry->size == 0)
@@ -1651,16 +1665,13 @@ dispatch_signal_begin(__siginfohandler_t sigfunc, siginfo_t *info, void *_ucp)
 	 */
 	ntop->context.uc_mcontext.mc_capregs.cap_sp = (uintptr_t)otop;
 
-	return (struct dispatch_signal_ret) {
-		.info = &ntop->info,
-		.ucp = &ntop->context
-	};
+	__attribute__((musttail))
+	return (dispatch_signal_3(sig, &ntop->info, &ntop->context, sigfunc));
 }
 
-void dispatch_signal_end(ucontext_t *, ucontext_t *);
-
+void dispatch_signal_4(ucontext_t *, ucontext_t *);
 void
-dispatch_signal_end(ucontext_t *new, ucontext_t *old __unused)
+dispatch_signal_4(ucontext_t *new, ucontext_t *old __unused)
 {
 	void *top;
 	struct stk_bottom *stack;

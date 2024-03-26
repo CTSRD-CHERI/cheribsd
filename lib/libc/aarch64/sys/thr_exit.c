@@ -28,12 +28,11 @@
 #include <sys/cdefs.h>
 #include <sys/types.h>
 
-void thr_exit(long *);
-
 void _rtld_thr_exit(long *);
 
 void
 thr_exit(long *state)
 {
-	_rtld_thr_exit(state);
+	__attribute__((musttail))
+	return (_rtld_thr_exit(state));
 }
