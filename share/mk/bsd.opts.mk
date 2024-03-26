@@ -105,7 +105,7 @@ __SINGLE_OPTIONS = \
    INIT_ALL
 
 __INIT_ALL_OPTIONS=	none pattern zero
-__INIT_ALL_DEFAULT=	none
+__INIT_ALL_DEFAULT=	zero
 
 .-include <local.opts.mk>
 

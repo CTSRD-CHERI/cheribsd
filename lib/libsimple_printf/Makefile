@@ -2,8 +2,7 @@
 
 .include <src.opts.mk>
 MK_SSP=	no
-MK_INIT_ALL_ZERO=	no
-MK_INIT_ALL_PATTERN=	no
+OPT_INIT_ALL=	none
 
 PACKAGE=lib${LIB}
 LIB=	simple_printf
