@@ -11,6 +11,14 @@
 
 #define _LIBUNWIND_VERSION 15000
 
+#if defined(_LIBUNWIND_SANDBOX_HARDENED) && !defined(_LIBUNWIND_SANDBOX_OTYPES)
+#error "_LIBUNWIND_SANDBOX_HARDENED is invalid without a sandboxing mechanism"
+#endif
+
+#if defined(_LIBUNWIND_SANDBOX_OTYPES) && defined(_LIBUNWIND_NO_HEAP)
+#error "_LIBUNWIND_NO_HEAP cannot be used with _LIBUNWIND_SANDBOX_OTYPES"
+#endif
+
 #if defined(__arm__) && !defined(__USING_SJLJ_EXCEPTIONS__) && \
     !defined(__ARM_DWARF_EH__) && !defined(__SEH__)
 #define _LIBUNWIND_ARM_EHABI
@@ -20,7 +28,7 @@
 #define _LIBUNWIND_HIGHEST_DWARF_REGISTER_X86_64    32
 #define _LIBUNWIND_HIGHEST_DWARF_REGISTER_PPC       112
 #define _LIBUNWIND_HIGHEST_DWARF_REGISTER_PPC64     116
-#define _LIBUNWIND_HIGHEST_DWARF_REGISTER_MORELLO   229
+#define _LIBUNWIND_HIGHEST_DWARF_REGISTER_MORELLO   230
 #define _LIBUNWIND_HIGHEST_DWARF_REGISTER_ARM64     95
 #define _LIBUNWIND_HIGHEST_DWARF_REGISTER_ARM       287
 #define _LIBUNWIND_HIGHEST_DWARF_REGISTER_OR1K      32
@@ -76,11 +84,11 @@
 # elif defined(__aarch64__)
 #  define _LIBUNWIND_TARGET_AARCH64 1
 #  if defined(__CHERI_PURE_CAPABILITY__)
-#    define _LIBUNWIND_CONTEXT_SIZE 100
+#    define _LIBUNWIND_CONTEXT_SIZE 102
 #    if defined(__SEH__)
 #      error "Pure-capability aarch64 SEH not supported"
 #    else
-#      define _LIBUNWIND_CURSOR_SIZE 124
+#      define _LIBUNWIND_CURSOR_SIZE 126
 #    endif
 #    define _LIBUNWIND_HIGHEST_DWARF_REGISTER _LIBUNWIND_HIGHEST_DWARF_REGISTER_MORELLO
 #  else

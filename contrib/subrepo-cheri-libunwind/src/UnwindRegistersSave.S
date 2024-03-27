@@ -837,6 +837,19 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
 
 #elif defined(__aarch64__)
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+DEFINE_LIBUNWIND_FUNCTION(__rtld_unw_getcontext)
+  mov    c2,      csp
+  str    c2,      [c1]
+  ret    c30
+END_LIBUNWIND_FUNCTION(__rtld_unw_getcontext)
+#ifdef _LIBUNWIND_SANDBOX_HARDENED
+WEAK_ALIAS(__rtld_unw_getcontext, _rtld_unw_getcontext)
+#else
+WEAK_ALIAS(__rtld_unw_getcontext, _rtld_unw_getcontext_unsealed)
+#endif
+#endif
+
 //
 // extern int __unw_getcontext(unw_context_t* thread_state)
 //
@@ -861,12 +874,15 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
   stp    c24,c25, [c0, #0x180]
   stp    c26,c27, [c0, #0x1a0]
   stp    c28,c29, [c0, #0x1c0]
-  str    c30,     [c0, #0x1e0]
   mov    c1,csp
-  str    c1,      [c0, #0x1f0]
+  stp    c30, c1, [c0, #0x1e0]
   str    c30,     [c0, #0x200]    // store return address as pcc
+
+  // Prepare c1 to get our executive stack.
+  add    c1, c0,  #0x210
+
   // skip cpsr
-  add    c0, c0, #0x220
+  add    c0, c0,  #0x230
   stp    d0, d1,  [c0, #0x000]
   stp    d2, d3,  [c0, #0x010]
   stp    d4, d5,  [c0, #0x020]
@@ -885,7 +901,11 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
   str    d30,     [c0, #0x0f0]
   str    d31,     [c0, #0x0f8]
   mov    x0, #0                   // return UNW_ESUCCESS
-  ret
+#ifdef _LIBUNWIND_SANDBOX_HARDENED
+  b      _rtld_unw_getcontext
+#else
+  b      _rtld_unw_getcontext_unsealed
+#endif
 #else
   stp    x0, x1,  [x0, #0x000]
   stp    x2, x3,  [x0, #0x010]

@@ -53,4 +53,7 @@ SRCS+=		s_logbl.c
 SRCS+=		s_scalbnl.c
 .endif
 
+SYMBOL_MAPS+=	${.CURDIR}/Symbol-c18n.map
+CFLAGS+=	-D_LIBUNWIND_SANDBOX_OTYPES -D_LIBUNWIND_SANDBOX_HARDENED
+
 .include <bsd.lib.mk>
