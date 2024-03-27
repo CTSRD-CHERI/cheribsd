@@ -55,6 +55,9 @@ enum {
 #if __has_feature(capabilities)
 	MODE_CHERI_REVOKE,
 #endif
+#ifdef PROC_CHERI_C18N_CTL
+	MODE_CHERI_C18N,
+#endif
 };
 
 static pid_t
@@ -86,6 +89,11 @@ str2pid(const char *str)
 #else
 #define	CHERI_REVOKE_USAGE
 #endif
+#ifdef PROC_CHERI_C18N_CTL
+#define	CHERI_C18N_USAGE "|cheric18n"
+#else
+#define	CHERI_C18N_USAGE
+#endif
 
 static void __dead2
 usage(void)
@@ -93,6 +101,7 @@ usage(void)
 
 	fprintf(stderr, "Usage: proccontrol -m (aslr|protmax|trace|trapcap|"
 	    "stackgap|nonewprivs|wxmap"KPTI_USAGE LA_USAGE CHERI_REVOKE_USAGE
+	    CHERI_C18N_USAGE
 	    ") [-q] [-s (enable|disable)] [-p pid | command]\n");
 	exit(1);
 }
@@ -138,6 +147,10 @@ main(int argc, char *argv[])
 #if __has_feature(capabilities)
 			else if (strcmp(optarg, "cherirevoke") == 0)
 				mode = MODE_CHERI_REVOKE;
+#endif
+#ifdef PROC_CHERI_C18N_CTL
+			else if (strcmp(optarg, "cheric18n") == 0)
+				mode = MODE_CHERI_C18N;
 #endif
 			else
 				usage();
@@ -211,6 +224,12 @@ main(int argc, char *argv[])
 #if __has_feature(capabilities)
 		case MODE_CHERI_REVOKE:
 			error = procctl(P_PID, pid, PROC_CHERI_REVOKE_STATUS,
+			    &arg);
+			break;
+#endif
+#ifdef PROC_CHERI_C18N_CTL
+		case MODE_CHERI_C18N:
+			error = procctl(P_PID, pid, PROC_CHERI_C18N_STATUS,
 			    &arg);
 			break;
 #endif
@@ -370,6 +389,21 @@ main(int argc, char *argv[])
 				printf(", not active\n");
 			break;
 #endif
+#ifdef PROC_CHERI_C18N_CTL
+		case MODE_CHERI_C18N:
+			switch (arg) {
+			case PROC_CHERI_C18N_ENABLE:
+				printf("enabled");
+				break;
+			case PROC_CHERI_C18N_DISABLE:
+				printf("disabled");
+				break;
+			case PROC_CHERI_C18N_NOFORCE:
+				printf("not forced");
+				break;
+			}
+			break;
+#endif
 		}
 	} else {
 		switch (mode) {
@@ -434,6 +468,13 @@ main(int argc, char *argv[])
 			arg = enable ? PROC_CHERI_REVOKE_FORCE_ENABLE :
 			    PROC_CHERI_REVOKE_FORCE_DISABLE;
 			error = procctl(P_PID, pid, PROC_CHERI_REVOKE_CTL, &arg);
+			break;
+#endif
+#ifdef PROC_CHERI_C18N_CTL
+		case MODE_CHERI_C18N:
+			arg = enable ? PROC_CHERI_C18N_ENABLE :
+			    PROC_CHERI_C18N_DISABLE;
+			error = procctl(P_PID, pid, PROC_CHERI_C18N_CTL, &arg);
 			break;
 #endif
 		default:

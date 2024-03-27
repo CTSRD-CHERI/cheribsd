@@ -48,11 +48,14 @@ static uintptr_t sealer_jmpbuf;
 
 uintptr_t sealer_pltgot, sealer_tramp;
 
+/* Enable compartmentalisation */
+bool ld_compartment_enable;
+
+/* Permission bit to be cleared for user code */
+uint64_t c18n_code_perm_clear;
+
 /* Use utrace() to log compartmentalisation-related events */
 const char *ld_compartment_utrace;
-
-/* Enable compartmentalisation */
-const char *ld_compartment_enable;
 
 /* Path of the compartmentalisation policy */
 const char *ld_compartment_policy;
@@ -429,21 +432,21 @@ tramp_should_include(const Obj_Entry *reqobj, const struct tramp_data *data)
 {
 	const char *sym;
 
-	/*
-	 * INVARIANT: The target of each trampoline is tagged.
-	 */
-	if (!cheri_gettag(data->target))
+	if (data->def == NULL)
+		return (true);
+
+	if (data->def == &sym_zero)
+		return (false);
+
+	sym = strtab_value(data->defobj, data->def->st_name);
+
+	if (string_base_search(&uni_compart.trusts, sym) != -1)
 		return (false);
 
 	if (reqobj == NULL)
 		return (true);
 
 	if (reqobj->compart_id == data->defobj->compart_id)
-		return (false);
-
-	sym = strtab_value(data->defobj, data->def->st_name);
-
-	if (string_base_search(&uni_compart.trusts, sym) != -1)
 		return (false);
 
 	if (string_base_search(&comparts.data[reqobj->compart_id].trusts, sym)
@@ -462,6 +465,11 @@ tramp_should_include(const Obj_Entry *reqobj, const struct tramp_data *data)
 /*
  * Stack switching
  */
+/*
+ * Assembly function with non-standard ABI.
+ */
+void allocate_rstk(void);
+
 struct stk_bottom {
 	compart_id_t compart_id;
 	/*
@@ -475,29 +483,6 @@ struct stk_bottom {
 	 */
 	void *top;
 };
-
-void *allocate_rstk(unsigned);
-
-static compart_id_t
-index_to_cid(unsigned index)
-{
-	struct stk_table_stack dummy;
-
-	index *= sizeof(dummy.bottom);
-	index -= offsetof(struct stk_table, stacks);
-	index -= offsetof(struct stk_table_stack, bottom);
-	index /= sizeof(dummy);
-
-	/*
-	 * Reverse the transform done in cid_to_table_index.
-	 */
-#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	++index;
-#endif
-	return (index);
-}
-
-static void init_compart_stack(void *, compart_id_t);
 
 static void
 init_compart_stack(void *base, compart_id_t cid)
@@ -535,8 +520,6 @@ c18n_init_rtld_stack(uintptr_t ret, void *base)
 	--stk;
 
 	stk = cheri_setboundsexact(stk, sizeof(*stk));
-	untrusted_stk_set(stk);
-
 	base = stk + 1;
 #endif
 
@@ -556,6 +539,17 @@ init_stk_table(struct stk_table *table)
 	void *sp = cheri_getstack();
 	table->stacks[cid_to_table_index(C18N_RTLD_COMPART_ID)].bottom =
 	    cheri_setoffset(sp, cheri_getlen(sp));
+}
+#else
+void install_dummy_stack(void);
+void
+install_dummy_stack(void)
+{
+	struct stk_bottom *stk = cheri_getstack();
+	stk = cheri_setoffset(stk, cheri_getlen(stk));
+	--stk;
+
+	untrusted_stk_set(stk->top);
 }
 #endif
 
@@ -1010,23 +1004,31 @@ void
 tramp_hook_impl(int event, const struct tramp_header *hdr,
     const struct trusted_frame *tf)
 {
-	const char *sym;
-	const char *callee;
-
+	struct utrace_c18n ut;
 	struct stk_bottom *stk;
 	compart_id_t caller_id;
-	const char *caller;
-
-	struct utrace_rtld ut;
-	static const char rtld_utrace_sig[RTLD_UTRACE_SIG_SZ] = RTLD_UTRACE_SIG;
+	const char *sym, *callee, *caller;
 
 	if (ld_compartment_utrace != NULL) {
+		memcpy(ut.sig, C18N_UTRACE_SIG, C18N_UTRACE_SIG_SZ);
+		ut.event = event;
+		ut.symnum = hdr->symnum;
+		ut.fp = tf->fp;
+		ut.pc = tf->pc;
+		ut.next = tf->next;
+		ut.o_sp = tf->o_sp;
+		ut.n_sp = tf->n_sp;
+		ut.csp = tf;
+		memcpy(&ut.fsig, &hdr->sig, sizeof(ut.fsig));
+
 		if (hdr->symnum == 0)
 			sym = "<unknown>";
 		else
 			sym = symname(hdr->defobj, hdr->symnum);
+		strlcpy(ut.symbol, sym, sizeof(ut.symbol));
 
 		callee = comparts.data[hdr->defobj->compart_id].name;
+		strlcpy(ut.callee, callee, sizeof(ut.callee));
 
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 		if (cheri_gettag(tf->pc) &&
@@ -1042,14 +1044,8 @@ tramp_hook_impl(int event, const struct tramp_header *hdr,
 			caller_id = C18N_RTLD_COMPART_ID;
 #endif
 		caller = comparts.data[caller_id].name;
-
-		memcpy(ut.sig, rtld_utrace_sig, sizeof(ut.sig));
-		ut.event = event;
-		ut.handle = hdr->target;
-		ut.mapsize = hdr->symnum;
-		strlcpy(ut.symbol, sym, sizeof(ut.symbol));
-		strlcpy(ut.callee, callee, sizeof(ut.callee));
 		strlcpy(ut.caller, caller, sizeof(ut.caller));
+
 		utrace(&ut, sizeof(ut));
 	}
 	if (ld_compartment_overhead != NULL)
@@ -1169,9 +1165,31 @@ tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *data)
 	ptraddr_t key;
 	int exp;
 
-	/* reqobj == NULL iff the request is by RTLD */
-	assert((reqobj == NULL || data->def != NULL) && data->defobj != NULL
-	    && func_sig_legal(data->sig));
+	if (!C18N_ENABLED)
+		return (data->target);
+
+	/*
+	 * INVARIANT: The defobj of each trampoline is tagged.
+	 */
+	assert(cheri_gettag(data->defobj));
+	if (data->def == NULL)
+		/*
+		 * XXX-DG: reqobj != NULL causes policies to be evaluated which
+		 * might result in a trampoline being elided. This is only safe
+		 * to do for jump slot relocations.
+		 *
+		 * Currently, the decision to elide the trampoline or not is
+		 * coupled with the decision of whether the symbol should be
+		 * made accesible to the requesting object. This is insecure.
+		 */
+		assert(reqobj == NULL);
+	else if (data->def == &sym_zero)
+		assert(data->target == NULL);
+	else
+		assert(data->defobj->symtab <= data->def &&
+		    data->def < data->defobj->symtab +
+		    data->defobj->dynsymcount);
+	assert(func_sig_legal(data->sig));
 
 	if (!tramp_should_include(reqobj, data))
 		return (data->target);
@@ -1283,9 +1301,8 @@ end:
 struct func_sig
 sigtab_get(const Obj_Entry *obj, unsigned long symnum)
 {
-	if (symnum >= obj->dynsymcount)
-		rtld_fatal("Invalid symbol number %lu for object %s.",
-		    symnum, obj->path);
+	rtld_require(symnum < obj->dynsymcount,
+	    "c18n: Invalid symbol number %lu for object %s", symnum, obj->path);
 
 	if (obj->sigtab == NULL)
 		return ((struct func_sig) { .valid = false });
@@ -1293,27 +1310,30 @@ sigtab_get(const Obj_Entry *obj, unsigned long symnum)
 	return (obj->sigtab[symnum]);
 }
 
-static struct tramp_header *
-tramp_reflect(void *entry)
+struct tramp_header *
+tramp_reflect(const void *data)
 {
-	struct tramp_pg *page = atomic_load_explicit(&tramp_pgs.head,
-	    memory_order_acquire);
-	uintptr_t data = (uintptr_t)entry;
 	struct tramp_header *ret;
+	struct tramp_pg *page;
 
-	if (!cheri_gettag(data))
+	if (!cheri_gettag(data) || !cheri_getsealed(data) ||
+	    cheri_gettype(data) != CHERI_OTYPE_SENTRY ||
+	    (cheri_getperm(data) & CHERI_PERM_LOAD) == 0 ||
+	    (cheri_getperm(data) & CHERI_PERM_EXECUTE) == 0 ||
+	    (cheri_getperm(data) & CHERI_PERM_EXECUTIVE) == 0)
 		return (NULL);
 
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	data -= 1;
+	data = (const char *)data - 1;
 #endif
-	data = (uintptr_t)__containerof((void *)data, struct tramp_header,
-	    entry);
+	data = __containerof(data, struct tramp_header, entry);
+
+	page = atomic_load_explicit(&tramp_pgs.head, memory_order_acquire);
 
 	while (page != NULL) {
-		ret = cheri_buildcap(page, data);
+		ret = cheri_buildcap(page, (uintptr_t)data);
 		if (cheri_gettag(ret)) {
-			if (cheri_gettag(ret->target))
+			if (cheri_gettag(ret->defobj))
 				/*
 				 * At this point, the provided data must have
 				 * been (a) tagged and (b) pointing to the entry
@@ -1333,6 +1353,15 @@ tramp_reflect(void *entry)
 /*
  * APIs
  */
+/*
+ * XXX: Explicit function pointer used so that RTLD can wrap it in trampoline.
+ */
+extern void (*_rtld_sighandler)(int, siginfo_t *, void *);
+extern void (*_rtld_dispatch_signal)(int, siginfo_t *, void *);
+
+void _rtld_sighandler_unsafe(int, siginfo_t *, void *);
+void _rtld_dispatch_signal_unsafe(int, siginfo_t *, void *);
+
 #define	C18N_FUNC_SIG_COUNT	72
 
 void
@@ -1408,6 +1437,8 @@ c18n_init(void)
 	 */
 	trusted_stk_set(stk_create(C18N_STACK_SIZE));
 	init_stk_table(table);
+#else
+	install_dummy_stack();
 #endif
 
 	stk_table_set(table);
@@ -1419,22 +1450,26 @@ c18n_init(void)
 
 	atomic_store_explicit(&tramp_pgs.head, tramp_pg_new(NULL),
 	    memory_order_relaxed);
-}
 
-void *
-c18n_return_address(void)
-{
-	struct trusted_frame *tframe;
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wframe-address"
 	/*
-	 * Unwind twice to locate the trusted frame.
+	 * Wrap the hooks used by external libraries in trampolines.
 	 */
-	tframe = __builtin_frame_address(2);
-#pragma clang diagnostic pop
-
-	return (tframe->pc);
+	_rtld_sighandler = tramp_intern(NULL, &(struct tramp_data) {
+		.target = _rtld_sighandler_unsafe,
+		.defobj = obj_rtld_p,
+		.sig = (struct func_sig) {
+			.valid = true,
+			.reg_args = 3, .mem_args = false, .ret_args = NONE
+		}
+	});
+	_rtld_dispatch_signal = tramp_intern(NULL, &(struct tramp_data) {
+		.target = _rtld_dispatch_signal_unsafe,
+		.defobj = obj_rtld_p,
+		.sig = (struct func_sig) {
+			.valid = true,
+			.reg_args = 3, .mem_args = false, .ret_args = NONE
+		}
+	});
 }
 
 /*
@@ -1459,26 +1494,38 @@ _rtld_thread_start_init(void (*p)(struct pthread *))
 	});
 }
 
-void _rtld_thread_start_impl(struct pthread *);
-
+void thread_start_2(struct pthread *);
 void
-_rtld_thread_start_impl(struct pthread *curthread)
+thread_start_2(struct pthread *curthread)
 {
-	struct stk_table *table = pop_stk_table(&free_stk_tables);
+	struct stk_table *table;
+
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	/*
+	 * When a new thread is created, the kernel stores the TCB in the
+	 * Executive mode thread pointer register. Here, move the TCB to the
+	 * Restricted mode thread pointer register.
+	 */
+	_tcb_set((struct tcb *)stk_table_get());
+#endif
+
+	table = pop_stk_table(&free_stk_tables);
 
 	/* See c18n_init */
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	trusted_stk_set(stk_create(C18N_STACK_SIZE));
 	init_stk_table(table);
+#else
+	install_dummy_stack();
 #endif
 
 	stk_table_set(table);
 
-	thr_thread_start(curthread);
+	__attribute__((musttail))
+	return (thr_thread_start(curthread));
 }
 
 void _rtld_thr_exit(long *);
-
 void
 _rtld_thr_exit(long *state)
 {
@@ -1513,32 +1560,44 @@ _rtld_thr_exit(long *state)
 		_exit(2);
 #endif
 
-	__sys_thr_exit(state);
+	__attribute__((musttail))
+	return (__sys_thr_exit(state));
 }
 
 /*
  * Signal support
  */
-void _rtld_dispatch_signal(int, siginfo_t *, void *);
+void (*_rtld_sighandler)(int, siginfo_t *, void *);
+void (*_rtld_dispatch_signal)(int, siginfo_t *, void *);
 
-#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-ptraddr_t sighandler_fix_link(struct trusted_frame *, ucontext_t *);
+void sighandler_2(int, siginfo_t *, void *);
+void dispatch_signal_3(int, siginfo_t *, void *, __siginfohandler_t);
 
-ptraddr_t
-sighandler_fix_link(struct trusted_frame *csp, ucontext_t *ucp)
+void _rtld_sighandler_unsafe(int sig, siginfo_t *info, void *_ucp)
 {
-	ptraddr_t ret = csp->next;
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	/*
+	 * The sigframe is pushed onto the trusted stack, disrupting the linked-
+	 * list. Repair the link by pointing it to the pre-signal top of the
+	 * trusted stack.
+	 */
+	ucontext_t *ucp = _ucp;
+	struct trusted_frame *tf = get_trusted_frame();
 
-	csp->next = ucp->uc_mcontext.mc_capregs.cap_sp;
+	tf->next = ucp->uc_mcontext.mc_capregs.cap_sp;
+#endif
 
-	return (ret);
+	__attribute__((musttail))
+	return (sighandler_2(sig, info, _ucp));
 }
 
-void sighandler_unfix_link(struct trusted_frame *, ptraddr_t);
-
-void sighandler_unfix_link(struct trusted_frame *csp, ptraddr_t link)
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+void sighandler_3(void);
+void sighandler_3(void)
 {
-	csp->next = link;
+	struct trusted_frame *tf = get_trusted_frame();
+
+	tf->next = tf->csp;
 }
 #endif
 
@@ -1547,26 +1606,12 @@ static struct sigaction_map {
 	__siginfohandler_t *n_handler;
 } sigaction_map[_SIG_MAXSIG];
 
-struct dispatch_signal_ret {
-	siginfo_t *info;
-	ucontext_t *ucp;
-};
-
-__siginfohandler_t *dispatch_signal_get(int);
-
-__siginfohandler_t *
-dispatch_signal_get(int sig)
+void dispatch_signal_2(int, siginfo_t *, void *, __siginfohandler_t);
+void
+dispatch_signal_2(int sig, siginfo_t *info, void *_ucp,
+    __siginfohandler_t sigfunc)
 {
-	return (sigaction_map[sig - 1].n_handler);
-}
-
-struct dispatch_signal_ret dispatch_signal_begin(__siginfohandler_t,
-    siginfo_t *, void *);
-
-struct dispatch_signal_ret
-dispatch_signal_begin(__siginfohandler_t sigfunc, siginfo_t *info, void *_ucp)
-{
-	compart_id_t cid = tramp_reflect(sigfunc)->defobj->compart_id;
+	compart_id_t cid;
 	struct stk_table_stack *entry;
 	ucontext_t *ucp = _ucp;
 	struct sigframe {
@@ -1574,6 +1619,10 @@ dispatch_signal_begin(__siginfohandler_t sigfunc, siginfo_t *info, void *_ucp)
 		ucontext_t context;
 	} *ntop, *otop;
 	struct stk_bottom *stack;
+
+	sigfunc = sigaction_map[sig - 1].n_handler;
+
+	cid = tramp_reflect(sigfunc)->defobj->compart_id;
 
 	entry = &stk_table_get()->stacks[cid_to_table_index(cid)];
 	if (entry->size == 0)
@@ -1597,16 +1646,13 @@ dispatch_signal_begin(__siginfohandler_t sigfunc, siginfo_t *info, void *_ucp)
 	 */
 	ntop->context.uc_mcontext.mc_capregs.cap_sp = (uintptr_t)otop;
 
-	return (struct dispatch_signal_ret) {
-		.info = &ntop->info,
-		.ucp = &ntop->context
-	};
+	__attribute__((musttail))
+	return (dispatch_signal_3(sig, &ntop->info, &ntop->context, sigfunc));
 }
 
-void dispatch_signal_end(ucontext_t *, ucontext_t *);
-
+void dispatch_signal_4(ucontext_t *, ucontext_t *);
 void
-dispatch_signal_end(ucontext_t *new, ucontext_t *old __unused)
+dispatch_signal_4(ucontext_t *new, ucontext_t *old __unused)
 {
 	void *top;
 	struct stk_bottom *stack;
@@ -1624,14 +1670,14 @@ dispatch_signal_end(ucontext_t *new, ucontext_t *old __unused)
 
 extern __siginfohandler_t *signal_dispatcher;
 
-__siginfohandler_t *signal_dispatcher = _rtld_dispatch_signal;
+__siginfohandler_t *signal_dispatcher = _rtld_dispatch_signal_unsafe;
 
 void _rtld_sighandler_init(__siginfohandler_t *);
 
 void
 _rtld_sighandler_init(__siginfohandler_t *p)
 {
-	assert(signal_dispatcher == _rtld_dispatch_signal &&
+	assert(signal_dispatcher == _rtld_dispatch_signal_unsafe &&
 	    (cheri_getperm(p) & CHERI_PERM_EXECUTIVE) == 0);
 	signal_dispatcher = tramp_intern(NULL, &(struct tramp_data) {
 		.target = p,

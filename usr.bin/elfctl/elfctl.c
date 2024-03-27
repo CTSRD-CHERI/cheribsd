@@ -72,6 +72,10 @@ static struct ControlFeatures featurelist[] = {
 	    "Force Enable CHERI revocation" },
 	{ "nocherirevoke", NT_FREEBSD_FCTL_CHERI_REVOKE_DISABLE,
 	    "Force Disable CHERI revocation" },
+	{ "cheric18n", NT_FREEBSD_FCTL_CHERI_C18N_ENABLE,
+	    "Force Enable CHERI library-based compartmentalisation" },
+	{ "nocheric18n", NT_FREEBSD_FCTL_CHERI_C18N_DISABLE,
+	    "Force Disable CHERI library-based compartmentalisation" },
 };
 
 static struct option long_opts[] = {

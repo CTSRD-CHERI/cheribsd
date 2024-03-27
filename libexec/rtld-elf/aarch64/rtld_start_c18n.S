@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2023 Dapeng Gao
+ * Copyright (c) 2024 Dapeng Gao
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,14 +25,5 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-#include <sys/types.h>
-
-void _rtld_thr_exit(long *);
-
-void
-thr_exit(long *state)
-{
-	__attribute__((musttail))
-	return (_rtld_thr_exit(state));
-}
+#define	C18N_VARIANT	_c18n
+#include "rtld_start.S"

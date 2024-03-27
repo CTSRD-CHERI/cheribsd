@@ -34,9 +34,10 @@
 /*
  * Global symbols
  */
+extern Obj_Entry *obj_rtld_p;
+extern size_t c18n_code_perm_clear;
 extern uintptr_t sealer_pltgot, sealer_tramp;
 extern const char *ld_compartment_utrace;
-extern const char *ld_compartment_enable;
 extern const char *ld_compartment_policy;
 extern const char *ld_compartment_overhead;
 extern const char *ld_compartment_sig;
@@ -46,16 +47,28 @@ extern const char *ld_compartment_unwind;
  * Policies
  */
 typedef uint16_t compart_id_t;
-#define	C18N_COMPARTMENT_ID_MAX	(UINT16_MAX >> 1)
+#define	C18N_COMPARTMENT_ID_MAX		index_to_cid(UINT16_MAX)
 
 compart_id_t compart_id_allocate(const char *);
 
 /*
  * Stack switching
  */
+/*
+ * This macro can only be used in a function directly invoked by a trampoline.
+ */
+#define	get_trusted_frame()	({					\
+		struct trusted_frame *_tf;				\
+		_Pragma("clang diagnostic push");			\
+		_Pragma("clang diagnostic ignored \"-Wframe-address\"");\
+		_tf = __builtin_frame_address(1);			\
+		_Pragma("clang diagnostic pop");			\
+		_tf;							\
+	})
+
 struct stk_table {
 	union {
-		void *(*resolver)(unsigned);
+		void (*resolver)(void);
 		SLIST_ENTRY(stk_table) next;
 	};
 	size_t capacity;
@@ -65,35 +78,30 @@ struct stk_table {
 	} stacks[];
 };
 
-struct Struct_Stack_Entry {
-    SLIST_ENTRY(Struct_Stack_Entry) link;
-    void *stack;
-};
+/*
+ * Define the base index of the stack table. Under the purecap ABI, RTLD does
+ * not need a stack table entry, so it is possible to save some space setting
+ * the base index to -1.
+ */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+#define	C18N_RTLD_TABLE_INDEX		0
+#else
+#define	C18N_RTLD_TABLE_INDEX		(-1)
+#endif
+
+#define	cid_to_table_index(cid)		((cid) + C18N_RTLD_TABLE_INDEX)
+
+#define	cid_to_index(cid)						\
+	(offsetof(struct stk_table, stacks[cid_to_table_index(cid)]) /	\
+	sizeof((struct stk_table_stack) {}.bottom))
+
+#define	index_to_cid(index)						\
+	(((index) * sizeof((struct stk_table_stack) {}.bottom) -	\
+	offsetof(struct stk_table, stacks) -				\
+	offsetof(struct stk_table_stack, bottom)) /			\
+	sizeof(struct stk_table_stack) - C18N_RTLD_TABLE_INDEX)
 
 void allocate_stk_table(void);
-
-static inline unsigned
-cid_to_table_index(compart_id_t cid)
-{
-	/*
-	 * Under the purecap ABI, cid is never zero, so it is possible to save
-	 * some space by subtracting one.
-	 */
-#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	--cid;
-#endif
-	return (cid);
-}
-
-static inline unsigned
-cid_to_index(compart_id_t cid)
-{
-	struct stk_table_stack dummy;
-	unsigned index = cid_to_table_index(cid);
-
-	return (offsetof(struct stk_table, stacks[index].bottom) /
-	    sizeof(dummy.bottom));
-}
 
 static inline struct stk_table *
 stk_table_get(void)
@@ -185,11 +193,14 @@ struct tramp_header {
 	uint32_t entry[];
 };
 
-void *tramp_hook(void *, int, void *, const Obj_Entry *, const Elf_Sym *,
-    void *);
+/*
+ * Assembly function with non-standard ABI.
+ */
+void tramp_hook(void);
+
 size_t tramp_compile(char **, const struct tramp_data *);
 void *tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *);
-
+struct tramp_header *tramp_reflect(const void *);
 struct func_sig sigtab_get(const Obj_Entry *, unsigned long);
 
 static inline long
@@ -207,10 +218,25 @@ func_sig_legal(struct func_sig sig)
 /*
  * APIs
  */
+/*
+ * This macro can only be used in a function directly invoked by a trampoline.
+ */
+#define	c18n_return_address()	({					\
+		void *_pc;						\
+		if (C18N_ENABLED)					\
+			_pc = get_trusted_frame()->pc;			\
+		else							\
+			_pc = __builtin_return_address(0);		\
+		_pc;							\
+	})
+
 void *_rtld_sandbox_code(void *, struct func_sig);
 void *_rtld_safebox_code(void *, struct func_sig);
 
-void c18n_init(void);
-void *c18n_return_address(void);
+void _rtld_bind_start_c18n(void);
+void *_rtld_tlsdesc_static_c18n(void *);
+void *_rtld_tlsdesc_undef_c18n(void *);
+void *_rtld_tlsdesc_dynamic_c18n(void *);
 
+void c18n_init(void);
 #endif

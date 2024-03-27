@@ -63,60 +63,31 @@ ENTRY(_rtld_thread_start)
 	 * This function MUST preserve the value of c0.
 	 */
 	bl	c18n_init_rtld_stack
-#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	/*
-	 * Move the Executive mode thread pointer to Restricted mode.
-	 */
-	mrs	c10, ctpidr_el0
-	msr	rctpidr_el0, c10
-#endif
-	b	_rtld_thread_start_impl
+	b	thread_start_2
 END(_rtld_thread_start)
 
 /*
- * void _rtld_sighandler(int, siginfo_t *, void *);
+ * void sighandler_2(int, siginfo_t *, void *);
  *
  * This function clobbers some callee-saved registers. This is fine because it
  * is only ever invoked via a trampoline by the kernel when a signal is
  * delivered.
  */
-ENTRY(_rtld_sighandler)
-#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	/*
-	 * The sigframe is pushed onto the trusted stack, disrupting the linked-
-	 * list. Repair the link by pointing it to the pre-signal top of the
-	 * trusted stack.
-	 */
-	mov	c19, c30
-	mov	c20, c0
-	mov	c21, c1
-	mov	c22, c2
-
-	mov	c0, csp
-	mov	c1, c2
-	bl	sighandler_fix_link
-	mov	x23, x0
-
-	mov	c0, c20
-	mov	c1, c21
-	mov	c2, c22
-#endif
-
+ENTRY(sighandler_2)
 	ldr	c3, signal_dispatcher
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	br	x3
 #else
+	mov	c19, c30
 	blr	c3
 
 	/*
 	 * Restore the link to its original value.
 	 */
-	mov	c0, csp
-	mov	x1, x23
 	mov	c30, c19
-	b	sighandler_unfix_link
+	b	sighandler_3
 #endif
-END(_rtld_sighandler)
+END(sighandler_2)
 
 /*
  * void _rtld_dispatch_signal(int, siginfo_t *, void *);
@@ -125,33 +96,78 @@ END(_rtld_sighandler)
  * is only ever invoked by either RTLD code that is aware of this behaviour or
  * external code via a trampoline.
  */
-ENTRY(_rtld_dispatch_signal)
-	mov	c24, c30
-	mov	w25, w0
-	mov	c26, c1
+ENTRY(_rtld_dispatch_signal_unsafe)
+	mov	c28, c2
+	b	dispatch_signal_2
+END(_rtld_dispatch_signal_unsafe)
+
+/*
+ * void dispatch_signal_3(int, siginfo_t *, void *, __siginfohandler_t);
+ *
+ * This function clobbers some callee-saved registers. This is fine because it
+ * is only ever invoked by either RTLD code that is aware of this behaviour or
+ * external code via a trampoline.
+ */
+ENTRY(dispatch_signal_3)
+	mov	c26, c30
 	mov	c27, c2
-	bl	dispatch_signal_get
-	mov	c28, c0
-
-	mov	c1, c26
-	mov	c2, c27
-	bl	dispatch_signal_begin
-	mov	c26, c1
-
-	mov	c2, c1
-	mov	c1, c0
-	mov	w0, w25
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	blr	x28
+	blr	x3
 #else
-	blr	c28
+	blr	c3
 #endif
 
-	mov	c0, c26
-	mov	c1, c27
-	mov	c30, c24
-	b	dispatch_signal_end
-END(_rtld_dispatch_signal)
+	mov	c30, c26
+	mov	c0, c27
+	mov	c1, c28
+	b	dispatch_signal_4
+END(dispatch_signal_3)
+
+.macro save_registers
+	/* Save the callee and the return address */
+	stp	c19, c30, [csp, #-(CAP_WIDTH * 2)]!
+
+	/* Save floating point arguments */
+	stp	q0, q1, [csp, #-(16 * 8)]!
+	stp	q2, q3, [csp, #(16 * 2)]
+	stp	q4, q5, [csp, #(16 * 4)]
+	stp	q6, q7, [csp, #(16 * 6)]
+
+	/* Save argument registers */
+	mov	c19, c0
+	mov	c20, c1
+	mov	c21, c2
+	mov	c22, c3
+	mov	c23, c4
+	mov	c24, c5
+	mov	c25, c6
+	mov	c26, c7
+	mov	c27, c8
+	mov	c28, c9
+.endmacro
+
+.macro restore_registers
+	/* Restore argument registers */
+	mov	c0, c19
+	mov	c1, c20
+	mov	c2, c21
+	mov	c3, c22
+	mov	c4, c23
+	mov	c5, c24
+	mov	c6, c25
+	mov	c7, c26
+	mov	c8, c27
+	mov	c9, c28
+
+	/* Restore floating point arguments */
+	ldp	q6, q7, [csp, #(16 * 6)]
+	ldp	q4, q5, [csp, #(16 * 4)]
+	ldp	q2, q3, [csp, #(16 * 2)]
+	ldp	q0, q1, [csp], #(16 * 8)
+
+	/* Restore the callee and the return address */
+	ldp	c19, c30, [csp], #(CAP_WIDTH * 2)
+.endmacro
 
 ENTRY(allocate_rstk)
 	/*
@@ -167,7 +183,8 @@ ENTRY(allocate_rstk)
 	 * The function should resolve the callee's stack, install it, and tail-
 	 * call the callee.
 	 *
-	 * All temporary registers must be cleared.
+	 * All argument registers must be preserved. All temporary registers
+	 * must be cleared.
 	 */
 
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
@@ -181,26 +198,7 @@ ENTRY(allocate_rstk)
 	msr	rcsp_el0, c20
 #endif
 
-	/* Save floating point arguments */
-	stp	q0, q1, [csp, #-(16 * 8)]!
-	stp	q2, q3, [csp, #(16 * 2)]
-	stp	q4, q5, [csp, #(16 * 4)]
-	stp	q6, q7, [csp, #(16 * 6)]
-
-	/* Save the callee and the return address */
-	stp	c19, c30, [csp, #-(CAP_WIDTH * 2)]!
-
-	/* Save argument registers */
-	mov	c19, c0
-	mov	c20, c1
-	mov	c21, c2
-	mov	c22, c3
-	mov	c23, c4
-	mov	c24, c5
-	mov	c25, c6
-	mov	c26, c7
-	mov	c27, c8
-	mov	c28, c9
+	save_registers
 
 	mov	w0, w14
 	bl	allocate_rstk_impl
@@ -208,32 +206,13 @@ ENTRY(allocate_rstk)
 	/* Load the callee's stack */
 	ldr	c10, [c0, #-CAP_WIDTH]
 
-	/* Restore the callee and the return address */
-	ldp	c11, c30, [csp], #(CAP_WIDTH * 2)
-
-	/* Restore floating point arguments */
-	ldp	q6, q7, [csp, #(16 * 6)]
-	ldp	q4, q5, [csp, #(16 * 4)]
-	ldp	q2, q3, [csp, #(16 * 2)]
-	ldp	q0, q1, [csp], #(16 * 8)
-
-	/* Restore argument registers */
-	mov	c0, c19
-	mov	c1, c20
-	mov	c2, c21
-	mov	c3, c22
-	mov	c4, c23
-	mov	c5, c24
-	mov	c6, c25
-	mov	c7, c26
-	mov	c8, c27
-	mov	c9, c28
+	restore_registers
 
 	/*
 	 * Clear temporary registers, except
 	 * - c10: Callee's stack
-	 * - c11: Callee's code
 	 */
+	mov	x11, xzr
 	mov	x12, xzr
 	mov	x13, xzr
 	mov	x14, xzr
@@ -244,10 +223,10 @@ ENTRY(allocate_rstk)
 
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	mov	csp, c10
-	br	x11
+	br	x19
 #else
 	msr	rcsp_el0, c10
-	brr	c11
+	brr	c19
 #endif
 END(allocate_rstk)
 
@@ -260,42 +239,18 @@ ENTRY(tramp_hook)
 	 *
 	 * Upon entry, c10-c12 hold the first arguments of tramp_hook.
 	 *
-	 * All argument registers must be preserved.
+	 * All argument registers and c19 must be preserved.
 	 */
 
-	/* Save argument registers */
-	stp	c0, c1, [csp, #-(CAP_WIDTH * 10)]!
-	stp	c2, c3, [csp, #(CAP_WIDTH * 2)]
-	stp	c4, c5, [csp, #(CAP_WIDTH * 4)]
-	stp	c6, c7, [csp, #(CAP_WIDTH * 6)]
-	stp	c8, c9, [csp, #(CAP_WIDTH * 8)]
-
-	/* Save floating point arguments */
-	stp	q0, q1, [csp, #-(16 * 8)]!
-	stp	q2, q3, [csp, #(16 * 2)]
-	stp	q4, q5, [csp, #(16 * 4)]
-	stp	q6, q7, [csp, #(16 * 6)]
+	save_registers
 
 	mov	c0, c10
 	mov	c1, c11
 	mov	c2, c12
 
-	str	c30, [csp, #-CAP_WIDTH]!
 	bl	tramp_hook_impl
-	ldr	c30, [csp], #CAP_WIDTH
 
-	/* Restore floating point arguments */
-	ldp	q6, q7, [csp, #(16 * 6)]
-	ldp	q4, q5, [csp, #(16 * 4)]
-	ldp	q2, q3, [csp, #(16 * 2)]
-	ldp	q0, q1, [csp], #(16 * 8)
-
-	/* Restore argument registers */
-	ldp	c8, c9, [csp, #(CAP_WIDTH * 8)]
-	ldp	c6, c7, [csp, #(CAP_WIDTH * 6)]
-	ldp	c4, c5, [csp, #(CAP_WIDTH * 4)]
-	ldp	c2, c3, [csp, #(CAP_WIDTH * 2)]
-	ldp	c0, c1, [csp], #(CAP_WIDTH * 10)
+	restore_registers
 
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	RETURN
