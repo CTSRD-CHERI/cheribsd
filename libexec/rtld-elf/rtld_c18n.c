@@ -1518,22 +1518,6 @@ c18n_init(void)
 	    memory_order_relaxed);
 }
 
-void *
-c18n_return_address(void)
-{
-	struct trusted_frame *tframe;
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wframe-address"
-	/*
-	 * Unwind twice to locate the trusted frame.
-	 */
-	tframe = __builtin_frame_address(2);
-#pragma clang diagnostic pop
-
-	return (tframe->pc);
-}
-
 /*
  * libthr support
  */
