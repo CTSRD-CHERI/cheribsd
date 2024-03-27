@@ -70,6 +70,8 @@ CRUNCH_SHLIBS+=	-lm
 # libz is needed by libprivatessh so we might as well link dynamically
 CRUNCH_SHLIBS+=	-lz
 
+# diff
+CRUNCH_LIBS+=		${CRUNCH_OBJTOP}/lib/libdiff/libdiff.a
 
 # grep/tar/xz
 CRUNCH_LIBS+=	-llzma
