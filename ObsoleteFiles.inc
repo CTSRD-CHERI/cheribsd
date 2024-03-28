@@ -51,6 +51,10 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20240411: Removal of ld-elf*-c18n.so.1
+OLD_FILES+=libexec/ld-elf-c18n.so.1
+OLD_FILES+=libexec/ld-elf64cb-c18n.so.1
+
 # 20240114: Removal of geom_map(4)
 OLD_FILES+=usr/share/man/man4/geom_map.4
 

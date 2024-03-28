@@ -448,6 +448,15 @@ void dump_Elf_Rel(Obj_Entry *, const Elf_Rel *, u_long);
 void dump_Elf_Rela(Obj_Entry *, const Elf_Rela *, u_long);
 
 #ifdef __CHERI_PURE_CAPABILITY__
+#ifdef RTLD_SANDBOX
+/*
+ * This environment variable is exposed here so that tls.h can see it.
+ */
+extern bool ld_compartment_enable;
+
+#define	C18N_ENABLED	ld_compartment_enable
+#endif
+
 /* TODO: we should have a separate member for .text/rodata */
 #define get_codesegment_cap(obj)					\
 	(cheri_clearperm((obj)->text_rodata_cap, CAP_RELOC_REMOVE_PERMS))

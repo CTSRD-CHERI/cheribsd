@@ -29,11 +29,15 @@ MK_UBSAN=	no
 
 .include <bsd.compat.pre.mk>
 
+.if (${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64")
+RTLD_SANDBOX=
+.endif
+
 .ifdef RTLD_SANDBOX
 CFLAGS+=-DRTLD_SANDBOX
 .endif
 
-.if !defined(NEED_COMPAT) && !defined(RTLD_SANDBOX)
+.if !defined(NEED_COMPAT)
 CONFS=		libmap.conf
 .endif
 PROG?=		ld-elf.so.1
@@ -116,7 +120,7 @@ CFLAGS+=	-I${RTLD_ELF_DIR}/cheri
 .ifdef RTLD_SANDBOX
 SRCS+= \
 	rtld_c18n.c \
-	rtld_c18n_policy.S \
+	rtld_c18n_mi.S \
 	rtld_c18n_machdep.c \
 	rtld_c18n_asm.S
 .endif

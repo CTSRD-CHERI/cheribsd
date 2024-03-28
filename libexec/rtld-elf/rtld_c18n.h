@@ -34,9 +34,9 @@
 /*
  * Global symbols
  */
+extern size_t c18n_code_perm_clear;
 extern uintptr_t sealer_pltgot, sealer_tramp;
 extern const char *ld_compartment_utrace;
-extern const char *ld_compartment_enable;
 extern const char *ld_compartment_policy;
 extern const char *ld_compartment_overhead;
 extern const char *ld_compartment_sig;
@@ -53,6 +53,18 @@ compart_id_t compart_id_allocate(const char *);
 /*
  * Stack switching
  */
+/*
+ * This macro can only be used in a function directly invoked by a trampoline.
+ */
+#define	get_trusted_stk()	({					\
+		struct trusted_frame *_tf;				\
+		_Pragma("clang diagnostic push");			\
+		_Pragma("clang diagnostic ignored \"-Wframe-address\"");\
+		_tf = __builtin_frame_address(1);			\
+		_Pragma("clang diagnostic pop");			\
+		_tf;							\
+	})
+
 struct stk_table {
 	union {
 		void *(*resolver)(unsigned);
@@ -207,10 +219,19 @@ func_sig_legal(struct func_sig sig)
 /*
  * APIs
  */
+/*
+ * This macro can only be used in a function directly invoked by a trampoline.
+ */
+#define	c18n_return_address()						\
+	(C18N_ENABLED ? get_trusted_stk()->pc : __builtin_return_address(0))
+
 void *_rtld_sandbox_code(void *, struct func_sig);
 void *_rtld_safebox_code(void *, struct func_sig);
 
-void c18n_init(Obj_Entry *);
-void *c18n_return_address(void);
+void _rtld_bind_start_c18n(void);
+void *_rtld_tlsdesc_static_c18n(void *);
+void *_rtld_tlsdesc_undef_c18n(void *);
+void *_rtld_tlsdesc_dynamic_c18n(void *);
 
+void c18n_init(Obj_Entry *);
 #endif
