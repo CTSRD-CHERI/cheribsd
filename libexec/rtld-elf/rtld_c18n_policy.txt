@@ -54,6 +54,7 @@ trust
 	execvp
 	execvpe
 	execvP
+	unw_getcontext
 	_rtld_thread_start
 
 callee [RTLD]
