@@ -421,7 +421,6 @@ kern_execve(struct thread *td, struct image_args *args,
 	}
 
 	if (opportunistic_coexecve != 0) {
-#ifndef OPPORTUNISTIC_USE_SID
 		sx_slock(&proctree_lock);
 		cop = proc_realparent(p);
 		PROC_LOCK(cop);
@@ -430,23 +429,6 @@ kern_execve(struct thread *td, struct image_args *args,
 			sx_sunlock(&proctree_lock);
 			goto fallback;
 		}
-#else
-		/*
-		 * If we're the session leader and we're executing something,
-		 * make sure it doesn't end up in the address space we could
-		 * have previously been sharing.  For example, don't try to
-		 * colocate users' session with init(8) just because getty(8)
-		 * used to colocate with it before changing the SID.
-		 */
-		if (p->p_pid == p->p_session->s_sid)
-			goto fallback;
-		sx_slock(&proctree_lock);
-		cop = pfind(p->p_session->s_sid);
-		if (cop == NULL) {
-			sx_sunlock(&proctree_lock);
-			goto fallback;
-		}
-#endif
 		if (p_cancolocate(td, cop, true) != 0) {
 			PROC_UNLOCK(cop);
 			sx_sunlock(&proctree_lock);
