@@ -138,7 +138,13 @@ execv(const char *name, char * const *argv)
 int
 execvp(const char *name, char * const *argv)
 {
-	return (_coexecvpe(0, name, argv, environ));
+	return (coexecvp(0, name, argv));
+}
+
+int
+coexecvp(pid_t pid, const char *name, char * const *argv)
+{
+	return (_coexecvpe(pid, name, argv, environ));
 }
 
 static int
