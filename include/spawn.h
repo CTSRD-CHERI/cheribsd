@@ -100,6 +100,8 @@ int posix_spawn_file_actions_addclosefrom_np(posix_spawn_file_actions_t *,
 int posix_spawnattr_init(posix_spawnattr_t *);
 int posix_spawnattr_destroy(posix_spawnattr_t *);
 
+int posix_spawnattr_getcopid(const posix_spawnattr_t * __restrict,
+    pid_t * __restrict);
 int posix_spawnattr_getflags(const posix_spawnattr_t * __restrict,
     short * __restrict);
 int posix_spawnattr_getpgroup(const posix_spawnattr_t * __restrict,
@@ -113,6 +115,7 @@ int posix_spawnattr_getsigdefault(const posix_spawnattr_t * __restrict,
 int posix_spawnattr_getsigmask(const posix_spawnattr_t * __restrict,
     sigset_t * __restrict sigmask);
 
+int posix_spawnattr_setcopid(posix_spawnattr_t *, pid_t);
 int posix_spawnattr_setflags(posix_spawnattr_t *, short);
 int posix_spawnattr_setpgroup(posix_spawnattr_t *, pid_t);
 int posix_spawnattr_setschedparam(posix_spawnattr_t * __restrict,

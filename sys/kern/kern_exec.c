@@ -235,20 +235,27 @@ sys_coexecve(struct thread *td, struct coexecve_args *uap)
 	struct proc *p;
 	int error;
 
-	error = pget(uap->pid, PGET_NOTWEXIT | PGET_HOLD | PGET_CANCOLOCATE, &p);
+	error = pre_execve(td, &oldvmspace);
 	if (error != 0)
 		return (error);
-	error = pre_execve(td, &oldvmspace);
-	if (error != 0) {
-		PRELE(p);
-		return (error);
-	}
-	error = exec_copyin_args(&args, uap->fname,
-	    UIO_USERSPACE, uap->argv, uap->envv);
-	if (error == 0)
+	error = exec_copyin_args(&args, uap->fname, UIO_USERSPACE,
+	    uap->argv, uap->envv);
+	if (error != 0)
+		goto out;
+
+	if (uap->pid > 0) {
+		error = pget(uap->pid, PGET_NOTWEXIT | PGET_HOLD | PGET_CANCOLOCATE, &p);
+		if (error != 0)
+			goto out;
 		error = kern_coexecve(td, &args, NULL, oldvmspace, p, false);
+		PRELE(p);
+	} else if (uap->pid == 0) {
+		error = kern_execve(td, &args, NULL, oldvmspace);
+	} else {
+		error = kern_coexecve(td, &args, NULL, oldvmspace, NULL, false);
+	}
+out:
 	post_execve(td, error, oldvmspace);
-	PRELE(p);
 
 	return (error);
 }
@@ -436,8 +443,13 @@ kern_coexecve(struct thread *td, struct image_args *args,
 	    exec_args_get_begin_envv(args) - args->begin_argv);
 	AUDIT_ARG_ENVV(exec_args_get_begin_envv(args), args->envc,
 	    args->endp - exec_args_get_begin_envv(args));
-	return (do_execve(td, args, mac_p, oldvmspace, cop,
-	    opportunistic));
+
+	/* Must have at least one argument. */
+	if (args->argc == 0) {
+		exec_free_args(args);
+		return (EINVAL);
+	}
+	return (do_execve(td, args, mac_p, oldvmspace, cop, opportunistic));
 }
 
 int
@@ -449,14 +461,7 @@ kern_execve(struct thread *td, struct image_args *args,
 
 	p = td->td_proc;
 
-	/* Must have at least one argument. */
-	if (args->argc == 0) {
-		exec_free_args(args);
-		return (EINVAL);
-	}
-
 	if (opportunistic_coexecve != 0) {
-#ifndef OPPORTUNISTIC_USE_SID
 		sx_slock(&proctree_lock);
 		cop = proc_realparent(p);
 		PROC_LOCK(cop);
@@ -465,23 +470,6 @@ kern_execve(struct thread *td, struct image_args *args,
 			sx_sunlock(&proctree_lock);
 			goto fallback;
 		}
-#else
-		/*
-		 * If we're the session leader and we're executing something,
-		 * make sure it doesn't end up in the address space we could
-		 * have previously been sharing.  For example, don't try to
-		 * colocate users' session with init(8) just because getty(8)
-		 * used to colocate with it before changing the SID.
-		 */
-		if (p->p_pid == p->p_session->s_sid)
-			goto fallback;
-		sx_slock(&proctree_lock);
-		cop = pfind(p->p_session->s_sid);
-		if (cop == NULL) {
-			sx_sunlock(&proctree_lock);
-			goto fallback;
-		}
-#endif
 		if (p_cancolocate(td, cop, true) != 0) {
 			PROC_UNLOCK(cop);
 			sx_sunlock(&proctree_lock);

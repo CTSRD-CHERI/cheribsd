@@ -58,6 +58,7 @@
 #define		__cap_set_fd			___cap_set_fd
 #define		clock_nanosleep			_clock_nanosleep
 #define		close				_close
+#define		coexecve			_coexecve
 #define		connect				_connect
 #define		dup				_dup
 #define		dup2				_dup2

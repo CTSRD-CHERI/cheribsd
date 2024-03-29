@@ -29,7 +29,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd May 6, 2016
+.Dd March 29, 2024
 .Dt COEXEC 1
 .Os
 .Sh NAME
@@ -37,23 +37,34 @@
 .Nd execute a process within colocated address space
 .Sh SYNOPSIS
 .Nm
-.Ar pid Ar path Op Ar args
+.Ar pid Ar command Op Ar args
 .Sh DESCRIPTION
 The
 .Nm
 utility is used to execute the binary specified by
-.Ar path
+.Ar command
 within address space indicated by
 .Ar pid .
+.Pp
+Note that using
+.Nm
+is usually not necessary if the
+.Va kern.opportunistic_coexecve
+sysctl is set to 1.
 .Sh EXIT STATUS
 The
 .Nm
 utility exits 0 on success, and >0 if an error occurs.
 .Sh EXAMPLES
-Execute
+Start a shell colocated with the process identified by PID 42:
+.Pp
+.Dl Nm Ar 42 Ar sh
+.Pp
+Run
 .Xr procstat 1
-within the address space of the current shell process:
-.Dl Nm Ar $$ Ar /usr/bin/procstat Ar -v Ar $$
+colocated with the current shell and display its memory map:
+.Pp
+.Dl Nm Ar $$ Ar procstat -v $$
 .Pp
 .Sh SEE ALSO
 .Xr coexecve 2

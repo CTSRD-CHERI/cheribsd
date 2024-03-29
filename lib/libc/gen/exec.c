@@ -138,11 +138,17 @@ execv(const char *name, char * const *argv)
 int
 execvp(const char *name, char * const *argv)
 {
-	return (_execvpe(name, argv, environ));
+	return (coexecvp(0, name, argv));
+}
+
+int
+coexecvp(pid_t pid, const char *name, char * const *argv)
+{
+	return (_coexecvpe(pid, name, argv, environ));
 }
 
 static int
-execvPe(const char *name, const char *path, char * const *argv,
+coexecvPe(pid_t pid, const char *name, const char *path, char * const *argv,
     char * const *envp)
 {
 	char **memp;
@@ -211,7 +217,7 @@ execvPe(const char *name, const char *path, char * const *argv,
 		bcopy(name, buf + lp + 1, ln);
 		buf[lp + ln + 1] = '\0';
 
-retry:		(void)_execve(bp, argv, envp);
+retry:		(void)_coexecve(pid, bp, argv, envp);
 		switch (errno) {
 		case E2BIG:
 			goto done;
@@ -244,7 +250,7 @@ retry:		(void)_execve(bp, argv, envp);
 				memp[1] = __DECONST(char*, bp);
 				memp[2] = NULL;
 			}
- 			(void)_execve(_PATH_BSHELL, memp, envp);
+			(void)_coexecve(pid, _PATH_BSHELL, memp, envp);
 			goto done;
 		case ENOMEM:
 			goto done;
@@ -285,11 +291,12 @@ done:
 int
 execvP(const char *name, const char *path, char * const argv[])
 {
-	return execvPe(name, path, argv, environ);
+
+	return (coexecvPe(0, name, path, argv, environ));
 }
 
 int
-_execvpe(const char *name, char * const argv[], char * const envp[])
+_coexecvpe(pid_t pid, const char *name, char * const argv[], char * const envp[])
 {
 	const char *path;
 
@@ -297,5 +304,5 @@ _execvpe(const char *name, char * const argv[], char * const envp[])
 	if ((path = getenv("PATH")) == NULL)
 		path = _PATH_DEFPATH;
 
-	return (execvPe(name, path, argv, envp));
+	return (coexecvPe(pid, name, path, argv, envp));
 }

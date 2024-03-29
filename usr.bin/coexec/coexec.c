@@ -38,24 +38,22 @@ __FBSDID("$FreeBSD$");
 #include <string.h>
 #include <unistd.h>
 
-extern char **environ;
-
 static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: coexec pid path [args ...]\n");
+	fprintf(stderr, "usage: coexec pid command [args ...]\n");
 	exit(1);
 }
 
 static pid_t
 parse_pid(const char *str)
 {
-	char *end;
+	char *tmp;
 	pid_t pid;
 
-	pid = strtoul(str, &end, 10);
-	if ((size_t)(end - str) != strlen(str))
+	pid = strtoul(str, &tmp, 10);
+	if (*tmp != '\0')
 		err(1, "invalid PID \"%s\"", str);
 
 	return (pid);
@@ -73,6 +71,6 @@ main(int argc, char **argv)
 
 	argv += 2;
 
-	coexecve(pid, argv[0], argv, environ);
-	err(1, "coexecve");
+	coexecvp(pid, argv[0], argv);
+	err(1, "%s", argv[0]);
 }

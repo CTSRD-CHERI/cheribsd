@@ -2767,10 +2767,6 @@ DB_SHOW_COMMAND(object, vm_object_print_static)
 
 	vm_page_t p;
 
-	static char *type_name[] =
-	    { "default", "swap", "vnode", "device", "phys", "dead",
-	    "sg", "mgtdevice" };
-
 	/* XXX count is an (unused) arg.  Avoid shadowing it. */
 #define	count	was_count
 
@@ -2781,11 +2777,8 @@ DB_SHOW_COMMAND(object, vm_object_print_static)
 
 	object = DB_DATA_PTR(addr, struct vm_object);
 	db_iprintf(
-	    "Object %p: type=%d<%s>, size=0x%jx, res=%d, ref=%d, flags=0x%x ruid %d charge %jx\n",
-	    object, (int)object->type,
-	    object->type >= 0 && object->type < nitems(type_name) ?
-	    type_name[object->type] : "unknown",
-	    (uintmax_t)object->size,
+	    "Object %p: type=%d, size=0x%jx, res=%d, ref=%d, flags=0x%x ruid %d charge %jx\n",
+	    object, (int)object->type, (uintmax_t)object->size,
 	    object->resident_page_count, object->ref_count, object->flags,
 	    object->cred ? object->cred->cr_ruid : -1, (uintmax_t)object->charge);
 	db_iprintf(" sref=%d, backing_object(%d)=(%p)+0x%jx\n",
