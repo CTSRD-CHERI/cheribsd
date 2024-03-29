@@ -50,6 +50,7 @@ struct __posix_spawnattr {
 	int			sa_schedpolicy;
 	sigset_t		sa_sigdefault;
 	sigset_t		sa_sigmask;
+	pid_t			sa_copid;
 };
 
 struct __posix_spawn_file_actions {
@@ -240,6 +241,7 @@ _posix_spawn_thr(void *data)
 {
 	struct posix_spawn_args *psa;
 	char * const *envp;
+	pid_t copid;
 
 	psa = data;
 	if (psa->sa != NULL) {
@@ -253,10 +255,11 @@ _posix_spawn_thr(void *data)
 			_exit(127);
 	}
 	envp = psa->envp != NULL ? psa->envp : environ;
+	copid = psa->sa != NULL ? (*psa->sa)->sa_copid : 0;
 	if (psa->use_env_path)
-		_execvpe(psa->path, psa->argv, envp);
+		_coexecvpe(copid, psa->path, psa->argv, envp);
 	else
-		_execve(psa->path, psa->argv, envp);
+		_coexecve(copid, psa->path, psa->argv, envp);
 	psa->error = errno;
 
 	/* This is called in such a way that it must not exit. */
@@ -628,6 +631,14 @@ posix_spawnattr_getsigmask(const posix_spawnattr_t * __restrict sa,
 }
 
 int
+posix_spawnattr_getcopid(const posix_spawnattr_t * __restrict sa,
+    pid_t * __restrict copid)
+{
+	*copid = (*sa)->sa_copid;
+	return (0);
+}
+
+int
 posix_spawnattr_setflags(posix_spawnattr_t *sa, short flags)
 {
 	(*sa)->sa_flags = flags;
@@ -669,5 +680,12 @@ posix_spawnattr_setsigmask(posix_spawnattr_t * __restrict sa,
     const sigset_t * __restrict sigmask)
 {
 	(*sa)->sa_sigmask = *sigmask;
+	return (0);
+}
+
+int
+posix_spawnattr_setcopid(posix_spawnattr_t *sa, pid_t copid)
+{
+	(*sa)->sa_copid = copid;
 	return (0);
 }
