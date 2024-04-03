@@ -4,6 +4,9 @@ compartment [TCB]
 	libc.so.7
 	libthr.so.3
 
+compartment [libunwind]
+	libgcc_s.so.1
+
 caller *
 trust
 	memset
@@ -52,3 +55,11 @@ export to [TCB]
 	_rtld_sighandler
 	_rtld_setjmp
 	_rtld_longjmp
+
+callee [RTLD]
+export to [libunwind]
+	_rtld_unw_getcontext
+	_rtld_unw_getcontext_unsealed
+	_rtld_unw_setcontext
+	_rtld_unw_setcontext_unsealed
+	_rtld_unw_getsealer
