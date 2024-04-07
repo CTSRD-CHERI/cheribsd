@@ -147,6 +147,9 @@ SUBDIR.${MK_TESTS}+= tests
 # libcompiler_rt on some architectures.
 LIBADD+=	compiler_rt
 
+# Install one public header, used by procstat(1).
+INCS=	rtld_c18n_public.h
+
 .include <bsd.prog.mk>
 ${PROG_FULL}:	${VERSION_MAP}
 .include <bsd.symver.mk>

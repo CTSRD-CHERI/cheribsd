@@ -203,6 +203,7 @@ void	procstat_freeargv(struct procstat *procstat);
 #ifndef ZFS
 void	procstat_freeauxv(struct procstat *procstat, Elf_Auxinfo *auxv);
 #endif
+void	procstat_freec18n(struct procstat *procstat __unused, void *p);
 void	procstat_freeenvv(struct procstat *procstat);
 void	procstat_freegroups(struct procstat *procstat, gid_t *groups);
 void	procstat_freekstack(struct procstat *procstat,
@@ -215,6 +216,8 @@ void	procstat_freeptlwpinfo(struct procstat *procstat,
 void	procstat_freevmmap(struct procstat *procstat,
     struct kinfo_vmentry *vmmap);
 struct advlock_list	*procstat_getadvlock(struct procstat *procstat);
+int	procstat_getc18n(struct procstat *procstat, struct kinfo_proc *kp,
+    void **pp, size_t *lenp);
 struct filestat_list	*procstat_getfiles(struct procstat *procstat,
     struct kinfo_proc *kp, int mmapped);
 struct kinfo_proc	*procstat_getprocs(struct procstat *procstat,

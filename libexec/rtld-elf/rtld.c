@@ -70,6 +70,7 @@
 #include "rtld_libc.h"
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 #include "rtld_c18n.h"
+#include "rtld_c18n_public.h"
 #endif
 
 /* Types. */
@@ -90,6 +91,9 @@ typedef void * (*path_enum_proc) (const char *path, size_t len, void *arg);
 extern struct r_debug r_debug; /* For GDB */
 extern int _thread_autoinit_dummy_decl;
 extern void (*__cleanup)(void);
+#ifdef __CHERI_PURE_CAPABILITY__
+extern struct rtld_c18n_stats rtld_c18n_stats;
+#endif
 
 struct dlerror_save {
 	int seen;
@@ -637,6 +641,12 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     for (i = 0;  i < AT_COUNT;  i++)
 	aux_info[i] = NULL;
     for (auxp = aux;  auxp->a_type != AT_NULL;  auxp++) {
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (auxp->a_type == AT_C18N)
+	    auxp->a_un.a_ptr = &rtld_c18n_stats;
+	if (auxp->a_type == AT_C18NLEN)
+	    auxp->a_un.a_val = sizeof(rtld_c18n_stats);
+#endif
 	if (auxp->a_type < AT_COUNT)
 	    aux_info[auxp->a_type] = auxp;
 #ifdef __powerpc__

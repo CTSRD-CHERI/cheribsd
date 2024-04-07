@@ -2502,6 +2502,83 @@ sysctl_kern_proc_auxv(SYSCTL_HANDLER_ARGS)
 }
 
 /*
+ * Return the c18n stats block from the target process.  The pointer and
+ * length are stored in the process's auxv vector and have to be retrieved
+ * first.
+ */
+static int
+sysctl_kern_proc_c18n(SYSCTL_HANDLER_ARGS)
+{
+	int *name = (int *)arg1;
+	u_int namelen = arg2;
+	struct proc *p;
+	char * __capability *auxv;
+	void * __capability c18np;
+	size_t c18nlen, vsize;
+	int c18n_found, c18nlen_found;
+	Elf_Auxinfo *auxp;
+	int error;
+	uint8_t *buffer;
+	ssize_t n;
+
+	/* Retrieve target process. */
+	if (namelen != 1)
+		return (EINVAL);
+	error = pget((pid_t)name[0], PGET_WANTREAD, &p);
+	if (error != 0)
+		return (error);
+	if ((p->p_flag & P_SYSTEM) != 0 ||
+	    (SV_PROC_FLAG(p, SV_CHERI) == 0)) {
+		PRELE(p);
+		return (0);
+	}
+
+	/* Load a copy of auxv from the target process. */
+	error = get_proc_vector(curthread, p, &auxv, &vsize, PROC_AUX);
+	if (error != 0)
+		goto out;
+
+	/* Locate the two auxv entries; error out if not found. */
+	c18n_found = c18nlen_found = 0;
+	for (auxp = (Elf_Auxinfo *)auxv; auxp->a_type != AT_NULL; auxp++) {
+		if (auxp->a_type == AT_C18N) {
+			c18np = auxp->a_un.a_ptr;
+			c18n_found = 1;
+		}
+		if (auxp->a_type == AT_C18NLEN) {
+			c18nlen = auxp->a_un.a_val;
+			c18nlen_found = 1;
+		}
+	}
+	if (!c18n_found || !c18nlen_found) {
+		error = ENOEXEC;
+		goto out_free;
+	}
+
+	/* Validate state, and if good, copy into buffer and then copy out. */
+	if (c18np == NULL || c18nlen == 0 || c18nlen > 1024) {
+		error = ENOEXEC;
+		goto out_free;
+	}
+
+	buffer = malloc(c18nlen, M_TEMP, M_WAITOK);
+	n = proc_readmem(curthread, p, (__cheri_addr vm_offset_t)c18np,
+	    buffer, c18nlen);
+	if (n != c18nlen) {
+		error = ENOMEM;
+		goto out_free2;
+	}
+	error = SYSCTL_OUT(req, buffer, c18nlen);
+out_free2:
+	free(buffer, M_TEMP);
+out_free:
+	free(auxv, M_TEMP);
+out:
+	PRELE(p);
+	return (error);
+}
+
+/*
  * Look up the canonical executable path running in the specified process.
  * It tries to return the same hardlink name as was used for execve(2).
  * This allows the programs that modify their behavior based on their progname,
@@ -3680,6 +3757,9 @@ static SYSCTL_NODE(_kern_proc, KERN_PROC_ENV, env, CTLFLAG_RD | CTLFLAG_MPSAFE,
 
 static SYSCTL_NODE(_kern_proc, KERN_PROC_AUXV, auxv, CTLFLAG_RD |
 	CTLFLAG_MPSAFE, sysctl_kern_proc_auxv, "Process ELF auxiliary vector");
+
+static SYSCTL_NODE(_kern_proc, KERN_PROC_C18N, c18n, CTLFLAG_RD |
+	CTLFLAG_MPSAFE, sysctl_kern_proc_c18n, "c18n statistics");
 
 static SYSCTL_NODE(_kern_proc, KERN_PROC_PATHNAME, pathname, CTLFLAG_RD |
 	CTLFLAG_MPSAFE, sysctl_kern_proc_pathname, "Process executable path");

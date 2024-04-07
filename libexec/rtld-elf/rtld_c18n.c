@@ -38,6 +38,7 @@
 #include "debug.h"
 #include "rtld.h"
 #include "rtld_c18n.h"
+#include "rtld_c18n_public.h"
 #include "rtld_libc.h"
 #include "rtld_utrace.h"
 
@@ -71,6 +72,8 @@ const char *ld_compartment_sig;
 
 /* Expose tagged frame pointers to trusted frames */
 const char *ld_compartment_unwind;
+
+struct rtld_c18n_stats rtld_c18n_stats;
 
 /*
  * Policies
@@ -223,6 +226,7 @@ compart_id_allocate(const char *lib)
 
 	com = comparts_data_add(lib);
 	string_base_push(&com->libs, lib);
+	atomic_add_long(&rtld_c18n_stats.rcs_compartments, 1);
 
 	return (i);
 }
@@ -704,6 +708,7 @@ stk_create(size_t size)
 		rtld_fatal("mmap failed");
 
 	stk = cheri_clearperm(stk + size, CHERI_PERM_EXECUTIVE);
+	atomic_add_long(&rtld_c18n_stats.rcs_stacks, 1);
 
 	return (stk);
 }
@@ -936,6 +941,7 @@ tramp_pg_new(struct tramp_pg *next)
 	SLIST_NEXT(pg, link) = next;
 	atomic_store_explicit(&pg->size, 0, memory_order_relaxed);
 	pg->capacity = capacity - offsetof(typeof(*pg), trampolines);
+	atomic_add_long(&rtld_c18n_stats.rcs_tramppages, 1);
 	return (pg);
 }
 
@@ -1026,6 +1032,7 @@ tramp_table_expand(int exp)
 			.key = 0,
 			.index = -1
 		};
+	rtld_c18n_stats.rcs_tramptable = back;
 }
 
 /* Public domain. Taken from https://github.com/skeeto/hash-prospector */
@@ -1182,6 +1189,7 @@ tramp_pgs_append(const struct tramp_data *data)
 	 * sufficiently large bounds to contain these rounded addresses.
 	 */
 	__clear_cache(cheri_copyaddress(pg, header->entry), tramp + len);
+	atomic_add_long(&rtld_c18n_stats.rcs_trampolines, 1);
 
 	return (header);
 }
@@ -1622,6 +1630,7 @@ _rtld_thr_exit(long *state)
 				.bottom = allocate_rstk,
 				.size = 0
 			};
+			atomic_add_long(&rtld_c18n_stats.rcs_stacks, -1);
 		}
 	}
 

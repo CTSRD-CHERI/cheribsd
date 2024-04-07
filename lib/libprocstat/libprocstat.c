@@ -355,6 +355,69 @@ procstat_freeprocs(struct procstat *procstat __unused, struct kinfo_proc *p)
 	p = NULL;
 }
 
+int
+procstat_getc18n(struct procstat *procstat, struct kinfo_proc *kp, void **pp,
+    size_t *lenp)
+{
+	int error, name[4];
+
+	*lenp = 1024;	/* Sensible maximim.  Unsensible constant. */
+	*pp = malloc(*lenp);
+	if (*pp == NULL)
+		goto out;
+
+	switch (procstat->type) {
+	case PROCSTAT_KVM:
+		warnx("kvm method is not supported");
+		goto out_free;
+
+	case PROCSTAT_SYSCTL:
+		break;
+
+	case PROCSTAT_CORE:
+		warnx("core method is not supported");
+		goto out_free;
+
+	default:
+		warnx("unknown access method: %d", procstat->type);
+		goto out_free;
+	}
+
+	/*
+	 * Error handling here is wrong.  If ENOEXEC, really want to print
+	 * output indicating no information, which this function signagure
+	 * doesn't currently support.  This is because the process probably
+	 * simply doesn't have c18n in use
+	 */
+	name[0] = CTL_KERN;
+	name[1] = KERN_PROC;
+	name[2] = KERN_PROC_C18N;
+	name[3] = kp->ki_pid;
+	error = sysctl(name, nitems(name), *pp, lenp, NULL, 0);
+	if (error != 0 && errno != ESRCH && errno != EPERM &&
+	    errno != ENOEXEC) {
+		warn("sysctl(kern.proc.c18n)");
+		goto out_free;
+	}
+	if (error != 0)
+		goto out_free;
+	return (0);
+
+out_free:
+	free(*pp);
+out:
+	*pp = NULL;
+	*lenp = 0;
+	return (-1);
+}
+
+void
+procstat_freec18n(struct procstat *procstat __unused, void *p)
+{
+
+	free(p);
+}
+
 struct filestat_list *
 procstat_getfiles(struct procstat *procstat, struct kinfo_proc *kp, int mmapped)
 {

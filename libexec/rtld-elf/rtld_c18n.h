@@ -30,6 +30,7 @@
 
 #include <stdint.h>
 #include "rtld_c18n_machdep.h"
+#include "rtld_c18n_public.h"
 
 /*
  * Global symbols
@@ -45,6 +46,8 @@ extern const char *ld_compartment_policy;
 extern const char *ld_compartment_overhead;
 extern const char *ld_compartment_sig;
 extern const char *ld_compartment_unwind;
+
+extern struct rtld_c18n_stats rtld_c18n_stats;
 
 /*
  * Policies

@@ -169,6 +169,8 @@ Substring commands are accepted.
 Display command line arguments for the process.
 .Pp
 Substring commands are accepted.
+.It Ar c18n
+Display CHERI compartmentalization information about a process.
 .It Ar cheri
 Display CHERI-specific information about the process.
 If the
@@ -297,6 +299,26 @@ command
 .It ARGS
 command line arguments (if available)
 .El
+.Ss Compartmentalization information
+Display CHERI compartmentalization information for a process (see
+.Xr c18n 7 ) :
+.Pp
+.Bl -tag -width TRMPTBL -compact
+.It PID
+process ID
+.It COMM
+command
+.It COMP
+number of compartments
+.It STKS
+number of compartment stacks
+.It TRAMPS
+number of initialized trampolines
+.It TRPGS
+number of pages mapped for trampolines
+.It TRMPTBL
+size of the trampoline table in bytes
+.El
 .Ss CHERI information
 Display the process ID, command, and CHERI-specific information:
 .Pp
@@ -313,6 +335,10 @@ quarantining status
 in-kernel revoker state
 .It EPOCH
 in-kernel revoker epoch
+.It C18N
+number of
+.Xr c18n 7
+compartments
 .El
 .Pp
 The following values indicate the support for CHERI in the process ABI:
@@ -915,6 +941,7 @@ procstat: procstat_getprocs()
 .Xr sctp 4 ,
 .Xr tcp 4 ,
 .Xr udp 4 ,
+.Xr c18n 7 ,
 .Xr stack 9
 .Sh AUTHORS
 .An Robert N M Watson Aq Mt rwatson@FreeBSD.org .
