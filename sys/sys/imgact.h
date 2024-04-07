@@ -86,6 +86,7 @@ struct image_params {
 	int canarylen;
 	void * __capability pagesizes;
 	int pagesizeslen;
+	struct cheri_c18n_info * __kerncap c18n_info;
 	void * __capability stack;
 	vm_prot_t stack_prot;
 	u_long stack_sz;

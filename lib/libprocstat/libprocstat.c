@@ -355,6 +355,48 @@ procstat_freeprocs(struct procstat *procstat __unused, struct kinfo_proc *p)
 	p = NULL;
 }
 
+int
+procstat_getc18n(struct procstat *procstat, struct kinfo_proc *kp, void *stats,
+    size_t *maxlen)
+{
+	int error, name[4];
+
+	if (stats == NULL)
+		goto out;
+
+	switch (procstat->type) {
+	case PROCSTAT_KVM:
+		warnx("kvm method is not supported");
+		goto out;
+
+	case PROCSTAT_SYSCTL:
+		break;
+
+	case PROCSTAT_CORE:
+		warnx("core method is not supported");
+		goto out;
+
+	default:
+		warnx("unknown access method: %d", procstat->type);
+		goto out;
+	}
+
+	name[0] = CTL_KERN;
+	name[1] = KERN_PROC;
+	name[2] = KERN_PROC_C18N;
+	name[3] = kp->ki_pid;
+	error = sysctl(name, nitems(name), stats, maxlen, NULL, 0);
+	if (error != 0) {
+		if (errno != ESRCH && errno != EPERM && errno != ENOEXEC)
+			warn("sysctl(kern.proc.c18n)");
+		goto out;
+	}
+	return (0);
+out:
+	*maxlen = 0;
+	return (-1);
+}
+
 struct filestat_list *
 procstat_getfiles(struct procstat *procstat, struct kinfo_proc *kp, int mmapped)
 {

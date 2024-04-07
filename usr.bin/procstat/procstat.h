@@ -60,6 +60,7 @@ void	procstat_args(struct procstat *prstat, struct kinfo_proc *kipp);
 void	procstat_auxv(struct procstat *prstat, struct kinfo_proc *kipp);
 void	procstat_basic(struct procstat *prstat, struct kinfo_proc *kipp);
 void	procstat_bin(struct procstat *prstat, struct kinfo_proc *kipp);
+void	procstat_c18n(struct procstat *prstat, struct kinfo_proc *kipp);
 void	procstat_cheri(struct procstat *prstat, struct kinfo_proc *kipp);
 void	procstat_cred(struct procstat *prstat, struct kinfo_proc *kipp);
 void	procstat_cs(struct procstat *prstat, struct kinfo_proc *kipp);

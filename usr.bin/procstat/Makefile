@@ -9,6 +9,7 @@ SRCS=	procstat.c		\
 	procstat_auxv.c		\
 	procstat_basic.c	\
 	procstat_bin.c		\
+	procstat_c18n.c		\
 	procstat_cheri.c	\
 	procstat_cred.c		\
 	procstat_cs.c		\

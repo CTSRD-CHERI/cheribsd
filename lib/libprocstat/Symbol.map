@@ -50,4 +50,6 @@ FBSD_1.7 {
 	 procstat_getquarantining;
 	 procstat_get_revoker_epoch;
 	 procstat_get_revoker_state;
+	 procstat_freec18n;
+	 procstat_getc18n;
 };

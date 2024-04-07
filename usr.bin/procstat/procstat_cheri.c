@@ -2,11 +2,17 @@
  * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2023 SRI International
+ * Copyright (c) 2024 Capabilities Limited
  *
  * This software was developed by SRI International, the University of
  * Cambridge Computer Laboratory (Department of Computer Science and
  * Technology), and Capabilities Limited under Defense Advanced Research
  * Projects Agency (DARPA) Contract No. HR001123C0031 ("MTSS").
+ *
+ * This software was developed by SRI International, the University of
+ * Cambridge Computer Laboratory (Department of Computer Science and
+ * Technology), and Capabilities Limited under Defense Advanced Research
+ * Projects Agency (DARPA) Contract No. FA8750-24-C-B047 ("DEC").
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,6 +41,7 @@
 #include <sys/socket.h>
 #include <sys/user.h>
 
+#include <cheri/c18n.h>
 #include <cheri/revoke.h>
 #include <cheri/revoke_kern.h>
 
@@ -51,6 +58,8 @@ static const char *get_revoker_epoch(struct procstat *procstat,
     struct kinfo_proc *kipp);
 static const char *get_revoker_state(struct procstat *procstat,
     struct kinfo_proc *kipp);
+static const char *get_c18n(struct procstat *procstat,
+    struct kinfo_proc *kipp);
 
 void
 procstat_cheri(struct procstat *procstat, struct kinfo_proc *kipp)
@@ -59,11 +68,12 @@ procstat_cheri(struct procstat *procstat, struct kinfo_proc *kipp)
 
 	if ((procstat_opts & PS_OPT_NOHEADER) == 0) {
 		if ((procstat_opts & PS_OPT_VERBOSE) == 0)
-			xo_emit("{T:/%5s %-19s %c %4s}\n",
-			    "PID", "COMM", 'C', "QUAR");
+			xo_emit("{T:/%5s %-19s %c %4s %5s}\n",
+			    "PID", "COMM", 'C', "QUAR", "C18N");
 		else
-			xo_emit("{T:/%5s %-19s %c %4s %7s %34s}\n",
-			    "PID", "COMM", 'C', "QUAR", "RSTATE", "EPOCH");
+			xo_emit("{T:/%5s %-19s %c %4s %7s %34s %5s}\n",
+			    "PID", "COMM", 'C', "QUAR", "RSTATE", "EPOCH",
+			    "C18N");
 	}
 
 	xo_emit("{k:process_id/%5d/%d}", kipp->ki_pid);
@@ -78,6 +88,7 @@ procstat_cheri(struct procstat *procstat, struct kinfo_proc *kipp)
 		xo_emit(" {:revoker_epoch/%34s/%s}", abi_cheri == 'P' ?
 		    get_revoker_epoch(procstat, kipp) : "-");
 	}
+	xo_emit(" {:compartments/%5s/%s}", get_c18n(procstat, kipp));
 	xo_emit("\n");
 }
 
@@ -169,4 +180,21 @@ get_revoker_state(struct procstat *procstat, struct kinfo_proc *kipp)
 	} else {
 		return ("-");
 	}
+}
+
+static const char *
+get_c18n(struct procstat *procstat, struct kinfo_proc *kipp)
+{
+	static char c18n_buf[6];
+	struct rtld_c18n_stats *rcs;
+	size_t len;
+
+	if (procstat_getc18n(procstat, kipp, (void **)&rcs, &len) < 0 &&
+	    errno != ESRCH && errno != EPERM && errno != ENOEXEC)
+		warn("procstat_get_c18n");
+	if (len < sizeof(*rcs) || rcs->version != RTLD_C18N_STATS_VERSION)
+		snprintf(c18n_buf, sizeof(c18n_buf), "-");
+	else
+		snprintf(c18n_buf, sizeof(c18n_buf), "%5lu", rcs->rcs_compart);
+	return (c18n_buf);
 }

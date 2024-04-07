@@ -284,6 +284,12 @@ procstat_auxv(struct procstat *procstat, struct kinfo_proc *kipp)
 			    prefix, "AT_USRSTACKLIM", auxv[i].a_un.a_val);
 			break;
 #endif
+#ifdef AT_CHERI_C18N
+		case AT_CHERI_C18N:
+			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_CHERI_C18N/%s}\n",
+			    prefix, "AT_CHERI_C18N", fmt_ptr(auxv[i].a_un.a_ptr));
+			break;
+#endif
 		default:
 			xo_emit("{dw:/%s}{Lw:/%16ld/%ld}{:UNKNOWN/%#lx}\n",
 			    prefix, auxv[i].a_type, auxv[i].a_un.a_val);

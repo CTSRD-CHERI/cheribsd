@@ -235,5 +235,5 @@ void *_rtld_tlsdesc_static_c18n(void *);
 void *_rtld_tlsdesc_undef_c18n(void *);
 void *_rtld_tlsdesc_dynamic_c18n(void *);
 
-void c18n_init(Obj_Entry *);
+void c18n_init(Obj_Entry *, Elf_Auxinfo *[]);
 #endif

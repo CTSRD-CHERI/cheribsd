@@ -784,6 +784,7 @@ struct proc {
 
 	TAILQ_HEAD(, kq_timer_cb_data)	p_kqtim_stop;	/* (c) */
 	LIST_ENTRY(proc) p_jaillist;	/* (d) Jail process linkage. */
+	struct cheri_c18n_info	*p_c18n_info;	/* (x) Compartment info block */
 };
 
 #define	p_session	p_pgrp->pg_session

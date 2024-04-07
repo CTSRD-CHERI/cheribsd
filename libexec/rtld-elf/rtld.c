@@ -987,7 +987,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
     if (C18N_ENABLED) {
-	c18n_init(&obj_rtld);
+	c18n_init(&obj_rtld, aux_info);
 
 	/*
 	 * Manually register the main object after the policy is loaded.
