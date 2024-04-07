@@ -38,6 +38,7 @@
 #include <sys/elf.h>
 #endif
 #include <sys/caprights.h>
+#include <cheri/c18n.h>
 
 /*
  * Vnode types.
@@ -215,6 +216,8 @@ void	procstat_freeptlwpinfo(struct procstat *procstat,
 void	procstat_freevmmap(struct procstat *procstat,
     struct kinfo_vmentry *vmmap);
 struct advlock_list	*procstat_getadvlock(struct procstat *procstat);
+int	procstat_getc18n(struct procstat *procstat, struct kinfo_proc *kp,
+    struct rtld_c18n_stats *stats);
 struct filestat_list	*procstat_getfiles(struct procstat *procstat,
     struct kinfo_proc *kp, int mmapped);
 struct kinfo_proc	*procstat_getprocs(struct procstat *procstat,

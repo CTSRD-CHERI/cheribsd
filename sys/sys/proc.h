@@ -751,6 +751,9 @@ struct proc {
 						 non ELF binaries. */
 	sbintime_t	p_umtx_min_timeout;
 	vm_offset_t	p_psstrings;
+#if __has_feature(capabilities)
+	struct cheri_c18n_info	*p_c18n_info;	/* (x) Compartment info block */
+#endif
 /* End area that is copied on creation. */
 #define	p_endcopy	p_xexit
 

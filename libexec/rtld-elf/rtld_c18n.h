@@ -202,7 +202,7 @@ void *_rtld_tlsdesc_static_c18n(void *);
 void *_rtld_tlsdesc_undef_c18n(void *);
 void *_rtld_tlsdesc_dynamic_c18n(void *);
 
-void c18n_init(Obj_Entry *);
+void c18n_init(Obj_Entry *, Elf_Auxinfo *[]);
 void c18n_init2(void);
 
 #include "rtld_c18n_machdep.h"

@@ -1556,7 +1556,7 @@ tramp_reflect(const void *data)
 #define	C18N_FUNC_SIG_COUNT	72
 
 void
-c18n_init(Obj_Entry *obj_rtld)
+c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 {
 	extern const char c18n_default_policy[];
 	extern const size_t c18n_default_policy_size;
@@ -1564,6 +1564,7 @@ c18n_init(Obj_Entry *obj_rtld)
 	int fd;
 	char *file;
 	struct stat st;
+	struct cheri_c18n_info *info;
 
 	/*
 	 * Create memory mapping for compartmentalisation statistics.
@@ -1587,6 +1588,16 @@ c18n_init(Obj_Entry *obj_rtld)
 		rtld_fatal("c18n: Cannot mmap file (%s)", rtld_strerror(errno));
 	atomic_store_explicit(&c18n_stats->version, RTLD_C18N_STATS_VERSION,
 	    memory_order_release);
+
+	if (aux_info[AT_CHERI_C18N] != NULL) {
+		info = aux_info[AT_CHERI_C18N]->a_un.a_ptr;
+		*info = (struct cheri_c18n_info) {
+			.stats_size = sizeof(*c18n_stats),
+			.stats = c18n_stats
+		};
+		atomic_store_explicit(&info->version, CHERI_C18N_INFO_VERSION,
+		    memory_order_release);
+	}
 
 	/*
 	 * Initialise compartment table, add the RTLD compartment, load the

@@ -103,6 +103,7 @@
 #endif
 
 #if __has_feature(capabilities)
+#include <cheri/c18n.h>
 #include <cheri/cheric.h>
 #endif
 
@@ -2501,6 +2502,65 @@ sysctl_kern_proc_auxv(SYSCTL_HANDLER_ARGS)
 	return (error != 0 ? error : error2);
 }
 
+#if __has_feature(capabilities)
+/*
+ * Return the c18n statistics block from the target process.
+ */
+static int
+sysctl_kern_proc_c18n(SYSCTL_HANDLER_ARGS)
+{
+	int *name = (int *)arg1;
+	u_int namelen = arg2;
+	struct proc *p;
+	struct cheri_c18n_info info;
+	int error;
+	void *buffer;
+	ssize_t n;
+
+	if (namelen != 1)
+		return (EINVAL);
+
+	error = pget((pid_t)name[0], PGET_WANTREAD, &p);
+	if (error != 0)
+		return (error);
+
+	if ((p->p_flag & P_SYSTEM) != 0 ||
+	    SV_PROC_FLAG(p, SV_CHERI) == 0 ||
+	    p->p_c18n_info == NULL)
+		goto out;
+
+	n = proc_readmem_cap(curthread, p, (vm_offset_t)p->p_c18n_info, &info,
+	    sizeof(info));
+	/*
+	 * If there is a version mismatch or the statistics block is oversized,
+	 * error out.
+	 */
+	if (n != sizeof(info) ||
+	    info.version != CHERI_C18N_INFO_VERSION ||
+	    info.stats_size == 0 ||
+	    info.stats_size > RTLD_C18N_STATS_MAX_SIZE ||
+	    !__CAP_CHECK(info.stats, info.stats_size) ||
+	    (cheri_getperm(info.stats) & CHERI_PERM_LOAD) == 0) {
+		error = ENOEXEC;
+		goto out;
+	}
+
+	buffer = malloc(info.stats_size, M_TEMP, M_WAITOK);
+	n = proc_readmem(curthread, p, (__cheri_addr vm_offset_t)info.stats,
+	    buffer, info.stats_size);
+	if (n != info.stats_size) {
+		error = ENOMEM;
+		goto out_free;
+	}
+	error = SYSCTL_OUT(req, buffer, info.stats_size);
+out_free:
+	free(buffer, M_TEMP);
+out:
+	PRELE(p);
+	return (error);
+}
+#endif
+
 /*
  * Look up the canonical executable path running in the specified process.
  * It tries to return the same hardlink name as was used for execve(2).
@@ -3680,6 +3740,12 @@ static SYSCTL_NODE(_kern_proc, KERN_PROC_ENV, env, CTLFLAG_RD | CTLFLAG_MPSAFE,
 
 static SYSCTL_NODE(_kern_proc, KERN_PROC_AUXV, auxv, CTLFLAG_RD |
 	CTLFLAG_MPSAFE, sysctl_kern_proc_auxv, "Process ELF auxiliary vector");
+
+#if __has_feature(capabilities)
+static SYSCTL_NODE(_kern_proc, KERN_PROC_C18N, c18n, CTLFLAG_RD |
+	CTLFLAG_MPSAFE, sysctl_kern_proc_c18n,
+	"Compartmentalisation statistics");
+#endif
 
 static SYSCTL_NODE(_kern_proc, KERN_PROC_PATHNAME, pathname, CTLFLAG_RD |
 	CTLFLAG_MPSAFE, sysctl_kern_proc_pathname, "Process executable path");

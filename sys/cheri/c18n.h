@@ -52,6 +52,19 @@ struct rtld_c18n_stats {
 	_Atomic(size_t) rcs_bytes_total;
 };
 
+/*
+ * The interface provided by the kernel for RTLD to supply compartmentalisation
+ * information. The version field doubles as a synchronisation flag where a
+ * non-zero value indicates that the other fields have been initialised.
+ */
+#define CHERI_C18N_INFO_VERSION		1
+
+struct cheri_c18n_info {
+	_Atomic(uint8_t) version;
+	size_t stats_size;
+	struct rtld_c18n_stats * __kerncap	stats;
+};
+
 #ifndef IN_RTLD
 #undef _Atomic
 #endif
