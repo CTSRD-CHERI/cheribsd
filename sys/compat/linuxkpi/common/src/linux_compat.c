@@ -1916,6 +1916,10 @@ linux_timer_callback_wrapper(void *context)
 
 	timer = context;
 
+	/* the timer is about to be shutdown permanently */
+	if (timer->function == NULL)
+		return;
+
 	if (linux_set_current_flags(curthread, M_NOWAIT)) {
 		/* try again later */
 		callout_reset(&timer->callout, 1,
@@ -1988,6 +1992,7 @@ int
 timer_shutdown_sync(struct timer_list *timer)
 {
 
+	timer->function = NULL;
 	return (del_timer_sync(timer));
 }
 
