@@ -221,7 +221,7 @@ struct __no_subobject_bounds {						\
 #endif
 
 #define SLIST_CONCAT(head1, head2, type, field) do {			\
-	QUEUE_TYPEOF(type) *curelm = SLIST_FIRST(head1);	\
+	QUEUE_TYPEOF(type) *curelm = SLIST_FIRST(head1);		\
 	if (curelm == NULL) {						\
 		if ((SLIST_FIRST(head1) = SLIST_FIRST(head2)) != NULL)	\
 			SLIST_INIT(head2);				\
@@ -403,9 +403,9 @@ struct __no_subobject_bounds {				\
 	(head)->stqh_last = &STAILQ_NEXT((elm), field);			\
 } while (0)
 
-#define	STAILQ_LAST(head, type, field)				\
-	(STAILQ_EMPTY((head)) ? NULL :				\
-	    __containerof((head)->stqh_last,			\
+#define	STAILQ_LAST(head, type, field)					\
+	(STAILQ_EMPTY((head)) ? NULL :					\
+	    __containerof((head)->stqh_last,				\
 	    QUEUE_TYPEOF(type), field.stqe_next))
 
 #define	STAILQ_NEXT(elm, field)	((elm)->field.stqe_next)
@@ -508,7 +508,7 @@ struct __no_subobject_bounds {				\
 	if (LIST_NEXT((elm), field) != NULL &&				\
 	    LIST_NEXT((elm), field)->field.le_prev !=			\
 	     &((elm)->field.le_next))					\
-	     	panic("Bad link elm %p next->prev != elm", (elm));	\
+		panic("Bad link elm %p next->prev != elm", (elm));	\
 } while (0)
 
 /*
@@ -526,21 +526,21 @@ struct __no_subobject_bounds {				\
 #define	QMD_LIST_CHECK_PREV(elm, field)
 #endif /* (_KERNEL && INVARIANTS) */
 
-#define LIST_CONCAT(head1, head2, type, field) do {			      \
-	QUEUE_TYPEOF(type) *curelm = LIST_FIRST(head1); 			\
-	if (curelm == NULL) {						      \
-		if ((LIST_FIRST(head1) = LIST_FIRST(head2)) != NULL) {	      \
-			LIST_FIRST(head2)->field.le_prev =		      \
-			    &LIST_FIRST((head1));			      \
-			LIST_INIT(head2);				      \
-		}							      \
-	} else if (LIST_FIRST(head2) != NULL) {				      \
-		while (LIST_NEXT(curelm, field) != NULL)		      \
-			curelm = LIST_NEXT(curelm, field);		      \
-		LIST_NEXT(curelm, field) = LIST_FIRST(head2);		      \
-		LIST_FIRST(head2)->field.le_prev = &LIST_NEXT(curelm, field); \
-		LIST_INIT(head2);					      \
-	}								      \
+#define LIST_CONCAT(head1, head2, type, field) do {			\
+	QUEUE_TYPEOF(type) *curelm = LIST_FIRST(head1);			\
+	if (curelm == NULL) {						\
+		if ((LIST_FIRST(head1) = LIST_FIRST(head2)) != NULL) {	\
+			LIST_FIRST(head2)->field.le_prev =		\
+			    &LIST_FIRST((head1));			\
+			LIST_INIT(head2);				\
+		}							\
+	} else if (LIST_FIRST(head2) != NULL) {				\
+		while (LIST_NEXT(curelm, field) != NULL)		\
+			curelm = LIST_NEXT(curelm, field);		\
+		LIST_NEXT(curelm, field) = LIST_FIRST(head2);		\
+		LIST_FIRST(head2)->field.le_prev = &LIST_NEXT(curelm, field);\
+		LIST_INIT(head2);					\
+	}								\
 } while (0)
 
 #define	LIST_EMPTY(head)	((head)->lh_first == NULL)
@@ -598,12 +598,12 @@ struct __no_subobject_bounds {				\
 
 #define	LIST_NEXT(elm, field)	((elm)->field.le_next)
 
-#define	LIST_PREV(elm, head, type, field)			\
-	((elm)->field.le_prev == &LIST_FIRST((head)) ? NULL :	\
-	    __containerof((elm)->field.le_prev,			\
+#define	LIST_PREV(elm, head, type, field)				\
+	((elm)->field.le_prev == &LIST_FIRST((head)) ? NULL :		\
+	    __containerof((elm)->field.le_prev,				\
 	    QUEUE_TYPEOF(type), field.le_next))
 
-#define LIST_REMOVE_HEAD(head, field) 					\
+#define LIST_REMOVE_HEAD(head, field)					\
 	LIST_REMOVE(LIST_FIRST(head), field)
 
 #define	LIST_REMOVE(elm, field) do {					\
@@ -612,7 +612,7 @@ struct __no_subobject_bounds {				\
 	QMD_LIST_CHECK_NEXT(elm, field);				\
 	QMD_LIST_CHECK_PREV(elm, field);				\
 	if (LIST_NEXT((elm), field) != NULL)				\
-		LIST_NEXT((elm), field)->field.le_prev = 		\
+		LIST_NEXT((elm), field)->field.le_prev =		\
 		    (elm)->field.le_prev;				\
 	*(elm)->field.le_prev = LIST_NEXT((elm), field);		\
 	TRASHIT(*oldnext);						\
@@ -689,7 +689,7 @@ struct __no_subobject_bounds {				\
  */
 #define	QMD_TAILQ_CHECK_TAIL(head, field) do {				\
 	if (*(head)->tqh_last != NULL)					\
-	    	panic("Bad tailq NEXT(%p->tqh_last) != NULL", (head)); 	\
+		panic("Bad tailq NEXT(%p->tqh_last) != NULL", (head));	\
 } while (0)
 
 /*
@@ -771,7 +771,7 @@ struct __no_subobject_bounds {				\
 	    (var) && ((tvar) = TAILQ_PREV((var), headname, field), 1);	\
 	    (var) = (tvar))
 
-#define	TAILQ_FOREACH_REVERSE_FROM_SAFE(var, head, headname, field, tvar) \
+#define	TAILQ_FOREACH_REVERSE_FROM_SAFE(var, head, headname, field, tvar)\
 	for ((var) = ((var) ? (var) : TAILQ_LAST((head), headname));	\
 	    (var) && ((tvar) = TAILQ_PREV((var), headname, field), 1);	\
 	    (var) = (tvar))
@@ -785,7 +785,7 @@ struct __no_subobject_bounds {				\
 #define	TAILQ_INSERT_AFTER(head, listelm, elm, field) do {		\
 	QMD_TAILQ_CHECK_NEXT(listelm, field);				\
 	if ((TAILQ_NEXT((elm), field) = TAILQ_NEXT((listelm), field)) != NULL)\
-		TAILQ_NEXT((elm), field)->field.tqe_prev = 		\
+		TAILQ_NEXT((elm), field)->field.tqe_prev =		\
 		    &TAILQ_NEXT((elm), field);				\
 	else {								\
 		(head)->tqh_last = &TAILQ_NEXT((elm), field);		\
@@ -840,7 +840,7 @@ struct __no_subobject_bounds {				\
  * the previous element. FAST is very useful for instances when
  * you may want to prefetch the last data element.
  */
-#define	TAILQ_LAST_FAST(head, type, field)			\
+#define	TAILQ_LAST_FAST(head, type, field)				\
     (TAILQ_EMPTY(head) ? NULL : __containerof((head)->tqh_last, QUEUE_TYPEOF(type), field.tqe_next))
 
 #define	TAILQ_NEXT(elm, field) ((elm)->field.tqe_next)
@@ -852,7 +852,7 @@ struct __no_subobject_bounds {				\
     ((elm)->field.tqe_prev == &(head)->tqh_first ? NULL :		\
      __containerof((elm)->field.tqe_prev, QUEUE_TYPEOF(type), field.tqe_next))
 
-#define TAILQ_REMOVE_HEAD(head, field) 					\
+#define TAILQ_REMOVE_HEAD(head, field)					\
 	TAILQ_REMOVE(head, TAILQ_FIRST(head), field)
 
 #define	TAILQ_REMOVE(head, elm, field) do {				\
@@ -861,7 +861,7 @@ struct __no_subobject_bounds {				\
 	QMD_TAILQ_CHECK_NEXT(elm, field);				\
 	QMD_TAILQ_CHECK_PREV(elm, field);				\
 	if ((TAILQ_NEXT((elm), field)) != NULL)				\
-		TAILQ_NEXT((elm), field)->field.tqe_prev = 		\
+		TAILQ_NEXT((elm), field)->field.tqe_prev =		\
 		    (elm)->field.tqe_prev;				\
 	else {								\
 		(head)->tqh_last = (elm)->field.tqe_prev;		\
