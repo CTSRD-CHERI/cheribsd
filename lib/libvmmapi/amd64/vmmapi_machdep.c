@@ -50,6 +50,7 @@ const char *vm_capstrmap[] = {
 	[VM_CAP_RDTSCP] = "rdtscp",
 	[VM_CAP_IPI_EXIT] = "ipi_exit",
 	[VM_CAP_MASK_HWINTR] = "mask_hwintr",
+	[VM_CAP_RFLAGS_TF] = "rflags_tf",
 	[VM_CAP_MAX] = NULL,
 };
 
