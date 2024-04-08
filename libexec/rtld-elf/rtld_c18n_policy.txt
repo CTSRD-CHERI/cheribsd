@@ -45,6 +45,7 @@ trust
 	unw_getcontext
 	unw_getcontext_unsealed
 	_rtld_thread_start
+	_rtld_sighandler
 
 callee [RTLD]
 export to [TCB]
@@ -53,6 +54,8 @@ export to [TCB]
 	_rtld_thr_exit
 	_rtld_sighandler_init
 	_rtld_sighandler
+	_rtld_siginvoke
+	_rtld_sigaction
 	_rtld_setjmp
 	_rtld_longjmp
 

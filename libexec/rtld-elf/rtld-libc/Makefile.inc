@@ -68,7 +68,7 @@ _libc_other_objects=sigsetjmp lstat stat fstat fstatat fstatfs syscall \
     _sigprocmask _write readlink __realpathat _setjmp setjmp setjmperr
 
 .ifdef RTLD_SANDBOX
-_libc_other_objects+=thr_exit
+_libc_other_objects+=thr_exit _sigaction
 .endif
 
 # Finally add additional architecture-dependent libc dependencies

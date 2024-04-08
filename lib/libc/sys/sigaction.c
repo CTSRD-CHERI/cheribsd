@@ -37,43 +37,15 @@ __weak_reference(__sys_sigaction, __sigaction);
 __weak_reference(sigaction, __libc_sigaction);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 /*
- * These weak symbols will always be resolved at runtime.
+ * This weak symbol will always be resolved at runtime.
  */
-/*
- * XXX: Explicit function pointer used so that RTLD can wrap it in trampoline.
- */
-extern void (*_rtld_sighandler)(int, siginfo_t *, void *);
-
-#pragma weak _rtld_sigaction_begin
-void *_rtld_sigaction_begin(int, struct sigaction *);
-
-#pragma weak _rtld_sigaction_end
-void _rtld_sigaction_end(int, void *, const struct sigaction *,
-    struct sigaction *);
+#pragma weak _rtld_sigaction
+int _rtld_sigaction(int, const struct sigaction *, struct sigaction *);
 
 int
 sigaction_c18n(int sig, const struct sigaction *act, struct sigaction *oact)
 {
-	int ret;
-	void *context = 0;
-	struct sigaction newact;
-	const struct sigaction *newactp = act;
-
-	if (act &&
-	    act->sa_handler != SIG_DFL && act->sa_handler != SIG_IGN) {
-		newact = *act;
-		newactp = &newact;
-
-		context = _rtld_sigaction_begin(sig, &newact);
-		newact.sa_sigaction = _rtld_sighandler;
-	}
-
-	ret = __sys_sigaction(sig, newactp, oact);
-
-	if (ret == 0)
-		_rtld_sigaction_end(sig, context, act, oact);
-
-	return (ret);
+	return (_rtld_sigaction(sig, act, oact));
 }
 #endif
 

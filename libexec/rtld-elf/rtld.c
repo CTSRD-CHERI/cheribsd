@@ -1058,6 +1058,11 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
        exit (0);
     }
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+    if (C18N_ENABLED)
+	c18n_init2();
+#endif
+
     /*
      * Processing tls relocations requires having the tls offsets
      * initialized.  Prepare offsets before starting initial
@@ -6100,7 +6105,7 @@ _rtld_allocate_tls(void *oldtls, size_t tcbsize, size_t tcbalign)
       tcbsize, tcbalign);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
     if (C18N_ENABLED)
-	allocate_stk_table();
+	ret = c18n_allocate_tcb(ret);
 #endif
     lock_release(rtld_bind_lock, &lockstate);
     return (ret);
@@ -6112,6 +6117,10 @@ _rtld_free_tls(void *tcb, size_t tcbsize, size_t tcbalign)
     RtldLockState lockstate;
 
     wlock_acquire(rtld_bind_lock, &lockstate);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+    if (C18N_ENABLED)
+	c18n_free_tcb();
+#endif
     free_tls(tcb, tcbsize, tcbalign);
     lock_release(rtld_bind_lock, &lockstate);
 }

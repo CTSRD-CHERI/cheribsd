@@ -28,51 +28,155 @@
 #ifndef RTLD_C18N_MACHDEP_H
 #define RTLD_C18N_MACHDEP_H
 
-#define	C18N_TRUSTED_FRAME_SIZE		15
+#include <sys/cdefs.h>
 
-#ifndef IN_ASM
-/*
- * Stack unwinding
- */
+#define	TRUSTED_FRAME_SIZE		16
+#define	TRUSTED_FRAME_SP_OSP		(16 * 12)
+#define	TRUSTED_FRAME_PREV		(16 * 14)
+#define	TRUSTED_FRAME_CALLER		(16 * 15)
+#define	TRUSTED_FRAME_CALLEE		(16 * 15 + 4)
+#define	TRUSTED_FRAME_LANDING		(16 * 15 + 8)
+
+#define	SIG_FRAME_SIZE			1360
+
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+#define	TRUSTED_STACK		rddc_el0
+#define	UNTRUSTED_STACK		csp
+#define	STACK_TABLE		rctpidr_el0
+#else
+#define	TRUSTED_STACK		ddc
+#define	UNTRUSTED_STACK		rcsp_el0
+#define	STACK_TABLE		ctpidr_el0
+#endif
+#define	STACK_TABLE_N		17
+#define	STACK_TABLE_C		__CONCAT(c, STACK_TABLE_N)
+#define	STACK_TABLE_RTLD	32
+
+#ifdef IN_ASM
+
+.macro	get_untrusted_stk	reg
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mov	\reg, UNTRUSTED_STACK
+#else
+	mrs	\reg, UNTRUSTED_STACK
+#endif
+.endmacro
+
+.macro	set_untrusted_stk	reg
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	mov	UNTRUSTED_STACK, \reg
+#else
+	msr	UNTRUSTED_STACK, \reg
+#endif
+.endmacro
+
+.macro	get_rtld_stk		reg
+	mrs	\reg, STACK_TABLE
+	ldr	\reg, [\reg, #STACK_TABLE_RTLD]
+.endmacro
+
+.macro	update_stk_table	osp, sp, index
+	mrs	STACK_TABLE_C, TRUSTED_STACK
+	ldrh	\index, [STACK_TABLE_C, #TRUSTED_FRAME_CALLEE]
+
+	mrs	STACK_TABLE_C, STACK_TABLE
+	ldr	\osp, [STACK_TABLE_C, \index, uxtw #0]
+	str	\sp, [STACK_TABLE_C, \index, uxtw #0]
+.endmacro
+
+#else
+
+static inline void *
+get_trusted_tp(void)
+{
+	void *ptr;
+
+	asm volatile ("mrs	%0, ctpidr_el0" : "=C" (ptr));
+	return (ptr);
+}
+
+static inline struct stk_table *
+get_stk_table(void)
+{
+	struct stk_table *table;
+
+	asm volatile ("mrs	%0, " __XSTRING(STACK_TABLE) : "=C" (table));
+	return (table);
+}
+
+static inline void
+set_stk_table(const struct stk_table *table)
+{
+	asm ("msr	" __XSTRING(STACK_TABLE) ", %0" :: "C" (table));
+}
+
+static inline struct trusted_frame *
+get_trusted_stk(void)
+{
+	struct trusted_frame *tf;
+
+	asm volatile ("mrs	%0, " __XSTRING(TRUSTED_STACK) : "=C" (tf));
+	return (tf);
+}
+
+static inline void
+set_trusted_stk(const struct trusted_frame *tf)
+{
+	asm ("msr	" __XSTRING(TRUSTED_STACK) ", %0" :: "C" (tf));
+}
+
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+static inline void
+set_untrusted_stk(const void *sp)
+{
+	asm ("msr	" __XSTRING(UNTRUSTED_STACK) ", %0" :: "C" (sp));
+}
+#endif
+
 struct trusted_frame {
 	void *fp;
 	void *pc;
 	/*
-	 * Address of the next trusted frame
+	 * c19 to c28
 	 */
-	ptraddr_t next;
-	/*
-	 * Number of return value registers, encoded in enum tramp_ret_args
-	 */
-	uint8_t ret_args : 2;
-	/*
-	 * This field contains the code address in the trampoline that the
-	 * callee should return to. This is only used by unwinders to detect
-	 * compartment boundaries.
-	 */
-	ptraddr_t cookie : 62;
+	void *regs[10];
 	/*
 	 * INVARIANT: This field contains the top of the caller's stack when the
 	 * caller made the call.
 	 */
-	void *n_sp;
+	void *sp;
 	/*
 	 * INVARIANT: This field contains the top of the caller's stack when the
 	 * caller was last entered.
 	 */
-	ptraddr_t o_sp;
+	void *osp;
 	/*
-	 * This field contains the address of the trusted stack before the
-	 * current frame was pushed. It is only used by unwinders.
+	 * Address of the previous trusted frame
 	 */
-	ptraddr_t csp;
+	struct trusted_frame *previous;
 	/*
-	 * c19 to c28
+	 * Compartment ID of the caller
 	 */
-	void *regs[10];
+	stk_table_index caller;
+	/*
+	 * Zeros
+	 */
+	uint16_t zeros;
+	/*
+	 * Compartment ID of the callee
+	 */
+	stk_table_index callee;
+	/*
+	 * Number of return value registers, encoded in enum tramp_ret_args
+	 */
+	uint8_t ret_args : 2;
+	uint16_t reserved : 14;
+	/*
+	 * This field contains the code address in the trampoline that the
+	 * callee should return to. This is used by trampolines to detect cross-
+	 * compartment tail-calls.
+	 */
+	ptraddr_t landing;
 };
-_Static_assert(
-    sizeof(struct trusted_frame) == sizeof(uintptr_t) * C18N_TRUSTED_FRAME_SIZE,
-    "Unexpected struct trusted_frame size");
 #endif
 #endif

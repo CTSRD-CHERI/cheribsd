@@ -31,6 +31,9 @@
 #include <sys/cdefs.h>
 #include <sys/elf_common.h>
 
+#define	IN_ASM
+#include "rtld_c18n_machdep.h"
+#undef IN_ASM
 
 /*
  * Pure-capability:
@@ -60,12 +63,6 @@ ENTRY(.rtld_start)
 	add	c0, c0, :lo12:_DYNAMIC		/* dynp */
 	mov	c1, c19				/* aux */
 	bl	_rtld_relocate_nonplt_self	/* Relocate ourselves early */
-
-#ifdef RTLD_SANDBOX
-	mov	c1, csp
-	sub	csp, csp, #(CAP_WIDTH * 2)
-	bl	c18n_init_rtld_stack
-#endif
 
 #if __CHERI_CAPABILITY_TABLE__ != 3
 #error "Only the PC-relative ABI is currently supported"
@@ -124,32 +121,26 @@ END(.rtld_start)
 ENTRY(C18N_SYM(_rtld_bind_start))
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 	/*
-	 * Maintain consistency of caller's stack.
+	 * Get the caller's current stack top.
 	 */
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	mov	c17, csp
-#else
-	mrs	c17, rcsp_el0
-#endif
-	gclim	x10, c17
-	scvalue c10, c17, x10
-	ldr	c18, [c10, #-CAP_WIDTH]
-	str	c17, [c10, #-CAP_WIDTH]
-
+	get_untrusted_stk	c10
+	/*
+	 * Update the stack lookup table with the caller's current stack top and
+	 * get the caller's old stack top.
+	 */
+	update_stk_table	c11, c10, w12
+	mov	c17, c10
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	/*
-	 * Switch to RTLD stack.
+	 * Switch to RTLD's stack.
 	 */
-	mrs	c10, rctpidr_el0
-	ldr	c10, [c10, #(CAP_WIDTH * 2)]
-	ldr	c10, [c10, #-CAP_WIDTH]
-	mov	csp, c10
+	get_rtld_stk		c10
+	set_untrusted_stk	c10
 #endif
-
 	/*
-	 * Save old top of caller's stack.
+	 * Save caller's old stack top.
 	 */
-	str	c18, [csp, #-CAP_WIDTH]!
+	str	c11, [csp, #-CAP_WIDTH]!
 #else
 	mov	PTR(17), PTRN(sp)
 #endif
@@ -216,20 +207,24 @@ ENTRY(C18N_SYM(_rtld_bind_start))
 	/* Restore frame pointer */
 	ldp	PTR(29), PTR(zr), [PTRN(sp)], #(PTR_WIDTH * 2)
 
-	/* Restore link register saved by the plt code */
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	ldr	c18, [csp], #CAP_WIDTH
-	gclim	x10, c18
-	scvalue	c11, c18, x10
-	ldr	c17, [c11, #-CAP_WIDTH]
-	str	c18, [c11, #-CAP_WIDTH]
-
-	ldp	czr, c30, [c17], #(PTR_WIDTH * 2)
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	mov	csp, c17
-#else
-	msr	rcsp_el0, c17
-#endif
+	/*
+	 * Load caller's old stack top.
+	 */
+	ldr	c10, [csp], #CAP_WIDTH
+	/*
+	 * Update the stack lookup table with the caller's old stack top and get
+	 * the caller's current stack top.
+	 */
+	update_stk_table	c11, c10, w12
+	/*
+	 * Pop the return address saved by the PLT.
+	 */
+	ldp	czr, c30, [c11], #(PTR_WIDTH * 2)
+	/*
+	 * Switch to caller's stack.
+	 */
+	set_untrusted_stk	c11
 
 	/*
 	 * Clear temporary registers that might contain RTLD-privileged
@@ -237,11 +232,16 @@ ENTRY(C18N_SYM(_rtld_bind_start))
 	 * clear them, but if the resolved function is trusted, then no such
 	 * clearing would be performed.
 	 */
-	mov	x12, xzr
 	mov	x13, xzr
 	mov	x14, xzr
 	mov	x15, xzr
+	/*
+	 * c16: Callee's code
+	 */
+	mov	x17, xzr
+	mov	x18, xzr
 #else
+	/* Restore link register saved by the plt code */
 	ldp	PTR(zr), PTR(30), [PTRN(sp)], #(PTR_WIDTH * 2)
 #endif
 
@@ -373,33 +373,26 @@ ENTRY(C18N_SYM(_rtld_tlsdesc_dynamic))
 	str	c19,	  [csp, #(9 * 32)]
 #if defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	/*
-	 * Maintain consistency of caller's stack. This step is only needed for
+	 * Get the caller's current stack top. This step is only needed for
 	 * _rtld_tlsdesc_dynamic because it might call external functions.
 	 */
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	mov	c17, csp
-#else
-	mrs	c17, rcsp_el0
-#endif
-	gclim	x10, c17
-	scvalue	c10, c17, x10
-	ldr	c18, [c10, #-CAP_WIDTH]
-	str	c17, [c10, #-CAP_WIDTH]
-
+	get_untrusted_stk	c10
+	/*
+	 * Update the stack lookup table with the caller's current stack top and
+	 * get the caller's old stack top.
+	 */
+	update_stk_table	c11, c10, w12
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	/*
-	 * Switch to RTLD stack.
+	 * Switch to RTLD's stack.
 	 */
-	mrs	c10, rctpidr_el0
-	ldr	c10, [c10, #(CAP_WIDTH * 2)]
-	ldr	c10, [c10, #-CAP_WIDTH]
-	mov	csp, c10
+	get_rtld_stk		c10
+	set_untrusted_stk	c10
 #endif
-
 	/*
-	 * Save old top of caller's stack.
+	 * Save caller's old stack top.
 	 */
-	str	c18, [csp, #-CAP_WIDTH]!
+	str	c11, [csp, #-CAP_WIDTH]!
 #endif
 	.cfi_rel_offset		 c1, 32
 	.cfi_rel_offset		 c2, 48
@@ -430,17 +423,19 @@ ENTRY(C18N_SYM(_rtld_tlsdesc_dynamic))
 
 	/* Restore slow path registers */
 #ifdef RTLD_SANDBOX
-	ldr	c18, [csp], #CAP_WIDTH
-	gclim	x10, c18
-	scvalue	c11, c18, x10
-	ldr	c17, [c11, #-CAP_WIDTH]
-	str	c18, [c11, #-CAP_WIDTH]
-
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	mov	csp, c17
-#else
-	msr	rcsp_el0, c17
-#endif
+	/*
+	 * Load caller's old stack top.
+	 */
+	ldr	c10, [csp], #CAP_WIDTH
+	/*
+	 * Update the stack lookup table with the caller's old stack top and get
+	 * the caller's current stack top.
+	 */
+	update_stk_table	c11, c10, w12
+	/*
+	 * Switch to caller's stack.
+	 */
+	set_untrusted_stk	c11
 #endif
 	ldr	c19,	  [csp, #(9 * 32)]
 	ldp	c17, c18, [csp, #(8 * 32)]

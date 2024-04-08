@@ -76,22 +76,14 @@ static void check_cancel(struct pthread *curthread, ucontext_t *ucp);
 /*
  * These weak symbols will always be resolved at runtime.
  */
-/*
- * XXX: Explicit function pointer used so that RTLD can wrap it in trampoline.
- */
-extern void (*_rtld_sighandler)(int, siginfo_t *, void *);
+#pragma weak _rtld_sighandler
+void _rtld_sighandler(int, siginfo_t *, void *);
 
-/*
- * XXX: Explicit function pointer used so that RTLD can wrap it in trampoline.
- */
-extern void (*_rtld_dispatch_signal)(int, siginfo_t *, void *);
+#pragma weak _rtld_sigaction
+int _rtld_sigaction(int, const struct sigaction *, struct sigaction *);
 
-#pragma weak _rtld_sigaction_begin
-void *_rtld_sigaction_begin(int, struct sigaction *);
-
-#pragma weak _rtld_sigaction_end
-void _rtld_sigaction_end(int, void *, const struct sigaction *,
-    struct sigaction *);
+#pragma weak _rtld_siginvoke
+void _rtld_siginvoke(int, siginfo_t *, void *, const struct sigaction *);
 #endif
 
 int	_sigtimedwait(const sigset_t *set, siginfo_t *info,
@@ -305,10 +297,14 @@ handle_signal(struct sigaction *actp, int sig, siginfo_t *info, ucontext_t *ucp)
 	if (!cancel_async)
 		curthread->cancel_enable = 0;
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	(void)sigfunc;
+#else
 	/* restore correct mask before calling user handler */
 	__sys_sigprocmask(SIG_SETMASK, &actp->sa_mask, NULL);
 
 	sigfunc = actp->sa_sigaction;
+#endif
 
 	/*
 	 * We have already reset cancellation point flags, so if user's code
@@ -318,6 +314,9 @@ handle_signal(struct sigaction *actp, int sig, siginfo_t *info, ucontext_t *ucp)
 	 * so after setjmps() returns once more, the user code may need to
 	 * re-set cancel_enable flag by calling pthread_setcancelstate().
 	 */
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	_rtld_siginvoke(sig, info, ucp, actp);
+#else
 	if ((actp->sa_flags & SA_SIGINFO) != 0) {
 		sigfunc(sig, info, ucp);
 	} else {
@@ -325,6 +324,7 @@ handle_signal(struct sigaction *actp, int sig, siginfo_t *info, ucontext_t *ucp)
 		    (struct sigcontext *)ucp, info->si_addr,
 		    (__sighandler_t *)sigfunc);
 	}
+#endif
 	err = errno;
 
 	curthread->in_sigsuspend = in_sigsuspend;
@@ -501,7 +501,11 @@ _thr_signal_init(int dlopened)
 		for (sig = 1; sig <= _SIG_MAXSIG; sig++) {
 			if (sig == SIGCANCEL)
 				continue;
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+			error = _rtld_sigaction(sig, NULL, &oact);
+#else
 			error = __sys_sigaction(sig, NULL, &oact);
+#endif
 			if (error == -1 || oact.sa_handler == SIG_DFL ||
 			    oact.sa_handler == SIG_IGN)
 				continue;
@@ -512,6 +516,8 @@ _thr_signal_init(int dlopened)
 			nact.sa_flags &= ~SA_NODEFER;
 			nact.sa_flags |= SA_SIGINFO;
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+			/* XXX: Ignore sigaltstack for now */
+			nact.sa_flags &= ~SA_ONSTACK;
 			nact.sa_sigaction = _rtld_sighandler;
 #else
 			nact.sa_sigaction = thr_sighandler;
@@ -615,9 +621,6 @@ __thr_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
 	sigset_t oldset;
 	struct usigaction *usa;
 	int ret, err;
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	void *context = NULL;
-#endif
 
 	if (!_SIG_VALID(sig) || sig == SIGCANCEL) {
 		errno = EINVAL;
@@ -644,15 +647,13 @@ __thr_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
 		 */
 		if (newact.sa_handler != SIG_DFL &&
 		    newact.sa_handler != SIG_IGN) {
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-			context = _rtld_sigaction_begin(sig, &newact);
-			newact.sa_sigaction = _rtld_dispatch_signal;
-#endif
 			usa->sigact = newact;
 			remove_thr_signals(&usa->sigact.sa_mask);
 			newact.sa_flags &= ~SA_NODEFER;
 			newact.sa_flags |= SA_SIGINFO;
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+			/* XXX: Ignore sigaltstack for now */
+			newact.sa_flags &= ~SA_ONSTACK;
 			newact.sa_sigaction = _rtld_sighandler;
 #else
 			newact.sa_sigaction = thr_sighandler;
@@ -675,11 +676,6 @@ __thr_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
 		else if (oact != NULL)
 			oldact = usa->sigact;
 	}
-
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	if (ret == 0)
-		_rtld_sigaction_end(sig, context, act, &oldact);
-#endif
 
 	_thr_rwl_unlock(&usa->lock);
 	__sys_sigprocmask(SIG_SETMASK, &oldset, NULL);

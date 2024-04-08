@@ -29,7 +29,6 @@
 #define RTLD_C18N_H
 
 #include <stdint.h>
-#include "rtld_c18n_machdep.h"
 
 /*
  * Global symbols
@@ -45,113 +44,79 @@ extern const char *ld_compartment_unwind;
 /*
  * Policies
  */
+/*
+ * RTLD is the first compartment.
+ */
+#define	RTLD_COMPART_ID		0
+
 typedef uint16_t compart_id_t;
-#define	C18N_COMPARTMENT_ID_MAX	(UINT16_MAX >> 1)
+/*
+ * Define another type for the stack table index to avoid confusion.
+ */
+typedef struct { uint16_t val; } stk_table_index;
 
 compart_id_t compart_id_allocate(const char *);
 
 /*
  * Stack switching
  */
-/*
- * This macro can only be used in a function directly invoked by a trampoline.
- */
-#define	get_trusted_stk()	({					\
-		struct trusted_frame *_tf;				\
-		_Pragma("clang diagnostic push");			\
-		_Pragma("clang diagnostic ignored \"-Wframe-address\"");\
-		_tf = __builtin_frame_address(1);			\
-		_Pragma("clang diagnostic pop");			\
-		_tf;							\
-	})
+struct stk_table_stk_info {
+	size_t size;
+	void *begin;
+};
+
+struct stk_table_metadata {
+	size_t capacity;
+	struct tcb_wrapper *wrap;
+	/*
+	 * This field and the next array record the base and length of the
+	 * trusted stack and each compartment stack. This information is used to
+	 * unmap the stacks when the thread exits.
+	 */
+	struct stk_table_stk_info trusted_stk;
+	struct stk_table_stk_info compart_stk[];
+};
 
 struct stk_table {
+	/*
+	 * This field contains the stack resolver when the table is installed in
+	 * a thread. When the thread exits and the table awaits to be garbage-
+	 * collected, this field points to the next element of a linked list.
+	 */
 	union {
-		void *(*resolver)(unsigned);
+		void (*resolver)(void);
 		SLIST_ENTRY(stk_table) next;
 	};
-	size_t capacity;
-	struct stk_table_stack {
-		void *bottom;
-		size_t size;
-	} stacks[];
-};
-
-struct Struct_Stack_Entry {
-    SLIST_ENTRY(Struct_Stack_Entry) link;
-    void *stack;
-};
-
-void allocate_stk_table(void);
-
-static inline unsigned
-cid_to_table_index(compart_id_t cid)
-{
 	/*
-	 * Under the purecap ABI, cid is never zero, so it is possible to save
-	 * some space by subtracting one.
+	 * This field points to a structure containing metadata about the table.
+	 * The metadata is not stored in-line so that the frequently-accessed
+	 * items of the table are densely packed to reduce cache pressure.
 	 */
-#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	--cid;
-#endif
-	return (cid);
-}
+	struct stk_table_metadata *meta;
+	/*
+	 * The i-th entry contains the current stack top of compartment i.
+	 */
+	struct stk_table_entry {
+		void *stack;
+		void *reserved;
+	} entries[];
+};
 
-static inline unsigned
-cid_to_index(compart_id_t cid)
-{
-	struct stk_table_stack dummy;
-	unsigned index = cid_to_table_index(cid);
+#define	cid_to_index_raw(cid)						\
+	offsetof(struct stk_table, entries[cid].stack)
 
-	return (offsetof(struct stk_table, stacks[index].bottom) /
-	    sizeof(dummy.bottom));
-}
+#define	cid_to_index(cid)	((stk_table_index) { cid_to_index_raw(cid) })
 
-static inline struct stk_table *
-stk_table_get(void)
-{
-	struct stk_table *table;
+#define	index_to_cid(index)						\
+	(((index).val -							\
+	offsetof(struct stk_table, entries) -				\
+	offsetof(struct stk_table_entry, stack)) /			\
+	sizeof(struct stk_table_entry))
 
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	asm ("mrs	%0, rctpidr_el0" : "=C" (table));
-#else
-	asm ("mrs	%0, ctpidr_el0" : "=C" (table));
-#endif
-	return (table);
-}
+#define	COMPART_ID_MAX		index_to_cid((stk_table_index) { -1 })
 
-static inline void
-stk_table_set(struct stk_table *table)
-{
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	asm ("msr	rctpidr_el0, %0" :: "C" (table));
-#else
-	asm ("msr	ctpidr_el0, %0" :: "C" (table));
-#endif
-}
-
-static inline void *
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-trusted_stk_get(void)
-#else
-untrusted_stk_get(void)
-#endif
-{
-	void *sp;
-
-	asm ("mrs	%0, rcsp_el0" : "=C" (sp));
-	return (sp);
-}
-
-static inline void
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-trusted_stk_set(void *sp)
-#else
-untrusted_stk_set(void *sp)
-#endif
-{
-	asm ("msr	rcsp_el0, %0" :: "C" (sp));
-}
+struct tcb *c18n_allocate_tcb(struct tcb *);
+void c18n_free_tcb(void);
 
 /*
  * Trampolines
@@ -179,8 +144,6 @@ struct func_sig {
 	unsigned char reg_args : 4;
 	unsigned char valid : 1;
 };
-_Static_assert(sizeof(struct func_sig) == sizeof(func_sig_int),
-    "Unexpected func_sig size");
 
 struct tramp_data {
 	void *target;
@@ -197,9 +160,13 @@ struct tramp_header {
 	uint32_t entry[];
 };
 
-void *tramp_hook(void *, int, void *, const Obj_Entry *, const Elf_Sym *,
-    void *);
+/*
+ * Assembly function with non-standard ABI.
+ */
+void tramp_hook(void);
+
 size_t tramp_compile(char **, const struct tramp_data *);
+
 void *tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *);
 struct tramp_header *tramp_reflect(const void *);
 struct func_sig sigtab_get(const Obj_Entry *, unsigned long);
@@ -234,4 +201,7 @@ void *_rtld_tlsdesc_undef_c18n(void *);
 void *_rtld_tlsdesc_dynamic_c18n(void *);
 
 void c18n_init(Obj_Entry *);
+void c18n_init2(void);
+
+#include "rtld_c18n_machdep.h"
 #endif
