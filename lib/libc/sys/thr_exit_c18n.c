@@ -26,14 +26,14 @@
  */
 
 #include <sys/cdefs.h>
-#include <sys/types.h>
-
-void thr_exit(long *);
 
 void _rtld_thr_exit(long *);
 
+__weak_reference(__sys_thr_exit, thr_exit);
+__weak_reference(__sys_thr_exit, _thr_exit);
+
 void
-thr_exit(long *state)
+__sys_thr_exit(long *state)
 {
 	_rtld_thr_exit(state);
 }

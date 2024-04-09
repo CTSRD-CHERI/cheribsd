@@ -46,6 +46,11 @@ SRCS+= POSIX2x_Fork.c
 
 SRCS+=	compat-stub.c
 
+.ifdef RTLD_SANDBOX
+SRCS+=	thr_exit_c18n.c	vfork_c18n.c	rfork_c18n.c
+NOASM+=	thr_exit.o	vfork.o
+.endif
+
 INTERPOSED = \
 	accept \
 	accept4 \

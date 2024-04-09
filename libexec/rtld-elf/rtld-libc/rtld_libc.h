@@ -51,9 +51,6 @@ int	__sys___getcwd(char *, size_t);
 int	__sys_sigprocmask(int, const sigset_t *, sigset_t *);
 int	__sys_thr_kill(long, int);
 int	__sys_thr_self(long *);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-void	__sys_thr_exit(long *);
-#endif
 __ssize_t	__sys_pread(int, void *, __size_t, __off_t);
 __ssize_t	__sys_read(int, void *, __size_t);
 __ssize_t	__sys_write(int, const void *, __size_t);

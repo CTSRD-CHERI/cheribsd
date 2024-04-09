@@ -1536,6 +1536,7 @@ _rtld_thread_start_impl(struct pthread *curthread)
 
 void _rtld_thr_exit(long *);
 
+void __sys_thr_exit(long *);
 void
 _rtld_thr_exit(long *state)
 {
