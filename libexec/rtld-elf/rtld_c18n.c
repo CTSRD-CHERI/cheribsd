@@ -1566,6 +1566,9 @@ c18n_init(void)
 			.reg_args = 3, .mem_args = false, .ret_args = NONE
 		}
 	});
+
+	/* Preinitialize to 1 to take into account the program binary. */
+	rtld_c18n_stats.rcs_compartments = 1;
 }
 
 /*
