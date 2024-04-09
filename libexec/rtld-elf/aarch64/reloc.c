@@ -371,20 +371,39 @@ reloc_plt(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 	    FUNC_PTR_REMOVE_PERMS);
 #endif
 	for (rela = obj->pltrela; rela < relalim; rela++) {
-		Elf_Addr *where;
+		uintptr_t *where;
+#ifdef __CHERI_PURE_CAPABILITY__
+		Elf_Addr *fragment;
+#endif
 
-		where = (Elf_Addr *)(obj->relocbase + rela->r_offset);
+		where = (uintptr_t *)(obj->relocbase + rela->r_offset);
+#ifdef __CHERI_PURE_CAPABILITY__
+		fragment = (Elf_Addr *)where;
+#endif
 
 		switch(ELF_R_TYPE(rela->r_info)) {
 #ifdef __CHERI_PURE_CAPABILITY__
 		case R_MORELLO_JUMP_SLOT:
 			/*
-			 * XXX: This would be far more natural if the linker
-			 * made it an R_MORELLO_RELATIVE-like fragment instead.
-			 * https://git.morello-project.org/morello/llvm-project/-/issues/19
+			 * Old ABI:
+			 *   - Treat as R_AARCH64_JUMP_SLOT
+			 *
+			 * New ABI:
+			 *   - Same representation as R_MORELLO_RELATIVE
+			 *
+			 * Determine which this is based on whether there's
+			 * non-zero metadata next to the address. Remove once
+			 * the new ABI is old enough that we can assume it is
+			 * in use.
 			 */
-			*(uintptr_t *)where = cheri_sealentry(jump_slot_base +
-			    *where);
+			if (fragment[1] == 0)
+				*where = cheri_sealentry(jump_slot_base +
+				    fragment[0]);
+			else
+				*where = init_cap_from_fragment(fragment,
+				    obj->relocbase, obj->text_rodata_cap,
+				    (Elf_Addr)(uintptr_t)obj->relocbase,
+				    rela->r_addend);
 			break;
 #else
 		case R_AARCH64_JUMP_SLOT:
@@ -396,8 +415,8 @@ reloc_plt(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 #else
 		case R_AARCH64_TLSDESC:
 #endif
-			reloc_tlsdesc(obj, rela, where, SYMLOOK_IN_PLT | flags,
-			    lockstate);
+			reloc_tlsdesc(obj, rela, (Elf_Addr *)where,
+			    SYMLOOK_IN_PLT | flags, lockstate);
 			break;
 #ifdef __CHERI_PURE_CAPABILITY__
 		case R_MORELLO_IRELATIVE:
