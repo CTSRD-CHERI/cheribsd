@@ -290,9 +290,9 @@ SUBDIR=	\
 	nmdm \
 	nullfs \
 	${_ntb} \
-	${_nvd} \
+	nvd \
 	${_nvdimm} \
-	${_nvme} \
+	nvme \
 	${_nvram} \
 	oce \
 	${_ocs_fc} \
@@ -805,8 +805,6 @@ _iwmfw=		iwmfw
 _iwnfw=		iwnfw
 .endif
 _nfe=		nfe
-_nvd=		nvd
-_nvme=		nvme
 _nvram=		nvram
 .if ${MK_CRYPT} != "no" || defined(ALL_MODULES)
 _padlock=	padlock
@@ -890,8 +888,6 @@ _cfi=		cfi
 _cpufreq=	cpufreq
 _exca=		exca
 _ffec=		ffec
-_nvd=		nvd
-_nvme=		nvme
 .endif
 
 .if ${MACHINE_ARCH:Mpowerpc64*} != ""
