@@ -88,7 +88,7 @@ procstat_cheri(struct procstat *procstat, struct kinfo_proc *kipp)
 		xo_emit(" {:revoker_epoch/%34s/%s}", abi_cheri == 'P' ?
 		    get_revoker_epoch(procstat, kipp) : "-");
 	}
-	xo_emit(" {:compartments/%s/%s}", get_c18n(procstat, kipp));
+	xo_emit(" {:compartments/%5s/%s}", get_c18n(procstat, kipp));
 	xo_emit("\n");
 }
 
@@ -192,6 +192,8 @@ get_c18n(struct procstat *procstat, struct kinfo_proc *kipp)
 	if (procstat_getc18n(procstat, kipp, (void **)&rcsp, &len) < 0) {
 		if (errno != ESRCH && errno != EPERM && errno != ENOEXEC)
 			warn("procstat_get_c18n");
+		snprintf(c18n_buf, sizeof(c18n_buf), "-");
+	} else if (len < sizeof(*rcsp)) {
 		snprintf(c18n_buf, sizeof(c18n_buf), "-");
 	} else {
 		snprintf(c18n_buf, sizeof(c18n_buf), "%5lu",
