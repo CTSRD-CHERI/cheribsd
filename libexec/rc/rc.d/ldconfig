@@ -30,7 +30,7 @@ ldconfig_paths()
 			fi
 		fi
 	done
-	for _ii in ${_paths} ${_soconf}; do
+	for _ii in ${_paths}; do
 		if [ -r "${_ii}" ]; then
 			_ldpaths="${_ldpaths} ${_ii}"
 		fi
@@ -49,7 +49,7 @@ ldconfig_start()
 	if [ -x "${ldconfig_command}" ]; then
 		_LDC=$(/libexec/ld-elf.so.1 -v | sed -n -e '/^Default lib path /s///p' | tr : ' ')
 		_LDC=$(ldconfig_paths "${ldconfig_local_dirs}" \
-		    "${ldconfig_paths}" "$_LDC")
+		    "${ldconfig_paths} /etc/ld-elf.so.conf" "$_LDC")
 		startmsg 'ELF ldconfig path:' ${_LDC}
 		${ldconfig} -elf ${_ins} ${_LDC}
 
