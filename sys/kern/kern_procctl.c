@@ -992,6 +992,57 @@ cheri_revoke_status(struct thread *td, struct proc *p, void *data)
 }
 #endif	/* CHERI_CAPREVOKE */
 
+#ifdef PROC_CHERI_C18N_CTL
+static int
+cheri_c18n_ctl(struct thread *td, struct proc *p, void *data)
+{
+	int state;
+
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+	state = *(int *)data;
+
+	switch (state) {
+	case PROC_CHERI_C18N_ENABLE:
+		p->p_flag2 |= P2_CHERI_C18N_ENABLE;
+		p->p_flag2 &= ~P2_CHERI_C18N_DISABLE;
+		break;
+	case PROC_CHERI_C18N_DISABLE:
+		p->p_flag2 |= P2_CHERI_C18N_DISABLE;
+		p->p_flag2 &= ~P2_CHERI_C18N_ENABLE;
+		break;
+	case PROC_CHERI_C18N_NOFORCE:
+		p->p_flag2 &= ~P2_CHERI_C18N_MASK;
+		break;
+	default:
+		return (EINVAL);
+	}
+	return (0);
+}
+
+static int
+cheri_c18n_status(struct thread *td, struct proc *p, void *data)
+{
+	int d;
+
+	switch (p->p_flag2 & P2_CHERI_C18N_MASK) {
+	case 0:
+		d = PROC_CHERI_C18N_NOFORCE;
+		break;
+	case P2_CHERI_C18N_ENABLE:
+		d = PROC_CHERI_C18N_ENABLE;
+		break;
+	case P2_CHERI_C18N_DISABLE:
+		d = PROC_CHERI_C18N_DISABLE;
+		break;
+	default:
+		panic("impossible P2_CHERI_C18N flags %x", p->p_flag2 &
+		    P2_CHERI_C18N_MASK);
+	}
+	*(int *)data = d;
+	return (0);
+}
+#endif
+
 static int
 pdeathsig_ctl(struct thread *td, struct proc *p, void *data)
 {
@@ -1170,6 +1221,20 @@ static const struct procctl_cmd_info procctl_cmds_info[] = {
 	      .need_candebug = false,
 	      .copyin_sz = 0, .copyout_sz = sizeof(int),
 	      .exec = wxmap_status, .copyout_on_error = false, },
+#ifdef PROC_CHERI_C18N_CTL
+	[PROC_CHERI_C18N_CTL] =
+	    { .lock_tree = PCTL_UNLOCKED, .one_proc = true,
+	      .esrch_is_einval = false, .no_nonnull_data = false,
+	      .need_candebug = true,
+	      .copyin_sz = sizeof(int), .copyout_sz = 0,
+	      .exec = cheri_c18n_ctl, .copyout_on_error = false, },
+	[PROC_CHERI_C18N_STATUS] =
+	    { .lock_tree = PCTL_UNLOCKED, .one_proc = true,
+	      .esrch_is_einval = false, .no_nonnull_data = false,
+	      .need_candebug = false,
+	      .copyin_sz = 0, .copyout_sz = sizeof(int),
+	      .exec = cheri_c18n_status, .copyout_on_error = false, },
+#endif
 #ifdef CHERI_CAPREVOKE
 	[PROC_CHERI_REVOKE_CTL] =
 	    { .lock_tree = PCTL_UNLOCKED, .one_proc = true,

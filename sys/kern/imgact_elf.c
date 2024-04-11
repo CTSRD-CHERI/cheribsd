@@ -1844,6 +1844,18 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	oc = atomic_load_int(&vm_overcommit);
 	bsdflags |= (oc & (SWAP_RESERVE_FORCE_ON | SWAP_RESERVE_RLIMIT_ON)) !=
 	    0 ? ELF_BSDF_VMNOOVERCOMMIT : 0;
+#if defined(__ELF_CHERI) && defined(__aarch64__)
+	/*
+	 * ELF_BSDF_CHERI_C18N tells the runtime linker to enable library-based
+	 * compartmentalisation.
+	 *
+	 * In case of conflicting flags, disable wins.
+	 */
+	if ((imgp->proc->p_flag2 & P2_CHERI_C18N_MASK) != 0) {
+		if ((imgp->proc->p_flag2 & P2_CHERI_C18N_DISABLE) == 0)
+			bsdflags |= ELF_BSDF_CHERI_C18N;
+	}
+#endif
 #if defined(__ELF_CHERI) && defined(CHERI_CAPREVOKE)
 	/*
 	 * ELF_BSDF_CHERI_REVOKE tells the runtime it should enable
