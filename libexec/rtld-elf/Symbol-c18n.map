@@ -1,4 +1,6 @@
 FBSDprivate_1.0 {
+    r_debug_comparts_state;
+    _compart_size;
     _rtld_thread_start_init;
     _rtld_thread_start;
     _rtld_thr_exit;

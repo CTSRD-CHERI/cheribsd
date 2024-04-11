@@ -152,6 +152,25 @@ struct compart {
 	bool restrict_imports;
 };
 
+extern int _compart_size;
+int _compart_size = sizeof(struct compart);
+
+extern struct r_debug r_debug;
+
+void
+r_debug_comparts_state(struct r_debug *, struct compart *);
+void
+r_debug_comparts_state(struct r_debug *rd __unused, struct compart *m __unused)
+{
+	/*
+	 * See r_debug_state().
+	 */
+	__compiler_membar();
+}
+
+#define GDB_COMPARTS_STATE(s,m)				\
+	r_debug.r_comparts_state = s; r_debug_comparts_state(&r_debug, m);
+
 /*
  * A pseudo-compartment that encompasses all compartments.
  */
@@ -183,7 +202,7 @@ comparts_data_expand(compart_id_t capacity)
 	data = realloc(comparts.data, sizeof(*data) * capacity);
 	if (data == NULL)
 		rtld_fatal("realloc failed");
-	comparts.data = data;
+	comparts.data = r_debug.r_comparts = data;
 	comparts.capacity = capacity;
 }
 
@@ -198,10 +217,13 @@ comparts_data_add(const char *name)
 	if (comparts.size == comparts.capacity)
 		comparts_data_expand(comparts.capacity * 2);
 
+	GDB_COMPARTS_STATE(RCT_ADD, NULL);
 	com = &comparts.data[comparts.size++];
 	*com = (struct compart) {
 		.name = name
 	};
+	r_debug.r_comparts_size = comparts.size;
+	GDB_COMPARTS_STATE(RCT_CONSISTENT, com);
 
 	return (com);
 }
@@ -1496,7 +1518,8 @@ c18n_init(Obj_Entry *obj_rtld)
 	 */
 	data = xmalloc(sizeof(*data) * comparts.capacity);
 	memcpy(data, comparts.data, sizeof(*comparts.data) * comparts.capacity);
-	comparts.data = data;
+	comparts.data = r_debug.r_comparts = data;
+	r_debug.r_comparts_size = comparts.size;
 
 	/*
 	 * Load the default policy

@@ -74,6 +74,14 @@ struct r_debug {
 		RT_DELETE			/* removing a shared library */
 	}		r_state;
 	void		*r_ldbase;		/* Base address of rtld */
+#if defined(IN_RTLD) && defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	enum {
+		RCT_CONSISTENT,			/* vector is stable */
+		RCT_ADD,			/* adding a compartment */
+	}		r_comparts_state;
+	int		r_comparts_size;
+	void		*r_comparts;		/* struct compart [] */
+#endif
 };
 
 #define	R_DEBUG_VERSION		1
