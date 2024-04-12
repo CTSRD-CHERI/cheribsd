@@ -1000,11 +1000,10 @@ tramp_pg_push(struct tramp_pg *pg, size_t len)
 	return (tramp);
 }
 
-typedef ssize_t slot_idx_t;
+typedef int32_t slot_idx_t;
 
 static struct {
 	_Alignas(CACHE_LINE_SIZE) _Atomic(slot_idx_t) size;
-	size_t back;
 	int exp;
 	const struct tramp_header **data;
 	struct tramp_map_kv {
@@ -1029,33 +1028,24 @@ tramp_table_max_load(int exp)
 }
 
 static void
-tramp_table_expand(int exp)
+expand_tramp_table(int exp)
 {
-	char *buffer;
-	size_t back, map_offset;
+	/*
+	 * The lower bound ensures that the maximum load can be calculated
+	 * without underflow. The upper bound ensures that the hash function
+	 * does not underflow.
+	 */
+	assert(3 <= exp && exp <= 31);
 
-	/* The data array only needs to be as large as the MAX_LOAD. */
-	back = sizeof(*tramp_table.data) * tramp_table_max_load(exp);
-	back = map_offset = roundup2(back, _Alignof(typeof(*tramp_table.map)));
-	back += sizeof(*tramp_table.map) << exp;
+	free(tramp_table.map);
 
-	buffer = mmap(NULL, back, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0);
-	if (buffer == MAP_FAILED)
-		rtld_fatal("mmap failed");
-
-	if (tramp_table.data != NULL) {
-		memcpy(buffer, tramp_table.data,
-		    sizeof(*tramp_table.data) *
-		    atomic_load_explicit(&tramp_table.size,
-		        memory_order_relaxed));
-		if (munmap(tramp_table.data, tramp_table.back) != 0)
-			rtld_fatal("munmap failed");
-	}
-
-	tramp_table.back = back;
 	tramp_table.exp = exp;
-	tramp_table.data = (void *)buffer;
-	tramp_table.map = (void *)(buffer + map_offset);
+	/*
+	 * The data array only needs to be as large as the maximum load.
+	 */
+	tramp_table.data = realloc(tramp_table.data,
+	    sizeof(*tramp_table.data) * tramp_table_max_load(exp));
+	tramp_table.map = xmalloc(sizeof(*tramp_table.map) << exp);
 
 	for (size_t i = 0; i < (1 << exp); ++i)
 		tramp_table.map[i] = (struct tramp_map_kv) {
@@ -1066,7 +1056,7 @@ tramp_table_expand(int exp)
 
 /* Public domain. Taken from https://github.com/skeeto/hash-prospector */
 static uint32_t
-pointer_hash(uint64_t key)
+hash_pointer(ptraddr_t key)
 {
 	uint32_t x = key ^ (key >> 32);
 
@@ -1096,15 +1086,13 @@ resize_table(int exp)
 	uint32_t hash;
 	slot_idx_t size, slot;
 
-	assert(0 < exp && exp < 32);
-
-	tramp_table_expand(exp);
+	expand_tramp_table(exp);
 
 	size = atomic_load_explicit(&tramp_table.size, memory_order_relaxed);
 
 	for (slot_idx_t idx = 0; idx < size; ++idx) {
 		key = (ptraddr_t)tramp_table.data[idx]->target;
-		hash = pointer_hash(key);
+		hash = hash_pointer(key);
 		slot = hash;
 
 		do {
@@ -1280,7 +1268,7 @@ tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *data)
 	RtldLockState lockstate;
 	const struct tramp_header *header;
 	ptraddr_t target = (ptraddr_t)data->target;
-	const uint32_t hash = pointer_hash(target);
+	const uint32_t hash = hash_pointer(target);
 	slot_idx_t slot, idx, writers;
 	ptraddr_t key;
 	int exp;
@@ -1576,7 +1564,7 @@ c18n_init(Obj_Entry *obj_rtld)
 	/*
 	 * Initialise trampoline table
 	 */
-	tramp_table_expand(exp);
+	expand_tramp_table(exp);
 
 	atomic_store_explicit(&tramp_pgs.head, tramp_pg_new(NULL),
 	    memory_order_relaxed);
