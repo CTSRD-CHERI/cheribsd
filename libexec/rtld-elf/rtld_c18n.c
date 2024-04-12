@@ -1012,16 +1012,12 @@ struct tramp_pg {
 	_Alignas(_Alignof(void *)) char trampolines[];
 };
 
-/*
- * 64K is the largest size such that any capability-aligned proper
- * sub-range can be exactly bounded by a Morello capability.
- */
-#define	C18N_TRAMPOLINE_PAGE_SIZE	64 * 1024
+static size_t tramp_pg_size;
 
 static struct tramp_pg *
 tramp_pg_new(struct tramp_pg *next)
 {
-	size_t capacity = C18N_TRAMPOLINE_PAGE_SIZE;
+	size_t capacity = tramp_pg_size;
 	struct tramp_pg *pg;
 
 	pg = mmap(NULL, capacity, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON,
@@ -1053,7 +1049,7 @@ tramp_pg_push(struct tramp_pg *pg, size_t len)
 	     */
 	    &size, n_size, memory_order_relaxed, memory_order_relaxed));
 
-	tramp = cheri_setbounds(tramp, len);
+	tramp = cheri_setboundsexact(tramp, len);
 	assert(cheri_gettag(tramp));
 
 	return (tramp);
@@ -1550,6 +1546,12 @@ c18n_init(Obj_Entry *obj_rtld)
 	}
 }
 
+/*
+ * Trampoline pages should be large to minimise pressure on the TLB, but not too
+ * large. 4MB is a reasonable threshold.
+ */
+#define	MAX_TRAMP_PG_SIZE		(4 * 1024 * 1024)
+
 void
 c18n_init2(void)
 {
@@ -1589,8 +1591,15 @@ c18n_init2(void)
 	expand_tramp_table(9);
 
 	/*
-	 * Create the first trampoline page.
+	 * Find a suitable page size and create the first trampoline page.
 	 */
+	for (int n = npagesizes - 1; n >= 0; --n) {
+		if (pagesizes[n] <= MAX_TRAMP_PG_SIZE) {
+			tramp_pg_size = pagesizes[n];
+			break;
+		}
+	}
+	assert(tramp_pg_size > 0);
 	atomic_store_explicit(&tramp_pgs.head, tramp_pg_new(NULL),
 	    memory_order_relaxed);
 }
