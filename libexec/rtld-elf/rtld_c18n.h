@@ -53,6 +53,18 @@ compart_id_t compart_id_allocate(const char *);
 /*
  * Stack switching
  */
+/*
+ * This macro can only be used in a function directly invoked by a trampoline.
+ */
+#define	get_trusted_frame()	({					\
+		struct trusted_frame *_tf;				\
+		_Pragma("clang diagnostic push");			\
+		_Pragma("clang diagnostic ignored \"-Wframe-address\"");\
+		_tf = __builtin_frame_address(1);			\
+		_Pragma("clang diagnostic pop");			\
+		_tf;							\
+	})
+
 struct stk_table {
 	union {
 		void *(*resolver)(unsigned);
