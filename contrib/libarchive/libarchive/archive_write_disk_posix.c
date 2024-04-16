@@ -37,7 +37,6 @@
  * CHERI CHANGES END
  */
 #include "archive_platform.h"
-__FBSDID("$FreeBSD$");
 
 #if !defined(_WIN32) || defined(__CYGWIN__)
 

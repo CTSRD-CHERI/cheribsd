@@ -24,7 +24,6 @@
  */
 #include "test.h"
 #include "test_utils.h"
-__FBSDID("$FreeBSD$");
 
 /*
  * Test read/write of a 10M block of data in a single operation.

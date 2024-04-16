@@ -26,7 +26,6 @@
 
 #include "test.h"
 #include "test_utils.h"
-__FBSDID("$FreeBSD$");
 
 /*
  * Check that we generate an error message when reading a truncated
