@@ -80,6 +80,5 @@ lockf(int filedes, int function, off_t size)
 		/* NOTREACHED */
 	}
 
-	return (((int (*)(int, int, intptr_t))
-	    *(__libc_interposing_slot(INTERPOS_fcntl)))(filedes, cmd, flip));
+	return (INTERPOS_SYS(fcntl, filedes, cmd, (intptr_t)&fl));
 }
