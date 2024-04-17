@@ -767,6 +767,13 @@ allocate_rstk_impl(unsigned index)
 /*
  * Stack unwinding
  */
+/*
+ * Assembly functions that are tail-called when compartmentalisation is
+ * disabled.
+ */
+uintptr_t _rtld_unw_getcontext_epilogue(uintptr_t, void **);
+struct jmp_args _rtld_unw_setcontext_epilogue(struct jmp_args, void *, void **);
+
 static void *
 unwind_cursor(struct trusted_frame *tf)
 {
@@ -799,6 +806,10 @@ _rtld_setjmp(uintptr_t ret, void **buf)
 uintptr_t
 _rtld_unw_getcontext(uintptr_t ret, void **buf)
 {
+	if (!C18N_ENABLED) {
+		__attribute__((musttail))
+		return (_rtld_unw_getcontext_epilogue(ret, buf));
+	}
 	*buf = cheri_seal(unwind_cursor(get_trusted_stk()), sealer_unwbuf);
 	return (ret);
 }
@@ -806,6 +817,10 @@ _rtld_unw_getcontext(uintptr_t ret, void **buf)
 uintptr_t
 _rtld_unw_getcontext_unsealed(uintptr_t ret, void **buf)
 {
+	if (!C18N_ENABLED) {
+		__attribute__((musttail))
+		return (_rtld_unw_getcontext_epilogue(ret, buf));
+	}
 	*buf = unwind_cursor(get_trusted_stk());
 	return (ret);
 }
@@ -899,13 +914,6 @@ _rtld_longjmp(struct jmp_args ret, void *rcsp, void **buf)
 	return (unwind_stack(ret, rcsp, cheri_unseal(*buf, sealer_jmpbuf),
 	    get_trusted_stk()));
 }
-
-/*
- * An assembly function that is called to complete the unwind when
- * compartmentalisation is disabled. The call must be a tail-call so that
- * registers are not clobbered.
- */
-struct jmp_args _rtld_unw_setcontext_epilogue(struct jmp_args, void *, void **);
 
 struct jmp_args
 _rtld_unw_setcontext(struct jmp_args ret, void *rcsp, void **buf)
