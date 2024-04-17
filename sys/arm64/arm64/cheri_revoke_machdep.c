@@ -140,9 +140,8 @@ again:
 		 * stxr returns 0 or 1, so use a value of 2
 		 * to indicate that it was not executed.
 		 */
-		stxr_status = 2;
-
 		__asm__ __volatile__ (
+		        "mov %w[stxr_status], #2\n\t"
 #ifndef __CHERI_PURE_CAPABILITY__
 			"bx #4\n\t"
 			".arch_extension c64\n\t"
