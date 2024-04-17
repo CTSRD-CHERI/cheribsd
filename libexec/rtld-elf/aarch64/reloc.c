@@ -63,6 +63,17 @@ void *_rtld_tlsdesc_undef(void *);
 void *_rtld_tlsdesc_dynamic(void *);
 
 bool
+arch_digest_dynamic(struct Struct_Obj_Entry *obj, const Elf_Dyn *dynp)
+{
+	if (dynp->d_tag == DT_AARCH64_VARIANT_PCS) {
+		obj->variant_pcs = true;
+		return (true);
+	}
+
+	return (false);
+}
+
+bool
 arch_digest_note(struct Struct_Obj_Entry *obj __unused, const Elf_Note *note)
 {
 	const char *note_name;
@@ -396,11 +407,14 @@ reloc_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela,
 int
 reloc_plt(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 {
+	const Obj_Entry *defobj;
 	const Elf_Rela *relalim;
 	const Elf_Rela *rela;
+	const Elf_Sym *def, *sym;
 #ifdef __CHERI_PURE_CAPABILITY__
 	uintptr_t jump_slot_base;
 #endif
+	bool lazy;
 
 	relalim = (const Elf_Rela *)((const char *)obj->pltrela +
 	    obj->pltrelasize);
@@ -409,7 +423,7 @@ reloc_plt(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 	    FUNC_PTR_REMOVE_PERMS);
 #endif
 	for (rela = obj->pltrela; rela < relalim; rela++) {
-		uintptr_t *where;
+		uintptr_t *where, target;
 #ifdef __CHERI_PURE_CAPABILITY__
 		Elf_Addr *fragment;
 #endif
@@ -422,32 +436,79 @@ reloc_plt(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 		switch(ELF_R_TYPE(rela->r_info)) {
 #ifdef __CHERI_PURE_CAPABILITY__
 		case R_MORELLO_JUMP_SLOT:
-			/*
-			 * Old ABI:
-			 *   - Treat as R_AARCH64_JUMP_SLOT
-			 *
-			 * New ABI:
-			 *   - Same representation as R_MORELLO_RELATIVE
-			 *
-			 * Determine which this is based on whether there's
-			 * non-zero metadata next to the address. Remove once
-			 * the new ABI is old enough that we can assume it is
-			 * in use.
-			 */
-			if (fragment[1] == 0)
-				*where = cheri_sealentry(jump_slot_base +
-				    fragment[0]);
-			else
-				*where = init_cap_from_fragment(fragment,
-				    obj->relocbase, obj->text_rodata_cap,
-				    (Elf_Addr)(uintptr_t)obj->relocbase,
-				    rela->r_addend);
-			break;
 #else
 		case R_AARCH64_JUMP_SLOT:
-			*where += (Elf_Addr)obj->relocbase;
-			break;
 #endif
+			lazy = true;
+			if (obj->variant_pcs) {
+				sym = &obj->symtab[ELF_R_SYM(rela->r_info)];
+				/*
+				 * Variant PCS functions don't follow the
+				 * standard register convention. Because of
+				 * this we can't use lazy relocation and
+				 * need to set the target address.
+				 */
+				if ((sym->st_other & STO_AARCH64_VARIANT_PCS) !=
+				    0)
+					lazy = false;
+			}
+			if (lazy) {
+#ifdef __CHERI_PURE_CAPABILITY__
+				/*
+				 * Old ABI:
+				 *   - Treat as R_AARCH64_JUMP_SLOT
+				 *
+				 * New ABI:
+				 *   - Same representation as
+				 *     R_MORELLO_RELATIVE
+				 *
+				 * Determine which this is based on
+				 * whether there's non-zero metadata
+				 * next to the address. Remove once
+				 * the new ABI is old enough that we
+				 * can assume it is in use.
+				 */
+				if (fragment[1] == 0)
+					*where = cheri_sealentry(
+					    jump_slot_base + fragment[0]);
+				else
+					*where = init_cap_from_fragment(
+					    fragment, obj->relocbase,
+					    obj->text_rodata_cap,
+					    (Elf_Addr)(uintptr_t)obj->relocbase,
+					    rela->r_addend);
+#else
+				*where += (Elf_Addr)obj->relocbase;
+#endif
+			} else {
+				def = find_symdef(ELF_R_SYM(rela->r_info), obj,
+				    &defobj, SYMLOOK_IN_PLT | flags, NULL,
+				    lockstate);
+				if (def == NULL)
+					return (-1);
+				if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC){
+					obj->gnu_ifunc = true;
+					continue;
+				}
+				target = (uintptr_t)make_function_pointer(def,
+				    defobj);
+#ifdef CHERI_LIB_C18N
+				target = (uintptr_t)tramp_intern(obj,
+				    &(struct tramp_data) {
+					.target = (void *)target,
+					.defobj = defobj,
+					.def = def,
+					.sig = sigtab_get(obj,
+					    ELF_R_SYM(rela->r_info))
+				    });
+#endif
+				/*
+				 * Ignore ld_bind_not as it requires lazy
+				 * binding
+				 */
+				*where = target;
+			}
+			break;
 #ifdef __CHERI_PURE_CAPABILITY__
 		case R_MORELLO_TLSDESC:
 #else
