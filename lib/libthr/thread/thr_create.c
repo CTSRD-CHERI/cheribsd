@@ -152,7 +152,15 @@ _pthread_create(pthread_t * __restrict thread,
 		new_thread->flags = THR_FLAGS_NEED_SUSPEND;
 		create_suspended = 1;
 	} else {
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+		/*
+		 * c18n: Always block all signals when creating a new thread to
+		 * allow RTLD to set up the environment to handle signals.
+		 */
+		create_suspended = 1;
+#else
 		create_suspended = 0;
+#endif
 	}
 
 	new_thread->state = PS_RUNNING;
@@ -289,8 +297,15 @@ static void
 thread_start(struct pthread *curthread)
 {
 	sigset_t set;
+	bool restore_sigmask;
 
-	if (curthread->attr.suspend == THR_CREATE_SUSPENDED)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	restore_sigmask = true;
+#else
+	restore_sigmask = curthread->attr.suspend == THR_CREATE_SUSPENDED;
+#endif
+
+	if (restore_sigmask)
 		set = curthread->sigmask;
 	_thr_signal_block_setup(curthread);
 
@@ -305,7 +320,7 @@ thread_start(struct pthread *curthread)
 	if (curthread->force_exit)
 		_pthread_exit(PTHREAD_CANCELED);
 
-	if (curthread->attr.suspend == THR_CREATE_SUSPENDED) {
+	if (restore_sigmask) {
 #if 0
 		/* Done in THR_UNLOCK() */
 		_thr_ast(curthread);
