@@ -32,5 +32,8 @@ GCC_4.3.0 {
 GCC_4.6.0 {
 } GCC_4.3.0;
 
-FBSDprivate_1.0 {
+GCC_7.0.0 {
 } GCC_4.6.0;
+
+FBSDprivate_1.0 {
+} GCC_7.0.0;
