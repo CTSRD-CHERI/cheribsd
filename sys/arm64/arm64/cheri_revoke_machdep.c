@@ -135,21 +135,18 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
 		 * not true, tho', because we're storing via the direct
 		 * mapping of physical memory.
 		 */
-again:
-		/*
-		 * stxr returns 0 or 1, so use a value of 2
-		 * to indicate that it was not executed.
-		 */
+
 		__asm__ __volatile__ (
-		        "mov %w[stxr_status], #2\n\t"
+		        "mov %w[stxr_status], #1\n\t"
 #ifndef __CHERI_PURE_CAPABILITY__
 			"bx #4\n\t"
 			".arch_extension c64\n\t"
 #endif
-			"ldxr %[cscratch], [%[cutp]]\n\t"
+			"0: ldxr %[cscratch], [%[cutp]]\n\t"
 			"cmp %[cscratch], %[cut]\n\t"
 			"bne 1f\n\t"
 			"stxr %w[stxr_status], %[cutr], [%[cutp]]\n\t"
+			"cbnz %w[stxr_status], 0b\n\t"
 			"1:\n\t"
 #ifndef __CHERI_PURE_CAPABILITY__
 			"bx #4\n\t"
@@ -162,16 +159,13 @@ again:
 		  : "memory");
 
 		/* stxr returns 0 on success */
-		if (__builtin_expect(stxr_status == 0, 1)) {
+		if (__predict_true(stxr_status == 0)) {
 			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
 			/* Don't count a revoked cap as HASCAPS */
 		} else if (!cheri_gettag(cscratch)) {
 			/* Data; don't sweat it */
 		} else if (cheri_revoke_is_revoked(cscratch)) {
 			/* Revoked cap; don't worry about it */
-		} else if (__builtin_expect(stxr_status == 1, 1)) {
-			/* stxr returns 1 on failure */
-			goto again;
 		} else {
 			/*
 			 * An unexpected capability - stxr_status was neither 0
