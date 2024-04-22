@@ -39,7 +39,6 @@ SRCS+=	\
 	__getosreldate.c \
 	getpagesize.c \
 	getpagesizes.c \
-	interposing_table.c \
 	libsys_sigwait.c
 
 .if ${LIB:U${SHLIB}} == "c"
@@ -48,6 +47,8 @@ SOBJS+=	libc_stubs.pico
 
 # Link the full implementation of ELF auxargs for static libc.
 STATICOBJS+=	auxv.o
+
+STATICOBJS+=	interposing_table.o
 .endif
 
 NOASM= \
