@@ -1521,6 +1521,8 @@ c18n_init(Obj_Entry *obj_rtld)
 	comparts.data = r_debug.r_comparts = data;
 	r_debug.r_comparts_size = comparts.size;
 
+	string_base_push(&data[C18N_RTLD_COMPART_ID].libs, obj_rtld->path);
+
 	/*
 	 * Load the default policy
 	 */
