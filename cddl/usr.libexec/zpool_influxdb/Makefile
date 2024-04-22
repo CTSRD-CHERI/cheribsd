@@ -2,6 +2,7 @@
 .PATH: ${ZFSTOP}/cmd/zpool_influxdb
 .PATH: ${ZFSTOP}/man/man8
 
+PACKAGE=zfs
 PROG=	zpool_influxdb
 MAN=	zpool_influxdb.8
 BINDIR?=	/usr/libexec/zfs
