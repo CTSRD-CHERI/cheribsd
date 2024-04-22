@@ -1,3 +1,5 @@
+SHLIBDIR?=	/lib
+
 .include <bsd.own.mk>
 
 .include <src.opts.mk>
@@ -5,7 +7,6 @@
 PACKAGE=	clibs
 SRCDIR=		${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
 SHLIB_MAJOR=	1
-SHLIBDIR?=	/lib
 
 .PATH: ${SRCDIR}
 
