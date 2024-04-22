@@ -138,7 +138,13 @@ execv(const char *name, char * const *argv)
 int
 execvp(const char *name, char * const *argv)
 {
-	return (_execvpe(name, argv, environ));
+	return (coexecvp(0, name, argv));
+}
+
+int
+coexecvp(pid_t pid, const char *name, char * const *argv)
+{
+	return (_coexecvpe(pid, name, argv, environ));
 }
 
 static int
@@ -211,11 +217,7 @@ coexecvPec(pid_t pid, const char *name, const char *path, char * const *argv,
 		bcopy(name, buf + lp + 1, ln);
 		buf[lp + ln + 1] = '\0';
 
-retry:
-		if (pid < 0)
-			(void)_execve(bp, argv, envp);
-		else
-			(void)_coexecvec(pid, bp, argv, envp, capv, capc);
+retry:		(void)_coexecvec(pid, bp, argv, envp, capv, capc);
 		switch (errno) {
 		case E2BIG:
 			goto done;
@@ -248,10 +250,7 @@ retry:
 				memp[1] = __DECONST(char*, bp);
 				memp[2] = NULL;
 			}
-			if (pid < 0)
-				(void)_execve(_PATH_BSHELL, memp, envp);
-			else
-				(void)_coexecvec(pid, bp, argv, envp, capv, capc);
+			(void)_coexecvec(pid, _PATH_BSHELL, memp, envp, capv, capc);
 			goto done;
 		case ENOMEM:
 			goto done;

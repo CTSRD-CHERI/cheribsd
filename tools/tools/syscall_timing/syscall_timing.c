@@ -58,32 +58,14 @@
 #include <string.h>
 #include <unistd.h>
 
-#ifdef WITH_LIBSTATCOUNTERS
-#include <statcounters.h>
-#endif
-
-/*
- * Enable by default; comment out to measure the overhead.
- */
-#define RAW
-
 static struct timespec ts_start, ts_end;
 static int alarm_timeout;
-#ifdef RAW
-#define	RAW_LEN_MAX	10
-static int raw_len = 1; /* 1, the time is always measured */
-#ifdef WITH_LIBSTATCOUNTERS
-static int raw_ids[RAW_LEN_MAX]; /* Array of counter ids */
-static uint64_t raw_prevs[RAW_LEN_MAX]; /* Array of last values for each counter */
-#endif
-static int *raw_numbers = NULL; /* Array of deltas between last and current */
-#define	RAW_NUMBER(iteration, counter)	raw_numbers[iteration * raw_len + counter]
-#define	RAW_PREV(counter)		raw_prevs[counter]
-#endif
 #ifdef CHERI_START_TRACE
 static volatile int trace;
 #endif
 static volatile int alarm_fired;
+
+#define	BENCHMARK_FOREACH(I, NUM) for (I = 0; I < NUM && alarm_fired == 0; I++)
 
 static void
 alarm_handler(int signum __unused)
@@ -124,62 +106,6 @@ benchmark_stop(void)
 	error = clock_gettime(CLOCK_REALTIME, &ts_end);
 	assert(error == 0);
 }
-
-#ifdef RAW
-static void
-benchmark_iteration(int i)
-{
-	static struct timespec ts_prev;
-	struct timespec ts_diff, ts_now;
-#ifdef WITH_LIBSTATCOUNTERS
-	uint64_t val;
-	int j;
-#endif
-	int error;
-
-	if (raw_numbers == NULL)
-		return;
-
-	/*
-	 * Note that this function gets called iterations + 1 times.
-	 */
-
-	error = clock_gettime(CLOCK_REALTIME, &ts_now);
-	assert(error == 0);
-
-	if (i == 0) {
-		ts_prev = ts_now;
-#ifdef WITH_LIBSTATCOUNTERS
-		for (j = 1; j < raw_len; j++)
-			RAW_PREV(j) = statcounters_sample_by_id(raw_ids[j]);
-#endif
-		return;
-	}
-
-	/*
-	 * 0 is a special case, it's always the time.
-	 */
-	ts_diff = ts_now;
-	timespecsub(&ts_diff, &ts_prev, &ts_diff);
-	assert(ts_diff.tv_sec == 0);
-	RAW_NUMBER(i, 0) = ts_diff.tv_nsec;
-	ts_prev = ts_now;
-
-#ifdef WITH_LIBSTATCOUNTERS
-	for (j = 1; j < raw_len; j++) {
-		val = statcounters_sample_by_id(raw_ids[j]);
-		assert(val >= RAW_PREV(j));
-		RAW_NUMBER(i, j) = val - RAW_PREV(j);
-		RAW_PREV(j) = val;
-	}
-#endif
-}
-#else /* !RAW */
-#define benchmark_iteration(X)	42
-#endif
-  
-#define	BENCHMARK_FOREACH(I, NUM) for (I = 0; benchmark_iteration(I), \
-	I < NUM && alarm_fired == 0; I++)
 
 static uintmax_t
 test_access(uintmax_t num, uintmax_t int_arg __unused, const char *path)
@@ -343,29 +269,6 @@ test_create_unlink(uintmax_t num, uintmax_t int_arg __unused, const char *path)
 }
 
 static uintmax_t
-test_dup(uintmax_t num, uintmax_t int_arg __unused, const char *path __unused)
-{
-	uintmax_t i;
-	int fd, shmfd;
-
-	shmfd = shm_open(SHM_ANON, O_CREAT | O_RDWR, 0600);
-	if (shmfd < 0)
-		err(-1, "test_dup: shm_open");
-	fd = dup(shmfd);
-	if (fd >= 0)
-		close(fd);
-	benchmark_start();
-	BENCHMARK_FOREACH(i, num) {
-		fd = dup(shmfd);
-		if (fd >= 0)
-			close(fd);
-	}
-	benchmark_stop();
-	close(shmfd);
-	return (i);
-}
-
-static uintmax_t
 test_fork(uintmax_t num, uintmax_t int_arg __unused, const char *path __unused)
 {
 	pid_t pid;
@@ -424,27 +327,6 @@ test_fork_exec(uintmax_t num, uintmax_t int_arg __unused, const char *path __unu
 			err(-1, "test_fork_exec: waitpid");
 	}
 	benchmark_stop();
-	return (i);
-}
-
-static uintmax_t
-test_fstat_shmfd(uintmax_t num, uintmax_t int_arg __unused, const char *path __unused)
-{
-	struct stat sb;
-	uintmax_t i;
-	int shmfd;
-
-	shmfd = shm_open(SHM_ANON, O_CREAT | O_RDWR, 0600);
-	if (shmfd < 0)
-		err(-1, "test_fstat_shmfd: shm_open");
-	if (fstat(shmfd, &sb) < 0)
-		err(-1, "test_fstat_shmfd: fstat");
-	benchmark_start();
-	BENCHMARK_FOREACH(i, num) {
-		(void)fstat(shmfd, &sb);
-	}
-	benchmark_stop();
-	close(shmfd);
 	return (i);
 }
 
@@ -565,6 +447,10 @@ test_memcpy(uintmax_t num, uintmax_t int_arg, const char *path __unused)
 
 	benchmark_start();
 	BENCHMARK_FOREACH(i, num) {
+		/*
+		 * Copy the memory there and back, to match the total amount
+		 * moved by pipeping/pipepingtd tests.
+		 */
 		memcpy(buf2, buf, int_arg);
 		memcpy(buf, buf2, int_arg);
 	}
@@ -771,7 +657,7 @@ test_pipepingtd(uintmax_t num, uintmax_t int_arg, const char *path __unused)
 
 	return (i);
 }
-#endif
+#endif /* WITH_PTHREAD */
 
 static uintmax_t
 test_read(uintmax_t num, uintmax_t int_arg, const char *path)
@@ -911,6 +797,50 @@ test_shmfd(uintmax_t num, uintmax_t int_arg __unused, const char *path __unused)
 		close(shmfd);
 	}
 	benchmark_stop();
+	return (i);
+}
+
+static uintmax_t
+test_shmfd_dup(uintmax_t num, uintmax_t int_arg __unused, const char *path __unused)
+{
+	uintmax_t i;
+	int fd, shmfd;
+
+	shmfd = shm_open(SHM_ANON, O_CREAT | O_RDWR, 0600);
+	if (shmfd < 0)
+		err(-1, "test_shmfd_dup: shm_open");
+	fd = dup(shmfd);
+	if (fd >= 0)
+		close(fd);
+	benchmark_start();
+	BENCHMARK_FOREACH(i, num) {
+		fd = dup(shmfd);
+		if (fd >= 0)
+			close(fd);
+	}
+	benchmark_stop();
+	close(shmfd);
+	return (i);
+}
+
+static uintmax_t
+test_shmfd_fstat(uintmax_t num, uintmax_t int_arg __unused, const char *path __unused)
+{
+	struct stat sb;
+	uintmax_t i;
+	int shmfd;
+
+	shmfd = shm_open(SHM_ANON, O_CREAT | O_RDWR, 0600);
+	if (shmfd < 0)
+		err(-1, "test_shmfd_fstat: shm_open");
+	if (fstat(shmfd, &sb) < 0)
+		err(-1, "test_shmfd_fstat: fstat");
+	benchmark_start();
+	BENCHMARK_FOREACH(i, num) {
+		(void)fstat(shmfd, &sb);
+	}
+	benchmark_stop();
+	close(shmfd);
 	return (i);
 }
 
@@ -1105,10 +1035,8 @@ static const struct test tests[] = {
 	{ "coping_slow_8000000", test_coping_slow, .t_flags = FLAG_NAME, .t_int = 8000000 },
 #endif
 	{ "create_unlink", test_create_unlink, .t_flags = FLAG_PATH },
-	{ "dup", test_dup, .t_flags = 0 },
 	{ "fork", test_fork, .t_flags = 0 },
 	{ "fork_exec", test_fork_exec, .t_flags = 0 },
-	{ "fstat_shmfd", test_fstat_shmfd, .t_flags = 0 },
 	{ "getppid", test_getppid, .t_flags = 0 },
 	{ "getpriority", test_getpriority, .t_flags = 0 },
 	{ "getprogname", test_getprogname, .t_flags = 0 },
@@ -1166,6 +1094,8 @@ static const struct test tests[] = {
 	{ "semaping", test_semaping, .t_flags = 0 },
 	{ "setuid", test_setuid, .t_flags = 0 },
 	{ "shmfd", test_shmfd, .t_flags = 0 },
+	{ "shmfd_dup", test_shmfd_dup, .t_flags = 0 },
+	{ "shmfd_fstat", test_shmfd_fstat, .t_flags = 0 },
 	{ "socket_local_stream", test_socket_stream, .t_int = PF_LOCAL },
 	{ "socket_local_dgram", test_socket_dgram, .t_int = PF_LOCAL },
 	{ "socketpair_stream", test_socketpair_stream, .t_flags = 0 },
@@ -1181,22 +1111,13 @@ static const int tests_count = sizeof(tests) / sizeof(tests[0]);
 static void
 usage(void)
 {
-#ifdef WITH_LIBSTATCOUNTERS
-	const char *name;
-#endif
 	int i;
 
-	fprintf(stderr, "syscall_timing [-c counter,...] [-i iterations] [-l loops] "
-	    "[-p path] [-r path] [-s seconds] [-t] test\n");
+	fprintf(stderr, "syscall_timing [-i iterations] [-l loops] "
+	    "[-p path] [-s seconds] [-t] test\n");
 	fprintf(stderr, "Available tests:\n");
 	for (i = 0; i < tests_count; i++)
 		fprintf(stderr, "  %s\n", tests[i].t_name);
-#ifdef WITH_LIBSTATCOUNTERS
-	name = NULL;
-	fprintf(stderr, "Available counters, to use with -c:\n");
-	while ((name = statcounters_get_next_name(name)) != NULL)
-		fprintf(stderr, "  %s\n", name);
-#endif
 	exit(-1);
 }
 
@@ -1204,10 +1125,6 @@ int
 main(int argc, char *argv[])
 {
 	struct timespec ts_res;
-#ifdef RAW
-	FILE *raw_fp;
-	char *raw_path;
-#endif
 	const struct test *the_test;
 	const char *name;
 	const char *path;
@@ -1225,25 +1142,9 @@ main(int argc, char *argv[])
 #endif
 	name = NULL;
 	path = NULL;
-#ifdef RAW
-	raw_fp = NULL;
-	raw_path = NULL;
-#endif
 	tmp_path = NULL;
-	while ((ch = getopt(argc, argv, "c:i:l:n:p:r:s:t")) != -1) {
+	while ((ch = getopt(argc, argv, "i:l:n:p:s:t")) != -1) {
 		switch (ch) {
-		case 'c':
-#ifndef WITH_LIBSTATCOUNTERS
-			errx(1, "compiled without WITH_LIBSTATCOUNTERS");
-#else
-			if (raw_len >= RAW_LEN_MAX)
-				errx(1, "must specify at most %d counters", RAW_LEN_MAX);
-			raw_ids[raw_len] = statcounters_id_from_name(optarg);
-			if (raw_ids[raw_len] < 0)
-				errx(1, "invalid counter name, see usage for list");
-			raw_len++;
-#endif
-			break;
 		case 'i':
 			ll = strtol(optarg, &endp, 10);
 			if (*endp != 0 || ll < 1)
@@ -1264,14 +1165,6 @@ main(int argc, char *argv[])
 
 		case 'p':
 			path = optarg;
-			break;
-
-		case 'r':
-#ifdef RAW
-			raw_path = optarg;
-#else
-			errx(1, "compiled without RAW");
-#endif
 			break;
 
 		case 's':
@@ -1297,14 +1190,6 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-#ifdef RAW
-	if (raw_path != NULL && iterations <= 0)
-		errx(1, "-r must be followed by -i");
-#endif
-#ifdef WITH_LIBSTATCOUNTERS
-	if (raw_len > 1 && raw_path == NULL)
-		errx(1, "-c must be followed by -r");
-#endif
 	if (iterations < 1 && alarm_timeout < 1)
 		usage();
 	if (iterations < 1)
@@ -1341,18 +1226,6 @@ main(int argc, char *argv[])
 		if ((the_test->t_flags & FLAG_NAME) && (name == NULL))
 			errx(1, "test %s requires -n", the_test->t_name);
 	}
-
-#ifdef RAW
-	if (raw_path != 0) {
-		raw_fp = fopen(raw_path, "w");
-		if (raw_fp == NULL)
-			err(1, "%s", raw_path);
-
-		raw_numbers = calloc(iterations + 1, sizeof(raw_numbers[0]) * raw_len);
-		if (raw_numbers == NULL)
-			err(1, "calloc");
-	}
-#endif
 
 	error = clock_getres(CLOCK_REALTIME, &ts_res);
 	assert(error == 0);
@@ -1410,20 +1283,6 @@ main(int argc, char *argv[])
 			printf("0.%09ju\n", (uintmax_t)nsecsperit);
 		}
 	}
-
-#ifdef RAW
-	if (raw_fp != NULL) {
-		for (i = 1; i < iterations + 1; i++) {
-			for (j = 0; j < raw_len; j++) {
-				fprintf(raw_fp, "%d%s", RAW_NUMBER(i, j),
-				    j == raw_len - 1 ? "\n" : "\t");
-			}
-		}
-		error = fclose(raw_fp);
-		if (error != 0)
-			warn("%s", raw_path);
-	}
-#endif
 
 	if (tmp_path != NULL) {
 		error = unlink(tmp_path);

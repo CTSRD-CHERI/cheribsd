@@ -292,6 +292,7 @@ MAN+=	alarm.3 \
 	posix_spawn.3 \
 	posix_spawn_file_actions_addopen.3 \
 	posix_spawn_file_actions_init.3 \
+	posix_spawnattr_getcopid.3 \
 	posix_spawnattr_getflags.3 \
 	posix_spawnattr_getpgroup.3 \
 	posix_spawnattr_getschedparam.3 \
@@ -489,6 +490,7 @@ MLINKS+=posix_spawn.3 posix_spawnp.3 \
 	posix_spawn_file_actions_addopen.3 posix_spawn_file_actions_addchdir_np.3 \
 	posix_spawn_file_actions_addopen.3 posix_spawn_file_actions_addfchdir_np.3 \
 	posix_spawn_file_actions_init.3 posix_spawn_file_actions_destroy.3 \
+	posix_spawnattr_getcopid.3 posix_spawnattr_setcopid.3 \
 	posix_spawnattr_getflags.3 posix_spawnattr_setflags.3 \
 	posix_spawnattr_getpgroup.3 posix_spawnattr_setpgroup.3 \
 	posix_spawnattr_getschedparam.3 posix_spawnattr_setschedparam.3 \

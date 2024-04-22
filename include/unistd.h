@@ -336,6 +336,7 @@ int	 execve(const char *, char * const *, char * const *);
 int	 coexecve(pid_t, const char *, char * const *, char * const *);
 int	 coexecvec(pid_t, const char *, char * const *, char * const *, void * const *, int);
 int	 execvp(const char *, char * const *);
+int	 coexecvp(pid_t, const char *, char * const *);
 int	 coexecvpc(pid_t, const char *, char * const *, void * const *, int);
 pid_t	 fork(void);
 long	 fpathconf(int, int);

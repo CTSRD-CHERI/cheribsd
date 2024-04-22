@@ -239,11 +239,21 @@ Note that the file to be executed can not be open for writing.
 .Pp
 The
 .Fn coexecve
-is equivalent to
+is similar to
 .Fn execve ,
 except it colocates the new process in an address space shared
 with another process identified by
 .Fa pid .
+Passing 0 as
+.Fa pid
+makes it equivalent to
+.Fn execve ,
+in that the process might still end up being colocated if
+.Dv kern.opportunistic_coexecve
+is enabled.
+If
+.Fa pid
+is -1, the process will not be colocated.
 .Pp
 The
 .Fn coexecvec

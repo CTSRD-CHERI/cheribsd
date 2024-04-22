@@ -71,6 +71,6 @@ main(int argc, char **argv)
 
 	argv += 2;
 
-	coexecvpc(pid, argv[0], argv, NULL, 0);
+	coexecvp(pid, argv[0], argv);
 	err(1, "%s", argv[0]);
 }

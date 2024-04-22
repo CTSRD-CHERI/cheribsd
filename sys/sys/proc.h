@@ -790,12 +790,14 @@ struct proc {
 	LIST_HEAD(, proc) p_orphans;	/* (e) Pointer to list of orphans. */
 	TAILQ_HEAD(, kq_timer_cb_data)	p_kqtim_stop;	/* (c) */
 	LIST_ENTRY(proc) p_jaillist;	/* (d) Jail process linkage. */
+
 	/*
 	 * Capability vector, see coxecvec(2).
 	 */
 	int			p_capc;
 	void * __capability	*p_capv;
 	const void 		*p_capv_vmspace;
+
 	ssize_t			p_cocall_received;
 };
 

@@ -29,7 +29,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd May 6, 2016
+.Dd March 29, 2024
 .Dt COEXEC 1
 .Os
 .Sh NAME
@@ -59,6 +59,12 @@ utility exits 0 on success, and >0 if an error occurs.
 Start a shell colocated with the process identified by PID 42:
 .Pp
 .Dl Nm Ar 42 Ar sh
+.Pp
+Run
+.Xr procstat 1
+colocated with the current shell and display its memory map:
+.Pp
+.Dl Nm Ar $$ Ar procstat -v $$
 .Pp
 .Sh SEE ALSO
 .Xr coexecve 2 ,
