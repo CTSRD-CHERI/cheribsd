@@ -989,7 +989,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	/*
 	 * Manually register the main object after the policy is loaded.
 	 */
-	object_add_name(obj_main, "[main]");
+	object_add_name(obj_main, obj_main->path);
     }
 #endif
 
