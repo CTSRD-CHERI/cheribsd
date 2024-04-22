@@ -232,9 +232,12 @@ sysctl_kern_stackprot(SYSCTL_HANDLER_ARGS)
  */
 static const struct execsw **execsw;
 
-int
-sys_coexecve(struct thread *td, struct coexecve_args *uap)
+static int
+kern_coexecvec(struct thread *td, pid_t pid, const char * __capability fname,
+    void * __capability argv, void * __capability envv,
+    void * __capability capv, int capc)
 {
+
 	struct image_args args;
 	struct vmspace *oldvmspace;
 	struct proc *p;
@@ -243,18 +246,30 @@ sys_coexecve(struct thread *td, struct coexecve_args *uap)
 	error = pre_execve(td, &oldvmspace);
 	if (error != 0)
 		return (error);
-	error = exec_copyin_args(&args, uap->fname, UIO_USERSPACE,
-	    uap->argv, uap->envv);
+
+	error = exec_copyin_args_capv(&args, fname,
+	    UIO_USERSPACE, argv, envv, capv, capc);
 	if (error != 0)
 		goto out;
 
-	if (uap->pid > 0) {
-		error = pget(uap->pid, PGET_NOTWEXIT | PGET_HOLD | PGET_CANCOLOCATE, &p);
+	if (pid > 0) {
+		error = pget(pid, PGET_NOTWEXIT | PGET_HOLD | PGET_CANCOLOCATE, &p);
 		if (error != 0)
 			goto out;
+
+		if (capv != NULL) {
+			if (td->td_proc->p_vmspace != p->p_vmspace) {
+				/*
+				 * XXX: priv_check(9)?
+				 */
+				error = EPROT;
+				goto out;
+			}
+		}
+
 		error = kern_coexecve(td, &args, NULL, oldvmspace, p, false);
 		PRELE(p);
-	} else if (uap->pid == 0) {
+	} else if (pid == 0) {
 		error = kern_execve(td, &args, NULL, oldvmspace);
 	} else {
 		error = kern_coexecve(td, &args, NULL, oldvmspace, NULL, false);
@@ -265,39 +280,38 @@ out:
 	return (error);
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct coexecve_args {
+	pid_t   pid,
+	char    *fname;
+	char    **argv;
+	char    **envv;
+};
+#endif
+int
+sys_coexecve(struct thread *td, struct coexecve_args *uap)
+{
+
+	return (kern_coexecvec(td, uap->pid, uap->fname, uap->argv,
+	    uap->envv, NULL, 0));
+}
+
+#ifndef _SYS_SYSPROTO_H_
+struct coexecvec_args {
+	pid_t   pid,
+	char    *fname;
+	char    **argv;
+	char    **envv;
+	char    *__capability *capv,
+	int     capc
+};
+#endif
 int
 sys_coexecvec(struct thread *td, struct coexecvec_args *uap)
 {
-	struct image_args args;
-	struct vmspace *oldvmspace;
-	struct proc *p;
-	int error;
 
-	error = pget(uap->pid, PGET_NOTWEXIT | PGET_HOLD | PGET_CANCOLOCATE, &p);
-	if (error != 0)
-		return (error);
-	if (uap->capv != NULL) {
-		if (td->td_proc->p_vmspace != p->p_vmspace) {
-			/*
-			 * XXX: priv_check(9)?
-			 */
-			PRELE(p);
-			return (EPROT);
-		}
-	}
-	error = pre_execve(td, &oldvmspace);
-	if (error != 0) {
-		PRELE(p);
-		return (error);
-	}
-	error = exec_copyin_args_capv(&args, uap->fname,
-	    UIO_USERSPACE, uap->argv, uap->envv, uap->capv, uap->capc);
-	if (error == 0)
-		error = kern_coexecve(td, &args, NULL, oldvmspace, p, false);
-	post_execve(td, error, oldvmspace);
-	PRELE(p);
-
-	return (error);
+	return (kern_coexecvec(td, uap->pid, uap->fname, uap->argv,
+	    uap->envv, uap->capv, uap->capc));
 }
 
 #ifndef _SYS_SYSPROTO_H_
