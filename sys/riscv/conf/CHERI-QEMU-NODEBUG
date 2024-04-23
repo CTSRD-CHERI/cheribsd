@@ -1,6 +1,6 @@
 #NO_UNIVERSE
 
 include "CHERI-QEMU"
-include "../../conf/std.nodebug"
+include "std.nodebug"
 
 ident CHERI-QEMU-NODEBUG

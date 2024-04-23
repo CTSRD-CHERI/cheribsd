@@ -4,7 +4,7 @@
 # $FreeBSD$
 
 include "GENERIC-MORELLO-PURECAP-SYZKALLER"
-include "../../conf/std.nodebug"
+include "std.nodebug"
 
 ident		GENERIC-MORELLO-PURECAP-SYZKALLER-NODEBUG
 

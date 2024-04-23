@@ -4,6 +4,6 @@ include "QEMU"
 include "std.CHERI-PURECAP"
 include "std.CHERI-NOCAPREVOKE"
 include "std.MFS-ROOT"
-include "../../conf/std.nodebug"
+include "std.nodebug"
 
 ident CHERI-PURECAP-NOCAPREVOKE-QEMU-MFS-ROOT-NODEBUG
