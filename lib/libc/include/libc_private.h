@@ -391,6 +391,8 @@ struct __nl_cat_d;
 struct _xlocale;
 struct __nl_cat_d *__catopen_l(const char *name, int type,
 	    struct _xlocale *locale);
+int __strerror_rl(int errnum, char *strerrbuf, size_t buflen,
+	    struct _xlocale *locale);
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 __pid_t		__sys_rfork(int);
