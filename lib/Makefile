@@ -211,7 +211,8 @@ SUBDIR.${MK_LDNS}+=	libldns
 SUBDIR.${MK_STATS}+=	libstats
 
 # The libraries under libclang_rt can only be built by clang.
-.if ${COMPILER_TYPE} == "clang" && !${MACHINE_ABI:Mpurecap}
+.if ${COMPILER_TYPE} == "clang" && ${MK_CLANG} != "no" && \
+    !${MACHINE_ABI:Mpurecap}
 _libclang_rt=	libclang_rt
 .elif (${MK_ASAN} != "no" || ${MK_UBSAN} != "no") && make(all)
 .error Requested build with sanitizers but cannot build runtime libraries!
