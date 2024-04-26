@@ -146,6 +146,9 @@ const char *ld_compartment_unwind;
 /* Export compartmentalisation statistics to a file */
 const char *ld_compartment_stats;
 
+/* Export count of compartment switches to statistics */
+const char *ld_compartment_switch_count;
+
 struct rtld_c18n_stats *c18n_stats;
 
 #define	INC_NUM_COMPART		(c18n_stats->rcs_compart++, comparts.size++)

@@ -46,8 +46,9 @@ procstat_c18n(struct procstat *procstat, struct kinfo_proc *kipp)
 	struct rtld_c18n_stats rcs;
 
 	if ((procstat_opts & PS_OPT_NOHEADER) == 0)
-		xo_emit("{T:/%5s %-19s %5s %5s %6s %5s %5s}\n",
-		    "PID", "COMM", "COMP", "STKS", "TRMPS", "TRPGS", "MEM");
+		xo_emit("{T:/%5s %-19s %5s %5s %6s %5s %5s %5s}\n",
+		    "PID", "COMM", "COMP", "STKS", "TRMPS", "TRPGS", "MEM",
+		    "SWTCH");
 
 	xo_emit("{k:process_id/%5d/%d}", kipp->ki_pid);
 	xo_emit(" {:command/%-19s/%s}", kipp->ki_comm);
@@ -58,6 +59,7 @@ procstat_c18n(struct procstat *procstat, struct kinfo_proc *kipp)
 		xo_emit(" {:trampolines/%6s/%s}", "-");
 		xo_emit(" {:tramppages/%5s/%s}", "-");
 		xo_emit(" {:memory/%5s/%s}", "-");
+		xo_emit(" {:switches/%5s/%s}", "-");
 	} else {
 		xo_emit(" {:compartments/%5zu/%zu}", rcs.rcs_compart);
 		xo_emit(" {:stacks/%5zu/%zu}", rcs.rcs_ustack);
@@ -65,6 +67,8 @@ procstat_c18n(struct procstat *procstat, struct kinfo_proc *kipp)
 		xo_emit(" {:tramppages/%5zu/%zu}", rcs.rcs_tramp_page);
 		xo_emit(" {[:5}{h,hn-decimal:memory/%zu/%zu}{]:}",
 		    rcs.rcs_bytes_total);
+		xo_emit(" {[:5}{h,hn-decimal,hn-1000:switches/%zu/%zu}{]:}",
+		    rcs.rcs_switch);
 	}
 	xo_emit("\n");
 }

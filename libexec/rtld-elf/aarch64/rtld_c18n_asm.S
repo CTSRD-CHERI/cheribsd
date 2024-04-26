@@ -400,6 +400,13 @@ TRAMP(tramp_update_fp_untagged)
 	clrtag	c29, TRUSTED_STACK_C
 TRAMPEND(tramp_update_fp_untagged)
 
+TRAMP(tramp_count_entry)
+1:	ldr	c24, #0		/* To be patched at runtime */
+	stadd	w25, [c24]
+TRAMPEND(tramp_count_entry)
+
+PATCH_POINT(tramp_count_entry, counter, 1b)
+
 TRAMP(tramp_call_hook)
 1:	ldr	c12, #0		/* To be patched at runtime */
 
@@ -452,6 +459,10 @@ TRAMP(tramp_invoke_res)
 	blrr	c23
 #endif
 TRAMPEND(tramp_invoke_res)
+
+TRAMP(tramp_count_return)
+	stadd	w25, [c24]
+TRAMPEND(tramp_count_return)
 
 TRAMP(tramp_pop_frame)
 	mrs	TRUSTED_STACK_C, TRUSTED_STACK

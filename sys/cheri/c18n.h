@@ -50,6 +50,7 @@ struct rtld_c18n_stats {
 	_Atomic(size_t) rcs_tramp;
 	_Atomic(size_t) rcs_tramp_page;
 	_Atomic(size_t) rcs_bytes_total;
+	_Atomic(size_t) rcs_switch;
 };
 
 /*

@@ -405,6 +405,7 @@ enum {
 	LD_COMPARTMENT_SIG,
 	LD_COMPARTMENT_UNWIND,
 	LD_COMPARTMENT_STATS,
+	LD_COMPARTMENT_SWITCH_COUNT,
 #endif
 };
 
@@ -454,6 +455,7 @@ static struct ld_env_var_desc ld_env_vars[] = {
 	LD_ENV_DESC(COMPARTMENT_SIG, false),
 	LD_ENV_DESC(COMPARTMENT_UNWIND, false),
 	LD_ENV_DESC(COMPARTMENT_STATS, false),
+	LD_ENV_DESC(COMPARTMENT_SWITCH_COUNT, false),
 #endif
 };
 
@@ -859,6 +861,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     ld_compartment_sig = ld_get_env_var(LD_COMPARTMENT_SIG);
     ld_compartment_unwind = ld_get_env_var(LD_COMPARTMENT_UNWIND);
     ld_compartment_stats = ld_get_env_var(LD_COMPARTMENT_STATS);
+    ld_compartment_switch_count = ld_get_env_var(LD_COMPARTMENT_SWITCH_COUNT);
     /*
      * DISABLE takes precedence over ENABLE.
      */
