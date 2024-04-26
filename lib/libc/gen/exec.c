@@ -308,9 +308,9 @@ _coexecvpec(pid_t pid, const char *name, char * const argv[],
 }
 
 int
-_execvpe(const char *name, char * const argv[], char * const envp[])
+_coexecvpe(pid_t pid, const char *name, char * const argv[], char * const envp[])
 {
-	return (_coexecvpec(-1, name, argv, envp, NULL, 0));
+	return (_coexecvpec(pid, name, argv, envp, NULL, 0));
 }
 
 int
