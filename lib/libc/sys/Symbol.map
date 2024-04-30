@@ -1056,4 +1056,6 @@ FBSDprivate_1.0 {
 	__sys_cpuset_setdomain;
 	__sys_break;
 	rpctls_syscall;
+        accel_malloc;
+        accel_demalloc;
 };
