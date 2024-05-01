@@ -28,22 +28,22 @@
 #include <machine/asm.h>
 ENTRY(generic_bs_r_1)
 	ldrb	w0, [PTR(1), x2]
-	ret
+	RETURN
 END(generic_bs_r_1)
 
 ENTRY(generic_bs_r_2)
 	ldrh	w0, [PTR(1), x2]
-	ret
+	RETURN
 END(generic_bs_r_2)
 
 ENTRY(generic_bs_r_4)
 	ldr	w0, [PTR(1), x2]
-	ret
+	RETURN
 END(generic_bs_r_4)
 
 ENTRY(generic_bs_r_8)
 	ldr	x0, [PTR(1), x2]
-	ret
+	RETURN
 END(generic_bs_r_8)
 
 ENTRY(generic_bs_rm_1)
@@ -64,7 +64,7 @@ ENTRY(generic_bs_rm_1)
 	subs	x4, x4, #1
 	b.ne	1b
 
-2:	ret
+2:	RETURN
 END(generic_bs_rm_1)
 
 ENTRY(generic_bs_rm_2)
@@ -85,7 +85,7 @@ ENTRY(generic_bs_rm_2)
 	subs	x4, x4, #1
 	b.ne	1b
 
-2:	ret
+2:	RETURN
 END(generic_bs_rm_2)
 
 ENTRY(generic_bs_rm_4)
@@ -106,7 +106,7 @@ ENTRY(generic_bs_rm_4)
 	subs	x4, x4, #1
 	b.ne	1b
 
-2:	ret
+2:	RETURN
 END(generic_bs_rm_4)
 
 ENTRY(generic_bs_rm_8)
@@ -127,7 +127,7 @@ ENTRY(generic_bs_rm_8)
 	subs	x4, x4, #1
 	b.ne	1b
 
-2:	ret
+2:	RETURN
 END(generic_bs_rm_8)
 
 ENTRY(generic_bs_rr_1)
@@ -148,7 +148,7 @@ ENTRY(generic_bs_rr_1)
 	subs	x4, x4, #1
 	b.ne	1b
 
-2:	ret
+2:	RETURN
 END(generic_bs_rr_1)
 
 ENTRY(generic_bs_rr_2)
@@ -169,7 +169,7 @@ ENTRY(generic_bs_rr_2)
 	subs	x4, x4, #1
 	b.ne	1b
 
-2:	ret
+2:	RETURN
 END(generic_bs_rr_2)
 
 ENTRY(generic_bs_rr_4)
@@ -190,7 +190,7 @@ ENTRY(generic_bs_rr_4)
 	subs	x4, x4, #1
 	b.ne	1b
 
-2:	ret
+2:	RETURN
 END(generic_bs_rr_4)
 
 ENTRY(generic_bs_rr_8)
@@ -211,28 +211,28 @@ ENTRY(generic_bs_rr_8)
 	subs	x4, x4, #1
 	b.ne	1b
 
-2:	ret
+2:	RETURN
 END(generic_bs_rr_8)
 
 
 ENTRY(generic_bs_w_1)
 	strb	w3, [PTR(1), x2]
-	ret
+	RETURN
 END(generic_bs_w_1)
 
 ENTRY(generic_bs_w_2)
 	strh	w3, [PTR(1), x2]
-	ret
+	RETURN
 END(generic_bs_w_2)
 
 ENTRY(generic_bs_w_4)
 	str	w3, [PTR(1), x2]
-	ret
+	RETURN
 END(generic_bs_w_4)
 
 ENTRY(generic_bs_w_8)
 	str	x3, [PTR(1), x2]
-	ret
+	RETURN
 END(generic_bs_w_8)
 
 ENTRY(generic_bs_wm_1)
@@ -252,7 +252,7 @@ ENTRY(generic_bs_wm_1)
 	subs	x4, x4, #1
 	b.ne	1b
 
-2:	ret
+2:	RETURN
 END(generic_bs_wm_1)
 
 ENTRY(generic_bs_wm_2)
@@ -272,7 +272,7 @@ ENTRY(generic_bs_wm_2)
 	subs	x4, x4, #1
 	b.ne	1b
 
-2:	ret
+2:	RETURN
 END(generic_bs_wm_2)
 
 ENTRY(generic_bs_wm_4)
@@ -292,7 +292,7 @@ ENTRY(generic_bs_wm_4)
 	subs	x4, x4, #1
 	b.ne	1b
 
-2:	ret
+2:	RETURN
 END(generic_bs_wm_4)
 
 ENTRY(generic_bs_wm_8)
@@ -312,7 +312,7 @@ ENTRY(generic_bs_wm_8)
 	subs	x4, x4, #1
 	b.ne	1b
 
-2:	ret
+2:	RETURN
 END(generic_bs_wm_8)
 
 ENTRY(generic_bs_wr_1)
@@ -332,7 +332,7 @@ ENTRY(generic_bs_wr_1)
 	subs	x4, x4, #1
 	b.ne	1b
 
-2:	ret
+2:	RETURN
 END(generic_bs_wr_1)
 
 ENTRY(generic_bs_wr_2)
@@ -352,7 +352,7 @@ ENTRY(generic_bs_wr_2)
 	subs	x4, x4, #1
 	b.ne	1b
 
-2:	ret
+2:	RETURN
 END(generic_bs_wr_2)
 
 ENTRY(generic_bs_wr_4)
@@ -372,7 +372,7 @@ ENTRY(generic_bs_wr_4)
 	subs	x4, x4, #1
 	b.ne	1b
 
-2:	ret
+2:	RETURN
 END(generic_bs_wr_4)
 
 ENTRY(generic_bs_wr_8)
@@ -392,12 +392,12 @@ ENTRY(generic_bs_wr_8)
 	subs	x4, x4, #1
 	b.ne	1b
 
-2:	ret
+2:	RETURN
 END(generic_bs_wr_8)
 
 ENTRY(generic_bs_fault)
 	mov	x0, #-1
-	ret
+	RETURN
 END(generic_bs_fault)
 
 ENTRY(generic_bs_peek_1)
@@ -407,7 +407,7 @@ generic_bs_peek_1f:
 	dsb	sy
 	strb	w0,[PTR(3)]
 	mov	x0, #0
-	ret
+	RETURN
 END(generic_bs_peek_1)
 
 	.section .rodata
@@ -422,7 +422,7 @@ generic_bs_peek_2f:
 	dsb	sy
 	strh	w0,[PTR(3)]
 	mov	x0, #0
-	ret
+	RETURN
 END(generic_bs_peek_2)
 
 ENTRY(generic_bs_peek_4)
@@ -432,7 +432,7 @@ generic_bs_peek_4f:
 	dsb	sy
 	str	w0,[PTR(3)]
 	mov	x0, #0
-	ret
+	RETURN
 END(generic_bs_peek_4)
 
 ENTRY(generic_bs_peek_8)
@@ -442,7 +442,7 @@ generic_bs_peek_8f:
 	dsb	sy
 	str	x0,[PTR(3)]
 	mov	x0, #0
-	ret
+	RETURN
 END(generic_bs_peek_8)
 
 ENTRY(generic_bs_poke_1)
@@ -451,7 +451,7 @@ generic_bs_poke_1f:
 	strb	w3, [PTR(1), x2]	/* Checked instruction */
 	dsb	sy
 	mov	x0, #0
-	ret
+	RETURN
 END(generic_bs_poke_1)
 
 ENTRY(generic_bs_poke_2)
@@ -460,7 +460,7 @@ generic_bs_poke_2f:
 	strh	w3, [PTR(1), x2]	/* Checked instruction */
 	dsb	sy
 	mov	x0, #0
-	ret
+	RETURN
 END(generic_bs_poke_2)
 
 ENTRY(generic_bs_poke_4)
@@ -469,7 +469,7 @@ generic_bs_poke_4f:
 	str	w3, [PTR(1), x2]	/* Checked instruction */
 	dsb	sy
 	mov	x0, #0
-	ret
+	RETURN
 END(generic_bs_poke_4)
 
 ENTRY(generic_bs_poke_8)
@@ -478,5 +478,5 @@ generic_bs_poke_8f:
 	str	x3, [PTR(1), x2]	/* Checked instruction */
 	dsb	sy
 	mov	x0, #0
-	ret
+	RETURN
 END(generic_bs_poke_8)

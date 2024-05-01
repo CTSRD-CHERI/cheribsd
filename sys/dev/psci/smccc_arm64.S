@@ -114,7 +114,7 @@ ENTRY(arm_smccc_\insn)
 	cbz	x4, 1f
 	stp	PTR(0), PTR(1), [PTR(4), #(2 * PTR_WIDTH) * 0]
 	stp	PTR(2), PTR(3), [PTR(4), #(2 * PTR_WIDTH) * 1]
-1:	ret
+1:	RETURN
 END(arm_smccc_\insn)
 .endm
 
@@ -158,7 +158,7 @@ ENTRY(arm_smccc_1_2_\insn)
 #ifdef __CHERI_PURE_CAPABILITY__
 	restore_registers
 #endif
-	ret
+	RETURN
 END(arm_smccc_1_2\insn)
 .endm
 /* int arm_smccc_1_2_*(const struct arm_smccc_1_2_regs *args,

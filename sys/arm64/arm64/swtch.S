@@ -122,7 +122,7 @@ ENTRY(cpu_throw)
 	ldp	PTR(27), PTR(28), [PTR(4), #PCB_REGS + (PCB_X19 + 8) * PTR_WIDTH]
 	ldp	PTR(29), PTRN(lr), [PTR(4), #PCB_REGS + (PCB_X19 + 10) * PTR_WIDTH]
 
-	ret
+	RETURN
 END(cpu_throw)
 
 /*
@@ -245,7 +245,7 @@ ENTRY(cpu_switch)
 	ldp	PTR(27), PTR(28), [PTR(4), #PCB_REGS + (PCB_X19 + 8) * PTR_WIDTH]
 	ldp	PTR(29), PTRN(lr), [PTR(4), #PCB_REGS + (PCB_X19 + 10) * PTR_WIDTH]
 
-	ret
+	RETURN
 END(cpu_switch)
 
 ENTRY(fork_trampoline)
@@ -347,7 +347,7 @@ ENTRY(savectx)
 	mov	PTRN(lr), PTR(28)
 #endif
 
-	ret
+	RETURN
 END(savectx)
 // CHERI CHANGES START
 // {
