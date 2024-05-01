@@ -82,7 +82,7 @@ ENTRY(memset)
 	and	count, count, #15
 	add	dst, dst, count
 	stp	A_l, A_l, [dst, #-16]	/* Repeat some/all of last store. */
-	ret
+	RETURN
 
 .Ltail15tiny:
 	/* Set up to 15 bytes.  Does not assume earlier memory
@@ -99,7 +99,7 @@ ENTRY(memset)
 	tbz	count, #0, 1f
 	strb	A_lw, [dst]
 1:
-	ret
+	RETURN
 
 	/* Critical loop.  Start at a new cache line boundary.  Assuming
 	 * 64 bytes per line, this ensures the entire loop is in one line.  */
@@ -130,7 +130,7 @@ ENTRY(memset)
 	tst	count, #0x3f
 	add	dst, dst, #16
 	b.ne	.Ltail63
-	ret
+	RETURN
 
 	/* For zeroing memory, check to see if we can use the ZVA feature to
 	 * zero entire 'cache' lines.  */
@@ -193,5 +193,5 @@ ENTRY(memset)
 	b.ge	3b
 	ands	count, count, zva_bits_x
 	b.ne	.Ltail_maybe_long
-	ret
+	RETURN
 END(memset)

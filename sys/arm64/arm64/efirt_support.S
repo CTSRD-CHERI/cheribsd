@@ -135,7 +135,7 @@ ENTRY(efi_rt_arch_call_nofault)
 	str	x0, [c8, #EC_EFI_STATUS]
 
 	add	csp, csp, #(17 * PTR_WIDTH)
-	ret
+	RETURN
 
 	/* Panic if passed more than 5 arguments */
 1:	add	csp, csp, #(17 * PTR_WIDTH)

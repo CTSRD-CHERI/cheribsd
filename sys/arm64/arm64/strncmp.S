@@ -102,7 +102,7 @@ L(syndrome_check):
 	lsr	data1, data1, #56
 	sub	result, data1, data2, lsr #56
 	csel result, result, xzr, hi
-	ret
+	RETURN
 #else
 	/* Not reached the limit, must have found the end or a diff.  */
 	tbz	limit, #63, L(not_limit)
@@ -129,7 +129,7 @@ L(not_limit):
 	cmp	data1, data2
 	cset	result, ne
 	cneg	result, result, lo
-	ret
+	RETURN
 1:
 	/* Re-compute the NUL-byte detection, using a byte-reversed value.  */
 	rev	tmp3, data1
@@ -150,7 +150,7 @@ L(end_quick):
 	   perform a signed 32-bit subtraction.  */
 	lsr	data1, data1, #56
 	sub	result, data1, data2, lsr #56
-	ret
+	RETURN
 #endif
 
 L(mutual_align):
@@ -189,7 +189,7 @@ L(byte_loop):
 	b.eq	L(byte_loop)
 L(done):
 	sub	result, data1, data2
-	ret
+	RETURN
 	/* Align the SRC1 to a dword by doing a bytewise compare and then do
 	   the dword loop.  */
 L(try_misaligned_words):
@@ -302,6 +302,6 @@ L(syndrome_check):
 
 L(ret0):
 	mov	result, #0
-	ret
+	RETURN
 END(strncmp)
 

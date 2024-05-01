@@ -60,7 +60,7 @@ EENTRY(copyio_fault)
 	EXIT_USER_ACCESS_CHECK(w0, PTR(1))
 copyio_fault_nopcb:
 	mov	x0, #EFAULT
-	ret
+	RETURN
 EEND(copyio_fault)
 END(copyio_c64_fault)
 
@@ -80,7 +80,7 @@ ENTRY(copyout)
 	b	copycommon
 
 1:	mov	x0, xzr		/* return 0 */
-	ret
+	RETURN
 
 END(copyout)
 
@@ -101,7 +101,7 @@ ENTRY(copyin)
 	b	copycommon
 
 1:	mov	x0, xzr		/* return 0 */
-	ret
+	RETURN
 
 END(copyin)
 
@@ -158,7 +158,7 @@ ENTRY(copyinstr)
 4:	mov	w1, #ENAMETOOLONG /* Load ENAMETOOLONG to return if failed */
 	cmp	w4, #0		/* Check if we saved the NUL-terminator */
 	csel	w0, wzr, w1, eq	/* If so return success, else failure */
-	ret
+	RETURN
 END(copyinstr)
 
 #if !__has_feature(capabilities)
@@ -258,7 +258,7 @@ ending:
 	SET_FAULT_HANDLER(xzr, x7) /* Clear the handler */
 
 	mov	x0, xzr		/* return 0 */
-	ret
+	RETURN
 	.size	copycommon, . - copycommon
 #endif /* !__has_feature(capabilities) */
 
@@ -292,7 +292,7 @@ ENTRY(copyincap)
 	b	copycapcommon
 
 1:	mov	x0, xzr		/* return 0 */
-	ret
+	RETURN
 END(copyincap)
 
 /*
@@ -324,7 +324,7 @@ ENTRY(copyoutcap)
 	b	copycapcommon
 
 1:	mov	x0, xzr		/* return 0 */
-	ret
+	RETURN
 END(copyoutcap)
 
 /*
@@ -397,7 +397,7 @@ copycap_done:
 	SET_FAULT_HANDLER(xzr, PTR(7))	/* Clear the handler */
 
 	mov	x0, xzr			/* Return 0 */
-	ret
+	RETURN
 	.size	copycapcommon, . - copycapcommon
 
 	.text
@@ -439,6 +439,6 @@ copy_done:
 	SET_FAULT_HANDLER(xzr, PTR(7))	/* Clear the handler */
 
 	mov	x0, xzr			/* Return 0 */
-	ret
+	RETURN
 	.size	copycommon, . - copycommon
 #endif

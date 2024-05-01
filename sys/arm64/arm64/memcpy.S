@@ -71,7 +71,7 @@ ENTRY(memcpy)
 	ldp	D_l, D_h, [srcend, -16]
 	stp	A_l, A_h, [dstin]
 	stp	D_l, D_h, [dstend, -16]
-	ret
+	RETURN
 
 	/* Copy 8-15 bytes.  */
 L(copy16):
@@ -80,7 +80,7 @@ L(copy16):
 	ldr	A_h, [srcend, -8]
 	str	A_l, [dstin]
 	str	A_h, [dstend, -8]
-	ret
+	RETURN
 
 	.p2align 3
 	/* Copy 4-7 bytes.  */
@@ -90,7 +90,7 @@ L(copy8):
 	ldr	B_lw, [srcend, -4]
 	str	A_lw, [dstin]
 	str	B_lw, [dstend, -4]
-	ret
+	RETURN
 
 	/* Copy 0..3 bytes using a branchless sequence.  */
 L(copy4):
@@ -103,7 +103,7 @@ L(copy4):
 	strb	B_lw, [dstin, tmp1]
 	strb	C_lw, [dstend, -1]
 L(copy0):
-	ret
+	RETURN
 
 	.p2align 4
 	/* Medium copies: 33..128 bytes.  */
@@ -118,7 +118,7 @@ L(copy32_128):
 	stp	B_l, B_h, [dstin, 16]
 	stp	C_l, C_h, [dstend, -32]
 	stp	D_l, D_h, [dstend, -16]
-	ret
+	RETURN
 
 	.p2align 4
 	/* Copy 65..128 bytes.  */
@@ -138,7 +138,7 @@ L(copy96):
 	stp	F_l, F_h, [dstin, 48]
 	stp	C_l, C_h, [dstend, -32]
 	stp	D_l, D_h, [dstend, -16]
-	ret
+	RETURN
 
 	.p2align 4
 	/* Copy more than 128 bytes.  */
@@ -190,7 +190,7 @@ L(copy64_from_end):
 	stp	A_l, A_h, [dstend, -48]
 	stp	B_l, B_h, [dstend, -32]
 	stp	C_l, C_h, [dstend, -16]
-	ret
+	RETURN
 
 	.p2align 4
 
@@ -236,7 +236,7 @@ L(copy64_from_start):
 	stp	A_l, A_h, [dstin, 32]
 	stp	B_l, B_h, [dstin, 16]
 	stp	C_l, C_h, [dstin]
-	ret
+	RETURN
 END(memcpy)
 EEND(memmove)
 

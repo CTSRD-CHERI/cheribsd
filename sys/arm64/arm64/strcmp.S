@@ -99,7 +99,7 @@ L(end):
 	   perform a signed 32-bit subtraction.  */
 	lsr	data1, data1, 56
 	sub	result, data1, data2, lsr 56
-	ret
+	RETURN
 
 	.p2align 4
 
@@ -183,7 +183,7 @@ L(tail):
 
 L(done):
 	sub	result, data1, data2
-	ret
+	RETURN
 
 END (strcmp)
 

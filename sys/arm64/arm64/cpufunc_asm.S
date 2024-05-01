@@ -109,7 +109,7 @@
 .endm
 
 ENTRY(arm64_nullop)
-	ret
+	RETURN
 END(arm64_nullop)
 
 /*
@@ -125,7 +125,7 @@ ENTRY(arm64_tlb_flushID)
 #endif
 	dsb	ish
 	isb
-	ret
+	RETURN
 END(arm64_tlb_flushID)
 
 /*
@@ -133,7 +133,7 @@ END(arm64_tlb_flushID)
  */
 ENTRY(arm64_dcache_wb_range)
 	cache_handle_range	dcop = cvac
-	ret
+	RETURN
 END(arm64_dcache_wb_range)
 
 /*
@@ -141,7 +141,7 @@ END(arm64_dcache_wb_range)
  */
 ENTRY(arm64_dcache_wbinv_range)
 	cache_handle_range	dcop = civac
-	ret
+	RETURN
 END(arm64_dcache_wbinv_range)
 
 /*
@@ -152,7 +152,7 @@ END(arm64_dcache_wbinv_range)
  */
 ENTRY(arm64_dcache_inv_range)
 	cache_handle_range	dcop = ivac
-	ret
+	RETURN
 END(arm64_dcache_inv_range)
 
 /*
@@ -163,7 +163,7 @@ END(arm64_dcache_inv_range)
 ENTRY(arm64_dic_idc_icache_sync_range)
 	dsb	ishst
 	isb
-	ret
+	RETURN
 END(arm64_dic_idc_icache_sync_range)
 
 /*
@@ -175,7 +175,7 @@ ENTRY(arm64_idc_aliasing_icache_sync_range)
 	ic	ialluis
 	dsb	ish
 	isb
-	ret
+	RETURN
 END(arm64_idc_aliasing_icache_sync_range)
 
 /*
@@ -191,7 +191,7 @@ ENTRY(arm64_aliasing_icache_sync_range)
 	ic	ialluis
 	dsb	ish
 	isb
-	ret
+	RETURN
 END(arm64_aliasing_icache_sync_range)
 
 /*
@@ -207,11 +207,11 @@ ENTRY(arm64_icache_sync_range_checked)
 	isb
 	SET_FAULT_HANDLER(xzr, PTR(6))
 	mov	x0, #0
-	ret
+	RETURN
 END(arm64_icache_sync_range_checked)
 
 ENTRY(cache_maint_fault)
 	SET_FAULT_HANDLER(xzr, PTR(1))
 	mov	x0, #EFAULT
-	ret
+	RETURN
 END(cache_maint_fault)

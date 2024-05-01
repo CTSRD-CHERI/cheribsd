@@ -55,7 +55,7 @@ ENTRY(fsu_fault)
 	EXIT_USER_ACCESS_CHECK(w0, PTR(1))
 fsu_fault_nopcb:
 	mov	x0, #-1
-	ret
+	RETURN
 END(fsu_fault)
 
 /*
@@ -85,7 +85,7 @@ ENTRY(swapueword8_llsc)
 1:	EXIT_USER_ACCESS(w6)
 	SET_FAULT_HANDLER(xzr, PTR(6))
 	mov	w0, w3
-	ret
+	RETURN
 END(swapueword8_llsc)
 
 /*
@@ -114,7 +114,7 @@ ENTRY(swapueword8_lse)
 	EXIT_USER_ACCESS(w6)
 	SET_FAULT_HANDLER(xzr, PTR(6))
 	mov	w0, #0
-	ret
+	RETURN
 END(swapueword8_lse)
 
 /*
@@ -144,7 +144,7 @@ ENTRY(swapueword32_llsc)
 1:	EXIT_USER_ACCESS(w6)
 	SET_FAULT_HANDLER(xzr, PTR(6))
 	mov	w0, w3
-	ret
+	RETURN
 END(swapueword32_llsc)
 
 /*
@@ -173,7 +173,7 @@ ENTRY(swapueword32_lse)
 	EXIT_USER_ACCESS(w6)
 	SET_FAULT_HANDLER(xzr, PTR(6))
 	mov	w0, #0
-	ret
+	RETURN
 END(swapueword32_llsc)
 
 /*
@@ -204,7 +204,7 @@ ENTRY(casueword32_llsc)
 	SET_FAULT_HANDLER(xzr, PTR(6))	/* Reset the fault handler */
 	str	w4, [PTR(2)]		/* Store the read data */
 	mov	w0, w5			/* Result same as store status */
-	ret				/* Return */
+	RETURN				/* Return */
 END(casueword32_llsc)
 
 /*
@@ -230,7 +230,7 @@ ENTRY(casueword32_lse)
 	EXIT_USER_ACCESS(w6)
 	SET_FAULT_HANDLER(xzr, PTR(6))	/* Reset the fault handler */
 	str	w1, [PTR(2)]		/* Store the read data */
-	ret				/* Return */
+	RETURN				/* Return */
 END(casueword32_lse)
 
 /*
@@ -260,7 +260,7 @@ ENTRY(casueword_llsc)
 	SET_FAULT_HANDLER(xzr, PTR(6))	/* Reset the fault handler */
 	str	x4, [PTR(2)]		/* Store the read data */
 	mov	w0, w5			/* Result same as store status */
-	ret				/* Return */
+	RETURN				/* Return */
 END(casueword_llsc)
 
 /*
@@ -286,7 +286,7 @@ ENTRY(casueword_lse)
 	EXIT_USER_ACCESS(w6)
 	SET_FAULT_HANDLER(xzr, PTR(6))	/* Reset the fault handler */
 	str	x1, [PTR(2)]		/* Store the read data */
-	ret				/* Return */
+	RETURN				/* Return */
 END(casueword_lse)
 
 .macro fsudata insn, ret_reg, user_arg
@@ -308,7 +308,7 @@ END(casueword_lse)
 ENTRY(fubyte)
 	check_user_access 0, (VM_MAXUSER_ADDRESS), fsu_fault_nopcb
 	fsudata	ldtrb, w0, 0
-	ret				/* Return */
+	RETURN				/* Return */
 END(fubyte)
 
 /*
@@ -317,7 +317,7 @@ END(fubyte)
 ENTRY(fuword16)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-1), fsu_fault_nopcb
 	fsudata	ldtrh, w0, 0
-	ret				/* Return */
+	RETURN				/* Return */
 END(fuword16)
 
 /*
@@ -328,7 +328,7 @@ ENTRY(fueword32)
 	fsudata	ldtr, w0, 0
 	str	w0, [PTR(1)]		/* Save the data in kernel space */
 	mov	w0, #0			/* Success */
-	ret				/* Return */
+	RETURN				/* Return */
 END(fueword32)
 
 /*
@@ -341,7 +341,7 @@ ENTRY(fueword)
 	fsudata	ldtr, x0, 0
 	str	x0, [PTR(1)]		/* Save the data in kernel space */
 	mov	x0, #0			/* Success */
-	ret				/* Return */
+	RETURN				/* Return */
 END(fueword)
 EEND(fueword64)
 
@@ -354,7 +354,7 @@ ENTRY(fuecap)
 	fsudata	ldtr, c0, 0
 	str	c0, [PTR(1)]		/* Save the data in kernel space */
 	mov	x0, #0			/* Success */
-	ret				/* Return */
+	RETURN				/* Return */
 END(fuecap)
 #endif
 
@@ -365,7 +365,7 @@ ENTRY(subyte)
 	check_user_access 0, (VM_MAXUSER_ADDRESS), fsu_fault_nopcb
 	fsudata	sttrb, w1, 0
 	mov	x0, #0			/* Success */
-	ret				/* Return */
+	RETURN				/* Return */
 END(subyte)
 
 /*
@@ -375,7 +375,7 @@ ENTRY(suword16)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-1), fsu_fault_nopcb
 	fsudata	sttrh, w1, 0
 	mov	x0, #0			/* Success */
-	ret				/* Return */
+	RETURN				/* Return */
 END(suword16)
 
 /*
@@ -385,7 +385,7 @@ ENTRY(suword32)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-3), fsu_fault_nopcb
 	fsudata	sttr, w1, 0
 	mov	x0, #0			/* Success */
-	ret				/* Return */
+	RETURN				/* Return */
 END(suword32)
 
 /*
@@ -396,7 +396,7 @@ ENTRY(suword)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-7), fsu_fault_nopcb
 	fsudata	sttr, x1, 0
 	mov	x0, #0			/* Success */
-	ret				/* Return */
+	RETURN				/* Return */
 END(suword)
 EEND(suword64)
 
@@ -408,7 +408,7 @@ ENTRY(sucap)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-15), fsu_fault_nopcb
 	fsudata	sttr, c1, 0
 	mov	x0, #0			/* Success */
-	ret				/* Return */
+	RETURN				/* Return */
 END(sucap)
 #endif
 
@@ -427,7 +427,7 @@ ENTRY(setjmp)
 
 	/* Return value */
 	mov	x0, #0
-	ret
+	RETURN
 END(setjmp)
 
 ENTRY(longjmp)
@@ -445,7 +445,7 @@ ENTRY(longjmp)
 
 	/* Load the return value */
 	mov	x0, x1
-	ret
+	RETURN
 END(longjmp)
 
 /*
@@ -461,7 +461,7 @@ ENTRY(pagezero_simple)
 	stp	PTR(zr), PTR(zr), [PTR(0)], #(2 * PTR_WIDTH)
 	cmp	PTR(0), PTR(1)
 	b.ne	1b
-	ret
+	RETURN
 
 END(pagezero_simple)
 
@@ -478,7 +478,7 @@ ENTRY(pagezero_cache)
 	add	PTR(0), PTR(0), x2
 	cmp	PTR(0), PTR(1)
 	b.ne	1b
-	ret
+	RETURN
 
 END(pagezero_cache)
 // CHERI CHANGES START
