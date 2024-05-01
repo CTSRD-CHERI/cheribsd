@@ -842,8 +842,15 @@ vm_mmap_getnext(struct vm *vm, vm_paddr_t *gpa, int *segid,
 			*segoff = mmnext->segoff;
 		if (len)
 			*len = mmnext->len;
-		if (prot)
+		if (prot) {
 			*prot = mmnext->prot;
+
+			/*
+			 * Hide the bits implicitly added by vm_mmap_memseg().
+			 * Userspace might not expect to see them returned here.
+			 */
+			*prot &= ~VM_PROT_CAP;
+		}
 		if (flags)
 			*flags = mmnext->flags;
 		return (0);
