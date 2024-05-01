@@ -186,6 +186,7 @@ fdt_add_gic(uint64_t dist_base, uint64_t dist_size,
 	gic_phandle = assign_phandle(fdt);
 	fdt_property_string(fdt, "compatible", "arm,gic-v3");
 	fdt_property(fdt, "interrupt-controller", NULL, 0);
+	fdt_property(fdt, "msi-controller", NULL, 0);
 	/* XXX: Needed given the root #address-cells? */
 	fdt_property_u32(fdt, "#address-cells", 2);
 	fdt_property_u32(fdt, "#interrupt-cells", 3);
@@ -201,7 +202,6 @@ fdt_add_gic(uint64_t dist_base, uint64_t dist_size,
 	    &prop);
 	SET_PROP_U32(prop, 0, 256);
 	SET_PROP_U32(prop, 1, 64);
-	fdt_property(fdt, "msi-controller", NULL, 0);
 
 	fdt_end_node(fdt);
 
