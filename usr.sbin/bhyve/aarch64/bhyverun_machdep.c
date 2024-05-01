@@ -63,12 +63,10 @@
 #define	RTC_MMIO_SIZE	0x1000
 #define	RTC_INTR	33
 
-#define	GIC_DIST_BASE	0x2f000000
-#define	GIC_DIST_SIZE	0x10000
-#define	GIC_REDIST_BASE	0x2f100000
-#define	GIC_REDIST_SIZE	0x20000
-/* 2 * 64K * 120 vCPUs */
-#define	GIC_REDIST_MAX	0xf00000
+#define	GIC_DIST_BASE		0x2f000000
+#define	GIC_DIST_SIZE		0x10000
+#define	GIC_REDIST_BASE		0x2f100000
+#define	GIC_REDIST_SIZE(ncpu)	((ncpu) * 2 * PAGE_SIZE_64K)
 
 #define	PCIE_INTA	34
 #define	PCIE_INTB	35
@@ -82,7 +80,7 @@ bhyve_init_config(void)
 
 	/* Set default values prior to option parsing. */
 	set_config_bool("acpi_tables", false);
-	set_config_bool("acpi_tables_in_memory", true);
+	set_config_bool("acpi_tables_in_memory", false);
 	set_config_value("memory.size", "256M");
 }
 
@@ -94,7 +92,7 @@ bhyve_usage(int code)
 	progname = getprogname();
 
 	fprintf(stderr,
-	    "Usage: %s [-AaCDHhSW]\n"
+	    "Usage: %s [-CDHhSW]\n"
 	    "       %*s [-c [[cpus=]numcpus][,sockets=n][,cores=n][,threads=n]]\n"
 	    "       %*s [-k config_file] [-m mem] [-o var=value]\n"
 	    "       %*s [-p vcpu:hostcpu] [-r file] [-s pci] [-U uuid] vmname\n"
@@ -361,7 +359,7 @@ int
 bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 {
 	const char *bootrom;
-	uint64_t elr, redist_size;
+	uint64_t elr;
 	int error;
 	int pcie_intrs[4] = {PCIE_INTA, PCIE_INTB, PCIE_INTC, PCIE_INTD};
 
@@ -373,7 +371,7 @@ bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 	load_bootrom(ctx, bootrom, &elr);
 	error = vm_set_register(bsp, VM_REG_GUEST_PC, elr);
 	if (error != 0) {
-		warn("vm_set_register(ELR_EL2)");
+		warn("vm_set_register(GUEST_PC)");
 		return (error);
 	}
 
@@ -381,16 +379,10 @@ bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp)
 	if (error != 0)
 		return (error);
 
-	redist_size = GIC_REDIST_SIZE * guest_ncpus;
-	if (redist_size > GIC_REDIST_MAX) {
-		warnx("too many vCPUs for GIC redistributor");
-		return (EINVAL);
-	}
-
 	fdt_add_gic(GIC_DIST_BASE, GIC_DIST_SIZE, GIC_REDIST_BASE,
-	    redist_size);
+	    GIC_REDIST_SIZE(guest_ncpus));
 	error = vm_attach_vgic(ctx, GIC_DIST_BASE, GIC_DIST_SIZE,
-	    GIC_REDIST_BASE, redist_size);
+	    GIC_REDIST_BASE, GIC_REDIST_SIZE(guest_ncpus));
 	if (error != 0) {
 		warn("vm_attach_vgic()");
 		return (error);
