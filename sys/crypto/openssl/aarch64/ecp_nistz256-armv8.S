@@ -2397,21 +2397,21 @@ ecp_nistz256_precomputed:
 .align	6
 ecp_nistz256_to_mont:
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-32]!
-	add	x29,sp,#0
-	stp	x19,x20,[sp,#16]
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(4*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
 
 	ldr	x3,.LRR		// bp[0]
-	ldp	x4,x5,[x1]
-	ldp	x6,x7,[x1,#16]
+	ldp	x4,x5,[PTR(1)]
+	ldp	x6,x7,[PTR(1),#16]
 	ldr	x12,.Lpoly+8
 	ldr	x13,.Lpoly+24
-	adr	x2,.LRR		// &bp[0]
+	adr	PTR(2),.LRR		// &bp[0]
 
 	bl	__ecp_nistz256_mul_mont
 
-	ldp	x19,x20,[sp,#16]
-	ldp	x29,x30,[sp],#32
+	ldp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(4*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	ecp_nistz256_to_mont,.-ecp_nistz256_to_mont
@@ -2422,21 +2422,21 @@ ecp_nistz256_to_mont:
 .align	4
 ecp_nistz256_from_mont:
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-32]!
-	add	x29,sp,#0
-	stp	x19,x20,[sp,#16]
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(4*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
 
 	mov	x3,#1			// bp[0]
-	ldp	x4,x5,[x1]
-	ldp	x6,x7,[x1,#16]
+	ldp	x4,x5,[PTR(1)]
+	ldp	x6,x7,[PTR(1),#16]
 	ldr	x12,.Lpoly+8
 	ldr	x13,.Lpoly+24
-	adr	x2,.Lone		// &bp[0]
+	adr	PTR(2),.Lone		// &bp[0]
 
 	bl	__ecp_nistz256_mul_mont
 
-	ldp	x19,x20,[sp,#16]
-	ldp	x29,x30,[sp],#32
+	ldp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(4*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	ecp_nistz256_from_mont,.-ecp_nistz256_from_mont
@@ -2448,20 +2448,20 @@ ecp_nistz256_from_mont:
 .align	4
 ecp_nistz256_mul_mont:
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-32]!
-	add	x29,sp,#0
-	stp	x19,x20,[sp,#16]
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(4*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
 
-	ldr	x3,[x2]		// bp[0]
-	ldp	x4,x5,[x1]
-	ldp	x6,x7,[x1,#16]
+	ldr	x3,[PTR(2)]		// bp[0]
+	ldp	x4,x5,[PTR(1)]
+	ldp	x6,x7,[PTR(1),#16]
 	ldr	x12,.Lpoly+8
 	ldr	x13,.Lpoly+24
 
 	bl	__ecp_nistz256_mul_mont
 
-	ldp	x19,x20,[sp,#16]
-	ldp	x29,x30,[sp],#32
+	ldp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(4*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	ecp_nistz256_mul_mont,.-ecp_nistz256_mul_mont
@@ -2472,19 +2472,19 @@ ecp_nistz256_mul_mont:
 .align	4
 ecp_nistz256_sqr_mont:
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-32]!
-	add	x29,sp,#0
-	stp	x19,x20,[sp,#16]
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(4*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
 
-	ldp	x4,x5,[x1]
-	ldp	x6,x7,[x1,#16]
+	ldp	x4,x5,[PTR(1)]
+	ldp	x6,x7,[PTR(1),#16]
 	ldr	x12,.Lpoly+8
 	ldr	x13,.Lpoly+24
 
 	bl	__ecp_nistz256_sqr_mont
 
-	ldp	x19,x20,[sp,#16]
-	ldp	x29,x30,[sp],#32
+	ldp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(4*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	ecp_nistz256_sqr_mont,.-ecp_nistz256_sqr_mont
@@ -2496,19 +2496,19 @@ ecp_nistz256_sqr_mont:
 .align	4
 ecp_nistz256_add:
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-16]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 
-	ldp	x14,x15,[x1]
-	ldp	x8,x9,[x2]
-	ldp	x16,x17,[x1,#16]
-	ldp	x10,x11,[x2,#16]
+	ldp	x14,x15,[PTR(1)]
+	ldp	x8,x9,[PTR(2)]
+	ldp	x16,x17,[PTR(1),#16]
+	ldp	x10,x11,[PTR(2),#16]
 	ldr	x12,.Lpoly+8
 	ldr	x13,.Lpoly+24
 
 	bl	__ecp_nistz256_add
 
-	ldp	x29,x30,[sp],#16
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(2*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	ecp_nistz256_add,.-ecp_nistz256_add
@@ -2519,17 +2519,17 @@ ecp_nistz256_add:
 .align	4
 ecp_nistz256_div_by_2:
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-16]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 
-	ldp	x14,x15,[x1]
-	ldp	x16,x17,[x1,#16]
+	ldp	x14,x15,[PTR(1)]
+	ldp	x16,x17,[PTR(1),#16]
 	ldr	x12,.Lpoly+8
 	ldr	x13,.Lpoly+24
 
 	bl	__ecp_nistz256_div_by_2
 
-	ldp	x29,x30,[sp],#16
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(2*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	ecp_nistz256_div_by_2,.-ecp_nistz256_div_by_2
@@ -2540,11 +2540,11 @@ ecp_nistz256_div_by_2:
 .align	4
 ecp_nistz256_mul_by_2:
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-16]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 
-	ldp	x14,x15,[x1]
-	ldp	x16,x17,[x1,#16]
+	ldp	x14,x15,[PTR(1)]
+	ldp	x16,x17,[PTR(1),#16]
 	ldr	x12,.Lpoly+8
 	ldr	x13,.Lpoly+24
 	mov	x8,x14
@@ -2554,7 +2554,7 @@ ecp_nistz256_mul_by_2:
 
 	bl	__ecp_nistz256_add	// ret = a+a	// 2*a
 
-	ldp	x29,x30,[sp],#16
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(2*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	ecp_nistz256_mul_by_2,.-ecp_nistz256_mul_by_2
@@ -2565,11 +2565,11 @@ ecp_nistz256_mul_by_2:
 .align	4
 ecp_nistz256_mul_by_3:
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-16]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 
-	ldp	x14,x15,[x1]
-	ldp	x16,x17,[x1,#16]
+	ldp	x14,x15,[PTR(1)]
+	ldp	x16,x17,[PTR(1),#16]
 	ldr	x12,.Lpoly+8
 	ldr	x13,.Lpoly+24
 	mov	x8,x14
@@ -2590,7 +2590,7 @@ ecp_nistz256_mul_by_3:
 
 	bl	__ecp_nistz256_add	// ret += a	// 2*a+a=3*a
 
-	ldp	x29,x30,[sp],#16
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(2*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	ecp_nistz256_mul_by_3,.-ecp_nistz256_mul_by_3
@@ -2602,17 +2602,17 @@ ecp_nistz256_mul_by_3:
 .align	4
 ecp_nistz256_sub:
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-16]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 
-	ldp	x14,x15,[x1]
-	ldp	x16,x17,[x1,#16]
+	ldp	x14,x15,[PTR(1)]
+	ldp	x16,x17,[PTR(1),#16]
 	ldr	x12,.Lpoly+8
 	ldr	x13,.Lpoly+24
 
 	bl	__ecp_nistz256_sub_from
 
-	ldp	x29,x30,[sp],#16
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(2*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	ecp_nistz256_sub,.-ecp_nistz256_sub
@@ -2623,10 +2623,10 @@ ecp_nistz256_sub:
 .align	4
 ecp_nistz256_neg:
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-16]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 
-	mov	x2,x1
+	mov	PTR(2),PTR(1)
 	mov	x14,xzr		// a = 0
 	mov	x15,xzr
 	mov	x16,xzr
@@ -2636,7 +2636,7 @@ ecp_nistz256_neg:
 
 	bl	__ecp_nistz256_sub_from
 
-	ldp	x29,x30,[sp],#16
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(2*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	ecp_nistz256_neg,.-ecp_nistz256_neg
@@ -2657,7 +2657,7 @@ __ecp_nistz256_mul_mont:
 
 	mul	x17,x7,x3		// a[3]*b[0]
 	umulh	x11,x7,x3
-	ldr	x3,[x2,#8]		// b[1]
+	ldr	x3,[PTR(2),#8]		// b[1]
 
 	adds	x15,x15,x8		// accumulate high parts of multiplication
 	lsl	x8,x14,#32
@@ -2687,7 +2687,7 @@ __ecp_nistz256_mul_mont:
 	adcs	x17,x17,x11
 	umulh	x11,x7,x3		// hi(a[3]*b[i])
 	adc	x19,x19,xzr
-	ldr	x3,[x2,#8*(1+1)]	// b[1+1]
+	ldr	x3,[PTR(2),#8*(1+1)]	// b[1+1]
 	adds	x15,x15,x8		// accumulate high parts of multiplication
 	lsl	x8,x14,#32
 	adcs	x16,x16,x9
@@ -2716,7 +2716,7 @@ __ecp_nistz256_mul_mont:
 	adcs	x17,x17,x11
 	umulh	x11,x7,x3		// hi(a[3]*b[i])
 	adc	x19,x19,xzr
-	ldr	x3,[x2,#8*(2+1)]	// b[2+1]
+	ldr	x3,[PTR(2),#8*(2+1)]	// b[2+1]
 	adds	x15,x15,x8		// accumulate high parts of multiplication
 	lsl	x8,x14,#32
 	adcs	x16,x16,x9
@@ -2770,9 +2770,9 @@ __ecp_nistz256_mul_mont:
 	csel	x14,x14,x8,lo	// ret = borrow ? ret : ret-modulus
 	csel	x15,x15,x9,lo
 	csel	x16,x16,x10,lo
-	stp	x14,x15,[x0]
+	stp	x14,x15,[PTR(0)]
 	csel	x17,x17,x11,lo
-	stp	x16,x17,[x0,#16]
+	stp	x16,x17,[PTR(0),#16]
 
 	ret
 .size	__ecp_nistz256_mul_mont,.-__ecp_nistz256_mul_mont
@@ -2893,9 +2893,9 @@ __ecp_nistz256_sqr_mont:
 	csel	x14,x14,x8,lo	// ret = borrow ? ret : ret-modulus
 	csel	x15,x15,x9,lo
 	csel	x16,x16,x10,lo
-	stp	x14,x15,[x0]
+	stp	x14,x15,[PTR(0)]
 	csel	x17,x17,x11,lo
-	stp	x16,x17,[x0,#16]
+	stp	x16,x17,[PTR(0),#16]
 
 	ret
 .size	__ecp_nistz256_sqr_mont,.-__ecp_nistz256_sqr_mont
@@ -2910,7 +2910,7 @@ __ecp_nistz256_add:
 	adcs	x15,x15,x9
 	adcs	x16,x16,x10
 	adcs	x17,x17,x11
-	adc	x1,xzr,xzr		// zap x1
+	adc	x1,xzr,xzr		// zap PTR(1)
 
 	adds	x8,x14,#1		// subs	x8,x4,#-1 // tmp = ret-modulus
 	sbcs	x9,x15,x12
@@ -2921,9 +2921,9 @@ __ecp_nistz256_add:
 	csel	x14,x14,x8,lo	// ret = borrow ? ret : ret-modulus
 	csel	x15,x15,x9,lo
 	csel	x16,x16,x10,lo
-	stp	x14,x15,[x0]
+	stp	x14,x15,[PTR(0)]
 	csel	x17,x17,x11,lo
-	stp	x16,x17,[x0,#16]
+	stp	x16,x17,[PTR(0),#16]
 
 	ret
 .size	__ecp_nistz256_add,.-__ecp_nistz256_add
@@ -2931,26 +2931,26 @@ __ecp_nistz256_add:
 .type	__ecp_nistz256_sub_from,%function
 .align	4
 __ecp_nistz256_sub_from:
-	ldp	x8,x9,[x2]
-	ldp	x10,x11,[x2,#16]
+	ldp	x8,x9,[PTR(2)]
+	ldp	x10,x11,[PTR(2),#16]
 	subs	x14,x14,x8		// ret = a-b
 	sbcs	x15,x15,x9
 	sbcs	x16,x16,x10
 	sbcs	x17,x17,x11
-	sbc	x1,xzr,xzr		// zap x1
+	sbc	x1,xzr,xzr		// zap PTR(1)
 
 	subs	x8,x14,#1		// adds	x8,x4,#-1 // tmp = ret+modulus
 	adcs	x9,x15,x12
 	adcs	x10,x16,xzr
 	adc	x11,x17,x13
-	cmp	x1,xzr			// did subtraction borrow?
+	cmp	x1,xzr		// did subtraction borrow?
 
 	csel	x14,x14,x8,eq	// ret = borrow ? ret+modulus : ret
 	csel	x15,x15,x9,eq
 	csel	x16,x16,x10,eq
-	stp	x14,x15,[x0]
+	stp	x14,x15,[PTR(0)]
 	csel	x17,x17,x11,eq
-	stp	x16,x17,[x0,#16]
+	stp	x16,x17,[PTR(0),#16]
 
 	ret
 .size	__ecp_nistz256_sub_from,.-__ecp_nistz256_sub_from
@@ -2958,26 +2958,26 @@ __ecp_nistz256_sub_from:
 .type	__ecp_nistz256_sub_morf,%function
 .align	4
 __ecp_nistz256_sub_morf:
-	ldp	x8,x9,[x2]
-	ldp	x10,x11,[x2,#16]
+	ldp	x8,x9,[PTR(2)]
+	ldp	x10,x11,[PTR(2),#16]
 	subs	x14,x8,x14		// ret = b-a
 	sbcs	x15,x9,x15
 	sbcs	x16,x10,x16
 	sbcs	x17,x11,x17
-	sbc	x1,xzr,xzr		// zap x1
+	sbc	x1,xzr,xzr		// zap PTR(1)
 
 	subs	x8,x14,#1		// adds	x8,x4,#-1 // tmp = ret+modulus
 	adcs	x9,x15,x12
 	adcs	x10,x16,xzr
 	adc	x11,x17,x13
-	cmp	x1,xzr			// did subtraction borrow?
+	cmp	x1,xzr		// did subtraction borrow?
 
 	csel	x14,x14,x8,eq	// ret = borrow ? ret+modulus : ret
 	csel	x15,x15,x9,eq
 	csel	x16,x16,x10,eq
-	stp	x14,x15,[x0]
+	stp	x14,x15,[PTR(0)]
 	csel	x17,x17,x11,eq
-	stp	x16,x17,[x0,#16]
+	stp	x16,x17,[PTR(0),#16]
 
 	ret
 .size	__ecp_nistz256_sub_morf,.-__ecp_nistz256_sub_morf
@@ -2989,7 +2989,7 @@ __ecp_nistz256_div_by_2:
 	adcs	x9,x15,x12
 	adcs	x10,x16,xzr
 	adcs	x11,x17,x13
-	adc	x1,xzr,xzr		// zap x1
+	adc	x1,xzr,xzr		// zap PTR(1)
 	tst	x14,#1		// is a even?
 
 	csel	x14,x14,x8,eq	// ret = even ? a : a+modulus
@@ -3005,9 +3005,9 @@ __ecp_nistz256_div_by_2:
 	lsr	x16,x16,#1
 	orr	x16,x16,x17,lsl#63
 	lsr	x17,x17,#1
-	stp	x14,x15,[x0]
+	stp	x14,x15,[PTR(0)]
 	orr	x17,x17,x1,lsl#63
-	stp	x16,x17,[x0,#16]
+	stp	x16,x17,[PTR(0),#16]
 
 	ret
 .size	__ecp_nistz256_div_by_2,.-__ecp_nistz256_div_by_2
@@ -3016,80 +3016,80 @@ __ecp_nistz256_div_by_2:
 .align	5
 ecp_nistz256_point_double:
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-96]!
-	add	x29,sp,#0
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	sub	sp,sp,#32*4
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(12*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	sub	PTRN(sp),PTRN(sp),#32*4
 
 .Ldouble_shortcut:
-	ldp	x14,x15,[x1,#32]
-	mov	x21,x0
-	ldp	x16,x17,[x1,#48]
-	mov	x22,x1
+	ldp	x14,x15,[PTR(1),#32]
+	mov	PTR(21),PTR(0)
+	ldp	x16,x17,[PTR(1),#48]
+	mov	PTR(22),PTR(1)
 	ldr	x12,.Lpoly+8
 	mov	x8,x14
 	ldr	x13,.Lpoly+24
 	mov	x9,x15
-	ldp	x4,x5,[x22,#64]	// forward load for p256_sqr_mont
+	ldp	x4,x5,[PTR(22),#64]	// forward load for p256_sqr_mont
 	mov	x10,x16
 	mov	x11,x17
-	ldp	x6,x7,[x22,#64+16]
-	add	x0,sp,#0
+	ldp	x6,x7,[PTR(22),#64+16]
+	add	PTR(0),PTRN(sp),#0
 	bl	__ecp_nistz256_add	// p256_mul_by_2(S, in_y);
 
-	add	x0,sp,#64
+	add	PTR(0),PTRN(sp),#64
 	bl	__ecp_nistz256_sqr_mont	// p256_sqr_mont(Zsqr, in_z);
 
-	ldp	x8,x9,[x22]
-	ldp	x10,x11,[x22,#16]
+	ldp	x8,x9,[PTR(22)]
+	ldp	x10,x11,[PTR(22),#16]
 	mov	x4,x14		// put Zsqr aside for p256_sub
 	mov	x5,x15
 	mov	x6,x16
 	mov	x7,x17
-	add	x0,sp,#32
+	add	PTR(0),PTRN(sp),#32
 	bl	__ecp_nistz256_add	// p256_add(M, Zsqr, in_x);
 
-	add	x2,x22,#0
+	add	PTR(2),PTR(22),#0
 	mov	x14,x4		// restore Zsqr
 	mov	x15,x5
-	ldp	x4,x5,[sp,#0]	// forward load for p256_sqr_mont
+	ldp	x4,x5,[PTRN(sp),#0]	// forward load for p256_sqr_mont
 	mov	x16,x6
 	mov	x17,x7
-	ldp	x6,x7,[sp,#0+16]
-	add	x0,sp,#64
+	ldp	x6,x7,[PTRN(sp),#0+16]
+	add	PTR(0),PTRN(sp),#64
 	bl	__ecp_nistz256_sub_morf	// p256_sub(Zsqr, in_x, Zsqr);
 
-	add	x0,sp,#0
+	add	PTR(0),PTRN(sp),#0
 	bl	__ecp_nistz256_sqr_mont	// p256_sqr_mont(S, S);
 
-	ldr	x3,[x22,#32]
-	ldp	x4,x5,[x22,#64]
-	ldp	x6,x7,[x22,#64+16]
-	add	x2,x22,#32
-	add	x0,sp,#96
+	ldr	x3,[PTR(22),#32]
+	ldp	x4,x5,[PTR(22),#64]
+	ldp	x6,x7,[PTR(22),#64+16]
+	add	PTR(2),PTR(22),#32
+	add	PTR(0),PTRN(sp),#96
 	bl	__ecp_nistz256_mul_mont	// p256_mul_mont(tmp0, in_z, in_y);
 
 	mov	x8,x14
 	mov	x9,x15
-	ldp	x4,x5,[sp,#0]	// forward load for p256_sqr_mont
+	ldp	x4,x5,[PTRN(sp),#0]	// forward load for p256_sqr_mont
 	mov	x10,x16
 	mov	x11,x17
-	ldp	x6,x7,[sp,#0+16]
-	add	x0,x21,#64
+	ldp	x6,x7,[PTRN(sp),#0+16]
+	add	PTR(0),PTR(21),#64
 	bl	__ecp_nistz256_add	// p256_mul_by_2(res_z, tmp0);
 
-	add	x0,sp,#96
+	add	PTR(0),PTRN(sp),#96
 	bl	__ecp_nistz256_sqr_mont	// p256_sqr_mont(tmp0, S);
 
-	ldr	x3,[sp,#64]		// forward load for p256_mul_mont
-	ldp	x4,x5,[sp,#32]
-	ldp	x6,x7,[sp,#32+16]
-	add	x0,x21,#32
+	ldr	x3,[PTRN(sp),#64]	// forward load for p256_mul_mont
+	ldp	x4,x5,[PTRN(sp),#32]
+	ldp	x6,x7,[PTRN(sp),#32+16]
+	add	PTR(0),PTR(21),#32
 	bl	__ecp_nistz256_div_by_2	// p256_div_by_2(res_y, tmp0);
 
-	add	x2,sp,#64
-	add	x0,sp,#32
+	add	PTR(2),PTRN(sp),#64
+	add	PTR(0),PTRN(sp),#32
 	bl	__ecp_nistz256_mul_mont	// p256_mul_mont(M, M, Zsqr);
 
 	mov	x8,x14		// duplicate M
@@ -3100,56 +3100,56 @@ ecp_nistz256_point_double:
 	mov	x5,x15
 	mov	x6,x16
 	mov	x7,x17
-	add	x0,sp,#32
+	add	PTR(0),PTRN(sp),#32
 	bl	__ecp_nistz256_add
 	mov	x8,x4			// restore M
 	mov	x9,x5
-	ldr	x3,[x22]		// forward load for p256_mul_mont
+	ldr	x3,[PTR(22)]		// forward load for p256_mul_mont
 	mov	x10,x6
-	ldp	x4,x5,[sp,#0]
+	ldp	x4,x5,[PTRN(sp),#0]
 	mov	x11,x7
-	ldp	x6,x7,[sp,#0+16]
+	ldp	x6,x7,[PTRN(sp),#0+16]
 	bl	__ecp_nistz256_add	// p256_mul_by_3(M, M);
 
-	add	x2,x22,#0
-	add	x0,sp,#0
+	add	PTR(2),PTR(22),#0
+	add	PTR(0),PTRN(sp),#0
 	bl	__ecp_nistz256_mul_mont	// p256_mul_mont(S, S, in_x);
 
 	mov	x8,x14
 	mov	x9,x15
-	ldp	x4,x5,[sp,#32]	// forward load for p256_sqr_mont
+	ldp	x4,x5,[PTRN(sp),#32]	// forward load for p256_sqr_mont
 	mov	x10,x16
 	mov	x11,x17
-	ldp	x6,x7,[sp,#32+16]
-	add	x0,sp,#96
+	ldp	x6,x7,[PTRN(sp),#32+16]
+	add	PTR(0),PTRN(sp),#96
 	bl	__ecp_nistz256_add	// p256_mul_by_2(tmp0, S);
 
-	add	x0,x21,#0
+	add	PTR(0),PTR(21),#0
 	bl	__ecp_nistz256_sqr_mont	// p256_sqr_mont(res_x, M);
 
-	add	x2,sp,#96
+	add	PTR(2),PTRN(sp),#96
 	bl	__ecp_nistz256_sub_from	// p256_sub(res_x, res_x, tmp0);
 
-	add	x2,sp,#0
-	add	x0,sp,#0
+	add	PTR(2),PTRN(sp),#0
+	add	PTR(0),PTRN(sp),#0
 	bl	__ecp_nistz256_sub_morf	// p256_sub(S, S, res_x);
 
-	ldr	x3,[sp,#32]
+	ldr	x3,[PTRN(sp),#32]
 	mov	x4,x14		// copy S
 	mov	x5,x15
 	mov	x6,x16
 	mov	x7,x17
-	add	x2,sp,#32
+	add	PTR(2),PTRN(sp),#32
 	bl	__ecp_nistz256_mul_mont	// p256_mul_mont(S, S, M);
 
-	add	x2,x21,#32
-	add	x0,x21,#32
+	add	PTR(2),PTR(21),#32
+	add	PTR(0),PTR(21),#32
 	bl	__ecp_nistz256_sub_from	// p256_sub(res_y, S, res_y);
 
-	add	sp,x29,#0		// destroy frame
-	ldp	x19,x20,[x29,#16]
-	ldp	x21,x22,[x29,#32]
-	ldp	x29,x30,[sp],#96
+	add	PTRN(sp),PTR(29),#0	// destroy frame
+	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
+	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(12*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	ecp_nistz256_point_double,.-ecp_nistz256_point_double
@@ -3158,20 +3158,20 @@ ecp_nistz256_point_double:
 .align	5
 ecp_nistz256_point_add:
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-96]!
-	add	x29,sp,#0
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	stp	x23,x24,[sp,#48]
-	stp	x25,x26,[sp,#64]
-	stp	x27,x28,[sp,#80]
-	sub	sp,sp,#32*12
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(12*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
+	stp	PTR(25),PTR(26),[PTRN(sp),#(8*PTR_WIDTH)]
+	stp	PTR(27),PTR(28),[PTRN(sp),#(10*PTR_WIDTH)]
+	sub	PTRN(sp),PTRN(sp),#32*12
 
-	ldp	x4,x5,[x2,#64]	// in2_z
-	ldp	x6,x7,[x2,#64+16]
-	mov	x21,x0
-	mov	x22,x1
-	mov	x23,x2
+	ldp	x4,x5,[PTR(2),#64]	// in2_z
+	ldp	x6,x7,[PTR(2),#64+16]
+	mov	PTR(21),PTR(0)
+	mov	PTR(22),PTR(1)
+	mov	PTR(23),PTR(2)
 	ldr	x12,.Lpoly+8
 	ldr	x13,.Lpoly+24
 	orr	x8,x4,x5
@@ -3179,73 +3179,73 @@ ecp_nistz256_point_add:
 	orr	x25,x8,x10
 	cmp	x25,#0
 	csetm	x25,ne		// ~in2infty
-	add	x0,sp,#192
+	add	PTR(0),PTRN(sp),#192
 	bl	__ecp_nistz256_sqr_mont	// p256_sqr_mont(Z2sqr, in2_z);
 
-	ldp	x4,x5,[x22,#64]	// in1_z
-	ldp	x6,x7,[x22,#64+16]
+	ldp	x4,x5,[PTR(22),#64]	// in1_z
+	ldp	x6,x7,[PTR(22),#64+16]
 	orr	x8,x4,x5
 	orr	x10,x6,x7
 	orr	x24,x8,x10
 	cmp	x24,#0
 	csetm	x24,ne		// ~in1infty
-	add	x0,sp,#128
+	add	PTR(0),PTRN(sp),#128
 	bl	__ecp_nistz256_sqr_mont	// p256_sqr_mont(Z1sqr, in1_z);
 
-	ldr	x3,[x23,#64]
-	ldp	x4,x5,[sp,#192]
-	ldp	x6,x7,[sp,#192+16]
-	add	x2,x23,#64
-	add	x0,sp,#320
+	ldr	x3,[PTR(23),#64]
+	ldp	x4,x5,[PTRN(sp),#192]
+	ldp	x6,x7,[PTRN(sp),#192+16]
+	add	PTR(2),PTR(23),#64
+	add	PTR(0),PTRN(sp),#320
 	bl	__ecp_nistz256_mul_mont	// p256_mul_mont(S1, Z2sqr, in2_z);
 
-	ldr	x3,[x22,#64]
-	ldp	x4,x5,[sp,#128]
-	ldp	x6,x7,[sp,#128+16]
-	add	x2,x22,#64
-	add	x0,sp,#352
+	ldr	x3,[PTR(22),#64]
+	ldp	x4,x5,[PTRN(sp),#128]
+	ldp	x6,x7,[PTRN(sp),#128+16]
+	add	PTR(2),PTR(22),#64
+	add	PTR(0),PTRN(sp),#352
 	bl	__ecp_nistz256_mul_mont	// p256_mul_mont(S2, Z1sqr, in1_z);
 
-	ldr	x3,[x22,#32]
-	ldp	x4,x5,[sp,#320]
-	ldp	x6,x7,[sp,#320+16]
-	add	x2,x22,#32
-	add	x0,sp,#320
+	ldr	x3,[PTR(22),#32]
+	ldp	x4,x5,[PTRN(sp),#320]
+	ldp	x6,x7,[PTRN(sp),#320+16]
+	add	PTR(2),PTR(22),#32
+	add	PTR(0),PTRN(sp),#320
 	bl	__ecp_nistz256_mul_mont	// p256_mul_mont(S1, S1, in1_y);
 
-	ldr	x3,[x23,#32]
-	ldp	x4,x5,[sp,#352]
-	ldp	x6,x7,[sp,#352+16]
-	add	x2,x23,#32
-	add	x0,sp,#352
+	ldr	x3,[PTR(23),#32]
+	ldp	x4,x5,[PTRN(sp),#352]
+	ldp	x6,x7,[PTRN(sp),#352+16]
+	add	PTR(2),PTR(23),#32
+	add	PTR(0),PTRN(sp),#352
 	bl	__ecp_nistz256_mul_mont	// p256_mul_mont(S2, S2, in2_y);
 
-	add	x2,sp,#320
-	ldr	x3,[sp,#192]	// forward load for p256_mul_mont
-	ldp	x4,x5,[x22]
-	ldp	x6,x7,[x22,#16]
-	add	x0,sp,#160
+	add	PTR(2),PTRN(sp),#320
+	ldr	x3,[PTRN(sp),#192]	// forward load for p256_mul_mont
+	ldp	x4,x5,[PTR(22)]
+	ldp	x6,x7,[PTR(22),#16]
+	add	PTR(0),PTRN(sp),#160
 	bl	__ecp_nistz256_sub_from	// p256_sub(R, S2, S1);
 
 	orr	x14,x14,x15	// see if result is zero
 	orr	x16,x16,x17
 	orr	x26,x14,x16	// ~is_equal(S1,S2)
 
-	add	x2,sp,#192
-	add	x0,sp,#256
+	add	PTR(2),PTRN(sp),#192
+	add	PTR(0),PTRN(sp),#256
 	bl	__ecp_nistz256_mul_mont	// p256_mul_mont(U1, in1_x, Z2sqr);
 
-	ldr	x3,[sp,#128]
-	ldp	x4,x5,[x23]
-	ldp	x6,x7,[x23,#16]
-	add	x2,sp,#128
-	add	x0,sp,#288
+	ldr	x3,[PTRN(sp),#128]
+	ldp	x4,x5,[PTR(23)]
+	ldp	x6,x7,[PTR(23),#16]
+	add	PTR(2),PTRN(sp),#128
+	add	PTR(0),PTRN(sp),#288
 	bl	__ecp_nistz256_mul_mont	// p256_mul_mont(U2, in2_x, Z1sqr);
 
-	add	x2,sp,#256
-	ldp	x4,x5,[sp,#160]	// forward load for p256_sqr_mont
-	ldp	x6,x7,[sp,#160+16]
-	add	x0,sp,#96
+	add	PTR(2),PTRN(sp),#256
+	ldp	x4,x5,[PTRN(sp),#160]	// forward load for p256_sqr_mont
+	ldp	x6,x7,[PTRN(sp),#160+16]
+	add	PTR(0),PTRN(sp),#96
 	bl	__ecp_nistz256_sub_from	// p256_sub(H, U2, U1);
 
 	orr	x14,x14,x15	// see if result is zero
@@ -3260,130 +3260,130 @@ ecp_nistz256_point_add:
 	cbnz	x14,.Ladd_proceed	// if(~is_equal(U1,U2) | in1infty | in2infty | ~is_equal(S1,S2))
 
 .Ladd_double:
-	mov	x1,x22
-	mov	x0,x21
-	ldp	x23,x24,[x29,#48]
-	ldp	x25,x26,[x29,#64]
-	ldp	x27,x28,[x29,#80]
-	add	sp,sp,#32*(12-4)	// difference in stack frames
+	mov	PTR(1),PTR(22)
+	mov	PTR(0),PTR(21)
+	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
+	ldp	PTR(25),PTR(26),[PTR(29),#(8*PTR_WIDTH)]
+	ldp	PTR(27),PTR(28),[PTR(29),#(10*PTR_WIDTH)]
+	add	PTRN(sp),PTRN(sp),#32*(12-4)	// difference in stack frames
 	b	.Ldouble_shortcut
 
 .align	4
 .Ladd_proceed:
-	add	x0,sp,#192
+	add	PTR(0),PTRN(sp),#192
 	bl	__ecp_nistz256_sqr_mont	// p256_sqr_mont(Rsqr, R);
 
-	ldr	x3,[x22,#64]
-	ldp	x4,x5,[sp,#96]
-	ldp	x6,x7,[sp,#96+16]
-	add	x2,x22,#64
-	add	x0,sp,#64
+	ldr	x3,[PTR(22),#64]
+	ldp	x4,x5,[PTRN(sp),#96]
+	ldp	x6,x7,[PTRN(sp),#96+16]
+	add	PTR(2),PTR(22),#64
+	add	PTR(0),PTRN(sp),#64
 	bl	__ecp_nistz256_mul_mont	// p256_mul_mont(res_z, H, in1_z);
 
-	ldp	x4,x5,[sp,#96]
-	ldp	x6,x7,[sp,#96+16]
-	add	x0,sp,#128
+	ldp	x4,x5,[PTRN(sp),#96]
+	ldp	x6,x7,[PTRN(sp),#96+16]
+	add	PTR(0),PTRN(sp),#128
 	bl	__ecp_nistz256_sqr_mont	// p256_sqr_mont(Hsqr, H);
 
-	ldr	x3,[x23,#64]
-	ldp	x4,x5,[sp,#64]
-	ldp	x6,x7,[sp,#64+16]
-	add	x2,x23,#64
-	add	x0,sp,#64
+	ldr	x3,[PTR(23),#64]
+	ldp	x4,x5,[PTRN(sp),#64]
+	ldp	x6,x7,[PTRN(sp),#64+16]
+	add	PTR(2),PTR(23),#64
+	add	PTR(0),PTRN(sp),#64
 	bl	__ecp_nistz256_mul_mont	// p256_mul_mont(res_z, res_z, in2_z);
 
-	ldr	x3,[sp,#96]
-	ldp	x4,x5,[sp,#128]
-	ldp	x6,x7,[sp,#128+16]
-	add	x2,sp,#96
-	add	x0,sp,#224
+	ldr	x3,[PTRN(sp),#96]
+	ldp	x4,x5,[PTRN(sp),#128]
+	ldp	x6,x7,[PTRN(sp),#128+16]
+	add	PTR(2),PTRN(sp),#96
+	add	PTR(0),PTRN(sp),#224
 	bl	__ecp_nistz256_mul_mont	// p256_mul_mont(Hcub, Hsqr, H);
 
-	ldr	x3,[sp,#128]
-	ldp	x4,x5,[sp,#256]
-	ldp	x6,x7,[sp,#256+16]
-	add	x2,sp,#128
-	add	x0,sp,#288
+	ldr	x3,[PTRN(sp),#128]
+	ldp	x4,x5,[PTRN(sp),#256]
+	ldp	x6,x7,[PTRN(sp),#256+16]
+	add	PTR(2),PTRN(sp),#128
+	add	PTR(0),PTRN(sp),#288
 	bl	__ecp_nistz256_mul_mont	// p256_mul_mont(U2, U1, Hsqr);
 
 	mov	x8,x14
 	mov	x9,x15
 	mov	x10,x16
 	mov	x11,x17
-	add	x0,sp,#128
+	add	PTR(0),PTRN(sp),#128
 	bl	__ecp_nistz256_add	// p256_mul_by_2(Hsqr, U2);
 
-	add	x2,sp,#192
-	add	x0,sp,#0
+	add	PTR(2),PTRN(sp),#192
+	add	PTR(0),PTRN(sp),#0
 	bl	__ecp_nistz256_sub_morf	// p256_sub(res_x, Rsqr, Hsqr);
 
-	add	x2,sp,#224
+	add	PTR(2),PTRN(sp),#224
 	bl	__ecp_nistz256_sub_from	//  p256_sub(res_x, res_x, Hcub);
 
-	add	x2,sp,#288
-	ldr	x3,[sp,#224]		// forward load for p256_mul_mont
-	ldp	x4,x5,[sp,#320]
-	ldp	x6,x7,[sp,#320+16]
-	add	x0,sp,#32
+	add	PTR(2),PTRN(sp),#288
+	ldr	x3,[PTRN(sp),#224]	// forward load for p256_mul_mont
+	ldp	x4,x5,[PTRN(sp),#320]
+	ldp	x6,x7,[PTRN(sp),#320+16]
+	add	PTR(0),PTRN(sp),#32
 	bl	__ecp_nistz256_sub_morf	// p256_sub(res_y, U2, res_x);
 
-	add	x2,sp,#224
-	add	x0,sp,#352
+	add	PTR(2),PTRN(sp),#224
+	add	PTR(0),PTRN(sp),#352
 	bl	__ecp_nistz256_mul_mont	// p256_mul_mont(S2, S1, Hcub);
 
-	ldr	x3,[sp,#160]
-	ldp	x4,x5,[sp,#32]
-	ldp	x6,x7,[sp,#32+16]
-	add	x2,sp,#160
-	add	x0,sp,#32
+	ldr	x3,[PTRN(sp),#160]
+	ldp	x4,x5,[PTRN(sp),#32]
+	ldp	x6,x7,[PTRN(sp),#32+16]
+	add	PTR(2),PTRN(sp),#160
+	add	PTR(0),PTRN(sp),#32
 	bl	__ecp_nistz256_mul_mont	// p256_mul_mont(res_y, res_y, R);
 
-	add	x2,sp,#352
+	add	PTR(2),PTRN(sp),#352
 	bl	__ecp_nistz256_sub_from	// p256_sub(res_y, res_y, S2);
 
-	ldp	x4,x5,[sp,#0]		// res
-	ldp	x6,x7,[sp,#0+16]
-	ldp	x8,x9,[x23]		// in2
-	ldp	x10,x11,[x23,#16]
-	ldp	x14,x15,[x22,#0]	// in1
+	ldp	x4,x5,[PTRN(sp),#0]	// res
+	ldp	x6,x7,[PTRN(sp),#0+16]
+	ldp	x8,x9,[PTR(23)]		// in2
+	ldp	x10,x11,[PTR(23),#16]
+	ldp	x14,x15,[PTR(22),#0]	// in1
 	cmp	x24,#0			// ~, remember?
-	ldp	x16,x17,[x22,#0+16]
+	ldp	x16,x17,[PTR(22),#0+16]
 	csel	x8,x4,x8,ne
 	csel	x9,x5,x9,ne
-	ldp	x4,x5,[sp,#0+0+32]	// res
+	ldp	x4,x5,[PTRN(sp),#0+0+32]	// res
 	csel	x10,x6,x10,ne
 	csel	x11,x7,x11,ne
 	cmp	x25,#0			// ~, remember?
-	ldp	x6,x7,[sp,#0+0+48]
+	ldp	x6,x7,[PTRN(sp),#0+0+48]
 	csel	x14,x8,x14,ne
 	csel	x15,x9,x15,ne
-	ldp	x8,x9,[x23,#0+32]	// in2
+	ldp	x8,x9,[PTR(23),#0+32]	// in2
 	csel	x16,x10,x16,ne
 	csel	x17,x11,x17,ne
-	ldp	x10,x11,[x23,#0+48]
-	stp	x14,x15,[x21,#0]
-	stp	x16,x17,[x21,#0+16]
-	ldp	x14,x15,[x22,#32]	// in1
+	ldp	x10,x11,[PTR(23),#0+48]
+	stp	x14,x15,[PTR(21),#0]
+	stp	x16,x17,[PTR(21),#0+16]
+	ldp	x14,x15,[PTR(22),#32]	// in1
 	cmp	x24,#0			// ~, remember?
-	ldp	x16,x17,[x22,#32+16]
+	ldp	x16,x17,[PTR(22),#32+16]
 	csel	x8,x4,x8,ne
 	csel	x9,x5,x9,ne
-	ldp	x4,x5,[sp,#0+32+32]	// res
+	ldp	x4,x5,[PTRN(sp),#0+32+32]	// res
 	csel	x10,x6,x10,ne
 	csel	x11,x7,x11,ne
 	cmp	x25,#0			// ~, remember?
-	ldp	x6,x7,[sp,#0+32+48]
+	ldp	x6,x7,[PTRN(sp),#0+32+48]
 	csel	x14,x8,x14,ne
 	csel	x15,x9,x15,ne
-	ldp	x8,x9,[x23,#32+32]	// in2
+	ldp	x8,x9,[PTR(23),#32+32]	// in2
 	csel	x16,x10,x16,ne
 	csel	x17,x11,x17,ne
-	ldp	x10,x11,[x23,#32+48]
-	stp	x14,x15,[x21,#32]
-	stp	x16,x17,[x21,#32+16]
-	ldp	x14,x15,[x22,#64]	// in1
+	ldp	x10,x11,[PTR(23),#32+48]
+	stp	x14,x15,[PTR(21),#32]
+	stp	x16,x17,[PTR(21),#32+16]
+	ldp	x14,x15,[PTR(22),#64]	// in1
 	cmp	x24,#0			// ~, remember?
-	ldp	x16,x17,[x22,#64+16]
+	ldp	x16,x17,[PTR(22),#64+16]
 	csel	x8,x4,x8,ne
 	csel	x9,x5,x9,ne
 	csel	x10,x6,x10,ne
@@ -3393,17 +3393,17 @@ ecp_nistz256_point_add:
 	csel	x15,x9,x15,ne
 	csel	x16,x10,x16,ne
 	csel	x17,x11,x17,ne
-	stp	x14,x15,[x21,#64]
-	stp	x16,x17,[x21,#64+16]
+	stp	x14,x15,[PTR(21),#64]
+	stp	x16,x17,[PTR(21),#64+16]
 
 .Ladd_done:
-	add	sp,x29,#0		// destroy frame
-	ldp	x19,x20,[x29,#16]
-	ldp	x21,x22,[x29,#32]
-	ldp	x23,x24,[x29,#48]
-	ldp	x25,x26,[x29,#64]
-	ldp	x27,x28,[x29,#80]
-	ldp	x29,x30,[sp],#96
+	add	PTRN(sp),PTR(29),#0		// destroy frame
+	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
+	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
+	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
+	ldp	PTR(25),PTR(26),[PTR(29),#(8*PTR_WIDTH)]
+	ldp	PTR(27),PTR(28),[PTR(29),#(10*PTR_WIDTH)]
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(12*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	ecp_nistz256_point_add,.-ecp_nistz256_point_add
@@ -3412,32 +3412,32 @@ ecp_nistz256_point_add:
 .align	5
 ecp_nistz256_point_add_affine:
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-80]!
-	add	x29,sp,#0
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	stp	x23,x24,[sp,#48]
-	stp	x25,x26,[sp,#64]
-	sub	sp,sp,#32*10
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(10*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
+	stp	PTR(25),PTR(26),[PTRN(sp),#(8*PTR_WIDTH)]
+	sub	PTRN(sp),PTRN(sp),#32*10
 
-	mov	x21,x0
-	mov	x22,x1
-	mov	x23,x2
+	mov	PTR(21),PTR(0)
+	mov	PTR(22),PTR(1)
+	mov	PTR(23),PTR(2)
 	ldr	x12,.Lpoly+8
 	ldr	x13,.Lpoly+24
 
-	ldp	x4,x5,[x1,#64]	// in1_z
-	ldp	x6,x7,[x1,#64+16]
+	ldp	x4,x5,[PTR(1),#64]	// in1_z
+	ldp	x6,x7,[PTR(1),#64+16]
 	orr	x8,x4,x5
 	orr	x10,x6,x7
 	orr	x24,x8,x10
 	cmp	x24,#0
 	csetm	x24,ne		// ~in1infty
 
-	ldp	x14,x15,[x2]	// in2_x
-	ldp	x16,x17,[x2,#16]
-	ldp	x8,x9,[x2,#32]	// in2_y
-	ldp	x10,x11,[x2,#48]
+	ldp	x14,x15,[PTR(2)]	// in2_x
+	ldp	x16,x17,[PTR(2),#16]
+	ldp	x8,x9,[PTR(2),#32]	// in2_y
+	ldp	x10,x11,[PTR(2),#48]
 	orr	x14,x14,x15
 	orr	x16,x16,x17
 	orr	x8,x8,x9
@@ -3448,150 +3448,150 @@ ecp_nistz256_point_add_affine:
 	cmp	x25,#0
 	csetm	x25,ne		// ~in2infty
 
-	add	x0,sp,#128
+	add	PTR(0),PTRN(sp),#128
 	bl	__ecp_nistz256_sqr_mont	// p256_sqr_mont(Z1sqr, in1_z);
 
 	mov	x4,x14
 	mov	x5,x15
 	mov	x6,x16
 	mov	x7,x17
-	ldr	x3,[x23]
-	add	x2,x23,#0
-	add	x0,sp,#96
+	ldr	x3,[PTR(23)]
+	add	PTR(2),PTR(23),#0
+	add	PTR(0),PTRN(sp),#96
 	bl	__ecp_nistz256_mul_mont	// p256_mul_mont(U2, Z1sqr, in2_x);
 
-	add	x2,x22,#0
-	ldr	x3,[x22,#64]	// forward load for p256_mul_mont
-	ldp	x4,x5,[sp,#128]
-	ldp	x6,x7,[sp,#128+16]
-	add	x0,sp,#160
+	add	PTR(2),PTR(22),#0
+	ldr	x3,[PTR(22),#64]	// forward load for p256_mul_mont
+	ldp	x4,x5,[PTRN(sp),#128]
+	ldp	x6,x7,[PTRN(sp),#128+16]
+	add	PTR(0),PTRN(sp),#160
 	bl	__ecp_nistz256_sub_from	// p256_sub(H, U2, in1_x);
 
-	add	x2,x22,#64
-	add	x0,sp,#128
+	add	PTR(2),PTR(22),#64
+	add	PTR(0),PTRN(sp),#128
 	bl	__ecp_nistz256_mul_mont	// p256_mul_mont(S2, Z1sqr, in1_z);
 
-	ldr	x3,[x22,#64]
-	ldp	x4,x5,[sp,#160]
-	ldp	x6,x7,[sp,#160+16]
-	add	x2,x22,#64
-	add	x0,sp,#64
+	ldr	x3,[PTR(22),#64]
+	ldp	x4,x5,[PTRN(sp),#160]
+	ldp	x6,x7,[PTRN(sp),#160+16]
+	add	PTR(2),PTR(22),#64
+	add	PTR(0),PTRN(sp),#64
 	bl	__ecp_nistz256_mul_mont	// p256_mul_mont(res_z, H, in1_z);
 
-	ldr	x3,[x23,#32]
-	ldp	x4,x5,[sp,#128]
-	ldp	x6,x7,[sp,#128+16]
-	add	x2,x23,#32
-	add	x0,sp,#128
+	ldr	x3,[PTR(23),#32]
+	ldp	x4,x5,[PTRN(sp),#128]
+	ldp	x6,x7,[PTRN(sp),#128+16]
+	add	PTR(2),PTR(23),#32
+	add	PTR(0),PTRN(sp),#128
 	bl	__ecp_nistz256_mul_mont	// p256_mul_mont(S2, S2, in2_y);
 
-	add	x2,x22,#32
-	ldp	x4,x5,[sp,#160]	// forward load for p256_sqr_mont
-	ldp	x6,x7,[sp,#160+16]
-	add	x0,sp,#192
+	add	PTR(2),PTR(22),#32
+	ldp	x4,x5,[PTRN(sp),#160]	// forward load for p256_sqr_mont
+	ldp	x6,x7,[PTRN(sp),#160+16]
+	add	PTR(0),PTRN(sp),#192
 	bl	__ecp_nistz256_sub_from	// p256_sub(R, S2, in1_y);
 
-	add	x0,sp,#224
+	add	PTR(0),PTRN(sp),#224
 	bl	__ecp_nistz256_sqr_mont	// p256_sqr_mont(Hsqr, H);
 
-	ldp	x4,x5,[sp,#192]
-	ldp	x6,x7,[sp,#192+16]
-	add	x0,sp,#288
+	ldp	x4,x5,[PTRN(sp),#192]
+	ldp	x6,x7,[PTRN(sp),#192+16]
+	add	PTR(0),PTRN(sp),#288
 	bl	__ecp_nistz256_sqr_mont	// p256_sqr_mont(Rsqr, R);
 
-	ldr	x3,[sp,#160]
-	ldp	x4,x5,[sp,#224]
-	ldp	x6,x7,[sp,#224+16]
-	add	x2,sp,#160
-	add	x0,sp,#256
+	ldr	x3,[PTRN(sp),#160]
+	ldp	x4,x5,[PTRN(sp),#224]
+	ldp	x6,x7,[PTRN(sp),#224+16]
+	add	PTR(2),PTRN(sp),#160
+	add	PTR(0),PTRN(sp),#256
 	bl	__ecp_nistz256_mul_mont	// p256_mul_mont(Hcub, Hsqr, H);
 
-	ldr	x3,[x22]
-	ldp	x4,x5,[sp,#224]
-	ldp	x6,x7,[sp,#224+16]
-	add	x2,x22,#0
-	add	x0,sp,#96
+	ldr	x3,[PTR(22)]
+	ldp	x4,x5,[PTRN(sp),#224]
+	ldp	x6,x7,[PTRN(sp),#224+16]
+	add	PTR(2),PTR(22),#0
+	add	PTR(0),PTRN(sp),#96
 	bl	__ecp_nistz256_mul_mont	// p256_mul_mont(U2, in1_x, Hsqr);
 
 	mov	x8,x14
 	mov	x9,x15
 	mov	x10,x16
 	mov	x11,x17
-	add	x0,sp,#224
+	add	PTR(0),PTRN(sp),#224
 	bl	__ecp_nistz256_add	// p256_mul_by_2(Hsqr, U2);
 
-	add	x2,sp,#288
-	add	x0,sp,#0
+	add	PTR(2),PTRN(sp),#288
+	add	PTR(0),PTRN(sp),#0
 	bl	__ecp_nistz256_sub_morf	// p256_sub(res_x, Rsqr, Hsqr);
 
-	add	x2,sp,#256
+	add	PTR(2),PTRN(sp),#256
 	bl	__ecp_nistz256_sub_from	//  p256_sub(res_x, res_x, Hcub);
 
-	add	x2,sp,#96
-	ldr	x3,[x22,#32]	// forward load for p256_mul_mont
-	ldp	x4,x5,[sp,#256]
-	ldp	x6,x7,[sp,#256+16]
-	add	x0,sp,#32
+	add	PTR(2),PTRN(sp),#96
+	ldr	x3,[PTR(22),#32]	// forward load for p256_mul_mont
+	ldp	x4,x5,[PTRN(sp),#256]
+	ldp	x6,x7,[PTRN(sp),#256+16]
+	add	PTR(0),PTRN(sp),#32
 	bl	__ecp_nistz256_sub_morf	// p256_sub(res_y, U2, res_x);
 
-	add	x2,x22,#32
-	add	x0,sp,#128
+	add	PTR(2),PTR(22),#32
+	add	PTR(0),PTRN(sp),#128
 	bl	__ecp_nistz256_mul_mont	// p256_mul_mont(S2, in1_y, Hcub);
 
-	ldr	x3,[sp,#192]
-	ldp	x4,x5,[sp,#32]
-	ldp	x6,x7,[sp,#32+16]
-	add	x2,sp,#192
-	add	x0,sp,#32
+	ldr	x3,[PTRN(sp),#192]
+	ldp	x4,x5,[PTRN(sp),#32]
+	ldp	x6,x7,[PTRN(sp),#32+16]
+	add	PTR(2),PTRN(sp),#192
+	add	PTR(0),PTRN(sp),#32
 	bl	__ecp_nistz256_mul_mont	// p256_mul_mont(res_y, res_y, R);
 
-	add	x2,sp,#128
+	add	PTR(2),PTRN(sp),#128
 	bl	__ecp_nistz256_sub_from	// p256_sub(res_y, res_y, S2);
 
-	ldp	x4,x5,[sp,#0]		// res
-	ldp	x6,x7,[sp,#0+16]
-	ldp	x8,x9,[x23]		// in2
-	ldp	x10,x11,[x23,#16]
-	ldp	x14,x15,[x22,#0]	// in1
+	ldp	x4,x5,[PTRN(sp),#0]	// res
+	ldp	x6,x7,[PTRN(sp),#0+16]
+	ldp	x8,x9,[PTR(23)]		// in2
+	ldp	x10,x11,[PTR(23),#16]
+	ldp	x14,x15,[PTR(22),#0]	// in1
 	cmp	x24,#0			// ~, remember?
-	ldp	x16,x17,[x22,#0+16]
+	ldp	x16,x17,[PTR(22),#0+16]
 	csel	x8,x4,x8,ne
 	csel	x9,x5,x9,ne
-	ldp	x4,x5,[sp,#0+0+32]	// res
+	ldp	x4,x5,[PTRN(sp),#0+0+32]	// res
 	csel	x10,x6,x10,ne
 	csel	x11,x7,x11,ne
 	cmp	x25,#0			// ~, remember?
-	ldp	x6,x7,[sp,#0+0+48]
+	ldp	x6,x7,[PTRN(sp),#0+0+48]
 	csel	x14,x8,x14,ne
 	csel	x15,x9,x15,ne
-	ldp	x8,x9,[x23,#0+32]	// in2
+	ldp	x8,x9,[PTR(23),#0+32]	// in2
 	csel	x16,x10,x16,ne
 	csel	x17,x11,x17,ne
-	ldp	x10,x11,[x23,#0+48]
-	stp	x14,x15,[x21,#0]
-	stp	x16,x17,[x21,#0+16]
-	adr	x23,.Lone_mont-64
-	ldp	x14,x15,[x22,#32]	// in1
+	ldp	x10,x11,[PTR(23),#0+48]
+	stp	x14,x15,[PTR(21),#0]
+	stp	x16,x17,[PTR(21),#0+16]
+	adr	PTR(23),.Lone_mont-64
+	ldp	x14,x15,[PTR(22),#32]	// in1
 	cmp	x24,#0			// ~, remember?
-	ldp	x16,x17,[x22,#32+16]
+	ldp	x16,x17,[PTR(22),#32+16]
 	csel	x8,x4,x8,ne
 	csel	x9,x5,x9,ne
-	ldp	x4,x5,[sp,#0+32+32]	// res
+	ldp	x4,x5,[PTRN(sp),#0+32+32]	// res
 	csel	x10,x6,x10,ne
 	csel	x11,x7,x11,ne
 	cmp	x25,#0			// ~, remember?
-	ldp	x6,x7,[sp,#0+32+48]
+	ldp	x6,x7,[PTRN(sp),#0+32+48]
 	csel	x14,x8,x14,ne
 	csel	x15,x9,x15,ne
-	ldp	x8,x9,[x23,#32+32]	// in2
+	ldp	x8,x9,[PTR(23),#32+32]	// in2
 	csel	x16,x10,x16,ne
 	csel	x17,x11,x17,ne
-	ldp	x10,x11,[x23,#32+48]
-	stp	x14,x15,[x21,#32]
-	stp	x16,x17,[x21,#32+16]
-	ldp	x14,x15,[x22,#64]	// in1
+	ldp	x10,x11,[PTR(23),#32+48]
+	stp	x14,x15,[PTR(21),#32]
+	stp	x16,x17,[PTR(21),#32+16]
+	ldp	x14,x15,[PTR(22),#64]	// in1
 	cmp	x24,#0			// ~, remember?
-	ldp	x16,x17,[x22,#64+16]
+	ldp	x16,x17,[PTR(22),#64+16]
 	csel	x8,x4,x8,ne
 	csel	x9,x5,x9,ne
 	csel	x10,x6,x10,ne
@@ -3601,15 +3601,15 @@ ecp_nistz256_point_add_affine:
 	csel	x15,x9,x15,ne
 	csel	x16,x10,x16,ne
 	csel	x17,x11,x17,ne
-	stp	x14,x15,[x21,#64]
-	stp	x16,x17,[x21,#64+16]
+	stp	x14,x15,[PTR(21),#64]
+	stp	x16,x17,[PTR(21),#64+16]
 
-	add	sp,x29,#0		// destroy frame
-	ldp	x19,x20,[x29,#16]
-	ldp	x21,x22,[x29,#32]
-	ldp	x23,x24,[x29,#48]
-	ldp	x25,x26,[x29,#64]
-	ldp	x29,x30,[sp],#80
+	add	PTRN(sp),PTR(29),#0		// destroy frame
+	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
+	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
+	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
+	ldp	PTR(25),PTR(26),[PTR(29),#(8*PTR_WIDTH)]
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(10*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	ecp_nistz256_point_add_affine,.-ecp_nistz256_point_add_affine
@@ -3622,20 +3622,20 @@ ecp_nistz256_point_add_affine:
 ecp_nistz256_ord_mul_mont:
 	AARCH64_VALID_CALL_TARGET
 	// Armv8.3-A PAuth: even though x30 is pushed to stack it is not popped later.
-	stp	x29,x30,[sp,#-64]!
-	add	x29,sp,#0
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	stp	x23,x24,[sp,#48]
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(8*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
 
-	adr	x23,.Lord
-	ldr	x3,[x2]		// bp[0]
-	ldp	x4,x5,[x1]
-	ldp	x6,x7,[x1,#16]
+	adr	PTR(23),.Lord
+	ldr	x3,[PTR(2)]		// bp[0]
+	ldp	x4,x5,[PTR(1)]
+	ldp	x6,x7,[PTR(1),#16]
 
-	ldp	x12,x13,[x23,#0]
-	ldp	x21,x22,[x23,#16]
-	ldr	x23,[x23,#32]
+	ldp	x12,x13,[PTR(23),#0]
+	ldp	x21,x22,[PTR(23),#16]
+	ldr	x23,[PTR(23),#32]
 
 	mul	x14,x4,x3		// a[0]*b[0]
 	umulh	x8,x4,x3
@@ -3656,7 +3656,7 @@ ecp_nistz256_ord_mul_mont:
 	adcs	x17,x17,x10
 	adc	x19,x19,xzr
 	mov	x20,xzr
-	ldr	x3,[x2,#8*1]		// b[i]
+	ldr	x3,[PTR(2),#8*1]		// b[i]
 
 	lsl	x8,x24,#32
 	subs	x16,x16,x24
@@ -3698,7 +3698,7 @@ ecp_nistz256_ord_mul_mont:
 	adcs	x17,x17,x10
 	adcs	x19,x19,x11
 	adc	x20,xzr,xzr
-	ldr	x3,[x2,#8*2]		// b[i]
+	ldr	x3,[PTR(2),#8*2]		// b[i]
 
 	lsl	x8,x24,#32
 	subs	x16,x16,x24
@@ -3740,7 +3740,7 @@ ecp_nistz256_ord_mul_mont:
 	adcs	x17,x17,x10
 	adcs	x19,x19,x11
 	adc	x20,xzr,xzr
-	ldr	x3,[x2,#8*3]		// b[i]
+	ldr	x3,[PTR(2),#8*3]		// b[i]
 
 	lsl	x8,x24,#32
 	subs	x16,x16,x24
@@ -3812,14 +3812,14 @@ ecp_nistz256_ord_mul_mont:
 	csel	x14,x14,x8,lo	// ret = borrow ? ret : ret-modulus
 	csel	x15,x15,x9,lo
 	csel	x16,x16,x10,lo
-	stp	x14,x15,[x0]
+	stp	x14,x15,[PTR(0)]
 	csel	x17,x17,x11,lo
-	stp	x16,x17,[x0,#16]
+	stp	x16,x17,[PTR(0),#16]
 
-	ldp	x19,x20,[sp,#16]
-	ldp	x21,x22,[sp,#32]
-	ldp	x23,x24,[sp,#48]
-	ldr	x29,[sp],#64
+	ldp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	ldp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	ldp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
+	ldr	PTR(29),[PTRN(sp)],#(8*PTR_WIDTH)
 	ret
 .size	ecp_nistz256_ord_mul_mont,.-ecp_nistz256_ord_mul_mont
 
@@ -3832,24 +3832,24 @@ ecp_nistz256_ord_mul_mont:
 ecp_nistz256_ord_sqr_mont:
 	AARCH64_VALID_CALL_TARGET
 	// Armv8.3-A PAuth: even though x30 is pushed to stack it is not popped later.
-	stp	x29,x30,[sp,#-64]!
-	add	x29,sp,#0
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	stp	x23,x24,[sp,#48]
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(8*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
 
-	adr	x23,.Lord
-	ldp	x4,x5,[x1]
-	ldp	x6,x7,[x1,#16]
+	adr	PTR(23),.Lord
+	ldp	x4,x5,[PTR(1)]
+	ldp	x6,x7,[PTR(1),#16]
 
-	ldp	x12,x13,[x23,#0]
-	ldp	x21,x22,[x23,#16]
-	ldr	x23,[x23,#32]
+	ldp	x12,x13,[PTR(23),#0]
+	ldp	x21,x22,[PTR(23),#16]
+	ldr	x23,[PTR(23),#32]
 	b	.Loop_ord_sqr
 
 .align	4
 .Loop_ord_sqr:
-	sub	x2,x2,#1
+	sub	PTR(2),PTR(2),#1
 	////////////////////////////////////////////////////////////////
 	//  |  |  |  |  |  |a1*a0|  |
 	//  |  |  |  |  |a2*a0|  |  |
@@ -4005,13 +4005,13 @@ ecp_nistz256_ord_sqr_mont:
 
 	cbnz	x2,.Loop_ord_sqr
 
-	stp	x4,x5,[x0]
-	stp	x6,x7,[x0,#16]
+	stp	x4,x5,[PTR(0)]
+	stp	x6,x7,[PTR(0),#16]
 
-	ldp	x19,x20,[sp,#16]
-	ldp	x21,x22,[sp,#32]
-	ldp	x23,x24,[sp,#48]
-	ldr	x29,[sp],#64
+	ldp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	ldp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	ldp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
+	ldr	PTR(29),[PTRN(sp)],#(8*PTR_WIDTH)
 	ret
 .size	ecp_nistz256_ord_sqr_mont,.-ecp_nistz256_ord_sqr_mont
 // void	ecp_nistz256_scatter_w5(void *x0,const P256_POINT *x1,
@@ -4022,59 +4022,59 @@ ecp_nistz256_ord_sqr_mont:
 ecp_nistz256_scatter_w5:
 	AARCH64_VALID_CALL_TARGET
 	// Armv8.3-A PAuth: even though x30 is pushed to stack it is not popped later.
-	stp	x29,x30,[sp,#-16]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 
-	add	x0,x0,x2,lsl#2
+	add	PTR(0),PTR(0),x2,lsl#2
 
-	ldp	x4,x5,[x1]		// X
-	ldp	x6,x7,[x1,#16]
-	stur	w4,[x0,#64*0-4]
+	ldp	x4,x5,[PTR(1)]		// X
+	ldp	x6,x7,[PTR(1),#16]
+	stur	w4,[PTR(0),#64*0-4]
 	lsr	x4,x4,#32
-	str	w5,[x0,#64*1-4]
+	str	w5,[PTR(0),#64*1-4]
 	lsr	x5,x5,#32
-	str	w6,[x0,#64*2-4]
+	str	w6,[PTR(0),#64*2-4]
 	lsr	x6,x6,#32
-	str	w7,[x0,#64*3-4]
+	str	w7,[PTR(0),#64*3-4]
 	lsr	x7,x7,#32
-	str	w4,[x0,#64*4-4]
-	str	w5,[x0,#64*5-4]
-	str	w6,[x0,#64*6-4]
-	str	w7,[x0,#64*7-4]
-	add	x0,x0,#64*8
+	str	w4,[PTR(0),#64*4-4]
+	str	w5,[PTR(0),#64*5-4]
+	str	w6,[PTR(0),#64*6-4]
+	str	w7,[PTR(0),#64*7-4]
+	add	PTR(0),PTR(0),#64*8
 
-	ldp	x4,x5,[x1,#32]	// Y
-	ldp	x6,x7,[x1,#48]
-	stur	w4,[x0,#64*0-4]
+	ldp	x4,x5,[PTR(1),#32]	// Y
+	ldp	x6,x7,[PTR(1),#48]
+	stur	w4,[PTR(0),#64*0-4]
 	lsr	x4,x4,#32
-	str	w5,[x0,#64*1-4]
+	str	w5,[PTR(0),#64*1-4]
 	lsr	x5,x5,#32
-	str	w6,[x0,#64*2-4]
+	str	w6,[PTR(0),#64*2-4]
 	lsr	x6,x6,#32
-	str	w7,[x0,#64*3-4]
+	str	w7,[PTR(0),#64*3-4]
 	lsr	x7,x7,#32
-	str	w4,[x0,#64*4-4]
-	str	w5,[x0,#64*5-4]
-	str	w6,[x0,#64*6-4]
-	str	w7,[x0,#64*7-4]
-	add	x0,x0,#64*8
+	str	w4,[PTR(0),#64*4-4]
+	str	w5,[PTR(0),#64*5-4]
+	str	w6,[PTR(0),#64*6-4]
+	str	w7,[PTR(0),#64*7-4]
+	add	PTR(0),PTR(0),#64*8
 
-	ldp	x4,x5,[x1,#64]	// Z
-	ldp	x6,x7,[x1,#80]
-	stur	w4,[x0,#64*0-4]
+	ldp	x4,x5,[PTR(1),#64]	// Z
+	ldp	x6,x7,[PTR(1),#80]
+	stur	w4,[PTR(0),#64*0-4]
 	lsr	x4,x4,#32
-	str	w5,[x0,#64*1-4]
+	str	w5,[PTR(0),#64*1-4]
 	lsr	x5,x5,#32
-	str	w6,[x0,#64*2-4]
+	str	w6,[PTR(0),#64*2-4]
 	lsr	x6,x6,#32
-	str	w7,[x0,#64*3-4]
+	str	w7,[PTR(0),#64*3-4]
 	lsr	x7,x7,#32
-	str	w4,[x0,#64*4-4]
-	str	w5,[x0,#64*5-4]
-	str	w6,[x0,#64*6-4]
-	str	w7,[x0,#64*7-4]
+	str	w4,[PTR(0),#64*4-4]
+	str	w5,[PTR(0),#64*5-4]
+	str	w6,[PTR(0),#64*6-4]
+	str	w7,[PTR(0),#64*7-4]
 
-	ldr	x29,[sp],#16
+	ldr	PTR(29),[PTRN(sp)],#(2*PTR_WIDTH)
 	ret
 .size	ecp_nistz256_scatter_w5,.-ecp_nistz256_scatter_w5
 
@@ -4086,23 +4086,23 @@ ecp_nistz256_scatter_w5:
 ecp_nistz256_gather_w5:
 	AARCH64_VALID_CALL_TARGET
 	// Armv8.3-A PAuth: even though x30 is pushed to stack it is not popped later.
-	stp	x29,x30,[sp,#-16]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 
 	cmp	x2,xzr
 	csetm	x3,ne
 	add	x2,x2,x3
-	add	x1,x1,x2,lsl#2
+	add	PTR(1),PTR(1),x2,lsl#2
 
-	ldr	w4,[x1,#64*0]
-	ldr	w5,[x1,#64*1]
-	ldr	w6,[x1,#64*2]
-	ldr	w7,[x1,#64*3]
-	ldr	w8,[x1,#64*4]
-	ldr	w9,[x1,#64*5]
-	ldr	w10,[x1,#64*6]
-	ldr	w11,[x1,#64*7]
-	add	x1,x1,#64*8
+	ldr	w4,[PTR(1),#64*0]
+	ldr	w5,[PTR(1),#64*1]
+	ldr	w6,[PTR(1),#64*2]
+	ldr	w7,[PTR(1),#64*3]
+	ldr	w8,[PTR(1),#64*4]
+	ldr	w9,[PTR(1),#64*5]
+	ldr	w10,[PTR(1),#64*6]
+	ldr	w11,[PTR(1),#64*7]
+	add	PTR(1),PTR(1),#64*8
 	orr	x4,x4,x8,lsl#32
 	orr	x5,x5,x9,lsl#32
 	orr	x6,x6,x10,lsl#32
@@ -4111,18 +4111,18 @@ ecp_nistz256_gather_w5:
 	csel	x5,x5,xzr,ne
 	csel	x6,x6,xzr,ne
 	csel	x7,x7,xzr,ne
-	stp	x4,x5,[x0]		// X
-	stp	x6,x7,[x0,#16]
+	stp	x4,x5,[PTR(0)]		// X
+	stp	x6,x7,[PTR(0),#16]
 
-	ldr	w4,[x1,#64*0]
-	ldr	w5,[x1,#64*1]
-	ldr	w6,[x1,#64*2]
-	ldr	w7,[x1,#64*3]
-	ldr	w8,[x1,#64*4]
-	ldr	w9,[x1,#64*5]
-	ldr	w10,[x1,#64*6]
-	ldr	w11,[x1,#64*7]
-	add	x1,x1,#64*8
+	ldr	w4,[PTR(1),#64*0]
+	ldr	w5,[PTR(1),#64*1]
+	ldr	w6,[PTR(1),#64*2]
+	ldr	w7,[PTR(1),#64*3]
+	ldr	w8,[PTR(1),#64*4]
+	ldr	w9,[PTR(1),#64*5]
+	ldr	w10,[PTR(1),#64*6]
+	ldr	w11,[PTR(1),#64*7]
+	add	PTR(1),PTR(1),#64*8
 	orr	x4,x4,x8,lsl#32
 	orr	x5,x5,x9,lsl#32
 	orr	x6,x6,x10,lsl#32
@@ -4131,17 +4131,17 @@ ecp_nistz256_gather_w5:
 	csel	x5,x5,xzr,ne
 	csel	x6,x6,xzr,ne
 	csel	x7,x7,xzr,ne
-	stp	x4,x5,[x0,#32]	// Y
-	stp	x6,x7,[x0,#48]
+	stp	x4,x5,[PTR(0),#32]	// Y
+	stp	x6,x7,[PTR(0),#48]
 
-	ldr	w4,[x1,#64*0]
-	ldr	w5,[x1,#64*1]
-	ldr	w6,[x1,#64*2]
-	ldr	w7,[x1,#64*3]
-	ldr	w8,[x1,#64*4]
-	ldr	w9,[x1,#64*5]
-	ldr	w10,[x1,#64*6]
-	ldr	w11,[x1,#64*7]
+	ldr	w4,[PTR(1),#64*0]
+	ldr	w5,[PTR(1),#64*1]
+	ldr	w6,[PTR(1),#64*2]
+	ldr	w7,[PTR(1),#64*3]
+	ldr	w8,[PTR(1),#64*4]
+	ldr	w9,[PTR(1),#64*5]
+	ldr	w10,[PTR(1),#64*6]
+	ldr	w11,[PTR(1),#64*7]
 	orr	x4,x4,x8,lsl#32
 	orr	x5,x5,x9,lsl#32
 	orr	x6,x6,x10,lsl#32
@@ -4150,10 +4150,10 @@ ecp_nistz256_gather_w5:
 	csel	x5,x5,xzr,ne
 	csel	x6,x6,xzr,ne
 	csel	x7,x7,xzr,ne
-	stp	x4,x5,[x0,#64]	// Z
-	stp	x6,x7,[x0,#80]
+	stp	x4,x5,[PTR(0),#64]	// Z
+	stp	x6,x7,[PTR(0),#80]
 
-	ldr	x29,[sp],#16
+	ldr	PTR(29),[PTRN(sp)],#(2*PTR_WIDTH)
 	ret
 .size	ecp_nistz256_gather_w5,.-ecp_nistz256_gather_w5
 
@@ -4165,41 +4165,41 @@ ecp_nistz256_gather_w5:
 ecp_nistz256_scatter_w7:
 	AARCH64_VALID_CALL_TARGET
 	// Armv8.3-A PAuth: even though x30 is pushed to stack it is not popped later.
-	stp	x29,x30,[sp,#-16]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 
-	add	x0,x0,x2
+	add	PTR(0),PTR(0),x2
 	mov	x2,#64/8
 .Loop_scatter_w7:
-	ldr	x3,[x1],#8
+	ldr	x3,[PTR(1)],#8
 	subs	x2,x2,#1
-	prfm	pstl1strm,[x0,#4096+64*0]
-	prfm	pstl1strm,[x0,#4096+64*1]
-	prfm	pstl1strm,[x0,#4096+64*2]
-	prfm	pstl1strm,[x0,#4096+64*3]
-	prfm	pstl1strm,[x0,#4096+64*4]
-	prfm	pstl1strm,[x0,#4096+64*5]
-	prfm	pstl1strm,[x0,#4096+64*6]
-	prfm	pstl1strm,[x0,#4096+64*7]
-	strb	w3,[x0,#64*0]
+	prfm	pstl1strm,[PTR(0),#4096+64*0]
+	prfm	pstl1strm,[PTR(0),#4096+64*1]
+	prfm	pstl1strm,[PTR(0),#4096+64*2]
+	prfm	pstl1strm,[PTR(0),#4096+64*3]
+	prfm	pstl1strm,[PTR(0),#4096+64*4]
+	prfm	pstl1strm,[PTR(0),#4096+64*5]
+	prfm	pstl1strm,[PTR(0),#4096+64*6]
+	prfm	pstl1strm,[PTR(0),#4096+64*7]
+	strb	w3,[PTR(0),#64*0]
 	lsr	x3,x3,#8
-	strb	w3,[x0,#64*1]
+	strb	w3,[PTR(0),#64*1]
 	lsr	x3,x3,#8
-	strb	w3,[x0,#64*2]
+	strb	w3,[PTR(0),#64*2]
 	lsr	x3,x3,#8
-	strb	w3,[x0,#64*3]
+	strb	w3,[PTR(0),#64*3]
 	lsr	x3,x3,#8
-	strb	w3,[x0,#64*4]
+	strb	w3,[PTR(0),#64*4]
 	lsr	x3,x3,#8
-	strb	w3,[x0,#64*5]
+	strb	w3,[PTR(0),#64*5]
 	lsr	x3,x3,#8
-	strb	w3,[x0,#64*6]
+	strb	w3,[PTR(0),#64*6]
 	lsr	x3,x3,#8
-	strb	w3,[x0,#64*7]
-	add	x0,x0,#64*8
+	strb	w3,[PTR(0),#64*7]
+	add	PTR(0),PTR(0),#64*8
 	b.ne	.Loop_scatter_w7
 
-	ldr	x29,[sp],#16
+	ldr	PTR(29),[PTRN(sp)],#(2*PTR_WIDTH)
 	ret
 .size	ecp_nistz256_scatter_w7,.-ecp_nistz256_scatter_w7
 
@@ -4211,34 +4211,34 @@ ecp_nistz256_scatter_w7:
 ecp_nistz256_gather_w7:
 	AARCH64_VALID_CALL_TARGET
 	// Armv8.3-A PAuth: even though x30 is pushed to stack it is not popped later.
-	stp	x29,x30,[sp,#-16]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 
 	cmp	x2,xzr
 	csetm	x3,ne
 	add	x2,x2,x3
-	add	x1,x1,x2
+	add	PTR(1),PTR(1),x2
 	mov	x2,#64/8
 	nop
 .Loop_gather_w7:
-	ldrb	w4,[x1,#64*0]
-	prfm	pldl1strm,[x1,#4096+64*0]
+	ldrb	w4,[PTR(1),#64*0]
+	prfm	pldl1strm,[PTR(1),#4096+64*0]
 	subs	x2,x2,#1
-	ldrb	w5,[x1,#64*1]
-	prfm	pldl1strm,[x1,#4096+64*1]
-	ldrb	w6,[x1,#64*2]
-	prfm	pldl1strm,[x1,#4096+64*2]
-	ldrb	w7,[x1,#64*3]
-	prfm	pldl1strm,[x1,#4096+64*3]
-	ldrb	w8,[x1,#64*4]
-	prfm	pldl1strm,[x1,#4096+64*4]
-	ldrb	w9,[x1,#64*5]
-	prfm	pldl1strm,[x1,#4096+64*5]
-	ldrb	w10,[x1,#64*6]
-	prfm	pldl1strm,[x1,#4096+64*6]
-	ldrb	w11,[x1,#64*7]
-	prfm	pldl1strm,[x1,#4096+64*7]
-	add	x1,x1,#64*8
+	ldrb	w5,[PTR(1),#64*1]
+	prfm	pldl1strm,[PTR(1),#4096+64*1]
+	ldrb	w6,[PTR(1),#64*2]
+	prfm	pldl1strm,[PTR(1),#4096+64*2]
+	ldrb	w7,[PTR(1),#64*3]
+	prfm	pldl1strm,[PTR(1),#4096+64*3]
+	ldrb	w8,[PTR(1),#64*4]
+	prfm	pldl1strm,[PTR(1),#4096+64*4]
+	ldrb	w9,[PTR(1),#64*5]
+	prfm	pldl1strm,[PTR(1),#4096+64*5]
+	ldrb	w10,[PTR(1),#64*6]
+	prfm	pldl1strm,[PTR(1),#4096+64*6]
+	ldrb	w11,[PTR(1),#64*7]
+	prfm	pldl1strm,[PTR(1),#4096+64*7]
+	add	PTR(1),PTR(1),#64*8
 	orr	x4,x4,x5,lsl#8
 	orr	x6,x6,x7,lsl#8
 	orr	x8,x8,x9,lsl#8
@@ -4247,9 +4247,9 @@ ecp_nistz256_gather_w7:
 	orr	x4,x4,x8,lsl#32
 	orr	x4,x4,x10,lsl#48
 	and	x4,x4,x3
-	str	x4,[x0],#8
+	str	x4,[PTR(0)],#8
 	b.ne	.Loop_gather_w7
 
-	ldr	x29,[sp],#16
+	ldr	PTR(29),[PTRN(sp)],#(2*PTR_WIDTH)
 	ret
 .size	ecp_nistz256_gather_w7,.-ecp_nistz256_gather_w7
