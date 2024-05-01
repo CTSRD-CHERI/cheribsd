@@ -2,7 +2,9 @@
 #include "arm_arch.h"
 
 .text
+#ifndef __CHERI_PURE_CAPABILITY__
 .arch	armv8-a+crypto
+#endif
 
 .align	5
 .globl	_armv7_neon_probe
@@ -83,7 +85,7 @@ OPENSSL_cleanse:
 	b.hi	.Lot		// len>15
 	nop
 .Little:
-	strb	wzr,[x0],#1	// store byte-by-byte
+	strb	wzr,[PTR(0)],#1	// store byte-by-byte
 	subs	x1,x1,#1
 	b.ne	.Little
 .Lret:	ret
@@ -91,13 +93,13 @@ OPENSSL_cleanse:
 .align	4
 .Lot:	tst	x0,#7
 	b.eq	.Laligned	// inp is aligned
-	strb	wzr,[x0],#1	// store byte-by-byte
+	strb	wzr,[PTR(0)],#1	// store byte-by-byte
 	sub	x1,x1,#1
 	b	.Lot
 
 .align	4
 .Laligned:
-	str	xzr,[x0],#8	// store word-by-word
+	str	xzr,[PTR(0)],#8	// store word-by-word
 	sub	x1,x1,#8
 	tst	x1,#-8
 	b.ne	.Laligned	// len>=8
@@ -114,8 +116,8 @@ CRYPTO_memcmp:
 	cbz	x2,.Lno_data	// len==0?
 	cmp	x2,#16
 	b.ne	.Loop_cmp
-	ldp	x8,x9,[x0]
-	ldp	x10,x11,[x1]
+	ldp	x8,x9,[PTR(0)]
+	ldp	x10,x11,[PTR(1)]
 	eor	x8,x8,x10
 	eor	x9,x9,x11
 	orr	x8,x8,x9
@@ -126,8 +128,8 @@ CRYPTO_memcmp:
 
 .align	4
 .Loop_cmp:
-	ldrb	w4,[x0],#1
-	ldrb	w5,[x1],#1
+	ldrb	w4,[PTR(0)],#1
+	ldrb	w5,[PTR(1)],#1
 	eor	w4,w4,w5
 	orr	w3,w3,w4
 	subs	x2,x2,#1

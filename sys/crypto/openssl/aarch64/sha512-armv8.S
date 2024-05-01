@@ -70,35 +70,40 @@
 sha512_block_data_order:
 	AARCH64_VALID_CALL_TARGET
 #ifndef	__KERNEL__
-	adrp	x16,OPENSSL_armcap_P
-	ldr	w16,[x16,#:lo12:OPENSSL_armcap_P]
+	adrp	PTR(16),OPENSSL_armcap_P
+	ldr	w16,[PTR(16),#:lo12:OPENSSL_armcap_P]
 	tst	w16,#ARMV8_SHA512
 	b.ne	.Lv8_entry
 #endif
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-128]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(16*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	stp	x23,x24,[sp,#48]
-	stp	x25,x26,[sp,#64]
-	stp	x27,x28,[sp,#80]
-	sub	sp,sp,#4*8
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
+	stp	PTR(25),PTR(26),[PTRN(sp),#(8*PTR_WIDTH)]
+	stp	PTR(27),PTR(28),[PTRN(sp),#(10*PTR_WIDTH)]
+	sub	PTRN(sp),PTRN(sp),#4*8
 
-	ldp	x20,x21,[x0]				// load context
-	ldp	x22,x23,[x0,#2*8]
-	ldp	x24,x25,[x0,#4*8]
-	add	x2,x1,x2,lsl#7	// end of input
-	ldp	x26,x27,[x0,#6*8]
-	adr	x30,.LK512
-	stp	x0,x2,[x29,#96]
+	ldp	x20,x21,[PTR(0)]				// load context
+	ldp	x22,x23,[PTR(0),#2*8]
+	ldp	x24,x25,[PTR(0),#4*8]
+#ifdef __CHERI_PURE_CAPABILITY__
+	lsl	x17,x2,#7
+	add	PTR(2),PTR(1),x17				// end of input
+#else
+	add	PTR(2),PTR(1),PTR(2),lsl#7	// end of input
+#endif
+	ldp	x26,x27,[PTR(0),#6*8]
+	adr	PTR(30),.LK512
+	stp	PTR(0),PTR(2),[PTR(29),#(12*PTR_WIDTH)]
 
 .Loop:
-	ldp	x3,x4,[x1],#2*8
-	ldr	x19,[x30],#8			// *K++
+	ldp	x3,x4,[PTR(1)],#2*8
+	ldr	x19,[PTR(30)],#8			// *K++
 	eor	x28,x21,x22				// magic seed
-	str	x1,[x29,#112]
+	str	PTR(1),[PTR(29),#(14*PTR_WIDTH)]
 #ifndef	__AARCH64EB__
 	rev	x3,x3			// 0
 #endif
@@ -120,12 +125,12 @@ sha512_block_data_order:
 	eor	x28,x28,x21			// Maj(a,b,c)
 	eor	x17,x6,x17,ror#34	// Sigma0(a)
 	add	x27,x27,x28			// h+=Maj(a,b,c)
-	ldr	x28,[x30],#8		// *K++, x19 in next round
+	ldr	x28,[PTR(30)],#8		// *K++, x19 in next round
 	//add	x27,x27,x17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	x4,x4			// 1
 #endif
-	ldp	x5,x6,[x1],#2*8
+	ldp	x5,x6,[PTR(1)],#2*8
 	add	x27,x27,x17			// h+=Sigma0(a)
 	ror	x16,x23,#14
 	add	x26,x26,x28			// h+=K[i]
@@ -145,7 +150,7 @@ sha512_block_data_order:
 	eor	x19,x19,x20			// Maj(a,b,c)
 	eor	x17,x7,x17,ror#34	// Sigma0(a)
 	add	x26,x26,x19			// h+=Maj(a,b,c)
-	ldr	x19,[x30],#8		// *K++, x28 in next round
+	ldr	x19,[PTR(30)],#8		// *K++, x28 in next round
 	//add	x26,x26,x17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	x5,x5			// 2
@@ -169,12 +174,12 @@ sha512_block_data_order:
 	eor	x28,x28,x27			// Maj(a,b,c)
 	eor	x17,x8,x17,ror#34	// Sigma0(a)
 	add	x25,x25,x28			// h+=Maj(a,b,c)
-	ldr	x28,[x30],#8		// *K++, x19 in next round
+	ldr	x28,[PTR(30)],#8		// *K++, x19 in next round
 	//add	x25,x25,x17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	x6,x6			// 3
 #endif
-	ldp	x7,x8,[x1],#2*8
+	ldp	x7,x8,[PTR(1)],#2*8
 	add	x25,x25,x17			// h+=Sigma0(a)
 	ror	x16,x21,#14
 	add	x24,x24,x28			// h+=K[i]
@@ -194,7 +199,7 @@ sha512_block_data_order:
 	eor	x19,x19,x26			// Maj(a,b,c)
 	eor	x17,x9,x17,ror#34	// Sigma0(a)
 	add	x24,x24,x19			// h+=Maj(a,b,c)
-	ldr	x19,[x30],#8		// *K++, x28 in next round
+	ldr	x19,[PTR(30)],#8		// *K++, x28 in next round
 	//add	x24,x24,x17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	x7,x7			// 4
@@ -218,12 +223,12 @@ sha512_block_data_order:
 	eor	x28,x28,x25			// Maj(a,b,c)
 	eor	x17,x10,x17,ror#34	// Sigma0(a)
 	add	x23,x23,x28			// h+=Maj(a,b,c)
-	ldr	x28,[x30],#8		// *K++, x19 in next round
+	ldr	x28,[PTR(30)],#8		// *K++, x19 in next round
 	//add	x23,x23,x17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	x8,x8			// 5
 #endif
-	ldp	x9,x10,[x1],#2*8
+	ldp	x9,x10,[PTR(1)],#2*8
 	add	x23,x23,x17			// h+=Sigma0(a)
 	ror	x16,x27,#14
 	add	x22,x22,x28			// h+=K[i]
@@ -243,7 +248,7 @@ sha512_block_data_order:
 	eor	x19,x19,x24			// Maj(a,b,c)
 	eor	x17,x11,x17,ror#34	// Sigma0(a)
 	add	x22,x22,x19			// h+=Maj(a,b,c)
-	ldr	x19,[x30],#8		// *K++, x28 in next round
+	ldr	x19,[PTR(30)],#8		// *K++, x28 in next round
 	//add	x22,x22,x17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	x9,x9			// 6
@@ -267,12 +272,12 @@ sha512_block_data_order:
 	eor	x28,x28,x23			// Maj(a,b,c)
 	eor	x17,x12,x17,ror#34	// Sigma0(a)
 	add	x21,x21,x28			// h+=Maj(a,b,c)
-	ldr	x28,[x30],#8		// *K++, x19 in next round
+	ldr	x28,[PTR(30)],#8		// *K++, x19 in next round
 	//add	x21,x21,x17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	x10,x10			// 7
 #endif
-	ldp	x11,x12,[x1],#2*8
+	ldp	x11,x12,[PTR(1)],#2*8
 	add	x21,x21,x17			// h+=Sigma0(a)
 	ror	x16,x25,#14
 	add	x20,x20,x28			// h+=K[i]
@@ -292,7 +297,7 @@ sha512_block_data_order:
 	eor	x19,x19,x22			// Maj(a,b,c)
 	eor	x17,x13,x17,ror#34	// Sigma0(a)
 	add	x20,x20,x19			// h+=Maj(a,b,c)
-	ldr	x19,[x30],#8		// *K++, x28 in next round
+	ldr	x19,[PTR(30)],#8		// *K++, x28 in next round
 	//add	x20,x20,x17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	x11,x11			// 8
@@ -316,12 +321,12 @@ sha512_block_data_order:
 	eor	x28,x28,x21			// Maj(a,b,c)
 	eor	x17,x14,x17,ror#34	// Sigma0(a)
 	add	x27,x27,x28			// h+=Maj(a,b,c)
-	ldr	x28,[x30],#8		// *K++, x19 in next round
+	ldr	x28,[PTR(30)],#8		// *K++, x19 in next round
 	//add	x27,x27,x17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	x12,x12			// 9
 #endif
-	ldp	x13,x14,[x1],#2*8
+	ldp	x13,x14,[PTR(1)],#2*8
 	add	x27,x27,x17			// h+=Sigma0(a)
 	ror	x16,x23,#14
 	add	x26,x26,x28			// h+=K[i]
@@ -341,7 +346,7 @@ sha512_block_data_order:
 	eor	x19,x19,x20			// Maj(a,b,c)
 	eor	x17,x15,x17,ror#34	// Sigma0(a)
 	add	x26,x26,x19			// h+=Maj(a,b,c)
-	ldr	x19,[x30],#8		// *K++, x28 in next round
+	ldr	x19,[PTR(30)],#8		// *K++, x28 in next round
 	//add	x26,x26,x17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	x13,x13			// 10
@@ -365,14 +370,14 @@ sha512_block_data_order:
 	eor	x28,x28,x27			// Maj(a,b,c)
 	eor	x17,x0,x17,ror#34	// Sigma0(a)
 	add	x25,x25,x28			// h+=Maj(a,b,c)
-	ldr	x28,[x30],#8		// *K++, x19 in next round
+	ldr	x28,[PTR(30)],#8		// *K++, x19 in next round
 	//add	x25,x25,x17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	x14,x14			// 11
 #endif
-	ldp	x15,x0,[x1],#2*8
+	ldp	x15,x0,[PTR(1)],#2*8
 	add	x25,x25,x17			// h+=Sigma0(a)
-	str	x6,[sp,#24]
+	str	x6,[PTRN(sp),#24]
 	ror	x16,x21,#14
 	add	x24,x24,x28			// h+=K[i]
 	eor	x6,x21,x21,ror#23
@@ -391,13 +396,13 @@ sha512_block_data_order:
 	eor	x19,x19,x26			// Maj(a,b,c)
 	eor	x17,x6,x17,ror#34	// Sigma0(a)
 	add	x24,x24,x19			// h+=Maj(a,b,c)
-	ldr	x19,[x30],#8		// *K++, x28 in next round
+	ldr	x19,[PTR(30)],#8		// *K++, x28 in next round
 	//add	x24,x24,x17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	x15,x15			// 12
 #endif
 	add	x24,x24,x17			// h+=Sigma0(a)
-	str	x7,[sp,#0]
+	str	x7,[PTRN(sp),#0]
 	ror	x16,x20,#14
 	add	x23,x23,x19			// h+=K[i]
 	eor	x7,x20,x20,ror#23
@@ -416,14 +421,14 @@ sha512_block_data_order:
 	eor	x28,x28,x25			// Maj(a,b,c)
 	eor	x17,x7,x17,ror#34	// Sigma0(a)
 	add	x23,x23,x28			// h+=Maj(a,b,c)
-	ldr	x28,[x30],#8		// *K++, x19 in next round
+	ldr	x28,[PTR(30)],#8		// *K++, x19 in next round
 	//add	x23,x23,x17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	x0,x0			// 13
 #endif
-	ldp	x1,x2,[x1]
+	ldp	x1,x2,[PTR(1)]
 	add	x23,x23,x17			// h+=Sigma0(a)
-	str	x8,[sp,#8]
+	str	x8,[PTRN(sp),#8]
 	ror	x16,x27,#14
 	add	x22,x22,x28			// h+=K[i]
 	eor	x8,x27,x27,ror#23
@@ -442,14 +447,14 @@ sha512_block_data_order:
 	eor	x19,x19,x24			// Maj(a,b,c)
 	eor	x17,x8,x17,ror#34	// Sigma0(a)
 	add	x22,x22,x19			// h+=Maj(a,b,c)
-	ldr	x19,[x30],#8		// *K++, x28 in next round
+	ldr	x19,[PTR(30)],#8		// *K++, x28 in next round
 	//add	x22,x22,x17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	x1,x1			// 14
 #endif
-	ldr	x6,[sp,#24]
+	ldr	x6,[PTRN(sp),#24]
 	add	x22,x22,x17			// h+=Sigma0(a)
-	str	x9,[sp,#16]
+	str	x9,[PTRN(sp),#16]
 	ror	x16,x26,#14
 	add	x21,x21,x19			// h+=K[i]
 	eor	x9,x26,x26,ror#23
@@ -468,14 +473,14 @@ sha512_block_data_order:
 	eor	x28,x28,x23			// Maj(a,b,c)
 	eor	x17,x9,x17,ror#34	// Sigma0(a)
 	add	x21,x21,x28			// h+=Maj(a,b,c)
-	ldr	x28,[x30],#8		// *K++, x19 in next round
+	ldr	x28,[PTR(30)],#8		// *K++, x19 in next round
 	//add	x21,x21,x17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	x2,x2			// 15
 #endif
-	ldr	x7,[sp,#0]
+	ldr	x7,[PTRN(sp),#0]
 	add	x21,x21,x17			// h+=Sigma0(a)
-	str	x10,[sp,#24]
+	str	x10,[PTRN(sp),#24]
 	ror	x16,x25,#14
 	add	x20,x20,x28			// h+=K[i]
 	ror	x9,x4,#1
@@ -501,13 +506,13 @@ sha512_block_data_order:
 	add	x3,x3,x12
 	add	x24,x24,x20			// d+=h
 	add	x20,x20,x19			// h+=Maj(a,b,c)
-	ldr	x19,[x30],#8		// *K++, x28 in next round
+	ldr	x19,[PTR(30)],#8		// *K++, x28 in next round
 	add	x3,x3,x9
 	add	x20,x20,x17			// h+=Sigma0(a)
 	add	x3,x3,x8
 .Loop_16_xx:
-	ldr	x8,[sp,#8]
-	str	x11,[sp,#0]
+	ldr	x8,[PTRN(sp),#8]
+	str	x11,[PTRN(sp),#0]
 	ror	x16,x24,#14
 	add	x27,x27,x19			// h+=K[i]
 	ror	x10,x5,#1
@@ -533,12 +538,12 @@ sha512_block_data_order:
 	add	x4,x4,x13
 	add	x23,x23,x27			// d+=h
 	add	x27,x27,x28			// h+=Maj(a,b,c)
-	ldr	x28,[x30],#8		// *K++, x19 in next round
+	ldr	x28,[PTR(30)],#8		// *K++, x19 in next round
 	add	x4,x4,x10
 	add	x27,x27,x17			// h+=Sigma0(a)
 	add	x4,x4,x9
-	ldr	x9,[sp,#16]
-	str	x12,[sp,#8]
+	ldr	x9,[PTRN(sp),#16]
+	str	x12,[PTRN(sp),#8]
 	ror	x16,x23,#14
 	add	x26,x26,x28			// h+=K[i]
 	ror	x11,x6,#1
@@ -564,12 +569,12 @@ sha512_block_data_order:
 	add	x5,x5,x14
 	add	x22,x22,x26			// d+=h
 	add	x26,x26,x19			// h+=Maj(a,b,c)
-	ldr	x19,[x30],#8		// *K++, x28 in next round
+	ldr	x19,[PTR(30)],#8		// *K++, x28 in next round
 	add	x5,x5,x11
 	add	x26,x26,x17			// h+=Sigma0(a)
 	add	x5,x5,x10
-	ldr	x10,[sp,#24]
-	str	x13,[sp,#16]
+	ldr	x10,[PTRN(sp),#24]
+	str	x13,[PTRN(sp),#16]
 	ror	x16,x22,#14
 	add	x25,x25,x19			// h+=K[i]
 	ror	x12,x7,#1
@@ -595,12 +600,12 @@ sha512_block_data_order:
 	add	x6,x6,x15
 	add	x21,x21,x25			// d+=h
 	add	x25,x25,x28			// h+=Maj(a,b,c)
-	ldr	x28,[x30],#8		// *K++, x19 in next round
+	ldr	x28,[PTR(30)],#8		// *K++, x19 in next round
 	add	x6,x6,x12
 	add	x25,x25,x17			// h+=Sigma0(a)
 	add	x6,x6,x11
-	ldr	x11,[sp,#0]
-	str	x14,[sp,#24]
+	ldr	x11,[PTRN(sp),#0]
+	str	x14,[PTRN(sp),#24]
 	ror	x16,x21,#14
 	add	x24,x24,x28			// h+=K[i]
 	ror	x13,x8,#1
@@ -626,12 +631,12 @@ sha512_block_data_order:
 	add	x7,x7,x0
 	add	x20,x20,x24			// d+=h
 	add	x24,x24,x19			// h+=Maj(a,b,c)
-	ldr	x19,[x30],#8		// *K++, x28 in next round
+	ldr	x19,[PTR(30)],#8		// *K++, x28 in next round
 	add	x7,x7,x13
 	add	x24,x24,x17			// h+=Sigma0(a)
 	add	x7,x7,x12
-	ldr	x12,[sp,#8]
-	str	x15,[sp,#0]
+	ldr	x12,[PTRN(sp),#8]
+	str	x15,[PTRN(sp),#0]
 	ror	x16,x20,#14
 	add	x23,x23,x19			// h+=K[i]
 	ror	x14,x9,#1
@@ -657,12 +662,12 @@ sha512_block_data_order:
 	add	x8,x8,x1
 	add	x27,x27,x23			// d+=h
 	add	x23,x23,x28			// h+=Maj(a,b,c)
-	ldr	x28,[x30],#8		// *K++, x19 in next round
+	ldr	x28,[PTR(30)],#8		// *K++, x19 in next round
 	add	x8,x8,x14
 	add	x23,x23,x17			// h+=Sigma0(a)
 	add	x8,x8,x13
-	ldr	x13,[sp,#16]
-	str	x0,[sp,#8]
+	ldr	x13,[PTRN(sp),#16]
+	str	x0,[PTRN(sp),#8]
 	ror	x16,x27,#14
 	add	x22,x22,x28			// h+=K[i]
 	ror	x15,x10,#1
@@ -688,12 +693,12 @@ sha512_block_data_order:
 	add	x9,x9,x2
 	add	x26,x26,x22			// d+=h
 	add	x22,x22,x19			// h+=Maj(a,b,c)
-	ldr	x19,[x30],#8		// *K++, x28 in next round
+	ldr	x19,[PTR(30)],#8		// *K++, x28 in next round
 	add	x9,x9,x15
 	add	x22,x22,x17			// h+=Sigma0(a)
 	add	x9,x9,x14
-	ldr	x14,[sp,#24]
-	str	x1,[sp,#16]
+	ldr	x14,[PTRN(sp),#24]
+	str	x1,[PTRN(sp),#16]
 	ror	x16,x26,#14
 	add	x21,x21,x19			// h+=K[i]
 	ror	x0,x11,#1
@@ -719,12 +724,12 @@ sha512_block_data_order:
 	add	x10,x10,x3
 	add	x25,x25,x21			// d+=h
 	add	x21,x21,x28			// h+=Maj(a,b,c)
-	ldr	x28,[x30],#8		// *K++, x19 in next round
+	ldr	x28,[PTR(30)],#8		// *K++, x19 in next round
 	add	x10,x10,x0
 	add	x21,x21,x17			// h+=Sigma0(a)
 	add	x10,x10,x15
-	ldr	x15,[sp,#0]
-	str	x2,[sp,#24]
+	ldr	x15,[PTRN(sp),#0]
+	str	x2,[PTRN(sp),#24]
 	ror	x16,x25,#14
 	add	x20,x20,x28			// h+=K[i]
 	ror	x1,x12,#1
@@ -750,12 +755,12 @@ sha512_block_data_order:
 	add	x11,x11,x4
 	add	x24,x24,x20			// d+=h
 	add	x20,x20,x19			// h+=Maj(a,b,c)
-	ldr	x19,[x30],#8		// *K++, x28 in next round
+	ldr	x19,[PTR(30)],#8		// *K++, x28 in next round
 	add	x11,x11,x1
 	add	x20,x20,x17			// h+=Sigma0(a)
 	add	x11,x11,x0
-	ldr	x0,[sp,#8]
-	str	x3,[sp,#0]
+	ldr	x0,[PTRN(sp),#8]
+	str	x3,[PTRN(sp),#0]
 	ror	x16,x24,#14
 	add	x27,x27,x19			// h+=K[i]
 	ror	x2,x13,#1
@@ -781,12 +786,12 @@ sha512_block_data_order:
 	add	x12,x12,x5
 	add	x23,x23,x27			// d+=h
 	add	x27,x27,x28			// h+=Maj(a,b,c)
-	ldr	x28,[x30],#8		// *K++, x19 in next round
+	ldr	x28,[PTR(30)],#8		// *K++, x19 in next round
 	add	x12,x12,x2
 	add	x27,x27,x17			// h+=Sigma0(a)
 	add	x12,x12,x1
-	ldr	x1,[sp,#16]
-	str	x4,[sp,#8]
+	ldr	x1,[PTRN(sp),#16]
+	str	x4,[PTRN(sp),#8]
 	ror	x16,x23,#14
 	add	x26,x26,x28			// h+=K[i]
 	ror	x3,x14,#1
@@ -812,12 +817,12 @@ sha512_block_data_order:
 	add	x13,x13,x6
 	add	x22,x22,x26			// d+=h
 	add	x26,x26,x19			// h+=Maj(a,b,c)
-	ldr	x19,[x30],#8		// *K++, x28 in next round
+	ldr	x19,[PTR(30)],#8		// *K++, x28 in next round
 	add	x13,x13,x3
 	add	x26,x26,x17			// h+=Sigma0(a)
 	add	x13,x13,x2
-	ldr	x2,[sp,#24]
-	str	x5,[sp,#16]
+	ldr	x2,[PTRN(sp),#24]
+	str	x5,[PTRN(sp),#16]
 	ror	x16,x22,#14
 	add	x25,x25,x19			// h+=K[i]
 	ror	x4,x15,#1
@@ -843,12 +848,12 @@ sha512_block_data_order:
 	add	x14,x14,x7
 	add	x21,x21,x25			// d+=h
 	add	x25,x25,x28			// h+=Maj(a,b,c)
-	ldr	x28,[x30],#8		// *K++, x19 in next round
+	ldr	x28,[PTR(30)],#8		// *K++, x19 in next round
 	add	x14,x14,x4
 	add	x25,x25,x17			// h+=Sigma0(a)
 	add	x14,x14,x3
-	ldr	x3,[sp,#0]
-	str	x6,[sp,#24]
+	ldr	x3,[PTRN(sp),#0]
+	str	x6,[PTRN(sp),#24]
 	ror	x16,x21,#14
 	add	x24,x24,x28			// h+=K[i]
 	ror	x5,x0,#1
@@ -874,12 +879,12 @@ sha512_block_data_order:
 	add	x15,x15,x8
 	add	x20,x20,x24			// d+=h
 	add	x24,x24,x19			// h+=Maj(a,b,c)
-	ldr	x19,[x30],#8		// *K++, x28 in next round
+	ldr	x19,[PTR(30)],#8		// *K++, x28 in next round
 	add	x15,x15,x5
 	add	x24,x24,x17			// h+=Sigma0(a)
 	add	x15,x15,x4
-	ldr	x4,[sp,#8]
-	str	x7,[sp,#0]
+	ldr	x4,[PTRN(sp),#8]
+	str	x7,[PTRN(sp),#0]
 	ror	x16,x20,#14
 	add	x23,x23,x19			// h+=K[i]
 	ror	x6,x1,#1
@@ -905,12 +910,12 @@ sha512_block_data_order:
 	add	x0,x0,x9
 	add	x27,x27,x23			// d+=h
 	add	x23,x23,x28			// h+=Maj(a,b,c)
-	ldr	x28,[x30],#8		// *K++, x19 in next round
+	ldr	x28,[PTR(30)],#8		// *K++, x19 in next round
 	add	x0,x0,x6
 	add	x23,x23,x17			// h+=Sigma0(a)
 	add	x0,x0,x5
-	ldr	x5,[sp,#16]
-	str	x8,[sp,#8]
+	ldr	x5,[PTRN(sp),#16]
+	str	x8,[PTRN(sp),#8]
 	ror	x16,x27,#14
 	add	x22,x22,x28			// h+=K[i]
 	ror	x7,x2,#1
@@ -936,12 +941,12 @@ sha512_block_data_order:
 	add	x1,x1,x10
 	add	x26,x26,x22			// d+=h
 	add	x22,x22,x19			// h+=Maj(a,b,c)
-	ldr	x19,[x30],#8		// *K++, x28 in next round
+	ldr	x19,[PTR(30)],#8		// *K++, x28 in next round
 	add	x1,x1,x7
 	add	x22,x22,x17			// h+=Sigma0(a)
 	add	x1,x1,x6
-	ldr	x6,[sp,#24]
-	str	x9,[sp,#16]
+	ldr	x6,[PTRN(sp),#24]
+	str	x9,[PTRN(sp),#16]
 	ror	x16,x26,#14
 	add	x21,x21,x19			// h+=K[i]
 	ror	x8,x3,#1
@@ -967,12 +972,12 @@ sha512_block_data_order:
 	add	x2,x2,x11
 	add	x25,x25,x21			// d+=h
 	add	x21,x21,x28			// h+=Maj(a,b,c)
-	ldr	x28,[x30],#8		// *K++, x19 in next round
+	ldr	x28,[PTR(30)],#8		// *K++, x19 in next round
 	add	x2,x2,x8
 	add	x21,x21,x17			// h+=Sigma0(a)
 	add	x2,x2,x7
-	ldr	x7,[sp,#0]
-	str	x10,[sp,#24]
+	ldr	x7,[PTRN(sp),#0]
+	str	x10,[PTRN(sp),#24]
 	ror	x16,x25,#14
 	add	x20,x20,x28			// h+=K[i]
 	ror	x9,x4,#1
@@ -998,43 +1003,43 @@ sha512_block_data_order:
 	add	x3,x3,x12
 	add	x24,x24,x20			// d+=h
 	add	x20,x20,x19			// h+=Maj(a,b,c)
-	ldr	x19,[x30],#8		// *K++, x28 in next round
+	ldr	x19,[PTR(30)],#8		// *K++, x28 in next round
 	add	x3,x3,x9
 	add	x20,x20,x17			// h+=Sigma0(a)
 	add	x3,x3,x8
 	cbnz	x19,.Loop_16_xx
 
-	ldp	x0,x2,[x29,#96]
-	ldr	x1,[x29,#112]
-	sub	x30,x30,#648		// rewind
+	ldp	PTR(0),PTR(2),[PTR(29),#(12*PTR_WIDTH)]
+	ldr	PTR(1),[PTR(29),#(14*PTR_WIDTH)]
+	sub	PTR(30),PTR(30),#648		// rewind
 
-	ldp	x3,x4,[x0]
-	ldp	x5,x6,[x0,#2*8]
-	add	x1,x1,#14*8			// advance input pointer
-	ldp	x7,x8,[x0,#4*8]
+	ldp	x3,x4,[PTR(0)]
+	ldp	x5,x6,[PTR(0),#2*8]
+	add	PTR(1),PTR(1),#14*8			// advance input pointer
+	ldp	x7,x8,[PTR(0),#4*8]
 	add	x20,x20,x3
-	ldp	x9,x10,[x0,#6*8]
+	ldp	x9,x10,[PTR(0),#6*8]
 	add	x21,x21,x4
 	add	x22,x22,x5
 	add	x23,x23,x6
-	stp	x20,x21,[x0]
+	stp	x20,x21,[PTR(0)]
 	add	x24,x24,x7
 	add	x25,x25,x8
-	stp	x22,x23,[x0,#2*8]
+	stp	x22,x23,[PTR(0),#2*8]
 	add	x26,x26,x9
 	add	x27,x27,x10
 	cmp	x1,x2
-	stp	x24,x25,[x0,#4*8]
-	stp	x26,x27,[x0,#6*8]
+	stp	x24,x25,[PTR(0),#4*8]
+	stp	x26,x27,[PTR(0),#6*8]
 	b.ne	.Loop
 
-	ldp	x19,x20,[x29,#16]
-	add	sp,sp,#4*8
-	ldp	x21,x22,[x29,#32]
-	ldp	x23,x24,[x29,#48]
-	ldp	x25,x26,[x29,#64]
-	ldp	x27,x28,[x29,#80]
-	ldp	x29,x30,[sp],#128
+	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
+	add	PTRN(sp),PTRN(sp),#4*8
+	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
+	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
+	ldp	PTR(25),PTR(26),[PTR(29),#(8*PTR_WIDTH)]
+	ldp	PTR(27),PTR(28),[PTR(29),#(10*PTR_WIDTH)]
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(16*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	sha512_block_data_order,.-sha512_block_data_order
@@ -1093,14 +1098,14 @@ sha512_block_data_order:
 sha512_block_armv8:
 .Lv8_entry:
 	// Armv8.3-A PAuth: even though x30 is pushed to stack it is not popped later
-	stp	x29,x30,[sp,#-16]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 
-	ld1	{v16.16b,v17.16b,v18.16b,v19.16b},[x1],#64	// load input
-	ld1	{v20.16b,v21.16b,v22.16b,v23.16b},[x1],#64
+	ld1	{v16.16b,v17.16b,v18.16b,v19.16b},[PTR(1)],#64	// load input
+	ld1	{v20.16b,v21.16b,v22.16b,v23.16b},[PTR(1)],#64
 
-	ld1	{v0.2d,v1.2d,v2.2d,v3.2d},[x0]		// load context
-	adr	x3,.LK512
+	ld1	{v0.2d,v1.2d,v2.2d,v3.2d},[PTR(0)]		// load context
+	adr	PTR(3),.LK512
 
 	rev64	v16.16b,v16.16b
 	rev64	v17.16b,v17.16b
@@ -1114,16 +1119,16 @@ sha512_block_armv8:
 
 .align	4
 .Loop_hw:
-	ld1	{v24.2d},[x3],#16
+	ld1	{v24.2d},[PTR(3)],#16
 	subs	x2,x2,#1
-	sub	x4,x1,#128
+	sub	PTR(4),PTR(1),#128
 	orr	v26.16b,v0.16b,v0.16b			// offload
 	orr	v27.16b,v1.16b,v1.16b
 	orr	v28.16b,v2.16b,v2.16b
 	orr	v29.16b,v3.16b,v3.16b
-	csel	x1,x1,x4,ne			// conditional rewind
+	csel	PTR(1),PTR(1),PTR(4),ne		// conditional rewind
 	add	v24.2d,v24.2d,v16.2d
-	ld1	{v25.2d},[x3],#16
+	ld1	{v25.2d},[PTR(3)],#16
 	ext	v24.16b,v24.16b,v24.16b,#8
 	ext	v5.16b,v2.16b,v3.16b,#8
 	ext	v6.16b,v1.16b,v2.16b,#8
@@ -1135,7 +1140,7 @@ sha512_block_armv8:
 	add	v4.2d,v1.2d,v3.2d		// "D + T1"
 .inst	0xce608423	//sha512h2 v3.16b,v1.16b,v0.16b
 	add	v25.2d,v25.2d,v17.2d
-	ld1	{v24.2d},[x3],#16
+	ld1	{v24.2d},[PTR(3)],#16
 	ext	v25.16b,v25.16b,v25.16b,#8
 	ext	v5.16b,v4.16b,v2.16b,#8
 	ext	v6.16b,v0.16b,v4.16b,#8
@@ -1147,7 +1152,7 @@ sha512_block_armv8:
 	add	v1.2d,v0.2d,v2.2d		// "D + T1"
 .inst	0xce638402	//sha512h2 v2.16b,v0.16b,v3.16b
 	add	v24.2d,v24.2d,v18.2d
-	ld1	{v25.2d},[x3],#16
+	ld1	{v25.2d},[PTR(3)],#16
 	ext	v24.16b,v24.16b,v24.16b,#8
 	ext	v5.16b,v1.16b,v4.16b,#8
 	ext	v6.16b,v3.16b,v1.16b,#8
@@ -1159,7 +1164,7 @@ sha512_block_armv8:
 	add	v0.2d,v3.2d,v4.2d		// "D + T1"
 .inst	0xce628464	//sha512h2 v4.16b,v3.16b,v2.16b
 	add	v25.2d,v25.2d,v19.2d
-	ld1	{v24.2d},[x3],#16
+	ld1	{v24.2d},[PTR(3)],#16
 	ext	v25.16b,v25.16b,v25.16b,#8
 	ext	v5.16b,v0.16b,v1.16b,#8
 	ext	v6.16b,v2.16b,v0.16b,#8
@@ -1171,7 +1176,7 @@ sha512_block_armv8:
 	add	v3.2d,v2.2d,v1.2d		// "D + T1"
 .inst	0xce648441	//sha512h2 v1.16b,v2.16b,v4.16b
 	add	v24.2d,v24.2d,v20.2d
-	ld1	{v25.2d},[x3],#16
+	ld1	{v25.2d},[PTR(3)],#16
 	ext	v24.16b,v24.16b,v24.16b,#8
 	ext	v5.16b,v3.16b,v0.16b,#8
 	ext	v6.16b,v4.16b,v3.16b,#8
@@ -1183,7 +1188,7 @@ sha512_block_armv8:
 	add	v2.2d,v4.2d,v0.2d		// "D + T1"
 .inst	0xce618480	//sha512h2 v0.16b,v4.16b,v1.16b
 	add	v25.2d,v25.2d,v21.2d
-	ld1	{v24.2d},[x3],#16
+	ld1	{v24.2d},[PTR(3)],#16
 	ext	v25.16b,v25.16b,v25.16b,#8
 	ext	v5.16b,v2.16b,v3.16b,#8
 	ext	v6.16b,v1.16b,v2.16b,#8
@@ -1195,7 +1200,7 @@ sha512_block_armv8:
 	add	v4.2d,v1.2d,v3.2d		// "D + T1"
 .inst	0xce608423	//sha512h2 v3.16b,v1.16b,v0.16b
 	add	v24.2d,v24.2d,v22.2d
-	ld1	{v25.2d},[x3],#16
+	ld1	{v25.2d},[PTR(3)],#16
 	ext	v24.16b,v24.16b,v24.16b,#8
 	ext	v5.16b,v4.16b,v2.16b,#8
 	ext	v6.16b,v0.16b,v4.16b,#8
@@ -1207,7 +1212,7 @@ sha512_block_armv8:
 	add	v1.2d,v0.2d,v2.2d		// "D + T1"
 .inst	0xce638402	//sha512h2 v2.16b,v0.16b,v3.16b
 	add	v25.2d,v25.2d,v23.2d
-	ld1	{v24.2d},[x3],#16
+	ld1	{v24.2d},[PTR(3)],#16
 	ext	v25.16b,v25.16b,v25.16b,#8
 	ext	v5.16b,v1.16b,v4.16b,#8
 	ext	v6.16b,v3.16b,v1.16b,#8
@@ -1219,7 +1224,7 @@ sha512_block_armv8:
 	add	v0.2d,v3.2d,v4.2d		// "D + T1"
 .inst	0xce628464	//sha512h2 v4.16b,v3.16b,v2.16b
 	add	v24.2d,v24.2d,v16.2d
-	ld1	{v25.2d},[x3],#16
+	ld1	{v25.2d},[PTR(3)],#16
 	ext	v24.16b,v24.16b,v24.16b,#8
 	ext	v5.16b,v0.16b,v1.16b,#8
 	ext	v6.16b,v2.16b,v0.16b,#8
@@ -1231,7 +1236,7 @@ sha512_block_armv8:
 	add	v3.2d,v2.2d,v1.2d		// "D + T1"
 .inst	0xce648441	//sha512h2 v1.16b,v2.16b,v4.16b
 	add	v25.2d,v25.2d,v17.2d
-	ld1	{v24.2d},[x3],#16
+	ld1	{v24.2d},[PTR(3)],#16
 	ext	v25.16b,v25.16b,v25.16b,#8
 	ext	v5.16b,v3.16b,v0.16b,#8
 	ext	v6.16b,v4.16b,v3.16b,#8
@@ -1243,7 +1248,7 @@ sha512_block_armv8:
 	add	v2.2d,v4.2d,v0.2d		// "D + T1"
 .inst	0xce618480	//sha512h2 v0.16b,v4.16b,v1.16b
 	add	v24.2d,v24.2d,v18.2d
-	ld1	{v25.2d},[x3],#16
+	ld1	{v25.2d},[PTR(3)],#16
 	ext	v24.16b,v24.16b,v24.16b,#8
 	ext	v5.16b,v2.16b,v3.16b,#8
 	ext	v6.16b,v1.16b,v2.16b,#8
@@ -1255,7 +1260,7 @@ sha512_block_armv8:
 	add	v4.2d,v1.2d,v3.2d		// "D + T1"
 .inst	0xce608423	//sha512h2 v3.16b,v1.16b,v0.16b
 	add	v25.2d,v25.2d,v19.2d
-	ld1	{v24.2d},[x3],#16
+	ld1	{v24.2d},[PTR(3)],#16
 	ext	v25.16b,v25.16b,v25.16b,#8
 	ext	v5.16b,v4.16b,v2.16b,#8
 	ext	v6.16b,v0.16b,v4.16b,#8
@@ -1267,7 +1272,7 @@ sha512_block_armv8:
 	add	v1.2d,v0.2d,v2.2d		// "D + T1"
 .inst	0xce638402	//sha512h2 v2.16b,v0.16b,v3.16b
 	add	v24.2d,v24.2d,v20.2d
-	ld1	{v25.2d},[x3],#16
+	ld1	{v25.2d},[PTR(3)],#16
 	ext	v24.16b,v24.16b,v24.16b,#8
 	ext	v5.16b,v1.16b,v4.16b,#8
 	ext	v6.16b,v3.16b,v1.16b,#8
@@ -1279,7 +1284,7 @@ sha512_block_armv8:
 	add	v0.2d,v3.2d,v4.2d		// "D + T1"
 .inst	0xce628464	//sha512h2 v4.16b,v3.16b,v2.16b
 	add	v25.2d,v25.2d,v21.2d
-	ld1	{v24.2d},[x3],#16
+	ld1	{v24.2d},[PTR(3)],#16
 	ext	v25.16b,v25.16b,v25.16b,#8
 	ext	v5.16b,v0.16b,v1.16b,#8
 	ext	v6.16b,v2.16b,v0.16b,#8
@@ -1291,7 +1296,7 @@ sha512_block_armv8:
 	add	v3.2d,v2.2d,v1.2d		// "D + T1"
 .inst	0xce648441	//sha512h2 v1.16b,v2.16b,v4.16b
 	add	v24.2d,v24.2d,v22.2d
-	ld1	{v25.2d},[x3],#16
+	ld1	{v25.2d},[PTR(3)],#16
 	ext	v24.16b,v24.16b,v24.16b,#8
 	ext	v5.16b,v3.16b,v0.16b,#8
 	ext	v6.16b,v4.16b,v3.16b,#8
@@ -1303,7 +1308,7 @@ sha512_block_armv8:
 	add	v2.2d,v4.2d,v0.2d		// "D + T1"
 .inst	0xce618480	//sha512h2 v0.16b,v4.16b,v1.16b
 	add	v25.2d,v25.2d,v23.2d
-	ld1	{v24.2d},[x3],#16
+	ld1	{v24.2d},[PTR(3)],#16
 	ext	v25.16b,v25.16b,v25.16b,#8
 	ext	v5.16b,v2.16b,v3.16b,#8
 	ext	v6.16b,v1.16b,v2.16b,#8
@@ -1315,7 +1320,7 @@ sha512_block_armv8:
 	add	v4.2d,v1.2d,v3.2d		// "D + T1"
 .inst	0xce608423	//sha512h2 v3.16b,v1.16b,v0.16b
 	add	v24.2d,v24.2d,v16.2d
-	ld1	{v25.2d},[x3],#16
+	ld1	{v25.2d},[PTR(3)],#16
 	ext	v24.16b,v24.16b,v24.16b,#8
 	ext	v5.16b,v4.16b,v2.16b,#8
 	ext	v6.16b,v0.16b,v4.16b,#8
@@ -1327,7 +1332,7 @@ sha512_block_armv8:
 	add	v1.2d,v0.2d,v2.2d		// "D + T1"
 .inst	0xce638402	//sha512h2 v2.16b,v0.16b,v3.16b
 	add	v25.2d,v25.2d,v17.2d
-	ld1	{v24.2d},[x3],#16
+	ld1	{v24.2d},[PTR(3)],#16
 	ext	v25.16b,v25.16b,v25.16b,#8
 	ext	v5.16b,v1.16b,v4.16b,#8
 	ext	v6.16b,v3.16b,v1.16b,#8
@@ -1339,7 +1344,7 @@ sha512_block_armv8:
 	add	v0.2d,v3.2d,v4.2d		// "D + T1"
 .inst	0xce628464	//sha512h2 v4.16b,v3.16b,v2.16b
 	add	v24.2d,v24.2d,v18.2d
-	ld1	{v25.2d},[x3],#16
+	ld1	{v25.2d},[PTR(3)],#16
 	ext	v24.16b,v24.16b,v24.16b,#8
 	ext	v5.16b,v0.16b,v1.16b,#8
 	ext	v6.16b,v2.16b,v0.16b,#8
@@ -1351,7 +1356,7 @@ sha512_block_armv8:
 	add	v3.2d,v2.2d,v1.2d		// "D + T1"
 .inst	0xce648441	//sha512h2 v1.16b,v2.16b,v4.16b
 	add	v25.2d,v25.2d,v19.2d
-	ld1	{v24.2d},[x3],#16
+	ld1	{v24.2d},[PTR(3)],#16
 	ext	v25.16b,v25.16b,v25.16b,#8
 	ext	v5.16b,v3.16b,v0.16b,#8
 	ext	v6.16b,v4.16b,v3.16b,#8
@@ -1363,7 +1368,7 @@ sha512_block_armv8:
 	add	v2.2d,v4.2d,v0.2d		// "D + T1"
 .inst	0xce618480	//sha512h2 v0.16b,v4.16b,v1.16b
 	add	v24.2d,v24.2d,v20.2d
-	ld1	{v25.2d},[x3],#16
+	ld1	{v25.2d},[PTR(3)],#16
 	ext	v24.16b,v24.16b,v24.16b,#8
 	ext	v5.16b,v2.16b,v3.16b,#8
 	ext	v6.16b,v1.16b,v2.16b,#8
@@ -1375,7 +1380,7 @@ sha512_block_armv8:
 	add	v4.2d,v1.2d,v3.2d		// "D + T1"
 .inst	0xce608423	//sha512h2 v3.16b,v1.16b,v0.16b
 	add	v25.2d,v25.2d,v21.2d
-	ld1	{v24.2d},[x3],#16
+	ld1	{v24.2d},[PTR(3)],#16
 	ext	v25.16b,v25.16b,v25.16b,#8
 	ext	v5.16b,v4.16b,v2.16b,#8
 	ext	v6.16b,v0.16b,v4.16b,#8
@@ -1387,7 +1392,7 @@ sha512_block_armv8:
 	add	v1.2d,v0.2d,v2.2d		// "D + T1"
 .inst	0xce638402	//sha512h2 v2.16b,v0.16b,v3.16b
 	add	v24.2d,v24.2d,v22.2d
-	ld1	{v25.2d},[x3],#16
+	ld1	{v25.2d},[PTR(3)],#16
 	ext	v24.16b,v24.16b,v24.16b,#8
 	ext	v5.16b,v1.16b,v4.16b,#8
 	ext	v6.16b,v3.16b,v1.16b,#8
@@ -1399,7 +1404,7 @@ sha512_block_armv8:
 	add	v0.2d,v3.2d,v4.2d		// "D + T1"
 .inst	0xce628464	//sha512h2 v4.16b,v3.16b,v2.16b
 	add	v25.2d,v25.2d,v23.2d
-	ld1	{v24.2d},[x3],#16
+	ld1	{v24.2d},[PTR(3)],#16
 	ext	v25.16b,v25.16b,v25.16b,#8
 	ext	v5.16b,v0.16b,v1.16b,#8
 	ext	v6.16b,v2.16b,v0.16b,#8
@@ -1411,7 +1416,7 @@ sha512_block_armv8:
 	add	v3.2d,v2.2d,v1.2d		// "D + T1"
 .inst	0xce648441	//sha512h2 v1.16b,v2.16b,v4.16b
 	add	v24.2d,v24.2d,v16.2d
-	ld1	{v25.2d},[x3],#16
+	ld1	{v25.2d},[PTR(3)],#16
 	ext	v24.16b,v24.16b,v24.16b,#8
 	ext	v5.16b,v3.16b,v0.16b,#8
 	ext	v6.16b,v4.16b,v3.16b,#8
@@ -1423,7 +1428,7 @@ sha512_block_armv8:
 	add	v2.2d,v4.2d,v0.2d		// "D + T1"
 .inst	0xce618480	//sha512h2 v0.16b,v4.16b,v1.16b
 	add	v25.2d,v25.2d,v17.2d
-	ld1	{v24.2d},[x3],#16
+	ld1	{v24.2d},[PTR(3)],#16
 	ext	v25.16b,v25.16b,v25.16b,#8
 	ext	v5.16b,v2.16b,v3.16b,#8
 	ext	v6.16b,v1.16b,v2.16b,#8
@@ -1435,7 +1440,7 @@ sha512_block_armv8:
 	add	v4.2d,v1.2d,v3.2d		// "D + T1"
 .inst	0xce608423	//sha512h2 v3.16b,v1.16b,v0.16b
 	add	v24.2d,v24.2d,v18.2d
-	ld1	{v25.2d},[x3],#16
+	ld1	{v25.2d},[PTR(3)],#16
 	ext	v24.16b,v24.16b,v24.16b,#8
 	ext	v5.16b,v4.16b,v2.16b,#8
 	ext	v6.16b,v0.16b,v4.16b,#8
@@ -1447,7 +1452,7 @@ sha512_block_armv8:
 	add	v1.2d,v0.2d,v2.2d		// "D + T1"
 .inst	0xce638402	//sha512h2 v2.16b,v0.16b,v3.16b
 	add	v25.2d,v25.2d,v19.2d
-	ld1	{v24.2d},[x3],#16
+	ld1	{v24.2d},[PTR(3)],#16
 	ext	v25.16b,v25.16b,v25.16b,#8
 	ext	v5.16b,v1.16b,v4.16b,#8
 	ext	v6.16b,v3.16b,v1.16b,#8
@@ -1459,7 +1464,7 @@ sha512_block_armv8:
 	add	v0.2d,v3.2d,v4.2d		// "D + T1"
 .inst	0xce628464	//sha512h2 v4.16b,v3.16b,v2.16b
 	add	v24.2d,v24.2d,v20.2d
-	ld1	{v25.2d},[x3],#16
+	ld1	{v25.2d},[PTR(3)],#16
 	ext	v24.16b,v24.16b,v24.16b,#8
 	ext	v5.16b,v0.16b,v1.16b,#8
 	ext	v6.16b,v2.16b,v0.16b,#8
@@ -1471,7 +1476,7 @@ sha512_block_armv8:
 	add	v3.2d,v2.2d,v1.2d		// "D + T1"
 .inst	0xce648441	//sha512h2 v1.16b,v2.16b,v4.16b
 	add	v25.2d,v25.2d,v21.2d
-	ld1	{v24.2d},[x3],#16
+	ld1	{v24.2d},[PTR(3)],#16
 	ext	v25.16b,v25.16b,v25.16b,#8
 	ext	v5.16b,v3.16b,v0.16b,#8
 	ext	v6.16b,v4.16b,v3.16b,#8
@@ -1483,7 +1488,7 @@ sha512_block_armv8:
 	add	v2.2d,v4.2d,v0.2d		// "D + T1"
 .inst	0xce618480	//sha512h2 v0.16b,v4.16b,v1.16b
 	add	v24.2d,v24.2d,v22.2d
-	ld1	{v25.2d},[x3],#16
+	ld1	{v25.2d},[PTR(3)],#16
 	ext	v24.16b,v24.16b,v24.16b,#8
 	ext	v5.16b,v2.16b,v3.16b,#8
 	ext	v6.16b,v1.16b,v2.16b,#8
@@ -1495,7 +1500,7 @@ sha512_block_armv8:
 	add	v4.2d,v1.2d,v3.2d		// "D + T1"
 .inst	0xce608423	//sha512h2 v3.16b,v1.16b,v0.16b
 	add	v25.2d,v25.2d,v23.2d
-	ld1	{v24.2d},[x3],#16
+	ld1	{v24.2d},[PTR(3)],#16
 	ext	v25.16b,v25.16b,v25.16b,#8
 	ext	v5.16b,v4.16b,v2.16b,#8
 	ext	v6.16b,v0.16b,v4.16b,#8
@@ -1506,9 +1511,9 @@ sha512_block_armv8:
 .inst	0xce678ad7	//sha512su1 v23.16b,v22.16b,v7.16b
 	add	v1.2d,v0.2d,v2.2d		// "D + T1"
 .inst	0xce638402	//sha512h2 v2.16b,v0.16b,v3.16b
-	ld1	{v25.2d},[x3],#16
+	ld1	{v25.2d},[PTR(3)],#16
 	add	v24.2d,v24.2d,v16.2d
-	ld1	{v16.16b},[x1],#16		// load next input
+	ld1	{v16.16b},[PTR(1)],#16		// load next input
 	ext	v24.16b,v24.16b,v24.16b,#8
 	ext	v5.16b,v1.16b,v4.16b,#8
 	ext	v6.16b,v3.16b,v1.16b,#8
@@ -1517,9 +1522,9 @@ sha512_block_armv8:
 	rev64	v16.16b,v16.16b
 	add	v0.2d,v3.2d,v4.2d		// "D + T1"
 .inst	0xce628464	//sha512h2 v4.16b,v3.16b,v2.16b
-	ld1	{v24.2d},[x3],#16
+	ld1	{v24.2d},[PTR(3)],#16
 	add	v25.2d,v25.2d,v17.2d
-	ld1	{v17.16b},[x1],#16		// load next input
+	ld1	{v17.16b},[PTR(1)],#16		// load next input
 	ext	v25.16b,v25.16b,v25.16b,#8
 	ext	v5.16b,v0.16b,v1.16b,#8
 	ext	v6.16b,v2.16b,v0.16b,#8
@@ -1528,9 +1533,9 @@ sha512_block_armv8:
 	rev64	v17.16b,v17.16b
 	add	v3.2d,v2.2d,v1.2d		// "D + T1"
 .inst	0xce648441	//sha512h2 v1.16b,v2.16b,v4.16b
-	ld1	{v25.2d},[x3],#16
+	ld1	{v25.2d},[PTR(3)],#16
 	add	v24.2d,v24.2d,v18.2d
-	ld1	{v18.16b},[x1],#16		// load next input
+	ld1	{v18.16b},[PTR(1)],#16		// load next input
 	ext	v24.16b,v24.16b,v24.16b,#8
 	ext	v5.16b,v3.16b,v0.16b,#8
 	ext	v6.16b,v4.16b,v3.16b,#8
@@ -1539,9 +1544,9 @@ sha512_block_armv8:
 	rev64	v18.16b,v18.16b
 	add	v2.2d,v4.2d,v0.2d		// "D + T1"
 .inst	0xce618480	//sha512h2 v0.16b,v4.16b,v1.16b
-	ld1	{v24.2d},[x3],#16
+	ld1	{v24.2d},[PTR(3)],#16
 	add	v25.2d,v25.2d,v19.2d
-	ld1	{v19.16b},[x1],#16		// load next input
+	ld1	{v19.16b},[PTR(1)],#16		// load next input
 	ext	v25.16b,v25.16b,v25.16b,#8
 	ext	v5.16b,v2.16b,v3.16b,#8
 	ext	v6.16b,v1.16b,v2.16b,#8
@@ -1550,9 +1555,9 @@ sha512_block_armv8:
 	rev64	v19.16b,v19.16b
 	add	v4.2d,v1.2d,v3.2d		// "D + T1"
 .inst	0xce608423	//sha512h2 v3.16b,v1.16b,v0.16b
-	ld1	{v25.2d},[x3],#16
+	ld1	{v25.2d},[PTR(3)],#16
 	add	v24.2d,v24.2d,v20.2d
-	ld1	{v20.16b},[x1],#16		// load next input
+	ld1	{v20.16b},[PTR(1)],#16		// load next input
 	ext	v24.16b,v24.16b,v24.16b,#8
 	ext	v5.16b,v4.16b,v2.16b,#8
 	ext	v6.16b,v0.16b,v4.16b,#8
@@ -1561,9 +1566,9 @@ sha512_block_armv8:
 	rev64	v20.16b,v20.16b
 	add	v1.2d,v0.2d,v2.2d		// "D + T1"
 .inst	0xce638402	//sha512h2 v2.16b,v0.16b,v3.16b
-	ld1	{v24.2d},[x3],#16
+	ld1	{v24.2d},[PTR(3)],#16
 	add	v25.2d,v25.2d,v21.2d
-	ld1	{v21.16b},[x1],#16		// load next input
+	ld1	{v21.16b},[PTR(1)],#16		// load next input
 	ext	v25.16b,v25.16b,v25.16b,#8
 	ext	v5.16b,v1.16b,v4.16b,#8
 	ext	v6.16b,v3.16b,v1.16b,#8
@@ -1572,9 +1577,9 @@ sha512_block_armv8:
 	rev64	v21.16b,v21.16b
 	add	v0.2d,v3.2d,v4.2d		// "D + T1"
 .inst	0xce628464	//sha512h2 v4.16b,v3.16b,v2.16b
-	ld1	{v25.2d},[x3],#16
+	ld1	{v25.2d},[PTR(3)],#16
 	add	v24.2d,v24.2d,v22.2d
-	ld1	{v22.16b},[x1],#16		// load next input
+	ld1	{v22.16b},[PTR(1)],#16		// load next input
 	ext	v24.16b,v24.16b,v24.16b,#8
 	ext	v5.16b,v0.16b,v1.16b,#8
 	ext	v6.16b,v2.16b,v0.16b,#8
@@ -1583,9 +1588,9 @@ sha512_block_armv8:
 	rev64	v22.16b,v22.16b
 	add	v3.2d,v2.2d,v1.2d		// "D + T1"
 .inst	0xce648441	//sha512h2 v1.16b,v2.16b,v4.16b
-	sub	x3,x3,#80*8	// rewind
+	sub	PTR(3),PTR(3),#80*8	// rewind
 	add	v25.2d,v25.2d,v23.2d
-	ld1	{v23.16b},[x1],#16		// load next input
+	ld1	{v23.16b},[PTR(1)],#16		// load next input
 	ext	v25.16b,v25.16b,v25.16b,#8
 	ext	v5.16b,v3.16b,v0.16b,#8
 	ext	v6.16b,v4.16b,v3.16b,#8
@@ -1601,9 +1606,9 @@ sha512_block_armv8:
 
 	cbnz	x2,.Loop_hw
 
-	st1	{v0.2d,v1.2d,v2.2d,v3.2d},[x0]		// store context
+	st1	{v0.2d,v1.2d,v2.2d,v3.2d},[PTR(0)]		// store context
 
-	ldr	x29,[sp],#16
+	ldr	PTR(29),[PTRN(sp)],#(2*PTR_WIDTH)
 	ret
 .size	sha512_block_armv8,.-sha512_block_armv8
 #endif
