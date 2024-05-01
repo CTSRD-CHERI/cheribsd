@@ -6193,7 +6193,7 @@ pmap_copy_pages(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
 		} else {
 			b_cp = (char *)PHYS_TO_DMAP_LEN(p_b + b_pg_offset, cnt);
 		}
-		bcopy(a_cp, b_cp, cnt);
+		bcopynocap(a_cp, b_cp, cnt);
 		a_offset += cnt;
 		b_offset += cnt;
 		xfersize -= cnt;
