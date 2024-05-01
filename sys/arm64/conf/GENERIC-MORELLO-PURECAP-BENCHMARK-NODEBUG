@@ -1,0 +1,4 @@
+include	"GENERIC-MORELLO-BENCHMARKABI"
+include	"../../conf/std.nodebug"
+
+ident	GENERIC-MORELLO-BENCHMARKABI-NODEBUG
