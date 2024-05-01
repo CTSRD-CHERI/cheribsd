@@ -407,7 +407,11 @@ SYSINIT(ilp32warn2, SI_SUB_LAST, SI_ORDER_FIFTH,
 #if __has_feature(capabilities)
 static char cheri_notice[] =
 #ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+    "CHERI pure-capability benchmark ABI kernel"
+#else
     "CHERI pure-capability kernel"
+#endif /* __ARM_MORELLO_PURECAP_BENCHMARK_ABI */
 #else
     "CHERI hybrid kernel"
 #endif
