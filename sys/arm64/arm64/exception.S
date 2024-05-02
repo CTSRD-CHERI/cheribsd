@@ -92,7 +92,11 @@
 	ldr	PTR(1), [PTR(18), #PC_SSBD]
 	cbz	x1, 1f
 	mov	w0, #1
+#ifdef __ASM_MORELLO_PURECAP_BENCHMARK_ABI
+	blr	x1
+#else
 	blr	PTR(1)
+#endif
 1:
 
 #ifdef PAC
@@ -135,7 +139,11 @@
 	ldr	PTR(1), [PTR(18), #PC_SSBD]
 	cbz	x1, 1f
 	mov	w0, #0
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	blr	x1
+#else
 	blr	PTR(1)
+#endif
 1:
 .endif
 	ldp	CAP(18), CAPN(lr), [PTRN(sp), #(TF_SP)]
