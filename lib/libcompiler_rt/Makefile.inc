@@ -132,10 +132,6 @@ SRCF+=		floatundisf
 #
 .if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386"
 SRCF+=		divxc3
-.if 0
-# Added in LLVM 18
-SRCF+=		extendxftf2
-.endif
 SRCF+=		fixxfdi
 SRCF+=		fixxfti
 SRCF+=		fixunsxfdi
@@ -145,10 +141,6 @@ SRCF+=		floattixf
 SRCF+=		floatuntixf
 SRCF+=		mulxc3
 SRCF+=		powixf2
-.if 0
-# Added in LLVM 18
-SRCF+=		trunctfxf2
-.endif
 
 # Avoid using SSE2 instructions on i386, if unsupported.
 .if ${MACHINE_CPUARCH} == "i386" && empty(MACHINE_CPU:Msse2)
@@ -157,6 +149,15 @@ SRCS+=		floatundixf.c
 .else
 SRCF+=		floatdixf
 SRCF+=		floatundixf
+.endif
+.endif
+
+# 128-bit float is an amd64 feature
+.if 0
+# Added in LLVM 18
+.if ${MACHINE_CPUARCH} == "amd64"
+SRCF+=		extendxftf2
+SRCF+=		trunctfxf2
 .endif
 .endif
 
