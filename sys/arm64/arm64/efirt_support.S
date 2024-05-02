@@ -103,7 +103,11 @@ ENTRY(efi_rt_arch_call_nofault)
 	bx	#4
 	.arch_extension	noc64
 	.arch_extension	a64c
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	blr	x6
+#else
 	blr	c6
+#endif
 	bx	#4
 	.arch_extension	c64
 
