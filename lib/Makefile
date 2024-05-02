@@ -80,6 +80,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	lib80211 \
 	${_libnetmap} \
 	libnv \
+	libnvmf \
 	libopenbsd \
 	libpam \
 	libpathconv \
