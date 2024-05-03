@@ -308,7 +308,7 @@
 #endif
 
 #if !defined(KASAN) && !defined(KMSAN)
-#define	UMA_MD_SMALL_ALLOC
+#define UMA_USE_DMAP
 #endif
 
 #ifndef LOCORE
