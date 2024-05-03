@@ -48,6 +48,7 @@ jobs:
         run: |
           brew update --quiet || true
           brew install ${{ matrix.pkgs }} || true
+          echo "PATH='/opt/homebrew/opt/llvm@14/bin:$PATH'" >> $GITHUB_ENV
       - name: create environment
         run: |
           echo "GITHUB_WORKSPACE = $GITHUB_WORKSPACE"
