@@ -63,6 +63,9 @@ struct Struct_Obj_Entry;
 })
 #endif
 
+/* No arch-specific dynamic tags */
+#define	arch_digest_dynamic(obj, dynp)	false
+
 bool arch_digest_note(struct Struct_Obj_Entry *obj, const Elf_Note *note);
 
 uintptr_t reloc_jmpslot(uintptr_t *where, uintptr_t target,
