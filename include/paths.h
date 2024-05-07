@@ -67,7 +67,6 @@
 #define	_PATH_FIRMWARE	"/usr/share/firmware"
 #define	_PATH_FTPUSERS	"/etc/ftpusers"
 #define	_PATH_FWMEM	"/dev/fwmem"
-#define	_PATH_GBDE	"/sbin/gbde"
 #define	_PATH_GELI	"/sbin/geli"
 #define	_PATH_HALT	"/sbin/halt"
 #ifdef COMPAT_libcompat
