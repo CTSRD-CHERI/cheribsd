@@ -150,6 +150,10 @@ void		 pmap_copy_page_tags(vm_page_t, vm_page_t);
 #endif
 void		 pmap_copy_pages(vm_page_t ma[], vm_offset_t a_offset,
 		    vm_page_t mb[], vm_offset_t b_offset, int xfersize);
+#if __has_feature(capabilities)
+void		 pmap_copy_pages_tags(vm_page_t ma[], vm_offset_t a_offset,
+		    vm_page_t mb[], vm_offset_t b_offset, int xfersize);
+#endif
 
 /*
  * CHERI capability revocation imposes the following novel demand on pmap_enter

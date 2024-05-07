@@ -6164,9 +6164,15 @@ pmap_copy_page_tags(vm_page_t msrc, vm_page_t mdst)
 
 int unmapped_buf_allowed = 1;
 
+#if __has_feature(capabilities)
+static void
+_pmap_copy_pages(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
+    vm_offset_t b_offset, int xfersize, bool clear_tags)
+#else
 void
 pmap_copy_pages(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
     vm_offset_t b_offset, int xfersize)
+#endif
 {
 	void *a_cp, *b_cp;
 	vm_page_t m_a, m_b;
@@ -6193,12 +6199,33 @@ pmap_copy_pages(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
 		} else {
 			b_cp = (char *)PHYS_TO_DMAP_LEN(p_b + b_pg_offset, cnt);
 		}
-		bcopynocap(a_cp, b_cp, cnt);
+#if __has_feature(capabilities)
+		if (clear_tags)
+			bcopynocap(a_cp, b_cp, cnt);
+		else
+#endif
+			bcopy(a_cp, b_cp, cnt);
 		a_offset += cnt;
 		b_offset += cnt;
 		xfersize -= cnt;
 	}
 }
+
+#if __has_feature(capabilities)
+void
+pmap_copy_pages(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
+    vm_offset_t b_offset, int xfersize)
+{
+	_pmap_copy_pages(ma, a_offset, mb, b_offset, xfersize, true);
+}
+
+void
+pmap_copy_pages_tags(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
+    vm_offset_t b_offset, int xfersize)
+{
+	_pmap_copy_pages(ma, a_offset, mb, b_offset, xfersize, false);
+}
+#endif
 
 vm_pointer_t
 pmap_quick_enter_page(vm_page_t m)
