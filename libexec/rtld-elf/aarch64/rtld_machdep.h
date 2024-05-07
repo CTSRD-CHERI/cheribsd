@@ -49,6 +49,8 @@
 
 struct Struct_Obj_Entry;
 
+#define	MD_OBJ_ENTRY
+
 /* Return the address of the .dynamic section in the dynamic linker. */
 #ifdef __CHERI_PURE_CAPABILITY__
 #define rtld_dynamic(obj) (&_DYNAMIC)

@@ -44,6 +44,8 @@
 
 struct Struct_Obj_Entry;
 
+#define	MD_OBJ_ENTRY
+
 #ifndef __CHERI_PURE_CAPABILITY__
 uint64_t set_gp(struct Struct_Obj_Entry *obj);
 #endif

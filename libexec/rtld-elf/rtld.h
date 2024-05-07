@@ -350,6 +350,8 @@ typedef struct Struct_Obj_Entry {
     bool cap_relocs_processed : 1; /* __cap_relocs section has been processed */
 #endif
 
+    MD_OBJ_ENTRY;
+
     struct link_map linkmap;	/* For GDB and dlinfo() */
     Objlist dldags;		/* Object belongs to these dlopened DAGs (%) */
     Objlist dagmembers;		/* DAG has these members (%) */
