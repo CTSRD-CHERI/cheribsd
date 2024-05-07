@@ -53,47 +53,19 @@ struct accel_ctrl_args {
 	// Data buffer count
 	int buffer_count;
 	// Data buffer information
-	ctrl_reg *buffers;
+	struct ctrl_reg *buffers;
 };
 
 int accel_malloc(struct accel_ctrl_args *accel_config);
 int accel_demalloc(struct accel_ctrl_args *accel_config);
 
-// JC TODO: Where to put following code?
-// JC TODO: Address translation?
-u64 accel_addr[8] = { 0xC0010000, 0xC0011000, 0xC0012000, 0xC0013000,
-	0xC0014000, 0xC0015000, 0xC0016000, 0xC0017000 };
-bool accel_states[8] = { 0 };
-
 int
 accel_malloc(struct accel_ctrl_args *accel_config)
 {
-	int index = -1;
-	for (int i = 0; i < 8; i++)
-		if (!accel_states[i]) {
-			accel_states[i] = 1;
-			index = i;
-			break;
-		}
-	if (index == -1)
-		return -1;
+	// int accel_addr[8] = { 0xC0010000, 0xC0011000, 0xC0012000, 0xC0013000,
+	// 	0xC0014000, 0xC0015000, 0xC0016000, 0xC0017000 };
 
-	// Allocate accelerator process
-	// JC: May need to use CHERI APIs
-	volatile u32 *accel_ptr = base_phy_addr[index];
-	accel_config->which = accel_ptr;
-
-	for (int i = 0; i < accel_config->buffer_count; i++) {
-		cntrl_reg *buffer = accel_config->buffers + i;
-
-		// Allocate buffer
-		u32 *data = (int *)malloc(buffer->size * sizeof(int));
-		buff->ptr = data;
-
-		// Write to control registers
-		*(volatile u32 *)(accel_ptr +
-		    (buffer->offset >> 2)) = (u32)data;
-	}
+	accel_config->buffer_count++;
 
 	return 0;
 }
@@ -102,26 +74,7 @@ int
 accel_demalloc(struct accel_ctrl_args *accel_config)
 {
 
-	volatile int accel_ptr = accel_config->which;
-
-	int index = -1;
-	for (int i = 0; i < 8; i++)
-		if (accel_addr[i] == accel_ptr && accel_states[i]) {
-			accel_states[i] = 0;
-			index = i;
-			break;
-		}
-	if (index == -1)
-		return -1;
-
-	// Deallocate accelerator process
-	// JC: May need to use CHERI APIs
-	for (int i = 0; i < accel_config->buffer_count; i++) {
-		cntrl_reg *buffer = accel_config->buffers + i;
-
-		// Deallocate buffer
-		free(buff->ptr);
-	}
+	accel_config->buffer_count--;
 
 	return 0;
 }
