@@ -880,7 +880,7 @@ int	_pthread_mutexattr_setrobust(pthread_mutexattr_t * _Nonnull, int);
 /* #include <fcntl.h> */
 #ifdef  _SYS_FCNTL_H_
 #ifndef _LIBC_PRIVATE_H_
-int     __sys_fcntl(int, int, __intptr_t);
+int     __sys_fcntl(int, int, intptr_t);
 int     __sys_openat(int, const char *, int, int);
 #endif /* _LIBC_PRIVATE_H_ */
 #endif /* _SYS_FCNTL_H_ */
