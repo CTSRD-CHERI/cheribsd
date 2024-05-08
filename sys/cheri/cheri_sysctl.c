@@ -36,6 +36,13 @@
 
 #include <cheri/cheri.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+FEATURE(cheriabi_kernel, "CheriABI kernel");
+#ifdef __CHERI_SUBOBJECT_BOUNDS__
+FEATURE(subobject_bounds, "CheriABI kernel with sub-object bounds");
+#endif
+#endif /* __CHERI_PURE_CAPABILITY__ */
+
 SYSCTL_NODE(_security, OID_AUTO, cheri, CTLFLAG_RD, 0,
     "CHERI settings and statistics");
 
