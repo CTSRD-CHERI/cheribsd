@@ -282,33 +282,45 @@ uiomove_flags(void *cp, int n, struct uio *uio, bool nofault,
 		switch (uio->uio_segflg) {
 		case UIO_USERSPACE:
 			maybe_yield();
-			if (preserve_tags) {
-				if (uio->uio_rw == UIO_READ)
+			switch (uio->uio_rw) {
+			case UIO_READ:
+				if (preserve_tags)
 					error = copyoutcap(cp, iov->iov_base,
 					    cnt);
 				else
+					error = copyout(cp, iov->iov_base, cnt);
+				break;
+			case UIO_WRITE:
+				if (preserve_tags)
 					error = copyincap(iov->iov_base, cp,
 					    cnt);
-			} else if (uio->uio_rw == UIO_READ)
-				error = copyout(cp, iov->iov_base, cnt);
-			else
-				error = copyin(iov->iov_base, cp, cnt);
+				else
+					error = copyout(cp, iov->iov_base, cnt);
+				break;
+			}
 			if (error)
 				goto out;
 			break;
 
 		case UIO_SYSSPACE:
-			if (preserve_tags) {
-				if (uio->uio_rw == UIO_READ)
+			switch (uio->uio_rw) {
+			case UIO_READ:
+				if (preserve_tags)
 					bcopy_c(PTR2CAP(cp), iov->iov_base,
 					    cnt);
 				else
+					bcopynocap_c(PTR2CAP(cp), iov->iov_base,
+					    cnt);
+				break;
+			case UIO_WRITE:
+				if (preserve_tags)
 					bcopy_c(iov->iov_base, PTR2CAP(cp),
 					    cnt);
-			} else if (uio->uio_rw == UIO_READ)
-				bcopynocap_c(PTR2CAP(cp), iov->iov_base, cnt);
-			else
-				bcopynocap_c(iov->iov_base, PTR2CAP(cp), cnt);
+				else
+					bcopynocap_c(iov->iov_base, PTR2CAP(cp),
+					    cnt);
+				break;
+			}
 			break;
 		case UIO_NOCOPY:
 			break;
