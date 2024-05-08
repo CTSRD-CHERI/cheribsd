@@ -41,6 +41,9 @@ FEATURE(cheriabi_kernel, "CheriABI kernel");
 #ifdef __CHERI_SUBOBJECT_BOUNDS__
 FEATURE(subobject_bounds, "CheriABI kernel with sub-object bounds");
 #endif
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+FEATURE(benchmark_abi_kernel, "Morello benchmark ABI kernel");
+#endif
 #endif /* __CHERI_PURE_CAPABILITY__ */
 
 SYSCTL_NODE(_security, OID_AUTO, cheri, CTLFLAG_RD, 0,
