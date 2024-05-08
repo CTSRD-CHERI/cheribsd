@@ -70,11 +70,11 @@ ENTRY(efi_rt_arch_call_nofault)
 	ldr	c6, [c0, #EC_FPTR]
 
 	/* Jump to 0f + 4 * (5 - ec_argcnt) + 1 */
-	adr	c9, 0f + 1
+	adr	c9, 0f
 	mov	x10, #20
 	sub	x8, x10, x8, lsl #2
 	add	c9, c9, x8, uxtx
-	br	c9
+	br	x9
 
 	/* Load the arguments into registers */
 0:	ldr	x4, [c0, #EC_ARG5]
