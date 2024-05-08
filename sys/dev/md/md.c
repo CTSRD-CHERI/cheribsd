@@ -987,11 +987,13 @@ unmapped_step:
 		auio.uio_iovcnt = 1;
 	}
 	iostart = auio.uio_offset;
-	if (auio.uio_rw == UIO_READ) {
+	switch (auio.uio_rw) {
+	case UIO_READ:
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 		error = VOP_READ(vp, &auio, 0, sc->cred);
 		VOP_UNLOCK(vp);
-	} else {
+		break;
+	case UIO_WRITE:
 		(void) vn_start_write(vp, &mp, V_WAIT);
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 		error = VOP_WRITE(vp, &auio, sc->flags & MD_ASYNC ? 0 : IO_SYNC,
@@ -1000,6 +1002,7 @@ unmapped_step:
 		vn_finished_write(mp);
 		if (error == 0)
 			sc->flags &= ~MD_VERIFY;
+		break;
 	}
 
 	/* When MD_CACHE is set, try to avoid double-caching the data. */
