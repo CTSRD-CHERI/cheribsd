@@ -1176,8 +1176,7 @@ tramp_hook_impl(int event, const struct tramp_header *hdr,
 	const char *sym;
 	const char *callee;
 	const char *caller;
-	struct utrace_rtld ut;
-	static const char rtld_utrace_sig[RTLD_UTRACE_SIG_SZ] = RTLD_UTRACE_SIG;
+	struct utrace_c18n ut;
 
 	if (ld_compartment_utrace != NULL) {
 		if (hdr->symnum == 0)
@@ -1187,10 +1186,15 @@ tramp_hook_impl(int event, const struct tramp_header *hdr,
 		callee = comparts.data[index_to_cid(tf->callee)].name;
 		caller = comparts.data[index_to_cid(tf->caller)].name;
 
-		memcpy(ut.sig, rtld_utrace_sig, sizeof(ut.sig));
+		memcpy(ut.sig, C18N_UTRACE_SIG, C18N_UTRACE_SIG_SZ);
 		ut.event = event;
-		ut.handle = hdr->target;
-		ut.mapsize = hdr->symnum;
+		ut.symnum = hdr->symnum;
+		ut.fp = tf->fp;
+		ut.pc = tf->pc;
+		ut.sp = tf->sp;
+		ut.osp = tf->osp;
+		ut.previous = tf->previous;
+		memcpy(&ut.fsig, &hdr->sig, sizeof(ut.fsig));
 		strlcpy(ut.symbol, sym, sizeof(ut.symbol));
 		strlcpy(ut.callee, callee, sizeof(ut.callee));
 		strlcpy(ut.caller, caller, sizeof(ut.caller));
