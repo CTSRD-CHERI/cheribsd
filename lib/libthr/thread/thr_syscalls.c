@@ -200,7 +200,7 @@ __thr_connect(int fd, const struct sockaddr *name, socklen_t namelen)
  *   if it is canceled.
  */
 static int
-__thr_fcntl(int fd, int cmd, intptr_t arg)
+__thr_fcntl(int fd, int cmd, __intptr_t arg)
 {
 	struct pthread *curthread;
 	int ret;
@@ -307,7 +307,7 @@ __thr_openat(int fd, const char *path, int flags, int mode)
 {
 	struct pthread *curthread;
 	int ret;
-	
+
 	curthread = _get_curthread();
 	_thr_cancel_enter(curthread);
 	ret = __sys_openat(fd, path, flags, mode);
