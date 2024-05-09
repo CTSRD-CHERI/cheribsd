@@ -65,10 +65,12 @@ sub AUTOLOAD()		# thunk [simplified] x86-style perlasm
     $code .= "\t$opcode\t".join(',',@_,$arg)."\n";
 }
 
-my ($out,$inp,$len,$key,$ctr) = map("x$_",(0..4));
+my ($out,$inp,$len,$key,$ctr) = ("PTR(0)","PTR(1)","x2","PTR(3)","x4");
+my ($ctrp) = ("PTR(4)");
 
 my @x=map("x$_",(5..17,19..21));
 my @d=map("x$_",(22..28,30));
+my @p=map("PTR($_)",(5..17,19..21));
 
 sub ROUND {
 my ($a0,$b0,$c0,$d0)=@_;
@@ -159,28 +161,28 @@ ChaCha20_ctr32:
 	b.lo	.Lshort
 
 #ifndef	__KERNEL__
-	adrp	x17,OPENSSL_armcap_P
-	ldr	w17,[x17,#:lo12:OPENSSL_armcap_P]
+	adrp	PTR(17),OPENSSL_armcap_P
+	ldr	w17,[PTR(17),#:lo12:OPENSSL_armcap_P]
 	tst	w17,#ARMV7_NEON
 	b.ne	.LChaCha20_neon
 #endif
 
 .Lshort:
-	stp	x29,x30,[sp,#-96]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(12*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 
-	adr	@x[0],.Lsigma
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	stp	x23,x24,[sp,#48]
-	stp	x25,x26,[sp,#64]
-	stp	x27,x28,[sp,#80]
-	sub	sp,sp,#64
+	adr	@p[0],.Lsigma
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
+	stp	PTR(25),PTR(26),[PTRN(sp),#(8*PTR_WIDTH)]
+	stp	PTR(27),PTR(28),[PTRN(sp),#(10*PTR_WIDTH)]
+	sub	PTRN(sp),PTRN(sp),#64
 
-	ldp	@d[0],@d[1],[@x[0]]		// load sigma
+	ldp	@d[0],@d[1],[@p[0]]		// load sigma
 	ldp	@d[2],@d[3],[$key]		// load key
 	ldp	@d[4],@d[5],[$key,#16]
-	ldp	@d[6],@d[7],[$ctr]		// load counter
+	ldp	@d[6],@d[7],[$ctrp]		// load counter
 #ifdef	__AARCH64EB__
 	ror	@d[2],@d[2],#32
 	ror	@d[3],@d[3],#32
@@ -278,13 +280,13 @@ $code.=<<___;
 
 	b.hi	.Loop_outer
 
-	ldp	x19,x20,[x29,#16]
-	add	sp,sp,#64
-	ldp	x21,x22,[x29,#32]
-	ldp	x23,x24,[x29,#48]
-	ldp	x25,x26,[x29,#64]
-	ldp	x27,x28,[x29,#80]
-	ldp	x29,x30,[sp],#96
+	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
+	add	PTRN(sp),PTRN(sp),#64
+	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
+	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
+	ldp	PTR(25),PTR(26),[PTR(29),#(8*PTR_WIDTH)]
+	ldp	PTR(27),PTR(28),[PTR(29),#(10*PTR_WIDTH)]
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(12*PTR_WIDTH)
 .Labort:
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
@@ -296,7 +298,7 @@ $code.=<<___;
 	sub	$out,$out,#1
 	add	$inp,$inp,$len
 	add	$out,$out,$len
-	add	$ctr,sp,$len
+	add	$ctrp,PTRN(sp),$len
 	neg	$len,$len
 
 	add	@x[0],@x[0],@x[1],lsl#32	// pack
@@ -317,31 +319,31 @@ $code.=<<___;
 	rev	@x[12],@x[12]
 	rev	@x[14],@x[14]
 #endif
-	stp	@x[0],@x[2],[sp,#0]
-	stp	@x[4],@x[6],[sp,#16]
-	stp	@x[8],@x[10],[sp,#32]
-	stp	@x[12],@x[14],[sp,#48]
+	stp	@x[0],@x[2],[PTRN(sp),#0]
+	stp	@x[4],@x[6],[PTRN(sp),#16]
+	stp	@x[8],@x[10],[PTRN(sp),#32]
+	stp	@x[12],@x[14],[PTRN(sp),#48]
 
 .Loop_tail:
 	ldrb	w10,[$inp,$len]
-	ldrb	w11,[$ctr,$len]
+	ldrb	w11,[$ctrp,$len]
 	add	$len,$len,#1
 	eor	w10,w10,w11
 	strb	w10,[$out,$len]
 	cbnz	$len,.Loop_tail
 
-	stp	xzr,xzr,[sp,#0]
-	stp	xzr,xzr,[sp,#16]
-	stp	xzr,xzr,[sp,#32]
-	stp	xzr,xzr,[sp,#48]
+	stp	xzr,xzr,[PTRN(sp),#0]
+	stp	xzr,xzr,[PTRN(sp),#16]
+	stp	xzr,xzr,[PTRN(sp),#32]
+	stp	xzr,xzr,[PTRN(sp),#48]
 
-	ldp	x19,x20,[x29,#16]
-	add	sp,sp,#64
-	ldp	x21,x22,[x29,#32]
-	ldp	x23,x24,[x29,#48]
-	ldp	x25,x26,[x29,#64]
-	ldp	x27,x28,[x29,#80]
-	ldp	x29,x30,[sp],#96
+	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
+	add	PTRN(sp),PTRN(sp),#64
+	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
+	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
+	ldp	PTR(25),PTR(26),[PTR(29),#(8*PTR_WIDTH)]
+	ldp	PTR(27),PTR(28),[PTR(29),#(10*PTR_WIDTH)]
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(12*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	ChaCha20_ctr32,.-ChaCha20_ctr32
@@ -434,29 +436,29 @@ $code.=<<___;
 ChaCha20_neon:
 	AARCH64_SIGN_LINK_REGISTER
 .LChaCha20_neon:
-	stp	x29,x30,[sp,#-96]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(12*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 
-	adr	@x[0],.Lsigma
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	stp	x23,x24,[sp,#48]
-	stp	x25,x26,[sp,#64]
-	stp	x27,x28,[sp,#80]
+	adr	@p[0],.Lsigma
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
+	stp	PTR(25),PTR(26),[PTRN(sp),#(8*PTR_WIDTH)]
+	stp	PTR(27),PTR(28),[PTRN(sp),#(10*PTR_WIDTH)]
 	cmp	$len,#512
 	b.hs	.L512_or_more_neon
 
-	sub	sp,sp,#64
+	sub	PTRN(sp),PTRN(sp),#64
 
-	ldp	@d[0],@d[1],[@x[0]]		// load sigma
-	ld1	{@K[0]},[@x[0]],#16
+	ldp	@d[0],@d[1],[@p[0]]		// load sigma
+	ld1	{@K[0]},[@p[0]],#16
 	ldp	@d[2],@d[3],[$key]		// load key
 	ldp	@d[4],@d[5],[$key,#16]
 	ld1	{@K[1],@K[2]},[$key]
-	ldp	@d[6],@d[7],[$ctr]		// load counter
-	ld1	{@K[3]},[$ctr]
-	stp	d8,d9,[sp]			// meet ABI requirements
-	ld1	{$CTR,$ROT24},[@x[0]]
+	ldp	@d[6],@d[7],[$ctrp]		// load counter
+	ld1	{@K[3]},[$ctrp]
+	stp	d8,d9,[PTRN(sp)]		// meet ABI requirements
+	ld1	{$CTR,$ROT24},[@p[0]]
 #ifdef	__AARCH64EB__
 	rev64	@K[0],@K[0]
 	ror	@d[2],@d[2],#32
@@ -658,22 +660,22 @@ $code.=<<___;
 
 	b.hi	.Loop_outer_neon
 
-	ldp	d8,d9,[sp]			// meet ABI requirements
+	ldp	d8,d9,[PTRN(sp)]			// meet ABI requirements
 
-	ldp	x19,x20,[x29,#16]
-	add	sp,sp,#64
-	ldp	x21,x22,[x29,#32]
-	ldp	x23,x24,[x29,#48]
-	ldp	x25,x26,[x29,#64]
-	ldp	x27,x28,[x29,#80]
-	ldp	x29,x30,[sp],#96
+	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
+	add	PTRN(sp),PTRN(sp),#64
+	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
+	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
+	ldp	PTR(25),PTR(26),[PTR(29),#(8*PTR_WIDTH)]
+	ldp	PTR(27),PTR(28),[PTR(29),#(10*PTR_WIDTH)]
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(12*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 
 .align	4
 .Ltail_neon:
 	add	$len,$len,#320
-	ldp	d8,d9,[sp]			// meet ABI requirements
+	ldp	d8,d9,[PTRN(sp)]			// meet ABI requirements
 	cmp	$len,#64
 	b.lo	.Less_than_64
 
@@ -770,35 +772,35 @@ $code.=<<___;
 	sub	$len,$len,#64
 
 .Last_neon:
-	st1.8	{$xa0-$xd0},[sp]
+	st1.8	{$xa0-$xd0},[PTRN(sp)]
 
 	sub	$out,$out,#1
 	add	$inp,$inp,$len
 	add	$out,$out,$len
-	add	$ctr,sp,$len
+	add	$ctrp,PTRN(sp),$len
 	neg	$len,$len
 
 .Loop_tail_neon:
 	ldrb	w10,[$inp,$len]
-	ldrb	w11,[$ctr,$len]
+	ldrb	w11,[$ctrp,$len]
 	add	$len,$len,#1
 	eor	w10,w10,w11
 	strb	w10,[$out,$len]
 	cbnz	$len,.Loop_tail_neon
 
-	stp	xzr,xzr,[sp,#0]
-	stp	xzr,xzr,[sp,#16]
-	stp	xzr,xzr,[sp,#32]
-	stp	xzr,xzr,[sp,#48]
+	stp	xzr,xzr,[PTRN(sp),#0]
+	stp	xzr,xzr,[PTRN(sp),#16]
+	stp	xzr,xzr,[PTRN(sp),#32]
+	stp	xzr,xzr,[PTRN(sp),#48]
 
 .Ldone_neon:
-	ldp	x19,x20,[x29,#16]
-	add	sp,sp,#64
-	ldp	x21,x22,[x29,#32]
-	ldp	x23,x24,[x29,#48]
-	ldp	x25,x26,[x29,#64]
-	ldp	x27,x28,[x29,#80]
-	ldp	x29,x30,[sp],#96
+	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
+	add	PTRN(sp),PTRN(sp),#64
+	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
+	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
+	ldp	PTR(25),PTR(26),[PTR(29),#(8*PTR_WIDTH)]
+	ldp	PTR(27),PTR(28),[PTR(29),#(10*PTR_WIDTH)]
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(12*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	ChaCha20_neon,.-ChaCha20_neon
@@ -845,29 +847,29 @@ $code.=<<___;
 .align	5
 ChaCha20_512_neon:
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-96]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(12*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 
-	adr	@x[0],.Lsigma
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	stp	x23,x24,[sp,#48]
-	stp	x25,x26,[sp,#64]
-	stp	x27,x28,[sp,#80]
+	adr	@p[0],.Lsigma
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
+	stp	PTR(25),PTR(26),[PTRN(sp),#(8*PTR_WIDTH)]
+	stp	PTR(27),PTR(28),[PTRN(sp),#(10*PTR_WIDTH)]
 
 .L512_or_more_neon:
-	sub	sp,sp,#128+64
+	sub	PTRN(sp),PTRN(sp),#128+64
 
 	eor	$ONE,$ONE,$ONE
-	ldp	@d[0],@d[1],[@x[0]]		// load sigma
-	ld1	{@K[0]},[@x[0]],#16
+	ldp	@d[0],@d[1],[@p[0]]		// load sigma
+	ld1	{@K[0]},[@p[0]],#16
 	ldp	@d[2],@d[3],[$key]		// load key
 	ldp	@d[4],@d[5],[$key,#16]
 	ld1	{@K[1],@K[2]},[$key]
-	ldp	@d[6],@d[7],[$ctr]		// load counter
-	ld1	{@K[3]},[$ctr]
-	ld1	{$ONE}[0],[@x[0]]
-	add	$key,@x[0],#16			// .Lrot24
+	ldp	@d[6],@d[7],[$ctrp]		// load counter
+	ld1	{@K[3]},[$ctrp]
+	ld1	{$ONE}[0],[@p[0]]
+	add	$key,@p[0],#16			// .Lrot24
 #ifdef	__AARCH64EB__
 	rev64	@K[0],@K[0]
 	ror	@d[2],@d[2],#32
@@ -878,18 +880,18 @@ ChaCha20_512_neon:
 	ror	@d[7],@d[7],#32
 #endif
 	add	@K[3],@K[3],$ONE		// += 1
-	stp	@K[0],@K[1],[sp,#0]		// off-load key block, invariant part
+	stp	@K[0],@K[1],[PTRN(sp),#0]	// off-load key block, invariant part
 	add	@K[3],@K[3],$ONE		// not typo
-	str	@K[2],[sp,#32]
+	str	@K[2],[PTRN(sp),#32]
 	add	@K[4],@K[3],$ONE
 	add	@K[5],@K[4],$ONE
 	add	@K[6],@K[5],$ONE
 	shl	$ONE,$ONE,#2			// 1 -> 4
 
-	stp	d8,d9,[sp,#128+0]		// meet ABI requirements
-	stp	d10,d11,[sp,#128+16]
-	stp	d12,d13,[sp,#128+32]
-	stp	d14,d15,[sp,#128+48]
+	stp	d8,d9,[PTRN(sp),#128+0]		// meet ABI requirements
+	stp	d10,d11,[PTRN(sp),#128+16]
+	stp	d12,d13,[PTRN(sp),#128+32]
+	stp	d14,d15,[PTRN(sp),#128+48]
 
 	sub	$len,$len,#512			// not typo
 
@@ -933,9 +935,9 @@ ChaCha20_512_neon:
 	 mov	$C3,@K[2]
 	lsr	@x[15],@d[7],#32
 	 mov	$C4,@K[2]
-	 stp	@K[3],@K[4],[sp,#48]		// off-load key block, variable part
+	 stp	@K[3],@K[4],[PTRN(sp),#48]	// off-load key block, variable part
 	 mov	$C5,@K[2]
-	 stp	@K[5],@K[6],[sp,#80]
+	 stp	@K[5],@K[6],[PTRN(sp),#80]
 
 	mov	$ctr,#5
 	ld1	{$rot24},[$key]
@@ -1094,13 +1096,13 @@ $code.=<<___;
 	cbnz	$ctr,.Loop_lower_neon
 
 	add.32	@x[0],@x[0],@d[0]		// accumulate key block
-	 ldp	@K[0],@K[1],[sp,#0]
+	 ldp	@K[0],@K[1],[PTRN(sp),#0]
 	add	@x[1],@x[1],@d[0],lsr#32
-	 ldp	@K[2],@K[3],[sp,#32]
+	 ldp	@K[2],@K[3],[PTRN(sp),#32]
 	add.32	@x[2],@x[2],@d[1]
-	 ldp	@K[4],@K[5],[sp,#64]
+	 ldp	@K[4],@K[5],[PTRN(sp),#64]
 	add	@x[3],@x[3],@d[1],lsr#32
-	 ldr	@K[6],[sp,#96]
+	 ldr	@K[6],[PTRN(sp),#96]
 	 add	$A0,$A0,@K[0]
 	add.32	@x[4],@x[4],@d[2]
 	 add	$A1,$A1,@K[0]
@@ -1195,9 +1197,9 @@ $code.=<<___;
 
 	ld1.8	{$A1-$D1},[$inp],#64
 	eor	$A2,$A2,$A0
-	 ldp	@K[0],@K[1],[sp,#0]
+	 ldp	@K[0],@K[1],[PTRN(sp),#0]
 	eor	$B2,$B2,$B0
-	 ldp	@K[2],@K[3],[sp,#32]
+	 ldp	@K[2],@K[3],[PTRN(sp),#32]
 	eor	$C2,$C2,$C0
 	eor	$D2,$D2,$D0
 	st1.8	{$A2-$D2},[$out],#64
@@ -1233,24 +1235,24 @@ $code.=<<___;
 	adds	$len,$len,#512
 	ushr	$ONE,$ONE,#1			// 4 -> 2
 
-	ldp	d10,d11,[sp,#128+16]		// meet ABI requirements
-	ldp	d12,d13,[sp,#128+32]
-	ldp	d14,d15,[sp,#128+48]
+	ldp	d10,d11,[PTRN(sp),#128+16]	// meet ABI requirements
+	ldp	d12,d13,[PTRN(sp),#128+32]
+	ldp	d14,d15,[PTRN(sp),#128+48]
 
-	stp	@K[0],@K[0],[sp,#0]		// wipe off-load area
-	stp	@K[0],@K[0],[sp,#32]
-	stp	@K[0],@K[0],[sp,#64]
+	stp	@K[0],@K[0],[PTRN(sp),#0]	// wipe off-load area
+	stp	@K[0],@K[0],[PTRN(sp),#32]
+	stp	@K[0],@K[0],[PTRN(sp),#64]
 
 	b.eq	.Ldone_512_neon
 
 	sub	$key,$key,#16			// .Lone
 	cmp	$len,#192
-	add	sp,sp,#128
+	add	PTRN(sp),PTRN(sp),#128
 	sub	@K[3],@K[3],$ONE		// -= 2
 	ld1	{$CTR,$ROT24},[$key]
 	b.hs	.Loop_outer_neon
 
-	ldp	d8,d9,[sp,#0]			// meet ABI requirements
+	ldp	d8,d9,[PTRN(sp),#0]		// meet ABI requirements
 	eor	@K[1],@K[1],@K[1]
 	eor	@K[2],@K[2],@K[2]
 	eor	@K[3],@K[3],@K[3]
@@ -1260,14 +1262,14 @@ $code.=<<___;
 	b	.Loop_outer
 
 .Ldone_512_neon:
-	ldp	d8,d9,[sp,#128+0]		// meet ABI requirements
-	ldp	x19,x20,[x29,#16]
-	add	sp,sp,#128+64
-	ldp	x21,x22,[x29,#32]
-	ldp	x23,x24,[x29,#48]
-	ldp	x25,x26,[x29,#64]
-	ldp	x27,x28,[x29,#80]
-	ldp	x29,x30,[sp],#96
+	ldp	d8,d9,[PTRN(sp),#128+0]		// meet ABI requirements
+	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
+	add	PTRN(sp),PTRN(sp),#128+64
+	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
+	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
+	ldp	PTR(25),PTR(26),[PTR(29),#(8*PTR_WIDTH)]
+	ldp	PTR(27),PTR(28),[PTR(29),#(10*PTR_WIDTH)]
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(12*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	ChaCha20_512_neon,.-ChaCha20_512_neon
