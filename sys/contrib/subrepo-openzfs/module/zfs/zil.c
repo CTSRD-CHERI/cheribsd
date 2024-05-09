@@ -2351,7 +2351,8 @@ zil_itx_create(uint64_t txtype, size_t olrsize)
 	itx_t *itx;
 
 	ASSERT3U(olrsize, >=, sizeof (lr_t));
-	lrsize = P2ROUNDUP_TYPED(olrsize, sizeof (uint64_t), size_t);
+	lrsize = MAX(olrsize, sizeof (itx_t) - offsetof(itx_t, itx_lr));
+	lrsize = P2ROUNDUP_TYPED(lrsize, sizeof (uint64_t), size_t);
 	ASSERT3U(lrsize, >=, olrsize);
 	itxsize = offsetof(itx_t, itx_lr) + lrsize;
 
