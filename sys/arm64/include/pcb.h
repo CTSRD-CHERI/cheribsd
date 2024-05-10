@@ -59,16 +59,7 @@ struct pcb {
 	uintcap_t	pcb_cid_el0;
 	uintcap_t	pcb_rcsp_el0;
 	uintcap_t	pcb_rddc_el0;
-#ifndef CHERI_COMPARTMENTALIZE_KERNEL
-	/*
-	 * Restricted registers must be fully maintained in the user space.
-	 * Or can it be fixed?
-	 *
-	 * XXXKW: How will it work with context switching between two user-space
-	 * threads with the active one running in the restricted mode?
-	 */
 	uintcap_t	pcb_rctpidr_el0;
-#endif
 #endif
 
 	/* Fault handler, the error value is passed in x0 */
