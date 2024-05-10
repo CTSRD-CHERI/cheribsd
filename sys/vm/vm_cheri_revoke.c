@@ -1196,6 +1196,7 @@ vm_map_install_cheri_revoke_shadow(struct vm_map *map, struct sysentvec *sv)
 	 * both large and sparsely mapped.
 	 */
 	vm_object_set_flag(vmo_shadow, OBJ_NOCAP);
+	vm_object_set_flag(vmo_shadow, OBJ_CHERISHADOW);
 
 	vmo_info = vm_object_allocate(OBJT_SWAP, PAGE_SIZE);
 
