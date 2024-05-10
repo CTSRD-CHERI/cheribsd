@@ -319,6 +319,13 @@ SUPERVISOR_ENTRY(fork_trampoline)
 	msr	ddc_el0, c0
 #endif
 
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	/* Restore Restricted sp and ddc */
+	ldp	CAP(10), CAP(11), [PTRN(sp), #TF_RCSP]
+	msr	rcsp_el0, CAP(10)
+	msr	rddc_el0, CAP(11)
+#endif
+
 	/* Restore the CPU registers */
 	ldp	CAP(0), CAP(1), [PTRN(sp), #TF_X + 0 * CAP_WIDTH]
 	ldp	CAP(2), CAP(3), [PTRN(sp), #TF_X + 2 * CAP_WIDTH]
