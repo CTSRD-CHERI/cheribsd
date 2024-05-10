@@ -107,7 +107,7 @@
 	 * use a trampoline as well.
 	 */
 	mov	x0, COMPARTMENT_KERNEL_ID
-	mov	x1, 0
+	mov	x1, TRAMPOLINE_TYPE_COMPARTMENT_ENTRY
 	bl	compartment_entry_stackptr
 	gclim	x1, c0
 	scvalue	c0, c0, x1

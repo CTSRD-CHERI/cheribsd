@@ -62,10 +62,6 @@ SYSCTL_NODE(_security, OID_AUTO, compartment, CTLFLAG_RD, 0,
 SYSCTL_NODE(_security_compartment, OID_AUTO, counters, CTLFLAG_RD, 0,
     "Counters for compartment trampolines");
 
-#define	TRAMPOLINE_TYPE_COMPARTMENT_ENTRY	0
-#define	TRAMPOLINE_TYPE_SUPERVISOR_ENTRY	1
-#define	TRAMPOLINE_TYPE_MAX			TRAMPOLINE_TYPE_SUPERVISOR_ENTRY
-
 unsigned long compartment_trampoline_counters[TRAMPOLINE_TYPE_MAX + 1];
 
 SYSCTL_ULONG(_security_compartment_counters, OID_AUTO, compartment_entry,
