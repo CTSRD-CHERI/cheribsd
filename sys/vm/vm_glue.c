@@ -640,6 +640,19 @@ vm_kstack_pindex(vm_offset_t ks, int kpages)
 }
 
 /*
+ * Initialise the kernel stack for a compartment.
+ *
+ * This function was added to let init_proc0() initialise compartment0.
+ */
+void
+vm_compartment_init_stack(struct compartment *compartment, vm_pointer_t stack)
+{
+
+	compartment->c_kstack = stack;
+	compartment->c_kstackptr = stack + kstack_pages * PAGE_SIZE;
+}
+
+/*
  * Allocate the kernel stack for a new compartment.
  */
 int
@@ -651,8 +664,7 @@ vm_compartment_new(struct compartment *compartment)
 	if (ks == 0)
 		return (0);
 
-	compartment->c_kstack = ks;
-	compartment->c_kstackptr = ks + kstack_pages * PAGE_SIZE;
+	vm_compartment_init_stack(compartment, ks);
 	return (1);
 }
 

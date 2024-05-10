@@ -117,18 +117,15 @@ compartment_linkup(struct compartment *compartment, int id, struct thread *td)
 }
 
 void
-compartment_linkup0(struct compartment *compartment, vm_pointer_t stack,
-    struct thread *td)
+compartment_linkup0(struct compartment *compartment, struct thread *td)
 {
 
-	compartment->c_kstack = stack;
-	compartment->c_kstackptr = stack + kstack_pages * PAGE_SIZE;
-
+	TAILQ_INIT(&td->td_compartments);
 	compartment_linkup(compartment, COMPARTMENT_KERNEL_ID, td);
 }
 
-static struct compartment *
-compartment_create(int id)
+SUPERVISOR_ENTRY(struct compartment *, compartment_create_for_thread,
+    (struct thread *td, int id))
 {
 	struct compartment *compartment;
 
@@ -139,9 +136,18 @@ compartment_create(int id)
 		panic("compartment_create unable to allocate stack");
 	}
 
-	compartment_linkup(compartment, id, curthread);
+	cpu_compartment_alloc(compartment);
+	compartment_linkup(compartment, id, td);
 
 	return (compartment);
+}
+
+static struct compartment *
+compartment_create(int id)
+{
+
+	return (SUPERVISOR_ENTRY_NAME(compartment_create_for_thread)
+	    (curthread, id));
 }
 
 void

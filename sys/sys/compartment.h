@@ -55,8 +55,8 @@ struct compartment {
 	TAILQ_ENTRY(compartment) c_next;
 };
 
-void compartment_linkup0(struct compartment *compartment, vm_pointer_t stack,
-    struct thread *td);
+void compartment_linkup0(struct compartment *compartment, struct thread *td);
+struct compartment *compartment_create_for_thread(struct thread *td, int id);
 void compartment_destroy(struct compartment *compartment);
 void compartment_trampoline_destroy(uintptr_t func);
 vm_pointer_t compartment_entry_stackptr(int id, int type);

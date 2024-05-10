@@ -797,7 +797,14 @@ thread_alloc(int pages)
 	}
 	td->td_tid = tid;
 	bzero(&td->td_sa.args, sizeof(td->td_sa.args));
+<<<<<<< HEAD
 	kasan_thread_alloc(td);
+=======
+	TAILQ_INIT(&td->td_compartments);
+	if (!thread_alloc_compartments(td)) {
+		return (NULL);
+	}
+>>>>>>> cc61af2b4fe5 (Rework linking compartments to threads)
 	kmsan_thread_alloc(td);
 	cpu_thread_alloc(td);
 	EVENTHANDLER_DIRECT_INVOKE(thread_ctor, td);
@@ -807,7 +814,7 @@ thread_alloc(int pages)
 int
 thread_recycle(struct thread *td, int pages)
 {
-	thread_free_compartments(td2);
+	thread_free_compartments(td);
 	if (td->td_kstack == 0 || td->td_kstack_pages != pages) {
 		if (td->td_kstack != 0)
 			vm_thread_dispose(td);
@@ -815,9 +822,26 @@ thread_recycle(struct thread *td, int pages)
 			return (ENOMEM);
 		cpu_thread_alloc(td);
 	}
+	if (!thread_alloc_compartments(td))
+		return (ENOMEM);
 	kasan_thread_alloc(td);
 	kmsan_thread_alloc(td);
 	return (0);
+}
+
+/*
+ * Allocate compiled-in kernel compartments.
+ */
+int
+thread_alloc_compartments(struct thread *td)
+{
+
+	KASSERT(TAILQ_EMPTY(&td->td_compartments),
+	    ("thread_alloc_compartments called on a thread with existing compartments"));
+
+	if (compartment_create_for_thread(td, COMPARTMENT_KERNEL_ID) == NULL)
+		return (0);
+	return (1);
 }
 
 void
@@ -1092,7 +1116,6 @@ thread_link(struct thread *td, struct proc *p)
 	LIST_INIT(&td->td_contested);
 	LIST_INIT(&td->td_lprof[0]);
 	LIST_INIT(&td->td_lprof[1]);
-	TAILQ_INIT(&td->td_compartments);
 #ifdef EPOCH_TRACE
 	SLIST_INIT(&td->td_epochs);
 #endif
