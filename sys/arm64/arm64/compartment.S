@@ -68,6 +68,8 @@ compartment_entries_length:
 	.chericap	0
 \type\()_entry_stackptr_func:
 	.chericap	0
+\type\()_node:
+	.space		48
 
 	/*
 	 * The trampoline uses r16-17 as scratch registers, as in PLT code.
