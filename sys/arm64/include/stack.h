@@ -39,8 +39,14 @@ bool unwind_frame(struct thread *, struct unwind_state *);
 
 #ifdef _SYS_PROC_H_
 
+#include <sys/compartment.h>
+#include <sys/queue.h>
+
 #include <machine/pcb.h>
 
+/*
+ * TODO: Return the current stack's usage.
+ */
 #define	GET_STACK_USAGE(total, used) do {				\
 	struct thread *td = curthread;					\
 	(total) = td->td_kstack_pages * PAGE_SIZE - sizeof(struct pcb);	\
@@ -50,9 +56,25 @@ bool unwind_frame(struct thread *, struct unwind_state *);
 static __inline bool
 kstack_contains(struct thread *td, vm_offset_t va, size_t len)
 {
-	return (va >= td->td_kstack && va + len >= va &&
+	struct compartment *compartment;
+
+	if (va >= td->td_kstack && va + len >= va &&
 	    va + len <= td->td_kstack + td->td_kstack_pages * PAGE_SIZE -
-	    sizeof(struct pcb));
+	    sizeof(struct pcb))
+		return (true);
+
+	TAILQ_FOREACH(compartment, &td->td_compartments, c_next) {
+		/*
+		 * A compartment stack does not contain a pcb object.
+		 */
+		if (va >= compartment->c_kstack && va + len >= va &&
+		    va + len <= compartment->c_kstack + td->td_kstack_pages *
+		    PAGE_SIZE) {
+			return (true);
+		}
+	}
+
+	return (false);
 }
 #endif	/* _SYS_PROC_H_ */
 
