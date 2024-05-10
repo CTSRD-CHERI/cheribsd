@@ -224,9 +224,10 @@ vmtotal(SYSCTL_HANDLER_ARGS)
 		 * this case, the lack of synchronization should not
 		 * impair the accuracy of the reported statistics.
 		 */
-		if ((object->flags & OBJ_FICTITIOUS) != 0) {
+		if ((object->flags & (OBJ_FICTITIOUS | OBJ_CHERISHADOW)) != 0) {
 			/*
-			 * Devices, like /dev/mem, will badly skew our totals.
+			 * Devices, like /dev/mem, will badly skew our totals,
+			 * as will the shadow bitmap.
 			 */
 			continue;
 		}
