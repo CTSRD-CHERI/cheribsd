@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2022 Konrad Witaszczyk
+ * Copyright (c) 2024 Konrad Witaszczyk
  *
  * This software was developed by the University of Cambridge Computer
  * Laboratory (Department of Computer Science and Technology) under Office of
@@ -30,45 +30,25 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _SYS_COMPARTMENT_H_
-#define	_SYS_COMPARTMENT_H_
+#ifndef _MACHINE__COMPARTMENT_H_
+#define	_MACHINE__COMPARTMENT_H_
 
-#ifndef _KERNEL
-#error "no user-serviceable parts inside"
+/*
+ * This header file includes compartmentalization-related macros that are common
+ * to assembly and C source code files.
+ */
+
+/*
+ * A compartment identifier for the kernel itself.
+ */
+#define	COMPARTMENT_KERNEL_ID			1
+
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+#define	COMPARTMENT_ENTRY_NAME(name)	name ## _compartment
+#define	SUPERVISOR_ENTRY_NAME(name)	name ## _supervisor
+#else
+#define	COMPARTMENT_ENTRY_NAME(name)	name
+#define	SUPERVISOR_ENTRY_NAME(name)	name
 #endif
 
-#include <sys/malloc.h>
-#include <sys/module.h>
-#include <sys/queue.h>
-
-#include <machine/compartment.h>
-
-SYSCTL_DECL(_security_compartment);
-
-struct thread;
-
-struct compartment {
-	int		 c_id;
-	struct thread	*c_thread;
-	vm_pointer_t	 c_kstack;
-	vm_pointer_t	 c_kstackptr;
-	TAILQ_ENTRY(compartment) c_next;
-};
-
-void compartment_linkup0(struct compartment *compartment, vm_pointer_t stack,
-    struct thread *td);
-void compartment_destroy(struct compartment *compartment);
-void compartment_trampoline_destroy(uintptr_t func);
-vm_pointer_t compartment_entry_stackptr(int id, int type);
-void *compartment_call(uintptr_t func);
-void *compartment_entry_for_kernel(const void *stackptr_func, uintptr_t func);
-void *compartment_entry_for_module(const module_t mod, uintptr_t func);
-void *compartment_entry(uintptr_t func);
-void *compartment_jump_for_module(const module_t mod, uintptr_t func);
-void *compartment_jump(uintptr_t func);
-
-#ifdef MALLOC_DECLARE
-MALLOC_DECLARE(M_COMPARTMENT);
-#endif
-
-#endif	/* !_SYS_COMPARTMENT_H_ */
+#endif	/* !_MACHINE__COMPARTMENT_H_ */
