@@ -42,7 +42,6 @@
 #ifdef _KERNEL
 #include <sys/_eventhandler.h>
 #endif
-#include <sys/compartment.h>
 #include <sys/condvar.h>
 #ifndef _KERNEL
 #include <sys/filedesc.h>
@@ -173,6 +172,7 @@ struct pargs {
  * either lock is sufficient for read access, but both locks must be held
  * for write access.
  */
+struct compartment;
 struct cpuset;
 struct filecaps;
 struct filemon;
