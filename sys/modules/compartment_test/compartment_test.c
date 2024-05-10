@@ -114,7 +114,7 @@ compartment_test_sysctl(int function, SYSCTL_HANDLER_ARGS)
 		if (compressor_stream != NULL)
 			return (EINVAL);
 		compressor_stream = compressor_init(
-		    compartment_jump((uintptr_t)compartment_test_compressor_cb),
+		    compartment_test_compressor_cb,
 		    COMPRESS_ZLIB_DEFLATE, sizeof(compressor_data), 0, NULL);
 		if (compressor_stream == NULL) {
 			error = ENOMEM;

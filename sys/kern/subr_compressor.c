@@ -520,17 +520,6 @@ compressor_register(struct compressor_methods *method)
 	if (mod == NULL)
 		panic("compressor_register: unable to find module");
 
-	if (module_getpolicy(mod)) {
-		method->init = compartment_entry_for_module(mod,
-		    (uintptr_t)method->init);
-		method->reset = compartment_entry_for_module(mod,
-		    (uintptr_t)method->reset);
-		method->write = compartment_entry_for_module(mod,
-		    (uintptr_t)method->write);
-		method->fini = compartment_entry_for_module(mod,
-		    (uintptr_t)method->fini);
-	}
-
 	MOD_SUNLOCK;
 
 	TAILQ_INSERT_TAIL(&compressors, method, next);
