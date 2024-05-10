@@ -38,12 +38,12 @@
 #ifdef __CHERI_PURE_CAPABILITY__
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	/*
-	 * Root compartment entries.
+	 * In-kernel compartment entries.
 	 */
 	.bss
 	.type	compartment_entries,#object
 	.global	compartment_entries
-	.p2align	4
+	.p2align 4
 compartment_entries:
 	.space	(PAGE_SIZE * COMPARTMENT_ENTRY_PAGES)
 	.size	compartment_entries, . - compartment_entries
