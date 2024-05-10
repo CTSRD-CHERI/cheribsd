@@ -234,12 +234,7 @@ __ElfType(Auxinfo);
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-void elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap,
-    const void *stackptr_func);
-#else
 void elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap);
-#endif
 #endif
 
 #define	ELF_STATIC_RELOC_LABEL(var, label)				\

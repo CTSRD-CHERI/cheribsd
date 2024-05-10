@@ -51,7 +51,6 @@
 		ELF_STATIC_RELOC_LABEL(func,				\
 		    COMPARTMENT_ENTRY_NAME(name));			\
 		return (compartment_entry_for_kernel(			\
-		    compartment_entry_stackptr,				\
 		    (uintptr_t)COMPARTMENT_ENTRY_NAME(name)));	\
 	}
 #define	COMPARTMENT_ENTRY(ret_type, name, args)				\
