@@ -74,7 +74,7 @@
 #endif
 .endmacro
 
-.macro buildptr_stack dregn, bootparamsn, sym
+.macro buildptr_stack dregn, bootparamsn, sym, restricted = 0
 	mov	x\dregn, #(PAGE_SIZE * KSTACK_PAGES)
 	buildptr \bootparamsn, \sym, x\dregn
 	add	PTR(\dregn), PTR(\bootparamsn), x\dregn
@@ -83,10 +83,14 @@
 	 * no place to store the PCB pointer here.
 	 * XXX-AM: It could be another bootparam if needed
 	 */
+.if \restricted == 1
 	/*
-	 * TODO: Is the PCB pointer used in the executive or restricted mode?
+	 * Make room for the saved restricted stack pointer.
 	 */
+	sub	PTRN(\dregn), PTRN(\dregn), PTR_WIDTH
+.else
 	sub	PTRN(\dregn), PTRN(\dregn), #PCB_SIZE
+.endif
 .endmacro
 
 .macro buildptr_range sregn, eregn, start_sym, end_sym, clrperm = x
@@ -290,7 +294,7 @@ virtdone:
 	 *
 	 * Preserve the stack pointer in x/c26 for bootparams.
 	 */
-	buildptr_stack 7, 26, rinitstack
+	buildptr_stack 7, 26, rinitstack, 1
 	msr	rcsp_el0, c7
 #endif
 	/*

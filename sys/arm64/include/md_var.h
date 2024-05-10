@@ -39,8 +39,8 @@ extern int compartment_entries_length;
 #endif
 extern char compartment_entry_trampoline[];
 extern int szcompartment_entry_trampoline;
-extern char compartment_jump_trampoline[];
-extern int szcompartment_jump_trampoline;
+extern char supervisor_entry_trampoline[];
+extern int szsupervisor_entry_trampoline;
 extern char sigcode[];
 extern int szsigcode;
 #if __has_feature(capabilities)

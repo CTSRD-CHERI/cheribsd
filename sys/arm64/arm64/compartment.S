@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2022 Konrad Witaszczyk
+ * Copyright (c) 2022-2024 Konrad Witaszczyk
  *
  * This software was developed by the University of Cambridge Computer
  * Laboratory (Department of Computer Science and Technology) under Office of
@@ -58,60 +58,126 @@ compartment_entries_length:
 #define	TRAMPOLINECODE(sym)					\
 	.section .rodata; .globl sym; .p2align 4; .type sym,#object; sym:
 
-TRAMPOLINECODE(compartment_entry_trampoline)
-compartment_entry_id:
+.macro template_entry_trampoline type
+\type\()_entry_id:
 	.word		0
-trampoline_type:
+\type\()_entry_type:
 	.word		0
-	.p2align	4
-compartment_entry_func:
+	.p2align 4
+\type\()_entry_func:
 	.chericap	0
-compartment_entry_stackptr_func:
+\type\()_entry_stackptr_func:
 	.chericap	0
 
-	str	c30, [csp, #-CAP_WIDTH]!
-	str	c19, [csp, #-CAP_WIDTH]!
-	str	c20, [csp, #-CAP_WIDTH]!
-	str	c10, [csp, #-CAP_WIDTH]!
+	/*
+	 * The trampoline uses r16-17 as scratch registers, as in PLT code.
+	 */
 
-	/* Save func arguments. */
+	/*
+	 * Store the caller's current Restricted stack pointer at the bottom of
+	 * its own Restricted stack.
+	 */
+	mrs	c16, rcsp_el0
+	gclim	x17, c16
+	scvalue	c17, c16, x17
+	str	c16, [c17, #-CAP_WIDTH]
+	mov	x17, xzr
+
+	/*
+	 * Push the caller's Restricted stack pointer and the link register onto
+	 * the trusted stack.
+	 */
+	stp	c16, c30, [csp, #-(CAP_WIDTH * 2)]!
+
+.ifc \type,supervisor
+	/*
+	 * Don't modify the Restricted stack pointer if we're branching into
+	 * Executive.
+	 */
+.else
+	/*
+	 * Push function arguments.
+	 */
 	stp	c0, c1, [csp, #-(CAP_WIDTH * 2)]!
 	stp	c2, c3, [csp, #-(CAP_WIDTH * 2)]!
 	stp	c4, c5, [csp, #-(CAP_WIDTH * 2)]!
 	stp	c6, c7, [csp, #-(CAP_WIDTH * 2)]!
+	stp	c8, c9, [csp, #-(CAP_WIDTH * 2)]!
+
+	/*
+	 * TODO: Clear all registers unused by the stack pointer function.
+	 */
 
 	/* Get or allocate a callee stack. */
-	ldr	x0, compartment_entry_id
-	ldr	x1, trampoline_type
-	ldr	c10, compartment_entry_stackptr_func
-	blr	c10
+	ldr	x0, \type\()_entry_id
+	ldr	x1, \type\()_entry_type
+	ldr	c16, \type\()_entry_stackptr_func
+	blr	c16
 
-	/* Store the callee stack. */
-	mov	c20, c0
+	/*
+	 * TODO: Clear all registers that could have been set by the stack
+	 * allocating function.
+	 */
 
-	/* Restore func arguments. */
+	/*
+	 * Load the calee's stack pointer from the bottom of its stack.
+	 */
+	gclim	x16, c0
+	scvalue	c16, c0, x16
+	ldr	c16, [c16, #-CAP_WIDTH]
+
+	/*
+	 * Pop function arguments.
+	 */
+	ldp	c8, c9, [csp], #(CAP_WIDTH * 2)
 	ldp	c6, c7, [csp], #(CAP_WIDTH * 2)
 	ldp	c4, c5, [csp], #(CAP_WIDTH * 2)
 	ldp	c2, c3, [csp], #(CAP_WIDTH * 2)
 	ldp	c0, c1, [csp], #(CAP_WIDTH * 2)
 
-	/* Switch to the callee stack. */
-	mov	c19, csp
-	msr	rcsp_el0, c20
+	/* Switch to the callee's stack. */
+	msr	rcsp_el0, c16
+.endif
 
-	/* Call func. */
-	ldr	c10, compartment_entry_func
-	blrr	c10
+	/*
+	 * TODO: Clear registers not used by the function signature.
+	 */
 
-	/* Switch to the caller stack. */
-	mov	csp, c19
+	/*
+	 * Call the target function.
+	 */
+	ldr	c16, \type\()_entry_func
+.ifc \type,supervisor
+	blr	c16
+.else
+	blrr	c16
+.endif
 
-	ldr	c10, [csp], #CAP_WIDTH
-	ldr	c20, [csp], #CAP_WIDTH
-	ldr	c19, [csp], #CAP_WIDTH
-	ldr	c30, [csp], #CAP_WIDTH
-	ret	c30
-	.align	3
+	/*
+	 * Pop the caller's Restricted stack pointer and link register from the
+	 * trusted stack.
+	 */
+	ldp	c16, c30, [csp], #(CAP_WIDTH * 2)
+
+	/*
+	 * Restore the caller's current Restricted stack pointer.
+	 */
+	msr	rcsp_el0, c16
+
+	/*
+	 * Clear temporary registers.
+	 */
+	mov	x16, xzr
+
+	/*
+	 * Return to the caller, possibly in Restricted.
+	 */
+	retr	c30
+	.p2align 4
+.endmacro
+
+TRAMPOLINECODE(compartment_entry_trampoline)
+	template_entry_trampoline compartment
 EEND(compartment_entry_trampoline)
 ecompartment_entry_trampoline:
 
@@ -123,33 +189,16 @@ ecompartment_entry_trampoline:
 szcompartment_entry_trampoline:
 	.quad	ecompartment_entry_trampoline - compartment_entry_trampoline
 
-TRAMPOLINECODE(compartment_jump_trampoline)
-	.word		0
-	.word		0
-	.p2align	4
-compartment_jump_func:
-	.chericap	0
-	.chericap	0
-
-	str	c30, [csp, #-CAP_WIDTH]!
-	str	c10, [csp, #-CAP_WIDTH]!
-
-	/* Call func. */
-	ldr	c10, compartment_jump_func
-	blr	c10
-
-	ldr	c10, [csp], #CAP_WIDTH
-	ldr	c30, [csp], #CAP_WIDTH
-	retr	c30
-	.align	3
-EEND(compartment_jump_trampoline)
-ecompartment_jump_trampoline:
+TRAMPOLINECODE(supervisor_entry_trampoline)
+	template_entry_trampoline supervisor
+EEND(supervisor_entry_trampoline)
+esupervisor_entry_trampoline:
 
 	.data
 	.align	3
-	.global	szcompartment_jump_trampoline
-	.type	szcompartment_jump_trampoline,#object
-	.size	szcompartment_jump_trampoline, 8
-szcompartment_jump_trampoline:
-	.quad	ecompartment_jump_trampoline - compartment_jump_trampoline
+	.global	szsupervisor_entry_trampoline
+	.type	szsupervisor_entry_trampoline,#object
+	.size	szsupervisor_entry_trampoline, 8
+szsupervisor_entry_trampoline:
+	.quad	esupervisor_entry_trampoline - supervisor_entry_trampoline
 #endif	/* __CHERI_PURE_CAPABILITY__ */
