@@ -123,7 +123,6 @@
 #endif
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-#define	COMPARTMENT_ENTRY_LIMIT	120000
 #define	COMPARTMENT_ENTRY_PAGES	7500	/* pages of compartment entries */
 #endif
 
