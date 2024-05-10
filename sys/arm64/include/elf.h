@@ -242,6 +242,12 @@ void elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap);
 #endif
 #endif
 
+#define	ELF_STATIC_RELOC_LABEL(var, label)				\
+	__asm __volatile(						\
+	    "adrp %0, " __STRING(label) "\n"				\
+	    "add %0, %0, :lo12:" __STRING(label) "\n"			\
+	    : "=&C"(var))
+
 #endif /* !_MACHINE_ELF_H_ */
 
 #endif /* !__arm__ */
