@@ -50,6 +50,7 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/compartment.h>
 #include <machine/cpufunc.h>
+#include <machine/elf.h>
 #include <machine/md_var.h>
 
 MALLOC_DEFINE(M_COMPARTMENT, "compartment", "kernel compartment");
@@ -163,7 +164,7 @@ compartment_entry_stackptr(int id, int type)
 
 static struct compartment_trampoline *
 compartment_trampoline_create(const module_t mod, int type, void *data,
-    size_t size, const void *stackptr_func, uintcap_t func)
+    size_t size, uintcap_t func)
 {
 	struct compartment_trampoline *trampoline;
 
@@ -231,27 +232,26 @@ compartment_call(uintptr_t func)
 }
 
 void *
-compartment_entry_for_kernel(const void *stackptr_func, uintptr_t func)
+compartment_entry_for_kernel(uintptr_t func)
 {
 
 	func = cheri_clearperm(func, CHERI_PERM_EXECUTIVE);
 	return (compartment_trampoline_create(NULL,
 	    TRAMPOLINE_TYPE_COMPARTMENT_ENTRY, compartment_entry_trampoline,
-	    szcompartment_entry_trampoline, stackptr_func, func));
+	    szcompartment_entry_trampoline, func));
 }
 
-void *
-compartment_entry_for_module(const module_t mod, uintptr_t func)
+SUPERVISOR_ENTRY(void *, compartment_entry_for_module, (const module_t mod,
+    uintptr_t func))
 {
 
 	func = cheri_clearperm(func, CHERI_PERM_EXECUTIVE);
 	return (compartment_trampoline_create(mod,
 	    TRAMPOLINE_TYPE_COMPARTMENT_ENTRY, compartment_entry_trampoline,
-	    szcompartment_entry_trampoline, compartment_entry_stackptr, func));
+	    szcompartment_entry_trampoline, func));
 }
 
-void *
-compartment_entry(uintptr_t func)
+SUPERVISOR_ENTRY(void *, compartment_entry, (uintptr_t func))
 {
 	void *codeptr;
 	module_t mod;
@@ -262,7 +262,8 @@ compartment_entry(uintptr_t func)
 	if (mod == NULL)
 		panic("compartment_entry: unable to find module");
 
-	codeptr = compartment_entry_for_module(mod, func);
+	codeptr = SUPERVISOR_ENTRY_NAME(compartment_entry_for_module)(mod,
+	    func);
 
 	MOD_SUNLOCK;
 	return (codeptr);
@@ -277,7 +278,7 @@ supervisor_entry_for_kernel(uintptr_t func)
 	     (void *)func));
 	return (compartment_trampoline_create(NULL,
 	    TRAMPOLINE_TYPE_SUPERVISOR_ENTRY, supervisor_entry_trampoline,
-	    szsupervisor_entry_trampoline, NULL, func));
+	    szsupervisor_entry_trampoline, func));
 }
 
 void *
