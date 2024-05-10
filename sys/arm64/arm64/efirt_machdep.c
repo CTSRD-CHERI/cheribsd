@@ -272,14 +272,6 @@ SUPERVISOR_ENTRY(void, efi_arch_leave, (void))
 	__asm __volatile(
 #ifdef __CHERI_PURE_CAPABILITY__
 	    "mrs c18, ctpidr_el1\n"
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	/*
-	 * See init_cpu_pcpup() in arm64/include/pcpu.h.
-	 */
-	    "scbnds c18, c18, %0\n"
-	    : :
-	      "n" (sizeof(((struct pcpu *)0)->pc_curthread))
-#endif
 #else
 	    "mrs x18, tpidr_el1	\n"
 #endif

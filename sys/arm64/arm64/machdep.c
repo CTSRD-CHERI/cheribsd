@@ -351,29 +351,13 @@ cpu_pcpu_init(struct pcpu *pcpu, int cpuid, size_t size)
 SUPERVISOR_ENTRY(void, init_cpu_pcpup, (void *pcpup))
 {
 #ifdef __CHERI_PURE_CAPABILITY__
-	/*
-	 * Without compartmentalization enabled, CTPIDR_EL1 and C18 point at
-	 * a pcpu object.
-	 *
-	 * With compartmentalization enabled, RCTPIDR_EL0 and C18 point at
-	 * a pointer to a thread object (a pointer to a pcpu object with bounds
-	 * narrowed to the first pc_curthread field) that is used in the
-	 * Restricted mode code and TPIDR_EL1 (accessed via CTPIDR_EL1 while in
-	 * the Executive mode) points at a pcpu object.
-	 */
 	__asm __volatile(
 	    "mov c18, %0 \n"
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	    "scbnds c18, c18, %1 \n"
 	    "msr rctpidr_el0, c18 \n"
 #endif
 	    "msr ctpidr_el1, %0"
-	    ::
-	      "C"(pcpup)
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	      , "n" (sizeof(uintcap_t))
-#endif
-	      );
+	    :: "C"(pcpup));
 #else
 	__asm __volatile(
 	    "mov x18, %0 \n"
