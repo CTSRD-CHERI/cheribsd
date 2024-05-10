@@ -35,6 +35,7 @@
  */
 
 #include <sys/param.h>
+#include <sys/compartment.h>
 #include <sys/efi.h>
 #include <sys/kernel.h>
 #include <sys/linker.h>
@@ -258,8 +259,7 @@ efi_arch_enter(void)
 	return (0);
 }
 
-void
-efi_arch_leave(void)
+SUPERVISOR_ENTRY(void, efi_arch_leave, (void))
 {
 
 	/*

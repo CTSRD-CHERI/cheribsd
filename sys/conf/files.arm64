@@ -89,6 +89,7 @@ arm64/arm64/strncmp.S				optional !cheri_purecap_kernel
 arm64/arm64/support_ifunc.c			standard
 arm64/arm64/support.S				standard
 arm64/arm64/swtch.S				standard
+arm64/arm64/swtch_supervisor.c			optional cheri_compartmentalize_kernel
 arm64/arm64/sys_machdep.c			standard
 arm64/arm64/trap.c				standard
 arm64/arm64/uio_machdep.c			standard

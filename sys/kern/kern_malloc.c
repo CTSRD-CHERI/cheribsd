@@ -58,6 +58,7 @@
 #include <sys/mutex.h>
 #include <sys/vmmeter.h>
 #include <sys/proc.h>
+#include <sys/compartment.h>
 #include <sys/queue.h>
 #include <sys/sbuf.h>
 #include <sys/smp.h>
@@ -793,8 +794,8 @@ malloc_domainset(size_t size, struct malloc_type *mtp, struct domainset *ds,
 /*
  * Allocate an executable area.
  */
-void *
-malloc_exec(size_t size, struct malloc_type *mtp, int flags)
+COMPARTMENT_ENTRY(void *, malloc_exec, (size_t size, struct malloc_type *mtp,
+    int flags))
 {
 
 	return (malloc_domainset_exec(size, mtp, DOMAINSET_RR(), flags));

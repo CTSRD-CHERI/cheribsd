@@ -79,7 +79,6 @@
 #include <machine/cpu.h>
 #include <machine/debug_monitor.h>
 #include <machine/hypervisor.h>
-#include <machine/ifunc.h>
 #include <machine/kdb.h>
 #include <machine/machdep.h>
 #include <machine/metadata.h>
@@ -349,13 +348,7 @@ cpu_pcpu_init(struct pcpu *pcpu, int cpuid, size_t size)
  * Set the pcpu pointer with a backup in tpidr_el1 to be
  * loaded when entering the kernel from userland.
  */
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-static void
-init_cpu_pcpup_ifunc(void *pcpup)
-#else
-void
-init_cpu_pcpup(void *pcpup)
-#endif
+SUPERVISOR_ENTRY(void, init_cpu_pcpup, (void *pcpup))
 {
 #ifdef __CHERI_PURE_CAPABILITY__
 	/*
@@ -387,14 +380,6 @@ init_cpu_pcpup(void *pcpup)
 	    "msr tpidr_el1, %0" :: "r"(pcpup));
 #endif
 }
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-DEFINE_IFUNC(, void, init_cpu_pcpup, (void *))
-{
-
-	return (compartment_jump_for_module(NULL,
-	    (uintptr_t)init_cpu_pcpup_ifunc));
-}
-#endif
 
 void
 spinlock_enter(void)

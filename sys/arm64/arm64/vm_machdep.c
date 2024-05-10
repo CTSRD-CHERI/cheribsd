@@ -31,6 +31,7 @@
 #include <sys/systm.h>
 #include <sys/limits.h>
 #include <sys/proc.h>
+#include <sys/compartment.h>
 #include <sys/sf_buf.h>
 #include <sys/signal.h>
 #include <sys/sysent.h>
@@ -63,8 +64,8 @@
  * Copy and update the pcb, set up the stack so that the child
  * ready to run and return to user mode.
  */
-void
-cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
+SUPERVISOR_ENTRY(void, cpu_fork, (struct thread *td1, struct proc *p2,
+    struct thread *td2, int flags))
 {
 	struct pcb *pcb2;
 	struct trapframe *tf;
@@ -206,8 +207,8 @@ cpu_set_syscall_retval(struct thread *td, int error)
  * finalizes the thread state and handles peculiarities of the first
  * return to userspace for the new thread.
  */
-void
-cpu_copy_thread(struct thread *td, struct thread *td0)
+SUPERVISOR_ENTRY(void, cpu_copy_thread, (struct thread *td,
+    struct thread *td0))
 {
 	bcopy(td0->td_frame, td->td_frame, sizeof(struct trapframe));
 	bcopy(td0->td_pcb, td->td_pcb, sizeof(struct pcb));
