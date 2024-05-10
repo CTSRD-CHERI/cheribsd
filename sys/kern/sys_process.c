@@ -493,6 +493,14 @@ proc_readmem(struct thread *td, struct proc *p, vm_offset_t va, void *buf,
 }
 
 ssize_t
+proc_readmem_cap(struct thread *td, struct proc *p, vm_offset_t va, void *buf,
+    size_t len)
+{
+
+	return (proc_iop(td, p, va, buf, len, UIO_READ_CAP));
+}
+
+ssize_t
 proc_writemem(struct thread *td, struct proc *p, vm_offset_t va, void *buf,
     size_t len)
 {

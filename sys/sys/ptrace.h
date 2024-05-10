@@ -264,6 +264,8 @@ int	proc_sstep(struct thread *_td);
 int	proc_rwmem(struct proc *_p, struct uio *_uio);
 ssize_t	proc_readmem(struct thread *_td, struct proc *_p, vm_offset_t _va,
 	    void *_buf, size_t _len);
+ssize_t	proc_readmem_cap(struct thread *_td, struct proc *_p, vm_offset_t _va,
+	    void *_buf, size_t _len);
 ssize_t	proc_writemem(struct thread *_td, struct proc *_p, vm_offset_t _va,
 	    void *_buf, size_t _len);
 #if __has_feature(capabilities)
