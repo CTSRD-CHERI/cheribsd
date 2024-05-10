@@ -115,10 +115,10 @@ deflate_global(uint8_t *data, uint32_t size, int decomp, uint8_t **out)
 
 	TAILQ_INIT(&bufs);
 	if (decomp) {
-		stream = compressor_init(compartment_jump((uintptr_t)deflate_global_cb),
+		stream = compressor_init(deflate_global_cb,
 		    COMPRESS_ZLIB_INFLATE, size * i, 0, &bufs);
 	} else {
-		stream = compressor_init(compartment_jump((uintptr_t)deflate_global_cb),
+		stream = compressor_init(deflate_global_cb,
 		    COMPRESS_ZLIB_DEFLATE, size * i, 0, &bufs);
 	}
 	if (stream == NULL) {

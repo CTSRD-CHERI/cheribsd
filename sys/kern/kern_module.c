@@ -172,12 +172,7 @@ module_register(const moduledata_t *data, linker_file_t container)
 	bzero(&newmod->data, sizeof(newmod->data));
 	newmod->file = container;
 	if (data->evhand != NULL) {
-		if (container != NULL && container->compartment) {
-			newmod->handler = compartment_entry_for_module(newmod,
-			    (uintptr_t)data->evhand);
-		} else {
-			newmod->handler = data->evhand;
-		}
+		newmod->handler = data->evhand;
 	} else {
 		newmod->handler = modevent_nop;
 	}
