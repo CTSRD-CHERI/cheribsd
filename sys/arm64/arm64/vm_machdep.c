@@ -94,14 +94,7 @@ SUPERVISOR_ENTRY(void, cpu_fork, (struct thread *td1, struct proc *p2,
 		td1->td_pcb->pcb_cid_el0 = READ_SPECIALREG_CAP(cid_el0);
 		td1->td_pcb->pcb_rcsp_el0 = READ_SPECIALREG_CAP(rcsp_el0);
 		td1->td_pcb->pcb_rddc_el0 = READ_SPECIALREG_CAP(rddc_el0);
-		/*
-		 * XXXKW: Disallowed in the Restricted mode.
-		 *
-		 * Require EL0 to be in the Executive mode when forking?
-		 */
-#ifndef CHERI_COMPARTMENTALIZE_KERNEL
 		td1->td_pcb->pcb_rctpidr_el0 = READ_SPECIALREG_CAP(rctpidr_el0);
-#endif
 #endif
 	}
 

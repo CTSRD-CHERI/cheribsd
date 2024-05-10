@@ -102,9 +102,7 @@ struct capreg {
 	__uintcap_t cid;
 	__uintcap_t rcsp;
 	__uintcap_t rddc;
-#ifndef CHERI_COMPARTMENTALIZE_KERNEL
 	__uintcap_t rctpidr;
-#endif
 	__uint64_t tagmask;
 	__uint64_t pad;
 };
