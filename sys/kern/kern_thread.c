@@ -799,6 +799,10 @@ thread_alloc(int pages)
 	}
 	td->td_tid = tid;
 	bzero(&td->td_sa.args, sizeof(td->td_sa.args));
+	TAILQ_INIT(&td->td_compartments);
+	if (!thread_alloc_compartments(td)) {
+		return (NULL);
+	}
 	kmsan_thread_alloc(td);
 	cpu_thread_alloc(td);
 	EVENTHANDLER_DIRECT_INVOKE(thread_ctor, td);
@@ -814,6 +818,21 @@ thread_alloc_stack(struct thread *td, int pages)
 	if (!vm_thread_new(td, pages))
 		return (0);
 	cpu_thread_alloc(td);
+	return (1);
+}
+
+/*
+ * Allocate compiled-in kernel compartments.
+ */
+int
+thread_alloc_compartments(struct thread *td)
+{
+
+	KASSERT(TAILQ_EMPTY(&td->td_compartments),
+	    ("thread_alloc_compartments called on a thread with existing compartments"));
+
+	if (compartment_create_for_thread(td, COMPARTMENT_KERNEL_ID) == NULL)
+		return (0);
 	return (1);
 }
 
@@ -1092,7 +1111,6 @@ thread_link(struct thread *td, struct proc *p)
 	LIST_INIT(&td->td_contested);
 	LIST_INIT(&td->td_lprof[0]);
 	LIST_INIT(&td->td_lprof[1]);
-	TAILQ_INIT(&td->td_compartments);
 #ifdef EPOCH_TRACE
 	SLIST_INIT(&td->td_epochs);
 #endif

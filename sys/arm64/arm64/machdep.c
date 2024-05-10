@@ -66,6 +66,7 @@
 #include <sys/vmmeter.h>
 
 #include <vm/vm.h>
+#include <vm/vm_extern.h>
 #include <vm/vm_param.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_object.h>
@@ -449,7 +450,9 @@ init_proc0(vm_pointer_t kstack)
 	thread0.td_pcb->pcb_vfpcpu = UINT_MAX;
 	thread0.td_frame = &proc0_tf;
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	compartment_linkup0(&compartment0, compartmentstack, &thread0);
+	vm_compartment_init_stack(&compartment0, compartmentstack);
+	cpu_compartment_alloc(&compartment0);
+	compartment_linkup0(&compartment0, &thread0);
 #endif
 #ifdef PAC
 	ptrauth_thread0(&thread0);
@@ -976,6 +979,31 @@ initarm(struct arm64_bootparams *abp)
 	 * trampolines.
 	 */
 	link_elf_ireloc(kmdp);
+
+	/* Set the pcpu data, this is needed by pmap_bootstrap */
+	pcpup = &pcpu0;
+	pcpu_init(pcpup, 0, sizeof(struct pcpu));
+
+	/* Initialize the pcpu pointer for this cpu. */
+	init_cpu_pcpup(pcpup);
+
+	/* locore.S sets sp_el0 to &thread0 so no need to set it here. */
+	PCPU_SET(curthread, &thread0);
+	PCPU_SET(midr, get_midr());
+
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	/*
+	 * init_proc0 links compartment0 that must be linked before any
+	 * trampoline is called.
+	 *
+	 * XXXKW: consdev_ops.cn_probe() called by cninit() is the first
+	 * function requiring a trampoline.
+	 */
+	init_proc0(abp->kern_stack, abp->compartment_stack);
+#else
+	init_proc0(abp->kern_stack);
+#endif
+
 #ifdef FDT
 	try_load_dtb(kmdp);
 #endif
@@ -1006,17 +1034,6 @@ initarm(struct arm64_bootparams *abp)
 	if (efifb != NULL)
 		physmem_exclude_region(efifb->fb_addr, efifb->fb_size,
 		    EXFLAG_NOALLOC);
-
-	/* Set the pcpu data, this is needed by pmap_bootstrap */
-	pcpup = &pcpu0;
-	pcpu_init(pcpup, 0, sizeof(struct pcpu));
-
-	/* Initialize the pcpu pointer for this cpu. */
-	init_cpu_pcpup(pcpup);
-
-	/* locore.S sets sp_el0 to &thread0 so no need to set it here. */
-	PCPU_SET(curthread, &thread0);
-	PCPU_SET(midr, get_midr());
 
 	/* Do basic tuning, hz etc */
 	init_param1();
@@ -1075,11 +1092,6 @@ initarm(struct arm64_bootparams *abp)
 	if (getenv_is_true("debug.dump_modinfo_at_boot"))
 		preload_dump();
 
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	init_proc0(abp->kern_stack, abp->compartment_stack);
-#else
-	init_proc0(abp->kern_stack);
-#endif
 	msgbufinit(msgbufp, msgbufsize);
 	mutex_init();
 	init_param2(physmem);

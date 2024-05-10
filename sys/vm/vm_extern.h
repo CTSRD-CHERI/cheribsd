@@ -137,6 +137,8 @@ void vm_thread_dispose(struct thread *td);
 int vm_thread_new(struct thread *td, int pages);
 void vm_thread_stack_back(struct domainset *ds, vm_offset_t kaddr,
     vm_page_t ma[], int npages, int req_class);
+void vm_compartment_init_stack(struct compartment *compartment,
+    vm_pointer_t stack);
 int vm_compartment_new(struct compartment *compartment);
 void vm_compartment_dispose(struct compartment *compartment);
 u_int vm_active_count(void);

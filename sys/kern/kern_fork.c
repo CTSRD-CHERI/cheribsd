@@ -1040,6 +1040,10 @@ fork1(struct thread *td, struct fork_req *fr)
 				goto fail2;
 			}
 		}
+		if (!thread_alloc_compartments(td2)) {
+			error = ENOMEM;
+			goto fail2;
+		}
 	}
 
 	if ((flags & RFMEM) == 0) {
