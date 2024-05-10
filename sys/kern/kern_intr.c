@@ -1363,7 +1363,10 @@ ithread_loop(void *arg)
  *
  * Input:
  * o ie:                        the event connected to this interrupt.
- * o frame:                     the current trap frame.
+--------------------------------------------------------------------------------
+ * o frame:                     the current trap frame. If the client interrupt
+ *				handler needs this frame, they should get it
+ *				via curthread->td_intr_frame.
  *
  * Return value:
  * o 0:                         everything ok.
