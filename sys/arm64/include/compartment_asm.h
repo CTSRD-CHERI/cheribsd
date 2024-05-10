@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2022 Konrad Witaszczyk
+ * Copyright (c) 2024 Konrad Witaszczyk
  *
  * This software was developed by the University of Cambridge Computer
  * Laboratory (Department of Computer Science and Technology) under Office of
@@ -30,45 +30,32 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _SYS_COMPARTMENT_H_
-#define	_SYS_COMPARTMENT_H_
+#ifndef _MACHINE_COMPARTMENT_ASM_H_
+#define	_MACHINE_COMPARTMENT_ASM_H_
 
-#ifndef _KERNEL
-#error "no user-serviceable parts inside"
+#include <machine/_compartment.h>
+
+/*
+ * This header file includes compartmentalization-related macros for assembly
+ * source code files.
+ */
+
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+#define	RELRO_ENTRY(label)					\
+	.section .data.rel.ro, "aw", @progbits;			\
+	.balign 16;						\
+	.type label##_ptr, @object;				\
+	label##_ptr:						\
+	.chericap label;					\
+	.size	label##_ptr, . - label##_ptr
+#define	RELRO_BRANCH(scratchn, dstsym)				\
+	adrp	c##scratchn, dstsym##_ptr;			\
+	ldr	c##scratchn, [c##scratchn, :lo12:dstsym##_ptr];	\
+	blr	c##scratchn
+
+#define	SUPERVISOR_ENTRY(sym)	ENTRY(SUPERVISOR_ENTRY_NAME(sym))
+#else
+#define	SUPERVISOR_ENTRY(sym)	ENTRY(sym)
 #endif
 
-#include <sys/malloc.h>
-#include <sys/module.h>
-#include <sys/queue.h>
-
-#include <machine/compartment.h>
-
-SYSCTL_DECL(_security_compartment);
-
-struct thread;
-
-struct compartment {
-	int		 c_id;
-	struct thread	*c_thread;
-	vm_pointer_t	 c_kstack;
-	vm_pointer_t	 c_kstackptr;
-	TAILQ_ENTRY(compartment) c_next;
-};
-
-void compartment_linkup0(struct compartment *compartment, vm_pointer_t stack,
-    struct thread *td);
-void compartment_destroy(struct compartment *compartment);
-void compartment_trampoline_destroy(uintptr_t func);
-vm_pointer_t compartment_entry_stackptr(int id, int type);
-void *compartment_call(uintptr_t func);
-void *compartment_entry_for_kernel(const void *stackptr_func, uintptr_t func);
-void *compartment_entry_for_module(const module_t mod, uintptr_t func);
-void *compartment_entry(uintptr_t func);
-void *compartment_jump_for_module(const module_t mod, uintptr_t func);
-void *compartment_jump(uintptr_t func);
-
-#ifdef MALLOC_DECLARE
-MALLOC_DECLARE(M_COMPARTMENT);
-#endif
-
-#endif	/* !_SYS_COMPARTMENT_H_ */
+#endif	/* !_MACHINE_COMPARTMENT_ASM_H_ */
