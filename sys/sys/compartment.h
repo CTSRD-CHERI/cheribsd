@@ -64,8 +64,8 @@ void *compartment_call(uintptr_t func);
 void *compartment_entry_for_kernel(uintptr_t func);
 void *compartment_entry_for_module(const module_t mod, uintptr_t func);
 void *compartment_entry(uintptr_t func);
-void *compartment_jump_for_module(const module_t mod, uintptr_t func);
-void *compartment_jump(uintptr_t func);
+void *supervisor_entry_for_kernel(uintptr_t func);
+void *supervisor_get_function(uintptr_t func);
 
 #ifdef MALLOC_DECLARE
 MALLOC_DECLARE(M_COMPARTMENT);
