@@ -48,6 +48,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
 
+#include <machine/compartment.h>
 #include <machine/cpufunc.h>
 #include <machine/md_var.h>
 
@@ -58,24 +59,21 @@ SYSCTL_NODE(_security, OID_AUTO, compartment, CTLFLAG_RD, 0,
 SYSCTL_NODE(_security_compartment, OID_AUTO, counters, CTLFLAG_RD, 0,
     "Counters for compartment trampolines");
 
-/*
- * A compartment identifier for the kernel itself.
- */
-#define	COMPARTMENT_KERNEL_ID			MODULE_KERNEL_ID
+#define	TRAMPOLINE_TYPE_COMPARTMENT_ENTRY	0
+#define	TRAMPOLINE_TYPE_SUPERVISOR_ENTRY	1
+#define	TRAMPOLINE_TYPE_MAX			TRAMPOLINE_TYPE_SUPERVISOR_ENTRY
 
-#define	COMPARTMENT_TRAMPOLINE_TYPE_ENTRY	0
-#define	COMPARTMENT_TRAMPOLINE_TYPE_JUMP	1
-#define	COMPARTMENT_TRAMPOLINE_TYPE_MAX		COMPARTMENT_TRAMPOLINE_TYPE_JUMP
+unsigned long compartment_trampoline_counters[TRAMPOLINE_TYPE_MAX + 1];
 
-unsigned long compartment_trampoline_counters[COMPARTMENT_TRAMPOLINE_TYPE_MAX + 1];
+SYSCTL_ULONG(_security_compartment_counters, OID_AUTO, compartment_entry,
+    CTLFLAG_RW,
+    &compartment_trampoline_counters[TRAMPOLINE_TYPE_COMPARTMENT_ENTRY], 0,
+    "Number of compartment entry calls");
 
-SYSCTL_ULONG(_security_compartment_counters, OID_AUTO, entry, CTLFLAG_RW,
-    &compartment_trampoline_counters[COMPARTMENT_TRAMPOLINE_TYPE_ENTRY], 0,
-    "Number of compartment entries");
-
-SYSCTL_ULONG(_security_compartment_counters, OID_AUTO, jump, CTLFLAG_RW,
-    &compartment_trampoline_counters[COMPARTMENT_TRAMPOLINE_TYPE_JUMP], 0,
-    "Number of compartment jumps");
+SYSCTL_ULONG(_security_compartment_counters, OID_AUTO, supervisor_entry,
+    CTLFLAG_RW,
+    &compartment_trampoline_counters[TRAMPOLINE_TYPE_SUPERVISOR_ENTRY], 0,
+    "Number of supervisor entry calls");
 
 struct compartment_trampoline {
 	int		ct_compartment_id;
@@ -238,7 +236,7 @@ compartment_entry_for_kernel(const void *stackptr_func, uintptr_t func)
 
 	func = cheri_clearperm(func, CHERI_PERM_EXECUTIVE);
 	return (compartment_trampoline_create(NULL,
-	    COMPARTMENT_TRAMPOLINE_TYPE_ENTRY, compartment_entry_trampoline,
+	    TRAMPOLINE_TYPE_COMPARTMENT_ENTRY, compartment_entry_trampoline,
 	    szcompartment_entry_trampoline, stackptr_func, func));
 }
 
@@ -248,8 +246,8 @@ compartment_entry_for_module(const module_t mod, uintptr_t func)
 
 	func = cheri_clearperm(func, CHERI_PERM_EXECUTIVE);
 	return (compartment_trampoline_create(mod,
-	    COMPARTMENT_TRAMPOLINE_TYPE_ENTRY, compartment_entry_trampoline,
-	    szcompartment_entry_trampoline, NULL, func));
+	    TRAMPOLINE_TYPE_COMPARTMENT_ENTRY, compartment_entry_trampoline,
+	    szcompartment_entry_trampoline, compartment_entry_stackptr, func));
 }
 
 void *
@@ -271,31 +269,34 @@ compartment_entry(uintptr_t func)
 }
 
 void *
-compartment_jump_for_module(const module_t mod, uintptr_t func)
+supervisor_entry_for_kernel(uintptr_t func)
 {
 
 	KASSERT((cheri_getperm(func) & CHERI_PERM_EXECUTIVE) != 0,
-	    ("Compartment jump capability %#lp has invalid permissions",
-	    (void *)func));
-	return (compartment_trampoline_create(mod,
-	    COMPARTMENT_TRAMPOLINE_TYPE_JUMP, compartment_jump_trampoline,
-	    szcompartment_jump_trampoline, NULL, func));
+	    ("Supervisor entry capability %#lp has invalid permissions",
+	     (void *)func));
+	return (compartment_trampoline_create(NULL,
+	    TRAMPOLINE_TYPE_SUPERVISOR_ENTRY, supervisor_entry_trampoline,
+	    szsupervisor_entry_trampoline, NULL, func));
 }
 
 void *
-compartment_jump(uintptr_t func)
+supervisor_get_function(uintptr_t func)
 {
-	void *codeptr;
-	module_t mod;
+	struct compartment_trampoline *trampoline;
 
-	MOD_SLOCK;
+	KASSERT((cheri_getperm(cheri_getpcc()) & CHERI_PERM_EXECUTIVE) != 0,
+	    ("PCC %#lp has invalid permissions",
+	    (void *)cheri_getpcc()));
+	KASSERT((cheri_getperm(func) & CHERI_PERM_EXECUTIVE) != 0,
+	    ("Supervisor trampoline capability %#lp has invalid permissions",
+	     (void *)func));
 
-	mod = module_lookupbyptr((uintptr_t)func);
-	if (mod == NULL)
-		panic("compartment_jump: unable to find module");
+	trampoline = cheri_kern_setaddress(cheri_getpcc(), func - 1);
+	trampoline = __containerof((char (*)[])trampoline,
+	    struct compartment_trampoline, ct_code);
+	KASSERT(trampoline->ct_type == TRAMPOLINE_TYPE_SUPERVISOR_ENTRY,
+	    ("Invalid trampoline type"));
 
-	codeptr = compartment_jump_for_module(mod, func);
-
-	MOD_SUNLOCK;
-	return (codeptr);
+	return ((void *)trampoline->ct_compartment_func);
 }
