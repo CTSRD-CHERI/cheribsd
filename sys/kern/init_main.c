@@ -50,6 +50,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/boottrace.h>
+#include <sys/compartment.h>
 #include <sys/conf.h>
 #include <sys/cpuset.h>
 #include <sys/dtrace_bsd.h>
