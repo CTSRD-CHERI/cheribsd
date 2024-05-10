@@ -34,7 +34,6 @@
 
 #include <machine/asm.h>
 #include <machine/param.h>
-__FBSDID("$FreeBSD$");
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
