@@ -41,7 +41,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/module.h>
+#include <sys/mutex.h>
 #include <sys/sx.h>
+#include <sys/tree.h>
 
 #include <cheri/cheric.h>
 
@@ -81,8 +83,27 @@ struct compartment_trampoline {
 	int		ct_type;
 	uintcap_t	ct_compartment_func;
 	uintcap_t	ct_compartment_stackptr_func;
+	RB_ENTRY(compartment_trampoline) ct_node;
 	char		ct_code[] __subobject_use_container_bounds;
 };
+
+static int
+compartment_trampoline_compare(struct compartment_trampoline *a,
+    struct compartment_trampoline *b)
+{
+
+	return ((ptraddr_t)a->ct_compartment_func -
+	    (ptraddr_t)b->ct_compartment_func);
+}
+
+RB_HEAD(compartment_tree, compartment_trampoline) compartment_trampolines =
+    RB_INITIALIZER(&compartment_trampolines);
+RB_GENERATE_STATIC(compartment_tree, compartment_trampoline, ct_node,
+    compartment_trampoline_compare);
+
+static struct mtx compartment_trampolines_lock;
+MTX_SYSINIT(compartmenttrampolines, &compartment_trampolines_lock,
+    "compartment_trampolines", MTX_DEF);
 
 static void
 compartment_linkup(struct compartment *compartment, int id, struct thread *td)
@@ -166,39 +187,80 @@ static struct compartment_trampoline *
 compartment_trampoline_create(const module_t mod, int type, void *data,
     size_t size, uintcap_t func)
 {
-	struct compartment_trampoline *trampoline;
+	struct compartment_trampoline *trampoline, *oldtrampoline;
+	struct compartment_trampoline tmptrampoline;
+	uintcap_t dstfunc;
 
 	KASSERT((cheri_getperm(cheri_getpcc()) & CHERI_PERM_EXECUTIVE) != 0,
 	    ("compartment_trampoline_create: PCC %#lp has invalid permissions",
 	    (void *)cheri_getpcc()));
 
+	if (mod != NULL) {
+		dstfunc = module_capability(mod, func);
+	} else {
+		dstfunc = (intcap_t)cheri_kern_setaddress(cheri_getpcc(),
+		    (intptr_t)func);
+		dstfunc = cheri_andperm(dstfunc, cheri_getperm(func));
+		dstfunc = cheri_capmode(dstfunc);
+		dstfunc = cheri_sealentry(dstfunc);
+	}
+
+	tmptrampoline.ct_compartment_func = dstfunc;
+	oldtrampoline = RB_FIND(compartment_tree, &compartment_trampolines,
+	    &tmptrampoline);
+	if (oldtrampoline != NULL) {
+		trampoline = oldtrampoline;
+		goto out;
+	}
+
 	/*
 	 * TODO: Free the trampoline.
 	 */
-	trampoline = malloc_exec(size, M_COMPARTMENT, M_WAITOK | M_ZERO);
+	if (mod != NULL) {
+		trampoline = SUPERVISOR_EXIT(malloc_exec,
+		    (size, M_COMPARTMENT, M_WAITOK | M_ZERO));
+	} else {
+		if (compartment_entries_length >= PAGE_SIZE *
+		    COMPARTMENT_ENTRY_PAGES) {
+			panic("compartment_trampoline_create: cannot allocate memory");
+		}
+		trampoline = (void *)(compartment_entries +
+		    compartment_entries_length);
+		compartment_entries_length += size;
+	}
 
 	memcpy(trampoline, data, size);
 
-	cpu_dcache_wb_range((vm_pointer_t)trampoline, (vm_size_t)size);
-	cpu_icache_sync_range((vm_pointer_t)trampoline, (vm_size_t)size);
+	trampoline->ct_compartment_func = dstfunc;
+	trampoline->ct_type = type;
+	ELF_STATIC_RELOC_LABEL(trampoline->ct_compartment_stackptr_func,
+	    compartment_entry_stackptr);
+	trampoline->ct_compartment_stackptr_func =
+	    cheri_sealentry(trampoline->ct_compartment_stackptr_func);
 
 	if (mod != NULL) {
 		trampoline->ct_compartment_id = module_getid(mod);
-		trampoline->ct_compartment_func = module_capability(mod, func);
+
+		cpu_dcache_wb_range((vm_pointer_t)trampoline, (vm_size_t)size);
+		cpu_icache_sync_range((vm_pointer_t)trampoline,
+		    (vm_size_t)size);
+
+		mtx_lock(&compartment_trampolines_lock);
 	} else {
 		trampoline->ct_compartment_id = COMPARTMENT_KERNEL_ID;
-		trampoline->ct_compartment_func = (uintcap_t)cheri_sealentry(
-		    cheri_capmode(cheri_setaddress(cheri_getpcc(), func)));
-	}
-	trampoline->ct_type = type;
-	if (stackptr_func != NULL) {
-		trampoline->ct_compartment_stackptr_func =
-		    (uintcap_t)stackptr_func;
-	} else {
-		trampoline->ct_compartment_stackptr_func =
-		    (uintcap_t)compartment_entry_stackptr;
 	}
 
+	oldtrampoline = RB_INSERT(compartment_tree, &compartment_trampolines,
+	    trampoline);
+	KASSERT(oldtrampoline == NULL,
+	    ("Trampoline for 0x%#lp already exists",
+	    (void *)trampoline->ct_compartment_func));
+
+	if (mod != NULL) {
+		mtx_unlock(&compartment_trampolines_lock);
+	}
+
+out:
 	func = (intcap_t)cheri_kern_setaddress(cheri_getpcc(),
 	    (intptr_t)trampoline);
 	/*
