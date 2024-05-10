@@ -83,8 +83,8 @@ void kmem_init(vm_pointer_t, vm_pointer_t);
 void kmem_init_zero_region(void);
 void kmeminit(void);
 
-int kernacc(void *, int, int);
-int useracc(void * __capability, int, int);
+bool kernacc(void *, int, int);
+bool useracc(void * __capability, int, int);
 #if __has_feature(capabilities)
 bool vm_cap_allows_prot(const void * __capability, vm_prot_t);
 #endif

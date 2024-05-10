@@ -126,7 +126,7 @@
  * just checking the vm_map_entry is sufficient within the kernel's address
  * space.
  */
-int
+bool
 kernacc(void *addr, int len, int rw)
 {
 	boolean_t rv;
@@ -138,7 +138,7 @@ kernacc(void *addr, int len, int rw)
 
 	if ((vm_offset_t)addr + len > vm_map_max(kernel_map) ||
 	    (vm_offset_t)addr + len < (vm_offset_t)addr)
-		return (FALSE);
+		return (false);
 
 	prot = rw;
 	saddr = trunc_page((vm_offset_t)addr);
@@ -158,7 +158,7 @@ kernacc(void *addr, int len, int rw)
  * vm_fault_quick(), or copyin()/copout()/su*()/fu*() functions should be
  * used in conjunction with this call.
  */
-int
+bool
 useracc(void * __capability cap, int len, int rw)
 {
 	vm_offset_t addr;
@@ -171,12 +171,12 @@ useracc(void * __capability cap, int len, int rw)
 	prot = rw;
 #if __has_feature(capabilities)
 	if (!__CAP_CHECK(cap, len) || !vm_cap_allows_prot(cap, prot))
-		return (FALSE);
+		return (false);
 #endif
 	addr = (__cheri_addr vm_offset_t)cap;
 	map = &curproc->p_vmspace->vm_map;
 	if (addr + len > vm_map_max(map) || addr + len < addr) {
-		return (FALSE);
+		return (false);
 	}
 	vm_map_lock_read(map);
 	rv = vm_map_check_protection(map, trunc_page(addr),
