@@ -99,6 +99,21 @@
 	mrs	CAP(2), rctpidr_el0
 	stp	CAP(0), CAP(1), [PTRN(sp), #(TF_RCSP)]
 	str	CAP(2), [PTRN(sp), #(TF_RCTPIDR)]
+.if \el == 0
+	/*
+	 * Install the kernel compartment stack before branching into any
+	 * trampoline. The trampoline code assumes a caller's compartment stack
+	 * is valid and hence the call to compartment_entry_stackptr() must not
+	 * use a trampoline as well.
+	 */
+	mov	x0, COMPARTMENT_KERNEL_ID
+	mov	x1, 0
+	bl	compartment_entry_stackptr
+	gclim	x1, c0
+	scvalue	c0, c0, x1
+	ldr	c0, [c0, #-CAP_WIDTH]
+	msr	rcsp_el0, c0
+.endif
 	/*
 	 * TODO: Clear capability registers (or tags)?
 	 */
