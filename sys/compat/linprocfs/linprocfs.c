@@ -2147,9 +2147,9 @@ again:
 			    msqids[id].u.msg_perm.gid,
 			    msqids[id].u.msg_perm.cuid,
 			    msqids[id].u.msg_perm.cgid,
-			    msqids[id].u.msg_stime,
-			    msqids[id].u.msg_rtime,
-			    msqids[id].u.msg_ctime);
+			    (long)msqids[id].u.msg_stime,
+			    (long)msqids[id].u.msg_rtime,
+			    (long)msqids[id].u.msg_ctime);
 
 	free(msqids, M_TEMP);
 	return (0);
@@ -2201,8 +2201,8 @@ again:
 			    semids[id].u.sem_perm.gid,
 			    semids[id].u.sem_perm.cuid,
 			    semids[id].u.sem_perm.cgid,
-			    semids[id].u.sem_otime,
-			    semids[id].u.sem_ctime);
+			    (long)semids[id].u.sem_otime,
+			    (long)semids[id].u.sem_ctime);
 
 	free(semids, M_TEMP);
 	return (0);
@@ -2258,9 +2258,9 @@ again:
 			    shmids[id].u.shm_perm.gid,
 			    shmids[id].u.shm_perm.cuid,
 			    shmids[id].u.shm_perm.cgid,
-			    shmids[id].u.shm_atime,
-			    shmids[id].u.shm_dtime,
-			    shmids[id].u.shm_ctime,
+			    (long)shmids[id].u.shm_atime,
+			    (long)shmids[id].u.shm_dtime,
+			    (long)shmids[id].u.shm_ctime,
 			    0, 0);	/* XXX rss & swp are not supported */
 
 	free(shmids, M_TEMP);
