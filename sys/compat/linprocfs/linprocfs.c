@@ -2135,7 +2135,7 @@ again:
 	for (id = 0; id < msgmni; id++)
 		if (msqids[id].u.msg_qbytes != 0)
 			sbuf_printf(sb,
-			    "%10d %10lu  %4o  %10lu %10lu %5u %5u %5u %5u %5u %5u %10ld %10ld %10ld\n",
+			    "%10d %10lu  %4o  %10lu %10lu %5u %5u %5u %5u %5u %5u %10lld %10lld %10lld\n",
 			    (int) msqids[id].u.msg_perm.key,
 			    IXSEQ_TO_IPCID(id, msqids[id].u.msg_perm),
 			    msqids[id].u.msg_perm.mode,
@@ -2147,9 +2147,9 @@ again:
 			    msqids[id].u.msg_perm.gid,
 			    msqids[id].u.msg_perm.cuid,
 			    msqids[id].u.msg_perm.cgid,
-			    (long)msqids[id].u.msg_stime,
-			    (long)msqids[id].u.msg_rtime,
-			    (long)msqids[id].u.msg_ctime);
+			    (long long)msqids[id].u.msg_stime,
+			    (long long)msqids[id].u.msg_rtime,
+			    (long long)msqids[id].u.msg_ctime);
 
 	free(msqids, M_TEMP);
 	return (0);
@@ -2192,7 +2192,7 @@ again:
 	for (id = 0; id < semmni; id++)
 		if ((semids[id].u.sem_perm.mode & SEM_ALLOC) != 0)
 			sbuf_printf(sb,
-			    "%10d %10lu  %4o %10u %5u %5u %5u %5u %10ld %10ld\n",
+			    "%10d %10lu  %4o %10u %5u %5u %5u %5u %10lld %10lld\n",
 			    (int) semids[id].u.sem_perm.key,
 			    IXSEQ_TO_IPCID(id, semids[id].u.sem_perm),
 			    semids[id].u.sem_perm.mode,
@@ -2201,8 +2201,8 @@ again:
 			    semids[id].u.sem_perm.gid,
 			    semids[id].u.sem_perm.cuid,
 			    semids[id].u.sem_perm.cgid,
-			    (long)semids[id].u.sem_otime,
-			    (long)semids[id].u.sem_ctime);
+			    (long long)semids[id].u.sem_otime,
+			    (long long)semids[id].u.sem_ctime);
 
 	free(semids, M_TEMP);
 	return (0);
@@ -2246,7 +2246,7 @@ again:
 	for (id = 0; id < shmmni; id++)
 		if ((shmids[id].u.shm_perm.mode & SHMSEG_ALLOCATED) != 0)
 			sbuf_printf(sb,
-			    "%10d %10lu  %4o %21lu %5u %5u  %5u %5u %5u %5u %5u %10ld %10ld %10ld %21d %21d\n",
+			    "%10d %10lu  %4o %21zu %5u %5u  %5u %5u %5u %5u %5u %10lld %10lld %10lld %21d %21d\n",
 			    (int) shmids[id].u.shm_perm.key,
 			    IXSEQ_TO_IPCID(id, shmids[id].u.shm_perm),
 			    shmids[id].u.shm_perm.mode,
@@ -2258,9 +2258,9 @@ again:
 			    shmids[id].u.shm_perm.gid,
 			    shmids[id].u.shm_perm.cuid,
 			    shmids[id].u.shm_perm.cgid,
-			    (long)shmids[id].u.shm_atime,
-			    (long)shmids[id].u.shm_dtime,
-			    (long)shmids[id].u.shm_ctime,
+			    (long long)shmids[id].u.shm_atime,
+			    (long long)shmids[id].u.shm_dtime,
+			    (long long)shmids[id].u.shm_ctime,
 			    0, 0);	/* XXX rss & swp are not supported */
 
 	free(shmids, M_TEMP);
