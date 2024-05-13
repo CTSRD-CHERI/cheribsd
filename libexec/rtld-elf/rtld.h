@@ -248,13 +248,6 @@ typedef struct Struct_Obj_Entry {
     caddr_t cap_relocs;		/* start of the __cap_relocs section */
     size_t cap_relocs_size;	/* size of the __cap_relocs section */
 #endif
-#ifdef __powerpc__
-#ifdef __powerpc64__
-    Elf_Addr glink;		/* GLINK PLT call stub section */
-#else
-    Elf_Addr *gotptr;		/* GOT pointer (secure-plt only) */
-#endif
-#endif
 
     const Elf_Verneed *verneed; /* Required versions. */
     Elf_Word verneednum;	/* Number of entries in verneed table */
