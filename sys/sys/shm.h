@@ -185,6 +185,8 @@ extern struct shminfo	shminfo;
 
 void	shmexit(struct vmspace *);
 void	shmfork(struct proc *, struct proc *);
+int	kern_get_shmsegs(struct thread *td, struct shmid_kernel **res,
+	    size_t *sz);
 
 #else /* !_KERNEL */
 
