@@ -63,6 +63,9 @@ typedef	intptr_t word;		/* "word" used for optimal copy speed */
 #if defined(MEMCOPY) || defined(MEMMOVE)
 #include <string.h>
 
+#undef memcpy	/* _FORTIFY_SOURCE */
+#undef memmove	/* _FORTIFY_SOURCE */
+
 #ifdef IN_LIBSYSCALLS
 __attribute__((weak, visibility("hidden")))
 #endif
@@ -75,6 +78,8 @@ __CAPSUFFIX(memmove)
 (void * __CAP dst0, const void * __CAP src0, size_t length)
 #else
 #include <strings.h>
+
+#undef bcopy	/* _FORTIFY_SOURCE */
 
 void
 bcopy(const void *src0, void *dst0, size_t length)
