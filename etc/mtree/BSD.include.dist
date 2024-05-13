@@ -354,6 +354,8 @@
         mac_veriexec
         ..
     ..
+    ssp
+    ..
     sys
         disk
         ..
