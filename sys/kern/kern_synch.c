@@ -42,6 +42,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_ktrace.h"
 #include "opt_sched.h"
 
+#include <sys/accel.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/blockcount.h>
@@ -714,4 +715,23 @@ sys_sched_getcpu(struct thread *td, struct sched_getcpu_args *uap)
 {
 	td->td_retval[0] = td->td_oncpu;
 	return (0);
+}
+
+int
+sys_accel_malloc(struct thread *td, struct accel_ctrl_args *accel_config)
+{
+        // int accel_addr[8] = { 0xC0010000, 0xC0011000, 0xC0012000, 0xC0013000,
+        //      0xC0014000, 0xC0015000, 0xC0016000, 0xC0017000 };
+
+        accel_config->buffer_count++;
+        return 0;
+}
+
+int
+sys_accel_demalloc(struct thread *td, struct accel_ctrl_args *accel_config)
+{
+
+        accel_config->buffer_count--;
+
+        return 0;
 }

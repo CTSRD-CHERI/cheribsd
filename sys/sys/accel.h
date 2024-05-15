@@ -54,8 +54,8 @@ struct accel_ctrl_args {
 	// struct ctrl_reg *buffers;
 };
 
-int accel_malloc(struct thread *td, struct accel_ctrl_args *accel_config);
-int accel_demalloc(struct thread *td, struct accel_ctrl_args *accel_config);
+// int sys_accel_malloc(struct thread *td, struct accel_ctrl_args *accel_config);
+// int sys_accel_demalloc(struct thread *td, struct accel_ctrl_args *accel_config);
 
 // int
 // accel_malloc(struct accel_ctrl_args *accel_config)
