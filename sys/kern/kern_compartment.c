@@ -38,9 +38,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/compartment.h>
 #include <sys/kernel.h>
 #include <sys/limits.h>
+#include <sys/linker.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
-#include <sys/module.h>
 #include <sys/mutex.h>
 #include <sys/sx.h>
 #include <sys/tree.h>
@@ -186,7 +186,7 @@ compartment_entry_stackptr(int id, int type)
 }
 
 static struct compartment_trampoline *
-compartment_trampoline_create(const module_t mod, int type, void *data,
+compartment_trampoline_create(const linker_file_t lf, int type, void *data,
     size_t size, uintcap_t func)
 {
 	struct compartment_trampoline *trampoline, *oldtrampoline;
@@ -197,9 +197,16 @@ compartment_trampoline_create(const module_t mod, int type, void *data,
 	    ("compartment_trampoline_create: PCC %#lp has invalid permissions",
 	    (void *)cheri_getpcc()));
 
-	if (mod != NULL) {
-		dstfunc = module_capability(mod, func);
+	if (lf != NULL) {
+		dstfunc = linker_file_capability(lf, func);
 	} else {
+		/*
+		 * We're creating a trampoline for the kernel while the kernel
+		 * is being relocated and linker_file_capability() isn't
+		 * available.
+		 *
+		 * Use PCC instead of the base address of the linker file.
+		 */
 		dstfunc = (intcap_t)cheri_kern_setaddress(cheri_getpcc(),
 		    (intptr_t)func);
 		dstfunc = cheri_andperm(dstfunc, cheri_getperm(func));
@@ -218,9 +225,9 @@ compartment_trampoline_create(const module_t mod, int type, void *data,
 	/*
 	 * TODO: Free the trampoline.
 	 */
-	if (mod != NULL) {
-		trampoline = SUPERVISOR_EXIT(malloc_exec,
-		    (size, M_COMPARTMENT, M_WAITOK | M_ZERO));
+	if (lf != NULL) {
+		trampoline = malloc_exec(size, M_COMPARTMENT, M_WAITOK |
+		    M_ZERO);
 	} else {
 		if (compartment_entries_length >= PAGE_SIZE *
 		    COMPARTMENT_ENTRY_PAGES) {
@@ -240,8 +247,8 @@ compartment_trampoline_create(const module_t mod, int type, void *data,
 	trampoline->ct_compartment_stackptr_func =
 	    cheri_sealentry(trampoline->ct_compartment_stackptr_func);
 
-	if (mod != NULL) {
-		trampoline->ct_compartment_id = module_getid(mod);
+	if (lf != NULL) {
+		trampoline->ct_compartment_id = lf->id;
 
 		cpu_dcache_wb_range((vm_pointer_t)trampoline, (vm_size_t)size);
 		cpu_icache_sync_range((vm_pointer_t)trampoline,
@@ -258,9 +265,8 @@ compartment_trampoline_create(const module_t mod, int type, void *data,
 	    ("Trampoline for 0x%#lp already exists",
 	    (void *)trampoline->ct_compartment_func));
 
-	if (mod != NULL) {
+	if (lf != NULL)
 		mtx_unlock(&compartment_trampolines_lock);
-	}
 
 out:
 	func = (intcap_t)cheri_kern_setaddress(cheri_getpcc(),
@@ -305,12 +311,12 @@ compartment_entry_for_kernel(uintptr_t func)
 	    szcompartment_entry_trampoline, func));
 }
 
-SUPERVISOR_ENTRY(void *, compartment_entry_for_module, (const module_t mod,
+SUPERVISOR_ENTRY(void *, compartment_entry_for_file, (const linker_file_t lf,
     uintptr_t func))
 {
 
 	func = cheri_clearperm(func, CHERI_PERM_EXECUTIVE);
-	return (compartment_trampoline_create(mod,
+	return (compartment_trampoline_create(lf,
 	    TRAMPOLINE_TYPE_COMPARTMENT_ENTRY, compartment_entry_trampoline,
 	    szcompartment_entry_trampoline, func));
 }
@@ -318,18 +324,18 @@ SUPERVISOR_ENTRY(void *, compartment_entry_for_module, (const module_t mod,
 SUPERVISOR_ENTRY(void *, compartment_entry, (uintptr_t func))
 {
 	void *codeptr;
-	module_t mod;
+	linker_file_t lf;
 
-	MOD_SLOCK;
+	if (linker_file_includes(linker_kernel_file, func))
+		lf = linker_kernel_file;
+	else
+		lf = linker_find_file_by_ptr((uintptr_t)func);
+	if (lf == NULL)
+		panic("compartment_entry: unable to find a linker file");
 
-	mod = module_lookupbyptr((uintptr_t)func);
-	if (mod == NULL)
-		panic("compartment_entry: unable to find module");
-
-	codeptr = SUPERVISOR_ENTRY_NAME(compartment_entry_for_module)(mod,
+	codeptr = SUPERVISOR_ENTRY_NAME(compartment_entry_for_file)(lf,
 	    func);
 
-	MOD_SUNLOCK;
 	return (codeptr);
 }
 
