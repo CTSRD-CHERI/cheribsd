@@ -33,9 +33,7 @@
 #ifndef _SYS_COMPARTMENT_H_
 #define	_SYS_COMPARTMENT_H_
 
-#ifndef _KERNEL
-#error "no user-serviceable parts inside"
-#endif
+#ifdef _KERNEL
 
 #include <sys/malloc.h>
 #include <sys/module.h>
@@ -70,5 +68,7 @@ void *supervisor_get_function(uintptr_t func);
 #ifdef MALLOC_DECLARE
 MALLOC_DECLARE(M_COMPARTMENT);
 #endif
+
+#endif	/* _KERNEL */
 
 #endif	/* !_SYS_COMPARTMENT_H_ */
