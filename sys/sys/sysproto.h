@@ -1878,6 +1878,12 @@ struct swapoff_args {
 struct kqueue1_args {
 	char flags_l_[PADL_(u_int)]; u_int flags; char flags_r_[PADR_(u_int)];
 };
+struct accel_malloc_args {
+	char accel_config_l_[PADL_(struct accel_ctrl_args * __capability)]; struct accel_ctrl_args * __capability accel_config; char accel_config_r_[PADR_(struct accel_ctrl_args * __capability)];
+};
+struct accel_demalloc_args {
+	char accel_config_l_[PADL_(struct accel_ctrl_args * __capability)]; struct accel_ctrl_args * __capability accel_config; char accel_config_r_[PADR_(struct accel_ctrl_args * __capability)];
+};
 int	sys_exit(struct thread *, struct exit_args *);
 int	sys_fork(struct thread *, struct fork_args *);
 int	sys_read(struct thread *, struct read_args *);
@@ -2278,6 +2284,8 @@ int	sys_fspacectl(struct thread *, struct fspacectl_args *);
 int	sys_sched_getcpu(struct thread *, struct sched_getcpu_args *);
 int	sys_swapoff(struct thread *, struct swapoff_args *);
 int	sys_kqueue1(struct thread *, struct kqueue1_args *);
+int	sys_accel_malloc(struct thread *, struct accel_malloc_args *);
+int	sys_accel_demalloc(struct thread *, struct accel_demalloc_args *);
 
 #ifdef COMPAT_43
 
@@ -3252,6 +3260,8 @@ int	freebsd13_swapoff(struct thread *, struct freebsd13_swapoff_args *);
 #define	SYS_AUE_sched_getcpu	AUE_NULL
 #define	SYS_AUE_swapoff	AUE_SWAPOFF
 #define	SYS_AUE_kqueue1	AUE_KQUEUE
+#define	SYS_AUE_accel_malloc	ACCEL_MALLOC
+#define	SYS_AUE_accel_demalloc	ACCEL_DEMALLOC
 
 #undef PAD_
 #undef PADL_

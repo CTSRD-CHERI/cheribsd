@@ -3442,6 +3442,20 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
+	/* freebsd64_accel_malloc */
+	case 584: {
+		struct freebsd64_accel_malloc_args *p = params;
+		uarg[a++] = (intptr_t)p->accel_config; /* struct accel_ctrl_args * */
+		*n_args = 1;
+		break;
+	}
+	/* freebsd64_accel_demalloc */
+	case 585: {
+		struct freebsd64_accel_demalloc_args *p = params;
+		uarg[a++] = (intptr_t)p->accel_config; /* struct accel_ctrl_args * */
+		*n_args = 1;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -9201,6 +9215,26 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* freebsd64_accel_malloc */
+	case 584:
+		switch (ndx) {
+		case 0:
+			p = "userland struct accel_ctrl_args *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* freebsd64_accel_demalloc */
+	case 585:
+		switch (ndx) {
+		case 0:
+			p = "userland struct accel_ctrl_args *";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -11166,6 +11200,16 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* kqueue1 */
 	case 583:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* freebsd64_accel_malloc */
+	case 584:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* freebsd64_accel_demalloc */
+	case 585:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

@@ -430,4 +430,6 @@ MIASM =  \
 	fspacectl.o \
 	sched_getcpu.o \
 	swapoff.o \
-	kqueue1.o
+	kqueue1.o \
+	accel_malloc.o \
+	accel_demalloc.o

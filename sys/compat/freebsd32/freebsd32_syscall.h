@@ -504,4 +504,6 @@
 #define	FREEBSD32_SYS_sched_getcpu	581
 #define	FREEBSD32_SYS_swapoff	582
 #define	FREEBSD32_SYS_kqueue1	583
-#define	FREEBSD32_SYS_MAXSYSCALL	584
+#define	FREEBSD32_SYS_accel_malloc	584
+#define	FREEBSD32_SYS_accel_demalloc	585
+#define	FREEBSD32_SYS_MAXSYSCALL	586

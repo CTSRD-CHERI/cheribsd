@@ -409,6 +409,8 @@ static int sysargmask[] = {
 	[SYS_sched_getcpu] = (0x0),
 	[SYS_swapoff] = (0x0 | 0x1),
 	[SYS_kqueue1] = (0x0),
+	[SYS_accel_malloc] = (0x0 | 0x1),
+	[SYS_accel_demalloc] = (0x0 | 0x1),
 };
 
 #endif /* !_SYSARGMAP_H_ */

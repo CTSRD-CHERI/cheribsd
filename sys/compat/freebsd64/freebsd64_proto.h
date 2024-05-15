@@ -1518,6 +1518,12 @@ struct freebsd64_swapoff_args {
 	char name_l_[PADL_(const char *)]; const char * name; char name_r_[PADR_(const char *)];
 	char flags_l_[PADL_(u_int)]; u_int flags; char flags_r_[PADR_(u_int)];
 };
+struct freebsd64_accel_malloc_args {
+	char accel_config_l_[PADL_(struct accel_ctrl_args *)]; struct accel_ctrl_args * accel_config; char accel_config_r_[PADR_(struct accel_ctrl_args *)];
+};
+struct freebsd64_accel_demalloc_args {
+	char accel_config_l_[PADL_(struct accel_ctrl_args *)]; struct accel_ctrl_args * accel_config; char accel_config_r_[PADR_(struct accel_ctrl_args *)];
+};
 int	freebsd64_read(struct thread *, struct freebsd64_read_args *);
 int	freebsd64_write(struct thread *, struct freebsd64_write_args *);
 int	freebsd64_open(struct thread *, struct freebsd64_open_args *);
@@ -1823,6 +1829,8 @@ int	freebsd64_aio_writev(struct thread *, struct freebsd64_aio_writev_args *);
 int	freebsd64_aio_readv(struct thread *, struct freebsd64_aio_readv_args *);
 int	freebsd64_fspacectl(struct thread *, struct freebsd64_fspacectl_args *);
 int	freebsd64_swapoff(struct thread *, struct freebsd64_swapoff_args *);
+int	freebsd64_accel_malloc(struct thread *, struct freebsd64_accel_malloc_args *);
+int	freebsd64_accel_demalloc(struct thread *, struct freebsd64_accel_demalloc_args *);
 
 #ifdef COMPAT_43
 
@@ -2389,6 +2397,8 @@ int	freebsd13_freebsd64_swapoff(struct thread *, struct freebsd13_freebsd64_swap
 #define	FREEBSD64_SYS_AUE_freebsd64_aio_readv	AUE_AIO_READV
 #define	FREEBSD64_SYS_AUE_freebsd64_fspacectl	AUE_FSPACECTL
 #define	FREEBSD64_SYS_AUE_freebsd64_swapoff	AUE_SWAPOFF
+#define	FREEBSD64_SYS_AUE_freebsd64_accel_malloc	ACCEL_MALLOC
+#define	FREEBSD64_SYS_AUE_freebsd64_accel_demalloc	ACCEL_DEMALLOC
 
 #undef PAD_
 #undef PADL_

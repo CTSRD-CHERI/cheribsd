@@ -428,4 +428,6 @@ MIASM =  \
 	freebsd64_fspacectl.o \
 	sched_getcpu.o \
 	freebsd64_swapoff.o \
-	kqueue1.o
+	kqueue1.o \
+	freebsd64_accel_malloc.o \
+	freebsd64_accel_demalloc.o
