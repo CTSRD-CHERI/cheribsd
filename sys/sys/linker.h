@@ -74,7 +74,6 @@ struct linker_file {
     int			flags;
 #define LINKER_FILE_LINKED	0x1	/* file has been fully linked */
 #define LINKER_FILE_MODULES	0x2	/* file has >0 modules at preload */
-    bool		compartment;	/* execute code in a compartment */
     TAILQ_ENTRY(linker_file) link;	/* list of all loaded files */
     char*		filename;	/* file which was loaded */
     char*		pathname;	/* file name with full path */
@@ -173,7 +172,6 @@ int linker_file_function_listall(linker_file_t,
  */
 int linker_add_class(linker_class_t _cls);
 int linker_file_unload(linker_file_t _file, int flags);
-int linker_load_policy(linker_file_t lf);
 int linker_load_dependencies(linker_file_t _lf);
 linker_file_t linker_make_file(const char* _filename, linker_class_t _cls);
 
@@ -298,7 +296,6 @@ int	elf_reloc(linker_file_t _lf, char *base, const void *_rel,
 int	elf_reloc_local(linker_file_t _lf, char *base, const void *_rel,
 	    int _type, elf_lookup_fn _lu);
 Elf_Addr elf_relocaddr(linker_file_t _lf, Elf_Addr addr);
-bool elf_get_compartment_ifunc(linker_file_t lf);
 const Elf_Sym *elf_get_sym(linker_file_t _lf, Elf_Size _symidx);
 const char *elf_get_symname(linker_file_t _lf, Elf_Size _symidx);
 void	link_elf_ireloc(caddr_t kmdp);

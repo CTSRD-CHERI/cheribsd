@@ -36,7 +36,6 @@
 #define	MDT_MODULE	2		/* module declaration */
 #define	MDT_VERSION	3		/* module version(s) */
 #define	MDT_PNP_INFO	4		/* Plug and play hints record */
-#define	MDT_POLICY	5		/* module policy */
 
 #define	MDT_STRUCT_VERSION	1	/* version of metadata structure */
 #define	MDT_SETNAME	"modmetadata_set"
@@ -103,14 +102,6 @@ struct mod_pnp_match_info
 				/*   longer than descr describes). */
 	int num_entry;		/* Number of entries in the table */
 };
-
-/*
- * Module policy declaration
- */
-struct mod_policy {
-	bool	mp_compartment;
-};
-
 #ifdef	_KERNEL
 
 #include <sys/linker_set.h>
@@ -181,15 +172,6 @@ struct mod_policy {
 	MODULE_METADATA(MODULE_VERSION_CONCAT(module, version), MDT_VERSION,\
 	    &MODULE_VERSION_CONCAT(module, version), __XSTRING(module))
 
-#define	MODULE_POLICY_CONCAT(module)	_##module##_policy
-#define	MODULE_POLICY(module, compartment)				\
-	static struct mod_policy MODULE_POLICY_CONCAT(module)		\
-	    __section(".data") = {					\
-		compartment						\
-	};								\
-	MODULE_METADATA(MODULE_POLICY_CONCAT(module), MDT_POLICY,\
-	    &MODULE_POLICY_CONCAT(module), __XSTRING(module))
-
 /**
  * Generic macros to create pnp info hints that modules may export
  * to allow external tools to parse their internal device tables
@@ -257,7 +239,6 @@ int	module_getid(module_t);
 module_t	module_getfnext(module_t);
 const char *	module_getname(module_t);
 void	module_setspecific(module_t, modspecific_t *);
-bool module_getpolicy(module_t mod);
 struct linker_file *module_file(module_t);
 
 #ifdef	MOD_DEBUG

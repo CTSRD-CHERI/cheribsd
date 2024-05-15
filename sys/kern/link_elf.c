@@ -535,14 +535,6 @@ link_elf_init(void* arg)
 	    linker_kernel_file->address, linker_kernel_file->size);
 	(void)link_elf_preload_parse_symbols(ef);
 
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	/*
-	 * Use the kernel linker-based compartmentalization model for the kernel
-	 * itself.
-	 */
-	linker_kernel_file->compartment = true;
-#endif
-
 #ifdef GDB
 	r_debug.r_map = NULL;
 	r_debug.r_brk = r_debug_state;
@@ -1047,14 +1039,6 @@ link_elf_link_preload_finish(linker_file_t lf)
 	elf_file_t ef;
 	int error;
 
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	/*
-	 * Apply the kernel linker-based compartmentalization model to
-	 * a pre-loaded kernel module before relocating the linker file.
-	 */
-	lf->compartment = true;
-#endif
-
 	ef = (elf_file_t) lf;
 	error = relocate_file(ef);
 	if (error == 0)
@@ -1331,9 +1315,6 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 		goto out;
 #endif
 	link_elf_reloc_local(lf);
-	error = linker_load_policy(lf);
-	if (error != 0)
-		goto out;
 
 	VOP_UNLOCK(nd.ni_vp);
 	error = linker_load_dependencies(lf);
@@ -1480,22 +1461,6 @@ elf_relocaddr(linker_file_t lf, Elf_Addr x)
 		return ((x - (Elf_Addr)ef->vnet_start) + (Elf_Addr)ef->vnet_base);
 #endif
 	return (x);
-}
-
-bool
-elf_get_compartment_ifunc(linker_file_t lf)
-{
-	elf_file_t ef = (elf_file_t)lf;
-
-	/*
-	 * Use trampolines for ifuncs if a linker file is compartmentalized
-	 * but not if it was pre-loaded.
-	 *
-	 * Pre-loaded linker files, including the kernel, are allowed to run
-	 * ifunc resolvers without restrictions to construct trampolines
-	 * themselves.
-	 */
-	return ((ef->preloaded && lf->compartment) ? false : lf->compartment);
 }
 
 static void
@@ -2262,23 +2227,6 @@ link_elf_ireloc(caddr_t kmdp)
 	 * relocate ifunc resolvers if they must be compartmentalized.
 	 */
 	ef->preloaded = true;
-
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	/*
-	 * Use the kernel linker-based compartmentalization model for the kernel
-	 * itself.
-	 *
-	 * This is repeated for the kernel in link_elf_init() when handling
-	 * SYSINT() for the kernel linker. link_elf_init() registers the kernel
-	 * as a pre-loaded kernel but does not relocate its symbols as we are
-	 * relocating them in link_elf_ireloc() below.
-	 *
-	 * Note that the rest of the elf->lf object remains zeroed within
-	 * link_elf_ireloc() as other fields than linker_file.compartment are
-	 * never used by its callees.
-	 */
-	ef->lf.compartment = true;
-#endif
 
 #ifdef RELOCATABLE_KERNEL
 	ef->address = (caddr_t) (__startkernel - KERNBASE);
