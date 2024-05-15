@@ -277,12 +277,4 @@ static moduledata_t zlib_mod = {
 	0
 };
 DECLARE_MODULE(zlib, zlib_mod, SI_SUB_DRIVERS, SI_ORDER_FIRST);
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-MODULE_POLICY(zlib, true);
-#else
-#ifndef CHERI_DONT_COMPARTMENTALIZE_KERNEL
-#warning "Module will not be compartmentalized (CHERI_COMPARTMENTALIZE_KERNEL is missing)."
-#endif
-MODULE_POLICY(zlib, false);
-#endif
 MODULE_VERSION(zlib, 1);

@@ -63,13 +63,5 @@ static moduledata_t compartment_function_mod = {
 };
 
 MODULE_VERSION(compartment_function, 1);
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-MODULE_POLICY(compartment_function, true);
-#else
-#ifndef CHERI_DONT_COMPARTMENTALIZE_KERNEL
-#warning "Module will not be compartmentalized (CHERI_COMPARTMENTALIZE_KERNEL is missing)."
-#endif
-MODULE_POLICY(compartment_function, false);
-#endif
 DECLARE_MODULE(compartment_function, compartment_function_mod, SI_SUB_PSEUDO,
     SI_ORDER_ANY);
