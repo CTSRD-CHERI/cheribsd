@@ -60,7 +60,6 @@ void compartment_trampoline_destroy(uintptr_t func);
 vm_pointer_t compartment_entry_stackptr(int id, int type);
 void *compartment_call(uintptr_t func);
 void *compartment_entry_for_kernel(uintptr_t func);
-void *compartment_entry_for_file(const linker_file_t lf, uintptr_t func);
 void *compartment_entry(uintptr_t func);
 void *supervisor_entry_for_kernel(uintptr_t func);
 void *supervisor_get_function(uintptr_t func);

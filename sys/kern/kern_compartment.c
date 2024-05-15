@@ -313,19 +313,8 @@ compartment_entry_for_kernel(uintptr_t func)
 	    szcompartment_entry_trampoline, func));
 }
 
-SUPERVISOR_ENTRY(void *, compartment_entry_for_file, (const linker_file_t lf,
-    uintptr_t func))
-{
-
-	func = cheri_clearperm(func, CHERI_PERM_EXECUTIVE);
-	return (compartment_trampoline_create(lf,
-	    TRAMPOLINE_TYPE_COMPARTMENT_ENTRY, compartment_entry_trampoline,
-	    szcompartment_entry_trampoline, func));
-}
-
 SUPERVISOR_ENTRY(void *, compartment_entry, (uintptr_t func))
 {
-	void *codeptr;
 	linker_file_t lf;
 
 	if (linker_file_includes(linker_kernel_file, func))
@@ -335,10 +324,10 @@ SUPERVISOR_ENTRY(void *, compartment_entry, (uintptr_t func))
 	if (lf == NULL)
 		panic("compartment_entry: unable to find a linker file");
 
-	codeptr = SUPERVISOR_ENTRY_NAME(compartment_entry_for_file)(lf,
-	    func);
-
-	return (codeptr);
+	func = cheri_clearperm(func, CHERI_PERM_EXECUTIVE);
+	return (compartment_trampoline_create(lf,
+	    TRAMPOLINE_TYPE_COMPARTMENT_ENTRY, compartment_entry_trampoline,
+	    szcompartment_entry_trampoline, func));
 }
 
 void *
