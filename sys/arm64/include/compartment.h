@@ -81,6 +81,11 @@
 	SUPERVISOR_ADD_ENTRY(ret_type, name, args)			\
 	static __attribute__((used)) ret_type				\
 	SUPERVISOR_ENTRY_NAME(name) args
+#define	SUPERVISOR_ASSERT()						\
+	KASSERT((cheri_getperm(cheri_getpcc()) &			\
+	    CHERI_PERM_EXECUTIVE) != 0,					\
+	    ("PCC %#lp has invalid permissions",			\
+	    (void *)cheri_getpcc()))
 #else
 #define	COMPARTMENT_ENTRY(ret_type, name, args)				\
 	ret_type							\
