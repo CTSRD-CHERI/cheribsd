@@ -784,10 +784,7 @@ handle_el1_sync_excp(struct hypctx *hypctx, struct vm_exit *vme_ret,
 		arm64_gen_reg_emul_data(esr_iss, vme_ret);
 		vme_ret->exitcode = VM_EXITCODE_REG_EMUL;
 		break;
-	case EXCP_BRK:
-		vmm_stat_incr(hypctx->vcpu, VMEXIT_BRK, 1);
-		vme_ret->exitcode = VM_EXITCODE_BRK;
-		break;
+
 	case EXCP_INSN_ABORT_L:
 	case EXCP_DATA_ABORT_L:
 		vmm_stat_incr(hypctx->vcpu, esr_ec == EXCP_DATA_ABORT_L ?
