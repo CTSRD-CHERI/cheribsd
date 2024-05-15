@@ -1,12 +1,6 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
- * Copyright (c) 2008,	Jeffrey Roberson <jeff@freebsd.org>
- * All rights reserved.
- *
- * Copyright (c) 2008 Nokia Corporation
- * All rights reserved.
- *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -34,6 +28,10 @@
 #ifndef _SYS_ACCEL_H_
 #define _SYS_ACCEL_H_
 
+#include <sys/cdefs.h>
+
+struct thread;
+
 // Data Buffer Information
 struct ctrl_reg {
 	// Address offset
@@ -56,8 +54,8 @@ struct accel_ctrl_args {
 	// struct ctrl_reg *buffers;
 };
 
-int accel_malloc(struct accel_ctrl_args *accel_config);
-int accel_demalloc(struct accel_ctrl_args *accel_config);
+int accel_malloc(struct thread *td, struct accel_ctrl_args *accel_config);
+int accel_demalloc(struct thread *td, struct accel_ctrl_args *accel_config);
 
 // int
 // accel_malloc(struct accel_ctrl_args *accel_config)

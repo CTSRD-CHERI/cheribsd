@@ -645,6 +645,6 @@ struct sysent sysent[] = {
 	{ .sy_narg = 0, .sy_call = (sy_call_t *)sys_sched_getcpu, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 581 = sched_getcpu */
 	{ .sy_narg = AS(swapoff_args), .sy_call = (sy_call_t *)sys_swapoff, .sy_auevent = AUE_SWAPOFF, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 582 = swapoff */
 	{ .sy_narg = AS(kqueue1_args), .sy_call = (sy_call_t *)sys_kqueue1, .sy_auevent = AUE_KQUEUE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 583 = kqueue1 */
-	{ .sy_narg = AS(accel_malloc_args), .sy_call = (sy_call_t *)sys_accel_malloc, .sy_auevent = ACCEL_MALLOC, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 584 = accel_malloc */
-	{ .sy_narg = AS(accel_demalloc_args), .sy_call = (sy_call_t *)sys_accel_demalloc, .sy_auevent = ACCEL_DEMALLOC, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 585 = accel_demalloc */
+	{ .sy_narg = AS(accel_malloc_args), .sy_call = (sy_call_t *)sys_accel_malloc, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 584 = accel_malloc */
+	{ .sy_narg = AS(accel_demalloc_args), .sy_call = (sy_call_t *)sys_accel_demalloc, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 585 = accel_demalloc */
 };

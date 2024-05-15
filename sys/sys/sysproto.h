@@ -3260,8 +3260,8 @@ int	freebsd13_swapoff(struct thread *, struct freebsd13_swapoff_args *);
 #define	SYS_AUE_sched_getcpu	AUE_NULL
 #define	SYS_AUE_swapoff	AUE_SWAPOFF
 #define	SYS_AUE_kqueue1	AUE_KQUEUE
-#define	SYS_AUE_accel_malloc	ACCEL_MALLOC
-#define	SYS_AUE_accel_demalloc	ACCEL_DEMALLOC
+#define	SYS_AUE_accel_malloc	AUE_NULL
+#define	SYS_AUE_accel_demalloc	AUE_NULL
 
 #undef PAD_
 #undef PADL_

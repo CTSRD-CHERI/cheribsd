@@ -3332,12 +3332,12 @@
 		    u_int flags
 		);
 	}
-584	ACCEL_MALLOC	STD|CAPENABLED {
+584	AUE_NULL	STD|CAPENABLED {
 		int accel_malloc(
 		    struct accel_ctrl_args *accel_config
 		);
 	}
-585	ACCEL_DEMALLOC	STD|CAPENABLED {
+585	AUE_NULL	STD|CAPENABLED {
 		int accel_demalloc(
 		    struct accel_ctrl_args *accel_config
 		);

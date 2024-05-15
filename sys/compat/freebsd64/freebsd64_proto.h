@@ -2397,8 +2397,8 @@ int	freebsd13_freebsd64_swapoff(struct thread *, struct freebsd13_freebsd64_swap
 #define	FREEBSD64_SYS_AUE_freebsd64_aio_readv	AUE_AIO_READV
 #define	FREEBSD64_SYS_AUE_freebsd64_fspacectl	AUE_FSPACECTL
 #define	FREEBSD64_SYS_AUE_freebsd64_swapoff	AUE_SWAPOFF
-#define	FREEBSD64_SYS_AUE_freebsd64_accel_malloc	ACCEL_MALLOC
-#define	FREEBSD64_SYS_AUE_freebsd64_accel_demalloc	ACCEL_DEMALLOC
+#define	FREEBSD64_SYS_AUE_freebsd64_accel_malloc	AUE_NULL
+#define	FREEBSD64_SYS_AUE_freebsd64_accel_demalloc	AUE_NULL
 
 #undef PAD_
 #undef PADL_
