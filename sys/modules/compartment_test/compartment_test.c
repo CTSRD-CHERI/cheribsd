@@ -68,8 +68,6 @@ compartment_test_sysctl(int function, SYSCTL_HANDLER_ARGS)
 {
 	int error, ii;
 	unsigned int value;
-	uintptr_t funptr;
-	module_t mod;
 
 	value = 0;
 	error = sysctl_handle_int(oidp, &value, 0, req);
@@ -83,20 +81,7 @@ compartment_test_sysctl(int function, SYSCTL_HANDLER_ARGS)
 	case SYSCTL_ENTRY_INIT:
 		if (compartment_entry_funptr != (uintptr_t)NULL)
 			return (EINVAL);
-
-		funptr = (uintptr_t)compartment_function;
-
-		MOD_SLOCK;
-		mod = module_lookupbyptr(funptr);
-		if (mod == NULL)
-			return (EINVAL);
-		if (module_getpolicy(mod)) {
-			funptr = (uintptr_t)compartment_entry_for_module(mod,
-			    funptr);
-		}
-		MOD_SUNLOCK;
-
-		compartment_entry_funptr = funptr;
+		compartment_entry_funptr = (uintptr_t)compartment_function;
 		break;
 	case SYSCTL_ENTRY_CALL:
 		if (compartment_entry_funptr == (uintptr_t)NULL)
