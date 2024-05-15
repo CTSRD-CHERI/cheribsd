@@ -302,14 +302,6 @@ SUPERVISOR_ENTRY(void, compartment_trampoline_destroy, (uintptr_t func))
 }
 
 void *
-compartment_call(uintptr_t func)
-{
-
-	return ((void *)cheri_sealentry(cheri_clearperm(func,
-	    CHERI_PERM_EXECUTIVE)));
-}
-
-void *
 compartment_entry_for_kernel(uintptr_t func)
 {
 
