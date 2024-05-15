@@ -2238,7 +2238,7 @@ link_elf_ireloc(caddr_t kmdp)
 	ef->dynamic = (Elf_Dyn *)&_DYNAMIC;
 	/*
 	 * Indicate that a linker file for the kernel is pre-loaded to correctly
-	 * relocate ifunc resolvers if they must be compartmentalized.
+	 * relocate ifunc resolvers.
 	 */
 	ef->preloaded = true;
 
