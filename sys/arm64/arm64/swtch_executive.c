@@ -37,8 +37,8 @@
 struct pcb;
 struct thread;
 
-SUPERVISOR_ADD_ENTRY(void, cpu_throw, (struct thread *, struct thread *))
-SUPERVISOR_ADD_ENTRY(void, cpu_switch, (struct thread *, struct thread *,
+EXECUTIVE_ADD_ENTRY(void, cpu_throw, (struct thread *, struct thread *))
+EXECUTIVE_ADD_ENTRY(void, cpu_switch, (struct thread *, struct thread *,
     struct mtx *))
-SUPERVISOR_ADD_ENTRY(void, fork_trampoline, (void));
-SUPERVISOR_ADD_ENTRY(int, savectx, (struct pcb *pcb));
+EXECUTIVE_ADD_ENTRY(void, fork_trampoline, (void));
+EXECUTIVE_ADD_ENTRY(int, savectx, (struct pcb *pcb));

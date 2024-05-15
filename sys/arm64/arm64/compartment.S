@@ -90,7 +90,7 @@ compartment_entries_length:
 	 */
 	stp	c16, c30, [csp, #-(CAP_WIDTH * 2)]!
 
-.ifc \type,supervisor
+.ifc \type,executive
 	/*
 	 * Don't modify the Restricted stack pointer if we're branching into
 	 * Executive.
@@ -148,7 +148,7 @@ compartment_entries_length:
 	 * Call the target function.
 	 */
 	ldr	c16, \type\()_entry_func
-.ifc \type,supervisor
+.ifc \type,executive
 	blr	c16
 .else
 	blrr	c16
@@ -190,16 +190,16 @@ ecompartment_entry_trampoline:
 szcompartment_entry_trampoline:
 	.quad	ecompartment_entry_trampoline - compartment_entry_trampoline
 
-TRAMPOLINECODE(supervisor_entry_trampoline)
-	template_entry_trampoline supervisor
-EEND(supervisor_entry_trampoline)
-esupervisor_entry_trampoline:
+TRAMPOLINECODE(executive_entry_trampoline)
+	template_entry_trampoline executive
+EEND(executive_entry_trampoline)
+eexecutive_entry_trampoline:
 
 	.data
 	.align	3
-	.global	szsupervisor_entry_trampoline
-	.type	szsupervisor_entry_trampoline,#object
-	.size	szsupervisor_entry_trampoline, 8
-szsupervisor_entry_trampoline:
-	.quad	esupervisor_entry_trampoline - supervisor_entry_trampoline
+	.global	szexecutive_entry_trampoline
+	.type	szexecutive_entry_trampoline,#object
+	.size	szexecutive_entry_trampoline, 8
+szexecutive_entry_trampoline:
+	.quad	eexecutive_entry_trampoline - executive_entry_trampoline
 #endif	/* __CHERI_PURE_CAPABILITY__ */
