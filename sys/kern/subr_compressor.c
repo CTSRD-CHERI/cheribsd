@@ -45,7 +45,6 @@
 #include <sys/lock.h>
 #include <sys/linker_set.h>
 #include <sys/malloc.h>
-#include <sys/module.h>
 #include <sys/queue.h>
 #include <sys/sx.h>
 
@@ -512,15 +511,6 @@ compressor_avail(int format)
 void
 compressor_register(struct compressor_methods *method)
 {
-	module_t mod;
-
-	MOD_SLOCK;
-
-	mod = module_lookupbyptr((uintptr_t)method->init);
-	if (mod == NULL)
-		panic("compressor_register: unable to find module");
-
-	MOD_SUNLOCK;
 
 	TAILQ_INSERT_TAIL(&compressors, method, next);
 }
