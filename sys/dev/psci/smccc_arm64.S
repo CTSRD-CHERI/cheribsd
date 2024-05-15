@@ -32,6 +32,7 @@
 
 #include <machine/asm.h>
 #include <machine/armreg.h>
+#include <machine/compartment_asm.h>
 
 /*
  * XXX-AM: Wrap HVC and SMC calls to save caller-save capability registers.
@@ -92,7 +93,7 @@
 #endif
 
 .macro arm_smccc_1_0	insn
-ENTRY(arm_smccc_\insn)
+EXECUTIVE_ENTRY(arm_smccc_\insn\())
 #ifdef __CHERI_PURE_CAPABILITY__
 	save_registers
 	str	PTR(9), [PTRN(sp), #-PTR_WIDTH]!
@@ -127,7 +128,7 @@ arm_smccc_1_0	hvc
 arm_smccc_1_0	smc
 
 .macro arm_smccc_1_2	insn
-ENTRY(arm_smccc_1_2_\insn)
+EXECUTIVE_ENTRY(arm_smccc_1_2_\insn\())
 #ifdef __CHERI_PURE_CAPABILITY__
 	save_registers
 #endif
