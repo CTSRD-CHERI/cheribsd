@@ -49,7 +49,6 @@
 #include "bhyverun.h"
 #include "config.h"
 #include "debug.h"
-#include "gdb.h"
 #include "mem.h"
 #include "vmexit.h"
 
@@ -113,10 +112,9 @@ vmexit_suspend(struct vmctx *ctx, struct vcpu *vcpu, struct vm_run *vmrun)
 }
 
 static int
-vmexit_debug(struct vmctx *ctx __unused, struct vcpu *vcpu,
+vmexit_debug(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
     struct vm_run *vmrun __unused)
 {
-	gdb_cpu_suspend(vcpu);
 	return (VMEXIT_CONTINUE);
 }
 
@@ -252,13 +250,6 @@ vmexit_hyp(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
 	return (VMEXIT_ABORT);
 }
 
-static int
-vmexit_brk(struct vmctx *ctx __unused, struct vcpu *vcpu, struct vm_run *vmrun)
-{
-	gdb_cpu_breakpoint(vcpu, vmrun->vm_exit);
-	return (VMEXIT_CONTINUE);
-}
-
 const vmexit_handler_t vmexit_handlers[VM_EXITCODE_MAX] = {
 	[VM_EXITCODE_BOGUS]  = vmexit_bogus,
 	[VM_EXITCODE_INST_EMUL] = vmexit_inst_emul,
@@ -266,5 +257,4 @@ const vmexit_handler_t vmexit_handlers[VM_EXITCODE_MAX] = {
 	[VM_EXITCODE_DEBUG] = vmexit_debug,
 	[VM_EXITCODE_SMCCC] = vmexit_smccc,
 	[VM_EXITCODE_HYP] = vmexit_hyp,
-	[VM_EXITCODE_BRK] = vmexit_brk,
 };
