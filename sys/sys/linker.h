@@ -302,6 +302,7 @@ int	elf_reloc(linker_file_t _lf, char *base, const void *_rel,
 int	elf_reloc_local(linker_file_t _lf, char *base, const void *_rel,
 	    int _type, elf_lookup_fn _lu);
 Elf_Addr elf_relocaddr(linker_file_t _lf, Elf_Addr addr);
+bool	elf_is_preloaded(linker_file_t lf);
 const Elf_Sym *elf_get_sym(linker_file_t _lf, Elf_Size _symidx);
 const char *elf_get_symname(linker_file_t _lf, Elf_Size _symidx);
 void	link_elf_ireloc(caddr_t kmdp);

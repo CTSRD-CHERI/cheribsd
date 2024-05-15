@@ -1463,6 +1463,15 @@ elf_relocaddr(linker_file_t lf, Elf_Addr x)
 	return (x);
 }
 
+bool
+elf_is_preloaded(linker_file_t lf)
+{
+	elf_file_t ef;
+
+	ef = (elf_file_t)lf;
+	return (ef->preloaded);
+}
+
 static void
 link_elf_unload_file(linker_file_t file)
 {
