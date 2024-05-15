@@ -36,6 +36,7 @@
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
+#include <sys/compartment.h>
 #include <sys/ptrace.h>
 #include <sys/reg.h>
 #include <sys/rwlock.h>
@@ -650,8 +651,8 @@ fail:
 }
 #endif
 
-void
-exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
+EXECUTIVE_ENTRY(void, exec_setregs, (struct thread *td,
+    struct image_params *imgp, uintcap_t stack))
 {
 	struct trapframe *tf = td->td_frame;
 	struct pcb *pcb = td->td_pcb;
