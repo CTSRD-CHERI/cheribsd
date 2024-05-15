@@ -718,20 +718,20 @@ sys_sched_getcpu(struct thread *td, struct sched_getcpu_args *uap)
 }
 
 int
-sys_accel_malloc(struct thread *td, struct accel_ctrl_args *accel_config)
+sys_accel_malloc(struct thread *td, struct accel_malloc_args *accel_malloc_arg)
 {
         // int accel_addr[8] = { 0xC0010000, 0xC0011000, 0xC0012000, 0xC0013000,
         //      0xC0014000, 0xC0015000, 0xC0016000, 0xC0017000 };
 
-        accel_config->buffer_count++;
+        accel_malloc_arg->accel_config->buffer_count++;
         return 0;
 }
 
 int
-sys_accel_demalloc(struct thread *td, struct accel_ctrl_args *accel_config)
+sys_accel_demalloc(struct thread *td, struct accel_demalloc_args *accel_demalloc_arg)
 {
 
-        accel_config->buffer_count--;
+        accel_demalloc_arg->accel_config->buffer_count--;
 
         return 0;
 }
