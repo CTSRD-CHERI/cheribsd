@@ -62,7 +62,7 @@ struct module {
 
 static TAILQ_HEAD(modulelist, module) modules;
 struct sx modules_sx;
-static int nextid = MODULE_KERNEL_ID;
+static int nextid = 1;
 static void module_shutdown(void *, int);
 
 static int
