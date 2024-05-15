@@ -595,15 +595,18 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 #ifdef __CHERI_PURE_CAPABILITY__
 	case R_MORELLO_CAPINIT:
 	case R_MORELLO_GLOB_DAT:
-		/*
-		 * XXXKW: module_register_init and other SYSINIT functions
-		 * have capinit relocations. These functions are called from the
-		 * kernel code (the executive mode).
-		 */
 		error = LINKER_SYMIDX_CAPABILITY(lf, symidx, 1, &cap);
 		if (error != 0)
 			return (-1);
 		cap += addend;
+		/*
+		 * XXXKW: Shouldn't cap be sealed regardless of
+		 * compartmentalization?
+		 */
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+		if ((cheri_getperm(cap) & CHERI_PERM_EXECUTE) != 0)
+			cap = (uintcap_t)compartment_entry(cap);
+#endif
 		*(uintcap_t *)where = cap;
 		break;
 	case R_MORELLO_JUMP_SLOT:
