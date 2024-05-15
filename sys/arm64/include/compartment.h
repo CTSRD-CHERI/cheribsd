@@ -50,8 +50,7 @@
 									\
 		ELF_STATIC_RELOC_LABEL(func,				\
 		    COMPARTMENT_ENTRY_NAME(name));			\
-		return (compartment_entry_for_kernel(			\
-		    (uintptr_t)COMPARTMENT_ENTRY_NAME(name)));	\
+		return (compartment_entry_for_kernel(func));		\
 	}
 #define	COMPARTMENT_ENTRY(ret_type, name, args)				\
 	static ret_type COMPARTMENT_ENTRY_NAME(name) args;		\
