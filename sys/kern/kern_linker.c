@@ -600,15 +600,6 @@ linker_find_file_by_id(int fileid)
 	return (lf);
 }
 
-bool
-linker_file_includes(linker_file_t lf, uintptr_t ptr)
-{
-
-	sx_assert(&kld_sx, SA_XLOCKED);
-	return (ptr >= (uintptr_t)lf->address &&
-	    ptr < (uintptr_t)lf->address + lf->size);
-}
-
 linker_file_t
 linker_find_file_by_ptr(uintptr_t ptr)
 {
@@ -616,7 +607,8 @@ linker_find_file_by_ptr(uintptr_t ptr)
 
 	sx_assert(&kld_sx, SA_XLOCKED);
 	TAILQ_FOREACH(lf, &linker_files, link) {
-		if (linker_file_includes(lf, ptr))
+		if (ptr >= (uintptr_t)lf->address &&
+		    ptr < (uintptr_t)lf->address + lf->size)
 			break;
 	}
 	return (lf);

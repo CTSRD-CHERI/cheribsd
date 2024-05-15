@@ -139,8 +139,6 @@ int linker_reference_module(const char* _modname, struct mod_depend *_verinfo,
 int linker_release_module(const char *_modname, struct mod_depend *_verinfo,
 			  linker_file_t _file);
 
-bool linker_file_includes(linker_file_t lf, uintptr_t ptr);
-
 linker_file_t linker_find_file_by_ptr(uintptr_t ptr);
 
 uintcap_t linker_file_capability(linker_file_t lf, uintcap_t ptr);

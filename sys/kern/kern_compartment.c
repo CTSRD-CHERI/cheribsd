@@ -317,10 +317,7 @@ SUPERVISOR_ENTRY(void *, compartment_entry, (uintptr_t func))
 {
 	linker_file_t lf;
 
-	if (linker_file_includes(linker_kernel_file, func))
-		lf = linker_kernel_file;
-	else
-		lf = linker_find_file_by_ptr((uintptr_t)func);
+	lf = linker_find_file_by_ptr((uintptr_t)func);
 	if (lf == NULL)
 		panic("compartment_entry: unable to find a linker file");
 
