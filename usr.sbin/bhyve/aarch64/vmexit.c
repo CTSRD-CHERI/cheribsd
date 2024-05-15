@@ -95,7 +95,7 @@ vmexit_reg_emul(struct vmctx *ctx __unused, struct vcpu *vcpu __unused,
 	vre = &vme->u.reg_emul.vre;
 
 	EPRINTLN("Unhandled register access: pc %#lx syndrome %#x reg %d\n",
-	    vme->pc, vre->inst_syndrome, vre->reg);
+	    (uint64_t)vme->pc, vre->inst_syndrome, vre->reg);
 	return (VMEXIT_ABORT);
 }
 
