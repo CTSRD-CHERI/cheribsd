@@ -168,18 +168,14 @@ module_register(const moduledata_t *data, linker_file_t container)
 	newmod->id = nextid++;
 	newmod->name = (char *)(newmod + 1);
 	strcpy(newmod->name, data->name);
+	newmod->handler = data->evhand ? data->evhand : modevent_nop;
 	newmod->arg = data->priv;
 	bzero(&newmod->data, sizeof(newmod->data));
-	newmod->file = container;
-	if (data->evhand != NULL) {
-		newmod->handler = data->evhand;
-	} else {
-		newmod->handler = modevent_nop;
-	}
-
 	TAILQ_INSERT_TAIL(&modules, newmod, link);
+
 	if (container)
 		TAILQ_INSERT_TAIL(&container->modules, newmod, flink);
+	newmod->file = container;
 	MOD_XUNLOCK;
 	return (0);
 }
