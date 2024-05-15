@@ -258,6 +258,8 @@ _posix_spawn_thr(void *data)
 	copid = psa->sa != NULL ? (*psa->sa)->sa_copid : 0;
 	if (psa->use_env_path)
 		_coexecvpe(copid, psa->path, psa->argv, envp);
+	else if (copid == 0)
+		_execve(psa->path, psa->argv, envp);
 	else
 		_coexecve(copid, psa->path, psa->argv, envp);
 	psa->error = errno;
