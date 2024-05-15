@@ -48,8 +48,8 @@
 #define	TRAMPOLINE_TYPE_MAX			TRAMPOLINE_TYPE_EXECUTIVE_ENTRY
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-#define	COMPARTMENT_ENTRY_NAME(name)	name ## _compartment
-#define	EXECUTIVE_ENTRY_NAME(name)	name ## _executive
+#define	COMPARTMENT_ENTRY_NAME(name)	name##_compartment
+#define	EXECUTIVE_ENTRY_NAME(name)	name##_executive
 #else
 #define	COMPARTMENT_ENTRY_NAME(name)	name
 #define	EXECUTIVE_ENTRY_NAME(name)	name
