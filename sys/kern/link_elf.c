@@ -2218,6 +2218,11 @@ link_elf_ireloc(caddr_t kmdp)
 	TSENTER();
 	ef = &eff;
 
+	/*
+	 * Create a temporary linker file object for the sake of relocations at
+	 * the boot stage. The actual kernel linker file object is created when
+	 * handling SYSINIT().
+	 */
 	bzero_early(ef, sizeof(*ef));
 
 	ef->modptr = kmdp;
