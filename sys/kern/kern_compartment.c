@@ -69,10 +69,10 @@ SYSCTL_ULONG(_security_compartment_counters, OID_AUTO, compartment_entry,
     &compartment_trampoline_counters[TRAMPOLINE_TYPE_COMPARTMENT_ENTRY], 0,
     "Number of compartment entry calls");
 
-SYSCTL_ULONG(_security_compartment_counters, OID_AUTO, supervisor_entry,
+SYSCTL_ULONG(_security_compartment_counters, OID_AUTO, executive_entry,
     CTLFLAG_RW,
-    &compartment_trampoline_counters[TRAMPOLINE_TYPE_SUPERVISOR_ENTRY], 0,
-    "Number of supervisor entry calls");
+    &compartment_trampoline_counters[TRAMPOLINE_TYPE_EXECUTIVE_ENTRY], 0,
+    "Number of executive entry calls");
 
 struct compartment_trampoline {
 	int		ct_compartment_id;
@@ -88,7 +88,7 @@ compartment_trampoline_compare(struct compartment_trampoline *a,
     struct compartment_trampoline *b)
 {
 
-	SUPERVISOR_ASSERT();
+	EXECUTIVE_ASSERT();
 
 	return ((ptraddr_t)a->ct_compartment_func -
 	    (ptraddr_t)b->ct_compartment_func);
@@ -107,7 +107,7 @@ static void
 compartment_linkup(struct compartment *compartment, int id, struct thread *td)
 {
 
-	SUPERVISOR_ASSERT();
+	EXECUTIVE_ASSERT();
 
 	compartment->c_id = id;
 	compartment->c_thread = td;
@@ -120,13 +120,13 @@ void
 compartment_linkup0(struct compartment *compartment, struct thread *td)
 {
 
-	SUPERVISOR_ASSERT();
+	EXECUTIVE_ASSERT();
 
 	TAILQ_INIT(&td->td_compartments);
 	compartment_linkup(compartment, COMPARTMENT_KERNEL_ID, td);
 }
 
-SUPERVISOR_ENTRY(struct compartment *, compartment_create_for_thread,
+EXECUTIVE_ENTRY(struct compartment *, compartment_create_for_thread,
     (struct thread *td, int id))
 {
 	struct compartment *compartment;
@@ -148,13 +148,13 @@ static struct compartment *
 compartment_create(int id)
 {
 
-	SUPERVISOR_ASSERT();
+	EXECUTIVE_ASSERT();
 
-	return (SUPERVISOR_ENTRY_NAME(compartment_create_for_thread)
+	return (EXECUTIVE_ENTRY_NAME(compartment_create_for_thread)
 	    (curthread, id));
 }
 
-SUPERVISOR_ENTRY(void, compartment_destroy, (struct compartment *compartment))
+EXECUTIVE_ENTRY(void, compartment_destroy, (struct compartment *compartment))
 {
 
 	TAILQ_REMOVE(&compartment->c_thread->td_compartments, compartment,
@@ -168,7 +168,7 @@ compartment_find(int id)
 {
 	struct compartment *compartment;
 
-	SUPERVISOR_ASSERT();
+	EXECUTIVE_ASSERT();
 
 	TAILQ_FOREACH(compartment, &curthread->td_compartments, c_next) {
 		if (compartment->c_id == id)
@@ -182,7 +182,7 @@ compartment_entry_stackptr(int id, int type)
 {
 	struct compartment *compartment;
 
-	SUPERVISOR_ASSERT();
+	EXECUTIVE_ASSERT();
 
 	/*
 	 * TODO: Make compartment_trampoline_counters actual atomic counters.
@@ -204,7 +204,7 @@ compartment_trampoline_create(const linker_file_t lf, int type, void *data,
 	struct compartment_trampoline tmptrampoline;
 	uintcap_t dstfunc;
 
-	SUPERVISOR_ASSERT();
+	EXECUTIVE_ASSERT();
 
 	if (lf != NULL) {
 		dstfunc = linker_file_capability(lf, func);
@@ -292,7 +292,7 @@ out:
 	return ((void *)func);
 }
 
-SUPERVISOR_ENTRY(void, compartment_trampoline_destroy, (uintptr_t func))
+EXECUTIVE_ENTRY(void, compartment_trampoline_destroy, (uintptr_t func))
 {
 	struct compartment_trampoline *trampoline;
 
@@ -305,7 +305,7 @@ void *
 compartment_entry_for_kernel(uintptr_t func)
 {
 
-	SUPERVISOR_ASSERT();
+	EXECUTIVE_ASSERT();
 
 	func = cheri_clearperm(func, CHERI_PERM_EXECUTIVE);
 	return (compartment_trampoline_create(NULL,
@@ -313,7 +313,7 @@ compartment_entry_for_kernel(uintptr_t func)
 	    szcompartment_entry_trampoline, func));
 }
 
-SUPERVISOR_ENTRY(void *, compartment_entry, (uintptr_t func))
+EXECUTIVE_ENTRY(void *, compartment_entry, (uintptr_t func))
 {
 	linker_file_t lf;
 
@@ -328,33 +328,33 @@ SUPERVISOR_ENTRY(void *, compartment_entry, (uintptr_t func))
 }
 
 void *
-supervisor_entry_for_kernel(uintptr_t func)
+executive_entry_for_kernel(uintptr_t func)
 {
 
-	SUPERVISOR_ASSERT();
+	EXECUTIVE_ASSERT();
 	KASSERT((cheri_getperm(func) & CHERI_PERM_EXECUTIVE) != 0,
-	    ("Supervisor entry capability %#lp has invalid permissions",
+	    ("Executive entry capability %#lp has invalid permissions",
 	     (void *)func));
 
 	return (compartment_trampoline_create(NULL,
-	    TRAMPOLINE_TYPE_SUPERVISOR_ENTRY, supervisor_entry_trampoline,
-	    szsupervisor_entry_trampoline, func));
+	    TRAMPOLINE_TYPE_EXECUTIVE_ENTRY, executive_entry_trampoline,
+	    szexecutive_entry_trampoline, func));
 }
 
 void *
-supervisor_get_function(uintptr_t func)
+executive_get_function(uintptr_t func)
 {
 	struct compartment_trampoline *trampoline;
 
-	SUPERVISOR_ASSERT();
+	EXECUTIVE_ASSERT();
 	KASSERT((cheri_getperm(func) & CHERI_PERM_EXECUTIVE) != 0,
-	    ("Supervisor trampoline capability %#lp has invalid permissions",
+	    ("Executive trampoline capability %#lp has invalid permissions",
 	     (void *)func));
 
 	trampoline = cheri_kern_setaddress(cheri_getpcc(), func - 1);
 	trampoline = __containerof((char (*)[])trampoline,
 	    struct compartment_trampoline, ct_code);
-	KASSERT(trampoline->ct_type == TRAMPOLINE_TYPE_SUPERVISOR_ENTRY,
+	KASSERT(trampoline->ct_type == TRAMPOLINE_TYPE_EXECUTIVE_ENTRY,
 	    ("Invalid trampoline type"));
 
 	return ((void *)trampoline->ct_compartment_func);

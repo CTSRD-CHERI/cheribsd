@@ -53,9 +53,9 @@
 	ldr	c##scratchn, [c##scratchn, :lo12:dstsym##_ptr];	\
 	blr	c##scratchn
 
-#define	SUPERVISOR_ENTRY(sym)	ENTRY(SUPERVISOR_ENTRY_NAME(sym))
+#define	EXECUTIVE_ENTRY(sym)	ENTRY(EXECUTIVE_ENTRY_NAME(sym))
 #else
-#define	SUPERVISOR_ENTRY(sym)	ENTRY(sym)
+#define	EXECUTIVE_ENTRY(sym)	ENTRY(sym)
 #endif
 
 #endif	/* !_MACHINE_COMPARTMENT_ASM_H_ */

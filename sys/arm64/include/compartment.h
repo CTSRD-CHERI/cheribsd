@@ -58,29 +58,29 @@
 	static __attribute__((used)) ret_type				\
 	COMPARTMENT_ENTRY_NAME(name) args
 
-#define	SUPERVISOR_ADD_ENTRY(ret_type, name, args)			\
+#define	EXECUTIVE_ADD_ENTRY(ret_type, name, args)			\
 	DEFINE_IFUNC(, ret_type, name, args)				\
 	{								\
 		uintptr_t func;						\
 									\
 		ELF_STATIC_RELOC_LABEL(func,				\
-		    SUPERVISOR_ENTRY_NAME(name));			\
-		return (supervisor_entry_for_kernel(func));		\
+		    EXECUTIVE_ENTRY_NAME(name));			\
+		return (executive_entry_for_kernel(func));		\
 	}
-#define	SUPERVISOR_EXIT(name, args)					\
+#define	EXECUTIVE_EXIT(name, args)					\
 	({								\
 		KASSERT((cheri_getperm(&name) &				\
 		    CHERI_PERM_EXECUTIVE) == 0,				\
-		    ("Supervisor's exit %s has invalid permissions",	\
+		    ("Executive's exit %s has invalid permissions",	\
 		    #name));						\
 		name args;						\
 	})
-#define	SUPERVISOR_ENTRY(ret_type, name, args)				\
-	static ret_type SUPERVISOR_ENTRY_NAME(name) args;		\
-	SUPERVISOR_ADD_ENTRY(ret_type, name, args)			\
+#define	EXECUTIVE_ENTRY(ret_type, name, args)				\
+	static ret_type EXECUTIVE_ENTRY_NAME(name) args;		\
+	EXECUTIVE_ADD_ENTRY(ret_type, name, args)			\
 	static __attribute__((used)) ret_type				\
-	SUPERVISOR_ENTRY_NAME(name) args
-#define	SUPERVISOR_ASSERT()						\
+	EXECUTIVE_ENTRY_NAME(name) args
+#define	EXECUTIVE_ASSERT()						\
 	KASSERT((cheri_getperm(cheri_getpcc()) &			\
 	    CHERI_PERM_EXECUTIVE) != 0,					\
 	    ("PCC %#lp has invalid permissions",			\
@@ -90,9 +90,9 @@
 	ret_type							\
 	COMPARTMENT_ENTRY_NAME(name) args
 
-#define	SUPERVISOR_ENTRY(ret_type, name, args)				\
+#define	EXECUTIVE_ENTRY(ret_type, name, args)				\
 	ret_type							\
-	SUPERVISOR_ENTRY_NAME(name) args
+	EXECUTIVE_ENTRY_NAME(name) args
 #endif
 
 #endif	/* !_MACHINE_COMPARTMENT_H_ */

@@ -58,7 +58,7 @@
 /*
  * void cpu_throw(struct thread *old, struct thread *new)
  */
-SUPERVISOR_ENTRY(cpu_throw)
+EXECUTIVE_ENTRY(cpu_throw)
 	/* Of old == NULL skip disabling stepping */
 	cbz	x0, 1f
 
@@ -147,7 +147,7 @@ END(cpu_throw)
  * x/c2 = mtx
  * x3 to x7, x16 and x17 are caller saved
  */
-SUPERVISOR_ENTRY(cpu_switch)
+EXECUTIVE_ENTRY(cpu_switch)
 	/*
 	 * Save the old context.
 	 */
@@ -274,7 +274,7 @@ SUPERVISOR_ENTRY(cpu_switch)
 	RETURN
 END(cpu_switch)
 
-SUPERVISOR_ENTRY(fork_trampoline)
+EXECUTIVE_ENTRY(fork_trampoline)
 	mov	PTR(0), PTR(19)
 	mov	PTR(1), PTR(20)
 	mov	PTR(2), PTRN(sp)
@@ -351,7 +351,7 @@ SUPERVISOR_ENTRY(fork_trampoline)
 	
 END(fork_trampoline)
 
-SUPERVISOR_ENTRY(savectx)
+EXECUTIVE_ENTRY(savectx)
 	/* Store the callee-saved registers */
 	stp	PTR(19), PTR(20), [PTR(0), #PCB_REGS + (PCB_X19 + 0) * PTR_WIDTH]
 	stp	PTR(21), PTR(22), [PTR(0), #PCB_REGS + (PCB_X19 + 2) * PTR_WIDTH]

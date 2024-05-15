@@ -259,7 +259,7 @@ efi_arch_enter(void)
 	return (0);
 }
 
-SUPERVISOR_ENTRY(void, efi_arch_leave, (void))
+EXECUTIVE_ENTRY(void, efi_arch_leave, (void))
 {
 
 	/*

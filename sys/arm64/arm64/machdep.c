@@ -349,7 +349,7 @@ cpu_pcpu_init(struct pcpu *pcpu, int cpuid, size_t size)
  * Set the pcpu pointer with a backup in tpidr_el1 to be
  * loaded when entering the kernel from userland.
  */
-SUPERVISOR_ENTRY(void, init_cpu_pcpup, (void *pcpup))
+EXECUTIVE_ENTRY(void, init_cpu_pcpup, (void *pcpup))
 {
 #ifdef __CHERI_PURE_CAPABILITY__
 	__asm __volatile(
