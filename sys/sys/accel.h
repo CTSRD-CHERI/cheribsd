@@ -37,7 +37,7 @@
 // Data Buffer Information
 struct ctrl_reg {
 	// Address offset
-	long offset;
+	int offset;
 	// Address size
 	// int addr_width;
 	// Buffer size
@@ -49,34 +49,34 @@ struct ctrl_reg {
 // HLS Kernel Information
 struct accel_ctrl_args {
 	// Pointer to the accelerator
-	void *which;
+	// void *which;
 	// Data buffer count
 	int buffer_count;
 	// Data buffer information
-	struct ctrl_reg *buffers;
+	// struct ctrl_reg *buffers;
 };
 
 int accel_malloc(struct accel_ctrl_args *accel_config);
 int accel_demalloc(struct accel_ctrl_args *accel_config);
 
-int
-accel_malloc(struct accel_ctrl_args *accel_config)
-{
-	// int accel_addr[8] = { 0xC0010000, 0xC0011000, 0xC0012000, 0xC0013000,
-	// 	0xC0014000, 0xC0015000, 0xC0016000, 0xC0017000 };
-
-	accel_config->buffer_count++;
-
-	return 0;
-}
-
-int
-accel_demalloc(struct accel_ctrl_args *accel_config)
-{
-
-	accel_config->buffer_count--;
-
-	return 0;
-}
+// int
+// accel_malloc(struct accel_ctrl_args *accel_config)
+// {
+// 	// int accel_addr[8] = { 0xC0010000, 0xC0011000, 0xC0012000, 0xC0013000,
+// 	// 	0xC0014000, 0xC0015000, 0xC0016000, 0xC0017000 };
+//
+// 	accel_config->buffer_count++;
+//
+// 	return 0;
+// }
+//
+// int
+// accel_demalloc(struct accel_ctrl_args *accel_config)
+// {
+//
+// 	accel_config->buffer_count--;
+//
+// 	return 0;
+// }
 
 #endif
