@@ -470,7 +470,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 #define	ARM64_ELF_RELOC_LATE_IFUNC	(1 << 1)
 	Elf_Addr *where, addr, addend;
 #ifdef __CHERI_PURE_CAPABILITY__
-	uintcap_t cap, oldcap;
+	uintcap_t cap;
 #else
 	Elf_Addr val;
 #endif
@@ -591,31 +591,6 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		break;
 #if __has_feature(capabilities)
 	case R_MORELLO_RELATIVE:
-		/*
-		 * A compartment policy might not have been loaded at the time
-		 * an R_MORELLO_RELATIVE relocation was relocated.
-		 *
-		 * Replace a code capability with a compartment call capability,
-		 * if required by the loaded policy.
-		 */
-		oldcap = *(uintcap_t *)where;
-		KASSERT(cheri_gettag(oldcap) != 0,
-		    ("R_MORELLO_RELATIVE relocation wasn't processed with ARM64_ELF_RELOC_LOCAL"));
-#if 0
-		/*
-		 * XXXKW: We shouldn't have to do this if the relocbase included
-		 * the correct permissions at the stage of relocating local
-		 * relocations.
-		 */
-		if ((cheri_getperm(oldcap) & CHERI_PERM_EXECUTE) != 0 &&
-		    lf->compartment) {
-			cap = (uintcap_t)relocbase;
-			cap = cheri_copyaddress(cap, oldcap);
-			cap = cheri_andperm(cap, cheri_getperm(oldcap));
-			cap = (uintcap_t)compartment_call((uintptr_t)cap);
-			*(uintcap_t *)where = cap;
-		}
-#endif
 		break;
 #ifdef __CHERI_PURE_CAPABILITY__
 	case R_MORELLO_CAPINIT:
