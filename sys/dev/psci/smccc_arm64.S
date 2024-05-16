@@ -159,7 +159,7 @@ ENTRY(arm_smccc_1_2_\insn)
 	restore_registers
 #endif
 	RETURN
-END(arm_smccc_1_2\insn)
+END(arm_smccc_1_2_\insn)
 .endm
 /* int arm_smccc_1_2_*(const struct arm_smccc_1_2_regs *args,
  *     struct arm_smccc_1_2_regs *res)
