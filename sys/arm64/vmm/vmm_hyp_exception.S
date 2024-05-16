@@ -337,7 +337,7 @@ LENTRY(handle_el2_el1_irq64)
 2:
 	ldr	CAP(9), [PTRN(sp)], #16
 	ret
-LEND(handle_el2_el1_irq)
+LEND(handle_el2_el1_irq64)
 
 LENTRY(handle_el2_el1_fiq64)
 	do_world_switch_to_host
