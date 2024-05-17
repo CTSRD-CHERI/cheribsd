@@ -9,26 +9,28 @@ OBJS+=	armv8_crypto_wrap.o aesv8-armx.o ghashv8-armx.o
 
 CFLAGS+=-I${SRCTOP}/sys/crypto/openssl
 
+CFLAGS_CRYPTO=	${CFLAGS:M-march=*:S/^$/-march=armv8-a/W:[-1]}+crypto
+
 # Remove -nostdinc so we can get the intrinsics.
 armv8_crypto_wrap.o: armv8_crypto_wrap.c
 	${CC} -c ${CFLAGS:C/^-O2$/-O3/:N-nostdinc:N-mgeneral-regs-only} \
 	    -I${SRCTOP}/sys/crypto/armv8 \
 	    ${WERROR} ${PROF} \
-	     -march=armv8-a+crypto ${.IMPSRC}
+	    ${CFLAGS_CRYPTO} ${.IMPSRC}
 	${CTFCONVERT_CMD}
 
 aesv8-armx.o: aesv8-armx.S
 	${CC} -c ${CFLAGS:C/^-O2$/-O3/:N-nostdinc:N-mgeneral-regs-only} \
 	    -I${SRCTOP}/sys/crypto/armv8 \
 	    ${WERROR} ${PROF} \
-	    -march=armv8-a+crypto ${.IMPSRC}
+	    ${CFLAGS_CRYPTO} ${.IMPSRC}
 	${CTFCONVERT_CMD}
 
 ghashv8-armx.o: ghashv8-armx.S
 	${CC} -c ${CFLAGS:C/^-O2$/-O3/:N-nostdinc:N-mgeneral-regs-only} \
 	    -I${SRCTOP}/sys/crypto/armv8 \
 	    ${WERROR} ${PROF} \
-	    -march=armv8-a+crypto ${.IMPSRC}
+	    ${CFLAGS_CRYPTO} ${.IMPSRC}
 	${CTFCONVERT_CMD}
 
 armv8_crypto_wrap.o: armv8_crypto.h
