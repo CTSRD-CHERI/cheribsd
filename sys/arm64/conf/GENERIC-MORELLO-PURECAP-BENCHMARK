@@ -1,5 +1,5 @@
 #
-# GENERIC-MORELLO-BENCHMARKABI -- Generic kernel configuration file for CheriBSD/Morello benchmark ABI kernel
+# GENERIC-MORELLO-PURECAP-BENCHMARK -- Generic kernel configuration file for CheriBSD/Morello benchmark ABI kernel
 #
 # For more information on this file, please read the config(5) manual page,
 # and/or the handbook section on Kernel Configuration Files:
