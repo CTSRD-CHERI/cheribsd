@@ -56,6 +56,8 @@ struct kld_file_stat;
 struct ksiginfo;
 struct mbuf;
 struct mmap_req;
+struct mq_attr;
+struct msghdr;
 struct msqid_ds;
 struct ntptimeval;
 struct pollfd;
@@ -590,6 +592,15 @@ int	kern_socketpair(struct thread *td, int domain, int type, int protocol,
 	    int *rsv);
 int	kern_unmount(struct thread *td, const char * __capability path,
 	    int flags);
+int	kern_kmq_notify(struct thread *, int, struct sigevent *);
+int	kern_kmq_open(struct thread *, const char * __capability, int, mode_t,
+		const struct mq_attr *);
+int	kern_kmq_setattr(struct thread *, int, const struct mq_attr *,
+		struct mq_attr *);
+int	kern_kmq_timedreceive(struct thread *, int, char * __capability,
+		size_t, unsigned int * __capability, const struct timespec *);
+int	kern_kmq_timedsend(struct thread *td, int, const char * __capability,
+		size_t, unsigned int, const struct timespec *);
 
 int	user_accept(struct thread *td, int s,
 	    struct sockaddr * __capability uname,
