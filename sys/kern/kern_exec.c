@@ -484,7 +484,7 @@ kern_execve(struct thread *td, struct image_args *args,
 		sx_slock(&proctree_lock);
 		cop = proc_realparent(p);
 		PROC_LOCK(cop);
-		if (cop->p_flag2 & P2_NOCOLOCATE) {
+		if (cop->p_flag2 & (P2_NOCOLOCATE | P2_WEXIT)) {
 			PROC_UNLOCK(cop);
 			sx_sunlock(&proctree_lock);
 			goto fallback;
