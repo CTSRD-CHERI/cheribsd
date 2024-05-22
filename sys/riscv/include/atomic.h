@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2015 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2015-2024 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -108,17 +108,11 @@ atomic_fcmpset##SUFFIX##WIDTH(__volatile uint##WIDTH##_t *p,		\
  */
 ATOMIC_CMPSET(8);
 ATOMIC_FCMPSET(8);
-ATOMIC_CMPSET(16);
-ATOMIC_FCMPSET(16);
-#define	atomic_cmpset_8		atomic_cmpset_8
+#define	atomic_cmpset_8			atomic_cmpset_8
 #define	atomic_fcmpset_8		atomic_fcmpset_8
-#define	atomic_cmpset_16		atomic_cmpset_16
-#define	atomic_fcmpset_16		atomic_fcmpset_16
 #else
 ATOMIC_CMPSET_ACQ_REL(8);
 ATOMIC_FCMPSET_ACQ_REL(8);
-ATOMIC_CMPSET_ACQ_REL(16);
-ATOMIC_FCMPSET_ACQ_REL(16);
 #endif
 
 #define	atomic_cmpset_char		atomic_cmpset_8
@@ -129,11 +123,50 @@ ATOMIC_FCMPSET_ACQ_REL(16);
 #define	atomic_fcmpset_rel_char		atomic_fcmpset_rel_8
 
 #define	atomic_cmpset_short		atomic_cmpset_16
-#define	atomic_cmpset_acq_short		atomic_cmpset_acq_16
-#define	atomic_cmpset_rel_short		atomic_cmpset_rel_16
 #define	atomic_fcmpset_short		atomic_fcmpset_16
+
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * In a purecap kernel we cannot use the generic sub-word implementation.
+ */
+ATOMIC_CMPSET(16);
+ATOMIC_FCMPSET(16);
+#define	atomic_cmpset_16		atomic_cmpset_16
+#define	atomic_fcmpset_16		atomic_fcmpset_16
+#else
+ATOMIC_CMPSET_ACQ_REL(16);
+ATOMIC_FCMPSET_ACQ_REL(16);
+#endif
+
+#define	atomic_load_acq_16	atomic_load_acq_16
+static __inline uint16_t
+atomic_load_acq_16(volatile uint16_t *p)
+{
+	uint16_t ret;
+
+	ret = *p;
+
+	fence();
+
+	return (ret);
+}
+
+static __inline void
+atomic_store_rel_16(volatile uint16_t *p, uint16_t val)
+{
+
+	fence();
+
+	*p = val;
+}
+
+#define	atomic_cmpset_acq_short		atomic_cmpset_acq_16
 #define	atomic_fcmpset_acq_short	atomic_fcmpset_acq_16
+#define	atomic_load_acq_short		atomic_load_acq_16
+
+#define	atomic_cmpset_rel_short		atomic_cmpset_rel_16
 #define	atomic_fcmpset_rel_short	atomic_fcmpset_rel_16
+#define	atomic_store_rel_short		atomic_store_rel_16
 
 #define	ATOMIC_OP_IMPL(WIDTH, OP, FN, PRE)					\
 	static __inline void							\
