@@ -1334,7 +1334,7 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 			semptr->semncnt++;
 
 		DPRINTF(("semop:  good night!\n"));
-		error = msleep_sbt(semakptr, sema_mtxp, (PZERO - 4) | PCATCH,
+		error = msleep_sbt(semakptr, sema_mtxp, PVFS | PCATCH,
 		    "semwait", sbt, precision, C_ABSOLUTE);
 		DPRINTF(("semop:  good morning (error=%d)!\n", error));
 		/* return code is checked below, after sem[nz]cnt-- */

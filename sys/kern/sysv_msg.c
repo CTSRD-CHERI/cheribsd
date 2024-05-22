@@ -898,7 +898,7 @@ kern_msgsnd(struct thread *td, int msqid, const void * __capability msgp,
 				we_own_it = 1;
 			}
 			DPRINTF(("msgsnd:  goodnight\n"));
-			error = msleep(msqkptr, &msq_mtx, (PZERO - 4) | PCATCH,
+			error = msleep(msqkptr, &msq_mtx, PVFS | PCATCH,
 			    "msgsnd", hz);
 			DPRINTF(("msgsnd:  good morning, error=%d\n", error));
 			if (we_own_it)
@@ -1268,7 +1268,7 @@ kern_msgrcv(struct thread *td, int msqid, void * __capability msgp,
 		 */
 
 		DPRINTF(("msgrcv:  goodnight\n"));
-		error = msleep(msqkptr, &msq_mtx, (PZERO - 4) | PCATCH,
+		error = msleep(msqkptr, &msq_mtx, PVFS | PCATCH,
 		    "msgrcv", 0);
 		DPRINTF(("msgrcv:  good morning (error=%d)\n", error));
 
