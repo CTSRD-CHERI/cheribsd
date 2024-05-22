@@ -50,7 +50,6 @@
  *    use the IPC facility without having to mount mqueue file system.
  */
 
-#include <sys/cdefs.h>
 #include "opt_capsicum.h"
 
 #include <sys/param.h>
@@ -395,7 +394,7 @@ mqfs_fileno_free(struct mqfs_info *mi, struct mqfs_node *mn)
 static __inline struct mqfs_node *
 mqnode_alloc(void)
 {
-	return uma_zalloc(mqnode_zone, M_WAITOK | M_ZERO);
+	return (uma_zalloc(mqnode_zone, M_WAITOK | M_ZERO));
 }
 
 static __inline void
@@ -467,8 +466,8 @@ mqfs_create_node(const char *name, int namelen, struct ucred *cred, int mode,
 	node->mn_type = nodetype;
 	node->mn_refcount = 1;
 	vfs_timestamp(&node->mn_birth);
-	node->mn_ctime = node->mn_atime = node->mn_mtime
-		= node->mn_birth;
+	node->mn_ctime = node->mn_atime = node->mn_mtime =
+	    node->mn_birth;
 	node->mn_uid = cred->cr_uid;
 	node->mn_gid = cred->cr_gid;
 	node->mn_mode = mode;
@@ -1033,8 +1032,8 @@ mqfs_create(struct vop_create_args *ap)
 /*
  * Remove an entry
  */
-static
-int do_unlink(struct mqfs_node *pn, struct ucred *ucred)
+static int
+do_unlink(struct mqfs_node *pn, struct ucred *ucred)
 {
 	struct mqfs_node *parent;
 	struct mqfs_vdata *vd;
@@ -1260,15 +1259,15 @@ mqfs_setattr(struct vop_setattr_args *ap)
 	td = curthread;
 	vap = ap->a_vap;
 	vp = ap->a_vp;
-	if ((vap->va_type != VNON) ||
-	    (vap->va_nlink != VNOVAL) ||
-	    (vap->va_fsid != VNOVAL) ||
-	    (vap->va_fileid != VNOVAL) ||
-	    (vap->va_blocksize != VNOVAL) ||
+	if (vap->va_type != VNON ||
+	    vap->va_nlink != VNOVAL ||
+	    vap->va_fsid != VNOVAL ||
+	    vap->va_fileid != VNOVAL ||
+	    vap->va_blocksize != VNOVAL ||
 	    (vap->va_flags != VNOVAL && vap->va_flags != 0) ||
-	    (vap->va_rdev != VNOVAL) ||
-	    ((int)vap->va_bytes != VNOVAL) ||
-	    (vap->va_gen != VNOVAL)) {
+	    vap->va_rdev != VNOVAL ||
+	    (int)vap->va_bytes != VNOVAL ||
+	    vap->va_gen != VNOVAL) {
 		return (EINVAL);
 	}
 
@@ -1297,7 +1296,7 @@ mqfs_setattr(struct vop_setattr_args *ap)
 		 * check in VOP_ACCESS() be enough?  Also, are the group bits
 		 * below definitely right?
 		 */
-		if (((ap->a_cred->cr_uid != pn->mn_uid) || uid != pn->mn_uid ||
+		if ((ap->a_cred->cr_uid != pn->mn_uid || uid != pn->mn_uid ||
 		    (gid != pn->mn_gid && !groupmember(gid, ap->a_cred))) &&
 		    (error = priv_check(td, PRIV_MQ_ADMIN)) != 0)
 			return (error);
@@ -1307,7 +1306,7 @@ mqfs_setattr(struct vop_setattr_args *ap)
 	}
 
 	if (vap->va_mode != (mode_t)VNOVAL) {
-		if ((ap->a_cred->cr_uid != pn->mn_uid) &&
+		if (ap->a_cred->cr_uid != pn->mn_uid &&
 		    (error = priv_check(td, PRIV_MQ_ADMIN)))
 			return (error);
 		pn->mn_mode = vap->va_mode;
@@ -1361,11 +1360,11 @@ mqfs_read(struct vop_read_args *ap)
 
 	mq = VTOMQ(vp);
 	snprintf(buf, sizeof(buf),
-		"QSIZE:%-10ld MAXMSG:%-10ld CURMSG:%-10ld MSGSIZE:%-10ld\n",
-		mq->mq_totalbytes,
-		mq->mq_maxmsg,
-		mq->mq_curmsgs,
-		mq->mq_msgsize);
+	    "QSIZE:%-10ld MAXMSG:%-10ld CURMSG:%-10ld MSGSIZE:%-10ld\n",
+	    mq->mq_totalbytes,
+	    mq->mq_maxmsg,
+	    mq->mq_curmsgs,
+	    mq->mq_msgsize);
 	buf[sizeof(buf)-1] = '\0';
 	len = strlen(buf);
 	error = uiomove_frombuf(buf, len, uio);
@@ -2031,7 +2030,7 @@ kern_kmq_open(struct thread *td, const char * __capability upath, int flags,
 	AUDIT_ARG_MODE(mode);
 
 	pdp = td->td_proc->p_pd;
-	cmode = (((mode & ~pdp->pd_cmask) & ALLPERMS) & ~S_ISTXT);
+	cmode = ((mode & ~pdp->pd_cmask) & ALLPERMS) & ~S_ISTXT;
 	mq = NULL;
 	if ((flags & O_CREAT) != 0 && attr != NULL) {
 		if (attr->mq_maxmsg <= 0 || attr->mq_maxmsg > maxmsg)
@@ -2870,7 +2869,7 @@ freebsd32_kmq_timedsend(struct thread *td,
 		abs_timeout = NULL;
 	waitok = !(fp->f_flag & O_NONBLOCK);
 	error = mqueue_send(mq, uap->msg_ptr, uap->msg_len,
-		uap->msg_prio, waitok, abs_timeout);
+	    uap->msg_prio, waitok, abs_timeout);
 out:
 	fdrop(fp, td);
 	return (error);
@@ -2901,7 +2900,7 @@ freebsd32_kmq_timedreceive(struct thread *td,
 		abs_timeout = NULL;
 	waitok = !(fp->f_flag & O_NONBLOCK);
 	error = mqueue_receive(mq, uap->msg_ptr, uap->msg_len,
-		uap->msg_prio, waitok, abs_timeout);
+	    uap->msg_prio, waitok, abs_timeout);
 out:
 	fdrop(fp, td);
 	return (error);
