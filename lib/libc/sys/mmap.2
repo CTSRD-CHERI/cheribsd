@@ -248,6 +248,14 @@ In contrast, if
 .Dv MAP_EXCL
 is specified, the request will fail if a mapping
 already exists within the range.
+.Pp
+Under CheriABI
+.Dv MAP_FIXED
+may be used with a NULL-derived capability, in which case
+.Dv MAP_EXCL
+is implied, or with a valid capability to an existing mapping.
+The former is allowed for compatability purposes and should be avoided
+in new code.
 .It Dv MAP_GUARD
 Instead of a mapping, create a guard of the specified size.
 Guards allow a process to create reservations in its address space,
@@ -430,6 +438,24 @@ Otherwise, a value of
 is returned and
 .Va errno
 is set to indicate the error.
+.Pp
+Under CheriABI, when a new region of address space is reserved,
+.Nm
+returns a capability with appropriate bounds (padded if required)
+and permissions implied by the
+.Dv PROT_MAX()
+portion of the
+.Fa prot
+argument (or by the passed
+.Dv PROT_*
+flags if no
+.Dv PROT_MAX()
+values are given).
+When the backing store of an existing mapping is updated via the
+.Dv MAP_FIXED
+flag, the passed value of
+.Fa addr
+is returned unmodified.
 .Sh ERRORS
 The
 .Fn mmap
