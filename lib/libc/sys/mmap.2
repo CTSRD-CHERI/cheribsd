@@ -166,9 +166,8 @@ is not representable as a precise capability,
 will fail.
 The
 .Dv MAP_ALIGNED_CHERI
-flag is assumed for CheriABI programs unless
-.Dv MAP_CHERI_NOSETBOUNDS
-is defined.
+flag is assumed for CheriABI programs when address space is being
+reserved.
 On architectures without CHERI support or where all capabilities are
 precise,
 .Dv MAP_ALIGNED_CHERI
@@ -216,15 +215,7 @@ This flag is identical to
 .Dv MAP_ANON
 and is provided for compatibility.
 .It Dv MAP_CHERI_NOSETBOUNDS
-This flag can only be used in combination with
-.Dv MAP_FIXED .
-In CheriABI, do not constrain the alignment of the capability, only
-require that mapping be possible at
-.Fa addr
-and that there be sufficient space in the capability for the request.
-The
-.Dv MAP_CHERI_NOSETBOUNDS
-flag is ignored by non-CheriABI programs.
+This flag is obsolete and should not be used.
 .It Dv MAP_EXCL
 This flag can only be used in combination with
 .Dv MAP_FIXED .
@@ -557,16 +548,6 @@ was specified and
 or
 .Fa size
 was not sufficently aligned for the current architecture.
-.It Bq Er EINVAL
-.Dv MAP_CHERI_NOSETBOUNDS
-was specified, but
-.Dv MAP_FIXED
-was not.
-CheriABI only.
-.It Bq Er EINVAL
-.Dv MAP_CHERI_NOSETBOUNDS
-was specified with an alignment request.
-CheriABI only.
 .It Bq Er EINVAL
 .Dv MAP_GUARD
 was specified, but the
