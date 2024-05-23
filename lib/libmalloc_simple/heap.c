@@ -114,26 +114,9 @@ __morepages(int n)
 		caddr_t extra_start = __builtin_align_up(pagepool_start,
 		    _pagesz);
 		size_t extra_bytes = pagepool_end - extra_start;
-#ifndef __CHERI_PURE_CAPABILITY__
 		if (munmap(extra_start, extra_bytes) != 0)
-			error_printf("%s: munmap %p failed\n", __func__, addr);
-#else
-		/*
-		 * XXX: CHERI128: Need to avoid rounding down to an imprecise
-		 * capability.
-		 * In many cases we could safely unmap part of the end
-		 * (since there's only one pointer to the allocation in
-		 * pagepool_list to be updated), but we need to be careful
-		 * to avoid making the result unrepresentable.  For now,
-		 * just leak the virtual addresses and MAP_GUARD the
-		 * unused pages.
-		 */
-		if (mmap(extra_start, extra_bytes, PROT_NONE,
-		    MAP_FIXED | MAP_GUARD | MAP_CHERI_NOSETBOUNDS, -1, 0) ==
-		    MAP_FAILED)
-			error_printf("%s: mmap MAP_GUARD %p failed\n",
-			    __func__, extra_start);
-#endif
+			error_printf("%s: munmap %p failed\n", __func__,
+			    extra_start);
 	}
 
 	if ((newpp = mmap(0, size, PROT_READ|PROT_WRITE, MAP_ANON, -1,
