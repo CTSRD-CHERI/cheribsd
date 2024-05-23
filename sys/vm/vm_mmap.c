@@ -153,13 +153,10 @@ mmap_retcap(struct thread *td, vm_pointer_t addr,
 	register_t perms, cap_prot;
 
 	/*
-	 * Return the original capability when MAP_CHERI_NOSETBOUNDS is set.
-	 *
-	 * NB: This means no permission changes.
-	 * The assumption is that the larger capability has the correct
-	 * permissions and we're only interested in adjusting page mappings.
+	 * If we're updating the backing store within an existing
+	 * reservation, just return the capability we were passed.
 	 */
-	if (mrp->mr_flags & MAP_CHERI_NOSETBOUNDS)
+	if ((mrp->mr_kern_flags & MAP_RESERVATION_CREATE) == 0)
 		return ((uintcap_t)mrp->mr_source_cap);
 
 	/*
