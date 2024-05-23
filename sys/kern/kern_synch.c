@@ -42,7 +42,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_ktrace.h"
 #include "opt_sched.h"
 
-#include <sys/accel.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/blockcount.h>
@@ -64,8 +63,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysproto.h>
 #include <sys/vmmeter.h>
 #ifdef KTRACE
+// clang-format off
 #include <sys/uio.h>
 #include <sys/ktrace.h>
+// clang-format on
 #endif
 #ifdef EPOCH_TRACE
 #include <sys/epoch.h>
@@ -74,31 +75,30 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpu.h>
 
 static void synch_setup(void *dummy);
-SYSINIT(synch_setup, SI_SUB_KICK_SCHEDULER, SI_ORDER_FIRST, synch_setup,
-    NULL);
+SYSINIT(synch_setup, SI_SUB_KICK_SCHEDULER, SI_ORDER_FIRST, synch_setup, NULL);
 
-int	hogticks;
+int hogticks;
 static const char pause_wchan[MAXCPU];
 
 static struct callout loadav_callout;
 
-struct loadavg averunnable =
-	{ {0, 0, 0}, FSCALE };	/* load average, of runnable procs */
+struct loadavg averunnable = { { 0, 0, 0 },
+	FSCALE }; /* load average, of runnable procs */
 /*
  * Constants for averages over 1, 5, and 15 minutes
  * when sampling at 5 second intervals.
  */
 static uint64_t cexp[3] = {
-	0.9200444146293232 * FSCALE,	/* exp(-1/12) */
-	0.9834714538216174 * FSCALE,	/* exp(-1/60) */
-	0.9944598480048967 * FSCALE,	/* exp(-1/180) */
+	0.9200444146293232 * FSCALE, /* exp(-1/12) */
+	0.9834714538216174 * FSCALE, /* exp(-1/60) */
+	0.9944598480048967 * FSCALE, /* exp(-1/180) */
 };
 
 /* kernel uses `FSCALE', userland (SHOULD) use kern.fscale */
 SYSCTL_INT(_kern, OID_AUTO, fscale, CTLFLAG_RD, SYSCTL_NULL_INT_PTR, FSCALE,
     "Fixed-point scale factor used for calculating load average values");
 
-static void	loadav(void *arg);
+static void loadav(void *arg);
 
 SDT_PROVIDER_DECLARE(sched);
 SDT_PROBE_DEFINE(sched, , , preempt);
@@ -107,7 +107,7 @@ static void
 sleepinit(void *unused)
 {
 
-	hogticks = (hz / 10) * 2;	/* Default only. */
+	hogticks = (hz / 10) * 2; /* Default only. */
 	init_sleepqueues();
 }
 
@@ -148,10 +148,10 @@ _sleep(const void *ident, struct lock_object *lock, int priority,
 	if (KTRPOINT(td, KTR_CSW))
 		ktrcsw(1, 0, wmesg);
 #endif
-	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, lock,
-	    "Sleeping on \"%s\"", wmesg);
+	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, lock, "Sleeping on \"%s\"",
+	    wmesg);
 	KASSERT(sbt != 0 || mtx_owned(&Giant) || lock != NULL ||
-	    (priority & PNOLOCK) != 0,
+		(priority & PNOLOCK) != 0,
 	    ("sleeping without a lock"));
 	KASSERT(ident != NULL, ("_sleep: NULL ident"));
 	KASSERT(TD_IS_RUNNING(td), ("_sleep: curthread not running"));
@@ -182,8 +182,8 @@ _sleep(const void *ident, struct lock_object *lock, int priority,
 		sleepq_flags |= SLEEPQ_INTERRUPTIBLE;
 
 	sleepq_lock(ident);
-	CTR5(KTR_PROC, "sleep: thread %ld (pid %ld, %s) on %s (%p)",
-	    td->td_tid, td->td_proc->p_pid, td->td_name, wmesg, ident);
+	CTR5(KTR_PROC, "sleep: thread %ld (pid %ld, %s) on %s (%p)", td->td_tid,
+	    td->td_proc->p_pid, td->td_name, wmesg, ident);
 
 	if (lock == &Giant.lock_object)
 		mtx_assert(&Giant, MA_OWNED);
@@ -271,13 +271,13 @@ msleep_spin_sbt(const void *ident, struct mtx *mtx, const char *wmesg,
 	if (sbt != 0)
 		sleepq_set_timeout_sbt(ident, sbt, pr, flags);
 
-	/*
-	 * Can't call ktrace with any spin locks held so it can lock the
-	 * ktrace_mtx lock, and WITNESS_WARN considers it an error to hold
-	 * any spin lock.  Thus, we have to drop the sleepq spin lock while
-	 * we handle those requests.  This is safe since we have placed our
-	 * thread on the sleep queue already.
-	 */
+		/*
+		 * Can't call ktrace with any spin locks held so it can lock the
+		 * ktrace_mtx lock, and WITNESS_WARN considers it an error to
+		 * hold any spin lock.  Thus, we have to drop the sleepq spin
+		 * lock while we handle those requests.  This is safe since we
+		 * have placed our thread on the sleep queue already.
+		 */
 #ifdef KTRACE
 	if (KTRPOINT(td, KTR_CSW)) {
 		sleepq_release(ident);
@@ -383,8 +383,8 @@ wakeup_any(const void *ident)
 	int wakeup_swapper;
 
 	sleepq_lock(ident);
-	wakeup_swapper = sleepq_signal(ident, SLEEPQ_SLEEP | SLEEPQ_UNFAIR |
-	    SLEEPQ_DROP, 0, 0);
+	wakeup_swapper = sleepq_signal(ident,
+	    SLEEPQ_SLEEP | SLEEPQ_UNFAIR | SLEEPQ_DROP, 0, 0);
 	if (wakeup_swapper)
 		kick_proc0();
 }
@@ -494,7 +494,7 @@ mi_switch(int flags)
 	uint64_t runtime, new_switchtime;
 	struct thread *td;
 
-	td = curthread;			/* XXX */
+	td = curthread; /* XXX */
 	THREAD_LOCK_ASSERT(td, MA_OWNED | MA_NOTRECURSED);
 	KASSERT(!TD_ON_RUNQ(td), ("mi_switch: called by old code"));
 #ifdef INVARIANTS
@@ -537,22 +537,23 @@ mi_switch(int flags)
 	td->td_runtime += runtime;
 	td->td_incruntime += runtime;
 	PCPU_SET(switchtime, new_switchtime);
-	td->td_generation++;	/* bump preempt-detect counter */
+	td->td_generation++; /* bump preempt-detect counter */
 	VM_CNT_INC(v_swtch);
 	PCPU_SET(switchticks, ticks);
 	CTR4(KTR_PROC, "mi_switch: old thread %ld (td_sched %p, pid %ld, %s)",
 	    td->td_tid, td_get_sched(td), td->td_proc->p_pid, td->td_name);
 #ifdef KDTRACE_HOOKS
 	if (SDT_PROBES_ENABLED() &&
-	    ((flags & SW_PREEMPT) != 0 || ((flags & SW_INVOL) != 0 &&
-	    (flags & SW_TYPE_MASK) == SWT_NEEDRESCHED)))
+	    ((flags & SW_PREEMPT) != 0 ||
+		((flags & SW_INVOL) != 0 &&
+		    (flags & SW_TYPE_MASK) == SWT_NEEDRESCHED)))
 		SDT_PROBE0(sched, , , preempt);
 #endif
 	sched_switch(td, flags);
 	CTR4(KTR_PROC, "mi_switch: new thread %ld (td_sched %p, pid %ld, %s)",
 	    td->td_tid, td_get_sched(td), td->td_proc->p_pid, td->td_name);
 
-	/* 
+	/*
 	 * If the last thread was exiting, finish cleaning it up.
 	 */
 	if ((td = PCPU_GET(deadthread))) {
@@ -586,7 +587,7 @@ setrunnable(struct thread *td, int srqflags)
 	case TDS_CAN_RUN:
 		KASSERT((td->td_flags & TDF_INMEM) != 0,
 		    ("setrunnable: td %p not in mem, flags 0x%X inhibit 0x%X",
-		    td, td->td_flags, td->td_inhibitors));
+			td, td->td_flags, td->td_inhibitors));
 		/* unlocks thread lock according to flags */
 		sched_wakeup(td, srqflags);
 		return (0);
@@ -626,7 +627,8 @@ loadav(void *arg)
 
 	for (i = 0; i < 3; i++)
 		avg->ldavg[i] = (cexp[i] * (uint64_t)avg->ldavg[i] +
-		    nrun * FSCALE * (FSCALE - cexp[i])) >> FSHIFT;
+				    nrun * FSCALE * (FSCALE - cexp[i])) >>
+		    FSHIFT;
 
 	/*
 	 * Schedule the next update to occur after 5 seconds, but add a
@@ -634,8 +636,8 @@ loadav(void *arg)
 	 * run at regular intervals.
 	 */
 	callout_reset_sbt(&loadav_callout,
-	    SBT_1US * (4000000 + (int)(random() % 2000001)), SBT_1US,
-	    loadav, NULL, C_DIRECT_EXEC | C_PREL(32));
+	    SBT_1US * (4000000 + (int)(random() % 2000001)), SBT_1US, loadav,
+	    NULL, C_DIRECT_EXEC | C_PREL(32));
 }
 
 static void
@@ -717,21 +719,210 @@ sys_sched_getcpu(struct thread *td, struct sched_getcpu_args *uap)
 	return (0);
 }
 
+#include <sys/accel.h>
+#include <sys/malloc.h>
+
+// clang-format off
+#include <vm/vm.h>
+#include <vm/vm_param.h>
+#include <vm/pmap.h>
+// clang-format on
+
+static MALLOC_DEFINE(M_BOUNCE, "bounce", "busdma bounce pages");
+
+static void
+XHls_WriteReg(int *BaseAddress, int RegOffset, int Data)
+{
+	BaseAddress[(RegOffset >> 2)] = Data;
+}
+static int
+XHls_ReadReg(int *BaseAddress, int RegOffset)
+{
+	return BaseAddress[RegOffset >> 2];
+}
+
+static void
+start_hls(int *base_address)
+{
+	int data = XHls_ReadReg(base_address, 0) & 0x80;
+	XHls_WriteReg(base_address, 0, data | 0x01);
+}
+
+static int
+is_hls_done(int *base_address)
+{
+	int data = XHls_ReadReg(base_address, 0);
+	return (data >> 1) & 0x1;
+}
+
+#define capchecker_nbentries (capchecker_size / sizeof(void *))
+
 int
 sys_accel_malloc(struct thread *td, struct accel_malloc_args *accel_malloc_arg)
 {
-        // int accel_addr[8] = { 0xC0010000, 0xC0011000, 0xC0012000, 0xC0013000,
-        //      0xC0014000, 0xC0015000, 0xC0016000, 0xC0017000 };
+	int accel_addr[8] = { 0xC0010000, 0xC0011000, 0xC0012000, 0xC0013000,
+		0xC0014000, 0xC0015000, 0xC0016000, 0xC0017000 };
 
-        accel_malloc_arg->accel_config->buffer_count++;
-        return 0;
+	// Initialize capchecker
+	int capchecker_base_phy_addr = 0xc0020000;
+	int capchecker_size = 0x00002000;
+	int **capchecker = pmap_mapdev(capchecker_base_phy_addr,
+	    capchecker_size * 4);
+
+	int accel_count;
+	copyin(&(accel_malloc_arg->accel_config->accel_count), &accel_count, 4);
+
+	int *accels[8];
+
+	// Initialize accelerator processes
+	for (int i = 0; i < accel_count; i++) {
+
+		// Allocate device io and return its virtual address
+		int physical_addr = accel_addr[i];
+		int *base_address = pmap_mapdev(physical_addr, 0x1000 * 4);
+		accels[i] = base_address;
+
+		// Initialize buffers
+		int buffer_count;
+		copyin(
+		    &(accel_malloc_arg->accel_config->accels[i].buffer_count),
+		    &buffer_count, 4);
+
+		for (int j = 0; j < buffer_count; j++) {
+
+			int offset, size;
+			copyin(&(accel_malloc_arg->accel_config->accels[i]
+				       .buffers[j]
+				       .size),
+			    &size, 4);
+			copyin(&(accel_malloc_arg->accel_config->accels[i]
+				       .buffers[j]
+				       .offset),
+			    &offset, 4);
+
+#define HLS_SIM
+
+#ifdef HLS_SIM
+			// Allocating continuous buffers
+			// JC: what is the API to do this?
+			int *temp = contigmalloc(PAGE_SIZE, M_BOUNCE, M_NOWAIT,
+			    0ul, size * 4, PAGE_SIZE, 0);
+
+			copyin((__cheri_tocap int * __capability)
+				   accel_malloc_arg->accel_config->accels[i]
+				       .buffers[j]
+				       .data,
+			    temp, 4 * size);
+#else
+			// Allocating continuous buffers
+			// JC: what is the API to do this?
+			int *temp = contigmalloc(PAGE_SIZE, M_BOUNCE, M_NOWAIT,
+			    0ul, size * 4, PAGE_SIZE, 0);
+			copyin((__cheri_tocap int * __capability)
+				   accel_malloc_arg->accel_config->accels[i]
+				       .buffers[j]
+				       .data,
+			    temp, 4 * size);
+#endif
+
+			// Update the address to the register based on the
+			// offset
+			int cap_id = (i << 5) + j;
+			capchecker[cap_id] = temp;
+			XHls_WriteReg(base_address, offset + 4,
+			    (int)(cap_id << (32 - 8)));
+			// JC: How to get address as an integer
+			// XHls_WriteReg(base_address, offset, temp);
+			XHls_WriteReg(base_address, offset,
+			    (__cheri_addr long int)temp);
+		}
+	}
+
+	// Start accelerators
+	for (int i = 0; i < accel_count; i++)
+		start_hls(accels[i]);
+
+#ifdef HLS_SIM
+
+	// Deallocate accelerator processes
+	for (int i = 0; i < accel_count; i++) {
+
+		// Initialize buffers
+		int buffer_count;
+		copyin(
+		    &(accel_malloc_arg->accel_config->accels[i].buffer_count),
+		    &buffer_count, 4);
+
+		for (int j = 0; j < buffer_count; j++) {
+
+			int offset, size;
+			copyin(&(accel_malloc_arg->accel_config->accels[i]
+				       .buffers[j]
+				       .size),
+			    &size, 4);
+			copyin(&(accel_malloc_arg->accel_config->accels[i]
+				       .buffers[j]
+				       .offset),
+			    &offset, 4);
+
+			// Update the address to the register based on the
+			// offset
+			int cap_id = (i << 5) + j;
+			int *temp = capchecker[cap_id];
+			copyout(temp,
+			    (__cheri_tocap int * __capability)
+				accel_malloc_arg->accel_config->accels[i]
+				    .buffers[j]
+				    .data,
+			    4 * size);
+			contigfree(temp, PAGE_SIZE, M_BOUNCE);
+		}
+		int *base_address = accels[i];
+		pmap_unmapdev(base_address, 0x1000 * 4);
+	}
+
+#endif
+
+	return 0;
 }
 
 int
-sys_accel_demalloc(struct thread *td, struct accel_demalloc_args *accel_demalloc_arg)
+sys_accel_demalloc(struct thread *td,
+    struct accel_demalloc_args *accel_demalloc_arg)
 {
 
-        accel_demalloc_arg->accel_config->buffer_count--;
+	// int accel_addr[8] = { 0xC0010000, 0xC0011000, 0xC0012000, 0xC0013000,
+	// 	0xC0014000, 0xC0015000, 0xC0016000, 0xC0017000 };
 
-        return 0;
+	// struct accel_ctrl_args aca;
+
+	// // JC: how to calculate the number of bytes?
+	// int bytes;
+	// copyin(&(accel_malloc_arg->bytes), &bytes, 4);
+	// copyin(&accel_malloc_arg, &aca, bytes);
+
+	// // Start accelerators
+	// for (int i = 0; i < aca->accel_count; i++)
+	// 	while (is_hls_done(accel_addr[i]))
+	// 		;
+
+	// // Deallocate accelerator processes
+	// for (int i = 0; i < aca->accel_count; i++) {
+	// 	int base_address = accel_addr[i];
+
+	// 	// Deallocate buffers
+	// 	for (int j = 0; j < aca.accels[i]->buffer_count; j++) {
+	// 		// Fetch data (maybe use copyout?)
+	// 		for (int k = 0; k < aca.accels[i]->buffers[j]->size;
+	// 		     k++)
+	// 			aca.accels[i]->buffers[j]->data[k] = *(
+	// 			    base_address +
+	// 			    aca.accels[i]->buffers[i]->offset + k);
+
+	// 		// Deallocating continuous buffers
+	// 		free(base_address + aca.accels[i]->buffers[i]->offset);
+	// 	}
+	// }
+
+	return 0;
 }
