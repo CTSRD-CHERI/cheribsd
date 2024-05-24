@@ -319,7 +319,6 @@ extern vm_offset_t dmap_max_addr;
 #ifdef __CHERI_PURE_CAPABILITY__
 extern void *dmap_base_cap;
 #endif
-extern vm_offset_t vm_max_kernel_address;
 
 #endif
 

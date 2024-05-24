@@ -255,7 +255,6 @@ extern void *dmap_capability;
 #else
 extern vm_offset_t dmap_max_addr;
 #endif
-extern vm_offset_t vm_max_kernel_address;
 extern void *init_pt_va;
 #endif
 
