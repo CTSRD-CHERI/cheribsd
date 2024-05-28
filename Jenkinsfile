@@ -160,6 +160,12 @@ def runTests(params, String suffix) {
             runTestStep(params, "${suffix}-purecap-kernel", suffix, testExtraArgs,
                         ["--run-${suffix}/kernel-abi purecap"])
         }
+        if (suffix.startsWith('morello')) {
+            testSteps["Test ${suffix} purecap-benchmark kernel"] = { ->
+                runTestStep(params, "${suffix}-purecap-benchmark-kernel", suffix, testExtraArgs,
+                            ["--run-${suffix}/kernel-abi purecap-benchmark"])
+            }
+        }
         testSteps.failFast = false
         parallel testSteps
     } else {
@@ -298,6 +304,9 @@ selectedArchitectures.each { suffix ->
         ]
         if (GlobalVars.selectedPurecapKernelArchitectures.contains(suffix)) {
             cheribuildArgs.add('--cheribsd/build-alternate-abi-kernels')
+            if (suffix.startsWith('morello')) {
+                cheribuildArgs.add('--cheribsd/build-benchmark-abi-kernels')
+            }
         }
         cheribuildProject(target: "cheribsd-${suffix}", architecture: suffix,
                           extraArgs: cheribuildArgs.join(" "),
