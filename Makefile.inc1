@@ -1838,7 +1838,7 @@ PKG_KERNCONF+= ${_k}-${_dbg}
 .endif
 .endfor
 
-.if defined(PACKAGE_BUILDING)
+.if defined(PACKAGE_BUILDING) || ${TARGET_ARCH} == "aarch64c"
 KERNCONF?=	${PKG_KERNCONF}
 .else
 KERNCONF?=	${GENERIC_KERNCONF}
