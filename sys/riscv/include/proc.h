@@ -104,6 +104,13 @@ struct switchercb {
 	 * XXX
 	 */
 	void * __capability			scb_cookiep;
+	
+	/*
+	 * The process ID of the process owning this scb
+	 * This is used for mitigating microarchitectural
+	 * side channels.
+	 */
+	pid_t					scb_pid;
 };
 #endif
 

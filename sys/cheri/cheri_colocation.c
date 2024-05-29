@@ -538,6 +538,7 @@ setup_scb(struct thread *td)
 	scb.scb_td = (__cheri_tocap void * __capability)td;
 	scb.scb_borrower_td = NULL;
 	scb.scb_caller_scb = errno_cap(EAGAIN);
+	scb.scb_pid = td->td_proc->p_pid;
 	colocation_store_scb(td, &scb);
 
 	return (0);
