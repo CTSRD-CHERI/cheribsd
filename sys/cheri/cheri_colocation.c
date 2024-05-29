@@ -530,6 +530,7 @@ setup_scb(struct thread *td)
 	scb.scb_td = (__cheri_tocap void * __capability)td;
 	scb.scb_borrower_td = NULL;
 	scb.scb_caller_scb = cheri_capability_build_user_data(0, 0, 0, EAGAIN);
+	scb.scb_pid = td->td_proc->p_pid;
 	colocation_store_scb(td, &scb);
 
 	return (0);

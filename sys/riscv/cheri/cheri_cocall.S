@@ -44,6 +44,7 @@
  */
 #define	caller	ct6
 #define	callee	ct0
+#define	PTID	0x4a0
 
 #define	SIGCODE(sym)						\
 	.text; .globl sym; .type sym,@object; .align 4; sym: .cfi_startproc
@@ -151,6 +152,9 @@ SIGCODE(switcher_cocall)
 	bgez	t3, 3f
 	mv	t5, a4
 	mv	a0, a4
+
+	cld	t1, SCB_PID(callee)
+	csrw	PTID, t1
 
 CSYM(switcher_cocall_copy_start)
 3:
