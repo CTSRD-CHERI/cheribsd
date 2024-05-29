@@ -52,6 +52,7 @@
  */
 #define	caller	ct0
 #define	callee	ct6
+#define	PTID	0x4a0
 
 #define	SIGCODE(sym)						\
 	.text; .globl sym; .type sym,@object; .align 4; sym: .cfi_startproc
@@ -164,6 +165,15 @@ SIGCODE(switcher_coaccept)
 	li	t0, 0
 
 3:
+
+	/*
+	 * Set the PTID
+	 * t1 is zeroed out later
+	 */
+
+	cld t1, SCB_PID(callee)
+	csrw PTID, t1	
+
 	/*
 	 * XXX: We should use cclear here, but until it's supported in qemu, let's just...
 	 */
