@@ -317,15 +317,35 @@ attach_size_rounddown_cleanup()
 	cleanup_common
 }
 
+atf_test_case query_verbose cleanup
+query_verbose()
+{
+	atf_set "descr" "mdconfig -lv should print device details"
+}
+query_verbose_body()
+{
+	atf_check -s exit:0 -o save:mdconfig.out \
+	    -x 'mdconfig -a -t swap -s 1m -o reserve -o force'
+	md=$(cat mdconfig.out)
+	atf_check -s exit:0 \
+		-o match:"$md[[:space:]]+swap[[:space:]]+1024K[[:space:]]+[-][[:space:]]+[-][[:space:]]+force,reserve" \
+	-x "mdconfig -lv -u $md"
+}
+query_verbose_cleanup()
+{
+	cleanup_common
+}
+
 atf_init_test_cases()
 {
-	atf_add_test_case attach_vnode_non_explicit_type cleanup_common
-	atf_add_test_case attach_vnode_explicit_type cleanup_common
-	atf_add_test_case attach_vnode_smaller_than_file cleanup_common
-	atf_add_test_case attach_vnode_larger_than_file cleanup_common
-	atf_add_test_case attach_vnode_sector_size cleanup_common
-	atf_add_test_case attach_malloc cleanup_common
-	atf_add_test_case attach_swap cleanup_common
-	atf_add_test_case attach_with_specific_unit_number cleanup_common
-	atf_add_test_case attach_size_rounddown cleanup_common
+	atf_add_test_case attach_vnode_non_explicit_type
+	atf_add_test_case attach_vnode_explicit_type
+	atf_add_test_case attach_vnode_smaller_than_file
+	atf_add_test_case attach_vnode_larger_than_file
+	atf_add_test_case attach_vnode_sector_size
+	atf_add_test_case attach_malloc
+	atf_add_test_case attach_swap
+	atf_add_test_case attach_with_specific_unit_number
+	atf_add_test_case attach_size_rounddown
+	atf_add_test_case query_verbose
 }
