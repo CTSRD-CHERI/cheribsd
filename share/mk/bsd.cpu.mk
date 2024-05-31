@@ -334,7 +334,7 @@ MACHINE_CPU += riscv
 .if ${MACHINE_CPUARCH} == "aarch64"
 . if ${MACHINE_CPU:Mcheri}
 CFLAGS+=	-march=morello
-CFLAGS+=	-Xclang -morello-vararg=new -Xclang -morello-bounded-memargs
+CFLAGS+=	-Xclang -morello-vararg=new -Xclang -morello-bounded-memargs -Xclang -cheri-c18n-func-signature
 LDFLAGS+=	-march=morello
 . endif
 
