@@ -750,8 +750,21 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 						obj->non_plt_gnu_ifunc = true;
 						continue;
 					}
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+					symval = (Elf_Addr)tramp_intern(NULL,
+					    &(struct tramp_data) {
+						.target =
+						    rtld_resolve_ifunc(defobj,
+						        def),
+						.defobj = defobj,
+						.def = def,
+						.sig = sigtab_get(obj,
+						    ELF_R_SYM(rela->r_info))
+					});
+#else
 					symval = (Elf_Addr)rtld_resolve_ifunc(
 					    defobj, def);
+#endif
 					break;
 				default:
 					_rtld_error("%s: IFUNC for TLS reloc",
@@ -787,12 +800,32 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			    where, rela->r_addend) != 0)
 				return (-1);
 			break;
-		case R_MORELLO_RELATIVE:
+		case R_MORELLO_RELATIVE: {
 			*(uintcap_t *)(void *)where =
 			    init_cap_from_fragment(where, data_cap,
 				text_rodata_cap,
 				(Elf_Addr)(uintptr_t)obj->relocbase,
 				rela->r_addend);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+			size_t symnum = ELF_R_SYM(rela->r_info);
+			if (symnum != 0) {
+				bool wrap = symnum >= obj->dynsymcount;
+				if (!wrap) {
+					unsigned type = ELF_ST_TYPE(
+					    obj->symtab[symnum].st_info);
+					wrap = (type == STT_FUNC ||
+					    type == STT_GNU_IFUNC);
+				}
+				if (wrap)
+					*(void **)where = tramp_intern(NULL,
+					    &(struct tramp_data) {
+						.target = *(void **)where,
+						.defobj = obj,
+						.sig = sigtab_get(obj, symnum)
+					});
+			}
+#endif
+		}
 			break;
 #endif /* __has_feature(capabilities) */
 		case R_AARCH64_ABS64:

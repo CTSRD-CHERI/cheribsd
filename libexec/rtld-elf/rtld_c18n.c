@@ -1500,12 +1500,12 @@ end:
 struct func_sig
 sigtab_get(const Obj_Entry *obj, unsigned long symnum)
 {
-	if (symnum >= obj->dynsymcount) {
-		rtld_fdprintf(STDERR_FILENO,
-		    "c18n: Invalid symbol number %lu for %s\n",
-		    symnum, obj->path);
-		abort();
-	}
+	// if (symnum >= obj->dynsymcount) {
+	// 	rtld_fdprintf(STDERR_FILENO,
+	// 	    "c18n: Invalid symbol number %lu for %s\n",
+	// 	    symnum, obj->path);
+	// 	abort();
+	// }
 
 	if (obj->sigtab == NULL)
 		return ((struct func_sig) { .valid = false });
@@ -1701,16 +1701,9 @@ void _rtld_thr_exit(long *);
 void
 _rtld_thread_start_init(void (*p)(struct pthread *))
 {
-	assert((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) == 0);
+	assert((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) != 0);
 	assert(thr_thread_start == NULL);
-	thr_thread_start = tramp_intern(NULL, &(struct tramp_data) {
-		.target = p,
-		.defobj = obj_from_addr(p),
-		.sig = (struct func_sig) {
-			.valid = true,
-			.reg_args = 1, .mem_args = false, .ret_args = NONE
-		}
-	});
+	thr_thread_start = p;
 }
 
 void
@@ -1837,16 +1830,9 @@ static __siginfohandler_t *signal_dispatcher = sigdispatch;
 void
 _rtld_sighandler_init(__siginfohandler_t *handler)
 {
-	assert((cheri_getperm(handler) & CHERI_PERM_EXECUTIVE) == 0);
+	assert((cheri_getperm(handler) & CHERI_PERM_EXECUTIVE) != 0);
 	assert(signal_dispatcher == sigdispatch);
-	signal_dispatcher = tramp_intern(NULL, &(struct tramp_data) {
-		.target = handler,
-		.defobj = obj_from_addr(handler),
-		.sig = (struct func_sig) {
-			.valid = true,
-			.reg_args = 3, .mem_args = false, .ret_args = NONE
-		}
-	});
+	signal_dispatcher = handler;
 }
 
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
@@ -2053,7 +2039,6 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 	bool siginfo;
 	void *sigfunc;
 	struct tramp_header *header;
-	const Obj_Entry *defobj;
 	compart_id_t callee;
 	stk_table_index callee_idx;
 	struct stk_table *table;
@@ -2068,25 +2053,22 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 		sigfunc = act->sa_handler;
 	if (!cheri_gettag(sigfunc)) {
 		rtld_fdprintf(STDERR_FILENO,
-		    "c18n: Invalid handler %#p for signal %d\n",
+		    "c18n: Untagged handler %#p for signal %d\n",
 		    sigfunc, sig);
 		abort();
 	}
 
 	/*
-	 * If the signal handler is not already wrapped by a trampoline, wrap it
-	 * in one.
+	 * The signal handler must be wrapped by a trampoline.
 	 */
 	header = tramp_reflect(sigfunc);
 	if (header == NULL) {
-		defobj = obj_from_addr(sigfunc);
-		sigfunc = tramp_intern(NULL, &(struct tramp_data) {
-		    .target = sigfunc,
-		    .defobj = defobj
-		});
-	} else
-		defobj = header->defobj;
-	callee = defobj->compart_id;
+		rtld_fdprintf(STDERR_FILENO,
+		    "c18n: Invalid handler %#p for signal %d\n",
+		    sigfunc, sig);
+		abort();
+	}
+	callee = header->defobj->compart_id;
 	callee_idx = cid_to_index(callee);
 
 	/*

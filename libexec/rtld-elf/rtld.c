@@ -1181,19 +1181,8 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     dbg("transferring control to program entry point = " PTR_FMT, obj_main->entry);
 
     /* Return the exit procedure and the program entry point. */
-    if (rtld_exit_ptr == NULL) {
+    if (rtld_exit_ptr == NULL)
 	rtld_exit_ptr = make_rtld_function_pointer(rtld_exit);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	rtld_exit_ptr = tramp_intern(NULL, &(struct tramp_data) {
-		.target = rtld_exit_ptr,
-		.defobj = &obj_rtld,
-		.sig = (struct func_sig) {
-			.valid = true,
-			.reg_args = 0, .mem_args = false, .ret_args = NONE
-		}
-	});
-#endif
-    }
     *exit_proc = rtld_exit_ptr;
     *objp = obj_main;
 
@@ -1222,7 +1211,6 @@ rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def)
 	ptr = tramp_intern(NULL, &(struct tramp_data) {
 		.target = ptr,
 		.defobj = obj,
-		.def = def,
 		.sig = (struct func_sig) { .valid = true,
 		    .reg_args = 8, .mem_args = false, .ret_args = ONE }
 	});
@@ -1261,27 +1249,27 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
 	rtld_die();
     if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC)
 	target = (uintptr_t)rtld_resolve_ifunc(defobj, def);
-    else {
+    else
 #ifdef __CHERI_PURE_CAPABILITY__
 	target = (uintptr_t)make_function_pointer(def, defobj);
-#ifdef RTLD_SANDBOX
-	target = (uintptr_t)tramp_intern(obj, &(struct tramp_data) {
-	    .target = (void *)target,
-	    .defobj = defobj,
-	    .def = def,
-	    .sig = sigtab_get(obj, ELF_R_SYM(rel->r_info))
-	});
-#endif
 #else
 	target = (uintptr_t)(defobj->relocbase + def->st_value);
 #endif
-    }
 
     dbg("\"%s\" in \"%s\" ==> %p in \"%s\"",
       defobj->strtab + def->st_name,
       obj->path == NULL ? NULL : basename(obj->path),
       (void *)target,
       defobj->path == NULL ? NULL : basename(defobj->path));
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+    target = (uintptr_t)tramp_intern(obj, &(struct tramp_data) {
+	.target = (void *)target,
+	.defobj = defobj,
+	.def = def,
+	.sig = sigtab_get(obj, ELF_R_SYM(rel->r_info))
+    });
+#endif
 
     /*
      * Write the new contents for the jmpslot. Note that depending on
@@ -3496,29 +3484,9 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 	lock_release(rtld_bind_lock, lockstate);
 	if (reg != NULL) {
 		func_ptr_type exit_ptr = make_rtld_function_pointer(rtld_exit);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-		exit_ptr = tramp_intern(NULL, &(struct tramp_data) {
-			.target = exit_ptr,
-			.defobj = &obj_rtld,
-			.sig = (struct func_sig) {
-				.valid = true,
-				.reg_args = 0, .mem_args = false, .ret_args = NONE
-			}
-		});
-#endif
 		dbg("Calling __libc_atexit(rtld_exit (" PTR_FMT "))", (void*)exit_ptr);
 		reg(exit_ptr);
 		rtld_exit_ptr = make_rtld_function_pointer(rtld_nop_exit);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-		rtld_exit_ptr = tramp_intern(NULL, &(struct tramp_data) {
-			.target = rtld_exit_ptr,
-			.defobj = &obj_rtld,
-			.sig = (struct func_sig) {
-				.valid = true,
-				.reg_args = 0, .mem_args = false, .ret_args = NONE
-			}
-		});
-#endif
 	}
 
         /*
@@ -4438,9 +4406,23 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
 	    sym = __DECONST(void*, make_function_pointer(def, defobj));
 	    dbg("dlsym(%s) is function: " PTR_FMT, name, sym);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	    sym = tramp_intern(NULL, &(struct tramp_data) {
+		.target = sym,
+		.defobj = defobj,
+		.def = def
+	    });
+#endif
 	} else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
 	    sym = rtld_resolve_ifunc(defobj, def);
 	    dbg("dlsym(%s) is ifunc. Resolved to: " PTR_FMT, name, sym);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	    sym = tramp_intern(NULL, &(struct tramp_data) {
+		.target = sym,
+		.defobj = defobj,
+		.def = def
+	    });
+#endif
 	} else if (ELF_ST_TYPE(def->st_info) == STT_TLS) {
 	    ti.ti_module = defobj->tlsindex;
 	    ti.ti_offset = def->st_value;
@@ -4699,17 +4681,6 @@ dl_iterate_phdr(__dl_iterate_hdr_callback callback, void *param)
 
 	init_marker(&marker);
 	error = 0;
-
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	callback = tramp_intern(NULL, &(struct tramp_data) {
-		.target = callback,
-		.defobj = obj_from_addr(callback),
-		.sig = (struct func_sig) {
-			.valid = true,
-			.reg_args = 3, .mem_args = false, .ret_args = ONE
-		}
-	});
-#endif
 
 	wlock_acquire(rtld_phdr_lock, &phdr_lockstate);
 	wlock_acquire(rtld_bind_lock, &bind_lockstate);

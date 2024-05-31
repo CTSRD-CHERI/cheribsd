@@ -38,7 +38,6 @@ trust
 	strsep
 	strstr
 	strnstr
-	__libc_start1
 	setjmp
 	_setjmp
 	sigsetjmp
