@@ -2205,6 +2205,7 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
 	vm_offset_t addr, starta;
 	vm_pindex_t pindex;
 	vm_page_t m;
+	vm_prot_t prot;
 	int i;
 
 	pmap = fs->map->pmap;
@@ -2234,6 +2235,14 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
 		if (starta < entry->start)
 			starta = entry->start;
 	}
+	prot = entry->protection;
+
+	/*
+	 * If pmap_enter() has enabled write access on a nearby mapping, then
+	 * don't attempt promotion, because it will fail.
+	 */
+	if ((fs->prot & VM_PROT_WRITE) != 0)
+		prot |= VM_PROT_NO_PROMOTE;
 
 	/*
 	 * Generate the sequence of virtual addresses that are candidates for
@@ -2301,8 +2310,7 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
 			 * VM_PROT_WRITE_CAP is ignored.
 			 */
 			pmap_enter_quick(pmap, addr, m,
-			    VM_OBJECT_MASK_CAP_PROT(lobject,
-			    entry->protection));
+			    VM_OBJECT_MASK_CAP_PROT(lobject, prot));
 		}
 		if (!obj_locked || lobject != entry->object.vm_object)
 			VM_OBJECT_RUNLOCK(lobject);

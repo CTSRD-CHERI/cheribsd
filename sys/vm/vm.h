@@ -79,6 +79,7 @@ typedef u_char vm_prot_t;	/* protection codes */
 #define	VM_PROT_COPY		((vm_prot_t) 0x20)	/* copy-on-read */
 #define	VM_PROT_PRIV_FLAG	((vm_prot_t) 0x40)
 #define	VM_PROT_FAULT_LOOKUP	VM_PROT_PRIV_FLAG
+#define	VM_PROT_NO_PROMOTE	VM_PROT_PRIV_FLAG
 #define	VM_PROT_QUICK_NOFAULT	VM_PROT_PRIV_FLAG	/* same to save bits */
 
 #define	VM_PROT_RWX		(VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE)
