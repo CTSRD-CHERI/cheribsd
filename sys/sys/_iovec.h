@@ -44,7 +44,7 @@ struct iovec {
 	size_t			iov_len;	/* Length. */
 };
 
-#if defined(_KERNEL)
+#ifdef _KERNEL
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	IOVEC_INIT IOVEC_INIT_C
 #else /* ! __CHERI_PURE_CAPABILITY__ */
@@ -63,19 +63,28 @@ struct iovec {
 	(iovp)->iov_len = (len);					\
 } while(0)
 #define	IOVEC_INIT_C IOVEC_INIT
-#endif
+#endif /* _KERNEL */
 
-#define	IOVEC_INIT_STR(iovp, str)					\
-	IOVEC_INIT(iovp, str, strlen(str) + 1)
+/* String with length including NUL terminator */
+#define	IOVEC_INIT_CSTR(iovp, str)	do {				\
+	void *__str = (str);						\
+	IOVEC_INIT(iovp, __str, strlen(__str) + 1);			\
+} while(0)
+
+/* XXX: CheriBSD compat */
+#define	IOVEC_INIT_STR		IOVEC_INIT_CSTR
+
+/* Object with size from sizeof() */
 #define	IOVEC_INIT_OBJ(iovp, obj)					\
 	IOVEC_INIT(iovp, &(obj), sizeof(obj))
 
 #define	IOVEC_ADVANCE(iovp, amt)	do {				\
-	size_t amount = (amt);						\
-	KASSERT(amount <= (iovp)->iov_len, ("%s: amount %zu > iov_len	\
-	    %zu", __func__, amount, (iovp)->iov_len));			\
-	(iovp)->iov_base = (char * __capability)((iovp)->iov_base) + amount; \
-	(iovp)->iov_len -= amount;					\
+	struct iovec *__iovp = (iovp);					\
+	size_t __amt = (amt);						\
+	KASSERT(__amt <= __iovp->iov_len, ("%s: amount %zu > iov_len	\
+	    %zu", __func__, __amt, __iovp->iov_len));			\
+	__iovp->iov_len -= __amt;					\
+	__iovp->iov_base = (char * __capability)__iovp->iov_base + __amt; \
 } while(0)
 
 #ifdef _KERNEL
