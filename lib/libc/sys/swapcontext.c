@@ -34,6 +34,9 @@
 #include <errno.h>
 #include <stddef.h>
 #include "libc_private.h"
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#include <errno.h>
+#endif
 
 __weak_reference(__sys_swapcontext, __swapcontext);
 __sym_compat(swapcontext, __impl_swapcontext, FBSD_1.0);
@@ -45,6 +48,14 @@ int
 swapcontext(ucontext_t *oucp, const ucontext_t *ucp)
 {
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	/*
+	 * Disable this syscall under library-based compartmentalisation.
+	 */
+	errno = ENOSYS;
+	return (-1);
+#else
 	return (((int (*)(ucontext_t *, const ucontext_t *))
 	    __libc_interposing[INTERPOS_swapcontext])(oucp, ucp));
+#endif
 }

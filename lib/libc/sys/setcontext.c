@@ -32,6 +32,9 @@
 #include <sys/types.h>
 #include <ucontext.h>
 #include "libc_private.h"
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#include <errno.h>
+#endif
 
 __weak_reference(__sys_setcontext, __setcontext);
 __sym_compat(setcontext, __impl_setcontext, FBSD_1.0);
@@ -43,6 +46,14 @@ int
 setcontext(const ucontext_t *uc)
 {
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	/*
+	 * Disable this syscall under library-based compartmentalisation.
+	 */
+	errno = ENOSYS;
+	return (-1);
+#else
 	return (((int (*)(const ucontext_t *))
 	    __libc_interposing[INTERPOS_setcontext])(uc));
+#endif
 }
