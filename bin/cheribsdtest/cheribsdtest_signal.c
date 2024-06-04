@@ -267,6 +267,9 @@ CHERIBSDTEST(signal_returncap,
 	CHERIBSDTEST_VERIFY2(v == CHERI_CAP_USER_CODE_LENGTH,
 	    "length 0x%jx (expected <= 0x%jx)", v,
 	    (uintmax_t)CHERI_CAP_USER_CODE_LENGTH);
+#elif defined(CHERIBSD_C18N_TESTS)
+	/* Maximum size of a trampoline. See C18N_MAX_TRAMP_SIZE in RTLD. */
+	CHERIBSDTEST_VERIFY2(v <= 0x300, "length 0x%jx (expected <= 0x300)", v);
 #else
 	CHERIBSDTEST_VERIFY2(v <= 0x100, "length 0x%jx (expected <= 0x100)", v);
 #endif
