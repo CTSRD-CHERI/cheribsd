@@ -26,6 +26,7 @@
 
 #include "assym.inc"
 #include "opt_kstack_pages.h"
+#include <sys/elf_common.h>
 #include <sys/syscall.h>
 #include <machine/asm.h>
 #include <machine/armreg.h>
@@ -1324,3 +1325,5 @@ aarch32_esigcode:
 	.size	sz_aarch32_sigcode, 8
 sz_aarch32_sigcode:
 	.quad aarch32_esigcode - aarch32_sigcode
+
+GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)

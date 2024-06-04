@@ -30,6 +30,8 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/elf_common.h>
+
 #include <machine/asm.h>
 #include <machine/armreg.h>
 
@@ -166,6 +168,8 @@ END(arm_smccc_1_2_\insn)
  */
 arm_smccc_1_2	hvc
 arm_smccc_1_2	smc
+
+GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)
 // CHERI CHANGES START
 // {
 //   "updated": 20230509,

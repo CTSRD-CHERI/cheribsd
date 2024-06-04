@@ -25,7 +25,9 @@
  *
  */
 
+#include <sys/elf_common.h>
 #include <machine/asm.h>
+
 ENTRY(generic_bs_r_1)
 	ldrb	w0, [PTR(1), x2]
 	RETURN
@@ -480,3 +482,5 @@ generic_bs_poke_8f:
 	mov	x0, #0
 	RETURN
 END(generic_bs_poke_8)
+
+GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)
