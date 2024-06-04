@@ -7,6 +7,7 @@ SRCS+=	\
 SRCS+=	vmm_instruction_emul.c
 
 BHYVE_FDT_SUPPORT=
+BHYVE_GDB_SUPPORT=
 
 .if ${MACHINE_ABI:Mpurecap}
 SRCS:= ${SRCS:Npci_nvme.c}
