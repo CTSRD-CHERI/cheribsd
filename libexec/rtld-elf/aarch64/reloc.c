@@ -244,7 +244,7 @@ struct tls_data {
 #endif
 };
 
-static void *
+static struct tls_data *
 #ifdef __CHERI_PURE_CAPABILITY__
 reloc_tlsdesc_alloc(int tlsindex, Elf_Addr tlsoffs, Elf_Addr tlssize)
 #else
@@ -264,16 +264,29 @@ reloc_tlsdesc_alloc(int tlsindex, Elf_Addr tlsoffs)
 	return (tlsdesc);
 }
 
+struct tlsdesc_entry {
+	void	*(*func)(void *);
+	union {
+		Elf_Ssize	addend;
+		struct {
+			Elf_Size	offset;
+#ifdef __CHERI_PURE_CAPABILITY__
+			Elf_Size	size;
+#endif
+		};
+		struct tls_data	*data;
+	};
+};
+
 static void
-reloc_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela, Elf_Addr *where,
-    int flags, RtldLockState *lockstate)
+reloc_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela,
+    struct tlsdesc_entry *where, int flags, RtldLockState *lockstate)
 {
 	const Elf_Sym *def;
 	const Obj_Entry *defobj;
 	Elf_Addr offs;
 #ifdef __CHERI_PURE_CAPABILITY__
-	Elf_Addr size = where[3];
-	void **wherec = (void **)where;
+	Elf_Addr size = where->size;
 #endif
 
 	offs = 0;
@@ -290,18 +303,13 @@ reloc_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela, Elf_Addr *where,
 		obj = defobj;
 		if (def->st_shndx == SHN_UNDEF) {
 			/* Weak undefined thread variable */
-#ifdef __CHERI_PURE_CAPABILITY__
 #ifdef RTLD_SANDBOX
 			if (C18N_ENABLED)
-				wherec[0] = _rtld_tlsdesc_undef_c18n;
+				where->func = _rtld_tlsdesc_undef_c18n;
 			else
 #endif
-				wherec[0] = _rtld_tlsdesc_undef;
-			where[2] = rela->r_addend;
-#else
-			where[0] = (Elf_Addr)_rtld_tlsdesc_undef;
-			where[1] = rela->r_addend;
-#endif
+				where->func = _rtld_tlsdesc_undef;
+			where->addend = rela->r_addend;
 			return;
 		}
 	}
@@ -309,32 +317,28 @@ reloc_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela, Elf_Addr *where,
 
 	if (obj->tlsoffset != 0) {
 		/* Variable is in initially allocated TLS segment */
-#ifdef __CHERI_PURE_CAPABILITY__
 #ifdef RTLD_SANDBOX
 		if (C18N_ENABLED)
-			wherec[0] = _rtld_tlsdesc_static_c18n;
+			where->func = _rtld_tlsdesc_static_c18n;
 		else
 #endif
-			wherec[0] = _rtld_tlsdesc_static;
-		where[2] = obj->tlsoffset + offs;
-		where[3] = size;
-#else
-		where[0] = (Elf_Addr)_rtld_tlsdesc_static;
-		where[1] = obj->tlsoffset + offs;
+			where->func = _rtld_tlsdesc_static;
+		where->offset = obj->tlsoffset + offs;
+#ifdef __CHERI_PURE_CAPABILITY__
+		where->size = size;
 #endif
 	} else {
 		/* TLS offset is unknown at load time, use dynamic resolving */
-#ifdef __CHERI_PURE_CAPABILITY__
 #ifdef RTLD_SANDBOX
 		if (C18N_ENABLED)
-			wherec[0] = _rtld_tlsdesc_dynamic_c18n;
+			where->func = _rtld_tlsdesc_dynamic_c18n;
 		else
 #endif
-			wherec[0] = _rtld_tlsdesc_dynamic;
-		wherec[1] = reloc_tlsdesc_alloc(obj->tlsindex, offs, size);
+			where->func = _rtld_tlsdesc_dynamic;
+#ifdef __CHERI_PURE_CAPABILITY__
+		where->data = reloc_tlsdesc_alloc(obj->tlsindex, offs, size);
 #else
-		where[0] = (Elf_Addr)_rtld_tlsdesc_dynamic;
-		where[1] = (Elf_Addr)reloc_tlsdesc_alloc(obj->tlsindex, offs);
+		where->data = reloc_tlsdesc_alloc(obj->tlsindex, offs);
 #endif
 	}
 }
@@ -402,7 +406,7 @@ reloc_plt(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 #else
 		case R_AARCH64_TLSDESC:
 #endif
-			reloc_tlsdesc(obj, rela, (Elf_Addr *)where,
+			reloc_tlsdesc(obj, rela, (struct tlsdesc_entry *)where,
 			    SYMLOOK_IN_PLT | flags, lockstate);
 			break;
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -804,7 +808,8 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 #else
 		case R_AARCH64_TLSDESC:
 #endif
-			reloc_tlsdesc(obj, rela, where, flags, lockstate);
+			reloc_tlsdesc(obj, rela, (struct tlsdesc_entry *)where,
+			    flags, lockstate);
 			break;
 #ifdef __CHERI_PURE_CAPABILITY__
 		case R_MORELLO_TLS_TPREL128:
