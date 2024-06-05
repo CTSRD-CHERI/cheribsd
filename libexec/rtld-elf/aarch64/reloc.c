@@ -235,16 +235,21 @@ do_copy_relocations(Obj_Entry *dstobj)
 	return (0);
 }
 
-#ifdef __CHERI_PURE_CAPABILITY__
 struct tls_data {
-	uintcap_t	dtv_gen;
+	uintptr_t	dtv_gen;
 	int		tls_index;
 	Elf_Addr	tls_offs;
+#ifdef __CHERI_PURE_CAPABILITY__
 	Elf_Addr	tls_size;
+#endif
 };
 
 static void *
+#ifdef __CHERI_PURE_CAPABILITY__
 reloc_tlsdesc_alloc(int tlsindex, Elf_Addr tlsoffs, Elf_Addr tlssize)
+#else
+reloc_tlsdesc_alloc(int tlsindex, Elf_Addr tlsoffs)
+#endif
 {
 	struct tls_data *tlsdesc;
 
@@ -252,30 +257,12 @@ reloc_tlsdesc_alloc(int tlsindex, Elf_Addr tlsoffs, Elf_Addr tlssize)
 	tlsdesc->dtv_gen = tls_dtv_generation;
 	tlsdesc->tls_index = tlsindex;
 	tlsdesc->tls_offs = tlsoffs;
+#ifdef __CHERI_PURE_CAPABILITY__
 	tlsdesc->tls_size = tlssize;
+#endif
 
 	return (tlsdesc);
 }
-#else
-struct tls_data {
-	Elf_Addr	dtv_gen;
-	int		tls_index;
-	Elf_Addr	tls_offs;
-};
-
-static Elf_Addr
-reloc_tlsdesc_alloc(int tlsindex, Elf_Addr tlsoffs)
-{
-	struct tls_data *tlsdesc;
-
-	tlsdesc = xmalloc(sizeof(struct tls_data));
-	tlsdesc->dtv_gen = tls_dtv_generation;
-	tlsdesc->tls_index = tlsindex;
-	tlsdesc->tls_offs = tlsoffs;
-
-	return ((Elf_Addr)tlsdesc);
-}
-#endif
 
 static void
 reloc_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela, Elf_Addr *where,
@@ -347,7 +334,7 @@ reloc_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela, Elf_Addr *where,
 		wherec[1] = reloc_tlsdesc_alloc(obj->tlsindex, offs, size);
 #else
 		where[0] = (Elf_Addr)_rtld_tlsdesc_dynamic;
-		where[1] = reloc_tlsdesc_alloc(obj->tlsindex, offs);
+		where[1] = (Elf_Addr)reloc_tlsdesc_alloc(obj->tlsindex, offs);
 #endif
 	}
 }
