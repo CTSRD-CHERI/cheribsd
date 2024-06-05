@@ -191,6 +191,6 @@ get_c18n(struct procstat *procstat, struct kinfo_proc *kipp)
 	if (procstat_getc18n(procstat, kipp, &rcs) != 0)
 		snprintf(c18n_buf, sizeof(c18n_buf), "-");
 	else
-		snprintf(c18n_buf, sizeof(c18n_buf), "%5lu", rcs.rcs_compart);
+		snprintf(c18n_buf, sizeof(c18n_buf), "%5zu", rcs.rcs_compart);
 	return (c18n_buf);
 }
