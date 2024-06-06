@@ -300,6 +300,12 @@ thread_start(struct pthread *curthread)
 	bool restore_sigmask;
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	/*
+	 * At this point, curthread->tcb contains a fake wrapper TCB created by
+	 * RTLD when the thread was created. The real TCB has now been installed
+	 * by RTLD upon thread start, and the struct member should be set to it.
+	 */
+	curthread->tcb = _tcb_get();
 	restore_sigmask = true;
 #else
 	restore_sigmask = curthread->attr.suspend == THR_CREATE_SUSPENDED;
