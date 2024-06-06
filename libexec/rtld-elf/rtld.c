@@ -6110,6 +6110,12 @@ _rtld_allocate_tls(void *oldtls, size_t tcbsize, size_t tcbalign)
     ret = allocate_tls(globallist_curr(TAILQ_FIRST(&obj_list)), oldtls,
       tcbsize, tcbalign);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+    /*
+     * Create a fake wrapper TCB containing pointers to the real TCB and stack
+     * lookup table. This is passed to the new thread as its initial TCB. Once
+     * the thread starts executing in _rtld_thread_start, it will set the
+     * thread's TCB to the real TCB after installing the stack lookup table.
+     */
     if (C18N_ENABLED)
 	ret = c18n_allocate_tcb(ret);
 #endif
