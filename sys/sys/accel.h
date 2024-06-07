@@ -59,6 +59,19 @@ struct accel_ctrl_args {
 	struct accel_config *accels;
 };
 
+// -----
+
+int *init_buffer_config(struct buffer_config *bc, int o, int w, int b);
+struct buffer_config *set_buffer_count(struct accel_config *x, int c);
+int get_buffer_count(struct accel_config *x);
+struct buffer_config *get_buffer_config(struct accel_config *x, int i);
+struct accel_config *set_accel_count(struct accel_ctrl_args *x, int c);
+struct accel_config *get_accel_config(struct accel_ctrl_args *x, int i);
+int *get_buffer_data_ptr(struct buffer_config *bc);
+int get_buffer_size(struct buffer_config *bc);
+
+// ------
+
 int *
 init_buffer_config(struct buffer_config *bc, int o, int w, int b)
 {
