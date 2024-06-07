@@ -1,5 +1,3 @@
-RTLD_SANDBOX=yes
-SHLIBDIR=	/usr/lib${COMPAT_libcompat:U}/c18n
-LIBDIR=		/usr/lib${COMPAT_libcompat:U}/c18n
+.include <bsd.init.mk>
 
 .include "${SRCTOP}/lib/libc/Makefile"
