@@ -63,7 +63,7 @@ static struct config_entry c[] = {
 	[PACKAGESITE] = {
 		PKG_CONFIG_STRING,
 		"PACKAGESITE",
-		URL_SCHEME_PREFIX "http://pkg.CheriBSD.org/${ABI}",
+		URL_SCHEME_PREFIX "http://pkg.CheriBSD.org/demo-2024-06/${ABI}",
 		NULL,
 		NULL,
 		false,
