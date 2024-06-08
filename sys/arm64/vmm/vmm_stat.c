@@ -162,5 +162,6 @@ VMM_STAT(VMEXIT_UNHANDLED_SYNC, "number of vmexits for an unhandled synchronous 
 VMM_STAT(VMEXIT_IRQ, "number of vmexits for an irq");
 VMM_STAT(VMEXIT_FIQ, "number of vmexits for an interrupt");
 VMM_STAT(VMEXIT_BRK, "number of vmexits for a breakpoint exception");
+VMM_STAT(VMEXIT_SS, "number of vmexits for a single-step exception");
 VMM_STAT(VMEXIT_UNHANDLED_EL2, "number of vmexits for an unhandled EL2 exception");
 VMM_STAT(VMEXIT_UNHANDLED, "number of vmexits for an unhandled exception");

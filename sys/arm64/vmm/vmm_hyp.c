@@ -33,6 +33,7 @@
 #include <sys/proc.h>
 
 #include <machine/armreg.h>
+#include <machine/cheri.h>
 
 #include "arm64.h"
 #include "hyp.h"

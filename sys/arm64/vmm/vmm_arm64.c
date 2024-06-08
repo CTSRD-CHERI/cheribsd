@@ -788,6 +788,10 @@ handle_el1_sync_excp(struct hypctx *hypctx, struct vm_exit *vme_ret,
 		vmm_stat_incr(hypctx->vcpu, VMEXIT_BRK, 1);
 		vme_ret->exitcode = VM_EXITCODE_BRK;
 		break;
+	case EXCP_SOFTSTP_EL0:
+		vmm_stat_incr(hypctx->vcpu, VMEXIT_SS, 1);
+		vme_ret->exitcode = VM_EXITCODE_SS;
+		break;
 	case EXCP_INSN_ABORT_L:
 	case EXCP_DATA_ABORT_L:
 		vmm_stat_incr(hypctx->vcpu, esr_ec == EXCP_DATA_ABORT_L ?
@@ -1306,9 +1310,19 @@ hypctx_regptr(struct hypctx *hypctx, int reg)
 	switch (reg) {
 	case VM_REG_GUEST_X0 ... VM_REG_GUEST_X29:
 		return (&hypctx->tf.tf_x[reg]);
+#if __has_feature(capabilities)
+	case VM_REG_GUEST_C0 ... VM_REG_GUEST_C29:
+		return (&hypctx->tf.tf_x[reg - VM_REG_GUEST_C0]);
+#endif
 	case VM_REG_GUEST_LR:
+#if __has_feature(capabilities)
+	case VM_REG_GUEST_C30:
+#endif
 		return (&hypctx->tf.tf_lr);
 	case VM_REG_GUEST_SP:
+#if __has_feature(capabilities)
+	case VM_REG_GUEST_CSP:
+#endif
 		return (&hypctx->tf.tf_sp);
 	case VM_REG_GUEST_CPSR:
 		return (&hypctx->tf.tf_spsr);
@@ -1324,6 +1338,24 @@ hypctx_regptr(struct hypctx *hypctx, int reg)
 		return (&hypctx->tcr_el1);
 	case VM_REG_GUEST_TCR2_EL1:
 		return (&hypctx->tcr2_el1);
+#if __has_feature(capabilities)
+	case VM_REG_GUEST_PCC:
+		return (&hypctx->tf.tf_elr); /* XXX-MJ */
+	case VM_REG_GUEST_DDC:
+		return (&hypctx->tf.tf_ddc);
+	case VM_REG_GUEST_CTPIDR:
+		return (&hypctx->tpidr_el0);
+	case VM_REG_GUEST_RCSP:
+		return (&hypctx->rcsp_el0);
+	case VM_REG_GUEST_RDDC:
+		return (&hypctx->rddc_el0);
+	case VM_REG_GUEST_RCTPIDR:
+		return (&hypctx->rctpidr_el0);
+	case VM_REG_GUEST_CID:
+		return (&hypctx->cid_el0);
+	case VM_REG_GUEST_CCTLR:
+		return (&hypctx->cctlr_el1);
+#endif
 	default:
 		break;
 	}
@@ -1350,6 +1382,9 @@ vmmops_getreg(void *vcpui, int reg, uintcap_t *retval)
 	case VM_REG_GUEST_LR:
 	case VM_REG_GUEST_SP:
 	case VM_REG_GUEST_X0 ... VM_REG_GUEST_X29:
+#if __has_feature(capabilities)
+	case VM_REG_GUEST_C0 ... VM_REG_GUEST_C30:
+#endif
 		*retval = *(uintcap_t *)regp;
 		break;
 	default:
@@ -1390,6 +1425,16 @@ vmmops_setreg(void *vcpui, int reg, uintcap_t val)
 	case VM_REG_GUEST_LR:
 	case VM_REG_GUEST_SP:
 	case VM_REG_GUEST_X0 ... VM_REG_GUEST_X29:
+#if __has_feature(capabilities)
+	case VM_REG_GUEST_CSP:
+	case VM_REG_GUEST_PCC:
+	case VM_REG_GUEST_DDC:
+	case VM_REG_GUEST_CTPIDR:
+	case VM_REG_GUEST_RCSP:
+	case VM_REG_GUEST_RCTPIDR:
+	case VM_REG_GUEST_CID:
+	case VM_REG_GUEST_C0 ... VM_REG_GUEST_C30:
+#endif
 		*(uintcap_t *)regp = val;
 		break;
 	default:
@@ -1431,9 +1476,10 @@ vmmops_getcap(void *vcpui, int num, int *retval)
 		*retval = 1;
 		ret = 0;
 		break;
-	case VM_CAP_BPT_EXIT:
-		*retval = (hypctx->mdcr_el2 & MDCR_EL2_TDE) != 0;
-		ret = 0;
+	case VM_CAP_BRK_EXIT:
+	case VM_CAP_SS_EXIT:
+	case VM_CAP_MASK_HWINTR:
+		*retval = (hypctx->setcaps & (1ul << num)) != 0;
 		break;
 	default:
 		break;
@@ -1448,16 +1494,64 @@ vmmops_setcap(void *vcpui, int num, int val)
 	struct hypctx *hypctx = vcpui;
 	int ret;
 
-	ret = ENOENT;
+	ret = 0;
 
 	switch (num) {
-	case VM_CAP_BPT_EXIT:
+	case VM_CAP_BRK_EXIT:
+		if ((val != 0) == (hypctx->setcaps & (1ul << num)) != 0)
+			break;
 		if (val != 0)
 			hypctx->mdcr_el2 |= MDCR_EL2_TDE;
 		else
 			hypctx->mdcr_el2 &= ~MDCR_EL2_TDE;
-		ret = 0;
 		break;
+	case VM_CAP_SS_EXIT:
+		if ((val != 0) == (hypctx->setcaps & (1ul << num)) != 0)
+			break;
+
+		if (val != 0) {
+			hypctx->debug_spsr |= (hypctx->tf.tf_spsr & PSR_SS);
+			hypctx->debug_mdscr |= hypctx->mdscr_el1 &
+			    (MDSCR_SS | MDSCR_KDE);
+
+			hypctx->tf.tf_spsr |= PSR_SS;
+			hypctx->mdscr_el1 |= MDSCR_SS | MDSCR_KDE;
+			hypctx->mdcr_el2 |= MDCR_EL2_TDE;
+		} else {
+			hypctx->tf.tf_spsr &= ~PSR_SS;
+			hypctx->tf.tf_spsr |= hypctx->debug_spsr;
+			hypctx->debug_spsr &= ~PSR_SS;
+			hypctx->mdscr_el1 &= ~(MDSCR_SS | MDSCR_KDE);
+			hypctx->mdscr_el1 |= hypctx->debug_mdscr;
+			hypctx->debug_mdscr &= ~(MDSCR_SS | MDSCR_KDE);
+			hypctx->mdcr_el2 &= ~MDCR_EL2_TDE;
+		}
+		break;
+	case VM_CAP_MASK_HWINTR:
+		if ((val != 0) == (hypctx->setcaps & (1ul << num)) != 0)
+			break;
+
+		if (val != 0) {
+			hypctx->debug_spsr |= (hypctx->tf.tf_spsr &
+			    (PSR_I | PSR_F));
+			hypctx->tf.tf_spsr |= PSR_I | PSR_F;
+		} else {
+			hypctx->tf.tf_spsr &= ~(PSR_I | PSR_F);
+			hypctx->tf.tf_spsr |= (hypctx->debug_spsr &
+			    (PSR_I | PSR_F));
+			hypctx->debug_spsr &= ~(PSR_I | PSR_F);
+		}
+		break;
+	default:
+		ret = ENOENT;
+		break;
+	}
+
+	if (ret == 0) {
+		if (val == 0)
+			hypctx->setcaps &= ~(1ul << num);
+		else
+			hypctx->setcaps |= (1ul << num);
 	}
 
 	return (ret);

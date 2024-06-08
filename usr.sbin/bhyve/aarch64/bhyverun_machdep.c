@@ -120,7 +120,7 @@ bhyve_optparse(int argc, char **argv)
 	const char *optstr;
 	int c;
 
-	optstr = "hCDG:SWk:f:o:p:c:s:m:U:";
+	optstr = "hCDSWk:f:o:p:G:c:s:m:U:";
 	while ((c = getopt(argc, argv, optstr)) != -1) {
 		switch (c) {
 		case 'c':
