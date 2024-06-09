@@ -2683,8 +2683,15 @@ again:
 		vm_map_reservation_delete_locked(map, reservation);
 		goto done;
 	}
-	if (rv == KERN_SUCCESS && update_anon)
-		map->anon_loc = reservation + length;
+
+	/*
+	 * Update the starting address for clustered anonymous memory mappings
+	 * if a starting address was not previously defined or an ASLR restart
+	 * placed an anonymous memory mapping at a lower address.
+	 */
+	if (update_anon && rv == KERN_SUCCESS && (map->anon_loc == 0 ||
+	    reservation < map->anon_loc))
+		map->anon_loc = reservation;
 done:
 	vm_map_unlock(map);
 	if (rv == KERN_SUCCESS) {
@@ -4691,9 +4698,6 @@ vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end,
 		if ((entry->eflags & MAP_ENTRY_IS_SUB_MAP) != 0 ||
 		    entry->object.vm_object != NULL)
 			pmap_map_delete(map->pmap, entry->start, entry->end);
-
-		if (entry->end == map->anon_loc)
-			map->anon_loc = entry->start;
 
 		/*
 		 * If using reservations, allocate a new reservation
