@@ -328,7 +328,7 @@ do_posix_spawn(pid_t *pid, const char *path,
 	p = rfork_thread(RFSPAWN, stack + stacksz, _posix_spawn_thr, &psa);
 	free(stack);
 #else
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	p = __sys_rfork(RFSPAWN);
 #else
 	p = rfork(RFSPAWN);

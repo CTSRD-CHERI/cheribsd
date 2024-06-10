@@ -67,7 +67,7 @@ _libc_other_objects=sigsetjmp lstat stat fstat fstatat fstatfs syscall \
     __sysctlbyname \
     _sigprocmask _write readlink __realpathat _setjmp setjmp setjmperr
 
-.ifdef RTLD_SANDBOX
+.ifdef CHERI_LIB_C18N
 _libc_other_objects+=thr_exit _sigaction ftruncate
 .endif
 

@@ -32,7 +32,7 @@
 #include <machine/setjmp.h>
 #include <sys/elf_common.h>
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 .weak _rtld_setjmp
 .weak _rtld_longjmp
 #endif
@@ -70,11 +70,11 @@ ENTRY(setjmp)
 	stp	d14, d15, [REG(0)], #16
 
 	/* Return value */
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	mov	c1, c0
 #endif
 	mov	x0, #0
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	/*
 	 * Tail-call to save Executive mode state
 	 */
@@ -110,7 +110,7 @@ ENTRY(longjmp)
 
 	/* Restore the stack pointer */
 	ldr	REG(8), [REG(0)], #(REG_WIDTH)
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	mov	c2, c8
 #else
 	mov	REGN(sp), REG(8)
@@ -131,12 +131,12 @@ ENTRY(longjmp)
 	ldp	d14, d15, [REG(0)], #16
 
 	/* Load the return value */
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	mov	c3, c0
 #endif
 	cmp	x1, #0
 	csinc	x0, x1, xzr, ne
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	/*
 	 * Tail-call to restore Executive mode state
 	 */

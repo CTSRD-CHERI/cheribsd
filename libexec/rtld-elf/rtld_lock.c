@@ -66,7 +66,7 @@
 #include "rtld.h"
 #include "rtld_machdep.h"
 #include "rtld_libc.h"
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 #include "rtld_c18n.h"
 #endif
 
@@ -248,7 +248,7 @@ thread_mask_clear(int mask)
 	lockinfo.thread_clr_flag(mask);
 }
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 #define	RTLD_LOCK_CNT	4
 #else
 #define	RTLD_LOCK_CNT	3
@@ -261,7 +261,7 @@ static struct rtld_lock {
 rtld_lock_t	rtld_bind_lock = &rtld_locks[0];
 rtld_lock_t	rtld_libc_lock = &rtld_locks[1];
 rtld_lock_t	rtld_phdr_lock = &rtld_locks[2];
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 rtld_lock_t	rtld_tramp_lock = &rtld_locks[3];
 #endif
 
@@ -410,7 +410,7 @@ _rtld_thread_init(struct RtldLockInfo *pli)
 	SymLook req;
 	void *locks[RTLD_LOCK_CNT];
 	int flags, i, res;
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	struct RtldLockInfo tmplockinfo;
 #endif
 
@@ -425,7 +425,7 @@ _rtld_thread_init(struct RtldLockInfo *pli)
 			if (res == 0)
 				lockinfo.rtli_version = pli->rtli_version;
 		}
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 		tmplockinfo = *pli;
 #define WRAP(_target, _valid, _reg_args, _mem_args, _ret_args)	\
 	_target = tramp_intern(NULL, &(struct tramp_data) {			\
