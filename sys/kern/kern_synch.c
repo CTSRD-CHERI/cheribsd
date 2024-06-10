@@ -760,27 +760,34 @@ is_hls_done(int *base_address)
 int
 sys_accel_malloc(struct thread *td, struct accel_malloc_args *accel_malloc_arg)
 {
-	int accel_addr[8] = { 0xC0010000, 0xC0011000, 0xC0012000, 0xC0013000,
-		0xC0014000, 0xC0015000, 0xC0016000, 0xC0017000 };
-
+	// int accel_addr[8] = { 0xC0010000, 0xC0011000, 0xC0012000, 0xC0013000,
+	// 	0xC0014000, 0xC0015000, 0xC0016000, 0xC0017000 };
 	// Initialize capchecker
-	int capchecker_base_phy_addr = 0xc0020000;
-	int capchecker_size = 0x00002000;
-	int **capchecker = pmap_mapdev(capchecker_base_phy_addr,
-	    capchecker_size * 4);
+	// int capchecker_base_phy_addr = 0xc0020000;
+	// int capchecker_size = 0x00002000;
+	// int **capchecker = pmap_mapdev(capchecker_base_phy_addr,
+	//     capchecker_size * 4);
+
+	// int accel_addr[8] = { 0x00002000, 0xC0011000, 0xC0012000, 0xC0013000,
+	// 	0xC0014000, 0xC0015000, 0xC0016000, 0xC0017000 };
+	// int **capchecker = contigmalloc(PAGE_SIZE, M_BOUNCE, M_NOWAIT, 0ul,
+	//     accel_addr[0] * 4, PAGE_SIZE, 0);
 
 	int accel_count;
 	copyin(&(accel_malloc_arg->accel_config->accel_count), &accel_count, 4);
 
-	int *accels[8];
+	// int *accels[8];
 
 	// Initialize accelerator processes
 	for (int i = 0; i < accel_count; i++) {
 
 		// Allocate device io and return its virtual address
-		int physical_addr = accel_addr[i];
-		int *base_address = pmap_mapdev(physical_addr, 0x1000 * 4);
-		accels[i] = base_address;
+		// int physical_addr = accel_addr[i];
+		// int *base_address = pmap_mapdev(physical_addr, 0x1000 * 4);
+		// int *base_address = contigmalloc(PAGE_SIZE, M_BOUNCE,
+		// M_NOWAIT,
+		//     0ul, accel_addr[0] * 4, PAGE_SIZE, 0);
+		// accels[i] = base_address;
 
 		// Initialize buffers
 		int buffer_count;
@@ -790,98 +797,76 @@ sys_accel_malloc(struct thread *td, struct accel_malloc_args *accel_malloc_arg)
 
 		for (int j = 0; j < buffer_count; j++) {
 
-			int offset, size;
-			copyin(&(accel_malloc_arg->accel_config->accels[i]
-				       .buffers[j]
-				       .size),
-			    &size, 4);
-			copyin(&(accel_malloc_arg->accel_config->accels[i]
-				       .buffers[j]
-				       .offset),
-			    &offset, 4);
+			// int offset, size;
+			// copyin(&(accel_malloc_arg->accel_config->accels[i]
+			// 	       .buffers[j]
+			// 	       .size),
+			//     &size, 4);
+			// copyin(&(accel_malloc_arg->accel_config->accels[i]
+			// 	       .buffers[j]
+			// 	       .offset),
+			//     &offset, 4);
 
-#define HLS_SIM
-
-#ifdef HLS_SIM
 			// Allocating continuous buffers
 			// JC: what is the API to do this?
-			int *temp = contigmalloc(PAGE_SIZE, M_BOUNCE, M_NOWAIT,
-			    0ul, size * 4, PAGE_SIZE, 0);
-
-			copyin((__cheri_tocap int * __capability)
-				   accel_malloc_arg->accel_config->accels[i]
-				       .buffers[j]
-				       .data,
-			    temp, 4 * size);
-#else
-			// Allocating continuous buffers
-			// JC: what is the API to do this?
-			int *temp = contigmalloc(PAGE_SIZE, M_BOUNCE, M_NOWAIT,
-			    0ul, size * 4, PAGE_SIZE, 0);
-			copyin((__cheri_tocap int * __capability)
-				   accel_malloc_arg->accel_config->accels[i]
-				       .buffers[j]
-				       .data,
-			    temp, 4 * size);
-#endif
+			// int *temp = contigmalloc(PAGE_SIZE, M_BOUNCE,
+			// M_NOWAIT,
+			//     0ul, size * 4, PAGE_SIZE, 0);
 
 			// Update the address to the register based on the
 			// offset
-			int cap_id = (i << 5) + j;
-			capchecker[cap_id] = temp;
-			XHls_WriteReg(base_address, offset + 4,
-			    (int)(cap_id << (32 - 8)));
-			// JC: How to get address as an integer
-			// XHls_WriteReg(base_address, offset, temp);
-			XHls_WriteReg(base_address, offset,
-			    (__cheri_addr long int)temp);
+
+			// 	int cap_id = (i << 5) + j;
+			// capchecker[cap_id] = temp;
+			// 	XHls_WriteReg(base_address, offset + 4,
+			// 	    (int)(cap_id << (32 - 8)));
+			// 	// JC: How to get address as an integer
+			// 	// XHls_WriteReg(base_address, offset, temp);
+			// 	XHls_WriteReg(base_address, offset,
+			// 	    (__cheri_addr long int)temp);
 		}
 	}
 
 	// Start accelerators
-	for (int i = 0; i < accel_count; i++)
-		start_hls(accels[i]);
+	// for (int i = 0; i < accel_count; i++)
+	// 	start_hls(accels[i]);
 
-#ifdef HLS_SIM
-
-	// Deallocate accelerator processes
-	for (int i = 0; i < accel_count; i++) {
-
-		// Initialize buffers
-		int buffer_count;
-		copyin(
-		    &(accel_malloc_arg->accel_config->accels[i].buffer_count),
-		    &buffer_count, 4);
-
-		for (int j = 0; j < buffer_count; j++) {
-
-			int offset, size;
-			copyin(&(accel_malloc_arg->accel_config->accels[i]
-				       .buffers[j]
-				       .size),
-			    &size, 4);
-			copyin(&(accel_malloc_arg->accel_config->accels[i]
-				       .buffers[j]
-				       .offset),
-			    &offset, 4);
-
-			// Update the address to the register based on the
-			// offset
-			int cap_id = (i << 5) + j;
-			int *temp = capchecker[cap_id];
-			copyout(temp,
-			    (__cheri_tocap int * __capability)
-				accel_malloc_arg->accel_config->accels[i]
-				    .buffers[j]
-				    .data,
-			    4 * size);
-			contigfree(temp, PAGE_SIZE, M_BOUNCE);
-		}
-		int *base_address = accels[i];
-		pmap_unmapdev(base_address, 0x1000 * 4);
-	}
-
-#endif
+	// #define HLS_SIM
+	// #ifdef HLS_SIM
+	//
+	// 	// Deallocate accelerator processes
+	// 	for (int i = 0; i < accel_count; i++) {
+	//
+	// 		// Initialize buffers
+	// 		int buffer_count;
+	// 		copyin(
+	// 		    &(accel_malloc_arg->accel_config->accels[i].buffer_count),
+	// 		    &buffer_count, 4);
+	//
+	// 		for (int j = 0; j < buffer_count; j++) {
+	//
+	// 			int offset, size;
+	// 			copyin(&(accel_malloc_arg->accel_config->accels[i]
+	// 				       .buffers[j]
+	// 				       .size),
+	// 			    &size, 4);
+	// 			copyin(&(accel_malloc_arg->accel_config->accels[i]
+	// 				       .buffers[j]
+	// 				       .offset),
+	// 			    &offset, 4);
+	//
+	// 			// Update the address to the register based on
+	// the
+	// 			// offset
+	// 			int cap_id = (i << 5) + j;
+	// 			int *temp = capchecker[cap_id];
+	// 			contigfree(temp, PAGE_SIZE, M_BOUNCE);
+	// 		}
+	// 		int *base_address = accels[i];
+	// 		pmap_unmapdev(base_address, 0x1000 * 4);
+	// 	}
+	//
+	// #endif
 
 	return 0;
 }
