@@ -51,7 +51,7 @@
 
 #include "debug.h"
 #include "rtld.h"
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 #include "rtld_c18n.h"
 #endif
 
@@ -278,7 +278,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	    base_addr, mapsize, PROT_NONE | PROT_MAX(_PROT_ALL), base_flags);
     mapbase = mmap(base_addr, mapsize, PROT_NONE | PROT_MAX(_PROT_ALL),
 	base_flags, -1, 0);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
     mapbase = cheri_clearperm(mapbase, c18n_code_perm_clear);
 #endif
     if (mapbase == MAP_FAILED) {

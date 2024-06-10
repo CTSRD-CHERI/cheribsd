@@ -31,7 +31,7 @@ LIBC_ARCH=${MACHINE_CPUARCH}
 # To include RCS ID strings from other BSD projects, remove -DNO__RCSID from CFLAGS.
 CFLAGS+=-DNO__SCCSID -DNO__RCSID
 
-.ifdef RTLD_SANDBOX
+.ifdef CHERI_LIB_C18N
 SHLIB=c
 .else
 LIB?=c
@@ -60,8 +60,8 @@ CANCELPOINTS_CFLAGS=-fexceptions
 CFLAGS+=${CANCELPOINTS_CFLAGS}
 .endif
 
-.ifdef RTLD_SANDBOX
-CFLAGS+=-DRTLD_SANDBOX
+.ifdef CHERI_LIB_C18N
+CFLAGS+=-DCHERI_LIB_C18N
 .endif
 
 # Use a more efficient TLS model for libc since we can reasonably assume that
@@ -203,12 +203,12 @@ libkern.${LIBC_ARCH}:: ${KMSRCS}
 	${CP} ${.ALLSRC} ${DESTDIR}/sys/libkern/${LIBC_ARCH}
 .endif
 
-.if !defined(NO_SYSCALLS) && !defined(RTLD_SANDBOX)
+.if !defined(NO_SYSCALLS) && !defined(CHERI_LIB_C18N)
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
 .endif
 
-.if defined(NO_SYSCALLS) || defined(RTLD_SANDBOX)
+.if defined(NO_SYSCALLS) || defined(CHERI_LIB_C18N)
 MAN:=
 MLINKS:=
 NLS:=

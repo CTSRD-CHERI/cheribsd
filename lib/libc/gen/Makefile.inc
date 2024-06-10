@@ -6,7 +6,7 @@
 CFLAGS+=	-DNO_COMPAT7
 .endif
 
-.ifndef RTLD_SANDBOX
+.ifndef CHERI_LIB_C18N
 CONFS+=	group master.passwd shells
 CONFSMODE_master.passwd=	600
 CONFSPACKAGE=   runtime
