@@ -824,42 +824,28 @@ sys_accel_malloc(struct thread *td, struct accel_malloc_args *accel_malloc_arg)
 	for (int i = 0; i < aca.accel_count; i++)
 		start_hls(accels[i]);
 
-	// #define HLS_SIM
-	// #ifdef HLS_SIM
-	//
-	// 	// Deallocate accelerator processes
-	// 	for (int i = 0; i < accel_count; i++) {
-	//
-	// 		// Initialize buffers
-	// 		int buffer_count;
-	// 		copyin(
-	// 		    &(accel_malloc_arg->accel_config->accels[i].buffer_count),
-	// 		    &buffer_count, 4);
-	//
-	// 		for (int j = 0; j < buffer_count; j++) {
-	//
-	// 			int offset, size;
-	// 			copyin(&(accel_malloc_arg->accel_config->accels[i]
-	// 				       .buffers[j]
-	// 				       .size),
-	// 			    &size, 4);
-	// 			copyin(&(accel_malloc_arg->accel_config->accels[i]
-	// 				       .buffers[j]
-	// 				       .offset),
-	// 			    &offset, 4);
-	//
-	// 			// Update the address to the register based on
-	// the
-	// 			// offset
-	// 			int cap_id = (i << 5) + j;
-	// 			int *temp = capchecker[cap_id];
-	// 			contigfree(temp, PAGE_SIZE, M_BOUNCE);
-	// 		}
-	// 		int *base_address = accels[i];
-	// 		pmap_unmapdev(base_address, 0x1000 * 4);
-	// 	}
-	//
-	// #endif
+#define HLS_SIM
+#ifdef HLS_SIM
+
+	// Deallocate accelerator processes
+	for (int i = 0; i < aca.accel_count; i++) {
+
+		// Initialize buffers
+		int buffer_count = aca.accels[i].buffer_count;
+		for (int j = 0; j < buffer_count; j++) {
+
+			// Update the address to the register based on the
+			// offset
+			int cap_id = (i << 5) + j;
+			int *temp = capchecker[cap_id];
+			temp[0] = cap_id;
+			contigfree(temp, PAGE_SIZE, M_BOUNCE);
+		}
+		int *base_address = accels[i];
+		contigfree(base_address, PAGE_SIZE, M_BOUNCE);
+	}
+	// contigfree(capchecker, PAGE_SIZE, M_BOUNCE);
+#endif
 
 	return 0;
 }
