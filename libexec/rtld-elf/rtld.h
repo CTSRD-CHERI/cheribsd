@@ -277,7 +277,7 @@ typedef struct Struct_Obj_Entry {
     Ver_Entry *vertab;		/* Versions required /defined by this object */
     int vernum;			/* Number of entries in vertab */
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
     uint16_t compart_id;
     const struct func_sig *sigtab;
 #endif
@@ -448,7 +448,7 @@ void dump_Elf_Rel(Obj_Entry *, const Elf_Rel *, u_long);
 void dump_Elf_Rela(Obj_Entry *, const Elf_Rela *, u_long);
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#ifdef RTLD_SANDBOX
+#ifdef CHERI_LIB_C18N
 /*
  * This environment variable is exposed here so that tls.h can see it.
  */

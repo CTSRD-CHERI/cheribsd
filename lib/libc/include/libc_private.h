@@ -461,7 +461,7 @@ struct _xlocale;
 struct __nl_cat_d *__catopen_l(const char *name, int type,
 	    struct _xlocale *locale);
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 __pid_t		__sys_rfork(int);
 int	sigaction_c18n(int, const struct sigaction *, struct sigaction *);
 #endif

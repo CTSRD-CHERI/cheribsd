@@ -52,7 +52,7 @@ static void	_thr_rtld_rlock_acquire(void *);
 static int	_thr_rtld_set_flag(int);
 static void	_thr_rtld_wlock_acquire(void *);
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 void _thread_start(struct pthread *);
 void _thr_sighandler(int, siginfo_t *, void *);
 
@@ -292,7 +292,7 @@ _thr_rtld_init(void)
 	/* mask signals, also force to resolve __sys_sigprocmask PLT */
 	_thr_signal_block(curthread);
 	_rtld_thread_init(&li);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	_rtld_thread_start_init(_thread_start);
 	_rtld_sighandler_init(_thr_sighandler);
 #endif

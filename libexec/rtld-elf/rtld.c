@@ -68,7 +68,7 @@
 #include "rtld_utrace.h"
 #include "notes.h"
 #include "rtld_libc.h"
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 #include "rtld_c18n.h"
 #endif
 
@@ -396,7 +396,7 @@ enum {
 	LD_SHOW_AUXV,
 	LD_STATIC_TLS_EXTRA,
 	LD_SKIP_INIT_FUNCS,
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	LD_UTRACE_COMPARTMENT,
 	LD_COMPARTMENT_ENABLE,
 	LD_COMPARTMENT_DISABLE,
@@ -446,7 +446,7 @@ static struct ld_env_var_desc ld_env_vars[] = {
 	LD_ENV_DESC(SHOW_AUXV, false),
 	LD_ENV_DESC(STATIC_TLS_EXTRA, false),
 	LD_ENV_DESC(SKIP_INIT_FUNCS, true),
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	LD_ENV_DESC(UTRACE_COMPARTMENT, false),
 	LD_ENV_DESC(COMPARTMENT_ENABLE, false),
 	LD_ENV_DESC(COMPARTMENT_DISABLE, false),
@@ -682,7 +682,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     if (aux_info[AT_BSDFLAGS] != NULL) {
 	if ((aux_info[AT_BSDFLAGS]->a_un.a_val & ELF_BSDF_SIGFASTBLK) != 0)
 	    ld_fast_sigblock = true;
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	if ((aux_info[AT_BSDFLAGS]->a_un.a_val & ELF_BSDF_CHERI_C18N) != 0)
 	    ld_compartment_enable = true;
 #endif
@@ -854,7 +854,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     if (!ld_tracing)
 	ld_tracing = ld_get_env_var(LD_TRACE_LOADED_OBJECTS);
     ld_utrace = ld_get_env_var(LD_UTRACE);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
     ld_compartment_utrace = ld_get_env_var(LD_UTRACE_COMPARTMENT);
     ld_compartment_policy = ld_get_env_var(LD_COMPARTMENT_POLICY);
     ld_compartment_overhead = ld_get_env_var(LD_COMPARTMENT_OVERHEAD);
@@ -921,7 +921,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	assert(aux_info[AT_PHENT]->a_un.a_val == sizeof(Elf_Phdr));
 	assert(aux_info[AT_ENTRY] != NULL);
 	imgentry = (dlfunc_t) aux_info[AT_ENTRY]->a_un.a_ptr;
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	imgentry = (dlfunc_t) cheri_clearperm(imgentry, c18n_code_perm_clear);
 #endif
 	dbg("Values from kernel:\n\tAT_PHDR=" PTR_FMT "\n"
@@ -988,7 +988,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     linkmap_add(obj_main);
     linkmap_add(&obj_rtld);
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
     if (C18N_ENABLED) {
 	c18n_init(&obj_rtld, aux_info);
 
@@ -1064,7 +1064,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
        exit (0);
     }
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
     if (C18N_ENABLED)
 	c18n_init2(&obj_rtld);
 #endif
@@ -1183,7 +1183,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     /* Return the exit procedure and the program entry point. */
     if (rtld_exit_ptr == NULL) {
 	rtld_exit_ptr = make_rtld_function_pointer(rtld_exit);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	rtld_exit_ptr = tramp_intern(NULL, &(struct tramp_data) {
 		.target = rtld_exit_ptr,
 		.defobj = &obj_rtld,
@@ -1197,7 +1197,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     *exit_proc = rtld_exit_ptr;
     *objp = obj_main;
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
     return ((func_ptr_type)tramp_intern(NULL, &(struct tramp_data) {
 	    .target = cheri_sealentry(obj_main->entry),
 	    .defobj = obj_main,
@@ -1218,7 +1218,7 @@ rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def)
 	uintptr_t target;
 
 	ptr = (void *)make_function_pointer(def, obj);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	ptr = tramp_intern(NULL, &(struct tramp_data) {
 		.target = ptr,
 		.defobj = obj,
@@ -1240,7 +1240,7 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
     uintptr_t *where;
     uintptr_t target;
     RtldLockState lockstate;
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
     struct trusted_frame *tf;
 
     if (C18N_ENABLED) {
@@ -1267,7 +1267,7 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
     else {
 #ifdef __CHERI_PURE_CAPABILITY__
 	target = (uintptr_t)make_function_pointer(def, defobj);
-#ifdef RTLD_SANDBOX
+#ifdef CHERI_LIB_C18N
 	target = (uintptr_t)tramp_intern(obj, &(struct tramp_data) {
 	    .target = (void *)target,
 	    .defobj = defobj,
@@ -1295,7 +1295,7 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
      */
     target = reloc_jmpslot(where, target, defobj, obj, rel);
     lock_release(rtld_bind_lock, &lockstate);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
     if (C18N_ENABLED)
 	tf = pop_dummy_rtld_trusted_frame(tf);
 #endif
@@ -1572,7 +1572,7 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	    assert(dynp->d_un.d_val == sizeof(Elf_Sym));
 	    break;
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	case DT_CHERI_C18N_SIG:
 	    if (ld_compartment_sig != NULL)
 		obj->sigtab = (const struct func_sig *)
@@ -3334,7 +3334,7 @@ Obj_Entry *
 obj_from_addr(const void *addr)
 {
     Obj_Entry *obj;
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
     struct tramp_header *header;
 
     if (C18N_ENABLED) {
@@ -3503,7 +3503,7 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 	lock_release(rtld_bind_lock, lockstate);
 	if (reg != NULL) {
 		func_ptr_type exit_ptr = make_rtld_function_pointer(rtld_exit);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 		exit_ptr = tramp_intern(NULL, &(struct tramp_data) {
 			.target = exit_ptr,
 			.defobj = &obj_rtld,
@@ -3516,7 +3516,7 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 		dbg("Calling __libc_atexit(rtld_exit (" PTR_FMT "))", (void*)exit_ptr);
 		reg(exit_ptr);
 		rtld_exit_ptr = make_rtld_function_pointer(rtld_nop_exit);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 		rtld_exit_ptr = tramp_intern(NULL, &(struct tramp_data) {
 			.target = rtld_exit_ptr,
 			.defobj = &obj_rtld,
@@ -4482,7 +4482,7 @@ dlsym(void *handle, const char *name)
 {
 	void *retaddr;
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	retaddr = c18n_return_address();
 #else
 	retaddr = __builtin_return_address(0);
@@ -4500,7 +4500,7 @@ dlfunc(void *handle, const char *name)
 	} rv;
 	void *retaddr;
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	retaddr = c18n_return_address();
 #else
 	retaddr = __builtin_return_address(0);
@@ -4521,7 +4521,7 @@ dlvsym(void *handle, const char *name, const char *version)
 	ventry.hash = elf_hash(version);
 	ventry.flags= 0;
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	retaddr = c18n_return_address();
 #else
 	retaddr = __builtin_return_address(0);
@@ -4633,7 +4633,7 @@ dlinfo(void *handle, int request, void *p)
     if (handle == NULL || handle == RTLD_SELF) {
 	void *retaddr;
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	retaddr = c18n_return_address();
 #else
 	retaddr = __builtin_return_address(0);	/* __GNUC__ only */
@@ -4707,7 +4707,7 @@ dl_iterate_phdr(__dl_iterate_hdr_callback callback, void *param)
 	init_marker(&marker);
 	error = 0;
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	callback = tramp_intern(NULL, &(struct tramp_data) {
 		.target = callback,
 		.defobj = obj_from_addr(callback),
@@ -5018,7 +5018,7 @@ get_program_var_addr(const char *name, RtldLockState *lockstate)
 	return (NULL);
     if (ELF_ST_TYPE(req.sym_out->st_info) == STT_FUNC) {
 	void *target = make_function_pointer(req.sym_out, req.defobj_out);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	target = tramp_intern(NULL, &(struct tramp_data) {
 		.target = target,
 		.defobj = req.defobj_out,
@@ -5028,7 +5028,7 @@ get_program_var_addr(const char *name, RtldLockState *lockstate)
 	return ((const void **)target);
     } else if (ELF_ST_TYPE(req.sym_out->st_info) == STT_GNU_IFUNC) {
 	void *target = rtld_resolve_ifunc(req.defobj_out, req.sym_out);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	target = tramp_intern(NULL, &(struct tramp_data) {
 		.target = target,
 		.defobj = req.defobj_out,
@@ -5758,14 +5758,14 @@ tls_get_addr_common(uintptr_t **dtvp, int index, size_t offset)
 	    dtv[index + 1] != 0))
 		return ((void *)(dtv[index + 1] + offset));
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	struct trusted_frame *tf;
 
 	if (C18N_ENABLED)
 		tf = push_dummy_rtld_trusted_frame(get_trusted_stk());
 #endif
 	ret = tls_get_addr_slow(dtvp, index, offset, false);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	if (C18N_ENABLED)
 		tf = pop_dummy_rtld_trusted_frame(tf);
 #endif
@@ -6129,7 +6129,7 @@ _rtld_allocate_tls(void *oldtls, size_t tcbsize, size_t tcbalign)
     wlock_acquire(rtld_bind_lock, &lockstate);
     ret = allocate_tls(globallist_curr(TAILQ_FIRST(&obj_list)), oldtls,
       tcbsize, tcbalign);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
     /*
      * Create a fake wrapper TCB containing pointers to the real TCB and stack
      * lookup table. This is passed to the new thread as its initial TCB. Once
@@ -6149,7 +6149,7 @@ _rtld_free_tls(void *tcb, size_t tcbsize, size_t tcbalign)
     RtldLockState lockstate;
 
     wlock_acquire(rtld_bind_lock, &lockstate);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
     if (C18N_ENABLED)
 	c18n_free_tcb();
 #endif
@@ -6169,7 +6169,7 @@ object_add_name(Obj_Entry *obj, const char *name)
     if (entry != NULL) {
 	strcpy(entry->name, name);
 	STAILQ_INSERT_TAIL(&obj->names, entry, link);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	if (C18N_ENABLED && obj->compart_id == 0)
 	    obj->compart_id = compart_id_allocate(entry->name);
 #endif

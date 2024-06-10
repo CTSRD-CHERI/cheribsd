@@ -15,7 +15,7 @@ LIBTHR_SRCTOP:=	${.PARSEDIR}
 .endif
 .PATH: ${LIBTHR_SRCTOP}
 
-.ifdef RTLD_SANDBOX
+.ifdef CHERI_LIB_C18N
 SHLIB=thr
 .else
 LIB=thr
@@ -43,8 +43,8 @@ CFLAGS.thr_symbols.c+=	-Wno-missing-variable-declarations
 CFLAGS.thr_sig.c+=	-fno-sanitize=address
 .endif
 
-.if ${MACHINE_CPUARCH} == "arm" || defined(RTLD_SANDBOX)
-# XXX: RTLD_SANDBOX currently does not support stack unwinding.
+.if ${MACHINE_CPUARCH} == "arm" || defined(CHERI_LIB_C18N)
+# XXX: CHERI_LIB_C18N currently does not support stack unwinding.
 NO_THREAD_UNWIND_STACK= yes
 .endif
 
@@ -53,8 +53,8 @@ CFLAGS+=-fexceptions
 CFLAGS+=-D_PTHREAD_FORCED_UNWIND
 .endif
 
-.ifdef RTLD_SANDBOX
-CFLAGS+=-DRTLD_SANDBOX
+.ifdef CHERI_LIB_C18N
+CFLAGS+=-DCHERI_LIB_C18N
 .endif
 
 LDFLAGS+=-Wl,-znodelete
@@ -62,7 +62,7 @@ LDFLAGS+=-Wl,-znodelete
 VERSION_DEF=${SRCTOP}/lib/libc/Versions.def
 SYMBOL_MAPS=${LIBTHR_SRCTOP}/pthread.map
 
-.ifndef RTLD_SANDBOX
+.ifndef CHERI_LIB_C18N
 MAN=	libthr.3
 .endif
 
@@ -93,7 +93,7 @@ CFLAGS.heap.c+=	-DIN_LIBTHR
 SRCS+= rtld_malloc.c
 .endif
 
-.ifndef RTLD_SANDBOX
+.ifndef CHERI_LIB_C18N
 .if ${MK_INSTALLLIB} != "no"
 SYMLINKS+=lib${LIB}.a ${LIBDIR}/libpthread.a
 .endif
