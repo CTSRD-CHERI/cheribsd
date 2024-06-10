@@ -6,6 +6,6 @@ SRCS+=	__vdso_gettc.c \
 MDASM=	cerror.S \
 	syscall.S
 
-.ifndef RTLD_SANDBOX
+.ifndef CHERI_LIB_C18N
 MDASM+=	vfork.S
 .endif

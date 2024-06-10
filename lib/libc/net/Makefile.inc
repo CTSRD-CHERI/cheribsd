@@ -2,7 +2,7 @@
 # machine-independent net sources
 .PATH: ${LIBC_SRCTOP}/net
 
-.ifndef RTLD_SANDBOX
+.ifndef CHERI_LIB_C18N
 CONFS+=	net/hosts net/hosts.equiv net/networks net/nsswitch.conf net/protocols
 .endif
 SRCS+=	base64.c ether_addr.c eui64.c \

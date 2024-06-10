@@ -36,7 +36,7 @@
 
 #include "debug.h"
 #include "rtld.h"
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 #include "rtld_c18n.h"
 #endif
 #include "rtld_printf.h"
@@ -65,14 +65,14 @@ init_pltgot(Obj_Entry *obj)
 {
 
 	if (obj->pltgot != NULL) {
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 		if (C18N_ENABLED)
 			obj->pltgot[1] = (uintptr_t)cheri_seal(obj,
 			    sealer_pltgot);
 		else
 #endif
 			obj->pltgot[1] = (uintptr_t)obj;
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 		if (C18N_ENABLED)
 			obj->pltgot[2] = (uintptr_t)&_rtld_bind_start_c18n;
 		else
@@ -303,7 +303,7 @@ reloc_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela,
 		obj = defobj;
 		if (def->st_shndx == SHN_UNDEF) {
 			/* Weak undefined thread variable */
-#ifdef RTLD_SANDBOX
+#ifdef CHERI_LIB_C18N
 			if (C18N_ENABLED)
 				where->func = _rtld_tlsdesc_undef_c18n;
 			else
@@ -317,7 +317,7 @@ reloc_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela,
 
 	if (obj->tlsoffset != 0) {
 		/* Variable is in initially allocated TLS segment */
-#ifdef RTLD_SANDBOX
+#ifdef CHERI_LIB_C18N
 		if (C18N_ENABLED)
 			where->func = _rtld_tlsdesc_static_c18n;
 		else
@@ -329,7 +329,7 @@ reloc_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela,
 #endif
 	} else {
 		/* TLS offset is unknown at load time, use dynamic resolving */
-#ifdef RTLD_SANDBOX
+#ifdef CHERI_LIB_C18N
 		if (C18N_ENABLED)
 			where->func = _rtld_tlsdesc_dynamic_c18n;
 		else
@@ -463,7 +463,7 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 				continue;
 			}
 			target = (uintptr_t)make_function_pointer(def, defobj);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 			target = (uintptr_t)tramp_intern(obj, &(struct tramp_data) {
 				.target = (void *)target,
 				.defobj = defobj,
@@ -525,7 +525,7 @@ reloc_iresolve_one(Obj_Entry *obj, const Elf_Rela *rela,
 	ptr = (uintptr_t)(obj->relocbase + rela->r_addend);
 #endif
 	lock_release(rtld_bind_lock, lockstate);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	ptr = (uintptr_t)tramp_intern(NULL, &(struct tramp_data) {
 		.target = (void *)ptr,
 		.defobj = obj,
@@ -616,7 +616,7 @@ reloc_gnu_ifunc(Obj_Entry *obj, int flags,
 				continue;
 			lock_release(rtld_bind_lock, lockstate);
 			target = (uintptr_t)rtld_resolve_ifunc(defobj, def);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 			target = (uintptr_t)tramp_intern(obj, &(struct tramp_data) {
 				.target = (void *)target,
 				.defobj = defobj,

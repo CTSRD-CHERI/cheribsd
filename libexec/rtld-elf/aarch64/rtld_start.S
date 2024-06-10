@@ -107,7 +107,7 @@ ENTRY(.rtld_start)
 END(.rtld_start)
 
 #define	C18N_VARIANT
-#undef	RTLD_SANDBOX
+#undef	CHERI_LIB_C18N
 #endif /* C18N_VARIANT */
 
 #define	C18N_SYM(name)		__CONCAT(name, C18N_VARIANT)
@@ -119,7 +119,7 @@ END(.rtld_start)
  * x17 = &_rtld_bind_start
  */
 ENTRY(C18N_SYM(_rtld_bind_start))
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	/*
 	 * Get the caller's current stack top.
 	 */
@@ -205,7 +205,7 @@ ENTRY(C18N_SYM(_rtld_bind_start))
 	/* Restore frame pointer */
 	ldp	PTR(29), PTR(zr), [PTRN(sp)], #(PTR_WIDTH * 2)
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	/*
 	 * Load caller's old stack top.
 	 */
@@ -246,7 +246,7 @@ ENTRY(C18N_SYM(_rtld_bind_start))
 	/* Call into the correct function */
 #if defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	br	x16
-#elif defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#elif defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	brr	PTR(16)
 #else
 	br	PTR(16)
@@ -268,7 +268,7 @@ ENTRY(C18N_SYM(_rtld_tlsdesc_static))
 	ldp	x0, x1, [c0, #16]
 	add	c0, c2, x0
 	scbnds	c0, c0, x1
-#if defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
+#if defined(CHERI_LIB_C18N) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	retr	c30
 #else
 	RETURN
@@ -287,7 +287,7 @@ END(C18N_SYM(_rtld_tlsdesc_static))
 ENTRY(C18N_SYM(_rtld_tlsdesc_undef))
 #ifdef __CHERI_PURE_CAPABILITY__
 	ldr	x0, [c0, #16]
-#if defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
+#if defined(CHERI_LIB_C18N) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	retr	c30
 #else
 	RETURN
@@ -340,7 +340,7 @@ ENTRY(C18N_SYM(_rtld_tlsdesc_dynamic))
 	/* Restore registers and return */
 	ldp	 c3,  c4, [csp], #32
 	.cfi_adjust_cfa_offset 	-2 * 16
-#if defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
+#if defined(CHERI_LIB_C18N) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	retr	c30
 #else
 	RETURN
@@ -369,7 +369,7 @@ ENTRY(C18N_SYM(_rtld_tlsdesc_dynamic))
 	stp	c15, c16, [csp, #(7 * 32)]
 	stp	c17, c18, [csp, #(8 * 32)]
 	str	c19,	  [csp, #(9 * 32)]
-#ifdef RTLD_SANDBOX
+#ifdef CHERI_LIB_C18N
 	/*
 	 * Get the caller's current stack top. This step is only needed for
 	 * _rtld_tlsdesc_dynamic because it might call external functions.
@@ -418,7 +418,7 @@ ENTRY(C18N_SYM(_rtld_tlsdesc_dynamic))
 	scbnds	c0, c0, x19
 
 	/* Restore slow path registers */
-#ifdef RTLD_SANDBOX
+#ifdef CHERI_LIB_C18N
 	/*
 	 * Load caller's old stack top.
 	 */
@@ -450,7 +450,7 @@ ENTRY(C18N_SYM(_rtld_tlsdesc_dynamic))
 	/* Restore fast path registers and return */
 	ldp	 c3,  c4, [csp], #32
 	.cfi_adjust_cfa_offset 	-2 * 16
-#if defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
+#if defined(CHERI_LIB_C18N) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	retr	c30
 #else
 	RETURN
