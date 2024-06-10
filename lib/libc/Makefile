@@ -128,13 +128,7 @@ NOASM=
 .include "${LIBC_SRCTOP}/stdlib/Makefile.inc"
 .include "${LIBC_SRCTOP}/stdtime/Makefile.inc"
 .include "${LIBC_SRCTOP}/string/Makefile.inc"
-.if !defined(NO_SYSCALLS)
 .include "${LIBC_SRCTOP}/sys/Makefile.inc"
-.else
-.PATH: ${LIBC_SRCTOP}/sys
-SRCS+=	interposing_table.c
-CFLAGS+=	-DNO_SYSCALLS
-.endif
 
 .if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap}
 .include "${LIBC_SRCTOP}/secure/Makefile.inc"
@@ -203,12 +197,12 @@ libkern.${LIBC_ARCH}:: ${KMSRCS}
 	${CP} ${.ALLSRC} ${DESTDIR}/sys/libkern/${LIBC_ARCH}
 .endif
 
-.if !defined(NO_SYSCALLS) && !defined(CHERI_LIB_C18N)
+.if !defined(CHERI_LIB_C18N)
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
 .endif
 
-.if defined(NO_SYSCALLS) || defined(CHERI_LIB_C18N)
+.if defined(CHERI_LIB_C18N)
 MAN:=
 MLINKS:=
 NLS:=
