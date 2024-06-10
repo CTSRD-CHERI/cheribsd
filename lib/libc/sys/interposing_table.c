@@ -34,12 +34,8 @@
 
 #define	SLOT(a, b) \
 	[INTERPOS_##a] = (interpos_func_t)b,
-#ifndef NO_SYSCALLS
 #define SLOT_SYS(s) \
 	[INTERPOS_##s] = (interpos_func_t)__sys_##s,
-#else
-#define SLOT_SYS(s)
-#endif
 #define SLOT_LIBC(s) \
 	[INTERPOS_##s] = (interpos_func_t)__libc_##s,
 interpos_func_t __libc_interposing[INTERPOS_MAX] = {
