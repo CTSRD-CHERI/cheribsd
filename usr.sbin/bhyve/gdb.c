@@ -168,10 +168,10 @@ static bool gdb_active = false;
 struct gdb_reg {
 	enum vm_reg_name id;
 	int size;
-}
+};
 
 #ifdef __amd64__
-static const gdb_regset[] = {
+static const struct gdb_reg gdb_regset[] = {
 	{ .id = VM_REG_GUEST_RAX, .size = 8 },
 	{ .id = VM_REG_GUEST_RBX, .size = 8 },
 	{ .id = VM_REG_GUEST_RCX, .size = 8 },
@@ -214,7 +214,7 @@ static const gdb_regset[] = {
 	{ .id = VM_REG_GUEST_EFER, .size = 8 },
 };
 #else /* __aarch64__ */
-static const gdb_regset[] = {
+static const struct gdb_reg gdb_regset[] = {
 	{ .id = VM_REG_GUEST_X0, .size = 8 },
 	{ .id = VM_REG_GUEST_X1, .size = 8 },
 	{ .id = VM_REG_GUEST_X2, .size = 8 },
