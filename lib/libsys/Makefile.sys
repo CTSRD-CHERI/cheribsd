@@ -14,6 +14,8 @@
 #		object file name (e.g., yeild.o).  Don't add more of these.
 # PSEUDO	Generate _<sys> and __sys_<sys> symbols, but not <sys>.
 #		Each entry is a bare syscall name (e.g., "clock_gettime").
+# NO_UNDERSCORE	Like PSEUDO, but generate __sys_<sys> only.  Typically used
+#		for varargs syscalls.
 # INTERPOSED	Like PSEUDO, but <sys>.c is added to SRCS.
 #		Used for syscalls intercepted by the threading library.
 #
