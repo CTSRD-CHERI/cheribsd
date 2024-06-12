@@ -907,7 +907,6 @@ _gdb_cpu_suspend(struct vcpu *vcpu, bool report_stop)
 static int
 _gdb_set_step(struct vcpu *vcpu, int val)
 {
-#ifdef __amd64__
 	int error;
 
 #ifdef __amd64__
@@ -926,12 +925,6 @@ _gdb_set_step(struct vcpu *vcpu, int val)
 		error = vm_set_capability(vcpu, VM_CAP_MASK_HWINTR, val);
 #endif
 	return (error);
-#else
-	(void)vcpu;
-	(void)val;
-	printf("%s:%d\n", __func__, __LINE__);
-	abort();
-#endif
 }
 
 /*
