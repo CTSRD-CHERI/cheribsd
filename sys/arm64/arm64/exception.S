@@ -286,9 +286,11 @@ ENTRY(handle_el0_sync)
 	KMSAN_ENTER
 	ldr	PTR(0), [PTR(18), #PC_CURTHREAD]
 	mov	PTR(1), PTRN(sp)
+	mov	PTR(22), PTR(0)
 	str	PTR(1), [PTR(0), #TD_FRAME]
 	bl	do_el0_sync
 	do_ast
+	str	PTR(zr), [PTR(22), #TD_FRAME]
 	KMSAN_LEAVE
 	restore_registers 0
 	ERET
