@@ -100,6 +100,36 @@ int main() {
                    :                               /* no outputs */            \
                    : [r14_value] "X"(expected_r14) /* inputs */                \
                    : "r14" /* clobbers */)
+#elif defined(__aarch64__)
+#ifdef __CHERI_PURE_CAPABILITY__
+  uintcap_t expected_c10 = 0x12345678;
+  uintcap_t expected_c11 = 0x87654321;
+  auto check_reg_values = [=](unw_context_t *context, unw_cursor_t *cursor) {
+    (void)context;
+    CHECK_REG(UNW_ARM64_C10, expected_c10);
+    CHECK_REG(UNW_ARM64_C11, expected_c11);
+  };
+#define ASM_SETUP_CONTEXT()                                                    \
+  __asm__ volatile("mov c10, %0\n\t"                                           \
+                   "mov c11, %1"                                               \
+                   :                                                           \
+                   : "r"(expected_c10), "r"(expected_c11)                      \
+                   : "c10", "c11")
+#else // __CHERI_PURE_CAPABILITY__
+  size_t expected_x10 = 0x12345678;
+  size_t expected_x11 = 0x87654321;
+  auto check_reg_values = [=](unw_context_t *context, unw_cursor_t *cursor) {
+    (void)context;
+    CHECK_REG(UNW_ARM64_X10, expected_x10);
+    CHECK_REG(UNW_ARM64_X11, expected_x11);
+  };
+#define ASM_SETUP_CONTEXT()                                                    \
+  __asm__ volatile("mov x10, %0\n\t"                                           \
+                   "mov x11, %1"                                               \
+                   :                                                           \
+                   : "r"(expected_x10), "r"(expected_x11)                      \
+                   : "x10", "x11")
+#endif // __CHERI_PURE_CAPABILITY__
 #else
 #warning "Test not implemented for this architecture"
   auto check_reg_values = [](unw_context_t *context, unw_cursor_t *cursor) {
