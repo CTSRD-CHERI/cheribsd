@@ -906,17 +906,6 @@ _rtld_unw_getcontext(uintptr_t ret, void **buf)
 	return (ret);
 }
 
-uintptr_t
-_rtld_unw_getcontext_unsealed(uintptr_t ret, void **buf)
-{
-	if (!C18N_ENABLED) {
-		__attribute__((musttail))
-		return (_rtld_unw_getcontext_epilogue(ret, buf));
-	}
-	*buf = unwind_cursor();
-	return (ret);
-}
-
 /*
  * Returning this struct allows us to control the content of unused return value
  * registers.
@@ -1011,8 +1000,7 @@ unwind_stack(struct jmp_args ret, void *rcsp, struct trusted_frame *target)
 }
 
 struct jmp_args _rtld_longjmp(struct jmp_args, void *, void **);
-struct jmp_args _rtld_unw_setcontext(struct jmp_args, void *, void **);
-struct jmp_args _rtld_unw_setcontext_unsealed(struct jmp_args, void *, void **);
+struct jmp_args _rtld_unw_setcontext_impl(struct jmp_args, void *, void **);
 
 struct jmp_args
 _rtld_longjmp(struct jmp_args ret, void *rcsp, void **buf)
@@ -1021,23 +1009,9 @@ _rtld_longjmp(struct jmp_args ret, void *rcsp, void **buf)
 }
 
 struct jmp_args
-_rtld_unw_setcontext(struct jmp_args ret, void *rcsp, void **buf)
+_rtld_unw_setcontext_impl(struct jmp_args ret, void *rcsp, void **buf)
 {
-	if (!C18N_ENABLED) {
-		__attribute__((musttail))
-		return (_rtld_unw_setcontext_epilogue(ret, rcsp, buf));
-	}
 	return (unwind_stack(ret, rcsp, cheri_unseal(*buf, sealer_unwbuf)));
-}
-
-struct jmp_args
-_rtld_unw_setcontext_unsealed(struct jmp_args ret, void *rcsp, void **buf)
-{
-	if (!C18N_ENABLED) {
-		__attribute__((musttail))
-		return (_rtld_unw_setcontext_epilogue(ret, rcsp, buf));
-	}
-	return (unwind_stack(ret, rcsp, *buf));
 }
 
 uintptr_t _rtld_unw_getsealer(void);
@@ -1637,8 +1611,16 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
  */
 #define	MAX_TRAMP_PG_SIZE		(4 * 1024 * 1024)
 
+/*
+ * XXX: Manually wrap _rtld_unw_setcontext_impl in a trampoline for now because
+ * it is called via a function pointer.
+ */
+extern struct jmp_args (*_rtld_unw_setcontext_ptr)(struct jmp_args, void *,
+    void **);
+struct jmp_args (*_rtld_unw_setcontext_ptr)(struct jmp_args, void *, void **);
+
 void
-c18n_init2(void)
+c18n_init2(Obj_Entry *obj_rtld)
 {
 	uintptr_t sealer;
 
@@ -1687,6 +1669,19 @@ c18n_init2(void)
 	assert(tramp_pg_size > 0);
 	atomic_store_explicit(&tramp_pgs.head, tramp_pg_new(NULL),
 	    memory_order_relaxed);
+
+	/*
+	 * XXX: Manually wrap _rtld_unw_setcontext_impl in a trampoline for now
+	 * because it is called via a function pointer.
+	*/
+	_rtld_unw_setcontext_ptr = tramp_intern(NULL, &(struct tramp_data) {
+		.target = &_rtld_unw_setcontext_impl,
+		.defobj = obj_rtld,
+		.sig = (struct func_sig) {
+			.valid = true,
+			.reg_args = 4, .mem_args = false, .ret_args = TWO
+		}
+	});
 }
 
 /*

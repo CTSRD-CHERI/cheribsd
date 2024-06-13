@@ -1066,7 +1066,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
     if (C18N_ENABLED)
-	c18n_init2();
+	c18n_init2(&obj_rtld);
 #endif
 
     /*

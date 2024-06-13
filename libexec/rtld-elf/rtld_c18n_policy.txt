@@ -43,7 +43,6 @@ trust
 	_setjmp
 	sigsetjmp
 	unw_getcontext
-	unw_getcontext_unsealed
 	_rtld_thread_start
 	_rtld_sighandler
 
@@ -62,7 +61,5 @@ export to [TCB]
 callee [RTLD]
 export to [libunwind]
 	_rtld_unw_getcontext
-	_rtld_unw_getcontext_unsealed
 	_rtld_unw_setcontext
-	_rtld_unw_setcontext_unsealed
 	_rtld_unw_getsealer
