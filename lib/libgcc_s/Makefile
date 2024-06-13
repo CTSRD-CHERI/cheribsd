@@ -56,7 +56,7 @@ SRCS+=		s_scalbnl.c
 # LIBUNWIND_SANDBOX_OTYPES is only supported on aarch64 (Morello).
 .if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
 SYMBOL_MAPS+=	${.CURDIR}/Symbol-c18n.map
-CFLAGS+=	-D_LIBUNWIND_SANDBOX_OTYPES -D_LIBUNWIND_SANDBOX_HARDENED
+CFLAGS+=	-D_LIBUNWIND_CHERI_C18N_SUPPORT
 .endif
 
 .include <bsd.lib.mk>
