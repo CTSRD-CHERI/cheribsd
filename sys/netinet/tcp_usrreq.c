@@ -2288,7 +2288,13 @@ unlock_and_done:
 #ifdef KERN_TLS
 		case TCP_TXTLS_ENABLE:
 			INP_WUNLOCK(inp);
+#if __has_feature(capabilities)
+			sopt->sopt_dir = SOPT_SETCAP;
+#endif
 			error = copyin_tls_enable(sopt, &tls);
+#if __has_feature(capabilities)
+			sopt->sopt_dir = SOPT_SET;
+#endif
 			if (error)
 				break;
 			error = ktls_enable_tx(so, &tls);
@@ -2305,8 +2311,14 @@ unlock_and_done:
 			break;
 		case TCP_RXTLS_ENABLE:
 			INP_WUNLOCK(inp);
+#if __has_feature(capabilities)
+			sopt->sopt_dir = SOPT_SETCAP;
+#endif
 			error = sooptcopyin(sopt, &tls, sizeof(tls),
 			    sizeof(tls));
+#if __has_feature(capabilities)
+			sopt->sopt_dir = SOPT_SET;
+#endif
 			if (error)
 				break;
 			error = ktls_enable_rx(so, &tls);
