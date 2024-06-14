@@ -3,8 +3,8 @@ SHLIBDIR?= /lib
 
 .include <src.opts.mk>
 
-LIBC_SRCTOP?= ${.CURDIR}/../libc
-LIBSYS_SRCTOP?=	${.CURDIR}
+LIBC_SRCTOP?= ${SRCTOP}/lib/libc
+LIBSYS_SRCTOP?=	${SRCTOP}/lib/libsys
 
 # Pick the current architecture directory for libsys. In general, this is named
 # MACHINE_CPUARCH, but some ABIs are different enough to require their own
