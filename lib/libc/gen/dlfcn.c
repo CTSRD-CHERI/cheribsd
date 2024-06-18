@@ -377,4 +377,28 @@ _rtld_is_dlopened(void *arg __unused)
 	return (0);
 }
 
+#pragma weak dl_c18n_get_trusted_stk
+void
+dl_c18n_get_trusted_stk(void **buf __unused) {
+}
+
+#pragma weak dl_c18n_unwind_trusted_stk
+void
+dl_c18n_unwind_trusted_stk(void *sp __unused, void *target __unused) {
+}
+
+#pragma weak dl_c18n_is_tramp
+int
+dl_c18n_is_tramp(ptraddr_t pc __unused, void *tfs __unused) {
+	return (0);
+}
+
+#pragma weak dl_c18n_pop_trusted_stk
+void *
+dl_c18n_pop_trusted_stk(struct dl_c18n_compart_state *state __unused,
+    void *tfs __unused) {
+	return (NULL);
+}
+
+
 #endif /* !defined(IN_LIBDL) || defined(PIC) */

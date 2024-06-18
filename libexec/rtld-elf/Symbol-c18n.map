@@ -11,10 +11,13 @@ FBSDprivate_1.0 {
     _rtld_setjmp;
     _rtld_longjmp;
     _rtld_unw_getcontext;
-    _rtld_unw_getcontext_unsealed;
     _rtld_unw_setcontext;
-    _rtld_unw_setcontext_unsealed;
     _rtld_unw_getsealer;
-    _rtld_safebox_code;
-    _rtld_sandbox_code;
+};
+
+FBSD_1.0 {
+    dl_c18n_get_trusted_stk;
+    dl_c18n_unwind_trusted_stk;
+    dl_c18n_is_tramp;
+    dl_c18n_pop_trusted_stk;
 };
