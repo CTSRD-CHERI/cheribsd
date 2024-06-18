@@ -35,46 +35,6 @@
  */
 
 /*
- * The _rtld_unw_{get,set}context_epilogue functions are stack unwinding
- * helpers. See the 'Stack unwinding' section in rtld_c18n.c.
- */
-ENTRY(_rtld_unw_getcontext_epilogue)
-	/*
-	 * FIXME: llvm-libunwind specific ABI. This should be better specified.
-	 */
-	mov	c2, csp
-	str	c2, [c1]
-	RETURN
-END(_rtld_unw_getcontext_epilogue)
-
-/*
- * XXX: If compartmentalisation is not enabled, _rtld_unw_setcontext_ptr is NULL
- * and we simply restore a few registers and return via retr (back to Restricted
- * mode). Otherwise, call _rtld_unw_setcontext_impl via a trampoline.
- */
-ENTRY(_rtld_unw_setcontext)
-	ldr	c16, _rtld_unw_setcontext_ptr
-	cbnz	w16, 1f
-	/*
-	 * FIXME: llvm-libunwind specific ABI. This should be better specified.
-	 */
-	mov	c16, c2
-	ldp	c2, c3, [c3, #(-0x210 + 0x20)]
-	mov	csp, c16
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	RETURN
-#else
-	retr	c30
-#endif
-1:
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	br	x16
-#else
-	br	c16
-#endif
-END(_rtld_unw_setcontext)
-
-/*
  * The _rtld_sighandler function is the actual signal handler passed to the
  * kernel when the user calls sigaction. It dispatches the signal to the
  * appropriate handler registered by the user.
