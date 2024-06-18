@@ -1874,10 +1874,10 @@ public:
   void       setIP(uintptr_t value) { _registers.__pc = value; }
   uintptr_t  getFP() const          { return _registers.__fp; }
   void       setFP(uintptr_t value) { _registers.__fp = value; }
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(_LIBUNWIND_CHERI_C18N_SUPPORT)
+#ifdef __CHERI_PURE_CAPABILITY__
   uintptr_t  getTrustedStack() const { return _registers.__ecsp; }
   void       setTrustedStack(uintptr_t value) { _registers.__ecsp = value; }
-#endif // __CHERI_PURE_CAPABILITY__ && _LIBUNWIND_CHERI_C18N_SUPPORT
+#endif
 
 private:
   struct GPRs {
