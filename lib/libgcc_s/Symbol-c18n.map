@@ -1,5 +1,0 @@
-FBSDprivate_1.0 {
-	_rtld_unw_getcontext;
-	_rtld_unw_setcontext;
-	_rtld_unw_getsealer;
-};
