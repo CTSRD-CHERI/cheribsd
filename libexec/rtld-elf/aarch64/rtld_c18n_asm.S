@@ -35,6 +35,9 @@
  */
 
 /*
+ * XXX: These assembly stubs are kept here for compatibility with old libunwind.
+ */
+/*
  * The _rtld_unw_{get,set}context_epilogue functions are stack unwinding
  * helpers. See the 'Stack unwinding' section in rtld_c18n.c.
  */
