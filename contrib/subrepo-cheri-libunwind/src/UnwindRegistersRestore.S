@@ -704,25 +704,6 @@ Lnovec:
 #elif defined(__aarch64__)
 
 //
-// extern "C" void __rtld_unw_setcontext(void *c0, void *c1,
-//                                       void *rcsp, void **sealed_ecsp);
-//
-#if defined(__CHERI_PURE_CAPABILITY__)
-DEFINE_LIBUNWIND_FUNCTION(__rtld_unw_setcontext)
-  mov    c16, c2
-  ldp    c2, c3,  [c3, #(-0x210 + 0x20)]
-  mov    csp, c16
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-  and    x30, x30, #~1
-  ret    x30
-#else
-  ret
-#endif
-END_LIBUNWIND_FUNCTION(__rtld_unw_setcontext)
-WEAK_ALIAS(__rtld_unw_setcontext, _rtld_unw_setcontext)
-#endif
-
-//
 // extern "C" void __libunwind_Registers_arm64_jumpto(Registers_arm64 *);
 //
 // On entry:
@@ -731,8 +712,12 @@ WEAK_ALIAS(__rtld_unw_setcontext, _rtld_unw_setcontext)
   .p2align 2
 DEFINE_LIBUNWIND_FUNCTION(__libunwind_Registers_arm64_jumpto)
 #ifdef __CHERI_PURE_CAPABILITY__
+  ldr    c1,      [c0, #0x1f0]  // Pass the target untrusted stack pointer
+  ldr    c2,      [c0, #0x210]  // Pass the target trusted stack pointer
+  bl     _rtld_unw_setcontext
+
   // skip restore of c0,c1 for now
-  // also skip restoring c2 and c3 because they will get clobbered later on
+  ldp    c2, c3,  [c0, #0x020]
   ldp    c4, c5,  [c0, #0x040]
   ldp    c6, c7,  [c0, #0x060]
   ldp    c8, c9,  [c0, #0x080]
@@ -772,17 +757,14 @@ DEFINE_LIBUNWIND_FUNCTION(__libunwind_Registers_arm64_jumpto)
   // context struct, because it is allocated on the stack, and an exception
   // could clobber the de-allocated portion of the stack after csp has been
   // restored.
-  ldr    c2,      [c0, #0x1f0]
-  add    c3, c0,  #0x210
-  ldp    c0, c1,  [c0, #0x000]
-  // XXX: variant PCS is not yet supported by rtld, work around it
-  // using a function pointer.
-  adrp   c16,     :got:_rtld_unw_setcontext
-  ldr    c16,     [c16, :got_lo12:_rtld_unw_setcontext]
+  ldr    c16,     [c0, #0x1f0]
+  ldp    c0, c1,  [c0, #0x000]  // restore c0,c1
+  mov    csp,c16                // restore csp
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-  br     x16
+  and    x30, x30, #~1
+  ret    x30                    // jump to pc
 #else
-  br     c16
+  ret                           // jump to pcc
 #endif
 #else
   // skip restore of x0,x1 for now
