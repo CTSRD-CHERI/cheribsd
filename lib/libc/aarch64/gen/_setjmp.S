@@ -81,9 +81,7 @@ ENTRY(_longjmp)
 
 	/* Restore the stack pointer */
 	ldr	REG(8), [REG(0)], #(REG_WIDTH)
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	mov	c2, c8
-#else
+#if !defined(__CHERI_PURE_CAPABILITY__) || !defined(RTLD_SANDBOX)
 	mov	REGN(sp), REG(8)
 #endif
 
@@ -105,11 +103,12 @@ ENTRY(_longjmp)
 
 	/* Load the return value */
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	mov	c3, c0
+	ldr	c2, [c0]
 #endif
 	cmp	x1, #0
 	csinc	x0, x1, xzr, ne
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	mov	c1, c8
 	/*
 	 * Tail-call to restore Executive mode state
 	 */
