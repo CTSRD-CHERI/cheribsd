@@ -60,7 +60,15 @@ export to [TCB]
 	_rtld_longjmp
 
 callee [RTLD]
+export to [TCB]
+export to [libunwind]
+	dl_c18n_get_trusted_stk
+	dl_c18n_unwind_trusted_stk
+
+callee [RTLD]
 export to [libunwind]
 	_rtld_unw_getcontext
 	_rtld_unw_setcontext
 	_rtld_unw_getsealer
+	dl_c18n_is_tramp
+	dl_c18n_pop_trusted_stk
