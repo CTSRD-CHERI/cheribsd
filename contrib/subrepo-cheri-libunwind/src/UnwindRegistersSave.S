@@ -837,13 +837,17 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
 
 #elif defined(__aarch64__)
 
-#if defined(__CHERI_PURE_CAPABILITY__)
-DEFINE_LIBUNWIND_FUNCTION(__rtld_unw_getcontext)
-  mov    c2,      csp
-  str    c2,      [c1]
-  ret    c30
-END_LIBUNWIND_FUNCTION(__rtld_unw_getcontext)
-WEAK_ALIAS(__rtld_unw_getcontext, _rtld_unw_getcontext)
+#ifdef __CHERI_PURE_CAPABILITY__
+DEFINE_LIBUNWIND_FUNCTION(__rtld_unw_noop)
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+  and    x30, x30, #~1
+  ret    x30
+#else
+  ret
+#endif
+END_LIBUNWIND_FUNCTION(__rtld_unw_noop)
+WEAK_ALIAS(__rtld_unw_noop, _rtld_unw_getcontext)
+WEAK_ALIAS(__rtld_unw_noop, _rtld_unw_setcontext)
 #endif
 
 //
