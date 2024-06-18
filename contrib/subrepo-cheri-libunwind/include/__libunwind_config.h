@@ -235,9 +235,4 @@
 # define _LIBUNWIND_HIGHEST_DWARF_REGISTER 287
 #endif // _LIBUNWIND_IS_NATIVE_ONLY
 
-#if defined(_LIBUNWIND_CHERI_C18N_SUPPORT) &&                                  \
-    !defined(_LIBUNWIND_TARGET_AARCH64)
-# error "LIBUNWIND_CHERI_C18N_SUPPORT is only supported on Morello"
-#endif
-
 #endif // ____LIBUNWIND_CONFIG_H__
