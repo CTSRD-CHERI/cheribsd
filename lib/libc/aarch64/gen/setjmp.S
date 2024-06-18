@@ -110,9 +110,7 @@ ENTRY(longjmp)
 
 	/* Restore the stack pointer */
 	ldr	REG(8), [REG(0)], #(REG_WIDTH)
-#ifdef CHERI_LIB_C18N
-	mov	c2, c8
-#else
+#ifndef CHERI_LIB_C18N
 	mov	REGN(sp), REG(8)
 #endif
 
@@ -132,11 +130,12 @@ ENTRY(longjmp)
 
 	/* Load the return value */
 #ifdef CHERI_LIB_C18N
-	mov	c3, c0
+	ldr	c2, [c0]
 #endif
 	cmp	x1, #0
 	csinc	x0, x1, xzr, ne
 #ifdef CHERI_LIB_C18N
+	mov	c1, c8
 	/*
 	 * Tail-call to restore Executive mode state
 	 */
