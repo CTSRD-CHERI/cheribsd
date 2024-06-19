@@ -151,7 +151,7 @@ int
 freebsd64_wait6(struct thread *td, struct freebsd64_wait6_args *uap)
 {
 	siginfo_t si, *sip;
-	struct siginfo64 si64;
+	struct __siginfo64 si64;
 	int error;
 	
 	if (uap->info != NULL) {

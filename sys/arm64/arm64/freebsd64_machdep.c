@@ -74,7 +74,7 @@
 
 _Static_assert(sizeof(mcontext64_t) == 880, "mcontext64_t size incorrect");
 _Static_assert(sizeof(ucontext64_t) == 960, "ucontext64_t size incorrect");
-_Static_assert(sizeof(struct siginfo64) == 80, "struct siginfo64 size incorrect");
+_Static_assert(sizeof(struct __siginfo64) == 80, "struct __siginfo64 size incorrect");
 
 extern u_long elf_hwcap;
 
