@@ -82,7 +82,7 @@ struct frame {
 
 #ifdef COMPAT_FREEBSD64
 struct sigframe64 {
-	struct siginfo64 sf_si;          /* actual saved siginfo */
+	struct __siginfo64 sf_si;          /* actual saved siginfo */
 	ucontext64_t    sf_uc;          /* actual saved ucontext */
 };
 #endif

@@ -72,7 +72,7 @@
 
 _Static_assert(sizeof(mcontext64_t) == 864, "mcontext64_t size incorrect");
 _Static_assert(sizeof(ucontext64_t) == 936, "ucontext64_t size incorrect");
-_Static_assert(sizeof(struct siginfo64) == 80, "struct siginfo64 size incorrect");
+_Static_assert(sizeof(struct __siginfo64) == 80, "struct __siginfo64 size incorrect");
 
 static void	freebsd64_sendsig(sig_t, ksiginfo_t *, sigset_t *);
 
