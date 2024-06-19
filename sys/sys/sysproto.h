@@ -41,16 +41,16 @@ struct fork_args {
 };
 struct read_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char buf_l_[PADL_(void * __capability)]; void * __capability buf; char buf_r_[PADR_(void * __capability)];
+	char buf_l_[PADL_(void * __kerncap)]; void * __kerncap buf; char buf_r_[PADR_(void * __kerncap)];
 	char nbyte_l_[PADL_(size_t)]; size_t nbyte; char nbyte_r_[PADR_(size_t)];
 };
 struct write_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char buf_l_[PADL_(const void * __capability)]; const void * __capability buf; char buf_r_[PADR_(const void * __capability)];
+	char buf_l_[PADL_(const void * __kerncap)]; const void * __kerncap buf; char buf_r_[PADR_(const void * __kerncap)];
 	char nbyte_l_[PADL_(size_t)]; size_t nbyte; char nbyte_r_[PADR_(size_t)];
 };
 struct open_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 };
@@ -59,46 +59,46 @@ struct close_args {
 };
 struct wait4_args {
 	char pid_l_[PADL_(int)]; int pid; char pid_r_[PADR_(int)];
-	char status_l_[PADL_(int * __capability)]; int * __capability status; char status_r_[PADR_(int * __capability)];
+	char status_l_[PADL_(int * __kerncap)]; int * __kerncap status; char status_r_[PADR_(int * __kerncap)];
 	char options_l_[PADL_(int)]; int options; char options_r_[PADR_(int)];
-	char rusage_l_[PADL_(struct rusage * __capability)]; struct rusage * __capability rusage; char rusage_r_[PADR_(struct rusage * __capability)];
+	char rusage_l_[PADL_(struct rusage * __kerncap)]; struct rusage * __kerncap rusage; char rusage_r_[PADR_(struct rusage * __kerncap)];
 };
 struct link_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
-	char to_l_[PADL_(const char * __capability)]; const char * __capability to; char to_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
+	char to_l_[PADL_(const char * __kerncap)]; const char * __kerncap to; char to_r_[PADR_(const char * __kerncap)];
 };
 struct unlink_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 };
 struct chdir_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 };
 struct fchdir_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 };
 struct chmod_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 };
 struct chown_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char uid_l_[PADL_(int)]; int uid; char uid_r_[PADR_(int)];
 	char gid_l_[PADL_(int)]; int gid; char gid_r_[PADR_(int)];
 };
 struct break_args {
-	char nsize_l_[PADL_(char * __capability)]; char * __capability nsize; char nsize_r_[PADR_(char * __capability)];
+	char nsize_l_[PADL_(char * __kerncap)]; char * __kerncap nsize; char nsize_r_[PADR_(char * __kerncap)];
 };
 struct getpid_args {
 	syscallarg_t dummy;
 };
 struct mount_args {
-	char type_l_[PADL_(const char * __capability)]; const char * __capability type; char type_r_[PADR_(const char * __capability)];
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char type_l_[PADL_(const char * __kerncap)]; const char * __kerncap type; char type_r_[PADR_(const char * __kerncap)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
-	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
+	char data_l_[PADL_(void * __kerncap)]; void * __kerncap data; char data_r_[PADR_(void * __kerncap)];
 };
 struct unmount_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct setuid_args {
@@ -113,48 +113,48 @@ struct geteuid_args {
 struct ptrace_args {
 	char req_l_[PADL_(int)]; int req; char req_r_[PADR_(int)];
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
-	char addr_l_[PADL_(char * __capability)]; char * __capability addr; char addr_r_[PADR_(char * __capability)];
+	char addr_l_[PADL_(char * __kerncap)]; char * __kerncap addr; char addr_r_[PADR_(char * __kerncap)];
 	char data_l_[PADL_(int)]; int data; char data_r_[PADR_(int)];
 };
 struct recvmsg_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char msg_l_[PADL_(struct msghdr * __capability)]; struct msghdr * __capability msg; char msg_r_[PADR_(struct msghdr * __capability)];
+	char msg_l_[PADL_(struct msghdr * __kerncap)]; struct msghdr * __kerncap msg; char msg_r_[PADR_(struct msghdr * __kerncap)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct sendmsg_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char msg_l_[PADL_(const struct msghdr * __capability)]; const struct msghdr * __capability msg; char msg_r_[PADR_(const struct msghdr * __capability)];
+	char msg_l_[PADL_(const struct msghdr * __kerncap)]; const struct msghdr * __kerncap msg; char msg_r_[PADR_(const struct msghdr * __kerncap)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct recvfrom_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char buf_l_[PADL_(void * __capability)]; void * __capability buf; char buf_r_[PADR_(void * __capability)];
+	char buf_l_[PADL_(void * __kerncap)]; void * __kerncap buf; char buf_r_[PADR_(void * __kerncap)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
-	char from_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability from; char from_r_[PADR_(struct sockaddr * __capability)];
-	char fromlenaddr_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t * __capability)];
+	char from_l_[PADL_(struct sockaddr * __kerncap)]; struct sockaddr * __kerncap from; char from_r_[PADR_(struct sockaddr * __kerncap)];
+	char fromlenaddr_l_[PADL_(__socklen_t * __kerncap)]; __socklen_t * __kerncap fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t * __kerncap)];
 };
 struct accept_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char name_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability name; char name_r_[PADR_(struct sockaddr * __capability)];
-	char anamelen_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability anamelen; char anamelen_r_[PADR_(__socklen_t * __capability)];
+	char name_l_[PADL_(struct sockaddr * __kerncap)]; struct sockaddr * __kerncap name; char name_r_[PADR_(struct sockaddr * __kerncap)];
+	char anamelen_l_[PADL_(__socklen_t * __kerncap)]; __socklen_t * __kerncap anamelen; char anamelen_r_[PADR_(__socklen_t * __kerncap)];
 };
 struct getpeername_args {
 	char fdes_l_[PADL_(int)]; int fdes; char fdes_r_[PADR_(int)];
-	char asa_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability asa; char asa_r_[PADR_(struct sockaddr * __capability)];
-	char alen_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability alen; char alen_r_[PADR_(__socklen_t * __capability)];
+	char asa_l_[PADL_(struct sockaddr * __kerncap)]; struct sockaddr * __kerncap asa; char asa_r_[PADR_(struct sockaddr * __kerncap)];
+	char alen_l_[PADL_(__socklen_t * __kerncap)]; __socklen_t * __kerncap alen; char alen_r_[PADR_(__socklen_t * __kerncap)];
 };
 struct getsockname_args {
 	char fdes_l_[PADL_(int)]; int fdes; char fdes_r_[PADR_(int)];
-	char asa_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability asa; char asa_r_[PADR_(struct sockaddr * __capability)];
-	char alen_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability alen; char alen_r_[PADR_(__socklen_t * __capability)];
+	char asa_l_[PADL_(struct sockaddr * __kerncap)]; struct sockaddr * __kerncap asa; char asa_r_[PADR_(struct sockaddr * __kerncap)];
+	char alen_l_[PADL_(__socklen_t * __kerncap)]; __socklen_t * __kerncap alen; char alen_r_[PADR_(__socklen_t * __kerncap)];
 };
 struct access_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char amode_l_[PADL_(int)]; int amode; char amode_r_[PADR_(int)];
 };
 struct chflags_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char flags_l_[PADL_(u_long)]; u_long flags; char flags_r_[PADR_(u_long)];
 };
 struct fchflags_args {
@@ -181,13 +181,13 @@ struct getegid_args {
 	syscallarg_t dummy;
 };
 struct profil_args {
-	char samples_l_[PADL_(char * __capability)]; char * __capability samples; char samples_r_[PADR_(char * __capability)];
+	char samples_l_[PADL_(char * __kerncap)]; char * __kerncap samples; char samples_r_[PADR_(char * __kerncap)];
 	char size_l_[PADL_(size_t)]; size_t size; char size_r_[PADR_(size_t)];
 	char offset_l_[PADL_(size_t)]; size_t offset; char offset_r_[PADR_(size_t)];
 	char scale_l_[PADL_(u_int)]; u_int scale; char scale_r_[PADR_(u_int)];
 };
 struct ktrace_args {
-	char fname_l_[PADL_(const char * __capability)]; const char * __capability fname; char fname_r_[PADR_(const char * __capability)];
+	char fname_l_[PADL_(const char * __kerncap)]; const char * __kerncap fname; char fname_r_[PADR_(const char * __kerncap)];
 	char ops_l_[PADL_(int)]; int ops; char ops_r_[PADR_(int)];
 	char facs_l_[PADL_(int)]; int facs; char facs_r_[PADR_(int)];
 	char pid_l_[PADL_(int)]; int pid; char pid_r_[PADR_(int)];
@@ -196,58 +196,58 @@ struct getgid_args {
 	syscallarg_t dummy;
 };
 struct getlogin_args {
-	char namebuf_l_[PADL_(char * __capability)]; char * __capability namebuf; char namebuf_r_[PADR_(char * __capability)];
+	char namebuf_l_[PADL_(char * __kerncap)]; char * __kerncap namebuf; char namebuf_r_[PADR_(char * __kerncap)];
 	char namelen_l_[PADL_(u_int)]; u_int namelen; char namelen_r_[PADR_(u_int)];
 };
 struct setlogin_args {
-	char namebuf_l_[PADL_(const char * __capability)]; const char * __capability namebuf; char namebuf_r_[PADR_(const char * __capability)];
+	char namebuf_l_[PADL_(const char * __kerncap)]; const char * __kerncap namebuf; char namebuf_r_[PADR_(const char * __kerncap)];
 };
 struct acct_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 };
 struct osigpending_args {
 	syscallarg_t dummy;
 };
 struct sigaltstack_args {
-	char ss_l_[PADL_(const struct sigaltstack * __capability)]; const struct sigaltstack * __capability ss; char ss_r_[PADR_(const struct sigaltstack * __capability)];
-	char oss_l_[PADL_(struct sigaltstack * __capability)]; struct sigaltstack * __capability oss; char oss_r_[PADR_(struct sigaltstack * __capability)];
+	char ss_l_[PADL_(const struct sigaltstack * __kerncap)]; const struct sigaltstack * __kerncap ss; char ss_r_[PADR_(const struct sigaltstack * __kerncap)];
+	char oss_l_[PADL_(struct sigaltstack * __kerncap)]; struct sigaltstack * __kerncap oss; char oss_r_[PADR_(struct sigaltstack * __kerncap)];
 };
 struct ioctl_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char com_l_[PADL_(u_long)]; u_long com; char com_r_[PADR_(u_long)];
-	char data_l_[PADL_(char * __capability)]; char * __capability data; char data_r_[PADR_(char * __capability)];
+	char data_l_[PADL_(char * __kerncap)]; char * __kerncap data; char data_r_[PADR_(char * __kerncap)];
 };
 struct reboot_args {
 	char opt_l_[PADL_(int)]; int opt; char opt_r_[PADR_(int)];
 };
 struct revoke_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 };
 struct symlink_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
-	char link_l_[PADL_(const char * __capability)]; const char * __capability link; char link_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
+	char link_l_[PADL_(const char * __kerncap)]; const char * __kerncap link; char link_r_[PADR_(const char * __kerncap)];
 };
 struct readlink_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
-	char buf_l_[PADL_(char * __capability)]; char * __capability buf; char buf_r_[PADR_(char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
+	char buf_l_[PADL_(char * __kerncap)]; char * __kerncap buf; char buf_r_[PADR_(char * __kerncap)];
 	char count_l_[PADL_(size_t)]; size_t count; char count_r_[PADR_(size_t)];
 };
 struct execve_args {
-	char fname_l_[PADL_(const char * __capability)]; const char * __capability fname; char fname_r_[PADR_(const char * __capability)];
-	char argv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability argv; char argv_r_[PADR_(char * __capability * __capability)];
-	char envv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability envv; char envv_r_[PADR_(char * __capability * __capability)];
+	char fname_l_[PADL_(const char * __kerncap)]; const char * __kerncap fname; char fname_r_[PADR_(const char * __kerncap)];
+	char argv_l_[PADL_(char * __kerncap * __kerncap)]; char * __kerncap * __kerncap argv; char argv_r_[PADR_(char * __kerncap * __kerncap)];
+	char envv_l_[PADL_(char * __kerncap * __kerncap)]; char * __kerncap * __kerncap envv; char envv_r_[PADR_(char * __kerncap * __kerncap)];
 };
 struct umask_args {
 	char newmask_l_[PADL_(mode_t)]; mode_t newmask; char newmask_r_[PADR_(mode_t)];
 };
 struct chroot_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 };
 struct ogetpagesize_args {
 	syscallarg_t dummy;
 };
 struct msync_args {
-	char addr_l_[PADL_(void * __capability)]; void * __capability addr; char addr_r_[PADR_(void * __capability)];
+	char addr_l_[PADL_(void * __kerncap)]; void * __kerncap addr; char addr_r_[PADR_(void * __kerncap)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
@@ -255,31 +255,31 @@ struct vfork_args {
 	syscallarg_t dummy;
 };
 struct munmap_args {
-	char addr_l_[PADL_(void * __capability)]; void * __capability addr; char addr_r_[PADR_(void * __capability)];
+	char addr_l_[PADL_(void * __kerncap)]; void * __kerncap addr; char addr_r_[PADR_(void * __kerncap)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 };
 struct mprotect_args {
-	char addr_l_[PADL_(void * __capability)]; void * __capability addr; char addr_r_[PADR_(void * __capability)];
+	char addr_l_[PADL_(void * __kerncap)]; void * __kerncap addr; char addr_r_[PADR_(void * __kerncap)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char prot_l_[PADL_(int)]; int prot; char prot_r_[PADR_(int)];
 };
 struct madvise_args {
-	char addr_l_[PADL_(void * __capability)]; void * __capability addr; char addr_r_[PADR_(void * __capability)];
+	char addr_l_[PADL_(void * __kerncap)]; void * __kerncap addr; char addr_r_[PADR_(void * __kerncap)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char behav_l_[PADL_(int)]; int behav; char behav_r_[PADR_(int)];
 };
 struct mincore_args {
-	char addr_l_[PADL_(const void * __capability)]; const void * __capability addr; char addr_r_[PADR_(const void * __capability)];
+	char addr_l_[PADL_(const void * __kerncap)]; const void * __kerncap addr; char addr_r_[PADR_(const void * __kerncap)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
-	char vec_l_[PADL_(char * __capability)]; char * __capability vec; char vec_r_[PADR_(char * __capability)];
+	char vec_l_[PADL_(char * __kerncap)]; char * __kerncap vec; char vec_r_[PADR_(char * __kerncap)];
 };
 struct getgroups_args {
 	char gidsetsize_l_[PADL_(int)]; int gidsetsize; char gidsetsize_r_[PADR_(int)];
-	char gidset_l_[PADL_(gid_t * __capability)]; gid_t * __capability gidset; char gidset_r_[PADR_(gid_t * __capability)];
+	char gidset_l_[PADL_(gid_t * __kerncap)]; gid_t * __kerncap gidset; char gidset_r_[PADR_(gid_t * __kerncap)];
 };
 struct setgroups_args {
 	char gidsetsize_l_[PADL_(int)]; int gidsetsize; char gidsetsize_r_[PADR_(int)];
-	char gidset_l_[PADL_(const gid_t * __capability)]; const gid_t * __capability gidset; char gidset_r_[PADR_(const gid_t * __capability)];
+	char gidset_l_[PADL_(const gid_t * __kerncap)]; const gid_t * __kerncap gidset; char gidset_r_[PADR_(const gid_t * __kerncap)];
 };
 struct getpgrp_args {
 	syscallarg_t dummy;
@@ -290,18 +290,18 @@ struct setpgid_args {
 };
 struct setitimer_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char itv_l_[PADL_(const struct itimerval * __capability)]; const struct itimerval * __capability itv; char itv_r_[PADR_(const struct itimerval * __capability)];
-	char oitv_l_[PADL_(struct itimerval * __capability)]; struct itimerval * __capability oitv; char oitv_r_[PADR_(struct itimerval * __capability)];
+	char itv_l_[PADL_(const struct itimerval * __kerncap)]; const struct itimerval * __kerncap itv; char itv_r_[PADR_(const struct itimerval * __kerncap)];
+	char oitv_l_[PADL_(struct itimerval * __kerncap)]; struct itimerval * __kerncap oitv; char oitv_r_[PADR_(struct itimerval * __kerncap)];
 };
 struct owait_args {
 	syscallarg_t dummy;
 };
 struct swapon_args {
-	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
+	char name_l_[PADL_(const char * __kerncap)]; const char * __kerncap name; char name_r_[PADR_(const char * __kerncap)];
 };
 struct getitimer_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char itv_l_[PADL_(struct itimerval * __capability)]; struct itimerval * __capability itv; char itv_r_[PADR_(struct itimerval * __capability)];
+	char itv_l_[PADL_(struct itimerval * __kerncap)]; struct itimerval * __kerncap itv; char itv_r_[PADR_(struct itimerval * __kerncap)];
 };
 struct getdtablesize_args {
 	syscallarg_t dummy;
@@ -311,7 +311,7 @@ struct dup2_args {
 	char to_l_[PADL_(u_int)]; u_int to; char to_r_[PADR_(u_int)];
 };
 struct cheri_cidcap_alloc_args {
-	char cidp_l_[PADL_(uintcap_t * __capability)]; uintcap_t * __capability cidp; char cidp_r_[PADR_(uintcap_t * __capability)];
+	char cidp_l_[PADL_(uintcap_t * __kerncap)]; uintcap_t * __kerncap cidp; char cidp_r_[PADR_(uintcap_t * __kerncap)];
 };
 struct fcntl_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -320,10 +320,10 @@ struct fcntl_args {
 };
 struct select_args {
 	char nd_l_[PADL_(int)]; int nd; char nd_r_[PADR_(int)];
-	char in_l_[PADL_(fd_set * __capability)]; fd_set * __capability in; char in_r_[PADR_(fd_set * __capability)];
-	char ou_l_[PADL_(fd_set * __capability)]; fd_set * __capability ou; char ou_r_[PADR_(fd_set * __capability)];
-	char ex_l_[PADL_(fd_set * __capability)]; fd_set * __capability ex; char ex_r_[PADR_(fd_set * __capability)];
-	char tv_l_[PADL_(struct timeval * __capability)]; struct timeval * __capability tv; char tv_r_[PADR_(struct timeval * __capability)];
+	char in_l_[PADL_(fd_set * __kerncap)]; fd_set * __kerncap in; char in_r_[PADR_(fd_set * __kerncap)];
+	char ou_l_[PADL_(fd_set * __kerncap)]; fd_set * __kerncap ou; char ou_r_[PADR_(fd_set * __kerncap)];
+	char ex_l_[PADL_(fd_set * __kerncap)]; fd_set * __kerncap ex; char ex_r_[PADR_(fd_set * __kerncap)];
+	char tv_l_[PADL_(struct timeval * __kerncap)]; struct timeval * __kerncap tv; char tv_r_[PADR_(struct timeval * __kerncap)];
 };
 struct fsync_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -340,7 +340,7 @@ struct socket_args {
 };
 struct connect_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char name_l_[PADL_(const struct sockaddr * __capability)]; const struct sockaddr * __capability name; char name_r_[PADR_(const struct sockaddr * __capability)];
+	char name_l_[PADL_(const struct sockaddr * __kerncap)]; const struct sockaddr * __kerncap name; char name_r_[PADR_(const struct sockaddr * __kerncap)];
 	char namelen_l_[PADL_(__socklen_t)]; __socklen_t namelen; char namelen_r_[PADR_(__socklen_t)];
 };
 struct getpriority_args {
@@ -349,14 +349,14 @@ struct getpriority_args {
 };
 struct bind_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char name_l_[PADL_(const struct sockaddr * __capability)]; const struct sockaddr * __capability name; char name_r_[PADR_(const struct sockaddr * __capability)];
+	char name_l_[PADL_(const struct sockaddr * __kerncap)]; const struct sockaddr * __kerncap name; char name_r_[PADR_(const struct sockaddr * __kerncap)];
 	char namelen_l_[PADL_(__socklen_t)]; __socklen_t namelen; char namelen_r_[PADR_(__socklen_t)];
 };
 struct setsockopt_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
 	char level_l_[PADL_(int)]; int level; char level_r_[PADR_(int)];
 	char name_l_[PADL_(int)]; int name; char name_r_[PADR_(int)];
-	char val_l_[PADL_(const void * __capability)]; const void * __capability val; char val_r_[PADR_(const void * __capability)];
+	char val_l_[PADL_(const void * __kerncap)]; const void * __kerncap val; char val_r_[PADR_(const void * __kerncap)];
 	char valsize_l_[PADL_(__socklen_t)]; __socklen_t valsize; char valsize_r_[PADR_(__socklen_t)];
 };
 struct listen_args {
@@ -364,33 +364,33 @@ struct listen_args {
 	char backlog_l_[PADL_(int)]; int backlog; char backlog_r_[PADR_(int)];
 };
 struct gettimeofday_args {
-	char tp_l_[PADL_(struct timeval * __capability)]; struct timeval * __capability tp; char tp_r_[PADR_(struct timeval * __capability)];
-	char tzp_l_[PADL_(struct timezone * __capability)]; struct timezone * __capability tzp; char tzp_r_[PADR_(struct timezone * __capability)];
+	char tp_l_[PADL_(struct timeval * __kerncap)]; struct timeval * __kerncap tp; char tp_r_[PADR_(struct timeval * __kerncap)];
+	char tzp_l_[PADL_(struct timezone * __kerncap)]; struct timezone * __kerncap tzp; char tzp_r_[PADR_(struct timezone * __kerncap)];
 };
 struct getrusage_args {
 	char who_l_[PADL_(int)]; int who; char who_r_[PADR_(int)];
-	char rusage_l_[PADL_(struct rusage * __capability)]; struct rusage * __capability rusage; char rusage_r_[PADR_(struct rusage * __capability)];
+	char rusage_l_[PADL_(struct rusage * __kerncap)]; struct rusage * __kerncap rusage; char rusage_r_[PADR_(struct rusage * __kerncap)];
 };
 struct getsockopt_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
 	char level_l_[PADL_(int)]; int level; char level_r_[PADR_(int)];
 	char name_l_[PADL_(int)]; int name; char name_r_[PADR_(int)];
-	char val_l_[PADL_(void * __capability)]; void * __capability val; char val_r_[PADR_(void * __capability)];
-	char avalsize_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability avalsize; char avalsize_r_[PADR_(__socklen_t * __capability)];
+	char val_l_[PADL_(void * __kerncap)]; void * __kerncap val; char val_r_[PADR_(void * __kerncap)];
+	char avalsize_l_[PADL_(__socklen_t * __kerncap)]; __socklen_t * __kerncap avalsize; char avalsize_r_[PADR_(__socklen_t * __kerncap)];
 };
 struct readv_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char iovp_l_[PADL_(const struct iovec * __capability)]; const struct iovec * __capability iovp; char iovp_r_[PADR_(const struct iovec * __capability)];
+	char iovp_l_[PADL_(const struct iovec * __kerncap)]; const struct iovec * __kerncap iovp; char iovp_r_[PADR_(const struct iovec * __kerncap)];
 	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
 };
 struct writev_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char iovp_l_[PADL_(const struct iovec * __capability)]; const struct iovec * __capability iovp; char iovp_r_[PADR_(const struct iovec * __capability)];
+	char iovp_l_[PADL_(const struct iovec * __kerncap)]; const struct iovec * __kerncap iovp; char iovp_r_[PADR_(const struct iovec * __kerncap)];
 	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
 };
 struct settimeofday_args {
-	char tv_l_[PADL_(const struct timeval * __capability)]; const struct timeval * __capability tv; char tv_r_[PADR_(const struct timeval * __capability)];
-	char tzp_l_[PADL_(const struct timezone * __capability)]; const struct timezone * __capability tzp; char tzp_r_[PADR_(const struct timezone * __capability)];
+	char tv_l_[PADL_(const struct timeval * __kerncap)]; const struct timeval * __kerncap tv; char tv_r_[PADR_(const struct timeval * __kerncap)];
+	char tzp_l_[PADL_(const struct timezone * __kerncap)]; const struct timezone * __kerncap tzp; char tzp_r_[PADR_(const struct timezone * __kerncap)];
 };
 struct fchown_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -410,23 +410,23 @@ struct setregid_args {
 	char egid_l_[PADL_(int)]; int egid; char egid_r_[PADR_(int)];
 };
 struct rename_args {
-	char from_l_[PADL_(const char * __capability)]; const char * __capability from; char from_r_[PADR_(const char * __capability)];
-	char to_l_[PADL_(const char * __capability)]; const char * __capability to; char to_r_[PADR_(const char * __capability)];
+	char from_l_[PADL_(const char * __kerncap)]; const char * __kerncap from; char from_r_[PADR_(const char * __kerncap)];
+	char to_l_[PADL_(const char * __kerncap)]; const char * __kerncap to; char to_r_[PADR_(const char * __kerncap)];
 };
 struct flock_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char how_l_[PADL_(int)]; int how; char how_r_[PADR_(int)];
 };
 struct mkfifo_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 };
 struct sendto_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char buf_l_[PADL_(const void * __capability)]; const void * __capability buf; char buf_r_[PADR_(const void * __capability)];
+	char buf_l_[PADL_(const void * __kerncap)]; const void * __kerncap buf; char buf_r_[PADR_(const void * __kerncap)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
-	char to_l_[PADL_(const struct sockaddr * __capability)]; const struct sockaddr * __capability to; char to_r_[PADR_(const struct sockaddr * __capability)];
+	char to_l_[PADL_(const struct sockaddr * __kerncap)]; const struct sockaddr * __kerncap to; char to_r_[PADR_(const struct sockaddr * __kerncap)];
 	char tolen_l_[PADL_(__socklen_t)]; __socklen_t tolen; char tolen_r_[PADR_(__socklen_t)];
 };
 struct shutdown_args {
@@ -437,22 +437,22 @@ struct socketpair_args {
 	char domain_l_[PADL_(int)]; int domain; char domain_r_[PADR_(int)];
 	char type_l_[PADL_(int)]; int type; char type_r_[PADR_(int)];
 	char protocol_l_[PADL_(int)]; int protocol; char protocol_r_[PADR_(int)];
-	char rsv_l_[PADL_(int * __capability)]; int * __capability rsv; char rsv_r_[PADR_(int * __capability)];
+	char rsv_l_[PADL_(int * __kerncap)]; int * __kerncap rsv; char rsv_r_[PADR_(int * __kerncap)];
 };
 struct mkdir_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 };
 struct rmdir_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 };
 struct utimes_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
-	char tptr_l_[PADL_(const struct timeval * __capability)]; const struct timeval * __capability tptr; char tptr_r_[PADR_(const struct timeval * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
+	char tptr_l_[PADL_(const struct timeval * __kerncap)]; const struct timeval * __kerncap tptr; char tptr_r_[PADR_(const struct timeval * __kerncap)];
 };
 struct adjtime_args {
-	char delta_l_[PADL_(const struct timeval * __capability)]; const struct timeval * __capability delta; char delta_r_[PADR_(const struct timeval * __capability)];
-	char olddelta_l_[PADL_(struct timeval * __capability)]; struct timeval * __capability olddelta; char olddelta_r_[PADR_(struct timeval * __capability)];
+	char delta_l_[PADL_(const struct timeval * __kerncap)]; const struct timeval * __kerncap delta; char delta_r_[PADR_(const struct timeval * __kerncap)];
+	char olddelta_l_[PADL_(struct timeval * __kerncap)]; struct timeval * __kerncap olddelta; char olddelta_r_[PADR_(struct timeval * __kerncap)];
 };
 struct ogethostid_args {
 	syscallarg_t dummy;
@@ -461,10 +461,10 @@ struct setsid_args {
 	syscallarg_t dummy;
 };
 struct quotactl_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
 	char uid_l_[PADL_(int)]; int uid; char uid_r_[PADR_(int)];
-	char arg_l_[PADL_(void * __capability)]; void * __capability arg; char arg_r_[PADR_(void * __capability)];
+	char arg_l_[PADL_(void * __kerncap)]; void * __kerncap arg; char arg_r_[PADR_(void * __kerncap)];
 };
 struct oquota_args {
 	syscallarg_t dummy;
@@ -473,28 +473,28 @@ struct nlm_syscall_args {
 	char debug_level_l_[PADL_(int)]; int debug_level; char debug_level_r_[PADR_(int)];
 	char grace_period_l_[PADL_(int)]; int grace_period; char grace_period_r_[PADR_(int)];
 	char addr_count_l_[PADL_(int)]; int addr_count; char addr_count_r_[PADR_(int)];
-	char addrs_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability addrs; char addrs_r_[PADR_(char * __capability * __capability)];
+	char addrs_l_[PADL_(char * __kerncap * __kerncap)]; char * __kerncap * __kerncap addrs; char addrs_r_[PADR_(char * __kerncap * __kerncap)];
 };
 struct nfssvc_args {
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
-	char argp_l_[PADL_(void * __capability)]; void * __capability argp; char argp_r_[PADR_(void * __capability)];
+	char argp_l_[PADL_(void * __kerncap)]; void * __kerncap argp; char argp_r_[PADR_(void * __kerncap)];
 };
 struct lgetfh_args {
-	char fname_l_[PADL_(const char * __capability)]; const char * __capability fname; char fname_r_[PADR_(const char * __capability)];
-	char fhp_l_[PADL_(struct fhandle * __capability)]; struct fhandle * __capability fhp; char fhp_r_[PADR_(struct fhandle * __capability)];
+	char fname_l_[PADL_(const char * __kerncap)]; const char * __kerncap fname; char fname_r_[PADR_(const char * __kerncap)];
+	char fhp_l_[PADL_(struct fhandle * __kerncap)]; struct fhandle * __kerncap fhp; char fhp_r_[PADR_(struct fhandle * __kerncap)];
 };
 struct getfh_args {
-	char fname_l_[PADL_(const char * __capability)]; const char * __capability fname; char fname_r_[PADR_(const char * __capability)];
-	char fhp_l_[PADL_(struct fhandle * __capability)]; struct fhandle * __capability fhp; char fhp_r_[PADR_(struct fhandle * __capability)];
+	char fname_l_[PADL_(const char * __kerncap)]; const char * __kerncap fname; char fname_r_[PADR_(const char * __kerncap)];
+	char fhp_l_[PADL_(struct fhandle * __kerncap)]; struct fhandle * __kerncap fhp; char fhp_r_[PADR_(struct fhandle * __kerncap)];
 };
 struct sysarch_args {
 	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];
-	char parms_l_[PADL_(char * __capability)]; char * __capability parms; char parms_r_[PADR_(char * __capability)];
+	char parms_l_[PADL_(char * __kerncap)]; char * __kerncap parms; char parms_r_[PADR_(char * __kerncap)];
 };
 struct rtprio_args {
 	char function_l_[PADL_(int)]; int function; char function_r_[PADR_(int)];
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
-	char rtp_l_[PADL_(struct rtprio * __capability)]; struct rtprio * __capability rtp; char rtp_r_[PADR_(struct rtprio * __capability)];
+	char rtp_l_[PADL_(struct rtprio * __kerncap)]; struct rtprio * __kerncap rtp; char rtp_r_[PADR_(struct rtprio * __kerncap)];
 };
 struct semsys_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
@@ -521,7 +521,7 @@ struct setfib_args {
 	char fibnum_l_[PADL_(int)]; int fibnum; char fibnum_r_[PADR_(int)];
 };
 struct ntp_adjtime_args {
-	char tp_l_[PADL_(struct timex * __capability)]; struct timex * __capability tp; char tp_r_[PADR_(struct timex * __capability)];
+	char tp_l_[PADL_(struct timex * __kerncap)]; struct timex * __kerncap tp; char tp_r_[PADR_(struct timex * __kerncap)];
 };
 struct setgid_args {
 	char gid_l_[PADL_(gid_t)]; gid_t gid; char gid_r_[PADR_(gid_t)];
@@ -533,7 +533,7 @@ struct seteuid_args {
 	char euid_l_[PADL_(uid_t)]; uid_t euid; char euid_r_[PADR_(uid_t)];
 };
 struct pathconf_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char name_l_[PADL_(int)]; int name; char name_r_[PADR_(int)];
 };
 struct fpathconf_args {
@@ -542,40 +542,40 @@ struct fpathconf_args {
 };
 struct getrlimit_args {
 	char which_l_[PADL_(u_int)]; u_int which; char which_r_[PADR_(u_int)];
-	char rlp_l_[PADL_(struct rlimit * __capability)]; struct rlimit * __capability rlp; char rlp_r_[PADR_(struct rlimit * __capability)];
+	char rlp_l_[PADL_(struct rlimit * __kerncap)]; struct rlimit * __kerncap rlp; char rlp_r_[PADR_(struct rlimit * __kerncap)];
 };
 struct setrlimit_args {
 	char which_l_[PADL_(u_int)]; u_int which; char which_r_[PADR_(u_int)];
-	char rlp_l_[PADL_(struct rlimit * __capability)]; struct rlimit * __capability rlp; char rlp_r_[PADR_(struct rlimit * __capability)];
+	char rlp_l_[PADL_(struct rlimit * __kerncap)]; struct rlimit * __kerncap rlp; char rlp_r_[PADR_(struct rlimit * __kerncap)];
 };
 struct __sysctl_args {
-	char name_l_[PADL_(int * __capability)]; int * __capability name; char name_r_[PADR_(int * __capability)];
+	char name_l_[PADL_(int * __kerncap)]; int * __kerncap name; char name_r_[PADR_(int * __kerncap)];
 	char namelen_l_[PADL_(u_int)]; u_int namelen; char namelen_r_[PADR_(u_int)];
-	char old_l_[PADL_(void * __capability)]; void * __capability old; char old_r_[PADR_(void * __capability)];
-	char oldlenp_l_[PADL_(size_t * __capability)]; size_t * __capability oldlenp; char oldlenp_r_[PADR_(size_t * __capability)];
-	char new_l_[PADL_(const void * __capability)]; const void * __capability new; char new_r_[PADR_(const void * __capability)];
+	char old_l_[PADL_(void * __kerncap)]; void * __kerncap old; char old_r_[PADR_(void * __kerncap)];
+	char oldlenp_l_[PADL_(size_t * __kerncap)]; size_t * __kerncap oldlenp; char oldlenp_r_[PADR_(size_t * __kerncap)];
+	char new_l_[PADL_(const void * __kerncap)]; const void * __kerncap new; char new_r_[PADR_(const void * __kerncap)];
 	char newlen_l_[PADL_(size_t)]; size_t newlen; char newlen_r_[PADR_(size_t)];
 };
 struct mlock_args {
-	char addr_l_[PADL_(const void * __capability)]; const void * __capability addr; char addr_r_[PADR_(const void * __capability)];
+	char addr_l_[PADL_(const void * __kerncap)]; const void * __kerncap addr; char addr_r_[PADR_(const void * __kerncap)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 };
 struct munlock_args {
-	char addr_l_[PADL_(const void * __capability)]; const void * __capability addr; char addr_r_[PADR_(const void * __capability)];
+	char addr_l_[PADL_(const void * __kerncap)]; const void * __kerncap addr; char addr_r_[PADR_(const void * __kerncap)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 };
 struct undelete_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 };
 struct futimes_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char tptr_l_[PADL_(const struct timeval * __capability)]; const struct timeval * __capability tptr; char tptr_r_[PADR_(const struct timeval * __capability)];
+	char tptr_l_[PADL_(const struct timeval * __kerncap)]; const struct timeval * __kerncap tptr; char tptr_r_[PADR_(const struct timeval * __kerncap)];
 };
 struct getpgid_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
 };
 struct poll_args {
-	char fds_l_[PADL_(struct pollfd * __capability)]; struct pollfd * __capability fds; char fds_r_[PADR_(struct pollfd * __capability)];
+	char fds_l_[PADL_(struct pollfd * __kerncap)]; struct pollfd * __kerncap fds; char fds_r_[PADR_(struct pollfd * __kerncap)];
 	char nfds_l_[PADL_(u_int)]; u_int nfds; char nfds_r_[PADR_(u_int)];
 	char timeout_l_[PADL_(int)]; int timeout; char timeout_r_[PADR_(int)];
 };
@@ -586,7 +586,7 @@ struct semget_args {
 };
 struct semop_args {
 	char semid_l_[PADL_(int)]; int semid; char semid_r_[PADR_(int)];
-	char sops_l_[PADL_(struct sembuf * __capability)]; struct sembuf * __capability sops; char sops_r_[PADR_(struct sembuf * __capability)];
+	char sops_l_[PADL_(struct sembuf * __kerncap)]; struct sembuf * __kerncap sops; char sops_r_[PADR_(struct sembuf * __kerncap)];
 	char nsops_l_[PADL_(size_t)]; size_t nsops; char nsops_r_[PADR_(size_t)];
 };
 struct msgget_args {
@@ -595,24 +595,24 @@ struct msgget_args {
 };
 struct msgsnd_args {
 	char msqid_l_[PADL_(int)]; int msqid; char msqid_r_[PADR_(int)];
-	char msgp_l_[PADL_(const void * __capability)]; const void * __capability msgp; char msgp_r_[PADR_(const void * __capability)];
+	char msgp_l_[PADL_(const void * __kerncap)]; const void * __kerncap msgp; char msgp_r_[PADR_(const void * __kerncap)];
 	char msgsz_l_[PADL_(size_t)]; size_t msgsz; char msgsz_r_[PADR_(size_t)];
 	char msgflg_l_[PADL_(int)]; int msgflg; char msgflg_r_[PADR_(int)];
 };
 struct msgrcv_args {
 	char msqid_l_[PADL_(int)]; int msqid; char msqid_r_[PADR_(int)];
-	char msgp_l_[PADL_(void * __capability)]; void * __capability msgp; char msgp_r_[PADR_(void * __capability)];
+	char msgp_l_[PADL_(void * __kerncap)]; void * __kerncap msgp; char msgp_r_[PADR_(void * __kerncap)];
 	char msgsz_l_[PADL_(size_t)]; size_t msgsz; char msgsz_r_[PADR_(size_t)];
 	char msgtyp_l_[PADL_(long)]; long msgtyp; char msgtyp_r_[PADR_(long)];
 	char msgflg_l_[PADL_(int)]; int msgflg; char msgflg_r_[PADR_(int)];
 };
 struct shmat_args {
 	char shmid_l_[PADL_(int)]; int shmid; char shmid_r_[PADR_(int)];
-	char shmaddr_l_[PADL_(const void * __capability)]; const void * __capability shmaddr; char shmaddr_r_[PADR_(const void * __capability)];
+	char shmaddr_l_[PADL_(const void * __kerncap)]; const void * __kerncap shmaddr; char shmaddr_r_[PADR_(const void * __kerncap)];
 	char shmflg_l_[PADL_(int)]; int shmflg; char shmflg_r_[PADR_(int)];
 };
 struct shmdt_args {
-	char shmaddr_l_[PADL_(const void * __capability)]; const void * __capability shmaddr; char shmaddr_r_[PADR_(const void * __capability)];
+	char shmaddr_l_[PADL_(const void * __kerncap)]; const void * __kerncap shmaddr; char shmaddr_r_[PADR_(const void * __kerncap)];
 };
 struct shmget_args {
 	char key_l_[PADL_(key_t)]; key_t key; char key_r_[PADR_(key_t)];
@@ -621,20 +621,20 @@ struct shmget_args {
 };
 struct clock_gettime_args {
 	char clock_id_l_[PADL_(clockid_t)]; clockid_t clock_id; char clock_id_r_[PADR_(clockid_t)];
-	char tp_l_[PADL_(struct timespec * __capability)]; struct timespec * __capability tp; char tp_r_[PADR_(struct timespec * __capability)];
+	char tp_l_[PADL_(struct timespec * __kerncap)]; struct timespec * __kerncap tp; char tp_r_[PADR_(struct timespec * __kerncap)];
 };
 struct clock_settime_args {
 	char clock_id_l_[PADL_(clockid_t)]; clockid_t clock_id; char clock_id_r_[PADR_(clockid_t)];
-	char tp_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability tp; char tp_r_[PADR_(const struct timespec * __capability)];
+	char tp_l_[PADL_(const struct timespec * __kerncap)]; const struct timespec * __kerncap tp; char tp_r_[PADR_(const struct timespec * __kerncap)];
 };
 struct clock_getres_args {
 	char clock_id_l_[PADL_(clockid_t)]; clockid_t clock_id; char clock_id_r_[PADR_(clockid_t)];
-	char tp_l_[PADL_(struct timespec * __capability)]; struct timespec * __capability tp; char tp_r_[PADR_(struct timespec * __capability)];
+	char tp_l_[PADL_(struct timespec * __kerncap)]; struct timespec * __kerncap tp; char tp_r_[PADR_(struct timespec * __kerncap)];
 };
 struct ktimer_create_args {
 	char clock_id_l_[PADL_(clockid_t)]; clockid_t clock_id; char clock_id_r_[PADR_(clockid_t)];
-	char evp_l_[PADL_(struct sigevent * __capability)]; struct sigevent * __capability evp; char evp_r_[PADR_(struct sigevent * __capability)];
-	char timerid_l_[PADL_(int * __capability)]; int * __capability timerid; char timerid_r_[PADR_(int * __capability)];
+	char evp_l_[PADL_(struct sigevent * __kerncap)]; struct sigevent * __kerncap evp; char evp_r_[PADR_(struct sigevent * __kerncap)];
+	char timerid_l_[PADL_(int * __kerncap)]; int * __kerncap timerid; char timerid_r_[PADR_(int * __kerncap)];
 };
 struct ktimer_delete_args {
 	char timerid_l_[PADL_(int)]; int timerid; char timerid_r_[PADR_(int)];
@@ -642,45 +642,45 @@ struct ktimer_delete_args {
 struct ktimer_settime_args {
 	char timerid_l_[PADL_(int)]; int timerid; char timerid_r_[PADR_(int)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
-	char value_l_[PADL_(const struct itimerspec * __capability)]; const struct itimerspec * __capability value; char value_r_[PADR_(const struct itimerspec * __capability)];
-	char ovalue_l_[PADL_(struct itimerspec * __capability)]; struct itimerspec * __capability ovalue; char ovalue_r_[PADR_(struct itimerspec * __capability)];
+	char value_l_[PADL_(const struct itimerspec * __kerncap)]; const struct itimerspec * __kerncap value; char value_r_[PADR_(const struct itimerspec * __kerncap)];
+	char ovalue_l_[PADL_(struct itimerspec * __kerncap)]; struct itimerspec * __kerncap ovalue; char ovalue_r_[PADR_(struct itimerspec * __kerncap)];
 };
 struct ktimer_gettime_args {
 	char timerid_l_[PADL_(int)]; int timerid; char timerid_r_[PADR_(int)];
-	char value_l_[PADL_(struct itimerspec * __capability)]; struct itimerspec * __capability value; char value_r_[PADR_(struct itimerspec * __capability)];
+	char value_l_[PADL_(struct itimerspec * __kerncap)]; struct itimerspec * __kerncap value; char value_r_[PADR_(struct itimerspec * __kerncap)];
 };
 struct ktimer_getoverrun_args {
 	char timerid_l_[PADL_(int)]; int timerid; char timerid_r_[PADR_(int)];
 };
 struct nanosleep_args {
-	char rqtp_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability rqtp; char rqtp_r_[PADR_(const struct timespec * __capability)];
-	char rmtp_l_[PADL_(struct timespec * __capability)]; struct timespec * __capability rmtp; char rmtp_r_[PADR_(struct timespec * __capability)];
+	char rqtp_l_[PADL_(const struct timespec * __kerncap)]; const struct timespec * __kerncap rqtp; char rqtp_r_[PADR_(const struct timespec * __kerncap)];
+	char rmtp_l_[PADL_(struct timespec * __kerncap)]; struct timespec * __kerncap rmtp; char rmtp_r_[PADR_(struct timespec * __kerncap)];
 };
 struct ffclock_getcounter_args {
-	char ffcount_l_[PADL_(ffcounter * __capability)]; ffcounter * __capability ffcount; char ffcount_r_[PADR_(ffcounter * __capability)];
+	char ffcount_l_[PADL_(ffcounter * __kerncap)]; ffcounter * __kerncap ffcount; char ffcount_r_[PADR_(ffcounter * __kerncap)];
 };
 struct ffclock_setestimate_args {
-	char cest_l_[PADL_(struct ffclock_estimate * __capability)]; struct ffclock_estimate * __capability cest; char cest_r_[PADR_(struct ffclock_estimate * __capability)];
+	char cest_l_[PADL_(struct ffclock_estimate * __kerncap)]; struct ffclock_estimate * __kerncap cest; char cest_r_[PADR_(struct ffclock_estimate * __kerncap)];
 };
 struct ffclock_getestimate_args {
-	char cest_l_[PADL_(struct ffclock_estimate * __capability)]; struct ffclock_estimate * __capability cest; char cest_r_[PADR_(struct ffclock_estimate * __capability)];
+	char cest_l_[PADL_(struct ffclock_estimate * __kerncap)]; struct ffclock_estimate * __kerncap cest; char cest_r_[PADR_(struct ffclock_estimate * __kerncap)];
 };
 struct clock_nanosleep_args {
 	char clock_id_l_[PADL_(clockid_t)]; clockid_t clock_id; char clock_id_r_[PADR_(clockid_t)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
-	char rqtp_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability rqtp; char rqtp_r_[PADR_(const struct timespec * __capability)];
-	char rmtp_l_[PADL_(struct timespec * __capability)]; struct timespec * __capability rmtp; char rmtp_r_[PADR_(struct timespec * __capability)];
+	char rqtp_l_[PADL_(const struct timespec * __kerncap)]; const struct timespec * __kerncap rqtp; char rqtp_r_[PADR_(const struct timespec * __kerncap)];
+	char rmtp_l_[PADL_(struct timespec * __kerncap)]; struct timespec * __kerncap rmtp; char rmtp_r_[PADR_(struct timespec * __kerncap)];
 };
 struct clock_getcpuclockid2_args {
 	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char clock_id_l_[PADL_(clockid_t * __capability)]; clockid_t * __capability clock_id; char clock_id_r_[PADR_(clockid_t * __capability)];
+	char clock_id_l_[PADL_(clockid_t * __kerncap)]; clockid_t * __kerncap clock_id; char clock_id_r_[PADR_(clockid_t * __kerncap)];
 };
 struct ntp_gettime_args {
-	char ntvp_l_[PADL_(struct ntptimeval * __capability)]; struct ntptimeval * __capability ntvp; char ntvp_r_[PADR_(struct ntptimeval * __capability)];
+	char ntvp_l_[PADL_(struct ntptimeval * __kerncap)]; struct ntptimeval * __kerncap ntvp; char ntvp_r_[PADR_(struct ntptimeval * __kerncap)];
 };
 struct minherit_args {
-	char addr_l_[PADL_(void * __capability)]; void * __capability addr; char addr_r_[PADR_(void * __capability)];
+	char addr_l_[PADL_(void * __kerncap)]; void * __kerncap addr; char addr_r_[PADR_(void * __kerncap)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char inherit_l_[PADL_(int)]; int inherit; char inherit_r_[PADR_(int)];
 };
@@ -691,64 +691,64 @@ struct issetugid_args {
 	syscallarg_t dummy;
 };
 struct lchown_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char uid_l_[PADL_(int)]; int uid; char uid_r_[PADR_(int)];
 	char gid_l_[PADL_(int)]; int gid; char gid_r_[PADR_(int)];
 };
 struct aio_read_args {
-	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __kerncap)]; struct aiocb * __kerncap aiocbp; char aiocbp_r_[PADR_(struct aiocb * __kerncap)];
 };
 struct aio_write_args {
-	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __kerncap)]; struct aiocb * __kerncap aiocbp; char aiocbp_r_[PADR_(struct aiocb * __kerncap)];
 };
 struct lio_listio_args {
 	char mode_l_[PADL_(int)]; int mode; char mode_r_[PADR_(int)];
-	char acb_list_l_[PADL_(struct aiocb * __capability const * __capability)]; struct aiocb * __capability const * __capability acb_list; char acb_list_r_[PADR_(struct aiocb * __capability const * __capability)];
+	char acb_list_l_[PADL_(struct aiocb * __kerncap const * __kerncap)]; struct aiocb * __kerncap const * __kerncap acb_list; char acb_list_r_[PADR_(struct aiocb * __kerncap const * __kerncap)];
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
-	char sig_l_[PADL_(struct sigevent * __capability)]; struct sigevent * __capability sig; char sig_r_[PADR_(struct sigevent * __capability)];
+	char sig_l_[PADL_(struct sigevent * __kerncap)]; struct sigevent * __kerncap sig; char sig_r_[PADR_(struct sigevent * __kerncap)];
 };
 struct kbounce_args {
-	char src_l_[PADL_(const void * __capability)]; const void * __capability src; char src_r_[PADR_(const void * __capability)];
-	char dst_l_[PADL_(void * __capability)]; void * __capability dst; char dst_r_[PADR_(void * __capability)];
+	char src_l_[PADL_(const void * __kerncap)]; const void * __kerncap src; char src_r_[PADR_(const void * __kerncap)];
+	char dst_l_[PADL_(void * __kerncap)]; void * __kerncap dst; char dst_r_[PADR_(void * __kerncap)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct flag_captured_args {
-	char message_l_[PADL_(const char * __capability)]; const char * __capability message; char message_r_[PADR_(const char * __capability)];
+	char message_l_[PADL_(const char * __kerncap)]; const char * __kerncap message; char message_r_[PADR_(const char * __kerncap)];
 	char key_l_[PADL_(uint32_t)]; uint32_t key; char key_r_[PADR_(uint32_t)];
 };
 struct cheri_revoke_get_shadow_args {
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
-	char arena_l_[PADL_(void * __capability)]; void * __capability arena; char arena_r_[PADR_(void * __capability)];
-	char shadow_l_[PADL_(void * __capability)]; void * __capability shadow; char shadow_r_[PADR_(void * __capability)];
+	char arena_l_[PADL_(void * __kerncap)]; void * __kerncap arena; char arena_r_[PADR_(void * __kerncap)];
+	char shadow_l_[PADL_(void * __kerncap)]; void * __kerncap shadow; char shadow_r_[PADR_(void * __kerncap)];
 };
 struct cheri_revoke_args {
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 	char start_epoch_l_[PADL_(uint64_t)]; uint64_t start_epoch; char start_epoch_r_[PADR_(uint64_t)];
-	char crsi_l_[PADL_(struct cheri_revoke_syscall_info * __capability)]; struct cheri_revoke_syscall_info * __capability crsi; char crsi_r_[PADR_(struct cheri_revoke_syscall_info * __capability)];
+	char crsi_l_[PADL_(struct cheri_revoke_syscall_info * __kerncap)]; struct cheri_revoke_syscall_info * __kerncap crsi; char crsi_r_[PADR_(struct cheri_revoke_syscall_info * __kerncap)];
 };
 struct lchmod_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 };
 struct lutimes_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
-	char tptr_l_[PADL_(const struct timeval * __capability)]; const struct timeval * __capability tptr; char tptr_r_[PADR_(const struct timeval * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
+	char tptr_l_[PADL_(const struct timeval * __kerncap)]; const struct timeval * __kerncap tptr; char tptr_r_[PADR_(const struct timeval * __kerncap)];
 };
 struct preadv_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char iovp_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iovp; char iovp_r_[PADR_(struct iovec * __capability)];
+	char iovp_l_[PADL_(struct iovec * __kerncap)]; struct iovec * __kerncap iovp; char iovp_r_[PADR_(struct iovec * __kerncap)];
 	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
 	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
 };
 struct pwritev_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char iovp_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iovp; char iovp_r_[PADR_(struct iovec * __capability)];
+	char iovp_l_[PADL_(struct iovec * __kerncap)]; struct iovec * __kerncap iovp; char iovp_r_[PADR_(struct iovec * __kerncap)];
 	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
 	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
 };
 struct fhopen_args {
-	char u_fhp_l_[PADL_(const struct fhandle * __capability)]; const struct fhandle * __capability u_fhp; char u_fhp_r_[PADR_(const struct fhandle * __capability)];
+	char u_fhp_l_[PADL_(const struct fhandle * __kerncap)]; const struct fhandle * __kerncap u_fhp; char u_fhp_r_[PADR_(const struct fhandle * __kerncap)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct modnext_args {
@@ -756,29 +756,29 @@ struct modnext_args {
 };
 struct modstat_args {
 	char modid_l_[PADL_(int)]; int modid; char modid_r_[PADR_(int)];
-	char stat_l_[PADL_(struct module_stat * __capability)]; struct module_stat * __capability stat; char stat_r_[PADR_(struct module_stat * __capability)];
+	char stat_l_[PADL_(struct module_stat * __kerncap)]; struct module_stat * __kerncap stat; char stat_r_[PADR_(struct module_stat * __kerncap)];
 };
 struct modfnext_args {
 	char modid_l_[PADL_(int)]; int modid; char modid_r_[PADR_(int)];
 };
 struct modfind_args {
-	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
+	char name_l_[PADL_(const char * __kerncap)]; const char * __kerncap name; char name_r_[PADR_(const char * __kerncap)];
 };
 struct kldload_args {
-	char file_l_[PADL_(const char * __capability)]; const char * __capability file; char file_r_[PADR_(const char * __capability)];
+	char file_l_[PADL_(const char * __kerncap)]; const char * __kerncap file; char file_r_[PADR_(const char * __kerncap)];
 };
 struct kldunload_args {
 	char fileid_l_[PADL_(int)]; int fileid; char fileid_r_[PADR_(int)];
 };
 struct kldfind_args {
-	char file_l_[PADL_(const char * __capability)]; const char * __capability file; char file_r_[PADR_(const char * __capability)];
+	char file_l_[PADL_(const char * __kerncap)]; const char * __kerncap file; char file_r_[PADR_(const char * __kerncap)];
 };
 struct kldnext_args {
 	char fileid_l_[PADL_(int)]; int fileid; char fileid_r_[PADR_(int)];
 };
 struct kldstat_args {
 	char fileid_l_[PADL_(int)]; int fileid; char fileid_r_[PADR_(int)];
-	char stat_l_[PADL_(struct kld_file_stat * __capability)]; struct kld_file_stat * __capability stat; char stat_r_[PADR_(struct kld_file_stat * __capability)];
+	char stat_l_[PADL_(struct kld_file_stat * __kerncap)]; struct kld_file_stat * __kerncap stat; char stat_r_[PADR_(struct kld_file_stat * __kerncap)];
 };
 struct kldfirstmod_args {
 	char fileid_l_[PADL_(int)]; int fileid; char fileid_r_[PADR_(int)];
@@ -797,19 +797,19 @@ struct setresgid_args {
 	char sgid_l_[PADL_(gid_t)]; gid_t sgid; char sgid_r_[PADR_(gid_t)];
 };
 struct aio_return_args {
-	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __kerncap)]; struct aiocb * __kerncap aiocbp; char aiocbp_r_[PADR_(struct aiocb * __kerncap)];
 };
 struct aio_suspend_args {
-	char aiocbp_l_[PADL_(const struct aiocb * __capability const * __capability)]; const struct aiocb * __capability const * __capability aiocbp; char aiocbp_r_[PADR_(const struct aiocb * __capability const * __capability)];
+	char aiocbp_l_[PADL_(const struct aiocb * __kerncap const * __kerncap)]; const struct aiocb * __kerncap const * __kerncap aiocbp; char aiocbp_r_[PADR_(const struct aiocb * __kerncap const * __kerncap)];
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
-	char timeout_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability timeout; char timeout_r_[PADR_(const struct timespec * __capability)];
+	char timeout_l_[PADL_(const struct timespec * __kerncap)]; const struct timespec * __kerncap timeout; char timeout_r_[PADR_(const struct timespec * __kerncap)];
 };
 struct aio_cancel_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __kerncap)]; struct aiocb * __kerncap aiocbp; char aiocbp_r_[PADR_(struct aiocb * __kerncap)];
 };
 struct aio_error_args {
-	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __kerncap)]; struct aiocb * __kerncap aiocbp; char aiocbp_r_[PADR_(struct aiocb * __kerncap)];
 };
 struct yield_args {
 	syscallarg_t dummy;
@@ -821,21 +821,21 @@ struct munlockall_args {
 	syscallarg_t dummy;
 };
 struct __getcwd_args {
-	char buf_l_[PADL_(char * __capability)]; char * __capability buf; char buf_r_[PADR_(char * __capability)];
+	char buf_l_[PADL_(char * __kerncap)]; char * __kerncap buf; char buf_r_[PADR_(char * __kerncap)];
 	char buflen_l_[PADL_(size_t)]; size_t buflen; char buflen_r_[PADR_(size_t)];
 };
 struct sched_setparam_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
-	char param_l_[PADL_(const struct sched_param * __capability)]; const struct sched_param * __capability param; char param_r_[PADR_(const struct sched_param * __capability)];
+	char param_l_[PADL_(const struct sched_param * __kerncap)]; const struct sched_param * __kerncap param; char param_r_[PADR_(const struct sched_param * __kerncap)];
 };
 struct sched_getparam_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
-	char param_l_[PADL_(struct sched_param * __capability)]; struct sched_param * __capability param; char param_r_[PADR_(struct sched_param * __capability)];
+	char param_l_[PADL_(struct sched_param * __kerncap)]; struct sched_param * __kerncap param; char param_r_[PADR_(struct sched_param * __kerncap)];
 };
 struct sched_setscheduler_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
 	char policy_l_[PADL_(int)]; int policy; char policy_r_[PADR_(int)];
-	char param_l_[PADL_(const struct sched_param * __capability)]; const struct sched_param * __capability param; char param_r_[PADR_(const struct sched_param * __capability)];
+	char param_l_[PADL_(const struct sched_param * __kerncap)]; const struct sched_param * __kerncap param; char param_r_[PADR_(const struct sched_param * __kerncap)];
 };
 struct sched_getscheduler_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
@@ -851,69 +851,69 @@ struct sched_get_priority_min_args {
 };
 struct sched_rr_get_interval_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
-	char interval_l_[PADL_(struct timespec * __capability)]; struct timespec * __capability interval; char interval_r_[PADR_(struct timespec * __capability)];
+	char interval_l_[PADL_(struct timespec * __kerncap)]; struct timespec * __kerncap interval; char interval_r_[PADR_(struct timespec * __kerncap)];
 };
 struct utrace_args {
-	char addr_l_[PADL_(const void * __capability)]; const void * __capability addr; char addr_r_[PADR_(const void * __capability)];
+	char addr_l_[PADL_(const void * __kerncap)]; const void * __kerncap addr; char addr_r_[PADR_(const void * __kerncap)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 };
 struct kldsym_args {
 	char fileid_l_[PADL_(int)]; int fileid; char fileid_r_[PADR_(int)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
+	char data_l_[PADL_(void * __kerncap)]; void * __kerncap data; char data_r_[PADR_(void * __kerncap)];
 };
 struct jail_args {
-	char jailp_l_[PADL_(struct jail * __capability)]; struct jail * __capability jailp; char jailp_r_[PADR_(struct jail * __capability)];
+	char jailp_l_[PADL_(struct jail * __kerncap)]; struct jail * __kerncap jailp; char jailp_r_[PADR_(struct jail * __kerncap)];
 };
 struct nnpfs_syscall_args {
 	char operation_l_[PADL_(int)]; int operation; char operation_r_[PADR_(int)];
-	char a_pathP_l_[PADL_(char * __capability)]; char * __capability a_pathP; char a_pathP_r_[PADR_(char * __capability)];
+	char a_pathP_l_[PADL_(char * __kerncap)]; char * __kerncap a_pathP; char a_pathP_r_[PADR_(char * __kerncap)];
 	char a_opcode_l_[PADL_(int)]; int a_opcode; char a_opcode_r_[PADR_(int)];
-	char a_paramsP_l_[PADL_(void * __capability)]; void * __capability a_paramsP; char a_paramsP_r_[PADR_(void * __capability)];
+	char a_paramsP_l_[PADL_(void * __kerncap)]; void * __kerncap a_paramsP; char a_paramsP_r_[PADR_(void * __kerncap)];
 	char a_followSymlinks_l_[PADL_(int)]; int a_followSymlinks; char a_followSymlinks_r_[PADR_(int)];
 };
 struct sigprocmask_args {
 	char how_l_[PADL_(int)]; int how; char how_r_[PADR_(int)];
-	char set_l_[PADL_(const sigset_t * __capability)]; const sigset_t * __capability set; char set_r_[PADR_(const sigset_t * __capability)];
-	char oset_l_[PADL_(sigset_t * __capability)]; sigset_t * __capability oset; char oset_r_[PADR_(sigset_t * __capability)];
+	char set_l_[PADL_(const sigset_t * __kerncap)]; const sigset_t * __kerncap set; char set_r_[PADR_(const sigset_t * __kerncap)];
+	char oset_l_[PADL_(sigset_t * __kerncap)]; sigset_t * __kerncap oset; char oset_r_[PADR_(sigset_t * __kerncap)];
 };
 struct sigsuspend_args {
-	char sigmask_l_[PADL_(const sigset_t * __capability)]; const sigset_t * __capability sigmask; char sigmask_r_[PADR_(const sigset_t * __capability)];
+	char sigmask_l_[PADL_(const sigset_t * __kerncap)]; const sigset_t * __kerncap sigmask; char sigmask_r_[PADR_(const sigset_t * __kerncap)];
 };
 struct sigpending_args {
-	char set_l_[PADL_(sigset_t * __capability)]; sigset_t * __capability set; char set_r_[PADR_(sigset_t * __capability)];
+	char set_l_[PADL_(sigset_t * __kerncap)]; sigset_t * __kerncap set; char set_r_[PADR_(sigset_t * __kerncap)];
 };
 struct sigtimedwait_args {
-	char set_l_[PADL_(const sigset_t * __capability)]; const sigset_t * __capability set; char set_r_[PADR_(const sigset_t * __capability)];
-	char info_l_[PADL_(struct __siginfo * __capability)]; struct __siginfo * __capability info; char info_r_[PADR_(struct __siginfo * __capability)];
-	char timeout_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability timeout; char timeout_r_[PADR_(const struct timespec * __capability)];
+	char set_l_[PADL_(const sigset_t * __kerncap)]; const sigset_t * __kerncap set; char set_r_[PADR_(const sigset_t * __kerncap)];
+	char info_l_[PADL_(struct __siginfo * __kerncap)]; struct __siginfo * __kerncap info; char info_r_[PADR_(struct __siginfo * __kerncap)];
+	char timeout_l_[PADL_(const struct timespec * __kerncap)]; const struct timespec * __kerncap timeout; char timeout_r_[PADR_(const struct timespec * __kerncap)];
 };
 struct sigwaitinfo_args {
-	char set_l_[PADL_(const sigset_t * __capability)]; const sigset_t * __capability set; char set_r_[PADR_(const sigset_t * __capability)];
-	char info_l_[PADL_(struct __siginfo * __capability)]; struct __siginfo * __capability info; char info_r_[PADR_(struct __siginfo * __capability)];
+	char set_l_[PADL_(const sigset_t * __kerncap)]; const sigset_t * __kerncap set; char set_r_[PADR_(const sigset_t * __kerncap)];
+	char info_l_[PADL_(struct __siginfo * __kerncap)]; struct __siginfo * __kerncap info; char info_r_[PADR_(struct __siginfo * __kerncap)];
 };
 struct __acl_get_file_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char type_l_[PADL_(__acl_type_t)]; __acl_type_t type; char type_r_[PADR_(__acl_type_t)];
-	char aclp_l_[PADL_(struct acl * __capability)]; struct acl * __capability aclp; char aclp_r_[PADR_(struct acl * __capability)];
+	char aclp_l_[PADL_(struct acl * __kerncap)]; struct acl * __kerncap aclp; char aclp_r_[PADR_(struct acl * __kerncap)];
 };
 struct __acl_set_file_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char type_l_[PADL_(__acl_type_t)]; __acl_type_t type; char type_r_[PADR_(__acl_type_t)];
-	char aclp_l_[PADL_(struct acl * __capability)]; struct acl * __capability aclp; char aclp_r_[PADR_(struct acl * __capability)];
+	char aclp_l_[PADL_(struct acl * __kerncap)]; struct acl * __kerncap aclp; char aclp_r_[PADR_(struct acl * __kerncap)];
 };
 struct __acl_get_fd_args {
 	char filedes_l_[PADL_(int)]; int filedes; char filedes_r_[PADR_(int)];
 	char type_l_[PADL_(__acl_type_t)]; __acl_type_t type; char type_r_[PADR_(__acl_type_t)];
-	char aclp_l_[PADL_(struct acl * __capability)]; struct acl * __capability aclp; char aclp_r_[PADR_(struct acl * __capability)];
+	char aclp_l_[PADL_(struct acl * __kerncap)]; struct acl * __kerncap aclp; char aclp_r_[PADR_(struct acl * __kerncap)];
 };
 struct __acl_set_fd_args {
 	char filedes_l_[PADL_(int)]; int filedes; char filedes_r_[PADR_(int)];
 	char type_l_[PADL_(__acl_type_t)]; __acl_type_t type; char type_r_[PADR_(__acl_type_t)];
-	char aclp_l_[PADL_(struct acl * __capability)]; struct acl * __capability aclp; char aclp_r_[PADR_(struct acl * __capability)];
+	char aclp_l_[PADL_(struct acl * __kerncap)]; struct acl * __kerncap aclp; char aclp_r_[PADR_(struct acl * __kerncap)];
 };
 struct __acl_delete_file_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char type_l_[PADL_(__acl_type_t)]; __acl_type_t type; char type_r_[PADR_(__acl_type_t)];
 };
 struct __acl_delete_fd_args {
@@ -921,54 +921,54 @@ struct __acl_delete_fd_args {
 	char type_l_[PADL_(__acl_type_t)]; __acl_type_t type; char type_r_[PADR_(__acl_type_t)];
 };
 struct __acl_aclcheck_file_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char type_l_[PADL_(__acl_type_t)]; __acl_type_t type; char type_r_[PADR_(__acl_type_t)];
-	char aclp_l_[PADL_(struct acl * __capability)]; struct acl * __capability aclp; char aclp_r_[PADR_(struct acl * __capability)];
+	char aclp_l_[PADL_(struct acl * __kerncap)]; struct acl * __kerncap aclp; char aclp_r_[PADR_(struct acl * __kerncap)];
 };
 struct __acl_aclcheck_fd_args {
 	char filedes_l_[PADL_(int)]; int filedes; char filedes_r_[PADR_(int)];
 	char type_l_[PADL_(__acl_type_t)]; __acl_type_t type; char type_r_[PADR_(__acl_type_t)];
-	char aclp_l_[PADL_(struct acl * __capability)]; struct acl * __capability aclp; char aclp_r_[PADR_(struct acl * __capability)];
+	char aclp_l_[PADL_(struct acl * __kerncap)]; struct acl * __kerncap aclp; char aclp_r_[PADR_(struct acl * __kerncap)];
 };
 struct extattrctl_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char filename_l_[PADL_(const char * __capability)]; const char * __capability filename; char filename_r_[PADR_(const char * __capability)];
+	char filename_l_[PADL_(const char * __kerncap)]; const char * __kerncap filename; char filename_r_[PADR_(const char * __kerncap)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char attrname_l_[PADL_(const char * __capability)]; const char * __capability attrname; char attrname_r_[PADR_(const char * __capability)];
+	char attrname_l_[PADL_(const char * __kerncap)]; const char * __kerncap attrname; char attrname_r_[PADR_(const char * __kerncap)];
 };
 struct extattr_set_file_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char attrname_l_[PADL_(const char * __capability)]; const char * __capability attrname; char attrname_r_[PADR_(const char * __capability)];
-	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
+	char attrname_l_[PADL_(const char * __kerncap)]; const char * __kerncap attrname; char attrname_r_[PADR_(const char * __kerncap)];
+	char data_l_[PADL_(void * __kerncap)]; void * __kerncap data; char data_r_[PADR_(void * __kerncap)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
 };
 struct extattr_get_file_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char attrname_l_[PADL_(const char * __capability)]; const char * __capability attrname; char attrname_r_[PADR_(const char * __capability)];
-	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
+	char attrname_l_[PADL_(const char * __kerncap)]; const char * __kerncap attrname; char attrname_r_[PADR_(const char * __kerncap)];
+	char data_l_[PADL_(void * __kerncap)]; void * __kerncap data; char data_r_[PADR_(void * __kerncap)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
 };
 struct extattr_delete_file_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char attrname_l_[PADL_(const char * __capability)]; const char * __capability attrname; char attrname_r_[PADR_(const char * __capability)];
+	char attrname_l_[PADL_(const char * __kerncap)]; const char * __kerncap attrname; char attrname_r_[PADR_(const char * __kerncap)];
 };
 struct aio_waitcomplete_args {
-	char aiocbp_l_[PADL_(struct aiocb * __capability * __capability)]; struct aiocb * __capability * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability * __capability)];
-	char timeout_l_[PADL_(struct timespec * __capability)]; struct timespec * __capability timeout; char timeout_r_[PADR_(struct timespec * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __kerncap * __kerncap)]; struct aiocb * __kerncap * __kerncap aiocbp; char aiocbp_r_[PADR_(struct aiocb * __kerncap * __kerncap)];
+	char timeout_l_[PADL_(struct timespec * __kerncap)]; struct timespec * __kerncap timeout; char timeout_r_[PADR_(struct timespec * __kerncap)];
 };
 struct getresuid_args {
-	char ruid_l_[PADL_(uid_t * __capability)]; uid_t * __capability ruid; char ruid_r_[PADR_(uid_t * __capability)];
-	char euid_l_[PADL_(uid_t * __capability)]; uid_t * __capability euid; char euid_r_[PADR_(uid_t * __capability)];
-	char suid_l_[PADL_(uid_t * __capability)]; uid_t * __capability suid; char suid_r_[PADR_(uid_t * __capability)];
+	char ruid_l_[PADL_(uid_t * __kerncap)]; uid_t * __kerncap ruid; char ruid_r_[PADR_(uid_t * __kerncap)];
+	char euid_l_[PADL_(uid_t * __kerncap)]; uid_t * __kerncap euid; char euid_r_[PADR_(uid_t * __kerncap)];
+	char suid_l_[PADL_(uid_t * __kerncap)]; uid_t * __kerncap suid; char suid_r_[PADR_(uid_t * __kerncap)];
 };
 struct getresgid_args {
-	char rgid_l_[PADL_(gid_t * __capability)]; gid_t * __capability rgid; char rgid_r_[PADR_(gid_t * __capability)];
-	char egid_l_[PADL_(gid_t * __capability)]; gid_t * __capability egid; char egid_r_[PADR_(gid_t * __capability)];
-	char sgid_l_[PADL_(gid_t * __capability)]; gid_t * __capability sgid; char sgid_r_[PADR_(gid_t * __capability)];
+	char rgid_l_[PADL_(gid_t * __kerncap)]; gid_t * __kerncap rgid; char rgid_r_[PADR_(gid_t * __kerncap)];
+	char egid_l_[PADL_(gid_t * __kerncap)]; gid_t * __kerncap egid; char egid_r_[PADR_(gid_t * __kerncap)];
+	char sgid_l_[PADL_(gid_t * __kerncap)]; gid_t * __kerncap sgid; char sgid_r_[PADR_(gid_t * __kerncap)];
 };
 struct kqueue_args {
 	syscallarg_t dummy;
@@ -976,27 +976,27 @@ struct kqueue_args {
 struct extattr_set_fd_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char attrname_l_[PADL_(const char * __capability)]; const char * __capability attrname; char attrname_r_[PADR_(const char * __capability)];
-	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
+	char attrname_l_[PADL_(const char * __kerncap)]; const char * __kerncap attrname; char attrname_r_[PADR_(const char * __kerncap)];
+	char data_l_[PADL_(void * __kerncap)]; void * __kerncap data; char data_r_[PADR_(void * __kerncap)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
 };
 struct extattr_get_fd_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char attrname_l_[PADL_(const char * __capability)]; const char * __capability attrname; char attrname_r_[PADR_(const char * __capability)];
-	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
+	char attrname_l_[PADL_(const char * __kerncap)]; const char * __kerncap attrname; char attrname_r_[PADR_(const char * __kerncap)];
+	char data_l_[PADL_(void * __kerncap)]; void * __kerncap data; char data_r_[PADR_(void * __kerncap)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
 };
 struct extattr_delete_fd_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char attrname_l_[PADL_(const char * __capability)]; const char * __capability attrname; char attrname_r_[PADR_(const char * __capability)];
+	char attrname_l_[PADL_(const char * __kerncap)]; const char * __kerncap attrname; char attrname_r_[PADR_(const char * __kerncap)];
 };
 struct __setugid_args {
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
 struct eaccess_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char amode_l_[PADL_(int)]; int amode; char amode_r_[PADR_(int)];
 };
 struct afs3_syscall_args {
@@ -1009,44 +1009,44 @@ struct afs3_syscall_args {
 	char parm6_l_[PADL_(long)]; long parm6; char parm6_r_[PADR_(long)];
 };
 struct nmount_args {
-	char iovp_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iovp; char iovp_r_[PADR_(struct iovec * __capability)];
+	char iovp_l_[PADL_(struct iovec * __kerncap)]; struct iovec * __kerncap iovp; char iovp_r_[PADR_(struct iovec * __kerncap)];
 	char iovcnt_l_[PADL_(unsigned int)]; unsigned int iovcnt; char iovcnt_r_[PADR_(unsigned int)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct __mac_get_proc_args {
-	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
+	char mac_p_l_[PADL_(struct mac * __kerncap)]; struct mac * __kerncap mac_p; char mac_p_r_[PADR_(struct mac * __kerncap)];
 };
 struct __mac_set_proc_args {
-	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
+	char mac_p_l_[PADL_(struct mac * __kerncap)]; struct mac * __kerncap mac_p; char mac_p_r_[PADR_(struct mac * __kerncap)];
 };
 struct __mac_get_fd_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
+	char mac_p_l_[PADL_(struct mac * __kerncap)]; struct mac * __kerncap mac_p; char mac_p_r_[PADR_(struct mac * __kerncap)];
 };
 struct __mac_get_file_args {
-	char path_p_l_[PADL_(const char * __capability)]; const char * __capability path_p; char path_p_r_[PADR_(const char * __capability)];
-	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
+	char path_p_l_[PADL_(const char * __kerncap)]; const char * __kerncap path_p; char path_p_r_[PADR_(const char * __kerncap)];
+	char mac_p_l_[PADL_(struct mac * __kerncap)]; struct mac * __kerncap mac_p; char mac_p_r_[PADR_(struct mac * __kerncap)];
 };
 struct __mac_set_fd_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
+	char mac_p_l_[PADL_(struct mac * __kerncap)]; struct mac * __kerncap mac_p; char mac_p_r_[PADR_(struct mac * __kerncap)];
 };
 struct __mac_set_file_args {
-	char path_p_l_[PADL_(const char * __capability)]; const char * __capability path_p; char path_p_r_[PADR_(const char * __capability)];
-	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
+	char path_p_l_[PADL_(const char * __kerncap)]; const char * __kerncap path_p; char path_p_r_[PADR_(const char * __kerncap)];
+	char mac_p_l_[PADL_(struct mac * __kerncap)]; struct mac * __kerncap mac_p; char mac_p_r_[PADR_(struct mac * __kerncap)];
 };
 struct kenv_args {
 	char what_l_[PADL_(int)]; int what; char what_r_[PADR_(int)];
-	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
-	char value_l_[PADL_(char * __capability)]; char * __capability value; char value_r_[PADR_(char * __capability)];
+	char name_l_[PADL_(const char * __kerncap)]; const char * __kerncap name; char name_r_[PADR_(const char * __kerncap)];
+	char value_l_[PADL_(char * __kerncap)]; char * __kerncap value; char value_r_[PADR_(char * __kerncap)];
 	char len_l_[PADL_(int)]; int len; char len_r_[PADR_(int)];
 };
 struct lchflags_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char flags_l_[PADL_(u_long)]; u_long flags; char flags_r_[PADR_(u_long)];
 };
 struct uuidgen_args {
-	char store_l_[PADL_(struct uuid * __capability)]; struct uuid * __capability store; char store_r_[PADR_(struct uuid * __capability)];
+	char store_l_[PADL_(struct uuid * __kerncap)]; struct uuid * __kerncap store; char store_r_[PADR_(struct uuid * __kerncap)];
 	char count_l_[PADL_(int)]; int count; char count_r_[PADR_(int)];
 };
 struct sendfile_args {
@@ -1054,14 +1054,14 @@ struct sendfile_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
 	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
-	char hdtr_l_[PADL_(struct sf_hdtr * __capability)]; struct sf_hdtr * __capability hdtr; char hdtr_r_[PADR_(struct sf_hdtr * __capability)];
-	char sbytes_l_[PADL_(off_t * __capability)]; off_t * __capability sbytes; char sbytes_r_[PADR_(off_t * __capability)];
+	char hdtr_l_[PADL_(struct sf_hdtr * __kerncap)]; struct sf_hdtr * __kerncap hdtr; char hdtr_r_[PADR_(struct sf_hdtr * __kerncap)];
+	char sbytes_l_[PADL_(off_t * __kerncap)]; off_t * __kerncap sbytes; char sbytes_r_[PADR_(off_t * __kerncap)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct mac_syscall_args {
-	char policy_l_[PADL_(const char * __capability)]; const char * __capability policy; char policy_r_[PADR_(const char * __capability)];
+	char policy_l_[PADL_(const char * __kerncap)]; const char * __kerncap policy; char policy_r_[PADR_(const char * __kerncap)];
 	char call_l_[PADL_(int)]; int call; char call_r_[PADR_(int)];
-	char arg_l_[PADL_(void * __capability)]; void * __capability arg; char arg_r_[PADR_(void * __capability)];
+	char arg_l_[PADL_(void * __kerncap)]; void * __kerncap arg; char arg_r_[PADR_(void * __kerncap)];
 };
 struct ksem_close_args {
 	char id_l_[PADL_(semid_t)]; semid_t id; char id_r_[PADR_(semid_t)];
@@ -1076,114 +1076,114 @@ struct ksem_trywait_args {
 	char id_l_[PADL_(semid_t)]; semid_t id; char id_r_[PADR_(semid_t)];
 };
 struct ksem_init_args {
-	char idp_l_[PADL_(semid_t * __capability)]; semid_t * __capability idp; char idp_r_[PADR_(semid_t * __capability)];
+	char idp_l_[PADL_(semid_t * __kerncap)]; semid_t * __kerncap idp; char idp_r_[PADR_(semid_t * __kerncap)];
 	char value_l_[PADL_(unsigned int)]; unsigned int value; char value_r_[PADR_(unsigned int)];
 };
 struct ksem_open_args {
-	char idp_l_[PADL_(semid_t * __capability)]; semid_t * __capability idp; char idp_r_[PADR_(semid_t * __capability)];
-	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
+	char idp_l_[PADL_(semid_t * __kerncap)]; semid_t * __kerncap idp; char idp_r_[PADR_(semid_t * __kerncap)];
+	char name_l_[PADL_(const char * __kerncap)]; const char * __kerncap name; char name_r_[PADR_(const char * __kerncap)];
 	char oflag_l_[PADL_(int)]; int oflag; char oflag_r_[PADR_(int)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 	char value_l_[PADL_(unsigned int)]; unsigned int value; char value_r_[PADR_(unsigned int)];
 };
 struct ksem_unlink_args {
-	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
+	char name_l_[PADL_(const char * __kerncap)]; const char * __kerncap name; char name_r_[PADR_(const char * __kerncap)];
 };
 struct ksem_getvalue_args {
 	char id_l_[PADL_(semid_t)]; semid_t id; char id_r_[PADR_(semid_t)];
-	char val_l_[PADL_(int * __capability)]; int * __capability val; char val_r_[PADR_(int * __capability)];
+	char val_l_[PADL_(int * __kerncap)]; int * __kerncap val; char val_r_[PADR_(int * __kerncap)];
 };
 struct ksem_destroy_args {
 	char id_l_[PADL_(semid_t)]; semid_t id; char id_r_[PADR_(semid_t)];
 };
 struct __mac_get_pid_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
-	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
+	char mac_p_l_[PADL_(struct mac * __kerncap)]; struct mac * __kerncap mac_p; char mac_p_r_[PADR_(struct mac * __kerncap)];
 };
 struct __mac_get_link_args {
-	char path_p_l_[PADL_(const char * __capability)]; const char * __capability path_p; char path_p_r_[PADR_(const char * __capability)];
-	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
+	char path_p_l_[PADL_(const char * __kerncap)]; const char * __kerncap path_p; char path_p_r_[PADR_(const char * __kerncap)];
+	char mac_p_l_[PADL_(struct mac * __kerncap)]; struct mac * __kerncap mac_p; char mac_p_r_[PADR_(struct mac * __kerncap)];
 };
 struct __mac_set_link_args {
-	char path_p_l_[PADL_(const char * __capability)]; const char * __capability path_p; char path_p_r_[PADR_(const char * __capability)];
-	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
+	char path_p_l_[PADL_(const char * __kerncap)]; const char * __kerncap path_p; char path_p_r_[PADR_(const char * __kerncap)];
+	char mac_p_l_[PADL_(struct mac * __kerncap)]; struct mac * __kerncap mac_p; char mac_p_r_[PADR_(struct mac * __kerncap)];
 };
 struct extattr_set_link_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char attrname_l_[PADL_(const char * __capability)]; const char * __capability attrname; char attrname_r_[PADR_(const char * __capability)];
-	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
+	char attrname_l_[PADL_(const char * __kerncap)]; const char * __kerncap attrname; char attrname_r_[PADR_(const char * __kerncap)];
+	char data_l_[PADL_(void * __kerncap)]; void * __kerncap data; char data_r_[PADR_(void * __kerncap)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
 };
 struct extattr_get_link_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char attrname_l_[PADL_(const char * __capability)]; const char * __capability attrname; char attrname_r_[PADR_(const char * __capability)];
-	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
+	char attrname_l_[PADL_(const char * __kerncap)]; const char * __kerncap attrname; char attrname_r_[PADR_(const char * __kerncap)];
+	char data_l_[PADL_(void * __kerncap)]; void * __kerncap data; char data_r_[PADR_(void * __kerncap)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
 };
 struct extattr_delete_link_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char attrname_l_[PADL_(const char * __capability)]; const char * __capability attrname; char attrname_r_[PADR_(const char * __capability)];
+	char attrname_l_[PADL_(const char * __kerncap)]; const char * __kerncap attrname; char attrname_r_[PADR_(const char * __kerncap)];
 };
 struct __mac_execve_args {
-	char fname_l_[PADL_(const char * __capability)]; const char * __capability fname; char fname_r_[PADR_(const char * __capability)];
-	char argv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability argv; char argv_r_[PADR_(char * __capability * __capability)];
-	char envv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability envv; char envv_r_[PADR_(char * __capability * __capability)];
-	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
+	char fname_l_[PADL_(const char * __kerncap)]; const char * __kerncap fname; char fname_r_[PADR_(const char * __kerncap)];
+	char argv_l_[PADL_(char * __kerncap * __kerncap)]; char * __kerncap * __kerncap argv; char argv_r_[PADR_(char * __kerncap * __kerncap)];
+	char envv_l_[PADL_(char * __kerncap * __kerncap)]; char * __kerncap * __kerncap envv; char envv_r_[PADR_(char * __kerncap * __kerncap)];
+	char mac_p_l_[PADL_(struct mac * __kerncap)]; struct mac * __kerncap mac_p; char mac_p_r_[PADR_(struct mac * __kerncap)];
 };
 struct sigaction_args {
 	char sig_l_[PADL_(int)]; int sig; char sig_r_[PADR_(int)];
-	char act_l_[PADL_(const struct sigaction * __capability)]; const struct sigaction * __capability act; char act_r_[PADR_(const struct sigaction * __capability)];
-	char oact_l_[PADL_(struct sigaction * __capability)]; struct sigaction * __capability oact; char oact_r_[PADR_(struct sigaction * __capability)];
+	char act_l_[PADL_(const struct sigaction * __kerncap)]; const struct sigaction * __kerncap act; char act_r_[PADR_(const struct sigaction * __kerncap)];
+	char oact_l_[PADL_(struct sigaction * __kerncap)]; struct sigaction * __kerncap oact; char oact_r_[PADR_(struct sigaction * __kerncap)];
 };
 struct sigreturn_args {
-	char sigcntxp_l_[PADL_(const struct __ucontext * __capability)]; const struct __ucontext * __capability sigcntxp; char sigcntxp_r_[PADR_(const struct __ucontext * __capability)];
+	char sigcntxp_l_[PADL_(const struct __ucontext * __kerncap)]; const struct __ucontext * __kerncap sigcntxp; char sigcntxp_r_[PADR_(const struct __ucontext * __kerncap)];
 };
 struct getcontext_args {
-	char ucp_l_[PADL_(struct __ucontext * __capability)]; struct __ucontext * __capability ucp; char ucp_r_[PADR_(struct __ucontext * __capability)];
+	char ucp_l_[PADL_(struct __ucontext * __kerncap)]; struct __ucontext * __kerncap ucp; char ucp_r_[PADR_(struct __ucontext * __kerncap)];
 };
 struct setcontext_args {
-	char ucp_l_[PADL_(const struct __ucontext * __capability)]; const struct __ucontext * __capability ucp; char ucp_r_[PADR_(const struct __ucontext * __capability)];
+	char ucp_l_[PADL_(const struct __ucontext * __kerncap)]; const struct __ucontext * __kerncap ucp; char ucp_r_[PADR_(const struct __ucontext * __kerncap)];
 };
 struct swapcontext_args {
-	char oucp_l_[PADL_(struct __ucontext * __capability)]; struct __ucontext * __capability oucp; char oucp_r_[PADR_(struct __ucontext * __capability)];
-	char ucp_l_[PADL_(const struct __ucontext * __capability)]; const struct __ucontext * __capability ucp; char ucp_r_[PADR_(const struct __ucontext * __capability)];
+	char oucp_l_[PADL_(struct __ucontext * __kerncap)]; struct __ucontext * __kerncap oucp; char oucp_r_[PADR_(struct __ucontext * __kerncap)];
+	char ucp_l_[PADL_(const struct __ucontext * __kerncap)]; const struct __ucontext * __kerncap ucp; char ucp_r_[PADR_(const struct __ucontext * __kerncap)];
 };
 struct __acl_get_link_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char type_l_[PADL_(__acl_type_t)]; __acl_type_t type; char type_r_[PADR_(__acl_type_t)];
-	char aclp_l_[PADL_(struct acl * __capability)]; struct acl * __capability aclp; char aclp_r_[PADR_(struct acl * __capability)];
+	char aclp_l_[PADL_(struct acl * __kerncap)]; struct acl * __kerncap aclp; char aclp_r_[PADR_(struct acl * __kerncap)];
 };
 struct __acl_set_link_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char type_l_[PADL_(__acl_type_t)]; __acl_type_t type; char type_r_[PADR_(__acl_type_t)];
-	char aclp_l_[PADL_(struct acl * __capability)]; struct acl * __capability aclp; char aclp_r_[PADR_(struct acl * __capability)];
+	char aclp_l_[PADL_(struct acl * __kerncap)]; struct acl * __kerncap aclp; char aclp_r_[PADR_(struct acl * __kerncap)];
 };
 struct __acl_delete_link_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char type_l_[PADL_(__acl_type_t)]; __acl_type_t type; char type_r_[PADR_(__acl_type_t)];
 };
 struct __acl_aclcheck_link_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char type_l_[PADL_(__acl_type_t)]; __acl_type_t type; char type_r_[PADR_(__acl_type_t)];
-	char aclp_l_[PADL_(struct acl * __capability)]; struct acl * __capability aclp; char aclp_r_[PADR_(struct acl * __capability)];
+	char aclp_l_[PADL_(struct acl * __kerncap)]; struct acl * __kerncap aclp; char aclp_r_[PADR_(struct acl * __kerncap)];
 };
 struct sigwait_args {
-	char set_l_[PADL_(const sigset_t * __capability)]; const sigset_t * __capability set; char set_r_[PADR_(const sigset_t * __capability)];
-	char sig_l_[PADL_(int * __capability)]; int * __capability sig; char sig_r_[PADR_(int * __capability)];
+	char set_l_[PADL_(const sigset_t * __kerncap)]; const sigset_t * __kerncap set; char set_r_[PADR_(const sigset_t * __kerncap)];
+	char sig_l_[PADL_(int * __kerncap)]; int * __kerncap sig; char sig_r_[PADR_(int * __kerncap)];
 };
 struct thr_create_args {
-	char ctx_l_[PADL_(struct __ucontext * __capability)]; struct __ucontext * __capability ctx; char ctx_r_[PADR_(struct __ucontext * __capability)];
-	char id_l_[PADL_(long * __capability)]; long * __capability id; char id_r_[PADR_(long * __capability)];
+	char ctx_l_[PADL_(struct __ucontext * __kerncap)]; struct __ucontext * __kerncap ctx; char ctx_r_[PADR_(struct __ucontext * __kerncap)];
+	char id_l_[PADL_(long * __kerncap)]; long * __kerncap id; char id_r_[PADR_(long * __kerncap)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct thr_exit_args {
-	char state_l_[PADL_(long * __capability)]; long * __capability state; char state_r_[PADR_(long * __capability)];
+	char state_l_[PADL_(long * __kerncap)]; long * __kerncap state; char state_r_[PADR_(long * __kerncap)];
 };
 struct thr_self_args {
-	char id_l_[PADL_(long * __capability)]; long * __capability id; char id_r_[PADR_(long * __capability)];
+	char id_l_[PADL_(long * __kerncap)]; long * __kerncap id; char id_r_[PADR_(long * __kerncap)];
 };
 struct thr_kill_args {
 	char id_l_[PADL_(long)]; long id; char id_r_[PADR_(long)];
@@ -1195,27 +1195,27 @@ struct jail_attach_args {
 struct extattr_list_fd_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
+	char data_l_[PADL_(void * __kerncap)]; void * __kerncap data; char data_r_[PADR_(void * __kerncap)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
 };
 struct extattr_list_file_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
+	char data_l_[PADL_(void * __kerncap)]; void * __kerncap data; char data_r_[PADR_(void * __kerncap)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
 };
 struct extattr_list_link_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
-	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
+	char data_l_[PADL_(void * __kerncap)]; void * __kerncap data; char data_r_[PADR_(void * __kerncap)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
 };
 struct ksem_timedwait_args {
 	char id_l_[PADL_(semid_t)]; semid_t id; char id_r_[PADR_(semid_t)];
-	char abstime_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability abstime; char abstime_r_[PADR_(const struct timespec * __capability)];
+	char abstime_l_[PADL_(const struct timespec * __kerncap)]; const struct timespec * __kerncap abstime; char abstime_r_[PADR_(const struct timespec * __kerncap)];
 };
 struct thr_suspend_args {
-	char timeout_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability timeout; char timeout_r_[PADR_(const struct timespec * __capability)];
+	char timeout_l_[PADL_(const struct timespec * __kerncap)]; const struct timespec * __kerncap timeout; char timeout_r_[PADR_(const struct timespec * __kerncap)];
 };
 struct thr_wake_args {
 	char id_l_[PADL_(long)]; long id; char id_r_[PADR_(long)];
@@ -1225,102 +1225,102 @@ struct kldunloadf_args {
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct audit_args {
-	char record_l_[PADL_(const void * __capability)]; const void * __capability record; char record_r_[PADR_(const void * __capability)];
+	char record_l_[PADL_(const void * __kerncap)]; const void * __kerncap record; char record_r_[PADR_(const void * __kerncap)];
 	char length_l_[PADL_(u_int)]; u_int length; char length_r_[PADR_(u_int)];
 };
 struct auditon_args {
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
+	char data_l_[PADL_(void * __kerncap)]; void * __kerncap data; char data_r_[PADR_(void * __kerncap)];
 	char length_l_[PADL_(u_int)]; u_int length; char length_r_[PADR_(u_int)];
 };
 struct getauid_args {
-	char auid_l_[PADL_(uid_t * __capability)]; uid_t * __capability auid; char auid_r_[PADR_(uid_t * __capability)];
+	char auid_l_[PADL_(uid_t * __kerncap)]; uid_t * __kerncap auid; char auid_r_[PADR_(uid_t * __kerncap)];
 };
 struct setauid_args {
-	char auid_l_[PADL_(uid_t * __capability)]; uid_t * __capability auid; char auid_r_[PADR_(uid_t * __capability)];
+	char auid_l_[PADL_(uid_t * __kerncap)]; uid_t * __kerncap auid; char auid_r_[PADR_(uid_t * __kerncap)];
 };
 struct getaudit_args {
-	char auditinfo_l_[PADL_(struct auditinfo * __capability)]; struct auditinfo * __capability auditinfo; char auditinfo_r_[PADR_(struct auditinfo * __capability)];
+	char auditinfo_l_[PADL_(struct auditinfo * __kerncap)]; struct auditinfo * __kerncap auditinfo; char auditinfo_r_[PADR_(struct auditinfo * __kerncap)];
 };
 struct setaudit_args {
-	char auditinfo_l_[PADL_(struct auditinfo * __capability)]; struct auditinfo * __capability auditinfo; char auditinfo_r_[PADR_(struct auditinfo * __capability)];
+	char auditinfo_l_[PADL_(struct auditinfo * __kerncap)]; struct auditinfo * __kerncap auditinfo; char auditinfo_r_[PADR_(struct auditinfo * __kerncap)];
 };
 struct getaudit_addr_args {
-	char auditinfo_addr_l_[PADL_(struct auditinfo_addr * __capability)]; struct auditinfo_addr * __capability auditinfo_addr; char auditinfo_addr_r_[PADR_(struct auditinfo_addr * __capability)];
+	char auditinfo_addr_l_[PADL_(struct auditinfo_addr * __kerncap)]; struct auditinfo_addr * __kerncap auditinfo_addr; char auditinfo_addr_r_[PADR_(struct auditinfo_addr * __kerncap)];
 	char length_l_[PADL_(u_int)]; u_int length; char length_r_[PADR_(u_int)];
 };
 struct setaudit_addr_args {
-	char auditinfo_addr_l_[PADL_(struct auditinfo_addr * __capability)]; struct auditinfo_addr * __capability auditinfo_addr; char auditinfo_addr_r_[PADR_(struct auditinfo_addr * __capability)];
+	char auditinfo_addr_l_[PADL_(struct auditinfo_addr * __kerncap)]; struct auditinfo_addr * __kerncap auditinfo_addr; char auditinfo_addr_r_[PADR_(struct auditinfo_addr * __kerncap)];
 	char length_l_[PADL_(u_int)]; u_int length; char length_r_[PADR_(u_int)];
 };
 struct auditctl_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 };
 struct _umtx_op_args {
-	char obj_l_[PADL_(void * __capability)]; void * __capability obj; char obj_r_[PADR_(void * __capability)];
+	char obj_l_[PADL_(void * __kerncap)]; void * __kerncap obj; char obj_r_[PADR_(void * __kerncap)];
 	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];
 	char val_l_[PADL_(u_long)]; u_long val; char val_r_[PADR_(u_long)];
-	char uaddr1_l_[PADL_(void * __capability)]; void * __capability uaddr1; char uaddr1_r_[PADR_(void * __capability)];
-	char uaddr2_l_[PADL_(void * __capability)]; void * __capability uaddr2; char uaddr2_r_[PADR_(void * __capability)];
+	char uaddr1_l_[PADL_(void * __kerncap)]; void * __kerncap uaddr1; char uaddr1_r_[PADR_(void * __kerncap)];
+	char uaddr2_l_[PADL_(void * __kerncap)]; void * __kerncap uaddr2; char uaddr2_r_[PADR_(void * __kerncap)];
 };
 struct thr_new_args {
-	char param_l_[PADL_(struct thr_param * __capability)]; struct thr_param * __capability param; char param_r_[PADR_(struct thr_param * __capability)];
+	char param_l_[PADL_(struct thr_param * __kerncap)]; struct thr_param * __kerncap param; char param_r_[PADR_(struct thr_param * __kerncap)];
 	char param_size_l_[PADL_(int)]; int param_size; char param_size_r_[PADR_(int)];
 };
 struct sigqueue_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
 	char signum_l_[PADL_(int)]; int signum; char signum_r_[PADR_(int)];
-	char value_l_[PADL_(void * __capability)]; void * __capability value; char value_r_[PADR_(void * __capability)];
+	char value_l_[PADL_(void * __kerncap)]; void * __kerncap value; char value_r_[PADR_(void * __kerncap)];
 };
 struct kmq_open_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
-	char attr_l_[PADL_(const struct mq_attr * __capability)]; const struct mq_attr * __capability attr; char attr_r_[PADR_(const struct mq_attr * __capability)];
+	char attr_l_[PADL_(const struct mq_attr * __kerncap)]; const struct mq_attr * __kerncap attr; char attr_r_[PADR_(const struct mq_attr * __kerncap)];
 };
 struct kmq_setattr_args {
 	char mqd_l_[PADL_(int)]; int mqd; char mqd_r_[PADR_(int)];
-	char attr_l_[PADL_(const struct mq_attr * __capability)]; const struct mq_attr * __capability attr; char attr_r_[PADR_(const struct mq_attr * __capability)];
-	char oattr_l_[PADL_(struct mq_attr * __capability)]; struct mq_attr * __capability oattr; char oattr_r_[PADR_(struct mq_attr * __capability)];
+	char attr_l_[PADL_(const struct mq_attr * __kerncap)]; const struct mq_attr * __kerncap attr; char attr_r_[PADR_(const struct mq_attr * __kerncap)];
+	char oattr_l_[PADL_(struct mq_attr * __kerncap)]; struct mq_attr * __kerncap oattr; char oattr_r_[PADR_(struct mq_attr * __kerncap)];
 };
 struct kmq_timedreceive_args {
 	char mqd_l_[PADL_(int)]; int mqd; char mqd_r_[PADR_(int)];
-	char msg_ptr_l_[PADL_(char * __capability)]; char * __capability msg_ptr; char msg_ptr_r_[PADR_(char * __capability)];
+	char msg_ptr_l_[PADL_(char * __kerncap)]; char * __kerncap msg_ptr; char msg_ptr_r_[PADR_(char * __kerncap)];
 	char msg_len_l_[PADL_(size_t)]; size_t msg_len; char msg_len_r_[PADR_(size_t)];
-	char msg_prio_l_[PADL_(unsigned * __capability)]; unsigned * __capability msg_prio; char msg_prio_r_[PADR_(unsigned * __capability)];
-	char abs_timeout_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability abs_timeout; char abs_timeout_r_[PADR_(const struct timespec * __capability)];
+	char msg_prio_l_[PADL_(unsigned * __kerncap)]; unsigned * __kerncap msg_prio; char msg_prio_r_[PADR_(unsigned * __kerncap)];
+	char abs_timeout_l_[PADL_(const struct timespec * __kerncap)]; const struct timespec * __kerncap abs_timeout; char abs_timeout_r_[PADR_(const struct timespec * __kerncap)];
 };
 struct kmq_timedsend_args {
 	char mqd_l_[PADL_(int)]; int mqd; char mqd_r_[PADR_(int)];
-	char msg_ptr_l_[PADL_(const char * __capability)]; const char * __capability msg_ptr; char msg_ptr_r_[PADR_(const char * __capability)];
+	char msg_ptr_l_[PADL_(const char * __kerncap)]; const char * __kerncap msg_ptr; char msg_ptr_r_[PADR_(const char * __kerncap)];
 	char msg_len_l_[PADL_(size_t)]; size_t msg_len; char msg_len_r_[PADR_(size_t)];
 	char msg_prio_l_[PADL_(unsigned)]; unsigned msg_prio; char msg_prio_r_[PADR_(unsigned)];
-	char abs_timeout_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability abs_timeout; char abs_timeout_r_[PADR_(const struct timespec * __capability)];
+	char abs_timeout_l_[PADL_(const struct timespec * __kerncap)]; const struct timespec * __kerncap abs_timeout; char abs_timeout_r_[PADR_(const struct timespec * __kerncap)];
 };
 struct kmq_notify_args {
 	char mqd_l_[PADL_(int)]; int mqd; char mqd_r_[PADR_(int)];
-	char sigev_l_[PADL_(const struct sigevent * __capability)]; const struct sigevent * __capability sigev; char sigev_r_[PADR_(const struct sigevent * __capability)];
+	char sigev_l_[PADL_(const struct sigevent * __kerncap)]; const struct sigevent * __kerncap sigev; char sigev_r_[PADR_(const struct sigevent * __kerncap)];
 };
 struct kmq_unlink_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 };
 struct abort2_args {
-	char why_l_[PADL_(const char * __capability)]; const char * __capability why; char why_r_[PADR_(const char * __capability)];
+	char why_l_[PADL_(const char * __kerncap)]; const char * __kerncap why; char why_r_[PADR_(const char * __kerncap)];
 	char nargs_l_[PADL_(int)]; int nargs; char nargs_r_[PADR_(int)];
-	char args_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability args; char args_r_[PADR_(void * __capability * __capability)];
+	char args_l_[PADL_(void * __kerncap * __kerncap)]; void * __kerncap * __kerncap args; char args_r_[PADR_(void * __kerncap * __kerncap)];
 };
 struct thr_set_name_args {
 	char id_l_[PADL_(long)]; long id; char id_r_[PADR_(long)];
-	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
+	char name_l_[PADL_(const char * __kerncap)]; const char * __kerncap name; char name_r_[PADR_(const char * __kerncap)];
 };
 struct aio_fsync_args {
 	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];
-	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __kerncap)]; struct aiocb * __kerncap aiocbp; char aiocbp_r_[PADR_(struct aiocb * __kerncap)];
 };
 struct rtprio_thread_args {
 	char function_l_[PADL_(int)]; int function; char function_r_[PADR_(int)];
 	char lwpid_l_[PADL_(lwpid_t)]; lwpid_t lwpid; char lwpid_r_[PADR_(lwpid_t)];
-	char rtp_l_[PADL_(struct rtprio * __capability)]; struct rtprio * __capability rtp; char rtp_r_[PADR_(struct rtprio * __capability)];
+	char rtp_l_[PADL_(struct rtprio * __kerncap)]; struct rtprio * __kerncap rtp; char rtp_r_[PADR_(struct rtprio * __kerncap)];
 };
 struct sctp_peeloff_args {
 	char sd_l_[PADL_(int)]; int sd; char sd_r_[PADR_(int)];
@@ -1328,45 +1328,45 @@ struct sctp_peeloff_args {
 };
 struct sctp_generic_sendmsg_args {
 	char sd_l_[PADL_(int)]; int sd; char sd_r_[PADR_(int)];
-	char msg_l_[PADL_(void * __capability)]; void * __capability msg; char msg_r_[PADR_(void * __capability)];
+	char msg_l_[PADL_(void * __kerncap)]; void * __kerncap msg; char msg_r_[PADR_(void * __kerncap)];
 	char mlen_l_[PADL_(int)]; int mlen; char mlen_r_[PADR_(int)];
-	char to_l_[PADL_(const struct sockaddr * __capability)]; const struct sockaddr * __capability to; char to_r_[PADR_(const struct sockaddr * __capability)];
+	char to_l_[PADL_(const struct sockaddr * __kerncap)]; const struct sockaddr * __kerncap to; char to_r_[PADR_(const struct sockaddr * __kerncap)];
 	char tolen_l_[PADL_(__socklen_t)]; __socklen_t tolen; char tolen_r_[PADR_(__socklen_t)];
-	char sinfo_l_[PADL_(struct sctp_sndrcvinfo * __capability)]; struct sctp_sndrcvinfo * __capability sinfo; char sinfo_r_[PADR_(struct sctp_sndrcvinfo * __capability)];
+	char sinfo_l_[PADL_(struct sctp_sndrcvinfo * __kerncap)]; struct sctp_sndrcvinfo * __kerncap sinfo; char sinfo_r_[PADR_(struct sctp_sndrcvinfo * __kerncap)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct sctp_generic_sendmsg_iov_args {
 	char sd_l_[PADL_(int)]; int sd; char sd_r_[PADR_(int)];
-	char iov_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iov; char iov_r_[PADR_(struct iovec * __capability)];
+	char iov_l_[PADL_(struct iovec * __kerncap)]; struct iovec * __kerncap iov; char iov_r_[PADR_(struct iovec * __kerncap)];
 	char iovlen_l_[PADL_(int)]; int iovlen; char iovlen_r_[PADR_(int)];
-	char to_l_[PADL_(const struct sockaddr * __capability)]; const struct sockaddr * __capability to; char to_r_[PADR_(const struct sockaddr * __capability)];
+	char to_l_[PADL_(const struct sockaddr * __kerncap)]; const struct sockaddr * __kerncap to; char to_r_[PADR_(const struct sockaddr * __kerncap)];
 	char tolen_l_[PADL_(__socklen_t)]; __socklen_t tolen; char tolen_r_[PADR_(__socklen_t)];
-	char sinfo_l_[PADL_(struct sctp_sndrcvinfo * __capability)]; struct sctp_sndrcvinfo * __capability sinfo; char sinfo_r_[PADR_(struct sctp_sndrcvinfo * __capability)];
+	char sinfo_l_[PADL_(struct sctp_sndrcvinfo * __kerncap)]; struct sctp_sndrcvinfo * __kerncap sinfo; char sinfo_r_[PADR_(struct sctp_sndrcvinfo * __kerncap)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct sctp_generic_recvmsg_args {
 	char sd_l_[PADL_(int)]; int sd; char sd_r_[PADR_(int)];
-	char iov_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iov; char iov_r_[PADR_(struct iovec * __capability)];
+	char iov_l_[PADL_(struct iovec * __kerncap)]; struct iovec * __kerncap iov; char iov_r_[PADR_(struct iovec * __kerncap)];
 	char iovlen_l_[PADL_(int)]; int iovlen; char iovlen_r_[PADR_(int)];
-	char from_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability from; char from_r_[PADR_(struct sockaddr * __capability)];
-	char fromlenaddr_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t * __capability)];
-	char sinfo_l_[PADL_(struct sctp_sndrcvinfo * __capability)]; struct sctp_sndrcvinfo * __capability sinfo; char sinfo_r_[PADR_(struct sctp_sndrcvinfo * __capability)];
-	char msg_flags_l_[PADL_(int * __capability)]; int * __capability msg_flags; char msg_flags_r_[PADR_(int * __capability)];
+	char from_l_[PADL_(struct sockaddr * __kerncap)]; struct sockaddr * __kerncap from; char from_r_[PADR_(struct sockaddr * __kerncap)];
+	char fromlenaddr_l_[PADL_(__socklen_t * __kerncap)]; __socklen_t * __kerncap fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t * __kerncap)];
+	char sinfo_l_[PADL_(struct sctp_sndrcvinfo * __kerncap)]; struct sctp_sndrcvinfo * __kerncap sinfo; char sinfo_r_[PADR_(struct sctp_sndrcvinfo * __kerncap)];
+	char msg_flags_l_[PADL_(int * __kerncap)]; int * __kerncap msg_flags; char msg_flags_r_[PADR_(int * __kerncap)];
 };
 struct pread_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char buf_l_[PADL_(void * __capability)]; void * __capability buf; char buf_r_[PADR_(void * __capability)];
+	char buf_l_[PADL_(void * __kerncap)]; void * __kerncap buf; char buf_r_[PADR_(void * __kerncap)];
 	char nbyte_l_[PADL_(size_t)]; size_t nbyte; char nbyte_r_[PADR_(size_t)];
 	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
 };
 struct pwrite_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char buf_l_[PADL_(const void * __capability)]; const void * __capability buf; char buf_r_[PADR_(const void * __capability)];
+	char buf_l_[PADL_(const void * __kerncap)]; const void * __kerncap buf; char buf_r_[PADR_(const void * __kerncap)];
 	char nbyte_l_[PADL_(size_t)]; size_t nbyte; char nbyte_r_[PADR_(size_t)];
 	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
 };
 struct mmap_args {
-	char addr_l_[PADL_(void * __capability)]; void * __capability addr; char addr_r_[PADR_(void * __capability)];
+	char addr_l_[PADL_(void * __kerncap)]; void * __kerncap addr; char addr_r_[PADR_(void * __kerncap)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char prot_l_[PADL_(int)]; int prot; char prot_r_[PADR_(int)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
@@ -1379,7 +1379,7 @@ struct lseek_args {
 	char whence_l_[PADL_(int)]; int whence; char whence_r_[PADR_(int)];
 };
 struct truncate_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char length_l_[PADL_(off_t)]; off_t length; char length_r_[PADR_(off_t)];
 };
 struct ftruncate_args {
@@ -1392,10 +1392,10 @@ struct thr_kill2_args {
 	char sig_l_[PADL_(int)]; int sig; char sig_r_[PADR_(int)];
 };
 struct shm_unlink_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 };
 struct cpuset_args {
-	char setid_l_[PADL_(cpusetid_t * __capability)]; cpusetid_t * __capability setid; char setid_r_[PADR_(cpusetid_t * __capability)];
+	char setid_l_[PADL_(cpusetid_t * __kerncap)]; cpusetid_t * __kerncap setid; char setid_r_[PADR_(cpusetid_t * __kerncap)];
 };
 struct cpuset_setid_args {
 	char which_l_[PADL_(cpuwhich_t)]; cpuwhich_t which; char which_r_[PADR_(cpuwhich_t)];
@@ -1406,109 +1406,109 @@ struct cpuset_getid_args {
 	char level_l_[PADL_(cpulevel_t)]; cpulevel_t level; char level_r_[PADR_(cpulevel_t)];
 	char which_l_[PADL_(cpuwhich_t)]; cpuwhich_t which; char which_r_[PADR_(cpuwhich_t)];
 	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
-	char setid_l_[PADL_(cpusetid_t * __capability)]; cpusetid_t * __capability setid; char setid_r_[PADR_(cpusetid_t * __capability)];
+	char setid_l_[PADL_(cpusetid_t * __kerncap)]; cpusetid_t * __kerncap setid; char setid_r_[PADR_(cpusetid_t * __kerncap)];
 };
 struct cpuset_getaffinity_args {
 	char level_l_[PADL_(cpulevel_t)]; cpulevel_t level; char level_r_[PADR_(cpulevel_t)];
 	char which_l_[PADL_(cpuwhich_t)]; cpuwhich_t which; char which_r_[PADR_(cpuwhich_t)];
 	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
 	char cpusetsize_l_[PADL_(size_t)]; size_t cpusetsize; char cpusetsize_r_[PADR_(size_t)];
-	char mask_l_[PADL_(cpuset_t * __capability)]; cpuset_t * __capability mask; char mask_r_[PADR_(cpuset_t * __capability)];
+	char mask_l_[PADL_(cpuset_t * __kerncap)]; cpuset_t * __kerncap mask; char mask_r_[PADR_(cpuset_t * __kerncap)];
 };
 struct cpuset_setaffinity_args {
 	char level_l_[PADL_(cpulevel_t)]; cpulevel_t level; char level_r_[PADR_(cpulevel_t)];
 	char which_l_[PADL_(cpuwhich_t)]; cpuwhich_t which; char which_r_[PADR_(cpuwhich_t)];
 	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
 	char cpusetsize_l_[PADL_(size_t)]; size_t cpusetsize; char cpusetsize_r_[PADR_(size_t)];
-	char mask_l_[PADL_(const cpuset_t * __capability)]; const cpuset_t * __capability mask; char mask_r_[PADR_(const cpuset_t * __capability)];
+	char mask_l_[PADL_(const cpuset_t * __kerncap)]; const cpuset_t * __kerncap mask; char mask_r_[PADR_(const cpuset_t * __kerncap)];
 };
 struct faccessat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char amode_l_[PADL_(int)]; int amode; char amode_r_[PADR_(int)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
 struct fchmodat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
 struct fchownat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char uid_l_[PADL_(uid_t)]; uid_t uid; char uid_r_[PADR_(uid_t)];
 	char gid_l_[PADL_(gid_t)]; gid_t gid; char gid_r_[PADR_(gid_t)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
 struct fexecve_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char argv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability argv; char argv_r_[PADR_(char * __capability * __capability)];
-	char envv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability envv; char envv_r_[PADR_(char * __capability * __capability)];
+	char argv_l_[PADL_(char * __kerncap * __kerncap)]; char * __kerncap * __kerncap argv; char argv_r_[PADR_(char * __kerncap * __kerncap)];
+	char envv_l_[PADL_(char * __kerncap * __kerncap)]; char * __kerncap * __kerncap envv; char envv_r_[PADR_(char * __kerncap * __kerncap)];
 };
 struct futimesat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
-	char times_l_[PADL_(const struct timeval * __capability)]; const struct timeval * __capability times; char times_r_[PADR_(const struct timeval * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
+	char times_l_[PADL_(const struct timeval * __kerncap)]; const struct timeval * __kerncap times; char times_r_[PADR_(const struct timeval * __kerncap)];
 };
 struct linkat_args {
 	char fd1_l_[PADL_(int)]; int fd1; char fd1_r_[PADR_(int)];
-	char path1_l_[PADL_(const char * __capability)]; const char * __capability path1; char path1_r_[PADR_(const char * __capability)];
+	char path1_l_[PADL_(const char * __kerncap)]; const char * __kerncap path1; char path1_r_[PADR_(const char * __kerncap)];
 	char fd2_l_[PADL_(int)]; int fd2; char fd2_r_[PADR_(int)];
-	char path2_l_[PADL_(const char * __capability)]; const char * __capability path2; char path2_r_[PADR_(const char * __capability)];
+	char path2_l_[PADL_(const char * __kerncap)]; const char * __kerncap path2; char path2_r_[PADR_(const char * __kerncap)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
 struct mkdirat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 };
 struct mkfifoat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 };
 struct openat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 };
 struct readlinkat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
-	char buf_l_[PADL_(char * __capability)]; char * __capability buf; char buf_r_[PADR_(char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
+	char buf_l_[PADL_(char * __kerncap)]; char * __kerncap buf; char buf_r_[PADR_(char * __kerncap)];
 	char bufsize_l_[PADL_(size_t)]; size_t bufsize; char bufsize_r_[PADR_(size_t)];
 };
 struct renameat_args {
 	char oldfd_l_[PADL_(int)]; int oldfd; char oldfd_r_[PADR_(int)];
-	char old_l_[PADL_(const char * __capability)]; const char * __capability old; char old_r_[PADR_(const char * __capability)];
+	char old_l_[PADL_(const char * __kerncap)]; const char * __kerncap old; char old_r_[PADR_(const char * __kerncap)];
 	char newfd_l_[PADL_(int)]; int newfd; char newfd_r_[PADR_(int)];
-	char new_l_[PADL_(const char * __capability)]; const char * __capability new; char new_r_[PADR_(const char * __capability)];
+	char new_l_[PADL_(const char * __kerncap)]; const char * __kerncap new; char new_r_[PADR_(const char * __kerncap)];
 };
 struct symlinkat_args {
-	char path1_l_[PADL_(const char * __capability)]; const char * __capability path1; char path1_r_[PADR_(const char * __capability)];
+	char path1_l_[PADL_(const char * __kerncap)]; const char * __kerncap path1; char path1_r_[PADR_(const char * __kerncap)];
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path2_l_[PADL_(const char * __capability)]; const char * __capability path2; char path2_r_[PADR_(const char * __capability)];
+	char path2_l_[PADL_(const char * __kerncap)]; const char * __kerncap path2; char path2_r_[PADR_(const char * __kerncap)];
 };
 struct unlinkat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
 struct posix_openpt_args {
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct gssd_syscall_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 };
 struct jail_get_args {
-	char iovp_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iovp; char iovp_r_[PADR_(struct iovec * __capability)];
+	char iovp_l_[PADL_(struct iovec * __kerncap)]; struct iovec * __kerncap iovp; char iovp_r_[PADR_(struct iovec * __kerncap)];
 	char iovcnt_l_[PADL_(unsigned int)]; unsigned int iovcnt; char iovcnt_r_[PADR_(unsigned int)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct jail_set_args {
-	char iovp_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iovp; char iovp_r_[PADR_(struct iovec * __capability)];
+	char iovp_l_[PADL_(struct iovec * __kerncap)]; struct iovec * __kerncap iovp; char iovp_r_[PADR_(struct iovec * __kerncap)];
 	char iovcnt_l_[PADL_(unsigned int)]; unsigned int iovcnt; char iovcnt_r_[PADR_(unsigned int)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
@@ -1519,35 +1519,35 @@ struct __semctl_args {
 	char semid_l_[PADL_(int)]; int semid; char semid_r_[PADR_(int)];
 	char semnum_l_[PADL_(int)]; int semnum; char semnum_r_[PADR_(int)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char arg_l_[PADL_(union semun * __capability)]; union semun * __capability arg; char arg_r_[PADR_(union semun * __capability)];
+	char arg_l_[PADL_(union semun * __kerncap)]; union semun * __kerncap arg; char arg_r_[PADR_(union semun * __kerncap)];
 };
 struct msgctl_args {
 	char msqid_l_[PADL_(int)]; int msqid; char msqid_r_[PADR_(int)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char buf_l_[PADL_(struct msqid_ds * __capability)]; struct msqid_ds * __capability buf; char buf_r_[PADR_(struct msqid_ds * __capability)];
+	char buf_l_[PADL_(struct msqid_ds * __kerncap)]; struct msqid_ds * __kerncap buf; char buf_r_[PADR_(struct msqid_ds * __kerncap)];
 };
 struct shmctl_args {
 	char shmid_l_[PADL_(int)]; int shmid; char shmid_r_[PADR_(int)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char buf_l_[PADL_(struct shmid_ds * __capability)]; struct shmid_ds * __capability buf; char buf_r_[PADR_(struct shmid_ds * __capability)];
+	char buf_l_[PADL_(struct shmid_ds * __kerncap)]; struct shmid_ds * __kerncap buf; char buf_r_[PADR_(struct shmid_ds * __kerncap)];
 };
 struct lpathconf_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char name_l_[PADL_(int)]; int name; char name_r_[PADR_(int)];
 };
 struct __cap_rights_get_args {
 	char version_l_[PADL_(int)]; int version; char version_r_[PADR_(int)];
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char rightsp_l_[PADL_(cap_rights_t * __capability)]; cap_rights_t * __capability rightsp; char rightsp_r_[PADR_(cap_rights_t * __capability)];
+	char rightsp_l_[PADL_(cap_rights_t * __kerncap)]; cap_rights_t * __kerncap rightsp; char rightsp_r_[PADR_(cap_rights_t * __kerncap)];
 };
 struct cap_enter_args {
 	syscallarg_t dummy;
 };
 struct cap_getmode_args {
-	char modep_l_[PADL_(u_int * __capability)]; u_int * __capability modep; char modep_r_[PADR_(u_int * __capability)];
+	char modep_l_[PADL_(u_int * __kerncap)]; u_int * __kerncap modep; char modep_r_[PADR_(u_int * __kerncap)];
 };
 struct pdfork_args {
-	char fdp_l_[PADL_(int * __capability)]; int * __capability fdp; char fdp_r_[PADR_(int * __capability)];
+	char fdp_l_[PADL_(int * __kerncap)]; int * __kerncap fdp; char fdp_r_[PADR_(int * __kerncap)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct pdkill_args {
@@ -1556,51 +1556,51 @@ struct pdkill_args {
 };
 struct pdgetpid_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char pidp_l_[PADL_(pid_t * __capability)]; pid_t * __capability pidp; char pidp_r_[PADR_(pid_t * __capability)];
+	char pidp_l_[PADL_(pid_t * __kerncap)]; pid_t * __kerncap pidp; char pidp_r_[PADR_(pid_t * __kerncap)];
 };
 struct pselect_args {
 	char nd_l_[PADL_(int)]; int nd; char nd_r_[PADR_(int)];
-	char in_l_[PADL_(fd_set * __capability)]; fd_set * __capability in; char in_r_[PADR_(fd_set * __capability)];
-	char ou_l_[PADL_(fd_set * __capability)]; fd_set * __capability ou; char ou_r_[PADR_(fd_set * __capability)];
-	char ex_l_[PADL_(fd_set * __capability)]; fd_set * __capability ex; char ex_r_[PADR_(fd_set * __capability)];
-	char ts_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability ts; char ts_r_[PADR_(const struct timespec * __capability)];
-	char sm_l_[PADL_(const sigset_t * __capability)]; const sigset_t * __capability sm; char sm_r_[PADR_(const sigset_t * __capability)];
+	char in_l_[PADL_(fd_set * __kerncap)]; fd_set * __kerncap in; char in_r_[PADR_(fd_set * __kerncap)];
+	char ou_l_[PADL_(fd_set * __kerncap)]; fd_set * __kerncap ou; char ou_r_[PADR_(fd_set * __kerncap)];
+	char ex_l_[PADL_(fd_set * __kerncap)]; fd_set * __kerncap ex; char ex_r_[PADR_(fd_set * __kerncap)];
+	char ts_l_[PADL_(const struct timespec * __kerncap)]; const struct timespec * __kerncap ts; char ts_r_[PADR_(const struct timespec * __kerncap)];
+	char sm_l_[PADL_(const sigset_t * __kerncap)]; const sigset_t * __kerncap sm; char sm_r_[PADR_(const sigset_t * __kerncap)];
 };
 struct getloginclass_args {
-	char namebuf_l_[PADL_(char * __capability)]; char * __capability namebuf; char namebuf_r_[PADR_(char * __capability)];
+	char namebuf_l_[PADL_(char * __kerncap)]; char * __kerncap namebuf; char namebuf_r_[PADR_(char * __kerncap)];
 	char namelen_l_[PADL_(size_t)]; size_t namelen; char namelen_r_[PADR_(size_t)];
 };
 struct setloginclass_args {
-	char namebuf_l_[PADL_(const char * __capability)]; const char * __capability namebuf; char namebuf_r_[PADR_(const char * __capability)];
+	char namebuf_l_[PADL_(const char * __kerncap)]; const char * __kerncap namebuf; char namebuf_r_[PADR_(const char * __kerncap)];
 };
 struct rctl_get_racct_args {
-	char inbufp_l_[PADL_(const void * __capability)]; const void * __capability inbufp; char inbufp_r_[PADR_(const void * __capability)];
+	char inbufp_l_[PADL_(const void * __kerncap)]; const void * __kerncap inbufp; char inbufp_r_[PADR_(const void * __kerncap)];
 	char inbuflen_l_[PADL_(size_t)]; size_t inbuflen; char inbuflen_r_[PADR_(size_t)];
-	char outbufp_l_[PADL_(void * __capability)]; void * __capability outbufp; char outbufp_r_[PADR_(void * __capability)];
+	char outbufp_l_[PADL_(void * __kerncap)]; void * __kerncap outbufp; char outbufp_r_[PADR_(void * __kerncap)];
 	char outbuflen_l_[PADL_(size_t)]; size_t outbuflen; char outbuflen_r_[PADR_(size_t)];
 };
 struct rctl_get_rules_args {
-	char inbufp_l_[PADL_(const void * __capability)]; const void * __capability inbufp; char inbufp_r_[PADR_(const void * __capability)];
+	char inbufp_l_[PADL_(const void * __kerncap)]; const void * __kerncap inbufp; char inbufp_r_[PADR_(const void * __kerncap)];
 	char inbuflen_l_[PADL_(size_t)]; size_t inbuflen; char inbuflen_r_[PADR_(size_t)];
-	char outbufp_l_[PADL_(void * __capability)]; void * __capability outbufp; char outbufp_r_[PADR_(void * __capability)];
+	char outbufp_l_[PADL_(void * __kerncap)]; void * __kerncap outbufp; char outbufp_r_[PADR_(void * __kerncap)];
 	char outbuflen_l_[PADL_(size_t)]; size_t outbuflen; char outbuflen_r_[PADR_(size_t)];
 };
 struct rctl_get_limits_args {
-	char inbufp_l_[PADL_(const void * __capability)]; const void * __capability inbufp; char inbufp_r_[PADR_(const void * __capability)];
+	char inbufp_l_[PADL_(const void * __kerncap)]; const void * __kerncap inbufp; char inbufp_r_[PADR_(const void * __kerncap)];
 	char inbuflen_l_[PADL_(size_t)]; size_t inbuflen; char inbuflen_r_[PADR_(size_t)];
-	char outbufp_l_[PADL_(void * __capability)]; void * __capability outbufp; char outbufp_r_[PADR_(void * __capability)];
+	char outbufp_l_[PADL_(void * __kerncap)]; void * __kerncap outbufp; char outbufp_r_[PADR_(void * __kerncap)];
 	char outbuflen_l_[PADL_(size_t)]; size_t outbuflen; char outbuflen_r_[PADR_(size_t)];
 };
 struct rctl_add_rule_args {
-	char inbufp_l_[PADL_(const void * __capability)]; const void * __capability inbufp; char inbufp_r_[PADR_(const void * __capability)];
+	char inbufp_l_[PADL_(const void * __kerncap)]; const void * __kerncap inbufp; char inbufp_r_[PADR_(const void * __kerncap)];
 	char inbuflen_l_[PADL_(size_t)]; size_t inbuflen; char inbuflen_r_[PADR_(size_t)];
-	char outbufp_l_[PADL_(void * __capability)]; void * __capability outbufp; char outbufp_r_[PADR_(void * __capability)];
+	char outbufp_l_[PADL_(void * __kerncap)]; void * __kerncap outbufp; char outbufp_r_[PADR_(void * __kerncap)];
 	char outbuflen_l_[PADL_(size_t)]; size_t outbuflen; char outbuflen_r_[PADR_(size_t)];
 };
 struct rctl_remove_rule_args {
-	char inbufp_l_[PADL_(const void * __capability)]; const void * __capability inbufp; char inbufp_r_[PADR_(const void * __capability)];
+	char inbufp_l_[PADL_(const void * __kerncap)]; const void * __kerncap inbufp; char inbufp_r_[PADR_(const void * __kerncap)];
 	char inbuflen_l_[PADL_(size_t)]; size_t inbuflen; char inbuflen_r_[PADR_(size_t)];
-	char outbufp_l_[PADL_(void * __capability)]; void * __capability outbufp; char outbufp_r_[PADR_(void * __capability)];
+	char outbufp_l_[PADL_(void * __kerncap)]; void * __kerncap outbufp; char outbufp_r_[PADR_(void * __kerncap)];
 	char outbuflen_l_[PADL_(size_t)]; size_t outbuflen; char outbuflen_r_[PADR_(size_t)];
 };
 struct posix_fallocate_args {
@@ -1617,23 +1617,23 @@ struct posix_fadvise_args {
 struct wait6_args {
 	char idtype_l_[PADL_(idtype_t)]; idtype_t idtype; char idtype_r_[PADR_(idtype_t)];
 	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
-	char status_l_[PADL_(int * __capability)]; int * __capability status; char status_r_[PADR_(int * __capability)];
+	char status_l_[PADL_(int * __kerncap)]; int * __kerncap status; char status_r_[PADR_(int * __kerncap)];
 	char options_l_[PADL_(int)]; int options; char options_r_[PADR_(int)];
-	char wrusage_l_[PADL_(struct __wrusage * __capability)]; struct __wrusage * __capability wrusage; char wrusage_r_[PADR_(struct __wrusage * __capability)];
-	char info_l_[PADL_(struct __siginfo * __capability)]; struct __siginfo * __capability info; char info_r_[PADR_(struct __siginfo * __capability)];
+	char wrusage_l_[PADL_(struct __wrusage * __kerncap)]; struct __wrusage * __kerncap wrusage; char wrusage_r_[PADR_(struct __wrusage * __kerncap)];
+	char info_l_[PADL_(struct __siginfo * __kerncap)]; struct __siginfo * __kerncap info; char info_r_[PADR_(struct __siginfo * __kerncap)];
 };
 struct cap_rights_limit_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char rightsp_l_[PADL_(cap_rights_t * __capability)]; cap_rights_t * __capability rightsp; char rightsp_r_[PADR_(cap_rights_t * __capability)];
+	char rightsp_l_[PADL_(cap_rights_t * __kerncap)]; cap_rights_t * __kerncap rightsp; char rightsp_r_[PADR_(cap_rights_t * __kerncap)];
 };
 struct cap_ioctls_limit_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char cmds_l_[PADL_(const u_long * __capability)]; const u_long * __capability cmds; char cmds_r_[PADR_(const u_long * __capability)];
+	char cmds_l_[PADL_(const u_long * __kerncap)]; const u_long * __kerncap cmds; char cmds_r_[PADR_(const u_long * __kerncap)];
 	char ncmds_l_[PADL_(size_t)]; size_t ncmds; char ncmds_r_[PADR_(size_t)];
 };
 struct cap_ioctls_get_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char cmds_l_[PADL_(u_long * __capability)]; u_long * __capability cmds; char cmds_r_[PADR_(u_long * __capability)];
+	char cmds_l_[PADL_(u_long * __kerncap)]; u_long * __kerncap cmds; char cmds_r_[PADR_(u_long * __kerncap)];
 	char maxcmds_l_[PADL_(size_t)]; size_t maxcmds; char maxcmds_r_[PADR_(size_t)];
 };
 struct cap_fcntls_limit_args {
@@ -1642,59 +1642,59 @@ struct cap_fcntls_limit_args {
 };
 struct cap_fcntls_get_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char fcntlrightsp_l_[PADL_(uint32_t * __capability)]; uint32_t * __capability fcntlrightsp; char fcntlrightsp_r_[PADR_(uint32_t * __capability)];
+	char fcntlrightsp_l_[PADL_(uint32_t * __kerncap)]; uint32_t * __kerncap fcntlrightsp; char fcntlrightsp_r_[PADR_(uint32_t * __kerncap)];
 };
 struct bindat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char name_l_[PADL_(const struct sockaddr * __capability)]; const struct sockaddr * __capability name; char name_r_[PADR_(const struct sockaddr * __capability)];
+	char name_l_[PADL_(const struct sockaddr * __kerncap)]; const struct sockaddr * __kerncap name; char name_r_[PADR_(const struct sockaddr * __kerncap)];
 	char namelen_l_[PADL_(__socklen_t)]; __socklen_t namelen; char namelen_r_[PADR_(__socklen_t)];
 };
 struct connectat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char name_l_[PADL_(const struct sockaddr * __capability)]; const struct sockaddr * __capability name; char name_r_[PADR_(const struct sockaddr * __capability)];
+	char name_l_[PADL_(const struct sockaddr * __kerncap)]; const struct sockaddr * __kerncap name; char name_r_[PADR_(const struct sockaddr * __kerncap)];
 	char namelen_l_[PADL_(__socklen_t)]; __socklen_t namelen; char namelen_r_[PADR_(__socklen_t)];
 };
 struct chflagsat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char flags_l_[PADL_(u_long)]; u_long flags; char flags_r_[PADR_(u_long)];
 	char atflag_l_[PADL_(int)]; int atflag; char atflag_r_[PADR_(int)];
 };
 struct accept4_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char name_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability name; char name_r_[PADR_(struct sockaddr * __capability)];
-	char anamelen_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability anamelen; char anamelen_r_[PADR_(__socklen_t * __capability)];
+	char name_l_[PADL_(struct sockaddr * __kerncap)]; struct sockaddr * __kerncap name; char name_r_[PADR_(struct sockaddr * __kerncap)];
+	char anamelen_l_[PADL_(__socklen_t * __kerncap)]; __socklen_t * __kerncap anamelen; char anamelen_r_[PADR_(__socklen_t * __kerncap)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct pipe2_args {
-	char fildes_l_[PADL_(int * __capability)]; int * __capability fildes; char fildes_r_[PADR_(int * __capability)];
+	char fildes_l_[PADL_(int * __kerncap)]; int * __kerncap fildes; char fildes_r_[PADR_(int * __kerncap)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct aio_mlock_args {
-	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __kerncap)]; struct aiocb * __kerncap aiocbp; char aiocbp_r_[PADR_(struct aiocb * __kerncap)];
 };
 struct procctl_args {
 	char idtype_l_[PADL_(idtype_t)]; idtype_t idtype; char idtype_r_[PADR_(idtype_t)];
 	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
 	char com_l_[PADL_(int)]; int com; char com_r_[PADR_(int)];
-	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
+	char data_l_[PADL_(void * __kerncap)]; void * __kerncap data; char data_r_[PADR_(void * __kerncap)];
 };
 struct ppoll_args {
-	char fds_l_[PADL_(struct pollfd * __capability)]; struct pollfd * __capability fds; char fds_r_[PADR_(struct pollfd * __capability)];
+	char fds_l_[PADL_(struct pollfd * __kerncap)]; struct pollfd * __kerncap fds; char fds_r_[PADR_(struct pollfd * __kerncap)];
 	char nfds_l_[PADL_(u_int)]; u_int nfds; char nfds_r_[PADR_(u_int)];
-	char ts_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability ts; char ts_r_[PADR_(const struct timespec * __capability)];
-	char set_l_[PADL_(const sigset_t * __capability)]; const sigset_t * __capability set; char set_r_[PADR_(const sigset_t * __capability)];
+	char ts_l_[PADL_(const struct timespec * __kerncap)]; const struct timespec * __kerncap ts; char ts_r_[PADR_(const struct timespec * __kerncap)];
+	char set_l_[PADL_(const sigset_t * __kerncap)]; const sigset_t * __kerncap set; char set_r_[PADR_(const sigset_t * __kerncap)];
 };
 struct futimens_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char times_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability times; char times_r_[PADR_(const struct timespec * __capability)];
+	char times_l_[PADL_(const struct timespec * __kerncap)]; const struct timespec * __kerncap times; char times_r_[PADR_(const struct timespec * __kerncap)];
 };
 struct utimensat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
-	char times_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability times; char times_r_[PADR_(const struct timespec * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
+	char times_l_[PADL_(const struct timespec * __kerncap)]; const struct timespec * __kerncap times; char times_r_[PADR_(const struct timespec * __kerncap)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
 struct fdatasync_args {
@@ -1702,138 +1702,138 @@ struct fdatasync_args {
 };
 struct fstat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char sb_l_[PADL_(struct stat * __capability)]; struct stat * __capability sb; char sb_r_[PADR_(struct stat * __capability)];
+	char sb_l_[PADL_(struct stat * __kerncap)]; struct stat * __kerncap sb; char sb_r_[PADR_(struct stat * __kerncap)];
 };
 struct fstatat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
-	char buf_l_[PADL_(struct stat * __capability)]; struct stat * __capability buf; char buf_r_[PADR_(struct stat * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
+	char buf_l_[PADL_(struct stat * __kerncap)]; struct stat * __kerncap buf; char buf_r_[PADR_(struct stat * __kerncap)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
 struct fhstat_args {
-	char u_fhp_l_[PADL_(const struct fhandle * __capability)]; const struct fhandle * __capability u_fhp; char u_fhp_r_[PADR_(const struct fhandle * __capability)];
-	char sb_l_[PADL_(struct stat * __capability)]; struct stat * __capability sb; char sb_r_[PADR_(struct stat * __capability)];
+	char u_fhp_l_[PADL_(const struct fhandle * __kerncap)]; const struct fhandle * __kerncap u_fhp; char u_fhp_r_[PADR_(const struct fhandle * __kerncap)];
+	char sb_l_[PADL_(struct stat * __kerncap)]; struct stat * __kerncap sb; char sb_r_[PADR_(struct stat * __kerncap)];
 };
 struct getdirentries_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char buf_l_[PADL_(char * __capability)]; char * __capability buf; char buf_r_[PADR_(char * __capability)];
+	char buf_l_[PADL_(char * __kerncap)]; char * __kerncap buf; char buf_r_[PADR_(char * __kerncap)];
 	char count_l_[PADL_(size_t)]; size_t count; char count_r_[PADR_(size_t)];
-	char basep_l_[PADL_(off_t * __capability)]; off_t * __capability basep; char basep_r_[PADR_(off_t * __capability)];
+	char basep_l_[PADL_(off_t * __kerncap)]; off_t * __kerncap basep; char basep_r_[PADR_(off_t * __kerncap)];
 };
 struct statfs_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
-	char buf_l_[PADL_(struct statfs * __capability)]; struct statfs * __capability buf; char buf_r_[PADR_(struct statfs * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
+	char buf_l_[PADL_(struct statfs * __kerncap)]; struct statfs * __kerncap buf; char buf_r_[PADR_(struct statfs * __kerncap)];
 };
 struct fstatfs_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char buf_l_[PADL_(struct statfs * __capability)]; struct statfs * __capability buf; char buf_r_[PADR_(struct statfs * __capability)];
+	char buf_l_[PADL_(struct statfs * __kerncap)]; struct statfs * __kerncap buf; char buf_r_[PADR_(struct statfs * __kerncap)];
 };
 struct getfsstat_args {
-	char buf_l_[PADL_(struct statfs * __capability)]; struct statfs * __capability buf; char buf_r_[PADR_(struct statfs * __capability)];
+	char buf_l_[PADL_(struct statfs * __kerncap)]; struct statfs * __kerncap buf; char buf_r_[PADR_(struct statfs * __kerncap)];
 	char bufsize_l_[PADL_(long)]; long bufsize; char bufsize_r_[PADR_(long)];
 	char mode_l_[PADL_(int)]; int mode; char mode_r_[PADR_(int)];
 };
 struct fhstatfs_args {
-	char u_fhp_l_[PADL_(const struct fhandle * __capability)]; const struct fhandle * __capability u_fhp; char u_fhp_r_[PADR_(const struct fhandle * __capability)];
-	char buf_l_[PADL_(struct statfs * __capability)]; struct statfs * __capability buf; char buf_r_[PADR_(struct statfs * __capability)];
+	char u_fhp_l_[PADL_(const struct fhandle * __kerncap)]; const struct fhandle * __kerncap u_fhp; char u_fhp_r_[PADR_(const struct fhandle * __kerncap)];
+	char buf_l_[PADL_(struct statfs * __kerncap)]; struct statfs * __kerncap buf; char buf_r_[PADR_(struct statfs * __kerncap)];
 };
 struct mknodat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 	char dev_l_[PADL_(dev_t)]; dev_t dev; char dev_r_[PADR_(dev_t)];
 };
 struct kevent_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char changelist_l_[PADL_(const struct kevent * __capability)]; const struct kevent * __capability changelist; char changelist_r_[PADR_(const struct kevent * __capability)];
+	char changelist_l_[PADL_(const struct kevent * __kerncap)]; const struct kevent * __kerncap changelist; char changelist_r_[PADR_(const struct kevent * __kerncap)];
 	char nchanges_l_[PADL_(int)]; int nchanges; char nchanges_r_[PADR_(int)];
-	char eventlist_l_[PADL_(struct kevent * __capability)]; struct kevent * __capability eventlist; char eventlist_r_[PADR_(struct kevent * __capability)];
+	char eventlist_l_[PADL_(struct kevent * __kerncap)]; struct kevent * __kerncap eventlist; char eventlist_r_[PADR_(struct kevent * __kerncap)];
 	char nevents_l_[PADL_(int)]; int nevents; char nevents_r_[PADR_(int)];
-	char timeout_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability timeout; char timeout_r_[PADR_(const struct timespec * __capability)];
+	char timeout_l_[PADL_(const struct timespec * __kerncap)]; const struct timespec * __kerncap timeout; char timeout_r_[PADR_(const struct timespec * __kerncap)];
 };
 struct cpuset_getdomain_args {
 	char level_l_[PADL_(cpulevel_t)]; cpulevel_t level; char level_r_[PADR_(cpulevel_t)];
 	char which_l_[PADL_(cpuwhich_t)]; cpuwhich_t which; char which_r_[PADR_(cpuwhich_t)];
 	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
 	char domainsetsize_l_[PADL_(size_t)]; size_t domainsetsize; char domainsetsize_r_[PADR_(size_t)];
-	char mask_l_[PADL_(domainset_t * __capability)]; domainset_t * __capability mask; char mask_r_[PADR_(domainset_t * __capability)];
-	char policy_l_[PADL_(int * __capability)]; int * __capability policy; char policy_r_[PADR_(int * __capability)];
+	char mask_l_[PADL_(domainset_t * __kerncap)]; domainset_t * __kerncap mask; char mask_r_[PADR_(domainset_t * __kerncap)];
+	char policy_l_[PADL_(int * __kerncap)]; int * __kerncap policy; char policy_r_[PADR_(int * __kerncap)];
 };
 struct cpuset_setdomain_args {
 	char level_l_[PADL_(cpulevel_t)]; cpulevel_t level; char level_r_[PADR_(cpulevel_t)];
 	char which_l_[PADL_(cpuwhich_t)]; cpuwhich_t which; char which_r_[PADR_(cpuwhich_t)];
 	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
 	char domainsetsize_l_[PADL_(size_t)]; size_t domainsetsize; char domainsetsize_r_[PADR_(size_t)];
-	char mask_l_[PADL_(domainset_t * __capability)]; domainset_t * __capability mask; char mask_r_[PADR_(domainset_t * __capability)];
+	char mask_l_[PADL_(domainset_t * __kerncap)]; domainset_t * __kerncap mask; char mask_r_[PADR_(domainset_t * __kerncap)];
 	char policy_l_[PADL_(int)]; int policy; char policy_r_[PADR_(int)];
 };
 struct getrandom_args {
-	char buf_l_[PADL_(void * __capability)]; void * __capability buf; char buf_r_[PADR_(void * __capability)];
+	char buf_l_[PADL_(void * __kerncap)]; void * __kerncap buf; char buf_r_[PADR_(void * __kerncap)];
 	char buflen_l_[PADL_(size_t)]; size_t buflen; char buflen_r_[PADR_(size_t)];
 	char flags_l_[PADL_(unsigned int)]; unsigned int flags; char flags_r_[PADR_(unsigned int)];
 };
 struct getfhat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(char * __capability)]; char * __capability path; char path_r_[PADR_(char * __capability)];
-	char fhp_l_[PADL_(struct fhandle * __capability)]; struct fhandle * __capability fhp; char fhp_r_[PADR_(struct fhandle * __capability)];
+	char path_l_[PADL_(char * __kerncap)]; char * __kerncap path; char path_r_[PADR_(char * __kerncap)];
+	char fhp_l_[PADL_(struct fhandle * __kerncap)]; struct fhandle * __kerncap fhp; char fhp_r_[PADR_(struct fhandle * __kerncap)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct fhlink_args {
-	char fhp_l_[PADL_(struct fhandle * __capability)]; struct fhandle * __capability fhp; char fhp_r_[PADR_(struct fhandle * __capability)];
-	char to_l_[PADL_(const char * __capability)]; const char * __capability to; char to_r_[PADR_(const char * __capability)];
+	char fhp_l_[PADL_(struct fhandle * __kerncap)]; struct fhandle * __kerncap fhp; char fhp_r_[PADR_(struct fhandle * __kerncap)];
+	char to_l_[PADL_(const char * __kerncap)]; const char * __kerncap to; char to_r_[PADR_(const char * __kerncap)];
 };
 struct fhlinkat_args {
-	char fhp_l_[PADL_(struct fhandle * __capability)]; struct fhandle * __capability fhp; char fhp_r_[PADR_(struct fhandle * __capability)];
+	char fhp_l_[PADL_(struct fhandle * __kerncap)]; struct fhandle * __kerncap fhp; char fhp_r_[PADR_(struct fhandle * __kerncap)];
 	char tofd_l_[PADL_(int)]; int tofd; char tofd_r_[PADR_(int)];
-	char to_l_[PADL_(const char * __capability)]; const char * __capability to; char to_r_[PADR_(const char * __capability)];
+	char to_l_[PADL_(const char * __kerncap)]; const char * __kerncap to; char to_r_[PADR_(const char * __kerncap)];
 };
 struct fhreadlink_args {
-	char fhp_l_[PADL_(struct fhandle * __capability)]; struct fhandle * __capability fhp; char fhp_r_[PADR_(struct fhandle * __capability)];
-	char buf_l_[PADL_(char * __capability)]; char * __capability buf; char buf_r_[PADR_(char * __capability)];
+	char fhp_l_[PADL_(struct fhandle * __kerncap)]; struct fhandle * __kerncap fhp; char fhp_r_[PADR_(struct fhandle * __kerncap)];
+	char buf_l_[PADL_(char * __kerncap)]; char * __kerncap buf; char buf_r_[PADR_(char * __kerncap)];
 	char bufsize_l_[PADL_(size_t)]; size_t bufsize; char bufsize_r_[PADR_(size_t)];
 };
 struct funlinkat_args {
 	char dfd_l_[PADL_(int)]; int dfd; char dfd_r_[PADR_(int)];
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
 struct copy_file_range_args {
 	char infd_l_[PADL_(int)]; int infd; char infd_r_[PADR_(int)];
-	char inoffp_l_[PADL_(off_t * __capability)]; off_t * __capability inoffp; char inoffp_r_[PADR_(off_t * __capability)];
+	char inoffp_l_[PADL_(off_t * __kerncap)]; off_t * __kerncap inoffp; char inoffp_r_[PADR_(off_t * __kerncap)];
 	char outfd_l_[PADL_(int)]; int outfd; char outfd_r_[PADR_(int)];
-	char outoffp_l_[PADL_(off_t * __capability)]; off_t * __capability outoffp; char outoffp_r_[PADR_(off_t * __capability)];
+	char outoffp_l_[PADL_(off_t * __kerncap)]; off_t * __kerncap outoffp; char outoffp_r_[PADR_(off_t * __kerncap)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char flags_l_[PADL_(unsigned int)]; unsigned int flags; char flags_r_[PADR_(unsigned int)];
 };
 struct __sysctlbyname_args {
-	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
+	char name_l_[PADL_(const char * __kerncap)]; const char * __kerncap name; char name_r_[PADR_(const char * __kerncap)];
 	char namelen_l_[PADL_(size_t)]; size_t namelen; char namelen_r_[PADR_(size_t)];
-	char old_l_[PADL_(void * __capability)]; void * __capability old; char old_r_[PADR_(void * __capability)];
-	char oldlenp_l_[PADL_(size_t * __capability)]; size_t * __capability oldlenp; char oldlenp_r_[PADR_(size_t * __capability)];
-	char new_l_[PADL_(void * __capability)]; void * __capability new; char new_r_[PADR_(void * __capability)];
+	char old_l_[PADL_(void * __kerncap)]; void * __kerncap old; char old_r_[PADR_(void * __kerncap)];
+	char oldlenp_l_[PADL_(size_t * __kerncap)]; size_t * __kerncap oldlenp; char oldlenp_r_[PADR_(size_t * __kerncap)];
+	char new_l_[PADL_(void * __kerncap)]; void * __kerncap new; char new_r_[PADR_(void * __kerncap)];
 	char newlen_l_[PADL_(size_t)]; size_t newlen; char newlen_r_[PADR_(size_t)];
 };
 struct shm_open2_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 	char shmflags_l_[PADL_(int)]; int shmflags; char shmflags_r_[PADR_(int)];
-	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
+	char name_l_[PADL_(const char * __kerncap)]; const char * __kerncap name; char name_r_[PADR_(const char * __kerncap)];
 };
 struct shm_rename_args {
-	char path_from_l_[PADL_(const char * __capability)]; const char * __capability path_from; char path_from_r_[PADR_(const char * __capability)];
-	char path_to_l_[PADL_(const char * __capability)]; const char * __capability path_to; char path_to_r_[PADR_(const char * __capability)];
+	char path_from_l_[PADL_(const char * __kerncap)]; const char * __kerncap path_from; char path_from_r_[PADR_(const char * __kerncap)];
+	char path_to_l_[PADL_(const char * __kerncap)]; const char * __kerncap path_to; char path_to_r_[PADR_(const char * __kerncap)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct sigfastblock_args {
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char ptr_l_[PADL_(void * __capability)]; void * __capability ptr; char ptr_r_[PADR_(void * __capability)];
+	char ptr_l_[PADL_(void * __kerncap)]; void * __kerncap ptr; char ptr_r_[PADR_(void * __kerncap)];
 };
 struct __realpathat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
-	char buf_l_[PADL_(char * __capability)]; char * __capability buf; char buf_r_[PADR_(char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
+	char buf_l_[PADL_(char * __kerncap)]; char * __kerncap buf; char buf_r_[PADR_(char * __kerncap)];
 	char size_l_[PADL_(size_t)]; size_t size; char size_r_[PADR_(size_t)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
@@ -1844,31 +1844,31 @@ struct close_range_args {
 };
 struct rpctls_syscall_args {
 	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 };
 struct __specialfd_args {
 	char type_l_[PADL_(int)]; int type; char type_r_[PADR_(int)];
-	char req_l_[PADL_(const void * __capability)]; const void * __capability req; char req_r_[PADR_(const void * __capability)];
+	char req_l_[PADL_(const void * __kerncap)]; const void * __kerncap req; char req_r_[PADR_(const void * __kerncap)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 };
 struct aio_writev_args {
-	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __kerncap)]; struct aiocb * __kerncap aiocbp; char aiocbp_r_[PADR_(struct aiocb * __kerncap)];
 };
 struct aio_readv_args {
-	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __kerncap)]; struct aiocb * __kerncap aiocbp; char aiocbp_r_[PADR_(struct aiocb * __kerncap)];
 };
 struct fspacectl_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char rqsr_l_[PADL_(const struct spacectl_range * __capability)]; const struct spacectl_range * __capability rqsr; char rqsr_r_[PADR_(const struct spacectl_range * __capability)];
+	char rqsr_l_[PADL_(const struct spacectl_range * __kerncap)]; const struct spacectl_range * __kerncap rqsr; char rqsr_r_[PADR_(const struct spacectl_range * __kerncap)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
-	char rmsr_l_[PADL_(struct spacectl_range * __capability)]; struct spacectl_range * __capability rmsr; char rmsr_r_[PADR_(struct spacectl_range * __capability)];
+	char rmsr_l_[PADL_(struct spacectl_range * __kerncap)]; struct spacectl_range * __kerncap rmsr; char rmsr_r_[PADR_(struct spacectl_range * __kerncap)];
 };
 struct sched_getcpu_args {
 	syscallarg_t dummy;
 };
 struct swapoff_args {
-	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
+	char name_l_[PADL_(const char * __kerncap)]; const char * __kerncap name; char name_r_[PADR_(const char * __kerncap)];
 	char flags_l_[PADL_(u_int)]; u_int flags; char flags_r_[PADR_(u_int)];
 };
 struct kqueuex_args {
@@ -1885,13 +1885,13 @@ struct timerfd_create_args {
 };
 struct timerfd_gettime_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char curr_value_l_[PADL_(struct itimerspec * __capability)]; struct itimerspec * __capability curr_value; char curr_value_r_[PADR_(struct itimerspec * __capability)];
+	char curr_value_l_[PADL_(struct itimerspec * __kerncap)]; struct itimerspec * __kerncap curr_value; char curr_value_r_[PADR_(struct itimerspec * __kerncap)];
 };
 struct timerfd_settime_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
-	char new_value_l_[PADL_(const struct itimerspec * __capability)]; const struct itimerspec * __capability new_value; char new_value_r_[PADR_(const struct itimerspec * __capability)];
-	char old_value_l_[PADL_(struct itimerspec * __capability)]; struct itimerspec * __capability old_value; char old_value_r_[PADR_(struct itimerspec * __capability)];
+	char new_value_l_[PADL_(const struct itimerspec * __kerncap)]; const struct itimerspec * __kerncap new_value; char new_value_r_[PADR_(const struct itimerspec * __kerncap)];
+	char old_value_l_[PADL_(struct itimerspec * __kerncap)]; struct itimerspec * __kerncap old_value; char old_value_r_[PADR_(struct itimerspec * __kerncap)];
 };
 int	sys_exit(struct thread *, struct exit_args *);
 int	sys_fork(struct thread *, struct fork_args *);
@@ -2300,7 +2300,7 @@ int	sys_timerfd_settime(struct thread *, struct timerfd_settime_args *);
 #ifdef COMPAT_43
 
 struct ocreat_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char mode_l_[PADL_(int)]; int mode; char mode_r_[PADR_(int)];
 };
 struct olseek_args {
@@ -2309,17 +2309,17 @@ struct olseek_args {
 	char whence_l_[PADL_(int)]; int whence; char whence_r_[PADR_(int)];
 };
 struct ostat_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
-	char ub_l_[PADL_(struct ostat * __capability)]; struct ostat * __capability ub; char ub_r_[PADR_(struct ostat * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
+	char ub_l_[PADL_(struct ostat * __kerncap)]; struct ostat * __kerncap ub; char ub_r_[PADR_(struct ostat * __kerncap)];
 };
 struct olstat_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
-	char ub_l_[PADL_(struct ostat * __capability)]; struct ostat * __capability ub; char ub_r_[PADR_(struct ostat * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
+	char ub_l_[PADL_(struct ostat * __kerncap)]; struct ostat * __kerncap ub; char ub_r_[PADR_(struct ostat * __kerncap)];
 };
 struct osigaction_args {
 	char signum_l_[PADL_(int)]; int signum; char signum_r_[PADR_(int)];
-	char nsa_l_[PADL_(struct osigaction * __capability)]; struct osigaction * __capability nsa; char nsa_r_[PADR_(struct osigaction * __capability)];
-	char osa_l_[PADL_(struct osigaction * __capability)]; struct osigaction * __capability osa; char osa_r_[PADR_(struct osigaction * __capability)];
+	char nsa_l_[PADL_(struct osigaction * __kerncap)]; struct osigaction * __kerncap nsa; char nsa_r_[PADR_(struct osigaction * __kerncap)];
+	char osa_l_[PADL_(struct osigaction * __kerncap)]; struct osigaction * __kerncap osa; char osa_r_[PADR_(struct osigaction * __kerncap)];
 };
 struct osigprocmask_args {
 	char how_l_[PADL_(int)]; int how; char how_r_[PADR_(int)];
@@ -2327,16 +2327,16 @@ struct osigprocmask_args {
 };
 struct ofstat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char sb_l_[PADL_(struct ostat * __capability)]; struct ostat * __capability sb; char sb_r_[PADR_(struct ostat * __capability)];
+	char sb_l_[PADL_(struct ostat * __kerncap)]; struct ostat * __kerncap sb; char sb_r_[PADR_(struct ostat * __kerncap)];
 };
 struct ogetkerninfo_args {
 	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];
-	char where_l_[PADL_(char * __capability)]; char * __capability where; char where_r_[PADR_(char * __capability)];
-	char size_l_[PADL_(size_t * __capability)]; size_t * __capability size; char size_r_[PADR_(size_t * __capability)];
+	char where_l_[PADL_(char * __kerncap)]; char * __kerncap where; char where_r_[PADR_(char * __kerncap)];
+	char size_l_[PADL_(size_t * __kerncap)]; size_t * __kerncap size; char size_r_[PADR_(size_t * __kerncap)];
 	char arg_l_[PADL_(int)]; int arg; char arg_r_[PADR_(int)];
 };
 struct ommap_args {
-	char addr_l_[PADL_(void * __capability)]; void * __capability addr; char addr_r_[PADR_(void * __capability)];
+	char addr_l_[PADL_(void * __kerncap)]; void * __kerncap addr; char addr_r_[PADR_(void * __kerncap)];
 	char len_l_[PADL_(int)]; int len; char len_r_[PADR_(int)];
 	char prot_l_[PADL_(int)]; int prot; char prot_r_[PADR_(int)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
@@ -2344,37 +2344,37 @@ struct ommap_args {
 	char pos_l_[PADL_(long)]; long pos; char pos_r_[PADR_(long)];
 };
 struct ogethostname_args {
-	char hostname_l_[PADL_(char * __capability)]; char * __capability hostname; char hostname_r_[PADR_(char * __capability)];
+	char hostname_l_[PADL_(char * __kerncap)]; char * __kerncap hostname; char hostname_r_[PADR_(char * __kerncap)];
 	char len_l_[PADL_(u_int)]; u_int len; char len_r_[PADR_(u_int)];
 };
 struct osethostname_args {
-	char hostname_l_[PADL_(char * __capability)]; char * __capability hostname; char hostname_r_[PADR_(char * __capability)];
+	char hostname_l_[PADL_(char * __kerncap)]; char * __kerncap hostname; char hostname_r_[PADR_(char * __kerncap)];
 	char len_l_[PADL_(u_int)]; u_int len; char len_r_[PADR_(u_int)];
 };
 struct oaccept_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char name_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability name; char name_r_[PADR_(struct sockaddr * __capability)];
-	char anamelen_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability anamelen; char anamelen_r_[PADR_(__socklen_t * __capability)];
+	char name_l_[PADL_(struct sockaddr * __kerncap)]; struct sockaddr * __kerncap name; char name_r_[PADR_(struct sockaddr * __kerncap)];
+	char anamelen_l_[PADL_(__socklen_t * __kerncap)]; __socklen_t * __kerncap anamelen; char anamelen_r_[PADR_(__socklen_t * __kerncap)];
 };
 struct osend_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char buf_l_[PADL_(const void * __capability)]; const void * __capability buf; char buf_r_[PADR_(const void * __capability)];
+	char buf_l_[PADL_(const void * __kerncap)]; const void * __kerncap buf; char buf_r_[PADR_(const void * __kerncap)];
 	char len_l_[PADL_(int)]; int len; char len_r_[PADR_(int)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct orecv_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char buf_l_[PADL_(void * __capability)]; void * __capability buf; char buf_r_[PADR_(void * __capability)];
+	char buf_l_[PADL_(void * __kerncap)]; void * __kerncap buf; char buf_r_[PADR_(void * __kerncap)];
 	char len_l_[PADL_(int)]; int len; char len_r_[PADR_(int)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct osigreturn_args {
-	char sigcntxp_l_[PADL_(struct osigcontext * __capability)]; struct osigcontext * __capability sigcntxp; char sigcntxp_r_[PADR_(struct osigcontext * __capability)];
+	char sigcntxp_l_[PADL_(struct osigcontext * __kerncap)]; struct osigcontext * __kerncap sigcntxp; char sigcntxp_r_[PADR_(struct osigcontext * __kerncap)];
 };
 struct osigvec_args {
 	char signum_l_[PADL_(int)]; int signum; char signum_r_[PADR_(int)];
-	char nsv_l_[PADL_(struct sigvec * __capability)]; struct sigvec * __capability nsv; char nsv_r_[PADR_(struct sigvec * __capability)];
-	char osv_l_[PADL_(struct sigvec * __capability)]; struct sigvec * __capability osv; char osv_r_[PADR_(struct sigvec * __capability)];
+	char nsv_l_[PADL_(struct sigvec * __kerncap)]; struct sigvec * __kerncap nsv; char nsv_r_[PADR_(struct sigvec * __kerncap)];
+	char osv_l_[PADL_(struct sigvec * __kerncap)]; struct sigvec * __kerncap osv; char osv_r_[PADR_(struct sigvec * __kerncap)];
 };
 struct osigblock_args {
 	char mask_l_[PADL_(int)]; int mask; char mask_r_[PADR_(int)];
@@ -2386,29 +2386,29 @@ struct osigsuspend_args {
 	char mask_l_[PADL_(osigset_t)]; osigset_t mask; char mask_r_[PADR_(osigset_t)];
 };
 struct osigstack_args {
-	char nss_l_[PADL_(struct sigstack * __capability)]; struct sigstack * __capability nss; char nss_r_[PADR_(struct sigstack * __capability)];
-	char oss_l_[PADL_(struct sigstack * __capability)]; struct sigstack * __capability oss; char oss_r_[PADR_(struct sigstack * __capability)];
+	char nss_l_[PADL_(struct sigstack * __kerncap)]; struct sigstack * __kerncap nss; char nss_r_[PADR_(struct sigstack * __kerncap)];
+	char oss_l_[PADL_(struct sigstack * __kerncap)]; struct sigstack * __kerncap oss; char oss_r_[PADR_(struct sigstack * __kerncap)];
 };
 struct orecvmsg_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char msg_l_[PADL_(struct omsghdr * __capability)]; struct omsghdr * __capability msg; char msg_r_[PADR_(struct omsghdr * __capability)];
+	char msg_l_[PADL_(struct omsghdr * __kerncap)]; struct omsghdr * __kerncap msg; char msg_r_[PADR_(struct omsghdr * __kerncap)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct osendmsg_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char msg_l_[PADL_(const struct omsghdr * __capability)]; const struct omsghdr * __capability msg; char msg_r_[PADR_(const struct omsghdr * __capability)];
+	char msg_l_[PADL_(const struct omsghdr * __kerncap)]; const struct omsghdr * __kerncap msg; char msg_r_[PADR_(const struct omsghdr * __kerncap)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct orecvfrom_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char buf_l_[PADL_(void * __capability)]; void * __capability buf; char buf_r_[PADR_(void * __capability)];
+	char buf_l_[PADL_(void * __kerncap)]; void * __kerncap buf; char buf_r_[PADR_(void * __kerncap)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
-	char from_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability from; char from_r_[PADR_(struct sockaddr * __capability)];
-	char fromlenaddr_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t * __capability)];
+	char from_l_[PADL_(struct sockaddr * __kerncap)]; struct sockaddr * __kerncap from; char from_r_[PADR_(struct sockaddr * __kerncap)];
+	char fromlenaddr_l_[PADL_(__socklen_t * __kerncap)]; __socklen_t * __kerncap fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t * __kerncap)];
 };
 struct otruncate_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char length_l_[PADL_(long)]; long length; char length_r_[PADR_(long)];
 };
 struct oftruncate_args {
@@ -2417,19 +2417,19 @@ struct oftruncate_args {
 };
 struct ogetpeername_args {
 	char fdes_l_[PADL_(int)]; int fdes; char fdes_r_[PADR_(int)];
-	char asa_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability asa; char asa_r_[PADR_(struct sockaddr * __capability)];
-	char alen_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability alen; char alen_r_[PADR_(__socklen_t * __capability)];
+	char asa_l_[PADL_(struct sockaddr * __kerncap)]; struct sockaddr * __kerncap asa; char asa_r_[PADR_(struct sockaddr * __kerncap)];
+	char alen_l_[PADL_(__socklen_t * __kerncap)]; __socklen_t * __kerncap alen; char alen_r_[PADR_(__socklen_t * __kerncap)];
 };
 struct osethostid_args {
 	char hostid_l_[PADL_(long)]; long hostid; char hostid_r_[PADR_(long)];
 };
 struct ogetrlimit_args {
 	char which_l_[PADL_(u_int)]; u_int which; char which_r_[PADR_(u_int)];
-	char rlp_l_[PADL_(struct orlimit * __capability)]; struct orlimit * __capability rlp; char rlp_r_[PADR_(struct orlimit * __capability)];
+	char rlp_l_[PADL_(struct orlimit * __kerncap)]; struct orlimit * __kerncap rlp; char rlp_r_[PADR_(struct orlimit * __kerncap)];
 };
 struct osetrlimit_args {
 	char which_l_[PADL_(u_int)]; u_int which; char which_r_[PADR_(u_int)];
-	char rlp_l_[PADL_(struct orlimit * __capability)]; struct orlimit * __capability rlp; char rlp_r_[PADR_(struct orlimit * __capability)];
+	char rlp_l_[PADL_(struct orlimit * __kerncap)]; struct orlimit * __kerncap rlp; char rlp_r_[PADR_(struct orlimit * __kerncap)];
 };
 struct okillpg_args {
 	char pgid_l_[PADL_(int)]; int pgid; char pgid_r_[PADR_(int)];
@@ -2437,14 +2437,14 @@ struct okillpg_args {
 };
 struct ogetsockname_args {
 	char fdes_l_[PADL_(int)]; int fdes; char fdes_r_[PADR_(int)];
-	char asa_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability asa; char asa_r_[PADR_(struct sockaddr * __capability)];
-	char alen_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability alen; char alen_r_[PADR_(__socklen_t * __capability)];
+	char asa_l_[PADL_(struct sockaddr * __kerncap)]; struct sockaddr * __kerncap asa; char asa_r_[PADR_(struct sockaddr * __kerncap)];
+	char alen_l_[PADL_(__socklen_t * __kerncap)]; __socklen_t * __kerncap alen; char alen_r_[PADR_(__socklen_t * __kerncap)];
 };
 struct ogetdirentries_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char buf_l_[PADL_(char * __capability)]; char * __capability buf; char buf_r_[PADR_(char * __capability)];
+	char buf_l_[PADL_(char * __kerncap)]; char * __kerncap buf; char buf_r_[PADR_(char * __kerncap)];
 	char count_l_[PADL_(u_int)]; u_int count; char count_r_[PADR_(u_int)];
-	char basep_l_[PADL_(long * __capability)]; long * __capability basep; char basep_r_[PADR_(long * __capability)];
+	char basep_l_[PADL_(long * __kerncap)]; long * __kerncap basep; char basep_r_[PADR_(long * __kerncap)];
 };
 int	ocreat(struct thread *, struct ocreat_args *);
 int	olseek(struct thread *, struct olseek_args *);
@@ -2490,49 +2490,49 @@ int	ogetdirentries(struct thread *, struct ogetdirentries_args *);
 #ifdef COMPAT_FREEBSD4
 
 struct freebsd4_getfsstat_args {
-	char buf_l_[PADL_(struct ostatfs * __capability)]; struct ostatfs * __capability buf; char buf_r_[PADR_(struct ostatfs * __capability)];
+	char buf_l_[PADL_(struct ostatfs * __kerncap)]; struct ostatfs * __kerncap buf; char buf_r_[PADR_(struct ostatfs * __kerncap)];
 	char bufsize_l_[PADL_(long)]; long bufsize; char bufsize_r_[PADR_(long)];
 	char mode_l_[PADL_(int)]; int mode; char mode_r_[PADR_(int)];
 };
 struct freebsd4_statfs_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
-	char buf_l_[PADL_(struct ostatfs * __capability)]; struct ostatfs * __capability buf; char buf_r_[PADR_(struct ostatfs * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
+	char buf_l_[PADL_(struct ostatfs * __kerncap)]; struct ostatfs * __kerncap buf; char buf_r_[PADR_(struct ostatfs * __kerncap)];
 };
 struct freebsd4_fstatfs_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char buf_l_[PADL_(struct ostatfs * __capability)]; struct ostatfs * __capability buf; char buf_r_[PADR_(struct ostatfs * __capability)];
+	char buf_l_[PADL_(struct ostatfs * __kerncap)]; struct ostatfs * __kerncap buf; char buf_r_[PADR_(struct ostatfs * __kerncap)];
 };
 struct freebsd4_getdomainname_args {
-	char domainname_l_[PADL_(char * __capability)]; char * __capability domainname; char domainname_r_[PADR_(char * __capability)];
+	char domainname_l_[PADL_(char * __kerncap)]; char * __kerncap domainname; char domainname_r_[PADR_(char * __kerncap)];
 	char len_l_[PADL_(int)]; int len; char len_r_[PADR_(int)];
 };
 struct freebsd4_setdomainname_args {
-	char domainname_l_[PADL_(char * __capability)]; char * __capability domainname; char domainname_r_[PADR_(char * __capability)];
+	char domainname_l_[PADL_(char * __kerncap)]; char * __kerncap domainname; char domainname_r_[PADR_(char * __kerncap)];
 	char len_l_[PADL_(int)]; int len; char len_r_[PADR_(int)];
 };
 struct freebsd4_uname_args {
-	char name_l_[PADL_(struct utsname * __capability)]; struct utsname * __capability name; char name_r_[PADR_(struct utsname * __capability)];
+	char name_l_[PADL_(struct utsname * __kerncap)]; struct utsname * __kerncap name; char name_r_[PADR_(struct utsname * __kerncap)];
 };
 struct freebsd4_fhstatfs_args {
-	char u_fhp_l_[PADL_(const struct fhandle * __capability)]; const struct fhandle * __capability u_fhp; char u_fhp_r_[PADR_(const struct fhandle * __capability)];
-	char buf_l_[PADL_(struct ostatfs * __capability)]; struct ostatfs * __capability buf; char buf_r_[PADR_(struct ostatfs * __capability)];
+	char u_fhp_l_[PADL_(const struct fhandle * __kerncap)]; const struct fhandle * __kerncap u_fhp; char u_fhp_r_[PADR_(const struct fhandle * __kerncap)];
+	char buf_l_[PADL_(struct ostatfs * __kerncap)]; struct ostatfs * __kerncap buf; char buf_r_[PADR_(struct ostatfs * __kerncap)];
 };
 struct freebsd4_sendfile_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
 	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
-	char hdtr_l_[PADL_(struct sf_hdtr * __capability)]; struct sf_hdtr * __capability hdtr; char hdtr_r_[PADR_(struct sf_hdtr * __capability)];
-	char sbytes_l_[PADL_(off_t * __capability)]; off_t * __capability sbytes; char sbytes_r_[PADR_(off_t * __capability)];
+	char hdtr_l_[PADL_(struct sf_hdtr * __kerncap)]; struct sf_hdtr * __kerncap hdtr; char hdtr_r_[PADR_(struct sf_hdtr * __kerncap)];
+	char sbytes_l_[PADL_(off_t * __kerncap)]; off_t * __kerncap sbytes; char sbytes_r_[PADR_(off_t * __kerncap)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct freebsd4_sigaction_args {
 	char sig_l_[PADL_(int)]; int sig; char sig_r_[PADR_(int)];
-	char act_l_[PADL_(const struct sigaction * __capability)]; const struct sigaction * __capability act; char act_r_[PADR_(const struct sigaction * __capability)];
-	char oact_l_[PADL_(struct sigaction * __capability)]; struct sigaction * __capability oact; char oact_r_[PADR_(struct sigaction * __capability)];
+	char act_l_[PADL_(const struct sigaction * __kerncap)]; const struct sigaction * __kerncap act; char act_r_[PADR_(const struct sigaction * __kerncap)];
+	char oact_l_[PADL_(struct sigaction * __kerncap)]; struct sigaction * __kerncap oact; char oact_r_[PADR_(struct sigaction * __kerncap)];
 };
 struct freebsd4_sigreturn_args {
-	char sigcntxp_l_[PADL_(const struct freebsd4_ucontext * __capability)]; const struct freebsd4_ucontext * __capability sigcntxp; char sigcntxp_r_[PADR_(const struct freebsd4_ucontext * __capability)];
+	char sigcntxp_l_[PADL_(const struct freebsd4_ucontext * __kerncap)]; const struct freebsd4_ucontext * __kerncap sigcntxp; char sigcntxp_r_[PADR_(const struct freebsd4_ucontext * __kerncap)];
 };
 int	freebsd4_getfsstat(struct thread *, struct freebsd4_getfsstat_args *);
 int	freebsd4_statfs(struct thread *, struct freebsd4_statfs_args *);
@@ -2552,20 +2552,20 @@ int	freebsd4_sigreturn(struct thread *, struct freebsd4_sigreturn_args *);
 
 struct freebsd6_pread_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char buf_l_[PADL_(void * __capability)]; void * __capability buf; char buf_r_[PADR_(void * __capability)];
+	char buf_l_[PADL_(void * __kerncap)]; void * __kerncap buf; char buf_r_[PADR_(void * __kerncap)];
 	char nbyte_l_[PADL_(size_t)]; size_t nbyte; char nbyte_r_[PADR_(size_t)];
 	char pad_l_[PADL_(int)]; int pad; char pad_r_[PADR_(int)];
 	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
 };
 struct freebsd6_pwrite_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char buf_l_[PADL_(const void * __capability)]; const void * __capability buf; char buf_r_[PADR_(const void * __capability)];
+	char buf_l_[PADL_(const void * __kerncap)]; const void * __kerncap buf; char buf_r_[PADR_(const void * __kerncap)];
 	char nbyte_l_[PADL_(size_t)]; size_t nbyte; char nbyte_r_[PADR_(size_t)];
 	char pad_l_[PADL_(int)]; int pad; char pad_r_[PADR_(int)];
 	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
 };
 struct freebsd6_mmap_args {
-	char addr_l_[PADL_(void * __capability)]; void * __capability addr; char addr_r_[PADR_(void * __capability)];
+	char addr_l_[PADL_(void * __kerncap)]; void * __kerncap addr; char addr_r_[PADR_(void * __kerncap)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char prot_l_[PADL_(int)]; int prot; char prot_r_[PADR_(int)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
@@ -2580,7 +2580,7 @@ struct freebsd6_lseek_args {
 	char whence_l_[PADL_(int)]; int whence; char whence_r_[PADR_(int)];
 };
 struct freebsd6_truncate_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char pad_l_[PADL_(int)]; int pad; char pad_r_[PADR_(int)];
 	char length_l_[PADL_(off_t)]; off_t length; char length_r_[PADR_(off_t)];
 };
@@ -2590,16 +2590,16 @@ struct freebsd6_ftruncate_args {
 	char length_l_[PADL_(off_t)]; off_t length; char length_r_[PADR_(off_t)];
 };
 struct freebsd6_aio_read_args {
-	char aiocbp_l_[PADL_(struct oaiocb * __capability)]; struct oaiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct oaiocb * __capability)];
+	char aiocbp_l_[PADL_(struct oaiocb * __kerncap)]; struct oaiocb * __kerncap aiocbp; char aiocbp_r_[PADR_(struct oaiocb * __kerncap)];
 };
 struct freebsd6_aio_write_args {
-	char aiocbp_l_[PADL_(struct oaiocb * __capability)]; struct oaiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct oaiocb * __capability)];
+	char aiocbp_l_[PADL_(struct oaiocb * __kerncap)]; struct oaiocb * __kerncap aiocbp; char aiocbp_r_[PADR_(struct oaiocb * __kerncap)];
 };
 struct freebsd6_lio_listio_args {
 	char mode_l_[PADL_(int)]; int mode; char mode_r_[PADR_(int)];
-	char acb_list_l_[PADL_(struct oaiocb * __capability const * __capability)]; struct oaiocb * __capability const * __capability acb_list; char acb_list_r_[PADR_(struct oaiocb * __capability const * __capability)];
+	char acb_list_l_[PADL_(struct oaiocb * __kerncap const * __kerncap)]; struct oaiocb * __kerncap const * __kerncap acb_list; char acb_list_r_[PADR_(struct oaiocb * __kerncap const * __kerncap)];
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
-	char sig_l_[PADL_(struct osigevent * __capability)]; struct osigevent * __capability sig; char sig_r_[PADR_(struct osigevent * __capability)];
+	char sig_l_[PADL_(struct osigevent * __kerncap)]; struct osigevent * __kerncap sig; char sig_r_[PADR_(struct osigevent * __kerncap)];
 };
 int	freebsd6_pread(struct thread *, struct freebsd6_pread_args *);
 int	freebsd6_pwrite(struct thread *, struct freebsd6_pwrite_args *);
@@ -2620,17 +2620,17 @@ struct freebsd7___semctl_args {
 	char semid_l_[PADL_(int)]; int semid; char semid_r_[PADR_(int)];
 	char semnum_l_[PADL_(int)]; int semnum; char semnum_r_[PADR_(int)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char arg_l_[PADL_(union semun_old * __capability)]; union semun_old * __capability arg; char arg_r_[PADR_(union semun_old * __capability)];
+	char arg_l_[PADL_(union semun_old * __kerncap)]; union semun_old * __kerncap arg; char arg_r_[PADR_(union semun_old * __kerncap)];
 };
 struct freebsd7_msgctl_args {
 	char msqid_l_[PADL_(int)]; int msqid; char msqid_r_[PADR_(int)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char buf_l_[PADL_(struct msqid_ds_old * __capability)]; struct msqid_ds_old * __capability buf; char buf_r_[PADR_(struct msqid_ds_old * __capability)];
+	char buf_l_[PADL_(struct msqid_ds_old * __kerncap)]; struct msqid_ds_old * __kerncap buf; char buf_r_[PADR_(struct msqid_ds_old * __kerncap)];
 };
 struct freebsd7_shmctl_args {
 	char shmid_l_[PADL_(int)]; int shmid; char shmid_r_[PADR_(int)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char buf_l_[PADL_(struct shmid_ds_old * __capability)]; struct shmid_ds_old * __capability buf; char buf_r_[PADR_(struct shmid_ds_old * __capability)];
+	char buf_l_[PADL_(struct shmid_ds_old * __kerncap)]; struct shmid_ds_old * __kerncap buf; char buf_r_[PADR_(struct shmid_ds_old * __kerncap)];
 };
 int	freebsd7___semctl(struct thread *, struct freebsd7___semctl_args *);
 int	freebsd7_msgctl(struct thread *, struct freebsd7_msgctl_args *);
@@ -2642,10 +2642,10 @@ int	freebsd7_shmctl(struct thread *, struct freebsd7_shmctl_args *);
 #ifdef COMPAT_FREEBSD10
 
 struct freebsd10__umtx_lock_args {
-	char umtx_l_[PADL_(struct umtx * __capability)]; struct umtx * __capability umtx; char umtx_r_[PADR_(struct umtx * __capability)];
+	char umtx_l_[PADL_(struct umtx * __kerncap)]; struct umtx * __kerncap umtx; char umtx_r_[PADR_(struct umtx * __kerncap)];
 };
 struct freebsd10__umtx_unlock_args {
-	char umtx_l_[PADL_(struct umtx * __capability)]; struct umtx * __capability umtx; char umtx_r_[PADR_(struct umtx * __capability)];
+	char umtx_l_[PADL_(struct umtx * __kerncap)]; struct umtx * __kerncap umtx; char umtx_r_[PADR_(struct umtx * __kerncap)];
 };
 int	freebsd10_pipe(struct thread *, struct freebsd10_pipe_args *);
 int	freebsd10__umtx_lock(struct thread *, struct freebsd10__umtx_lock_args *);
@@ -2657,7 +2657,7 @@ int	freebsd10__umtx_unlock(struct thread *, struct freebsd10__umtx_unlock_args *
 #ifdef COMPAT_FREEBSD11
 
 struct freebsd11_mknod_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char mode_l_[PADL_(int)]; int mode; char mode_r_[PADR_(int)];
 	char dev_l_[PADL_(uint32_t)]; uint32_t dev; char dev_r_[PADR_(uint32_t)];
 };
@@ -2665,78 +2665,78 @@ struct freebsd11_vadvise_args {
 	char anom_l_[PADL_(int)]; int anom; char anom_r_[PADR_(int)];
 };
 struct freebsd11_stat_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
-	char ub_l_[PADL_(struct freebsd11_stat * __capability)]; struct freebsd11_stat * __capability ub; char ub_r_[PADR_(struct freebsd11_stat * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
+	char ub_l_[PADL_(struct freebsd11_stat * __kerncap)]; struct freebsd11_stat * __kerncap ub; char ub_r_[PADR_(struct freebsd11_stat * __kerncap)];
 };
 struct freebsd11_fstat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char sb_l_[PADL_(struct freebsd11_stat * __capability)]; struct freebsd11_stat * __capability sb; char sb_r_[PADR_(struct freebsd11_stat * __capability)];
+	char sb_l_[PADL_(struct freebsd11_stat * __kerncap)]; struct freebsd11_stat * __kerncap sb; char sb_r_[PADR_(struct freebsd11_stat * __kerncap)];
 };
 struct freebsd11_lstat_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
-	char ub_l_[PADL_(struct freebsd11_stat * __capability)]; struct freebsd11_stat * __capability ub; char ub_r_[PADR_(struct freebsd11_stat * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
+	char ub_l_[PADL_(struct freebsd11_stat * __kerncap)]; struct freebsd11_stat * __kerncap ub; char ub_r_[PADR_(struct freebsd11_stat * __kerncap)];
 };
 struct freebsd11_getdirentries_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char buf_l_[PADL_(char * __capability)]; char * __capability buf; char buf_r_[PADR_(char * __capability)];
+	char buf_l_[PADL_(char * __kerncap)]; char * __kerncap buf; char buf_r_[PADR_(char * __kerncap)];
 	char count_l_[PADL_(u_int)]; u_int count; char count_r_[PADR_(u_int)];
-	char basep_l_[PADL_(long * __capability)]; long * __capability basep; char basep_r_[PADR_(long * __capability)];
+	char basep_l_[PADL_(long * __kerncap)]; long * __kerncap basep; char basep_r_[PADR_(long * __kerncap)];
 };
 struct freebsd11_getdents_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char buf_l_[PADL_(char * __capability)]; char * __capability buf; char buf_r_[PADR_(char * __capability)];
+	char buf_l_[PADL_(char * __kerncap)]; char * __kerncap buf; char buf_r_[PADR_(char * __kerncap)];
 	char count_l_[PADL_(size_t)]; size_t count; char count_r_[PADR_(size_t)];
 };
 struct freebsd11_nstat_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
-	char ub_l_[PADL_(struct nstat * __capability)]; struct nstat * __capability ub; char ub_r_[PADR_(struct nstat * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
+	char ub_l_[PADL_(struct nstat * __kerncap)]; struct nstat * __kerncap ub; char ub_r_[PADR_(struct nstat * __kerncap)];
 };
 struct freebsd11_nfstat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char sb_l_[PADL_(struct nstat * __capability)]; struct nstat * __capability sb; char sb_r_[PADR_(struct nstat * __capability)];
+	char sb_l_[PADL_(struct nstat * __kerncap)]; struct nstat * __kerncap sb; char sb_r_[PADR_(struct nstat * __kerncap)];
 };
 struct freebsd11_nlstat_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
-	char ub_l_[PADL_(struct nstat * __capability)]; struct nstat * __capability ub; char ub_r_[PADR_(struct nstat * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
+	char ub_l_[PADL_(struct nstat * __kerncap)]; struct nstat * __kerncap ub; char ub_r_[PADR_(struct nstat * __kerncap)];
 };
 struct freebsd11_fhstat_args {
-	char u_fhp_l_[PADL_(const struct fhandle * __capability)]; const struct fhandle * __capability u_fhp; char u_fhp_r_[PADR_(const struct fhandle * __capability)];
-	char sb_l_[PADL_(struct freebsd11_stat * __capability)]; struct freebsd11_stat * __capability sb; char sb_r_[PADR_(struct freebsd11_stat * __capability)];
+	char u_fhp_l_[PADL_(const struct fhandle * __kerncap)]; const struct fhandle * __kerncap u_fhp; char u_fhp_r_[PADR_(const struct fhandle * __kerncap)];
+	char sb_l_[PADL_(struct freebsd11_stat * __kerncap)]; struct freebsd11_stat * __kerncap sb; char sb_r_[PADR_(struct freebsd11_stat * __kerncap)];
 };
 struct freebsd11_kevent_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char changelist_l_[PADL_(const struct freebsd11_kevent * __capability)]; const struct freebsd11_kevent * __capability changelist; char changelist_r_[PADR_(const struct freebsd11_kevent * __capability)];
+	char changelist_l_[PADL_(const struct freebsd11_kevent * __kerncap)]; const struct freebsd11_kevent * __kerncap changelist; char changelist_r_[PADR_(const struct freebsd11_kevent * __kerncap)];
 	char nchanges_l_[PADL_(int)]; int nchanges; char nchanges_r_[PADR_(int)];
-	char eventlist_l_[PADL_(struct freebsd11_kevent * __capability)]; struct freebsd11_kevent * __capability eventlist; char eventlist_r_[PADR_(struct freebsd11_kevent * __capability)];
+	char eventlist_l_[PADL_(struct freebsd11_kevent * __kerncap)]; struct freebsd11_kevent * __kerncap eventlist; char eventlist_r_[PADR_(struct freebsd11_kevent * __kerncap)];
 	char nevents_l_[PADL_(int)]; int nevents; char nevents_r_[PADR_(int)];
-	char timeout_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability timeout; char timeout_r_[PADR_(const struct timespec * __capability)];
+	char timeout_l_[PADL_(const struct timespec * __kerncap)]; const struct timespec * __kerncap timeout; char timeout_r_[PADR_(const struct timespec * __kerncap)];
 };
 struct freebsd11_getfsstat_args {
-	char buf_l_[PADL_(struct freebsd11_statfs * __capability)]; struct freebsd11_statfs * __capability buf; char buf_r_[PADR_(struct freebsd11_statfs * __capability)];
+	char buf_l_[PADL_(struct freebsd11_statfs * __kerncap)]; struct freebsd11_statfs * __kerncap buf; char buf_r_[PADR_(struct freebsd11_statfs * __kerncap)];
 	char bufsize_l_[PADL_(long)]; long bufsize; char bufsize_r_[PADR_(long)];
 	char mode_l_[PADL_(int)]; int mode; char mode_r_[PADR_(int)];
 };
 struct freebsd11_statfs_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
-	char buf_l_[PADL_(struct freebsd11_statfs * __capability)]; struct freebsd11_statfs * __capability buf; char buf_r_[PADR_(struct freebsd11_statfs * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
+	char buf_l_[PADL_(struct freebsd11_statfs * __kerncap)]; struct freebsd11_statfs * __kerncap buf; char buf_r_[PADR_(struct freebsd11_statfs * __kerncap)];
 };
 struct freebsd11_fstatfs_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char buf_l_[PADL_(struct freebsd11_statfs * __capability)]; struct freebsd11_statfs * __capability buf; char buf_r_[PADR_(struct freebsd11_statfs * __capability)];
+	char buf_l_[PADL_(struct freebsd11_statfs * __kerncap)]; struct freebsd11_statfs * __kerncap buf; char buf_r_[PADR_(struct freebsd11_statfs * __kerncap)];
 };
 struct freebsd11_fhstatfs_args {
-	char u_fhp_l_[PADL_(const struct fhandle * __capability)]; const struct fhandle * __capability u_fhp; char u_fhp_r_[PADR_(const struct fhandle * __capability)];
-	char buf_l_[PADL_(struct freebsd11_statfs * __capability)]; struct freebsd11_statfs * __capability buf; char buf_r_[PADR_(struct freebsd11_statfs * __capability)];
+	char u_fhp_l_[PADL_(const struct fhandle * __kerncap)]; const struct fhandle * __kerncap u_fhp; char u_fhp_r_[PADR_(const struct fhandle * __kerncap)];
+	char buf_l_[PADL_(struct freebsd11_statfs * __kerncap)]; struct freebsd11_statfs * __kerncap buf; char buf_r_[PADR_(struct freebsd11_statfs * __kerncap)];
 };
 struct freebsd11_fstatat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
-	char buf_l_[PADL_(struct freebsd11_stat * __capability)]; struct freebsd11_stat * __capability buf; char buf_r_[PADR_(struct freebsd11_stat * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
+	char buf_l_[PADL_(struct freebsd11_stat * __kerncap)]; struct freebsd11_stat * __kerncap buf; char buf_r_[PADR_(struct freebsd11_stat * __kerncap)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
 struct freebsd11_mknodat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 	char dev_l_[PADL_(uint32_t)]; uint32_t dev; char dev_r_[PADR_(uint32_t)];
 };
@@ -2765,7 +2765,7 @@ int	freebsd11_mknodat(struct thread *, struct freebsd11_mknodat_args *);
 #ifdef COMPAT_FREEBSD12
 
 struct freebsd12_shm_open_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char path_l_[PADL_(const char * __kerncap)]; const char * __kerncap path; char path_r_[PADR_(const char * __kerncap)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
 };
@@ -2781,7 +2781,7 @@ int	freebsd12_closefrom(struct thread *, struct freebsd12_closefrom_args *);
 #ifdef COMPAT_FREEBSD13
 
 struct freebsd13_swapoff_args {
-	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
+	char name_l_[PADL_(const char * __kerncap)]; const char * __kerncap name; char name_r_[PADR_(const char * __kerncap)];
 };
 int	freebsd13_swapoff(struct thread *, struct freebsd13_swapoff_args *);
 
