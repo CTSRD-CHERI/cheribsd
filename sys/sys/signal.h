@@ -329,7 +329,7 @@ struct __siginfo32 {
 #endif
 
 #if defined(_WANT_LWPINFO64) || (defined(_KERNEL) && defined(COMPAT_FREEBSD64))
-struct siginfo64 {
+struct __siginfo64 {
 	int	si_signo;		/* signal number */
 	int	si_errno;		/* errno association */
 	int	si_code;		/* signal code */

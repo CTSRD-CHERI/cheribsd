@@ -198,7 +198,7 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 		 */
 		data = sizeof(r.pl);
 		if (uap->data < offsetof(struct ptrace_lwpinfo64, pl_siginfo) +
-		    sizeof(struct siginfo64))
+		    sizeof(struct __siginfo64))
 			data = offsetof(struct ptrace_lwpinfo, pl_siginfo);
 		break;
 	case PT_GETLWPLIST:
