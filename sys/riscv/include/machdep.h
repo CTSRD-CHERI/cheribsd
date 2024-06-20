@@ -36,7 +36,6 @@
 #define	_MACHINE_MACHDEP_H_
 
 struct riscv_bootparams {
-	vm_pointer_t	kern_l1pt;	/* Kernel L1 base */
 	vm_paddr_t	kern_phys;	/* Kernel base (physical) addr */
 	vm_pointer_t	kern_stack;
 	vm_paddr_t	dtbp_phys;	/* Device tree blob physical addr */
