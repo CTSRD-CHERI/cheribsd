@@ -162,13 +162,39 @@ _start:
 	 *  a1 - zero or dtbp
 	 */
 pagetables:
-	/* Get the kernel's load address */
+	/* Get the kernel's load address (kernstart) in s9 */
 #ifdef __CHERI_PURE_CAPABILITY__
 	cllc	cra, get_physmem
 	cjalr	cra
 #else
 	jal	get_physmem
 #endif
+
+	/* Construct 1GB Identity Map (1:1 PA->VA) */
+#ifdef __CHERI_PURE_CAPABILITY__
+	cllc	cs1, pagetable_l1
+#else
+	lla	s1, pagetable_l1
+#endif
+
+	srli	s2, s9, L1_SHIFT	/* kernstart >> L1_SHIFT */
+	andi	a5, s2, Ln_ADDR_MASK	/* & Ln_ADDR_MASK */
+	li	t4, (PTE_KERN)
+	slli	s2, s2, PTE_PPN2_S	/* (s2 << PTE_PPN2_S) */
+	or	t6, t4, s2
+
+	/* Store L1 PTE entry to position */
+	li	a6, PTE_SIZE
+	mulw	a5, a5, a6		/* calculate L1 slot */
+#ifdef __CHERI_PURE_CAPABILITY__
+	cincoffset ct0, cs1, a5
+	csd	t6, (ct0)		/* Store new PTE */
+#else
+	add	t0, s1, a5
+	sd	t6, (t0)		/* Store new PTE */
+#endif
+
+	/* Construct the virtual address space */
 
 	/* Add L1 entry for kernel */
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -250,38 +276,6 @@ pagetables:
 	sd	t6, (t0)
 #endif
 
-	/* Check if we have a DTB that needs to be mapped */
-	beqz	a1, 2f
-
-	/* Create an L2 mapping for the DTB */
-#ifdef __CHERI_PURE_CAPABILITY__
-	cllc	cs1, pagetable_l2_devmap
-#else
-	lla	s1, pagetable_l2_devmap
-#endif
-	mv	s2, a1
-	srli	s2, s2, PAGE_SHIFT
-	/* Mask off any bits that aren't aligned */
-	andi	s2, s2, ~((1 << (PTE_PPN1_S - PTE_PPN0_S)) - 1)
-
-	li	t0, (PTE_KERN)
-	slli	t2, s2, PTE_PPN0_S	/* << PTE_PPN0_S */
-	or	t0, t0, t2
-
-	/* Store the L2 table entry for the DTB */
-	li	a6, PTE_SIZE
-	li	a5, VM_EARLY_DTB_ADDRESS
-	srli	a5, a5, L2_SHIFT    /* >> L2_SHIFT */
-	andi	a5, a5, Ln_ADDR_MASK    /* & Ln_ADDR_MASK */
-	mulw	a5, a5, a6
-#ifdef __CHERI_PURE_CAPABILITY__
-	cincoffset ct1, cs1, a5
-	csd	t0, (ct1)
-#else
-	add	t1, s1, a5
-	sd	t0, (t1)
-#endif
-
 	/* Page tables END */
 
 	/*
@@ -289,7 +283,6 @@ pagetables:
 	 * may generate a page fault. We simply wish to continue onwards, so
 	 * have the trap deliver us to 'va'.
 	 */
-2:
 	li	t1, KERNBASE
 	sub	t1, t1, s9
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -424,20 +417,7 @@ va:
 	csd	s9, RISCV_BOOTPARAMS_KERN_PHYS(csp)
 
 	csc	cs3, RISCV_BOOTPARAMS_KERN_STACK(csp)
-
-	li	t0, (VM_EARLY_DTB_ADDRESS)
-	csetaddr ct0, cs0, t0
-	li	t1, L2_SIZE
-	csetbounds ct0, ct0, t1
-	/* Add offset of DTB within superpage */
-	li	t1, (L2_OFFSET)
-	and	t1, s1, t1
-	cincoffset ct0, ct0, t1
-	li	t1, CHERI_PERMS_KERNEL_DATA
-	candperm ct0, ct0, t1
-	csc	ct0, RISCV_BOOTPARAMS_DTBP_VIRT(csp)
 	csd	s1, RISCV_BOOTPARAMS_DTBP_PHYS(csp)
-
 	csc	cs2, RISCV_BOOTPARAMS_MODULEP(csp)
 
 	/* Discard omnipotent cs0. */
@@ -490,15 +470,7 @@ va:
 
 	la	t0, initstack
 	sd	t0, RISCV_BOOTPARAMS_KERN_STACK(sp)
-
-	li	t0, (VM_EARLY_DTB_ADDRESS)
-	/* Add offset of DTB within superpage */
-	li	t1, (L2_OFFSET)
-	and	t1, s1, t1
-	add	t0, t0, t1
-	sd	t0, RISCV_BOOTPARAMS_DTBP_VIRT(sp)
 	sd	s1, RISCV_BOOTPARAMS_DTBP_PHYS(sp)
-
 	sd	s2, RISCV_BOOTPARAMS_MODULEP(sp)
 
 	mv	a0, sp
