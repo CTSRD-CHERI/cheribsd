@@ -63,7 +63,7 @@ ENTRY(_setjmp)
 	/*
 	 * Tail-call to save Executive mode state
 	 */
-	b	_rtld_setjmp
+	b	c18n_get_trusted_stk
 #else
 	RETURN
 #endif
