@@ -579,7 +579,8 @@ _vmware=	vmware
 .endif
 
 .if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
-    ${MACHINE_CPUARCH} == "i386" || ${MACHINE_ARCH} == "armv7"
+    ${MACHINE_CPUARCH} == "i386" || ${MACHINE_ARCH} == "armv7" || \
+	${MACHINE_ARCH:Mpowerpc64*} != ""
 .if !${MACHINE_ABI:Mpurecap}
 _ossl=		ossl
 .endif
