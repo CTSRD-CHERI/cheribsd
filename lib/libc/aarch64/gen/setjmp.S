@@ -32,11 +32,6 @@
 #include <machine/setjmp.h>
 #include <sys/elf_common.h>
 
-#ifdef CHERI_LIB_C18N
-.weak _rtld_setjmp
-.weak _rtld_longjmp
-#endif
-
 ENTRY(setjmp)
 	sub	REGN(sp), REGN(sp), #(REG_WIDTH * 2)
 	stp	REG(0), REGN(lr), [REGN(sp)]
@@ -78,7 +73,7 @@ ENTRY(setjmp)
 	/*
 	 * Tail-call to save Executive mode state
 	 */
-	b	_rtld_setjmp
+	b	c18n_get_trusted_stk
 #else
 	RETURN
 #endif
@@ -139,7 +134,7 @@ ENTRY(longjmp)
 	/*
 	 * Tail-call to restore Executive mode state
 	 */
-	b	_rtld_longjmp
+	b	c18n_unwind_trusted_stk
 #else
 	RETURN
 #endif

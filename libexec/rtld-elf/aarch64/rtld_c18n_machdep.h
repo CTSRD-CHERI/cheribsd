@@ -133,7 +133,7 @@ set_untrusted_stk(const void *sp)
 }
 #endif
 
-struct trusted_frame {
+struct compart_state {
 	void *fp;
 	void *pc;
 	/*
@@ -145,38 +145,6 @@ struct trusted_frame {
 	 * caller made the call.
 	 */
 	void *sp;
-	/*
-	 * INVARIANT: This field contains the top of the caller's stack when the
-	 * caller was last entered.
-	 */
-	void *osp;
-	/*
-	 * Address of the previous trusted frame
-	 */
-	struct trusted_frame *previous;
-	/*
-	 * Compartment ID of the caller
-	 */
-	stk_table_index caller;
-	/*
-	 * Zeros
-	 */
-	uint16_t zeros;
-	/*
-	 * Compartment ID of the callee
-	 */
-	stk_table_index callee;
-	/*
-	 * Number of return value registers, encoded in enum tramp_ret_args
-	 */
-	uint8_t ret_args : 2;
-	uint16_t reserved : 14;
-	/*
-	 * This field contains the code address in the trampoline that the
-	 * callee should return to. This is used by trampolines to detect cross-
-	 * compartment tail-calls.
-	 */
-	ptraddr_t landing;
 };
 #endif
 #endif

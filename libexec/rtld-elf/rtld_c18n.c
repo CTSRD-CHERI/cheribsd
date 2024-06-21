@@ -87,7 +87,7 @@ _Static_assert(
     TRUSTED_FRAME_SIZE * sizeof(uintptr_t) == sizeof(struct trusted_frame),
     "Unexpected struct trusted_frame size");
 _Static_assert(
-    TRUSTED_FRAME_SP_OSP == offsetof(struct trusted_frame, sp),
+    TRUSTED_FRAME_SP_OSP == offsetof(struct trusted_frame, state.sp),
     "Unexpected struct trusted_frame member offset");
 _Static_assert(
     TRUSTED_FRAME_PREV == offsetof(struct trusted_frame, previous),
@@ -117,8 +117,7 @@ _Static_assert(
  * Sealers for RTLD privileged information
  */
 static uintptr_t sealer_tcb;
-static uintptr_t sealer_jmpbuf;
-static uintptr_t sealer_unwbuf;
+static uintptr_t sealer_trusted_stk;
 
 uintptr_t sealer_pltgot, sealer_tramp;
 
@@ -859,9 +858,19 @@ resolve_untrusted_stk_impl(stk_table_index index)
 
 /*
  * Stack unwinding
+ *
+ * APIs exposed to stack unwinders (e.g., libc setjmp/longjmp and libunwind)
  */
-static void *
-unwind_cursor(void)
+uintptr_t c18n_get_trusted_stk(uintptr_t, struct trusted_frame **);
+uintptr_t c18n_unwind_trusted_stk(uintptr_t, void *, struct trusted_frame *);
+
+bool c18n_is_enabled(void);
+bool c18n_is_tramp(ptraddr_t, struct trusted_frame *);
+struct trusted_frame *c18n_pop_trusted_stk(struct compart_state *,
+    struct trusted_frame *);
+
+uintptr_t
+c18n_get_trusted_stk(uintptr_t ret, struct trusted_frame **buf)
 {
 	/*
 	 * This helper is used by functions like setjmp. Before setjmp is
@@ -875,30 +884,14 @@ unwind_cursor(void)
 	 * buffer.
 	 */
 
-	return (get_trusted_stk()->previous);
-}
-
-uintptr_t _rtld_setjmp(uintptr_t, void **);
-uintptr_t _rtld_unw_getcontext(uintptr_t, void **);
-uintptr_t _rtld_unw_getcontext_unsealed(uintptr_t, void **);
-
-uintptr_t
-_rtld_setjmp(uintptr_t ret, void **buf)
-{
-	*buf = cheri_seal(unwind_cursor(), sealer_jmpbuf);
-	return (ret);
-}
-
-uintptr_t
-_rtld_unw_getcontext(uintptr_t ret, void **buf)
-{
 	if (C18N_ENABLED)
-		*buf = cheri_seal(unwind_cursor(), sealer_unwbuf);
+		*buf = cheri_seal(get_trusted_stk()->previous,
+		    sealer_trusted_stk);
 	return (ret);
 }
 
-static uintptr_t
-unwind_stack(uintptr_t ret, void *rcsp, struct trusted_frame *target)
+uintptr_t
+c18n_unwind_trusted_stk(uintptr_t ret, void *rcsp, struct trusted_frame *target)
 {
 	/*
 	 * This helper is used by functions like longjmp. Before longjmp is
@@ -920,6 +913,9 @@ unwind_stack(uintptr_t ret, void *rcsp, struct trusted_frame *target)
 	struct trusted_frame *cur, *tf;
 	sigset_t nset, oset;
 
+	if (!C18N_ENABLED)
+		return (ret);
+
 	/*
 	 * Make the function re-entrant by blocking all signals.
 	 */
@@ -927,6 +923,7 @@ unwind_stack(uintptr_t ret, void *rcsp, struct trusted_frame *target)
 	sigprocmask(SIG_SETMASK, &nset, &oset);
 
 	tf = get_trusted_stk();
+	target = cheri_unseal(target, sealer_trusted_stk);
 
 	if (!cheri_is_subset(tf, target) || tf->previous >= target) {
 		rtld_fdprintf(STDERR_FILENO,
@@ -974,7 +971,7 @@ unwind_stack(uintptr_t ret, void *rcsp, struct trusted_frame *target)
 		abort();
 	}
 
-	tf->sp = rcsp;
+	tf->state.sp = rcsp;
 	tf->osp = *ospp;
 	tf->previous = cur;
 	tf->caller = index;
@@ -984,28 +981,25 @@ unwind_stack(uintptr_t ret, void *rcsp, struct trusted_frame *target)
 	return (ret);
 }
 
-uintptr_t _rtld_longjmp(uintptr_t, void *, void *);
-uintptr_t _rtld_unw_setcontext(uintptr_t, void *, void *);
-
-uintptr_t
-_rtld_longjmp(uintptr_t ret, void *rcsp, void *csp)
+bool
+c18n_is_enabled(void)
 {
-	return (unwind_stack(ret, rcsp, cheri_unseal(csp, sealer_jmpbuf)));
+	return (C18N_ENABLED);
 }
 
-uintptr_t
-_rtld_unw_setcontext(uintptr_t ret, void *rcsp, void *csp)
+bool
+c18n_is_tramp(ptraddr_t pc, struct trusted_frame *tf)
 {
-	if (C18N_ENABLED)
-		ret = unwind_stack(ret, rcsp, cheri_unseal(csp, sealer_unwbuf));
-	return (ret);
+	tf = cheri_unseal(tf, sealer_trusted_stk);
+	return (pc == tf->landing);
 }
 
-uintptr_t _rtld_unw_getsealer(void);
-uintptr_t
-_rtld_unw_getsealer(void)
+struct trusted_frame *
+c18n_pop_trusted_stk(struct compart_state *state, struct trusted_frame *tf)
 {
-	return (sealer_unwbuf);
+	tf = cheri_unseal(tf, sealer_trusted_stk);
+	*state = tf->state;
+	return (cheri_seal(tf->previous, sealer_trusted_stk));
 }
 
 /*
@@ -1195,9 +1189,9 @@ tramp_hook_impl(int event, const struct tramp_header *hdr,
 		memcpy(ut.sig, C18N_UTRACE_SIG, C18N_UTRACE_SIG_SZ);
 		ut.event = event;
 		ut.symnum = hdr->symnum;
-		ut.fp = tf->fp;
-		ut.pc = tf->pc;
-		ut.sp = tf->sp;
+		ut.fp = tf->state.fp;
+		ut.pc = tf->state.pc;
+		ut.sp = tf->state.sp;
 		ut.osp = tf->osp;
 		ut.previous = tf->previous;
 		memcpy(&ut.fsig, &hdr->sig, sizeof(ut.fsig));
@@ -1616,10 +1610,7 @@ c18n_init2(void)
 	sealer_tcb = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
 
-	sealer_jmpbuf = cheri_setboundsexact(sealer, 1);
-	sealer += 1;
-
-	sealer_unwbuf = cheri_setboundsexact(sealer, 1);
+	sealer_trusted_stk = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
 
 	sealer_tramp = cheri_setboundsexact(sealer, C18N_FUNC_SIG_COUNT);
@@ -1942,7 +1933,9 @@ found:
 	 */
 	ntf = tf - 2;
 	*ntf = (struct trusted_frame) {
-		.sp = nsp,
+		.state = (struct compart_state) {
+			.sp = nsp
+		},
 		.osp = osp,
 		.previous = tf,
 		.caller = intr_idx,
@@ -1997,7 +1990,7 @@ found:
 	 * compartment.
 	 */
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	set_untrusted_stk(ntf->sp);
+	set_untrusted_stk(ntf->state.sp);
 #endif
 }
 
