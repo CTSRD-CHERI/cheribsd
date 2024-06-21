@@ -55,11 +55,15 @@ export to [TCB]
 	_rtld_sighandler
 	_rtld_siginvoke
 	_rtld_sigaction
-	_rtld_setjmp
-	_rtld_longjmp
+
+callee [RTLD]
+export to [TCB]
+export to [libunwind]
+	c18n_get_trusted_stk
+	c18n_unwind_trusted_stk
 
 callee [RTLD]
 export to [libunwind]
-	_rtld_unw_getcontext
-	_rtld_unw_setcontext
-	_rtld_unw_getsealer
+	c18n_is_enabled
+	c18n_is_tramp
+	c18n_pop_trusted_stk
