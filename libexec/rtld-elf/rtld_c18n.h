@@ -118,6 +118,50 @@ struct stk_table {
 
 #define	COMPART_ID_MAX		index_to_cid((stk_table_index) { -1 })
 
+#include "rtld_c18n_machdep.h"
+
+struct trusted_frame {
+	/*
+	 * Architecture-specific callee-saved registers, including fp, sp, and
+	 * the return address
+	 */
+	struct compart_state state;
+	/*
+	 * INVARIANT: This field contains the top of the caller's stack when the
+	 * caller was last entered.
+	 */
+	void *osp;
+	/*
+	 * Address of the previous trusted frame
+	 */
+	struct trusted_frame *previous;
+	/*
+	 * Compartment ID of the caller
+	 */
+	stk_table_index caller;
+	/*
+	 * This padding space must be filled with zeros so that an optimised
+	 * trampoline can use a wide load to load multiple fields of the trusted
+	 * frame and then use a word-sized register to extract the caller field.
+	 */
+	uint16_t zeros;
+	/*
+	 * Compartment ID of the callee
+	 */
+	stk_table_index callee;
+	/*
+	 * Number of return value registers, encoded in enum tramp_ret_args
+	 */
+	uint8_t ret_args : 2;
+	uint16_t reserved : 14;
+	/*
+	 * This field contains the code address in the trampoline that the
+	 * callee should return to. This is used by trampolines to detect cross-
+	 * compartment tail-calls.
+	 */
+	ptraddr_t landing;
+};
+
 struct tcb *c18n_allocate_tcb(struct tcb *);
 void c18n_free_tcb(void);
 
@@ -192,8 +236,8 @@ func_sig_legal(struct func_sig sig)
 /*
  * This macro can only be used in a function directly invoked by a trampoline.
  */
-#define	c18n_return_address()						\
-	(C18N_ENABLED ? get_trusted_stk()->pc : __builtin_return_address(0))
+#define	c18n_return_address()	(C18N_ENABLED ?				\
+	get_trusted_stk()->state.pc : __builtin_return_address(0))
 
 void *_rtld_sandbox_code(void *, struct func_sig);
 void *_rtld_safebox_code(void *, struct func_sig);
@@ -206,5 +250,4 @@ void *_rtld_tlsdesc_dynamic_c18n(void *);
 void c18n_init(Obj_Entry *, Elf_Auxinfo *[]);
 void c18n_init2(void);
 
-#include "rtld_c18n_machdep.h"
 #endif
