@@ -714,7 +714,7 @@ DEFINE_LIBUNWIND_FUNCTION(__libunwind_Registers_arm64_jumpto)
 #ifdef __CHERI_PURE_CAPABILITY__
   ldr    c1,      [c0, #0x1f0]  // Pass the target untrusted stack pointer
   ldr    c2,      [c0, #0x210]  // Pass the target trusted stack pointer
-  bl     _rtld_unw_setcontext
+  bl     c18n_unwind_trusted_stk
 
   // skip restore of c0,c1 for now
   ldp    c2, c3,  [c0, #0x020]
