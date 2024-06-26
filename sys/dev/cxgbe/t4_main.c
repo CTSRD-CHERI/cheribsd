@@ -4350,9 +4350,7 @@ calculate_iaq(struct adapter *sc, struct intrs_and_queues *iaq, int itype,
 	 */
 	do {
 		if (iaq->nrxq > 1) {
-			do {
-				iaq->nrxq--;
-			} while (!powerof2(iaq->nrxq));
+			iaq->nrxq = rounddown_pow_of_two(iaq->nrxq - 1);
 			if (iaq->nnmrxq > iaq->nrxq)
 				iaq->nnmrxq = iaq->nrxq;
 		}
