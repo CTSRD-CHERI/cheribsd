@@ -144,8 +144,11 @@ TAILQ_HEAD(sectionlist, section);
 
 /* Internal data structure for segments. */
 struct segment {
+	uint64_t	p_type;
 	uint64_t	vaddr;	/* virtual addr (VMA) */
 	uint64_t	paddr;	/* physical addr (LMA) */
+	uint64_t	p_flags;
+	uint64_t	p_align;
 	uint64_t	off;	/* file offset */
 	uint64_t	fsz;	/* file size */
 	uint64_t	msz;	/* memory size */
@@ -237,6 +240,7 @@ struct elfcopy {
 	char		*prefix_alloc;	/* alloc section prefix. */
 	char		*prefix_sym;	/* symbol prefix. */
 	char		*debuglink;	/* GNU debuglink file. */
+	char		*transplant;
 	struct section	*symtab;	/* .symtab section. */
 	struct section	*strtab;	/* .strtab section. */
 	struct section	*shstrtab;	/* .shstrtab section. */
@@ -317,6 +321,8 @@ struct symop *lookup_symop_list(struct elfcopy *_ecp, const char *_name,
     unsigned int _op);
 void	resync_sections(struct elfcopy *_ecp);
 void	setup_phdr(struct elfcopy *_ecp);
+void	transplant(struct elfcopy *_ecp);
+size_t	first_free_offset(struct elfcopy *ecp);
 void	update_shdr(struct elfcopy *_ecp, int _update_link);
 
 #ifndef LIBELF_AR

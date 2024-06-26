@@ -76,6 +76,7 @@ enum options
 	ECP_STRIP_DWO,
 	ECP_STRIP_SYMBOLS,
 	ECP_STRIP_UNNEEDED,
+	ECP_TRANSPLANT,
 	ECP_WEAKEN_ALL,
 	ECP_WEAKEN_SYMBOLS
 };
@@ -165,6 +166,7 @@ static struct option elfcopy_longopts[] =
 	{"strip-symbol", required_argument, NULL, 'N'},
 	{"strip-symbols", required_argument, NULL, ECP_STRIP_SYMBOLS},
 	{"strip-unneeded", no_argument, NULL, ECP_STRIP_UNNEEDED},
+	{"transplant", required_argument, NULL, ECP_TRANSPLANT},
 	{"version", no_argument, NULL, 'V'},
 	{"weaken", no_argument, NULL, ECP_WEAKEN_ALL},
 	{"weaken-symbol", required_argument, NULL, 'W'},
@@ -346,6 +348,8 @@ create_elf(struct elfcopy *ecp)
 	 */
 	create_scn(ecp);
 
+	transplant(ecp);
+
 	/* Apply section address changes, if any. */
 	adjust_addr(ecp);
 
@@ -428,12 +432,22 @@ create_elf(struct elfcopy *ecp)
 	/* Store SHDR offset in EHDR. */
 	oeh.e_shoff = shtab->off;
 
-	/* Put program header table immediately after the Elf header. */
 	if (ecp->ophnum > 0) {
-		oeh.e_phoff = gelf_fsize(ecp->eout, ELF_T_EHDR, 1, EV_CURRENT);
-		if (oeh.e_phoff == 0)
-			errx(EXIT_FAILURE, "gelf_fsize() failed: %s",
-			    elf_errmsg(-1));
+		if (ecp->ophnum <= ecp->iphnum) {
+			/* Put program header table immediately after the Elf header. */
+			oeh.e_phoff = gelf_fsize(ecp->eout, ELF_T_EHDR, 1, EV_CURRENT);
+			if (oeh.e_phoff == 0)
+				errx(EXIT_FAILURE, "gelf_fsize() failed: %s",
+				    elf_errmsg(-1));
+		} else {
+			/*
+			 * Append it at the end, there's no room after the ELF header.
+			 * Create a new section for it.
+			 */
+			//oeh.e_phoff = first_free_offset(ecp);
+			oeh.e_phoff = 1024 * 1024 * 2;
+			fprintf(stderr, "off %zd\n", oeh.e_phoff);
+		}
 	}
 
 	/*
@@ -879,7 +893,7 @@ elfcopy_main(struct elfcopy *ecp, int argc, char **argv)
 	char			*fn, *s;
 	int			 opt;
 
-	while ((opt = getopt_long(argc, argv, "dB:gG:I:j:K:L:N:O:pR:s:SwW:xXV",
+	while ((opt = getopt_long(argc, argv, "dB:gG:I:j:K:L:N:O:pR:s:ST:wW:xXV",
 	    elfcopy_longopts, NULL)) != -1) {
 		switch(opt) {
 		case 'B':
@@ -929,6 +943,9 @@ elfcopy_main(struct elfcopy *ecp, int argc, char **argv)
 			break;
 		case 'p':
 			ecp->flags |= PRESERVE_DATE;
+			break;
+		case 'T':
+			ecp->transplant = optarg;
 			break;
 		case 'V':
 			print_version();
@@ -1504,6 +1521,7 @@ Usage: %s [options] infile [outfile]\n\
                                Remove the named section.\n\
   -S | --strip-all             Remove all symbol and relocation information\n\
                                from the output.\n\
+  -T path | --transplant=path  Transplant loadable bits into the output.\n\
   -V | --version               Print a version identifier and exit.\n\
   -W SYM | --weaken-symbol=SYM Mark symbol SYM as weak in the output.\n\
   -X | --discard-locals        Do not copy compiler generated symbols to\n\

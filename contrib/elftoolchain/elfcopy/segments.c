@@ -492,8 +492,11 @@ setup_phdr(struct elfcopy *ecp)
 			    elf_errmsg(-1));
 		if ((seg = calloc(1, sizeof(*seg))) == NULL)
 			err(EXIT_FAILURE, "calloc failed");
+		seg->p_type	= iphdr.p_type;
 		seg->vaddr	= iphdr.p_vaddr;
 		seg->paddr	= iphdr.p_paddr;
+		seg->p_flags	= iphdr.p_flags;
+		seg->p_align	= iphdr.p_align;
 		seg->off	= iphdr.p_offset;
 		seg->fsz	= iphdr.p_filesz;
 		seg->msz	= iphdr.p_memsz;
@@ -507,7 +510,7 @@ copy_phdr(struct elfcopy *ecp)
 {
 	struct segment	*seg;
 	struct section	*s;
-	GElf_Phdr	 iphdr, ophdr;
+	GElf_Phdr	 ophdr;
 	int		 i;
 
 	STAILQ_FOREACH(seg, &ecp->v_seg, seg_list) {
@@ -560,26 +563,20 @@ copy_phdr(struct elfcopy *ecp)
 	if (elf_update(ecp->eout, ELF_C_NULL) < 0)
 		errx(EXIT_FAILURE, "elf_update() failed: %s", elf_errmsg(-1));
 
-	/*
-	 * iphnum == ophnum, since we don't remove program headers even if
-	 * they no longer contain sections.
-	 */
 	i = 0;
 	STAILQ_FOREACH(seg, &ecp->v_seg, seg_list) {
-		if (i >= ecp->iphnum)
-			break;
-		if (gelf_getphdr(ecp->ein, i, &iphdr) != &iphdr)
-			errx(EXIT_FAILURE, "gelf_getphdr failed: %s",
-			    elf_errmsg(-1));
+		if (i >= ecp->ophnum)
+			errx(1, "wtf");
+
 		if (gelf_getphdr(ecp->eout, i, &ophdr) != &ophdr)
 			errx(EXIT_FAILURE, "gelf_getphdr failed: %s",
 			    elf_errmsg(-1));
 
-		ophdr.p_type = iphdr.p_type;
+		ophdr.p_type = seg->p_type;
 		ophdr.p_vaddr = seg->vaddr;
 		ophdr.p_paddr = seg->paddr;
-		ophdr.p_flags = iphdr.p_flags;
-		ophdr.p_align = iphdr.p_align;
+		ophdr.p_flags = seg->p_flags;
+		ophdr.p_align = seg->p_align;
 		ophdr.p_offset = seg->off;
 		ophdr.p_filesz = seg->fsz;
 		ophdr.p_memsz = seg->msz;
