@@ -1194,17 +1194,17 @@ static int
 handle_deladdr_inet(struct nlmsghdr *hdr, struct nl_parsed_ifa *attrs,
     if_t ifp, struct nlpcb *nlp, struct nl_pstate *npt)
 {
-	struct sockaddr_in *addr = (struct sockaddr_in *)attrs->ifa_local;
+	struct sockaddr *addr = attrs->ifa_local;
 
 	if (addr == NULL)
-		addr = (struct sockaddr_in *)attrs->ifa_address;
+		addr = attrs->ifa_address;
 
 	if (addr == NULL) {
 		nlmsg_report_err_msg(npt, "empty IFA_ADDRESS/IFA_LOCAL");
 		return (EINVAL);
 	}
 
-	struct in_aliasreq req = { .ifra_addr = *addr };
+	struct ifreq req = { .ifr_addr = *addr };
 
 	return (in_control_ioctl(SIOCDIFADDR, &req, ifp, nlp_get_cred(nlp)));
 }
@@ -1288,7 +1288,7 @@ handle_deladdr_inet6(struct nlmsghdr *hdr, struct nl_parsed_ifa *attrs,
 		return (EINVAL);
 	}
 
-	struct in6_aliasreq req = { .ifra_addr = *addr };
+	struct in6_ifreq req = { .ifr_addr = *addr };
 
 	return (in6_control_ioctl(SIOCDIFADDR_IN6, &req, ifp, nlp_get_cred(nlp)));
 }
