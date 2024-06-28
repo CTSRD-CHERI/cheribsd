@@ -360,19 +360,33 @@ logger(int pri, const char *fmt, ...)
 static int
 ifaddr_ad(unsigned long d, const char *ifnam, struct sockaddr *sa, struct sockaddr *mask)
 {
-	struct ifaliasreq req;
+	struct ifreq ifr;
+	struct ifaliasreq ifra;
+	caddr_t req;
 	int fd, error;
 
 	fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (fd < 0)
 		return (-1);
 
-	memset(&req, 0, sizeof(struct ifaliasreq));
-	strlcpy(req.ifra_name, ifnam, sizeof(req.ifra_name));
-	memcpy(&req.ifra_addr, sa, sa->sa_len);
-	memcpy(&req.ifra_mask, mask, mask->sa_len);
+	switch (d) {
+	case SIOCAIFADDR:
+		memset(&ifra, 0, sizeof(ifra));
+		strlcpy(ifra.ifra_name, ifnam, sizeof(ifra.ifra_name));
+		memcpy(&ifra.ifra_addr, sa, sa->sa_len);
+		memcpy(&ifra.ifra_mask, mask, mask->sa_len);
+		req = (caddr_t)&ifra;
+		break;
+	case SIOCDIFADDR:
+		memset(&ifr, 0, sizeof(ifr));
+		strlcpy(ifr.ifr_name, ifnam, sizeof(ifr.ifr_name));
+		req = (caddr_t)&ifr;
+		break;
+	default:
+		return (-1);
+	}
 
-	error = ioctl(fd, d, (char *)&req);
+	error = ioctl(fd, d, req);
 	close(fd);
 	return (error);
 }
