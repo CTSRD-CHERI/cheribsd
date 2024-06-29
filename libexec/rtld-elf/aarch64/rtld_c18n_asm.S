@@ -84,18 +84,18 @@ ENTRY(_rtld_sighandler)
 	 * Get the interrupted compartment's current stack top.
 	 */
 	get_untrusted_stk	c3
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	/*
 	 * The function is executing on an unknown untrusted stack. Switch to
 	 * RTLD's stack.
 	 */
 	get_rtld_stk		c4
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	/*
 	 * Allocate a sigframe on RTLD's stack.
 	 */
 	sub	c4, c4, #SIG_FRAME_SIZE
-	set_untrusted_stk	c4
 #endif
+	set_untrusted_stk	c4
 	b	_rtld_sighandler_impl
 END(_rtld_sighandler)
 

@@ -1883,11 +1883,6 @@ _rtld_sighandler_impl(int sig, siginfo_t *info, ucontext_t *ucp, void *nsp)
 
 	info = &sf->sf_si;
 	ucp = &sf->sf_uc;
-#else
-	/*
-	 * Switch to RTLD's stack.
-	 */
-	set_untrusted_stk(table->entries[RTLD_COMPART_ID].stack);
 #endif
 
 	tf = get_trusted_stk();
