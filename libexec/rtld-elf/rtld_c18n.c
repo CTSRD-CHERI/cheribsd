@@ -1931,17 +1931,16 @@ _rtld_sighandler_impl(int sig, siginfo_t *info, ucontext_t *ucp, void *nsp)
 	intr = index_to_cid(intr_idx);
 	if (cheri_is_subset(table->meta->compart_stk[intr].begin, nsp))
 		goto found_trusted;
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	/*
-	 * In the benchmark ABI, lazy binding, thread-local storage, and stack
-	 * resolution all involve switching to RTLD's stack. In this case, nsp
-	 * would refer to RTLD's stack top.
+	 * Lazy binding, thread-local storage, and stack resolution all involve
+	 * switching to RTLD's stack. In this case, nsp would refer to RTLD's
+	 * stack top.
 	 */
 	intr_idx = cid_to_index(RTLD_COMPART_ID);
 	intr = RTLD_COMPART_ID;
 	if (cheri_is_subset(table->meta->compart_stk[intr].begin, nsp))
 		goto found_trusted;
-#else
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 found_failed:
 #endif
 	rtld_fdprintf(STDERR_FILENO,
