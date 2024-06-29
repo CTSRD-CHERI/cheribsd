@@ -1248,7 +1248,7 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
 #endif
 
     rlock_acquire(rtld_bind_lock, &lockstate);
-	
+
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
     if (C18N_ENABLED) {
 	tf = get_trusted_stk();
