@@ -1240,10 +1240,21 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
     uintptr_t *where;
     uintptr_t target;
     RtldLockState lockstate;
-
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    if (C18N_ENABLED)
+    struct trusted_frame *tf;
+
+    if (C18N_ENABLED) {
 	obj = cheri_unseal(obj, sealer_pltgot);
+	tf = get_trusted_stk();
+	/*
+	 * Push a dummy trusted frame indicating that the current compartment is
+	 * RTLD.
+	 */
+	*--tf = (struct trusted_frame) {
+		.callee = cid_to_index(RTLD_COMPART_ID)
+	};
+	set_trusted_stk(tf);
+    }
 #endif
 
     rlock_acquire(rtld_bind_lock, &lockstate);
@@ -1292,6 +1303,12 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
      */
     target = reloc_jmpslot(where, target, defobj, obj, rel);
     lock_release(rtld_bind_lock, &lockstate);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+    if (C18N_ENABLED) {
+	assert(get_trusted_stk() == tf);
+	set_trusted_stk(++tf);
+    }
+#endif
     return (target);
 }
 
