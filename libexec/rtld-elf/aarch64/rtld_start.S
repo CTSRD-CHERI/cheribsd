@@ -371,7 +371,7 @@ ENTRY(C18N_SYM(_rtld_tlsdesc_dynamic))
 	stp	c15, c16, [csp, #(7 * 32)]
 	stp	c17, c18, [csp, #(8 * 32)]
 	str	c19,	  [csp, #(9 * 32)]
-#if defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
+#ifdef RTLD_SANDBOX
 	/*
 	 * Get the caller's current stack top. This step is only needed for
 	 * _rtld_tlsdesc_dynamic because it might call external functions.
