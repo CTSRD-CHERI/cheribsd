@@ -1247,6 +1247,19 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
 #endif
 
     rlock_acquire(rtld_bind_lock, &lockstate);
+	
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	struct trusted_frame *tf = get_trusted_stk();
+	/*
+	 * Push a dummy trusted frame indicating that the current compartment
+	 * is RTLD.
+	 */
+	*--tf = (struct trusted_frame) {
+		.callee = cid_to_index(RTLD_COMPART_ID)
+	};
+	set_trusted_stk(tf);
+#endif
+
     if (sigsetjmp(lockstate.env, 0) != 0)
 	    lock_upgrade(rtld_bind_lock, &lockstate);
     if (obj->pltrel)
@@ -1291,6 +1304,9 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
      * that the trampoline needs.
      */
     target = reloc_jmpslot(where, target, defobj, obj, rel);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	set_trusted_stk(++tf);
+#endif
     lock_release(rtld_bind_lock, &lockstate);
     return (target);
 }
