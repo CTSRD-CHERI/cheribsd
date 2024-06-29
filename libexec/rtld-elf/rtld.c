@@ -1240,10 +1240,13 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
     uintptr_t *where;
     uintptr_t target;
     RtldLockState lockstate;
-
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    if (C18N_ENABLED)
+    struct trusted_frame *tf;
+
+    if (C18N_ENABLED) {
 	obj = cheri_unseal(obj, sealer_pltgot);
+	tf = push_dummy_rtld_trusted_frame(get_trusted_stk());
+    }
 #endif
 
     rlock_acquire(rtld_bind_lock, &lockstate);
@@ -1292,6 +1295,10 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
      */
     target = reloc_jmpslot(where, target, defobj, obj, rel);
     lock_release(rtld_bind_lock, &lockstate);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+    if (C18N_ENABLED)
+	tf = pop_dummy_rtld_trusted_frame(tf);
+#endif
     return (target);
 }
 

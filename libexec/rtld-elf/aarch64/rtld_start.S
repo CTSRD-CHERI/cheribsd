@@ -129,18 +129,16 @@ ENTRY(C18N_SYM(_rtld_bind_start))
 	 * get the caller's old stack top.
 	 */
 	update_stk_table	c11, c10, w12
-	mov	c17, c10
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	/*
 	 * Switch to RTLD's stack.
 	 */
-	get_rtld_stk		c10
-	set_untrusted_stk	c10
-#endif
+	get_rtld_stk		c12
+	set_untrusted_stk	c12
 	/*
 	 * Save caller's old stack top.
 	 */
 	str	c11, [csp, #-CAP_WIDTH]!
+	mov	c17, c10
 #else
 	mov	PTR(17), PTRN(sp)
 #endif

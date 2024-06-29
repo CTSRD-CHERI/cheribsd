@@ -71,8 +71,8 @@
 .endmacro
 
 .macro	get_rtld_stk		reg
-	mrs	\reg, STACK_TABLE
-	ldr	\reg, [\reg, #STACK_TABLE_RTLD]
+	mrs	STACK_TABLE_C, STACK_TABLE
+	ldr	\reg, [STACK_TABLE_C, #STACK_TABLE_RTLD]
 .endmacro
 
 .macro	update_stk_table	osp, sp, index
