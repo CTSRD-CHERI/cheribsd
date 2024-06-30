@@ -745,14 +745,23 @@ init_stk_table(struct stk_table *table, struct tcb_wrapper *wrap)
 	};
 
 	/*
-	 * Record RTLD's stack in the stack lookup table. The recorded size of
-	 * the stack remains zero so that the stack is not ummapped upon thread
-	 * exit.
+	 * Record RTLD's stack in the stack lookup table.
 	 */
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	sp = cheri_setoffset(cheri_getstack(), 0);
 #else
-	sp = NULL;
+	/*
+	 * RTLD's actual stack is the Executive stack which does not need to be
+	 * stored in the stack lookup table. Instead, fill the table entry with
+	 * a one-byte dummy stack.
+	 *
+	 * Note that NULL cannot be used here because a compartment can then
+	 * pretend to be RTLD when a signal is delivered. Nor can a zero-length
+	 * stack be used because the signal handler uses the recorded size of
+	 * the stack to determine whether it has been allocated.
+	 */
+	static char dummy_stk;
+	sp = &dummy_stk;
 #endif
 	size = cheri_getlen(sp);
 	assert(size > 0);
