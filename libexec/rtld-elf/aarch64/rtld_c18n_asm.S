@@ -154,14 +154,12 @@ ENTRY(create_untrusted_stk)
 	 * callee-saved registers must be cleared.
 	 */
 
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	/*
 	 * The execution stack is still the caller's stack. Switch to RTLD's
 	 * stack.
 	 */
 	get_rtld_stk		c10
 	set_untrusted_stk	c10
-#endif
 
 	save_arguments
 
