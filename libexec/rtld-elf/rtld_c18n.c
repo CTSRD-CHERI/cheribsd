@@ -826,7 +826,16 @@ resolve_untrusted_stk_impl(stk_table_index index)
 	void *stk;
 	sigset_t nset, oset;
 	struct stk_table *table;
-	struct trusted_frame backup, *tf;
+	struct trusted_frame *tf = get_trusted_stk();
+
+	/*
+	 * Push a dummy trusted frame indicating that the current compartment is
+	 * RTLD.
+	 */
+	*--tf = (struct trusted_frame) {
+		.callee = cid_to_index(RTLD_COMPART_ID)
+	};
+	set_trusted_stk(tf);
 
 	/*
 	 * Make the function re-entrant by blocking all signals and re-check
@@ -835,23 +844,13 @@ resolve_untrusted_stk_impl(stk_table_index index)
 	SIGFILLSET(nset);
 	sigprocmask(SIG_SETMASK, &nset, &oset);
 
-	/*
-	 * The topmost trusted frame isn't valid---it references a transition
-	 * that hasn't taken place yet. Back up the topmost frame, pop it from
-	 * the trusted stack and restore it later.
-	 */
-	tf = get_trusted_stk();
-	backup = *tf;
-	set_trusted_stk(backup.previous);
-
 	table = get_stk_table();
 	stk = get_or_create_untrusted_stk(index_to_cid(index), &table);
 
-	assert(get_trusted_stk() == backup.previous);
-	*tf = backup;
-	set_trusted_stk(tf);
-
 	sigprocmask(SIG_SETMASK, &oset, NULL);
+
+	assert(get_trusted_stk() == tf);
+	set_trusted_stk(++tf);
 
 	return (stk);
 }
