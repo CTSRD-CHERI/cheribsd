@@ -5750,13 +5750,26 @@ void *
 tls_get_addr_common(uintptr_t **dtvp, int index, size_t offset)
 {
 	uintptr_t *dtv;
+	void *ret;
 
 	dtv = *dtvp;
 	/* Check dtv generation in case new modules have arrived */
 	if (__predict_true(dtv[0] == tls_dtv_generation &&
 	    dtv[index + 1] != 0))
 		return ((void *)(dtv[index + 1] + offset));
-	return (tls_get_addr_slow(dtvp, index, offset, false));
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	struct trusted_frame *tf;
+
+	if (C18N_ENABLED)
+		tf = push_dummy_rtld_trusted_frame(get_trusted_stk());
+#endif
+	ret = tls_get_addr_slow(dtvp, index, offset, false);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	if (C18N_ENABLED)
+		tf = pop_dummy_rtld_trusted_frame(tf);
+#endif
+	return (ret);
 }
 
 #ifdef TLS_VARIANT_I

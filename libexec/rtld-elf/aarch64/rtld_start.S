@@ -380,13 +380,11 @@ ENTRY(C18N_SYM(_rtld_tlsdesc_dynamic))
 	 * get the caller's old stack top.
 	 */
 	update_stk_table	c11, c10, w12
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	/*
 	 * Switch to RTLD's stack.
 	 */
 	get_rtld_stk		c10
 	set_untrusted_stk	c10
-#endif
 	/*
 	 * Save caller's old stack top.
 	 */
