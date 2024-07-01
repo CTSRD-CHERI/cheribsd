@@ -232,7 +232,7 @@ add_to_sublevel(struct sort_level *sl, struct sort_list_item *item, size_t indx)
 	}
 
 	if (++(ssl->tosort_num) > ssl->tosort_sz) {
-		ssl->tosort_sz = ssl->tosort_num + 128;
+		ssl->tosort_sz = ssl->tosort_num * 2;
 		ssl->tosort = sort_realloc(ssl->tosort,
 		    sizeof(struct sort_list_item*) * (ssl->tosort_sz));
 	}
@@ -245,7 +245,7 @@ add_leaf(struct sort_level *sl, struct sort_list_item *item)
 {
 
 	if (++(sl->leaves_num) > sl->leaves_sz) {
-		sl->leaves_sz = sl->leaves_num + 128;
+		sl->leaves_sz = sl->leaves_num * 2;
 		sl->leaves = sort_realloc(sl->leaves,
 		    (sizeof(struct sort_list_item*) * (sl->leaves_sz)));
 	}
