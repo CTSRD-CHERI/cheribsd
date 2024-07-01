@@ -118,8 +118,33 @@ struct stk_table {
 
 #define	COMPART_ID_MAX		index_to_cid((stk_table_index) { -1 })
 
+#include "rtld_c18n_machdep.h"
+
 struct tcb *c18n_allocate_tcb(struct tcb *);
 void c18n_free_tcb(void);
+
+/*
+ * When entering the RTLD without a trampoline (e.g., during lazy binding, TLS
+ * lookup, or stack resolution), a dummy trusted frame indicating that the
+ * current compartment is RTLD must be pushed.
+ */
+static inline struct trusted_frame *
+push_dummy_rtld_trusted_frame(struct trusted_frame *tf)
+{
+	*--tf = (struct trusted_frame) {
+		.callee = cid_to_index(RTLD_COMPART_ID)
+	};
+	set_trusted_stk(tf);
+	return (tf);
+}
+
+static inline struct trusted_frame *
+pop_dummy_rtld_trusted_frame(struct trusted_frame *tf)
+{
+	assert(get_trusted_stk() == tf);
+	set_trusted_stk(++tf);
+	return (tf);
+}
 
 /*
  * Trampolines
@@ -205,6 +230,4 @@ void *_rtld_tlsdesc_dynamic_c18n(void *);
 
 void c18n_init(Obj_Entry *, Elf_Auxinfo *[]);
 void c18n_init2(Obj_Entry *);
-
-#include "rtld_c18n_machdep.h"
 #endif

@@ -764,17 +764,14 @@ init_stk_table(struct stk_table *table, struct tcb_wrapper *wrap)
 	table->entries[RTLD_COMPART_ID].stack = sp + size;
 
 	/*
-	 * Push a dummy trusted frame indicating that the 'root' compartment
-	 * is RTLD.
+	 * Push a dummy trusted frame indicating that the 'root' compartment is
+	 * RTLD.
 	 */
-	*--tf = (struct trusted_frame) {
-		.callee = cid_to_index(RTLD_COMPART_ID)
-	};
+	tf = push_dummy_rtld_trusted_frame(tf);
 
 	/*
-	 * Install the trusted stack and the stack lookup table.
+	 * Install the stack lookup table.
 	 */
-	set_trusted_stk(tf);
 	set_stk_table(table);
 }
 
