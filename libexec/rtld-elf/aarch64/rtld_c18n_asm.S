@@ -35,46 +35,6 @@
  */
 
 /*
- * The _rtld_unw_{get,set}context_epilogue functions are stack unwinding
- * helpers. See the 'Stack unwinding' section in rtld_c18n.c.
- */
-ENTRY(_rtld_unw_getcontext_epilogue)
-	/*
-	 * FIXME: llvm-libunwind specific ABI. This should be better specified.
-	 */
-	mov	c2, csp
-	str	c2, [c1]
-	RETURN
-END(_rtld_unw_getcontext_epilogue)
-
-/*
- * XXX: If compartmentalisation is not enabled, _rtld_unw_setcontext_ptr is NULL
- * and we simply restore a few registers and return via retr (back to Restricted
- * mode). Otherwise, call _rtld_unw_setcontext_impl via a trampoline.
- */
-ENTRY(_rtld_unw_setcontext)
-	ldr	c16, _rtld_unw_setcontext_ptr
-	cbnz	w16, 1f
-	/*
-	 * FIXME: llvm-libunwind specific ABI. This should be better specified.
-	 */
-	mov	c16, c2
-	ldp	c2, c3, [c3, #(-0x210 + 0x20)]
-	mov	csp, c16
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	RETURN
-#else
-	retr	c30
-#endif
-1:
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	br	x16
-#else
-	br	c16
-#endif
-END(_rtld_unw_setcontext)
-
-/*
  * The _rtld_sighandler function is the actual signal handler passed to the
  * kernel when the user calls sigaction. It dispatches the signal to the
  * appropriate handler registered by the user.
@@ -84,18 +44,18 @@ ENTRY(_rtld_sighandler)
 	 * Get the interrupted compartment's current stack top.
 	 */
 	get_untrusted_stk	c3
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	/*
 	 * The function is executing on an unknown untrusted stack. Switch to
 	 * RTLD's stack.
 	 */
 	get_rtld_stk		c4
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	/*
 	 * Allocate a sigframe on RTLD's stack.
 	 */
 	sub	c4, c4, #SIG_FRAME_SIZE
-	set_untrusted_stk	c4
 #endif
+	set_untrusted_stk	c4
 	b	_rtld_sighandler_impl
 END(_rtld_sighandler)
 
@@ -154,14 +114,12 @@ ENTRY(create_untrusted_stk)
 	 * callee-saved registers must be cleared.
 	 */
 
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	/*
 	 * The execution stack is still the caller's stack. Switch to RTLD's
 	 * stack.
 	 */
 	get_rtld_stk		c10
 	set_untrusted_stk	c10
-#endif
 
 	save_arguments
 

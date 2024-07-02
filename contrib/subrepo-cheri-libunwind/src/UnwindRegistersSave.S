@@ -837,13 +837,19 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
 
 #elif defined(__aarch64__)
 
-#if defined(__CHERI_PURE_CAPABILITY__)
-DEFINE_LIBUNWIND_FUNCTION(__rtld_unw_getcontext)
-  mov    c2,      csp
-  str    c2,      [c1]
-  ret    c30
-END_LIBUNWIND_FUNCTION(__rtld_unw_getcontext)
-WEAK_ALIAS(__rtld_unw_getcontext, _rtld_unw_getcontext)
+#ifdef __CHERI_PURE_CAPABILITY__
+DEFINE_LIBUNWIND_FUNCTION(_c18n_noop)
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+  and    x30, x30, #~1
+  ret    x30
+#else
+  ret
+#endif
+END_LIBUNWIND_FUNCTION(_c18n_noop)
+// uintptr_t c18n_get_trusted_stk(uintptr_t, struct trusted_frame **);
+WEAK_ALIAS(_c18n_noop, c18n_get_trusted_stk)
+// uintptr_t c18n_unwind_trusted_stk(uintptr_t, void *, struct trusted_frame *);
+WEAK_ALIAS(_c18n_noop, c18n_unwind_trusted_stk)
 #endif
 
 //
@@ -898,7 +904,7 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
   str    d30,     [c0, #0x0f0]
   str    d31,     [c0, #0x0f8]
   mov    x0, #0                   // return UNW_ESUCCESS
-  b      _rtld_unw_getcontext
+  b      c18n_get_trusted_stk
 #else
   stp    x0, x1,  [x0, #0x000]
   stp    x2, x3,  [x0, #0x010]

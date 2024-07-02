@@ -87,7 +87,7 @@ _Static_assert(
     TRUSTED_FRAME_SIZE * sizeof(uintptr_t) == sizeof(struct trusted_frame),
     "Unexpected struct trusted_frame size");
 _Static_assert(
-    TRUSTED_FRAME_SP_OSP == offsetof(struct trusted_frame, sp),
+    TRUSTED_FRAME_SP_OSP == offsetof(struct trusted_frame, state.sp),
     "Unexpected struct trusted_frame member offset");
 _Static_assert(
     TRUSTED_FRAME_PREV == offsetof(struct trusted_frame, previous),
@@ -117,8 +117,7 @@ _Static_assert(
  * Sealers for RTLD privileged information
  */
 static uintptr_t sealer_tcb;
-static uintptr_t sealer_jmpbuf;
-static uintptr_t sealer_unwbuf;
+static uintptr_t sealer_trusted_stk;
 
 uintptr_t sealer_pltgot, sealer_tramp;
 
@@ -745,14 +744,23 @@ init_stk_table(struct stk_table *table, struct tcb_wrapper *wrap)
 	};
 
 	/*
-	 * Record RTLD's stack in the stack lookup table. The recorded size of
-	 * the stack remains zero so that the stack is not ummapped upon thread
-	 * exit.
+	 * Record RTLD's stack in the stack lookup table.
 	 */
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	sp = cheri_setoffset(cheri_getstack(), 0);
 #else
-	sp = NULL;
+	/*
+	 * RTLD's actual stack is the Executive stack which does not need to be
+	 * stored in the stack lookup table. Instead, fill the table entry with
+	 * a one-byte dummy stack.
+	 *
+	 * Note that NULL cannot be used here because a compartment can then
+	 * pretend to be RTLD when a signal is delivered. Nor can a zero-length
+	 * stack be used because the signal handler uses the recorded size of
+	 * the stack to determine whether it has been allocated.
+	 */
+	static char dummy_stk;
+	sp = &dummy_stk;
 #endif
 	size = cheri_getlen(sp);
 	assert(size > 0);
@@ -826,7 +834,16 @@ resolve_untrusted_stk_impl(stk_table_index index)
 	void *stk;
 	sigset_t nset, oset;
 	struct stk_table *table;
-	struct trusted_frame backup, *tf;
+	struct trusted_frame *tf = get_trusted_stk();
+
+	/*
+	 * Push a dummy trusted frame indicating that the current compartment is
+	 * RTLD.
+	 */
+	*--tf = (struct trusted_frame) {
+		.callee = cid_to_index(RTLD_COMPART_ID)
+	};
+	set_trusted_stk(tf);
 
 	/*
 	 * Make the function re-entrant by blocking all signals and re-check
@@ -835,39 +852,32 @@ resolve_untrusted_stk_impl(stk_table_index index)
 	SIGFILLSET(nset);
 	sigprocmask(SIG_SETMASK, &nset, &oset);
 
-	/*
-	 * The topmost trusted frame isn't valid---it references a transition
-	 * that hasn't taken place yet. Back up the topmost frame, pop it from
-	 * the trusted stack and restore it later.
-	 */
-	tf = get_trusted_stk();
-	backup = *tf;
-	set_trusted_stk(backup.previous);
-
 	table = get_stk_table();
 	stk = get_or_create_untrusted_stk(index_to_cid(index), &table);
 
-	assert(get_trusted_stk() == backup.previous);
-	*tf = backup;
-	set_trusted_stk(tf);
-
 	sigprocmask(SIG_SETMASK, &oset, NULL);
+
+	assert(get_trusted_stk() == tf);
+	set_trusted_stk(++tf);
 
 	return (stk);
 }
 
 /*
  * Stack unwinding
+ *
+ * APIs exposed to stack unwinders (e.g., libc setjmp/longjmp and libunwind)
  */
-/*
- * Assembly functions that are tail-called when compartmentalisation is
- * disabled.
- */
-uintptr_t _rtld_unw_getcontext_epilogue(uintptr_t, void **);
-struct jmp_args _rtld_unw_setcontext_epilogue(struct jmp_args, void *, void **);
+uintptr_t c18n_get_trusted_stk(uintptr_t, struct trusted_frame **);
+uintptr_t c18n_unwind_trusted_stk(uintptr_t, void *, struct trusted_frame *);
 
-static void *
-unwind_cursor(void)
+bool c18n_is_enabled(void);
+bool c18n_is_tramp(ptraddr_t, struct trusted_frame *);
+struct trusted_frame *c18n_pop_trusted_stk(struct compart_state *,
+    struct trusted_frame *);
+
+uintptr_t
+c18n_get_trusted_stk(uintptr_t ret, struct trusted_frame **buf)
 {
 	/*
 	 * This helper is used by functions like setjmp. Before setjmp is
@@ -881,39 +891,14 @@ unwind_cursor(void)
 	 * buffer.
 	 */
 
-	return (get_trusted_stk()->previous);
-}
-
-uintptr_t _rtld_setjmp(uintptr_t, void **);
-uintptr_t _rtld_unw_getcontext(uintptr_t, void **);
-uintptr_t _rtld_unw_getcontext_unsealed(uintptr_t, void **);
-
-uintptr_t
-_rtld_setjmp(uintptr_t ret, void **buf)
-{
-	*buf = cheri_seal(unwind_cursor(), sealer_jmpbuf);
+	if (C18N_ENABLED)
+		*buf = cheri_seal(get_trusted_stk()->previous,
+		    sealer_trusted_stk);
 	return (ret);
 }
 
 uintptr_t
-_rtld_unw_getcontext(uintptr_t ret, void **buf)
-{
-	if (!C18N_ENABLED) {
-		__attribute__((musttail))
-		return (_rtld_unw_getcontext_epilogue(ret, buf));
-	}
-	*buf = cheri_seal(unwind_cursor(), sealer_unwbuf);
-	return (ret);
-}
-
-/*
- * Returning this struct allows us to control the content of unused return value
- * registers.
- */
-struct jmp_args { uintptr_t ret1; uintptr_t ret2; };
-
-static struct jmp_args
-unwind_stack(struct jmp_args ret, void *rcsp, struct trusted_frame *target)
+c18n_unwind_trusted_stk(uintptr_t ret, void *rcsp, struct trusted_frame *target)
 {
 	/*
 	 * This helper is used by functions like longjmp. Before longjmp is
@@ -935,6 +920,9 @@ unwind_stack(struct jmp_args ret, void *rcsp, struct trusted_frame *target)
 	struct trusted_frame *cur, *tf;
 	sigset_t nset, oset;
 
+	if (!C18N_ENABLED)
+		return (ret);
+
 	/*
 	 * Make the function re-entrant by blocking all signals.
 	 */
@@ -942,6 +930,7 @@ unwind_stack(struct jmp_args ret, void *rcsp, struct trusted_frame *target)
 	sigprocmask(SIG_SETMASK, &nset, &oset);
 
 	tf = get_trusted_stk();
+	target = cheri_unseal(target, sealer_trusted_stk);
 
 	if (!cheri_is_subset(tf, target) || tf->previous >= target) {
 		rtld_fdprintf(STDERR_FILENO,
@@ -989,7 +978,7 @@ unwind_stack(struct jmp_args ret, void *rcsp, struct trusted_frame *target)
 		abort();
 	}
 
-	tf->sp = rcsp;
+	tf->state.sp = rcsp;
 	tf->osp = *ospp;
 	tf->previous = cur;
 	tf->caller = index;
@@ -999,26 +988,25 @@ unwind_stack(struct jmp_args ret, void *rcsp, struct trusted_frame *target)
 	return (ret);
 }
 
-struct jmp_args _rtld_longjmp(struct jmp_args, void *, void **);
-struct jmp_args _rtld_unw_setcontext_impl(struct jmp_args, void *, void **);
-
-struct jmp_args
-_rtld_longjmp(struct jmp_args ret, void *rcsp, void **buf)
+bool
+c18n_is_enabled(void)
 {
-	return (unwind_stack(ret, rcsp, cheri_unseal(*buf, sealer_jmpbuf)));
+	return (C18N_ENABLED);
 }
 
-struct jmp_args
-_rtld_unw_setcontext_impl(struct jmp_args ret, void *rcsp, void **buf)
+bool
+c18n_is_tramp(ptraddr_t pc, struct trusted_frame *tf)
 {
-	return (unwind_stack(ret, rcsp, cheri_unseal(*buf, sealer_unwbuf)));
+	tf = cheri_unseal(tf, sealer_trusted_stk);
+	return (pc == tf->landing);
 }
 
-uintptr_t _rtld_unw_getsealer(void);
-uintptr_t
-_rtld_unw_getsealer(void)
+struct trusted_frame *
+c18n_pop_trusted_stk(struct compart_state *state, struct trusted_frame *tf)
 {
-	return (sealer_unwbuf);
+	tf = cheri_unseal(tf, sealer_trusted_stk);
+	*state = tf->state;
+	return (cheri_seal(tf->previous, sealer_trusted_stk));
 }
 
 /*
@@ -1208,9 +1196,9 @@ tramp_hook_impl(int event, const struct tramp_header *hdr,
 		memcpy(ut.sig, C18N_UTRACE_SIG, C18N_UTRACE_SIG_SZ);
 		ut.event = event;
 		ut.symnum = hdr->symnum;
-		ut.fp = tf->fp;
-		ut.pc = tf->pc;
-		ut.sp = tf->sp;
+		ut.fp = tf->state.fp;
+		ut.pc = tf->state.pc;
+		ut.sp = tf->state.sp;
 		ut.osp = tf->osp;
 		ut.previous = tf->previous;
 		memcpy(&ut.fsig, &hdr->sig, sizeof(ut.fsig));
@@ -1611,16 +1599,8 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
  */
 #define	MAX_TRAMP_PG_SIZE		(4 * 1024 * 1024)
 
-/*
- * XXX: Manually wrap _rtld_unw_setcontext_impl in a trampoline for now because
- * it is called via a function pointer.
- */
-extern struct jmp_args (*_rtld_unw_setcontext_ptr)(struct jmp_args, void *,
-    void **);
-struct jmp_args (*_rtld_unw_setcontext_ptr)(struct jmp_args, void *, void **);
-
 void
-c18n_init2(Obj_Entry *obj_rtld)
+c18n_init2(void)
 {
 	uintptr_t sealer;
 
@@ -1637,10 +1617,7 @@ c18n_init2(Obj_Entry *obj_rtld)
 	sealer_tcb = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
 
-	sealer_jmpbuf = cheri_setboundsexact(sealer, 1);
-	sealer += 1;
-
-	sealer_unwbuf = cheri_setboundsexact(sealer, 1);
+	sealer_trusted_stk = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
 
 	sealer_tramp = cheri_setboundsexact(sealer, C18N_FUNC_SIG_COUNT);
@@ -1669,19 +1646,6 @@ c18n_init2(Obj_Entry *obj_rtld)
 	assert(tramp_pg_size > 0);
 	atomic_store_explicit(&tramp_pgs.head, tramp_pg_new(NULL),
 	    memory_order_relaxed);
-
-	/*
-	 * XXX: Manually wrap _rtld_unw_setcontext_impl in a trampoline for now
-	 * because it is called via a function pointer.
-	*/
-	_rtld_unw_setcontext_ptr = tramp_intern(NULL, &(struct tramp_data) {
-		.target = &_rtld_unw_setcontext_impl,
-		.defobj = obj_rtld,
-		.sig = (struct func_sig) {
-			.valid = true,
-			.reg_args = 4, .mem_args = false, .ret_args = TWO
-		}
-	});
 }
 
 /*
@@ -1886,11 +1850,6 @@ _rtld_sighandler_impl(int sig, siginfo_t *info, ucontext_t *ucp, void *nsp)
 
 	info = &sf->sf_si;
 	ucp = &sf->sf_uc;
-#else
-	/*
-	 * Switch to RTLD's stack.
-	 */
-	set_untrusted_stk(table->entries[RTLD_COMPART_ID].stack);
 #endif
 
 	tf = get_trusted_stk();
@@ -1934,17 +1893,16 @@ _rtld_sighandler_impl(int sig, siginfo_t *info, ucontext_t *ucp, void *nsp)
 	intr = index_to_cid(intr_idx);
 	if (cheri_is_subset(table->meta->compart_stk[intr].begin, nsp))
 		goto found_trusted;
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	/*
-	 * In the benchmark ABI, lazy binding, thread-local storage, and stack
-	 * resolution all involve switching to RTLD's stack. In this case, nsp
-	 * would refer to RTLD's stack top.
+	 * Lazy binding, thread-local storage, and stack resolution all involve
+	 * switching to RTLD's stack. In this case, nsp would refer to RTLD's
+	 * stack top.
 	 */
 	intr_idx = cid_to_index(RTLD_COMPART_ID);
 	intr = RTLD_COMPART_ID;
 	if (cheri_is_subset(table->meta->compart_stk[intr].begin, nsp))
 		goto found_trusted;
-#else
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 found_failed:
 #endif
 	rtld_fdprintf(STDERR_FILENO,
@@ -1982,7 +1940,9 @@ found:
 	 */
 	ntf = tf - 2;
 	*ntf = (struct trusted_frame) {
-		.sp = nsp,
+		.state = (struct compart_state) {
+			.sp = nsp
+		},
 		.osp = osp,
 		.previous = tf,
 		.caller = intr_idx,
@@ -2037,7 +1997,7 @@ found:
 	 * compartment.
 	 */
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	set_untrusted_stk(ntf->sp);
+	set_untrusted_stk(ntf->state.sp);
 #endif
 }
 

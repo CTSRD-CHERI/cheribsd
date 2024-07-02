@@ -1066,7 +1066,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
     if (C18N_ENABLED)
-	c18n_init2(&obj_rtld);
+	c18n_init2();
 #endif
 
     /*
@@ -1240,10 +1240,21 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
     uintptr_t *where;
     uintptr_t target;
     RtldLockState lockstate;
-
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-    if (C18N_ENABLED)
+    struct trusted_frame *tf;
+
+    if (C18N_ENABLED) {
 	obj = cheri_unseal(obj, sealer_pltgot);
+	tf = get_trusted_stk();
+	/*
+	 * Push a dummy trusted frame indicating that the current compartment is
+	 * RTLD.
+	 */
+	*--tf = (struct trusted_frame) {
+		.callee = cid_to_index(RTLD_COMPART_ID)
+	};
+	set_trusted_stk(tf);
+    }
 #endif
 
     rlock_acquire(rtld_bind_lock, &lockstate);
@@ -1292,6 +1303,12 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
      */
     target = reloc_jmpslot(where, target, defobj, obj, rel);
     lock_release(rtld_bind_lock, &lockstate);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+    if (C18N_ENABLED) {
+	assert(get_trusted_stk() == tf);
+	set_trusted_stk(++tf);
+    }
+#endif
     return (target);
 }
 
@@ -5743,13 +5760,37 @@ void *
 tls_get_addr_common(uintptr_t **dtvp, int index, size_t offset)
 {
 	uintptr_t *dtv;
+	void *ret;
 
 	dtv = *dtvp;
 	/* Check dtv generation in case new modules have arrived */
 	if (__predict_true(dtv[0] == tls_dtv_generation &&
 	    dtv[index + 1] != 0))
 		return ((void *)(dtv[index + 1] + offset));
-	return (tls_get_addr_slow(dtvp, index, offset, false));
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	struct trusted_frame *tf;
+
+	if (C18N_ENABLED) {
+		tf = get_trusted_stk();
+		/*
+		 * Push a dummy trusted frame indicating that the current
+		 * compartment is RTLD.
+		 */
+		*--tf = (struct trusted_frame) {
+			.callee = cid_to_index(RTLD_COMPART_ID)
+		};
+		set_trusted_stk(tf);
+	}
+#endif
+	ret = tls_get_addr_slow(dtvp, index, offset, false);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	if (C18N_ENABLED) {
+		assert(get_trusted_stk() == tf);
+		set_trusted_stk(++tf);
+	}
+#endif
+	return (ret);
 }
 
 #ifdef TLS_VARIANT_I
