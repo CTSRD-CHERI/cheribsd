@@ -568,16 +568,17 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 	vm_offset_t end = 0;
 	vm_offset_t seg_addr;
 	vm_size_t seg_size;
-	int i;
+	int i, result;
 	vm_pointer_t reservation;
 	void * __capability reservation_cap;
-	Elf_Addr rbase = *preferred_rbase;
-#ifdef __ELF_CHERI
-	int result;
-	vm_offset_t alignment, load_addr;
-	vm_size_t size;
 	vm_map_t map;
+	Elf_Addr rbase = *preferred_rbase;
+	vm_size_t size;
+#ifdef __ELF_CHERI
+	vm_offset_t alignment, load_addr;
 #endif
+
+	map = &imgp->proc->p_vmspace->vm_map;
 
 	for (i = 0; i < hdr->e_phnum; i++) {
 		if (phdr[i].p_type != PT_LOAD || phdr[i].p_memsz == 0)
@@ -618,15 +619,14 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 	}
 
 	/*
-	 * Note: vm_map_reservation_create aligns down, but we have to align
-	 * upwards here to avoid rounding down to zero for the main executable.
-	 * For RTLD we also align upwards to avoid aligning down into the
-	 * memory region for the main binary.
+	 * Note: vm_map_reservation_create aligns down, but we have to
+	 * align upwards here to avoid rounding down to zero for the main
+	 * executable. For RTLD we also align upwards to avoid aligning
+	 * down into the memory region for the main binary.
 	 */
 	alignment = MAX(CHERI_REPRESENTABLE_ALIGNMENT(end - start), PAGE_SIZE);
 	size = CHERI_REPRESENTABLE_LENGTH(end - start);
 	load_addr = roundup2(start + rbase, alignment);
-	map = &imgp->proc->p_vmspace->vm_map;
 	vm_map_lock(map);
 	if (imgp->cop != NULL) {
 		/*
@@ -641,12 +641,15 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 		}
 	}
 	reservation = load_addr;
+#else
+	size = end - start;
+	vm_map_lock(map);
+#endif
 	result = vm_map_reservation_create_locked(map, &reservation, size,
 	    VM_PROT_ALL);
 	vm_map_unlock(map);
 	if (result != KERN_SUCCESS)
 		return (vm_mmap_to_errno(result));
-#endif
 
 	*preferred_rbase = reservation - start;
 
