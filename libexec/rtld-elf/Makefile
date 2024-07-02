@@ -30,11 +30,11 @@ MK_UBSAN=	no
 .include <bsd.compat.pre.mk>
 
 .if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
-RTLD_SANDBOX=
+CHERI_LIB_C18N=
 .endif
 
-.ifdef RTLD_SANDBOX
-CFLAGS+=-DRTLD_SANDBOX
+.ifdef CHERI_LIB_C18N
+CFLAGS+=-DCHERI_LIB_C18N
 .endif
 
 .if !defined(NEED_COMPAT)
@@ -95,7 +95,7 @@ LDFLAGS+=	-Wl,--version-script=${VERSION_MAP}
 SYMBOL_MAPS+=	${RTLD_ELF_DIR}/${RTLD_ARCH}/Symbol.map
 .endif
 
-.ifdef RTLD_SANDBOX
+.ifdef CHERI_LIB_C18N
 SYMBOL_MAPS+=	${RTLD_ELF_DIR}/Symbol-c18n.map
 .endif
 
@@ -117,7 +117,7 @@ SRCS+=		cheri_reloc.c
 CFLAGS+=	-I${RTLD_ELF_DIR}/cheri
 .endif
 
-.ifdef RTLD_SANDBOX
+.ifdef CHERI_LIB_C18N
 SRCS+= \
 	rtld_c18n.c \
 	rtld_c18n_mi.S \

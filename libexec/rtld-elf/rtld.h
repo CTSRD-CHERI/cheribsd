@@ -277,7 +277,7 @@ typedef struct Struct_Obj_Entry {
     Ver_Entry *vertab;		/* Versions required /defined by this object */
     int vernum;			/* Number of entries in vertab */
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
     uint16_t compart_id;
     const struct func_sig *sigtab;
 #endif
@@ -323,6 +323,7 @@ typedef struct Struct_Obj_Entry {
     bool on_fini_list: 1;	/* Object is already on fini list. */
     bool dag_inited : 1;	/* Object has its DAG initialized. */
     bool filtees_loaded : 1;	/* Filtees loaded */
+    bool filtees_loading : 1;	/* In process of filtees loading */
     bool irelative : 1;		/* Object has R_MACHDEP_IRELATIVE relocs */
     bool irelative_nonplt : 1;	/* Object has R_MACHDEP_IRELATIVE non-plt relocs */
     bool gnu_ifunc : 1;		/* Object has references to STT_GNU_IFUNC */
@@ -448,7 +449,7 @@ void dump_Elf_Rel(Obj_Entry *, const Elf_Rel *, u_long);
 void dump_Elf_Rela(Obj_Entry *, const Elf_Rela *, u_long);
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#ifdef RTLD_SANDBOX
+#ifdef CHERI_LIB_C18N
 /*
  * This environment variable is exposed here so that tls.h can see it.
  */

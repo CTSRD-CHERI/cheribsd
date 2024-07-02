@@ -7,7 +7,7 @@ CFLAGS+=-D_ACL_PRIVATE
 subr_acl_nfs4.c: ${SRCTOP}/sys/kern/subr_acl_nfs4.c
 	cat ${.ALLSRC} > ${.TARGET}
 
-.ifndef RTLD_SANDBOX
+.ifndef CHERI_LIB_C18N
 CONFS+=	posix1e/mac.conf
 .endif
 SRCS+=	acl_branding.c			\

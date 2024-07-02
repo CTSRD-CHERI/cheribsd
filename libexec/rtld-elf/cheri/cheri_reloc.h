@@ -35,7 +35,7 @@
 
 #include "debug.h"
 #include "rtld.h"
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 #include "rtld_c18n.h"
 #endif
 

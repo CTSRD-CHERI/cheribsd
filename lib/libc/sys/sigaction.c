@@ -35,7 +35,7 @@
 
 __weak_reference(__sys_sigaction, __sigaction);
 __weak_reference(sigaction, __libc_sigaction);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 /*
  * This weak symbol will always be resolved at runtime.
  */
@@ -53,7 +53,6 @@ sigaction_c18n(int sig, const struct sigaction *act, struct sigaction *oact)
 int
 sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
 {
-
 	return (((int (*)(int, const struct sigaction *, struct sigaction *))
-	    __libc_interposing[INTERPOS_sigaction])(sig, act, oact));
+	    *(__libc_interposing_slot(INTERPOS_sigaction)))(sig, act, oact));
 }

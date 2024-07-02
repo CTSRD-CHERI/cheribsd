@@ -51,7 +51,7 @@ int	__sys___getcwd(char *, size_t);
 int	__sys_sigprocmask(int, const sigset_t *, sigset_t *);
 int	__sys_thr_kill(long, int);
 int	__sys_thr_self(long *);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 void    __sys_thr_exit(long *);
 struct sigaction;
 int     __sys_sigaction(int, const struct sigaction *, struct sigaction *);

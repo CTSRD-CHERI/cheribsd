@@ -21,6 +21,7 @@ SUBDIR_BOOTSTRAP= \
 	libelf \
 	libssp \
 	libssp_nonshared \
+	libsys \
 	msun
 
 # The main list; please keep these sorted alphabetically.
@@ -113,7 +114,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 
 .if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
 .if !defined(COMPAT_LIBCOMPAT) || ${COMPAT_LIBCOMPAT} == "64CB"
-SUBDIR+=	libc_c18n libthr_c18n
+SUBDIR+=	c18n
 .endif
 .endif
 
@@ -136,7 +137,7 @@ SUBDIR_DEPEND_libbsnmp= ${_libnetgraph}
 SUBDIR_DEPEND_cheri-libc++:= libcxxrt
 # libssp_nonshared doesn't need to be linked into libc on every arch, but it is
 # small enough to build that this bit of serialization is likely insignificant.
-SUBDIR_DEPEND_libc= libcompiler_rt libssp_nonshared
+SUBDIR_DEPEND_libc= libsys libcompiler_rt libssp_nonshared
 SUBDIR_DEPEND_libcam= libsbuf
 SUBDIR_DEPEND_libcasper= libnv
 SUBDIR_DEPEND_libdevstat= libkvm
@@ -151,6 +152,8 @@ SUBDIR_DEPEND_libpjdlog= libutil
 SUBDIR_DEPEND_libprocstat= libkvm libutil
 SUBDIR_DEPEND_libradius= libmd
 SUBDIR_DEPEND_libsmb= libkiconv
+# See comment above about libssp_nonshared
+SUBDIR_DEPEND_libsys= libcompiler_rt libssp_nonshared
 SUBDIR_DEPEND_libtacplus= libmd
 SUBDIR_DEPEND_libulog= libmd
 SUBDIR_DEPEND_libunbound= ${_libldns}

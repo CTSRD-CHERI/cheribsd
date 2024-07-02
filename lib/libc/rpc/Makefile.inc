@@ -1,6 +1,6 @@
 
 .PATH: ${LIBC_SRCTOP}/rpc ${LIBC_SRCTOP}/.
-.ifndef RTLD_SANDBOX
+.ifndef CHERI_LIB_C18N
 CONFS+=	rpc/netconfig rpc/rpc
 .endif
 SRCS+=	auth_none.c auth_unix.c authunix_prot.c bindresvport.c clnt_bcast.c \

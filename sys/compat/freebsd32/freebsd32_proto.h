@@ -108,12 +108,12 @@ struct freebsd32_getrusage_args {
 };
 struct freebsd32_readv_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char iovp_l_[PADL_(struct iovec32 *)]; struct iovec32 * iovp; char iovp_r_[PADR_(struct iovec32 *)];
+	char iovp_l_[PADL_(const struct iovec32 *)]; const struct iovec32 * iovp; char iovp_r_[PADR_(const struct iovec32 *)];
 	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
 };
 struct freebsd32_writev_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char iovp_l_[PADL_(struct iovec32 *)]; struct iovec32 * iovp; char iovp_r_[PADR_(struct iovec32 *)];
+	char iovp_l_[PADL_(const struct iovec32 *)]; const struct iovec32 * iovp; char iovp_r_[PADR_(const struct iovec32 *)];
 	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
 };
 struct freebsd32_settimeofday_args {
@@ -298,12 +298,12 @@ struct freebsd32_jail_args {
 };
 struct freebsd32_sigtimedwait_args {
 	char set_l_[PADL_(const sigset_t *)]; const sigset_t * set; char set_r_[PADR_(const sigset_t *)];
-	char info_l_[PADL_(struct siginfo32 *)]; struct siginfo32 * info; char info_r_[PADR_(struct siginfo32 *)];
+	char info_l_[PADL_(struct __siginfo32 *)]; struct __siginfo32 * info; char info_r_[PADR_(struct __siginfo32 *)];
 	char timeout_l_[PADL_(const struct timespec32 *)]; const struct timespec32 * timeout; char timeout_r_[PADR_(const struct timespec32 *)];
 };
 struct freebsd32_sigwaitinfo_args {
 	char set_l_[PADL_(const sigset_t *)]; const sigset_t * set; char set_r_[PADR_(const sigset_t *)];
-	char info_l_[PADL_(struct siginfo32 *)]; struct siginfo32 * info; char info_r_[PADR_(struct siginfo32 *)];
+	char info_l_[PADL_(struct __siginfo32 *)]; struct __siginfo32 * info; char info_r_[PADR_(struct __siginfo32 *)];
 };
 struct freebsd32_aio_waitcomplete_args {
 	char aiocbp_l_[PADL_(uint32_t *)]; uint32_t * aiocbp; char aiocbp_r_[PADR_(uint32_t *)];
@@ -585,7 +585,7 @@ struct freebsd32_wait6_args {
 	char status_l_[PADL_(int *)]; int * status; char status_r_[PADR_(int *)];
 	char options_l_[PADL_(int)]; int options; char options_r_[PADR_(int)];
 	char wrusage_l_[PADL_(struct __wrusage32 *)]; struct __wrusage32 * wrusage; char wrusage_r_[PADR_(struct __wrusage32 *)];
-	char info_l_[PADL_(struct siginfo32 *)]; struct siginfo32 * info; char info_r_[PADR_(struct siginfo32 *)];
+	char info_l_[PADL_(struct __siginfo32 *)]; struct __siginfo32 * info; char info_r_[PADR_(struct __siginfo32 *)];
 };
 struct freebsd32_cap_ioctls_limit_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];

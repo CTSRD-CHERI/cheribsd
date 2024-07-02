@@ -40,7 +40,7 @@ __weak_reference(__sys_accept4, __accept4);
 int
 accept4(int s, struct sockaddr *addr, socklen_t *addrlen, int flags)
 {
-
 	return (((int (*)(int, struct sockaddr *, socklen_t *, int))
-	    __libc_interposing[INTERPOS_accept4])(s, addr, addrlen, flags));
+	    *(__libc_interposing_slot(INTERPOS_accept4)))
+	    (s, addr, addrlen, flags));
 }

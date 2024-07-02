@@ -129,7 +129,7 @@ freebsd64_sigwait(struct thread *td, struct freebsd64_sigwait_args *uap)
 }
 
 void
-siginfo_to_siginfo64(const siginfo_t *si, struct siginfo64 *si64)
+siginfo_to_siginfo64(const siginfo_t *si, struct __siginfo64 *si64)
 {
 	memset(si64, 0, sizeof(*si64));
 	si64->si_signo = si->si_signo;
@@ -148,10 +148,10 @@ siginfo_to_siginfo64(const siginfo_t *si, struct siginfo64 *si64)
 static int
 freebsd64_copyout_siginfo(const siginfo_t *si, void * __capability info)
 {
-	struct siginfo64 si64;
+	struct __siginfo64 si64;
 	
 	siginfo_to_siginfo64(si, &si64);
-	return (copyout(&si64, info, sizeof(struct siginfo64)));
+	return (copyout(&si64, info, sizeof(struct __siginfo64)));
 }
 
 int
@@ -231,7 +231,8 @@ freebsd64_sigqueue(struct thread *td, struct freebsd64_sigqueue_args *uap)
 int freebsd64_sigfastblock(struct thread *td,
     struct freebsd64_sigfastblock_args *uap)
 {
-	return (kern_sigfastblock(td, uap->cmd, __USER_CAP_OBJ(uap->ptr)));
+	return (kern_sigfastblock(td, uap->cmd,
+	    __USER_CAP(uap->ptr, sizeof(uint32_t))));
 }
 /*
  * CHERI CHANGES START

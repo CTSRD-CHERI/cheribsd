@@ -2,7 +2,7 @@
 # machine-independent net sources
 .PATH: ${LIBC_SRCTOP}/net
 
-.ifndef RTLD_SANDBOX
+.ifndef CHERI_LIB_C18N
 CONFS+=	net/hosts net/hosts.equiv net/networks net/nsswitch.conf net/protocols
 .endif
 SRCS+=	base64.c ether_addr.c eui64.c \
@@ -14,7 +14,7 @@ SRCS+=	base64.c ether_addr.c eui64.c \
 	if_indextoname.c if_nameindex.c if_nametoindex.c \
 	ip6opt.c linkaddr.c map_v4v6.c name6.c ntoh.c \
 	nsdispatch.c nslexer.l nsparser.y nss_compat.c \
-	rcmd.c rcmdsh.c recv.c rthdr.c sctp_sys_calls.c send.c \
+	rcmd.c rcmdsh.c rthdr.c sctp_sys_calls.c \
         sockatmark.c sourcefilter.c vars.c
 
 .if ${MK_NS_CACHING} != "no"

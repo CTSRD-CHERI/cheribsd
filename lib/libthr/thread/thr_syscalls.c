@@ -200,7 +200,7 @@ __thr_connect(int fd, const struct sockaddr *name, socklen_t namelen)
  *   if it is canceled.
  */
 static int
-__thr_fcntl(int fd, int cmd, intptr_t arg)
+__thr_fcntl(int fd, int cmd, __intptr_t arg)
 {
 	struct pthread *curthread;
 	int ret;
@@ -307,7 +307,7 @@ __thr_openat(int fd, const char *path, int flags, int mode)
 {
 	struct pthread *curthread;
 	int ret;
-	
+
 	curthread = _get_curthread();
 	_thr_cancel_enter(curthread);
 	ret = __sys_openat(fd, path, flags, mode);
@@ -640,6 +640,18 @@ __thr_interpose_libc(void)
 #define	SLOT(name)					\
 	*(__libc_interposing_slot(INTERPOS_##name)) =	\
 	    (interpos_func_t)__thr_##name;
+	SLOT(system);
+	SLOT(tcdrain);
+	SLOT(spinlock);
+	SLOT(spinunlock);
+#ifndef __CHERI_PURE_CAPABILITY__
+	SLOT(map_stacks_exec);
+#endif
+#undef SLOT
+
+#define	SLOT(name)					\
+	*(__libsys_interposing_slot(INTERPOS_##name)) =	\
+	    (interpos_func_t)__thr_##name;
 	SLOT(accept);
 	SLOT(accept4);
 	SLOT(aio_suspend);
@@ -668,19 +680,12 @@ __thr_interpose_libc(void)
 	SLOT(sigtimedwait);
 	SLOT(sigwaitinfo);
 	SLOT(swapcontext);
-	SLOT(system);
-	SLOT(tcdrain);
 	SLOT(wait4);
 	SLOT(write);
 	SLOT(writev);
-	SLOT(spinlock);
-	SLOT(spinunlock);
 	SLOT(kevent);
 	SLOT(wait6);
 	SLOT(ppoll);
-#ifndef __CHERI_PURE_CAPABILITY__
-	SLOT(map_stacks_exec);
-#endif
 	SLOT(fdatasync);
 	SLOT(clock_nanosleep);
 	SLOT(pdfork);

@@ -7,6 +7,13 @@
 PACKAGE=	clibs
 SHLIBDIR?= /lib
 
+LIBADD=	c sys
+.if defined(COMPAT_libcompat)
+# XXX: work around gcc -m32 + bfd ld path issue for DT_NEEDED symbols.
+# https://sourceware.org/bugzilla/show_bug.cgi?id=31395
+LDFLAGS+=	-Wl,--rpath=/usr/lib${COMPAT_libcompat}
+.endif
+
 .include <src.opts.mk>
 MK_SSP=	no
 
@@ -15,12 +22,15 @@ LIBTHR_SRCTOP:=	${.PARSEDIR}
 .endif
 .PATH: ${LIBTHR_SRCTOP}
 
-.ifdef RTLD_SANDBOX
+.ifdef CHERI_LIB_C18N
 SHLIB=thr
 .else
 LIB=thr
 .endif
 SHLIB_MAJOR= 3
+
+LIBADD=	sys
+
 NO_WTHREAD_SAFETY=1
 NO_WCAST_ALIGN.gcc=1    # for gcc 4.2
 CFLAGS+=-DPTHREAD_KERNEL
@@ -43,8 +53,8 @@ CFLAGS.thr_symbols.c+=	-Wno-missing-variable-declarations
 CFLAGS.thr_sig.c+=	-fno-sanitize=address
 .endif
 
-.if ${MACHINE_CPUARCH} == "arm" || defined(RTLD_SANDBOX)
-# XXX: RTLD_SANDBOX currently does not support stack unwinding.
+.if ${MACHINE_CPUARCH} == "arm" || defined(CHERI_LIB_C18N)
+# XXX: CHERI_LIB_C18N currently does not support stack unwinding.
 NO_THREAD_UNWIND_STACK= yes
 .endif
 
@@ -53,8 +63,8 @@ CFLAGS+=-fexceptions
 CFLAGS+=-D_PTHREAD_FORCED_UNWIND
 .endif
 
-.ifdef RTLD_SANDBOX
-CFLAGS+=-DRTLD_SANDBOX
+.ifdef CHERI_LIB_C18N
+CFLAGS+=-DCHERI_LIB_C18N
 .endif
 
 LDFLAGS+=-Wl,-znodelete
@@ -62,7 +72,7 @@ LDFLAGS+=-Wl,-znodelete
 VERSION_DEF=${SRCTOP}/lib/libc/Versions.def
 SYMBOL_MAPS=${LIBTHR_SRCTOP}/pthread.map
 
-.ifndef RTLD_SANDBOX
+.ifndef CHERI_LIB_C18N
 MAN=	libthr.3
 .endif
 
@@ -93,7 +103,15 @@ CFLAGS.heap.c+=	-DIN_LIBTHR
 SRCS+= rtld_malloc.c
 .endif
 
-.ifndef RTLD_SANDBOX
+LIBSYS_SRCTOP=	${.CURDIR:H}/libsys
+.if exists(${LIBSYS_SRCTOP}/${MACHINE_CPUARCH}/_umtx_op_err.S)
+.PATH: ${LIBSYS_SRCTOP}/${MACHINE_CPUARCH}
+.else
+.PATH: ${LIBSYS_SRCTOP}
+.endif
+STATICOBJS+=	_umtx_op_err.o
+
+.ifndef CHERI_LIB_C18N
 .if ${MK_INSTALLLIB} != "no"
 SYMLINKS+=lib${LIB}.a ${LIBDIR}/libpthread.a
 .endif

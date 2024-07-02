@@ -57,7 +57,7 @@
 
 static int  create_stack(struct pthread_attr *pattr);
 static void thread_start(struct pthread *curthread) __used;
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 #pragma weak _thread_start = thread_start
 
 /*
@@ -152,7 +152,7 @@ _pthread_create(pthread_t * __restrict thread,
 		new_thread->flags = THR_FLAGS_NEED_SUSPEND;
 		create_suspended = 1;
 	} else {
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 		/*
 		 * c18n: Always block all signals when creating a new thread to
 		 * allow RTLD to set up the environment to handle signals.
@@ -188,7 +188,7 @@ _pthread_create(pthread_t * __restrict thread,
 		locked = 1;
 	} else
 		locked = 0;
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	param.start_func = (void (*)(void *)) _rtld_thread_start;
 #else
 	param.start_func = (void (*)(void *)) thread_start;
@@ -299,7 +299,7 @@ thread_start(struct pthread *curthread)
 	sigset_t set;
 	bool restore_sigmask;
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
 	/*
 	 * At this point, curthread->tcb contains a fake wrapper TCB created by
 	 * RTLD when the thread was created. The real TCB has now been installed

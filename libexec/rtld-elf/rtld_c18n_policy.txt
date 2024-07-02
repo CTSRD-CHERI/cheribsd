@@ -3,6 +3,7 @@ Version 1
 compartment [TCB]
 	libc.so.7
 	libthr.so.3
+	libsys.so.7
 
 compartment [libunwind]
 	libgcc_s.so.1
