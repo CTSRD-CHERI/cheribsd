@@ -745,14 +745,23 @@ init_stk_table(struct stk_table *table, struct tcb_wrapper *wrap)
 	};
 
 	/*
-	 * Record RTLD's stack in the stack lookup table. The recorded size of
-	 * the stack remains zero so that the stack is not ummapped upon thread
-	 * exit.
+	 * Record RTLD's stack in the stack lookup table.
 	 */
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	sp = cheri_setoffset(cheri_getstack(), 0);
 #else
-	sp = NULL;
+	/*
+	 * RTLD's actual stack is the Executive stack which does not need to be
+	 * stored in the stack lookup table. Instead, fill the table entry with
+	 * a one-byte dummy stack.
+	 *
+	 * Note that NULL cannot be used here because a compartment can then
+	 * pretend to be RTLD when a signal is delivered. Nor can a zero-length
+	 * stack be used because the signal handler uses the recorded size of
+	 * the stack to determine whether it has been allocated.
+	 */
+	static char dummy_stk;
+	sp = &dummy_stk;
 #endif
 	size = cheri_getlen(sp);
 	assert(size > 0);
@@ -764,17 +773,14 @@ init_stk_table(struct stk_table *table, struct tcb_wrapper *wrap)
 	table->entries[RTLD_COMPART_ID].stack = sp + size;
 
 	/*
-	 * Push a dummy trusted frame indicating that the 'root' compartment
-	 * is RTLD.
+	 * Push a dummy trusted frame indicating that the 'root' compartment is
+	 * RTLD.
 	 */
-	*--tf = (struct trusted_frame) {
-		.callee = cid_to_index(RTLD_COMPART_ID)
-	};
+	tf = push_dummy_rtld_trusted_frame(tf);
 
 	/*
-	 * Install the trusted stack and the stack lookup table.
+	 * Install the stack lookup table.
 	 */
-	set_trusted_stk(tf);
 	set_stk_table(table);
 }
 
@@ -826,7 +832,13 @@ resolve_untrusted_stk_impl(stk_table_index index)
 	void *stk;
 	sigset_t nset, oset;
 	struct stk_table *table;
-	struct trusted_frame backup, *tf;
+	struct trusted_frame *tf;
+
+	/*
+	 * Push a dummy trusted frame indicating that the current compartment is
+	 * RTLD.
+	 */
+	tf = push_dummy_rtld_trusted_frame(get_trusted_stk());
 
 	/*
 	 * Make the function re-entrant by blocking all signals and re-check
@@ -835,23 +847,12 @@ resolve_untrusted_stk_impl(stk_table_index index)
 	SIGFILLSET(nset);
 	sigprocmask(SIG_SETMASK, &nset, &oset);
 
-	/*
-	 * The topmost trusted frame isn't valid---it references a transition
-	 * that hasn't taken place yet. Back up the topmost frame, pop it from
-	 * the trusted stack and restore it later.
-	 */
-	tf = get_trusted_stk();
-	backup = *tf;
-	set_trusted_stk(backup.previous);
-
 	table = get_stk_table();
 	stk = get_or_create_untrusted_stk(index_to_cid(index), &table);
 
-	assert(get_trusted_stk() == backup.previous);
-	*tf = backup;
-	set_trusted_stk(tf);
-
 	sigprocmask(SIG_SETMASK, &oset, NULL);
+
+	tf = pop_dummy_rtld_trusted_frame(tf);
 
 	return (stk);
 }
@@ -1886,11 +1887,6 @@ _rtld_sighandler_impl(int sig, siginfo_t *info, ucontext_t *ucp, void *nsp)
 
 	info = &sf->sf_si;
 	ucp = &sf->sf_uc;
-#else
-	/*
-	 * Switch to RTLD's stack.
-	 */
-	set_untrusted_stk(table->entries[RTLD_COMPART_ID].stack);
 #endif
 
 	tf = get_trusted_stk();
@@ -1934,17 +1930,16 @@ _rtld_sighandler_impl(int sig, siginfo_t *info, ucontext_t *ucp, void *nsp)
 	intr = index_to_cid(intr_idx);
 	if (cheri_is_subset(table->meta->compart_stk[intr].begin, nsp))
 		goto found_trusted;
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	/*
-	 * In the benchmark ABI, lazy binding, thread-local storage, and stack
-	 * resolution all involve switching to RTLD's stack. In this case, nsp
-	 * would refer to RTLD's stack top.
+	 * Lazy binding, thread-local storage, and stack resolution all involve
+	 * switching to RTLD's stack. In this case, nsp would refer to RTLD's
+	 * stack top.
 	 */
 	intr_idx = cid_to_index(RTLD_COMPART_ID);
 	intr = RTLD_COMPART_ID;
 	if (cheri_is_subset(table->meta->compart_stk[intr].begin, nsp))
 		goto found_trusted;
-#else
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 found_failed:
 #endif
 	rtld_fdprintf(STDERR_FILENO,

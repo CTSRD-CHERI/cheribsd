@@ -130,13 +130,11 @@ ENTRY(C18N_SYM(_rtld_bind_start))
 	 */
 	update_stk_table	c11, c10, w12
 	mov	c17, c10
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	/*
 	 * Switch to RTLD's stack.
 	 */
 	get_rtld_stk		c10
 	set_untrusted_stk	c10
-#endif
 	/*
 	 * Save caller's old stack top.
 	 */
@@ -371,7 +369,7 @@ ENTRY(C18N_SYM(_rtld_tlsdesc_dynamic))
 	stp	c15, c16, [csp, #(7 * 32)]
 	stp	c17, c18, [csp, #(8 * 32)]
 	str	c19,	  [csp, #(9 * 32)]
-#if defined(RTLD_SANDBOX) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
+#ifdef RTLD_SANDBOX
 	/*
 	 * Get the caller's current stack top. This step is only needed for
 	 * _rtld_tlsdesc_dynamic because it might call external functions.
@@ -382,13 +380,11 @@ ENTRY(C18N_SYM(_rtld_tlsdesc_dynamic))
 	 * get the caller's old stack top.
 	 */
 	update_stk_table	c11, c10, w12
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	/*
 	 * Switch to RTLD's stack.
 	 */
 	get_rtld_stk		c10
 	set_untrusted_stk	c10
-#endif
 	/*
 	 * Save caller's old stack top.
 	 */
