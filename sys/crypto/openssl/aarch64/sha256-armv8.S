@@ -70,37 +70,42 @@
 sha256_block_data_order:
 	AARCH64_VALID_CALL_TARGET
 #ifndef	__KERNEL__
-	adrp	x16,OPENSSL_armcap_P
-	ldr	w16,[x16,#:lo12:OPENSSL_armcap_P]
+	adrp	PTR(16),OPENSSL_armcap_P
+	ldr	w16,[PTR(16),#:lo12:OPENSSL_armcap_P]
 	tst	w16,#ARMV8_SHA256
 	b.ne	.Lv8_entry
 	tst	w16,#ARMV7_NEON
 	b.ne	.Lneon_entry
 #endif
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-128]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(16*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	stp	x23,x24,[sp,#48]
-	stp	x25,x26,[sp,#64]
-	stp	x27,x28,[sp,#80]
-	sub	sp,sp,#4*4
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
+	stp	PTR(25),PTR(26),[PTRN(sp),#(8*PTR_WIDTH)]
+	stp	PTR(27),PTR(28),[PTRN(sp),#(10*PTR_WIDTH)]
+	sub	PTRN(sp),PTRN(sp),#4*4
 
-	ldp	w20,w21,[x0]				// load context
-	ldp	w22,w23,[x0,#2*4]
-	ldp	w24,w25,[x0,#4*4]
-	add	x2,x1,x2,lsl#6	// end of input
-	ldp	w26,w27,[x0,#6*4]
-	adr	x30,.LK256
-	stp	x0,x2,[x29,#96]
+	ldp	w20,w21,[PTR(0)]				// load context
+	ldp	w22,w23,[PTR(0),#2*4]
+	ldp	w24,w25,[PTR(0),#4*4]
+#ifdef __CHERI_PURE_CAPABILITY__
+	lsl	x17,x2,#6
+	add	PTR(2),PTR(1),x17				// end of input
+#else
+	add	PTR(2),PTR(1),PTR(2),lsl#6	// end of input
+#endif
+	ldp	w26,w27,[PTR(0),#6*4]
+	adr	PTR(30),.LK256
+	stp	PTR(0),PTR(2),[PTR(29),#(12*PTR_WIDTH)]
 
 .Loop:
-	ldp	w3,w4,[x1],#2*4
-	ldr	w19,[x30],#4			// *K++
+	ldp	w3,w4,[PTR(1)],#2*4
+	ldr	w19,[PTR(30)],#4			// *K++
 	eor	w28,w21,w22				// magic seed
-	str	x1,[x29,#112]
+	str	PTR(1),[PTR(29),#(14*PTR_WIDTH)]
 #ifndef	__AARCH64EB__
 	rev	w3,w3			// 0
 #endif
@@ -122,12 +127,12 @@ sha256_block_data_order:
 	eor	w28,w28,w21			// Maj(a,b,c)
 	eor	w17,w6,w17,ror#13	// Sigma0(a)
 	add	w27,w27,w28			// h+=Maj(a,b,c)
-	ldr	w28,[x30],#4		// *K++, w19 in next round
+	ldr	w28,[PTR(30)],#4		// *K++, w19 in next round
 	//add	w27,w27,w17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	w4,w4			// 1
 #endif
-	ldp	w5,w6,[x1],#2*4
+	ldp	w5,w6,[PTR(1)],#2*4
 	add	w27,w27,w17			// h+=Sigma0(a)
 	ror	w16,w23,#6
 	add	w26,w26,w28			// h+=K[i]
@@ -147,7 +152,7 @@ sha256_block_data_order:
 	eor	w19,w19,w20			// Maj(a,b,c)
 	eor	w17,w7,w17,ror#13	// Sigma0(a)
 	add	w26,w26,w19			// h+=Maj(a,b,c)
-	ldr	w19,[x30],#4		// *K++, w28 in next round
+	ldr	w19,[PTR(30)],#4		// *K++, w28 in next round
 	//add	w26,w26,w17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	w5,w5			// 2
@@ -171,12 +176,12 @@ sha256_block_data_order:
 	eor	w28,w28,w27			// Maj(a,b,c)
 	eor	w17,w8,w17,ror#13	// Sigma0(a)
 	add	w25,w25,w28			// h+=Maj(a,b,c)
-	ldr	w28,[x30],#4		// *K++, w19 in next round
+	ldr	w28,[PTR(30)],#4		// *K++, w19 in next round
 	//add	w25,w25,w17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	w6,w6			// 3
 #endif
-	ldp	w7,w8,[x1],#2*4
+	ldp	w7,w8,[PTR(1)],#2*4
 	add	w25,w25,w17			// h+=Sigma0(a)
 	ror	w16,w21,#6
 	add	w24,w24,w28			// h+=K[i]
@@ -196,7 +201,7 @@ sha256_block_data_order:
 	eor	w19,w19,w26			// Maj(a,b,c)
 	eor	w17,w9,w17,ror#13	// Sigma0(a)
 	add	w24,w24,w19			// h+=Maj(a,b,c)
-	ldr	w19,[x30],#4		// *K++, w28 in next round
+	ldr	w19,[PTR(30)],#4		// *K++, w28 in next round
 	//add	w24,w24,w17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	w7,w7			// 4
@@ -220,12 +225,12 @@ sha256_block_data_order:
 	eor	w28,w28,w25			// Maj(a,b,c)
 	eor	w17,w10,w17,ror#13	// Sigma0(a)
 	add	w23,w23,w28			// h+=Maj(a,b,c)
-	ldr	w28,[x30],#4		// *K++, w19 in next round
+	ldr	w28,[PTR(30)],#4		// *K++, w19 in next round
 	//add	w23,w23,w17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	w8,w8			// 5
 #endif
-	ldp	w9,w10,[x1],#2*4
+	ldp	w9,w10,[PTR(1)],#2*4
 	add	w23,w23,w17			// h+=Sigma0(a)
 	ror	w16,w27,#6
 	add	w22,w22,w28			// h+=K[i]
@@ -245,7 +250,7 @@ sha256_block_data_order:
 	eor	w19,w19,w24			// Maj(a,b,c)
 	eor	w17,w11,w17,ror#13	// Sigma0(a)
 	add	w22,w22,w19			// h+=Maj(a,b,c)
-	ldr	w19,[x30],#4		// *K++, w28 in next round
+	ldr	w19,[PTR(30)],#4		// *K++, w28 in next round
 	//add	w22,w22,w17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	w9,w9			// 6
@@ -269,12 +274,12 @@ sha256_block_data_order:
 	eor	w28,w28,w23			// Maj(a,b,c)
 	eor	w17,w12,w17,ror#13	// Sigma0(a)
 	add	w21,w21,w28			// h+=Maj(a,b,c)
-	ldr	w28,[x30],#4		// *K++, w19 in next round
+	ldr	w28,[PTR(30)],#4		// *K++, w19 in next round
 	//add	w21,w21,w17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	w10,w10			// 7
 #endif
-	ldp	w11,w12,[x1],#2*4
+	ldp	w11,w12,[PTR(1)],#2*4
 	add	w21,w21,w17			// h+=Sigma0(a)
 	ror	w16,w25,#6
 	add	w20,w20,w28			// h+=K[i]
@@ -294,7 +299,7 @@ sha256_block_data_order:
 	eor	w19,w19,w22			// Maj(a,b,c)
 	eor	w17,w13,w17,ror#13	// Sigma0(a)
 	add	w20,w20,w19			// h+=Maj(a,b,c)
-	ldr	w19,[x30],#4		// *K++, w28 in next round
+	ldr	w19,[PTR(30)],#4		// *K++, w28 in next round
 	//add	w20,w20,w17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	w11,w11			// 8
@@ -318,12 +323,12 @@ sha256_block_data_order:
 	eor	w28,w28,w21			// Maj(a,b,c)
 	eor	w17,w14,w17,ror#13	// Sigma0(a)
 	add	w27,w27,w28			// h+=Maj(a,b,c)
-	ldr	w28,[x30],#4		// *K++, w19 in next round
+	ldr	w28,[PTR(30)],#4		// *K++, w19 in next round
 	//add	w27,w27,w17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	w12,w12			// 9
 #endif
-	ldp	w13,w14,[x1],#2*4
+	ldp	w13,w14,[PTR(1)],#2*4
 	add	w27,w27,w17			// h+=Sigma0(a)
 	ror	w16,w23,#6
 	add	w26,w26,w28			// h+=K[i]
@@ -343,7 +348,7 @@ sha256_block_data_order:
 	eor	w19,w19,w20			// Maj(a,b,c)
 	eor	w17,w15,w17,ror#13	// Sigma0(a)
 	add	w26,w26,w19			// h+=Maj(a,b,c)
-	ldr	w19,[x30],#4		// *K++, w28 in next round
+	ldr	w19,[PTR(30)],#4		// *K++, w28 in next round
 	//add	w26,w26,w17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	w13,w13			// 10
@@ -367,14 +372,14 @@ sha256_block_data_order:
 	eor	w28,w28,w27			// Maj(a,b,c)
 	eor	w17,w0,w17,ror#13	// Sigma0(a)
 	add	w25,w25,w28			// h+=Maj(a,b,c)
-	ldr	w28,[x30],#4		// *K++, w19 in next round
+	ldr	w28,[PTR(30)],#4		// *K++, w19 in next round
 	//add	w25,w25,w17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	w14,w14			// 11
 #endif
-	ldp	w15,w0,[x1],#2*4
+	ldp	w15,w0,[PTR(1)],#2*4
 	add	w25,w25,w17			// h+=Sigma0(a)
-	str	w6,[sp,#12]
+	str	w6,[PTRN(sp),#12]
 	ror	w16,w21,#6
 	add	w24,w24,w28			// h+=K[i]
 	eor	w6,w21,w21,ror#14
@@ -393,13 +398,13 @@ sha256_block_data_order:
 	eor	w19,w19,w26			// Maj(a,b,c)
 	eor	w17,w6,w17,ror#13	// Sigma0(a)
 	add	w24,w24,w19			// h+=Maj(a,b,c)
-	ldr	w19,[x30],#4		// *K++, w28 in next round
+	ldr	w19,[PTR(30)],#4		// *K++, w28 in next round
 	//add	w24,w24,w17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	w15,w15			// 12
 #endif
 	add	w24,w24,w17			// h+=Sigma0(a)
-	str	w7,[sp,#0]
+	str	w7,[PTRN(sp),#0]
 	ror	w16,w20,#6
 	add	w23,w23,w19			// h+=K[i]
 	eor	w7,w20,w20,ror#14
@@ -418,14 +423,14 @@ sha256_block_data_order:
 	eor	w28,w28,w25			// Maj(a,b,c)
 	eor	w17,w7,w17,ror#13	// Sigma0(a)
 	add	w23,w23,w28			// h+=Maj(a,b,c)
-	ldr	w28,[x30],#4		// *K++, w19 in next round
+	ldr	w28,[PTR(30)],#4		// *K++, w19 in next round
 	//add	w23,w23,w17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	w0,w0			// 13
 #endif
-	ldp	w1,w2,[x1]
+	ldp	w1,w2,[PTR(1)]
 	add	w23,w23,w17			// h+=Sigma0(a)
-	str	w8,[sp,#4]
+	str	w8,[PTRN(sp),#4]
 	ror	w16,w27,#6
 	add	w22,w22,w28			// h+=K[i]
 	eor	w8,w27,w27,ror#14
@@ -444,14 +449,14 @@ sha256_block_data_order:
 	eor	w19,w19,w24			// Maj(a,b,c)
 	eor	w17,w8,w17,ror#13	// Sigma0(a)
 	add	w22,w22,w19			// h+=Maj(a,b,c)
-	ldr	w19,[x30],#4		// *K++, w28 in next round
+	ldr	w19,[PTR(30)],#4		// *K++, w28 in next round
 	//add	w22,w22,w17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	w1,w1			// 14
 #endif
-	ldr	w6,[sp,#12]
+	ldr	w6,[PTRN(sp),#12]
 	add	w22,w22,w17			// h+=Sigma0(a)
-	str	w9,[sp,#8]
+	str	w9,[PTRN(sp),#8]
 	ror	w16,w26,#6
 	add	w21,w21,w19			// h+=K[i]
 	eor	w9,w26,w26,ror#14
@@ -470,14 +475,14 @@ sha256_block_data_order:
 	eor	w28,w28,w23			// Maj(a,b,c)
 	eor	w17,w9,w17,ror#13	// Sigma0(a)
 	add	w21,w21,w28			// h+=Maj(a,b,c)
-	ldr	w28,[x30],#4		// *K++, w19 in next round
+	ldr	w28,[PTR(30)],#4		// *K++, w19 in next round
 	//add	w21,w21,w17			// h+=Sigma0(a)
 #ifndef	__AARCH64EB__
 	rev	w2,w2			// 15
 #endif
-	ldr	w7,[sp,#0]
+	ldr	w7,[PTRN(sp),#0]
 	add	w21,w21,w17			// h+=Sigma0(a)
-	str	w10,[sp,#12]
+	str	w10,[PTRN(sp),#12]
 	ror	w16,w25,#6
 	add	w20,w20,w28			// h+=K[i]
 	ror	w9,w4,#7
@@ -503,13 +508,13 @@ sha256_block_data_order:
 	add	w3,w3,w12
 	add	w24,w24,w20			// d+=h
 	add	w20,w20,w19			// h+=Maj(a,b,c)
-	ldr	w19,[x30],#4		// *K++, w28 in next round
+	ldr	w19,[PTR(30)],#4		// *K++, w28 in next round
 	add	w3,w3,w9
 	add	w20,w20,w17			// h+=Sigma0(a)
 	add	w3,w3,w8
 .Loop_16_xx:
-	ldr	w8,[sp,#4]
-	str	w11,[sp,#0]
+	ldr	w8,[PTRN(sp),#4]
+	str	w11,[PTRN(sp),#0]
 	ror	w16,w24,#6
 	add	w27,w27,w19			// h+=K[i]
 	ror	w10,w5,#7
@@ -535,12 +540,12 @@ sha256_block_data_order:
 	add	w4,w4,w13
 	add	w23,w23,w27			// d+=h
 	add	w27,w27,w28			// h+=Maj(a,b,c)
-	ldr	w28,[x30],#4		// *K++, w19 in next round
+	ldr	w28,[PTR(30)],#4		// *K++, w19 in next round
 	add	w4,w4,w10
 	add	w27,w27,w17			// h+=Sigma0(a)
 	add	w4,w4,w9
-	ldr	w9,[sp,#8]
-	str	w12,[sp,#4]
+	ldr	w9,[PTRN(sp),#8]
+	str	w12,[PTRN(sp),#4]
 	ror	w16,w23,#6
 	add	w26,w26,w28			// h+=K[i]
 	ror	w11,w6,#7
@@ -566,12 +571,12 @@ sha256_block_data_order:
 	add	w5,w5,w14
 	add	w22,w22,w26			// d+=h
 	add	w26,w26,w19			// h+=Maj(a,b,c)
-	ldr	w19,[x30],#4		// *K++, w28 in next round
+	ldr	w19,[PTR(30)],#4		// *K++, w28 in next round
 	add	w5,w5,w11
 	add	w26,w26,w17			// h+=Sigma0(a)
 	add	w5,w5,w10
-	ldr	w10,[sp,#12]
-	str	w13,[sp,#8]
+	ldr	w10,[PTRN(sp),#12]
+	str	w13,[PTRN(sp),#8]
 	ror	w16,w22,#6
 	add	w25,w25,w19			// h+=K[i]
 	ror	w12,w7,#7
@@ -597,12 +602,12 @@ sha256_block_data_order:
 	add	w6,w6,w15
 	add	w21,w21,w25			// d+=h
 	add	w25,w25,w28			// h+=Maj(a,b,c)
-	ldr	w28,[x30],#4		// *K++, w19 in next round
+	ldr	w28,[PTR(30)],#4		// *K++, w19 in next round
 	add	w6,w6,w12
 	add	w25,w25,w17			// h+=Sigma0(a)
 	add	w6,w6,w11
-	ldr	w11,[sp,#0]
-	str	w14,[sp,#12]
+	ldr	w11,[PTRN(sp),#0]
+	str	w14,[PTRN(sp),#12]
 	ror	w16,w21,#6
 	add	w24,w24,w28			// h+=K[i]
 	ror	w13,w8,#7
@@ -628,12 +633,12 @@ sha256_block_data_order:
 	add	w7,w7,w0
 	add	w20,w20,w24			// d+=h
 	add	w24,w24,w19			// h+=Maj(a,b,c)
-	ldr	w19,[x30],#4		// *K++, w28 in next round
+	ldr	w19,[PTR(30)],#4		// *K++, w28 in next round
 	add	w7,w7,w13
 	add	w24,w24,w17			// h+=Sigma0(a)
 	add	w7,w7,w12
-	ldr	w12,[sp,#4]
-	str	w15,[sp,#0]
+	ldr	w12,[PTRN(sp),#4]
+	str	w15,[PTRN(sp),#0]
 	ror	w16,w20,#6
 	add	w23,w23,w19			// h+=K[i]
 	ror	w14,w9,#7
@@ -659,12 +664,12 @@ sha256_block_data_order:
 	add	w8,w8,w1
 	add	w27,w27,w23			// d+=h
 	add	w23,w23,w28			// h+=Maj(a,b,c)
-	ldr	w28,[x30],#4		// *K++, w19 in next round
+	ldr	w28,[PTR(30)],#4		// *K++, w19 in next round
 	add	w8,w8,w14
 	add	w23,w23,w17			// h+=Sigma0(a)
 	add	w8,w8,w13
-	ldr	w13,[sp,#8]
-	str	w0,[sp,#4]
+	ldr	w13,[PTRN(sp),#8]
+	str	w0,[PTRN(sp),#4]
 	ror	w16,w27,#6
 	add	w22,w22,w28			// h+=K[i]
 	ror	w15,w10,#7
@@ -690,12 +695,12 @@ sha256_block_data_order:
 	add	w9,w9,w2
 	add	w26,w26,w22			// d+=h
 	add	w22,w22,w19			// h+=Maj(a,b,c)
-	ldr	w19,[x30],#4		// *K++, w28 in next round
+	ldr	w19,[PTR(30)],#4		// *K++, w28 in next round
 	add	w9,w9,w15
 	add	w22,w22,w17			// h+=Sigma0(a)
 	add	w9,w9,w14
-	ldr	w14,[sp,#12]
-	str	w1,[sp,#8]
+	ldr	w14,[PTRN(sp),#12]
+	str	w1,[PTRN(sp),#8]
 	ror	w16,w26,#6
 	add	w21,w21,w19			// h+=K[i]
 	ror	w0,w11,#7
@@ -721,12 +726,12 @@ sha256_block_data_order:
 	add	w10,w10,w3
 	add	w25,w25,w21			// d+=h
 	add	w21,w21,w28			// h+=Maj(a,b,c)
-	ldr	w28,[x30],#4		// *K++, w19 in next round
+	ldr	w28,[PTR(30)],#4		// *K++, w19 in next round
 	add	w10,w10,w0
 	add	w21,w21,w17			// h+=Sigma0(a)
 	add	w10,w10,w15
-	ldr	w15,[sp,#0]
-	str	w2,[sp,#12]
+	ldr	w15,[PTRN(sp),#0]
+	str	w2,[PTRN(sp),#12]
 	ror	w16,w25,#6
 	add	w20,w20,w28			// h+=K[i]
 	ror	w1,w12,#7
@@ -752,12 +757,12 @@ sha256_block_data_order:
 	add	w11,w11,w4
 	add	w24,w24,w20			// d+=h
 	add	w20,w20,w19			// h+=Maj(a,b,c)
-	ldr	w19,[x30],#4		// *K++, w28 in next round
+	ldr	w19,[PTR(30)],#4		// *K++, w28 in next round
 	add	w11,w11,w1
 	add	w20,w20,w17			// h+=Sigma0(a)
 	add	w11,w11,w0
-	ldr	w0,[sp,#4]
-	str	w3,[sp,#0]
+	ldr	w0,[PTRN(sp),#4]
+	str	w3,[PTRN(sp),#0]
 	ror	w16,w24,#6
 	add	w27,w27,w19			// h+=K[i]
 	ror	w2,w13,#7
@@ -783,12 +788,12 @@ sha256_block_data_order:
 	add	w12,w12,w5
 	add	w23,w23,w27			// d+=h
 	add	w27,w27,w28			// h+=Maj(a,b,c)
-	ldr	w28,[x30],#4		// *K++, w19 in next round
+	ldr	w28,[PTR(30)],#4		// *K++, w19 in next round
 	add	w12,w12,w2
 	add	w27,w27,w17			// h+=Sigma0(a)
 	add	w12,w12,w1
-	ldr	w1,[sp,#8]
-	str	w4,[sp,#4]
+	ldr	w1,[PTRN(sp),#8]
+	str	w4,[PTRN(sp),#4]
 	ror	w16,w23,#6
 	add	w26,w26,w28			// h+=K[i]
 	ror	w3,w14,#7
@@ -814,12 +819,12 @@ sha256_block_data_order:
 	add	w13,w13,w6
 	add	w22,w22,w26			// d+=h
 	add	w26,w26,w19			// h+=Maj(a,b,c)
-	ldr	w19,[x30],#4		// *K++, w28 in next round
+	ldr	w19,[PTR(30)],#4		// *K++, w28 in next round
 	add	w13,w13,w3
 	add	w26,w26,w17			// h+=Sigma0(a)
 	add	w13,w13,w2
-	ldr	w2,[sp,#12]
-	str	w5,[sp,#8]
+	ldr	w2,[PTRN(sp),#12]
+	str	w5,[PTRN(sp),#8]
 	ror	w16,w22,#6
 	add	w25,w25,w19			// h+=K[i]
 	ror	w4,w15,#7
@@ -845,12 +850,12 @@ sha256_block_data_order:
 	add	w14,w14,w7
 	add	w21,w21,w25			// d+=h
 	add	w25,w25,w28			// h+=Maj(a,b,c)
-	ldr	w28,[x30],#4		// *K++, w19 in next round
+	ldr	w28,[PTR(30)],#4		// *K++, w19 in next round
 	add	w14,w14,w4
 	add	w25,w25,w17			// h+=Sigma0(a)
 	add	w14,w14,w3
-	ldr	w3,[sp,#0]
-	str	w6,[sp,#12]
+	ldr	w3,[PTRN(sp),#0]
+	str	w6,[PTRN(sp),#12]
 	ror	w16,w21,#6
 	add	w24,w24,w28			// h+=K[i]
 	ror	w5,w0,#7
@@ -876,12 +881,12 @@ sha256_block_data_order:
 	add	w15,w15,w8
 	add	w20,w20,w24			// d+=h
 	add	w24,w24,w19			// h+=Maj(a,b,c)
-	ldr	w19,[x30],#4		// *K++, w28 in next round
+	ldr	w19,[PTR(30)],#4		// *K++, w28 in next round
 	add	w15,w15,w5
 	add	w24,w24,w17			// h+=Sigma0(a)
 	add	w15,w15,w4
-	ldr	w4,[sp,#4]
-	str	w7,[sp,#0]
+	ldr	w4,[PTRN(sp),#4]
+	str	w7,[PTRN(sp),#0]
 	ror	w16,w20,#6
 	add	w23,w23,w19			// h+=K[i]
 	ror	w6,w1,#7
@@ -907,12 +912,12 @@ sha256_block_data_order:
 	add	w0,w0,w9
 	add	w27,w27,w23			// d+=h
 	add	w23,w23,w28			// h+=Maj(a,b,c)
-	ldr	w28,[x30],#4		// *K++, w19 in next round
+	ldr	w28,[PTR(30)],#4		// *K++, w19 in next round
 	add	w0,w0,w6
 	add	w23,w23,w17			// h+=Sigma0(a)
 	add	w0,w0,w5
-	ldr	w5,[sp,#8]
-	str	w8,[sp,#4]
+	ldr	w5,[PTRN(sp),#8]
+	str	w8,[PTRN(sp),#4]
 	ror	w16,w27,#6
 	add	w22,w22,w28			// h+=K[i]
 	ror	w7,w2,#7
@@ -938,12 +943,12 @@ sha256_block_data_order:
 	add	w1,w1,w10
 	add	w26,w26,w22			// d+=h
 	add	w22,w22,w19			// h+=Maj(a,b,c)
-	ldr	w19,[x30],#4		// *K++, w28 in next round
+	ldr	w19,[PTR(30)],#4		// *K++, w28 in next round
 	add	w1,w1,w7
 	add	w22,w22,w17			// h+=Sigma0(a)
 	add	w1,w1,w6
-	ldr	w6,[sp,#12]
-	str	w9,[sp,#8]
+	ldr	w6,[PTRN(sp),#12]
+	str	w9,[PTRN(sp),#8]
 	ror	w16,w26,#6
 	add	w21,w21,w19			// h+=K[i]
 	ror	w8,w3,#7
@@ -969,12 +974,12 @@ sha256_block_data_order:
 	add	w2,w2,w11
 	add	w25,w25,w21			// d+=h
 	add	w21,w21,w28			// h+=Maj(a,b,c)
-	ldr	w28,[x30],#4		// *K++, w19 in next round
+	ldr	w28,[PTR(30)],#4		// *K++, w19 in next round
 	add	w2,w2,w8
 	add	w21,w21,w17			// h+=Sigma0(a)
 	add	w2,w2,w7
-	ldr	w7,[sp,#0]
-	str	w10,[sp,#12]
+	ldr	w7,[PTRN(sp),#0]
+	str	w10,[PTRN(sp),#12]
 	ror	w16,w25,#6
 	add	w20,w20,w28			// h+=K[i]
 	ror	w9,w4,#7
@@ -1000,43 +1005,43 @@ sha256_block_data_order:
 	add	w3,w3,w12
 	add	w24,w24,w20			// d+=h
 	add	w20,w20,w19			// h+=Maj(a,b,c)
-	ldr	w19,[x30],#4		// *K++, w28 in next round
+	ldr	w19,[PTR(30)],#4		// *K++, w28 in next round
 	add	w3,w3,w9
 	add	w20,w20,w17			// h+=Sigma0(a)
 	add	w3,w3,w8
 	cbnz	w19,.Loop_16_xx
 
-	ldp	x0,x2,[x29,#96]
-	ldr	x1,[x29,#112]
-	sub	x30,x30,#260		// rewind
+	ldp	PTR(0),PTR(2),[PTR(29),#(12*PTR_WIDTH)]
+	ldr	PTR(1),[PTR(29),#(14*PTR_WIDTH)]
+	sub	PTR(30),PTR(30),#260		// rewind
 
-	ldp	w3,w4,[x0]
-	ldp	w5,w6,[x0,#2*4]
-	add	x1,x1,#14*4			// advance input pointer
-	ldp	w7,w8,[x0,#4*4]
+	ldp	w3,w4,[PTR(0)]
+	ldp	w5,w6,[PTR(0),#2*4]
+	add	PTR(1),PTR(1),#14*4			// advance input pointer
+	ldp	w7,w8,[PTR(0),#4*4]
 	add	w20,w20,w3
-	ldp	w9,w10,[x0,#6*4]
+	ldp	w9,w10,[PTR(0),#6*4]
 	add	w21,w21,w4
 	add	w22,w22,w5
 	add	w23,w23,w6
-	stp	w20,w21,[x0]
+	stp	w20,w21,[PTR(0)]
 	add	w24,w24,w7
 	add	w25,w25,w8
-	stp	w22,w23,[x0,#2*4]
+	stp	w22,w23,[PTR(0),#2*4]
 	add	w26,w26,w9
 	add	w27,w27,w10
 	cmp	x1,x2
-	stp	w24,w25,[x0,#4*4]
-	stp	w26,w27,[x0,#6*4]
+	stp	w24,w25,[PTR(0),#4*4]
+	stp	w26,w27,[PTR(0),#6*4]
 	b.ne	.Loop
 
-	ldp	x19,x20,[x29,#16]
-	add	sp,sp,#4*4
-	ldp	x21,x22,[x29,#32]
-	ldp	x23,x24,[x29,#48]
-	ldp	x25,x26,[x29,#64]
-	ldp	x27,x28,[x29,#80]
-	ldp	x29,x30,[sp],#128
+	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
+	add	PTRN(sp),PTRN(sp),#4*4
+	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
+	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
+	ldp	PTR(25),PTR(26),[PTR(29),#(8*PTR_WIDTH)]
+	ldp	PTR(27),PTR(28),[PTR(29),#(10*PTR_WIDTH)]
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(16*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	sha256_block_data_order,.-sha256_block_data_order
@@ -1071,121 +1076,121 @@ sha256_block_data_order:
 sha256_block_armv8:
 .Lv8_entry:
 	// Armv8.3-A PAuth: even though x30 is pushed to stack it is not popped later.
-	stp	x29,x30,[sp,#-16]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 
-	ld1	{v0.4s,v1.4s},[x0]
-	adr	x3,.LK256
+	ld1	{v0.4s,v1.4s},[PTR(0)]
+	adr	PTR(3),.LK256
 
 .Loop_hw:
-	ld1	{v4.16b,v5.16b,v6.16b,v7.16b},[x1],#64
+	ld1	{v4.16b,v5.16b,v6.16b,v7.16b},[PTR(1)],#64
 	sub	x2,x2,#1
-	ld1	{v16.4s},[x3],#16
+	ld1	{v16.4s},[PTR(3)],#16
 	rev32	v4.16b,v4.16b
 	rev32	v5.16b,v5.16b
 	rev32	v6.16b,v6.16b
 	rev32	v7.16b,v7.16b
 	orr	v18.16b,v0.16b,v0.16b		// offload
 	orr	v19.16b,v1.16b,v1.16b
-	ld1	{v17.4s},[x3],#16
+	ld1	{v17.4s},[PTR(3)],#16
 	add	v16.4s,v16.4s,v4.4s
 .inst	0x5e2828a4	//sha256su0 v4.16b,v5.16b
 	orr	v2.16b,v0.16b,v0.16b
 .inst	0x5e104020	//sha256h v0.16b,v1.16b,v16.4s
 .inst	0x5e105041	//sha256h2 v1.16b,v2.16b,v16.4s
 .inst	0x5e0760c4	//sha256su1 v4.16b,v6.16b,v7.16b
-	ld1	{v16.4s},[x3],#16
+	ld1	{v16.4s},[PTR(3)],#16
 	add	v17.4s,v17.4s,v5.4s
 .inst	0x5e2828c5	//sha256su0 v5.16b,v6.16b
 	orr	v2.16b,v0.16b,v0.16b
 .inst	0x5e114020	//sha256h v0.16b,v1.16b,v17.4s
 .inst	0x5e115041	//sha256h2 v1.16b,v2.16b,v17.4s
 .inst	0x5e0460e5	//sha256su1 v5.16b,v7.16b,v4.16b
-	ld1	{v17.4s},[x3],#16
+	ld1	{v17.4s},[PTR(3)],#16
 	add	v16.4s,v16.4s,v6.4s
 .inst	0x5e2828e6	//sha256su0 v6.16b,v7.16b
 	orr	v2.16b,v0.16b,v0.16b
 .inst	0x5e104020	//sha256h v0.16b,v1.16b,v16.4s
 .inst	0x5e105041	//sha256h2 v1.16b,v2.16b,v16.4s
 .inst	0x5e056086	//sha256su1 v6.16b,v4.16b,v5.16b
-	ld1	{v16.4s},[x3],#16
+	ld1	{v16.4s},[PTR(3)],#16
 	add	v17.4s,v17.4s,v7.4s
 .inst	0x5e282887	//sha256su0 v7.16b,v4.16b
 	orr	v2.16b,v0.16b,v0.16b
 .inst	0x5e114020	//sha256h v0.16b,v1.16b,v17.4s
 .inst	0x5e115041	//sha256h2 v1.16b,v2.16b,v17.4s
 .inst	0x5e0660a7	//sha256su1 v7.16b,v5.16b,v6.16b
-	ld1	{v17.4s},[x3],#16
+	ld1	{v17.4s},[PTR(3)],#16
 	add	v16.4s,v16.4s,v4.4s
 .inst	0x5e2828a4	//sha256su0 v4.16b,v5.16b
 	orr	v2.16b,v0.16b,v0.16b
 .inst	0x5e104020	//sha256h v0.16b,v1.16b,v16.4s
 .inst	0x5e105041	//sha256h2 v1.16b,v2.16b,v16.4s
 .inst	0x5e0760c4	//sha256su1 v4.16b,v6.16b,v7.16b
-	ld1	{v16.4s},[x3],#16
+	ld1	{v16.4s},[PTR(3)],#16
 	add	v17.4s,v17.4s,v5.4s
 .inst	0x5e2828c5	//sha256su0 v5.16b,v6.16b
 	orr	v2.16b,v0.16b,v0.16b
 .inst	0x5e114020	//sha256h v0.16b,v1.16b,v17.4s
 .inst	0x5e115041	//sha256h2 v1.16b,v2.16b,v17.4s
 .inst	0x5e0460e5	//sha256su1 v5.16b,v7.16b,v4.16b
-	ld1	{v17.4s},[x3],#16
+	ld1	{v17.4s},[PTR(3)],#16
 	add	v16.4s,v16.4s,v6.4s
 .inst	0x5e2828e6	//sha256su0 v6.16b,v7.16b
 	orr	v2.16b,v0.16b,v0.16b
 .inst	0x5e104020	//sha256h v0.16b,v1.16b,v16.4s
 .inst	0x5e105041	//sha256h2 v1.16b,v2.16b,v16.4s
 .inst	0x5e056086	//sha256su1 v6.16b,v4.16b,v5.16b
-	ld1	{v16.4s},[x3],#16
+	ld1	{v16.4s},[PTR(3)],#16
 	add	v17.4s,v17.4s,v7.4s
 .inst	0x5e282887	//sha256su0 v7.16b,v4.16b
 	orr	v2.16b,v0.16b,v0.16b
 .inst	0x5e114020	//sha256h v0.16b,v1.16b,v17.4s
 .inst	0x5e115041	//sha256h2 v1.16b,v2.16b,v17.4s
 .inst	0x5e0660a7	//sha256su1 v7.16b,v5.16b,v6.16b
-	ld1	{v17.4s},[x3],#16
+	ld1	{v17.4s},[PTR(3)],#16
 	add	v16.4s,v16.4s,v4.4s
 .inst	0x5e2828a4	//sha256su0 v4.16b,v5.16b
 	orr	v2.16b,v0.16b,v0.16b
 .inst	0x5e104020	//sha256h v0.16b,v1.16b,v16.4s
 .inst	0x5e105041	//sha256h2 v1.16b,v2.16b,v16.4s
 .inst	0x5e0760c4	//sha256su1 v4.16b,v6.16b,v7.16b
-	ld1	{v16.4s},[x3],#16
+	ld1	{v16.4s},[PTR(3)],#16
 	add	v17.4s,v17.4s,v5.4s
 .inst	0x5e2828c5	//sha256su0 v5.16b,v6.16b
 	orr	v2.16b,v0.16b,v0.16b
 .inst	0x5e114020	//sha256h v0.16b,v1.16b,v17.4s
 .inst	0x5e115041	//sha256h2 v1.16b,v2.16b,v17.4s
 .inst	0x5e0460e5	//sha256su1 v5.16b,v7.16b,v4.16b
-	ld1	{v17.4s},[x3],#16
+	ld1	{v17.4s},[PTR(3)],#16
 	add	v16.4s,v16.4s,v6.4s
 .inst	0x5e2828e6	//sha256su0 v6.16b,v7.16b
 	orr	v2.16b,v0.16b,v0.16b
 .inst	0x5e104020	//sha256h v0.16b,v1.16b,v16.4s
 .inst	0x5e105041	//sha256h2 v1.16b,v2.16b,v16.4s
 .inst	0x5e056086	//sha256su1 v6.16b,v4.16b,v5.16b
-	ld1	{v16.4s},[x3],#16
+	ld1	{v16.4s},[PTR(3)],#16
 	add	v17.4s,v17.4s,v7.4s
 .inst	0x5e282887	//sha256su0 v7.16b,v4.16b
 	orr	v2.16b,v0.16b,v0.16b
 .inst	0x5e114020	//sha256h v0.16b,v1.16b,v17.4s
 .inst	0x5e115041	//sha256h2 v1.16b,v2.16b,v17.4s
 .inst	0x5e0660a7	//sha256su1 v7.16b,v5.16b,v6.16b
-	ld1	{v17.4s},[x3],#16
+	ld1	{v17.4s},[PTR(3)],#16
 	add	v16.4s,v16.4s,v4.4s
 	orr	v2.16b,v0.16b,v0.16b
 .inst	0x5e104020	//sha256h v0.16b,v1.16b,v16.4s
 .inst	0x5e105041	//sha256h2 v1.16b,v2.16b,v16.4s
 
-	ld1	{v16.4s},[x3],#16
+	ld1	{v16.4s},[PTR(3)],#16
 	add	v17.4s,v17.4s,v5.4s
 	orr	v2.16b,v0.16b,v0.16b
 .inst	0x5e114020	//sha256h v0.16b,v1.16b,v17.4s
 .inst	0x5e115041	//sha256h2 v1.16b,v2.16b,v17.4s
 
-	ld1	{v17.4s},[x3]
+	ld1	{v17.4s},[PTR(3)]
 	add	v16.4s,v16.4s,v6.4s
-	sub	x3,x3,#64*4-16	// rewind
+	sub	PTR(3),PTR(3),#64*4-16	// rewind
 	orr	v2.16b,v0.16b,v0.16b
 .inst	0x5e104020	//sha256h v0.16b,v1.16b,v16.4s
 .inst	0x5e105041	//sha256h2 v1.16b,v2.16b,v16.4s
@@ -1200,9 +1205,9 @@ sha256_block_armv8:
 
 	cbnz	x2,.Loop_hw
 
-	st1	{v0.4s,v1.4s},[x0]
+	st1	{v0.4s,v1.4s},[PTR(0)]
 
-	ldr	x29,[sp],#16
+	ldr	PTR(29),[PTRN(sp)],#(2*PTR_WIDTH)
 	ret
 .size	sha256_block_armv8,.-sha256_block_armv8
 #endif
@@ -1215,39 +1220,44 @@ sha256_block_neon:
 	AARCH64_VALID_CALL_TARGET
 .Lneon_entry:
 	// Armv8.3-A PAuth: even though x30 is pushed to stack it is not popped later
-	stp	x29, x30, [sp, #-16]!
-	mov	x29, sp
-	sub	sp,sp,#16*4
+	stp	PTR(29), PTR(30), [PTRN(sp), #-(2*PTR_WIDTH)]!
+	mov	PTR(29), PTRN(sp)
+	sub	PTRN(sp),PTRN(sp),#16*4
 
-	adr	x16,.LK256
-	add	x2,x1,x2,lsl#6	// len to point at the end of inp
+	adr	PTR(16),.LK256
+#ifdef __CHERI_PURE_CAPABILITY__
+	lsl	x17,x2,#6
+	add	PTR(2),PTR(1),x17		// len to point at the end of inp
+#else
+	add	PTR(2),PTR(1),PTR(2),lsl#6	// len to point at the end of inp
+#endif
 
-	ld1	{v0.16b},[x1], #16
-	ld1	{v1.16b},[x1], #16
-	ld1	{v2.16b},[x1], #16
-	ld1	{v3.16b},[x1], #16
-	ld1	{v4.4s},[x16], #16
-	ld1	{v5.4s},[x16], #16
-	ld1	{v6.4s},[x16], #16
-	ld1	{v7.4s},[x16], #16
+	ld1	{v0.16b},[PTR(1)], #16
+	ld1	{v1.16b},[PTR(1)], #16
+	ld1	{v2.16b},[PTR(1)], #16
+	ld1	{v3.16b},[PTR(1)], #16
+	ld1	{v4.4s},[PTR(16)], #16
+	ld1	{v5.4s},[PTR(16)], #16
+	ld1	{v6.4s},[PTR(16)], #16
+	ld1	{v7.4s},[PTR(16)], #16
 	rev32	v0.16b,v0.16b		// yes, even on
 	rev32	v1.16b,v1.16b		// big-endian
 	rev32	v2.16b,v2.16b
 	rev32	v3.16b,v3.16b
-	mov	x17,sp
+	mov	PTR(17),PTRN(sp)
 	add	v4.4s,v4.4s,v0.4s
 	add	v5.4s,v5.4s,v1.4s
 	add	v6.4s,v6.4s,v2.4s
-	st1	{v4.4s,v5.4s},[x17], #32
+	st1	{v4.4s,v5.4s},[PTR(17)], #32
 	add	v7.4s,v7.4s,v3.4s
-	st1	{v6.4s,v7.4s},[x17]
-	sub	x17,x17,#32
+	st1	{v6.4s,v7.4s},[PTR(17)]
+	sub	PTR(17),PTR(17),#32
 
-	ldp	w3,w4,[x0]
-	ldp	w5,w6,[x0,#8]
-	ldp	w7,w8,[x0,#16]
-	ldp	w9,w10,[x0,#24]
-	ldr	w12,[sp,#0]
+	ldp	w3,w4,[PTR(0)]
+	ldp	w5,w6,[PTR(0),#8]
+	ldp	w7,w8,[PTR(0),#16]
+	ldp	w9,w10,[PTR(0),#24]
+	ldr	w12,[PTRN(sp),#0]
 	mov	w13,wzr
 	eor	w14,w4,w5
 	mov	w15,wzr
@@ -1277,7 +1287,7 @@ sha256_block_neon:
 	eor	w15,w15,w3,ror#20
 	ushr	v7.4s,v4.4s,#18
 	add	w10,w10,w11
-	ldr	w12,[sp,#4]
+	ldr	w12,[PTRN(sp),#4]
 	and	w14,w14,w13
 	eor	v5.16b,v5.16b,v6.16b
 	ror	w15,w15,#2
@@ -1305,7 +1315,7 @@ sha256_block_neon:
 	eor	w15,w15,w10,ror#20
 	sli	v7.4s,v19.4s,#13
 	add	w9,w9,w11
-	ldr	w12,[sp,#8]
+	ldr	w12,[PTRN(sp),#8]
 	and	w13,w13,w14
 	eor	v17.16b,v17.16b,v16.16b
 	ror	w15,w15,#2
@@ -1333,10 +1343,10 @@ sha256_block_neon:
 	eor	w15,w15,w9,ror#20
 	add	w8,w8,w11
 	sli	v17.4s,v0.4s,#13
-	ldr	w12,[sp,#12]
+	ldr	w12,[PTRN(sp),#12]
 	and	w14,w14,w13
 	ror	w15,w15,#2
-	ld1	{v4.4s},[x16], #16
+	ld1	{v4.4s},[PTR(16)], #16
 	add	w4,w4,w8
 	eor	v19.16b,v19.16b,v17.16b
 	eor	w14,w14,w10
@@ -1358,12 +1368,12 @@ sha256_block_neon:
 	eor	w14,w8,w9
 	eor	w15,w15,w8,ror#20
 	add	w7,w7,w11
-	ldr	w12,[sp,#16]
+	ldr	w12,[PTRN(sp),#16]
 	and	w13,w13,w14
 	ror	w15,w15,#2
 	add	w3,w3,w7
 	eor	w13,w13,w9
-	st1	{v4.4s},[x17], #16
+	st1	{v4.4s},[PTR(17)], #16
 	ext	v4.16b,v1.16b,v2.16b,#4
 	add	w6,w6,w12
 	add	w7,w7,w15
@@ -1386,7 +1396,7 @@ sha256_block_neon:
 	eor	w15,w15,w7,ror#20
 	ushr	v7.4s,v4.4s,#18
 	add	w6,w6,w11
-	ldr	w12,[sp,#20]
+	ldr	w12,[PTRN(sp),#20]
 	and	w14,w14,w13
 	eor	v5.16b,v5.16b,v6.16b
 	ror	w15,w15,#2
@@ -1414,7 +1424,7 @@ sha256_block_neon:
 	eor	w15,w15,w6,ror#20
 	sli	v7.4s,v19.4s,#13
 	add	w5,w5,w11
-	ldr	w12,[sp,#24]
+	ldr	w12,[PTRN(sp),#24]
 	and	w13,w13,w14
 	eor	v17.16b,v17.16b,v16.16b
 	ror	w15,w15,#2
@@ -1442,10 +1452,10 @@ sha256_block_neon:
 	eor	w15,w15,w5,ror#20
 	add	w4,w4,w11
 	sli	v17.4s,v1.4s,#13
-	ldr	w12,[sp,#28]
+	ldr	w12,[PTRN(sp),#28]
 	and	w14,w14,w13
 	ror	w15,w15,#2
-	ld1	{v4.4s},[x16], #16
+	ld1	{v4.4s},[PTR(16)], #16
 	add	w8,w8,w4
 	eor	v19.16b,v19.16b,v17.16b
 	eor	w14,w14,w6
@@ -1467,12 +1477,12 @@ sha256_block_neon:
 	eor	w14,w4,w5
 	eor	w15,w15,w4,ror#20
 	add	w3,w3,w11
-	ldr	w12,[sp,#32]
+	ldr	w12,[PTRN(sp),#32]
 	and	w13,w13,w14
 	ror	w15,w15,#2
 	add	w7,w7,w3
 	eor	w13,w13,w5
-	st1	{v4.4s},[x17], #16
+	st1	{v4.4s},[PTR(17)], #16
 	ext	v4.16b,v2.16b,v3.16b,#4
 	add	w10,w10,w12
 	add	w3,w3,w15
@@ -1495,7 +1505,7 @@ sha256_block_neon:
 	eor	w15,w15,w3,ror#20
 	ushr	v7.4s,v4.4s,#18
 	add	w10,w10,w11
-	ldr	w12,[sp,#36]
+	ldr	w12,[PTRN(sp),#36]
 	and	w14,w14,w13
 	eor	v5.16b,v5.16b,v6.16b
 	ror	w15,w15,#2
@@ -1523,7 +1533,7 @@ sha256_block_neon:
 	eor	w15,w15,w10,ror#20
 	sli	v7.4s,v19.4s,#13
 	add	w9,w9,w11
-	ldr	w12,[sp,#40]
+	ldr	w12,[PTRN(sp),#40]
 	and	w13,w13,w14
 	eor	v17.16b,v17.16b,v16.16b
 	ror	w15,w15,#2
@@ -1551,10 +1561,10 @@ sha256_block_neon:
 	eor	w15,w15,w9,ror#20
 	add	w8,w8,w11
 	sli	v17.4s,v2.4s,#13
-	ldr	w12,[sp,#44]
+	ldr	w12,[PTRN(sp),#44]
 	and	w14,w14,w13
 	ror	w15,w15,#2
-	ld1	{v4.4s},[x16], #16
+	ld1	{v4.4s},[PTR(16)], #16
 	add	w4,w4,w8
 	eor	v19.16b,v19.16b,v17.16b
 	eor	w14,w14,w10
@@ -1576,12 +1586,12 @@ sha256_block_neon:
 	eor	w14,w8,w9
 	eor	w15,w15,w8,ror#20
 	add	w7,w7,w11
-	ldr	w12,[sp,#48]
+	ldr	w12,[PTRN(sp),#48]
 	and	w13,w13,w14
 	ror	w15,w15,#2
 	add	w3,w3,w7
 	eor	w13,w13,w9
-	st1	{v4.4s},[x17], #16
+	st1	{v4.4s},[PTR(17)], #16
 	ext	v4.16b,v3.16b,v0.16b,#4
 	add	w6,w6,w12
 	add	w7,w7,w15
@@ -1604,7 +1614,7 @@ sha256_block_neon:
 	eor	w15,w15,w7,ror#20
 	ushr	v7.4s,v4.4s,#18
 	add	w6,w6,w11
-	ldr	w12,[sp,#52]
+	ldr	w12,[PTRN(sp),#52]
 	and	w14,w14,w13
 	eor	v5.16b,v5.16b,v6.16b
 	ror	w15,w15,#2
@@ -1632,7 +1642,7 @@ sha256_block_neon:
 	eor	w15,w15,w6,ror#20
 	sli	v7.4s,v19.4s,#13
 	add	w5,w5,w11
-	ldr	w12,[sp,#56]
+	ldr	w12,[PTRN(sp),#56]
 	and	w13,w13,w14
 	eor	v17.16b,v17.16b,v16.16b
 	ror	w15,w15,#2
@@ -1660,10 +1670,10 @@ sha256_block_neon:
 	eor	w15,w15,w5,ror#20
 	add	w4,w4,w11
 	sli	v17.4s,v3.4s,#13
-	ldr	w12,[sp,#60]
+	ldr	w12,[PTRN(sp),#60]
 	and	w14,w14,w13
 	ror	w15,w15,#2
-	ld1	{v4.4s},[x16], #16
+	ld1	{v4.4s},[PTR(16)], #16
 	add	w8,w8,w4
 	eor	v19.16b,v19.16b,v17.16b
 	eor	w14,w14,w6
@@ -1685,30 +1695,38 @@ sha256_block_neon:
 	eor	w14,w4,w5
 	eor	w15,w15,w4,ror#20
 	add	w3,w3,w11
-	ldr	w12,[x16]
+	ldr	w12,[PTR(16)]
 	and	w13,w13,w14
 	ror	w15,w15,#2
 	add	w7,w7,w3
 	eor	w13,w13,w5
-	st1	{v4.4s},[x17], #16
+	st1	{v4.4s},[PTR(17)], #16
 	cmp	w12,#0				// check for K256 terminator
-	ldr	w12,[sp,#0]
-	sub	x17,x17,#64
+	ldr	w12,[PTRN(sp),#0]
+	sub	PTR(17),PTR(17),#64
 	bne	.L_00_48
 
-	sub	x16,x16,#256		// rewind x16
+	sub	PTR(16),PTR(16),#256		// rewind PTR(16)
 	cmp	x1,x2
+#ifdef __CHERI_PURE_CAPABILITY__
+	mov	x17, #-64
+#else
 	mov	x17, #64
+#endif
 	csel	x17, x17, xzr, eq
-	sub	x1,x1,x17			// avoid SEGV
-	mov	x17,sp
+#ifdef __CHERI_PURE_CAPABILITY__
+	add	PTR(1),PTR(1),x17			// avoid SEGV
+#else
+	sub	PTR(1),PTR(1),x17			// avoid SEGV
+#endif
+	mov	PTR(17),PTRN(sp)
 	add	w10,w10,w12
 	add	w3,w3,w15
 	and	w12,w8,w7
-	ld1	{v0.16b},[x1],#16
+	ld1	{v0.16b},[PTR(1)],#16
 	bic	w15,w9,w7
 	eor	w11,w7,w7,ror#5
-	ld1	{v4.4s},[x16],#16
+	ld1	{v4.4s},[PTR(16)],#16
 	add	w3,w3,w13
 	orr	w12,w12,w15
 	eor	w11,w11,w7,ror#19
@@ -1720,7 +1738,7 @@ sha256_block_neon:
 	eor	w15,w15,w3,ror#20
 	add	v4.4s,v4.4s,v0.4s
 	add	w10,w10,w11
-	ldr	w12,[sp,#4]
+	ldr	w12,[PTRN(sp),#4]
 	and	w14,w14,w13
 	ror	w15,w15,#2
 	add	w6,w6,w10
@@ -1739,7 +1757,7 @@ sha256_block_neon:
 	eor	w14,w10,w3
 	eor	w15,w15,w10,ror#20
 	add	w9,w9,w11
-	ldr	w12,[sp,#8]
+	ldr	w12,[PTRN(sp),#8]
 	and	w13,w13,w14
 	ror	w15,w15,#2
 	add	w5,w5,w9
@@ -1758,7 +1776,7 @@ sha256_block_neon:
 	eor	w13,w9,w10
 	eor	w15,w15,w9,ror#20
 	add	w8,w8,w11
-	ldr	w12,[sp,#12]
+	ldr	w12,[PTRN(sp),#12]
 	and	w14,w14,w13
 	ror	w15,w15,#2
 	add	w4,w4,w8
@@ -1777,19 +1795,19 @@ sha256_block_neon:
 	eor	w14,w8,w9
 	eor	w15,w15,w8,ror#20
 	add	w7,w7,w11
-	ldr	w12,[sp,#16]
+	ldr	w12,[PTRN(sp),#16]
 	and	w13,w13,w14
 	ror	w15,w15,#2
 	add	w3,w3,w7
 	eor	w13,w13,w9
-	st1	{v4.4s},[x17], #16
+	st1	{v4.4s},[PTR(17)], #16
 	add	w6,w6,w12
 	add	w7,w7,w15
 	and	w12,w4,w3
-	ld1	{v1.16b},[x1],#16
+	ld1	{v1.16b},[PTR(1)],#16
 	bic	w15,w5,w3
 	eor	w11,w3,w3,ror#5
-	ld1	{v4.4s},[x16],#16
+	ld1	{v4.4s},[PTR(16)],#16
 	add	w7,w7,w13
 	orr	w12,w12,w15
 	eor	w11,w11,w3,ror#19
@@ -1801,7 +1819,7 @@ sha256_block_neon:
 	eor	w15,w15,w7,ror#20
 	add	v4.4s,v4.4s,v1.4s
 	add	w6,w6,w11
-	ldr	w12,[sp,#20]
+	ldr	w12,[PTRN(sp),#20]
 	and	w14,w14,w13
 	ror	w15,w15,#2
 	add	w10,w10,w6
@@ -1820,7 +1838,7 @@ sha256_block_neon:
 	eor	w14,w6,w7
 	eor	w15,w15,w6,ror#20
 	add	w5,w5,w11
-	ldr	w12,[sp,#24]
+	ldr	w12,[PTRN(sp),#24]
 	and	w13,w13,w14
 	ror	w15,w15,#2
 	add	w9,w9,w5
@@ -1839,7 +1857,7 @@ sha256_block_neon:
 	eor	w13,w5,w6
 	eor	w15,w15,w5,ror#20
 	add	w4,w4,w11
-	ldr	w12,[sp,#28]
+	ldr	w12,[PTRN(sp),#28]
 	and	w14,w14,w13
 	ror	w15,w15,#2
 	add	w8,w8,w4
@@ -1858,19 +1876,19 @@ sha256_block_neon:
 	eor	w14,w4,w5
 	eor	w15,w15,w4,ror#20
 	add	w3,w3,w11
-	ldr	w12,[sp,#32]
+	ldr	w12,[PTRN(sp),#32]
 	and	w13,w13,w14
 	ror	w15,w15,#2
 	add	w7,w7,w3
 	eor	w13,w13,w5
-	st1	{v4.4s},[x17], #16
+	st1	{v4.4s},[PTR(17)], #16
 	add	w10,w10,w12
 	add	w3,w3,w15
 	and	w12,w8,w7
-	ld1	{v2.16b},[x1],#16
+	ld1	{v2.16b},[PTR(1)],#16
 	bic	w15,w9,w7
 	eor	w11,w7,w7,ror#5
-	ld1	{v4.4s},[x16],#16
+	ld1	{v4.4s},[PTR(16)],#16
 	add	w3,w3,w13
 	orr	w12,w12,w15
 	eor	w11,w11,w7,ror#19
@@ -1882,7 +1900,7 @@ sha256_block_neon:
 	eor	w15,w15,w3,ror#20
 	add	v4.4s,v4.4s,v2.4s
 	add	w10,w10,w11
-	ldr	w12,[sp,#36]
+	ldr	w12,[PTRN(sp),#36]
 	and	w14,w14,w13
 	ror	w15,w15,#2
 	add	w6,w6,w10
@@ -1901,7 +1919,7 @@ sha256_block_neon:
 	eor	w14,w10,w3
 	eor	w15,w15,w10,ror#20
 	add	w9,w9,w11
-	ldr	w12,[sp,#40]
+	ldr	w12,[PTRN(sp),#40]
 	and	w13,w13,w14
 	ror	w15,w15,#2
 	add	w5,w5,w9
@@ -1920,7 +1938,7 @@ sha256_block_neon:
 	eor	w13,w9,w10
 	eor	w15,w15,w9,ror#20
 	add	w8,w8,w11
-	ldr	w12,[sp,#44]
+	ldr	w12,[PTRN(sp),#44]
 	and	w14,w14,w13
 	ror	w15,w15,#2
 	add	w4,w4,w8
@@ -1939,19 +1957,19 @@ sha256_block_neon:
 	eor	w14,w8,w9
 	eor	w15,w15,w8,ror#20
 	add	w7,w7,w11
-	ldr	w12,[sp,#48]
+	ldr	w12,[PTRN(sp),#48]
 	and	w13,w13,w14
 	ror	w15,w15,#2
 	add	w3,w3,w7
 	eor	w13,w13,w9
-	st1	{v4.4s},[x17], #16
+	st1	{v4.4s},[PTR(17)], #16
 	add	w6,w6,w12
 	add	w7,w7,w15
 	and	w12,w4,w3
-	ld1	{v3.16b},[x1],#16
+	ld1	{v3.16b},[PTR(1)],#16
 	bic	w15,w5,w3
 	eor	w11,w3,w3,ror#5
-	ld1	{v4.4s},[x16],#16
+	ld1	{v4.4s},[PTR(16)],#16
 	add	w7,w7,w13
 	orr	w12,w12,w15
 	eor	w11,w11,w3,ror#19
@@ -1963,7 +1981,7 @@ sha256_block_neon:
 	eor	w15,w15,w7,ror#20
 	add	v4.4s,v4.4s,v3.4s
 	add	w6,w6,w11
-	ldr	w12,[sp,#52]
+	ldr	w12,[PTRN(sp),#52]
 	and	w14,w14,w13
 	ror	w15,w15,#2
 	add	w10,w10,w6
@@ -1982,7 +2000,7 @@ sha256_block_neon:
 	eor	w14,w6,w7
 	eor	w15,w15,w6,ror#20
 	add	w5,w5,w11
-	ldr	w12,[sp,#56]
+	ldr	w12,[PTRN(sp),#56]
 	and	w13,w13,w14
 	ror	w15,w15,#2
 	add	w9,w9,w5
@@ -2001,7 +2019,7 @@ sha256_block_neon:
 	eor	w13,w5,w6
 	eor	w15,w15,w5,ror#20
 	add	w4,w4,w11
-	ldr	w12,[sp,#60]
+	ldr	w12,[PTRN(sp),#60]
 	and	w14,w14,w13
 	ror	w15,w15,#2
 	add	w8,w8,w4
@@ -2024,33 +2042,33 @@ sha256_block_neon:
 	ror	w15,w15,#2
 	add	w7,w7,w3
 	eor	w13,w13,w5
-	st1	{v4.4s},[x17], #16
+	st1	{v4.4s},[PTR(17)], #16
 	add	w3,w3,w15			// h+=Sigma0(a) from the past
-	ldp	w11,w12,[x0,#0]
+	ldp	w11,w12,[PTR(0),#0]
 	add	w3,w3,w13			// h+=Maj(a,b,c) from the past
-	ldp	w13,w14,[x0,#8]
+	ldp	w13,w14,[PTR(0),#8]
 	add	w3,w3,w11			// accumulate
 	add	w4,w4,w12
-	ldp	w11,w12,[x0,#16]
+	ldp	w11,w12,[PTR(0),#16]
 	add	w5,w5,w13
 	add	w6,w6,w14
-	ldp	w13,w14,[x0,#24]
+	ldp	w13,w14,[PTR(0),#24]
 	add	w7,w7,w11
 	add	w8,w8,w12
-	ldr	w12,[sp,#0]
-	stp	w3,w4,[x0,#0]
+	ldr	w12,[PTRN(sp),#0]
+	stp	w3,w4,[PTR(0),#0]
 	add	w9,w9,w13
 	mov	w13,wzr
-	stp	w5,w6,[x0,#8]
+	stp	w5,w6,[PTR(0),#8]
 	add	w10,w10,w14
-	stp	w7,w8,[x0,#16]
+	stp	w7,w8,[PTR(0),#16]
 	eor	w14,w4,w5
-	stp	w9,w10,[x0,#24]
+	stp	w9,w10,[PTR(0),#24]
 	mov	w15,wzr
-	mov	x17,sp
+	mov	PTR(17),PTRN(sp)
 	b.ne	.L_00_48
 
-	ldr	x29,[x29]
-	add	sp,sp,#16*4+16
+	ldr	PTR(29),[PTR(29)]
+	add	PTRN(sp),PTRN(sp),#16*4+(2*PTR_WIDTH)
 	ret
 .size	sha256_block_neon,.-sha256_block_neon

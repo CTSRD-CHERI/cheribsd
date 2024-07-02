@@ -18,16 +18,16 @@
 poly1305_init:
 	AARCH64_VALID_CALL_TARGET
 	cmp	x1,xzr
-	stp	xzr,xzr,[x0]		// zero hash value
-	stp	xzr,xzr,[x0,#16]	// [along with is_base2_26]
+	stp	xzr,xzr,[PTR(0)]		// zero hash value
+	stp	xzr,xzr,[PTR(0),#16]	// [along with is_base2_26]
 
-	csel	x0,xzr,x0,eq
+	csel	PTR(0),PTR(zr),PTR(0),eq
 	b.eq	.Lno_key
 
-	adrp	x17,OPENSSL_armcap_P
-	ldr	w17,[x17,#:lo12:OPENSSL_armcap_P]
+	adrp	PTR(17),OPENSSL_armcap_P
+	ldr	w17,[PTR(17),#:lo12:OPENSSL_armcap_P]
 
-	ldp	x7,x8,[x1]		// load key
+	ldp	x7,x8,[PTR(1)]		// load key
 	mov	x9,#0xfffffffc0fffffff
 	movk	x9,#0x0fff,lsl#48
 #ifdef	__AARCH64EB__
@@ -37,22 +37,22 @@ poly1305_init:
 	and	x7,x7,x9		// &=0ffffffc0fffffff
 	and	x9,x9,#-4
 	and	x8,x8,x9		// &=0ffffffc0ffffffc
-	stp	x7,x8,[x0,#32]	// save key value
+	stp	x7,x8,[PTR(0),#32]	// save key value
 
 	tst	w17,#ARMV7_NEON
 
-	adr	x12,.Lpoly1305_blocks
-	adr	x7,.Lpoly1305_blocks_neon
-	adr	x13,.Lpoly1305_emit
-	adr	x8,.Lpoly1305_emit_neon
+	adr	PTR(12),.Lpoly1305_blocks
+	adr	PTR(7),.Lpoly1305_blocks_neon
+	adr	PTR(13),.Lpoly1305_emit
+	adr	PTR(8),.Lpoly1305_emit_neon
 
-	csel	x12,x12,x7,eq
-	csel	x13,x13,x8,eq
+	csel	PTR(12),PTR(12),PTR(7),eq
+	csel	PTR(13),PTR(13),PTR(8),eq
 
 #ifdef	__ILP32__
-	stp	w12,w13,[x2]
+	stp	w12,w13,[PTR(2)]
 #else
-	stp	x12,x13,[x2]
+	stp	PTR(12),PTR(13),[PTR(2)]
 #endif
 
 	mov	x0,#1
@@ -61,6 +61,7 @@ poly1305_init:
 .size	poly1305_init,.-poly1305_init
 
 .type	poly1305_blocks,%function
+.type	.Lpoly1305_blocks,%function
 .align	5
 poly1305_blocks:
 .Lpoly1305_blocks:
@@ -70,15 +71,15 @@ poly1305_blocks:
 	ands	x2,x2,#-16
 	b.eq	.Lno_data
 
-	ldp	x4,x5,[x0]		// load hash value
-	ldp	x7,x8,[x0,#32]	// load key value
-	ldr	x6,[x0,#16]
+	ldp	x4,x5,[PTR(0)]		// load hash value
+	ldp	x7,x8,[PTR(0),#32]	// load key value
+	ldr	x6,[PTR(0),#16]
 	add	x9,x8,x8,lsr#2	// s1 = r1 + (r1 >> 2)
 	b	.Loop
 
 .align	5
 .Loop:
-	ldp	x10,x11,[x1],#16	// load input
+	ldp	x10,x11,[PTR(1)],#16	// load input
 	sub	x2,x2,#16
 #ifdef	__AARCH64EB__
 	rev	x10,x10
@@ -121,23 +122,24 @@ poly1305_blocks:
 
 	cbnz	x2,.Loop
 
-	stp	x4,x5,[x0]		// store hash value
-	str	x6,[x0,#16]
+	stp	x4,x5,[PTR(0)]		// store hash value
+	str	x6,[PTR(0),#16]
 
 .Lno_data:
 	ret
 .size	poly1305_blocks,.-poly1305_blocks
 
 .type	poly1305_emit,%function
+.type	.Lpoly1305_emit,%function
 .align	5
 poly1305_emit:
 .Lpoly1305_emit:
 	// The symbol .poly1305_emit is not a .globl symbol
 	// but a pointer to it is returned by poly1305_init
 	AARCH64_VALID_CALL_TARGET
-	ldp	x4,x5,[x0]		// load hash base 2^64
-	ldr	x6,[x0,#16]
-	ldp	x10,x11,[x2]	// load nonce
+	ldp	x4,x5,[PTR(0)]		// load hash base 2^64
+	ldr	x6,[PTR(0),#16]
+	ldp	x10,x11,[PTR(2)]	// load nonce
 
 	adds	x12,x4,#5		// compare to modulus
 	adcs	x13,x5,xzr
@@ -158,7 +160,7 @@ poly1305_emit:
 	rev	x4,x4			// flip output bytes
 	rev	x5,x5
 #endif
-	stp	x4,x5,[x1]		// write result
+	stp	x4,x5,[PTR(1)]		// write result
 
 	ret
 .size	poly1305_emit,.-poly1305_emit
@@ -209,53 +211,54 @@ poly1305_splat:
 	ubfx	x15,x5,#14,#26
 	extr	x16,x6,x5,#40
 
-	str	w12,[x0,#16*0]	// r0
+	str	w12,[PTR(0),#16*0]	// r0
 	add	w12,w13,w13,lsl#2	// r1*5
-	str	w13,[x0,#16*1]	// r1
+	str	w13,[PTR(0),#16*1]	// r1
 	add	w13,w14,w14,lsl#2	// r2*5
-	str	w12,[x0,#16*2]	// s1
-	str	w14,[x0,#16*3]	// r2
+	str	w12,[PTR(0),#16*2]	// s1
+	str	w14,[PTR(0),#16*3]	// r2
 	add	w14,w15,w15,lsl#2	// r3*5
-	str	w13,[x0,#16*4]	// s2
-	str	w15,[x0,#16*5]	// r3
+	str	w13,[PTR(0),#16*4]	// s2
+	str	w15,[PTR(0),#16*5]	// r3
 	add	w15,w16,w16,lsl#2	// r4*5
-	str	w14,[x0,#16*6]	// s3
-	str	w16,[x0,#16*7]	// r4
-	str	w15,[x0,#16*8]	// s4
+	str	w14,[PTR(0),#16*6]	// s3
+	str	w16,[PTR(0),#16*7]	// r4
+	str	w15,[PTR(0),#16*8]	// s4
 
 	ret
 .size	poly1305_splat,.-poly1305_splat
 
 .type	poly1305_blocks_neon,%function
+.type	.Lpoly1305_blocks_neon,%function
 .align	5
 poly1305_blocks_neon:
 .Lpoly1305_blocks_neon:
 	// The symbol .Lpoly1305_blocks_neon is not a .globl symbol
 	// but a pointer to it is returned by poly1305_init
 	AARCH64_VALID_CALL_TARGET
-	ldr	x17,[x0,#24]
+	ldr	x17,[PTR(0),#24]
 	cmp	x2,#128
 	b.hs	.Lblocks_neon
 	cbz	x17,.Lpoly1305_blocks
 
 .Lblocks_neon:
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-80]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH+64)]!
+	add	PTR(29),PTRN(sp),#0
 
 	ands	x2,x2,#-16
 	b.eq	.Lno_data_neon
 
 	cbz	x17,.Lbase2_64_neon
 
-	ldp	w10,w11,[x0]		// load hash value base 2^26
-	ldp	w12,w13,[x0,#8]
-	ldr	w14,[x0,#16]
+	ldp	w10,w11,[PTR(0)]		// load hash value base 2^26
+	ldp	w12,w13,[PTR(0),#8]
+	ldr	w14,[PTR(0),#16]
 
 	tst	x2,#31
 	b.eq	.Leven_neon
 
-	ldp	x7,x8,[x0,#32]	// load key value
+	ldp	x7,x8,[PTR(0),#32]	// load key value
 
 	add	x4,x10,x11,lsl#26	// base 2^26 -> base 2^64
 	lsr	x5,x12,#12
@@ -266,7 +269,7 @@ poly1305_blocks_neon:
 	adds	x5,x5,x14,lsl#40
 	adc	x14,x6,xzr		// can be partially reduced...
 
-	ldp	x12,x13,[x1],#16	// load input
+	ldp	x12,x13,[PTR(1)],#16	// load input
 	sub	x2,x2,#16
 	add	x9,x8,x8,lsr#2	// s1 = r1 + (r1 >> 2)
 
@@ -286,7 +289,7 @@ poly1305_blocks_neon:
 	adc	x6,x6,x3
 
 	bl	poly1305_mult
-	ldr	x30,[sp,#8]
+	ldr	PTR(30),[PTRN(sp),#PTR_WIDTH]
 
 	cbz	x3,.Lstore_base2_64_neon
 
@@ -299,28 +302,28 @@ poly1305_blocks_neon:
 
 	cbnz	x2,.Leven_neon
 
-	stp	w10,w11,[x0]		// store hash value base 2^26
-	stp	w12,w13,[x0,#8]
-	str	w14,[x0,#16]
+	stp	w10,w11,[PTR(0)]		// store hash value base 2^26
+	stp	w12,w13,[PTR(0),#8]
+	str	w14,[PTR(0),#16]
 	b	.Lno_data_neon
 
 .align	4
 .Lstore_base2_64_neon:
-	stp	x4,x5,[x0]		// store hash value base 2^64
-	stp	x6,xzr,[x0,#16]	// note that is_base2_26 is zeroed
+	stp	x4,x5,[PTR(0)]		// store hash value base 2^64
+	stp	x6,xzr,[PTR(0),#16]	// note that is_base2_26 is zeroed
 	b	.Lno_data_neon
 
 .align	4
 .Lbase2_64_neon:
-	ldp	x7,x8,[x0,#32]	// load key value
+	ldp	x7,x8,[PTR(0),#32]	// load key value
 
-	ldp	x4,x5,[x0]		// load hash value base 2^64
-	ldr	x6,[x0,#16]
+	ldp	x4,x5,[PTR(0)]		// load hash value base 2^64
+	ldr	x6,[PTR(0),#16]
 
 	tst	x2,#31
 	b.eq	.Linit_neon
 
-	ldp	x12,x13,[x1],#16	// load input
+	ldp	x12,x13,[PTR(1)],#16	// load input
 	sub	x2,x2,#16
 	add	x9,x8,x8,lsr#2	// s1 = r1 + (r1 >> 2)
 #ifdef	__AARCH64EB__
@@ -341,10 +344,10 @@ poly1305_blocks_neon:
 	ubfx	x13,x5,#14,#26
 	extr	x14,x6,x5,#40
 
-	stp	d8,d9,[sp,#16]		// meet ABI requirements
-	stp	d10,d11,[sp,#32]
-	stp	d12,d13,[sp,#48]
-	stp	d14,d15,[sp,#64]
+	stp	d8,d9,[PTRN(sp),#2*PTR_WIDTH]	// meet ABI requirements
+	stp	d10,d11,[PTRN(sp),#2*PTR_WIDTH+16]
+	stp	d12,d13,[PTRN(sp),#2*PTR_WIDTH+32]
+	stp	d14,d15,[PTRN(sp),#2*PTR_WIDTH+48]
 
 	fmov	d24,x10
 	fmov	d25,x11
@@ -357,43 +360,43 @@ poly1305_blocks_neon:
 	add	x9,x8,x8,lsr#2	// s1 = r1 + (r1 >> 2)
 	mov	x5,x8
 	mov	x6,xzr
-	add	x0,x0,#48+12
+	add	PTR(0),PTR(0),#48+12
 	bl	poly1305_splat
 
 	bl	poly1305_mult		// r^2
-	sub	x0,x0,#4
+	sub	PTR(0),PTR(0),#4
 	bl	poly1305_splat
 
 	bl	poly1305_mult		// r^3
-	sub	x0,x0,#4
+	sub	PTR(0),PTR(0),#4
 	bl	poly1305_splat
 
 	bl	poly1305_mult		// r^4
-	sub	x0,x0,#4
+	sub	PTR(0),PTR(0),#4
 	bl	poly1305_splat
-	ldr	x30,[sp,#8]
+	ldr	PTR(30),[PTRN(sp),#PTR_WIDTH]
 
-	add	x16,x1,#32
-	adr	x17,.Lzeros
+	add	PTR(16),PTR(1),#32
+	adr	PTR(17),.Lzeros
 	subs	x2,x2,#64
-	csel	x16,x17,x16,lo
+	csel	PTR(16),PTR(17),PTR(16),lo
 
 	mov	x4,#1
-	stur	x4,[x0,#-24]		// set is_base2_26
-	sub	x0,x0,#48		// restore original x0
+	stur	x4,[PTR(0),#-24]		// set is_base2_26
+	sub	PTR(0),PTR(0),#48		// restore original PTR(0)
 	b	.Ldo_neon
 
 .align	4
 .Leven_neon:
-	add	x16,x1,#32
-	adr	x17,.Lzeros
+	add	PTR(16),PTR(1),#32
+	adr	PTR(17),.Lzeros
 	subs	x2,x2,#64
-	csel	x16,x17,x16,lo
+	csel	PTR(16),PTR(17),PTR(16),lo
 
-	stp	d8,d9,[sp,#16]		// meet ABI requirements
-	stp	d10,d11,[sp,#32]
-	stp	d12,d13,[sp,#48]
-	stp	d14,d15,[sp,#64]
+	stp	d8,d9,[PTRN(sp),#2*PTR_WIDTH]	// meet ABI requirements
+	stp	d10,d11,[PTRN(sp),#2*PTR_WIDTH+16]
+	stp	d12,d13,[PTRN(sp),#2*PTR_WIDTH+32]
+	stp	d14,d15,[PTRN(sp),#2*PTR_WIDTH+48]
 
 	fmov	d24,x10
 	fmov	d25,x11
@@ -402,11 +405,11 @@ poly1305_blocks_neon:
 	fmov	d28,x14
 
 .Ldo_neon:
-	ldp	x8,x12,[x16],#16	// inp[2:3] (or zero)
-	ldp	x9,x13,[x16],#48
+	ldp	x8,x12,[PTR(16)],#16	// inp[2:3] (or zero)
+	ldp	x9,x13,[PTR(16)],#48
 
 	lsl	x3,x3,#24
-	add	x15,x0,#48
+	add	PTR(15),PTR(0),#48
 
 #ifdef	__AARCH64EB__
 	rev	x8,x8
@@ -437,12 +440,12 @@ poly1305_blocks_neon:
 	fmov	d17,x10
 	fmov	d18,x12
 
-	ldp	x8,x12,[x1],#16	// inp[0:1]
-	ldp	x9,x13,[x1],#48
+	ldp	x8,x12,[PTR(1)],#16	// inp[0:1]
+	ldp	x9,x13,[PTR(1)],#48
 
-	ld1	{v0.4s,v1.4s,v2.4s,v3.4s},[x15],#64
-	ld1	{v4.4s,v5.4s,v6.4s,v7.4s},[x15],#64
-	ld1	{v8.4s},[x15]
+	ld1	{v0.4s,v1.4s,v2.4s,v3.4s},[PTR(15)],#64
+	ld1	{v4.4s,v5.4s,v6.4s,v7.4s},[PTR(15)],#64
+	ld1	{v8.4s},[PTR(15)]
 
 #ifdef	__AARCH64EB__
 	rev	x8,x8
@@ -498,12 +501,12 @@ poly1305_blocks_neon:
 
 	subs	x2,x2,#64
 	umull	v23.2d,v14.2s,v7.s[2]
-	csel	x16,x17,x16,lo
+	csel	PTR(16),PTR(17),PTR(16),lo
 	umull	v22.2d,v14.2s,v5.s[2]
 	umull	v21.2d,v14.2s,v3.s[2]
-	ldp	x8,x12,[x16],#16	// inp[2:3] (or zero)
+	ldp	x8,x12,[PTR(16)],#16	// inp[2:3] (or zero)
 	umull	v20.2d,v14.2s,v1.s[2]
-	ldp	x9,x13,[x16],#48
+	ldp	x9,x13,[PTR(16)],#48
 	umull	v19.2d,v14.2s,v0.s[2]
 #ifdef	__AARCH64EB__
 	rev	x8,x8
@@ -564,9 +567,9 @@ poly1305_blocks_neon:
 	add	v9.2s,v9.2s,v24.2s
 	fmov	d18,x12
 	umlal	v22.2d,v11.2s,v1.s[0]
-	ldp	x8,x12,[x1],#16	// inp[0:1]
+	ldp	x8,x12,[PTR(1)],#16	// inp[0:1]
 	umlal	v19.2d,v11.2s,v6.s[0]
-	ldp	x9,x13,[x1],#48
+	ldp	x9,x13,[PTR(1)],#48
 	umlal	v23.2d,v11.2s,v3.s[0]
 	umlal	v20.2d,v11.2s,v8.s[0]
 	umlal	v21.2d,v11.2s,v0.s[0]
@@ -761,13 +764,13 @@ poly1305_blocks_neon:
 	// horizontal add
 
 	addp	v22.2d,v22.2d,v22.2d
-	ldp	d8,d9,[sp,#16]		// meet ABI requirements
+	ldp	d8,d9,[PTRN(sp),#2*PTR_WIDTH]	// meet ABI requirements
 	addp	v19.2d,v19.2d,v19.2d
-	ldp	d10,d11,[sp,#32]
+	ldp	d10,d11,[PTRN(sp),#2*PTR_WIDTH+16]
 	addp	v23.2d,v23.2d,v23.2d
-	ldp	d12,d13,[sp,#48]
+	ldp	d12,d13,[PTRN(sp),#2*PTR_WIDTH+32]
 	addp	v20.2d,v20.2d,v20.2d
-	ldp	d14,d15,[sp,#64]
+	ldp	d14,d15,[PTRN(sp),#2*PTR_WIDTH+48]
 	addp	v21.2d,v21.2d,v21.2d
 
 	////////////////////////////////////////////////////////////////
@@ -804,28 +807,29 @@ poly1305_blocks_neon:
 	////////////////////////////////////////////////////////////////
 	// write the result, can be partially reduced
 
-	st4	{v19.s,v20.s,v21.s,v22.s}[0],[x0],#16
-	st1	{v23.s}[0],[x0]
+	st4	{v19.s,v20.s,v21.s,v22.s}[0],[PTR(0)],#16
+	st1	{v23.s}[0],[PTR(0)]
 
 .Lno_data_neon:
-	ldr	x29,[sp],#80
+	ldr	PTR(29),[PTRN(sp)],#(2*PTR_WIDTH+64)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	poly1305_blocks_neon,.-poly1305_blocks_neon
 
 .type	poly1305_emit_neon,%function
+.type	.Lpoly1305_emit_neon,%function
 .align	5
 poly1305_emit_neon:
 .Lpoly1305_emit_neon:
 	// The symbol .Lpoly1305_emit_neon is not a .globl symbol
 	// but a pointer to it is returned by poly1305_init
 	AARCH64_VALID_CALL_TARGET
-	ldr	x17,[x0,#24]
+	ldr	x17,[PTR(0),#24]
 	cbz	x17,poly1305_emit
 
-	ldp	w10,w11,[x0]		// load hash value base 2^26
-	ldp	w12,w13,[x0,#8]
-	ldr	w14,[x0,#16]
+	ldp	w10,w11,[PTR(0)]		// load hash value base 2^26
+	ldp	w12,w13,[PTR(0),#8]
+	ldr	w14,[PTR(0),#16]
 
 	add	x4,x10,x11,lsl#26	// base 2^26 -> base 2^64
 	lsr	x5,x12,#12
@@ -836,7 +840,7 @@ poly1305_emit_neon:
 	adds	x5,x5,x14,lsl#40
 	adc	x6,x6,xzr		// can be partially reduced...
 
-	ldp	x10,x11,[x2]	// load nonce
+	ldp	x10,x11,[PTR(2)]	// load nonce
 
 	and	x12,x6,#-4		// ... so reduce
 	add	x12,x12,x6,lsr#2
@@ -864,7 +868,7 @@ poly1305_emit_neon:
 	rev	x4,x4			// flip output bytes
 	rev	x5,x5
 #endif
-	stp	x4,x5,[x1]		// write result
+	stp	x4,x5,[PTR(1)]		// write result
 
 	ret
 .size	poly1305_emit_neon,.-poly1305_emit_neon

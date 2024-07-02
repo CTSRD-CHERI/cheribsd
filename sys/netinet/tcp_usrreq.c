@@ -1918,7 +1918,7 @@ copyin_tls_enable(struct sockopt *sopt, struct tls_enable *tls)
 	int error;
 
 	if (sopt->sopt_valsize == sizeof(tls_v0)) {
-		error = sooptcopyin(sopt, &tls_v0, sizeof(tls_v0),
+		error = sooptcopyincap(sopt, &tls_v0, sizeof(tls_v0),
 		    sizeof(tls_v0));
 		if (error)
 			return (error);
@@ -1937,7 +1937,7 @@ copyin_tls_enable(struct sockopt *sopt, struct tls_enable *tls)
 		return (0);
 	}
 
-	return (sooptcopyin(sopt, tls, sizeof(*tls), sizeof(*tls)));
+	return (sooptcopyincap(sopt, tls, sizeof(*tls), sizeof(*tls)));
 }
 #endif
 
@@ -2305,7 +2305,7 @@ unlock_and_done:
 			break;
 		case TCP_RXTLS_ENABLE:
 			INP_WUNLOCK(inp);
-			error = sooptcopyin(sopt, &tls, sizeof(tls),
+			error = sooptcopyincap(sopt, &tls, sizeof(tls),
 			    sizeof(tls));
 			if (error)
 				break;

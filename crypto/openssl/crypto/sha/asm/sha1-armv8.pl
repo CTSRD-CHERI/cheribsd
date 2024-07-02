@@ -47,7 +47,7 @@ open OUT,"| \"$^X\" $xlate $flavour \"$output\""
     or die "can't call $xlate: $1";
 *STDOUT=*OUT;
 
-($ctx,$inp,$num)=("x0","x1","x2");
+($ctx,$inp,$num)=("PTR(0)","PTR(1)","x2");
 @Xw=map("w$_",(3..17,19));
 @Xx=map("x$_",(3..17,19));
 @V=($A,$B,$C,$D,$E)=map("w$_",(20..24));
@@ -188,19 +188,19 @@ $code.=<<___;
 .align	6
 sha1_block_data_order:
 	AARCH64_VALID_CALL_TARGET
-	adrp	x16,OPENSSL_armcap_P
-	ldr	w16,[x16,#:lo12:OPENSSL_armcap_P]
+	adrp	PTR(16),OPENSSL_armcap_P
+	ldr	w16,[PTR(16),#:lo12:OPENSSL_armcap_P]
 	tst	w16,#ARMV8_SHA1
 	b.ne	.Lv8_entry
 
 	// Armv8.3-A PAuth: even though x30 is pushed to stack it is not popped later.
-	stp	x29,x30,[sp,#-96]!
-	add	x29,sp,#0
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	stp	x23,x24,[sp,#48]
-	stp	x25,x26,[sp,#64]
-	stp	x27,x28,[sp,#80]
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(12*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
+	stp	PTR(25),PTR(26),[PTRN(sp),#(8*PTR_WIDTH)]
+	stp	PTR(27),PTR(28),[PTRN(sp),#(10*PTR_WIDTH)]
 
 	ldp	$A,$B,[$ctx]
 	ldp	$C,$D,[$ctx,#8]
@@ -234,12 +234,12 @@ $code.=<<___;
 	str	$E,[$ctx,#16]
 	cbnz	$num,.Loop
 
-	ldp	x19,x20,[sp,#16]
-	ldp	x21,x22,[sp,#32]
-	ldp	x23,x24,[sp,#48]
-	ldp	x25,x26,[sp,#64]
-	ldp	x27,x28,[sp,#80]
-	ldr	x29,[sp],#96
+	ldp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	ldp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	ldp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
+	ldp	PTR(25),PTR(26),[PTRN(sp),#(8*PTR_WIDTH)]
+	ldp	PTR(27),PTR(28),[PTRN(sp),#(10*PTR_WIDTH)]
+	ldr	PTR(29),[PTRN(sp)],#(12*PTR_WIDTH)
 	ret
 .size	sha1_block_data_order,.-sha1_block_data_order
 ___
@@ -256,15 +256,15 @@ $code.=<<___;
 sha1_block_armv8:
 .Lv8_entry:
 	// Armv8.3-A PAuth: even though x30 is pushed to stack it is not popped later.
-	stp	x29,x30,[sp,#-16]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 
-	adr	x4,.Lconst
+	adr	PTR(4),.Lconst
 	eor	$E,$E,$E
 	ld1.32	{$ABCD},[$ctx],#16
 	ld1.32	{$E}[0],[$ctx]
 	sub	$ctx,$ctx,#16
-	ld1.32	{@Kxx[0]-@Kxx[3]},[x4]
+	ld1.32	{@Kxx[0]-@Kxx[3]},[PTR(4)]
 
 .Loop_hw:
 	ld1	{@MSG[0]-@MSG[3]},[$inp],#64
@@ -316,7 +316,7 @@ $code.=<<___;
 	st1.32	{$ABCD},[$ctx],#16
 	st1.32	{$E}[0],[$ctx]
 
-	ldr	x29,[sp],#16
+	ldr	PTR(29),[PTRN(sp)],#(2*PTR_WIDTH)
 	ret
 .size	sha1_block_armv8,.-sha1_block_armv8
 .align	6

@@ -3017,19 +3017,32 @@ sooptcopyin(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
 	if (valsize > len)
 		sopt->sopt_valsize = valsize = len;
 
-	if (sopt->sopt_td != NULL) {
+	if (sopt->sopt_td != NULL)
+		return (copyin(sopt->sopt_val, buf, valsize));
+
+	bcopynocap((__cheri_fromcap void *)sopt->sopt_val, buf, valsize);
+	return (0);
+}
+
 #if __has_feature(capabilities)
-		if (sopt->sopt_dir == SOPT_SETCAP ||
-		    sopt->sopt_dir == SOPT_GETCAP)
-			return (copyincap(sopt->sopt_val, buf, valsize));
-		else
-#endif
-			return (copyin(sopt->sopt_val, buf, valsize));
-	}
+/* Version of sooptcopyin that preserves tags. */
+int
+sooptcopyincap(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
+{
+	size_t	valsize;
+
+	if ((valsize = sopt->sopt_valsize) < minlen)
+		return EINVAL;
+	if (valsize > len)
+		sopt->sopt_valsize = valsize = len;
+
+	if (sopt->sopt_td != NULL)
+		return (copyincap(sopt->sopt_val, buf, valsize));
 
 	bcopy((__cheri_fromcap void *)sopt->sopt_val, buf, valsize);
 	return (0);
 }
+#endif
 
 /*
  * Kernel version of setsockopt(2).
@@ -3211,16 +3224,8 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 				    tmpmac.m_buflen);
 			} else
 #endif
-			{
-#if __has_feature(capabilities)
-				sopt->sopt_dir = SOPT_SETCAP;
-#endif
-				error = sooptcopyin(sopt, &extmac,
+				error = sooptcopyincap(sopt, &extmac,
 				    sizeof extmac, sizeof extmac);
-#if __has_feature(capabilities)
-				sopt->sopt_dir = SOPT_SET;
-#endif
-			}
 			if (error)
 				goto bad;
 			error = mac_setsockopt_label(sopt->sopt_td->td_ucred,
@@ -3288,15 +3293,10 @@ sooptcopyout(struct sockopt *sopt, const void *buf, size_t len)
 	valsize = min(len, sopt->sopt_valsize);
 	sopt->sopt_valsize = valsize;
 	if (sopt->sopt_val != NULL) {
-		if (sopt->sopt_td != NULL) {
-#if __has_feature(capabilities)
-			KASSERT(sopt->sopt_dir != SOPT_GETCAP &&
-			   sopt->sopt_dir != SOPT_SETCAP,
-			   ("exporting capabilities not supproted"));
-#endif
+		if (sopt->sopt_td != NULL)
 			error = copyout(buf, sopt->sopt_val, valsize);
-		} else
-			bcopy(buf, (__cheri_fromcap void *)sopt->sopt_val,
+		else
+			bcopynocap(buf, (__cheri_fromcap void *)sopt->sopt_val,
 			    valsize);
 	}
 	return (error);
@@ -3438,16 +3438,8 @@ integer:
 				    tmpmac.m_buflen);
 			} else
 #endif
-			{
-#if __has_feature(capabilities)
-				sopt->sopt_dir = SOPT_GETCAP;
-#endif
-				error = sooptcopyin(sopt, &extmac,
-				    sizeof extmac, sizeof extmac);
-#if __has_feature(capabilities)
-				sopt->sopt_dir = SOPT_GET;
-#endif
-			}
+				error = sooptcopyincap(sopt, &extmac,
+				    sizeof(extmac), sizeof(extmac));
 			if (error)
 				goto bad;
 			error = mac_getsockopt_label(sopt->sopt_td->td_ucred,
@@ -3477,16 +3469,8 @@ integer:
 				    tmpmac.m_buflen);
 			} else
 #endif
-			{
-#if __has_feature(capabilities)
-				sopt->sopt_dir = SOPT_GETCAP;
-#endif
-				error = sooptcopyin(sopt, &extmac,
-				    sizeof extmac, sizeof extmac);
-#if __has_feature(capabilities)
-				sopt->sopt_dir = SOPT_GET;
-#endif
-			}
+				error = sooptcopyincap(sopt, &extmac,
+				    sizeof(extmac), sizeof(extmac));
 			if (error)
 				goto bad;
 			error = mac_getsockopt_peerlabel(

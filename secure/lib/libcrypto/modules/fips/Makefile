@@ -14,7 +14,7 @@ SRCS+=	provider_core.c provider_predefined.c \
 SRCS+=	cpuid.c ctype.c
 .if defined(ASM_aarch64)
 SRCS+=	arm64cpuid.S armcap.c
-ACFLAGS.arm64cpuid.S=	-march=armv8-a+crypto
+ACFLAGS.arm64cpuid.S=	${CFLAGS_CRYPTO}
 .elif defined(ASM_amd64)
 SRCS+=	x86_64cpuid.S
 .elif defined(ASM_arm)
@@ -35,7 +35,7 @@ SRCS+=	mem_clr.c
 SRCS+=	aes_cfb.c aes_ecb.c aes_ige.c aes_misc.c aes_ofb.c aes_wrap.c
 .if defined(ASM_aarch64)
 SRCS+=	aes_cbc.c aes_core.c aesv8-armx.S vpaes-armv8.S
-ACFLAGS.aesv8-armx.S=	-march=armv8-a+crypto
+ACFLAGS.aesv8-armx.S=	${CFLAGS_CRYPTO}
 .elif defined(ASM_amd64)
 SRCS+=	aes-x86_64.S aesni-mb-x86_64.S aesni-sha1-x86_64.S
 SRCS+=	aesni-sha256-x86_64.S aesni-x86_64.S bsaes-x86_64.S vpaes-x86_64.S
@@ -155,7 +155,8 @@ SRCS+=	cbc128.c ctr128.c cfb128.c ofb128.c gcm128.c ccm128.c xts128.c
 SRCS+=	wrap128.c
 .if defined(ASM_aarch64)
 SRCS+=	ghashv8-armx.S aes-gcm-armv8_64.S
-ACFLAGS.ghashv8-armx.S=	-march=armv8-a+crypto
+ACFLAGS.ghashv8-armx.S=	${CFLAGS_CRYPTO}
+ACFLAGS.aes-gcm-armv8_64.S=	${CFLAGS_CRYPTO}
 .elif defined(ASM_amd64)
 SRCS+=	aesni-gcm-x86_64.S ghash-x86_64.S
 .elif defined(ASM_arm)
