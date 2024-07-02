@@ -27,6 +27,10 @@
 
 #include <machine/ifunc.h>
 
+#ifdef CHERIBSD_DYNAMIC_TESTS
+#include <cheribsdtest_dynamic.h>
+#endif
+
 #include "cheribsdtest.h"
 
 static int
@@ -50,3 +54,17 @@ CHERIBSDTEST(call_ifunc, "Check that IFUNCs can be called")
 
 	cheribsdtest_success();
 }
+
+#ifdef CHERIBSD_DYNAMIC_TESTS
+CHERIBSDTEST(dynamic_ifunc,
+    "Check that IFUNCs can be called from another object")
+{
+	int ret;
+
+	ret = cheribsdtest_dynamic_ifunc();
+	if (ret != 42)
+		cheribsdtest_failure_errx("Returned %d, expected 42", ret);
+
+	cheribsdtest_success();
+}
+#endif

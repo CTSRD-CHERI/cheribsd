@@ -1,5 +1,12 @@
 /*-
- * Copyright (c) 2021 Jessica Clarke
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright (c) 2024 Dapeng Gao
+ *
+ * This software was developed by the University of Cambridge Computer
+ * Laboratory (Department of Computer Science and Technology) under Innovate
+ * UK project 105694, "Digital Security by Design (DSbD) Technology Platform
+ * Prototype".
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,14 +30,19 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _CHERIBSDTEST_DYNAMIC_H_
-#define _CHERIBSDTEST_DYNAMIC_H_
+#include <sys/types.h>
 
-void cheribsdtest_dynamic_dummy_func(void);
-void (*cheribsdtest_dynamic_get_dummy_fptr(void))(void);
+#include <machine/ifunc.h>
 
-void * __capability cheribsdtest_dynamic_identity_cap(void * __capability cap);
+#include "cheribsdtest_dynamic.h"
 
-int cheribsdtest_dynamic_ifunc(void);
+static int
+cheribsdtest_dynamic_ifunc_impl(void)
+{
+        return (42);
+}
 
-#endif
+DEFINE_UIFUNC(, int, cheribsdtest_dynamic_ifunc, (void))
+{
+	return (cheribsdtest_dynamic_ifunc_impl);
+}
