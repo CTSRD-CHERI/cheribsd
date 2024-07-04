@@ -99,6 +99,7 @@ ASSYM(TF_A, offsetof(struct trapframe, tf_a));
 ASSYM(TF_SEPC, offsetof(struct trapframe, tf_sepc));
 #if __has_feature(capabilities)
 ASSYM(TF_DDC, offsetof(struct trapframe, tf_ddc));
+ASSYM(TF_TIDC, offsetof(struct trapframe, tf_tidc));
 #endif
 ASSYM(TF_STVAL, offsetof(struct trapframe, tf_stval));
 ASSYM(TF_SCAUSE, offsetof(struct trapframe, tf_scause));
