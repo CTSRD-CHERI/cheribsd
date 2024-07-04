@@ -65,6 +65,7 @@ struct capregs {
 	__uintcap_t	cp_ca[8];
 	__uintcap_t	cp_sepcc;
 	__uintcap_t	cp_ddc;
+	__uintcap_t	cp_tidc;
 	__register_t	cp_sstatus;
 	__register_t	cp_pad;
 };
