@@ -682,6 +682,9 @@ ENTRY(fork_trampoline)
 	clc	ct0, (TF_DDC)(csp)
 	cspecialw ddc, ct0
 
+	clc	ct0, (TF_TIDC)(csp)
+	cspecialw 3, ct0	/* utidc */
+
 	/* Restore exception program counter */
 	clc	ct0, (TF_SEPC)(csp)
 	cspecialw sepcc, ct0
