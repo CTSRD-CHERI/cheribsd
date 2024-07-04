@@ -72,8 +72,8 @@ static void get_fpcontext(struct thread *td, mcontext_t *mcp);
 static void set_fpcontext(struct thread *td, mcontext_t *mcp);
 
 #if __has_feature(capabilities)
-_Static_assert(sizeof(mcontext_t) == 1152, "mcontext_t size incorrect");
-_Static_assert(sizeof(ucontext_t) == 1248, "ucontext_t size incorrect");
+_Static_assert(sizeof(mcontext_t) == 1168, "mcontext_t size incorrect");
+_Static_assert(sizeof(ucontext_t) == 1264, "ucontext_t size incorrect");
 _Static_assert(sizeof(siginfo_t) == 112, "siginfo_t size incorrect");
 #else
 _Static_assert(sizeof(mcontext_t) == 864, "mcontext_t size incorrect");
@@ -235,6 +235,8 @@ _Static_assert(offsetof(struct trapframe, tf_sepc) ==
     offsetof(struct capreg, sepcc), "sepcc mismatch");
 _Static_assert(offsetof(struct trapframe, tf_ddc) ==
     offsetof(struct capreg, ddc), "ddc mismatch");
+_Static_assert(offsetof(struct trapframe, tf_tidc) ==
+    offsetof(struct capreg, tidc), "tidc mismatch");
 
 int
 fill_capregs(struct thread *td, struct capreg *regs)
@@ -418,6 +420,7 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
 	mcp->mc_capregs.cp_ctp = tf->tf_tp;
 	mcp->mc_capregs.cp_sepcc = tf->tf_sepc;
 	mcp->mc_capregs.cp_ddc = tf->tf_ddc;
+	mcp->mc_capregs.cp_tidc = tf->tf_tidc;
 	mcp->mc_capregs.cp_sstatus = tf->tf_sstatus;
 #else
 	memcpy(mcp->mc_gpregs.gp_t, tf->tf_t, sizeof(mcp->mc_gpregs.gp_t));
@@ -478,6 +481,7 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 	tf->tf_gp = mcp->mc_capregs.cp_cgp;
 	tf->tf_sepc = mcp->mc_capregs.cp_sepcc;
 	tf->tf_ddc = mcp->mc_capregs.cp_ddc;
+	tf->tf_tidc = mcp->mc_capregs.cp_tidc;
 	tf->tf_sstatus = mcp->mc_capregs.cp_sstatus;
 #else
 	memcpy(tf->tf_t, mcp->mc_gpregs.gp_t, sizeof(tf->tf_t));
