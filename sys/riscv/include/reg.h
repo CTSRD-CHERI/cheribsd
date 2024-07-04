@@ -69,6 +69,7 @@ struct capreg {
 	__uintcap_t ca[8];	/* function arguments */
 	__uintcap_t sepcc;	/* exception program counter */
 	__uintcap_t ddc;
+	__uintcap_t tidc;
 	__uint64_t tagmask;
 	__uint64_t pad;
 };

@@ -43,6 +43,8 @@
 #define	QEMU_SET_QTRACE		101	/* Set (or clear) QEMU tracing. */
 #define	QEMU_SET_QTRACE_USER	102	/* Set (or clear) QEMU per-thread user-only tracing mode */
 
+#define	RISCV_SET_UTIDC         103     /* Set user thread id capability */
+
 #ifndef _KERNEL
 
 __BEGIN_DECLS
