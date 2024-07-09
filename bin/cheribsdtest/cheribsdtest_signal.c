@@ -364,7 +364,16 @@ CHERIBSDTEST(kernel_pointer_store_sigsegv,
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGSEGV,
     .ct_si_code = SEGV_MAPERR,
-    .ct_si_trapno = TRAPNO_STORE_PF)
+#ifdef __riscv
+    /*
+     * CHERI RISC-V doesn't differentiate loads from stores when
+     * emulating SIGSEGV.
+     */
+    .ct_si_trapno = TRAPNO_LOAD_PF
+#else
+    .ct_si_trapno = TRAPNO_STORE_PF
+#endif
+	)
 {
 	char *p = (void *)(uintptr_t)VM_MIN_KERNEL_ADDRESS;
 
