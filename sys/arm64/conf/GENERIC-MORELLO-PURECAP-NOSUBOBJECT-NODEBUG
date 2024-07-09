@@ -1,0 +1,4 @@
+include	"GENERIC-MORELLO-PURECAP-NOSUBOBJECT"
+include	"../../conf/std.nodebug"
+
+ident	GENERIC-MORELLO-PURECAP-NOSUBOBJECT-NODEBUG
