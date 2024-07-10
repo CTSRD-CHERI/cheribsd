@@ -152,10 +152,9 @@ struct trusted_frame {
 	 */
 	stk_table_index callee;
 	/*
-	 * Number of return value registers, encoded in enum tramp_ret_args
+	 * Number of return value registers with architecture-specific encoding
 	 */
-	uint8_t ret_args : 2;
-	uint16_t reserved : 14;
+	uint16_t n_rets;
 	/*
 	 * This field contains the code address in the trampoline that the
 	 * callee should return to. This is used by trampolines to detect cross-
