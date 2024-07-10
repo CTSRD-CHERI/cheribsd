@@ -511,7 +511,7 @@ SYSCTL_BOOL(_vm_cheri_revoke, OID_AUTO, avoid_faults, CTLFLAG_RWTUN,
 static bool
 vm_cheri_revoke_skip_fault(vm_object_t object)
 {
-	return (cheri_revoke_avoid_faults && (object->flags == OBJ_SWAP) != 0 &&
+	return (cheri_revoke_avoid_faults && (object->flags & OBJ_SWAP) != 0 &&
 	    pctrie_is_empty(&object->un_pager.swp.swp_blks) &&
 	    (object->backing_object == NULL ||
 	    (object->backing_object->flags & OBJ_HASCAP) == 0));
