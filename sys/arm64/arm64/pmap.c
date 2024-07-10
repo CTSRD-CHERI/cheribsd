@@ -530,10 +530,10 @@ pagecopy_cleartags(void *s, void *d)
 }
 
 static __inline void
-pmap_set_cap_bits(pd_entry_t *table, uint64_t bits)
+pmap_set_cap_bits(pt_entry_t *ent, uint64_t bits)
 {
-	pmap_clear_bits(table,ATTR_CAP_MASK);
-	pmap_set_bits(table,bits);
+	pmap_clear_bits(ent,ATTR_CAP_MASK);
+	pmap_set_bits(ent,bits);
 }
 #endif
 
@@ -896,10 +896,16 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m,
 	}
 
 #if __has_feature(capabilities)
-	val |= pmap_pte_cr(pmap, va, prot);
+	uint64_t cap_val = ATTR_CAP_NONE;
+	if (prot & VM_PROT_READ_CAP) {
+		if ((va < VM_MAX_USER_ADDRESS) && (pmap->pm_stage == PM_STAGE1))
+			cap_val = pmap->flags.uclg ? ATTR_CAP_GEN1 : ATTR_CAP_GEN0;
+		else
+			cap_val = ATTR_CAP_GEN0;
+	}
 
 	VM_PAGE_ASSERT_PGA_CAPMETA_PMAP_ENTER(m, prot);
-	if ((prot & VM_PROT_WRITE) != 0 && (prot & VM_PROT_WRITE_CAP) != 0) {
+	if (prot & VM_PROT_WRITE_CAP) {
 		KASSERT((vm_page_astate_load(m).flags & PGA_CAPSTORE) != 0,
 		    ("%s: page %p does not have CAPSTORE set", __func__, m));
 
@@ -914,10 +920,11 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m,
 		 * but it's not required.
 		 */
 		if (pmap->pm_stage == PM_STAGE1 && va < VM_MAX_USER_ADDRESS)
-			val |= ATTR_CDBM;
+			cap_val = pmap->flags.uclg ? ATTR_CAP_GEN1 : ATTR_CAP_GEN0;
 		else
-			val |= ATTR_SC;
+			cap_val = ATTR_CAP_GEN0;
 	}
+	val |= cap_val;
 #endif
 
 	return (val);

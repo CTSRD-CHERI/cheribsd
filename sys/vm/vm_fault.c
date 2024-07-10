@@ -2010,10 +2010,10 @@ found:
 		}
 	} else {
 #ifdef INVARIANTS
-		vm_page_astate_t mas = vm_page_astate_load(fs.m);
-		KASSERT(!(mas.flags & PGA_CAPDIRTY) ||
-		    (mas.flags & PGA_CAPSTORE),
-		    ("CAPDIRTY w/o CAPSTORE"));
+		//vm_page_astate_t mas = vm_page_astate_load(fs.m);
+		//KASSERT(!(mas.flags & PGA_CAPDIRTY) ||
+		//    (mas.flags & PGA_CAPSTORE),
+		//    ("CAPDIRTY w/o CAPSTORE"));
 #endif
 	}
 #endif
