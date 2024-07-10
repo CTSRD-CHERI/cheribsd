@@ -528,6 +528,13 @@ pagecopy_cleartags(void *s, void *d)
 	for (i = 0; i < PAGE_SIZE / sizeof(*dst); i++)
 		*dst++ = cheri_cleartag(*src++);
 }
+
+static __inline void
+pmap_set_cap_bits(pd_entry_t *table, uint64_t bits)
+{
+	pmap_clear_bits(table,ATTR_CAP_MASK);
+	pmap_set_bits(table,bits);
+}
 #endif
 
 static __inline pd_entry_t *
@@ -892,7 +899,7 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m,
 	val |= pmap_pte_cr(pmap, va, prot);
 
 	VM_PAGE_ASSERT_PGA_CAPMETA_PMAP_ENTER(m, prot);
-	if ((prot & VM_PROT_WRITE_CAP) != 0) {
+	if ((prot & VM_PROT_WRITE) != 0 && (prot & VM_PROT_WRITE_CAP) != 0) {
 		KASSERT((vm_page_astate_load(m).flags & PGA_CAPSTORE) != 0,
 		    ("%s: page %p does not have CAPSTORE set", __func__, m));
 
@@ -5399,9 +5406,9 @@ static inline void
 pmap_update_pte_clg(pmap_t pmap, pt_entry_t *pte)
 {
 	if (pmap->flags.uclg) {
-		pmap_set_bits(pte, ATTR_LC_GEN_MASK);
+		pmap_set_cap_bits(pte, ATTR_CAP_GEN1);
 	} else {
-		pmap_clear_bits(pte, ATTR_LC_GEN_MASK);
+		pmap_set_cap_bits(pte, ATTR_CAP_GEN0);
 	}
 }
 
