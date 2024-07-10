@@ -3848,7 +3848,7 @@ je_allocm(void **ptr, size_t *rsize, size_t size, int flags) {
 	if (rsize != NULL) {
 		*rsize = isalloc(tsdn_fetch(), p);
 	}
-	*ptr = BOUND_PTR(p, size);
+	*ptr = p;
 	return ALLOCM_SUCCESS;
 }
 
@@ -3873,7 +3873,7 @@ je_rallocm(void **ptr, size_t *rsize, size_t size, size_t extra, int flags) {
 	} else {
 		void *p = je_rallocx(*ptr, size+extra, flags);
 		if (p != NULL) {
-			*ptr = BOUND_PTR(p, size+extra);
+			*ptr = p;
 			ret = ALLOCM_SUCCESS;
 		} else {
 			ret = ALLOCM_ERR_OOM;
