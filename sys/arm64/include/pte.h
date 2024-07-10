@@ -62,9 +62,9 @@ typedef	uint64_t	pt_entry_t;		/* page table entry */
 #define	ATTR_LC_GEN1		(3UL << 61)
 #define	ATTR_SC			(1UL << 60)
 #define	ATTR_CDBM		(1UL << 59)
-#define ATTR_CAP_MASK       (7UL << 59)
+#define ATTR_CAP_MASK      (15UL << 59)
 #define ATTR_CAP_NONE       (0UL << 59)
-#define ATTR_CAP_DIRTYABLE  (1UL << 59)
+#define ATTR_CAP_DIRTYABLE  (5UL << 59)
 #define ATTR_CAP_GEN0      (11UL << 59)
 #define ATTR_CAP_GEN1      (15UL << 59)
 #endif
