@@ -3770,7 +3770,7 @@ je_malloc_usable_size(JEMALLOC_USABLE_SIZE_CONST void *ptr) {
 			ret = isalloc(tsdn, ptr);
 		}
 #ifdef __CHERI_PURE_CAPABILITY__
-		if (ret != 0) {
+		if (ret != 0 && cheri_gettag(ptr)) {
 			ret = MIN(ret, cheri_getlen(ptr));
 		}
 #endif
