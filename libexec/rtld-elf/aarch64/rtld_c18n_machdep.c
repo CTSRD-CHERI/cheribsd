@@ -100,10 +100,10 @@ tramp_compile(char **entry, const struct tramp_data *data)
 		*PATCH_INS(PATCH_OFF(tramp, name)) |= _value;		\
 	} while (0)
 
-#define	PATCH_ADD(tramp, name, value)					\
+#define	PATCH_UBFM(tramp, name, value)					\
 	do {								\
 		uint32_t _value = (value);				\
-		_value = ((_value & 0xfff) << 10);			\
+		_value = ((_value & 0x3f) << 10);			\
 		*PATCH_INS(PATCH_OFF(tramp, name)) |= _value;		\
 	} while (0)
 
@@ -145,11 +145,18 @@ tramp_compile(char **entry, const struct tramp_data *data)
 	size += offsetof(struct tramp_header, entry);
 
 	COPY(push_frame);
-	PATCH_LDR_IMM(push_frame, target, target_off);
 	PATCH_MOV(push_frame, cid, cid_to_index(data->defobj->compart_id).val);
-	PATCH_ADD(push_frame, ret_args,
-	    data->sig.valid ? data->sig.ret_args << (16 - 12) : 0);
 	landing_off = PATCH_OFF(push_frame, landing);
+	/*
+	 * The number of return value registers is encoded as follows:
+	 * - TWO:	0b1111
+	 * - ONE:	0b0111
+	 * - NONE:	0b0011
+	 * - INDIRECT:	0b0001
+	 */
+	PATCH_UBFM(push_frame, n_rets,
+	    51 - (data->sig.valid ? data->sig.ret_args : 0));
+	PATCH_LDR_IMM(push_frame, target, target_off);
 
 	if (executive || ld_compartment_unwind != NULL)
 		COPY(update_fp);

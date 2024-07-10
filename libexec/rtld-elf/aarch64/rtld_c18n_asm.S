@@ -148,8 +148,8 @@ ENTRY(create_untrusted_stk)
 	/*
 	 * NON-STANDARD CALLING CONVENTION
 	 *
-	 * c19: Callee to be tail-called
-	 * w20: Callee's compartment ID
+	 * w19: Callee's compartment ID
+	 * c26: Callee to be tail-called
 	 *
 	 * The function resolves the callee's stack, installs it, and tail-calls
 	 * the callee.
@@ -167,7 +167,7 @@ ENTRY(create_untrusted_stk)
 
 	save_arguments
 
-	mov	w0, w20
+	mov	w0, w19
 	bl	resolve_untrusted_stk_impl
 	mov	c10, c0
 
@@ -189,14 +189,14 @@ ENTRY(create_untrusted_stk)
 	mov	x18, xzr
 
 	/*
-	 * All callee-saved registers are safe except c23
+	 * All callee-saved registers are safe except c28
 	 */
-	mov	x23, xzr
+	mov	x28, xzr
 
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	br	x19
+	br	x26
 #else
-	brr	c19
+	brr	c26
 #endif
 END(create_untrusted_stk)
 
@@ -280,85 +280,95 @@ TRAMP(tramp_push_frame)
 	 * Store the caller's current stack top in the stack lookup table.
 	 */
 	str	c15, [STACK_TABLE_C, w12, uxtw #0]
-
-	stp	c19, c20, [TRUSTED_STACK_C, #(-CAP_WIDTH * TRUSTED_FRAME_SIZE + CAP_WIDTH * 2)]
-	/*
-	 * Load the target capability.
-	 */
-1:	ldr	c19, #0		/* To be patched at runtime */
-	/*
-	 * Get the callee's compartment ID.
-	 */
-2:	movz	w20, #0			/* To be patched at runtime */
 	/*
 	 * Get the length of the stack lookup table.
 	 */
 	gclen	x13, STACK_TABLE_C
-	/*
-	 * Use subs instead of cmp to clear a register tag.
-	 */
-	subs	x14, x13, x20
 
+	stp	c19, c20, [TRUSTED_STACK_C, #(-CAP_WIDTH * TRUSTED_FRAME_SIZE + CAP_WIDTH * 2)]
 	/*
-	 * Save the callee's current stack top and old stack top.
+	 * Get the callee's compartment ID.
 	 */
-	stp	c15, c16, [TRUSTED_STACK_C, #(-CAP_WIDTH * TRUSTED_FRAME_SIZE + TRUSTED_FRAME_SP_OSP)]
+1:	movz	w19, #0			/* To be patched at runtime */
+	/*
+	 * Use subs instead of cmp to clear a capability tag.
+	 */
+	subs	x14, x13, x19
 	/*
 	 * If the stack lookup table index is out-of-bounds, set it to zero.
 	 */
-	csel	w16, w20, wzr, hi
+	csel	w20, w19, wzr, hi
 	/*
 	 * Load the callee's stack if the stack lookup table index is within
 	 * bounds. Otherwise the resolver will be loaded.
 	 */
-	ldr	c17, [STACK_TABLE_C, w16, uxtw #0]
+	ldr	c17, [STACK_TABLE_C, w20, uxtw #0]
+	/*
+	 * The tag of the return capability is set iff the condition flag is cs.
+	 */
+	chktgd	c30
+	/*
+	 * Compare the return address to the landing address. The call is a
+	 * tail-call iff the condition flag is eq.
+	 */
+	ccmp	x30, x11, #0, cs
 
 	stp	c21, c22, [TRUSTED_STACK_C, #(-CAP_WIDTH * TRUSTED_FRAME_SIZE + CAP_WIDTH * 4)]
 	/*
+	 * Get the offset to the next trusted frame.
+	 */
+	mov	x21, #-(CAP_WIDTH * TRUSTED_FRAME_SIZE)
+	/*
+	 * If the call is a tail-call, do not bump the trusted stack pointer.
+	 */
+	csel	x22, xzr, x21, eq
+
+	stp	c23, c24, [TRUSTED_STACK_C, #(-CAP_WIDTH * TRUSTED_FRAME_SIZE + CAP_WIDTH * 6)]
+	/*
+	 * If the call is a tail-call, get the number of return value registers
+	 * of the caller.
+	 */
+	csinv	x23, x10, xzr, eq
+	/*
+	 * Get the landing address.
+	 */
+2:	adr	c24, #0			/* To be patched at runtime */
+
+	stp	c25, c26, [TRUSTED_STACK_C, #(-CAP_WIDTH * TRUSTED_FRAME_SIZE + CAP_WIDTH * 8)]
+	/*
+	 * Compute the number of return value registers. If the call is a tail-
+	 * call, it is the minimum of that of the caller and the callee.
+	 */
+3:	ubfm	x25, x23, #48, #0	/* To be patched at runtime */
+	/*
+	 * Load the target capability.
+	 */
+4:	ldr	c26, #0			/* To be patched at runtime */
+
+	/*
+	 * Save the caller's current stack top and old stack top.
+	 */
+	stp	c15, c16, [TRUSTED_STACK_C, #(-CAP_WIDTH * TRUSTED_FRAME_SIZE + TRUSTED_FRAME_SP_OSP)]
+	/*
+	 * Get the permissions of the loaded value.
+	 */
+	gcperm	x16, c17
+
+	stp	c27, c28, [TRUSTED_STACK_C, #(-CAP_WIDTH * TRUSTED_FRAME_SIZE + CAP_WIDTH * 10)]
+	/*
 	 * The resolver is loaded iff the condition flag is ne.
 	 */
-	gcperm	x21, c17
-	ands	x22, x21, #(1 << 15)
+	ands	x27, x16, #(1 << 15)
 	/*
 	 * If the resolver is loaded, keep the stack unchanged. Otherwise,
 	 * install the callee's stack.
 	 */
 	csel	c15, c15, c17, ne
-
-	stp	c23, c24, [TRUSTED_STACK_C, #(-CAP_WIDTH * TRUSTED_FRAME_SIZE + CAP_WIDTH * 6)]
 	/*
 	 * If the resolver is loaded, set the branch target to it. Otherwise,
 	 * install the callee.
 	 */
-	csel	c23, c17, c19, ne
-	/*
-	 * Compare the return address to the landing address.
-	 */
-	subs	x24, x30, x11
-
-	stp	c25, c26, [TRUSTED_STACK_C, #(-CAP_WIDTH * TRUSTED_FRAME_SIZE + CAP_WIDTH * 8)]
-	/*
-	 * Get the tag of the return capability.
-	 */
-	gctag	x25, c30
-	/*
-	 * Get the offset to the next trusted frame.
-	 */
-	mov	x26, #-(CAP_WIDTH * TRUSTED_FRAME_SIZE)
-	/*
-	 * The call is a tail-call iff the condition flag is eq.
-	 */
-	ccmp	x25, #1, #0, eq
-
-	stp	c27, c28, [TRUSTED_STACK_C, #(-CAP_WIDTH * TRUSTED_FRAME_SIZE + CAP_WIDTH * 10)]
-	/*
-	 * If the call is a tail call, do not bump the trusted stack pointer.
-	 */
-	csel	x27, xzr, x26, eq
-	/*
-	 * Get the landing address.
-	 */
-3:	adr	c28, #0			/* To be patched at runtime */
+	csel	c28, c17, c26, ne
 
 	/*
 	 * Save the address of the previous trusted frame and the compartment ID
@@ -374,21 +384,22 @@ TRAMP(tramp_push_frame)
 	 * information about the callee regardless of whether the call is a
 	 * tail-call.
 	 */
-	add	TRUSTED_STACK_C, TRUSTED_STACK_C, x27
+	add	TRUSTED_STACK_C, TRUSTED_STACK_C, x22
 
 	/*
 	 * Save the landing address.
 	 */
-	str	x28, [TRUSTED_STACK_C, #TRUSTED_FRAME_LANDING]
+	str	x24, [TRUSTED_STACK_C, #TRUSTED_FRAME_LANDING]
 	/*
-	 * Get the number of return value registers.
+	 * Combine the caller's compartment ID and the number of return value
+	 * registers.
 	 */
-4:	add	w28, w20, #0, lsl #12	/* To be patched at runtime */
+	orr	w24, w19, w25, lsl #16
 	/*
 	 * Save the callee's compartment ID and the number of return value
 	 * registers.
 	 */
-	str	w28, [TRUSTED_STACK_C, #TRUSTED_FRAME_CALLEE]
+	str	w24, [TRUSTED_STACK_C, #TRUSTED_FRAME_CALLEE]
 
 	msr	TRUSTED_STACK, TRUSTED_STACK_C
 
@@ -402,10 +413,10 @@ TRAMP(tramp_push_frame)
 	set_untrusted_stk	c15
 TRAMPEND(tramp_push_frame)
 
-PATCH_POINT(tramp_push_frame, target, 1b)
-PATCH_POINT(tramp_push_frame, cid, 2b)
-PATCH_POINT(tramp_push_frame, landing, 3b)
-PATCH_POINT(tramp_push_frame, ret_args, 4b)
+PATCH_POINT(tramp_push_frame, cid, 1b)
+PATCH_POINT(tramp_push_frame, landing, 2b)
+PATCH_POINT(tramp_push_frame, n_rets, 3b)
+PATCH_POINT(tramp_push_frame, target, 4b)
 
 /*
  * Save the address of the current frame to c29 so that unwinders can locate it.
@@ -421,6 +432,7 @@ TRAMPEND(tramp_update_fp_untagged)
 
 TRAMP(tramp_count_entry)
 1:	ldr	c24, #0		/* To be patched at runtime */
+	movz	w25, #1
 	stadd	w25, [c24]
 TRAMPEND(tramp_count_entry)
 
@@ -444,9 +456,9 @@ PATCH_POINT(tramp_call_hook, header, 3b)
 
 TRAMP(tramp_invoke_exe)
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	blr	x23
+	blr	x28
 #else
-	blr	c23
+	blr	c28
 #endif
 TRAMPEND(tramp_invoke_exe)
 
@@ -473,9 +485,9 @@ TRAMP(tramp_invoke_res)
 	clrtag	TRUSTED_STACK_C, TRUSTED_STACK_C
 
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	blr	x23
+	blr	x28
 #else
-	blrr	c23
+	blrr	c28
 #endif
 TRAMPEND(tramp_invoke_res)
 
@@ -530,22 +542,22 @@ TRAMP(tramp_pop_frame)
 	str	c12, [STACK_TABLE_C, w10, uxtw #0]
 
 	/*
-	 * Extract the number of return value registers.
+	 * Extract the number of return value registers. The number of return
+	 * value registers is encoded as follows:
+	 * - TWO:	0b11
+	 * - ONE:	0b01
+	 * - NONE:	0b00
+	 * - INDIRECT:	0b00
 	 */
-	ubfx	x13, x10, #48, #2
+	ubfx	x13, x10, #50, #2
 	/*
-	 * Clear unused return value registers. The registers to clear are
-	 * encoded as follows:
-	 * - None:	0b00
-	 * - c1 only:	0b01
-	 * - c0 and c1:	0b1x
-	 * Use comparison and csel to avoid branching.
+	 * Clear unused return value registers.
 	 *
-	 * Use subs instead of cmp to clear a register tag.
+	 * Use subs instead of cmp to clear a capability tag.
 	 */
 	subs	w14, w13, #0b01
-	csel	c0, czr, c0, hi
-	csel	c1, czr, c1, hs
+	csel	c0, czr, c0, lo
+	csel	c1, czr, c1, ls
 
 	/*
 	 * Clear temporary registers.
