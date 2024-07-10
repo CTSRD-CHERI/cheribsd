@@ -2273,7 +2273,13 @@ imalloc_init_check(static_opts_t *sopts, dynamic_opts_t *dopts) {
 JEMALLOC_ALWAYS_INLINE int
 imalloc(static_opts_t *sopts, dynamic_opts_t *dopts) {
 	int ret;
-	size_t size;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * Ask for the usable size so that we can bound the returned pointer.
+	 */
+	sopts->usize = true;
+#endif
 
 	/*
 	 * CHERI: Rounding of allocation size occurs in imalloc_body()
@@ -2301,9 +2307,7 @@ imalloc(static_opts_t *sopts, dynamic_opts_t *dopts) {
 		ret = imalloc_body(sopts, dopts, tsd);
 	}
 	if (ret == 0) {
-		/* overflow causes imalloc_body to return ENOMEM */
-		(void)compute_size_with_overflow(1, dopts, &size);
-		*dopts->result = BOUND_PTR(*dopts->result, size);
+		*dopts->result = BOUND_PTR(*dopts->result, dopts->usize);
 	}
 	return ret;
 }
@@ -2428,7 +2432,7 @@ je_malloc(size_t size) {
 		LOG("core.malloc.exit", "result: %p", ret);
 
 		/* Fastpath success */
-		return BOUND_PTR(ret, size);
+		return BOUND_PTR(ret, sz_index2size(ind));
 	}
 
 	return malloc_default(size);
@@ -2791,7 +2795,7 @@ je_realloc(void *ptr, size_t arg_size) {
 	check_entry_exit_locking(tsdn);
 
 	LOG("core.realloc.exit", "result: %p", ret);
-	return (BOUND_PTR(ret, size));
+	return (BOUND_PTR(ret, sz_s2u(size)));
 }
 
 JEMALLOC_NOINLINE
@@ -3325,7 +3329,7 @@ je_rallocx(void *ptr, size_t size, int flags) {
 	check_entry_exit_locking(tsd_tsdn(tsd));
 
 	LOG("core.rallocx.exit", "result: %p", p);
-	return BOUND_PTR(p, size);
+	return BOUND_PTR(p, sz_s2u(size));
 label_oom:
 	if (config_xmalloc && unlikely(opt_xmalloc)) {
 		malloc_write("<jemalloc>: Error in rallocx(): out of memory\n");
