@@ -132,7 +132,7 @@ typedef	uint64_t	pt_entry_t;		/* page table entry */
  * ATTR_CAP_RW as a single operand, so separate orr instructions are
  * required for ATTR_CAP_RW.
  */
-#define	ATTR_CAP_RW	(ATTR_LC_ENABLED | ATTR_SC)
+#define	ATTR_CAP_RW	ATTR_CAP_GEN0
 #endif
 #define	ATTR_DEFAULT	(ATTR_AF | ATTR_SH(ATTR_SH_IS))
 
