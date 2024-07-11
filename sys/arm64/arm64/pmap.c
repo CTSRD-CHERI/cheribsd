@@ -5533,7 +5533,7 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 #if VM_NRESERVLEVEL > 0
 	pd_entry_t *l2, l2e;
 #endif
-	pt_entry_t *pte, tpte, exppte;
+	pt_entry_t *pte, tpte/*, exppte*/;
 	vm_page_t m;
 	int lvl;
 
@@ -5613,7 +5613,8 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 				 * store-release below, and so we're going to
 				 * scan the page again anyway.
 				 */
-				pmap_clear_bits(pte, ATTR_SC);
+				//pmap_clear_bits(pte, ATTR_SC);
+				pmap_set_cap_bits(pte, ATTR_CAP_DIRTYABLE);
 			} else if (tpte & ATTR_CDBM) {
 				/*
 				 * PTE CAP-DIRTYABLE -> CAP-CLEAN
@@ -5639,9 +5640,9 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 				 * entry as cap-load-faulting, but we don't have
 				 * such a mechanism on Morello.
 				 */
-				exppte = tpte;
-				pmap_fcmpset(pte, &exppte, exppte & ~ATTR_CDBM);
-
+				//exppte = tpte;
+				//pmap_fcmpset(pte, &exppte, exppte & ~ATTR_CDBM);
+				pmap_set_cap_bits(pte, ATTR_CAP_NONE);
 			} else if (flags & PMAP_CAPLOADGEN_NONEWMAPS) {
 				/* No new mappings possible */
 				vm_page_astate_t mas = vm_page_astate_load(m);
@@ -5686,7 +5687,8 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 			 * probably doesn't get set often ough to merit.
 			 */
 			if ((tpte & ATTR_CDBM) && !(tpte & ATTR_SC)) {
-				pmap_set_bits(pte, ATTR_SC);
+				//pmap_set_bits(pte, ATTR_SC);
+				pmap_set_cap_bits(pte, (pmap->flags.uclg ? ATTR_CAP_GEN1 : ATTR_CAP_GEN0));
 			}
 		}
 
