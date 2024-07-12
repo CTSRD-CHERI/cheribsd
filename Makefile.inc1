@@ -175,7 +175,6 @@ KNOWN_ARCHES?=	aarch64/arm64 \
 		aarch64c/arm64 \
 		aarch64cb/arm64 \
 		amd64 \
-		armv6/arm \
 		armv7/arm \
 		i386 \
 		powerpc \
