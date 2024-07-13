@@ -2381,7 +2381,7 @@ err:
 	return (result);
 }
 
-#if VM_NRESERVLEVEL == 1
+#if VM_NRESERVLEVEL <= 1
 static const int aslr_pages_rnd_64[2] = {0x1000, 0x10};
 static const int aslr_pages_rnd_32[2] = {0x100, 0x4};
 #elif VM_NRESERVLEVEL == 2
