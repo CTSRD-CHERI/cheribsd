@@ -145,6 +145,10 @@ int	updateiov(const struct uio *uiop, struct iovec * __capability iovp);
 
 #else /* !_KERNEL */
 
+#if defined(_FORTIFY_SOURCE) && _FORTIFY_SOURCE > 0
+#include <ssp/uio.h>
+#endif
+
 __BEGIN_DECLS
 ssize_t	readv(int, const struct iovec *, int);
 ssize_t	writev(int, const struct iovec *, int);
