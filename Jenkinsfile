@@ -291,7 +291,7 @@ selectedArchitectures.each { suffix ->
         }
         def cheribuildArgs = [
                 "'--cheribsd/build-options=${extraBuildOptions}'",
-                '--cheribsd/default-kernel-abi=hybrid',
+                '--cheribsd/default-kernel-abi=purecap',
                 '--keep-install-dir',
                 '--install-prefix=/rootfs',
                 '--cheribsd/build-lib32',
