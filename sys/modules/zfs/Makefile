@@ -1,4 +1,3 @@
-
 SRCDIR=${ZFSTOP}/module
 INCDIR=${ZFSTOP}/include
 

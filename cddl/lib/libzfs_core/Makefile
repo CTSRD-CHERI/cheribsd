@@ -1,4 +1,3 @@
-
 .PATH: ${ZFSTOP}/lib/libzfs_core
 .PATH: ${ZFSTOP}/include
 .PATH: ${ZFSTOP}/include/os/freebsd/zfs

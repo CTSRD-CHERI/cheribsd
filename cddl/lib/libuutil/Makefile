@@ -1,4 +1,3 @@
-
 .PATH: ${ZFSTOP}/lib/libuutil
 
 PACKAGE=	zfs

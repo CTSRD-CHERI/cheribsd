@@ -1,4 +1,3 @@
-
 .PATH: ${ZFSTOP}/cmd
 
 PACKAGE=	zfs

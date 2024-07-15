@@ -1,4 +1,3 @@
-
 .include <src.opts.mk>
 
 .PATH: ${LIBC_SRCTOP}/db/hash

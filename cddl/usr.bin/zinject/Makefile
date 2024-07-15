@@ -1,4 +1,3 @@
-
 .PATH: ${ZFSTOP}/cmd/zinject
 .PATH: ${ZFSTOP}/man/man8
 

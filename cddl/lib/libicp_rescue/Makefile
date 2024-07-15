@@ -1,4 +1,3 @@
-
 .PATH: ${ZFSTOP}/module/icp
 
 PACKAGE=	utilities

@@ -1,4 +1,3 @@
-
 .PATH: ${ZFSTOP}/module/icp
 .PATH: ${ZFSTOP}/module/zcommon
 .PATH: ${ZFSTOP}/lib/libzfs

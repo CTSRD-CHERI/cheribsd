@@ -1,4 +1,3 @@
-
 .PATH: ${ZFSTOP}/module/avl
 
 PACKAGE=	zfs

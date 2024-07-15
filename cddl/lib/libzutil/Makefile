@@ -1,4 +1,3 @@
-
 .PATH: ${ZFSTOP}/lib/libzutil
 .PATH: ${ZFSTOP}/lib/libzutil/os/freebsd
 .PATH: ${ZFSTOP}/module/os/freebsd/zfs

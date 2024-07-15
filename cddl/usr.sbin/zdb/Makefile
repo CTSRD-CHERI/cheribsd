@@ -1,4 +1,3 @@
-
 .PATH: ${ZFSTOP}/cmd/zdb
 .PATH: ${ZFSTOP}/man/man8
 

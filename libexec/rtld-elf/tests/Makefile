@@ -1,4 +1,3 @@
-
 .include <src.opts.mk>
 
 SUBDIR+=	libpythagoras libdeep libval libval2 target

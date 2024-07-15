@@ -1,4 +1,3 @@
-
 .PATH: ${LIBC_SRCTOP}/rpc ${LIBC_SRCTOP}/.
 .ifndef CHERI_LIB_C18N
 CONFS+=	rpc/netconfig rpc/rpc

@@ -1,4 +1,3 @@
-
 .PATH: ${ZFSTOP}/lib/libzfsbootenv
 .PATH: ${ZFSTOP}/include
 

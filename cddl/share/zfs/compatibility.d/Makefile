@@ -1,4 +1,3 @@
-
 .PATH: ${ZFSTOP}/cmd/zpool/compatibility.d
 
 PACKAGE=	zfs
