@@ -25,21 +25,21 @@
  * SUCH DAMAGE.
  */
 
-#define	C18N_VARIANT	_c18n
-#include "rtld_start.S"
-#undef C18N_VARIANT
+#ifndef __MACHINE_C18N_H__
+#define	__MACHINE_C18N_H__
 
-.section	.rodata
-.globl	c18n_default_policy
-.type	c18n_default_policy,%object
-c18n_default_policy:
-	.incbin "rtld_c18n_policy.txt"
-c18n_default_policy_end:
-.size	c18n_default_policy, . - c18n_default_policy
+struct dl_c18n_compart_state {
+	void *fp;	/* s0 */
+	void *pc;
+	/*
+	 * s1 to s11
+	 */
+	void *regs[11];
+	/*
+	 * INVARIANT: This field contains the top of the caller's stack when the
+	 * caller made the call.
+	 */
+	void *sp;
+};
 
-.globl	c18n_default_policy_size
-.type	c18n_default_policy_size,%object
-.align	3
-c18n_default_policy_size:
-	.quad	c18n_default_policy_end - c18n_default_policy
-.size	c18n_default_policy_size, . - c18n_default_policy_size
+#endif /* __MACHINE_C18N_H__ */

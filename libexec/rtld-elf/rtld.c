@@ -6369,7 +6369,9 @@ c18n_assign_plt_compartments(Obj_Entry *obj)
 static const void *
 c18n_clear_pcc_perms(const char *name, const void *pcc)
 {
+#ifdef HAS_RESTRICTED_MODE
 	pcc = cheri_clearperm(pcc, CHERI_PERM_EXECUTIVE);
+#endif
 	if (strcmp("libsys.so.7", name) != 0)
 		pcc = cheri_clearperm(pcc, CHERI_PERM_SYSCALL);
 	return (pcc);

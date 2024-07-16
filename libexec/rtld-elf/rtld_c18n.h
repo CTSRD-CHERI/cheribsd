@@ -58,6 +58,9 @@
 #define	c18n_unseal_subset(cap, sealer, super)	cheri_unseal(cap, sealer)
 #endif
 
+#ifndef HAS_RESTRICTED_MODE
+extern uintptr_t sealer_tidc;
+#endif
 #ifndef CHERI_LIB_C18N_NO_OTYPE
 extern uintptr_t sealer_pltgot;
 #endif
