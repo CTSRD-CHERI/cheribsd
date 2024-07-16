@@ -32,10 +32,37 @@
 
 #include <stdint.h>
 
+#ifdef __aarch64__
+#define	HAS_RESTRICTED_MODE
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+#define	USE_RESTRICTED_MODE
+#endif
+#endif
+
 /*
  * Global symbols
  */
+#ifdef CHERI_LIB_C18N_NO_OTYPE
+#define	c18n_seal(cap, sealer)			cap
+#define	c18n_unseal(cap, sealer)		cap
+#define	c18n_seal_subset(cap, sealer)		cheri_sealentry(cap)
+#define	c18n_unseal_subset(cap, sealer, super)	(			\
+	cheri_gettag(cap) ?						\
+	cheri_buildcap(super, (uintptr_t)cheri_unseal(cap, 0)) :	\
+	cap								\
+)
+#else
+#define	c18n_seal(cap, sealer)			cheri_seal(cap, sealer)
+#define	c18n_unseal(cap, sealer)		cheri_unseal(cap, sealer)
+#define	c18n_seal_subset(cap, sealer)		cheri_seal(cap, sealer)
+#define	c18n_unseal_subset(cap, sealer, super)	cheri_unseal(cap, sealer)
+#endif
+
+#ifdef HAS_RESTRICTED_MODE
 extern size_t c18n_code_perm_clear;
+#else
+extern uintptr_t sealer_tidc;
+#endif
 #ifndef CHERI_LIB_C18N_NO_OTYPE
 extern uintptr_t sealer_pltgot;
 #endif

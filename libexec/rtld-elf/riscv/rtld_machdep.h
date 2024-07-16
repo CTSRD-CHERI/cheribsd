@@ -82,11 +82,29 @@ uintptr_t reloc_jmpslot(uintptr_t *where, uintptr_t target,
 #define call_init_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)
 
 /* TODO: Per-function captable/PLT/FNDESC support (needs CGP) */
+#ifdef CHERI_LIB_C18N
+#define call_init_array_pointer(_obj, _target)				\
+	(((InitArrFunc)tramp_intern(NULL, &(struct tramp_data) {	\
+		.target = (void *)(_target).value,			\
+		.defobj = _obj,						\
+		.sig = (struct func_sig) { .valid = true,		\
+		    .reg_args = 3, .mem_args = false, .ret_args = NONE }\
+	}))(main_argc, main_argv, environ))
+
+#define call_fini_array_pointer(_obj, _target)				\
+	(((InitFunc)tramp_intern(NULL, &(struct tramp_data) {		\
+		.target = (void *)(_target).value,			\
+		.defobj = _obj,						\
+		.sig = (struct func_sig) { .valid = true,		\
+		    .reg_args = 0, .mem_args = false, .ret_args = NONE }\
+	}))())
+#else
 #define call_init_array_pointer(obj, target)				\
 	(((InitArrFunc)(target).value)(main_argc, main_argv, environ))
 
 #define call_fini_array_pointer(obj, target)				\
 	(((InitFunc)(target).value)())
+#endif
 
 #else /* __CHERI_PURE_CAPABILITY__ */
 
