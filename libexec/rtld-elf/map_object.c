@@ -278,7 +278,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	    base_addr, mapsize, PROT_NONE | PROT_MAX(_PROT_ALL), base_flags);
     mapbase = mmap(base_addr, mapsize, PROT_NONE | PROT_MAX(_PROT_ALL),
 	base_flags, -1, 0);
-#ifdef CHERI_LIB_C18N
+#ifdef HAS_RESTRICTED_MODE
     mapbase = cheri_clearperm(mapbase, c18n_code_perm_clear);
 #endif
     if (mapbase == MAP_FAILED) {

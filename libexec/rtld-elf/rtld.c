@@ -873,7 +873,9 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	ld_elf_hints_default = _PATH_ELF_HINTS_C18N;
 	ld_path_libmap_conf = _PATH_LIBMAP_CONF_C18N;
 	ld_standard_library_path = STANDARD_LIBRARY_PATH_C18N;
+#ifdef HAS_RESTRICTED_MODE
 	c18n_code_perm_clear = CHERI_PERM_EXECUTIVE;
+#endif
     }
 #endif
 
@@ -921,7 +923,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	assert(aux_info[AT_PHENT]->a_un.a_val == sizeof(Elf_Phdr));
 	assert(aux_info[AT_ENTRY] != NULL);
 	imgentry = (dlfunc_t) aux_info[AT_ENTRY]->a_un.a_ptr;
-#ifdef CHERI_LIB_C18N
+#ifdef HAS_RESTRICTED_MODE
 	imgentry = (dlfunc_t) cheri_clearperm(imgentry, c18n_code_perm_clear);
 #endif
 	dbg("Values from kernel:\n\tAT_PHDR=" PTR_FMT "\n"

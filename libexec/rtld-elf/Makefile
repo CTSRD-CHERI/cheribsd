@@ -29,7 +29,7 @@ MK_UBSAN=	no
 
 .include <bsd.compat.pre.mk>
 
-.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
+.if ${MACHINE_ABI:Mpurecap} && (${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "riscv")
 CHERI_LIB_C18N=
 .endif
 

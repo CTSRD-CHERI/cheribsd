@@ -38,7 +38,7 @@ c18n_default_policy_end:
 .size	c18n_default_policy, . - c18n_default_policy
 
 .globl	c18n_default_policy_size
-.type	c18n_default_policy_size,#object
+.type	c18n_default_policy_size,%object
 .align	3
 c18n_default_policy_size:
 	.quad	c18n_default_policy_end - c18n_default_policy
