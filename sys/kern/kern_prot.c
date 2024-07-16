@@ -825,14 +825,14 @@ int
 user_setgroups(struct thread *td, int gidsetsize,
     const gid_t * __capability gidset)
 {
-	gid_t smallgroups[XU_NGROUPS];
+	gid_t smallgroups[CRED_SMALLGROUPS_NB];
 	gid_t *groups;
 	int error;
 
 	if (gidsetsize > ngroups_max + 1 || gidsetsize < 0)
 		return (EINVAL);
 
-	if (gidsetsize > XU_NGROUPS)
+	if (gidsetsize > CRED_SMALLGROUPS_NB)
 		groups = malloc(gidsetsize * sizeof(gid_t), M_TEMP, M_WAITOK);
 	else
 		groups = smallgroups;
@@ -841,7 +841,7 @@ user_setgroups(struct thread *td, int gidsetsize,
 	if (error == 0)
 		error = kern_setgroups(td, gidsetsize, groups);
 
-	if (gidsetsize > XU_NGROUPS)
+	if (gidsetsize > CRED_SMALLGROUPS_NB)
 		free(groups, M_TEMP);
 	return (error);
 }
