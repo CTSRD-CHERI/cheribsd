@@ -1,5 +1,8 @@
 SRCS+=	__vdso_gettc.c \
 	sched_getcpu_gen.c
 
-MDASM=	cerror.S \
-	vfork.S
+MDASM=	cerror.S
+
+.ifndef CHERI_LIB_C18N
+MDASM+=	vfork.S
+.endif

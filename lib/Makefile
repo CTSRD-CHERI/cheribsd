@@ -114,7 +114,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	ncurses \
 	nss_tacplus
 
-.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
+.if ${MACHINE_ABI:Mpurecap} && (${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "riscv")
 .if !defined(COMPAT_LIBCOMPAT) || ${COMPAT_LIBCOMPAT} == "64CB"
 SUBDIR+=	c18n
 .endif

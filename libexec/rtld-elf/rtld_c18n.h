@@ -32,11 +32,22 @@
 
 #include <stdint.h>
 
+#ifdef __aarch64__
+#define	HAS_RESTRICTED_MODE
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+#define	USE_RESTRICTED_MODE
+#endif
+#endif
+
 /*
  * Global symbols
  */
-extern size_t c18n_code_perm_clear;
 extern uintptr_t sealer_pltgot, sealer_tramp;
+#ifdef HAS_RESTRICTED_MODE
+extern size_t c18n_code_perm_clear;
+#else
+extern uintptr_t sealer_tidc;
+#endif
 extern const char *ld_compartment_utrace;
 extern const char *ld_compartment_policy;
 extern const char *ld_compartment_overhead;
