@@ -58,6 +58,18 @@ ENTRY(setjmp)
 	csc	ct0, (0 * 16)(ca0)
 	csc	csp, (1 * 16)(ca0)
 	cincoffset ca0, ca0, (2 * 16)
+#ifdef CHERI_LIB_C18N
+	/* Store the trusted stack pointer */
+	cincoffset csp, csp, -(2 * 16)
+	csc	ca0, (0 * 16)(csp)
+	csc	cra, (1 * 16)(csp)
+	clgc	ct0, _C_LABEL(dl_c18n_get_trusted_stk)
+	cjalr	ct0
+	clc	ca0, (0 * 16)(csp)
+	clc	cra, (1 * 16)(csp)
+	cincoffset csp, csp, (2 * 16)
+	cincoffset ca0, ca0, 16
+#endif
 
 	/* Store the general purpose registers and ra */
 	csc	cs0, (0 * 16)(ca0)
@@ -168,6 +180,22 @@ ENTRY(longjmp)
 	cld	t1, (ct1)
 	bne	t0, t1, botch
 
+#ifdef CHERI_LIB_C18N
+	/*
+	 * Preserve the arguments in callee-saved registers instead of pushing
+	 * them onto the stack because stack unwinding will switch the stack.
+	 */
+	cmove	cs0, ca0
+	cmove	cs1, ca1
+	/* Pass the target untrusted stack pointer and trusted stack pointer */
+	clc	ca0, (1 * 16)(cs0)
+	clc	ca1, (2 * 16)(cs0)
+	clgc	ct0, _C_LABEL(dl_c18n_unwind_trusted_stk)
+	cjalr	ct0
+	cmove	ca0, cs0
+	cmove	ca1, cs1
+#endif
+
 	cincoffset csp, csp, -(3 * 16)
 	csc	ca0, (0 * 16)(csp)
 	csc	cra, (1 * 16)(csp)
@@ -188,6 +216,10 @@ ENTRY(longjmp)
 	/* Restore the stack pointer */
 	clc	csp, 16(ca0)
 	cincoffset ca0, ca0, (2 * 16)
+#ifdef CHERI_LIB_C18N
+	/* Skip the trusted stack pointer */
+	cincoffset ca0, ca0, 16
+#endif
 
 	/* Restore the general purpose registers and ra */
 	clc	cs0, (0 * 16)(ca0)

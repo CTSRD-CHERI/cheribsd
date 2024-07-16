@@ -33,7 +33,7 @@ MK_UBSAN=	no
 # one cannot turn it back on.
 FORTIFY_SOURCE=	0
 
-.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
+.if ${MACHINE_ABI:Mpurecap} && (${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "riscv")
 CHERI_LIB_C18N=
 .endif
 

@@ -55,6 +55,8 @@
  * _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
  */
 
+#ifndef C18N_VARIANT
+
 ENTRY(.rtld_start)
 #ifdef __CHERI_PURE_CAPABILITY__
 	cmove	cs0, ca0				/* Put aux in a callee-saved register */
@@ -226,3 +228,5 @@ ENTRY(_rtld_bind_start)
 	JR_PTR	PTR(t0)
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(_rtld_bind_start)
+
+#endif /* C18N_VARIANT */
