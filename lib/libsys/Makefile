@@ -30,7 +30,7 @@ CFLAGS+=-I${LIBSYS_SRCTOP}/${LIBC_ARCH}
 CFLAGS+=-I${LIBC_SRCTOP}/${LIBC_ARCH}
 
 .PATH: ${LIBC_SRCTOP}/string
-SRCS+=	memcpy.c memset.c strlcpy.c
+SOBJS+=	memcpy.pico memset.pico strlcpy.pico
 
 CLEANFILES+=tags
 INSTALL_PIC_ARCHIVE=
