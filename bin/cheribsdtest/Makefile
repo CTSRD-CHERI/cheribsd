@@ -13,7 +13,7 @@ SUBDIR+=	purecap \
 		purecap-dynamic-mt \
 		purecap-mt
 
-.if ${MACHINE_CPUARCH} == "aarch64" && ${MACHINE_ABI:Mpurecap}
+.if ${MACHINE_ABI:Mpurecap}
 SUBDIR+=	mt-c18n
 .endif
 .endif
