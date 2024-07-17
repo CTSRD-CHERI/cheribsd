@@ -172,7 +172,7 @@ check_initreg_code(void * __capability c)
 		    (CHERI_PERMS_SWALL & ~CHERI_PERM_SW_VMEM));
 
 	/* Check that the raw permission bits match the kernel header: */
-#if defined(CHERIBSD_C18N_TESTS) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
+#if defined(CHERIBSD_C18N_TESTS) && defined(__aarch64__) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	if (v != (CHERI_CAP_USER_CODE_PERMS & ~CHERI_PERM_EXECUTIVE))
 		cheribsdtest_failure_errx("perms %jx (expected %jx)", v,
 		    (uintmax_t)(CHERI_CAP_USER_CODE_PERMS & ~CHERI_PERM_EXECUTIVE));
