@@ -147,6 +147,10 @@ extern struct cheribsdtest_child_state *ccsp;
 #endif
 #endif
 
+#ifndef XFAIL_C18N_FPTR_CANON_INT
+#define	XFAIL_C18N_FPTR_CANON_INT	NULL
+#endif
+
 struct cheri_test {
 	const char	*ct_name;
 	const char	*ct_desc;

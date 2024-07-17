@@ -53,4 +53,9 @@
 
 #define	CAPREG_PCC(capreg)	((capreg)->sepcc)
 
+#ifdef CHERIBSD_C18N_TESTS
+#define	 XFAIL_C18N_FPTR_CANON_INT \
+    "on RISC-V, function pointers are not canonical when relocated as integer addresses"
+#endif
+
 #endif /* !_CHERIBSDTEST_H_ */
