@@ -67,7 +67,7 @@
 #define	PROC_WXMAP_STATUS	22	/* query W^X */
 #define	PROC_CHERI_REVOKE_CTL	1001	/* en/dis CHERI revocation */
 #define	PROC_CHERI_REVOKE_STATUS 1002	/* query CHERI revocation status */
-#if __has_feature(capabilities) && defined(__aarch64__)
+#if __has_feature(capabilities)
 #define	PROC_CHERI_C18N_CTL	1003	/* en/dis CHERI compartmentalisation */
 #define	PROC_CHERI_C18N_STATUS	1004	/* query CHERI compartmentalisation status */
 #endif
