@@ -948,8 +948,10 @@ pipe_build_write_buffer(struct pipe *wpipe, struct uio *uio)
 	wpipe->pipe_pages.cnt = size;
 
 	IOVEC_ADVANCE(uio->uio_iov, size);
-	if (uio->uio_iov->iov_len == 0)
+	if (uio->uio_iov->iov_len == 0) {
 		uio->uio_iov++;
+		uio->uio_iovcnt--;
+	}
 	uio->uio_resid -= size;
 	uio->uio_offset += size;
 	return (0);
