@@ -403,6 +403,7 @@ static struct ld_env_var_desc ld_env_vars[] = {
 	LD_ENV_DESC(TRACE_LOADED_OBJECTS_ALL, false),
 	LD_ENV_DESC(SHOW_AUXV, false),
 	LD_ENV_DESC(STATIC_TLS_EXTRA, false),
+	LD_ENV_DESC(NO_DL_ITERATE_PHDR_AFTER_FORK, false),
 	LD_ENV_DESC(SKIP_INIT_FUNCS, true),
 #ifdef CHERI_LIB_C18N
 	LD_ENV_DESC(UTRACE_COMPARTMENT, false),
