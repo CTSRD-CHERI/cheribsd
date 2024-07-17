@@ -87,7 +87,8 @@ CHERIBSDTEST(fptr_canon_dlfunc,
 
 CHERIBSDTEST(fptr_canon_int,
     "Check that function pointers are canonical when relocated as integer "
-    "addresses")
+    "addresses",
+    .ct_xfail_reason = XFAIL_C18N_FPTR_CANON_INT)
 {
 	volatile ptraddr_t fptr_int;
 	void (* volatile fptr_dlsym)(void);
