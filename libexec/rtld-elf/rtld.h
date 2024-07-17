@@ -425,6 +425,48 @@ typedef struct Struct_SymLook {
     struct Struct_RtldLockState *lockstate;
 } SymLook;
 
+enum {
+	LD_BIND_NOW = 0,
+	LD_PRELOAD,
+	LD_LIBMAP,
+	LD_LIBRARY_PATH,
+	LD_LIBRARY_PATH_FDS,
+	LD_LIBMAP_DISABLE,
+	LD_BIND_NOT,
+	LD_DEBUG,
+	LD_DEBUG_VERBOSE,
+	LD_DEBUG_CHERI,
+	LD_DEBUG_STATS,
+	LD_DEBUG_CATEGORIES,
+	LD_ELF_HINTS_PATH,
+	LD_LOADFLTR,
+	LD_LIBRARY_PATH_RPATH,
+	LD_PRELOAD_FDS,
+	LD_DYNAMIC_WEAK,
+	LD_TRACE_LOADED_OBJECTS,
+	LD_UTRACE,
+	LD_DUMP_REL_PRE,
+	LD_DUMP_REL_POST,
+	LD_TRACE_LOADED_OBJECTS_PROGNAME,
+	LD_TRACE_LOADED_OBJECTS_FMT1,
+	LD_TRACE_LOADED_OBJECTS_FMT2,
+	LD_TRACE_LOADED_OBJECTS_ALL,
+	LD_SHOW_AUXV,
+	LD_STATIC_TLS_EXTRA,
+	LD_SKIP_INIT_FUNCS,
+#ifdef CHERI_LIB_C18N
+	LD_UTRACE_COMPARTMENT,
+	LD_COMPARTMENT_ENABLE,
+	LD_COMPARTMENT_DISABLE,
+	LD_COMPARTMENT_POLICY,
+	LD_COMPARTMENT_OVERHEAD,
+	LD_COMPARTMENT_SIG,
+	LD_COMPARTMENT_UNWIND,
+	LD_COMPARTMENT_STATS,
+	LD_COMPARTMENT_SWITCH_COUNT,
+#endif
+};
+
 void _rtld_error(const char *, ...) __printflike(1, 2) __exported;
 void rtld_die(void) __dead2;
 #define rtld_fatal(args...)	do { _rtld_error(args); rtld_die(); } while (0)
@@ -506,6 +548,7 @@ __BEGIN_DECLS
 /*
  * Function declarations.
  */
+const char *ld_get_env_var(int idx);
 uintptr_t rtld_round_page(uintptr_t);
 uintptr_t rtld_trunc_page(uintptr_t);
 Elf32_Word elf_hash(const char *);

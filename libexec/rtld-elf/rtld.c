@@ -367,48 +367,6 @@ ld_utrace_log(int event, void *handle, void *mapbase, size_t mapsize,
 	utrace(&ut, sizeof(ut));
 }
 
-enum {
-	LD_BIND_NOW = 0,
-	LD_PRELOAD,
-	LD_LIBMAP,
-	LD_LIBRARY_PATH,
-	LD_LIBRARY_PATH_FDS,
-	LD_LIBMAP_DISABLE,
-	LD_BIND_NOT,
-	LD_DEBUG,
-	LD_DEBUG_VERBOSE,
-	LD_DEBUG_CHERI,
-	LD_DEBUG_STATS,
-	LD_DEBUG_CATEGORIES,
-	LD_ELF_HINTS_PATH,
-	LD_LOADFLTR,
-	LD_LIBRARY_PATH_RPATH,
-	LD_PRELOAD_FDS,
-	LD_DYNAMIC_WEAK,
-	LD_TRACE_LOADED_OBJECTS,
-	LD_UTRACE,
-	LD_DUMP_REL_PRE,
-	LD_DUMP_REL_POST,
-	LD_TRACE_LOADED_OBJECTS_PROGNAME,
-	LD_TRACE_LOADED_OBJECTS_FMT1,
-	LD_TRACE_LOADED_OBJECTS_FMT2,
-	LD_TRACE_LOADED_OBJECTS_ALL,
-	LD_SHOW_AUXV,
-	LD_STATIC_TLS_EXTRA,
-	LD_SKIP_INIT_FUNCS,
-#ifdef CHERI_LIB_C18N
-	LD_UTRACE_COMPARTMENT,
-	LD_COMPARTMENT_ENABLE,
-	LD_COMPARTMENT_DISABLE,
-	LD_COMPARTMENT_POLICY,
-	LD_COMPARTMENT_OVERHEAD,
-	LD_COMPARTMENT_SIG,
-	LD_COMPARTMENT_UNWIND,
-	LD_COMPARTMENT_STATS,
-	LD_COMPARTMENT_SWITCH_COUNT,
-#endif
-};
-
 struct ld_env_var_desc {
 	const char * const n;
 	const char *val;
@@ -459,7 +417,7 @@ static struct ld_env_var_desc ld_env_vars[] = {
 #endif
 };
 
-static const char *
+const char *
 ld_get_env_var(int idx)
 {
 	return (ld_env_vars[idx].val);
