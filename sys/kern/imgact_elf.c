@@ -238,11 +238,7 @@ SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, shared_page, CTLFLAG_RWTUN,
     __XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE))
     ": enable shared page address randomization");
 
-#ifdef __ELF_CHERI
-static int __elfN(sigfastblock) = 0;
-#else
 static int __elfN(sigfastblock) = 1;
-#endif
 SYSCTL_INT(ELF_NODE_OID, OID_AUTO, sigfastblock,
     CTLFLAG_RWTUN, &__elfN(sigfastblock), 0,
     "enable sigfastblock for new processes");
