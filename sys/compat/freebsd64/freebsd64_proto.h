@@ -1521,6 +1521,11 @@ struct freebsd64_getrlimitusage_args {
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 	char res_l_[PADL_(rlim_t *)]; rlim_t * res; char res_r_[PADR_(rlim_t *)];
 };
+struct freebsd64_setcred_args {
+	char flags_l_[PADL_(u_int)]; u_int flags; char flags_r_[PADR_(u_int)];
+	char wcred_l_[PADL_(const struct setcred64 *)]; const struct setcred64 * wcred; char wcred_r_[PADR_(const struct setcred64 *)];
+	char size_l_[PADL_(size_t)]; size_t size; char size_r_[PADR_(size_t)];
+};
 int	freebsd64_read(struct thread *, struct freebsd64_read_args *);
 int	freebsd64_write(struct thread *, struct freebsd64_write_args *);
 int	freebsd64_open(struct thread *, struct freebsd64_open_args *);
@@ -1828,6 +1833,7 @@ int	freebsd64_timerfd_gettime(struct thread *, struct freebsd64_timerfd_gettime_
 int	freebsd64_timerfd_settime(struct thread *, struct freebsd64_timerfd_settime_args *);
 int	freebsd64_kcmp(struct thread *, struct freebsd64_kcmp_args *);
 int	freebsd64_getrlimitusage(struct thread *, struct freebsd64_getrlimitusage_args *);
+int	freebsd64_setcred(struct thread *, struct freebsd64_setcred_args *);
 
 #ifdef COMPAT_43
 
@@ -2402,6 +2408,7 @@ int	freebsd13_freebsd64_swapoff(struct thread *, struct freebsd13_freebsd64_swap
 #define	FREEBSD64_SYS_AUE_freebsd64_timerfd_settime	AUE_TIMERFD
 #define	FREEBSD64_SYS_AUE_freebsd64_kcmp	AUE_NULL
 #define	FREEBSD64_SYS_AUE_freebsd64_getrlimitusage	AUE_NULL
+#define	FREEBSD64_SYS_AUE_freebsd64_setcred	AUE_SETCRED
 
 #undef PAD_
 #undef PADL_

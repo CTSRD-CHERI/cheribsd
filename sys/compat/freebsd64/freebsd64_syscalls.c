@@ -596,4 +596,5 @@ const char *freebsd64_syscallnames[] = {
 	"freebsd64_kcmp",			/* 588 = freebsd64_kcmp */
 	"freebsd64_getrlimitusage",			/* 589 = freebsd64_getrlimitusage */
 	"fchroot",			/* 590 = fchroot */
+	"freebsd64_setcred",			/* 591 = freebsd64_setcred */
 };

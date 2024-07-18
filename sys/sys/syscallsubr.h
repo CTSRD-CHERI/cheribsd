@@ -493,6 +493,8 @@ int	kern_select(struct thread *td, int nd, fd_set * __capability fd_in,
 	    struct timeval *tvp, int abi_nfdbits);
 int	kern_sendit(struct thread *td, int s, struct msghdr *mp, int flags,
 	    struct mbuf *control, enum uio_seg segflg);
+int	kern_setcred(struct thread *const td, const u_int flags,
+	    struct setcred *const wcred, gid_t *preallocated_groups);
 int	kern_setgroups(struct thread *td, int *ngrpp, gid_t *groups);
 int	kern_setitimer(struct thread *, u_int, struct itimerval *,
 	    struct itimerval *);
@@ -723,6 +725,8 @@ int	user_sendit(struct thread *td, int s, struct msghdr *mp, int flags);
 int	user_sendto(struct thread *td, int s, const char * __capability buf,
 	    size_t len, int flags, const struct sockaddr * __capability to,
 	    socklen_t tolen);
+int	user_setcred(struct thread *const td, const u_int flags,
+	    struct setcred *const wcred);
 int	user_setgroups(struct thread *td, int gidsetsize,
 	    const gid_t * __capability gidset);
 int	user_settimeofday(struct thread *td,

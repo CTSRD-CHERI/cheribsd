@@ -1364,6 +1364,32 @@ freebsd64_setlogin(struct thread *td, struct freebsd64_setlogin_args *uap)
 	return (kern_setlogin(td, __USER_CAP_STR(uap->namebuf)));
 }
 
+int
+freebsd64_setcred(struct thread *td, struct freebsd64_setcred_args *uap)
+{
+	struct setcred wcred;
+	struct setcred64 wcred64;
+	int error;
+
+	if (uap->size != sizeof(wcred64))
+		return (EINVAL);
+	error = copyin(__USER_CAP_OBJ(uap->wcred), &wcred64, sizeof(wcred64));
+	if (error != 0)
+		return (error);
+	CP(wcred64, wcred, sc_uid);
+	CP(wcred64, wcred, sc_ruid);
+	CP(wcred64, wcred, sc_svuid);
+	CP(wcred64, wcred, sc_gid);
+	CP(wcred64, wcred, sc_rgid);
+	CP(wcred64, wcred, sc_svgid);
+	CP(wcred64, wcred, sc_supp_groups_nb);
+	wcred.sc_supp_groups = __USER_CAP(wcred64.sc_supp_groups,
+	    wcred64.sc_supp_groups_nb * sizeof(gid_t));
+	wcred.sc_label = __USER_CAP(wcred64.sc_label, sizeof(struct mac64));
+	return (user_setcred(td, uap->flags, &wcred));
+}
+
+
 /*
  * kern_rctl.c
  */

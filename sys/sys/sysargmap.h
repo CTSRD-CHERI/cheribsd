@@ -414,6 +414,7 @@ static int sysargmask[] = {
 	[SYS_kcmp] = (0x0 | 0x8 | 0x10),
 	[SYS_getrlimitusage] = (0x0 | 0x4),
 	[SYS_fchroot] = (0x0),
+	[SYS_setcred] = (0x0 | 0x2),
 };
 
 #endif /* !_SYSARGMAP_H_ */

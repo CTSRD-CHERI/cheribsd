@@ -87,6 +87,7 @@
 #include <sys/timex.h>
 #include <sys/unistd.h>
 #include <sys/ucontext.h>
+#include <sys/ucred.h>
 #include <sys/vnode.h>
 #include <sys/wait.h>
 #include <sys/ipc.h>
@@ -114,6 +115,7 @@
 #endif
 
 #include <security/audit/audit.h>
+#include <security/mac/mac_syscalls.h>
 
 #include <compat/freebsd32/freebsd32_util.h>
 #include <compat/freebsd32/freebsd32.h>
@@ -4010,6 +4012,31 @@ ofreebsd32_sethostid(struct thread *td, struct ofreebsd32_sethostid_args *uap)
 	    sizeof(hostid), NULL, 0));
 }
 #endif
+
+int
+freebsd32_setcred(struct thread *td, struct freebsd32_setcred_args *uap)
+{
+	struct setcred wcred;
+	struct setcred32 wcred32;
+	int error;
+
+	if (uap->size != sizeof(wcred32))
+		return (EINVAL);
+	error = copyin(uap->wcred, &wcred32, sizeof(wcred32));
+	if (error != 0)
+		return (error);
+	CP(wcred32, wcred, sc_uid);
+	CP(wcred32, wcred, sc_ruid);
+	CP(wcred32, wcred, sc_svuid);
+	CP(wcred32, wcred, sc_gid);
+	CP(wcred32, wcred, sc_rgid);
+	CP(wcred32, wcred, sc_svgid);
+	CP(wcred32, wcred, sc_supp_groups_nb);
+	PTRIN_CP(wcred32, wcred, sc_supp_groups);
+	PTRIN_CP(wcred32, wcred, sc_label);
+	return (user_setcred(td, uap->flags, &wcred));
+}
+
 // CHERI CHANGES START
 // {
 //   "updated": 20230509,
