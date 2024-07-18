@@ -1844,7 +1844,7 @@ kern_sigaltstack(struct thread *td, stack_t *ss, stack_t *oss)
 
 #ifdef CHERI_CAPREVOKE
 void
-sigaltstack_cheri_revoke(struct thread *td,
+sig_thread_cheri_revoke(struct thread *td,
     const struct vm_cheri_revoke_cookie *crc)
 {
 	CHERI_REVOKE_STATS_FOR(crst, crc);
@@ -1857,6 +1857,19 @@ sigaltstack_cheri_revoke(struct thread *td,
 			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
 			td->td_sigstk.ss_sp =
 			    (void * __capability)cheri_revoke_cap(sp);
+		}
+	}
+
+	if ((td->td_pflags & TDP_SIGFASTBLOCK) != 0) {
+		uintcap_t sbp = (uintcap_t)td->td_sigblock_ptr;
+
+		if (cheri_gettag(sbp)) {
+			CHERI_REVOKE_STATS_BUMP(crst, caps_found);
+			if (vm_cheri_revoke_test(crc, sbp)) {
+				CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
+				td->td_sigblock_ptr =
+				    (void * __capability)cheri_revoke_cap(sbp);
+			}
 		}
 	}
 }

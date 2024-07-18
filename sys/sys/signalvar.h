@@ -421,7 +421,7 @@ void	trapsignal(struct thread *td, ksiginfo_t *ksi);
 
 #ifdef CHERI_CAPREVOKE
 struct vm_cheri_revoke_cookie;
-void sigaltstack_cheri_revoke(struct thread *,
+void sig_thread_cheri_revoke(struct thread *,
     const struct vm_cheri_revoke_cookie *);
 #endif
 
