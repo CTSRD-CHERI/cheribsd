@@ -643,7 +643,7 @@ fast_out:
 		/* Per-thread kernel hoarders */
 		FOREACH_THREAD_IN_PROC (td->td_proc, ptd) {
 			cheri_revoke_td_frame(ptd, &vmcrc);
-			sigaltstack_cheri_revoke(ptd, &vmcrc);
+			sig_thread_cheri_revoke(ptd, &vmcrc);
 		}
 	}
 
