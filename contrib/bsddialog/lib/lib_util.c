@@ -68,6 +68,8 @@
  * [static] text_properties();
  * [static] text_autosize();
  * [static] text_size();
+ * [static] widget_decor_height(htext, hnotext, bool buttons);
+ * [static] widget_decor_width();
  * [static] widget_min_height(conf, htext, hnotext, bool buttons);
  * [static] widget_min_width(conf, wtext, minw, buttons);
  *          set_widget_size();
@@ -755,23 +757,44 @@ text_size(struct bsddialog_conf *conf, int rows, int cols, const char *text,
 }
 
 static int
+widget_decor_height(int htext, int hnotext, bool withbuttons)
+{
+	int h;
+
+	/* dialog borders */
+	h = BORDERS;
+
+	/* text */
+	h += htext;
+
+	/* specific widget lines without text */
+	h += hnotext;
+
+	/* buttons */
+	if (withbuttons)
+		h += HBUTTONS; /* buttons and their up-border */
+
+	return (h);
+}
+
+static int
+widget_decor_width(void)
+{
+	int w;
+
+	/* dialog borders */
+	w = BORDERS;
+
+	return (w);
+}
+
+static int
 widget_min_height(struct bsddialog_conf *conf, int htext, int hnotext,
     bool withbuttons)
 {
 	int min;
 
-	/* dialog borders */
-	min = BORDERS;
-
-	/* text */
-	min += htext;
-
-	/* specific widget lines without text */
-	min += hnotext;
-
-	/* buttons */
-	if (withbuttons)
-		min += HBUTTONS; /* buttons and their up-border */
+	min = widget_decor_height(htext, hnotext, withbuttons);
 
 	/* conf.auto_minheight */
 	min = MAX(min, (int)conf->auto_minheight);
@@ -812,8 +835,7 @@ widget_min_width(struct bsddialog_conf *conf, int wtext, int minwidget,
 		min = MAX(min, wbottomtitle + 4);
 	}
 
-	/* dialog borders */
-	min += BORDERS;
+	min += widget_decor_width();
 	/* conf.auto_minwidth */
 	min = MAX(min, (int)conf->auto_minwidth);
 
@@ -895,21 +917,17 @@ int widget_maxsize(struct bsddialog_conf *conf, int rows, int cols, int *maxh,
 	if (text_size(conf, rows, cols, text, bs, 0, 0, &htext, &wtext) != 0)
 		return (BSDDIALOG_ERROR);
 
-	/*
-	 * XXX: Should possibly clear conf->auto_min{height,width}
-	 * temporarily.
-	 */
 	minheight = widget_min_height(conf, htext, 0, bs->nbuttons > 0);
 	if (h < minheight)
 		RETURN_FMTERROR("Current rows: %d, needed at least: %d",
 		    h, minheight);
-	*maxh = h - minheight;
+	*maxh = h - widget_decor_height(htext, 0, bs->nbuttons > 0);
 
 	minwidth = widget_min_width(conf, wtext, 0, bs);
 	if (w < minwidth)
 		RETURN_FMTERROR("Current cols: %d, needed at least %d",
 		    w, minwidth);
-	*maxw = w - minwidth;
+	*maxw = w - widget_decor_width();
 
 	return (0);
 }
