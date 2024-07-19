@@ -229,7 +229,7 @@ do_mixedgauge(struct bsddialog_conf *conf, const char *text, int rows, int cols,
 	for (i = 0; i < (int)nminibars; i++)
 		max_minibarlen = MAX(max_minibarlen,
 		    (int)strcols(CHECK_STR(minilabels[i])));
-	max_minibarlen += 3 + 16; /* seps + [...] */
+	max_minibarlen += 3 + 15; /* seps + [...] */
 	max_minibarlen = MAX(max_minibarlen, MIN_WMGBOX); /* mainbar */
 
 	if (prepare_dialog(conf, text, rows, cols, &d) != 0)
@@ -247,7 +247,7 @@ do_mixedgauge(struct bsddialog_conf *conf, const char *text, int rows, int cols,
 			hnotext = maxh;
 		}
 		if (maxw < max_minibarlen) {
-			label_len_cap = maxw - (3 + 16); /* seps + [...] */
+			label_len_cap = maxw - (3 + 15); /* seps + [...] */
 			max_minibarlen = maxw;
 		}
 	}
