@@ -140,7 +140,7 @@ ATOMIC_FCMPSET_ACQ_REL(16);
 
 #define	atomic_load_acq_16	atomic_load_acq_16
 static __inline uint16_t
-atomic_load_acq_16(volatile uint16_t *p)
+atomic_load_acq_16(const volatile uint16_t *p)
 {
 	uint16_t ret;
 
@@ -269,7 +269,7 @@ ATOMIC_CMPSET(32)
 ATOMIC_FCMPSET(32)
 
 static __inline uint32_t
-atomic_load_acq_32(volatile uint32_t *p)
+atomic_load_acq_32(const volatile uint32_t *p)
 {
 
 	return (__atomic_load_n(p, __ATOMIC_ACQUIRE));
