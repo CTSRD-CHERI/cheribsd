@@ -146,7 +146,7 @@ tramp_compile(char **entry, const struct tramp_data *data)
 		size += unused_regs;
 	}
 	COPY(invoke);
-	PATCH_LANDING(landing_off, size);
+	PATCH_LANDING(landing_off, size - pcc_off);
 
 	COPY(pop_frame);
 	pcc_off = PATCH_OFF(pop_frame, pcc);
