@@ -35,6 +35,11 @@
 #include <machine/asm.h>
 #include <machine/setjmp.h>
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+.weak _rtld_setjmp
+.weak _rtld_longjmp
+#endif
+
 ENTRY(setjmp)
 #ifdef __CHERI_PURE_CAPABILITY__
 	cincoffset csp, csp, -(2 * 16)
@@ -95,8 +100,19 @@ ENTRY(setjmp)
 #endif
 
 	/* Return value */
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	cmove	ca1, ca0
+#endif
 	li	a0, 0
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	/*
+	 * Tail-call to save trusted stack state
+	 */
+	clgc	ct0, _C_LABEL(c18n_get_trusted_stk)
+	cjr	ct0
+#else
 	cret
+#endif
 #else
 	addi	sp, sp, -(2 * 8)
 	sd	a0, 0(sp)
@@ -186,7 +202,11 @@ ENTRY(longjmp)
 	cincoffset csp, csp, (3 * 16)
 
 	/* Restore the stack pointer */
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	clc	ca3, 16(ca0)
+#else
 	clc	csp, 16(ca0)
+#endif
 	cincoffset ca0, ca0, (2 * 16)
 
 	/* Restore the general purpose registers and ra */
@@ -225,8 +245,20 @@ ENTRY(longjmp)
 #endif
 
 	/* Load the return value */
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	clc	ca2, 0(ca0)
+#endif
 	mv	a0, a1
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	cmove	ca1, ca3
+	/*
+	 * Tail-call to restore trusted stack state
+	 */
+	clgc	ct0, _C_LABEL(c18n_unwind_trusted_stk)
+	cjr	ct0
+#else
 	cret
+#endif
 
 botch:
 	clgc	ct0, _C_LABEL(longjmperror)
