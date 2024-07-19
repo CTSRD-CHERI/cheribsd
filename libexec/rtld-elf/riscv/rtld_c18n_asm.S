@@ -409,8 +409,6 @@ TRAMPEND(tramp_clear_args_a05)
 PATCH_POINT(tramp_clear_args_a05, a05, 1b)
 
 TRAMP(tramp_clear_args)
-.option push
-.option rvc
 	/*
 	 * Each instruction here is 2 bytes long.
 	 */
@@ -422,7 +420,6 @@ TRAMP(tramp_clear_args)
 	addi		a2, x0, 0
 	addi		a1, x0, 0
 	addi		a0, x0, 0
-.option pop
 TRAMPEND(tramp_clear_args)
 
 TRAMP(tramp_invoke)

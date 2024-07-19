@@ -1718,7 +1718,14 @@ _rtld_thread_start(struct pthread *curthread)
 	 * new thread. Extract and install the actual tcb and stack lookup
 	 * table.
 	 */
-	wrap = __containerof(get_trusted_tp(), struct tcb_wrapper, header);
+	tcb = get_trusted_tp();
+#ifdef __riscv
+	/*
+	 * The TCB is shifted by the kernel on RISC-V. See `cpu_set_user_tls`.
+	 */
+	tcb -= 1;
+#endif
+	wrap = __containerof(tcb, struct tcb_wrapper, header);
 
 	tcb = cheri_unseal(wrap->tcb, sealer_tcb);
 	*tcb = wrap->header;

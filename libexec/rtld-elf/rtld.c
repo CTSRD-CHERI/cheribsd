@@ -4499,9 +4499,23 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
 	    sym = __DECONST(void*, make_function_pointer(def, defobj));
 	    dbg("dlsym(%s) is function: " PTR_FMT, name, sym);
+#if defined(CHERI_LIB_C18N) && defined(__riscv)
+	    sym = tramp_intern(NULL, &(struct tramp_data) {
+		.target = sym,
+		.defobj = defobj,
+		.def = def
+	    });
+#endif
 	} else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
 	    sym = rtld_resolve_ifunc(defobj, def);
 	    dbg("dlsym(%s) is ifunc. Resolved to: " PTR_FMT, name, sym);
+#if defined(CHERI_LIB_C18N) && defined(__riscv)
+	    sym = tramp_intern(NULL, &(struct tramp_data) {
+		.target = sym,
+		.defobj = defobj,
+		.def = def
+	    });
+#endif
 	} else if (ELF_ST_TYPE(def->st_info) == STT_TLS) {
 	    ti.ti_module = defobj->tlsindex;
 	    ti.ti_offset = def->st_value;
