@@ -59,7 +59,8 @@ drm_gem_cma_destruct(struct drm_gem_cma_object *bo)
 
 	if (bo->vbase != 0) {
 		pmap_qremove(bo->vbase, bo->npages);
-		vmem_free(kmem_arena, bo->vbase, round_page(bo->gem_obj.size));
+		vmem_free(kernel_arena, bo->vbase,
+		    round_page(bo->gem_obj.size));
 	}
 
 	for (i = 0; i < bo->npages; i++) {
