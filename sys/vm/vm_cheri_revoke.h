@@ -164,5 +164,5 @@ enum vm_cheri_revoke_fault_res vm_cheri_revoke_fault_visit(
 #endif
 #define CHERI_REVOKE_STATS_BUMP(st, ctr) CHERI_REVOKE_STATS_INC(st, ctr, 1)
 
-#endif
-#endif
+#endif /* CHERI_CAPREVOKE */
+#endif /* !_VM_CHERI_REVOKE_ */
