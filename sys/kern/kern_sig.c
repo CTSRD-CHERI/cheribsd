@@ -1847,31 +1847,9 @@ void
 sig_thread_cheri_revoke(struct thread *td,
     const struct vm_cheri_revoke_cookie *crc)
 {
-	CHERI_REVOKE_STATS_FOR(crst, crc);
-
-	uintcap_t sp = (uintcap_t)td->td_sigstk.ss_sp;
-
-	if (cheri_gettag(sp)) {
-		CHERI_REVOKE_STATS_BUMP(crst, caps_found);
-		if (vm_cheri_revoke_test(crc, sp)) {
-			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
-			td->td_sigstk.ss_sp =
-			    (void * __capability)cheri_revoke_cap(sp);
-		}
-	}
-
-	if ((td->td_pflags & TDP_SIGFASTBLOCK) != 0) {
-		uintcap_t sbp = (uintcap_t)td->td_sigblock_ptr;
-
-		if (cheri_gettag(sbp)) {
-			CHERI_REVOKE_STATS_BUMP(crst, caps_found);
-			if (vm_cheri_revoke_test(crc, sbp)) {
-				CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
-				td->td_sigblock_ptr =
-				    (void * __capability)cheri_revoke_cap(sbp);
-			}
-		}
-	}
+	vm_cheri_revoke_cap(crc, (uintcap_t *)&td->td_sigstk.ss_sp);
+	if ((td->td_pflags & TDP_SIGFASTBLOCK) != 0)
+		vm_cheri_revoke_cap(crc, (uintcap_t *)&td->td_sigblock_ptr);
 }
 #endif
 

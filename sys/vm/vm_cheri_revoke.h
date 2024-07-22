@@ -115,6 +115,8 @@ void vm_cheri_revoke_publish_epochs(
     struct cheri_revoke_info_page * __capability,
     const struct cheri_revoke_epochs *);
 
+/*  Revoke a single capability if needed */
+void vm_cheri_revoke_cap(const struct vm_cheri_revoke_cookie *, uintcap_t *);
 
 /***************************** KERNEL MD LAYER ******************************/
 

@@ -710,16 +710,8 @@ void
 cheri_revoke_td_frame(struct thread *td,
     const struct vm_cheri_revoke_cookie *crc)
 {
-	CHERI_REVOKE_STATS_FOR(crst, crc);
-
 #define CHERI_REVOKE_REG(r) \
-	do { if (cheri_gettag(r)) { \
-		CHERI_REVOKE_STATS_BUMP(crst, caps_found); \
-		if (vm_cheri_revoke_test(crc, r)) { \
-			r = cheri_revoke_cap(r); \
-			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared); \
-		} \
-	    }} while(0)
+	vm_cheri_revoke_cap(crc, &(r))
 
 	CHERI_REVOKE_REG(td->td_frame->tf_ra);
 	CHERI_REVOKE_REG(td->td_frame->tf_sp);

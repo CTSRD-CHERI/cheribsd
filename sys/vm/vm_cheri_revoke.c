@@ -1390,3 +1390,20 @@ vm_cheri_revoke_info_page(struct vm_map *map, struct sysentvec *sv,
 	    CHERI_PERM_GLOBAL,
 	    sv->sv_cheri_revoke_info_page, PAGE_SIZE, 0);
 }
+
+void
+vm_cheri_revoke_cap(const struct vm_cheri_revoke_cookie *crc, uintcap_t *p)
+{
+	CHERI_REVOKE_STATS_FOR(crst, crc);
+
+	uintcap_t v = *p;
+
+	if (!cheri_gettag(v))
+		return;
+
+	CHERI_REVOKE_STATS_BUMP(crst, caps_found);
+	if (vm_cheri_revoke_test(crc, v)) {
+		*p = cheri_revoke_cap(v);
+		CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
+	}
+}
