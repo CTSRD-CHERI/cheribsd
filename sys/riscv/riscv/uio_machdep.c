@@ -63,7 +63,8 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 	int save = 0;
 	bool mapped;
 
-	KASSERT(uio->uio_rw == UIO_READ || uio->uio_rw == UIO_WRITE,
+	KASSERT(uio->uio_rw == UIO_READ || uio->uio_rw == UIO_WRITE ||
+	    uio->uio_rw == UIO_READ_CAP || uio->uio_rw == UIO_WRITE_CAP,
 	    ("uiomove_fromphys: mode"));
 	KASSERT(uio->uio_segflg != UIO_USERSPACE || uio->uio_td == curthread,
 	    ("uiomove_fromphys proc"));
