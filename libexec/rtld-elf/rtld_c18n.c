@@ -1277,6 +1277,8 @@ tramp_pgs_append(const struct tramp_data *data)
 	 * sufficiently large bounds to contain these rounded addresses.
 	 */
 	__clear_cache(cheri_copyaddress(pg, header->entry), tramp + len);
+#elif __riscv
+	asm volatile ("fence.i");
 #endif
 
 	return (header);
