@@ -30,11 +30,22 @@
 
 #include <stdint.h>
 
+#ifdef __aarch64__
+#define	HAS_RESTRICTED_MODE
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+#define	USE_RESTRICTED_MODE
+#endif
+#endif
+
 /*
  * Global symbols
  */
-extern size_t c18n_code_perm_clear;
 extern uintptr_t sealer_pltgot, sealer_tramp;
+#ifdef HAS_RESTRICTED_MODE
+extern size_t c18n_code_perm_clear;
+#else
+extern uintptr_t sealer_tidc;
+#endif
 extern const char *ld_compartment_utrace;
 extern const char *ld_compartment_policy;
 extern const char *ld_compartment_overhead;
@@ -119,6 +130,47 @@ struct stk_table {
 #define	COMPART_ID_MAX		index_to_cid((stk_table_index) { -1 })
 
 #include "rtld_c18n_machdep.h"
+
+struct trusted_frame {
+	/*
+	 * Architecture-specific callee-saved registers, including fp, sp, and
+	 * the return address
+	 */
+	struct compart_state state;
+	/*
+	 * INVARIANT: This field contains the top of the caller's stack when the
+	 * caller was last entered.
+	 */
+	void *osp;
+	/*
+	 * Address of the previous trusted frame
+	 */
+	struct trusted_frame *previous;
+	/*
+	 * Compartment ID of the caller
+	 */
+	stk_table_index caller;
+	/*
+	 * This padding space must be filled with zeros so that an optimised
+	 * trampoline can use a wide load to load multiple fields of the trusted
+	 * frame and then use a word-sized register to extract the caller field.
+	 */
+	uint16_t zeros;
+	/*
+	 * Compartment ID of the callee
+	 */
+	stk_table_index callee;
+	/*
+	 * Number of return value registers with architecture-specific encoding
+	 */
+	uint16_t n_rets;
+	/*
+	 * This field contains the code address in the trampoline that the
+	 * callee should return to. This is used by trampolines to detect cross-
+	 * compartment tail-calls.
+	 */
+	ptraddr_t landing;
+};
 
 struct tcb *c18n_allocate_tcb(struct tcb *);
 void c18n_free_tcb(void);
@@ -217,8 +269,8 @@ func_sig_legal(struct func_sig sig)
 /*
  * This macro can only be used in a function directly invoked by a trampoline.
  */
-#define	c18n_return_address()						\
-	(C18N_ENABLED ? get_trusted_stk()->pc : __builtin_return_address(0))
+#define	c18n_return_address()	(C18N_ENABLED ?				\
+	get_trusted_stk()->state.pc : __builtin_return_address(0))
 
 void *_rtld_sandbox_code(void *, struct func_sig);
 void *_rtld_safebox_code(void *, struct func_sig);
@@ -229,5 +281,5 @@ void *_rtld_tlsdesc_undef_c18n(void *);
 void *_rtld_tlsdesc_dynamic_c18n(void *);
 
 void c18n_init(Obj_Entry *, Elf_Auxinfo *[]);
-void c18n_init2(Obj_Entry *);
+void c18n_init2(void);
 #endif

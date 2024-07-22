@@ -126,6 +126,13 @@
 	cspecialw sscratchc, ct0
 	cspecialr ct0, sepcc
 	csc	ct0, (TF_SEPC)(csp)
+	/* Store user tidc */
+.if \mode == 1
+	cspecialr ct0, 11	/* stidc */
+.else
+	cspecialr ct0, 3	/* utidc */
+.endif
+	csc	ct0, (TF_TIDC)(csp)
 	cspecialr ct0, ddc
 	csc	ct0, (TF_DDC)(csp)
 
@@ -280,6 +287,12 @@
 	 */
 	clc	ct0, (TF_DDC)(csp)
 	cspecialw ddc, ct0
+	clc	ct0, (TF_TIDC)(csp)
+.if \mode == 1
+	cspecialw 11, ct0	/* stidc */
+.else
+	cspecialw 3, ct0	/* utidc */
+.endif
 	clc	ct0, (TF_SEPC)(csp)
 	cspecialw sepcc, ct0
 

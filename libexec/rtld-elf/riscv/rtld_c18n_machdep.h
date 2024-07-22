@@ -29,59 +29,42 @@
 #define RTLD_C18N_MACHDEP_H
 
 #include <sys/cdefs.h>
+#include <machine/riscvreg.h>
 
-#define	TRUSTED_FRAME_SIZE		16
-#define	TRUSTED_FRAME_SP_OSP		(16 * 12)
-#define	TRUSTED_FRAME_PREV		(16 * 14)
-#define	TRUSTED_FRAME_CALLER		(16 * 15)
-#define	TRUSTED_FRAME_CALLEE		(16 * 15 + 4)
-#define	TRUSTED_FRAME_LANDING		(16 * 15 + 8)
+#define	TRUSTED_FRAME_SIZE		17
+#define	TRUSTED_FRAME_SP_OSP		(16 * 13)
+#define	TRUSTED_FRAME_PREV		(16 * 15)
+#define	TRUSTED_FRAME_CALLER		(16 * 16)
+#define	TRUSTED_FRAME_CALLEE		(16 * 16 + 4)
+#define	TRUSTED_FRAME_LANDING		(16 * 16 + 8)
 
-#define	SIG_FRAME_SIZE			1360
+#define	SIG_FRAME_SIZE			1376
 
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-#define	TRUSTED_STACK		rddc_el0
 #define	UNTRUSTED_STACK		csp
-#define	STACK_TABLE		rctpidr_el0
-#else
-#define	TRUSTED_STACK		ddc
-#define	UNTRUSTED_STACK		rcsp_el0
-#define	STACK_TABLE		ctpidr_el0
-#endif
-#define	STACK_TABLE_N		17
-#define	STACK_TABLE_C		__CONCAT(c, STACK_TABLE_N)
+#define	TIDC			3
+#define	TRUSTED_STACK		0
+#define	STACK_TABLE		CLEN_BYTES
+#define	STACK_TABLE_N		6
+#define	STACK_TABLE_C		__CONCAT(ct, STACK_TABLE_N)
 #define	STACK_TABLE_RTLD	32
 
 #ifdef IN_ASM
 
 .macro	get_untrusted_stk	reg
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	mov	\reg, UNTRUSTED_STACK
-#else
-	mrs	\reg, UNTRUSTED_STACK
-#endif
+	cmove		\reg, UNTRUSTED_STACK
 .endmacro
 
 .macro	set_untrusted_stk	reg
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	mov	UNTRUSTED_STACK, \reg
-#else
-	msr	UNTRUSTED_STACK, \reg
-#endif
+	cmove		UNTRUSTED_STACK, \reg
 .endmacro
 
 .macro	get_rtld_stk		reg
-	mrs	STACK_TABLE_C, STACK_TABLE
-	ldr	\reg, [STACK_TABLE_C, #STACK_TABLE_RTLD]
-.endmacro
-
-.macro	update_stk_table	osp, sp, index
-	mrs	STACK_TABLE_C, TRUSTED_STACK
-	ldrh	\index, [STACK_TABLE_C, #TRUSTED_FRAME_CALLEE]
-
-	mrs	STACK_TABLE_C, STACK_TABLE
-	ldr	\osp, [STACK_TABLE_C, \index, uxtw #0]
-	str	\sp, [STACK_TABLE_C, \index, uxtw #0]
+	clgc		\reg, sealer_tidc
+	clc		\reg, 0(\reg)
+	cspecialr	STACK_TABLE_C, TIDC
+	cunseal		STACK_TABLE_C, STACK_TABLE_C, \reg
+	clc		STACK_TABLE_C, STACK_TABLE(STACK_TABLE_C)
+	clc		\reg, STACK_TABLE_RTLD(STACK_TABLE_C)
 .endmacro
 
 #else
@@ -91,55 +74,62 @@ get_trusted_tp(void)
 {
 	void *ptr;
 
-	asm volatile ("mrs	%0, ctpidr_el0" : "=C" (ptr));
+	asm volatile ("cmove	%0, ctp" : "=C" (ptr));
 	return (ptr);
 }
+
+struct tidc {
+	struct trusted_frame *trusted_stk;
+	struct stk_table *table;
+};
 
 static inline struct stk_table *
 get_stk_table(void)
 {
-	struct stk_table *table;
+	struct tidc *tidc;
 
-	asm volatile ("mrs	%0, " __XSTRING(STACK_TABLE) : "=C" (table));
-	return (table);
+	asm volatile ("cspecialr	%0, " __XSTRING(TIDC) : "=C" (tidc));
+	tidc = cheri_unseal(tidc, sealer_tidc);
+	return (tidc->table);
 }
 
 static inline void
-set_stk_table(const struct stk_table *table)
+set_stk_table(struct stk_table *table)
 {
-	asm ("msr	" __XSTRING(STACK_TABLE) ", %0" :: "C" (table));
+	struct tidc *tidc;
+
+	asm volatile ("cspecialr	%0, " __XSTRING(TIDC) : "=C" (tidc));
+	tidc = cheri_unseal(tidc, sealer_tidc);
+	tidc->table = table;
 }
 
 static inline struct trusted_frame *
 get_trusted_stk(void)
 {
-	struct trusted_frame *tf;
+	struct tidc *tidc;
 
-	asm volatile ("mrs	%0, " __XSTRING(TRUSTED_STACK) : "=C" (tf));
-	return (tf);
+	asm volatile ("cspecialr	%0, " __XSTRING(TIDC) : "=C" (tidc));
+	tidc = cheri_unseal(tidc, sealer_tidc);
+	return (tidc->trusted_stk);
 }
 
 static inline void
-set_trusted_stk(const struct trusted_frame *tf)
+set_trusted_stk(struct trusted_frame *tf)
 {
-	asm ("msr	" __XSTRING(TRUSTED_STACK) ", %0" :: "C" (tf));
-}
+	struct tidc *tidc;
 
-#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-static inline void
-set_untrusted_stk(const void *sp)
-{
-	asm ("msr	" __XSTRING(UNTRUSTED_STACK) ", %0" :: "C" (sp));
+	asm volatile ("cspecialr	%0, " __XSTRING(TIDC) : "=C" (tidc));
+	tidc = cheri_unseal(tidc, sealer_tidc);
+	tidc->trusted_stk = tf;
 }
-#endif
 
 struct compart_state {
-	void *fp;
+	void *fp;	/* s0 */
 	void *pc;
 	/*
-	 * c19 to c28
+	 * s1 to s11
 	 */
-	void *regs[10];
+	void *regs[11];
 	/*
 	 * INVARIANT: This field contains the top of the caller's stack when the
 	 * caller made the call.

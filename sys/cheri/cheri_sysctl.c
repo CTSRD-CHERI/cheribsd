@@ -80,7 +80,6 @@ SYSCTL_INT(_security_cheri, OID_AUTO, bound_legacy_capabilities,
     CTLFLAG_RWTUN, &security_cheri_bound_legacy_capabilities, 0,
     "Set bounds on userspace capabilities created by legacy ABIs.");
 
-#ifdef __aarch64__
 /*
  * Set the default state of library-based compartmentalisation (c18n) in
  * userspace.
@@ -89,7 +88,6 @@ bool security_cheri_lib_based_c18n_default = false;
 SYSCTL_BOOL(_security_cheri, OID_AUTO, lib_based_c18n_default, CTLFLAG_RWTUN,
     &security_cheri_lib_based_c18n_default, 0,
     "Userspace library-based compartmentalisation default");
-#endif
 
 #ifdef CHERI_CAPREVOKE
 /*

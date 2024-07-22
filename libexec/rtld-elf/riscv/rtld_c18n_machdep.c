@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2021-2023 Dapeng Gao
+ * Copyright (c) 2024 Dapeng Gao
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,7 +38,6 @@
 #include "rtld.h"
 #include "rtld_c18n.h"
 #include "rtld_libc.h"
-#include "rtld_utrace.h"
 
 /*
  * Trampolines
@@ -53,24 +52,13 @@ tramp_compile(char **entry, const struct tramp_data *data)
 	IMPORT(push_frame);
 	IMPORT(update_fp);
 	IMPORT(update_fp_untagged);
-	IMPORT(count_entry);
-	IMPORT(call_hook);
-	IMPORT(invoke_exe);
-	IMPORT(clear_mem_args);
-	IMPORT(clear_ret_args_indirect);
-	IMPORT(clear_ret_args);
-	IMPORT(invoke_res);
-	IMPORT(count_return);
+	IMPORT(clear_args);
+	IMPORT(invoke);
 	IMPORT(pop_frame);
 
 	size_t size = 0;
 	char *buf = *entry;
-	size_t hook_off, count_off;
-	size_t header_off, target_off, landing_off, unused_regs;
-	bool executive = cheri_getperm(data->target) & CHERI_PERM_EXECUTIVE;
-	bool count = ld_compartment_switch_count != NULL;
-	bool hook = ld_compartment_utrace != NULL ||
-	    ld_compartment_overhead != NULL;
+	size_t sealer_off, target_off, pcc_off, landing_off, unused_regs;
 
 #define	COPY_VALUE(val)	({				\
 	size_t _old_size = size;			\
@@ -93,44 +81,29 @@ tramp_compile(char **entry, const struct tramp_data *data)
 		size + patch_tramp_##tramp##_##name;			\
 	})
 
-#define PATCH_MOV(tramp, name, value)					\
+#define	PATCH_I_TYPE(tramp, name, value)				\
 	do {								\
 		uint32_t _value = (value);				\
-		_value = ((_value & 0xffff) << 5);			\
+		_value = ((_value & 0xfff) << 20);			\
 		*PATCH_INS(PATCH_OFF(tramp, name)) |= _value;		\
 	} while (0)
 
-#define	PATCH_UBFM(tramp, name, value)					\
+#define	PATCH_LANDING(landing_off, value)				\
 	do {								\
 		uint32_t _value = (value);				\
-		_value = ((_value & 0x3f) << 10);			\
+		_value = ((_value & 0xfff) << 20);			\
+		*PATCH_INS(landing_off) |= _value;			\
+	} while (0)
+
+#define	PATCH_CClear(tramp, name, value)				\
+	do {								\
+		uint32_t _value = (value);				\
+		_value = ((_value & 0x1f) << 7) |			\
+		    ((_value & 0xe0) << 10);				\
 		*PATCH_INS(PATCH_OFF(tramp, name)) |= _value;		\
 	} while (0)
 
-#define	PATCH_LDR_IMM(tramp, name, target)				\
-	do {								\
-		int32_t _offset = PATCH_OFF(tramp, name);		\
-		int32_t _value = (target) - _offset;			\
-		_value =						\
-		    (roundup2(_value, sizeof(void *)) & 0x1ffff0) << 1;	\
-		*PATCH_INS(_offset) |= _value;				\
-	} while(0)
-
-#define	PATCH_ADR(offset, target)					\
-	do {								\
-		int32_t _offset = (offset);				\
-		int32_t _value = (target) - _offset;			\
-		_value =						\
-		    ((_value & 0x3) << 29) |				\
-		    ((_value & 0x1ffffc) << 3);				\
-		*PATCH_INS(_offset) |= _value;				\
-	} while (0)
-
-	if (hook)
-		hook_off = COPY_VALUE(&tramp_hook);
-
-	if (count)
-		count_off = COPY_VALUE(&c18n_stats->rcs_switch);
+	sealer_off = COPY_VALUE(sealer_tidc);
 
 	*(struct tramp_header *)(buf + size) = (struct tramp_header) {
 		.target = data->target,
@@ -139,77 +112,45 @@ tramp_compile(char **entry, const struct tramp_data *data)
 		    0 : data->def - data->defobj->symtab,
 		.sig = data->sig
 	};
-	header_off = size;
 	target_off = size + offsetof(struct tramp_header, target);
 	*entry = buf + size;
 	size += offsetof(struct tramp_header, entry);
 
 	COPY(push_frame);
-	PATCH_MOV(push_frame, cid, cid_to_index(data->defobj->compart_id).val);
+	pcc_off = PATCH_OFF(push_frame, pcc);
+	PATCH_I_TYPE(push_frame, unsealer, sealer_off - pcc_off);
+	PATCH_I_TYPE(push_frame, cid,
+	    cid_to_index(data->defobj->compart_id).val);
+	PATCH_I_TYPE(push_frame, target, target_off - pcc_off);
 	landing_off = PATCH_OFF(push_frame, landing);
 	/*
 	 * The number of return value registers is encoded as follows:
-	 * - TWO:	0b1111
-	 * - ONE:	0b0111
-	 * - NONE:	0b0011
-	 * - INDIRECT:	0b0001
+	 * - TWO:	0b00
+	 * - ONE:	0b01
+	 * - NONE:	0b10
+	 * - INDIRECT:	0b11
 	 */
-	PATCH_UBFM(push_frame, n_rets,
-	    51 - (data->sig.valid ? data->sig.ret_args : 0));
-	PATCH_LDR_IMM(push_frame, target, target_off);
+	PATCH_I_TYPE(push_frame, n_rets,
+	    data->sig.valid ? data->sig.ret_args : 0);
 
-	if (executive || ld_compartment_unwind != NULL)
+	if (ld_compartment_unwind != NULL)
 		COPY(update_fp);
 	else
 		COPY(update_fp_untagged);
 
-	if (count) {
-		COPY(count_entry);
-		PATCH_LDR_IMM(count_entry, counter, count_off);
+	if (data->sig.valid) {
+		/* Each instruction here is 2 bytes long. */
+		unused_regs = (8 - data->sig.reg_args) *
+		    sizeof(*tramp_clear_args) / 2;
+		memcpy(buf + size, tramp_clear_args, unused_regs);
+		size += unused_regs;
 	}
-
-	if (hook) {
-		COPY(call_hook);
-		PATCH_LDR_IMM(call_hook, function, hook_off);
-		PATCH_MOV(call_hook, event, UTRACE_COMPARTMENT_ENTER);
-		PATCH_ADR(PATCH_OFF(call_hook, header), header_off);
-	}
-
-	if (executive)
-		COPY(invoke_exe);
-	else {
-		if (data->sig.valid) {
-			if (!data->sig.mem_args)
-				COPY(clear_mem_args);
-
-			if (data->sig.ret_args != INDIRECT)
-				COPY(clear_ret_args_indirect);
-
-			unused_regs = sizeof(*tramp_clear_ret_args) *
-			    (8 - data->sig.reg_args);
-
-			memcpy(buf + size, tramp_clear_ret_args, unused_regs);
-			size += unused_regs;
-		}
-		COPY(invoke_res);
-	}
-	/*
-	 * Add 1 to set the LSB of the landing address so that it matches the
-	 * address generated by a branch-and-link instruction in C64 mode.
-	 */
-	PATCH_ADR(landing_off, size + 1);
-
-	if (count)
-		COPY(count_return);
-
-	if (hook) {
-		COPY(call_hook);
-		PATCH_LDR_IMM(call_hook, function, hook_off);
-		PATCH_MOV(call_hook, event, UTRACE_COMPARTMENT_LEAVE);
-		PATCH_ADR(PATCH_OFF(call_hook, header), header_off);
-	}
+	COPY(invoke);
+	PATCH_LANDING(landing_off, size - pcc_off);
 
 	COPY(pop_frame);
+	pcc_off = PATCH_OFF(pop_frame, pcc);
+	PATCH_I_TYPE(pop_frame, unsealer, sealer_off - pcc_off);
 
 	return (size);
 }
