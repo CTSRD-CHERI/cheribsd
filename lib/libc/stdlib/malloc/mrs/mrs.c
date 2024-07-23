@@ -1515,6 +1515,21 @@ mrs_realloc(void *ptr, size_t size)
 	mrs_debug_printf("mrs_realloc: called ptr %p ptr size %zu new size %zu\n",
 	    ptr, old_size, size);
 
+	/*
+	 * If the new size fits in the current allocation and we won't
+	 * be wasting too much space, just return the existing pointer.
+	 *
+	 * Only try to reclaim space by copying if we'd recover at least
+	 * half of the allocated storage.  In other cases we can't tell
+	 * the difference between shrinking and linear growth into a
+	 * large over-allocation (e.g., growing into snmalloc's
+	 * power-of-two buckets by 1K) and we especially want to avoid
+	 * copying such cases.
+	 */
+	if (ptr != NULL && cheri_gettag(ptr) && cheri_getoffset(ptr) == 0 &&
+	    size <= old_size && old_size - size <= (old_size >> 1))
+		return (ptr);
+
 	void *new_alloc = mrs_malloc(size);
 
 	/*
