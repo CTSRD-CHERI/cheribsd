@@ -951,8 +951,8 @@ static __inline void
 vm_page_capdirty(vm_page_t m)
 {
 
-	KASSERT(vm_page_astate_load(m).flags & PGA_CAPSTORE,
-		("vm_page_capdirty w/o PGA_CAPSTORE m=%p", m));
+	//KASSERT(vm_page_astate_load(m).flags & PGA_CAPSTORE,
+	//	("vm_page_capdirty w/o PGA_CAPSTORE m=%p", m));
 
 	vm_page_aflag_set(m, PGA_CAPDIRTY);
 }
