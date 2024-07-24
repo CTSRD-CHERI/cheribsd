@@ -1226,47 +1226,40 @@ void
 cheri_revoke_td_frame(struct thread *td, const struct vm_cheri_revoke_cookie
     *crc)
 {
-#define CHERI_REVOKE_REG(r) \
-	vm_cheri_revoke_cap(crc, &(r))
-
-	CHERI_REVOKE_REG(td->td_frame->tf_sp);
-	CHERI_REVOKE_REG(td->td_frame->tf_lr);
-	CHERI_REVOKE_REG(td->td_frame->tf_elr);
-	CHERI_REVOKE_REG(td->td_frame->tf_ddc);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[0]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[1]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[2]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[3]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[4]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[5]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[6]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[7]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[8]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[9]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[10]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[11]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[12]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[13]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[14]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[15]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[16]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[17]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[18]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[19]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[20]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[21]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[22]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[23]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[24]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[25]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[26]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[27]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[28]);
-	CHERI_REVOKE_REG(td->td_frame->tf_x[29]);
-
-#undef CHERI_REVOKE_REG
-
-	return;
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_sp);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_lr);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_elr);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_ddc);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[0]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[1]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[2]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[3]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[4]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[5]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[6]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[7]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[8]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[9]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[10]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[11]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[12]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[13]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[14]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[15]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[16]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[17]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[18]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[19]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[20]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[21]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[22]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[23]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[24]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[25]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[26]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[27]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[28]);
+	vm_cheri_revoke_cap(crc, &td->td_frame->tf_x[29]);
 }
 #endif
 // CHERI CHANGES START
