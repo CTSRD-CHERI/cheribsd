@@ -110,6 +110,12 @@ struct sec_add {
 	STAILQ_ENTRY(sec_add) sadd_list;
 };
 
+struct transplant {
+	char	*name;
+
+	TAILQ_ENTRY(transplant) t_list;
+};
+
 struct segment;
 
 /* Internal data structure for sections. */
@@ -240,7 +246,6 @@ struct elfcopy {
 	char		*prefix_alloc;	/* alloc section prefix. */
 	char		*prefix_sym;	/* symbol prefix. */
 	char		*debuglink;	/* GNU debuglink file. */
-	char		*transplant;
 	struct section	*symtab;	/* .symtab section. */
 	struct section	*strtab;	/* .strtab section. */
 	struct section	*shstrtab;	/* .shstrtab section. */
@@ -255,6 +260,7 @@ struct elfcopy {
 	STAILQ_HEAD(, symop) v_symop;	/* list of symbols operations. */
 	STAILQ_HEAD(, symfile) v_symfile; /* list of symlist files. */
 	TAILQ_HEAD(, section) v_sec;	/* list of sections. */
+	TAILQ_HEAD(, transplant) v_transplants; /* list of transplants. */
 
 	/*
 	 * Fields for the ar(1) archive.
@@ -270,6 +276,7 @@ struct elfcopy {
 	size_t		 s_sn_sz;	/* current size of sn table. */
 	off_t		 rela_off;	/* offset relative to pseudo members. */
 	STAILQ_HEAD(, ar_obj) v_arobj;	/* archive object(member) list. */
+	size_t		 phoff;		/* for when you need to move phdrs */
 };
 
 void	add_section(struct elfcopy *_ecp, const char *_optarg);
@@ -322,6 +329,7 @@ struct symop *lookup_symop_list(struct elfcopy *_ecp, const char *_name,
 void	resync_sections(struct elfcopy *_ecp);
 void	setup_phdr(struct elfcopy *_ecp);
 void	transplant(struct elfcopy *_ecp);
+void	add_transplant(struct elfcopy *_ecp, const char *_name);
 size_t	first_free_offset(struct elfcopy *ecp);
 void	update_shdr(struct elfcopy *_ecp, int _update_link);
 
