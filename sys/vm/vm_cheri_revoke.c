@@ -54,6 +54,7 @@
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/pmap.h>
+#include <vm/swap_pager.h>
 #include <vm/vm_map.h>
 #include <vm/vm_object.h>
 #include <vm/vm_extern.h>
@@ -512,7 +513,6 @@ static bool
 vm_cheri_revoke_skip_fault(vm_object_t object)
 {
 	return (cheri_revoke_avoid_faults && (object->flags & OBJ_SWAP) != 0 &&
-	    pctrie_is_empty(&object->un_pager.swp.swp_blks) &&
 	    (object->backing_object == NULL ||
 	    (object->backing_object->flags & OBJ_HASCAP) == 0));
 }
@@ -638,26 +638,24 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc,
 	(void)vm_page_grab_valid(&m, obj, ipi, VM_ALLOC_NOZERO);
 
 	if (m == NULL) {
-		/* Can we avoid calling vm_fault() when the page is not resident? */
+		/*
+		 * Can we avoid calling vm_fault() for non-resident pages, or
+		 * for paged-out pages that do not contain capabilities?
+		 */
 		if (vm_cheri_revoke_skip_fault(obj)) {
-			/* Look forward in the object's collection of pages */
-			vm_page_t obj_next_pg = vm_page_find_least(obj, ipi);
+			vm_pindex_t nextpindex;
+			vm_offset_t lastoff;
 
-			vm_offset_t lastoff =
-			    entry->end - entry->start + entry->offset;
-
-			if ((obj_next_pg == NULL) ||
-			    (obj_next_pg->pindex >= OFF_TO_IDX(lastoff))) {
+			lastoff = entry->end - entry->start + entry->offset;
+			nextpindex = swap_pager_cheri_revoke_next(obj, ipi);
+			if (nextpindex >= OFF_TO_IDX(lastoff)) {
 				CHERI_REVOKE_STATS_INC(crst, pages_skip_fast,
 				    (entry->end - addr) >> PAGE_SHIFT);
 				*ooff = lastoff;
 			} else {
-				KASSERT(obj_next_pg->object == obj,
-				    ("Fast find page in bad object?"));
-
-				*ooff = IDX_TO_OFF(obj_next_pg->pindex);
 				CHERI_REVOKE_STATS_INC(crst, pages_skip_fast,
-				    obj_next_pg->pindex - ipi);
+				    nextpindex - ipi);
+				*ooff = IDX_TO_OFF(nextpindex);
 			}
 			return (VM_CHERI_REVOKE_AT_OK);
 		}
