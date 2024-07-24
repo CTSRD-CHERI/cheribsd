@@ -444,9 +444,7 @@ create_elf(struct elfcopy *ecp)
 			 * Append it at the end, there's no room after the ELF header.
 			 * Create a new section for it.
 			 */
-			//oeh.e_phoff = first_free_offset(ecp);
-			oeh.e_phoff = 1024 * 1024 * 2;
-			fprintf(stderr, "off %zd\n", oeh.e_phoff);
+			oeh.e_phoff = ecp->phoff = first_free_offset(ecp) + 0x10000 /* 0x XXX */;
 		}
 	}
 
@@ -945,7 +943,7 @@ elfcopy_main(struct elfcopy *ecp, int argc, char **argv)
 			ecp->flags |= PRESERVE_DATE;
 			break;
 		case 'T':
-			ecp->transplant = optarg;
+			add_transplant(ecp, optarg);
 			break;
 		case 'V':
 			print_version();
@@ -1681,6 +1679,7 @@ main(int argc, char **argv)
 	STAILQ_INIT(&ecp->v_symfile);
 	STAILQ_INIT(&ecp->v_arobj);
 	TAILQ_INIT(&ecp->v_sec);
+	TAILQ_INIT(&ecp->v_transplants);
 
 	if ((ecp->progname = ELFTC_GETPROGNAME()) == NULL)
 		ecp->progname = "elfcopy";

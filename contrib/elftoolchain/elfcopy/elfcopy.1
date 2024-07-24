@@ -23,7 +23,7 @@
 .\"
 .\" $Id: elfcopy.1 3642 2018-10-14 14:24:28Z jkoshy $
 .\"
-.Dd August 30, 2017
+.Dd July 16, 2024
 .Dt ELFCOPY 1
 .Os
 .Sh NAME
@@ -350,6 +350,17 @@ Do not copy symbols that are not needed for relocation processing.
 .El
 .Sh DIAGNOSTICS
 .Ex -std
+.Sh EXAMPLES
+Merge existing shared objects
+.Pa libA.so ,
+.Pa libB.so , and
+.Pa libC.so
+into a
+.Xr compartmentalization 7
+multi-library
+.Pa libABC.so :
+.Pp
+.Dl Nm Fl T Ar libB.so Fl T Ar libC.so Ar libA.so libABC.so
 .Sh SEE ALSO
 .Xr ar 1 ,
 .Xr ld 1 ,
