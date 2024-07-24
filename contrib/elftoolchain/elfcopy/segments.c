@@ -528,6 +528,13 @@ copy_phdr(struct elfcopy *ecp)
 			}
 			seg->fsz = seg->msz = gelf_fsize(ecp->eout, ELF_T_PHDR,
 			    ecp->ophnum, EV_CURRENT);
+
+			if (ecp->phoff != 0) {
+#ifdef	DEBUG
+				printf("%s: moving phoff from %zd to %zd\n", __func__, seg->off, ecp->phoff);
+#endif
+				seg->off = ecp->phoff;
+			}
 			continue;
 		}
 
@@ -537,12 +544,17 @@ copy_phdr(struct elfcopy *ecp)
 			seg->paddr = s->lma;
 		}
 
-		seg->fsz = seg->msz = 0;
-		for (i = 0; i < seg->nsec; i++) {
-			s = seg->v_sec[i];
-			seg->msz = s->vma + s->sz - seg->vaddr;
-			if (s->type != SHT_NOBITS)
-				seg->fsz = s->off + s->sz - seg->off;
+		/*
+		 * XXX: Don't know what it is for, but zeroing fsz and msz here breaks -T.
+		 */
+		if (TAILQ_EMPTY(&ecp->v_transplants)) {
+			seg->fsz = seg->msz = 0;
+			for (i = 0; i < seg->nsec; i++) {
+				s = seg->v_sec[i];
+				seg->msz = s->vma + s->sz - seg->vaddr;
+				if (s->type != SHT_NOBITS)
+					seg->fsz = s->off + s->sz - seg->off;
+			}
 		}
 	}
 
