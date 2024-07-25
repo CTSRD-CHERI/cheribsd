@@ -119,7 +119,7 @@ END(.rtld_start)
  * x17 = &_rtld_bind_start
  */
 ENTRY(C18N_SYM(_rtld_bind_start))
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
+#ifdef CHERI_LIB_C18N
 	/*
 	 * Get the caller's current stack top.
 	 */
@@ -205,7 +205,7 @@ ENTRY(C18N_SYM(_rtld_bind_start))
 	/* Restore frame pointer */
 	ldp	PTR(29), PTR(zr), [PTRN(sp)], #(PTR_WIDTH * 2)
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
+#ifdef CHERI_LIB_C18N
 	/*
 	 * Load caller's old stack top.
 	 */
@@ -246,7 +246,7 @@ ENTRY(C18N_SYM(_rtld_bind_start))
 	/* Call into the correct function */
 #if defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	br	x16
-#elif defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
+#elif defined(CHERI_LIB_C18N)
 	brr	PTR(16)
 #else
 	br	PTR(16)
