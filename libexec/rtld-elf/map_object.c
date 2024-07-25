@@ -304,12 +304,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	data_vlimit = rtld_round_page(segs[i]->p_vaddr + segs[i]->p_filesz);
 	data_addr = mapbase + (data_vaddr - base_vaddr);
 	data_prot = convert_prot(segs[i]->p_flags);
-	/*
-	 * Set MAP_CHERI_NOSETBOUNDS to avoid the need for a precisely
-	 * representable region. We already have a valid capability and only
-	 * want to check if mapping from the file (MAP_ANON for bss) succeeded.
-	 */
-	data_flags = convert_flags(segs[i]->p_flags) | MAP_FIXED | MAP_CHERI_NOSETBOUNDS;
+	data_flags = convert_flags(segs[i]->p_flags) | MAP_FIXED;
 	dbg("Mapping %s PT_LOAD(%d) with flags 0x%x at %p", path, i,
 	    segs[i]->p_flags, data_addr, data_vlimit);
 

@@ -325,12 +325,6 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 		if (flags & MAP_FIXED)
 			flags |= MAP_EXCL;
 
-		if (flags & MAP_CHERI_NOSETBOUNDS) {
-			SYSERRCAUSE("MAP_CHERI_NOSETBOUNDS without a valid "
-			    "addr capability");
-			return (EINVAL);
-		}
-
 		source_cap = userspace_root_cap;
 	}
 	KASSERT(cheri_gettag(source_cap),
@@ -493,8 +487,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	/*
 	 * Ignore old flags that used to be defined but did not do anything.
 	 */
-	if (!SV_CURPROC_FLAG(SV_CHERI))
-		flags &= ~(MAP_RESERVED0020 | MAP_RESERVED0040);
+	flags &= ~(MAP_RESERVED0020 | MAP_RESERVED0040);
 
 	/*
 	 * Enforce the constraints.
@@ -537,8 +530,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	unsigned int extra_flags =
 	    (flags & ~(MAP_SHARED | MAP_PRIVATE | MAP_FIXED | MAP_HASSEMAPHORE |
 	    MAP_STACK | MAP_NOSYNC | MAP_ANON | MAP_EXCL | MAP_NOCORE |
-	    MAP_PREFAULT_READ | MAP_GUARD | MAP_32BIT | MAP_CHERI_NOSETBOUNDS |
-	    MAP_ALIGNMENT_MASK));
+	    MAP_PREFAULT_READ | MAP_GUARD | MAP_32BIT | MAP_ALIGNMENT_MASK));
 	if (extra_flags != 0) {
 		SYSERRCAUSE("%s: Unhandled flag(s) 0x%x", __func__,
 		    extra_flags);
@@ -561,7 +553,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	}
 	if ((flags & MAP_GUARD) != 0 && (prot != PROT_NONE || fd != -1 ||
 	    pos != 0 || (flags & ~(MAP_FIXED | MAP_GUARD | MAP_EXCL |
-	    MAP_CHERI_NOSETBOUNDS | MAP_RESERVATION_CREATE |
+	    MAP_RESERVATION_CREATE |
 	    MAP_32BIT | MAP_ALIGNMENT_MASK)) != 0)) {
 		SYSERRCAUSE("%s: Invalid arguments with MAP_GUARD", __func__);
 		return (EINVAL);
