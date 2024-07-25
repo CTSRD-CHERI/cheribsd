@@ -358,6 +358,7 @@ vmspace_zinit(void *mem, int size, int flags)
 	vm_map_t map;
 
 	vm = (struct vmspace *)mem;
+	mtx_init(&vm->vm_mtx, "vmspace", NULL, MTX_DEF);
 	map = &vm->vm_map;
 
 	memset(map, 0, sizeof(*map));
@@ -406,6 +407,7 @@ vmspace_alloc(vm_pointer_t min, vm_pointer_t max, pmap_pinit_t pinit)
 	CTR1(KTR_VM, "vmspace_alloc: %p", vm);
 	_vm_map_init(&vm->vm_map, vmspace_pmap(vm), min, max);
 	refcount_init(&vm->vm_refcnt, 1);
+	LIST_INIT(&vm->vm_proclist);
 	vm->vm_shm = NULL;
 	vm->vm_swrss = 0;
 	vm->vm_tsize = 0;
@@ -451,6 +453,8 @@ vmspace_dofree(struct vmspace *vm)
 	 */
 	shmexit(vm);
 
+	KASSERT(LIST_EMPTY(&vm->vm_proclist), ("vm_proclist isn't empty"));
+
 	/*
 	 * Lock the map, to wait out all other references to it.
 	 * Delete all of the mappings and pages they hold, then call
@@ -483,8 +487,47 @@ vmspace_exitfree(struct proc *p)
 	vm = p->p_vmspace;
 	p->p_vmspace = NULL;
 	PROC_VMSPACE_UNLOCK(p);
+	vmspace_remove_proc(vm, p);
 	KASSERT(vm == &vmspace0, ("vmspace_exitfree: wrong vmspace"));
 	vmspace_free(vm);
+}
+
+void
+vmspace_insert_proc(struct vmspace *vm, struct proc *p)
+{
+#ifdef INVARIANTS
+	struct proc *proc;
+
+	LIST_FOREACH(proc, &vm->vm_proclist, p_vm_proclist)
+		KASSERT(proc != p, ("proc %d is already in vm_proclist",
+		    p->p_pid));
+#endif
+	VMSPACE_LOCK(vm);
+	LIST_INSERT_HEAD(&vm->vm_proclist, p, p_vm_proclist);
+	VMSPACE_UNLOCK(vm);
+}
+
+void
+vmspace_remove_proc(struct vmspace *vm, struct proc *p)
+{
+#ifdef INVARIANTS
+	struct proc *proc;
+	bool found = false;
+#endif
+
+	VMSPACE_LOCK(vm);
+#ifdef INVARIANTS
+	LIST_FOREACH(proc, &vm->vm_proclist, p_vm_proclist) {
+		if (proc == p) {
+			found = true;
+			break;
+		}
+	}
+	KASSERT(found, ("proc %d not in vm_proclist", p->p_pid));
+#endif
+	if (!LIST_EMPTY(&vm->vm_proclist))
+		LIST_REMOVE(p, p_vm_proclist);
+	VMSPACE_UNLOCK(vm);
 }
 
 void
@@ -507,9 +550,11 @@ vmspace_exit(struct thread *td)
 	refcount_acquire(&vmspace0.vm_refcnt);
 	if (!(released = refcount_release_if_last(&vm->vm_refcnt))) {
 		if (p->p_vmspace != &vmspace0) {
+			vmspace_remove_proc(p->p_vmspace, p);
 			PROC_VMSPACE_LOCK(p);
 			p->p_vmspace = &vmspace0;
 			PROC_VMSPACE_UNLOCK(p);
+			vmspace_insert_proc(p->p_vmspace, p);
 			pmap_activate(td);
 		}
 		released = refcount_release(&vm->vm_refcnt);
@@ -520,15 +565,19 @@ vmspace_exit(struct thread *td)
 		 * back first if necessary.
 		 */
 		if (p->p_vmspace != vm) {
+			vmspace_remove_proc(p->p_vmspace, p);
 			PROC_VMSPACE_LOCK(p);
 			p->p_vmspace = vm;
 			PROC_VMSPACE_UNLOCK(p);
+			vmspace_insert_proc(p->p_vmspace, p);
 			pmap_activate(td);
 		}
 		pmap_remove_pages(vmspace_pmap(vm));
+		vmspace_remove_proc(p->p_vmspace, p);
 		PROC_VMSPACE_LOCK(p);
 		p->p_vmspace = &vmspace0;
 		PROC_VMSPACE_UNLOCK(p);
+		vmspace_insert_proc(p->p_vmspace, p);
 		pmap_activate(td);
 		vmspace_dofree(vm);
 	}
@@ -579,21 +628,26 @@ void
 vmspace_switch_aio(struct vmspace *newvm)
 {
 	struct vmspace *oldvm;
+	struct proc *p;
 
 	/* XXX: Need some way to assert that this is an aio daemon. */
 
 	KASSERT(refcount_load(&newvm->vm_refcnt) > 0,
 	    ("vmspace_switch_aio: newvm unreferenced"));
 
-	oldvm = curproc->p_vmspace;
+	p = curproc;
+
+	oldvm = p->p_vmspace;
 	if (oldvm == newvm)
 		return;
 
 	/*
 	 * Point to the new address space and refer to it.
 	 */
-	curproc->p_vmspace = newvm;
+	vmspace_remove_proc(oldvm, p);
+	p->p_vmspace = newvm;
 	refcount_acquire(&newvm->vm_refcnt);
+	vmspace_insert_proc(newvm, p);
 
 	/* Activate the new mapping. */
 	pmap_activate(curthread);
@@ -5841,9 +5895,11 @@ vmspace_exec(struct proc *p, vm_offset_t minuser, vm_offset_t maxuser)
 	 * run it down.  Even though there is little or no chance of blocking
 	 * here, it is a good idea to keep this form for future mods.
 	 */
+	vmspace_remove_proc(p->p_vmspace, p);
 	PROC_VMSPACE_LOCK(p);
 	p->p_vmspace = newvmspace;
 	PROC_VMSPACE_UNLOCK(p);
+	vmspace_insert_proc(p->p_vmspace, p);
 	if (p == curthread->td_proc)
 		pmap_activate(curthread);
 	curthread->td_pflags |= TDP_EXECVMSPC;
@@ -5875,9 +5931,11 @@ vmspace_unshare(struct proc *p)
 		vmspace_free(newvmspace);
 		return (ENOMEM);
 	}
+	vmspace_remove_proc(oldvmspace, p);
 	PROC_VMSPACE_LOCK(p);
 	p->p_vmspace = newvmspace;
 	PROC_VMSPACE_UNLOCK(p);
+	vmspace_insert_proc(newvmspace, p);
 	if (p == curthread->td_proc)
 		pmap_activate(curthread);
 	vmspace_free(oldvmspace);

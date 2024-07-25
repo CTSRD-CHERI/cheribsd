@@ -686,6 +686,8 @@ struct proc {
 					       (if I am reaper). */
 	LIST_ENTRY(proc) p_reapsibling;	/* (e) List of siblings - descendants of
 					       the same reaper. */
+	LIST_ENTRY(proc) p_vm_proclist; /* (b) List of processes sharing
+						p_vmspace  */
 	struct mtx	p_mtx;		/* (n) Lock for this struct. */
 	struct mtx	p_statmtx;	/* Lock for the stats */
 	struct mtx	p_itimmtx;	/* Lock for the virt/prof timers */

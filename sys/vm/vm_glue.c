@@ -581,6 +581,7 @@ vm_forkproc(struct thread *td, struct proc *p2, struct thread *td2,
 		if (p1->p_vmspace->vm_shm)
 			shmfork(p1, p2);
 	}
+	vmspace_insert_proc(p2->p_vmspace, p2);
 
 	/*
 	 * cpu_fork will copy and update the pcb, set up the kernel stack,
