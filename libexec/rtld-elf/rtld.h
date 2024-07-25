@@ -277,7 +277,7 @@ typedef struct Struct_Obj_Entry {
     Ver_Entry *vertab;		/* Versions required /defined by this object */
     int vernum;			/* Number of entries in vertab */
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
+#ifdef CHERI_LIB_C18N
     uint16_t compart_id;
     const struct func_sig *sigtab;
 #endif
