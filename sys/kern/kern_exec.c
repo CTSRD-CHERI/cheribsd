@@ -305,6 +305,9 @@ kern_coexecvec(struct thread *td, pid_t pid, const char * __capability fname,
 	}
 
 	error = kern_coexecve(td, &args, NULL, oldvmspace, cop, false);
+	if (error == EJUSTRETURN) {
+		KASSERT(td->td_proc->p_vmspace == cop->p_vmspace, ("not colocated"));
+	}
 	PRELE(cop);
 out:
 	post_execve(td, error, oldvmspace);
