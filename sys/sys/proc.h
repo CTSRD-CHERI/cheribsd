@@ -960,6 +960,7 @@ struct proc {
 #define	SINGLE_EXIT	1
 #define	SINGLE_BOUNDARY	2
 #define	SINGLE_ALLPROC	3
+#define	SINGLE_VMSPACE	4
 
 #ifdef MALLOC_DECLARE
 MALLOC_DECLARE(M_PARGS);
@@ -1330,6 +1331,8 @@ bool	stop_all_proc_block(void);
 void	stop_all_proc_unblock(void);
 void	stop_all_proc(void);
 void	resume_all_proc(void);
+void	stop_vmspace_proc(struct proc *cp);
+void	resume_vmspace_proc(struct proc *cp);
 
 static __inline int
 curthread_pflags_set(int flags)

@@ -1117,7 +1117,7 @@ calc_remaining(struct proc *p, int mode)
 	PROC_SLOCK_ASSERT(p, MA_OWNED);
 	if (mode == SINGLE_EXIT)
 		remaining = p->p_numthreads;
-	else if (mode == SINGLE_BOUNDARY)
+	else if (mode == SINGLE_BOUNDARY || mode == SINGLE_VMSPACE)
 		remaining = p->p_numthreads - p->p_boundary_count;
 	else if (mode == SINGLE_NO_EXIT || mode == SINGLE_ALLPROC)
 		remaining = p->p_numthreads - p->p_suspcount;
@@ -1163,6 +1163,7 @@ restart:
 		break;
 	case SINGLE_BOUNDARY:
 	case SINGLE_NO_EXIT:
+	case SINGLE_VMSPACE:
 		if (TD_IS_SUSPENDED(td2) &&
 		    (td2->td_flags & TDF_BOUNDARY) == 0) {
 			wakeup_swapper |= thread_unsuspend_one(td2, p, false);
@@ -1224,7 +1225,8 @@ thread_single(struct proc *p, int mode)
 
 	td = curthread;
 	KASSERT(mode == SINGLE_EXIT || mode == SINGLE_BOUNDARY ||
-	    mode == SINGLE_ALLPROC || mode == SINGLE_NO_EXIT,
+	    mode == SINGLE_ALLPROC || mode == SINGLE_NO_EXIT ||
+	    mode == SINGLE_VMSPACE,
 	    ("invalid mode %d", mode));
 	/*
 	 * If allowing non-ALLPROC singlethreading for non-curproc
@@ -1233,7 +1235,8 @@ thread_single(struct proc *p, int mode)
 	 * this is not implemented because it is not used.
 	 */
 	KASSERT((mode == SINGLE_ALLPROC && td->td_proc != p) ||
-	    (mode != SINGLE_ALLPROC && td->td_proc == p),
+	    ((mode != SINGLE_ALLPROC || mode != SINGLE_VMSPACE) &&
+	    td->td_proc == p),
 	    ("mode %d proc %p curproc %p", mode, p, td->td_proc));
 	mtx_assert(&Giant, MA_NOTOWNED);
 	PROC_LOCK_ASSERT(p, MA_OWNED);
@@ -1258,7 +1261,7 @@ thread_single(struct proc *p, int mode)
 		p->p_flag &= ~P_SINGLE_BOUNDARY;
 	} else {
 		p->p_flag &= ~P_SINGLE_EXIT;
-		if (mode == SINGLE_BOUNDARY)
+		if (mode == SINGLE_BOUNDARY || mode == SINGLE_VMSPACE)
 			p->p_flag |= P_SINGLE_BOUNDARY;
 		else
 			p->p_flag &= ~P_SINGLE_BOUNDARY;
@@ -1326,7 +1329,7 @@ stopme:
 			PROC_LOCK(p);
 			PROC_SLOCK(p);
 		}
-	} else if (mode == SINGLE_BOUNDARY) {
+	} else if (mode == SINGLE_BOUNDARY || mode == SINGLE_VMSPACE) {
 		/*
 		 * Wait until all suspended threads are removed from
 		 * the processors.  The thread_suspend_check()

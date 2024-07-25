@@ -3953,6 +3953,127 @@ again:
 	stop_all_proc_unblock();
 }
 
+/*
+ * stop_vmspace_proc() stops all proceses which share a vmspace with
+ * curproc.  It should be run after curproc has entered thread_single.
+ */
+void
+stop_vmspace_proc(struct proc* cp)
+{
+	struct proc *p;
+	struct vmspace *vm;
+	int r, gen;
+	bool restart, seen_stopped, seen_exiting, stopped_some;
+
+	/*
+	 * XXX-BD: Prevent multiple callers on a vmspace.
+	 * Maybe atomic CAS on a field in vmspace?
+	 */
+
+	vm = cp->p_vmspace;
+vmspace_loop:
+	VMSPACE_LOCK(vm);
+	/*
+	 * XXX: allproc_gen should work, but should vmspaces have a generation?
+	 */
+	gen = allproc_gen;
+	seen_exiting = seen_stopped = stopped_some = restart = false;
+	LIST_REMOVE(cp, p_vm_proclist);
+	LIST_INSERT_HEAD(&vm->vm_proclist, cp, p_vm_proclist);
+	for (;;) {
+		p = LIST_NEXT(cp, p_vm_proclist);
+		if (p == NULL)
+			break;
+		LIST_REMOVE(cp, p_vm_proclist);
+		LIST_INSERT_AFTER(p, cp, p_vm_proclist);
+		PROC_LOCK(p);
+		if ((p->p_flag & (P_KPROC | P_SYSTEM | P_TOTAL_STOP)) != 0) {
+			PROC_UNLOCK(p);
+			continue;
+		}
+		if ((p->p_flag2 & P2_WEXIT) != 0) {
+			seen_exiting = true;
+			PROC_UNLOCK(p);
+			continue;
+		}
+		if (P_SHOULDSTOP(p) == P_STOPPED_SINGLE) {
+			/*
+			 * Stopped processes are tolerated when there
+			 * are no other processes which might continue
+			 * them.  P_STOPPED_SINGLE but not
+			 * P_TOTAL_STOP process still has at least one
+			 * thread running.
+			 */
+			seen_stopped = true;
+			PROC_UNLOCK(p);
+			continue;
+		}
+		VMSPACE_UNLOCK(vm);
+		_PHOLD(p);
+		r = thread_single(p, SINGLE_VMSPACE);
+		if (r != 0)
+			restart = true;
+		else
+			stopped_some = true;
+		_PRELE(p);
+		PROC_UNLOCK(p);
+		VMSPACE_LOCK(vm);
+	}
+	/* Catch forked children we did not see in iteration. */
+	if (gen != allproc_gen)
+		restart = true;
+	VMSPACE_UNLOCK(vm);
+	if (restart || stopped_some || seen_exiting || seen_stopped) {
+		kern_yield(PRI_USER);
+		goto vmspace_loop;
+	}
+}
+
+void
+resume_vmspace_proc(struct proc *cp)
+{
+	struct proc *p;
+	struct vmspace *vm;
+
+	vm = cp->p_vmspace;
+
+	VMSPACE_LOCK(vm);
+again:
+	LIST_REMOVE(cp, p_vm_proclist);
+	LIST_INSERT_HEAD(&vm->vm_proclist, cp, p_vm_proclist);
+	for (;;) {
+		p = LIST_NEXT(cp, p_vm_proclist);
+		if (p == NULL)
+			break;
+		LIST_REMOVE(cp, p_vm_proclist);
+		LIST_INSERT_AFTER(p, cp, p_vm_proclist);
+		PROC_LOCK(p);
+		if (p->p_vmspace != cp->p_vmspace) {
+			PROC_UNLOCK(p);
+			continue;
+		}
+		if ((p->p_flag & P_TOTAL_STOP) != 0) {
+			VMSPACE_UNLOCK(vm);
+			_PHOLD(p);
+			thread_single_end(p, SINGLE_VMSPACE);
+			_PRELE(p);
+			PROC_UNLOCK(p);
+			VMSPACE_LOCK(vm);
+		} else {
+			PROC_UNLOCK(p);
+		}
+	}
+	/*  Did the loop above missed any stopped process ? */
+	FOREACH_PROC_IN_SYSTEM(p) {
+		/* No need for proc lock. */
+		if ((p->p_flag & P_TOTAL_STOP) != 0)
+			goto again;
+	}
+	VMSPACE_UNLOCK(vm);
+
+	/* See "XXX-BD: Prevent multiple callers on a vmspace" above */
+}
+
 /* #define	TOTAL_STOP_DEBUG	1 */
 #ifdef TOTAL_STOP_DEBUG
 volatile static int ap_resume;
