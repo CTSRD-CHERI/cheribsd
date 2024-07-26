@@ -3343,6 +3343,7 @@ restart_checks:
 		if ((flags & VM_MAP_PROTECT_KEEP_CAP) != 0 &&
 		    (entry->max_protection & VM_PROT_CAP) != 0) {
 			new_prot = VM_PROT_ADD_CAP(new_prot);
+			new_maxprot = VM_PROT_ADD_CAP(new_maxprot);
 			flags &= ~VM_MAP_PROTECT_KEEP_CAP;
 			goto restart_checks;
 		}
