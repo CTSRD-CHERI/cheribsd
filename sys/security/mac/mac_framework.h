@@ -96,7 +96,7 @@ struct in6_addr;
 
 #include <ddb/ddb.h>			/* db_expr_t */
 
-int	copyin_mac(void * __capability mac_p, struct mac *mac);
+int	copyin_mac(const void * const __capability mac_p, struct mac *mac);
 
 /*
  * Entry points to the TrustedBSD MAC Framework from the remainder of the

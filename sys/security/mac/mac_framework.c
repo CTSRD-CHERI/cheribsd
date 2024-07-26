@@ -743,7 +743,7 @@ mac_check_structmac_consistent(const struct mac *mac)
 }
 
 int
-copyin_mac(void * __capability mac_p, struct mac *mac)
+copyin_mac(const void * const __capability mac_p, struct mac *mac)
 {
 	int error;
 
