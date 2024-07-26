@@ -3306,6 +3306,9 @@ again:
 	 * Make a first pass to check for protection violations.
 	 */
 restart_checks:
+	KASSERT((flags & VM_MAP_PROTECT_KEEP_CAP) == 0 ||
+	    (flags & (VM_MAP_PROTECT_SET_PROT | VM_MAP_PROTECT_SET_MAXPROT)) !=
+	       0, ("VM_MAP_PROTECT_KEEP_CAP, but not setting any protections"));
 	check_prot = 0;
 	if ((flags & VM_MAP_PROTECT_SET_PROT) != 0)
 		check_prot |= new_prot;
@@ -3326,10 +3329,10 @@ restart_checks:
 
 		/*
 		 * When VM_MAP_PROTECT_KEEP_CAP is used (for mprotect()),
-		 * upgrade* new_prot to include the associated VM_PROT_CAP
+		 * upgrade new_prot to include the associated VM_PROT_CAP
 		 * bits and retry the the scan.  This means that the
 		 * mprotect will fail if it spans map entries with and
-		 * without VM_PROT_CAP set.
+		 * without VM_PROT_CAP set set in max_protection.
 		 *
 		 * Alternatively, VM_MAP_PROTECT_KEEP_CAP could be applied to
 		 * individual map entries.  The current approach gives
@@ -3337,9 +3340,8 @@ restart_checks:
 		 * potential compatibility breakage.  The alternative
 		 * would maximize compatibility.
 		 */
-		if (flags & VM_MAP_PROTECT_KEEP_CAP &&
-		    (((flags & VM_MAP_PROTECT_SET_MAXPROT) != 0 && (entry->max_protection & VM_PROT_CAP) != 0) ||
-		    ((flags & VM_MAP_PROTECT_SET_MAXPROT) == 0 && (entry->protection & VM_PROT_CAP) != 0))) {
+		if ((flags & VM_MAP_PROTECT_KEEP_CAP) != 0 &&
+		    (entry->max_protection & VM_PROT_CAP) != 0) {
 			new_prot = VM_PROT_ADD_CAP(new_prot);
 			flags &= ~VM_MAP_PROTECT_KEEP_CAP;
 			goto restart_checks;
