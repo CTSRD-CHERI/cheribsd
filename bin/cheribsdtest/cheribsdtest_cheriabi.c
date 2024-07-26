@@ -284,6 +284,23 @@ CHERIBSDTEST(cheriabi_munmap_invalid_ptr,
 	cheribsdtest_success();
 }
 
+CHERIBSDTEST(cheriabi_mprotect_upgrade_prot_cap,
+    "Check that upgrading from PROT_NONE includes capability permissions")
+{
+	void * volatile *p;
+
+	p = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, PAGE_SIZE,
+	    PROT_NONE | PROT_MAX(PROT_READ | PROT_WRITE),
+	    MAP_ANON | MAP_PRIVATE, -1, 0));
+	CHERIBSDTEST_CHECK_SYSCALL(mprotect(__DEVOLATILE(void *, p), PAGE_SIZE,
+	    PROT_READ | PROT_WRITE));
+
+	/* Attempt to store a capability */
+	*p = __DEVOLATILE(void *, p);
+
+	cheribsdtest_success();
+}
+
 CHERIBSDTEST(cheriabi_mprotect_invalid_ptr,
     "Check that mprotect() rejects invalid pointer arguments")
 {
