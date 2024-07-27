@@ -52,6 +52,14 @@
             ..
             __numeric
             ..
+            __ostream
+            ..
+            __pstl
+                backends
+                ..
+                cpu_algos
+                ..
+            ..
             __random
             ..
             __ranges
@@ -59,6 +67,8 @@
             __string
             ..
             __thread
+                support
+                ..
             ..
             __tuple_dir
             ..
