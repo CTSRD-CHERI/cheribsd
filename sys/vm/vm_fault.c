@@ -639,7 +639,9 @@ vm_fault_populate_cleanup(vm_object_t object, vm_pindex_t first,
 	VM_OBJECT_ASSERT_WLOCKED(object);
 	MPASS(first <= last);
 	for (pidx = first, m = vm_page_lookup(object, pidx);
-	    pidx <= last; pidx++, m = vm_page_next(m)) {
+	    pidx <= last; pidx++, m = TAILQ_NEXT(m, listq)) {
+		KASSERT(m != NULL && m->pindex == pidx,
+		    ("%s: pindex mismatch", __func__));
 		vm_fault_populate_check_page(m);
 		vm_page_deactivate(m);
 		vm_page_xunbusy(m);
@@ -787,9 +789,10 @@ skip_pmap_bdry:
 	prot = VM_OBJECT_MASK_CAP_PROT(fs->first_object, fs->prot);
 	for (pidx = pager_first, m = vm_page_lookup(fs->first_object, pidx);
 	    pidx <= pager_last;
-	    pidx += npages, m = vm_page_next(&m[npages - 1])) {
+	    pidx += npages, m = TAILQ_NEXT(&m[npages - 1], listq)) {
 		vaddr = fs->entry->start + IDX_TO_OFF(pidx) - fs->entry->offset;
-
+		KASSERT(m != NULL && m->pindex == pidx,
+		    ("%s: pindex mismatch", __func__));
 		psind = m->psind;
 		while (psind > 0 && ((vaddr & (pagesizes[psind] - 1)) != 0 ||
 		    pidx + OFF_TO_IDX(pagesizes[psind]) - 1 > pager_last ||
