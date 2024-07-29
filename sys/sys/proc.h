@@ -460,7 +460,7 @@ do {									\
 #define	TDF_SINTR	0x00000008 /* Sleep is interruptible. */
 #define	TDF_TIMEOUT	0x00000010 /* Timing out during sleep. */
 #define	TDF_IDLETD	0x00000020 /* This is a per-CPU idle thread. */
-#define	TDF_CANSWAP	0x00000040 /* Thread can be swapped. */
+#define	TDF_UNUSED11	0x00000040 /* Available */
 #define	TDF_SIGWAIT	0x00000080 /* Ignore ignored signals */
 #define	TDF_KTH_SUSP	0x00000100 /* kthread is suspended */
 #define	TDF_ALLPROCSUSP	0x00000200 /* suspended by SINGLE_ALLPROC */
@@ -476,7 +476,7 @@ do {									\
 #define	TDF_SERESTART	0x00080000 /* ERESTART on stop attempts. */
 #define	TDF_THRWAKEUP	0x00100000 /* Libthr thread must not suspend itself. */
 #define	TDF_SEINTR	0x00200000 /* EINTR on stop attempts. */
-#define	TDF_SWAPINREQ	0x00400000 /* Swapin request due to wakeup. */
+#define	TDF_UNUSED12	0x00400000 /* Available */
 #define	TDF_UNUSED6	0x00800000 /* Available */
 #define	TDF_SCHED0	0x01000000 /* Reserved for scheduler private use */
 #define	TDF_SCHED1	0x02000000 /* Reserved for scheduler private use */
@@ -582,14 +582,12 @@ enum {
  */
 #define	TDI_SUSPENDED	0x0001	/* On suspension queue. */
 #define	TDI_SLEEPING	0x0002	/* Actually asleep! (tricky). */
-#define	TDI_SWAPPED	0x0004	/* Stack not in mem.  Bad juju if run. */
 #define	TDI_LOCK	0x0008	/* Stopped on a lock. */
 #define	TDI_IWAIT	0x0010	/* Awaiting interrupt. */
 
 #define	TD_IS_SLEEPING(td)	((td)->td_inhibitors & TDI_SLEEPING)
 #define	TD_ON_SLEEPQ(td)	((td)->td_wchan != NULL)
 #define	TD_IS_SUSPENDED(td)	((td)->td_inhibitors & TDI_SUSPENDED)
-#define	TD_IS_SWAPPED(td)	((td)->td_inhibitors & TDI_SWAPPED)
 #define	TD_ON_LOCK(td)		((td)->td_inhibitors & TDI_LOCK)
 #define	TD_AWAITING_INTR(td)	((td)->td_inhibitors & TDI_IWAIT)
 #ifdef _KERNEL
@@ -610,7 +608,6 @@ enum {
 #define	KTDSTATE(td)							\
 	(((td)->td_inhibitors & TDI_SLEEPING) != 0 ? "sleep"  :		\
 	((td)->td_inhibitors & TDI_SUSPENDED) != 0 ? "suspended" :	\
-	((td)->td_inhibitors & TDI_SWAPPED) != 0 ? "swapped" :		\
 	((td)->td_inhibitors & TDI_LOCK) != 0 ? "blocked" :		\
 	((td)->td_inhibitors & TDI_IWAIT) != 0 ? "iwait" : "yielding")
 
@@ -626,14 +623,12 @@ enum {
 } while (0)
 
 #define	TD_SET_SLEEPING(td)	TD_SET_INHIB((td), TDI_SLEEPING)
-#define	TD_SET_SWAPPED(td)	TD_SET_INHIB((td), TDI_SWAPPED)
 #define	TD_SET_LOCK(td)		TD_SET_INHIB((td), TDI_LOCK)
 #define	TD_SET_SUSPENDED(td)	TD_SET_INHIB((td), TDI_SUSPENDED)
 #define	TD_SET_IWAIT(td)	TD_SET_INHIB((td), TDI_IWAIT)
 #define	TD_SET_EXITING(td)	TD_SET_INHIB((td), TDI_EXITING)
 
 #define	TD_CLR_SLEEPING(td)	TD_CLR_INHIB((td), TDI_SLEEPING)
-#define	TD_CLR_SWAPPED(td)	TD_CLR_INHIB((td), TDI_SWAPPED)
 #define	TD_CLR_LOCK(td)		TD_CLR_INHIB((td), TDI_LOCK)
 #define	TD_CLR_SUSPENDED(td)	TD_CLR_INHIB((td), TDI_SUSPENDED)
 #define	TD_CLR_IWAIT(td)	TD_CLR_INHIB((td), TDI_IWAIT)
@@ -828,8 +823,7 @@ struct proc {
 					   shortcuts) */
 #define	P_SUGID		0x00000100	/* Had set id privileges since last
 					   exec. */
-#define	P_SYSTEM	0x00000200	/* System proc: no sigs, stats or
-					   swapping. */
+#define	P_SYSTEM	0x00000200	/* System proc: no sigs or stats. */
 #define	P_SINGLE_EXIT	0x00000400	/* Threads suspending should exit,
 					   not wait. */
 #define	P_TRACED	0x00000800	/* Debugged process being traced. */
@@ -854,8 +848,8 @@ struct proc {
 #define	P_INEXEC	0x04000000	/* Process is in execve(). */
 #define	P_STATCHILD	0x08000000	/* Child process stopped or exited. */
 #define	P_INMEM		0x10000000	/* Loaded into memory. */
-#define	P_SWAPPINGOUT	0x20000000	/* Process is being swapped out. */
-#define	P_SWAPPINGIN	0x40000000	/* Process is being swapped in. */
+#define	P_UNUSED1	0x20000000	/* --available-- */
+#define	P_UNUSED2	0x40000000	/* --available-- */
 #define	P_PPTRACE	0x80000000	/* PT_TRACEME by vforked child. */
 
 #define	P_STOPPED	(P_STOPPED_SIG|P_STOPPED_SINGLE|P_STOPPED_TRACE)
@@ -1059,9 +1053,6 @@ extern pid_t pid_max;
 	PROC_LOCK_ASSERT(_p, MA_OWNED);					\
 	_p->p_cowgen - _td->td_cowgen;					\
 })
-
-/* Check whether a thread is safe to be swapped out. */
-#define	thread_safetoswapout(td)	((td)->td_flags & TDF_CANSWAP)
 
 /* Control whether or not it is safe for curthread to sleep. */
 #define	THREAD_NO_SLEEPING()		do {				\
