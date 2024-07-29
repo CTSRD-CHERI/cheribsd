@@ -857,14 +857,6 @@ vm_waitproc(struct proc *p)
 	vmspace_exitfree(p);		/* and clean-out the vmspace */
 }
 
-/*
- * This used to kick the thread which faults in threads.
- */
-void
-kick_proc0(void)
-{
-}
-
 #if __has_feature(capabilities)
 bool
 vm_cap_allows_prot(const void * __capability cap, vm_prot_t prot)
