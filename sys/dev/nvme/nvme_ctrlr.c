@@ -1259,11 +1259,6 @@ nvme_ctrlr_passthrough_cmd(struct nvme_controller *ctrlr,
 			return EIO;
 		}
 		if (is_user_buffer) {
-			/*
-			 * Ensure the user buffer is wired for the duration of
-			 *  this pass-through command.
-			 */
-			PHOLD(curproc);
 			buf = uma_zalloc(pbuf_zone, M_WAITOK);
 			buf->b_iocmd = pt->is_read ? BIO_READ : BIO_WRITE;
 			if (vmapbuf(buf, pt->buf, pt->len, 1) < 0) {
@@ -1310,7 +1305,6 @@ nvme_ctrlr_passthrough_cmd(struct nvme_controller *ctrlr,
 		vunmapbuf(buf);
 err:
 		uma_zfree(pbuf_zone, buf);
-		PRELE(curproc);
 	}
 
 	return (ret);
@@ -1357,11 +1351,6 @@ nvme_ctrlr_linux_passthru_cmd(struct nvme_controller *ctrlr,
 		if ((npc->opcode & 0x3) == 0 || (npc->opcode & 0x3) == 3)
 			return (EINVAL);
 		if (is_user) {
-			/*
-			 * Ensure the user buffer is wired for the duration of
-			 *  this pass-through command.
-			 */
-			PHOLD(curproc);
 			buf = uma_zalloc(pbuf_zone, M_WAITOK);
 			buf->b_iocmd = npc->opcode & 1 ? BIO_WRITE : BIO_READ;
 			if (vmapbuf(buf, (void * __capability)(uintcap_t)npc->addr,
@@ -1409,7 +1398,6 @@ nvme_ctrlr_linux_passthru_cmd(struct nvme_controller *ctrlr,
 		vunmapbuf(buf);
 err:
 		uma_zfree(pbuf_zone, buf);
-		PRELE(curproc);
 	}
 
 	return (ret);
