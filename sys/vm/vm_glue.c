@@ -854,11 +854,12 @@ vm_waitproc(struct proc *p)
 	vmspace_exitfree(p);		/* and clean-out the vmspace */
 }
 
+/*
+ * This used to kick the thread which faults in threads.
+ */
 void
 kick_proc0(void)
 {
-
-	wakeup(&proc0);
 }
 
 #if __has_feature(capabilities)
