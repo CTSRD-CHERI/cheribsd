@@ -301,6 +301,32 @@ CHERIBSDTEST(cheriabi_mprotect_upgrade_prot_cap,
 	cheribsdtest_success();
 }
 
+CHERIBSDTEST(cheriabi_mprotect_downgrade_prot_cap,
+    "Check that downgrading to PROT_MAX(PROT_READ) includes capability read",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO | CT_FLAG_SI_ADDR,
+    .ct_signum = SIGSEGV,
+    .ct_si_code = SEGV_ACCERR,
+    .ct_si_trapno = TRAPNO_STORE_PF)
+{
+	void * volatile *p;
+
+	p = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, PAGE_SIZE,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0));
+	*p = __DEVOLATILE(void *, p);
+
+	/* Downgrade and attempt to load a capability */
+	CHERIBSDTEST_CHECK_SYSCALL(mprotect(__DEVOLATILE(void *, p), PAGE_SIZE,
+	    PROT_READ | PROT_MAX(PROT_READ)));
+	CHERIBSDTEST_VERIFY(cheri_gettag(*p));
+
+	/* Try a store.  This should fault. */
+	cheribsdtest_set_expected_si_addr(
+	    NULL_DERIVED_VOIDP(__DEVOLATILE(void *, p)));
+	*p = __DEVOLATILE(void *, p);
+
+	cheribsdtest_failure_errx("tagged store succeeded after downgrade");
+}
+
 CHERIBSDTEST(cheriabi_mprotect_invalid_ptr,
     "Check that mprotect() rejects invalid pointer arguments")
 {
