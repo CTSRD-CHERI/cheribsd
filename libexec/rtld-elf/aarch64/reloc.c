@@ -1,7 +1,8 @@
 /*-
- * Copyright (c) 2014-2015 The FreeBSD Foundation
  * Copyright 2020 Brett F. Gutstein
  * All rights reserved.
+ *
+ * Copyright (c) 2014-2015 The FreeBSD Foundation
  *
  * Portions of this software were developed by Andrew Turner
  * under sponsorship from the FreeBSD Foundation.
