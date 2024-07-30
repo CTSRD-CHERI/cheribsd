@@ -278,6 +278,7 @@ out_release:
 }
 
 static struct rwlock drm_vma_lock;
+RW_SYSINIT(drm_freebsd, &drm_vma_lock, "drmcompat-vma-lock");
 static TAILQ_HEAD(, vm_area_struct) drm_vma_head =
     TAILQ_HEAD_INITIALIZER(drm_vma_head);
 
@@ -795,18 +796,3 @@ int drm_irq_uninstall(struct drm_device *dev)
 {
 	panic("%s: Not implemented yet.", __func__);
 }
-
-static void
-drm_stub_init(void *arg)
-{
-	rw_init(&drm_vma_lock, "drmcompat-vma-lock");
-}
-
-static void
-drm_stub_uninit(void *arg)
-{
-	rw_destroy(&drm_vma_lock);
-}
-
-SYSINIT(drm_stub, SI_SUB_DRIVERS, SI_ORDER_SECOND, drm_stub_init, NULL);
-SYSUNINIT(drm_stub, SI_SUB_DRIVERS, SI_ORDER_SECOND, drm_stub_uninit, NULL);
