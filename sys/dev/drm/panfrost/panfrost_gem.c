@@ -694,9 +694,11 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 		error = panfrost_alloc_pages_iommu(bo);
 	else
 		error = panfrost_alloc_pages_contig(bo);
-
-	if (error)
+	if (error) {
+		printf("%s:%d failed to allocate %d pages\n",
+		    __func__, __LINE__, npages);
 		return (error);
+	}
 
 	bo->sgt = drm_prime_pages_to_sg(m0, npages);
 
