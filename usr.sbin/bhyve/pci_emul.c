@@ -48,6 +48,7 @@
 
 #include "acpi.h"
 #include "bhyverun.h"
+#include "bootrom.h"
 #include "config.h"
 #include "debug.h"
 #ifdef __amd64__
@@ -853,6 +854,9 @@ pci_emul_alloc_bar(struct pci_devinst *pdi, int idx, enum pcibar_type type,
 		TAILQ_INSERT_BEFORE(bar, new_bar, chain);
 	}
 
+	if (bootrom_boot())
+		return (0);
+
 	/*
 	 * pci_passthru devices synchronize their physical and virtual command
 	 * register on init. For that reason, the virtual cmd reg should be
@@ -966,8 +970,19 @@ pci_emul_assign_bar(struct pci_devinst *const pdi, const int idx,
 		pci_set_cfgdata32(pdi, PCIR_BAR(idx + 1), bar >> 32);
 	}
 
-	if (type != PCIBAR_ROM) {
-		register_bar(pdi, idx);
+	switch (type) {
+	case PCIBAR_IO:
+		if (porten(pdi))
+			register_bar(pdi, idx);
+		break;
+	case PCIBAR_MEM32:
+	case PCIBAR_MEM64:
+	case PCIBAR_MEMHI64:
+		if (memen(pdi))
+			register_bar(pdi, idx);
+		break;
+	default:
+		break;
 	}
 
 	return (0);
@@ -1140,7 +1155,8 @@ pci_emul_init(struct vmctx *ctx, struct pci_devemu *pde, int bus, int slot,
 	pci_set_cfgdata8(pdi, PCIR_INTLINE, 255);
 	pci_set_cfgdata8(pdi, PCIR_INTPIN, 0);
 
-	pci_set_cfgdata8(pdi, PCIR_COMMAND, PCIM_CMD_BUSMASTEREN);
+	if (!bootrom_boot())
+		pci_set_cfgdata8(pdi, PCIR_COMMAND, PCIM_CMD_BUSMASTEREN);
 
 	err = (*pde->pe_init)(pdi, fi->fi_config);
 	if (err == 0)
