@@ -56,6 +56,27 @@
 .endm
 
 /*
+ * Lower 32 bits of CONTEXTIDR_EL1 are PID
+ * Upper 32 bits are reserved for future use e.g. TID
+ */
+.macro pid_in_context_idr
+#ifdef __CHERI_PURE_CAPABILITY__
+	adrp	c9, :got:arm64_pid_in_contextidr
+	ldr	c9, [c9, :got_lo12:arm64_pid_in_contextidr]
+	ldrb	w10, [c9]
+#else
+	adrp	x9, arm64_pid_in_contextidr
+	ldrb	w10, [x9, :lo12:arm64_pid_in_contextidr]
+#endif
+	cbz	w10, 998f
+	ldr	PTR(9), [PTR(1), #TD_PROC]
+	/* PID is always 0 or positive, do not sign extend */
+	ldr	w10, [PTR(9), #P_PID]
+	msr	contextidr_el1, x10
+998:
+.endm
+
+/*
  * void cpu_throw(struct thread *old, struct thread *new)
  */
 ENTRY(cpu_throw)
@@ -66,7 +87,10 @@ ENTRY(cpu_throw)
 	ldr	PTR(4), [PTR(0), #TD_PCB]
 	ldr	w5, [PTR(4), #PCB_FLAGS]
 	clear_step_flag w5, x6
+
 1:
+	/* debug/trace: set CONTEXTIDR_EL1 to current PID, if enabled */
+	pid_in_context_idr
 
 #ifdef VFP
 	/* Backup the new thread pointer around a call to C code */
@@ -175,6 +199,9 @@ ENTRY(cpu_switch)
 	mov	PTR(19), PTR(0)
 	mov	PTR(20), PTR(1)
 	mov	PTR(21), PTR(2)
+
+	/* debug/trace: set CONTEXTIDR_EL1 to current PID, if enabled */
+	pid_in_context_idr
 
 #ifdef VFP
 	bl	vfp_save_state_switch
