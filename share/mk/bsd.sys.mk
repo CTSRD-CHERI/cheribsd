@@ -257,6 +257,14 @@ CWARNFLAGS+=	-Wno-system-headers
 CWARNFLAGS+=	-Wno-error=pass-failed
 .endif
 
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 160000
+# Work around warnings in libc++15 when built with Clang 16+.
+# This has to be here rather than scoped to libc++ since it is
+# triggered in headers used by (almost) all C++ programs.
+# FIXME: Remove this once libc++ has been upgraded.
+CXXWARNFLAGS+=-Wno-keyword-compat
+.endif
+
 # How to handle FreeBSD custom printf format specifiers.
 .if ${COMPILER_TYPE} == "clang" || \
     (${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} >= 120100)
