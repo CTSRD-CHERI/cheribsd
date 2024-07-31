@@ -211,7 +211,7 @@ freebsd_parse_boot_param(struct arm64_bootparams *abp)
 
 	preload_metadata = (caddr_t)(uintptr_t)(abp->modulep);
 	preload_metadata = cheri_kern_andperm(preload_metadata,
-	    CHERI_PERMS_KERNEL_RODATA & CHERI_PERMS_KERNEL_DATA_NOCAP);
+	    CHERI_PERMS_KERNEL_DATA & CHERI_PERMS_KERNEL_DATA_NOCAP);
 	kmdp = preload_search_by_type("elf kernel");
 	if (kmdp == NULL)
 		return (0);
