@@ -1976,11 +1976,11 @@ gdb_query(const uint8_t *data, size_t len)
 			append_char('l');
 		} else if (doff + dlen >= sizeof(capbuf)) {
 			append_char('l');
-			append_packet_data(capbuf + doff,
+			append_binary_data(capbuf + doff,
 			    sizeof(capbuf) - doff);
 		} else {
 			append_char('m');
-			append_packet_data(capbuf + doff, dlen);
+			append_binary_data(capbuf + doff, dlen);
 		}
 		finish_packet();
 #else
