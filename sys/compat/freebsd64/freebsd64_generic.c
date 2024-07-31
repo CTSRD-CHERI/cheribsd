@@ -196,6 +196,13 @@ freebsd64_ppoll(struct thread *td, struct freebsd64_ppoll_args *uap)
 	return (user_ppoll(td, __USER_CAP_ARRAY(uap->fds, uap->nfds),
 	    uap->nfds, __USER_CAP_OBJ(uap->ts), __USER_CAP_OBJ(uap->set)));
 }
+
+int
+freebsd64_kcmp(struct thread *td, struct freebsd64_kcmp_args *uap)
+{
+	return (kern_kcmp(td, uap->pid1, uap->pid2, uap->type,
+	    uap->idx1, uap->idx2));
+}
 /*
  * CHERI CHANGES START
  * {
