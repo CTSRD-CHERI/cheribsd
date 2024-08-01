@@ -39,3 +39,6 @@ nooptions 	KDTRACE_HOOKS		# Kernel DTrace hooks
 
 # Doesn't build with Morello LLVM
 nooptions 	PAC
+
+# Stores user and kernel pointers in uint64_t
+nodevice	netmap
