@@ -188,7 +188,7 @@
 #define	FREEBSD64_SYS_freebsd64_setrlimit	195
 #define	FREEBSD64_SYS_freebsd11_freebsd64_getdirentries	196
 				/* 197 is freebsd6 freebsd64_mmap */
-#define	FREEBSD64_SYS___syscall	198
+#define	FREEBSD64_SYS_freebsd64___syscall	198
 				/* 199 is freebsd6 lseek */
 				/* 200 is freebsd6 freebsd64_truncate */
 				/* 201 is freebsd6 ftruncate */

@@ -247,7 +247,7 @@ struct sysent freebsd64_sysent[] = {
 	{ .sy_narg = AS(freebsd64_setrlimit_args), .sy_call = (sy_call_t *)freebsd64_setrlimit, .sy_auevent = AUE_SETRLIMIT, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 195 = freebsd64_setrlimit */
 	{ compat11(AS(freebsd11_freebsd64_getdirentries_args),freebsd64_getdirentries), .sy_auevent = AUE_GETDIRENTRIES, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 196 = freebsd11 freebsd64_getdirentries */
 	{ compat6(AS(freebsd6_freebsd64_mmap_args),freebsd64_mmap), .sy_auevent = AUE_MMAP, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 197 = freebsd6 freebsd64_mmap */
-	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },		/* 198 = __syscall */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },		/* 198 = freebsd64___syscall */
 	{ compat6(AS(freebsd6_lseek_args),lseek), .sy_auevent = AUE_LSEEK, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 199 = freebsd6 lseek */
 	{ compat6(AS(freebsd6_freebsd64_truncate_args),freebsd64_truncate), .sy_auevent = AUE_TRUNCATE, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 200 = freebsd6 freebsd64_truncate */
 	{ compat6(AS(freebsd6_ftruncate_args),ftruncate), .sy_auevent = AUE_FTRUNCATE, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 201 = freebsd6 ftruncate */

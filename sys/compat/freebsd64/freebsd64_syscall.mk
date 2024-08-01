@@ -125,7 +125,7 @@ MIASM =  \
 	freebsd64_getrlimit.o \
 	freebsd64_setrlimit.o \
 	freebsd11_freebsd64_getdirentries.o \
-	__syscall.o \
+	freebsd64___syscall.o \
 	freebsd64___sysctl.o \
 	freebsd64_mlock.o \
 	freebsd64_munlock.o \
