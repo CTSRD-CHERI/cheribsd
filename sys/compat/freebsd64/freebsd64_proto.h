@@ -234,7 +234,7 @@ struct freebsd64_cheri_cidcap_alloc_args {
 struct freebsd64_fcntl_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char arg_l_[PADL_(intptr_t)]; intptr_t arg; char arg_r_[PADR_(intptr_t)];
+	char arg_l_[PADL_(intptr64_t)]; intptr64_t arg; char arg_r_[PADR_(intptr64_t)];
 };
 struct freebsd64_select_args {
 	char nd_l_[PADL_(int)]; int nd; char nd_r_[PADR_(int)];
@@ -1513,8 +1513,8 @@ struct freebsd64_kcmp_args {
 	char pid1_l_[PADL_(pid_t)]; pid_t pid1; char pid1_r_[PADR_(pid_t)];
 	char pid2_l_[PADL_(pid_t)]; pid_t pid2; char pid2_r_[PADR_(pid_t)];
 	char type_l_[PADL_(int)]; int type; char type_r_[PADR_(int)];
-	char idx1_l_[PADL_(uintptr_t)]; uintptr_t idx1; char idx1_r_[PADR_(uintptr_t)];
-	char idx2_l_[PADL_(uintptr_t)]; uintptr_t idx2; char idx2_r_[PADR_(uintptr_t)];
+	char idx1_l_[PADL_(uintptr64_t)]; uintptr64_t idx1; char idx1_r_[PADR_(uintptr64_t)];
+	char idx2_l_[PADL_(uintptr64_t)]; uintptr64_t idx2; char idx2_r_[PADR_(uintptr64_t)];
 };
 int	freebsd64_read(struct thread *, struct freebsd64_read_args *);
 int	freebsd64_write(struct thread *, struct freebsd64_write_args *);

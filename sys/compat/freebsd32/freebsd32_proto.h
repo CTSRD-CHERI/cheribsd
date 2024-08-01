@@ -89,7 +89,7 @@ struct freebsd32_getitimer_args {
 struct freebsd32_fcntl_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char arg_l_[PADL_(intptr_t)]; intptr_t arg; char arg_r_[PADR_(intptr_t)];
+	char arg_l_[PADL_(intptr32_t)]; intptr32_t arg; char arg_r_[PADR_(intptr32_t)];
 };
 struct freebsd32_select_args {
 	char nd_l_[PADL_(int)]; int nd; char nd_r_[PADR_(int)];
