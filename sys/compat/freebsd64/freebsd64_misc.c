@@ -1179,7 +1179,7 @@ freebsd64_fcntl(struct thread *td, struct freebsd64_fcntl_args *uap)
 	case F_SETLK:
 	case F_SETLKW:
 	case F_SETLK_REMOTE:
-		arg = (intcap_t)__USER_CAP_UNBOUND((void *)uap->arg);
+		arg = (intcap_t)__USER_CAP_UNBOUND(uap->arg);
 		break;
 	default:
 		arg = (intcap_t)uap->arg;
