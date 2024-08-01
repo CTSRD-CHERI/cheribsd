@@ -132,7 +132,9 @@ zk_thread_create(void (*func)(void *), void *arg, size_t stksize, int state)
 	 * multiple of system page size.
 	 */
 	VERIFY0(pthread_attr_setstacksize(&attr, stksize));
+#ifndef __CHERI_PURE_CAPABILITY__
 	VERIFY0(pthread_attr_setguardsize(&attr, PAGESIZE));
+#endif
 
 	VERIFY(ztw = malloc(sizeof (*ztw)));
 	ztw->func = func;
