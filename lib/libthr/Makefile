@@ -102,7 +102,7 @@ CFLAGS.heap.c+=	-DIN_LIBTHR
 SRCS+= rtld_malloc.c
 .endif
 
-LIBSYS_SRCTOP=	${.CURDIR:H}/libsys
+LIBSYS_SRCTOP=	${LIBTHR_SRCTOP:H}/libsys
 .if exists(${LIBSYS_SRCTOP}/${MACHINE_CPUARCH}/_umtx_op_err.S)
 .PATH: ${LIBSYS_SRCTOP}/${MACHINE_CPUARCH}
 .else
