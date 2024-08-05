@@ -67,7 +67,8 @@
 
 static void vm_cheri_revoke_pass_pre(vm_map_t);
 static void vm_cheri_revoke_pass_post(vm_map_t);
-static int vm_cheri_revoke_pass_locked(const struct vm_cheri_revoke_cookie *);
+static int vm_cheri_revoke_pass_locked(struct vmspace *,
+    const struct vm_cheri_revoke_cookie *);
 
 static SYSCTL_NODE(_vm_stats, OID_AUTO, cheri_revoke,
     CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
@@ -92,6 +93,11 @@ static COUNTER_U64_DEFINE_EARLY(cheri_skip_obj_no_hascap);
 SYSCTL_COUNTER_U64(_vm_stats_cheri_revoke, OID_AUTO, skip_obj_no_hascap, CTLFLAG_RD,
     &cheri_skip_obj_no_hascap,
     "Virtual pages skipped in VM objects with no capabilities");
+
+static COUNTER_U64_DEFINE_EARLY(cheri_last_ref_early_finish);
+SYSCTL_COUNTER_U64(_vm_stats_cheri_revoke, OID_AUTO, last_ref_early_finish, CTLFLAG_RD,
+    &cheri_last_ref_early_finish,
+    "Scans finished early because the target exited");
 
 /***************************** KERNEL THREADS ***************************/
 
@@ -182,6 +188,7 @@ vm_cheri_revoke_kproc(void *arg __unused)
 		mtx_unlock(&async_revoke_mtx);
 
 		vmspace_switch_aio(arc->vm);
+		vmspace_free(arc->vm);
 
 		/*
 		 * Advance the async state machine.
@@ -192,7 +199,7 @@ vm_cheri_revoke_kproc(void *arg __unused)
 		/*
 		 * Do the actual revocation pass.
 		 */
-		error = vm_cheri_revoke_pass_locked(&arc->cookie);
+		error = vm_cheri_revoke_pass_locked(arc->vm, &arc->cookie);
 
 		/*
 		 * A revocation pass is done.  Advance the state machine again
@@ -200,7 +207,6 @@ vm_cheri_revoke_kproc(void *arg __unused)
 		 */
 		vm_cheri_revoke_pass_async_post(map, error);
 
-		vmspace_free(arc->vm);
 		free(arc, M_REVOKE);
 	}
 
@@ -907,10 +913,14 @@ ok:
  * The map must be read-locked on entry and will be read-locked on exit, but
  * the lock may be dropped internally.  The map must, therefore, also be
  * held across invocation.
+ *
+ * The containing vmspace may be referenced by the "vm" parameter to signal that
+ * the revocation sweep is asynchronous and should terminate if the caller ends
+ * up holding the final vmspace reference.
  */
 static int
 vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc,
-    vm_map_entry_t entry, vm_offset_t *addr)
+    struct vmspace *vm, vm_map_entry_t entry, vm_offset_t *addr)
 {
 	vm_offset_t ooffset;
 	vm_object_t obj;
@@ -960,6 +970,13 @@ vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc,
 #ifdef INVARIANTS
 		vm_offset_t oaddr = *addr;
 #endif
+
+		/* Has the target process already exited? */
+		if (vm != NULL && refcount_load(&vm->vm_refcnt) == 1) {
+			VM_OBJECT_WUNLOCK(obj);
+			counter_u64_add(cheri_last_ref_early_finish, 1);
+			return (KERN_NOT_RECEIVER);
+		}
 
 		/* Find ourselves in this object */
 		ooffset = *addr - entry->start + entry->offset;
@@ -1033,7 +1050,8 @@ vm_cheri_revoke_pass_post(vm_map_t map)
  * returning.
  */
 static int
-vm_cheri_revoke_pass_locked(const struct vm_cheri_revoke_cookie *crc)
+vm_cheri_revoke_pass_locked(struct vmspace *vm,
+    const struct vm_cheri_revoke_cookie *crc)
 {
 	int res = KERN_SUCCESS;
 	const vm_map_t map = crc->map;
@@ -1056,13 +1074,21 @@ vm_cheri_revoke_pass_locked(const struct vm_cheri_revoke_cookie *crc)
 		 * XXX Somewhere around here we should be resetting
 		 * MPROT_QUARANTINE'd map entries to be usable again, yes?
 		 */
-		res = vm_cheri_revoke_map_entry(crc, entry, &addr);
+		res = vm_cheri_revoke_map_entry(crc, vm, entry, &addr);
 
-		/*
-		 * We might be bailing out because a page fault failed for
-		 * catastrophic reasons (or polite ones like ptrace()).
-		 */
-		if (res != KERN_SUCCESS) {
+		switch (res) {
+		case KERN_SUCCESS:
+			break;
+		case KERN_NOT_RECEIVER:
+			/* The vmspace is orphaned, there is nothing to do. */
+			res = KERN_SUCCESS;
+			goto out;
+		default:
+			/*
+			 * We might be bailing out because a page fault failed
+			 * for catastrophic reasons (or polite ones like
+			 * ptrace()).
+			 */
 			printf("CHERI revoke bail va=%lx res=%d\n", addr, res);
 			goto out;
 		}
@@ -1106,7 +1132,7 @@ vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *crc)
 	int res;
 
 	vm_cheri_revoke_pass_pre(crc->map);
-	res = vm_cheri_revoke_pass_locked(crc);
+	res = vm_cheri_revoke_pass_locked(NULL, crc);
 	vm_cheri_revoke_pass_post(crc->map);
 
 	return (res);
