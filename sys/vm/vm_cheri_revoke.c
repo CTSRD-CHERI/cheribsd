@@ -83,6 +83,16 @@ SYSCTL_COUNTER_U64(_vm_stats_cheri_revoke, OID_AUTO, restarts, CTLFLAG_RD,
     &cheri_revoke_restarts,
     "Number of VM map re-lookups");
 
+static COUNTER_U64_DEFINE_EARLY(cheri_skip_prot_no_readcap);
+SYSCTL_COUNTER_U64(_vm_stats_cheri_revoke, OID_AUTO, skip_prot_no_readcap, CTLFLAG_RD,
+    &cheri_skip_prot_no_readcap,
+    "Virtual pages skipped in map entries without readcap permission");
+
+static COUNTER_U64_DEFINE_EARLY(cheri_skip_obj_no_hascap);
+SYSCTL_COUNTER_U64(_vm_stats_cheri_revoke, OID_AUTO, skip_obj_no_hascap, CTLFLAG_RD,
+    &cheri_skip_obj_no_hascap,
+    "Virtual pages skipped in VM objects with no capabilities");
+
 /***************************** KERNEL THREADS ***************************/
 
 static MALLOC_DEFINE(M_REVOKE, "cheri_revoke", "cheri_revoke temporary data");
@@ -905,6 +915,7 @@ vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc,
 	vm_offset_t ooffset;
 	vm_object_t obj;
 	enum vm_cro_at res;
+	int flags;
 
 	KASSERT(!(entry->eflags & MAP_ENTRY_IS_SUB_MAP),
 	    ("cheri_revoke SUB_MAP"));
@@ -915,9 +926,33 @@ vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc,
 	if (!obj)
 		goto fini;
 
-	/* Skip entire mappings that do not permit capability reads */
-	if ((entry->max_protection & VM_PROT_READ_CAP) == 0)
+	/*
+	 * Skip mappings outright if we know they can't bear capabilities.
+	 * Specifically, if one of the following applies:
+	 * 1. OBJ_NOCAP is set (which implies it is set in backing objects), as
+	 *    is the case for the quarantine bitmap,
+	 * 2. the mapping cannot acquire PROT_READ_CAP permission for the rest
+	 *    of its existence,
+	 * 3. OBJ_HASCAP is unset, meaning that the object and its backing
+	 *    object cannot bear capabilities,
+	 * we can safely jump to the next map entry.
+	 *
+	 * The object flags are not toggled after initialization, so it is safe
+	 * to check them without the object lock.
+	 */
+	flags = atomic_load_int(&obj->flags);
+	if ((flags & OBJ_NOCAP) != 0)
 		goto fini;
+	if ((entry->max_protection & VM_PROT_READ_CAP) == 0) {
+		counter_u64_add(cheri_skip_prot_no_readcap,
+		    atop(entry->end - *addr));
+		goto fini;
+	}
+	if ((flags & OBJ_HASCAP) == 0) {
+		counter_u64_add(cheri_skip_obj_no_hascap,
+		    atop(entry->end - *addr));
+		goto fini;
+	}
 
 	VM_OBJECT_WLOCK(obj);
 	while (*addr < entry->end) {
