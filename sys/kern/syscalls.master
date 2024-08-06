@@ -1054,28 +1054,28 @@
 169	AUE_SEMSYS	NOSTD|VARARG4 {
 		int semsys(
 		    int which,
-		    intptr_t a2,
-		    intptr_t a3,
-		    intptr_t a4,
-		    intptr_t a5
+		    int a2,
+		    int a3,
+		    int a4,
+		    int a5
 		);
 	}
 170	AUE_MSGSYS	NOSTD|VARARG5 {
 		int msgsys(
 		    int which,
-		    intptr_t a2,
-		    intptr_t a3,
-		    intptr_t a4,
-		    intptr_t a5,
-		    intptr_t a6
+		    int a2,
+		    int a3,
+		    int a4,
+		    int a5,
+		    int a6
 		);
 	}
 171	AUE_SHMSYS	NOSTD|VARARG3 {
 		int shmsys(
 		    int which,
-		    intptr_t a2,
-		    intptr_t a3,
-		    intptr_t a4
+		    int a2,
+		    int a3,
+		    int a4
 		);
 	}
 172	AUE_NULL	RESERVED

@@ -1089,7 +1089,6 @@ static struct syscall_helper_data shm64_syscalls[] = {
 	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_shmat),
 	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_shmdt),
 	FREEBSD64_SYSCALL_INIT_HELPER_COMPAT(shmget),
-	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_shmsys),
 	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_shmctl),
 #if defined(COMPAT_FREEBSD7)
 	FREEBSD64_SYSCALL_INIT_HELPER(freebsd7_freebsd64_shmctl),
@@ -1798,7 +1797,6 @@ done:
 int
 freebsd64_shmat(struct thread *td, struct freebsd64_shmat_args *uap)
 {
-
 	return (kern_shmat(td, uap->shmid, __USER_CAP_UNBOUND(uap->shmaddr),
 	    uap->shmflg));
 }
@@ -1806,54 +1804,7 @@ freebsd64_shmat(struct thread *td, struct freebsd64_shmat_args *uap)
 int
 freebsd64_shmdt(struct thread *td, struct freebsd64_shmdt_args *uap)
 {
-
 	return (kern_shmdt(td, __USER_CAP_UNBOUND(uap->shmaddr)));
-}
-
-int
-freebsd64_shmsys(struct thread *td, struct freebsd64_shmsys_args *uap)
-{
-
-#ifdef COMPAT_FREEBSD7
-	AUDIT_ARG_SVIPC_WHICH(uap->which);
-	switch (uap->which) {
-	case 0:	{	/* shmat */
-		struct shmat_args ap;
-
-		ap.shmid = uap->a2;
-		ap.shmaddr = (void *)uap->a3;
-		ap.shmflg = uap->a4;
-		return (sysent[SYS_shmat].sy_call(td, &ap));
-	}
-	case 2: {	/* shmdt */
-		struct shmdt_args ap;
-
-		ap.shmaddr = (void *)uap->a2;
-		return (sysent[SYS_shmdt].sy_call(td, &ap));
-	}
-	case 3: {	/* shmget */
-		struct shmget_args ap;
-
-		ap.key = uap->a2;
-		ap.size = uap->a3;
-		ap.shmflg = uap->a4;
-		return (sysent[SYS_shmget].sy_call(td, &ap));
-	}
-	case 4: {	/* shmctl */
-		struct freebsd7_freebsd64_shmctl_args ap;
-
-		ap.shmid = uap->a2;
-		ap.cmd = uap->a3;
-		ap.buf = (void *)uap->a4;
-		return (freebsd7_freebsd64_shmctl(td, &ap));
-	}
-	case 1:		/* oshmctl */
-	default:
-		return (EINVAL);
-	}
-#else
-	return (nosys(td, NULL));
-#endif
 }
 
 #ifdef COMPAT_FREEBSD7
