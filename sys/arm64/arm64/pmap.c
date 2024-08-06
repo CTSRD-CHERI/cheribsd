@@ -470,7 +470,7 @@ static pv_entry_t pmap_pvh_remove(struct md_page *pvh, pmap_t pmap,
 static void pmap_abort_ptp(pmap_t pmap, vm_offset_t va, vm_page_t mpte);
 static bool pmap_activate_int(pmap_t pmap);
 static void pmap_alloc_asid(pmap_t pmap);
-static int pmap_change_props_locked(vm_offset_t va, vm_size_t size,
+static int pmap_change_props_locked(vm_pointer_t va, vm_size_t size,
     vm_prot_t prot, int mode, bool skip_unmapped);
 static bool pmap_copy_l3c(pmap_t pmap, pt_entry_t *l3p, vm_offset_t va,
     pt_entry_t l3e, vm_page_t ml3, struct rwlock **lockp);
@@ -8297,7 +8297,7 @@ pmap_page_set_memattr(vm_page_t m, vm_memattr_t ma)
  * virtual address range or the direct map.
  */
 int
-pmap_change_attr(vm_offset_t va, vm_size_t size, int mode)
+pmap_change_attr(vm_pointer_t va, vm_size_t size, int mode)
 {
 	int error;
 
@@ -8315,7 +8315,7 @@ pmap_change_attr(vm_offset_t va, vm_size_t size, int mode)
  * map are never executable.
  */
 int
-pmap_change_prot(vm_offset_t va, vm_size_t size, vm_prot_t prot)
+pmap_change_prot(vm_pointer_t va, vm_size_t size, vm_prot_t prot)
 {
 	int error;
 
@@ -8330,10 +8330,11 @@ pmap_change_prot(vm_offset_t va, vm_size_t size, vm_prot_t prot)
 }
 
 static int
-pmap_change_props_locked(vm_offset_t va, vm_size_t size, vm_prot_t prot,
+pmap_change_props_locked(vm_pointer_t va, vm_size_t size, vm_prot_t prot,
     int mode, bool skip_unmapped)
 {
-	vm_offset_t base, offset, tmpva;
+	vm_pointer_t base, tmpva;
+	vm_offset_t offset;
 	vm_size_t pte_size;
 	vm_paddr_t pa;
 	pt_entry_t pte, *ptep, *newpte;
@@ -8481,7 +8482,7 @@ pmap_change_props_locked(vm_offset_t va, vm_size_t size, vm_prot_t prot,
 			 * the cache.
 			 */
 			if (mode == VM_MEMATTR_UNCACHEABLE)
-				cpu_dcache_wbinv_range((void *)(uintptr_t)tmpva, pte_size);
+				cpu_dcache_wbinv_range((void *)tmpva, pte_size);
 			tmpva += pte_size;
 		}
 	}

@@ -34,7 +34,7 @@
 static inline int
 set_memory_uc(unsigned long addr, int numpages)
 {
-	vm_offset_t va;
+	vm_pointer_t va;
 	vm_size_t len;
 
 	va = PHYS_TO_DMAP(addr);
@@ -47,7 +47,7 @@ static inline int
 set_memory_wc(unsigned long addr, int numpages)
 {
 #ifdef VM_MEMATTR_WRITE_COMBINING
-	vm_offset_t va;
+	vm_pointer_t va;
 	vm_size_t len;
 
 	va = PHYS_TO_DMAP(addr);
@@ -62,7 +62,7 @@ set_memory_wc(unsigned long addr, int numpages)
 static inline int
 set_memory_wb(unsigned long addr, int numpages)
 {
-	vm_offset_t va;
+	vm_pointer_t va;
 	vm_size_t len;
 
 	va = PHYS_TO_DMAP(addr);
