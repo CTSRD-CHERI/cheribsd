@@ -245,7 +245,7 @@ pmcstat_stats_reset(int reset_global)
  * Resolve file name and line number for the given address.
  */
 int
-pmcstat_image_addr2line(struct pmcstat_image *image, uintfptr_t addr,
+pmcstat_image_addr2line(struct pmcstat_image *image, ptraddr_t addr,
     char *sourcefile, size_t sourcefile_len, unsigned *sourceline,
     char *funcname, size_t funcname_len)
 {

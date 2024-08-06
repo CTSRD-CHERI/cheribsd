@@ -98,7 +98,7 @@ struct pmcpl_ct_arc {
 };
 
 struct pmcpl_ct_instr {
-	uintfptr_t		pctf_func;
+	ptraddr_t		pctf_func;
 	struct pmcpl_ct_sample	pctf_samples;
 };
 
@@ -107,7 +107,7 @@ struct pmcpl_ct_instr {
  */
 struct pmcpl_ct_node {
 	struct pmcstat_image	*pct_image;
-	uintfptr_t		pct_func;
+	ptraddr_t		pct_func;
 
 	struct pmcstat_symbol	*pct_sym;
 	pmcstat_interned_string	pct_ifl;
@@ -280,7 +280,7 @@ pmcpl_ct_instr_grow(int cursize, int *maxsize, struct pmcpl_ct_instr **items)
 
 static void
 pmcpl_ct_instr_add(struct pmcpl_ct_node *ct, int pmcin,
-    uintfptr_t pc, unsigned v)
+    ptraddr_t pc, unsigned v)
 {
 	int i;
 	struct pmcpl_ct_instr *in;
@@ -670,7 +670,7 @@ pmcpl_ct_node_update(struct pmcpl_ct_node *parent,
  */
 
 static struct pmcpl_ct_node *
-pmcpl_ct_node_hash_lookup(struct pmcstat_image *image, uintfptr_t pc,
+pmcpl_ct_node_hash_lookup(struct pmcstat_image *image, ptraddr_t pc,
     struct pmcstat_symbol *sym, char *fl, char *fn)
 {
 	int i;
@@ -687,7 +687,7 @@ pmcpl_ct_node_hash_lookup(struct pmcstat_image *image, uintfptr_t pc,
 		ifn = 0;
 	}
 
-	for (hash = i = 0; i < (int)sizeof(uintfptr_t); i++)
+	for (hash = i = 0; i < (int)sizeof(ptraddr_t); i++)
 		hash += (pc >> i) & 0xFF;
 
 	hash &= PMCSTAT_HASH_MASK;
@@ -735,10 +735,10 @@ pmcpl_ct_node_hash_lookup(struct pmcstat_image *image, uintfptr_t pc,
 
 void
 pmcpl_ct_process(struct pmcstat_process *pp, struct pmcstat_pmcrecord *pmcr,
-    uint32_t nsamples, uintfptr_t *cc, int usermode, uint32_t cpu)
+    uint32_t nsamples, ptraddr_t *cc, int usermode, uint32_t cpu)
 {
 	int i, n, pmcin;
-	uintfptr_t pc, loadaddress;
+	ptraddr_t pc, loadaddress;
 	struct pmcstat_image *image;
 	struct pmcstat_symbol *sym;
 	struct pmcstat_pcmap *ppm[PMC_CALLCHAIN_DEPTH_MAX];
@@ -835,11 +835,11 @@ pmcpl_ct_process(struct pmcstat_process *pp, struct pmcstat_pmcrecord *pmcr,
  */
 
 static void
-pmcpl_ct_node_printchild(struct pmcpl_ct_node *ct, uintfptr_t paddr,
+pmcpl_ct_node_printchild(struct pmcpl_ct_node *ct, ptraddr_t paddr,
     int pline)
 {
 	int i, j, line;
-	uintfptr_t addr;
+	ptraddr_t addr;
 	struct pmcpl_ct_node *child;
 	char sourcefile[PATH_MAX];
 	char funcname[PATH_MAX];
@@ -904,7 +904,7 @@ static void
 pmcpl_ct_node_printself(struct pmcpl_ct_node *ct)
 {
 	int i, j, fline, line;
-	uintfptr_t faddr, addr;
+	ptraddr_t faddr, addr;
 	char sourcefile[PATH_MAX];
 	char funcname[PATH_MAX];
 
@@ -1036,7 +1036,7 @@ _pmcpl_ct_expand_inline(struct pmcpl_ct_node *ct)
 {
 	int i, j;
 	unsigned fline, line, v;
-	uintfptr_t faddr, addr, pc;
+	ptraddr_t faddr, addr, pc;
 	char sourcefile[PATH_MAX];
 	char ffuncname[PATH_MAX], funcname[PATH_MAX];
 	char buffer[PATH_MAX];
