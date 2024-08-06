@@ -853,36 +853,36 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* freebsd64_semsys */
+	/* semsys */
 	case 169: {
-		struct freebsd64_semsys_args *p = params;
+		struct semsys_args *p = params;
 		iarg[a++] = p->which; /* int */
-		uarg[a++] = (intptr_t)p->a2; /* intptr_t */
-		uarg[a++] = (intptr_t)p->a3; /* intptr_t */
-		uarg[a++] = (intptr_t)p->a4; /* intptr_t */
-		uarg[a++] = (intptr_t)p->a5; /* intptr_t */
+		iarg[a++] = p->a2; /* int */
+		iarg[a++] = p->a3; /* int */
+		iarg[a++] = p->a4; /* int */
+		iarg[a++] = p->a5; /* int */
 		*n_args = 5;
 		break;
 	}
-	/* freebsd64_msgsys */
+	/* msgsys */
 	case 170: {
-		struct freebsd64_msgsys_args *p = params;
+		struct msgsys_args *p = params;
 		iarg[a++] = p->which; /* int */
-		uarg[a++] = (intptr_t)p->a2; /* intptr_t */
-		uarg[a++] = (intptr_t)p->a3; /* intptr_t */
-		uarg[a++] = (intptr_t)p->a4; /* intptr_t */
-		uarg[a++] = (intptr_t)p->a5; /* intptr_t */
-		uarg[a++] = (intptr_t)p->a6; /* intptr_t */
+		iarg[a++] = p->a2; /* int */
+		iarg[a++] = p->a3; /* int */
+		iarg[a++] = p->a4; /* int */
+		iarg[a++] = p->a5; /* int */
+		iarg[a++] = p->a6; /* int */
 		*n_args = 6;
 		break;
 	}
-	/* freebsd64_shmsys */
+	/* shmsys */
 	case 171: {
-		struct freebsd64_shmsys_args *p = params;
+		struct shmsys_args *p = params;
 		iarg[a++] = p->which; /* int */
-		uarg[a++] = (intptr_t)p->a2; /* intptr_t */
-		uarg[a++] = (intptr_t)p->a3; /* intptr_t */
-		uarg[a++] = (intptr_t)p->a4; /* intptr_t */
+		iarg[a++] = p->a2; /* int */
+		iarg[a++] = p->a3; /* int */
+		iarg[a++] = p->a4; /* int */
 		*n_args = 4;
 		break;
 	}
@@ -4848,67 +4848,67 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* freebsd64_semsys */
+	/* semsys */
 	case 169:
 		switch (ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "intptr_t";
+			p = "int";
 			break;
 		case 2:
-			p = "intptr_t";
+			p = "int";
 			break;
 		case 3:
-			p = "intptr_t";
+			p = "int";
 			break;
 		case 4:
-			p = "intptr_t";
+			p = "int";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* freebsd64_msgsys */
+	/* msgsys */
 	case 170:
 		switch (ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "intptr_t";
+			p = "int";
 			break;
 		case 2:
-			p = "intptr_t";
+			p = "int";
 			break;
 		case 3:
-			p = "intptr_t";
+			p = "int";
 			break;
 		case 4:
-			p = "intptr_t";
+			p = "int";
 			break;
 		case 5:
-			p = "intptr_t";
+			p = "int";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* freebsd64_shmsys */
+	/* shmsys */
 	case 171:
 		switch (ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "intptr_t";
+			p = "int";
 			break;
 		case 2:
-			p = "intptr_t";
+			p = "int";
 			break;
 		case 3:
-			p = "intptr_t";
+			p = "int";
 			break;
 		default:
 			break;
@@ -9809,17 +9809,17 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* freebsd64_semsys */
+	/* semsys */
 	case 169:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* freebsd64_msgsys */
+	/* msgsys */
 	case 170:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* freebsd64_shmsys */
+	/* shmsys */
 	case 171:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

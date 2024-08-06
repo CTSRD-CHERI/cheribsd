@@ -359,27 +359,6 @@ struct freebsd64_rtprio_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
 	char rtp_l_[PADL_(struct rtprio *)]; struct rtprio * rtp; char rtp_r_[PADR_(struct rtprio *)];
 };
-struct freebsd64_semsys_args {
-	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char a2_l_[PADL_(intptr_t)]; intptr_t a2; char a2_r_[PADR_(intptr_t)];
-	char a3_l_[PADL_(intptr_t)]; intptr_t a3; char a3_r_[PADR_(intptr_t)];
-	char a4_l_[PADL_(intptr_t)]; intptr_t a4; char a4_r_[PADR_(intptr_t)];
-	char a5_l_[PADL_(intptr_t)]; intptr_t a5; char a5_r_[PADR_(intptr_t)];
-};
-struct freebsd64_msgsys_args {
-	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char a2_l_[PADL_(intptr_t)]; intptr_t a2; char a2_r_[PADR_(intptr_t)];
-	char a3_l_[PADL_(intptr_t)]; intptr_t a3; char a3_r_[PADR_(intptr_t)];
-	char a4_l_[PADL_(intptr_t)]; intptr_t a4; char a4_r_[PADR_(intptr_t)];
-	char a5_l_[PADL_(intptr_t)]; intptr_t a5; char a5_r_[PADR_(intptr_t)];
-	char a6_l_[PADL_(intptr_t)]; intptr_t a6; char a6_r_[PADR_(intptr_t)];
-};
-struct freebsd64_shmsys_args {
-	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char a2_l_[PADL_(intptr_t)]; intptr_t a2; char a2_r_[PADR_(intptr_t)];
-	char a3_l_[PADL_(intptr_t)]; intptr_t a3; char a3_r_[PADR_(intptr_t)];
-	char a4_l_[PADL_(intptr_t)]; intptr_t a4; char a4_r_[PADR_(intptr_t)];
-};
 struct freebsd64_ntp_adjtime_args {
 	char tp_l_[PADL_(struct timex *)]; struct timex * tp; char tp_r_[PADR_(struct timex *)];
 };
@@ -1607,9 +1586,6 @@ int	freebsd64_lgetfh(struct thread *, struct freebsd64_lgetfh_args *);
 int	freebsd64_getfh(struct thread *, struct freebsd64_getfh_args *);
 int	freebsd64_sysarch(struct thread *, struct freebsd64_sysarch_args *);
 int	freebsd64_rtprio(struct thread *, struct freebsd64_rtprio_args *);
-int	freebsd64_semsys(struct thread *, struct freebsd64_semsys_args *);
-int	freebsd64_msgsys(struct thread *, struct freebsd64_msgsys_args *);
-int	freebsd64_shmsys(struct thread *, struct freebsd64_shmsys_args *);
 int	freebsd64_ntp_adjtime(struct thread *, struct freebsd64_ntp_adjtime_args *);
 int	freebsd64_pathconf(struct thread *, struct freebsd64_pathconf_args *);
 int	freebsd64_getrlimit(struct thread *, struct freebsd64_getrlimit_args *);
@@ -2153,9 +2129,6 @@ int	freebsd13_freebsd64_swapoff(struct thread *, struct freebsd13_freebsd64_swap
 #define	FREEBSD64_SYS_AUE_freebsd64_getfh	AUE_NFS_GETFH
 #define	FREEBSD64_SYS_AUE_freebsd64_sysarch	AUE_SYSARCH
 #define	FREEBSD64_SYS_AUE_freebsd64_rtprio	AUE_RTPRIO
-#define	FREEBSD64_SYS_AUE_freebsd64_semsys	AUE_SEMSYS
-#define	FREEBSD64_SYS_AUE_freebsd64_msgsys	AUE_MSGSYS
-#define	FREEBSD64_SYS_AUE_freebsd64_shmsys	AUE_SHMSYS
 #define	FREEBSD64_SYS_AUE_freebsd6_freebsd64_pread	AUE_PREAD
 #define	FREEBSD64_SYS_AUE_freebsd6_freebsd64_pwrite	AUE_PWRITE
 #define	FREEBSD64_SYS_AUE_freebsd64_ntp_adjtime	AUE_NTP_ADJTIME

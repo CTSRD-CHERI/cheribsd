@@ -165,9 +165,9 @@
 				/* 164 is obsolete freebsd4_uname */
 #define	FREEBSD64_SYS_freebsd64_sysarch	165
 #define	FREEBSD64_SYS_freebsd64_rtprio	166
-#define	FREEBSD64_SYS_freebsd64_semsys	169
-#define	FREEBSD64_SYS_freebsd64_msgsys	170
-#define	FREEBSD64_SYS_freebsd64_shmsys	171
+#define	FREEBSD64_SYS_semsys	169
+#define	FREEBSD64_SYS_msgsys	170
+#define	FREEBSD64_SYS_shmsys	171
 				/* 173 is freebsd6 freebsd64_pread */
 				/* 174 is freebsd6 freebsd64_pwrite */
 #define	FREEBSD64_SYS_setfib	175
