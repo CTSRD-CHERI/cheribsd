@@ -6,9 +6,6 @@ CXXSTD= c++14
 CWARNFLAGS.gcc+= -Wno-redundant-decls
 CFLAGS+= -I${SRCTOP}/lib/libpmcstat
 
-# XXX: not at all purecap clean
-MK_WERROR=	no
-
 LIBADD=	pmc m pmcstat elf
 
 SRCS=	pmc.c pmc_util.c cmd_pmc_stat.c \
