@@ -220,7 +220,7 @@ static struct syscall_helper_data msg64_syscalls[] = {
 	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_msgrcv),
 	FREEBSD64_SYSCALL_INIT_HELPER_COMPAT(msgget),
 #if defined(COMPAT_FREEBSD7)
-	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_msgsys),
+	FREEBSD64_SYSCALL_INIT_HELPER_COMPAT(msgsys),
 	FREEBSD64_SYSCALL_INIT_HELPER(freebsd7_freebsd64_msgctl),
 #endif
 	SYSCALL_INIT_LAST
@@ -1818,30 +1818,6 @@ freebsd32_msgrcv(struct thread *td, struct freebsd32_msgrcv_args *uap)
 #endif
 
 #ifdef COMPAT_FREEBSD64
-int
-freebsd64_msgsys(struct thread *td, struct freebsd64_msgsys_args *uap)
-{
-
-#ifdef COMPAT_FREEBSD7
-	AUDIT_ARG_SVIPC_WHICH(uap->which);
-	switch (uap->which) {
-	case 0:
-		return (freebsd7_freebsd64_msgctl(td,
-		    (struct freebsd7_freebsd64_msgctl_args *)&uap->a2));
-	case 2:
-		return (freebsd64_msgsnd(td,
-		    (struct freebsd64_msgsnd_args *)&uap->a2));
-	case 3:
-		return (freebsd64_msgrcv(td,
-		    (struct freebsd64_msgrcv_args *)&uap->a2));
-	default:
-		return (sys_msgsys(td, (struct msgsys_args *)uap));
-	}
-#else
-	return (nosys(td, (struct nosys_args *)uap));
-#endif
-}
-
 #if defined(COMPAT_FREEBSD7)
 int
 freebsd7_freebsd64_msgctl(struct thread *td,
