@@ -296,3 +296,87 @@ CHERIBSDTEST(signal_returncap,
 	cheribsdtest_success();
 }
 #endif
+
+#ifndef __CHERI_PURE_CAPABILITY__
+/*
+ * Ensure that invalid addresses still raise SIGSEGV (rather than
+ * SIGPROT) for hybrid mode.
+ */
+CHERIBSDTEST(null_pointer_load_sigsegv,
+    "Check that loading from NULL raises SIGSEGV",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGSEGV,
+    .ct_si_code = SEGV_MAPERR,
+    .ct_si_trapno = TRAPNO_LOAD_PF)
+{
+	volatile char *p = (void *)(uintptr_t)1;
+
+	(void)*p;
+	cheribsdtest_failure_errx("Unexpected load from NULL pointer");
+}
+
+CHERIBSDTEST(null_pointer_store_sigsegv,
+    "Check that storing to NULL raises SIGSEGV",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGSEGV,
+    .ct_si_code = SEGV_MAPERR,
+    .ct_si_trapno = TRAPNO_STORE_PF)
+{
+	char *p = (void *)(uintptr_t)1;
+
+	*p = 1;
+	cheribsdtest_failure_errx("Unexpected store to NULL pointer");
+}
+
+CHERIBSDTEST(null_pointer_exec_sigsegv,
+    "Check that branching to NULL raises SIGSEGV",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGSEGV,
+    .ct_si_code = SEGV_MAPERR,
+    .ct_si_trapno = TRAPNO_EXEC_PF)
+{
+	void (*p)(void) = (void *)(uintptr_t)1;
+
+	p();
+	cheribsdtest_failure_errx("Unexpected branch to NULL pointer");
+}
+
+CHERIBSDTEST(kernel_pointer_load_sigsegv,
+    "Check that loading from a kernel address raises SIGSEGV",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGSEGV,
+    .ct_si_code = SEGV_MAPERR,
+    .ct_si_trapno = TRAPNO_LOAD_PF)
+{
+	volatile char *p = (void *)(uintptr_t)VM_MIN_KERNEL_ADDRESS;
+
+	(void)*p;
+	cheribsdtest_failure_errx("Unexpected load from kernel address");
+}
+
+CHERIBSDTEST(kernel_pointer_store_sigsegv,
+    "Check that storing to a kernel address raises SIGSEGV",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGSEGV,
+    .ct_si_code = SEGV_MAPERR,
+    .ct_si_trapno = TRAPNO_STORE_PF)
+{
+	char *p = (void *)(uintptr_t)VM_MIN_KERNEL_ADDRESS;
+
+	*p = 1;
+	cheribsdtest_failure_errx("Unexpected store to kernel address");
+}
+
+CHERIBSDTEST(kernel_pointer_exec_sigsegv,
+    "Check that branching to a kernel address raises SIGSEGV",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGSEGV,
+    .ct_si_code = SEGV_MAPERR,
+    .ct_si_trapno = TRAPNO_EXEC_PF)
+{
+	void (*p)(void) = (void *)(uintptr_t)VM_MIN_KERNEL_ADDRESS;
+
+	p();
+	cheribsdtest_failure_errx("Unexpected branch to kernel address");
+}
+#endif
