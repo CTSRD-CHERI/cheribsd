@@ -901,7 +901,7 @@ preload_protect(elf_file_t ef, vm_prot_t prot)
 			nprot |= VM_PROT_WRITE;
 		if ((phdr->p_flags & PF_X) != 0)
 			nprot |= VM_PROT_EXECUTE;
-		error = pmap_change_prot((vm_offset_t)ef->address +
+		error = pmap_change_prot((vm_pointer_t)ef->address +
 		    phdr->p_vaddr, round_page(phdr->p_memsz), nprot);
 		if (error != 0)
 			break;
