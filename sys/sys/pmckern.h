@@ -74,17 +74,17 @@ typedef enum ring_type {
 
 struct pmckern_procexec {
 	int		pm_credentialschanged;
-	uintptr_t	pm_baseaddr;
-	uintptr_t	pm_dynaddr;
+	ptraddr_t	pm_baseaddr;
+	ptraddr_t	pm_dynaddr;
 };
 
 struct pmckern_map_in {
 	void		*pm_file;	/* filename or vnode pointer */
-	uintfptr_t	pm_address;	/* address object is loaded at */
+	ptraddr_t	pm_address;	/* address object is loaded at */
 };
 
 struct pmckern_map_out {
-	uintfptr_t	pm_address;	/* start address of region */
+	ptraddr_t	pm_address;	/* start address of region */
 	size_t		pm_size;	/* size of unmapped region */
 };
 

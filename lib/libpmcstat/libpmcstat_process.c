@@ -189,7 +189,7 @@ pmcstat_process_exec(struct pmcstat_process *pp,
  */
 
 struct pmcstat_pcmap *
-pmcstat_process_find_map(struct pmcstat_process *p, uintfptr_t pc)
+pmcstat_process_find_map(struct pmcstat_process *p, ptraddr_t pc)
 {
 	struct pmcstat_pcmap *ppm;
 

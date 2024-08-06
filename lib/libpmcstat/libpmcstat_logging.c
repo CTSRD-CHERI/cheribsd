@@ -117,8 +117,8 @@ pmcstat_pmcid_add(pmc_id_t pmcid, pmcstat_interned_string ps,
  */
 
 static void
-pmcstat_image_unmap(struct pmcstat_process *pp, uintfptr_t start,
-    uintfptr_t end)
+pmcstat_image_unmap(struct pmcstat_process *pp, ptraddr_t start,
+    ptraddr_t end)
 {
 	struct pmcstat_pcmap *pcm, *pcmtmp, *pcmnew;
 
