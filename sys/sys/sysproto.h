@@ -498,24 +498,24 @@ struct rtprio_args {
 };
 struct semsys_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char a2_l_[PADL_(intcap_t)]; intcap_t a2; char a2_r_[PADR_(intcap_t)];
-	char a3_l_[PADL_(intcap_t)]; intcap_t a3; char a3_r_[PADR_(intcap_t)];
-	char a4_l_[PADL_(intcap_t)]; intcap_t a4; char a4_r_[PADR_(intcap_t)];
-	char a5_l_[PADL_(intcap_t)]; intcap_t a5; char a5_r_[PADR_(intcap_t)];
+	char a2_l_[PADL_(int)]; int a2; char a2_r_[PADR_(int)];
+	char a3_l_[PADL_(int)]; int a3; char a3_r_[PADR_(int)];
+	char a4_l_[PADL_(int)]; int a4; char a4_r_[PADR_(int)];
+	char a5_l_[PADL_(int)]; int a5; char a5_r_[PADR_(int)];
 };
 struct msgsys_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char a2_l_[PADL_(intcap_t)]; intcap_t a2; char a2_r_[PADR_(intcap_t)];
-	char a3_l_[PADL_(intcap_t)]; intcap_t a3; char a3_r_[PADR_(intcap_t)];
-	char a4_l_[PADL_(intcap_t)]; intcap_t a4; char a4_r_[PADR_(intcap_t)];
-	char a5_l_[PADL_(intcap_t)]; intcap_t a5; char a5_r_[PADR_(intcap_t)];
-	char a6_l_[PADL_(intcap_t)]; intcap_t a6; char a6_r_[PADR_(intcap_t)];
+	char a2_l_[PADL_(int)]; int a2; char a2_r_[PADR_(int)];
+	char a3_l_[PADL_(int)]; int a3; char a3_r_[PADR_(int)];
+	char a4_l_[PADL_(int)]; int a4; char a4_r_[PADR_(int)];
+	char a5_l_[PADL_(int)]; int a5; char a5_r_[PADR_(int)];
+	char a6_l_[PADL_(int)]; int a6; char a6_r_[PADR_(int)];
 };
 struct shmsys_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char a2_l_[PADL_(intcap_t)]; intcap_t a2; char a2_r_[PADR_(intcap_t)];
-	char a3_l_[PADL_(intcap_t)]; intcap_t a3; char a3_r_[PADR_(intcap_t)];
-	char a4_l_[PADL_(intcap_t)]; intcap_t a4; char a4_r_[PADR_(intcap_t)];
+	char a2_l_[PADL_(int)]; int a2; char a2_r_[PADR_(int)];
+	char a3_l_[PADL_(int)]; int a3; char a3_r_[PADR_(int)];
+	char a4_l_[PADL_(int)]; int a4; char a4_r_[PADR_(int)];
 };
 struct setfib_args {
 	char fibnum_l_[PADL_(int)]; int fibnum; char fibnum_r_[PADR_(int)];
