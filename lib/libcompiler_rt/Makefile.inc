@@ -133,7 +133,10 @@ SRCF+=		floatundisf
 .if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386"
 .info DIMDBG: Enabling 80-bit long double
 SRCF+=		divxc3
+.if 0
+# Added in LLVM 18
 SRCF+=		extendxftf2
+.endif
 SRCF+=		fixxfdi
 SRCF+=		fixxfti
 SRCF+=		fixunsxfdi
@@ -143,7 +146,10 @@ SRCF+=		floattixf
 SRCF+=		floatuntixf
 SRCF+=		mulxc3
 SRCF+=		powixf2
+.if 0
+# Added in LLVM 18
 SRCF+=		trunctfxf2
+.endif
 
 # Avoid using SSE2 instructions on i386, if unsupported.
 .if ${MACHINE_CPUARCH} == "i386" && empty(MACHINE_CPU:Msse2)
@@ -158,10 +164,18 @@ SRCF+=		floatundixf
 .endif
 
 # __cpu_model support, only used on aarch64 and x86
+.if 0
+# Changed in LLVM 18
 .if ${MACHINE_CPUARCH} == "aarch64"
 SRCS+=		cpu_model/aarch64.c
 .elif ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386"
 SRCS+=		cpu_model/x86.c
+.endif
+.else
+.if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
+    ${MACHINE_CPUARCH} == "i386"
+SRCF+=		cpu_model
+.endif
 .endif
 
 # The fp_mode implementation for amd64 and i386 is shared, while other
