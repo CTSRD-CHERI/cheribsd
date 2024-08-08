@@ -1628,13 +1628,14 @@ transplant_one(struct elfcopy *ecp, struct transplant *t)
 	static int	 prefix;
 
 	struct segment	*seg;
-	struct section	*s;
+	struct section	*s, **smap;
 	int		 ifd;
 	Elf		*ein;
 	Elf_Scn		*scn;
 	Elf_Data	*data;
 	Elf64_Shdr	*shdr;
 	GElf_Phdr	 iphdr;
+	GElf_Shdr	 shdrvalue;
 	size_t		 shdrnum, phdrnum;
 	size_t		 i, transplant_offset;
 	char		*sname, *name;
@@ -1660,10 +1661,18 @@ transplant_one(struct elfcopy *ecp, struct transplant *t)
 	transplant_offset = roundup(first_free_offset(ecp), 0x100000);
 
 	/*
-	 * Transplant the sections.
+	 * Allocate a map of section numbers to update links (sh_link) between
+	 * them.
 	 */
 	if (elf_getshdrnum(ein, &shdrnum) == -1)
 		errx(EXIT_FAILURE, "elf_getshdrnum() failed: %s", elf_errmsg(-1));
+	smap = calloc(shdrnum, sizeof(*smap));
+	if (smap == NULL)
+		errx(EXIT_FAILURE, "calloc() failed: %s", elf_errmsg(-1));
+
+	/*
+	 * Transplant the sections.
+	 */
 	for (i = 1; i < shdrnum; i++) {
 		scn = elf_getscn(ein, i);
 		if (scn == NULL)
@@ -1692,7 +1701,37 @@ transplant_one(struct elfcopy *ecp, struct transplant *t)
 		    data->d_size, shdr->sh_offset + transplant_offset, shdr->sh_type,
 		    ELF_T_BYTE, shdr->sh_flags, shdr->sh_addralign,
 		    shdr->sh_addr + transplant_offset, 1 /* XXX */);
+		smap[i] = s;
+
+		if (gelf_getshdr(s->os, &shdrvalue) == NULL)
+			errx(EXIT_FAILURE, "gelf_getshdr() failed: %s",
+			    elf_errmsg(-1));
+		shdrvalue.sh_link = shdr->sh_link;
+		if (!gelf_update_shdr(s->os, &shdrvalue))
+			errx(EXIT_FAILURE, "gelf_update_shdr() failed: %s",
+			    elf_errmsg(-1));
+
 		add_to_inseg_list(ecp, s);
+	}
+
+	/*
+	 * Update section links.
+	 */
+	for (i = 1; i < shdrnum; i++) {
+		s = smap[i];
+		if (s == NULL)
+			continue;
+
+		if (gelf_getshdr(s->os, &shdrvalue) == NULL)
+			errx(EXIT_FAILURE, "gelf_getshdr() failed: %s",
+			    elf_errmsg(-1));
+		if (shdrvalue.sh_link == 0)
+			continue;
+
+		shdrvalue.sh_link = elf_ndxscn(smap[shdrvalue.sh_link]->os);
+		if (!gelf_update_shdr(s->os, &shdrvalue))
+			errx(EXIT_FAILURE, "gelf_update_shdr() failed: %s",
+			    elf_errmsg(-1));
 	}
 
 	/*
@@ -1748,6 +1787,8 @@ transplant_one(struct elfcopy *ecp, struct transplant *t)
 	    shdr->sh_addralign, shdr->sh_addr + transplant_offset, 0);
 	//add_to_inseg_list(ecp, s);
 #endif
+
+	free(smap);
 }
 
 void
