@@ -1674,17 +1674,6 @@ transplant_one(struct elfcopy *ecp, struct transplant *t)
 			errx(EXIT_FAILURE, "elf_getshdr() failed: %s", elf_errmsg(-1));
 
 		/*
-		 * Filter which sections we want to transplant.
-		 */
-		switch (shdr->sh_type) {
-		case SHT_PROGBITS:
-		case SHT_DYNAMIC:
-			break;
-		default:
-			continue;
-		}
-
-		/*
 		 * Extract section name.
 		 */
 		sname = elf_strptr(ein, string_table_section_index, shdr->sh_name);
