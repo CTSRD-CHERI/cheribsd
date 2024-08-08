@@ -2954,6 +2954,7 @@ _dtrace_tools= cddl/lib/libctf cddl/lib/libspl cddl/usr.bin/ctfconvert \
 .if ${XAS:M/*} == ""
 .if ${MK_ELFTOOLCHAIN_BOOTSTRAP} != "no"
 _elftctools=	lib/libelftc \
+		lib/libelf \
 		lib/libpe \
 		usr.bin/elfctl \
 		usr.bin/elfdump \
