@@ -980,9 +980,9 @@ vmem_import(vmem_t *vm, vmem_size_t size, vmem_size_t align, int flags)
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (vm->vm_flags & VMEM_CAPABILITY_ARENA) {
 		KASSERT(cheri_gettag(addr), ("Expected valid capability"));
-		KASSERT(cheri_getlen(addr) == size,
-		    ("Inexact bounds expected %zx found %zx",
-		    (size_t)size, cheri_getlen(addr)));
+		KASSERT(cheri_bytes_remaining((void *)addr) >= size,
+		    ("Insufficient bounds for size %zx in %#p",
+			(size_t)size, (void *)addr));
 	}
 #endif
 
