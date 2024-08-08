@@ -445,6 +445,9 @@ create_elf(struct elfcopy *ecp)
 			 * Create a new section for it.
 			 */
 			oeh.e_phoff = ecp->phoff = first_free_offset(ecp) + 0x10000 /* 0x XXX */;
+			oeh.e_phoff = roundup(oeh.e_phoff,
+			    gelf_falign(ecp->eout, ELF_T_PHDR));
+			ecp->phoff = oeh.e_phoff;
 		}
 	}
 
