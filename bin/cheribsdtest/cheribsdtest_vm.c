@@ -177,14 +177,17 @@ CHERIBSDTEST(vm_shm_open_anon_unix_surprise,
 		cheribsdtest_failure_errx("Fork failed; errno=%d", errno);
 
 	if (pid == 0) {
-		void * __capability * map;
+		void * __capability *map;
 		void * __capability c;
 		int fd, tag;
 		struct msghdr msg = { 0 };
 		struct cmsghdr * cmsg;
 		char cmsgbuf[CMSG_SPACE(sizeof(fd))] = { 0 } ;
 		char iovbuf[16];
-		struct iovec iov = { .iov_base = iovbuf, .iov_len = sizeof(iovbuf) };
+		struct iovec iov = {
+			.iov_base = iovbuf,
+			.iov_len = sizeof(iovbuf)
+		};
 
 		close(sv[1]);
 
@@ -196,15 +199,13 @@ CHERIBSDTEST(vm_shm_open_anon_unix_surprise,
 		CHERIBSDTEST_CHECK_SYSCALL(recvmsg(sv[0], &msg, 0));
 
 		/* Deconstruct cmsg */
-		/* XXX Doesn't compile: cmsg = CMSG_FIRSTHDR(&msg); */
-		cmsg = msg.msg_control;
-		memmove(&fd, CMSG_DATA(cmsg), sizeof(fd));
+		cmsg = CMSG_FIRSTHDR(&msg);
+		memcpy(&fd, CMSG_DATA(cmsg), sizeof(fd));
 
 		CHERIBSDTEST_VERIFY2(fd >= 0, "fd read OK");
 
 		map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
-						PROT_READ, MAP_SHARED, fd,
-						0));
+		    PROT_READ, MAP_SHARED, fd, 0));
 		c = *map;
 
 		if (verbose)
@@ -219,14 +220,17 @@ CHERIBSDTEST(vm_shm_open_anon_unix_surprise,
 
 		exit(tag);
 	} else {
-		void * __capability * map;
+		void * __capability *map;
 		void * __capability c;
 		int fd, res;
 		struct msghdr msg = { 0 };
 		struct cmsghdr * cmsg;
 		char cmsgbuf[CMSG_SPACE(sizeof(fd))] = { 0 };
 		char iovbuf[16] = { 0 };
-		struct iovec iov = { .iov_base = iovbuf, .iov_len = sizeof(iovbuf) };
+		struct iovec iov = {
+			.iov_base = iovbuf,
+			.iov_len = sizeof(iovbuf)
+		};
 
 		close(sv[0]);
 
@@ -252,12 +256,11 @@ CHERIBSDTEST(vm_shm_open_anon_unix_surprise,
 		msg.msg_iovlen = 1;
 		msg.msg_control = cmsgbuf;
 		msg.msg_controllen = sizeof(cmsgbuf);
-		/* XXX cmsg = CMSG_FIRSTHDR(&msg); */
-		cmsg = msg.msg_control;
+		cmsg = CMSG_FIRSTHDR(&msg);
 		cmsg->cmsg_level = SOL_SOCKET;
 		cmsg->cmsg_type = SCM_RIGHTS;
 		cmsg->cmsg_len = CMSG_LEN(sizeof fd);
-		memmove(CMSG_DATA(cmsg), &fd, sizeof(fd));
+		memcpy(CMSG_DATA(cmsg), &fd, sizeof(fd));
 		msg.msg_controllen = cmsg->cmsg_len;
 
 		/* Send! */
