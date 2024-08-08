@@ -34,6 +34,7 @@ SRCS=	elf.c							\
 	gelf_dyn.c						\
 	gelf_ehdr.c						\
 	gelf_getclass.c						\
+	gelf_falign.c						\
 	gelf_fsize.c						\
 	gelf_mips64el.c						\
 	gelf_move.c						\

@@ -63,6 +63,7 @@ global:
 	elf_update;
 	elf_version;
 	gelf_checksum;
+	gelf_falign;
 	gelf_fsize;
 	gelf_getcap;
 	gelf_getclass;
