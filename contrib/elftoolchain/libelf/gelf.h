@@ -72,6 +72,7 @@ typedef Elf64_Syminfo	GElf_Syminfo;	/* Symbol information */
 extern "C" {
 #endif
 long		gelf_checksum(Elf *_elf);
+unsigned int	gelf_falign(Elf *e, Elf_Type t);
 size_t		gelf_fsize(Elf *_elf, Elf_Type _type, size_t _count,
 			unsigned int _version);
 GElf_Chdr	*gelf_getchdr(Elf_Scn *_scn, GElf_Chdr *_dst);
