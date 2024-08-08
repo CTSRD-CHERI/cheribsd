@@ -1677,8 +1677,12 @@ transplant_one(struct elfcopy *ecp, struct transplant *t)
 		 * Filter which sections we want to transplant.
 		 */
 		switch (shdr->sh_type) {
-		case SHT_PROGBITS:
 		case SHT_DYNAMIC:
+		case SHT_DYNSYM:
+		case SHT_HASH:
+		case SHT_PROGBITS:
+		case SHT_STRTAB:
+		case SHT_SYMTAB:
 			break;
 		default:
 			continue;
