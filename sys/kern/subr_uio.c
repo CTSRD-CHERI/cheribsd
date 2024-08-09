@@ -54,6 +54,7 @@
 #include <sys/sysctl.h>
 #include <sys/vnode.h>
 
+#include <vm/uma.h>
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/vm_extern.h>
