@@ -124,6 +124,10 @@ extern void snmalloc_flush_message_queue(void);
 	"_RUNTIME_REVOCATION_SYNC_REVOKE"
 #define	MALLOC_REVOKE_ASYNC_ENV \
 	"_RUNTIME_REVOCATION_ASYNC_REVOKE"
+#define	MALLOC_BOUND_CHERI_POINTERS \
+	"_RUNTIME_BOUND_CHERI_POINTERS"
+#define	MALLOC_NOBOUND_CHERI_POINTERS \
+	"_RUNTIME_NOBOUND_CHERI_POINTERS"
 
 /*
  * Different allocators give their strong symbols different names.  Hide
@@ -296,6 +300,27 @@ static void *entire_shadow;
 static bool quarantining = true;
 static bool revoke_every_free = false;
 static bool revoke_async = false;
+static bool bound_pointers = false;
+
+/*
+ * Optionally apply strict bounds to pointers returned by malloc() and friends.
+ * This is technically UB since it means that the pointer passed to free() is
+ * not what we got from the allocator.  However, it may be useful for
+ * demonstrating CHERI's spatial safety guarantees in demos and so on.
+ *
+ * The default behaviour lets the allocator provide pointers with bounds
+ * covering the usable size of the allocation, beyond the requested size, which
+ * is friendlier to realloc() loops.  With revocation enabled, strict bounds
+ * would force a new allocation for each realloc() call, which can hurt quite a
+ * bit.
+ */
+static void *
+mrs_bound_pointer(void *p, size_t size)
+{
+	if (p != NULL && bound_pointers && size > 0)
+		p = cheri_setbounds(p, size);
+	return (p);
+}
 
 struct mrs_descriptor_slab_entry {
 	void *ptr;
@@ -1283,6 +1308,11 @@ init(void)
 		else if (getenv(MALLOC_REVOKE_ASYNC_ENV) != NULL)
 			revoke_async = true;
 #endif
+
+		if (getenv(MALLOC_BOUND_CHERI_POINTERS) != NULL)
+			bound_pointers = true;
+		else if (getenv(MALLOC_NOBOUND_CHERI_POINTERS) != NULL)
+			bound_pointers = false;
 	}
 	if (!quarantining)
 #if defined(PRINT_CAPREVOKE) || defined(PRINT_CAPREVOKE_MRS) || defined(PRINT_STATS)
@@ -1345,10 +1375,16 @@ fini(void)
 /* mrs functions */
 
 static void *
+mrs_real_malloc(size_t size)
+{
+	return (mrs_bound_pointer(REAL(malloc)(size), size));
+}
+
+static void *
 mrs_malloc(size_t size)
 {
 	if (!quarantining)
-		return (REAL(malloc)(size));
+		return (mrs_real_malloc(size));
 
 	/*mrs_debug_printf("mrs_malloc: called\n");*/
 
@@ -1366,9 +1402,9 @@ mrs_malloc(size_t size)
 	 * of the currently supported allocators do.
 	 */
 	if (size < CAPREVOKE_BITMAP_ALIGNMENT)
-		allocated_region = REAL(malloc)(CAPREVOKE_BITMAP_ALIGNMENT);
+		allocated_region = mrs_real_malloc(CAPREVOKE_BITMAP_ALIGNMENT);
 	else
-		allocated_region = REAL(malloc)(size);
+		allocated_region = mrs_real_malloc(size);
 	if (allocated_region == NULL) {
 		MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0,
 		    allocated_region);
@@ -1388,13 +1424,19 @@ mrs_malloc(size_t size)
 	return (allocated_region);
 }
 
+static void *
+mrs_real_calloc(size_t number, size_t size)
+{
+	return (mrs_bound_pointer(REAL(calloc)(number, size), number * size));
+}
+
 void *
 mrs_calloc(size_t number, size_t size)
 {
 	size_t tmpsize;
 
 	if (!quarantining)
-		return (REAL(calloc)(number, size));
+		return (mrs_real_calloc(number, size));
 
 	/*
 	 * This causes problems if our library is initialized before
@@ -1417,9 +1459,9 @@ mrs_calloc(size_t number, size_t size)
 	 */
 	if (!__builtin_mul_overflow(number, size, &tmpsize) &&
 	    tmpsize < CAPREVOKE_BITMAP_ALIGNMENT)
-		allocated_region = REAL(calloc)(1, CAPREVOKE_BITMAP_ALIGNMENT);
+		allocated_region = mrs_real_calloc(1, CAPREVOKE_BITMAP_ALIGNMENT);
 	else
-		allocated_region = REAL(calloc)(number, size);
+		allocated_region = mrs_real_calloc(number, size);
 	if (allocated_region == NULL) {
 		MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number,
 		    allocated_region);
@@ -1439,10 +1481,21 @@ mrs_calloc(size_t number, size_t size)
 }
 
 static int
+mrs_real_posix_memalign(void **ptr, size_t alignment, size_t size)
+{
+	int ret;
+
+	ret = REAL(posix_memalign)(ptr, alignment, size);
+	if (ret == 0)
+		*ptr = mrs_bound_pointer(*ptr, size);
+	return (ret);
+}
+
+static int
 mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 {
 	if (!quarantining)
-		return (REAL(posix_memalign)(ptr, alignment, size));
+		return (mrs_real_posix_memalign(ptr, alignment, size));
 
 	mrs_debug_printf("mrs_posix_memalign: called ptr %p alignment %zu size %zu\n",
 	    ptr, alignment, size);
@@ -1452,7 +1505,7 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 	if (alignment < CAPREVOKE_BITMAP_ALIGNMENT)
 		alignment = CAPREVOKE_BITMAP_ALIGNMENT;
 
-	int ret = REAL(posix_memalign)(ptr, alignment, size);
+	int ret = mrs_real_posix_memalign(ptr, alignment, size);
 	if (ret != 0) {
 		return (ret);
 	}
@@ -1468,10 +1521,16 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 }
 
 static void *
+mrs_real_aligned_alloc(size_t alignment, size_t size)
+{
+	return (mrs_bound_pointer(REAL(aligned_alloc)(alignment, size), size));
+}
+
+static void *
 mrs_aligned_alloc(size_t alignment, size_t size)
 {
 	if (!quarantining)
-		return (REAL(aligned_alloc)(alignment, size));
+		return (mrs_real_aligned_alloc(alignment, size));
 
 	mrs_debug_printf("mrs_aligned_alloc: called alignment %zu size %zu\n",
 	    alignment, size);
@@ -1481,7 +1540,7 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 	if (alignment < CAPREVOKE_BITMAP_ALIGNMENT)
 		alignment = CAPREVOKE_BITMAP_ALIGNMENT;
 
-	void *allocated_region = REAL(aligned_alloc)(alignment, size);
+	void *allocated_region = mrs_real_aligned_alloc(alignment, size);
 	if (allocated_region == NULL) {
 		MRS_UTRACE(UTRACE_MRS_ALIGNED_ALLOC, NULL, size, alignment,
 		    allocated_region);
@@ -1499,6 +1558,12 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 	return (allocated_region);
 }
 
+static void *
+mrs_real_realloc(void *ptr, size_t size)
+{
+	return (mrs_bound_pointer(REAL(realloc)(ptr, size), size));
+}
+
 /*
  * Replace realloc with a malloc and free to avoid dangling pointers
  * in case of in-place realloc that shrinks the buffer.  If ptr is not
@@ -1509,7 +1574,7 @@ static void *
 mrs_realloc(void *ptr, size_t size)
 {
 	if (!quarantining)
-		return (REAL(realloc)(ptr, size));
+		return (mrs_real_realloc(ptr, size));
 
 	size_t old_size = cheri_getlen(ptr);
 	mrs_debug_printf("mrs_realloc: called ptr %p ptr size %zu new size %zu\n",
@@ -1583,6 +1648,12 @@ mrs_free(void *ptr)
 	check_and_perform_flush(true);
 }
 
+static void *
+mrs_real_mallocx(size_t size, int flags)
+{
+	return (mrs_bound_pointer(REAL(mallocx)(size, flags), size));
+}
+
 void *
 mrs_mallocx(size_t size, int flags)
 {
@@ -1590,7 +1661,7 @@ mrs_mallocx(size_t size, int flags)
 	void *ret;
 
 	if (!quarantining)
-		return (REAL(mallocx)(size, flags));
+		return (mrs_real_mallocx(size, flags));
 
 	if (align <= CAPREVOKE_BITMAP_ALIGNMENT)
 		ret = mrs_malloc(size);
@@ -1605,6 +1676,12 @@ mrs_mallocx(size_t size, int flags)
 	return (ret);
 }
 
+static void *
+mrs_real_rallocx(void *ptr, size_t size, int flags)
+{
+	return (mrs_bound_pointer(REAL(rallocx)(ptr, size, flags), size));
+}
+
 void *
 mrs_rallocx(void *ptr, size_t size, int flags)
 {
@@ -1612,7 +1689,7 @@ mrs_rallocx(void *ptr, size_t size, int flags)
 	size_t old_size;
 
 	if (!quarantining)
-		return (REAL(rallocx)(ptr, size, flags));
+		return (mrs_real_rallocx(ptr, size, flags));
 
 	old_size = cheri_getlen(ptr);
 
