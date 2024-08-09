@@ -531,7 +531,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct freebsd64_fcntl_args *p = params;
 		iarg[a++] = p->fd; /* int */
 		iarg[a++] = p->cmd; /* int */
-		uarg[a++] = (intptr_t)p->arg; /* intptr_t */
+		uarg[a++] = (intptr_t)p->arg; /* int64_t */
 		*n_args = 3;
 		break;
 	}
@@ -857,10 +857,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 169: {
 		struct freebsd64_semsys_args *p = params;
 		iarg[a++] = p->which; /* int */
-		uarg[a++] = (intptr_t)p->a2; /* intptr_t */
-		uarg[a++] = (intptr_t)p->a3; /* intptr_t */
-		uarg[a++] = (intptr_t)p->a4; /* intptr_t */
-		uarg[a++] = (intptr_t)p->a5; /* intptr_t */
+		uarg[a++] = (intptr_t)p->a2; /* int64_t */
+		uarg[a++] = (intptr_t)p->a3; /* int64_t */
+		uarg[a++] = (intptr_t)p->a4; /* int64_t */
+		uarg[a++] = (intptr_t)p->a5; /* int64_t */
 		*n_args = 5;
 		break;
 	}
@@ -868,11 +868,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 170: {
 		struct freebsd64_msgsys_args *p = params;
 		iarg[a++] = p->which; /* int */
-		uarg[a++] = (intptr_t)p->a2; /* intptr_t */
-		uarg[a++] = (intptr_t)p->a3; /* intptr_t */
-		uarg[a++] = (intptr_t)p->a4; /* intptr_t */
-		uarg[a++] = (intptr_t)p->a5; /* intptr_t */
-		uarg[a++] = (intptr_t)p->a6; /* intptr_t */
+		uarg[a++] = (intptr_t)p->a2; /* int64_t */
+		uarg[a++] = (intptr_t)p->a3; /* int64_t */
+		uarg[a++] = (intptr_t)p->a4; /* int64_t */
+		uarg[a++] = (intptr_t)p->a5; /* int64_t */
+		uarg[a++] = (intptr_t)p->a6; /* int64_t */
 		*n_args = 6;
 		break;
 	}
@@ -880,9 +880,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 171: {
 		struct freebsd64_shmsys_args *p = params;
 		iarg[a++] = p->which; /* int */
-		uarg[a++] = (intptr_t)p->a2; /* intptr_t */
-		uarg[a++] = (intptr_t)p->a3; /* intptr_t */
-		uarg[a++] = (intptr_t)p->a4; /* intptr_t */
+		uarg[a++] = (intptr_t)p->a2; /* int64_t */
+		uarg[a++] = (intptr_t)p->a3; /* int64_t */
+		uarg[a++] = (intptr_t)p->a4; /* int64_t */
 		*n_args = 4;
 		break;
 	}
@@ -953,7 +953,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* __syscall */
+	/* freebsd64___syscall */
 	case 198: {
 		*n_args = 0;
 		break;
@@ -3475,8 +3475,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[a++] = p->pid1; /* pid_t */
 		iarg[a++] = p->pid2; /* pid_t */
 		iarg[a++] = p->type; /* int */
-		uarg[a++] = (intptr_t)p->idx1; /* uintptr_t */
-		uarg[a++] = (intptr_t)p->idx2; /* uintptr_t */
+		uarg[a++] = (intptr_t)p->idx1; /* uint64_t */
+		uarg[a++] = (intptr_t)p->idx2; /* uint64_t */
 		*n_args = 5;
 		break;
 	}
@@ -4296,7 +4296,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "intptr_t";
+			p = "int64_t";
 			break;
 		default:
 			break;
@@ -4855,16 +4855,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "intptr_t";
+			p = "int64_t";
 			break;
 		case 2:
-			p = "intptr_t";
+			p = "int64_t";
 			break;
 		case 3:
-			p = "intptr_t";
+			p = "int64_t";
 			break;
 		case 4:
-			p = "intptr_t";
+			p = "int64_t";
 			break;
 		default:
 			break;
@@ -4877,19 +4877,19 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "intptr_t";
+			p = "int64_t";
 			break;
 		case 2:
-			p = "intptr_t";
+			p = "int64_t";
 			break;
 		case 3:
-			p = "intptr_t";
+			p = "int64_t";
 			break;
 		case 4:
-			p = "intptr_t";
+			p = "int64_t";
 			break;
 		case 5:
-			p = "intptr_t";
+			p = "int64_t";
 			break;
 		default:
 			break;
@@ -4902,13 +4902,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "intptr_t";
+			p = "int64_t";
 			break;
 		case 2:
-			p = "intptr_t";
+			p = "int64_t";
 			break;
 		case 3:
-			p = "intptr_t";
+			p = "int64_t";
 			break;
 		default:
 			break;
@@ -5016,7 +5016,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* __syscall */
+	/* freebsd64___syscall */
 	case 198:
 		break;
 	/* freebsd64___sysctl */
@@ -9303,10 +9303,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "uintptr_t";
+			p = "uint64_t";
 			break;
 		case 4:
-			p = "uintptr_t";
+			p = "uint64_t";
 			break;
 		default:
 			break;
@@ -9869,7 +9869,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* __syscall */
+	/* freebsd64___syscall */
 	case 198:
 	/* freebsd64___sysctl */
 	case 202:

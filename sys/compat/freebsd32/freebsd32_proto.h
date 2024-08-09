@@ -89,7 +89,7 @@ struct freebsd32_getitimer_args {
 struct freebsd32_fcntl_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char arg_l_[PADL_(intptr_t)]; intptr_t arg; char arg_r_[PADR_(intptr_t)];
+	char arg_l_[PADL_(int32_t)]; int32_t arg; char arg_r_[PADR_(int32_t)];
 };
 struct freebsd32_select_args {
 	char nd_l_[PADL_(int)]; int nd; char nd_r_[PADR_(int)];
@@ -134,24 +134,24 @@ struct freebsd32_sysarch_args {
 };
 struct freebsd32_semsys_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char a2_l_[PADL_(intptr_t)]; intptr_t a2; char a2_r_[PADR_(intptr_t)];
-	char a3_l_[PADL_(intptr_t)]; intptr_t a3; char a3_r_[PADR_(intptr_t)];
-	char a4_l_[PADL_(intptr_t)]; intptr_t a4; char a4_r_[PADR_(intptr_t)];
-	char a5_l_[PADL_(intptr_t)]; intptr_t a5; char a5_r_[PADR_(intptr_t)];
+	char a2_l_[PADL_(int32_t)]; int32_t a2; char a2_r_[PADR_(int32_t)];
+	char a3_l_[PADL_(int32_t)]; int32_t a3; char a3_r_[PADR_(int32_t)];
+	char a4_l_[PADL_(int32_t)]; int32_t a4; char a4_r_[PADR_(int32_t)];
+	char a5_l_[PADL_(int32_t)]; int32_t a5; char a5_r_[PADR_(int32_t)];
 };
 struct freebsd32_msgsys_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char a2_l_[PADL_(intptr_t)]; intptr_t a2; char a2_r_[PADR_(intptr_t)];
-	char a3_l_[PADL_(intptr_t)]; intptr_t a3; char a3_r_[PADR_(intptr_t)];
-	char a4_l_[PADL_(intptr_t)]; intptr_t a4; char a4_r_[PADR_(intptr_t)];
-	char a5_l_[PADL_(intptr_t)]; intptr_t a5; char a5_r_[PADR_(intptr_t)];
-	char a6_l_[PADL_(intptr_t)]; intptr_t a6; char a6_r_[PADR_(intptr_t)];
+	char a2_l_[PADL_(int32_t)]; int32_t a2; char a2_r_[PADR_(int32_t)];
+	char a3_l_[PADL_(int32_t)]; int32_t a3; char a3_r_[PADR_(int32_t)];
+	char a4_l_[PADL_(int32_t)]; int32_t a4; char a4_r_[PADR_(int32_t)];
+	char a5_l_[PADL_(int32_t)]; int32_t a5; char a5_r_[PADR_(int32_t)];
+	char a6_l_[PADL_(int32_t)]; int32_t a6; char a6_r_[PADR_(int32_t)];
 };
 struct freebsd32_shmsys_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char a2_l_[PADL_(intptr_t)]; intptr_t a2; char a2_r_[PADR_(intptr_t)];
-	char a3_l_[PADL_(intptr_t)]; intptr_t a3; char a3_r_[PADR_(intptr_t)];
-	char a4_l_[PADL_(intptr_t)]; intptr_t a4; char a4_r_[PADR_(intptr_t)];
+	char a2_l_[PADL_(int32_t)]; int32_t a2; char a2_r_[PADR_(int32_t)];
+	char a3_l_[PADL_(int32_t)]; int32_t a3; char a3_r_[PADR_(int32_t)];
+	char a4_l_[PADL_(int32_t)]; int32_t a4; char a4_r_[PADR_(int32_t)];
 };
 struct freebsd32_ntp_adjtime_args {
 	char tp_l_[PADL_(struct timex32 *)]; struct timex32 * tp; char tp_r_[PADR_(struct timex32 *)];

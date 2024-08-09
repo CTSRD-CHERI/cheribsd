@@ -234,7 +234,7 @@ struct freebsd64_cheri_cidcap_alloc_args {
 struct freebsd64_fcntl_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char arg_l_[PADL_(intptr_t)]; intptr_t arg; char arg_r_[PADR_(intptr_t)];
+	char arg_l_[PADL_(int64_t)]; int64_t arg; char arg_r_[PADR_(int64_t)];
 };
 struct freebsd64_select_args {
 	char nd_l_[PADL_(int)]; int nd; char nd_r_[PADR_(int)];
@@ -361,24 +361,24 @@ struct freebsd64_rtprio_args {
 };
 struct freebsd64_semsys_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char a2_l_[PADL_(intptr_t)]; intptr_t a2; char a2_r_[PADR_(intptr_t)];
-	char a3_l_[PADL_(intptr_t)]; intptr_t a3; char a3_r_[PADR_(intptr_t)];
-	char a4_l_[PADL_(intptr_t)]; intptr_t a4; char a4_r_[PADR_(intptr_t)];
-	char a5_l_[PADL_(intptr_t)]; intptr_t a5; char a5_r_[PADR_(intptr_t)];
+	char a2_l_[PADL_(int64_t)]; int64_t a2; char a2_r_[PADR_(int64_t)];
+	char a3_l_[PADL_(int64_t)]; int64_t a3; char a3_r_[PADR_(int64_t)];
+	char a4_l_[PADL_(int64_t)]; int64_t a4; char a4_r_[PADR_(int64_t)];
+	char a5_l_[PADL_(int64_t)]; int64_t a5; char a5_r_[PADR_(int64_t)];
 };
 struct freebsd64_msgsys_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char a2_l_[PADL_(intptr_t)]; intptr_t a2; char a2_r_[PADR_(intptr_t)];
-	char a3_l_[PADL_(intptr_t)]; intptr_t a3; char a3_r_[PADR_(intptr_t)];
-	char a4_l_[PADL_(intptr_t)]; intptr_t a4; char a4_r_[PADR_(intptr_t)];
-	char a5_l_[PADL_(intptr_t)]; intptr_t a5; char a5_r_[PADR_(intptr_t)];
-	char a6_l_[PADL_(intptr_t)]; intptr_t a6; char a6_r_[PADR_(intptr_t)];
+	char a2_l_[PADL_(int64_t)]; int64_t a2; char a2_r_[PADR_(int64_t)];
+	char a3_l_[PADL_(int64_t)]; int64_t a3; char a3_r_[PADR_(int64_t)];
+	char a4_l_[PADL_(int64_t)]; int64_t a4; char a4_r_[PADR_(int64_t)];
+	char a5_l_[PADL_(int64_t)]; int64_t a5; char a5_r_[PADR_(int64_t)];
+	char a6_l_[PADL_(int64_t)]; int64_t a6; char a6_r_[PADR_(int64_t)];
 };
 struct freebsd64_shmsys_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char a2_l_[PADL_(intptr_t)]; intptr_t a2; char a2_r_[PADR_(intptr_t)];
-	char a3_l_[PADL_(intptr_t)]; intptr_t a3; char a3_r_[PADR_(intptr_t)];
-	char a4_l_[PADL_(intptr_t)]; intptr_t a4; char a4_r_[PADR_(intptr_t)];
+	char a2_l_[PADL_(int64_t)]; int64_t a2; char a2_r_[PADR_(int64_t)];
+	char a3_l_[PADL_(int64_t)]; int64_t a3; char a3_r_[PADR_(int64_t)];
+	char a4_l_[PADL_(int64_t)]; int64_t a4; char a4_r_[PADR_(int64_t)];
 };
 struct freebsd64_ntp_adjtime_args {
 	char tp_l_[PADL_(struct timex *)]; struct timex * tp; char tp_r_[PADR_(struct timex *)];
@@ -1534,8 +1534,8 @@ struct freebsd64_kcmp_args {
 	char pid1_l_[PADL_(pid_t)]; pid_t pid1; char pid1_r_[PADR_(pid_t)];
 	char pid2_l_[PADL_(pid_t)]; pid_t pid2; char pid2_r_[PADR_(pid_t)];
 	char type_l_[PADL_(int)]; int type; char type_r_[PADR_(int)];
-	char idx1_l_[PADL_(uintptr_t)]; uintptr_t idx1; char idx1_r_[PADR_(uintptr_t)];
-	char idx2_l_[PADL_(uintptr_t)]; uintptr_t idx2; char idx2_r_[PADR_(uintptr_t)];
+	char idx1_l_[PADL_(uint64_t)]; uint64_t idx1; char idx1_r_[PADR_(uint64_t)];
+	char idx2_l_[PADL_(uint64_t)]; uint64_t idx2; char idx2_r_[PADR_(uint64_t)];
 };
 int	freebsd64_read(struct thread *, struct freebsd64_read_args *);
 int	freebsd64_write(struct thread *, struct freebsd64_write_args *);
