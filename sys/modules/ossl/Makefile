@@ -73,7 +73,7 @@ ${SRCS.aarch64:M*.S:S/S/o/}: ${.TARGET:R}.S
 # Clang doesn't recognize "aes*" instructions without -march set.
 aesv8-armx.o: aesv8-armx.S
 	${CC} -c ${CFLAGS:N-mgeneral-regs-only} ${WERROR} ${PROF} \
-	    -march=armv8-a+crypto ${.IMPSRC}
+	    ${CFLAGS:M-march=*:S/^$/-march=armv8-a/W:[-1]}+crypto ${.IMPSRC}
 	${CTFCONVERT_CMD}
 
 OBJS.aarch64= aesv8-armx.o

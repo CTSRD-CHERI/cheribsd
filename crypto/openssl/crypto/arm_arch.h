@@ -177,6 +177,22 @@ extern unsigned int OPENSSL_armv8_rsa_neonized;
     .popsection;
 #  endif
 
+   /*
+    * Support macros for Morello
+    */
+
+#  if __ARM_ARCH__>=8
+#   ifdef __CHERI_PURE_CAPABILITY__
+#    define PTR_WIDTH 16
+#    define PTR(n) c ## n
+#    define PTRN(n) c ## n
+#   else
+#    define PTR_WIDTH 8
+#    define PTR(n) x ## n
+#    define PTRN(n) n
+#   endif
+#  endif
+
 # endif  /* defined __ASSEMBLER__ */
 
 #endif
