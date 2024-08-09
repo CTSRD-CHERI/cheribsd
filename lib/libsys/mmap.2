@@ -104,7 +104,7 @@ argument by
 .Em or Ns 'ing
 the following values:
 .Pp
-.Bl -tag -width PROT_WRITE -compact
+.Bl -tag -width PROT_NO_CAP -compact
 .It Dv PROT_NONE
 Pages may not be accessed.
 .It Dv PROT_READ
@@ -113,7 +113,42 @@ Pages may be read.
 Pages may be written.
 .It Dv PROT_EXEC
 Pages may be executed.
+.It Dv PROT_CAP
+CHERI capabilities may be read or written as dictated by
+.Dv PROT_READ
+and
+.Dv PROT_WRITE .
+.It Dv PROT_NO_CAP
+Respect the absence of
+.Dv PROT_CAP .
 .El
+.Pp
+On CHERI platforms, compatability is retained with unmodified POSIX
+programs by implying
+.Dv PROT_CAP
+if either of
+.Dv PROT_READ
+and
+.Dv PROT_WRITE
+is set unless the underlying backing store can not safety support
+capabilities (e.g., a
+.Dv MAP_SHARED
+mapping of a file).
+If either of
+.Dv PROT_NO_CAP
+are set, then capability permissions will not be implied.
+When
+.Dv PROT_CAP
+is passed, at least one of
+.Dv PROT_READ
+and
+.Dv PROT_WRITE
+is required.
+On non-CHERI platforms the
+.Dv PROT_CAP
+and
+.Dv PROT_NO_CAP
+flags have no effect.
 .Pp
 In addition to these protection flags,
 .Fx
@@ -130,6 +165,14 @@ values wrapped in the
 macro into the
 .Fa prot
 argument.
+The
+.Dv PROT_MAX()
+flags must be a superset of the unwrapped flags.
+If one set of flags contains
+.Dv PROT_CAP
+or
+.Dv PROT_NO_CAP
+then both must.
 .Pp
 The
 .Fa flags
@@ -614,6 +657,12 @@ The
 .Fa prot
 argument contains protections which are not a subset of the specified
 maximum protections.
+.It Bq Er ENOTSUP
+.Dv PROT_CAP
+without
+.Dv PROT_READ
+or
+.Dv PROT_WRITE .
 .El
 .Sh SEE ALSO
 .Xr madvise 2 ,

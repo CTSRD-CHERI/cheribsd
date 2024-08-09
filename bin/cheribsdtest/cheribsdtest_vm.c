@@ -115,6 +115,81 @@ CHERIBSDTEST(vm_tag_mmap_anon,
 	cheribsdtest_success();
 }
 
+CHERIBSDTEST(vm_tag_mmap_anon_cap,
+    "check tags are stored for MAP_ANON pages with explicit permissions")
+{
+	mmap_and_check_tag_stored(-1, PROT_READ | PROT_WRITE | PROT_CAP,
+	    MAP_ANON);
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(vm_notag_mmap_no_cap,
+    "check tags are not stored it we request no capablity permissions",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO | CT_FLAG_SI_ADDR,
+    .ct_signum = SIGSEGV,
+    .ct_si_code = SEGV_STORETAG,
+    .ct_si_trapno = TRAPNO_STORE_CAP_PF,
+    .ct_check_skip = skip_need_writable_tmp)
+{
+	void * __capability volatile *cp;
+	void * __capability cp_value;
+	int v;
+
+	cp = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
+	    PROT_READ | PROT_WRITE | PROT_NO_CAP, MAP_ANON, -1, 0));
+	cheribsdtest_set_expected_si_addr(NULL_DERIVED_VOIDP(cp));
+	cp_value = cheri_ptr(&v, sizeof(v));
+	*cp = cp_value;
+	cheribsdtest_failure_errx("tagged store succeeded");
+}
+
+CHERIBSDTEST(vm_notag_mprotect_no_cap,
+    "check tags are not stored if we remove capability page permissions",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO | CT_FLAG_SI_ADDR,
+    .ct_signum = SIGSEGV,
+    .ct_si_code = SEGV_STORETAG,
+    .ct_si_trapno = TRAPNO_STORE_CAP_PF,
+    .ct_check_skip = skip_need_writable_tmp)
+{
+	void * __capability volatile *cp;
+	void * __capability cp_value;
+	int v;
+
+	cp = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
+	    PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+	CHERIBSDTEST_CHECK_SYSCALL(mprotect(__DEVOLATILE(void *, cp),
+	    getpagesize(), PROT_READ | PROT_WRITE | PROT_NO_CAP));
+	cheribsdtest_set_expected_si_addr(NULL_DERIVED_VOIDP(cp));
+	cp_value = cheri_ptr(&v, sizeof(v));
+	*cp = cp_value;
+	cheribsdtest_failure_errx("tagged store succeeded");
+}
+
+static void
+mmap_check_bad_protections(int prot, int expected_errno)
+{
+	CHERIBSDTEST_CHECK_CALL_ERROR((int)(intptr_t)mmap(NULL, getpagesize(),
+	    prot, MAP_ANON, -1, 0), expected_errno);
+}
+
+CHERIBSDTEST(vm_mmap_diallowed_prot,
+    "check that disallowed protection combinations are rejected")
+{
+	/* Max protections not a superset */
+	mmap_check_bad_protections(PROT_READ | PROT_WRITE | PROT_MAX(PROT_READ),
+	    ENOTSUP);
+
+	/* Mixing implied and explict protections */
+	mmap_check_bad_protections(PROT_READ | PROT_CAP | PROT_MAX(PROT_READ),
+	    ENOTSUP);
+
+	/* Disallowed explicit capability protection combinations */
+	mmap_check_bad_protections(PROT_CAP, ENOTSUP);
+	mmap_check_bad_protections(PROT_MAX(PROT_CAP), ENOTSUP);
+
+	cheribsdtest_success();
+}
+
 CHERIBSDTEST(vm_tag_shm_open_anon_shared,
     "check tags are stored for SHM_ANON MAP_SHARED pages")
 {

@@ -50,8 +50,8 @@ typedef unsigned long pgprot_t;
 
 #define page	vm_page
 
-#define	LINUXKPI_PROT_VALID (1 << 5)
-#define	LINUXKPI_CACHE_MODE_SHIFT 6
+#define	LINUXKPI_PROT_VALID (1 << 6)
+#define	LINUXKPI_CACHE_MODE_SHIFT 7
 
 CTASSERT((VM_PROT_ALL & -LINUXKPI_PROT_VALID) == 0);
 

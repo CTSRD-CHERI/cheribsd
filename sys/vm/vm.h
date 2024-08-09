@@ -76,8 +76,9 @@ typedef u_char vm_prot_t;	/* protection codes */
 #define	VM_PROT_EXECUTE		((vm_prot_t) 0x04)
 #define	VM_PROT_READ_CAP	((vm_prot_t) 0x08)
 #define	VM_PROT_WRITE_CAP	((vm_prot_t) 0x10)
-#define	VM_PROT_COPY		((vm_prot_t) 0x20)	/* copy-on-read */
-#define	VM_PROT_PRIV_FLAG	((vm_prot_t) 0x40)
+#define	VM_PROT_NO_IMPLY_CAP	((vm_prot_t) 0x20)
+#define	VM_PROT_COPY		((vm_prot_t) 0x40)	/* copy-on-read */
+#define	VM_PROT_PRIV_FLAG	((vm_prot_t) 0x80)
 #define	VM_PROT_FAULT_LOOKUP	VM_PROT_PRIV_FLAG
 #define	VM_PROT_QUICK_NOFAULT	VM_PROT_PRIV_FLAG	/* same to save bits */
 
@@ -86,17 +87,19 @@ typedef u_char vm_prot_t;	/* protection codes */
 #define	VM_PROT_DEFAULT		VM_PROT_RWX
 #define	VM_PROT_CAP		(VM_PROT_READ_CAP|VM_PROT_WRITE_CAP)
 #define	VM_PROT_RW_CAP		(VM_PROT_RW|VM_PROT_CAP)
-#define	VM_PROT_ALL		(VM_PROT_RWX|VM_PROT_CAP)
+#define	VM_PROT_ALL		(VM_PROT_RWX|VM_PROT_CAP|VM_PROT_NO_IMPLY_CAP)
 
 #define	VM_PROT_ADD_CAP(prot)	 __extension__ ({			\
 	vm_prot_t cp, p;						\
 									\
 	cp = p = (prot);						\
-	if ((p & VM_PROT_READ) != 0)					\
-		cp |= VM_PROT_READ_CAP;					\
-	if ((p & VM_PROT_WRITE) != 0)					\
-		cp |= VM_PROT_WRITE_CAP;				\
-	cp;								\
+	if ((p & (VM_PROT_CAP | VM_PROT_NO_IMPLY_CAP)) == 0) {		\
+		if ((p & VM_PROT_READ) != 0)				\
+			cp |= VM_PROT_READ_CAP;				\
+		if ((p & VM_PROT_WRITE) != 0)				\
+			cp |= VM_PROT_WRITE_CAP;			\
+	}								\
+	cp |= VM_PROT_NO_IMPLY_CAP;					\
 })
 
 #define	VM_PROT_EXTRACT(prot)	((prot) & VM_PROT_ALL)
