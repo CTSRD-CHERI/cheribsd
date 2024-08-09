@@ -2099,7 +2099,7 @@ charged:
 
 	new_entry->inheritance = inheritance;
 	new_entry->protection = prot;
-	new_entry->max_protection = max;
+	new_entry->max_protection = max | VM_PROT_NO_IMPLY_CAP;
 	new_entry->wired_count = 0;
 	new_entry->wiring_thread = NULL;
 	new_entry->read_ahead = VM_FAULT_READ_AHEAD_INIT;
@@ -3470,7 +3470,8 @@ restart_checks:
 		old_prot = entry->protection;
 
 		if ((flags & VM_MAP_PROTECT_SET_MAXPROT) != 0) {
-			entry->max_protection = new_maxprot;
+			entry->max_protection = new_maxprot |
+			    VM_PROT_NO_IMPLY_CAP;
 			entry->protection = new_maxprot & old_prot;
 		}
 		if ((flags & VM_MAP_PROTECT_SET_PROT) != 0)
@@ -6232,10 +6233,23 @@ vm_map_prot2perms(vm_prot_t prot)
 {
 	int perms = 0;
 
-	if (prot & (VM_PROT_READ | VM_PROT_COPY))
-		perms |= CHERI_PROT2PERM_READ_PERMS;
-	if (prot & VM_PROT_WRITE)
-		perms |= CHERI_PROT2PERM_WRITE_PERMS;
+	if (prot & (VM_PROT_CAP | VM_PROT_NO_IMPLY_CAP)) {
+		if (prot & (VM_PROT_READ | VM_PROT_COPY))
+			perms |= CHERI_PROT2PERM_READ_PERMS;
+		if (prot & VM_PROT_READ_CAP)
+			perms |= CHERI_PROT2PERM_READ_CAP_PERMS;
+		if (prot & VM_PROT_WRITE)
+			perms |= CHERI_PROT2PERM_WRITE_PERMS;
+		if (prot & VM_PROT_WRITE_CAP)
+			perms |= CHERI_PROT2PERM_WRITE_CAP_PERMS;
+	} else {
+		if (prot & (VM_PROT_READ | VM_PROT_COPY))
+			perms |= CHERI_PROT2PERM_READ_PERMS |
+			    CHERI_PROT2PERM_READ_CAP_PERMS;
+		if (prot & VM_PROT_WRITE)
+			perms |= CHERI_PROT2PERM_WRITE_PERMS |
+			    CHERI_PROT2PERM_WRITE_CAP_PERMS;
+	}
 	if (prot & VM_PROT_EXECUTE)
 		perms |= CHERI_PROT2PERM_EXEC_PERMS;
 
@@ -6280,7 +6294,7 @@ vm_map_reservation_insert(vm_map_t map, vm_offset_t addr, vm_size_t length,
 	new_entry->end = addr + length;
 	new_entry->reservation = reservation;
 	new_entry->next_read = addr;
-	new_entry->max_protection = max;
+	new_entry->max_protection = max | VM_PROT_NO_IMPLY_CAP;
 	vm_map_entry_link(map, new_entry);
 	vm_map_log("reserve", new_entry);
 

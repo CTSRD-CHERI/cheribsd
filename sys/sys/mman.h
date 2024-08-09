@@ -52,8 +52,11 @@
 #define	PROT_READ	0x01	/* pages can be read */
 #define	PROT_WRITE	0x02	/* pages can be written */
 #define	PROT_EXEC	0x04	/* pages can be executed */
+#define	PROT_CAP	0x08	/* capabilities can be read/written */
+#define	PROT_NO_CAP	0x10	/* honor PROT_CAP absense */
 #if __BSD_VISIBLE
-#define	_PROT_ALL	(PROT_READ | PROT_WRITE | PROT_EXEC)
+#define	_PROT_CAP	(PROT_CAP | PROT_NO_CAP)
+#define	_PROT_ALL	(PROT_READ | PROT_WRITE | PROT_EXEC | _PROT_CAP)
 #define	PROT_EXTRACT(prot)	((prot) & _PROT_ALL)
 
 #define	_PROT_MAX_SHIFT	16
