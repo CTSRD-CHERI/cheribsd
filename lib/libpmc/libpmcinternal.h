@@ -33,5 +33,6 @@
  * Prototypes.
  */
 const char *_pmc_name_of_event(enum pmc_event _ev, enum pmc_cputype _cpu);
+const char *_pmu_alias_get(const char *name);
 
 #endif	/* LIBPMC_INTERNAL_H */
