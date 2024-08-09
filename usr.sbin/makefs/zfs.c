@@ -74,7 +74,13 @@ zfs_prep_opts(fsinfo_t *fsopts)
 	zfs_opt_t *zfs;
 	size_t align;
 
-	align = alignof(uint64_t);
+	/*
+	 * The first field of zfs_opt_t must be aligned.
+	 *
+	 * For some reason snmalloc returns EINVAL if the alignment is smaller
+	 * than the pointer size, so work around that.
+	 */
+	align = MAX(alignof(uint64_t), sizeof(void *));
 	zfs = aligned_alloc(align, roundup2(sizeof(*zfs), align));
 	if (zfs == NULL)
 		err(1, "aligned_alloc");
