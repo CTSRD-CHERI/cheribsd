@@ -37,6 +37,7 @@
 #include "acpi.h"
 #include "atkbdc.h"
 #include "bhyverun.h"
+#include "bootrom.h"
 #include "config.h"
 #include "debug.h"
 #include "e820.h"
@@ -287,7 +288,7 @@ bhyve_start_vcpu(struct vcpu *vcpu, bool bsp)
 	int error;
 
 	if (bsp) {
-		if (lpc_bootrom()) {
+		if (bootrom_boot()) {
 			error = vm_set_capability(vcpu,
 			    VM_CAP_UNRESTRICTED_GUEST, 1);
 			if (error != 0) {
@@ -330,6 +331,9 @@ bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp __unused)
 	error = e820_init(ctx);
 	if (error != 0)
 		return (error);
+	error = bootrom_loadrom(ctx);
+	if (error != 0)
+		return (error);
 
 	return (0);
 }
@@ -351,7 +355,7 @@ bhyve_init_platform_late(struct vmctx *ctx, struct vcpu *bsp __unused)
 	if (error != 0)
 		return (error);
 
-	if (lpc_bootrom() && strcmp(lpc_fwcfg(), "bhyve") == 0)
+	if (bootrom_boot() && strcmp(lpc_fwcfg(), "bhyve") == 0)
 		fwctl_init();
 
 	if (get_config_bool("acpi_tables")) {
