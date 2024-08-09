@@ -50,7 +50,7 @@ extern int pmcstat_pmcinfilter; /* PMC index displayed. */
 const char *pmcstat_pmcid_to_name(pmc_id_t _pmcid);
 const char *pmcstat_pmcindex_to_name(int pmcin);
 struct pmcstat_pmcrecord *pmcstat_pmcindex_to_pmcr(int pmcin);
-int pmcstat_image_addr2line(struct pmcstat_image *image, uintfptr_t addr,
+int pmcstat_image_addr2line(struct pmcstat_image *image, ptraddr_t addr,
     char *sourcefile, size_t sourcefile_len, unsigned *sourceline,
     char *funcname, size_t funcname_len);
 

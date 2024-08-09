@@ -409,12 +409,12 @@ pmcpl_gmon_newpmc(pmcstat_interned_string ps, struct pmcstat_pmcrecord *pr)
 
 void
 pmcpl_gmon_process(struct pmcstat_process *pp, struct pmcstat_pmcrecord *pmcr,
-    uint32_t nsamples, uintfptr_t *cc, int usermode, uint32_t cpu)
+    uint32_t nsamples, ptraddr_t *cc, int usermode, uint32_t cpu)
 {
 	struct pmcstat_pcmap *map;
 	struct pmcstat_image *image;
 	struct pmcstat_gmonfile *pgf;
-	uintfptr_t bucket;
+	ptraddr_t bucket;
 	HISTCOUNTER *hc;
 	WIDEHISTCOUNTER *whc;
 	pmc_id_t pmcid;

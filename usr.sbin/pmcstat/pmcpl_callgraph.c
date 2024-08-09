@@ -101,7 +101,7 @@ int pmcstat_cgnode_hash_count;
 static pmcstat_interned_string pmcstat_previous_filename_printed;
 
 static struct pmcstat_cgnode *
-pmcstat_cgnode_allocate(struct pmcstat_image *image, uintfptr_t pc)
+pmcstat_cgnode_allocate(struct pmcstat_image *image, ptraddr_t pc)
 {
 	struct pmcstat_cgnode *cg;
 
@@ -138,14 +138,14 @@ pmcstat_cgnode_free(struct pmcstat_cgnode *cg)
  */
 static struct pmcstat_cgnode *
 pmcstat_cgnode_hash_lookup_pc(struct pmcstat_process *pp, pmc_id_t pmcid,
-    uintfptr_t pc, int usermode)
+    ptraddr_t pc, int usermode)
 {
 	struct pmcstat_pcmap *ppm;
 	struct pmcstat_symbol *sym;
 	struct pmcstat_image *image;
 	struct pmcstat_cgnode *cg;
 	struct pmcstat_cgnode_hash *h;
-	uintfptr_t loadaddress;
+	ptraddr_t loadaddress;
 	unsigned int i, hash;
 
 	ppm = pmcstat_process_find_map(usermode ? pp : pmcstat_kernproc, pc);
@@ -168,7 +168,7 @@ pmcstat_cgnode_hash_lookup_pc(struct pmcstat_process *pp, pmc_id_t pmcid,
 			pmcstat_stats.ps_samples_unknown_function++;
 	}
 
-	for (hash = i = 0; i < sizeof(uintfptr_t); i++)
+	for (hash = i = 0; i < sizeof(ptraddr_t); i++)
 		hash += (pc >> i) & 0xFF;
 
 	hash &= PMCSTAT_HASH_MASK;
@@ -232,7 +232,7 @@ pmcstat_cgnode_compare(const void *a, const void *b)
 
 static struct pmcstat_cgnode *
 pmcstat_cgnode_find(struct pmcstat_cgnode *parent, struct pmcstat_image *image,
-    uintfptr_t pcoffset)
+    ptraddr_t pcoffset)
 {
 	struct pmcstat_cgnode *child;
 
@@ -336,9 +336,9 @@ pmcstat_cgnode_print(struct pmcstat_cgnode *cg, int depth, uint32_t total)
 
 void
 pmcpl_cg_process(struct pmcstat_process *pp, struct pmcstat_pmcrecord *pmcr,
-    uint32_t nsamples, uintfptr_t *cc, int usermode, uint32_t cpu)
+    uint32_t nsamples, ptraddr_t *cc, int usermode, uint32_t cpu)
 {
-	uintfptr_t pc, loadaddress;
+	ptraddr_t pc, loadaddress;
 	uint32_t n;
 	struct pmcstat_image *image;
 	struct pmcstat_pcmap *ppm;

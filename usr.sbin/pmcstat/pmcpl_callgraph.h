@@ -39,7 +39,7 @@
 
 struct pmcstat_cgnode {
 	struct pmcstat_image	*pcg_image;
-	uintfptr_t		pcg_func;
+	ptraddr_t		pcg_func;
 	uint32_t		pcg_count;
 	uint32_t		pcg_nchildren;
 	LIST_ENTRY(pmcstat_cgnode) pcg_sibling;
@@ -59,7 +59,7 @@ int pmcpl_cg_init(void);
 void pmcpl_cg_shutdown(FILE *mf);
 void pmcpl_cg_process(
     struct pmcstat_process *pp, struct pmcstat_pmcrecord *pmcr,
-    uint32_t nsamples, uintfptr_t *cc, int usermode, uint32_t cpu);
+    uint32_t nsamples, ptraddr_t *cc, int usermode, uint32_t cpu);
 int pmcpl_cg_topkeypress(int c, void *w);
 void pmcpl_cg_topdisplay(void);
 void pmcpl_cg_configure(char *opt);
