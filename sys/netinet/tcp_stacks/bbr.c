@@ -9556,15 +9556,6 @@ bbr_do_closing(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		return (ret_val);
 	}
 	/*
-	 * If new data are received on a connection after the user processes
-	 * are gone, then RST the other end.
-	 * We call a new function now so we might continue and setup
-	 * to reset at all data being ack'd.
-	 */
-	if ((tp->t_flags & TF_CLOSED) && tlen &&
-	    bbr_check_data_after_close(m, bbr, tp, &tlen, th, so))
-		return (1);
-	/*
 	 * If last ACK falls within this segment's sequence numbers, record
 	 * its timestamp. NOTE: 1) That the test incorporates suggestions
 	 * from the latest proposal of the tcplw@cray.com list (Braden
@@ -9666,15 +9657,6 @@ bbr_do_lastack(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	if (ctf_drop_checks(to, m, th, tp, &tlen, &thflags, &drop_hdrlen, &ret_val)) {
 		return (ret_val);
 	}
-	/*
-	 * If new data are received on a connection after the user processes
-	 * are gone, then RST the other end.
-	 * We call a new function now so we might continue and setup
-	 * to reset at all data being ack'd.
-	 */
-	if ((tp->t_flags & TF_CLOSED) && tlen &&
-	    bbr_check_data_after_close(m, bbr, tp, &tlen, th, so))
-		return (1);
 	/*
 	 * If last ACK falls within this segment's sequence numbers, record
 	 * its timestamp. NOTE: 1) That the test incorporates suggestions
@@ -11807,7 +11789,7 @@ bbr_output_wtime(struct tcpcb *tp, const struct timeval *tv)
 	uint32_t recwin, sendwin;
 	int32_t sb_offset;
 	int32_t flags, abandon, error = 0;
-	struct tcp_log_buffer *lgb = NULL;
+	struct tcp_log_buffer *lgb;
 	struct mbuf *m;
 	struct mbuf *mb;
 	uint32_t if_hw_tsomaxsegcount = 0;
@@ -13590,12 +13572,12 @@ send:
 			mtu = inp->inp_route.ro_nh->nh_mtu;
 	}
 #endif				/* INET */
-out:
-
 	if (lgb) {
 		lgb->tlb_errno = error;
 		lgb = NULL;
 	}
+
+out:
 	/*
 	 * In transmit state, time the transmission and arrange for the
 	 * retransmit.  In persist state, just set snd_max.

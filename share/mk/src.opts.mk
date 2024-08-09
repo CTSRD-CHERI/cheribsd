@@ -420,13 +420,6 @@ BROKEN_OPTIONS+=LIB64C
 BROKEN_OPTIONS+=HYPERV
 .endif
 
-# NVME is only aarch64*, x86 and powerpc64*
-.if !${__T:Maarch64*} && ${__T} != "amd64" && ${__T} != "i386" && \
-    ${__T:Mpowerpc64*} == ""
-BROKEN_OPTIONS+=NVME
-.endif
-
-# XXX: Does not yet build for aarch64c
 .if ${__T} == "aarch64" || ${__T} == "amd64" || ${__T} == "i386" || \
     ${__T:Mpowerpc64*} != "" || ${__T:Mriscv64*} != ""
 __DEFAULT_YES_OPTIONS+=OPENMP

@@ -24,7 +24,6 @@
  */
 #include "test.h"
 #include "test_utils.h"
-__FBSDID("$FreeBSD$");
 
 DEFINE_TEST(test_read_pax_truncated)
 {

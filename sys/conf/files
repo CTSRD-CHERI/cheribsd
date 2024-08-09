@@ -3474,6 +3474,7 @@ dev/usb/misc/cp2112.c		optional cp2112
 dev/usb/misc/udbp.c		optional udbp
 dev/usb/misc/ugold.c		optional ugold
 dev/usb/misc/uled.c		optional uled
+dev/usb/misc/i2ctinyusb.c	optional i2ctinyusb
 #
 # USB input drivers
 #
@@ -3534,13 +3535,13 @@ dev/virtio/mmio/virtio_mmio_cmdline.c	optional	virtio_mmio
 dev/virtio/mmio/virtio_mmio_fdt.c	optional	virtio_mmio fdt
 dev/virtio/mmio/virtio_mmio_if.m	optional	virtio_mmio
 dev/virtio/network/if_vtnet.c		optional	vtnet
-dev/virtio/block/virtio_blk.c		optional	virtio_blk
 dev/virtio/balloon/virtio_balloon.c	optional	virtio_balloon
-dev/virtio/gpu/virtio_gpu.c		optional	virtio_gpu
-dev/virtio/scsi/virtio_scsi.c		optional	virtio_scsi
-dev/virtio/random/virtio_random.c	optional	virtio_random
+dev/virtio/block/virtio_blk.c		optional	virtio_blk
 dev/virtio/console/virtio_console.c	optional	virtio_console
+dev/virtio/gpu/virtio_gpu.c		optional	virtio_gpu
+dev/virtio/random/virtio_random.c	optional	virtio_random
 dev/virtio/scmi/virtio_scmi.c		optional	virtio_scmi
+dev/virtio/scsi/virtio_scsi.c		optional	virtio_scsi
 dev/vkbd/vkbd.c			optional vkbd
 dev/vmgenc/vmgenc_acpi.c	optional acpi
 dev/vmware/vmxnet3/if_vmx.c		optional vmx
@@ -3764,7 +3765,6 @@ geom/label/g_label_flashmap.c	optional geom_label
 geom/label/g_label_iso9660.c	optional geom_label
 geom/label/g_label_msdosfs.c	optional geom_label
 geom/label/g_label_ntfs.c	optional geom_label
-geom/label/g_label_reiserfs.c	optional geom_label
 geom/label/g_label_ufs.c	optional geom_label
 geom/label/g_label_gpt.c	optional geom_label | geom_label_gpt
 geom/label/g_label_disk_ident.c	optional geom_label

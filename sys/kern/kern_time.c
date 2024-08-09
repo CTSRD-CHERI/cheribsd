@@ -58,6 +58,7 @@
 
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
+#include <vm/uma.h>
 #ifdef CHERI_CAPREVOKE
 #include <vm/vm_cheri_revoke.h>
 #ifdef CHERI_CAPREVOKE_STATS

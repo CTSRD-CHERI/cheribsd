@@ -65,9 +65,7 @@ open(const char *path, int flags, ...)
 	} else {
 		mode = 0;
 	}
-	return (((int (*)(int, const char *, int, int))
-	    *(__libc_interposing_slot(INTERPOS_openat)))
-	    (AT_FDCWD, path, flags, mode));
+	return (INTERPOS_SYS(openat, AT_FDCWD, path, flags, mode));
 }
 
 #ifdef __CHERI_PURE_CAPABILITY__

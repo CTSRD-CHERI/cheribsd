@@ -24,7 +24,6 @@
  */
 #include "test.h"
 #include "test_utils.h"
-__FBSDID("$FreeBSD$");
 
 static unsigned char testdata[10 * 1024 * 1024];
 static unsigned char testdatacopy[10 * 1024 * 1024];
