@@ -37,8 +37,6 @@
 
 #define	INTR_IRQ_INVALID	0xFFFFFFFF
 
-#define INTR_ROOT_IRQ	0
-
 #ifndef LOCORE
 
 typedef unsigned long intr_irq_t;
