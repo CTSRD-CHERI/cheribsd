@@ -2599,11 +2599,11 @@ static int
 ena_enable_wc(device_t pdev, struct resource *res)
 {
 #if defined(__i386) || defined(__amd64) || defined(__aarch64__)
-	vm_offset_t va;
+	vm_pointer_t va;
 	vm_size_t len;
 	int rc;
 
-	va = (vm_offset_t)rman_get_virtual(res);
+	va = (vm_pointer_t)rman_get_virtual(res);
 	len = rman_get_size(res);
 	/* Enable write combining */
 	rc = pmap_change_attr(va, len, VM_MEMATTR_WRITE_COMBINING);

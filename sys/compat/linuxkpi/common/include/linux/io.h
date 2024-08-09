@@ -545,7 +545,7 @@ void lkpi_arch_phys_wc_del(int);
 static inline int
 arch_io_reserve_memtype_wc(resource_size_t start, resource_size_t size)
 {
-	vm_offset_t va;
+	vm_pointer_t va;
 
 	va = PHYS_TO_DMAP(start);
 
@@ -559,7 +559,7 @@ arch_io_reserve_memtype_wc(resource_size_t start, resource_size_t size)
 static inline void
 arch_io_free_memtype_wc(resource_size_t start, resource_size_t size)
 {
-	vm_offset_t va;
+	vm_pointer_t va;
 
 	va = PHYS_TO_DMAP(start);
 

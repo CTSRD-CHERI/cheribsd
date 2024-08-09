@@ -160,8 +160,8 @@ extern vm_pointer_t virtual_end;
 
 void	pmap_activate_vm(pmap_t);
 void	pmap_bootstrap(vm_size_t);
-int	pmap_change_attr(vm_offset_t va, vm_size_t size, int mode);
-int	pmap_change_prot(vm_offset_t va, vm_size_t size, vm_prot_t prot);
+int	pmap_change_attr(vm_pointer_t va, vm_size_t size, int mode);
+int	pmap_change_prot(vm_pointer_t va, vm_size_t size, vm_prot_t prot);
 void	pmap_kenter(vm_offset_t sva, vm_size_t size, vm_paddr_t pa, int mode);
 void	pmap_kenter_device(vm_offset_t, vm_size_t, vm_paddr_t);
 bool	pmap_klookup(vm_offset_t va, vm_paddr_t *pa);
