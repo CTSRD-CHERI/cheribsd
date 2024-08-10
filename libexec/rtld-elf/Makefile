@@ -37,7 +37,7 @@ CHERI_LIB_C18N=
 CFLAGS+=-DCHERI_LIB_C18N
 .endif
 
-.if !defined(NEED_COMPAT)
+.if !defined(NEED_COMPAT) && !defined(BUILD_RTLD_DEBUG)
 CONFS=		libmap.conf
 .endif
 PROG?=		ld-elf.so.1
