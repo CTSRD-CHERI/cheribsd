@@ -43,10 +43,12 @@
  * CHERI CHANGES END
  */
 
-#include <fcntl.h>
-#include <stdarg.h>
 #include <sys/types.h>
 #include <sys/syscall.h>
+
+#include <fcntl.h>
+#include <stdarg.h>
+
 #include "libc_private.h"
 
 typedef int (*fcntl_func)(int, int, intptr_t);
@@ -82,14 +84,22 @@ call_fcntl(fcntl_func fn, int fd, int cmd, va_list ap)
 
 #pragma weak fcntl
 int
+vfcntl(int fd, int cmd, va_list ap)
+{
+	fcntl_func fn = (fcntl_func)*__libsys_interposing_slot(INTERPOS_fcntl);
+
+	return (call_fcntl(fn, fd, cmd, ap));
+}
+
+#pragma weak fcntl
+int
 fcntl(int fd, int cmd, ...)
 {
 	va_list args;
 	int result;
-	fcntl_func fn = (fcntl_func)*__libsys_interposing_slot(INTERPOS_fcntl);
 
 	va_start(args, cmd);
-	result = call_fcntl(fn, fd, cmd, args);
+	result = vfcntl(fd, cmd, args);
 	va_end(args);
 
 	return (result);
