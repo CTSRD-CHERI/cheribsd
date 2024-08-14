@@ -6257,6 +6257,11 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 		res = PMAP_CAPLOADGEN_UNABLE;
 		goto out;
 	case 3:
+		if ((tpte & ATTR_CONTIGUOUS) != 0) {
+			m = NULL;
+			res = PMAP_CAPLOADGEN_UNABLE;
+			goto out;
+		}
 		break;
 	}
 
