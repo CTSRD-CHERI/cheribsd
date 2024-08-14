@@ -5667,6 +5667,18 @@ pmap_enter_l3c(pmap_t pmap, vm_offset_t va, pt_entry_t l3e, u_int flags,
 	KASSERT(!VA_IS_CLEANMAP(va) || (l3e & ATTR_SW_MANAGED) == 0,
 	    ("pmap_enter_l3c: managed mapping within the clean submap"));
 
+#ifdef CHERI_CAPREVOKE
+	if (!ADDR_IS_KERNEL(va)) {
+		/*
+		 * pmap_caploadgen_update() currently does not handle L3C
+		 * mappings.  Avoid creating them at all on the basis that the
+		 * pessimization of going through vm_fault() for capload faults
+		 * is probably worse than not having L3C mappings at all. 
+		 */
+		return (KERN_FAILURE);
+	}
+#endif
+
 	/*
 	 * If the L3 PTP is not resident, we attempt to create it here.
 	 */
