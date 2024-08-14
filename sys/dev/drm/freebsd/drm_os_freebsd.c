@@ -35,7 +35,7 @@
 #include <vm/vm_pager.h>
 
 #include <drm/drmP.h>
-#include "../..//drm_internal.h"
+#include "../../drm_internal.h"
 
 MALLOC_DEFINE(DRM_MEM_DRIVER, "drm_driver", "DRM DRIVER Data Structures");
 MALLOC_DEFINE(DRM_MEM_KMS, "drm_kms", "DRM KMS Data Structures");
@@ -285,10 +285,6 @@ static TAILQ_HEAD(, vm_area_struct) drm_vma_head =
 static void
 drm_vmap_free(struct vm_area_struct *vmap)
 {
-
-	/* Drop reference on mm_struct */
-//	mmput(vmap->vm_mm);
-
 	kfree(vmap);
 }
 
@@ -365,7 +361,6 @@ drm_cdev_pager_populate(vm_object_t vm_obj, vm_pindex_t pidx, int fault_type,
 	struct vm_area_struct *vmap;
 	int err;
 
-
 	/* get VM area structure */
 	vmap = drm_vmap_find(vm_obj->handle);
 	MPASS(vmap != NULL);
@@ -373,7 +368,6 @@ drm_cdev_pager_populate(vm_object_t vm_obj, vm_pindex_t pidx, int fault_type,
 
 	VM_OBJECT_WUNLOCK(vm_obj);
 
-//	down_write(&vmap->vm_mm->mmap_sem);
 	if (unlikely(vmap->vm_ops == NULL)) {
 		err = VM_FAULT_SIGBUS;
 	} else {
@@ -421,7 +415,6 @@ drm_cdev_pager_populate(vm_object_t vm_obj, vm_pindex_t pidx, int fault_type,
 		err = VM_PAGER_ERROR;
 		break;
 	}
-//	up_write(&vmap->vm_mm->mmap_sem);
 	VM_OBJECT_WLOCK(vm_obj);
 	return (err);
 }
@@ -451,11 +444,9 @@ drm_cdev_pager_dtor(void *handle)
 	 */
 	drm_vmap_remove(vmap);
 
-//	down_write(&vmap->vm_mm->mmap_sem);
 	vm_ops = vmap->vm_ops;
 	if (likely(vm_ops != NULL))
 		vm_ops->close(vmap);
-//	up_write(&vmap->vm_mm->mmap_sem);
 
 	drm_vmap_free(vmap);
 }
@@ -491,15 +482,8 @@ drm_fstub_do_mmap(struct file *file, const struct file_operations *fops,
 	vmap->vm_flags = vmap->vm_page_prot = (prot & VM_PROT_ALL);
 	vmap->vm_ops = NULL;
 	vmap->vm_file = file;
-//	vmap->vm_mm = mm;
 
 	rv = fops->mmap(file, vmap);
-//	if (unlikely(down_write_killable(&vmap->vm_mm->mmap_sem))) {
-//		rv = EINTR;
-//	} else {
-//		rv = -fops->mmap(file, vmap);
-//		up_write(&vmap->vm_mm->mmap_sem);
-//	}
 	if (rv != 0) {
 		drm_vmap_free(vmap);
 		return (rv);
