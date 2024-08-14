@@ -5643,6 +5643,9 @@ pmap_enter_l3c_rx(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_page_t *ml3p,
 		l3e |= ATTR_S1_UXN;
 	if (pmap != kernel_pmap)
 		l3e |= ATTR_S1_nG;
+#if __has_feature(capabilities)
+	l3e |= pmap_pte_cr(pmap, va, prot);
+#endif
 	return (pmap_enter_l3c(pmap, va, l3e, PMAP_ENTER_NOSLEEP |
 	    PMAP_ENTER_NOREPLACE | PMAP_ENTER_NORECLAIM, m, ml3p, lockp));
 }
