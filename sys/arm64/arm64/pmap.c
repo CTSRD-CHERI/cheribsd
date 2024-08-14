@@ -3958,6 +3958,9 @@ pmap_remove_l3c(pmap_t pmap, pt_entry_t *l3p, vm_offset_t va, vm_offset_t *vap,
 		    (ATTR_SW_DBM | ATTR_S1_AP(ATTR_S1_AP_RW)))
 			first_l3e &= ~ATTR_S1_AP_RW_BIT;
 		first_l3e |= l3e & ATTR_AF;
+#if __has_feature(capabilities)
+		first_l3e |= l3e & (ATTR_CDBM | ATTR_SC);
+#endif
 	}
 	if ((first_l3e & ATTR_SW_WIRED) != 0)
 		pmap->pm_stats.wired_count -= L3C_ENTRIES;
@@ -3989,7 +3992,7 @@ pmap_remove_l3c(pmap_t pmap, pt_entry_t *l3p, vm_offset_t va, vm_offset_t *vap,
 		for (mt = m, tva = va; mt < &m[L3C_ENTRIES]; mt++, tva +=
 		    L3_SIZE) {
 			if (pmap_pte_dirty(pmap, first_l3e))
-				vm_page_dirty(mt);
+				pmap_page_dirty(pmap, first_l3e, mt);
 			if ((first_l3e & ATTR_AF) != 0)
 				vm_page_aflag_set(mt, PGA_REFERENCED);
 			pmap_pvh_free(&mt->md, pmap, tva);
@@ -4432,8 +4435,8 @@ pmap_mask_set_l3c(pmap_t pmap, pt_entry_t *l3p, vm_offset_t va,
 	    (nbits & ATTR_S1_AP(ATTR_S1_AP_RO)) != 0 &&
 	    dirty) {
 		m = PHYS_TO_VM_PAGE(PTE_TO_PHYS(pmap_load(l3p)));
-		for (mt = m; mt < &m[L3C_ENTRIES]; mt++)
-			vm_page_dirty(mt);
+		for (mt = m, tl3p = l3p; mt < &m[L3C_ENTRIES]; mt++, tl3p++)
+			pmap_page_dirty(pmap, pmap_load(tl3p), mt);
 	}
 
 	if (*vap == va_next)
