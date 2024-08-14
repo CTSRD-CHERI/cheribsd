@@ -381,7 +381,6 @@ drm_cdev_pager_populate(vm_object_t vm_obj, vm_pindex_t pidx, int fault_type,
 		vmf.vma = vmap;
 
 		vmap->vm_pfn_count = 0;
-		vmap->vm_pfn_pcount = &vmap->vm_pfn_count;
 		vmap->vm_obj = vm_obj;
 
 		err = vmap->vm_ops->fault(vmap, &vmf);
@@ -482,6 +481,7 @@ drm_fstub_do_mmap(struct file *file, const struct file_operations *fops,
 	vmap->vm_flags = vmap->vm_page_prot = (prot & VM_PROT_ALL);
 	vmap->vm_ops = NULL;
 	vmap->vm_file = file;
+	vmap->vm_pfn_pcount = &vmap->vm_pfn_count;
 
 	rv = fops->mmap(file, vmap);
 	if (rv != 0) {
