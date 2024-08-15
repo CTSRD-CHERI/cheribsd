@@ -526,6 +526,6 @@ zfs-sha512-x86_64.o: sha512-x86_64.S
 	${CTFCONVERT_CMD}
 .endif
 
-.if ${MACHINE_ARCH} == "aarch64c" || ${MACHINE_ARCH} == "riscv64c"
+.if ${MACHINE_ABI:Mpurecap}
 CFLAGS+=-Xclang -cheri-bounds=conservative
 .endif
