@@ -67,6 +67,7 @@
 #include "io/vgic.h"
 #include "io/vgic_v3.h"
 #include "io/vtimer.h"
+#include "vmm_handlers.h"
 #include "vmm_stat.h"
 
 #define	HANDLED		1
@@ -103,9 +104,6 @@ static vm_pointer_t stack_hyp_va[MAXCPU];
 static vmem_t *el2_mem_alloc;
 
 static void arm_setup_vectors(void *arg);
-static void vmm_pmap_clean_stage2_tlbi(void);
-static void vmm_pmap_invalidate_range(uint64_t, vm_offset_t, vm_offset_t, bool);
-static void vmm_pmap_invalidate_all(uint64_t);
 
 DPCPU_DEFINE_STATIC(struct hypctx *, vcpu);
 
@@ -293,7 +291,6 @@ vmmops_modinit(int ipinum)
 	vm_paddr_t vmm_base;
 	uint64_t id_aa64mmfr0_el1, pa_range_bits, pa_range_field;
 	uint64_t cnthctl_el2;
-	register_t daif;
 	int cpu, i;
 	bool rv __diagused;
 
@@ -344,9 +341,9 @@ vmmops_modinit(int ipinum)
 
 	/* Set up the stage 2 pmap callbacks */
 	MPASS(pmap_clean_stage2_tlbi == NULL);
-	pmap_clean_stage2_tlbi = vmm_pmap_clean_stage2_tlbi;
-	pmap_stage2_invalidate_range = vmm_pmap_invalidate_range;
-	pmap_stage2_invalidate_all = vmm_pmap_invalidate_all;
+	pmap_clean_stage2_tlbi = vmm_clean_s2_tlbi;
+	pmap_stage2_invalidate_range = vmm_s2_tlbi_range;
+	pmap_stage2_invalidate_all = vmm_s2_tlbi_all;
 
 	/*
 	 * Create an allocator for the virtual address space used by EL2.
@@ -501,9 +498,7 @@ vmmops_modinit(int ipinum)
 	if (next_hyp_va < HYP_VM_MAX_ADDRESS - PAGE_SIZE)
 		el2_vmem_add(next_hyp_va, HYP_VM_MAX_ADDRESS - next_hyp_va);
 
-	daif = intr_disable();
-	cnthctl_el2 = vmm_call_hyp1(HYP_READ_REGISTER, HYP_REG_CNTHCTL);
-	intr_restore(daif);
+	cnthctl_el2 = vmm_read_reg(HYP_REG_CNTHCTL);
 
 	vgic_init();
 	vtimer_init(cnthctl_el2);
@@ -649,26 +644,6 @@ vmmops_vmspace_free(struct vmspace *vmspace)
 
 	pmap_remove_pages(vmspace_pmap(vmspace));
 	vmspace_free(vmspace);
-}
-
-static void
-vmm_pmap_clean_stage2_tlbi(void)
-{
-	vmm_call_hyp0(HYP_CLEAN_S2_TLBI);
-}
-
-static void
-vmm_pmap_invalidate_range(uint64_t vttbr, vm_offset_t sva, vm_offset_t eva,
-    bool final_only)
-{
-	MPASS(eva > sva);
-	vmm_call_hyp4(HYP_S2_TLBI_RANGE, vttbr, sva, eva, final_only);
-}
-
-static void
-vmm_pmap_invalidate_all(uint64_t vttbr)
-{
-	vmm_call_hyp1(HYP_S2_TLBI_ALL, vttbr);
 }
 
 static inline void
@@ -1228,8 +1203,8 @@ vmmops_run(void *vcpui, uintcap_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 		arm64_set_active_vcpu(hypctx);
 		vgic_flush_hwstate(hypctx);
 
-		excp_type = vmm_call_hyp2(HYP_ENTER_GUEST,
-		    hyp->el2_addr, hypctx->el2_addr);
+		/* Call into EL2 to switch to the guest */
+		excp_type = vmm_enter_guest(hyp, hypctx);
 
 		vgic_sync_hwstate(hypctx);
 		vtimer_sync_hwstate(hypctx);
