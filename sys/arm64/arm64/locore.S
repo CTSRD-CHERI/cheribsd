@@ -302,7 +302,6 @@ virtdone:
 	str	PTR(25), [PTR(0), #BP_KERN_STACK]
 	str	x27, [PTR(0), #BP_KERN_TTBR0]
 	str	x23, [PTR(0), #BP_BOOT_EL]
-	str	x4,  [PTR(0), #BP_HCR_EL2]
 
 #ifdef KASAN
 	/* Save bootparams */
