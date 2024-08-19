@@ -25,6 +25,8 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/elf_common.h>
+
 #include <machine/asm.h>
 #include <machine/armreg.h>
 
@@ -161,3 +163,5 @@ efi_rt_panic_str_ptr:
 	.chericap	efi_rt_panic_str
 	.size	efi_rt_panic_str_ptr, . - efi_rt_panic_str_ptr
 #endif
+
+GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)
