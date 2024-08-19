@@ -227,6 +227,7 @@ vmm_hyp_reg_store(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 	hypctx->tf.tf_spsr = READ_SPECIALREG(spsr_el2);
 	if (guest) {
 		hypctx->tf.tf_esr = READ_SPECIALREG(esr_el2);
+		hypctx->par_el1 = READ_SPECIALREG(par_el1);
 	}
 
 	/* Store the guest special registers */
@@ -254,7 +255,6 @@ vmm_hyp_reg_store(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 	hypctx->csselr_el1 = READ_SPECIALREG(csselr_el1);
 	hypctx->mdccint_el1 = READ_SPECIALREG(mdccint_el1);
 	hypctx->mdscr_el1 = READ_SPECIALREG(mdscr_el1);
-	hypctx->par_el1 = READ_SPECIALREG(par_el1);
 
 	if (guest_or_nonvhe(guest)) {
 #if __has_feature(capabilities)
@@ -321,7 +321,6 @@ vmm_hyp_reg_restore(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 	WRITE_SPECIALREG(csselr_el1, hypctx->csselr_el1);
 	WRITE_SPECIALREG(mdccint_el1, hypctx->mdccint_el1);
 	WRITE_SPECIALREG(mdscr_el1, hypctx->mdscr_el1);
-	WRITE_SPECIALREG(par_el1, hypctx->par_el1);
 
 	if (guest_or_nonvhe(guest)) {
 #if __has_feature(capabilities)
@@ -347,6 +346,10 @@ vmm_hyp_reg_restore(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 		/* TODO: tcr2_el1 */
 		WRITE_SPECIALREG(EL1_REG(TTBR0), hypctx->ttbr0_el1);
 		WRITE_SPECIALREG(EL1_REG(TTBR1), hypctx->ttbr1_el1);
+	}
+
+	if (guest) {
+		WRITE_SPECIALREG(par_el1, hypctx->par_el1);
 	}
 
 	WRITE_SPECIALREG(cptr_el2, hypctx->cptr_el2);
