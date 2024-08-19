@@ -286,6 +286,9 @@ vmm_hyp_reg_restore(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 	uint64_t dfr0;
 
 	/* Restore the special registers */
+	WRITE_SPECIALREG(hcr_el2, hypctx->hcr_el2);
+	isb();
+
 #if __has_feature(capabilities)
 	WRITE_SPECIALREG(cctlr_el0, hypctx->cctlr_el0);
 	WRITE_SPECIALREG(cctlr_el1, hypctx->cctlr_el1);
@@ -331,7 +334,6 @@ vmm_hyp_reg_restore(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 	WRITE_SPECIALREG(spsr_el1, hypctx->spsr_el1);
 
 	WRITE_SPECIALREG(cptr_el2, hypctx->cptr_el2);
-	WRITE_SPECIALREG(hcr_el2, hypctx->hcr_el2);
 	WRITE_SPECIALREG(vpidr_el2, hypctx->vpidr_el2);
 	WRITE_SPECIALREG(vmpidr_el2, hypctx->vmpidr_el2);
 
