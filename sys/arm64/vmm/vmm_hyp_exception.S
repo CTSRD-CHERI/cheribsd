@@ -175,6 +175,14 @@ hyp_vectors:
 	/* Restore host VTTBR */
 	mov	x9, #VTTBR_HOST
 	msr	vttbr_el2, x9
+
+#ifdef VMM_VHE
+#if __has_feature(capabilities)
+	msr	cvbar_el1, c1
+#else
+	msr	vbar_el1, x1
+#endif
+#endif
 .endm
 
 
@@ -286,6 +294,25 @@ LEND(handle_el2_el1_error64)
  * x0 - hypctx address
  */
 ENTRY(VMM_HYP_FUNC(do_call_guest))
+#ifdef VMM_VHE
+#if __has_feature(capabilities)
+	mrs	c1, cvbar_el1
+#else
+	mrs	x1, vbar_el1
+#endif
+	adrp	PTR(2), hyp_vectors
+	add	PTR(2), PTR(2), :lo12:hyp_vectors
+#if __has_feature(capabilities)
+#ifndef __CHERI_PURE_CAPABILITY__
+	cvtp	c2, x2
+#endif
+	msr	cvbar_el1, c2
+#else
+	msr	vbar_el1, x2
+#endif
+	isb
+#endif
+
 	/* Save hypctx address */
 	msr	PTRN(tpidr_el2), PTR(0)
 
