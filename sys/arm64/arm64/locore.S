@@ -254,7 +254,7 @@ virtdone:
 	/* Zero the BSS */
 	buildptr_range 15, 14, _bss_start, _end
 1:
-	str	xzr, [PTR(15)], #8
+	stp	xzr, xzr, [PTR(15)], #16
 	cmp	PTR(15), PTR(14)
 	b.lo	1b
 
