@@ -27,6 +27,7 @@
  */
 
 #include <sys/queue.h>
+#include <stdbool.h>
 #include <gelf.h>
 #include <libelftc.h>
 
@@ -111,7 +112,15 @@ struct sec_add {
 };
 
 struct transplant {
-	char	*name;
+	bool		isparent;
+	char		*namestr;
+
+	/* Values to be placed in an object header. */
+	uint64_t	id;
+	uint64_t	name;
+	uint64_t	vaddr;
+	uint64_t	msz;
+	uint64_t	dynamicndx;
 
 	TAILQ_ENTRY(transplant) t_list;
 };
@@ -141,6 +150,7 @@ struct section {
 	int		 pseudo;
 	int		 nocopy;
 
+	struct transplant *iobject;
 	Elftc_String_Table *strtab;
 
 	TAILQ_ENTRY(section) sec_list;	/* next section */
@@ -199,6 +209,7 @@ struct elfcopy {
 	Elf		*eout;	/* ELF descriptor of output object */
 	int		 iphnum; /* num. of input object phdr entries */
 	int		 ophnum; /* num. of output object phdr entries */
+	int		 oohnum; /* num. of output object object entries */
 	int		 nos;	/* num. of output object sections */
 
 	enum {
@@ -234,6 +245,7 @@ struct elfcopy {
 #define	SEC_COPY	0x01000000U
 #define	DISCARD_LLABEL	0x02000000U
 #define	LOCALIZE_HIDDEN	0x04000000U
+#define	TRANSPLANT	0x08000000U
 
 	int		 flags;		/* elfcopy run control flags. */
 	int64_t		 change_addr;	/* Section address adjustment. */
@@ -249,6 +261,7 @@ struct elfcopy {
 	struct section	*symtab;	/* .symtab section. */
 	struct section	*strtab;	/* .strtab section. */
 	struct section	*shstrtab;	/* .shstrtab section. */
+	struct section	*object;	/* .object section. */
 	uint64_t	*secndx;	/* section index map. */
 	uint64_t	*symndx;	/* symbol index map. */
 	unsigned char	*v_rel;		/* symbols needed by relocation. */
@@ -310,6 +323,7 @@ void	create_scn(struct elfcopy *_ecp);
 void	create_srec(struct elfcopy *_ecp, int _ifd, int _ofd, const char *_ofn);
 void	create_symtab(struct elfcopy *_ecp);
 void	create_symtab_data(struct elfcopy *_ecp);
+void	create_ohdr(struct elfcopy *_ecp);
 void	create_tempfile(const char *_src, char **_fn, int *_fd);
 void	finalize_external_symtab(struct elfcopy *_ecp);
 void	free_elf(struct elfcopy *_ecp);
@@ -329,7 +343,8 @@ struct symop *lookup_symop_list(struct elfcopy *_ecp, const char *_name,
 void	resync_sections(struct elfcopy *_ecp);
 void	setup_phdr(struct elfcopy *_ecp);
 void	transplant(struct elfcopy *_ecp);
-void	add_transplant(struct elfcopy *_ecp, const char *_name);
+void	add_transplant(struct elfcopy *_ecp, const char *_namestr);
+void	add_transplant_parent(struct elfcopy *_ecp, const char *_namestr);
 size_t	first_free_offset(struct elfcopy *ecp);
 void	update_shdr(struct elfcopy *_ecp, int _update_link);
 

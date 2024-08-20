@@ -26,6 +26,7 @@
 
 #include <sys/param.h>
 #include <sys/stat.h>
+#include <assert.h>
 #include <err.h>
 #include <fcntl.h>
 #include <libgen.h>
@@ -1432,8 +1433,11 @@ update_shdr(struct elfcopy *ecp, int update_link)
 		/*
 		 * sh_link needs to be updated, since the index of the
 		 * linked section might have changed.
+		 *
+		 * Sections copied from additional objects have sh_link values
+		 * already updated.
 		 */
-		if (update_link && osh.sh_link != 0)
+		if (update_link && osh.sh_link != 0 && s->iobject == NULL)
 			osh.sh_link = ecp->secndx[osh.sh_link];
 
 		/*
@@ -1608,18 +1612,81 @@ add_section(struct elfcopy *ecp, const char *arg)
 	ecp->flags |= SEC_ADD;
 }
 
-void
-add_transplant(struct elfcopy *ecp, const char *name)
+static struct transplant *
+transplant_new(const char *namestr, bool isparent)
 {
 	struct transplant	*t;
 
 	if ((t = malloc(sizeof(*t))) == NULL)
 		err(EXIT_FAILURE, "malloc failed");
 
-	if ((t->name = strdup(name)) == NULL)
+	if ((t->namestr = strdup(namestr)) == NULL)
 		err(EXIT_FAILURE, "strdup failed");
 
+	t->isparent = isparent;
+
+	return (t);
+}
+
+void
+add_transplant(struct elfcopy *ecp, const char *namestr)
+{
+	struct transplant	*t;
+
+	t = transplant_new(namestr, false);
 	TAILQ_INSERT_TAIL(&ecp->v_transplants, t, t_list);
+}
+
+void
+add_transplant_parent(struct elfcopy *ecp, const char *namestr)
+{
+	struct transplant	*t;
+
+	t = transplant_new(namestr, true);
+	TAILQ_INSERT_HEAD(&ecp->v_transplants, t, t_list);
+}
+
+static void
+transplant_parent(struct elfcopy *ecp, struct transplant *t)
+{
+	GElf_Phdr	firstphdr, iphdr, lastphdr;
+	size_t		dynamicndx, i, phdrnum;
+	bool		isfirstphdr;
+
+	if (elf_getphdrnum(ecp->ein, &phdrnum) == -1)
+		errx(EXIT_FAILURE, "elf_getphdrnum() failed: %s", elf_errmsg(-1));
+
+	dynamicndx = 0;
+	isfirstphdr = true;
+	for (i = 0; i < phdrnum; i++) {
+		if (gelf_getphdr(ecp->ein, i, &iphdr) != &iphdr)
+			errx(EXIT_FAILURE, "gelf_getphdr failed: %s", elf_errmsg(-1));
+
+		switch (iphdr.p_type) {
+		case PT_DYNAMIC:
+			assert(dynamicndx == 0);
+			dynamicndx = i;
+			/* FALLTHROUGH */
+		case PT_LOAD:
+			break;
+		default:
+			continue;
+		}
+
+		if (isfirstphdr) {
+			firstphdr = iphdr;
+			isfirstphdr = false;
+		}
+		lastphdr = iphdr;
+	}
+	assert(!isfirstphdr);
+
+	/*
+	 * Update transplant with information for an object header.
+	 */
+	t->vaddr = firstphdr.p_vaddr;
+	t->msz = lastphdr.p_vaddr + lastphdr.p_memsz - firstphdr.p_vaddr;
+	t->dynamicndx = dynamicndx;
 }
 
 static void
@@ -1627,7 +1694,7 @@ transplant_one(struct elfcopy *ecp, struct transplant *t)
 {
 	static int	 prefix;
 
-	struct segment	*seg;
+	struct segment	*firstseg, *seg;
 	struct section	*s, **smap;
 	int		 ifd;
 	Elf		*ein;
@@ -1636,7 +1703,7 @@ transplant_one(struct elfcopy *ecp, struct transplant *t)
 	Elf64_Shdr	*shdr;
 	GElf_Phdr	 iphdr;
 	GElf_Shdr	 shdrvalue;
-	size_t		 shdrnum, phdrnum;
+	size_t		 dynamicndx, shdrnum, phdrnum;
 	size_t		 i, transplant_offset;
 	char		*sname, *name;
 	size_t string_table_section_index;
@@ -1644,9 +1711,9 @@ transplant_one(struct elfcopy *ecp, struct transplant *t)
 
 	prefix++;
 
-	ifd = open(t->name, O_RDONLY);
+	ifd = open(t->namestr, O_RDONLY);
 	if (ifd == -1)
-		err(EXIT_FAILURE, "open %s failed", t->name);
+		err(EXIT_FAILURE, "open %s failed", t->namestr);
 	ein = elf_begin(ifd, ELF_C_READ, NULL);
 	if (ein == NULL)
 		errx(EXIT_FAILURE, "elf_begin() failed: %s", elf_errmsg(-1));
@@ -1716,6 +1783,7 @@ transplant_one(struct elfcopy *ecp, struct transplant *t)
 		    data->d_size, shdr->sh_offset + transplant_offset, shdr->sh_type,
 		    ELF_T_BYTE, shdr->sh_flags, shdr->sh_addralign,
 		    shdr->sh_addr + transplant_offset, 1 /* XXX */);
+		s->iobject = t;
 		smap[i] = s;
 
 		if (gelf_getshdr(s->os, &shdrvalue) == NULL)
@@ -1753,6 +1821,9 @@ transplant_one(struct elfcopy *ecp, struct transplant *t)
 	/*
 	 * Now do segments (program headers).
 	 */
+	dynamicndx = 0;
+	firstseg = NULL;
+	seg = NULL;
 	if (elf_getphdrnum(ein, &phdrnum) == -1)
 		errx(EXIT_FAILURE, "elf_getphdrnum() failed: %s", elf_errmsg(-1));
 	for (i = 0; i < phdrnum; i++) {
@@ -1763,8 +1834,11 @@ transplant_one(struct elfcopy *ecp, struct transplant *t)
 		 * Filter which segments we want to transplant.
 		 */
 		switch (iphdr.p_type) {
-		case PT_LOAD:
 		case PT_DYNAMIC:
+			assert(dynamicndx == 0);
+			dynamicndx = ecp->ophnum;
+			/* FALLTHROUGH */
+		case PT_LOAD:
 			break;
 		default:
 			continue;
@@ -1790,7 +1864,19 @@ transplant_one(struct elfcopy *ecp, struct transplant *t)
 		seg->msz	= iphdr.p_memsz;
 		seg->type	= iphdr.p_type;
 		STAILQ_INSERT_TAIL(&ecp->v_seg, seg, seg_list);
+
+		if (firstseg == NULL)
+			firstseg = seg;
 	}
+	assert(firstseg != NULL);
+	assert(seg != NULL);
+
+	/*
+	 * Update transplant with information for an object header.
+	 */
+	t->vaddr = firstseg->vaddr;
+	t->msz = seg->vaddr + seg->msz - firstseg->vaddr;
+	t->dynamicndx = dynamicndx;
 
 #if 0
 	/*
@@ -1812,8 +1898,16 @@ transplant(struct elfcopy *ecp)
 {
 	struct transplant	*t;
 
-	TAILQ_FOREACH(t, &ecp->v_transplants, t_list)
-		transplant_one(ecp, t);
+	TAILQ_FOREACH(t, &ecp->v_transplants, t_list) {
+		t->id = ecp->oohnum;
+		t->name = elftc_string_table_insert(ecp->shstrtab->strtab,
+		    t->namestr);
+		if (t->isparent)
+			transplant_parent(ecp, t);
+		else
+			transplant_one(ecp, t);
+		ecp->oohnum++;
+	}
 }
 
 void
