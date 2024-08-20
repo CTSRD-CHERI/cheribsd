@@ -374,6 +374,18 @@ compart_id_allocate(const char *lib)
 			goto out;
 	}
 
+#ifdef __riscv
+	/*
+	 * XXX Dapeng: All compartments have the same compartment ID on
+	 * CHERI-RISC-V to work around the lack of bounded memory and variadic
+	 * arguments.
+	 */
+	lib = "[grand]";
+	for (i = RTLD_COMPART_ID; i < comparts.size; ++i)
+		if (string_base_search(&comparts.data[i].libs, lib))
+			return (i);
+#endif
+
 	com = add_comparts_data(lib);
 	string_base_push(&com->libs, lib);
 
@@ -605,12 +617,21 @@ tramp_should_include(const Plt_Entry *plt, compart_id_t caller,
 
 	callee = compart_id_for_address(data->defobj, (ptraddr_t)data->target);
 
+#ifdef __riscv
+	/*
+	 * XXX Dapeng: All compartments have the same compartment ID on
+	 * CHERI-RISC-V to work around the lack of bounded memory and variadic
+	 * arguments.
+	 */
+	(void)plt;
+#else
 	/*
 	 * Jump slots within the same compartment do not require a
 	 * trampoline.
 	 */
 	if (plt != NULL && caller == callee)
 		return (false);
+#endif
 
 	if (string_base_search(&comparts.data[caller].trusts, sym))
 		return (false);
