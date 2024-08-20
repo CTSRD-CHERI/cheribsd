@@ -123,6 +123,15 @@ typedef struct {
 	Elf64_Xword	p_align;	/* Alignment in memory and file. */
 } Elf64_Phdr;
 
+typedef struct {
+	Elf64_Word	o_id;		/* Object identifier. */
+	Elf64_Word	o_name;		/* Object name
+					   (index into the string table). */
+	Elf64_Addr	o_vaddr;	/* Virtual address in memory image. */
+	Elf64_Xword	o_memsz;	/* Size of contents in memory. */
+	Elf64_Word	o_dynamicndx;	/* Dynamic segment index. */
+} Elf64_Ohdr;
+
 /*
  * Dynamic structure.  The ".dynamic" section contains an array of them.
  */
