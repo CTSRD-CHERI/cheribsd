@@ -43,6 +43,7 @@ typedef Elf64_Chdr	GElf_Chdr;	/* Compressed section header */
 typedef Elf64_Dyn	GElf_Dyn;	/* ".dynamic" section entries */
 typedef Elf64_Ehdr	GElf_Ehdr;	/* ELF header */
 typedef Elf64_Phdr	GElf_Phdr;	/* Program header */
+typedef Elf64_Ohdr	GElf_Ohdr;	/* Object header */
 typedef Elf64_Shdr	GElf_Shdr;	/* Section header */
 typedef Elf64_Sym	GElf_Sym;	/* Symbol table entries */
 typedef Elf64_Rel	GElf_Rel;	/* Relocation entries */
@@ -80,6 +81,7 @@ int		gelf_getclass(Elf *_elf);
 GElf_Dyn	*gelf_getdyn(Elf_Data *_data, int _index, GElf_Dyn *_dst);
 GElf_Ehdr	*gelf_getehdr(Elf *_elf, GElf_Ehdr *_dst);
 GElf_Phdr	*gelf_getphdr(Elf *_elf, int _index, GElf_Phdr *_dst);
+GElf_Ohdr	*gelf_getohdr(Elf *_elf, int _index, GElf_Ohdr *_dst);
 GElf_Rel	*gelf_getrel(Elf_Data *_src, int _index, GElf_Rel *_dst);
 GElf_Rela	*gelf_getrela(Elf_Data *_src, int _index, GElf_Rela *_dst);
 GElf_Shdr	*gelf_getshdr(Elf_Scn *_scn, GElf_Shdr *_dst);
@@ -88,9 +90,11 @@ GElf_Sym	*gelf_getsymshndx(Elf_Data *_src, Elf_Data *_shindexsrc,
 			int _index, GElf_Sym *_dst, Elf32_Word *_shindexdst);
 void *		gelf_newehdr(Elf *_elf, int _class);
 void *		gelf_newphdr(Elf *_elf, size_t _phnum);
+void *		gelf_newohdr(Elf *_elf, size_t _phnum);
 int		gelf_update_dyn(Elf_Data *_dst, int _index, GElf_Dyn *_src);
 int		gelf_update_ehdr(Elf *_elf, GElf_Ehdr *_src);
 int		gelf_update_phdr(Elf *_elf, int _index, GElf_Phdr *_src);
+int		gelf_update_ohdr(Elf *_elf, int _index, GElf_Ohdr *_src);
 int		gelf_update_rel(Elf_Data *_dst, int _index, GElf_Rel *_src);
 int		gelf_update_rela(Elf_Data *_dst, int _index, GElf_Rela *_src);
 int		gelf_update_shdr(Elf_Scn *_dst, GElf_Shdr *_src);

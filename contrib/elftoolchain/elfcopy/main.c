@@ -350,6 +350,9 @@ create_elf(struct elfcopy *ecp)
 
 	transplant(ecp);
 
+	if ((ecp->flags & TRANSPLANT) != 0)
+		create_ohdr(ecp);
+
 	/* Apply section address changes, if any. */
 	adjust_addr(ecp);
 
@@ -947,6 +950,7 @@ elfcopy_main(struct elfcopy *ecp, int argc, char **argv)
 			break;
 		case 'T':
 			add_transplant(ecp, optarg);
+			ecp->flags |= TRANSPLANT;
 			break;
 		case 'V':
 			print_version();
@@ -1111,6 +1115,9 @@ elfcopy_main(struct elfcopy *ecp, int argc, char **argv)
 	outfile = NULL;
 	if (argc > 1)
 		outfile = argv[1];
+
+	if ((ecp->flags & TRANSPLANT) != 0)
+		add_transplant_parent(ecp, infile);
 
 	create_file(ecp, infile, outfile);
 }
