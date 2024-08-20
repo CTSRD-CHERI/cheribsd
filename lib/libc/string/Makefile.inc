@@ -28,11 +28,12 @@ MISRCS+=bcmp.c bcopy.c bzero.c explicit_bzero.c \
 	wmemcmp.c \
 	wmemcpy.c wmemmove.c wmempcpy.c wmemset.c
 
+SYM_MAPS+=	${LIBC_SRCTOP}/string/Symbol.map
+
 .if ${MACHINE_CPU:Mcheri} && !${MACHINE_ABI:Mpurecap}
 MISRCS+=memcpy_c.c memmove_c.c memset_c.c
+SYM_MAPS+=	${LIBC_SRCTOP}/string/Symbol_cheri_hybrid.map
 .endif
-
-SYM_MAPS+=	${LIBC_SRCTOP}/string/Symbol.map
 
 .if ${MK_ASAN} != "no"
 # These source files deliberately read out of bounds since they assume that
