@@ -963,6 +963,7 @@ _ELF_DEFINE_PT(PT_SHLIB,            5, "reserved")		\
 _ELF_DEFINE_PT(PT_PHDR,             6,				\
 	"describes the program header itself")			\
 _ELF_DEFINE_PT(PT_TLS,              7, "thread local storage")	\
+_ELF_DEFINE_PT(PT_OBJECT,           8, "object information")	\
 _ELF_DEFINE_PT(PT_LOOS,             0x60000000UL,		\
 	"start of OS-specific range")				\
 _ELF_DEFINE_PT(PT_SUNW_UNWIND,      0x6464E550UL,		\
@@ -2722,6 +2723,27 @@ typedef struct {
 	Elf64_Xword	p_align;     /* Alignment constraints. */
 } Elf64_Phdr;
 
+/*
+ * Object Header Table (OHDR) entries.
+ */
+
+/* 32 bit OHDR entry. */
+typedef struct {
+	Elf32_Word	o_name;		/* Object name
+					   (index into the string table). */
+	Elf32_Word	o_dynamicndx;	/* PT_DYNAMIC index. */
+	Elf32_Addr	o_vaddr;	/* Virtual address in memory image. */
+	Elf32_Word	o_memsz;	/* Size of contents in memory. */
+} Elf32_Ohdr;
+
+/* 64 bit OHDR entry. */
+typedef struct {
+	Elf64_Word	o_name;		/* Object name
+					   (index into the string table). */
+	Elf64_Word	o_dynamicndx;	/* PT_DYNAMIC index. */
+	Elf64_Addr	o_vaddr;	/* Virtual address in memory image. */
+	Elf64_Xword	o_memsz;	/* Size of contents in memory. */
+} Elf64_Ohdr;
 
 /*
  * Move entries, for describing data in COMMON blocks in a compact

@@ -6,7 +6,7 @@ TOP=	..
 
 PROG=	elfcopy
 
-SRCS=	archive.c ascii.c binary.c main.c sections.c segments.c \
+SRCS=	archive.c ascii.c binary.c main.c objects.c sections.c segments.c \
 	symbols.c
 
 WARNS?=	5

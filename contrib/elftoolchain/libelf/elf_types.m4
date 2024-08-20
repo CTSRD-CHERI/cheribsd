@@ -47,6 +47,7 @@ define(`ELF_TYPE_LIST',
 	`MOVEP,		MoveP',
 	`NOTE,		Note',
 	`OFF,		Off',
+	`OHDR,		Ohdr',
 	`PHDR,		Phdr',
 	`REL,		Rel',
 	`RELA,		Rela',
@@ -168,6 +169,20 @@ DEFINE_STRUCT(`Elf64_Phdr',
 	`p_filesz,	XWORD',
 	`p_memsz,	XWORD',
 	`p_align,	XWORD',
+	`_,_'')
+
+DEFINE_STRUCT(`Elf32_Ohdr',
+	``o_name,	WORD',
+	`o_dynamicndx,	WORD',
+	`o_vaddr,	ADDR',
+	`o_memsz,	WORD',
+	`_,_'')
+
+DEFINE_STRUCT(`Elf64_Ohdr',
+	``o_name,	WORD',
+	`o_dynamicndx,	WORD',
+	`o_vaddr,	ADDR',
+	`o_memsz,	XWORD',
 	`_,_'')
 
 DEFINE_STRUCT(`Elf32_Rel',

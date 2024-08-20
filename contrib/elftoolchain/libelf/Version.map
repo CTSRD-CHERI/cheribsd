@@ -14,9 +14,11 @@ global:
 	elf64_checksum;
 	elf64_fsize;
 	elf64_getehdr;
+	elf64_getohdr;
 	elf64_getphdr;
 	elf64_getshdr;
 	elf64_newehdr;
+	elf64_newohdr;
 	elf64_newphdr;
 	elf64_xlatetof;
 	elf64_xlatetom;
@@ -40,6 +42,7 @@ global:
 	elf_getident;
 	elf_getphdrnum;
 	elf_getphnum;
+	elf_getohdrnum;
 	elf_getscn;
 	elf_getshdrnum;
 	elf_getshdrstrndx;
@@ -70,6 +73,7 @@ global:
 	gelf_getdyn;
 	gelf_getehdr;
 	gelf_getmove;
+	gelf_getohdr;
 	gelf_getphdr;
 	gelf_getrel;
 	gelf_getrela;
@@ -78,11 +82,13 @@ global:
 	gelf_getsyminfo;
 	gelf_getsymshndx;
 	gelf_newehdr;
+	gelf_newohdr;
 	gelf_newphdr;
 	gelf_update_cap;
 	gelf_update_dyn;
 	gelf_update_ehdr;
 	gelf_update_move;
+	gelf_update_ohdr;
 	gelf_update_phdr;
 	gelf_update_rel;
 	gelf_update_rela;
