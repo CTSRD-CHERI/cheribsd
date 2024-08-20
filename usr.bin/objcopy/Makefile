@@ -14,7 +14,8 @@ objcopy.1: elfcopy.1
 	    -e '/\.Nm elfcopy ,/d' < ${.ALLSRC} > ${.TARGET}
 CLEANFILES+= objcopy.1
 
-SRCS=	archive.c ascii.c binary.c main.c pe.c sections.c segments.c symbols.c
+SRCS=	archive.c ascii.c binary.c main.c objects.c pe.c sections.c segments.c \
+	symbols.c
 
 WARNS?=	5
 
