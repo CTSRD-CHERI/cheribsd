@@ -969,6 +969,10 @@ local function handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
 		if funcalias == "yield" then
 			return
 		end
+		-- flag_captured has never been exposed as a syscall
+		if funcalias == "flag_captured" then
+			return
+		end
 		if funcalias ~= "exit" and funcalias ~= "vfork" then
 			write_line("libsysmap", string.format("\t_%s;\n",
 			    funcalias))
