@@ -62,6 +62,7 @@ typedef enum {
 	ELF_T_MOVEP,
 	ELF_T_NOTE,
 	ELF_T_OFF,
+	ELF_T_OHDR,
 	ELF_T_PHDR,
 	ELF_T_REL,
 	ELF_T_RELA,
@@ -204,6 +205,7 @@ Elf_Data	*elf_getdata(Elf_Scn *, Elf_Data *);
 char		*elf_getident(Elf *_elf, size_t *_ptr);
 int		elf_getphdrnum(Elf *_elf, size_t *_dst);
 int		elf_getphnum(Elf *_elf, size_t *_dst);	/* Deprecated */
+int		elf_getohdrnum(Elf *_elf, size_t *_dst);
 Elf_Scn		*elf_getscn(Elf *_elf, size_t _index);
 int		elf_getshdrnum(Elf *_elf, size_t *_dst);
 int		elf_getshnum(Elf *_elf, size_t *_dst);	/* Deprecated */
@@ -247,9 +249,11 @@ size_t		elf64_fsize(Elf_Type _type, size_t _count,
 Elf64_Chdr	*elf64_getchdr(Elf_Scn *_scn);
 Elf64_Ehdr	*elf64_getehdr(Elf *_elf);
 Elf64_Phdr	*elf64_getphdr(Elf *_elf);
+Elf64_Ohdr	*elf64_getohdr(Elf *_elf);
 Elf64_Shdr	*elf64_getshdr(Elf_Scn *_scn);
 Elf64_Ehdr	*elf64_newehdr(Elf *_elf);
 Elf64_Phdr	*elf64_newphdr(Elf *_elf, size_t _count);
+Elf64_Ohdr	*elf64_newohdr(Elf *_elf, size_t _count);
 Elf_Data	*elf64_xlatetof(Elf_Data *_dst, const Elf_Data *_src,
 			unsigned int _enc);
 Elf_Data	*elf64_xlatetom(Elf_Data *_dst, const Elf_Data *_src,
