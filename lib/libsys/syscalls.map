@@ -313,8 +313,6 @@ FBSDprivate_1.0 {
 	__sys_lio_listio;
 	_kbounce;
 	__sys_kbounce;
-	_flag_captured;
-	__sys_flag_captured;
 	_cheri_revoke_get_shadow;
 	__sys_cheri_revoke_get_shadow;
 	_cheri_revoke;
