@@ -222,9 +222,12 @@ GCC_4.6.0 {
 	__trunctfsf2;
 	__unordtf2;
 #endif
+#if 0
+/* Added in LLVM 18 */
 #if defined(__amd64__)
 	__extendxftf2;
 	__trunctfxf2;
+#endif
 #endif
 };
 
