@@ -218,7 +218,7 @@ TRAMP(tramp_push_frame)
 	/*
 	 * Load the caller's old stack top from the stack lookup table.
 	 */
-	csetoffset	STACK_TABLE_C, STACK_TABLE_C, t4
+	cincoffsetimm	STACK_TABLE_C, STACK_TABLE_C, STACK_TABLE_RTLD
 	clc		ct5, 0(STACK_TABLE_C)
 	/*
 	 * Store the caller's current stack top in the stack lookup table.
@@ -252,7 +252,7 @@ TRAMP(tramp_push_frame)
 	 * Load the callee's stack if the stack lookup table index is within
 	 * bounds. Otherwise the resolver will be loaded.
 	 */
-	csetoffset	STACK_TABLE_C, STACK_TABLE_C, s10
+	cincoffsetimm	STACK_TABLE_C, STACK_TABLE_C, 0
 	clc		ct6, 0(STACK_TABLE_C)
 
 	/*
@@ -497,7 +497,7 @@ TRAMP(tramp_pop_frame)
 	/*
 	 * Store the caller's old stack top in the stack lookup table.
 	 */
-	csetoffset	STACK_TABLE_C, STACK_TABLE_C, t1
+	cincoffsetimm	STACK_TABLE_C, STACK_TABLE_C, STACK_TABLE_RTLD
 	csc		ca6, 0(STACK_TABLE_C)
 
 	/*

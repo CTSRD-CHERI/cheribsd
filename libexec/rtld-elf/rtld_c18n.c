@@ -872,6 +872,7 @@ resolve_untrusted_stk_impl(stk_table_index index)
 	SIGFILLSET(nset);
 	sigprocmask(SIG_SETMASK, &nset, &oset);
 
+	(void)index;
 	table = get_stk_table();
 	stk = get_or_create_untrusted_stk(index_to_cid(index), &table);
 
@@ -2205,12 +2206,16 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 	 */
 	table = get_stk_table();
 	osp = get_or_create_untrusted_stk(callee, &table);
+#ifdef __riscv
+	nsp = (void *)info;
+#else
 	nsp = osp - 1;
 	*nsp = (struct sigframe) {
 		.sf_si = *info,
 		.sf_uc = *ucp
 	};
 	table->entries[callee].stack = nsp;
+#endif
 
 	/*
 	 * Push a dummy frame onto the trusted stack that would restore the

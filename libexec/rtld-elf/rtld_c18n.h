@@ -121,13 +121,21 @@ struct stk_table {
 
 #define	cid_to_index(cid)	((stk_table_index) { cid_to_index_raw(cid) })
 
+/*
 #define	index_to_cid(index)						\
 	(((index).val -							\
 	offsetof(struct stk_table, entries) -				\
 	offsetof(struct stk_table_entry, stack)) /			\
 	sizeof(struct stk_table_entry))
+ */
 
+#define	index_to_cid(index)	RTLD_COMPART_ID
+
+/*
 #define	COMPART_ID_MAX		index_to_cid((stk_table_index) { -1 })
+ */
+
+#define	COMPART_ID_MAX		256
 
 #include "rtld_c18n_machdep.h"
 
