@@ -57,7 +57,6 @@ void __start(int argc, char **argv, char **env, void (*cleanup)(void)) __dead2;
 void
 __start(int argc, char **argv, char **env, void (*cleanup)(void))
 {
-	__asm__ volatile(".cfi_undefined ra");
 #ifdef SHOULD_PROCESS_CAP_RELOCS
 	/*
 	 * Initialize __cap_relocs for static executables. The run-time linker
