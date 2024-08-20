@@ -343,6 +343,17 @@ compart_id_allocate(const char *lib)
 		if (string_base_search(&comparts.data[i].libs, lib) != -1)
 			return (i);
 
+#ifdef __riscv
+	/*
+	 * XXX: All compartments have the same compartment ID on CHERI-RISC-V to
+	 * work around the lack of bounded memory and variadic arguments.
+	 */
+	lib = "[grand]";
+	for (i = RTLD_COMPART_ID; i < comparts.size; ++i)
+		if (string_base_search(&comparts.data[i].libs, lib) != -1)
+			return (i);
+#endif
+
 	com = add_comparts_data(lib);
 	string_base_push(&com->libs, lib);
 
@@ -571,8 +582,14 @@ tramp_should_include(const Obj_Entry *reqobj, const struct tramp_data *data)
 	if (reqobj == NULL)
 		return (true);
 
+#ifndef __riscv
+	/*
+	 * XXX: All compartments have the same compartment ID on CHERI-RISC-V to
+	 * work around the lack of bounded memory and variadic arguments.
+	 */
 	if (reqobj->compart_id == data->defobj->compart_id)
 		return (false);
+#endif
 
 	if (string_base_search(&comparts.data[reqobj->compart_id].trusts, sym)
 	    != -1)
