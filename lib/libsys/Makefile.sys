@@ -104,6 +104,12 @@ INTERPOSED = \
 	writev
 
 .ifdef CHERI_LIB_C18N
+# Pseudo implementations of system calls we don't currently fully support
+SRCS+= \
+	rfork_c18n.c \
+	thr_exit_c18n.c \
+	vfork_c18n.c
+
 PSEUDO+= \
 	rfork
 NOASM+=	\
