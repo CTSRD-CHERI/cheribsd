@@ -756,6 +756,33 @@ If the currently executed image in the process itself has revocation enabled,
 the
 .Dv PROC_CHERI_REVOKE_ACTIVE
 flag is or-ed with the value listed above.
+.It Dv PROC_CHERI_COLOCATION_CTL
+Controls the opportunistic
+.Xr colocation 7
+in the target process and its descendants that did not either change
+the control or modify it by other means.
+The
+.Fa data
+parameter must point to the integer variable holding one of the following
+values:
+.Bl -tag -width PROC_CHERI_OPPORTUNISTIC_DISABLE
+.It Dv PROC_CHERI_OPPORTUNISTIC_ENABLE
+Enable opportunistic colocation - newly executed binaries will be colocated
+with their parent process whenever possible.
+.It Dv PROC_CHERI_OPPORTUNISTIC_DISABLE
+Disable opportunistic colocation.
+.El
+.It Dv PROC_CHERI_COLOCATION_STATUS
+Returns the current status of opportunistic colocation enablement
+for the target process.
+The
+.Fa data
+parameter must point to the integer variable, where one of the
+following values is written:
+.Bl -tag -width PROC_CHERI_OPPORTUNISTIC_DISABLE
+.It Dv PROC_CHERI_OPPORTUNISTIC_ENABLE
+.It Dv PROC_CHERI_OPPORTUNISTIC_DISABLE
+.El
 .Sh NOTES
 Disabling tracing on a process should not be considered a security
 feature, as it is bypassable both by the kernel and privileged processes,
@@ -880,6 +907,7 @@ or invalid signal number.
 .Xr wait 2 ,
 .Xr capsicum 4 ,
 .Xr hwpmc 4 ,
+.Xr colocation 7 ,
 .Xr init 8
 .Sh HISTORY
 The

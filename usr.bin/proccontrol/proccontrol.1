@@ -79,6 +79,8 @@ Control limiting usermode process address space to 48 bits of address,
 AMD64 only, on machines capable of 57-bit addressing.
 .It Ar cherirevoke
 Control the use of CHERI revocation in the process.
+.It Ar opportunistic
+Control the use of CHERI opportunistic process colocation.
 .El
 .Pp
 The
@@ -124,6 +126,9 @@ delivery, do
 To query the current ASLR enablement mode for the running
 process 1020, do
 .Dl "proccontrol -m aslr -q -p 1020"
+.It
+To start a shell with opportunistic colocation enabled, do
+.Dl "proccontrol -m opportunistic -s enable sh"
 .El
 .Sh SEE ALSO
 .Xr kill 2 ,

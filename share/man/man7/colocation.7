@@ -44,17 +44,24 @@ Process colocation is a mechanism for processes to share a virtual address space
 while preserving the usual protection and separation by employing CHERI.
 Because memory capabilities must not be transferred between address spaces,
 colocation enables their use as an IPC mechanism.
-Included is a set of APIs and mechanisms to make use of that capability.
+Included is a set of APIs and mechanisms to make use of that functionality.
 For a general tutorial see:
 .Pp
 .Lk https://github.com/CTSRD-CHERI/cheripedia/wiki/Colocation-Tutorial
 .Pp
-To execute a binary colocated with another process indicated by its PID.
+To execute a binary colocated with its parent process, or an arbitrary
+process indicated by its PID,
 use
 .Xr coexecve 2
 instead of the usual
 .Xr execve 2 .
-Processes can also get colocated opportunistically.
+Processes can also get colocated opportunistically with their parents;
+this can be enabled with
+.Xr procctl 2 .
+Both ways can be employed from command line using
+.Xr coexec 1
+and
+.Xr proccontrol 1 .
 .Pp
 Capabilities can be transferred between colocated processes using
 a number of mechanisms:
@@ -104,9 +111,9 @@ tunables:
 .It Va debug.colocation_debug
 Set to 1 to enable debug messages.
 Defaults to 0.
-.It Va kern.opportunistic_coexecve
-Set to 0 to disable opportunistic colocation.
-Defaults to 1.
+.\" .It Va kern.opportunistic_coexecve
+.\" Set to 0 to disable opportunistic colocation.
+.\" Defaults to 1.
 .Sh EXAMPLES
 Show the memory map of your current shell and everything
 that got opportunistically colocated with it:
@@ -126,11 +133,3 @@ Process colocation was implemented by
 .An Edward Tomasz Napierala Aq Mt en322@cl.cam.ac.uk
 at the University of Cambridge Computer Laboratory under DARPA/AFRL contract
 (FA8750-10-C-0237) ("CTSRD"), as part of the DARPA CRASH research programme.
-.Sh BUGS
-It should be able to colocate processes using
-.Xr posix_spawn 3
-instead of the
-.Xr vfork 2
-/
-.Xr coexecve 2
-pair.

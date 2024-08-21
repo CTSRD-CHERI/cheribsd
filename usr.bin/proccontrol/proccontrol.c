@@ -54,6 +54,7 @@ enum {
 #endif
 #if __has_feature(capabilities)
 	MODE_CHERI_REVOKE,
+	MODE_CHERI_OPPORTUNISTIC,
 #endif
 };
 
@@ -82,9 +83,9 @@ str2pid(const char *str)
 #define	LA_USAGE
 #endif
 #if __has_feature(capabilities)
-#define	CHERI_REVOKE_USAGE "|cherirevoke"
+#define	CHERI_USAGE "|cherirevoke|opportunistic"
 #else
-#define	CHERI_REVOKE_USAGE
+#define	CHERI_USAGE
 #endif
 
 static void __dead2
@@ -92,7 +93,7 @@ usage(void)
 {
 
 	fprintf(stderr, "Usage: proccontrol -m (aslr|protmax|trace|trapcap|"
-	    "stackgap|nonewprivs|wxmap"KPTI_USAGE LA_USAGE CHERI_REVOKE_USAGE
+	    "stackgap|nonewprivs|wxmap"KPTI_USAGE LA_USAGE CHERI_USAGE
 	    ") [-q] [-s (enable|disable)] [-p pid | command]\n");
 	exit(1);
 }
@@ -138,6 +139,8 @@ main(int argc, char *argv[])
 #if __has_feature(capabilities)
 			else if (strcmp(optarg, "cherirevoke") == 0)
 				mode = MODE_CHERI_REVOKE;
+			else if (strcmp(optarg, "opportunistic") == 0)
+				mode = MODE_CHERI_OPPORTUNISTIC;
 #endif
 			else
 				usage();
@@ -211,6 +214,10 @@ main(int argc, char *argv[])
 #if __has_feature(capabilities)
 		case MODE_CHERI_REVOKE:
 			error = procctl(P_PID, pid, PROC_CHERI_REVOKE_STATUS,
+			    &arg);
+			break;
+		case MODE_CHERI_OPPORTUNISTIC:
+			error = procctl(P_PID, pid, PROC_CHERI_COLOCATION_STATUS,
 			    &arg);
 			break;
 #endif
@@ -369,6 +376,19 @@ main(int argc, char *argv[])
 			else
 				printf(", not active\n");
 			break;
+		case MODE_CHERI_OPPORTUNISTIC:
+			switch (arg) {
+			case PROC_CHERI_OPPORTUNISTIC_ENABLE:
+				printf("enabled\n");
+				break;
+			case PROC_CHERI_OPPORTUNISTIC_DISABLE:
+				printf("disabled\n");
+				break;
+			default:
+				printf("invalid\n");
+				break;
+			}
+			break;
 #endif
 		}
 	} else {
@@ -434,6 +454,11 @@ main(int argc, char *argv[])
 			arg = enable ? PROC_CHERI_REVOKE_FORCE_ENABLE :
 			    PROC_CHERI_REVOKE_FORCE_DISABLE;
 			error = procctl(P_PID, pid, PROC_CHERI_REVOKE_CTL, &arg);
+			break;
+		case MODE_CHERI_OPPORTUNISTIC:
+			arg = enable ? PROC_CHERI_OPPORTUNISTIC_ENABLE :
+			    PROC_CHERI_OPPORTUNISTIC_ENABLE;
+			error = procctl(P_PID, pid, PROC_CHERI_COLOCATION_CTL, &arg);
 			break;
 #endif
 		default:

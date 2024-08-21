@@ -248,9 +248,9 @@ Passing 0 as
 .Fa pid
 makes it equivalent to
 .Fn execve ,
-in that the process might still end up being colocated if
-.Dv kern.opportunistic_coexecve
-is enabled.
+in that the process might still end up being opportunistically colocated
+if enabled with
+.Xr procctl 2 .
 If
 .Fa pid
 is -1, the process will not be colocated.

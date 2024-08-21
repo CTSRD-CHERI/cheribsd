@@ -907,6 +907,8 @@ struct proc {
 						   permitted */
 #define	P2_REAPKILLED		0x00080000
 #define	P2_NOCOLOCATE		0x00100000
+#define	P2_CHERI_OPPORTUNISTIC	0x00200000	/* Enable opportunistic
+						   colocation */
 
 #define	P2_CHERI_REVOKE_ENABLE	0x40000000	/* Force enable revocation */
 #define	P2_CHERI_REVOKE_DISABLE	0x80000000	/* Force disable revocation */

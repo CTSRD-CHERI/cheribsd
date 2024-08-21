@@ -480,7 +480,9 @@ kern_execve(struct thread *td, struct image_args *args,
 
 	p = td->td_proc;
 
-	if (opportunistic_coexecve != 0) {
+	// XXX: We don't really need the lock here, right?
+	if ((p->p_flag2 & P2_CHERI_OPPORTUNISTIC) != 0 ||
+	    opportunistic_coexecve != 0) {
 		sx_slock(&proctree_lock);
 		cop = proc_realparent(p);
 		PROC_LOCK(cop);

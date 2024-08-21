@@ -1522,7 +1522,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		 * XXX: Don't warn if opportunistic coexecve is enabled,
 		 * it's too spammy in that case.
 		 */
-		if (!opportunistic_coexecve)
+		if ((imgp->proc->p_flag2 & P2_CHERI_OPPORTUNISTIC) == 0)
 			uprintf("Cannot coexecute a static binary\n");
 		error = EINVAL;
 		goto ret;
