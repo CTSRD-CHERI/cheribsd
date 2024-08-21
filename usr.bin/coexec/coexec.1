@@ -45,26 +45,24 @@ utility is used to execute the binary specified by
 .Ar command
 within address space indicated by
 .Ar pid .
-.Pp
-Note that using
-.Nm
-is usually not necessary if the
-.Va kern.opportunistic_coexecve
-sysctl is set to 1, which is the default.
+Zero is a shortcut for the parent process.
+The new process is run with opportunistic colocation enabled,
+making its future descendants likely to be colocated as well.
 .Sh EXIT STATUS
 The
 .Nm
 utility exits 0 on success, and >0 if an error occurs.
 .Sh EXAMPLES
-Start a shell colocated with the process identified by PID 42:
-.Pp
-.Dl Nm Ar 42 Ar sh
-.Pp
 Run
 .Xr procstat 1
 colocated with the current shell and display its memory map:
 .Pp
-.Dl Nm Ar $$ Ar procstat -v $$
+.Dl Nm Ar 0 Ar procstat -v $$
+.Pp
+Do not colocate with any existing process, just spawn a shell
+with opportunistic colocation enabled:
+.Pp
+.Dl Nm Ar -1 Ar sh
 .Pp
 .Sh SEE ALSO
 .Xr coexecve 2 ,

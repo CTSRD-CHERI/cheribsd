@@ -31,6 +31,7 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include <sys/procctl.h>
 #include <err.h>
 #include <limits.h>
 #include <stdio.h>
@@ -59,6 +60,17 @@ parse_pid(const char *str)
 	return (pid);
 }
 
+static void
+enable_opportunistic_colocation(void)
+{
+	int error, arg;
+
+	arg = PROC_CHERI_OPPORTUNISTIC_ENABLE;
+	error = procctl(P_PID, 0, PROC_CHERI_COLOCATION_CTL, &arg);
+	if (error != 0)
+		err(1, "procctl");
+}
+
 int
 main(int argc, char **argv)
 {
@@ -69,8 +81,18 @@ main(int argc, char **argv)
 
 	pid = parse_pid(argv[1]);
 
-	argv += 2;
+	/*
+	 * It's not the best place to do it, but it's much more convenient to do:
+	 *
+	 * $ coexec 0 sh
+	 *
+	 * compared to
+	 *
+	 * $ proccontrol -m opportunistic -s enable sh
+	 */
+	enable_opportunistic_colocation();
 
+	argv += 2;
 	coexecvp(pid, argv[0], argv);
 	err(1, "%s", argv[0]);
 }
