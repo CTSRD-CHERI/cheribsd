@@ -39,11 +39,3 @@ SRCS+= \
 .if !${MACHINE_ABI:Mpurecap}
 SRCS+=	brk.c
 .endif
-
-# Pseudo implementations of functions we don't currently fully support
-.ifdef CHERI_LIB_C18N
-SRCS+= \
-	rfork_c18n.c \
-	thr_exit_c18n.c \
-	vfork_c18n.c
-.endif
