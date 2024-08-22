@@ -134,6 +134,9 @@ fake_preload_metadata(void *dtb_ptr, size_t dtb_size)
 
 	preload_metadata = (caddr_t)(uintptr_t)fake_preload;
 
+	/* Initialize preload_kmdp */
+	preload_initkmdp(true);
+
 	init_static_kenv(NULL, 0);
 
 	return (lastaddr);
@@ -200,7 +203,6 @@ static vm_offset_t
 freebsd_parse_boot_param(struct arm64_bootparams *abp)
 {
 	vm_offset_t lastaddr = 0;
-	void *kmdp;
 #ifdef DDB
 	vm_pointer_t ksym_start;
 	vm_pointer_t ksym_end;
@@ -213,16 +215,18 @@ freebsd_parse_boot_param(struct arm64_bootparams *abp)
 	preload_metadata = (caddr_t)(uintptr_t)(abp->modulep);
 	preload_metadata = cheri_kern_perms_and(preload_metadata,
 	    CHERI_PERMS_KERNEL_DATA & CHERI_PERMS_KERNEL_DATA_NOCAP);
-	kmdp = preload_search_by_type("elf kernel");
-	if (kmdp == NULL)
+
+	/* Initialize preload_kmdp */
+	preload_initkmdp(false);
+	if (preload_kmdp == NULL)
 		return (0);
 
-	boothowto = MD_FETCH(kmdp, MODINFOMD_HOWTO, int);
+	boothowto = MD_FETCH(preload_kmdp, MODINFOMD_HOWTO, int);
 	/*
 	 * XXX-AM: Sadly we don't have bounds for this. We need the
 	 * loader to support passing capabilities here.
 	 */
-	env_addr = MD_FETCH(kmdp, MODINFOMD_ENVP, vm_offset_t);
+	env_addr = MD_FETCH(preload_kmdp, MODINFOMD_ENVP, vm_offset_t);
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (env_addr != 0) {
 		env_addr = (vm_pointer_t)cheri_address_set(kernel_root_cap,
@@ -233,10 +237,10 @@ freebsd_parse_boot_param(struct arm64_bootparams *abp)
 #endif
 	loader_envp = (char *)env_addr;
 	init_static_kenv(loader_envp, 0);
-	lastaddr = MD_FETCH(kmdp, MODINFOMD_KERNEND, vm_offset_t);
+	lastaddr = MD_FETCH(preload_kmdp, MODINFOMD_KERNEND, vm_offset_t);
 #ifdef DDB
-	ksym_start = MD_FETCH(kmdp, MODINFOMD_SSYM, vm_offset_t);
-	ksym_end = MD_FETCH(kmdp, MODINFOMD_ESYM, vm_offset_t);
+	ksym_start = MD_FETCH(preload_kmdp, MODINFOMD_SSYM, vm_offset_t);
+	ksym_end = MD_FETCH(preload_kmdp, MODINFOMD_ESYM, vm_offset_t);
 #ifdef __CHERI_PURE_CAPABILITY__
 	ksym_start = (vm_pointer_t)cheri_address_set(kernel_root_cap,
 	    ksym_start);
