@@ -111,8 +111,11 @@ uintptr_t reloc_jmpslot(uintptr_t *where, uintptr_t target,
 
 #endif /* __CHERI_PURE_CAPABILITY__ */
 
+extern unsigned long elf_hwcap;
 #define	call_ifunc_resolver(ptr) \
-	(((uintptr_t (*)(void))ptr)())
+	(((uintptr_t (*)(unsigned long, unsigned long, unsigned long,	\
+	    unsigned long, unsigned long, unsigned long, unsigned long,	\
+	    unsigned long))ptr)(elf_hwcap, 0, 0, 0, 0, 0, 0, 0))
 
 /*
  * TLS
