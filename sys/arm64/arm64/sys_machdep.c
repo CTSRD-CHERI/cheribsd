@@ -73,6 +73,17 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 		error = pmap_bti_set(vmspace_pmap(td->td_proc->p_vmspace),
 		    trunc_page(gp_args.addr), round_page(eva));
 		break;
+	case 0x101: {
+		uint64_t val = READ_SPECIALREG(pmuserenr_el0);
+		return (copyout(&val, uap->parms, sizeof(val)));
+	}
+	case 0x102: {
+		uint64_t val;
+		error = copyin(uap->parms, &val, sizeof(val));
+		if (!error)
+			WRITE_SPECIALREG(pmuserenr_el0, val);
+		return (error);
+	}
 	default:
 		error = EINVAL;
 		break;
