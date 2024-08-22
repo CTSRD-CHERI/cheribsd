@@ -762,7 +762,7 @@ reloc_jmpslot(uintptr_t *where, uintptr_t target,
 }
 
 void
-ifunc_init(Elf_Auxinfo aux_info[__min_size(AT_COUNT)] __unused)
+ifunc_init(Elf_Auxinfo *aux_info[__min_size(AT_COUNT)] __unused)
 {
 
 }
