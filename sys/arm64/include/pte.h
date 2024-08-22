@@ -62,6 +62,11 @@ typedef	uint64_t	pt_entry_t;		/* page table entry */
 #define	ATTR_LC_GEN1		(3UL << 61)
 #define	ATTR_SC			(1UL << 60)
 #define	ATTR_CDBM		(1UL << 59)
+#define ATTR_CAP_MASK      (15UL << 59)
+#define ATTR_CAP_NONE       (0UL << 59)
+#define ATTR_CAP_DIRTYABLE  (5UL << 59)
+#define ATTR_CAP_GEN0      (11UL << 59)
+#define ATTR_CAP_GEN1      (15UL << 59)
 #endif
 
 #define BASE_MASK		~ATTR_MASK
@@ -127,7 +132,7 @@ typedef	uint64_t	pt_entry_t;		/* page table entry */
  * ATTR_CAP_RW as a single operand, so separate orr instructions are
  * required for ATTR_CAP_RW.
  */
-#define	ATTR_CAP_RW	(ATTR_LC_ENABLED | ATTR_SC)
+#define	ATTR_CAP_RW	ATTR_CAP_GEN0
 #endif
 #define	ATTR_DEFAULT	(ATTR_AF | ATTR_SH(ATTR_SH_IS))
 

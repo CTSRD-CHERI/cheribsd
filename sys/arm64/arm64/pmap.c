@@ -528,6 +528,13 @@ pagecopy_cleartags(void *s, void *d)
 	for (i = 0; i < PAGE_SIZE / sizeof(*dst); i++)
 		*dst++ = cheri_cleartag(*src++);
 }
+
+static __inline void
+pmap_set_cap_bits(pt_entry_t *ent, uint64_t bits)
+{
+	pmap_clear_bits(ent,ATTR_CAP_MASK);
+	pmap_set_bits(ent,bits);
+}
 #endif
 
 static __inline pd_entry_t *
@@ -849,20 +856,20 @@ pmap_pte_cr(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
 		if ((va < VM_MAX_USER_ADDRESS) &&
 		    (pmap->pm_stage == PM_STAGE1)) {
 			/* Stage 1 user pages gated by CLG */
-			return pmap->flags.uclg ? ATTR_LC_GEN1 : ATTR_LC_GEN0;
+			return pmap->flags.uclg ? ATTR_CAP_GEN1 : ATTR_CAP_GEN0;
 		} else {
 			/*
 			 * Kernel pages always load OK; Stage 2 doesn't support
 			 * CLG.
 			 */
-			return ATTR_LC_ENABLED;
+			return ATTR_CAP_GEN0;
 		}
 #else
-		return ATTR_LC_ENABLED;
+		return ATTR_CAP_GEN0;
 #endif
 	} else {
 		/* XXX Let's see what happens! */
-		return ATTR_LC_DISABLED;
+		return ATTR_CAP_NONE;
 	}
 }
 #endif
@@ -889,10 +896,16 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m,
 	}
 
 #if __has_feature(capabilities)
-	val |= pmap_pte_cr(pmap, va, prot);
+	uint64_t cap_val = ATTR_CAP_NONE;
+	if (prot & VM_PROT_READ_CAP) {
+		if ((va < VM_MAX_USER_ADDRESS) && (pmap->pm_stage == PM_STAGE1))
+			cap_val = pmap->flags.uclg ? ATTR_CAP_GEN1 : ATTR_CAP_GEN0;
+		else
+			cap_val = ATTR_CAP_GEN0;
+	}
 
 	VM_PAGE_ASSERT_PGA_CAPMETA_PMAP_ENTER(m, prot);
-	if ((prot & VM_PROT_WRITE_CAP) != 0) {
+	if (prot & VM_PROT_WRITE_CAP) {
 		KASSERT((vm_page_astate_load(m).flags & PGA_CAPSTORE) != 0,
 		    ("%s: page %p does not have CAPSTORE set", __func__, m));
 
@@ -907,10 +920,11 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m,
 		 * but it's not required.
 		 */
 		if (pmap->pm_stage == PM_STAGE1 && va < VM_MAX_USER_ADDRESS)
-			val |= ATTR_CDBM;
+			cap_val = pmap->flags.uclg ? ATTR_CAP_GEN1 : ATTR_CAP_GEN0;
 		else
-			val |= ATTR_SC;
+			cap_val = ATTR_CAP_GEN0;
 	}
+	val |= cap_val;
 #endif
 
 	return (val);
@@ -4969,6 +4983,7 @@ pmap_enter_2mpage(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if (pmap != kernel_pmap)
 		new_l2 |= ATTR_S1_nG;
 #if __has_feature(capabilities)
+	new_l2 &= ~ATTR_CAP_MASK;
 	new_l2 |= pmap_pte_cr(pmap, va, prot);
 #endif
 	return (pmap_enter_l2(pmap, va, new_l2, PMAP_ENTER_NOSLEEP |
@@ -5340,6 +5355,7 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 	if (pmap != kernel_pmap)
 		l3_val |= ATTR_S1_nG;
 #if __has_feature(capabilities)
+	l3_val &= ~ATTR_CAP_MASK;
 	l3_val |= pmap_pte_cr(pmap, va, prot);
 #endif
 
@@ -5399,9 +5415,9 @@ static inline void
 pmap_update_pte_clg(pmap_t pmap, pt_entry_t *pte)
 {
 	if (pmap->flags.uclg) {
-		pmap_set_bits(pte, ATTR_LC_GEN_MASK);
+		pmap_set_cap_bits(pte, ATTR_CAP_GEN1);
 	} else {
-		pmap_clear_bits(pte, ATTR_LC_GEN_MASK);
+		pmap_set_cap_bits(pte, ATTR_CAP_GEN0);
 	}
 }
 
@@ -5519,7 +5535,7 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 #if VM_NRESERVLEVEL > 0
 	pd_entry_t *l2, l2e;
 #endif
-	pt_entry_t *pte, tpte, exppte;
+	pt_entry_t *pte, tpte/*, exppte*/;
 	vm_page_t m;
 	int lvl;
 
@@ -5599,7 +5615,8 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 				 * store-release below, and so we're going to
 				 * scan the page again anyway.
 				 */
-				pmap_clear_bits(pte, ATTR_SC);
+				//pmap_clear_bits(pte, ATTR_SC);
+				pmap_set_cap_bits(pte, ATTR_CAP_DIRTYABLE);
 			} else if (tpte & ATTR_CDBM) {
 				/*
 				 * PTE CAP-DIRTYABLE -> CAP-CLEAN
@@ -5625,9 +5642,9 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 				 * entry as cap-load-faulting, but we don't have
 				 * such a mechanism on Morello.
 				 */
-				exppte = tpte;
-				pmap_fcmpset(pte, &exppte, exppte & ~ATTR_CDBM);
-
+				//exppte = tpte;
+				//pmap_fcmpset(pte, &exppte, exppte & ~ATTR_CDBM);
+				pmap_set_cap_bits(pte, ATTR_CAP_NONE);
 			} else if (flags & PMAP_CAPLOADGEN_NONEWMAPS) {
 				/* No new mappings possible */
 				vm_page_astate_t mas = vm_page_astate_load(m);
@@ -5672,7 +5689,8 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 			 * probably doesn't get set often ough to merit.
 			 */
 			if ((tpte & ATTR_CDBM) && !(tpte & ATTR_SC)) {
-				pmap_set_bits(pte, ATTR_SC);
+				//pmap_set_bits(pte, ATTR_SC);
+				pmap_set_cap_bits(pte, (pmap->flags.uclg ? ATTR_CAP_GEN1 : ATTR_CAP_GEN0));
 			}
 		}
 
@@ -8393,7 +8411,8 @@ pmap_fault(pmap_t pmap, uint64_t esr, uint64_t far)
 		if (ptep != NULL &&
 		    ((pte = pmap_load(ptep)) & ATTR_CDBM) != 0) {
 			if ((pte & ATTR_SC) == 0) {
-				pmap_set_bits(ptep, ATTR_SC);
+				//pmap_set_bits(ptep, ATTR_SC);
+				pmap_set_cap_bits(ptep, (pmap->flags.uclg ? ATTR_CAP_GEN1 : ATTR_CAP_GEN0));
 				pmap_s1_invalidate_page(pmap, far, true);
 			}
 			rv = KERN_SUCCESS;
