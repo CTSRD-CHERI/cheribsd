@@ -90,6 +90,7 @@ ELFTC_VCSID("$Id: readelf.c 3769 2019-06-29 15:15:02Z emaste $");
 #define	RE_W	0x00080000
 #define	RE_X	0x00100000
 #define	RE_Z	0x00200000
+#define	RE_O	0x00400000
 
 /*
  * dwarf dump options.
@@ -201,6 +202,7 @@ static struct option longopts[] = {
 	{"hex-dump", required_argument, NULL, 'x'},
 	{"histogram", no_argument, NULL, 'I'},
 	{"notes", no_argument, NULL, 'n'},
+	{"objects", no_argument, NULL, 'o'},
 	{"program-headers", no_argument, NULL, 'l'},
 	{"relocs", no_argument, NULL, 'r'},
 	{"sections", no_argument, NULL, 'S'},
@@ -345,6 +347,7 @@ static void dump_gnu_hash(struct readelf *re, struct section *s);
 static void dump_gnu_property_type_0(struct readelf *re, const char *buf,
     size_t sz);
 static void dump_hash(struct readelf *re);
+static void dump_ohdr(struct readelf *re);
 static void dump_phdr(struct readelf *re);
 static void dump_ppc_attributes(uint8_t *p, uint8_t *pe);
 static void dump_section_groups(struct readelf *re);
@@ -711,6 +714,7 @@ phdr_type(unsigned int mach, unsigned int ptype)
 	case PT_SHLIB: return "SHLIB";
 	case PT_PHDR: return "PHDR";
 	case PT_TLS: return "TLS";
+	case PT_OBJECT: return "OBJECT";
 	case PT_GNU_EH_FRAME: return "GNU_EH_FRAME";
 	case PT_GNU_STACK: return "GNU_STACK";
 	case PT_GNU_RELRO: return "GNU_RELRO";
@@ -2611,6 +2615,72 @@ dump_phdr(struct readelf *re)
 	}
 #undef	PH_HDR
 #undef	PH_CT
+}
+
+static void
+dump_ohdr(struct readelf *re)
+{
+	GElf_Ohdr oohdr;
+	Elf_Data *data, fbuf, mbuf;
+	struct section *s;
+	int elferr, i;
+
+#define	OH_HDR	"[Nr] Name", "Addr", "Size", "DynamicIndex"
+#define	OH_CT	i, get_string(re, s->link, oohdr.o_name),	\
+		(uintmax_t)oohdr.o_vaddr, (uintmax_t)oohdr.o_memsz,	\
+		oohdr.o_dynamicndx
+
+	printf("\nObject Headers:\n");
+	printf("  %-23s%-19s%-11s%-3s\n", OH_HDR);
+
+	for (i = 0; (size_t)i < re->shnum; i++) {
+		s = &re->sl[i];
+		if (s->name != NULL && strcmp(s->name, ".object") == 0)
+			break;
+	}
+	if ((size_t)i >= re->shnum) {
+		printf("\nThere are no object headers in this file.\n");
+		return;
+	}
+
+	if ((data = elf_rawdata(s->scn, NULL)) == NULL) {
+		elferr = elf_errno();
+		if (elferr != 0)
+			warnx("elf_rawdata failed: %s",
+			    elf_errmsg(elferr));
+		return;
+	}
+
+	memset(&fbuf, 0, sizeof(fbuf));
+	fbuf.d_type = ELF_T_OHDR;
+	fbuf.d_buf = data->d_buf;
+	fbuf.d_size = gelf_fsize(re->elf, ELF_T_OHDR, 1, EV_CURRENT);
+	fbuf.d_version = EV_CURRENT;
+	memset(&mbuf, 0, sizeof(mbuf));
+	mbuf.d_type = fbuf.d_type;
+	mbuf.d_size = sizeof(oohdr);
+	mbuf.d_buf = &oohdr;
+	mbuf.d_version = fbuf.d_version;
+
+	i = 0;
+	memset(&oohdr, 0, sizeof(oohdr));
+	while ((char *)fbuf.d_buf + fbuf.d_size <= (char *)data->d_buf +
+	    data->d_size) {
+		if (gelf_xlatetom(re->elf, &mbuf, &fbuf,
+		    re->ehdr.e_ident[EI_DATA]) != &mbuf) {
+			warnx("gelf_xlatetom failed: %s", elf_errmsg(-1));
+			return;
+		}
+
+		printf("  [%2d] %-17s 0x%16.16jx 0x%8.8jx %3u\n",
+		    OH_CT);
+
+		fbuf.d_buf = (char *)fbuf.d_buf + fbuf.d_size;
+		i++;
+	}
+	printf("\n");
+
+#undef	OH_HDR
 }
 
 static char *
@@ -7437,6 +7507,8 @@ dump_elf(struct readelf *re)
 		dump_ehdr(re);
 	if (re->options & RE_L)
 		dump_phdr(re);
+	if (re->options & RE_O)
+		dump_ohdr(re);
 	if (re->options & RE_SS)
 		dump_shdr(re);
 	if (re->options & RE_G)
@@ -7974,7 +8046,7 @@ main(int argc, char **argv)
 	memset(re, 0, sizeof(*re));
 	STAILQ_INIT(&re->v_dumpop);
 
-	while ((opt = getopt_long(argc, argv, "AacDdegHhIi:lNnp:rSstuVvWw::x:z",
+	while ((opt = getopt_long(argc, argv, "AacDdegHhIi:lNnp:rSstouVvWw::x:z",
 	    longopts, NULL)) != -1) {
 		switch(opt) {
 		case '?':
@@ -7985,7 +8057,8 @@ main(int argc, char **argv)
 			break;
 		case 'a':
 			re->options |= RE_AA | RE_D | RE_G | RE_H | RE_II |
-			    RE_L | RE_N | RE_R | RE_SS | RE_S | RE_U | RE_VV;
+			    RE_L | RE_N | RE_O |RE_R | RE_SS | RE_S | RE_U |
+			    RE_VV;
 			break;
 		case 'c':
 			re->options |= RE_C;
@@ -7997,7 +8070,7 @@ main(int argc, char **argv)
 			re->options |= RE_D;
 			break;
 		case 'e':
-			re->options |= RE_H | RE_L | RE_SS;
+			re->options |= RE_H | RE_L | RE_O | RE_SS;
 			break;
 		case 'g':
 			re->options |= RE_G;
@@ -8022,6 +8095,9 @@ main(int argc, char **argv)
 			break;
 		case 'n':
 			re->options |= RE_N;
+			break;
+		case 'o':
+			re->options |= RE_O;
 			break;
 		case 'p':
 			re->options |= RE_P;
