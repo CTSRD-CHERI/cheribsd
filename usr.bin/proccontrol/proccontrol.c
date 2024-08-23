@@ -98,11 +98,15 @@ str2pid(const char *str)
 static void __dead2
 usage(void)
 {
-
-	fprintf(stderr, "Usage: proccontrol -m (aslr|protmax|trace|trapcap|"
-	    "stackgap|nonewprivs|wxmap"KPTI_USAGE LA_USAGE CHERI_REVOKE_USAGE
-	    CHERI_C18N_USAGE
-	    ") [-q] [-s (enable|disable)] [-p pid | command]\n");
+	fprintf(stderr, "Usage:\n");
+	fprintf(stderr, "    proccontrol -m mode -s (enable|disable) "
+	    "(-p pid | command)\n");
+	fprintf(stderr, "    proccontrol -m mode -q [-p pid]\n");
+	fprintf(stderr, "Modes: "
+	    "aslr|protmax|trace|trapcap|stackgap|nonewprivs|wxmap"
+	    KPTI_USAGE LA_USAGE
+	    CHERI_REVOKE_USAGE CHERI_C18N_USAGE
+	    "\n");
 	exit(1);
 }
 
@@ -183,6 +187,8 @@ main(int argc, char *argv[])
 			usage();
 		pid = getpid();
 	} else if (pid == -1) {
+		if (!query)
+			usage();
 		pid = getpid();
 	}
 
