@@ -27,7 +27,12 @@ AARCH64_STRING_FUNCS+= \
 
 # SIMD-enhanced routines not derived from Arm's code
 MDSRCS+= \
-	strcmp.S
+	strcmp.S \
+	strspn.S \
+	strcspn.S \
+	strpbrk.c \
+	strsep.c
+
 #
 # Add the above functions. Generate an asm file that includes the needed
 # Arm Optimized Routines file defining the function name to the libc name.
