@@ -142,6 +142,12 @@ typedef	__pid_t		pid_t;
 #define	O_EMPTY_PATH	0x02000000
 #endif
 
+#if __BSD_VISIBLE
+#define	O_SHARECAP	O_DIRECTORY	/* Allow cross address space capability
+					   sharing.  POSIX shm and memfd
+					   specific. */
+#endif
+
 /*
  * XXX missing O_RSYNC.
  */

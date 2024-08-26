@@ -379,6 +379,7 @@ struct vmspace {
 #if __has_feature(capabilities)
 	uint64_t vm_prev_cid;	/* (d) last compartment ID allocated */
 #endif
+	LIST_HEAD(, shmfd) vm_shm_objects;	/* (d) local shm objects */
 	/*
 	 * Keep the PMAP last, so that CPU-specific variations of that
 	 * structure on a single architecture don't result in offset

@@ -112,6 +112,27 @@ The size of the object can be adjusted via
 and queried via
 .Xr fstat 2 .
 .Pp
+On systems supporting CHERI capabilities, capabilities may only be shared
+within a single address space unless the shared memory object is created
+with the
+.Dv O_SHARECAP
+flag in the initial call to
+.Fn shm_open .
+Additionally, capabilities can only be stored to or loaded from mappings
+created using
+.Xr mmap 2
+where the
+.Dv PROT_CAP
+permission is specified.
+Without
+.Dv PROT_CAP
+stores of valid capabilities will trigger a fault and loads will always
+yield an invalid capability.
+On fork, pages with capability permissions remain shared, but are
+downgraded to remove capability permissions unless
+.Dv O_SHARECAP
+was used during object creation.
+.Pp
 The new descriptor is set to close during
 .Xr execve 2
 system calls;

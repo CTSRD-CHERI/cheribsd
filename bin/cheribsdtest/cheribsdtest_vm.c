@@ -191,12 +191,28 @@ CHERIBSDTEST(vm_mmap_diallowed_prot,
 }
 
 CHERIBSDTEST(vm_tag_shm_open_anon_shared,
-    "check tags are stored for SHM_ANON MAP_SHARED pages")
+    "check tags are stored for SHM_ANON MAP_SHARED pages when requested")
+{
+	int fd = CHERIBSDTEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
+	CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
+	mmap_and_check_tag_stored(fd, PROT_READ | PROT_WRITE | PROT_CAP,
+	    MAP_SHARED);
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(vm_tag_shm_open_anon_shared_implied_cap,
+    "check tags are not stored for SHM_ANON MAP_SHARED pages by default",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGSEGV,
+    .ct_si_code = SEGV_STORETAG,
+    .ct_si_trapno = TRAPNO_STORE_CAP_PF,
+    .ct_check_skip = skip_need_writable_tmp)
 {
 	int fd = CHERIBSDTEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
 	CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
 	mmap_and_check_tag_stored(fd, PROT_READ | PROT_WRITE, MAP_SHARED);
-	cheribsdtest_success();
+
+	cheribsdtest_failure_errx("store succeeded");
 }
 
 CHERIBSDTEST(vm_tag_shm_open_anon_private,
@@ -204,7 +220,8 @@ CHERIBSDTEST(vm_tag_shm_open_anon_private,
 {
 	int fd = CHERIBSDTEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
 	CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
-	mmap_and_check_tag_stored(fd, PROT_READ | PROT_WRITE, MAP_PRIVATE);
+	mmap_and_check_tag_stored(fd, PROT_READ | PROT_WRITE | PROT_CAP,
+	    MAP_PRIVATE);
 	cheribsdtest_success();
 }
 
@@ -220,14 +237,15 @@ CHERIBSDTEST(vm_tag_shm_open_anon_shared2x,
 	CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
 
 	map2 = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
-		PROT_READ, MAP_SHARED, fd, 0));
+	    PROT_READ | PROT_CAP, MAP_SHARED, fd, 0));
 
 	/* Verify that no capability present */
 	c2 = *map2;
 	CHERIBSDTEST_VERIFY2(cheri_gettag(c2) == 0, "tag exists on first read");
 	CHERIBSDTEST_VERIFY2(c2 == NULL, "Initial read NULL");
 
-	mmap_and_check_tag_stored(fd, PROT_READ | PROT_WRITE, MAP_SHARED);
+	mmap_and_check_tag_stored(fd, PROT_READ | PROT_WRITE | PROT_CAP,
+	    MAP_SHARED);
 
 	/* And now verify that it is, thanks to the aliased maps */
 	c2 = *map2;
@@ -237,10 +255,7 @@ CHERIBSDTEST(vm_tag_shm_open_anon_shared2x,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(vm_shm_open_anon_unix_surprise,
-    "test SHM_ANON vs SCM_RIGHTS",
-    .ct_xfail_reason =
-	"Tags currently survive cross-AS aliasing of SHM_ANON objects")
+CHERIBSDTEST(vm_shm_open_anon_unix_cross_as, "test SHM_ANON vs SCM_RIGHTS")
 {
 	int sv[2];
 	int pid;
@@ -280,7 +295,7 @@ CHERIBSDTEST(vm_shm_open_anon_unix_surprise,
 		CHERIBSDTEST_VERIFY2(fd >= 0, "fd read OK");
 
 		map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
-		    PROT_READ, MAP_PRIVATE, fd, 0));
+		    PROT_READ | PROT_CAP, MAP_SHARED, fd, 0));
 		c = *map;
 
 		if (verbose)
@@ -308,12 +323,12 @@ CHERIBSDTEST(vm_shm_open_anon_unix_surprise,
 
 		close(sv[0]);
 
-		fd = CHERIBSDTEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
+		fd = CHERIBSDTEST_CHECK_SYSCALL(shm_open(SHM_ANON,
+		    O_RDWR | O_SHARECAP, 0600));
 		CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
 
 		map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
-						PROT_READ | PROT_WRITE,
-						MAP_SHARED, fd, 0));
+		    PROT_READ | PROT_WRITE | PROT_CAP, MAP_SHARED, fd, 0));
 
 		/* Just some pointer */
 		*map = &fd;
@@ -345,9 +360,9 @@ CHERIBSDTEST(vm_shm_open_anon_unix_surprise,
 
 		waitpid(pid, &res, 0);
 		if (res == 0) {
-			cheribsdtest_success();
+			cheribsdtest_failure_errx("tags failed to transfer");
 		} else if (WIFEXITED(res) && WEXITSTATUS(res) == 1) {
-			cheribsdtest_failure_errx("tag transfer succeeded");
+			cheribsdtest_success();
 		} else {
 			cheribsdtest_failure_errx("child setup error occured (this is *unexpected*");
 		}
@@ -366,7 +381,7 @@ CHERIBSDTEST(shm_open_read_nocaps,
 	CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
 
 	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
-	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+	    PROT_READ | PROT_WRITE | PROT_CAP, MAP_SHARED, fd, 0));
 
 	/* Just some pointer */
 	*map = &fd;
@@ -637,12 +652,11 @@ skip_need_writable_tmp(const char *name __unused)
  * and write a tagged capability to it.
  *
  * 2) Create a second copy-on-write mapping; read back the tagged value via
- * the second mapping, and confirm that it still has a tag.
- * (cheribsdtest_vm_cow_read)
+ * the second mapping, and confirm that it still has a tag.  (vm_cow_read)
  *
  * 3) Write an adjacent word in the second mapping, which should cause a
  * copy-on-write, then read back the capability and confirm that it still has
- * a tag.  (cheribsdtest_vm_cow_write)
+ * a tag.  (vm_cow_write)
  */
 CHERIBSDTEST(vm_cow_read,
     "read capabilities from a copy-on-write page")
@@ -662,9 +676,11 @@ CHERIBSDTEST(vm_cow_read,
 	 * Create 'real' and copy-on-write mappings.
 	 */
 	cp_real = CHERIBSDTEST_CHECK_SYSCALL2(mmap(NULL, getpagesize(),
-	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0), "mmap cp_real");
+	    PROT_READ | PROT_WRITE | PROT_CAP, MAP_SHARED, fd, 0),
+	    "mmap cp_real");
 	cp_copy = CHERIBSDTEST_CHECK_SYSCALL2(mmap(NULL, getpagesize(),
-	    PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0), "mmap cp_copy");
+	    PROT_READ | PROT_WRITE | PROT_CAP, MAP_PRIVATE, fd, 0),
+	    "mmap cp_copy");
 
 	/*
 	 * Write out a tagged capability to 'real' mapping -- doesn't really
@@ -711,9 +727,11 @@ CHERIBSDTEST(vm_cow_write,
 	 * Create 'real' and copy-on-write mappings.
 	 */
 	cp_real = CHERIBSDTEST_CHECK_SYSCALL2(mmap(NULL, getpagesize(),
-	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0), "mmap cp_real");
+	    PROT_READ | PROT_WRITE | PROT_CAP, MAP_SHARED, fd, 0),
+	    "mmap cp_real");
 	cp_copy = CHERIBSDTEST_CHECK_SYSCALL2(mmap(NULL, getpagesize(),
-	    PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0), "mmap cp_copy");
+	    PROT_READ | PROT_WRITE | PROT_CAP, MAP_PRIVATE, fd, 0),
+	    "mmap cp_copy");
 
 	/*
 	 * Write out a tagged capability to 'real' mapping -- doesn't really
@@ -1249,7 +1267,7 @@ CHERIBSDTEST(vm_shm_largepage_basic,
 		    "psind=%d errno=%d", psind, errno);
 		CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, ps[psind]));
 		addr = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, ps[psind],
-		    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+		    PROT_READ | PROT_WRITE | PROT_CAP, MAP_SHARED, fd, 0));
 
 		/* Verify mmap output */
 		CHERIBSDTEST_VERIFY2(cheri_gettag(addr) != 0,
@@ -2699,7 +2717,7 @@ CHERIBSDTEST(cheri_revoke_shm_anon_hoard_unmapped,
 	CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
 
 	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
-	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+	    PROT_READ | PROT_WRITE | PROT_CAP, MAP_SHARED, fd, 0));
 
 	to_revoke = malloc(1);
 	*map = to_revoke;
@@ -2785,7 +2803,7 @@ CHERIBSDTEST(cheri_revoke_shm_anon_hoard_closed,
 		CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
 
 		map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
-		    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+		    PROT_READ | PROT_WRITE | PROT_CAP, MAP_SHARED, fd, 0));
 
 		to_revoke = malloc(1);
 		*map = to_revoke;

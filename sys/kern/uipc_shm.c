@@ -937,7 +937,7 @@ shm_dotruncate(struct shmfd *shmfd, off_t length)
  * routines.
  */
 struct shmfd *
-shm_alloc(struct ucred *ucred, mode_t mode, bool largepage)
+shm_alloc(struct ucred *ucred, mode_t mode, bool largepage, bool sharecap)
 {
 	struct shmfd *shmfd;
 	vm_object_t obj;
@@ -962,6 +962,16 @@ shm_alloc(struct ucred *ucred, mode_t mode, bool largepage)
 	}
 	KASSERT(shmfd->shm_object != NULL, ("shm_create: vm_pager_allocate"));
 	vm_object_set_flag(shmfd->shm_object, OBJ_HASCAP);
+	if (sharecap) {
+		shmfd->shm_vmspace = NULL;
+		vm_object_set_flag(shmfd->shm_object, OBJ_SHARECAP);
+	} else {
+		shmfd->shm_vmspace = curproc->p_vmspace;
+		vm_map_lock(&curproc->p_vmspace->vm_map);
+		LIST_INSERT_HEAD(&curproc->p_vmspace->vm_shm_objects,
+		    shmfd, shm_vmspace_entry);
+		vm_map_unlock(&curproc->p_vmspace->vm_map);
+	}
 	vfs_timestamp(&shmfd->shm_birthtime);
 	shmfd->shm_atime = shmfd->shm_mtime = shmfd->shm_ctime =
 	    shmfd->shm_birthtime;
@@ -989,11 +999,19 @@ void
 shm_drop(struct shmfd *shmfd)
 {
 	vm_object_t obj;
+	struct vmspace *vm;
 
 	if (refcount_release(&shmfd->shm_refs)) {
 #ifdef MAC
 		mac_posixshm_destroy(shmfd);
 #endif
+		vm = atomic_load_ptr(&shmfd->shm_vmspace);
+		if (vm != NULL) {
+			vm_map_lock(&vm->vm_map);
+			if (vm == atomic_load_ptr(&shmfd->shm_vmspace))
+				LIST_REMOVE(shmfd, shm_vmspace_entry);
+			vm_map_unlock(&vm->vm_map);
+		}
 		rangelock_destroy(&shmfd->shm_rl);
 		mtx_destroy(&shmfd->shm_mtx);
 		obj = shmfd->shm_object;
@@ -1005,6 +1023,25 @@ shm_drop(struct shmfd *shmfd)
 		vm_object_deallocate(obj);
 		free(shmfd, M_SHMFD);
 	}
+}
+
+void
+shm_vmspace_free(struct vmspace *vm)
+{
+	struct shmfd *shmfd;
+
+	vm_map_lock(&vm->vm_map);
+	while (!LIST_EMPTY(&vm->vm_shm_objects)) {
+		shmfd = LIST_FIRST(&vm->vm_shm_objects);
+
+		KASSERT(shmfd->shm_vmspace == vm, ("wrong vmspace! %p != %p",
+		    shmfd->shm_vmspace, vm));
+
+		LIST_REMOVE(shmfd, shm_vmspace_entry);
+		atomic_store_ptr(&shmfd->shm_vmspace, NULL);
+		/* XXX: free refs to shmfds? */
+	}
+	vm_map_unlock(&vm->vm_map);
 }
 
 /*
@@ -1168,7 +1205,7 @@ kern_shm_open2(struct thread *td, const char * __capability userpath,
 	Fnv32_t fnv;
 	mode_t cmode;
 	int error, fd, initial_seals;
-	bool largepage;
+	bool largepage, sharecap;
 
 	if ((shmflags & ~(SHM_ALLOW_SEALING | SHM_GROW_ON_WRITE |
 	    SHM_LARGEPAGE)) != 0)
@@ -1184,8 +1221,15 @@ kern_shm_open2(struct thread *td, const char * __capability userpath,
 	if ((flags & O_ACCMODE) != O_RDONLY && (flags & O_ACCMODE) != O_RDWR)
 		return (EINVAL);
 
-	if ((flags & ~(O_ACCMODE | O_CREAT | O_EXCL | O_TRUNC | O_CLOEXEC)) != 0)
+	if ((flags & ~(O_ACCMODE | O_CREAT | O_EXCL | O_TRUNC | O_CLOEXEC |
+	    O_SHARECAP)) != 0)
 		return (EINVAL);
+
+	/* XXX: add a proc flag to allow/disallow */
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+		sharecap = (flags & O_SHARECAP) != 0;
+	else
+		sharecap = true;
 
 	largepage = (shmflags & SHM_LARGEPAGE) != 0;
 	if (largepage && !PMAP_HAS_LARGEPAGES)
@@ -1248,7 +1292,7 @@ kern_shm_open2(struct thread *td, const char * __capability userpath,
 			fdrop(fp, td);
 			return (EINVAL);
 		}
-		shmfd = shm_alloc(td->td_ucred, cmode, largepage);
+		shmfd = shm_alloc(td->td_ucred, cmode, largepage, sharecap);
 		shmfd->shm_seals = initial_seals;
 		shmfd->shm_flags = shmflags;
 	} else {
@@ -1264,7 +1308,7 @@ kern_shm_open2(struct thread *td, const char * __capability userpath,
 				if (error == 0) {
 #endif
 					shmfd = shm_alloc(td->td_ucred, cmode,
-					    largepage);
+					    largepage, sharecap);
 					shmfd->shm_seals = initial_seals;
 					shmfd->shm_flags = shmflags;
 					shm_insert(path, fnv, shmfd);
@@ -1309,6 +1353,9 @@ kern_shm_open2(struct thread *td, const char * __capability userpath,
 			else if ((flags & (O_CREAT | O_EXCL)) ==
 			    (O_CREAT | O_EXCL))
 				error = EEXIST;
+			else if (sharecap &&
+			    (shmfd->shm_object->flags & O_SHARECAP) == 0)
+				error = EPERM;
 			else if (shmflags != 0 && shmflags != shmfd->shm_flags)
 				error = EINVAL;
 			else {
@@ -1762,10 +1809,27 @@ shm_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr,
 			goto out;
 		}
 	}
-	maxprot &= max_maxprot;
+	if ((max_maxprot & (VM_PROT_CAP | VM_PROT_NO_IMPLY_CAP)) != 0) {
+		/*
+		 * If we want capability permissions, we must either be in
+		 * the original address space or the object must have the
+		 * OBJ_SHARECAP flag set.
+		 */
+		if ((max_maxprot & VM_PROT_CAP) != 0 &&
+		    (shmfd->shm_object->flags & OBJ_SHARECAP) == 0 &&
+		    shmfd->shm_vmspace != td->td_proc->p_vmspace) {
+			error = EACCES;
+			goto out;
+		}
 
-	prot = VM_PROT_ADD_CAP(prot);
-	maxprot = VM_PROT_ADD_CAP(prot);
+		/*
+		 * If we've asked for (or explicitly rejected) capability
+		 * permissions, imply them for maxprot so we don't end up
+		 * with prot as a superset of maxport.
+		 */
+		maxprot = VM_PROT_ADD_CAP(maxprot);
+	}
+	maxprot &= max_maxprot;
 
 	/* See comment in vn_mmap(). */
 	if (

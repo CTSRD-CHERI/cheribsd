@@ -203,6 +203,8 @@ struct vm_object {
 #define	OBJ_NOCAP	0x20000		/* object and all shadow objects can
 					   not store capabilities */
 #define	OBJ_CHERISHADOW	0x40000		/* object is the shadow bitmap */
+#define	OBJ_SHARECAP	0x80000		/* capabilities in object can be
+					   shared across vmspaces */
 
 /*
  * Helpers to perform conversion between vm_object page indexes and offsets.

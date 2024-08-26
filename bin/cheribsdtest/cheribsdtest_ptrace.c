@@ -217,11 +217,12 @@ CHERIBSDTEST(ptrace_writecap, "Basic tests of PIOD_WRITE_CHERI_CAP")
 	uintcap_t *map, pp[2];
 	char capbuf[2][sizeof(uintcap_t) + 1];
 
-	fd = CHERIBSDTEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
+	fd = CHERIBSDTEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR | O_SHARECAP,
+	    0600));
 	CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
 
 	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
-	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+	    PROT_READ | PROT_WRITE | PROT_CAP, MAP_SHARED, fd, 0));
 
 	pid = fork_child();
 

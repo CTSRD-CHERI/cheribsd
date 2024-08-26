@@ -73,6 +73,7 @@
 #include <vm/vm.h>
 #include <vm/vm_object.h>
 #include <vm/pmap.h>
+#include <vm/vm_map.h>
 #endif
 
 #ifndef prefetch

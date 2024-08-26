@@ -421,6 +421,7 @@ vmspace_alloc(vm_pointer_t min, vm_pointer_t max, pmap_pinit_t pinit)
 	 */
 	vm->vm_prev_cid = 0;
 #endif
+	LIST_INIT(&vm->vm_shm_objects);
 	return (vm);
 }
 
@@ -450,6 +451,11 @@ vmspace_dofree(struct vmspace *vm)
 	 * exit1().
 	 */
 	shmexit(vm);
+
+	/*
+	 * Clean up local posix shm objects.
+	 */
+	shm_vmspace_free(vm);
 
 	/*
 	 * Lock the map, to wait out all other references to it.
@@ -5150,6 +5156,10 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 
 #if __has_feature(capabilities)
 	vm2->vm_prev_cid = vm1->vm_prev_cid;
+	/*
+	 * NB: we don't copy vm_shm_objects as by definition, no copied
+	 * objects will be local to the new vmspace.
+	 */
 #endif
 
 	new_map->anon_loc = old_map->anon_loc;
@@ -5157,6 +5167,8 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 	    MAP_ASLR_STACK | MAP_RESERVATIONS | MAP_WXORX);
 
 	VM_MAP_ENTRY_FOREACH(old_entry, old_map) {
+		bool strip_cap_perms = false;
+
 		if ((old_entry->eflags & MAP_ENTRY_IS_SUB_MAP) != 0)
 			panic("vm_map_fork: encountered a submap");
 
@@ -5180,6 +5192,11 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 				vm_map_entry_back(old_entry);
 				object = old_entry->object.vm_object;
 			}
+
+			/* XXX: add a proc flag to allow/disallow */
+			if ((old_entry->max_protection & VM_PROT_CAP) != 0 &&
+			    (object->flags & OBJ_SHARECAP) == 0)
+				strip_cap_perms = true;
 
 			/*
 			 * Add the reference before calling vm_object_shadow
@@ -5242,6 +5259,10 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 			*new_entry = *old_entry;
 			new_entry->eflags &= ~(MAP_ENTRY_USER_WIRED |
 			    MAP_ENTRY_IN_TRANSITION);
+			if (strip_cap_perms) {
+				new_entry->protection &= ~VM_PROT_CAP;
+				new_entry->max_protection &= ~VM_PROT_CAP;
+			}
 			new_entry->wiring_thread = NULL;
 			new_entry->wired_count = 0;
 			if (new_entry->eflags & MAP_ENTRY_WRITECNT) {
@@ -5259,11 +5280,19 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 
 			/*
 			 * Update the physical map
+			 *
+			 * If this is a shared object that might contain
+			 * capabilities, we've removed the capability
+			 * permissions and need to let a fault set
+			 * hardware permissions up properly rather than
+			 * blindly copying them.
 			 */
-			pmap_copy(new_map->pmap, old_map->pmap,
-			    new_entry->start,
-			    (old_entry->end - old_entry->start),
-			    old_entry->start);
+			if (!strip_cap_perms) {
+				pmap_copy(new_map->pmap, old_map->pmap,
+				    new_entry->start,
+				    (old_entry->end - old_entry->start),
+				    old_entry->start);
+			}
 			break;
 
 		case VM_INHERIT_COPY:
