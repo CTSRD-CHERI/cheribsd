@@ -38,6 +38,49 @@
 #include <machine/riscvreg.h>
 #endif
 
+#define	INT_SIZE	8
+#define	INT(x)		x
+#define	LOAD_INT	PTR(ld)
+#define	STORE_INT	PTR(sd)
+
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	LOAD_PTR	LOAD_CAP
+#define	STORE_PTR	STORE_CAP
+#define	ADD_PTR		cincoffset
+#define	MV_PTR		cmove
+#define	PTR_SIZE	CAP_SIZE
+#define	PTR(x)		CAP(x)
+#else
+#define	LOAD_PTR	LOAD_INT
+#define	STORE_PTR	STORE_INT
+#define	ADD_PTR		add
+#define	MV_PTR		mv
+#define	PTR_SIZE	INT_SIZE
+#define	PTR(x)		INT(x)
+#endif
+
+#define	JR_PTR		PTR(jr)
+
+#if __has_feature(capabilities)
+#define	LOAD_CAP	PTR(lc)
+#define	STORE_CAP	PTR(sc)
+#define	CAP_SIZE	16
+#define	CAP(x)		c ## x
+#else
+#define	LOAD_CAP	ld
+#define	STORE_CAP	sd
+#define	CAP_SIZE	8
+#define	CAP(x)		x
+#endif
+
+#ifdef __riscv_float_abi_double
+#define	FLT_SIZE	8
+#define	LOAD_FLT	PTR(fld)
+#define	STORE_FLT	PTR(fsd)
+#else
+#define	FLT_SIZE	0
+#endif
+
 /*
  * Pure-capability:
  *
@@ -56,6 +99,7 @@
  */
 
 ENTRY(.rtld_start)
+	.cfi_undefined PTR(ra)	/* Do not attempt to unwind any further. */
 #ifdef __CHERI_PURE_CAPABILITY__
 	cmove	cs0, ca0				/* Put aux in a callee-saved register */
 	cmove	cs1, csp				/* And the stack pointer */
@@ -101,49 +145,6 @@ ENTRY(.rtld_start)
 	jr	t0		/* Jump to the entry point */
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(.rtld_start)
-
-#define	INT_SIZE	8
-#define	INT(x)		x
-#define	LOAD_INT	PTR(ld)
-#define	STORE_INT	PTR(sd)
-
-#ifdef __CHERI_PURE_CAPABILITY__
-#define	LOAD_PTR	LOAD_CAP
-#define	STORE_PTR	STORE_CAP
-#define	ADD_PTR		cincoffset
-#define	MV_PTR		cmove
-#define	PTR_SIZE	CAP_SIZE
-#define	PTR(x)		CAP(x)
-#else
-#define	LOAD_PTR	LOAD_INT
-#define	STORE_PTR	STORE_INT
-#define	ADD_PTR		add
-#define	MV_PTR		mv
-#define	PTR_SIZE	INT_SIZE
-#define	PTR(x)		INT(x)
-#endif
-
-#define	JR_PTR		PTR(jr)
-
-#if __has_feature(capabilities)
-#define	LOAD_CAP	PTR(lc)
-#define	STORE_CAP	PTR(sc)
-#define	CAP_SIZE	16
-#define	CAP(x)		c ## x
-#else
-#define	LOAD_CAP	ld
-#define	STORE_CAP	sd
-#define	CAP_SIZE	8
-#define	CAP(x)		x
-#endif
-
-#ifdef __riscv_float_abi_double
-#define	FLT_SIZE	8
-#define	LOAD_FLT	PTR(fld)
-#define	STORE_FLT	PTR(fsd)
-#else
-#define	FLT_SIZE	0
-#endif
 
 /*
  * t0 = obj pointer
