@@ -353,7 +353,7 @@ main(int argc, char **argv)
 		/*
 		 * Child, will coexecvec(2) the new command.
 		 */
-		coexecvpc(getppid(), argv[0], argv, capv, capc);
+		coexecvpc(0, argv[0], argv, capv, capc);
 
 		/*
 		 * Shouldn't have returned.

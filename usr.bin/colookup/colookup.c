@@ -225,6 +225,6 @@ main(int argc, char **argv)
 	if (argc < 1 || chosen >= 0 || name != NULL | filename != NULL)
 		usage();
 
-	coexecvpc(getppid(), argv[0], argv, capv, capc);
+	coexecvpc(0, argv[0], argv, capv, capc);
 	err(1, "%s", argv[0]);
 }

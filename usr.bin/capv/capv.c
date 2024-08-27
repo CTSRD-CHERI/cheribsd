@@ -186,7 +186,7 @@ main(int argc, char **argv)
 	}
 
 	if (iflag) {
-		coexecvpc(getppid(), argv[0], argv, new_capv, capc);
+		coexecvpc(0, argv[0], argv, new_capv, capc);
 		err(1, "%s", argv[0]);
 	}
 

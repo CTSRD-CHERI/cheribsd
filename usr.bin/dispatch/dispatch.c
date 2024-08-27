@@ -164,7 +164,7 @@ main(int argc, char **argv)
 		/*
 		 * Child, will coexecvec(2) the new command.
 		 */
-		coexecvpc(getppid(), argv[0], argv, capv, nitems(capv));
+		coexecvpc(0, argv[0], argv, capv, nitems(capv));
 
 		/*
 		 * Shouldn't have returned.
