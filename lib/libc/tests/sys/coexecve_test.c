@@ -220,7 +220,7 @@ ATF_TC_BODY(fork_coexecvec, tc)
 
 	pid = atf_utils_fork();
 	if (pid == 0) {
-		error = coexecvec_helper(getppid(), "fork_coexecvec_h", new_capv, 1);
+		error = coexecvec_helper(0, "fork_coexecvec_h", new_capv, 1);
 		ATF_REQUIRE_EQ(error, -1);
 		ATF_REQUIRE_EQ(errno, EPROT);
 	} else {
@@ -255,7 +255,7 @@ ATF_TC_BODY(vfork_coexecvec, tc)
 	if (pid < 0) {
 		atf_tc_fail("vfork returned %d: %s", pid, strerror(errno));
 	} else if (pid == 0) {
-		error = coexecvec_helper(getppid(), "vfork_coexecvec_h", new_capv, 1);
+		error = coexecvec_helper(0, "vfork_coexecvec_h", new_capv, 1);
 		atf_tc_fail("coexecvec returned %d: %s", error, strerror(errno));
 	} else {
 		pid = waitpid(pid, &status, 0);

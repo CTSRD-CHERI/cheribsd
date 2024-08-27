@@ -255,10 +255,10 @@ _posix_spawn_thr(void *data)
 			_exit(127);
 	}
 	envp = psa->envp != NULL ? psa->envp : environ;
-	copid = psa->sa != NULL ? (*psa->sa)->sa_copid : 0;
+	copid = psa->sa != NULL ? (*psa->sa)->sa_copid : -1;
 	if (psa->use_env_path)
 		_coexecvpe(copid, psa->path, psa->argv, envp);
-	else if (copid == 0)
+	else if (copid == -1)
 		_execve(psa->path, psa->argv, envp);
 	else
 		_coexecve(copid, psa->path, psa->argv, envp);
@@ -573,6 +573,7 @@ posix_spawnattr_init(posix_spawnattr_t *ret)
 		return (errno);
 
 	/* Set defaults as specified by POSIX, cleared above */
+	sa->sa_copid = -1;
 	*ret = sa;
 	return (0);
 }

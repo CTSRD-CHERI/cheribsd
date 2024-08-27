@@ -246,14 +246,14 @@ with another process identified by
 .Fa pid .
 Passing 0 as
 .Fa pid
-makes it equivalent to
-.Fn execve ,
-in that the process might still end up being opportunistically colocated
-if enabled with
-.Xr procctl 2 .
-If
+means the parent process.
+Passing -1 for
 .Fa pid
-is -1, the process will not be colocated.
+means the process will not be colocated, unless the opportunistic colocation
+is enabled with
+.Xr procctl 2 ,
+making it equivalent to
+.Fn execve .
 .Pp
 The
 .Fn coexecvec

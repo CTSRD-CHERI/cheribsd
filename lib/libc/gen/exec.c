@@ -138,7 +138,7 @@ execv(const char *name, char * const *argv)
 int
 execvp(const char *name, char * const *argv)
 {
-	return (coexecvp(0, name, argv));
+	return (coexecvp(-1, name, argv));
 }
 
 int
@@ -218,7 +218,7 @@ coexecvPec(pid_t pid, const char *name, const char *path, char * const *argv,
 		buf[lp + ln + 1] = '\0';
 
 retry:
-		if (pid == 0 && capc == 0)
+		if (pid == -1 && capc == 0)
 			(void)_execve(bp, argv, envp);
 		else
 			(void)_coexecvec(pid, bp, argv, envp, capv, capc);
@@ -255,7 +255,7 @@ retry:
 				memp[1] = __DECONST(char*, bp);
 				memp[2] = NULL;
 			}
-			if (pid == 0 && capc == 0)
+			if (pid == -1 && capc == 0)
 				(void)_execve(_PATH_BSHELL, memp, envp);
 			else
 				(void)_coexecvec(pid, _PATH_BSHELL, memp, envp, capv, capc);

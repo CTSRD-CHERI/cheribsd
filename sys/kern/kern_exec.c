@@ -233,6 +233,34 @@ sysctl_kern_stackprot(SYSCTL_HANDLER_ARGS)
 static const struct execsw **execsw;
 
 static int
+colocation_parent(struct thread *td, struct proc **copp)
+{
+	struct proc *cop;
+	int error;
+
+	sx_slock(&proctree_lock);
+	cop = proc_realparent(td->td_proc);
+	PROC_LOCK(cop);
+	if (cop->p_flag2 & (P2_NOCOLOCATE | P2_WEXIT)) {
+		error = ESRCH;
+		goto out;
+	}
+	if (p_cancolocate(td, cop, true) != 0) {
+		error = EPROT;
+		goto out;
+	}
+
+	error = 0;
+	_PHOLD(cop);
+	*copp = cop;
+out:
+	PROC_UNLOCK(cop);
+	sx_sunlock(&proctree_lock);
+
+	return (error);
+}
+
+static int
 kern_coexecvec(struct thread *td, pid_t pid, const char * __capability fname,
     void * __capability argv, void * __capability envv,
     void * __capability capv, int capc)
@@ -240,7 +268,7 @@ kern_coexecvec(struct thread *td, pid_t pid, const char * __capability fname,
 
 	struct image_args args;
 	struct vmspace *oldvmspace;
-	struct proc *p;
+	struct proc *cop;
 	int error;
 
 	error = pre_execve(td, &oldvmspace);
@@ -252,28 +280,31 @@ kern_coexecvec(struct thread *td, pid_t pid, const char * __capability fname,
 	if (error != 0)
 		goto out;
 
-	if (pid > 0) {
-		error = pget(pid, PGET_NOTWEXIT | PGET_HOLD | PGET_CANCOLOCATE, &p);
-		if (error != 0)
-			goto out;
-
-		if (capv != NULL) {
-			if (td->td_proc->p_vmspace != p->p_vmspace) {
-				/*
-				 * XXX: priv_check(9)?
-				 */
-				error = EPROT;
-				goto out;
-			}
-		}
-
-		error = kern_coexecve(td, &args, NULL, oldvmspace, p, false);
-		PRELE(p);
-	} else if (pid == 0) {
+	if (pid < 0) {
 		error = kern_execve(td, &args, NULL, oldvmspace);
-	} else {
-		error = kern_coexecve(td, &args, NULL, oldvmspace, NULL, false);
+		goto out;
 	}
+
+	if (pid == 0)
+		error = colocation_parent(td, &cop);
+	else
+		error = pget(pid, PGET_NOTWEXIT | PGET_HOLD | PGET_CANCOLOCATE, &cop);
+	if (error != 0)
+		goto out;
+
+	if (capv != NULL) {
+		if (td->td_proc->p_vmspace != cop->p_vmspace) {
+			/*
+			 * XXX: priv_check(9)?
+			 */
+			error = EPROT;
+			PRELE(cop);
+			goto out;
+		}
+	}
+
+	error = kern_coexecve(td, &args, NULL, oldvmspace, cop, false);
+	PRELE(cop);
 out:
 	post_execve(td, error, oldvmspace);
 
@@ -483,22 +514,9 @@ kern_execve(struct thread *td, struct image_args *args,
 	// XXX: We don't really need the lock here, right?
 	if ((p->p_flag2 & P2_CHERI_OPPORTUNISTIC) != 0 ||
 	    opportunistic_coexecve != 0) {
-		sx_slock(&proctree_lock);
-		cop = proc_realparent(p);
-		PROC_LOCK(cop);
-		if (cop->p_flag2 & (P2_NOCOLOCATE | P2_WEXIT)) {
-			PROC_UNLOCK(cop);
-			sx_sunlock(&proctree_lock);
+		error = colocation_parent(td, &cop);
+		if (error != 0)
 			goto fallback;
-		}
-		if (p_cancolocate(td, cop, true) != 0) {
-			PROC_UNLOCK(cop);
-			sx_sunlock(&proctree_lock);
-			goto fallback;
-		}
-		_PHOLD(cop);
-		PROC_UNLOCK(cop);
-		sx_sunlock(&proctree_lock);
 		error = kern_coexecve(td, args, mac_p, oldvmspace, cop, true);
 		PRELE(cop);
 
