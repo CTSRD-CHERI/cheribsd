@@ -280,7 +280,7 @@ CHERIBSDTEST(vm_shm_open_anon_unix_surprise,
 		CHERIBSDTEST_VERIFY2(fd >= 0, "fd read OK");
 
 		map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
-		    PROT_READ, MAP_SHARED, fd, 0));
+		    PROT_READ, MAP_PRIVATE, fd, 0));
 		c = *map;
 
 		if (verbose)
