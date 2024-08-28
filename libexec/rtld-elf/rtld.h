@@ -58,7 +58,17 @@
 #include <cheri/cheric.h>
 #endif
 
+#ifdef CHERI_LIB_C18N
+/*
+ * This environment variable is exposed here so that tls.h can see it.
+ */
+extern bool ld_compartment_enable;
+
+#define	C18N_ENABLED	ld_compartment_enable
+#endif
+
 #include "rtld_lock.h"
+#include "rtld_machdep.h"
 
 __BEGIN_DECLS
 
@@ -449,15 +459,6 @@ void dump_Elf_Rel(Obj_Entry *, const Elf_Rel *, u_long);
 void dump_Elf_Rela(Obj_Entry *, const Elf_Rela *, u_long);
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#ifdef CHERI_LIB_C18N
-/*
- * This environment variable is exposed here so that tls.h can see it.
- */
-extern bool ld_compartment_enable;
-
-#define	C18N_ENABLED	ld_compartment_enable
-#endif
-
 /* TODO: we should have a separate member for .text/rodata */
 #define get_codesegment_cap(obj)					\
 	(cheri_clearperm((obj)->text_rodata_cap, CAP_RELOC_REMOVE_PERMS))
@@ -478,10 +479,12 @@ extern bool ld_compartment_enable;
 
 __END_DECLS
 
-/* rtld_machdep.h depends on struct Obj_Entry and _rtld_error() */
-#include "rtld_machdep.h"
+#if __has_feature(capabilities)
+/* rtld_cheri_machdep.h depends on struct Obj_Entry and _rtld_error() */
+#include "rtld_cheri_machdep.h"
+#endif
 
-/* Archictectures other than CHERI can just call the pointer */
+/* Architectures other than CHERI can just call the pointer */
 #ifndef call_init_array_pointer
 #define call_init_array_pointer(obj, target) call_init_pointer(obj, (target).value)
 #endif
