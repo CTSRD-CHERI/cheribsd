@@ -39,6 +39,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/auxv.h>
 #include <sys/capsicum.h>
 #include <sys/param.h>
+#include <sys/procctl.h>
 #include <sys/queue.h>
 #include <sys/sbuf.h>
 #include <sys/types.h>
@@ -219,6 +220,17 @@ respond(capv_paths_t *inp, ssize_t received, capv_paths_return_t *outp)
 	prepare(outp, pathname->p_path, fdcap);
 }
 
+static void
+enable_opportunistic_colocation(void)
+{
+	int error, arg;
+
+	arg = PROC_CHERI_OPPORTUNISTIC_ENABLE;
+	error = procctl(P_PID, 0, PROC_CHERI_COLOCATION_CTL, &arg);
+	if (error != 0)
+		err(1, "procctl");
+}
+
 int
 main(int argc, char **argv)
 {
@@ -315,6 +327,7 @@ main(int argc, char **argv)
 		/*
 		 * Child, will coexecvec(2) the new command.
 		 */
+		enable_opportunistic_colocation();
 		coexecvpc(0, argv[0], argv, capv, capc);
 
 		/*

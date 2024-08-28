@@ -32,6 +32,7 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/auxv.h>
+#include <sys/procctl.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <err.h>
@@ -158,6 +159,17 @@ consider(int *capcp, void * __capability **capvp, int *chosenp,
 	*filenamep = NULL;
 }
 
+static void
+enable_opportunistic_colocation(void)
+{
+	int error, arg;
+
+	arg = PROC_CHERI_OPPORTUNISTIC_ENABLE;
+	error = procctl(P_PID, 0, PROC_CHERI_COLOCATION_CTL, &arg);
+	if (error != 0)
+		err(1, "procctl");
+}
+
 int
 main(int argc, char **argv)
 {
@@ -225,6 +237,7 @@ main(int argc, char **argv)
 	if (argc < 1 || chosen >= 0 || name != NULL | filename != NULL)
 		usage();
 
+	enable_opportunistic_colocation();
 	coexecvpc(0, argv[0], argv, capv, capc);
 	err(1, "%s", argv[0]);
 }
