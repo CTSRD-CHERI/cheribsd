@@ -181,11 +181,12 @@ drm_gem_cma_fault(struct vm_area_struct *dummy, struct vm_fault *vmf)
 	VM_OBJECT_WLOCK(obj);
 	for (i = 0; i < bo->npages; i++) {
 		page = bo->m[i];
-		if (vm_page_busied(page))
+		if (!vm_page_tryxbusy(page))
 			goto fail_unlock;
-		if (vm_page_insert(page, obj, i))
+		if (vm_page_insert(page, obj, i)) {
+			vm_page_xunbusy(page);
 			goto fail_unlock;
-		vm_page_tryxbusy(page);
+		}
 		page->valid = VM_PAGE_BITS_ALL;
 	}
 	VM_OBJECT_WUNLOCK(obj);
@@ -197,6 +198,8 @@ drm_gem_cma_fault(struct vm_area_struct *dummy, struct vm_fault *vmf)
 	return (VM_FAULT_NOPAGE);
 
 fail_unlock:
+	for (i--; i >= 0; i--)
+		vm_page_xunbusy(bo->m[i]);
 	VM_OBJECT_WUNLOCK(obj);
 	DRM_ERROR("%s: insert failed\n", __func__);
 	return (VM_FAULT_SIGBUS);

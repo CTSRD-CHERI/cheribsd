@@ -303,6 +303,7 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 
 	pidx = OFF_TO_IDX(vmf->virtual_address);
 
+retry:
 	VM_OBJECT_WLOCK(obj);
 	if (bo->pages) {
 		if (pidx >= bo->npages) {
@@ -320,11 +321,14 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 			return (VM_FAULT_SIGBUS);
 	}
 
-	if (vm_page_busied(page))
+	if (!vm_page_tryxbusy(page)) {
+		vm_page_busy_sleep(page, "panfrost", 0);
+		goto retry;
+	}
+	if (vm_page_insert(page, obj, pidx)) {
+		vm_page_xunbusy(page);
 		goto fail_unlock;
-	if (vm_page_insert(page, obj, pidx))
-		goto fail_unlock;
-	vm_page_tryxbusy(page);
+	}
 	vm_page_valid(page);
 	VM_OBJECT_WUNLOCK(obj);
 
