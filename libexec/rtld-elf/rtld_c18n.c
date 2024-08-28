@@ -944,7 +944,8 @@ unwind_stack(struct jmp_args ret, void *rcsp, struct trusted_frame *target)
 
 	tf = get_trusted_stk();
 
-	if (!cheri_is_subset(tf, target) || tf->previous >= target) {
+	if (!cheri_is_subset(tf, target) ||
+	    (ptraddr_t)tf->previous >= (ptraddr_t)target) {
 		rtld_fdprintf(STDERR_FILENO,
 		    "c18n: Illegal unwind from %#p to %#p\n", tf, target);
 		abort();
@@ -960,7 +961,7 @@ unwind_stack(struct jmp_args ret, void *rcsp, struct trusted_frame *target)
 		cid = index_to_cid(index);
 		ospp = &table->entries[cid].stack;
 
-		if (*ospp > cur->osp) {
+		if ((ptraddr_t)*ospp > (ptraddr_t)cur->osp) {
 			rtld_fdprintf(STDERR_FILENO,
 			    "c18n: Cannot unwind %s from %#p to %#p\n",
 			    comparts.data[cid].name, *ospp, cur->osp);
@@ -969,9 +970,9 @@ unwind_stack(struct jmp_args ret, void *rcsp, struct trusted_frame *target)
 
 		*ospp = cur->osp;
 		cur = cur->previous;
-	} while (cur < target);
+	} while ((ptraddr_t)cur < (ptraddr_t)target);
 
-	if (cur != target) {
+	if ((ptraddr_t)cur != (ptraddr_t)target) {
 		rtld_fdprintf(STDERR_FILENO,
 		    "c18n: Illegal unwind from %#p to %#p\n", cur, target);
 		abort();
@@ -982,7 +983,7 @@ unwind_stack(struct jmp_args ret, void *rcsp, struct trusted_frame *target)
 	 * topmost trusted frame to restore the untrusted stack when it is
 	 * popped.
 	 */
-	if (rcsp > *ospp) {
+	if ((ptraddr_t)rcsp > (ptraddr_t)*ospp) {
 		rtld_fdprintf(STDERR_FILENO,
 		    "c18n: Cannot complete unwind %s from %#p to %#p, ",
 		    "tf: %#p -> %#p\n", comparts.data[cid].name, rcsp, *ospp,
