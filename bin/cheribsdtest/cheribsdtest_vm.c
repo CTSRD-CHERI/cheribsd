@@ -2657,6 +2657,129 @@ CHERIBSDTEST(cheri_revoke_shm_anon_hoard_unmapped,
 	cheribsdtest_success();
 }
 
+CHERIBSDTEST(cheri_revoke_shm_anon_hoard_closed,
+    "Capability is revoked within an unmapped and closed shm object",
+    .ct_xfail_reason = "unmapped part of shm objects aren't revoked")
+{
+	int sv[2];
+	int pid;
+
+	CHERIBSDTEST_CHECK_SYSCALL(socketpair(AF_UNIX, SOCK_DGRAM, 0, sv) != 0);
+
+	pid = fork();
+	if (pid == -1)
+		cheribsdtest_failure_errx("Fork failed; errno=%d", errno);
+
+	if (pid == 0) {
+		int fd;
+		struct msghdr msg = { 0 };
+		struct cmsghdr * cmsg;
+		char cmsgbuf[CMSG_SPACE(sizeof(fd))] = { 0 } ;
+		char iovbuf[16];
+		struct iovec iov = {
+			.iov_base = iovbuf,
+			.iov_len = sizeof(iovbuf)
+		};
+
+		close(sv[1]);
+
+		/* Read from socket */
+		msg.msg_iov = &iov;
+		msg.msg_iovlen = 1;
+		msg.msg_control = cmsgbuf;
+		msg.msg_controllen = sizeof(cmsgbuf);
+		CHERIBSDTEST_CHECK_SYSCALL(recvmsg(sv[0], &msg, 0));
+
+		/* Deconstruct cmsg */
+		cmsg = CMSG_FIRSTHDR(&msg);
+		memcpy(&fd, CMSG_DATA(cmsg), sizeof(fd));
+
+		CHERIBSDTEST_VERIFY2(fd >= 0, "fd read OK");
+
+		/* Send the fd back. */
+		CHERIBSDTEST_CHECK_SYSCALL(sendmsg(sv[0], &msg, 0));
+
+		close(sv[0]);
+		close(fd);
+
+		exit(0);
+	} else {
+		void * volatile to_revoke;
+		void * volatile * map;
+		int fd, res;
+		struct msghdr msg = { 0 };
+		struct cmsghdr * cmsg;
+		char cmsgbuf[CMSG_SPACE(sizeof(fd))] = { 0 };
+		char iovbuf[16] = { 0 };
+		struct iovec iov = {
+			.iov_base = iovbuf,
+			.iov_len = sizeof(iovbuf)
+		};
+
+		close(sv[0]);
+
+		fd = CHERIBSDTEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
+		CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
+
+		map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
+		    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+
+		to_revoke = malloc(1);
+		*map = to_revoke;
+		CHERIBSDTEST_VERIFY(cheri_gettag(*map));
+
+		CHERIBSDTEST_CHECK_SYSCALL(munmap(__DEVOLATILE(void *, map),
+		    getpagesize()));
+
+		/* Construct control message */
+		msg.msg_iov = &iov;
+		msg.msg_iovlen = 1;
+		msg.msg_control = cmsgbuf;
+		msg.msg_controllen = sizeof(cmsgbuf);
+		cmsg = CMSG_FIRSTHDR(&msg);
+		cmsg->cmsg_level = SOL_SOCKET;
+		cmsg->cmsg_type = SCM_RIGHTS;
+		cmsg->cmsg_len = CMSG_LEN(sizeof fd);
+		memcpy(CMSG_DATA(cmsg), &fd, sizeof(fd));
+		msg.msg_controllen = cmsg->cmsg_len;
+
+		/* Send! */
+		CHERIBSDTEST_CHECK_SYSCALL(sendmsg(sv[1], &msg, 0));
+		close(fd);
+
+		/* Revoke the pointer */
+		free(to_revoke);
+		malloc_revoke();
+		CHERIBSDTEST_VERIFY(check_revoked(to_revoke));
+
+		/* Receive the fd back */
+		msg.msg_controllen = sizeof(cmsgbuf);
+		CHERIBSDTEST_CHECK_SYSCALL(recvmsg(sv[1], &msg, 0));
+
+		/* Deconstruct cmsg */
+		cmsg = CMSG_FIRSTHDR(&msg);
+		memcpy(&fd, CMSG_DATA(cmsg), sizeof(fd));
+
+		CHERIBSDTEST_VERIFY2(fd >= 0, "fd read OK");
+
+		map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
+		    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+
+		CHERIBSDTEST_VERIFY(to_revoke == *map);
+		CHERIBSDTEST_VERIFY(check_revoked(*map));
+
+		close(sv[1]);
+		close(fd);
+
+		waitpid(pid, &res, 0);
+		if (res == 0) {
+			cheribsdtest_success();
+		} else {
+			cheribsdtest_failure_errx("child failed");
+		}
+	}
+}
+
 #endif /* CHERIBSDTEST_CHERI_REVOKE_TESTS */
 
 #endif /* __CHERI_PURE_CAPABILITY__ */
