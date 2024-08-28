@@ -2623,6 +2623,40 @@ CHERIBSDTEST(cheri_revoke_cow_mapping,
 
 	cheribsdtest_success();
 }
+
+CHERIBSDTEST(cheri_revoke_shm_anon_hoard_unmapped,
+    "Capability is revoked within an unmapped shm object",
+    .ct_xfail_reason = "unmapped part of shm objects aren't revoked")
+{
+	int fd;
+	void * volatile to_revoke;
+	void * volatile *map;
+
+	fd = CHERIBSDTEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
+	CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
+
+	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
+	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+
+	to_revoke = malloc(1);
+	*map = to_revoke;
+	CHERIBSDTEST_VERIFY(cheri_gettag(*map));
+
+	munmap(__DEVOLATILE(void *, map), getpagesize());
+
+	free(to_revoke);
+	malloc_revoke();
+	CHERIBSDTEST_VERIFY(check_revoked(to_revoke));
+
+	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
+	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+
+	CHERIBSDTEST_VERIFY(to_revoke == *map);
+	CHERIBSDTEST_VERIFY(check_revoked(*map));
+
+	cheribsdtest_success();
+}
+
 #endif /* CHERIBSDTEST_CHERI_REVOKE_TESTS */
 
 #endif /* __CHERI_PURE_CAPABILITY__ */
