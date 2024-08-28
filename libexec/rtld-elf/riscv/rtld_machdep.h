@@ -67,83 +67,6 @@ uintptr_t reloc_jmpslot(uintptr_t *where, uintptr_t target,
     const struct Struct_Obj_Entry *defobj, const struct Struct_Obj_Entry *obj,
     const Elf_Rel *rel);
 
-#if __has_feature(capabilities)
-
-#define	FUNC_PTR_REMOVE_PERMS						\
-	(CHERI_PERM_SEAL | CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |	\
-	CHERI_PERM_STORE_LOCAL_CAP)
-
-#define	DATA_PTR_REMOVE_PERMS						\
-	(CHERI_PERM_SEAL | CHERI_PERM_EXECUTE)
-
-#define	CAP_RELOC_REMOVE_PERMS						\
-	(CHERI_PERM_SW_VMEM)
-
-#ifdef __CHERI_PURE_CAPABILITY__
-/* TODO: ABIs with tight bounds */
-#define can_use_tight_pcc_bounds(obj) ((void)(obj), false)
-#endif
-
-/*
- * Create a pointer to a function.
- * Important: this is not necessarily callable! For ABIs with tight bounds we
- * need to load CGP first -> use make_function_pointer() instead.
- */
-static inline dlfunc_t __capability
-make_code_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
-    bool tight_bounds, size_t addend)
-{
-	const void * __capability ret;
-
-	ret = get_codesegment_cap(defobj) + def->st_value;
-	/* Remove store and seal permissions */
-	ret = cheri_clearperm(ret, FUNC_PTR_REMOVE_PERMS);
-	if (tight_bounds) {
-		ret = cheri_setbounds(ret, def->st_size);
-	}
-	/*
-	 * Note: The addend is required for C++ exceptions since capabilities
-	 * for catch blocks point to the middle of a function.
-	 */
-	ret = cheri_incoffset(ret, addend);
-	/* All code pointers should be sentries: */
-	ret = __builtin_cheri_seal_entry(ret);
-	return __DECONST_CAP(dlfunc_t __capability, ret);
-}
-
-/*
- * Create a function pointer that can be called anywhere
- */
-static inline dlfunc_t __capability
-make_function_cap_with_addend(const Elf_Sym *def,
-    const struct Struct_Obj_Entry *defobj, size_t addend)
-{
-	/* TODO: ABIs with tight bounds */
-	return make_code_cap(def, defobj, /*tight_bounds=*/false, addend);
-}
-
-static inline dlfunc_t __capability
-make_function_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
-{
-	return make_function_cap_with_addend(def, defobj, /*addend=*/0);
-}
-
-static inline void * __capability
-make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
-{
-	void * __capability ret;
-	ret = get_datasegment_cap(defobj) + def->st_value;
-	/* Remove execute and seal permissions */
-	ret = cheri_clearperm(ret, DATA_PTR_REMOVE_PERMS);
-	ret = cheri_setbounds(ret, def->st_size);
-	return ret;
-}
-
-#define set_bounds_if_nonnull(cap, size)	\
-	do { if (cap) { cap = cheri_setbounds(cap, size); } } while(0)
-
-#endif /* __has_feature(capabilities) */
-
 #ifdef __CHERI_PURE_CAPABILITY__
 
 #define make_function_pointer(def, defobj) \
@@ -206,17 +129,5 @@ typedef struct {
 extern void *__tls_get_addr(tls_index* ti);
 
 #define	md_abi_variant_hook(x)
-
-#ifdef __CHERI_PURE_CAPABILITY__
-static inline void
-fix_obj_mapping_cap_permissions(Obj_Entry *obj, const char *path __unused)
-{
-	obj->text_rodata_cap = (const char*)cheri_clearperm(obj->text_rodata_cap, FUNC_PTR_REMOVE_PERMS);
-	obj->relocbase = (char*)cheri_clearperm(obj->relocbase, DATA_PTR_REMOVE_PERMS);
-	obj->mapbase = (char*)cheri_clearperm(obj->mapbase, DATA_PTR_REMOVE_PERMS);
-	/* Purecap code also needs the capmode flag */
-	obj->text_rodata_cap = cheri_setflags(obj->text_rodata_cap, CHERI_FLAGS_CAP_MODE);
-}
-#endif
 
 #endif
