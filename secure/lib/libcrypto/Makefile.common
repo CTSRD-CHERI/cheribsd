@@ -10,9 +10,7 @@ CFLAGS+=	-DB_ENDIAN
 .ifndef WITHOUT_AUTO_ASM
 .if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
     ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "i386"
-.if !${MACHINE_ARCH:Maarch64*c*}
 ASM_${MACHINE_CPUARCH}=
-.endif
 .elif ${MACHINE_ARCH} == "powerpc" || ${MACHINE_ARCH} == "powerpc64" || \
     ${MACHINE_ARCH} == "powerpc64le"
 ASM_${MACHINE_ARCH}=
@@ -22,6 +20,7 @@ ASM_${MACHINE_ARCH}=
 .if defined(ASM_${MACHINE_CPUARCH}) || defined(ASM_${MACHINE_ARCH})
 CFLAGS+=	-DOPENSSL_CPUID_OBJ
 .if defined(ASM_aarch64)
+CFLAGS_CRYPTO=	${CFLAGS:M-march=*:S/^$/-march=armv8-a/W:[-1]}+crypto
 CFLAGS+=	-DOPENSSL_BN_ASM_MONT
 CFLAGS+=	-DSHA1_ASM -DSHA256_ASM -DSHA512_ASM
 CFLAGS+=	-DKECCAK1600_ASM

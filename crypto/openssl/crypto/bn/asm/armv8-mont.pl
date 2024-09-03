@@ -56,15 +56,21 @@ open OUT,"| \"$^X\" $xlate $flavour \"$output\""
 
 ($lo0,$hi0,$aj,$m0,$alo,$ahi,
  $lo1,$hi1,$nj,$m1,$nlo,$nhi,
- $ovf, $i,$j,$tp,$tj) = map("x$_",6..17,19..24);
+ $ovf, $i,$j,$tpx,$tj) = map("x$_",6..17,19..24);
+$tp = "PTR(22)";
 
 # int bn_mul_mont(
-$rp="x0";	# BN_ULONG *rp,
-$ap="x1";	# const BN_ULONG *ap,
-$bp="x2";	# const BN_ULONG *bp,
-$np="x3";	# const BN_ULONG *np,
-$n0="x4";	# const BN_ULONG *n0,
+$rp="PTR(0)";	# BN_ULONG *rp,
+$ap="PTR(1)";	# const BN_ULONG *ap,
+$bp="PTR(2)";	# const BN_ULONG *bp,
+$np="PTR(3)";	# const BN_ULONG *np,
+$n0p="PTR(4)";	# const BN_ULONG *n0,
 $num="x5";	# int num);
+$rpx="x0";
+$apx="x1";
+$bpx="x2";
+$npx="x3";
+$n0="x4";
 
 $code.=<<___;
 #include "arm_arch.h"
@@ -85,8 +91,8 @@ bn_mul_mont:
 	cmp	$num,#32
 	b.le	.Lscalar_impl
 #ifndef	__KERNEL__
-	adrp	x17,OPENSSL_armv8_rsa_neonized
-	ldr	w17,[x17,#:lo12:OPENSSL_armv8_rsa_neonized]
+	adrp	PTR(17),OPENSSL_armv8_rsa_neonized
+	ldr	w17,[PTR(17),#:lo12:OPENSSL_armv8_rsa_neonized]
 	cbnz	w17, bn_mul8x_mont_neon
 #endif
 
@@ -97,18 +103,27 @@ bn_mul_mont:
 	b.eq	__bn_mul4x_mont
 
 .Lmul_mont:
-	stp	x29,x30,[sp,#-64]!
-	add	x29,sp,#0
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	stp	x23,x24,[sp,#48]
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(8*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
 
 	ldr	$m0,[$bp],#8		// bp[0]
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	$lo0,$num
+	add	$tp,csp,$lo0,lsl#3
+#else
 	sub	$tp,sp,$num,lsl#3
+#endif
 	ldp	$hi0,$aj,[$ap],#16	// ap[0..1]
 	lsl	$num,$num,#3
-	ldr	$n0,[$n0]		// *n0
+	ldr	$n0,[$n0p]		// *n0
+#ifdef __CHERI_PURE_CAPABILITY__
+	alignd	$tp,$tp,#4		// ABI says so
+#else
 	and	$tp,$tp,#-16		// ABI says so
+#endif
 	ldp	$hi1,$nj,[$np],#16	// np[0..1]
 
 	mul	$lo0,$hi0,$m0		// ap[0]*bp[0]
@@ -118,7 +133,7 @@ bn_mul_mont:
 	umulh	$ahi,$aj,$m0
 
 	mul	$m1,$lo0,$n0		// "tp[0]"*n0
-	mov	sp,$tp			// alloca
+	mov	PTRN(sp),$tp		// alloca
 
 	// (*)	mul	$lo1,$hi1,$m1	// np[0]*m1
 	umulh	$hi1,$hi1,$m1
@@ -158,13 +173,27 @@ bn_mul_mont:
 	cbnz	$j,.L1st
 
 .L1st_skip:
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	$num,$num
+#endif
 	adds	$lo0,$alo,$hi0
+#ifdef __CHERI_PURE_CAPABILITY__
+	add	$ap,$ap,$num		// rewind $ap
+#else
 	sub	$ap,$ap,$num		// rewind $ap
+#endif
 	adc	$hi0,$ahi,xzr
 
 	adds	$lo1,$nlo,$hi1
+#ifdef __CHERI_PURE_CAPABILITY__
+	add	$np,$np,$num		// rewind $np
+#else
 	sub	$np,$np,$num		// rewind $np
+#endif
 	adc	$hi1,$nhi,xzr
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	$num,$num
+#endif
 
 	adds	$lo1,$lo1,$lo0
 	sub	$i,$num,#8		// i=num-1
@@ -176,8 +205,8 @@ bn_mul_mont:
 .Louter:
 	ldr	$m0,[$bp],#8		// bp[i]
 	ldp	$hi0,$aj,[$ap],#16
-	ldr	$tj,[sp]		// tp[0]
-	add	$tp,sp,#8
+	ldr	$tj,[PTRN(sp)]		// tp[0]
+	add	$tp,PTRN(sp),#8
 
 	mul	$lo0,$hi0,$m0		// ap[0]*bp[i]
 	sub	$j,$num,#16		// j=num-2
@@ -223,16 +252,30 @@ bn_mul_mont:
 	cbnz	$j,.Linner
 
 .Linner_skip:
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	$num,$num
+#endif
 	ldr	$tj,[$tp],#8		// tp[j]
 	adc	$hi1,$hi1,xzr
 	adds	$lo0,$alo,$hi0
+#ifdef __CHERI_PURE_CAPABILITY__
+	add	$ap,$ap,$num		// rewind $ap
+#else
 	sub	$ap,$ap,$num		// rewind $ap
+#endif
 	adc	$hi0,$ahi,xzr
 
 	adds	$lo1,$nlo,$hi1
+#ifdef __CHERI_PURE_CAPABILITY__
+	add	$np,$np,$num		// rewind $np
+#else
 	sub	$np,$np,$num		// rewind $np
+#endif
 	adcs	$hi1,$nhi,$ovf
 	adc	$ovf,xzr,xzr
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	$num,$num
+#endif
 
 	adds	$lo0,$lo0,$tj
 	adc	$hi0,$hi0,xzr
@@ -248,8 +291,8 @@ bn_mul_mont:
 	// if it is, subtract the modulus. But comparison implies
 	// subtraction. So we subtract modulus, see if it borrowed,
 	// and conditionally copy original value.
-	ldr	$tj,[sp]		// tp[0]
-	add	$tp,sp,#8
+	ldr	$tj,[PTRN(sp)]		// tp[0]
+	add	$tp,PTRN(sp),#8
 	ldr	$nj,[$np],#8		// np[0]
 	subs	$j,$num,#8		// j=num-1 and clear borrow
 	mov	$ap,$rp
@@ -265,8 +308,8 @@ bn_mul_mont:
 	sbcs	$ovf,$ovf,xzr		// did it borrow?
 	str	$aj,[$ap],#8		// rp[num-1]
 
-	ldr	$tj,[sp]		// tp[0]
-	add	$tp,sp,#8
+	ldr	$tj,[PTRN(sp)]		// tp[0]
+	add	$tp,PTRN(sp),#8
 	ldr	$aj,[$rp],#8		// rp[0]
 	sub	$num,$num,#8		// num--
 	nop
@@ -283,12 +326,12 @@ bn_mul_mont:
 	stur	xzr,[$tp,#-8]		// wipe tp
 	stur	$nj,[$rp,#-8]
 
-	ldp	x19,x20,[x29,#16]
-	mov	sp,x29
-	ldp	x21,x22,[x29,#32]
+	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
+	mov	PTRN(sp),PTR(29)
+	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
 	mov	x0,#1
-	ldp	x23,x24,[x29,#48]
-	ldr	x29,[sp],#64
+	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
+	ldr	PTR(29),[PTRN(sp)],#(8*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	bn_mul_mont,.-bn_mul_mont
@@ -304,8 +347,10 @@ my $zero="v14";
 my $temp="v15";
 my $ACCTemp="v16";
 
-my ($rptr,$aptr,$bptr,$nptr,$n0,$num)=map("x$_",(0..5));
-my ($tinptr,$toutptr,$inner,$outer,$bnptr)=map("x$_",(6..11));
+my ($rptr,$aptr,$bptr,$nptr,$n0,$num)=("PTR(0)","PTR(1)","PTR(2)","PTR(3)","PTR(4)","x5");
+my ($tinptr,$toutptr,$inner,$outer,$bnptr)=("PTR(6)","PTR(7)","x8","x9","PTR(10)");
+my ($aptrx,$bptrx)=("x1","x2");
+my ($negnum)=("x12");
 
 $code.=<<___;
 .type	bn_mul8x_mont_neon,%function
@@ -313,25 +358,36 @@ $code.=<<___;
 bn_mul8x_mont_neon:
 	// Not adding AARCH64_SIGN_LINK_REGISTER here because bn_mul8x_mont_neon is jumped to
 	// only from bn_mul_mont which has already signed the return address.
-	stp	x29,x30,[sp,#-80]!
-	mov	x16,sp
-	stp	d8,d9,[sp,#16]
-	stp	d10,d11,[sp,#32]
-	stp	d12,d13,[sp,#48]
-	stp	d14,d15,[sp,#64]
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH+64)]!
+	mov	PTR(16),PTRN(sp)
+	stp	d8,d9,[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	d10,d11,[PTRN(sp),#(2*PTR_WIDTH+16)]
+	stp	d12,d13,[PTRN(sp),#(2*PTR_WIDTH+32)]
+	stp	d14,d15,[PTRN(sp),#(2*PTR_WIDTH+48)]
 	lsl	$num,$num,#1
 	eor	$zero.16b,$zero.16b,$zero.16b
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	$negnum,$num
+#endif
 
 .align	4
 .LNEON_8n:
 	eor	@ACC[0].16b,@ACC[0].16b,@ACC[0].16b
-	sub	$toutptr,sp,#128
+	sub	$toutptr,PTRN(sp),#128
 	eor	@ACC[1].16b,@ACC[1].16b,@ACC[1].16b
+#ifdef __CHERI_PURE_CAPABILITY__
+	add	$toutptr,$toutptr,$negnum,lsl#4
+#else
 	sub	$toutptr,$toutptr,$num,lsl#4
+#endif
 	eor	@ACC[2].16b,@ACC[2].16b,@ACC[2].16b
+#ifdef __CHERI_PURE_CAPABILITY__
+	alignd	$toutptr,$toutptr,#6
+#else
 	and	$toutptr,$toutptr,#-64
+#endif
 	eor	@ACC[3].16b,@ACC[3].16b,@ACC[3].16b
-	mov	sp,$toutptr		// alloca
+	mov	PTRN(sp),$toutptr	// alloca
 	eor	@ACC[4].16b,@ACC[4].16b,@ACC[4].16b
 	add	$toutptr,$toutptr,#256
 	eor	@ACC[5].16b,@ACC[5].16b,@ACC[5].16b
@@ -347,10 +403,10 @@ bn_mul8x_mont_neon:
 	st1	{@ACC[6].2d,@ACC[7].2d},[$toutptr],#32
 	bne	.LNEON_8n_init
 
-	add	$tinptr,sp,#256
+	add	$tinptr,PTRN(sp),#256
 	ld1	{$A0.4s,$A1.4s},[$aptr],#32
-	add	$bnptr,sp,#8
-	ldr	$sM0,[$n0],#4
+	add	$bnptr,PTRN(sp),#8
+	ldr	$sM0,[$n0p],#4
 	mov	$outer,$num
 	b	.LNEON_8n_outer
 
@@ -358,7 +414,7 @@ bn_mul8x_mont_neon:
 .LNEON_8n_outer:
 	ldr	$sBi,[$bptr],#4   // *b++
 	uxtl	$Bi.4s,$Bi.4h
-	add	$toutptr,sp,#128
+	add	$toutptr,PTRN(sp),#128
 	ld1	{$N0.4s,$N1.4s},[$nptr],#32
 
 	umlal	@ACC[0].2d,$Bi.2s,$A0.s[0]
@@ -371,7 +427,7 @@ bn_mul8x_mont_neon:
 	umlal	@ACC[4].2d,$Bi.2s,$A1.s[0]
 	mul	$Ni.2s,$Ni.2s,$M0.2s
 	umlal	@ACC[5].2d,$Bi.2s,$A1.s[1]
-	st1	{$Bi.2s},[sp]		// put aside smashed b[8*i+0]
+	st1	{$Bi.2s},[PTRN(sp)]	// put aside smashed b[8*i+0]
 	umlal	@ACC[6].2d,$Bi.2s,$A1.s[2]
 	uxtl	$Ni.4s,$Ni.4h
 	umlal	@ACC[7].2d,$Bi.2s,$A1.s[3]
@@ -416,7 +472,7 @@ $code.=<<___;
 ___
 }
 $code.=<<___;
-	ld1	{$Bi.2s},[sp]		// pull smashed b[8*i+0]
+	ld1	{$Bi.2s},[PTRN(sp)]	// pull smashed b[8*i+0]
 	umlal	@ACC[0].2d,$Ni.2s,$N0.s[0]
 	ld1	{$A0.4s,$A1.4s},[$aptr],#32
 	umlal	@ACC[1].2d,$Ni.2s,$N0.s[1]
@@ -435,7 +491,7 @@ $code.=<<___;
 	umlal	@ACC[7].2d,$Ni.2s,$N1.s[3]
 	add	@ACC[1].2d,@ACC[1].2d,@ACC[0].2d
 	st1	{$Ni.2s},[$bnptr],#8	// put aside smashed m[8*i+$i]
-	add	$bnptr,sp,#8		// rewind
+	add	$bnptr,PTRN(sp),#8	// rewind
 ___
 	push(@ACC,shift(@ACC));
 $code.=<<___;
@@ -492,14 +548,18 @@ ___
 }
 $code.=<<___;
 	b.ne	.LInner_after_rewind$i
+#ifdef __CHERI_PURE_CAPABILITY__
+	add	$aptr,$aptr,$negnum,lsl#2	// rewind
+#else
 	sub	$aptr,$aptr,$num,lsl#2	// rewind
+#endif
 .LInner_after_rewind$i:
 	umlal	@ACC[0].2d,$Ni.2s,$N0.s[0]
-	ld1	{$Bi.2s},[sp]		// pull smashed b[8*i+0]
+	ld1	{$Bi.2s},[PTRN(sp)]	// pull smashed b[8*i+0]
 	umlal	@ACC[1].2d,$Ni.2s,$N0.s[1]
 	ld1	{$A0.4s,$A1.4s},[$aptr],#32
 	umlal	@ACC[2].2d,$Ni.2s,$N0.s[2]
-	add	$bnptr,sp,#8		// rewind
+	add	$bnptr,PTRN(sp),#8	// rewind
 	umlal	@ACC[3].2d,$Ni.2s,$N0.s[3]
 	umlal	@ACC[4].2d,$Ni.2s,$N1.s[0]
 	umlal	@ACC[5].2d,$Ni.2s,$N1.s[1]
@@ -511,7 +571,7 @@ $code.=<<___;
 ___
 	push(@ACC,shift(@ACC));
 $code.=<<___;
-	add	$tinptr,sp,#128
+	add	$tinptr,PTRN(sp),#128
 	st1	{@ACC[0].2d,@ACC[1].2d},[$toutptr],#32
 	eor	$N0.16b,$N0.16b,$N0.16b	// $N0
 	st1	{@ACC[2].2d,@ACC[3].2d},[$toutptr],#32
@@ -526,20 +586,24 @@ $code.=<<___;
 	ld1	{@ACC[6].2d,@ACC[7].2d},[$tinptr],#32
 
 	b.eq	.LInner_8n_jump_2steps
+#ifdef __CHERI_PURE_CAPABILITY__
+	add	$nptr,$nptr,$negnum,lsl#2	// rewind
+#else
 	sub	$nptr,$nptr,$num,lsl#2	// rewind
+#endif
 	b	.LNEON_8n_outer
 
 .LInner_8n_jump_2steps:
-	add	$toutptr,sp,#128
-	st1	{$N0.2d,$N1.2d}, [sp],#32	// start wiping stack frame
+	add	$toutptr,PTRN(sp),#128
+	st1	{$N0.2d,$N1.2d}, [PTRN(sp)],#32	// start wiping stack frame
 	mov	$Temp.16b,@ACC[0].16b
 	ushr	$temp.2d,@ACC[0].2d,#16
 	ext	@ACC[0].16b,@ACC[0].16b,@ACC[0].16b,#8
-	st1	{$N0.2d,$N1.2d}, [sp],#32
+	st1	{$N0.2d,$N1.2d}, [PTRN(sp)],#32
 	add	@ACC[0].2d,@ACC[0].2d,$temp.2d
-	st1	{$N0.2d,$N1.2d}, [sp],#32
+	st1	{$N0.2d,$N1.2d}, [PTRN(sp)],#32
 	ushr	$temp.2d,@ACC[0].2d,#16
-	st1	{$N0.2d,$N1.2d}, [sp],#32
+	st1	{$N0.2d,$N1.2d}, [PTRN(sp)],#32
 	zip1	@ACC[0].4h,$Temp.4h,@ACC[0].4h
 	ins	$temp.d[1],$zero.d[0]
 
@@ -584,9 +648,15 @@ $code.=<<___;
 	bne	.LNEON_tail
 
 	st1	{$temp.s}[0], [$toutptr],#4	// top-most bit
+#ifdef __CHERI_PURE_CAPABILITY__
+	add	$nptr,$nptr,$negnum,lsl#2	// rewind $nptr
+	sub	$aptr,PTRN(sp),#0
+	cmn	x0,xzr				// clear carry flag
+#else
 	sub	$nptr,$nptr,$num,lsl#2		// rewind $nptr
-	subs	$aptr,sp,#0			// clear carry flag
-	add	$bptr,sp,$num,lsl#2
+	subs	$aptr,PTRN(sp),#0		// clear carry flag
+#endif
+	add	$bptr,PTRN(sp),$num,lsl#2
 
 .LNEON_sub:
 	ldp	w4,w5,[$aptr],#8
@@ -597,7 +667,7 @@ $code.=<<___;
 	sbcs	w9,w5,w9
 	sbcs	w10,w6,w10
 	sbcs	w11,w7,w11
-	sub	x17,$bptr,$aptr
+	sub	x17,$bptrx,$aptrx
 	stp	w8,w9,[$rptr],#8
 	stp	w10,w11,[$rptr],#8
 	cbnz	x17,.LNEON_sub
@@ -605,10 +675,15 @@ $code.=<<___;
 	ldr	w10, [$aptr]		// load top-most bit
 	mov	x11,sp
 	eor	v0.16b,v0.16b,v0.16b
-	sub	x11,$bptr,x11		// this is num*4
+	sub	x11,$bptrx,x11		// this is num*4
 	eor	v1.16b,v1.16b,v1.16b
-	mov	$aptr,sp
+	mov	$aptr,PTRN(sp)
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	x11,x11
+	add	$rptr,$rptr,x11		// rewind $rptr
+#else
 	sub	$rptr,$rptr,x11		// rewind $rptr
+#endif
 	mov	$nptr,$bptr		// second 3/4th of frame
 	sbcs	w10,w10,wzr		// result is carry flag
 
@@ -642,17 +717,17 @@ $code.=<<___;
 .LCopy_2:
 	st1	{v0.2d,v1.2d}, [$aptr],#32		// wipe
 	st1	{v0.2d,v1.2d}, [$nptr],#32		// wipe
-	sub	x17,$bptr,$aptr		// preserves carry
+	sub	x17,$bptrx,$aptrx		// preserves carry
 	stp	w8,w9,[$rptr],#8
 	stp	w10,w11,[$rptr],#8
 	cbnz	x17,.LNEON_copy_n_zap
 
-	mov	sp,x16
-	ldp	d14,d15,[sp,#64]
-	ldp	d12,d13,[sp,#48]
-	ldp	d10,d11,[sp,#32]
-	ldp	d8,d9,[sp,#16]
-	ldr	x29,[sp],#80
+	mov	PTRN(sp),PTR(16)
+	ldp	d14,d15,[PTRN(sp),#(2*PTR_WIDTH+48)]
+	ldp	d12,d13,[PTRN(sp),#(2*PTR_WIDTH+32)]
+	ldp	d10,d11,[PTRN(sp),#(2*PTR_WIDTH+16)]
+	ldp	d8,d9,[PTRN(sp),#(2*PTR_WIDTH)]
+	ldr	PTR(29),[PTRN(sp)],#(2*PTR_WIDTH+64)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret			// bx lr
 
@@ -668,6 +743,8 @@ my ($t0,$t1,$t2,$t3)=map("x$_",(14..17));
 my ($acc0,$acc1,$acc2,$acc3,$acc4,$acc5,$acc6,$acc7)=map("x$_",(19..26));
 my ($cnt,$carry,$topmost)=("x27","x28","x30");
 my ($tp,$ap_end,$na0)=($bp,$np,$carry);
+my ($t0p,$t1p,$t2p)=map("PTR($_)",(14..16));
+my ($tpx,$ap_endx)=($bpx,$npx);
 
 $code.=<<___;
 .type	__bn_sqr8x_mont,%function
@@ -678,24 +755,29 @@ __bn_sqr8x_mont:
 .Lsqr8x_mont:
 	// Not adding AARCH64_SIGN_LINK_REGISTER here because __bn_sqr8x_mont is jumped to
 	// only from bn_mul_mont which has already signed the return address.
-	stp	x29,x30,[sp,#-128]!
-	add	x29,sp,#0
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	stp	x23,x24,[sp,#48]
-	stp	x25,x26,[sp,#64]
-	stp	x27,x28,[sp,#80]
-	stp	$rp,$np,[sp,#96]	// offload rp and np
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(16*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
+	stp	PTR(25),PTR(26),[PTRN(sp),#(8*PTR_WIDTH)]
+	stp	PTR(27),PTR(28),[PTRN(sp),#(10*PTR_WIDTH)]
+	stp	$rp,$np,[PTRN(sp),#(12*PTR_WIDTH)]	// offload rp and np
 
 	ldp	$a0,$a1,[$ap,#8*0]
 	ldp	$a2,$a3,[$ap,#8*2]
 	ldp	$a4,$a5,[$ap,#8*4]
 	ldp	$a6,$a7,[$ap,#8*6]
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	$t0,$num
+	add	$tp,csp,$t0,lsl#4
+#else
 	sub	$tp,sp,$num,lsl#4
+#endif
 	lsl	$num,$num,#3
-	ldr	$n0,[$n0]		// *n0
-	mov	sp,$tp			// alloca
+	ldr	$n0,[$n0p]		// *n0
+	mov	PTRN(sp),$tp		// alloca
 	sub	$cnt,$num,#8*8
 	b	.Lsqr8x_zero_start
 
@@ -723,8 +805,8 @@ __bn_sqr8x_mont:
 	mov	$acc5,xzr
 	mov	$acc6,xzr
 	mov	$acc7,xzr
-	mov	$tp,sp
-	str	$n0,[x29,#112]		// offload n0
+	mov	$tp,PTRN(sp)
+	str	$n0,[PTR(29),#(14*PTR_WIDTH)]	// offload n0
 
 	// Multiply everything but a[i]*a[i]
 .align	4
@@ -882,11 +964,16 @@ __bn_sqr8x_mont:
 	 umulh	$t3,$a7,$a6		// hi(a[7]*a[6])
 	adc	$acc5,xzr,xzr		// t[13]
 	adds	$acc4,$acc4,$t0
-	sub	$cnt,$ap_end,$ap	// done yet?
+	sub	$cnt,$ap_endx,$apx	// done yet?
 	adc	$acc5,$acc5,$t1
 
 	adds	$acc5,$acc5,$t2
-	sub	$t0,$ap_end,$num	// rewinded ap
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	$t0,$num
+	add	$t0p,$ap_end,$t0	// rewinded ap
+#else
+	sub	$t0p,$ap_end,$num	// rewinded ap
+#endif
 	adc	$acc6,xzr,xzr		// t[14]
 	add	$acc6,$acc6,$t3
 
@@ -1008,31 +1095,36 @@ __bn_sqr8x_mont:
 	ldp	$a0,$a1,[$rp,#8*0]
 	add	$ap,$rp,#8*8
 	ldp	$a2,$a3,[$rp,#8*2]
-	sub	$t0,$ap_end,$ap		// is it last iteration?
+	sub	$t0,$ap_endx,$apx	// is it last iteration?
 	ldp	$a4,$a5,[$rp,#8*4]
-	sub	$t1,$tp,$t0
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	$t0,$t0
+	add	$t1p,$tp,$t0
+#else
+	sub	$t1p,$tp,$t0
+#endif
 	ldp	$a6,$a7,[$rp,#8*6]
 	cbz	$t0,.Lsqr8x_outer_loop
 
 	stp	$acc0,$acc1,[$tp,#8*0]
-	ldp	$acc0,$acc1,[$t1,#8*0]
+	ldp	$acc0,$acc1,[$t1p,#8*0]
 	stp	$acc2,$acc3,[$tp,#8*2]
-	ldp	$acc2,$acc3,[$t1,#8*2]
+	ldp	$acc2,$acc3,[$t1p,#8*2]
 	stp	$acc4,$acc5,[$tp,#8*4]
-	ldp	$acc4,$acc5,[$t1,#8*4]
+	ldp	$acc4,$acc5,[$t1p,#8*4]
 	stp	$acc6,$acc7,[$tp,#8*6]
-	mov	$tp,$t1
-	ldp	$acc6,$acc7,[$t1,#8*6]
+	mov	$tp,$t1p
+	ldp	$acc6,$acc7,[$t1p,#8*6]
 	b	.Lsqr8x_outer_loop
 
 .align	4
 .Lsqr8x_outer_break:
 	// Now multiply above result by 2 and add a[n-1]*a[n-1]|...|a[0]*a[0]
-	ldp	$a1,$a3,[$t0,#8*0]	// recall that $t0 is &a[0]
-	ldp	$t1,$t2,[sp,#8*1]
-	ldp	$a5,$a7,[$t0,#8*2]
-	add	$ap,$t0,#8*4
-	ldp	$t3,$t0,[sp,#8*3]
+	ldp	$a1,$a3,[$t0p,#8*0]	// recall that $t0 is &a[0]
+	ldp	$t1,$t2,[PTRN(sp),#8*1]
+	ldp	$a5,$a7,[$t0p,#8*2]
+	add	$ap,$t0p,#8*4
+	ldp	$t3,$t0,[PTRN(sp),#8*3]
 
 	stp	$acc0,$acc1,[$tp,#8*0]
 	mul	$acc0,$a1,$a1
@@ -1041,7 +1133,7 @@ __bn_sqr8x_mont:
 	stp	$acc4,$acc5,[$tp,#8*4]
 	mul	$a2,$a3,$a3
 	stp	$acc6,$acc7,[$tp,#8*6]
-	mov	$tp,sp
+	mov	$tp,PTRN(sp)
 	umulh	$a3,$a3,$a3
 	adds	$acc1,$a1,$t1,lsl#1
 	extr	$t1,$t2,$t1,#63
@@ -1087,8 +1179,14 @@ __bn_sqr8x_mont:
 	cbnz	$cnt,.Lsqr4x_shift_n_add
 ___
 my ($np,$np_end)=($ap,$ap_end);
+my ($npx,$np_endx)=($apx,$ap_endx);
 $code.=<<___;
-	 ldp	$np,$n0,[x29,#104]	// pull np and n0
+#ifdef __CHERI_PURE_CAPABILITY__
+	 ldr	$np,[PTR(29),#(13*PTR_WIDTH)]		// pull np
+	 ldr	$n0,[PTR(29),#(14*PTR_WIDTH)]		// pull n0
+#else
+	 ldp	$np,$n0,[PTR(29),#(13*PTR_WIDTH)]	// pull np and n0
+#endif
 
 	adcs	$acc2,$a2,$t1
 	extr	$t2,$t3,$t2,#63
@@ -1103,7 +1201,7 @@ $code.=<<___;
 	extr	$t3,$t0,$t3,#63
 	adcs	$acc4,$a4,$t3
 	extr	$t0,$t1,$t0,#63
-	 ldp	$acc0,$acc1,[sp,#8*0]
+	 ldp	$acc0,$acc1,[PTRN(sp),#8*0]
 	adcs	$acc5,$a5,$t0
 	extr	$t1,$t2,$t1,#63
 	 ldp	$a0,$a1,[$np,#8*0]
@@ -1117,14 +1215,14 @@ $code.=<<___;
 	mul	$na0,$n0,$acc0		// t[0]*n0
 	ldp	$a6,$a7,[$np,#8*6]
 	add	$np_end,$np,$num
-	ldp	$acc2,$acc3,[sp,#8*2]
+	ldp	$acc2,$acc3,[PTRN(sp),#8*2]
 	stp	$acc4,$acc5,[$tp,#8*4]
-	ldp	$acc4,$acc5,[sp,#8*4]
+	ldp	$acc4,$acc5,[PTRN(sp),#8*4]
 	stp	$acc6,$acc7,[$tp,#8*6]
-	ldp	$acc6,$acc7,[sp,#8*6]
+	ldp	$acc6,$acc7,[PTRN(sp),#8*6]
 	add	$np,$np,#8*8
 	mov	$topmost,xzr		// initial top-most carry
-	mov	$tp,sp
+	mov	$tp,PTRN(sp)
 	mov	$cnt,#8
 
 .Lsqr8x_reduction:
@@ -1170,7 +1268,7 @@ $code.=<<___;
 	ldp	$t0,$t1,[$tp,#8*0]
 	ldp	$t2,$t3,[$tp,#8*2]
 	mov	$rp,$tp
-	sub	$cnt,$np_end,$np	// done yet?
+	sub	$cnt,$np_endx,$npx	// done yet?
 	adds	$acc0,$acc0,$t0
 	adcs	$acc1,$acc1,$t1
 	ldp	$t0,$t1,[$tp,#8*4]
@@ -1235,8 +1333,13 @@ $code.=<<___;
 					// note that carry flag is guaranteed
 					// to be zero at this point
 	ldp	$a0,$a1,[$tp,#8*0]
-	sub	$cnt,$np_end,$np	// done yet?
-	sub	$t2,$np_end,$num	// rewinded np
+	sub	$cnt,$np_endx,$npx	// done yet?
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	$t2,$num
+	add	$t2p,$np_end,$t2	// rewinded np
+#else
+	sub	$t2p,$np_end,$num	// rewinded np
+#endif
 	ldp	$a2,$a3,[$tp,#8*2]
 	ldp	$a4,$a5,[$tp,#8*4]
 	ldp	$a6,$a7,[$tp,#8*6]
@@ -1262,24 +1365,24 @@ $code.=<<___;
 
 .align	4
 .Lsqr8x_tail_break:
-	ldr	$n0,[x29,#112]		// pull n0
-	add	$cnt,$tp,#8*8		// end of current t[num] window
+	ldr	$n0,[PTR(29),#(14*PTR_WIDTH)]	// pull n0
+	add	$cnt,$tpx,#8*8		// end of current t[num] window
 
 	subs	xzr,$topmost,#1		// "move" top-most carry to carry bit
 	adcs	$t0,$acc0,$a0
 	adcs	$t1,$acc1,$a1
 	ldp	$acc0,$acc1,[$rp,#8*0]
 	adcs	$acc2,$acc2,$a2
-	ldp	$a0,$a1,[$t2,#8*0]	// recall that $t2 is &n[0]
+	ldp	$a0,$a1,[$t2p,#8*0]	// recall that $t2 is &n[0]
 	adcs	$acc3,$acc3,$a3
-	ldp	$a2,$a3,[$t2,#8*2]
+	ldp	$a2,$a3,[$t2p,#8*2]
 	adcs	$acc4,$acc4,$a4
 	adcs	$acc5,$acc5,$a5
-	ldp	$a4,$a5,[$t2,#8*4]
+	ldp	$a4,$a5,[$t2p,#8*4]
 	adcs	$acc6,$acc6,$a6
 	adcs	$acc7,$acc7,$a7
-	ldp	$a6,$a7,[$t2,#8*6]
-	add	$np,$t2,#8*8
+	ldp	$a6,$a7,[$t2p,#8*6]
+	add	$np,$t2p,#8*8
 	adc	$topmost,xzr,xzr	// top-most carry
 	mul	$na0,$n0,$acc0
 	stp	$t0,$t1,[$tp,#8*0]
@@ -1298,7 +1401,7 @@ $code.=<<___;
 	// if it is, subtract the modulus. But comparison implies
 	// subtraction. So we subtract modulus, see if it borrowed,
 	// and conditionally copy original value.
-	ldr	$rp,[x29,#96]		// pull rp
+	ldr	$rp,[PTR(29),#(12*PTR_WIDTH)]	// pull rp
 	add	$tp,$tp,#8*8
 	subs	$t0,$acc0,$a0
 	sbcs	$t1,$acc1,$a1
@@ -1333,8 +1436,8 @@ $code.=<<___;
 	cbnz	$cnt,.Lsqr8x_sub
 
 	sbcs	$t2,$acc2,$a2
-	 mov	$tp,sp
-	 add	$ap,sp,$num
+	 mov	$tp,PTRN(sp)
+	 add	$ap,PTRN(sp),$num
 	 ldp	$a0,$a1,[$ap_end,#8*0]
 	sbcs	$t3,$acc3,$a3
 	stp	$t0,$t1,[$rp,#8*0]
@@ -1347,7 +1450,7 @@ $code.=<<___;
 	sbcs	$t3,$acc7,$a7
 	 ldp	$acc2,$acc3,[$ap,#8*2]
 	sbcs	xzr,$topmost,xzr	// did it borrow?
-	ldr	x30,[x29,#8]		// pull return address
+	ldr	PTR(30),[PTR(29),#PTR_WIDTH]	// pull return address
 	stp	$t0,$t1,[$rp,#8*4]
 	stp	$t2,$t3,[$rp,#8*6]
 
@@ -1387,26 +1490,26 @@ $code.=<<___;
 .align	4
 .Lsqr8x8_post_condition:
 	adc	$carry,xzr,xzr
-	ldr	x30,[x29,#8]		// pull return address
+	ldr	PTR(30),[PTR(29),#PTR_WIDTH]	// pull return address
 	// $acc0-7,$carry hold result, $a0-7 hold modulus
 	subs	$a0,$acc0,$a0
-	ldr	$ap,[x29,#96]		// pull rp
+	ldr	$ap,[PTR(29),#(12*PTR_WIDTH)]	// pull rp
 	sbcs	$a1,$acc1,$a1
-	 stp	xzr,xzr,[sp,#8*0]
+	 stp	xzr,xzr,[PTRN(sp),#8*0]
 	sbcs	$a2,$acc2,$a2
-	 stp	xzr,xzr,[sp,#8*2]
+	 stp	xzr,xzr,[PTRN(sp),#8*2]
 	sbcs	$a3,$acc3,$a3
-	 stp	xzr,xzr,[sp,#8*4]
+	 stp	xzr,xzr,[PTRN(sp),#8*4]
 	sbcs	$a4,$acc4,$a4
-	 stp	xzr,xzr,[sp,#8*6]
+	 stp	xzr,xzr,[PTRN(sp),#8*6]
 	sbcs	$a5,$acc5,$a5
-	 stp	xzr,xzr,[sp,#8*8]
+	 stp	xzr,xzr,[PTRN(sp),#8*8]
 	sbcs	$a6,$acc6,$a6
-	 stp	xzr,xzr,[sp,#8*10]
+	 stp	xzr,xzr,[PTRN(sp),#8*10]
 	sbcs	$a7,$acc7,$a7
-	 stp	xzr,xzr,[sp,#8*12]
+	 stp	xzr,xzr,[PTRN(sp),#8*12]
 	sbcs	$carry,$carry,xzr	// did it borrow?
-	 stp	xzr,xzr,[sp,#8*14]
+	 stp	xzr,xzr,[PTRN(sp),#8*14]
 
 	// $a0-7 hold result-modulus
 	csel	$a0,$acc0,$a0,lo
@@ -1423,14 +1526,14 @@ $code.=<<___;
 	stp	$a6,$a7,[$ap,#8*6]
 
 .Lsqr8x_done:
-	ldp	x19,x20,[x29,#16]
-	mov	sp,x29
-	ldp	x21,x22,[x29,#32]
+	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
+	mov	PTRN(sp),PTR(29)
+	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
 	mov	x0,#1
-	ldp	x23,x24,[x29,#48]
-	ldp	x25,x26,[x29,#64]
-	ldp	x27,x28,[x29,#80]
-	ldr	x29,[sp],#128
+	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
+	ldp	PTR(25),PTR(26),[PTR(29),#(8*PTR_WIDTH)]
+	ldp	PTR(27),PTR(28),[PTR(29),#(10*PTR_WIDTH)]
+	ldr	PTR(29),[PTRN(sp)],#(16*PTR_WIDTH)
 	// x30 is loaded earlier
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
@@ -1448,9 +1551,11 @@ my ($a0,$a1,$a2,$a3,
     $t0,$t1,$t2,$t3,
     $m0,$m1,$m2,$m3,
     $acc0,$acc1,$acc2,$acc3,$acc4,
-    $bi,$mi,$tp,$ap_end,$cnt) = map("x$_",(6..17,19..28));
+    $bi,$mi,$cnt) = map("x$_",(6..17,19..25,28));
+my ($tp,$ap_end,$ap_endx) = ("PTR(26)", "PTR(27)","x27");
+my ($t0p,$t1p,$t2p,$t3p) = map("PTR($_)",(10..13));
 my  $bp_end=$rp;
-my  ($carry,$topmost) = ($rp,"x30");
+my  ($carry,$topmost) = ($rpx,"x30");
 
 $code.=<<___;
 .type	__bn_mul4x_mont,%function
@@ -1458,22 +1563,27 @@ $code.=<<___;
 __bn_mul4x_mont:
 	// Not adding AARCH64_SIGN_LINK_REGISTER here because __bn_mul4x_mont is jumped to
 	// only from bn_mul_mont (or __bn_sqr8x_mont from bn_mul_mont) which has already signed the return address.
-	stp	x29,x30,[sp,#-128]!
-	add	x29,sp,#0
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	stp	x23,x24,[sp,#48]
-	stp	x25,x26,[sp,#64]
-	stp	x27,x28,[sp,#80]
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(16*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
+	stp	PTR(25),PTR(26),[PTRN(sp),#(8*PTR_WIDTH)]
+	stp	PTR(27),PTR(28),[PTRN(sp),#(10*PTR_WIDTH)]
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	$t0,$num
+	add	$tp,csp,$t0,lsl#3
+#else
 	sub	$tp,sp,$num,lsl#3
+#endif
 	lsl	$num,$num,#3
-	ldr	$n0,[$n0]		// *n0
-	sub	sp,$tp,#8*4		// alloca
+	ldr	$n0,[$n0p]		// *n0
+	sub	PTRN(sp),$tp,#8*4	// alloca
 
-	add	$t0,$bp,$num
+	add	$t0p,$bp,$num
 	add	$ap_end,$ap,$num
-	stp	$rp,$t0,[x29,#96]	// offload rp and &b[num]
+	stp	$rp,$t0p,[PTR(29),#(12*PTR_WIDTH)]	// offload rp and &b[num]
 
 	ldr	$bi,[$bp,#8*0]		// b[0]
 	ldp	$a0,$a1,[$ap,#8*0]	// a[0..3]
@@ -1485,10 +1595,15 @@ __bn_mul4x_mont:
 	mov	$acc3,xzr
 	ldp	$m0,$m1,[$np,#8*0]	// n[0..3]
 	ldp	$m2,$m3,[$np,#8*2]
+#ifdef __CHERI_PURE_CAPABILITY__
+	add	$np,$np,#8*4
+	cmn	x0,xzr			// clear carry bit
+#else
 	adds	$np,$np,#8*4		// clear carry bit
+#endif
 	mov	$carry,xzr
 	mov	$cnt,#0
-	mov	$tp,sp
+	mov	$tp,PTRN(sp)
 
 .Loop_mul4x_1st_reduction:
 	mul	$t0,$a0,$bi		// lo(a[0..3]*b[0])
@@ -1530,7 +1645,7 @@ __bn_mul4x_mont:
 	adcs	$acc3,$acc4,$carry
 	adc	$carry,xzr,xzr
 	adds	$acc0,$acc0,$t0
-	sub	$t0,$ap_end,$ap
+	sub	$t0,$ap_endx,$apx
 	adcs	$acc1,$acc1,$t1
 	adcs	$acc2,$acc2,$t2
 	adcs	$acc3,$acc3,$t3
@@ -1542,7 +1657,7 @@ __bn_mul4x_mont:
 	ldp	$a0,$a1,[$ap,#8*0]	// a[4..7]
 	ldp	$a2,$a3,[$ap,#8*2]
 	add	$ap,$ap,#8*4
-	ldr	$mi,[sp]		// a[0]*n0
+	ldr	$mi,[PTRN(sp)]		// a[0]*n0
 	ldp	$m0,$m1,[$np,#8*0]	// n[4..7]
 	ldp	$m2,$m3,[$np,#8*2]
 	add	$np,$np,#8*4
@@ -1583,17 +1698,22 @@ __bn_mul4x_mont:
 	adcs	$acc4,$acc4,$carry
 	umulh	$t3,$m3,$mi
 	adc	$carry,xzr,xzr
-	ldr	$mi,[sp,$cnt]		// next t[0]*n0
+	ldr	$mi,[PTRN(sp),$cnt]	// next t[0]*n0
 	str	$acc0,[$tp],#8		// result!!!
 	adds	$acc0,$acc1,$t0
-	sub	$t0,$ap_end,$ap		// done yet?
+	sub	$t0,$ap_endx,$apx	// done yet?
 	adcs	$acc1,$acc2,$t1
 	adcs	$acc2,$acc3,$t2
 	adcs	$acc3,$acc4,$t3
 	//adc	$carry,$carry,xzr
 	cbnz	$cnt,.Loop_mul4x_1st_tail
 
-	sub	$t1,$ap_end,$num	// rewinded $ap
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	$t1,$num
+	add	$t1p,$ap_end,$t1	// rewinded $ap
+#else
+	sub	$t1p,$ap_end,$num	// rewinded $ap
+#endif
 	cbz	$t0,.Lmul4x_proceed
 
 	ldp	$a0,$a1,[$ap,#8*0]
@@ -1608,20 +1728,30 @@ __bn_mul4x_mont:
 .Lmul4x_proceed:
 	ldr	$bi,[$bp,#8*4]!		// *++b
 	adc	$topmost,$carry,xzr
-	ldp	$a0,$a1,[$t1,#8*0]	// a[0..3]
+	ldp	$a0,$a1,[$t1p,#8*0]	// a[0..3]
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	$t0,$num
+	add	$np,$np,$t0		// rewind np
+#else
 	sub	$np,$np,$num		// rewind np
-	ldp	$a2,$a3,[$t1,#8*2]
-	add	$ap,$t1,#8*4
+#endif
+	ldp	$a2,$a3,[$t1p,#8*2]
+	add	$ap,$t1p,#8*4
 
 	stp	$acc0,$acc1,[$tp,#8*0]	// result!!!
-	ldp	$acc0,$acc1,[sp,#8*4]	// t[0..3]
+	ldp	$acc0,$acc1,[PTRN(sp),#8*4]	// t[0..3]
 	stp	$acc2,$acc3,[$tp,#8*2]	// result!!!
-	ldp	$acc2,$acc3,[sp,#8*6]
+	ldp	$acc2,$acc3,[PTRN(sp),#8*6]
 
 	ldp	$m0,$m1,[$np,#8*0]	// n[0..3]
-	mov	$tp,sp
+	mov	$tp,PTRN(sp)
 	ldp	$m2,$m3,[$np,#8*2]
+#ifdef __CHERI_PURE_CAPABILITY__
+	add	$np,$np,#8*4
+	cmn	x0,xzr			// clear carry bit
+#else
 	adds	$np,$np,#8*4		// clear carry bit
+#endif
 	mov	$carry,xzr
 
 .align	4
@@ -1683,7 +1813,7 @@ __bn_mul4x_mont:
 	adcs	$acc3,$acc3,$t3
 	//adc	$carry,$carry,xzr
 
-	ldr	$mi,[sp]		// t[0]*n0
+	ldr	$mi,[PTRN(sp)]		// t[0]*n0
 	ldp	$m0,$m1,[$np,#8*0]	// n[4..7]
 	ldp	$m2,$m3,[$np,#8*2]
 	add	$np,$np,#8*4
@@ -1724,18 +1854,23 @@ __bn_mul4x_mont:
 	adcs	$acc3,$acc3,$t3
 	umulh	$t3,$m3,$mi
 	adcs	$acc4,$acc4,$carry
-	ldr	$mi,[sp,$cnt]		// next a[0]*n0
+	ldr	$mi,[PTRN(sp),$cnt]	// next a[0]*n0
 	adc	$carry,xzr,xzr
 	str	$acc0,[$tp],#8		// result!!!
 	adds	$acc0,$acc1,$t0
-	sub	$t0,$ap_end,$ap		// done yet?
+	sub	$t0,$ap_endx,$apx	// done yet?
 	adcs	$acc1,$acc2,$t1
 	adcs	$acc2,$acc3,$t2
 	adcs	$acc3,$acc4,$t3
 	//adc	$carry,$carry,xzr
 	cbnz	$cnt,.Loop_mul4x_tail
 
-	sub	$t1,$np,$num		// rewinded np?
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	$t1,$num
+	add	$t1p,$np,$t1		// rewinded np?
+#else
+	sub	$t1p,$np,$num		// rewinded np?
+#endif
 	adc	$carry,$carry,xzr
 	cbz	$t0,.Loop_mul4x_break
 
@@ -1756,30 +1891,40 @@ __bn_mul4x_mont:
 
 .align	4
 .Loop_mul4x_break:
-	ldp	$t2,$t3,[x29,#96]	// pull rp and &b[num]
+	ldp	$t2p,$t3p,[PTR(29),#(12*PTR_WIDTH)]	// pull rp and &b[num]
 	adds	$acc0,$acc0,$topmost
 	add	$bp,$bp,#8*4		// bp++
 	adcs	$acc1,$acc1,xzr
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	$t0,$num
+	add	$ap,$ap,$t0		// rewind ap
+#else
 	sub	$ap,$ap,$num		// rewind ap
+#endif
 	adcs	$acc2,$acc2,xzr
 	stp	$acc0,$acc1,[$tp,#8*0]	// result!!!
 	adcs	$acc3,$acc3,xzr
-	ldp	$acc0,$acc1,[sp,#8*4]	// t[0..3]
+	ldp	$acc0,$acc1,[PTRN(sp),#8*4]	// t[0..3]
 	adc	$topmost,$carry,xzr
 	stp	$acc2,$acc3,[$tp,#8*2]	// result!!!
-	cmp	$bp,$t3			// done yet?
-	ldp	$acc2,$acc3,[sp,#8*6]
-	ldp	$m0,$m1,[$t1,#8*0]	// n[0..3]
-	ldp	$m2,$m3,[$t1,#8*2]
-	add	$np,$t1,#8*4
+	cmp	$bp,$t3p		// done yet?
+	ldp	$acc2,$acc3,[PTRN(sp),#8*6]
+	ldp	$m0,$m1,[$t1p,#8*0]	// n[0..3]
+	ldp	$m2,$m3,[$t1p,#8*2]
+	add	$np,$t1p,#8*4
 	b.eq	.Lmul4x_post
 
 	ldr	$bi,[$bp]
 	ldp	$a0,$a1,[$ap,#8*0]	// a[0..3]
 	ldp	$a2,$a3,[$ap,#8*2]
+#ifdef __CHERI_PURE_CAPABILITY__
+	add	$ap,$ap,#8*4
+	cmn	x0,xzr			// clear carry bit
+#else
 	adds	$ap,$ap,#8*4		// clear carry bit
+#endif
 	mov	$carry,xzr
-	mov	$tp,sp
+	mov	$tp,PTRN(sp)
 	b	.Loop_mul4x_reduction
 
 .align	4
@@ -1788,10 +1933,10 @@ __bn_mul4x_mont:
 	// if it is, subtract the modulus. But comparison implies
 	// subtraction. So we subtract modulus, see if it borrowed,
 	// and conditionally copy original value.
-	mov	$rp,$t2
-	mov	$ap_end,$t2		// $rp copy
+	mov	$rp,$t2p
+	mov	$ap_end,$t2p		// $rp copy
 	subs	$t0,$acc0,$m0
-	add	$tp,sp,#8*8
+	add	$tp,PTRN(sp),#8*8
 	sbcs	$t1,$acc1,$m1
 	sub	$cnt,$num,#8*4
 
@@ -1813,8 +1958,8 @@ __bn_mul4x_mont:
 	cbnz	$cnt,.Lmul4x_sub
 
 	sbcs	$t2,$acc2,$m2
-	 mov	$tp,sp
-	 add	$ap,sp,#8*4
+	 mov	$tp,PTRN(sp)
+	 add	$ap,PTRN(sp),#8*4
 	 ldp	$a0,$a1,[$ap_end,#8*0]
 	sbcs	$t3,$acc3,$m3
 	stp	$t0,$t1,[$rp,#8*0]
@@ -1823,7 +1968,7 @@ __bn_mul4x_mont:
 	 ldp	$acc0,$acc1,[$ap,#8*0]
 	 ldp	$acc2,$acc3,[$ap,#8*2]
 	sbcs	xzr,$topmost,xzr	// did it borrow?
-	ldr	x30,[x29,#8]		// pull return address
+	ldr	PTR(30),[PTR(29),#PTR_WIDTH]	// pull return address
 
 	sub	$cnt,$num,#8*4
 .Lmul4x_cond_copy:
@@ -1861,18 +2006,18 @@ __bn_mul4x_mont:
 .align	4
 .Lmul4x4_post_condition:
 	adc	$carry,$carry,xzr
-	ldr	$ap,[x29,#96]		// pull rp
+	ldr	$ap,[PTR(29),#(12*PTR_WIDTH)]	// pull rp
 	// $acc0-3,$carry hold result, $m0-7 hold modulus
 	subs	$a0,$acc0,$m0
-	ldr	x30,[x29,#8]		// pull return address
+	ldr	PTR(30),[PTR(29),#PTR_WIDTH]	// pull return address
 	sbcs	$a1,$acc1,$m1
-	 stp	xzr,xzr,[sp,#8*0]
+	 stp	xzr,xzr,[PTRN(sp),#8*0]
 	sbcs	$a2,$acc2,$m2
-	 stp	xzr,xzr,[sp,#8*2]
+	 stp	xzr,xzr,[PTRN(sp),#8*2]
 	sbcs	$a3,$acc3,$m3
-	 stp	xzr,xzr,[sp,#8*4]
+	 stp	xzr,xzr,[PTRN(sp),#8*4]
 	sbcs	xzr,$carry,xzr		// did it borrow?
-	 stp	xzr,xzr,[sp,#8*6]
+	 stp	xzr,xzr,[PTRN(sp),#8*6]
 
 	// $a0-3 hold result-modulus
 	csel	$a0,$acc0,$a0,lo
@@ -1883,14 +2028,14 @@ __bn_mul4x_mont:
 	stp	$a2,$a3,[$ap,#8*2]
 
 .Lmul4x_done:
-	ldp	x19,x20,[x29,#16]
-	mov	sp,x29
-	ldp	x21,x22,[x29,#32]
+	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
+	mov	PTRN(sp),PTR(29)
+	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
 	mov	x0,#1
-	ldp	x23,x24,[x29,#48]
-	ldp	x25,x26,[x29,#64]
-	ldp	x27,x28,[x29,#80]
-	ldr	x29,[sp],#128
+	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
+	ldp	PTR(25),PTR(26),[PTR(29),#(8*PTR_WIDTH)]
+	ldp	PTR(27),PTR(28),[PTR(29),#(10*PTR_WIDTH)]
+	ldr	PTR(29),[PTRN(sp)],#(16*PTR_WIDTH)
 	// x30 loaded earlier
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret

@@ -94,7 +94,8 @@ if ($output =~ /512/) {
 
 $func="sha${BITS}_block_data_order";
 
-($ctx,$inp,$num,$Ktbl)=map("x$_",(0..2,30));
+($ctx,$inp,$num,$Ktbl)=map("PTR($_)",(0..2,30));
+($inpx,$numx)=map("x$_",(1..2));
 
 @X=map("$reg_t$_",(3..15,0..2));
 @V=($A,$B,$C,$D,$E,$F,$G,$H)=map("$reg_t$_",(20..27));
@@ -118,13 +119,13 @@ $code.=<<___	if ($i==13);
 	ldp	@X[14],@X[15],[$inp]
 ___
 $code.=<<___	if ($i>=14);
-	ldr	@X[($i-11)&15],[sp,#`$SZ*(($i-11)%4)`]
+	ldr	@X[($i-11)&15],[PTRN(sp),#`$SZ*(($i-11)%4)`]
 ___
 $code.=<<___	if ($i>0 && $i<16);
 	add	$a,$a,$t1			// h+=Sigma0(a)
 ___
 $code.=<<___	if ($i>=11);
-	str	@X[($i-8)&15],[sp,#`$SZ*(($i-8)%4)`]
+	str	@X[($i-8)&15],[PTRN(sp),#`$SZ*(($i-8)%4)`]
 ___
 # While ARMv8 specifies merged rotate-n-logical operation such as
 # 'eor x,y,z,ror#n', it was found to negatively affect performance
@@ -204,8 +205,8 @@ $code.=<<___;
 $func:
 	AARCH64_VALID_CALL_TARGET
 #ifndef	__KERNEL__
-	adrp	x16,OPENSSL_armcap_P
-	ldr	w16,[x16,#:lo12:OPENSSL_armcap_P]
+	adrp	PTR(16),OPENSSL_armcap_P
+	ldr	w16,[PTR(16),#:lo12:OPENSSL_armcap_P]
 ___
 $code.=<<___	if ($SZ==4);
 	tst	w16,#ARMV8_SHA256
@@ -220,29 +221,34 @@ ___
 $code.=<<___;
 #endif
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-128]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(16*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	stp	x23,x24,[sp,#48]
-	stp	x25,x26,[sp,#64]
-	stp	x27,x28,[sp,#80]
-	sub	sp,sp,#4*$SZ
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
+	stp	PTR(25),PTR(26),[PTRN(sp),#(8*PTR_WIDTH)]
+	stp	PTR(27),PTR(28),[PTRN(sp),#(10*PTR_WIDTH)]
+	sub	PTRN(sp),PTRN(sp),#4*$SZ
 
 	ldp	$A,$B,[$ctx]				// load context
 	ldp	$C,$D,[$ctx,#2*$SZ]
 	ldp	$E,$F,[$ctx,#4*$SZ]
+#ifdef __CHERI_PURE_CAPABILITY__
+	lsl	x17,$numx,#`log(16*$SZ)/log(2)`
+	add	$num,$inp,x17				// end of input
+#else
 	add	$num,$inp,$num,lsl#`log(16*$SZ)/log(2)`	// end of input
+#endif
 	ldp	$G,$H,[$ctx,#6*$SZ]
 	adr	$Ktbl,.LK$BITS
-	stp	$ctx,$num,[x29,#96]
+	stp	$ctx,$num,[PTR(29),#(12*PTR_WIDTH)]
 
 .Loop:
 	ldp	@X[0],@X[1],[$inp],#2*$SZ
 	ldr	$t2,[$Ktbl],#$SZ			// *K++
 	eor	$t3,$B,$C				// magic seed
-	str	$inp,[x29,#112]
+	str	$inp,[PTR(29),#(14*PTR_WIDTH)]
 ___
 for ($i=0;$i<16;$i++)	{ &BODY_00_xx($i,@V); unshift(@V,pop(@V)); }
 $code.=".Loop_16_xx:\n";
@@ -250,8 +256,8 @@ for (;$i<32;$i++)	{ &BODY_00_xx($i,@V); unshift(@V,pop(@V)); }
 $code.=<<___;
 	cbnz	$t2,.Loop_16_xx
 
-	ldp	$ctx,$num,[x29,#96]
-	ldr	$inp,[x29,#112]
+	ldp	$ctx,$num,[PTR(29),#(12*PTR_WIDTH)]
+	ldr	$inp,[PTR(29),#(14*PTR_WIDTH)]
 	sub	$Ktbl,$Ktbl,#`$SZ*($rounds+1)`		// rewind
 
 	ldp	@X[0],@X[1],[$ctx]
@@ -269,18 +275,18 @@ $code.=<<___;
 	stp	$C,$D,[$ctx,#2*$SZ]
 	add	$G,$G,@X[6]
 	add	$H,$H,@X[7]
-	cmp	$inp,$num
+	cmp	$inpx,$numx
 	stp	$E,$F,[$ctx,#4*$SZ]
 	stp	$G,$H,[$ctx,#6*$SZ]
 	b.ne	.Loop
 
-	ldp	x19,x20,[x29,#16]
-	add	sp,sp,#4*$SZ
-	ldp	x21,x22,[x29,#32]
-	ldp	x23,x24,[x29,#48]
-	ldp	x25,x26,[x29,#64]
-	ldp	x27,x28,[x29,#80]
-	ldp	x29,x30,[sp],#128
+	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
+	add	PTRN(sp),PTRN(sp),#4*$SZ
+	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
+	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
+	ldp	PTR(25),PTR(26),[PTR(29),#(8*PTR_WIDTH)]
+	ldp	PTR(27),PTR(28),[PTR(29),#(10*PTR_WIDTH)]
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(16*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	$func,.-$func
@@ -358,7 +364,7 @@ $code.=<<___;
 ___
 
 if ($SZ==4) {
-my $Ktbl="x3";
+my $Ktbl="PTR(3)";
 
 my ($ABCD,$EFGH,$abcd)=map("v$_.16b",(0..2));
 my @MSG=map("v$_.16b",(4..7));
@@ -372,15 +378,15 @@ $code.=<<___;
 sha256_block_armv8:
 .Lv8_entry:
 	// Armv8.3-A PAuth: even though x30 is pushed to stack it is not popped later.
-	stp		x29,x30,[sp,#-16]!
-	add		x29,sp,#0
+	stp		PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	add		PTR(29),PTRN(sp),#0
 
 	ld1.32		{$ABCD,$EFGH},[$ctx]
 	adr		$Ktbl,.LK256
 
 .Loop_hw:
 	ld1		{@MSG[0]-@MSG[3]},[$inp],#64
-	sub		$num,$num,#1
+	sub		$numx,$numx,#1
 	ld1.32		{$W0},[$Ktbl],#16
 	rev32		@MSG[0],@MSG[0]
 	rev32		@MSG[1],@MSG[1]
@@ -429,11 +435,11 @@ $code.=<<___;
 	add.i32		$ABCD,$ABCD,$ABCD_SAVE
 	add.i32		$EFGH,$EFGH,$EFGH_SAVE
 
-	cbnz		$num,.Loop_hw
+	cbnz		$numx,.Loop_hw
 
 	st1.32		{$ABCD,$EFGH},[$ctx]
 
-	ldr		x29,[sp],#16
+	ldr		PTR(29),[PTRN(sp)],#(2*PTR_WIDTH)
 	ret
 .size	sha256_block_armv8,.-sha256_block_armv8
 #endif
@@ -448,8 +454,9 @@ if ($SZ==4) {	######################################### NEON stuff #
 
 my @V = ($A,$B,$C,$D,$E,$F,$G,$H) = map("w$_",(3..10));
 my ($t0,$t1,$t2,$t3,$t4) = map("w$_",(11..15));
-my $Ktbl="x16";
-my $Xfer="x17";
+my $Ktbl="PTR(16)";
+my $Xfer="PTR(17)";
+my $temp="x17";
 my @X = map("q$_",(0..3));
 my ($T0,$T1,$T2,$T3,$T4,$T5,$T6,$T7) = map("q$_",(4..7,16..19));
 my $j=0;
@@ -617,7 +624,7 @@ sub body_00_15 () {
 	'&eor	($t2,$a,$b)',			# a^b, b^c in next round
 	'&eor	($t4,$t4,$a,"ror#".($Sigma0[2]-$Sigma0[0]))',	# Sigma0(a)
 	'&add	($h,$h,$t0)',			# h+=Sigma1(e)
-	'&ldr	($t1,sprintf "[sp,#%d]",4*(($j+1)&15))	if (($j&15)!=15);'.
+	'&ldr	($t1,sprintf "[PTRN(sp),#%d]",4*(($j+1)&15))	if (($j&15)!=15);'.
 	'&ldr	($t1,"[$Ktbl]")				if ($j==15);'.
 	'&and	($t3,$t3,$t2)',			# (b^c)&=(a^b)
 	'&ror	($t4,$t4,"#$Sigma0[0]")',
@@ -637,12 +644,17 @@ sha256_block_neon:
 	AARCH64_VALID_CALL_TARGET
 .Lneon_entry:
 	// Armv8.3-A PAuth: even though x30 is pushed to stack it is not popped later
-	stp	x29, x30, [sp, #-16]!
-	mov	x29, sp
-	sub	sp,sp,#16*4
+	stp	PTR(29), PTR(30), [PTRN(sp), #-(2*PTR_WIDTH)]!
+	mov	PTR(29), PTRN(sp)
+	sub	PTRN(sp),PTRN(sp),#16*4
 
 	adr	$Ktbl,.LK256
+#ifdef __CHERI_PURE_CAPABILITY__
+	lsl	$temp,$numx,#6
+	add	$num,$inp,$temp		// len to point at the end of inp
+#else
 	add	$num,$inp,$num,lsl#6	// len to point at the end of inp
+#endif
 
 	ld1.8	{@X[0]},[$inp], #16
 	ld1.8	{@X[1]},[$inp], #16
@@ -656,7 +668,7 @@ sha256_block_neon:
 	rev32	@X[1],@X[1]		// big-endian
 	rev32	@X[2],@X[2]
 	rev32	@X[3],@X[3]
-	mov	$Xfer,sp
+	mov	$Xfer,PTRN(sp)
 	add.32	$T0,$T0,@X[0]
 	add.32	$T1,$T1,@X[1]
 	add.32	$T2,$T2,@X[2]
@@ -669,7 +681,7 @@ sha256_block_neon:
 	ldp	$C,$D,[$ctx,#8]
 	ldp	$E,$F,[$ctx,#16]
 	ldp	$G,$H,[$ctx,#24]
-	ldr	$t1,[sp,#0]
+	ldr	$t1,[PTRN(sp),#0]
 	mov	$t2,wzr
 	eor	$t3,$B,$C
 	mov	$t4,wzr
@@ -684,16 +696,24 @@ ___
 	&Xupdate(\&body_00_15);
 $code.=<<___;
 	cmp	$t1,#0				// check for K256 terminator
-	ldr	$t1,[sp,#0]
+	ldr	$t1,[PTRN(sp),#0]
 	sub	$Xfer,$Xfer,#64
 	bne	.L_00_48
 
 	sub	$Ktbl,$Ktbl,#256		// rewind $Ktbl
-	cmp	$inp,$num
-	mov	$Xfer, #64
-	csel	$Xfer, $Xfer, xzr, eq
-	sub	$inp,$inp,$Xfer			// avoid SEGV
-	mov	$Xfer,sp
+	cmp	$inpx,$numx
+#ifdef __CHERI_PURE_CAPABILITY__
+	mov	$temp, #-64
+#else
+	mov	$temp, #64
+#endif
+	csel	$temp, $temp, xzr, eq
+#ifdef __CHERI_PURE_CAPABILITY__
+	add	$inp,$inp,$temp			// avoid SEGV
+#else
+	sub	$inp,$inp,$temp			// avoid SEGV
+#endif
+	mov	$Xfer,PTRN(sp)
 ___
 	&Xpreload(\&body_00_15);
 	&Xpreload(\&body_00_15);
@@ -712,7 +732,7 @@ $code.=<<___;
 	ldp	$t2,$t3,[$ctx,#24]
 	add	$E,$E,$t0
 	add	$F,$F,$t1
-	 ldr	$t1,[sp,#0]
+	 ldr	$t1,[PTRN(sp),#0]
 	stp	$A,$B,[$ctx,#0]
 	add	$G,$G,$t2
 	 mov	$t2,wzr
@@ -722,18 +742,18 @@ $code.=<<___;
 	 eor	$t3,$B,$C
 	stp	$G,$H,[$ctx,#24]
 	 mov	$t4,wzr
-	 mov	$Xfer,sp
+	 mov	$Xfer,PTRN(sp)
 	b.ne	.L_00_48
 
-	ldr	x29,[x29]
-	add	sp,sp,#16*4+16
+	ldr	PTR(29),[PTR(29)]
+	add	PTRN(sp),PTRN(sp),#16*4+(2*PTR_WIDTH)
 	ret
 .size	sha256_block_neon,.-sha256_block_neon
 ___
 }
 
 if ($SZ==8) {
-my $Ktbl="x3";
+my $Ktbl="PTR(3)";
 
 my @H = map("v$_.16b",(0..4));
 my ($fg,$de,$m9_10)=map("v$_.16b",(5..7));
@@ -748,8 +768,8 @@ $code.=<<___;
 sha512_block_armv8:
 .Lv8_entry:
 	// Armv8.3-A PAuth: even though x30 is pushed to stack it is not popped later
-	stp		x29,x30,[sp,#-16]!
-	add		x29,sp,#0
+	stp		PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	add		PTR(29),PTRN(sp),#0
 
 	ld1		{@MSG[0]-@MSG[3]},[$inp],#64	// load input
 	ld1		{@MSG[4]-@MSG[7]},[$inp],#64
@@ -770,13 +790,13 @@ sha512_block_armv8:
 .align	4
 .Loop_hw:
 	ld1.64		{$W0},[$Ktbl],#16
-	subs		$num,$num,#1
-	sub		x4,$inp,#128
+	subs		$numx,$numx,#1
+	sub		PTR(4),$inp,#128
 	orr		$AB,@H[0],@H[0]			// offload
 	orr		$CD,@H[1],@H[1]
 	orr		$EF,@H[2],@H[2]
 	orr		$GH,@H[3],@H[3]
-	csel		$inp,$inp,x4,ne			// conditional rewind
+	csel		$inp,$inp,PTR(4),ne		// conditional rewind
 ___
 for($i=0;$i<32;$i++) {
 $code.=<<___;
@@ -824,11 +844,11 @@ $code.=<<___;
 	add.i64		@H[2],@H[2],$EF
 	add.i64		@H[3],@H[3],$GH
 
-	cbnz		$num,.Loop_hw
+	cbnz		$numx,.Loop_hw
 
 	st1.64		{@H[0]-@H[3]},[$ctx]		// store context
 
-	ldr		x29,[sp],#16
+	ldr		PTR(29),[PTRN(sp)],#(2*PTR_WIDTH)
 	ret
 .size	sha512_block_armv8,.-sha512_block_armv8
 #endif

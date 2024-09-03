@@ -17,8 +17,8 @@ bn_mul_mont:
 	cmp	x5,#32
 	b.le	.Lscalar_impl
 #ifndef	__KERNEL__
-	adrp	x17,OPENSSL_armv8_rsa_neonized
-	ldr	w17,[x17,#:lo12:OPENSSL_armv8_rsa_neonized]
+	adrp	PTR(17),OPENSSL_armv8_rsa_neonized
+	ldr	w17,[PTR(17),#:lo12:OPENSSL_armv8_rsa_neonized]
 	cbnz	w17, bn_mul8x_mont_neon
 #endif
 
@@ -29,19 +29,28 @@ bn_mul_mont:
 	b.eq	__bn_mul4x_mont
 
 .Lmul_mont:
-	stp	x29,x30,[sp,#-64]!
-	add	x29,sp,#0
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	stp	x23,x24,[sp,#48]
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(8*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
 
-	ldr	x9,[x2],#8		// bp[0]
-	sub	x22,sp,x5,lsl#3
-	ldp	x7,x8,[x1],#16	// ap[0..1]
+	ldr	x9,[PTR(2)],#8		// bp[0]
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	x6,x5
+	add	PTR(22),csp,x6,lsl#3
+#else
+	sub	PTR(22),sp,x5,lsl#3
+#endif
+	ldp	x7,x8,[PTR(1)],#16	// ap[0..1]
 	lsl	x5,x5,#3
-	ldr	x4,[x4]		// *n0
-	and	x22,x22,#-16		// ABI says so
-	ldp	x13,x14,[x3],#16	// np[0..1]
+	ldr	x4,[PTR(4)]		// *n0
+#ifdef __CHERI_PURE_CAPABILITY__
+	alignd	PTR(22),PTR(22),#4		// ABI says so
+#else
+	and	PTR(22),PTR(22),#-16		// ABI says so
+#endif
+	ldp	x13,x14,[PTR(3)],#16	// np[0..1]
 
 	mul	x6,x7,x9		// ap[0]*bp[0]
 	sub	x21,x5,#16		// j=num-2
@@ -50,7 +59,7 @@ bn_mul_mont:
 	umulh	x11,x8,x9
 
 	mul	x15,x6,x4		// "tp[0]"*n0
-	mov	sp,x22			// alloca
+	mov	PTRN(sp),PTR(22)		// alloca
 
 	// (*)	mul	x12,x13,x15	// np[0]*m1
 	umulh	x13,x13,x15
@@ -71,12 +80,12 @@ bn_mul_mont:
 	cbz	x21,.L1st_skip
 
 .L1st:
-	ldr	x8,[x1],#8
+	ldr	x8,[PTR(1)],#8
 	adds	x6,x10,x7
 	sub	x21,x21,#8		// j--
 	adc	x7,x11,xzr
 
-	ldr	x14,[x3],#8
+	ldr	x14,[PTR(3)],#8
 	adds	x12,x16,x13
 	mul	x10,x8,x9		// ap[j]*bp[0]
 	adc	x13,x17,xzr
@@ -86,35 +95,49 @@ bn_mul_mont:
 	mul	x16,x14,x15		// np[j]*m1
 	adc	x13,x13,xzr
 	umulh	x17,x14,x15
-	str	x12,[x22],#8		// tp[j-1]
+	str	x12,[PTR(22)],#8		// tp[j-1]
 	cbnz	x21,.L1st
 
 .L1st_skip:
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	x5,x5
+#endif
 	adds	x6,x10,x7
-	sub	x1,x1,x5		// rewind x1
+#ifdef __CHERI_PURE_CAPABILITY__
+	add	PTR(1),PTR(1),x5		// rewind PTR(1)
+#else
+	sub	PTR(1),PTR(1),x5		// rewind PTR(1)
+#endif
 	adc	x7,x11,xzr
 
 	adds	x12,x16,x13
-	sub	x3,x3,x5		// rewind x3
+#ifdef __CHERI_PURE_CAPABILITY__
+	add	PTR(3),PTR(3),x5		// rewind PTR(3)
+#else
+	sub	PTR(3),PTR(3),x5		// rewind PTR(3)
+#endif
 	adc	x13,x17,xzr
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	x5,x5
+#endif
 
 	adds	x12,x12,x6
 	sub	x20,x5,#8		// i=num-1
 	adcs	x13,x13,x7
 
 	adc	x19,xzr,xzr		// upmost overflow bit
-	stp	x12,x13,[x22]
+	stp	x12,x13,[PTR(22)]
 
 .Louter:
-	ldr	x9,[x2],#8		// bp[i]
-	ldp	x7,x8,[x1],#16
-	ldr	x23,[sp]		// tp[0]
-	add	x22,sp,#8
+	ldr	x9,[PTR(2)],#8		// bp[i]
+	ldp	x7,x8,[PTR(1)],#16
+	ldr	x23,[PTRN(sp)]		// tp[0]
+	add	PTR(22),PTRN(sp),#8
 
 	mul	x6,x7,x9		// ap[0]*bp[i]
 	sub	x21,x5,#16		// j=num-2
 	umulh	x7,x7,x9
-	ldp	x13,x14,[x3],#16
+	ldp	x13,x14,[PTR(3)],#16
 	mul	x10,x8,x9		// ap[1]*bp[i]
 	adds	x6,x6,x23
 	umulh	x11,x8,x9
@@ -132,15 +155,15 @@ bn_mul_mont:
 	cbz	x21,.Linner_skip
 
 .Linner:
-	ldr	x8,[x1],#8
+	ldr	x8,[PTR(1)],#8
 	adc	x13,x13,xzr
-	ldr	x23,[x22],#8		// tp[j]
+	ldr	x23,[PTR(22)],#8		// tp[j]
 	adds	x6,x10,x7
 	sub	x21,x21,#8		// j--
 	adc	x7,x11,xzr
 
 	adds	x12,x16,x13
-	ldr	x14,[x3],#8
+	ldr	x14,[PTR(3)],#8
 	adc	x13,x17,xzr
 
 	mul	x10,x8,x9		// ap[j]*bp[i]
@@ -151,20 +174,34 @@ bn_mul_mont:
 	mul	x16,x14,x15		// np[j]*m1
 	adds	x12,x12,x6
 	umulh	x17,x14,x15
-	stur	x12,[x22,#-16]		// tp[j-1]
+	stur	x12,[PTR(22),#-16]		// tp[j-1]
 	cbnz	x21,.Linner
 
 .Linner_skip:
-	ldr	x23,[x22],#8		// tp[j]
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	x5,x5
+#endif
+	ldr	x23,[PTR(22)],#8		// tp[j]
 	adc	x13,x13,xzr
 	adds	x6,x10,x7
-	sub	x1,x1,x5		// rewind x1
+#ifdef __CHERI_PURE_CAPABILITY__
+	add	PTR(1),PTR(1),x5		// rewind PTR(1)
+#else
+	sub	PTR(1),PTR(1),x5		// rewind PTR(1)
+#endif
 	adc	x7,x11,xzr
 
 	adds	x12,x16,x13
-	sub	x3,x3,x5		// rewind x3
+#ifdef __CHERI_PURE_CAPABILITY__
+	add	PTR(3),PTR(3),x5		// rewind PTR(3)
+#else
+	sub	PTR(3),PTR(3),x5		// rewind PTR(3)
+#endif
 	adcs	x13,x17,x19
 	adc	x19,xzr,xzr
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	x5,x5
+#endif
 
 	adds	x6,x6,x23
 	adc	x7,x7,xzr
@@ -172,7 +209,7 @@ bn_mul_mont:
 	adds	x12,x12,x6
 	adcs	x13,x13,x7
 	adc	x19,x19,xzr		// upmost overflow bit
-	stp	x12,x13,[x22,#-16]
+	stp	x12,x13,[PTR(22),#-16]
 
 	cbnz	x20,.Louter
 
@@ -180,47 +217,47 @@ bn_mul_mont:
 	// if it is, subtract the modulus. But comparison implies
 	// subtraction. So we subtract modulus, see if it borrowed,
 	// and conditionally copy original value.
-	ldr	x23,[sp]		// tp[0]
-	add	x22,sp,#8
-	ldr	x14,[x3],#8		// np[0]
+	ldr	x23,[PTRN(sp)]		// tp[0]
+	add	PTR(22),PTRN(sp),#8
+	ldr	x14,[PTR(3)],#8		// np[0]
 	subs	x21,x5,#8		// j=num-1 and clear borrow
-	mov	x1,x0
+	mov	PTR(1),PTR(0)
 .Lsub:
 	sbcs	x8,x23,x14		// tp[j]-np[j]
-	ldr	x23,[x22],#8
+	ldr	x23,[PTR(22)],#8
 	sub	x21,x21,#8		// j--
-	ldr	x14,[x3],#8
-	str	x8,[x1],#8		// rp[j]=tp[j]-np[j]
+	ldr	x14,[PTR(3)],#8
+	str	x8,[PTR(1)],#8		// rp[j]=tp[j]-np[j]
 	cbnz	x21,.Lsub
 
 	sbcs	x8,x23,x14
 	sbcs	x19,x19,xzr		// did it borrow?
-	str	x8,[x1],#8		// rp[num-1]
+	str	x8,[PTR(1)],#8		// rp[num-1]
 
-	ldr	x23,[sp]		// tp[0]
-	add	x22,sp,#8
-	ldr	x8,[x0],#8		// rp[0]
+	ldr	x23,[PTRN(sp)]		// tp[0]
+	add	PTR(22),PTRN(sp),#8
+	ldr	x8,[PTR(0)],#8		// rp[0]
 	sub	x5,x5,#8		// num--
 	nop
 .Lcond_copy:
 	sub	x5,x5,#8		// num--
 	csel	x14,x23,x8,lo		// did it borrow?
-	ldr	x23,[x22],#8
-	ldr	x8,[x0],#8
-	stur	xzr,[x22,#-16]		// wipe tp
-	stur	x14,[x0,#-16]
+	ldr	x23,[PTR(22)],#8
+	ldr	x8,[PTR(0)],#8
+	stur	xzr,[PTR(22),#-16]		// wipe tp
+	stur	x14,[PTR(0),#-16]
 	cbnz	x5,.Lcond_copy
 
 	csel	x14,x23,x8,lo
-	stur	xzr,[x22,#-8]		// wipe tp
-	stur	x14,[x0,#-8]
+	stur	xzr,[PTR(22),#-8]		// wipe tp
+	stur	x14,[PTR(0),#-8]
 
-	ldp	x19,x20,[x29,#16]
-	mov	sp,x29
-	ldp	x21,x22,[x29,#32]
+	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
+	mov	PTRN(sp),PTR(29)
+	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
 	mov	x0,#1
-	ldp	x23,x24,[x29,#48]
-	ldr	x29,[sp],#64
+	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
+	ldr	PTR(29),[PTRN(sp)],#(8*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	bn_mul_mont,.-bn_mul_mont
@@ -229,53 +266,64 @@ bn_mul_mont:
 bn_mul8x_mont_neon:
 	// Not adding AARCH64_SIGN_LINK_REGISTER here because bn_mul8x_mont_neon is jumped to
 	// only from bn_mul_mont which has already signed the return address.
-	stp	x29,x30,[sp,#-80]!
-	mov	x16,sp
-	stp	d8,d9,[sp,#16]
-	stp	d10,d11,[sp,#32]
-	stp	d12,d13,[sp,#48]
-	stp	d14,d15,[sp,#64]
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH+64)]!
+	mov	PTR(16),PTRN(sp)
+	stp	d8,d9,[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	d10,d11,[PTRN(sp),#(2*PTR_WIDTH+16)]
+	stp	d12,d13,[PTRN(sp),#(2*PTR_WIDTH+32)]
+	stp	d14,d15,[PTRN(sp),#(2*PTR_WIDTH+48)]
 	lsl	x5,x5,#1
 	eor	v14.16b,v14.16b,v14.16b
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	x12,x5
+#endif
 
 .align	4
 .LNEON_8n:
 	eor	v6.16b,v6.16b,v6.16b
-	sub	x7,sp,#128
+	sub	PTR(7),PTRN(sp),#128
 	eor	v7.16b,v7.16b,v7.16b
-	sub	x7,x7,x5,lsl#4
+#ifdef __CHERI_PURE_CAPABILITY__
+	add	PTR(7),PTR(7),x12,lsl#4
+#else
+	sub	PTR(7),PTR(7),x5,lsl#4
+#endif
 	eor	v8.16b,v8.16b,v8.16b
-	and	x7,x7,#-64
+#ifdef __CHERI_PURE_CAPABILITY__
+	alignd	PTR(7),PTR(7),#6
+#else
+	and	PTR(7),PTR(7),#-64
+#endif
 	eor	v9.16b,v9.16b,v9.16b
-	mov	sp,x7		// alloca
+	mov	PTRN(sp),PTR(7)	// alloca
 	eor	v10.16b,v10.16b,v10.16b
-	add	x7,x7,#256
+	add	PTR(7),PTR(7),#256
 	eor	v11.16b,v11.16b,v11.16b
 	sub	x8,x5,#8
 	eor	v12.16b,v12.16b,v12.16b
 	eor	v13.16b,v13.16b,v13.16b
 
 .LNEON_8n_init:
-	st1	{v6.2d,v7.2d},[x7],#32
+	st1	{v6.2d,v7.2d},[PTR(7)],#32
 	subs	x8,x8,#8
-	st1	{v8.2d,v9.2d},[x7],#32
-	st1	{v10.2d,v11.2d},[x7],#32
-	st1	{v12.2d,v13.2d},[x7],#32
+	st1	{v8.2d,v9.2d},[PTR(7)],#32
+	st1	{v10.2d,v11.2d},[PTR(7)],#32
+	st1	{v12.2d,v13.2d},[PTR(7)],#32
 	bne	.LNEON_8n_init
 
-	add	x6,sp,#256
-	ld1	{v0.4s,v1.4s},[x1],#32
-	add	x10,sp,#8
-	ldr	s30,[x4],#4
+	add	PTR(6),PTRN(sp),#256
+	ld1	{v0.4s,v1.4s},[PTR(1)],#32
+	add	PTR(10),PTRN(sp),#8
+	ldr	s30,[PTR(4)],#4
 	mov	x9,x5
 	b	.LNEON_8n_outer
 
 .align	4
 .LNEON_8n_outer:
-	ldr	s28,[x2],#4   // *b++
+	ldr	s28,[PTR(2)],#4   // *b++
 	uxtl	v28.4s,v28.4h
-	add	x7,sp,#128
-	ld1	{v2.4s,v3.4s},[x3],#32
+	add	PTR(7),PTRN(sp),#128
+	ld1	{v2.4s,v3.4s},[PTR(3)],#32
 
 	umlal	v6.2d,v28.2s,v0.s[0]
 	umlal	v7.2d,v28.2s,v0.s[1]
@@ -287,11 +335,11 @@ bn_mul8x_mont_neon:
 	umlal	v10.2d,v28.2s,v1.s[0]
 	mul	v29.2s,v29.2s,v30.2s
 	umlal	v11.2d,v28.2s,v1.s[1]
-	st1	{v28.2s},[sp]		// put aside smashed b[8*i+0]
+	st1	{v28.2s},[PTRN(sp)]	// put aside smashed b[8*i+0]
 	umlal	v12.2d,v28.2s,v1.s[2]
 	uxtl	v29.4s,v29.4h
 	umlal	v13.2d,v28.2s,v1.s[3]
-	ldr	s28,[x2],#4   // *b++
+	ldr	s28,[PTR(2)],#4   // *b++
 	umlal	v6.2d,v29.2s,v2.s[0]
 	umlal	v7.2d,v29.2s,v2.s[1]
 	uxtl	v28.4s,v28.4h
@@ -307,9 +355,9 @@ bn_mul8x_mont_neon:
 	umlal	v13.2d,v29.2s,v3.s[3]
 	add	v16.2d,v7.2d,v6.2d
 	ins	v7.d[0],v16.d[0]
-	st1	{v29.2s},[x10],#8	// put aside smashed m[8*i+0]
+	st1	{v29.2s},[PTR(10)],#8	// put aside smashed m[8*i+0]
 	umlal	v7.2d,v28.2s,v0.s[0]
-	ld1	{v6.2d},[x6],#16
+	ld1	{v6.2d},[PTR(6)],#16
 	umlal	v8.2d,v28.2s,v0.s[1]
 	umlal	v9.2d,v28.2s,v0.s[2]
 	shl	v29.2d,v7.2d,#16
@@ -319,11 +367,11 @@ bn_mul8x_mont_neon:
 	umlal	v11.2d,v28.2s,v1.s[0]
 	mul	v29.2s,v29.2s,v30.2s
 	umlal	v12.2d,v28.2s,v1.s[1]
-	st1	{v28.2s},[x10],#8	// put aside smashed b[8*i+1]
+	st1	{v28.2s},[PTR(10)],#8	// put aside smashed b[8*i+1]
 	umlal	v13.2d,v28.2s,v1.s[2]
 	uxtl	v29.4s,v29.4h
 	umlal	v6.2d,v28.2s,v1.s[3]
-	ldr	s28,[x2],#4   // *b++
+	ldr	s28,[PTR(2)],#4   // *b++
 	umlal	v7.2d,v29.2s,v2.s[0]
 	umlal	v8.2d,v29.2s,v2.s[1]
 	uxtl	v28.4s,v28.4h
@@ -339,9 +387,9 @@ bn_mul8x_mont_neon:
 	umlal	v6.2d,v29.2s,v3.s[3]
 	add	v16.2d,v8.2d,v7.2d
 	ins	v8.d[0],v16.d[0]
-	st1	{v29.2s},[x10],#8	// put aside smashed m[8*i+1]
+	st1	{v29.2s},[PTR(10)],#8	// put aside smashed m[8*i+1]
 	umlal	v8.2d,v28.2s,v0.s[0]
-	ld1	{v7.2d},[x6],#16
+	ld1	{v7.2d},[PTR(6)],#16
 	umlal	v9.2d,v28.2s,v0.s[1]
 	umlal	v10.2d,v28.2s,v0.s[2]
 	shl	v29.2d,v8.2d,#16
@@ -351,11 +399,11 @@ bn_mul8x_mont_neon:
 	umlal	v12.2d,v28.2s,v1.s[0]
 	mul	v29.2s,v29.2s,v30.2s
 	umlal	v13.2d,v28.2s,v1.s[1]
-	st1	{v28.2s},[x10],#8	// put aside smashed b[8*i+2]
+	st1	{v28.2s},[PTR(10)],#8	// put aside smashed b[8*i+2]
 	umlal	v6.2d,v28.2s,v1.s[2]
 	uxtl	v29.4s,v29.4h
 	umlal	v7.2d,v28.2s,v1.s[3]
-	ldr	s28,[x2],#4   // *b++
+	ldr	s28,[PTR(2)],#4   // *b++
 	umlal	v8.2d,v29.2s,v2.s[0]
 	umlal	v9.2d,v29.2s,v2.s[1]
 	uxtl	v28.4s,v28.4h
@@ -371,9 +419,9 @@ bn_mul8x_mont_neon:
 	umlal	v7.2d,v29.2s,v3.s[3]
 	add	v16.2d,v9.2d,v8.2d
 	ins	v9.d[0],v16.d[0]
-	st1	{v29.2s},[x10],#8	// put aside smashed m[8*i+2]
+	st1	{v29.2s},[PTR(10)],#8	// put aside smashed m[8*i+2]
 	umlal	v9.2d,v28.2s,v0.s[0]
-	ld1	{v8.2d},[x6],#16
+	ld1	{v8.2d},[PTR(6)],#16
 	umlal	v10.2d,v28.2s,v0.s[1]
 	umlal	v11.2d,v28.2s,v0.s[2]
 	shl	v29.2d,v9.2d,#16
@@ -383,11 +431,11 @@ bn_mul8x_mont_neon:
 	umlal	v13.2d,v28.2s,v1.s[0]
 	mul	v29.2s,v29.2s,v30.2s
 	umlal	v6.2d,v28.2s,v1.s[1]
-	st1	{v28.2s},[x10],#8	// put aside smashed b[8*i+3]
+	st1	{v28.2s},[PTR(10)],#8	// put aside smashed b[8*i+3]
 	umlal	v7.2d,v28.2s,v1.s[2]
 	uxtl	v29.4s,v29.4h
 	umlal	v8.2d,v28.2s,v1.s[3]
-	ldr	s28,[x2],#4   // *b++
+	ldr	s28,[PTR(2)],#4   // *b++
 	umlal	v9.2d,v29.2s,v2.s[0]
 	umlal	v10.2d,v29.2s,v2.s[1]
 	uxtl	v28.4s,v28.4h
@@ -403,9 +451,9 @@ bn_mul8x_mont_neon:
 	umlal	v8.2d,v29.2s,v3.s[3]
 	add	v16.2d,v10.2d,v9.2d
 	ins	v10.d[0],v16.d[0]
-	st1	{v29.2s},[x10],#8	// put aside smashed m[8*i+3]
+	st1	{v29.2s},[PTR(10)],#8	// put aside smashed m[8*i+3]
 	umlal	v10.2d,v28.2s,v0.s[0]
-	ld1	{v9.2d},[x6],#16
+	ld1	{v9.2d},[PTR(6)],#16
 	umlal	v11.2d,v28.2s,v0.s[1]
 	umlal	v12.2d,v28.2s,v0.s[2]
 	shl	v29.2d,v10.2d,#16
@@ -415,11 +463,11 @@ bn_mul8x_mont_neon:
 	umlal	v6.2d,v28.2s,v1.s[0]
 	mul	v29.2s,v29.2s,v30.2s
 	umlal	v7.2d,v28.2s,v1.s[1]
-	st1	{v28.2s},[x10],#8	// put aside smashed b[8*i+4]
+	st1	{v28.2s},[PTR(10)],#8	// put aside smashed b[8*i+4]
 	umlal	v8.2d,v28.2s,v1.s[2]
 	uxtl	v29.4s,v29.4h
 	umlal	v9.2d,v28.2s,v1.s[3]
-	ldr	s28,[x2],#4   // *b++
+	ldr	s28,[PTR(2)],#4   // *b++
 	umlal	v10.2d,v29.2s,v2.s[0]
 	umlal	v11.2d,v29.2s,v2.s[1]
 	uxtl	v28.4s,v28.4h
@@ -435,9 +483,9 @@ bn_mul8x_mont_neon:
 	umlal	v9.2d,v29.2s,v3.s[3]
 	add	v16.2d,v11.2d,v10.2d
 	ins	v11.d[0],v16.d[0]
-	st1	{v29.2s},[x10],#8	// put aside smashed m[8*i+4]
+	st1	{v29.2s},[PTR(10)],#8	// put aside smashed m[8*i+4]
 	umlal	v11.2d,v28.2s,v0.s[0]
-	ld1	{v10.2d},[x6],#16
+	ld1	{v10.2d},[PTR(6)],#16
 	umlal	v12.2d,v28.2s,v0.s[1]
 	umlal	v13.2d,v28.2s,v0.s[2]
 	shl	v29.2d,v11.2d,#16
@@ -447,11 +495,11 @@ bn_mul8x_mont_neon:
 	umlal	v7.2d,v28.2s,v1.s[0]
 	mul	v29.2s,v29.2s,v30.2s
 	umlal	v8.2d,v28.2s,v1.s[1]
-	st1	{v28.2s},[x10],#8	// put aside smashed b[8*i+5]
+	st1	{v28.2s},[PTR(10)],#8	// put aside smashed b[8*i+5]
 	umlal	v9.2d,v28.2s,v1.s[2]
 	uxtl	v29.4s,v29.4h
 	umlal	v10.2d,v28.2s,v1.s[3]
-	ldr	s28,[x2],#4   // *b++
+	ldr	s28,[PTR(2)],#4   // *b++
 	umlal	v11.2d,v29.2s,v2.s[0]
 	umlal	v12.2d,v29.2s,v2.s[1]
 	uxtl	v28.4s,v28.4h
@@ -467,9 +515,9 @@ bn_mul8x_mont_neon:
 	umlal	v10.2d,v29.2s,v3.s[3]
 	add	v16.2d,v12.2d,v11.2d
 	ins	v12.d[0],v16.d[0]
-	st1	{v29.2s},[x10],#8	// put aside smashed m[8*i+5]
+	st1	{v29.2s},[PTR(10)],#8	// put aside smashed m[8*i+5]
 	umlal	v12.2d,v28.2s,v0.s[0]
-	ld1	{v11.2d},[x6],#16
+	ld1	{v11.2d},[PTR(6)],#16
 	umlal	v13.2d,v28.2s,v0.s[1]
 	umlal	v6.2d,v28.2s,v0.s[2]
 	shl	v29.2d,v12.2d,#16
@@ -479,11 +527,11 @@ bn_mul8x_mont_neon:
 	umlal	v8.2d,v28.2s,v1.s[0]
 	mul	v29.2s,v29.2s,v30.2s
 	umlal	v9.2d,v28.2s,v1.s[1]
-	st1	{v28.2s},[x10],#8	// put aside smashed b[8*i+6]
+	st1	{v28.2s},[PTR(10)],#8	// put aside smashed b[8*i+6]
 	umlal	v10.2d,v28.2s,v1.s[2]
 	uxtl	v29.4s,v29.4h
 	umlal	v11.2d,v28.2s,v1.s[3]
-	ldr	s28,[x2],#4   // *b++
+	ldr	s28,[PTR(2)],#4   // *b++
 	umlal	v12.2d,v29.2s,v2.s[0]
 	umlal	v13.2d,v29.2s,v2.s[1]
 	uxtl	v28.4s,v28.4h
@@ -499,9 +547,9 @@ bn_mul8x_mont_neon:
 	umlal	v11.2d,v29.2s,v3.s[3]
 	add	v16.2d,v13.2d,v12.2d
 	ins	v13.d[0],v16.d[0]
-	st1	{v29.2s},[x10],#8	// put aside smashed m[8*i+6]
+	st1	{v29.2s},[PTR(10)],#8	// put aside smashed m[8*i+6]
 	umlal	v13.2d,v28.2s,v0.s[0]
-	ld1	{v12.2d},[x6],#16
+	ld1	{v12.2d},[PTR(6)],#16
 	umlal	v6.2d,v28.2s,v0.s[1]
 	umlal	v7.2d,v28.2s,v0.s[2]
 	shl	v29.2d,v13.2d,#16
@@ -511,13 +559,13 @@ bn_mul8x_mont_neon:
 	umlal	v9.2d,v28.2s,v1.s[0]
 	mul	v29.2s,v29.2s,v30.2s
 	umlal	v10.2d,v28.2s,v1.s[1]
-	st1	{v28.2s},[x10],#8	// put aside smashed b[8*i+7]
+	st1	{v28.2s},[PTR(10)],#8	// put aside smashed b[8*i+7]
 	umlal	v11.2d,v28.2s,v1.s[2]
 	uxtl	v29.4s,v29.4h
 	umlal	v12.2d,v28.2s,v1.s[3]
-	ld1	{v28.2s},[sp]		// pull smashed b[8*i+0]
+	ld1	{v28.2s},[PTRN(sp)]	// pull smashed b[8*i+0]
 	umlal	v13.2d,v29.2s,v2.s[0]
-	ld1	{v0.4s,v1.4s},[x1],#32
+	ld1	{v0.4s,v1.4s},[PTR(1)],#32
 	umlal	v6.2d,v29.2s,v2.s[1]
 	umlal	v7.2d,v29.2s,v2.s[2]
 	mov	v5.16b,v13.16b
@@ -533,8 +581,8 @@ bn_mul8x_mont_neon:
 	umlal	v11.2d,v29.2s,v3.s[2]
 	umlal	v12.2d,v29.2s,v3.s[3]
 	add	v6.2d,v6.2d,v13.2d
-	st1	{v29.2s},[x10],#8	// put aside smashed m[8*i+7]
-	add	x10,sp,#8		// rewind
+	st1	{v29.2s},[PTR(10)],#8	// put aside smashed m[8*i+7]
+	add	PTR(10),PTRN(sp),#8	// rewind
 	sub	x8,x5,#8
 	b	.LNEON_8n_inner
 
@@ -542,20 +590,20 @@ bn_mul8x_mont_neon:
 .LNEON_8n_inner:
 	subs	x8,x8,#8
 	umlal	v6.2d,v28.2s,v0.s[0]
-	ld1	{v13.2d},[x6]
+	ld1	{v13.2d},[PTR(6)]
 	umlal	v7.2d,v28.2s,v0.s[1]
-	ld1	{v29.2s},[x10],#8	// pull smashed m[8*i+0]
+	ld1	{v29.2s},[PTR(10)],#8	// pull smashed m[8*i+0]
 	umlal	v8.2d,v28.2s,v0.s[2]
-	ld1	{v2.4s,v3.4s},[x3],#32
+	ld1	{v2.4s,v3.4s},[PTR(3)],#32
 	umlal	v9.2d,v28.2s,v0.s[3]
 	b.eq	.LInner_jump
-	add	x6,x6,#16	// don't advance in last iteration
+	add	PTR(6),PTR(6),#16	// don't advance in last iteration
 .LInner_jump:
 	umlal	v10.2d,v28.2s,v1.s[0]
 	umlal	v11.2d,v28.2s,v1.s[1]
 	umlal	v12.2d,v28.2s,v1.s[2]
 	umlal	v13.2d,v28.2s,v1.s[3]
-	ld1	{v28.2s},[x10],#8	// pull smashed b[8*i+1]
+	ld1	{v28.2s},[PTR(10)],#8	// pull smashed b[8*i+1]
 	umlal	v6.2d,v29.2s,v2.s[0]
 	umlal	v7.2d,v29.2s,v2.s[1]
 	umlal	v8.2d,v29.2s,v2.s[2]
@@ -564,21 +612,21 @@ bn_mul8x_mont_neon:
 	umlal	v11.2d,v29.2s,v3.s[1]
 	umlal	v12.2d,v29.2s,v3.s[2]
 	umlal	v13.2d,v29.2s,v3.s[3]
-	st1	{v6.2d},[x7],#16
+	st1	{v6.2d},[PTR(7)],#16
 	umlal	v7.2d,v28.2s,v0.s[0]
-	ld1	{v6.2d},[x6]
+	ld1	{v6.2d},[PTR(6)]
 	umlal	v8.2d,v28.2s,v0.s[1]
-	ld1	{v29.2s},[x10],#8	// pull smashed m[8*i+1]
+	ld1	{v29.2s},[PTR(10)],#8	// pull smashed m[8*i+1]
 	umlal	v9.2d,v28.2s,v0.s[2]
 	b.eq	.LInner_jump1
-	add	x6,x6,#16	// don't advance in last iteration
+	add	PTR(6),PTR(6),#16	// don't advance in last iteration
 .LInner_jump1:
 	umlal	v10.2d,v28.2s,v0.s[3]
 	umlal	v11.2d,v28.2s,v1.s[0]
 	umlal	v12.2d,v28.2s,v1.s[1]
 	umlal	v13.2d,v28.2s,v1.s[2]
 	umlal	v6.2d,v28.2s,v1.s[3]
-	ld1	{v28.2s},[x10],#8	// pull smashed b[8*i+2]
+	ld1	{v28.2s},[PTR(10)],#8	// pull smashed b[8*i+2]
 	umlal	v7.2d,v29.2s,v2.s[0]
 	umlal	v8.2d,v29.2s,v2.s[1]
 	umlal	v9.2d,v29.2s,v2.s[2]
@@ -587,21 +635,21 @@ bn_mul8x_mont_neon:
 	umlal	v12.2d,v29.2s,v3.s[1]
 	umlal	v13.2d,v29.2s,v3.s[2]
 	umlal	v6.2d,v29.2s,v3.s[3]
-	st1	{v7.2d},[x7],#16
+	st1	{v7.2d},[PTR(7)],#16
 	umlal	v8.2d,v28.2s,v0.s[0]
-	ld1	{v7.2d},[x6]
+	ld1	{v7.2d},[PTR(6)]
 	umlal	v9.2d,v28.2s,v0.s[1]
-	ld1	{v29.2s},[x10],#8	// pull smashed m[8*i+2]
+	ld1	{v29.2s},[PTR(10)],#8	// pull smashed m[8*i+2]
 	umlal	v10.2d,v28.2s,v0.s[2]
 	b.eq	.LInner_jump2
-	add	x6,x6,#16	// don't advance in last iteration
+	add	PTR(6),PTR(6),#16	// don't advance in last iteration
 .LInner_jump2:
 	umlal	v11.2d,v28.2s,v0.s[3]
 	umlal	v12.2d,v28.2s,v1.s[0]
 	umlal	v13.2d,v28.2s,v1.s[1]
 	umlal	v6.2d,v28.2s,v1.s[2]
 	umlal	v7.2d,v28.2s,v1.s[3]
-	ld1	{v28.2s},[x10],#8	// pull smashed b[8*i+3]
+	ld1	{v28.2s},[PTR(10)],#8	// pull smashed b[8*i+3]
 	umlal	v8.2d,v29.2s,v2.s[0]
 	umlal	v9.2d,v29.2s,v2.s[1]
 	umlal	v10.2d,v29.2s,v2.s[2]
@@ -610,21 +658,21 @@ bn_mul8x_mont_neon:
 	umlal	v13.2d,v29.2s,v3.s[1]
 	umlal	v6.2d,v29.2s,v3.s[2]
 	umlal	v7.2d,v29.2s,v3.s[3]
-	st1	{v8.2d},[x7],#16
+	st1	{v8.2d},[PTR(7)],#16
 	umlal	v9.2d,v28.2s,v0.s[0]
-	ld1	{v8.2d},[x6]
+	ld1	{v8.2d},[PTR(6)]
 	umlal	v10.2d,v28.2s,v0.s[1]
-	ld1	{v29.2s},[x10],#8	// pull smashed m[8*i+3]
+	ld1	{v29.2s},[PTR(10)],#8	// pull smashed m[8*i+3]
 	umlal	v11.2d,v28.2s,v0.s[2]
 	b.eq	.LInner_jump3
-	add	x6,x6,#16	// don't advance in last iteration
+	add	PTR(6),PTR(6),#16	// don't advance in last iteration
 .LInner_jump3:
 	umlal	v12.2d,v28.2s,v0.s[3]
 	umlal	v13.2d,v28.2s,v1.s[0]
 	umlal	v6.2d,v28.2s,v1.s[1]
 	umlal	v7.2d,v28.2s,v1.s[2]
 	umlal	v8.2d,v28.2s,v1.s[3]
-	ld1	{v28.2s},[x10],#8	// pull smashed b[8*i+4]
+	ld1	{v28.2s},[PTR(10)],#8	// pull smashed b[8*i+4]
 	umlal	v9.2d,v29.2s,v2.s[0]
 	umlal	v10.2d,v29.2s,v2.s[1]
 	umlal	v11.2d,v29.2s,v2.s[2]
@@ -633,21 +681,21 @@ bn_mul8x_mont_neon:
 	umlal	v6.2d,v29.2s,v3.s[1]
 	umlal	v7.2d,v29.2s,v3.s[2]
 	umlal	v8.2d,v29.2s,v3.s[3]
-	st1	{v9.2d},[x7],#16
+	st1	{v9.2d},[PTR(7)],#16
 	umlal	v10.2d,v28.2s,v0.s[0]
-	ld1	{v9.2d},[x6]
+	ld1	{v9.2d},[PTR(6)]
 	umlal	v11.2d,v28.2s,v0.s[1]
-	ld1	{v29.2s},[x10],#8	// pull smashed m[8*i+4]
+	ld1	{v29.2s},[PTR(10)],#8	// pull smashed m[8*i+4]
 	umlal	v12.2d,v28.2s,v0.s[2]
 	b.eq	.LInner_jump4
-	add	x6,x6,#16	// don't advance in last iteration
+	add	PTR(6),PTR(6),#16	// don't advance in last iteration
 .LInner_jump4:
 	umlal	v13.2d,v28.2s,v0.s[3]
 	umlal	v6.2d,v28.2s,v1.s[0]
 	umlal	v7.2d,v28.2s,v1.s[1]
 	umlal	v8.2d,v28.2s,v1.s[2]
 	umlal	v9.2d,v28.2s,v1.s[3]
-	ld1	{v28.2s},[x10],#8	// pull smashed b[8*i+5]
+	ld1	{v28.2s},[PTR(10)],#8	// pull smashed b[8*i+5]
 	umlal	v10.2d,v29.2s,v2.s[0]
 	umlal	v11.2d,v29.2s,v2.s[1]
 	umlal	v12.2d,v29.2s,v2.s[2]
@@ -656,21 +704,21 @@ bn_mul8x_mont_neon:
 	umlal	v7.2d,v29.2s,v3.s[1]
 	umlal	v8.2d,v29.2s,v3.s[2]
 	umlal	v9.2d,v29.2s,v3.s[3]
-	st1	{v10.2d},[x7],#16
+	st1	{v10.2d},[PTR(7)],#16
 	umlal	v11.2d,v28.2s,v0.s[0]
-	ld1	{v10.2d},[x6]
+	ld1	{v10.2d},[PTR(6)]
 	umlal	v12.2d,v28.2s,v0.s[1]
-	ld1	{v29.2s},[x10],#8	// pull smashed m[8*i+5]
+	ld1	{v29.2s},[PTR(10)],#8	// pull smashed m[8*i+5]
 	umlal	v13.2d,v28.2s,v0.s[2]
 	b.eq	.LInner_jump5
-	add	x6,x6,#16	// don't advance in last iteration
+	add	PTR(6),PTR(6),#16	// don't advance in last iteration
 .LInner_jump5:
 	umlal	v6.2d,v28.2s,v0.s[3]
 	umlal	v7.2d,v28.2s,v1.s[0]
 	umlal	v8.2d,v28.2s,v1.s[1]
 	umlal	v9.2d,v28.2s,v1.s[2]
 	umlal	v10.2d,v28.2s,v1.s[3]
-	ld1	{v28.2s},[x10],#8	// pull smashed b[8*i+6]
+	ld1	{v28.2s},[PTR(10)],#8	// pull smashed b[8*i+6]
 	umlal	v11.2d,v29.2s,v2.s[0]
 	umlal	v12.2d,v29.2s,v2.s[1]
 	umlal	v13.2d,v29.2s,v2.s[2]
@@ -679,21 +727,21 @@ bn_mul8x_mont_neon:
 	umlal	v8.2d,v29.2s,v3.s[1]
 	umlal	v9.2d,v29.2s,v3.s[2]
 	umlal	v10.2d,v29.2s,v3.s[3]
-	st1	{v11.2d},[x7],#16
+	st1	{v11.2d},[PTR(7)],#16
 	umlal	v12.2d,v28.2s,v0.s[0]
-	ld1	{v11.2d},[x6]
+	ld1	{v11.2d},[PTR(6)]
 	umlal	v13.2d,v28.2s,v0.s[1]
-	ld1	{v29.2s},[x10],#8	// pull smashed m[8*i+6]
+	ld1	{v29.2s},[PTR(10)],#8	// pull smashed m[8*i+6]
 	umlal	v6.2d,v28.2s,v0.s[2]
 	b.eq	.LInner_jump6
-	add	x6,x6,#16	// don't advance in last iteration
+	add	PTR(6),PTR(6),#16	// don't advance in last iteration
 .LInner_jump6:
 	umlal	v7.2d,v28.2s,v0.s[3]
 	umlal	v8.2d,v28.2s,v1.s[0]
 	umlal	v9.2d,v28.2s,v1.s[1]
 	umlal	v10.2d,v28.2s,v1.s[2]
 	umlal	v11.2d,v28.2s,v1.s[3]
-	ld1	{v28.2s},[x10],#8	// pull smashed b[8*i+7]
+	ld1	{v28.2s},[PTR(10)],#8	// pull smashed b[8*i+7]
 	umlal	v12.2d,v29.2s,v2.s[0]
 	umlal	v13.2d,v29.2s,v2.s[1]
 	umlal	v6.2d,v29.2s,v2.s[2]
@@ -702,14 +750,14 @@ bn_mul8x_mont_neon:
 	umlal	v9.2d,v29.2s,v3.s[1]
 	umlal	v10.2d,v29.2s,v3.s[2]
 	umlal	v11.2d,v29.2s,v3.s[3]
-	st1	{v12.2d},[x7],#16
+	st1	{v12.2d},[PTR(7)],#16
 	umlal	v13.2d,v28.2s,v0.s[0]
-	ld1	{v12.2d},[x6]
+	ld1	{v12.2d},[PTR(6)]
 	umlal	v6.2d,v28.2s,v0.s[1]
-	ld1	{v29.2s},[x10],#8	// pull smashed m[8*i+7]
+	ld1	{v29.2s},[PTR(10)],#8	// pull smashed m[8*i+7]
 	umlal	v7.2d,v28.2s,v0.s[2]
 	b.eq	.LInner_jump7
-	add	x6,x6,#16	// don't advance in last iteration
+	add	PTR(6),PTR(6),#16	// don't advance in last iteration
 .LInner_jump7:
 	umlal	v8.2d,v28.2s,v0.s[3]
 	umlal	v9.2d,v28.2s,v1.s[0]
@@ -717,51 +765,59 @@ bn_mul8x_mont_neon:
 	umlal	v11.2d,v28.2s,v1.s[2]
 	umlal	v12.2d,v28.2s,v1.s[3]
 	b.ne	.LInner_after_rewind8
-	sub	x1,x1,x5,lsl#2	// rewind
+#ifdef __CHERI_PURE_CAPABILITY__
+	add	PTR(1),PTR(1),x12,lsl#2	// rewind
+#else
+	sub	PTR(1),PTR(1),x5,lsl#2	// rewind
+#endif
 .LInner_after_rewind8:
 	umlal	v13.2d,v29.2s,v2.s[0]
-	ld1	{v28.2s},[sp]		// pull smashed b[8*i+0]
+	ld1	{v28.2s},[PTRN(sp)]	// pull smashed b[8*i+0]
 	umlal	v6.2d,v29.2s,v2.s[1]
-	ld1	{v0.4s,v1.4s},[x1],#32
+	ld1	{v0.4s,v1.4s},[PTR(1)],#32
 	umlal	v7.2d,v29.2s,v2.s[2]
-	add	x10,sp,#8		// rewind
+	add	PTR(10),PTRN(sp),#8	// rewind
 	umlal	v8.2d,v29.2s,v2.s[3]
 	umlal	v9.2d,v29.2s,v3.s[0]
 	umlal	v10.2d,v29.2s,v3.s[1]
 	umlal	v11.2d,v29.2s,v3.s[2]
-	st1	{v13.2d},[x7],#16
+	st1	{v13.2d},[PTR(7)],#16
 	umlal	v12.2d,v29.2s,v3.s[3]
 
 	bne	.LNEON_8n_inner
-	add	x6,sp,#128
-	st1	{v6.2d,v7.2d},[x7],#32
+	add	PTR(6),PTRN(sp),#128
+	st1	{v6.2d,v7.2d},[PTR(7)],#32
 	eor	v2.16b,v2.16b,v2.16b	// v2
-	st1	{v8.2d,v9.2d},[x7],#32
+	st1	{v8.2d,v9.2d},[PTR(7)],#32
 	eor	v3.16b,v3.16b,v3.16b	// v3
-	st1	{v10.2d,v11.2d},[x7],#32
-	st1	{v12.2d},[x7]
+	st1	{v10.2d,v11.2d},[PTR(7)],#32
+	st1	{v12.2d},[PTR(7)]
 
 	subs	x9,x9,#8
-	ld1	{v6.2d,v7.2d},[x6],#32
-	ld1	{v8.2d,v9.2d},[x6],#32
-	ld1	{v10.2d,v11.2d},[x6],#32
-	ld1	{v12.2d,v13.2d},[x6],#32
+	ld1	{v6.2d,v7.2d},[PTR(6)],#32
+	ld1	{v8.2d,v9.2d},[PTR(6)],#32
+	ld1	{v10.2d,v11.2d},[PTR(6)],#32
+	ld1	{v12.2d,v13.2d},[PTR(6)],#32
 
 	b.eq	.LInner_8n_jump_2steps
-	sub	x3,x3,x5,lsl#2	// rewind
+#ifdef __CHERI_PURE_CAPABILITY__
+	add	PTR(3),PTR(3),x12,lsl#2	// rewind
+#else
+	sub	PTR(3),PTR(3),x5,lsl#2	// rewind
+#endif
 	b	.LNEON_8n_outer
 
 .LInner_8n_jump_2steps:
-	add	x7,sp,#128
-	st1	{v2.2d,v3.2d}, [sp],#32	// start wiping stack frame
+	add	PTR(7),PTRN(sp),#128
+	st1	{v2.2d,v3.2d}, [PTRN(sp)],#32	// start wiping stack frame
 	mov	v5.16b,v6.16b
 	ushr	v15.2d,v6.2d,#16
 	ext	v6.16b,v6.16b,v6.16b,#8
-	st1	{v2.2d,v3.2d}, [sp],#32
+	st1	{v2.2d,v3.2d}, [PTRN(sp)],#32
 	add	v6.2d,v6.2d,v15.2d
-	st1	{v2.2d,v3.2d}, [sp],#32
+	st1	{v2.2d,v3.2d}, [PTRN(sp)],#32
 	ushr	v15.2d,v6.2d,#16
-	st1	{v2.2d,v3.2d}, [sp],#32
+	st1	{v2.2d,v3.2d}, [PTRN(sp)],#32
 	zip1	v6.4h,v5.4h,v6.4h
 	ins	v15.d[1],v14.d[0]
 
@@ -774,17 +830,17 @@ bn_mul8x_mont_neon:
 	mov	v5.16b,v6.16b
 	ushr	v15.2d,v6.2d,#16
 	ext	v6.16b,v6.16b,v6.16b,#8
-	ld1	{v8.2d,v9.2d}, [x6],#32
+	ld1	{v8.2d,v9.2d}, [PTR(6)],#32
 	add	v6.2d,v6.2d,v15.2d
-	ld1	{v10.2d,v11.2d}, [x6],#32
+	ld1	{v10.2d,v11.2d}, [PTR(6)],#32
 	ushr	v15.2d,v6.2d,#16
-	ld1	{v12.2d,v13.2d}, [x6],#32
+	ld1	{v12.2d,v13.2d}, [PTR(6)],#32
 	zip1	v6.4h,v5.4h,v6.4h
 	ins	v15.d[1],v14.d[0]
 
 .LNEON_tail_entry:
 	add	v7.2d,v7.2d,v15.2d
-	st1	{v6.s}[0], [x7],#4
+	st1	{v6.s}[0], [PTR(7)],#4
 	ushr	v15.2d,v7.2d,#16
 	mov	v5.16b,v7.16b
 	ext	v7.16b,v7.16b,v7.16b,#8
@@ -793,7 +849,7 @@ bn_mul8x_mont_neon:
 	zip1	v7.4h,v5.4h,v7.4h
 	ins	v15.d[1],v14.d[0]
 	add	v8.2d,v8.2d,v15.2d
-	st1	{v7.s}[0], [x7],#4
+	st1	{v7.s}[0], [PTR(7)],#4
 	ushr	v15.2d,v8.2d,#16
 	mov	v5.16b,v8.16b
 	ext	v8.16b,v8.16b,v8.16b,#8
@@ -802,7 +858,7 @@ bn_mul8x_mont_neon:
 	zip1	v8.4h,v5.4h,v8.4h
 	ins	v15.d[1],v14.d[0]
 	add	v9.2d,v9.2d,v15.2d
-	st1	{v8.s}[0], [x7],#4
+	st1	{v8.s}[0], [PTR(7)],#4
 	ushr	v15.2d,v9.2d,#16
 	mov	v5.16b,v9.16b
 	ext	v9.16b,v9.16b,v9.16b,#8
@@ -811,7 +867,7 @@ bn_mul8x_mont_neon:
 	zip1	v9.4h,v5.4h,v9.4h
 	ins	v15.d[1],v14.d[0]
 	add	v10.2d,v10.2d,v15.2d
-	st1	{v9.s}[0], [x7],#4
+	st1	{v9.s}[0], [PTR(7)],#4
 	ushr	v15.2d,v10.2d,#16
 	mov	v5.16b,v10.16b
 	ext	v10.16b,v10.16b,v10.16b,#8
@@ -820,7 +876,7 @@ bn_mul8x_mont_neon:
 	zip1	v10.4h,v5.4h,v10.4h
 	ins	v15.d[1],v14.d[0]
 	add	v11.2d,v11.2d,v15.2d
-	st1	{v10.s}[0], [x7],#4
+	st1	{v10.s}[0], [PTR(7)],#4
 	ushr	v15.2d,v11.2d,#16
 	mov	v5.16b,v11.16b
 	ext	v11.16b,v11.16b,v11.16b,#8
@@ -829,7 +885,7 @@ bn_mul8x_mont_neon:
 	zip1	v11.4h,v5.4h,v11.4h
 	ins	v15.d[1],v14.d[0]
 	add	v12.2d,v12.2d,v15.2d
-	st1	{v11.s}[0], [x7],#4
+	st1	{v11.s}[0], [PTR(7)],#4
 	ushr	v15.2d,v12.2d,#16
 	mov	v5.16b,v12.16b
 	ext	v12.16b,v12.16b,v12.16b,#8
@@ -838,7 +894,7 @@ bn_mul8x_mont_neon:
 	zip1	v12.4h,v5.4h,v12.4h
 	ins	v15.d[1],v14.d[0]
 	add	v13.2d,v13.2d,v15.2d
-	st1	{v12.s}[0], [x7],#4
+	st1	{v12.s}[0], [PTR(7)],#4
 	ushr	v15.2d,v13.2d,#16
 	mov	v5.16b,v13.16b
 	ext	v13.16b,v13.16b,v13.16b,#8
@@ -846,81 +902,92 @@ bn_mul8x_mont_neon:
 	ushr	v15.2d,v13.2d,#16
 	zip1	v13.4h,v5.4h,v13.4h
 	ins	v15.d[1],v14.d[0]
-	ld1	{v6.2d,v7.2d}, [x6],#32
+	ld1	{v6.2d,v7.2d}, [PTR(6)],#32
 	subs	x8,x8,#8
-	st1	{v13.s}[0], [x7],#4
+	st1	{v13.s}[0], [PTR(7)],#4
 	bne	.LNEON_tail
 
-	st1	{v15.s}[0], [x7],#4	// top-most bit
-	sub	x3,x3,x5,lsl#2		// rewind x3
-	subs	x1,sp,#0			// clear carry flag
-	add	x2,sp,x5,lsl#2
+	st1	{v15.s}[0], [PTR(7)],#4	// top-most bit
+#ifdef __CHERI_PURE_CAPABILITY__
+	add	PTR(3),PTR(3),x12,lsl#2	// rewind PTR(3)
+	sub	PTR(1),PTRN(sp),#0
+	cmn	x0,xzr				// clear carry flag
+#else
+	sub	PTR(3),PTR(3),x5,lsl#2		// rewind PTR(3)
+	subs	PTR(1),PTRN(sp),#0		// clear carry flag
+#endif
+	add	PTR(2),PTRN(sp),x5,lsl#2
 
 .LNEON_sub:
-	ldp	w4,w5,[x1],#8
-	ldp	w6,w7,[x1],#8
-	ldp	w8,w9,[x3],#8
-	ldp	w10,w11,[x3],#8
+	ldp	w4,w5,[PTR(1)],#8
+	ldp	w6,w7,[PTR(1)],#8
+	ldp	w8,w9,[PTR(3)],#8
+	ldp	w10,w11,[PTR(3)],#8
 	sbcs	w8,w4,w8
 	sbcs	w9,w5,w9
 	sbcs	w10,w6,w10
 	sbcs	w11,w7,w11
 	sub	x17,x2,x1
-	stp	w8,w9,[x0],#8
-	stp	w10,w11,[x0],#8
+	stp	w8,w9,[PTR(0)],#8
+	stp	w10,w11,[PTR(0)],#8
 	cbnz	x17,.LNEON_sub
 
-	ldr	w10, [x1]		// load top-most bit
+	ldr	w10, [PTR(1)]		// load top-most bit
 	mov	x11,sp
 	eor	v0.16b,v0.16b,v0.16b
 	sub	x11,x2,x11		// this is num*4
 	eor	v1.16b,v1.16b,v1.16b
-	mov	x1,sp
-	sub	x0,x0,x11		// rewind x0
-	mov	x3,x2		// second 3/4th of frame
+	mov	PTR(1),PTRN(sp)
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	x11,x11
+	add	PTR(0),PTR(0),x11		// rewind PTR(0)
+#else
+	sub	PTR(0),PTR(0),x11		// rewind PTR(0)
+#endif
+	mov	PTR(3),PTR(2)		// second 3/4th of frame
 	sbcs	w10,w10,wzr		// result is carry flag
 
 .LNEON_copy_n_zap:
-	ldp	w4,w5,[x1],#8
-	ldp	w6,w7,[x1],#8
-	ldp	w8,w9,[x0],#8
-	ldp	w10,w11,[x0]
-	sub	x0,x0,#8
+	ldp	w4,w5,[PTR(1)],#8
+	ldp	w6,w7,[PTR(1)],#8
+	ldp	w8,w9,[PTR(0)],#8
+	ldp	w10,w11,[PTR(0)]
+	sub	PTR(0),PTR(0),#8
 	b.cs	.LCopy_1
 	mov	w8,w4
 	mov	w9,w5
 	mov	w10,w6
 	mov	w11,w7
 .LCopy_1:
-	st1	{v0.2d,v1.2d}, [x3],#32		// wipe
-	st1	{v0.2d,v1.2d}, [x3],#32		// wipe
-	ldp	w4,w5,[x1],#8
-	ldp	w6,w7,[x1],#8
-	stp	w8,w9,[x0],#8
-	stp	w10,w11,[x0],#8
-	sub	x1,x1,#32
-	ldp	w8,w9,[x0],#8
-	ldp	w10,w11,[x0]
-	sub	x0,x0,#8
+	st1	{v0.2d,v1.2d}, [PTR(3)],#32		// wipe
+	st1	{v0.2d,v1.2d}, [PTR(3)],#32		// wipe
+	ldp	w4,w5,[PTR(1)],#8
+	ldp	w6,w7,[PTR(1)],#8
+	stp	w8,w9,[PTR(0)],#8
+	stp	w10,w11,[PTR(0)],#8
+	sub	PTR(1),PTR(1),#32
+	ldp	w8,w9,[PTR(0)],#8
+	ldp	w10,w11,[PTR(0)]
+	sub	PTR(0),PTR(0),#8
 	b.cs	.LCopy_2
 	mov	w8, w4
 	mov	w9, w5
 	mov	w10, w6
 	mov	w11, w7
 .LCopy_2:
-	st1	{v0.2d,v1.2d}, [x1],#32		// wipe
-	st1	{v0.2d,v1.2d}, [x3],#32		// wipe
+	st1	{v0.2d,v1.2d}, [PTR(1)],#32		// wipe
+	st1	{v0.2d,v1.2d}, [PTR(3)],#32		// wipe
 	sub	x17,x2,x1		// preserves carry
-	stp	w8,w9,[x0],#8
-	stp	w10,w11,[x0],#8
+	stp	w8,w9,[PTR(0)],#8
+	stp	w10,w11,[PTR(0)],#8
 	cbnz	x17,.LNEON_copy_n_zap
 
-	mov	sp,x16
-	ldp	d14,d15,[sp,#64]
-	ldp	d12,d13,[sp,#48]
-	ldp	d10,d11,[sp,#32]
-	ldp	d8,d9,[sp,#16]
-	ldr	x29,[sp],#80
+	mov	PTRN(sp),PTR(16)
+	ldp	d14,d15,[PTRN(sp),#(2*PTR_WIDTH+48)]
+	ldp	d12,d13,[PTRN(sp),#(2*PTR_WIDTH+32)]
+	ldp	d10,d11,[PTRN(sp),#(2*PTR_WIDTH+16)]
+	ldp	d8,d9,[PTRN(sp),#(2*PTR_WIDTH)]
+	ldr	PTR(29),[PTRN(sp)],#(2*PTR_WIDTH+64)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret	// bx lr
 
@@ -928,48 +995,53 @@ bn_mul8x_mont_neon:
 .type	__bn_sqr8x_mont,%function
 .align	5
 __bn_sqr8x_mont:
-	cmp	x1,x2
+	cmp	PTR(1),PTR(2)
 	b.ne	__bn_mul4x_mont
 .Lsqr8x_mont:
 	// Not adding AARCH64_SIGN_LINK_REGISTER here because __bn_sqr8x_mont is jumped to
 	// only from bn_mul_mont which has already signed the return address.
-	stp	x29,x30,[sp,#-128]!
-	add	x29,sp,#0
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	stp	x23,x24,[sp,#48]
-	stp	x25,x26,[sp,#64]
-	stp	x27,x28,[sp,#80]
-	stp	x0,x3,[sp,#96]	// offload rp and np
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(16*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
+	stp	PTR(25),PTR(26),[PTRN(sp),#(8*PTR_WIDTH)]
+	stp	PTR(27),PTR(28),[PTRN(sp),#(10*PTR_WIDTH)]
+	stp	PTR(0),PTR(3),[PTRN(sp),#(12*PTR_WIDTH)]	// offload rp and np
 
-	ldp	x6,x7,[x1,#8*0]
-	ldp	x8,x9,[x1,#8*2]
-	ldp	x10,x11,[x1,#8*4]
-	ldp	x12,x13,[x1,#8*6]
+	ldp	x6,x7,[PTR(1),#8*0]
+	ldp	x8,x9,[PTR(1),#8*2]
+	ldp	x10,x11,[PTR(1),#8*4]
+	ldp	x12,x13,[PTR(1),#8*6]
 
-	sub	x2,sp,x5,lsl#4
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	x14,x5
+	add	PTR(2),csp,x14,lsl#4
+#else
+	sub	PTR(2),sp,x5,lsl#4
+#endif
 	lsl	x5,x5,#3
-	ldr	x4,[x4]		// *n0
-	mov	sp,x2			// alloca
+	ldr	x4,[PTR(4)]		// *n0
+	mov	PTRN(sp),PTR(2)		// alloca
 	sub	x27,x5,#8*8
 	b	.Lsqr8x_zero_start
 
 .Lsqr8x_zero:
 	sub	x27,x27,#8*8
-	stp	xzr,xzr,[x2,#8*0]
-	stp	xzr,xzr,[x2,#8*2]
-	stp	xzr,xzr,[x2,#8*4]
-	stp	xzr,xzr,[x2,#8*6]
+	stp	xzr,xzr,[PTR(2),#8*0]
+	stp	xzr,xzr,[PTR(2),#8*2]
+	stp	xzr,xzr,[PTR(2),#8*4]
+	stp	xzr,xzr,[PTR(2),#8*6]
 .Lsqr8x_zero_start:
-	stp	xzr,xzr,[x2,#8*8]
-	stp	xzr,xzr,[x2,#8*10]
-	stp	xzr,xzr,[x2,#8*12]
-	stp	xzr,xzr,[x2,#8*14]
-	add	x2,x2,#8*16
+	stp	xzr,xzr,[PTR(2),#8*8]
+	stp	xzr,xzr,[PTR(2),#8*10]
+	stp	xzr,xzr,[PTR(2),#8*12]
+	stp	xzr,xzr,[PTR(2),#8*14]
+	add	PTR(2),PTR(2),#8*16
 	cbnz	x27,.Lsqr8x_zero
 
-	add	x3,x1,x5
-	add	x1,x1,#8*8
+	add	PTR(3),PTR(1),x5
+	add	PTR(1),PTR(1),#8*8
 	mov	x19,xzr
 	mov	x20,xzr
 	mov	x21,xzr
@@ -978,8 +1050,8 @@ __bn_sqr8x_mont:
 	mov	x24,xzr
 	mov	x25,xzr
 	mov	x26,xzr
-	mov	x2,sp
-	str	x4,[x29,#112]		// offload n0
+	mov	PTR(2),PTRN(sp)
+	str	x4,[PTR(29),#(14*PTR_WIDTH)]	// offload n0
 
 	// Multiply everything but a[i]*a[i]
 .align	4
@@ -1031,7 +1103,7 @@ __bn_sqr8x_mont:
 	umulh	x15,x9,x6
 	adcs	x26,x26,x16
 	umulh	x16,x10,x6
-	stp	x19,x20,[x2],#8*2	// t[0..1]
+	stp	x19,x20,[PTR(2)],#8*2	// t[0..1]
 	adc	x19,xzr,xzr		// t[8]
 	adds	x21,x21,x17		// t[2]+lo(a[1]*a[0])
 	umulh	x17,x11,x6
@@ -1060,7 +1132,7 @@ __bn_sqr8x_mont:
 	umulh	x16,x10,x7
 	adcs	x19,x19,x17
 	umulh	x17,x11,x7
-	stp	x21,x22,[x2],#8*2	// t[2..3]
+	stp	x21,x22,[PTR(2)],#8*2	// t[2..3]
 	adc	x20,xzr,xzr		// t[9]
 	adds	x23,x23,x14
 	umulh	x14,x12,x7
@@ -1085,7 +1157,7 @@ __bn_sqr8x_mont:
 	umulh	x15,x11,x8
 	adcs	x20,x20,x16
 	umulh	x16,x12,x8
-	stp	x23,x24,[x2],#8*2	// t[4..5]
+	stp	x23,x24,[PTR(2)],#8*2	// t[4..5]
 	adc	x21,xzr,xzr		// t[10]
 	adds	x25,x25,x17
 	umulh	x17,x13,x8
@@ -1106,7 +1178,7 @@ __bn_sqr8x_mont:
 	umulh	x16,x12,x9
 	adcs	x21,x21,x17
 	umulh	x17,x13,x9
-	stp	x25,x26,[x2],#8*2	// t[6..7]
+	stp	x25,x26,[PTR(2)],#8*2	// t[6..7]
 	adc	x22,xzr,xzr		// t[11]
 	adds	x19,x19,x14
 	mul	x14,x11,x10		// lo(a[5..7]*a[4])		(v)
@@ -1141,31 +1213,36 @@ __bn_sqr8x_mont:
 	adc	x24,x24,x15
 
 	adds	x24,x24,x16
-	sub	x14,x3,x5	// rewinded ap
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	x14,x5
+	add	PTR(14),PTR(3),x14	// rewinded ap
+#else
+	sub	PTR(14),PTR(3),x5	// rewinded ap
+#endif
 	adc	x25,xzr,xzr		// t[14]
 	add	x25,x25,x17
 
 	cbz	x27,.Lsqr8x_outer_break
 
 	mov	x4,x6
-	ldp	x6,x7,[x2,#8*0]
-	ldp	x8,x9,[x2,#8*2]
-	ldp	x10,x11,[x2,#8*4]
-	ldp	x12,x13,[x2,#8*6]
+	ldp	x6,x7,[PTR(2),#8*0]
+	ldp	x8,x9,[PTR(2),#8*2]
+	ldp	x10,x11,[PTR(2),#8*4]
+	ldp	x12,x13,[PTR(2),#8*6]
 	adds	x19,x19,x6
 	adcs	x20,x20,x7
-	ldp	x6,x7,[x1,#8*0]
+	ldp	x6,x7,[PTR(1),#8*0]
 	adcs	x21,x21,x8
 	adcs	x22,x22,x9
-	ldp	x8,x9,[x1,#8*2]
+	ldp	x8,x9,[PTR(1),#8*2]
 	adcs	x23,x23,x10
 	adcs	x24,x24,x11
-	ldp	x10,x11,[x1,#8*4]
+	ldp	x10,x11,[PTR(1),#8*4]
 	adcs	x25,x25,x12
-	mov	x0,x1
+	mov	PTR(0),PTR(1)
 	adcs	x26,xzr,x13
-	ldp	x12,x13,[x1,#8*6]
-	add	x1,x1,#8*8
+	ldp	x12,x13,[PTR(1),#8*6]
+	add	PTR(1),PTR(1),#8*8
 	//adc	x28,xzr,xzr		// moved below
 	mov	x27,#-8*8
 
@@ -1215,7 +1292,7 @@ __bn_sqr8x_mont:
 	adcs	x26,x26,x17
 	umulh	x17,x9,x4
 	adc	x28,x28,xzr
-	str	x19,[x2],#8
+	str	x19,[PTR(2)],#8
 	adds	x19,x20,x14
 	umulh	x14,x10,x4
 	adcs	x20,x21,x15
@@ -1224,7 +1301,7 @@ __bn_sqr8x_mont:
 	umulh	x16,x12,x4
 	adcs	x22,x23,x17
 	umulh	x17,x13,x4
-	ldr	x4,[x0,x27]
+	ldr	x4,[PTR(0),x27]
 	adcs	x23,x24,x14
 	adcs	x24,x25,x15
 	adcs	x25,x26,x16
@@ -1233,70 +1310,75 @@ __bn_sqr8x_mont:
 	cbnz	x27,.Lsqr8x_mul
 					// note that carry flag is guaranteed
 					// to be zero at this point
-	cmp	x1,x3		// done yet?
+	cmp	PTR(1),PTR(3)		// done yet?
 	b.eq	.Lsqr8x_break
 
-	ldp	x6,x7,[x2,#8*0]
-	ldp	x8,x9,[x2,#8*2]
-	ldp	x10,x11,[x2,#8*4]
-	ldp	x12,x13,[x2,#8*6]
+	ldp	x6,x7,[PTR(2),#8*0]
+	ldp	x8,x9,[PTR(2),#8*2]
+	ldp	x10,x11,[PTR(2),#8*4]
+	ldp	x12,x13,[PTR(2),#8*6]
 	adds	x19,x19,x6
-	ldur	x4,[x0,#-8*8]
+	ldur	x4,[PTR(0),#-8*8]
 	adcs	x20,x20,x7
-	ldp	x6,x7,[x1,#8*0]
+	ldp	x6,x7,[PTR(1),#8*0]
 	adcs	x21,x21,x8
 	adcs	x22,x22,x9
-	ldp	x8,x9,[x1,#8*2]
+	ldp	x8,x9,[PTR(1),#8*2]
 	adcs	x23,x23,x10
 	adcs	x24,x24,x11
-	ldp	x10,x11,[x1,#8*4]
+	ldp	x10,x11,[PTR(1),#8*4]
 	adcs	x25,x25,x12
 	mov	x27,#-8*8
 	adcs	x26,x26,x13
-	ldp	x12,x13,[x1,#8*6]
-	add	x1,x1,#8*8
+	ldp	x12,x13,[PTR(1),#8*6]
+	add	PTR(1),PTR(1),#8*8
 	//adc	x28,xzr,xzr		// moved above
 	b	.Lsqr8x_mul
 
 .align	4
 .Lsqr8x_break:
-	ldp	x6,x7,[x0,#8*0]
-	add	x1,x0,#8*8
-	ldp	x8,x9,[x0,#8*2]
-	sub	x14,x3,x1		// is it last iteration?
-	ldp	x10,x11,[x0,#8*4]
-	sub	x15,x2,x14
-	ldp	x12,x13,[x0,#8*6]
+	ldp	x6,x7,[PTR(0),#8*0]
+	add	PTR(1),PTR(0),#8*8
+	ldp	x8,x9,[PTR(0),#8*2]
+	sub	x14,x3,x1	// is it last iteration?
+	ldp	x10,x11,[PTR(0),#8*4]
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	x14,x14
+	add	PTR(15),PTR(2),x14
+#else
+	sub	PTR(15),PTR(2),x14
+#endif
+	ldp	x12,x13,[PTR(0),#8*6]
 	cbz	x14,.Lsqr8x_outer_loop
 
-	stp	x19,x20,[x2,#8*0]
-	ldp	x19,x20,[x15,#8*0]
-	stp	x21,x22,[x2,#8*2]
-	ldp	x21,x22,[x15,#8*2]
-	stp	x23,x24,[x2,#8*4]
-	ldp	x23,x24,[x15,#8*4]
-	stp	x25,x26,[x2,#8*6]
-	mov	x2,x15
-	ldp	x25,x26,[x15,#8*6]
+	stp	x19,x20,[PTR(2),#8*0]
+	ldp	x19,x20,[PTR(15),#8*0]
+	stp	x21,x22,[PTR(2),#8*2]
+	ldp	x21,x22,[PTR(15),#8*2]
+	stp	x23,x24,[PTR(2),#8*4]
+	ldp	x23,x24,[PTR(15),#8*4]
+	stp	x25,x26,[PTR(2),#8*6]
+	mov	PTR(2),PTR(15)
+	ldp	x25,x26,[PTR(15),#8*6]
 	b	.Lsqr8x_outer_loop
 
 .align	4
 .Lsqr8x_outer_break:
 	// Now multiply above result by 2 and add a[n-1]*a[n-1]|...|a[0]*a[0]
-	ldp	x7,x9,[x14,#8*0]	// recall that x14 is &a[0]
-	ldp	x15,x16,[sp,#8*1]
-	ldp	x11,x13,[x14,#8*2]
-	add	x1,x14,#8*4
-	ldp	x17,x14,[sp,#8*3]
+	ldp	x7,x9,[PTR(14),#8*0]	// recall that x14 is &a[0]
+	ldp	x15,x16,[PTRN(sp),#8*1]
+	ldp	x11,x13,[PTR(14),#8*2]
+	add	PTR(1),PTR(14),#8*4
+	ldp	x17,x14,[PTRN(sp),#8*3]
 
-	stp	x19,x20,[x2,#8*0]
+	stp	x19,x20,[PTR(2),#8*0]
 	mul	x19,x7,x7
-	stp	x21,x22,[x2,#8*2]
+	stp	x21,x22,[PTR(2),#8*2]
 	umulh	x7,x7,x7
-	stp	x23,x24,[x2,#8*4]
+	stp	x23,x24,[PTR(2),#8*4]
 	mul	x8,x9,x9
-	stp	x25,x26,[x2,#8*6]
-	mov	x2,sp
+	stp	x25,x26,[PTR(2),#8*6]
+	mov	PTR(2),PTRN(sp)
 	umulh	x9,x9,x9
 	adds	x20,x7,x15,lsl#1
 	extr	x15,x16,x15,#63
@@ -1307,76 +1389,81 @@ __bn_sqr8x_mont:
 	extr	x16,x17,x16,#63
 	sub	x27,x27,#8*4
 	adcs	x22,x9,x16
-	ldp	x15,x16,[x2,#8*5]
+	ldp	x15,x16,[PTR(2),#8*5]
 	mul	x10,x11,x11
-	ldp	x7,x9,[x1],#8*2
+	ldp	x7,x9,[PTR(1)],#8*2
 	umulh	x11,x11,x11
 	mul	x12,x13,x13
 	umulh	x13,x13,x13
 	extr	x17,x14,x17,#63
-	stp	x19,x20,[x2,#8*0]
+	stp	x19,x20,[PTR(2),#8*0]
 	adcs	x23,x10,x17
 	extr	x14,x15,x14,#63
-	stp	x21,x22,[x2,#8*2]
+	stp	x21,x22,[PTR(2),#8*2]
 	adcs	x24,x11,x14
-	ldp	x17,x14,[x2,#8*7]
+	ldp	x17,x14,[PTR(2),#8*7]
 	extr	x15,x16,x15,#63
 	adcs	x25,x12,x15
 	extr	x16,x17,x16,#63
 	adcs	x26,x13,x16
-	ldp	x15,x16,[x2,#8*9]
+	ldp	x15,x16,[PTR(2),#8*9]
 	mul	x6,x7,x7
-	ldp	x11,x13,[x1],#8*2
+	ldp	x11,x13,[PTR(1)],#8*2
 	umulh	x7,x7,x7
 	mul	x8,x9,x9
 	umulh	x9,x9,x9
-	stp	x23,x24,[x2,#8*4]
+	stp	x23,x24,[PTR(2),#8*4]
 	extr	x17,x14,x17,#63
-	stp	x25,x26,[x2,#8*6]
-	add	x2,x2,#8*8
+	stp	x25,x26,[PTR(2),#8*6]
+	add	PTR(2),PTR(2),#8*8
 	adcs	x19,x6,x17
 	extr	x14,x15,x14,#63
 	adcs	x20,x7,x14
-	ldp	x17,x14,[x2,#8*3]
+	ldp	x17,x14,[PTR(2),#8*3]
 	extr	x15,x16,x15,#63
 	cbnz	x27,.Lsqr4x_shift_n_add
-	ldp	x1,x4,[x29,#104]	// pull np and n0
+#ifdef __CHERI_PURE_CAPABILITY__
+	ldr	PTR(1),[PTR(29),#(13*PTR_WIDTH)]		// pull np
+	ldr	x4,[PTR(29),#(14*PTR_WIDTH)]		// pull n0
+#else
+	ldp	PTR(1),x4,[PTR(29),#(13*PTR_WIDTH)]	// pull np and n0
+#endif
 
 	adcs	x21,x8,x15
 	extr	x16,x17,x16,#63
 	adcs	x22,x9,x16
-	ldp	x15,x16,[x2,#8*5]
+	ldp	x15,x16,[PTR(2),#8*5]
 	mul	x10,x11,x11
 	umulh	x11,x11,x11
-	stp	x19,x20,[x2,#8*0]
+	stp	x19,x20,[PTR(2),#8*0]
 	mul	x12,x13,x13
 	umulh	x13,x13,x13
-	stp	x21,x22,[x2,#8*2]
+	stp	x21,x22,[PTR(2),#8*2]
 	extr	x17,x14,x17,#63
 	adcs	x23,x10,x17
 	extr	x14,x15,x14,#63
-	ldp	x19,x20,[sp,#8*0]
+	ldp	x19,x20,[PTRN(sp),#8*0]
 	adcs	x24,x11,x14
 	extr	x15,x16,x15,#63
-	ldp	x6,x7,[x1,#8*0]
+	ldp	x6,x7,[PTR(1),#8*0]
 	adcs	x25,x12,x15
 	extr	x16,xzr,x16,#63
-	ldp	x8,x9,[x1,#8*2]
+	ldp	x8,x9,[PTR(1),#8*2]
 	adc	x26,x13,x16
-	ldp	x10,x11,[x1,#8*4]
+	ldp	x10,x11,[PTR(1),#8*4]
 
 	// Reduce by 512 bits per iteration
 	mul	x28,x4,x19		// t[0]*n0
-	ldp	x12,x13,[x1,#8*6]
-	add	x3,x1,x5
-	ldp	x21,x22,[sp,#8*2]
-	stp	x23,x24,[x2,#8*4]
-	ldp	x23,x24,[sp,#8*4]
-	stp	x25,x26,[x2,#8*6]
-	ldp	x25,x26,[sp,#8*6]
-	add	x1,x1,#8*8
+	ldp	x12,x13,[PTR(1),#8*6]
+	add	PTR(3),PTR(1),x5
+	ldp	x21,x22,[PTRN(sp),#8*2]
+	stp	x23,x24,[PTR(2),#8*4]
+	ldp	x23,x24,[PTRN(sp),#8*4]
+	stp	x25,x26,[PTR(2),#8*6]
+	ldp	x25,x26,[PTRN(sp),#8*6]
+	add	PTR(1),PTR(1),#8*8
 	mov	x30,xzr		// initial top-most carry
-	mov	x2,sp
+	mov	PTR(2),PTRN(sp)
 	mov	x27,#8
 
 .Lsqr8x_reduction:
@@ -1384,7 +1471,7 @@ __bn_sqr8x_mont:
 	mul	x15,x7,x28
 	sub	x27,x27,#1
 	mul	x16,x8,x28
-	str	x28,[x2],#8		// put aside t[0]*n0 for tail processing
+	str	x28,[PTR(2)],#8		// put aside t[0]*n0 for tail processing
 	mul	x17,x9,x28
 	// (*)	adds	xzr,x19,x14
 	subs	xzr,x19,#1		// (*)
@@ -1419,16 +1506,16 @@ __bn_sqr8x_mont:
 	adc	x26,x26,x17
 	cbnz	x27,.Lsqr8x_reduction
 
-	ldp	x14,x15,[x2,#8*0]
-	ldp	x16,x17,[x2,#8*2]
-	mov	x0,x2
+	ldp	x14,x15,[PTR(2),#8*0]
+	ldp	x16,x17,[PTR(2),#8*2]
+	mov	PTR(0),PTR(2)
 	sub	x27,x3,x1	// done yet?
 	adds	x19,x19,x14
 	adcs	x20,x20,x15
-	ldp	x14,x15,[x2,#8*4]
+	ldp	x14,x15,[PTR(2),#8*4]
 	adcs	x21,x21,x16
 	adcs	x22,x22,x17
-	ldp	x16,x17,[x2,#8*6]
+	ldp	x16,x17,[PTR(2),#8*6]
 	adcs	x23,x23,x14
 	adcs	x24,x24,x15
 	adcs	x25,x25,x16
@@ -1436,13 +1523,13 @@ __bn_sqr8x_mont:
 	//adc	x28,xzr,xzr		// moved below
 	cbz	x27,.Lsqr8x8_post_condition
 
-	ldur	x4,[x2,#-8*8]
-	ldp	x6,x7,[x1,#8*0]
-	ldp	x8,x9,[x1,#8*2]
-	ldp	x10,x11,[x1,#8*4]
+	ldur	x4,[PTR(2),#-8*8]
+	ldp	x6,x7,[PTR(1),#8*0]
+	ldp	x8,x9,[PTR(1),#8*2]
+	ldp	x10,x11,[PTR(1),#8*4]
 	mov	x27,#-8*8
-	ldp	x12,x13,[x1,#8*6]
-	add	x1,x1,#8*8
+	ldp	x12,x13,[PTR(1),#8*6]
+	add	PTR(1),PTR(1),#8*8
 
 .Lsqr8x_tail:
 	mul	x14,x6,x4
@@ -1468,7 +1555,7 @@ __bn_sqr8x_mont:
 	adcs	x26,x26,x17
 	umulh	x17,x9,x4
 	adc	x28,x28,xzr
-	str	x19,[x2],#8
+	str	x19,[PTR(2)],#8
 	adds	x19,x20,x14
 	umulh	x14,x10,x4
 	adcs	x20,x21,x15
@@ -1477,7 +1564,7 @@ __bn_sqr8x_mont:
 	umulh	x16,x12,x4
 	adcs	x22,x23,x17
 	umulh	x17,x13,x4
-	ldr	x4,[x0,x27]
+	ldr	x4,[PTR(0),x27]
 	adcs	x23,x24,x14
 	adcs	x24,x25,x15
 	adcs	x25,x26,x16
@@ -1486,63 +1573,68 @@ __bn_sqr8x_mont:
 	cbnz	x27,.Lsqr8x_tail
 					// note that carry flag is guaranteed
 					// to be zero at this point
-	ldp	x6,x7,[x2,#8*0]
+	ldp	x6,x7,[PTR(2),#8*0]
 	sub	x27,x3,x1	// done yet?
-	sub	x16,x3,x5	// rewinded np
-	ldp	x8,x9,[x2,#8*2]
-	ldp	x10,x11,[x2,#8*4]
-	ldp	x12,x13,[x2,#8*6]
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	x16,x5
+	add	PTR(16),PTR(3),x16	// rewinded np
+#else
+	sub	PTR(16),PTR(3),x5	// rewinded np
+#endif
+	ldp	x8,x9,[PTR(2),#8*2]
+	ldp	x10,x11,[PTR(2),#8*4]
+	ldp	x12,x13,[PTR(2),#8*6]
 	cbz	x27,.Lsqr8x_tail_break
 
-	ldur	x4,[x0,#-8*8]
+	ldur	x4,[PTR(0),#-8*8]
 	adds	x19,x19,x6
 	adcs	x20,x20,x7
-	ldp	x6,x7,[x1,#8*0]
+	ldp	x6,x7,[PTR(1),#8*0]
 	adcs	x21,x21,x8
 	adcs	x22,x22,x9
-	ldp	x8,x9,[x1,#8*2]
+	ldp	x8,x9,[PTR(1),#8*2]
 	adcs	x23,x23,x10
 	adcs	x24,x24,x11
-	ldp	x10,x11,[x1,#8*4]
+	ldp	x10,x11,[PTR(1),#8*4]
 	adcs	x25,x25,x12
 	mov	x27,#-8*8
 	adcs	x26,x26,x13
-	ldp	x12,x13,[x1,#8*6]
-	add	x1,x1,#8*8
+	ldp	x12,x13,[PTR(1),#8*6]
+	add	PTR(1),PTR(1),#8*8
 	//adc	x28,xzr,xzr		// moved above
 	b	.Lsqr8x_tail
 
 .align	4
 .Lsqr8x_tail_break:
-	ldr	x4,[x29,#112]		// pull n0
+	ldr	x4,[PTR(29),#(14*PTR_WIDTH)]	// pull n0
 	add	x27,x2,#8*8		// end of current t[num] window
 
 	subs	xzr,x30,#1		// "move" top-most carry to carry bit
 	adcs	x14,x19,x6
 	adcs	x15,x20,x7
-	ldp	x19,x20,[x0,#8*0]
+	ldp	x19,x20,[PTR(0),#8*0]
 	adcs	x21,x21,x8
-	ldp	x6,x7,[x16,#8*0]	// recall that x16 is &n[0]
+	ldp	x6,x7,[PTR(16),#8*0]	// recall that x16 is &n[0]
 	adcs	x22,x22,x9
-	ldp	x8,x9,[x16,#8*2]
+	ldp	x8,x9,[PTR(16),#8*2]
 	adcs	x23,x23,x10
 	adcs	x24,x24,x11
-	ldp	x10,x11,[x16,#8*4]
+	ldp	x10,x11,[PTR(16),#8*4]
 	adcs	x25,x25,x12
 	adcs	x26,x26,x13
-	ldp	x12,x13,[x16,#8*6]
-	add	x1,x16,#8*8
+	ldp	x12,x13,[PTR(16),#8*6]
+	add	PTR(1),PTR(16),#8*8
 	adc	x30,xzr,xzr	// top-most carry
 	mul	x28,x4,x19
-	stp	x14,x15,[x2,#8*0]
-	stp	x21,x22,[x2,#8*2]
-	ldp	x21,x22,[x0,#8*2]
-	stp	x23,x24,[x2,#8*4]
-	ldp	x23,x24,[x0,#8*4]
+	stp	x14,x15,[PTR(2),#8*0]
+	stp	x21,x22,[PTR(2),#8*2]
+	ldp	x21,x22,[PTR(0),#8*2]
+	stp	x23,x24,[PTR(2),#8*4]
+	ldp	x23,x24,[PTR(0),#8*4]
 	cmp	x27,x29		// did we hit the bottom?
-	stp	x25,x26,[x2,#8*6]
-	mov	x2,x0			// slide the window
-	ldp	x25,x26,[x0,#8*6]
+	stp	x25,x26,[PTR(2),#8*6]
+	mov	PTR(2),PTR(0)			// slide the window
+	ldp	x25,x26,[PTR(0),#8*6]
 	mov	x27,#8
 	b.ne	.Lsqr8x_reduction
 
@@ -1550,139 +1642,139 @@ __bn_sqr8x_mont:
 	// if it is, subtract the modulus. But comparison implies
 	// subtraction. So we subtract modulus, see if it borrowed,
 	// and conditionally copy original value.
-	ldr	x0,[x29,#96]		// pull rp
-	add	x2,x2,#8*8
+	ldr	PTR(0),[PTR(29),#(12*PTR_WIDTH)]	// pull rp
+	add	PTR(2),PTR(2),#8*8
 	subs	x14,x19,x6
 	sbcs	x15,x20,x7
 	sub	x27,x5,#8*8
-	mov	x3,x0		// x0 copy
+	mov	PTR(3),PTR(0)		// PTR(0) copy
 
 .Lsqr8x_sub:
 	sbcs	x16,x21,x8
-	ldp	x6,x7,[x1,#8*0]
+	ldp	x6,x7,[PTR(1),#8*0]
 	sbcs	x17,x22,x9
-	stp	x14,x15,[x0,#8*0]
+	stp	x14,x15,[PTR(0),#8*0]
 	sbcs	x14,x23,x10
-	ldp	x8,x9,[x1,#8*2]
+	ldp	x8,x9,[PTR(1),#8*2]
 	sbcs	x15,x24,x11
-	stp	x16,x17,[x0,#8*2]
+	stp	x16,x17,[PTR(0),#8*2]
 	sbcs	x16,x25,x12
-	ldp	x10,x11,[x1,#8*4]
+	ldp	x10,x11,[PTR(1),#8*4]
 	sbcs	x17,x26,x13
-	ldp	x12,x13,[x1,#8*6]
-	add	x1,x1,#8*8
-	ldp	x19,x20,[x2,#8*0]
+	ldp	x12,x13,[PTR(1),#8*6]
+	add	PTR(1),PTR(1),#8*8
+	ldp	x19,x20,[PTR(2),#8*0]
 	sub	x27,x27,#8*8
-	ldp	x21,x22,[x2,#8*2]
-	ldp	x23,x24,[x2,#8*4]
-	ldp	x25,x26,[x2,#8*6]
-	add	x2,x2,#8*8
-	stp	x14,x15,[x0,#8*4]
+	ldp	x21,x22,[PTR(2),#8*2]
+	ldp	x23,x24,[PTR(2),#8*4]
+	ldp	x25,x26,[PTR(2),#8*6]
+	add	PTR(2),PTR(2),#8*8
+	stp	x14,x15,[PTR(0),#8*4]
 	sbcs	x14,x19,x6
-	stp	x16,x17,[x0,#8*6]
-	add	x0,x0,#8*8
+	stp	x16,x17,[PTR(0),#8*6]
+	add	PTR(0),PTR(0),#8*8
 	sbcs	x15,x20,x7
 	cbnz	x27,.Lsqr8x_sub
 
 	sbcs	x16,x21,x8
-	mov	x2,sp
-	add	x1,sp,x5
-	ldp	x6,x7,[x3,#8*0]
+	mov	PTR(2),PTRN(sp)
+	add	PTR(1),PTRN(sp),x5
+	ldp	x6,x7,[PTR(3),#8*0]
 	sbcs	x17,x22,x9
-	stp	x14,x15,[x0,#8*0]
+	stp	x14,x15,[PTR(0),#8*0]
 	sbcs	x14,x23,x10
-	ldp	x8,x9,[x3,#8*2]
+	ldp	x8,x9,[PTR(3),#8*2]
 	sbcs	x15,x24,x11
-	stp	x16,x17,[x0,#8*2]
+	stp	x16,x17,[PTR(0),#8*2]
 	sbcs	x16,x25,x12
-	ldp	x19,x20,[x1,#8*0]
+	ldp	x19,x20,[PTR(1),#8*0]
 	sbcs	x17,x26,x13
-	ldp	x21,x22,[x1,#8*2]
+	ldp	x21,x22,[PTR(1),#8*2]
 	sbcs	xzr,x30,xzr	// did it borrow?
-	ldr	x30,[x29,#8]		// pull return address
-	stp	x14,x15,[x0,#8*4]
-	stp	x16,x17,[x0,#8*6]
+	ldr	PTR(30),[PTR(29),#PTR_WIDTH]	// pull return address
+	stp	x14,x15,[PTR(0),#8*4]
+	stp	x16,x17,[PTR(0),#8*6]
 
 	sub	x27,x5,#8*4
 .Lsqr4x_cond_copy:
 	sub	x27,x27,#8*4
 	csel	x14,x19,x6,lo
-	stp	xzr,xzr,[x2,#8*0]
+	stp	xzr,xzr,[PTR(2),#8*0]
 	csel	x15,x20,x7,lo
-	ldp	x6,x7,[x3,#8*4]
-	ldp	x19,x20,[x1,#8*4]
+	ldp	x6,x7,[PTR(3),#8*4]
+	ldp	x19,x20,[PTR(1),#8*4]
 	csel	x16,x21,x8,lo
-	stp	xzr,xzr,[x2,#8*2]
-	add	x2,x2,#8*4
+	stp	xzr,xzr,[PTR(2),#8*2]
+	add	PTR(2),PTR(2),#8*4
 	csel	x17,x22,x9,lo
-	ldp	x8,x9,[x3,#8*6]
-	ldp	x21,x22,[x1,#8*6]
-	add	x1,x1,#8*4
-	stp	x14,x15,[x3,#8*0]
-	stp	x16,x17,[x3,#8*2]
-	add	x3,x3,#8*4
-	stp	xzr,xzr,[x1,#8*0]
-	stp	xzr,xzr,[x1,#8*2]
+	ldp	x8,x9,[PTR(3),#8*6]
+	ldp	x21,x22,[PTR(1),#8*6]
+	add	PTR(1),PTR(1),#8*4
+	stp	x14,x15,[PTR(3),#8*0]
+	stp	x16,x17,[PTR(3),#8*2]
+	add	PTR(3),PTR(3),#8*4
+	stp	xzr,xzr,[PTR(1),#8*0]
+	stp	xzr,xzr,[PTR(1),#8*2]
 	cbnz	x27,.Lsqr4x_cond_copy
 
 	csel	x14,x19,x6,lo
-	stp	xzr,xzr,[x2,#8*0]
+	stp	xzr,xzr,[PTR(2),#8*0]
 	csel	x15,x20,x7,lo
-	stp	xzr,xzr,[x2,#8*2]
+	stp	xzr,xzr,[PTR(2),#8*2]
 	csel	x16,x21,x8,lo
 	csel	x17,x22,x9,lo
-	stp	x14,x15,[x3,#8*0]
-	stp	x16,x17,[x3,#8*2]
+	stp	x14,x15,[PTR(3),#8*0]
+	stp	x16,x17,[PTR(3),#8*2]
 
 	b	.Lsqr8x_done
 
 .align	4
 .Lsqr8x8_post_condition:
 	adc	x28,xzr,xzr
-	ldr	x30,[x29,#8]		// pull return address
+	ldr	PTR(30),[PTR(29),#PTR_WIDTH]	// pull return address
 	// x19-7,x28 hold result, x6-7 hold modulus
 	subs	x6,x19,x6
-	ldr	x1,[x29,#96]		// pull rp
+	ldr	PTR(1),[PTR(29),#(12*PTR_WIDTH)]	// pull rp
 	sbcs	x7,x20,x7
-	stp	xzr,xzr,[sp,#8*0]
+	stp	xzr,xzr,[PTRN(sp),#8*0]
 	sbcs	x8,x21,x8
-	stp	xzr,xzr,[sp,#8*2]
+	stp	xzr,xzr,[PTRN(sp),#8*2]
 	sbcs	x9,x22,x9
-	stp	xzr,xzr,[sp,#8*4]
+	stp	xzr,xzr,[PTRN(sp),#8*4]
 	sbcs	x10,x23,x10
-	stp	xzr,xzr,[sp,#8*6]
+	stp	xzr,xzr,[PTRN(sp),#8*6]
 	sbcs	x11,x24,x11
-	stp	xzr,xzr,[sp,#8*8]
+	stp	xzr,xzr,[PTRN(sp),#8*8]
 	sbcs	x12,x25,x12
-	stp	xzr,xzr,[sp,#8*10]
+	stp	xzr,xzr,[PTRN(sp),#8*10]
 	sbcs	x13,x26,x13
-	stp	xzr,xzr,[sp,#8*12]
+	stp	xzr,xzr,[PTRN(sp),#8*12]
 	sbcs	x28,x28,xzr	// did it borrow?
-	stp	xzr,xzr,[sp,#8*14]
+	stp	xzr,xzr,[PTRN(sp),#8*14]
 
 	// x6-7 hold result-modulus
 	csel	x6,x19,x6,lo
 	csel	x7,x20,x7,lo
 	csel	x8,x21,x8,lo
 	csel	x9,x22,x9,lo
-	stp	x6,x7,[x1,#8*0]
+	stp	x6,x7,[PTR(1),#8*0]
 	csel	x10,x23,x10,lo
 	csel	x11,x24,x11,lo
-	stp	x8,x9,[x1,#8*2]
+	stp	x8,x9,[PTR(1),#8*2]
 	csel	x12,x25,x12,lo
 	csel	x13,x26,x13,lo
-	stp	x10,x11,[x1,#8*4]
-	stp	x12,x13,[x1,#8*6]
+	stp	x10,x11,[PTR(1),#8*4]
+	stp	x12,x13,[PTR(1),#8*6]
 
 .Lsqr8x_done:
-	ldp	x19,x20,[x29,#16]
-	mov	sp,x29
-	ldp	x21,x22,[x29,#32]
+	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
+	mov	PTRN(sp),PTR(29)
+	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
 	mov	x0,#1
-	ldp	x23,x24,[x29,#48]
-	ldp	x25,x26,[x29,#64]
-	ldp	x27,x28,[x29,#80]
-	ldr	x29,[sp],#128
+	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
+	ldp	PTR(25),PTR(26),[PTR(29),#(8*PTR_WIDTH)]
+	ldp	PTR(27),PTR(28),[PTR(29),#(10*PTR_WIDTH)]
+	ldr	PTR(29),[PTRN(sp)],#(16*PTR_WIDTH)
 	// x30 is loaded earlier
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
@@ -1692,37 +1784,47 @@ __bn_sqr8x_mont:
 __bn_mul4x_mont:
 	// Not adding AARCH64_SIGN_LINK_REGISTER here because __bn_mul4x_mont is jumped to
 	// only from bn_mul_mont (or __bn_sqr8x_mont from bn_mul_mont) which has already signed the return address.
-	stp	x29,x30,[sp,#-128]!
-	add	x29,sp,#0
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	stp	x23,x24,[sp,#48]
-	stp	x25,x26,[sp,#64]
-	stp	x27,x28,[sp,#80]
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(16*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
+	stp	PTR(25),PTR(26),[PTRN(sp),#(8*PTR_WIDTH)]
+	stp	PTR(27),PTR(28),[PTRN(sp),#(10*PTR_WIDTH)]
 
-	sub	x26,sp,x5,lsl#3
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	x10,x5
+	add	PTR(26),csp,x10,lsl#3
+#else
+	sub	PTR(26),sp,x5,lsl#3
+#endif
 	lsl	x5,x5,#3
-	ldr	x4,[x4]		// *n0
-	sub	sp,x26,#8*4		// alloca
+	ldr	x4,[PTR(4)]		// *n0
+	sub	PTRN(sp),PTR(26),#8*4	// alloca
 
-	add	x10,x2,x5
-	add	x27,x1,x5
-	stp	x0,x10,[x29,#96]	// offload rp and &b[num]
+	add	PTR(10),PTR(2),x5
+	add	PTR(27),PTR(1),x5
+	stp	PTR(0),PTR(10),[PTR(29),#(12*PTR_WIDTH)]	// offload rp and &b[num]
 
-	ldr	x24,[x2,#8*0]		// b[0]
-	ldp	x6,x7,[x1,#8*0]	// a[0..3]
-	ldp	x8,x9,[x1,#8*2]
-	add	x1,x1,#8*4
+	ldr	x24,[PTR(2),#8*0]		// b[0]
+	ldp	x6,x7,[PTR(1),#8*0]	// a[0..3]
+	ldp	x8,x9,[PTR(1),#8*2]
+	add	PTR(1),PTR(1),#8*4
 	mov	x19,xzr
 	mov	x20,xzr
 	mov	x21,xzr
 	mov	x22,xzr
-	ldp	x14,x15,[x3,#8*0]	// n[0..3]
-	ldp	x16,x17,[x3,#8*2]
-	adds	x3,x3,#8*4		// clear carry bit
+	ldp	x14,x15,[PTR(3),#8*0]	// n[0..3]
+	ldp	x16,x17,[PTR(3),#8*2]
+#ifdef __CHERI_PURE_CAPABILITY__
+	add	PTR(3),PTR(3),#8*4
+	cmn	x0,xzr			// clear carry bit
+#else
+	adds	PTR(3),PTR(3),#8*4		// clear carry bit
+#endif
 	mov	x0,xzr
 	mov	x28,#0
-	mov	x26,sp
+	mov	PTR(26),PTRN(sp)
 
 .Loop_mul4x_1st_reduction:
 	mul	x10,x6,x24		// lo(a[0..3]*b[0])
@@ -1742,10 +1844,10 @@ __bn_mul4x_mont:
 	umulh	x12,x8,x24
 	adc	x23,xzr,xzr
 	umulh	x13,x9,x24
-	ldr	x24,[x2,x28]		// next b[i] (or b[0])
+	ldr	x24,[PTR(2),x28]		// next b[i] (or b[0])
 	adds	x20,x20,x10
 	// (*)	mul	x10,x14,x25	// lo(n[0..3]*t[0]*n0)
-	str	x25,[x26],#8		// put aside t[0]*n0 for tail processing
+	str	x25,[PTR(26)],#8		// put aside t[0]*n0 for tail processing
 	adcs	x21,x21,x11
 	mul	x11,x15,x25
 	adcs	x22,x22,x12
@@ -1773,13 +1875,13 @@ __bn_mul4x_mont:
 
 	cbz	x10,.Lmul4x4_post_condition
 
-	ldp	x6,x7,[x1,#8*0]	// a[4..7]
-	ldp	x8,x9,[x1,#8*2]
-	add	x1,x1,#8*4
-	ldr	x25,[sp]		// a[0]*n0
-	ldp	x14,x15,[x3,#8*0]	// n[4..7]
-	ldp	x16,x17,[x3,#8*2]
-	add	x3,x3,#8*4
+	ldp	x6,x7,[PTR(1),#8*0]	// a[4..7]
+	ldp	x8,x9,[PTR(1),#8*2]
+	add	PTR(1),PTR(1),#8*4
+	ldr	x25,[PTRN(sp)]		// a[0]*n0
+	ldp	x14,x15,[PTR(3),#8*0]	// n[4..7]
+	ldp	x16,x17,[PTR(3),#8*2]
+	add	PTR(3),PTR(3),#8*4
 
 .Loop_mul4x_1st_tail:
 	mul	x10,x6,x24		// lo(a[4..7]*b[i])
@@ -1798,7 +1900,7 @@ __bn_mul4x_mont:
 	adcs	x22,x22,x13
 	umulh	x13,x9,x24
 	adc	x23,xzr,xzr
-	ldr	x24,[x2,x28]		// next b[i] (or b[0])
+	ldr	x24,[PTR(2),x28]		// next b[i] (or b[0])
 	adds	x20,x20,x10
 	mul	x10,x14,x25		// lo(n[4..7]*a[0]*n0)
 	adcs	x21,x21,x11
@@ -1817,45 +1919,60 @@ __bn_mul4x_mont:
 	adcs	x23,x23,x0
 	umulh	x13,x17,x25
 	adc	x0,xzr,xzr
-	ldr	x25,[sp,x28]		// next t[0]*n0
-	str	x19,[x26],#8		// result!!!
+	ldr	x25,[PTRN(sp),x28]	// next t[0]*n0
+	str	x19,[PTR(26)],#8		// result!!!
 	adds	x19,x20,x10
-	sub	x10,x27,x1		// done yet?
+	sub	x10,x27,x1	// done yet?
 	adcs	x20,x21,x11
 	adcs	x21,x22,x12
 	adcs	x22,x23,x13
 	//adc	x0,x0,xzr
 	cbnz	x28,.Loop_mul4x_1st_tail
 
-	sub	x11,x27,x5	// rewinded x1
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	x11,x5
+	add	PTR(11),PTR(27),x11	// rewinded PTR(1)
+#else
+	sub	PTR(11),PTR(27),x5	// rewinded PTR(1)
+#endif
 	cbz	x10,.Lmul4x_proceed
 
-	ldp	x6,x7,[x1,#8*0]
-	ldp	x8,x9,[x1,#8*2]
-	add	x1,x1,#8*4
-	ldp	x14,x15,[x3,#8*0]
-	ldp	x16,x17,[x3,#8*2]
-	add	x3,x3,#8*4
+	ldp	x6,x7,[PTR(1),#8*0]
+	ldp	x8,x9,[PTR(1),#8*2]
+	add	PTR(1),PTR(1),#8*4
+	ldp	x14,x15,[PTR(3),#8*0]
+	ldp	x16,x17,[PTR(3),#8*2]
+	add	PTR(3),PTR(3),#8*4
 	b	.Loop_mul4x_1st_tail
 
 .align	5
 .Lmul4x_proceed:
-	ldr	x24,[x2,#8*4]!		// *++b
+	ldr	x24,[PTR(2),#8*4]!		// *++b
 	adc	x30,x0,xzr
-	ldp	x6,x7,[x11,#8*0]	// a[0..3]
-	sub	x3,x3,x5		// rewind np
-	ldp	x8,x9,[x11,#8*2]
-	add	x1,x11,#8*4
+	ldp	x6,x7,[PTR(11),#8*0]	// a[0..3]
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	x10,x5
+	add	PTR(3),PTR(3),x10		// rewind np
+#else
+	sub	PTR(3),PTR(3),x5		// rewind np
+#endif
+	ldp	x8,x9,[PTR(11),#8*2]
+	add	PTR(1),PTR(11),#8*4
 
-	stp	x19,x20,[x26,#8*0]	// result!!!
-	ldp	x19,x20,[sp,#8*4]	// t[0..3]
-	stp	x21,x22,[x26,#8*2]	// result!!!
-	ldp	x21,x22,[sp,#8*6]
+	stp	x19,x20,[PTR(26),#8*0]	// result!!!
+	ldp	x19,x20,[PTRN(sp),#8*4]	// t[0..3]
+	stp	x21,x22,[PTR(26),#8*2]	// result!!!
+	ldp	x21,x22,[PTRN(sp),#8*6]
 
-	ldp	x14,x15,[x3,#8*0]	// n[0..3]
-	mov	x26,sp
-	ldp	x16,x17,[x3,#8*2]
-	adds	x3,x3,#8*4		// clear carry bit
+	ldp	x14,x15,[PTR(3),#8*0]	// n[0..3]
+	mov	PTR(26),PTRN(sp)
+	ldp	x16,x17,[PTR(3),#8*2]
+#ifdef __CHERI_PURE_CAPABILITY__
+	add	PTR(3),PTR(3),#8*4
+	cmn	x0,xzr			// clear carry bit
+#else
+	adds	PTR(3),PTR(3),#8*4		// clear carry bit
+#endif
 	mov	x0,xzr
 
 .align	4
@@ -1877,10 +1994,10 @@ __bn_mul4x_mont:
 	umulh	x12,x8,x24
 	adc	x23,xzr,xzr
 	umulh	x13,x9,x24
-	ldr	x24,[x2,x28]		// next b[i]
+	ldr	x24,[PTR(2),x28]		// next b[i]
 	adds	x20,x20,x10
 	// (*)	mul	x10,x14,x25
-	str	x25,[x26],#8		// put aside t[0]*n0 for tail processing
+	str	x25,[PTR(26)],#8		// put aside t[0]*n0 for tail processing
 	adcs	x21,x21,x11
 	mul	x11,x15,x25		// lo(n[0..3]*t[0]*n0
 	adcs	x22,x22,x12
@@ -1906,21 +2023,21 @@ __bn_mul4x_mont:
 	cbnz	x28,.Loop_mul4x_reduction
 
 	adc	x0,x0,xzr
-	ldp	x10,x11,[x26,#8*4]	// t[4..7]
-	ldp	x12,x13,[x26,#8*6]
-	ldp	x6,x7,[x1,#8*0]	// a[4..7]
-	ldp	x8,x9,[x1,#8*2]
-	add	x1,x1,#8*4
+	ldp	x10,x11,[PTR(26),#8*4]	// t[4..7]
+	ldp	x12,x13,[PTR(26),#8*6]
+	ldp	x6,x7,[PTR(1),#8*0]	// a[4..7]
+	ldp	x8,x9,[PTR(1),#8*2]
+	add	PTR(1),PTR(1),#8*4
 	adds	x19,x19,x10
 	adcs	x20,x20,x11
 	adcs	x21,x21,x12
 	adcs	x22,x22,x13
 	//adc	x0,x0,xzr
 
-	ldr	x25,[sp]		// t[0]*n0
-	ldp	x14,x15,[x3,#8*0]	// n[4..7]
-	ldp	x16,x17,[x3,#8*2]
-	add	x3,x3,#8*4
+	ldr	x25,[PTRN(sp)]		// t[0]*n0
+	ldp	x14,x15,[PTR(3),#8*0]	// n[4..7]
+	ldp	x16,x17,[PTR(3),#8*2]
+	add	PTR(3),PTR(3),#8*4
 
 .align	4
 .Loop_mul4x_tail:
@@ -1940,7 +2057,7 @@ __bn_mul4x_mont:
 	adcs	x22,x22,x13
 	umulh	x13,x9,x24
 	adc	x23,xzr,xzr
-	ldr	x24,[x2,x28]		// next b[i]
+	ldr	x24,[PTR(2),x28]		// next b[i]
 	adds	x20,x20,x10
 	mul	x10,x14,x25		// lo(n[4..7]*t[0]*n0)
 	adcs	x21,x21,x11
@@ -1958,62 +2075,77 @@ __bn_mul4x_mont:
 	adcs	x22,x22,x13
 	umulh	x13,x17,x25
 	adcs	x23,x23,x0
-	ldr	x25,[sp,x28]		// next a[0]*n0
+	ldr	x25,[PTRN(sp),x28]	// next a[0]*n0
 	adc	x0,xzr,xzr
-	str	x19,[x26],#8		// result!!!
+	str	x19,[PTR(26)],#8		// result!!!
 	adds	x19,x20,x10
-	sub	x10,x27,x1		// done yet?
+	sub	x10,x27,x1	// done yet?
 	adcs	x20,x21,x11
 	adcs	x21,x22,x12
 	adcs	x22,x23,x13
 	//adc	x0,x0,xzr
 	cbnz	x28,.Loop_mul4x_tail
 
-	sub	x11,x3,x5		// rewinded np?
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	x11,x5
+	add	PTR(11),PTR(3),x11		// rewinded np?
+#else
+	sub	PTR(11),PTR(3),x5		// rewinded np?
+#endif
 	adc	x0,x0,xzr
 	cbz	x10,.Loop_mul4x_break
 
-	ldp	x10,x11,[x26,#8*4]
-	ldp	x12,x13,[x26,#8*6]
-	ldp	x6,x7,[x1,#8*0]
-	ldp	x8,x9,[x1,#8*2]
-	add	x1,x1,#8*4
+	ldp	x10,x11,[PTR(26),#8*4]
+	ldp	x12,x13,[PTR(26),#8*6]
+	ldp	x6,x7,[PTR(1),#8*0]
+	ldp	x8,x9,[PTR(1),#8*2]
+	add	PTR(1),PTR(1),#8*4
 	adds	x19,x19,x10
 	adcs	x20,x20,x11
 	adcs	x21,x21,x12
 	adcs	x22,x22,x13
 	//adc	x0,x0,xzr
-	ldp	x14,x15,[x3,#8*0]
-	ldp	x16,x17,[x3,#8*2]
-	add	x3,x3,#8*4
+	ldp	x14,x15,[PTR(3),#8*0]
+	ldp	x16,x17,[PTR(3),#8*2]
+	add	PTR(3),PTR(3),#8*4
 	b	.Loop_mul4x_tail
 
 .align	4
 .Loop_mul4x_break:
-	ldp	x12,x13,[x29,#96]	// pull rp and &b[num]
+	ldp	PTR(12),PTR(13),[PTR(29),#(12*PTR_WIDTH)]	// pull rp and &b[num]
 	adds	x19,x19,x30
-	add	x2,x2,#8*4		// bp++
+	add	PTR(2),PTR(2),#8*4		// bp++
 	adcs	x20,x20,xzr
-	sub	x1,x1,x5		// rewind ap
+#ifdef __CHERI_PURE_CAPABILITY__
+	neg	x10,x5
+	add	PTR(1),PTR(1),x10		// rewind ap
+#else
+	sub	PTR(1),PTR(1),x5		// rewind ap
+#endif
 	adcs	x21,x21,xzr
-	stp	x19,x20,[x26,#8*0]	// result!!!
+	stp	x19,x20,[PTR(26),#8*0]	// result!!!
 	adcs	x22,x22,xzr
-	ldp	x19,x20,[sp,#8*4]	// t[0..3]
+	ldp	x19,x20,[PTRN(sp),#8*4]	// t[0..3]
 	adc	x30,x0,xzr
-	stp	x21,x22,[x26,#8*2]	// result!!!
-	cmp	x2,x13			// done yet?
-	ldp	x21,x22,[sp,#8*6]
-	ldp	x14,x15,[x11,#8*0]	// n[0..3]
-	ldp	x16,x17,[x11,#8*2]
-	add	x3,x11,#8*4
+	stp	x21,x22,[PTR(26),#8*2]	// result!!!
+	cmp	PTR(2),PTR(13)		// done yet?
+	ldp	x21,x22,[PTRN(sp),#8*6]
+	ldp	x14,x15,[PTR(11),#8*0]	// n[0..3]
+	ldp	x16,x17,[PTR(11),#8*2]
+	add	PTR(3),PTR(11),#8*4
 	b.eq	.Lmul4x_post
 
-	ldr	x24,[x2]
-	ldp	x6,x7,[x1,#8*0]	// a[0..3]
-	ldp	x8,x9,[x1,#8*2]
-	adds	x1,x1,#8*4		// clear carry bit
+	ldr	x24,[PTR(2)]
+	ldp	x6,x7,[PTR(1),#8*0]	// a[0..3]
+	ldp	x8,x9,[PTR(1),#8*2]
+#ifdef __CHERI_PURE_CAPABILITY__
+	add	PTR(1),PTR(1),#8*4
+	cmn	x0,xzr			// clear carry bit
+#else
+	adds	PTR(1),PTR(1),#8*4		// clear carry bit
+#endif
 	mov	x0,xzr
-	mov	x26,sp
+	mov	PTR(26),PTRN(sp)
 	b	.Loop_mul4x_reduction
 
 .align	4
@@ -2022,109 +2154,109 @@ __bn_mul4x_mont:
 	// if it is, subtract the modulus. But comparison implies
 	// subtraction. So we subtract modulus, see if it borrowed,
 	// and conditionally copy original value.
-	mov	x0,x12
-	mov	x27,x12		// x0 copy
+	mov	PTR(0),PTR(12)
+	mov	PTR(27),PTR(12)		// PTR(0) copy
 	subs	x10,x19,x14
-	add	x26,sp,#8*8
+	add	PTR(26),PTRN(sp),#8*8
 	sbcs	x11,x20,x15
 	sub	x28,x5,#8*4
 
 .Lmul4x_sub:
 	sbcs	x12,x21,x16
-	ldp	x14,x15,[x3,#8*0]
+	ldp	x14,x15,[PTR(3),#8*0]
 	sub	x28,x28,#8*4
-	ldp	x19,x20,[x26,#8*0]
+	ldp	x19,x20,[PTR(26),#8*0]
 	sbcs	x13,x22,x17
-	ldp	x16,x17,[x3,#8*2]
-	add	x3,x3,#8*4
-	ldp	x21,x22,[x26,#8*2]
-	add	x26,x26,#8*4
-	stp	x10,x11,[x0,#8*0]
+	ldp	x16,x17,[PTR(3),#8*2]
+	add	PTR(3),PTR(3),#8*4
+	ldp	x21,x22,[PTR(26),#8*2]
+	add	PTR(26),PTR(26),#8*4
+	stp	x10,x11,[PTR(0),#8*0]
 	sbcs	x10,x19,x14
-	stp	x12,x13,[x0,#8*2]
-	add	x0,x0,#8*4
+	stp	x12,x13,[PTR(0),#8*2]
+	add	PTR(0),PTR(0),#8*4
 	sbcs	x11,x20,x15
 	cbnz	x28,.Lmul4x_sub
 
 	sbcs	x12,x21,x16
-	mov	x26,sp
-	add	x1,sp,#8*4
-	ldp	x6,x7,[x27,#8*0]
+	mov	PTR(26),PTRN(sp)
+	add	PTR(1),PTRN(sp),#8*4
+	ldp	x6,x7,[PTR(27),#8*0]
 	sbcs	x13,x22,x17
-	stp	x10,x11,[x0,#8*0]
-	ldp	x8,x9,[x27,#8*2]
-	stp	x12,x13,[x0,#8*2]
-	ldp	x19,x20,[x1,#8*0]
-	ldp	x21,x22,[x1,#8*2]
+	stp	x10,x11,[PTR(0),#8*0]
+	ldp	x8,x9,[PTR(27),#8*2]
+	stp	x12,x13,[PTR(0),#8*2]
+	ldp	x19,x20,[PTR(1),#8*0]
+	ldp	x21,x22,[PTR(1),#8*2]
 	sbcs	xzr,x30,xzr	// did it borrow?
-	ldr	x30,[x29,#8]		// pull return address
+	ldr	PTR(30),[PTR(29),#PTR_WIDTH]	// pull return address
 
 	sub	x28,x5,#8*4
 .Lmul4x_cond_copy:
 	sub	x28,x28,#8*4
 	csel	x10,x19,x6,lo
-	stp	xzr,xzr,[x26,#8*0]
+	stp	xzr,xzr,[PTR(26),#8*0]
 	csel	x11,x20,x7,lo
-	ldp	x6,x7,[x27,#8*4]
-	ldp	x19,x20,[x1,#8*4]
+	ldp	x6,x7,[PTR(27),#8*4]
+	ldp	x19,x20,[PTR(1),#8*4]
 	csel	x12,x21,x8,lo
-	stp	xzr,xzr,[x26,#8*2]
-	add	x26,x26,#8*4
+	stp	xzr,xzr,[PTR(26),#8*2]
+	add	PTR(26),PTR(26),#8*4
 	csel	x13,x22,x9,lo
-	ldp	x8,x9,[x27,#8*6]
-	ldp	x21,x22,[x1,#8*6]
-	add	x1,x1,#8*4
-	stp	x10,x11,[x27,#8*0]
-	stp	x12,x13,[x27,#8*2]
-	add	x27,x27,#8*4
+	ldp	x8,x9,[PTR(27),#8*6]
+	ldp	x21,x22,[PTR(1),#8*6]
+	add	PTR(1),PTR(1),#8*4
+	stp	x10,x11,[PTR(27),#8*0]
+	stp	x12,x13,[PTR(27),#8*2]
+	add	PTR(27),PTR(27),#8*4
 	cbnz	x28,.Lmul4x_cond_copy
 
 	csel	x10,x19,x6,lo
-	stp	xzr,xzr,[x26,#8*0]
+	stp	xzr,xzr,[PTR(26),#8*0]
 	csel	x11,x20,x7,lo
-	stp	xzr,xzr,[x26,#8*2]
+	stp	xzr,xzr,[PTR(26),#8*2]
 	csel	x12,x21,x8,lo
-	stp	xzr,xzr,[x26,#8*3]
+	stp	xzr,xzr,[PTR(26),#8*3]
 	csel	x13,x22,x9,lo
-	stp	xzr,xzr,[x26,#8*4]
-	stp	x10,x11,[x27,#8*0]
-	stp	x12,x13,[x27,#8*2]
+	stp	xzr,xzr,[PTR(26),#8*4]
+	stp	x10,x11,[PTR(27),#8*0]
+	stp	x12,x13,[PTR(27),#8*2]
 
 	b	.Lmul4x_done
 
 .align	4
 .Lmul4x4_post_condition:
 	adc	x0,x0,xzr
-	ldr	x1,[x29,#96]		// pull rp
+	ldr	PTR(1),[PTR(29),#(12*PTR_WIDTH)]	// pull rp
 	// x19-3,x0 hold result, x14-7 hold modulus
 	subs	x6,x19,x14
-	ldr	x30,[x29,#8]		// pull return address
+	ldr	PTR(30),[PTR(29),#PTR_WIDTH]	// pull return address
 	sbcs	x7,x20,x15
-	stp	xzr,xzr,[sp,#8*0]
+	stp	xzr,xzr,[PTRN(sp),#8*0]
 	sbcs	x8,x21,x16
-	stp	xzr,xzr,[sp,#8*2]
+	stp	xzr,xzr,[PTRN(sp),#8*2]
 	sbcs	x9,x22,x17
-	stp	xzr,xzr,[sp,#8*4]
+	stp	xzr,xzr,[PTRN(sp),#8*4]
 	sbcs	xzr,x0,xzr		// did it borrow?
-	stp	xzr,xzr,[sp,#8*6]
+	stp	xzr,xzr,[PTRN(sp),#8*6]
 
 	// x6-3 hold result-modulus
 	csel	x6,x19,x6,lo
 	csel	x7,x20,x7,lo
 	csel	x8,x21,x8,lo
 	csel	x9,x22,x9,lo
-	stp	x6,x7,[x1,#8*0]
-	stp	x8,x9,[x1,#8*2]
+	stp	x6,x7,[PTR(1),#8*0]
+	stp	x8,x9,[PTR(1),#8*2]
 
 .Lmul4x_done:
-	ldp	x19,x20,[x29,#16]
-	mov	sp,x29
-	ldp	x21,x22,[x29,#32]
+	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
+	mov	PTRN(sp),PTR(29)
+	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
 	mov	x0,#1
-	ldp	x23,x24,[x29,#48]
-	ldp	x25,x26,[x29,#64]
-	ldp	x27,x28,[x29,#80]
-	ldr	x29,[sp],#128
+	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
+	ldp	PTR(25),PTR(26),[PTR(29),#(8*PTR_WIDTH)]
+	ldp	PTR(27),PTR(28),[PTR(29),#(10*PTR_WIDTH)]
+	ldr	PTR(29),[PTRN(sp)],#(16*PTR_WIDTH)
 	// x30 loaded earlier
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret

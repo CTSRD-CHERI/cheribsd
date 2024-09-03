@@ -158,15 +158,17 @@ die "can't locate arm-xlate.pl";
 open OUT,"| \"$^X\" $xlate $flavour $output";
 *STDOUT=*OUT;
 
-$input_ptr="x0";  #argument block
+$input_ptr="PTR(0)";  #argument block
+$input_ptrx="x0";
 $bit_length="x1";
-$output_ptr="x2";
-$current_tag="x3";
-$counter="x16";
-$cc="x8";
+$output_ptr="PTR(2)";
+$current_tag="PTR(3)";
+$counter="PTR(16)";
+$cc="PTR(8)";
 
 {
-my ($end_input_ptr,$main_end_input_ptr,$input_l0,$input_h0)=map("x$_",(4..7));
+my ($end_input_ptrx,$main_end_input_ptr,$input_l0,$input_h0)=map("x$_",(4..7));
+my ($end_input_ptr)=map("PTR($_)",(4));
 my ($input_l1,$input_h1,$input_l2,$input_h2,$input_l3,$input_h3)=map("x$_",(19..24));
 my ($output_l1,$output_h1,$output_l2,$output_h2,$output_l3,$output_h3)=map("x$_",(19..24));
 my ($output_l0,$output_h0)=map("x$_",(6..7));
@@ -229,7 +231,12 @@ $code=<<___;
 
 #if __ARM_MAX_ARCH__>=8
 ___
-$code.=".arch   armv8-a+crypto\n.text\n"    if ($flavour =~ /64/);
+$code.=<<___			if ($flavour =~ /64/);
+#ifndef __CHERI_PURE_CAPABILITY__
+.arch	armv8-a+crypto
+#endif
+.text
+___
 $code.=<<___                    if ($flavour !~ /64/);
 .fpu    neon
 #ifdef __thumb2__
@@ -259,15 +266,15 @@ $code.=<<___;
 aes_gcm_enc_128_kernel:
 	AARCH64_VALID_CALL_TARGET
 	cbz     x1, .L128_enc_ret
-	stp     x19, x20, [sp, #-112]!
-	mov     x16, x4
-	mov     x8, x5
-	stp     x21, x22, [sp, #16]
-	stp     x23, x24, [sp, #32]
-	stp     d8, d9, [sp, #48]
-	stp     d10, d11, [sp, #64]
-	stp     d12, d13, [sp, #80]
-	stp     d14, d15, [sp, #96]
+	stp     PTR(19), PTR(20), [PTRN(sp), #-(6*PTR_WIDTH+64)]!
+	mov     $counter, PTR(4)
+	mov     $cc, PTR(5)
+	stp     PTR(21), PTR(22), [PTRN(sp), #(2*PTR_WIDTH)]
+	stp     PTR(23), PTR(24), [PTRN(sp), #(4*PTR_WIDTH)]
+	stp     d8, d9, [PTRN(sp), #(6*PTR_WIDTH)]
+	stp     d10, d11, [PTRN(sp), #(6*PTR_WIDTH+16)]
+	stp     d12, d13, [PTRN(sp), #(6*PTR_WIDTH+32)]
+	stp     d14, d15, [PTRN(sp), #(6*PTR_WIDTH+48)]
 
 	ldp     $ctr96_b64x, $ctr96_t32x, [$counter]              @ ctr96_b64, ctr96_t32
 #ifdef __AARCH64EB__
@@ -286,7 +293,12 @@ aes_gcm_enc_128_kernel:
 	mov     $len, $main_end_input_ptr
 
 	ld1     {$rk0s}, [$cc], #16								  @ load rk0
+#ifdef __CHERI_PURE_CAPABILITY__
+	lsr     $end_input_ptrx, $bit_length, #3
+	add     $end_input_ptr, $input_ptr, $end_input_ptrx       @ end_input_ptr
+#else
 	add     $end_input_ptr, $input_ptr, $bit_length, lsr #3   @ end_input_ptr
+#endif
 	sub     $main_end_input_ptr, $main_end_input_ptr, #1      @ byte_len - 1
 
 	lsr     $rctr32x, $ctr96_t32x, #32
@@ -382,10 +394,10 @@ aes_gcm_enc_128_kernel:
 	trn2    $h12k.2d,  $h1.2d,    $h2.2d                      @ h2l | h1l
 
 	aese    $ctr3b, $rk4  \n  aesmc   $ctr3b, $ctr3b          @ AES block 3 - round 4
-	add     $main_end_input_ptr, $main_end_input_ptr, $input_ptr
+	add     $main_end_input_ptr, $main_end_input_ptr, $input_ptrx
 
 	aese    $ctr2b, $rk4  \n  aesmc   $ctr2b, $ctr2b          @ AES block 2 - round 4
-	cmp     $input_ptr, $main_end_input_ptr                   @ check if we have <= 4 blocks
+	cmp     $input_ptrx, $main_end_input_ptr                  @ check if we have <= 4 blocks
 
 	aese    $ctr0b, $rk4  \n  aesmc   $ctr0b, $ctr0b          @ AES block 0 - round 4
 
@@ -505,7 +517,7 @@ aes_gcm_enc_128_kernel:
 	st1     { $res1b}, [$output_ptr], #16                     @ AES block 1 - store result
 
 	fmov    $ctr2d, $ctr96_b64x                               @ CTR block 6
-	cmp     $input_ptr, $main_end_input_ptr                   @ check if we have <= 8 blocks
+	cmp     $input_ptrx, $main_end_input_ptr                  @ check if we have <= 8 blocks
 
 	fmov    $ctr2.d[1], $ctr32x                               @ CTR block 6
 	rev     $ctr32w, $rctr32w                                 @ CTR block 7
@@ -676,7 +688,7 @@ aes_gcm_enc_128_kernel:
 	fmov    $ctr_t3.d[1], $input_h3                           @ AES block 4k+3 - mov high
 
 	aese    $ctr3b, $rk6  \n  aesmc   $ctr3b, $ctr3b          @ AES block 4k+7 - round 6
-	cmp     $input_ptr, $main_end_input_ptr                   @ LOOP CONTROL
+	cmp     $input_ptrx, $main_end_input_ptr                  @ LOOP CONTROL
 
 	aese    $ctr1b, $rk8  \n  aesmc   $ctr1b, $ctr1b          @ AES block 4k+5 - round 8
 	eor     $acc_mb, $acc_mb, $mod_t.16b                      @ MODULO - fold into mid
@@ -891,7 +903,7 @@ aes_gcm_enc_128_kernel:
 	aese    $ctr2b, $rk9                                      @ AES block 4k+6 - round 9
 	.L128_enc_tail:                                           @ TAIL
 
-	sub     $main_end_input_ptr, $end_input_ptr, $input_ptr   @ main_end_input_ptr is number of bytes left to process
+	sub     $main_end_input_ptr, $end_input_ptrx, $input_ptrx @ main_end_input_ptr is number of bytes left to process
 	ldp     $input_l0, $input_h0, [$input_ptr], #16           @ AES block 4k+4 - load plaintext
 #ifdef __AARCH64EB__
 	rev     $input_l0, $input_l0
@@ -1115,13 +1127,13 @@ aes_gcm_enc_128_kernel:
 	rev64   $acc_lb, $acc_lb
 	mov     x0, $len
 	st1     { $acc_l.16b }, [$current_tag]
-	ldp     x21, x22, [sp, #16]
-	ldp     x23, x24, [sp, #32]
-	ldp     d8, d9, [sp, #48]
-	ldp     d10, d11, [sp, #64]
-	ldp     d12, d13, [sp, #80]
-	ldp     d14, d15, [sp, #96]
-	ldp     x19, x20, [sp], #112
+	ldp     PTR(21), PTR(22), [PTRN(sp), #(2*PTR_WIDTH)]
+	ldp     PTR(23), PTR(24), [PTRN(sp), #(4*PTR_WIDTH)]
+	ldp     d8, d9, [PTRN(sp), #(6*PTR_WIDTH)]
+	ldp     d10, d11, [PTRN(sp), #(6*PTR_WIDTH+16)]
+	ldp     d12, d13, [PTRN(sp), #(6*PTR_WIDTH+32)]
+	ldp     d14, d15, [PTRN(sp), #(6*PTR_WIDTH+48)]
+	ldp     PTR(19), PTR(20), [PTRN(sp)], #(6*PTR_WIDTH+64)
 	ret
 
 .L128_enc_ret:
@@ -1145,15 +1157,15 @@ $code.=<<___;
 aes_gcm_dec_128_kernel:
 	AARCH64_VALID_CALL_TARGET
 	cbz     x1, .L128_dec_ret
-	stp     x19, x20, [sp, #-112]!
-	mov     x16, x4
-	mov     x8, x5
-	stp     x21, x22, [sp, #16]
-	stp     x23, x24, [sp, #32]
-	stp     d8, d9, [sp, #48]
-	stp     d10, d11, [sp, #64]
-	stp     d12, d13, [sp, #80]
-	stp     d14, d15, [sp, #96]
+	stp     PTR(19), PTR(20), [PTRN(sp), #-(6*PTR_WIDTH+64)]!
+	mov     $counter, PTR(4)
+	mov     $cc, PTR(5)
+	stp     PTR(21), PTR(22), [PTRN(sp), #(2*PTR_WIDTH)]
+	stp     PTR(23), PTR(24), [PTRN(sp), #(4*PTR_WIDTH)]
+	stp     d8, d9, [PTRN(sp), #(6*PTR_WIDTH)]
+	stp     d10, d11, [PTRN(sp), #(6*PTR_WIDTH+16)]
+	stp     d12, d13, [PTRN(sp), #(6*PTR_WIDTH+32)]
+	stp     d14, d15, [PTRN(sp), #(6*PTR_WIDTH+48)]
 
 	lsr     $main_end_input_ptr, $bit_length, #3              @ byte_len
 	mov     $len, $main_end_input_ptr
@@ -1209,7 +1221,12 @@ aes_gcm_dec_128_kernel:
 	add     $rctr32w, $rctr32w, #1                            @ CTR block 3
 
 	fmov    $ctr3.d[1], $ctr32x                               @ CTR block 3
+#ifdef __CHERI_PURE_CAPABILITY__
+	lsr     $end_input_ptrx, $bit_length, #3
+	add     $end_input_ptr, $input_ptr, $end_input_ptrx       @ end_input_ptr
+#else
 	add     $end_input_ptr, $input_ptr, $bit_length, lsr #3   @ end_input_ptr
+#endif
 
 	aese    $ctr1b, $rk0  \n  aesmc   $ctr1b, $ctr1b          @ AES block 1 - round 0
 	ld1     {$rk3s}, [$cc], #16                                @ load rk3
@@ -1285,7 +1302,7 @@ aes_gcm_dec_128_kernel:
 	ext     $h4b, $h4b, $h4b, #8
 #endif
 	trn2    $h12k.2d,  $h1.2d,    $h2.2d                      @ h2l | h1l
-	add     $main_end_input_ptr, $main_end_input_ptr, $input_ptr
+	add     $main_end_input_ptr, $main_end_input_ptr, $input_ptrx
 
 	aese    $ctr1b, $rk7  \n  aesmc   $ctr1b, $ctr1b          @ AES block 1 - round 7
 
@@ -1311,7 +1328,7 @@ aes_gcm_dec_128_kernel:
 	aese    $ctr3b, $rk9                                      @ AES block 3 - round 9
 
 	aese    $ctr0b, $rk9                                      @ AES block 0 - round 9
-	cmp     $input_ptr, $main_end_input_ptr                   @ check if we have <= 4 blocks
+	cmp     $input_ptrx, $main_end_input_ptr                  @ check if we have <= 4 blocks
 
 	aese    $ctr1b, $rk9                                      @ AES block 1 - round 9
 	eor     $h34k.16b, $h34k.16b, $acc_h.16b                  @ h4k | h3k
@@ -1336,7 +1353,7 @@ aes_gcm_dec_128_kernel:
 	mov     $output_h1, $ctr1.d[1]                            @ AES block 1 - mov high
 
 	mov     $output_l0, $ctr0.d[0]                            @ AES block 0 - mov low
-	cmp     $input_ptr, $main_end_input_ptr                   @ check if we have <= 8 blocks
+	cmp     $input_ptrx, $main_end_input_ptr                  @ check if we have <= 8 blocks
 
 	mov     $output_h0, $ctr0.d[1]                            @ AES block 0 - mov high
 
@@ -1578,7 +1595,7 @@ aes_gcm_dec_128_kernel:
 
 	aese    $ctr3b, $rk9                                      @ AES block 4k+7 - round 9
 	fmov    $ctr1d, $ctr96_b64x                               @ CTR block 4k+9
-	cmp     $input_ptr, $main_end_input_ptr                   @ LOOP CONTROL
+	cmp     $input_ptrx, $main_end_input_ptr                  @ LOOP CONTROL
 
 	rev64   $res0b, $res0b                                    @ GHASH block 4k+4
 	eor     $acc_lb, $acc_lb, $acc_mb                         @ MODULO - fold into low
@@ -1779,7 +1796,7 @@ aes_gcm_dec_128_kernel:
 	eor     $acc_lb, $acc_lb, $acc_mb                         @ MODULO - fold into low
 	.L128_dec_tail:                                           @ TAIL
 
-	sub     $main_end_input_ptr, $end_input_ptr, $input_ptr   @ main_end_input_ptr is number of bytes left to process
+	sub     $main_end_input_ptr, $end_input_ptrx, $input_ptrx @ main_end_input_ptr is number of bytes left to process
 	ld1     { $res1b}, [$input_ptr], #16                      @ AES block 4k+4 - load ciphertext
 
 	eor     $ctr0b, $res1b, $ctr0b                            @ AES block 4k+4 - result
@@ -1953,7 +1970,7 @@ aes_gcm_dec_128_kernel:
 
 	eor     $res0b, $res0b, $t0.16b                           @ feed in partial tag
 
-	ldp     $end_input_ptr, $main_end_input_ptr, [$output_ptr] @ load existing bytes we need to not overwrite
+	ldp     $end_input_ptrx, $main_end_input_ptr, [$output_ptr] @ load existing bytes we need to not overwrite
 
 	and     $output_h0, $output_h0, $ctr96_b64x
 
@@ -1966,7 +1983,7 @@ aes_gcm_dec_128_kernel:
 	pmull   $t0.1q, $t0.1d, $h12k.1d                          @ GHASH final block - mid
 
 	pmull   $rk3q1, $res0.1d, $h1.1d                          @ GHASH final block - low
-	bic     $end_input_ptr, $end_input_ptr, $ctr32x           @ mask out low existing bytes
+	bic     $end_input_ptrx, $end_input_ptrx, $ctr32x         @ mask out low existing bytes
 	and     $output_l0, $output_l0, $ctr32x
 
 #ifndef __AARCH64EB__
@@ -1989,7 +2006,7 @@ aes_gcm_dec_128_kernel:
 
 	eor     $acc_mb, $acc_mb, $t9.16b                         @ MODULO - karatsuba tidy up
 
-	orr     $output_l0, $output_l0, $end_input_ptr
+	orr     $output_l0, $output_l0, $end_input_ptrx
 	str     $ctr32w, [$counter, #12]                          @ store the updated counter
 
 	orr     $output_h0, $output_h0, $main_end_input_ptr
@@ -2011,13 +2028,13 @@ aes_gcm_dec_128_kernel:
 	mov     x0, $len
 	st1     { $acc_l.16b }, [$current_tag]
 
-	ldp     x21, x22, [sp, #16]
-	ldp     x23, x24, [sp, #32]
-	ldp     d8, d9, [sp, #48]
-	ldp     d10, d11, [sp, #64]
-	ldp     d12, d13, [sp, #80]
-	ldp     d14, d15, [sp, #96]
-	ldp     x19, x20, [sp], #112
+	ldp     PTR(21), PTR(22), [PTRN(sp), #(2*PTR_WIDTH)]
+	ldp     PTR(23), PTR(24), [PTRN(sp), #(4*PTR_WIDTH)]
+	ldp     d8, d9, [PTRN(sp), #(6*PTR_WIDTH)]
+	ldp     d10, d11, [PTRN(sp), #(6*PTR_WIDTH+16)]
+	ldp     d12, d13, [PTRN(sp), #(6*PTR_WIDTH+32)]
+	ldp     d14, d15, [PTRN(sp), #(6*PTR_WIDTH+48)]
+	ldp     PTR(19), PTR(20), [PTRN(sp)], #(6*PTR_WIDTH+64)
 	ret
 
 	.L128_dec_ret:
@@ -2028,7 +2045,8 @@ ___
 }
 
 {
-my ($end_input_ptr,$main_end_input_ptr,$input_l0,$input_h0)=map("x$_",(4..7));
+my ($end_input_ptrx,$main_end_input_ptr,$input_l0,$input_h0)=map("x$_",(4..7));
+my $end_input_ptr="PTR(4)";    
 my ($input_l1,$input_h1,$input_l2,$input_h2,$input_l3,$input_h3)=map("x$_",(19..24));
 my ($output_l1,$output_h1,$output_l2,$output_h2,$output_l3,$output_h3)=map("x$_",(19..24));
 my ($output_l0,$output_h0)=map("x$_",(6..7));
@@ -2103,15 +2121,15 @@ $code.=<<___;
 aes_gcm_enc_192_kernel:
 	AARCH64_VALID_CALL_TARGET
 	cbz     x1, .L192_enc_ret
-	stp     x19, x20, [sp, #-112]!
-	mov     x16, x4
-	mov     x8, x5
-	stp     x21, x22, [sp, #16]
-	stp     x23, x24, [sp, #32]
-	stp     d8, d9, [sp, #48]
-	stp     d10, d11, [sp, #64]
-	stp     d12, d13, [sp, #80]
-	stp     d14, d15, [sp, #96]
+	stp     PTR(19), PTR(20), [PTRN(sp), #-(6*PTR_WIDTH+64)]!
+	mov     $counter, PTR(4)
+	mov     $cc, PTR(5)
+	stp     PTR(21), PTR(22), [PTRN(sp), #(2*PTR_WIDTH)]
+	stp     PTR(23), PTR(24), [PTRN(sp), #(4*PTR_WIDTH)]
+	stp     d8, d9, [PTRN(sp), #(6*PTR_WIDTH)]
+	stp     d10, d11, [PTRN(sp), #(6*PTR_WIDTH+16)]
+	stp     d12, d13, [PTRN(sp), #(6*PTR_WIDTH+32)]
+	stp     d14, d15, [PTRN(sp), #(6*PTR_WIDTH+48)]
 
 	ldp     $ctr96_b64x, $ctr96_t32x, [$counter]             @ ctr96_b64, ctr96_t32
 #ifdef __AARCH64EB__
@@ -2285,11 +2303,16 @@ aes_gcm_enc_192_kernel:
 	eor     $h34k.16b, $h34k.16b, $acc_h.16b                 @ h4k | h3k
 
 	aese    $ctr2b, $rk11                                    @ AES block 2 - round 11
+#ifdef __CHERI_PURE_CAPABILITY__
+	lsr     $end_input_ptrx, $bit_length, #3
+	add     $end_input_ptr, $input_ptr, $end_input_ptrx      @ end_input_ptr
+#else
 	add     $end_input_ptr, $input_ptr, $bit_length, lsr #3  @ end_input_ptr
-	add     $main_end_input_ptr, $main_end_input_ptr, $input_ptr
+#endif
+	add     $main_end_input_ptr, $main_end_input_ptr, $input_ptrx
 
 	aese    $ctr1b, $rk11                                    @ AES block 1 - round 11
-	cmp     $input_ptr, $main_end_input_ptr                  @ check if we have <= 4 blocks
+	cmp     $input_ptrx, $main_end_input_ptr                 @ check if we have <= 4 blocks
 
 	aese    $ctr0b, $rk11                                    @ AES block 0 - round 11
 	add     $rctr32w, $rctr32w, #1                           @ CTR block 3
@@ -2320,7 +2343,7 @@ aes_gcm_enc_192_kernel:
 	rev     $input_h1, $input_h1
 #endif
 	add     $input_ptr, $input_ptr, #64                      @ AES input_ptr update
-	cmp     $input_ptr, $main_end_input_ptr                  @ check if we have <= 8 blocks
+	cmp     $input_ptrx, $main_end_input_ptr                 @ check if we have <= 8 blocks
 
 	eor     $input_l0, $input_l0, $rk12_l                    @ AES block 0 - round 12 low
 
@@ -2527,7 +2550,7 @@ aes_gcm_enc_192_kernel:
 	eor     $acc_lb, $acc_lb, $t8.16b                        @ GHASH block 4k+3 - low
 
 	pmull   $t9.1q, $t9.1d, $h12k.1d                         @ GHASH block 4k+3 - mid
-	cmp     $input_ptr, $main_end_input_ptr                  @ LOOP CONTROL
+	cmp     $input_ptrx, $main_end_input_ptr                 @ LOOP CONTROL
 	fmov    $ctr_t0d, $input_l0                              @ AES block 4k+4 - mov low
 
 	aese    $ctr2b, $rk6  \n  aesmc   $ctr2b, $ctr2b         @ AES block 4k+6 - round 6
@@ -2786,7 +2809,7 @@ aes_gcm_enc_192_kernel:
 	eor     $acc_lb, $acc_lb, $acc_mb
 	.L192_enc_tail:                                          @ TAIL
 
-	sub     $main_end_input_ptr, $end_input_ptr, $input_ptr  @ main_end_input_ptr is number of bytes left to process
+	sub     $main_end_input_ptr, $end_input_ptrx, $input_ptrx @ main_end_input_ptr is number of bytes left to process
 	ldp     $input_l0, $input_h0, [$input_ptr], #16          @ AES block 4k+4 - load plaintext
 #ifdef __AARCH64EB__
 	rev     $input_l0, $input_l0
@@ -3010,13 +3033,13 @@ aes_gcm_enc_192_kernel:
 	mov     x0, $len
 	st1     { $acc_l.16b }, [$current_tag]
 
-	ldp     x21, x22, [sp, #16]
-	ldp     x23, x24, [sp, #32]
-	ldp     d8, d9, [sp, #48]
-	ldp     d10, d11, [sp, #64]
-	ldp     d12, d13, [sp, #80]
-	ldp     d14, d15, [sp, #96]
-	ldp     x19, x20, [sp], #112
+	ldp     PTR(21), PTR(22), [PTRN(sp), #(2*PTR_WIDTH)]
+	ldp     PTR(23), PTR(24), [PTRN(sp), #(4*PTR_WIDTH)]
+	ldp     d8, d9, [PTRN(sp), #(6*PTR_WIDTH)]
+	ldp     d10, d11, [PTRN(sp), #(6*PTR_WIDTH+16)]
+	ldp     d12, d13, [PTRN(sp), #(6*PTR_WIDTH+32)]
+	ldp     d14, d15, [PTRN(sp), #(6*PTR_WIDTH+48)]
+	ldp     PTR(19), PTR(20), [PTRN(sp)], #(6*PTR_WIDTH+64)
 	ret
 
 .L192_enc_ret:
@@ -3040,17 +3063,22 @@ $code.=<<___;
 aes_gcm_dec_192_kernel:
 	AARCH64_VALID_CALL_TARGET
 	cbz     x1, .L192_dec_ret
-	stp     x19, x20, [sp, #-112]!
-	mov     x16, x4
-	mov     x8, x5
-	stp     x21, x22, [sp, #16]
-	stp     x23, x24, [sp, #32]
-	stp     d8, d9, [sp, #48]
-	stp     d10, d11, [sp, #64]
-	stp     d12, d13, [sp, #80]
-	stp     d14, d15, [sp, #96]
+	stp     PTR(19), PTR(20), [PTRN(sp), #-(6*PTR_WIDTH+64)]!
+	mov     $counter, PTR(4)
+	mov     $cc, PTR(5)
+	stp     PTR(21), PTR(22), [PTRN(sp), #(2*PTR_WIDTH)]
+	stp     PTR(23), PTR(24), [PTRN(sp), #(4*PTR_WIDTH)]
+	stp     d8, d9, [PTRN(sp), #(6*PTR_WIDTH)]
+	stp     d10, d11, [PTRN(sp), #(6*PTR_WIDTH+16)]
+	stp     d12, d13, [PTRN(sp), #(6*PTR_WIDTH+32)]
+	stp     d14, d15, [PTRN(sp), #(6*PTR_WIDTH+48)]
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	lsr     $end_input_ptrx, $bit_length, #3
+	add     $end_input_ptr, $input_ptr, $end_input_ptrx       @ end_input_ptr
+#else
 	add     $end_input_ptr, $input_ptr, $bit_length, lsr #3   @ end_input_ptr
+#endif
 	ldp     $ctr96_b64x, $ctr96_t32x, [$counter]              @ ctr96_b64, ctr96_t32
 #ifdef __AARCH64EB__
 	rev     $ctr96_b64x, $ctr96_b64x
@@ -3204,10 +3232,10 @@ aes_gcm_dec_192_kernel:
 	and     $main_end_input_ptr, $main_end_input_ptr, #0xffffffffffffffc0    @ number of bytes to be processed in main loop (at least 1 byte must be handled by tail)
 
 	aese    $ctr3b, $rk10 \n  aesmc   $ctr3b, $ctr3b          @ AES block 3 - round 10
-	add     $main_end_input_ptr, $main_end_input_ptr, $input_ptr
+	add     $main_end_input_ptr, $main_end_input_ptr, $input_ptrx
 
 	aese    $ctr1b, $rk9  \n  aesmc   $ctr1b, $ctr1b          @ AES block 1 - round 9
-	cmp     $input_ptr, $main_end_input_ptr                   @ check if we have <= 4 blocks
+	cmp     $input_ptrx, $main_end_input_ptr                  @ check if we have <= 4 blocks
 
 	aese    $ctr0b, $rk9  \n  aesmc   $ctr0b, $ctr0b          @ AES block 0 - round 9
 	trn1    $t0.2d,    $h1.2d,    $h2.2d                      @ h2h | h1h
@@ -3250,7 +3278,7 @@ aes_gcm_dec_192_kernel:
 
 	fmov    $ctr0d, $ctr96_b64x                               @ CTR block 4
 	rev64   $res1b, $res1b                                    @ GHASH block 1
-	cmp     $input_ptr, $main_end_input_ptr                   @ check if we have <= 8 blocks
+	cmp     $input_ptrx, $main_end_input_ptr                  @ check if we have <= 8 blocks
 
 	eor     $output_l1, $output_l1, $rk12_l                   @ AES block 1 - round 12 low
 #ifdef __AARCH64EB__
@@ -3459,7 +3487,7 @@ aes_gcm_dec_192_kernel:
 	aese    $ctr2b, $rk9  \n  aesmc   $ctr2b, $ctr2b          @ AES block 4k+6 - round 9
 	eor     $acc_mb, $acc_mb, $acc_hb                         @ MODULO - fold into mid
 
-	cmp     $input_ptr, $main_end_input_ptr                   @ LOOP CONTROL
+	cmp     $input_ptrx, $main_end_input_ptr                  @ LOOP CONTROL
 
 	eor     $ctr0b, $res0b, $ctr0b                            @ AES block 4k+4 - result
 	eor     $output_h3, $output_h3, $rk12_h                   @ AES block 4k+3 - round 12 high
@@ -3724,7 +3752,7 @@ aes_gcm_dec_192_kernel:
 	eor     $acc_lb, $acc_lb, $acc_mb                         @ MODULO - fold into low
 	.L192_dec_tail:                                           @ TAIL
 
-	sub     $main_end_input_ptr, $end_input_ptr, $input_ptr   @ main_end_input_ptr is number of bytes left to process
+	sub     $main_end_input_ptr, $end_input_ptrx, $input_ptrx @ main_end_input_ptr is number of bytes left to process
 	ld1     { $res1b}, [$input_ptr], #16                      @ AES block 4k+4 - load ciphertext
 
 	eor     $ctr0b, $res1b, $ctr0b                            @ AES block 4k+4 - result
@@ -3875,7 +3903,7 @@ aes_gcm_dec_192_kernel:
 	.L192_dec_blocks_less_than_1:                             @ blocks left <= 1
 
 	mvn     $rk12_l, xzr                                      @ rk12_l = 0xffffffffffffffff
-	ldp     $end_input_ptr, $main_end_input_ptr, [$output_ptr]  @ load existing bytes we need to not overwrite
+	ldp     $end_input_ptrx, $main_end_input_ptr, [$output_ptr] @ load existing bytes we need to not overwrite
 	and     $bit_length, $bit_length, #127                    @ bit_length %= 128
 
 	sub     $bit_length, $bit_length, #128                    @ bit_length -= 128
@@ -3893,9 +3921,9 @@ aes_gcm_dec_192_kernel:
 
 	fmov    $ctr0d, $ctr32x                                   @ ctr0b is mask for last block
 	and     $output_l0, $output_l0, $ctr32x
-	bic     $end_input_ptr, $end_input_ptr, $ctr32x           @ mask out low existing bytes
+	bic     $end_input_ptrx, $end_input_ptrx, $ctr32x         @ mask out low existing bytes
 
-	orr     $output_l0, $output_l0, $end_input_ptr
+	orr     $output_l0, $output_l0, $end_input_ptrx
 	mov     $ctr0.d[1], $ctr96_b64x
 #ifndef __AARCH64EB__
 	rev     $ctr32w, $rctr32w
@@ -3957,13 +3985,13 @@ aes_gcm_dec_192_kernel:
 	mov     x0, $len
 	st1     { $acc_l.16b }, [$current_tag]
 
-	ldp     x21, x22, [sp, #16]
-	ldp     x23, x24, [sp, #32]
-	ldp     d8, d9, [sp, #48]
-	ldp     d10, d11, [sp, #64]
-	ldp     d12, d13, [sp, #80]
-	ldp     d14, d15, [sp, #96]
-	ldp     x19, x20, [sp], #112
+	ldp     PTR(21), PTR(22), [PTRN(sp), #(2*PTR_WIDTH)]
+	ldp     PTR(23), PTR(24), [PTRN(sp), #(4*PTR_WIDTH)]
+	ldp     d8, d9, [PTRN(sp), #(6*PTR_WIDTH)]
+	ldp     d10, d11, [PTRN(sp), #(6*PTR_WIDTH+16)]
+	ldp     d12, d13, [PTRN(sp), #(6*PTR_WIDTH+32)]
+	ldp     d14, d15, [PTRN(sp), #(6*PTR_WIDTH+48)]
+	ldp     PTR(19), PTR(20), [PTRN(sp)], #(6*PTR_WIDTH+64)
 	ret
 
 .L192_dec_ret:
@@ -3974,7 +4002,8 @@ ___
 }
 
 {
-my ($end_input_ptr,$main_end_input_ptr,$input_l0,$input_h0)=map("x$_",(4..7));
+my ($end_input_ptrx,$main_end_input_ptr,$input_l0,$input_h0)=map("x$_",(4..7));
+my $end_input_ptr="PTR(4)";
 my ($input_l1,$input_h1,$input_l2,$input_h2,$input_l3,$input_h3)=map("x$_",(19..24));
 my ($output_l1,$output_h1,$output_l2,$output_h2,$output_l3,$output_h3)=map("x$_",(19..24));
 my ($output_l0,$output_h0)=map("x$_",(6..7));
@@ -4048,17 +4077,22 @@ $code.=<<___;
 aes_gcm_enc_256_kernel:
 	AARCH64_VALID_CALL_TARGET
 	cbz     x1, .L256_enc_ret
-	stp     x19, x20, [sp, #-112]!
-	mov     x16, x4
-	mov     x8, x5
-	stp     x21, x22, [sp, #16]
-	stp     x23, x24, [sp, #32]
-	stp     d8, d9, [sp, #48]
-	stp     d10, d11, [sp, #64]
-	stp     d12, d13, [sp, #80]
-	stp     d14, d15, [sp, #96]
+	stp     PTR(19), PTR(20), [PTRN(sp), #-(6*PTR_WIDTH+64)]!
+	mov     $counter, PTR(4)
+	mov     $cc, PTR(5)
+	stp     PTR(21), PTR(22), [PTRN(sp), #(2*PTR_WIDTH)]
+	stp     PTR(23), PTR(24), [PTRN(sp), #(4*PTR_WIDTH)]
+	stp     d8, d9, [PTRN(sp), #(6*PTR_WIDTH)]
+	stp     d10, d11, [PTRN(sp), #(6*PTR_WIDTH+16)]
+	stp     d12, d13, [PTRN(sp), #(6*PTR_WIDTH+32)]
+	stp     d14, d15, [PTRN(sp), #(6*PTR_WIDTH+48)]
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	lsr     $end_input_ptrx, $bit_length, #3
+	add     $end_input_ptr, $input_ptr, $end_input_ptrx       @ end_input_ptr
+#else
 	add     $end_input_ptr, $input_ptr, $bit_length, lsr #3   @ end_input_ptr
+#endif
 	lsr     $main_end_input_ptr, $bit_length, #3              @ byte_len
 	mov     $len, $main_end_input_ptr
 	ldp     $ctr96_b64x, $ctr96_t32x, [$counter]              @ ctr96_b64, ctr96_t32
@@ -4078,14 +4112,14 @@ aes_gcm_enc_256_kernel:
 	and     $main_end_input_ptr, $main_end_input_ptr, #0xffffffffffffffc0 @ number of bytes to be processed in main loop (at least 1 byte must be handled by tail)
 
 	ld1     {$rk1s}, [$cc], #16                               @ load rk1
-	add     $main_end_input_ptr, $main_end_input_ptr, $input_ptr
+	add     $main_end_input_ptr, $main_end_input_ptr, $input_ptrx
 
 	lsr     $rctr32x, $ctr96_t32x, #32
 	fmov    $ctr2d, $ctr96_b64x                               @ CTR block 2
 	orr     $ctr96_t32w, $ctr96_t32w, $ctr96_t32w
 
 	rev     $rctr32w, $rctr32w                                @ rev_ctr32
-	cmp     $input_ptr, $main_end_input_ptr                   @ check if we have <= 4 blocks
+	cmp     $input_ptrx, $main_end_input_ptr                  @ check if we have <= 4 blocks
 	fmov    $ctr1d, $ctr96_b64x                               @ CTR block 1
 
 	aese    $ctr0b, $rk0  \n  aesmc   $ctr0b, $ctr0b          @ AES block 0 - round 0
@@ -4287,7 +4321,7 @@ aes_gcm_enc_256_kernel:
 	eor     $input_h3, $input_h3, $rk14_h                     @ AES block 3 - round 14 high
 	fmov    $ctr_t0d, $input_l0                               @ AES block 0 - mov low
 
-	cmp     $input_ptr, $main_end_input_ptr                   @ check if we have <= 8 blocks
+	cmp     $input_ptrx, $main_end_input_ptr                  @ check if we have <= 8 blocks
 	fmov    $ctr_t0.d[1], $input_h0                           @ AES block 0 - mov high
 	eor     $input_l3, $input_l3, $rk14_l                     @ AES block 3 - round 14 low
 
@@ -4541,7 +4575,7 @@ aes_gcm_enc_256_kernel:
 	fmov    $ctr_t1.d[1], $input_h1                           @ AES block 4k+5 - mov high
 
 	fmov    $ctr_t2d, $input_l2                               @ AES block 4k+6 - mov low
-	cmp     $input_ptr, $main_end_input_ptr                   @ LOOP CONTROL
+	cmp     $input_ptrx, $main_end_input_ptr                  @ LOOP CONTROL
 
 	fmov    $ctr_t2.d[1], $input_h2                           @ AES block 4k+6 - mov high
 
@@ -4776,7 +4810,7 @@ aes_gcm_enc_256_kernel:
 	.L256_enc_tail:                                           @ TAIL
 
 	ext     $t0.16b, $acc_lb, $acc_lb, #8                     @ prepare final partial tag
-	sub     $main_end_input_ptr, $end_input_ptr, $input_ptr   @ main_end_input_ptr is number of bytes left to process
+	sub     $main_end_input_ptr, $end_input_ptrx, $input_ptrx @ main_end_input_ptr is number of bytes left to process
 	ldp     $input_l0, $input_h0, [$input_ptr], #16           @ AES block 4k+4 - load plaintext
 #ifdef __AARCH64EB__
 	rev     $input_l0, $input_l0
@@ -4998,13 +5032,13 @@ aes_gcm_enc_256_kernel:
 	mov     x0, $len
 	st1     { $acc_l.16b }, [$current_tag]
 
-	ldp     x21, x22, [sp, #16]
-	ldp     x23, x24, [sp, #32]
-	ldp     d8, d9, [sp, #48]
-	ldp     d10, d11, [sp, #64]
-	ldp     d12, d13, [sp, #80]
-	ldp     d14, d15, [sp, #96]
-	ldp     x19, x20, [sp], #112
+	ldp     PTR(21), PTR(22), [PTRN(sp), #(2*PTR_WIDTH)]
+	ldp     PTR(23), PTR(24), [PTRN(sp), #(4*PTR_WIDTH)]
+	ldp     d8, d9, [PTRN(sp), #(6*PTR_WIDTH)]
+	ldp     d10, d11, [PTRN(sp), #(6*PTR_WIDTH+16)]
+	ldp     d12, d13, [PTRN(sp), #(6*PTR_WIDTH+32)]
+	ldp     d14, d15, [PTRN(sp), #(6*PTR_WIDTH+48)]
+	ldp     PTR(19), PTR(20), [PTRN(sp)], #(6*PTR_WIDTH+64)
 	ret
 
 .L256_enc_ret:
@@ -5033,15 +5067,15 @@ $code.=<<___;
 aes_gcm_dec_256_kernel:
 	AARCH64_VALID_CALL_TARGET
 	cbz     x1, .L256_dec_ret
-	stp     x19, x20, [sp, #-112]!
-	mov     x16, x4
-	mov     x8, x5
-	stp     x21, x22, [sp, #16]
-	stp     x23, x24, [sp, #32]
-	stp     d8, d9, [sp, #48]
-	stp     d10, d11, [sp, #64]
-	stp     d12, d13, [sp, #80]
-	stp     d14, d15, [sp, #96]
+	stp     PTR(19), PTR(20), [PTRN(sp), #-(6*PTR_WIDTH+64)]!
+	mov     $counter, PTR(4)
+	mov     $cc, PTR(5)
+	stp     PTR(21), PTR(22), [PTRN(sp), #(2*PTR_WIDTH)]
+	stp     PTR(23), PTR(24), [PTRN(sp), #(4*PTR_WIDTH)]
+	stp     d8, d9, [PTRN(sp), #(6*PTR_WIDTH)]
+	stp     d10, d11, [PTRN(sp), #(6*PTR_WIDTH+16)]
+	stp     d12, d13, [PTRN(sp), #(6*PTR_WIDTH+32)]
+	stp     d14, d15, [PTRN(sp), #(6*PTR_WIDTH+48)]
 
 	lsr     $main_end_input_ptr, $bit_length, #3              @ byte_len
 	mov     $len, $main_end_input_ptr
@@ -5061,7 +5095,12 @@ aes_gcm_dec_256_kernel:
 	ld1     {$rk1s}, [$cc], #16                               @ load rk1
 	and     $main_end_input_ptr, $main_end_input_ptr, #0xffffffffffffffc0 @ number of bytes to be processed in main loop (at least 1 byte must be handled by tail)
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	lsr     $end_input_ptrx, $bit_length, #3
+	add     $end_input_ptr, $input_ptr, $end_input_ptrx       @ end_input_ptr
+#else
 	add     $end_input_ptr, $input_ptr, $bit_length, lsr #3   @ end_input_ptr
+#endif
 	ld1     {$rk2s}, [$cc], #16                               @ load rk2
 
 	lsr     $rctr32x, $ctr96_t32x, #32
@@ -5069,7 +5108,7 @@ aes_gcm_dec_256_kernel:
 	orr     $ctr96_t32w, $ctr96_t32w, $ctr96_t32w
 
 	ld1     {$rk4s}, [$cc], #16                               @ load rk4
-	add     $main_end_input_ptr, $main_end_input_ptr, $input_ptr
+	add     $main_end_input_ptr, $main_end_input_ptr, $input_ptrx
 	rev     $rctr32w, $rctr32w                                @ rev_ctr32
 
 	add     $rctr32w, $rctr32w, #1                            @ increment rev_ctr32
@@ -5155,7 +5194,7 @@ aes_gcm_dec_256_kernel:
 	aese    $ctr3b, $rk3  \n  aesmc   $ctr3b, $ctr3b          @ AES block 3 - round 3
 
 	aese    $ctr0b, $rk4  \n  aesmc   $ctr0b, $ctr0b          @ AES block 0 - round 4
-	cmp     $input_ptr, $main_end_input_ptr                   @ check if we have <= 4 blocks
+	cmp     $input_ptrx, $main_end_input_ptr                  @ check if we have <= 4 blocks
 
 	aese    $ctr2b, $rk3  \n  aesmc   $ctr2b, $ctr2b          @ AES block 2 - round 3
 
@@ -5307,7 +5346,7 @@ aes_gcm_dec_256_kernel:
 	stp     $output_l1, $output_h1, [$output_ptr], #16        @ AES block 1 - store result
 
 	eor     $ctr2b, $res2b, $ctr2b                            @ AES block 2 - result
-	cmp     $input_ptr, $main_end_input_ptr                   @ check if we have <= 8 blocks
+	cmp     $input_ptrx, $main_end_input_ptr                  @ check if we have <= 8 blocks
 	b.ge    .L256_dec_prepretail                              @ do prepretail
 
 	.L256_dec_main_loop:                                      @ main loop start
@@ -5520,7 +5559,7 @@ aes_gcm_dec_256_kernel:
 
 	aese    $ctr2b, $rk13                                     @ AES block 4k+6 - round 13
 	orr     $ctr32x, $ctr96_t32x, $ctr32x, lsl #32            @ CTR block 4k+9
-	cmp     $input_ptr, $main_end_input_ptr                   @ LOOP CONTROL
+	cmp     $input_ptrx, $main_end_input_ptr                  @ LOOP CONTROL
 
 	add     $rctr32w, $rctr32w, #1                            @ CTR block 4k+9
 
@@ -5773,7 +5812,7 @@ aes_gcm_dec_256_kernel:
 	eor     $acc_lb, $acc_lb, $acc_mb                         @ MODULO - fold into low
 	.L256_dec_tail:                                           @ TAIL
 
-	sub     $main_end_input_ptr, $end_input_ptr, $input_ptr   @ main_end_input_ptr is number of bytes left to process
+	sub     $main_end_input_ptr, $end_input_ptrx, $input_ptrx @ main_end_input_ptr is number of bytes left to process
 	ld1     { $res1b}, [$input_ptr], #16                      @ AES block 4k+4 - load ciphertext
 
 	eor     $ctr0b, $res1b, $ctr0b                            @ AES block 4k+4 - result
@@ -5933,7 +5972,7 @@ aes_gcm_dec_256_kernel:
 	sub     $bit_length, $bit_length, #128                   @ bit_length -= 128
 	mvn     $rk14_l, xzr                                     @ rk14_l = 0xffffffffffffffff
 
-	ldp     $end_input_ptr, $main_end_input_ptr, [$output_ptr] @ load existing bytes we need to not overwrite
+	ldp     $end_input_ptrx, $main_end_input_ptr, [$output_ptr] @ load existing bytes we need to not overwrite
 	neg     $bit_length, $bit_length                         @ bit_length = 128 - #bits in input (in range [1,128])
 
 	and     $bit_length, $bit_length, #127                   @ bit_length %= 128
@@ -5948,7 +5987,7 @@ aes_gcm_dec_256_kernel:
 	and     $output_l0, $output_l0, $ctr32x
 
 	mov     $ctr0.d[1], $ctr96_b64x
-	bic     $end_input_ptr, $end_input_ptr, $ctr32x          @ mask out low existing bytes
+	bic     $end_input_ptrx, $end_input_ptrx, $ctr32x        @ mask out low existing bytes
 
 #ifndef __AARCH64EB__
 	rev     $ctr32w, $rctr32w
@@ -5958,7 +5997,7 @@ aes_gcm_dec_256_kernel:
 
 	bic     $main_end_input_ptr, $main_end_input_ptr, $ctr96_b64x      @ mask out high existing bytes
 
-	orr     $output_l0, $output_l0, $end_input_ptr
+	orr     $output_l0, $output_l0, $end_input_ptrx
 
 	and     $output_h0, $output_h0, $ctr96_b64x
 
@@ -6017,13 +6056,13 @@ aes_gcm_dec_256_kernel:
 	mov     x0, $len
 	st1     { $acc_l.16b }, [$current_tag]
 
-	ldp     x21, x22, [sp, #16]
-	ldp     x23, x24, [sp, #32]
-	ldp     d8, d9, [sp, #48]
-	ldp     d10, d11, [sp, #64]
-	ldp     d12, d13, [sp, #80]
-	ldp     d14, d15, [sp, #96]
-	ldp     x19, x20, [sp], #112
+	ldp     PTR(21), PTR(22), [PTRN(sp), #(2*PTR_WIDTH)]
+	ldp     PTR(23), PTR(24), [PTRN(sp), #(4*PTR_WIDTH)]
+	ldp     d8, d9, [PTRN(sp), #(6*PTR_WIDTH)]
+	ldp     d10, d11, [PTRN(sp), #(6*PTR_WIDTH+16)]
+	ldp     d12, d13, [PTRN(sp), #(6*PTR_WIDTH+32)]
+	ldp     d14, d15, [PTRN(sp), #(6*PTR_WIDTH+48)]
+	ldp     PTR(19), PTR(20), [PTRN(sp)], #(6*PTR_WIDTH+64)
 	ret
 
 .L256_dec_ret:

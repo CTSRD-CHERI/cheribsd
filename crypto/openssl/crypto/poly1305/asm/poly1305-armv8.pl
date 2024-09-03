@@ -49,8 +49,10 @@ open OUT,"| \"$^X\" $xlate $flavour \"$output\""
     or die "can't call $xlate: $!";
 *STDOUT=*OUT;
 
-my ($ctx,$inp,$len,$padbit) = map("x$_",(0..3));
-my ($mac,$nonce)=($inp,$len);
+my ($ctx,$inp,$len,$padbit) = ("PTR(0)","PTR(1)","x2","x3");
+my ($mac,$nonce)=($inp,"PTR(2)");
+my ($inpx) = ("x1");
+my ($func,$r0p,$r1p,$d0p,$d1p) = map("PTR($_)",(2,7..8,12..13));
 
 my ($h0,$h1,$h2,$r0,$r1,$s1,$t0,$t1,$d0,$d1,$d2) = map("x$_",(4..14));
 
@@ -73,15 +75,15 @@ $code.=<<___;
 .align	5
 poly1305_init:
 	AARCH64_VALID_CALL_TARGET
-	cmp	$inp,xzr
+	cmp	$inpx,xzr
 	stp	xzr,xzr,[$ctx]		// zero hash value
 	stp	xzr,xzr,[$ctx,#16]	// [along with is_base2_26]
 
-	csel	x0,xzr,x0,eq
+	csel	$ctx,PTR(zr),$ctx,eq
 	b.eq	.Lno_key
 
-	adrp	x17,OPENSSL_armcap_P
-	ldr	w17,[x17,#:lo12:OPENSSL_armcap_P]
+	adrp	PTR(17),OPENSSL_armcap_P
+	ldr	w17,[PTR(17),#:lo12:OPENSSL_armcap_P]
 
 	ldp	$r0,$r1,[$inp]		// load key
 	mov	$s1,#0xfffffffc0fffffff
@@ -97,18 +99,18 @@ poly1305_init:
 
 	tst	w17,#ARMV7_NEON
 
-	adr	$d0,.Lpoly1305_blocks
-	adr	$r0,.Lpoly1305_blocks_neon
-	adr	$d1,.Lpoly1305_emit
-	adr	$r1,.Lpoly1305_emit_neon
+	adr	$d0p,.Lpoly1305_blocks
+	adr	$r0p,.Lpoly1305_blocks_neon
+	adr	$d1p,.Lpoly1305_emit
+	adr	$r1p,.Lpoly1305_emit_neon
 
-	csel	$d0,$d0,$r0,eq
-	csel	$d1,$d1,$r1,eq
+	csel	$d0p,$d0p,$r0p,eq
+	csel	$d1p,$d1p,$r1p,eq
 
 #ifdef	__ILP32__
-	stp	w12,w13,[$len]
+	stp	w12,w13,[$func]
 #else
-	stp	$d0,$d1,[$len]
+	stp	$d0p,$d1p,[$func]
 #endif
 
 	mov	x0,#1
@@ -117,6 +119,7 @@ poly1305_init:
 .size	poly1305_init,.-poly1305_init
 
 .type	poly1305_blocks,%function
+.type	.Lpoly1305_blocks,%function
 .align	5
 poly1305_blocks:
 .Lpoly1305_blocks:
@@ -185,6 +188,7 @@ poly1305_blocks:
 .size	poly1305_blocks,.-poly1305_blocks
 
 .type	poly1305_emit,%function
+.type	Lpoly1305_emit,%function
 .align	5
 poly1305_emit:
 .Lpoly1305_emit:
@@ -226,8 +230,8 @@ my ($ACC0,$ACC1,$ACC2,$ACC3,$ACC4) = map("v$_.2d",(19..23));
 my ($H0,$H1,$H2,$H3,$H4) = map("v$_.2s",(24..28));
 my ($T0,$T1,$MASK) = map("v$_",(29..31));
 
-my ($in2,$zeros)=("x16","x17");
-my $is_base2_26 = $zeros;		# borrow
+my ($in2,$zeros)=("PTR(16)","PTR(17)");
+my $is_base2_26 = "x17";		# borrow
 
 $code.=<<___;
 .type	poly1305_mult,%function
@@ -295,6 +299,7 @@ poly1305_splat:
 .size	poly1305_splat,.-poly1305_splat
 
 .type	poly1305_blocks_neon,%function
+.type	.Lpoly1305_blocks_neon,%function
 .align	5
 poly1305_blocks_neon:
 .Lpoly1305_blocks_neon:
@@ -308,8 +313,8 @@ poly1305_blocks_neon:
 
 .Lblocks_neon:
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-80]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH+64)]!
+	add	PTR(29),PTRN(sp),#0
 
 	ands	$len,$len,#-16
 	b.eq	.Lno_data_neon
@@ -354,7 +359,7 @@ poly1305_blocks_neon:
 	adc	$h2,$h2,$padbit
 
 	bl	poly1305_mult
-	ldr	x30,[sp,#8]
+	ldr	PTR(30),[PTRN(sp),#PTR_WIDTH]
 
 	cbz	$padbit,.Lstore_base2_64_neon
 
@@ -409,10 +414,10 @@ poly1305_blocks_neon:
 	ubfx	x13,$h1,#14,#26
 	extr	x14,$h2,$h1,#40
 
-	stp	d8,d9,[sp,#16]		// meet ABI requirements
-	stp	d10,d11,[sp,#32]
-	stp	d12,d13,[sp,#48]
-	stp	d14,d15,[sp,#64]
+	stp	d8,d9,[PTRN(sp),#2*PTR_WIDTH]	// meet ABI requirements
+	stp	d10,d11,[PTRN(sp),#2*PTR_WIDTH+16]
+	stp	d12,d13,[PTRN(sp),#2*PTR_WIDTH+32]
+	stp	d14,d15,[PTRN(sp),#2*PTR_WIDTH+48]
 
 	fmov	${H0},x10
 	fmov	${H1},x11
@@ -439,7 +444,7 @@ poly1305_blocks_neon:
 	bl	poly1305_mult		// r^4
 	sub	$ctx,$ctx,#4
 	bl	poly1305_splat
-	ldr	x30,[sp,#8]
+	ldr	PTR(30),[PTRN(sp),#PTR_WIDTH]
 
 	add	$in2,$inp,#32
 	adr	$zeros,.Lzeros
@@ -458,10 +463,10 @@ poly1305_blocks_neon:
 	subs	$len,$len,#64
 	csel	$in2,$zeros,$in2,lo
 
-	stp	d8,d9,[sp,#16]		// meet ABI requirements
-	stp	d10,d11,[sp,#32]
-	stp	d12,d13,[sp,#48]
-	stp	d14,d15,[sp,#64]
+	stp	d8,d9,[PTRN(sp),#2*PTR_WIDTH]	// meet ABI requirements
+	stp	d10,d11,[PTRN(sp),#2*PTR_WIDTH+16]
+	stp	d12,d13,[PTRN(sp),#2*PTR_WIDTH+32]
+	stp	d14,d15,[PTRN(sp),#2*PTR_WIDTH+48]
 
 	fmov	${H0},x10
 	fmov	${H1},x11
@@ -474,7 +479,7 @@ poly1305_blocks_neon:
 	ldp	x9,x13,[$in2],#48
 
 	lsl	$padbit,$padbit,#24
-	add	x15,$ctx,#48
+	add	PTR(15),$ctx,#48
 
 #ifdef	__AARCH64EB__
 	rev	x8,x8
@@ -508,9 +513,9 @@ poly1305_blocks_neon:
 	ldp	x8,x12,[$inp],#16	// inp[0:1]
 	ldp	x9,x13,[$inp],#48
 
-	ld1	{$R0,$R1,$S1,$R2},[x15],#64
-	ld1	{$S2,$R3,$S3,$R4},[x15],#64
-	ld1	{$S4},[x15]
+	ld1	{$R0,$R1,$S1,$R2},[PTR(15)],#64
+	ld1	{$S2,$R3,$S3,$R4},[PTR(15)],#64
+	ld1	{$S4},[PTR(15)]
 
 #ifdef	__AARCH64EB__
 	rev	x8,x8
@@ -829,13 +834,13 @@ poly1305_blocks_neon:
 	// horizontal add
 
 	addp	$ACC3,$ACC3,$ACC3
-	 ldp	d8,d9,[sp,#16]		// meet ABI requirements
+	 ldp	d8,d9,[PTRN(sp),#2*PTR_WIDTH]	// meet ABI requirements
 	addp	$ACC0,$ACC0,$ACC0
-	 ldp	d10,d11,[sp,#32]
+	 ldp	d10,d11,[PTRN(sp),#2*PTR_WIDTH+16]
 	addp	$ACC4,$ACC4,$ACC4
-	 ldp	d12,d13,[sp,#48]
+	 ldp	d12,d13,[PTRN(sp),#2*PTR_WIDTH+32]
 	addp	$ACC1,$ACC1,$ACC1
-	 ldp	d14,d15,[sp,#64]
+	 ldp	d14,d15,[PTRN(sp),#2*PTR_WIDTH+48]
 	addp	$ACC2,$ACC2,$ACC2
 
 	////////////////////////////////////////////////////////////////
@@ -876,12 +881,13 @@ poly1305_blocks_neon:
 	st1	{$ACC4}[0],[$ctx]
 
 .Lno_data_neon:
-	ldr	x29,[sp],#80
+	ldr	PTR(29),[PTRN(sp)],#(2*PTR_WIDTH+64)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	poly1305_blocks_neon,.-poly1305_blocks_neon
 
 .type	poly1305_emit_neon,%function
+.type	.Lpoly1305_emit_neon,%function
 .align	5
 poly1305_emit_neon:
 .Lpoly1305_emit_neon:

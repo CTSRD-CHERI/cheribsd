@@ -27,28 +27,28 @@ ChaCha20_ctr32:
 	b.lo	.Lshort
 
 #ifndef	__KERNEL__
-	adrp	x17,OPENSSL_armcap_P
-	ldr	w17,[x17,#:lo12:OPENSSL_armcap_P]
+	adrp	PTR(17),OPENSSL_armcap_P
+	ldr	w17,[PTR(17),#:lo12:OPENSSL_armcap_P]
 	tst	w17,#ARMV7_NEON
 	b.ne	.LChaCha20_neon
 #endif
 
 .Lshort:
-	stp	x29,x30,[sp,#-96]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(12*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 
-	adr	x5,.Lsigma
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	stp	x23,x24,[sp,#48]
-	stp	x25,x26,[sp,#64]
-	stp	x27,x28,[sp,#80]
-	sub	sp,sp,#64
+	adr	PTR(5),.Lsigma
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
+	stp	PTR(25),PTR(26),[PTRN(sp),#(8*PTR_WIDTH)]
+	stp	PTR(27),PTR(28),[PTRN(sp),#(10*PTR_WIDTH)]
+	sub	PTRN(sp),PTRN(sp),#64
 
-	ldp	x22,x23,[x5]		// load sigma
-	ldp	x24,x25,[x3]		// load key
-	ldp	x26,x27,[x3,#16]
-	ldp	x28,x30,[x4]		// load counter
+	ldp	x22,x23,[PTR(5)]		// load sigma
+	ldp	x24,x25,[PTR(3)]		// load key
+	ldp	x26,x27,[PTR(3),#16]
+	ldp	x28,x30,[PTR(4)]		// load counter
 #ifdef	__AARCH64EB__
 	ror	x24,x24,#32
 	ror	x25,x25,#32
@@ -199,17 +199,17 @@ ChaCha20_ctr32:
 
 	add	x5,x5,x6,lsl#32	// pack
 	add	x7,x7,x8,lsl#32
-	ldp	x6,x8,[x1,#0]		// load input
+	ldp	x6,x8,[PTR(1),#0]		// load input
 	add	x9,x9,x10,lsl#32
 	add	x11,x11,x12,lsl#32
-	ldp	x10,x12,[x1,#16]
+	ldp	x10,x12,[PTR(1),#16]
 	add	x13,x13,x14,lsl#32
 	add	x15,x15,x16,lsl#32
-	ldp	x14,x16,[x1,#32]
+	ldp	x14,x16,[PTR(1),#32]
 	add	x17,x17,x19,lsl#32
 	add	x20,x20,x21,lsl#32
-	ldp	x19,x21,[x1,#48]
-	add	x1,x1,#64
+	ldp	x19,x21,[PTR(1),#48]
+	add	PTR(1),PTR(1),#64
 #ifdef	__AARCH64EB__
 	rev	x5,x5
 	rev	x7,x7
@@ -229,22 +229,22 @@ ChaCha20_ctr32:
 	eor	x17,x17,x19
 	eor	x20,x20,x21
 
-	stp	x5,x7,[x0,#0]		// store output
+	stp	x5,x7,[PTR(0),#0]		// store output
 	add	x28,x28,#1			// increment counter
-	stp	x9,x11,[x0,#16]
-	stp	x13,x15,[x0,#32]
-	stp	x17,x20,[x0,#48]
-	add	x0,x0,#64
+	stp	x9,x11,[PTR(0),#16]
+	stp	x13,x15,[PTR(0),#32]
+	stp	x17,x20,[PTR(0),#48]
+	add	PTR(0),PTR(0),#64
 
 	b.hi	.Loop_outer
 
-	ldp	x19,x20,[x29,#16]
-	add	sp,sp,#64
-	ldp	x21,x22,[x29,#32]
-	ldp	x23,x24,[x29,#48]
-	ldp	x25,x26,[x29,#64]
-	ldp	x27,x28,[x29,#80]
-	ldp	x29,x30,[sp],#96
+	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
+	add	PTRN(sp),PTRN(sp),#64
+	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
+	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
+	ldp	PTR(25),PTR(26),[PTR(29),#(8*PTR_WIDTH)]
+	ldp	PTR(27),PTR(28),[PTR(29),#(10*PTR_WIDTH)]
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(12*PTR_WIDTH)
 .Labort:
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
@@ -253,10 +253,10 @@ ChaCha20_ctr32:
 .Ltail:
 	add	x2,x2,#64
 .Less_than_64:
-	sub	x0,x0,#1
-	add	x1,x1,x2
-	add	x0,x0,x2
-	add	x4,sp,x2
+	sub	PTR(0),PTR(0),#1
+	add	PTR(1),PTR(1),x2
+	add	PTR(0),PTR(0),x2
+	add	PTR(4),PTRN(sp),x2
 	neg	x2,x2
 
 	add	x5,x5,x6,lsl#32	// pack
@@ -277,31 +277,31 @@ ChaCha20_ctr32:
 	rev	x17,x17
 	rev	x20,x20
 #endif
-	stp	x5,x7,[sp,#0]
-	stp	x9,x11,[sp,#16]
-	stp	x13,x15,[sp,#32]
-	stp	x17,x20,[sp,#48]
+	stp	x5,x7,[PTRN(sp),#0]
+	stp	x9,x11,[PTRN(sp),#16]
+	stp	x13,x15,[PTRN(sp),#32]
+	stp	x17,x20,[PTRN(sp),#48]
 
 .Loop_tail:
-	ldrb	w10,[x1,x2]
-	ldrb	w11,[x4,x2]
+	ldrb	w10,[PTR(1),x2]
+	ldrb	w11,[PTR(4),x2]
 	add	x2,x2,#1
 	eor	w10,w10,w11
-	strb	w10,[x0,x2]
+	strb	w10,[PTR(0),x2]
 	cbnz	x2,.Loop_tail
 
-	stp	xzr,xzr,[sp,#0]
-	stp	xzr,xzr,[sp,#16]
-	stp	xzr,xzr,[sp,#32]
-	stp	xzr,xzr,[sp,#48]
+	stp	xzr,xzr,[PTRN(sp),#0]
+	stp	xzr,xzr,[PTRN(sp),#16]
+	stp	xzr,xzr,[PTRN(sp),#32]
+	stp	xzr,xzr,[PTRN(sp),#48]
 
-	ldp	x19,x20,[x29,#16]
-	add	sp,sp,#64
-	ldp	x21,x22,[x29,#32]
-	ldp	x23,x24,[x29,#48]
-	ldp	x25,x26,[x29,#64]
-	ldp	x27,x28,[x29,#80]
-	ldp	x29,x30,[sp],#96
+	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
+	add	PTRN(sp),PTRN(sp),#64
+	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
+	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
+	ldp	PTR(25),PTR(26),[PTR(29),#(8*PTR_WIDTH)]
+	ldp	PTR(27),PTR(28),[PTR(29),#(10*PTR_WIDTH)]
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(12*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	ChaCha20_ctr32,.-ChaCha20_ctr32
@@ -314,29 +314,29 @@ ChaCha20_ctr32:
 ChaCha20_neon:
 	AARCH64_SIGN_LINK_REGISTER
 .LChaCha20_neon:
-	stp	x29,x30,[sp,#-96]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(12*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 
-	adr	x5,.Lsigma
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	stp	x23,x24,[sp,#48]
-	stp	x25,x26,[sp,#64]
-	stp	x27,x28,[sp,#80]
+	adr	PTR(5),.Lsigma
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
+	stp	PTR(25),PTR(26),[PTRN(sp),#(8*PTR_WIDTH)]
+	stp	PTR(27),PTR(28),[PTRN(sp),#(10*PTR_WIDTH)]
 	cmp	x2,#512
 	b.hs	.L512_or_more_neon
 
-	sub	sp,sp,#64
+	sub	PTRN(sp),PTRN(sp),#64
 
-	ldp	x22,x23,[x5]		// load sigma
-	ld1	{v0.4s},[x5],#16
-	ldp	x24,x25,[x3]		// load key
-	ldp	x26,x27,[x3,#16]
-	ld1	{v1.4s,v2.4s},[x3]
-	ldp	x28,x30,[x4]		// load counter
-	ld1	{v3.4s},[x4]
-	stp	d8,d9,[sp]			// meet ABI requirements
-	ld1	{v8.4s,v9.4s},[x5]
+	ldp	x22,x23,[PTR(5)]		// load sigma
+	ld1	{v0.4s},[PTR(5)],#16
+	ldp	x24,x25,[PTR(3)]		// load key
+	ldp	x26,x27,[PTR(3),#16]
+	ld1	{v1.4s,v2.4s},[PTR(3)]
+	ldp	x28,x30,[PTR(4)]		// load counter
+	ld1	{v3.4s},[PTR(4)]
+	stp	d8,d9,[PTRN(sp)]		// meet ABI requirements
+	ld1	{v8.4s,v9.4s},[PTR(5)]
 #ifdef	__AARCH64EB__
 	rev64	v0.4s,v0.4s
 	ror	x24,x24,#32
@@ -654,21 +654,21 @@ ChaCha20_neon:
 
 	add	x5,x5,x6,lsl#32	// pack
 	add	x7,x7,x8,lsl#32
-	ldp	x6,x8,[x1,#0]		// load input
+	ldp	x6,x8,[PTR(1),#0]		// load input
 	add	v16.4s,v16.4s,v0.4s			// accumulate key block
 	add	x9,x9,x10,lsl#32
 	add	x11,x11,x12,lsl#32
-	ldp	x10,x12,[x1,#16]
+	ldp	x10,x12,[PTR(1),#16]
 	add	v17.4s,v17.4s,v1.4s
 	add	x13,x13,x14,lsl#32
 	add	x15,x15,x16,lsl#32
-	ldp	x14,x16,[x1,#32]
+	ldp	x14,x16,[PTR(1),#32]
 	add	v18.4s,v18.4s,v2.4s
 	add	x17,x17,x19,lsl#32
 	add	x20,x20,x21,lsl#32
-	ldp	x19,x21,[x1,#48]
+	ldp	x19,x21,[PTR(1),#48]
 	add	v19.4s,v19.4s,v3.4s
-	add	x1,x1,#64
+	add	PTR(1),PTR(1),#64
 #ifdef	__AARCH64EB__
 	rev	x5,x5
 	rev	x7,x7
@@ -679,7 +679,7 @@ ChaCha20_neon:
 	rev	x17,x17
 	rev	x20,x20
 #endif
-	ld1	{v4.16b,v5.16b,v6.16b,v7.16b},[x1],#64
+	ld1	{v4.16b,v5.16b,v6.16b,v7.16b},[PTR(1)],#64
 	eor	x5,x5,x6
 	add	v20.4s,v20.4s,v0.4s
 	eor	x7,x7,x8
@@ -698,79 +698,79 @@ ChaCha20_neon:
 	eor	x20,x20,x21
 	eor	v19.16b,v19.16b,v7.16b
 	add	v8.4s,v8.4s,v4.4s			// += 5
-	ld1	{v4.16b,v5.16b,v6.16b,v7.16b},[x1],#64
+	ld1	{v4.16b,v5.16b,v6.16b,v7.16b},[PTR(1)],#64
 
-	stp	x5,x7,[x0,#0]		// store output
+	stp	x5,x7,[PTR(0),#0]		// store output
 	add	x28,x28,#5			// increment counter
-	stp	x9,x11,[x0,#16]
-	stp	x13,x15,[x0,#32]
-	stp	x17,x20,[x0,#48]
-	add	x0,x0,#64
+	stp	x9,x11,[PTR(0),#16]
+	stp	x13,x15,[PTR(0),#32]
+	stp	x17,x20,[PTR(0),#48]
+	add	PTR(0),PTR(0),#64
 
-	st1	{v16.16b,v17.16b,v18.16b,v19.16b},[x0],#64
+	st1	{v16.16b,v17.16b,v18.16b,v19.16b},[PTR(0)],#64
 	add	v24.4s,v24.4s,v0.4s
 	add	v25.4s,v25.4s,v1.4s
 	add	v26.4s,v26.4s,v2.4s
 	add	v27.4s,v27.4s,v3.4s
-	ld1	{v16.16b,v17.16b,v18.16b,v19.16b},[x1],#64
+	ld1	{v16.16b,v17.16b,v18.16b,v19.16b},[PTR(1)],#64
 
 	eor	v20.16b,v20.16b,v4.16b
 	eor	v21.16b,v21.16b,v5.16b
 	eor	v22.16b,v22.16b,v6.16b
 	eor	v23.16b,v23.16b,v7.16b
-	st1	{v20.16b,v21.16b,v22.16b,v23.16b},[x0],#64
+	st1	{v20.16b,v21.16b,v22.16b,v23.16b},[PTR(0)],#64
 	add	v28.4s,v28.4s,v0.4s
 	add	v29.4s,v29.4s,v1.4s
 	add	v30.4s,v30.4s,v2.4s
 	add	v31.4s,v31.4s,v3.4s
-	ld1	{v20.16b,v21.16b,v22.16b,v23.16b},[x1],#64
+	ld1	{v20.16b,v21.16b,v22.16b,v23.16b},[PTR(1)],#64
 
 	eor	v24.16b,v24.16b,v16.16b
 	eor	v25.16b,v25.16b,v17.16b
 	eor	v26.16b,v26.16b,v18.16b
 	eor	v27.16b,v27.16b,v19.16b
-	st1	{v24.16b,v25.16b,v26.16b,v27.16b},[x0],#64
+	st1	{v24.16b,v25.16b,v26.16b,v27.16b},[PTR(0)],#64
 
 	eor	v28.16b,v28.16b,v20.16b
 	eor	v29.16b,v29.16b,v21.16b
 	eor	v30.16b,v30.16b,v22.16b
 	eor	v31.16b,v31.16b,v23.16b
-	st1	{v28.16b,v29.16b,v30.16b,v31.16b},[x0],#64
+	st1	{v28.16b,v29.16b,v30.16b,v31.16b},[PTR(0)],#64
 
 	b.hi	.Loop_outer_neon
 
-	ldp	d8,d9,[sp]			// meet ABI requirements
+	ldp	d8,d9,[PTRN(sp)]			// meet ABI requirements
 
-	ldp	x19,x20,[x29,#16]
-	add	sp,sp,#64
-	ldp	x21,x22,[x29,#32]
-	ldp	x23,x24,[x29,#48]
-	ldp	x25,x26,[x29,#64]
-	ldp	x27,x28,[x29,#80]
-	ldp	x29,x30,[sp],#96
+	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
+	add	PTRN(sp),PTRN(sp),#64
+	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
+	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
+	ldp	PTR(25),PTR(26),[PTR(29),#(8*PTR_WIDTH)]
+	ldp	PTR(27),PTR(28),[PTR(29),#(10*PTR_WIDTH)]
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(12*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 
 .align	4
 .Ltail_neon:
 	add	x2,x2,#320
-	ldp	d8,d9,[sp]			// meet ABI requirements
+	ldp	d8,d9,[PTRN(sp)]			// meet ABI requirements
 	cmp	x2,#64
 	b.lo	.Less_than_64
 
 	add	x5,x5,x6,lsl#32	// pack
 	add	x7,x7,x8,lsl#32
-	ldp	x6,x8,[x1,#0]		// load input
+	ldp	x6,x8,[PTR(1),#0]		// load input
 	add	x9,x9,x10,lsl#32
 	add	x11,x11,x12,lsl#32
-	ldp	x10,x12,[x1,#16]
+	ldp	x10,x12,[PTR(1),#16]
 	add	x13,x13,x14,lsl#32
 	add	x15,x15,x16,lsl#32
-	ldp	x14,x16,[x1,#32]
+	ldp	x14,x16,[PTR(1),#32]
 	add	x17,x17,x19,lsl#32
 	add	x20,x20,x21,lsl#32
-	ldp	x19,x21,[x1,#48]
-	add	x1,x1,#64
+	ldp	x19,x21,[PTR(1),#48]
+	add	PTR(1),PTR(1),#64
 #ifdef	__AARCH64EB__
 	rev	x5,x5
 	rev	x7,x7
@@ -790,26 +790,26 @@ ChaCha20_neon:
 	eor	x17,x17,x19
 	eor	x20,x20,x21
 
-	stp	x5,x7,[x0,#0]		// store output
+	stp	x5,x7,[PTR(0),#0]		// store output
 	add	v16.4s,v16.4s,v0.4s			// accumulate key block
-	stp	x9,x11,[x0,#16]
+	stp	x9,x11,[PTR(0),#16]
 	add	v17.4s,v17.4s,v1.4s
-	stp	x13,x15,[x0,#32]
+	stp	x13,x15,[PTR(0),#32]
 	add	v18.4s,v18.4s,v2.4s
-	stp	x17,x20,[x0,#48]
+	stp	x17,x20,[PTR(0),#48]
 	add	v19.4s,v19.4s,v3.4s
-	add	x0,x0,#64
+	add	PTR(0),PTR(0),#64
 	b.eq	.Ldone_neon
 	sub	x2,x2,#64
 	cmp	x2,#64
 	b.lo	.Last_neon
 
-	ld1	{v4.16b,v5.16b,v6.16b,v7.16b},[x1],#64
+	ld1	{v4.16b,v5.16b,v6.16b,v7.16b},[PTR(1)],#64
 	eor	v16.16b,v16.16b,v4.16b
 	eor	v17.16b,v17.16b,v5.16b
 	eor	v18.16b,v18.16b,v6.16b
 	eor	v19.16b,v19.16b,v7.16b
-	st1	{v16.16b,v17.16b,v18.16b,v19.16b},[x0],#64
+	st1	{v16.16b,v17.16b,v18.16b,v19.16b},[PTR(0)],#64
 	b.eq	.Ldone_neon
 
 	add	v16.4s,v20.4s,v0.4s
@@ -820,12 +820,12 @@ ChaCha20_neon:
 	add	v19.4s,v23.4s,v3.4s
 	b.lo	.Last_neon
 
-	ld1	{v4.16b,v5.16b,v6.16b,v7.16b},[x1],#64
+	ld1	{v4.16b,v5.16b,v6.16b,v7.16b},[PTR(1)],#64
 	eor	v20.16b,v16.16b,v4.16b
 	eor	v21.16b,v17.16b,v5.16b
 	eor	v22.16b,v18.16b,v6.16b
 	eor	v23.16b,v19.16b,v7.16b
-	st1	{v20.16b,v21.16b,v22.16b,v23.16b},[x0],#64
+	st1	{v20.16b,v21.16b,v22.16b,v23.16b},[PTR(0)],#64
 	b.eq	.Ldone_neon
 
 	add	v16.4s,v24.4s,v0.4s
@@ -836,12 +836,12 @@ ChaCha20_neon:
 	add	v19.4s,v27.4s,v3.4s
 	b.lo	.Last_neon
 
-	ld1	{v4.16b,v5.16b,v6.16b,v7.16b},[x1],#64
+	ld1	{v4.16b,v5.16b,v6.16b,v7.16b},[PTR(1)],#64
 	eor	v24.16b,v16.16b,v4.16b
 	eor	v25.16b,v17.16b,v5.16b
 	eor	v26.16b,v18.16b,v6.16b
 	eor	v27.16b,v19.16b,v7.16b
-	st1	{v24.16b,v25.16b,v26.16b,v27.16b},[x0],#64
+	st1	{v24.16b,v25.16b,v26.16b,v27.16b},[PTR(0)],#64
 	b.eq	.Ldone_neon
 
 	add	v16.4s,v28.4s,v0.4s
@@ -851,35 +851,35 @@ ChaCha20_neon:
 	sub	x2,x2,#64
 
 .Last_neon:
-	st1	{v16.16b,v17.16b,v18.16b,v19.16b},[sp]
+	st1	{v16.16b,v17.16b,v18.16b,v19.16b},[PTRN(sp)]
 
-	sub	x0,x0,#1
-	add	x1,x1,x2
-	add	x0,x0,x2
-	add	x4,sp,x2
+	sub	PTR(0),PTR(0),#1
+	add	PTR(1),PTR(1),x2
+	add	PTR(0),PTR(0),x2
+	add	PTR(4),PTRN(sp),x2
 	neg	x2,x2
 
 .Loop_tail_neon:
-	ldrb	w10,[x1,x2]
-	ldrb	w11,[x4,x2]
+	ldrb	w10,[PTR(1),x2]
+	ldrb	w11,[PTR(4),x2]
 	add	x2,x2,#1
 	eor	w10,w10,w11
-	strb	w10,[x0,x2]
+	strb	w10,[PTR(0),x2]
 	cbnz	x2,.Loop_tail_neon
 
-	stp	xzr,xzr,[sp,#0]
-	stp	xzr,xzr,[sp,#16]
-	stp	xzr,xzr,[sp,#32]
-	stp	xzr,xzr,[sp,#48]
+	stp	xzr,xzr,[PTRN(sp),#0]
+	stp	xzr,xzr,[PTRN(sp),#16]
+	stp	xzr,xzr,[PTRN(sp),#32]
+	stp	xzr,xzr,[PTRN(sp),#48]
 
 .Ldone_neon:
-	ldp	x19,x20,[x29,#16]
-	add	sp,sp,#64
-	ldp	x21,x22,[x29,#32]
-	ldp	x23,x24,[x29,#48]
-	ldp	x25,x26,[x29,#64]
-	ldp	x27,x28,[x29,#80]
-	ldp	x29,x30,[sp],#96
+	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
+	add	PTRN(sp),PTRN(sp),#64
+	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
+	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
+	ldp	PTR(25),PTR(26),[PTR(29),#(8*PTR_WIDTH)]
+	ldp	PTR(27),PTR(28),[PTR(29),#(10*PTR_WIDTH)]
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(12*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	ChaCha20_neon,.-ChaCha20_neon
@@ -887,29 +887,29 @@ ChaCha20_neon:
 .align	5
 ChaCha20_512_neon:
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-96]!
-	add	x29,sp,#0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(12*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
 
-	adr	x5,.Lsigma
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	stp	x23,x24,[sp,#48]
-	stp	x25,x26,[sp,#64]
-	stp	x27,x28,[sp,#80]
+	adr	PTR(5),.Lsigma
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
+	stp	PTR(25),PTR(26),[PTRN(sp),#(8*PTR_WIDTH)]
+	stp	PTR(27),PTR(28),[PTRN(sp),#(10*PTR_WIDTH)]
 
 .L512_or_more_neon:
-	sub	sp,sp,#128+64
+	sub	PTRN(sp),PTRN(sp),#128+64
 
 	eor	v7.16b,v7.16b,v7.16b
-	ldp	x22,x23,[x5]		// load sigma
-	ld1	{v0.4s},[x5],#16
-	ldp	x24,x25,[x3]		// load key
-	ldp	x26,x27,[x3,#16]
-	ld1	{v1.4s,v2.4s},[x3]
-	ldp	x28,x30,[x4]		// load counter
-	ld1	{v3.4s},[x4]
-	ld1	{v7.s}[0],[x5]
-	add	x3,x5,#16			// .Lrot24
+	ldp	x22,x23,[PTR(5)]		// load sigma
+	ld1	{v0.4s},[PTR(5)],#16
+	ldp	x24,x25,[PTR(3)]		// load key
+	ldp	x26,x27,[PTR(3),#16]
+	ld1	{v1.4s,v2.4s},[PTR(3)]
+	ldp	x28,x30,[PTR(4)]		// load counter
+	ld1	{v3.4s},[PTR(4)]
+	ld1	{v7.s}[0],[PTR(5)]
+	add	PTR(3),PTR(5),#16			// .Lrot24
 #ifdef	__AARCH64EB__
 	rev64	v0.4s,v0.4s
 	ror	x24,x24,#32
@@ -920,18 +920,18 @@ ChaCha20_512_neon:
 	ror	x30,x30,#32
 #endif
 	add	v3.4s,v3.4s,v7.4s		// += 1
-	stp	q0,q1,[sp,#0]		// off-load key block, invariant part
+	stp	q0,q1,[PTRN(sp),#0]	// off-load key block, invariant part
 	add	v3.4s,v3.4s,v7.4s		// not typo
-	str	q2,[sp,#32]
+	str	q2,[PTRN(sp),#32]
 	add	v4.4s,v3.4s,v7.4s
 	add	v5.4s,v4.4s,v7.4s
 	add	v6.4s,v5.4s,v7.4s
 	shl	v7.4s,v7.4s,#2			// 1 -> 4
 
-	stp	d8,d9,[sp,#128+0]		// meet ABI requirements
-	stp	d10,d11,[sp,#128+16]
-	stp	d12,d13,[sp,#128+32]
-	stp	d14,d15,[sp,#128+48]
+	stp	d8,d9,[PTRN(sp),#128+0]		// meet ABI requirements
+	stp	d10,d11,[PTRN(sp),#128+16]
+	stp	d12,d13,[PTRN(sp),#128+32]
+	stp	d14,d15,[PTRN(sp),#128+48]
 
 	sub	x2,x2,#512			// not typo
 
@@ -975,12 +975,12 @@ ChaCha20_512_neon:
 	mov	v22.16b,v2.16b
 	lsr	x21,x30,#32
 	mov	v26.16b,v2.16b
-	stp	q3,q4,[sp,#48]		// off-load key block, variable part
+	stp	q3,q4,[PTRN(sp),#48]	// off-load key block, variable part
 	mov	v30.16b,v2.16b
-	stp	q5,q6,[sp,#80]
+	stp	q5,q6,[PTRN(sp),#80]
 
 	mov	x4,#5
-	ld1	{v6.4s},[x3]
+	ld1	{v6.4s},[PTR(3)]
 	subs	x2,x2,#512
 .Loop_upper_neon:
 	sub	x4,x4,#1
@@ -1401,17 +1401,17 @@ ChaCha20_512_neon:
 
 	add	x5,x5,x6,lsl#32	// pack
 	add	x7,x7,x8,lsl#32
-	ldp	x6,x8,[x1,#0]		// load input
+	ldp	x6,x8,[PTR(1),#0]		// load input
 	add	x9,x9,x10,lsl#32
 	add	x11,x11,x12,lsl#32
-	ldp	x10,x12,[x1,#16]
+	ldp	x10,x12,[PTR(1),#16]
 	add	x13,x13,x14,lsl#32
 	add	x15,x15,x16,lsl#32
-	ldp	x14,x16,[x1,#32]
+	ldp	x14,x16,[PTR(1),#32]
 	add	x17,x17,x19,lsl#32
 	add	x20,x20,x21,lsl#32
-	ldp	x19,x21,[x1,#48]
-	add	x1,x1,#64
+	ldp	x19,x21,[PTR(1),#48]
+	add	PTR(1),PTR(1),#64
 #ifdef	__AARCH64EB__
 	rev	x5,x5
 	rev	x7,x7
@@ -1431,18 +1431,18 @@ ChaCha20_512_neon:
 	eor	x17,x17,x19
 	eor	x20,x20,x21
 
-	stp	x5,x7,[x0,#0]		// store output
+	stp	x5,x7,[PTR(0),#0]		// store output
 	add	x28,x28,#1			// increment counter
 	mov	w5,w22			// unpack key block
 	lsr	x6,x22,#32
-	stp	x9,x11,[x0,#16]
+	stp	x9,x11,[PTR(0),#16]
 	mov	w7,w23
 	lsr	x8,x23,#32
-	stp	x13,x15,[x0,#32]
+	stp	x13,x15,[PTR(0),#32]
 	mov	w9,w24
 	lsr	x10,x24,#32
-	stp	x17,x20,[x0,#48]
-	add	x0,x0,#64
+	stp	x17,x20,[PTR(0),#48]
+	add	PTR(0),PTR(0),#64
 	mov	w11,w25
 	lsr	x12,x25,#32
 	mov	w13,w26
@@ -1856,13 +1856,13 @@ ChaCha20_512_neon:
 	cbnz	x4,.Loop_lower_neon
 
 	add	w5,w5,w22		// accumulate key block
-	ldp	q0,q1,[sp,#0]
+	ldp	q0,q1,[PTRN(sp),#0]
 	add	x6,x6,x22,lsr#32
-	ldp	q2,q3,[sp,#32]
+	ldp	q2,q3,[PTRN(sp),#32]
 	add	w7,w7,w23
-	ldp	q4,q5,[sp,#64]
+	ldp	q4,q5,[PTRN(sp),#64]
 	add	x8,x8,x23,lsr#32
-	ldr	q6,[sp,#96]
+	ldr	q6,[PTRN(sp),#96]
 	add	v8.4s,v8.4s,v0.4s
 	add	w9,w9,w24
 	add	v12.4s,v12.4s,v0.4s
@@ -1892,27 +1892,27 @@ ChaCha20_512_neon:
 	add	v31.4s,v31.4s,v7.4s			// +4
 	add	x7,x7,x8,lsl#32
 	add	v11.4s,v11.4s,v3.4s
-	ldp	x6,x8,[x1,#0]		// load input
+	ldp	x6,x8,[PTR(1),#0]		// load input
 	add	v15.4s,v15.4s,v4.4s
 	add	x9,x9,x10,lsl#32
 	add	v19.4s,v19.4s,v5.4s
 	add	x11,x11,x12,lsl#32
 	add	v23.4s,v23.4s,v6.4s
-	ldp	x10,x12,[x1,#16]
+	ldp	x10,x12,[PTR(1),#16]
 	add	v27.4s,v27.4s,v3.4s
 	add	x13,x13,x14,lsl#32
 	add	v31.4s,v31.4s,v4.4s
 	add	x15,x15,x16,lsl#32
 	add	v9.4s,v9.4s,v1.4s
-	ldp	x14,x16,[x1,#32]
+	ldp	x14,x16,[PTR(1),#32]
 	add	v13.4s,v13.4s,v1.4s
 	add	x17,x17,x19,lsl#32
 	add	v17.4s,v17.4s,v1.4s
 	add	x20,x20,x21,lsl#32
 	add	v21.4s,v21.4s,v1.4s
-	ldp	x19,x21,[x1,#48]
+	ldp	x19,x21,[PTR(1),#48]
 	add	v25.4s,v25.4s,v1.4s
-	add	x1,x1,#64
+	add	PTR(1),PTR(1),#64
 	add	v29.4s,v29.4s,v1.4s
 
 #ifdef	__AARCH64EB__
@@ -1925,7 +1925,7 @@ ChaCha20_512_neon:
 	rev	x17,x17
 	rev	x20,x20
 #endif
-	ld1	{v0.16b,v1.16b,v2.16b,v3.16b},[x1],#64
+	ld1	{v0.16b,v1.16b,v2.16b,v3.16b},[PTR(1)],#64
 	eor	x5,x5,x6
 	eor	x7,x7,x8
 	eor	x9,x9,x10
@@ -1938,52 +1938,52 @@ ChaCha20_512_neon:
 	eor	v10.16b,v10.16b,v2.16b
 	eor	x20,x20,x21
 	eor	v11.16b,v11.16b,v3.16b
-	ld1	{v0.16b,v1.16b,v2.16b,v3.16b},[x1],#64
+	ld1	{v0.16b,v1.16b,v2.16b,v3.16b},[PTR(1)],#64
 
-	stp	x5,x7,[x0,#0]		// store output
+	stp	x5,x7,[PTR(0),#0]		// store output
 	add	x28,x28,#7			// increment counter
-	stp	x9,x11,[x0,#16]
-	stp	x13,x15,[x0,#32]
-	stp	x17,x20,[x0,#48]
-	add	x0,x0,#64
-	st1	{v8.16b,v9.16b,v10.16b,v11.16b},[x0],#64
+	stp	x9,x11,[PTR(0),#16]
+	stp	x13,x15,[PTR(0),#32]
+	stp	x17,x20,[PTR(0),#48]
+	add	PTR(0),PTR(0),#64
+	st1	{v8.16b,v9.16b,v10.16b,v11.16b},[PTR(0)],#64
 
-	ld1	{v8.16b,v9.16b,v10.16b,v11.16b},[x1],#64
+	ld1	{v8.16b,v9.16b,v10.16b,v11.16b},[PTR(1)],#64
 	eor	v12.16b,v12.16b,v0.16b
 	eor	v13.16b,v13.16b,v1.16b
 	eor	v14.16b,v14.16b,v2.16b
 	eor	v15.16b,v15.16b,v3.16b
-	st1	{v12.16b,v13.16b,v14.16b,v15.16b},[x0],#64
+	st1	{v12.16b,v13.16b,v14.16b,v15.16b},[PTR(0)],#64
 
-	ld1	{v12.16b,v13.16b,v14.16b,v15.16b},[x1],#64
+	ld1	{v12.16b,v13.16b,v14.16b,v15.16b},[PTR(1)],#64
 	eor	v16.16b,v16.16b,v8.16b
-	ldp	q0,q1,[sp,#0]
+	ldp	q0,q1,[PTRN(sp),#0]
 	eor	v17.16b,v17.16b,v9.16b
-	ldp	q2,q3,[sp,#32]
+	ldp	q2,q3,[PTRN(sp),#32]
 	eor	v18.16b,v18.16b,v10.16b
 	eor	v19.16b,v19.16b,v11.16b
-	st1	{v16.16b,v17.16b,v18.16b,v19.16b},[x0],#64
+	st1	{v16.16b,v17.16b,v18.16b,v19.16b},[PTR(0)],#64
 
-	ld1	{v16.16b,v17.16b,v18.16b,v19.16b},[x1],#64
+	ld1	{v16.16b,v17.16b,v18.16b,v19.16b},[PTR(1)],#64
 	eor	v20.16b,v20.16b,v12.16b
 	eor	v21.16b,v21.16b,v13.16b
 	eor	v22.16b,v22.16b,v14.16b
 	eor	v23.16b,v23.16b,v15.16b
-	st1	{v20.16b,v21.16b,v22.16b,v23.16b},[x0],#64
+	st1	{v20.16b,v21.16b,v22.16b,v23.16b},[PTR(0)],#64
 
-	ld1	{v20.16b,v21.16b,v22.16b,v23.16b},[x1],#64
+	ld1	{v20.16b,v21.16b,v22.16b,v23.16b},[PTR(1)],#64
 	eor	v24.16b,v24.16b,v16.16b
 	eor	v25.16b,v25.16b,v17.16b
 	eor	v26.16b,v26.16b,v18.16b
 	eor	v27.16b,v27.16b,v19.16b
-	st1	{v24.16b,v25.16b,v26.16b,v27.16b},[x0],#64
+	st1	{v24.16b,v25.16b,v26.16b,v27.16b},[PTR(0)],#64
 
 	shl	v8.4s,v7.4s,#1			// 4 -> 8
 	eor	v28.16b,v28.16b,v20.16b
 	eor	v29.16b,v29.16b,v21.16b
 	eor	v30.16b,v30.16b,v22.16b
 	eor	v31.16b,v31.16b,v23.16b
-	st1	{v28.16b,v29.16b,v30.16b,v31.16b},[x0],#64
+	st1	{v28.16b,v29.16b,v30.16b,v31.16b},[PTR(0)],#64
 
 	add	v3.4s,v3.4s,v8.4s			// += 8
 	add	v4.4s,v4.4s,v8.4s
@@ -1995,24 +1995,24 @@ ChaCha20_512_neon:
 	adds	x2,x2,#512
 	ushr	v7.4s,v7.4s,#1			// 4 -> 2
 
-	ldp	d10,d11,[sp,#128+16]		// meet ABI requirements
-	ldp	d12,d13,[sp,#128+32]
-	ldp	d14,d15,[sp,#128+48]
+	ldp	d10,d11,[PTRN(sp),#128+16]	// meet ABI requirements
+	ldp	d12,d13,[PTRN(sp),#128+32]
+	ldp	d14,d15,[PTRN(sp),#128+48]
 
-	stp	q0,q0,[sp,#0]		// wipe off-load area
-	stp	q0,q0,[sp,#32]
-	stp	q0,q0,[sp,#64]
+	stp	q0,q0,[PTRN(sp),#0]	// wipe off-load area
+	stp	q0,q0,[PTRN(sp),#32]
+	stp	q0,q0,[PTRN(sp),#64]
 
 	b.eq	.Ldone_512_neon
 
-	sub	x3,x3,#16			// .Lone
+	sub	PTR(3),PTR(3),#16			// .Lone
 	cmp	x2,#192
-	add	sp,sp,#128
+	add	PTRN(sp),PTRN(sp),#128
 	sub	v3.4s,v3.4s,v7.4s		// -= 2
-	ld1	{v8.4s,v9.4s},[x3]
+	ld1	{v8.4s,v9.4s},[PTR(3)]
 	b.hs	.Loop_outer_neon
 
-	ldp	d8,d9,[sp,#0]			// meet ABI requirements
+	ldp	d8,d9,[PTRN(sp),#0]		// meet ABI requirements
 	eor	v1.16b,v1.16b,v1.16b
 	eor	v2.16b,v2.16b,v2.16b
 	eor	v3.16b,v3.16b,v3.16b
@@ -2022,14 +2022,14 @@ ChaCha20_512_neon:
 	b	.Loop_outer
 
 .Ldone_512_neon:
-	ldp	d8,d9,[sp,#128+0]		// meet ABI requirements
-	ldp	x19,x20,[x29,#16]
-	add	sp,sp,#128+64
-	ldp	x21,x22,[x29,#32]
-	ldp	x23,x24,[x29,#48]
-	ldp	x25,x26,[x29,#64]
-	ldp	x27,x28,[x29,#80]
-	ldp	x29,x30,[sp],#96
+	ldp	d8,d9,[PTRN(sp),#128+0]		// meet ABI requirements
+	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
+	add	PTRN(sp),PTRN(sp),#128+64
+	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
+	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
+	ldp	PTR(25),PTR(26),[PTR(29),#(8*PTR_WIDTH)]
+	ldp	PTR(27),PTR(28),[PTR(29),#(10*PTR_WIDTH)]
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(12*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	ChaCha20_512_neon,.-ChaCha20_512_neon

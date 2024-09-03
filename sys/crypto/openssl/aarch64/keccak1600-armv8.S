@@ -37,14 +37,14 @@ iotas:
 .align	5
 KeccakF1600_int:
 	AARCH64_SIGN_LINK_REGISTER
-	adr	x28,iotas
-	stp	x28,x30,[sp,#16]		// 32 bytes on top are mine
+	adr	PTR(28),iotas
+	stp	PTR(28),PTR(30),[PTRN(sp),#(2*PTR_WIDTH)]	// 32 bytes on top are mine
 	b	.Loop
 .align	4
 .Loop:
 	////////////////////////////////////////// Theta
 	eor	x26,x0,x5
-	stp	x4,x9,[sp,#0]	// offload pair...
+	stp	x4,x9,[PTRN(sp),#0]	// offload pair...
 	eor	x27,x1,x6
 	eor	x28,x2,x7
 	eor	x30,x3,x8
@@ -89,7 +89,7 @@ KeccakF1600_int:
 	eor	x10,x10,x4
 	eor	x15,x15,x4
 	eor	x20,x20,x4
-	ldp	x4,x9,[sp,#0]	// re-load offloaded data
+	ldp	x4,x9,[PTRN(sp),#0]	// re-load offloaded data
 	eor	x26,   x3,x28		// mov	x26,x3
 	eor	x8,x8,x28
 	eor	x13,x13,x28
@@ -145,15 +145,15 @@ KeccakF1600_int:
 	eor	x0,x0,x26
 	bic	x26,x4,x3
 	eor	x1,x1,x27
-	ldr	x27,[sp,#16]
+	ldr	PTR(27),[PTRN(sp),#16]
 	eor	x3,x3,x28
 	eor	x4,x4,x30
 	eor	x2,x2,x26
-	ldr	x30,[x27],#8		// Iota[i++]
+	ldr	x30,[PTR(27)],#8		// Iota[i++]
 
 	bic	x26,x7,x6
 	tst	x27,#255			// are we done?
-	str	x27,[sp,#16]
+	str	x27,[PTRN(sp),#16]
 	bic	x27,x8,x7
 	bic	x28,x5,x9
 	eor	x0,x0,x30		// A[0][0] ^= Iota
@@ -200,7 +200,7 @@ KeccakF1600_int:
 
 	bne	.Loop
 
-	ldr	x30,[sp,#24]
+	ldr	PTR(30),[PTRN(sp),#(2*PTR_WIDTH+8)]
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	KeccakF1600_int,.-KeccakF1600_int
@@ -209,55 +209,55 @@ KeccakF1600_int:
 .align	5
 KeccakF1600:
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-128]!
-	add	x29,sp,#0
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	stp	x23,x24,[sp,#48]
-	stp	x25,x26,[sp,#64]
-	stp	x27,x28,[sp,#80]
-	sub	sp,sp,#48
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(16*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
+	stp	PTR(25),PTR(26),[PTRN(sp),#(8*PTR_WIDTH)]
+	stp	PTR(27),PTR(28),[PTRN(sp),#(10*PTR_WIDTH)]
+	sub	PTRN(sp),PTRN(sp),#(2*PTR_WIDTH+32)
 
-	str	x0,[sp,#32]			// offload argument
-	mov	x26,x0
-	ldp	x0,x1,[x0,#16*0]
-	ldp	x2,x3,[x26,#16*1]
-	ldp	x4,x5,[x26,#16*2]
-	ldp	x6,x7,[x26,#16*3]
-	ldp	x8,x9,[x26,#16*4]
-	ldp	x10,x11,[x26,#16*5]
-	ldp	x12,x13,[x26,#16*6]
-	ldp	x14,x15,[x26,#16*7]
-	ldp	x16,x17,[x26,#16*8]
-	ldp	x25,x19,[x26,#16*9]
-	ldp	x20,x21,[x26,#16*10]
-	ldp	x22,x23,[x26,#16*11]
-	ldr	x24,[x26,#16*12]
+	str	PTR(0),[PTRN(sp),#32]		// offload argument
+	mov	PTR(26),PTR(0)
+	ldp	x0,x1,[PTR(0),#16*0]
+	ldp	x2,x3,[PTR(26),#16*1]
+	ldp	x4,x5,[PTR(26),#16*2]
+	ldp	x6,x7,[PTR(26),#16*3]
+	ldp	x8,x9,[PTR(26),#16*4]
+	ldp	x10,x11,[PTR(26),#16*5]
+	ldp	x12,x13,[PTR(26),#16*6]
+	ldp	x14,x15,[PTR(26),#16*7]
+	ldp	x16,x17,[PTR(26),#16*8]
+	ldp	x25,x19,[PTR(26),#16*9]
+	ldp	x20,x21,[PTR(26),#16*10]
+	ldp	x22,x23,[PTR(26),#16*11]
+	ldr	x24,[PTR(26),#16*12]
 
 	bl	KeccakF1600_int
 
-	ldr	x26,[sp,#32]
-	stp	x0,x1,[x26,#16*0]
-	stp	x2,x3,[x26,#16*1]
-	stp	x4,x5,[x26,#16*2]
-	stp	x6,x7,[x26,#16*3]
-	stp	x8,x9,[x26,#16*4]
-	stp	x10,x11,[x26,#16*5]
-	stp	x12,x13,[x26,#16*6]
-	stp	x14,x15,[x26,#16*7]
-	stp	x16,x17,[x26,#16*8]
-	stp	x25,x19,[x26,#16*9]
-	stp	x20,x21,[x26,#16*10]
-	stp	x22,x23,[x26,#16*11]
-	str	x24,[x26,#16*12]
+	ldr	PTR(26),[PTRN(sp),#32]
+	stp	x0,x1,[PTR(26),#16*0]
+	stp	x2,x3,[PTR(26),#16*1]
+	stp	x4,x5,[PTR(26),#16*2]
+	stp	x6,x7,[PTR(26),#16*3]
+	stp	x8,x9,[PTR(26),#16*4]
+	stp	x10,x11,[PTR(26),#16*5]
+	stp	x12,x13,[PTR(26),#16*6]
+	stp	x14,x15,[PTR(26),#16*7]
+	stp	x16,x17,[PTR(26),#16*8]
+	stp	x25,x19,[PTR(26),#16*9]
+	stp	x20,x21,[PTR(26),#16*10]
+	stp	x22,x23,[PTR(26),#16*11]
+	str	x24,[PTR(26),#16*12]
 
-	ldp	x19,x20,[x29,#16]
-	add	sp,sp,#48
-	ldp	x21,x22,[x29,#32]
-	ldp	x23,x24,[x29,#48]
-	ldp	x25,x26,[x29,#64]
-	ldp	x27,x28,[x29,#80]
-	ldp	x29,x30,[sp],#128
+	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
+	add	PTRN(sp),PTRN(sp),#(2*PTR_WIDTH+32)
+	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
+	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
+	ldp	PTR(25),PTR(26),[PTR(29),#(8*PTR_WIDTH)]
+	ldp	PTR(27),PTR(28),[PTR(29),#(10*PTR_WIDTH)]
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(16*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	KeccakF1600,.-KeccakF1600
@@ -267,35 +267,35 @@ KeccakF1600:
 .align	5
 SHA3_absorb:
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-128]!
-	add	x29,sp,#0
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
-	stp	x23,x24,[sp,#48]
-	stp	x25,x26,[sp,#64]
-	stp	x27,x28,[sp,#80]
-	sub	sp,sp,#64
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(16*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
+	stp	PTR(25),PTR(26),[PTRN(sp),#(8*PTR_WIDTH)]
+	stp	PTR(27),PTR(28),[PTRN(sp),#(10*PTR_WIDTH)]
+	sub	PTRN(sp),PTRN(sp),#(2*PTR_WIDTH+48)
 
-	stp	x0,x1,[sp,#32]			// offload arguments
-	stp	x2,x3,[sp,#48]
+	stp	PTR(0),PTR(1),[PTRN(sp),#32]	// offload arguments
+	stp	x2,x3,[PTRN(sp),#(2*PTR_WIDTH+32)]
 
-	mov	x26,x0			// uint64_t A[5][5]
-	mov	x27,x1			// const void *inp
+	mov	PTR(26),PTR(0)			// uint64_t A[5][5]
+	mov	PTR(27),PTR(1)			// const void *inp
 	mov	x28,x2			// size_t len
 	mov	x30,x3			// size_t bsz
-	ldp	x0,x1,[x26,#16*0]
-	ldp	x2,x3,[x26,#16*1]
-	ldp	x4,x5,[x26,#16*2]
-	ldp	x6,x7,[x26,#16*3]
-	ldp	x8,x9,[x26,#16*4]
-	ldp	x10,x11,[x26,#16*5]
-	ldp	x12,x13,[x26,#16*6]
-	ldp	x14,x15,[x26,#16*7]
-	ldp	x16,x17,[x26,#16*8]
-	ldp	x25,x19,[x26,#16*9]
-	ldp	x20,x21,[x26,#16*10]
-	ldp	x22,x23,[x26,#16*11]
-	ldr	x24,[x26,#16*12]
+	ldp	x0,x1,[PTR(26),#16*0]
+	ldp	x2,x3,[PTR(26),#16*1]
+	ldp	x4,x5,[PTR(26),#16*2]
+	ldp	x6,x7,[PTR(26),#16*3]
+	ldp	x8,x9,[PTR(26),#16*4]
+	ldp	x10,x11,[PTR(26),#16*5]
+	ldp	x12,x13,[PTR(26),#16*6]
+	ldp	x14,x15,[PTR(26),#16*7]
+	ldp	x16,x17,[PTR(26),#16*8]
+	ldp	x25,x19,[PTR(26),#16*9]
+	ldp	x20,x21,[PTR(26),#16*10]
+	ldp	x22,x23,[PTR(26),#16*11]
+	ldr	x24,[PTR(26),#16*12]
 	b	.Loop_absorb
 
 .align	4
@@ -303,203 +303,203 @@ SHA3_absorb:
 	subs	x26,x28,x30		// len - bsz
 	blo	.Labsorbed
 
-	str	x26,[sp,#48]			// save len - bsz
-	ldr	x26,[x27],#8		// *inp++
+	str	x26,[PTRN(sp),#(2*PTR_WIDTH+32)]	// save len - bsz
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x0,x0,x26
 	cmp	x30,#8*(0+2)
 	blo	.Lprocess_block
-	ldr	x26,[x27],#8		// *inp++
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x1,x1,x26
 	beq	.Lprocess_block
-	ldr	x26,[x27],#8		// *inp++
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x2,x2,x26
 	cmp	x30,#8*(2+2)
 	blo	.Lprocess_block
-	ldr	x26,[x27],#8		// *inp++
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x3,x3,x26
 	beq	.Lprocess_block
-	ldr	x26,[x27],#8		// *inp++
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x4,x4,x26
 	cmp	x30,#8*(4+2)
 	blo	.Lprocess_block
-	ldr	x26,[x27],#8		// *inp++
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x5,x5,x26
 	beq	.Lprocess_block
-	ldr	x26,[x27],#8		// *inp++
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x6,x6,x26
 	cmp	x30,#8*(6+2)
 	blo	.Lprocess_block
-	ldr	x26,[x27],#8		// *inp++
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x7,x7,x26
 	beq	.Lprocess_block
-	ldr	x26,[x27],#8		// *inp++
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x8,x8,x26
 	cmp	x30,#8*(8+2)
 	blo	.Lprocess_block
-	ldr	x26,[x27],#8		// *inp++
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x9,x9,x26
 	beq	.Lprocess_block
-	ldr	x26,[x27],#8		// *inp++
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x10,x10,x26
 	cmp	x30,#8*(10+2)
 	blo	.Lprocess_block
-	ldr	x26,[x27],#8		// *inp++
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x11,x11,x26
 	beq	.Lprocess_block
-	ldr	x26,[x27],#8		// *inp++
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x12,x12,x26
 	cmp	x30,#8*(12+2)
 	blo	.Lprocess_block
-	ldr	x26,[x27],#8		// *inp++
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x13,x13,x26
 	beq	.Lprocess_block
-	ldr	x26,[x27],#8		// *inp++
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x14,x14,x26
 	cmp	x30,#8*(14+2)
 	blo	.Lprocess_block
-	ldr	x26,[x27],#8		// *inp++
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x15,x15,x26
 	beq	.Lprocess_block
-	ldr	x26,[x27],#8		// *inp++
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x16,x16,x26
 	cmp	x30,#8*(16+2)
 	blo	.Lprocess_block
-	ldr	x26,[x27],#8		// *inp++
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x17,x17,x26
 	beq	.Lprocess_block
-	ldr	x26,[x27],#8		// *inp++
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x25,x25,x26
 	cmp	x30,#8*(18+2)
 	blo	.Lprocess_block
-	ldr	x26,[x27],#8		// *inp++
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x19,x19,x26
 	beq	.Lprocess_block
-	ldr	x26,[x27],#8		// *inp++
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x20,x20,x26
 	cmp	x30,#8*(20+2)
 	blo	.Lprocess_block
-	ldr	x26,[x27],#8		// *inp++
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x21,x21,x26
 	beq	.Lprocess_block
-	ldr	x26,[x27],#8		// *inp++
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x22,x22,x26
 	cmp	x30,#8*(22+2)
 	blo	.Lprocess_block
-	ldr	x26,[x27],#8		// *inp++
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x23,x23,x26
 	beq	.Lprocess_block
-	ldr	x26,[x27],#8		// *inp++
+	ldr	x26,[PTR(27)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev	x26,x26
 #endif
 	eor	x24,x24,x26
 
 .Lprocess_block:
-	str	x27,[sp,#40]			// save inp
+	str	PTR(27),[PTRN(sp),#(PTR_WIDTH+32)]	// save inp
 
 	bl	KeccakF1600_int
 
-	ldr	x27,[sp,#40]			// restore arguments
-	ldp	x28,x30,[sp,#48]
+	ldr	PTR(27),[PTRN(sp),#(PTR_WIDTH+32)]	// restore arguments
+	ldp	x28,x30,[PTRN(sp),#(2*PTR_WIDTH+32)]
 	b	.Loop_absorb
 
 .align	4
 .Labsorbed:
-	ldr	x27,[sp,#32]
-	stp	x0,x1,[x27,#16*0]
-	stp	x2,x3,[x27,#16*1]
-	stp	x4,x5,[x27,#16*2]
-	stp	x6,x7,[x27,#16*3]
-	stp	x8,x9,[x27,#16*4]
-	stp	x10,x11,[x27,#16*5]
-	stp	x12,x13,[x27,#16*6]
-	stp	x14,x15,[x27,#16*7]
-	stp	x16,x17,[x27,#16*8]
-	stp	x25,x19,[x27,#16*9]
-	stp	x20,x21,[x27,#16*10]
-	stp	x22,x23,[x27,#16*11]
-	str	x24,[x27,#16*12]
+	ldr	PTR(27),[PTRN(sp),#32]
+	stp	x0,x1,[PTR(27),#16*0]
+	stp	x2,x3,[PTR(27),#16*1]
+	stp	x4,x5,[PTR(27),#16*2]
+	stp	x6,x7,[PTR(27),#16*3]
+	stp	x8,x9,[PTR(27),#16*4]
+	stp	x10,x11,[PTR(27),#16*5]
+	stp	x12,x13,[PTR(27),#16*6]
+	stp	x14,x15,[PTR(27),#16*7]
+	stp	x16,x17,[PTR(27),#16*8]
+	stp	x25,x19,[PTR(27),#16*9]
+	stp	x20,x21,[PTR(27),#16*10]
+	stp	x22,x23,[PTR(27),#16*11]
+	str	x24,[PTR(27),#16*12]
 
 	mov	x0,x28			// return value
-	ldp	x19,x20,[x29,#16]
-	add	sp,sp,#64
-	ldp	x21,x22,[x29,#32]
-	ldp	x23,x24,[x29,#48]
-	ldp	x25,x26,[x29,#64]
-	ldp	x27,x28,[x29,#80]
-	ldp	x29,x30,[sp],#128
+	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
+	add	PTRN(sp),PTRN(sp),#(2*PTR_WIDTH+48)
+	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
+	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
+	ldp	PTR(25),PTR(26),[PTR(29),#(8*PTR_WIDTH)]
+	ldp	PTR(27),PTR(28),[PTR(29),#(10*PTR_WIDTH)]
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(16*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	SHA3_absorb,.-SHA3_absorb
@@ -508,68 +508,68 @@ SHA3_absorb:
 .align	5
 SHA3_squeeze:
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-48]!
-	add	x29,sp,#0
-	stp	x19,x20,[sp,#16]
-	stp	x21,x22,[sp,#32]
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(6*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
+	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
 
-	mov	x19,x0			// put aside arguments
-	mov	x20,x1
+	mov	PTR(19),PTR(0)			// put aside arguments
+	mov	PTR(20),PTR(1)
 	mov	x21,x2
 	mov	x22,x3
 
 .Loop_squeeze:
-	ldr	x4,[x0],#8
+	ldr	x4,[PTR(0)],#8
 	cmp	x21,#8
 	blo	.Lsqueeze_tail
 #ifdef	__AARCH64EB__
 	rev	x4,x4
 #endif
-	str	x4,[x20],#8
+	str	x4,[PTR(20)],#8
 	subs	x21,x21,#8
 	beq	.Lsqueeze_done
 
 	subs	x3,x3,#8
 	bhi	.Loop_squeeze
 
-	mov	x0,x19
+	mov	PTR(0),PTR(19)
 	bl	KeccakF1600
-	mov	x0,x19
+	mov	PTR(0),PTR(19)
 	mov	x3,x22
 	b	.Loop_squeeze
 
 .align	4
 .Lsqueeze_tail:
-	strb	w4,[x20],#1
+	strb	w4,[PTR(20)],#1
 	lsr	x4,x4,#8
 	subs	x21,x21,#1
 	beq	.Lsqueeze_done
-	strb	w4,[x20],#1
+	strb	w4,[PTR(20)],#1
 	lsr	x4,x4,#8
 	subs	x21,x21,#1
 	beq	.Lsqueeze_done
-	strb	w4,[x20],#1
+	strb	w4,[PTR(20)],#1
 	lsr	x4,x4,#8
 	subs	x21,x21,#1
 	beq	.Lsqueeze_done
-	strb	w4,[x20],#1
+	strb	w4,[PTR(20)],#1
 	lsr	x4,x4,#8
 	subs	x21,x21,#1
 	beq	.Lsqueeze_done
-	strb	w4,[x20],#1
+	strb	w4,[PTR(20)],#1
 	lsr	x4,x4,#8
 	subs	x21,x21,#1
 	beq	.Lsqueeze_done
-	strb	w4,[x20],#1
+	strb	w4,[PTR(20)],#1
 	lsr	x4,x4,#8
 	subs	x21,x21,#1
 	beq	.Lsqueeze_done
-	strb	w4,[x20],#1
+	strb	w4,[PTR(20)],#1
 
 .Lsqueeze_done:
-	ldp	x19,x20,[sp,#16]
-	ldp	x21,x22,[sp,#32]
-	ldp	x29,x30,[sp],#48
+	ldp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
+	ldp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(6*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	SHA3_squeeze,.-SHA3_squeeze
@@ -577,7 +577,7 @@ SHA3_squeeze:
 .align	5
 KeccakF1600_ce:
 	mov	x9,#24
-	adr	x10,iotas
+	adr	PTR(10),iotas
 	b	.Loop_ce
 .align	4
 .Loop_ce:
@@ -641,7 +641,7 @@ KeccakF1600_ce:
 .inst	0xce3a62f7	//bcax v23.16b,v23.16b,v26.16b,   v24.16b
 .inst	0xce286b18	//bcax v24.16b,v24.16b,v8.16b,v26.16b	// A[1][3]=A[4][1]
 
-	ld1r	{v26.2d},[x10],#8
+	ld1r	{v26.2d},[PTR(10)],#8
 
 .inst	0xce330fd1	//bcax v17.16b,v30.16b,   v19.16b,v3.16b	// A[0][3]=A[3][3]
 .inst	0xce2f4c72	//bcax v18.16b,v3.16b,v15.16b,v19.16b	// A[0][3]=A[3][3]
@@ -679,46 +679,46 @@ KeccakF1600_ce:
 .align	5
 KeccakF1600_cext:
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-80]!
-	add	x29,sp,#0
-	stp	d8,d9,[sp,#16]		// per ABI requirement
-	stp	d10,d11,[sp,#32]
-	stp	d12,d13,[sp,#48]
-	stp	d14,d15,[sp,#64]
-	ldp	d0,d1,[x0,#8*0]
-	ldp	d2,d3,[x0,#8*2]
-	ldp	d4,d5,[x0,#8*4]
-	ldp	d6,d7,[x0,#8*6]
-	ldp	d8,d9,[x0,#8*8]
-	ldp	d10,d11,[x0,#8*10]
-	ldp	d12,d13,[x0,#8*12]
-	ldp	d14,d15,[x0,#8*14]
-	ldp	d16,d17,[x0,#8*16]
-	ldp	d18,d19,[x0,#8*18]
-	ldp	d20,d21,[x0,#8*20]
-	ldp	d22,d23,[x0,#8*22]
-	ldr	d24,[x0,#8*24]
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH+64)]!
+	add	PTR(29),PTRN(sp),#0
+	stp	d8,d9,[PTRN(sp),#(2*PTR_WIDTH)]	// per ABI requirement
+	stp	d10,d11,[PTRN(sp),#(2*PTR_WIDTH+16)]
+	stp	d12,d13,[PTRN(sp),#(2*PTR_WIDTH+32)]
+	stp	d14,d15,[PTRN(sp),#(2*PTR_WIDTH+48)]
+	ldp	d0,d1,[PTR(0),#8*0]
+	ldp	d2,d3,[PTR(0),#8*2]
+	ldp	d4,d5,[PTR(0),#8*4]
+	ldp	d6,d7,[PTR(0),#8*6]
+	ldp	d8,d9,[PTR(0),#8*8]
+	ldp	d10,d11,[PTR(0),#8*10]
+	ldp	d12,d13,[PTR(0),#8*12]
+	ldp	d14,d15,[PTR(0),#8*14]
+	ldp	d16,d17,[PTR(0),#8*16]
+	ldp	d18,d19,[PTR(0),#8*18]
+	ldp	d20,d21,[PTR(0),#8*20]
+	ldp	d22,d23,[PTR(0),#8*22]
+	ldr	d24,[PTR(0),#8*24]
 	bl	KeccakF1600_ce
-	ldr	x30,[sp,#8]
-	stp	d0,d1,[x0,#8*0]
-	stp	d2,d3,[x0,#8*2]
-	stp	d4,d5,[x0,#8*4]
-	stp	d6,d7,[x0,#8*6]
-	stp	d8,d9,[x0,#8*8]
-	stp	d10,d11,[x0,#8*10]
-	stp	d12,d13,[x0,#8*12]
-	stp	d14,d15,[x0,#8*14]
-	stp	d16,d17,[x0,#8*16]
-	stp	d18,d19,[x0,#8*18]
-	stp	d20,d21,[x0,#8*20]
-	stp	d22,d23,[x0,#8*22]
-	str	d24,[x0,#8*24]
+	ldr	PTR(30),[PTRN(sp),#PTR_WIDTH]
+	stp	d0,d1,[PTR(0),#8*0]
+	stp	d2,d3,[PTR(0),#8*2]
+	stp	d4,d5,[PTR(0),#8*4]
+	stp	d6,d7,[PTR(0),#8*6]
+	stp	d8,d9,[PTR(0),#8*8]
+	stp	d10,d11,[PTR(0),#8*10]
+	stp	d12,d13,[PTR(0),#8*12]
+	stp	d14,d15,[PTR(0),#8*14]
+	stp	d16,d17,[PTR(0),#8*16]
+	stp	d18,d19,[PTR(0),#8*18]
+	stp	d20,d21,[PTR(0),#8*20]
+	stp	d22,d23,[PTR(0),#8*22]
+	str	d24,[PTR(0),#8*24]
 
-	ldp	d8,d9,[sp,#16]
-	ldp	d10,d11,[sp,#32]
-	ldp	d12,d13,[sp,#48]
-	ldp	d14,d15,[sp,#64]
-	ldr	x29,[sp],#80
+	ldp	d8,d9,[PTRN(sp),#(2*PTR_WIDTH)]
+	ldp	d10,d11,[PTRN(sp),#(2*PTR_WIDTH+16)]
+	ldp	d12,d13,[PTRN(sp),#(2*PTR_WIDTH+32)]
+	ldp	d14,d15,[PTRN(sp),#(2*PTR_WIDTH+48)]
+	ldr	PTR(29),[PTRN(sp)],#(2*PTR_WIDTH+64)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	KeccakF1600_cext,.-KeccakF1600_cext
@@ -727,188 +727,188 @@ KeccakF1600_cext:
 .align	5
 SHA3_absorb_cext:
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-80]!
-	add	x29,sp,#0
-	stp	d8,d9,[sp,#16]		// per ABI requirement
-	stp	d10,d11,[sp,#32]
-	stp	d12,d13,[sp,#48]
-	stp	d14,d15,[sp,#64]
-	ldp	d0,d1,[x0,#8*0]
-	ldp	d2,d3,[x0,#8*2]
-	ldp	d4,d5,[x0,#8*4]
-	ldp	d6,d7,[x0,#8*6]
-	ldp	d8,d9,[x0,#8*8]
-	ldp	d10,d11,[x0,#8*10]
-	ldp	d12,d13,[x0,#8*12]
-	ldp	d14,d15,[x0,#8*14]
-	ldp	d16,d17,[x0,#8*16]
-	ldp	d18,d19,[x0,#8*18]
-	ldp	d20,d21,[x0,#8*20]
-	ldp	d22,d23,[x0,#8*22]
-	ldr	d24,[x0,#8*24]
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH+64)]!
+	add	PTR(29),PTRN(sp),#0
+	stp	d8,d9,[PTRN(sp),#(2*PTR_WIDTH)]	// per ABI requirement
+	stp	d10,d11,[PTRN(sp),#(2*PTR_WIDTH+16)]
+	stp	d12,d13,[PTRN(sp),#(2*PTR_WIDTH+32)]
+	stp	d14,d15,[PTRN(sp),#(2*PTR_WIDTH+48)]
+	ldp	d0,d1,[PTR(0),#8*0]
+	ldp	d2,d3,[PTR(0),#8*2]
+	ldp	d4,d5,[PTR(0),#8*4]
+	ldp	d6,d7,[PTR(0),#8*6]
+	ldp	d8,d9,[PTR(0),#8*8]
+	ldp	d10,d11,[PTR(0),#8*10]
+	ldp	d12,d13,[PTR(0),#8*12]
+	ldp	d14,d15,[PTR(0),#8*14]
+	ldp	d16,d17,[PTR(0),#8*16]
+	ldp	d18,d19,[PTR(0),#8*18]
+	ldp	d20,d21,[PTR(0),#8*20]
+	ldp	d22,d23,[PTR(0),#8*22]
+	ldr	d24,[PTR(0),#8*24]
 	b	.Loop_absorb_ce
 
 .align	4
 .Loop_absorb_ce:
 	subs	x2,x2,x3		// len - bsz
 	blo	.Labsorbed_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
 	eor	v0.16b,v0.16b,v31.16b
 	cmp	x3,#8*(0+2)
 	blo	.Lprocess_block_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
 	eor	v1.16b,v1.16b,v31.16b
 	beq	.Lprocess_block_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
 	eor	v2.16b,v2.16b,v31.16b
 	cmp	x3,#8*(2+2)
 	blo	.Lprocess_block_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
 	eor	v3.16b,v3.16b,v31.16b
 	beq	.Lprocess_block_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
 	eor	v4.16b,v4.16b,v31.16b
 	cmp	x3,#8*(4+2)
 	blo	.Lprocess_block_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
 	eor	v5.16b,v5.16b,v31.16b
 	beq	.Lprocess_block_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
 	eor	v6.16b,v6.16b,v31.16b
 	cmp	x3,#8*(6+2)
 	blo	.Lprocess_block_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
 	eor	v7.16b,v7.16b,v31.16b
 	beq	.Lprocess_block_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
 	eor	v8.16b,v8.16b,v31.16b
 	cmp	x3,#8*(8+2)
 	blo	.Lprocess_block_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
 	eor	v9.16b,v9.16b,v31.16b
 	beq	.Lprocess_block_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
 	eor	v10.16b,v10.16b,v31.16b
 	cmp	x3,#8*(10+2)
 	blo	.Lprocess_block_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
 	eor	v11.16b,v11.16b,v31.16b
 	beq	.Lprocess_block_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
 	eor	v12.16b,v12.16b,v31.16b
 	cmp	x3,#8*(12+2)
 	blo	.Lprocess_block_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
 	eor	v13.16b,v13.16b,v31.16b
 	beq	.Lprocess_block_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
 	eor	v14.16b,v14.16b,v31.16b
 	cmp	x3,#8*(14+2)
 	blo	.Lprocess_block_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
 	eor	v15.16b,v15.16b,v31.16b
 	beq	.Lprocess_block_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
 	eor	v16.16b,v16.16b,v31.16b
 	cmp	x3,#8*(16+2)
 	blo	.Lprocess_block_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
 	eor	v17.16b,v17.16b,v31.16b
 	beq	.Lprocess_block_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
 	eor	v18.16b,v18.16b,v31.16b
 	cmp	x3,#8*(18+2)
 	blo	.Lprocess_block_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
 	eor	v19.16b,v19.16b,v31.16b
 	beq	.Lprocess_block_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
 	eor	v20.16b,v20.16b,v31.16b
 	cmp	x3,#8*(20+2)
 	blo	.Lprocess_block_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
 	eor	v21.16b,v21.16b,v31.16b
 	beq	.Lprocess_block_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
 	eor	v22.16b,v22.16b,v31.16b
 	cmp	x3,#8*(22+2)
 	blo	.Lprocess_block_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
 	eor	v23.16b,v23.16b,v31.16b
 	beq	.Lprocess_block_ce
-	ldr	d31,[x1],#8		// *inp++
+	ldr	d31,[PTR(1)],#8		// *inp++
 #ifdef	__AARCH64EB__
 	rev64	v31.16b,v31.16b
 #endif
@@ -922,26 +922,26 @@ SHA3_absorb_cext:
 
 .align	4
 .Labsorbed_ce:
-	stp	d0,d1,[x0,#8*0]
-	stp	d2,d3,[x0,#8*2]
-	stp	d4,d5,[x0,#8*4]
-	stp	d6,d7,[x0,#8*6]
-	stp	d8,d9,[x0,#8*8]
-	stp	d10,d11,[x0,#8*10]
-	stp	d12,d13,[x0,#8*12]
-	stp	d14,d15,[x0,#8*14]
-	stp	d16,d17,[x0,#8*16]
-	stp	d18,d19,[x0,#8*18]
-	stp	d20,d21,[x0,#8*20]
-	stp	d22,d23,[x0,#8*22]
-	str	d24,[x0,#8*24]
+	stp	d0,d1,[PTR(0),#8*0]
+	stp	d2,d3,[PTR(0),#8*2]
+	stp	d4,d5,[PTR(0),#8*4]
+	stp	d6,d7,[PTR(0),#8*6]
+	stp	d8,d9,[PTR(0),#8*8]
+	stp	d10,d11,[PTR(0),#8*10]
+	stp	d12,d13,[PTR(0),#8*12]
+	stp	d14,d15,[PTR(0),#8*14]
+	stp	d16,d17,[PTR(0),#8*16]
+	stp	d18,d19,[PTR(0),#8*18]
+	stp	d20,d21,[PTR(0),#8*20]
+	stp	d22,d23,[PTR(0),#8*22]
+	str	d24,[PTR(0),#8*24]
 	add	x0,x2,x3		// return value
 
-	ldp	d8,d9,[sp,#16]
-	ldp	d10,d11,[sp,#32]
-	ldp	d12,d13,[sp,#48]
-	ldp	d14,d15,[sp,#64]
-	ldp	x29,x30,[sp],#80
+	ldp	d8,d9,[PTRN(sp),#(2*PTR_WIDTH)]
+	ldp	d10,d11,[PTRN(sp),#(2*PTR_WIDTH+16)]
+	ldp	d12,d13,[PTRN(sp),#(2*PTR_WIDTH+32)]
+	ldp	d14,d15,[PTRN(sp),#(2*PTR_WIDTH+48)]
+	ldp	PTR(29),PTR(30),[PTRN(sp)],#(2*PTR_WIDTH+64)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	SHA3_absorb_cext,.-SHA3_absorb_cext
@@ -950,19 +950,19 @@ SHA3_absorb_cext:
 .align	5
 SHA3_squeeze_cext:
 	AARCH64_SIGN_LINK_REGISTER
-	stp	x29,x30,[sp,#-16]!
-	add	x29,sp,#0
-	mov	x9,x0
+	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH)]!
+	add	PTR(29),PTRN(sp),#0
+	mov	PTR(9),PTR(0)
 	mov	x10,x3
 
 .Loop_squeeze_ce:
-	ldr	x4,[x9],#8
+	ldr	x4,[PTR(9)],#8
 	cmp	x2,#8
 	blo	.Lsqueeze_tail_ce
 #ifdef	__AARCH64EB__
 	rev	x4,x4
 #endif
-	str	x4,[x1],#8
+	str	x4,[PTR(1)],#8
 	beq	.Lsqueeze_done_ce
 
 	sub	x2,x2,#8
@@ -970,41 +970,41 @@ SHA3_squeeze_cext:
 	bhi	.Loop_squeeze_ce
 
 	bl	KeccakF1600_cext
-	ldr	x30,[sp,#8]
-	mov	x9,x0
+	ldr	PTR(30),[PTRN(sp),#PTR_WIDTH]
+	mov	PTR(9),PTR(0)
 	mov	x10,x3
 	b	.Loop_squeeze_ce
 
 .align	4
 .Lsqueeze_tail_ce:
-	strb	w4,[x1],#1
+	strb	w4,[PTR(1)],#1
 	lsr	x4,x4,#8
 	subs	x2,x2,#1
 	beq	.Lsqueeze_done_ce
-	strb	w4,[x1],#1
+	strb	w4,[PTR(1)],#1
 	lsr	x4,x4,#8
 	subs	x2,x2,#1
 	beq	.Lsqueeze_done_ce
-	strb	w4,[x1],#1
+	strb	w4,[PTR(1)],#1
 	lsr	x4,x4,#8
 	subs	x2,x2,#1
 	beq	.Lsqueeze_done_ce
-	strb	w4,[x1],#1
+	strb	w4,[PTR(1)],#1
 	lsr	x4,x4,#8
 	subs	x2,x2,#1
 	beq	.Lsqueeze_done_ce
-	strb	w4,[x1],#1
+	strb	w4,[PTR(1)],#1
 	lsr	x4,x4,#8
 	subs	x2,x2,#1
 	beq	.Lsqueeze_done_ce
-	strb	w4,[x1],#1
+	strb	w4,[PTR(1)],#1
 	lsr	x4,x4,#8
 	subs	x2,x2,#1
 	beq	.Lsqueeze_done_ce
-	strb	w4,[x1],#1
+	strb	w4,[PTR(1)],#1
 
 .Lsqueeze_done_ce:
-	ldr	x29,[sp],#16
+	ldr	PTR(29),[PTRN(sp)],#(2*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	SHA3_squeeze_cext,.-SHA3_squeeze_cext
