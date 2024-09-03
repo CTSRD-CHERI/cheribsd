@@ -926,6 +926,7 @@ _malo=	malo
 # crypto just because we haven't ported the assembly).
 .if ${MACHINE_CPU:Mcheri}
 BROKEN_MODULES+=armv8crypto
+BROKEN_MODULES+=bnxt
 BROKEN_MODULES+=dpaa2
 BROKEN_MODULES+=ena
 BROKEN_MODULES+=linprocfs linux64 linux_common
