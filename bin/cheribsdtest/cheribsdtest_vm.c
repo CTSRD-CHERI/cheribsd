@@ -287,7 +287,6 @@ CHERIBSDTEST(vm_shm_open_anon_unix_surprise,
 			fprintf(stderr, "rx cap: %#lp\n", c);
 
 		tag = cheri_gettag(c);
-		CHERIBSDTEST_VERIFY2(tag == 0, "tag read");
 
 		CHERIBSDTEST_CHECK_SYSCALL(munmap(map, getpagesize()));
 		close(sv[0]);
@@ -347,8 +346,10 @@ CHERIBSDTEST(vm_shm_open_anon_unix_surprise,
 		waitpid(pid, &res, 0);
 		if (res == 0) {
 			cheribsdtest_success();
-		} else {
+		} else if (WIFEXITED(res) && WEXITSTATUS(res) == 1) {
 			cheribsdtest_failure_errx("tag transfer succeeded");
+		} else {
+			cheribsdtest_failure_errx("child setup error occured (this is *unexpected*");
 		}
 	}
 }
