@@ -311,46 +311,9 @@ drm_vmap_find(void *handle)
 }
 
 static int
-drm_cdev_pager_fault(vm_object_t vm_obj, vm_ooffset_t offset, int prot,
-    vm_page_t *mres)
+drm_cdev_pager_fault(vm_object_t vm_obj __unused, vm_ooffset_t offset __unused,
+    int prot __unused, vm_page_t *mres __unused)
 {
-	struct vm_area_struct *vmap;
-
-	vmap = drm_vmap_find(vm_obj->handle);
-
-	MPASS(vmap != NULL);
-	MPASS(vmap->vm_private_data == vm_obj->handle);
-
-	if (likely(vmap->vm_ops != NULL && offset < vmap->vm_len)) {
-		vm_paddr_t paddr = IDX_TO_OFF(vmap->vm_pfn) + offset;
-		vm_page_t page;
-
-		if (((*mres)->flags & PG_FICTITIOUS) != 0) {
-			/*
-			 * If the passed in result page is a fake
-			 * page, update it with the new physical
-			 * address.
-			 */
-			page = *mres;
-			vm_page_updatefake(page, paddr, vm_obj->memattr);
-		} else {
-			/*
-			 * Replace the passed in "mres" page with our
-			 * own fake page and free up the all of the
-			 * original pages.
-			 */
-			VM_OBJECT_WUNLOCK(vm_obj);
-			page = vm_page_getfake(paddr, vm_obj->memattr);
-			VM_OBJECT_WLOCK(vm_obj);
-
-			vm_page_replace(page, vm_obj,
-			    (*mres)->pindex, *mres);
-
-			*mres = page;
-		}
-		page->valid = VM_PAGE_BITS_ALL;
-		return (VM_PAGER_OK);
-	}
 	return (VM_PAGER_FAIL);
 }
 
