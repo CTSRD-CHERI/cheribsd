@@ -397,7 +397,7 @@ drm_cdev_pager_populate(vm_object_t vm_obj, vm_pindex_t pidx, int fault_type,
 		err = VM_PAGER_AGAIN;
 		break;
 	case VM_FAULT_SIGBUS:
-		err = VM_PAGER_BAD;
+		err = VM_PAGER_FAIL;
 		break;
 	case VM_FAULT_NOPAGE:
 		/*
