@@ -154,16 +154,16 @@ static void
 phys_pager_dealloc(vm_object_t object)
 {
 
+	VM_OBJECT_WUNLOCK(object);
 	if (object->handle != NULL) {
-		VM_OBJECT_WUNLOCK(object);
 		mtx_lock(&phys_pager_mtx);
 		TAILQ_REMOVE(&phys_pager_object_list, object, pager_object_list);
 		mtx_unlock(&phys_pager_mtx);
-		VM_OBJECT_WLOCK(object);
 	}
-	object->type = OBJT_DEAD;
 	if (object->un_pager.phys.ops->phys_pg_dtor != NULL)
 		object->un_pager.phys.ops->phys_pg_dtor(object);
+	VM_OBJECT_WLOCK(object);
+	object->type = OBJT_DEAD;
 	object->handle = NULL;
 }
 
