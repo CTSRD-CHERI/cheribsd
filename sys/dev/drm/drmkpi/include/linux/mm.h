@@ -119,20 +119,18 @@ struct vm_area_struct {
 struct vm_fault {
 	unsigned int flags;
 	pgoff_t	pgoff;
-	union {
-		/* user-space address */
-		void *virtual_address;	/* < 4.11 */
-		unsigned long address;	/* >= 4.11 */
-	};
+	vm_object_t object;
+	vm_pindex_t pindex;	/* fault pindex */
+	int count;		/* pages faulted in */
 	struct page *page;
-	struct vm_area_struct *vma;
 };
 
 struct vm_operations_struct {
 	void    (*open) (struct vm_area_struct *);
 	void    (*close) (struct vm_area_struct *);
-	int     (*fault) (struct vm_area_struct *, struct vm_fault *);
+	int     (*fault) (struct vm_fault *);
 	int	(*access) (struct vm_area_struct *, unsigned long, void *, int, int);
+	int	objtype;
 };
 
 struct sysinfo {

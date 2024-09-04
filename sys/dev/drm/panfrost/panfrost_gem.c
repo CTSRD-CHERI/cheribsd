@@ -95,8 +95,6 @@ panfrost_gem_free_object(struct drm_gem_object *obj)
 				continue;
 
 			vm_page_lock(m);
-			m->flags &= ~PG_FICTITIOUS;
-			m->oflags |= VPO_UNMANAGED;
 			vm_page_unwire_noq(m);
 			vm_page_free(m);
 			vm_page_unlock(m);
@@ -287,7 +285,7 @@ sgt_get_page_by_idx(struct sg_table *sgt, int pidx)
 }
 
 static vm_fault_t
-panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+panfrost_gem_fault(struct vm_fault *vmf)
 {
 	struct panfrost_gem_object *bo;
 	struct drm_gem_object *gem_obj;
@@ -296,12 +294,12 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	vm_pindex_t pidx;
 	vm_object_t obj;
 
-	obj = vma->vm_obj;
-	gem_obj = vma->vm_private_data;
+	obj = vmf->object;
+	gem_obj = obj->handle;
 	bo = (struct panfrost_gem_object *)gem_obj;
 	sc = gem_obj->dev->dev_private;
 
-	pidx = OFF_TO_IDX(vmf->virtual_address);
+	pidx = vmf->pindex;
 
 retry:
 	VM_OBJECT_WLOCK(obj);
@@ -332,9 +330,7 @@ retry:
 	vm_page_valid(page);
 	VM_OBJECT_WUNLOCK(obj);
 
-	vma->vm_pfn_first = pidx;
-	vma->vm_pfn_count = 1;
-
+	vmf->count = 1;
 	return (VM_FAULT_NOPAGE);
 
 fail_unlock:
@@ -360,6 +356,7 @@ static const struct vm_operations_struct panfrost_gem_vm_ops = {
 	.fault = panfrost_gem_fault,
 	.open = panfrost_gem_vm_open,
 	.close = panfrost_gem_vm_close,
+	.objtype = OBJT_PHYS,
 };
 
 int
@@ -615,8 +612,6 @@ retry:
 		va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 		cpu_dcache_wb_range((void *)va, PAGE_SIZE);
 		m->valid = VM_PAGE_BITS_ALL;
-		m->oflags &= ~VPO_UNMANAGED;
-		m->flags |= PG_FICTITIOUS;
 		bo->pages[i] = m;
 	}
 
@@ -664,8 +659,6 @@ retry:
 		va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 		cpu_dcache_wb_range((void *)va, PAGE_SIZE);
 		m->valid = VM_PAGE_BITS_ALL;
-		m->oflags &= ~VPO_UNMANAGED;
-		m->flags |= PG_FICTITIOUS;
 		bo->pages[i] = m;
 		m++;
 	}

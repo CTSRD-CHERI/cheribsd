@@ -24,10 +24,13 @@
  */
 
 #include <sys/param.h>
-#include <sys/priv.h>
-#include <sys/sglist.h>
-#include <sys/rwlock.h>
+#include <sys/lock.h>
 #include <sys/mman.h>
+#include <sys/priv.h>
+#include <sys/rwlock.h>
+#include <sys/sglist.h>
+#include <sys/sx.h>
+#include <sys/sysctl.h>
 
 #include <vm/vm.h>
 #include <vm/vm_object.h>
@@ -277,37 +280,28 @@ out_release:
 	return (ENXIO);
 }
 
-static struct rwlock drm_vma_lock;
-RW_SYSINIT(drm_freebsd, &drm_vma_lock, "drmcompat-vma-lock");
-static TAILQ_HEAD(, vm_area_struct) drm_vma_head =
+/*
+ * Glue between a VM object, DRM GEM object (referenced via object->handle), and
+ * mappings of said VM object.  The FreeBSD VM fault handler gives us very
+ * little visibility into the mappings of the object, so this list of vmas is
+ * not really used.
+ */
+struct drm_object_glue {
+	vm_object_t		object;
+	const struct vm_operations_struct *ops;
+	TAILQ_HEAD(, vm_area_struct) vmas;	/* existing mappings */
+	TAILQ_ENTRY(drm_object_glue) link;	/* global list linkage */
+};
+
+static struct sx drm_vma_lock;
+SX_SYSINIT(drm_freebsd, &drm_vma_lock, "drmcompat-vma-lock");
+static TAILQ_HEAD(, drm_object_glue) drm_vma_head =
     TAILQ_HEAD_INITIALIZER(drm_vma_head);
 
 static void
 drm_vmap_free(struct vm_area_struct *vmap)
 {
 	kfree(vmap);
-}
-
-static void
-drm_vmap_remove(struct vm_area_struct *vmap)
-{
-	rw_wlock(&drm_vma_lock);
-	TAILQ_REMOVE(&drm_vma_head, vmap, vm_entry);
-	rw_wunlock(&drm_vma_lock);
-}
-
-static struct vm_area_struct *
-drm_vmap_find(void *handle)
-{
-	struct vm_area_struct *vmap;
-
-	rw_rlock(&drm_vma_lock);
-	TAILQ_FOREACH(vmap, &drm_vma_head, vm_entry) {
-		if (vmap->vm_private_data == handle)
-			break;
-	}
-	rw_runlock(&drm_vma_lock);
-	return (vmap);
 }
 
 static int
@@ -321,38 +315,38 @@ static int
 drm_cdev_pager_populate(vm_object_t vm_obj, vm_pindex_t pidx, int fault_type,
     vm_prot_t max_prot, vm_pindex_t *first, vm_pindex_t *last)
 {
-	struct vm_area_struct *vmap;
+	struct vm_fault vmf;
+	struct drm_object_glue *dog;
 	int err;
-
-	/* get VM area structure */
-	vmap = drm_vmap_find(vm_obj->handle);
-	MPASS(vmap != NULL);
-	MPASS(vmap->vm_private_data == vm_obj->handle);
 
 	VM_OBJECT_WUNLOCK(vm_obj);
 
-	if (unlikely(vmap->vm_ops == NULL)) {
+	sx_slock(&drm_vma_lock);
+	TAILQ_FOREACH(dog, &drm_vma_head, link) {
+		if (dog->object->handle == vm_obj->handle)
+			break;
+	}
+	sx_sunlock(&drm_vma_lock);
+	MPASS(dog != NULL);
+
+	if (unlikely(dog->ops == NULL)) {
 		err = VM_FAULT_SIGBUS;
 	} else {
-		struct vm_fault vmf;
-
-		/* fill out VM fault structure */
-		vmf.virtual_address = (void *)(uintptr_t)IDX_TO_OFF(pidx);
+		vmf.object = vm_obj;
+		vmf.pindex = pidx;
 		vmf.flags = (fault_type & VM_PROT_WRITE) ? FAULT_FLAG_WRITE : 0;
 		vmf.pgoff = 0;
 		vmf.page = NULL;
-		vmf.vma = vmap;
+		vmf.count = 0;
 
-		vmap->vm_pfn_count = 0;
-		vmap->vm_obj = vm_obj;
+		err = dog->ops->fault(&vmf);
 
-		err = vmap->vm_ops->fault(vmap, &vmf);
-
-		while (vmap->vm_pfn_count == 0 && err == VM_FAULT_NOPAGE) {
+		while (vmf.count == 0 && err == VM_FAULT_NOPAGE) {
 			kern_yield(PRI_USER);
-			err = vmap->vm_ops->fault(vmap, &vmf);
+			err = dog->ops->fault(&vmf);
 		}
 	}
+	VM_OBJECT_WLOCK(vm_obj);
 
 	/* translate return code */
 	switch (err) {
@@ -369,15 +363,14 @@ drm_cdev_pager_populate(vm_object_t vm_obj, vm_pindex_t pidx, int fault_type,
 		 * found in the object, it will simply xbusy the first
 		 * page and return with vm_pfn_count set to 1.
 		 */
-		*first = vmap->vm_pfn_first;
-		*last = *first + vmap->vm_pfn_count - 1;
+		*first = vmf.pindex;
+		*last = *first + vmf.count - 1;
 		err = VM_PAGER_OK;
 		break;
 	default:
 		err = VM_PAGER_ERROR;
 		break;
 	}
-	VM_OBJECT_WLOCK(vm_obj);
 	return (err);
 }
 
@@ -385,8 +378,6 @@ static int
 drm_cdev_pager_ctor(void *handle, vm_ooffset_t size, vm_prot_t prot,
 		      vm_ooffset_t foff, struct ucred *cred, u_short *color)
 {
-
-	MPASS(drm_vmap_find(handle) != NULL);
 	*color = 0;
 	return (0);
 }
@@ -394,33 +385,47 @@ drm_cdev_pager_ctor(void *handle, vm_ooffset_t size, vm_prot_t prot,
 static void
 drm_cdev_pager_dtor(void *handle)
 {
-	const struct vm_operations_struct *vm_ops;
-	struct vm_area_struct *vmap;
+	struct vm_area_struct *vma, *vma1;
+	struct drm_object_glue *dog;
 
-	vmap = drm_vmap_find(handle);
-	MPASS(vmap != NULL);
+	sx_xlock(&drm_vma_lock);
+	TAILQ_FOREACH(dog, &drm_vma_head, link) {
+		if (dog->object->handle == handle)
+			break;
+	}
+	MPASS(dog != NULL);
+	TAILQ_REMOVE(&drm_vma_head, dog, link);
+	sx_xunlock(&drm_vma_lock);
 
-	/*
-	 * Remove handle before calling close operation to prevent
-	 * other threads from reusing the handle pointer.
-	 */
-	drm_vmap_remove(vmap);
-
-	vm_ops = vmap->vm_ops;
-	if (likely(vm_ops != NULL))
-		vm_ops->close(vmap);
-
-	drm_vmap_free(vmap);
+	MPASS(!TAILQ_EMPTY(&dog->vmas));
+	TAILQ_FOREACH_SAFE(vma, &dog->vmas, vm_entry, vma1) {
+		TAILQ_REMOVE(&dog->vmas, vma, vm_entry);
+		vma->vm_ops->close(vma);
+		drm_vmap_free(vma);
+	}
+	kfree(dog);
 }
 
-static struct cdev_pager_ops drm_mgtdev_pg_ops = {
+static void
+drm_phys_pager_dtor(vm_object_t object)
+{
+	drm_cdev_pager_dtor(object->handle);
+}
+
+static const struct phys_pager_ops drm_phys_pg_objs = {
+	/* OBJT_PHYS */
+	.phys_pg_populate	= drm_cdev_pager_populate,
+	.phys_pg_dtor		= drm_phys_pager_dtor
+};
+
+static const struct cdev_pager_ops drm_mgtdev_pg_ops = {
 	/* OBJT_MGTDEVICE */
 	.cdev_pg_populate	= drm_cdev_pager_populate,
 	.cdev_pg_ctor		= drm_cdev_pager_ctor,
 	.cdev_pg_dtor		= drm_cdev_pager_dtor
 };
 
-static struct cdev_pager_ops drm_dev_pg_ops = {
+static const struct cdev_pager_ops drm_dev_pg_ops = {
 	/* OBJT_DEVICE */
 	.cdev_pg_fault		= drm_cdev_pager_fault,
 	.cdev_pg_ctor		= drm_cdev_pager_ctor,
@@ -454,9 +459,8 @@ drm_fstub_do_mmap(struct file *file, const struct file_operations *fops,
 	attr = pgprot2cachemode(vmap->vm_page_prot);
 
 	if (vmap->vm_ops != NULL) {
-		struct vm_area_struct *ptr;
-		void *vm_private_data;
-		bool vm_no_fault;
+		struct drm_object_glue *dog;
+		void *handle;
 
 		if (vmap->vm_ops->open == NULL ||
 		    vmap->vm_ops->close == NULL ||
@@ -466,62 +470,47 @@ drm_fstub_do_mmap(struct file *file, const struct file_operations *fops,
 			return (EINVAL);
 		}
 
-		vm_private_data = vmap->vm_private_data;
+		handle = vmap->vm_private_data;
 
-		rw_wlock(&drm_vma_lock);
-		TAILQ_FOREACH(ptr, &drm_vma_head, vm_entry) {
-			if (ptr->vm_private_data == vm_private_data)
+		sx_xlock(&drm_vma_lock);
+		TAILQ_FOREACH(dog, &drm_vma_head, link) {
+			if (dog->object->handle == handle)
 				break;
 		}
-		/* check if there is an existing VM area struct */
-		if (ptr != NULL) {
-			/* check if the VM area structure is invalid */
-			if (ptr->vm_ops == NULL ||
-			    ptr->vm_ops->open == NULL ||
-			    ptr->vm_ops->close == NULL) {
-				rv = ESTALE;
-				vm_no_fault = 1;
-			} else {
-				rv = EEXIST;
-				vm_no_fault = (ptr->vm_ops->fault == NULL);
-			}
+		if (dog != NULL) {
+			KASSERT(dog->ops == vmap->vm_ops,
+			    ("mismatched vm_ops"));
+			TAILQ_INSERT_HEAD(&dog->vmas, vmap, vm_entry);
+			*obj = dog->object;
+			vm_object_reference(*obj);
 		} else {
-			/* insert VM area structure into list */
-			TAILQ_INSERT_TAIL(&drm_vma_head, vmap, vm_entry);
-			rv = 0;
-			vm_no_fault = (vmap->vm_ops->fault == NULL);
-		}
-		rw_wunlock(&drm_vma_lock);
-
-		if (rv != 0) {
-			/* free allocated VM area struct */
-			drm_vmap_free(vmap);
-			/* check for stale VM area struct */
-			if (rv != EEXIST)
-				return (rv);
-		}
-
-		/* check if there is no fault handler */
-		if (vm_no_fault) {
-			*obj = cdev_pager_allocate(vm_private_data,
-			    OBJT_DEVICE, &drm_dev_pg_ops, size, prot,
-			    *foff, td->td_ucred);
-		} else {
-			*obj = cdev_pager_allocate(vm_private_data,
-			    OBJT_MGTDEVICE, &drm_mgtdev_pg_ops, size, prot,
-			    *foff, td->td_ucred);
-		}
-
-		/* check if allocating the VM object failed */
-		if (*obj == NULL) {
-			if (rv == 0) {
-				/* remove VM area struct from list */
-				drm_vmap_remove(vmap);
-				/* free allocated VM area struct */
-				drm_vmap_free(vmap);
+			switch (vmap->vm_ops->objtype) {
+			case OBJT_DEVICE:
+			case OBJT_MGTDEVICE:
+				*obj = cdev_pager_allocate(handle,
+				    vmap->vm_ops->objtype,
+				    vmap->vm_ops->objtype == OBJT_DEVICE ?
+				    &drm_dev_pg_ops : &drm_mgtdev_pg_ops,
+				    size, prot, *foff, td->td_ucred);
+				break;
+			case OBJT_PHYS:
+				*obj = phys_pager_allocate(handle,
+				    &drm_phys_pg_objs, NULL, size, prot, *foff,
+				    td->td_ucred);
+				break;
+			default:
+				__assert_unreachable();
 			}
-			return (EINVAL);
+			dog = kzalloc(sizeof(*dog), GFP_KERNEL);
+			dog->object = *obj;
+			dog->ops = vmap->vm_ops;
+			TAILQ_INIT(&dog->vmas);
+
+			TAILQ_INSERT_HEAD(&dog->vmas, vmap, vm_entry);
+			TAILQ_INSERT_HEAD(&drm_vma_head, dog, link);
 		}
+		vmap->vm_obj = dog->object;
+		sx_xunlock(&drm_vma_lock);
 	} else {
 		struct sglist *sg;
 
