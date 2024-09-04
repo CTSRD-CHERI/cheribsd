@@ -566,7 +566,7 @@ drm_fstub_do_mmap(struct file *file, const struct file_operations *fops,
 		sglist_append_phys(sg, (vm_paddr_t)vmap->vm_pfn << PAGE_SHIFT,
 		    vmap->vm_len);
 
-		*obj = vm_pager_allocate(OBJT_SG, sg, vmap->vm_len, prot, 0,
+		*obj = vm_pager_allocate(OBJT_SG, sg, size, prot, 0,
 		    td->td_ucred);
 
 		drm_vmap_free(vmap);
