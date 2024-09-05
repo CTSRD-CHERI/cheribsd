@@ -66,10 +66,6 @@ CANCELPOINTS_CFLAGS=-fexceptions
 CFLAGS+=${CANCELPOINTS_CFLAGS}
 .endif
 
-.ifdef CHERI_LIB_C18N
-CFLAGS+=-DCHERI_LIB_C18N
-.endif
-
 # Use a more efficient TLS model for libc since we can reasonably assume that
 # it will be loaded during program startup.
 CFLAGS+= -ftls-model=initial-exec
