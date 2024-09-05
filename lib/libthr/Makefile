@@ -56,10 +56,6 @@ CFLAGS+=-fexceptions
 CFLAGS+=-D_PTHREAD_FORCED_UNWIND
 .endif
 
-.ifdef CHERI_LIB_C18N
-CFLAGS+=-DCHERI_LIB_C18N
-.endif
-
 LDFLAGS+=-Wl,-znodelete
 LDFLAGS+=-Wl,--auxiliary,libsys.so.7
 
