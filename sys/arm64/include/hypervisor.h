@@ -261,6 +261,8 @@
 #define	 VTCR_EL2_HWU61		(1UL << VTCR_EL2_HWU61_SHIFT)
 #define	VTCR_EL2_HWU62_SHIFT	28
 #define	 VTCR_EL2_HWU62		(1UL << VTCR_EL2_HWU62_SHIFT)
+#define	VTCR_EL2_DS_SHIFT	32
+#define	VTCR_EL2_DS		(0x1UL << VTCR_EL2_DS_SHIFT)
 
 /* VTTBR_EL2 - Virtualization Translation Table Base Register */
 #define	VTTBR_VMID_MASK		0xffff000000000000

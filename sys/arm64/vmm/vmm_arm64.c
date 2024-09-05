@@ -475,6 +475,14 @@ vmmops_modinit(int ipinum)
 	 */
 	el2_regs.vtcr_el2 |= VTCR_EL2_HWU59 | VTCR_EL2_HWU60 | VTCR_EL2_HWU61;
 #endif
+	/*
+	 * If FEAT_LPA2 is enabled in the host then we need to enable it here
+	 * so the page tables created by pmap.c are correct. The meaning of
+	 * the shareability field changes to become address bits when this
+	 * is set.
+	 */
+	if ((READ_SPECIALREG(tcr_el1) & TCR_DS) != 0)
+		el2_regs.vtcr_el2 |= VTCR_EL2_DS;
 
 	smp_rendezvous(NULL, arm_setup_vectors, NULL, &el2_regs);
 
