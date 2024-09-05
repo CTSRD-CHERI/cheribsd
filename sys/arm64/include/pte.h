@@ -122,14 +122,8 @@ typedef	uint64_t	pt_entry_t;		/* page table entry */
 #define	 ATTR_S2_MEMATTR_WB		0xf
 
 #if __has_feature(capabilities)
-/*
- * The aarch64 orr instruction cannot handle ATTR_DEFAULT |
- * ATTR_CAP_RW as a single operand, so separate orr instructions are
- * required for ATTR_CAP_RW.
- */
 #define	ATTR_CAP_RW	(ATTR_LC_ENABLED | ATTR_SC)
 #endif
-#define	ATTR_DEFAULT	(ATTR_AF | ATTR_SH(ATTR_SH_IS))
 
 #define	ATTR_DESCR_MASK		3
 #define	ATTR_DESCR_VALID	1

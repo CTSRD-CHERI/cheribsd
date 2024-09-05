@@ -1013,7 +1013,7 @@ LENTRY(build_l2_block_pagetable)
 	orr	x12, x12, #(ATTR_LC_ENABLED)
 	orr	x12, x12, #(ATTR_CDBM | ATTR_SC)
 #endif
-	orr	x12, x12, #(ATTR_DEFAULT)
+	orr	x12, x12, #(ATTR_AF | ATTR_SH(ATTR_SH_IS))
 	orr	x12, x12, #(ATTR_S1_UXN)
 #ifdef __ARM_FEATURE_BTI_DEFAULT
 	orr	x12, x12, #(ATTR_S1_GP)
@@ -1092,7 +1092,7 @@ LENTRY(build_l3_page_pagetable)
 #if __has_feature(capabilities)
 	orr	x12, x12, #(ATTR_CAP_RW)
 #endif
-	orr	x12, x12, #(ATTR_DEFAULT)
+	orr	x12, x12, #(ATTR_AF | ATTR_SH(ATTR_SH_IS))
 	orr	x12, x12, #(ATTR_S1_UXN)
 #ifdef __ARM_FEATURE_BTI_DEFAULT
 	orr	x12, x12, #(ATTR_S1_GP)
