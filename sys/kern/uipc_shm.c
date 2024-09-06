@@ -78,6 +78,7 @@
 #include <sys/stat.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
+#include <sys/sysent.h>
 #include <sys/sysproto.h>
 #include <sys/systm.h>
 #include <sys/sx.h>
@@ -1042,6 +1043,104 @@ shm_vmspace_free(struct vmspace *vm)
 		/* XXX: free refs to shmfds? */
 	}
 	vm_map_unlock(&vm->vm_map);
+}
+
+void
+shm_map_local_objs(struct proc *p, struct vm_cheri_revoke_cookie *crc)
+{
+	struct vmspace *vm = p->p_vmspace;
+	vm_map_t map = &vm->vm_map;
+	struct shmfd *shmfd;
+	void *rl_cookie;
+	vm_prot_t prot, max_prot;
+	int rv;
+
+	vm_map_lock(map);
+	LIST_FOREACH(shmfd, &vm->vm_shm_objects, shm_vmspace_entry) {
+		vm_offset_t align = PAGE_SIZE;
+		vm_offset_t vaddr = 0;
+		vm_pointer_t reservation;
+		/* XXX: can we avoid mapping some objects? */
+
+		prot = max_prot = VM_PROT_ALL;
+
+		shm_hold(shmfd);
+		rl_cookie = shm_rangelock_wlock(shmfd, 0, OFF_MAX);
+
+		vm_object_reference(shmfd->shm_object);
+
+		KASSERT(shmfd->shm_hoard_addr == 0,
+		    ("shm obj already mapped?"));
+		if (shm_largepage(shmfd))
+			align = pagesizes[shmfd->shm_lp_psind];
+		align = MAX(align,
+		    CHERI_REPRESENTABLE_ALIGNMENT(shmfd->shm_size));
+
+		/*
+		 * We don't need to do the retry dance to try and avoid sbrk
+		 * space because this only applies to pure-capability
+		 * processes and those don't do sbrk.
+		 */
+		rv = vm_map_find_aligned(map, &vaddr,
+		    shmfd->shm_size, vm_map_max(map), align);
+		if (rv != KERN_SUCCESS)
+			goto fail;
+		reservation = vaddr;
+		rv = vm_map_reservation_create_locked(map,
+		    &reservation, shmfd->shm_size, max_prot);
+		if (rv != KERN_SUCCESS)
+			goto fail;
+		rv = vm_map_insert(map, shmfd->shm_object, 0,
+		    reservation, reservation + shmfd->shm_size,
+		    prot, max_prot, MAP_DISABLE_COREDUMP | MAP_INHERIT_NONE,
+		    reservation);
+
+		if (rv != KERN_SUCCESS)
+			vm_map_reservation_delete_locked(map,
+			    reservation);
+		shmfd->shm_hoard_addr = reservation;
+		shmfd->shm_hoard_size = shmfd->shm_size;
+fail:
+		shm_rangelock_unlock(shmfd, rl_cookie);
+		if (rv != KERN_SUCCESS) {
+			vm_object_deallocate(shmfd->shm_object);
+			shm_drop(shmfd);
+		}
+
+		if (rv != KERN_SUCCESS) {
+			/*
+			 * XXX Out of suitable address space?
+			 * What to do?  Probably kill all procs in the
+			 * vmspace as we can't revoke?
+			 */
+			panic("Can't map shm object");
+		}
+	}
+	vm_map_unlock(map);
+}
+
+void
+shm_unmap_local_objs(struct proc *p, struct vm_cheri_revoke_cookie *crc)
+{
+	struct vmspace *vm = p->p_vmspace;
+	vm_map_t map = &vm->vm_map;
+	struct shmfd *shmfd;
+	void *rl_cookie;
+	int rv;
+
+	vm_map_lock(map);
+	LIST_FOREACH(shmfd, &vm->vm_shm_objects, shm_vmspace_entry) {
+		rl_cookie = shm_rangelock_wlock(shmfd, 0, OFF_MAX);
+		rv = vm_map_delete(map, shmfd->shm_hoard_addr,
+		    shmfd->shm_hoard_addr + shmfd->shm_hoard_size, false);
+		if (rv != KERN_SUCCESS)
+			panic("failed to delete shm hoard map entry\n");
+		shmfd->shm_hoard_addr = 0;
+		shmfd->shm_hoard_size = 0;
+		shm_rangelock_unlock(shmfd, rl_cookie);
+		shm_drop(shmfd);
+	}
+	vm_map_unlock(map);
 }
 
 /*

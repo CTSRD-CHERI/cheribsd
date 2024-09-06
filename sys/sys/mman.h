@@ -278,6 +278,8 @@ struct shmfd {
 	vm_pindex_t	shm_pages;	/* allocated pages */
 	struct vmspace	*shm_vmspace;
 	LIST_ENTRY(shmfd) shm_vmspace_entry;
+	vm_pointer_t	shm_hoard_addr;
+	vm_ooffset_t	shm_hoard_size;
 	int		shm_refs;
 	uid_t		shm_uid;
 	gid_t		shm_gid;
@@ -311,6 +313,8 @@ struct shmfd {
 
 #ifdef _KERNEL
 struct prison;
+struct proc;
+struct vm_cheri_revoke_cookie;
 
 int	shm_map(struct file *fp, size_t size, off_t offset, void **memp);
 int	shm_unmap(struct file *fp, void *mem, size_t size);
@@ -324,6 +328,9 @@ void	shm_vmspace_free(struct vmspace *vm);
 int	shm_dotruncate(struct shmfd *shmfd, off_t length);
 bool	shm_largepage(struct shmfd *shmfd);
 void	shm_remove_prison(struct prison *pr);
+void	shm_map_local_objs(struct proc *p, struct vm_cheri_revoke_cookie *crc);
+void	shm_unmap_local_objs(struct proc *p,
+	    struct vm_cheri_revoke_cookie *crc);
 
 extern struct fileops shm_ops;
 

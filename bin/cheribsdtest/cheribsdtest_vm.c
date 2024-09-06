@@ -2706,8 +2706,7 @@ CHERIBSDTEST(cheri_revoke_cow_mapping,
 }
 
 CHERIBSDTEST(cheri_revoke_shm_anon_hoard_unmapped,
-    "Capability is revoked within an unmapped shm object",
-    .ct_xfail_reason = "unmapped part of shm objects aren't revoked")
+    "Capability is revoked within an unmapped shm object")
 {
 	int fd;
 	void * volatile to_revoke;
@@ -2739,8 +2738,7 @@ CHERIBSDTEST(cheri_revoke_shm_anon_hoard_unmapped,
 }
 
 CHERIBSDTEST(cheri_revoke_shm_anon_hoard_closed,
-    "Capability is revoked within an unmapped and closed shm object",
-    .ct_xfail_reason = "unmapped part of shm objects aren't revoked")
+    "Capability is revoked within an unmapped and closed shm object")
 {
 	int sv[2];
 	int pid;
