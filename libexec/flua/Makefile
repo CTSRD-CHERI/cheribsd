@@ -4,7 +4,7 @@ LUASRC?=	${SRCTOP}/contrib/lua/src
 .PATH: ${LUASRC}
 
 PROG=	flua
-WARNS?=	2
+WARNS?=	3
 MAN=	# No manpage; this is internal.
 
 CWARNFLAGS.gcc+=	-Wno-format-nonliteral
@@ -34,11 +34,5 @@ LDFLAGS+=	-Wl,-E
 # the use of `tmpnam' is dangerous, better use `mkstemp'
 LD_FATAL_WARNINGS=no
 .endif
-
-UCLSRC?=	${SRCTOP}/contrib/libucl
-.PATH: ${UCLSRC}/lua
-SRCS+=	lua_ucl.c
-CFLAGS+=	-I${UCLSRC}/include -I${UCLSRC}/src -I${UCLSRC}/uthash
-LIBADD+=	ucl
 
 .include <bsd.prog.mk>
