@@ -64,6 +64,14 @@ enum vm_mmap_style {
 #define	VM_MEM_F_INCORE	0x01	/* include guest memory in core file */
 #define	VM_MEM_F_WIRED	0x02	/* guest memory is wired */
 
+/* Memory size and allocation policy for a single NUMA domain. */
+struct vm_mem_domain {
+	size_t size;
+	int ds_policy;
+	domainset_t *ds_mask;
+	size_t ds_size;
+};
+
 #if __has_feature(capabilities) && defined(__aarch64__)
 #define	VMMAPI_CHERI
 typedef uintcap_t vm_register_t;
@@ -122,7 +130,9 @@ struct vcpu *vm_vcpu_open(struct vmctx *ctx, int vcpuid);
 void	vm_vcpu_close(struct vcpu *vcpu);
 int	vcpu_id(struct vcpu *vcpu);
 int	vm_parse_memsize(const char *optarg, size_t *memsize);
-int	vm_setup_memory(struct vmctx *ctx, size_t len, enum vm_mmap_style s);
+int vm_setup_memory(struct vmctx *ctx, size_t len, enum vm_mmap_style s);
+int vm_setup_memory_domains(struct vmctx *ctx, enum vm_mmap_style s,
+			    struct vm_mem_domain *doms, int ndoms);
 void	*vm_map_gpa(struct vmctx *ctx, vm_paddr_t gaddr, size_t len);
 /* inverse operation to vm_map_gpa - extract guest address from host pointer */
 vm_paddr_t vm_rev_map_gpa(struct vmctx *ctx, void *addr);
