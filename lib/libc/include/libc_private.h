@@ -396,7 +396,7 @@ int __strerror_rl(int errnum, char *strerrbuf, size_t buflen,
 
 #ifdef CHERI_LIB_C18N
 __pid_t		__sys_rfork(int);
-int	sigaction_c18n(int, const struct sigaction *, struct sigaction *);
+int	_rtld_sigaction(int, const struct sigaction *, struct sigaction *);
 #endif
 
 #endif /* _LIBC_PRIVATE_H_ */
