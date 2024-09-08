@@ -35,19 +35,6 @@
 
 __weak_reference(__sys_sigaction, __sigaction);
 __weak_reference(sigaction, __libc_sigaction);
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
-/*
- * This weak symbol will always be resolved at runtime.
- */
-#pragma weak _rtld_sigaction
-int _rtld_sigaction(int, const struct sigaction *, struct sigaction *);
-
-int
-sigaction_c18n(int sig, const struct sigaction *act, struct sigaction *oact)
-{
-	return (_rtld_sigaction(sig, act, oact));
-}
-#endif
 
 #pragma weak sigaction
 int

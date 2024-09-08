@@ -32,6 +32,19 @@
 #include <sys/types.h>
 #include "libc_private.h"
 
+#ifdef CHERI_LIB_C18N
+/*
+ * XXX: A wrapper is needed to redirect the call because directly referencing
+ * _rtld_sigaction as a function pointer causes it to not be wrapped in a
+ * trampoline at the moment.
+ */
+int
+_rtld_sigaction_wrapper(int sig, const struct sigaction *oact,
+    struct sigaction *act) {
+	return (_rtld_sigaction(sig, oact, act));
+}
+#endif
+
 #define	SLOT(a, b) \
 	[INTERPOS_##a] = (interpos_func_t)b
 static interpos_func_t __libsys_interposing[INTERPOS_MAX] = {
@@ -56,8 +69,8 @@ static interpos_func_t __libsys_interposing[INTERPOS_MAX] = {
 	SLOT(sendmsg, __sys_sendmsg),
 	SLOT(sendto, __sys_sendto),
 	SLOT(setcontext, __sys_setcontext),
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(CHERI_LIB_C18N)
-	SLOT(sigaction, sigaction_c18n),
+#ifdef CHERI_LIB_C18N
+	SLOT(sigaction, _rtld_sigaction_wrapper),
 #else
 	SLOT(sigaction, __sys_sigaction),
 #endif
