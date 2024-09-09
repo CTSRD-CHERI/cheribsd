@@ -29,6 +29,7 @@ CFLAGS.zfs.c+= -DIN_BASE
 CFLAGS.zfs.c+= -I${ZFSTOP}/include
 CFLAGS.zfs.c+= -I${ZFSTOP}/lib/libspl/include
 CFLAGS.zfs.c+= -I${ZFSTOP}/lib/libspl/include/os/freebsd
+CFLAGS.zfs.c+= -I${ZFSTOP}/lib/libzpool/include
 CFLAGS.zfs.c+= -I${ZFSTOP}/module/icp/include
 CFLAGS.zfs.c+= -include ${ZFSTOP}/include/os/freebsd/spl/sys/ccompile.h
 CFLAGS.zfs.c+= -DHAVE_ISSETUGID
