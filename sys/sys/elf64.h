@@ -124,6 +124,18 @@ typedef struct {
 } Elf64_Phdr;
 
 /*
+ * Object header.
+ */
+
+typedef struct {
+	Elf64_Word	o_name;		/* Object name
+					   (index into the string table). */
+	Elf64_Word	o_dynamicndx;	/* PT_DYNAMIC index. */
+	Elf64_Addr	o_vaddr;	/* Virtual address in memory image. */
+	Elf64_Xword	o_memsz;	/* Size of contents in memory. */
+} Elf64_Ohdr;
+
+/*
  * Dynamic structure.  The ".dynamic" section contains an array of them.
  */
 

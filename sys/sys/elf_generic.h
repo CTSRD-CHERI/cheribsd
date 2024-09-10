@@ -69,6 +69,7 @@ __ElfType(Sword);
 __ElfType(Word);
 __ElfType(Ehdr);
 __ElfType(Shdr);
+__ElfType(Ohdr);
 __ElfType(Phdr);
 __ElfType(Dyn);
 __ElfType(Rel);
