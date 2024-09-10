@@ -532,6 +532,7 @@ typedef struct {
 #define	PT_SHLIB	5	/* Reserved (not used). */
 #define	PT_PHDR		6	/* Location of program header itself. */
 #define	PT_TLS		7	/* Thread local storage segment */
+#define	PT_OBJECT	8	/* Object information segment. */
 #define	PT_LOOS		0x60000000	/* First OS-specific. */
 #define	PT_C18N_NAME	0x64331380	/* Sub-object compartment. */
 #define	PT_CHERI_PCC	0x64348450	/* CHERI PCC bounds. */
