@@ -89,11 +89,12 @@ run()
 # $1 directory
 # $2 source filename w/o extension
 # $3 source extension
+# $4 optional regex for egrep -w
 _clean_dep()
 {
 	for libcompat in "" $ALL_libcompats; do
 		dirprfx=${libcompat:+obj-lib${libcompat}/}
-		if egrep -qw "$2\.$3" "$OBJTOP"/$dirprfx$1/.depend.$2.*o 2>/dev/null; then
+		if egrep -qw "${4:-$2\.$3}" "$OBJTOP"/$dirprfx$1/.depend.$2.*o 2>/dev/null; then
 			echo "Removing stale ${libcompat:+lib${libcompat} }dependencies and objects for $2.$3"
 			run rm -f \
 			    "$OBJTOP"/$dirprfx$1/.depend.$2.* \
@@ -104,9 +105,11 @@ _clean_dep()
 
 clean_dep()
 {
-	_clean_dep "$1" "$2" "$3"
+	local dir="$1"; shift
+
+	_clean_dep "$dir" "$@"
 	if [ "$1" == "lib/libc" ]; then
-		_clean_dep lib/libc_c18n "$2" "$3"
+		_clean_dep lib/libc_c18n "$@"
 	fi
 }
 
