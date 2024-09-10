@@ -532,6 +532,7 @@ typedef struct {
 #define	PT_SHLIB	5	/* Reserved (not used). */
 #define	PT_PHDR		6	/* Location of program header itself. */
 #define	PT_TLS		7	/* Thread local storage segment */
+#define	PT_OBJECT	8	/* Object information segment. */
 #define	PT_LOOS		0x60000000	/* First OS-specific. */
 #define	PT_SUNW_UNWIND	0x6464e550	/* amd64 UNWIND program header */
 #define	PT_GNU_EH_FRAME	0x6474e550
