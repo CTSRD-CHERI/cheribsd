@@ -3875,6 +3875,7 @@ enum pmap_caploadgen_res
 pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 {
 	enum pmap_caploadgen_res res;
+	struct rwlock *lock;
 	pd_entry_t *l2, l2e;
 	pt_entry_t *pte, oldpte = 0;
 	vm_page_t m;
@@ -3885,6 +3886,7 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 	    ("pmap_caploadgen_update: pmap crg %d but CPU mismatch",
 	    (int)pmap->flags.uclg));
 
+retry:
 	l2 = pmap_l2(pmap, va);
 	if (l2 == NULL || ((l2e = pmap_load(l2)) & PTE_V) == 0) {
 		m = NULL;
@@ -3892,15 +3894,25 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 		goto out;
 	}
 	if ((l2e & PTE_RWX) != 0) {
+		bool demoted;
+
 		/*
-		 * Large page: bouncing out here means we'll take a VM fault
-		 * to find the page in question.
-		 *
-		 * XXX We'd rather just demote the L2 page right now, surely?
+		 * Demote superpage and contiguous mappings.  When performing
+		 * load-side revocation, we don't want to pay the latency
+		 * penalty of scanning a large mapping.  Ideally, however, the
+		 * background scan could avoid breaking these mappings.  For
+		 * now, we attempt to reconstruct them below.
 		 */
-		m = NULL;
-		res = PMAP_CAPLOADGEN_UNABLE;
-		goto out;
+		lock = NULL;
+		demoted = pmap_demote_l2_locked(pmap, l2, va, &lock);
+		if (lock != NULL)
+			rw_wunlock(lock);
+		if (!demoted) {
+			m = NULL;
+			res = PMAP_CAPLOADGEN_UNABLE;
+			goto out;
+		}
+		goto retry;
 	}
 	pte = pmap_l2_to_l3(l2, va);
 	if (pte == NULL || ((oldpte = pmap_load(pte)) & PTE_V) == 0) {
