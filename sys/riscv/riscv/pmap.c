@@ -4156,9 +4156,11 @@ pmap_assert_consistent_clg(pmap_t pmap, vm_offset_t va)
 	if ((tpte & PTE_CW) == 0)
 		return;
 	if ((tpte & PTE_CRG) == 0) {
-		KASSERT(pmap->flags.uclg == 0, ("PTR_CRG unset, but GCLG set"));
+		KASSERT(pmap->flags.uclg == 0,
+		    ("PTR_CRG unset, but GCLG set (%#lx)", tpte));
 	} else {
-		KASSERT(pmap->flags.uclg == 1, ("PTR_CRG set, but GCLG unset"));
+		KASSERT(pmap->flags.uclg == 1,
+		    ("PTR_CRG set, but GCLG unset (%#lx)", tpte));
 	}
 }
 #endif /* CHERI_CAPREVOKE */

@@ -6719,7 +6719,7 @@ pmap_assert_consistent_clg(pmap_t pmap, vm_offset_t va)
 
 	pte = pmap_pte(pmap, va, &level);
 	if (pte == NULL)
-		return;	/* XXX: why does this happen? */
+		return;
 	tpte = pmap_load(pte);
 	if ((tpte & ATTR_SW_MANAGED) == 0 || !pmap_pte_capdirty(pmap, tpte))
 		return;
@@ -6729,10 +6729,12 @@ pmap_assert_consistent_clg(pmap_t pmap, vm_offset_t va)
 	case ATTR_LC_ENABLED:
 		panic("no clg");
 	case ATTR_LC_GEN0:
-		KASSERT(pmap->flags.uclg == 0, ("GEN0 LCLG with GEN1 GCLG"));
+		KASSERT(pmap->flags.uclg == 0,
+		    ("GEN0 LCLG with GEN1 GCLG (%#lx)", tpte));
 		break;
 	case ATTR_LC_GEN1:
-		KASSERT(pmap->flags.uclg == 1, ("GEN1 LCLG with GEN0 GCLG"));
+		KASSERT(pmap->flags.uclg == 1,
+		    ("GEN1 LCLG with GEN0 GCLG (%#lx)", tpte));
 		break;
 	default:
 		panic("impossible?");
