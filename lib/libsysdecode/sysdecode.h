@@ -109,6 +109,7 @@ bool	sysdecode_sctp_snd_flags(FILE *_fp, int _flags, int *_rem);
 const char *sysdecode_semctl_cmd(int _cmd);
 bool	sysdecode_semget_flags(FILE *_fp, int _flag, int *_rem);
 bool	sysdecode_sendfile_flags(FILE *_fp, int _flags, int *_rem);
+bool	sysdecode_shm_open_flags(FILE *_fp, int _flags, int *_rem);
 bool	sysdecode_shmat_flags(FILE *_fp, int _flags, int *_rem);
 const char *sysdecode_shmctl_cmd(int _cmd);
 const char *sysdecode_shutdown_how(int _how);

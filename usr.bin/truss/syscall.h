@@ -121,6 +121,7 @@ enum Argtype {
 	Ptraceop,
 	Sendfileflags,
 	Sendfilehdtr,
+	ShmOpen,
 	Quotactlcmd,
 	Reboothowto,
 	Resource,

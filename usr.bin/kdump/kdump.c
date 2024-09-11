@@ -1339,7 +1339,7 @@ ktrsyscall_freebsd(struct ktr_syscall *ktr, register_t **resip,
 					print_number(ip, narg, c);
 				}
 				putchar(',');
-				print_mask_arg(sysdecode_open_flags, ip[0]);
+				print_mask_arg(sysdecode_shm_open_flags, ip[0]);
 				putchar(',');
 				decode_filemode(ip[1]);
 				ip += 2;
@@ -1354,7 +1354,7 @@ ktrsyscall_freebsd(struct ktr_syscall *ktr, register_t **resip,
 					print_number(ip, narg, c);
 				}
 				putchar(',');
-				print_mask_arg(sysdecode_open_flags, ip[0]);
+				print_mask_arg(sysdecode_shm_open_flags, ip[0]);
 				putchar(',');
 				decode_filemode(ip[1]);
 				putchar(',');
