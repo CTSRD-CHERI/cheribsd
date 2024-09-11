@@ -9196,6 +9196,9 @@ pmap_demote_l3c(pmap_t pmap, pt_entry_t *l3p, vm_offset_t va)
 		    (ATTR_S1_AP(ATTR_S1_AP_RW) | ATTR_SW_DBM))
 			mask = ATTR_S1_AP_RW_BIT;
 		nbits |= l3e & ATTR_AF;
+#if __has_feature(capabilities)
+		nbits |= l3e & ATTR_SC;
+#endif
 	}
 	if ((nbits & ATTR_AF) != 0) {
 		pmap_invalidate_range(pmap, va & ~L3C_OFFSET, (va + L3C_SIZE) &
