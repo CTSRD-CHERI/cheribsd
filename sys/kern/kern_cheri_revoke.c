@@ -724,9 +724,7 @@ post_revoke_pass:
 
 	/* OK, that's that.  Where do we stand now? */
 	if (res == KERN_SUCCESS && myst == CHERI_REVOKE_ST_CLOSING) {
-#ifdef DIAGNOSTIC
 		vm_cheri_assert_consistent_clg(&vm->vm_map);
-#endif
 		/* Signal the end of this revocation epoch */
 		epoch++;
 		crepochs.dequeue = epoch;

@@ -508,6 +508,15 @@ SYSCTL_BOOL(_vm_cheri_revoke, OID_AUTO, avoid_faults, CTLFLAG_RWTUN,
     &cheri_revoke_avoid_faults, 0,
     "Avoid faulting when the pager is known not to contain the page");
 
+#ifdef DIAGNOSTIC
+static bool cheri_validate_clg = true;
+#else
+static bool cheri_validate_clg = false;
+#endif
+SYSCTL_BOOL(_vm_cheri_revoke, OID_AUTO, validate_clg, CTLFLAG_RWTUN,
+    &cheri_validate_clg, 0,
+    "Validate LCLGs against the pmap after forks and revocation scans");
+
 static bool
 vm_cheri_revoke_skip_fault(vm_object_t object)
 {
@@ -1104,15 +1113,20 @@ vm_cheri_assert_consistent_clg(struct vm_map *map)
 {
 	pmap_t pmap = map->pmap;
 	vm_map_entry_t entry;
+	vm_object_t object;
 	vm_offset_t addr;
 
 	/* Called with map lock held */
 
+	if (!cheri_validate_clg)
+		return;
 	VM_MAP_ENTRY_FOREACH(entry, map) {
-		if ((entry->max_protection & VM_PROT_READ_CAP) == 0 ||
-		    entry->object.vm_object == NULL) {
+		if ((entry->max_protection & VM_PROT_READ_CAP) == 0)
 			continue;
-		}
+		object = entry->object.vm_object;
+		if (object == NULL || (object->flags & OBJ_HASCAP) == 0 ||
+		    (object->flags & OBJ_NOCAP) != 0)
+			continue;
 
 		for (addr = entry->start; addr < entry->end;
 		    addr += pagesizes[0]) {

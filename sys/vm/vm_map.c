@@ -5342,7 +5342,7 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 #endif
 		}
 	}
-#if defined(CHERI_CAPREVOKE) && defined(DIAGNOSTIC)
+#if defined(CHERI_CAPREVOKE)
 	vm_cheri_assert_consistent_clg(new_map);
 #endif
 	/*
