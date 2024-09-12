@@ -1986,28 +1986,6 @@ link_elf_each_function_nameval(linker_file_t file,
 	return (0);
 }
 
-const Elf_Sym *
-elf_get_sym(linker_file_t lf, Elf_Size symidx)
-{
-	elf_file_t ef = (elf_file_t)lf;
-
-	if (symidx >= ef->nchains)
-		return (NULL);
-	return (ef->symtab + symidx);
-}
-
-const char *
-elf_get_symname(linker_file_t lf, Elf_Size symidx)
-{
-	elf_file_t ef = (elf_file_t)lf;
-	const Elf_Sym *sym;
-
-	if (symidx >= ef->nchains)
-		return (NULL);
-	sym = ef->symtab + symidx;
-	return (ef->strtab + sym->st_name);
-}
-
 /*
  * Symbol lookup functions that can be used when the symbol index is known (ie
  * in relocations). It uses the symbol index instead of doing a fully fledged
