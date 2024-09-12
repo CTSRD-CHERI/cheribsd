@@ -5868,18 +5868,6 @@ pmap_enter_l3c(pmap_t pmap, vm_offset_t va, pt_entry_t l3e, u_int flags,
 	KASSERT(!VA_IS_CLEANMAP(va) || (l3e & ATTR_SW_MANAGED) == 0,
 	    ("pmap_enter_l3c: managed mapping within the clean submap"));
 
-#ifdef CHERI_CAPREVOKE
-	if (!ADDR_IS_KERNEL(va)) {
-		/*
-		 * pmap_caploadgen_update() currently does not handle L3C
-		 * mappings.  Avoid creating them at all on the basis that the
-		 * pessimization of going through vm_fault() for capload faults
-		 * is probably worse than not having L3C mappings at all. 
-		 */
-		return (KERN_FAILURE);
-	}
-#endif
-
 	/*
 	 * If the L3 PTP is not resident, we attempt to create it here.
 	 */
@@ -6677,15 +6665,17 @@ out:
 #if VM_NRESERVLEVEL > 0
 	/*
 	 * If we...
-	 *   are on the background scan (as indicated by EXCLUSIVE),
+	 *   are on the background scan (as indicated by NONEWMAPS),
 	 *   are writing back a PTE (m != NULL),
 	 *   have superpages enabled,
-	 *   are at the last page of an L2 entry,
-	 * then see if we can put a superpage back together.
+	 * try to restore an L3C mapping.  If that succeeded, then see if we can
+	 * put a superpage back together.
 	 */
 	if ((flags & PMAP_CAPLOADGEN_NONEWMAPS) &&
-	    (m != NULL) && pmap_ps_enabled(pmap) &&
-	    ((va & (L2_OFFSET - L3_OFFSET)) == (L2_OFFSET - L3_OFFSET))) {
+	    m != NULL && pmap_ps_enabled(pmap) &&
+	    (va & L3C_OFFSET) == (PTE_TO_PHYS(tpte) & L3C_OFFSET) &&
+	    vm_reserv_is_populated(m, L3C_ENTRIES) &&
+	    pmap_promote_l3c(pmap, pte, va)) {
 		KASSERT(lvl == 3,
 		    ("pmap_caploadgen_update superpage: lvl != 3"));
 		KASSERT((m->flags & PG_FICTITIOUS) == 0,
