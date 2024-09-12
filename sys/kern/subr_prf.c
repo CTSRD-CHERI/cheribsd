@@ -874,6 +874,8 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 					PCHAR('R');
 				if (num & CHERI_PERM_STORE_CAP)
 					PCHAR('W');
+				if (num & CHERI_PERM_EXECUTIVE)
+					PCHAR('E');
 				PCHAR(',');
 
 				/* bounds */
