@@ -82,7 +82,7 @@ typedef struct elf_file {
 	int		preloaded;	/* Was file pre-loaded */
 	caddr_t		address;	/* Relocation address */
 #ifdef SPARSE_MAPPING
-	vm_object_t	object;		/* VM object to hold file pages */
+	vm_object_t	vmobject;	/* VM object to hold file pages */
 #endif
 	Elf_Dyn		*dynamic;	/* Symbol table etc. */
 	Elf_Hashelt	nbuckets;	/* DT_HASH info */
@@ -504,7 +504,7 @@ link_elf_init(void* arg)
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif
 #ifdef SPARSE_MAPPING
-	ef->object = NULL;
+	ef->vmobject = NULL;
 #endif
 	ef->dynamic = dp;
 
@@ -1013,7 +1013,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	ef->address = *(caddr_t *)baseptr;
 #endif
 #ifdef SPARSE_MAPPING
-	ef->object = NULL;
+	ef->vmobject = NULL;
 #endif
 	dp = ef->address + *(vm_offset_t *)dynptr;
 	ef->dynamic = (Elf_Dyn *)dp;
@@ -1252,13 +1252,13 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 
 	ef = (elf_file_t) lf;
 #ifdef SPARSE_MAPPING
-	ef->object = vm_pager_allocate(OBJT_PHYS, NULL, mapsize, VM_PROT_ALL,
+	ef->vmobject = vm_pager_allocate(OBJT_PHYS, NULL, mapsize, VM_PROT_ALL,
 	    0, thread0.td_ucred);
-	if (ef->object == NULL) {
+	if (ef->vmobject == NULL) {
 		error = ENOMEM;
 		goto out;
 	}
-	vm_object_set_flag(ef->object, OBJ_HASCAP);
+	vm_object_set_flag(ef->vmobject, OBJ_HASCAP);
 #ifdef __amd64__
 	mapbase = (caddr_t)KERNBASE;
 #else
@@ -1267,12 +1267,12 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	/*
 	 * Mapping protections are downgraded after relocation processing.
 	 */
-	error = vm_map_find(kernel_map, ef->object, 0,
+	error = vm_map_find(kernel_map, ef->vmobject, 0,
 	    (vm_offset_t *)&mapbase, mapsize, 0, VMFS_OPTIMAL_SPACE,
 	    VM_PROT_ALL, VM_PROT_ALL, 0);
 	if (error != 0) {
-		vm_object_deallocate(ef->object);
-		ef->object = NULL;
+		vm_object_deallocate(ef->vmobject);
+		ef->vmobject = NULL;
 		goto out;
 	}
 #else
@@ -1525,10 +1525,10 @@ link_elf_unload_file(linker_file_t file)
 	}
 
 #ifdef SPARSE_MAPPING
-	if (ef->object != NULL) {
+	if (ef->vmobject != NULL) {
 		vm_map_remove(kernel_map, (vm_offset_t) ef->address,
 		    (vm_offset_t) ef->address
-		    + (ef->object->size << PAGE_SHIFT));
+		    + (ef->vmobject->size << PAGE_SHIFT));
 	}
 #else
 	free(ef->address, M_LINKER);
