@@ -1733,6 +1733,13 @@ _rtld_thread_start(struct pthread *curthread)
 	thr_thread_start(curthread);
 }
 
+static bool
+identify_untrusted_stk(void *canonical, void *untrusted)
+{
+	canonical = cheri_clearperm(canonical, CHERI_PERM_SW_VMEM);
+	return (cheri_is_subset(untrusted, canonical));
+}
+
 void
 _rtld_thr_exit(long *state)
 {
@@ -1762,7 +1769,8 @@ _rtld_thr_exit(long *state)
 		data = &table->meta->compart_stk[i];
 		if (data->size == 0)
 			continue;
-		if (!cheri_is_subset(data->begin, table->entries[i].stack)) {
+		if (!identify_untrusted_stk(
+		    data->begin, table->entries[i].stack)) {
 			rtld_fdprintf(STDERR_FILENO,
 			    "c18n: Untrusted stack %#p of %s is not derived "
 			    "from %#p\n", table->entries[i].stack,
@@ -1896,22 +1904,22 @@ _rtld_sighandler_impl(int sig, siginfo_t *info, ucontext_t *ucp, void *nsp)
 	intr_idx = tf->callee;
 	intr = index_to_cid(intr_idx);
 	if (intr < table->meta->capacity &&
-	    table->meta->compart_stk[intr].size > 0) {
-		if (cheri_is_subset(table->meta->compart_stk[intr].begin, nsp))
-			goto found;
-		/*
-		 * If the interrupt occured at a point in the trampoline while a
-		 * tail-call is taking place, where the callee has been updated
-		 * but the callee's stack has not been installed yet, nsp would
-		 * refer to the stack top of the compartment identified as the
-		 * caller in a partially constructed frame above the topmost
-		 * frame.
-		 */
-		intr_idx = tf[-1].caller;
-		intr = index_to_cid(intr_idx);
-		if (cheri_is_subset(table->meta->compart_stk[intr].begin, nsp))
-			goto found_trusted;
-	}
+	    table->meta->compart_stk[intr].size > 0 &&
+	    identify_untrusted_stk(table->meta->compart_stk[intr].begin, nsp))
+		goto found;
+	/*
+	 * If the interrupt occured at a point in the trampoline while a
+	 * tail-call is taking place, where the callee has been updated but the
+	 * callee's stack has not been installed yet, nsp would refer to the
+	 * stack top of the compartment identified as the caller in a partially
+	 * constructed frame above the topmost frame.
+	 */
+	intr_idx = tf[-1].caller;
+	intr = index_to_cid(intr_idx);
+	if (intr < table->meta->capacity &&
+	    table->meta->compart_stk[intr].size > 0 &&
+	    identify_untrusted_stk(table->meta->compart_stk[intr].begin, nsp))
+		goto found_trusted;
 	/*
 	 * If the interrupt occurred at a point in the trampoline where a new
 	 * frame has been pushed but the callee's stack has not been installed
@@ -1928,7 +1936,7 @@ _rtld_sighandler_impl(int sig, siginfo_t *info, ucontext_t *ucp, void *nsp)
 	 */
 	intr_idx = tf->caller;
 	intr = index_to_cid(intr_idx);
-	if (cheri_is_subset(table->meta->compart_stk[intr].begin, nsp))
+	if (identify_untrusted_stk(table->meta->compart_stk[intr].begin, nsp))
 		goto found_trusted;
 	/*
 	 * Lazy binding, thread-local storage, and stack resolution all involve
@@ -1937,7 +1945,7 @@ _rtld_sighandler_impl(int sig, siginfo_t *info, ucontext_t *ucp, void *nsp)
 	 */
 	intr_idx = cid_to_index(RTLD_COMPART_ID);
 	intr = RTLD_COMPART_ID;
-	if (cheri_is_subset(table->meta->compart_stk[intr].begin, nsp))
+	if (identify_untrusted_stk(table->meta->compart_stk[intr].begin, nsp))
 		goto found_trusted;
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 found_failed:
