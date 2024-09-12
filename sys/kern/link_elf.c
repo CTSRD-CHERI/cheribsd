@@ -34,6 +34,7 @@
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
+#include <sys/types.h>
 #ifdef SPARSE_MAPPING
 #include <sys/mman.h>
 #endif
@@ -77,13 +78,10 @@
 
 #define MAXSEGS 4
 
-typedef struct elf_file {
-	struct linker_file lf __subobject_member_used_for_c_inheritance; /* Common fields */
-	int		preloaded;	/* Was file pre-loaded */
+typedef struct elf_object {
+	off_t		offset;		/* Offset of the object */
+	off_t		dynoffset;	/* Offset of its dynamic segment */
 	caddr_t		address;	/* Relocation address */
-#ifdef SPARSE_MAPPING
-	vm_object_t	vmobject;	/* VM object to hold file pages */
-#endif
 	Elf_Dyn		*dynamic;	/* Symbol table etc. */
 	Elf_Hashelt	nbuckets;	/* DT_HASH info */
 	Elf_Hashelt	nchains;
@@ -105,6 +103,16 @@ typedef struct elf_file {
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(DT_CHERI___CAPRELOCS)
 	void		*caprelocs;	/* DT_CHERI___CAPRELOCS */
 	int		caprelocssize;	/* DT_CHERI___CAPRELOCSSZ */
+#endif
+	TAILQ_ENTRY(elf_object)	next;
+} *elf_object_t;
+
+typedef struct elf_file {
+	struct linker_file lf __subobject_member_used_for_c_inheritance; /* Common fields */
+	int		preloaded;	/* Was file pre-loaded */
+	caddr_t		address;	/* Relocation address */
+#ifdef SPARSE_MAPPING
+	vm_object_t	vmobject;	/* VM object to hold file pages */
 #endif
 	caddr_t		modptr;
 	const Elf_Sym	*ddbsymtab;	/* The symbol table we are using */
@@ -129,6 +137,8 @@ typedef struct elf_file {
 #ifdef GDB
 	struct link_map	gdb;		/* hooks for gdb */
 #endif
+	struct elf_object pobject;	/* Parent object. */
+	TAILQ_HEAD(elf_object_head, elf_object) objects;
 } *elf_file_t;
 
 struct elf_set {
@@ -181,6 +191,7 @@ static int	link_elf_symidx_address(linker_file_t, unsigned long, int,
 static int	link_elf_symidx_capability(linker_file_t, unsigned long, int,
 		    uintcap_t *);
 #endif
+static void	elf_init_objects(elf_file_t);
 static int	elf_lookup(linker_file_t, Elf_Size, int, Elf_Addr *);
 
 static kobj_method_t link_elf_methods[] = {
@@ -228,7 +239,7 @@ SYSCTL_BOOL(_debug, OID_AUTO, link_elf_leak_locals,
 typedef int (*elf_reloc_fn)(linker_file_t lf, char *relocbase,
     const void *data, int type, elf_lookup_fn lookup);
 
-static int	parse_dynamic(elf_file_t);
+static int	parse_dynamic_object(elf_object_t object, elf_file_t ef);
 static int	relocate_file(elf_file_t);
 static int	relocate_file1(elf_file_t ef, elf_lookup_fn lookup,
 		    elf_reloc_fn reloc, bool ifuncs);
@@ -424,7 +435,10 @@ link_elf_link_common_finish(linker_file_t lf)
 	newfilename = malloc(strlen(lf->filename) + 1, M_LINKER, M_WAITOK);
 	strcpy(newfilename, lf->filename);
 	ef->gdb.l_name = newfilename;
-	ef->gdb.l_ld = ef->dynamic;
+	/*
+	 * TODO: Adapt GDB to the new ELF format.
+	 */
+	ef->gdb.l_ld = ef->pobject.dynamic;
 	link_elf_add_gdb(&ef->gdb);
 	GDB_STATE(RT_CONSISTENT);
 #endif
@@ -486,6 +500,7 @@ link_elf_init(void* arg)
 		    __func__);
 
 	ef = (elf_file_t) linker_kernel_file;
+	elf_init_objects(ef);
 	ef->preloaded = 1;
 #ifdef RELOCATABLE_KERNEL
 	/* Compute relative displacement */
@@ -506,10 +521,11 @@ link_elf_init(void* arg)
 #ifdef SPARSE_MAPPING
 	ef->vmobject = NULL;
 #endif
-	ef->dynamic = dp;
+	ef->pobject.address = ef->address;
+	ef->pobject.dynamic = dp;
 
 	if (dp != NULL)
-		parse_dynamic(ef);
+		parse_dynamic_object(&ef->pobject, ef);
 #ifdef RELOCATABLE_KERNEL
 	linker_kernel_file->address = (caddr_t)__startkernel;
 	linker_kernel_file->size = (intptr_t)(__endkernel - __startkernel);
@@ -629,63 +645,70 @@ link_elf_preload_parse_symbols(elf_file_t ef)
 }
 
 static int
-parse_dynamic(elf_file_t ef)
+parse_dynamic_object(elf_object_t object, elf_file_t ef)
 {
 	Elf_Dyn *dp;
 	int plttype = DT_REL;
 
-	for (dp = ef->dynamic; dp->d_tag != DT_NULL; dp++) {
+	for (dp = object->dynamic; dp->d_tag != DT_NULL; dp++) {
 		switch (dp->d_tag) {
 		case DT_HASH:
 		{
 			/* From src/libexec/rtld-elf/rtld.c */
 			const Elf_Hashelt *hashtab = (const Elf_Hashelt *)
-			    (ef->address + dp->d_un.d_ptr);
-			ef->nbuckets = hashtab[0];
-			ef->nchains = hashtab[1];
-			ef->buckets = cheri_kern_setbounds(hashtab + 2,
-			    ef->nbuckets * sizeof(Elf_Hashelt));
-			ef->chains = cheri_kern_setbounds(hashtab + 2 + ef->nbuckets,
-			    ef->nchains * sizeof(Elf_Hashelt));
+			    (object->address + dp->d_un.d_ptr);
+			object->nbuckets = hashtab[0];
+			object->nchains = hashtab[1];
+			object->buckets = cheri_kern_setbounds(hashtab + 2,
+			    object->nbuckets * sizeof(Elf_Hashelt));
+			object->chains = cheri_kern_setbounds(hashtab + 2 +
+			    object->nbuckets, object->nchains *
+			    sizeof(Elf_Hashelt));
 			break;
 		}
 		case DT_STRTAB:
-			ef->strtab = (caddr_t) (ef->address + dp->d_un.d_ptr);
+			object->strtab = (caddr_t) (object->address +
+			    dp->d_un.d_ptr);
 			break;
 		case DT_STRSZ:
-			ef->strsz = dp->d_un.d_val;
+			object->strsz = dp->d_un.d_val;
 			break;
 		case DT_SYMTAB:
-			ef->symtab = (Elf_Sym*) (ef->address + dp->d_un.d_ptr);
+			object->symtab = (Elf_Sym*) (object->address +
+			    dp->d_un.d_ptr);
 			break;
 		case DT_SYMENT:
 			if (dp->d_un.d_val != sizeof(Elf_Sym))
 				return (ENOEXEC);
 			break;
 		case DT_PLTGOT:
-			ef->got = (Elf_Addr *) (ef->address + dp->d_un.d_ptr);
+			object->got = (Elf_Addr *) (object->address +
+			    dp->d_un.d_ptr);
 			break;
 		case DT_REL:
-			ef->rel = (const Elf_Rel *) (ef->address + dp->d_un.d_ptr);
+			object->rel = (const Elf_Rel *) (object->address +
+			    dp->d_un.d_ptr);
 			break;
 		case DT_RELSZ:
-			ef->relsize = dp->d_un.d_val;
+			object->relsize = dp->d_un.d_val;
 			break;
 		case DT_RELENT:
 			if (dp->d_un.d_val != sizeof(Elf_Rel))
 				return (ENOEXEC);
 			break;
 		case DT_JMPREL:
-			ef->pltrel = (const Elf_Rel *) (ef->address + dp->d_un.d_ptr);
+			object->pltrel = (const Elf_Rel *) (object->address +
+			    dp->d_un.d_ptr);
 			break;
 		case DT_PLTRELSZ:
-			ef->pltrelsize = dp->d_un.d_val;
+			object->pltrelsize = dp->d_un.d_val;
 			break;
 		case DT_RELA:
-			ef->rela = (const Elf_Rela *) (ef->address + dp->d_un.d_ptr);
+			object->rela = (const Elf_Rela *) (object->address +
+			    dp->d_un.d_ptr);
 			break;
 		case DT_RELASZ:
-			ef->relasize = dp->d_un.d_val;
+			object->relasize = dp->d_un.d_val;
 			break;
 		case DT_RELAENT:
 			if (dp->d_un.d_val != sizeof(Elf_Rela))
@@ -698,10 +721,10 @@ parse_dynamic(elf_file_t ef)
 			break;
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(DT_CHERI___CAPRELOCS)
 		case DT_CHERI___CAPRELOCS:
-			ef->caprelocs = ef->address + dp->d_un.d_ptr;
+			object->caprelocs = object->address + dp->d_un.d_ptr;
 			break;
 		case DT_CHERI___CAPRELOCSSZ:
-			ef->caprelocssize = dp->d_un.d_val;
+			object->caprelocssize = dp->d_un.d_val;
 			break;
 #endif
 #ifndef __CHERI_PURE_CAPABILITY__
@@ -719,21 +742,25 @@ parse_dynamic(elf_file_t ef)
 	 * Set bounds on all section pointers for which we know the size
 	 * If we are not a cheri kernel these are no-ops.
 	 */
-	if (ef->strtab != NULL)
-		ef->strtab = cheri_kern_setbounds(ef->strtab, ef->strsz);
-	if (ef->rel != NULL)
-		ef->rel = cheri_kern_setbounds(ef->rel, ef->relsize);
-	if (ef->pltrel != NULL)
-		ef->pltrel = cheri_kern_setbounds(ef->pltrel, ef->pltrelsize);
-	if (ef->rela != NULL)
-		ef->rela = cheri_kern_setbounds(ef->rela, ef->relasize);
-	if (ef->symtab != NULL)
-		ef->symtab = cheri_kern_setbounds(ef->symtab,
-		    ef->nchains * sizeof(Elf_Sym));
+	if (object->strtab != NULL)
+		object->strtab = cheri_kern_setbounds(object->strtab,
+		    object->strsz);
+	if (object->rel != NULL)
+		object->rel = cheri_kern_setbounds(object->rel,
+		    object->relsize);
+	if (object->pltrel != NULL)
+		object->pltrel = cheri_kern_setbounds(object->pltrel,
+		    object->pltrelsize);
+	if (object->rela != NULL)
+		object->rela = cheri_kern_setbounds(object->rela,
+		    object->relasize);
+	if (object->symtab != NULL)
+		object->symtab = cheri_kern_setbounds(object->symtab,
+		    object->nchains * sizeof(Elf_Sym));
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(DT_CHERI___CAPRELOCS)
-	if (ef->caprelocs != NULL)
-		ef->caprelocs = cheri_kern_setbounds(ef->caprelocs,
-		    ef->caprelocssize);
+	if (object->caprelocs != NULL)
+		object->caprelocs = cheri_kern_setbounds(object->caprelocs,
+		    object->caprelocssize);
 #endif
 
 	/*
@@ -742,22 +769,30 @@ parse_dynamic(elf_file_t ef)
 	 * a symbol after GOT, in any case the got capability
 	 * would be limited by ef->address capability.
 	 */
-	/* if (ef->got) */
-	/* 	ef->got */
+	/* if (object->got) */
+	/* 	object->got */
 
 	if (plttype == DT_RELA) {
-		ef->pltrela = (const Elf_Rela *)ef->pltrel;
-		ef->pltrel = NULL;
-		ef->pltrelasize = ef->pltrelsize;
-		ef->pltrelsize = 0;
+		object->pltrela = (const Elf_Rela *)object->pltrel;
+		object->pltrel = NULL;
+		object->pltrelasize = object->pltrelsize;
+		object->pltrelsize = 0;
 	}
 
-	ef->ddbsymtab = ef->symtab;
-	ef->ddbsymcnt = ef->nchains;
-	ef->ddbstrtab = ef->strtab;
-	ef->ddbstrcnt = ef->strsz;
+	/*
+	 * TODO: Adapt ddb to the new ELF format.
+	 */
+	/*
+	 * Use sections of the parent object for ddb.
+	 */
+	if (&ef->pobject == object) {
+		ef->ddbsymtab = object->symtab;
+		ef->ddbsymcnt = object->nchains;
+		ef->ddbstrtab = object->strtab;
+		ef->ddbstrcnt = object->strsz;
+	}
 
-	return elf_cpu_parse_dynamic(ef->address, ef->dynamic);
+	return elf_cpu_parse_dynamic(object->address, object->dynamic);
 }
 
 #define	LS_PADDING	0x90909090
@@ -1001,6 +1036,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 		return (ENOMEM);
 
 	ef = (elf_file_t) lf;
+	elf_init_objects(ef);
 	ef->preloaded = 1;
 	ef->modptr = modptr;
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -1016,7 +1052,8 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	ef->vmobject = NULL;
 #endif
 	dp = ef->address + *(vm_offset_t *)dynptr;
-	ef->dynamic = (Elf_Dyn *)dp;
+	ef->pobject.address = ef->address;
+	ef->pobject.dynamic = (Elf_Dyn *)dp;
 	lf->address = ef->address;
 	lf->size = *(size_t *)sizeptr;
 
@@ -1033,7 +1070,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	link_elf_locate_exidx_preload(lf, modptr);
 #endif
 
-	error = parse_dynamic(ef);
+	error = parse_dynamic_object(&ef->pobject, ef);
 	if (error == 0)
 		error = parse_dpcpu(ef);
 #ifdef VIMAGE
@@ -1075,13 +1112,13 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	struct nameidata nd;
 	struct thread* td = curthread;	/* XXX */
 	Elf_Ehdr *hdr;
-	caddr_t firstpage, segbase;
+	caddr_t firstpage, phdrpage, segbase;
 	int nbytes, i;
-	Elf_Phdr *phdr;
+	Elf_Phdr *dynphdr, *objphdr, *phdr, *phtable;
 	Elf_Phdr *phlimit;
-	Elf_Phdr *segs[MAXSEGS];
-	int nsegs;
-	Elf_Phdr *phdyn;
+	Elf_Phdr **segs;
+	Elf_Ohdr *ohdr, *ohtable;
+	int maxsegs, nobjects, nsegs;
 	caddr_t mapbase;
 	size_t mapsize;
 	Elf_Addr base_vaddr;
@@ -1090,6 +1127,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	ssize_t resid;
 	int flags;
 	elf_file_t ef;
+	elf_object_t object;
 	linker_file_t lf;
 	Elf_Shdr *shdr;
 	int symtabindex;
@@ -1099,9 +1137,11 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	int strcnt;
 	char *shstrs;
 
+	ohtable = NULL;
 	shdr = NULL;
 	lf = NULL;
 	shstrs = NULL;
+	segs = NULL;
 
 	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, PTR2CAP(filename));
 	flags = FREAD;
@@ -1112,12 +1152,14 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	if (nd.ni_vp->v_type != VREG) {
 		error = ENOEXEC;
 		firstpage = NULL;
+		phdrpage = NULL;
 		goto out;
 	}
 #ifdef MAC
 	error = mac_kld_check_load(curthread->td_ucred, nd.ni_vp);
 	if (error != 0) {
 		firstpage = NULL;
+		phdrpage = NULL;
 		goto out;
 	}
 #endif
@@ -1126,11 +1168,11 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	 * Read the elf header from the file.
 	 */
 	firstpage = malloc(PAGE_SIZE, M_LINKER, M_WAITOK);
+	phdrpage = NULL;
 	hdr = (Elf_Ehdr *)firstpage;
 	error = vn_rdwr(UIO_READ, nd.ni_vp, PTR2CAP(firstpage), PAGE_SIZE, 0,
 	    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED,
 	    &resid, td);
-	nbytes = PAGE_SIZE - resid;
 	if (error != 0)
 		goto out;
 
@@ -1138,6 +1180,14 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 		error = ENOEXEC;
 		goto out;
 	}
+
+	phdrpage = malloc(PAGE_SIZE, M_LINKER, M_WAITOK);
+	error = vn_rdwr(UIO_READ, nd.ni_vp, PTR2CAP(phdrpage), PAGE_SIZE,
+	    rounddown(hdr->e_phoff, PAGE_SIZE), UIO_SYSSPACE, IO_NODELOCKED,
+	    td->td_ucred, NOCRED, &resid, td);
+	nbytes = PAGE_SIZE - resid;
+	if (error != 0)
+		goto out;
 
 	if (hdr->e_ident[EI_CLASS] != ELF_TARG_CLASS ||
 	    hdr->e_ident[EI_DATA] != ELF_TARG_DATA) {
@@ -1177,15 +1227,103 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 #endif
 
 	/*
-	 * We rely on the program header being in the first page.
+	 * We rely on the program header being within the same page.
 	 * This is not strictly required by the ABI specification, but
 	 * it seems to always true in practice.  And, it simplifies
 	 * things considerably.
 	 */
 	if (!((hdr->e_phentsize == sizeof(Elf_Phdr)) &&
-	      (hdr->e_phoff + hdr->e_phnum*sizeof(Elf_Phdr) <= PAGE_SIZE) &&
-	      (hdr->e_phoff + hdr->e_phnum*sizeof(Elf_Phdr) <= nbytes)))
+	      (hdr->e_phoff % PAGE_SIZE + hdr->e_phnum*sizeof(Elf_Phdr) <= PAGE_SIZE) &&
+	      (hdr->e_phoff % PAGE_SIZE + hdr->e_phnum*sizeof(Elf_Phdr) <= nbytes)))
 		link_elf_error(filename, "Unreadable program headers");
+
+	lf = linker_make_file(filename, &link_elf_class);
+	if (lf == NULL) {
+		error = ENOMEM;
+		goto out;
+	}
+	ef = (elf_file_t) lf;
+	elf_init_objects(ef);
+
+	phtable = (Elf_Phdr *) (phdrpage + hdr->e_phoff % PAGE_SIZE);
+	phlimit = phtable + hdr->e_phnum;
+
+	/*
+	 * Find the main dynamic segment and check if object headers exist.
+	 */
+	dynphdr = NULL;
+	objphdr = NULL;
+	for (phdr = phtable; phdr < phlimit; phdr++) {
+		switch (phdr->p_type) {
+		case PT_DYNAMIC:
+			if (dynphdr == NULL)
+				dynphdr = phdr;
+			break;
+		case PT_OBJECT:
+			if (objphdr != NULL) {
+				link_elf_error(filename, "Duplicate PT_OBJECT segment");
+				error = ENOEXEC;
+				goto out;
+			}
+			objphdr = phdr;
+			if (objphdr->p_filesz == 0 ||
+			    (objphdr->p_filesz % sizeof(*ohdr)) != 0) {
+				link_elf_error(filename, "Invalid PT_OBJECT segment's size");
+				error = ENOEXEC;
+				goto out;
+			}
+			break;
+		}
+	}
+	if (dynphdr == NULL) {
+		link_elf_error(filename, "File is not dynamically-linked");
+		error = ENOEXEC;
+		goto out;
+	}
+
+	nobjects = 0;
+	if (objphdr != NULL) {
+		ohtable = malloc(objphdr->p_filesz, M_LINKER, M_WAITOK | M_ZERO);
+		error = vn_rdwr(UIO_READ, nd.ni_vp, PTR2CAP(ohtable),
+		    objphdr->p_filesz, objphdr->p_offset, UIO_SYSSPACE, IO_NODELOCKED,
+		    td->td_ucred, NOCRED, &resid, td);
+		if (error != 0)
+			goto out;
+
+		/*
+		 * There are as many objects as can fit in the object segment.
+		 */
+		for (ohdr = ohtable; (ptraddr_t)ohdr < (ptraddr_t)ohtable +
+		    objphdr->p_filesz; ohdr++) {
+			if (&phtable[ohdr->o_dynamicndx] >= phlimit) {
+				link_elf_error(filename, "Invalid PT_DYNAMIC index");
+				error = ENOEXEC;
+				goto out;
+			}
+
+			if (nobjects == 0) {
+				object = &ef->pobject;
+			} else {
+				object = malloc(sizeof(*object), M_LINKER,
+				    M_WAITOK | M_ZERO);
+				TAILQ_INSERT_TAIL(&ef->objects, object, next);
+			}
+			object->offset = ohdr->o_vaddr;
+			object->dynoffset =
+			    phtable[ohdr->o_dynamicndx].p_vaddr;
+			nobjects++;
+		}
+		if (nobjects == 0) {
+			link_elf_error(filename, "Empty PT_OBJECT segment");
+			error = ENOEXEC;
+			goto out;
+		}
+	} else {
+		object = &ef->pobject;
+		object->offset = 0;
+		object->dynoffset = dynphdr->p_vaddr;
+		nobjects++;
+	}
 
 	/*
 	 * Scan the program header entries, and save key information.
@@ -1193,14 +1331,13 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	 * We rely on there being exactly two load segments, text and data,
 	 * in that order.
 	 */
-	phdr = (Elf_Phdr *) (firstpage + hdr->e_phoff);
-	phlimit = phdr + hdr->e_phnum;
+	maxsegs = MAXSEGS * nobjects;
+	segs = malloc(maxsegs * sizeof(*segs), M_LINKER, M_WAITOK);
 	nsegs = 0;
-	phdyn = NULL;
-	while (phdr < phlimit) {
+	for (phdr = phtable; phdr < phlimit; phdr++) {
 		switch (phdr->p_type) {
 		case PT_LOAD:
-			if (nsegs == MAXSEGS) {
+			if (nsegs == maxsegs) {
 				link_elf_error(filename, "Too many sections");
 				error = ENOEXEC;
 				goto out;
@@ -1212,21 +1349,10 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 			++nsegs;
 			break;
 
-		case PT_DYNAMIC:
-			phdyn = phdr;
-			break;
-
 		case PT_INTERP:
 			error = ENOSYS;
 			goto out;
 		}
-
-		++phdr;
-	}
-	if (phdyn == NULL) {
-		link_elf_error(filename, "Object is not dynamically-linked");
-		error = ENOEXEC;
-		goto out;
 	}
 	if (nsegs == 0) {
 		link_elf_error(filename, "No sections");
@@ -1244,13 +1370,6 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	    segs[nsegs - 1]->p_memsz);
 	mapsize = base_vlimit - base_vaddr;
 
-	lf = linker_make_file(filename, &link_elf_class);
-	if (lf == NULL) {
-		error = ENOMEM;
-		goto out;
-	}
-
-	ef = (elf_file_t) lf;
 #ifdef SPARSE_MAPPING
 	ef->vmobject = vm_pager_allocate(OBJT_PHYS, NULL, mapsize, VM_PROT_ALL,
 	    0, thread0.td_ucred);
@@ -1316,14 +1435,17 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 		    segs[i]->p_memsz - segs[i]->p_filesz);
 	}
 
-	ef->dynamic = (Elf_Dyn *) (mapbase + phdyn->p_vaddr - base_vaddr);
-
 	lf->address = ef->address;
 	lf->size = mapsize;
 
-	error = parse_dynamic(ef);
-	if (error != 0)
-		goto out;
+	TAILQ_FOREACH(object, &ef->objects, next) {
+		object->address = ef->address + object->offset;
+		object->dynamic = (Elf_Dyn *)(mapbase + object->dynoffset -
+		    base_vaddr);
+		error = parse_dynamic_object(object, ef);
+		if (error != 0)
+			goto out;
+	}
 	error = parse_dpcpu(ef);
 	if (error != 0)
 		goto out;
@@ -1454,11 +1576,21 @@ nosyms:
 out:
 	VOP_UNLOCK(nd.ni_vp);
 	vn_close(nd.ni_vp, FREAD, td->td_ucred, td);
-	if (error != 0 && lf != NULL)
+	if (error != 0 && lf != NULL) {
+		while (!TAILQ_EMPTY(&ef->objects)) {
+			object = TAILQ_FIRST(&ef->objects);
+			TAILQ_REMOVE(&ef->objects, object, next);
+			if (object != &ef->pobject)
+				free(object, M_LINKER);
+		}
 		linker_file_unload(lf, LINKER_UNLOAD_FORCE);
+	}
 	free(shdr, M_LINKER);
+	free(phdrpage, M_LINKER);
 	free(firstpage, M_LINKER);
 	free(shstrs, M_LINKER);
+	free(ohtable, M_LINKER);
+	free(segs, M_LINKER);
 
 	return (error);
 }
@@ -1549,24 +1681,24 @@ link_elf_unload_preload(linker_file_t file)
 }
 
 static const char *
-symbol_name(elf_file_t ef, Elf_Size r_info)
+symbol_name(elf_object_t object, Elf_Size r_info)
 {
 	const Elf_Sym *ref;
 
 	if (ELF_R_SYM(r_info)) {
-		ref = ef->symtab + ELF_R_SYM(r_info);
-		return (ef->strtab + ref->st_name);
+		ref = object->symtab + ELF_R_SYM(r_info);
+		return (object->strtab + ref->st_name);
 	}
 	return (NULL);
 }
 
 static int
-symbol_type(elf_file_t ef, Elf_Size r_info)
+symbol_type(elf_object_t object, Elf_Size r_info)
 {
 	const Elf_Sym *ref;
 
 	if (ELF_R_SYM(r_info)) {
-		ref = ef->symtab + ELF_R_SYM(r_info);
+		ref = object->symtab + ELF_R_SYM(r_info);
 		return (ELF_ST_TYPE(ref->st_info));
 	}
 	return (STT_NOTYPE);
@@ -1579,18 +1711,19 @@ relocate_file1(elf_file_t ef, elf_lookup_fn lookup, elf_reloc_fn reloc,
 	const Elf_Rel *rel;
 	const Elf_Rela *rela;
 	const char *symname;
+	elf_object_t object;
 
 	TSENTER();
 #define	APPLY_RELOCS(iter, tbl, tblsize, type) do {			\
 	for ((iter) = (tbl); (iter) != NULL &&				\
 	    (iter) < (tbl) + (tblsize) / sizeof(*(iter)); (iter)++) {	\
-		if ((symbol_type(ef, (iter)->r_info) ==			\
+		if ((symbol_type(object, (iter)->r_info) ==		\
 		    STT_GNU_IFUNC ||					\
 		    elf_is_ifunc_reloc((iter)->r_info)) != ifuncs)	\
 			continue;					\
 		if (reloc(&ef->lf, ef->address,				\
 		    (iter), (type), lookup)) {				\
-			symname = symbol_name(ef, (iter)->r_info);	\
+			symname = symbol_name(object, (iter)->r_info);	\
 			printf("link_elf: symbol %s undefined\n",	\
 			    symname);					\
 			return (ENOENT);				\
@@ -1598,12 +1731,14 @@ relocate_file1(elf_file_t ef, elf_lookup_fn lookup, elf_reloc_fn reloc,
 	}								\
 } while (0)
 
-	APPLY_RELOCS(rel, ef->rel, ef->relsize, ELF_RELOC_REL);
-	TSENTER2("ef->rela");
-	APPLY_RELOCS(rela, ef->rela, ef->relasize, ELF_RELOC_RELA);
-	TSEXIT2("ef->rela");
-	APPLY_RELOCS(rel, ef->pltrel, ef->pltrelsize, ELF_RELOC_REL);
-	APPLY_RELOCS(rela, ef->pltrela, ef->pltrelasize, ELF_RELOC_RELA);
+	TAILQ_FOREACH_REVERSE(object, &ef->objects, elf_object_head, next) {
+		APPLY_RELOCS(rel, object->rel, object->relsize, ELF_RELOC_REL);
+		TSENTER2("object->rela");
+		APPLY_RELOCS(rela, object->rela, object->relasize, ELF_RELOC_RELA);
+		TSEXIT2("object->rela");
+		APPLY_RELOCS(rel, object->pltrel, object->pltrelsize, ELF_RELOC_REL);
+		APPLY_RELOCS(rela, object->pltrela, object->pltrelasize, ELF_RELOC_RELA);
+	}
 
 #undef APPLY_RELOCS
 
@@ -1640,38 +1775,40 @@ elf_hash(const char *name)
 }
 
 static int
-link_elf_lookup_symbol1(linker_file_t lf, const char *name, c_linker_sym_t *sym,
-    bool see_local)
+link_elf_object_lookup_symbol1(elf_object_t object, linker_file_t lf __unused,
+    const char *name, c_linker_sym_t *sym, bool see_local)
 {
-	elf_file_t ef = (elf_file_t) lf;
 	unsigned long symnum;
 	const Elf_Sym* symp;
 	const char *strp;
 	Elf32_Word hash;
 
 	/* If we don't have a hash, bail. */
-	if (ef->buckets == NULL || ef->nbuckets == 0) {
+	if (object->buckets == NULL || object->nbuckets == 0) {
 		printf("link_elf_lookup_symbol: missing symbol hash table\n");
 		return (ENOENT);
 	}
 
 	/* First, search hashed global symbols */
 	hash = elf_hash(name);
-	symnum = ef->buckets[hash % ef->nbuckets];
+	symnum = object->buckets[hash % object->nbuckets];
+	/* Check if the symbol can belong to this object. */
+	if (symnum >= object->nchains)
+		return (ENOENT);
 
 	while (symnum != STN_UNDEF) {
-		if (symnum >= ef->nchains) {
+		if (symnum >= object->nchains) {
 			printf("%s: corrupt symbol table\n", __func__);
 			return (ENOENT);
 		}
 
-		symp = ef->symtab + symnum;
+		symp = object->symtab + symnum;
 		if (symp->st_name == 0) {
 			printf("%s: corrupt symbol table\n", __func__);
 			return (ENOENT);
 		}
 
-		strp = ef->strtab + symp->st_name;
+		strp = object->strtab + symp->st_name;
 
 		if (strcmp(name, strp) == 0) {
 			if (symp->st_shndx != SHN_UNDEF ||
@@ -1687,9 +1824,26 @@ link_elf_lookup_symbol1(linker_file_t lf, const char *name, c_linker_sym_t *sym,
 			return (ENOENT);
 		}
 
-		symnum = ef->chains[symnum];
+		symnum = object->chains[symnum];
 	}
 
+	return (ENOENT);
+}
+
+static int
+link_elf_lookup_symbol1(linker_file_t lf, const char *name, c_linker_sym_t *sym,
+    bool see_local)
+{
+	elf_file_t ef = (elf_file_t)lf;
+	elf_object_t object;
+	int ret;
+
+	TAILQ_FOREACH(object, &ef->objects, next) {
+		ret = link_elf_object_lookup_symbol1(object, lf, name, sym,
+		    see_local);
+		if (ret != ENOENT)
+			return (ret);
+	}
 	return (ENOENT);
 }
 
@@ -1785,20 +1939,18 @@ link_elf_lookup_debug_symbol_ctf(linker_file_t lf, const char *name,
 }
 
 static int
-link_elf_symbol_values1(linker_file_t lf, c_linker_sym_t sym,
-    linker_symval_t *symval, bool see_local)
+link_elf_object_symbol_values1(elf_object_t object, linker_file_t lf,
+    c_linker_sym_t sym, linker_symval_t *symval, bool see_local)
 {
-	elf_file_t ef;
 	const Elf_Sym *es;
 	caddr_t val;
 
-	ef = (elf_file_t)lf;
 	es = (const Elf_Sym *)sym;
-	if (es >= ef->symtab && es < ef->symtab + ef->nchains) {
+	if (es >= object->symtab && es < object->symtab + object->nchains) {
 		if (!see_local && ELF_ST_BIND(es->st_info) == STB_LOCAL)
 			return (ENOENT);
-		symval->name = ef->strtab + es->st_name;
-		val = (caddr_t)ef->address + es->st_value;
+		symval->name = object->strtab + es->st_name;
+		val = object->address + es->st_value;
 		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC)
 			val = ((caddr_t (*)(void))val)();
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -1807,6 +1959,23 @@ link_elf_symbol_values1(linker_file_t lf, c_linker_sym_t sym,
 		symval->value = val;
 		symval->size = es->st_size;
 		return (0);
+	}
+	return (ENOENT);
+}
+
+static int
+link_elf_symbol_values1(linker_file_t lf, c_linker_sym_t sym,
+    linker_symval_t *symval, bool see_local)
+{
+	elf_file_t ef = (elf_file_t)lf;
+	elf_object_t object;
+	int ret;
+
+	TAILQ_FOREACH(object, &ef->objects, next) {
+		ret = link_elf_object_symbol_values1(object, lf, sym, symval,
+		    see_local);
+		if (ret != ENOENT)
+			return (ret);
 	}
 	return (ENOENT);
 }
@@ -1825,13 +1994,16 @@ link_elf_debug_symbol_values(linker_file_t lf, c_linker_sym_t sym,
     linker_symval_t *symval)
 {
 	elf_file_t ef = (elf_file_t)lf;
+	elf_object_t object;
 	const Elf_Sym *es = (const Elf_Sym *)sym;
 	caddr_t val;
 
 	if (link_elf_symbol_values1(lf, sym, symval, true) == 0)
 		return (0);
-	if (ef->symtab == ef->ddbsymtab)
-		return (ENOENT);
+	TAILQ_FOREACH(object, &ef->objects, next) {
+		if (object->symtab == ef->ddbsymtab)
+			return (ENOENT);
+	}
 
 	if (es >= ef->ddbsymtab && es < (ef->ddbsymtab + ef->ddbsymcnt)) {
 		symval->name = ef->ddbstrtab + es->st_name;
@@ -2004,17 +2176,24 @@ link_elf_symidx_address(linker_file_t lf, unsigned long symidx, int deps,
 #endif
 {
 	elf_file_t ef = (elf_file_t)lf;
+	elf_object_t object;
 	const Elf_Sym *sym;
 	const char *symbol;
 	caddr_t addr, start, base;
 
+	/* TODO:
+	 * Attempt to relocate the first object only.
+	 * We don't have relocations for other objects yet.
+	 */
+	object = &ef->pobject;
+
 	/* Don't even try to lookup the symbol if the index is bogus. */
-	if (symidx >= ef->nchains) {
+	if (symidx >= object->nchains) {
 		*res = 0;
 		return (EINVAL);
 	}
 
-	sym = ef->symtab + symidx;
+	sym = object->symtab + symidx;
 
 	/*
 	 * Don't do a full lookup when the symbol is local. It may even
@@ -2042,7 +2221,7 @@ link_elf_symidx_address(linker_file_t lf, unsigned long symidx, int deps,
 	 * always be added.
 	 */
 
-	symbol = ef->strtab + sym->st_name;
+	symbol = object->strtab + sym->st_name;
 
 	/* Force a lookup failure if the symbol name is bogus. */
 	if (*symbol == 0) {
@@ -2093,6 +2272,15 @@ link_elf_symidx_address(linker_file_t lf, unsigned long symidx, int deps,
 }
 #endif
 
+static void
+elf_init_objects(elf_file_t ef)
+{
+
+	memset(&ef->pobject, 0, sizeof(ef->pobject));
+	TAILQ_INIT(&ef->objects);
+	TAILQ_INSERT_TAIL(&ef->objects, &ef->pobject, next);
+}
+
 static int
 elf_lookup(linker_file_t lf, Elf_Size symidx, int deps, Elf_Addr *res)
 {
@@ -2137,7 +2325,7 @@ resolve_cap_reloc(void *arg, bool function, bool constant, ptraddr_t object,
 #endif
 
 static void
-link_elf_reloc_local(linker_file_t lf)
+link_elf_object_reloc_local(linker_file_t lf, elf_object_t object)
 {
 	const Elf_Rel *rellim;
 	const Elf_Rel *rel;
@@ -2146,8 +2334,9 @@ link_elf_reloc_local(linker_file_t lf)
 	elf_file_t ef = (elf_file_t)lf;
 
 	/* Perform relocations without addend if there are any: */
-	if ((rel = ef->rel) != NULL) {
-		rellim = (const Elf_Rel *)((const char *)ef->rel + ef->relsize);
+	if ((rel = object->rel) != NULL) {
+		rellim = (const Elf_Rel *)((const char *)object->rel +
+		    object->relsize);
 		while (rel < rellim) {
 			elf_reloc_local(lf, ef->address, rel,
 			    ELF_RELOC_REL, elf_lookup);
@@ -2156,9 +2345,9 @@ link_elf_reloc_local(linker_file_t lf)
 	}
 
 	/* Perform relocations with addend if there are any: */
-	if ((rela = ef->rela) != NULL) {
+	if ((rela = object->rela) != NULL) {
 		relalim = (const Elf_Rela *)
-		    ((const char *)ef->rela + ef->relasize);
+		    ((const char *)object->rela + object->relasize);
 		while (rela < relalim) {
 			elf_reloc_local(lf, ef->address, rela,
 			    ELF_RELOC_RELA, elf_lookup);
@@ -2167,15 +2356,26 @@ link_elf_reloc_local(linker_file_t lf)
 	}
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(DT_CHERI___CAPRELOCS)
-	if (ef->caprelocs != NULL) {
+	if (object->caprelocs != NULL) {
 		void *data_cap;
 
 		data_cap = cheri_andperm(ef->address, CHERI_PERMS_KERNEL_DATA);
-		init_linker_file_cap_relocs(ef->caprelocs,
-		    (char *)ef->caprelocs + ef->caprelocssize, data_cap,
+		init_linker_file_cap_relocs(object->caprelocs,
+		    (char *)object->caprelocs + object->caprelocssize, data_cap,
 		    (ptraddr_t)ef->address, resolve_cap_reloc, ef);
 	}
 #endif
+}
+
+static void
+link_elf_reloc_local(linker_file_t lf)
+{
+	elf_file_t ef = (elf_file_t)lf;
+	elf_object_t object;
+
+	TAILQ_FOREACH(object, &ef->objects, next) {
+		link_elf_object_reloc_local(lf, object);
+	}
 }
 
 static long
@@ -2225,19 +2425,35 @@ link_elf_propagate_vnets(linker_file_t lf)
  * at that point.
  */
 static int
-elf_lookup_ifunc(linker_file_t lf, Elf_Size symidx, int deps __unused,
-    Elf_Addr *res)
+elf_object_lookup_ifunc(elf_object_t object, linker_file_t lf, Elf_Size symidx,
+    int deps __unused, Elf_Addr *res)
 {
 	elf_file_t ef;
 	const Elf_Sym *symp;
 	caddr_t val;
 
 	ef = (elf_file_t)lf;
-	symp = ef->symtab + symidx;
+	symp = object->symtab + symidx;
 	if (ELF_ST_TYPE(symp->st_info) == STT_GNU_IFUNC) {
 		val = (caddr_t)ef->address + symp->st_value;
 		*res = ((Elf_Addr (*)(void))val)();
 		return (0);
+	}
+	return (ENOENT);
+}
+
+static int
+elf_lookup_ifunc(linker_file_t lf, Elf_Size symidx, int deps __unused,
+    Elf_Addr *res)
+{
+	elf_file_t ef = (elf_file_t)lf;
+	elf_object_t object;
+	int ret;
+
+	TAILQ_FOREACH(object, &ef->objects, next) {
+		ret = elf_object_lookup_ifunc(object, lf, symidx, deps, res);
+		if (ret != ENOENT)
+			return (ret);
 	}
 	return (ENOENT);
 }
@@ -2258,8 +2474,8 @@ link_elf_ireloc(caddr_t kmdp)
 	 */
 	bzero_early(ef, sizeof(*ef));
 
+	elf_init_objects(ef);
 	ef->modptr = kmdp;
-	ef->dynamic = (Elf_Dyn *)&_DYNAMIC;
 	/*
 	 * Indicate that a linker file for the kernel is pre-loaded to correctly
 	 * relocate ifunc resolvers.
@@ -2279,7 +2495,9 @@ link_elf_ireloc(caddr_t kmdp)
 	ef->address = cheri_setaddress(kernel_executive_root_cap, 0);
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif
-	parse_dynamic(ef);
+	ef->pobject.address = ef->address;
+	ef->pobject.dynamic = (Elf_Dyn *)&_DYNAMIC;
+	parse_dynamic_object(&ef->pobject, ef);
 
 	link_elf_preload_parse_symbols(ef);
 	relocate_file1(ef, elf_lookup_ifunc, elf_reloc, true);
