@@ -13,6 +13,8 @@
 #
 # KMOD		The name of the kernel module to build.
 #
+# KMODMO	Set to YES to build as a multi-object kernel module.
+#
 # KMODDIR	Base path for kernel modules (see kld(4)). [/boot/kernel]
 #
 # KMODOWN	Module file owner. [${BINOWN}]
@@ -67,12 +69,15 @@
 #
 
 AWK?=		awk
+KMODMO?=	NO
 KMODLOAD?=	/sbin/kldload
 KMODUNLOAD?=	/sbin/kldunload
 KMODISLOADED?=	/sbin/kldstat -q -n
 OBJCOPY?=	objcopy
 XARGS?=		xargs
 XARGS_J?=	-J
+LD_MO?=		${SYSDIR}/tools/ld_mo.sh
+OBJCOPY_MO?=	objcopy
 
 .include "kmod.opts.mk"
 .include <bsd.sysdir.mk>
@@ -240,7 +245,7 @@ ${PROG}.debug: ${FULLPROG}
 	${OBJCOPY} --only-keep-debug ${FULLPROG} ${.TARGET}
 .endif
 
-.if ${__KLD_SHARED} == yes
+.if ${__KLD_SHARED} == yes && ${KMODMO} != YES
 ${FULLPROG}: ${KMOD}.kld
 	${LD} -m ${LD_EMULATION} -Bshareable -znotext -znorelro ${_LDFLAGS} \
 	    -o ${.TARGET} ${KMOD}.kld
@@ -258,13 +263,20 @@ CLEANFILES+=	export_syms
 LDSCRIPT_FLAGS?= -T ${SYSDIR}/conf/ldscript.kmod.${MACHINE}
 .endif
 
-.if ${__KLD_SHARED} == yes
+.if ${KMODMO} == YES
+${FULLPROG}: ${OBJS} ${BLOB_OBJS}
+.elif ${__KLD_SHARED} == yes
 ${KMOD}.kld: ${OBJS} ${BLOB_OBJS}
 .else
 ${FULLPROG}: ${OBJS} ${BLOB_OBJS}
 .endif
+.if ${KMODMO} == YES
+	${LD_MO} -m ${LD_EMULATION} ${_LDFLAGS} ${LDSCRIPT_FLAGS} -Bshareable \
+	    -znotext -znorelro -o ${.TARGET} ${OBJS} ${BLOB_OBJS}
+.else
 	${LD} -m ${LD_EMULATION} ${_LDFLAGS} ${LDSCRIPT_FLAGS} -r \
 	    -o ${.TARGET} ${OBJS} ${BLOB_OBJS}
+.endif
 .if ${MK_CTF} != "no"
 	${CTFMERGE} ${CTFFLAGS} -o ${.TARGET} ${OBJS} ${BLOB_OBJS}
 .endif
@@ -285,7 +297,7 @@ ${FULLPROG}: ${OBJS} ${BLOB_OBJS}
 	${AWK} -v prefix=${PREFIX_SYMS} -f ${SYSDIR}/conf/kmod_syms_prefix.awk \
 	    ${.TARGET} /dev/null | ${XARGS} ${XARGS_J} % ${OBJCOPY} % ${.TARGET}
 .endif
-.if !defined(DEBUG_FLAGS) && ${__KLD_SHARED} == no
+.if !defined(DEBUG_FLAGS) && (${__KLD_SHARED} == no || ${KMODMO} != YES)
 	${OBJCOPY} --strip-debug ${.TARGET}
 .endif
 
