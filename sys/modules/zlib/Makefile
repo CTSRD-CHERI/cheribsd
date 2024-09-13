@@ -3,8 +3,8 @@
 .PATH: ${SRCTOP}/sys/contrib/zlib
 
 KMOD?=	zlib
-SRCS+=	zcalloc.c
 SRCS+=	zlib_mod.c
+SRCS+=	zcalloc.c
 SRCS+=	adler32.c
 SRCS+=	compress.c
 SRCS+=	crc32.c
