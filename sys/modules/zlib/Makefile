@@ -2,7 +2,7 @@
 .PATH: ${SRCTOP}/sys/dev/zlib
 .PATH: ${SRCTOP}/sys/contrib/zlib
 
-KMOD=	zlib
+KMOD?=	zlib
 SRCS+=	zcalloc.c
 SRCS+=	zlib_mod.c
 SRCS+=	adler32.c
