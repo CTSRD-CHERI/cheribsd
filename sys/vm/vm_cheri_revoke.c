@@ -1120,6 +1120,8 @@ vm_cheri_assert_consistent_clg(struct vm_map *map)
 
 	if (!cheri_validate_clg)
 		return;
+	if (cheri_revoke_st_is_revoking(map->vm_cheri_revoke_st))
+		return;
 	VM_MAP_ENTRY_FOREACH(entry, map) {
 		if ((entry->max_protection & VM_PROT_READ_CAP) == 0)
 			continue;
