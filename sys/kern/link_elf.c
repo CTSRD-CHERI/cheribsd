@@ -76,7 +76,14 @@
 #include <ddb/db_ctf.h>
 #endif
 
-#define MAXSEGS 4
+/* Maximum number of objects in a multi-object ELF file. */
+#define	MAXOBJS		100
+/* Maximum number of segments not related to objects. */
+#define	MAXPARENTSEGS	8
+/* Maximum number of segments per object. */
+#define	MAXOBJSEGS	4
+/* Maximum total number of program headers in a file. */
+#define	MAXPHNUM	(MAXPARENTSEGS + MAXOBJS * MAXOBJSEGS)
 
 typedef struct elf_object {
 	off_t		offset;		/* Offset of the object */
@@ -1112,7 +1119,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	struct nameidata nd;
 	struct thread* td = curthread;	/* XXX */
 	Elf_Ehdr *hdr;
-	caddr_t firstpage, phdrpage, segbase;
+	caddr_t firstpage, phdrpages, segbase;
 	int nbytes, i;
 	Elf_Phdr *dynphdr, *objphdr, *phdr, *phtable;
 	Elf_Phdr *phlimit;
@@ -1152,14 +1159,14 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	if (nd.ni_vp->v_type != VREG) {
 		error = ENOEXEC;
 		firstpage = NULL;
-		phdrpage = NULL;
+		phdrpages = NULL;
 		goto out;
 	}
 #ifdef MAC
 	error = mac_kld_check_load(curthread->td_ucred, nd.ni_vp);
 	if (error != 0) {
 		firstpage = NULL;
-		phdrpage = NULL;
+		phdrpages = NULL;
 		goto out;
 	}
 #endif
@@ -1168,7 +1175,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	 * Read the elf header from the file.
 	 */
 	firstpage = malloc(PAGE_SIZE, M_LINKER, M_WAITOK);
-	phdrpage = NULL;
+	phdrpages = NULL;
 	hdr = (Elf_Ehdr *)firstpage;
 	error = vn_rdwr(UIO_READ, nd.ni_vp, PTR2CAP(firstpage), PAGE_SIZE, 0,
 	    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED,
@@ -1181,11 +1188,27 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 		goto out;
 	}
 
-	phdrpage = malloc(PAGE_SIZE, M_LINKER, M_WAITOK);
-	error = vn_rdwr(UIO_READ, nd.ni_vp, PTR2CAP(phdrpage), PAGE_SIZE,
+	if (!(hdr->e_phentsize == sizeof(Elf_Phdr))) {
+		link_elf_error(filename, "Invalid size of a program header entry");
+		error = ENOEXEC;
+		goto out;
+	}
+	if (hdr->e_phnum > MAXPHNUM) {
+		link_elf_error(filename, "Exceeded number of program headers");
+		error = ENOEXEC;
+		goto out;
+	}
+
+	/*
+	 * XXXKW: Above some number of program headers, we should partially
+	 * read them rather than read in all program headers at once.
+	 */
+	nbytes = roundup2(hdr->e_phoff + hdr->e_phnum * sizeof(Elf_Phdr),
+	    PAGE_SIZE) - rounddown2(hdr->e_phoff, PAGE_SIZE);
+	phdrpages = malloc(nbytes, M_LINKER, M_WAITOK);
+	error = vn_rdwr(UIO_READ, nd.ni_vp, PTR2CAP(phdrpages), nbytes,
 	    rounddown(hdr->e_phoff, PAGE_SIZE), UIO_SYSSPACE, IO_NODELOCKED,
 	    td->td_ucred, NOCRED, &resid, td);
-	nbytes = PAGE_SIZE - resid;
 	if (error != 0)
 		goto out;
 
@@ -1226,17 +1249,6 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 #endif
 #endif
 
-	/*
-	 * We rely on the program header being within the same page.
-	 * This is not strictly required by the ABI specification, but
-	 * it seems to always true in practice.  And, it simplifies
-	 * things considerably.
-	 */
-	if (!((hdr->e_phentsize == sizeof(Elf_Phdr)) &&
-	      (hdr->e_phoff % PAGE_SIZE + hdr->e_phnum*sizeof(Elf_Phdr) <= PAGE_SIZE) &&
-	      (hdr->e_phoff % PAGE_SIZE + hdr->e_phnum*sizeof(Elf_Phdr) <= nbytes)))
-		link_elf_error(filename, "Unreadable program headers");
-
 	lf = linker_make_file(filename, &link_elf_class);
 	if (lf == NULL) {
 		error = ENOMEM;
@@ -1245,7 +1257,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	ef = (elf_file_t) lf;
 	elf_init_objects(ef);
 
-	phtable = (Elf_Phdr *) (phdrpage + hdr->e_phoff % PAGE_SIZE);
+	phtable = (Elf_Phdr *) (phdrpages + hdr->e_phoff % PAGE_SIZE);
 	phlimit = phtable + hdr->e_phnum;
 
 	/*
@@ -1324,6 +1336,11 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 		object->dynoffset = dynphdr->p_vaddr;
 		nobjects++;
 	}
+	if (nobjects > MAXOBJS) {
+		link_elf_error(filename, "Exceeded number of objects");
+		error = ENOEXEC;
+		goto out;
+	}
 
 	/*
 	 * Scan the program header entries, and save key information.
@@ -1331,7 +1348,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	 * We rely on there being exactly two load segments, text and data,
 	 * in that order.
 	 */
-	maxsegs = MAXSEGS * nobjects;
+	maxsegs = MAXOBJSEGS * nobjects;
 	segs = malloc(maxsegs * sizeof(*segs), M_LINKER, M_WAITOK);
 	nsegs = 0;
 	for (phdr = phtable; phdr < phlimit; phdr++) {
@@ -1586,7 +1603,7 @@ out:
 		linker_file_unload(lf, LINKER_UNLOAD_FORCE);
 	}
 	free(shdr, M_LINKER);
-	free(phdrpage, M_LINKER);
+	free(phdrpages, M_LINKER);
 	free(firstpage, M_LINKER);
 	free(shstrs, M_LINKER);
 	free(ohtable, M_LINKER);
