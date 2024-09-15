@@ -2514,9 +2514,24 @@ vm_map_find_aligned(vm_map_t map, vm_offset_t *addr, vm_size_t length,
  */
 int
 vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
-	    vm_pointer_t *addr,	/* IN/OUT */
-	    vm_size_t length, vm_offset_t max_addr, int find_space,
-	    vm_prot_t prot, vm_prot_t max, int cow)
+    vm_pointer_t *addr,	/* IN/OUT */
+    vm_size_t length, vm_offset_t max_addr, int find_space,
+    vm_prot_t prot, vm_prot_t max, int cow)
+{
+	int rv;
+
+	vm_map_lock(map);
+	rv = vm_map_find_locked(map, object, offset, addr, length, max_addr,
+	    find_space, prot, max, cow);
+	vm_map_unlock(map);
+	return (rv);
+}
+
+int
+vm_map_find_locked(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
+    vm_pointer_t *addr,	/* IN/OUT */
+    vm_size_t length, vm_offset_t max_addr, int find_space,
+    vm_prot_t prot, vm_prot_t max, int cow)
 {
 	vm_offset_t alignment, curr_min_addr, min_addr, vaddr;
 	int gap, pidx, rv, try;
@@ -2526,7 +2541,7 @@ vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 
 	KASSERT((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) == 0 ||
 	    object == NULL,
-	    ("vm_map_find: non-NULL backing object for stack"));
+	    ("non-NULL backing object for stack"));
 	MPASS((cow & MAP_REMAP) == 0 || (find_space == VMFS_NO_SPACE &&
 	    (cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) == 0));
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -2564,7 +2579,6 @@ vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	    (map->flags & MAP_ASLR_IGNSTART) != 0)
 		curr_min_addr = min_addr = vm_map_min(map);
 	try = 0;
-	vm_map_lock(map);
 	if (cluster) {
 		curr_min_addr = map->anon_loc;
 		if (curr_min_addr == 0)
@@ -2649,8 +2663,7 @@ again:
 					MPASS(try == 1);
 					goto again;
 				}
-				rv = KERN_NO_SPACE;
-				goto done;
+				return (KERN_NO_SPACE);
 			}
 		}
 		/*
@@ -2667,23 +2680,21 @@ again:
 				try = 0;
 				goto again;
 			}
-			goto done;
+			return (rv);
 		}
 	} else if ((cow & MAP_REMAP) != 0) {
-		if (!vm_map_range_valid(map, vaddr, vaddr + length)) {
-			rv = KERN_INVALID_ADDRESS;
-			goto done;
-		}
+		if (!vm_map_range_valid(map, vaddr, vaddr + length))
+			return (KERN_INVALID_ADDRESS);
 		rv = vm_map_delete(map, vaddr, vaddr + length, true);
 		if (rv != KERN_SUCCESS)
-			goto done;
+			return (rv);
 	}
 
 	reservation = vaddr;
 	rv = vm_map_reservation_create_locked(map, &reservation,
 	    length, max);
 	if (rv != KERN_SUCCESS)
-		goto done;
+		return (rv);
 
 	/*
 	 * The guard mapping must have PROT_NONE maxprot but the capability we
@@ -2702,7 +2713,7 @@ again:
 	}
 	if (rv != KERN_SUCCESS) {
 		vm_map_reservation_delete_locked(map, reservation);
-		goto done;
+		return (rv);
 	}
 
 	/*
@@ -2713,15 +2724,11 @@ again:
 	if (update_anon && rv == KERN_SUCCESS && (map->anon_loc == 0 ||
 	    reservation < map->anon_loc))
 		map->anon_loc = reservation;
-done:
-	vm_map_unlock(map);
-	if (rv == KERN_SUCCESS) {
+
 #ifdef __CHERI_PURE_CAPABILITY__
-		KASSERT(cheri_gettag(reservation),
-		    ("Expected valid capability"));
+	KASSERT(cheri_gettag(reservation), ("Expected valid capability"));
 #endif
-		*addr = reservation;
-	}
+	*addr = reservation;
 	return (rv);
 }
 
