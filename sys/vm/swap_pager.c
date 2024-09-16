@@ -2347,8 +2347,8 @@ swp_pager_meta_cheri_put_tags(vm_page_t page)
  * SWP_PAGER_META_TRANSFER() - transfer a range of blocks in the srcobject's
  * swap metadata into dstobject.
  *
- *	This routine will free swap metadata structures as they are cleaned
- *	out.
+ *	Blocks in src that correspond to holes in dst are transferred.  Blocks
+ *	in src that correspond to blocks in dst are freed.
  */
 static void
 swp_pager_meta_transfer(vm_object_t srcobject, vm_object_t dstobject,
@@ -2392,8 +2392,10 @@ swp_pager_meta_transfer(vm_object_t srcobject, vm_object_t dstobject,
 				 */
 				d[i] = blk;
 				d_mask |= 1 << i;
-			} else if (blk != SWAPBLK_NONE)
+			} else if (blk != SWAPBLK_NONE) {
+				/* Dst has a block at pindex, so free block. */
 				swp_pager_update_freerange(&range, sb->d[i]);
+			}
 #if __has_feature(capabilities)
 			swp_pager_cheri_xfer_tags(dstobject,
 			    sb->p + i - offset, sb, i);
