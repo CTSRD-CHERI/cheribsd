@@ -1649,15 +1649,15 @@ add_transplant_parent(struct elfcopy *ecp, const char *namestr)
 static void
 transplant_parent(struct elfcopy *ecp, struct transplant *t)
 {
-	GElf_Phdr	firstphdr, iphdr, lastphdr;
+	GElf_Phdr	firstload, iphdr, lastload;
 	size_t		dynamicndx, i, phdrnum;
-	bool		isfirstphdr;
+	bool		isfirstload;
 
 	if (elf_getphdrnum(ecp->ein, &phdrnum) == -1)
 		errx(EXIT_FAILURE, "elf_getphdrnum() failed: %s", elf_errmsg(-1));
 
 	dynamicndx = 0;
-	isfirstphdr = true;
+	isfirstload = true;
 	for (i = 0; i < phdrnum; i++) {
 		if (gelf_getphdr(ecp->ein, i, &iphdr) != &iphdr)
 			errx(EXIT_FAILURE, "gelf_getphdr failed: %s", elf_errmsg(-1));
@@ -1666,26 +1666,26 @@ transplant_parent(struct elfcopy *ecp, struct transplant *t)
 		case PT_DYNAMIC:
 			assert(dynamicndx == 0);
 			dynamicndx = i;
-			/* FALLTHROUGH */
+			break;
 		case PT_LOAD:
+			if (isfirstload) {
+				firstload = iphdr;
+				isfirstload = false;
+			}
+			lastload = iphdr;
 			break;
 		default:
-			continue;
+			/* Nothing to do. */
+			break;
 		}
-
-		if (isfirstphdr) {
-			firstphdr = iphdr;
-			isfirstphdr = false;
-		}
-		lastphdr = iphdr;
 	}
-	assert(!isfirstphdr);
+	assert(!isfirstload);
 
 	/*
 	 * Update transplant with information for an object header.
 	 */
-	t->vaddr = firstphdr.p_vaddr;
-	t->msz = lastphdr.p_vaddr + lastphdr.p_memsz - firstphdr.p_vaddr;
+	t->vaddr = firstload.p_vaddr;
+	t->msz = lastload.p_vaddr + lastload.p_memsz - firstload.p_vaddr;
 	t->dynamicndx = dynamicndx;
 }
 
@@ -1694,7 +1694,7 @@ transplant_one(struct elfcopy *ecp, struct transplant *t)
 {
 	static int	 prefix;
 
-	struct segment	*firstseg, *seg;
+	struct segment	*firstseg, *lastseg, *seg;
 	struct section	*s, **smap;
 	int		 ifd;
 	Elf		*ein;
@@ -1808,6 +1808,7 @@ transplant_one(struct elfcopy *ecp, struct transplant *t)
 	 */
 	dynamicndx = 0;
 	firstseg = NULL;
+	lastseg = NULL;
 	seg = NULL;
 	if (elf_getphdrnum(ein, &phdrnum) == -1)
 		errx(EXIT_FAILURE, "elf_getphdrnum() failed: %s", elf_errmsg(-1));
@@ -1822,7 +1823,7 @@ transplant_one(struct elfcopy *ecp, struct transplant *t)
 		case PT_DYNAMIC:
 			assert(dynamicndx == 0);
 			dynamicndx = ecp->ophnum;
-			/* FALLTHROUGH */
+			break;
 		case PT_LOAD:
 			break;
 		default:
@@ -1850,17 +1851,21 @@ transplant_one(struct elfcopy *ecp, struct transplant *t)
 		seg->type	= iphdr.p_type;
 		STAILQ_INSERT_TAIL(&ecp->v_seg, seg, seg_list);
 
-		if (firstseg == NULL)
-			firstseg = seg;
+		if (iphdr.p_type == PT_LOAD) {
+			if (firstseg == NULL)
+				firstseg = seg;
+			lastseg = seg;
+		}
 	}
 	assert(firstseg != NULL);
+	assert(lastseg != NULL);
 	assert(seg != NULL);
 
 	/*
 	 * Update transplant with information for an object header.
 	 */
 	t->vaddr = firstseg->vaddr;
-	t->msz = seg->vaddr + seg->msz - firstseg->vaddr;
+	t->msz = lastseg->vaddr + lastseg->msz - firstseg->vaddr;
 	t->dynamicndx = dynamicndx;
 
 #if 0
