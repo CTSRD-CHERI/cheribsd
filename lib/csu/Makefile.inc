@@ -25,7 +25,8 @@ ACFLAGS+=	-DLOCORE
 CFLAGS+=	-DSTRIP_FBSDID
 CFLAGS+=	-fno-omit-frame-pointer
 CFLAGS+=	-I${.CURDIR:H}/common \
-		-I${SRCTOP}/lib/libc/include
+		-I${SRCTOP}/lib/libc/include \
+		-I${SRCTOP}/lib/libsys \
 
 .if ${MACHINE_ABI:Mpurecap}
 # Purecap code requires crt_init_globals to be called before using jump tables
