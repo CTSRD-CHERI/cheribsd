@@ -73,10 +73,6 @@ main() {
 		_ret=$?
 	fi
 
-	for _object in ${_objects} ${_parentobject}; do
-		rm ${_object}.mo
-	done
-
 	return $_ret
 }
 

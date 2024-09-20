@@ -343,6 +343,9 @@ ${_ILINKS}:
 	ln -fns $$path ${.TARGET:T}
 
 CLEANFILES+= ${PROG} ${KMOD}.kld ${OBJS}
+.if ${KMODMO} == YES
+CLEANFILES+= ${OBJS:S/$/.mo/}
+.endif
 
 .if defined(DEBUG_FLAGS) && ${MK_SPLIT_KERNEL_DEBUG} != "no"
 CLEANFILES+= ${FULLPROG} ${PROG}.debug
