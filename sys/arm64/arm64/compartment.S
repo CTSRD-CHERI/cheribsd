@@ -59,7 +59,7 @@ compartment_entries_length:
 
 .macro template_entry_trampoline type
 \type\()_entry_id:
-	.word		0
+	.long		0
 \type\()_entry_type:
 	.word		0
 	.p2align 4
@@ -67,6 +67,7 @@ compartment_entries_length:
 	.chericap	0
 \type\()_entry_stackptr_func:
 	.chericap	0
+	/* sizeof(RB_ENTRY(compartment_trampoline)) */
 \type\()_node:
 	.space		48
 

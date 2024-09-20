@@ -35,6 +35,7 @@
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/types.h>
+#include <sys/compartment.h>
 #ifdef SPARSE_MAPPING
 #include <sys/mman.h>
 #endif
@@ -87,6 +88,7 @@
 
 struct elf_object {
 	unsigned int	id;		/* Identifier in the object table. */
+	u_long		compartment_id;	/* Identifier for a compartment. */
 	char		*name;		/* Name of the object. */
 	caddr_t		address;	/* Relocation address */
 	size_t		size;		/* Size of the object. */
@@ -1501,7 +1503,8 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 				object = elf_object_create(ef);
 
 			error = elf_object_init(object, objectid,
-			    ef->address + ohdr->o_vaddr,
+			    cheri_kern_setbounds(ef->address + ohdr->o_vaddr,
+			    ohdr->o_memsz),
 			    ohdr->o_memsz,
 			    (Elf_Dyn *)(ef->address +
 			    phtable[ohdr->o_dynamicndx].p_vaddr - base_vaddr),
@@ -1644,6 +1647,31 @@ out:
 	free(segs, M_LINKER);
 
 	return (error);
+}
+
+void
+elf_compartment_entry(linker_file_t lf, uintcap_t ptr, u_long *idp,
+    uintptr_t *ptrp)
+{
+	elf_file_t ef;
+	elf_object_t object;
+	uintcap_t cap;
+
+	ef = (elf_file_t)lf;
+
+	TAILQ_FOREACH(object, &ef->objects, next) {
+		if (ptr >= (uintptr_t)object->address &&
+		    ptr < (uintptr_t)object->address + object->size)
+			break;
+	}
+	KASSERT(object != NULL,
+	    ("elf_capability: unexpected pointer %p", (void *)ptr));
+
+	*idp = object->compartment_id;
+	cap = cheri_setaddress((uintcap_t)object->address, ptr);
+	cap = cheri_andperm(cap, cheri_getperm(ptr));
+	cap = cheri_sealentry(cheri_capmode(cap));
+	*ptrp = (uintptr_t)cap;
 }
 
 Elf_Addr
@@ -2375,6 +2403,7 @@ elf_object_init(elf_object_t object, unsigned int id, caddr_t address,
 	}
 
 	object->id = id;
+	object->compartment_id = compartment_id_create();
 	object->address = address;
 	object->size = size;
 	object->dynamic = dynamic;

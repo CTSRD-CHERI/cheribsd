@@ -75,13 +75,15 @@ SYSCTL_ULONG(_security_compartment_counters, OID_AUTO, executive_entry,
     "Number of executive entry calls");
 
 struct compartment_trampoline {
-	int		ct_compartment_id;
+	u_long		ct_compartment_id;
 	int		ct_type;
 	uintcap_t	ct_compartment_func;
 	uintcap_t	ct_compartment_stackptr_func;
 	RB_ENTRY(compartment_trampoline) ct_node;
 	char		ct_code[] __subobject_use_container_bounds;
 };
+
+static u_long compartment_lastid = COMPARTMENT_KERNEL_ID;
 
 static int
 compartment_trampoline_compare(struct compartment_trampoline *a,
@@ -102,6 +104,14 @@ RB_GENERATE_STATIC(compartment_tree, compartment_trampoline, ct_node,
 static struct mtx compartment_trampolines_lock;
 MTX_SYSINIT(compartmenttrampolines, &compartment_trampolines_lock,
     "compartment_trampolines", MTX_DEF);
+
+u_long
+compartment_id_create(void)
+{
+
+	atomic_add_long(&compartment_lastid, 1);
+	return (compartment_lastid);
+}
 
 static void
 compartment_linkup(struct compartment *compartment, int id, struct thread *td)
@@ -203,11 +213,12 @@ compartment_trampoline_create(const linker_file_t lf, int type, void *data,
 	struct compartment_trampoline *trampoline, *oldtrampoline;
 	struct compartment_trampoline tmptrampoline;
 	uintcap_t dstfunc;
+	u_long dstid;
 
 	EXECUTIVE_ASSERT();
 
 	if (lf != NULL) {
-		dstfunc = linker_file_capability(lf, func);
+		elf_compartment_entry(lf, func, &dstid, &dstfunc);
 	} else {
 		/*
 		 * We're creating a trampoline for the kernel while the kernel
@@ -216,6 +227,7 @@ compartment_trampoline_create(const linker_file_t lf, int type, void *data,
 		 *
 		 * Use PCC instead of the base address of the linker file.
 		 */
+		dstid = COMPARTMENT_KERNEL_ID;
 		dstfunc = (intcap_t)cheri_kern_setaddress(cheri_getpcc(),
 		    (intptr_t)func);
 		dstfunc = cheri_andperm(dstfunc, cheri_getperm(func));
@@ -256,16 +268,13 @@ compartment_trampoline_create(const linker_file_t lf, int type, void *data,
 	trampoline->ct_compartment_stackptr_func =
 	    cheri_sealentry(trampoline->ct_compartment_stackptr_func);
 
+	trampoline->ct_compartment_id = dstid;
 	if (lf != NULL) {
-		trampoline->ct_compartment_id = lf->id;
-
 		cpu_dcache_wb_range((vm_pointer_t)trampoline, (vm_size_t)size);
 		cpu_icache_sync_range((vm_pointer_t)trampoline,
 		    (vm_size_t)size);
 
 		mtx_lock(&compartment_trampolines_lock);
-	} else {
-		trampoline->ct_compartment_id = COMPARTMENT_KERNEL_ID;
 	}
 
 	oldtrampoline = RB_INSERT(compartment_tree, &compartment_trampolines,

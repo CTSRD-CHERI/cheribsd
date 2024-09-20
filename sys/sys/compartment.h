@@ -53,6 +53,7 @@ struct compartment {
 	TAILQ_ENTRY(compartment) c_next;
 };
 
+u_long compartment_id_create(void);
 void compartment_linkup0(struct compartment *compartment, struct thread *td);
 struct compartment *compartment_create_for_thread(struct thread *td, int id);
 void compartment_destroy(struct compartment *compartment);

@@ -316,6 +316,8 @@ int	elf_reloc(linker_file_t _lf, elf_object_t object, char *base,
 	    const void *_rel, int _type, elf_lookup_fn _lu);
 int	elf_reloc_local(linker_file_t _lf, elf_object_t object, char *base,
 	    const void *_rel, int _type, elf_lookup_fn _lu);
+void	elf_compartment_entry(linker_file_t lf, uintcap_t ptr, u_long *idp,
+	    uintptr_t *ptrp);
 Elf_Addr elf_relocaddr(linker_file_t _lf, Elf_Addr addr);
 bool	elf_is_preloaded(linker_file_t lf);
 void	link_elf_ireloc(caddr_t kmdp);
