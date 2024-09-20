@@ -86,9 +86,10 @@
 #define	MAXPHNUM	(MAXPARENTSEGS + MAXOBJS * MAXOBJSEGS)
 
 struct elf_object {
-	off_t		offset;		/* Offset of the object */
-	off_t		dynoffset;	/* Offset of its dynamic segment */
+	unsigned int	id;		/* Identifier in the object table. */
+	char		*name;		/* Name of the object. */
 	caddr_t		address;	/* Relocation address */
+	size_t		size;		/* Size of the object. */
 	Elf_Dyn		*dynamic;	/* Symbol table etc. */
 	Elf_Hashelt	nbuckets;	/* DT_HASH info */
 	Elf_Hashelt	nchains;
@@ -202,6 +203,10 @@ static int	link_elf_symidx_address(linker_file_t, unsigned long, int,
 		    ptraddr_t *);
 #endif
 static void	elf_init_objects(elf_file_t);
+static elf_object_t elf_object_create(elf_file_t ef);
+static int	elf_object_init(elf_object_t object, unsigned int id,
+		    caddr_t address, size_t size, Elf_Dyn *dynamic,
+		    const char *name);
 static int	elf_lookup(linker_file_t, elf_object_t, Elf_Size, int, Elf_Addr *);
 
 static kobj_method_t link_elf_methods[] = {
@@ -493,6 +498,7 @@ link_elf_init(void* arg)
 	caddr_t modptr, baseptr, sizeptr;
 	elf_file_t ef;
 	const char *modname;
+	int error;
 
 	linker_add_class(&link_elf_class);
 
@@ -531,8 +537,10 @@ link_elf_init(void* arg)
 #ifdef SPARSE_MAPPING
 	ef->vmobject = NULL;
 #endif
-	ef->pobject.address = ef->address;
-	ef->pobject.dynamic = dp;
+	error = elf_object_init(&ef->pobject, 0, ef->address,
+	    cheri_getlength(ef->address), dp, NULL);
+	if (error != 0)
+		panic("%s: Can't initialize an object for kernel", __func__);
 
 	if (dp != NULL)
 		parse_dynamic_object(&ef->pobject, ef);
@@ -1022,7 +1030,6 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	elf_file_t ef;
 	linker_file_t lf;
 	int error;
-	void *dp;
 
 	/* Look to see if we have the file preloaded */
 	modptr = preload_search_by_name(filename);
@@ -1061,9 +1068,12 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 #ifdef SPARSE_MAPPING
 	ef->vmobject = NULL;
 #endif
-	dp = ef->address + *(vm_offset_t *)dynptr;
-	ef->pobject.address = ef->address;
-	ef->pobject.dynamic = (Elf_Dyn *)dp;
+	error = elf_object_init(&ef->pobject, 0, ef->address,
+	    cheri_getlength(ef->address),
+	    (Elf_Dyn *)(ef->address + *(vm_offset_t *)dynptr),
+	    NULL);
+	if (error != 0)
+		goto out;
 	lf->address = ef->address;
 	lf->size = *(size_t *)sizeptr;
 
@@ -1089,6 +1099,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 #endif
 	if (error == 0)
 		error = preload_protect(ef, VM_PROT_ALL);
+out:
 	if (error != 0) {
 		linker_file_unload(lf, LINKER_UNLOAD_FORCE);
 		return (error);
@@ -1128,7 +1139,8 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	Elf_Phdr *phlimit;
 	Elf_Phdr **segs;
 	Elf_Ohdr *ohdr, *ohtable;
-	int maxsegs, nobjects, nsegs;
+	int maxsegs, nsegs;
+	unsigned int nobjects, objectid;
 	caddr_t mapbase;
 	size_t mapsize;
 	Elf_Addr base_vaddr;
@@ -1316,16 +1328,6 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 				goto out;
 			}
 
-			if (nobjects == 0) {
-				object = &ef->pobject;
-			} else {
-				object = malloc(sizeof(*object), M_LINKER,
-				    M_WAITOK | M_ZERO);
-				TAILQ_INSERT_TAIL(&ef->objects, object, next);
-			}
-			object->offset = ohdr->o_vaddr;
-			object->dynoffset =
-			    phtable[ohdr->o_dynamicndx].p_vaddr;
 			nobjects++;
 		}
 		if (nobjects == 0) {
@@ -1334,9 +1336,6 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 			goto out;
 		}
 	} else {
-		object = &ef->pobject;
-		object->offset = 0;
-		object->dynoffset = dynphdr->p_vaddr;
 		nobjects++;
 	}
 	if (nobjects > MAXOBJS) {
@@ -1458,14 +1457,81 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	lf->address = ef->address;
 	lf->size = mapsize;
 
-	TAILQ_FOREACH(object, &ef->objects, next) {
-		object->address = ef->address + object->offset;
-		object->dynamic = (Elf_Dyn *)(mapbase + object->dynoffset -
-		    base_vaddr);
+	/*
+	 * Try and load the symbol table if it's present.  (you can
+	 * strip it!)
+	 */
+	nbytes = hdr->e_shnum * hdr->e_shentsize;
+	if (nbytes == 0 || hdr->e_shoff == 0)
+		goto nosyms;
+	shdr = malloc(nbytes, M_LINKER, M_WAITOK | M_ZERO);
+	error = vn_rdwr(UIO_READ, nd.ni_vp,
+	    PTR2CAP(shdr), nbytes, hdr->e_shoff,
+	    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED,
+	    &resid, td);
+	if (error != 0)
+		goto out;
+
+	/* Read section string table */
+	shstrindex = hdr->e_shstrndx;
+	if (shstrindex != 0 && shdr[shstrindex].sh_type == SHT_STRTAB &&
+	    shdr[shstrindex].sh_size != 0) {
+		nbytes = shdr[shstrindex].sh_size;
+		shstrs = malloc(nbytes, M_LINKER, M_WAITOK | M_ZERO);
+		error = vn_rdwr(UIO_READ, nd.ni_vp, PTR2CAP(shstrs), nbytes,
+		    shdr[shstrindex].sh_offset, UIO_SYSSPACE, IO_NODELOCKED,
+		    td->td_ucred, NOCRED, &resid, td);
+		if (error)
+			goto out;
+	}
+
+	if (ohtable != NULL) {
+		if (shstrs == NULL) {
+			link_elf_error(filename, "Missing .shstrtab");
+			error = ENOEXEC;
+			goto out;
+		}
+
+		for (objectid = 0; objectid < nobjects; objectid++) {
+			ohdr = &ohtable[objectid];
+
+			if (objectid == 0)
+				object = TAILQ_FIRST(&ef->objects);
+			else
+				object = elf_object_create(ef);
+
+			error = elf_object_init(object, objectid,
+			    ef->address + ohdr->o_vaddr,
+			    ohdr->o_memsz,
+			    (Elf_Dyn *)(ef->address +
+			    phtable[ohdr->o_dynamicndx].p_vaddr - base_vaddr),
+			    shstrs + ohdr->o_name);
+			if (error != 0)
+				goto out;
+
+			error = parse_dynamic_object(object, ef);
+			if (error != 0)
+				goto out;
+		}
+	} else {
+		KASSERT(nobjects == 1,
+		    ("link_elf_load_file: unexpected number of objects (%u)",
+		    nobjects));
+
+		object = TAILQ_FIRST(&ef->objects);
+
+		error = elf_object_init(object, 0, ef->address,
+		    cheri_getlength(ef->address),
+		    (Elf_Dyn *)(ef->address + dynphdr->p_vaddr - base_vaddr),
+		    NULL);
+		if (error != 0)
+			goto out;
+
 		error = parse_dynamic_object(object, ef);
 		if (error != 0)
 			goto out;
 	}
+
 	error = parse_dpcpu(ef);
 	if (error != 0)
 		goto out;
@@ -1513,34 +1579,6 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 		}
 	}
 #endif
-
-	/*
-	 * Try and load the symbol table if it's present.  (you can
-	 * strip it!)
-	 */
-	nbytes = hdr->e_shnum * hdr->e_shentsize;
-	if (nbytes == 0 || hdr->e_shoff == 0)
-		goto nosyms;
-	shdr = malloc(nbytes, M_LINKER, M_WAITOK | M_ZERO);
-	error = vn_rdwr(UIO_READ, nd.ni_vp,
-	    PTR2CAP(shdr), nbytes, hdr->e_shoff,
-	    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED,
-	    &resid, td);
-	if (error != 0)
-		goto out;
-
-	/* Read section string table */
-	shstrindex = hdr->e_shstrndx;
-	if (shstrindex != 0 && shdr[shstrindex].sh_type == SHT_STRTAB &&
-	    shdr[shstrindex].sh_size != 0) {
-		nbytes = shdr[shstrindex].sh_size;
-		shstrs = malloc(nbytes, M_LINKER, M_WAITOK | M_ZERO);
-		error = vn_rdwr(UIO_READ, nd.ni_vp, PTR2CAP(shstrs), nbytes,
-		    shdr[shstrindex].sh_offset, UIO_SYSSPACE, IO_NODELOCKED,
-		    td->td_ucred, NOCRED, &resid, td);
-		if (error)
-			goto out;
-	}
 
 	symtabindex = -1;
 	symstrindex = -1;
@@ -2308,6 +2346,40 @@ elf_init_objects(elf_file_t ef)
 	TAILQ_INSERT_TAIL(&ef->objects, &ef->pobject, next);
 }
 
+static elf_object_t
+elf_object_create(elf_file_t ef)
+{
+	elf_object_t object;
+
+	object = malloc(sizeof(*object), M_LINKER, M_WAITOK | M_ZERO);
+	TAILQ_INSERT_TAIL(&ef->objects, object, next);
+	return (object);
+}
+
+static int
+elf_object_init(elf_object_t object, unsigned int id, caddr_t address,
+    size_t size, Elf_Dyn *dynamic, const char *name)
+{
+	char *newname;
+
+	if (name != NULL) {
+		newname = strdup(name, M_LINKER);
+		if (newname == NULL) {
+			link_elf_error(name, "Unable to copy an object name");
+			return (ENOMEM);
+		}
+	} else {
+		newname = NULL;
+	}
+
+	object->id = id;
+	object->address = address;
+	object->size = size;
+	object->dynamic = dynamic;
+	object->name = newname;
+	return (0);
+}
+
 static int
 elf_lookup(linker_file_t lf, elf_object_t object, Elf_Size symidx, int deps,
     Elf_Addr *res)
@@ -2481,6 +2553,7 @@ link_elf_ireloc(caddr_t kmdp)
 {
 	struct elf_file eff;
 	elf_file_t ef;
+	int error;
 
 	TSENTER();
 	ef = &eff;
@@ -2513,8 +2586,10 @@ link_elf_ireloc(caddr_t kmdp)
 	ef->address = cheri_setaddress(kernel_executive_root_cap, 0);
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif
-	ef->pobject.address = ef->address;
-	ef->pobject.dynamic = (Elf_Dyn *)&_DYNAMIC;
+	error = elf_object_init(&ef->pobject, 0, ef->address,
+	    cheri_getlength(ef->address), (Elf_Dyn *)&_DYNAMIC, NULL);
+	if (error != 0)
+		panic("%s: Can't initialize an object for kernel", __func__);
 	parse_dynamic_object(&ef->pobject, ef);
 
 	link_elf_preload_parse_symbols(ef);
