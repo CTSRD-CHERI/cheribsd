@@ -412,6 +412,7 @@ static int sysargmask[] = {
 	[SYS_timerfd_gettime] = (0x0 | 0x2),
 	[SYS_timerfd_settime] = (0x0 | 0x4 | 0x8),
 	[SYS_kcmp] = (0x0 | 0x8 | 0x10),
+	[SYS_getrlimitusage] = (0x0 | 0x4),
 };
 
 #endif /* !_SYSARGMAP_H_ */

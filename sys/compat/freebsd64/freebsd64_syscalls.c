@@ -594,4 +594,5 @@ const char *freebsd64_syscallnames[] = {
 	"freebsd64_timerfd_gettime",			/* 586 = freebsd64_timerfd_gettime */
 	"freebsd64_timerfd_settime",			/* 587 = freebsd64_timerfd_settime */
 	"freebsd64_kcmp",			/* 588 = freebsd64_kcmp */
+	"freebsd64_getrlimitusage",			/* 589 = freebsd64_getrlimitusage */
 };

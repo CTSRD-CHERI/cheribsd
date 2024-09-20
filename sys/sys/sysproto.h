@@ -1900,6 +1900,11 @@ struct kcmp_args {
 	char idx1_l_[PADL_(uintcap_t)]; uintcap_t idx1; char idx1_r_[PADR_(uintcap_t)];
 	char idx2_l_[PADL_(uintcap_t)]; uintcap_t idx2; char idx2_r_[PADR_(uintcap_t)];
 };
+struct getrlimitusage_args {
+	char which_l_[PADL_(u_int)]; u_int which; char which_r_[PADR_(u_int)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char res_l_[PADL_(rlim_t * __kerncap)]; rlim_t * __kerncap res; char res_r_[PADR_(rlim_t * __kerncap)];
+};
 int	sys_exit(struct thread *, struct exit_args *);
 int	sys_fork(struct thread *, struct fork_args *);
 int	sys_read(struct thread *, struct read_args *);
@@ -2304,6 +2309,7 @@ int	sys_timerfd_create(struct thread *, struct timerfd_create_args *);
 int	sys_timerfd_gettime(struct thread *, struct timerfd_gettime_args *);
 int	sys_timerfd_settime(struct thread *, struct timerfd_settime_args *);
 int	sys_kcmp(struct thread *, struct kcmp_args *);
+int	sys_getrlimitusage(struct thread *, struct getrlimitusage_args *);
 
 #ifdef COMPAT_43
 
@@ -3288,6 +3294,7 @@ int	freebsd13_swapoff(struct thread *, struct freebsd13_swapoff_args *);
 #define	SYS_AUE_timerfd_gettime	AUE_TIMERFD
 #define	SYS_AUE_timerfd_settime	AUE_TIMERFD
 #define	SYS_AUE_kcmp	AUE_NULL
+#define	SYS_AUE_getrlimitusage	AUE_NULL
 
 #undef PAD_
 #undef PADL_

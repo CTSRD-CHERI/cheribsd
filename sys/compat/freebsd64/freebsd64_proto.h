@@ -1516,6 +1516,11 @@ struct freebsd64_kcmp_args {
 	char idx1_l_[PADL_(uintptr64_t)]; uintptr64_t idx1; char idx1_r_[PADR_(uintptr64_t)];
 	char idx2_l_[PADL_(uintptr64_t)]; uintptr64_t idx2; char idx2_r_[PADR_(uintptr64_t)];
 };
+struct freebsd64_getrlimitusage_args {
+	char which_l_[PADL_(u_int)]; u_int which; char which_r_[PADR_(u_int)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char res_l_[PADL_(rlim_t *)]; rlim_t * res; char res_r_[PADR_(rlim_t *)];
+};
 int	freebsd64_read(struct thread *, struct freebsd64_read_args *);
 int	freebsd64_write(struct thread *, struct freebsd64_write_args *);
 int	freebsd64_open(struct thread *, struct freebsd64_open_args *);
@@ -1822,6 +1827,7 @@ int	freebsd64_swapoff(struct thread *, struct freebsd64_swapoff_args *);
 int	freebsd64_timerfd_gettime(struct thread *, struct freebsd64_timerfd_gettime_args *);
 int	freebsd64_timerfd_settime(struct thread *, struct freebsd64_timerfd_settime_args *);
 int	freebsd64_kcmp(struct thread *, struct freebsd64_kcmp_args *);
+int	freebsd64_getrlimitusage(struct thread *, struct freebsd64_getrlimitusage_args *);
 
 #ifdef COMPAT_43
 
@@ -2395,6 +2401,7 @@ int	freebsd13_freebsd64_swapoff(struct thread *, struct freebsd13_freebsd64_swap
 #define	FREEBSD64_SYS_AUE_freebsd64_timerfd_gettime	AUE_TIMERFD
 #define	FREEBSD64_SYS_AUE_freebsd64_timerfd_settime	AUE_TIMERFD
 #define	FREEBSD64_SYS_AUE_freebsd64_kcmp	AUE_NULL
+#define	FREEBSD64_SYS_AUE_freebsd64_getrlimitusage	AUE_NULL
 
 #undef PAD_
 #undef PADL_

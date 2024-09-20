@@ -3481,6 +3481,15 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 5;
 		break;
 	}
+	/* freebsd64_getrlimitusage */
+	case 589: {
+		struct freebsd64_getrlimitusage_args *p = params;
+		uarg[a++] = p->which; /* u_int */
+		iarg[a++] = p->flags; /* int */
+		uarg[a++] = (intptr_t)p->res; /* rlim_t * */
+		*n_args = 3;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -9313,6 +9322,22 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* freebsd64_getrlimitusage */
+	case 589:
+		switch (ndx) {
+		case 0:
+			p = "u_int";
+			break;
+		case 1:
+			p = "int";
+			break;
+		case 2:
+			p = "userland rlim_t *";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -11298,6 +11323,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* freebsd64_kcmp */
 	case 588:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* freebsd64_getrlimitusage */
+	case 589:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

@@ -656,4 +656,5 @@ struct sysent freebsd64_sysent[] = {
 	{ .sy_narg = AS(freebsd64_timerfd_gettime_args), .sy_call = (sy_call_t *)freebsd64_timerfd_gettime, .sy_auevent = AUE_TIMERFD, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 586 = freebsd64_timerfd_gettime */
 	{ .sy_narg = AS(freebsd64_timerfd_settime_args), .sy_call = (sy_call_t *)freebsd64_timerfd_settime, .sy_auevent = AUE_TIMERFD, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 587 = freebsd64_timerfd_settime */
 	{ .sy_narg = AS(freebsd64_kcmp_args), .sy_call = (sy_call_t *)freebsd64_kcmp, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 588 = freebsd64_kcmp */
+	{ .sy_narg = AS(freebsd64_getrlimitusage_args), .sy_call = (sy_call_t *)freebsd64_getrlimitusage, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 589 = freebsd64_getrlimitusage */
 };
