@@ -72,6 +72,7 @@ METHOD int search_symbol {
 #
 METHOD int symidx_address {
 	linker_file_t	file;
+	elf_object_t	object;
 	unsigned long	index;
 	int		deps;
 	ptraddr_t	*address;
@@ -86,6 +87,7 @@ HEADER {
 
 METHOD int symidx_capability {
 	linker_file_t	file;
+	elf_object_t	object;
 	unsigned long	index;
 	int		deps;
 	uintcap_t	*cap;

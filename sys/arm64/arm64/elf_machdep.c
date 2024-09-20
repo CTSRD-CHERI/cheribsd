@@ -469,8 +469,8 @@ build_cap_from_fragment(Elf_Addr *fragment, Elf_Addr relocbase, Elf_Addr offset,
  * in order for the -zifunc-noplt optimization to work.
  */
 static int
-elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
-    int type, int flags, elf_lookup_fn lookup)
+elf_reloc_internal(linker_file_t lf, elf_object_t object, char *relocbase,
+    const void *data, int type, int flags, elf_lookup_fn lookup)
 {
 #define	ARM64_ELF_RELOC_LOCAL		(1 << 0)
 #define	ARM64_ELF_RELOC_LATE_IFUNC	(1 << 1)
@@ -557,14 +557,14 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 	case R_AARCH64_FUNC_RELATIVE:
 		break;
 	case R_AARCH64_TSTBR14:
-		error = lookup(lf, symidx, 1, &addr);
+		error = lookup(lf, object, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 		error = reloc_instr_imm((Elf32_Addr *)where,
 		    addr + addend - (Elf_Addr)where, 15, 2);
 		break;
 	case R_AARCH64_CONDBR19:
-		error = lookup(lf, symidx, 1, &addr);
+		error = lookup(lf, object, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 		error = reloc_instr_imm((Elf32_Addr *)where,
@@ -572,7 +572,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		break;
 	case R_AARCH64_JUMP26:
 	case R_AARCH64_CALL26:
-		error = lookup(lf, symidx, 1, &addr);
+		error = lookup(lf, object, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 		error = reloc_instr_imm((Elf32_Addr *)where,
@@ -581,7 +581,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 	case R_AARCH64_ABS64:
 	case R_AARCH64_GLOB_DAT:
 	case R_AARCH64_JUMP_SLOT:
-		error = lookup(lf, symidx, 1, &addr);
+		error = lookup(lf, object, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 		*where = addr + addend;
@@ -605,7 +605,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 #ifdef __CHERI_PURE_CAPABILITY__
 	case R_MORELLO_CAPINIT:
 	case R_MORELLO_GLOB_DAT:
-		error = LINKER_SYMIDX_CAPABILITY(lf, symidx, 1, &cap);
+		error = LINKER_SYMIDX_CAPABILITY(lf, object, symidx, 1, &cap);
 		if (error != 0)
 			return (-1);
 		cap += addend;
@@ -620,7 +620,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		*(uintcap_t *)where = cap;
 		break;
 	case R_MORELLO_JUMP_SLOT:
-		error = LINKER_SYMIDX_CAPABILITY(lf, symidx, 1, &cap);
+		error = LINKER_SYMIDX_CAPABILITY(lf, object, symidx, 1, &cap);
 		if (error != 0)
 			return (-1);
 		cap = cheri_clearperm(cap, CHERI_PERM_SEAL |
@@ -667,29 +667,30 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 }
 
 int
-elf_reloc_local(linker_file_t lf, char *relocbase, const void *data,
-    int type, elf_lookup_fn lookup)
+elf_reloc_local(linker_file_t lf, elf_object_t object, char *relocbase,
+    const void *data, int type, elf_lookup_fn lookup)
 {
 
-	return (elf_reloc_internal(lf, relocbase, data, type,
+	return (elf_reloc_internal(lf, object, relocbase, data, type,
 	    ARM64_ELF_RELOC_LOCAL, lookup));
 }
 
 /* Process one elf relocation with addend. */
 int
-elf_reloc(linker_file_t lf, char *relocbase, const void *data, int type,
-    elf_lookup_fn lookup)
+elf_reloc(linker_file_t lf, elf_object_t object, char *relocbase,
+    const void *data, int type, elf_lookup_fn lookup)
 {
 
-	return (elf_reloc_internal(lf, relocbase, data, type, 0, lookup));
+	return (elf_reloc_internal(lf, object, relocbase, data, type, 0,
+	    lookup));
 }
 
 int
-elf_reloc_late(linker_file_t lf, char *relocbase, const void *data,
-    int type, elf_lookup_fn lookup)
+elf_reloc_late(linker_file_t lf, elf_object_t object, char *relocbase,
+    const void *data, int type, elf_lookup_fn lookup)
 {
 
-	return (elf_reloc_internal(lf, relocbase, data, type,
+	return (elf_reloc_internal(lf, object, relocbase, data, type,
 	    ARM64_ELF_RELOC_LATE_IFUNC, lookup));
 }
 

@@ -85,7 +85,7 @@
 /* Maximum total number of program headers in a file. */
 #define	MAXPHNUM	(MAXPARENTSEGS + MAXOBJS * MAXOBJSEGS)
 
-typedef struct elf_object {
+struct elf_object {
 	off_t		offset;		/* Offset of the object */
 	off_t		dynoffset;	/* Offset of its dynamic segment */
 	caddr_t		address;	/* Relocation address */
@@ -112,7 +112,7 @@ typedef struct elf_object {
 	int		caprelocssize;	/* DT_CHERI___CAPRELOCSSZ */
 #endif
 	TAILQ_ENTRY(elf_object)	next;
-} *elf_object_t;
+};
 
 typedef struct elf_file {
 	struct linker_file lf __subobject_member_used_for_c_inheritance; /* Common fields */
@@ -192,14 +192,17 @@ static long	link_elf_strtab_get(linker_file_t, caddr_t *);
 #ifdef VIMAGE
 static void	link_elf_propagate_vnets(linker_file_t);
 #endif
+#ifdef __CHERI_PURE_CAPABILITY__
+static int	link_elf_symidx_address(linker_file_t, elf_object_t,
+		    unsigned long, int, ptraddr_t *);
+static int	link_elf_symidx_capability(linker_file_t, elf_object_t,
+		    unsigned long, int, uintcap_t *);
+#else
 static int	link_elf_symidx_address(linker_file_t, unsigned long, int,
 		    ptraddr_t *);
-#ifdef __CHERI_PURE_CAPABILITY__
-static int	link_elf_symidx_capability(linker_file_t, unsigned long, int,
-		    uintcap_t *);
 #endif
 static void	elf_init_objects(elf_file_t);
-static int	elf_lookup(linker_file_t, Elf_Size, int, Elf_Addr *);
+static int	elf_lookup(linker_file_t, elf_object_t, Elf_Size, int, Elf_Addr *);
 
 static kobj_method_t link_elf_methods[] = {
 	KOBJMETHOD(linker_lookup_symbol,	link_elf_lookup_symbol),
@@ -243,8 +246,8 @@ SYSCTL_BOOL(_debug, OID_AUTO, link_elf_leak_locals,
     CTLFLAG_RWTUN, &link_elf_leak_locals, 0,
     "Allow local symbols to participate in global module symbol resolution");
 
-typedef int (*elf_reloc_fn)(linker_file_t lf, char *relocbase,
-    const void *data, int type, elf_lookup_fn lookup);
+typedef int (*elf_reloc_fn)(linker_file_t lf, elf_object_t object,
+    char *relocbase, const void *data, int type, elf_lookup_fn lookup);
 
 static int	parse_dynamic_object(elf_object_t object, elf_file_t ef);
 static int	relocate_file(elf_file_t);
@@ -1738,7 +1741,7 @@ relocate_file1(elf_file_t ef, elf_lookup_fn lookup, elf_reloc_fn reloc,
 		    STT_GNU_IFUNC ||					\
 		    elf_is_ifunc_reloc((iter)->r_info)) != ifuncs)	\
 			continue;					\
-		if (reloc(&ef->lf, ef->address,				\
+		if (reloc(&ef->lf, object, object->address,		\
 		    (iter), (type), lookup)) {				\
 			symname = symbol_name(object, (iter)->r_info);	\
 			printf("link_elf: symbol %s undefined\n",	\
@@ -1748,7 +1751,7 @@ relocate_file1(elf_file_t ef, elf_lookup_fn lookup, elf_reloc_fn reloc,
 	}								\
 } while (0)
 
-	TAILQ_FOREACH_REVERSE(object, &ef->objects, elf_object_head, next) {
+	TAILQ_FOREACH(object, &ef->objects, next) {
 		APPLY_RELOCS(rel, object->rel, object->relsize, ELF_RELOC_REL);
 		TSENTER2("object->rela");
 		APPLY_RELOCS(rela, object->rela, object->relasize, ELF_RELOC_RELA);
@@ -2184,33 +2187,36 @@ link_elf_each_function_nameval(linker_file_t file,
  */
 #ifdef __CHERI_PURE_CAPABILITY__
 static int
-link_elf_symidx_capability(linker_file_t lf, unsigned long symidx, int deps,
-    uintcap_t *res)
+link_elf_symidx_capability(linker_file_t lf, elf_object_t object,
+    unsigned long symidx, int deps, uintcap_t *res)
 #else
 static int
 link_elf_symidx_address(linker_file_t lf, unsigned long symidx, int deps,
     ptraddr_t *res)
 #endif
 {
+#ifndef __CHERI_PURE_CAPABILITY__
 	elf_file_t ef = (elf_file_t)lf;
-	elf_object_t object;
+#endif
 	const Elf_Sym *sym;
 	const char *symbol;
 	caddr_t addr, start, base;
 
-	/* TODO:
-	 * Attempt to relocate the first object only.
-	 * We don't have relocations for other objects yet.
-	 */
-	object = &ef->pobject;
-
 	/* Don't even try to lookup the symbol if the index is bogus. */
+#ifdef __CHERI_PURE_CAPABILITY__
 	if (symidx >= object->nchains) {
+#else
+	if (symidx >= ef->nchains) {
+#endif
 		*res = 0;
 		return (EINVAL);
 	}
 
+#ifdef __CHERI_PURE_CAPABILITY__
 	sym = object->symtab + symidx;
+#else
+	sym = ef->symtab + symidx;
+#endif
 
 	/*
 	 * Don't do a full lookup when the symbol is local. It may even
@@ -2223,7 +2229,7 @@ link_elf_symidx_address(linker_file_t lf, unsigned long symidx, int deps,
 			return (EINVAL);
 		}
 #ifdef __CHERI_PURE_CAPABILITY__
-		*res = (uintcap_t)make_capability(sym, ef->address +
+		*res = (uintcap_t)make_capability(sym, object->address +
 		    sym->st_value);
 #else
 		*res = ((ptraddr_t)ef->address + sym->st_value);
@@ -2238,7 +2244,11 @@ link_elf_symidx_address(linker_file_t lf, unsigned long symidx, int deps,
 	 * always be added.
 	 */
 
+#ifdef __CHERI_PURE_CAPABILITY__
 	symbol = object->strtab + sym->st_name;
+#else
+	symbol = ef->strtab + sym->st_name;
+#endif
 
 	/* Force a lookup failure if the symbol name is bogus. */
 	if (*symbol == 0) {
@@ -2276,13 +2286,13 @@ link_elf_symidx_address(linker_file_t lf, unsigned long symidx, int deps,
 
 #ifdef __CHERI_PURE_CAPABILITY__
 static int
-link_elf_symidx_address(linker_file_t lf, unsigned long symidx, int deps,
-    ptraddr_t *res)
+link_elf_symidx_address(linker_file_t lf, elf_object_t object,
+    unsigned long symidx, int deps, ptraddr_t *res)
 {
 	uintcap_t cap;
 	int error;
 
-	error = link_elf_symidx_capability(lf, symidx, deps, &cap);
+	error = link_elf_symidx_capability(lf, object, symidx, deps, &cap);
 	if (error == 0)
 		*res = (ptraddr_t)cap;
 	return (error);
@@ -2299,12 +2309,13 @@ elf_init_objects(elf_file_t ef)
 }
 
 static int
-elf_lookup(linker_file_t lf, Elf_Size symidx, int deps, Elf_Addr *res)
+elf_lookup(linker_file_t lf, elf_object_t object, Elf_Size symidx, int deps,
+    Elf_Addr *res)
 {
 	ptraddr_t addr;
 	int error;
 
-	error = link_elf_symidx_address(lf, symidx, deps, &addr);
+	error = link_elf_symidx_address(lf, object, symidx, deps, &addr);
 	if (error == 0)
 		*res = addr;
 	return (error);
@@ -2315,10 +2326,10 @@ static void
 resolve_cap_reloc(void *arg, bool function, bool constant, ptraddr_t object,
     void **src)
 {
-	elf_file_t ef = arg;
+	elf_object_t of = arg;
 	caddr_t addr, start, base;
 
-	addr = ef->address + object;
+	addr = of->address + object;
 	if (elf_set_find(&set_pcpu_list, addr, &start, &base)) {
 		addr = (ptraddr_t)addr - (ptraddr_t)start + base;
 	}
@@ -2348,14 +2359,13 @@ link_elf_object_reloc_local(linker_file_t lf, elf_object_t object)
 	const Elf_Rel *rel;
 	const Elf_Rela *relalim;
 	const Elf_Rela *rela;
-	elf_file_t ef = (elf_file_t)lf;
 
 	/* Perform relocations without addend if there are any: */
 	if ((rel = object->rel) != NULL) {
 		rellim = (const Elf_Rel *)((const char *)object->rel +
 		    object->relsize);
 		while (rel < rellim) {
-			elf_reloc_local(lf, ef->address, rel,
+			elf_reloc_local(lf, object, object->address, rel,
 			    ELF_RELOC_REL, elf_lookup);
 			rel++;
 		}
@@ -2366,7 +2376,7 @@ link_elf_object_reloc_local(linker_file_t lf, elf_object_t object)
 		relalim = (const Elf_Rela *)
 		    ((const char *)object->rela + object->relasize);
 		while (rela < relalim) {
-			elf_reloc_local(lf, ef->address, rela,
+			elf_reloc_local(lf, object, object->address, rela,
 			    ELF_RELOC_RELA, elf_lookup);
 			rela++;
 		}
@@ -2376,10 +2386,11 @@ link_elf_object_reloc_local(linker_file_t lf, elf_object_t object)
 	if (object->caprelocs != NULL) {
 		void *data_cap;
 
-		data_cap = cheri_andperm(ef->address, CHERI_PERMS_KERNEL_DATA);
+		data_cap = cheri_andperm(object->address,
+		    CHERI_PERMS_KERNEL_DATA);
 		init_linker_file_cap_relocs(object->caprelocs,
 		    (char *)object->caprelocs + object->caprelocssize, data_cap,
-		    (ptraddr_t)ef->address, resolve_cap_reloc, ef);
+		    (ptraddr_t)object->address, resolve_cap_reloc, object);
 	}
 #endif
 }
@@ -2442,17 +2453,15 @@ link_elf_propagate_vnets(linker_file_t lf)
  * at that point.
  */
 static int
-elf_object_lookup_ifunc(elf_object_t object, linker_file_t lf, Elf_Size symidx,
-    int deps __unused, Elf_Addr *res)
+elf_object_lookup_ifunc(linker_file_t lf __unused, elf_object_t object,
+    Elf_Size symidx, int deps __unused, Elf_Addr *res)
 {
-	elf_file_t ef;
 	const Elf_Sym *symp;
 	caddr_t val;
 
-	ef = (elf_file_t)lf;
 	symp = object->symtab + symidx;
 	if (ELF_ST_TYPE(symp->st_info) == STT_GNU_IFUNC) {
-		val = (caddr_t)ef->address + symp->st_value;
+		val = (caddr_t)object->address + symp->st_value;
 		*res = ((Elf_Addr (*)(void))val)();
 		return (0);
 	}
@@ -2460,19 +2469,11 @@ elf_object_lookup_ifunc(elf_object_t object, linker_file_t lf, Elf_Size symidx,
 }
 
 static int
-elf_lookup_ifunc(linker_file_t lf, Elf_Size symidx, int deps __unused,
-    Elf_Addr *res)
+elf_lookup_ifunc(linker_file_t lf, elf_object_t object, Elf_Size symidx,
+    int deps __unused, Elf_Addr *res)
 {
-	elf_file_t ef = (elf_file_t)lf;
-	elf_object_t object;
-	int ret;
 
-	TAILQ_FOREACH(object, &ef->objects, next) {
-		ret = elf_object_lookup_ifunc(object, lf, symidx, deps, res);
-		if (ret != ENOENT)
-			return (ret);
-	}
-	return (ENOENT);
+	return (elf_object_lookup_ifunc(lf, object, symidx, deps, res));
 }
 
 void
