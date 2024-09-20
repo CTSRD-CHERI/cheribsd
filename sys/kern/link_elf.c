@@ -1634,15 +1634,8 @@ nosyms:
 out:
 	VOP_UNLOCK(nd.ni_vp);
 	vn_close(nd.ni_vp, FREAD, td->td_ucred, td);
-	if (error != 0 && lf != NULL) {
-		while (!TAILQ_EMPTY(&ef->objects)) {
-			object = TAILQ_FIRST(&ef->objects);
-			TAILQ_REMOVE(&ef->objects, object, next);
-			if (object != &ef->pobject)
-				free(object, M_LINKER);
-		}
+	if (error != 0 && lf != NULL)
 		linker_file_unload(lf, LINKER_UNLOAD_FORCE);
-	}
 	free(shdr, M_LINKER);
 	free(phdrpages, M_LINKER);
 	free(firstpage, M_LINKER);
@@ -1684,6 +1677,7 @@ static void
 link_elf_unload_file(linker_file_t file)
 {
 	elf_file_t ef = (elf_file_t) file;
+	elf_object_t object;
 
 	if (ef->pcpu_base != 0) {
 		dpcpu_free((void *)ef->pcpu_base,
@@ -1708,6 +1702,14 @@ link_elf_unload_file(linker_file_t file)
 
 	/* Notify MD code that a module is being unloaded. */
 	elf_cpu_unload_file(file);
+
+	while (!TAILQ_EMPTY(&ef->objects)) {
+		object = TAILQ_FIRST(&ef->objects);
+		TAILQ_REMOVE(&ef->objects, object, next);
+		free(object->name, M_LINKER);
+		if (object != &ef->pobject)
+			free(object, M_LINKER);
+	}
 
 	if (ef->preloaded) {
 		link_elf_unload_preload(file);
