@@ -82,6 +82,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     Elf_Ehdr *hdr;
     int i;
     Elf_Phdr *phdr;
+    Elf_Phdr *phdr_start;
     Elf_Phdr *phlimit;
     Elf_Phdr **segs;
     int nsegs;
@@ -122,6 +123,8 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     Elf_Addr text_rodata_start_offset = 0;
     Elf_Addr text_rodata_end_offset = 0;
 #endif
+    Obj_Entry *subobj;
+    Elf_Ohdr *ohdr = NULL, *ohdr_end = NULL;
 
     hdr = get_elf_header(fd, path, sb, main_path, &phdr);
     if (hdr == NULL)
@@ -135,6 +138,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     phlimit = phdr + hdr->e_phnum;
     nsegs = -1;
     phdyn = phinterp = phtls = NULL;
+    phdr_start = phdr;
     phdr_vaddr = 0;
     relro_page = 0;
     relro_size = 0;
@@ -184,10 +188,21 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	    break;
 
 	case PT_DYNAMIC:
-	    phdyn = phdr;
+            /*
+             * XXX Dapeng: Only accept the first PT_DYNAMIC as this variable is
+             * only used for the parent object. The PT_DYNAMICs of sub-objects
+             * will be assigned later.
+             */
+            if (phdyn == NULL)
+                phdyn = phdr;
 	    break;
 
 	case PT_TLS:
+            /*
+             * XXX Dapeng: To properly support TLS for the sub-objects we'd need
+             * to figure out which PT_TLS entry corresponds to which sub-object,
+             * which is not very clean to do right now.
+             */
 	    phtls = phdr;
 	    break;
 
@@ -232,6 +247,27 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	    }
 	    note_end = note_start + phdr->p_filesz;
 	    break;
+
+        case PT_OBJECT:
+            if (ohdr != NULL) {
+                _rtld_error("%s: Duplicate PT_OBJECT entries", path);
+                goto error;
+            }
+            if (phdr->p_filesz == 0 || (phdr->p_filesz % sizeof(*ohdr)) != 0) {
+                _rtld_error("%s: Invalid PT_OBJECT entry", path);
+                goto error;
+            }
+            ohdr = mmap(NULL,
+                rtld_round_page(phdr->p_offset + phdr->p_filesz) - rtld_trunc_page(phdr->p_offset),
+                PROT_READ, MAP_PRIVATE, fd,
+                rtld_trunc_page(phdr->p_offset));
+            if (ohdr == MAP_FAILED) {
+                _rtld_error("%s: error mapping PT_OBJECT (%d)", path, errno);
+                goto error;
+            }
+            ohdr = (Elf_Ohdr *)((char *)ohdr + (phdr->p_offset - rtld_trunc_page(phdr->p_offset)));
+            ohdr_end = (Elf_Ohdr *)((char *)ohdr + phdr->p_filesz);
+            break;
 	}
 
 	++phdr;
@@ -377,8 +413,13 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     obj->mapbase = mapbase;
     obj->mapsize = mapsize;
     obj->vaddrbase = base_vaddr;
+    if (ohdr != NULL) {
+        obj->mapsize = ohdr->o_memsz;
+        obj->mapbase = cheri_setbounds(obj->mapbase + ohdr->o_vaddr,
+            obj->mapsize);
+    }
 
-    obj->relocbase = mapbase - base_vaddr;
+    obj->relocbase = obj->mapbase - base_vaddr;
 #ifdef __CHERI_PURE_CAPABILITY__
     if (obj->vaddrbase != 0) {
 	rtld_fdprintf(STDERR_FILENO, "%s: nonzero vaddrbase %zd may be broken "
@@ -424,7 +465,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	obj->tlsalign = phtls->p_align;
 	obj->tlspoffset = phtls->p_offset;
 	obj->tlsinitsize = phtls->p_filesz;
-	obj->tlsinit = mapbase + phtls->p_vaddr;
+	obj->tlsinit = obj->mapbase + phtls->p_vaddr;
     }
 #ifndef __CHERI_PURE_CAPABILITY__
     obj->stack_flags = stack_flags;
@@ -437,6 +478,44 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     if (note_map != NULL)
 	munmap(note_map, note_map_len);
     munmap(hdr, page_size);
+
+    /*
+     * XXX Dapeng: Duplicate the above code for each sub-object.
+     */
+    if (ohdr == NULL)
+        return (obj);
+
+    /* Start iterating from the second entry */
+    while (++ohdr < ohdr_end) {
+        subobj = obj_new();
+        if (sb != NULL) {
+                subobj->dev = sb->st_dev;
+                subobj->ino = sb->st_ino;
+        }
+        subobj->mapsize = ohdr->o_memsz;
+        subobj->mapbase = cheri_setbounds(mapbase + ohdr->o_vaddr, subobj->mapsize);
+        subobj->vaddrbase = base_vaddr;
+
+        /* Shift the relocation base by the offset of the sub-object */
+        subobj->relocbase = subobj->mapbase - base_vaddr;
+        /*
+         * XXX Dapeng: These bounds are incorrect but are not used anyway.
+         */
+        subobj->text_rodata_start_offset = text_rodata_start_offset;
+        subobj->text_rodata_end_offset = text_rodata_end_offset;
+        subobj->text_rodata_cap = subobj->relocbase;
+        fix_obj_mapping_cap_permissions(subobj, path);
+        /* Find the dynamic table using the index from the object header */
+        subobj->dynamic = (const Elf_Dyn *)(subobj->relocbase + (phdr_start[ohdr->o_dynamicndx].p_vaddr - ohdr->o_vaddr));
+        /* subobj->phdr is NULL */
+        /* subobj->phsize is 0 */
+        /* subobj->interp is NULL */
+        /* subobj->tls* are NULL as TLS is not supported yet */
+        /* subobj->relro* are NULL as RELRO is no supported yet */
+        /* Notes are not processed for sub-objects */
+
+        STAILQ_INSERT_TAIL(&obj->subobjects, subobj, next_subobject);
+    }
     return (obj);
 
 error1:
@@ -602,6 +681,7 @@ obj_new(void)
     STAILQ_INIT(&obj->dldags);
     STAILQ_INIT(&obj->dagmembers);
     STAILQ_INIT(&obj->names);
+    STAILQ_INIT(&obj->subobjects);
     return obj;
 }
 

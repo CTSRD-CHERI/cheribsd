@@ -70,6 +70,7 @@ __ElfType(Word);
 __ElfType(Ehdr);
 __ElfType(Shdr);
 __ElfType(Phdr);
+__ElfType(Ohdr);
 __ElfType(Dyn);
 __ElfType(Rel);
 __ElfType(Rela);

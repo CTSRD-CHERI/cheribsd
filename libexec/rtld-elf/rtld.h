@@ -281,6 +281,8 @@ typedef struct Struct_Obj_Entry {
     uint16_t compart_id;
     const struct func_sig *sigtab;
 #endif
+    STAILQ_HEAD(, Struct_Obj_Entry) subobjects;
+    STAILQ_ENTRY(Struct_Obj_Entry) next_subobject;
 
     void* init_ptr;		/* Initialization function to call */
     void* fini_ptr;		/* Termination function to call */
