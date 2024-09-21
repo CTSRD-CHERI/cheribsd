@@ -1004,6 +1004,23 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     obj_count++;
     obj_loads++;
 
+    Obj_Entry *subobj;
+    STAILQ_FOREACH(subobj, &obj_main->subobjects, next_subobject) {
+	subobj->path = obj_main->path;
+	if (!digest_dynamic(subobj, 0)) {
+	    rtld_fdprintf(STDERR_FILENO, "digest_dynamic failed");
+	    abort();
+	}
+	linkmap_add(subobj);
+	/*
+	 * All subobjects should have an SONAME, so they should be automatically
+	 * registered as a compartment.
+	 */
+	TAILQ_INSERT_TAIL(&obj_list, subobj, next);
+	obj_count++;
+	obj_loads++;
+    }
+
     /* Initialize a fake symbol for resolving undefined weak references. */
     sym_zero.st_info = ELF_ST_INFO(STB_GLOBAL, STT_NOTYPE);
     sym_zero.st_shndx = SHN_UNDEF;
@@ -3283,6 +3300,24 @@ do_load_object(int fd, const char *name, char *path, struct stat *sbp,
 	dbg("  WARNING: %s has impure text", obj->path);
     LD_UTRACE(UTRACE_LOAD_OBJECT, obj, obj->mapbase, obj->mapsize, 0,
 	obj->path);
+
+    Obj_Entry *subobj;
+    STAILQ_FOREACH(subobj, &obj->subobjects, next_subobject) {
+	subobj->path = obj->path;
+	subobj->dlopened = (flags & RTLD_LO_DLOPEN) != 0;
+	if (!digest_dynamic(subobj, 0)) {
+	    rtld_fdprintf(STDERR_FILENO, "digest_dynamic failed");
+	    abort();
+	}
+	/*
+	 * All subobjects should have an SONAME, so they should be automatically
+	 * registered as a compartment.
+	 */
+	TAILQ_INSERT_TAIL(&obj_list, subobj, next);
+	obj_count++;
+	obj_loads++;
+	linkmap_add(subobj);
+    }
 
     return (obj);
 
