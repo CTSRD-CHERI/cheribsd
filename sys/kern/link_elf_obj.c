@@ -155,8 +155,8 @@ static long	link_elf_strtab_get(linker_file_t, caddr_t *);
 static void	link_elf_propagate_vnets(linker_file_t);
 #endif
 
-static int	elf_obj_lookup(linker_file_t lf, Elf_Size symidx, int deps,
-		    Elf_Addr *);
+static int	elf_obj_lookup(linker_file_t lf, elf_object_t object,
+		    Elf_Size symidx, int deps, Elf_Addr *);
 
 static kobj_method_t link_elf_methods[] = {
 	KOBJMETHOD(linker_lookup_symbol,	link_elf_lookup_symbol),
@@ -1443,7 +1443,7 @@ relocate_file1(elf_file_t ef, bool ifuncs)
 			if ((ELF_ST_TYPE(sym->st_info) == STT_GNU_IFUNC ||
 			    elf_is_ifunc_reloc(rel->r_info)) != ifuncs)
 				continue;
-			if (elf_reloc(&ef->lf, base, rel, ELF_RELOC_REL,
+			if (elf_reloc(&ef->lf, NULL, base, rel, ELF_RELOC_REL,
 			    elf_obj_lookup)) {
 				symname = symbol_name(ef, rel->r_info);
 				printf("link_elf_obj: symbol %s undefined\n",
@@ -1478,7 +1478,7 @@ relocate_file1(elf_file_t ef, bool ifuncs)
 			if ((ELF_ST_TYPE(sym->st_info) == STT_GNU_IFUNC ||
 			    elf_is_ifunc_reloc(rela->r_info)) != ifuncs)
 				continue;
-			if (elf_reloc(&ef->lf, base, rela, ELF_RELOC_RELA,
+			if (elf_reloc(&ef->lf, NULL, base, rela, ELF_RELOC_RELA,
 			    elf_obj_lookup)) {
 				symname = symbol_name(ef, rela->r_info);
 				printf("link_elf_obj: symbol %s undefined\n",
@@ -1747,7 +1747,8 @@ elf_obj_cleanup_globals_cache(elf_file_t ef)
  * the case that the symbol can be found through the hash table.
  */
 static int
-elf_obj_lookup(linker_file_t lf, Elf_Size symidx, int deps, Elf_Addr *res)
+elf_obj_lookup(linker_file_t lf, elf_object_t object __unused, Elf_Size symidx,
+    int deps, Elf_Addr *res)
 {
 	elf_file_t ef = (elf_file_t)lf;
 	Elf_Sym *sym;
@@ -1907,7 +1908,7 @@ link_elf_reloc_local(linker_file_t lf, bool ifuncs)
 			if ((ELF_ST_TYPE(sym->st_info) == STT_GNU_IFUNC ||
 			    elf_is_ifunc_reloc(rel->r_info)) != ifuncs)
 				continue;
-			if (elf_reloc_local(lf, base, rel, ELF_RELOC_REL,
+			if (elf_reloc_local(lf, NULL, base, rel, ELF_RELOC_REL,
 			    elf_obj_lookup) != 0)
 				return (ENOEXEC);
 		}
@@ -1937,8 +1938,8 @@ link_elf_reloc_local(linker_file_t lf, bool ifuncs)
 			if ((ELF_ST_TYPE(sym->st_info) == STT_GNU_IFUNC ||
 			    elf_is_ifunc_reloc(rela->r_info)) != ifuncs)
 				continue;
-			if (elf_reloc_local(lf, base, rela, ELF_RELOC_RELA,
-			    elf_obj_lookup) != 0)
+			if (elf_reloc_local(lf, NULL, base, rela,
+			    ELF_RELOC_RELA, elf_obj_lookup) != 0)
 				return (ENOEXEC);
 		}
 	}
