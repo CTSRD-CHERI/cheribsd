@@ -41,7 +41,6 @@
 #include <sys/kernel.h>
 #include <sys/sdt.h>
 #include <sys/systm.h>
-#include <sys/compartment.h>
 
 #include <opencrypto/cryptodev.h>
 #include <opencrypto/deflate.h>
