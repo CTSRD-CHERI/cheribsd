@@ -356,8 +356,8 @@ elf_is_ifunc_reloc(Elf_Size r_info __unused)
  * FIXME: only RISCV64 is supported.
  */
 static int
-elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
-    int type, int local, elf_lookup_fn lookup)
+elf_reloc_internal(linker_file_t lf, elf_object_t object, char *relocbase,
+    const void *data, int type, int local, elf_lookup_fn lookup)
 {
 	Elf_Size rtype, symidx;
 	const Elf_Rela *rela;
@@ -394,7 +394,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		break;
 
 	case R_RISCV_64:
-		error = lookup(lf, symidx, 1, &addr);
+		error = lookup(lf, object, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 
@@ -407,7 +407,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		break;
 
 	case R_RISCV_JUMP_SLOT:
-		error = lookup(lf, symidx, 1, &addr);
+		error = lookup(lf, object, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 
@@ -429,7 +429,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		break;
 
 	case R_RISCV_JAL:
-		error = lookup(lf, symidx, 1, &addr);
+		error = lookup(lf, object, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 
@@ -456,7 +456,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		 * of the sequence of AUIPC and JALR.
 		 */
 		/* Calculate and check the pc relative offset. */
-		error = lookup(lf, symidx, 1, &addr);
+		error = lookup(lf, object, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 
@@ -481,7 +481,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		break;
 
 	case R_RISCV_PCREL_HI20:
-		error = lookup(lf, symidx, 1, &addr);
+		error = lookup(lf, object, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 
@@ -497,7 +497,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		break;
 
 	case R_RISCV_PCREL_LO12_I:
-		error = lookup(lf, symidx, 1, &addr);
+		error = lookup(lf, object, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 
@@ -512,7 +512,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		break;
 
 	case R_RISCV_PCREL_LO12_S:
-		error = lookup(lf, symidx, 1, &addr);
+		error = lookup(lf, object, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 
@@ -528,7 +528,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		break;
 
 	case R_RISCV_HI20:
-		error = lookup(lf, symidx, 1, &addr);
+		error = lookup(lf, object, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 
@@ -544,7 +544,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		break;
 
 	case R_RISCV_LO12_I:
-		error = lookup(lf, symidx, 1, &addr);
+		error = lookup(lf, object, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 
@@ -559,7 +559,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		break;
 
 	case R_RISCV_LO12_S:
-		error = lookup(lf, symidx, 1, &addr);
+		error = lookup(lf, object, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 
@@ -576,7 +576,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	case R_RISCV_CHERI_CAPABILITY:
-		error = LINKER_SYMIDX_CAPABILITY(lf, symidx, 1, &cap);
+		error = LINKER_SYMIDX_CAPABILITY(lf, object, symidx, 1, &cap);
 		if (error != 0)
 			return (-1);
 
@@ -600,19 +600,21 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 }
 
 int
-elf_reloc(linker_file_t lf, char *relocbase, const void *data, int type,
-    elf_lookup_fn lookup)
+elf_reloc(linker_file_t lf, elf_object_t object, char *relocbase,
+    const void *data, int type, elf_lookup_fn lookup)
 {
 
-	return (elf_reloc_internal(lf, relocbase, data, type, 0, lookup));
+	return (elf_reloc_internal(lf, object, relocbase, data, type, 0,
+	    lookup));
 }
 
 int
-elf_reloc_local(linker_file_t lf, char *relocbase, const void *data,
-    int type, elf_lookup_fn lookup)
+elf_reloc_local(linker_file_t lf, elf_object_t object, char *relocbase,
+    const void *data, int type, elf_lookup_fn lookup)
 {
 
-	return (elf_reloc_internal(lf, relocbase, data, type, 1, lookup));
+	return (elf_reloc_internal(lf, object, relocbase, data, type, 1,
+	    lookup));
 }
 
 int
