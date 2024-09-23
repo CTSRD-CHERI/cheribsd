@@ -538,8 +538,14 @@ link_elf_init(void* arg)
 #ifdef SPARSE_MAPPING
 	ef->vmobject = NULL;
 #endif
+
 	error = elf_object_init(&ef->pobject, 0, ef->address,
-	    cheri_getlength(ef->address), dp, NULL);
+#ifdef RELOCATABLE_KERNEL
+	    -(intptr_t)ef->address,
+#else
+	    VM_MAX_ADDRESS,
+#endif
+	    dp, NULL);
 	if (error != 0)
 		panic("%s: Can't initialize an object for kernel", __func__);
 
@@ -1070,7 +1076,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	ef->vmobject = NULL;
 #endif
 	error = elf_object_init(&ef->pobject, 0, ef->address,
-	    cheri_getlength(ef->address),
+	    *(size_t *)sizeptr,
 	    (Elf_Dyn *)(ef->address + *(vm_offset_t *)dynptr),
 	    NULL);
 	if (error != 0)
@@ -1522,8 +1528,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 
 		object = TAILQ_FIRST(&ef->objects);
 
-		error = elf_object_init(object, 0, ef->address,
-		    cheri_getlength(ef->address),
+		error = elf_object_init(object, 0, ef->address, mapsize,
 		    (Elf_Dyn *)(ef->address + dynphdr->p_vaddr - base_vaddr),
 		    NULL);
 		if (error != 0)
@@ -2606,7 +2611,12 @@ link_elf_ireloc(caddr_t kmdp)
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif
 	error = elf_object_init(&ef->pobject, 0, ef->address,
-	    cheri_getlength(ef->address), (Elf_Dyn *)&_DYNAMIC, NULL);
+#ifdef RELOCATABLE_KERNEL
+	    -(intptr_t)ef->address,
+#else
+	    VM_MAX_ADDRESS,
+#endif
+	    (Elf_Dyn *)&_DYNAMIC, NULL);
 	if (error != 0)
 		panic("%s: Can't initialize an object for kernel", __func__);
 	parse_dynamic_object(&ef->pobject, ef);
