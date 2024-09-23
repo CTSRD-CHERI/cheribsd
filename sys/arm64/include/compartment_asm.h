@@ -33,7 +33,7 @@
 #ifndef _MACHINE_COMPARTMENT_ASM_H_
 #define	_MACHINE_COMPARTMENT_ASM_H_
 
-#include <machine/_compartment.h>
+#include <sys/_compartment.h>
 
 /*
  * This header file includes compartmentalization-related macros for assembly
