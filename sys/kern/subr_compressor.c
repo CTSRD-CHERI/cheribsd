@@ -38,7 +38,6 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 
-#include <sys/compartment.h>
 #include <sys/compressor.h>
 #include <sys/endian.h>
 #include <sys/kernel.h>
