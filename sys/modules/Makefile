@@ -84,8 +84,6 @@ SUBDIR=	\
 	${_cfi} \
 	${_chromebook_platform} \
 	${_ciss} \
-	compartment_function \
-	compartment_test \
 	${_coretemp} \
 	${_cpsw} \
 	${_cpuctl} \
@@ -924,6 +922,12 @@ _bcm283x_pwm=  bcm283x_pwm
 # LLVM 10 crashes when building if_malo_pci.c, fixed in LLVM11:
 # https://bugs.llvm.org/show_bug.cgi?id=44351
 _malo=	malo
+.endif
+
+# Modules explicitly making use of kernel compartmentalization.
+.if ${KERN_OPTS:MCHERI_COMPARTMENTALIZE_KERNEL}
+SUBDIR+=	compartment_function
+SUBDIR+=	compartment_test
 .endif
 
 # Some of these work in hybrid kernels but we disable them for consistency
