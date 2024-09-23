@@ -639,16 +639,6 @@ linker_find_file_by_ptr(uintptr_t ptr)
 	return (lf);
 }
 
-uintcap_t
-linker_file_capability(linker_file_t lf, uintcap_t ptr)
-{
-	uintcap_t cap;
-
-	cap = cheri_setaddress((uintcap_t)lf->address, ptr);
-	cap = cheri_andperm(cap, cheri_getperm(ptr));
-	return (cheri_sealentry(cheri_capmode(cap)));
-}
-
 int
 linker_file_foreach(linker_predicate_t *predicate, void *context)
 {
