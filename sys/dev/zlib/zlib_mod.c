@@ -42,13 +42,13 @@
 #include <contrib/zlib/zlib.h>
 #include <contrib/zlib/zutil.h>
 
-SDT_PROVIDER_DECLARE(zlib);
+SDT_PROVIDER_DEFINE(zlib);
 SDT_PROBE_DEFINE3(zlib, , init, error,
     "int", "int", "int");
 SDT_PROBE_DEFINE6(zlib, , write, error3,
     "int", "int", "int", "int", "int", "int");
-SDT_PROBE_DEFINE6(zlib, , write, iteration,
-    "int", "int", "int", "int", "int", "int");
+SDT_PROBE_DEFINE5(zlib, , write, iteration,
+    "int", "int", "int", "int", "int");
 
 #define	ZLIB_PROBE_ERROR(fun, deflate, ret)				\
 	SDT_PROBE3(zlib, , fun, error, deflate, __LINE__, ret)
@@ -56,7 +56,7 @@ SDT_PROBE_DEFINE6(zlib, , write, iteration,
 	SDT_PROBE6(zlib, , fun, error3, deflate, __LINE__, ret, arg0,	\
 	arg1, arg2)
 #define	ZLIB_PROBE_ITERATION(fun, deflate, arg0, arg1, arg2)		\
-	SDT_PROBE5(zlib, , fun, 0, deflate, __LINE__, arg0, arg1, arg2)
+	SDT_PROBE5(zlib, , fun, iteration, deflate, __LINE__, arg0, arg1, arg2)
 
 struct zlib_stream {
 	bool			zls_deflate;	/* deflate/inflate flag */
