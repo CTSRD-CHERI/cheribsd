@@ -433,6 +433,7 @@ vm_thread_dispose(struct thread *td)
 	vm_kstack_dispose(ks, pages);
 }
 
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 /*
  * Initialise the kernel stack for a compartment.
  *
@@ -472,6 +473,7 @@ vm_compartment_dispose(struct compartment *compartment)
 	compartment->c_kstackptr = 0;
 	vm_kstack_dispose(ks, kstack_pages);
 }
+#endif
 
 /*
  * Allocate physical pages, following the specified NUMA policy, to back a

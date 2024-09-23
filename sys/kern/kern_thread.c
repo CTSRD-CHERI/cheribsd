@@ -799,10 +799,12 @@ thread_alloc(int pages)
 	}
 	td->td_tid = tid;
 	bzero(&td->td_sa.args, sizeof(td->td_sa.args));
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	TAILQ_INIT(&td->td_compartments);
 	if (!thread_alloc_compartments(td)) {
 		return (NULL);
 	}
+#endif
 	kmsan_thread_alloc(td);
 	cpu_thread_alloc(td);
 	EVENTHANDLER_DIRECT_INVOKE(thread_ctor, td);
@@ -821,6 +823,7 @@ thread_alloc_stack(struct thread *td, int pages)
 	return (1);
 }
 
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 /*
  * Allocate compiled-in kernel compartments.
  */
@@ -846,6 +849,7 @@ thread_free_compartments(struct thread *td)
 		compartment_destroy(compartment);
 	}
 }
+#endif
 
 /*
  * Deallocate a thread.
@@ -861,7 +865,9 @@ thread_free_batched(struct thread *td)
 	cpu_thread_free(td);
 	if (td->td_kstack != 0)
 		vm_thread_dispose(td);
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	thread_free_compartments(td);
+#endif
 	callout_drain(&td->td_slpcallout);
 	/*
 	 * Freeing handled by the caller.

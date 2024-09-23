@@ -85,7 +85,9 @@
 
 struct elf_object {
 	unsigned int	id;		/* Identifier in the object table. */
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	u_long		compartment_id;	/* Identifier for a compartment. */
+#endif
 	char		*name;		/* Name of the object. */
 	caddr_t		address;	/* Relocation address */
 	size_t		size;		/* Size of the object. */
@@ -1631,6 +1633,7 @@ out:
 	return (error);
 }
 
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 void
 elf_compartment_entry(linker_file_t lf, uintcap_t ptr, u_long *idp,
     uintptr_t *ptrp)
@@ -1655,6 +1658,7 @@ elf_compartment_entry(linker_file_t lf, uintcap_t ptr, u_long *idp,
 	cap = cheri_sealentry(cheri_capmode(cap));
 	*ptrp = (uintptr_t)cap;
 }
+#endif
 
 Elf_Addr
 elf_relocaddr(linker_file_t lf, Elf_Addr x)
@@ -2357,7 +2361,9 @@ elf_object_init(elf_object_t object, unsigned int id, caddr_t address,
 	}
 
 	object->id = id;
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	object->compartment_id = compartment_id_create();
+#endif
 	object->address = address;
 	object->size = size;
 	object->dynamic = dynamic;

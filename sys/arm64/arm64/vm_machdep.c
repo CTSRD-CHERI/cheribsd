@@ -131,7 +131,11 @@ EXECUTIVE_ENTRY(void, cpu_fork, (struct thread *td1, struct proc *p2,
 	td2->td_pcb->pcb_x[PCB_X19] = (uintptr_t)fork_return;
 	td2->td_pcb->pcb_x[PCB_X20] = (uintptr_t)td2;
 	td2->td_pcb->pcb_x[PCB_LR] =
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	    (uintptr_t)executive_get_function((uintptr_t)fork_trampoline);
+#else
+	    (uintptr_t)fork_trampoline;
+#endif
 	td2->td_pcb->pcb_sp = (uintptr_t)td2->td_frame;
 
 	vfp_new_thread(td2, td1, true);
@@ -210,7 +214,11 @@ EXECUTIVE_ENTRY(void, cpu_copy_thread, (struct thread *td,
 	td->td_pcb->pcb_x[PCB_X19] = (uintptr_t)fork_return;
 	td->td_pcb->pcb_x[PCB_X20] = (uintptr_t)td;
 	td->td_pcb->pcb_x[PCB_LR] =
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	    (uintptr_t)executive_get_function((uintptr_t)fork_trampoline);
+#else
+	    (uintptr_t)fork_trampoline;
+#endif
 	td->td_pcb->pcb_sp = (uintptr_t)td->td_frame;
 
 	/* Update VFP state for the new thread */
@@ -333,6 +341,7 @@ cpu_thread_clean(struct thread *td)
 {
 }
 
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 void
 cpu_compartment_alloc(struct compartment *compartment)
 {
@@ -344,6 +353,7 @@ cpu_compartment_alloc(struct compartment *compartment)
 	    (vm_pointer_t)(((vm_pointer_t *)compartment->c_kstackptr) - 1);
 	*((vm_pointer_t *)compartment->c_kstackptr) = compartment->c_kstackptr;
 }
+#endif
 
 /*
  * Intercept the return address from a freshly forked process that has NOT

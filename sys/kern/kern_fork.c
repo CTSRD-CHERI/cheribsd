@@ -1031,7 +1031,9 @@ fork1(struct thread *td, struct fork_req *fr)
 		proc_linkup(newproc, td2);
 	} else {
 		kmsan_thread_alloc(td2);
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 		thread_free_compartments(td2);
+#endif
 		if (td2->td_kstack == 0 || td2->td_kstack_pages != pages) {
 			if (td2->td_kstack != 0)
 				vm_thread_dispose(td2);
@@ -1040,10 +1042,12 @@ fork1(struct thread *td, struct fork_req *fr)
 				goto fail2;
 			}
 		}
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 		if (!thread_alloc_compartments(td2)) {
 			error = ENOMEM;
 			goto fail2;
 		}
+#endif
 	}
 
 	if ((flags & RFMEM) == 0) {
