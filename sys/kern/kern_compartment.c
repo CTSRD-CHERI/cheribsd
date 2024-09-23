@@ -222,7 +222,7 @@ compartment_trampoline_create(const linker_file_t lf, int type, void *data,
 	} else {
 		/*
 		 * We're creating a trampoline for the kernel while the kernel
-		 * is being relocated and linker_file_capability() isn't
+		 * is being relocated and elf_compartment_entry() isn't
 		 * available.
 		 *
 		 * Use PCC instead of the base address of the linker file.

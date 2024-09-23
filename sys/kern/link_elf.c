@@ -1670,7 +1670,7 @@ elf_compartment_entry(linker_file_t lf, uintcap_t ptr, u_long *idp,
 			break;
 	}
 	KASSERT(object != NULL,
-	    ("elf_capability: unexpected pointer %p", (void *)ptr));
+	    ("elf_compartment_entry: unexpected pointer %p", (void *)ptr));
 
 	*idp = object->compartment_id;
 	cap = cheri_setaddress((uintcap_t)object->address, ptr);
