@@ -270,8 +270,8 @@ elf_is_ifunc_reloc(Elf_Size r_info)
 
 /* Process one elf relocation with addend. */
 static int
-elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
-    int type, bool late_ifunc, elf_lookup_fn lookup)
+elf_reloc_internal(linker_file_t lf, elf_object_t object, char *relocbase,
+    const void *data, int type, bool late_ifunc, elf_lookup_fn lookup)
 {
 	Elf64_Addr *where, val;
 	Elf32_Addr *where32, val32;
@@ -323,7 +323,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 			break;
 
 		case R_X86_64_64:	/* S + A */
-			error = lookup(lf, symidx, 1, &addr);
+			error = lookup(lf, object, symidx, 1, &addr);
 			val = addr + addend;
 			if (error != 0)
 				return (-1);
@@ -334,7 +334,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		case R_X86_64_PC32:	/* S + A - P */
 		case R_X86_64_PLT32:	/* L + A - P, L is PLT location for
 					   the symbol, which we treat as S */
-			error = lookup(lf, symidx, 1, &addr);
+			error = lookup(lf, object, symidx, 1, &addr);
 			where32 = (Elf32_Addr *)where;
 			val32 = (Elf32_Addr)(addr + addend - (Elf_Addr)where);
 			if (error != 0)
@@ -344,7 +344,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 			break;
 
 		case R_X86_64_32S:	/* S + A sign extend */
-			error = lookup(lf, symidx, 1, &addr);
+			error = lookup(lf, object, symidx, 1, &addr);
 			val32 = (Elf32_Addr)(addr + addend);
 			where32 = (Elf32_Addr *)where;
 			if (error != 0)
@@ -364,7 +364,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 
 		case R_X86_64_GLOB_DAT:	/* S */
 		case R_X86_64_JMP_SLOT:	/* XXX need addend + offset */
-			error = lookup(lf, symidx, 1, &addr);
+			error = lookup(lf, object, symidx, 1, &addr);
 			if (error != 0)
 				return (-1);
 			if (*where != addr)
@@ -394,27 +394,30 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 }
 
 int
-elf_reloc(linker_file_t lf, char *relocbase, const void *data, int type,
-    elf_lookup_fn lookup)
+elf_reloc(linker_file_t lf, elf_object_t object, char *relocbase,
+    const void *data, int type, elf_lookup_fn lookup)
 {
 
-	return (elf_reloc_internal(lf, relocbase, data, type, false, lookup));
+	return (elf_reloc_internal(lf, object, relocbase, data, type, false,
+	    lookup));
 }
 
 int
-elf_reloc_local(linker_file_t lf, char *relocbase, const void *data,
-    int type, elf_lookup_fn lookup)
+elf_reloc_local(linker_file_t lf, elf_object_t object, char *relocbase,
+    const void *data, int type, elf_lookup_fn lookup)
 {
 
-	return (elf_reloc_internal(lf, relocbase, data, type, false, lookup));
+	return (elf_reloc_internal(lf, object, relocbase, data, type, false,
+	    lookup));
 }
 
 int
-elf_reloc_late(linker_file_t lf, char *relocbase, const void *data,
-    int type, elf_lookup_fn lookup)
+elf_reloc_late(linker_file_t lf, elf_object_t object, char *relocbase,
+    const void *data, int type, elf_lookup_fn lookup)
 {
 
-	return (elf_reloc_internal(lf, relocbase, data, type, true, lookup));
+	return (elf_reloc_internal(lf, object, relocbase, data, type, true,
+	    lookup));
 }
 
 int
