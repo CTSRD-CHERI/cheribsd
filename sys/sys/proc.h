@@ -172,7 +172,9 @@ struct pargs {
  * either lock is sufficient for read access, but both locks must be held
  * for write access.
  */
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 struct compartment;
+#endif
 struct cpuset;
 struct filecaps;
 struct filemon;
@@ -392,7 +394,9 @@ struct thread {
 	int		td_pmcpend;
 	void		*td_remotereq;	/* (c) dbg remote request. */
 	off_t		td_ktr_io_lim;	/* (k) limit for ktrace file size */
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	TAILQ_HEAD(, compartment) td_compartments;	/* (k) Thread compartments. */
+#endif
 #ifdef EPOCH_TRACE
 	SLIST_HEAD(, epoch_tracker) td_epochs;
 #endif
@@ -1261,11 +1265,15 @@ void	cpu_thread_alloc(struct thread *);
 void	cpu_thread_clean(struct thread *);
 void	cpu_thread_exit(struct thread *);
 void	cpu_thread_free(struct thread *);
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 void	cpu_compartment_alloc(struct compartment *compartment);
+#endif
 struct	thread *thread_alloc(int pages);
 int	thread_check_susp(struct thread *td, bool sleep);
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 int	thread_alloc_compartments(struct thread *td);
 void	thread_free_compartments(struct thread *td);
+#endif
 void	thread_cow_get_proc(struct thread *newtd, struct proc *p);
 void	thread_cow_get(struct thread *newtd, struct thread *td);
 void	thread_cow_free(struct thread *td);

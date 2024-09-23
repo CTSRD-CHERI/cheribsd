@@ -3915,7 +3915,7 @@ kern/kern_boottrace.c		standard
 kern/kern_cheri_revoke.c	standard
 kern/kern_clock.c		standard
 kern/kern_clocksource.c		standard
-kern/kern_compartment.c		optional cpu_cheri
+kern/kern_compartment.c		optional cheri_compartmentalize_kernel
 kern/kern_condvar.c		standard
 kern/kern_conf.c		standard
 kern/kern_cons.c		standard

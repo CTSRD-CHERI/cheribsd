@@ -56,13 +56,16 @@ bool unwind_frame(struct thread *, struct unwind_state *);
 static __inline bool
 kstack_contains(struct thread *td, vm_offset_t va, size_t len)
 {
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	struct compartment *compartment;
+#endif
 
 	if (va >= td->td_kstack && va + len >= va &&
 	    va + len <= td->td_kstack + td->td_kstack_pages * PAGE_SIZE -
 	    sizeof(struct pcb))
 		return (true);
 
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	TAILQ_FOREACH(compartment, &td->td_compartments, c_next) {
 		/*
 		 * A compartment stack does not contain a pcb object.
@@ -73,6 +76,7 @@ kstack_contains(struct thread *td, vm_offset_t va, size_t len)
 			return (true);
 		}
 	}
+#endif
 
 	return (false);
 }

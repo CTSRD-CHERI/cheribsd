@@ -797,14 +797,13 @@ thread_alloc(int pages)
 	}
 	td->td_tid = tid;
 	bzero(&td->td_sa.args, sizeof(td->td_sa.args));
-<<<<<<< HEAD
-	kasan_thread_alloc(td);
-=======
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	TAILQ_INIT(&td->td_compartments);
 	if (!thread_alloc_compartments(td)) {
 		return (NULL);
 	}
->>>>>>> cc61af2b4fe5 (Rework linking compartments to threads)
+#endif
+	kasan_thread_alloc(td);
 	kmsan_thread_alloc(td);
 	cpu_thread_alloc(td);
 	EVENTHANDLER_DIRECT_INVOKE(thread_ctor, td);
@@ -814,7 +813,9 @@ thread_alloc(int pages)
 int
 thread_recycle(struct thread *td, int pages)
 {
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	thread_free_compartments(td);
+#endif
 	if (td->td_kstack == 0 || td->td_kstack_pages != pages) {
 		if (td->td_kstack != 0)
 			vm_thread_dispose(td);
@@ -822,13 +823,16 @@ thread_recycle(struct thread *td, int pages)
 			return (ENOMEM);
 		cpu_thread_alloc(td);
 	}
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	if (!thread_alloc_compartments(td))
 		return (ENOMEM);
+#endif
 	kasan_thread_alloc(td);
 	kmsan_thread_alloc(td);
 	return (0);
 }
 
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 /*
  * Allocate compiled-in kernel compartments.
  */
@@ -854,6 +858,7 @@ thread_free_compartments(struct thread *td)
 		compartment_destroy(compartment);
 	}
 }
+#endif
 
 /*
  * Deallocate a thread.
@@ -869,7 +874,9 @@ thread_free_batched(struct thread *td)
 	cpu_thread_free(td);
 	if (td->td_kstack != 0)
 		vm_thread_dispose(td);
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	thread_free_compartments(td);
+#endif
 	callout_drain(&td->td_slpcallout);
 	/*
 	 * Freeing handled by the caller.
