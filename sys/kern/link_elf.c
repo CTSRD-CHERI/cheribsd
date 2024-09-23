@@ -197,14 +197,11 @@ static long	link_elf_strtab_get(linker_file_t, caddr_t *);
 #ifdef VIMAGE
 static void	link_elf_propagate_vnets(linker_file_t);
 #endif
-#ifdef __CHERI_PURE_CAPABILITY__
 static int	link_elf_symidx_address(linker_file_t, elf_object_t,
 		    unsigned long, int, ptraddr_t *);
+#ifdef __CHERI_PURE_CAPABILITY__
 static int	link_elf_symidx_capability(linker_file_t, elf_object_t,
 		    unsigned long, int, uintcap_t *);
-#else
-static int	link_elf_symidx_address(linker_file_t, unsigned long, int,
-		    ptraddr_t *);
 #endif
 static void	elf_init_objects(elf_file_t);
 static elf_object_t elf_object_create(elf_file_t ef);
@@ -2263,32 +2260,21 @@ link_elf_symidx_capability(linker_file_t lf, elf_object_t object,
     unsigned long symidx, int deps, uintcap_t *res)
 #else
 static int
-link_elf_symidx_address(linker_file_t lf, unsigned long symidx, int deps,
-    ptraddr_t *res)
+link_elf_symidx_address(linker_file_t lf, elf_object_t object,
+    unsigned long symidx, int deps, ptraddr_t *res)
 #endif
 {
-#ifndef __CHERI_PURE_CAPABILITY__
-	elf_file_t ef = (elf_file_t)lf;
-#endif
 	const Elf_Sym *sym;
 	const char *symbol;
 	caddr_t addr, start, base;
 
 	/* Don't even try to lookup the symbol if the index is bogus. */
-#ifdef __CHERI_PURE_CAPABILITY__
 	if (symidx >= object->nchains) {
-#else
-	if (symidx >= ef->nchains) {
-#endif
 		*res = 0;
 		return (EINVAL);
 	}
 
-#ifdef __CHERI_PURE_CAPABILITY__
 	sym = object->symtab + symidx;
-#else
-	sym = ef->symtab + symidx;
-#endif
 
 	/*
 	 * Don't do a full lookup when the symbol is local. It may even
@@ -2304,7 +2290,7 @@ link_elf_symidx_address(linker_file_t lf, unsigned long symidx, int deps,
 		*res = (uintcap_t)make_capability(sym, object->address +
 		    sym->st_value);
 #else
-		*res = ((ptraddr_t)ef->address + sym->st_value);
+		*res = ((ptraddr_t)object->address + sym->st_value);
 #endif
 		return (0);
 	}
@@ -2316,11 +2302,7 @@ link_elf_symidx_address(linker_file_t lf, unsigned long symidx, int deps,
 	 * always be added.
 	 */
 
-#ifdef __CHERI_PURE_CAPABILITY__
 	symbol = object->strtab + sym->st_name;
-#else
-	symbol = ef->strtab + sym->st_name;
-#endif
 
 	/* Force a lookup failure if the symbol name is bogus. */
 	if (*symbol == 0) {
