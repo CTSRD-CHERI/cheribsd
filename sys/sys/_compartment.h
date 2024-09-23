@@ -30,8 +30,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _MACHINE__COMPARTMENT_H_
-#define	_MACHINE__COMPARTMENT_H_
+#ifndef _SYS__COMPARTMENT_H_
+#define	_SYS__COMPARTMENT_H_
 
 /*
  * This header file includes compartmentalization-related macros that are common
@@ -55,4 +55,4 @@
 #define	EXECUTIVE_ENTRY_NAME(name)	name
 #endif
 
-#endif	/* !_MACHINE__COMPARTMENT_H_ */
+#endif	/* !_SYS__COMPARTMENT_H_ */

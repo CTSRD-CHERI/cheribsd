@@ -33,7 +33,8 @@
 #ifndef _MACHINE_COMPARTMENT_H_
 #define	_MACHINE_COMPARTMENT_H_
 
-#include <machine/_compartment.h>
+#include <sys/_compartment.h>
+
 #include <machine/elf.h>
 #include <machine/ifunc.h>
 
@@ -42,7 +43,6 @@
  * code files.
  */
 
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 #define	COMPARTMENT_ADD_ENTRY(ret_type, name, args)			\
 	DEFINE_IFUNC(, ret_type, name, args)				\
 	{								\
@@ -85,14 +85,5 @@
 	    CHERI_PERM_EXECUTIVE) != 0,					\
 	    ("PCC %#lp has invalid permissions",			\
 	    (void *)cheri_getpcc()))
-#else
-#define	COMPARTMENT_ENTRY(ret_type, name, args)				\
-	ret_type							\
-	COMPARTMENT_ENTRY_NAME(name) args
-
-#define	EXECUTIVE_ENTRY(ret_type, name, args)				\
-	ret_type							\
-	EXECUTIVE_ENTRY_NAME(name) args
-#endif
 
 #endif	/* !_MACHINE_COMPARTMENT_H_ */

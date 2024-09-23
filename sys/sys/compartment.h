@@ -35,10 +35,12 @@
 
 #ifdef _KERNEL
 
+#include <sys/_compartment.h>
 #include <sys/malloc.h>
 #include <sys/linker.h>
 #include <sys/queue.h>
 
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 #include <machine/compartment.h>
 
 SYSCTL_DECL(_security_compartment);
@@ -66,6 +68,15 @@ void *executive_get_function(uintptr_t func);
 
 #ifdef MALLOC_DECLARE
 MALLOC_DECLARE(M_COMPARTMENT);
+#endif
+#else	/* CHERI_COMPARTMENTALIZE_KERNEL */
+#define	COMPARTMENT_ENTRY(ret_type, name, args)				\
+	ret_type							\
+	COMPARTMENT_ENTRY_NAME(name) args
+
+#define	EXECUTIVE_ENTRY(ret_type, name, args)				\
+	ret_type							\
+	EXECUTIVE_ENTRY_NAME(name) args
 #endif
 
 #endif	/* _KERNEL */
