@@ -84,7 +84,11 @@
 .macro buildptr_stack dregn, bootparamsn, sym, restricted = 0
 	mov	x\dregn, #(PAGE_SIZE * KSTACK_PAGES)
 	buildptr \bootparamsn, \sym, x\dregn
-	add	PTR(\dregn), PTR(\bootparamsn), x\dregn
+#if __has_feature(capabilities)
+	add	c\dregn, c\bootparamsn, x\dregn
+#else
+	add	x\dregn, x\bootparamsn, x\dregn
+#endif
 	/*
 	 * Can not yet enforce bounds between PCB and KSTACK as we have
 	 * no place to store the PCB pointer here.
@@ -94,9 +98,17 @@
 	/*
 	 * Make room for the saved restricted stack pointer.
 	 */
-	sub	PTRN(\dregn), PTRN(\dregn), PTR_WIDTH
+#if __has_feature(capabilities)
+	sub	c\dregn, c\dregn, PTR_WIDTH
+#else
+	sub	x\dregn, x\dregn, PTR_WIDTH
+#endif
 .else
-	sub	PTRN(\dregn), PTRN(\dregn), #PCB_SIZE
+#if __has_feature(capabilities)
+	sub	c\dregn, c\dregn, #PCB_SIZE
+#else
+	sub	x\dregn, x\dregn, #PCB_SIZE
+#endif
 .endif
 .endmacro
 
