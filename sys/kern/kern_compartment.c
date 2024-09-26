@@ -141,8 +141,10 @@ EXECUTIVE_ENTRY(struct compartment *, compartment_create_for_thread,
 {
 	struct compartment *compartment;
 
-	compartment = malloc(sizeof(*compartment), M_COMPARTMENT, M_WAITOK |
-	    M_ZERO);
+	compartment = malloc(sizeof(*compartment), M_COMPARTMENT, M_NOWAIT |
+	    M_USE_RESERVE | M_ZERO);
+	KASSERT(compartment != NULL, ("%s: unable to allocate a compartment",
+	    __func__));
 
 	if (!vm_compartment_new(compartment)) {
 		panic("compartment_create unable to allocate stack");
@@ -247,8 +249,10 @@ compartment_trampoline_create(const linker_file_t lf, int type, void *data,
 	 * TODO: Free the trampoline.
 	 */
 	if (lf != NULL) {
-		trampoline = malloc_exec(size, M_COMPARTMENT, M_WAITOK |
-		    M_ZERO);
+		trampoline = malloc_exec(size, M_COMPARTMENT, M_NOWAIT |
+		    M_USE_RESERVE | M_ZERO);
+		KASSERT(trampoline != NULL,
+		    ("%s: unable to allocate a trampoline", __func__));
 	} else {
 		if (compartment_entries_length >= PAGE_SIZE *
 		    COMPARTMENT_ENTRY_PAGES) {
