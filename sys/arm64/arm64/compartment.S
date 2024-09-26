@@ -156,6 +156,15 @@ compartment_entries_length:
 .endif
 
 	/*
+	 * Store the callee's current Restricted stack pointer at the bottom of
+	 * its own Restricted stack in case it changed in a nested call.
+	 */
+	mrs	c16, rcsp_el0
+	gclim	x17, c16
+	scvalue	c17, c16, x17
+	str	c16, [c17, #-CAP_WIDTH]
+
+	/*
 	 * Pop the caller's Restricted stack pointer and link register from the
 	 * trusted stack.
 	 */
@@ -170,6 +179,7 @@ compartment_entries_length:
 	 * Clear temporary registers.
 	 */
 	mov	x16, xzr
+	mov	x17, xzr
 
 	/*
 	 * Return to the caller, possibly in Restricted.
