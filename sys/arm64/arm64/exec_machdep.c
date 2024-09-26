@@ -691,15 +691,15 @@ EXECUTIVE_ENTRY(void, exec_setregs, (struct thread *td,
 
 #if __has_feature(capabilities)
 	td->td_pcb->pcb_cid_el0 = 0;
+#ifndef CHERI_COMPARTMENTALIZE_KERNEL
 	td->td_pcb->pcb_rcsp_el0 = 0;
 	td->td_pcb->pcb_rddc_el0 = 0;
-#ifndef CHERI_COMPARTMENTALIZE_KERNEL
 	td->td_pcb->pcb_rctpidr_el0 = 0;
 #endif
 	WRITE_SPECIALREG_CAP(cid_el0, 0);
+#ifndef CHERI_COMPARTMENTALIZE_KERNEL
 	WRITE_SPECIALREG_CAP(rcsp_el0, 0);
 	WRITE_SPECIALREG_CAP(rddc_el0, 0);
-#ifndef CHERI_COMPARTMENTALIZE_KERNEL
 	WRITE_SPECIALREG_CAP(rctpidr_el0, 0);
 #endif
 #endif
