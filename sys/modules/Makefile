@@ -928,6 +928,7 @@ _malo=	malo
 .if ${KERN_OPTS:MCHERI_COMPARTMENTALIZE_KERNEL}
 SUBDIR+=	compartment_function
 SUBDIR+=	compartment_test
+SUBDIR+=	zlib_mo
 .endif
 
 # Some of these work in hybrid kernels but we disable them for consistency
