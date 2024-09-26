@@ -1936,6 +1936,10 @@ vm_map_insert1(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	    max != VM_PROT_NONE))
 		return (KERN_INVALID_ARGUMENT);
 
+	if ((cow & (MAP_INHERIT_SHARE | MAP_INHERIT_NONE)) ==
+	    (MAP_INHERIT_SHARE | MAP_INHERIT_NONE))
+		return (KERN_INVALID_ARGUMENT);
+
 	protoeflags = 0;
 	if (cow & MAP_COPY_ON_WRITE)
 		protoeflags |= MAP_ENTRY_COW | MAP_ENTRY_NEEDS_COPY;
@@ -1961,6 +1965,8 @@ vm_map_insert1(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		protoeflags |= MAP_ENTRY_STACK_GAP_UP;
 	if (cow & MAP_INHERIT_SHARE)
 		inheritance = VM_INHERIT_SHARE;
+	else if (cow & MAP_INHERIT_NONE)
+		inheritance = VM_INHERIT_NONE;
 	else
 		inheritance = VM_INHERIT_DEFAULT;
 	if ((cow & MAP_CREATE_SHADOW) != 0)
