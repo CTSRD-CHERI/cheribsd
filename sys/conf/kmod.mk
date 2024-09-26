@@ -234,6 +234,11 @@ OBJS+=	${SRCS:N*.h:R:S/$/.o/g}
 PROG=	${KMOD}.ko
 .endif
 
+.if ${KMODMO} == YES
+# Multi-object ELF modules are compiled directly into a shared file with debug
+# symbols.
+FULLPROG=	${PROG}
+.else
 .if !defined(DEBUG_FLAGS) || ${MK_SPLIT_KERNEL_DEBUG} == "no"
 FULLPROG=	${PROG}
 .else
@@ -245,7 +250,7 @@ ${PROG}.debug: ${FULLPROG}
 	${OBJCOPY} --only-keep-debug ${FULLPROG} ${.TARGET}
 .endif
 
-.if ${__KLD_SHARED} == yes && ${KMODMO} != YES
+.if ${__KLD_SHARED} == yes
 ${FULLPROG}: ${KMOD}.kld
 	${LD} -m ${LD_EMULATION} -Bshareable -znotext -znorelro ${_LDFLAGS} \
 	    -o ${.TARGET} ${KMOD}.kld
@@ -253,6 +258,7 @@ ${FULLPROG}: ${KMOD}.kld
 	${OBJCOPY} --strip-debug ${.TARGET}
 .endif
 .endif
+.endif # ${KMODMO} != YES
 
 EXPORT_SYMS?=	NO
 .if ${EXPORT_SYMS} != YES
@@ -271,8 +277,9 @@ ${KMOD}.kld: ${OBJS} ${BLOB_OBJS}
 ${FULLPROG}: ${OBJS} ${BLOB_OBJS}
 .endif
 .if ${KMODMO} == YES
-	${LD_MO} -m ${LD_EMULATION} ${_LDFLAGS} ${LDSCRIPT_FLAGS} -Bshareable \
-	    -znotext -znorelro -o ${.TARGET} ${OBJS} ${BLOB_OBJS}
+	OBJCOPY_MO="${OBJCOPY_MO}" \
+	    ${LD_MO} -m ${LD_EMULATION} ${_LDFLAGS} ${LDSCRIPT_FLAGS} \
+	    -Bshareable -znotext -znorelro -o ${.TARGET} ${OBJS} ${BLOB_OBJS}
 .else
 	${LD} -m ${LD_EMULATION} ${_LDFLAGS} ${LDSCRIPT_FLAGS} -r \
 	    -o ${.TARGET} ${OBJS} ${BLOB_OBJS}
@@ -280,6 +287,9 @@ ${FULLPROG}: ${OBJS} ${BLOB_OBJS}
 .if ${MK_CTF} != "no"
 	${CTFMERGE} ${CTFFLAGS} -o ${.TARGET} ${OBJS} ${BLOB_OBJS}
 .endif
+.if ${KMODMO} == YES
+# Multi-object ELF modules cannot use EXPORT_SYMS.
+.else
 .if defined(EXPORT_SYMS)
 .if ${EXPORT_SYMS} != YES
 .if ${EXPORT_SYMS} == NO
@@ -297,9 +307,10 @@ ${FULLPROG}: ${OBJS} ${BLOB_OBJS}
 	${AWK} -v prefix=${PREFIX_SYMS} -f ${SYSDIR}/conf/kmod_syms_prefix.awk \
 	    ${.TARGET} /dev/null | ${XARGS} ${XARGS_J} % ${OBJCOPY} % ${.TARGET}
 .endif
-.if !defined(DEBUG_FLAGS) && (${__KLD_SHARED} == no || ${KMODMO} != YES)
+.if !defined(DEBUG_FLAGS) && ${__KLD_SHARED} == no
 	${OBJCOPY} --strip-debug ${.TARGET}
 .endif
+.endif # ${KMODMO} != YES
 
 _ILINKS=machine
 .if ${MACHINE_CPUARCH} == "i386" || ${MACHINE_CPUARCH} == "amd64"
@@ -365,10 +376,12 @@ realinstall: _kmodinstall
 _kmodinstall: .PHONY
 	${INSTALL} -T release -o ${KMODOWN} -g ${KMODGRP} -m ${KMODMODE} \
 	    ${_INSTALLFLAGS} ${PROG} ${DESTDIR}${KMODDIR}/
+.if ${KMODMO} != YES
 .if defined(DEBUG_FLAGS) && !defined(INSTALL_NODEBUG) && ${MK_KERNEL_SYMBOLS} != "no"
 	${INSTALL} -T dbg -o ${KMODOWN} -g ${KMODGRP} -m ${KMODMODE} \
 	    ${_INSTALLFLAGS} ${PROG}.debug ${DESTDIR}${KERN_DEBUGDIR}${KMODDIR}/
 .endif
+.endif # ${KMODMO} != YES
 
 .include <bsd.links.mk>
 
