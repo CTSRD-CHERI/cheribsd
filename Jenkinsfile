@@ -42,7 +42,7 @@ if (!env.CHANGE_ID && (archiveBranches.contains(env.BRANCH_NAME) || env.BRANCH_N
 }
 // Add an architecture selector for manual builds
 def allArchitectures = [
-        "aarch64", "amd64",
+        "aarch64",
         "morello-hybrid", "morello-purecap",
         "riscv64", "riscv64-hybrid", "riscv64-purecap"
 ]
