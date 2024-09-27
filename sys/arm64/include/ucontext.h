@@ -72,6 +72,14 @@ struct arm64_reg_context {
 };
 
 #define	ARM64_CTX_END		0xa5a5a5a5
+#define	ARM64_CTX_SVE		0x00657673
+
+struct sve_context {
+	struct arm64_reg_context sve_ctx;
+	__uint16_t	sve_vector_len;
+	__uint16_t	sve_flags;
+	__uint16_t	sve_reserved[2];
+};
 
 struct __mcontext {
 #if __CHERI_USER_ABI
