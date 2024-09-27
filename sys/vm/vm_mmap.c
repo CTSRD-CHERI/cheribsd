@@ -318,7 +318,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	 * derived from the passed capability.  In all other cases, the
 	 * new capability is derived from the per-thread mmap capability.
 	 *
-	 * If MAP_FIXED specified and addr does not meet the above
+	 * If MAP_FIXED is specified and addr does not meet the above
 	 * requirements, then MAP_EXCL is implied to prevent changing
 	 * page contents without permission.
 	 *
