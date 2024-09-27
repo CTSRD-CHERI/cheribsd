@@ -876,12 +876,10 @@ main(int argc, char *argv[])
 	 * failure status.
 	 */
 	assert(sizeof(*ccsp) <= (size_t)getpagesize());
-	ccsp = mmap(NULL, getpagesize(), PROT_READ | PROT_WRITE, MAP_ANON, -1,
-	    0);
+	ccsp = mmap(NULL, getpagesize(), PROT_READ | PROT_WRITE | PROT_CAP,
+	    MAP_ANON | MAP_SHARED, -1, 0);
 	if (ccsp == MAP_FAILED)
 		err(EX_OSERR, "mmap");
-	if (minherit(ccsp, getpagesize(), INHERIT_SHARE) < 0)
-		err(EX_OSERR, "minherit");
 
 	/*
 	 * Disable core dumps unless specifically enabled.
