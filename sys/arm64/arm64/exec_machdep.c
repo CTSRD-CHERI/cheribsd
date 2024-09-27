@@ -956,6 +956,8 @@ sys_sigreturn(struct thread *td, struct sigreturn_args *uap)
 	if (copyincap(uap->sigcntxp, &uc, sizeof(uc)))
 		return (EFAULT);
 
+	/* Stop an interrupt from causing the sve state to be dropped */
+	td->td_sa.code = -1;
 	error = set_mcontext(td, &uc.uc_mcontext);
 	if (error != 0)
 		return (error);

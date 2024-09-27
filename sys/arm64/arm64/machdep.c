@@ -113,10 +113,10 @@
 #include <dev/smbios/smbios.h>
 
 #ifdef __CHERI_PURE_CAPABILITY__
-_Static_assert(sizeof(struct pcb) == 1456, "struct pcb is incorrect size");
+_Static_assert(sizeof(struct pcb) == 1472, "struct pcb is incorrect size");
 _Static_assert(offsetof(struct pcb, pcb_fpusaved) == 336,
     "pcb_fpusaved changed offset");
-_Static_assert(offsetof(struct pcb, pcb_fpustate) == 400,
+_Static_assert(offsetof(struct pcb, pcb_fpustate) == 416,
     "pcb_fpustate changed offset");
 #elif __has_feature(capabilities)
 _Static_assert(sizeof(struct pcb) == 1344, "struct pcb is incorrect size");
