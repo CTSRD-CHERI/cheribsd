@@ -696,9 +696,12 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 		/*
 		 * Mapping blank space is trivial.
 		 */
+		if ((flags & MAP_SHARED) == 0) {
+			prot = VM_PROT_ADD_CAP(prot);
+			max_prot = VM_PROT_ADD_CAP(max_prot);
+		}
 		error = vm_mmap_object(&vms->vm_map, &addr, max_addr, size,
-		    VM_PROT_ADD_CAP(prot), VM_PROT_ADD_CAP(max_prot), flags,
-		    NULL, pos, FALSE, td);
+		    prot, max_prot, flags, NULL, pos, FALSE, td);
 	} else {
 		/*
 		 * Mapping file, get fp for validation and don't let the
@@ -2080,6 +2083,17 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
 		docow |= MAP_CHECK_EXCL;
 	if ((flags & MAP_GUARD) != 0)
 		docow |= MAP_CREATE_GUARD;
+	/*
+	 * If we're creating a new shared resevation with anonymous
+	 * backing and capability permissions, let the vm system know so
+	 * the entry can be backed and OBJ_SHARECAP set.
+	 *
+	 * XXX: there should be a permission check...
+	 */
+	if ((flags & (MAP_ANON | MAP_SHARED | MAP_RESERVATION_CREATE)) ==
+	    (MAP_ANON | MAP_SHARED | MAP_RESERVATION_CREATE) &&
+	    (maxprot & (VM_PROT_READ_CAP | VM_PROT_WRITE_CAP)) != 0)
+		docow |= MAP_SHARECAP;
 
 	if (fitit) {
 		if ((flags & MAP_ALIGNMENT_MASK) == MAP_ALIGNED_SUPER)

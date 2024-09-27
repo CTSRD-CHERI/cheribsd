@@ -138,6 +138,7 @@ static uma_zone_t vmspace_zone;
 static int vmspace_zinit(void *mem, int size, int flags);
 static void _vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min,
     vm_pointer_t max);
+static inline void vm_map_entry_back(vm_map_entry_t entry);
 static void vm_map_entry_deallocate(vm_map_entry_t entry, boolean_t system_map);
 static void vm_map_entry_delete(vm_map_t map, vm_map_entry_t entry);
 static void vm_map_entry_dispose(vm_map_t map, vm_map_entry_t entry);
@@ -2120,6 +2121,17 @@ charged:
 	KASSERT(cred == NULL || !ENTRY_CHARGED(new_entry),
 	    ("overcommit: vm_map_insert leaks vm_map %p", new_entry));
 	new_entry->cred = cred;
+
+	if ((cow & MAP_SHARECAP) != 0) {
+		KASSERT(new_entry->inheritance == VM_INHERIT_SHARE,
+		    ("MAP_SHARECAP on unshared mapping"));
+		if (new_entry->object.vm_object == NULL)
+			vm_map_entry_back(new_entry);
+		VM_OBJECT_WLOCK(new_entry->object.vm_object);
+		vm_object_set_flag(new_entry->object.vm_object, OBJ_HASCAP);
+		vm_object_set_flag(new_entry->object.vm_object, OBJ_SHARECAP);
+		VM_OBJECT_WUNLOCK(new_entry->object.vm_object);
+	}
 
 	/*
 	 * Insert the new entry into the list
