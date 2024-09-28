@@ -1923,6 +1923,7 @@ swap_pager_swapped_pages(vm_object_t object)
 static void
 swap_pager_swapoff_object(struct swdevt *sp, vm_object_t object)
 {
+	struct pctrie_iter pages;
 	struct page_range range;
 	struct swblk *sb;
 	vm_page_t m;
@@ -1937,6 +1938,7 @@ swap_pager_swapoff_object(struct swdevt *sp, vm_object_t object)
 
 	pi = 0;
 	i = 0;
+	vm_page_iter_init(&pages, object);
 	swp_pager_init_freerange(&range);
 	for (;;) {
 		if (i == 0 && (object->flags & OBJ_DEAD) != 0) {
@@ -1963,7 +1965,6 @@ swap_pager_swapoff_object(struct swdevt *sp, vm_object_t object)
 			if (sb == NULL)
 				break;
 			sb_empty = true;
-			m = NULL;
 		}
 
 		/* Skip an invalid block. */
@@ -1971,7 +1972,6 @@ swap_pager_swapoff_object(struct swdevt *sp, vm_object_t object)
 		if (blk == SWAPBLK_NONE || !swp_pager_isondev(blk, sp)) {
 			if (blk != SWAPBLK_NONE)
 				sb_empty = false;
-			m = NULL;
 			i++;
 			continue;
 		}
@@ -1980,8 +1980,7 @@ swap_pager_swapoff_object(struct swdevt *sp, vm_object_t object)
 		 * Look for a page corresponding to this block, If the found
 		 * page has pending operations, sleep and restart the scan.
 		 */
-		m = m != NULL ? vm_page_next(m) :
-		    vm_page_lookup(object, sb->p + i);
+		m = vm_page_iter_lookup(&pages, sb->p + i);
 		if (m != NULL && (m->oflags & VPO_SWAPINPROG) != 0) {
 			m->oflags |= VPO_SWAPSLEEP;
 			VM_OBJECT_SLEEP(object, &object->handle, PSWP, "swpoff",
@@ -2433,6 +2432,7 @@ static void
 swp_pager_meta_free(vm_object_t object, vm_pindex_t pindex, vm_pindex_t count,
     vm_size_t *freed)
 {
+	struct pctrie_iter pages;
 	struct page_range range;
 	struct swblk *sb;
 	vm_page_t m;
@@ -2443,11 +2443,11 @@ swp_pager_meta_free(vm_object_t object, vm_pindex_t pindex, vm_pindex_t count,
 	VM_OBJECT_ASSERT_WLOCKED(object);
 
 	fc = 0;
-	m = NULL;
 	if (count == 0 || swblk_is_empty(object))
 		goto out;
 
 	swp_pager_init_freerange(&range);
+	vm_page_iter_init(&pages, object);
 	last = pindex + count;
 	sb = swblk_start_limit(object, pindex, last);
 	start = (sb != NULL && sb->p < pindex) ? pindex - sb->p : 0;
@@ -2459,9 +2459,7 @@ swp_pager_meta_free(vm_object_t object, vm_pindex_t pindex, vm_pindex_t count,
 				continue;
 			swp_pager_update_freerange(&range, sb->d[i]);
 			if (freed != NULL) {
-				m = (m != NULL && m->pindex == sb->p + i - 1) ?
-				    vm_page_next(m) :
-				    vm_page_lookup(object, sb->p + i);
+				m = vm_page_iter_lookup(&pages, sb->p + i);
 				if (m == NULL || vm_page_none_valid(m))
 					fc++;
 			}
