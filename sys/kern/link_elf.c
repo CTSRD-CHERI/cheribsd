@@ -210,6 +210,9 @@ static int	link_elf_symidx_capability(linker_file_t, elf_object_t,
 static void	elf_init_objects(elf_file_t);
 static elf_object_t elf_object_create(elf_file_t ef);
 static int	elf_object_init(elf_object_t object, unsigned int id,
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+		    u_long compartment_id,
+#endif
 		    caddr_t address, size_t size, Elf_Dyn *dynamic,
 		    const char *name);
 static int	elf_lookup(linker_file_t, elf_object_t, Elf_Size, int, Elf_Addr *);
@@ -543,7 +546,11 @@ link_elf_init(void* arg)
 	ef->vmobject = NULL;
 #endif
 
-	error = elf_object_init(&ef->pobject, 0, ef->address,
+	error = elf_object_init(&ef->pobject, 0,
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	    COMPARTMENT_KERNEL_ID,
+#endif
+	    ef->address,
 #ifdef RELOCATABLE_KERNEL
 	    -(intptr_t)ef->address,
 #else
@@ -1079,8 +1086,11 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 #ifdef SPARSE_MAPPING
 	ef->vmobject = NULL;
 #endif
-	error = elf_object_init(&ef->pobject, 0, ef->address,
-	    *(size_t *)sizeptr,
+	error = elf_object_init(&ef->pobject, 0,
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	    COMPARTMENT_KERNEL_ID,
+#endif
+	    ef->address, *(size_t *)sizeptr,
 	    (Elf_Dyn *)(ef->address + *(vm_offset_t *)dynptr),
 	    NULL);
 	if (error != 0)
@@ -1512,6 +1522,9 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 				object = elf_object_create(ef);
 
 			error = elf_object_init(object, objectid,
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+			    0,
+#endif
 			    cheri_kern_setbounds(ef->address + ohdr->o_vaddr,
 			    ohdr->o_memsz),
 			    ohdr->o_memsz,
@@ -1532,7 +1545,11 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 
 		object = TAILQ_FIRST(&ef->objects);
 
-		error = elf_object_init(object, 0, ef->address, mapsize,
+		error = elf_object_init(object, 0,
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+		    0,
+#endif
+		    ef->address, mapsize,
 		    (Elf_Dyn *)(ef->address + dynphdr->p_vaddr - base_vaddr),
 		    NULL);
 		if (error != 0)
@@ -2382,8 +2399,11 @@ elf_object_create(elf_file_t ef)
 }
 
 static int
-elf_object_init(elf_object_t object, unsigned int id, caddr_t address,
-    size_t size, Elf_Dyn *dynamic, const char *name)
+elf_object_init(elf_object_t object, unsigned int id,
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+    u_long compartment_id,
+#endif
+    caddr_t address, size_t size, Elf_Dyn *dynamic, const char *name)
 {
 	char *newname;
 
@@ -2398,13 +2418,17 @@ elf_object_init(elf_object_t object, unsigned int id, caddr_t address,
 	}
 
 	object->id = id;
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	object->compartment_id = compartment_id_create();
-#endif
 	object->address = address;
 	object->size = size;
 	object->dynamic = dynamic;
 	object->name = newname;
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	if (compartment_id > 0) {
+		object->compartment_id = compartment_id;
+	} else {
+		object->compartment_id = compartment_id_create();
+	}
+#endif
 	return (0);
 }
 
@@ -2634,7 +2658,11 @@ link_elf_ireloc(caddr_t kmdp)
 	ef->address = cheri_setaddress(kernel_executive_root_cap, 0);
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif
-	error = elf_object_init(&ef->pobject, 0, ef->address,
+	error = elf_object_init(&ef->pobject, 0,
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	    COMPARTMENT_KERNEL_ID,
+#endif
+	    ef->address,
 #ifdef RELOCATABLE_KERNEL
 	    -(intptr_t)ef->address,
 #else
