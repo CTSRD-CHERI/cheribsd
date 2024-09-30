@@ -1551,7 +1551,7 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 #endif
 		    ef->address, mapsize,
 		    (Elf_Dyn *)(ef->address + dynphdr->p_vaddr - base_vaddr),
-		    NULL);
+		    filename);
 		if (error != 0)
 			goto out;
 
