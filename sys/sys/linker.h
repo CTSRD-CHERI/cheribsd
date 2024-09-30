@@ -202,6 +202,7 @@ int linker_ddb_symbol_values(c_linker_sym_t _sym, linker_symval_t *_symval);
 int linker_ddb_search_symbol_name(ptraddr_t value, char *buf, u_int buflen,
 				  long *offset);
 void elf_ddb_kldstat_objects(linker_file_t lf);
+void elf_ddb_show_compartment_symbols(elf_object_t object);
 
 /*
  * stack(9) helper for situations where kernel locking is required.

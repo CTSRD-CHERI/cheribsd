@@ -52,10 +52,12 @@ struct compartment {
 	struct thread	*c_thread;
 	vm_pointer_t	 c_kstack;
 	vm_pointer_t	 c_kstackptr;
-	TAILQ_ENTRY(compartment) c_next;
+	TAILQ_ENTRY(compartment) c_next;	/* Next in a thread. */
+	TAILQ_ENTRY(compartment) c_mnext;	/* Next with the same id. */
 };
 
-u_long compartment_id_create(void);
+u_long compartment_id_create(const char *name, uintcap_t base,
+    elf_object_t object);
 void compartment_linkup0(struct compartment *compartment, struct thread *td);
 struct compartment *compartment_create_for_thread(struct thread *td, u_long id);
 void compartment_destroy(struct compartment *compartment);

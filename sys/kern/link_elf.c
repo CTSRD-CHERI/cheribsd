@@ -2426,13 +2426,13 @@ elf_object_init(elf_object_t object, unsigned int id,
 	if (compartment_id > 0) {
 		object->compartment_id = compartment_id;
 	} else {
-		object->compartment_id = compartment_id_create();
+		object->compartment_id = compartment_id_create(object->name,
+		    (uintcap_t)object->address, object);
 	}
 #endif
 	return (0);
 }
 
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 #ifdef DDB
 void
 elf_ddb_kldstat_objects(linker_file_t lf)
@@ -2449,8 +2449,37 @@ elf_ddb_kldstat_objects(linker_file_t lf)
 		    object->name != NULL ? object->name : "-");
 	}
 }
-#endif /* DDB */
+
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+void
+elf_ddb_show_compartment_symbols(elf_object_t object)
+{
+	const Elf_Rel *rel;
+	const Elf_Rela *rela;
+	const char *symname;
+
+#define	PRINT_RELOCS(iter, tbl, tblsize, type) do {			\
+	for ((iter) = (tbl); (iter) != NULL &&				\
+	    (iter) < (tbl) + (tblsize) / sizeof(*(iter)); (iter)++) {	\
+		if (db_pager_quit)					\
+			return;						\
+		symname = symbol_name(object, (iter)->r_info);		\
+		if (symname != NULL) {					\
+			db_printf("   %s\n", symname);			\
+		}							\
+	}								\
+} while (0)
+
+	PRINT_RELOCS(rel, object->rel, object->relsize, ELF_RELOC_REL);
+	PRINT_RELOCS(rela, object->rela, object->relasize, ELF_RELOC_RELA);
+	PRINT_RELOCS(rel, object->pltrel, object->pltrelsize, ELF_RELOC_REL);
+	PRINT_RELOCS(rela, object->pltrela, object->pltrelasize,
+	    ELF_RELOC_RELA);
+
+#undef PRINT_RELOCS
+}
 #endif /* CHERI_COMPARTMENTALIZE_KERNEL */
+#endif /* DDB */
 
 static int
 elf_lookup(linker_file_t lf, elf_object_t object, Elf_Size symidx, int deps,

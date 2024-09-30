@@ -31,6 +31,7 @@
  */
 
 #include <sys/cdefs.h>
+#include "opt_ddb.h"
 __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
@@ -55,6 +56,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/elf.h>
 #include <machine/md_var.h>
 
+#ifdef DDB
+#include <ddb/ddb.h>
+#endif
+
 MALLOC_DEFINE(M_COMPARTMENT, "compartment", "kernel compartment");
 
 SYSCTL_NODE(_security, OID_AUTO, compartment, CTLFLAG_RD, 0,
@@ -74,6 +79,13 @@ SYSCTL_ULONG(_security_compartment_counters, OID_AUTO, executive_entry,
     &compartment_trampoline_counters[TRAMPOLINE_TYPE_EXECUTIVE_ENTRY], 0,
     "Number of executive entry calls");
 
+struct compartment_metadata {
+	char		*cm_name;
+	uintcap_t	 cm_base;
+	elf_object_t	 cm_object;
+	TAILQ_HEAD(, compartment) cm_compartments;
+};
+
 struct compartment_trampoline {
 	u_long		ct_compartment_id;
 	int		ct_type;
@@ -84,6 +96,9 @@ struct compartment_trampoline {
 };
 
 static u_long compartment_lastid = COMPARTMENT_KERNEL_ID;
+static u_long compartment_maxnid;
+static struct compartment_metadata **compartment_metadata;
+struct sx __exclusive_cache_line compartment_metadatalock;
 
 static int
 compartment_trampoline_compare(struct compartment_trampoline *a,
@@ -105,11 +120,67 @@ static struct mtx compartment_trampolines_lock;
 MTX_SYSINIT(compartmenttrampolines, &compartment_trampolines_lock,
     "compartment_trampolines", MTX_DEF);
 
+static void
+compartment_metadata_create(u_long id, const char *name, uintcap_t base,
+    elf_object_t object)
+{
+
+	sx_slock(&compartment_metadatalock);
+
+	if (id >= compartment_maxnid) {
+		if (!sx_try_upgrade(&compartment_metadatalock)) {
+			sx_sunlock(&compartment_metadatalock);
+			sx_xlock(&compartment_metadatalock);
+		}
+		compartment_maxnid *= 2;
+		compartment_metadata = realloc(compartment_metadata,
+		    sizeof(*compartment_metadata) * compartment_maxnid,
+		    M_COMPARTMENT, M_NOWAIT | M_USE_RESERVE | M_ZERO);
+		KASSERT(compartment_metadata != NULL,
+		    ("%s: unable to reallocate compartment metadata array",
+		     __func__));
+		sx_downgrade(&compartment_metadatalock);
+	}
+
+	compartment_metadata[id] = malloc(sizeof(**compartment_metadata),
+	    M_COMPARTMENT, M_NOWAIT | M_USE_RESERVE | M_ZERO);
+	KASSERT(compartment_metadata[id] != NULL,
+	    ("%s: unable to allocate compartment metadata", __func__));
+	compartment_metadata[id]->cm_name = strdup(name, M_COMPARTMENT);
+	KASSERT(compartment_metadata[id]->cm_name != NULL,
+	    ("%s: unable to initialize compartment metadata", __func__));
+	compartment_metadata[id]->cm_base = base;
+	compartment_metadata[id]->cm_object = object;
+	TAILQ_INIT(&compartment_metadata[id]->cm_compartments);
+
+	sx_sunlock(&compartment_metadatalock);
+}
+
+static void
+compartment_metadata_init(void *arg __unused)
+{
+
+	sx_init(&compartment_metadatalock, "compartment_metadata");
+
+	compartment_maxnid = COMPARTMENT_KERNEL_ID + 1;
+	compartment_metadata = malloc(sizeof(*compartment_metadata) *
+	    compartment_maxnid, M_COMPARTMENT, M_NOWAIT | M_USE_RESERVE |
+	    M_ZERO);
+	KASSERT(compartment_metadata != NULL,
+	    ("%s: unable to allocate compartment metadata array", __func__));
+	compartment_metadata_create(COMPARTMENT_KERNEL_ID, "kernel",
+	    (uintcap_t)kernel_root_cap, NULL);
+}
+
+SYSINIT(compartment, SI_SUB_KLD, SI_ORDER_FIRST, compartment_metadata_init,
+    NULL);
+
 u_long
-compartment_id_create(void)
+compartment_id_create(const char *name, uintcap_t base, elf_object_t object)
 {
 
 	atomic_add_long(&compartment_lastid, 1);
+	compartment_metadata_create(compartment_lastid, name, base, object);
 	return (compartment_lastid);
 }
 
@@ -177,6 +248,12 @@ compartment_create(u_long id)
 
 EXECUTIVE_ENTRY(void, compartment_destroy, (struct compartment *compartment))
 {
+
+
+	sx_slock(&compartment_metadatalock);
+	TAILQ_REMOVE(&compartment_metadata[compartment->c_id]->cm_compartments,
+	    compartment, c_mnext);
+	sx_sunlock(&compartment_metadatalock);
 
 	TAILQ_REMOVE(&compartment->c_thread->td_compartments, compartment,
 	    c_next);
@@ -381,3 +458,85 @@ executive_get_function(uintptr_t func)
 
 	return ((void *)trampoline->ct_compartment_func);
 }
+
+#ifdef DDB
+DB_COMMAND_FLAGS(c18nstat, db_c18nstat, DB_CMD_MEMSAFE)
+{
+	const struct proc *proc;
+	const struct thread *thread;
+	const struct compartment *compartment;
+	bool verbose;
+	u_long ii;
+
+	verbose = false;
+	for (ii = 0; modif[ii] != '\0'; ii++) {
+		switch (modif[ii]) {
+		case 'v':
+			verbose = true;
+			break;
+		}
+	}
+
+#define	ADDRESS_WIDTH	((int)(sizeof(ptraddr_t) * 2 + 2))
+	db_printf("ADDRESS%*c %6s %-20s %5s %6s %-20s %-20s\n",
+	    ADDRESS_WIDTH - 7, ' ', "CID", "CNAME", "PID", "TID", "COMM",
+	    "TDNAME");
+	if (verbose) {
+		ii = COMPARTMENT_KERNEL_ID;
+	} else {
+		db_printf("*%*c %6lu %-20s %5s %6s %-20s %-20s\n",
+		    ADDRESS_WIDTH - 1, ' ', (u_long)COMPARTMENT_KERNEL_ID,
+		    compartment_metadata[COMPARTMENT_KERNEL_ID]->cm_name,
+		    "*", "*", "*", "*");
+		ii = COMPARTMENT_KERNEL_ID + 1;
+	}
+#undef	ADDRESS_WIDTH
+	for (; ii <= compartment_lastid; ii++) {
+		if (db_pager_quit)
+			return;
+		if (TAILQ_EMPTY(&compartment_metadata[ii]->cm_compartments))
+			continue;
+		TAILQ_FOREACH(compartment,
+		    &compartment_metadata[ii]->cm_compartments, c_mnext) {
+			thread = compartment->c_thread;
+			proc = thread->td_proc;
+			db_printf("0x%-16lx %6lu %-20s %5d %6d %-20s %-20s\n",
+			    (ptraddr_t)compartment, ii,
+			    compartment_metadata[ii]->cm_name, proc->p_pid,
+			    thread->td_tid, proc->p_comm, thread->td_name);
+		}
+	}
+}
+
+DB_SHOW_COMMAND(compartment, db_show_compartment)
+{
+	const struct proc *proc;
+	const struct thread *thread;
+	const struct compartment *compartment;
+	const struct compartment_metadata *metadata;
+
+	if (!have_addr) {
+		db_printf("show compartment addr\n");
+		return;
+	}
+
+	compartment = DB_DATA_PTR(addr, struct compartment);
+	metadata = compartment_metadata[compartment->c_id];
+	thread = compartment->c_thread;
+	proc = thread->td_proc;
+
+	db_printf("Compartment at %p:\n", compartment);
+	db_printf(" id: %lu\n", compartment->c_id);
+	db_printf(" name: %s\n", metadata->cm_name);
+	db_printf(" base capability: %#p\n", (void *)metadata->cm_base);
+	db_printf(" stack pointer: %#p\n", (void *)compartment->c_kstackptr);
+	db_printf(" proc (pid %d): %p\n", proc->p_pid, proc);
+	db_printf(" proc command: %s\n", proc->p_comm);
+	db_printf(" thread (tid %d): %p\n", thread->td_tid, thread);
+	db_printf(" thread name: %s\n", thread->td_name);
+	if (metadata->cm_object != NULL) {
+		db_printf(" imported symbols:\n");
+		elf_ddb_show_compartment_symbols(metadata->cm_object);
+	}
+}
+#endif /* DDB */
