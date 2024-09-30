@@ -114,7 +114,8 @@ compartment_id_create(void)
 }
 
 static void
-compartment_linkup(struct compartment *compartment, int id, struct thread *td)
+compartment_linkup(struct compartment *compartment, u_long id,
+    struct thread *td)
 {
 
 	EXECUTIVE_ASSERT();
@@ -137,7 +138,7 @@ compartment_linkup0(struct compartment *compartment, struct thread *td)
 }
 
 EXECUTIVE_ENTRY(struct compartment *, compartment_create_for_thread,
-    (struct thread *td, int id))
+    (struct thread *td, u_long id))
 {
 	struct compartment *compartment;
 
@@ -153,11 +154,19 @@ EXECUTIVE_ENTRY(struct compartment *, compartment_create_for_thread,
 	cpu_compartment_alloc(compartment);
 	compartment_linkup(compartment, id, td);
 
+	sx_slock(&compartment_metadatalock);
+	KASSERT(id < compartment_maxnid,
+	    ("%s: id %lu exceeds the maximum value %lu", __func__, id,
+	     compartment_maxnid - 1));
+	TAILQ_INSERT_TAIL(&compartment_metadata[id]->cm_compartments,
+	    compartment, c_mnext);
+	sx_sunlock(&compartment_metadatalock);
+
 	return (compartment);
 }
 
 static struct compartment *
-compartment_create(int id)
+compartment_create(u_long id)
 {
 
 	EXECUTIVE_ASSERT();
@@ -176,7 +185,7 @@ EXECUTIVE_ENTRY(void, compartment_destroy, (struct compartment *compartment))
 }
 
 static struct compartment *
-compartment_find(int id)
+compartment_find(u_long id)
 {
 	struct compartment *compartment;
 
@@ -190,7 +199,7 @@ compartment_find(int id)
 }
 
 vm_pointer_t
-compartment_entry_stackptr(int id, int type)
+compartment_entry_stackptr(u_long id, int type)
 {
 	struct compartment *compartment;
 

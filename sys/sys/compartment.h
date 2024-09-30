@@ -48,7 +48,7 @@ SYSCTL_DECL(_security_compartment);
 struct thread;
 
 struct compartment {
-	int		 c_id;
+	u_long		 c_id;
 	struct thread	*c_thread;
 	vm_pointer_t	 c_kstack;
 	vm_pointer_t	 c_kstackptr;
@@ -57,10 +57,10 @@ struct compartment {
 
 u_long compartment_id_create(void);
 void compartment_linkup0(struct compartment *compartment, struct thread *td);
-struct compartment *compartment_create_for_thread(struct thread *td, int id);
+struct compartment *compartment_create_for_thread(struct thread *td, u_long id);
 void compartment_destroy(struct compartment *compartment);
 void compartment_trampoline_destroy(uintptr_t func);
-vm_pointer_t compartment_entry_stackptr(int id, int type);
+vm_pointer_t compartment_entry_stackptr(u_long id, int type);
 void *compartment_entry_for_kernel(uintptr_t func);
 void *compartment_entry(uintptr_t func);
 void *executive_entry_for_kernel(uintptr_t func);
