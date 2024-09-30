@@ -46,7 +46,8 @@ SUBDIR+= \
 	cheribsdtest \
 	helloworld \
 	helloworld_cxx \
-	helloworld_static
+	helloworld_static \
+	zlibtest
 .endif  # ${MACHINE_ABI:Mpurecap} || ${MK_LIB64C} == "yes"
 
 
