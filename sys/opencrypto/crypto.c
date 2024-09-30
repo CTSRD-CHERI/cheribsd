@@ -190,7 +190,16 @@ SYSCTL_INT(_kern, OID_AUTO, crypto_workers_num, CTLFLAG_RDTUN,
 
 static	uma_zone_t cryptop_zone;
 
-int	crypto_devallowsoft = 0;
+int	crypto_devallowsoft =
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+/*
+ * /dev/crypto must be available to demonstrate the example zlib kernel module
+ * with the zlibtest user-space program.
+ */
+    1;
+#else
+    0;
+#endif
 SYSCTL_INT(_kern_crypto, OID_AUTO, allow_soft, CTLFLAG_RWTUN,
 	   &crypto_devallowsoft, 0,
 	   "Enable use of software crypto by /dev/crypto");
