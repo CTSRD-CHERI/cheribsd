@@ -53,6 +53,10 @@
 
 #include <machine/elf.h>
 
+#ifdef DDB
+#include <ddb/ddb.h>
+#endif
+
 #include <net/vnet.h>
 
 #include <security/mac/mac_framework.h>
@@ -2403,6 +2407,26 @@ elf_object_init(elf_object_t object, unsigned int id, caddr_t address,
 	object->name = newname;
 	return (0);
 }
+
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+#ifdef DDB
+void
+elf_ddb_kldstat_objects(linker_file_t lf)
+{
+	elf_file_t ef;
+	elf_object_t object;
+
+	ef = (elf_file_t)lf;
+	TAILQ_FOREACH(object, &ef->objects, next) {
+		if (db_pager_quit)
+			return;
+		db_printf("        0x%-16lx 0x%-16zx %s\n",
+		    (ptraddr_t)object->address, object->size,
+		    object->name != NULL ? object->name : "-");
+	}
+}
+#endif /* DDB */
+#endif /* CHERI_COMPARTMENTALIZE_KERNEL */
 
 static int
 elf_lookup(linker_file_t lf, elf_object_t object, Elf_Size symidx, int deps,

@@ -1493,14 +1493,16 @@ DB_COMMAND_FLAGS(kldstat, db_kldstat, DB_CMD_MEMSAFE)
 {
 	linker_file_t lf;
 
-#define	POINTER_WIDTH	((int)(sizeof(void *) * 2 + 2))
-	db_printf("Id Refs Address%*c Size     Name\n", POINTER_WIDTH - 7, ' ');
-#undef	POINTER_WIDTH
+#define	ADDRESS_WIDTH	((int)(sizeof(ptraddr_t) * 2 + 2))
+	db_printf("Id Refs Address%*c Size               Name\n",
+	    ADDRESS_WIDTH - 7, ' ');
+#undef	ADDRESS_WIDTH
 	TAILQ_FOREACH(lf, &linker_files, link) {
 		if (db_pager_quit)
 			return;
-		db_printf("%2d %4d %p %-8zx %s\n", lf->id, lf->refs,
-		    lf->address, lf->size, lf->filename);
+		db_printf("%2d %4d 0x%-16lx 0x%-16zx %s\n", lf->id, lf->refs,
+		    (ptraddr_t)lf->address, lf->size, lf->filename);
+		elf_ddb_kldstat_objects(lf);
 	}
 }
 #endif /* DDB */
