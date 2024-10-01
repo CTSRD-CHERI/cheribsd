@@ -32,7 +32,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/param.h>
+#include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
 
@@ -40,12 +40,32 @@
 
 #include <err.h>
 #include <fcntl.h>
+#include <signal.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sysexits.h>
+#include <unistd.h>
 
 #include <zlib.h>
 
-int
-main(void)
+static void
+usage(void)
+{
+
+	fprintf(stderr,
+"usage:\n"
+"    zlibtest [options]\n"
+"\n"
+"options:\n"
+"    -p  -- Pause the test after interacting with the zlib kernel module\n"
+	     );
+	exit(EX_USAGE);
+}
+
+static void
+do_test(bool pause)
 {
 	int fd, res;
 	struct session2_op cs;
@@ -74,6 +94,14 @@ main(void)
 	if (res < 0)
 		err(1, "CIOCCRYPT");
 
+	if (pause) {
+		warnx("pausing the process");
+		if (kill(getpid(), SIGSTOP) == -1) {
+			err(1, "kill");
+		}
+		warnx("resuming the process");
+	}
+
 	memset(&z, 0, sizeof(z));
 	z.next_in = buf1;
 	z.avail_in = co1.len;
@@ -96,5 +124,27 @@ main(void)
 		errx(1, "decomp data mismatch");
 
 	warnx("success");
-	return 0;
+}
+
+int
+main(int argc, char *argv[])
+{
+	int ch;
+	bool pause;
+
+	pause = false;
+	while ((ch = getopt(argc, argv, "ph")) != -1) {
+		switch (ch) {
+		case 'p':
+			pause = true;
+			break;
+		case 'h':
+		default:
+			usage();
+		}
+	}
+
+	do_test(pause);
+
+	return (0);
 }
