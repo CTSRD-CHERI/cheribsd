@@ -1985,26 +1985,6 @@ _rtld_sighandler_impl(int sig, siginfo_t *info, ucontext_t *ucp, void *nsp)
 	uintptr_t *table_reg;
 
 	table = get_stk_table();
-
-#ifndef USE_RESTRICTED_MODE
-	/*
-	 * Move the sigframe to RTLD's stack.
-	 */
-	*sf = (struct sigframe) {
-		.sf_si = *info,
-		.sf_uc = *ucp
-	};
-
-	/*
-	 * Zero the sigframe on the interrupted compartment's stack.
-	 */
-	memset(info, 0, sizeof(*info));
-	memset(ucp, 0, sizeof(*ucp));
-
-	info = &sf->sf_si;
-	ucp = &sf->sf_uc;
-#endif
-
 	tf = get_trusted_stk();
 	/*
 	 * Usually, nsp is actually the interrupted compartment's stack top.
@@ -2073,6 +2053,31 @@ found_trusted:
 		goto found_failed;
 #endif
 found:
+
+#ifndef USE_RESTRICTED_MODE
+	/*
+	 * If the interrupted compartment is not RTLD, copy the sigframe from
+	 * the interrupted compartment's stack to RLTD's stack.
+	 */
+	if (intr != RTLD_COMPART_ID) {
+		/*
+		 * Move the sigframe to RTLD's stack.
+		 */
+		*sf = (struct sigframe) {
+			.sf_si = *info,
+			.sf_uc = *ucp
+		};
+
+		/*
+		 * Zero the sigframe on the interrupted compartment's stack.
+		 */
+		memset(info, 0, sizeof(*info));
+		memset(ucp, 0, sizeof(*ucp));
+
+		info = &sf->sf_si;
+		ucp = &sf->sf_uc;
+	}
+#endif
 
 	/*
 	 * Emulate a compartment transition from the interrupted compartment to
