@@ -3778,14 +3778,35 @@ vm_map_inherit(vm_map_t map, vm_offset_t start, vm_offset_t end,
 		}
 	}
 #endif
-	if (new_inheritance == VM_INHERIT_COPY) {
+	if (new_inheritance == VM_INHERIT_COPY ||
+	    new_inheritance == VM_INHERIT_SHARE) {
 		for (entry = start_entry; entry->start < end;
 		    prev_entry = entry, entry = vm_map_entry_succ(entry)) {
-			if ((entry->eflags & MAP_ENTRY_SPLIT_BOUNDARY_MASK)
+			if (new_inheritance == VM_INHERIT_COPY &&
+			    (entry->eflags & MAP_ENTRY_SPLIT_BOUNDARY_MASK)
 			    != 0) {
 				rv = KERN_INVALID_ARGUMENT;
 				goto unlock;
 			}
+			/*
+			 * CheriABI: mostly disallow post-fork sharing via
+			 * minherit().  Developers should use mmap and
+			 * MAP_SHARED instead.  Do allow no-op reqests
+			 * and sharing of mappings that either have no
+			 * capabilities or where objects have the
+			 * OBJ_SHARECAP flag.
+			 */
+			if (new_inheritance == VM_INHERIT_SHARE &&
+			    entry->inheritance != VM_INHERIT_SHARE &&
+			    /* XXX: check reservations instead? */
+			    SV_CURPROC_FLAG(SV_CHERI) &&
+			    (entry->object.vm_object == NULL ||
+			     (entry->object.vm_object->flags &
+			      (OBJ_NOCAP | OBJ_SHARECAP)) == 0)) {
+				rv = KERN_PROTECTION_FAILURE;
+				goto unlock;
+			}
+
 		}
 	}
 	for (entry = start_entry; entry->start < end; prev_entry = entry,

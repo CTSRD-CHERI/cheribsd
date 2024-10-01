@@ -389,11 +389,16 @@ CHERIBSDTEST(cheriabi_minherit_invalid_ptr,
 	CHERIBSDTEST_CHECK_CALL_ERROR(minherit(mappings.middle + mappings.maplen,
 	    mappings.maplen, INHERIT_NONE), EPROT);
 
+	/*
+	 * minherit() should not be able to mark a MAP_ANON mapping shared
+	 * upless it was initially marked as shared.
+	 */
+	CHERIBSDTEST_CHECK_CALL_ERROR(minherit(mappings.middle, mappings.maplen,
+	    INHERIT_SHARE), EACCES);
+
 	/* Sanity check: minherit() on a valid capability should succeed. */
 	CHERIBSDTEST_CHECK_SYSCALL(minherit(mappings.middle, mappings.maplen,
 	    INHERIT_NONE));
-	CHERIBSDTEST_CHECK_SYSCALL(minherit(mappings.middle, mappings.maplen,
-	    INHERIT_SHARE));
 
 	/* Unmapping the original capabilities should succeed. */
 	free_adjacent_mappings(&mappings);
