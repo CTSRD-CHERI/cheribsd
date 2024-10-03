@@ -316,7 +316,7 @@ local function process_config(file)
 				end
 			end
 			-- Heuristically convert anything fully numeric
-			-- to a number.
+			-- to a number to allow us to compare compat levels.
 			if tonumber(value) ~= nil then
 				value = tonumber(value)
 			end
