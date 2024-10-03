@@ -101,6 +101,13 @@ function scarg:process()
 			self.type = self.type:gsub("(union [^ ]*)", "%1" ..
 			    config.abi_type_suffix)
 		end
+
+		-- Allow pointers to be qualified
+		self.type = util.trim(self.type:gsub("[*]",
+		    config.ptr_qualified))
+		self.type = self.type:gsub(" *$", "")	-- trailing space
+		self.type = self.type:gsub("  *", " ")	-- extra spaces
+
 		return true
 	end
 	return false
