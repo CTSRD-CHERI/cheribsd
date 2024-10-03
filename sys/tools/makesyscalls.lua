@@ -1469,7 +1469,7 @@ if not config_modified.capenabled then
 elseif config.capenabled ~= "" then
 	-- Due to limitations in the config format mostly, we'll have a comma
 	-- separated list.  Parse it into lines
-	local capenabled, sysc = {}
+	local capenabled = {}
 	-- print("here: " .. config.capenabled)
 	for sysc in config.capenabled:gmatch("([^,]+)") do
 		capenabled[sysc] = true
