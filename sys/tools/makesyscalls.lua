@@ -41,7 +41,6 @@ local generated_tag = "@" .. "generated"
 -- Default configuration; any of these may get replaced by a configuration file
 -- optionally specified.
 local config = {
-	os_id_keyword = "FreeBSD",		-- obsolete, ignored on input, not generated
 	abi_func_prefix = "",
 	libsysmap = "/dev/null",
 	libsys_h = "/dev/null",
@@ -501,13 +500,6 @@ local process_syscall_def
 
 -- These patterns are processed in order on any line that isn't empty.
 local pattern_table = {
-	{
-		-- To be removed soon
-		pattern = "%s*$" .. config.os_id_keyword,
-		process = function(_, _)
-			-- Ignore... ID tag
-		end,
-	},
 	{
 		dump_prevline = true,
 		pattern = "^#%s*include",
@@ -1576,14 +1568,13 @@ write_line("sysargmap", string.format([[/*
  * System call argument map.
  *
  * DO NOT EDIT-- this file is automatically %s.
- * $%s$
  */
 
 #ifndef %s
 #define	%s
 
 static int %s[] = {
-]], generated_tag, config['os_id_keyword'], config['sysargmap_h'],
+]], generated_tag, config['sysargmap_h'],
     config['sysargmap_h'], config['sysargmaskname']))
 
 write_line("sysnames", string.format([[/*
