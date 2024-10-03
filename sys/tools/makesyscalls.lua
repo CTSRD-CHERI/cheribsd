@@ -1588,6 +1588,7 @@ write_line("libsysmap", string.format([[/*
  *
  * DO NOT EDIT-- this file is automatically %s.
  */
+
 FBSDprivate_1.0 {
 ]], generated_tag))
 
@@ -1598,6 +1599,7 @@ write_line("libsys_h", string.format([[/*
  *
  * DO NOT EDIT-- this file is automatically %s.
  */
+
 #ifndef __LIBSYS_H_
 #define __LIBSYS_H_
 
