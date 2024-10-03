@@ -73,7 +73,7 @@ local config = {
 	abi_ptr_array_t = "",
 	ptr_intptr_t_cast = "intptr_t",
 	ptr_qualified="*",
-	ptrmaskname = "sysargmask",
+	sysargmaskname = "sysargmask",
 	syscall_abi_change = "",
 	sys_abi_change = {},
 	syscall_no_abi_change = "",
@@ -1584,7 +1584,7 @@ write_line("sysargmap", string.format([[/*
 
 static int %s[] = {
 ]], generated_tag, config['os_id_keyword'], config['sysargmap_h'],
-    config['sysargmap_h'], config['ptrmaskname']))
+    config['sysargmap_h'], config['sysargmaskname']))
 
 write_line("sysnames", string.format([[/*
  * System call names.
