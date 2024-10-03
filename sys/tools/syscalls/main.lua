@@ -24,6 +24,7 @@ local FreeBSDSyscall = require("core.freebsd-syscall")
 -- Modules for each file:
 local init_sysent = require("scripts.init_sysent")
 local libsys_h = require("scripts.libsys_h")
+local sysargmap = require("scripts.sysargmap")
 local syscall_h = require("scripts.syscall_h")
 local syscall_mk = require("scripts.syscall_mk")
 local syscalls = require("scripts.syscalls")
@@ -47,6 +48,7 @@ local tbl = FreeBSDSyscall:new{sysfile = sysfile, config = config}
 -- Output files:
 init_sysent.file = config.syssw
 libsys_h.file = config.libsys_h
+sysargmap.file = config.sysargmap
 syscall_h.file = config.syshdr
 syscall_mk.file = config.sysmk
 syscalls.file = config.sysnames
@@ -56,6 +58,7 @@ systrace_args.file = config.systrace
 
 init_sysent.generate(tbl, config, init_sysent.file)
 libsys_h.generate(tbl, config, libsys_h.file)
+sysargmap.generate(tbl, config, sysargmap.file)
 syscall_h.generate(tbl, config, syscall_h.file)
 syscall_mk.generate(tbl, config, syscall_mk.file)
 syscalls.generate(tbl, config, syscalls.file)
