@@ -50,8 +50,6 @@
 ;	SYSMUX	syscall multiplexer.  No prototype, argument struct, or
 ;		handler is declared or used.  Handled in MD syscall code.
 ;	CAPENABLED syscall is allowed in capability mode
-;	VARARG	last argument is passed with a variadic calling convention.
-;	VARARG#	last # args are passed with a variadic calling convention.
 ;
 ; To support programmatic generation of both the default ABI and 32-bit compat
 ; (freebsd32) we impose a number of restrictions on the types of system calls.
@@ -145,7 +143,7 @@
 		    size_t nbyte
 		);
 	}
-5	AUE_OPEN_RWTC	STD|VARARG {
+5	AUE_OPEN_RWTC	STD {
 		int open(
 		    _In_z_ const char *path,
 		    int flags,
@@ -426,7 +424,7 @@
 		    _Out_opt_ _Contains_long_ptr_ struct sigaltstack *oss
 		);
 	}
-54	AUE_IOCTL	STD|CAPENABLED|VARARG {
+54	AUE_IOCTL	STD|CAPENABLED {
 		int ioctl(
 		    int fd,
 		    u_long com,
@@ -616,7 +614,7 @@
 		    uintcap_t *cidp
 		)
 	}
-92	AUE_FCNTL	STD|CAPENABLED|VARARG {
+92	AUE_FCNTL	STD|CAPENABLED {
 		int fcntl(
 		    int fd,
 		    int cmd,
@@ -1051,7 +1049,7 @@
 		);
 	}
 167-168	AUE_NULL	RESERVED
-169	AUE_SEMSYS	NOSTD|VARARG4 {
+169	AUE_SEMSYS	NOSTD {
 		int semsys(
 		    int which,
 		    int a2,
@@ -1060,7 +1058,7 @@
 		    int a5
 		);
 	}
-170	AUE_MSGSYS	NOSTD|VARARG5 {
+170	AUE_MSGSYS	NOSTD {
 		int msgsys(
 		    int which,
 		    int a2,
@@ -1070,7 +1068,7 @@
 		    int a6
 		);
 	}
-171	AUE_SHMSYS	NOSTD|VARARG3 {
+171	AUE_SHMSYS	NOSTD {
 		int shmsys(
 		    int which,
 		    int a2,
@@ -2750,7 +2748,7 @@
 		    uint32_t dev
 		);
 	}
-499	AUE_OPENAT_RWTC	STD|CAPENABLED|VARARG {
+499	AUE_OPENAT_RWTC	STD|CAPENABLED {
 		int openat(
 		    int fd,
 		    _In_z_ const char *path,
