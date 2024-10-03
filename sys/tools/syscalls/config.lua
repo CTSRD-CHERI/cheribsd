@@ -45,6 +45,7 @@ local config = {
 	abi_headers = "",
 	abi_intptr_t = "intptr_t",
 	ptr_intptr_t_cast = "intptr_t",
+	ptr_qualified = "*",
 	obsol = {},
 	unimpl = {},
 	capabilities_conf = "capabilities.conf",
