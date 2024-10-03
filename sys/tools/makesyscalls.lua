@@ -208,10 +208,6 @@ local known_flags = {
 	NOTSTATIC	= 0x00000100,
 	CAPENABLED	= 0x00000200,
 	SYSMUX		= 0x00000400,
-	VARARG		= 0x00000800,
-	VARARG3		= 0x00001000,
-	VARARG4		= 0x00002000,
-	VARARG5		= 0x00004000,
 
 	-- Compat flags start from here.  We have plenty of space.
 }
