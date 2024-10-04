@@ -1729,7 +1729,7 @@ fail:
 int
 shm_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr,
     vm_offset_t max_addr, vm_size_t objsize,
-    vm_prot_t prot, vm_prot_t cap_maxprot, int flags,
+    vm_prot_t prot, vm_prot_t max_maxprot, int flags,
     vm_ooffset_t foff, struct thread *td)
 {
 	struct shmfd *shmfd;
@@ -1752,8 +1752,8 @@ shm_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr,
 	 * writeable.
 	 */
 	if ((flags & MAP_SHARED) == 0) {
-		cap_maxprot |= VM_PROT_WRITE;
-		maxprot |= VM_PROT_WRITE;
+		if ((max_maxprot & VM_PROT_WRITE) != 0)
+			maxprot |= VM_PROT_WRITE;
 		writecnt = false;
 	} else {
 		if ((fp->f_flag & FWRITE) != 0 &&
@@ -1773,7 +1773,7 @@ shm_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr,
 			goto out;
 		}
 	}
-	maxprot &= cap_maxprot;
+	maxprot &= max_maxprot;
 
 	prot = VM_PROT_ADD_CAP(prot);
 	maxprot = VM_PROT_ADD_CAP(prot);
