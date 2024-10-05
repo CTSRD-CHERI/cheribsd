@@ -201,10 +201,11 @@ struct vm_object {
 					   mapping flag */
 #define	OBJ_PAGERPRIV1	0x00004000	/* Pager private */
 #define	OBJ_PAGERPRIV2	0x00008000	/* Pager private */
-#define	OBJ_HASCAP	0x00010000	/* object can store capabilities */
-#define	OBJ_NOCAP	0x00020000	/* object and all shadow objects can
+#define	OBJ_SYSVSHM	0x00010000	/* SysV SHM */
+#define	OBJ_HASCAP	0x00020000	/* object can store capabilities */
+#define	OBJ_NOCAP	0x00040000	/* object and all shadow objects can
 					   not store capabilities */
-#define	OBJ_CHERISHADOW	0x00040000	/* object is the shadow bitmap */
+#define	OBJ_CHERISHADOW	0x00080000	/* object is the shadow bitmap */
 
 /*
  * Helpers to perform conversion between vm_object page indexes and offsets.
