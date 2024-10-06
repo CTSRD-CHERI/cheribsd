@@ -182,27 +182,29 @@ struct vm_object {
 /*
  * Flags
  */
-#define	OBJ_FICTITIOUS	0x0001		/* (c) contains fictitious pages */
-#define	OBJ_UNMANAGED	0x0002		/* (c) contains unmanaged pages */
-#define	OBJ_POPULATE	0x0004		/* pager implements populate() */
-#define	OBJ_DEAD	0x0008		/* dead objects (during rundown) */
-#define	OBJ_ANON	0x0010		/* (c) contains anonymous memory */
-#define	OBJ_UMTXDEAD	0x0020		/* umtx pshared was terminated */
-#define	OBJ_SIZEVNLOCK	0x0040		/* lock vnode to check obj size */
-#define	OBJ_PG_DTOR	0x0080		/* dont reset object, leave that for dtor */
-#define	OBJ_SHADOWLIST	0x0100		/* Object is on the shadow list. */
-#define	OBJ_SWAP	0x0200		/* object swaps, type will be OBJT_SWAP
+#define	OBJ_FICTITIOUS	0x00000001	/* (c) contains fictitious pages */
+#define	OBJ_UNMANAGED	0x00000002	/* (c) contains unmanaged pages */
+#define	OBJ_POPULATE	0x00000004	/* pager implements populate() */
+#define	OBJ_DEAD	0x00000008	/* dead objects (during rundown) */
+#define	OBJ_ANON	0x00000010	/* (c) contains anonymous memory */
+#define	OBJ_UMTXDEAD	0x00000020	/* umtx pshared was terminated */
+#define	OBJ_SIZEVNLOCK	0x00000040	/* lock vnode to check obj size */
+#define	OBJ_PG_DTOR	0x00000080	/* do not reset object, leave that
+					   for dtor */
+#define	OBJ_SHADOWLIST	0x00000100	/* Object is on the shadow list. */
+#define	OBJ_SWAP	0x00000200	/* object swaps, type will be OBJT_SWAP
 					   or dynamically registered */
-#define	OBJ_SPLIT	0x0400		/* object is being split */
-#define	OBJ_COLLAPSING	0x0800		/* Parent of collapse. */
-#define	OBJ_COLORED	0x1000		/* pg_color is defined */
-#define	OBJ_ONEMAPPING	0x2000		/* One USE (a single, non-forked) mapping flag */
-#define	OBJ_PAGERPRIV1	0x4000		/* Pager private */
-#define	OBJ_PAGERPRIV2	0x8000		/* Pager private */
-#define	OBJ_HASCAP	0x10000		/* object can store capabilities */
-#define	OBJ_NOCAP	0x20000		/* object and all shadow objects can
+#define	OBJ_SPLIT	0x00000400	/* object is being split */
+#define	OBJ_COLLAPSING	0x00000800	/* Parent of collapse. */
+#define	OBJ_COLORED	0x00001000	/* pg_color is defined */
+#define	OBJ_ONEMAPPING	0x00002000	/* One USE (a single, non-forked)
+					   mapping flag */
+#define	OBJ_PAGERPRIV1	0x00004000	/* Pager private */
+#define	OBJ_PAGERPRIV2	0x00008000	/* Pager private */
+#define	OBJ_HASCAP	0x00010000	/* object can store capabilities */
+#define	OBJ_NOCAP	0x00020000	/* object and all shadow objects can
 					   not store capabilities */
-#define	OBJ_CHERISHADOW	0x40000		/* object is the shadow bitmap */
+#define	OBJ_CHERISHADOW	0x00040000	/* object is the shadow bitmap */
 
 /*
  * Helpers to perform conversion between vm_object page indexes and offsets.
