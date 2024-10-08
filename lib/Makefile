@@ -68,6 +68,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libiscsiutil \
 	libjail \
 	libkiconv \
+	libkldelf \
 	libkvm \
 	liblua \
 	liblzma \

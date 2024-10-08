@@ -31,7 +31,7 @@
 #include <errno.h>
 #include <gelf.h>
 
-#include "ef.h"
+#include "kldelf.h"
 
 /*
  * Apply relocations to the values obtained from the file. `relbase' is the

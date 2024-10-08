@@ -45,7 +45,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "ef.h"
+#include "kldelf.h"
 
 SET_DECLARE(elf_reloc, struct elf_reloc_data);
 SET_DECLARE(elf_capreloc, struct elf_capreloc_data);

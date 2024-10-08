@@ -33,7 +33,7 @@
 #include <errno.h>
 #include <gelf.h>
 
-#include "ef.h"
+#include "kldelf.h"
 
 /*
  * Apply relocations to the values obtained from the file. `relbase' is the
@@ -41,7 +41,7 @@
  * that is to be relocated, and has been copied to *dest
  */
 static int
-ef_amd64_reloc(struct elf_file *ef, const void *reldata, Elf_Type reltype,
+ef_i386_reloc(struct elf_file *ef, const void *reldata, Elf_Type reltype,
     GElf_Addr relbase, GElf_Addr dataoff, size_t len, void *dest)
 {
 	char *where;
@@ -72,37 +72,21 @@ ef_amd64_reloc(struct elf_file *ef, const void *reldata, Elf_Type reltype,
 	if (where < (char *)dest || where >= (char *)dest + len)
 		return (0);
 
-	if (reltype == ELF_T_REL) {
-		/* Addend is 32 bit on 32 bit relocs */
-		switch (rtype) {
-		case R_X86_64_PC32:
-		case R_X86_64_32S:
-			addend = le32dec(where);
-			break;
-		default:
-			addend = le64dec(where);
-			break;
-		}
-	}
+	if (reltype == ELF_T_REL)
+		addend = le32dec(where);
 
 	switch (rtype) {
-	case R_X86_64_NONE:	/* none */
+	case R_386_RELATIVE:	/* B + A */
+		addr = relbase + addend;
+		le32enc(where, addr);
 		break;
-	case R_X86_64_64:	/* S + A */
-		addr = EF_SYMADDR(ef, symidx) + addend;
-		le64enc(where, addr);
-		break;
-	case R_X86_64_32S:	/* S + A sign extend */
+	case R_386_32:	/* S + A - P */
 		addr = EF_SYMADDR(ef, symidx) + addend;
 		le32enc(where, addr);
 		break;
-	case R_X86_64_GLOB_DAT:	/* S */
+	case R_386_GLOB_DAT:	/* S */
 		addr = EF_SYMADDR(ef, symidx);
-		le64enc(where, addr);
-		break;
-	case R_X86_64_RELATIVE:	/* B + A */
-		addr = relbase + addend;
-		le64enc(where, addr);
+		le32enc(where, addr);
 		break;
 	default:
 		warnx("unhandled relocation type %d", (int)rtype);
@@ -110,4 +94,4 @@ ef_amd64_reloc(struct elf_file *ef, const void *reldata, Elf_Type reltype,
 	return (0);
 }
 
-ELF_RELOC(ELFCLASS64, ELFDATA2LSB, EM_X86_64, ef_amd64_reloc);
+ELF_RELOC(ELFCLASS32, ELFDATA2LSB, EM_386, ef_i386_reloc);
