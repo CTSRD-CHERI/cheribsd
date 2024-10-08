@@ -802,3 +802,9 @@ elf_capreloc(struct elf_file *efile, const Gcapreloc *capreloc,
 	return (efile->ef_capreloc(efile, capreloc, relbase, dataoff, len,
 	    dest));
 }
+
+int
+elf_lookup_symbol(struct elf_file *efile, const char *name, GElf_Sym **sym)
+{
+	return (EF_LOOKUP_SYMBOL(efile, name, sym));
+}
