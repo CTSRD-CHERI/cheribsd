@@ -141,7 +141,7 @@ again:
 			"beq x0, %[ok], 1f\n\t"
 			"sc.c.cap %[cutr], (%[cutp])\n\t"
 			"1:\n\t"
-		  : [ok] "=r" (ok), [cscratch] "=&C" (cscratch),
+		  : [ok] "=&r" (ok), [cscratch] "=&C" (cscratch),
 		    [cutr] "+C" (cutr)
 		  : [cut] "C" (cut), [cutp] "C" (cutp)
 		  : "memory");
