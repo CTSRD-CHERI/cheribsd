@@ -110,7 +110,7 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
 		CHERI_REVOKE_STATS_BUMP(crst, caps_found_revoked);
 	} else if (cheri_gettag(cut) && ctp(crshadow, cut, perms, start, end)) {
 		void * __capability cscratch;
-		int stxr_status;
+		int stxr_status = 1;
 
 		uintcap_t cutr = cheri_revoke_cap(cut);
 
@@ -137,7 +137,6 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
 		 */
 
 		__asm__ __volatile__ (
-		        "mov %w[stxr_status], #1\n\t"
 #ifndef __CHERI_PURE_CAPABILITY__
 			"bx #4\n\t"
 			".arch_extension c64\n\t"
@@ -153,7 +152,7 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
 			".arch_extension noc64\n\t"
 			".arch_extension a64c\n\t"
 #endif
-		  : [stxr_status] "=r" (stxr_status),
+		  : [stxr_status] "+&r" (stxr_status),
 		    [cscratch] "=&C" (cscratch), [cutr] "+C" (cutr)
 		  : [cut] "C" (cut), [cutp] "C" (cutp)
 		  : "memory");
