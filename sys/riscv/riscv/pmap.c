@@ -3880,6 +3880,7 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 	pt_entry_t *pte, oldpte = 0;
 	vm_page_t m;
 
+	rw_rlock(&pvh_global_lock);
 	PMAP_LOCK(pmap);
 
 	KASSERT(!(csr_read(sccsr) & SCCSR_UGCLG) == !(pmap->flags.uclg),
@@ -4010,6 +4011,7 @@ retry:
 						sfence_vma_page(va);
 					}
 					PMAP_UNLOCK(pmap);
+					rw_runlock(&pvh_global_lock);
 					pmap_caploadgen_test_all_clean(m);
 					m = NULL;
 					goto out_unlocked;
@@ -4133,6 +4135,7 @@ out:
 #endif /* VM_NRESERVLEVEL > 0 */
 
 	PMAP_UNLOCK(pmap);
+	rw_runlock(&pvh_global_lock);
 out_unlocked:
 
 	if (*mp != NULL) {
