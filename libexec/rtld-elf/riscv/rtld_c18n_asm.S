@@ -191,6 +191,8 @@ END(create_untrusted_stk)
 
 TRAMP(tramp_push_frame)
 1:	auipcc		ct0, 0
+	addi		t1, x0, 7
+	csrw		0x4a0, t1
 	/*
 	 * Get the unsealer for the thread identifier buffer.
 	 */
@@ -424,11 +426,14 @@ TRAMPEND(tramp_clear_args)
 
 TRAMP(tramp_invoke)
 	ccleartag	TRUSTED_STACK_C, TRUSTED_STACK_C
+	csrw		0x4a0, s9
 	cjalr		cra, cs4
 TRAMPEND(tramp_invoke)
 
 TRAMP(tramp_pop_frame)
 1:	auipcc		ct4, 0
+	addi		t0, x0, 7
+	csrw		0x4a0, t0
 	/*
 	 * Get the unsealer for the thread identifier buffer.
 	 */
@@ -527,6 +532,7 @@ TRAMP(tramp_pop_frame)
 	addi		t4, x0, 0
 	addi		t5, x0, 0
 	addi		t6, x0, 0
+	csrw		0x4a0, t1
 
 	cret
 TRAMPEND(tramp_pop_frame)
