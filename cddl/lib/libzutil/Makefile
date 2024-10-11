@@ -28,6 +28,7 @@ CSTD=	c99
 CFLAGS+= -I${ZFSTOP}/include
 CFLAGS+= -I${ZFSTOP}/lib/libspl/include/
 CFLAGS+= -I${ZFSTOP}/lib/libspl/include/os/freebsd
+CFLAGS+= -I${ZFSTOP}/lib/libzpool/include
 CFLAGS+= -I${ZFSTOP}/include/os/freebsd/zfs
 CFLAGS+= -I${SRCTOP}/sys
 CFLAGS+= -I${SRCTOP}/cddl/compat/opensolaris/include

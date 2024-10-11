@@ -21,6 +21,7 @@ CFLAGS+= -DIN_BASE
 CFLAGS+= -I${ZFSTOP}/include
 CFLAGS+= -I${ZFSTOP}/lib/libspl/include/
 CFLAGS+= -I${ZFSTOP}/lib/libspl/include/os/freebsd
+CFLAGS+= -I${ZFSTOP}/lib/libzpool/include
 CFLAGS+= -I${SRCTOP}/cddl/compat/opensolaris/include
 CFLAGS+= -I${ZFSTOP}/module/icp/include
 CFLAGS+= -include ${ZFSTOP}/include/os/freebsd/spl/sys/ccompile.h
