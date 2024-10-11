@@ -105,8 +105,13 @@ tramp_compile(char **entry, const struct tramp_data *data)
 
 	sealer_off = COPY_VALUE(sealer_tidc);
 
+	void* t = data->target;
+	asm volatile ("csetcid %[output0], %[input0], %[input1]"
+		     : [output0] "=C"(t)
+		     : [input0] "C"(t), [input1] "r" ((data->defobj->compart_id)+1));
+
 	*(struct tramp_header *)(buf + size) = (struct tramp_header) {
-		.target = data->target,
+		.target = t,
 		.defobj = data->defobj,
 		.symnum = data->def == NULL ?
 		    0 : data->def - data->defobj->symtab,
