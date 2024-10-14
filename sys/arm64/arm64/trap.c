@@ -503,7 +503,6 @@ bad_far:
 		} else {
 			if (td->td_intr_nesting_level == 0 &&
 			    pcb->pcb_onfault != 0) {
-				frame->tf_x[0] = error;
 #if __has_feature(capabilities)
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 				trapframe_set_elr(frame,
