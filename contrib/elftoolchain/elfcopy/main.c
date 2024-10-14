@@ -348,6 +348,14 @@ create_elf(struct elfcopy *ecp)
 	 */
 	create_scn(ecp);
 
+	/*
+	 * Create symbol table. Symbols are filtered or stripped according to
+	 * command line args specified by user, and later updated for the new
+	 * layout of sections in the output object.
+	 */
+	if ((ecp->flags & SYMTAB_EXIST) != 0)
+		create_symtab(ecp);
+
 	transplant(ecp);
 
 	if ((ecp->flags & TRANSPLANT) != 0)
@@ -370,6 +378,7 @@ create_elf(struct elfcopy *ecp)
 	    !STAILQ_EMPTY(&ecp->v_symop))
 		ecp->flags &= ~SYMTAB_INTACT;
 
+#if 0
 	/*
 	 * Create symbol table. Symbols are filtered or stripped according to
 	 * command line args specified by user, and later updated for the new
@@ -377,7 +386,7 @@ create_elf(struct elfcopy *ecp)
 	 */
 	if ((ecp->flags & SYMTAB_EXIST) != 0)
 		create_symtab(ecp);
-
+#endif
 	/*
 	 * Write the underlying ehdr. Note that it should be called
 	 * before elf_setshstrndx() since it will overwrite e->e_shstrndx.
@@ -436,22 +445,22 @@ create_elf(struct elfcopy *ecp)
 	oeh.e_shoff = shtab->off;
 
 	if (ecp->ophnum > 0) {
-		if (ecp->ophnum <= ecp->iphnum) {
+		// if (ecp->ophnum <= ecp->iphnum) {
 			/* Put program header table immediately after the Elf header. */
 			oeh.e_phoff = gelf_fsize(ecp->eout, ELF_T_EHDR, 1, EV_CURRENT);
 			if (oeh.e_phoff == 0)
 				errx(EXIT_FAILURE, "gelf_fsize() failed: %s",
 				    elf_errmsg(-1));
-		} else {
-			/*
-			 * Append it at the end, there's no room after the ELF header.
-			 * Create a new section for it.
-			 */
-			oeh.e_phoff = ecp->phoff = first_free_offset(ecp) + 0x10000 /* 0x XXX */;
-			oeh.e_phoff = roundup(oeh.e_phoff,
-			    gelf_falign(ecp->eout, ELF_T_PHDR));
-			ecp->phoff = oeh.e_phoff;
-		}
+		// } else {
+		// 	/*
+		// 	 * Append it at the end, there's no room after the ELF header.
+		// 	 * Create a new section for it.
+		// 	 */
+		// 	oeh.e_phoff = ecp->phoff = first_free_offset(ecp) + 0x10000 /* 0x XXX */;
+		// 	oeh.e_phoff = roundup(oeh.e_phoff,
+		// 	    gelf_falign(ecp->eout, ELF_T_PHDR));
+		// 	ecp->phoff = oeh.e_phoff;
+		// }
 	}
 
 	/*

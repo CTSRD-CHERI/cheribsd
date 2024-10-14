@@ -476,7 +476,9 @@ setup_phdr(struct elfcopy *ecp)
 		errx(EXIT_FAILURE, "elf_getphnum failed: %s",
 		    elf_errmsg(-1));
 
-	ecp->ophnum = ecp->iphnum = iphnum;
+	// ecp->ophnum = ecp->iphnum = iphnum;
+	ecp->iphnum = iphnum;
+	ecp->ophnum = 0;
 	if (iphnum == 0)
 		return;
 
@@ -490,6 +492,9 @@ setup_phdr(struct elfcopy *ecp)
 		if (gelf_getphdr(ecp->ein, i, &iphdr) != &iphdr)
 			errx(EXIT_FAILURE, "gelf_getphdr failed: %s",
 			    elf_errmsg(-1));
+		if (iphdr.p_type == PT_NULL)
+			continue;
+		ecp->ophnum++;
 		if ((seg = calloc(1, sizeof(*seg))) == NULL)
 			err(EXIT_FAILURE, "calloc failed");
 		seg->p_type	= iphdr.p_type;
@@ -529,12 +534,12 @@ copy_phdr(struct elfcopy *ecp)
 			seg->fsz = seg->msz = gelf_fsize(ecp->eout, ELF_T_PHDR,
 			    ecp->ophnum, EV_CURRENT);
 
-			if (ecp->phoff != 0) {
-#ifdef	DEBUG
-				printf("%s: moving phoff from %zd to %zd\n", __func__, seg->off, ecp->phoff);
-#endif
-				seg->off = ecp->phoff;
-			}
+// 			if (ecp->phoff != 0) {
+// #ifdef	DEBUG
+// 				printf("%s: moving phoff from %zd to %zd\n", __func__, seg->off, ecp->phoff);
+// #endif
+// 				seg->off = ecp->phoff;
+// 			}
 			continue;
 		}
 

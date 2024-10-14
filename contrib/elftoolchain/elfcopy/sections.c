@@ -1776,6 +1776,7 @@ transplant_one(struct elfcopy *ecp, struct transplant *t)
 			    elf_errmsg(-1));
 		shdrvalue.sh_entsize = shdr->sh_entsize;
 		shdrvalue.sh_link = shdr->sh_link;
+		shdrvalue.sh_info = shdr->sh_info;
 		if (!gelf_update_shdr(s->os, &shdrvalue))
 			errx(EXIT_FAILURE, "gelf_update_shdr() failed: %s",
 			    elf_errmsg(-1));

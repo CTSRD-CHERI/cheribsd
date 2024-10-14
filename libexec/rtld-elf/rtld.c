@@ -1011,7 +1011,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	    rtld_fdprintf(STDERR_FILENO, "digest_dynamic failed");
 	    abort();
 	}
-	linkmap_add(subobj);
+	// linkmap_add(subobj);
 	/*
 	 * All subobjects should have an SONAME, so they should be automatically
 	 * registered as a compartment.
@@ -1930,6 +1930,8 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
     const Elf_Phdr *ph;
     caddr_t note_start, note_end;
     int nsegs = 0;
+    Obj_Entry *subobj;
+    Elf_Ohdr *ohdr = NULL, *ohdr_end = NULL;
 
     obj = obj_new();
     for (ph = phdr;  ph < phlimit;  ph++) {
@@ -1995,7 +1997,8 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 	    break;
 
 	case PT_DYNAMIC:
-	    obj->dynamic = (const Elf_Dyn *)(ph->p_vaddr + obj->relocbase);
+	    if (obj->dynamic == NULL)
+		obj->dynamic = (const Elf_Dyn *)(ph->p_vaddr + obj->relocbase);
 	    break;
 
 	case PT_TLS:
@@ -2037,6 +2040,11 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 	    note_end = note_start + ph->p_filesz;
 	    digest_notes(obj, (const Elf_Note *)note_start, (const Elf_Note *)note_end);
 	    break;
+
+	case PT_OBJECT:
+	    ohdr = (void *)(obj->mapbase + ph->p_vaddr);
+	    ohdr_end = (void *)((char *)ohdr + ph->p_filesz);
+	    break;
 	}
     }
     if (nsegs < 1) {
@@ -2056,10 +2064,53 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
      * of the object). Note: csetbounds is done after parsing .dynamic
      */
     obj->text_rodata_cap = (const char *)cheri_copyaddress(entry, obj->relocbase);
+#ifdef __CHERI_PURE_CAPABILITY__
+    obj->text_rodata_cap = cheri_setbounds(obj->text_rodata_cap, ohdr->o_memsz);
+#endif
     fix_obj_mapping_cap_permissions(obj, path);
 #endif
 
     obj->entry = entry;
+
+    /*
+     * XXX Dapeng: Duplicate the above code for each sub-object.
+     */
+    if (ohdr == NULL)
+	return (obj);
+
+    /* Start iterating from the second entry */
+    while (++ohdr < ohdr_end) {
+        subobj = obj_new();
+        subobj->mapsize = ohdr->o_memsz;
+        subobj->mapbase = obj->mapbase + (ohdr->o_vaddr - obj->vaddrbase);
+#ifdef __CHERI_PURE_CAPABILITY__
+        subobj->mapbase = cheri_setbounds(subobj->mapbase, subobj->mapsize);
+#endif
+        subobj->vaddrbase = 0;
+
+        /* Shift the relocation base by the offset of the sub-object */
+        subobj->relocbase = subobj->mapbase;
+#ifdef __CHERI_PURE_CAPABILITY__
+        /*
+         * XXX Dapeng: The text_rodata_* offsets are unused.
+         */
+        subobj->text_rodata_cap = cheri_copyaddress(entry, subobj->relocbase);
+#ifdef __CHERI_PURE_CAPABILITY__
+	subobj->text_rodata_cap = cheri_setbounds(subobj->text_rodata_cap, ohdr->o_memsz);
+#endif
+        fix_obj_mapping_cap_permissions(subobj, path);
+#endif
+        /* Find the dynamic table using the index from the object header */
+        subobj->dynamic = (const Elf_Dyn *)(subobj->relocbase + (phdr[ohdr->o_dynamicndx].p_vaddr - ohdr->o_vaddr));
+        /* subobj->phdr is NULL */
+        /* subobj->phsize is 0 */
+        /* subobj->interp is NULL */
+        /* subobj->tls* are NULL as TLS is not supported yet */
+        /* subobj->relro* are NULL as RELRO is no supported yet */
+        /* Notes are not processed for sub-objects */
+
+        STAILQ_INSERT_TAIL(&obj->subobjects, subobj, next_subobject);
+    }
     return (obj);
 }
 
@@ -3316,7 +3367,7 @@ do_load_object(int fd, const char *name, char *path, struct stat *sbp,
 	TAILQ_INSERT_TAIL(&obj_list, subobj, next);
 	obj_count++;
 	obj_loads++;
-	linkmap_add(subobj);
+	// linkmap_add(subobj);
     }
 
     return (obj);

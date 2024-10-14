@@ -96,13 +96,14 @@ create_ohdr(struct elfcopy *ecp)
 		ii++;
 	}
 
-	align = gelf_falign(ecp->eout, ELF_T_OHDR);
+	// align = gelf_falign(ecp->eout, ELF_T_OHDR);
+	align = 4096;
 	off = roundup(first_free_offset(ecp), align);
 	/*
 	 * The object headers are not loadable.
 	 */
 	s = create_external_section(ecp, ".object", NULL, data, datasize,
-	    off, SHT_PROGBITS, ELF_T_BYTE, 0, align, 0, 0);
+	    off, SHT_PROGBITS, ELF_T_BYTE, 0, 4096, 0, 0);
 
 	/*
 	 * Link .object with .shstrtab that stores names of objects.
@@ -116,11 +117,36 @@ create_ohdr(struct elfcopy *ecp)
 		errx(EXIT_FAILURE, "gelf_update_shdr() failed: %s",
 		    elf_errmsg(-1));
 
+	struct segment *lastseg = NULL;
+	STAILQ_FOREACH(seg, &ecp->v_seg, seg_list) {
+		if (seg->p_type != PT_LOAD)
+			continue;
+		lastseg = seg;
+	}
+	assert(lastseg != NULL);
+
+	if ((seg = calloc(1, sizeof(*seg))) == NULL)
+		err(EXIT_FAILURE, "calloc() failed");
+	seg->p_type	= PT_LOAD;
+	seg->vaddr	= roundup(lastseg->vaddr + lastseg->msz, 4096);
+	seg->paddr	= seg->vaddr;
+	seg->p_flags	= PF_R;
+	seg->p_align	= s->align;
+	seg->off	= s->off;
+	seg->fsz	= s->sz;
+	seg->msz	= seg->fsz;
+	seg->type	= seg->p_type;
+	STAILQ_INSERT_TAIL(&ecp->v_seg, seg, seg_list);
+
+	ecp->ophnum++;
+
 	if ((seg = calloc(1, sizeof(*seg))) == NULL)
 		err(EXIT_FAILURE, "calloc() failed");
 	seg->p_type	= PT_OBJECT;
-	seg->vaddr	= 0;
-	seg->paddr	= 0;
+	seg->vaddr	= roundup(lastseg->vaddr + lastseg->msz, 4096);
+	seg->paddr	= seg->vaddr;
+	// seg->vaddr	= 0;
+	// seg->paddr	= 0;
 	seg->p_flags	= PF_R;
 	seg->p_align	= s->align;
 	seg->off	= s->off;
