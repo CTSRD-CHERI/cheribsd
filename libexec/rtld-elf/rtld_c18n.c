@@ -119,7 +119,10 @@ _Static_assert(
 static uintptr_t sealer_tcb;
 static uintptr_t sealer_trusted_stk;
 
-uintptr_t sealer_pltgot, sealer_tramp;
+#ifndef CHERI_LIB_C18N_NO_OTYPE
+uintptr_t sealer_pltgot;
+#endif
+uintptr_t sealer_tramp;
 
 /* Enable compartmentalisation */
 bool ld_compartment_enable;
@@ -1272,22 +1275,12 @@ tramp_hook_impl(int event, const struct tramp_header *hdr,
 		getpid();
 }
 
-#define	C18N_MAX_TRAMP_SIZE	768
-
 static const struct tramp_header *
-tramp_pgs_append(const struct tramp_data *data)
+tramp_pgs_alloc(const char buf[], const char *bufp, size_t len)
 {
-	size_t len;
-	/* A capability-aligned buffer large enough to hold a trampoline */
-	_Alignas(_Alignof(struct tramp_header)) char buf[C18N_MAX_TRAMP_SIZE];
-	struct tramp_header *header;
-	char *bufp = buf;
-
 	char *tramp;
 	struct tramp_pg *pg;
-
-	/* Fill a temporary buffer with the trampoline and obtain its length */
-	len = tramp_compile(&bufp, data);
+	struct tramp_header *header;
 
 	pg = atomic_load_explicit(&tramp_pgs.head, memory_order_acquire);
 	tramp = tramp_pg_push(pg, len);
@@ -1349,16 +1342,23 @@ tramp_check_sig(const struct tramp_header *found, const Obj_Entry *reqobj,
 	}
 }
 
+#define	C18N_MAX_TRAMP_SIZE	768
+
 static const struct tramp_header *
 tramp_create(const struct tramp_data *data)
 {
 	struct tramp_data newdata = *data;
+	/* A capability-aligned buffer large enough to hold a trampoline */
+	_Alignas(_Alignof(struct tramp_header)) char buf[C18N_MAX_TRAMP_SIZE];
+	char *bufp = buf;
+	size_t len;
 
 	if (!newdata.sig.valid && newdata.def != NULL)
 		newdata.sig = sigtab_get(newdata.defobj,
 		    newdata.def - newdata.defobj->symtab);
 
-	return (tramp_pgs_append(&newdata));
+	len = tramp_compile(&bufp, &newdata);
+	return (tramp_pgs_alloc(buf, bufp, len));
 }
 
 static const void *
@@ -1373,6 +1373,23 @@ tramp_make_entry(const struct tramp_header *header)
 
 	return (cheri_sealentry(entry));
 }
+
+#if defined(__aarch64__) && defined(CHERI_LIB_C18N_NO_OTYPE)
+const void *
+plt_tramp_make(Obj_Entry *data)
+{
+	const struct tramp_header *header;
+	/* A capability-aligned buffer large enough to hold a trampoline */
+	_Alignas(_Alignof(struct tramp_header)) char buf[72];
+	char *bufp = buf;
+	size_t len;
+
+	len = plt_tramp_compile(&bufp, data);
+	header = tramp_pgs_alloc(buf, bufp, len);
+
+	return (tramp_make_entry(header));
+}
+#endif
 
 void *
 tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *data)
@@ -1680,8 +1697,10 @@ c18n_init2(Obj_Entry *obj_rtld)
 	    &(size_t) { sizeof(sealer) }, NULL, 0) < 0)
 		rtld_fatal("sysctlbyname failed");
 
+#ifndef CHERI_LIB_C18N_NO_OTYPE
 	sealer_pltgot = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
+#endif
 
 	sealer_tcb = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
