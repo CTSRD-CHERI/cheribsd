@@ -42,7 +42,10 @@
 /*
  * Global symbols
  */
-extern uintptr_t sealer_pltgot, sealer_tramp;
+#ifndef CHERI_LIB_C18N_NO_OTYPE
+extern uintptr_t sealer_pltgot;
+#endif
+extern uintptr_t sealer_tramp;
 #ifdef HAS_RESTRICTED_MODE
 extern size_t c18n_code_perm_clear;
 #else
@@ -242,12 +245,24 @@ struct tramp_header {
 	uint32_t entry[];
 };
 
+#ifdef CHERI_LIB_C18N_NO_OTYPE
+struct plt_tramp_header {
+	void *target;
+	Obj_Entry *obj;
+	uint32_t entry[];
+};
+#endif
+
 /*
  * Assembly function with non-standard ABI.
  */
 void tramp_hook(void);
 
 size_t tramp_compile(char **, const struct tramp_data *);
+#ifdef CHERI_LIB_C18N_NO_OTYPE
+size_t plt_tramp_compile(char **, Obj_Entry *);
+const void *plt_tramp_make(Obj_Entry *);
+#endif
 
 void *tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *);
 struct tramp_header *tramp_reflect(const void *);

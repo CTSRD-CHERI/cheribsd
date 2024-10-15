@@ -122,7 +122,10 @@ _Static_assert(
 static uintptr_t sealer_tcb;
 static uintptr_t sealer_trusted_stk;
 
-uintptr_t sealer_pltgot, sealer_tramp;
+#ifndef CHERI_LIB_C18N_NO_OTYPE
+uintptr_t sealer_pltgot;
+#endif
+uintptr_t sealer_tramp;
 
 #ifdef HAS_RESTRICTED_MODE
 /* Permission bit to be cleared for user code */
@@ -1149,6 +1152,59 @@ tramp_pg_push(struct tramp_pg *pg, size_t len)
 	return (tramp);
 }
 
+static struct {
+	_Alignas(CACHE_LINE_SIZE) _Atomic(struct tramp_pg *) head;
+	_Alignas(CACHE_LINE_SIZE) atomic_flag lock;
+} tramp_pgs = {
+	.lock = ATOMIC_FLAG_INIT
+};
+
+static char *
+tramp_pgs_alloc(const char buf[], size_t len)
+{
+	char *tramp;
+	struct tramp_pg *pg;
+
+	pg = atomic_load_explicit(&tramp_pgs.head, memory_order_acquire);
+	tramp = tramp_pg_push(pg, len);
+	if (tramp == NULL) {
+		while (atomic_flag_test_and_set_explicit(&tramp_pgs.lock,
+		    memory_order_acquire));
+		pg = atomic_load_explicit(&tramp_pgs.head,
+		    memory_order_relaxed);
+		tramp = tramp_pg_push(pg, len);
+		if (tramp == NULL) {
+			pg = tramp_pg_new(pg);
+			tramp = tramp_pg_push(pg, len);
+			atomic_store_explicit(&tramp_pgs.head, pg,
+			    memory_order_release);
+		}
+		atomic_flag_clear_explicit(&tramp_pgs.lock,
+		    memory_order_release);
+	}
+	assert(cheri_gettag(tramp));
+
+	memcpy(tramp, buf, len);
+
+#ifdef __aarch64__
+	/*
+	 * Ensure i- and d-cache coherency after writing executable code. The
+	 * __clear_cache procedure rounds the addresses to cache-line-aligned
+	 * addresses. Derive the start address from pg so that it has
+	 * sufficiently large bounds to contain these rounded addresses.
+	 */
+	__clear_cache(cheri_copyaddress(pg, tramp), tramp + len);
+#elif __riscv
+	/*
+	 * XXX Dapeng: This is insufficient for multicore as fence.i only
+	 * guarantees consistency on the current core.
+	 */
+	asm volatile ("fence.i");
+#endif
+
+	return (tramp);
+}
+
 typedef int32_t slot_idx_t;
 
 static struct {
@@ -1161,13 +1217,6 @@ static struct {
 	} *map;
 	_Alignas(CACHE_LINE_SIZE) _Atomic(slot_idx_t) writers;
 } tramp_table;
-
-static struct {
-	_Alignas(CACHE_LINE_SIZE) _Atomic(struct tramp_pg *) head;
-	_Alignas(CACHE_LINE_SIZE) atomic_flag lock;
-} tramp_pgs = {
-	.lock = ATOMIC_FLAG_INIT
-};
 
 static slot_idx_t
 tramp_table_max_load(int exp)
@@ -1294,58 +1343,55 @@ tramp_hook_impl(int event, const struct tramp_header *hdr,
 		getpid();
 }
 
+static const void *
+tramp_make_entry(const uint32_t *entry)
+{
+	entry = cheri_clearperm(entry, FUNC_PTR_REMOVE_PERMS);
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	entry = cheri_capmode(entry);
+#endif
+
+	return (cheri_sealentry(entry));
+}
+
+#if defined(__aarch64__) && defined(CHERI_LIB_C18N_NO_OTYPE)
+const void *
+plt_tramp_make(Obj_Entry *data)
+{
+	struct plt_tramp_header *header;
+	/* A capability-aligned buffer large enough to hold a trampoline */
+	_Alignas(_Alignof(struct plt_tramp_header)) char buf[64];
+	char *bufp = buf;
+	char *tramp;
+
+	/* Fill a temporary buffer with the trampoline and obtain its length */
+	tramp = tramp_pgs_alloc(buf, plt_tramp_compile(&bufp, data));
+
+	header = (struct plt_tramp_header *)(tramp + (bufp - buf));
+
+	return (tramp_make_entry(header->entry));
+}
+#endif
+
 #define	C18N_MAX_TRAMP_SIZE	768
 
 static const struct tramp_header *
-tramp_pgs_append(const struct tramp_data *data)
+tramp_create(const struct tramp_data *data)
 {
-	size_t len;
+	struct tramp_data newdata = *data;
 	/* A capability-aligned buffer large enough to hold a trampoline */
 	_Alignas(_Alignof(struct tramp_header)) char buf[C18N_MAX_TRAMP_SIZE];
-	struct tramp_header *header;
 	char *bufp = buf;
-
 	char *tramp;
-	struct tramp_pg *pg;
+
+	if (!newdata.sig.valid && newdata.def != NULL)
+		newdata.sig = sigtab_get(newdata.defobj,
+		    newdata.def - newdata.defobj->symtab);
 
 	/* Fill a temporary buffer with the trampoline and obtain its length */
-	len = tramp_compile(&bufp, data);
+	tramp = tramp_pgs_alloc(buf, tramp_compile(&bufp, data));
 
-	pg = atomic_load_explicit(&tramp_pgs.head, memory_order_acquire);
-	tramp = tramp_pg_push(pg, len);
-	if (tramp == NULL) {
-		while (atomic_flag_test_and_set_explicit(&tramp_pgs.lock,
-		    memory_order_acquire));
-		pg = atomic_load_explicit(&tramp_pgs.head,
-		    memory_order_relaxed);
-		tramp = tramp_pg_push(pg, len);
-		if (tramp == NULL) {
-			pg = tramp_pg_new(pg);
-			tramp = tramp_pg_push(pg, len);
-			atomic_store_explicit(&tramp_pgs.head, pg,
-			    memory_order_release);
-		}
-		atomic_flag_clear_explicit(&tramp_pgs.lock,
-		    memory_order_release);
-	}
-	assert(cheri_gettag(tramp));
-
-	memcpy(tramp, buf, len);
-	header = (struct tramp_header *)(tramp + (bufp - buf));
-
-#ifdef __aarch64__
-	/*
-	 * Ensure i- and d-cache coherency after writing executable code. The
-	 * __clear_cache procedure rounds the addresses to cache-line-aligned
-	 * addresses. Derive the start address from pg so that it has
-	 * sufficiently large bounds to contain these rounded addresses.
-	 */
-	__clear_cache(cheri_copyaddress(pg, header->entry), tramp + len);
-#elif __riscv
-	asm volatile ("fence.i");
-#endif
-
-	return (header);
+	return ((struct tramp_header *)(tramp + (bufp - buf)));
 }
 
 static bool
@@ -1373,31 +1419,6 @@ tramp_check_sig(const struct tramp_header *found, const Obj_Entry *reqobj,
 		    reqobj->path, C18N_SIG_FORMAT(data->sig),
 		    found->defobj->path, C18N_SIG_FORMAT(sig));
 	}
-}
-
-static const struct tramp_header *
-tramp_create(const struct tramp_data *data)
-{
-	struct tramp_data newdata = *data;
-
-	if (!newdata.sig.valid && newdata.def != NULL)
-		newdata.sig = sigtab_get(newdata.defobj,
-		    newdata.def - newdata.defobj->symtab);
-
-	return (tramp_pgs_append(&newdata));
-}
-
-static const void *
-tramp_make_entry(const struct tramp_header *header)
-{
-	const void *entry = header->entry;
-
-	entry = cheri_clearperm(entry, FUNC_PTR_REMOVE_PERMS);
-#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	entry = cheri_capmode(entry);
-#endif
-
-	return (cheri_sealentry(entry));
 }
 
 void *
@@ -1543,7 +1564,7 @@ end:
 	/*
 	 * Most consumers use type (void *) for function pointers.
 	 */
-	return (__DECONST(void *, tramp_make_entry(header)));
+	return (__DECONST(void *, tramp_make_entry(header->entry)));
 }
 
 struct func_sig
@@ -1710,8 +1731,10 @@ c18n_init2(Obj_Entry *obj_rtld)
 	    &(size_t) { sizeof(sealer) }, NULL, 0) < 0)
 		rtld_fatal("sysctlbyname failed");
 
+#ifndef CHERI_LIB_C18N_NO_OTYPE
 	sealer_pltgot = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
+#endif
 
 	sealer_tcb = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
