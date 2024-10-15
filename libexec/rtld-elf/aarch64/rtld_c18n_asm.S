@@ -580,3 +580,12 @@ TRAMP(tramp_pop_frame)
 	retr	c30
 #endif
 TRAMPEND(tramp_pop_frame)
+
+TRAMP(tramp_plt)
+1:	ldr	c17, #0		/* To be patched at runtime */
+2:	ldr	c18, #0		/* To be patched at runtime */
+	br	c17
+TRAMPEND(tramp_plt)
+
+PATCH_POINT(tramp_plt, target, 1b)
+PATCH_POINT(tramp_plt, obj, 2b)

@@ -43,34 +43,9 @@
 /*
  * Trampolines
  */
-size_t
-tramp_compile(char **entry, const struct tramp_data *data)
-{
 #define IMPORT(template)				\
 	extern const uint32_t tramp_##template[];	\
 	extern const size_t size_tramp_##template
-
-	IMPORT(push_frame);
-	IMPORT(update_fp);
-	IMPORT(update_fp_untagged);
-	IMPORT(count_entry);
-	IMPORT(call_hook);
-	IMPORT(invoke_exe);
-	IMPORT(clear_mem_args);
-	IMPORT(clear_ret_args_indirect);
-	IMPORT(clear_ret_args);
-	IMPORT(invoke_res);
-	IMPORT(count_return);
-	IMPORT(pop_frame);
-
-	size_t size = 0;
-	char *buf = *entry;
-	size_t hook_off, count_off;
-	size_t header_off, target_off, landing_off, unused_regs;
-	bool executive = cheri_getperm(data->target) & CHERI_PERM_EXECUTIVE;
-	bool count = ld_compartment_switch_count != NULL;
-	bool hook = ld_compartment_utrace != NULL ||
-	    ld_compartment_overhead != NULL;
 
 #define	COPY_VALUE(val)	({				\
 	size_t _old_size = size;			\
@@ -125,6 +100,31 @@ tramp_compile(char **entry, const struct tramp_data *data)
 		    ((_value & 0x1ffffc) << 3);				\
 		*PATCH_INS(_offset) |= _value;				\
 	} while (0)
+
+size_t
+tramp_compile(char **entry, const struct tramp_data *data)
+{
+	IMPORT(push_frame);
+	IMPORT(update_fp);
+	IMPORT(update_fp_untagged);
+	IMPORT(count_entry);
+	IMPORT(call_hook);
+	IMPORT(invoke_exe);
+	IMPORT(clear_mem_args);
+	IMPORT(clear_ret_args_indirect);
+	IMPORT(clear_ret_args);
+	IMPORT(invoke_res);
+	IMPORT(count_return);
+	IMPORT(pop_frame);
+
+	size_t size = 0;
+	char *buf = *entry;
+	size_t hook_off, count_off;
+	size_t header_off, target_off, landing_off, unused_regs;
+	bool executive = cheri_getperm(data->target) & CHERI_PERM_EXECUTIVE;
+	bool count = ld_compartment_switch_count != NULL;
+	bool hook = ld_compartment_utrace != NULL ||
+	    ld_compartment_overhead != NULL;
 
 	if (hook)
 		hook_off = COPY_VALUE(&tramp_hook);
@@ -213,3 +213,30 @@ tramp_compile(char **entry, const struct tramp_data *data)
 
 	return (size);
 }
+
+#ifdef CHERI_LIB_C18N_NO_OTYPE
+size_t
+plt_tramp_compile(char **entry, Obj_Entry *obj)
+{
+	IMPORT(plt);
+
+	size_t size = 0;
+	char *buf = *entry;
+	size_t target_off, obj_off;
+
+	*(struct plt_tramp_header *)(buf + size) = (struct plt_tramp_header) {
+		.target = &_rtld_bind_start_c18n,
+		.obj = obj
+	};
+	target_off = size + offsetof(struct plt_tramp_header, target);
+	obj_off = size + offsetof(struct plt_tramp_header, obj);
+	*entry = buf + size;
+	size += offsetof(struct plt_tramp_header, entry);
+
+	COPY(plt);
+	PATCH_LDR_IMM(plt, target, target_off);
+	PATCH_LDR_IMM(plt, obj, obj_off);
+
+	return (size);
+}
+#endif

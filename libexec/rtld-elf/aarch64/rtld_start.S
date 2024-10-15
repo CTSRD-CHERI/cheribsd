@@ -121,6 +121,12 @@ END(.rtld_start)
 ENTRY(C18N_SYM(_rtld_bind_start))
 #ifdef CHERI_LIB_C18N
 	/*
+	 * The calling convention of this function is different when
+	 * compartmentalisation is enabled and otype sealing is disabled.
+	 * &GOT[2] no longer contains a capability to the Obj_Entry. Instead, it
+	 * is passed via register c18.
+	 */
+	/*
 	 * Get the caller's current stack top.
 	 */
 	get_untrusted_stk	c10
@@ -183,7 +189,11 @@ ENTRY(C18N_SYM(_rtld_bind_start))
 	add	x1, x1, x3		/* reloff = x3 + offset = (3 or 1.5) * offset */
 
 	/* Load obj */
+#if defined(CHERI_LIB_C18N) && defined(CHERI_LIB_C18N_NO_OTYPE)
+	mov	c0, c18
+#else
 	ldr	PTR(0), [PTR(16), #-PTR_WIDTH]
+#endif
 
 	/* Call into rtld */
 	bl	_rtld_bind
