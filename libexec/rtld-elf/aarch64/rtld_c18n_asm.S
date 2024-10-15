@@ -581,3 +581,16 @@ TRAMP(tramp_pop_frame)
 	retr	c30
 #endif
 TRAMPEND(tramp_pop_frame)
+
+TRAMP(tramp_plt)
+1:	ldr	c17, #0		/* To be patched at runtime */
+2:	ldr	c18, #0		/* To be patched at runtime */
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	br	x17
+#else
+	br	c17
+#endif
+TRAMPEND(tramp_plt)
+
+PATCH_POINT(tramp_plt, target, 1b)
+PATCH_POINT(tramp_plt, plt, 2b)
