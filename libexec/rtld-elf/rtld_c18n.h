@@ -35,7 +35,9 @@
 /*
  * Global symbols
  */
+#ifndef CHERI_LIB_C18N_NO_OTYPE
 extern uintptr_t sealer_pltgot;
+#endif
 extern const char *ld_compartment_utrace;
 extern const char *ld_compartment_policy;
 extern const char *ld_compartment_overhead;
@@ -247,6 +249,10 @@ struct tramp_header {
 void tramp_hook(void);
 
 size_t tramp_compile(char **, const struct tramp_data *);
+#ifdef CHERI_LIB_C18N_NO_OTYPE
+size_t plt_tramp_compile(char **, Plt_Entry *);
+const void *plt_tramp_make(Plt_Entry *);
+#endif
 
 void *tramp_intern(const Plt_Entry *, compart_id_t, const struct tramp_data *);
 struct tramp_header *tramp_reflect(const void *);

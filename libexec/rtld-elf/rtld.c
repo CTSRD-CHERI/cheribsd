@@ -1199,7 +1199,9 @@ _rtld_bind(Plt_Entry *plt, Elf_Size reloff)
     struct trusted_frame *tf;
 
     if (C18N_ENABLED) {
+#ifndef CHERI_LIB_C18N_NO_OTYPE
 	plt = cheri_unseal(plt, sealer_pltgot);
+#endif
 	tf = push_dummy_rtld_trusted_frame(get_trusted_stk());
     }
 #endif
