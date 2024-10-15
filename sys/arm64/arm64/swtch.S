@@ -338,14 +338,12 @@ ENTRY(savectx)
 	stp	x5, x6, [x0, #PCB_SP]
 #endif
 
-	/* Store the VFP registers */
 #ifdef VFP
-	mov	PTR(28), PTRN(lr)
-	bl	vfp_save_state_savectx
-	mov	PTRN(lr), PTR(28)
+	/* Store the VFP registers */
+	b	vfp_save_state_savectx
+#else
+	ret
 #endif
-
-	RETURN
 END(savectx)
 
 GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)

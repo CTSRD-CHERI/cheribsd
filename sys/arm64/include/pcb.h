@@ -91,7 +91,7 @@ struct pcb {
 
 #ifdef _KERNEL
 void	makectx(struct trapframe *tf, struct pcb *pcb);
-int	savectx(struct pcb *pcb) __returns_twice;
+void	savectx(struct pcb *pcb) __returns_twice;
 #endif
 
 #endif /* !LOCORE */
