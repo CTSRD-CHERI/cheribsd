@@ -105,8 +105,6 @@ retry:
 	}
 
 	for (i = 0; i < npages; i++, m++) {
-		if ((m->flags & PG_ZERO) == 0)
-			pmap_zero_page(m);
 		m->valid = VM_PAGE_BITS_ALL;
 		(*ret_page)[i] = m;
 	}

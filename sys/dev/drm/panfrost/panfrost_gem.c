@@ -607,8 +607,6 @@ retry:
 
 			return (ENOMEM);
 		}
-		if ((m->flags & PG_ZERO) == 0)
-			pmap_zero_page(m);
 		va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 		cpu_dcache_wb_range((void *)va, PAGE_SIZE);
 		m->valid = VM_PAGE_BITS_ALL;
@@ -654,8 +652,6 @@ retry:
 		return (ENOMEM);
 	}
 	for (i = 0; i < bo->npages; i++) {
-		if ((m->flags & PG_ZERO) == 0)
-			pmap_zero_page(m);
 		va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 		cpu_dcache_wb_range((void *)va, PAGE_SIZE);
 		m->valid = VM_PAGE_BITS_ALL;
