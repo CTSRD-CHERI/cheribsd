@@ -3875,16 +3875,19 @@ enum pmap_caploadgen_res
 pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 {
 	enum pmap_caploadgen_res res;
+	struct rwlock *lock;
 	pd_entry_t *l2, l2e;
 	pt_entry_t *pte, oldpte = 0;
 	vm_page_t m;
 
+	rw_rlock(&pvh_global_lock);
 	PMAP_LOCK(pmap);
 
 	KASSERT(!(csr_read(sccsr) & SCCSR_UGCLG) == !(pmap->flags.uclg),
 	    ("pmap_caploadgen_update: pmap crg %d but CPU mismatch",
 	    (int)pmap->flags.uclg));
 
+retry:
 	l2 = pmap_l2(pmap, va);
 	if (l2 == NULL || ((l2e = pmap_load(l2)) & PTE_V) == 0) {
 		m = NULL;
@@ -3892,15 +3895,25 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 		goto out;
 	}
 	if ((l2e & PTE_RWX) != 0) {
+		bool demoted;
+
 		/*
-		 * Large page: bouncing out here means we'll take a VM fault
-		 * to find the page in question.
-		 *
-		 * XXX We'd rather just demote the L2 page right now, surely?
+		 * Demote superpage and contiguous mappings.  When performing
+		 * load-side revocation, we don't want to pay the latency
+		 * penalty of scanning a large mapping.  Ideally, however, the
+		 * background scan could avoid breaking these mappings.  For
+		 * now, we attempt to reconstruct them below.
 		 */
-		m = NULL;
-		res = PMAP_CAPLOADGEN_UNABLE;
-		goto out;
+		lock = NULL;
+		demoted = pmap_demote_l2_locked(pmap, l2, va, &lock);
+		if (lock != NULL)
+			rw_wunlock(lock);
+		if (!demoted) {
+			m = NULL;
+			res = PMAP_CAPLOADGEN_UNABLE;
+			goto out;
+		}
+		goto retry;
 	}
 	pte = pmap_l2_to_l3(l2, va);
 	if (pte == NULL || ((oldpte = pmap_load(pte)) & PTE_V) == 0) {
@@ -3998,6 +4011,7 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 						sfence_vma_page(va);
 					}
 					PMAP_UNLOCK(pmap);
+					rw_runlock(&pvh_global_lock);
 					pmap_caploadgen_test_all_clean(m);
 					m = NULL;
 					goto out_unlocked;
@@ -4121,6 +4135,7 @@ out:
 #endif /* VM_NRESERVLEVEL > 0 */
 
 	PMAP_UNLOCK(pmap);
+	rw_runlock(&pvh_global_lock);
 out_unlocked:
 
 	if (*mp != NULL) {
@@ -4156,9 +4171,11 @@ pmap_assert_consistent_clg(pmap_t pmap, vm_offset_t va)
 	if ((tpte & PTE_CW) == 0)
 		return;
 	if ((tpte & PTE_CRG) == 0) {
-		KASSERT(pmap->flags.uclg == 0, ("PTR_CRG unset, but GCLG set"));
+		KASSERT(pmap->flags.uclg == 0,
+		    ("PTR_CRG unset, but GCLG set (%#lx)", tpte));
 	} else {
-		KASSERT(pmap->flags.uclg == 1, ("PTR_CRG set, but GCLG unset"));
+		KASSERT(pmap->flags.uclg == 1,
+		    ("PTR_CRG set, but GCLG unset (%#lx)", tpte));
 	}
 }
 #endif /* CHERI_CAPREVOKE */

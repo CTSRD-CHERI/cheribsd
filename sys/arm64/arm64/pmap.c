@@ -4973,21 +4973,6 @@ setl3:
 			return (false);
 		}
 		all_l3e_AF &= oldl3;
-#if __has_feature(capabilities)
-		/*
-		 * Prohibit superpages involving CDBM-set SC-clear PTEs.  The
-		 * revoker creates these without TLB shootdown, and so there
-		 * may be a SC-set TLBE still in the system.  Thankfully,
-		 * these are ephemera: either they'll transition to CD-set
-		 * or CW-clear in the next revocation epoch.
-		 */
-		if ((oldl3 & (ATTR_CDBM | ATTR_SC)) == ATTR_CDBM) {
-			atomic_add_long(&pmap_l2_p_failures, 1);
-			CTR2(KTR_PMAP, "pmap_promote_l2: CDBM failure for va "
-			    "%#lx in pmap %p", va, pmap);
-			return (false);
-		}
-#endif
 		pa -= PAGE_SIZE;
 	}
 
@@ -5081,6 +5066,18 @@ pmap_promote_l3c(pmap_t pmap, pd_entry_t *l3p, vm_offset_t va)
 	 * to a read-only mapping.  See pmap_promote_l2() for the rationale.
 	 */
 set_first:
+#if __has_feature(capabilities)
+	/*
+	 * Prohibit superpages involving CDBM-set SC-clear PTEs.  See
+	 * pmap_promote_l2() for the rationale.
+	 */
+	if ((firstl3c & (ATTR_CDBM | ATTR_SC)) == ATTR_CDBM) {
+		CTR2(KTR_PMAP, "pmap_promote_l3c: CDBM failure for va "
+		    "%#lx in pmap %p", va, pmap);
+		return (false);
+	}
+#endif
+
 	if ((firstl3c & (ATTR_S1_AP_RW_BIT | ATTR_SW_DBM)) ==
 	    (ATTR_S1_AP(ATTR_S1_AP_RO) | ATTR_SW_DBM)) {
 		/*
@@ -5871,18 +5868,6 @@ pmap_enter_l3c(pmap_t pmap, vm_offset_t va, pt_entry_t l3e, u_int flags,
 	KASSERT(!VA_IS_CLEANMAP(va) || (l3e & ATTR_SW_MANAGED) == 0,
 	    ("pmap_enter_l3c: managed mapping within the clean submap"));
 
-#ifdef CHERI_CAPREVOKE
-	if (!ADDR_IS_KERNEL(va)) {
-		/*
-		 * pmap_caploadgen_update() currently does not handle L3C
-		 * mappings.  Avoid creating them at all on the basis that the
-		 * pessimization of going through vm_fault() for capload faults
-		 * is probably worse than not having L3C mappings at all. 
-		 */
-		return (KERN_FAILURE);
-	}
-#endif
-
 	/*
 	 * If the L3 PTP is not resident, we attempt to create it here.
 	 */
@@ -6440,6 +6425,7 @@ enum pmap_caploadgen_res
 pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 {
 	enum pmap_caploadgen_res res;
+	struct rwlock *lock;
 #if VM_NRESERVLEVEL > 0
 	pd_entry_t *l2, l2e;
 #endif
@@ -6455,6 +6441,7 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 	    ("pmap_caploadgen_update: pmap clg %d but CPU mismatch",
 	    (int)pmap->flags.uclg));
 
+retry:
 	pte = pmap_pte(pmap, va, &lvl);
 	if (pte == NULL) {
 		m = NULL;
@@ -6474,23 +6461,37 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 		break;
 	}
 
-	switch(lvl) {
-	/*
-	 * Large page: bouncing out here means we'll take a VM fault to
-	 * find the page in question.
-	 *
-	 * XXX We'd rather just demote the pages right now, surely?
-	 */
+	switch (lvl) {
+	default:
+		__assert_unreachable();
 	case 1:
-	case 2:
+		/* XXX-MJ we can't really demote shm_largepage mappings */
 		m = NULL;
 		res = PMAP_CAPLOADGEN_UNABLE;
-		goto out;
-	case 3:
-		if ((tpte & ATTR_CONTIGUOUS) != 0) {
+		break;
+	case 2:
+		/*
+		 * Demote superpage and contiguous mappings.  When performing
+		 * load-side revocation, we don't want to pay the latency
+		 * penalty of scanning a large mapping.  Ideally, however, the
+		 * background scan could avoid breaking these mappings.  For
+		 * now, we attempt to reconstruct them below.
+		 */
+		lock = NULL;
+		pte = pmap_demote_l2_locked(pmap, pte, va, &lock);
+		if (lock != NULL)
+			rw_wunlock(lock);
+		if (pte == NULL) {
+			/* Demotion failed. */
 			m = NULL;
 			res = PMAP_CAPLOADGEN_UNABLE;
 			goto out;
+		}
+		goto retry;
+	case 3:
+		if ((tpte & ATTR_CONTIGUOUS) != 0) {
+			pmap_demote_l3c(pmap, pte, va);
+			goto retry;
 		}
 		break;
 	}
@@ -6664,15 +6665,17 @@ out:
 #if VM_NRESERVLEVEL > 0
 	/*
 	 * If we...
-	 *   are on the background scan (as indicated by EXCLUSIVE),
+	 *   are on the background scan (as indicated by NONEWMAPS),
 	 *   are writing back a PTE (m != NULL),
 	 *   have superpages enabled,
-	 *   are at the last page of an L2 entry,
-	 * then see if we can put a superpage back together.
+	 * try to restore an L3C mapping.  If that succeeded, then see if we can
+	 * put a superpage back together.
 	 */
 	if ((flags & PMAP_CAPLOADGEN_NONEWMAPS) &&
-	    (m != NULL) && pmap_ps_enabled(pmap) &&
-	    ((va & (L2_OFFSET - L3_OFFSET)) == (L2_OFFSET - L3_OFFSET))) {
+	    m != NULL && pmap_ps_enabled(pmap) &&
+	    (va & L3C_OFFSET) == (PTE_TO_PHYS(tpte) & L3C_OFFSET) &&
+	    vm_reserv_is_populated(m, L3C_ENTRIES) &&
+	    pmap_promote_l3c(pmap, pte, va)) {
 		KASSERT(lvl == 3,
 		    ("pmap_caploadgen_update superpage: lvl != 3"));
 		KASSERT((m->flags & PG_FICTITIOUS) == 0,
@@ -6719,7 +6722,7 @@ pmap_assert_consistent_clg(pmap_t pmap, vm_offset_t va)
 
 	pte = pmap_pte(pmap, va, &level);
 	if (pte == NULL)
-		return;	/* XXX: why does this happen? */
+		return;
 	tpte = pmap_load(pte);
 	if ((tpte & ATTR_SW_MANAGED) == 0 || !pmap_pte_capdirty(pmap, tpte))
 		return;
@@ -6729,10 +6732,12 @@ pmap_assert_consistent_clg(pmap_t pmap, vm_offset_t va)
 	case ATTR_LC_ENABLED:
 		panic("no clg");
 	case ATTR_LC_GEN0:
-		KASSERT(pmap->flags.uclg == 0, ("GEN0 LCLG with GEN1 GCLG"));
+		KASSERT(pmap->flags.uclg == 0,
+		    ("GEN0 LCLG with GEN1 GCLG (%#lx)", tpte));
 		break;
 	case ATTR_LC_GEN1:
-		KASSERT(pmap->flags.uclg == 1, ("GEN1 LCLG with GEN0 GCLG"));
+		KASSERT(pmap->flags.uclg == 1,
+		    ("GEN1 LCLG with GEN0 GCLG (%#lx)", tpte));
 		break;
 	default:
 		panic("impossible?");
@@ -9194,6 +9199,9 @@ pmap_demote_l3c(pmap_t pmap, pt_entry_t *l3p, vm_offset_t va)
 		    (ATTR_S1_AP(ATTR_S1_AP_RW) | ATTR_SW_DBM))
 			mask = ATTR_S1_AP_RW_BIT;
 		nbits |= l3e & ATTR_AF;
+#if __has_feature(capabilities)
+		nbits |= l3e & ATTR_SC;
+#endif
 	}
 	if ((nbits & ATTR_AF) != 0) {
 		pmap_invalidate_range(pmap, va & ~L3C_OFFSET, (va + L3C_SIZE) &
