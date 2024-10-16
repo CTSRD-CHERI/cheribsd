@@ -136,7 +136,6 @@ static uintptr_t sealer_trusted_stk;
 
 uintptr_t sealer_pltgot;
 #endif
-uintptr_t sealer_tramp;
 
 /* Enable compartmentalisation */
 bool ld_compartment_enable;
@@ -1702,6 +1701,7 @@ struct jmp_args (*_rtld_unw_setcontext_ptr)(struct jmp_args, void *, void **);
 void
 c18n_init2(Obj_Entry *obj_rtld)
 {
+#ifndef CHERI_LIB_C18N_NO_OTYPE
 	uintptr_t sealer;
 
 	/*
@@ -1711,7 +1711,6 @@ c18n_init2(Obj_Entry *obj_rtld)
 	    &(size_t) { sizeof(sealer) }, NULL, 0) < 0)
 		rtld_fatal("sysctlbyname failed");
 
-#ifndef CHERI_LIB_C18N_NO_OTYPE
 	sealer_pltgot = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
 
@@ -1721,9 +1720,6 @@ c18n_init2(Obj_Entry *obj_rtld)
 	sealer_trusted_stk = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
 #endif
-
-	sealer_tramp = cheri_setboundsexact(sealer, C18N_FUNC_SIG_COUNT);
-	sealer += C18N_FUNC_SIG_COUNT;
 
 	/*
 	 * All libraries have been loaded. Create and initialise a stack lookup
