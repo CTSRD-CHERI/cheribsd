@@ -39,7 +39,6 @@ extern size_t c18n_code_perm_clear;
 #ifndef CHERI_LIB_C18N_NO_OTYPE
 extern uintptr_t sealer_pltgot;
 #endif
-extern uintptr_t sealer_tramp;
 extern const char *ld_compartment_utrace;
 extern const char *ld_compartment_policy;
 extern const char *ld_compartment_overhead;
@@ -270,9 +269,6 @@ func_sig_legal(struct func_sig sig)
 /*
  * APIs
  */
-void *_rtld_sandbox_code(void *, struct func_sig);
-void *_rtld_safebox_code(void *, struct func_sig);
-
 void _rtld_bind_start_c18n(void);
 void *_rtld_tlsdesc_static_c18n(void *);
 void *_rtld_tlsdesc_undef_c18n(void *);
