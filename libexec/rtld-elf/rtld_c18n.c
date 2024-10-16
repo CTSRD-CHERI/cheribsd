@@ -119,7 +119,7 @@ _Static_assert(
 static uintptr_t sealer_tcb;
 static uintptr_t sealer_trusted_stk;
 
-uintptr_t sealer_pltgot, sealer_tramp;
+uintptr_t sealer_pltgot;
 
 /* Enable compartmentalisation */
 bool ld_compartment_enable;
@@ -1683,8 +1683,6 @@ _rtld_tramp_reflect(const void *addr)
 /*
  * APIs
  */
-#define	C18N_FUNC_SIG_COUNT	72
-
 bool _rtld_c18n_is_enabled(void);
 
 bool
@@ -1800,9 +1798,6 @@ c18n_init2(Obj_Entry *obj_rtld)
 
 	sealer_trusted_stk = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
-
-	sealer_tramp = cheri_setboundsexact(sealer, C18N_FUNC_SIG_COUNT);
-	sealer += C18N_FUNC_SIG_COUNT;
 
 	/*
 	 * All libraries have been loaded. Create and initialise a stack lookup
