@@ -51,6 +51,15 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 2024xxxx: Remove Altera DE4 drivers
+OLD_FILES+=usr/share/man/man4/altera_atse.4.gz
+OLD_FILES+=usr/share/man/man4/altera_avgen.4.gz
+OLD_FILES+=usr/share/man/man4/altera_jtag_uart.4.gz
+OLD_FILES+=usr/share/man/man4/altera_sdcard.4.gz
+OLD_FILES+=usr/share/man/man4/altera_sdcardc.4.gz
+OLD_FILES+=usr/share/man/man4/atse.4.gz
+OLD_FILES+=usr/share/man/man4/berirom.4.gz
+
 # 20240527: csh: Remove hardlink /.cshrc
 OLD_FILES+=.cshrc
 
