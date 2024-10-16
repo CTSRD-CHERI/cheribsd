@@ -116,10 +116,19 @@ _Static_assert(
 /*
  * Sealers for RTLD privileged information
  */
-static uintptr_t sealer_tcb;
+#ifdef CHERI_LIB_C18N_NO_OTYPE
+#define	c18n_seal(cap, sealer)			cap
+#define	c18n_unseal(cap, sealer)		cap
+#else
+#define	c18n_seal(cap, sealer)			cheri_seal(cap, sealer)
+#define	c18n_unseal(cap, sealer)		cheri_unseal(cap, sealer)
+#endif
+
 static uintptr_t sealer_trusted_stk;
 
 #ifndef CHERI_LIB_C18N_NO_OTYPE
+static uintptr_t sealer_tcb;
+
 uintptr_t sealer_pltgot;
 #endif
 uintptr_t sealer_tramp;
@@ -711,8 +720,8 @@ c18n_allocate_tcb(struct tcb *tcb)
 	wrap = c18n_malloc(sizeof(*wrap));
 	*wrap = (struct tcb_wrapper) {
 		.header = *tcb,
-		.tcb = cheri_seal(tcb, sealer_tcb),
-		.table = cheri_seal(table, sealer_tcb)
+		.tcb = c18n_seal(tcb, sealer_tcb),
+		.table = c18n_seal(table, sealer_tcb)
 	};
 
 	return (&wrap->header);
@@ -1722,10 +1731,10 @@ c18n_init2(Obj_Entry *obj_rtld)
 #ifndef CHERI_LIB_C18N_NO_OTYPE
 	sealer_pltgot = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
-#endif
 
 	sealer_tcb = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
+#endif
 
 	sealer_trusted_stk = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
@@ -1811,11 +1820,11 @@ _rtld_thread_start(struct pthread *curthread)
 	 */
 	wrap = __containerof(get_trusted_tp(), struct tcb_wrapper, header);
 
-	tcb = cheri_unseal(wrap->tcb, sealer_tcb);
+	tcb = c18n_unseal(wrap->tcb, sealer_tcb);
 	*tcb = wrap->header;
 	_tcb_set(tcb);
 
-	table = cheri_unseal(wrap->table, sealer_tcb);
+	table = c18n_unseal(wrap->table, sealer_tcb);
 	init_stk_table(table, wrap);
 
 	thr_thread_start(curthread);
