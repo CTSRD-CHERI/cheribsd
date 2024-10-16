@@ -58,6 +58,7 @@ OLD_FILES+=usr/share/man/man4/altera_jtag_uart.4.gz
 OLD_FILES+=usr/share/man/man4/altera_sdcard.4.gz
 OLD_FILES+=usr/share/man/man4/altera_sdcardc.4.gz
 OLD_FILES+=usr/share/man/man4/atse.4.gz
+OLD_FILES+=usr/share/man/man4/berirom.4.gz
 
 # 20241124: library and tests of OpenBSD dc
 OLD_FILES+=usr/share/misc/bc.library
