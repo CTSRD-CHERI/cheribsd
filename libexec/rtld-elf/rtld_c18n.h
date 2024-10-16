@@ -45,7 +45,6 @@
 #ifndef CHERI_LIB_C18N_NO_OTYPE
 extern uintptr_t sealer_pltgot;
 #endif
-extern uintptr_t sealer_tramp;
 #ifdef HAS_RESTRICTED_MODE
 extern size_t c18n_code_perm_clear;
 #else

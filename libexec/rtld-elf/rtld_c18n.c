@@ -139,7 +139,6 @@ static uintptr_t sealer_trusted_stk;
 
 uintptr_t sealer_pltgot;
 #endif
-uintptr_t sealer_tramp;
 
 #ifdef HAS_RESTRICTED_MODE
 /* Permission bit to be cleared for user code */
@@ -1760,9 +1759,6 @@ c18n_init2(Obj_Entry *obj_rtld)
 	sealer_tidc = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
 #endif
-
-	sealer_tramp = cheri_setboundsexact(sealer, C18N_FUNC_SIG_COUNT);
-	sealer += C18N_FUNC_SIG_COUNT;
 
 	/*
 	 * All libraries have been loaded. Create and initialise a stack lookup
