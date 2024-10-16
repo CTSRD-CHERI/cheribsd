@@ -122,15 +122,20 @@ _Static_assert(
 #ifdef CHERI_LIB_C18N_NO_OTYPE
 #define	c18n_seal(cap, sealer)			cap
 #define	c18n_unseal(cap, sealer)		cap
+#define	c18n_seal_subset(cap, sealer)		cheri_sealentry(cap)
+#define	c18n_unseal_subset(cap, sealer, super)	(			\
+	cheri_gettag(cap) ?						\
+	cheri_buildcap(super, (uintptr_t)cheri_unseal(cap, 0)) :	\
+	cap								\
+)
 #else
 #define	c18n_seal(cap, sealer)			cheri_seal(cap, sealer)
 #define	c18n_unseal(cap, sealer)		cheri_unseal(cap, sealer)
-#endif
+#define	c18n_seal_subset(cap, sealer)		cheri_seal(cap, sealer)
+#define	c18n_unseal_subset(cap, sealer, super)	cheri_unseal(cap, sealer)
 
-static uintptr_t sealer_trusted_stk;
-
-#ifndef CHERI_LIB_C18N_NO_OTYPE
 static uintptr_t sealer_tcb;
+static uintptr_t sealer_trusted_stk;
 
 uintptr_t sealer_pltgot;
 #endif
@@ -923,10 +928,10 @@ dl_c18n_get_trusted_stack(uintptr_t pc)
 		return (NULL);
 
 	tf = get_trusted_stk()->previous;
-	if (dl_c18n_is_trampoline(pc, cheri_seal(tf, sealer_trusted_stk)))
+	if (dl_c18n_is_trampoline(pc, c18n_seal_subset(tf, sealer_trusted_stk)))
 		tf = tf->previous;
 
-	return (cheri_seal(tf, sealer_trusted_stk));
+	return (c18n_seal_subset(tf, sealer_trusted_stk));
 }
 
 #ifdef __aarch64__
@@ -989,7 +994,7 @@ dl_c18n_unwind_trusted_stack(void *rcsp, void *target)
 	sigprocmask(SIG_SETMASK, &nset, &oset);
 
 	tf = get_trusted_stk();
-	target = cheri_unseal(target, sealer_trusted_stk);
+	target = c18n_unseal_subset(target, sealer_trusted_stk, tf);
 
 	if (!cheri_is_subset(tf, target) ||
 	    (ptraddr_t)tf->previous >= (ptraddr_t)target) {
@@ -1057,7 +1062,7 @@ dl_c18n_is_trampoline(uintptr_t pc, void *tfs)
 	if (!cheri_gettag(pc))
 		return (0);
 
-	tf = cheri_unseal(tfs, sealer_trusted_stk);
+	tf = c18n_unseal_subset(tfs, sealer_trusted_stk, get_trusted_stk());
 	return (pc == tf->landing);
 }
 
@@ -1069,9 +1074,9 @@ dl_c18n_pop_trusted_stack(struct dl_c18n_compart_state *state, void *tfs)
 	if (!C18N_ENABLED)
 		return (NULL);
 
-	tf = cheri_unseal(tfs, sealer_trusted_stk);
+	tf = c18n_unseal_subset(tfs, sealer_trusted_stk, get_trusted_stk());
 	*state = tf->state;
-	return (cheri_seal(tf->previous, sealer_trusted_stk));
+	return (c18n_seal_subset(tf->previous, sealer_trusted_stk));
 }
 
 #ifdef __aarch64__
@@ -1100,7 +1105,7 @@ uintptr_t _rtld_unw_getsealer(void);
 uintptr_t
 _rtld_unw_getsealer(void)
 {
-	return (sealer_trusted_stk);
+	return (0);
 }
 #endif
 
@@ -1746,10 +1751,10 @@ c18n_init2(Obj_Entry *obj_rtld)
 
 	sealer_tcb = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
-#endif
 
 	sealer_trusted_stk = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
+#endif
 
 #ifndef HAS_RESTRICTED_MODE
 	sealer_tidc = cheri_setboundsexact(sealer, 1);
