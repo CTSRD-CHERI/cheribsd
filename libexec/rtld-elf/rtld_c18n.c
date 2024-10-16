@@ -116,10 +116,10 @@ _Static_assert(
 /*
  * Sealers for RTLD privileged information
  */
+#ifndef CHERI_LIB_C18N_NO_OTYPE
 static uintptr_t sealer_tcb;
 static uintptr_t sealer_trusted_stk;
 
-#ifndef CHERI_LIB_C18N_NO_OTYPE
 uintptr_t sealer_pltgot;
 #endif
 
@@ -728,8 +728,8 @@ c18n_allocate_tcb(struct tcb *tcb)
 	wrap = c18n_malloc(sizeof(*wrap));
 	*wrap = (struct tcb_wrapper) {
 		.header = *tcb,
-		.tcb = cheri_seal(tcb, sealer_tcb),
-		.table = cheri_seal(table, sealer_tcb)
+		.tcb = c18n_seal(tcb, sealer_tcb),
+		.table = c18n_seal(table, sealer_tcb)
 	};
 
 	return (&wrap->header);
@@ -940,7 +940,7 @@ dl_c18n_get_trusted_stack(uintptr_t pc)
 	if (c18n_is_tramp(pc, tf))
 		tf = tf->previous;
 
-	return (cheri_seal(tf, sealer_trusted_stk));
+	return (c18n_seal_subset(tf, sealer_trusted_stk));
 }
 
 /*
@@ -1001,7 +1001,7 @@ dl_c18n_unwind_trusted_stack(void *rcsp, void *target)
 	sigprocmask(SIG_SETMASK, &nset, &oset);
 
 	tf = get_trusted_stk();
-	target = cheri_unseal(target, sealer_trusted_stk);
+	target = c18n_unseal_subset(target, sealer_trusted_stk, tf);
 
 	if (!cheri_is_subset(tf, target) ||
 	    (ptraddr_t)tf->previous >= (ptraddr_t)target) {
@@ -1066,7 +1066,7 @@ dl_c18n_is_trampoline(uintptr_t pc, void *tfs)
 	if (!C18N_ENABLED)
 		return (0);
 
-	tf = cheri_unseal(tfs, sealer_trusted_stk);
+	tf = c18n_unseal_subset(tfs, sealer_trusted_stk, get_trusted_stk());
 	if (!cheri_gettag(tf))
 		return (0);
 
@@ -1081,9 +1081,9 @@ dl_c18n_pop_trusted_stack(struct dl_c18n_compart_state *state, void *tfs)
 	if (!C18N_ENABLED)
 		return (NULL);
 
-	tf = cheri_unseal(tfs, sealer_trusted_stk);
+	tf = c18n_unseal_subset(tfs, sealer_trusted_stk, get_trusted_stk());
 	*state = tf->state;
-	return (cheri_seal(tf->previous, sealer_trusted_stk));
+	return (c18n_seal_subset(tf->previous, sealer_trusted_stk));
 }
 
 /*
@@ -1797,6 +1797,7 @@ struct jmp_args (*_rtld_unw_setcontext_ptr)(struct jmp_args, void *, void **);
 void
 c18n_init2(Obj_Entry *obj_rtld)
 {
+#ifndef CHERI_LIB_C18N_NO_OTYPE
 	uintptr_t sealer;
 
 	/*
@@ -1806,16 +1807,15 @@ c18n_init2(Obj_Entry *obj_rtld)
 	    &(size_t) { sizeof(sealer) }, NULL, 0) < 0)
 		rtld_fatal("sysctlbyname failed");
 
-#ifndef CHERI_LIB_C18N_NO_OTYPE
 	sealer_pltgot = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
-#endif
 
 	sealer_tcb = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
 
 	sealer_trusted_stk = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
+#endif
 
 	/*
 	 * All libraries have been loaded. Create and initialise a stack lookup
@@ -1890,11 +1890,11 @@ _rtld_thread_start(struct pthread *curthread)
 	 */
 	wrap = __containerof(get_trusted_tp(), struct tcb_wrapper, header);
 
-	tcb = cheri_unseal(wrap->tcb, sealer_tcb);
+	tcb = c18n_unseal(wrap->tcb, sealer_tcb);
 	*tcb = wrap->header;
 	_tcb_set(tcb);
 
-	table = cheri_unseal(wrap->table, sealer_tcb);
+	table = c18n_unseal(wrap->table, sealer_tcb);
 	init_stk_table(table, wrap);
 
 	thr_thread_start(curthread);
