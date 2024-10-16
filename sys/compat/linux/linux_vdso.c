@@ -64,7 +64,7 @@ __elfN(linux_shared_page_init)(char **mapping, vm_size_t size)
 {
 	vm_page_t m;
 	vm_object_t obj;
-	vm_offset_t addr;
+	vm_pointer_t addr;
 	size_t n, pages;
 
 	pages = size / PAGE_SIZE;

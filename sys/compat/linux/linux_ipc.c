@@ -293,7 +293,7 @@ linux_ipc64_perm_to_ipc_perm(struct l_ipc64_perm *in, struct l_ipc_perm *out)
 }
 
 static int
-linux_msqid_pullup(l_int ver, struct l_msqid64_ds *linux_msqid64, caddr_t uaddr)
+linux_msqid_pullup(l_int ver, struct l_msqid64_ds *linux_msqid64, void * __capability uaddr)
 {
 	struct l_msqid_ds linux_msqid;
 	int error;
@@ -317,7 +317,7 @@ linux_msqid_pullup(l_int ver, struct l_msqid64_ds *linux_msqid64, caddr_t uaddr)
 }
 
 static int
-linux_msqid_pushdown(l_int ver, struct l_msqid64_ds *linux_msqid64, caddr_t uaddr)
+linux_msqid_pushdown(l_int ver, struct l_msqid64_ds *linux_msqid64, void * __capability uaddr)
 {
 	struct l_msqid_ds linux_msqid;
 	int error;
@@ -361,7 +361,7 @@ linux_msqid_pushdown(l_int ver, struct l_msqid64_ds *linux_msqid64, caddr_t uadd
 }
 
 static int
-linux_semid_pullup(l_int ver, struct l_semid64_ds *linux_semid64, caddr_t uaddr)
+linux_semid_pullup(l_int ver, struct l_semid64_ds *linux_semid64, void * __capability uaddr)
 {
 	struct l_semid_ds linux_semid;
 	int error;
@@ -380,7 +380,7 @@ linux_semid_pullup(l_int ver, struct l_semid64_ds *linux_semid64, caddr_t uaddr)
 }
 
 static int
-linux_semid_pushdown(l_int ver, struct l_semid64_ds *linux_semid64, caddr_t uaddr)
+linux_semid_pushdown(l_int ver, struct l_semid64_ds *linux_semid64, void * __capability uaddr)
 {
 	struct l_semid_ds linux_semid;
 	int error;
@@ -407,7 +407,7 @@ linux_semid_pushdown(l_int ver, struct l_semid64_ds *linux_semid64, caddr_t uadd
 }
 
 static int
-linux_shmid_pullup(l_int ver, struct l_shmid64_ds *linux_shmid64, caddr_t uaddr)
+linux_shmid_pullup(l_int ver, struct l_shmid64_ds *linux_shmid64, void * __capability uaddr)
 {
 	struct l_shmid_ds linux_shmid;
 	int error;
@@ -427,7 +427,7 @@ linux_shmid_pullup(l_int ver, struct l_shmid64_ds *linux_shmid64, caddr_t uaddr)
 }
 
 static int
-linux_shmid_pushdown(l_int ver, struct l_shmid64_ds *linux_shmid64, caddr_t uaddr)
+linux_shmid_pushdown(l_int ver, struct l_shmid64_ds *linux_shmid64, void * __capability uaddr)
 {
 	struct l_shmid_ds linux_shmid;
 	int error;
@@ -463,7 +463,7 @@ linux_shmid_pushdown(l_int ver, struct l_shmid64_ds *linux_shmid64, caddr_t uadd
 
 static int
 linux_shminfo_pushdown(l_int ver, struct l_shminfo64 *linux_shminfo64,
-    caddr_t uaddr)
+    void * __capability uaddr)
 {
 	struct l_shminfo linux_shminfo;
 
@@ -574,7 +574,7 @@ linux_semctl(struct thread *td, struct linux_semctl_args *args)
 		linux_to_bsd_semid_ds(&linux_semid64, &semid);
 		semun.buf = &semid;
 		return (kern_semctl(td, args->semid, args->semnum, cmd, &semun,
-		    td->td_retval));
+		    (register_t *)td->td_retval));
 	case LINUX_IPC_STAT:
 		cmd = IPC_STAT;
 		semun.buf = &semid;
@@ -626,11 +626,11 @@ linux_semctl(struct thread *td, struct linux_semctl_args *args)
 		return (0);
 	case LINUX_GETALL:
 		cmd = GETALL;
-		semun.array = __USER_CAP_UNBOUND(PTRIN(args->arg.array));
+		semun.array = PTRIN(args->arg.array);
 		break;
 	case LINUX_SETALL:
 		cmd = SETALL;
-		semun.array = __USER_CAP_UNBOUND(PTRIN(args->arg.array));
+		semun.array = PTRIN(args->arg.array);
 		break;
 	default:
 		linux_msg(td, "ipc type %d is not implemented",
@@ -638,13 +638,13 @@ linux_semctl(struct thread *td, struct linux_semctl_args *args)
 		return (EINVAL);
 	}
 	return (kern_semctl(td, args->semid, args->semnum, cmd, &semun,
-	    td->td_retval));
+	    (register_t *)td->td_retval));
 }
 
 int
 linux_msgsnd(struct thread *td, struct linux_msgsnd_args *args)
 {
-	const void *msgp;
+	const void * __capability msgp;
 	long mtype;
 	l_long lmtype;
 	int error;
@@ -656,14 +656,14 @@ linux_msgsnd(struct thread *td, struct linux_msgsnd_args *args)
 		return (error);
 	mtype = (long)lmtype;
 	return (kern_msgsnd(td, args->msqid,
-	    PTR2CAP((const char *)msgp) + sizeof(lmtype),
+	    (const char * __capability)msgp + sizeof(lmtype),
 	    args->msgsz, args->msgflg, mtype));
 }
 
 int
 linux_msgrcv(struct thread *td, struct linux_msgrcv_args *args)
 {
-	void *msgp;
+	void * __capability msgp;
 	long mtype;
 	l_long lmtype;
 	int error;
@@ -672,7 +672,7 @@ linux_msgrcv(struct thread *td, struct linux_msgrcv_args *args)
 		return (EINVAL);
 	msgp = PTRIN(args->msgp);
 	if ((error = kern_msgrcv(td, args->msqid,
-	    PTR2CAP((char *)msgp) + sizeof(lmtype), args->msgsz,
+	    (char * __capability)msgp + sizeof(lmtype), args->msgsz,
 	    args->msgtyp, args->msgflg, &mtype)) != 0)
 		return (error);
 	lmtype = (l_long)mtype;

@@ -956,7 +956,7 @@ linux_psignal(struct thread *td, int pid, int sig)
 }
 
 int
-linux_copyin_sigset(struct thread *td, l_sigset_t *lset,
+linux_copyin_sigset(struct thread *td, l_sigset_t * __capability lset,
     l_size_t sigsetsize, sigset_t *set, sigset_t **pset)
 {
 	l_sigset_t lmask;

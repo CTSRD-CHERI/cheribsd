@@ -138,7 +138,7 @@ linux_kern_lstat(struct thread *td, const char * __capability path,
 #endif
 
 static int
-newstat_copyout(struct stat *buf, void *ubuf)
+newstat_copyout(struct stat *buf, void * __capability ubuf)
 {
 	struct l_newstat tbuf;
 

@@ -88,12 +88,12 @@ struct linux_robust_list_head {
 	l_uintptr_t			pending_list;
 };
 
-int futex_xchgl(int oparg, uint32_t *uaddr, int *oldval);
-int futex_addl(int oparg, uint32_t *uaddr, int *oldval);
-int futex_orl(int oparg, uint32_t *uaddr, int *oldval);
-int futex_andl(int oparg, uint32_t *uaddr, int *oldval);
-int futex_xorl(int oparg, uint32_t *uaddr, int *oldval);
-int futex_wake(struct thread *td, uint32_t *uaddr, int val, bool shared);
+int futex_xchgl(int oparg, uint32_t * __capability uaddr, int *oldval);
+int futex_addl(int oparg, uint32_t * __capability uaddr, int *oldval);
+int futex_orl(int oparg, uint32_t * __capability uaddr, int *oldval);
+int futex_andl(int oparg, uint32_t * __capability uaddr, int *oldval);
+int futex_xorl(int oparg, uint32_t * __capability uaddr, int *oldval);
+int futex_wake(struct thread *td, uint32_t * __capability uaddr, int val, bool shared);
 void	release_futexes(struct thread *,
 			struct linux_emuldata *);
 

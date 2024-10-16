@@ -324,13 +324,13 @@ __linuxN(note_nt_auxv)(void *arg, struct sbuf *sb, size_t *sizep)
  * as the initial stack pointer.
  */
 int
-__linuxN(copyout_strings)(struct image_params *imgp, uintptr_t *stack_base)
+__linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 {
 	char canary[LINUX_AT_RANDOM_LEN];
-	char **vectp;
+	char * __capability * __capability vectp;
 	char *stringp;
-	uintptr_t destp, ustringp;
-	struct ps_strings *arginfo;
+	uintcap_t destp, ustringp;
+	struct ps_strings * __capability arginfo;
 	struct proc *p;
 	size_t execpath_len;
 	int argc, envc;
@@ -338,7 +338,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintptr_t *stack_base)
 
 	p = imgp->proc;
 	destp =	PROC_PS_STRINGS(p);
-	arginfo = imgp->ps_strings = (void *)destp;
+	arginfo = imgp->ps_strings = (void * __capability)destp;
 
 	/*
 	 * Copy the image path for the rtld.
@@ -347,7 +347,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintptr_t *stack_base)
 		execpath_len = strlen(imgp->execpath) + 1;
 		destp -= execpath_len;
 		destp = rounddown2(destp, sizeof(void *));
-		imgp->execpathp = (void *)destp;
+		imgp->execpathp = (void * __capability)destp;
 		error = copyout(imgp->execpath, imgp->execpathp, execpath_len);
 		if (error != 0)
 			return (error);
@@ -358,7 +358,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintptr_t *stack_base)
 	 */
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
-	imgp->canary = (void *)destp;
+	imgp->canary = (void * __capability)destp;
 	error = copyout(canary, imgp->canary, sizeof(canary));
 	if (error != 0)
 		return (error);
@@ -380,7 +380,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintptr_t *stack_base)
 		destp = rounddown2(destp, sizeof(void *));
 	}
 
-	vectp = (char **)destp;
+	vectp = (char * __capability * __capability)destp;
 
 	/*
 	 * Allocate room for the argv[] and env vectors including the
@@ -391,12 +391,12 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintptr_t *stack_base)
 	/*
 	 * Starting with 2.24, glibc depends on a 16-byte stack alignment.
 	 */
-	vectp = (char **)((((uintptr_t)vectp + 8) & ~0xF) - 8);
+	vectp = (char * __capability * __capability)((((uintcap_t)vectp + 8) & ~0xF) - 8);
 
 	/*
 	 * vectp also becomes our initial stack base
 	 */
-	*stack_base = (uintptr_t)vectp;
+	*stack_base = (uintcap_t)vectp;
 
 	stringp = imgp->args->begin_argv;
 	argc = imgp->args->argc;
@@ -405,7 +405,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintptr_t *stack_base)
 	/*
 	 * Copy out strings - arguments and environment.
 	 */
-	error = copyout(stringp, (void *)ustringp,
+	error = copyout(stringp, (void * __capability)ustringp,
 	    ARG_MAX - imgp->args->stringspace);
 	if (error != 0)
 		return (error);
@@ -414,7 +414,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintptr_t *stack_base)
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
 	imgp->argv = vectp;
-	if (suword(&arginfo->ps_argvstr, (long)(intptr_t)vectp) != 0 ||
+	if (suword(&arginfo->ps_argvstr, (long)(intcap_t)vectp) != 0 ||
 	    suword32(&arginfo->ps_nargvstr, argc) != 0)
 		return (EFAULT);
 
@@ -434,7 +434,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintptr_t *stack_base)
 		return (EFAULT);
 
 	imgp->envv = vectp;
-	if (suword(&arginfo->ps_envstr, (long)(intptr_t)vectp) != 0 ||
+	if (suword(&arginfo->ps_envstr, (long)(intcap_t)vectp) != 0 ||
 	    suword32(&arginfo->ps_nenvstr, envc) != 0)
 		return (EFAULT);
 
@@ -456,7 +456,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintptr_t *stack_base)
 	if (imgp->auxargs) {
 		vectp++;
 		error = imgp->sysent->sv_copyout_auxargs(imgp,
-		    (uintptr_t)vectp);
+		    (uintcap_t)vectp);
 		if (error != 0)
 			return (error);
 	}
@@ -487,7 +487,7 @@ linux_trans_osrel(const Elf_Note *note, int32_t *osrel)
 }
 
 int
-__linuxN(copyout_auxargs)(struct image_params *imgp, uintptr_t base)
+__linuxN(copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 {
 	struct thread *td = curthread;
 	Elf_Auxargs *args;

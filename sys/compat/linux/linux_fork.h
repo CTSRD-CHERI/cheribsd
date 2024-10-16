@@ -85,8 +85,8 @@ struct l_user_clone_args {
  */
 struct l_clone_args {
 	uint64_t flags;
-	l_int *child_tid;
-	l_int *parent_tid;
+	l_int * __kerncap child_tid;
+	l_int * __kerncap parent_tid;
 	l_int exit_signal;
 	l_ulong stack;
 	l_ulong stack_size;
@@ -96,7 +96,7 @@ struct l_clone_args {
 #define	LINUX_CLONE_ARGS_SIZE_VER0	64
 
 int linux_set_upcall(struct thread *, register_t);
-int linux_set_cloned_tls(struct thread *, void *);
+int linux_set_cloned_tls(struct thread *, void * __capability);
 void linux_thread_detach(struct thread *);
 #endif /* defined(_KERNEL) */
 

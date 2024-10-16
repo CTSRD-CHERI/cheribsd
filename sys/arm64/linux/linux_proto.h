@@ -135,7 +135,7 @@ struct linux_dup3_args {
 struct linux_fcntl_args {
 	char fd_l_[PADL_(l_uint)]; l_uint fd; char fd_r_[PADR_(l_uint)];
 	char cmd_l_[PADL_(l_uint)]; l_uint cmd; char cmd_r_[PADR_(l_uint)];
-	char arg_l_[PADL_(l_ulong)]; l_ulong arg; char arg_r_[PADR_(l_ulong)];
+	char arg_l_[PADL_(l_uintptr_t)]; l_uintptr_t arg; char arg_r_[PADR_(l_uintptr_t)];
 };
 struct linux_inotify_init1_args {
 	char flags_l_[PADL_(l_int)]; l_int flags; char flags_r_[PADR_(l_int)];
@@ -149,7 +149,7 @@ struct linux_inotify_rm_watch_args {
 struct linux_ioctl_args {
 	char fd_l_[PADL_(l_uint)]; l_uint fd; char fd_r_[PADR_(l_uint)];
 	char cmd_l_[PADL_(l_uint)]; l_uint cmd; char cmd_r_[PADR_(l_uint)];
-	char arg_l_[PADL_(l_ulong)]; l_ulong arg; char arg_r_[PADR_(l_ulong)];
+	char arg_l_[PADL_(l_uintptr_t)]; l_uintptr_t arg; char arg_r_[PADR_(l_uintptr_t)];
 };
 struct linux_ioprio_set_args {
 	char which_l_[PADL_(l_int)]; l_int which; char which_r_[PADR_(l_int)];
@@ -504,8 +504,8 @@ struct linux_syslog_args {
 struct linux_ptrace_args {
 	char req_l_[PADL_(l_long)]; l_long req; char req_r_[PADR_(l_long)];
 	char pid_l_[PADL_(l_long)]; l_long pid; char pid_r_[PADR_(l_long)];
-	char addr_l_[PADL_(l_ulong)]; l_ulong addr; char addr_r_[PADR_(l_ulong)];
-	char data_l_[PADL_(l_ulong)]; l_ulong data; char data_r_[PADR_(l_ulong)];
+	char addr_l_[PADL_(l_uintptr_t)]; l_uintptr_t addr; char addr_r_[PADR_(l_uintptr_t)];
+	char data_l_[PADL_(l_uintptr_t)]; l_uintptr_t data; char data_r_[PADR_(l_uintptr_t)];
 };
 struct linux_sched_setparam_args {
 	char pid_l_[PADL_(l_pid_t)]; l_pid_t pid; char pid_r_[PADR_(l_pid_t)];

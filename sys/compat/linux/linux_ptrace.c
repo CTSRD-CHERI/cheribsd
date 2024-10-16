@@ -157,7 +157,7 @@ linux_ptrace_status(struct thread *td, pid_t pid, int status)
 }
 
 static int
-linux_ptrace_peek(struct thread *td, pid_t pid, void *addr, void *data)
+linux_ptrace_peek(struct thread *td, pid_t pid, void * __capability addr, void * __capability data)
 {
 	int error;
 
@@ -234,7 +234,7 @@ linux_ptrace_geteventmsg(struct thread *td, pid_t pid, l_ulong data)
 }
 
 static int
-linux_ptrace_getsiginfo(struct thread *td, pid_t pid, l_ulong data)
+linux_ptrace_getsiginfo(struct thread *td, pid_t pid, uintptr_t data)
 {
 	struct ptrace_lwpinfo lwpinfo;
 	l_siginfo_t l_siginfo;
@@ -255,7 +255,7 @@ linux_ptrace_getsiginfo(struct thread *td, pid_t pid, l_ulong data)
 	sig = bsd_to_linux_signal(lwpinfo.pl_siginfo.si_signo);
 	memset(&l_siginfo, 0, sizeof(l_siginfo));
 	siginfo_to_lsiginfo(&lwpinfo.pl_siginfo, &l_siginfo, sig);
-	error = copyout(&l_siginfo, (void *)data, sizeof(l_siginfo));
+	error = copyout(&l_siginfo, (void * __capability)data, sizeof(l_siginfo));
 	return (error);
 }
 
@@ -275,12 +275,12 @@ linux_ptrace_getregs(struct thread *td, pid_t pid, void *data)
 	if (error != 0)
 		return (error);
 
-	error = copyout(&l_regset, (void *)data, sizeof(l_regset));
+	error = copyout(&l_regset, (void * __capability)data, sizeof(l_regset));
 	return (error);
 }
 
 static int
-linux_ptrace_setregs(struct thread *td, pid_t pid, void *data)
+linux_ptrace_setregs(struct thread *td, pid_t pid, void * __capability data)
 {
 	struct reg b_reg;
 	struct linux_pt_regset l_regset;
@@ -295,7 +295,7 @@ linux_ptrace_setregs(struct thread *td, pid_t pid, void *data)
 }
 
 static int
-linux_ptrace_getregset_prstatus(struct thread *td, pid_t pid, l_ulong data)
+linux_ptrace_getregset_prstatus(struct thread *td, pid_t pid, uintptr_t data)
 {
 	struct reg b_reg;
 	struct linux_pt_regset l_regset;
@@ -303,7 +303,7 @@ linux_ptrace_getregset_prstatus(struct thread *td, pid_t pid, l_ulong data)
 	size_t len;
 	int error;
 
-	error = copyin((const void *)data, &iov, sizeof(iov));
+	error = copyin((const void * __capability)data, &iov, sizeof(iov));
 	if (error != 0) {
 		linux_msg(td, "copyin error %d", error);
 		return (error);
@@ -319,7 +319,7 @@ linux_ptrace_getregset_prstatus(struct thread *td, pid_t pid, l_ulong data)
 		return (error);
 
 	len = MIN(iov.iov_len, sizeof(l_regset));
-	error = copyout(&l_regset, (void *)iov.iov_base, len);
+	error = copyout(&l_regset, (void * __capability)iov.iov_base, len);
 	if (error != 0) {
 		linux_msg(td, "copyout error %d", error);
 		return (error);
@@ -367,7 +367,7 @@ linux_ptrace_seize(struct thread *td, pid_t pid, l_ulong addr, l_ulong data)
 
 static int
 linux_ptrace_get_syscall_info(struct thread *td, pid_t pid,
-    l_ulong len, l_ulong data)
+    l_ulong len, uintptr_t data)
 {
 	struct ptrace_lwpinfo lwpinfo;
 	struct ptrace_sc_ret sr;

@@ -84,9 +84,9 @@ _Static_assert(offsetof(struct l_ifreq, ifr_name) ==
 
 #define	SECURITY_CONTEXT_STRING	"unconfined"
 
-static int linux_sendmsg_common(struct thread *, l_int, struct l_msghdr *,
+static int linux_sendmsg_common(struct thread *, l_int, struct l_msghdr * __capability,
 					l_uint);
-static int linux_recvmsg_common(struct thread *, l_int, struct l_msghdr *,
+static int linux_recvmsg_common(struct thread *, l_int, struct l_msghdr * __capability,
 					l_uint, struct msghdr *);
 static int linux_set_socket_flags(int, int *);
 
@@ -755,7 +755,7 @@ linux_set_socket_flags(int lflags, int *flags)
 }
 
 static int
-linux_copyout_sockaddr(const struct sockaddr *sa, void *uaddr, size_t len)
+linux_copyout_sockaddr(const struct sockaddr *sa, void * __capability uaddr, size_t len)
 {
 	struct l_sockaddr *lsa;
 	int error;
@@ -774,7 +774,7 @@ static int
 linux_sendit(struct thread *td, int s, struct msghdr *mp, int flags,
     struct mbuf *control, enum uio_seg segflg)
 {
-	struct sockaddr *to;
+	struct sockaddr * __capability to;
 	int error, len;
 
 	if (mp->msg_name != NULL) {
@@ -1299,7 +1299,7 @@ linux_sendto(struct thread *td, struct linux_sendto_args *args)
 int
 linux_recvfrom(struct thread *td, struct linux_recvfrom_args *args)
 {
-	struct sockaddr *sa;
+	struct sockaddr * __capability sa;
 	struct msghdr msg;
 	struct iovec aiov;
 	int error, fromlen;
@@ -1312,7 +1312,7 @@ linux_recvfrom(struct thread *td, struct linux_recvfrom_args *args)
 		if (fromlen < 0)
 			return (EINVAL);
 		fromlen = min(fromlen, SOCK_MAXADDRLEN);
-		sa = malloc(fromlen, M_SONAME, M_WAITOK);
+		sa = malloc_c(fromlen, M_SONAME, M_WAITOK);
 	} else {
 		fromlen = 0;
 		sa = NULL;
@@ -1345,12 +1345,12 @@ linux_recvfrom(struct thread *td, struct linux_recvfrom_args *args)
 		error = copyout(&msg.msg_namelen, PTRIN(args->fromlen),
 		    sizeof(msg.msg_namelen));
 out:
-	free(sa, M_SONAME);
+	free_c(sa, M_SONAME);
 	return (error);
 }
 
 static int
-linux_sendmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
+linux_sendmsg_common(struct thread *td, l_int s, struct l_msghdr * __capability msghdr,
     l_uint flags)
 {
 	struct sockaddr_storage ss = { .ss_len = sizeof(ss) };
@@ -1358,9 +1358,9 @@ linux_sendmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	struct mbuf *control;
 	struct msghdr msg;
 	struct l_cmsghdr linux_cmsg;
-	struct l_cmsghdr *ptr_cmsg;
+	struct l_cmsghdr * __capability ptr_cmsg;
 	struct l_msghdr linux_msghdr;
-	struct iovec *iov;
+	struct iovec * __capability iov;
 	socklen_t datalen;
 	struct socket *so;
 	sa_family_t sa_family;
@@ -1533,7 +1533,7 @@ linux_sendmsg(struct thread *td, struct linux_sendmsg_args *args)
 int
 linux_sendmmsg(struct thread *td, struct linux_sendmmsg_args *args)
 {
-	struct l_mmsghdr *msg;
+	struct l_mmsghdr * __capability msg;
 	l_uint retval;
 	int error, datagrams;
 
@@ -1768,7 +1768,7 @@ recvmsg_scm_ipproto_ip(l_int msg_type, l_int lmsg_type, socklen_t *datalen,
 }
 
 static int
-linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
+linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr * __capability msghdr,
     l_uint flags, struct msghdr *msg)
 {
 	struct proc *p = td->td_proc;
@@ -1776,10 +1776,10 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	struct l_cmsghdr *lcm = NULL;
 	socklen_t datalen, maxlen, outlen;
 	struct l_msghdr l_msghdr;
-	struct iovec *iov, *uiov;
+	struct iovec *iov, * __capability uiov;
 	struct mbuf *m, *control = NULL;
 	struct mbuf **controlp;
-	struct sockaddr *sa;
+	struct sockaddr * __capability sa;
 	caddr_t outbuf;
 	void *data, *udata;
 	int error, skiped;

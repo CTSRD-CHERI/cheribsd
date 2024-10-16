@@ -111,7 +111,7 @@ linux_fetch_syscall_args(struct thread *td)
 {
 	struct proc *p;
 	struct syscall_args *sa;
-	register_t *ap;
+	syscallarg_t *ap;
 
 	p = td->td_proc;
 	ap = td->td_frame->tf_x;
@@ -258,7 +258,7 @@ linux_rt_sigreturn(struct thread *td, struct linux_rt_sigreturn_args *args)
 
 	tf = td->td_frame;
 	frame = (struct l_sigframe *)tf->tf_sp;
-	error = copyin((void *)&frame->sf, sf, sizeof(*sf));
+	error = copyin((void * __capability)&frame->sf, sf, sizeof(*sf));
 	if (error != 0) {
 		free(sf, M_LINUX);
 		return (error);

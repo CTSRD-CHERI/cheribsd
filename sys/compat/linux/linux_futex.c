@@ -57,26 +57,28 @@
 
 #define	GET_SHARED(a)	(a->flags & FUTEX_SHARED) ? AUTO_SHARE : THREAD_SHARE
 
-static int futex_atomic_op(struct thread *, int, uint32_t *, int *);
+static int futex_atomic_op(struct thread *, int, uint32_t * __capability, int *);
 static int handle_futex_death(struct thread *td, struct linux_emuldata *,
-    uint32_t *, unsigned int, bool);
-static int fetch_robust_entry(struct linux_robust_list **,
-    struct linux_robust_list **, unsigned int *);
+    uint32_t * __capability, unsigned int, bool);
+static int fetch_robust_entry(struct linux_robust_list * __capability *,
+    struct linux_robust_list * __capability * __capability, unsigned int *);
 
 struct linux_futex_args {
-	uint32_t	*uaddr;
+	uint32_t	* __kerncap uaddr;
 	int32_t		op;
 	uint32_t	flags;
 	bool		clockrt;
 	uint32_t	val;
+	// Normally should be a kernel space address so no __kerncap (Already copied in)
+	// In case LINUX_FUTEX_CMD is not LINUX_FUTEX_WAIT, LINUX_FUTEX_WAIT_BITSET, LINUX_FUTEX_LOCK_PI or LINUX_FUTEX_LOCK_PI2, use the user-supplied data directly with fromcap.
 	struct timespec	*ts;
-	uint32_t	*uaddr2;
+	uint32_t	* __kerncap uaddr2;
 	uint32_t	val3;
 	bool		val3_compare;
 	struct timespec	kts;
 };
 
-static inline int futex_key_get(const void *, int, int, struct umtx_key *);
+static inline int futex_key_get(const void * __capability, int, int, struct umtx_key *);
 static void linux_umtx_abs_timeout_init(struct umtx_abs_timeout *,
 	    struct linux_futex_args *);
 static int linux_futex(struct thread *, struct linux_futex_args *);
@@ -87,10 +89,10 @@ static int linux_futex_wakeop(struct thread *, struct linux_futex_args *);
 static int linux_futex_lock_pi(struct thread *, bool, struct linux_futex_args *);
 static int linux_futex_unlock_pi(struct thread *, bool,
 	    struct linux_futex_args *);
-static int futex_wake_pi(struct thread *, uint32_t *, bool);
+static int futex_wake_pi(struct thread *, uint32_t * __capability, bool);
 
 static int
-futex_key_get(const void *uaddr, int type, int share, struct umtx_key *key)
+futex_key_get(const void * __capability uaddr, int type, int share, struct umtx_key *key)
 {
 
 	/* Check that futex address is a 32bit aligned. */
@@ -100,7 +102,7 @@ futex_key_get(const void *uaddr, int type, int share, struct umtx_key *key)
 }
 
 int
-futex_wake(struct thread *td, uint32_t *uaddr, int val, bool shared)
+futex_wake(struct thread *td, uint32_t * __capability uaddr, int val, bool shared)
 {
 	struct linux_futex_args args;
 
@@ -115,7 +117,7 @@ futex_wake(struct thread *td, uint32_t *uaddr, int val, bool shared)
 }
 
 static int
-futex_wake_pi(struct thread *td, uint32_t *uaddr, bool shared)
+futex_wake_pi(struct thread *td, uint32_t * __capability uaddr, bool shared)
 {
 	struct linux_futex_args args;
 
@@ -128,7 +130,7 @@ futex_wake_pi(struct thread *td, uint32_t *uaddr, bool shared)
 }
 
 static int
-futex_atomic_op(struct thread *td, int encoded_op, uint32_t *uaddr,
+futex_atomic_op(struct thread *td, int encoded_op, uint32_t * __capability uaddr,
     int *res)
 {
 	int op = (encoded_op >> 28) & 7;
@@ -835,7 +837,9 @@ linux_sys_futex(struct thread *td, struct linux_sys_futex_args *args)
 		}
 		break;
 	default:
-		fargs.ts = PTRIN(args->timeout);
+		// LINUX_FUTEX_CMD is not the four mentioned above
+		// fromcap directly without copying in the timespec
+		fargs.ts = (__cheri_fromcap void *)PTRIN(args->timeout);
 	}
 	return (linux_futex(td, &fargs));
 }
@@ -893,7 +897,7 @@ int
 linux_get_robust_list(struct thread *td, struct linux_get_robust_list_args *args)
 {
 	struct linux_emuldata *em;
-	struct linux_robust_list_head *head;
+	struct linux_robust_list_head * __capability head;
 	l_size_t len;
 	struct thread *td2;
 	int error;
@@ -934,7 +938,7 @@ linux_get_robust_list(struct thread *td, struct linux_get_robust_list_args *args
 }
 
 static int
-handle_futex_death(struct thread *td, struct linux_emuldata *em, uint32_t *uaddr,
+handle_futex_death(struct thread *td, struct linux_emuldata *em, uint32_t * __capability uaddr,
     unsigned int pi, bool pending_op)
 {
 	uint32_t uval, nval, mval;
@@ -996,17 +1000,17 @@ retry:
 }
 
 static int
-fetch_robust_entry(struct linux_robust_list **entry,
-    struct linux_robust_list **head, unsigned int *pi)
+fetch_robust_entry(struct linux_robust_list * __capability *entry,
+    struct linux_robust_list * __capability * __capability head, unsigned int *pi)
 {
-	l_ulong uentry;
+	uintcap_t uentry;
 	int error;
 
-	error = copyin((const void *)head, &uentry, sizeof(uentry));
+	error = copyin((const void * __capability)head, &uentry, sizeof(uentry));
 	if (error != 0)
 		return (EFAULT);
 
-	*entry = (void *)(uentry & ~1UL);
+	*entry = (void * __capability)(uentry & ~1UL);
 	*pi = uentry & 1;
 
 	return (0);
@@ -1019,10 +1023,10 @@ fetch_robust_entry(struct linux_robust_list **entry,
 void
 release_futexes(struct thread *td, struct linux_emuldata *em)
 {
-	struct linux_robust_list_head *head;
-	struct linux_robust_list *entry, *next_entry, *pending;
+	struct linux_robust_list_head * __capability head;
+	struct linux_robust_list * __capability entry, * __capability next_entry, * __capability pending;
 	unsigned int limit = 2048, pi, next_pi, pip;
-	uint32_t *uaddr;
+	uint32_t * __capability uaddr;
 	l_long futex_offset;
 	int error;
 
@@ -1050,7 +1054,7 @@ release_futexes(struct thread *td, struct linux_emuldata *em)
 		 * don't process it twice.
 		 */
 		if (entry != pending) {
-			uaddr = (uint32_t *)((caddr_t)entry + futex_offset);
+			uaddr = (uint32_t * __capability)((char * __capability)entry + futex_offset);
 			if (handle_futex_death(td, em, uaddr, pi,
 			    LINUX_HANDLE_DEATH_LIST))
 				return;
@@ -1068,7 +1072,7 @@ release_futexes(struct thread *td, struct linux_emuldata *em)
 	}
 
 	if (pending) {
-		uaddr = (uint32_t *)((caddr_t)pending + futex_offset);
+		uaddr = (uint32_t * __capability)((char * __capability)pending + futex_offset);
 		(void)handle_futex_death(td, em, uaddr, pip,
 		    LINUX_HANDLE_DEATH_PENDING);
 	}

@@ -574,8 +574,8 @@ linux_utimensat_lts_to_ts(struct l_timespec *l_times, struct timespec *times)
 }
 
 static int
-linux_common_utimensat(struct thread *td, int ldfd, const char *pathname,
-    struct timespec *timesp, int lflags)
+linux_common_utimensat(struct thread *td, int ldfd, const char * __capability pathname,
+    struct timespec * __capability timesp, int lflags)
 {
 	int dfd, flags = 0;
 
@@ -1709,7 +1709,7 @@ linux_prctl(struct thread *td, struct linux_prctl_args *args)
 			return (error);
 		pdeath_signal = bsd_to_linux_signal(pdeath_signal);
 		return (copyout(&pdeath_signal,
-		    (void *)(register_t)args->arg2,
+		    (void *)args->arg2,
 		    sizeof(pdeath_signal)));
 	/*
 	 * In Linux, this flag controls if set[gu]id processes can coredump.
@@ -1774,7 +1774,7 @@ linux_prctl(struct thread *td, struct linux_prctl_args *args)
 		 * check on copyout.
 		 */
 		max_size = MIN(sizeof(comm), sizeof(p->p_comm));
-		error = copyinstr((void *)(register_t)args->arg2, comm,
+		error = copyinstr((void *)args->arg2, comm,
 		    max_size, NULL);
 
 		/* Linux silently truncates the name if it is too long. */
@@ -1785,7 +1785,7 @@ linux_prctl(struct thread *td, struct linux_prctl_args *args)
 			 * safe side. This should be changed in case
 			 * copyinstr() is changed to guarantee this.
 			 */
-			error = copyin((void *)(register_t)args->arg2, comm,
+			error = copyin((void *)args->arg2, comm,
 			    max_size - 1);
 			comm[max_size - 1] = '\0';
 		}
@@ -1800,7 +1800,7 @@ linux_prctl(struct thread *td, struct linux_prctl_args *args)
 		PROC_LOCK(p);
 		strlcpy(comm, p->p_comm, sizeof(comm));
 		PROC_UNLOCK(p);
-		error = copyout(comm, (void *)(register_t)args->arg2,
+		error = copyout(comm, (void *)args->arg2,
 		    strlen(comm) + 1);
 		break;
 	case LINUX_PR_GET_SECCOMP:

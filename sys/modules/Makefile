@@ -928,7 +928,7 @@ BROKEN_MODULES+=armv8crypto
 BROKEN_MODULES+=bnxt
 BROKEN_MODULES+=dpaa2
 BROKEN_MODULES+=ena
-BROKEN_MODULES+=linprocfs linux64 linux_common
+#BROKEN_MODULES+=linux64
 BROKEN_MODULES+=mlx4 mlx4en mlx5 mlx5en
 .endif
 
