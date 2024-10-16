@@ -41,7 +41,6 @@ local generated_tag = "@" .. "generated"
 -- Default configuration; any of these may get replaced by a configuration file
 -- optionally specified.
 local config = {
-	os_id_keyword = "FreeBSD",		-- obsolete, ignored on input, not generated
 	abi_func_prefix = "",
 	libsysmap = "/dev/null",
 	libsys_h = "/dev/null",
@@ -73,7 +72,7 @@ local config = {
 	abi_ptr_array_t = "",
 	ptr_intptr_t_cast = "intptr_t",
 	ptr_qualified="*",
-	ptrmaskname = "sysargmask",
+	sysargmaskname = "sysargmask",
 	syscall_abi_change = "",
 	sys_abi_change = {},
 	syscall_no_abi_change = "",
@@ -208,10 +207,6 @@ local known_flags = {
 	NOTSTATIC	= 0x00000100,
 	CAPENABLED	= 0x00000200,
 	SYSMUX		= 0x00000400,
-	VARARG		= 0x00000800,
-	VARARG3		= 0x00001000,
-	VARARG4		= 0x00002000,
-	VARARG5		= 0x00004000,
 
 	-- Compat flags start from here.  We have plenty of space.
 }
@@ -316,7 +311,7 @@ local function process_config(file)
 				end
 			end
 			-- Heuristically convert anything fully numeric
-			-- to a number.
+			-- to a number to allow us to compare compat levels.
 			if tonumber(value) ~= nil then
 				value = tonumber(value)
 			end
@@ -506,13 +501,6 @@ local process_syscall_def
 -- These patterns are processed in order on any line that isn't empty.
 local pattern_table = {
 	{
-		-- To be removed soon
-		pattern = "%s*$" .. config.os_id_keyword,
-		process = function(_, _)
-			-- Ignore... ID tag
-		end,
-	},
-	{
 		dump_prevline = true,
 		pattern = "^#%s*include",
 		process = function(line)
@@ -649,15 +637,6 @@ local function get_mask_pat(pflags)
 	end
 
 	return mask
-end
-
-local function align_sysent_comment(col)
-	write_line("sysent", "\t")
-	col = col + 8 - col % 8
-	while col < 56 do
-		write_line("sysent", "\t")
-		col = col + 8
-	end
 end
 
 local function strip_arg_annotations(arg)
@@ -924,20 +903,17 @@ local function handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
 
 	write_line("sysent",
 	    string.format("\t{ .sy_narg = %s, .sy_call = (sy_call_t *)", argssize))
-	local column = 8 + 2 + #argssize + 15
 
 	if flags & known_flags.SYSMUX ~= 0 then
 		write_line("sysent", string.format(
 		    "nosys, .sy_auevent = AUE_NULL, " ..
 		    ".sy_flags = %s, .sy_thrcnt = SY_THR_STATIC },",
 		    sysflags))
-		column = column + #"nosys" + #"AUE_NULL" + 3
 	elseif flags & known_flags.NOSTD ~= 0 then
 		write_line("sysent", string.format(
 		    "lkmressys, .sy_auevent = AUE_NULL, " ..
 		    ".sy_flags = %s, .sy_thrcnt = SY_THR_ABSENT },",
 		    sysflags))
-		column = column + #"lkmressys" + #"AUE_NULL" + 3
 	else
 		if funcname == "nosys" or funcname == "lkmnosys" or
 		    funcname == "sysarch" or funcname:find("^freebsd") or
@@ -945,17 +921,14 @@ local function handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
 			write_line("sysent", string.format(
 			    "%s, .sy_auevent = %s, .sy_flags = %s, .sy_thrcnt = %s },",
 			    funcname, auditev, sysflags, thr_flag))
-			column = column + #funcname + #auditev + #sysflags + 3
 		else
 			write_line("sysent", string.format(
 			    "sys_%s, .sy_auevent = %s, .sy_flags = %s, .sy_thrcnt = %s },",
 			    funcname, auditev, sysflags, thr_flag))
-			column = column + #funcname + #auditev + #sysflags + 7
 		end
 	end
 
-	align_sysent_comment(column)
-	write_line("sysent", string.format("/* %d = %s */\n",
+	write_line("sysent", string.format("\t/* %d = %s */\n",
 	    sysnum, funcalias))
 	write_line("sysnames", string.format("\t\"%s\",\t\t\t/* %d = %s */\n",
 	    funcalias, sysnum, funcalias))
@@ -1027,9 +1000,8 @@ local function handle_obsol(sysnum, funcname, comment)
 	write_line("sysent",
 	    "\t{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, " ..
 	    ".sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },")
-	align_sysent_comment(34)
 
-	write_line("sysent", string.format("/* %d = obsolete %s */\n",
+	write_line("sysent", string.format("\t/* %d = obsolete %s */\n",
 	    sysnum, comment))
 	write_line("sysnames", string.format(
 	    "\t\"obs_%s\",\t\t\t/* %d = obsolete %s */\n",
@@ -1098,17 +1070,13 @@ local function handle_compat(sysnum, thr_flag, flags, sysflags, rettype,
 		    ".sy_auevent = %s, .sy_flags = 0, " ..
 		    ".sy_thrcnt = SY_THR_ABSENT },",
 		    "0", "lkmressys", "AUE_NULL"))
-		align_sysent_comment(8 + 2 + #"0" + 15 + #"lkmressys" +
-		    #"AUE_NULL" + 3)
 	else
 		write_line("sysent", string.format(
 		    "\t{ %s(%s,%s), .sy_auevent = %s, .sy_flags = %s, .sy_thrcnt = %s },",
 		    wrap, argssize, funcname, auditev, sysflags, thr_flag))
-		align_sysent_comment(8 + 9 + #argssize + 1 + #funcname +
-		    #auditev + #sysflags + 4)
 	end
 
-	write_line("sysent", string.format("/* %d = %s %s */\n",
+	write_line("sysent", string.format("\t/* %d = %s %s */\n",
 	    sysnum, descr, funcalias))
 	write_line("sysnames", string.format(
 	    "\t\"%s.%s\",\t\t/* %d = %s %s */\n",
@@ -1138,7 +1106,7 @@ local function handle_unimpl(sysnum, sysstart, sysend, comment)
 		write_line("sysent", string.format(
 		    "\t{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, " ..
 		    ".sy_auevent = AUE_NULL, .sy_flags = 0, " ..
-		    ".sy_thrcnt = SY_THR_ABSENT },\t\t\t/* %d = %s */\n",
+		    ".sy_thrcnt = SY_THR_ABSENT },\t/* %d = %s */\n",
 		    sysnum, comment))
 		write_line("sysnames", string.format(
 		    "\t\"#%d\",\t\t\t/* %d = %s */\n",
@@ -1469,7 +1437,7 @@ if not config_modified.capenabled then
 elseif config.capenabled ~= "" then
 	-- Due to limitations in the config format mostly, we'll have a comma
 	-- separated list.  Parse it into lines
-	local capenabled, sysc = {}
+	local capenabled = {}
 	-- print("here: " .. config.capenabled)
 	for sysc in config.capenabled:gmatch("([^,]+)") do
 		capenabled[sysc] = true
@@ -1580,15 +1548,14 @@ write_line("sysargmap", string.format([[/*
  * System call argument map.
  *
  * DO NOT EDIT-- this file is automatically %s.
- * $%s$
  */
 
 #ifndef %s
 #define	%s
 
 static int %s[] = {
-]], generated_tag, config['os_id_keyword'], config['sysargmap_h'],
-    config['sysargmap_h'], config['ptrmaskname']))
+]], generated_tag, config['sysargmap_h'],
+    config['sysargmap_h'], config['sysargmaskname']))
 
 write_line("sysnames", string.format([[/*
  * System call names.
@@ -1607,14 +1574,21 @@ write_line("syshdr", string.format([[/*
 
 ]], generated_tag))
 
-write_line("sysmk", string.format([[# FreeBSD system call object files.
+write_line("sysmk", string.format([[
+#
+# FreeBSD system call object files.
+#
 # DO NOT EDIT-- this file is automatically %s.
+#
+
 MIASM = ]], generated_tag))
 
 write_line("libsysmap", string.format([[/*
  * FreeBSD system call symbols.
- *  DO NOT EDIT-- this file is automatically %s.
+ *
+ * DO NOT EDIT-- this file is automatically %s.
  */
+
 FBSDprivate_1.0 {
 ]], generated_tag))
 
@@ -1623,8 +1597,9 @@ write_line("libsys_h", string.format([[/*
  *
  * Do not use directly, include <libsys.h> instead.
  *
- *  DO NOT EDIT-- this file is automatically %s.
+ * DO NOT EDIT-- this file is automatically %s.
  */
+
 #ifndef __LIBSYS_H_
 #define __LIBSYS_H_
 
@@ -1642,8 +1617,9 @@ write_line("libsys_h", string.format([[/*
 write_line("systrace", string.format([[/*
  * System call argument to DTrace register array converstion.
  *
- * DO NOT EDIT-- this file is automatically %s.
  * This file is part of the DTrace syscall provider.
+ *
+ * DO NOT EDIT-- this file is automatically %s.
  */
 
 static void

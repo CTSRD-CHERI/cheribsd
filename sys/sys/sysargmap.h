@@ -2,7 +2,6 @@
  * System call argument map.
  *
  * DO NOT EDIT-- this file is automatically @generated.
- * $FreeBSD$
  */
 
 #ifndef _SYSARGMAP_H_
