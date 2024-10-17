@@ -217,7 +217,6 @@ ENTRY(tramp_hook)
 
 	mov	c0, c10
 	mov	c1, c11
-	mrs	c2, TRUSTED_STACK
 	bl	tramp_hook_impl
 
 	restore_arguments
