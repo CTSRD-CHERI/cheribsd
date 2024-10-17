@@ -514,7 +514,7 @@ void
 linux_thread_detach(struct thread *td)
 {
 	struct linux_emuldata *em;
-	int *child_clear_tid;
+	int * __capability child_clear_tid;
 	int error;
 
 	em = em_find(td);

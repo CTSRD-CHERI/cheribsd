@@ -52,17 +52,17 @@
 
 struct listxattr_args {
 	int		fd;
-	const char	*path;
-	char		*list;
+	const char	* __kerncap path;
+	char		* __kerncap list;
 	l_size_t	size;
 	int		follow;
 };
 
 struct setxattr_args {
 	int		fd;
-	const char	*path;
-	const char	*name;
-	void 		*value;
+	const char	* __kerncap path;
+	const char	* __kerncap name;
+	void 		* __kerncap value;
 	l_size_t	size;
 	l_int		flags;
 	int		follow;
@@ -70,17 +70,17 @@ struct setxattr_args {
 
 struct getxattr_args {
 	int		fd;
-	const char	*path;
-	const char	*name;
-	void 		*value;
+	const char	* __kerncap path;
+	const char	* __kerncap name;
+	void 		* __kerncap value;
 	l_size_t	size;
 	int		follow;
 };
 
 struct removexattr_args {
 	int		fd;
-	const char	*path;
-	const char	*name;
+	const char	* __kerncap path;
+	const char	* __kerncap name;
 	int		follow;
 };
 
@@ -98,7 +98,7 @@ error_to_xattrerror(int attrnamespace, int error)
 }
 
 static int
-xatrr_to_extattr(const char *uattrname, int *attrnamespace, char *attrname)
+xatrr_to_extattr(const char * __capability uattrname, int *attrnamespace, char *attrname)
 {
 	char uname[LINUX_XATTR_NAME_MAX + 1], *dot;
 	size_t len, cplen;
@@ -131,7 +131,7 @@ static int
 listxattr(struct thread *td, struct listxattr_args *args)
 {
 	char attrname[LINUX_XATTR_NAME_MAX + 1];
-	char *data, *prefix, *key;
+	char * __capability data, *prefix, *key;
 	struct uio auio;
 	struct iovec aiov;
 	unsigned char keylen;
@@ -143,7 +143,7 @@ listxattr(struct thread *td, struct listxattr_args *args)
 	else
 		sz = LINUX_XATTR_LIST_MAX;
 
-	data = malloc(sz, M_LINUX, M_WAITOK);
+	data = malloc_c(sz, M_LINUX, M_WAITOK);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_rw = UIO_READ;
@@ -203,7 +203,7 @@ listxattr(struct thread *td, struct listxattr_args *args)
 	}
 	if (error == 0)
 		td->td_retval[0] = cnt;
-	free(data, M_LINUX);
+	free_c(data, M_LINUX);
 	return (error_to_xattrerror(attrnamespace, error));
 }
 

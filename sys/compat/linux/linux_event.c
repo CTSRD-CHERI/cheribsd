@@ -94,7 +94,7 @@ struct epoll_copyin_args {
 };
 
 struct epoll_copyout_args {
-	struct epoll_event	*leventlist;
+	struct epoll_event	* __kerncap leventlist;
 	struct proc		*p;
 	uint32_t		count;
 	int			error;
@@ -367,7 +367,7 @@ leave1:
  */
 
 static int
-linux_epoll_wait_ts(struct thread *td, int epfd, struct epoll_event *events,
+linux_epoll_wait_ts(struct thread *td, int epfd, struct epoll_event * __capability events,
     int maxevents, struct timespec *tsp, sigset_t *uset)
 {
 	struct epoll_copyout_args coargs;
@@ -429,7 +429,7 @@ leave:
 }
 
 static int
-linux_epoll_wait_common(struct thread *td, int epfd, struct epoll_event *events,
+linux_epoll_wait_common(struct thread *td, int epfd, struct epoll_event * __capability events,
     int maxevents, int timeout, sigset_t *uset)
 {
 	struct timespec ts, *tsp;

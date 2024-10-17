@@ -196,7 +196,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct linux_fcntl_args *p = params;
 		iarg[a++] = p->fd; /* l_uint */
 		iarg[a++] = p->cmd; /* l_uint */
-		iarg[a++] = p->arg; /* l_ulong */
+		uarg[a++] = (intptr_t)p->arg; /* l_uintptr_t */
 		*n_args = 3;
 		break;
 	}
@@ -222,7 +222,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct linux_ioctl_args *p = params;
 		iarg[a++] = p->fd; /* l_uint */
 		iarg[a++] = p->cmd; /* l_uint */
-		iarg[a++] = p->arg; /* l_ulong */
+		uarg[a++] = (intptr_t)p->arg; /* l_uintptr_t */
 		*n_args = 3;
 		break;
 	}
@@ -933,8 +933,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct linux_ptrace_args *p = params;
 		iarg[a++] = p->req; /* l_long */
 		iarg[a++] = p->pid; /* l_long */
-		iarg[a++] = p->addr; /* l_ulong */
-		iarg[a++] = p->data; /* l_ulong */
+		uarg[a++] = (intptr_t)p->addr; /* l_uintptr_t */
+		uarg[a++] = (intptr_t)p->data; /* l_uintptr_t */
 		*n_args = 4;
 		break;
 	}
@@ -2761,7 +2761,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "l_uint";
 			break;
 		case 2:
-			p = "l_ulong";
+			p = "l_uintptr_t";
 			break;
 		default:
 			break;
@@ -2793,7 +2793,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "l_uint";
 			break;
 		case 2:
-			p = "l_ulong";
+			p = "l_uintptr_t";
 			break;
 		default:
 			break;
@@ -3993,10 +3993,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "l_long";
 			break;
 		case 2:
-			p = "l_ulong";
+			p = "l_uintptr_t";
 			break;
 		case 3:
-			p = "l_ulong";
+			p = "l_uintptr_t";
 			break;
 		default:
 			break;

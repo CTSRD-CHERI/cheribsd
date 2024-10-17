@@ -58,10 +58,10 @@ linux_set_upcall(struct thread *td, register_t stack)
 }
 
 int
-linux_set_cloned_tls(struct thread *td, void *desc)
+linux_set_cloned_tls(struct thread *td, void * __capability desc)
 {
 
-	if ((uint64_t)desc >= VM_MAXUSER_ADDRESS)
+	if ((uint64_t)(uintcap_t)desc >= VM_MAXUSER_ADDRESS)
 		return (EPERM);
 
 	return (cpu_set_user_tls(td, desc));
@@ -117,7 +117,8 @@ linux_ptrace_peekuser(struct thread *td, pid_t pid, void *addr, void *data)
 {
 
 	LINUX_RATELIMIT_MSG_OPT1("PTRACE_PEEKUSER offset %ld not implemented; "
-	    "returning EINVAL", (uintptr_t)addr);
+	    "returning EINVAL", (long)addr);
+
 	return (EINVAL);
 }
 
@@ -126,6 +127,6 @@ linux_ptrace_pokeuser(struct thread *td, pid_t pid, void *addr, void *data)
 {
 
 	LINUX_RATELIMIT_MSG_OPT1("PTRACE_POKEUSER offset %ld "
-	    "not implemented; returning EINVAL", (uintptr_t)addr);
+	    "not implemented; returning EINVAL", (long)addr);
 	return (EINVAL);
 }

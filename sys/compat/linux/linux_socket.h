@@ -76,7 +76,7 @@ struct l_cmsghdr {
 /* Ancillary data object information macros */
 
 #define LINUX_CMSG_ALIGN(len)	roundup2(len, sizeof(l_ulong))
-#define LINUX_CMSG_DATA(cmsg)	((void *)((char *)(cmsg) + \
+#define LINUX_CMSG_DATA(cmsg)	((void * __capability)((char * __capability)(cmsg) + \
 				    LINUX_CMSG_ALIGN(sizeof(struct l_cmsghdr))))
 #define LINUX_CMSG_SPACE(len)	(LINUX_CMSG_ALIGN(sizeof(struct l_cmsghdr)) + \
 				    LINUX_CMSG_ALIGN(len))

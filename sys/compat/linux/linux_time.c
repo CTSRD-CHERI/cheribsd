@@ -137,7 +137,7 @@ linux_to_native_timespec(struct timespec *ntp, struct l_timespec *ltp)
 }
 
 int
-linux_put_timespec(struct timespec *ntp, struct l_timespec *ltp)
+linux_put_timespec(struct timespec *ntp, struct l_timespec * __capability ltp)
 {
 	struct l_timespec lts;
 	int error;
@@ -149,7 +149,7 @@ linux_put_timespec(struct timespec *ntp, struct l_timespec *ltp)
 }
 
 int
-linux_get_timespec(struct timespec *ntp, const struct l_timespec *ultp)
+linux_get_timespec(struct timespec *ntp, const struct l_timespec * __capability ultp)
 {
 	struct l_timespec lts;
 	int error;

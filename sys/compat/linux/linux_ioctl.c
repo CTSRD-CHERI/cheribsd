@@ -210,7 +210,7 @@ linux_ioctl_hdio(struct thread *td, struct linux_ioctl_args *args)
 			hdg.heads = fwheads;
 			hdg.sectors = fwsectors;
 			hdg.start = 0;
-			error = copyout(&hdg, (void *)args->arg, sizeof(hdg));
+			error = copyout(&hdg, (void * __capability)args->arg, sizeof(hdg));
 		} else if ((args->cmd & 0xffff) == LINUX_HDIO_GET_GEO_BIG) {
 			struct linux_hd_big_geometry hdbg;
 
@@ -219,7 +219,7 @@ linux_ioctl_hdio(struct thread *td, struct linux_ioctl_args *args)
 			hdbg.heads = fwheads;
 			hdbg.sectors = fwsectors;
 			hdbg.start = 0;
-			error = copyout(&hdbg, (void *)args->arg, sizeof(hdbg));
+			error = copyout(&hdbg, (void * __capability)args->arg, sizeof(hdbg));
 		}
 		return (error);
 		break;
@@ -262,7 +262,7 @@ linux_ioctl_disk(struct thread *td, struct linux_ioctl_args *args)
 		/*
 		 * XXX: How do we know we return the right size of integer ?
 		 */
-		return (copyout(&sectorsize, (void *)args->arg,
+		return (copyout(&sectorsize, (void * __capability)args->arg,
 		    sizeof(sectorsize)));
 		break;
 	case LINUX_BLKGETSIZE64:
@@ -272,7 +272,7 @@ linux_ioctl_disk(struct thread *td, struct linux_ioctl_args *args)
 		if (error)
 			return (error);
 		blksize64 = mediasize;
-		return (copyout(&blksize64, (void *)args->arg,
+		return (copyout(&blksize64, (void * __capability)args->arg,
 		    sizeof(blksize64)));
 	case LINUX_BLKSSZGET:
 		error = fo_ioctl(fp, DIOCGSECTORSIZE,
@@ -280,7 +280,7 @@ linux_ioctl_disk(struct thread *td, struct linux_ioctl_args *args)
 		fdrop(fp, td);
 		if (error)
 			return (error);
-		return (copyout(&sectorsize, (void *)args->arg,
+		return (copyout(&sectorsize, (void * __capability)args->arg,
 		    sizeof(sectorsize)));
 		break;
 	case LINUX_BLKPBSZGET:
@@ -302,7 +302,7 @@ linux_ioctl_disk(struct thread *td, struct linux_ioctl_args *args)
 			psectorsize = sectorsize;
 		}
 		fdrop(fp, td);
-		return (copyout(&psectorsize, (void *)args->arg,
+		return (copyout(&psectorsize, (void * __capability)args->arg,
 		    sizeof(psectorsize)));
 	}
 	fdrop(fp, td);
@@ -675,11 +675,11 @@ linux_ioctl_termio(struct thread *td, struct linux_ioctl_args *args)
 		if (error)
 			break;
 		bsd_to_linux_termios(&bios, &lios);
-		error = copyout(&lios, (void *)args->arg, sizeof(lios));
+		error = copyout(&lios, (void * __capability)args->arg, sizeof(lios));
 		break;
 
 	case LINUX_TCSETS:
-		error = copyin((void *)args->arg, &lios, sizeof(lios));
+		error = copyin((void * __capability)args->arg, &lios, sizeof(lios));
 		if (error)
 			break;
 		linux_to_bsd_termios(&lios, &bios);
@@ -688,7 +688,7 @@ linux_ioctl_termio(struct thread *td, struct linux_ioctl_args *args)
 		break;
 
 	case LINUX_TCSETSW:
-		error = copyin((void *)args->arg, &lios, sizeof(lios));
+		error = copyin((void * __capability)args->arg, &lios, sizeof(lios));
 		if (error)
 			break;
 		linux_to_bsd_termios(&lios, &bios);
@@ -697,7 +697,7 @@ linux_ioctl_termio(struct thread *td, struct linux_ioctl_args *args)
 		break;
 
 	case LINUX_TCSETSF:
-		error = copyin((void *)args->arg, &lios, sizeof(lios));
+		error = copyin((void * __capability)args->arg, &lios, sizeof(lios));
 		if (error)
 			break;
 		linux_to_bsd_termios(&lios, &bios);
@@ -711,11 +711,11 @@ linux_ioctl_termio(struct thread *td, struct linux_ioctl_args *args)
 		if (error)
 			break;
 		bsd_to_linux_termio(&bios, &lio);
-		error = (copyout(&lio, (void *)args->arg, sizeof(lio)));
+		error = (copyout(&lio, (void * __capability)args->arg, sizeof(lio)));
 		break;
 
 	case LINUX_TCSETA:
-		error = copyin((void *)args->arg, &lio, sizeof(lio));
+		error = copyin((void * __capability)args->arg, &lio, sizeof(lio));
 		if (error)
 			break;
 		linux_to_bsd_termio(&lio, &bios);
@@ -724,7 +724,7 @@ linux_ioctl_termio(struct thread *td, struct linux_ioctl_args *args)
 		break;
 
 	case LINUX_TCSETAW:
-		error = copyin((void *)args->arg, &lio, sizeof(lio));
+		error = copyin((void * __capability)args->arg, &lio, sizeof(lio));
 		if (error)
 			break;
 		linux_to_bsd_termio(&lio, &bios);
@@ -733,7 +733,7 @@ linux_ioctl_termio(struct thread *td, struct linux_ioctl_args *args)
 		break;
 
 	case LINUX_TCSETAF:
-		error = copyin((void *)args->arg, &lio, sizeof(lio));
+		error = copyin((void * __capability)args->arg, &lio, sizeof(lio));
 		if (error)
 			break;
 		linux_to_bsd_termio(&lio, &bios);
@@ -887,13 +887,13 @@ linux_ioctl_termio(struct thread *td, struct linux_ioctl_args *args)
 		lss.type = LINUX_PORT_16550A;
 		lss.flags = 0;
 		lss.close_delay = 0;
-		error = copyout(&lss, (void *)args->arg, sizeof(lss));
+		error = copyout(&lss, (void * __capability)args->arg, sizeof(lss));
 		break;
 	}
 
 	case LINUX_TIOCSSERIAL: {
 		struct linux_serial_struct lss;
-		error = copyin((void *)args->arg, &lss, sizeof(lss));
+		error = copyin((void * __capability)args->arg, &lss, sizeof(lss));
 		if (error)
 			break;
 		/* XXX - It really helps to have an implementation that
@@ -960,7 +960,7 @@ linux_ioctl_termio(struct thread *td, struct linux_ioctl_args *args)
 			fdrop(fp, td);
 			return (EINVAL);
 		}
-		error = (copyout(&linux_line, (void *)args->arg, sizeof(int)));
+		error = (copyout(&linux_line, (void * __capability)args->arg, sizeof(int)));
 		break;
 	}
 
@@ -1002,7 +1002,7 @@ linux_ioctl_termio(struct thread *td, struct linux_ioctl_args *args)
 
 		error = fo_ioctl(fp, TIOCGPTN, (caddr_t)&nb, td->td_ucred, td);
 		if (!error)
-			error = copyout(&nb, (void *)args->arg,
+			error = copyout(&nb, (void * __capability)args->arg,
 			    sizeof(int));
 		break;
 	}
@@ -1454,7 +1454,7 @@ linux_ioctl_cdrom(struct thread *td, struct linux_ioctl_args *args)
 		if (!error) {
 			lth.cdth_trk0 = th.starting_track;
 			lth.cdth_trk1 = th.ending_track;
-			error = copyout(&lth, (void *)args->arg, sizeof(lth));
+			error = copyout(&lth, (void * __capability)args->arg, sizeof(lth));
 		}
 		break;
 	}

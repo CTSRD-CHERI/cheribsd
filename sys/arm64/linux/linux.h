@@ -43,7 +43,7 @@ typedef uint32_t	l_uint;
 typedef uint64_t	l_ulong;
 typedef uint16_t	l_ushort;
 
-typedef l_ulong		l_uintptr_t;
+typedef kuintcap_t	l_uintptr_t;
 typedef l_long		l_clock_t;
 typedef l_int		l_daddr_t;
 typedef l_uint		l_gid_t;
@@ -157,7 +157,7 @@ struct l_newstat {
 #define	LINUX_SA_NOMASK		0x40000000	/* SA_NODEFER */
 #define	LINUX_SA_ONESHOT	0x80000000	/* SA_RESETHAND */
 
-typedef void	(*l_handler_t)(l_int);
+typedef void	(* __kerncap l_handler_t)(l_int);
 
 typedef struct {
 	l_handler_t	lsa_handler;

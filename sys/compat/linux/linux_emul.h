@@ -37,13 +37,13 @@ struct image_params;
  * this will be extended as we need more functionality
  */
 struct linux_emuldata {
-	int    *child_set_tid;	/* in clone(): Child's TID to set on clone */
-	int    *child_clear_tid;/* in clone(): Child's TID to clear on exit */
+	int    * __kerncap child_set_tid;	/* in clone(): Child's TID to set on clone */
+	int    * __kerncap child_clear_tid;/* in clone(): Child's TID to clear on exit */
 
 	int	flags;			/* thread emuldata flags */
 	int	em_tid;			/* thread id */
 
-	struct	linux_robust_list_head	*robust_futexes;
+	struct	linux_robust_list_head	* __kerncap robust_futexes;
 };
 
 struct linux_emuldata	*em_find(struct thread *);

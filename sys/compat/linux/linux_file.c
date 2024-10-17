@@ -58,9 +58,9 @@
 #include <compat/linux/linux_util.h>
 #include <compat/linux/linux_file.h>
 
-static int	linux_common_open(struct thread *, int, const char *, int, int,
+static int	linux_common_open(struct thread *, int, const char * __capability, int, int,
 		    enum uio_seg);
-static int	linux_do_accessat(struct thread *t, int, const char *, int, int);
+static int	linux_do_accessat(struct thread *t, int, const char * __capability, int, int);
 static int	linux_getdents_error(struct thread *, int, int);
 
 static struct bsd_to_linux_bitmap seal_bitmap[] = {
@@ -306,7 +306,7 @@ linux_open_by_handle_at(struct thread *td,
 		return (EINVAL);
 
 	bsd_flags = linux_common_openflags(args->flags);
-	return (kern_fhopen(td, (void *)&args->handle->f_handle, bsd_flags));
+	return (kern_fhopen(td, (void * __capability)&args->handle->f_handle, bsd_flags));
 }
 
 int
@@ -403,7 +403,7 @@ linux_getdents(struct thread *td, struct linux_getdents_args *args)
 	struct dirent *bdp;
 	caddr_t inp, buf;		/* BSD-format */
 	int len, reclen;		/* BSD-format */
-	caddr_t outp;			/* Linux-format */
+	char * __capability outp;	/* Linux-format */
 	int resid, linuxreclen;		/* Linux-format */
 	caddr_t lbuf;			/* Linux-format */
 	off_t base;
@@ -425,7 +425,7 @@ linux_getdents(struct thread *td, struct linux_getdents_args *args)
 
 	len = td->td_retval[0];
 	inp = buf;
-	outp = (caddr_t)args->dent;
+	outp = (char * __capability)args->dent;
 	resid = args->count;
 	retval = 0;
 
@@ -480,7 +480,7 @@ linux_getdents64(struct thread *td, struct linux_getdents64_args *args)
 	struct dirent *bdp;
 	caddr_t inp, buf;		/* BSD-format */
 	int len, reclen;		/* BSD-format */
-	caddr_t outp;			/* Linux-format */
+	char * __capability outp;	/* Linux-format */
 	int resid, linuxreclen;		/* Linux-format */
 	off_t base;
 	struct l_dirent64 *linux_dirent64;
@@ -502,7 +502,7 @@ linux_getdents64(struct thread *td, struct linux_getdents64_args *args)
 
 	len = td->td_retval[0];
 	inp = buf;
-	outp = (caddr_t)args->dirent;
+	outp = (char * __capability)args->dirent;
 	resid = args->count;
 	retval = 0;
 
@@ -610,7 +610,7 @@ linux_access(struct thread *td, struct linux_access_args *args)
 #endif
 
 static int
-linux_do_accessat(struct thread *td, int ldfd, const char *filename,
+linux_do_accessat(struct thread *td, int ldfd, const char * __capability filename,
     int amode, int flags)
 {
 	int dfd;
@@ -620,7 +620,7 @@ linux_do_accessat(struct thread *td, int ldfd, const char *filename,
 		return (EINVAL);
 
 	dfd = (ldfd == LINUX_AT_FDCWD) ? AT_FDCWD : ldfd;
-	return (kern_accessat(td, dfd, __USER_CAP_PATH(filename),
+	return (kern_accessat(td, dfd, filename,
 	    UIO_USERSPACE, flags, amode));
 }
 
@@ -705,7 +705,7 @@ linux_unlinkat(struct thread *td, struct linux_unlinkat_args *args)
 		return (EINVAL);
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
 	return (linux_unlinkat_impl(td, UIO_USERSPACE,
-	    __USER_CAP_PATH(args->pathname), dfd, args));
+	    args->pathname, dfd, args));
 }
 
 int
@@ -1372,7 +1372,7 @@ fcntl_common(struct thread *td, struct linux_fcntl_args *args)
 		return (kern_fcntl(td, args->fd, F_SETFL, arg));
 
 	case LINUX_F_GETLK:
-		error = copyin((void *)args->arg, &linux_flock,
+		error = copyin((void * __capability)args->arg, &linux_flock,
 		    sizeof(linux_flock));
 		if (error)
 			return (error);
@@ -1381,11 +1381,11 @@ fcntl_common(struct thread *td, struct linux_fcntl_args *args)
 		if (error)
 			return (error);
 		bsd_to_linux_flock(&bsd_flock, &linux_flock);
-		return (copyout(&linux_flock, (void *)args->arg,
+		return (copyout(&linux_flock, (void * __capability)args->arg,
 		    sizeof(linux_flock)));
 
 	case LINUX_F_SETLK:
-		error = copyin((void *)args->arg, &linux_flock,
+		error = copyin((void * __capability)args->arg, &linux_flock,
 		    sizeof(linux_flock));
 		if (error)
 			return (error);
@@ -1394,7 +1394,7 @@ fcntl_common(struct thread *td, struct linux_fcntl_args *args)
 		    (intptr_t)&bsd_flock));
 
 	case LINUX_F_SETLKW:
-		error = copyin((void *)args->arg, &linux_flock,
+		error = copyin((void * __capability)args->arg, &linux_flock,
 		    sizeof(linux_flock));
 		if (error)
 			return (error);
