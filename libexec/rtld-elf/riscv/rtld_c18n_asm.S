@@ -167,6 +167,30 @@ ENTRY(create_untrusted_stk)
 END(create_untrusted_stk)
 
 /*
+ * The tramp_hook function has non-standard ABI and is only called by
+ * trampolines to trace compartment transitions.
+ */
+ENTRY(tramp_hook)
+	/*
+	 * NON-STANDARD CALLING CONVENTION
+	 *
+	 * ct0-ct1 hold the first two arguments of tramp_hook.
+	 *
+	 * All argument registers and callee-saved registers must be preserved.
+	 */
+
+	save_arguments
+
+	cmove		ca0, ct0
+	cmove		ca1, ct1
+	cjal		tramp_hook_impl
+
+	restore_arguments
+
+	cret
+END(tramp_hook)
+
+/*
  * The trampoline templates are assembly code sequences used to construct
  * trampolines by tramp_compile. They are code but reside in rodata. Hence a new
  * macro is defined to describe them.
@@ -322,7 +346,25 @@ TRAMP(tramp_push_frame)
 	 * Save the the compartment ID of the caller.
 	 */
 	csw		t4, (-CLEN_BYTES * TRUSTED_FRAME_SIZE + TRUSTED_FRAME_CALLER)(TRUSTED_STACK_C)
+TRAMPEND(tramp_push_frame)
 
+PATCH_POINT(tramp_push_frame, pcc, 1b)
+PATCH_POINT(tramp_push_frame, unsealer, 2b)
+PATCH_POINT(tramp_push_frame, cid, 3b)
+PATCH_POINT(tramp_push_frame, target, 5b)
+
+TRAMP(tramp_count_entry)
+.option push
+.option norvc
+1:	clc		cs6, 0(ct0)		/* To be patched at runtime */
+.option pop
+	li		s7, 1
+	camoadd.d	x0, s7, (cs6)
+TRAMPEND(tramp_count_entry)
+
+PATCH_POINT(tramp_count_entry, counter, 1b)
+
+TRAMP(tramp_push_frame_2)
 	/*
 	 * Get the landing address.
 	 */
@@ -373,14 +415,27 @@ TRAMP(tramp_push_frame)
 	 * trusted frame would be inconsistent with the untrusted stack.
 	 */
 	set_untrusted_stk	cs5
-TRAMPEND(tramp_push_frame)
+TRAMPEND(tramp_push_frame_2)
 
-PATCH_POINT(tramp_push_frame, pcc, 1b)
-PATCH_POINT(tramp_push_frame, unsealer, 2b)
-PATCH_POINT(tramp_push_frame, cid, 3b)
-PATCH_POINT(tramp_push_frame, target, 5b)
-PATCH_POINT(tramp_push_frame, landing, 7b)
-PATCH_POINT(tramp_push_frame, n_rets, 10b)
+PATCH_POINT(tramp_push_frame_2, landing, 7b)
+PATCH_POINT(tramp_push_frame_2, n_rets, 10b)
+
+TRAMP(tramp_call_hook)
+1:	auipcc		ct1, 0
+.option push
+.option norvc
+2:	clc		cra, 0(ct1)		/* To be patched at runtime */
+
+3:	addi		t0, x0, 0		/* To be patched at runtime */
+4:	cincoffsetimm	ct1, ct1, 0		/* To be patched at runtime */
+.option pop
+	cjalr		cra, cra
+TRAMPEND(tramp_call_hook)
+
+PATCH_POINT(tramp_call_hook, pcc, 1b)
+PATCH_POINT(tramp_call_hook, function, 2b)
+PATCH_POINT(tramp_call_hook, event, 3b)
+PATCH_POINT(tramp_call_hook, header, 4b)
 
 /*
  * Save the address of the current frame to fp so that unwinders can locate it.
@@ -426,6 +481,10 @@ TRAMP(tramp_invoke)
 	ccleartag	TRUSTED_STACK_C, TRUSTED_STACK_C
 	cjalr		cra, cs4
 TRAMPEND(tramp_invoke)
+
+TRAMP(tramp_count_return)
+	camoadd.d	x0, s7, (cs6)
+TRAMPEND(tramp_count_return)
 
 TRAMP(tramp_pop_frame)
 1:	auipcc		ct4, 0
