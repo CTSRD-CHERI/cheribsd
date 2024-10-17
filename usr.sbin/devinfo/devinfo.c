@@ -156,7 +156,7 @@ print_dev(struct devinfo_dev *dev)
 /*
  * Print information about a device and its children.
  */
-int
+static int
 print_device(struct devinfo_dev *dev, void *arg)
 {
 	struct indent_arg	ia;
