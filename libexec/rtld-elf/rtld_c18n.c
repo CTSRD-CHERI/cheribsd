@@ -1319,16 +1319,16 @@ resize_table(int exp)
 }
 
 void
-tramp_hook_impl(int, const struct tramp_header *, const struct trusted_frame *);
+tramp_hook_impl(int, const struct tramp_header *);
 
 void
-tramp_hook_impl(int event, const struct tramp_header *hdr,
-    const struct trusted_frame *tf)
+tramp_hook_impl(int event, const struct tramp_header *hdr)
 {
 	const char *sym;
 	const char *callee;
 	const char *caller;
 	struct utrace_c18n ut;
+	const struct trusted_frame *tf = get_trusted_stk();
 
 	if (ld_compartment_utrace != NULL) {
 		if (hdr->symnum == 0)
