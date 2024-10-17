@@ -103,6 +103,20 @@ cheri_revoke_hoarders(struct proc *p, struct vm_cheri_revoke_cookie *crc)
 	kqueue_cheri_revoke(p->p_fd, crc);
 }
 
+static void
+cheri_revoke_map_hoards(struct proc *p, struct vm_cheri_revoke_cookie *crc)
+{
+	/* POSIX shared memory */
+	shm_map_local_objs(p, crc);
+}
+
+static void
+cheri_revoke_unmap_hoards(struct proc *p, struct vm_cheri_revoke_cookie *crc)
+{
+	/* POSIX shared memory */
+	shm_unmap_local_objs(p, crc);
+}
+
 void
 cheri_revoke_vmspace_fork(struct vmspace *dstvm, struct vmspace *srcvm)
 {
@@ -650,6 +664,8 @@ fast_out:
 	/* Per-process kernel hoarders */
 	cheri_revoke_hoarders(td->td_proc, &vmcrc);
 
+	cheri_revoke_map_hoards(td->td_proc, &vmcrc);
+
 	KASSERT(myst == CHERI_REVOKE_ST_INITING ||
 	    myst == CHERI_REVOKE_ST_CLOSING,
 	    ("unexpected state %d in revoker", myst));
@@ -727,6 +743,8 @@ post_revoke_pass:
 #ifdef DIAGNOSTIC
 		vm_cheri_assert_consistent_clg(&vm->vm_map);
 #endif
+		cheri_revoke_unmap_hoards(td->td_proc, &vmcrc);
+
 		/* Signal the end of this revocation epoch */
 		epoch++;
 		crepochs.dequeue = epoch;

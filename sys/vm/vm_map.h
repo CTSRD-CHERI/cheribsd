@@ -379,6 +379,7 @@ struct vmspace {
 #if __has_feature(capabilities)
 	uint64_t vm_prev_cid;	/* (d) last compartment ID allocated */
 #endif
+	LIST_HEAD(, shmfd) vm_shm_objects;	/* (d) local shm objects */
 	/*
 	 * Keep the PMAP last, so that CPU-specific variations of that
 	 * structure on a single architecture don't result in offset
@@ -469,6 +470,8 @@ long vmspace_resident_count(struct vmspace *vmspace);
 #define	MAP_SPLIT_BOUNDARY_MASK	0x00180000
 #define	MAP_NO_HINT		0x00200000
 #define	MAP_CREATE_SHADOW	0x00400000
+#define	MAP_INHERIT_NONE	0x00800000
+#define	MAP_SHARECAP		0x01000000
 
 #define	MAP_SPLIT_BOUNDARY_SHIFT 19
 

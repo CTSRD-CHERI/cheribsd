@@ -50,6 +50,7 @@
 .Nm sysdecode_rfork_flags ,
 .Nm sysdecode_semget_flags ,
 .Nm sysdecode_sendfile_flags ,
+.Nm sysdecode_shm_open_flags ,
 .Nm sysdecode_shmat_flags ,
 .Nm sysdecode_sctp_nxt_flags ,
 .Nm sysdecode_sctp_rcv_flags ,
@@ -119,6 +120,8 @@
 .Ft bool
 .Fn sysdecode_sendfile_flags "FILE *fp" "int flags" "int *rem"
 .Ft bool
+.Fn sysdecode_shm_open_flags "FILE *fp" "int flags" "int *rem"
+.Ft bool
 .Fn sysdecode_shmat_flags "FILE *fp" "int flags" "int *rem"
 .Ft bool
 .Fn sysdecode_socket_type "FILE *fp" "int type" "int *rem"
@@ -186,6 +189,7 @@ Most of these functions decode an argument passed to a system call:
 .It Fn sysdecode_rfork_flags Ta Xr rfork 2 Ta Fa flags
 .It Fn sysdecode_semget_flags Ta Xr semget 2 Ta Fa flags
 .It Fn sysdecode_sendfile_flags Ta Xr sendfile 2 Ta Fa flags
+.It Fn sysdecode_shm_open_flags Ta Xr shm_open 2 Ta Fa flags
 .It Fn sysdecode_shmat_flags Ta Xr shmat 2 Ta Fa flags
 .It Fn sysdecode_socket_type Ta Xr socket 2 Ta Fa type
 .It Fn sysdecode_thr_create_flags Ta Xr thr_create 2 Ta Fa flags

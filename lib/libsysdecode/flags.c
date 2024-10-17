@@ -276,8 +276,9 @@ sysdecode_fadvice(int advice)
 	return (lookup_value(fadvisebehav, advice));
 }
 
-bool
-sysdecode_open_flags(FILE *fp, int flags, int *rem)
+static bool
+_sysdecode_open_flags(FILE *fp, int flags, int *rem,
+    struct name_table open_flag_table[])
 {
 	bool printed;
 	int mode;
@@ -309,10 +310,22 @@ sysdecode_open_flags(FILE *fp, int flags, int *rem)
 		printed = false;
 	}
 	val = (unsigned)flags;
-	print_mask_part(fp, openflags, &val, &printed);
+	print_mask_part(fp, open_flag_table, &val, &printed);
 	if (rem != NULL)
 		*rem = val | mode;
 	return (printed);
+}
+
+bool
+sysdecode_open_flags(FILE *fp, int flags, int *rem)
+{
+	return (_sysdecode_open_flags(fp, flags, rem, openflags));
+}
+
+bool
+sysdecode_shm_open_flags(FILE *fp, int flags, int *rem)
+{
+	return (_sysdecode_open_flags(fp, flags, rem, shm_open_flags));
 }
 
 bool

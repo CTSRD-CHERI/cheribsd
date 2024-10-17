@@ -529,9 +529,9 @@ static const struct syscall_decode decoded_syscalls[] = {
 	  .args = { { Int, 0 }, { Sockoptlevel, 1 }, { Sockoptname, 2 },
 		    { Ptr | IN, 3 }, { Socklent, 4 } } },
 	{ .name = "shm_open", .ret_type = 1, .nargs = 3,
-	  .args = { { ShmName | IN, 0 }, { Open, 1 }, { Octal, 2 } } },
+	  .args = { { ShmName | IN, 0 }, { ShmOpen, 1 }, { Octal, 2 } } },
 	{ .name = "shm_open2", .ret_type = 1, .nargs = 5,
-	  .args = { { ShmName | IN, 0 }, { Open, 1 }, { Octal, 2 },
+	  .args = { { ShmName | IN, 0 }, { ShmOpen, 1 }, { Octal, 2 },
 		    { ShmFlags, 3 }, { Name | IN, 4 } } },
 	{ .name = "shm_rename", .ret_type = 1, .nargs = 3,
 	  .args = { { Name | IN, 0 }, { Name | IN, 1 }, { Hex, 2 } } },
@@ -2028,6 +2028,9 @@ print_arg(struct syscall_arg *sc, syscallarg_t *args, syscallarg_t *retval,
 		break;
 	case Whence:
 		print_integer_arg(sysdecode_whence, fp, args[sc->offset]);
+		break;
+	case ShmOpen:
+		print_mask_arg(sysdecode_shm_open_flags, fp, args[sc->offset]);
 		break;
 	case ShmFlags:
 		print_mask_arg(sysdecode_shmflags, fp, args[sc->offset]);

@@ -138,6 +138,7 @@ static uma_zone_t vmspace_zone;
 static int vmspace_zinit(void *mem, int size, int flags);
 static void _vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min,
     vm_pointer_t max);
+static inline void vm_map_entry_back(vm_map_entry_t entry);
 static void vm_map_entry_deallocate(vm_map_entry_t entry, boolean_t system_map);
 static void vm_map_entry_delete(vm_map_t map, vm_map_entry_t entry);
 static void vm_map_entry_dispose(vm_map_t map, vm_map_entry_t entry);
@@ -421,6 +422,7 @@ vmspace_alloc(vm_pointer_t min, vm_pointer_t max, pmap_pinit_t pinit)
 	 */
 	vm->vm_prev_cid = 0;
 #endif
+	LIST_INIT(&vm->vm_shm_objects);
 	return (vm);
 }
 
@@ -450,6 +452,11 @@ vmspace_dofree(struct vmspace *vm)
 	 * exit1().
 	 */
 	shmexit(vm);
+
+	/*
+	 * Clean up local posix shm objects.
+	 */
+	shm_vmspace_free(vm);
 
 	/*
 	 * Lock the map, to wait out all other references to it.
@@ -1930,6 +1937,10 @@ vm_map_insert1(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	    max != VM_PROT_NONE))
 		return (KERN_INVALID_ARGUMENT);
 
+	if ((cow & (MAP_INHERIT_SHARE | MAP_INHERIT_NONE)) ==
+	    (MAP_INHERIT_SHARE | MAP_INHERIT_NONE))
+		return (KERN_INVALID_ARGUMENT);
+
 	protoeflags = 0;
 	if (cow & MAP_COPY_ON_WRITE)
 		protoeflags |= MAP_ENTRY_COW | MAP_ENTRY_NEEDS_COPY;
@@ -1955,6 +1966,8 @@ vm_map_insert1(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		protoeflags |= MAP_ENTRY_STACK_GAP_UP;
 	if (cow & MAP_INHERIT_SHARE)
 		inheritance = VM_INHERIT_SHARE;
+	else if (cow & MAP_INHERIT_NONE)
+		inheritance = VM_INHERIT_NONE;
 	else
 		inheritance = VM_INHERIT_DEFAULT;
 	if ((cow & MAP_CREATE_SHADOW) != 0)
@@ -2108,6 +2121,17 @@ charged:
 	KASSERT(cred == NULL || !ENTRY_CHARGED(new_entry),
 	    ("overcommit: vm_map_insert leaks vm_map %p", new_entry));
 	new_entry->cred = cred;
+
+	if ((cow & MAP_SHARECAP) != 0) {
+		KASSERT(new_entry->inheritance == VM_INHERIT_SHARE,
+		    ("MAP_SHARECAP on unshared mapping"));
+		if (new_entry->object.vm_object == NULL)
+			vm_map_entry_back(new_entry);
+		VM_OBJECT_WLOCK(new_entry->object.vm_object);
+		vm_object_set_flag(new_entry->object.vm_object, OBJ_HASCAP);
+		vm_object_set_flag(new_entry->object.vm_object, OBJ_SHARECAP);
+		VM_OBJECT_WUNLOCK(new_entry->object.vm_object);
+	}
 
 	/*
 	 * Insert the new entry into the list
@@ -3754,14 +3778,35 @@ vm_map_inherit(vm_map_t map, vm_offset_t start, vm_offset_t end,
 		}
 	}
 #endif
-	if (new_inheritance == VM_INHERIT_COPY) {
+	if (new_inheritance == VM_INHERIT_COPY ||
+	    new_inheritance == VM_INHERIT_SHARE) {
 		for (entry = start_entry; entry->start < end;
 		    prev_entry = entry, entry = vm_map_entry_succ(entry)) {
-			if ((entry->eflags & MAP_ENTRY_SPLIT_BOUNDARY_MASK)
+			if (new_inheritance == VM_INHERIT_COPY &&
+			    (entry->eflags & MAP_ENTRY_SPLIT_BOUNDARY_MASK)
 			    != 0) {
 				rv = KERN_INVALID_ARGUMENT;
 				goto unlock;
 			}
+			/*
+			 * CheriABI: mostly disallow post-fork sharing via
+			 * minherit().  Developers should use mmap and
+			 * MAP_SHARED instead.  Do allow no-op reqests
+			 * and sharing of mappings that either have no
+			 * capabilities or where objects have the
+			 * OBJ_SHARECAP flag.
+			 */
+			if (new_inheritance == VM_INHERIT_SHARE &&
+			    entry->inheritance != VM_INHERIT_SHARE &&
+			    /* XXX: check reservations instead? */
+			    SV_CURPROC_FLAG(SV_CHERI) &&
+			    (entry->object.vm_object == NULL ||
+			     (entry->object.vm_object->flags &
+			      (OBJ_NOCAP | OBJ_SHARECAP)) == 0)) {
+				rv = KERN_PROTECTION_FAILURE;
+				goto unlock;
+			}
+
 		}
 	}
 	for (entry = start_entry; entry->start < end; prev_entry = entry,
@@ -5150,6 +5195,10 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 
 #if __has_feature(capabilities)
 	vm2->vm_prev_cid = vm1->vm_prev_cid;
+	/*
+	 * NB: we don't copy vm_shm_objects as by definition, no copied
+	 * objects will be local to the new vmspace.
+	 */
 #endif
 
 	new_map->anon_loc = old_map->anon_loc;
@@ -5157,6 +5206,8 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 	    MAP_ASLR_STACK | MAP_RESERVATIONS | MAP_WXORX);
 
 	VM_MAP_ENTRY_FOREACH(old_entry, old_map) {
+		bool strip_cap_perms = false;
+
 		if ((old_entry->eflags & MAP_ENTRY_IS_SUB_MAP) != 0)
 			panic("vm_map_fork: encountered a submap");
 
@@ -5180,6 +5231,11 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 				vm_map_entry_back(old_entry);
 				object = old_entry->object.vm_object;
 			}
+
+			/* XXX: add a proc flag to allow/disallow */
+			if ((old_entry->max_protection & VM_PROT_CAP) != 0 &&
+			    (object->flags & OBJ_SHARECAP) == 0)
+				strip_cap_perms = true;
 
 			/*
 			 * Add the reference before calling vm_object_shadow
@@ -5242,6 +5298,10 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 			*new_entry = *old_entry;
 			new_entry->eflags &= ~(MAP_ENTRY_USER_WIRED |
 			    MAP_ENTRY_IN_TRANSITION);
+			if (strip_cap_perms) {
+				new_entry->protection &= ~VM_PROT_CAP;
+				new_entry->max_protection &= ~VM_PROT_CAP;
+			}
 			new_entry->wiring_thread = NULL;
 			new_entry->wired_count = 0;
 			if (new_entry->eflags & MAP_ENTRY_WRITECNT) {
@@ -5259,11 +5319,19 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 
 			/*
 			 * Update the physical map
+			 *
+			 * If this is a shared object that might contain
+			 * capabilities, we've removed the capability
+			 * permissions and need to let a fault set
+			 * hardware permissions up properly rather than
+			 * blindly copying them.
 			 */
-			pmap_copy(new_map->pmap, old_map->pmap,
-			    new_entry->start,
-			    (old_entry->end - old_entry->start),
-			    old_entry->start);
+			if (!strip_cap_perms) {
+				pmap_copy(new_map->pmap, old_map->pmap,
+				    new_entry->start,
+				    (old_entry->end - old_entry->start),
+				    old_entry->start);
+			}
 			break;
 
 		case VM_INHERIT_COPY:
