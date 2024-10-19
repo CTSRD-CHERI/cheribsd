@@ -81,6 +81,12 @@ FBSD_1.0 {
 	dlvsym;
 	dlinfo;
 	dl_iterate_phdr;
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(__aarch64__)
+	dl_c18n_get_trusted_stk;
+	dl_c18n_unwind_trusted_stk;
+	dl_c18n_is_tramp;
+	dl_c18n_pop_trusted_stk;
+#endif
 	drand48;
 	erand48;
 	err_set_file;

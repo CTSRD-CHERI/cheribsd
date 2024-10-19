@@ -110,6 +110,14 @@ int _rtld_addr_phdr(const void *, struct dl_phdr_info *);
 int _rtld_get_stack_prot(void);
 int _rtld_is_dlopened(void *);
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(__aarch64__)
+#include <machine/c18n.h>
+void *dl_c18n_get_trusted_stk(void);
+void dl_c18n_unwind_trusted_stk(void *, void *);
+int dl_c18n_is_tramp(ptraddr_t, void *);
+void *dl_c18n_pop_trusted_stk(struct dl_c18n_compart_state *, void *);
+#endif
+
 #ifdef __ARM_EABI__
 void * dl_unwind_find_exidx(const void *, int *);
 #endif
