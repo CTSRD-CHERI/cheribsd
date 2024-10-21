@@ -130,6 +130,7 @@ WARNS?=	3
 TESTS_SUBDIRS+=	acct
 TESTS_SUBDIRS+=	execve
 TESTS_SUBDIRS+=	pipe
+TESTS_SUBDIRS+=	tty
 
 .include <netbsd-tests.test.mk>
 
