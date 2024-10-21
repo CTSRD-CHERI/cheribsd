@@ -171,7 +171,6 @@ MIASM =  \
 	aio_write.o \
 	lio_listio.o \
 	kbounce.o \
-	flag_captured.o \
 	cheri_revoke_get_shadow.o \
 	cheri_revoke.o \
 	freebsd11_getdents.o \
@@ -201,7 +200,6 @@ MIASM =  \
 	aio_suspend.o \
 	aio_cancel.o \
 	aio_error.o \
-	yield.o \
 	mlockall.o \
 	munlockall.o \
 	__getcwd.o \

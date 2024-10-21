@@ -12,7 +12,7 @@
 #define	FREEBSD64_SYS_freebsd64_open	5
 #define	FREEBSD64_SYS_close	6
 #define	FREEBSD64_SYS_freebsd64_wait4	7
-				/* 8 is obsolete ocreat */
+				/* 8 is obsolete creat */
 #define	FREEBSD64_SYS_freebsd64_link	9
 #define	FREEBSD64_SYS_freebsd64_unlink	10
 				/* 11 is obsolete execv */
@@ -22,8 +22,8 @@
 #define	FREEBSD64_SYS_freebsd64_chmod	15
 #define	FREEBSD64_SYS_freebsd64_chown	16
 #define	FREEBSD64_SYS_freebsd64_break	17
-				/* 18 is obsolete freebsd4_getfsstat */
-				/* 19 is obsolete olseek */
+				/* 18 is obsolete getfsstat */
+				/* 19 is obsolete lseek */
 #define	FREEBSD64_SYS_getpid	20
 #define	FREEBSD64_SYS_freebsd64_mount	21
 #define	FREEBSD64_SYS_freebsd64_unmount	22
@@ -42,21 +42,21 @@
 #define	FREEBSD64_SYS_fchflags	35
 #define	FREEBSD64_SYS_sync	36
 #define	FREEBSD64_SYS_kill	37
-				/* 38 is obsolete ostat */
+				/* 38 is obsolete stat */
 #define	FREEBSD64_SYS_getppid	39
-				/* 40 is obsolete olstat */
+				/* 40 is obsolete lstat */
 #define	FREEBSD64_SYS_dup	41
 #define	FREEBSD64_SYS_freebsd10_pipe	42
 #define	FREEBSD64_SYS_getegid	43
 #define	FREEBSD64_SYS_freebsd64_profil	44
 #define	FREEBSD64_SYS_freebsd64_ktrace	45
-				/* 46 is obsolete osigaction */
+				/* 46 is obsolete sigaction */
 #define	FREEBSD64_SYS_getgid	47
-				/* 48 is obsolete osigprocmask */
+				/* 48 is obsolete sigprocmask */
 #define	FREEBSD64_SYS_freebsd64_getlogin	49
 #define	FREEBSD64_SYS_freebsd64_setlogin	50
 #define	FREEBSD64_SYS_freebsd64_acct	51
-				/* 52 is obsolete osigpending */
+				/* 52 is obsolete sigpending */
 #define	FREEBSD64_SYS_freebsd64_sigaltstack	53
 #define	FREEBSD64_SYS_freebsd64_ioctl	54
 #define	FREEBSD64_SYS_reboot	55
@@ -66,16 +66,16 @@
 #define	FREEBSD64_SYS_freebsd64_execve	59
 #define	FREEBSD64_SYS_umask	60
 #define	FREEBSD64_SYS_freebsd64_chroot	61
-				/* 62 is obsolete ofstat */
-				/* 63 is obsolete ogetkerninfo */
-				/* 64 is obsolete ogetpagesize */
+				/* 62 is obsolete fstat */
+				/* 63 is obsolete getkerninfo */
+				/* 64 is obsolete getpagesize */
 #define	FREEBSD64_SYS_freebsd64_msync	65
 #define	FREEBSD64_SYS_vfork	66
 				/* 67 is obsolete vread */
 				/* 68 is obsolete vwrite */
 				/* 69 is obsolete sbrk */
 				/* 70 is obsolete sstk */
-				/* 71 is obsolete ommap */
+				/* 71 is obsolete mmap */
 #define	FREEBSD64_SYS_freebsd11_vadvise	72
 #define	FREEBSD64_SYS_freebsd64_munmap	73
 #define	FREEBSD64_SYS_freebsd64_mprotect	74
@@ -88,11 +88,11 @@
 #define	FREEBSD64_SYS_getpgrp	81
 #define	FREEBSD64_SYS_setpgid	82
 #define	FREEBSD64_SYS_freebsd64_setitimer	83
-				/* 84 is obsolete owait */
+				/* 84 is obsolete wait */
 #define	FREEBSD64_SYS_freebsd64_swapon	85
 #define	FREEBSD64_SYS_freebsd64_getitimer	86
-				/* 87 is obsolete ogethostname */
-				/* 88 is obsolete osethostname */
+				/* 87 is obsolete gethostname */
+				/* 88 is obsolete sethostname */
 #define	FREEBSD64_SYS_getdtablesize	89
 #define	FREEBSD64_SYS_dup2	90
 #define	FREEBSD64_SYS_freebsd64_cheri_cidcap_alloc	91
@@ -102,22 +102,22 @@
 #define	FREEBSD64_SYS_setpriority	96
 #define	FREEBSD64_SYS_socket	97
 #define	FREEBSD64_SYS_freebsd64_connect	98
-				/* 99 is obsolete oaccept */
+				/* 99 is obsolete accept */
 #define	FREEBSD64_SYS_getpriority	100
-				/* 101 is obsolete osend */
-				/* 102 is obsolete orecv */
-				/* 103 is obsolete osigreturn */
+				/* 101 is obsolete send */
+				/* 102 is obsolete recv */
+				/* 103 is obsolete sigreturn */
 #define	FREEBSD64_SYS_freebsd64_bind	104
 #define	FREEBSD64_SYS_freebsd64_setsockopt	105
 #define	FREEBSD64_SYS_listen	106
 				/* 107 is obsolete vtimes */
-				/* 108 is obsolete osigvec */
-				/* 109 is obsolete osigblock */
-				/* 110 is obsolete osigsetmask */
-				/* 111 is obsolete osigsuspend */
-				/* 112 is obsolete osigstack */
-				/* 113 is obsolete orecvmsg */
-				/* 114 is obsolete osendmsg */
+				/* 108 is obsolete sigvec */
+				/* 109 is obsolete sigblock */
+				/* 110 is obsolete sigsetmask */
+				/* 111 is obsolete sigsuspend */
+				/* 112 is obsolete sigstack */
+				/* 113 is obsolete recvmsg */
+				/* 114 is obsolete sendmsg */
 				/* 115 is obsolete vtrace */
 #define	FREEBSD64_SYS_freebsd64_gettimeofday	116
 #define	FREEBSD64_SYS_freebsd64_getrusage	117
@@ -127,12 +127,12 @@
 #define	FREEBSD64_SYS_freebsd64_settimeofday	122
 #define	FREEBSD64_SYS_fchown	123
 #define	FREEBSD64_SYS_fchmod	124
-				/* 125 is obsolete orecvfrom */
+				/* 125 is obsolete recvfrom */
 #define	FREEBSD64_SYS_setreuid	126
 #define	FREEBSD64_SYS_setregid	127
 #define	FREEBSD64_SYS_freebsd64_rename	128
-				/* 129 is obsolete otruncate */
-				/* 130 is obsolete oftruncate */
+				/* 129 is obsolete truncate */
+				/* 130 is obsolete ftruncate */
 #define	FREEBSD64_SYS_flock	131
 #define	FREEBSD64_SYS_freebsd64_mkfifo	132
 #define	FREEBSD64_SYS_freebsd64_sendto	133
@@ -143,26 +143,26 @@
 #define	FREEBSD64_SYS_freebsd64_utimes	138
 				/* 139 is obsolete sigreturn */
 #define	FREEBSD64_SYS_freebsd64_adjtime	140
-				/* 141 is obsolete ogetpeername */
-				/* 142 is obsolete ogethostid */
-				/* 143 is obsolete osethostid */
-				/* 144 is obsolete ogetrlimit */
-				/* 145 is obsolete osetrlimit */
-				/* 146 is obsolete okillpg */
+				/* 141 is obsolete getpeername */
+				/* 142 is obsolete gethostid */
+				/* 143 is obsolete sethostid */
+				/* 144 is obsolete getrlimit */
+				/* 145 is obsolete setrlimit */
+				/* 146 is obsolete killpg */
 #define	FREEBSD64_SYS_setsid	147
 #define	FREEBSD64_SYS_freebsd64_quotactl	148
-				/* 149 is obsolete oquota */
-				/* 150 is obsolete ogetsockname */
+				/* 149 is obsolete quota */
+				/* 150 is obsolete getsockname */
 #define	FREEBSD64_SYS_freebsd64_nlm_syscall	154
 #define	FREEBSD64_SYS_freebsd64_nfssvc	155
-				/* 156 is obsolete ogetdirentries */
-				/* 157 is obsolete freebsd4_statfs */
-				/* 158 is obsolete freebsd4_fstatfs */
+				/* 156 is obsolete getdirentries */
+				/* 157 is obsolete statfs */
+				/* 158 is obsolete fstatfs */
 #define	FREEBSD64_SYS_freebsd64_lgetfh	160
 #define	FREEBSD64_SYS_freebsd64_getfh	161
-				/* 162 is obsolete freebsd4_getdomainname */
-				/* 163 is obsolete freebsd4_setdomainname */
-				/* 164 is obsolete freebsd4_uname */
+				/* 162 is obsolete getdomainname */
+				/* 163 is obsolete setdomainname */
+				/* 164 is obsolete uname */
 #define	FREEBSD64_SYS_freebsd64_sysarch	165
 #define	FREEBSD64_SYS_freebsd64_rtprio	166
 #define	FREEBSD64_SYS_semsys	169
@@ -246,7 +246,7 @@
 #define	FREEBSD64_SYS_freebsd11_freebsd64_nlstat	280
 #define	FREEBSD64_SYS_freebsd64_preadv	289
 #define	FREEBSD64_SYS_freebsd64_pwritev	290
-				/* 297 is obsolete freebsd4_fhstatfs */
+				/* 297 is obsolete fhstatfs */
 #define	FREEBSD64_SYS_freebsd64_fhopen	298
 #define	FREEBSD64_SYS_freebsd11_freebsd64_fhstat	299
 #define	FREEBSD64_SYS_modnext	300
@@ -285,15 +285,15 @@
 #define	FREEBSD64_SYS_sched_get_priority_min	333
 #define	FREEBSD64_SYS_freebsd64_sched_rr_get_interval	334
 #define	FREEBSD64_SYS_freebsd64_utrace	335
-				/* 336 is obsolete freebsd4_sendfile */
+				/* 336 is obsolete sendfile */
 #define	FREEBSD64_SYS_freebsd64_kldsym	337
 #define	FREEBSD64_SYS_freebsd64_jail	338
 #define	FREEBSD64_SYS_freebsd64_nnpfs_syscall	339
 #define	FREEBSD64_SYS_freebsd64_sigprocmask	340
 #define	FREEBSD64_SYS_freebsd64_sigsuspend	341
-				/* 342 is obsolete freebsd4_sigaction */
+				/* 342 is obsolete sigaction */
 #define	FREEBSD64_SYS_freebsd64_sigpending	343
-				/* 344 is obsolete freebsd4_sigreturn */
+				/* 344 is obsolete sigreturn */
 #define	FREEBSD64_SYS_freebsd64_sigtimedwait	345
 #define	FREEBSD64_SYS_freebsd64_sigwaitinfo	346
 #define	FREEBSD64_SYS_freebsd64___acl_get_file	347
