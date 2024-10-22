@@ -150,6 +150,13 @@ KERNEL_EXTRA_INSTALL+= ${KERNEL_KO}.bin
 CLEAN+=	${KERNEL_KO}.bin
 .endif
 
+# Generate an IR version of the kernel as an extra build output.
+.if defined(COMPILE_IR)
+KERNEL_EXTRA+= ${KERNEL_KO}.ll
+KERNEL_EXTRA_INSTALL+= ${KERNEL_KO}.ll
+CLEAN+=	${KERNEL_KO}.ll
+.endif
+
 .ORDER: kernel-install modules-install
 
 beforebuild: .PHONY
@@ -211,6 +218,14 @@ ${FULLKERNEL}: ${SYSTEM_DEP} vers.o
 .endif
 	${SYSTEM_LD_TAIL}
 
+.if defined(COMPILE_IR)
+#${KERNEL_KO}.ll: LLVM_LINK=/zdata/cheri/output/morello-sdk/bin/llvm-link
+${KERNEL_KO}.ll: ${SYSTEM_LLDEP}
+	@rm -f ${.TARGET}
+	@echo linking ${.TARGET}
+	${LLVM_LINK} -S -o ${.TARGET} ${SYSTEM_LLOBJS}
+.endif
+
 OBJS_DEPEND_GUESS+=	offset.inc assym.inc vnode_if.h ${BEFORE_DEPEND:M*.h} \
 			${MFILES:T:S/.m$/.h/}
 
@@ -237,6 +252,7 @@ kernel-clean:
 force-dynamic-hack.c:
 	:> ${.TARGET}
 
+force-dynamic-hack.pico: CFLAGS_STAGE=
 force-dynamic-hack.pico: force-dynamic-hack.c Makefile
 	${CC} ${CCLDFLAGS} -shared ${CFLAGS} -nostdlib \
 	    force-dynamic-hack.c -o ${.TARGET}
@@ -245,21 +261,21 @@ offset.inc: $S/kern/genoffset.sh genoffset.o
 	NM='${NM}' NMFLAGS='${NMFLAGS}' sh $S/kern/genoffset.sh genoffset.o > ${.TARGET}
 
 genoffset.o: $S/kern/genoffset.c
-	${CC} -c ${NOSAN_CFLAGS:N-flto*:N-fno-common} \
+	${CC} ${NOSAN_CFLAGS:N-flto*:N-fno-common} \
 	    -fcommon $S/kern/genoffset.c
 
 # genoffset_test.o is not actually used for anything - the point of compiling it
 # is to exercise the CTASSERT that checks that the offsets in the offset.inc
 # _lite struct(s) match those in the original(s). 
 genoffset_test.o: $S/kern/genoffset.c offset.inc
-	${CC} -c ${NOSAN_CFLAGS:N-flto*:N-fno-common} \
-	    -fcommon -DOFFSET_TEST $S/kern/genoffset.c -o ${.TARGET}
+	${CC} ${NOSAN_CFLAGS:N-flto*:N-fno-common} \
+	    -fcommon -DOFFSET_TEST $S/kern/genoffset.c
 
 assym.inc: $S/kern/genassym.sh genassym.o genoffset_test.o
 	NM='${NM}' NMFLAGS='${NMFLAGS}' sh $S/kern/genassym.sh genassym.o > ${.TARGET}
 
 genassym.o: $S/$M/$M/genassym.c  offset.inc
-	${CC} -c ${NOSAN_CFLAGS:N-flto*:N-fno-common} \
+	${CC} ${NOSAN_CFLAGS:N-flto*:N-fno-common} \
 	    -fcommon $S/$M/$M/genassym.c
 
 OBJS_DEPEND_GUESS+= opt_global.h
@@ -475,8 +491,8 @@ vnode_if_typedef.h:
 .if ${MFS_IMAGE:Uno} != "no"
 .if empty(MD_ROOT_SIZE_CONFIGURED)
 embedfs_${MFS_IMAGE:T:R}.o: ${MFS_IMAGE} $S/dev/md/embedfs.S
-	${CC} ${CFLAGS} ${ACFLAGS} -DMFS_IMAGE=\""${MFS_IMAGE}"\" -c \
-	    $S/dev/md/embedfs.S -o ${.TARGET}
+	${CC} ${CFLAGS} ${ACFLAGS} -DMFS_IMAGE=\""${MFS_IMAGE}"\" \
+	    $S/dev/md/embedfs.S
 .endif
 .endif
 

@@ -75,6 +75,7 @@ char *	PREFIX;
 char 	destdir[MAXPATHLEN];
 char 	srcdir[MAXPATHLEN];
 
+int	compileir;
 int	debugging;
 int	found_defaults;
 int	incignore;
@@ -117,6 +118,7 @@ main(int argc, char **argv)
 	struct includepath* ipath;
 	int printmachine;
 	bool cust_dest = false;
+	struct opt *ol;
 
 	printmachine = 0;
 	kernfile = NULL;
@@ -227,6 +229,12 @@ main(int argc, char **argv)
 	if (SLIST_EMPTY(&cputype)) {
 		printf("cpu type must be specified\n");
 		exit(1);
+	}
+	SLIST_FOREACH(ol, &mkopt, op_next) {
+		if (strcmp(ol->op_name, "COMPILE_IR") == 0) {
+			compileir = 1;
+			break;
+		}
 	}
 	checkversion();
 

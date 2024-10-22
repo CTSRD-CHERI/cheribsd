@@ -1,5 +1,6 @@
 *.a
 *.core
+*.llo
 *.o
 *.orig
 *.rej

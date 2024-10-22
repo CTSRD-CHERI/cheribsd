@@ -46,6 +46,9 @@ nodevice	zlib
 # Enable compartmentalization by default
 options 	CHERI_COMPARTMENTALIZE_KERNEL
 
+# Compile an IR version of the kernel and kernel modules for analysis
+makeoptions	COMPILE_IR
+
 # Make sure not compile in components that depend on contrib zlib code
 nooptions 	DDB_CTF		# Kernel ELF linker loads CTF data
 nooptions 	GEOM_UZIP	# Read-only compressed disks

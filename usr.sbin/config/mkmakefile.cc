@@ -54,7 +54,8 @@ typedef std::unordered_map<std::string, std::string>	env_map;
 
 static char *tail(char *);
 static void do_clean(FILE *);
-static void do_rules(FILE *);
+static void do_rules(FILE *, bool intoir);
+static void do_rules_ir(FILE *);
 static void do_xxfiles(char *, FILE *);
 static void do_objs(FILE *);
 static void do_before_depend(FILE *);
@@ -165,9 +166,11 @@ makefile(void)
 			do_objs(ofp);
 		else if (strncmp(line, "%FILES.", 7) == 0)
 			do_xxfiles(line, ofp);
-		else if (eq(line, "%RULES\n"))
-			do_rules(ofp);
-		else if (eq(line, "%CLEAN\n"))
+		else if (eq(line, "%RULES\n")) {
+			do_rules(ofp, false);
+			if (compileir == 1)
+				do_rules(ofp, true);
+		} else if (eq(line, "%CLEAN\n"))
 			do_clean(ofp);
 		else if (strncmp(line, "%VERSREQ=", 9) == 0)
 			line[0] = '\0'; /* handled elsewhere */
@@ -740,7 +743,7 @@ tail(char *fn)
  * which is part of the system.
  */
 static void
-do_rules(FILE *f)
+do_rules(FILE *f, bool intoir)
 {
 	char *cp, *np, och;
 	struct file_list *ftp;
@@ -752,7 +755,7 @@ do_rules(FILE *f)
 			fprintf(stderr, "WARNING: %s\n", ftp->f_warn);
 		cp = (np = ftp->f_fn) + strlen(ftp->f_fn) - 1;
 		och = *cp;
-		if (ftp->f_flags & NO_IMPLCT_RULE) {
+		if (!intoir && ftp->f_flags & NO_IMPLCT_RULE) {
 			if (ftp->f_depends)
 				fprintf(f, "%s%s: %s\n",
 					ftp->f_objprefix, np, ftp->f_depends);
@@ -761,21 +764,28 @@ do_rules(FILE *f)
 		}
 		else {
 			*cp = '\0';
-			if (och == 'o') {
+			if (intoir && och == 'c') {
+				fprintf(f,
+					"%s%sllo: CFLAGS_STAGE=-S -emit-llvm -o ${.TARGET}\n",
+					ftp->f_objprefix, tail(np));
+			}
+			if (!intoir && och == 'o') {
 				fprintf(f, "%s%so:\n\t-cp %s%so .\n\n",
 					ftp->f_objprefix, tail(np),
 					ftp->f_srcprefix, np);
 				continue;
 			}
 			if (ftp->f_depends) {
-				fprintf(f, "%s%so: %s%s%c %s\n",
+				fprintf(f, "%s%s%s: %s%s%c %s\n",
 					ftp->f_objprefix, tail(np),
+					intoir ? "llo" : "o",
 					ftp->f_srcprefix, np, och,
 					ftp->f_depends);
 			}
 			else {
-				fprintf(f, "%s%so: %s%s%c\n",
+				fprintf(f, "%s%s%s: %s%s%c\n",
 					ftp->f_objprefix, tail(np),
+					intoir ? "llo" : "o",
 					ftp->f_srcprefix, np, och);
 			}
 		}
@@ -799,13 +809,17 @@ do_rules(FILE *f)
 			compilewith = cmd;
 		}
 		*cp = och;
-		if (strlen(ftp->f_objprefix))
-			fprintf(f, "\t%s %s%s\n", compilewith,
-			    ftp->f_srcprefix, np);
-		else
-			fprintf(f, "\t%s\n", compilewith);
+		if (intoir && och == 'S') {
+			fprintf(f, "\t:> ${.TARGET}\n");
+		} else {
+			if (strlen(ftp->f_objprefix))
+				fprintf(f, "\t%s %s%s\n", compilewith,
+				    ftp->f_srcprefix, np);
+			else
+				fprintf(f, "\t%s\n", compilewith);
+		}
 
-		if (!(ftp->f_flags & NO_CTFCONVERT))
+		if (!intoir && !(ftp->f_flags & NO_CTFCONVERT))
 			fprintf(f, "\t${NORMAL_CTFCONVERT}\n\n");
 		else
 			fprintf(f, "\n");

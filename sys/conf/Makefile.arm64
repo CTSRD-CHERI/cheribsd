@@ -28,7 +28,7 @@ DRM_CFLAGS+=	'-DKBUILD_MODNAME="DRMv5.6"'
 DRM_CFLAGS+=	-Wno-cast-qual -Wno-pointer-arith -Wno-missing-prototypes
 # Complain about unsigned long long versus uint64_t, remove -Wformat for now
 DRM_CFLAGS+=	-Wno-format
-DRM_C=		${CC} -c ${DRM_CFLAGS} ${WERROR} ${PROF} ${.IMPSRC}
+DRM_C=		${CC} ${DRM_CFLAGS} ${WERROR} ${PROF} ${.IMPSRC}
 
 .if !defined(S)
 S=	../../..
