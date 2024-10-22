@@ -82,8 +82,8 @@ MODULE_VERSION(linux64elf, 1);
 static int linux_szsigcode;
 static vm_object_t linux_vdso_obj;
 static char *linux_vdso_mapping;
-extern char _binary_linux_vdso_so_o_start;
-extern char _binary_linux_vdso_so_o_end;
+extern char _binary_linux_vdso_so_o_start[];
+extern char _binary_linux_vdso_so_o_end[];
 static vm_offset_t linux_vdso_base;
 
 extern struct sysent linux_sysent[LINUX_SYS_MAXSYSCALL];
@@ -97,7 +97,7 @@ static void	linux_vdso_reloc(char *mapping, Elf_Addr offset);
 static void	linux_set_syscall_retval(struct thread *td, int error);
 static int	linux_fetch_syscall_args(struct thread *td);
 static void	linux_exec_setregs(struct thread *td, struct image_params *imgp,
-		    uintptr_t stack);
+		    uintcap_t stack);
 static void	linux_exec_sysvec_init(void *param);
 static int	linux_on_exec_vmspace(struct proc *p,
 		    struct image_params *imgp);
@@ -128,7 +128,7 @@ linux_fetch_syscall_args(struct thread *td)
 	if (sa->callp->sy_narg > nitems(sa->args))
 		panic("ARM64TODO: Could we have more than %zu args?",
 		    nitems(sa->args));
-	memcpy(sa->args, ap, nitems(sa->args) * sizeof(register_t));
+	memcpy(sa->args, ap, nitems(sa->args) * sizeof(syscallarg_t));
 
 	td->td_retval[0] = 0;
 	return (0);
@@ -162,14 +162,19 @@ linux64_arch_copyout_auxargs(struct image_params *imgp, Elf_Auxinfo **pos)
  */
 static void
 linux_exec_setregs(struct thread *td, struct image_params *imgp,
-    uintptr_t stack)
+    uintcap_t stack)
 {
 	struct trapframe *regs = td->td_frame;
 	struct pcb *pcb = td->td_pcb;
 
 	memset(regs, 0, sizeof(*regs));
 	regs->tf_sp = stack;
+#if __has_feature(capabilities)
+	hybridabi_thread_setregs(td, imgp->entry_addr);
+#else
 	regs->tf_elr = imgp->entry_addr;
+#endif
+
 	pcb->pcb_tpidr_el0 = 0;
 	pcb->pcb_tpidrro_el0 = 0;
 	WRITE_SPECIALREG(tpidrro_el0, 0);
@@ -249,7 +254,7 @@ int
 linux_rt_sigreturn(struct thread *td, struct linux_rt_sigreturn_args *args)
 {
 	struct l_rt_sigframe *sf;
-	struct l_sigframe *frame;
+	struct l_sigframe * __capability frame;
 	struct trapframe *tf;
 	sigset_t bmask;
 	int error;
@@ -257,7 +262,7 @@ linux_rt_sigreturn(struct thread *td, struct linux_rt_sigreturn_args *args)
 	sf = malloc(sizeof(*sf), M_LINUX, M_WAITOK | M_ZERO);
 
 	tf = td->td_frame;
-	frame = (struct l_sigframe *)tf->tf_sp;
+	frame = (struct l_sigframe * __capability)tf->tf_sp;
 	error = copyin((void * __capability)&frame->sf, sf, sizeof(*sf));
 	if (error != 0) {
 		free(sf, M_LINUX);
@@ -296,7 +301,7 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	struct thread *td;
 	struct proc *p;
 	struct trapframe *tf;
-	struct l_sigframe *fp, *frame;
+	struct l_sigframe * __capability fp, *frame;
 	struct l_fpsimd_context *fpsimd;
 	struct l_esr_context *esr;
 	l_stack_t uc_stack;
@@ -323,23 +328,23 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !onstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		fp = (struct l_sigframe *)((uintptr_t)td->td_sigstk.ss_sp +
+		fp = (struct l_sigframe * __capability)((uintcap_t)td->td_sigstk.ss_sp +
 		    td->td_sigstk.ss_size);
 #if defined(COMPAT_43)
 		td->td_sigstk.ss_flags |= SS_ONSTACK;
 #endif
 	} else {
-		fp = (struct l_sigframe *)td->td_frame->tf_sp;
+		fp = (struct l_sigframe * __capability)td->td_frame->tf_sp;
 	}
 
 	/* Make room, keeping the stack aligned */
 	fp--;
-	fp = (struct l_sigframe *)STACKALIGN(fp);
+	fp = (struct l_sigframe * __capability)STACKALIGN(fp);
 
 	get_mcontext(td, &uc.uc_mcontext, 0);
 	uc.uc_sigmask = *mask;
 
-	uc_stack.ss_sp = PTROUT(td->td_sigstk.ss_sp);
+	uc_stack.ss_sp = (uintcap_t)(td->td_sigstk.ss_sp);
 	uc_stack.ss_size = td->td_sigstk.ss_size;
 	uc_stack.ss_flags = (td->td_pflags & TDP_ALTSTACK) != 0 ?
 	    (onstack ? LINUX_SS_ONSTACK : 0) : LINUX_SS_DISABLE;
@@ -354,7 +359,7 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	frame->sf.sf_uc.uc_sc.sp = tf->tf_sp;
 	frame->sf.sf_uc.uc_sc.pc = tf->tf_elr;
 	frame->sf.sf_uc.uc_sc.pstate = tf->tf_spsr;
-	frame->sf.sf_uc.uc_sc.fault_address = (register_t)ksi->ksi_addr;
+	frame->sf.sf_uc.uc_sc.fault_address = (register_t)(uintcap_t)ksi->ksi_addr;
 
 	/* Stack frame for unwinding */
 	frame->fp = tf->tf_x[29];
@@ -402,16 +407,16 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 	tf->tf_x[0]= sig;
 	if (issiginfo) {
-		tf->tf_x[1] = (register_t)&fp->sf.sf_si;
-		tf->tf_x[2] = (register_t)&fp->sf.sf_uc;
+		tf->tf_x[1] = (uintcap_t)&fp->sf.sf_si;
+		tf->tf_x[2] = (uintcap_t)&fp->sf.sf_uc;
 	} else {
 		tf->tf_x[1] = 0;
 		tf->tf_x[2] = 0;
 	}
-	tf->tf_x[29] = (register_t)&fp->fp;
-	tf->tf_elr = (register_t)catcher;
-	tf->tf_sp = (register_t)fp;
-	tf->tf_lr = (register_t)__user_rt_sigreturn;
+	tf->tf_x[29] = (uintcap_t)&fp->fp;
+	tf->tf_elr = (uintcap_t)catcher;
+	tf->tf_sp = (uintcap_t)fp;
+	tf->tf_lr = (uintcap_t)__user_rt_sigreturn;
 
 	CTR3(KTR_SIG, "sendsig: return td=%p pc=%#x sp=%#x", td, tf->tf_elr,
 	    tf->tf_sp);
@@ -425,7 +430,7 @@ struct sysentvec elf_linux_sysvec = {
 	.sv_table	= linux_sysent,
 	.sv_fixup	= __elfN(freebsd_fixup),
 	.sv_sendsig	= linux_rt_sendsig,
-	.sv_sigcode	= &_binary_linux_vdso_so_o_start,
+	.sv_sigcode	= _binary_linux_vdso_so_o_start,
 	.sv_szsigcode	= &linux_szsigcode,
 	.sv_name	= "Linux ELF64",
 	.sv_coredump	= elf64_coredump,
@@ -480,7 +485,7 @@ linux_on_exec_vmspace(struct proc *p, struct image_params *imgp)
 static void
 linux_exec_sysvec_init(void *param)
 {
-	l_uintptr_t *ktimekeep_base;
+	l_ulong *ktimekeep_base;
 	struct sysentvec *sv;
 	ptrdiff_t tkoff;
 
@@ -489,7 +494,7 @@ linux_exec_sysvec_init(void *param)
 	exec_sysvec_init(sv);
 
 	tkoff = kern_timekeep_base - linux_vdso_base;
-	ktimekeep_base = (l_uintptr_t *)(linux_vdso_mapping + tkoff);
+	ktimekeep_base = (l_ulong *)(linux_vdso_mapping + tkoff);
 	*ktimekeep_base = sv->sv_shared_page_base + sv->sv_timekeep_offset;
 }
 SYSINIT(elf_linux_exec_sysvec_init, SI_SUB_EXEC + 1, SI_ORDER_ANY,
@@ -498,8 +503,8 @@ SYSINIT(elf_linux_exec_sysvec_init, SI_SUB_EXEC + 1, SI_ORDER_ANY,
 static void
 linux_vdso_install(const void *param)
 {
-	char *vdso_start = &_binary_linux_vdso_so_o_start;
-	char *vdso_end = &_binary_linux_vdso_so_o_end;
+	char *vdso_start = _binary_linux_vdso_so_o_start;
+	char *vdso_end = _binary_linux_vdso_so_o_end;
 
 	linux_szsigcode = vdso_end - vdso_start;
 	MPASS(linux_szsigcode <= LINUX_VDSOPAGE_SIZE);

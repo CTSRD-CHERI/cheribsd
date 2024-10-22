@@ -33,8 +33,8 @@
  * Helper macros for translating objects between different ABIs.
  */
 
-#define	PTRIN(v)	(void * __capability)(uintcap_t)(v)
-#define	PTROUT(v)	(uintcap_t)(v)
+#define	PTRIN(v)	(void *)(uintptr_t)(v)
+#define	PTROUT(v)	(uintptr_t)(v)
 
 #define	CP(src, dst, fld) do {			\
 	(dst).fld = (src).fld;			\

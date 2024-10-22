@@ -43,6 +43,7 @@
 #include <compat/linux/linux_misc.h>
 #include <compat/linux/linux_signal.h>
 #include <compat/linux/linux_util.h>
+#include <compat/freebsd64/freebsd64.h>
 
 #define	LINUX_PTRACE_TRACEME		0
 #define	LINUX_PTRACE_PEEKTEXT		1
@@ -157,13 +158,13 @@ linux_ptrace_status(struct thread *td, pid_t pid, int status)
 }
 
 static int
-linux_ptrace_peek(struct thread *td, pid_t pid, void * __capability addr, void * __capability data)
+linux_ptrace_peek(struct thread *td, pid_t pid, void *addr, void *data)
 {
 	int error;
 
-	error = kern_ptrace(td, PT_READ_I, pid, addr, 0);
+	error = kern_ptrace(td, PT_READ_I, pid, __USER_CAP_UNBOUND(addr), 0);
 	if (error == 0)
-		error = copyout(td->td_retval, data, sizeof(l_int));
+		error = copyout(td->td_retval, __USER_CAP(data, sizeof(l_int)), sizeof(l_int));
 	else if (error == ENOMEM)
 		error = EIO;
 	td->td_retval[0] = error;
@@ -255,7 +256,7 @@ linux_ptrace_getsiginfo(struct thread *td, pid_t pid, uintptr_t data)
 	sig = bsd_to_linux_signal(lwpinfo.pl_siginfo.si_signo);
 	memset(&l_siginfo, 0, sizeof(l_siginfo));
 	siginfo_to_lsiginfo(&lwpinfo.pl_siginfo, &l_siginfo, sig);
-	error = copyout(&l_siginfo, (void * __capability)data, sizeof(l_siginfo));
+	error = copyout(&l_siginfo, __USER_CAP(data, sizeof(l_siginfo)), sizeof(l_siginfo));
 	return (error);
 }
 
@@ -275,18 +276,18 @@ linux_ptrace_getregs(struct thread *td, pid_t pid, void *data)
 	if (error != 0)
 		return (error);
 
-	error = copyout(&l_regset, (void * __capability)data, sizeof(l_regset));
+	error = copyout(&l_regset, __USER_CAP(data, sizeof(l_regset)), sizeof(l_regset));
 	return (error);
 }
 
 static int
-linux_ptrace_setregs(struct thread *td, pid_t pid, void * __capability data)
+linux_ptrace_setregs(struct thread *td, pid_t pid, void *data)
 {
 	struct reg b_reg;
 	struct linux_pt_regset l_regset;
 	int error;
 
-	error = copyin(data, &l_regset, sizeof(l_regset));
+	error = copyin(__USER_CAP(data, sizeof(l_regset)), &l_regset, sizeof(l_regset));
 	if (error != 0)
 		return (error);
 	linux_to_bsd_regset(&b_reg, &l_regset);
@@ -299,11 +300,11 @@ linux_ptrace_getregset_prstatus(struct thread *td, pid_t pid, uintptr_t data)
 {
 	struct reg b_reg;
 	struct linux_pt_regset l_regset;
-	struct iovec iov;
+	struct iovec64 iov;
 	size_t len;
 	int error;
 
-	error = copyin((const void * __capability)data, &iov, sizeof(iov));
+	error = copyin(__USER_CAP(data, sizeof(iov)), &iov, sizeof(iov));
 	if (error != 0) {
 		linux_msg(td, "copyin error %d", error);
 		return (error);
@@ -319,14 +320,14 @@ linux_ptrace_getregset_prstatus(struct thread *td, pid_t pid, uintptr_t data)
 		return (error);
 
 	len = MIN(iov.iov_len, sizeof(l_regset));
-	error = copyout(&l_regset, (void * __capability)iov.iov_base, len);
+	error = copyout(&l_regset, __USER_CAP(iov.iov_base, len), len);
 	if (error != 0) {
 		linux_msg(td, "copyout error %d", error);
 		return (error);
 	}
 
 	iov.iov_len = len;
-	error = copyout(&iov, (void *)data, sizeof(iov));
+	error = copyout(&iov, __USER_CAP(data, sizeof(iov)), sizeof(iov));
 	if (error != 0) {
 		linux_msg(td, "iov copyout error %d", error);
 		return (error);
@@ -443,7 +444,7 @@ linux_ptrace_get_syscall_info(struct thread *td, pid_t pid,
 	linux_ptrace_get_syscall_info_machdep(&b_reg, &si);
 
 	len = MIN(len, sizeof(si));
-	error = copyout(&si, (void *)data, len);
+	error = copyout(&si, __USER_CAP(data, len), len);
 	if (error == 0)
 		td->td_retval[0] = sizeof(si);
 
@@ -483,14 +484,14 @@ linux_ptrace(struct thread *td, struct linux_ptrace_args *uap)
 		break;
 	case LINUX_PTRACE_POKETEXT:
 	case LINUX_PTRACE_POKEDATA:
-		error = kern_ptrace(td, PT_WRITE_D, pid, addr, uap->data);
+		error = kern_ptrace(td, PT_WRITE_D, pid, __USER_CAP_UNBOUND(addr), uap->data);
 		if (error != 0)
 			goto out;
 		/*
 		 * Linux expects this syscall to write 64 bits, not 32.
 		 */
 		error = kern_ptrace(td, PT_WRITE_D, pid,
-		    (void *)(uap->addr + 4), uap->data >> 32);
+		    __USER_CAP_UNBOUND(uap->addr + 4), uap->data >> 32);
 		break;
 	case LINUX_PTRACE_POKEUSER:
 		error = linux_ptrace_pokeuser(td, pid, addr, (void *)uap->data);
@@ -499,16 +500,16 @@ linux_ptrace(struct thread *td, struct linux_ptrace_args *uap)
 		error = map_signum(uap->data, &sig);
 		if (error != 0)
 			break;
-		error = kern_ptrace(td, PT_CONTINUE, pid, (void *)1, sig);
+		error = kern_ptrace(td, PT_CONTINUE, pid, __USER_CAP_UNBOUND(1), sig);
 		break;
 	case LINUX_PTRACE_KILL:
-		error = kern_ptrace(td, PT_KILL, pid, addr, uap->data);
+		error = kern_ptrace(td, PT_KILL, pid, __USER_CAP_UNBOUND(addr), uap->data);
 		break;
 	case LINUX_PTRACE_SINGLESTEP:
 		error = map_signum(uap->data, &sig);
 		if (error != 0)
 			break;
-		error = kern_ptrace(td, PT_STEP, pid, (void *)1, sig);
+		error = kern_ptrace(td, PT_STEP, pid, __USER_CAP_UNBOUND(1), sig);
 		break;
 	case LINUX_PTRACE_GETREGS:
 		error = linux_ptrace_getregs(td, pid, (void *)uap->data);
@@ -517,19 +518,19 @@ linux_ptrace(struct thread *td, struct linux_ptrace_args *uap)
 		error = linux_ptrace_setregs(td, pid, (void *)uap->data);
 		break;
 	case LINUX_PTRACE_ATTACH:
-		error = kern_ptrace(td, PT_ATTACH, pid, addr, uap->data);
+		error = kern_ptrace(td, PT_ATTACH, pid, __USER_CAP_UNBOUND(addr), uap->data);
 		break;
 	case LINUX_PTRACE_DETACH:
 		error = map_signum(uap->data, &sig);
 		if (error != 0)
 			break;
-		error = kern_ptrace(td, PT_DETACH, pid, (void *)1, sig);
+		error = kern_ptrace(td, PT_DETACH, pid, __USER_CAP_UNBOUND(1), sig);
 		break;
 	case LINUX_PTRACE_SYSCALL:
 		error = map_signum(uap->data, &sig);
 		if (error != 0)
 			break;
-		error = kern_ptrace(td, PT_SYSCALL, pid, (void *)1, sig);
+		error = kern_ptrace(td, PT_SYSCALL, pid, __USER_CAP_UNBOUND(1), sig);
 		break;
 	case LINUX_PTRACE_SETOPTIONS:
 		error = linux_ptrace_setoptions(td, pid, uap->data);

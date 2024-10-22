@@ -210,7 +210,7 @@ linux_ioctl_hdio(struct thread *td, struct linux_ioctl_args *args)
 			hdg.heads = fwheads;
 			hdg.sectors = fwsectors;
 			hdg.start = 0;
-			error = copyout(&hdg, (void * __capability)args->arg, sizeof(hdg));
+			error = copyout(&hdg, __USER_CAP(args->arg, sizeof(hdg)), sizeof(hdg));
 		} else if ((args->cmd & 0xffff) == LINUX_HDIO_GET_GEO_BIG) {
 			struct linux_hd_big_geometry hdbg;
 
@@ -219,7 +219,7 @@ linux_ioctl_hdio(struct thread *td, struct linux_ioctl_args *args)
 			hdbg.heads = fwheads;
 			hdbg.sectors = fwsectors;
 			hdbg.start = 0;
-			error = copyout(&hdbg, (void * __capability)args->arg, sizeof(hdbg));
+			error = copyout(&hdbg, __USER_CAP(args->arg, sizeof(hdbg)), sizeof(hdbg));
 		}
 		return (error);
 		break;
@@ -262,7 +262,7 @@ linux_ioctl_disk(struct thread *td, struct linux_ioctl_args *args)
 		/*
 		 * XXX: How do we know we return the right size of integer ?
 		 */
-		return (copyout(&sectorsize, (void * __capability)args->arg,
+		return (copyout(&sectorsize, __USER_CAP(args->arg, sizeof(sectorsize)),
 		    sizeof(sectorsize)));
 		break;
 	case LINUX_BLKGETSIZE64:
@@ -272,7 +272,7 @@ linux_ioctl_disk(struct thread *td, struct linux_ioctl_args *args)
 		if (error)
 			return (error);
 		blksize64 = mediasize;
-		return (copyout(&blksize64, (void * __capability)args->arg,
+		return (copyout(&blksize64, __USER_CAP(args->arg, sizeof(blksize64)),
 		    sizeof(blksize64)));
 	case LINUX_BLKSSZGET:
 		error = fo_ioctl(fp, DIOCGSECTORSIZE,
@@ -280,7 +280,7 @@ linux_ioctl_disk(struct thread *td, struct linux_ioctl_args *args)
 		fdrop(fp, td);
 		if (error)
 			return (error);
-		return (copyout(&sectorsize, (void * __capability)args->arg,
+		return (copyout(&sectorsize, __USER_CAP(args->arg, sizeof(sectorsize)),
 		    sizeof(sectorsize)));
 		break;
 	case LINUX_BLKPBSZGET:
@@ -302,7 +302,7 @@ linux_ioctl_disk(struct thread *td, struct linux_ioctl_args *args)
 			psectorsize = sectorsize;
 		}
 		fdrop(fp, td);
-		return (copyout(&psectorsize, (void * __capability)args->arg,
+		return (copyout(&psectorsize, __USER_CAP(args->arg, sizeof(psectorsize)),
 		    sizeof(psectorsize)));
 	}
 	fdrop(fp, td);
@@ -675,11 +675,11 @@ linux_ioctl_termio(struct thread *td, struct linux_ioctl_args *args)
 		if (error)
 			break;
 		bsd_to_linux_termios(&bios, &lios);
-		error = copyout(&lios, (void * __capability)args->arg, sizeof(lios));
+		error = copyout(&lios, __USER_CAP(args->arg, sizeof(lios)), sizeof(lios));
 		break;
 
 	case LINUX_TCSETS:
-		error = copyin((void * __capability)args->arg, &lios, sizeof(lios));
+		error = copyin(__USER_CAP(args->arg, sizeof(lios)), &lios, sizeof(lios));
 		if (error)
 			break;
 		linux_to_bsd_termios(&lios, &bios);
@@ -688,7 +688,7 @@ linux_ioctl_termio(struct thread *td, struct linux_ioctl_args *args)
 		break;
 
 	case LINUX_TCSETSW:
-		error = copyin((void * __capability)args->arg, &lios, sizeof(lios));
+		error = copyin(__USER_CAP(args->arg, sizeof(lios)), &lios, sizeof(lios));
 		if (error)
 			break;
 		linux_to_bsd_termios(&lios, &bios);
@@ -697,7 +697,7 @@ linux_ioctl_termio(struct thread *td, struct linux_ioctl_args *args)
 		break;
 
 	case LINUX_TCSETSF:
-		error = copyin((void * __capability)args->arg, &lios, sizeof(lios));
+		error = copyin(__USER_CAP(args->arg, sizeof(lios)), &lios, sizeof(lios));
 		if (error)
 			break;
 		linux_to_bsd_termios(&lios, &bios);
@@ -711,11 +711,11 @@ linux_ioctl_termio(struct thread *td, struct linux_ioctl_args *args)
 		if (error)
 			break;
 		bsd_to_linux_termio(&bios, &lio);
-		error = (copyout(&lio, (void * __capability)args->arg, sizeof(lio)));
+		error = (copyout(&lio, __USER_CAP(args->arg, sizeof(lio)), sizeof(lio)));
 		break;
 
 	case LINUX_TCSETA:
-		error = copyin((void * __capability)args->arg, &lio, sizeof(lio));
+		error = copyin(__USER_CAP(args->arg, sizeof(lio)), &lio, sizeof(lio));
 		if (error)
 			break;
 		linux_to_bsd_termio(&lio, &bios);
@@ -724,7 +724,7 @@ linux_ioctl_termio(struct thread *td, struct linux_ioctl_args *args)
 		break;
 
 	case LINUX_TCSETAW:
-		error = copyin((void * __capability)args->arg, &lio, sizeof(lio));
+		error = copyin(__USER_CAP(args->arg, sizeof(lio)), &lio, sizeof(lio));
 		if (error)
 			break;
 		linux_to_bsd_termio(&lio, &bios);
@@ -733,7 +733,7 @@ linux_ioctl_termio(struct thread *td, struct linux_ioctl_args *args)
 		break;
 
 	case LINUX_TCSETAF:
-		error = copyin((void * __capability)args->arg, &lio, sizeof(lio));
+		error = copyin(__USER_CAP(args->arg, sizeof(lio)), &lio, sizeof(lio));
 		if (error)
 			break;
 		linux_to_bsd_termio(&lio, &bios);
@@ -887,13 +887,13 @@ linux_ioctl_termio(struct thread *td, struct linux_ioctl_args *args)
 		lss.type = LINUX_PORT_16550A;
 		lss.flags = 0;
 		lss.close_delay = 0;
-		error = copyout(&lss, (void * __capability)args->arg, sizeof(lss));
+		error = copyout(&lss, __USER_CAP(args->arg, sizeof(lss)), sizeof(lss));
 		break;
 	}
 
 	case LINUX_TIOCSSERIAL: {
 		struct linux_serial_struct lss;
-		error = copyin((void * __capability)args->arg, &lss, sizeof(lss));
+		error = copyin(__USER_CAP(args->arg, sizeof(lss)), &lss, sizeof(lss));
 		if (error)
 			break;
 		/* XXX - It really helps to have an implementation that
@@ -960,7 +960,7 @@ linux_ioctl_termio(struct thread *td, struct linux_ioctl_args *args)
 			fdrop(fp, td);
 			return (EINVAL);
 		}
-		error = (copyout(&linux_line, (void * __capability)args->arg, sizeof(int)));
+		error = (copyout(&linux_line, __USER_CAP(args->arg, sizeof(int)), sizeof(int)));
 		break;
 	}
 
@@ -1002,7 +1002,7 @@ linux_ioctl_termio(struct thread *td, struct linux_ioctl_args *args)
 
 		error = fo_ioctl(fp, TIOCGPTN, (caddr_t)&nb, td->td_ucred, td);
 		if (!error)
-			error = copyout(&nb, (void * __capability)args->arg,
+			error = copyout(&nb, __USER_CAP(args->arg, sizeof(int)),
 			    sizeof(int));
 		break;
 	}
@@ -1454,7 +1454,7 @@ linux_ioctl_cdrom(struct thread *td, struct linux_ioctl_args *args)
 		if (!error) {
 			lth.cdth_trk0 = th.starting_track;
 			lth.cdth_trk1 = th.ending_track;
-			error = copyout(&lth, (void * __capability)args->arg, sizeof(lth));
+			error = copyout(&lth, __USER_CAP(args->arg, sizeof(lth)), sizeof(lth));
 		}
 		break;
 	}
@@ -1463,7 +1463,7 @@ linux_ioctl_cdrom(struct thread *td, struct linux_ioctl_args *args)
 		struct linux_cdrom_tocentry lte;
 		struct ioc_read_toc_single_entry irtse;
 
-		error = copyin((void *)args->arg, &lte, sizeof(lte));
+		error = copyin(__USER_CAP(args->arg, sizeof(lte)), &lte, sizeof(lte));
 		if (error)
 			break;
 		irtse.address_format = lte.cdte_format;
@@ -1475,7 +1475,7 @@ linux_ioctl_cdrom(struct thread *td, struct linux_ioctl_args *args)
 			lte.cdte_adr = irtse.entry.addr_type;
 			bsd_to_linux_msf_lba(irtse.address_format,
 			    &irtse.entry.addr, &lte.cdte_addr);
-			error = copyout(&lte, (void *)args->arg, sizeof(lte));
+			error = copyout(&lte, __USER_CAP(args->arg, sizeof(lte)), sizeof(lte));
 		}
 		break;
 	}
@@ -1502,7 +1502,7 @@ linux_ioctl_cdrom(struct thread *td, struct linux_ioctl_args *args)
 		struct ioc_read_subchannel bsdsc;
 		struct cd_sub_channel_info bsdinfo;
 
-		error = copyin((void *)args->arg, &sc, sizeof(sc));
+		error = copyin(__USER_CAP(args->arg, sizeof(sc)), &sc, sizeof(sc));
 		if (error)
 			break;
 
@@ -1516,12 +1516,12 @@ linux_ioctl_cdrom(struct thread *td, struct linux_ioctl_args *args)
 		bsdsc.data_format = CD_CURRENT_POSITION;
 		bsdsc.track = 0;
 		bsdsc.data_len = sizeof(sc);
-		bsdsc.data = (void *)args->arg;
+		bsdsc.data = __USER_CAP(args->arg, sizeof(sc));
 		error = fo_ioctl(fp, CDIOCREADSUBCHANNEL, (caddr_t)&bsdsc,
 		    td->td_ucred, td);
 		if (error)
 			break;
-		error = copyin((void *)args->arg, &bsdinfo, sizeof(bsdinfo));
+		error = copyin(__USER_CAP(args->arg, sizeof(bsdinfo)), &bsdinfo, sizeof(bsdinfo));
 		if (error)
 			break;
 		sc.cdsc_audiostatus = bsdinfo.header.audio_status;
@@ -1533,7 +1533,7 @@ linux_ioctl_cdrom(struct thread *td, struct linux_ioctl_args *args)
 		    bsdinfo.what.position.absaddr.lba);
 		set_linux_cdrom_addr(&sc.cdsc_reladdr, sc.cdsc_format,
 		    bsdinfo.what.position.reladdr.lba);
-		error = copyout(&sc, (void *)args->arg, sizeof(sc));
+		error = copyout(&sc, __USER_CAP(args->arg, sizeof(sc)), sizeof(sc));
 		break;
 	}
 
@@ -1578,7 +1578,7 @@ linux_ioctl_cdrom(struct thread *td, struct linux_ioctl_args *args)
 
 		lds = malloc(sizeof(*lds), M_LINUX, M_WAITOK);
 		bds = malloc(sizeof(*bds), M_LINUX, M_WAITOK);
-		error = copyin((void *)args->arg, lds, sizeof(*lds));
+		error = copyin(__USER_CAP(args->arg, sizeof(*lds)), lds, sizeof(*lds));
 		if (error)
 			goto out;
 		error = linux_to_bsd_dvd_struct(lds, bds);
@@ -1591,7 +1591,7 @@ linux_ioctl_cdrom(struct thread *td, struct linux_ioctl_args *args)
 		error = bsd_to_linux_dvd_struct(bds, lds);
 		if (error)
 			goto out;
-		error = copyout(lds, (void *)args->arg, sizeof(*lds));
+		error = copyout(lds, __USER_CAP(args->arg, sizeof(*lds)), sizeof(*lds));
 	out:
 		free(bds, M_LINUX);
 		free(lds, M_LINUX);
@@ -1605,7 +1605,7 @@ linux_ioctl_cdrom(struct thread *td, struct linux_ioctl_args *args)
 		struct dvd_authinfo bda;
 		int bcode;
 
-		error = copyin((void *)args->arg, &lda, sizeof(lda));
+		error = copyin(__USER_CAP(args->arg, sizeof(lda)), &lda, sizeof(lda));
 		if (error)
 			break;
 		error = linux_to_bsd_dvd_authinfo(&lda, &bcode, &bda);
@@ -1616,7 +1616,7 @@ linux_ioctl_cdrom(struct thread *td, struct linux_ioctl_args *args)
 		if (error) {
 			if (lda.type == LINUX_DVD_HOST_SEND_KEY2) {
 				lda.type = LINUX_DVD_AUTH_FAILURE;
-				(void)copyout(&lda, (void *)args->arg,
+				(void)copyout(&lda, __USER_CAP(args->arg, sizeof(lda)),
 				    sizeof(lda));
 			}
 			break;
@@ -1624,7 +1624,7 @@ linux_ioctl_cdrom(struct thread *td, struct linux_ioctl_args *args)
 		error = bsd_to_linux_dvd_authinfo(&bda, &lda);
 		if (error)
 			break;
-		error = copyout(&lda, (void *)args->arg, sizeof(lda));
+		error = copyout(&lda, __USER_CAP(args->arg, sizeof(lda)), sizeof(lda));
 		break;
 	}
 
@@ -1636,7 +1636,7 @@ linux_ioctl_cdrom(struct thread *td, struct linux_ioctl_args *args)
 		    td->td_ucred, td);
 		if (error)
 			break;
-		error = copyout(&id.channel, (void *)args->arg, sizeof(int));
+		error = copyout(&id.channel, __USER_CAP(args->arg, sizeof(int)), sizeof(int));
 		break;
 	}
 
@@ -1652,7 +1652,7 @@ linux_ioctl_cdrom(struct thread *td, struct linux_ioctl_args *args)
 		idl.dev_id = (id.scsi_id & 0xff) + ((id.lun & 0xff) << 8) +
 		    ((id.channel & 0xff) << 16) + ((id.host_no & 0xff) << 24);
 		idl.host_unique_id = id.host_no;
-		error = copyout(&idl, (void *)args->arg, sizeof(idl));
+		error = copyout(&idl, __USER_CAP(args->arg, sizeof(idl)), sizeof(idl));
 		break;
 	}
 
@@ -1779,7 +1779,7 @@ linux_ioctl_sound(struct thread *td, struct linux_ioctl_args *args)
 			strncpy(info.id, "OSS", sizeof(info.id) - 1);
 			strncpy(info.name, "FreeBSD OSS Mixer",
 			    sizeof(info.name) - 1);
-			return (copyout(&info, (void *)args->arg,
+			return (copyout(&info, __USER_CAP(args->arg, sizeof(info)),
 			    sizeof(info)));
 		}
 		default:
@@ -1790,7 +1790,7 @@ linux_ioctl_sound(struct thread *td, struct linux_ioctl_args *args)
 
 	case LINUX_OSS_GETVERSION: {
 		int version = linux_get_oss_version(td);
-		return (copyout(&version, (void *)args->arg, sizeof(int)));
+		return (copyout(&version, __USER_CAP(args->arg, sizeof(int)), sizeof(int)));
 	}
 
 	case LINUX_SOUND_MIXER_READ_STEREODEVS:
@@ -2043,7 +2043,7 @@ linux_ioctl_console(struct thread *td, struct linux_ioctl_args *args)
 
 	case LINUX_VT_SETMODE: {
 		struct vt_mode mode;
-		if ((error = copyin((void *)args->arg, &mode, sizeof(mode))))
+		if ((error = copyin(__USER_CAP(args->arg, sizeof(mode)), &mode, sizeof(mode))))
 			break;
 		if (LINUX_SIG_VALID(mode.relsig))
 			mode.relsig = linux_to_bsd_signal(mode.relsig);
@@ -2055,7 +2055,7 @@ linux_ioctl_console(struct thread *td, struct linux_ioctl_args *args)
 			mode.acqsig = 0;
 		/* XXX. Linux ignores frsig and set it to 0. */
 		mode.frsig = 0;
-		if ((error = copyout(&mode, (void *)args->arg, sizeof(mode))))
+		if ((error = copyout(&mode, __USER_CAP(args->arg, sizeof(mode)), sizeof(mode))))
 			break;
 		args->cmd = VT_SETMODE;
 		error = (sys_ioctl(td, (struct ioctl_args *)args));
@@ -2101,13 +2101,13 @@ linux_ioctl_ifname(struct thread *td, struct l_ifreq *uifr)
 	struct l_ifreq ifr;
 	int error, ret;
 
-	error = copyin(uifr, &ifr, sizeof(ifr));
+	error = copyin(__USER_CAP_OBJ(uifr), &ifr, sizeof(ifr));
 	if (error != 0)
 		return (error);
 	ret = ifname_bsd_to_linux_idx(ifr.ifr_index, ifr.ifr_name,
 	    LINUX_IFNAMSIZ);
 	if (ret > 0)
-		return (copyout(&ifr, uifr, sizeof(ifr)));
+		return (copyout(&ifr, __USER_CAP_OBJ(uifr), sizeof(ifr)));
 	else
 		return (ENODEV);
 }
@@ -2188,17 +2188,17 @@ linux_ifconf(struct thread *td, struct ifconf *uifc)
 	struct sbuf *sb;
 	int error, full;
 
-	error = copyin(uifc, &ifc, sizeof(ifc));
+	error = copyin(__USER_CAP_OBJ(uifc), &ifc, sizeof(ifc));
 	if (error != 0)
 		return (error);
 
 	/* handle the 'request buffer size' case */
-	if (PTRIN(ifc.ifc_buf) == NULL) {
+	if (ifc.ifc_buf == NULL) {
 		ifc.ifc_len = 0;
 		NET_EPOCH_ENTER(et);
 		if_foreach(linux_ifconf_ifnet_cb, &ifc);
 		NET_EPOCH_EXIT(et);
-		return (copyout(&ifc, uifc, sizeof(ifc)));
+		return (copyout(&ifc, __USER_CAP_OBJ(uifc), sizeof(ifc)));
 	}
 	if (ifc.ifc_len <= 0)
 		return (EINVAL);
@@ -2227,9 +2227,9 @@ again:
 
 	ifc.ifc_len = cbs.valid_len;
 	sbuf_finish(sb);
-	error = copyout(sbuf_data(sb), PTRIN(ifc.ifc_buf), ifc.ifc_len);
+	error = copyout(sbuf_data(sb), ifc.ifc_buf, ifc.ifc_len);
 	if (error == 0)
-		error = copyout(&ifc, uifc, sizeof(ifc));
+		error = copyout(&ifc, __USER_CAP_OBJ(uifc), sizeof(ifc));
 	sbuf_delete(sb);
 
 	return (error);
@@ -2301,7 +2301,7 @@ linux_ioctl_socket_ifreq(struct thread *td, int fd, u_int cmd,
 		return (ENOIOCTL);
 	}
 
-	error = copyin(uifr, &lifr, sizeof(lifr));
+	error = copyin(__USER_CAP_OBJ(uifr), &lifr, sizeof(lifr));
 	if (error != 0)
 		return (error);
 	bzero(&bifr, sizeof(bifr));
@@ -2365,7 +2365,7 @@ linux_ioctl_socket_ifreq(struct thread *td, int fd, u_int cmd,
 		break;
 	}
 
-	return (copyout(&lifr, uifr, sizeof(lifr)));
+	return (copyout(&lifr, __USER_CAP_OBJ(uifr), sizeof(lifr)));
 }
 
 /*
@@ -2506,7 +2506,7 @@ linux_ioctl_sg_io(struct thread *td, struct linux_ioctl_args *args)
 		return (error);
 	}
 
-	if ((error = copyin((void *)args->arg, &io32, sizeof(io32))) != 0)
+	if ((error = copyin(__USER_CAP(args->arg, sizeof(io32)), &io32, sizeof(io32))) != 0)
 		goto out;
 
 	CP(io32, io, interface_id);
@@ -2558,7 +2558,7 @@ linux_ioctl_sg_io(struct thread *td, struct linux_ioctl_args *args)
 	CP(io, io32, duration);
 	CP(io, io32, info);
 
-	error = copyout(&io32, (void *)args->arg, sizeof(io32));
+	error = copyout(&io32, __USER_CAP(args->arg, sizeof(io32)), sizeof(io32));
 
 out:
 	fdrop(fp, td);
@@ -2831,7 +2831,7 @@ linux_ioctl_v4l(struct thread *td, struct linux_ioctl_args *args)
 		    &cap_ioctl_rights, &fp);
 		if (error != 0)
 			return (error);
-		error = copyin((void *) args->arg, &l_vtun, sizeof(l_vtun));
+		error = copyin(__USER_CAP(args->arg, sizeof(l_vtun)), &l_vtun, sizeof(l_vtun));
 		if (error) {
 			fdrop(fp, td);
 			return (error);
@@ -2840,7 +2840,7 @@ linux_ioctl_v4l(struct thread *td, struct linux_ioctl_args *args)
 		error = fo_ioctl(fp, VIDIOCGTUNER, &vtun, td->td_ucred, td);
 		if (!error) {
 			bsd_to_linux_v4l_tuner(&vtun, &l_vtun);
-			error = copyout(&l_vtun, (void *) args->arg,
+			error = copyout(&l_vtun, __USER_CAP(args->arg, sizeof(l_vtun)),
 			    sizeof(l_vtun));
 		}
 		fdrop(fp, td);
@@ -2851,7 +2851,7 @@ linux_ioctl_v4l(struct thread *td, struct linux_ioctl_args *args)
 		    &cap_ioctl_rights, &fp);
 		if (error != 0)
 			return (error);
-		error = copyin((void *) args->arg, &l_vtun, sizeof(l_vtun));
+		error = copyin(__USER_CAP(args->arg, sizeof(l_vtun)), &l_vtun, sizeof(l_vtun));
 		if (error) {
 			fdrop(fp, td);
 			return (error);
@@ -2873,7 +2873,7 @@ linux_ioctl_v4l(struct thread *td, struct linux_ioctl_args *args)
 		error = fo_ioctl(fp, VIDIOCGWIN, &vwin, td->td_ucred, td);
 		if (!error) {
 			bsd_to_linux_v4l_window(&vwin, &l_vwin);
-			error = copyout(&l_vwin, (void *) args->arg,
+			error = copyout(&l_vwin, __USER_CAP(args->arg, sizeof(l_vwin)),
 			    sizeof(l_vwin));
 		}
 		fdrop(fp, td);
@@ -2884,7 +2884,7 @@ linux_ioctl_v4l(struct thread *td, struct linux_ioctl_args *args)
 		    &cap_ioctl_rights, &fp);
 		if (error != 0)
 			return (error);
-		error = copyin((void *) args->arg, &l_vwin, sizeof(l_vwin));
+		error = copyin(__USER_CAP(args->arg, sizeof(l_vwin)), &l_vwin, sizeof(l_vwin));
 		if (error) {
 			fdrop(fp, td);
 			return (error);
@@ -2912,7 +2912,7 @@ linux_ioctl_v4l(struct thread *td, struct linux_ioctl_args *args)
 		error = fo_ioctl(fp, VIDIOCGFBUF, &vbuf, td->td_ucred, td);
 		if (!error) {
 			bsd_to_linux_v4l_buffer(&vbuf, &l_vbuf);
-			error = copyout(&l_vbuf, (void *) args->arg,
+			error = copyout(&l_vbuf, __USER_CAP(args->arg, sizeof(l_vbuf)),
 			    sizeof(l_vbuf));
 		}
 		fdrop(fp, td);
@@ -2923,7 +2923,7 @@ linux_ioctl_v4l(struct thread *td, struct linux_ioctl_args *args)
 		    &cap_ioctl_rights, &fp);
 		if (error != 0)
 			return (error);
-		error = copyin((void *) args->arg, &l_vbuf, sizeof(l_vbuf));
+		error = copyin(__USER_CAP(args->arg, sizeof(l_vbuf)), &l_vbuf, sizeof(l_vbuf));
 		if (error) {
 			fdrop(fp, td);
 			return (error);
@@ -2953,7 +2953,7 @@ linux_ioctl_v4l(struct thread *td, struct linux_ioctl_args *args)
 		    &cap_ioctl_rights, &fp);
 		if (error != 0)
 			return (error);
-		error = copyin((void *) args->arg, &l_vcode, sizeof(l_vcode));
+		error = copyin(__USER_CAP(args->arg, sizeof(l_vcode)), &l_vcode, sizeof(l_vcode));
 		if (error) {
 			fdrop(fp, td);
 			return (error);
@@ -3202,7 +3202,7 @@ linux_ioctl_v4l2(struct thread *td, struct linux_ioctl_args *args)
 	case LINUX_VIDIOC_G_FMT:
 	case LINUX_VIDIOC_S_FMT:
 	case LINUX_VIDIOC_TRY_FMT:
-		error = copyin((void *)args->arg, &l_vformat, sizeof(l_vformat));
+		error = copyin(__USER_CAP(args->arg, sizeof(l_vformat)), &l_vformat, sizeof(l_vformat));
 		if (error)
 			return (error);
 		error = fget(td, args->fd,
@@ -3222,13 +3222,13 @@ linux_ioctl_v4l2(struct thread *td, struct linux_ioctl_args *args)
 			    td->td_ucred, td);
 		bsd_to_linux_v4l2_format(&vformat, &l_vformat);
 		if (error == 0)
-			error = copyout(&l_vformat, (void *)args->arg,
+			error = copyout(&l_vformat, __USER_CAP(args->arg, sizeof(l_vformat)),
 			    sizeof(l_vformat));
 		fdrop(fp, td);
 		return (error);
 
 	case LINUX_VIDIOC_ENUMSTD:
-		error = copyin((void *)args->arg, &l_vstd, sizeof(l_vstd));
+		error = copyin(__USER_CAP(args->arg, sizeof(l_vstd)), &l_vstd, sizeof(l_vstd));
 		if (error)
 			return (error);
 		linux_to_bsd_v4l2_standard(&l_vstd, &vstd);
@@ -3243,7 +3243,7 @@ linux_ioctl_v4l2(struct thread *td, struct linux_ioctl_args *args)
 			return (error);
 		}
 		bsd_to_linux_v4l2_standard(&vstd, &l_vstd);
-		error = copyout(&l_vstd, (void *)args->arg, sizeof(l_vstd));
+		error = copyout(&l_vstd, __USER_CAP(args->arg, sizeof(l_vstd)), sizeof(l_vstd));
 		fdrop(fp, td);
 		return (error);
 
@@ -3252,7 +3252,7 @@ linux_ioctl_v4l2(struct thread *td, struct linux_ioctl_args *args)
 		 * The Linux struct l_v4l2_input differs only in size,
 		 * it has no padding at the end.
 		 */
-		error = copyin((void *)args->arg, &vinp,
+		error = copyin(__USER_CAP(args->arg, sizeof(struct l_v4l2_input)), &vinp,
 				sizeof(struct l_v4l2_input));
 		if (error != 0)
 			return (error);
@@ -3266,7 +3266,7 @@ linux_ioctl_v4l2(struct thread *td, struct linux_ioctl_args *args)
 			fdrop(fp, td);
 			return (error);
 		}
-		error = copyout(&vinp, (void *)args->arg,
+		error = copyout(&vinp, __USER_CAP(args->arg, sizeof(struct l_v4l2_input)),
 				sizeof(struct l_v4l2_input));
 		fdrop(fp, td);
 		return (error);
@@ -3274,7 +3274,7 @@ linux_ioctl_v4l2(struct thread *td, struct linux_ioctl_args *args)
 	case LINUX_VIDIOC_QUERYBUF:
 	case LINUX_VIDIOC_QBUF:
 	case LINUX_VIDIOC_DQBUF:
-		error = copyin((void *)args->arg, &l_vbuf, sizeof(l_vbuf));
+		error = copyin(__USER_CAP(args->arg, sizeof(l_vbuf)), &l_vbuf, sizeof(l_vbuf));
 		if (error)
 			return (error);
 		error = fget(td, args->fd,
@@ -3293,7 +3293,7 @@ linux_ioctl_v4l2(struct thread *td, struct linux_ioctl_args *args)
 			    td->td_ucred, td);
 		bsd_to_linux_v4l2_buffer(&vbuf, &l_vbuf);
 		if (error == 0)
-			error = copyout(&l_vbuf, (void *)args->arg,
+			error = copyout(&l_vbuf, __USER_CAP(args->arg, sizeof(l_vbuf)),
 			    sizeof(l_vbuf));
 		fdrop(fp, td);
 		return (error);
@@ -3475,7 +3475,7 @@ linux_ioctl_evdev(struct thread *td, struct linux_ioctl_args *args)
 		args->cmd = EVIOCRMFF;
 		break;
 	case EVIOCSCLOCKID: {
-		error = copyin(PTRIN(args->arg), &clock, sizeof(clock));
+		error = copyin(__USER_CAP(args->arg, sizeof(clock)), &clock, sizeof(clock));
 		if (error != 0)
 			return (error);
 		if (clock & ~(LINUX_IOCTL_EVDEV_CLK))

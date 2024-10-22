@@ -814,11 +814,11 @@ int
 linux_sys_futex(struct thread *td, struct linux_sys_futex_args *args)
 {
 	struct linux_futex_args fargs = {
-		.uaddr = args->uaddr,
+		.uaddr = __USER_CAP_UNBOUND(args->uaddr),
 		.op = args->op,
 		.val = args->val,
 		.ts = NULL,
-		.uaddr2 = args->uaddr2,
+		.uaddr2 = __USER_CAP_UNBOUND(args->uaddr2),
 		.val3 = args->val3,
 		.val3_compare = true,
 	};
@@ -838,8 +838,8 @@ linux_sys_futex(struct thread *td, struct linux_sys_futex_args *args)
 		break;
 	default:
 		// LINUX_FUTEX_CMD is not the four mentioned above
-		// fromcap directly without copying in the timespec
-		fargs.ts = (__cheri_fromcap void *)PTRIN(args->timeout);
+		// copy directly without copying in the timespec
+		fargs.ts = PTRIN(args->timeout);
 	}
 	return (linux_futex(td, &fargs));
 }
@@ -850,11 +850,11 @@ linux_sys_futex_time64(struct thread *td,
     struct linux_sys_futex_time64_args *args)
 {
 	struct linux_futex_args fargs = {
-		.uaddr = args->uaddr,
+		.uaddr = __USER_CAP_UNBOUND(args->uaddr),
 		.op = args->op,
 		.val = args->val,
 		.ts = NULL,
-		.uaddr2 = args->uaddr2,
+		.uaddr2 = __USER_CAP_UNBOUND(args->uaddr2),
 		.val3 = args->val3,
 		.val3_compare = true,
 	};
@@ -888,7 +888,7 @@ linux_set_robust_list(struct thread *td, struct linux_set_robust_list_args *args
 		return (EINVAL);
 
 	em = em_find(td);
-	em->robust_futexes = args->head;
+	em->robust_futexes = __USER_CAP_OBJ(args->head);
 
 	return (0);
 }
@@ -930,11 +930,11 @@ linux_get_robust_list(struct thread *td, struct linux_get_robust_list_args *args
 	}
 
 	len = sizeof(struct linux_robust_list_head);
-	error = copyout(&len, args->len, sizeof(l_size_t));
+	error = copyout(&len, __USER_CAP_OBJ(args->len), sizeof(l_size_t));
 	if (error != 0)
 		return (EFAULT);
 
-	return (copyout(&head, args->head, sizeof(l_uintptr_t)));
+	return (copyout(&head, __USER_CAP_OBJ(args->head), sizeof(l_uintptr_t)));
 }
 
 static int
@@ -999,6 +999,7 @@ retry:
 	return (0);
 }
 
+// TODO: This is probably wrong...
 static int
 fetch_robust_entry(struct linux_robust_list * __capability *entry,
     struct linux_robust_list * __capability * __capability head, unsigned int *pi)
@@ -1034,7 +1035,7 @@ release_futexes(struct thread *td, struct linux_emuldata *em)
 	if (head == NULL)
 		return;
 
-	if (fetch_robust_entry(&entry, PTRIN(&head->list.next), &pi))
+	if (fetch_robust_entry(&entry, (void * __capability)(&head->list.next), &pi))
 		return;
 
 	error = copyin(&head->futex_offset, &futex_offset,
@@ -1042,11 +1043,11 @@ release_futexes(struct thread *td, struct linux_emuldata *em)
 	if (error != 0)
 		return;
 
-	if (fetch_robust_entry(&pending, PTRIN(&head->pending_list), &pip))
+	if (fetch_robust_entry(&pending, (void * __capability)(&head->pending_list), &pip))
 		return;
 
 	while (entry != &head->list) {
-		error = fetch_robust_entry(&next_entry, PTRIN(&entry->next),
+		error = fetch_robust_entry(&next_entry, (void * __capability)(&entry->next),
 		    &next_pi);
 
 		/*

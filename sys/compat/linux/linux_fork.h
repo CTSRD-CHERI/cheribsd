@@ -96,7 +96,7 @@ struct l_clone_args {
 #define	LINUX_CLONE_ARGS_SIZE_VER0	64
 
 int linux_set_upcall(struct thread *, register_t);
-int linux_set_cloned_tls(struct thread *, void * __capability);
+int linux_set_cloned_tls(struct thread *, void *);
 void linux_thread_detach(struct thread *);
 #endif /* defined(_KERNEL) */
 

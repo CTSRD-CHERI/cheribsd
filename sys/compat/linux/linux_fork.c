@@ -360,8 +360,8 @@ linux_clone(struct thread *td, struct linux_clone_args *args)
 {
 	struct l_clone_args ca = {
 		.flags = (lower_32_bits(args->flags) & ~LINUX_CSIGNAL),
-		.child_tid = args->child_tidptr,
-		.parent_tid = args->parent_tidptr,
+		.child_tid = __USER_CAP_OBJ(args->child_tidptr),
+		.parent_tid = __USER_CAP_OBJ(args->parent_tidptr),
 		.exit_signal = (lower_32_bits(args->flags) & LINUX_CSIGNAL),
 		.stack = args->stack,
 		.tls = args->tls,
@@ -446,7 +446,7 @@ linux_clone3(struct thread *td, struct linux_clone3_args *args)
 	 */
 	size = max(args->usize, sizeof(*uca));
 	uca = malloc(size, M_LINUX, M_WAITOK | M_ZERO);
-	error = copyin(args->uargs, uca, args->usize);
+	error = copyin(__USER_CAP(args->uargs, args->usize), uca, args->usize);
 	if (error != 0)
 		goto out;
 	error = linux_clone3_args_valid(uca);
@@ -454,8 +454,8 @@ linux_clone3(struct thread *td, struct linux_clone3_args *args)
 		goto out;
 	ca = malloc(sizeof(*ca), M_LINUX, M_WAITOK | M_ZERO);
 	ca->flags = uca->flags;
-	ca->child_tid = PTRIN(uca->child_tid);
-	ca->parent_tid = PTRIN(uca->parent_tid);
+	ca->child_tid = __USER_CAP(uca->child_tid, sizeof(l_int));
+	ca->parent_tid = __USER_CAP(uca->parent_tid, sizeof(l_int));
 	ca->exit_signal = uca->exit_signal;
 	ca->stack = uca->stack + uca->stack_size;
 	ca->stack_size = uca->stack_size;
@@ -500,7 +500,7 @@ linux_set_tid_address(struct thread *td, struct linux_set_tid_address_args *args
 	em = em_find(td);
 	KASSERT(em != NULL, ("set_tid_address: emuldata not found.\n"));
 
-	em->child_clear_tid = args->tidptr;
+	em->child_clear_tid = __USER_CAP_OBJ(args->tidptr);
 
 	td->td_retval[0] = em->em_tid;
 

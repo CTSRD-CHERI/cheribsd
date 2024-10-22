@@ -77,6 +77,7 @@ ENTRY(futex_xchgl)
 	SET_FAULT_HANDLER(PTR(9), PTR(4))	/* And set it */
 	ENTER_USER_ACCESS(w9, PTR(4))
 	mov	w5, #LINUX_FUTEX_MAX_LOOPS
+	ENTER_C64
 	prfm	pstl1strm, [CAP(1)]
 	mov	w6, w0			/* Save oparg */
 1:	ldxr	w4, [CAP(1)]		/* Load oldval from uaddr */
@@ -86,6 +87,7 @@ ENTRY(futex_xchgl)
 	cbnz	w5, 1b			/* Loop */
 	mov	x0, #EAGAIN		/* Store of newval failed */
 3:	dmb	ish
+	EXIT_C64
 	EXIT_USER_ACCESS(w9)
 	SET_FAULT_HANDLER(xzr, PTR(9))	/* Reset the fault handler */
 	str w4, [CAP(2)]		/* Store oldval */
@@ -103,6 +105,7 @@ ENTRY(futex_addl)
 	SET_FAULT_HANDLER(PTR(9), PTR(4))
 	ENTER_USER_ACCESS(w9, PTR(4))
 	mov	w5, #LINUX_FUTEX_MAX_LOOPS
+	ENTER_C64
 	prfm	pstl1strm, [CAP(1)]
 	mov	w6, w0
 1:	ldxr	w4, [CAP(1)]
@@ -113,6 +116,7 @@ ENTRY(futex_addl)
 	cbnz	w5, 1b
 	mov	x0, #EAGAIN
 3:	dmb	ish
+	EXIT_C64
 	EXIT_USER_ACCESS(w9)
 	SET_FAULT_HANDLER(xzr, PTR(9))
 	str w4, [CAP(2)]
@@ -130,6 +134,7 @@ ENTRY(futex_orl)
 	SET_FAULT_HANDLER(PTR(9), PTR(4))
 	ENTER_USER_ACCESS(w9, PTR(4))
 	mov	w5, #LINUX_FUTEX_MAX_LOOPS
+	ENTER_C64
 	prfm	pstl1strm, [CAP(1)]
 	mov	w6, w0
 1:	ldxr	w4, [CAP(1)]
@@ -140,6 +145,7 @@ ENTRY(futex_orl)
 	cbnz	w5, 1b
 	mov	x0, #EAGAIN
 3:	dmb	ish
+	EXIT_C64
 	EXIT_USER_ACCESS(w9)
 	SET_FAULT_HANDLER(xzr, PTR(9))
 	str w4, [CAP(2)]
@@ -157,6 +163,7 @@ ENTRY(futex_andl)
 	SET_FAULT_HANDLER(PTR(9), PTR(4))
 	ENTER_USER_ACCESS(w9, PTR(4))
 	mov	w5, #LINUX_FUTEX_MAX_LOOPS
+	ENTER_C64
 	prfm	pstl1strm, [CAP(1)]
 	mov	w6, w0
 1:	ldxr	w4, [CAP(1)]
@@ -167,6 +174,7 @@ ENTRY(futex_andl)
 	cbnz	w5, 1b
 	mov	x0, #EAGAIN
 3:	dmb	ish
+	EXIT_C64
 	EXIT_USER_ACCESS(w9)
 	SET_FAULT_HANDLER(xzr, PTR(9))
 	str w4, [CAP(2)]
@@ -184,6 +192,7 @@ ENTRY(futex_xorl)
 	SET_FAULT_HANDLER(PTR(9), PTR(4))
 	ENTER_USER_ACCESS(w9, PTR(4))
 	mov	w5, #LINUX_FUTEX_MAX_LOOPS
+	ENTER_C64
 	prfm	pstl1strm, [CAP(1)]
 	mov	w6, w0
 1:	ldxr	w4, [CAP(1)]
@@ -194,6 +203,7 @@ ENTRY(futex_xorl)
 	cbnz	w5, 1b
 	mov	x0, #EAGAIN
 3:	dmb	ish
+	EXIT_C64
 	EXIT_USER_ACCESS(w9)
 	SET_FAULT_HANDLER(xzr, PTR(9))
 	str w4, [CAP(2)]

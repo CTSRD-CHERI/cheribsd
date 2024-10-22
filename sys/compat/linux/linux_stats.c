@@ -138,7 +138,7 @@ linux_kern_lstat(struct thread *td, const char * __capability path,
 #endif
 
 static int
-newstat_copyout(struct stat *buf, void * __capability ubuf)
+newstat_copyout(struct stat *buf, void *ubuf)
 {
 	struct l_newstat tbuf;
 
@@ -160,7 +160,7 @@ newstat_copyout(struct stat *buf, void * __capability ubuf)
 	tbuf.st_blksize = buf->st_blksize;
 	tbuf.st_blocks = buf->st_blocks;
 
-	return (copyout(&tbuf, ubuf, sizeof(tbuf)));
+	return (copyout(&tbuf, __USER_CAP(ubuf, sizeof(tbuf)), sizeof(tbuf)));
 }
 
 
@@ -239,7 +239,7 @@ old_stat_copyout(struct stat *buf, void *ubuf)
 	lbuf.st_flags = buf->st_flags;
 	lbuf.st_gen = buf->st_gen;
 
-	return (copyout(&lbuf, ubuf, sizeof(lbuf)));
+	return (copyout(&lbuf, __USER_CAP(ubuf, sizeof(lbuf)), sizeof(lbuf)));
 }
 
 int
@@ -392,7 +392,7 @@ linux_statfs(struct thread *td, struct linux_statfs_args *args)
 	free(bsd_statfs, M_STATFS);
 	if (error != 0)
 		return (error);
-	return (copyout(&linux_statfs, args->buf, sizeof(linux_statfs)));
+	return (copyout(&linux_statfs, __USER_CAP(args->buf, sizeof(linux_statfs)), sizeof(linux_statfs)));
 }
 
 #if defined(__i386__) || (defined(__amd64__) && defined(COMPAT_LINUX32))
@@ -433,7 +433,7 @@ linux_statfs64(struct thread *td, struct linux_statfs64_args *args)
 	free(bsd_statfs, M_STATFS);
 	if (error != 0)
 		return (error);
-	return (copyout(&linux_statfs, args->buf, sizeof(linux_statfs)));
+	return (copyout(&linux_statfs, __USER_CAP(args->buf, sizeof(linux_statfs)), sizeof(linux_statfs)));
 }
 
 int
@@ -453,7 +453,7 @@ linux_fstatfs64(struct thread *td, struct linux_fstatfs64_args *args)
 	free(bsd_statfs, M_STATFS);
 	if (error != 0)
 		return (error);
-	return (copyout(&linux_statfs, args->buf, sizeof(linux_statfs)));
+	return (copyout(&linux_statfs, __USER_CAP(args->buf, sizeof(linux_statfs)), sizeof(linux_statfs)));
 }
 #endif /* __i386__ || (__amd64__ && COMPAT_LINUX32) */
 
@@ -471,7 +471,7 @@ linux_fstatfs(struct thread *td, struct linux_fstatfs_args *args)
 	free(bsd_statfs, M_STATFS);
 	if (error != 0)
 		return (error);
-	return (copyout(&linux_statfs, args->buf, sizeof(linux_statfs)));
+	return (copyout(&linux_statfs, __USER_CAP(args->buf, sizeof(linux_statfs)), sizeof(linux_statfs)));
 }
 
 struct l_ustat
@@ -524,7 +524,7 @@ stat64_copyout(struct stat *buf, void *ubuf)
 	 */
 	lbuf.__st_ino = buf->st_ino;
 
-	return (copyout(&lbuf, ubuf, sizeof(lbuf)));
+	return (copyout(&lbuf, __USER_CAP(ubuf, sizeof(lbuf)), sizeof(lbuf)));
 }
 
 int
@@ -690,7 +690,7 @@ statx_copyout(struct stat *buf, void *ubuf)
 	tbuf.stx_dev_major = linux_encode_major(buf->st_dev);
 	tbuf.stx_dev_minor = linux_encode_minor(buf->st_dev);
 
-	return (copyout(&tbuf, ubuf, sizeof(tbuf)));
+	return (copyout(&tbuf, __USER_CAP(ubuf, sizeof(tbuf)), sizeof(tbuf)));
 }
 
 int
@@ -712,7 +712,7 @@ linux_statx(struct thread *td, struct linux_statx_args *args)
 	    AT_EMPTY_PATH : 0;
 
 	dirfd = (args->dirfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dirfd;
-	error = linux_kern_statat(td, flags, dirfd, args->pathname,
+	error = linux_kern_statat(td, flags, dirfd, __USER_CAP_PATH(args->pathname),
 	    UIO_USERSPACE, &buf);
 	if (error == 0)
 		error = statx_copyout(&buf, args->statxbuf);

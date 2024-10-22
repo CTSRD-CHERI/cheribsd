@@ -121,7 +121,7 @@ static int	linux_utimensat_lts64_to_ts(struct l_timespec64 *,
 			struct timespec *);
 #endif
 static int	linux_common_utimensat(struct thread *, int,
-			const char *, struct timespec *, int);
+			const char * __capability, struct timespec * __capability, int);
 static int	linux_common_pselect6(struct thread *, l_int,
 			l_fd_set *, l_fd_set *, l_fd_set *,
 			struct timespec *, l_uintptr_t *);
@@ -178,7 +178,7 @@ linux_sysinfo(struct thread *td, struct linux_sysinfo_args *args)
 
 	sysinfo.mem_unit = 1;
 
-	return (copyout(&sysinfo, args->info, sizeof(sysinfo)));
+	return (copyout(&sysinfo, __USER_CAP_OBJ(args->info), sizeof(sysinfo)));
 }
 
 #ifdef LINUX_LEGACY_SYSCALLS
@@ -243,7 +243,7 @@ linux_select(struct thread *td, struct linux_select_args *args)
 	 * time left.
 	 */
 	if (args->timeout) {
-		if ((error = copyin(args->timeout, &ltv, sizeof(ltv))))
+		if ((error = copyin(__USER_CAP_OBJ(args->timeout), &ltv, sizeof(ltv))))
 			goto select_out;
 		utv.tv_sec = ltv.tv_sec;
 		utv.tv_usec = ltv.tv_usec;
@@ -290,7 +290,7 @@ linux_select(struct thread *td, struct linux_select_args *args)
 			timevalclear(&utv);
 		ltv.tv_sec = utv.tv_sec;
 		ltv.tv_usec = utv.tv_usec;
-		if ((error = copyout(&ltv, args->timeout, sizeof(ltv))))
+		if ((error = copyout(&ltv, __USER_CAP_OBJ(args->timeout), sizeof(ltv))))
 			goto select_out;
 	}
 
@@ -393,7 +393,7 @@ linux_time(struct thread *td, struct linux_time_args *args)
 
 	microtime(&tv);
 	tm = tv.tv_sec;
-	if (args->tm && (error = copyout(&tm, args->tm, sizeof(tm))))
+	if (args->tm && (error = copyout(&tm, __USER_CAP_OBJ(args->tm), sizeof(tm))))
 		return (error);
 	td->td_retval[0] = tm;
 	return (0);
@@ -443,7 +443,7 @@ linux_times(struct thread *td, struct linux_times_args *args)
 		tms.tms_cutime = CONVTCK(cutime);
 		tms.tms_cstime = CONVTCK(cstime);
 
-		if ((error = copyout(&tms, args->buf, sizeof(tms))))
+		if ((error = copyout(&tms, __USER_CAP_OBJ(args->buf), sizeof(tms))))
 			return (error);
 	}
 
@@ -493,7 +493,7 @@ linux_newuname(struct thread *td, struct linux_newuname_args *args)
 	strlcpy(utsname.machine, "i686", LINUX_MAX_UTSNAME);
 #endif
 
-	return (copyout(&utsname, args->buf, sizeof(utsname)));
+	return (copyout(&utsname, __USER_CAP_OBJ(args->buf), sizeof(utsname)));
 }
 
 struct l_utimbuf {
@@ -510,7 +510,7 @@ linux_utime(struct thread *td, struct linux_utime_args *args)
 	int error;
 
 	if (args->times) {
-		if ((error = copyin(args->times, &lut, sizeof lut)) != 0)
+		if ((error = copyin(__USER_CAP_OBJ(args->times), &lut, sizeof lut)) != 0)
 			return (error);
 		tv[0].tv_sec = lut.l_actime;
 		tv[0].tv_usec = 0;
@@ -534,7 +534,7 @@ linux_utimes(struct thread *td, struct linux_utimes_args *args)
 	int error;
 
 	if (args->tptr != NULL) {
-		if ((error = copyin(args->tptr, ltv, sizeof ltv)) != 0)
+		if ((error = copyin(__USER_CAP_OBJ(args->tptr), ltv, sizeof ltv)) != 0)
 			return (error);
 		tv[0].tv_sec = ltv[0].tv_sec;
 		tv[0].tv_usec = ltv[0].tv_usec;
@@ -612,11 +612,11 @@ int
 linux_utimensat(struct thread *td, struct linux_utimensat_args *args)
 {
 	struct l_timespec l_times[2];
-	struct timespec times[2], *timesp;
+	struct timespec times[2], * __capability timesp;
 	int error;
 
 	if (args->times != NULL) {
-		error = copyin(args->times, l_times, sizeof(l_times));
+		error = copyin(__USER_CAP(args->times, sizeof(l_times)), l_times, sizeof(l_times));
 		if (error != 0)
 			return (error);
 
@@ -630,7 +630,7 @@ linux_utimensat(struct thread *td, struct linux_utimensat_args *args)
 	} else
 		timesp = NULL;
 
-	return (linux_common_utimensat(td, args->dfd, args->pathname,
+	return (linux_common_utimensat(td, args->dfd, __USER_CAP_PATH(args->pathname),
 	    timesp, args->flags));
 }
 
@@ -667,11 +667,11 @@ int
 linux_utimensat_time64(struct thread *td, struct linux_utimensat_time64_args *args)
 {
 	struct l_timespec64 l_times[2];
-	struct timespec times[2], *timesp;
+	struct timespec times[2], * __capability timesp;
 	int error;
 
 	if (args->times64 != NULL) {
-		error = copyin(args->times64, l_times, sizeof(l_times));
+		error = copyin(__USER_CAP(args->times64, sizeof(l_times)), l_times, sizeof(l_times));
 		if (error != 0)
 			return (error);
 
@@ -685,7 +685,7 @@ linux_utimensat_time64(struct thread *td, struct linux_utimensat_time64_args *ar
 	} else
 		timesp = NULL;
 
-	return (linux_common_utimensat(td, args->dfd, args->pathname,
+	return (linux_common_utimensat(td, args->dfd, __USER_CAP_PATH(args->pathname),
 	    timesp, args->flags));
 }
 #endif /* __i386__ || (__amd64__ && COMPAT_LINUX32) */
@@ -701,7 +701,7 @@ linux_futimesat(struct thread *td, struct linux_futimesat_args *args)
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
 
 	if (args->utimes != NULL) {
-		if ((error = copyin(args->utimes, ltv, sizeof ltv)) != 0)
+		if ((error = copyin(__USER_CAP(args->utimes, sizeof ltv), ltv, sizeof ltv)) != 0)
 			return (error);
 		tv[0].tv_sec = ltv[0].tv_sec;
 		tv[0].tv_usec = ltv[0].tv_usec;
@@ -744,14 +744,14 @@ linux_common_wait(struct thread *td, idtype_t idtype, int id, int *statusp,
 		} else if (WIFCONTINUED(tmpstat)) {
 			tmpstat = 0xffff;
 		}
-		error = copyout(&tmpstat, statusp, sizeof(int));
+		error = copyout(&tmpstat, __USER_CAP_OBJ(statusp), sizeof(int));
 	}
 	if (error == 0 && rup != NULL)
-		error = linux_copyout_rusage(&wru.wru_self, rup);
+		error = linux_copyout_rusage(&wru.wru_self, __USER_CAP(rup, sizeof(struct rusage)));
 	if (error == 0 && infop != NULL && td->td_retval[0] != 0) {
 		sig = bsd_to_linux_signal(siginfo.si_signo);
 		siginfo_to_lsiginfo(&siginfo, &lsi, sig);
-		error = copyout(&lsi, infop, sizeof(lsi));
+		error = copyout(&lsi, __USER_CAP_OBJ(infop), sizeof(lsi));
 	}
 
 	return (error);
@@ -916,13 +916,13 @@ linux_mknodat(struct thread *td, struct linux_mknodat_args *args)
 	switch (args->mode & S_IFMT) {
 	case S_IFIFO:
 	case S_IFSOCK:
-		error = kern_mkfifoat(td, dfd, args->filename, UIO_USERSPACE,
+		error = kern_mkfifoat(td, dfd, __USER_CAP_PATH(args->filename), UIO_USERSPACE,
 		    args->mode);
 		break;
 
 	case S_IFCHR:
 	case S_IFBLK:
-		error = kern_mknodat(td, dfd, args->filename, UIO_USERSPACE,
+		error = kern_mknodat(td, dfd, __USER_CAP_PATH(args->filename), UIO_USERSPACE,
 		    args->mode, linux_decode_dev(args->dev));
 		break;
 
@@ -934,7 +934,7 @@ linux_mknodat(struct thread *td, struct linux_mknodat_args *args)
 		args->mode |= S_IFREG;
 		/* FALLTHROUGH */
 	case S_IFREG:
-		error = kern_openat(td, dfd, args->filename, UIO_USERSPACE,
+		error = kern_openat(td, dfd, __USER_CAP_PATH(args->filename), UIO_USERSPACE,
 		    O_WRONLY | O_CREAT | O_TRUNC, args->mode);
 		if (error == 0)
 			kern_close(td, td->td_retval[0]);
@@ -991,7 +991,7 @@ linux_setitimer(struct thread *td, struct linux_setitimer_args *uap)
 		return (linux_getitimer(td, (struct linux_getitimer_args *)uap));
 	}
 
-	error = copyin(uap->itv, &ls, sizeof(ls));
+	error = copyin(__USER_CAP_OBJ(uap->itv), &ls, sizeof(ls));
 	if (error != 0)
 		return (error);
 	B2L_ITIMERVAL(&aitv, &ls);
@@ -1000,7 +1000,7 @@ linux_setitimer(struct thread *td, struct linux_setitimer_args *uap)
 		return (error);
 	B2L_ITIMERVAL(&ls, &oitv);
 
-	return (copyout(&ls, uap->oitv, sizeof(ls)));
+	return (copyout(&ls, __USER_CAP_OBJ(uap->oitv), sizeof(ls)));
 }
 
 int
@@ -1014,7 +1014,7 @@ linux_getitimer(struct thread *td, struct linux_getitimer_args *uap)
 	if (error != 0)
 		return (error);
 	B2L_ITIMERVAL(&ls, &aitv);
-	return (copyout(&ls, uap->itv, sizeof(ls)));
+	return (copyout(&ls, __USER_CAP_OBJ(uap->itv), sizeof(ls)));
 }
 
 #if defined(__i386__) || (defined(__amd64__) && defined(COMPAT_LINUX32))
@@ -1039,7 +1039,7 @@ linux_setgroups(struct thread *td, struct linux_setgroups_args *args)
 	if (ngrp < 0 || ngrp >= ngroups_max + 1)
 		return (EINVAL);
 	linux_gidset = malloc(ngrp * sizeof(*linux_gidset), M_LINUX, M_WAITOK);
-	error = copyin(args->grouplist, linux_gidset, ngrp * sizeof(l_gid_t));
+	error = copyin(__USER_CAP_ARRAY(args->grouplist, ngrp), linux_gidset, ngrp * sizeof(l_gid_t));
 	if (error)
 		goto out;
 	newcred = crget();
@@ -1117,7 +1117,7 @@ linux_getgroups(struct thread *td, struct linux_getgroups_args *args)
 		ngrp++;
 	}
 
-	error = copyout(linux_gidset, args->grouplist, ngrp * sizeof(l_gid_t));
+	error = copyout(linux_gidset, __USER_CAP_ARRAY(args->grouplist, ngrp), ngrp * sizeof(l_gid_t));
 	free(linux_gidset, M_LINUX);
 	if (error)
 		return (error);
@@ -1183,7 +1183,7 @@ linux_setrlimit(struct thread *td, struct linux_setrlimit_args *args)
 	if (which == -1)
 		return (EINVAL);
 
-	error = copyin(args->rlim, &rlim, sizeof(rlim));
+	error = copyin(__USER_CAP_OBJ(args->rlim), &rlim, sizeof(rlim));
 	if (error)
 		return (error);
 
@@ -1203,7 +1203,7 @@ linux_old_getrlimit(struct thread *td, struct linux_old_getrlimit_args *args)
 	if (linux_get_dummy_limit(td, args->resource, &bsd_rlim)) {
 		rlim.rlim_cur = bsd_rlim.rlim_cur;
 		rlim.rlim_max = bsd_rlim.rlim_max;
-		return (copyout(&rlim, args->rlim, sizeof(rlim)));
+		return (copyout(&rlim, __USER_CAP_OBJ(args->rlim), sizeof(rlim)));
 	}
 
 	if (args->resource >= LINUX_RLIM_NLIMITS)
@@ -1230,7 +1230,7 @@ linux_old_getrlimit(struct thread *td, struct linux_old_getrlimit_args *args)
 	if (rlim.rlim_max == ULONG_MAX)
 		rlim.rlim_max = LONG_MAX;
 #endif
-	return (copyout(&rlim, args->rlim, sizeof(rlim)));
+	return (copyout(&rlim, __USER_CAP_OBJ(args->rlim), sizeof(rlim)));
 }
 #endif /* __i386__ || (__amd64__ && COMPAT_LINUX32) */
 
@@ -1244,7 +1244,7 @@ linux_getrlimit(struct thread *td, struct linux_getrlimit_args *args)
 	if (linux_get_dummy_limit(td, args->resource, &bsd_rlim)) {
 		rlim.rlim_cur = bsd_rlim.rlim_cur;
 		rlim.rlim_max = bsd_rlim.rlim_max;
-		return (copyout(&rlim, args->rlim, sizeof(rlim)));
+		return (copyout(&rlim, __USER_CAP_OBJ(args->rlim), sizeof(rlim)));
 	}
 
 	if (args->resource >= LINUX_RLIM_NLIMITS)
@@ -1258,7 +1258,7 @@ linux_getrlimit(struct thread *td, struct linux_getrlimit_args *args)
 
 	rlim.rlim_cur = (l_ulong)bsd_rlim.rlim_cur;
 	rlim.rlim_max = (l_ulong)bsd_rlim.rlim_max;
-	return (copyout(&rlim, args->rlim, sizeof(rlim)));
+	return (copyout(&rlim, __USER_CAP_OBJ(args->rlim), sizeof(rlim)));
 }
 
 int
@@ -1283,7 +1283,7 @@ linux_sched_setscheduler(struct thread *td,
 		return (EINVAL);
 	}
 
-	error = copyin(args->param, &sched_param, sizeof(sched_param));
+	error = copyin(__USER_CAP_OBJ(args->param), &sched_param, sizeof(sched_param));
 	if (error)
 		return (error);
 
@@ -1541,7 +1541,7 @@ linux_sethostname(struct thread *td, struct linux_sethostname_args *args)
 
 	name[0] = CTL_KERN;
 	name[1] = KERN_HOSTNAME;
-	return (userland_sysctl(td, name, 2, 0, 0, 0, args->hostname,
+	return (userland_sysctl(td, name, 2, 0, 0, 0, __USER_CAP(args->hostname, args->len),
 	    args->len, 0, 0));
 }
 
@@ -1552,7 +1552,7 @@ linux_setdomainname(struct thread *td, struct linux_setdomainname_args *args)
 
 	name[0] = CTL_KERN;
 	name[1] = KERN_NISDOMAINNAME;
-	return (userland_sysctl(td, name, 2, 0, 0, 0, args->name,
+	return (userland_sysctl(td, name, 2, 0, 0, 0, __USER_CAP(args->name, args->len),
 	    args->len, 0, 0));
 }
 
@@ -1597,7 +1597,7 @@ linux_capget(struct thread *td, struct linux_capget_args *uap)
 	if (uap->hdrp == NULL)
 		return (EFAULT);
 
-	error = copyin(uap->hdrp, &luch, sizeof(luch));
+	error = copyin(__USER_CAP_OBJ(uap->hdrp), &luch, sizeof(luch));
 	if (error != 0)
 		return (error);
 
@@ -1611,7 +1611,7 @@ linux_capget(struct thread *td, struct linux_capget_args *uap)
 		break;
 	default:
 		luch.version = _LINUX_CAPABILITY_VERSION_1;
-		error = copyout(&luch, uap->hdrp, sizeof(luch));
+		error = copyout(&luch, __USER_CAP_OBJ(uap->hdrp), sizeof(luch));
 		if (error)
 			return (error);
 		return (EINVAL);
@@ -1628,7 +1628,7 @@ linux_capget(struct thread *td, struct linux_capget_args *uap)
 		 * to request.
 		 */
 		memset(&lucd, 0, u32s * sizeof(lucd[0]));
-		error = copyout(&lucd, uap->datap, u32s * sizeof(lucd[0]));
+		error = copyout(&lucd, __USER_CAP_ARRAY(uap->datap, u32s), u32s * sizeof(lucd[0]));
 	}
 
 	return (error);
@@ -1644,7 +1644,7 @@ linux_capset(struct thread *td, struct linux_capset_args *uap)
 	if (uap->hdrp == NULL || uap->datap == NULL)
 		return (EFAULT);
 
-	error = copyin(uap->hdrp, &luch, sizeof(luch));
+	error = copyin(__USER_CAP_OBJ(uap->hdrp), &luch, sizeof(luch));
 	if (error != 0)
 		return (error);
 
@@ -1658,7 +1658,7 @@ linux_capset(struct thread *td, struct linux_capset_args *uap)
 		break;
 	default:
 		luch.version = _LINUX_CAPABILITY_VERSION_1;
-		error = copyout(&luch, uap->hdrp, sizeof(luch));
+		error = copyout(&luch, __USER_CAP_OBJ(uap->hdrp), sizeof(luch));
 		if (error)
 			return (error);
 		return (EINVAL);
@@ -1667,7 +1667,7 @@ linux_capset(struct thread *td, struct linux_capset_args *uap)
 	if (luch.pid)
 		return (EPERM);
 
-	error = copyin(uap->datap, &lucd, u32s * sizeof(lucd[0]));
+	error = copyin(__USER_CAP_ARRAY(uap->datap, u32s), &lucd, u32s * sizeof(lucd[0]));
 	if (error != 0)
 		return (error);
 
@@ -1709,7 +1709,7 @@ linux_prctl(struct thread *td, struct linux_prctl_args *args)
 			return (error);
 		pdeath_signal = bsd_to_linux_signal(pdeath_signal);
 		return (copyout(&pdeath_signal,
-		    (void *)args->arg2,
+		    __USER_CAP(args->arg2, sizeof(pdeath_signal)),
 		    sizeof(pdeath_signal)));
 	/*
 	 * In Linux, this flag controls if set[gu]id processes can coredump.
@@ -1774,7 +1774,7 @@ linux_prctl(struct thread *td, struct linux_prctl_args *args)
 		 * check on copyout.
 		 */
 		max_size = MIN(sizeof(comm), sizeof(p->p_comm));
-		error = copyinstr((void *)args->arg2, comm,
+		error = copyinstr(__USER_CAP(args->arg2, max_size), comm,
 		    max_size, NULL);
 
 		/* Linux silently truncates the name if it is too long. */
@@ -1785,7 +1785,7 @@ linux_prctl(struct thread *td, struct linux_prctl_args *args)
 			 * safe side. This should be changed in case
 			 * copyinstr() is changed to guarantee this.
 			 */
-			error = copyin((void *)args->arg2, comm,
+			error = copyin(__USER_CAP(args->arg2, max_size - 1), comm,
 			    max_size - 1);
 			comm[max_size - 1] = '\0';
 		}
@@ -1800,7 +1800,7 @@ linux_prctl(struct thread *td, struct linux_prctl_args *args)
 		PROC_LOCK(p);
 		strlcpy(comm, p->p_comm, sizeof(comm));
 		PROC_UNLOCK(p);
-		error = copyout(comm, (void *)args->arg2,
+		error = copyout(comm, __USER_CAP(args->arg2, strlen(comm) + 1),
 		    strlen(comm) + 1);
 		break;
 	case LINUX_PR_GET_SECCOMP:
@@ -1855,7 +1855,7 @@ linux_sched_setparam(struct thread *td,
 	struct thread *tdt;
 	int error, policy;
 
-	error = copyin(uap->param, &sched_param, sizeof(sched_param));
+	error = copyin(__USER_CAP_OBJ(uap->param), &sched_param, sizeof(sched_param));
 	if (error)
 		return (error);
 
@@ -1945,7 +1945,7 @@ linux_sched_getparam(struct thread *td,
 	} else
 		PROC_UNLOCK(tdt->td_proc);
 
-	error = copyout(&sched_param, uap->param, sizeof(sched_param));
+	error = copyout(&sched_param, __USER_CAP_OBJ(uap->param), sizeof(sched_param));
 	return (error);
 }
 
@@ -1975,7 +1975,7 @@ linux_sched_getaffinity(struct thread *td,
 	if (error == ERANGE)
 		error = EINVAL;
  	if (error == 0)
-		error = copyout(mask, args->user_mask_ptr, size);
+		error = copyout(mask, __USER_CAP(args->user_mask_ptr, size), size);
 	if (error == 0)
 		td->td_retval[0] = size;
 	free(mask, M_LINUX);
@@ -2003,7 +2003,7 @@ linux_sched_setaffinity(struct thread *td,
 
 	len = min(args->len, sizeof(cpuset_t));
 	mask = malloc(sizeof(cpuset_t), M_TEMP, M_WAITOK | M_ZERO);
-	error = copyin(args->user_mask_ptr, mask, len);
+	error = copyin(__USER_CAP(args->user_mask_ptr, len), mask, len);
 	if (error != 0)
 		goto out;
 	/* Linux ignore high bits */
@@ -2039,7 +2039,7 @@ linux_prlimit64(struct thread *td, struct linux_prlimit64_args *args)
 		if (linux_get_dummy_limit(td, args->resource, &rlim)) {
 			lrlim.rlim_cur = rlim.rlim_cur;
 			lrlim.rlim_max = rlim.rlim_max;
-			return (copyout(&lrlim, args->old, sizeof(lrlim)));
+			return (copyout(&lrlim, __USER_CAP(args->old, sizeof(lrlim)), sizeof(lrlim)));
 		}
 	}
 
@@ -2056,7 +2056,7 @@ linux_prlimit64(struct thread *td, struct linux_prlimit64_args *args)
 		 * rlim is unsigned 64-bit. FreeBSD treats negative limits
 		 * as INFINITY so we do not need a conversion even.
 		 */
-		error = copyin(args->new, &nrlim, sizeof(nrlim));
+		error = copyin(__USER_CAP_OBJ(args->new), &nrlim, sizeof(nrlim));
 		if (error != 0)
 			return (error);
 	}
@@ -2086,7 +2086,7 @@ linux_prlimit64(struct thread *td, struct linux_prlimit64_args *args)
 			lrlim.rlim_max = LINUX_RLIM_INFINITY;
 		else
 			lrlim.rlim_max = rlim.rlim_max;
-		error = copyout(&lrlim, args->old, sizeof(lrlim));
+		error = copyout(&lrlim, __USER_CAP(args->old, sizeof(lrlim)), sizeof(lrlim));
 		if (error != 0)
 			goto out;
 	}
@@ -2134,7 +2134,7 @@ linux_common_pselect6(struct thread *td, l_int nfds, l_fd_set *readfds,
 
 	ssp = NULL;
 	if (sig != NULL) {
-		error = copyin(sig, &lpse6, sizeof(lpse6));
+		error = copyin(__USER_CAP(sig, sizeof(lpse6)), &lpse6, sizeof(lpse6));
 		if (error != 0)
 			return (error);
 		error = linux_copyin_sigset(td, PTRIN(lpse6.ss),
@@ -2304,7 +2304,7 @@ linux_pollin(struct thread *td, struct pollfd *fds, struct pollfd *ufds, u_int n
 	int error;
 	u_int i;
 
-	error = copyin(ufds, fds, nfd * sizeof(*fds));
+	error = copyin(__USER_CAP_ARRAY(ufds, nfd), fds, nfd * sizeof(*fds));
 	if (error != 0)
 		return (error);
 
@@ -2497,7 +2497,7 @@ linux_mincore(struct thread *td, struct linux_mincore_args *args)
 int
 linux_syslog(struct thread *td, struct linux_syslog_args *args)
 {
-	char buf[128], *src, *dst;
+	char buf[128], *src, * __capability dst;
 	u_int seq;
 	int buflen, error;
 
@@ -2519,7 +2519,7 @@ linux_syslog(struct thread *td, struct linux_syslog_args *args)
 	msgbuf_peekbytes(msgbufp, NULL, 0, &seq);
 	mtx_unlock(&msgbuf_lock);
 
-	dst = args->buf;
+	dst = __USER_CAP(args->buf, args->len);
 	error = copyout(&SYSLOG_TAG, dst, sizeof(SYSLOG_TAG));
 	/* The -1 is to skip the trailing '\0'. */
 	dst += sizeof(SYSLOG_TAG) - 1;
@@ -2536,14 +2536,14 @@ linux_syslog(struct thread *td, struct linux_syslog_args *args)
 			if (*src == '\0')
 				continue;
 
-			if (dst >= args->buf + args->len)
+			if ((__cheri_addr ptraddr_t)dst >= (ptraddr_t)args->buf + args->len)
 				goto out;
 
 			error = copyout(src, dst, 1);
 			dst++;
 
 			if (*src == '\n' && *(src + 1) != '<' &&
-			    dst + sizeof(SYSLOG_TAG) < args->buf + args->len) {
+			    (__cheri_addr ptraddr_t)dst + sizeof(SYSLOG_TAG) < (ptraddr_t)args->buf + args->len) {
 				error = copyout(&SYSLOG_TAG,
 				    dst, sizeof(SYSLOG_TAG));
 				dst += sizeof(SYSLOG_TAG) - 1;
@@ -2551,7 +2551,7 @@ linux_syslog(struct thread *td, struct linux_syslog_args *args)
 		}
 	}
 out:
-	td->td_retval[0] = dst - args->buf;
+	td->td_retval[0] = (__cheri_addr ptraddr_t)dst - (ptraddr_t)args->buf;
 	return (error);
 }
 
@@ -2565,9 +2565,9 @@ linux_getcpu(struct thread *td, struct linux_getcpu_args *args)
 	node = cpuid_to_pcpu[cpu]->pc_domain;
 
 	if (args->cpu != NULL)
-		error = copyout(&cpu, args->cpu, sizeof(l_int));
+		error = copyout(&cpu, __USER_CAP_OBJ(args->cpu), sizeof(l_int));
 	if (args->node != NULL)
-		error = copyout(&node, args->node, sizeof(l_int));
+		error = copyout(&node, __USER_CAP_OBJ(args->node), sizeof(l_int));
 	return (error);
 }
 
@@ -3024,13 +3024,13 @@ linux_mq_open(struct thread *td, struct linux_mq_open_args *args)
 		return (EINVAL);
 	flags = FFLAGS(flags);
 	if ((flags & O_CREAT) != 0 && args->attr != NULL) {
-		error = copyin(args->attr, &attr, sizeof(attr));
+		error = copyin(__USER_CAP_OBJ(args->attr), &attr, sizeof(attr));
 		if (error != 0)
 			return (error);
 		attr.mq_flags = L2B_MQ_FLAGS(attr.mq_flags);
 	}
 
-	return (kern_kmq_open(td, args->name, flags, args->mode,
+	return (kern_kmq_open(td, __USER_CAP_STR(args->name), flags, args->mode,
 	    args->attr != NULL ? &attr : NULL));
 }
 
@@ -3038,7 +3038,7 @@ int
 linux_mq_unlink(struct thread *td, struct linux_mq_unlink_args *args)
 {
 	struct kmq_unlink_args bsd_args = {
-		.path = PTRIN(args->name)
+		.path = __USER_CAP_STR(args->name)
 	};
 
 	return (sys_kmq_unlink(td, &bsd_args));
@@ -3059,7 +3059,7 @@ linux_mq_timedsend(struct thread *td, struct linux_mq_timedsend_args *args)
 		abs_timeout = &ts;
 	}
 
-	return (kern_kmq_timedsend(td, args->mqd, PTRIN(args->msg_ptr),
+	return (kern_kmq_timedsend(td, args->mqd, __USER_CAP(args->msg_ptr, args->msg_len),
 		args->msg_len, args->msg_prio, abs_timeout));
 }
 
@@ -3078,8 +3078,8 @@ linux_mq_timedreceive(struct thread *td, struct linux_mq_timedreceive_args *args
 		abs_timeout = &ts;
 	}
 
-	return (kern_kmq_timedreceive(td, args->mqd, PTRIN(args->msg_ptr),
-		args->msg_len, args->msg_prio, abs_timeout));
+	return (kern_kmq_timedreceive(td, args->mqd, __USER_CAP(args->msg_ptr, args->msg_len),
+		args->msg_len, __USER_CAP_OBJ(args->msg_prio), abs_timeout));
 }
 
 int
@@ -3092,7 +3092,7 @@ linux_mq_notify(struct thread *td, struct linux_mq_notify_args *args)
 	if (args->sevp == NULL)
 		evp = NULL;
 	else {
-		error = copyin(args->sevp, &l_ev, sizeof(l_ev));
+		error = copyin(__USER_CAP_OBJ(args->sevp), &l_ev, sizeof(l_ev));
 		if (error != 0)
 			return (error);
 		error = linux_convert_l_sigevent(&l_ev, &ev);
@@ -3111,7 +3111,7 @@ linux_mq_getsetattr(struct thread *td, struct linux_mq_getsetattr_args *args)
 	int error;
 
 	if (args->attr != NULL) {
-		error = copyin(args->attr, &attr, sizeof(attr));
+		error = copyin(__USER_CAP_OBJ(args->attr), &attr, sizeof(attr));
 		if (error != 0)
 			return (error);
 		attr.mq_flags = L2B_MQ_FLAGS(attr.mq_flags);
@@ -3122,7 +3122,7 @@ linux_mq_getsetattr(struct thread *td, struct linux_mq_getsetattr_args *args)
 	if (error == 0 && args->oattr != NULL) {
 		oattr.mq_flags = B2L_MQ_FLAGS(oattr.mq_flags);
 		bzero(oattr.__reserved, sizeof(oattr.__reserved));
-		error = copyout(&oattr, args->oattr, sizeof(oattr));
+		error = copyout(&oattr, __USER_CAP_OBJ(args->oattr), sizeof(oattr));
 	}
 
 	return (error);

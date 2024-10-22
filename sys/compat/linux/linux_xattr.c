@@ -131,7 +131,7 @@ static int
 listxattr(struct thread *td, struct listxattr_args *args)
 {
 	char attrname[LINUX_XATTR_NAME_MAX + 1];
-	char * __capability data, *prefix, *key;
+	char * __capability data, *prefix, * __capability key;
 	struct uio auio;
 	struct iovec aiov;
 	unsigned char keylen;
@@ -191,7 +191,7 @@ listxattr(struct thread *td, struct listxattr_args *args)
 			}
 			++key;
 			if (args->list != NULL && args->size > 0) {
-				sprintf(attrname, "%s.%.*s", prefix, keylen, key);
+				sprintf(attrname, "%s.%.*s", prefix, keylen, (__cheri_fromcap char *)key);
 				error = copyout(attrname, args->list, pairlen);
 				if (error != 0)
 					break;
@@ -212,8 +212,8 @@ linux_listxattr(struct thread *td, struct linux_listxattr_args *args)
 {
 	struct listxattr_args eargs = {
 		.fd = -1,
-		.path = args->path,
-		.list = args->list,
+		.path = __USER_CAP_PATH(args->path),
+		.list = __USER_CAP(args->list, args->size),
 		.size = args->size,
 		.follow = FOLLOW,
 	};
@@ -226,8 +226,8 @@ linux_llistxattr(struct thread *td, struct linux_llistxattr_args *args)
 {
 	struct listxattr_args eargs = {
 		.fd = -1,
-		.path = args->path,
-		.list = args->list,
+		.path = __USER_CAP_PATH(args->path),
+		.list = __USER_CAP(args->list, args->size),
 		.size = args->size,
 		.follow = NOFOLLOW,
 	};
@@ -241,7 +241,7 @@ linux_flistxattr(struct thread *td, struct linux_flistxattr_args *args)
 	struct listxattr_args eargs = {
 		.fd = args->fd,
 		.path = NULL,
-		.list = args->list,
+		.list = __USER_CAP(args->list, args->size),
 		.size = args->size,
 		.follow = 0,
 	};
@@ -272,8 +272,8 @@ linux_removexattr(struct thread *td, struct linux_removexattr_args *args)
 {
 	struct removexattr_args eargs = {
 		.fd = -1,
-		.path = args->path,
-		.name = args->name,
+		.path = __USER_CAP_PATH(args->path),
+		.name = __USER_CAP_STR(args->name),
 		.follow = FOLLOW,
 	};
 
@@ -285,8 +285,8 @@ linux_lremovexattr(struct thread *td, struct linux_lremovexattr_args *args)
 {
 	struct removexattr_args eargs = {
 		.fd = -1,
-		.path = args->path,
-		.name = args->name,
+		.path = __USER_CAP_PATH(args->path),
+		.name = __USER_CAP_STR(args->name),
 		.follow = NOFOLLOW,
 	};
 
@@ -299,7 +299,7 @@ linux_fremovexattr(struct thread *td, struct linux_fremovexattr_args *args)
 	struct removexattr_args eargs = {
 		.fd = args->fd,
 		.path = NULL,
-		.name = args->name,
+		.name = __USER_CAP_STR(args->name),
 		.follow = 0,
 	};
 
@@ -329,9 +329,9 @@ linux_getxattr(struct thread *td, struct linux_getxattr_args *args)
 {
 	struct getxattr_args eargs = {
 		.fd = -1,
-		.path = args->path,
-		.name = args->name,
-		.value = args->value,
+		.path = __USER_CAP_PATH(args->path),
+		.name = __USER_CAP_STR(args->name),
+		.value = __USER_CAP(args->value, args->size),
 		.size = args->size,
 		.follow = FOLLOW,
 	};
@@ -344,9 +344,9 @@ linux_lgetxattr(struct thread *td, struct linux_lgetxattr_args *args)
 {
 	struct getxattr_args eargs = {
 		.fd = -1,
-		.path = args->path,
-		.name = args->name,
-		.value = args->value,
+		.path = __USER_CAP_PATH(args->path),
+		.name = __USER_CAP_STR(args->name),
+		.value = __USER_CAP(args->value, args->size),
 		.size = args->size,
 		.follow = NOFOLLOW,
 	};
@@ -360,8 +360,8 @@ linux_fgetxattr(struct thread *td, struct linux_fgetxattr_args *args)
 	struct getxattr_args eargs = {
 		.fd = args->fd,
 		.path = NULL,
-		.name = args->name,
-		.value = args->value,
+		.name = __USER_CAP_STR(args->name),
+		.value = __USER_CAP(args->value, args->size),
 		.size = args->size,
 		.follow = 0,
 	};
@@ -416,9 +416,9 @@ linux_setxattr(struct thread *td, struct linux_setxattr_args *args)
 {
 	struct setxattr_args eargs = {
 		.fd = -1,
-		.path = args->path,
-		.name = args->name,
-		.value = args->value,
+		.path = __USER_CAP_PATH(args->path),
+		.name = __USER_CAP_STR(args->name),
+		.value = __USER_CAP(args->value, args->size),
 		.size = args->size,
 		.flags = args->flags,
 		.follow = FOLLOW,
@@ -432,9 +432,9 @@ linux_lsetxattr(struct thread *td, struct linux_lsetxattr_args *args)
 {
 	struct setxattr_args eargs = {
 		.fd = -1,
-		.path = args->path,
-		.name = args->name,
-		.value = args->value,
+		.path = __USER_CAP_PATH(args->path),
+		.name = __USER_CAP_STR(args->name),
+		.value = __USER_CAP(args->value, args->size),
 		.size = args->size,
 		.flags = args->flags,
 		.follow = NOFOLLOW,
@@ -449,8 +449,8 @@ linux_fsetxattr(struct thread *td, struct linux_fsetxattr_args *args)
 	struct setxattr_args eargs = {
 		.fd = args->fd,
 		.path = NULL,
-		.name = args->name,
-		.value = args->value,
+		.name = __USER_CAP_STR(args->name),
+		.value = __USER_CAP(args->value, args->size),
 		.size = args->size,
 		.flags = args->flags,
 		.follow = 0,

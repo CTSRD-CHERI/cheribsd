@@ -43,7 +43,7 @@ typedef uint32_t	l_uint;
 typedef uint64_t	l_ulong;
 typedef uint16_t	l_ushort;
 
-typedef kuintcap_t	l_uintptr_t;
+typedef uintptr_t	l_uintptr_t;
 typedef l_long		l_clock_t;
 typedef l_int		l_daddr_t;
 typedef l_uint		l_gid_t;
