@@ -68,12 +68,11 @@ Elf_Auxinfo *__auxargs;
  * This restriction only applies to statically linked binaries since the dynamic
  * linker takes care of initialization otherwise.
  */
-void
-_start(void *auxv,
+__dead2 static void
+__start(void *auxv,
 	void (*cleanup)(void),			/* from shared loader */
 	struct Struct_Obj_Entry *obj)		/* from shared loader */
 {
-	__asm__ volatile(".cfi_undefined cra");
 	int argc = 0;
 	char **argv = NULL;
 	char **env = NULL;
@@ -127,4 +126,21 @@ _start(void *auxv,
 	__auxargs = auxv; /* Store the global auxargs pointer */
 
 	__libc_start1(argc, argv, env, cleanup, main, NULL, NULL);
+}
+
+/*
+ * The real entry point _start just sets the unwind info for CRA to undefined
+ * which tells libunwind to stop unwinding and then calls the real __start.
+ * This is needed because ".cfi_undefined" inline assembly in a non-naked
+ * function could be overridden by the default unwinding information.
+ */
+__attribute__((naked, used)) void
+_start(void *auxv,
+	void (*cleanup)(void),			/* from shared loader */
+	struct Struct_Obj_Entry *obj)		/* from shared loader */
+{
+	__asm__(
+	    ".cfi_undefined cra\n"
+	    "ccall %0"
+	    :: "i"(__start));
 }
