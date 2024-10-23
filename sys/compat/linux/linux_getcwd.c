@@ -70,7 +70,7 @@ linux_getcwd(struct thread *td, struct linux_getcwd_args *uap)
 	if (error == ENOMEM)
 		error = ERANGE;
 	if (error == 0) {
-		error = copyout(retbuf, uap->buf, buflen);
+		error = copyout(retbuf, __USER_CAP(uap->buf, buflen), buflen);
 		if (error == 0)
 			td->td_retval[0] = buflen;
 	}

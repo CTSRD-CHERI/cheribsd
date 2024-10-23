@@ -928,7 +928,7 @@ struct v4l2_ext_control {
 		__s64 value64;
 		char *string;
 	} x;
-} __attribute__ ((packed));
+};
 
 struct v4l2_ext_controls {
 	__u32 ctrl_class;

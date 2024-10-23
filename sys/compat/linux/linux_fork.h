@@ -85,8 +85,8 @@ struct l_user_clone_args {
  */
 struct l_clone_args {
 	uint64_t flags;
-	l_int *child_tid;
-	l_int *parent_tid;
+	l_int * __kerncap child_tid;
+	l_int * __kerncap parent_tid;
 	l_int exit_signal;
 	l_ulong stack;
 	l_ulong stack_size;

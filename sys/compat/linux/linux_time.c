@@ -145,7 +145,7 @@ linux_put_timespec(struct timespec *ntp, struct l_timespec *ltp)
 	error = native_to_linux_timespec(&lts, ntp);
 	if (error != 0)
 		return (error);
-	return (copyout(&lts, ltp, sizeof(lts)));
+	return (copyout(&lts, __USER_CAP_OBJ(ltp), sizeof(lts)));
 }
 
 int
@@ -154,7 +154,7 @@ linux_get_timespec(struct timespec *ntp, const struct l_timespec *ultp)
 	struct l_timespec lts;
 	int error;
 
-	error = copyin(ultp, &lts, sizeof(lts));
+	error = copyin(__USER_CAP_OBJ(ultp), &lts, sizeof(lts));
 	if (error != 0)
 		return (error);
 	return (linux_to_native_timespec(ntp, &lts));
@@ -199,7 +199,7 @@ linux_put_timespec64(struct timespec *ntp, struct l_timespec64 *ltp)
 	error = native_to_linux_timespec64(&lts, ntp);
 	if (error != 0)
 		return (error);
-	return (copyout(&lts, ltp, sizeof(lts)));
+	return (copyout(&lts, __USER_CAP_OBJ(ltp), sizeof(lts)));
 }
 
 int
@@ -208,7 +208,7 @@ linux_get_timespec64(struct timespec *ntp, const struct l_timespec64 *ultp)
 	struct l_timespec64 lts;
 	int error;
 
-	error = copyin(ultp, &lts, sizeof(lts));
+	error = copyin(__USER_CAP_OBJ(ultp), &lts, sizeof(lts));
 	if (error != 0)
 		return (error);
 	return (linux_to_native_timespec64(ntp, &lts));

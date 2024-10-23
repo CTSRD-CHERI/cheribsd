@@ -751,7 +751,7 @@ struct proc {
 	void		*p_elf_brandinfo; /* (x) Elf_Brandinfo, NULL for
 						 non ELF binaries. */
 	sbintime_t	p_umtx_min_timeout;
-	vm_offset_t	p_psstrings;
+	vm_pointer_t	p_psstrings;
 #if __has_feature(capabilities)
 	struct cheri_c18n_info	*p_c18n_info;	/* (x) Compartment info block */
 #endif

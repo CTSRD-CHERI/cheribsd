@@ -161,7 +161,7 @@
 		int linux_fcntl(
 		    l_uint fd,
 		    l_uint cmd,
-		    l_ulong arg
+		    l_uintptr_t arg
 		);
 	}
 26	AUE_NULL	STD	{
@@ -179,7 +179,7 @@
 		int linux_ioctl(
 		    l_uint fd,
 		    l_uint cmd,
-		    l_ulong arg
+		    l_uintptr_t arg
 		);
 	}
 30	AUE_SETPRIORITY	STD	{
@@ -726,8 +726,8 @@
 		int linux_ptrace(
 		    l_long req,
 		    l_long pid,
-		    l_ulong addr,
-		    l_ulong data
+		    l_uintptr_t addr,
+		    l_uintptr_t data
 		);
 	}
 118	AUE_SCHED_SETPARAM	STD	{

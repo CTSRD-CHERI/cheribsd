@@ -94,7 +94,7 @@ struct epoll_copyin_args {
 };
 
 struct epoll_copyout_args {
-	struct epoll_event	*leventlist;
+	struct epoll_event	* __kerncap leventlist;
 	struct proc		*p;
 	uint32_t		count;
 	int			error;
@@ -294,7 +294,7 @@ linux_epoll_ctl(struct thread *td, struct linux_epoll_ctl_args *args)
 	int error;
 
 	if (args->op != LINUX_EPOLL_CTL_DEL) {
-		error = copyin(args->event, &le, sizeof(le));
+		error = copyin(__USER_CAP_OBJ(args->event), &le, sizeof(le));
 		if (error != 0)
 			return (error);
 	}
@@ -404,7 +404,7 @@ linux_epoll_wait_ts(struct thread *td, int epfd, struct epoll_event *events,
 		ast_sched(td, TDA_SIGSUSPEND);
 	}
 
-	coargs.leventlist = events;
+	coargs.leventlist = __USER_CAP(events, sizeof(struct epoll_event) * maxevents);
 	coargs.p = td->td_proc;
 	coargs.count = 0;
 	coargs.error = 0;
@@ -638,7 +638,7 @@ linux_timerfd_gettime(struct thread *td, struct linux_timerfd_gettime_args *args
 
 	error = native_to_linux_itimerspec(&lots, &ots);
 	if (error == 0)
-		error = copyout(&lots, args->old_value, sizeof(lots));
+		error = copyout(&lots, __USER_CAP_OBJ(args->old_value), sizeof(lots));
 
 	return (error);
 }
@@ -650,7 +650,7 @@ linux_timerfd_settime(struct thread *td, struct linux_timerfd_settime_args *args
 	struct itimerspec nts, ots;
 	int error;
 
-	error = copyin(args->new_value, &lots, sizeof(lots));
+	error = copyin(__USER_CAP_OBJ(args->new_value), &lots, sizeof(lots));
 	if (error != 0)
 		return (error);
 	error = linux_to_native_itimerspec(&nts, &lots);
@@ -663,7 +663,7 @@ linux_timerfd_settime(struct thread *td, struct linux_timerfd_settime_args *args
 	if (error == 0 && args->old_value != NULL) {
 		error = native_to_linux_itimerspec(&lots, &ots);
 		if (error == 0)
-			error = copyout(&lots, args->old_value, sizeof(lots));
+			error = copyout(&lots, __USER_CAP_OBJ(args->old_value), sizeof(lots));
 	}
 
 	return (error);
