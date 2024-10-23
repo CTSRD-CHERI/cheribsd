@@ -37,7 +37,7 @@
 #include <cheri/cheri.h>
 
 #ifdef __CHERI_PURE_CAPABILITY__
-FEATURE(cheriabi_kernel, "CheriABI kernel");
+FEATURE(cheri_purecap_kernel, "pure-capability kernel");
 #ifdef __CHERI_SUBOBJECT_BOUNDS__
 FEATURE(subobject_bounds, "CheriABI kernel with sub-object bounds");
 #endif
