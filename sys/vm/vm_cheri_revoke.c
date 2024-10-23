@@ -54,6 +54,7 @@
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/pmap.h>
+#include <vm/swap_pager.h>
 #include <vm/vm_map.h>
 #include <vm/vm_object.h>
 #include <vm/vm_extern.h>
@@ -66,7 +67,8 @@
 
 static void vm_cheri_revoke_pass_pre(vm_map_t);
 static void vm_cheri_revoke_pass_post(vm_map_t);
-static int vm_cheri_revoke_pass_locked(const struct vm_cheri_revoke_cookie *);
+static int vm_cheri_revoke_pass_locked(struct vmspace *,
+    const struct vm_cheri_revoke_cookie *);
 
 static SYSCTL_NODE(_vm_stats, OID_AUTO, cheri_revoke,
     CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
@@ -81,6 +83,21 @@ static COUNTER_U64_DEFINE_EARLY(cheri_revoke_restarts);
 SYSCTL_COUNTER_U64(_vm_stats_cheri_revoke, OID_AUTO, restarts, CTLFLAG_RD,
     &cheri_revoke_restarts,
     "Number of VM map re-lookups");
+
+static COUNTER_U64_DEFINE_EARLY(cheri_skip_prot_no_readcap);
+SYSCTL_COUNTER_U64(_vm_stats_cheri_revoke, OID_AUTO, skip_prot_no_readcap, CTLFLAG_RD,
+    &cheri_skip_prot_no_readcap,
+    "Virtual pages skipped in map entries without readcap permission");
+
+static COUNTER_U64_DEFINE_EARLY(cheri_skip_obj_no_hascap);
+SYSCTL_COUNTER_U64(_vm_stats_cheri_revoke, OID_AUTO, skip_obj_no_hascap, CTLFLAG_RD,
+    &cheri_skip_obj_no_hascap,
+    "Virtual pages skipped in VM objects with no capabilities");
+
+static COUNTER_U64_DEFINE_EARLY(cheri_last_ref_early_finish);
+SYSCTL_COUNTER_U64(_vm_stats_cheri_revoke, OID_AUTO, last_ref_early_finish, CTLFLAG_RD,
+    &cheri_last_ref_early_finish,
+    "Scans finished early because the target exited");
 
 /***************************** KERNEL THREADS ***************************/
 
@@ -171,6 +188,7 @@ vm_cheri_revoke_kproc(void *arg __unused)
 		mtx_unlock(&async_revoke_mtx);
 
 		vmspace_switch_aio(arc->vm);
+		vmspace_free(arc->vm);
 
 		/*
 		 * Advance the async state machine.
@@ -181,7 +199,7 @@ vm_cheri_revoke_kproc(void *arg __unused)
 		/*
 		 * Do the actual revocation pass.
 		 */
-		error = vm_cheri_revoke_pass_locked(&arc->cookie);
+		error = vm_cheri_revoke_pass_locked(arc->vm, &arc->cookie);
 
 		/*
 		 * A revocation pass is done.  Advance the state machine again
@@ -189,7 +207,6 @@ vm_cheri_revoke_kproc(void *arg __unused)
 		 */
 		vm_cheri_revoke_pass_async_post(map, error);
 
-		vmspace_free(arc->vm);
 		free(arc, M_REVOKE);
 	}
 
@@ -521,7 +538,6 @@ static bool
 vm_cheri_revoke_skip_fault(vm_object_t object)
 {
 	return (cheri_revoke_avoid_faults && (object->flags & OBJ_SWAP) != 0 &&
-	    pctrie_is_empty(&object->un_pager.swp.swp_blks) &&
 	    (object->backing_object == NULL ||
 	    (object->backing_object->flags & OBJ_HASCAP) == 0));
 }
@@ -647,26 +663,24 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc,
 	(void)vm_page_grab_valid(&m, obj, ipi, VM_ALLOC_NOZERO);
 
 	if (m == NULL) {
-		/* Can we avoid calling vm_fault() when the page is not resident? */
+		/*
+		 * Can we avoid calling vm_fault() for non-resident pages, or
+		 * for paged-out pages that do not contain capabilities?
+		 */
 		if (vm_cheri_revoke_skip_fault(obj)) {
-			/* Look forward in the object's collection of pages */
-			vm_page_t obj_next_pg = vm_page_find_least(obj, ipi);
+			vm_pindex_t nextpindex;
+			vm_offset_t lastoff;
 
-			vm_offset_t lastoff =
-			    entry->end - entry->start + entry->offset;
-
-			if ((obj_next_pg == NULL) ||
-			    (obj_next_pg->pindex >= OFF_TO_IDX(lastoff))) {
+			lastoff = entry->end - entry->start + entry->offset;
+			nextpindex = swap_pager_cheri_revoke_next(obj, ipi);
+			if (nextpindex >= OFF_TO_IDX(lastoff)) {
 				CHERI_REVOKE_STATS_INC(crst, pages_skip_fast,
 				    (entry->end - addr) >> PAGE_SHIFT);
 				*ooff = lastoff;
 			} else {
-				KASSERT(obj_next_pg->object == obj,
-				    ("Fast find page in bad object?"));
-
-				*ooff = IDX_TO_OFF(obj_next_pg->pindex);
 				CHERI_REVOKE_STATS_INC(crst, pages_skip_fast,
-				    obj_next_pg->pindex - ipi);
+				    nextpindex - ipi);
+				*ooff = IDX_TO_OFF(nextpindex);
 			}
 			return (VM_CHERI_REVOKE_AT_OK);
 		}
@@ -908,14 +922,19 @@ ok:
  * The map must be read-locked on entry and will be read-locked on exit, but
  * the lock may be dropped internally.  The map must, therefore, also be
  * held across invocation.
+ *
+ * The containing vmspace may be referenced by the "vm" parameter to signal that
+ * the revocation sweep is asynchronous and should terminate if the caller ends
+ * up holding the final vmspace reference.
  */
 static int
 vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc,
-    vm_map_entry_t entry, vm_offset_t *addr)
+    struct vmspace *vm, vm_map_entry_t entry, vm_offset_t *addr)
 {
 	vm_offset_t ooffset;
 	vm_object_t obj;
 	enum vm_cro_at res;
+	int flags;
 
 	KASSERT(!(entry->eflags & MAP_ENTRY_IS_SUB_MAP),
 	    ("cheri_revoke SUB_MAP"));
@@ -926,9 +945,33 @@ vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc,
 	if (!obj)
 		goto fini;
 
-	/* Skip entire mappings that do not permit capability reads */
-	if ((entry->max_protection & VM_PROT_READ_CAP) == 0)
+	/*
+	 * Skip mappings outright if we know they can't bear capabilities.
+	 * Specifically, if one of the following applies:
+	 * 1. OBJ_NOCAP is set (which implies it is set in backing objects), as
+	 *    is the case for the quarantine bitmap,
+	 * 2. the mapping cannot acquire PROT_READ_CAP permission for the rest
+	 *    of its existence,
+	 * 3. OBJ_HASCAP is unset, meaning that the object and its backing
+	 *    object cannot bear capabilities,
+	 * we can safely jump to the next map entry.
+	 *
+	 * The object flags are not toggled after initialization, so it is safe
+	 * to check them without the object lock.
+	 */
+	flags = atomic_load_int(&obj->flags);
+	if ((flags & OBJ_NOCAP) != 0)
 		goto fini;
+	if ((entry->max_protection & VM_PROT_READ_CAP) == 0) {
+		counter_u64_add(cheri_skip_prot_no_readcap,
+		    atop(entry->end - *addr));
+		goto fini;
+	}
+	if ((flags & OBJ_HASCAP) == 0) {
+		counter_u64_add(cheri_skip_obj_no_hascap,
+		    atop(entry->end - *addr));
+		goto fini;
+	}
 
 	VM_OBJECT_WLOCK(obj);
 	while (*addr < entry->end) {
@@ -936,6 +979,13 @@ vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc,
 #ifdef INVARIANTS
 		vm_offset_t oaddr = *addr;
 #endif
+
+		/* Has the target process already exited? */
+		if (vm != NULL && refcount_load(&vm->vm_refcnt) == 1) {
+			VM_OBJECT_WUNLOCK(obj);
+			counter_u64_add(cheri_last_ref_early_finish, 1);
+			return (KERN_NOT_RECEIVER);
+		}
 
 		/* Find ourselves in this object */
 		ooffset = *addr - entry->start + entry->offset;
@@ -1009,7 +1059,8 @@ vm_cheri_revoke_pass_post(vm_map_t map)
  * returning.
  */
 static int
-vm_cheri_revoke_pass_locked(const struct vm_cheri_revoke_cookie *crc)
+vm_cheri_revoke_pass_locked(struct vmspace *vm,
+    const struct vm_cheri_revoke_cookie *crc)
 {
 	int res = KERN_SUCCESS;
 	const vm_map_t map = crc->map;
@@ -1032,13 +1083,21 @@ vm_cheri_revoke_pass_locked(const struct vm_cheri_revoke_cookie *crc)
 		 * XXX Somewhere around here we should be resetting
 		 * MPROT_QUARANTINE'd map entries to be usable again, yes?
 		 */
-		res = vm_cheri_revoke_map_entry(crc, entry, &addr);
+		res = vm_cheri_revoke_map_entry(crc, vm, entry, &addr);
 
-		/*
-		 * We might be bailing out because a page fault failed for
-		 * catastrophic reasons (or polite ones like ptrace()).
-		 */
-		if (res != KERN_SUCCESS) {
+		switch (res) {
+		case KERN_SUCCESS:
+			break;
+		case KERN_NOT_RECEIVER:
+			/* The vmspace is orphaned, there is nothing to do. */
+			res = KERN_SUCCESS;
+			goto out;
+		default:
+			/*
+			 * We might be bailing out because a page fault failed
+			 * for catastrophic reasons (or polite ones like
+			 * ptrace()).
+			 */
 			printf("CHERI revoke bail va=%lx res=%d\n", addr, res);
 			goto out;
 		}
@@ -1082,7 +1141,7 @@ vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *crc)
 	int res;
 
 	vm_cheri_revoke_pass_pre(crc->map);
-	res = vm_cheri_revoke_pass_locked(crc);
+	res = vm_cheri_revoke_pass_locked(NULL, crc);
 	vm_cheri_revoke_pass_post(crc->map);
 
 	return (res);

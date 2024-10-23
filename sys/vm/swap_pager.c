@@ -1101,6 +1101,16 @@ swp_pager_cheri_xfer_tags(vm_object_t dstobject, vm_pindex_t pindex,
 	modpi = pindex % SWAP_META_PAGES;
 	memcpy(&dstsb->t[modpi], &sb->t[srcmodpi], sizeof(sb->t[srcmodpi]));
 }
+
+static bool
+swp_pager_cheri_has_tags(struct swblk *sb, int p)
+{
+	for (int i = 0; i < TAG_WORDS_PER_PAGE; i++) {
+		if (sb->t[p][i] != 0)
+			return (true);
+	}
+	return (false);
+}
 #endif
 
 static bool
@@ -3341,6 +3351,45 @@ swap_pager_release_writecount(vm_object_t object, vm_offset_t start,
 	object->un_pager.swp.writemappings -= (vm_ooffset_t)end - start;
 	VM_OBJECT_WUNLOCK(object);
 }
+
+#ifdef CHERI_CAPREVOKE
+/*
+ * Return the smallest pindex greater than or equal to "pindex" for which at
+ * least one of the following applies:
+ * 1) there is a resident page
+ * 2) there is a swap block with at least one capability tag.
+ * During a revocation scan, there is no need to page in until that point.
+ */
+vm_pindex_t
+swap_pager_cheri_revoke_next(vm_object_t object, vm_pindex_t pindex)
+{
+	vm_page_t m_next;
+	struct swblk *sb;
+	vm_pindex_t respindex, swpindex;
+
+	VM_OBJECT_ASSERT_LOCKED(object);
+
+	m_next = vm_page_find_least(object, pindex);
+	respindex = m_next != NULL ? m_next->pindex : object->size;
+
+	for (swpindex = rounddown2(pindex, SWAP_META_PAGES);;
+	    swpindex = sb->p + SWAP_META_PAGES) {
+		sb = SWAP_PCTRIE_LOOKUP_GE(&object->un_pager.swp.swp_blks,
+		    swpindex);
+		if (sb == NULL || sb->p >= respindex)
+			break;
+		for (int i = 0; i < SWAP_META_PAGES; i++) {
+			if (sb->p + i >= pindex && sb->p + i < respindex &&
+			    sb->d[i] != SWAPBLK_NONE &&
+			    swp_pager_cheri_has_tags(sb, i))
+				return (sb->p + i);
+		}
+	}
+
+	return (respindex);
+}
+#endif
+
 // CHERI CHANGES START
 // {
 //   "updated": 20230509,
