@@ -43,26 +43,27 @@
  * CHERI CHANGES END
  */
 
-#include <fcntl.h>
-#include <stdarg.h>
 #include <sys/types.h>
 #include <sys/syscall.h>
+
+#include <fcntl.h>
+#include <stdarg.h>
+
 #include "libc_private.h"
 
-#pragma weak fcntl
-int
-fcntl(int fd, int cmd, ...)
+typedef int (*fcntl_func)(int, int, intptr_t);
+
+static int
+call_fcntl(fcntl_func fn, int fd, int cmd, va_list ap)
 {
-	va_list args;
 	intptr_t arg;
 
-	va_start(args, cmd);
 	switch (cmd) {
 	case F_GETLK:
 	case F_SETLK:
 	case F_SETLKW:
 	case F_KINFO:
-		arg = va_arg(args, intptr_t);
+		arg = va_arg(ap, intptr_t);
 		break;
 
 	case F_GETFD:
@@ -74,13 +75,34 @@ fcntl(int fd, int cmd, ...)
 		break;
 
 	default:
-		arg = va_arg(args, int);
+		arg = va_arg(ap, int);
 		break;
 	}
+
+	return (fn(fd, cmd, arg));
+}
+
+#pragma weak fcntl
+int
+vfcntl(int fd, int cmd, va_list ap)
+{
+	fcntl_func fn = (fcntl_func)*__libsys_interposing_slot(INTERPOS_fcntl);
+
+	return (call_fcntl(fn, fd, cmd, ap));
+}
+
+#pragma weak fcntl
+int
+fcntl(int fd, int cmd, ...)
+{
+	va_list args;
+	int result;
+
+	va_start(args, cmd);
+	result = vfcntl(fd, cmd, args);
 	va_end(args);
 
-	return (((int (*)(int, int, intptr_t))
-	    *(__libc_interposing_slot(INTERPOS_fcntl)))(fd, cmd, arg));
+	return (result);
 }
 
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -90,31 +112,12 @@ int
 _fcntl(int fd, int cmd, ...)
 {
 	va_list args;
-	intptr_t arg;
+	int result;
 
 	va_start(args, cmd);
-	switch (cmd) {
-	case F_GETLK:
-	case F_SETLK:
-	case F_SETLKW:
-	case F_KINFO:
-		arg = va_arg(args, intptr_t);
-		break;
-
-	case F_GETFD:
-	case F_GETFL:
-	case F_GETOWN:
-	case F_GET_SEALS:
-	case F_ISUNIONSTACK:
-		arg = 0;
-		break;
-
-	default:
-		arg = va_arg(args, int);
-		break;
-	}
+	result = call_fcntl(__sys_fcntl, fd, cmd, args);
 	va_end(args);
 
-	return (__sys_fcntl(fd, cmd, arg));
+	return (result);
 }
 #endif
