@@ -28,6 +28,7 @@
 
 #include <sys/param.h>
 #include <sys/assym.h>
+#include <sys/bus.h>
 #include <sys/pcpu.h>
 #include <sys/proc.h>
 
@@ -35,6 +36,7 @@
 #include <machine/efi.h>
 #endif
 #include <machine/frame.h>
+#include <machine/intr.h>
 #include <machine/machdep.h>
 #include <machine/pcb.h>
 
@@ -92,6 +94,9 @@ ASSYM(TF_DDC, offsetof(struct trapframe, tf_ddc));
 ASSYM(TF_SPSR, offsetof(struct trapframe, tf_spsr));
 ASSYM(TF_ESR, offsetof(struct trapframe, tf_esr));
 ASSYM(TF_X, offsetof(struct trapframe, tf_x));
+
+ASSYM(INTR_ROOT_IRQ, INTR_ROOT_IRQ);
+ASSYM(INTR_ROOT_FIQ, INTR_ROOT_FIQ);
 
 #ifdef __CHERI_PURE_CAPABILITY__
 ASSYM(EC_EFI_STATUS, offsetof(struct efirt_callinfo, ec_efi_status));
