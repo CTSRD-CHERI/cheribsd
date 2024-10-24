@@ -305,6 +305,7 @@ SUBDIR=	\
 	otus \
 	${_otusfw} \
 	ow \
+	p9fs \
 	${_padlock} \
 	${_padlock_rng} \
 	${_pchtherm} \
@@ -578,7 +579,8 @@ _vmware=	vmware
 .endif
 
 .if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
-    ${MACHINE_CPUARCH} == "i386" || ${MACHINE_ARCH} == "armv7"
+    ${MACHINE_CPUARCH} == "i386" || ${MACHINE_ARCH} == "armv7" || \
+	${MACHINE_ARCH:Mpowerpc64*} != ""
 .if !${MACHINE_ABI:Mpurecap}
 _ossl=		ossl
 .endif
