@@ -35,6 +35,8 @@
 
 #include <sys/systm.h>
 
+#include <machine/intr.h>
+
 #define	INTR_IRQ_INVALID	0xFFFFFFFF
 
 typedef unsigned long intr_irq_t;
