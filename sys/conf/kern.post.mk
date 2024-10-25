@@ -493,6 +493,11 @@ vnode_if_typedef.h:
 embedfs_${MFS_IMAGE:T:R}.o: ${MFS_IMAGE} $S/dev/md/embedfs.S
 	${CC} ${CFLAGS} ${ACFLAGS} -DMFS_IMAGE=\""${MFS_IMAGE}"\" \
 	    $S/dev/md/embedfs.S
+
+.if defined(COMPILE_IR)
+embedfs_${MFS_IMAGE:T:R}.llo: $S/dev/md/embedfs.S
+	:> ${.TARGET}
+.endif
 .endif
 .endif
 
