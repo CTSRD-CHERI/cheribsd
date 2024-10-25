@@ -106,6 +106,7 @@ struct file_list {
 	int     f_type;                 /* type */
 	u_char	f_flags;		/* see below */
 	char	*f_compilewith;		/* special make rule if present */
+	char	*f_compileirwith;	/* special IR make rule if present */
 	char	*f_depends;		/* additional dependencies */
 	char	*f_clean;		/* File list to add to clean rule */
 	char	*f_warn;		/* warning message */

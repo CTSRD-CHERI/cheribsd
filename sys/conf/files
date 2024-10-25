@@ -5275,11 +5275,13 @@ rpctlscd.h			optional krpc | nfslockd | nfscl | nfsd	\
 rpctlscd_xdr.c			optional krpc | nfslockd | nfscl | nfsd	\
 	dependency		"$S/rpc/rpcsec_tls/rpctlscd.x rpctlscd.h"		\
 	compile-with		"RPCGEN_CPP='${CPP}' rpcgen -c $S/rpc/rpcsec_tls/rpctlscd.x -o rpctlscd_xdr.c" no-ctfconvert \
+	compile-ir-with		"${NORMAL_C}" \
 	no-implicit-rule before-depend local				\
 	clean			"rpctlscd_xdr.c"
 rpctlscd_clnt.c			optional krpc | nfslockd | nfscl | nfsd	\
 	dependency		"$S/rpc/rpcsec_tls/rpctlscd.x rpctlscd.h"		\
 	compile-with		"RPCGEN_CPP='${CPP}' rpcgen -lM $S/rpc/rpcsec_tls/rpctlscd.x | grep -v string.h > rpctlscd_clnt.c" no-ctfconvert \
+	compile-ir-with		"${NORMAL_C}" \
 	no-implicit-rule before-depend local				\
 	clean			"rpctlscd_clnt.c"
 rpctlssd.h			optional krpc | nfslockd | nfscl | nfsd	\
@@ -5290,11 +5292,13 @@ rpctlssd.h			optional krpc | nfslockd | nfscl | nfsd	\
 rpctlssd_xdr.c			optional krpc | nfslockd | nfscl | nfsd	\
 	dependency		"$S/rpc/rpcsec_tls/rpctlssd.x rpctlssd.h"		\
 	compile-with		"RPCGEN_CPP='${CPP}' rpcgen -c $S/rpc/rpcsec_tls/rpctlssd.x -o rpctlssd_xdr.c" no-ctfconvert \
+	compile-ir-with		"${NORMAL_C}" \
 	no-implicit-rule before-depend local				\
 	clean			"rpctlssd_xdr.c"
 rpctlssd_clnt.c			optional krpc | nfslockd | nfscl | nfsd	\
 	dependency		"$S/rpc/rpcsec_tls/rpctlssd.x rpctlssd.h"		\
 	compile-with		"RPCGEN_CPP='${CPP}' rpcgen -lM $S/rpc/rpcsec_tls/rpctlssd.x | grep -v string.h > rpctlssd_clnt.c" no-ctfconvert \
+	compile-ir-with		"${NORMAL_C}" \
 	no-implicit-rule before-depend local				\
 	clean			"rpctlssd_clnt.c"
 rpc/rpcsec_tls/rpctls_impl.c	optional krpc | nfslockd | nfscl | nfsd

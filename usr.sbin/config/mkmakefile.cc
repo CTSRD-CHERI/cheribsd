@@ -54,8 +54,8 @@ typedef std::unordered_map<std::string, std::string>	env_map;
 
 static char *tail(char *);
 static void do_clean(FILE *);
-static void do_rules(FILE *, bool intoir);
-static void do_rules_ir(FILE *);
+static void do_rules(FILE *);
+static void do_ir_rules(FILE *);
 static void do_xxfiles(char *, FILE *);
 static void do_objs(FILE *);
 static void do_before_depend(FILE *);
@@ -167,9 +167,9 @@ makefile(void)
 		else if (strncmp(line, "%FILES.", 7) == 0)
 			do_xxfiles(line, ofp);
 		else if (eq(line, "%RULES\n")) {
-			do_rules(ofp, false);
+			do_rules(ofp);
 			if (compileir == 1)
-				do_rules(ofp, true);
+				do_ir_rules(ofp);
 		} else if (eq(line, "%CLEAN\n"))
 			do_clean(ofp);
 		else if (strncmp(line, "%VERSREQ=", 9) == 0)
@@ -390,6 +390,7 @@ read_file(char *fname)
 	struct includepath *ipath;
 	configword wd;
 	char *rfile, *compilewith, *depends, *clean, *fnamebuf, *warning;
+	char *compileirwith;
 	const char *objprefix;
 	int compile, match, nreqs, std, filetype, negate,
 	    imp_rule, no_ctfconvert, no_obj, before_depend, nowerror;
@@ -454,6 +455,7 @@ next:
 	match = 1;
 	nreqs = 0;
 	compilewith = NULL;
+	compileirwith = NULL;
 	depends = NULL;
 	clean = NULL;
 	warning = NULL;
@@ -532,6 +534,14 @@ next:
 			compilewith = ns(wd);
 			continue;
 		}
+		if (eq(wd, "compile-ir-with")) {
+			wd = get_quoted_word(fp);
+			if (wd.eof() || wd.eol())
+				errout("%s: %s missing compile command string.\n",
+				       fname, rfile);
+			compileirwith = ns(wd);
+			continue;
+		}
 		if (eq(wd, "warning")) {
 			wd = get_quoted_word(fp);
 			if (wd.eof() || wd.eol())
@@ -606,6 +616,7 @@ nextparam:
 		if (nowerror)
 			tp->f_flags |= NOWERROR;
 		tp->f_compilewith = compilewith;
+		tp->f_compileirwith = compileirwith;
 		tp->f_depends = depends;
 		tp->f_clean = clean;
 		tp->f_warn = warning;
@@ -743,7 +754,7 @@ tail(char *fn)
  * which is part of the system.
  */
 static void
-do_rules(FILE *f, bool intoir)
+do_rules(FILE *f)
 {
 	char *cp, *np, och;
 	struct file_list *ftp;
@@ -755,7 +766,7 @@ do_rules(FILE *f, bool intoir)
 			fprintf(stderr, "WARNING: %s\n", ftp->f_warn);
 		cp = (np = ftp->f_fn) + strlen(ftp->f_fn) - 1;
 		och = *cp;
-		if (!intoir && ftp->f_flags & NO_IMPLCT_RULE) {
+		if (ftp->f_flags & NO_IMPLCT_RULE) {
 			if (ftp->f_depends)
 				fprintf(f, "%s%s: %s\n",
 					ftp->f_objprefix, np, ftp->f_depends);
@@ -764,28 +775,21 @@ do_rules(FILE *f, bool intoir)
 		}
 		else {
 			*cp = '\0';
-			if (intoir && och == 'c') {
-				fprintf(f,
-					"%s%sllo: CFLAGS_STAGE=-S -emit-llvm -o ${.TARGET}\n",
-					ftp->f_objprefix, tail(np));
-			}
-			if (!intoir && och == 'o') {
+			if (och == 'o') {
 				fprintf(f, "%s%so:\n\t-cp %s%so .\n\n",
 					ftp->f_objprefix, tail(np),
 					ftp->f_srcprefix, np);
 				continue;
 			}
 			if (ftp->f_depends) {
-				fprintf(f, "%s%s%s: %s%s%c %s\n",
+				fprintf(f, "%s%so: %s%s%c %s\n",
 					ftp->f_objprefix, tail(np),
-					intoir ? "llo" : "o",
 					ftp->f_srcprefix, np, och,
 					ftp->f_depends);
 			}
 			else {
-				fprintf(f, "%s%s%s: %s%s%c\n",
+				fprintf(f, "%s%so: %s%s%c\n",
 					ftp->f_objprefix, tail(np),
-					intoir ? "llo" : "o",
 					ftp->f_srcprefix, np, och);
 			}
 		}
@@ -809,20 +813,118 @@ do_rules(FILE *f, bool intoir)
 			compilewith = cmd;
 		}
 		*cp = och;
-		if (intoir && och == 'S') {
-			fprintf(f, "\t:> ${.TARGET}\n");
-		} else {
-			if (strlen(ftp->f_objprefix))
-				fprintf(f, "\t%s %s%s\n", compilewith,
-				    ftp->f_srcprefix, np);
-			else
-				fprintf(f, "\t%s\n", compilewith);
-		}
+		if (strlen(ftp->f_objprefix))
+			fprintf(f, "\t%s %s%s\n", compilewith,
+			    ftp->f_srcprefix, np);
+		else
+			fprintf(f, "\t%s\n", compilewith);
 
-		if (!intoir && !(ftp->f_flags & NO_CTFCONVERT))
+		if (!(ftp->f_flags & NO_CTFCONVERT))
 			fprintf(f, "\t${NORMAL_CTFCONVERT}\n\n");
 		else
 			fprintf(f, "\n");
+	}
+}
+
+/*
+ * Create the makerules to compile files into IR.
+ */
+static void
+do_ir_rules(FILE *f)
+{
+	char *cp, *np, och;
+	struct file_list *ftp;
+	char *compilewith;
+	char cmd[128];
+
+	STAILQ_FOREACH(ftp, &ftab, f_next) {
+		if (ftp->f_warn)
+			fprintf(stderr, "WARNING: %s\n", ftp->f_warn);
+		cp = (np = ftp->f_fn) + strlen(ftp->f_fn) - 1;
+		och = *cp;
+		*cp = '\0';
+
+		/*
+		 * Handle only .c and .m files.
+		 */
+		switch (och) {
+		case 'c':
+		case 'm':
+			/*
+			 * Overwrite CFLAGS_STAGE to compile into IR instead of
+			 * machine code.
+			 */
+			fprintf(f,
+			    "%s%sllo: CFLAGS_STAGE=-S -emit-llvm -o ${.TARGET}\n",
+			    ftp->f_objprefix, tail(np));
+			break;
+		case 'S':
+			break;
+		default:
+			continue;
+		}
+
+		fprintf(f, "%s%sllo: ",
+		    ftp->f_objprefix, tail(np));
+		if (och == 'm') {
+			/*
+			 * Depend on a .c file generated from an .m file."
+			 */
+			fprintf(f, "%s%sc",
+			    ftp->f_objprefix, tail(np));
+		} else {
+			/*
+			 * Always depend on a source file that is compiled into
+			 * IR. This includes the case when no implicit rule is
+			 * used for the .o file.
+			 */
+			fprintf(f, "%s%s%c",
+			    ftp->f_srcprefix, np, och);
+		}
+		if (ftp->f_depends)
+			fprintf(f, " %s", ftp->f_depends);
+		fprintf(f, "\n");
+
+		if (och == 'S') {
+			/*
+			 * Currently, we don't support assembly files.
+			 * Create an empty file and skip the rest for now.
+			 */
+			fprintf(f, "\t:> ${.TARGET}\n");
+			goto next;
+		}
+
+		compilewith = ftp->f_compileirwith;
+		if (compilewith == NULL)
+			compilewith = ftp->f_compilewith;
+		if (compilewith == NULL) {
+			const char *ftype = NULL;
+
+			switch (ftp->f_type) {
+			case NORMAL:
+				ftype = "NORMAL";
+				break;
+			default:
+				fprintf(stderr,
+				    "config: don't know rules for %s\n", np);
+				break;
+			}
+			/*
+			 * Always compile IR from C.
+			 */
+			snprintf(cmd, sizeof(cmd),
+			    "${%s_C%s}", ftype,
+			    ftp->f_flags & NOWERROR ? "_NOWERROR" : "");
+			compilewith = cmd;
+		}
+		*cp = och;
+		if (strlen(ftp->f_objprefix))
+			fprintf(f, "\t%s %s%s\n", compilewith,
+			    ftp->f_srcprefix, np);
+		else
+			fprintf(f, "\t%s\n", compilewith);
+next:
+		fprintf(f, "\n");
 	}
 }
 

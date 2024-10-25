@@ -735,6 +735,7 @@ arm64/nvidia/tegra210/tegra210_xusbpadctl.c	optional fdt soc_nvidia_tegra210
 tegra210_xusb_fw.c				optional tegra210_xusb_fw	\
 	dependency	"$S/conf/files.arm64"					\
 	compile-with	"${AWK} -f $S/tools/fw_stub.awk tegra210_xusb.fw:tegra210_xusb_fw -mtegra210_xusb_fw -c${.TARGET}" \
+	compile-ir-with	"${NORMAL_C}" \
 	no-ctfconvert no-implicit-rule before-depend local			\
 	clean		"tegra210_xusb_fw.c"
 
