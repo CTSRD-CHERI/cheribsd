@@ -119,21 +119,7 @@ _Static_assert(
 /*
  * Sealers for RTLD privileged information
  */
-#ifdef CHERI_LIB_C18N_NO_OTYPE
-#define	c18n_seal(cap, sealer)			cap
-#define	c18n_unseal(cap, sealer)		cap
-#define	c18n_seal_subset(cap, sealer)		cheri_sealentry(cap)
-#define	c18n_unseal_subset(cap, sealer, super)	(			\
-	cheri_gettag(cap) ?						\
-	cheri_buildcap(super, (uintptr_t)cheri_unseal(cap, 0)) :	\
-	cap								\
-)
-#else
-#define	c18n_seal(cap, sealer)			cheri_seal(cap, sealer)
-#define	c18n_unseal(cap, sealer)		cheri_unseal(cap, sealer)
-#define	c18n_seal_subset(cap, sealer)		cheri_seal(cap, sealer)
-#define	c18n_unseal_subset(cap, sealer, super)	cheri_unseal(cap, sealer)
-
+#ifndef CHERI_LIB_C18N_NO_OTYPE
 static uintptr_t sealer_tcb;
 static uintptr_t sealer_trusted_stk;
 
@@ -621,9 +607,56 @@ struct tcb_wrapper {
 	struct tcb *tcb;
 	struct stk_table *table;
 #ifndef HAS_RESTRICTED_MODE
+#ifdef CHERI_LIB_C18N_NO_OTYPE
+	struct tidc *tidc;
+#else
 	struct tidc tidc;
 #endif
+#endif
 };
+
+#if !defined(HAS_RESTRICTED_MODE) && defined(CHERI_LIB_C18N_NO_OTYPE)
+/* Maximum number of threads lifted from thr_list.c */
+#define	MAX_THREADS	100000
+
+static struct tidc *tidc_freelist;
+
+static struct tidc *
+allocate_tidc(void)
+{
+	struct tidc *tidc;
+
+	tidc = tidc_freelist;
+	if (tidc == NULL) {
+		rtld_fdprintf(STDERR_FILENO, "c18n: Cannot allocate tidc\n");
+		abort();
+	}
+	tidc_freelist = tidc->next;
+
+	return (tidc);
+}
+
+static void
+free_tidc(struct tidc *tidc)
+{
+	tidc->next = tidc_freelist;
+	tidc_freelist = tidc;
+}
+
+static uintptr_t
+init_tidc_table(size_t len)
+{
+	struct tidc *table, *tidc;
+
+	table = c18n_malloc(sizeof(*table) * len);
+	for (size_t i = 0; i < len; ++i) {
+		tidc = cheri_setboundsexact(&table[i], sizeof(*tidc));
+		free_tidc(tidc);
+	}
+
+	return ((uintptr_t)table);
+}
+#endif
 
 static void
 push_stk_table(_Atomic(struct stk_table *) *head, struct stk_table *table)
@@ -634,10 +667,10 @@ push_stk_table(_Atomic(struct stk_table *) *head, struct stk_table *table)
 
 	while (!atomic_compare_exchange_weak_explicit(head, link, table,
 	    /*
-	     * Use release ordering to ensure that table construction happens
-	     * before the push.
+	     * Use release ordering to ensure that table use happens before the
+	     * push.
 	     */
-	    memory_order_release, memory_order_release));
+	    memory_order_release, memory_order_relaxed));
 }
 
 static struct stk_table *
@@ -651,10 +684,10 @@ pop_stk_table(_Atomic(struct stk_table *) *head)
 		next = SLIST_NEXT(table, next);
 	} while (!atomic_compare_exchange_weak_explicit(head, &table, next,
 	    /*
-	     * Use acquire ordering to ensure that the pop happens after table
-	     * construction.
+	     * Use acquire ordering to ensure that the pop happens before table
+	     * use.
 	     */
-	    memory_order_acquire, memory_order_acquire));
+	    memory_order_acquire, memory_order_relaxed));
 
 	return (table);
 }
@@ -711,7 +744,10 @@ c18n_allocate_tcb(struct tcb *tcb)
 	*wrap = (struct tcb_wrapper) {
 		.header = *tcb,
 		.tcb = c18n_seal(tcb, sealer_tcb),
-		.table = c18n_seal(table, sealer_tcb)
+		.table = c18n_seal(table, sealer_tcb),
+#if !defined(HAS_RESTRICTED_MODE) && defined(CHERI_LIB_C18N_NO_OTYPE)
+		.tidc = allocate_tidc()
+#endif
 	};
 
 	return (&wrap->header);
@@ -724,6 +760,9 @@ c18n_free_tcb(void)
 
 	table = pop_stk_table(&dead_stk_tables);
 
+#if !defined(HAS_RESTRICTED_MODE) && defined(CHERI_LIB_C18N_NO_OTYPE)
+	free_tidc(table->meta->wrap->tidc);
+#endif
 	c18n_free(table->meta->wrap);
 	c18n_free(table->meta);
 	c18n_free(table);
@@ -805,8 +844,12 @@ init_stk_table(struct stk_table *table, struct tcb_wrapper *wrap)
 	/*
 	 * Install the tidc buffer.
 	 */
-	tidc = cheri_setboundsexact(&wrap->tidc, sizeof(wrap->tidc));
-	tidc = cheri_seal(tidc, sealer_tidc);
+#ifdef CHERI_LIB_C18N_NO_OTYPE
+	tidc = wrap->tidc;
+#else
+	tidc = cheri_setboundsexact(&wrap->tidc, sizeof(*tidc));
+#endif
+	tidc = c18n_seal_subset(tidc, sealer_tidc);
 	if (sysarch(RISCV_SET_UTIDC, &tidc) != 0) {
 		rtld_fdprintf(STDERR_FILENO, "c18n: Cannot set tidc %#p\n",
 		    tidc);
@@ -1734,8 +1777,9 @@ struct jmp_args (*_rtld_unw_setcontext_ptr)(struct jmp_args, void *, void **);
 void
 c18n_init2(Obj_Entry *obj_rtld)
 {
-	uintptr_t sealer;
 	struct tcb_wrapper *wrap;
+#ifndef CHERI_LIB_C18N_NO_OTYPE
+	uintptr_t sealer;
 
 	/*
 	 * Allocate otypes for RTLD use
@@ -1744,7 +1788,6 @@ c18n_init2(Obj_Entry *obj_rtld)
 	    &(size_t) { sizeof(sealer) }, NULL, 0) < 0)
 		rtld_fatal("sysctlbyname failed");
 
-#ifndef CHERI_LIB_C18N_NO_OTYPE
 	sealer_pltgot = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
 
@@ -1753,11 +1796,15 @@ c18n_init2(Obj_Entry *obj_rtld)
 
 	sealer_trusted_stk = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
-#endif
 
 #ifndef HAS_RESTRICTED_MODE
 	sealer_tidc = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
+#endif
+#else
+#ifndef HAS_RESTRICTED_MODE
+	sealer_tidc = init_tidc_table(MAX_THREADS);
+#endif
 #endif
 
 	/*
@@ -1765,7 +1812,11 @@ c18n_init2(Obj_Entry *obj_rtld)
 	 * table with the same size as the number of compartments.
 	 */
 	wrap = c18n_malloc(sizeof(*wrap));
-	*wrap = (struct tcb_wrapper) {};
+	*wrap = (struct tcb_wrapper) {
+#if !defined(HAS_RESTRICTED_MODE) && defined(CHERI_LIB_C18N_NO_OTYPE)
+		.tidc = allocate_tidc()
+#endif
+	};
 	init_stk_table(expand_stk_table(NULL, comparts.size), wrap);
 
 	/*

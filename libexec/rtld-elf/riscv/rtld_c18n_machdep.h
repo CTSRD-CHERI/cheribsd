@@ -58,13 +58,25 @@
 	cmove		UNTRUSTED_STACK, \reg
 .endmacro
 
-.macro	get_rtld_stk		reg
+.macro	get_rtld_stk		reg, tmp
 	clgc		\reg, sealer_tidc
 	clc		\reg, 0(\reg)
 	cspecialr	STACK_TABLE_C, TIDC
-	cunseal		STACK_TABLE_C, STACK_TABLE_C, \reg
+	unseal_tidc	STACK_TABLE_C, STACK_TABLE_C, \reg, \tmp
 	clc		STACK_TABLE_C, STACK_TABLE(STACK_TABLE_C)
 	clc		\reg, STACK_TABLE_RTLD(STACK_TABLE_C)
+.endmacro
+
+.macro	unseal_tidc		out, tidc, unsealer, tmp
+#ifdef CHERI_LIB_C18N_NO_OTYPE
+	cgettag		\tmp, \tidc
+	beqz		\tmp, 9999f
+	cunseal		\tidc, \tidc, cnull
+9999:
+	cbuildcap	\out, \unsealer, \tidc
+#else
+	cunseal		\out, \tidc, \unsealer
+#endif
 .endmacro
 
 #else
@@ -81,6 +93,9 @@ get_trusted_tp(void)
 struct tidc {
 	struct trusted_frame *trusted_stk;
 	struct stk_table *table;
+#ifdef CHERI_LIB_C18N_NO_OTYPE
+	struct tidc *next;
+#endif
 };
 
 static inline struct stk_table *
@@ -89,7 +104,7 @@ get_stk_table(void)
 	struct tidc *tidc;
 
 	asm volatile ("cspecialr	%0, " __XSTRING(TIDC) : "=C" (tidc));
-	tidc = cheri_unseal(tidc, sealer_tidc);
+	tidc = c18n_unseal_subset(tidc, sealer_tidc, sealer_tidc);
 	return (tidc->table);
 }
 
@@ -99,7 +114,7 @@ set_stk_table(struct stk_table *table)
 	struct tidc *tidc;
 
 	asm volatile ("cspecialr	%0, " __XSTRING(TIDC) : "=C" (tidc));
-	tidc = cheri_unseal(tidc, sealer_tidc);
+	tidc = c18n_unseal_subset(tidc, sealer_tidc, sealer_tidc);
 	tidc->table = table;
 }
 
@@ -109,7 +124,7 @@ get_trusted_stk(void)
 	struct tidc *tidc;
 
 	asm volatile ("cspecialr	%0, " __XSTRING(TIDC) : "=C" (tidc));
-	tidc = cheri_unseal(tidc, sealer_tidc);
+	tidc = c18n_unseal_subset(tidc, sealer_tidc, sealer_tidc);
 	return (tidc->trusted_stk);
 }
 
@@ -119,7 +134,7 @@ set_trusted_stk(struct trusted_frame *tf)
 	struct tidc *tidc;
 
 	asm volatile ("cspecialr	%0, " __XSTRING(TIDC) : "=C" (tidc));
-	tidc = cheri_unseal(tidc, sealer_tidc);
+	tidc = c18n_unseal_subset(tidc, sealer_tidc, sealer_tidc);
 	tidc->trusted_stk = tf;
 }
 #endif

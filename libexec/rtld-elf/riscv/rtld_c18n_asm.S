@@ -48,7 +48,7 @@ ENTRY(_rtld_sighandler)
 	 * The function is executing on an unknown untrusted stack. Switch to
 	 * RTLD's stack.
 	 */
-	get_rtld_stk		ca4
+	get_rtld_stk		ca4, t0
 	/*
 	 * Allocate a sigframe on RTLD's stack.
 	 */
@@ -134,7 +134,7 @@ ENTRY(create_untrusted_stk)
 	 * The execution stack is still the caller's stack. Switch to RTLD's
 	 * stack.
 	 */
-	get_rtld_stk		ct0
+	get_rtld_stk		ct0, t1
 	set_untrusted_stk	ct0
 
 	save_arguments
@@ -226,7 +226,7 @@ TRAMP(tramp_push_frame)
 	 * Get and unseal the thread identifier buffer.
 	 */
 	cspecialr	ct2, TIDC
-	cunseal		ct1, ct2, ct1
+	unseal_tidc	ct1, ct2, ct1, t3
 	/*
 	 * Get the trusted stack.
 	 */
@@ -499,7 +499,7 @@ TRAMP(tramp_pop_frame)
 	 * Get and unseal the thread identifier buffer.
 	 */
 	cspecialr	ct0, TIDC
-	cunseal		ct4, ct0, ct4
+	unseal_tidc	ct4, ct0, ct4, t1
 
 	/*
 	 * Get the trusted stack.
