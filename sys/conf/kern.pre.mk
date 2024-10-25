@@ -426,6 +426,9 @@ MKMODULESENV+=	DEBUG_FLAGS="${DEBUG}"
 .if !defined(NO_MODULES)
 MKMODULESENV+=	__MPATH="${__MPATH}"
 .endif
+.if defined(COMPILE_IR)
+MKMODULESENV+=	COMPILE_IR="${COMPILE_IR}"
+.endif
 
 # Detect kernel config options that force stack frames to be turned on.
 DDB_ENABLED!=	grep DDB opt_ddb.h || true ; echo

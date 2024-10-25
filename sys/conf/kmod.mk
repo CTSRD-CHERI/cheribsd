@@ -260,6 +260,18 @@ ${FULLPROG}: ${KMOD}.kld
 .endif
 .endif # ${KMODMO} != YES
 
+.if defined(COMPILE_IR)
+LLOBJS+=${SRCS:N*.h:N*.S:R:S/$/.llo/g}
+
+${PROG}.ll: ${LLOBJS}
+	${LLVM_LINK} -S -o ${.TARGET} ${LLOBJS}
+
+${FULLPROG}: ${PROG}.ll
+
+# Create explicit rules to build *.llo files in the kernel module's directory.
+DEPENDOBJS+=	${LLOBJS}
+.endif
+
 EXPORT_SYMS?=	NO
 .if ${EXPORT_SYMS} != YES
 CLEANFILES+=	export_syms
@@ -362,6 +374,10 @@ CLEANFILES+= ${OBJS:S/$/.mo/}
 CLEANFILES+= ${FULLPROG} ${PROG}.debug
 .endif
 
+.if defined(COMPILE_IR)
+CLEANFILES+= ${PROG}.ll ${LLOBJS}
+.endif
+
 .if !target(install)
 
 _INSTALLFLAGS:=	${INSTALLFLAGS}
@@ -382,6 +398,10 @@ _kmodinstall: .PHONY
 	    ${_INSTALLFLAGS} ${PROG}.debug ${DESTDIR}${KERN_DEBUGDIR}${KMODDIR}/
 .endif
 .endif # ${KMODMO} != YES
+.if defined(COMPILE_IR)
+	${INSTALL} -T release -o ${KMODOWN} -g ${KMODGRP} -m ${KMODMODE} \
+	    ${_INSTALLFLAGS} ${PROG}.ll ${DESTDIR}${KMODDIR}/
+.endif
 
 .include <bsd.links.mk>
 
