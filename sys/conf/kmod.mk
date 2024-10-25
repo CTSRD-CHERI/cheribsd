@@ -267,9 +267,6 @@ ${PROG}.ll: ${LLOBJS}
 	${LLVM_LINK} -S -o ${.TARGET} ${LLOBJS}
 
 ${FULLPROG}: ${PROG}.ll
-
-# Create explicit rules to build *.llo files in the kernel module's directory.
-DEPENDOBJS+=	${LLOBJS}
 .endif
 
 EXPORT_SYMS?=	NO
