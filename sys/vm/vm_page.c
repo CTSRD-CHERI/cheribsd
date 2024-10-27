@@ -1714,7 +1714,6 @@ void
 vm_page_iter_init(struct pctrie_iter *pages, vm_object_t object)
 {
 
-	VM_OBJECT_ASSERT_LOCKED(object);
 	vm_radix_iter_init(pages, &object->rtree);
 }
 
@@ -1728,7 +1727,6 @@ vm_page_iter_limit_init(struct pctrie_iter *pages, vm_object_t object,
     vm_pindex_t limit)
 {
 
-	VM_OBJECT_ASSERT_LOCKED(object);
 	vm_radix_iter_limit_init(pages, &object->rtree, limit);
 }
 
