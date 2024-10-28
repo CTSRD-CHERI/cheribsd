@@ -181,7 +181,7 @@ ENTRY(C18N_SYM(_rtld_bind_start))
 #endif
 	add	x1, x1, x3		/* reloff = x3 + offset = (3 or 1.5) * offset */
 
-	/* Load obj */
+	/* Load plt */
 	ldr	PTR(0), [PTR(16), #-PTR_WIDTH]
 
 	/* Call into rtld */

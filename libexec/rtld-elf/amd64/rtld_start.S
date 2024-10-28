@@ -55,7 +55,7 @@
 /*
  * Binder entry point.  Control is transferred to here by code in the PLT.
  * On entry, there are two arguments on the stack.  In ascending address
- * order, they are (1) "obj", a pointer to the calling object's Obj_Entry,
+ * order, they are (1) "plt", a pointer to the calling object's Plt_Entry,
  * and (2) "reloff", the byte offset of the appropriate relocation entry
  * in the PLT relocation table.
  *
@@ -65,7 +65,7 @@
  *
  * Stack map:
  * reloff       0x60
- * obj          0x58
+ * plt          0x58
  * spare	0x50
  * rflags       0x48
  * rax          0x40
@@ -116,7 +116,7 @@ _rtld_bind_start:
 	.cfi_adjust_cfa_offset 8
 	.cfi_offset	%r11,-96
 
-	movq	0x58(%rsp),%rdi		# Fetch obj argument
+	movq	0x58(%rsp),%rdi		# Fetch plt argument
 	movq	0x60(%rsp),%rsi		# Fetch reloff argument
 	leaq	(%rsi,%rsi,2),%rsi	# multiply by 3
 	leaq	(,%rsi,8),%rsi		# now 8, for 24 (sizeof Elf_Rela)
@@ -154,7 +154,7 @@ _rtld_bind_start:
 	.cfi_restore %rax
 	popfq				# Restore rflags
 	.cfi_adjust_cfa_offset -8
-	leaq	16(%rsp),%rsp		# Discard spare, obj, do not change rflags
+	leaq	16(%rsp),%rsp		# Discard spare, plt, do not change rflags
 	ret				# "Return" to target address
 	.cfi_endproc
 	.size	_rtld_bind_start, . - _rtld_bind_start

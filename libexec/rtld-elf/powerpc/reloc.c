@@ -61,7 +61,8 @@ bool
 arch_digest_dynamic(struct Struct_Obj_Entry *obj, const Elf_Dyn *dynp)
 {
 	if (dynp->d_tag == DT_PPC_GOT) {
-		obj->gotptr = (Elf_Addr *)(obj->relocbase + dynp->d_un.d_ptr);
+		obj->plts[0].gotptr =
+		    (Elf_Addr *)(obj->relocbase + dynp->d_un.d_ptr);
 		return (true);
 	}
 
@@ -382,25 +383,26 @@ done:
  * Initialise a PLT slot to the resolving trampoline
  */
 static int
-reloc_plt_object(Obj_Entry *obj, const Elf_Rela *rela)
+reloc_plt_object(Plt_Entry *plt, const Elf_Rela *rela)
 {
+	Obj_Entry *obj = plt->obj;
 	Elf_Word *where = (Elf_Word *)(obj->relocbase + rela->r_offset);
 	Elf_Addr *pltresolve, *pltlongresolve, *jmptab;
 	Elf_Addr distance;
-	int N = obj->pltrelasize / sizeof(Elf_Rela);
+	int N = plt->relasize / sizeof(Elf_Rela);
 	int reloff;
 
-	reloff = rela - obj->pltrela;
+	reloff = rela - plt->rela;
 
 	if (reloff < 0)
 		return (-1);
 
-	if (obj->gotptr != NULL) {
+	if (plt->gotptr != NULL) {
 		*where += (Elf_Addr)obj->relocbase;
 		return (0);
 	}
 
-	pltlongresolve = obj->pltgot + 5;
+	pltlongresolve = plt->pltgot + 5;
 	pltresolve = pltlongresolve + 5;
 
 	distance = (Elf_Addr)pltresolve - (Elf_Addr)(where + 1);
@@ -414,7 +416,7 @@ reloc_plt_object(Obj_Entry *obj, const Elf_Rela *rela)
 		where[0] = 0x39600000 | reloff;
 		where[1] = 0x48000000 | (distance & 0x03fffffc);
 	} else {
-		jmptab = obj->pltgot + JMPTAB_BASE(N);
+		jmptab = plt->pltgot + JMPTAB_BASE(N);
 		jmptab[reloff] = (u_int)pltlongresolve;
 
 		/* lis	r11,jmptab[reloff]@ha */
@@ -440,17 +442,18 @@ reloc_plt_object(Obj_Entry *obj, const Elf_Rela *rela)
  * Process the PLT relocations.
  */
 int
-reloc_plt(Obj_Entry *obj, int flags __unused, RtldLockState *lockstate __unused)
+reloc_plt(Plt_Entry *plt, int flags __unused, RtldLockState *lockstate __unused)
 {
+	Obj_Entry *obj = plt->obj;
 	const Elf_Rela *relalim;
 	const Elf_Rela *rela;
-	int N = obj->pltrelasize / sizeof(Elf_Rela);
+	int N = plt->relasize / sizeof(Elf_Rela);
 
-	if (obj->pltrelasize != 0) {
+	if (plt->relasize != 0) {
 
-		relalim = (const Elf_Rela *)((const char *)obj->pltrela +
-		    obj->pltrelasize);
-		for (rela = obj->pltrela;  rela < relalim;  rela++) {
+		relalim = (const Elf_Rela *)((const char *)plt->rela +
+		    plt->relasize);
+		for (rela = plt->rela;  rela < relalim;  rela++) {
 			if (ELF_R_TYPE(rela->r_info) == R_PPC_IRELATIVE) {
 				dbg("ABI violation - found IRELATIVE in the PLT.");
 				obj->irelative = true;
@@ -464,7 +467,7 @@ reloc_plt(Obj_Entry *obj, int flags __unused, RtldLockState *lockstate __unused)
 			 */
 			assert(ELF_R_TYPE(rela->r_info) == R_PPC_JMP_SLOT);
 
-			if (reloc_plt_object(obj, rela) < 0) {
+			if (reloc_plt_object(plt, rela) < 0) {
 				return (-1);
 			}
 		}
@@ -474,8 +477,8 @@ reloc_plt(Obj_Entry *obj, int flags __unused, RtldLockState *lockstate __unused)
 	 * Sync the icache for the byte range represented by the
 	 * trampoline routines and call slots.
 	 */
-	if (obj->pltgot != NULL && obj->gotptr == NULL)
-		__syncicache(obj->pltgot, JMPTAB_BASE(N)*4);
+	if (plt->pltgot != NULL && plt->gotptr == NULL)
+		__syncicache(plt->pltgot, JMPTAB_BASE(N)*4);
 
 	return (0);
 }
@@ -484,8 +487,9 @@ reloc_plt(Obj_Entry *obj, int flags __unused, RtldLockState *lockstate __unused)
  * LD_BIND_NOW was set - force relocation for all jump slots
  */
 int
-reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
+reloc_jmpslots(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 {
+	Obj_Entry *obj = plt->obj;
 	const Obj_Entry *defobj;
 	const Elf_Rela *relalim;
 	const Elf_Rela *rela;
@@ -493,9 +497,9 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 	Elf_Addr *where;
 	Elf_Addr target;
 
-	relalim = (const Elf_Rela *)((const char *)obj->pltrela +
-	    obj->pltrelasize);
-	for (rela = obj->pltrela; rela < relalim; rela++) {
+	relalim = (const Elf_Rela *)((const char *)plt->rela +
+	    plt->relasize);
+	for (rela = plt->rela; rela < relalim; rela++) {
 		/* This isn't actually a jump slot, ignore it. */
 		if (ELF_R_TYPE(rela->r_info) == R_PPC_IRELATIVE)
 			continue;
@@ -524,7 +528,7 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 		}
 	}
 
-	obj->jmpslots_done = true;
+	plt->jmpslots_done = true;
 
 	return (0);
 }
@@ -537,6 +541,7 @@ Elf_Addr
 reloc_jmpslot(Elf_Addr *wherep, Elf_Addr target,
     const Obj_Entry *defobj __unused, const Obj_Entry *obj, const Elf_Rel *rel)
 {
+	Plt_Entry *plt = &obj->plts[0];
 	Elf_Addr offset;
 	const Elf_Rela *rela = (const Elf_Rela *) rel;
 
@@ -550,10 +555,10 @@ reloc_jmpslot(Elf_Addr *wherep, Elf_Addr target,
 	/*
 	 * Process Secure-PLT.
 	 */
-	if (obj->gotptr != NULL) {
-		assert(wherep >= (Elf_Word *)obj->pltgot);
+	if (plt->gotptr != NULL) {
+		assert(wherep >= (Elf_Word *)plt->pltgot);
 		assert(wherep <
-		    (Elf_Word *)obj->pltgot + obj->pltrelasize);
+		    (Elf_Word *)plt->pltgot + plt->relasize);
 		if (*wherep != target)
 			*wherep = target;
 		goto out;
@@ -578,18 +583,18 @@ reloc_jmpslot(Elf_Addr *wherep, Elf_Addr target,
 	} else {
 		Elf_Addr *pltcall, *jmptab;
 		int distance;
-		int N = obj->pltrelasize / sizeof(Elf_Rela);
-		int reloff = rela - obj->pltrela;
+		int N = plt->relasize / sizeof(Elf_Rela);
+		int reloff = rela - plt->rela;
 
 		if (reloff < 0)
 			return (-1);
 
-		pltcall = obj->pltgot;
+		pltcall = plt->pltgot;
 
 		dbg(" reloc_jmpslot: indir, reloff=%x, N=%x\n",
 		    reloff, N);
 
-		jmptab = obj->pltgot + JMPTAB_BASE(N);
+		jmptab = plt->pltgot + JMPTAB_BASE(N);
 		jmptab[reloff] = target;
 		mb(); /* Order jmptab update before next changes */
 
@@ -619,6 +624,7 @@ reloc_iresolve(Obj_Entry *obj,
 	 * Since PLT slots on PowerPC are always R_PPC_JMP_SLOT,
 	 * R_PPC_IRELATIVE is in RELA.
 	 */
+	Plt_Entry *plt = &obj->plts[0];
 	const Elf_Rela *relalim;
 	const Elf_Rela *rela;
 	Elf_Addr *where, target, *ptr;
@@ -643,8 +649,8 @@ reloc_iresolve(Obj_Entry *obj,
 	 * XXX Remove me when lld is fixed!
 	 * LLD currently makes illegal relocations in the PLT.
 	 */
-	relalim = (const Elf_Rela *)((const char *)obj->pltrela + obj->pltrelasize);
-	for (rela = obj->pltrela;  rela < relalim;  rela++) {
+	relalim = (const Elf_Rela *)((const char *)plt->rela + plt->relasize);
+	for (rela = plt->rela;  rela < relalim;  rela++) {
 		if (ELF_R_TYPE(rela->r_info) == R_PPC_IRELATIVE) {
 			ptr = (Elf_Addr *)(obj->relocbase + rela->r_addend);
 			where = (Elf_Addr *)(obj->relocbase + rela->r_offset);
@@ -672,6 +678,7 @@ int
 reloc_gnu_ifunc(Obj_Entry *obj __unused, int flags __unused,
     struct Struct_RtldLockState *lockstate __unused)
 {
+	Plt_Entry *plt = &obj->plts[0];
 	const Elf_Rela *relalim;
 	const Elf_Rela *rela;
 	Elf_Addr *where, target;
@@ -680,8 +687,8 @@ reloc_gnu_ifunc(Obj_Entry *obj __unused, int flags __unused,
 
 	if (!obj->gnu_ifunc)
 		return (0);
-	relalim = (const Elf_Rela *)((const char *)obj->pltrela + obj->pltrelasize);
-	for (rela = obj->pltrela;  rela < relalim;  rela++) {
+	relalim = (const Elf_Rela *)((const char *)plt->rela + plt->relasize);
+	for (rela = plt->rela;  rela < relalim;  rela++) {
 		if (ELF_R_TYPE(rela->r_info) == R_PPC_JMP_SLOT) {
 			where = (Elf_Addr *)(obj->relocbase + rela->r_offset);
 			def = find_symdef(ELF_R_SYM(rela->r_info), obj, &defobj,
@@ -709,25 +716,25 @@ reloc_gnu_ifunc(Obj_Entry *obj __unused, int flags __unused,
 #define PLTRESOLVE_SIZE		24
 
 void
-init_pltgot(Obj_Entry *obj)
+init_pltgot(Plt_Entry *plt)
 {
 	Elf_Word *pltcall, *pltresolve, *pltlongresolve;
 	Elf_Word *jmptab;
-	int N = obj->pltrelasize / sizeof(Elf_Rela);
+	int N = plt->relasize / sizeof(Elf_Rela);
 
-	pltcall = obj->pltgot;
+	pltcall = plt->pltgot;
 
 	if (pltcall == NULL) {
 		return;
 	}
 
 	/* Handle Secure-PLT first, if applicable. */
-	if (obj->gotptr != NULL) {
-		obj->gotptr[1] = (Elf_Addr)_rtld_bind_secureplt_start;
-		obj->gotptr[2] = (Elf_Addr)obj;
+	if (plt->gotptr != NULL) {
+		plt->gotptr[1] = (Elf_Addr)_rtld_bind_secureplt_start;
+		plt->gotptr[2] = (Elf_Addr)plt;
 		dbg("obj %s secure-plt gotptr=%p start=%p obj=%p",
-		    obj->path, obj->gotptr,
-		    (void *)obj->gotptr[1], (void *)obj->gotptr[2]);
+		    plt->obj->path, plt->gotptr,
+		    (void *)plt->gotptr[1], (void *)plt->gotptr[2]);
 		return;
 	}
 
@@ -758,7 +765,7 @@ init_pltgot(Obj_Entry *obj)
 	 * of the jumptable into the absolute-call assembler code so it
 	 * can determine this address.
 	 */
-	jmptab = obj->pltgot + JMPTAB_BASE(N);
+	jmptab = plt->pltgot + JMPTAB_BASE(N);
 	pltcall[1] |= _ppc_ha(jmptab);	   /* addis 11,11,jmptab@ha */
 	pltcall[2] |= _ppc_la(jmptab);     /* lwz   11,jmptab@l(11) */
 
@@ -771,7 +778,7 @@ init_pltgot(Obj_Entry *obj)
 	 * We place pltlongresolve first, so it can fix up its arguments
 	 * and then fall through to the regular PLT resolver.
 	 */
-	pltlongresolve = obj->pltgot + 5;
+	pltlongresolve = plt->pltgot + 5;
 
 	memcpy(pltlongresolve, _rtld_powerpc_pltlongresolve,
 	    PLTLONGRESOLVE_SIZE);
@@ -782,8 +789,8 @@ init_pltgot(Obj_Entry *obj)
 	memcpy(pltresolve, _rtld_powerpc_pltresolve, PLTRESOLVE_SIZE);
 	pltresolve[0] |= _ppc_ha(_rtld_bind_start);
 	pltresolve[1] |= _ppc_la(_rtld_bind_start);
-	pltresolve[3] |= _ppc_ha(obj);
-	pltresolve[4] |= _ppc_la(obj);
+	pltresolve[3] |= _ppc_ha(plt);
+	pltresolve[4] |= _ppc_la(plt);
 
 	/*
 	 * The icache will be sync'd in reloc_plt, which is called

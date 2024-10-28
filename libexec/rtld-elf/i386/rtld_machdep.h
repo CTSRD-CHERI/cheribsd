@@ -35,6 +35,8 @@
 
 struct Struct_Obj_Entry;
 
+#define	MD_PLT_ENTRY
+
 #define	MD_OBJ_ENTRY
 
 /* Return the address of the .dynamic section in the dynamic linker. */
