@@ -179,6 +179,18 @@ typedef struct Struct_Sym_Match_Result {
     int vcount;
 } Sym_Match_Result;
 
+typedef struct Struct_Plt_Entry {
+    struct Struct_Obj_Entry *obj;
+
+    uintptr_t *pltgot;		/* PLT or GOT, depending on architecture */
+    const Elf_Rel *rel;		/* PLT relocation entries */
+    unsigned long relsize;	/* Size in bytes of PLT relocation info */
+    const Elf_Rela *rela;	/* PLT relocation entries with addend */
+    unsigned long relasize;	/* Size in bytes of PLT addend reloc info */
+    bool jmpslots_done : 1;	/* Already have relocated the jump slots */
+    MD_PLT_ENTRY;
+} Plt_Entry;
+
 #define VER_INFO_HIDDEN	0x01
 
 /*
@@ -239,17 +251,14 @@ typedef struct Struct_Obj_Entry {
     size_t tlspoffset;		/* p_offset of the static TLS block */
 
     /* Items from the dynamic section. */
-    uintptr_t *pltgot;		/* PLT or GOT, depending on architecture */
+    Plt_Entry *plts;
+    unsigned long nplts;
     const Elf_Rel *rel;		/* Relocation entries */
     unsigned long relsize;	/* Size in bytes of relocation info */
     const Elf_Rela *rela;	/* Relocation entries with addend */
     unsigned long relasize;	/* Size in bytes of addend relocation info */
     const Elf_Relr *relr;	/* RELR relocation entries */
     unsigned long relrsize;	/* Size in bytes of RELR relocations */
-    const Elf_Rel *pltrel;	/* PLT relocation entries */
-    unsigned long pltrelsize;	/* Size in bytes of PLT relocation info */
-    const Elf_Rela *pltrela;	/* PLT relocation entries with addend */
-    unsigned long pltrelasize;	/* Size in bytes of PLT addend reloc info */
     const Elf_Sym *symtab;	/* Symbol table */
     const char *strtab;		/* String table */
     unsigned long strsize;	/* Size in bytes of string table */
@@ -315,7 +324,6 @@ typedef struct Struct_Obj_Entry {
     bool deepbind : 1;		/* True if loaded with RTLD_DEEPBIND" */
     bool bind_now : 1;		/* True if all relocations should be made first */
     bool traced : 1;		/* Already printed in ldd trace output */
-    bool jmpslots_done : 1;	/* Already have relocated the jump slots */
     bool init_done : 1;		/* Already have added object to init list */
     bool tls_static : 1;	/* Already allocated offset for static TLS */
     bool tls_dynamic : 1;	/* A non-static DTV entry has been allocated */
@@ -591,13 +599,13 @@ bool check_elf_headers(const Elf_Ehdr *hdr, const char *path);
 int do_copy_relocations(Obj_Entry *);
 int reloc_non_plt(Obj_Entry *, Obj_Entry *, int flags,
     struct Struct_RtldLockState *);
-int reloc_plt(Obj_Entry *, int flags, struct Struct_RtldLockState *);
-int reloc_jmpslots(Obj_Entry *, int flags, struct Struct_RtldLockState *);
+int reloc_plt(Plt_Entry *, int flags, struct Struct_RtldLockState *);
+int reloc_jmpslots(Plt_Entry *, int flags, struct Struct_RtldLockState *);
 int reloc_iresolve(Obj_Entry *, struct Struct_RtldLockState *);
 int reloc_iresolve_nonplt(Obj_Entry *, struct Struct_RtldLockState *);
 int reloc_gnu_ifunc(Obj_Entry *, int flags, struct Struct_RtldLockState *);
 void ifunc_init(Elf_Auxinfo *[__min_size(AT_COUNT)]);
-void init_pltgot(Obj_Entry *);
+void init_pltgot(Plt_Entry *);
 void allocate_initial_tls(Obj_Entry *);
 
 #ifdef RTLD_HAS_CAPRELOCS

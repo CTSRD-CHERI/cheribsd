@@ -540,6 +540,8 @@ obj_free(Obj_Entry *obj)
 	free(obj->origin_path);
     if (obj->z_origin)
 	free(__DECONST(void*, obj->rpath));
+    if (obj->plts)
+	free(obj->plts);
     if (obj->priv)
 	free(obj->priv);
     if (obj->path)

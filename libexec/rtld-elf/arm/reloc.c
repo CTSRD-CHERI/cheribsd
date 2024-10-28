@@ -17,11 +17,11 @@
 #include "rtld_paths.h"
 
 void
-init_pltgot(Obj_Entry *obj)
+init_pltgot(Plt_Entry *plt)
 {       
-	if (obj->pltgot != NULL) {
-		obj->pltgot[1] = (Elf_Addr) obj;
-		obj->pltgot[2] = (Elf_Addr) &_rtld_bind_start;
+	if (plt->pltgot != NULL) {
+		plt->pltgot[1] = (Elf_Addr) plt;
+		plt->pltgot[2] = (Elf_Addr) &_rtld_bind_start;
 	}
 }
 
@@ -348,14 +348,15 @@ done:
  *  * Process the PLT relocations.
  *   */
 int
-reloc_plt(Obj_Entry *obj, int flags __unused, RtldLockState *lockstate __unused)
+reloc_plt(Plt_Entry *plt, int flags __unused, RtldLockState *lockstate __unused)
 {
+	Obj_Entry *obj = plt->obj;
 	const Elf_Rel *rellim;
 	const Elf_Rel *rel;
 		
-	rellim = (const Elf_Rel *)((const char *)obj->pltrel +
-	    obj->pltrelsize);
-	for (rel = obj->pltrel;  rel < rellim;  rel++) {
+	rellim = (const Elf_Rel *)((const char *)plt->rel +
+	    plt->relsize);
+	for (rel = plt->rel;  rel < rellim;  rel++) {
 		Elf_Addr *where;
 
 		assert(ELF_R_TYPE(rel->r_info) == R_ARM_JUMP_SLOT);
@@ -371,8 +372,9 @@ reloc_plt(Obj_Entry *obj, int flags __unused, RtldLockState *lockstate __unused)
  *  * LD_BIND_NOW was set - force relocation for all jump slots
  *   */
 int
-reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
+reloc_jmpslots(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 {
+	Obj_Entry *obj = plt->obj;
 	const Obj_Entry *defobj;
 	const Elf_Rel *rellim;
 	const Elf_Rel *rel;
@@ -380,8 +382,8 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 	Elf_Addr *where;
 	Elf_Addr target;
 	
-	rellim = (const Elf_Rel *)((const char *)obj->pltrel + obj->pltrelsize);
-	for (rel = obj->pltrel; rel < rellim; rel++) {
+	rellim = (const Elf_Rel *)((const char *)plt->rel + plt->relsize);
+	for (rel = plt->rel; rel < rellim; rel++) {
 		assert(ELF_R_TYPE(rel->r_info) == R_ARM_JUMP_SLOT);
 		where = (Elf_Addr *)(obj->relocbase + rel->r_offset);
 		def = find_symdef(ELF_R_SYM(rel->r_info), obj, &defobj,
@@ -396,7 +398,7 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 		    (const Elf_Rel *) rel);
 	}
 	
-	obj->jmpslots_done = true;
+	plt->jmpslots_done = true;
 	
 	return (0);
 }

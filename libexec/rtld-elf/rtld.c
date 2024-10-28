@@ -281,7 +281,7 @@ func_ptr_type _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp
 #else
 func_ptr_type _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp);
 #endif
-uintptr_t _rtld_bind(Obj_Entry *obj, Elf_Size reloff);
+uintptr_t _rtld_bind(Plt_Entry *obj, Elf_Size reloff);
 
 int npagesizes;
 static int osreldate;
@@ -852,7 +852,8 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     dbg("%s is initialized, base address = " PTR_FMT, __progname,
 	(caddr_t) aux_info[AT_BASE]->a_un.a_ptr);
     dbg("RTLD dynamic = " PTR_FMT, obj_rtld.dynamic);
-    dbg("RTLD pltgot  = " PTR_FMT, obj_rtld.pltgot);
+    dbg("RTLD pltgot  = " PTR_FMT, obj_rtld.nplts == 0 ? NULL :
+	obj_rtld.plts[0].pltgot);
 
     dbg("initializing thread locks");
     lockdflt_init();
@@ -1191,11 +1192,12 @@ rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def)
 }
 
 uintptr_t
-_rtld_bind(Obj_Entry *obj, Elf_Size reloff)
+_rtld_bind(Plt_Entry *plt, Elf_Size reloff)
 {
     const Elf_Rel *rel;
     const Elf_Sym *def;
     const Obj_Entry *defobj;
+    Obj_Entry *obj;
     uintptr_t *where;
     uintptr_t target;
     RtldLockState lockstate;
@@ -1203,18 +1205,19 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
     struct trusted_frame *tf;
 
     if (C18N_ENABLED) {
-	obj = cheri_unseal(obj, sealer_pltgot);
+	plt = cheri_unseal(plt, sealer_pltgot);
 	tf = push_dummy_rtld_trusted_frame(get_trusted_stk());
     }
 #endif
 
+    obj = plt->obj;
     rlock_acquire(rtld_bind_lock, &lockstate);
     if (sigsetjmp(lockstate.env, 0) != 0)
 	    lock_upgrade(rtld_bind_lock, &lockstate);
-    if (obj->pltrel)
-	rel = (const Elf_Rel *)((const char *)obj->pltrel + reloff);
+    if (plt->rel != NULL)
+	rel = (const Elf_Rel *)((const char *)plt->rel + reloff);
     else
-	rel = (const Elf_Rel *)((const char *)obj->pltrela + reloff);
+	rel = (const Elf_Rel *)((const char *)plt->rela + reloff);
 
     where = (uintptr_t *)(obj->relocbase + rel->r_offset);
     def = find_symdef(ELF_R_SYM(rel->r_info), obj, &defobj, SYMLOOK_IN_PLT,
@@ -1444,6 +1447,33 @@ rtld_die(void)
 }
 
 /*
+ * Count the number of PLTs in a shared object's DYNAMIC section.
+ */
+static unsigned long
+count_plts(const Elf_Dyn *dynp)
+{
+    unsigned long jmprel, pltrelsz, pltgot;
+
+    jmprel = pltrelsz = pltgot = 0;
+    for (;  dynp->d_tag != DT_NULL;  dynp++) {
+	switch (dynp->d_tag) {
+	case DT_JMPREL:
+	    jmprel++;
+	    break;
+	case DT_PLTRELSZ:
+	    pltrelsz++;
+	    break;
+	case DT_PLTGOT:
+	    pltgot++;
+	    break;
+	default:
+	    break;
+	}
+    }
+    return (MAX(MAX(jmprel, pltrelsz), pltgot));
+}
+
+/*
  * Process a shared object's DYNAMIC section, and save the important
  * information in its Obj_Entry structure.
  */
@@ -1457,10 +1487,13 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
     Needed_Entry **needed_aux_filtees_tail = &obj->needed_aux_filtees;
     const Elf_Hashelt *hashtab;
     const Elf32_Word *hashval;
+    Plt_Entry *plt;
     Elf32_Word bkt, nmaskwords;
+    unsigned long i, jmprel, pltrelsz, pltgot;
     int bloom_size32;
     int plttype = DT_REL;
 
+    jmprel = pltrelsz = pltgot = 0;
     *dyn_rpath = NULL;
     *dyn_soname = NULL;
     *dyn_runpath = NULL;
@@ -1469,6 +1502,9 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
     dynp = obj->dynamic;
     if (dynp == NULL)
 	return;
+    obj->nplts = count_plts(dynp);
+    if (obj->nplts != 0)
+	    obj->plts = xcalloc(obj->nplts, sizeof(*obj->plts));
     for (;  dynp->d_tag != DT_NULL;  dynp++) {
 	switch (dynp->d_tag) {
 
@@ -1490,12 +1526,14 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	    if (dynp->d_un.d_ptr == 0)
 		break;
 #endif
-	    obj->pltrel = (const Elf_Rel *)
+	    obj->plts[jmprel].rel = (const Elf_Rel *)
 	      (obj->relocbase + dynp->d_un.d_ptr);
+	    jmprel++;
 	    break;
 
 	case DT_PLTRELSZ:
-	    obj->pltrelsize = dynp->d_un.d_val;
+	    obj->plts[pltrelsz].relsize = dynp->d_un.d_val;
+	    pltrelsz++;
 	    break;
 
 	case DT_RELA:
@@ -1653,7 +1691,9 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	    if (dynp->d_un.d_ptr == 0)
 		break;
 #endif
-	    obj->pltgot = (uintptr_t *)(obj->relocbase + dynp->d_un.d_ptr);
+	    obj->plts[pltgot].pltgot =
+		(uintptr_t *)(obj->relocbase + dynp->d_un.d_ptr);
+	    pltgot++;
 	    break;
 
 	case DT_TEXTREL:
@@ -1776,11 +1816,24 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 
     obj->traced = false;
 
+#ifdef __aarch64__
+    /* Ignore empty PLT entries for Morello. */
+    if (obj->nplts == 1 && obj->plts[0].rel == NULL &&
+	obj->plts[0].pltgot == NULL) {
+	    free(obj->plts);
+	    obj->plts = NULL;
+	    obj->nplts = 0;
+    }
+#endif
+
     if (plttype == DT_RELA) {
-	obj->pltrela = (const Elf_Rela *) obj->pltrel;
-	obj->pltrel = NULL;
-	obj->pltrelasize = obj->pltrelsize;
-	obj->pltrelsize = 0;
+	for (i = 0; i < obj->nplts; i++) {
+	    plt = &obj->plts[i];
+	    plt->rela = (const Elf_Rela *) plt->rel;
+	    plt->rel = NULL;
+	    plt->relasize = plt->relsize;
+	    plt->relsize = 0;
+	}
     }
 
     /* Determine size of dynsym table (equal to nchains of sysv hash) */
@@ -1818,7 +1871,19 @@ static bool
 digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
     const Elf_Dyn *dyn_soname, const Elf_Dyn *dyn_runpath)
 {
+	Plt_Entry *plt;
+	unsigned long i;
 
+	for (i = 0; i < obj->nplts; i++) {
+	    plt = &obj->plts[i];
+	    if (plt->pltgot == NULL)
+		return (false);
+	    if (plt->rel == NULL && plt->rela == NULL)
+		return (false);
+	    if (plt->relsize == 0 && plt->relasize == 0)
+		return (false);
+	    plt->obj = obj;
+	}
 	if (obj->z_origin && !obj_resolve_origin(obj))
 		return (false);
 
@@ -1837,8 +1902,11 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 	// any overflows at runtime.
 	set_bounds_if_nonnull(obj->rel, obj->relsize);
 	set_bounds_if_nonnull(obj->rela, obj->relasize);
-	set_bounds_if_nonnull(obj->pltrel, obj->pltrelsize);
-	set_bounds_if_nonnull(obj->pltrela, obj->pltrelasize);
+	for (i = 0; i < obj->nplts; i++) {
+	    plt = &obj->plts[i];
+	    set_bounds_if_nonnull(plt->rel, plt->relsize);
+	    set_bounds_if_nonnull(plt->rela, plt->relasize);
+	}
 	set_bounds_if_nonnull(obj->strtab, obj->strsize);
 	set_bounds_if_nonnull(obj->phdr, obj->phsize);
 
@@ -3685,6 +3753,8 @@ static int
 relocate_object(Obj_Entry *obj, bool bind_now, Obj_Entry *rtldobj,
     int flags, RtldLockState *lockstate)
 {
+	Plt_Entry *plt;
+	unsigned long i;
 
 	if (obj->relocated)
 		return (0);
@@ -3715,16 +3785,20 @@ relocate_object(Obj_Entry *obj, bool bind_now, Obj_Entry *rtldobj,
 	if (obj->textrel && reloc_textrel_prot(obj, false) != 0)
 		return (-1);
 
-	/* Set the special PLT or GOT entries. */
-	init_pltgot(obj);
+	for (i = 0; i < obj->nplts; i++) {
+		plt = &obj->plts[i];
 
-	/* Process the PLT relocations. */
-	if (reloc_plt(obj, flags, lockstate) == -1)
-		return (-1);
-	/* Relocate the jump slots if we are doing immediate binding. */
-	if ((obj->bind_now || bind_now) && reloc_jmpslots(obj, flags,
-	    lockstate) == -1)
-		return (-1);
+		/* Set the special PLT or GOT entries. */
+		init_pltgot(plt);
+
+		/* Process the PLT relocations. */
+		if (reloc_plt(plt, flags, lockstate) == -1)
+			return (-1);
+		/* Relocate the jump slots if we are doing immediate binding. */
+		if ((obj->bind_now || bind_now) && reloc_jmpslots(plt, flags,
+		    lockstate) == -1)
+			return (-1);
+	}
 
 	if (obj != rtldobj && !obj->mainprog && obj_enforce_relro(obj) == -1)
 		return (-1);

@@ -147,7 +147,7 @@ ENTRY(.rtld_start)
 END(.rtld_start)
 
 /*
- * t0 = obj pointer
+ * t0 = plt pointer
  * t1 = reloc offset
  */
 ENTRY(_rtld_bind_start)
@@ -190,7 +190,7 @@ ENTRY(_rtld_bind_start)
 	slli	a1, t1, 1	/* Mult items by 2 */
 	add	a1, a1, t1	/* Plus item */
 
-	/* Load obj */
+	/* Load plt */
 	MV_PTR	PTR(a0), PTR(t0)
 
 	/* Call into rtld */

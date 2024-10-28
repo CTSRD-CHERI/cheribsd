@@ -146,7 +146,7 @@ _ENTRY(_rtld_bind_start)
 	mr	%r3,%r11
 	mulli	%r4,%r12,24		# Multiply index by sizeof(Elf_Rela)
 
-	bl      _rtld_bind		# target addr = _rtld_bind(obj, reloff)
+	bl      _rtld_bind		# target addr = _rtld_bind(plt, reloff)
 	nop
 
 #if !defined(_CALL_ELF) || _CALL_ELF == 1

@@ -381,12 +381,13 @@ done:
  * Initialise a PLT slot to the resolving trampoline
  */
 static int
-reloc_plt_object(Obj_Entry *obj, const Elf_Rela *rela)
+reloc_plt_object(Plt_Entry *plt, const Elf_Rela *rela)
 {
+	Obj_Entry *obj = plt->obj;
 	Elf_Addr *where = (Elf_Addr *)(obj->relocbase + rela->r_offset);
 	long reloff;
 
-	reloff = rela - obj->pltrela;
+	reloff = rela - plt->rela;
 
 	dbg(" reloc_plt_object: where=%p,reloff=%lx,glink=%#lx", (void *)where,
 	    reloff, obj->glink);
@@ -408,15 +409,16 @@ reloc_plt_object(Obj_Entry *obj, const Elf_Rela *rela)
  * Process the PLT relocations.
  */
 int
-reloc_plt(Obj_Entry *obj, int flags __unused, RtldLockState *lockstate __unused)
+reloc_plt(Plt_Entry *plt, int flags __unused, RtldLockState *lockstate __unused)
 {
+	Obj_Entry *obj = plt->obj;
 	const Elf_Rela *relalim;
 	const Elf_Rela *rela;
 
-	if (obj->pltrelasize != 0) {
-		relalim = (const Elf_Rela *)((const char *)obj->pltrela +
-		    obj->pltrelasize);
-		for (rela = obj->pltrela;  rela < relalim;  rela++) {
+	if (plt->relasize != 0) {
+		relalim = (const Elf_Rela *)((const char *)plt->rela +
+		    plt->relasize);
+		for (rela = plt->rela;  rela < relalim;  rela++) {
 
 #if defined(_CALL_ELF) && _CALL_ELF == 2
 			if (ELF_R_TYPE(rela->r_info) == R_PPC_IRELATIVE) {
@@ -432,7 +434,7 @@ reloc_plt(Obj_Entry *obj, int flags __unused, RtldLockState *lockstate __unused)
 			 */
 			assert(ELF_R_TYPE(rela->r_info) == R_PPC_JMP_SLOT);
 
-			if (reloc_plt_object(obj, rela) < 0) {
+			if (reloc_plt_object(plt, rela) < 0) {
 				return (-1);
 			}
 		}
@@ -445,8 +447,9 @@ reloc_plt(Obj_Entry *obj, int flags __unused, RtldLockState *lockstate __unused)
  * LD_BIND_NOW was set - force relocation for all jump slots
  */
 int
-reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
+reloc_jmpslots(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 {
+	Obj_Entry *obj = plt->obj;
 	const Obj_Entry *defobj;
 	const Elf_Rela *relalim;
 	const Elf_Rela *rela;
@@ -454,9 +457,9 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 	Elf_Addr *where;
 	Elf_Addr target;
 
-	relalim = (const Elf_Rela *)((const char *)obj->pltrela +
-	    obj->pltrelasize);
-	for (rela = obj->pltrela; rela < relalim; rela++) {
+	relalim = (const Elf_Rela *)((const char *)plt->rela +
+	    plt->relasize);
+	for (rela = plt->rela; rela < relalim; rela++) {
 		/* This isn't actually a jump slot, ignore it. */
 		if (ELF_R_TYPE(rela->r_info) == R_PPC_IRELATIVE)
 			continue;
@@ -489,11 +492,10 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 		}
 	}
 
-	obj->jmpslots_done = true;
+	plt->jmpslots_done = true;
 
 	return (0);
 }
-
 
 /*
  * Update the value of a PLT jump slot.
@@ -564,6 +566,31 @@ out:
 	return (target);
 }
 
+#if defined(_CALL_ELF) && _CALL_ELF == 2
+static void
+reloc_iresolve_plt(Plt_Entry *plt, RtldLockState *lockstate)
+{
+	Obj_Entry *obj = plt->obj;
+	const Elf_Rela *relalim;
+	const Elf_Rela *rela;
+	Elf_Addr *where, target, *ptr;
+
+        relalim = (const Elf_Rela *)((const char *)plt->rela + plt->relasize);
+        for (rela = plt->rela;  rela < relalim;  rela++) {
+                if (ELF_R_TYPE(rela->r_info) == R_PPC_IRELATIVE) {
+                        ptr = (Elf_Addr *)(obj->relocbase + rela->r_addend);
+                        where = (Elf_Addr *)(obj->relocbase + rela->r_offset);
+
+                        lock_release(rtld_bind_lock, lockstate);
+                        target = call_ifunc_resolver(ptr);
+                        wlock_acquire(rtld_bind_lock, lockstate);
+
+                        *where = target;
+                }
+        }
+}
+#endif
+
 int
 reloc_iresolve(Obj_Entry *obj,
     struct Struct_RtldLockState *lockstate)
@@ -581,6 +608,7 @@ reloc_iresolve(Obj_Entry *obj,
 	const Elf_Rela *relalim;
 	const Elf_Rela *rela;
 	Elf_Addr *where, target, *ptr;
+	unsigned long i;
 
 	if (!obj->irelative)
 		return (0);
@@ -602,51 +630,33 @@ reloc_iresolve(Obj_Entry *obj,
 	 * XXX Remove me when lld is fixed!
 	 * LLD currently makes illegal relocations in the PLT.
 	 */
-        relalim = (const Elf_Rela *)((const char *)obj->pltrela + obj->pltrelasize);
-        for (rela = obj->pltrela;  rela < relalim;  rela++) {
-                if (ELF_R_TYPE(rela->r_info) == R_PPC_IRELATIVE) {
-                        ptr = (Elf_Addr *)(obj->relocbase + rela->r_addend);
-                        where = (Elf_Addr *)(obj->relocbase + rela->r_offset);
-
-                        lock_release(rtld_bind_lock, lockstate);
-                        target = call_ifunc_resolver(ptr);
-                        wlock_acquire(rtld_bind_lock, lockstate);
-
-                        *where = target;
-                }
-        }
+	for (i = 0; i < obj->nplts; i++)
+		reloc_iresolve_plt(&obj->plts[i], lockstate);
 
 	obj->irelative = false;
 	return (0);
 #endif
 }
 
-int
-reloc_gnu_ifunc(Obj_Entry *obj __unused, int flags __unused,
-    struct Struct_RtldLockState *lockstate __unused)
+#if defined(_CALL_ELF) && _CALL_ELF == 2
+static bool
+reloc_gnu_ifunc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 {
-#if !defined(_CALL_ELF) || _CALL_ELF == 1
-	_rtld_error("reloc_gnu_ifunc(): Not implemented!");
-	/* XXX not implemented */
-	return (-1);
-#else
-
+	Obj_Entry *obj = plt->obj;
 	const Elf_Rela *relalim;
 	const Elf_Rela *rela;
 	Elf_Addr *where, target;
 	const Elf_Sym *def;
 	const Obj_Entry *defobj;
 
-	if (!obj->gnu_ifunc)
-		return (0);
-	relalim = (const Elf_Rela *)((const char *)obj->pltrela + obj->pltrelasize);
-	for (rela = obj->pltrela;  rela < relalim;  rela++) {
+	relalim = (const Elf_Rela *)((const char *)plt->rela + plt->relasize);
+	for (rela = plt->rela;  rela < relalim;  rela++) {
 		if (ELF_R_TYPE(rela->r_info) == R_PPC_JMP_SLOT) {
 			where = (Elf_Addr *)(obj->relocbase + rela->r_offset);
 			def = find_symdef(ELF_R_SYM(rela->r_info), obj, &defobj,
 			    SYMLOOK_IN_PLT | flags, NULL, lockstate);
 			if (def == NULL)
-				return (-1);
+				return (false);
 			if (ELF_ST_TYPE(def->st_info) != STT_GNU_IFUNC)
 				continue;
 			lock_release(rtld_bind_lock, lockstate);
@@ -656,6 +666,26 @@ reloc_gnu_ifunc(Obj_Entry *obj __unused, int flags __unused,
 			    (const Elf_Rel *)rela);
 		}
 	}
+	return (true);
+}
+#endif
+
+int
+reloc_gnu_ifunc(Obj_Entry *obj, int flags,
+    struct Struct_RtldLockState *lockstate)
+{
+#if !defined(_CALL_ELF) || _CALL_ELF == 1
+	_rtld_error("reloc_gnu_ifunc(): Not implemented!");
+	/* XXX not implemented */
+	return (-1);
+#else
+	unsigned long i;
+
+	if (!obj->gnu_ifunc)
+		return (0);
+	for (i = 0; i < obj->nplts; i++)
+		if (!reloc_gnu_ifunc_plt(&obj->plts[i], flags, lockstate))
+			return (-1);
 	obj->gnu_ifunc = false;
 	return (0);
 #endif
@@ -669,11 +699,11 @@ reloc_iresolve_nonplt(Obj_Entry *obj __unused,
 }
 
 void
-init_pltgot(Obj_Entry *obj)
+init_pltgot(Plt_Entry *plt)
 {
 	Elf_Addr *pltcall;
 
-	pltcall = obj->pltgot;
+	pltcall = plt->pltgot;
 
 	if (pltcall == NULL) {
 		return;
@@ -681,10 +711,10 @@ init_pltgot(Obj_Entry *obj)
 
 #if defined(_CALL_ELF) && _CALL_ELF == 2
 	pltcall[0] = (Elf_Addr)&_rtld_bind_start; 
-	pltcall[1] = (Elf_Addr)obj;
+	pltcall[1] = (Elf_Addr)plt;
 #else
 	memcpy(pltcall, _rtld_bind_start, sizeof(struct funcdesc));
-	pltcall[2] = (Elf_Addr)obj;
+	pltcall[2] = (Elf_Addr)plt;
 #endif
 }
 
