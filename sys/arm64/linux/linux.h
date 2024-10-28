@@ -43,7 +43,7 @@ typedef uint32_t	l_uint;
 typedef uint64_t	l_ulong;
 typedef uint16_t	l_ushort;
 
-typedef uintptr_t	l_uintptr_t;
+typedef l_ulong		l_uintptr_t;
 typedef l_long		l_clock_t;
 typedef l_int		l_daddr_t;
 typedef l_uint		l_gid_t;
@@ -189,10 +189,20 @@ struct linux_pt_regset {
 	l_ulong cpsr;
 };
 
+struct iovec;
+struct uio;
+struct l_iovec64 {
+	l_uintptr_t	iov_base;
+	l_size_t	iov_len;
+};
+
 #ifdef _KERNEL
 struct reg;
 struct syscall_info;
-
+int	linux64_copyiniov(struct l_iovec64 * __capability iovp64,
+	    l_ulong iovcnt, struct iovec **iovp, int error);
+int	linux64_copyinuio(struct l_iovec64 * __capability iovp64,
+	    l_ulong iovcnt, struct uio **uiop);
 void	bsd_to_linux_regset(const struct reg *b_reg,
 	    struct linux_pt_regset *l_regset);
 void	linux_to_bsd_regset(struct reg *b_reg,
