@@ -837,15 +837,6 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
 
 #elif defined(__aarch64__)
 
-#if defined(__CHERI_PURE_CAPABILITY__)
-DEFINE_LIBUNWIND_FUNCTION(__rtld_unw_getcontext)
-  mov    c2,      csp
-  str    c2,      [c1]
-  ret    c30
-END_LIBUNWIND_FUNCTION(__rtld_unw_getcontext)
-WEAK_ALIAS(__rtld_unw_getcontext, _rtld_unw_getcontext)
-#endif
-
 //
 // extern int __unw_getcontext(unw_context_t* thread_state)
 //
@@ -874,10 +865,6 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
   mov    c1,csp
   str    c1,      [c0, #0x1f0]
   str    c30,     [c0, #0x200]    // store return address as pcc
-
-  // Prepare c1 to get our executive stack.
-  add    c1, c0,  #0x210
-
   // skip cpsr
   add    c0, c0,  #0x230
   stp    d0, d1,  [c0, #0x000]
@@ -897,8 +884,21 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
   stp    d28,d29, [c0, #0x0e0]
   str    d30,     [c0, #0x0f0]
   str    d31,     [c0, #0x0f8]
+#ifdef _LIBUNWIND_HAS_CHERI_LIB_C18N
+  // Store the trusted stack pointer
+  stp    c0, c30, [csp, #-0x20]!
+  mov    c0, c30
+  bl     dl_c18n_get_trusted_stack
+  ldp    c1, c30, [csp], #0x20
+  str    c0, [c1, #-0x20]         // -0x230 + 0x210 = -0x20
+#endif
   mov    x0, #0                   // return UNW_ESUCCESS
-  b      _rtld_unw_getcontext
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+  and    x30, x30, #~1
+  ret    x30                    // jump to pc
+#else
+  ret                           // jump to pcc
+#endif
 #else
   stp    x0, x1,  [x0, #0x000]
   stp    x2, x3,  [x0, #0x010]
