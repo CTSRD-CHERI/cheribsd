@@ -43,6 +43,7 @@
         "linux_emul.h": "c",
         "linux.h": "c",
         "linux32_proto.h": "c",
-        "__config": "cpp"
+        "__config": "cpp",
+        "__locale": "c"
     }
 }
