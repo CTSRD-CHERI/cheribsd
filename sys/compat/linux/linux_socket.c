@@ -1804,7 +1804,7 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr * __capability 
 	error = freebsd32_copyiniov(PTRIN(msg->msg_iov), msg->msg_iovlen,
 	    &iov, EMSGSIZE);
 #else
-	error = linux64_copyiniov((void * __capability)msg.msg_iov, msg->msg_iovlen, &iov, EMSGSIZE);
+	error = linux64_copyiniov((void * __capability)msg->msg_iov, msg->msg_iovlen, &iov, EMSGSIZE);
 #endif
 	if (error != 0)
 		return (error);
