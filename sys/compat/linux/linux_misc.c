@@ -2466,7 +2466,7 @@ linux_getrandom(struct thread *td, struct linux_getrandom_args *args)
 	if (args->count > INT_MAX)
 		args->count = INT_MAX;
 
-	IOVEC_INIT(&iov, args->buf, args->count);
+	IOVEC_INIT(&iov, __USER_CAP(args->buf, args->count), args->count);
 
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
