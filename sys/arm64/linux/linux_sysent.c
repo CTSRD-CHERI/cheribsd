@@ -77,9 +77,9 @@ struct sysent linux_sysent[] = {
 	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 60 = linux_quotactl */
 	{ .sy_narg = AS(linux_getdents64_args), .sy_call = (sy_call_t *)linux_getdents64, .sy_auevent = AUE_GETDIRENTRIES, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 61 = linux_getdents64 */
 	{ .sy_narg = AS(linux_lseek_args), .sy_call = (sy_call_t *)linux_lseek, .sy_auevent = AUE_LSEEK, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 62 = linux_lseek */
-	{ .sy_narg = AS(read_args), .sy_call = (sy_call_t *)sys_read, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 63 = read */
+	{ .sy_narg = AS(linux_read_args), .sy_call = (sy_call_t *)linux_read, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 63 = linux_read */
 	{ .sy_narg = AS(linux_write_args), .sy_call = (sy_call_t *)linux_write, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 64 = linux_write */
-	{ .sy_narg = AS(readv_args), .sy_call = (sy_call_t *)sys_readv, .sy_auevent = AUE_READV, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 65 = readv */
+	{ .sy_narg = AS(linux_readv_args), .sy_call = (sy_call_t *)linux_readv, .sy_auevent = AUE_READV, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 65 = linux_readv */
 	{ .sy_narg = AS(linux_writev_args), .sy_call = (sy_call_t *)linux_writev, .sy_auevent = AUE_WRITEV, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 66 = linux_writev */
 	{ .sy_narg = AS(linux_pread_args), .sy_call = (sy_call_t *)linux_pread, .sy_auevent = AUE_PREAD, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 67 = linux_pread */
 	{ .sy_narg = AS(linux_pwrite_args), .sy_call = (sy_call_t *)linux_pwrite, .sy_auevent = AUE_PWRITE, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 68 = linux_pwrite */

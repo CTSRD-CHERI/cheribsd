@@ -59,9 +59,9 @@
 #define	LINUX_SYS_linux_pipe2	59
 #define	LINUX_SYS_linux_getdents64	61
 #define	LINUX_SYS_linux_lseek	62
-#define	LINUX_SYS_read	63
+#define	LINUX_SYS_linux_read	63
 #define	LINUX_SYS_linux_write	64
-#define	LINUX_SYS_readv	65
+#define	LINUX_SYS_linux_readv	65
 #define	LINUX_SYS_linux_writev	66
 #define	LINUX_SYS_linux_pread	67
 #define	LINUX_SYS_linux_pwrite	68
