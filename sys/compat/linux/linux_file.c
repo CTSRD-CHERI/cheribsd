@@ -1850,6 +1850,39 @@ linux_enobufs2eagain(struct thread *td, int fd, int error)
 	return (error);
 }
 
+// Currently linux_read() and linux_readv() are only used in arm64 to handle pointer-capability conversion
+// Unused in other architecture (they will call sys_ versions directly)
+
+int
+linux_read(struct thread *td, struct linux_read_args *args)
+{
+	struct read_args bargs = {
+		.fd = args->fd,
+		.buf = __USER_CAP(args->buf, args->nbyte),
+		.nbyte = args->nbyte,
+	}
+
+	return (sys_read(td, bargs));
+}
+
+int
+linux_readv(struct thread *td, struct linux_readv_args *args)
+{
+	struct uio *auio;
+	int error;
+
+#ifdef COMPAT_LINUX32
+	error = freebsd32_copyinuio(PTRIN(args->iovp), args->iovcnt, &auio);
+#else
+	error = linux64_copyinuio(__USER_CAP_ARRAY(((struct l_iovec64*)args->iovp), args->iovcnt), args->iovcnt, &auio);
+#endif
+	if (error != 0)
+		return (error);
+	error = kern_readv(td, args->fd, auio);
+	freeuio(auio);
+	return error;
+}
+
 int
 linux_write(struct thread *td, struct linux_write_args *args)
 {
