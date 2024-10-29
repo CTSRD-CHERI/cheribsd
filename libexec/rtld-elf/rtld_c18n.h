@@ -263,12 +263,6 @@ func_sig_legal(struct func_sig sig)
 /*
  * APIs
  */
-/*
- * This macro can only be used in a function directly invoked by a trampoline.
- */
-#define	c18n_return_address()	(C18N_ENABLED ?				\
-	get_trusted_stk()->state.pc : __builtin_return_address(0))
-
 void *_rtld_sandbox_code(void *, struct func_sig);
 void *_rtld_safebox_code(void *, struct func_sig);
 
