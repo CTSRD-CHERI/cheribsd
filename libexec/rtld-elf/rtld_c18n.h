@@ -193,6 +193,19 @@ pop_dummy_rtld_trusted_frame(struct trusted_frame *tf)
 /*
  * Stack unwinding
  */
+#ifdef rtld_get_return_address
+#undef rtld_get_return_address
+#define	rtld_get_return_address()	({				\
+	void *__retaddr = __builtin_return_address(0);			\
+	if (C18N_ENABLED) {						\
+		struct trusted_frame *__tf = get_trusted_stk();		\
+		if (c18n_is_tramp((uintptr_t)__retaddr, __tf))		\
+			__retaddr = __tf->state.pc;			\
+	}								\
+	__retaddr;							\
+})
+#endif
+
 int c18n_is_tramp(uintptr_t, const struct trusted_frame *);
 
 /*
@@ -263,12 +276,6 @@ func_sig_legal(struct func_sig sig)
 /*
  * APIs
  */
-/*
- * This macro can only be used in a function directly invoked by a trampoline.
- */
-#define	c18n_return_address()	(C18N_ENABLED ?				\
-	get_trusted_stk()->state.pc : __builtin_return_address(0))
-
 void *_rtld_sandbox_code(void *, struct func_sig);
 void *_rtld_safebox_code(void *, struct func_sig);
 
