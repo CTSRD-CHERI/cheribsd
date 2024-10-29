@@ -503,7 +503,7 @@ linux_ptrace(struct thread *td, struct linux_ptrace_args *uap)
 		error = kern_ptrace(td, PT_CONTINUE, pid, __USER_CAP_UNBOUND(1), sig);
 		break;
 	case LINUX_PTRACE_KILL:
-		error = kern_ptrace(td, PT_KILL, pid, __USER_CAP_UNBOUND(addr), uap->data);
+		error = kern_ptrace(td, PT_KILL, pid, addr, uap->data);
 		break;
 	case LINUX_PTRACE_SINGLESTEP:
 		error = map_signum(uap->data, &sig);
@@ -518,7 +518,7 @@ linux_ptrace(struct thread *td, struct linux_ptrace_args *uap)
 		error = linux_ptrace_setregs(td, pid, __USER_CAP(uap->data, sizeof(struct linux_pt_regset)));
 		break;
 	case LINUX_PTRACE_ATTACH:
-		error = kern_ptrace(td, PT_ATTACH, pid, __USER_CAP_UNBOUND(addr), uap->data);
+		error = kern_ptrace(td, PT_ATTACH, pid, addr, uap->data);
 		break;
 	case LINUX_PTRACE_DETACH:
 		error = map_signum(uap->data, &sig);
