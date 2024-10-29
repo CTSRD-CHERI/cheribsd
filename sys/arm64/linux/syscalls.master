@@ -381,8 +381,8 @@
 		    l_int whence
 		);
 	}
-63	AUE_NULL	NOPROTO	{
-		int read(
+63	AUE_NULL	STD	{
+		int linux_read(
 		    int fd,
 		    char *buf,
 		    l_size_t nbyte
@@ -395,8 +395,8 @@
 		    l_size_t nbyte
 		);
 	}
-65	AUE_READV	NOPROTO	{
-		int readv(
+65	AUE_READV	STD	{
+		int linux_readv(
 		    int fd,
 		    struct iovec *iovp,
 		    u_int iovcnt
