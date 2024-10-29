@@ -1037,7 +1037,7 @@ linux_preadv(struct thread *td, struct linux_preadv_args *uap)
 #ifdef COMPAT_LINUX32
 	error = freebsd32_copyinuio(PTRIN(uap->vec), uap->vlen, &auio);
 #else
-	error = freebsd64_copyinuio(__USER_CAP_ARRAY(((struct iovec64*)uap->vec), uap->vlen), uap->vlen, &auio);
+	error = linux64_copyinuio(__USER_CAP_ARRAY(((struct l_iovec64*)uap->vec), uap->vlen), uap->vlen, &auio);
 #endif
 	if (error != 0)
 		return (error);
@@ -1064,7 +1064,7 @@ linux_pwritev(struct thread *td, struct linux_pwritev_args *uap)
 #ifdef COMPAT_LINUX32
 	error = freebsd32_copyinuio(PTRIN(uap->vec), uap->vlen, &auio);
 #else
-	error = freebsd64_copyinuio(__USER_CAP_ARRAY(((struct iovec64*)uap->vec), uap->vlen), uap->vlen, &auio);
+	error = linux64_copyinuio(__USER_CAP_ARRAY(((struct l_iovec64*)uap->vec), uap->vlen), uap->vlen, &auio);
 #endif
 	if (error != 0)
 		return (error);
@@ -1871,7 +1871,7 @@ linux_writev(struct thread *td, struct linux_writev_args *args)
 #ifdef COMPAT_LINUX32
 	error = freebsd32_copyinuio(PTRIN(args->iovp), args->iovcnt, &auio);
 #else
-	error = freebsd64_copyinuio(__USER_CAP_ARRAY(((struct iovec64*)args->iovp), args->iovcnt), args->iovcnt, &auio);
+	error = linux64_copyinuio(__USER_CAP_ARRAY(((struct l_iovec64*)args->iovp), args->iovcnt), args->iovcnt, &auio);
 #endif
 	if (error != 0)
 		return (error);

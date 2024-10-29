@@ -703,8 +703,7 @@ linux_to_bsd_msghdr(struct msghdr *bhdr, const struct l_msghdr *lhdr)
 
 	bhdr->msg_name		= __USER_CAP(lhdr->msg_name, lhdr->msg_namelen);
 	bhdr->msg_namelen	= lhdr->msg_namelen;
-	// TODO: May be wrong due to incompatible types
-	bhdr->msg_iov		= __USER_CAP(lhdr->msg_iov, lhdr->msg_iovlen * sizeof(struct iovec));
+	bhdr->msg_iov		= __USER_CAP(lhdr->msg_iov, lhdr->msg_iovlen * sizeof(struct l_iovec64));
 	bhdr->msg_iovlen	= lhdr->msg_iovlen;
 	// TODO: Check
 	bhdr->msg_control	= __USER_CAP_UNBOUND(lhdr->msg_control);
@@ -1396,7 +1395,7 @@ linux_sendmsg_common(struct thread *td, l_int s, struct l_msghdr * __capability 
 	error = freebsd32_copyiniov(PTRIN(msg.msg_iov), msg.msg_iovlen,
 	    &iov, EMSGSIZE);
 #else
-	error = copyiniov(msg.msg_iov, msg.msg_iovlen, &iov, EMSGSIZE);
+	error = linux64_copyiniov((void * __capability)msg.msg_iov, msg.msg_iovlen, &iov, EMSGSIZE);
 #endif
 	if (error != 0)
 		return (error);
@@ -1805,7 +1804,7 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr * __capability 
 	error = freebsd32_copyiniov(PTRIN(msg->msg_iov), msg->msg_iovlen,
 	    &iov, EMSGSIZE);
 #else
-	error = copyiniov(msg->msg_iov, msg->msg_iovlen, &iov, EMSGSIZE);
+	error = linux64_copyiniov((void * __capability)msg.msg_iov, msg->msg_iovlen, &iov, EMSGSIZE);
 #endif
 	if (error != 0)
 		return (error);
