@@ -83,6 +83,20 @@ __BEGIN_DECLS
 	    typeof (Y) y_ = (Y);	\
 	    (x_ > y_) ? x_ : y_; })
 
+#ifdef CHERI_LIB_C18N
+#define	rtld_get_return_address()	__builtin_return_address(0)
+#else
+#define	rtld_get_return_address()	({				\
+	void *__retaddr = __builtin_return_address(0);			\
+	if (C18N_ENABLED) {						\
+		struct trusted_frame *__tf = get_trusted_stk();		\
+		if (c18n_is_tramp((uintptr_t)__retaddr, __tf))		\
+			__retaddr = __tf->state.pc;			\
+	}								\
+	__retaddr;							\
+})
+#endif
+
 #define NEW(type)	((type *) xmalloc(sizeof(type)))
 #define CNEW(type)	((type *) xcalloc(1, sizeof(type)))
 
