@@ -117,7 +117,7 @@ linux_ptrace_peekuser(struct thread *td, pid_t pid, void * __capability addr, vo
 {
 
 	LINUX_RATELIMIT_MSG_OPT1("PTRACE_PEEKUSER offset %ld not implemented; "
-	    "returning EINVAL", (long)addr);
+	    "returning EINVAL", (__cheri_addr long)addr);
 
 	return (EINVAL);
 }
@@ -127,7 +127,7 @@ linux_ptrace_pokeuser(struct thread *td, pid_t pid, void * __capability addr, vo
 {
 
 	LINUX_RATELIMIT_MSG_OPT1("PTRACE_POKEUSER offset %ld "
-	    "not implemented; returning EINVAL", (long)addr);
+	    "not implemented; returning EINVAL", (__cheri_addr long)addr);
 	return (EINVAL);
 }
 
