@@ -1860,7 +1860,7 @@ linux_read(struct thread *td, struct linux_read_args *args)
 		.fd = args->fd,
 		.buf = __USER_CAP(args->buf, args->nbyte),
 		.nbyte = args->nbyte,
-	}
+	};
 
 	return (sys_read(td, bargs));
 }
