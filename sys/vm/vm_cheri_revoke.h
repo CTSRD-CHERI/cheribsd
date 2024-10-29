@@ -62,7 +62,7 @@ uintcap_t cheri_revoke_sealed(uintcap_t);
  * This is almost certainly a sufficiently subtle point that this is not
  * entirely the right answer, though I hope it's not entirely wrong, either.
  */
-static __always_inline inline uintcap_t
+static __always_inline uintcap_t
 cheri_revoke_cap(uintcap_t c)
 {
 #ifndef CHERI_CAPREVOKE_CLEARTAGS
