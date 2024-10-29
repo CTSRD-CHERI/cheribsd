@@ -826,7 +826,7 @@ linux_sendto_hdrincl(struct thread *td, struct linux_sendto_args *linux_args)
  */
 #define linux_ip_copysize	8
 
-	struct ip * __capability packet;
+	struct ip *packet;
 	struct msghdr msg;
 	struct iovec aiov[1];
 	int error;
@@ -836,10 +836,10 @@ linux_sendto_hdrincl(struct thread *td, struct linux_sendto_args *linux_args)
 	    linux_args->len > IP_MAXPACKET)
 		return (EINVAL);
 
-	packet = (struct ip * __capability)malloc_c(linux_args->len, M_LINUX, M_WAITOK);
+	packet = (struct ip *)malloc(linux_args->len, M_LINUX, M_WAITOK);
 
 	/* Make kernel copy of the packet to be sent */
-	if ((error = copyin(__USER_CAP(linux_args->msg, linux_args->len), (__cheri_fromcap void *)packet,
+	if ((error = copyin(__USER_CAP(linux_args->msg, linux_args->len), packet,
 	    linux_args->len)))
 		goto goout;
 
@@ -858,7 +858,7 @@ linux_sendto_hdrincl(struct thread *td, struct linux_sendto_args *linux_args)
 	error = linux_sendit(td, linux_args->s, &msg, linux_args->flags,
 	    NULL, UIO_SYSSPACE);
 goout:
-	free_c(packet, M_LINUX);
+	free(packet, M_LINUX);
 	return (error);
 }
 
@@ -1292,7 +1292,7 @@ linux_sendto(struct thread *td, struct linux_sendto_args *args)
 	}
 	msg.msg_iov = &aiov;
 	msg.msg_iovlen = 1;
-	IOVEC_INIT(&aiov, __USER_CAP(args->msg, args->len), args->len);
+	IOVEC_INIT_C(&aiov, __USER_CAP(args->msg, args->len), args->len);
 	fdrop(fp, td);
 	return (linux_sendit(td, args->s, &msg, args->flags, NULL,
 	    UIO_USERSPACE));
@@ -1324,7 +1324,7 @@ linux_recvfrom(struct thread *td, struct linux_recvfrom_args *args)
 	msg.msg_namelen = fromlen;
 	msg.msg_iov = &aiov;
 	msg.msg_iovlen = 1;
-	IOVEC_INIT(&aiov, __USER_CAP(args->buf, args->len), args->len);
+	IOVEC_INIT_C(&aiov, __USER_CAP(args->buf, args->len), args->len);
 	msg.msg_control = 0;
 	msg.msg_flags = linux_to_bsd_msg_flags(args->flags);
 
