@@ -113,7 +113,7 @@ linux_ptrace_getregs_machdep(struct thread *td __unused, pid_t pid __unused,
 }
 
 int
-linux_ptrace_peekuser(struct thread *td, pid_t pid, void *addr, void *data)
+linux_ptrace_peekuser(struct thread *td, pid_t pid, void * __capability addr, void * __capability data)
 {
 
 	LINUX_RATELIMIT_MSG_OPT1("PTRACE_PEEKUSER offset %ld not implemented; "
@@ -123,7 +123,7 @@ linux_ptrace_peekuser(struct thread *td, pid_t pid, void *addr, void *data)
 }
 
 int
-linux_ptrace_pokeuser(struct thread *td, pid_t pid, void *addr, void *data)
+linux_ptrace_pokeuser(struct thread *td, pid_t pid, void * __capability addr, void * __capability data)
 {
 
 	LINUX_RATELIMIT_MSG_OPT1("PTRACE_POKEUSER offset %ld "

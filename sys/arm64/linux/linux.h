@@ -212,9 +212,9 @@ void	linux_ptrace_get_syscall_info_machdep(const struct reg *reg,
 int	linux_ptrace_getregs_machdep(struct thread *td, pid_t pid,
 	    struct linux_pt_regset *l_regset);
 int	linux_ptrace_peekuser(struct thread *td, pid_t pid,
-	    void *addr, void *data);
+	    void * __capability addr, void * __capability data);
 int	linux_ptrace_pokeuser(struct thread *td, pid_t pid,
-	    void *addr, void *data);
+	    void * __capability addr, void * __capability data);
 #endif /* _KERNEL */
 
 #endif /* _ARM64_LINUX_H_ */
