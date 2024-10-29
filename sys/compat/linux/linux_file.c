@@ -1862,7 +1862,7 @@ linux_read(struct thread *td, struct linux_read_args *args)
 		.nbyte = args->nbyte,
 	};
 
-	return (sys_read(td, bargs));
+	return (sys_read(td, &bargs));
 }
 
 int
