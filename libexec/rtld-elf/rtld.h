@@ -214,11 +214,9 @@ typedef struct Struct_Obj_Entry {
     /*
      * For CHERI we need a capability for the executable + rodata segments so
      * that we can derive code capabilities from it.
-     * By having these additional members we can remove execute permissions from
+     * By having this additional member we can remove execute permissions from
      * relocbase and mapbase.
      */
-    Elf_Addr text_rodata_start_offset;
-    Elf_Addr text_rodata_end_offset;
     const char *text_rodata_cap;	/* Capability for the executable mapping */
 #endif
     caddr_t relocbase;		/* Relocation constant = mapbase - vaddrbase */

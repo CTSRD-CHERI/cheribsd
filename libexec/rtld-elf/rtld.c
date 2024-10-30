@@ -1934,16 +1934,6 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 		    rtld_round_page(ph->p_vaddr + ph->p_memsz) - obj->vaddrbase);
 	    }
 	    nsegs++;
-#ifdef __CHERI_PURE_CAPABILITY__
-	    if (!(ph->p_flags & PF_W)) {
-		Elf_Addr start_addr = ph->p_vaddr;
-		obj->text_rodata_start_offset = rtld_min(start_addr, obj->text_rodata_start_offset);
-		obj->text_rodata_end_offset = rtld_max(start_addr + ph->p_memsz, obj->text_rodata_end_offset);
-		dbg("%s: processing readonly PT_LOAD[%d], new text/rodata start "
-		    " = %zx text/rodata end = %zx", path, nsegs,
-		    (size_t)obj->text_rodata_start_offset, (size_t)obj->text_rodata_end_offset);
-	    }
-#endif
 	    break;
 
 	case PT_DYNAMIC:
@@ -1975,13 +1965,6 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 	    obj->relro_page = obj->relocbase + rtld_trunc_page(ph->p_vaddr);
 	    obj->relro_size = rtld_trunc_page(ph->p_vaddr + ph->p_memsz) -
 	      rtld_trunc_page(ph->p_vaddr);
-#ifdef __CHERI_PURE_CAPABILITY__
-	    obj->text_rodata_start_offset = rtld_min(ph->p_vaddr, obj->text_rodata_start_offset);
-	    obj->text_rodata_end_offset = rtld_max(ph->p_vaddr + ph->p_memsz, obj->text_rodata_end_offset);
-	    dbg("%s: Adding PT_GNU_RELRO, new text/rodata start "
-		" = %zx text/rodata end = %zx", path,
-		(size_t)obj->text_rodata_start_offset, (size_t)obj->text_rodata_end_offset);
-#endif
 	    break;
 
 	case PT_NOTE:
@@ -2005,7 +1988,7 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
     }
     /*
      * Derive text_rodata cap from AT_ENTRY (but set the address to the beginning
-     * of the object). Note: csetbounds is done after parsing .dynamic
+     * of the object).
      */
     obj->text_rodata_cap = (const char *)cheri_copyaddress(entry, obj->relocbase);
     fix_obj_mapping_cap_permissions(obj, path);
@@ -2763,28 +2746,6 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
-    /* find the end of rodata/text: */
-
-    for (int i = 0; i < ehdr->e_phnum; i++) {
-	const Elf_Phdr *ph = &objtmp.phdr[i];
-	if (ph->p_type != PT_LOAD)
-	    continue;
-	if (!(ph->p_flags & PF_W)) {
-	    Elf_Addr start_addr = ph->p_vaddr;
-	    objtmp.text_rodata_start_offset = rtld_min(start_addr, objtmp.text_rodata_start_offset);
-	    objtmp.text_rodata_end_offset = rtld_max(start_addr + ph->p_memsz, objtmp.text_rodata_end_offset);
-#if defined(DEBUG_VERBOSE) && DEBUG_VERBOSE > 3
-	    /* debug is not initialized yet so dbg() is a no-op */
-	    rtld_fdprintf(STDERR_FILENO, "rtld: processing PT_LOAD phdr[%d], "
-		"new text/rodata start  = %zx text/rodata end = %zx\n", i + 1,
-		(size_t)objtmp.text_rodata_start_offset, (size_t)objtmp.text_rodata_end_offset);
-#endif
-	}
-    }
-    /*
-     * Note: no csetbounds yet since we also need to include .cap_table (which
-     * is part of the r/w section). Bounds are set after .dynamic is read.
-     */
     objtmp.text_rodata_cap = objtmp.relocbase;
     fix_obj_mapping_cap_permissions(&objtmp, "RTLD");
 #endif
