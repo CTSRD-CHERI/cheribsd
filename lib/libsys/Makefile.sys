@@ -51,10 +51,6 @@ STATICOBJS+=	auxv.o
 STATICOBJS+=	interposing_table.o
 .endif
 
-NOASM= \
-	flag_captured.o \
-	yield.o
-
 PSEUDO= \
 	clock_gettime \
 	exit \
