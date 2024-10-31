@@ -39,6 +39,7 @@
 #endif
 #include <assert.h>
 #include <dlfcn.h>
+#include <errno.h>
 #include <link.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -375,6 +376,22 @@ _rtld_is_dlopened(void *arg __unused)
 {
 
 	return (0);
+}
+
+#pragma weak rtld_get_var
+const char *
+rtld_get_var(const char *name __unused)
+{
+	_rtld_error(sorry);
+	return (NULL);
+}
+
+#pragma weak rtld_set_var
+int
+rtld_set_var(const char *name __unused, const char *val __unused)
+{
+	_rtld_error(sorry);
+	return (EINVAL);
 }
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(__aarch64__)

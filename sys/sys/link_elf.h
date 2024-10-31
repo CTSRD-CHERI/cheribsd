@@ -109,6 +109,8 @@ int dl_iterate_phdr(__dl_iterate_hdr_callback, void *);
 int _rtld_addr_phdr(const void *, struct dl_phdr_info *);
 int _rtld_get_stack_prot(void);
 int _rtld_is_dlopened(void *);
+const char *rtld_get_var(const char *name);
+int rtld_set_var(const char *name, const char *val);
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(__aarch64__)
 #include <machine/c18n.h>
