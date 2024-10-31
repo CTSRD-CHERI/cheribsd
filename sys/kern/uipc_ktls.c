@@ -3083,6 +3083,7 @@ ktls_encrypt(struct ktls_wq *wq, struct mbuf *top)
 
 		if ((m->m_epg_flags & EPG_FLAG_ANON) == 0)
 			ktls_finish_nonanon(m, &state);
+		m->m_flags |= M_RDONLY;
 
 		npages += m->m_epg_nrdy;
 
@@ -3121,6 +3122,7 @@ ktls_encrypt_cb(struct ktls_ocf_encrypt_state *state, int error)
 
 	if ((m->m_epg_flags & EPG_FLAG_ANON) == 0)
 		ktls_finish_nonanon(m, state);
+	m->m_flags |= M_RDONLY;
 
 	so = state->so;
 	free(state, M_KTLS);
