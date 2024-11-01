@@ -51,6 +51,9 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20241104: remove the outdated c2x.7 symlink in favor of c23.7
+OLD_FILES+=usr/share/man/man7/c2x.7.gz
+
 # 20250421: Removal of /usr/lib{,64c,64cb}/c18n
 OLD_FILES+=usr/lib/c18n/libc.so
 OLD_FILES+=usr/lib/c18n/libc.so.7
