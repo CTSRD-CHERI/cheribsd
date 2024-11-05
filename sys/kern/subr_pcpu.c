@@ -70,7 +70,7 @@ struct dpcpu_free {
 	TAILQ_ENTRY(dpcpu_free) df_link;
 };
 
-DPCPU_DEFINE_STATIC(char, modspace[DPCPU_MODMIN] __aligned(__alignof(void *)));
+DPCPU_DEFINE_STATIC_ARRAY(char, modspace, [DPCPU_MODMIN] __aligned(__alignof(void *)));
 static TAILQ_HEAD(, dpcpu_free) dpcpu_head = TAILQ_HEAD_INITIALIZER(dpcpu_head);
 static struct sx dpcpu_lock;
 uintptr_t dpcpu_off[MAXCPU];

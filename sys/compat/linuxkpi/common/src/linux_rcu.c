@@ -110,7 +110,8 @@ CTASSERT(TS_RCU_TYPE_MAX == RCU_TYPE_MAX);
 
 static ck_epoch_t linux_epoch[RCU_TYPE_MAX];
 static struct linux_epoch_head linux_epoch_head[RCU_TYPE_MAX];
-DPCPU_DEFINE_STATIC(struct linux_epoch_record, linux_epoch_record[RCU_TYPE_MAX]);
+DPCPU_DEFINE_STATIC_ARRAY(struct linux_epoch_record, linux_epoch_record,
+    [RCU_TYPE_MAX]);
 
 static void linux_rcu_cleaner_func(void *, int);
 
@@ -132,7 +133,7 @@ linux_rcu_runtime_init(void *arg __unused)
 		CPU_FOREACH(i) {
 			struct linux_epoch_record *record;
 
-			record = &DPCPU_ID_GET(i, linux_epoch_record[j]);
+			record = DPCPU_ID_ARRAY_PTR(i, linux_epoch_record, j);
 
 			record->cpuid = i;
 			record->type = j;
@@ -202,7 +203,7 @@ linux_rcu_read_lock(unsigned type)
 	 */
 	sched_pin();
 
-	record = &DPCPU_GET(linux_epoch_record[type]);
+	record = DPCPU_ARRAY_PTR(linux_epoch_record, type);
 
 	/*
 	 * Use a critical section to prevent recursion inside
@@ -234,7 +235,7 @@ linux_rcu_read_unlock(unsigned type)
 	if (--(ts->rcu_recurse[type]) != 0)
 		return;
 
-	record = &DPCPU_GET(linux_epoch_record[type]);
+	record = DPCPU_ARRAY_PTR(linux_epoch_record, type);
 
 	/*
 	 * Use a critical section to prevent recursion inside

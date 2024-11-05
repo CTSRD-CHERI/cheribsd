@@ -1035,3 +1035,8 @@ CHERI_COMPARTMENTALIZE_KERNEL	opt_global.h
 # Disable system-call authorisation for compartmentalised user code.
 #
 CPU_CHERI_NO_SYSCALL_AUTHORIZE opt_global.h
+
+#
+# Use functions instead of direct references for DPCPU variables.
+#
+DPCPU_FUNCS opt_global.h

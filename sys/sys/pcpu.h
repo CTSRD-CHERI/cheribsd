@@ -83,15 +83,104 @@ extern uintptr_t dpcpu_off[];
 #define	DPCPU_SIZE		roundup2(DPCPU_BYTES, PAGE_SIZE)
 #define	DPCPU_MODSIZE		(DPCPU_SIZE - (DPCPU_BYTES - DPCPU_MODMIN))
 #endif
+#define	DPCPU_NAME(n)		pcpu_entry_##n
+
+/*
+ * Accessors with a given base.
+ *
+ * The base points to a CPU's page of dynamic variables with a bias of
+ * DPCPU_BIAS.  In non-purecap kernels, the bias is -DPCPU_START
+ * removing a subtraction from the access.  In CHERI purecap kernels,
+ * the bias is 0 as the base pointer would be unrepresentable
+ * otherwise.
+ */
+#ifdef DPCPU_FUNCS
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	DPCPU_BIAS	0
+#define	__DPCPU_PTR(b, t, n)						\
+	cheri_setboundsexact((t *)((b) +				\
+	    ((ptraddr_t)&DPCPU_NAME(n) - (ptraddr_t)DPCPU_START)),	\
+	    CHERI_REPRESENTABLE_LENGTH(sizeof(DPCPU_NAME(n))))
+#else /* __CHERI_PURE_CAPABILITY__ */
+#define	DPCPU_BIAS	((char *)NULL - (char *)DPCPU_START)
+#define	__DPCPU_PTR(b, t, n)						\
+    (t *)((b) + (uintptr_t)&DPCPU_NAME(n))
+#endif /* __CHERI_PURE_CAPABILITY__ */
+#else /* DPCPU_FUNCS */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	DPCPU_BIAS	0
+#define	_DPCPU_PTR(b, n)						\
+	cheri_setboundsexact((__typeof(DPCPU_NAME(n)) *)((b) +		\
+	    ((ptraddr_t)&DPCPU_NAME(n) - (ptraddr_t)DPCPU_START)),	\
+	    CHERI_REPRESENTABLE_LENGTH(sizeof(DPCPU_NAME(n))))
+#else /* __CHERI_PURE_CAPABILITY__ */
+#define	DPCPU_BIAS	((char *)NULL - (char *)DPCPU_START)
+#define	_DPCPU_PTR(b, n)						\
+    (__typeof(DPCPU_NAME(n))*)((b) + (uintptr_t)&DPCPU_NAME(n))
+#endif /* __CHERI_PURE_CAPABILITY__ */
+#define	_DPCPU_GET(b, n)	(*_DPCPU_PTR(b, n))
+#define	_DPCPU_SET(b, n, v)	(*_DPCPU_PTR(b, n) = v)
+#endif /* !DPCPU_FUNCS */
 
 /*
  * Declaration and definition.
  */
-#define	DPCPU_NAME(n)		pcpu_entry_##n
+#ifdef DPCPU_FUNCS
+#define	__DPCPU_DEFINE_PTR(qual, t, n)					\
+	qual t *							\
+	__dpcpu_ptr_##n(uintptr_t dynamic)				\
+	{								\
+									\
+		return ((t *)(void *)__DPCPU_PTR(dynamic, t, n));	\
+	}
+#define	__DPCPU_DEFINE_ARRAY_PTR(qual, t, n)				\
+	qual t *							\
+	__dpcpu_ptr_##n(uintptr_t dynamic, int ii)			\
+	{								\
+									\
+		return ((t *)(void *)__DPCPU_PTR(dynamic, t, n[ii]));	\
+	}
+#define	__DPCPU_DEFINE_ARRAY_PTR2(qual, t, n)				\
+	qual t *							\
+	__dpcpu_ptr_##n(uintptr_t dynamic, int ii, int jj)		\
+	{								\
+									\
+		return ((t *)(void *)__DPCPU_PTR(dynamic, t, n[ii][jj])); \
+	}
+
+#define	DPCPU_DECLARE(t, n)						\
+	t *__dpcpu_ptr_##n(uintptr_t dynamic)
+#define	DPCPU_DEFINE(t, n)						\
+	struct _hack; t DPCPU_NAME(n) __section(DPCPU_SETNAME) __used;	\
+	__DPCPU_DEFINE_PTR(, t, n)
+#define	DPCPU_DEFINE_ARRAY(t, n, exp)					\
+	struct _hack; t DPCPU_NAME(n) exp __section(DPCPU_SETNAME) __used; \
+	__DPCPU_DEFINE_ARRAY_PTR(, t, n)
+#define	DPCPU_DEFINE_ARRAY2(t, n, exp)					\
+	struct _hack; t DPCPU_NAME(n) exp __section(DPCPU_SETNAME) __used; \
+	__DPCPU_DEFINE_ARRAY_PTR2(, t, n)
+#else
 #define	DPCPU_DECLARE(t, n)	extern t DPCPU_NAME(n)
 /* struct _hack is to stop this from being used with the static keyword. */
 #define	DPCPU_DEFINE(t, n)	\
     struct _hack; t DPCPU_NAME(n) __section(DPCPU_SETNAME) __used
+#define	DPCPU_DEFINE_ARRAY(t, n, exp)	\
+    struct _hack; t DPCPU_NAME(n) exp __section(DPCPU_SETNAME) __used
+#define	DPCPU_DEFINE_ARRAY2(t, n, exp)	DPCPU_DEFINE_ARRAY(t, n, exp)
+#endif /* !DPCPU_FUNCS */
+
+#ifdef DPCPU_FUNCS
+#define	DPCPU_DEFINE_STATIC(t, n)	\
+	t DPCPU_NAME(n) __section(DPCPU_SETNAME) __used;		\
+	__DPCPU_DEFINE_PTR(static __used, t, n);			\
+	t DPCPU_NAME(n)
+#define	DPCPU_DEFINE_STATIC_ARRAY(t, n, exp)				\
+	t DPCPU_NAME(n) exp __section(DPCPU_SETNAME) __used;		\
+	__DPCPU_DEFINE_ARRAY_PTR(static __used, t, n)
+#define	DPCPU_DEFINE_STATIC_ARRAY2(t, n, exp)				\
+	t DPCPU_NAME(n) exp __section(DPCPU_SETNAME) __used;		\
+	__DPCPU_DEFINE_ARRAY_PTR2(static __used, t, n)
+#else /* DPCPU_FUNCS */
 #if defined(KLD_MODULE) && (defined(__aarch64__) || defined(__riscv) \
 		|| defined(__powerpc64__) || defined(__i386__))
 /*
@@ -111,47 +200,72 @@ extern uintptr_t dpcpu_off[];
  */
 #define	DPCPU_DEFINE_STATIC(t, n)	\
     t DPCPU_NAME(n) __section(DPCPU_SETNAME) __used
+#define	DPCPU_DEFINE_STATIC_ARRAY(t, n, exp)	\
+    t DPCPU_NAME(n) exp __section(DPCPU_SETNAME) __used
+#define	DPCPU_DEFINE_STATIC_ARRAY2(t, n, exp)	\
+    DPCPU_DEFINE_STATIC_ARRAY(t, n, exp)
 #else
 #define	DPCPU_DEFINE_STATIC(t, n)	\
     static t DPCPU_NAME(n) __section(DPCPU_SETNAME) __used
+#define	DPCPU_DEFINE_STATIC_ARRAY(t, n, exp)	\
+    static t DPCPU_NAME(n) exp __section(DPCPU_SETNAME) __used
+#define	DPCPU_DEFINE_STATIC_ARRAY2(t, n, exp)	\
+    DPCPU_DEFINE_STATIC_ARRAY(t, n, exp)
 #endif
-
-/*
- * Accessors with a given base.
- *
- * The base points to a CPU's page of dynamic variables with a bias of
- * DPCPU_BIAS.  In non-purecap kernels, the bias is -DPCPU_START
- * removing a subtraction from the access.  In CHERI purecap kernels,
- * the bias is 0 as the base pointer would be unrepresentable
- * otherwise.
- */
-#ifdef __CHERI_PURE_CAPABILITY__
-#define	DPCPU_BIAS	0
-#define	_DPCPU_PTR(b, n)						\
-	cheri_setboundsexact((__typeof(DPCPU_NAME(n)) *)((b) +		\
-	    ((ptraddr_t)&DPCPU_NAME(n) - (ptraddr_t)DPCPU_START)),	\
-	    CHERI_REPRESENTABLE_LENGTH(sizeof(DPCPU_NAME(n))))
-#else /* __CHERI_PURE_CAPABILITY__ */
-#define	DPCPU_BIAS	((char *)NULL - (char *)DPCPU_START)
-#define	_DPCPU_PTR(b, n)						\
-    (__typeof(DPCPU_NAME(n))*)((b) + (uintptr_t)&DPCPU_NAME(n))
-#endif /* __CHERI_PURE_CAPABILITY__ */
-#define	_DPCPU_GET(b, n)	(*_DPCPU_PTR(b, n))
-#define	_DPCPU_SET(b, n, v)	(*_DPCPU_PTR(b, n) = v)
+#endif /* !DPCPU_FUNCS */
 
 /*
  * Accessors for the current cpu.
  */
-#define	DPCPU_PTR(n)		_DPCPU_PTR(PCPU_GET(dynamic), n)
-#define	DPCPU_GET(n)		(*DPCPU_PTR(n))
-#define	DPCPU_SET(n, v)		(*DPCPU_PTR(n) = v)
+#ifdef DPCPU_FUNCS
+#define	DPCPU_PTR(n)							\
+	__dpcpu_ptr_##n(PCPU_GET(dynamic))
+#define	DPCPU_ARRAY_PTR(n, ii)						\
+	__dpcpu_ptr_##n(PCPU_GET(dynamic), ii)
+#define	DPCPU_ARRAY_PTR2(n, ii, jj)					\
+	__dpcpu_ptr_##n(PCPU_GET(dynamic), ii, jj)
+#else
+#define	DPCPU_PTR(n)			_DPCPU_PTR(PCPU_GET(dynamic), n)
+#define	DPCPU_ARRAY_PTR(n, ii)		_DPCPU_PTR(PCPU_GET(dynamic), n[ii])
+#define	DPCPU_ARRAY_PTR2(n, ii, jj)	_DPCPU_PTR(PCPU_GET(dynamic), n[ii][jj])
+#endif
+#define	DPCPU_GET(n)			(*DPCPU_PTR(n))
+#define	DPCPU_ARRAY_GET(n, ii)		(*DPCPU_ARRAY_PTR(n, ii))
+#define	DPCPU_ARRAY_GET2(n, ii, jj)	(*DPCPU_ARRAY_PTR2(n, ii, jj))
+#define	DPCPU_SET(n, v)			(*DPCPU_PTR(n) = v)
+#define	DPCPU_ARRAY_SET(n, v, ii)	(*DPCPU_ARRAY_PTR(n, ii) = v)
+#define	DPCPU_ARRAY_SET2(n, v, ii, jj)	(*DPCPU_ARRAY_PTR(n, ii, jj) = v)
 
 /*
  * Accessors for remote cpus.
  */
-#define	DPCPU_ID_PTR(i, n)	_DPCPU_PTR(dpcpu_off[(i)], n)
-#define	DPCPU_ID_GET(i, n)	(*DPCPU_ID_PTR(i, n))
-#define	DPCPU_ID_SET(i, n, v)	(*DPCPU_ID_PTR(i, n) = v)
+#ifdef DPCPU_FUNCS
+#define	DPCPU_ID_PTR(i, n)						\
+	__dpcpu_ptr_##n(dpcpu_off[(i)])
+#define	DPCPU_ID_ARRAY_PTR(i, n, ii)					\
+	__dpcpu_ptr_##n(dpcpu_off[(i)], ii)
+#define	DPCPU_ID_ARRAY_PTR2(i, n, ii, jj)				\
+	__dpcpu_ptr_##n(dpcpu_off[(i)], ii, jj)
+#else
+#define	DPCPU_ID_PTR(i, n)						\
+	_DPCPU_PTR(dpcpu_off[(i)], n)
+#define	DPCPU_ID_ARRAY_PTR(i, n, ii)					\
+	_DPCPU_PTR(dpcpu_off[(i)], n[ii])
+#define	DPCPU_ID_ARRAY_PTR2(i, n, ii, jj)				\
+	_DPCPU_PTR(dpcpu_off[(i)], n[ii][jj])
+#endif
+#define	DPCPU_ID_GET(i, n)						\
+	(*DPCPU_ID_PTR(i, n))
+#define	DPCPU_ID_ARRAY_GET(i, n, ii)					\
+	(*DPCPU_ID_ARRAY_PTR(i, n, ii))
+#define	DPCPU_ID_ARRAY_GET2(i, n, ii, jj)				\
+	(*DPCPU_ID_ARRAY_PTR2(i, n, ii, jj))
+#define	DPCPU_ID_SET(i, n, v)						\
+	(*DPCPU_ID_PTR(i, n) = v)
+#define	DPCPU_ID_ARRAY_SET(i, n, v, ii)					\
+	(*DPCPU_ID_ARRAY_PTR(i, n, ii) = v)
+#define	DPCPU_ID_ARRAY_SET2(i, n, v, ii, jj)				\
+	(*DPCPU_ID_ARRAY_PTR2(i, n, ii, jj) = v)
 
 /*
  * Utility macros.

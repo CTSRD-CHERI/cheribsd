@@ -82,7 +82,7 @@ SYSCTL_NODE(_kern_sched, OID_AUTO, stats, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "switch stats");
 
 /* Switch reasons from mi_switch(9). */
-DPCPU_DEFINE(long, sched_switch_stats[SWT_COUNT]);
+DPCPU_DEFINE_ARRAY(long, sched_switch_stats, [SWT_COUNT]);
 SCHED_STAT_DEFINE_VAR(owepreempt,
     &DPCPU_NAME(sched_switch_stats[SWT_OWEPREEMPT]), "");
 SCHED_STAT_DEFINE_VAR(turnstile,

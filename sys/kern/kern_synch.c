@@ -505,7 +505,7 @@ mi_switch(int flags)
 		td->td_swinvoltick = ticks;
 	}
 #ifdef SCHED_STATS
-	SCHED_STAT_INC(sched_switch_stats[flags & SW_TYPE_MASK]);
+	SCHED_STAT_ARRAY_INC(sched_switch_stats, [flags & SW_TYPE_MASK]);
 #endif
 	/*
 	 * Compute the amount of time during which the current

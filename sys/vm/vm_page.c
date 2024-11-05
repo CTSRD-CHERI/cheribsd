@@ -112,7 +112,7 @@
 
 struct vm_domain vm_dom[MAXMEMDOM];
 
-DPCPU_DEFINE_STATIC(struct vm_batchqueue, pqbatch[MAXMEMDOM][PQ_COUNT]);
+DPCPU_DEFINE_STATIC_ARRAY2(struct vm_batchqueue, pqbatch, [MAXMEMDOM][PQ_COUNT]);
 
 struct mtx_padalign __exclusive_cache_line pa_lock[PA_LOCK_COUNT];
 
@@ -3895,7 +3895,7 @@ vm_page_pqbatch_submit(vm_page_t m, uint8_t queue)
 
 	domain = vm_page_domain(m);
 	critical_enter();
-	bq = DPCPU_PTR(pqbatch[domain][queue]);
+	bq = DPCPU_ARRAY_PTR2(pqbatch, domain, queue);
 	slots_remaining = vm_batchqueue_insert(bq, m);
 	if (slots_remaining > (VM_BATCHQUEUE_SIZE >> 1)) {
 		/* keep building the bq */
@@ -3918,7 +3918,7 @@ vm_page_pqbatch_submit(vm_page_t m, uint8_t queue)
 	pq = &VM_DOMAIN(domain)->vmd_pagequeues[queue];
 	vm_pagequeue_lock(pq);
 	critical_enter();
-	bq = DPCPU_PTR(pqbatch[domain][queue]);
+	bq = DPCPU_ARRAY_PTR2(pqbatch, domain, queue);
 	vm_pqbatch_process(pq, bq, queue);
 	vm_pqbatch_process_page(pq, m, queue);
 	vm_pagequeue_unlock(pq);
@@ -3953,7 +3953,7 @@ vm_page_pqbatch_drain(void)
 				vm_pagequeue_lock(pq);
 				critical_enter();
 				vm_pqbatch_process(pq,
-				    DPCPU_PTR(pqbatch[domain][queue]), queue);
+				    DPCPU_ARRAY_PTR2(pqbatch, domain, queue), queue);
 				critical_exit();
 				vm_pagequeue_unlock(pq);
 			}
