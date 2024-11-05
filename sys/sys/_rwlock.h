@@ -28,6 +28,8 @@
 #ifndef _SYS__RWLOCK_H_
 #define	_SYS__RWLOCK_H_
 
+#include <sys/_types.h>
+#include <sys/_lock.h>
 #include <machine/param.h>
 
 /*
@@ -41,7 +43,7 @@
  */
 struct rwlock {
 	struct lock_object	lock_object __subobject_member_used_for_c_inheritance;
-	volatile uintptr_t	rw_lock __subobject_use_container_bounds;
+	volatile __uintptr_t	rw_lock __subobject_use_container_bounds;
 };
 
 /*
@@ -55,7 +57,7 @@ struct rwlock {
  */
 struct rwlock_padalign {
 	struct lock_object	lock_object __subobject_member_used_for_c_inheritance;
-	volatile uintptr_t	rw_lock __subobject_use_container_bounds;
+	volatile __uintptr_t	rw_lock __subobject_use_container_bounds;
 } __aligned(CACHE_LINE_SIZE);
 
 #endif /* !_SYS__RWLOCK_H_ */
