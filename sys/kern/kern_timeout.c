@@ -71,8 +71,6 @@
 #include <machine/cpu.h>
 #endif
 
-DPCPU_DECLARE(sbintime_t, hardclocktime);
-
 SDT_PROVIDER_DEFINE(callout_execute);
 SDT_PROBE_DEFINE1(callout_execute, , , callout__start, "struct callout *");
 SDT_PROBE_DEFINE1(callout_execute, , , callout__end, "struct callout *");

@@ -519,6 +519,7 @@ void	hardclock_sync(int cpu);
 void	statclock(int cnt, int usermode);
 void	profclock(int cnt, int usermode, uintfptr_t pc);
 
+DPCPU_DECLARE(sbintime_t, hardclocktime);
 int	hardclockintr(void);
 
 void	startprofclock(struct proc *);

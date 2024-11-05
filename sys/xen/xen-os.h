@@ -44,6 +44,8 @@
 #include <xen/hvm.h>
 #include <contrib/xen/event_channel.h>
 
+DPCPU_DECLARE(struct vcpu_info *, vcpu_info);
+
 /*
  * Setup function which needs to be called on each processor by architecture
  */

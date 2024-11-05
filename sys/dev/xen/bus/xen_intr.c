@@ -96,8 +96,6 @@ DPCPU_DEFINE_STATIC(struct xen_intr_pcpu_data, xen_intr_pcpu) = {
 	.last_processed_l2i = LONG_BIT - 1
 };
 
-DPCPU_DECLARE(struct vcpu_info *, vcpu_info);
-
 #define	INVALID_EVTCHN		(~(evtchn_port_t)0) /* Invalid event channel */
 #define	is_valid_evtchn(x)	((uintmax_t)(x) < NR_EVENT_CHANNELS)
 

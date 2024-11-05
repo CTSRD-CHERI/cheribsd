@@ -89,8 +89,6 @@ struct xentimer_pcpu_data {
 
 DPCPU_DEFINE(struct xentimer_pcpu_data, xentimer_pcpu);
 
-DPCPU_DECLARE(struct vcpu_info *, vcpu_info);
-
 struct xentimer_softc {
 	device_t dev;
 	struct timecounter tc;
