@@ -194,7 +194,7 @@ tasklet_schedule(struct tasklet_struct *ts)
 	} else if (TASKLET_ST_CMPSET(ts, TASKLET_ST_IDLE, TASKLET_ST_BUSY)) {
 		struct tasklet_worker *tw;
 
-		tw = &DPCPU_GET(tasklet_worker);
+		tw = DPCPU_PTR(tasklet_worker);
 
 		/* tasklet_handler() was not queued */
 		TASKLET_WORKER_LOCK(tw);

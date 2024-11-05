@@ -132,7 +132,7 @@ drmcompat_idr_preload(gfp_t gfp_mask)
 
 	sched_pin();
 
-	lic = &DPCPU_GET(drmcompat_idr_cache);
+	lic = DPCPU_PTR(drmcompat_idr_cache);
 
 	/* fill up cache */
 	spin_lock(&lic->lock);
@@ -153,7 +153,7 @@ drmcompat_idr_preload_end(void)
 {
 	struct drmcompat_idr_cache *lic;
 
-	lic = &DPCPU_GET(drmcompat_idr_cache);
+	lic = DPCPU_PTR(drmcompat_idr_cache);
 	spin_unlock(&lic->lock);
 	sched_unpin();
 }
@@ -411,7 +411,7 @@ idr_get(struct idr *idp)
 		MPASS(il->bitmap != 0);
 	} else if ((il = malloc(sizeof(*il), M_IDR, M_ZERO | M_NOWAIT)) != NULL) {
 		bitmap_fill(&il->bitmap, IDR_SIZE);
-	} else if ((il = idr_preload_dequeue_locked(&DPCPU_GET(drmcompat_idr_cache))) != NULL) {
+	} else if ((il = idr_preload_dequeue_locked(DPCPU_PTR(drmcompat_idr_cache))) != NULL) {
 		bitmap_fill(&il->bitmap, IDR_SIZE);
 	} else {
 		return (NULL);
