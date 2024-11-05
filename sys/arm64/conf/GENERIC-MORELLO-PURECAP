@@ -46,6 +46,9 @@ nodevice	zlib
 # Enable compartmentalization by default
 options 	CHERI_COMPARTMENTALIZE_KERNEL
 
+# Use DPCPU accessor functions
+options 	DPCPU_FUNCS
+
 # Compile an IR version of the kernel and kernel modules for analysis
 makeoptions	COMPILE_IR
 
