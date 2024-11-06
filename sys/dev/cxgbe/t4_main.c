@@ -604,6 +604,11 @@ static int t5_write_combine = 0;
 SYSCTL_INT(_hw_cxl, OID_AUTO, write_combine, CTLFLAG_RDTUN, &t5_write_combine,
     0, "Use WC instead of UC for BAR2");
 
+/* From t4_sysctls: doorbells = {"\20\1UDB\2WCWR\3UDBWC\4KDB"} */
+static int t4_doorbells_allowed = 0xf;
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, doorbells_allowed, CTLFLAG_RDTUN,
+	   &t4_doorbells_allowed, 0, "Limit tx queues to these doorbells");
+
 static int t4_num_vis = 1;
 SYSCTL_INT(_hw_cxgbe, OID_AUTO, num_vis, CTLFLAG_RDTUN, &t4_num_vis, 0,
     "Number of VIs per port");
@@ -1344,6 +1349,10 @@ t4_attach(device_t dev)
 		goto done; /* error message displayed already */
 
 	rc = t4_map_bar_2(sc);
+	if (rc != 0)
+		goto done; /* error message displayed already */
+
+	rc = t4_adj_doorbells(sc);
 	if (rc != 0)
 		goto done; /* error message displayed already */
 
@@ -2535,7 +2544,7 @@ cxgbe_probe(device_t dev)
     IFCAP_HWRXTSTMP | IFCAP_MEXTPG)
 #define T4_CAP_ENABLE (T4_CAP)
 
-static int
+static void
 cxgbe_vi_attach(device_t dev, struct vi_info *vi)
 {
 	if_t ifp;
@@ -2574,10 +2583,6 @@ cxgbe_vi_attach(device_t dev, struct vi_info *vi)
 
 	/* Allocate an ifnet and set it up */
 	ifp = if_alloc_dev(IFT_ETHER, dev);
-	if (ifp == NULL) {
-		device_printf(dev, "Cannot allocate ifnet\n");
-		return (ENOMEM);
-	}
 	vi->ifp = ifp;
 	if_setsoftc(ifp, vi);
 
@@ -2680,8 +2685,6 @@ cxgbe_vi_attach(device_t dev, struct vi_info *vi)
 	pa.pa_type = PFIL_TYPE_ETHERNET;
 	pa.pa_headname = if_name(ifp);
 	vi->pfil = pfil_head_register(&pa);
-
-	return (0);
 }
 
 static int
@@ -2690,13 +2693,11 @@ cxgbe_attach(device_t dev)
 	struct port_info *pi = device_get_softc(dev);
 	struct adapter *sc = pi->adapter;
 	struct vi_info *vi;
-	int i, rc;
+	int i;
 
 	sysctl_ctx_init(&pi->ctx);
 
-	rc = cxgbe_vi_attach(dev, &pi->vi[0]);
-	if (rc)
-		return (rc);
+	cxgbe_vi_attach(dev, &pi->vi[0]);
 
 	for_each_vi(pi, i, vi) {
 		if (i == 0)
@@ -3576,11 +3577,8 @@ vcxgbe_attach(device_t dev)
 	if (rc)
 		return (rc);
 
-	rc = cxgbe_vi_attach(dev, vi);
-	if (rc) {
-		t4_free_vi(sc, sc->mbox, sc->pf, 0, vi->viid);
-		return (rc);
-	}
+	cxgbe_vi_attach(dev, vi);
+
 	return (0);
 }
 
@@ -3759,6 +3757,18 @@ t4_map_bar_2(struct adapter *sc)
 	sc->iwt.wc_en = isset(&sc->doorbells, DOORBELL_UDBWC) ? 1 : 0;
 
 	return (0);
+}
+
+int
+t4_adj_doorbells(struct adapter *sc)
+{
+	if ((sc->doorbells & t4_doorbells_allowed) != 0) {
+		sc->doorbells &= t4_doorbells_allowed;
+		return (0);
+	}
+	CH_ERR(sc, "No usable doorbell (available = 0x%x, allowed = 0x%x).\n",
+	       sc->doorbells, t4_doorbells_allowed);
+	return (EINVAL);
 }
 
 struct memwin_init {
@@ -4329,9 +4339,7 @@ calculate_iaq(struct adapter *sc, struct intrs_and_queues *iaq, int itype,
 	 */
 	do {
 		if (iaq->nrxq > 1) {
-			do {
-				iaq->nrxq--;
-			} while (!powerof2(iaq->nrxq));
+			iaq->nrxq = rounddown_pow_of_two(iaq->nrxq - 1);
 			if (iaq->nnmrxq > iaq->nrxq)
 				iaq->nnmrxq = iaq->nrxq;
 		}
@@ -6024,25 +6032,27 @@ apply_link_config(struct port_info *pi)
 	if (lc->requested_fec & FEC_BASER_RS)
 		MPASS(lc->pcaps & FW_PORT_CAP32_FEC_BASER_RS);
 #endif
-	rc = -t4_link_l1cfg(sc, sc->mbox, pi->tx_chan, lc);
-	if (rc != 0) {
-		/* Don't complain if the VF driver gets back an EPERM. */
-		if (!(sc->flags & IS_VF) || rc != FW_EPERM)
+	if (!(sc->flags & IS_VF)) {
+		rc = -t4_link_l1cfg(sc, sc->mbox, pi->tx_chan, lc);
+		if (rc != 0) {
 			device_printf(pi->dev, "l1cfg failed: %d\n", rc);
-	} else {
-		/*
-		 * An L1_CFG will almost always result in a link-change event if
-		 * the link is up, and the driver will refresh the actual
-		 * fec/fc/etc. when the notification is processed.  If the link
-		 * is down then the actual settings are meaningless.
-		 *
-		 * This takes care of the case where a change in the L1 settings
-		 * may not result in a notification.
-		 */
-		if (lc->link_ok && !(lc->requested_fc & PAUSE_AUTONEG))
-			lc->fc = lc->requested_fc & (PAUSE_TX | PAUSE_RX);
+			return (rc);
+		}
 	}
-	return (rc);
+
+	/*
+	 * An L1_CFG will almost always result in a link-change event if the
+	 * link is up, and the driver will refresh the actual fec/fc/etc. when
+	 * the notification is processed.  If the link is down then the actual
+	 * settings are meaningless.
+	 *
+	 * This takes care of the case where a change in the L1 settings may not
+	 * result in a notification.
+	 */
+	if (lc->link_ok && !(lc->requested_fc & PAUSE_AUTONEG))
+		lc->fc = lc->requested_fc & (PAUSE_TX | PAUSE_RX);
+
+	return (0);
 }
 
 #define FW_MAC_EXACT_CHUNK	7
@@ -8131,10 +8141,6 @@ sysctl_bitfield_8b(SYSCTL_HANDLER_ARGS)
 	int rc;
 	struct sbuf *sb;
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return(rc);
-
 	sb = sbuf_new_for_sysctl(NULL, NULL, 128, req);
 	if (sb == NULL)
 		return (ENOMEM);
@@ -8151,10 +8157,6 @@ sysctl_bitfield_16b(SYSCTL_HANDLER_ARGS)
 {
 	int rc;
 	struct sbuf *sb;
-
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return(rc);
 
 	sb = sbuf_new_for_sysctl(NULL, NULL, 128, req);
 	if (sb == NULL)
@@ -8413,10 +8415,6 @@ sysctl_pause_settings(SYSCTL_HANDLER_ARGS)
 		struct sbuf *sb;
 		static char *bits = "\20\1RX\2TX\3AUTO";
 
-		rc = sysctl_wire_old_buffer(req, 0);
-		if (rc != 0)
-			return(rc);
-
 		sb = sbuf_new_for_sysctl(NULL, NULL, 128, req);
 		if (sb == NULL)
 			return (ENOMEM);
@@ -8478,10 +8476,6 @@ sysctl_link_fec(SYSCTL_HANDLER_ARGS)
 	struct sbuf *sb;
 	static char *bits = "\20\1RS-FEC\2FC-FEC\3NO-FEC\4RSVD1\5RSVD2";
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return(rc);
-
 	sb = sbuf_new_for_sysctl(NULL, NULL, 128, req);
 	if (sb == NULL)
 		return (ENOMEM);
@@ -8508,10 +8502,6 @@ sysctl_requested_fec(SYSCTL_HANDLER_ARGS)
 		struct sbuf *sb;
 		static char *bits = "\20\1RS-FEC\2FC-FEC\3NO-FEC\4RSVD2"
 		    "\5RSVD3\6auto\7module";
-
-		rc = sysctl_wire_old_buffer(req, 0);
-		if (rc != 0)
-			return(rc);
 
 		sb = sbuf_new_for_sysctl(NULL, NULL, 128, req);
 		if (sb == NULL)
@@ -8588,10 +8578,6 @@ sysctl_module_fec(SYSCTL_HANDLER_ARGS)
 	struct sbuf *sb;
 	static char *bits = "\20\1RS-FEC\2FC-FEC\3NO-FEC\4RSVD2\5RSVD3";
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
-
 	sb = sbuf_new_for_sysctl(NULL, NULL, 128, req);
 	if (sb == NULL)
 		return (ENOMEM);
@@ -8618,14 +8604,15 @@ sysctl_module_fec(SYSCTL_HANDLER_ARGS)
 	fec = lc->fec_hint;
 	if (pi->mod_type == FW_PORT_MOD_TYPE_NONE ||
 	    !fec_supported(lc->pcaps)) {
+		PORT_UNLOCK(pi);
 		sbuf_printf(sb, "n/a");
 	} else {
 		if (fec == 0)
 			fec = FEC_NONE;
+		PORT_UNLOCK(pi);
 		sbuf_printf(sb, "%b", fec & M_FW_PORT_CAP32_FEC, bits);
 	}
 	rc = sbuf_finish(sb);
-	PORT_UNLOCK(pi);
 done:
 	sbuf_delete(sb);
 	end_synchronized_op(sc, 0);
@@ -8845,10 +8832,6 @@ sysctl_loadavg(SYSCTL_HANDLER_ARGS)
 	if (rc)
 		return (rc);
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
-
 	sb = sbuf_new_for_sysctl(NULL, NULL, 4096, req);
 	if (sb == NULL)
 		return (ENOMEM);
@@ -8878,14 +8861,11 @@ sysctl_cctrl(SYSCTL_HANDLER_ARGS)
 		"0.9375"
 	};
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
-
 	sb = sbuf_new_for_sysctl(NULL, NULL, 4096, req);
 	if (sb == NULL)
 		return (ENOMEM);
 
+	rc = 0;
 	mtx_lock(&sc->reg_lock);
 	if (hw_off_limits(sc))
 		rc = ENXIO;
@@ -8960,10 +8940,6 @@ sysctl_cim_ibq_obq(SYSCTL_HANDLER_ARGS)
 		goto done;
 	}
 	n = rc * sizeof(uint32_t);	/* rc has # of words actually read */
-
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		goto done;
 
 	sb = sbuf_new_for_sysctl(NULL, NULL, PAGE_SIZE, req);
 	if (sb == NULL) {
@@ -9083,9 +9059,6 @@ sysctl_cim_la(SYSCTL_HANDLER_ARGS)
 	struct sbuf *sb;
 	int rc;
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
 	sb = sbuf_new_for_sysctl(NULL, NULL, 4096, req);
 	if (sb == NULL)
 		return (ENOMEM);
@@ -9153,10 +9126,6 @@ sysctl_cim_ma_la(SYSCTL_HANDLER_ARGS)
 	uint32_t *buf, *p;
 	int rc;
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
-
 	sb = sbuf_new_for_sysctl(NULL, NULL, 4096, req);
 	if (sb == NULL)
 		return (ENOMEM);
@@ -9164,6 +9133,7 @@ sysctl_cim_ma_la(SYSCTL_HANDLER_ARGS)
 	buf = malloc(2 * CIM_MALA_SIZE * 5 * sizeof(uint32_t), M_CXGBE,
 	    M_ZERO | M_WAITOK);
 
+	rc = 0;
 	mtx_lock(&sc->reg_lock);
 	if (hw_off_limits(sc))
 		rc = ENXIO;
@@ -9204,10 +9174,6 @@ sysctl_cim_pif_la(SYSCTL_HANDLER_ARGS)
 	uint32_t *buf, *p;
 	int rc;
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
-
 	sb = sbuf_new_for_sysctl(NULL, NULL, 4096, req);
 	if (sb == NULL)
 		return (ENOMEM);
@@ -9215,6 +9181,7 @@ sysctl_cim_pif_la(SYSCTL_HANDLER_ARGS)
 	buf = malloc(2 * CIM_PIFLA_SIZE * 6 * sizeof(uint32_t), M_CXGBE,
 	    M_ZERO | M_WAITOK);
 
+	rc = 0;
 	mtx_lock(&sc->reg_lock);
 	if (hw_off_limits(sc))
 		rc = ENXIO;
@@ -9284,10 +9251,6 @@ sysctl_cim_qcfg(SYSCTL_HANDLER_ARGS)
 	if (rc)
 		return (rc);
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
-
 	sb = sbuf_new_for_sysctl(NULL, NULL, PAGE_SIZE, req);
 	if (sb == NULL)
 		return (ENOMEM);
@@ -9320,14 +9283,11 @@ sysctl_cpl_stats(SYSCTL_HANDLER_ARGS)
 	int rc;
 	struct tp_cpl_stats stats;
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
-
 	sb = sbuf_new_for_sysctl(NULL, NULL, 256, req);
 	if (sb == NULL)
 		return (ENOMEM);
 
+	rc = 0;
 	mtx_lock(&sc->reg_lock);
 	if (hw_off_limits(sc))
 		rc = ENXIO;
@@ -9366,14 +9326,11 @@ sysctl_ddp_stats(SYSCTL_HANDLER_ARGS)
 	int rc;
 	struct tp_usm_stats stats;
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return(rc);
-
 	sb = sbuf_new_for_sysctl(NULL, NULL, 256, req);
 	if (sb == NULL)
 		return (ENOMEM);
 
+	rc = 0;
 	mtx_lock(&sc->reg_lock);
 	if (hw_off_limits(sc))
 		rc = ENXIO;
@@ -9399,14 +9356,11 @@ sysctl_tid_stats(SYSCTL_HANDLER_ARGS)
 	int rc;
 	struct tp_tid_stats stats;
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return(rc);
-
 	sb = sbuf_new_for_sysctl(NULL, NULL, 256, req);
 	if (sb == NULL)
 		return (ENOMEM);
 
+	rc = 0;
 	mtx_lock(&sc->reg_lock);
 	if (hw_off_limits(sc))
 		rc = ENXIO;
@@ -9543,9 +9497,6 @@ sysctl_devlog(SYSCTL_HANDLER_ARGS)
 	int rc;
 	struct sbuf *sb;
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
 	sb = sbuf_new_for_sysctl(NULL, NULL, 4096, req);
 	if (sb == NULL)
 		return (ENOMEM);
@@ -9588,10 +9539,7 @@ sysctl_fcoe_stats(SYSCTL_HANDLER_ARGS)
 	struct tp_fcoe_stats stats[MAX_NCHAN];
 	int i, nchan = sc->chip_params->nchan;
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
-
+	rc = 0;
 	mtx_lock(&sc->reg_lock);
 	if (hw_off_limits(sc))
 		rc = ENXIO;
@@ -9644,16 +9592,13 @@ sysctl_hw_sched(SYSCTL_HANDLER_ARGS)
 	unsigned int map, kbps, ipg, mode;
 	unsigned int pace_tab[NTX_SCHED];
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
-
 	sb = sbuf_new_for_sysctl(NULL, NULL, 512, req);
 	if (sb == NULL)
 		return (ENOMEM);
 
 	mtx_lock(&sc->reg_lock);
 	if (hw_off_limits(sc)) {
+		mtx_unlock(&sc->reg_lock);
 		rc = ENXIO;
 		goto done;
 	}
@@ -9661,6 +9606,7 @@ sysctl_hw_sched(SYSCTL_HANDLER_ARGS)
 	map = t4_read_reg(sc, A_TP_TX_MOD_QUEUE_REQ_MAP);
 	mode = G_TIMERMODE(t4_read_reg(sc, A_TP_MOD_CONFIG));
 	t4_read_pace_tbl(sc, pace_tab);
+	mtx_unlock(&sc->reg_lock);
 
 	sbuf_printf(sb, "Scheduler  Mode   Channel  Rate (Kbps)   "
 	    "Class IPG (0.1 ns)   Flow IPG (us)");
@@ -9686,7 +9632,6 @@ sysctl_hw_sched(SYSCTL_HANDLER_ARGS)
 	}
 	rc = sbuf_finish(sb);
 done:
-	mtx_unlock(&sc->reg_lock);
 	sbuf_delete(sb);
 	return (rc);
 }
@@ -9709,16 +9654,13 @@ sysctl_lb_stats(SYSCTL_HANDLER_ARGS)
 		"BG2FramesTrunc:", "BG3FramesTrunc:"
 	};
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
-
 	sb = sbuf_new_for_sysctl(NULL, NULL, 4096, req);
 	if (sb == NULL)
 		return (ENOMEM);
 
 	memset(s, 0, sizeof(s));
 
+	rc = 0;
 	for (i = 0; i < sc->chip_params->nchan; i += 2) {
 		mtx_lock(&sc->reg_lock);
 		if (hw_off_limits(sc))
@@ -9741,7 +9683,8 @@ sysctl_lb_stats(SYSCTL_HANDLER_ARGS)
 				   *p0++, *p1++);
 	}
 
-	rc = sbuf_finish(sb);
+	if (rc == 0)
+		rc = sbuf_finish(sb);
 	sbuf_delete(sb);
 
 	return (rc);
@@ -9755,9 +9698,6 @@ sysctl_linkdnrc(SYSCTL_HANDLER_ARGS)
 	struct link_config *lc = &pi->link_cfg;
 	struct sbuf *sb;
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return(rc);
 	sb = sbuf_new_for_sysctl(NULL, NULL, 64, req);
 	if (sb == NULL)
 		return (ENOMEM);
@@ -10095,10 +10035,6 @@ sysctl_mps_tcam(SYSCTL_HANDLER_ARGS)
 
 	MPASS(chip_id(sc) <= CHELSIO_T5);
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
-
 	sb = sbuf_new_for_sysctl(NULL, NULL, 4096, req);
 	if (sb == NULL)
 		return (ENOMEM);
@@ -10106,6 +10042,7 @@ sysctl_mps_tcam(SYSCTL_HANDLER_ARGS)
 	sbuf_printf(sb,
 	    "Idx  Ethernet address     Mask     Vld Ports PF"
 	    "  VF              Replication             P0 P1 P2 P3  ML");
+	rc = 0;
 	for (i = 0; i < sc->chip_params->mps_tcam_size; i++) {
 		uint64_t tcamx, tcamy, mask;
 		uint32_t cls_lo, cls_hi;
@@ -10199,10 +10136,6 @@ sysctl_mps_tcam_t6(SYSCTL_HANDLER_ARGS)
 
 	MPASS(chip_id(sc) > CHELSIO_T5);
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
-
 	sb = sbuf_new_for_sysctl(NULL, NULL, 4096, req);
 	if (sb == NULL)
 		return (ENOMEM);
@@ -10212,6 +10145,7 @@ sysctl_mps_tcam_t6(SYSCTL_HANDLER_ARGS)
 	    "                           Replication"
 	    "                                    P0 P1 P2 P3  ML\n");
 
+	rc = 0;
 	for (i = 0; i < sc->chip_params->mps_tcam_size; i++) {
 		uint8_t dip_hit, vlan_vld, lookup_type, port_num;
 		uint16_t ivlan;
@@ -10381,10 +10315,7 @@ sysctl_path_mtus(SYSCTL_HANDLER_ARGS)
 	int rc;
 	uint16_t mtus[NMTUS];
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
-
+	rc = 0;
 	mtx_lock(&sc->reg_lock);
 	if (hw_off_limits(sc))
 		rc = ENXIO;
@@ -10426,10 +10357,7 @@ sysctl_pm_stats(SYSCTL_HANDLER_ARGS)
 		"Rx FIFO wait", NULL, "Rx latency"
 	};
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
-
+	rc = 0;
 	mtx_lock(&sc->reg_lock);
 	if (hw_off_limits(sc))
 		rc = ENXIO;
@@ -10490,10 +10418,7 @@ sysctl_rdma_stats(SYSCTL_HANDLER_ARGS)
 	int rc;
 	struct tp_rdma_stats stats;
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
-
+	rc = 0;
 	mtx_lock(&sc->reg_lock);
 	if (hw_off_limits(sc))
 		rc = ENXIO;
@@ -10524,10 +10449,7 @@ sysctl_tcp_stats(SYSCTL_HANDLER_ARGS)
 	int rc;
 	struct tp_tcp_stats v4, v6;
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
-
+	rc = 0;
 	mtx_lock(&sc->reg_lock);
 	if (hw_off_limits(sc))
 		rc = ENXIO;
@@ -10567,10 +10489,7 @@ sysctl_tids(SYSCTL_HANDLER_ARGS)
 	uint32_t x, y;
 	struct tid_info *t = &sc->tids;
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
-
+	rc = 0;
 	sb = sbuf_new_for_sysctl(NULL, NULL, 256, req);
 	if (sb == NULL)
 		return (ENOMEM);
@@ -10662,10 +10581,7 @@ sysctl_tp_err_stats(SYSCTL_HANDLER_ARGS)
 	int rc;
 	struct tp_err_stats stats;
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
-
+	rc = 0;
 	mtx_lock(&sc->reg_lock);
 	if (hw_off_limits(sc))
 		rc = ENXIO;
@@ -10743,10 +10659,7 @@ sysctl_tnl_stats(SYSCTL_HANDLER_ARGS)
 	int rc;
 	struct tp_tnl_stats stats;
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return(rc);
-
+	rc = 0;
 	mtx_lock(&sc->reg_lock);
 	if (hw_off_limits(sc))
 		rc = ENXIO;
@@ -11010,10 +10923,7 @@ sysctl_tp_la(SYSCTL_HANDLER_ARGS)
 	u_int i, inc;
 	void (*show_func)(struct sbuf *, uint64_t *, int);
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
-
+	rc = 0;
 	sb = sbuf_new_for_sysctl(NULL, NULL, 4096, req);
 	if (sb == NULL)
 		return (ENOMEM);
@@ -11061,10 +10971,7 @@ sysctl_tx_rate(SYSCTL_HANDLER_ARGS)
 	int rc;
 	u64 nrate[MAX_NCHAN], orate[MAX_NCHAN];
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
-
+	rc = 0;
 	mtx_lock(&sc->reg_lock);
 	if (hw_off_limits(sc))
 		rc = ENXIO;
@@ -11107,10 +11014,7 @@ sysctl_ulprx_la(SYSCTL_HANDLER_ARGS)
 	uint32_t *buf, *p;
 	int rc, i;
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
-
+	rc = 0;
 	sb = sbuf_new_for_sysctl(NULL, NULL, 4096, req);
 	if (sb == NULL)
 		return (ENOMEM);
@@ -11151,10 +11055,7 @@ sysctl_wcwr_stats(SYSCTL_HANDLER_ARGS)
 
 	MPASS(chip_id(sc) >= CHELSIO_T5);
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
-
+	rc = 0;
 	mtx_lock(&sc->reg_lock);
 	if (hw_off_limits(sc))
 		rc = ENXIO;
@@ -11201,10 +11102,6 @@ sysctl_cpus(SYSCTL_HANDLER_ARGS)
 
 	CPU_ZERO(&cpuset);
 	rc = bus_get_cpus(sc->dev, op, sizeof(cpuset), &cpuset);
-	if (rc != 0)
-		return (rc);
-
-	rc = sysctl_wire_old_buffer(req, 0);
 	if (rc != 0)
 		return (rc);
 
@@ -12217,7 +12114,7 @@ t4_os_link_changed(struct port_info *pi)
 
 	for_each_vi(pi, v, vi) {
 		ifp = vi->ifp;
-		if (ifp == NULL)
+		if (ifp == NULL || IS_DETACHING(vi))
 			continue;
 
 		if (lc->link_ok) {
@@ -12842,30 +12739,26 @@ tweak_tunables(void)
 
 #ifdef DDB
 static void
-t4_dump_tcb(struct adapter *sc, int tid)
+t4_dump_mem(struct adapter *sc, u_int addr, u_int len)
 {
-	uint32_t base, i, j, off, pf, reg, save, tcb_addr, win_pos;
+	uint32_t base, j, off, pf, reg, save, win_pos;
 
 	reg = PCIE_MEM_ACCESS_REG(A_PCIE_MEM_ACCESS_OFFSET, 2);
 	save = t4_read_reg(sc, reg);
 	base = sc->memwin[2].mw_base;
 
-	/* Dump TCB for the tid */
-	tcb_addr = t4_read_reg(sc, A_TP_CMM_TCB_BASE);
-	tcb_addr += tid * TCB_SIZE;
-
 	if (is_t4(sc)) {
 		pf = 0;
-		win_pos = tcb_addr & ~0xf;	/* start must be 16B aligned */
+		win_pos = addr & ~0xf;	/* start must be 16B aligned */
 	} else {
 		pf = V_PFNUM(sc->pf);
-		win_pos = tcb_addr & ~0x7f;	/* start must be 128B aligned */
+		win_pos = addr & ~0x7f;	/* start must be 128B aligned */
 	}
+	off = addr - win_pos;
 	t4_write_reg(sc, reg, win_pos | pf);
 	t4_read_reg(sc, reg);
 
-	off = tcb_addr - win_pos;
-	for (i = 0; i < 4; i++) {
+	while (len > 0 && !db_pager_quit) {
 		uint32_t buf[8];
 		for (j = 0; j < 8; j++, off += 4)
 			buf[j] = htonl(t4_read_reg(sc, base + off));
@@ -12873,10 +12766,25 @@ t4_dump_tcb(struct adapter *sc, int tid)
 		db_printf("%08x %08x %08x %08x %08x %08x %08x %08x\n",
 		    buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6],
 		    buf[7]);
+		if (len <= sizeof(buf))
+			len = 0;
+		else
+			len -= sizeof(buf);
 	}
 
 	t4_write_reg(sc, reg, save);
 	t4_read_reg(sc, reg);
+}
+
+static void
+t4_dump_tcb(struct adapter *sc, int tid)
+{
+	uint32_t tcb_addr;
+
+	/* Dump TCB for the tid */
+	tcb_addr = t4_read_reg(sc, A_TP_CMM_TCB_BASE);
+	tcb_addr += tid * TCB_SIZE;
+	t4_dump_mem(sc, tcb_addr, TCB_SIZE);
 }
 
 static void
@@ -13009,6 +12917,51 @@ DB_TABLE_COMMAND_FLAGS(show_t4, tcb, db_show_t4tcb, CS_OWN)
 	}
 
 	t4_dump_tcb(device_get_softc(dev), tid);
+}
+
+DB_TABLE_COMMAND_FLAGS(show_t4, memdump, db_show_memdump, CS_OWN)
+{
+	device_t dev;
+	int radix, t;
+	bool valid;
+
+	valid = false;
+	radix = db_radix;
+	db_radix = 10;
+	t = db_read_token();
+	if (t == tIDENT) {
+		dev = device_lookup_by_name(db_tok_string);
+		t = db_read_token();
+		if (t == tNUMBER) {
+			addr = db_tok_number;
+			t = db_read_token();
+			if (t == tNUMBER) {
+				count = db_tok_number;
+				valid = true;
+			}
+		}
+	}
+	db_radix = radix;
+	db_skip_to_eol();
+	if (!valid) {
+		db_printf("usage: show t4 memdump <nexus> <addr> <len>\n");
+		return;
+	}
+
+	if (dev == NULL) {
+		db_printf("device not found\n");
+		return;
+	}
+	if (addr < 0) {
+		db_printf("invalid address\n");
+		return;
+	}
+	if (count <= 0) {
+		db_printf("invalid length\n");
+		return;
+	}
+
+	t4_dump_mem(device_get_softc(dev), addr, count);
 }
 #endif
 

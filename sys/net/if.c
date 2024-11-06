@@ -655,7 +655,7 @@ if_alloc_domain(u_char type, int numa_domain)
 		old = ifindex_table;
 		ck_pr_store_ptr(&ifindex_table, new);
 		if_indexlim = newlim;
-		epoch_wait_preempt(net_epoch_preempt);
+		NET_EPOCH_WAIT();
 		free(old, M_IFNET);
 	}
 	if (idx > if_index)
@@ -1191,7 +1191,7 @@ if_detach_internal(struct ifnet *ifp, bool vmove)
 	 * At this point we know the interface still was on the ifnet list
 	 * and we removed it so we are in a stable state.
 	 */
-	epoch_wait_preempt(net_epoch_preempt);
+	NET_EPOCH_WAIT();
 
 	/*
 	 * Ensure all pending EPOCH(9) callbacks have been executed. This
@@ -1324,19 +1324,7 @@ finish_vnet_shutdown:
 static int
 if_vmove(struct ifnet *ifp, struct vnet *new_vnet)
 {
-#ifdef DEV_BPF
-	u_int bif_dlt, bif_hdrlen;
-#endif
 	int rc;
-
-#ifdef DEV_BPF
- 	/*
-	 * if_detach_internal() will call the eventhandler to notify
-	 * interface departure.  That will detach if_bpf.  We need to
-	 * safe the dlt and hdrlen so we can re-attach it later.
-	 */
-	bpf_get_bp_params(ifp->if_bpf, &bif_dlt, &bif_hdrlen);
-#endif
 
 	/*
 	 * Detach from current vnet, but preserve LLADDR info, do not
@@ -1359,12 +1347,6 @@ if_vmove(struct ifnet *ifp, struct vnet *new_vnet)
 	 */
 	CURVNET_SET_QUIET(new_vnet);
 	if_attach_internal(ifp, true);
-
-#ifdef DEV_BPF
-	if (ifp->if_bpf == NULL)
-		bpfattach(ifp, bif_dlt, bif_hdrlen);
-#endif
-
 	CURVNET_RESTORE();
 	return (0);
 }
@@ -1402,8 +1384,8 @@ if_vmove_loan(struct thread *td, struct ifnet *ifp, char *ifname, int jid)
 	/* XXX Lock interfaces to avoid races. */
 	CURVNET_SET_QUIET(pr->pr_vnet);
 	difp = ifunit(ifname);
+	CURVNET_RESTORE();
 	if (difp != NULL) {
-		CURVNET_RESTORE();
 		prison_free(pr);
 		return (EEXIST);
 	}
@@ -1413,16 +1395,13 @@ if_vmove_loan(struct thread *td, struct ifnet *ifp, char *ifname, int jid)
 	shutdown = VNET_IS_SHUTTING_DOWN(ifp->if_vnet);
 	if (shutdown) {
 		sx_xunlock(&ifnet_detach_sxlock);
-		CURVNET_RESTORE();
 		prison_free(pr);
 		return (EBUSY);
 	}
-	CURVNET_RESTORE();
 
 	found = if_unlink_ifnet(ifp, true);
 	if (! found) {
 		sx_xunlock(&ifnet_detach_sxlock);
-		CURVNET_RESTORE();
 		prison_free(pr);
 		return (ENODEV);
 	}
@@ -1603,7 +1582,7 @@ _if_delgroup_locked(struct ifnet *ifp, struct ifg_list *ifgl,
 	}
 	IFNET_WUNLOCK();
 
-	epoch_wait_preempt(net_epoch_preempt);
+	NET_EPOCH_WAIT();
 	EVENTHANDLER_INVOKE(group_change_event, groupname);
 	if (freeifgl) {
 		EVENTHANDLER_INVOKE(group_detach_event, ifgl->ifgl_group);
@@ -2550,6 +2529,7 @@ const struct ifcap_nv_bit_name ifcap_nv_bit_names[] = {
 const struct ifcap_nv_bit_name ifcap2_nv_bit_names[] = {
 	CAP2NV(RXTLS4),
 	CAP2NV(RXTLS6),
+	CAP2NV(IPSEC_OFFLOAD),
 	{0, NULL}
 };
 #undef CAPNV
@@ -5551,6 +5531,12 @@ void *
 if_getl2com(if_t ifp)
 {
 	return (ifp->if_l2com);
+}
+
+void
+if_setipsec_accel_methods(if_t ifp, const struct if_ipsec_accel_methods *m)
+{
+	ifp->if_ipsec_accel_m = m;
 }
 
 #ifdef DDB

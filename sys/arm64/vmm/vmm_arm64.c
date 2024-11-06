@@ -1188,8 +1188,18 @@ vmmops_run(void *vcpui, uintcap_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 
 			/* Set the new cpsr */
 			hypctx->tf.tf_spsr = hypctx->spsr_el1 & PSR_FLAGS;
-			/* TODO: DIT, PAN, SSBS */
 			hypctx->tf.tf_spsr |= PSR_DAIF | PSR_M_EL1h;
+
+			/*
+			 * Update fields that may change on exeption entry
+			 * based on how sctlr_el1 is configured.
+			 */
+			if ((hypctx->sctlr_el1 & SCTLR_SPAN) == 0)
+				hypctx->tf.tf_spsr |= PSR_PAN;
+			if ((hypctx->sctlr_el1 & SCTLR_DSSBS) == 0)
+				hypctx->tf.tf_spsr &= ~PSR_SSBS;
+			else
+				hypctx->tf.tf_spsr |= PSR_SSBS;
 		}
 
 		daif = intr_disable();

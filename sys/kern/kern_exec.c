@@ -2199,6 +2199,7 @@ compress_chunk(struct coredump_params *cp, char * __capability base, char *buf,
 	size_t chunk_len;
 	int error;
 
+	error = 0;
 	while (len > 0) {
 		chunk_len = MIN(len, CORE_BUF_SIZE);
 
@@ -2245,6 +2246,7 @@ core_output(char * __capability base, size_t len, off_t offset,
 	if (cp->comp != NULL)
 		return (compress_chunk(cp, base, tmpbuf, len));
 
+	error = 0;
 	map = &cp->td->td_proc->p_vmspace->vm_map;
 	for (; len > 0; base += runlen, offset += runlen, len -= runlen) {
 		/*

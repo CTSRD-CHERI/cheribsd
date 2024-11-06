@@ -5595,8 +5595,7 @@ retry:
 			pv = &pc->pc_pventry[field * 64 + bit];
 			pc->pc_map[field] &= ~(1ul << bit);
 			/* If this was the last item, move it to tail */
-			if (pc->pc_map[0] == 0 && pc->pc_map[1] == 0 &&
-			    pc->pc_map[2] == 0) {
+			if (pc_is_full(pc)) {
 				TAILQ_REMOVE(&pmap->pm_pvchunk, pc, pc_list);
 				TAILQ_INSERT_TAIL(&pmap->pm_pvchunk, pc,
 				    pc_list);
@@ -5807,8 +5806,7 @@ pmap_pv_demote_pde(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	va_last = va + NBPDR - PAGE_SIZE;
 	for (;;) {
 		pc = TAILQ_FIRST(&pmap->pm_pvchunk);
-		KASSERT(pc->pc_map[0] != 0 || pc->pc_map[1] != 0 ||
-		    pc->pc_map[2] != 0, ("pmap_pv_demote_pde: missing spare"));
+		KASSERT(!pc_is_full(pc), ("pmap_pv_demote_pde: missing spare"));
 		for (field = 0; field < _NPCM; field++) {
 			while (pc->pc_map[field]) {
 				bit = bsfq(pc->pc_map[field]);
@@ -5829,7 +5827,7 @@ pmap_pv_demote_pde(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 		TAILQ_INSERT_TAIL(&pmap->pm_pvchunk, pc, pc_list);
 	}
 out:
-	if (pc->pc_map[0] == 0 && pc->pc_map[1] == 0 && pc->pc_map[2] == 0) {
+	if (pc_is_full(pc)) {
 		TAILQ_REMOVE(&pmap->pm_pvchunk, pc, pc_list);
 		TAILQ_INSERT_TAIL(&pmap->pm_pvchunk, pc, pc_list);
 	}
@@ -6796,8 +6794,7 @@ retry_pdpe:
 		 */
 		if ((ptpaddr & PG_PS) != 0) {
 			/*
-			 * Are we protecting the entire large page?  If not,
-			 * demote the mapping and fall through.
+			 * Are we protecting the entire large page?
 			 */
 			if (sva + NBPDR == va_next && eva >= va_next) {
 				/*
@@ -6807,9 +6804,23 @@ retry_pdpe:
 				if (pmap_protect_pde(pmap, pde, sva, prot))
 					anychanged = true;
 				continue;
-			} else if (!pmap_demote_pde(pmap, pde, sva)) {
+			}
+
+			/*
+			 * Does the large page mapping need to change?  If so,
+			 * demote it and fall through.
+			 */
+			pbits = ptpaddr;
+			if ((prot & VM_PROT_WRITE) == 0)
+				pbits &= ~(PG_RW | PG_M);
+			if ((prot & VM_PROT_EXECUTE) == 0)
+				pbits |= pg_nx;
+			if (ptpaddr == pbits || !pmap_demote_pde(pmap, pde,
+			    sva)) {
 				/*
-				 * The large page mapping was destroyed.
+				 * Either the large page mapping doesn't need
+				 * to change, or it was destroyed during
+				 * demotion.
 				 */
 				continue;
 			}
@@ -7595,10 +7606,13 @@ pmap_enter_pde(pmap_t pmap, vm_offset_t va, pd_entry_t newpde, u_int flags,
 	if ((newpde & PG_W) != 0 && pmap != kernel_pmap) {
 		uwptpg = pmap_alloc_pt_page(pmap, pmap_pde_pindex(va),
 		    VM_ALLOC_WIRED);
-		if (uwptpg == NULL)
+		if (uwptpg == NULL) {
+			pmap_abort_ptp(pmap, va, pdpg);
 			return (KERN_RESOURCE_SHORTAGE);
+		}
 		if (pmap_insert_pt_page(pmap, uwptpg, true, false)) {
 			pmap_free_pt_page(pmap, uwptpg, false);
+			pmap_abort_ptp(pmap, va, pdpg);
 			return (KERN_RESOURCE_SHORTAGE);
 		}
 
@@ -11668,15 +11682,16 @@ pmap_pkru_clear(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
  * Reserve enough memory to:
  * 1) allocate PDP pages for the shadow map(s),
  * 2) shadow the boot stack of KSTACK_PAGES pages,
- * so we need one PD page, one or two PT pages, and KSTACK_PAGES shadow pages
- * per shadow map.
+ * 3) assuming that the kernel stack does not cross a 1GB boundary,
+ * so we need one or two PD pages, one or two PT pages, and KSTACK_PAGES shadow
+ * pages per shadow map.
  */
 #ifdef KASAN
 #define	SAN_EARLY_PAGES	\
-	(NKASANPML4E + 1 + 2 + howmany(KSTACK_PAGES, KASAN_SHADOW_SCALE))
+	(NKASANPML4E + 2 + 2 + howmany(KSTACK_PAGES, KASAN_SHADOW_SCALE))
 #else
 #define	SAN_EARLY_PAGES	\
-	(NKMSANSHADPML4E + NKMSANORIGPML4E + 2 * (1 + 2 + KSTACK_PAGES))
+	(NKMSANSHADPML4E + NKMSANORIGPML4E + 2 * (2 + 2 + KSTACK_PAGES))
 #endif
 
 static uint64_t __nosanitizeaddress __nosanitizememory

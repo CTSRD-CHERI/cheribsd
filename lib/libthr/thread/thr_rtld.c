@@ -234,8 +234,8 @@ _thr_rtld_init(void)
 	struct RtldLockInfo	li;
 	struct pthread		*curthread;
 	ucontext_t *uc;
-	long dummy = -1;
 	int uc_len;
+	char dummy[2] = {};
 
 	curthread = _get_curthread();
 
@@ -244,14 +244,14 @@ _thr_rtld_init(void)
 	 * XXXAR: this line here hangs when running Qt unit tests, let's just
 	 * use an invalid opcode to get EINVAL
 	 */
-	/* _umtx_op_err((struct umtx *)&dummy, UMTX_OP_WAKE, 1, 0, 0); */
-	_umtx_op_err((struct umtx *)&dummy, INT_MAX, 1, 0, 0);
+	/* _umtx_op_err(&dummy, UMTX_OP_WAKE, 1, 0, 0); */
+	_umtx_op_err(&dummy, INT_MAX, 1, 0, 0);
 	
 	/* force to resolve errno() PLT */
 	__error();
 
 	/* force to resolve memcpy PLT */
-	memcpy(&dummy, &dummy, sizeof(dummy));
+	memcpy(&dummy[0], &dummy[1], 1);
 
 	mprotect(NULL, 0, 0);
 	_rtld_get_stack_prot();

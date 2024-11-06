@@ -80,6 +80,7 @@ arm64/arm64/ptrauth.c				optional pac \
 	compile-with	"${NORMAL_C:N-mbranch-protection*} -mbranch-protection=bti"
 arm64/arm64/pmap.c				standard
 arm64/arm64/ptrace_machdep.c			standard
+arm64/arm64/sdt_machdep.c			optional kdtrace_hooks
 arm64/arm64/sigtramp.S				standard
 arm64/arm64/freebsd64cb_sigtramp.S		optional cpu_cheri
 arm64/arm64/stack_machdep.c			optional ddb | stack
