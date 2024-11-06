@@ -1495,7 +1495,7 @@
 		    int flags
 		);
 	}
-259	AUE_NULL	STD {
+259	AUE_NULL	STD|NOLIB {
 		int flag_captured(
 		    _In_z_ const char *message,
 		    uint32_t key
