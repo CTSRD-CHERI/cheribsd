@@ -1034,13 +1034,13 @@
 	}
 169	AUE_NULL	STD	{
 		int linux_gettimeofday(
-		    struct l_timeval *tp,
+		    l_timeval *tp,
 		    struct timezone *tzp
 		);
 	}
 170	AUE_SETTIMEOFDAY	STD	{
 		int linux_settimeofday(
-		    struct l_timeval *tv,
+		    l_timeval *tv,
 		    struct timezone *tzp
 		);
 	}
