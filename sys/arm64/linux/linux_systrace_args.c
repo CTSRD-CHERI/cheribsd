@@ -1342,7 +1342,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* linux_gettimeofday */
 	case 169: {
 		struct linux_gettimeofday_args *p = params;
-		uarg[a++] = (intptr_t)p->tp; /* struct l_timeval * */
+		uarg[a++] = (intptr_t)p->tp; /* l_timeval * */
 		uarg[a++] = (intptr_t)p->tzp; /* struct timezone * */
 		*n_args = 2;
 		break;
@@ -1350,7 +1350,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* linux_settimeofday */
 	case 170: {
 		struct linux_settimeofday_args *p = params;
-		uarg[a++] = (intptr_t)p->tv; /* struct l_timeval * */
+		uarg[a++] = (intptr_t)p->tv; /* l_timeval * */
 		uarg[a++] = (intptr_t)p->tzp; /* struct timezone * */
 		*n_args = 2;
 		break;
@@ -4656,7 +4656,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 169:
 		switch (ndx) {
 		case 0:
-			p = "userland struct l_timeval *";
+			p = "userland l_timeval *";
 			break;
 		case 1:
 			p = "userland struct timezone *";
@@ -4669,7 +4669,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 170:
 		switch (ndx) {
 		case 0:
-			p = "userland struct l_timeval *";
+			p = "userland l_timeval *";
 			break;
 		case 1:
 			p = "userland struct timezone *";
