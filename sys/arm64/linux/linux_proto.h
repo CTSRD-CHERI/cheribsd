@@ -686,11 +686,11 @@ struct linux_getcpu_args {
 	char cache_l_[PADL_(void *)]; void * cache; char cache_r_[PADR_(void *)];
 };
 struct linux_gettimeofday_args {
-	char tp_l_[PADL_(struct l_timeval *)]; struct l_timeval * tp; char tp_r_[PADR_(struct l_timeval *)];
+	char tp_l_[PADL_(l_timeval *)]; l_timeval * tp; char tp_r_[PADR_(l_timeval *)];
 	char tzp_l_[PADL_(struct timezone *)]; struct timezone * tzp; char tzp_r_[PADR_(struct timezone *)];
 };
 struct linux_settimeofday_args {
-	char tv_l_[PADL_(struct l_timeval *)]; struct l_timeval * tv; char tv_r_[PADR_(struct l_timeval *)];
+	char tv_l_[PADL_(l_timeval *)]; l_timeval * tv; char tv_r_[PADR_(l_timeval *)];
 	char tzp_l_[PADL_(struct timezone *)]; struct timezone * tzp; char tzp_r_[PADR_(struct timezone *)];
 };
 struct linux_adjtimex_args {
