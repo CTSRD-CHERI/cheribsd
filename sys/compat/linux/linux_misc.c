@@ -351,7 +351,7 @@ linux_msync(struct thread *td, struct linux_msync_args *args)
 }
 
 int
-linux_mlock(struct thread *td, struct linux_mlock_args *args)
+linux_mlock(struct thread *td, struct linux_mlock_args *uap)
 {
 
 	return (kern_mlock(td->td_proc, td->td_ucred,
@@ -359,7 +359,7 @@ linux_mlock(struct thread *td, struct linux_mlock_args *args)
 }
 
 int
-linux_munlock(struct thread *td, struct linux_munlock_args *args)
+linux_munlock(struct thread *td, struct linux_munlock_args *uap)
 {
 
 	return (kern_munlock(td, (uintptr_t)uap->addr, uap->len));
