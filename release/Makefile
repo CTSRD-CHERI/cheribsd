@@ -248,7 +248,7 @@ dvd: packagesystem
 	done
 .if defined(NO_ROOT)
 	echo "./usr/freebsd-dist type=dir uname=root gname=wheel mode=0755" >> ${.TARGET}/METALOG
-	for dist in MANIFEST $$(ls *.txz); \
+	for dist in MANIFEST *.txz; \
 	    do echo "./usr/freebsd-dist/$${dist} type=file uname=root gname=wheel mode=0644" >> ${.TARGET}/METALOG; \
 	done
 .endif
