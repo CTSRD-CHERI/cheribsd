@@ -2675,7 +2675,7 @@ get_argenv_ptr(l_uintptr_t * __capability *arrayp, void * __capability *ptrp)
 // Temporarily define this macro
 #define COMPAT_LINUX64
 
-	l_uintptr_t * __capability array;
+	char * __capability array;
 #ifdef COMPAT_LINUX32
 	uint32_t ptr32;
 #elif defined(COMPAT_LINUX64)
@@ -2684,7 +2684,7 @@ get_argenv_ptr(l_uintptr_t * __capability *arrayp, void * __capability *ptrp)
 	uintcap_t ptr;
 #endif
 
-	array = *arrayp;
+	array = (char * __capability)*arrayp;
 #ifdef COMPAT_LINUX32
 	if (fueword32(array, &ptr32) == -1)
 		return (EFAULT);
@@ -2701,7 +2701,7 @@ get_argenv_ptr(l_uintptr_t * __capability *arrayp, void * __capability *ptrp)
 	array += sizeof(ptr);
 	*ptrp = (void * __capability)ptr;
 #endif
-	*arrayp = array;
+	*arrayp = (l_uintptr_t * __capability)array;
 	return (0);
 }
 
