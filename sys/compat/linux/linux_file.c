@@ -717,6 +717,13 @@ linux_chdir(struct thread *td, struct linux_chdir_args *args)
 	return (kern_chdir(td, __USER_CAP_PATH(args->path), UIO_USERSPACE));
 }
 
+int
+linux_chroot(struct thread *td, struct linux_chroot_args *args)
+{
+
+	return (kern_chroot(td, __USER_CAP_PATH(args->path)));
+}
+
 #ifdef LINUX_LEGACY_SYSCALLS
 int
 linux_chmod(struct thread *td, struct linux_chmod_args *args)
@@ -1699,7 +1706,7 @@ linux_fallocate(struct thread *td, struct linux_fallocate_args *args)
 	 */
 	if (args->mode != 0)
 		return (EOPNOTSUPP);
-
+	
 #if defined(__amd64__) && defined(COMPAT_LINUX32)
 	len = PAIR32TO64(off_t, args->len);
 	offset = PAIR32TO64(off_t, args->offset);

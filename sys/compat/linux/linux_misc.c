@@ -351,6 +351,21 @@ linux_msync(struct thread *td, struct linux_msync_args *args)
 }
 
 int
+linux_mlock(struct thread *td, struct linux_mlock_args *args)
+{
+
+	return (kern_mlock(td->td_proc, td->td_ucred,
+	    __DECONST(uintptr_t, uap->addr), uap->len));
+}
+
+int
+linux_munlock(struct thread *td, struct linux_munlock_args *args)
+{
+
+	return (kern_munlock(td, (uintptr_t)uap->addr, uap->len));
+}
+
+int
 linux_mprotect(struct thread *td, struct linux_mprotect_args *uap)
 {
 
@@ -381,6 +396,14 @@ linux_mmap2(struct thread *td, struct linux_mmap2_args *uap)
 	return (linux_mmap_common(td, PTROUT(uap->addr), uap->len, uap->prot,
 	    uap->flags, uap->fd, uap->pgoff));
 #endif
+}
+
+// May need to be changed if reused in PCuABI
+int
+linux_munmap(struct thread *td, struct linux_munmap_args *args)
+{
+
+	return (kern_munmap(td, (uintptr_t)args->addr, args->len));
 }
 
 #ifdef LINUX_LEGACY_SYSCALLS
@@ -1262,6 +1285,13 @@ linux_getrlimit(struct thread *td, struct linux_getrlimit_args *args)
 }
 
 int
+linux_getrusage(struct thread *td, struct linux_getrusage_args *args)
+{
+
+	return (kern_getrusage(td, args->who, __USER_CAP_OBJ(args->rusage)));
+}
+
+int
 linux_sched_setscheduler(struct thread *td,
     struct linux_sched_setscheduler_args *args)
 {
@@ -1472,6 +1502,20 @@ linux_reboot(struct thread *td, struct linux_reboot_args *args)
 }
 
 int
+linux_getresuid(struct thread *td, struct linux_getresuid_args *args)
+{
+
+	return (kern_getresuid(td, __USER_CAP_OBJ(args->ruid), __USER_CAP_OBJ(args->euid), __USER_CAP_OBJ(args->suid)));
+}
+
+int
+linux_getresgid(struct thread *td, struct linux_getresgid_args *args)
+{
+
+	return (kern_getresgid(td, __USER_CAP_OBJ(args->rgid), __USER_CAP_OBJ(args->egid), __USER_CAP_OBJ(args->sgid)));
+}
+
+int
 linux_getpid(struct thread *td, struct linux_getpid_args *args)
 {
 
@@ -1570,6 +1614,13 @@ linux_exit_group(struct thread *td, struct linux_exit_group_args *args)
 	 */
 	exit1(td, args->error_code, 0);
 		/* NOTREACHED */
+}
+
+int
+linux_acct(struct thread *td, struct linux_acct_args *args)
+{
+
+	return (kern_acct(td, __USER_CAP_PATH(args->path)));
 }
 
 #define _LINUX_CAPABILITY_VERSION_1  0x19980330
@@ -3126,6 +3177,13 @@ linux_mq_getsetattr(struct thread *td, struct linux_mq_getsetattr_args *args)
 	}
 
 	return (error);
+}
+
+int
+linux_swapon(struct thread *td, struct linux_swapon_args *args)
+{
+
+	return (kern_swapon(td, __USER_CAP_STR(args->name)));
 }
 
 MODULE_DEPEND(linux, mqueuefs, 1, 1, 1);

@@ -519,6 +519,19 @@ linux_semtimedop(struct thread *td, struct linux_semtimedop_args *args)
 }
 
 int
+linux_semop(struct thread *td, struct linux_semop_args *args)
+{
+
+	struct semop_args bargs = {
+		.semid = args->semid,
+		.sops = __USER_CAP_ARRAY(args->sops, args->nsops),
+		.nsops = args->nsops
+	};
+
+	return (sys_semop(td, &bargs));
+}
+
+int
 linux_semget(struct thread *td, struct linux_semget_args *args)
 {
 	struct semget_args bsd_args = {

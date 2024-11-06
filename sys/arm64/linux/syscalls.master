@@ -310,8 +310,8 @@
 		    int fd
 		);
 	}
-51	AUE_CHROOT	NOPROTO	{
-		int chroot(
+51	AUE_CHROOT	STD	{
+		int linux_chroot(
 		    char *path
 		);
 	}
@@ -558,8 +558,8 @@
 		    l_int flags
 		);
 	}
-89	AUE_ACCT	NOPROTO	{
-		int acct(
+89	AUE_ACCT	STD	{
+		int linux_acct(
 		    char *path
 		);
 	}
@@ -909,11 +909,11 @@
 		    uid_t suid
 		);
 	}
-148	AUE_GETRESUID	NOPROTO	{
-		int getresuid(
-		    uid_t *ruid,
-		    uid_t *euid,
-		    uid_t *suid
+148	AUE_GETRESUID	STD	{
+		int linux_getresuid(
+		    l_uid_t *ruid,
+		    l_uid_t *euid,
+		    l_uid_t *suid
 		);
 	}
 149	AUE_SETRESGID	NOPROTO	{
@@ -923,11 +923,11 @@
 		    gid_t sgid
 		);
 	}
-150	AUE_GETRESGID	NOPROTO	{
-		int getresgid(
-		    gid_t *rgid,
-		    gid_t *egid,
-		    gid_t *sgid
+150	AUE_GETRESGID	STD	{
+		int linux_getresgid(
+		    l_gid_t *rgid,
+		    l_gid_t *egid,
+		    l_gid_t *sgid
 		);
 	}
 151	AUE_SETFSUID	STD	{
@@ -1005,9 +1005,9 @@
 		    struct l_rlimit *rlim
 		);
 	}
-165	AUE_GETRUSAGE	NOPROTO	{
-		int getrusage(
-		    int who,
+165	AUE_GETRUSAGE	STD	{
+		int linux_getrusage(
+		    l_int who,
 		    struct rusage *rusage
 		);
 	}
@@ -1032,14 +1032,14 @@
 		    void *cache
 		);
 	}
-169	AUE_NULL	NOPROTO	{
-		int gettimeofday(
+169	AUE_NULL	STD	{
+		int linux_gettimeofday(
 		    struct l_timeval *tp,
 		    struct timezone *tzp
 		);
 	}
-170	AUE_SETTIMEOFDAY	NOPROTO	{
-		int settimeofday(
+170	AUE_SETTIMEOFDAY	STD	{
+		int linux_settimeofday(
 		    struct l_timeval *tv,
 		    struct timezone *tzp
 		);
@@ -1170,8 +1170,8 @@
 		    struct l_timespec *timeout
 		);
 	}
-193	AUE_NULL	NOPROTO	{
-		int semop(
+193	AUE_NULL	STD	{
+		int linux_semop(
 		    l_int semid,
 		    struct sembuf *sops,
 		    l_size_t nsops
@@ -1323,8 +1323,8 @@
 		    l_ulong dsend
 		);
 	}
-215	AUE_MUNMAP	NOPROTO	{
-		int munmap(
+215	AUE_MUNMAP	STD	{
+		int linux_munmap(
 		    void *addr,
 		    l_size_t len
 		);
@@ -1381,8 +1381,8 @@
 		    l_int advice
 		);
 	}
-224	AUE_SWAPON	NOPROTO	{
-		int swapon(
+224	AUE_SWAPON	STD	{
+		int linux_swapon(
 		    char *name
 		);
 	}
@@ -1403,16 +1403,16 @@
 		    l_int fl
 		);
 	}
-228	AUE_MLOCK	NOPROTO	{
-		int mlock(
+228	AUE_MLOCK	STD	{
+		int linux_mlock(
 		    const void *addr,
-		    size_t len
+		    l_size_t len
 		);
 	}
-229	AUE_MUNLOCK	NOPROTO	{
-		int munlock(
+229	AUE_MUNLOCK	STD	{
+		int linux_munlock(
 		    const void *addr,
-		    size_t len
+		    l_size_t len
 		);
 	}
 230	AUE_MLOCKALL	NOPROTO	{

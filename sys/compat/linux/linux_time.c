@@ -803,3 +803,19 @@ linux_clock_nanosleep_time64(struct thread *td,
 	return (error);
 }
 #endif
+
+int
+linux_gettimeofday(struct thread *td,
+    struct linux_gettimeofday_args *args)
+{
+	
+	return (kern_gettimeofday(td, __USER_CAP_OBJ(args->tp), __USER_CAP_OBJ(args->tzp)));
+}
+
+int
+linux_settimeofday(struct thread *td,
+    struct linux_settimeofday_args *args)
+{
+	
+	return (kern_settimeofday(td, __USER_CAP_OBJ(args->tv), __USER_CAP_OBJ(args->tzp)));
+}
