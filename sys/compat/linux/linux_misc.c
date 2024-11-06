@@ -1287,8 +1287,14 @@ linux_getrlimit(struct thread *td, struct linux_getrlimit_args *args)
 int
 linux_getrusage(struct thread *td, struct linux_getrusage_args *args)
 {
+	struct rusage ru;
+	int error;
 
-	return (kern_getrusage(td, args->who, __USER_CAP_OBJ(args->rusage)));
+	error = kern_getrusage(td, args->who, &ru);
+	if (error == 0)
+		error = copyout(&ru, __USER_CAP_OBJ(args->rusage),
+		    sizeof(struct rusage));
+	return (error);
 }
 
 int
