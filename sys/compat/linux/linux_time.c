@@ -817,5 +817,5 @@ linux_settimeofday(struct thread *td,
     struct linux_settimeofday_args *args)
 {
 	
-	return (kern_settimeofday(td, __USER_CAP_OBJ(args->tv), __USER_CAP_OBJ(args->tzp)));
+	return (user_settimeofday(td, __USER_CAP_OBJ(args->tv), __USER_CAP_OBJ(args->tzp)));
 }
