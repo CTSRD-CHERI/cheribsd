@@ -2671,6 +2671,10 @@ linux_seccomp(struct thread *td, struct linux_seccomp_args *args)
 static int
 get_argenv_ptr(l_uintptr_t * __capability *arrayp, void * __capability *ptrp)
 {
+
+// Temporarily define this macro
+#define COMPAT_LINUX64
+
 	l_uintptr_t * __capability array;
 #ifdef COMPAT_LINUX32
 	uint32_t ptr32;
