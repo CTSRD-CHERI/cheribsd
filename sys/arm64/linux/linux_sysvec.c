@@ -396,7 +396,7 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	memcpy(&frame->sf.sf_uc.uc_stack, &uc_stack, sizeof(uc_stack));
 
 	/* Copy the sigframe out to the user's stack. */
-	if (copyout(frame, __USER_CAP_OBJ(fp), sizeof(*fp)) != 0) {
+	if (copyout(frame, __USER_CAP((uintcap_t)fp, sizeof(*fp)), sizeof(*fp)) != 0) {
 		/* Process has trashed its stack. Kill it. */
 		free(frame, M_LINUX);
 		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td, fp);
