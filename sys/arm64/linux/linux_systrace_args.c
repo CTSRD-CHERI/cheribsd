@@ -390,9 +390,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* chroot */
+	/* linux_chroot */
 	case 51: {
-		struct chroot_args *p = params;
+		struct linux_chroot_args *p = params;
 		uarg[a++] = (intptr_t)p->path; /* char * */
 		*n_args = 1;
 		break;
@@ -708,9 +708,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
-	/* acct */
+	/* linux_acct */
 	case 89: {
-		struct acct_args *p = params;
+		struct linux_acct_args *p = params;
 		uarg[a++] = (intptr_t)p->path; /* char * */
 		*n_args = 1;
 		break;
@@ -1174,12 +1174,12 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* getresuid */
+	/* linux_getresuid */
 	case 148: {
-		struct getresuid_args *p = params;
-		uarg[a++] = (intptr_t)p->ruid; /* uid_t * */
-		uarg[a++] = (intptr_t)p->euid; /* uid_t * */
-		uarg[a++] = (intptr_t)p->suid; /* uid_t * */
+		struct linux_getresuid_args *p = params;
+		uarg[a++] = (intptr_t)p->ruid; /* l_uid_t * */
+		uarg[a++] = (intptr_t)p->euid; /* l_uid_t * */
+		uarg[a++] = (intptr_t)p->suid; /* l_uid_t * */
 		*n_args = 3;
 		break;
 	}
@@ -1192,12 +1192,12 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* getresgid */
+	/* linux_getresgid */
 	case 150: {
-		struct getresgid_args *p = params;
-		uarg[a++] = (intptr_t)p->rgid; /* gid_t * */
-		uarg[a++] = (intptr_t)p->egid; /* gid_t * */
-		uarg[a++] = (intptr_t)p->sgid; /* gid_t * */
+		struct linux_getresgid_args *p = params;
+		uarg[a++] = (intptr_t)p->rgid; /* l_gid_t * */
+		uarg[a++] = (intptr_t)p->egid; /* l_gid_t * */
+		uarg[a++] = (intptr_t)p->sgid; /* l_gid_t * */
 		*n_args = 3;
 		break;
 	}
@@ -1304,10 +1304,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* getrusage */
+	/* linux_getrusage */
 	case 165: {
-		struct getrusage_args *p = params;
-		iarg[a++] = p->who; /* int */
+		struct linux_getrusage_args *p = params;
+		iarg[a++] = p->who; /* l_int */
 		uarg[a++] = (intptr_t)p->rusage; /* struct rusage * */
 		*n_args = 2;
 		break;
@@ -1339,17 +1339,17 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* gettimeofday */
+	/* linux_gettimeofday */
 	case 169: {
-		struct gettimeofday_args *p = params;
+		struct linux_gettimeofday_args *p = params;
 		uarg[a++] = (intptr_t)p->tp; /* struct l_timeval * */
 		uarg[a++] = (intptr_t)p->tzp; /* struct timezone * */
 		*n_args = 2;
 		break;
 	}
-	/* settimeofday */
+	/* linux_settimeofday */
 	case 170: {
-		struct settimeofday_args *p = params;
+		struct linux_settimeofday_args *p = params;
 		uarg[a++] = (intptr_t)p->tv; /* struct l_timeval * */
 		uarg[a++] = (intptr_t)p->tzp; /* struct timezone * */
 		*n_args = 2;
@@ -1525,9 +1525,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
-	/* semop */
+	/* linux_semop */
 	case 193: {
-		struct semop_args *p = params;
+		struct linux_semop_args *p = params;
 		iarg[a++] = p->semid; /* l_int */
 		uarg[a++] = (intptr_t)p->sops; /* struct sembuf * */
 		iarg[a++] = p->nsops; /* l_size_t */
@@ -1719,9 +1719,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* munmap */
+	/* linux_munmap */
 	case 215: {
-		struct munmap_args *p = params;
+		struct linux_munmap_args *p = params;
 		uarg[a++] = (intptr_t)p->addr; /* void * */
 		iarg[a++] = p->len; /* l_size_t */
 		*n_args = 2;
@@ -1795,9 +1795,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
-	/* swapon */
+	/* linux_swapon */
 	case 224: {
-		struct swapon_args *p = params;
+		struct linux_swapon_args *p = params;
 		uarg[a++] = (intptr_t)p->name; /* char * */
 		*n_args = 1;
 		break;
@@ -1825,19 +1825,19 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* mlock */
+	/* linux_mlock */
 	case 228: {
-		struct mlock_args *p = params;
+		struct linux_mlock_args *p = params;
 		uarg[a++] = (intptr_t)p->addr; /* const void * */
-		uarg[a++] = p->len; /* size_t */
+		iarg[a++] = p->len; /* l_size_t */
 		*n_args = 2;
 		break;
 	}
-	/* munlock */
+	/* linux_munlock */
 	case 229: {
-		struct munlock_args *p = params;
+		struct linux_munlock_args *p = params;
 		uarg[a++] = (intptr_t)p->addr; /* const void * */
-		uarg[a++] = p->len; /* size_t */
+		iarg[a++] = p->len; /* l_size_t */
 		*n_args = 2;
 		break;
 	}
@@ -3081,7 +3081,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* chroot */
+	/* linux_chroot */
 	case 51:
 		switch (ndx) {
 		case 0:
@@ -3635,7 +3635,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* acct */
+	/* linux_acct */
 	case 89:
 		switch (ndx) {
 		case 0:
@@ -4389,17 +4389,17 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* getresuid */
+	/* linux_getresuid */
 	case 148:
 		switch (ndx) {
 		case 0:
-			p = "userland uid_t *";
+			p = "userland l_uid_t *";
 			break;
 		case 1:
-			p = "userland uid_t *";
+			p = "userland l_uid_t *";
 			break;
 		case 2:
-			p = "userland uid_t *";
+			p = "userland l_uid_t *";
 			break;
 		default:
 			break;
@@ -4421,17 +4421,17 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* getresgid */
+	/* linux_getresgid */
 	case 150:
 		switch (ndx) {
 		case 0:
-			p = "userland gid_t *";
+			p = "userland l_gid_t *";
 			break;
 		case 1:
-			p = "userland gid_t *";
+			p = "userland l_gid_t *";
 			break;
 		case 2:
-			p = "userland gid_t *";
+			p = "userland l_gid_t *";
 			break;
 		default:
 			break;
@@ -4591,11 +4591,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* getrusage */
+	/* linux_getrusage */
 	case 165:
 		switch (ndx) {
 		case 0:
-			p = "int";
+			p = "l_int";
 			break;
 		case 1:
 			p = "userland struct rusage *";
@@ -4652,7 +4652,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* gettimeofday */
+	/* linux_gettimeofday */
 	case 169:
 		switch (ndx) {
 		case 0:
@@ -4665,7 +4665,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* settimeofday */
+	/* linux_settimeofday */
 	case 170:
 		switch (ndx) {
 		case 0:
@@ -4938,7 +4938,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* semop */
+	/* linux_semop */
 	case 193:
 		switch (ndx) {
 		case 0:
@@ -5289,7 +5289,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* munmap */
+	/* linux_munmap */
 	case 215:
 		switch (ndx) {
 		case 0:
@@ -5415,7 +5415,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* swapon */
+	/* linux_swapon */
 	case 224:
 		switch (ndx) {
 		case 0:
@@ -5460,27 +5460,27 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* mlock */
+	/* linux_mlock */
 	case 228:
 		switch (ndx) {
 		case 0:
 			p = "userland const void *";
 			break;
 		case 1:
-			p = "size_t";
+			p = "l_size_t";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* munlock */
+	/* linux_munlock */
 	case 229:
 		switch (ndx) {
 		case 0:
 			p = "userland const void *";
 			break;
 		case 1:
-			p = "size_t";
+			p = "l_size_t";
 			break;
 		default:
 			break;
@@ -6553,7 +6553,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* chroot */
+	/* linux_chroot */
 	case 51:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -6721,7 +6721,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* acct */
+	/* linux_acct */
 	case 89:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -6993,7 +6993,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* getresuid */
+	/* linux_getresuid */
 	case 148:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -7003,7 +7003,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* getresgid */
+	/* linux_getresgid */
 	case 150:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -7075,7 +7075,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* getrusage */
+	/* linux_getrusage */
 	case 165:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -7095,12 +7095,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* gettimeofday */
+	/* linux_gettimeofday */
 	case 169:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* settimeofday */
+	/* linux_settimeofday */
 	case 170:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -7191,7 +7191,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* semop */
+	/* linux_semop */
 	case 193:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -7296,7 +7296,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* munmap */
+	/* linux_munmap */
 	case 215:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -7332,7 +7332,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* swapon */
+	/* linux_swapon */
 	case 224:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -7349,12 +7349,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* mlock */
+	/* linux_mlock */
 	case 228:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* munlock */
+	/* linux_munlock */
 	case 229:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

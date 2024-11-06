@@ -234,6 +234,9 @@ struct linux_faccessat_args {
 struct linux_chdir_args {
 	char path_l_[PADL_(char *)]; char * path; char path_r_[PADR_(char *)];
 };
+struct linux_chroot_args {
+	char path_l_[PADL_(char *)]; char * path; char path_r_[PADR_(char *)];
+};
 struct linux_fchmodat_args {
 	char dfd_l_[PADL_(l_int)]; l_int dfd; char dfd_r_[PADR_(l_int)];
 	char filename_l_[PADL_(const char *)]; const char * filename; char filename_r_[PADR_(const char *)];
@@ -397,6 +400,9 @@ struct linux_utimensat_args {
 	char pathname_l_[PADL_(const char *)]; const char * pathname; char pathname_r_[PADR_(const char *)];
 	char times_l_[PADL_(const struct l_timespec *)]; const struct l_timespec * times; char times_r_[PADR_(const struct l_timespec *)];
 	char flags_l_[PADL_(l_int)]; l_int flags; char flags_r_[PADR_(l_int)];
+};
+struct linux_acct_args {
+	char path_l_[PADL_(char *)]; char * path; char path_r_[PADR_(char *)];
 };
 struct linux_capget_args {
 	char hdrp_l_[PADL_(struct l_user_cap_header *)]; struct l_user_cap_header * hdrp; char hdrp_r_[PADR_(struct l_user_cap_header *)];
@@ -614,6 +620,16 @@ struct linux_reboot_args {
 	char cmd_l_[PADL_(l_uint)]; l_uint cmd; char cmd_r_[PADR_(l_uint)];
 	char arg_l_[PADL_(void *)]; void * arg; char arg_r_[PADR_(void *)];
 };
+struct linux_getresuid_args {
+	char ruid_l_[PADL_(l_uid_t *)]; l_uid_t * ruid; char ruid_r_[PADR_(l_uid_t *)];
+	char euid_l_[PADL_(l_uid_t *)]; l_uid_t * euid; char euid_r_[PADR_(l_uid_t *)];
+	char suid_l_[PADL_(l_uid_t *)]; l_uid_t * suid; char suid_r_[PADR_(l_uid_t *)];
+};
+struct linux_getresgid_args {
+	char rgid_l_[PADL_(l_gid_t *)]; l_gid_t * rgid; char rgid_r_[PADR_(l_gid_t *)];
+	char egid_l_[PADL_(l_gid_t *)]; l_gid_t * egid; char egid_r_[PADR_(l_gid_t *)];
+	char sgid_l_[PADL_(l_gid_t *)]; l_gid_t * sgid; char sgid_r_[PADR_(l_gid_t *)];
+};
 struct linux_setfsuid_args {
 	char uid_l_[PADL_(l_uid_t)]; l_uid_t uid; char uid_r_[PADR_(l_uid_t)];
 };
@@ -653,6 +669,10 @@ struct linux_setrlimit_args {
 	char resource_l_[PADL_(l_uint)]; l_uint resource; char resource_r_[PADR_(l_uint)];
 	char rlim_l_[PADL_(struct l_rlimit *)]; struct l_rlimit * rlim; char rlim_r_[PADR_(struct l_rlimit *)];
 };
+struct linux_getrusage_args {
+	char who_l_[PADL_(l_int)]; l_int who; char who_r_[PADR_(l_int)];
+	char rusage_l_[PADL_(struct rusage *)]; struct rusage * rusage; char rusage_r_[PADR_(struct rusage *)];
+};
 struct linux_prctl_args {
 	char option_l_[PADL_(l_int)]; l_int option; char option_r_[PADR_(l_int)];
 	char arg2_l_[PADL_(l_uintptr_t)]; l_uintptr_t arg2; char arg2_r_[PADR_(l_uintptr_t)];
@@ -664,6 +684,14 @@ struct linux_getcpu_args {
 	char cpu_l_[PADL_(l_uint *)]; l_uint * cpu; char cpu_r_[PADR_(l_uint *)];
 	char node_l_[PADL_(l_uint *)]; l_uint * node; char node_r_[PADR_(l_uint *)];
 	char cache_l_[PADL_(void *)]; void * cache; char cache_r_[PADR_(void *)];
+};
+struct linux_gettimeofday_args {
+	char tp_l_[PADL_(struct l_timeval *)]; struct l_timeval * tp; char tp_r_[PADR_(struct l_timeval *)];
+	char tzp_l_[PADL_(struct timezone *)]; struct timezone * tzp; char tzp_r_[PADR_(struct timezone *)];
+};
+struct linux_settimeofday_args {
+	char tv_l_[PADL_(struct l_timeval *)]; struct l_timeval * tv; char tv_r_[PADR_(struct l_timeval *)];
+	char tzp_l_[PADL_(struct timezone *)]; struct timezone * tzp; char tzp_r_[PADR_(struct timezone *)];
 };
 struct linux_adjtimex_args {
 	syscallarg_t dummy;
@@ -756,6 +784,11 @@ struct linux_semtimedop_args {
 	char tsops_l_[PADL_(struct sembuf *)]; struct sembuf * tsops; char tsops_r_[PADR_(struct sembuf *)];
 	char nsops_l_[PADL_(l_size_t)]; l_size_t nsops; char nsops_r_[PADR_(l_size_t)];
 	char timeout_l_[PADL_(struct l_timespec *)]; struct l_timespec * timeout; char timeout_r_[PADR_(struct l_timespec *)];
+};
+struct linux_semop_args {
+	char semid_l_[PADL_(l_int)]; l_int semid; char semid_r_[PADR_(l_int)];
+	char sops_l_[PADL_(struct sembuf *)]; struct sembuf * sops; char sops_r_[PADR_(struct sembuf *)];
+	char nsops_l_[PADL_(l_size_t)]; l_size_t nsops; char nsops_r_[PADR_(l_size_t)];
 };
 struct linux_shmget_args {
 	char key_l_[PADL_(l_key_t)]; l_key_t key; char key_r_[PADR_(l_key_t)];
@@ -862,6 +895,10 @@ struct linux_recvmsg_args {
 struct linux_brk_args {
 	char dsend_l_[PADL_(l_ulong)]; l_ulong dsend; char dsend_r_[PADR_(l_ulong)];
 };
+struct linux_munmap_args {
+	char addr_l_[PADL_(void *)]; void * addr; char addr_r_[PADR_(void *)];
+	char len_l_[PADL_(l_size_t)]; l_size_t len; char len_r_[PADR_(l_size_t)];
+};
 struct linux_mremap_args {
 	char addr_l_[PADL_(l_ulong)]; l_ulong addr; char addr_r_[PADR_(l_ulong)];
 	char old_len_l_[PADL_(l_ulong)]; l_ulong old_len; char old_len_r_[PADR_(l_ulong)];
@@ -904,6 +941,9 @@ struct linux_fadvise64_args {
 	char len_l_[PADL_(l_size_t)]; l_size_t len; char len_r_[PADR_(l_size_t)];
 	char advice_l_[PADL_(l_int)]; l_int advice; char advice_r_[PADR_(l_int)];
 };
+struct linux_swapon_args {
+	char name_l_[PADL_(char *)]; char * name; char name_r_[PADR_(char *)];
+};
 struct linux_swapoff_args {
 	syscallarg_t dummy;
 };
@@ -916,6 +956,14 @@ struct linux_msync_args {
 	char addr_l_[PADL_(l_ulong)]; l_ulong addr; char addr_r_[PADR_(l_ulong)];
 	char len_l_[PADL_(l_size_t)]; l_size_t len; char len_r_[PADR_(l_size_t)];
 	char fl_l_[PADL_(l_int)]; l_int fl; char fl_r_[PADR_(l_int)];
+};
+struct linux_mlock_args {
+	char addr_l_[PADL_(const void *)]; const void * addr; char addr_r_[PADR_(const void *)];
+	char len_l_[PADL_(l_size_t)]; l_size_t len; char len_r_[PADR_(l_size_t)];
+};
+struct linux_munlock_args {
+	char addr_l_[PADL_(const void *)]; const void * addr; char addr_r_[PADR_(const void *)];
+	char len_l_[PADL_(l_size_t)]; l_size_t len; char len_r_[PADR_(l_size_t)];
 };
 struct linux_mincore_args {
 	char start_l_[PADL_(l_ulong)]; l_ulong start; char start_r_[PADR_(l_ulong)];
@@ -1295,6 +1343,7 @@ int	linux_ftruncate(struct thread *, struct linux_ftruncate_args *);
 int	linux_fallocate(struct thread *, struct linux_fallocate_args *);
 int	linux_faccessat(struct thread *, struct linux_faccessat_args *);
 int	linux_chdir(struct thread *, struct linux_chdir_args *);
+int	linux_chroot(struct thread *, struct linux_chroot_args *);
 int	linux_fchmodat(struct thread *, struct linux_fchmodat_args *);
 int	linux_fchownat(struct thread *, struct linux_fchownat_args *);
 int	linux_openat(struct thread *, struct linux_openat_args *);
@@ -1326,6 +1375,7 @@ int	linux_timerfd_create(struct thread *, struct linux_timerfd_create_args *);
 int	linux_timerfd_settime(struct thread *, struct linux_timerfd_settime_args *);
 int	linux_timerfd_gettime(struct thread *, struct linux_timerfd_gettime_args *);
 int	linux_utimensat(struct thread *, struct linux_utimensat_args *);
+int	linux_acct(struct thread *, struct linux_acct_args *);
 int	linux_capget(struct thread *, struct linux_capget_args *);
 int	linux_capset(struct thread *, struct linux_capset_args *);
 int	linux_personality(struct thread *, struct linux_personality_args *);
@@ -1376,6 +1426,8 @@ int	linux_rt_sigqueueinfo(struct thread *, struct linux_rt_sigqueueinfo_args *);
 int	linux_rt_sigreturn(struct thread *, struct linux_rt_sigreturn_args *);
 int	linux_getpriority(struct thread *, struct linux_getpriority_args *);
 int	linux_reboot(struct thread *, struct linux_reboot_args *);
+int	linux_getresuid(struct thread *, struct linux_getresuid_args *);
+int	linux_getresgid(struct thread *, struct linux_getresgid_args *);
 int	linux_setfsuid(struct thread *, struct linux_setfsuid_args *);
 int	linux_setfsgid(struct thread *, struct linux_setfsgid_args *);
 int	linux_times(struct thread *, struct linux_times_args *);
@@ -1387,8 +1439,11 @@ int	linux_sethostname(struct thread *, struct linux_sethostname_args *);
 int	linux_setdomainname(struct thread *, struct linux_setdomainname_args *);
 int	linux_getrlimit(struct thread *, struct linux_getrlimit_args *);
 int	linux_setrlimit(struct thread *, struct linux_setrlimit_args *);
+int	linux_getrusage(struct thread *, struct linux_getrusage_args *);
 int	linux_prctl(struct thread *, struct linux_prctl_args *);
 int	linux_getcpu(struct thread *, struct linux_getcpu_args *);
+int	linux_gettimeofday(struct thread *, struct linux_gettimeofday_args *);
+int	linux_settimeofday(struct thread *, struct linux_settimeofday_args *);
 int	linux_adjtimex(struct thread *, struct linux_adjtimex_args *);
 int	linux_getpid(struct thread *, struct linux_getpid_args *);
 int	linux_getppid(struct thread *, struct linux_getppid_args *);
@@ -1409,6 +1464,7 @@ int	linux_msgsnd(struct thread *, struct linux_msgsnd_args *);
 int	linux_semget(struct thread *, struct linux_semget_args *);
 int	linux_semctl(struct thread *, struct linux_semctl_args *);
 int	linux_semtimedop(struct thread *, struct linux_semtimedop_args *);
+int	linux_semop(struct thread *, struct linux_semop_args *);
 int	linux_shmget(struct thread *, struct linux_shmget_args *);
 int	linux_shmctl(struct thread *, struct linux_shmctl_args *);
 int	linux_shmat(struct thread *, struct linux_shmat_args *);
@@ -1429,6 +1485,7 @@ int	linux_shutdown(struct thread *, struct linux_shutdown_args *);
 int	linux_sendmsg(struct thread *, struct linux_sendmsg_args *);
 int	linux_recvmsg(struct thread *, struct linux_recvmsg_args *);
 int	linux_brk(struct thread *, struct linux_brk_args *);
+int	linux_munmap(struct thread *, struct linux_munmap_args *);
 int	linux_mremap(struct thread *, struct linux_mremap_args *);
 int	linux_add_key(struct thread *, struct linux_add_key_args *);
 int	linux_request_key(struct thread *, struct linux_request_key_args *);
@@ -1437,9 +1494,12 @@ int	linux_clone(struct thread *, struct linux_clone_args *);
 int	linux_execve(struct thread *, struct linux_execve_args *);
 int	linux_mmap2(struct thread *, struct linux_mmap2_args *);
 int	linux_fadvise64(struct thread *, struct linux_fadvise64_args *);
+int	linux_swapon(struct thread *, struct linux_swapon_args *);
 int	linux_swapoff(struct thread *, struct linux_swapoff_args *);
 int	linux_mprotect(struct thread *, struct linux_mprotect_args *);
 int	linux_msync(struct thread *, struct linux_msync_args *);
+int	linux_mlock(struct thread *, struct linux_mlock_args *);
+int	linux_munlock(struct thread *, struct linux_munlock_args *);
 int	linux_mincore(struct thread *, struct linux_mincore_args *);
 int	linux_madvise(struct thread *, struct linux_madvise_args *);
 int	linux_remap_file_pages(struct thread *, struct linux_remap_file_pages_args *);
@@ -1557,6 +1617,7 @@ int	linux_fchmodat2(struct thread *, struct linux_fchmodat2_args *);
 #define	LINUX_SYS_AUE_linux_fallocate	AUE_NULL
 #define	LINUX_SYS_AUE_linux_faccessat	AUE_FACCESSAT
 #define	LINUX_SYS_AUE_linux_chdir	AUE_CHDIR
+#define	LINUX_SYS_AUE_linux_chroot	AUE_CHROOT
 #define	LINUX_SYS_AUE_linux_fchmodat	AUE_FCHMODAT
 #define	LINUX_SYS_AUE_linux_fchownat	AUE_FCHOWNAT
 #define	LINUX_SYS_AUE_linux_openat	AUE_OPEN_RWTC
@@ -1588,6 +1649,7 @@ int	linux_fchmodat2(struct thread *, struct linux_fchmodat2_args *);
 #define	LINUX_SYS_AUE_linux_timerfd_settime	AUE_NULL
 #define	LINUX_SYS_AUE_linux_timerfd_gettime	AUE_NULL
 #define	LINUX_SYS_AUE_linux_utimensat	AUE_FUTIMESAT
+#define	LINUX_SYS_AUE_linux_acct	AUE_ACCT
 #define	LINUX_SYS_AUE_linux_capget	AUE_CAPGET
 #define	LINUX_SYS_AUE_linux_capset	AUE_CAPSET
 #define	LINUX_SYS_AUE_linux_personality	AUE_PERSONALITY
@@ -1638,6 +1700,8 @@ int	linux_fchmodat2(struct thread *, struct linux_fchmodat2_args *);
 #define	LINUX_SYS_AUE_linux_rt_sigreturn	AUE_NULL
 #define	LINUX_SYS_AUE_linux_getpriority	AUE_GETPRIORITY
 #define	LINUX_SYS_AUE_linux_reboot	AUE_REBOOT
+#define	LINUX_SYS_AUE_linux_getresuid	AUE_GETRESUID
+#define	LINUX_SYS_AUE_linux_getresgid	AUE_GETRESGID
 #define	LINUX_SYS_AUE_linux_setfsuid	AUE_SETFSUID
 #define	LINUX_SYS_AUE_linux_setfsgid	AUE_SETFSGID
 #define	LINUX_SYS_AUE_linux_times	AUE_NULL
@@ -1649,8 +1713,11 @@ int	linux_fchmodat2(struct thread *, struct linux_fchmodat2_args *);
 #define	LINUX_SYS_AUE_linux_setdomainname	AUE_SYSCTL
 #define	LINUX_SYS_AUE_linux_getrlimit	AUE_GETRLIMIT
 #define	LINUX_SYS_AUE_linux_setrlimit	AUE_SETRLIMIT
+#define	LINUX_SYS_AUE_linux_getrusage	AUE_GETRUSAGE
 #define	LINUX_SYS_AUE_linux_prctl	AUE_PRCTL
 #define	LINUX_SYS_AUE_linux_getcpu	AUE_NULL
+#define	LINUX_SYS_AUE_linux_gettimeofday	AUE_NULL
+#define	LINUX_SYS_AUE_linux_settimeofday	AUE_SETTIMEOFDAY
 #define	LINUX_SYS_AUE_linux_adjtimex	AUE_ADJTIME
 #define	LINUX_SYS_AUE_linux_getpid	AUE_GETPID
 #define	LINUX_SYS_AUE_linux_getppid	AUE_GETPPID
@@ -1671,6 +1738,7 @@ int	linux_fchmodat2(struct thread *, struct linux_fchmodat2_args *);
 #define	LINUX_SYS_AUE_linux_semget	AUE_NULL
 #define	LINUX_SYS_AUE_linux_semctl	AUE_NULL
 #define	LINUX_SYS_AUE_linux_semtimedop	AUE_NULL
+#define	LINUX_SYS_AUE_linux_semop	AUE_NULL
 #define	LINUX_SYS_AUE_linux_shmget	AUE_NULL
 #define	LINUX_SYS_AUE_linux_shmctl	AUE_NULL
 #define	LINUX_SYS_AUE_linux_shmat	AUE_NULL
@@ -1691,6 +1759,7 @@ int	linux_fchmodat2(struct thread *, struct linux_fchmodat2_args *);
 #define	LINUX_SYS_AUE_linux_sendmsg	AUE_SENDMSG
 #define	LINUX_SYS_AUE_linux_recvmsg	AUE_RECVMSG
 #define	LINUX_SYS_AUE_linux_brk	AUE_NULL
+#define	LINUX_SYS_AUE_linux_munmap	AUE_MUNMAP
 #define	LINUX_SYS_AUE_linux_mremap	AUE_NULL
 #define	LINUX_SYS_AUE_linux_add_key	AUE_NULL
 #define	LINUX_SYS_AUE_linux_request_key	AUE_NULL
@@ -1699,9 +1768,12 @@ int	linux_fchmodat2(struct thread *, struct linux_fchmodat2_args *);
 #define	LINUX_SYS_AUE_linux_execve	AUE_EXECVE
 #define	LINUX_SYS_AUE_linux_mmap2	AUE_MMAP
 #define	LINUX_SYS_AUE_linux_fadvise64	AUE_NULL
+#define	LINUX_SYS_AUE_linux_swapon	AUE_SWAPON
 #define	LINUX_SYS_AUE_linux_swapoff	AUE_SWAPOFF
 #define	LINUX_SYS_AUE_linux_mprotect	AUE_MPROTECT
 #define	LINUX_SYS_AUE_linux_msync	AUE_MSYNC
+#define	LINUX_SYS_AUE_linux_mlock	AUE_MLOCK
+#define	LINUX_SYS_AUE_linux_munlock	AUE_MUNLOCK
 #define	LINUX_SYS_AUE_linux_mincore	AUE_MINCORE
 #define	LINUX_SYS_AUE_linux_madvise	AUE_MADVISE
 #define	LINUX_SYS_AUE_linux_remap_file_pages	AUE_NULL
