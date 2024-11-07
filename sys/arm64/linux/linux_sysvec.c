@@ -273,7 +273,7 @@ linux_rt_sigreturn(struct thread *td, struct linux_rt_sigreturn_args *args)
 	tf->tf_lr = sf->sf_uc.uc_sc.regs[30];
 	tf->tf_sp = sf->sf_uc.uc_sc.sp;
 	tf->tf_elr = sf->sf_uc.uc_sc.pc;
-	tf->ddc = sf->sf_uc.uc_sc.ddc;
+	tf->tf_ddc = sf->sf_uc.uc_sc.ddc;
 
 	if ((sf->sf_uc.uc_sc.pstate & PSR_M_MASK) != PSR_M_EL0t ||
 	    (sf->sf_uc.uc_sc.pstate & PSR_AARCH32) != 0 ||
@@ -360,7 +360,7 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	frame->sf.sf_uc.uc_sc.sp = tf->tf_sp;
 	frame->sf.sf_uc.uc_sc.pc = tf->tf_elr;
 	frame->sf.sf_uc.uc_sc.pstate = tf->tf_spsr;
-	frame->sf.sf_uc.uc_sc.ddc = tf->ddc;
+	frame->sf.sf_uc.uc_sc.ddc = tf->tf_ddc;
 	frame->sf.sf_uc.uc_sc.fault_address = (uintcap_t)ksi->ksi_addr;
 
 	/* Stack frame for unwinding */

@@ -55,6 +55,7 @@ struct l_sigcontext {
 	uintcap_t	sp;
 	uintcap_t	pc;
 	uintcap_t	pstate;
+	uintcap_t   ddc;
 #else
 	uint64_t	fault_address;
 	uint64_t	regs[31];
