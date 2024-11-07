@@ -118,7 +118,9 @@ struct netisr_workstream {
 	struct netisr_work	nws_work[NETISR_MAXPROT];
 } __aligned(CACHE_LINE_SIZE);
 
+#ifdef _KERNEL
 DPCPU_DECLARE(struct netisr_workstream, nws);
+#endif
 
 /*
  * Per-workstream flags.
