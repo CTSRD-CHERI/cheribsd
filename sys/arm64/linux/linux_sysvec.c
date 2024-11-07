@@ -405,15 +405,17 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	}
 	free(frame, M_LINUX);
 
+	// Use offsetof (following freebsd64) to make sure no capability info is present in case fp has no capability info
+	// This is necessary to run vanilla binaries
 	tf->tf_x[0]= sig;
 	if (issiginfo) {
-		tf->tf_x[1] = (uintcap_t)&fp->sf.sf_si;
-		tf->tf_x[2] = (uintcap_t)&fp->sf.sf_uc;
+		tf->tf_x[1] = (uintcap_t)fp + offsetof(struct l_sigframe, sf) + offsetof(struct l_rt_sigframe, sf_si);
+		tf->tf_x[2] = (uintcap_t)fp + offsetof(struct l_sigframe, sf) + offsetof(struct l_rt_sigframe, sf_uc);
 	} else {
 		tf->tf_x[1] = 0;
 		tf->tf_x[2] = 0;
 	}
-	tf->tf_x[29] = (uintcap_t)&fp->fp;
+	tf->tf_x[29] = (uintcap_t)fp + offsetof(struct l_sigframe, fp);
 	tf->tf_sp = (uintcap_t)fp;
 	tf->tf_lr = (uintcap_t)__user_rt_sigreturn;
 
