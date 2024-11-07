@@ -414,9 +414,14 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		tf->tf_x[2] = 0;
 	}
 	tf->tf_x[29] = (uintcap_t)&fp->fp;
-	tf->tf_elr = (uintcap_t)catcher;
 	tf->tf_sp = (uintcap_t)fp;
 	tf->tf_lr = (uintcap_t)__user_rt_sigreturn;
+
+#if __has_feature(capabilities)
+	trapframe_set_elr(tf, (uintcap_t)catcher);
+#else
+	tf->tf_elr = (uintcap_t)catcher;
+#endif
 
 	CTR3(KTR_SIG, "sendsig: return td=%p pc=%#x sp=%#x", td, tf->tf_elr,
 	    tf->tf_sp);
