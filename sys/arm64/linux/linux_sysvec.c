@@ -263,7 +263,7 @@ linux_rt_sigreturn(struct thread *td, struct linux_rt_sigreturn_args *args)
 
 	tf = td->td_frame;
 	frame = (struct l_sigframe * __capability)tf->tf_sp;
-	error = copyin((void * __capability)&frame->sf, sf, sizeof(*sf));
+	error = copyin(__USER_CAP((uintcap_t)&frame->sf, sizeof(*sf)), sf, sizeof(*sf));
 	if (error != 0) {
 		free(sf, M_LINUX);
 		return (error);
@@ -359,7 +359,7 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	frame->sf.sf_uc.uc_sc.sp = tf->tf_sp;
 	frame->sf.sf_uc.uc_sc.pc = tf->tf_elr;
 	frame->sf.sf_uc.uc_sc.pstate = tf->tf_spsr;
-	frame->sf.sf_uc.uc_sc.fault_address = (register_t)(uintcap_t)ksi->ksi_addr;
+	frame->sf.sf_uc.uc_sc.fault_address = (uintcap_t)ksi->ksi_addr;
 
 	/* Stack frame for unwinding */
 	frame->fp = tf->tf_x[29];
@@ -406,7 +406,6 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	free(frame, M_LINUX);
 
 	// Use offsetof (following freebsd64) to make sure no capability info is present in case fp has no capability info
-	// This is necessary to run vanilla binaries
 	tf->tf_x[0]= sig;
 	if (issiginfo) {
 		tf->tf_x[1] = (uintcap_t)fp + offsetof(struct l_sigframe, sf) + offsetof(struct l_rt_sigframe, sf_si);
