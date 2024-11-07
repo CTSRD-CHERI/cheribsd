@@ -49,11 +49,19 @@ struct l_esr_context {
 };
 
 struct l_sigcontext {
+#if __has_feature(capabilities)
+	uintcap_t	fault_address;
+	uintcap_t	regs[31];
+	uintcap_t	sp;
+	uintcap_t	pc;
+	uintcap_t	pstate;
+#else
 	uint64_t	fault_address;
 	uint64_t	regs[31];
 	uint64_t	sp;
 	uint64_t	pc;
 	uint64_t	pstate;
+#endif
 	uint8_t		__reserved[4096] __attribute__((__aligned__(16)));
 };
 
@@ -74,8 +82,13 @@ struct l_rt_sigframe {
 struct l_sigframe {
 	struct l_rt_sigframe sf;
 	/* frame_record */
+#if __has_feature(capabilities)
+	uintcap_t	fp;
+	uintcap_t	lr;
+#else
 	uint64_t	fp;
 	uint64_t	lr;
+#endif
 };
 
 #define	LINUX_MINSIGSTKSZ	roundup(sizeof(struct l_sigframe), 16)
