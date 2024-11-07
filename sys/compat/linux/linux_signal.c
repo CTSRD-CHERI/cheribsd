@@ -75,7 +75,7 @@ linux_to_bsd_sigaction(l_sigaction_t *lsa, struct sigaction *bsa)
 	unsigned long flags;
 
 	linux_to_bsd_sigset(&lsa->lsa_mask, &bsa->sa_mask);
-	bsa->sa_handler = lsa->lsa_handler;
+	bsa->sa_handler = __USER_CODE_CAP(lsa->lsa_handler);
 	bsa->sa_flags = 0;
 
 	flags = lsa->lsa_flags;
@@ -141,7 +141,7 @@ bsd_to_linux_sigaction(struct sigaction *bsa, l_sigaction_t *lsa)
 #ifdef COMPAT_LINUX32
 	lsa->lsa_handler = (uintptr_t)bsa->sa_handler;
 #else
-	lsa->lsa_handler = bsa->sa_handler;
+	lsa->lsa_handler = (l_uintptr_t)(uintcap_t)bsa->sa_handler;
 #endif
 	lsa->lsa_restorer = 0;		/* unsupported */
 	lsa->lsa_flags = 0;

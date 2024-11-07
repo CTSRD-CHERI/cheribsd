@@ -157,7 +157,7 @@ struct l_newstat {
 #define	LINUX_SA_NOMASK		0x40000000	/* SA_NODEFER */
 #define	LINUX_SA_ONESHOT	0x80000000	/* SA_RESETHAND */
 
-typedef void	(* __kerncap l_handler_t)(l_int);
+typedef l_uintptr_t	l_handler_t;
 
 typedef struct {
 	l_handler_t	lsa_handler;
