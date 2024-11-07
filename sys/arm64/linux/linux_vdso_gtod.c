@@ -83,7 +83,7 @@ __vdso_clock_gettime_fallback(clockid_t clock_id, struct l_timespec *lts)
 static int
 __vdso_gettimeofday_fallback(l_timeval *ltv, struct timezone *ltz)
 {
-	register long svc asm("x8") = LINUX_SYS_gettimeofday;
+	register long svc asm("x8") = LINUX_SYS_linux_gettimeofday;
 	register l_timeval *tv asm("x0") = ltv;
 	register struct timezone *tz asm("x1") = ltz;
 	register long res asm ("x0");
