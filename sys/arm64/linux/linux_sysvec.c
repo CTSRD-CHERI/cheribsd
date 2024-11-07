@@ -263,7 +263,7 @@ linux_rt_sigreturn(struct thread *td, struct linux_rt_sigreturn_args *args)
 
 	tf = td->td_frame;
 	frame = (struct l_sigframe * __capability)tf->tf_sp;
-	error = copyin(__USER_CAP((uintcap_t)&frame->sf, sizeof(*sf)), sf, sizeof(*sf));
+	error = copyincap(__USER_CAP((uintcap_t)&frame->sf, sizeof(*sf)), sf, sizeof(*sf));
 	if (error != 0) {
 		free(sf, M_LINUX);
 		return (error);
@@ -398,7 +398,7 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	memcpy(&frame->sf.sf_uc.uc_stack, &uc_stack, sizeof(uc_stack));
 
 	/* Copy the sigframe out to the user's stack. */
-	if (copyout(frame, __USER_CAP((uintcap_t)fp, sizeof(*fp)), sizeof(*fp)) != 0) {
+	if (copyoutcap(frame, __USER_CAP((uintcap_t)fp, sizeof(*fp)), sizeof(*fp)) != 0) {
 		/* Process has trashed its stack. Kill it. */
 		free(frame, M_LINUX);
 		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td, fp);
