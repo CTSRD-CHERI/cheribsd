@@ -166,31 +166,29 @@ linux64_copyinuio(struct l_iovec64 * __capability iovp, l_ulong iovcnt,
 	struct l_iovec64 iov64;
 	struct iovec *iov;
 	struct uio *uio;
-	uint64_t iovlen;
 	int error, i;
+	
 	*uiop = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (EINVAL);
-	iovlen = iovcnt * sizeof(struct iovec);
-	uio = malloc(iovlen + sizeof(*uio), M_IOV, M_WAITOK);
-	iov = (struct iovec *)(uio + 1);
+	uio = allocuio(iovcnt);
+	iov = uio->uio_iov;
 	for (i = 0; i < iovcnt; i++) {
 		error = copyin(&iovp[i], &iov64, sizeof(struct l_iovec64));
 		if (error) {
-			free(uio, M_IOV);
+			freeuio(uio);
 			return (error);
 		}
 		IOVEC_INIT_C(&iov[i], __USER_CAP(iov64.iov_base,
 		    iov64.iov_len), iov64.iov_len);
 	}
-	uio->uio_iov = iov;
 	uio->uio_iovcnt = iovcnt;
 	uio->uio_segflg = UIO_USERSPACE;
 	uio->uio_offset = -1;
 	uio->uio_resid = 0;
 	for (i = 0; i < iovcnt; i++) {
-		if (iov->iov_len > INT64_MAX - uio->uio_resid) {
-			free(uio, M_IOV);
+		if (iov->iov_len > SIZE_MAX - uio->uio_resid) {
+			freeuio(uio);
 			return (EINVAL);
 		}
 		uio->uio_resid += iov->iov_len;
