@@ -13,7 +13,9 @@ TESTS_SUBDIRS+=	nss
 TESTS_SUBDIRS+=	regex
 TESTS_SUBDIRS+=	resolv
 TESTS_SUBDIRS+=	rpc
+.if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap}
 TESTS_SUBDIRS+=	secure
+.endif
 TESTS_SUBDIRS+=	setjmp
 TESTS_SUBDIRS+=	stdio
 TESTS_SUBDIRS+=	stdlib
