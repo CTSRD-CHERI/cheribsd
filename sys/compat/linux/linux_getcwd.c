@@ -40,9 +40,12 @@
 #include <sys/proc.h>
 #include <sys/vnode.h>
 
-#ifdef COMPAT_LINUX32
+#if defined(COMPAT_LINUX32)
 #include <machine/../linux32/linux.h>
 #include <machine/../linux32/linux32_proto.h>
+#elif defined(COMPAT_LINUX64)
+#include <machine/../linux64/linux.h>
+#include <machine/../linux64/linux64_proto.h>
 #else
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
@@ -70,7 +73,7 @@ linux_getcwd(struct thread *td, struct linux_getcwd_args *uap)
 	if (error == ENOMEM)
 		error = ERANGE;
 	if (error == 0) {
-		error = copyout(retbuf, __USER_CAP(uap->buf, buflen), buflen);
+		error = copyout(retbuf, LINUX_USER_CAP(uap->buf, buflen), buflen);
 		if (error == 0)
 			td->td_retval[0] = buflen;
 	}

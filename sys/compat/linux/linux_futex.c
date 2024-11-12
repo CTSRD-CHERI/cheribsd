@@ -39,9 +39,12 @@
 #include <sys/vnode.h>
 #include <sys/umtxvar.h>
 
-#ifdef COMPAT_LINUX32
+#if defined(COMPAT_LINUX32)
 #include <machine/../linux32/linux.h>
 #include <machine/../linux32/linux32_proto.h>
+#elif defined(COMPAT_LINUX64)
+#include <machine/../linux64/linux.h>
+#include <machine/../linux64/linux64_proto.h>
 #else
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
@@ -814,11 +817,11 @@ int
 linux_sys_futex(struct thread *td, struct linux_sys_futex_args *args)
 {
 	struct linux_futex_args fargs = {
-		.uaddr = __USER_CAP_UNBOUND(args->uaddr),
+		.uaddr = LINUX_USER_CAP_UNBOUND(args->uaddr),
 		.op = args->op,
 		.val = args->val,
 		.ts = NULL,
-		.uaddr2 = __USER_CAP_UNBOUND(args->uaddr2),
+		.uaddr2 = LINUX_USER_CAP_UNBOUND(args->uaddr2),
 		.val3 = args->val3,
 		.val3_compare = true,
 	};
@@ -850,11 +853,11 @@ linux_sys_futex_time64(struct thread *td,
     struct linux_sys_futex_time64_args *args)
 {
 	struct linux_futex_args fargs = {
-		.uaddr = __USER_CAP_UNBOUND(args->uaddr),
+		.uaddr = LINUX_USER_CAP_UNBOUND(args->uaddr),
 		.op = args->op,
 		.val = args->val,
 		.ts = NULL,
-		.uaddr2 = __USER_CAP_UNBOUND(args->uaddr2),
+		.uaddr2 = LINUX_USER_CAP_UNBOUND(args->uaddr2),
 		.val3 = args->val3,
 		.val3_compare = true,
 	};
@@ -888,7 +891,7 @@ linux_set_robust_list(struct thread *td, struct linux_set_robust_list_args *args
 		return (EINVAL);
 
 	em = em_find(td);
-	em->robust_futexes = __USER_CAP_OBJ(args->head);
+	em->robust_futexes = LINUX_USER_CAP_OBJ(args->head);
 
 	return (0);
 }
@@ -930,11 +933,11 @@ linux_get_robust_list(struct thread *td, struct linux_get_robust_list_args *args
 	}
 
 	len = sizeof(struct linux_robust_list_head);
-	error = copyout(&len, __USER_CAP_OBJ(args->len), sizeof(l_size_t));
+	error = copyout(&len, LINUX_USER_CAP_OBJ(args->len), sizeof(l_size_t));
 	if (error != 0)
 		return (EFAULT);
 
-	return (copyout(&head, __USER_CAP_OBJ(args->head), sizeof(l_uintptr_t)));
+	return (copyout(&head, LINUX_USER_CAP_OBJ(args->head), sizeof(l_uintptr_t)));
 }
 
 static int

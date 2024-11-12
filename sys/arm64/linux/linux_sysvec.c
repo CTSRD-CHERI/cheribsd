@@ -72,7 +72,11 @@
 #include <machine/vfp.h>
 #endif
 
+#ifdef __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+MODULE_VERSION(linux64celf, 1);
+#else
 MODULE_VERSION(linux64elf, 1);
+#endif
 
 #define	LINUX_VDSOPAGE_SIZE	PAGE_SIZE * 2
 #define	LINUX_VDSOPAGE		(VM_MAXUSER_ADDRESS - \
@@ -673,6 +677,12 @@ static moduledata_t linux64_elf_mod = {
 	0
 };
 
-DECLARE_MODULE_TIED(linux64elf, linux64_elf_mod, SI_SUB_EXEC, SI_ORDER_ANY);
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+DECLARE_MODULE_TIED(linux64celf, linux_elf_mod, SI_SUB_EXEC, SI_ORDER_ANY);
+MODULE_DEPEND(linux64celf, linux_common, 1, 1, 1);
+FEATURE(linux64c, "AArch64 Linux 64bit CheriABI support");
+#else
+DECLARE_MODULE_TIED(linux64elf, linux_elf_mod, SI_SUB_EXEC, SI_ORDER_ANY);
 MODULE_DEPEND(linux64elf, linux_common, 1, 1, 1);
 FEATURE(linux64, "AArch64 Linux 64bit support");
+#endif

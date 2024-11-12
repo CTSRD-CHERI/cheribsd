@@ -36,9 +36,12 @@
 #include <sys/syscallsubr.h>
 #include <sys/sysproto.h>
 
-#ifdef COMPAT_LINUX32
+#if defined(COMPAT_LINUX32)
 #include <machine/../linux32/linux.h>
 #include <machine/../linux32/linux32_proto.h>
+#elif defined(COMPAT_LINUX64)
+#include <machine/../linux64/linux.h>
+#include <machine/../linux64/linux64_proto.h>
 #else
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
@@ -70,7 +73,7 @@ int
 linux_chown16(struct thread *td, struct linux_chown16_args *args)
 {
 
-	return (kern_fchownat(td, AT_FDCWD, __USER_CAP_PATH(args->path),
+	return (kern_fchownat(td, AT_FDCWD, LINUX_USER_CAP_PATH(args->path),
 	    UIO_USERSPACE, CAST_NOCHG(args->uid), CAST_NOCHG(args->gid), 0));
 }
 
@@ -78,7 +81,7 @@ int
 linux_lchown16(struct thread *td, struct linux_lchown16_args *args)
 {
 
-	return (kern_fchownat(td, AT_FDCWD, __USER_CAP_PATH(args->path),
+	return (kern_fchownat(td, AT_FDCWD, LINUX_USER_CAP_PATH(args->path),
 	    UIO_USERSPACE, CAST_NOCHG(args->uid), CAST_NOCHG(args->gid),
 	    AT_SYMLINK_NOFOLLOW));
 }

@@ -44,4 +44,4 @@ int	linux64_copyinuio(struct l_iovec64 * __capability iovp64,
 	    l_ulong iovcnt, struct uio **uiop);
 #endif /* _KERNEL */
 
-#endif /* _ARM64_LINUX64_H_ */
+#endif /* _ARM64_LINUX64_LINUX_H_ */
