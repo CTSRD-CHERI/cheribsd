@@ -72,7 +72,7 @@
 #include <machine/vfp.h>
 #endif
 
-#ifdef __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
 MODULE_VERSION(linux64celf, 1);
 #else
 MODULE_VERSION(linux64elf, 1);
@@ -449,7 +449,11 @@ struct sysentvec elf_linux_sysvec = {
 	.sv_sendsig	= linux_rt_sendsig,
 	.sv_sigcode	= _binary_linux_vdso_so_o_start,
 	.sv_szsigcode	= &linux_szsigcode,
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+	.sv_name	= "Linux ELF64C",
+#else
 	.sv_name	= "Linux ELF64",
+#endif
 	.sv_coredump	= elf64_coredump,
 	.sv_elf_core_osabi = ELFOSABI_NONE,
 	.sv_elf_core_abi_vendor = LINUX_ABI_VENDOR,
@@ -465,8 +469,13 @@ struct sysentvec elf_linux_sysvec = {
 	.sv_setregs	= linux_exec_setregs,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+	.sv_flags	= SV_ABI_LINUX | SV_LP64 | SV_SHP | SV_SIG_DISCIGN |
+	    SV_SIG_WAITNDQ | SV_TIMEKEEP | SV_CHERI,
+#else
 	.sv_flags	= SV_ABI_LINUX | SV_LP64 | SV_SHP | SV_SIG_DISCIGN |
 	    SV_SIG_WAITNDQ | SV_TIMEKEEP,
+#endif
 	.sv_set_syscall_retval = linux_set_syscall_retval,
 	.sv_fetch_syscall_args = linux_fetch_syscall_args,
 	.sv_syscallnames = linux_syscallnames,
@@ -671,8 +680,12 @@ linux64_elf_modevent(module_t mod, int type, void *data)
 	return (error);
 }
 
-static moduledata_t linux64_elf_mod = {
+static moduledata_t linux_elf_mod = {
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+	"linux64celf",
+#else
 	"linux64elf",
+#endif
 	linux64_elf_modevent,
 	0
 };
