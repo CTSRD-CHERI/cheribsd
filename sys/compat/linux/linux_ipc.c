@@ -584,7 +584,7 @@ linux_semctl(struct thread *td, struct linux_semctl_args *args)
 	case LINUX_IPC_SET:
 		cmd = IPC_SET;
 		error = linux_semid_pullup(args->cmd & LINUX_IPC_64,
-		    &linux_semid64, (void * __linuxcap)(args->arg.buf));
+		    &linux_semid64, (void * __linuxcap)(uintcap_t)(args->arg.buf));
 		if (error != 0)
 			return (error);
 		linux_to_bsd_semid_ds(&linux_semid64, &semid);
@@ -600,7 +600,7 @@ linux_semctl(struct thread *td, struct linux_semctl_args *args)
 			return (error);
 		bsd_to_linux_semid_ds(&semid, &linux_semid64);
 		return (linux_semid_pushdown(args->cmd & LINUX_IPC_64,
-		    &linux_semid64, (void * __linuxcap)(args->arg.buf)));
+		    &linux_semid64, (void * __linuxcap)(uintcap_t)(args->arg.buf)));
 	case LINUX_SEM_STAT:
 		cmd = SEM_STAT;
 		semun.buf = &semid;
@@ -610,7 +610,7 @@ linux_semctl(struct thread *td, struct linux_semctl_args *args)
 			return (error);
 		bsd_to_linux_semid_ds(&semid, &linux_semid64);
 		error = linux_semid_pushdown(args->cmd & LINUX_IPC_64,
-		    &linux_semid64, (void * __linuxcap)(args->arg.buf));
+		    &linux_semid64, (void * __linuxcap)(uintcap_t)(args->arg.buf));
 		if (error == 0)
 			td->td_retval[0] = rval;
 		return (error);
