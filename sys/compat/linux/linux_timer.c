@@ -34,9 +34,12 @@
 #include <sys/syscallsubr.h>
 #include <sys/time.h>
 
-#ifdef COMPAT_LINUX32
+#if defined(COMPAT_LINUX32)
 #include <machine/../linux32/linux.h>
 #include <machine/../linux32/linux32_proto.h>
+#elif defined(COMPAT_LINUX64)
+#include <machine/../linux64/linux.h>
+#include <machine/../linux64/linux64_proto.h>
 #else
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
@@ -54,7 +57,7 @@ linux_convert_l_sigevent(const struct l_sigevent *l_sig, struct sigevent *sig)
 			return (EINVAL);
 		sig->sigev_notify = SIGEV_SIGNAL;
 		sig->sigev_signo = linux_to_bsd_signal(l_sig->sigev_signo);
-		PTRIN_CP(*l_sig, *sig, sigev_value.sival_ptr);
+		sig->sigev_value.sival_ptr = LINUX_USER_CAP_UNBOUND(l_sig->sigev_value.sival_ptr);
 		break;
 	case L_SIGEV_NONE:
 		sig->sigev_notify = SIGEV_NONE;
@@ -73,7 +76,7 @@ linux_convert_l_sigevent(const struct l_sigevent *l_sig, struct sigevent *sig)
 		sig->sigev_notify = SIGEV_THREAD_ID;
 		CP2(*l_sig, *sig, _l_sigev_un._tid, sigev_notify_thread_id);
 		sig->sigev_signo = linux_to_bsd_signal(l_sig->sigev_signo);
-		PTRIN_CP(*l_sig, *sig, sigev_value.sival_ptr);
+		sig->sigev_value.sival_ptr = LINUX_USER_CAP_UNBOUND(l_sig->sigev_value.sival_ptr);
 		break;
 	default:
 		return (EINVAL);
@@ -92,7 +95,7 @@ linux_timer_create(struct thread *td, struct linux_timer_create_args *uap)
 	if (uap->evp == NULL) {
 		evp = NULL;
 	} else {
-		error = copyin(uap->evp, &l_ev, sizeof(l_ev));
+		error = copyin(LINUX_USER_CAP_OBJ(uap->evp), &l_ev, sizeof(l_ev));
 		if (error != 0)
 			return (error);
 		error = linux_convert_l_sigevent(&l_ev, &ev);
@@ -105,7 +108,7 @@ linux_timer_create(struct thread *td, struct linux_timer_create_args *uap)
 		return (error);
 	error = kern_ktimer_create(td, nwhich, evp, &id, -1);
 	if (error == 0) {
-		error = copyout(&id, uap->timerid, sizeof(int));
+		error = copyout(&id, LINUX_USER_CAP_OBJ(uap->timerid), sizeof(int));
 		if (error != 0)
 			kern_ktimer_delete(td, id);
 	}
@@ -119,7 +122,7 @@ linux_timer_settime(struct thread *td, struct linux_timer_settime_args *uap)
 	struct itimerspec val, oval, *ovalp;
 	int flags, error;
 
-	error = copyin(uap->new, &l_val, sizeof(l_val));
+	error = copyin(LINUX_USER_CAP(uap->new, sizeof(l_val)), &l_val, sizeof(l_val));
 	if (error != 0)
 		return (error);
 	error = linux_to_native_itimerspec(&val, &l_val);
@@ -133,7 +136,7 @@ linux_timer_settime(struct thread *td, struct linux_timer_settime_args *uap)
 	if (error == 0 && uap->old != NULL) {
 		error = native_to_linux_itimerspec(&l_val, &val);
 		if (error == 0)
-			error = copyout(&l_oval, uap->old, sizeof(l_oval));
+			error = copyout(&l_oval, LINUX_USER_CAP(uap->old, sizeof(l_oval)), sizeof(l_oval));
 	}
 	return (error);
 }
@@ -146,7 +149,7 @@ linux_timer_settime64(struct thread *td, struct linux_timer_settime64_args *uap)
 	struct itimerspec val, oval, *ovalp;
 	int flags, error;
 
-	error = copyin(uap->new, &l_val, sizeof(l_val));
+	error = copyin(LINUX_USER_CAP(uap->new, sizeof(l_val)), &l_val, sizeof(l_val));
 	if (error != 0)
 		return (error);
 	error = linux_to_native_itimerspec64(&val, &l_val);
@@ -160,7 +163,7 @@ linux_timer_settime64(struct thread *td, struct linux_timer_settime64_args *uap)
 	if (error == 0 && uap->old != NULL) {
 		error = native_to_linux_itimerspec64(&l_val, &val);
 		if (error == 0)
-			error = copyout(&l_oval, uap->old, sizeof(l_oval));
+			error = copyout(&l_oval, LINUX_USER_CAP(uap->old, sizeof(l_oval)), sizeof(l_oval));
 	}
 	return (error);
 }
@@ -177,7 +180,7 @@ linux_timer_gettime(struct thread *td, struct linux_timer_gettime_args *uap)
 	if (error == 0)
 		error = native_to_linux_itimerspec(&l_val, &val);
 	if (error == 0)
-		error = copyout(&l_val, uap->setting, sizeof(l_val));
+		error = copyout(&l_val, LINUX_USER_CAP(uap->setting, sizeof(l_val)), sizeof(l_val));
 	return (error);
 }
 
@@ -193,7 +196,7 @@ linux_timer_gettime64(struct thread *td, struct linux_timer_gettime64_args *uap)
 	if (error == 0)
 		error = native_to_linux_itimerspec64(&l_val, &val);
 	if (error == 0)
-		error = copyout(&l_val, uap->setting, sizeof(l_val));
+		error = copyout(&l_val, LINUX_USER_CAP(uap->setting, sizeof(l_val)), sizeof(l_val));
 	return (error);
 }
 #endif

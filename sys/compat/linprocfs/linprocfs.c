@@ -571,7 +571,7 @@ linprocfs_doprocmountinfo(PFS_FILL_ARGS)
 {
 	const char *mntfrom, *mntto, *fstype;
 	char *dlep, *flep;
-	struct statfs *buf, *sp;
+	struct statfs * __capability buf, *sp;
 	size_t count, lep_len;
 	struct vnode *vp;
 	struct pwd *pwd;
@@ -595,7 +595,7 @@ linprocfs_doprocmountinfo(PFS_FILL_ARGS)
 	if (error != 0)
 		goto out;
 
-	for (sp = buf; count > 0; sp++, count--) {
+	for (sp = (__cheri_fromcap struct statfs *)buf; count > 0; sp++, count--) {
 		error = _mtab_helper(pn, sp, &mntfrom, &mntto, &fstype);
 		if (error != 0) {
 			MPASS(error == ECANCELED);
@@ -648,7 +648,7 @@ linprocfs_doprocmountinfo(PFS_FILL_ARGS)
 
 	error = 0;
 out:
-	free(buf, M_TEMP);
+	free_c(buf, M_TEMP);
 	free(flep, M_TEMP);
 	return (error);
 }

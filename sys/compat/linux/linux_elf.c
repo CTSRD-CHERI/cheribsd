@@ -56,13 +56,16 @@
 
 #include <machine/elf.h>
 
-#ifdef COMPAT_LINUX32
+#if defined(COMPAT_LINUX32)
 #define linux_pt_regset linux_pt_regset32
 #define bsd_to_linux_regset bsd_to_linux_regset32
 #include <machine/../linux32/linux.h>
+#elif defined(COMPAT_LINUX64)
+#include <machine/../linux64/linux.h>
 #else
 #include <machine/../linux/linux.h>
 #endif
+
 #include <compat/linux/linux_elf.h>
 #include <compat/linux/linux_mib.h>
 #include <compat/linux/linux_misc.h>
@@ -324,13 +327,13 @@ __linuxN(note_nt_auxv)(void *arg, struct sbuf *sb, size_t *sizep)
  * as the initial stack pointer.
  */
 int
-__linuxN(copyout_strings)(struct image_params *imgp, uintptr_t *stack_base)
+__linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 {
 	char canary[LINUX_AT_RANDOM_LEN];
-	char **vectp;
+	uint64_t * __capability vectp;
 	char *stringp;
-	uintptr_t destp, ustringp;
-	struct ps_strings *arginfo;
+	uintcap_t destp, ustringp;
+	struct ps_strings * __capability arginfo;
 	struct proc *p;
 	size_t execpath_len;
 	int argc, envc;
@@ -338,7 +341,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintptr_t *stack_base)
 
 	p = imgp->proc;
 	destp =	PROC_PS_STRINGS(p);
-	arginfo = imgp->ps_strings = (void *)destp;
+	arginfo = imgp->ps_strings = (void * __capability)destp;
 
 	/*
 	 * Copy the image path for the rtld.
@@ -346,8 +349,8 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintptr_t *stack_base)
 	if (imgp->execpath != NULL && imgp->auxargs != NULL) {
 		execpath_len = strlen(imgp->execpath) + 1;
 		destp -= execpath_len;
-		destp = rounddown2(destp, sizeof(void *));
-		imgp->execpathp = (void *)destp;
+		destp = rounddown2(destp, sizeof(uint64_t));
+		imgp->execpathp = (void * __capability)cheri_setboundsexact(destp, execpath_len);
 		error = copyout(imgp->execpath, imgp->execpathp, execpath_len);
 		if (error != 0)
 			return (error);
@@ -358,7 +361,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintptr_t *stack_base)
 	 */
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
-	imgp->canary = (void *)destp;
+	imgp->canary = (void * __capability)cheri_setboundsexact(destp, sizeof(canary));;
 	error = copyout(canary, imgp->canary, sizeof(canary));
 	if (error != 0)
 		return (error);
@@ -368,8 +371,8 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintptr_t *stack_base)
 	 * Allocate room for the argument and environment strings.
 	 */
 	destp -= ARG_MAX - imgp->args->stringspace;
-	destp = rounddown2(destp, sizeof(void *));
-	ustringp = destp;
+	destp = rounddown2(destp, sizeof(uint64_t));
+	ustringp = cheri_setbounds(destp, ARG_MAX - imgp->args->stringspace);
 
 	if (imgp->auxargs) {
 		/*
@@ -377,10 +380,10 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintptr_t *stack_base)
 		 * array.  It has up to LINUX_AT_COUNT entries.
 		 */
 		destp -= LINUX_AT_COUNT * sizeof(Elf_Auxinfo);
-		destp = rounddown2(destp, sizeof(void *));
+		destp = rounddown2(destp, sizeof(uint64_t));
 	}
 
-	vectp = (char **)destp;
+	vectp = (uint64_t * __capability)destp;
 
 	/*
 	 * Allocate room for the argv[] and env vectors including the
@@ -391,12 +394,12 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintptr_t *stack_base)
 	/*
 	 * Starting with 2.24, glibc depends on a 16-byte stack alignment.
 	 */
-	vectp = (char **)((((uintptr_t)vectp + 8) & ~0xF) - 8);
+	vectp = (uint64_t * __capability)((((uintcap_t)vectp + 8) & ~0xF) - 8);
 
 	/*
 	 * vectp also becomes our initial stack base
 	 */
-	*stack_base = (uintptr_t)vectp;
+	*stack_base = (uintcap_t)vectp;
 
 	stringp = imgp->args->begin_argv;
 	argc = imgp->args->argc;
@@ -405,7 +408,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintptr_t *stack_base)
 	/*
 	 * Copy out strings - arguments and environment.
 	 */
-	error = copyout(stringp, (void *)ustringp,
+	error = copyout(stringp, (void * __capability)ustringp,
 	    ARG_MAX - imgp->args->stringspace);
 	if (error != 0)
 		return (error);
@@ -413,8 +416,8 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintptr_t *stack_base)
 	/*
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
-	imgp->argv = vectp;
-	if (suword(&arginfo->ps_argvstr, (long)(intptr_t)vectp) != 0 ||
+	imgp->argv = cheri_setbounds(vectp, (argc + 1) * sizeof(*vectp));;
+	if (suword(&arginfo->ps_argvstr, (long)(intcap_t)vectp) != 0 ||
 	    suword32(&arginfo->ps_nargvstr, argc) != 0)
 		return (EFAULT);
 
@@ -434,7 +437,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintptr_t *stack_base)
 		return (EFAULT);
 
 	imgp->envv = vectp;
-	if (suword(&arginfo->ps_envstr, (long)(intptr_t)vectp) != 0 ||
+	if (suword(&arginfo->ps_envstr, (long)(intcap_t)vectp) != 0 ||
 	    suword32(&arginfo->ps_nenvstr, envc) != 0)
 		return (EFAULT);
 
@@ -455,8 +458,10 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintptr_t *stack_base)
 
 	if (imgp->auxargs) {
 		vectp++;
+		imgp->auxv = cheri_setbounds(vectp,
+		    LINUX_AT_COUNT * sizeof(Elf_Auxinfo));
 		error = imgp->sysent->sv_copyout_auxargs(imgp,
-		    (uintptr_t)vectp);
+		    (uintcap_t)imgp->auxv);
 		if (error != 0)
 			return (error);
 	}
@@ -487,7 +492,7 @@ linux_trans_osrel(const Elf_Note *note, int32_t *osrel)
 }
 
 int
-__linuxN(copyout_auxargs)(struct image_params *imgp, uintptr_t base)
+__linuxN(copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 {
 	struct thread *td = curthread;
 	Elf_Auxargs *args;
@@ -527,7 +532,7 @@ __linuxN(copyout_auxargs)(struct image_params *imgp, uintptr_t base)
 	if (linux_kernver(td) >= LINUX_KERNVER(2,6,30))
 		AUXARGS_ENTRY_PTR(pos, LINUX_AT_RANDOM, imgp->canary);
 	if (linux_kernver(td) >= LINUX_KERNVER(2,6,26) && imgp->execpathp != 0)
-		AUXARGS_ENTRY(pos, LINUX_AT_EXECFN, PTROUT(imgp->execpathp));
+		AUXARGS_ENTRY_PTR(pos, LINUX_AT_EXECFN, imgp->execpathp);
 	if (args->execfd != -1)
 		AUXARGS_ENTRY(pos, AT_EXECFD, args->execfd);
 	if (linux_kernver(td) >= LINUX_KERNVER(5,13,0))
@@ -539,7 +544,7 @@ __linuxN(copyout_auxargs)(struct image_params *imgp, uintptr_t base)
 	imgp->auxargs = NULL;
 	KASSERT(pos - aarray <= LINUX_AT_COUNT, ("Too many auxargs"));
 
-	error = copyout(aarray, PTRIN(base), sizeof(*aarray) * LINUX_AT_COUNT);
+	error = copyout(aarray, (void * __capability)(base), sizeof(*aarray) * LINUX_AT_COUNT);
 	free(aarray, M_TEMP);
 	return (error);
 }

@@ -46,9 +46,12 @@
 
 #include <security/audit/audit.h>
 
-#ifdef COMPAT_LINUX32
+#if defined(COMPAT_LINUX32)
 #include <machine/../linux32/linux.h>
 #include <machine/../linux32/linux32_proto.h>
+#elif defined(COMPAT_LINUX64)
+#include <machine/../linux64/linux.h>
+#include <machine/../linux64/linux64_proto.h>
 #else
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
@@ -160,7 +163,7 @@ newstat_copyout(struct stat *buf, void *ubuf)
 	tbuf.st_blksize = buf->st_blksize;
 	tbuf.st_blocks = buf->st_blocks;
 
-	return (copyout(&tbuf, ubuf, sizeof(tbuf)));
+	return (copyout(&tbuf, LINUX_USER_CAP(ubuf, sizeof(tbuf)), sizeof(tbuf)));
 }
 
 
@@ -171,7 +174,7 @@ linux_newstat(struct thread *td, struct linux_newstat_args *args)
 	struct stat buf;
 	int error;
 
-	error = linux_kern_stat(td, __USER_CAP_PATH(args->path),
+	error = linux_kern_stat(td, LINUX_USER_CAP_PATH(args->path),
 	    UIO_USERSPACE, &buf);
 	if (error)
 		return (error);
@@ -184,7 +187,7 @@ linux_newlstat(struct thread *td, struct linux_newlstat_args *args)
 	struct stat sb;
 	int error;
 
-	error = linux_kern_lstat(td, __USER_CAP_PATH(args->path),
+	error = linux_kern_lstat(td, LINUX_USER_CAP_PATH(args->path),
 	    UIO_USERSPACE, &sb);
 	if (error)
 		return (error);
@@ -239,7 +242,7 @@ old_stat_copyout(struct stat *buf, void *ubuf)
 	lbuf.st_flags = buf->st_flags;
 	lbuf.st_gen = buf->st_gen;
 
-	return (copyout(&lbuf, ubuf, sizeof(lbuf)));
+	return (copyout(&lbuf, LINUX_USER_CAP(ubuf, sizeof(lbuf)), sizeof(lbuf)));
 }
 
 int
@@ -248,7 +251,7 @@ linux_stat(struct thread *td, struct linux_stat_args *args)
 	struct stat buf;
 	int error;
 
-	error = linux_kern_stat(td, __USER_CAP_PATH(args->path),
+	error = linux_kern_stat(td, LINUX_USER_CAP_PATH(args->path),
 	    UIO_USERSPACE, &buf);
 	if (error) {
 		return (error);
@@ -262,7 +265,7 @@ linux_lstat(struct thread *td, struct linux_lstat_args *args)
 	struct stat buf;
 	int error;
 
-	error = linux_kern_lstat(td, __USER_CAP_PATH(args->path),
+	error = linux_kern_lstat(td, LINUX_USER_CAP_PATH(args->path),
 	    UIO_USERSPACE, &buf);
 	if (error) {
 		return (error);
@@ -385,14 +388,14 @@ linux_statfs(struct thread *td, struct linux_statfs_args *args)
 	int error;
 
 	bsd_statfs = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
-	error = kern_statfs(td, __USER_CAP_PATH(args->path),
+	error = kern_statfs(td, LINUX_USER_CAP_PATH(args->path),
 	    UIO_USERSPACE, bsd_statfs);
 	if (error == 0)
 		error = bsd_to_linux_statfs(bsd_statfs, &linux_statfs);
 	free(bsd_statfs, M_STATFS);
 	if (error != 0)
 		return (error);
-	return (copyout(&linux_statfs, args->buf, sizeof(linux_statfs)));
+	return (copyout(&linux_statfs, LINUX_USER_CAP(args->buf, sizeof(linux_statfs)), sizeof(linux_statfs)));
 }
 
 #if defined(__i386__) || (defined(__amd64__) && defined(COMPAT_LINUX32))
@@ -426,14 +429,14 @@ linux_statfs64(struct thread *td, struct linux_statfs64_args *args)
 		return (EINVAL);
 
 	bsd_statfs = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
-	error = kern_statfs(td, __USER_CAP_PATH(args->path),
+	error = kern_statfs(td, LINUX_USER_CAP_PATH(args->path),
 	    UIO_USERSPACE, bsd_statfs);
 	if (error == 0)
 		bsd_to_linux_statfs64(bsd_statfs, &linux_statfs);
 	free(bsd_statfs, M_STATFS);
 	if (error != 0)
 		return (error);
-	return (copyout(&linux_statfs, args->buf, sizeof(linux_statfs)));
+	return (copyout(&linux_statfs, LINUX_USER_CAP(args->buf, sizeof(linux_statfs)), sizeof(linux_statfs)));
 }
 
 int
@@ -453,7 +456,7 @@ linux_fstatfs64(struct thread *td, struct linux_fstatfs64_args *args)
 	free(bsd_statfs, M_STATFS);
 	if (error != 0)
 		return (error);
-	return (copyout(&linux_statfs, args->buf, sizeof(linux_statfs)));
+	return (copyout(&linux_statfs, LINUX_USER_CAP(args->buf, sizeof(linux_statfs)), sizeof(linux_statfs)));
 }
 #endif /* __i386__ || (__amd64__ && COMPAT_LINUX32) */
 
@@ -471,7 +474,7 @@ linux_fstatfs(struct thread *td, struct linux_fstatfs_args *args)
 	free(bsd_statfs, M_STATFS);
 	if (error != 0)
 		return (error);
-	return (copyout(&linux_statfs, args->buf, sizeof(linux_statfs)));
+	return (copyout(&linux_statfs, LINUX_USER_CAP(args->buf, sizeof(linux_statfs)), sizeof(linux_statfs)));
 }
 
 struct l_ustat
@@ -524,7 +527,7 @@ stat64_copyout(struct stat *buf, void *ubuf)
 	 */
 	lbuf.__st_ino = buf->st_ino;
 
-	return (copyout(&lbuf, ubuf, sizeof(lbuf)));
+	return (copyout(&lbuf, LINUX_USER_CAP(ubuf, sizeof(lbuf)), sizeof(lbuf)));
 }
 
 int
@@ -533,7 +536,7 @@ linux_stat64(struct thread *td, struct linux_stat64_args *args)
 	struct stat buf;
 	int error;
 
-	error = linux_kern_stat(td, __USER_CAP_PATH(args->filename),
+	error = linux_kern_stat(td, LINUX_USER_CAP_PATH(args->filename),
 	    UIO_USERSPACE, &buf);
 	if (error)
 		return (error);
@@ -546,7 +549,7 @@ linux_lstat64(struct thread *td, struct linux_lstat64_args *args)
 	struct stat sb;
 	int error;
 
-	error = linux_kern_lstat(td, __USER_CAP_PATH(args->filename),
+	error = linux_kern_lstat(td, LINUX_USER_CAP_PATH(args->filename),
 	    UIO_USERSPACE, &sb);
 	if (error)
 		return (error);
@@ -584,7 +587,7 @@ linux_fstatat64(struct thread *td, struct linux_fstatat64_args *args)
 
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
 	error = linux_kern_statat(td, flag, dfd,
-	    __USER_CAP_PATH(args->pathname), UIO_USERSPACE, &buf);
+	    LINUX_USER_CAP_PATH(args->pathname), UIO_USERSPACE, &buf);
 	if (error == 0)
 		error = stat64_copyout(&buf, args->statbuf);
 
@@ -612,7 +615,7 @@ linux_newfstatat(struct thread *td, struct linux_newfstatat_args *args)
 
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
 	error = linux_kern_statat(td, flag, dfd,
-	    __USER_CAP_PATH(args->pathname), UIO_USERSPACE, &buf);
+	    LINUX_USER_CAP_PATH(args->pathname), UIO_USERSPACE, &buf);
 	if (error == 0)
 		error = newstat_copyout(&buf, args->statbuf);
 
@@ -690,7 +693,7 @@ statx_copyout(struct stat *buf, void *ubuf)
 	tbuf.stx_dev_major = linux_encode_major(buf->st_dev);
 	tbuf.stx_dev_minor = linux_encode_minor(buf->st_dev);
 
-	return (copyout(&tbuf, ubuf, sizeof(tbuf)));
+	return (copyout(&tbuf, LINUX_USER_CAP(ubuf, sizeof(tbuf)), sizeof(tbuf)));
 }
 
 int
@@ -712,7 +715,7 @@ linux_statx(struct thread *td, struct linux_statx_args *args)
 	    AT_EMPTY_PATH : 0;
 
 	dirfd = (args->dirfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dirfd;
-	error = linux_kern_statat(td, flags, dirfd, args->pathname,
+	error = linux_kern_statat(td, flags, dirfd, LINUX_USER_CAP_PATH(args->pathname),
 	    UIO_USERSPACE, &buf);
 	if (error == 0)
 		error = statx_copyout(&buf, args->statxbuf);

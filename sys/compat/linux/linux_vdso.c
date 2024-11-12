@@ -29,6 +29,9 @@
 #define	__ELF_WORD_SIZE	32
 #else
 #define	__ELF_WORD_SIZE	64
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+#define	__ELF_CHERI
+#endif
 #endif
 
 #include <sys/param.h>
@@ -64,7 +67,7 @@ __elfN(linux_shared_page_init)(char **mapping, vm_size_t size)
 {
 	vm_page_t m;
 	vm_object_t obj;
-	vm_offset_t addr;
+	vm_pointer_t addr;
 	size_t n, pages;
 
 	pages = size / PAGE_SIZE;

@@ -75,7 +75,7 @@ struct l_v4l2_ext_control {
 		int64_t value64;
 		l_uintptr_t string;
 	} u;
-} __attribute__ ((packed));
+};
 
 struct l_v4l2_ext_controls {
 	uint32_t ctrl_class;

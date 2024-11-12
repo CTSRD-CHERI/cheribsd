@@ -47,8 +47,15 @@
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 
+#ifdef COMPAT_LINUX64
+#include <arm64/linux64/linux.h>
+#include <arm64/linux64/linux64_proto.h>
+#include <arm64/linux64/linux64_sigframe.h>
+#else
 #include <arm64/linux/linux.h>
 #include <arm64/linux/linux_proto.h>
+#include <arm64/linux/linux_sigframe.h>
+#endif
 #include <compat/linux/linux_elf.h>
 #include <compat/linux/linux_emul.h>
 #include <compat/linux/linux_fork.h>
@@ -59,15 +66,17 @@
 #include <compat/linux/linux_util.h>
 #include <compat/linux/linux_vdso.h>
 
-#include <arm64/linux/linux_sigframe.h>
-
 #include <machine/md_var.h>
 #include <machine/pcb.h>
 #ifdef VFP
 #include <machine/vfp.h>
 #endif
 
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+MODULE_VERSION(linux64celf, 1);
+#else
 MODULE_VERSION(linux64elf, 1);
+#endif
 
 #define	LINUX_VDSOPAGE_SIZE	PAGE_SIZE * 2
 #define	LINUX_VDSOPAGE		(VM_MAXUSER_ADDRESS - \
@@ -82,8 +91,8 @@ MODULE_VERSION(linux64elf, 1);
 static int linux_szsigcode;
 static vm_object_t linux_vdso_obj;
 static char *linux_vdso_mapping;
-extern char _binary_linux_vdso_so_o_start;
-extern char _binary_linux_vdso_so_o_end;
+extern char _binary_linux_vdso_so_o_start[];
+extern char _binary_linux_vdso_so_o_end[];
 static vm_offset_t linux_vdso_base;
 
 extern struct sysent linux_sysent[LINUX_SYS_MAXSYSCALL];
@@ -97,7 +106,7 @@ static void	linux_vdso_reloc(char *mapping, Elf_Addr offset);
 static void	linux_set_syscall_retval(struct thread *td, int error);
 static int	linux_fetch_syscall_args(struct thread *td);
 static void	linux_exec_setregs(struct thread *td, struct image_params *imgp,
-		    uintptr_t stack);
+		    uintcap_t stack);
 static void	linux_exec_sysvec_init(void *param);
 static int	linux_on_exec_vmspace(struct proc *p,
 		    struct image_params *imgp);
@@ -111,7 +120,7 @@ linux_fetch_syscall_args(struct thread *td)
 {
 	struct proc *p;
 	struct syscall_args *sa;
-	register_t *ap;
+	syscallarg_t *ap;
 
 	p = td->td_proc;
 	ap = td->td_frame->tf_x;
@@ -128,7 +137,7 @@ linux_fetch_syscall_args(struct thread *td)
 	if (sa->callp->sy_narg > nitems(sa->args))
 		panic("ARM64TODO: Could we have more than %zu args?",
 		    nitems(sa->args));
-	memcpy(sa->args, ap, nitems(sa->args) * sizeof(register_t));
+	memcpy(sa->args, ap, nitems(sa->args) * sizeof(syscallarg_t));
 
 	td->td_retval[0] = 0;
 	return (0);
@@ -162,14 +171,19 @@ linux64_arch_copyout_auxargs(struct image_params *imgp, Elf_Auxinfo **pos)
  */
 static void
 linux_exec_setregs(struct thread *td, struct image_params *imgp,
-    uintptr_t stack)
+    uintcap_t stack)
 {
 	struct trapframe *regs = td->td_frame;
 	struct pcb *pcb = td->td_pcb;
 
 	memset(regs, 0, sizeof(*regs));
 	regs->tf_sp = stack;
+#if __has_feature(capabilities)
+	hybridabi_thread_setregs(td, imgp->entry_addr);
+#else
 	regs->tf_elr = imgp->entry_addr;
+#endif
+
 	pcb->pcb_tpidr_el0 = 0;
 	pcb->pcb_tpidrro_el0 = 0;
 	WRITE_SPECIALREG(tpidrro_el0, 0);
@@ -249,7 +263,7 @@ int
 linux_rt_sigreturn(struct thread *td, struct linux_rt_sigreturn_args *args)
 {
 	struct l_rt_sigframe *sf;
-	struct l_sigframe *frame;
+	struct l_sigframe * __capability frame;
 	struct trapframe *tf;
 	sigset_t bmask;
 	int error;
@@ -257,8 +271,8 @@ linux_rt_sigreturn(struct thread *td, struct linux_rt_sigreturn_args *args)
 	sf = malloc(sizeof(*sf), M_LINUX, M_WAITOK | M_ZERO);
 
 	tf = td->td_frame;
-	frame = (struct l_sigframe *)tf->tf_sp;
-	error = copyin((void *)&frame->sf, sf, sizeof(*sf));
+	frame = (struct l_sigframe * __capability)tf->tf_sp;
+	error = copyincap(__USER_CAP((uintcap_t)&frame->sf, sizeof(*sf)), sf, sizeof(*sf));
 	if (error != 0) {
 		free(sf, M_LINUX);
 		return (error);
@@ -268,6 +282,7 @@ linux_rt_sigreturn(struct thread *td, struct linux_rt_sigreturn_args *args)
 	tf->tf_lr = sf->sf_uc.uc_sc.regs[30];
 	tf->tf_sp = sf->sf_uc.uc_sc.sp;
 	tf->tf_elr = sf->sf_uc.uc_sc.pc;
+	tf->tf_ddc = sf->sf_uc.uc_sc.ddc;
 
 	if ((sf->sf_uc.uc_sc.pstate & PSR_M_MASK) != PSR_M_EL0t ||
 	    (sf->sf_uc.uc_sc.pstate & PSR_AARCH32) != 0 ||
@@ -296,7 +311,7 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	struct thread *td;
 	struct proc *p;
 	struct trapframe *tf;
-	struct l_sigframe *fp, *frame;
+	struct l_sigframe * __capability fp, *frame;
 	struct l_fpsimd_context *fpsimd;
 	struct l_esr_context *esr;
 	l_stack_t uc_stack;
@@ -323,23 +338,23 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !onstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		fp = (struct l_sigframe *)((uintptr_t)td->td_sigstk.ss_sp +
+		fp = (struct l_sigframe * __capability)((uintcap_t)td->td_sigstk.ss_sp +
 		    td->td_sigstk.ss_size);
 #if defined(COMPAT_43)
 		td->td_sigstk.ss_flags |= SS_ONSTACK;
 #endif
 	} else {
-		fp = (struct l_sigframe *)td->td_frame->tf_sp;
+		fp = (struct l_sigframe * __capability)td->td_frame->tf_sp;
 	}
 
 	/* Make room, keeping the stack aligned */
 	fp--;
-	fp = (struct l_sigframe *)STACKALIGN(fp);
+	fp = (struct l_sigframe * __capability)STACKALIGN(fp);
 
 	get_mcontext(td, &uc.uc_mcontext, 0);
 	uc.uc_sigmask = *mask;
 
-	uc_stack.ss_sp = PTROUT(td->td_sigstk.ss_sp);
+	uc_stack.ss_sp = (uintcap_t)(td->td_sigstk.ss_sp);
 	uc_stack.ss_size = td->td_sigstk.ss_size;
 	uc_stack.ss_flags = (td->td_pflags & TDP_ALTSTACK) != 0 ?
 	    (onstack ? LINUX_SS_ONSTACK : 0) : LINUX_SS_DISABLE;
@@ -354,7 +369,8 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	frame->sf.sf_uc.uc_sc.sp = tf->tf_sp;
 	frame->sf.sf_uc.uc_sc.pc = tf->tf_elr;
 	frame->sf.sf_uc.uc_sc.pstate = tf->tf_spsr;
-	frame->sf.sf_uc.uc_sc.fault_address = (register_t)ksi->ksi_addr;
+	frame->sf.sf_uc.uc_sc.ddc = tf->tf_ddc;
+	frame->sf.sf_uc.uc_sc.fault_address = (uintcap_t)ksi->ksi_addr;
 
 	/* Stack frame for unwinding */
 	frame->fp = tf->tf_x[29];
@@ -391,7 +407,7 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	memcpy(&frame->sf.sf_uc.uc_stack, &uc_stack, sizeof(uc_stack));
 
 	/* Copy the sigframe out to the user's stack. */
-	if (copyout(frame, fp, sizeof(*fp)) != 0) {
+	if (copyoutcap(frame, __USER_CAP((uintcap_t)fp, sizeof(*fp)), sizeof(*fp)) != 0) {
 		/* Process has trashed its stack. Kill it. */
 		free(frame, M_LINUX);
 		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td, fp);
@@ -400,18 +416,24 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	}
 	free(frame, M_LINUX);
 
+	// Use offsetof (following freebsd64) to make sure no capability info is present in case fp has no capability info
 	tf->tf_x[0]= sig;
 	if (issiginfo) {
-		tf->tf_x[1] = (register_t)&fp->sf.sf_si;
-		tf->tf_x[2] = (register_t)&fp->sf.sf_uc;
+		tf->tf_x[1] = (uintcap_t)fp + offsetof(struct l_sigframe, sf) + offsetof(struct l_rt_sigframe, sf_si);
+		tf->tf_x[2] = (uintcap_t)fp + offsetof(struct l_sigframe, sf) + offsetof(struct l_rt_sigframe, sf_uc);
 	} else {
 		tf->tf_x[1] = 0;
 		tf->tf_x[2] = 0;
 	}
-	tf->tf_x[29] = (register_t)&fp->fp;
-	tf->tf_elr = (register_t)catcher;
-	tf->tf_sp = (register_t)fp;
-	tf->tf_lr = (register_t)__user_rt_sigreturn;
+	tf->tf_x[29] = (uintcap_t)fp + offsetof(struct l_sigframe, fp);
+	tf->tf_sp = (uintcap_t)fp;
+	tf->tf_lr = (uintcap_t)__user_rt_sigreturn;
+
+#if __has_feature(capabilities)
+	trapframe_set_elr(tf, (uintcap_t)catcher);
+#else
+	tf->tf_elr = (uintcap_t)catcher;
+#endif
 
 	CTR3(KTR_SIG, "sendsig: return td=%p pc=%#x sp=%#x", td, tf->tf_elr,
 	    tf->tf_sp);
@@ -425,9 +447,13 @@ struct sysentvec elf_linux_sysvec = {
 	.sv_table	= linux_sysent,
 	.sv_fixup	= __elfN(freebsd_fixup),
 	.sv_sendsig	= linux_rt_sendsig,
-	.sv_sigcode	= &_binary_linux_vdso_so_o_start,
+	.sv_sigcode	= _binary_linux_vdso_so_o_start,
 	.sv_szsigcode	= &linux_szsigcode,
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+	.sv_name	= "Linux ELF64C",
+#else
 	.sv_name	= "Linux ELF64",
+#endif
 	.sv_coredump	= elf64_coredump,
 	.sv_elf_core_osabi = ELFOSABI_NONE,
 	.sv_elf_core_abi_vendor = LINUX_ABI_VENDOR,
@@ -443,8 +469,13 @@ struct sysentvec elf_linux_sysvec = {
 	.sv_setregs	= linux_exec_setregs,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+	.sv_flags	= SV_ABI_LINUX | SV_LP64 | SV_SHP | SV_SIG_DISCIGN |
+	    SV_SIG_WAITNDQ | SV_TIMEKEEP | SV_CHERI,
+#else
 	.sv_flags	= SV_ABI_LINUX | SV_LP64 | SV_SHP | SV_SIG_DISCIGN |
 	    SV_SIG_WAITNDQ | SV_TIMEKEEP,
+#endif
 	.sv_set_syscall_retval = linux_set_syscall_retval,
 	.sv_fetch_syscall_args = linux_fetch_syscall_args,
 	.sv_syscallnames = linux_syscallnames,
@@ -480,7 +511,7 @@ linux_on_exec_vmspace(struct proc *p, struct image_params *imgp)
 static void
 linux_exec_sysvec_init(void *param)
 {
-	l_uintptr_t *ktimekeep_base;
+	l_ulong *ktimekeep_base;
 	struct sysentvec *sv;
 	ptrdiff_t tkoff;
 
@@ -489,7 +520,7 @@ linux_exec_sysvec_init(void *param)
 	exec_sysvec_init(sv);
 
 	tkoff = kern_timekeep_base - linux_vdso_base;
-	ktimekeep_base = (l_uintptr_t *)(linux_vdso_mapping + tkoff);
+	ktimekeep_base = (l_ulong *)(linux_vdso_mapping + tkoff);
 	*ktimekeep_base = sv->sv_shared_page_base + sv->sv_timekeep_offset;
 }
 SYSINIT(elf_linux_exec_sysvec_init, SI_SUB_EXEC + 1, SI_ORDER_ANY,
@@ -498,8 +529,8 @@ SYSINIT(elf_linux_exec_sysvec_init, SI_SUB_EXEC + 1, SI_ORDER_ANY,
 static void
 linux_vdso_install(const void *param)
 {
-	char *vdso_start = &_binary_linux_vdso_so_o_start;
-	char *vdso_end = &_binary_linux_vdso_so_o_end;
+	char *vdso_start = _binary_linux_vdso_so_o_start;
+	char *vdso_end = _binary_linux_vdso_so_o_end;
 
 	linux_szsigcode = vdso_end - vdso_start;
 	MPASS(linux_szsigcode <= LINUX_VDSOPAGE_SIZE);
@@ -649,12 +680,22 @@ linux64_elf_modevent(module_t mod, int type, void *data)
 	return (error);
 }
 
-static moduledata_t linux64_elf_mod = {
+static moduledata_t linux_elf_mod = {
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+	"linux64celf",
+#else
 	"linux64elf",
+#endif
 	linux64_elf_modevent,
 	0
 };
 
-DECLARE_MODULE_TIED(linux64elf, linux64_elf_mod, SI_SUB_EXEC, SI_ORDER_ANY);
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+DECLARE_MODULE_TIED(linux64celf, linux_elf_mod, SI_SUB_EXEC, SI_ORDER_ANY);
+MODULE_DEPEND(linux64celf, linux_common, 1, 1, 1);
+FEATURE(linux64c, "AArch64 Linux 64bit CheriABI support");
+#else
+DECLARE_MODULE_TIED(linux64elf, linux_elf_mod, SI_SUB_EXEC, SI_ORDER_ANY);
 MODULE_DEPEND(linux64elf, linux_common, 1, 1, 1);
 FEATURE(linux64, "AArch64 Linux 64bit support");
+#endif

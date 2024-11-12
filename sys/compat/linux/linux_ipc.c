@@ -37,9 +37,12 @@
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
 
-#ifdef COMPAT_LINUX32
+#if defined(COMPAT_LINUX32)
 #include <machine/../linux32/linux.h>
 #include <machine/../linux32/linux32_proto.h>
+#elif defined(COMPAT_LINUX64)
+#include <machine/../linux64/linux.h>
+#include <machine/../linux64/linux64_proto.h>
 #else
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
@@ -293,15 +296,15 @@ linux_ipc64_perm_to_ipc_perm(struct l_ipc64_perm *in, struct l_ipc_perm *out)
 }
 
 static int
-linux_msqid_pullup(l_int ver, struct l_msqid64_ds *linux_msqid64, caddr_t uaddr)
+linux_msqid_pullup(l_int ver, struct l_msqid64_ds *linux_msqid64, void * __linuxcap uaddr)
 {
 	struct l_msqid_ds linux_msqid;
 	int error;
 
 	if (ver == LINUX_IPC_64 || SV_CURPROC_FLAG(SV_LP64))
-		return (copyin(uaddr, linux_msqid64, sizeof(*linux_msqid64)));
+		return (copyin(LINUX_USER_CAP(uaddr, sizeof(*linux_msqid64)), linux_msqid64, sizeof(*linux_msqid64)));
 
-	error = copyin(uaddr, &linux_msqid, sizeof(linux_msqid));
+	error = copyin(LINUX_USER_CAP(uaddr, sizeof(linux_msqid)), &linux_msqid, sizeof(linux_msqid));
 	if (error != 0)
 		return (error);
 
@@ -317,13 +320,13 @@ linux_msqid_pullup(l_int ver, struct l_msqid64_ds *linux_msqid64, caddr_t uaddr)
 }
 
 static int
-linux_msqid_pushdown(l_int ver, struct l_msqid64_ds *linux_msqid64, caddr_t uaddr)
+linux_msqid_pushdown(l_int ver, struct l_msqid64_ds *linux_msqid64, void * __linuxcap uaddr)
 {
 	struct l_msqid_ds linux_msqid;
 	int error;
 
 	if (ver == LINUX_IPC_64 || SV_CURPROC_FLAG(SV_LP64))
-		return (copyout(linux_msqid64, uaddr, sizeof(*linux_msqid64)));
+		return (copyout(linux_msqid64, LINUX_USER_CAP(uaddr, sizeof(*linux_msqid64)), sizeof(*linux_msqid64)));
 
 	bzero(&linux_msqid, sizeof(linux_msqid));
 	error = linux_ipc64_perm_to_ipc_perm(&linux_msqid64->msg_perm,
@@ -357,18 +360,18 @@ linux_msqid_pushdown(l_int ver, struct l_msqid64_ds *linux_msqid64, caddr_t uadd
 	    linux_msqid.msg_rtime != linux_msqid64->msg_rtime ||
 	    linux_msqid.msg_ctime != linux_msqid64->msg_ctime)
 		return (EOVERFLOW);
-	return (copyout(&linux_msqid, uaddr, sizeof(linux_msqid)));
+	return (copyout(&linux_msqid, LINUX_USER_CAP(uaddr, sizeof(linux_msqid)), sizeof(linux_msqid)));
 }
 
 static int
-linux_semid_pullup(l_int ver, struct l_semid64_ds *linux_semid64, caddr_t uaddr)
+linux_semid_pullup(l_int ver, struct l_semid64_ds *linux_semid64, void * __linuxcap uaddr)
 {
 	struct l_semid_ds linux_semid;
 	int error;
 
 	if (ver == LINUX_IPC_64 || SV_CURPROC_FLAG(SV_LP64))
-		return (copyin(uaddr, linux_semid64, sizeof(*linux_semid64)));
-	error = copyin(uaddr, &linux_semid, sizeof(linux_semid));
+		return (copyin(LINUX_USER_CAP(uaddr, sizeof(*linux_semid64)), linux_semid64, sizeof(*linux_semid64)));
+	error = copyin(LINUX_USER_CAP(uaddr, sizeof(linux_semid)), &linux_semid, sizeof(linux_semid));
 	if (error != 0)
 		return (error);
 
@@ -380,13 +383,13 @@ linux_semid_pullup(l_int ver, struct l_semid64_ds *linux_semid64, caddr_t uaddr)
 }
 
 static int
-linux_semid_pushdown(l_int ver, struct l_semid64_ds *linux_semid64, caddr_t uaddr)
+linux_semid_pushdown(l_int ver, struct l_semid64_ds *linux_semid64, void * __linuxcap uaddr)
 {
 	struct l_semid_ds linux_semid;
 	int error;
 
 	if (ver == LINUX_IPC_64 || SV_CURPROC_FLAG(SV_LP64))
-		return (copyout(linux_semid64, uaddr, sizeof(*linux_semid64)));
+		return (copyout(linux_semid64, LINUX_USER_CAP(uaddr, sizeof(*linux_semid64)), sizeof(*linux_semid64)));
 
 	bzero(&linux_semid, sizeof(linux_semid));
 		error = linux_ipc64_perm_to_ipc_perm(&linux_semid64->sem_perm,
@@ -403,19 +406,19 @@ linux_semid_pushdown(l_int ver, struct l_semid64_ds *linux_semid64, caddr_t uadd
 	    linux_semid.sem_ctime != linux_semid64->sem_ctime ||
 	    linux_semid.sem_nsems != linux_semid64->sem_nsems)
 		return (EOVERFLOW);
-	return (copyout(&linux_semid, uaddr, sizeof(linux_semid)));
+	return (copyout(&linux_semid, LINUX_USER_CAP(uaddr, sizeof(linux_semid)), sizeof(linux_semid)));
 }
 
 static int
-linux_shmid_pullup(l_int ver, struct l_shmid64_ds *linux_shmid64, caddr_t uaddr)
+linux_shmid_pullup(l_int ver, struct l_shmid64_ds *linux_shmid64, void * __linuxcap uaddr)
 {
 	struct l_shmid_ds linux_shmid;
 	int error;
 
 	if (ver == LINUX_IPC_64 || SV_CURPROC_FLAG(SV_LP64))
-		return (copyin(uaddr, linux_shmid64, sizeof(*linux_shmid64)));
+		return (copyin(LINUX_USER_CAP(uaddr, sizeof(*linux_shmid64)), linux_shmid64, sizeof(*linux_shmid64)));
 
-	error = copyin(uaddr, &linux_shmid, sizeof(linux_shmid));
+	error = copyin(LINUX_USER_CAP(uaddr, sizeof(linux_shmid)), &linux_shmid, sizeof(linux_shmid));
 	if (error != 0)
 		return (error);
 
@@ -427,13 +430,13 @@ linux_shmid_pullup(l_int ver, struct l_shmid64_ds *linux_shmid64, caddr_t uaddr)
 }
 
 static int
-linux_shmid_pushdown(l_int ver, struct l_shmid64_ds *linux_shmid64, caddr_t uaddr)
+linux_shmid_pushdown(l_int ver, struct l_shmid64_ds *linux_shmid64, void * __linuxcap uaddr)
 {
 	struct l_shmid_ds linux_shmid;
 	int error;
 
 	if (ver == LINUX_IPC_64 || SV_CURPROC_FLAG(SV_LP64))
-		return (copyout(linux_shmid64, uaddr, sizeof(*linux_shmid64)));
+		return (copyout(linux_shmid64, LINUX_USER_CAP(uaddr, sizeof(*linux_shmid64)), sizeof(*linux_shmid64)));
 
 	bzero(&linux_shmid, sizeof(linux_shmid));
 	error = linux_ipc64_perm_to_ipc_perm(&linux_shmid64->shm_perm,
@@ -458,17 +461,17 @@ linux_shmid_pushdown(l_int ver, struct l_shmid64_ds *linux_shmid64, caddr_t uadd
 	    linux_shmid.shm_lpid != linux_shmid64->shm_lpid ||
 	    linux_shmid.shm_nattch != linux_shmid64->shm_nattch)
 		return (EOVERFLOW);
-	return (copyout(&linux_shmid, uaddr, sizeof(linux_shmid)));
+	return (copyout(&linux_shmid, LINUX_USER_CAP(uaddr, sizeof(linux_shmid)), sizeof(linux_shmid)));
 }
 
 static int
 linux_shminfo_pushdown(l_int ver, struct l_shminfo64 *linux_shminfo64,
-    caddr_t uaddr)
+    void * __linuxcap uaddr)
 {
 	struct l_shminfo linux_shminfo;
 
 	if (ver == LINUX_IPC_64 || SV_CURPROC_FLAG(SV_LP64))
-		return (copyout(linux_shminfo64, uaddr,
+		return (copyout(linux_shminfo64, LINUX_USER_CAP(uaddr, sizeof(*linux_shminfo64)),
 		    sizeof(*linux_shminfo64)));
 
 	bzero(&linux_shminfo, sizeof(linux_shminfo));
@@ -477,7 +480,7 @@ linux_shminfo_pushdown(l_int ver, struct l_shminfo64 *linux_shminfo64,
 	linux_shminfo.shmmni = linux_shminfo64->shmmni;
 	linux_shminfo.shmseg = linux_shminfo64->shmseg;
 	linux_shminfo.shmall = linux_shminfo64->shmall;
-	return (copyout(&linux_shminfo, uaddr, sizeof(linux_shminfo)));
+	return (copyout(&linux_shminfo, LINUX_USER_CAP(uaddr, sizeof(linux_shminfo)), sizeof(linux_shminfo)));
 }
 
 #if defined(__i386__) || (defined(__amd64__) && defined(COMPAT_LINUX32))
@@ -514,8 +517,21 @@ linux_semtimedop(struct thread *td, struct linux_semtimedop_args *args)
 	} else
 		tsa = NULL;
 
-	return (kern_semop(td, args->semid, PTRIN(args->tsops),
+	return (kern_semop(td, args->semid, LINUX_USER_CAP(args->tsops, sizeof(struct sembuf) * args->nsops),
 	    args->nsops, tsa));
+}
+
+int
+linux_semop(struct thread *td, struct linux_semop_args *args)
+{
+
+	struct semop_args bargs = {
+		.semid = args->semid,
+		.sops = LINUX_USER_CAP_ARRAY(args->sops, args->nsops),
+		.nsops = args->nsops
+	};
+
+	return (sys_semop(td, &bargs));
 }
 
 int
@@ -568,13 +584,13 @@ linux_semctl(struct thread *td, struct linux_semctl_args *args)
 	case LINUX_IPC_SET:
 		cmd = IPC_SET;
 		error = linux_semid_pullup(args->cmd & LINUX_IPC_64,
-		    &linux_semid64, PTRIN(args->arg.buf));
+		    &linux_semid64, (void * __linuxcap)(uintcap_t)(args->arg.buf));
 		if (error != 0)
 			return (error);
 		linux_to_bsd_semid_ds(&linux_semid64, &semid);
 		semun.buf = &semid;
 		return (kern_semctl(td, args->semid, args->semnum, cmd, &semun,
-		    td->td_retval));
+		    (register_t *)td->td_retval));
 	case LINUX_IPC_STAT:
 		cmd = IPC_STAT;
 		semun.buf = &semid;
@@ -584,7 +600,7 @@ linux_semctl(struct thread *td, struct linux_semctl_args *args)
 			return (error);
 		bsd_to_linux_semid_ds(&semid, &linux_semid64);
 		return (linux_semid_pushdown(args->cmd & LINUX_IPC_64,
-		    &linux_semid64, PTRIN(args->arg.buf)));
+		    &linux_semid64, (void * __linuxcap)(uintcap_t)(args->arg.buf)));
 	case LINUX_SEM_STAT:
 		cmd = SEM_STAT;
 		semun.buf = &semid;
@@ -594,7 +610,7 @@ linux_semctl(struct thread *td, struct linux_semctl_args *args)
 			return (error);
 		bsd_to_linux_semid_ds(&semid, &linux_semid64);
 		error = linux_semid_pushdown(args->cmd & LINUX_IPC_64,
-		    &linux_semid64, PTRIN(args->arg.buf));
+		    &linux_semid64, (void * __linuxcap)(uintcap_t)(args->arg.buf));
 		if (error == 0)
 			td->td_retval[0] = rval;
 		return (error);
@@ -616,7 +632,7 @@ linux_semctl(struct thread *td, struct linux_semctl_args *args)
 		linux_seminfo.semaem = used_sems;
 */
 		error = copyout(&linux_seminfo,
-		    PTRIN(args->arg.buf), sizeof(linux_seminfo));
+		    LINUX_USER_CAP(args->arg.buf, sizeof(linux_seminfo)), sizeof(linux_seminfo));
 		if (error != 0)
 			return (error);
 		/*
@@ -626,11 +642,11 @@ linux_semctl(struct thread *td, struct linux_semctl_args *args)
 		return (0);
 	case LINUX_GETALL:
 		cmd = GETALL;
-		semun.array = __USER_CAP_UNBOUND(PTRIN(args->arg.array));
+		semun.array = LINUX_USER_CAP_UNBOUND(args->arg.array);
 		break;
 	case LINUX_SETALL:
 		cmd = SETALL;
-		semun.array = __USER_CAP_UNBOUND(PTRIN(args->arg.array));
+		semun.array = LINUX_USER_CAP_UNBOUND(args->arg.array);
 		break;
 	default:
 		linux_msg(td, "ipc type %d is not implemented",
@@ -638,41 +654,41 @@ linux_semctl(struct thread *td, struct linux_semctl_args *args)
 		return (EINVAL);
 	}
 	return (kern_semctl(td, args->semid, args->semnum, cmd, &semun,
-	    td->td_retval));
+	    (register_t *)td->td_retval));
 }
 
 int
 linux_msgsnd(struct thread *td, struct linux_msgsnd_args *args)
 {
-	const void *msgp;
+	const void * __capability msgp;
 	long mtype;
 	l_long lmtype;
 	int error;
 
 	if ((l_long)args->msgsz < 0 || args->msgsz > (l_long)msginfo.msgmax)
 		return (EINVAL);
-	msgp = PTRIN(args->msgp);
+	msgp = LINUX_USER_CAP(args->msgp, sizeof(lmtype) + args->msgsz);
 	if ((error = copyin(msgp, &lmtype, sizeof(lmtype))) != 0)
 		return (error);
 	mtype = (long)lmtype;
 	return (kern_msgsnd(td, args->msqid,
-	    PTR2CAP((const char *)msgp) + sizeof(lmtype),
+	    (const char * __capability)msgp + sizeof(lmtype),
 	    args->msgsz, args->msgflg, mtype));
 }
 
 int
 linux_msgrcv(struct thread *td, struct linux_msgrcv_args *args)
 {
-	void *msgp;
+	void * __capability msgp;
 	long mtype;
 	l_long lmtype;
 	int error;
 
 	if ((l_long)args->msgsz < 0 || args->msgsz > (l_long)msginfo.msgmax)
 		return (EINVAL);
-	msgp = PTRIN(args->msgp);
+	msgp = LINUX_USER_CAP(args->msgp, sizeof(lmtype) + args->msgsz);
 	if ((error = kern_msgrcv(td, args->msqid,
-	    PTR2CAP((char *)msgp) + sizeof(lmtype), args->msgsz,
+	    (char * __capability)msgp + sizeof(lmtype), args->msgsz,
 	    args->msgtyp, args->msgflg, &mtype)) != 0)
 		return (error);
 	lmtype = (l_long)mtype;
@@ -719,7 +735,7 @@ linux_msgctl(struct thread *td, struct linux_msgctl_args *args)
 		linux_msginfo.msgssz = msginfo.msgssz;
 		linux_msginfo.msgtql = msginfo.msgtql;	/* XXX MSG_INFO. */
 		linux_msginfo.msgseg = msginfo.msgseg;
-		error = copyout(&linux_msginfo, PTRIN(args->buf),
+		error = copyout(&linux_msginfo, LINUX_USER_CAP(args->buf, sizeof(linux_msginfo)),
 		    sizeof(linux_msginfo));
 		if (error == 0)
 		    td->td_retval[0] = msginfo.msgmni;	/* XXX */
@@ -737,7 +753,7 @@ linux_msgctl(struct thread *td, struct linux_msgctl_args *args)
 
 	case LINUX_IPC_SET:
 		error = linux_msqid_pullup(args->cmd & LINUX_IPC_64,
-		    &linux_msqid64, PTRIN(args->buf));
+		    &linux_msqid64, (void * __linuxcap)(args->buf));
 		if (error != 0)
 			return (error);
 		linux_to_bsd_msqid_ds(&linux_msqid64, &bsd_msqid);
@@ -763,7 +779,7 @@ linux_msgctl(struct thread *td, struct linux_msgctl_args *args)
 	if (bsd_cmd == LINUX_IPC_STAT) {
 		bsd_to_linux_msqid_ds(&bsd_msqid, &linux_msqid64);
 		return (linux_msqid_pushdown(args->cmd & LINUX_IPC_64,
-		    &linux_msqid64, PTRIN(args->buf)));
+		    &linux_msqid64, (void * __linuxcap)(args->buf)));
 	}
 
 	return (0);
@@ -774,7 +790,7 @@ linux_shmat(struct thread *td, struct linux_shmat_args *args)
 {
 	struct shmat_args bsd_args = {
 		.shmid = args->shmid,
-		.shmaddr = PTRIN(args->shmaddr),
+		.shmaddr = LINUX_USER_CAP_UNBOUND(args->shmaddr),
 		.shmflg = args->shmflg
 	};
 
@@ -785,7 +801,7 @@ int
 linux_shmdt(struct thread *td, struct linux_shmdt_args *args)
 {
 	struct shmdt_args bsd_args = {
-		.shmaddr = PTRIN(args->shmaddr)
+		.shmaddr = LINUX_USER_CAP_UNBOUND(args->shmaddr)
 	};
 
 	return (sys_shmdt(td, &bsd_args));
@@ -829,7 +845,7 @@ linux_shmctl(struct thread *td, struct linux_shmctl_args *args)
 		bsd_to_linux_shminfo(&bsd_shminfo, &linux_shminfo64);
 
 		return (linux_shminfo_pushdown(args->cmd & LINUX_IPC_64,
-		    &linux_shminfo64, PTRIN(args->buf)));
+		    &linux_shminfo64, (void * __linuxcap)(args->buf)));
 	}
 
 	case LINUX_SHM_INFO: {
@@ -843,7 +859,7 @@ linux_shmctl(struct thread *td, struct linux_shmctl_args *args)
 
 		bsd_to_linux_shm_info(&bsd_shm_info, &linux_shm_info);
 
-		return (copyout(&linux_shm_info, PTRIN(args->buf),
+		return (copyout(&linux_shm_info, LINUX_USER_CAP(args->buf, sizeof(struct l_shm_info)),
 		    sizeof(struct l_shm_info)));
 	}
 
@@ -857,7 +873,7 @@ linux_shmctl(struct thread *td, struct linux_shmctl_args *args)
 		bsd_to_linux_shmid_ds(&bsd_shmid, &linux_shmid64);
 
 		return (linux_shmid_pushdown(args->cmd & LINUX_IPC_64,
-		    &linux_shmid64, PTRIN(args->buf)));
+		    &linux_shmid64, (void * __linuxcap)(args->buf)));
 
 	case LINUX_SHM_STAT:
 		/* Perform shmctl wanting removed segments lookup */
@@ -869,11 +885,11 @@ linux_shmctl(struct thread *td, struct linux_shmctl_args *args)
 		bsd_to_linux_shmid_ds(&bsd_shmid, &linux_shmid64);
 
 		return (linux_shmid_pushdown(args->cmd & LINUX_IPC_64,
-		    &linux_shmid64, PTRIN(args->buf)));
+		    &linux_shmid64, (void * __linuxcap)(args->buf)));
 
 	case LINUX_IPC_SET:
 		error = linux_shmid_pullup(args->cmd & LINUX_IPC_64,
-		    &linux_shmid64, PTRIN(args->buf));
+		    &linux_shmid64, (void * __linuxcap)(args->buf));
 		if (error != 0)
 			return (error);
 
@@ -890,7 +906,7 @@ linux_shmctl(struct thread *td, struct linux_shmctl_args *args)
 			buf = NULL;
 		else {
 			error = linux_shmid_pullup(args->cmd & LINUX_IPC_64,
-			    &linux_shmid64, PTRIN(args->buf));
+			    &linux_shmid64, (void * __linuxcap)(args->buf));
 			if (error != 0)
 				return (error);
 			linux_to_bsd_shmid_ds(&linux_shmid64, &bsd_shmid);

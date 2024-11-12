@@ -337,7 +337,7 @@ linux_schedtail(struct thread *td)
 #else
 	int error __unused;
 #endif
-	int *child_set_tid;
+	int * __capability child_set_tid;
 
 	em = em_find(td);
 	KASSERT(em != NULL, ("linux_schedtail: thread emuldata not found.\n"));

@@ -45,9 +45,12 @@ __KERNEL_RCSID(0, "$NetBSD: linux_time.c,v 1.14 2006/05/14 03:40:54 christos Exp
 #include <sys/syscallsubr.h>
 #include <sys/time.h>
 
-#ifdef COMPAT_LINUX32
+#if defined(COMPAT_LINUX32)
 #include <machine/../linux32/linux.h>
 #include <machine/../linux32/linux32_proto.h>
+#elif defined(COMPAT_LINUX64)
+#include <machine/../linux64/linux.h>
+#include <machine/../linux64/linux64_proto.h>
 #else
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
@@ -137,7 +140,7 @@ linux_to_native_timespec(struct timespec *ntp, struct l_timespec *ltp)
 }
 
 int
-linux_put_timespec(struct timespec *ntp, struct l_timespec *ltp)
+linux_put_timespec(struct timespec *ntp, struct l_timespec * __linuxcap ltp)
 {
 	struct l_timespec lts;
 	int error;
@@ -145,16 +148,16 @@ linux_put_timespec(struct timespec *ntp, struct l_timespec *ltp)
 	error = native_to_linux_timespec(&lts, ntp);
 	if (error != 0)
 		return (error);
-	return (copyout(&lts, ltp, sizeof(lts)));
+	return (copyout(&lts, LINUX_USER_CAP_OBJ(ltp), sizeof(lts)));
 }
 
 int
-linux_get_timespec(struct timespec *ntp, const struct l_timespec *ultp)
+linux_get_timespec(struct timespec *ntp, const struct l_timespec * __linuxcap ultp)
 {
 	struct l_timespec lts;
 	int error;
 
-	error = copyin(ultp, &lts, sizeof(lts));
+	error = copyin(LINUX_USER_CAP_OBJ(ultp), &lts, sizeof(lts));
 	if (error != 0)
 		return (error);
 	return (linux_to_native_timespec(ntp, &lts));
@@ -199,7 +202,7 @@ linux_put_timespec64(struct timespec *ntp, struct l_timespec64 *ltp)
 	error = native_to_linux_timespec64(&lts, ntp);
 	if (error != 0)
 		return (error);
-	return (copyout(&lts, ltp, sizeof(lts)));
+	return (copyout(&lts, LINUX_USER_CAP_OBJ(ltp), sizeof(lts)));
 }
 
 int
@@ -208,7 +211,7 @@ linux_get_timespec64(struct timespec *ntp, const struct l_timespec64 *ultp)
 	struct l_timespec64 lts;
 	int error;
 
-	error = copyin(ultp, &lts, sizeof(lts));
+	error = copyin(LINUX_USER_CAP_OBJ(ultp), &lts, sizeof(lts));
 	if (error != 0)
 		return (error);
 	return (linux_to_native_timespec64(ntp, &lts));
@@ -803,3 +806,19 @@ linux_clock_nanosleep_time64(struct thread *td,
 	return (error);
 }
 #endif
+
+int
+linux_gettimeofday(struct thread *td,
+    struct linux_gettimeofday_args *args)
+{
+	
+	return (kern_gettimeofday(td, LINUX_USER_CAP_OBJ(args->tp), LINUX_USER_CAP_OBJ(args->tzp)));
+}
+
+int
+linux_settimeofday(struct thread *td,
+    struct linux_settimeofday_args *args)
+{
+	
+	return (user_settimeofday(td, LINUX_USER_CAP_OBJ(args->tv), LINUX_USER_CAP_OBJ(args->tzp)));
+}

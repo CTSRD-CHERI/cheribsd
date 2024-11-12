@@ -38,8 +38,13 @@
 #include <machine/atomic.h>
 #include <machine/stdarg.h>
 
+#ifdef COMPAT_LINUX64
+#include <arm64/linux64/linux.h>
+#include <arm64/linux64/linux64_proto.h>
+#else
 #include <arm64/linux/linux.h>
-#include <arm64/linux/linux_syscall.h>
+#include <arm64/linux/linux_proto.h>
+#endif
 #include <compat/linux/linux_errno.h>
 #include <compat/linux/linux_time.h>
 
@@ -83,7 +88,7 @@ __vdso_clock_gettime_fallback(clockid_t clock_id, struct l_timespec *lts)
 static int
 __vdso_gettimeofday_fallback(l_timeval *ltv, struct timezone *ltz)
 {
-	register long svc asm("x8") = LINUX_SYS_gettimeofday;
+	register long svc asm("x8") = LINUX_SYS_linux_gettimeofday;
 	register l_timeval *tv asm("x0") = ltv;
 	register struct timezone *tz asm("x1") = ltz;
 	register long res asm ("x0");

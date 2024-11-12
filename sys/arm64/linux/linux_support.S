@@ -37,14 +37,19 @@
 #include "assym.inc"
 
 .macro check_user_access user_arg, limit, bad_addr_func
+#if __has_feature(capabilities)
+	gcvalue	x6, c\user_arg
+#else
+	mov 	x6, x\user_arg
+#endif
 	ldr	x7, =(\limit)
-	cmp	x\user_arg, x7
+	cmp	x6, x7
 	b.cs	\bad_addr_func
 .endm
 
 futex_fault:
-	SET_FAULT_HANDLER(xzr, x1)
-	EXIT_USER_ACCESS_CHECK(w0, x1)
+	SET_FAULT_HANDLER(xzr, PTR(1))
+	EXIT_USER_ACCESS_CHECK(w0, PTR(1))
 futex_fault_nopcb:
 	mov	x0, #EFAULT
 	ret
@@ -52,7 +57,7 @@ futex_fault_nopcb:
 #define	LINUX_FUTEX_MAX_LOOPS	128
 
 /*
- * int oparg, uint32_t *uaddr, int *oldval
+ * int oparg, uint32_t * __capability uaddr, int *oldval
  *
  * Return 0 on success, errno on failure,
  * EAGAIN is returned if LL/SC operation fails.
@@ -64,114 +69,144 @@ futex_fault_nopcb:
 /* (int *)uaddr2 = oparg */
 ENTRY(futex_xchgl)
 	check_user_access 1, (VM_MAXUSER_ADDRESS-3), futex_fault_nopcb
-	adr	x9, futex_fault		/* Load the fault handler */
-	SET_FAULT_HANDLER(x9, x4)	/* And set it */
-	ENTER_USER_ACCESS(w9, x4)
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
+        cvtd    c2, x2                  /* Store through a capability */
+        scbnds  c2, c2, #4              /* Set the bounds */
+#endif
+	adr	PTR(9), futex_fault		/* Load the fault handler */
+	SET_FAULT_HANDLER(PTR(9), PTR(4))	/* And set it */
+	ENTER_USER_ACCESS(w9, PTR(4))
 	mov	w5, #LINUX_FUTEX_MAX_LOOPS
-	prfm	pstl1strm, [x1]
+	ENTER_C64
+	prfm	pstl1strm, [CAP(1)]
 	mov	w6, w0			/* Save oparg */
-1:	ldxr	w4, [x1]		/* Load oldval from uaddr */
-	stlxr	w0, w6, [x1]		/* Store oparg to uaddr */
+1:	ldxr	w4, [CAP(1)]		/* Load oldval from uaddr */
+	stlxr	w0, w6, [CAP(1)]	/* Store oparg to uaddr */
 	cbz	w0, 3f			/* Exit on success */
 	sub	w5, w5, w0		/* Dec loop counter, w0 is 1 */
 	cbnz	w5, 1b			/* Loop */
 	mov	x0, #EAGAIN		/* Store of newval failed */
 3:	dmb	ish
+	EXIT_C64
 	EXIT_USER_ACCESS(w9)
-	SET_FAULT_HANDLER(xzr, x9)	/* Reset the fault handler */
-	str w4, [x2]			/* Store oldval */
+	SET_FAULT_HANDLER(xzr, PTR(9))	/* Reset the fault handler */
+	str w4, [CAP(2)]		/* Store oldval */
 	ret
 END(futex_xchgl)
 
 /* (int *)uaddr2 += oparg */
 ENTRY(futex_addl)
 	check_user_access 1, (VM_MAXUSER_ADDRESS-3), futex_fault_nopcb
-	adr	x9, futex_fault
-	SET_FAULT_HANDLER(x9, x4)
-	ENTER_USER_ACCESS(w9, x4)
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
+        cvtd    c2, x2                  /* Store through a capability */
+        scbnds  c2, c2, #4              /* Set the bounds */
+#endif
+	adr	PTR(9), futex_fault
+	SET_FAULT_HANDLER(PTR(9), PTR(4))
+	ENTER_USER_ACCESS(w9, PTR(4))
 	mov	w5, #LINUX_FUTEX_MAX_LOOPS
-	prfm	pstl1strm, [x1]
+	ENTER_C64
+	prfm	pstl1strm, [CAP(1)]
 	mov	w6, w0
-1:	ldxr	w4, [x1]
+1:	ldxr	w4, [CAP(1)]
 	add	w3, w4, w6		/* oldval + oparg */
-	stlxr	w0, w3, [x1]
+	stlxr	w0, w3, [CAP(1)]
 	cbz	w0, 3f
 	sub	w5, w5, w0
 	cbnz	w5, 1b
 	mov	x0, #EAGAIN
 3:	dmb	ish
+	EXIT_C64
 	EXIT_USER_ACCESS(w9)
-	SET_FAULT_HANDLER(xzr, x9)
-	str w4, [x2]
+	SET_FAULT_HANDLER(xzr, PTR(9))
+	str w4, [CAP(2)]
 	ret
 END(futex_addl)
 
 /* (int *)uaddr2 |= oparg */
 ENTRY(futex_orl)
 	check_user_access 1, (VM_MAXUSER_ADDRESS-3), futex_fault_nopcb
-	adr	x9, futex_fault
-	SET_FAULT_HANDLER(x9, x4)
-	ENTER_USER_ACCESS(w9, x4)
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
+        cvtd    c2, x2                  /* Store through a capability */
+        scbnds  c2, c2, #4              /* Set the bounds */
+#endif
+	adr	PTR(9), futex_fault
+	SET_FAULT_HANDLER(PTR(9), PTR(4))
+	ENTER_USER_ACCESS(w9, PTR(4))
 	mov	w5, #LINUX_FUTEX_MAX_LOOPS
-	prfm	pstl1strm, [x1]
+	ENTER_C64
+	prfm	pstl1strm, [CAP(1)]
 	mov	w6, w0
-1:	ldxr	w4, [x1]
+1:	ldxr	w4, [CAP(1)]
 	orr	w3, w4, w6		/* oldavl |= oparg */
-	stlxr	w0, w3, [x1]
+	stlxr	w0, w3, [CAP(1)]
 	cbz	w0, 3f
 	sub	w5, w5, w0
 	cbnz	w5, 1b
 	mov	x0, #EAGAIN
 3:	dmb	ish
+	EXIT_C64
 	EXIT_USER_ACCESS(w9)
-	SET_FAULT_HANDLER(xzr, x9)
-	str w4, [x2]
+	SET_FAULT_HANDLER(xzr, PTR(9))
+	str w4, [CAP(2)]
 	ret
 END(futex_orl)
 
 /* (int *)uaddr2 &= oparg */
 ENTRY(futex_andl)
 	check_user_access 1, (VM_MAXUSER_ADDRESS-3), futex_fault_nopcb
-	adr	x9, futex_fault
-	SET_FAULT_HANDLER(x9, x4)
-	ENTER_USER_ACCESS(w9, x4)
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
+        cvtd    c2, x2                  /* Store through a capability */
+        scbnds  c2, c2, #4              /* Set the bounds */
+#endif
+	adr	PTR(9), futex_fault
+	SET_FAULT_HANDLER(PTR(9), PTR(4))
+	ENTER_USER_ACCESS(w9, PTR(4))
 	mov	w5, #LINUX_FUTEX_MAX_LOOPS
-	prfm	pstl1strm, [x1]
+	ENTER_C64
+	prfm	pstl1strm, [CAP(1)]
 	mov	w6, w0
-1:	ldxr	w4, [x1]
+1:	ldxr	w4, [CAP(1)]
 	and	w3, w4, w6		/* oldval &= oparg */
-	stlxr	w0, w3, [x1]
+	stlxr	w0, w3, [CAP(1)]
 	cbz	w0, 3f
 	sub	w5, w5, w0
 	cbnz	w5, 1b
 	mov	x0, #EAGAIN
 3:	dmb	ish
+	EXIT_C64
 	EXIT_USER_ACCESS(w9)
-	SET_FAULT_HANDLER(xzr, x9)
-	str w4, [x2]
+	SET_FAULT_HANDLER(xzr, PTR(9))
+	str w4, [CAP(2)]
 	ret
 END(futex_andl)
 
 /* (int *)uaddr2 ^= oparg */
 ENTRY(futex_xorl)
 	check_user_access 1, (VM_MAXUSER_ADDRESS-3), futex_fault_nopcb
-	adr	x9, futex_fault
-	SET_FAULT_HANDLER(x9, x4)
-	ENTER_USER_ACCESS(w9, x4)
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
+        cvtd    c2, x2                  /* Store through a capability */
+        scbnds  c2, c2, #4              /* Set the bounds */
+#endif
+	adr	PTR(9), futex_fault
+	SET_FAULT_HANDLER(PTR(9), PTR(4))
+	ENTER_USER_ACCESS(w9, PTR(4))
 	mov	w5, #LINUX_FUTEX_MAX_LOOPS
-	prfm	pstl1strm, [x1]
+	ENTER_C64
+	prfm	pstl1strm, [CAP(1)]
 	mov	w6, w0
-1:	ldxr	w4, [x1]
+1:	ldxr	w4, [CAP(1)]
 	eor	w3, w4, w6		/* oldval ^= oparg */
-	stlxr	w0, w3, [x1]
+	stlxr	w0, w3, [CAP(1)]
 	cbz	w0, 3f
 	sub	w5, w5, w0
 	cbnz	w5, 1b
 	mov	x0, #EAGAIN
 3:	dmb	ish
+	EXIT_C64
 	EXIT_USER_ACCESS(w9)
-	SET_FAULT_HANDLER(xzr, x9)
-	str w4, [x2]
+	SET_FAULT_HANDLER(xzr, PTR(9))
+	str w4, [CAP(2)]
 	ret
 END(futex_xorl)
 

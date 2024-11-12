@@ -36,13 +36,22 @@
 #include <sys/sx.h>
 #include <sys/syscallsubr.h>
 
+#if defined(COMPAT_LINUX32)
+#include <machine/../linux32/linux.h>
+#include <machine/../linux32/linux32_proto.h>
+#elif defined(COMPAT_LINUX64)
+#include <machine/../linux64/linux.h>
+#include <machine/../linux64/linux64_proto.h>
+#else
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
+#endif
 #include <compat/linux/linux_emul.h>
 #include <compat/linux/linux_errno.h>
 #include <compat/linux/linux_misc.h>
 #include <compat/linux/linux_signal.h>
 #include <compat/linux/linux_util.h>
+#include <compat/freebsd64/freebsd64.h>
 
 #define	LINUX_PTRACE_TRACEME		0
 #define	LINUX_PTRACE_PEEKTEXT		1
@@ -157,7 +166,7 @@ linux_ptrace_status(struct thread *td, pid_t pid, int status)
 }
 
 static int
-linux_ptrace_peek(struct thread *td, pid_t pid, void *addr, void *data)
+linux_ptrace_peek(struct thread *td, pid_t pid, void * __capability addr, void * __capability data)
 {
 	int error;
 
@@ -234,7 +243,7 @@ linux_ptrace_geteventmsg(struct thread *td, pid_t pid, l_ulong data)
 }
 
 static int
-linux_ptrace_getsiginfo(struct thread *td, pid_t pid, l_ulong data)
+linux_ptrace_getsiginfo(struct thread *td, pid_t pid, void * __capability data)
 {
 	struct ptrace_lwpinfo lwpinfo;
 	l_siginfo_t l_siginfo;
@@ -255,12 +264,12 @@ linux_ptrace_getsiginfo(struct thread *td, pid_t pid, l_ulong data)
 	sig = bsd_to_linux_signal(lwpinfo.pl_siginfo.si_signo);
 	memset(&l_siginfo, 0, sizeof(l_siginfo));
 	siginfo_to_lsiginfo(&lwpinfo.pl_siginfo, &l_siginfo, sig);
-	error = copyout(&l_siginfo, (void *)data, sizeof(l_siginfo));
+	error = copyout(&l_siginfo, data, sizeof(l_siginfo));
 	return (error);
 }
 
 static int
-linux_ptrace_getregs(struct thread *td, pid_t pid, void *data)
+linux_ptrace_getregs(struct thread *td, pid_t pid, void * __capability data)
 {
 	struct reg b_reg;
 	struct linux_pt_regset l_regset;
@@ -275,12 +284,12 @@ linux_ptrace_getregs(struct thread *td, pid_t pid, void *data)
 	if (error != 0)
 		return (error);
 
-	error = copyout(&l_regset, (void *)data, sizeof(l_regset));
+	error = copyout(&l_regset, data, sizeof(l_regset));
 	return (error);
 }
 
 static int
-linux_ptrace_setregs(struct thread *td, pid_t pid, void *data)
+linux_ptrace_setregs(struct thread *td, pid_t pid, void * __capability data)
 {
 	struct reg b_reg;
 	struct linux_pt_regset l_regset;
@@ -295,15 +304,19 @@ linux_ptrace_setregs(struct thread *td, pid_t pid, void *data)
 }
 
 static int
-linux_ptrace_getregset_prstatus(struct thread *td, pid_t pid, l_ulong data)
+linux_ptrace_getregset_prstatus(struct thread *td, pid_t pid, void * __capability data)
 {
 	struct reg b_reg;
 	struct linux_pt_regset l_regset;
+#ifdef COMPAT_LINUX64
+	struct l_iovec64 iov;
+#else
 	struct iovec iov;
+#endif
 	size_t len;
 	int error;
 
-	error = copyin((const void *)data, &iov, sizeof(iov));
+	error = copyin(data, &iov, sizeof(iov));
 	if (error != 0) {
 		linux_msg(td, "copyin error %d", error);
 		return (error);
@@ -319,14 +332,14 @@ linux_ptrace_getregset_prstatus(struct thread *td, pid_t pid, l_ulong data)
 		return (error);
 
 	len = MIN(iov.iov_len, sizeof(l_regset));
-	error = copyout(&l_regset, (void *)iov.iov_base, len);
+	error = copyout(&l_regset, LINUX_USER_CAP(iov.iov_base, len), len);
 	if (error != 0) {
 		linux_msg(td, "copyout error %d", error);
 		return (error);
 	}
 
 	iov.iov_len = len;
-	error = copyout(&iov, (void *)data, sizeof(iov));
+	error = copyout(&iov, data, sizeof(iov));
 	if (error != 0) {
 		linux_msg(td, "iov copyout error %d", error);
 		return (error);
@@ -336,7 +349,7 @@ linux_ptrace_getregset_prstatus(struct thread *td, pid_t pid, l_ulong data)
 }
 
 static int
-linux_ptrace_getregset(struct thread *td, pid_t pid, l_ulong addr, l_ulong data)
+linux_ptrace_getregset(struct thread *td, pid_t pid, l_uintptr_t addr, void * __capability data)
 {
 
 	switch (addr) {
@@ -352,13 +365,13 @@ linux_ptrace_getregset(struct thread *td, pid_t pid, l_ulong addr, l_ulong data)
 		return (EINVAL);
 	default:
 		linux_msg(td, "PTRACE_GETREGSET request %#lx not implemented; "
-		    "returning EINVAL", addr);
+		    "returning EINVAL", (unsigned long)addr);
 		return (EINVAL);
 	}
 }
 
 static int
-linux_ptrace_seize(struct thread *td, pid_t pid, l_ulong addr, l_ulong data)
+linux_ptrace_seize(struct thread *td, pid_t pid, l_uintptr_t addr, l_uintptr_t data)
 {
 
 	linux_msg(td, "PTRACE_SEIZE not implemented; returning EINVAL");
@@ -367,7 +380,7 @@ linux_ptrace_seize(struct thread *td, pid_t pid, l_ulong addr, l_ulong data)
 
 static int
 linux_ptrace_get_syscall_info(struct thread *td, pid_t pid,
-    l_ulong len, l_ulong data)
+    l_ulong len, void* __capability data)
 {
 	struct ptrace_lwpinfo lwpinfo;
 	struct ptrace_sc_ret sr;
@@ -443,7 +456,7 @@ linux_ptrace_get_syscall_info(struct thread *td, pid_t pid,
 	linux_ptrace_get_syscall_info_machdep(&b_reg, &si);
 
 	len = MIN(len, sizeof(si));
-	error = copyout(&si, (void *)data, len);
+	error = copyout(&si, data, len);
 	if (error == 0)
 		td->td_retval[0] = sizeof(si);
 
@@ -453,7 +466,7 @@ linux_ptrace_get_syscall_info(struct thread *td, pid_t pid,
 int
 linux_ptrace(struct thread *td, struct linux_ptrace_args *uap)
 {
-	void *addr;
+	void * __capability addr;
 	pid_t pid;
 	int error, sig;
 
@@ -461,7 +474,7 @@ linux_ptrace(struct thread *td, struct linux_ptrace_args *uap)
 		return (ENOSYS);
 
 	pid  = (pid_t)uap->pid;
-	addr = (void *)uap->addr;
+	addr = LINUX_USER_CAP_UNBOUND(uap->addr);
 
 	switch (uap->req) {
 	case LINUX_PTRACE_TRACEME:
@@ -469,17 +482,17 @@ linux_ptrace(struct thread *td, struct linux_ptrace_args *uap)
 		break;
 	case LINUX_PTRACE_PEEKTEXT:
 	case LINUX_PTRACE_PEEKDATA:
-		error = linux_ptrace_peek(td, pid, addr, (void *)uap->data);
+		error = linux_ptrace_peek(td, pid, addr, LINUX_USER_CAP(uap->data, sizeof(l_int)));
 		if (error != 0)
 			goto out;
 		/*
 		 * Linux expects this syscall to read 64 bits, not 32.
 		 */
 		error = linux_ptrace_peek(td, pid,
-		    (void *)(uap->addr + 4), (void *)(uap->data + 4));
+		    LINUX_USER_CAP_UNBOUND(uap->addr + 4), LINUX_USER_CAP(uap->data + 4, sizeof(l_int)));
 		break;
 	case LINUX_PTRACE_PEEKUSER:
-		error = linux_ptrace_peekuser(td, pid, addr, (void *)uap->data);
+		error = linux_ptrace_peekuser(td, pid, addr, LINUX_USER_CAP(uap->data, sizeof(l_int)));
 		break;
 	case LINUX_PTRACE_POKETEXT:
 	case LINUX_PTRACE_POKEDATA:
@@ -490,16 +503,16 @@ linux_ptrace(struct thread *td, struct linux_ptrace_args *uap)
 		 * Linux expects this syscall to write 64 bits, not 32.
 		 */
 		error = kern_ptrace(td, PT_WRITE_D, pid,
-		    (void *)(uap->addr + 4), uap->data >> 32);
+		    LINUX_USER_CAP_UNBOUND(uap->addr + 4), uap->data >> 32);
 		break;
 	case LINUX_PTRACE_POKEUSER:
-		error = linux_ptrace_pokeuser(td, pid, addr, (void *)uap->data);
+		error = linux_ptrace_pokeuser(td, pid, addr, LINUX_USER_CAP(uap->data, sizeof(l_int)));
 		break;
 	case LINUX_PTRACE_CONT:
 		error = map_signum(uap->data, &sig);
 		if (error != 0)
 			break;
-		error = kern_ptrace(td, PT_CONTINUE, pid, (void *)1, sig);
+		error = kern_ptrace(td, PT_CONTINUE, pid, LINUX_USER_CAP_UNBOUND(1), sig);
 		break;
 	case LINUX_PTRACE_KILL:
 		error = kern_ptrace(td, PT_KILL, pid, addr, uap->data);
@@ -508,13 +521,13 @@ linux_ptrace(struct thread *td, struct linux_ptrace_args *uap)
 		error = map_signum(uap->data, &sig);
 		if (error != 0)
 			break;
-		error = kern_ptrace(td, PT_STEP, pid, (void *)1, sig);
+		error = kern_ptrace(td, PT_STEP, pid, LINUX_USER_CAP_UNBOUND(1), sig);
 		break;
 	case LINUX_PTRACE_GETREGS:
-		error = linux_ptrace_getregs(td, pid, (void *)uap->data);
+		error = linux_ptrace_getregs(td, pid, LINUX_USER_CAP(uap->data, sizeof(struct linux_pt_regset)));
 		break;
 	case LINUX_PTRACE_SETREGS:
-		error = linux_ptrace_setregs(td, pid, (void *)uap->data);
+		error = linux_ptrace_setregs(td, pid, LINUX_USER_CAP(uap->data, sizeof(struct linux_pt_regset)));
 		break;
 	case LINUX_PTRACE_ATTACH:
 		error = kern_ptrace(td, PT_ATTACH, pid, addr, uap->data);
@@ -523,13 +536,13 @@ linux_ptrace(struct thread *td, struct linux_ptrace_args *uap)
 		error = map_signum(uap->data, &sig);
 		if (error != 0)
 			break;
-		error = kern_ptrace(td, PT_DETACH, pid, (void *)1, sig);
+		error = kern_ptrace(td, PT_DETACH, pid, LINUX_USER_CAP_UNBOUND(1), sig);
 		break;
 	case LINUX_PTRACE_SYSCALL:
 		error = map_signum(uap->data, &sig);
 		if (error != 0)
 			break;
-		error = kern_ptrace(td, PT_SYSCALL, pid, (void *)1, sig);
+		error = kern_ptrace(td, PT_SYSCALL, pid, LINUX_USER_CAP_UNBOUND(1), sig);
 		break;
 	case LINUX_PTRACE_SETOPTIONS:
 		error = linux_ptrace_setoptions(td, pid, uap->data);
@@ -538,16 +551,16 @@ linux_ptrace(struct thread *td, struct linux_ptrace_args *uap)
 		error = linux_ptrace_geteventmsg(td, pid, uap->data);
 		break;
 	case LINUX_PTRACE_GETSIGINFO:
-		error = linux_ptrace_getsiginfo(td, pid, uap->data);
+		error = linux_ptrace_getsiginfo(td, pid, LINUX_USER_CAP(uap->data, sizeof(l_siginfo_t)));
 		break;
 	case LINUX_PTRACE_GETREGSET:
-		error = linux_ptrace_getregset(td, pid, uap->addr, uap->data);
+		error = linux_ptrace_getregset(td, pid, uap->addr, LINUX_USER_CAP(uap->data, sizeof(struct l_iovec64)));
 		break;
 	case LINUX_PTRACE_SEIZE:
 		error = linux_ptrace_seize(td, pid, uap->addr, uap->data);
 		break;
 	case LINUX_PTRACE_GET_SYSCALL_INFO:
-		error = linux_ptrace_get_syscall_info(td, pid, uap->addr, uap->data);
+		error = linux_ptrace_get_syscall_info(td, pid, uap->addr, LINUX_USER_CAP(uap->data, uap->addr));
 		break;
 	default:
 		linux_msg(td, "ptrace(%ld, ...) not implemented; "

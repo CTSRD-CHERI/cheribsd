@@ -43,7 +43,12 @@ typedef uint32_t	l_uint;
 typedef uint64_t	l_ulong;
 typedef uint16_t	l_ushort;
 
+#if defined(COMPAT_LINUX64) || defined(COMPAT_LINUX32)
 typedef l_ulong		l_uintptr_t;
+#else
+typedef uintcap_t	l_uintptr_t;
+#endif
+typedef uintcap_t	l_uintcap_t;
 typedef l_long		l_clock_t;
 typedef l_int		l_daddr_t;
 typedef l_uint		l_gid_t;
@@ -157,7 +162,7 @@ struct l_newstat {
 #define	LINUX_SA_NOMASK		0x40000000	/* SA_NODEFER */
 #define	LINUX_SA_ONESHOT	0x80000000	/* SA_RESETHAND */
 
-typedef void	(*l_handler_t)(l_int);
+typedef l_uintptr_t	l_handler_t;
 
 typedef struct {
 	l_handler_t	lsa_handler;
@@ -189,10 +194,10 @@ struct linux_pt_regset {
 	l_ulong cpsr;
 };
 
+
 #ifdef _KERNEL
 struct reg;
 struct syscall_info;
-
 void	bsd_to_linux_regset(const struct reg *b_reg,
 	    struct linux_pt_regset *l_regset);
 void	linux_to_bsd_regset(struct reg *b_reg,
@@ -202,9 +207,9 @@ void	linux_ptrace_get_syscall_info_machdep(const struct reg *reg,
 int	linux_ptrace_getregs_machdep(struct thread *td, pid_t pid,
 	    struct linux_pt_regset *l_regset);
 int	linux_ptrace_peekuser(struct thread *td, pid_t pid,
-	    void *addr, void *data);
+	    void * __capability addr, void * __capability data);
 int	linux_ptrace_pokeuser(struct thread *td, pid_t pid,
-	    void *addr, void *data);
+	    void * __capability addr, void * __capability data);
 #endif /* _KERNEL */
 
 #endif /* _ARM64_LINUX_H_ */

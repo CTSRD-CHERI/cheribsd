@@ -28,14 +28,16 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 
-#ifdef COMPAT_LINUX32
+#if defined(COMPAT_LINUX32)
 #include <machine/../linux32/linux.h>
 #include <machine/../linux32/linux32_proto.h>
+#elif defined(COMPAT_LINUX64)
+#include <machine/../linux64/linux.h>
+#include <machine/../linux64/linux64_proto.h>
 #else
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
 #endif
-
 
 enum linux_rseq_cpu_id_state {
 	LINUX_RSEQ_CPU_ID_UNINITIALIZED			= -1,

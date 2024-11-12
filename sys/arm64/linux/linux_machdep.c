@@ -33,8 +33,13 @@
 
 #include <vm/vm_param.h>
 
+#ifdef COMPAT_LINUX64
+#include <arm64/linux64/linux.h>
+#include <arm64/linux64/linux64_proto.h>
+#else
 #include <arm64/linux/linux.h>
 #include <arm64/linux/linux_proto.h>
+#endif
 #include <compat/linux/linux_fork.h>
 #include <compat/linux/linux_misc.h>
 #include <compat/linux/linux_util.h>
@@ -64,7 +69,7 @@ linux_set_cloned_tls(struct thread *td, void *desc)
 	if ((uint64_t)desc >= VM_MAXUSER_ADDRESS)
 		return (EPERM);
 
-	return (cpu_set_user_tls(td, desc));
+	return (cpu_set_user_tls(td, __USER_CAP_UNBOUND(desc)));
 }
 
 void
@@ -113,19 +118,20 @@ linux_ptrace_getregs_machdep(struct thread *td __unused, pid_t pid __unused,
 }
 
 int
-linux_ptrace_peekuser(struct thread *td, pid_t pid, void *addr, void *data)
+linux_ptrace_peekuser(struct thread *td, pid_t pid, void * __capability addr, void * __capability data)
 {
 
 	LINUX_RATELIMIT_MSG_OPT1("PTRACE_PEEKUSER offset %ld not implemented; "
-	    "returning EINVAL", (uintptr_t)addr);
+	    "returning EINVAL", (__cheri_addr long)addr);
+
 	return (EINVAL);
 }
 
 int
-linux_ptrace_pokeuser(struct thread *td, pid_t pid, void *addr, void *data)
+linux_ptrace_pokeuser(struct thread *td, pid_t pid, void * __capability addr, void * __capability data)
 {
 
 	LINUX_RATELIMIT_MSG_OPT1("PTRACE_POKEUSER offset %ld "
-	    "not implemented; returning EINVAL", (uintptr_t)addr);
+	    "not implemented; returning EINVAL", (__cheri_addr long)addr);
 	return (EINVAL);
 }
