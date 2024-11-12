@@ -32,4 +32,7 @@
  */
 
 #define __ELF_WORD_SIZE 64
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+#define	__ELF_CHERI
+#endif
 #include <compat/linux/linux_elf.c>

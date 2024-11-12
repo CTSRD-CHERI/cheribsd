@@ -320,7 +320,7 @@ linux_ptrace_getregset_prstatus(struct thread *td, pid_t pid, void * __capabilit
 		return (error);
 
 	len = MIN(iov.iov_len, sizeof(l_regset));
-	error = copyout(&l_regset, __USER_CAP(iov.iov_base, len), len);
+	error = copyout(&l_regset, LINUX_USER_CAP(iov.iov_base, len), len);
 	if (error != 0) {
 		linux_msg(td, "copyout error %d", error);
 		return (error);
@@ -462,7 +462,7 @@ linux_ptrace(struct thread *td, struct linux_ptrace_args *uap)
 		return (ENOSYS);
 
 	pid  = (pid_t)uap->pid;
-	addr = __USER_CAP_UNBOUND(uap->addr);
+	addr = LINUX_USER_CAP_UNBOUND(uap->addr);
 
 	switch (uap->req) {
 	case LINUX_PTRACE_TRACEME:
@@ -470,17 +470,17 @@ linux_ptrace(struct thread *td, struct linux_ptrace_args *uap)
 		break;
 	case LINUX_PTRACE_PEEKTEXT:
 	case LINUX_PTRACE_PEEKDATA:
-		error = linux_ptrace_peek(td, pid, addr, __USER_CAP(uap->data, sizeof(l_int)));
+		error = linux_ptrace_peek(td, pid, addr, LINUX_USER_CAP(uap->data, sizeof(l_int)));
 		if (error != 0)
 			goto out;
 		/*
 		 * Linux expects this syscall to read 64 bits, not 32.
 		 */
 		error = linux_ptrace_peek(td, pid,
-		    __USER_CAP_UNBOUND(uap->addr + 4), __USER_CAP(uap->data + 4, sizeof(l_int)));
+		    LINUX_USER_CAP_UNBOUND(uap->addr + 4), LINUX_USER_CAP(uap->data + 4, sizeof(l_int)));
 		break;
 	case LINUX_PTRACE_PEEKUSER:
-		error = linux_ptrace_peekuser(td, pid, addr, __USER_CAP(uap->data, sizeof(l_int)));
+		error = linux_ptrace_peekuser(td, pid, addr, LINUX_USER_CAP(uap->data, sizeof(l_int)));
 		break;
 	case LINUX_PTRACE_POKETEXT:
 	case LINUX_PTRACE_POKEDATA:
@@ -491,16 +491,16 @@ linux_ptrace(struct thread *td, struct linux_ptrace_args *uap)
 		 * Linux expects this syscall to write 64 bits, not 32.
 		 */
 		error = kern_ptrace(td, PT_WRITE_D, pid,
-		    __USER_CAP_UNBOUND(uap->addr + 4), uap->data >> 32);
+		    LINUX_USER_CAP_UNBOUND(uap->addr + 4), uap->data >> 32);
 		break;
 	case LINUX_PTRACE_POKEUSER:
-		error = linux_ptrace_pokeuser(td, pid, addr, __USER_CAP(uap->data, sizeof(l_int)));
+		error = linux_ptrace_pokeuser(td, pid, addr, LINUX_USER_CAP(uap->data, sizeof(l_int)));
 		break;
 	case LINUX_PTRACE_CONT:
 		error = map_signum(uap->data, &sig);
 		if (error != 0)
 			break;
-		error = kern_ptrace(td, PT_CONTINUE, pid, __USER_CAP_UNBOUND(1), sig);
+		error = kern_ptrace(td, PT_CONTINUE, pid, LINUX_USER_CAP_UNBOUND(1), sig);
 		break;
 	case LINUX_PTRACE_KILL:
 		error = kern_ptrace(td, PT_KILL, pid, addr, uap->data);
@@ -509,13 +509,13 @@ linux_ptrace(struct thread *td, struct linux_ptrace_args *uap)
 		error = map_signum(uap->data, &sig);
 		if (error != 0)
 			break;
-		error = kern_ptrace(td, PT_STEP, pid, __USER_CAP_UNBOUND(1), sig);
+		error = kern_ptrace(td, PT_STEP, pid, LINUX_USER_CAP_UNBOUND(1), sig);
 		break;
 	case LINUX_PTRACE_GETREGS:
-		error = linux_ptrace_getregs(td, pid, __USER_CAP(uap->data, sizeof(struct linux_pt_regset)));
+		error = linux_ptrace_getregs(td, pid, LINUX_USER_CAP(uap->data, sizeof(struct linux_pt_regset)));
 		break;
 	case LINUX_PTRACE_SETREGS:
-		error = linux_ptrace_setregs(td, pid, __USER_CAP(uap->data, sizeof(struct linux_pt_regset)));
+		error = linux_ptrace_setregs(td, pid, LINUX_USER_CAP(uap->data, sizeof(struct linux_pt_regset)));
 		break;
 	case LINUX_PTRACE_ATTACH:
 		error = kern_ptrace(td, PT_ATTACH, pid, addr, uap->data);
@@ -524,13 +524,13 @@ linux_ptrace(struct thread *td, struct linux_ptrace_args *uap)
 		error = map_signum(uap->data, &sig);
 		if (error != 0)
 			break;
-		error = kern_ptrace(td, PT_DETACH, pid, __USER_CAP_UNBOUND(1), sig);
+		error = kern_ptrace(td, PT_DETACH, pid, LINUX_USER_CAP_UNBOUND(1), sig);
 		break;
 	case LINUX_PTRACE_SYSCALL:
 		error = map_signum(uap->data, &sig);
 		if (error != 0)
 			break;
-		error = kern_ptrace(td, PT_SYSCALL, pid, __USER_CAP_UNBOUND(1), sig);
+		error = kern_ptrace(td, PT_SYSCALL, pid, LINUX_USER_CAP_UNBOUND(1), sig);
 		break;
 	case LINUX_PTRACE_SETOPTIONS:
 		error = linux_ptrace_setoptions(td, pid, uap->data);
@@ -539,16 +539,16 @@ linux_ptrace(struct thread *td, struct linux_ptrace_args *uap)
 		error = linux_ptrace_geteventmsg(td, pid, uap->data);
 		break;
 	case LINUX_PTRACE_GETSIGINFO:
-		error = linux_ptrace_getsiginfo(td, pid, __USER_CAP(uap->data, sizeof(l_siginfo_t)));
+		error = linux_ptrace_getsiginfo(td, pid, LINUX_USER_CAP(uap->data, sizeof(l_siginfo_t)));
 		break;
 	case LINUX_PTRACE_GETREGSET:
-		error = linux_ptrace_getregset(td, pid, uap->addr, __USER_CAP(uap->data, sizeof(struct l_iovec64)));
+		error = linux_ptrace_getregset(td, pid, uap->addr, LINUX_USER_CAP(uap->data, sizeof(struct l_iovec64)));
 		break;
 	case LINUX_PTRACE_SEIZE:
 		error = linux_ptrace_seize(td, pid, uap->addr, uap->data);
 		break;
 	case LINUX_PTRACE_GET_SYSCALL_INFO:
-		error = linux_ptrace_get_syscall_info(td, pid, uap->addr, __USER_CAP(uap->data, uap->addr));
+		error = linux_ptrace_get_syscall_info(td, pid, uap->addr, LINUX_USER_CAP(uap->data, uap->addr));
 		break;
 	default:
 		linux_msg(td, "ptrace(%ld, ...) not implemented; "

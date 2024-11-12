@@ -30,8 +30,13 @@
 #include <sys/proc.h>
 #include <sys/sdt.h>
 
+#ifdef COMPAT_LINUX64
+#include <arm64/linux64/linux.h>
+#include <arm64/linux64/linux64_proto.h>
+#else
 #include <arm64/linux/linux.h>
 #include <arm64/linux/linux_proto.h>
+#endif
 #include <compat/linux/linux_dtrace.h>
 #include <compat/linux/linux_util.h>
 

@@ -157,7 +157,11 @@ struct l_newstat {
 #define	LINUX_SA_NOMASK		0x40000000	/* SA_NODEFER */
 #define	LINUX_SA_ONESHOT	0x80000000	/* SA_RESETHAND */
 
+#ifdef COMPAT_LINUX64
 typedef l_uintptr_t	l_handler_t;
+#else
+typedef void	(*l_handler_t)(l_int);
+#endif
 
 typedef struct {
 	l_handler_t	lsa_handler;
@@ -189,20 +193,10 @@ struct linux_pt_regset {
 	l_ulong cpsr;
 };
 
-struct iovec;
-struct uio;
-struct l_iovec64 {
-	l_uintptr_t	iov_base;
-	l_size_t	iov_len;
-};
 
 #ifdef _KERNEL
 struct reg;
 struct syscall_info;
-int	linux64_copyiniov(struct l_iovec64 * __capability iovp64,
-	    l_ulong iovcnt, struct iovec **iovp, int error);
-int	linux64_copyinuio(struct l_iovec64 * __capability iovp64,
-	    l_ulong iovcnt, struct uio **uiop);
 void	bsd_to_linux_regset(const struct reg *b_reg,
 	    struct linux_pt_regset *l_regset);
 void	linux_to_bsd_regset(struct reg *b_reg,

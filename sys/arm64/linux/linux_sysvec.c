@@ -47,8 +47,15 @@
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 
+#ifdef COMPAT_LINUX64
+#include <arm64/linux64/linux.h>
+#include <arm64/linux64/linux64_proto.h>
+#include <arm64/linux64/linux64_sigframe.h>
+#else
 #include <arm64/linux/linux.h>
 #include <arm64/linux/linux_proto.h>
+#include <arm64/linux/linux_sigframe.h>
+#endif
 #include <compat/linux/linux_elf.h>
 #include <compat/linux/linux_emul.h>
 #include <compat/linux/linux_fork.h>
@@ -58,8 +65,6 @@
 #include <compat/linux/linux_signal.h>
 #include <compat/linux/linux_util.h>
 #include <compat/linux/linux_vdso.h>
-
-#include <arm64/linux/linux_sigframe.h>
 
 #include <machine/md_var.h>
 #include <machine/pcb.h>

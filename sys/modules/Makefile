@@ -537,6 +537,9 @@ SUBDIR+=	linux
 .if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64"
 SUBDIR+=	linux64
 SUBDIR+=	linux_common
+.if ${MACHINE_CPU:Mcheri}
+SUBDIR+=	linux64c
+.endif
 .endif
 
 .if ${MACHINE_CPUARCH} != "arm"
@@ -928,7 +931,6 @@ BROKEN_MODULES+=armv8crypto
 BROKEN_MODULES+=bnxt
 BROKEN_MODULES+=dpaa2
 BROKEN_MODULES+=ena
-#BROKEN_MODULES+=linux64
 BROKEN_MODULES+=mlx4 mlx4en mlx5 mlx5en
 .endif
 

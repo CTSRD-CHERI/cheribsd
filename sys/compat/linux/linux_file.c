@@ -45,17 +45,21 @@
 #include <sys/unistd.h>
 #include <sys/vnode.h>
 
-#ifdef COMPAT_LINUX32
+#if defined(COMPAT_LINUX32)
 #include <compat/freebsd32/freebsd32_misc.h>
 #include <compat/freebsd32/freebsd32_util.h>
 #include <machine/../linux32/linux.h>
 #include <machine/../linux32/linux32_proto.h>
-#else
+#elif defined(COMPAT_LINUX64)
 #include <compat/freebsd64/freebsd64.h>
 #include <compat/freebsd64/freebsd64_util.h>
+#include <machine/../linux64/linux.h>
+#include <machine/../linux64/linux64_proto.h>
+#else
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
 #endif
+
 #include <compat/linux/linux_misc.h>
 #include <compat/linux/linux_util.h>
 #include <compat/linux/linux_file.h>
@@ -101,7 +105,7 @@ int
 linux_creat(struct thread *td, struct linux_creat_args *args)
 {
 
-	return (kern_openat(td, AT_FDCWD, __USER_CAP_PATH(args->path),
+	return (kern_openat(td, AT_FDCWD, LINUX_USER_CAP_PATH(args->path),
 	    UIO_USERSPACE, O_WRONLY | O_CREAT | O_TRUNC, args->mode));
 }
 #endif
@@ -164,7 +168,7 @@ linux_common_open(struct thread *td, int dirfd, const char *path,
 	int bsd_flags, error;
 
 	bsd_flags = linux_common_openflags(l_flags);
-	error = kern_openat(td, dirfd, __USER_CAP_PATH(path), seg, bsd_flags, mode);
+	error = kern_openat(td, dirfd, LINUX_USER_CAP_PATH(path), seg, bsd_flags, mode);
 	if (error != 0) {
 		if (error == EMLINK)
 			error = ELOOP;
@@ -251,14 +255,14 @@ linux_name_to_handle_at(struct thread *td,
 	if ((args->flags & LINUX_AT_EMPTY_PATH) != 0)
 		bsd_flags |= AT_EMPTY_PATH;
 
-	error = kern_getfhat(td, bsd_flags, fd, __USER_CAP_PATH(args->name),
+	error = kern_getfhat(td, bsd_flags, fd, LINUX_USER_CAP_PATH(args->name),
 	    UIO_USERSPACE, &fh, UIO_SYSSPACE);
 	if (error != 0)
 		return (error);
 
 	/* Emit mount_id -- required before EOVERFLOW case. */
 	mount_id = (fh.fh_fsid.val[0] ^ fh.fh_fsid.val[1]);
-	error = copyout(&mount_id, __USER_CAP_OBJ(args->mnt_id), sizeof(mount_id));
+	error = copyout(&mount_id, LINUX_USER_CAP_OBJ(args->mnt_id), sizeof(mount_id));
 	if (error != 0)
 		return (error);
 
@@ -454,7 +458,7 @@ linux_getdents(struct thread *td, struct linux_getdents_args *args)
 		lbuf[linuxreclen - 1] = bdp->d_type;
 		strlcpy(linux_dirent->d_name, bdp->d_name,
 		    linuxreclen - offsetof(struct l_dirent, d_name)-1);
-		error = copyout(linux_dirent, __USER_CAP(outp, linuxreclen), linuxreclen);
+		error = copyout(linux_dirent, LINUX_USER_CAP(outp, linuxreclen), linuxreclen);
 		if (error != 0)
 			goto out;
 
@@ -527,7 +531,7 @@ linux_getdents64(struct thread *td, struct linux_getdents64_args *args)
 		linux_dirent64->d_type = bdp->d_type;
 		strlcpy(linux_dirent64->d_name, bdp->d_name,
 		    linuxreclen - offsetof(struct l_dirent64, d_name));
-		error = copyout(linux_dirent64, __USER_CAP(outp, linuxreclen), linuxreclen);
+		error = copyout(linux_dirent64, LINUX_USER_CAP(outp, linuxreclen), linuxreclen);
 		if (error != 0)
 			goto out;
 
@@ -582,7 +586,7 @@ linux_readdir(struct thread *td, struct linux_readdir_args *args)
 	linux_dirent->d_reclen = bdp->d_namlen;
 	strlcpy(linux_dirent->d_name, bdp->d_name,
 	    linuxreclen - offsetof(struct l_dirent, d_name));
-	error = copyout(linux_dirent, __USER_CAP(args->dent, linuxreclen), linuxreclen);
+	error = copyout(linux_dirent, LINUX_USER_CAP(args->dent, linuxreclen), linuxreclen);
 	if (error == 0)
 		td->td_retval[0] = linuxreclen;
 
@@ -606,7 +610,7 @@ linux_access(struct thread *td, struct linux_access_args *args)
 	if (args->amode & ~(F_OK | X_OK | W_OK | R_OK))
 		return (EINVAL);
 
-	return (kern_accessat(td, AT_FDCWD, __USER_CAP_PATH(args->path),
+	return (kern_accessat(td, AT_FDCWD, LINUX_USER_CAP_PATH(args->path),
 	    UIO_USERSPACE, 0, args->amode));
 }
 #endif
@@ -622,7 +626,7 @@ linux_do_accessat(struct thread *td, int ldfd, const char *filename,
 		return (EINVAL);
 
 	dfd = (ldfd == LINUX_AT_FDCWD) ? AT_FDCWD : ldfd;
-	return (kern_accessat(td, dfd, __USER_CAP_PATH(filename),
+	return (kern_accessat(td, dfd, LINUX_USER_CAP_PATH(filename),
 	    UIO_USERSPACE, flags, amode));
 }
 
@@ -662,11 +666,11 @@ linux_unlink(struct thread *td, struct linux_unlink_args *args)
 	int error;
 	struct stat st;
 
-	error = kern_funlinkat(td, AT_FDCWD, __USER_CAP_PATH(args->path),
+	error = kern_funlinkat(td, AT_FDCWD, LINUX_USER_CAP_PATH(args->path),
 	    FD_NONE, UIO_USERSPACE, 0, 0);
 	if (error == EPERM) {
 		/* Introduce POSIX noncompliant behaviour of Linux */
-		if (kern_statat(td, 0, AT_FDCWD, __USER_CAP_PATH(args->path),
+		if (kern_statat(td, 0, AT_FDCWD, LINUX_USER_CAP_PATH(args->path),
 		    UIO_USERSPACE, &st) == 0) {
 			if (S_ISDIR(st.st_mode))
 				error = EISDIR;
@@ -707,21 +711,21 @@ linux_unlinkat(struct thread *td, struct linux_unlinkat_args *args)
 		return (EINVAL);
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
 	return (linux_unlinkat_impl(td, UIO_USERSPACE,
-	    __USER_CAP_PATH(args->pathname), dfd, args));
+	    LINUX_USER_CAP_PATH(args->pathname), dfd, args));
 }
 
 int
 linux_chdir(struct thread *td, struct linux_chdir_args *args)
 {
 
-	return (kern_chdir(td, __USER_CAP_PATH(args->path), UIO_USERSPACE));
+	return (kern_chdir(td, LINUX_USER_CAP_PATH(args->path), UIO_USERSPACE));
 }
 
 int
 linux_chroot(struct thread *td, struct linux_chroot_args *args)
 {
 
-	return (kern_chroot(td, __USER_CAP_PATH(args->path)));
+	return (kern_chroot(td, LINUX_USER_CAP_PATH(args->path)));
 }
 
 #ifdef LINUX_LEGACY_SYSCALLS
@@ -729,7 +733,7 @@ int
 linux_chmod(struct thread *td, struct linux_chmod_args *args)
 {
 
-	return (kern_fchmodat(td, AT_FDCWD, __USER_CAP_PATH(args->path), UIO_USERSPACE,
+	return (kern_fchmodat(td, AT_FDCWD, LINUX_USER_CAP_PATH(args->path), UIO_USERSPACE,
 	    args->mode, 0));
 }
 #endif
@@ -740,7 +744,7 @@ linux_fchmodat(struct thread *td, struct linux_fchmodat_args *args)
 	int dfd;
 
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
-	return (kern_fchmodat(td, dfd, __USER_CAP_PATH(args->filename), UIO_USERSPACE,
+	return (kern_fchmodat(td, dfd, LINUX_USER_CAP_PATH(args->filename), UIO_USERSPACE,
 	    args->mode, 0));
 }
 
@@ -749,7 +753,7 @@ int
 linux_mkdir(struct thread *td, struct linux_mkdir_args *args)
 {
 
-	return (kern_mkdirat(td, AT_FDCWD, __USER_CAP_PATH(args->path), UIO_USERSPACE, args->mode));
+	return (kern_mkdirat(td, AT_FDCWD, LINUX_USER_CAP_PATH(args->path), UIO_USERSPACE, args->mode));
 }
 #endif
 
@@ -759,7 +763,7 @@ linux_mkdirat(struct thread *td, struct linux_mkdirat_args *args)
 	int dfd;
 
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
-	return (kern_mkdirat(td, dfd, __USER_CAP_PATH(args->pathname), UIO_USERSPACE, args->mode));
+	return (kern_mkdirat(td, dfd, LINUX_USER_CAP_PATH(args->pathname), UIO_USERSPACE, args->mode));
 }
 
 #ifdef LINUX_LEGACY_SYSCALLS
@@ -767,7 +771,7 @@ int
 linux_rmdir(struct thread *td, struct linux_rmdir_args *args)
 {
 
-	return (kern_frmdirat(td, AT_FDCWD, __USER_CAP_PATH(args->path), FD_NONE,
+	return (kern_frmdirat(td, AT_FDCWD, LINUX_USER_CAP_PATH(args->path), FD_NONE,
 	    UIO_USERSPACE, 0));
 }
 
@@ -775,8 +779,8 @@ int
 linux_rename(struct thread *td, struct linux_rename_args *args)
 {
 
-	return (kern_renameat(td, AT_FDCWD, __USER_CAP_PATH(args->from), AT_FDCWD,
-	    __USER_CAP_PATH(args->to), UIO_USERSPACE));
+	return (kern_renameat(td, AT_FDCWD, LINUX_USER_CAP_PATH(args->from), AT_FDCWD,
+	    LINUX_USER_CAP_PATH(args->to), UIO_USERSPACE));
 }
 #endif
 
@@ -822,8 +826,8 @@ linux_renameat2(struct thread *td, struct linux_renameat2_args *args)
 
 	olddfd = (args->olddfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->olddfd;
 	newdfd = (args->newdfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->newdfd;
-	return (kern_renameat(td, olddfd, __USER_CAP_PATH(args->oldname), newdfd,
-	    __USER_CAP_PATH(args->newname), UIO_USERSPACE));
+	return (kern_renameat(td, olddfd, LINUX_USER_CAP_PATH(args->oldname), newdfd,
+	    LINUX_USER_CAP_PATH(args->newname), UIO_USERSPACE));
 }
 
 #ifdef LINUX_LEGACY_SYSCALLS
@@ -831,7 +835,7 @@ int
 linux_symlink(struct thread *td, struct linux_symlink_args *args)
 {
 
-	return (kern_symlinkat(td, __USER_CAP_PATH(args->path), AT_FDCWD, __USER_CAP_PATH(args->to),
+	return (kern_symlinkat(td, LINUX_USER_CAP_PATH(args->path), AT_FDCWD, LINUX_USER_CAP_PATH(args->to),
 	    UIO_USERSPACE));
 }
 #endif
@@ -842,7 +846,7 @@ linux_symlinkat(struct thread *td, struct linux_symlinkat_args *args)
 	int dfd;
 
 	dfd = (args->newdfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->newdfd;
-	return (kern_symlinkat(td, __USER_CAP_PATH(args->oldname), dfd, __USER_CAP_PATH(args->newname),
+	return (kern_symlinkat(td, LINUX_USER_CAP_PATH(args->oldname), dfd, LINUX_USER_CAP_PATH(args->newname),
 	    UIO_USERSPACE));
 }
 
@@ -854,8 +858,8 @@ linux_readlink(struct thread *td, struct linux_readlink_args *args)
 	if (args->count <= 0)
 		return (EINVAL);
 
-	return (kern_readlinkat(td, AT_FDCWD, __USER_CAP_PATH(args->name), UIO_USERSPACE,
-	    __USER_CAP(args->buf, args->count), UIO_USERSPACE, args->count));
+	return (kern_readlinkat(td, AT_FDCWD, LINUX_USER_CAP_PATH(args->name), UIO_USERSPACE,
+	    LINUX_USER_CAP(args->buf, args->count), UIO_USERSPACE, args->count));
 }
 #endif
 
@@ -868,15 +872,15 @@ linux_readlinkat(struct thread *td, struct linux_readlinkat_args *args)
 		return (EINVAL);
 
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
-	return (kern_readlinkat(td, dfd, __USER_CAP_PATH(args->path), UIO_USERSPACE,
-	    __USER_CAP(args->buf, args->bufsiz), UIO_USERSPACE, args->bufsiz));
+	return (kern_readlinkat(td, dfd, LINUX_USER_CAP_PATH(args->path), UIO_USERSPACE,
+	    LINUX_USER_CAP(args->buf, args->bufsiz), UIO_USERSPACE, args->bufsiz));
 }
 
 int
 linux_truncate(struct thread *td, struct linux_truncate_args *args)
 {
 
-	return (kern_truncate(td, __USER_CAP_PATH(args->path), UIO_USERSPACE, args->length));
+	return (kern_truncate(td, LINUX_USER_CAP_PATH(args->path), UIO_USERSPACE, args->length));
 }
 
 #if defined(__i386__) || (defined(__amd64__) && defined(COMPAT_LINUX32))
@@ -891,7 +895,7 @@ linux_truncate64(struct thread *td, struct linux_truncate64_args *args)
 	length = args->length;
 #endif
 
-	return (kern_truncate(td, __USER_CAP_PATH(args->path), UIO_USERSPACE, length));
+	return (kern_truncate(td, LINUX_USER_CAP_PATH(args->path), UIO_USERSPACE, length));
 }
 #endif /* __i386__ || (__amd64__ && COMPAT_LINUX32) */
 
@@ -923,7 +927,7 @@ int
 linux_link(struct thread *td, struct linux_link_args *args)
 {
 
-	return (kern_linkat(td, AT_FDCWD, AT_FDCWD, __USER_CAP_PATH(args->path), __USER_CAP_PATH(args->to),
+	return (kern_linkat(td, AT_FDCWD, AT_FDCWD, LINUX_USER_CAP_PATH(args->path), LINUX_USER_CAP_PATH(args->to),
 	    UIO_USERSPACE, AT_SYMLINK_FOLLOW));
 }
 #endif
@@ -942,8 +946,8 @@ linux_linkat(struct thread *td, struct linux_linkat_args *args)
 
 	olddfd = (args->olddfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->olddfd;
 	newdfd = (args->newdfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->newdfd;
-	return (kern_linkat(td, olddfd, newdfd, __USER_CAP_PATH(args->oldname),
-	    __USER_CAP_PATH(args->newname), UIO_USERSPACE, flag));
+	return (kern_linkat(td, olddfd, newdfd, LINUX_USER_CAP_PATH(args->oldname),
+	    LINUX_USER_CAP_PATH(args->newname), UIO_USERSPACE, flag));
 }
 
 int
@@ -989,7 +993,7 @@ linux_pread(struct thread *td, struct linux_pread_args *uap)
 	offset = uap->offset;
 #endif
 
-	error = kern_pread(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte), uap->nbyte, offset);
+	error = kern_pread(td, uap->fd, LINUX_USER_CAP(uap->buf, uap->nbyte), uap->nbyte, offset);
 	if (error == 0) {
 		/* This seems to violate POSIX but Linux does it. */
 		error = fgetvp(td, uap->fd, &cap_pread_rights, &vp);
@@ -1014,7 +1018,7 @@ linux_pwrite(struct thread *td, struct linux_pwrite_args *uap)
 #endif
 
 	return (linux_enobufs2eagain(td, uap->fd,
-	    kern_pwrite(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte), uap->nbyte, offset)));
+	    kern_pwrite(td, uap->fd, LINUX_USER_CAP(uap->buf, uap->nbyte), uap->nbyte, offset)));
 }
 
 #define HALF_LONG_BITS ((sizeof(l_long) * NBBY / 2))
@@ -1041,10 +1045,12 @@ linux_preadv(struct thread *td, struct linux_preadv_args *uap)
 	offset = pos_from_hilo(uap->pos_h, uap->pos_l);
 	if (offset < 0)
 		return (EINVAL);
-#ifdef COMPAT_LINUX32
+#if defined(COMPAT_LINUX32)
 	error = freebsd32_copyinuio(PTRIN(uap->vec), uap->vlen, &auio);
+#elif defined(COMPAT_LINUX64)
+	error = linux64_copyinuio(LINUX_USER_CAP_ARRAY(((struct l_iovec64*)uap->vec), uap->vlen), uap->vlen, &auio);
 #else
-	error = linux64_copyinuio(__USER_CAP_ARRAY(((struct l_iovec64*)uap->vec), uap->vlen), uap->vlen, &auio);
+	error = copyinuio((void * __capability)uap->vec, uap->vlen, &auio);
 #endif
 	if (error != 0)
 		return (error);
@@ -1068,10 +1074,12 @@ linux_pwritev(struct thread *td, struct linux_pwritev_args *uap)
 	offset = pos_from_hilo(uap->pos_h, uap->pos_l);
 	if (offset < 0)
 		return (EINVAL);
-#ifdef COMPAT_LINUX32
+#if defined(OMPAT_LINUX32)
 	error = freebsd32_copyinuio(PTRIN(uap->vec), uap->vlen, &auio);
+#elif defined(COMPAT_LINUX64)
+	error = linux64_copyinuio(LINUX_USER_CAP_ARRAY(((struct l_iovec64*)uap->vec), uap->vlen), uap->vlen, &auio);
 #else
-	error = linux64_copyinuio(__USER_CAP_ARRAY(((struct l_iovec64*)uap->vec), uap->vlen), uap->vlen, &auio);
+	error = copyinuio((void * __capability)uap->vec, uap->vlen, &auio);
 #endif
 	if (error != 0)
 		return (error);
@@ -1091,18 +1099,18 @@ linux_mount(struct thread *td, struct linux_mount_args *args)
 	mntonname = malloc(MNAMELEN, M_TEMP, M_WAITOK);
 	mntfromname = malloc(MNAMELEN, M_TEMP, M_WAITOK);
 	data = NULL;
-	error = copyinstr(__USER_CAP_STR(args->filesystemtype), fstypename, MNAMELEN - 1,
+	error = copyinstr(LINUX_USER_CAP_STR(args->filesystemtype), fstypename, MNAMELEN - 1,
 	    NULL);
 	if (error != 0)
 		goto out;
 	if (args->specialfile != NULL) {
-		error = copyinstr(__USER_CAP_STR(args->specialfile), mntfromname, MNAMELEN - 1, NULL);
+		error = copyinstr(LINUX_USER_CAP_STR(args->specialfile), mntfromname, MNAMELEN - 1, NULL);
 		if (error != 0)
 			goto out;
 	} else {
 		mntfromname[0] = '\0';
 	}
-	error = copyinstr(__USER_CAP_PATH(args->dir), mntonname, MNAMELEN - 1, NULL);
+	error = copyinstr(LINUX_USER_CAP_PATH(args->dir), mntonname, MNAMELEN - 1, NULL);
 	if (error != 0)
 		goto out;
 
@@ -1119,7 +1127,7 @@ linux_mount(struct thread *td, struct linux_mount_args *args)
 		strcpy(mntfromname, "/dev/fuse");
 		strcpy(fstypename, "fusefs");
 		data = malloc(MNAMELEN, M_TEMP, M_WAITOK);
-		error = copyinstr(__USER_CAP_STR(args->data), data, MNAMELEN - 1, NULL);
+		error = copyinstr(LINUX_USER_CAP_STR(args->data), data, MNAMELEN - 1, NULL);
 		if (error != 0)
 			goto out;
 
@@ -1170,7 +1178,7 @@ int
 linux_oldumount(struct thread *td, struct linux_oldumount_args *args)
 {
 
-	return (kern_unmount(td, __USER_CAP_PATH(args->path), 0));
+	return (kern_unmount(td, LINUX_USER_CAP_PATH(args->path), 0));
 }
 #endif /* __i386__ || (__amd64__ && COMPAT_LINUX32) */
 
@@ -1190,7 +1198,7 @@ linux_umount(struct thread *td, struct linux_umount_args *args)
 		return (EINVAL);
 	}
 
-	return (kern_unmount(td, __USER_CAP_PATH(args->path), flags));
+	return (kern_unmount(td, LINUX_USER_CAP_PATH(args->path), flags));
 }
 #endif
 
@@ -1381,7 +1389,7 @@ fcntl_common(struct thread *td, struct linux_fcntl_args *args)
 		return (kern_fcntl(td, args->fd, F_SETFL, arg));
 
 	case LINUX_F_GETLK:
-		error = copyin(__USER_CAP(args->arg, sizeof(linux_flock)), &linux_flock,
+		error = copyin(LINUX_USER_CAP(args->arg, sizeof(linux_flock)), &linux_flock,
 		    sizeof(linux_flock));
 		if (error)
 			return (error);
@@ -1390,11 +1398,11 @@ fcntl_common(struct thread *td, struct linux_fcntl_args *args)
 		if (error)
 			return (error);
 		bsd_to_linux_flock(&bsd_flock, &linux_flock);
-		return (copyout(&linux_flock, __USER_CAP(args->arg, sizeof(linux_flock)),
+		return (copyout(&linux_flock, LINUX_USER_CAP(args->arg, sizeof(linux_flock)),
 		    sizeof(linux_flock)));
 
 	case LINUX_F_SETLK:
-		error = copyin(__USER_CAP(args->arg, sizeof(linux_flock)), &linux_flock,
+		error = copyin(LINUX_USER_CAP(args->arg, sizeof(linux_flock)), &linux_flock,
 		    sizeof(linux_flock));
 		if (error)
 			return (error);
@@ -1403,7 +1411,7 @@ fcntl_common(struct thread *td, struct linux_fcntl_args *args)
 		    (intptr_t)&bsd_flock));
 
 	case LINUX_F_SETLKW:
-		error = copyin(__USER_CAP(args->arg, sizeof(linux_flock)), &linux_flock,
+		error = copyin(LINUX_USER_CAP(args->arg, sizeof(linux_flock)), &linux_flock,
 		    sizeof(linux_flock));
 		if (error)
 			return (error);
@@ -1488,7 +1496,7 @@ linux_fcntl64(struct thread *td, struct linux_fcntl64_args *args)
 
 	switch (args->cmd) {
 	case LINUX_F_GETLK64:
-		error = copyin(__USER_CAP(args->arg, sizeof(linux_flock)), &linux_flock,
+		error = copyin(LINUX_USER_CAP(args->arg, sizeof(linux_flock)), &linux_flock,
 		    sizeof(linux_flock));
 		if (error)
 			return (error);
@@ -1497,11 +1505,11 @@ linux_fcntl64(struct thread *td, struct linux_fcntl64_args *args)
 		if (error)
 			return (error);
 		bsd_to_linux_flock64(&bsd_flock, &linux_flock);
-		return (copyout(&linux_flock, __USER_CAP(args->arg, sizeof(linux_flock)),
+		return (copyout(&linux_flock, LINUX_USER_CAP(args->arg, sizeof(linux_flock)),
 			    sizeof(linux_flock)));
 
 	case LINUX_F_SETLK64:
-		error = copyin(__USER_CAP(args->arg, sizeof(linux_flock)), &linux_flock,
+		error = copyin(LINUX_USER_CAP(args->arg, sizeof(linux_flock)), &linux_flock,
 		    sizeof(linux_flock));
 		if (error)
 			return (error);
@@ -1510,7 +1518,7 @@ linux_fcntl64(struct thread *td, struct linux_fcntl64_args *args)
 		    (intptr_t)&bsd_flock));
 
 	case LINUX_F_SETLKW64:
-		error = copyin(__USER_CAP(args->arg, sizeof(linux_flock)), &linux_flock,
+		error = copyin(LINUX_USER_CAP(args->arg, sizeof(linux_flock)), &linux_flock,
 		    sizeof(linux_flock));
 		if (error)
 			return (error);
@@ -1531,7 +1539,7 @@ int
 linux_chown(struct thread *td, struct linux_chown_args *args)
 {
 
-	return (kern_fchownat(td, AT_FDCWD, __USER_CAP_PATH(args->path), UIO_USERSPACE,
+	return (kern_fchownat(td, AT_FDCWD, LINUX_USER_CAP_PATH(args->path), UIO_USERSPACE,
 	    args->uid, args->gid, 0));
 }
 #endif
@@ -1553,7 +1561,7 @@ linux_fchownat(struct thread *td, struct linux_fchownat_args *args)
 	    AT_EMPTY_PATH;
 
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD :  args->dfd;
-	return (kern_fchownat(td, dfd, __USER_CAP_PATH(args->filename),
+	return (kern_fchownat(td, dfd, LINUX_USER_CAP_PATH(args->filename),
 	    UIO_USERSPACE, args->uid, args->gid, flag));
 }
 
@@ -1562,7 +1570,7 @@ int
 linux_lchown(struct thread *td, struct linux_lchown_args *args)
 {
 
-	return (kern_fchownat(td, AT_FDCWD, __USER_CAP_PATH(args->path), UIO_USERSPACE, args->uid,
+	return (kern_fchownat(td, AT_FDCWD, LINUX_USER_CAP_PATH(args->path), UIO_USERSPACE, args->uid,
 	    args->gid, AT_SYMLINK_NOFOLLOW));
 }
 #endif
@@ -1639,7 +1647,7 @@ linux_pipe(struct thread *td, struct linux_pipe_args *args)
 	if (error != 0)
 		return (error);
 
-	error = copyout(fildes, __USER_CAP(args->pipefds, sizeof(fildes)), sizeof(fildes));
+	error = copyout(fildes, LINUX_USER_CAP(args->pipefds, sizeof(fildes)), sizeof(fildes));
 	if (error != 0) {
 		(void)kern_close(td, fildes[0]);
 		(void)kern_close(td, fildes[1]);
@@ -1667,7 +1675,7 @@ linux_pipe2(struct thread *td, struct linux_pipe2_args *args)
 	if (error != 0)
 		return (error);
 
-	error = copyout(fildes, __USER_CAP(args->pipefds, sizeof(fildes)), sizeof(fildes));
+	error = copyout(fildes, LINUX_USER_CAP(args->pipefds, sizeof(fildes)), sizeof(fildes));
 	if (error != 0) {
 		(void)kern_close(td, fildes[0]);
 		(void)kern_close(td, fildes[1]);
@@ -1737,13 +1745,13 @@ linux_copy_file_range(struct thread *td, struct linux_copy_file_range_args
 	flags = 0;
 	inoffp = outoffp = NULL;
 	if (args->off_in != NULL) {
-		error = copyin(__USER_CAP_OBJ(args->off_in), &inoff, sizeof(l_loff_t));
+		error = copyin(LINUX_USER_CAP_OBJ(args->off_in), &inoff, sizeof(l_loff_t));
 		if (error != 0)
 			return (error);
 		inoffp = &inoff;
 	}
 	if (args->off_out != NULL) {
-		error = copyin(__USER_CAP_OBJ(args->off_out), &outoff, sizeof(l_loff_t));
+		error = copyin(LINUX_USER_CAP_OBJ(args->off_out), &outoff, sizeof(l_loff_t));
 		if (error != 0)
 			return (error);
 		outoffp = &outoff;
@@ -1752,9 +1760,9 @@ linux_copy_file_range(struct thread *td, struct linux_copy_file_range_args
 	error = kern_copy_file_range(td, args->fd_in, inoffp, args->fd_out,
 	    outoffp, args->len, flags);
 	if (error == 0 && args->off_in != NULL)
-		error = copyout(inoffp, __USER_CAP_OBJ(args->off_in), sizeof(l_loff_t));
+		error = copyout(inoffp, LINUX_USER_CAP_OBJ(args->off_in), sizeof(l_loff_t));
 	if (error == 0 && args->off_out != NULL)
-		error = copyout(outoffp, __USER_CAP_OBJ(args->off_out), sizeof(l_loff_t));
+		error = copyout(outoffp, LINUX_USER_CAP_OBJ(args->off_out), sizeof(l_loff_t));
 	return (error);
 }
 
@@ -1772,7 +1780,7 @@ linux_memfd_create(struct thread *td, struct linux_memfd_create_args *args)
 	 * does keep the rest of this function fairly clean as they don't have
 	 * to worry about cleanup on the way out.
 	 */
-	error = copyinstr(__USER_CAP_STR(args->uname_ptr),
+	error = copyinstr(LINUX_USER_CAP_STR(args->uname_ptr),
 	    memfd_name + sizeof(LINUX_MEMFD_PREFIX) - 1,
 	    LINUX_NAME_MAX - sizeof(LINUX_MEMFD_PREFIX) - 1, NULL);
 	if (error != 0) {
@@ -1865,7 +1873,7 @@ linux_read(struct thread *td, struct linux_read_args *args)
 {
 	struct read_args bargs = {
 		.fd = args->fd,
-		.buf = __USER_CAP(args->buf, args->nbyte),
+		.buf = LINUX_USER_CAP(args->buf, args->nbyte),
 		.nbyte = args->nbyte,
 	};
 
@@ -1878,10 +1886,12 @@ linux_readv(struct thread *td, struct linux_readv_args *args)
 	struct uio *auio;
 	int error;
 
-#ifdef COMPAT_LINUX32
+#if defined(COMPAT_LINUX32)
 	error = freebsd32_copyinuio(PTRIN(args->iovp), args->iovcnt, &auio);
+#elif defined(COMPAT_LINUX64)
+	error = linux64_copyinuio(LINUX_USER_CAP_ARRAY(((struct l_iovec64*)args->iovp), args->iovcnt), args->iovcnt, &auio);
 #else
-	error = linux64_copyinuio(__USER_CAP_ARRAY(((struct l_iovec64*)args->iovp), args->iovcnt), args->iovcnt, &auio);
+	error = copyinuio((void * __capability)args->iovp, args->iovcnt, &auio);
 #endif
 	if (error != 0)
 		return (error);
@@ -1895,7 +1905,7 @@ linux_write(struct thread *td, struct linux_write_args *args)
 {
 	struct write_args bargs = {
 		.fd	= args->fd,
-		.buf	= __USER_CAP(args->buf, args->nbyte),
+		.buf	= LINUX_USER_CAP(args->buf, args->nbyte),
 		.nbyte	= args->nbyte,
 	};
 
@@ -1908,10 +1918,12 @@ linux_writev(struct thread *td, struct linux_writev_args *args)
 	struct uio *auio;
 	int error;
 
-#ifdef COMPAT_LINUX32
+#if defined(COMPAT_LINUX32)
 	error = freebsd32_copyinuio(PTRIN(args->iovp), args->iovcnt, &auio);
+#elif defined(COMPAT_LINUX64)
+	error = linux64_copyinuio(LINUX_USER_CAP_ARRAY(((struct l_iovec64*)args->iovp), args->iovcnt), args->iovcnt, &auio);
 #else
-	error = linux64_copyinuio(__USER_CAP_ARRAY(((struct l_iovec64*)args->iovp), args->iovcnt), args->iovcnt, &auio);
+	error = copyinuio((void * __capability)args->iovp, args->iovcnt, &auio);
 #endif
 	if (error != 0)
 		return (error);

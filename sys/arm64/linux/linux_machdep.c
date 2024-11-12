@@ -33,8 +33,13 @@
 
 #include <vm/vm_param.h>
 
+#ifdef COMPAT_LINUX64
+#include <arm64/linux64/linux.h>
+#include <arm64/linux64/linux64_proto.h>
+#else
 #include <arm64/linux/linux.h>
 #include <arm64/linux/linux_proto.h>
+#endif
 #include <compat/linux/linux_fork.h>
 #include <compat/linux/linux_misc.h>
 #include <compat/linux/linux_util.h>
@@ -167,7 +172,7 @@ linux64_copyinuio(struct l_iovec64 * __capability iovp, l_ulong iovcnt,
 	struct iovec *iov;
 	struct uio *uio;
 	int error, i;
-	
+
 	*uiop = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (EINVAL);

@@ -1,11 +1,17 @@
+.include "${SYSDIR}/conf/kern.opts.mk"
 
-.PATH: ${SRCTOP}/sys/compat/linux ${SRCTOP}/sys/${MACHINE}/linux
+.if ${MACHINE_CPU:Mcheri}
+SFX=	64
+CFLAGS+=	-DCOMPAT_FREEBSD64 -DCOMPAT_LINUX64
+.endif
+
+.PATH: ${SRCTOP}/sys/compat/linux ${SRCTOP}/sys/${MACHINE}/linux${SFX}
 .if ${MACHINE_CPUARCH} == "amd64"
 .PATH: ${SRCTOP}/sys/x86/linux
 .endif
 
 KMOD=	linux64
-SRCS=	linux_dummy_machdep.c \
+SRCS=	linux${SFX}_dummy_machdep.c \
 	linux_elf64.c \
 	linux_event.c \
 	linux_file.c \
@@ -14,17 +20,17 @@ SRCS=	linux_dummy_machdep.c \
 	linux_getcwd.c \
 	linux_ioctl.c \
 	linux_ipc.c \
-	linux_machdep.c \
+	linux${SFX}_machdep.c \
 	linux_misc.c \
 	linux_ptrace.c \
 	linux_rseq.c \
 	linux_signal.c \
 	linux_socket.c \
 	linux_stats.c \
-	linux_syscalls.c \
+	linux${SFX}_syscalls.c \
 	linux_sysctl.c \
-	linux_sysent.c \
-	linux_sysvec.c \
+	linux${SFX}_sysent.c \
+	linux${SFX}_sysvec.c \
 	linux_time.c \
 	linux_vdso.c \
 	linux_timer.c \
@@ -35,22 +41,22 @@ SRCS=	linux_dummy_machdep.c \
 	bus_if.h \
 	device_if.h \
 	vnode_if.h \
-	linux_support.S \
+	linux${SFX}_support.S \
 	linux_vdso_inc.S
 .if ${MACHINE_CPUARCH} == "amd64"
 SRCS+=	linux_dummy_x86.c
 .endif
-DPSRCS=	assym.inc linux_genassym.c
+DPSRCS=	assym.inc linux${SFX}_genassym.c
 
 # XXX: for assym.inc
 SRCS+=  opt_kstack_pages.h opt_nfs.h opt_hwpmc_hooks.h
 
-CLEANFILES=	linux_assym.h linux_genassym.o linux_locore.o \
-		genassym.o linux_vdso_gtod.o linux_vdso.so.o
+CLEANFILES=	linux${SFX}_assym.h linux${SFX}_genassym.o linux${SFX}_locore.o \
+		genassym.o linux${SFX}_vdso_gtod.o linux${SFX}_vdso.so.o
 
 
-linux_assym.h: linux_genassym.o
-	sh ${SYSDIR}/kern/genassym.sh linux_genassym.o > ${.TARGET}
+linux${SFX}_assym.h: linux${SFX}_genassym.o
+	sh ${SYSDIR}/kern/genassym.sh linux${SFX}_genassym.o > ${.TARGET}
 
 .if ${MACHINE_CPUARCH} == "amd64"
 VDSOFLAGS=-mcmodel=small -msoft-float
@@ -61,7 +67,7 @@ VDSODEPS=linux_vdso_gettc_x86.inc
 VDSOFLAGS=-mgeneral-regs-only -mcmodel=small -ffixed-x18
 .endif
 
-linux_locore.o: linux_assym.h assym.inc
+linux${SFX}_locore.o: linux${SFX}_assym.h assym.inc
 	${CC} -c -x assembler-with-cpp -DLOCORE \
 	-fPIC -pipe -O2 -Werror ${VDSOFLAGS} \
 	-nostdinc -fasynchronous-unwind-tables \
@@ -69,27 +75,27 @@ linux_locore.o: linux_assym.h assym.inc
 	-fno-stack-protector -I. -I${SYSDIR} -I${SRCTOP}/include \
 	    ${.IMPSRC} -o ${.TARGET}
 
-linux_vdso_gtod.o: linux_vdso_gtod.inc ${VDSODEPS}
+linux${SFX}_vdso_gtod.o: linux${SFX}_vdso_gtod.inc ${VDSODEPS}
 	${CC} -c -fPIC -pipe -O2 -Werror ${VDSOFLAGS} \
 	-nostdinc -fasynchronous-unwind-tables \
 	-fno-omit-frame-pointer -foptimize-sibling-calls \
 	-fno-stack-protector -I. -I${SYSDIR} -I${SRCTOP}/include \
 	    ${.IMPSRC} -o ${.TARGET}
 
-linux_vdso.so.o: linux_locore.o linux_vdso_gtod.o
-	${LD} --shared --eh-frame-hdr -soname=linux-vdso.so.1 \
+linux${SFX}_vdso.so.o: linux${SFX}_locore.o linux${SFX}_vdso_gtod.o
+	${LD} --shared --eh-frame-hdr -soname=linux${SFX}-vdso.so.1 \
 	--no-undefined --hash-style=both -warn-common -nostdlib \
 	--strip-debug -s --build-id=sha1 -Bsymbolic \
-	-T${SRCTOP}/sys/${MACHINE}/linux/linux_vdso.lds.s \
+	-T${SRCTOP}/sys/${MACHINE}/linux${SFX}/linux${SFX}_vdso.lds.s \
 	-o ${.TARGET} ${.ALLSRC:M*.o}
 
-linux_vdso_inc.o: linux_vdso.so.o
+linux${SFX}_vdso_inc.o: linux${SFX}_vdso.so.o
 
-linux_support.o: linux_support.S assym.inc linux_assym.h
+linux${SFX}_support.o: linux${SFX}_support.S assym.inc linux${SFX}_assym.h
 	${CC} -c -x assembler-with-cpp -DLOCORE ${CFLAGS} \
 	    ${.ALLSRC:M*.S:u} -o ${.TARGET}
 
-linux_genassym.o: offset.inc
+linux${SFX}_genassym.o: offset.inc
 	${CC} -c ${CFLAGS:N-flto*:N-fno-common:N-fsanitize*:N-fno-sanitize*} \
 	    -fcommon ${.IMPSRC}
 

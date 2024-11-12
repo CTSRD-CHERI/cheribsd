@@ -56,13 +56,16 @@
 
 #include <machine/elf.h>
 
-#ifdef COMPAT_LINUX32
+#if defined(COMPAT_LINUX32)
 #define linux_pt_regset linux_pt_regset32
 #define bsd_to_linux_regset bsd_to_linux_regset32
 #include <machine/../linux32/linux.h>
+#elif defined(COMPAT_LINUX64)
+#include <machine/../linux64/linux.h>
 #else
 #include <machine/../linux/linux.h>
 #endif
+
 #include <compat/linux/linux_elf.h>
 #include <compat/linux/linux_mib.h>
 #include <compat/linux/linux_misc.h>

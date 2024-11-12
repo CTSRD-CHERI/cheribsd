@@ -38,8 +38,13 @@
 #include <machine/atomic.h>
 #include <machine/stdarg.h>
 
+#ifdef COMPAT_LINUX64
+#include <arm64/linux64/linux.h>
+#include <arm64/linux64/linux64_proto.h>
+#else
 #include <arm64/linux/linux.h>
-#include <arm64/linux/linux_syscall.h>
+#include <arm64/linux/linux_proto.h>
+#endif
 #include <compat/linux/linux_errno.h>
 #include <compat/linux/linux_time.h>
 
