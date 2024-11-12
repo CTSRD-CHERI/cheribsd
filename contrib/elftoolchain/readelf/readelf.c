@@ -711,6 +711,7 @@ phdr_type(unsigned int mach, unsigned int ptype)
 	case PT_SHLIB: return "SHLIB";
 	case PT_PHDR: return "PHDR";
 	case PT_TLS: return "TLS";
+	case PT_CHERI_PCC: return "CHERI_PCC";
 	case PT_GNU_EH_FRAME: return "GNU_EH_FRAME";
 	case PT_GNU_STACK: return "GNU_STACK";
 	case PT_GNU_RELRO: return "GNU_RELRO";
