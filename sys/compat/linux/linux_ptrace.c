@@ -300,7 +300,11 @@ linux_ptrace_getregset_prstatus(struct thread *td, pid_t pid, void * __capabilit
 {
 	struct reg b_reg;
 	struct linux_pt_regset l_regset;
+#ifdef COMPAT_LINUX64
 	struct l_iovec64 iov;
+#else
+	struct iovec iov;
+#endif
 	size_t len;
 	int error;
 
