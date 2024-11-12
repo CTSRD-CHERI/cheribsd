@@ -370,7 +370,7 @@ leave1:
  */
 
 static int
-linux_epoll_wait_ts(struct thread *td, int epfd, struct epoll_event *events,
+linux_epoll_wait_ts(struct thread *td, int epfd, struct epoll_event * __capability events,
     int maxevents, struct timespec *tsp, sigset_t *uset)
 {
 	struct epoll_copyout_args coargs;
@@ -407,7 +407,7 @@ linux_epoll_wait_ts(struct thread *td, int epfd, struct epoll_event *events,
 		ast_sched(td, TDA_SIGSUSPEND);
 	}
 
-	coargs.leventlist = LINUX_USER_CAP(events, sizeof(struct epoll_event) * maxevents);
+	coargs.leventlist = events;
 	coargs.p = td->td_proc;
 	coargs.count = 0;
 	coargs.error = 0;
@@ -432,7 +432,7 @@ leave:
 }
 
 static int
-linux_epoll_wait_common(struct thread *td, int epfd, struct epoll_event *events,
+linux_epoll_wait_common(struct thread *td, int epfd, struct epoll_event * __capability events,
     int maxevents, int timeout, sigset_t *uset)
 {
 	struct timespec ts, *tsp;
@@ -459,7 +459,7 @@ int
 linux_epoll_wait(struct thread *td, struct linux_epoll_wait_args *args)
 {
 
-	return (linux_epoll_wait_common(td, args->epfd, args->events,
+	return (linux_epoll_wait_common(td, args->epfd, LINUX_USER_CAP_ARRAY(args->events, args->maxevents),
 	    args->maxevents, args->timeout, NULL));
 }
 #endif
@@ -470,12 +470,12 @@ linux_epoll_pwait(struct thread *td, struct linux_epoll_pwait_args *args)
 	sigset_t mask, *pmask;
 	int error;
 
-	error = linux_copyin_sigset(td, args->mask, sizeof(l_sigset_t),
+	error = linux_copyin_sigset(td, LINUX_USER_CAP_OBJ(args->mask), sizeof(l_sigset_t),
 	    &mask, &pmask);
 	if (error != 0)
 		return (error);
 
-	return (linux_epoll_wait_common(td, args->epfd, args->events,
+	return (linux_epoll_wait_common(td, args->epfd, LINUX_USER_CAP_ARRAY(args->events, args->maxevents),
 	    args->maxevents, args->timeout, pmask));
 }
 
@@ -511,7 +511,7 @@ linux_epoll_pwait2(struct thread *td, struct linux_epoll_pwait2_args *args)
 	sigset_t mask, *pmask;
 	int error;
 
-	error = linux_copyin_sigset(td, args->mask, sizeof(l_sigset_t),
+	error = linux_copyin_sigset(td, LINUX_USER_CAP_OBJ(args->mask), sizeof(l_sigset_t),
 	    &mask, &pmask);
 	if (error != 0)
 		return (error);
@@ -524,7 +524,7 @@ linux_epoll_pwait2(struct thread *td, struct linux_epoll_pwait2_args *args)
 	} else
 		tsa = NULL;
 
-	return (linux_epoll_wait_ts(td, args->epfd, args->events,
+	return (linux_epoll_wait_ts(td, args->epfd, LINUX_USER_CAP_ARRAY(args->events, args->maxevents),
 	    args->maxevents, tsa, pmask));
 }
 #endif /* __i386__ || (__amd64__ && COMPAT_LINUX32) */

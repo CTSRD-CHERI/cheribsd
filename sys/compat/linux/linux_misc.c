@@ -129,7 +129,7 @@ static int	linux_common_pselect6(struct thread *, l_int,
 			l_fd_set *, l_fd_set *, l_fd_set *,
 			struct timespec *, l_uintptr_t *);
 static int	linux_common_ppoll(struct thread *, struct pollfd *,
-			uint32_t, struct timespec *, l_sigset_t *,
+			uint32_t, struct timespec *, l_sigset_t * __capability,
 			l_size_t);
 static int	linux_pollin(struct thread *, struct pollfd *,
 			struct pollfd *, u_int);
@@ -2197,7 +2197,7 @@ linux_common_pselect6(struct thread *td, l_int nfds, l_fd_set *readfds,
 		error = copyin(LINUX_USER_CAP(sig, sizeof(lpse6)), &lpse6, sizeof(lpse6));
 		if (error != 0)
 			return (error);
-		error = linux_copyin_sigset(td, PTRIN(lpse6.ss),
+		error = linux_copyin_sigset(td, LINUX_USER_CAP(lpse6.ss, lpse6.ss_len),
 		    lpse6.ss_len, &ss, &ssp);
 		if (error != 0)
 		    return (error);
@@ -2279,7 +2279,7 @@ linux_ppoll(struct thread *td, struct linux_ppoll_args *args)
 		tsp = NULL;
 
 	error = linux_common_ppoll(td, args->fds, args->nfds, tsp,
-	    args->sset, args->ssize);
+	    LINUX_USER_CAP(args->sset, args->ssize), args->ssize);
 	if (error == 0 && args->tsp != NULL)
 		error = linux_put_timespec(&uts, args->tsp);
 	return (error);
@@ -2287,7 +2287,7 @@ linux_ppoll(struct thread *td, struct linux_ppoll_args *args)
 
 static int
 linux_common_ppoll(struct thread *td, struct pollfd *fds, uint32_t nfds,
-    struct timespec *tsp, l_sigset_t *sset, l_size_t ssize)
+    struct timespec *tsp, l_sigset_t * __capability sset, l_size_t ssize)
 {
 	struct timespec ts0, ts1;
 	struct pollfd stackfds[32];
