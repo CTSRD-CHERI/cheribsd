@@ -537,7 +537,7 @@ typedef struct {
 #define	PT_C18N_NAME	0x64331380	/* Sub-object compartment. */
 #define	PT_CHERI_PCC	0x64348450	/* CHERI PCC bounds. */
 #define	PT_COMPARTMENT	0x64331380	/* Sub-object compartment. */
-#define	PT_CHERI_BOUNDS	0x64348450	/* CHERI PCC bounds. */
+#define	PT_CHERI_PCC	0x64348450	/* CHERI PCC bounds. */
 #define	PT_SUNW_UNWIND	0x6464e550	/* amd64 UNWIND program header */
 #define	PT_GNU_EH_FRAME	0x6474e550
 #define	PT_GNU_STACK	0x6474e551
