@@ -617,7 +617,7 @@ linux_access(struct thread *td, struct linux_access_args *args)
 #endif
 
 static int
-linux_do_accessat(struct thread *td, int ldfd, const char *filename,
+linux_do_accessat(struct thread *td, int ldfd, const char * __capability filename,
     int amode, int flags)
 {
 	int dfd;
@@ -627,7 +627,7 @@ linux_do_accessat(struct thread *td, int ldfd, const char *filename,
 		return (EINVAL);
 
 	dfd = (ldfd == LINUX_AT_FDCWD) ? AT_FDCWD : ldfd;
-	return (kern_accessat(td, dfd, LINUX_USER_CAP_PATH(filename),
+	return (kern_accessat(td, dfd, filename,
 	    UIO_USERSPACE, flags, amode));
 }
 
