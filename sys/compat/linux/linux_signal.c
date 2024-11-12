@@ -69,7 +69,7 @@ static int	linux_tdsignal(struct thread *td, lwpid_t tid,
 		    int tgid, int sig);
 static void	sicode_to_lsicode(int sig, int si_code, int *lsi_code);
 static int	linux_common_rt_sigtimedwait(struct thread *,
-		    l_sigset_t *, struct timespec *, l_siginfo_t *,
+		    l_sigset_t * __capability, struct timespec *, l_siginfo_t * __capability,
 		    l_size_t);
 
 static void
@@ -354,7 +354,7 @@ linux_rt_sigprocmask(struct thread *td, struct linux_rt_sigprocmask_args *args)
 	sigset_t set, *pset;
 	int error;
 
-	error = linux_copyin_sigset(td, args->mask, args->sigsetsize,
+	error = linux_copyin_sigset(td, LINUX_USER_CAP(args->mask, args->sigsetsize), args->sigsetsize,
 	    &set, &pset);
 	if (error != 0)
 		return (EINVAL);
@@ -480,13 +480,13 @@ linux_rt_sigtimedwait(struct thread *td,
 	} else
 		tsa = NULL;
 
-	return (linux_common_rt_sigtimedwait(td, args->mask, tsa,
-	    args->ptr, args->sigsetsize));
+	return (linux_common_rt_sigtimedwait(td, LINUX_USER_CAP_OBJ(args->mask), tsa,
+	    LINUX_USER_CAP_OBJ(args->ptr), args->sigsetsize));
 }
 
 static int
-linux_common_rt_sigtimedwait(struct thread *td, l_sigset_t *mask,
-    struct timespec *tsa, l_siginfo_t *ptr, l_size_t sigsetsize)
+linux_common_rt_sigtimedwait(struct thread *td, l_sigset_t * __capability mask,
+    struct timespec *tsa, l_siginfo_t * __capability ptr, l_size_t sigsetsize)
 {
 	int error, sig;
 	sigset_t bset;
@@ -507,7 +507,7 @@ linux_common_rt_sigtimedwait(struct thread *td, l_sigset_t *mask,
 	if (ptr) {
 		memset(&lsi, 0, sizeof(lsi));
 		siginfo_to_lsiginfo(&ksi.ksi_info, &lsi, sig);
-		error = copyout(&lsi, LINUX_USER_CAP_OBJ(ptr), sizeof(lsi));
+		error = copyout(&lsi, ptr, sizeof(lsi));
 	}
 	if (error == 0)
 		td->td_retval[0] = sig;
@@ -869,7 +869,7 @@ linux_rt_sigsuspend(struct thread *td, struct linux_rt_sigsuspend_args *uap)
 	sigset_t sigmask;
 	int error;
 
-	error = linux_copyin_sigset(td, uap->newset, uap->sigsetsize,
+	error = linux_copyin_sigset(td, LINUX_USER_CAP(uap->newset, uap->sigsetsize), uap->sigsetsize,
 	    &sigmask, NULL);
 	if (error != 0)
 		return (error);
@@ -959,7 +959,7 @@ linux_psignal(struct thread *td, int pid, int sig)
 }
 
 int
-linux_copyin_sigset(struct thread *td, l_sigset_t *lset,
+linux_copyin_sigset(struct thread *td, l_sigset_t * __capability lset,
     l_size_t sigsetsize, sigset_t *set, sigset_t **pset)
 {
 	l_sigset_t lmask;
@@ -968,7 +968,7 @@ linux_copyin_sigset(struct thread *td, l_sigset_t *lset,
 	if (sigsetsize != sizeof(l_sigset_t))
 		return (EINVAL);
 	if (lset != NULL) {
-		error = copyin(LINUX_USER_CAP_OBJ(lset), &lmask, sizeof(lmask));
+		error = copyin(lset, &lmask, sizeof(lmask));
 		if (error != 0)
 			return (error);
 		linux_to_bsd_sigset(&lmask, set);
