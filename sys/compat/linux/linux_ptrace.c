@@ -365,7 +365,7 @@ linux_ptrace_getregset(struct thread *td, pid_t pid, l_uintptr_t addr, void * __
 		return (EINVAL);
 	default:
 		linux_msg(td, "PTRACE_GETREGSET request %#lx not implemented; "
-		    "returning EINVAL", addr);
+		    "returning EINVAL", (unsigned long)addr);
 		return (EINVAL);
 	}
 }
