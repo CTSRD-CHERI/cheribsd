@@ -4,7 +4,7 @@
  * DO NOT EDIT-- this file is automatically @generated.
  */
 
-const char *linux_syscallnames[] = {
+const char *linux64_syscallnames[] = {
 	"#0",			/* 0 = linux_io_setup */
 	"#1",			/* 1 = linux_io_destroy */
 	"#2",			/* 2 = linux_io_submit */

@@ -13,7 +13,7 @@
 #define AS(name) (sizeof(struct name) / sizeof(syscallarg_t))
 
 /* The casts are bogus but will do for now. */
-struct sysent linux_sysent[] = {
+struct sysent linux64_sysent[] = {
 	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 0 = linux_io_setup */
 	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 1 = linux_io_destroy */
 	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 2 = linux_io_submit */
