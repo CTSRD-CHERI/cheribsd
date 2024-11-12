@@ -635,7 +635,7 @@ int
 linux_faccessat(struct thread *td, struct linux_faccessat_args *args)
 {
 
-	return (linux_do_accessat(td, args->dfd, LINUX_USER_CAP_PTH(args->filename), args->amode,
+	return (linux_do_accessat(td, args->dfd, LINUX_USER_CAP_PATH(args->filename), args->amode,
 	    0));
 }
 
