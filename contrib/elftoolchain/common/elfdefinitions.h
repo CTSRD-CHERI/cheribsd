@@ -965,6 +965,8 @@ _ELF_DEFINE_PT(PT_PHDR,             6,				\
 _ELF_DEFINE_PT(PT_TLS,              7, "thread local storage")	\
 _ELF_DEFINE_PT(PT_LOOS,             0x60000000UL,		\
 	"start of OS-specific range")				\
+_ELF_DEFINE_PT(PT_CHERI_PCC,        0x64348450UL,		\
+	"CHERI PCC bounds")					\
 _ELF_DEFINE_PT(PT_SUNW_UNWIND,      0x6464E550UL,		\
 	"Solaris/amd64 stack unwind tables")			\
 _ELF_DEFINE_PT(PT_GNU_EH_FRAME,     0x6474E550UL,		\
