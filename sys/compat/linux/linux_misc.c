@@ -126,15 +126,15 @@ static int	linux_utimensat_lts64_to_ts(struct l_timespec64 *,
 static int	linux_common_utimensat(struct thread *, int,
 			const char * __capability, struct timespec * __capability, int);
 static int	linux_common_pselect6(struct thread *, l_int,
-			l_fd_set *, l_fd_set *, l_fd_set *,
-			struct timespec *, l_uintptr_t *);
-static int	linux_common_ppoll(struct thread *, struct pollfd *,
+			l_fd_set * __capability, l_fd_set * __capability, l_fd_set * __capability,
+			struct timespec *, l_uintptr_t * __capability);
+static int	linux_common_ppoll(struct thread *, struct pollfd * __capability,
 			uint32_t, struct timespec *, l_sigset_t * __capability,
 			l_size_t);
 static int	linux_pollin(struct thread *, struct pollfd *,
-			struct pollfd *, u_int);
+			struct pollfd * __capability, u_int);
 static int	linux_pollout(struct thread *, struct pollfd *,
-			struct pollfd *, u_int);
+			struct pollfd * __capability, u_int);
 
 int
 linux_sysinfo(struct thread *td, struct linux_sysinfo_args *args)
@@ -345,28 +345,59 @@ linux_mremap(struct thread *td, struct linux_mremap_args *args)
 #define LINUX_MS_INVALIDATE  0x0002
 #define LINUX_MS_SYNC        0x0004
 
+// We include the capability-specific checks by calling sys_msync
+// instead of kern_msync directly when the supplied args are capabilities
+
 int
 linux_msync(struct thread *td, struct linux_msync_args *args)
 {
-
+#if defined(LINUX_COMPAT64) || defined(LINUX_COMPAT32)
 	return (kern_msync(td, args->addr, args->len,
 	    args->fl & ~LINUX_MS_SYNC));
+#else
+	struct msync_args bargs = {
+		.addr = args->addr,
+		.len = args->len,
+		.flags = args->fl & ~LINUX_MS_SYNC
+	};
+
+	return (sys_msync(td, &bargs));
+#endif
 }
 
 int
 linux_mlock(struct thread *td, struct linux_mlock_args *uap)
 {
-
+#if defined(LINUX_COMPAT64) || defined(LINUX_COMPAT32)
 	return (kern_mlock(td->td_proc, td->td_ucred,
 	    __DECONST(uintptr_t, uap->addr), uap->len));
+#else
+	struct mlock_args bargs = {
+		.addr = uap->addr,
+		.len = uap->len
+	};
+
+	return (sys_mlock(td, &bargs));
+#endif
 }
 
 int
 linux_munlock(struct thread *td, struct linux_munlock_args *uap)
 {
-
+#if defined(LINUX_COMPAT64) || defined(LINUX_COMPAT32)
 	return (kern_munlock(td, (uintptr_t)uap->addr, uap->len));
+#else
+	struct munlock_args bargs = {
+		.addr = uap->addr,
+		.len = uap->len
+	};
+
+	return (sys_munlock(td, &bargs));
+#endif
 }
+
+// We are ignoring capability-specific checks here
+// Maybe fix them in the future
 
 int
 linux_mprotect(struct thread *td, struct linux_mprotect_args *uap)
@@ -401,12 +432,19 @@ linux_mmap2(struct thread *td, struct linux_mmap2_args *uap)
 #endif
 }
 
-// May need to be changed if reused in PCuABI
 int
 linux_munmap(struct thread *td, struct linux_munmap_args *args)
 {
-
+#if defined(LINUX_COMPAT64) || defined(LINUX_COMPAT32)
 	return (kern_munmap(td, (uintptr_t)args->addr, args->len));
+#else
+	struct munmap_args bargs = {
+		.addr = uap->addr,
+		.len = uap->len
+	};
+
+	return (sys_munmap(td, &bargs));
+#endif
 }
 
 #ifdef LINUX_LEGACY_SYSCALLS
@@ -742,8 +780,8 @@ linux_futimesat(struct thread *td, struct linux_futimesat_args *args)
 #endif
 
 static int
-linux_common_wait(struct thread *td, idtype_t idtype, int id, int *statusp,
-    int options, void *rup, l_siginfo_t *infop)
+linux_common_wait(struct thread *td, idtype_t idtype, int id, int * __capability statusp,
+    int options, void * __capability rup, l_siginfo_t * __capability infop)
 {
 	l_siginfo_t lsi;
 	siginfo_t siginfo;
@@ -770,14 +808,14 @@ linux_common_wait(struct thread *td, idtype_t idtype, int id, int *statusp,
 		} else if (WIFCONTINUED(tmpstat)) {
 			tmpstat = 0xffff;
 		}
-		error = copyout(&tmpstat, LINUX_USER_CAP_OBJ(statusp), sizeof(int));
+		error = copyout(&tmpstat, statusp, sizeof(int));
 	}
 	if (error == 0 && rup != NULL)
-		error = linux_copyout_rusage(&wru.wru_self, LINUX_USER_CAP(rup, sizeof(struct rusage)));
+		error = linux_copyout_rusage(&wru.wru_self, rup);
 	if (error == 0 && infop != NULL && td->td_retval[0] != 0) {
 		sig = bsd_to_linux_signal(siginfo.si_signo);
 		siginfo_to_lsiginfo(&siginfo, &lsi, sig);
-		error = copyout(&lsi, LINUX_USER_CAP_OBJ(infop), sizeof(lsi));
+		error = copyout(&lsi, infop, sizeof(lsi));
 	}
 
 	return (error);
@@ -838,8 +876,8 @@ linux_wait4(struct thread *td, struct linux_wait4_args *args)
 		id = (id_t)args->pid;
 	}
 
-	return (linux_common_wait(td, idtype, id, args->status, options,
-	    args->rusage, NULL));
+	return (linux_common_wait(td, idtype, id, LINUX_USER_CAP_OBJ(args->status), options,
+	    LINUX_USER_CAP_OBJ(args->rusage), NULL));
 }
 
 int
@@ -885,7 +923,7 @@ linux_waitid(struct thread *td, struct linux_waitid_args *args)
 	}
 
 	error = linux_common_wait(td, idtype, id, NULL, options,
-	    args->rusage, args->info);
+	    LINUX_USER_CAP_OBJ(args->rusage), LINUX_USER_CAP_OBJ(args->info));
 	td->td_retval[0] = 0;
 
 	return (error);
@@ -2173,8 +2211,8 @@ linux_pselect6(struct thread *td, struct linux_pselect6_args *args)
 	} else
 		tsp = NULL;
 
-	error = linux_common_pselect6(td, args->nfds, args->readfds,
-	    args->writefds, args->exceptfds, tsp, args->sig);
+	error = linux_common_pselect6(td, args->nfds, LINUX_USER_CAP_OBJ(args->readfds),
+	    LINUX_USER_CAP_OBJ(args->writefds), LINUX_USER_CAP_OBJ(args->exceptfds), tsp, LINUX_USER_CAP(args->sig, sizeof(struct l_pselect6arg)));
 
 	if (args->tsp != NULL)
 		linux_put_timespec(&ts, args->tsp);
@@ -2182,9 +2220,9 @@ linux_pselect6(struct thread *td, struct linux_pselect6_args *args)
 }
 
 static int
-linux_common_pselect6(struct thread *td, l_int nfds, l_fd_set *readfds,
-    l_fd_set *writefds, l_fd_set *exceptfds, struct timespec *tsp,
-    l_uintptr_t *sig)
+linux_common_pselect6(struct thread *td, l_int nfds, l_fd_set * __capability readfds,
+    l_fd_set * __capability writefds, l_fd_set * __capability exceptfds, struct timespec *tsp,
+    l_uintptr_t * __capability sig)
 {
 	struct timeval utv, tv0, tv1, *tvp;
 	struct l_pselect6arg lpse6;
@@ -2194,7 +2232,7 @@ linux_common_pselect6(struct thread *td, l_int nfds, l_fd_set *readfds,
 
 	ssp = NULL;
 	if (sig != NULL) {
-		error = copyin(LINUX_USER_CAP(sig, sizeof(lpse6)), &lpse6, sizeof(lpse6));
+		error = copyin(sig, &lpse6, sizeof(lpse6));
 		if (error != 0)
 			return (error);
 		error = linux_copyin_sigset(td, LINUX_USER_CAP(lpse6.ss, lpse6.ss_len),
@@ -2218,9 +2256,9 @@ linux_common_pselect6(struct thread *td, l_int nfds, l_fd_set *readfds,
 	} else
 		tvp = NULL;
 
-	error = kern_pselect(td, nfds, LINUX_USER_CAP_UNBOUND(readfds),
-	    LINUX_USER_CAP_UNBOUND(writefds),
-	    LINUX_USER_CAP_UNBOUND(exceptfds), tvp, ssp, LINUX_NFDBITS);
+	error = kern_pselect(td, nfds, readfds,
+	    writefds,
+	    exceptfds, tvp, ssp, LINUX_NFDBITS);
 
 	if (tsp != NULL) {
 		/*
@@ -2278,7 +2316,7 @@ linux_ppoll(struct thread *td, struct linux_ppoll_args *args)
 	} else
 		tsp = NULL;
 
-	error = linux_common_ppoll(td, args->fds, args->nfds, tsp,
+	error = linux_common_ppoll(td, LINUX_USER_CAP_ARRAY(args->fds, args-nfds), args->nfds, tsp,
 	    LINUX_USER_CAP(args->sset, args->ssize), args->ssize);
 	if (error == 0 && args->tsp != NULL)
 		error = linux_put_timespec(&uts, args->tsp);
@@ -2286,7 +2324,7 @@ linux_ppoll(struct thread *td, struct linux_ppoll_args *args)
 }
 
 static int
-linux_common_ppoll(struct thread *td, struct pollfd *fds, uint32_t nfds,
+linux_common_ppoll(struct thread *td, struct pollfd * __capability fds, uint32_t nfds,
     struct timespec *tsp, l_sigset_t * __capability sset, l_size_t ssize)
 {
 	struct timespec ts0, ts1;
@@ -2359,12 +2397,12 @@ linux_ppoll_time64(struct thread *td, struct linux_ppoll_time64_args *args)
 #endif /* __i386__ || (__amd64__ && COMPAT_LINUX32) */
 
 static int
-linux_pollin(struct thread *td, struct pollfd *fds, struct pollfd *ufds, u_int nfd)
+linux_pollin(struct thread *td, struct pollfd *fds, struct pollfd * __capability ufds, u_int nfd)
 {
 	int error;
 	u_int i;
 
-	error = copyin(LINUX_USER_CAP_ARRAY(ufds, nfd), fds, nfd * sizeof(*fds));
+	error = copyin(ufds, fds, nfd * sizeof(*fds));
 	if (error != 0)
 		return (error);
 
@@ -2378,7 +2416,7 @@ linux_pollin(struct thread *td, struct pollfd *fds, struct pollfd *ufds, u_int n
 }
 
 static int
-linux_pollout(struct thread *td, struct pollfd *fds, struct pollfd *ufds, u_int nfd)
+linux_pollout(struct thread *td, struct pollfd *fds, struct pollfd * __capability ufds, u_int nfd)
 {
 	int error = 0;
 	u_int i, n = 0;
