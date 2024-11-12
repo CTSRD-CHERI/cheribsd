@@ -60,6 +60,7 @@
 #include <machine/../linux/linux_proto.h>
 #endif
 
+#include <compat/linux/linux.h>
 #include <compat/linux/linux_misc.h>
 #include <compat/linux/linux_util.h>
 #include <compat/linux/linux_file.h>
