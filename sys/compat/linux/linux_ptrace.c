@@ -36,8 +36,16 @@
 #include <sys/sx.h>
 #include <sys/syscallsubr.h>
 
+#if defined(COMPAT_LINUX32)
+#include <machine/../linux32/linux.h>
+#include <machine/../linux32/linux32_proto.h>
+#elif defined(COMPAT_LINUX64)
+#include <machine/../linux64/linux.h>
+#include <machine/../linux64/linux64_proto.h>
+#else
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
+#endif
 #include <compat/linux/linux_emul.h>
 #include <compat/linux/linux_errno.h>
 #include <compat/linux/linux_misc.h>
