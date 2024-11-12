@@ -65,9 +65,9 @@
 #include <compat/linux/linux_util.h>
 #include <compat/linux/linux_file.h>
 
-static int	linux_common_open(struct thread *, int, const char *, int, int,
+static int	linux_common_open(struct thread *, int, const char * __capability, int, int,
 		    enum uio_seg);
-static int	linux_do_accessat(struct thread *t, int, const char *, int, int);
+static int	linux_do_accessat(struct thread *t, int, const char * __capability, int, int);
 static int	linux_getdents_error(struct thread *, int, int);
 
 static struct bsd_to_linux_bitmap seal_bitmap[] = {
@@ -160,7 +160,7 @@ linux_common_openflags(int l_flags)
 }
 
 static int
-linux_common_open(struct thread *td, int dirfd, const char *path,
+linux_common_open(struct thread *td, int dirfd, const char * __capability path,
     int l_flags, int mode, enum uio_seg seg)
 {
 	struct proc *p = td->td_proc;
@@ -169,7 +169,7 @@ linux_common_open(struct thread *td, int dirfd, const char *path,
 	int bsd_flags, error;
 
 	bsd_flags = linux_common_openflags(l_flags);
-	error = kern_openat(td, dirfd, LINUX_USER_CAP_PATH(path), seg, bsd_flags, mode);
+	error = kern_openat(td, dirfd, path, seg, bsd_flags, mode);
 	if (error != 0) {
 		if (error == EMLINK)
 			error = ELOOP;
@@ -216,7 +216,7 @@ linux_openat(struct thread *td, struct linux_openat_args *args)
 	int dfd;
 
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
-	return (linux_common_open(td, dfd, args->filename, args->flags,
+	return (linux_common_open(td, dfd, LINUX_USER_CAP_PATH(args->filename), args->flags,
 	    args->mode, UIO_USERSPACE));
 }
 
@@ -225,7 +225,7 @@ int
 linux_open(struct thread *td, struct linux_open_args *args)
 {
 
-	return (linux_common_open(td, AT_FDCWD, args->path, args->flags,
+	return (linux_common_open(td, AT_FDCWD, LINUX_USER_CAP_PATH(args->path), args->flags,
 	    args->mode, UIO_USERSPACE));
 }
 #endif
@@ -635,7 +635,7 @@ int
 linux_faccessat(struct thread *td, struct linux_faccessat_args *args)
 {
 
-	return (linux_do_accessat(td, args->dfd, args->filename, args->amode,
+	return (linux_do_accessat(td, args->dfd, LINUX_USER_CAP_PTH(args->filename), args->amode,
 	    0));
 }
 
@@ -655,7 +655,7 @@ linux_faccessat2(struct thread *td, struct linux_faccessat2_args *args)
 	    AT_EACCESS;
 	flags |= (args->flags & LINUX_AT_EMPTY_PATH) == 0 ? 0 :
 	    AT_EMPTY_PATH;
-	return (linux_do_accessat(td, args->dfd, args->filename, args->amode,
+	return (linux_do_accessat(td, args->dfd, LINUX_USER_CAP_PATH(args->filename), args->amode,
 	    flags));
 }
 
