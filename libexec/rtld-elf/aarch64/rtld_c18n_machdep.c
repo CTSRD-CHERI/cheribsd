@@ -252,9 +252,12 @@ _rtld_safebox_code(void *target, struct func_sig sig)
 	}
 
 	if (sig.valid) {
+		const char *pcc;
+
+		pcc = pcc_cap(obj, (const char *)target - obj->relocbase);
 		asm ("chkssu	%0, %0, %1"
 		    : "+C" (target)
-		    : "C" (obj->text_rodata_cap)
+		    : "C" (pcc)
 		    : "cc");
 		target = cheri_seal(target,
 		    sealer_tramp + func_sig_to_otype(sig));

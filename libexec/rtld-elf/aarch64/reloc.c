@@ -147,7 +147,7 @@ init_pltgot(Plt_Entry *plt)
  */
 static uintcap_t
 init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
-    const void * __capability text_rodata_cap, Elf_Addr base_addr,
+    const void * __capability pcc_cap, Elf_Addr base_addr,
     Elf_Size addend)
 {
 	uintcap_t cap;
@@ -159,7 +159,7 @@ init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
 	perms = fragment[1] >> (8 * sizeof(*fragment) - 8);
 
 	cap = perms == MORELLO_FRAG_EXECUTABLE ?
-	    (uintcap_t)text_rodata_cap : (uintcap_t)data_cap;
+	    (uintcap_t)pcc_cap : (uintcap_t)data_cap;
 	cap = cheri_setaddress(cap, base_addr + address);
 	cap = cheri_clearperm(cap, CAP_RELOC_REMOVE_PERMS);
 
@@ -414,15 +414,11 @@ reloc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 	const Elf_Rela *rela;
 	const Elf_Sym *def, *sym;
 #ifdef __CHERI_PURE_CAPABILITY__
-	uintptr_t jump_slot_base;
+	const char *pcc;
 #endif
 	bool lazy;
 
 	relalim = (const Elf_Rela *)((const char *)plt->rela + plt->relasize);
-#ifdef __CHERI_PURE_CAPABILITY__
-	jump_slot_base = (uintptr_t)cheri_clearperm(obj->text_rodata_cap,
-	    FUNC_PTR_REMOVE_PERMS);
-#endif
 	for (rela = plt->rela; rela < relalim; rela++) {
 		uintptr_t *where, target;
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -469,13 +465,15 @@ reloc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 				 * the new ABI is old enough that we
 				 * can assume it is in use.
 				 */
+				pcc = pcc_cap(obj, fragment[0]);
+				pcc = cheri_clearperm(pcc,
+				    FUNC_PTR_REMOVE_PERMS);
 				if (fragment[1] == 0)
 					*where = cheri_sealentry(
-					    jump_slot_base + fragment[0]);
+					    (uintptr_t)pcc);
 				else
 					*where = init_cap_from_fragment(
-					    fragment, obj->relocbase,
-					    obj->text_rodata_cap,
+					    fragment, obj->relocbase, pcc,
 					    (Elf_Addr)(uintptr_t)obj->relocbase,
 					    rela->r_addend);
 #else
@@ -623,11 +621,10 @@ reloc_iresolve_one(Obj_Entry *obj, const Elf_Rela *rela,
 	 */
 	if ((fragment[0] == 0 && fragment[1] == 0) ||
 	    (Elf_Ssize)fragment[0] == rela->r_addend)
-		ptr = (uintptr_t)(obj->text_rodata_cap + (rela->r_addend -
-		    (obj->text_rodata_cap - obj->relocbase)));
+		ptr = (uintptr_t)pcc_cap(obj, rela->r_addend);
 	else
 		ptr = init_cap_from_fragment(fragment, obj->relocbase,
-		    obj->text_rodata_cap,
+		    pcc_cap(obj, fragment[0]),
 		    (Elf_Addr)(uintptr_t)obj->relocbase,
 		    rela->r_addend);
 #else
@@ -802,7 +799,6 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 	Elf_Addr *where, symval;
 #if __has_feature(capabilities)
 	void * __capability data_cap;
-	const void * __capability text_rodata_cap;
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -816,7 +812,6 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 
 #if __has_feature(capabilities)
 	data_cap = get_datasegment_cap(obj);
-	text_rodata_cap = get_codesegment_cap(obj);
 #endif
 
 	/*
@@ -907,7 +902,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		case R_MORELLO_RELATIVE:
 			*(uintcap_t *)(void *)where =
 			    init_cap_from_fragment(where, data_cap,
-				text_rodata_cap,
+				pcc_cap(obj, where[0]),
 				(Elf_Addr)(uintptr_t)obj->relocbase,
 				rela->r_addend);
 			break;

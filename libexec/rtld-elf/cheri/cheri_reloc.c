@@ -55,10 +55,9 @@ process___cap_relocs(Obj_Entry* obj)
 	    (struct capreloc *)(obj->cap_relocs + obj->cap_relocs_size);
 
 	char * __capability data_base = get_datasegment_cap(obj);
-	const char * __capability code_base = get_codesegment_cap(obj);
 
-	dbg("Processing %lu __cap_relocs for %s (code base = %#lp, data base = %#lp)\n",
-	    (end_relocs - start_relocs), obj->path, code_base, data_base);
+	dbg("Processing %lu __cap_relocs for %s (data base = %#lp)\n",
+	    (end_relocs - start_relocs), obj->path, data_base);
 
 	bool tight_pcc_bounds;
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -87,7 +86,7 @@ process___cap_relocs(Obj_Entry* obj)
 		if ((reloc->permissions & function_reloc_flag) ==
 		    function_reloc_flag) {
 			/* code pointer */
-			cap = (uintcap_t)code_base + reloc->object;
+			cap = (uintcap_t)pcc_cap(obj, reloc->object);
 			cap = cheri_clearperm(cap, FUNC_PTR_REMOVE_PERMS);
 
 			/*
@@ -98,7 +97,7 @@ process___cap_relocs(Obj_Entry* obj)
 		} else if ((reloc->permissions & constant_reloc_flag) ==
 		    constant_reloc_flag) {
 			 /* read-only data pointer */
-			cap = (uintcap_t)code_base + reloc->object;
+			cap = (uintcap_t)pcc_cap(obj, reloc->object);
 			cap = cheri_clearperm(cap, FUNC_PTR_REMOVE_PERMS);
 			cap = cheri_clearperm(cap, DATA_PTR_REMOVE_PERMS);
 		} else {

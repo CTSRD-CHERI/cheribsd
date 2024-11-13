@@ -230,6 +230,8 @@ typedef struct Struct_Obj_Entry {
      * relocbase and mapbase.
      */
     const char *text_rodata_cap;	/* Capability for the executable mapping */
+    const char **pcc_caps;
+    unsigned long npcc_caps;
 #endif
     caddr_t relocbase;		/* Relocation constant = mapbase - vaddrbase */
     const Elf_Dyn *dynamic;	/* Dynamic section */
@@ -508,6 +510,10 @@ extern Elf_Sym sym_zero;	/* For resolving undefined weak refs. */
 extern bool ld_bind_not;
 extern bool ld_fast_sigblock;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+bool create_pcc_caps(Obj_Entry *);
+const char *pcc_cap(const Obj_Entry *, Elf_Off);
+#endif
 void dump_relocations(Obj_Entry *);
 void dump_obj_relocations(Obj_Entry *);
 void dump_Elf_Rel(Obj_Entry *, const Elf_Rel *, u_long);
@@ -530,6 +536,7 @@ void dump_Elf_Rela(Obj_Entry *, const Elf_Rela *, u_long);
 	    cheri_setaddress(cheri_getdefault(),		\
 	        (ptraddr_t)(uintptr_t)obj->mapbase),		\
 	    obj->mapsize)
+#define	pcc_cap(obj, offset)	(get_codesegment_cap((obj)) + (offset))
 #endif
 
 __END_DECLS
