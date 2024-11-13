@@ -677,12 +677,13 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc,
 				CHERI_REVOKE_STATS_INC(crst, pages_skip_fast,
 				    (entry->end - addr) >> PAGE_SHIFT);
 				*ooff = lastoff;
-			} else {
+				return (VM_CHERI_REVOKE_AT_OK);
+			} else if (nextpindex != ipi) {
 				CHERI_REVOKE_STATS_INC(crst, pages_skip_fast,
 				    nextpindex - ipi);
 				*ooff = IDX_TO_OFF(nextpindex);
+				return (VM_CHERI_REVOKE_AT_OK);
 			}
-			return (VM_CHERI_REVOKE_AT_OK);
 		}
 
 		CHERI_REVOKE_STATS_BUMP(crst, pages_faulted_ro);
