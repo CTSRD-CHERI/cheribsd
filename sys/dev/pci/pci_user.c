@@ -1302,7 +1302,7 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 			 */
 			cio->status = PCI_GETCONF_ERROR;
 			error = EINVAL;
-                       goto getconfexit;
+			goto getconfexit;
 		}
 
 		/*
