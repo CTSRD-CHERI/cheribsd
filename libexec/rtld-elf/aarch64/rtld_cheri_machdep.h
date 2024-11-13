@@ -62,7 +62,7 @@ make_code_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
 {
 	const void * __capability ret;
 
-	ret = get_codesegment_cap(defobj) + def->st_value;
+	ret = pcc_cap(defobj, def->st_value);
 	/* Remove store and seal permissions */
 	ret = cheri_clearperm(ret, FUNC_PTR_REMOVE_PERMS);
 	if (tight_bounds) {

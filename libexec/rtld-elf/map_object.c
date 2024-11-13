@@ -353,14 +353,6 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     fix_obj_mapping_cap_permissions(obj, path);
 #endif
     obj->dynamic = (const Elf_Dyn *)(obj->relocbase + phdyn->p_vaddr);
-    if (hdr->e_entry != 0) {
-#ifdef __CHERI_PURE_CAPABILITY__
-	obj->entry = (const void*)(obj->text_rodata_cap + hdr->e_entry);
-	dbg("\tentry for %s: %-#p", path, obj->entry);
-#else
-	obj->entry = (const void*)(obj->relocbase + hdr->e_entry);
-#endif
-    }
     if (phdr_vaddr != 0) {
 	obj->phdr = (const Elf_Phdr *)(obj->relocbase + phdr_vaddr);
     } else {
@@ -385,9 +377,22 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	obj->tlsinitsize = phtls->p_filesz;
 	obj->tlsinit = mapbase + phtls->p_vaddr;
     }
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI_PURE_CAPABILITY__
+    if (!create_pcc_caps(obj)) {
+	obj_free(obj);
+	goto error1;
+    }
+#else
     obj->stack_flags = stack_flags;
 #endif
+    if (hdr->e_entry != 0) {
+#ifdef __CHERI_PURE_CAPABILITY__
+	obj->entry = (const void *)pcc_cap(obj, hdr->e_entry);
+	dbg("\tentry for %s: %-#p", path, obj->entry);
+#else
+	obj->entry = (const void *)(obj->relocbase + hdr->e_entry);
+#endif
+    }
     if (note_start < note_end)
 	digest_notes(obj, (const Elf_Note *)note_start, (const Elf_Note *)note_end);
     if (note_map != NULL)
@@ -546,6 +551,10 @@ obj_free(Obj_Entry *obj)
 	free(obj->priv);
     if (obj->path)
 	free(obj->path);
+#ifdef __CHERI_PURE_CAPABILITY__
+    if (obj->pcc_caps)
+	free(obj->pcc_caps);
+#endif
     if (obj->phdr_alloc)
 	free(__DECONST(void *, obj->phdr));
     free(obj);
