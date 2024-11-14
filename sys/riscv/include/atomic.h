@@ -231,6 +231,26 @@ atomic_readandclear_32(volatile uint32_t *p)
 	return (__atomic_exchange_n(p, 0, __ATOMIC_RELAXED));
 }
 
+static __inline int
+atomic_testandclear_32(volatile uint32_t *p, u_int val)
+{
+	uint32_t mask, old;
+
+	mask = (1u << (val & 31));
+	old = __atomic_fetch_and(p, ~mask, __ATOMIC_RELAXED);
+	return ((old & mask) != 0);
+}
+
+static __inline int
+atomic_testandset_32(volatile uint32_t *p, u_int val)
+{
+	uint32_t mask, old;
+
+	mask = (1u << (val & 31));
+	old = __atomic_fetch_or(p, mask, __ATOMIC_RELAXED);
+	return ((old & mask) != 0);
+}
+
 #define	atomic_add_int		atomic_add_32
 #define	atomic_clear_int	atomic_clear_32
 #define	atomic_cmpset_int	atomic_cmpset_32
@@ -311,6 +331,36 @@ atomic_swap_64(volatile uint64_t *p, uint64_t val)
 	return (__atomic_exchange_n(p, val, __ATOMIC_RELAXED));
 }
 
+static __inline int
+atomic_testandclear_64(volatile uint64_t *p, u_int val)
+{
+	uint64_t mask, old;
+
+	mask = (1ul << (val & 63));
+	old = __atomic_fetch_and(p, ~mask, __ATOMIC_RELAXED);
+	return ((old & mask) != 0);
+}
+
+static __inline int
+atomic_testandset_64(volatile uint64_t *p, u_int val)
+{
+	uint64_t mask, old;
+
+	mask = (1ul << (val & 63));
+	old = __atomic_fetch_or(p, mask, __ATOMIC_RELAXED);
+	return ((old & mask) != 0);
+}
+
+static __inline int
+atomic_testandset_acq_64(volatile uint64_t *p, u_int val)
+{
+	uint64_t mask, old;
+
+	mask = (1ul << (val & 63));
+	old = __atomic_fetch_or(p, mask, __ATOMIC_ACQUIRE);
+	return ((old & mask) != 0);
+}
+
 #ifdef __CHERI_PURE_CAPABILITY__
 static __inline uintptr_t
 atomic_swap_ptr(volatile uintptr_t *p, uintptr_t val)
@@ -331,6 +381,9 @@ atomic_swap_ptr(volatile uintptr_t *p, uintptr_t val)
 #define	atomic_set_long			atomic_set_64
 #define	atomic_subtract_long		atomic_subtract_64
 #define	atomic_swap_long		atomic_swap_64
+#define	atomic_testandclear_long	atomic_testandclear_64
+#define	atomic_testandset_long		atomic_testandset_64
+#define	atomic_testandset_acq_long	atomic_testandset_acq_64
 
 #ifndef __CHERI_PURE_CAPABILITY__
 #define	atomic_add_ptr			atomic_add_64
@@ -342,6 +395,8 @@ atomic_swap_ptr(volatile uintptr_t *p, uintptr_t val)
 #define	atomic_set_ptr			atomic_set_64
 #define	atomic_subtract_ptr		atomic_subtract_64
 #define	atomic_swap_ptr			atomic_swap_64
+#define	atomic_testandclear_ptr		atomic_testandclear_64
+#define	atomic_testandset_ptr		atomic_testandset_64
 #endif
 
 ATOMIC_ACQ_REL(set, 64)
@@ -458,6 +513,62 @@ atomic_readandclear_ptr(volatile uintptr_t *p)
 {
 
 	return (__atomic_exchange_n(p, 0, __ATOMIC_RELAXED));
+}
+
+static __inline int
+atomic_testandclear_ptr(volatile uintptr_t *p, u_int val)
+{
+	uintptr_t old;
+	ptraddr_t mask;
+
+	mask = ((ptraddr_t)1) << (val & 63);
+#ifdef notyet
+	old = __atomic_or_fetch(p, val, __ATOMIC_RELAXED);
+#else
+	uintptr_t temp1;
+	u_long temp2;
+
+	__asm __volatile(
+		"1:	clr.c	%1, %0\n"
+		"	cgetaddr %3, %1\n"
+		"	and	%3, %3, %4\n"
+		"	csetaddr %2, %1, %3\n"
+		"	csc.c	%3, %2, %0\n"
+		"	bnez	%3, 1b\n"
+		: "+A" (*p), "=&C" (old), "=&C" (temp1), "=&r" (temp2)
+		: "r" (~(ptraddr_t)mask)
+		: "memory");
+#endif
+
+	return ((old & mask) != 0);
+}
+
+static __inline int
+atomic_testandset_ptr(volatile uintptr_t *p, u_int val)
+{
+	uintptr_t old;
+	ptraddr_t mask;
+
+	mask = ((ptraddr_t)1) << (val & 63);
+#ifdef notyet
+	old = __atomic_or_fetch(p, val, __ATOMIC_RELAXED);
+#else
+	uintptr_t temp1;
+	u_long temp2;
+
+	__asm __volatile(
+		"1:	clr.c	%1, %0\n"
+		"	cgetaddr %3, %1\n"
+		"	or	%3, %3, %4\n"
+		"	csetaddr %2, %1, %3\n"
+		"	csc.c	%3, %2, %0\n"
+		"	bnez	%3, 1b\n"
+		: "+A" (*p), "=&C" (old), "=&C" (temp1), "=&r" (temp2)
+		: "r" ((ptraddr_t)mask)
+		: "memory");
+#endif
+
+	return ((old & mask) != 0);
 }
 
 ATOMIC_ACQ_REL(set, ptr);
