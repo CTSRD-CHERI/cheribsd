@@ -1,0 +1,5 @@
+include	"GENERIC-MORELLO-NODEBUG"
+
+ident	GENERIC-MORELLO-ZEROINIT-NODEBUG
+
+makeoptions 	INIT_ALL=zero
