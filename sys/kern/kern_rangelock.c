@@ -146,7 +146,7 @@ rangelock_unlock(struct rangelock *lock, void *cookie)
 
 	sleepq_lock(&lock->sleepers);
 #ifdef INVARIANTS
-	int r = atomic_testandset_long((uintptr_t *)&e->rl_q_next, 0);
+	int r = atomic_testandset_ptr((uintptr_t *)&e->rl_q_next, 0);
 	MPASS(r == 0);
 #else
 	atomic_set_ptr((uintptr_t *)&e->rl_q_next, 1);
