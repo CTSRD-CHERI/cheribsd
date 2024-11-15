@@ -1,5 +1,0 @@
-include GENERIC
-
-ident   GENERIC-DPCPU-FUNCS
-
-options 	DPCPU_FUNCS

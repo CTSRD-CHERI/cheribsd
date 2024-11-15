@@ -1037,6 +1037,6 @@ CHERI_COMPARTMENTALIZE_KERNEL	opt_global.h
 CPU_CHERI_NO_SYSCALL_AUTHORIZE opt_global.h
 
 #
-# Use functions instead of direct references for DPCPU variables.
+# Use functions instead of direct references for PCPU/DPCPU variables.
 #
-DPCPU_FUNCS opt_global.h
+PCPU_FUNCS opt_global.h

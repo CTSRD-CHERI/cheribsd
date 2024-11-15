@@ -94,7 +94,7 @@ extern uintptr_t dpcpu_off[];
  * the bias is 0 as the base pointer would be unrepresentable
  * otherwise.
  */
-#ifdef DPCPU_FUNCS
+#ifdef PCPU_FUNCS
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	DPCPU_BIAS	0
 #define	__DPCPU_PTR(b, t, n)						\
@@ -106,7 +106,7 @@ extern uintptr_t dpcpu_off[];
 #define	__DPCPU_PTR(b, t, n)						\
     (t *)((b) + (uintptr_t)&DPCPU_NAME(n))
 #endif /* __CHERI_PURE_CAPABILITY__ */
-#else /* DPCPU_FUNCS */
+#else /* PCPU_FUNCS */
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	DPCPU_BIAS	0
 #define	_DPCPU_PTR(b, n)						\
@@ -120,12 +120,12 @@ extern uintptr_t dpcpu_off[];
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #define	_DPCPU_GET(b, n)	(*_DPCPU_PTR(b, n))
 #define	_DPCPU_SET(b, n, v)	(*_DPCPU_PTR(b, n) = v)
-#endif /* !DPCPU_FUNCS */
+#endif /* !PCPU_FUNCS */
 
 /*
  * Declaration and definition.
  */
-#ifdef DPCPU_FUNCS
+#ifdef PCPU_FUNCS
 #define	__DPCPU_DEFINE_PTR(qual, t, n)					\
 	qual t *							\
 	__dpcpu_ptr_##n(uintptr_t dynamic)				\
@@ -167,9 +167,9 @@ extern uintptr_t dpcpu_off[];
 #define	DPCPU_DEFINE_ARRAY(t, n, exp)	\
     struct _hack; t DPCPU_NAME(n) exp __section(DPCPU_SETNAME) __used
 #define	DPCPU_DEFINE_ARRAY2(t, n, exp)	DPCPU_DEFINE_ARRAY(t, n, exp)
-#endif /* !DPCPU_FUNCS */
+#endif /* !PCPU_FUNCS */
 
-#ifdef DPCPU_FUNCS
+#ifdef PCPU_FUNCS
 #define	DPCPU_DEFINE_STATIC(t, n)	\
 	t DPCPU_NAME(n) __section(DPCPU_SETNAME) __used;		\
 	__DPCPU_DEFINE_PTR(static __used, t, n);			\
@@ -180,7 +180,7 @@ extern uintptr_t dpcpu_off[];
 #define	DPCPU_DEFINE_STATIC_ARRAY2(t, n, exp)				\
 	t DPCPU_NAME(n) exp __section(DPCPU_SETNAME) __used;		\
 	__DPCPU_DEFINE_ARRAY_PTR2(static __used, t, n)
-#else /* DPCPU_FUNCS */
+#else /* PCPU_FUNCS */
 #if defined(KLD_MODULE) && (defined(__aarch64__) || defined(__riscv) \
 		|| defined(__powerpc64__) || defined(__i386__))
 /*
@@ -212,12 +212,12 @@ extern uintptr_t dpcpu_off[];
 #define	DPCPU_DEFINE_STATIC_ARRAY2(t, n, exp)	\
     DPCPU_DEFINE_STATIC_ARRAY(t, n, exp)
 #endif
-#endif /* !DPCPU_FUNCS */
+#endif /* !PCPU_FUNCS */
 
 /*
  * Accessors for the current cpu.
  */
-#ifdef DPCPU_FUNCS
+#ifdef PCPU_FUNCS
 #define	DPCPU_PTR(n)							\
 	__dpcpu_ptr_##n(PCPU_GET(dynamic))
 #define	DPCPU_ARRAY_PTR(n, ii)						\
@@ -239,7 +239,7 @@ extern uintptr_t dpcpu_off[];
 /*
  * Accessors for remote cpus.
  */
-#ifdef DPCPU_FUNCS
+#ifdef PCPU_FUNCS
 #define	DPCPU_ID_PTR(i, n)						\
 	__dpcpu_ptr_##n(dpcpu_off[(i)])
 #define	DPCPU_ID_ARRAY_PTR(i, n, ii)					\
