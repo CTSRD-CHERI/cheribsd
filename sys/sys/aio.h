@@ -97,7 +97,7 @@
 struct __aiocb_private {
 	long	status;
 	long	error;
-	void	* __kerncap kernelinfo;
+	void	* __kerncap spare;
 };
 
 /*
