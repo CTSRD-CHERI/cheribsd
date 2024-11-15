@@ -667,21 +667,19 @@ static __inline void							\
 atomic_##op##_##bar##ptr(volatile uintptr_t *p, uintptr_t val)		\
 {									\
 	uintptr_t previous;						\
-	ptraddr_t tmp1, tmp2;						\
+	ptraddr_t tmp;							\
 	int res;							\
 									\
 	__asm __volatile(						\
 		"1:"							\
 		"ld" #a "xr %0, [%4]\n"					\
 		"gcvalue %2, %0\n"					\
-		"gcvalue %3, %5\n"					\
 		"" #asm_op " %2, %2, %3\n"				\
 		"scvalue %0, %0, %2\n"					\
 		"st" #l "xr %w1, %0, [%4]\n"				\
 		"cbnz %w1, 1b"						\
-		: "=&C" (previous), "=&r" (res), "=&r" (tmp1),		\
-		"=&r" (tmp2)						\
-		: "C" (p), "C" (val)					\
+		: "=&C" (previous), "=&r" (res), "=&r" (tmp)		\
+		: "r" ((ptraddr_t)val), "C" (p)				\
 		: "memory", "cc");					\
 }
 
