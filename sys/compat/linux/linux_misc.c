@@ -348,10 +348,15 @@ linux_mremap(struct thread *td, struct linux_mremap_args *args)
 // We include the capability-specific checks by calling sys_msync
 // instead of kern_msync directly when the supplied args are capabilities
 
+// PCuABI should pass in capabilities
+// But current argument is still ulong
+// TODO: Fix this
+
 int
 linux_msync(struct thread *td, struct linux_msync_args *args)
 {
-#if defined(LINUX_COMPAT64) || defined(LINUX_COMPAT32)
+	// defined(LINUX_COMPAT64) || defined(LINUX_COMPAT32)
+#if 1
 	return (kern_msync(td, args->addr, args->len,
 	    args->fl & ~LINUX_MS_SYNC));
 #else
@@ -435,12 +440,13 @@ linux_mmap2(struct thread *td, struct linux_mmap2_args *uap)
 int
 linux_munmap(struct thread *td, struct linux_munmap_args *args)
 {
-#if defined(LINUX_COMPAT64) || defined(LINUX_COMPAT32)
+	// defined(LINUX_COMPAT64) || defined(LINUX_COMPAT32)
+#if 1
 	return (kern_munmap(td, (uintptr_t)args->addr, args->len));
 #else
 	struct munmap_args bargs = {
-		.addr = uap->addr,
-		.len = uap->len
+		.addr = args->addr,
+		.len = args->len
 	};
 
 	return (sys_munmap(td, &bargs));
@@ -2316,7 +2322,7 @@ linux_ppoll(struct thread *td, struct linux_ppoll_args *args)
 	} else
 		tsp = NULL;
 
-	error = linux_common_ppoll(td, LINUX_USER_CAP_ARRAY(args->fds, args-nfds), args->nfds, tsp,
+	error = linux_common_ppoll(td, LINUX_USER_CAP_ARRAY(args->fds, args->nfds), args->nfds, tsp,
 	    LINUX_USER_CAP(args->sset, args->ssize), args->ssize);
 	if (error == 0 && args->tsp != NULL)
 		error = linux_put_timespec(&uts, args->tsp);
