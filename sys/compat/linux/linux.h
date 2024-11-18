@@ -396,8 +396,10 @@ void linux_netlink_deregister(void);
 #endif
 #if defined(COMPAT_LINUX32) || defined(COMPAT_LINUX64)
 #define	__linuxcap
+typedef uintptr_t linuxcap_t;
 #else
 #define	__linuxcap	__capability
+typedef uintcap_t linuxcap_t;
 #endif
 
 #endif /* _LINUX_MI_H_ */
