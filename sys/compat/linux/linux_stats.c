@@ -141,7 +141,7 @@ linux_kern_lstat(struct thread *td, const char * __capability path,
 #endif
 
 static int
-newstat_copyout(struct stat *buf, void *ubuf)
+newstat_copyout(struct stat *buf, void * __capability ubuf)
 {
 	struct l_newstat tbuf;
 
@@ -163,7 +163,7 @@ newstat_copyout(struct stat *buf, void *ubuf)
 	tbuf.st_blksize = buf->st_blksize;
 	tbuf.st_blocks = buf->st_blocks;
 
-	return (copyout(&tbuf, LINUX_USER_CAP(ubuf, sizeof(tbuf)), sizeof(tbuf)));
+	return (copyout(&tbuf, ubuf, sizeof(tbuf)));
 }
 
 
@@ -203,7 +203,7 @@ linux_newfstat(struct thread *td, struct linux_newfstat_args *args)
 
 	error = linux_kern_fstat(td, args->fd, &buf);
 	if (!error)
-		error = newstat_copyout(&buf, args->buf);
+		error = newstat_copyout(&buf, LINUX_USER_CAP_OBJ(args->buf));
 
 	return (error);
 }
