@@ -1957,7 +1957,7 @@ linux_recvmsg(struct thread *td, struct linux_recvmsg_args *args)
 }
 
 static int
-linux_recvmmsg_common(struct thread *td, l_int s, struct l_mmsghdr *msg,
+linux_recvmmsg_common(struct thread *td, l_int s, struct l_mmsghdr * __capability msg,
     l_uint vlen, l_uint flags, struct timespec *tts)
 {
 	struct msghdr bsd_msg;
@@ -2024,7 +2024,7 @@ linux_recvmmsg(struct thread *td, struct linux_recvmmsg_args *args)
 	}
 		else ptts = NULL;
 
-	return (linux_recvmmsg_common(td, args->s, PTRIN(args->msg),
+	return (linux_recvmmsg_common(td, args->s, LINUX_USER_CAP_OBJ(args->msg),
 	    args->vlen, args->flags, ptts));
 }
 
