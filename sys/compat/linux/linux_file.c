@@ -487,7 +487,7 @@ linux_getdents64(struct thread *td, struct linux_getdents64_args *args)
 	struct dirent *bdp;
 	caddr_t inp, buf;		/* BSD-format */
 	int len, reclen;		/* BSD-format */
-	caddr_t outp;				/* Linux-format */
+	char * __capability outp;				/* Linux-format */
 	int resid, linuxreclen;		/* Linux-format */
 	off_t base;
 	struct l_dirent64 *linux_dirent64;
@@ -509,7 +509,7 @@ linux_getdents64(struct thread *td, struct linux_getdents64_args *args)
 
 	len = td->td_retval[0];
 	inp = buf;
-	outp = (caddr_t)args->dirent;
+	outp = LINUX_USER_CAP(args->dirent, args->count);
 	resid = args->count;
 	retval = 0;
 
@@ -532,7 +532,7 @@ linux_getdents64(struct thread *td, struct linux_getdents64_args *args)
 		linux_dirent64->d_type = bdp->d_type;
 		strlcpy(linux_dirent64->d_name, bdp->d_name,
 		    linuxreclen - offsetof(struct l_dirent64, d_name));
-		error = copyout(linux_dirent64, LINUX_USER_CAP(outp, linuxreclen), linuxreclen);
+		error = copyout(linux_dirent64, outp, linuxreclen);
 		if (error != 0)
 			goto out;
 
