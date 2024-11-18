@@ -562,7 +562,7 @@ vm_cleanup(struct vm *vm, bool destroy)
 		PCPU_SET(curvmpmap, NULL);
 		sched_unpin();
 		CPU_FOREACH(i) {
-			MPASS(cpuid_to_pcpu[i]->pc_curvmpmap != pmap);
+			MPASS(PCPU_ID_GET(i, curvmpmap) != pmap);
 		}
 	}
 

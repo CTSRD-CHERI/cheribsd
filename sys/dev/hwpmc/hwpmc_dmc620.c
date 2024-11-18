@@ -299,7 +299,7 @@ CLASSDEP_FN4(dmc620_allocate_pmc, int, cpu, int, ri, struct pmc *,pm,
 
 	pd = &dmc620desc(class, cpu, ri)->pd_descr;
 	if (dmc620_pmcs[class_ri2unit(class, ri)].domain !=
-	    pcpu_find(cpu)->pc_domain)
+	    PCPU_ID_GET(cpu, domain))
 		return (EINVAL);
 
 	/* check class match */

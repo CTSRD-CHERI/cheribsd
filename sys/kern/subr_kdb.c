@@ -644,10 +644,10 @@ kdb_thr_ctx(struct thread *thr)
 		return (&kdb_pcb);
 
 #ifdef SMP
-	STAILQ_FOREACH(pc, &cpuhead, pc_allcpu)  {
-		if (pc->pc_curthread == thr &&
-		    CPU_ISSET(pc->pc_cpuid, &stopped_cpus))
-			return (&stoppcbs[pc->pc_cpuid]);
+	for (pc = pcpu_first(); pc != NULL; pc = pcpu_next(pc)) {
+		if (PCPU_REF_GET(pc, curthread) == thr &&
+		    CPU_ISSET(PCPU_REF_GET(pc, cpuid), &stopped_cpus))
+			return (&stoppcbs[PCPU_REF_GET(pc, cpuid)]);
 	}
 #endif
 	return (thr->td_pcb);

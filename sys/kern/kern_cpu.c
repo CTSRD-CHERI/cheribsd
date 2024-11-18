@@ -177,7 +177,7 @@ cpufreq_attach(device_t dev)
 	if (sc->max_mhz <= 0) {
 		CF_DEBUG("Unable to obtain nominal frequency.\n");
 		pc = cpu_get_pcpu(dev);
-		if (cpu_est_clockrate(pc->pc_cpuid, &rate) == 0)
+		if (cpu_est_clockrate(PCPU_REF_GET(pc, cpuid), &rate) == 0)
 			sc->max_mhz = rate / 1000000;
 		else
 			sc->max_mhz = CPUFREQ_VAL_UNKNOWN;
@@ -340,7 +340,7 @@ cf_set_method(device_t dev, const struct cf_level *level, int priority)
 		thread_lock(curthread);
 		pri = curthread->td_priority;
 		sched_prio(curthread, PRI_MIN);
-		sched_bind(curthread, pc->pc_cpuid);
+		sched_bind(curthread, PCPU_REF_GET(pc, cpuid));
 		thread_unlock(curthread);
 		CF_DEBUG("setting abs freq %d on %s (cpu %d)\n", set->freq,
 		    device_get_nameunit(set->dev), PCPU_GET(cpuid));
@@ -367,7 +367,7 @@ cf_set_method(device_t dev, const struct cf_level *level, int priority)
 		thread_lock(curthread);
 		pri = curthread->td_priority;
 		sched_prio(curthread, PRI_MIN);
-		sched_bind(curthread, pc->pc_cpuid);
+		sched_bind(curthread, PCPU_REF_GET(pc, cpuid));
 		thread_unlock(curthread);
 		CF_DEBUG("setting rel freq %d on %s (cpu %d)\n", set->freq,
 		    device_get_nameunit(set->dev), PCPU_GET(cpuid));
@@ -546,7 +546,7 @@ cf_get_method(device_t dev, struct cf_level *level)
 		error = ENXIO;
 		goto out;
 	}
-	cpu_est_clockrate(pc->pc_cpuid, &rate);
+	cpu_est_clockrate(PCPU_REF_GET(pc, cpuid), &rate);
 	rate /= 1000000;
 	bdiff = 1 << 30;
 	for (i = 0; i < count; i++) {
@@ -675,7 +675,8 @@ cf_levels_method(device_t dev, struct cf_level *levels, int *count)
 			 */
 			if (sc->max_mhz <= 0) {
 				pc = cpu_get_pcpu(dev);
-				cpu_est_clockrate(pc->pc_cpuid, &rate);
+				cpu_est_clockrate(PCPU_REF_GET(pc, cpuid),
+				    &rate);
 				sc->max_mhz = rate / 1000000;
 			}
 		}

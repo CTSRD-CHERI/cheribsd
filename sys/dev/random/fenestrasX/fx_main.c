@@ -152,7 +152,7 @@ _fxrng_alg_read(uint8_t *output, size_t nbytes, uint64_t *seed_version_out)
 	 * of DPCPU, but the macros cater only to pinned threads; we want to
 	 * operate on our initial CPU, without pinning, *even if* we migrate.
 	 */
-	pcpu_brng_p = _DPCPU_PTR(pcpu->pc_dynamic, fxrng_brng);
+	pcpu_brng_p = _DPCPU_PTR(PCPU_REF_GET(pcpu, dynamic), fxrng_brng);
 
 	rng = (void *)atomic_load_acq_ptr((uintptr_t *)pcpu_brng_p);
 
@@ -166,7 +166,7 @@ _fxrng_alg_read(uint8_t *output, size_t nbytes, uint64_t *seed_version_out)
 		struct domainset *ds;
 		int domain;
 
-		domain = pcpu->pc_domain;
+		domain = PCPU_REF_GET(pcpu, domain);
 
 		/*
 		 * Allocate pcpu BRNGs off-domain on weird NUMA machines like

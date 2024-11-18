@@ -5410,7 +5410,6 @@ pmc_generic_cpu_finalize(struct pmc_mdep *md __unused)
 static int
 pmc_initialize(void)
 {
-	struct pcpu *pc;
 	struct pmc_binding pb;
 	struct pmc_classdep *pcd;
 	struct pmc_sample *ps;
@@ -5551,8 +5550,7 @@ pmc_initialize(void)
 	for (cpu = 0; cpu < maxcpu; cpu++) {
 		if (!pmc_cpu_is_active(cpu))
 			continue;
-		pc = pcpu_find(cpu);
-		domain = pc->pc_domain;
+		domain = PCPU_ID_GET(cpu, domain);
 		sb = malloc_domainset(sizeof(struct pmc_samplebuffer) +
 		    pmc_nsamples * sizeof(struct pmc_sample), M_PMC,
 		    DOMAINSET_PREF(domain), M_WAITOK | M_ZERO);

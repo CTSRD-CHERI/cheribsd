@@ -51,6 +51,7 @@
 #include <sys/msan.h>
 #include <sys/msgbuf.h>
 #include <sys/pcpu.h>
+#include <sys/pcpu_executive.h>
 #include <sys/physmem.h>
 #include <sys/proc.h>
 #include <sys/ptrace.h>
@@ -342,10 +343,10 @@ cpu_est_clockrate(int cpu_id, uint64_t *rate)
 	if (pc == NULL || rate == NULL)
 		return (EINVAL);
 
-	if (pc->pc_clock == 0)
+	if (PCPU_REF_GET(pc, clock) == 0)
 		return (EOPNOTSUPP);
 
-	*rate = pc->pc_clock;
+	*rate = PCPU_REF_GET(pc, clock);
 	return (0);
 }
 
@@ -353,8 +354,8 @@ void
 cpu_pcpu_init(struct pcpu *pcpu, int cpuid, size_t size)
 {
 
-	pcpu->pc_acpi_id = 0xffffffff;
-	pcpu->pc_mpidr = UINT64_MAX;
+	PCPU_REF_SET(pcpu, acpi_id, 0xffffffff);
+	PCPU_REF_SET(pcpu, mpidr, UINT64_MAX);
 }
 
 /*
@@ -441,7 +442,7 @@ init_proc0(vm_pointer_t kstack)
 {
 	struct pcpu *pcpup;
 
-	pcpup = cpuid_to_pcpu[0];
+	pcpup = pcpu_find(0);
 	MPASS(pcpup != NULL);
 
 	/* XXX-AM: We need to set bounds on pcb and kstack here as in MIPS */
@@ -469,7 +470,7 @@ init_proc0(vm_pointer_t kstack)
 #ifdef PAC
 	ptrauth_thread0(&thread0);
 #endif
-	pcpup->pc_curpcb = thread0.td_pcb;
+	PCPU_REF_SET(pcpup, curpcb, thread0.td_pcb);
 
 	/*
 	 * Unmask SError exceptions. They are used to signal a RAS failure,

@@ -2345,12 +2345,10 @@ witness_display_spinlock(struct lock_object *lock, struct thread *owner,
     int (*prnt)(const char *fmt, ...))
 {
 	struct lock_instance *instance;
-	struct pcpu *pc;
 
 	if (owner->td_critnest == 0 || owner->td_oncpu == NOCPU)
 		return;
-	pc = pcpu_find(owner->td_oncpu);
-	instance = find_instance(pc->pc_spinlocks, lock);
+	instance = find_instance(PCPU_ID_GET(owner->td_oncpu, spinlocks), lock);
 	if (instance != NULL)
 		witness_list_lock(instance, prnt);
 }

@@ -558,7 +558,7 @@ acpi_px_get(device_t dev, struct cf_setting *set)
 	pc = cpu_get_pcpu(dev);
 	if (pc == NULL)
 		return (ENXIO);
-	cpu_est_clockrate(pc->pc_cpuid, &rate);
+	cpu_est_clockrate(PCPU_REF_GET(pc, cpuid), &rate);
 	rate /= 1000000;
 	for (i = 0; i < sc->px_count; i++) {
 		if (CPUFREQ_CMP(sc->px_states[i].core_freq, rate)) {

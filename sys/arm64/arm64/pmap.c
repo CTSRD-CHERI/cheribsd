@@ -9443,10 +9443,10 @@ pmap_reset_asid_set(pmap_t pmap)
 		if (cpuid == curcpu)
 			continue;
 		if (stage == PM_STAGE1) {
-			curpmap = pcpu_find(cpuid)->pc_curpmap;
+			curpmap = PCPU_ID_GET(cpuid, curpmap);
 			PMAP_ASSERT_STAGE1(pmap);
 		} else {
-			curpmap = pcpu_find(cpuid)->pc_curvmpmap;
+			curpmap = PCPU_ID_GET(cpuid, curvmpmap);
 			if (curpmap == NULL)
 				continue;
 			PMAP_ASSERT_STAGE2(pmap);

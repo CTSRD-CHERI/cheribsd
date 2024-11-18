@@ -103,12 +103,23 @@ void init_cpu_pcpup(void *pcpup);
 
 #define	curthread get_curthread()
 
-#define	PCPU_GET(member)	(pcpup->pc_ ## member)
-#define	PCPU_ADD(member, value)	(pcpup->pc_ ## member += (value))
-#define	PCPU_PTR(member)	(&pcpup->pc_ ## member)
-#define	PCPU_SET(member,value)	(pcpup->pc_ ## member = (value))
+/*
+ * XXXKW: Given that the curthread literal is defined, we must prevent macro
+ * argument expansion as PCPU_*(curthread) would be expanded to a wrong name
+ * otherwise. Hence, we concatenate the member argument directly in PCPU
+ * accessor macros.
+ */
+#define	__PCPU_REF_PTR(ref, _member)					\
 
-#define	PCPU_GET_MPIDR(pc)	((pc)->pc_mpidr)
+#define	__PCPU_PTR(_member)		__PCPU_REF_PTR(pcpup, _member)
+#define	PCPU_PTR(member)						\
+	(__PCPU_PTR(_ ## member))
+#define	PCPU_GET(member)						\
+	(*__PCPU_PTR(_ ## member))
+#define	PCPU_ADD(member, value)						\
+	(*__PCPU_PTR(_ ## member) += (value))
+#define	PCPU_SET(member,value)						\
+	(*__PCPU_PTR(_ ## member) = (value))
 
 #endif	/* _KERNEL */
 

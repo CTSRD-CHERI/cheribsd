@@ -712,7 +712,6 @@ linprocfs_dopartitions(PFS_FILL_ARGS)
 static int
 linprocfs_dostat(PFS_FILL_ARGS)
 {
-	struct pcpu *pcpu;
 	long cp_time[CPUSTATES];
 	long *cp;
 	struct timeval boottime;
@@ -752,8 +751,7 @@ linprocfs_dostat(PFS_FILL_ARGS)
 	sbuf_printf(sb, "%s", zero_pad);
 
 	CPU_FOREACH(i) {
-		pcpu = pcpu_find(i);
-		cp = pcpu->pc_cp_time;
+		cp = (long *)PCPU_ID_PTR(i, cp_time);
 		sbuf_printf(sb, "cpu%d %lu %lu %lu %lu", i,
 		    T2J(cp[CP_USER]),
 		    T2J(cp[CP_NICE]),

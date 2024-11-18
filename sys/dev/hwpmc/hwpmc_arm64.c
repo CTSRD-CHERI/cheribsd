@@ -539,7 +539,7 @@ pmc_arm64_initialize(void)
 	 * TODO: how to handle differences between cores due to big.LITTLE?
 	 * For now, just use MIDR from CPU 0.
 	 */
-	midr = (uint64_t)(pcpu_find(0)->pc_midr);
+	midr = (uint64_t)(PCPU_ID_GET(0, midr));
 	midr &= ~(CPU_VAR_MASK | CPU_REV_MASK);
 	snprintf(pmc_cpuid, sizeof(pmc_cpuid), "0x%016lx", midr);
 

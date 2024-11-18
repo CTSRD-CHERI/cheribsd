@@ -56,6 +56,7 @@
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/pcpu.h>
+#include <sys/pcpu_executive.h>
 #include <sys/proc.h>
 #include <sys/smp.h>
 #include <sys/sx.h>

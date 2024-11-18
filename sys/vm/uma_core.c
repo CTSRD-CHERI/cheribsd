@@ -1998,11 +1998,13 @@ pcpu_page_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 			p = vm_page_alloc_noobj(flags);
 #else
 			pc = pcpu_find(cpu);
-			if (__predict_false(VM_DOMAIN_EMPTY(pc->pc_domain)))
+			if (__predict_false(VM_DOMAIN_EMPTY(PCPU_REF_GET(pc,
+			    domain)))) {
 				p = NULL;
-			else
-				p = vm_page_alloc_noobj_domain(pc->pc_domain,
-				    flags);
+			} else {
+				p = vm_page_alloc_noobj_domain(
+				    PCPU_REF_GET(pc, domain), flags);
+			}
 			if (__predict_false(p == NULL))
 				p = vm_page_alloc_noobj(flags);
 #endif

@@ -102,7 +102,7 @@ pmu_parse_affinity(device_t dev, struct pmu_softc *sc, struct pmu_intr *irq,
 
 	for (i = 0; i < MAXCPU; i++) {
 		pcpu = pcpu_find(i);
-		if (pcpu != NULL && PCPU_GET_MPIDR(pcpu) == mpidr) {
+		if (pcpu != NULL && PCPU_REF_GET(pcpu, mpidr) == mpidr) {
 			irq->cpuid = i;
 			return (0);
 		}

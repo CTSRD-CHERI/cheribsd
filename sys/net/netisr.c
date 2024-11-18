@@ -1276,7 +1276,7 @@ netisr_start_swi(u_int cpuid, struct pcpu *pc)
 	    SWI_NET, INTR_TYPE_NET | INTR_MPSAFE, &nwsp->nws_swi_cookie);
 	if (error)
 		panic("%s: swi_add %d", __func__, error);
-	pc->pc_netisr = nwsp->nws_intr_event;
+	PCPU_REF_SET(pc, netisr, nwsp->nws_intr_event);
 	if (netisr_bindthreads) {
 		error = intr_event_bind(nwsp->nws_intr_event, cpuid);
 		if (error != 0)
@@ -1332,14 +1332,14 @@ netisr_init(void *arg)
 #endif
 
 #ifdef EARLY_AP_STARTUP
-	STAILQ_FOREACH(pc, &cpuhead, pc_allcpu) {
+	for (pc = pcpu_first(); pc != NULL; pc = pcpu_next(pc)) {
 		if (nws_count >= netisr_maxthreads)
 			break;
-		netisr_start_swi(pc->pc_cpuid, pc);
+		netisr_start_swi(PCPU_REF_GET(pc, cpuid), pc);
 	}
 #else
 	pc = get_pcpu();
-	netisr_start_swi(pc->pc_cpuid, pc);
+	netisr_start_swi(PCPU_REF_GET(pc, cpuid), pc);
 #endif
 }
 SYSINIT(netisr_init, SI_SUB_SOFTINTR, SI_ORDER_FIRST, netisr_init, NULL);
@@ -1354,13 +1354,13 @@ netisr_start(void *arg)
 {
 	struct pcpu *pc;
 
-	STAILQ_FOREACH(pc, &cpuhead, pc_allcpu) {
+	for (pc = pcpu_first(); pc != NULL; pc = pcpu_next(pc)) {
 		if (nws_count >= netisr_maxthreads)
 			break;
 		/* Worker will already be present for boot CPU. */
-		if (pc->pc_netisr != NULL)
+		if (PCPU_REF_GET(pc, netisr) != NULL)
 			continue;
-		netisr_start_swi(pc->pc_cpuid, pc);
+		netisr_start_swi(PCPU_REF_GET(pc, cpuid), pc);
 	}
 }
 SYSINIT(netisr_start, SI_SUB_SMP, SI_ORDER_MIDDLE, netisr_start, NULL);

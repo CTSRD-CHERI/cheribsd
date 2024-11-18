@@ -158,8 +158,9 @@ unlock_rm(struct lock_object *lock)
 		critical_enter();
 		td = curthread;
 		pc = get_pcpu();
-		for (queue = pc->pc_rm_queue.rmq_next;
-		    queue != &pc->pc_rm_queue; queue = queue->rmq_next) {
+		for (queue = PCPU_REF_PTR(pc, rm_queue)->rmq_next;
+		    queue != PCPU_REF_PTR(pc, rm_queue);
+		    queue = queue->rmq_next) {
 			tracker = (struct rm_priotracker *)queue;
 				if ((tracker->rmp_rmlock == rm) &&
 				    (tracker->rmp_thread == td)) {
@@ -204,15 +205,15 @@ rm_tracker_add(struct pcpu *pc, struct rm_priotracker *tracker)
 	struct rm_queue *next;
 
 	/* Initialize all tracker pointers */
-	tracker->rmp_cpuQueue.rmq_prev = &pc->pc_rm_queue;
-	next = pc->pc_rm_queue.rmq_next;
+	tracker->rmp_cpuQueue.rmq_prev = PCPU_REF_PTR(pc, rm_queue);
+	next = PCPU_REF_PTR(pc, rm_queue)->rmq_next;
 	tracker->rmp_cpuQueue.rmq_next = next;
 
 	/* rmq_prev is not used during froward traversal. */
 	next->rmq_prev = &tracker->rmp_cpuQueue;
 
 	/* Update pointer to first element. */
-	pc->pc_rm_queue.rmq_next = &tracker->rmp_cpuQueue;
+	PCPU_REF_PTR(pc, rm_queue)->rmq_next = &tracker->rmp_cpuQueue;
 }
 
 /*
@@ -220,7 +221,7 @@ rm_tracker_add(struct pcpu *pc, struct rm_priotracker *tracker)
  * has on this CPU for the lock 'rm'.
  */
 static int
-rm_trackers_present(const struct pcpu *pc, const struct rmlock *rm,
+rm_trackers_present(struct pcpu *pc, const struct rmlock *rm,
     const struct thread *td)
 {
 	struct rm_queue *queue;
@@ -228,7 +229,8 @@ rm_trackers_present(const struct pcpu *pc, const struct rmlock *rm,
 	int count;
 
 	count = 0;
-	for (queue = pc->pc_rm_queue.rmq_next; queue != &pc->pc_rm_queue;
+	for (queue = PCPU_REF_PTR(pc, rm_queue)->rmq_next;
+	    queue != PCPU_REF_PTR(pc, rm_queue);
 	    queue = queue->rmq_next) {
 		tracker = (struct rm_priotracker *)queue;
 		if ((tracker->rmp_rmlock == rm) && (tracker->rmp_thread == td))
@@ -261,7 +263,8 @@ rm_cleanIPI(void *arg)
 	struct rm_queue *queue;
 	pc = get_pcpu();
 
-	for (queue = pc->pc_rm_queue.rmq_next; queue != &pc->pc_rm_queue;
+	for (queue = PCPU_REF_PTR(pc, rm_queue)->rmq_next;
+	    queue != PCPU_REF_PTR(pc, rm_queue);
 	    queue = queue->rmq_next) {
 		tracker = (struct rm_priotracker *)queue;
 		if (tracker->rmp_rmlock == rm && tracker->rmp_flags == 0) {
@@ -354,7 +357,7 @@ _rm_rlock_hard(struct rmlock *rm, struct rm_priotracker *tracker, int trylock)
 	pc = get_pcpu();
 
 	/* Check if we just need to do a proper critical_exit. */
-	if (!CPU_ISSET(pc->pc_cpuid, &rm->rm_writecpus)) {
+	if (!CPU_ISSET(PCPU_REF_GET(pc, cpuid), &rm->rm_writecpus)) {
 		critical_exit();
 		return (1);
 	}
@@ -417,7 +420,7 @@ _rm_rlock_hard(struct rmlock *rm, struct rm_priotracker *tracker, int trylock)
 
 	critical_enter();
 	pc = get_pcpu();
-	CPU_CLR(pc->pc_cpuid, &rm->rm_writecpus);
+	CPU_CLR(PCPU_REF_GET(pc, cpuid), &rm->rm_writecpus);
 	rm_tracker_add(pc, tracker);
 	sched_pin();
 	critical_exit();
@@ -449,7 +452,7 @@ _rm_rlock(struct rmlock *rm, struct rm_priotracker *tracker, int trylock)
 	td->td_critnest++;	/* critical_enter(); */
 	atomic_interrupt_fence();
 
-	pc = cpuid_to_pcpu[td->td_oncpu];
+	pc = pcpu_find(td->td_oncpu);
 	rm_tracker_add(pc, tracker);
 	sched_pin();
 
@@ -461,7 +464,7 @@ _rm_rlock(struct rmlock *rm, struct rm_priotracker *tracker, int trylock)
 	 * conditional jump.
 	 */
 	if (__predict_true(0 == (td->td_owepreempt |
-	    CPU_ISSET(pc->pc_cpuid, &rm->rm_writecpus))))
+	    CPU_ISSET(PCPU_REF_GET(pc, cpuid), &rm->rm_writecpus))))
 		return (1);
 
 	/* We do not have a read token and need to acquire one. */
@@ -513,7 +516,7 @@ _rm_runlock(struct rmlock *rm, struct rm_priotracker *tracker)
 	td->td_critnest++;	/* critical_enter(); */
 	atomic_interrupt_fence();
 
-	pc = cpuid_to_pcpu[td->td_oncpu];
+	pc = pcpu_find(td->td_oncpu);
 	rm_tracker_remove(pc, tracker);
 
 	atomic_interrupt_fence();
@@ -843,9 +846,10 @@ db_show_rm(const struct lock_object *lock)
 	ddb_display_cpuset(__DEQUALIFY(const cpuset_t *, &rm->rm_writecpus));
 	db_printf("\n");
 	db_printf(" per-CPU readers:\n");
-	STAILQ_FOREACH(pc, &cpuhead, pc_allcpu)
-		for (queue = pc->pc_rm_queue.rmq_next;
-		    queue != &pc->pc_rm_queue; queue = queue->rmq_next) {
+	for (pc = pcpu_first(); pc != NULL; pc = pcpu_next(pc))
+		for (queue = PCPU_REF_PTR(pc, rm_queue)->rmq_next;
+		    queue != PCPU_REF_PTR(pc, rm_queue);
+		    queue = queue->rmq_next) {
 			tr = (struct rm_priotracker *)queue;
 			if (tr->rmp_rmlock == rm)
 				print_tracker(tr);

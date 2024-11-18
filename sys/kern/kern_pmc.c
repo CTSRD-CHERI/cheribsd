@@ -354,7 +354,7 @@ init_hwpmc(void *dummy __unused)
 		TAILQ_INIT(&pmc_dom_hdrs[domain]->pdbh_head);
 	}
 	CPU_FOREACH(cpu) {
-		domain = pcpu_find(cpu)->pc_domain;
+		domain = PCPU_ID_GET(cpu, domain);
 		KASSERT(pmc_dom_hdrs[domain] != NULL, ("no mem allocated for domain: %d", domain));
 		pmc_dom_hdrs[domain]->pdbh_ncpus++;
 	}

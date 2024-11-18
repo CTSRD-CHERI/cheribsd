@@ -1816,7 +1816,6 @@ tcp_hpts_mod_load(void)
 	struct timeval tv;
 	sbintime_t sb;
 	struct tcp_hpts_entry *hpts;
-	struct pcpu *pc;
 	char unit[16];
 	uint32_t ncpus = mp_ncpus ? mp_ncpus : MAXCPU;
 	int count, domain;
@@ -1985,8 +1984,7 @@ tcp_hpts_mod_load(void)
 					if (intr_event_bind_ithread_cpuset(hpts->ie,
 						&tcp_pace.grps[j]->cg_mask) == 0) {
 						bound++;
-						pc = pcpu_find(i);
-						domain = pc->pc_domain;
+						domain = PCPU_ID_GET(i, domain);
 						count = hpts_domains[domain].count;
 						hpts_domains[domain].cpu[count] = i;
 						hpts_domains[domain].count++;

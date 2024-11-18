@@ -348,8 +348,8 @@ racct_getpcpu(struct proc *p, u_int pcpu)
 			continue;
 #ifdef SMP
 		found = 0;
-		STAILQ_FOREACH(pc, &cpuhead, pc_allcpu) {
-			if (td == pc->pc_idlethread) {
+		for (pc = pcpu_first(); pc != NULL; pc = pcpu_next(pc)) {
+			if (td == PCPU_REF_GET(pc, idlethread)) {
 				found = 1;
 				break;
 			}

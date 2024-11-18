@@ -1092,7 +1092,7 @@ pmap_active_cpus(pmap_t pmap, cpuset_t *res)
 
 	CPU_ZERO(res);
 	CPU_FOREACH(c) {
-		td = cpuid_to_pcpu[c]->pc_curthread;
+		td = PCPU_ID_GET(c, curthread);
 		p = td->td_proc;
 		if (p == NULL)
 			continue;

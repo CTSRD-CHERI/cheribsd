@@ -1081,7 +1081,7 @@ gicv3_its_attach(device_t dev)
 		if (CPU_ISSET(cpu, &sc->sc_cpus) != 0)
 			sc->sc_its_cols[cpu] = malloc_domainset(
 			    sizeof(*sc->sc_its_cols[0]), M_GICV3_ITS,
-			    DOMAINSET_PREF(pcpu_find(cpu)->pc_domain),
+			    DOMAINSET_PREF(PCPU_ID_GET(cpu, domain)),
 			    M_WAITOK | M_ZERO);
 		else
 			sc->sc_its_cols[cpu] = NULL;

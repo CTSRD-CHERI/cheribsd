@@ -84,8 +84,8 @@ check_cpu_switched(int c, cpuset_t *csp, uint64_t *swt, bool init)
 	if (CPU_ISSET(c, csp))
 		return;
 
-	pc = cpuid_to_pcpu[c];
-	if (pc->pc_curthread == pc->pc_idlethread) {
+	pc = pcpu_find(c);
+	if (PCPU_REF_GET(pc, curthread) == PCPU_REF_GET(pc, idlethread)) {
 		CPU_SET(c, csp);
 		return;
 	}
@@ -97,7 +97,7 @@ check_cpu_switched(int c, cpuset_t *csp, uint64_t *swt, bool init)
 	 */
 	atomic_thread_fence_acq();
 
-	sw = pc->pc_switchtime;
+	sw = PCPU_REF_GET(pc, switchtime);
 	if (init)
 		swt[c] = sw;
 	else if (sw != swt[c])
@@ -160,7 +160,7 @@ kern_membarrier(struct thread *td, int cmd, unsigned flags, int cpu_id)
 		} else {
 			CPU_ZERO(&cs);
 			CPU_FOREACH(c) {
-				td1 = cpuid_to_pcpu[c]->pc_curthread;
+				td1 = PCPU_ID_GET(c, curthread);
 				p1 = td1->td_proc;
 				if (p1 != NULL &&
 				    (p1->p_flag2 & P2_MEMBAR_GLOBE) != 0)

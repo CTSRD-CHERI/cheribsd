@@ -490,7 +490,6 @@ static int
 ktls_init(void)
 {
 	struct thread *td;
-	struct pcpu *pc;
 	int count, domain, error, i;
 
 	ktls_wq = malloc(sizeof(*ktls_wq) * (mp_maxid + 1), M_KTLS,
@@ -517,8 +516,7 @@ ktls_init(void)
 		STAILQ_INIT(&ktls_wq[i].so_head);
 		mtx_init(&ktls_wq[i].mtx, "ktls work queue", NULL, MTX_DEF);
 		if (ktls_bind_threads > 1) {
-			pc = pcpu_find(i);
-			domain = pc->pc_domain;
+			domain = PCPU_ID_GET(i, domain);
 			count = ktls_domains[domain].count;
 			ktls_domains[domain].cpu[count] = i;
 			ktls_domains[domain].count++;
@@ -3301,9 +3299,7 @@ ktls_work_thread(void *ctx)
 		int error;
 
 		if (ktls_bind_threads > 1) {
-			struct pcpu *pc = pcpu_find(cpu);
-
-			error = ktls_bind_domain(pc->pc_domain);
+			error = ktls_bind_domain(PCPU_ID_GET(cpu, domain));
 		} else {
 			cpuset_t mask;
 

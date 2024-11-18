@@ -331,7 +331,7 @@ acpi_cpu_attach(device_t dev)
     cpu_id = device_get_unit(dev);
     cpu_softc[cpu_id] = sc;
     pcpu_data = pcpu_find(cpu_id);
-    pcpu_data->pc_device = dev;
+    PCPU_REF_SET(pcpu_data, device, dev);
     sc->cpu_pcpu = pcpu_data;
     cpu_smi_cmd = AcpiGbl_FADT.SmiCommand;
     cpu_cst_cnt = AcpiGbl_FADT.CstControl;
@@ -494,7 +494,7 @@ disable_idle(struct acpi_cpu_softc *sc)
 {
     cpuset_t cpuset;
 
-    CPU_SETOF(sc->cpu_pcpu->pc_cpuid, &cpuset);
+    CPU_SETOF(PCPU_REF_GET(sc->cpu_pcpu, cpuid), &cpuset);
     sc->cpu_disable_idle = TRUE;
 
     /*
@@ -562,8 +562,8 @@ acpi_pcpu_get_id(device_t dev, uint32_t acpi_id, u_int *cpu_id)
 
     CPU_FOREACH(i) {
 	pc = pcpu_find(i);
-	if (pc->pc_acpi_id == acpi_id) {
-	    *cpu_id = pc->pc_cpuid;
+	if (PCPU_REF_GET(pc, acpi_id) == acpi_id) {
+	    *cpu_id = PCPU_REF_GET(pc, cpuid);
 	    return (0);
 	}
     }
@@ -574,8 +574,8 @@ acpi_pcpu_get_id(device_t dev, uint32_t acpi_id, u_int *cpu_id)
      */
     if (mp_ncpus == 1) {
 	pc = pcpu_find(0);
-	if (pc->pc_acpi_id == 0xffffffff)
-	    pc->pc_acpi_id = acpi_id;
+	if (PCPU_REF_GET(pc, acpi_id) == 0xffffffff)
+	    PCPU_REF_SET(pc, acpi_id, acpi_id);
 	*cpu_id = 0;
 	return (0);
     }

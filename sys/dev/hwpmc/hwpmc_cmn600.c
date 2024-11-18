@@ -332,7 +332,7 @@ cmn600_allocate_pmc(int cpu, int ri, struct pmc *pm,
 	desc = cmn600desc(ri);
 	arg = desc->pd_rw_arg;
 	pd = &desc->pd_descr;
-	if (cmn600_pmcs[class_ri2unit(ri)].domain != pcpu_find(cpu)->pc_domain)
+	if (cmn600_pmcs[class_ri2unit(ri)].domain != PCPU_ID_GET(cpu, domain))
 		return (EINVAL);
 
 	/* check class match */

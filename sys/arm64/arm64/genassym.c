@@ -30,6 +30,7 @@
 #include <sys/assym.h>
 #include <sys/bus.h>
 #include <sys/intr.h>
+#include <sys/pcpu_executive.h>
 #include <sys/pcpu.h>
 #include <sys/proc.h>
 

@@ -45,6 +45,7 @@
 #include <sys/queue.h>
 #include <sys/_rmlock.h>
 #include <sys/resource.h>
+#include <sys/pcpu_executive.h>
 #include <machine/pcpu.h>
 
 #define	DPCPU_SETNAME		"set_pcpu"
@@ -52,6 +53,45 @@
 
 #ifdef _KERNEL
 #include <cheri/cheric.h>
+
+/*
+ * Define PCPU_{REF,ID}_*() macros to directly use a PCPU variable if their
+ * machine-dependent implementation does not exist.
+ */
+/*
+ * XXXKW: Given that the curthread literal is defined, we must prevent macro
+ * argument expansion as PCPU_*(curthread) would be expanded to a wrong name
+ * otherwise. Hence, we concatenate the member argument directly in PCPU
+ * accessor macros.
+ */
+#ifndef PCPU_REF_PTR
+#ifndef __PCPU_REF_PTR
+#define	__PCPU_REF_PTR(ref, _member)					\
+	(&(ref)->pc ## _member)
+#endif
+#define	PCPU_REF_PTR(ref, member)					\
+	__PCPU_REF_PTR(ref, _ ## member)
+#define	PCPU_REF_GET(ref, member)					\
+	(*__PCPU_REF_PTR(ref, _ ## member))
+#define	PCPU_REF_ADD(ref, member, value)				\
+	(*__PCPU_REF_PTR(ref, _ ## member) += (value))
+#define	PCPU_REF_SET(ref, member, value)				\
+	(*__PCPU_REF_PTR(ref, _ ## member) = (value))
+#endif /* !PCPU_REF_PTR */
+#ifndef PCPU_ID_PTR
+#ifndef __PCPU_ID_PTR
+#define	__PCPU_ID_PTR(id, _member)					\
+	(&cpuid_to_pcpu[id]->pc ## _member)
+#endif
+#define	PCPU_ID_PTR(id, member)						\
+	__PCPU_ID_PTR(id, _ ## member)
+#define	PCPU_ID_GET(id, member)						\
+	(*__PCPU_ID_PTR(id, _ ## member))
+#define	PCPU_ID_ADD(id, member, value)					\
+	(*__PCPU_ID_PTR(id, _ ## member) += (value))
+#define	PCPU_ID_SET(id, member, value)					\
+	(*__PCPU_ID_PTR(id, _ ## member) = (value))
+#endif /* !__PCPU_ID_PTR */
 
 /*
  * Define a set for pcpu data.
@@ -302,52 +342,6 @@ extern uintptr_t dpcpu_off[];
 	}								\
 } while (0)
 
-#endif /* _KERNEL */
-
-/*
- * This structure maps out the global data that needs to be kept on a
- * per-cpu basis.  The members are accessed via the PCPU_GET/SET/PTR
- * macros defined in <machine/pcpu.h>.  Machine dependent fields are
- * defined in the PCPU_MD_FIELDS macro defined in <machine/pcpu.h>.
- */
-struct pcpu {
-	struct thread	*pc_curthread;		/* Current thread */
-	struct thread	*pc_idlethread;		/* Idle thread */
-	struct thread	*pc_fpcurthread;	/* Fp state owner */
-	struct thread	*pc_deadthread;		/* Zombie thread or NULL */
-	struct pcb	*pc_curpcb;		/* Current pcb */
-	void		*pc_sched;		/* Scheduler state */
-	uint64_t	pc_switchtime;		/* cpu_ticks() at last csw */
-	int		pc_switchticks;		/* `ticks' at last csw */
-	u_int		pc_cpuid;		/* This cpu number */
-	STAILQ_ENTRY(pcpu) pc_allcpu;
-	struct lock_list_entry *pc_spinlocks;
-	long		pc_cp_time[CPUSTATES];	/* statclock ticks */
-	struct _device	*pc_device;		/* CPU device handle */
-	void		*pc_netisr;		/* netisr SWI cookie */
-	int8_t		pc_vfs_freevnodes;	/* freevnodes counter */
-	char		pc_unused1[3];		/* unused pad */
-	int		pc_domain;		/* Memory domain. */
-	struct rm_queue	pc_rm_queue;		/* rmlock list of trackers */
-	uintptr_t	pc_dynamic;		/* Dynamic per-cpu data area */
-	uint64_t	pc_early_dummy_counter;	/* Startup time counter(9) */
-	uintptr_t	pc_zpcpu_offset;	/* Offset into zpcpu allocs */
-
-	/*
-	 * Keep MD fields last, so that CPU-specific variations on a
-	 * single architecture don't result in offset variations of
-	 * the machine-independent fields of the pcpu.  Even though
-	 * the pcpu structure is private to the kernel, some ports
-	 * (e.g., lsof, part of gtop) define _KERNEL and include this
-	 * header.  While strictly speaking this is wrong, there's no
-	 * reason not to keep the offsets of the MI fields constant
-	 * if only to make kernel debugging easier.
-	 */
-	PCPU_MD_FIELDS;
-} __aligned(CACHE_LINE_SIZE);
-
-#ifdef _KERNEL
-
 STAILQ_HEAD(cpuhead, pcpu);
 
 extern struct cpuhead cpuhead;
@@ -464,6 +458,9 @@ void	dpcpu_free(void *s, int size);
 void	dpcpu_init(void *dpcpu, int cpuid);
 void	pcpu_destroy(struct pcpu *pcpu);
 struct	pcpu *pcpu_find(u_int cpuid);
+#define	pcpu_exists(cpuid)	cpuid_to_pcpu[(cpuid)]
+#define	pcpu_first()	STAILQ_FIRST(&cpuhead)
+#define	pcpu_next(pcpu)	STAILQ_NEXT(pcpu, pc_allcpu)
 void	pcpu_init(struct pcpu *pcpu, int cpuid, size_t size);
 
 #endif /* _KERNEL */

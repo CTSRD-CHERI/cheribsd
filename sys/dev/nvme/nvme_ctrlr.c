@@ -205,7 +205,7 @@ nvme_ctrlr_construct_io_qpairs(struct nvme_controller *ctrlr)
 				;
 			/* Shuffle multiple NVMe devices between CPUs. */
 			qpair->cpu = c + (device_get_unit(ctrlr->dev)+n/2) % n;
-			qpair->domain = pcpu_find(qpair->cpu)->pc_domain;
+			qpair->domain = PCPU_ID_GET(qpair->cpu, domain);
 		} else {
 			qpair->cpu = CPU_FFS(&cpuset_domain[ctrlr->domain]) - 1;
 			qpair->domain = ctrlr->domain;

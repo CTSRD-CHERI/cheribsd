@@ -2652,7 +2652,7 @@ print_cpu_midr(struct sbuf *sb, u_int cpu)
 	u_int impl_id;
 	u_int part_id;
 
-	midr = pcpu_find(cpu)->pc_midr;
+	midr = PCPU_ID_GET(cpu, midr);
 
 	cpu_impl_name = NULL;
 	cpu_partsp = NULL;

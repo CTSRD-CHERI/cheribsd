@@ -124,7 +124,6 @@ static long empty[CPUSTATES];
 static int
 sysctl_kern_cp_times(SYSCTL_HANDLER_ARGS)
 {
-	struct pcpu *pcpu;
 	int error;
 	int c;
 	long *cp_time;
@@ -143,8 +142,7 @@ sysctl_kern_cp_times(SYSCTL_HANDLER_ARGS)
 	}
 	for (error = 0, c = 0; error == 0 && c <= mp_maxid; c++) {
 		if (!CPU_ABSENT(c)) {
-			pcpu = pcpu_find(c);
-			cp_time = pcpu->pc_cp_time;
+			cp_time = (long *)PCPU_ID_PTR(c, cp_time);
 		} else {
 			cp_time = empty;
 		}
@@ -309,15 +307,15 @@ SYSCTL_INT(_debug_deadlkres, OID_AUTO, sleepfreq, CTLFLAG_RWTUN, &sleepfreq, 0,
 void
 read_cpu_time(long *cp_time)
 {
-	struct pcpu *pc;
+	long *cpu_cp_time;
 	int i, j;
 
 	/* Sum up global cp_time[]. */
 	bzero(cp_time, sizeof(long) * CPUSTATES);
 	CPU_FOREACH(i) {
-		pc = pcpu_find(i);
+		cpu_cp_time = (long *)PCPU_ID_PTR(i, cp_time);
 		for (j = 0; j < CPUSTATES; j++)
-			cp_time[j] += pc->pc_cp_time[j];
+			cp_time[j] += cpu_cp_time[j];
 	}
 }
 

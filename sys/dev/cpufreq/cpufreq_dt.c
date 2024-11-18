@@ -86,15 +86,13 @@ static void
 cpufreq_dt_notify(device_t dev, uint64_t freq)
 {
 	struct cpufreq_dt_softc *sc;
-	struct pcpu *pc;
 	int cpu;
 
 	sc = device_get_softc(dev);
 
 	CPU_FOREACH(cpu) {
 		if (CPU_ISSET(cpu, &sc->cpus)) {
-			pc = pcpu_find(cpu);
-			pc->pc_clock = freq;
+			PCPU_ID_SET(cpu, clock, freq);
 		}
 	}
 }

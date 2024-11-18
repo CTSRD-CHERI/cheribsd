@@ -1616,7 +1616,7 @@ vnlru_read_freevnodes(void)
 	if (slop < VNLRU_FREEVNODES_SLOP)
 		return (rfreevnodes >= 0 ? rfreevnodes : 0);
 	CPU_FOREACH(cpu) {
-		rfreevnodes += cpuid_to_pcpu[cpu]->pc_vfs_freevnodes;
+		rfreevnodes += PCPU_ID_GET(cpu, vfs_freevnodes);
 	}
 	atomic_store_long(&freevnodes_old, rfreevnodes);
 	return (freevnodes_old >= 0 ? freevnodes_old : 0);

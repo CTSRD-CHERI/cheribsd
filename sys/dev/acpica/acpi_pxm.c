@@ -221,9 +221,9 @@ cpu_get_info(struct pcpu *pc)
 	int id;
 
 #ifdef __aarch64__
-	id = pc->pc_acpi_id;
+	id = PCPU_REF_GET(pc, acpi_id);
 #else
-	id = pc->pc_apic_id;
+	id = PCPU_REF_GET(pc, apic_id);
 #endif
 	cpup = cpu_find(id);
 	if (cpup == NULL)
@@ -657,11 +657,11 @@ acpi_pxm_set_cpu_locality(void)
 		pc = pcpu_find(i);
 		KASSERT(pc != NULL, ("no pcpu data for CPU %u", i));
 		cpu = cpu_get_info(pc);
-		pc->pc_domain = vm_ndomains > 1 ? cpu->domain : 0;
-		CPU_SET(i, &cpuset_domain[pc->pc_domain]);
+		PCPU_REF_SET(pc, domain, vm_ndomains > 1 ? cpu->domain : 0);
+		CPU_SET(i, &cpuset_domain[PCPU_REF_GET(pc, domain)]);
 		if (bootverbose)
 			printf("SRAT: CPU %u has memory domain %d\n", i,
-			    pc->pc_domain);
+			    PCPU_REF_GET(pc, domain));
 	}
 	/* XXXMJ the page is leaked. */
 	pmap_unmapbios(cpus, sizeof(*cpus) * max_cpus);

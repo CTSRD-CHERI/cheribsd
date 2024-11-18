@@ -383,7 +383,7 @@ generic_restart_cpus(cpuset_t map, u_int type)
 			if (!CPU_ISSET(id, &map))
 				continue;
 
-			mb = &pcpu_find(id)->pc_monitorbuf;
+			mb = PCPU_ID_PTR(id, monitorbuf);
 			atomic_store_int(&mb->stop_state,
 			    MONITOR_STOPSTATE_RUNNING);
 		}
@@ -975,7 +975,6 @@ smp_rendezvous_cpus_done(struct smp_rendezvous_cpus_retry_arg *arg)
 int
 quiesce_cpus(cpuset_t map, const char *wmesg, int prio)
 {
-	struct pcpu *pcpu;
 	u_int *gen;
 	int error;
 	int cpu;
@@ -987,20 +986,19 @@ quiesce_cpus(cpuset_t map, const char *wmesg, int prio)
 		for (cpu = 0; cpu <= mp_maxid; cpu++) {
 			if (!CPU_ISSET(cpu, &map) || CPU_ABSENT(cpu))
 				continue;
-			pcpu = pcpu_find(cpu);
-			gen[cpu] = pcpu->pc_idlethread->td_generation;
+			gen[cpu] = PCPU_ID_GET(cpu, idlethread)->td_generation;
 		}
 	}
 	for (cpu = 0; cpu <= mp_maxid; cpu++) {
 		if (!CPU_ISSET(cpu, &map) || CPU_ABSENT(cpu))
 			continue;
-		pcpu = pcpu_find(cpu);
 		thread_lock(curthread);
 		sched_bind(curthread, cpu);
 		thread_unlock(curthread);
 		if ((prio & PDROP) != 0)
 			continue;
-		while (gen[cpu] == pcpu->pc_idlethread->td_generation) {
+		while (gen[cpu] == PCPU_ID_GET(cpu,
+		    idlethread)->td_generation) {
 			error = tsleep(quiesce_cpus, prio & ~PDROP, wmesg, 1);
 			if (error != EWOULDBLOCK)
 				goto out;
@@ -1040,14 +1038,15 @@ quiesce_all_critical(void)
 	MPASS(curthread->td_critnest == 0);
 
 	CPU_FOREACH(cpu) {
-		pcpu = cpuid_to_pcpu[cpu];
-		td = pcpu->pc_curthread;
+		pcpu = pcpu_find(cpu);
+		td = PCPU_REF_GET(pcpu, curthread);
 		for (;;) {
 			if (td->td_critnest == 0)
 				break;
 			cpu_spinwait();
 			newtd = (struct thread *)
-			    atomic_load_acq_ptr((void *)pcpu->pc_curthread);
+			    atomic_load_acq_ptr((void *)PCPU_REF_GET(pcpu,
+			    curthread));
 			if (td != newtd)
 				break;
 		}

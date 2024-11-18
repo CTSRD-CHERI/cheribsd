@@ -1191,10 +1191,11 @@ forward_wakeup(int cpunum)
 	CPU_OR(&dontuse, &dontuse, &hlt_cpus_mask);
 	CPU_ZERO(&map2);
 	if (forward_wakeup_use_loop) {
-		STAILQ_FOREACH(pc, &cpuhead, pc_allcpu) {
-			id = pc->pc_cpuid;
+		for (pc = pcpu_first(); pc != NULL; pc = pcpu_next(pc)) {
+			id = PCPU_REF_GET(pc, cpuid);
 			if (!CPU_ISSET(id, &dontuse) &&
-			    pc->pc_curthread == pc->pc_idlethread) {
+			    PCPU_REF_GET(pc, curthread) ==
+			    PCPU_REF_GET(pc, idlethread)) {
 				CPU_SET(id, &map2);
 			}
 		}
@@ -1226,11 +1227,11 @@ forward_wakeup(int cpunum)
 	}
 	if (!CPU_EMPTY(&map)) {
 		forward_wakeups_delivered++;
-		STAILQ_FOREACH(pc, &cpuhead, pc_allcpu) {
-			id = pc->pc_cpuid;
+		for (pc = pcpu_first(); pc != NULL; pc = pcpu_next(pc)) {
+			id = PCPU_REF_GET(pc, cpuid);
 			if (!CPU_ISSET(id, &map))
 				continue;
-			if (cpu_idle_wakeup(pc->pc_cpuid))
+			if (cpu_idle_wakeup(PCPU_REF_GET(pc, cpuid)))
 				CPU_CLR(id, &map);
 		}
 		if (!CPU_EMPTY(&map))
@@ -1245,10 +1246,9 @@ forward_wakeup(int cpunum)
 static void
 kick_other_cpu(int pri, int cpuid)
 {
-	struct pcpu *pcpu;
+	struct thread *td;
 	int cpri;
 
-	pcpu = pcpu_find(cpuid);
 	if (CPU_ISSET(cpuid, &idle_cpus_mask)) {
 		forward_wakeups_delivered++;
 		if (!cpu_idle_wakeup(cpuid))
@@ -1256,7 +1256,8 @@ kick_other_cpu(int pri, int cpuid)
 		return;
 	}
 
-	cpri = pcpu->pc_curthread->td_priority;
+	td = PCPU_ID_GET(cpuid, curthread);
+	cpri = td->td_priority;
 	if (pri >= cpri)
 		return;
 
@@ -1270,8 +1271,8 @@ kick_other_cpu(int pri, int cpuid)
 	}
 #endif /* defined(IPI_PREEMPTION) && defined(PREEMPTION) */
 
-	if (pcpu->pc_curthread->td_lock == &sched_lock) {
-		ast_sched_locked(pcpu->pc_curthread, TDA_SCHED);
+	if (td->td_lock == &sched_lock) {
+		ast_sched_locked(td, TDA_SCHED);
 		ipi_cpu(cpuid, IPI_AST);
 	}
 }

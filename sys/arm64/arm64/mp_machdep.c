@@ -44,6 +44,7 @@
 #include <sys/module.h>
 #include <sys/mutex.h>
 #include <sys/pcpu.h>
+#include <sys/pcpu_executive.h>
 #include <sys/proc.h>
 #include <sys/sched.h>
 #include <sys/smp.h>
@@ -134,7 +135,7 @@ static bool
 is_boot_cpu(uint64_t target_cpu)
 {
 
-	return (PCPU_GET_MPIDR(cpuid_to_pcpu[0]) == (target_cpu & CPU_AFF_MASK));
+	return (PCPU_ID_GET(0, mpidr) == (target_cpu & CPU_AFF_MASK));
 }
 
 static void
@@ -200,11 +201,11 @@ init_secondary(uint64_t cpu)
 	 * they can pass random value in it.
 	 */
 	mpidr = READ_SPECIALREG(mpidr_el1) & CPU_AFF_MASK;
-	if (cpu >= MAXCPU || cpuid_to_pcpu[cpu] == NULL ||
-	    PCPU_GET_MPIDR(cpuid_to_pcpu[cpu]) != mpidr) {
+	if (cpu >= MAXCPU || !pcpu_exists(cpu) ||
+	    PCPU_ID_GET(cpu, mpidr) != mpidr) {
 		for (cpu = 0; cpu < mp_maxid; cpu++)
-			if (cpuid_to_pcpu[cpu] != NULL &&
-			    PCPU_GET_MPIDR(cpuid_to_pcpu[cpu]) == mpidr)
+			if (pcpu_exists(cpu) &&
+			    PCPU_ID_GET(cpu, mpidr) == mpidr)
 				break;
 		if ( cpu >= MAXCPU)
 			panic("MPIDR for this CPU is not in pcpu table");
@@ -218,8 +219,8 @@ init_secondary(uint64_t cpu)
 	 * We need this before signalling the CPU is ready to
 	 * let the boot CPU use the results.
 	 */
-	pcpup = cpuid_to_pcpu[cpu];
-	pcpup->pc_midr = get_midr();
+	pcpup = pcpu_find(cpu);
+	PCPU_REF_SET(pcpup, midr, get_midr());
 	identify_cpu(cpu);
 
 	/* Ensure the stores in identify_cpu have completed */
@@ -232,14 +233,14 @@ init_secondary(uint64_t cpu)
 
 	/* Initialize curthread */
 	KASSERT(PCPU_GET(idlethread) != NULL, ("no idle thread"));
-	pcpup->pc_curthread = pcpup->pc_idlethread;
+	PCPU_REF_SET(pcpup, curthread, PCPU_REF_GET(pcpup, idlethread));
 	schedinit_ap();
 
 	/* Initialize curpmap to match TTBR0's current setting. */
 	pmap0 = vmspace_pmap(&vmspace0);
 	KASSERT(pmap_to_ttbr0(pmap0) == READ_SPECIALREG(ttbr0_el1),
 	    ("pmap0 doesn't match cpu %ld's ttbr0", cpu));
-	pcpup->pc_curpmap = pmap0;
+	PCPU_REF_SET(pcpup, curpmap, pmap0);
 
 	install_cpu_errata();
 
@@ -473,7 +474,7 @@ start_cpu(u_int cpuid, uint64_t target_cpu, int domain, vm_paddr_t release_addr)
 	    M_WAITOK | M_ZERO);
 	pmap_disable_promotion((vm_offset_t)pcpup, size);
 	pcpu_init(pcpup, cpuid, sizeof(struct pcpu));
-	pcpup->pc_mpidr = target_cpu & CPU_AFF_MASK;
+	PCPU_REF_SET(pcpup, mpidr, target_cpu & CPU_AFF_MASK);
 	bootpcpu = pcpup;
 
 	dpcpu[cpuid - 1] = (void *)(pcpup + 1);
@@ -544,8 +545,8 @@ madt_handler(ACPI_SUBTABLE_HEADER *entry, void *arg)
 			domain = acpi_pxm_get_cpu_locality(intr->Uid);
 #endif
 		if (start_cpu(id, intr->ArmMpidr, domain, 0)) {
-			MPASS(cpuid_to_pcpu[id] != NULL);
-			cpuid_to_pcpu[id]->pc_acpi_id = intr->Uid;
+			MPASS(pcpu_exists(id));
+			PCPU_ID_SET(id, acpi_id, intr->Uid);
 			/*
 			 * Don't increment for the boot CPU, its CPU ID is
 			 * reserved.
@@ -663,7 +664,7 @@ start_cpu_fdt(u_int id, phandle_t node, u_int addr_size, pcell_t *reg)
 	if (vm_ndomains == 1 ||
 	    OF_getencprop(node, "numa-node-id", &domain, sizeof(domain)) <= 0)
 		domain = 0;
-	cpuid_to_pcpu[cpuid]->pc_domain = domain;
+	PCPU_ID_SET(cpuid, domain, domain);
 	if (domain < MAXMEMDOM)
 		CPU_SET(cpuid, &cpuset_domain[domain]);
 	return (true);
@@ -697,7 +698,7 @@ cpu_mp_start(void)
 	/* CPU 0 is always boot CPU. */
 	CPU_SET(0, &all_cpus);
 	mpidr = READ_SPECIALREG(mpidr_el1) & CPU_AFF_MASK;
-	cpuid_to_pcpu[0]->pc_mpidr = mpidr;
+	PCPU_ID_SET(0, mpidr, mpidr);
 
 	cpu_desc_init();
 

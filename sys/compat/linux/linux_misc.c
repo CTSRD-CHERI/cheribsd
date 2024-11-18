@@ -2562,7 +2562,7 @@ linux_getcpu(struct thread *td, struct linux_getcpu_args *args)
 
 	cpu = td->td_oncpu; /* Make sure it doesn't change during copyout(9) */
 	error = 0;
-	node = cpuid_to_pcpu[cpu]->pc_domain;
+	node = PCPU_ID_GET(cpu, domain);
 
 	if (args->cpu != NULL)
 		error = copyout(&cpu, args->cpu, sizeof(l_int));
