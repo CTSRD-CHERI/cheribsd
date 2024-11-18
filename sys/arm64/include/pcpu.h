@@ -47,6 +47,9 @@ struct debug_monitor_state;
 #endif
 
 #define	PCPU_MD_FIELDS							\
+	/*								\
+	 * Restricted fields						\
+	 */								\
 	u_int	pc_acpi_id;	/* ACPI CPU id */			\
 	u_int	pc_midr;	/* stored MIDR value */			\
 	uint64_t pc_clock;						\
@@ -62,6 +65,16 @@ struct debug_monitor_state;
 
 struct pcb;
 struct pcpu;
+
+PCPU_DECLARE(u_int, acpi_id);
+PCPU_DECLARE(u_int, midr);
+PCPU_DECLARE(uint64_t, clock);
+PCPU_DECLARE(pcpu_bp_harden, bp_harden);
+PCPU_DECLARE(pcpu_ssbd, ssbd);
+PCPU_DECLARE(struct pmap *, curpmap);
+PCPU_DECLARE(struct pmap *, curvmpmap);
+PCPU_DECLARE(uint64_t, mpidr);
+PCPU_DECLARE(u_int, bcast_tlbi_workaround);
 
 #ifdef __CHERI_PURE_CAPABILITY__
 /*
@@ -109,9 +122,16 @@ void init_cpu_pcpup(void *pcpup);
  * otherwise. Hence, we concatenate the member argument directly in PCPU
  * accessor macros.
  */
+#ifdef PCPU_FUNCS
 #define	__PCPU_REF_PTR(ref, _member)					\
+	__pcpu_ptr ## _member(ref)
+#endif
 
+#ifdef PCPU_FUNCS
+#define	__PCPU_PTR(_member)		__pcpu_ptr ## _member (pcpup)
+#else
 #define	__PCPU_PTR(_member)		__PCPU_REF_PTR(pcpup, _member)
+#endif
 #define	PCPU_PTR(member)						\
 	(__PCPU_PTR(_ ## member))
 #define	PCPU_GET(member)						\
@@ -120,6 +140,14 @@ void init_cpu_pcpup(void *pcpup);
 	(*__PCPU_PTR(_ ## member) += (value))
 #define	PCPU_SET(member,value)						\
 	(*__PCPU_PTR(_ ## member) = (value))
+
+#ifdef PCPU_FUNCS
+/*
+ * XXXKW: We use an id-specific function not to call pcpu_find() on the caller
+ * side to eliminate an additional domain transition on CHERI.
+ */
+#define	__PCPU_ID_PTR(id, _member)	__pcpu_id_ptr ## _member(id)
+#endif
 
 #endif	/* _KERNEL */
 

@@ -45,7 +45,10 @@
 #include <sys/queue.h>
 #include <sys/_rmlock.h>
 #include <sys/resource.h>
+#include <sys/_pcpu.h>
+#ifndef PCPU_FUNCS
 #include <sys/pcpu_executive.h>
+#endif
 #include <machine/pcpu.h>
 
 #define	DPCPU_SETNAME		"set_pcpu"
@@ -342,10 +345,39 @@ extern uintptr_t dpcpu_off[];
 	}								\
 } while (0)
 
+#ifdef PCPU_FUNCS
+struct pcpu;
+#endif
+/*
+ * XXXKW: The unrestricted fields should be directly accessed rather than using
+ * function accessors.
+ */
+PCPU_DECLARE(struct thread *, curthread);
+PCPU_DECLARE(u_int, cpuid);
+PCPU_DECLARE(int, domain);
+PCPU_DECLARE(struct thread *, idlethread);
+PCPU_DECLARE(struct thread *, fpcurthread);
+PCPU_DECLARE(struct thread *, deadthread);
+PCPU_DECLARE(struct pcb *, curpcb);
+PCPU_DECLARE(void *, sched);
+PCPU_DECLARE(uint64_t, switchtime);
+PCPU_DECLARE(int, switchticks);
+PCPU_DECLARE(struct lock_list_entry *, spinlocks);
+PCPU_DECLARE(long, cp_time);
+PCPU_DECLARE(struct _device *, device);
+PCPU_DECLARE(void *, netisr);
+PCPU_DECLARE(int8_t, vfs_freevnodes);
+PCPU_DECLARE(struct rm_queue, rm_queue);
+PCPU_DECLARE(uintptr_t, dynamic);
+PCPU_DECLARE(uint64_t, early_dummy_counter);
+PCPU_DECLARE(uintptr_t, zpcpu_offset);
+
+#ifndef PCPU_FUNCS
 STAILQ_HEAD(cpuhead, pcpu);
 
 extern struct cpuhead cpuhead;
 extern struct pcpu *cpuid_to_pcpu[];
+#endif
 
 #define	curcpu		PCPU_GET(cpuid)
 #define	curvidata	PCPU_GET(vidata)
@@ -458,9 +490,15 @@ void	dpcpu_free(void *s, int size);
 void	dpcpu_init(void *dpcpu, int cpuid);
 void	pcpu_destroy(struct pcpu *pcpu);
 struct	pcpu *pcpu_find(u_int cpuid);
+#ifdef PCPU_FUNCS
+int	pcpu_exists(u_int cpuid);
+struct pcpu *pcpu_first(void);
+struct pcpu *pcpu_next(struct pcpu *pcpu);
+#else
 #define	pcpu_exists(cpuid)	cpuid_to_pcpu[(cpuid)]
 #define	pcpu_first()	STAILQ_FIRST(&cpuhead)
 #define	pcpu_next(pcpu)	STAILQ_NEXT(pcpu, pc_allcpu)
+#endif
 void	pcpu_init(struct pcpu *pcpu, int cpuid, size_t size);
 
 #endif /* _KERNEL */

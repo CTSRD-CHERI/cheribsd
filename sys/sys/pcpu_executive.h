@@ -42,6 +42,7 @@
 #include <sys/queue.h>
 #include <sys/_rmlock.h>
 #include <sys/resource.h>
+#include <sys/_pcpu.h>
 #include <machine/pcpu.h>
 
 /*
@@ -51,7 +52,16 @@
  * defined in the PCPU_MD_FIELDS macro defined in <machine/pcpu.h>.
  */
 struct pcpu {
+	/*
+	 * Unrestricted fields
+	 */
 	struct thread	*pc_curthread;		/* Current thread */
+	u_int		pc_cpuid;		/* This cpu number */
+	int		pc_domain;		/* Memory domain. */
+
+	/*
+	 * Restricted fields
+	 */
 	struct thread	*pc_idlethread;		/* Idle thread */
 	struct thread	*pc_fpcurthread;	/* Fp state owner */
 	struct thread	*pc_deadthread;		/* Zombie thread or NULL */
@@ -59,19 +69,21 @@ struct pcpu {
 	void		*pc_sched;		/* Scheduler state */
 	uint64_t	pc_switchtime;		/* cpu_ticks() at last csw */
 	int		pc_switchticks;		/* `ticks' at last csw */
-	u_int		pc_cpuid;		/* This cpu number */
-	STAILQ_ENTRY(pcpu) pc_allcpu;
 	struct lock_list_entry *pc_spinlocks;
 	long		pc_cp_time[CPUSTATES];	/* statclock ticks */
 	struct _device	*pc_device;		/* CPU device handle */
 	void		*pc_netisr;		/* netisr SWI cookie */
 	int8_t		pc_vfs_freevnodes;	/* freevnodes counter */
 	char		pc_unused1[3];		/* unused pad */
-	int		pc_domain;		/* Memory domain. */
 	struct rm_queue	pc_rm_queue;		/* rmlock list of trackers */
 	uintptr_t	pc_dynamic;		/* Dynamic per-cpu data area */
 	uint64_t	pc_early_dummy_counter;	/* Startup time counter(9) */
 	uintptr_t	pc_zpcpu_offset;	/* Offset into zpcpu allocs */
+
+	/*
+	 * Executive fields
+	 */
+	STAILQ_ENTRY(pcpu) pc_allcpu;
 
 	/*
 	 * Keep MD fields last, so that CPU-specific variations on a

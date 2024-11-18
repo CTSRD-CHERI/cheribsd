@@ -1,10 +1,12 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2019 The FreeBSD Foundation
+ * Copyright (c) 2024 Konrad Witaszczyk
  *
- * This software was developed by Konstantin Belousov <kib@FreeBSD.org>
- * under sponsorship from the FreeBSD Foundation.
+ * This software was developed by the University of Cambridge Computer
+ * Laboratory (Department of Computer Science and Technology) under Office of
+ * Naval Research (ONR) Contract No. N00014-22-1-2463 ("SoftWare Integrated
+ * with Secure Hardware (SWISH)").
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -18,7 +20,7 @@
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
@@ -28,31 +30,25 @@
  * SUCH DAMAGE.
  */
 
-#ifdef __arm__
-#include <arm/pcpu_aux.h>
-#else /* !__arm__ */
+#include <sys/cdefs.h>
+#include <sys/param.h>
+#include <sys/pcpu.h>
+#include <sys/pcpu_executive.h>
 
-#ifndef _MACHINE_PCPU_AUX_H_
-#define	_MACHINE_PCPU_AUX_H_
+#include <machine/pcpu.h>
 
-#ifndef _KERNEL
-#error "Not for userspace"
-#endif
-
-#ifndef _SYS_PCPU_H_
-#error "Do not include machine/pcpu_aux.h directly"
-#endif
-
-#ifndef PCPU_FUNCS
 /*
  * To minimize memory waste in per-cpu UMA zones, the page size should
  * be a multiple of the size of struct pcpu.
  */
 _Static_assert(PAGE_SIZE % sizeof(struct pcpu) == 0, "fix pcpu size");
-#endif
 
-extern uint64_t pcpu0_early_dummy_counter;
-
-#endif	/* _MACHINE_PCPU_AUX_H_ */
-
-#endif /* !__arm__ */
+PCPU_DEFINE(u_int, acpi_id);
+PCPU_DEFINE(u_int, midr);
+PCPU_DEFINE(uint64_t, clock);
+PCPU_DEFINE(pcpu_bp_harden, bp_harden);
+PCPU_DEFINE(pcpu_ssbd, ssbd);
+PCPU_DEFINE(struct pmap *, curpmap);
+PCPU_DEFINE(struct pmap *, curvmpmap);
+PCPU_DEFINE(uint64_t, mpidr);
+PCPU_DEFINE(u_int, bcast_tlbi_workaround);

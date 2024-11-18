@@ -71,11 +71,38 @@ struct dpcpu_free {
 	TAILQ_ENTRY(dpcpu_free) df_link;
 };
 
+/*
+ * As it is not used in this file, make sure the curthread literal is not
+ * defined to correctly define the curthread's accessor.
+ */
+PCPU_DEFINE(struct thread *, curthread);
+PCPU_DEFINE(u_int, cpuid);
+PCPU_DEFINE(int, domain);
+PCPU_DEFINE(struct thread *, idlethread);
+PCPU_DEFINE(struct thread *, fpcurthread);
+PCPU_DEFINE(struct thread *, deadthread);
+PCPU_DEFINE(struct pcb *, curpcb);
+PCPU_DEFINE(void *, sched);
+PCPU_DEFINE(uint64_t, switchtime);
+PCPU_DEFINE(int, switchticks);
+PCPU_DEFINE(struct lock_list_entry *, spinlocks);
+PCPU_DEFINE(long, cp_time);
+PCPU_DEFINE(struct _device *, device);
+PCPU_DEFINE(void *, netisr);
+PCPU_DEFINE(int8_t, vfs_freevnodes);
+PCPU_DEFINE(struct rm_queue, rm_queue);
+PCPU_DEFINE(uintptr_t, dynamic);
+PCPU_DEFINE(uint64_t, early_dummy_counter);
+PCPU_DEFINE(uintptr_t, zpcpu_offset);
 DPCPU_DEFINE_STATIC_ARRAY(char, modspace, [DPCPU_MODMIN] __aligned(__alignof(void *)));
 static TAILQ_HEAD(, dpcpu_free) dpcpu_head = TAILQ_HEAD_INITIALIZER(dpcpu_head);
 static struct sx dpcpu_lock;
 uintptr_t dpcpu_off[MAXCPU];
 struct pcpu *cpuid_to_pcpu[MAXCPU];
+#ifdef PCPU_FUNCS
+STAILQ_HEAD(cpuhead, pcpu);
+static
+#endif
 struct cpuhead cpuhead = STAILQ_HEAD_INITIALIZER(cpuhead);
 #ifdef __CHERI_PURE_CAPABILITY__
 uintptr_t dpcpu_start = DPCPU_START;
@@ -294,6 +321,38 @@ pcpu_find(u_int cpuid)
 
 	return (cpuid_to_pcpu[cpuid]);
 }
+
+#ifdef PCPU_FUNCS
+/*
+ * Test if a struct pcpu exists by cpu id.
+ */
+int
+pcpu_exists(u_int cpuid)
+{
+
+	return (pcpu_find(cpuid) != NULL);
+}
+
+/*
+ * Get the first struct pcpu to traverse the cpuhead list.
+ */
+struct pcpu *
+pcpu_first(void)
+{
+
+	return (STAILQ_FIRST(&cpuhead));
+}
+
+/*
+ * Get the next struct pcpu to traverse the cpuhead list.
+ */
+struct pcpu *
+pcpu_next(struct pcpu *pcpu)
+{
+
+	return (STAILQ_NEXT(pcpu, pc_allcpu));
+}
+#endif
 
 int
 sysctl_dpcpu_quad(SYSCTL_HANDLER_ARGS)
