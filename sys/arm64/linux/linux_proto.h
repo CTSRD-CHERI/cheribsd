@@ -365,7 +365,7 @@ struct linux_readlinkat_args {
 struct linux_newfstatat_args {
 	char dfd_l_[PADL_(l_int)]; l_int dfd; char dfd_r_[PADR_(l_int)];
 	char pathname_l_[PADL_(char * __capability)]; char * __capability pathname; char pathname_r_[PADR_(char * __capability)];
-	char statbuf_l_[PADL_(struct l_stat64 * __capability)]; struct l_stat64 * __capability statbuf; char statbuf_r_[PADR_(struct l_stat64 * __capability)];
+	char statbuf_l_[PADL_(struct l_newstat * __capability)]; struct l_newstat * __capability statbuf; char statbuf_r_[PADR_(struct l_newstat * __capability)];
 	char flag_l_[PADL_(l_int)]; l_int flag; char flag_r_[PADR_(l_int)];
 };
 struct linux_newfstat_args {

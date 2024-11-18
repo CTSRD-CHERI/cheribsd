@@ -635,7 +635,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct linux_newfstatat_args *p = params;
 		iarg[a++] = p->dfd; /* l_int */
 		uarg[a++] = (intptr_t)p->pathname; /* char * */
-		uarg[a++] = (intptr_t)p->statbuf; /* struct l_stat64 * */
+		uarg[a++] = (intptr_t)p->statbuf; /* struct l_newstat * */
 		iarg[a++] = p->flag; /* l_int */
 		*n_args = 4;
 		break;
@@ -3510,7 +3510,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland char *";
 			break;
 		case 2:
-			p = "userland struct l_stat64 *";
+			p = "userland struct l_newstat *";
 			break;
 		case 3:
 			p = "l_int";
