@@ -355,7 +355,7 @@ linux_mremap(struct thread *td, struct linux_mremap_args *args)
 int
 linux_msync(struct thread *td, struct linux_msync_args *args)
 {
-	// defined(LINUX_COMPAT64) || defined(LINUX_COMPAT32)
+	// defined(COMPAT_LINUX64) || defined(COMPAT_LINUX32)
 #if 1
 	return (kern_msync(td, args->addr, args->len,
 	    args->fl & ~LINUX_MS_SYNC));
@@ -373,7 +373,7 @@ linux_msync(struct thread *td, struct linux_msync_args *args)
 int
 linux_mlock(struct thread *td, struct linux_mlock_args *uap)
 {
-#if defined(LINUX_COMPAT64) || defined(LINUX_COMPAT32)
+#if defined(COMPAT_LINUX64) || defined(COMPAT_LINUX32)
 	return (kern_mlock(td->td_proc, td->td_ucred,
 	    __DECONST(uintptr_t, uap->addr), uap->len));
 #else
@@ -389,7 +389,7 @@ linux_mlock(struct thread *td, struct linux_mlock_args *uap)
 int
 linux_munlock(struct thread *td, struct linux_munlock_args *uap)
 {
-#if defined(LINUX_COMPAT64) || defined(LINUX_COMPAT32)
+#if defined(COMPAT_LINUX64) || defined(COMPAT_LINUX32)
 	return (kern_munlock(td, (uintptr_t)uap->addr, uap->len));
 #else
 	struct munlock_args bargs = {
@@ -440,7 +440,7 @@ linux_mmap2(struct thread *td, struct linux_mmap2_args *uap)
 int
 linux_munmap(struct thread *td, struct linux_munmap_args *args)
 {
-	// defined(LINUX_COMPAT64) || defined(LINUX_COMPAT32)
+	// defined(COMPAT_LINUX64) || defined(COMPAT_LINUX32)
 #if 1
 	return (kern_munmap(td, (uintptr_t)args->addr, args->len));
 #else
