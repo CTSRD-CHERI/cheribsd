@@ -115,6 +115,8 @@
 
 #include <dev/smbios/smbios.h>
 
+#include "assym.inc"
+
 #if defined(CHERI_COMPARTMENTALIZE_KERNEL)
 /*
  * TODO: define the size and offsets.
@@ -146,7 +148,11 @@ enum arm64_bus arm64_bus_method = ARM64_BUS_NONE;
  * could relocate this, but will need to keep the same virtual address as
  * it's reverenced by the EARLY_COUNTER macro.
  */
-struct pcpu pcpu0;
+static struct pcpu pcpu0;
+__asm(
+    ".globl pcpu0_early_dummy_counter\n"
+    ".set pcpu0_early_dummy_counter, pcpu0 + " __XSTRING(PC_EARLY_DUMMY_COUNTER)
+);
 
 #if defined(PERTHREAD_SSP)
 /*

@@ -49,7 +49,7 @@
  */
 _Static_assert(PAGE_SIZE % sizeof(struct pcpu) == 0, "fix pcpu size");
 
-extern struct pcpu pcpu0;
+extern uint64_t pcpu0_early_dummy_counter;
 
 #endif	/* _MACHINE_PCPU_AUX_H_ */
 

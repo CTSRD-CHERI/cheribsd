@@ -34,7 +34,7 @@
 #include <sys/pcpu.h>
 #include <machine/atomic.h>
 
-#define	EARLY_COUNTER	PCPU_REF_PTR(&pcpu0, early_dummy_counter)
+#define	EARLY_COUNTER	&pcpu0_early_dummy_counter
 
 #define	counter_enter()	do {} while (0)
 #define	counter_exit()	do {} while (0)

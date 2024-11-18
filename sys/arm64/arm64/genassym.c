@@ -66,6 +66,7 @@ ASSYM(PCPU_SIZE, sizeof(struct pcpu));
 ASSYM(PC_CURPCB, offsetof(struct pcpu, pc_curpcb));
 ASSYM(PC_CURTHREAD, offsetof(struct pcpu, pc_curthread));
 ASSYM(PC_CURTHREAD_SIZE, sizeof(((struct pcpu *)0)->pc_curthread));
+ASSYM(PC_EARLY_DUMMY_COUNTER, offsetof(struct pcpu, pc_early_dummy_counter));
 ASSYM(PC_SSBD, offsetof(struct pcpu, pc_ssbd));
 
 /* Size of pcb, rounded to keep stack alignment */
