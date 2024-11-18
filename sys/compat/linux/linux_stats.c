@@ -178,7 +178,7 @@ linux_newstat(struct thread *td, struct linux_newstat_args *args)
 	    UIO_USERSPACE, &buf);
 	if (error)
 		return (error);
-	return (newstat_copyout(&buf, args->buf));
+	return (newstat_copyout(&buf, LINUX_USER_CAP_OBJ(args->buf)));
 }
 
 int
@@ -191,7 +191,7 @@ linux_newlstat(struct thread *td, struct linux_newlstat_args *args)
 	    UIO_USERSPACE, &sb);
 	if (error)
 		return (error);
-	return (newstat_copyout(&sb, args->buf));
+	return (newstat_copyout(&sb, LINUX_USER_CAP_OBJ(args->buf)));
 }
 #endif
 
@@ -617,7 +617,7 @@ linux_newfstatat(struct thread *td, struct linux_newfstatat_args *args)
 	error = linux_kern_statat(td, flag, dfd,
 	    LINUX_USER_CAP_PATH(args->pathname), UIO_USERSPACE, &buf);
 	if (error == 0)
-		error = newstat_copyout(&buf, args->statbuf);
+		error = newstat_copyout(&buf, LINUX_USER_CAP_OBJ(args->statbuf));
 
 	return (error);
 }

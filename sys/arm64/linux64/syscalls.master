@@ -501,7 +501,7 @@
 		int linux_newfstatat(
 		    l_int dfd,
 		    char *pathname,
-		    struct l_stat64 *statbuf,
+		    struct l_newstat *statbuf,
 		    l_int flag
 		);
 	}
