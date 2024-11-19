@@ -570,31 +570,6 @@ interp_cap(struct image_params *imgp, Elf_Auxargs *args, uint64_t perms)
 	return (cheri_capability_build_user_rwx(perms, interp_base, interp_len,
 	    args->base - interp_base));
 }
-
-static void * __capability
-timekeep_cap(struct image_params *imgp)
-{
-	void * __capability tmpcap;
-	struct vmspace *vmspace = imgp->proc->p_vmspace;
-	uintcap_t timekeep_base;
-	size_t timekeep_len;
-
-	timekeep_base = vmspace->vm_shp_base + imgp->sysent->sv_timekeep_offset;
-	timekeep_len = sizeof(struct vdso_timekeep) +
-	    sizeof(struct vdso_timehands) * VDSO_TH_NUM;
-
-	/* These are sub-page so should be representable as-is. */
-	KASSERT(timekeep_base == CHERI_REPRESENTABLE_ALIGN_DOWN(timekeep_base,
-	    timekeep_len), ("timekeep_base needs rounding"));
-	KASSERT(timekeep_len == CHERI_REPRESENTABLE_LENGTH(timekeep_len),
-	    ("timekeep_len needs rounding"));
-
-	tmpcap = (void * __capability)cheri_setboundsexact(
-	    cheri_andperm(timekeep_base, CHERI_PERMS_USERSPACE_RODATA),
-	    timekeep_len);
-
-	return (tmpcap);
-}
 #endif
 
 int
