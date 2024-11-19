@@ -330,12 +330,12 @@ int
 __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 {
 	char canary[LINUX_AT_RANDOM_LEN];
-	uint64_t * __capability vectp;
+	l_uintptr_t * __capability vectp;
 	char *stringp;
 	uintcap_t destp, ustringp;
 	struct ps_strings * __capability arginfo;
 	struct proc *p;
-	size_t execpath_len;
+	size_t execpath_len, len;
 	int argc, envc;
 	int error;
 
@@ -349,7 +349,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 	if (imgp->execpath != NULL && imgp->auxargs != NULL) {
 		execpath_len = strlen(imgp->execpath) + 1;
 		destp -= execpath_len;
-		destp = rounddown2(destp, sizeof(uint64_t));
+		destp = rounddown2(destp, sizeof(l_uintptr_t));
 		imgp->execpathp = (void * __capability)cheri_setboundsexact(destp, execpath_len);
 		error = copyout(imgp->execpath, imgp->execpathp, execpath_len);
 		if (error != 0)
@@ -371,7 +371,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 	 * Allocate room for the argument and environment strings.
 	 */
 	destp -= ARG_MAX - imgp->args->stringspace;
-	destp = rounddown2(destp, sizeof(uint64_t));
+	destp = rounddown2(destp, sizeof(l_uintptr_t));
 	ustringp = cheri_setbounds(destp, ARG_MAX - imgp->args->stringspace);
 
 	if (imgp->auxargs) {
@@ -380,10 +380,10 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 		 * array.  It has up to LINUX_AT_COUNT entries.
 		 */
 		destp -= LINUX_AT_COUNT * sizeof(Elf_Auxinfo);
-		destp = rounddown2(destp, sizeof(uint64_t));
+		destp = rounddown2(destp, sizeof(l_uintptr_t));
 	}
 
-	vectp = (uint64_t * __capability)destp;
+	vectp = (l_uintptr_t * __capability)destp;
 
 	/*
 	 * Allocate room for the argv[] and env vectors including the
@@ -394,7 +394,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 	/*
 	 * Starting with 2.24, glibc depends on a 16-byte stack alignment.
 	 */
-	vectp = (uint64_t * __capability)((((uintcap_t)vectp + 8) & ~0xF) - 8);
+	vectp = (l_uintptr_t * __capability)((((uintcap_t)vectp + 8) & ~0xF) - 8);
 
 	/*
 	 * vectp also becomes our initial stack base
@@ -417,7 +417,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
 	imgp->argv = cheri_setbounds(vectp, (argc + 1) * sizeof(*vectp));;
-	if (suword(&arginfo->ps_argvstr, (long)(intcap_t)vectp) != 0 ||
+	if (suptr(&arginfo->ps_argvstr, (intcap_t)vectp) != 0 ||
 	    suword32(&arginfo->ps_nargvstr, argc) != 0)
 		return (EFAULT);
 
@@ -425,19 +425,24 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 	 * Fill in argument portion of vector table.
 	 */
 	for (; argc > 0; --argc) {
+		len = strlen(stringp) + 1;
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+		if (sucap(vectp++, cheri_setbounds(ustringp, len)) != 0)
+			return (EFAULT);
+#else
 		if (suword(vectp++, ustringp) != 0)
 			return (EFAULT);
-		while (*stringp++ != 0)
-			ustringp++;
-		ustringp++;
+#endif
+		stringp += len;
+		ustringp += len;
 	}
 
 	/* a null vector table pointer separates the argp's from the envp's */
 	if (suword(vectp++, 0) != 0)
 		return (EFAULT);
 
-	imgp->envv = vectp;
-	if (suword(&arginfo->ps_envstr, (long)(intcap_t)vectp) != 0 ||
+	imgp->envv = cheri_setbounds(vectp, (envc + 1) * sizeof(*vectp));
+	if (suptr(&arginfo->ps_envstr, (intcap_t)vectp) != 0 ||
 	    suword32(&arginfo->ps_nenvstr, envc) != 0)
 		return (EFAULT);
 
@@ -445,11 +450,16 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 	 * Fill in environment portion of vector table.
 	 */
 	for (; envc > 0; --envc) {
+		len = strlen(stringp) + 1;
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+		if (sucap(vectp++, cheri_setbounds(ustringp, len)) != 0)
+			return (EFAULT);
+#else
 		if (suword(vectp++, ustringp) != 0)
 			return (EFAULT);
-		while (*stringp++ != 0)
-			ustringp++;
-		ustringp++;
+#endif
+		stringp += len;
+		ustringp += len;
 	}
 
 	/* end of vector table is a null pointer */
