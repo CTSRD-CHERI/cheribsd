@@ -268,6 +268,9 @@ elf64c_header_supported(const struct image_params *imgp,
 {
 	uint32_t note_value;
 
+	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
+	if (hdr->e_ident[EI_OSABI] == ELFOSABI_LINUX) return false;
+
 	if (get_benchmark_abi_note(imgp, &note_value))
 		return (note_value == 0);
 
@@ -279,6 +282,9 @@ elf64cb_header_supported(const struct image_params *imgp,
     const int32_t *osrel __unused, const uint32_t *fctl0 __unused)
 {
 	uint32_t note_value;
+
+	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
+	if (hdr->e_ident[EI_OSABI] == ELFOSABI_LINUX) return false;
 
 	if (get_benchmark_abi_note(imgp, &note_value))
 		return (note_value == 1);
