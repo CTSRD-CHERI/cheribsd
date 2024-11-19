@@ -338,10 +338,25 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 	size_t execpath_len, len;
 	int argc, envc;
 	int error;
+	bool strings_on_stack;
 
 	p = imgp->proc;
-	destp =	PROC_PS_STRINGS(p);
-	arginfo = imgp->ps_strings = (void * __capability)destp;
+
+	strings_on_stack = true;
+
+#if __has_feature(capabilities)
+	if (imgp->stack != imgp->strings)
+		strings_on_stack = false;
+	destp = (uintcap_t)imgp->strings;
+	destp = cheri_setaddress(destp, PROC_PS_STRINGS(p));
+	arginfo = (struct ps_strings * __capability)cheri_setboundsexact(destp,
+	    sizeof(*arginfo));
+#else
+	destp = (uintptr_t)PROC_PS_STRINGS(p);
+	arginfo = (struct ps_strings *)destp;
+#endif
+
+	imgp->ps_strings = arginfo;
 
 	/*
 	 * Copy the image path for the rtld.
@@ -396,10 +411,14 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	vectp = (l_uintptr_t * __capability)((((uintcap_t)vectp + 8) & ~0xF) - 8);
 
-	/*
-	 * vectp also becomes our initial stack base
-	 */
-	*stack_base = (uintcap_t)vectp;
+	if (!strings_on_stack) {
+		*stack_base = (uintcap_t)imgp->stack;
+	} else {
+		/*
+		 * vectp also becomes our initial stack base
+		 */
+		*stack_base = (uintcap_t)vectp;
+	}
 
 	stringp = imgp->args->begin_argv;
 	argc = imgp->args->argc;
