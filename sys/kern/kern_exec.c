@@ -807,8 +807,6 @@ interpret:
 	/* reset caught signals */
 	execsigs(p);
 
-	uprintf("execsigs Done");
-
 	/* name this process - nameiexec(p, ndp) */
 	bzero(p->p_comm, sizeof(p->p_comm));
 	if (args->fname)
@@ -820,7 +818,6 @@ interpret:
 #ifdef KTR
 	sched_clear_tdname(td);
 #endif
-	uprintf("renaming Done");
 
 	/*
 	 * mark as execed, wakeup the process that vforked (if any) and tell
@@ -839,14 +836,12 @@ interpret:
 		/* STOPs are no longer ignored, arrange for AST */
 		signotify(td);
 	}
-	uprintf("renaming Done");
 
 	if ((imgp->sysent->sv_setid_allowed != NULL &&
 	    !(*imgp->sysent->sv_setid_allowed)(td, imgp)) ||
 	    (p->p_flag2 & P2_NO_NEW_PRIVS) != 0)
 		execve_nosetid(imgp);
 
-	uprintf("execve_nosetid Done");
 
 	/*
 	 * Implement image setuid/setgid installation.
