@@ -185,17 +185,48 @@ linux_exec_setregs(struct thread *td, struct image_params *imgp,
 	struct pcb *pcb = td->td_pcb;
 
 	memset(regs, 0, sizeof(*regs));
-	regs->tf_sp = stack;
+
+
 #if __has_feature(capabilities)
-	hybridabi_thread_setregs(td, imgp->entry_addr);
-#else
-	regs->tf_elr = imgp->entry_addr;
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
+		regs->tf_x[0] = (uintcap_t)imgp->args->argc;
+		regs->tf_x[1] = imgp->argv;
+		regs->tf_x[2] = imgp->envv;
+		regs->tf_x[3] = imgp->auxv;
+		regs->tf_sp = stack;
+		trapframe_set_elr(regs, (uintcap_t)cheri_exec_pcc(td, imgp));
+	} else
 #endif
+	{
+		regs->tf_sp = stack;
+#if __has_feature(capabilities)
+		hybridabi_thread_setregs(td, imgp->entry_addr);
+#else
+		regs->tf_elr = imgp->entry_addr;
+#endif
+	}
 
 	pcb->pcb_tpidr_el0 = 0;
 	pcb->pcb_tpidrro_el0 = 0;
+
+#if __has_feature(capabilities)
+	WRITE_SPECIALREG_CAP(ctpidrro_el0, 0);
+	WRITE_SPECIALREG_CAP(ctpidr_el0, 0);
+#else
 	WRITE_SPECIALREG(tpidrro_el0, 0);
 	WRITE_SPECIALREG(tpidr_el0, 0);
+#endif
+
+#if __has_feature(capabilities)
+	td->td_pcb->pcb_cid_el0 = 0;
+	td->td_pcb->pcb_rcsp_el0 = 0;
+	td->td_pcb->pcb_rddc_el0 = 0;
+	td->td_pcb->pcb_rctpidr_el0 = 0;
+	WRITE_SPECIALREG_CAP(cid_el0, 0);
+	WRITE_SPECIALREG_CAP(rcsp_el0, 0);
+	WRITE_SPECIALREG_CAP(rddc_el0, 0);
+	WRITE_SPECIALREG_CAP(rctpidr_el0, 0);
+#endif
 
 #ifdef VFP
 	vfp_reset_state(td, pcb);
