@@ -364,7 +364,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 	if (imgp->execpath != NULL && imgp->auxargs != NULL) {
 		execpath_len = strlen(imgp->execpath) + 1;
 		destp -= execpath_len;
-		destp = rounddown2(destp, sizeof(l_uintptr_t));
+		destp = rounddown2(destp, sizeof(void * __capability));
 		imgp->execpathp = (void * __capability)cheri_setboundsexact(destp, execpath_len);
 		error = copyout(imgp->execpath, imgp->execpathp, execpath_len);
 		if (error != 0)
@@ -386,7 +386,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 	 * Allocate room for the argument and environment strings.
 	 */
 	destp -= ARG_MAX - imgp->args->stringspace;
-	destp = rounddown2(destp, sizeof(l_uintptr_t));
+	destp = rounddown2(destp, sizeof(void * __capability));
 	ustringp = cheri_setbounds(destp, ARG_MAX - imgp->args->stringspace);
 
 	if (imgp->auxargs) {
@@ -395,7 +395,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 		 * array.  It has up to LINUX_AT_COUNT entries.
 		 */
 		destp -= LINUX_AT_COUNT * sizeof(Elf_Auxinfo);
-		destp = rounddown2(destp, sizeof(l_uintptr_t));
+		destp = rounddown2(destp, sizeof(void * __capability));
 	}
 
 	vectp = (l_uintptr_t * __capability)destp;
