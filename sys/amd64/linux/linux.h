@@ -87,7 +87,7 @@ typedef struct {
 /*
  * Miscellaneous
  */
-#define LINUX_AT_COUNT		21	/* Count of used aux entry types.
+#define LINUX_AT_COUNT		41	/* Count of used aux entry types.
 					 * Keep this synchronized with
 					 * linux_copyout_auxargs() code.
 					 */
