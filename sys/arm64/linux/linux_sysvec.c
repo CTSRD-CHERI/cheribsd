@@ -190,9 +190,9 @@ linux_exec_setregs(struct thread *td, struct image_params *imgp,
 #if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
 
 	// Test it has reached here
-	int* test = nullptr;
+	int* test = 0;
 	*test = 1;
-	
+
 	regs->tf_x[0] = (uintcap_t)imgp->args->argc;
 	regs->tf_x[1] = (uintcap_t)imgp->argv;
 	regs->tf_x[2] = (uintcap_t)imgp->envv;
