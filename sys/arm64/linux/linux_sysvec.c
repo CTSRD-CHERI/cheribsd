@@ -187,24 +187,26 @@ linux_exec_setregs(struct thread *td, struct image_params *imgp,
 	memset(regs, 0, sizeof(*regs));
 
 
-#if __has_feature(capabilities)
-	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
-		regs->tf_x[0] = (uintcap_t)imgp->args->argc;
-		regs->tf_x[1] = (uintcap_t)imgp->argv;
-		regs->tf_x[2] = (uintcap_t)imgp->envv;
-		regs->tf_x[3] = (uintcap_t)imgp->auxv;
-		regs->tf_sp = stack;
-		trapframe_set_elr(regs, (uintcap_t)cheri_exec_pcc(td, imgp));
-	} else
-#endif
-	{
-		regs->tf_sp = stack;
-#if __has_feature(capabilities)
-		hybridabi_thread_setregs(td, imgp->entry_addr);
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+
+	// Test it has reached here
+	int* test = nullptr;
+	*test = 1;
+	
+	regs->tf_x[0] = (uintcap_t)imgp->args->argc;
+	regs->tf_x[1] = (uintcap_t)imgp->argv;
+	regs->tf_x[2] = (uintcap_t)imgp->envv;
+	regs->tf_x[3] = (uintcap_t)imgp->auxv;
+	regs->tf_sp = stack;
+	trapframe_set_elr(regs, (uintcap_t)cheri_exec_pcc(td, imgp));
 #else
-		regs->tf_elr = imgp->entry_addr;
+	regs->tf_sp = stack;
+#if __has_feature(capabilities)
+	hybridabi_thread_setregs(td, imgp->entry_addr);
+#else
+	regs->tf_elr = imgp->entry_addr;
 #endif
-	}
+#endif
 
 	pcb->pcb_tpidr_el0 = 0;
 	pcb->pcb_tpidrro_el0 = 0;
