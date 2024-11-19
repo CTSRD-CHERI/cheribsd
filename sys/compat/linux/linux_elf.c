@@ -549,12 +549,17 @@ __linuxN(copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	if (linux_kernver(td) >= LINUX_KERNVER(2,4,0))
 		AUXARGS_ENTRY(pos, LINUX_AT_CLKTCK, stclohz);
 	AUXARGS_ENTRY(pos, AT_PAGESZ, args->pagesz);
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
 	AUXARGS_ENTRY_PTR(pos, AT_PHDR, args->phdr);
+	AUXARGS_ENTRY_PTR(pos, AT_ENTRY, args->entry);
+#else
+	AUXARGS_ENTRY(pos, AT_PHDR, args->phdr);
+	AUXARGS_ENTRY(pos, AT_ENTRY, args->entry);
+#endif
 	AUXARGS_ENTRY(pos, AT_PHENT, args->phent);
 	AUXARGS_ENTRY(pos, AT_PHNUM, args->phnum);
 	AUXARGS_ENTRY(pos, AT_BASE, args->base);
 	AUXARGS_ENTRY(pos, AT_FLAGS, args->flags);
-	AUXARGS_ENTRY_PTR(pos, AT_ENTRY, args->entry);
 	AUXARGS_ENTRY(pos, AT_UID, imgp->proc->p_ucred->cr_ruid);
 	AUXARGS_ENTRY(pos, AT_EUID, imgp->proc->p_ucred->cr_svuid);
 	AUXARGS_ENTRY(pos, AT_GID, imgp->proc->p_ucred->cr_rgid);
