@@ -613,6 +613,9 @@ __linuxN(copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	AUXARGS_ENTRY_PTR(pos, AT_PHDR, cheri_setaddress(prog_cap(imgp,
 	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM),
 	    args->phdr));
+	AUXARGS_ENTRY_PTR(pos, LINUX_AT_CHERI_EXEC_RW_CAP, cheri_setaddress(prog_cap(imgp,
+	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM),
+	    args->phdr));
 #else
 	AUXARGS_ENTRY(pos, AT_PHDR, args->phdr);
 #endif
@@ -628,6 +631,7 @@ __linuxN(copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	entry = cheri_setflags(entry, CHERI_FLAGS_CAP_MODE);
 #endif
 	AUXARGS_ENTRY_PTR(pos, AT_ENTRY, entry);
+	AUXARGS_ENTRY_PTR(pos, LINUX_AT_CHERI_EXEC_RX_CAP, entry);
 
 	if (imgp->interp_end == 0) {
 		if (args->hdr_etype != ET_DYN) {

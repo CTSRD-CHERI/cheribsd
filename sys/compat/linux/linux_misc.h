@@ -96,6 +96,19 @@
 #define	LINUX_AT_MINSIGSTKSZ	51	/* min stack size required by the kernel */
 #endif
 
+#define LINUX_AT_CHERI_EXEC_RW_CAP	60
+#define LINUX_AT_CHERI_EXEC_RX_CAP	61
+#define LINUX_AT_CHERI_INTERP_RW_CAP	62
+#define LINUX_AT_CHERI_INTERP_RX_CAP	63
+#define LINUX_AT_CHERI_STACK_CAP	64
+#define LINUX_AT_CHERI_SEAL_CAP	65
+#define LINUX_AT_CHERI_CID_CAP	66
+
+#define LINUX_AT_ARGC	80
+#define LINUX_AT_ARGV	81
+#define LINUX_AT_ENVC	82
+#define LINUX_AT_ENVP	83
+
 /* Linux sets the i387 to extended precision. */
 #if defined(__i386__) || defined(__amd64__)
 #define	__LINUX_NPXCW__		0x37f
