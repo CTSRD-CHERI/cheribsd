@@ -530,6 +530,10 @@ __linuxN(copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	Elf_Auxinfo *aarray, *pos;
 	struct proc *p;
 	int error, issetugid;
+#ifdef __ELF_CHERI
+	void * __capability exec_base;
+	void * __capability entry;
+#endif
 
 	p = imgp->proc;
 	issetugid = p->p_flag & P_SUGID ? 1 : 0;
@@ -549,16 +553,69 @@ __linuxN(copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	if (linux_kernver(td) >= LINUX_KERNVER(2,4,0))
 		AUXARGS_ENTRY(pos, LINUX_AT_CLKTCK, stclohz);
 	AUXARGS_ENTRY(pos, AT_PAGESZ, args->pagesz);
-#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
-	AUXARGS_ENTRY_PTR(pos, AT_PHDR, args->phdr);
-	AUXARGS_ENTRY_PTR(pos, AT_ENTRY, args->entry);
+
+#ifdef __ELF_CHERI
+	/*
+	 * AT_ENTRY gives an executable capability for the whole
+	 * program and AT_PHDR a writable one.  RTLD is responsible for
+	 * setting bounds.  Needs SW_VMEM so relro pages can be made RO.
+	 */
+	AUXARGS_ENTRY_PTR(pos, AT_PHDR, cheri_setaddress(prog_cap(imgp,
+	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM),
+	    args->phdr));
 #else
 	AUXARGS_ENTRY(pos, AT_PHDR, args->phdr);
-	AUXARGS_ENTRY(pos, AT_ENTRY, args->entry);
 #endif
+
+#ifdef __ELF_CHERI
+	entry = cheri_setaddress(prog_cap(imgp, CHERI_CAP_USER_CODE_PERMS),
+	    args->entry);
+#ifdef CHERI_FLAGS_CAP_MODE
+	/*
+	 * On architectures with a mode flag bit, we must ensure the flag is set in
+	 * AT_ENTRY for RTLD to be able to jump to it.
+	 */
+	entry = cheri_setflags(entry, CHERI_FLAGS_CAP_MODE);
+#endif
+	AUXARGS_ENTRY_PTR(pos, AT_ENTRY, entry);
+
+	if (imgp->interp_end == 0) {
+		if (args->hdr_etype != ET_DYN) {
+			/*
+			 * For statically linked (but not static-PIE, i.e.
+			 * currently only RTLD direct exec), AT_BASE should be
+			 * untagged args->base (zero) rather than a massively
+			 * out-of-bounds capability with address zero that may
+			 * or may not be tagged.
+			 */
+			exec_base = (void *__capability)(uintcap_t)args->base;
+		} else {
+			/*
+			 * For static-PIE we need AT_BASE for relocations and
+			 * therefore needs to be RWX.
+			 * TODO: should probably use AT_ENTRY/AT_PHDR instead.
+			 */
+			exec_base = prog_cap(imgp, CHERI_CAP_USER_DATA_PERMS |
+			    CHERI_CAP_USER_CODE_PERMS);
+		}
+	} else {
+		/*
+		 * XXX: AT_BASE is both writable and executable to permit
+		 * textrel fixups.
+		 * TODO: should probably use AT_ENTRY/AT_PHDR instead.
+		 */
+		exec_base = interp_cap(imgp, args,
+		    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
+	}
+	AUXARGS_ENTRY_PTR(pos, AT_BASE, cheri_setaddress(exec_base,
+	    args->base));
+#else
+	AUXARGS_ENTRY(pos, AT_ENTRY, args->entry);
+	AUXARGS_ENTRY(pos, AT_BASE, args->base);
+#endif
+
 	AUXARGS_ENTRY(pos, AT_PHENT, args->phent);
 	AUXARGS_ENTRY(pos, AT_PHNUM, args->phnum);
-	AUXARGS_ENTRY(pos, AT_BASE, args->base);
 	AUXARGS_ENTRY(pos, AT_FLAGS, args->flags);
 	AUXARGS_ENTRY(pos, AT_UID, imgp->proc->p_ucred->cr_ruid);
 	AUXARGS_ENTRY(pos, AT_EUID, imgp->proc->p_ucred->cr_svuid);
