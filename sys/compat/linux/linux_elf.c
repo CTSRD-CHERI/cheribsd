@@ -330,7 +330,11 @@ int
 __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 {
 	char canary[LINUX_AT_RANDOM_LEN];
-	l_uintptr_t * __capability vectp;
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+	char * __capability * __capability vectp;
+#else
+	int64_t * __capability vectp;
+#endif
 	char *stringp;
 	uintcap_t destp, ustringp;
 	struct ps_strings * __capability arginfo;
@@ -398,7 +402,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 		destp = rounddown2(destp, sizeof(void * __capability));
 	}
 
-	vectp = (l_uintptr_t * __capability)destp;
+	vectp = (void * __capability)destp;
 
 	/*
 	 * Allocate room for the argv[] and env vectors including the
@@ -409,7 +413,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 	/*
 	 * Starting with 2.24, glibc depends on a 16-byte stack alignment.
 	 */
-	vectp = (l_uintptr_t * __capability)((((uintcap_t)vectp + 8) & ~0xF) - 8);
+	vectp = (void * __capability)((((uintcap_t)vectp + 8) & ~0xF) - 8);
 
 	if (!strings_on_stack) {
 		*stack_base = (uintcap_t)imgp->stack;
