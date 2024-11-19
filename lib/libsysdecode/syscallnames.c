@@ -55,6 +55,9 @@ static
 static
 #ifdef __aarch64__
 #include <arm64/linux/linux_syscalls.c>
+#if __has_feature(capabilities)
+#include <arm64/linux64/linux64_syscalls.c>
+#endif
 #elif __amd64__
 #include <amd64/linux/linux_syscalls.c>
 #else
@@ -93,6 +96,12 @@ sysdecode_syscallname(enum sysdecode_abi abi, unsigned int code)
 		if (code < nitems(linux_syscallnames))
 			return (linux_syscallnames[code]);
 		break;
+#if __has_feature(capabilities)
+	case SYSDECODE_ABI_LINUX64:
+		if (code < nitems(linux64_syscallnames))
+			return (linux64_syscallnames[code]);
+		break;
+#endif
 #endif
 #ifdef __amd64__
 	case SYSDECODE_ABI_LINUX32:

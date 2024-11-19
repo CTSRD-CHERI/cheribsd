@@ -109,10 +109,20 @@ static struct procabi freebsd64 = {
 static struct procabi linux = {
 	.type = "Linux",
 	.abi = SYSDECODE_ABI_LINUX,
-	.pointer_size = sizeof(ptraddr_t),
+	.pointer_size = sizeof(void * __capability),
 	.extra_syscalls = STAILQ_HEAD_INITIALIZER(linux.extra_syscalls),
 	.syscalls = { NULL }
 };
+
+#if __has_feature(capabilities)
+static struct procabi linux64 = {
+	.type = "Linux64",
+	.abi = SYSDECODE_ABI_LINUX64,
+	.pointer_size = sizeof(uint64_t),
+	.extra_syscalls = STAILQ_HEAD_INITIALIZER(linux64.extra_syscalls),
+	.syscalls = { NULL }
+};
+#endif
 
 #if __SIZEOF_POINTER__ > 4
 static struct procabi linux32 = {
@@ -150,7 +160,12 @@ static struct procabi_table abis[] = {
 	{ "FreeBSD a.out", &freebsd },
 #endif
 #if __SIZEOF_POINTER__ >= 8
+#if __has_feature(capabilities)
+	{ "Linux ELF64C", &linux },
+	{ "Linux ELF64", &linux64 },
+#else
 	{ "Linux ELF64", &linux },
+#endif
 	{ "Linux ELF32", &linux32 },
 #else
 	{ "Linux ELF32", &linux },

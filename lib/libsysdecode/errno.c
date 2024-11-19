@@ -48,7 +48,8 @@ sysdecode_abi_to_freebsd_errno(enum sysdecode_abi abi, int error)
 		return (error);
 #if defined(__aarch64__) || defined(__amd64__) || defined(__i386__)
 	case SYSDECODE_ABI_LINUX:
-	case SYSDECODE_ABI_LINUX32: {
+	case SYSDECODE_ABI_LINUX32:
+	case SYSDECODE_ABI_LINUX64: {
 		unsigned int i;
 
 		/*
@@ -80,6 +81,7 @@ sysdecode_freebsd_to_abi_errno(enum sysdecode_abi abi, int error)
 #if defined(__aarch64__) || defined(__amd64__) || defined(__i386__)
 	case SYSDECODE_ABI_LINUX:
 	case SYSDECODE_ABI_LINUX32:
+	case SYSDECODE_ABI_LINUX64:
 		if (error >= 0 && error <= ELAST)
 			return (linux_errtbl[error]);
 		break;
