@@ -190,9 +190,9 @@ linux_exec_setregs(struct thread *td, struct image_params *imgp,
 #if __has_feature(capabilities)
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
 		regs->tf_x[0] = (uintcap_t)imgp->args->argc;
-		regs->tf_x[1] = imgp->argv;
-		regs->tf_x[2] = imgp->envv;
-		regs->tf_x[3] = imgp->auxv;
+		regs->tf_x[1] = (uintcap_t)imgp->argv;
+		regs->tf_x[2] = (uintcap_t)imgp->envv;
+		regs->tf_x[3] = (uintcap_t)imgp->auxv;
 		regs->tf_sp = stack;
 		trapframe_set_elr(regs, (uintcap_t)cheri_exec_pcc(td, imgp));
 	} else
