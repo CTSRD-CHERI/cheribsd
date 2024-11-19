@@ -414,12 +414,12 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 #endif
 
 	if (!strings_on_stack) {
-		*stack_base = (uintcap_t)imgp->stack;
+		*stack_base = ((((uintcap_t)imgp->stack + 8) & ~0xF) - 8);
 	} else {
 		/*
 		 * vectp also becomes our initial stack base
 		 */
-		*stack_base = (uintcap_t)vectp;
+		*stack_base = ((((uintcap_t)vectp + 8) & ~0xF) - 8);
 	}
 
 	stringp = imgp->args->begin_argv;
