@@ -760,7 +760,6 @@ interpret:
 	 */
 	error = (*p->p_sysent->sv_fixup)(&stack_base, imgp);
 	if (error != 0) {
-		uprintf("sv_fixup Failed");
 		vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
 		goto exec_fail_dealloc;
 	}
@@ -842,7 +841,6 @@ interpret:
 	    (p->p_flag2 & P2_NO_NEW_PRIVS) != 0)
 		execve_nosetid(imgp);
 
-
 	/*
 	 * Implement image setuid/setgid installation.
 	 */
@@ -868,10 +866,8 @@ interpret:
 		fdsetugidsafety(td);
 		error = fdcheckstd(td);
 		vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
-		if (error != 0) {
-			uprintf("fdcheckstd Failed");
+		if (error != 0)
 			goto exec_fail_dealloc;
-		}
 		PROC_LOCK(p);
 #ifdef MAC
 		if (will_transition) {
