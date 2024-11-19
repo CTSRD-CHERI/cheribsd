@@ -664,7 +664,7 @@ linux_syncfs(struct thread *td, struct linux_syncfs_args *args)
 }
 
 static int
-statx_copyout(struct stat *buf, void *ubuf)
+statx_copyout(struct stat *buf, void * __capability ubuf)
 {
 	struct l_statx tbuf;
 
@@ -693,7 +693,7 @@ statx_copyout(struct stat *buf, void *ubuf)
 	tbuf.stx_dev_major = linux_encode_major(buf->st_dev);
 	tbuf.stx_dev_minor = linux_encode_minor(buf->st_dev);
 
-	return (copyout(&tbuf, LINUX_USER_CAP(ubuf, sizeof(tbuf)), sizeof(tbuf)));
+	return (copyout(&tbuf, ubuf, sizeof(tbuf)));
 }
 
 int
@@ -718,7 +718,7 @@ linux_statx(struct thread *td, struct linux_statx_args *args)
 	error = linux_kern_statat(td, flags, dirfd, LINUX_USER_CAP_PATH(args->pathname),
 	    UIO_USERSPACE, &buf);
 	if (error == 0)
-		error = statx_copyout(&buf, args->statxbuf);
+		error = statx_copyout(&buf, LINUX_USER_CAP(args->statxbuf, sizeof(struct l_statx)));
 
 	return (error);
 }
