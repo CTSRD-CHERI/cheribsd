@@ -2639,7 +2639,7 @@ linux_syslog(struct thread *td, struct linux_syslog_args *args)
 			if (*src == '\0')
 				continue;
 
-			if ((__cheri_addr ptraddr_t)dst >= (ptraddr_t)args->buf + args->len)
+			if ((__cheri_addr ptraddr_t)dst >= (ptraddr_t)(linuxcap_t)args->buf + args->len)
 				goto out;
 
 			error = copyout(src, dst, 1);
