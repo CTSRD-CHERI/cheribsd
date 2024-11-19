@@ -1093,12 +1093,6 @@ atomic_testandset_acq_long(volatile u_long *p, u_int v)
 	return (a);
 }
 
-#define	atomic_testandclear_int		atomic_testandclear_int
-#define	atomic_testandset_int		atomic_testandset_int
-#define	atomic_testandclear_long	atomic_testandclear_long
-#define	atomic_testandset_long		atomic_testandset_long
-#define	atomic_testandset_acq_long	atomic_testandset_acq_long
-
 #ifdef __powerpc64__
 #define	atomic_testandclear_ptr		atomic_testandclear_long
 #define	atomic_testandset_ptr		atomic_testandset_long
