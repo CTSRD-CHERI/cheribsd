@@ -2646,7 +2646,7 @@ linux_syslog(struct thread *td, struct linux_syslog_args *args)
 			dst++;
 
 			if (*src == '\n' && *(src + 1) != '<' &&
-			    (__cheri_addr ptraddr_t)dst + sizeof(SYSLOG_TAG) < (ptraddr_t)args->buf + args->len) {
+			    (__cheri_addr ptraddr_t)dst + sizeof(SYSLOG_TAG) < (ptraddr_t)(linuxcap_t)args->buf + args->len) {
 				error = copyout(&SYSLOG_TAG,
 				    dst, sizeof(SYSLOG_TAG));
 				dst += sizeof(SYSLOG_TAG) - 1;
@@ -2654,7 +2654,7 @@ linux_syslog(struct thread *td, struct linux_syslog_args *args)
 		}
 	}
 out:
-	td->td_retval[0] = (__cheri_addr ptraddr_t)dst - (ptraddr_t)args->buf;
+	td->td_retval[0] = (__cheri_addr ptraddr_t)dst - (ptraddr_t)(linuxcap_t)args->buf;
 	return (error);
 }
 
