@@ -1513,10 +1513,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 
 	error = exec_new_vmspace(imgp, sv);
 
-	if (error != 0) {
-		uprintf("exec_new_vmspace\n");
-	}
-
 	imgp->proc->p_sysent = sv;
 	imgp->proc->p_elf_brandinfo = brand_info;
 
@@ -1540,26 +1536,19 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	}
 
 	vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
-	if (error != 0) {
-		uprintf("rnd_base");
+	if (error != 0)
 		goto ret;
-	}
-		
 
 #if __has_feature(capabilities)
 	error = __elfN(build_imgact_capability)(imgp, &imgp->imgact_capability,
 	    hdr, phdr, &imgp->et_dyn_addr);
-	if (error != 0) {
-		uprintf("build_imgact_capability");
+	if (error != 0)
 		goto ret;
-	}
 #endif
 	error = __elfN(load_sections)(imgp, hdr, phdr, imgp->et_dyn_addr,
 	    &representable_start, &representable_end);
-	if (error != 0) {
-		uprintf("load_sections");
+	if (error != 0)
 		goto ret;
-	}
 
 	/* Round start/end addresses to representability */
 	imgp->start_addr = CHERI_REPRESENTABLE_ALIGN_DOWN(representable_start,
@@ -1568,10 +1557,8 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	    CHERI_REPRESENTABLE_LENGTH(representable_end - representable_start);
 
 	error = __elfN(enforce_limits)(imgp, hdr, phdr);
-	if (error != 0) {
-		uprintf("enforce_limits");
+	if (error != 0)
 		goto ret;
-	}
 
 	/*
 	 * We load the dynamic linker where a userland call
@@ -1586,10 +1573,8 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		error = __CONCAT(rnd_, __elfN(base))(map, addr, maxv1,
 		    (MAXPAGESIZES > 1 && pagesizes[1] != 0) ?
 		    pagesizes[1] : pagesizes[0], &anon_loc);
-		if (error != 0) {
-			uprintf("rnd_base2");
+		if (error != 0)
 			goto ret;
-		}
 		map->anon_loc = anon_loc;
 	} else {
 		map->anon_loc = addr;
@@ -1623,10 +1608,8 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		addr = imgp->et_dyn_addr;
 
 	error = exec_map_stack(imgp);
-	if (error != 0) {
-		uprintf("exec_map_stack");
+	if (error != 0)
 		goto ret;
-	}
 
 	/*
 	 * Construct auxargs table (used by the copyout_auxargs routine)

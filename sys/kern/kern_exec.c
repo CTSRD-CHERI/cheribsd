@@ -1361,7 +1361,7 @@ exec_map_stack(struct image_params *imgp)
 	 * XXX This almost surely belongs elsewhere, but I don't immediately
 	 * see a per-sv hook here.
 	 */
-	if (sv->sv_flags & SV_CHERI) {
+	if (sv->sv_flags & SV_CHERI && !(sv->sv_flags & SV_SKIPCAPREVOKE)) {
 		error = vm_map_install_cheri_revoke_shadow(map, sv);
 
 		if (error != KERN_SUCCESS) {
