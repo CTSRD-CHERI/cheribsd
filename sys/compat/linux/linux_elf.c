@@ -496,6 +496,8 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 		if (error != 0)
 			return (error);
 	}
+	
+	uprintf("Copyout Strings Succeeded");
 
 	return (0);
 }
