@@ -604,15 +604,39 @@ __linuxN(copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 		AUXARGS_ENTRY(pos, LINUX_AT_CLKTCK, stclohz);
 	AUXARGS_ENTRY(pos, AT_PAGESZ, args->pagesz);
 
+
+// Handle AT_PHDR and LINUX_AT_CHERI_EXEC_RW_CAP
 #ifdef __ELF_CHERI
 	/*
 	 * AT_ENTRY gives an executable capability for the whole
 	 * program and AT_PHDR a writable one.  RTLD is responsible for
 	 * setting bounds.  Needs SW_VMEM so relro pages can be made RO.
 	 */
+
+	/*
+	 * A valid unsealed capability with the following properties:
+     * Its address is set to the address of the program headers of the executable (as usual).
+     * Its bounds include the program headers.
+     * Its permissions include: 
+     * - Global
+     * - Load
+	 */
 	AUXARGS_ENTRY_PTR(pos, AT_PHDR, cheri_setaddress(prog_cap(imgp,
 	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM),
 	    args->phdr));
+
+	/*
+	 * If the executable has at least one writable segment, a valid unsealed capability with the following properties:
+     * Its address is set to the start of the executable's RW region.
+     * Its bounds include the executable's RW region (see section "Purecap ELF executables").
+     * Its permissions include: 
+     * - ROOT_CAP_PERMS
+     * - READ_CAP_PERMS
+     * - WRITE_CAP_PERMS
+     * - BranchSealedPair
+	 *
+	 * Note: This is used for relocation
+	 */
 	AUXARGS_ENTRY_PTR(pos, LINUX_AT_CHERI_EXEC_RW_CAP, cheri_setaddress(prog_cap(imgp,
 	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM),
 	    args->phdr));
@@ -620,6 +644,8 @@ __linuxN(copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	AUXARGS_ENTRY(pos, AT_PHDR, args->phdr);
 #endif
 
+
+// Handle AT_ENTRY and LINUX_AT_CHERI_EXEC_RX_CAP
 #ifdef __ELF_CHERI
 	entry = cheri_setaddress(prog_cap(imgp, CHERI_CAP_USER_CODE_PERMS),
 	    args->entry);
@@ -630,44 +656,38 @@ __linuxN(copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	 */
 	entry = cheri_setflags(entry, CHERI_FLAGS_CAP_MODE);
 #endif
-	AUXARGS_ENTRY_PTR(pos, AT_ENTRY, entry);
+	/*
+	 * A valid unsealed capability with the following properties:
+     * Its address is set to the start of the executable's RX region.
+     * Its bounds include the executable's RX region (see section "Purecap ELF executables").
+     * Its permissions include: 
+     * - ROOT_CAP_PERMS
+     * - READ_CAP_PERMS
+     * - EXEC_CAP_PERMS
+     * - BranchSealedPair
+	 *
+	 * Note: This is used for relocation
+	 */
 	AUXARGS_ENTRY_PTR(pos, LINUX_AT_CHERI_EXEC_RX_CAP, entry);
 
-	if (imgp->interp_end == 0) {
-		if (args->hdr_etype != ET_DYN) {
-			/*
-			 * For statically linked (but not static-PIE, i.e.
-			 * currently only RTLD direct exec), AT_BASE should be
-			 * untagged args->base (zero) rather than a massively
-			 * out-of-bounds capability with address zero that may
-			 * or may not be tagged.
-			 */
-			exec_base = (void *__capability)(uintcap_t)args->base;
-		} else {
-			/*
-			 * For static-PIE we need AT_BASE for relocations and
-			 * therefore needs to be RWX.
-			 * TODO: should probably use AT_ENTRY/AT_PHDR instead.
-			 */
-			exec_base = prog_cap(imgp, CHERI_CAP_USER_DATA_PERMS |
-			    CHERI_CAP_USER_CODE_PERMS);
-		}
-	} else {
-		/*
-		 * XXX: AT_BASE is both writable and executable to permit
-		 * textrel fixups.
-		 * TODO: should probably use AT_ENTRY/AT_PHDR instead.
-		 */
-		exec_base = interp_cap(imgp, args,
-		    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
-	}
-	AUXARGS_ENTRY_PTR(pos, AT_BASE, cheri_setaddress(exec_base,
-	    args->base));
+
+	/*
+	 * A valid sealed capability with the following properties:
+     * Its address is set to the entry address of the executable (as usual).
+     * Its bounds include the executable's RX region (see section "Purecap ELF executables").
+     * Its permissions are the same as the initial PCC.
+	 * Its object type is set to 1 (RB).
+	 *
+	 * Note: Use sealentry here
+	 */
+	entry = cheri_sealentry(entry);
+	AUXARGS_ENTRY_PTR(pos, AT_ENTRY, entry);
 #else
 	AUXARGS_ENTRY(pos, AT_ENTRY, args->entry);
-	AUXARGS_ENTRY(pos, AT_BASE, args->base);
 #endif
 
+	// In PCuABI, we are not using AT_BASE for relocation, unlike CheriABI
+	AUXARGS_ENTRY(pos, AT_BASE, args->base);
 	AUXARGS_ENTRY(pos, AT_PHENT, args->phent);
 	AUXARGS_ENTRY(pos, AT_PHNUM, args->phnum);
 	AUXARGS_ENTRY(pos, AT_FLAGS, args->flags);
