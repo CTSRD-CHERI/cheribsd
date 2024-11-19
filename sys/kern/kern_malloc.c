@@ -110,7 +110,7 @@ dtrace_malloc_probe_func_t __read_mostly	dtrace_malloc_probe;
 #define	MALLOC_DEBUG	1
 #endif
 
-#if defined(KASAN) || defined(DEBUG_REDZONE)
+#if defined(KASAN) || defined(DEBUG_REDZONE) || defined(__CHERI_PURE_CAPABILITY__)
 #define	DEBUG_REDZONE_ARG_DEF	, unsigned long osize
 #define	DEBUG_REDZONE_ARG	, osize
 #else
@@ -680,7 +680,7 @@ void *
 	int indx;
 	caddr_t va;
 	uma_zone_t zone;
-#if defined(DEBUG_REDZONE) || defined(KASAN)
+#if defined(DEBUG_REDZONE) || defined(KASAN) || defined(__CHERI_PURE_CAPABILITY__)
 	unsigned long osize = size;
 #endif
 
@@ -695,6 +695,14 @@ void *
 	if (__predict_false(size > kmem_zmax))
 		return (malloc_large(size, mtp, DOMAINSET_RR(), flags
 		    DEBUG_REDZONE_ARG));
+
+	/*
+	 * XXX-AM: Imply M_ZERO to ensure that non-representable padding
+	 * space is zero-initialized.
+	 */
+	if (size != CHERI_REPRESENTABLE_LENGTH(size)) {
+		flags |= M_ZERO;
+	}
 
 	if (size & KMEM_ZMASK)
 		size = (size & ~KMEM_ZMASK) + KMEM_ZBASE;
@@ -722,10 +730,13 @@ void *
 		kasan_mark((void *)va, osize, size, KASAN_MALLOC_REDZONE);
 #endif
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_getlen(va) <= CHERI_REPRESENTABLE_LENGTH(size),
-	    ("Invalid bounds: expected %zx found %zx",
-	        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
-	        (size_t)cheri_getlen(va)));
+	/* Intentionally inexect bounds allow for non-representable sizes */
+	va = cheri_setbounds(va, osize);
+	KASSERT(cheri_gettag(va),
+	    ("Invalid malloc: %#p requested size %zx", va, osize));
+	KASSERT(cheri_getlen(va) == CHERI_REPRESENTABLE_LENGTH(osize),
+	    ("Invalid malloc: %#p expected length %zx", va,
+		(size_t)CHERI_REPRESENTABLE_LENGTH(osize)));
 #endif
 	return ((void *) va);
 }
@@ -765,7 +776,7 @@ malloc_domainset(size_t size, struct malloc_type *mtp, struct domainset *ds,
 	caddr_t va;
 	int domain;
 	int indx;
-#if defined(KASAN) || defined(DEBUG_REDZONE)
+#if defined(KASAN) || defined(DEBUG_REDZONE) || defined(__CHERI_PURE_CAPABILITY__)
 	unsigned long osize = size;
 #endif
 
@@ -780,6 +791,11 @@ malloc_domainset(size_t size, struct malloc_type *mtp, struct domainset *ds,
 	if (__predict_false(size > kmem_zmax))
 		return (malloc_large(size, mtp, DOMAINSET_RR(), flags
 		    DEBUG_REDZONE_ARG));
+
+	/* XXX-AM: see malloc() */
+	if (size != CHERI_REPRESENTABLE_LENGTH(size)) {
+		flags |= M_ZERO;
+	}
 
 	vm_domainset_iter_policy_init(&di, ds, &domain, &flags);
 	do {
@@ -804,6 +820,15 @@ malloc_domainset(size_t size, struct malloc_type *mtp, struct domainset *ds,
 		kmsan_orig(va, size, KMSAN_TYPE_MALLOC, KMSAN_RET_ADDR);
 	}
 #endif
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Intentionally inexect bounds allow for non-representable sizes */
+	va = cheri_setbounds(va, osize);
+	KASSERT(cheri_gettag(va),
+	    ("Invalid malloc: %#p requested size %zx", va, osize));
+	KASSERT(cheri_getlen(va) == CHERI_REPRESENTABLE_LENGTH(osize),
+	    ("Invalid malloc: %#p expected length %zx", va,
+		(size_t)CHERI_REPRESENTABLE_LENGTH(osize)));
+#endif
 	return (va);
 }
 
@@ -821,7 +846,7 @@ void *
 malloc_domainset_exec(size_t size, struct malloc_type *mtp, struct domainset *ds,
     int flags)
 {
-#if defined(DEBUG_REDZONE) || defined(KASAN)
+#if defined(DEBUG_REDZONE) || defined(KASAN) || defined(__CHERI_PURE_CAPABILITY__)
 	unsigned long osize = size;
 #endif
 #ifdef MALLOC_DEBUG
@@ -996,11 +1021,10 @@ _free(void *addr, struct malloc_type *mtp, bool dozero)
 	case __predict_true(SLAB_COOKIE_SLAB_PTR):
 		size = zone->uz_size;
 #ifdef __CHERI_PURE_CAPABILITY__
-		if (__predict_false(cheri_getlen(addr) !=
-		    CHERI_REPRESENTABLE_LENGTH(size)))
-			panic("Invalid bounds: expected %zx found %zx",
-			    (size_t)CHERI_REPRESENTABLE_LENGTH(size),
-			    cheri_getlen(addr));
+		addr = uma_zgrow_bounds(zone, addr);
+		KASSERT(cheri_getlen(addr) == size,
+		    ("vtozoneslab disagrees witht uma_zgrow_bounds: %zx != %zx",
+			cheri_getlen(addr), size));
 #endif
 #if defined(INVARIANTS) && !defined(KASAN)
 		free_save_type(addr, mtp, size);
@@ -1074,6 +1098,10 @@ realloc(void *addr, size_t size, struct malloc_type *mtp, int flags)
 #endif
 	unsigned long alloc;
 	void *newaddr;
+#ifdef __CHERI_PURE_CAPABILITY__
+	uma_keg_t keg;
+	int i;
+#endif
 
 	KASSERT(mtp->ks_version == M_VERSION,
 	    ("realloc: bad malloc type version"));
@@ -1112,7 +1140,15 @@ realloc(void *addr, size_t size, struct malloc_type *mtp, int flags)
 	/* Get the size of the original block */
 	switch (GET_SLAB_COOKIE(slab)) {
 	case __predict_true(SLAB_COOKIE_SLAB_PTR):
+#ifdef __CHERI_PURE_CAPABILITY__
 		alloc = zone->uz_size;
+		keg = zone->uz_keg;
+		i = slab_item_index(slab, keg, addr);
+		addr = slab_item(slab, keg, i);
+		addr = cheri_setboundsexact(addr, alloc);
+#else
+		alloc = zone->uz_size;
+#endif
 		break;
 	case SLAB_COOKIE_MALLOC_LARGE:
 		alloc = malloc_large_size(slab);

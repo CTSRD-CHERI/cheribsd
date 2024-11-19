@@ -413,24 +413,11 @@ slab_tohashslab(uma_slab_t slab)
 static inline void *
 slab_data(uma_slab_t slab, uma_keg_t keg)
 {
-	void *data;
 
-	if ((keg->uk_flags & UMA_ZFLAG_OFFPAGE) == 0) {
-		data = (void *)cheri_kern_setboundsexact(
-		    (uintptr_t)slab - keg->uk_pgoff, keg->uk_pgoff);
-#ifdef __CHERI_PURE_CAPABILITY__
-		KASSERT(cheri_gettag(data),
-		    ("Unrepresentable slab uk_pgoff %x", keg->uk_pgoff));
-#endif
-	} else {
-		data = slab_tohashslab(slab)->uhs_data;
-#ifdef __CHERI_PURE_CAPABILITY__
-		KASSERT(cheri_getlen(data) == keg->uk_ppera * PAGE_SIZE,
-		    ("Unexpected offpage slab capability: %#p, "
-			"expected %d pages", data, keg->uk_ppera));
-#endif
-	}
-	return (data);
+	if ((keg->uk_flags & UMA_ZFLAG_OFFPAGE) == 0)
+		return ((void *)((uintptr_t)slab - keg->uk_pgoff));
+	else
+		return (slab_tohashslab(slab)->uhs_data);
 }
 
 static inline void *
