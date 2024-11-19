@@ -760,6 +760,7 @@ interpret:
 	 */
 	error = (*p->p_sysent->sv_fixup)(&stack_base, imgp);
 	if (error != 0) {
+		uprintf("sv_fixup Failed");
 		vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
 		goto exec_fail_dealloc;
 	}
@@ -806,6 +807,8 @@ interpret:
 	/* reset caught signals */
 	execsigs(p);
 
+	uprintf("execsigs Done");
+
 	/* name this process - nameiexec(p, ndp) */
 	bzero(p->p_comm, sizeof(p->p_comm));
 	if (args->fname)
@@ -817,6 +820,7 @@ interpret:
 #ifdef KTR
 	sched_clear_tdname(td);
 #endif
+	uprintf("renaming Done");
 
 	/*
 	 * mark as execed, wakeup the process that vforked (if any) and tell
@@ -835,11 +839,14 @@ interpret:
 		/* STOPs are no longer ignored, arrange for AST */
 		signotify(td);
 	}
+	uprintf("renaming Done");
 
 	if ((imgp->sysent->sv_setid_allowed != NULL &&
 	    !(*imgp->sysent->sv_setid_allowed)(td, imgp)) ||
 	    (p->p_flag2 & P2_NO_NEW_PRIVS) != 0)
 		execve_nosetid(imgp);
+
+	uprintf("execve_nosetid Done");
 
 	/*
 	 * Implement image setuid/setgid installation.
@@ -866,8 +873,10 @@ interpret:
 		fdsetugidsafety(td);
 		error = fdcheckstd(td);
 		vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
-		if (error != 0)
+		if (error != 0) {
+			uprintf("fdcheckstd Failed");
 			goto exec_fail_dealloc;
+		}
 		PROC_LOCK(p);
 #ifdef MAC
 		if (will_transition) {
