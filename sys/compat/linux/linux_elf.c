@@ -330,11 +330,7 @@ int
 __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 {
 	char canary[LINUX_AT_RANDOM_LEN];
-#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
-	char * __capability * __capability vectp;
-#else
-	int64_t * __capability vectp;
-#endif
+	l_uintptr_t * __capability vectp;
 	char *stringp;
 	uintcap_t destp, ustringp;
 	struct ps_strings * __capability arginfo;
@@ -368,7 +364,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 	if (imgp->execpath != NULL && imgp->auxargs != NULL) {
 		execpath_len = strlen(imgp->execpath) + 1;
 		destp -= execpath_len;
-		destp = rounddown2(destp, sizeof(void * __capability));
+		destp = rounddown2(destp, sizeof(l_uintptr_t));
 		imgp->execpathp = (void * __capability)cheri_setboundsexact(destp, execpath_len);
 		error = copyout(imgp->execpath, imgp->execpathp, execpath_len);
 		if (error != 0)
@@ -390,7 +386,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 	 * Allocate room for the argument and environment strings.
 	 */
 	destp -= ARG_MAX - imgp->args->stringspace;
-	destp = rounddown2(destp, sizeof(void * __capability));
+	destp = rounddown2(destp, sizeof(l_uintptr_t));
 	ustringp = cheri_setbounds(destp, ARG_MAX - imgp->args->stringspace);
 
 	if (imgp->auxargs) {
@@ -399,10 +395,10 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 		 * array.  It has up to LINUX_AT_COUNT entries.
 		 */
 		destp -= LINUX_AT_COUNT * sizeof(Elf_Auxinfo);
-		destp = rounddown2(destp, sizeof(void * __capability));
+		destp = rounddown2(destp, sizeof(l_uintptr_t));
 	}
 
-	vectp = (void * __capability)destp;
+	vectp = (l_uintptr_t * __capability)destp;
 
 	/*
 	 * Allocate room for the argv[] and env vectors including the
@@ -410,10 +406,12 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	vectp -= imgp->args->argc + 1 + imgp->args->envc + 1;
 
+#if defined(COMPAT_LINUX64) || defined(COMPAT_LINUX32)
 	/*
 	 * Starting with 2.24, glibc depends on a 16-byte stack alignment.
 	 */
-	vectp = (void * __capability)((((uintcap_t)vectp + 8) & ~0xF) - 8);
+	vectp = (l_uintptr_t * __capability)((((uintcap_t)vectp + 8) & ~0xF) - 8);
+#endif
 
 	if (!strings_on_stack) {
 		*stack_base = (uintcap_t)imgp->stack;
@@ -440,7 +438,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
 	imgp->argv = cheri_setbounds(vectp, (argc + 1) * sizeof(*vectp));;
-	if (suword(&arginfo->ps_argvstr, (long)(intcap_t)vectp) != 0 ||
+	if (suptr(&arginfo->ps_argvstr, (intcap_t)vectp) != 0 ||
 	    suword32(&arginfo->ps_nargvstr, argc) != 0)
 		return (EFAULT);
 
@@ -465,7 +463,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 		return (EFAULT);
 
 	imgp->envv = cheri_setbounds(vectp, (envc + 1) * sizeof(*vectp));
-	if (suword(&arginfo->ps_envstr, (long)(intcap_t)vectp) != 0 ||
+	if (suptr(&arginfo->ps_envstr, (intcap_t)vectp) != 0 ||
 	    suword32(&arginfo->ps_nenvstr, envc) != 0)
 		return (EFAULT);
 
