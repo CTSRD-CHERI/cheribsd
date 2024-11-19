@@ -842,7 +842,8 @@ linux_sys_futex(struct thread *td, struct linux_sys_futex_args *args)
 	default:
 		// LINUX_FUTEX_CMD is not the four mentioned above
 		// copy directly without copying in the timespec
-		fargs.ts = PTRIN(args->timeout);
+		fargs.ts = (void *)(linuxcap_t)(args->timeout);
+		PTRIN();
 	}
 	return (linux_futex(td, &fargs));
 }
