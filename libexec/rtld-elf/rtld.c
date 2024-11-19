@@ -2922,11 +2922,6 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
     const Elf_Dyn *dyn_soname;
     const Elf_Dyn *dyn_runpath;
 
-#ifdef RTLD_INIT_PAGESIZES_EARLY
-    /* The page size is required by the dynamic memory allocator. */
-    init_pagesizes(aux_info);
-#endif
-
 #if defined(DEBUG_VERBOSE) && DEBUG_VERBOSE > 1
     /* debug is not initialized yet so dbg() is a no-op -> use printf()*/
     rtld_fdprintf(STDERR_FILENO, "rtld: %s(" PTR_FMT ", %p)\n", __func__, mapbase, aux_info);
@@ -2994,10 +2989,8 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
     /* Now that non-local variables can be accesses, copy out obj_rtld. */
     memcpy(&obj_rtld, &objtmp, sizeof(obj_rtld));
 
-#ifndef RTLD_INIT_PAGESIZES_EARLY
     /* The page size is required by the dynamic memory allocator. */
     init_pagesizes(aux_info);
-#endif
 
     if (aux_info[AT_OSRELDATE] != NULL)
 	    osreldate = aux_info[AT_OSRELDATE]->a_un.a_val;
