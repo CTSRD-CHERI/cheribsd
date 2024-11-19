@@ -53,6 +53,13 @@ int
 cheri_syscall_authorize(struct thread *td, u_int code, int nargs,
     syscallarg_t *args)
 {
+	/*
+	 * PCuABI Binaries does not have this permission. We just skip the check.
+	 */
+	if (SV_PROC_ABI(td->td_proc) == SV_ABI_LINUX) {
+		return (0);
+	}
+
 	uintmax_t c_perms;
 
 	/*
