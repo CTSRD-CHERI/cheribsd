@@ -56,6 +56,7 @@ static
 #ifdef __aarch64__
 #include <arm64/linux/linux_syscalls.c>
 #if __has_feature(capabilities)
+static
 #include <arm64/linux64/linux64_syscalls.c>
 #endif
 #elif __amd64__
