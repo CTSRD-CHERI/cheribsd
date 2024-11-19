@@ -581,7 +581,6 @@ __linuxN(copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	struct proc *p;
 	int error, issetugid;
 #ifdef __ELF_CHERI
-	void * __capability exec_base;
 	void * __capability entry;
 #endif
 
