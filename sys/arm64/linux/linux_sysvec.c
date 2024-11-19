@@ -27,6 +27,9 @@
  */
 
 #define	__ELF_WORD_SIZE	64
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+#define __ELF_CHERI
+#endif
 
 #include <sys/param.h>
 #include <sys/elf.h>
@@ -95,8 +98,13 @@ extern char _binary_linux_vdso_so_o_start[];
 extern char _binary_linux_vdso_so_o_end[];
 static vm_offset_t linux_vdso_base;
 
+#ifdef COMPAT_LINUX64
+extern struct sysent linux64_sysent[LINUX64_SYS_MAXSYSCALL];
+extern const char *linux64_syscallnames[];
+#else
 extern struct sysent linux_sysent[LINUX_SYS_MAXSYSCALL];
 extern const char *linux_syscallnames[];
+#endif
 
 SET_DECLARE(linux_ioctl_handler_set, struct linux_ioctl_handler);
 
@@ -443,8 +451,13 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 }
 
 struct sysentvec elf_linux_sysvec = {
+#ifdef COMPAT_LINUX64
+	.sv_size	= LINUX64_SYS_MAXSYSCALL,
+	.sv_table	= linux64_sysent,
+#else
 	.sv_size	= LINUX_SYS_MAXSYSCALL,
 	.sv_table	= linux_sysent,
+#endif
 	.sv_fixup	= __elfN(freebsd_fixup),
 	.sv_sendsig	= linux_rt_sendsig,
 	.sv_sigcode	= _binary_linux_vdso_so_o_start,
