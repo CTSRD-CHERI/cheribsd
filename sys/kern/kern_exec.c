@@ -1331,8 +1331,12 @@ exec_map_stack(struct image_params *imgp)
 		error = vm_mmap_object(map, &strings_addr, 0, strings_size,
 		    VM_PROT_RW_CAP, VM_PROT_RW_CAP, MAP_ANON | MAP_FIXED |
 		    MAP_RESERVATION_CREATE, NULL, 0, FALSE, curthread);
-		if (error != KERN_SUCCESS)
+		if (error != KERN_SUCCESS) {
+			uprintf("%s: Create separate space for strings failed"
+			    " mach error %d errno %d",
+			    __func__, error, vm_mmap_to_errno(error));
 			return (vm_mmap_to_errno(error));
+		}
 #ifdef __CHERI_PURE_CAPABILITY__
 		imgp->strings = (void *)strings_addr;
 #else
@@ -1360,8 +1364,12 @@ exec_map_stack(struct image_params *imgp)
 	if (sv->sv_flags & SV_CHERI) {
 		error = vm_map_install_cheri_revoke_shadow(map, sv);
 
-		if (error != KERN_SUCCESS)
+		if (error != KERN_SUCCESS) {
+			uprintf("%s: vm_map_install_cheri_revoke_shadow failed"
+			    " mach error %d errno %d",
+			    __func__, error, vm_mmap_to_errno(error));
 			return (vm_mmap_to_errno(error));
+		}
 	}
 #endif
 
