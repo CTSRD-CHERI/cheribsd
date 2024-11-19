@@ -491,7 +491,11 @@ struct sysentvec elf_linux_sysvec = {
 #endif
 	.sv_set_syscall_retval = linux_set_syscall_retval,
 	.sv_fetch_syscall_args = linux_fetch_syscall_args,
+#ifdef COMPAT_LINUX64
+	.sv_syscallnames = linux64_syscallnames,
+#else
 	.sv_syscallnames = linux_syscallnames,
+#endif
 	.sv_shared_page_base = LINUX_SHAREDPAGE,
 	.sv_shared_page_len = PAGE_SIZE,
 	.sv_schedtail	= linux_schedtail,

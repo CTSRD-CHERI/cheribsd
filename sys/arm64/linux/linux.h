@@ -31,7 +31,12 @@
 #include <sys/abi_compat.h>
 
 #include <compat/linux/linux.h>
+
+#ifdef COMPAT_LINUX64
+#include <arm64/linux64/linux64_syscall.h>
+#else
 #include <arm64/linux/linux_syscall.h>
+#endif
 
 #define	LINUX_DTRACE	linuxulator
 
