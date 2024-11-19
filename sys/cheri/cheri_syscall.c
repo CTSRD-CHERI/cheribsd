@@ -35,6 +35,7 @@
 #include <sys/proc.h>
 #include <sys/syscall.h>
 #include <sys/sysctl.h>
+#include <sys/sysent.h>
 
 #include <ddb/ddb.h>
 #include <sys/kdb.h>
