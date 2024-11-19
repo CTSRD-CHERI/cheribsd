@@ -467,7 +467,7 @@ struct sysentvec elf_linux_sysvec = {
 #else
 	.sv_name	= "Linux ELF64",
 #endif
-	.sv_coredump	= elf64_coredump,
+	.sv_coredump	= __elfN(coredump),
 	.sv_elf_core_osabi = ELFOSABI_NONE,
 	.sv_elf_core_abi_vendor = LINUX_ABI_VENDOR,
 	.sv_elf_core_prepare_notes = linux64_prepare_notes,
@@ -621,7 +621,7 @@ linux_vdso_reloc(char *mapping, Elf_Addr offset)
 	}
 }
 
-static Elf_Brandnote linux64_brandnote = {
+static Elf_Brandnote linux_brandnote = {
 	.hdr.n_namesz	= sizeof(GNU_ABI_VENDOR),
 	.hdr.n_descsz	= 16,
 	.hdr.n_type	= 1,
@@ -630,26 +630,26 @@ static Elf_Brandnote linux64_brandnote = {
 	.trans_osrel	= linux_trans_osrel
 };
 
-static Elf64_Brandinfo linux_glibc2brand = {
+static Elf_Brandinfo linux_glibc2brand = {
 	.brand		= ELFOSABI_LINUX,
 	.machine	= EM_AARCH64,
 	.compat_3_brand	= "Linux",
 	.interp_path	= "/lib64/ld-linux-x86-64.so.2",
 	.sysvec		= &elf_linux_sysvec,
 	.interp_newpath	= NULL,
-	.brand_note	= &linux64_brandnote,
+	.brand_note	= &linux_brandnote,
 	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE
 };
 
-Elf64_Brandinfo *linux_brandlist[] = {
+Elf_Brandinfo *linux_brandlist[] = {
 	&linux_glibc2brand,
 	NULL
 };
 
 static int
-linux64_elf_modevent(module_t mod, int type, void *data)
+linux_elf_modevent(module_t mod, int type, void *data)
 {
-	Elf64_Brandinfo **brandinfo;
+	Elf_Brandinfo **brandinfo;
 	struct linux_ioctl_handler**lihp;
 	int error;
 
@@ -658,7 +658,7 @@ linux64_elf_modevent(module_t mod, int type, void *data)
 	case MOD_LOAD:
 		for (brandinfo = &linux_brandlist[0]; *brandinfo != NULL;
 		    ++brandinfo)
-			if (elf64_insert_brand_entry(*brandinfo) < 0)
+			if (__elfN(insert_brand_entry)(*brandinfo) < 0)
 				error = EINVAL;
 		if (error == 0) {
 			SET_FOREACH(lihp, linux_ioctl_handler_set)
@@ -671,12 +671,12 @@ linux64_elf_modevent(module_t mod, int type, void *data)
 	case MOD_UNLOAD:
 		for (brandinfo = &linux_brandlist[0]; *brandinfo != NULL;
 		    ++brandinfo)
-			if (elf64_brand_inuse(*brandinfo))
+			if (__elfN(brand_inuse)(*brandinfo))
 				error = EBUSY;
 		if (error == 0) {
 			for (brandinfo = &linux_brandlist[0];
 			    *brandinfo != NULL; ++brandinfo)
-				if (elf64_remove_brand_entry(*brandinfo) < 0)
+				if (__elfN(remove_brand_entry)(*brandinfo) < 0)
 					error = EINVAL;
 		}
 		if (error == 0) {
@@ -699,7 +699,7 @@ static moduledata_t linux_elf_mod = {
 #else
 	"linux64elf",
 #endif
-	linux64_elf_modevent,
+	linux_elf_modevent,
 	0
 };
 
