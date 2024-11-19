@@ -504,7 +504,11 @@ struct sysentvec elf_linux_sysvec = {
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= LINUX_USRSTACK,
 	.sv_psstringssz	= sizeof(struct ps_strings),
+#if  __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+	.sv_stackprot	= VM_PROT_RW_CAP,
+#else
 	.sv_stackprot	= VM_PROT_READ | VM_PROT_WRITE,
+#endif
 	.sv_copyout_auxargs = __linuxN(copyout_auxargs),
 	.sv_copyout_strings = __linuxN(copyout_strings),
 	.sv_setregs	= linux_exec_setregs,

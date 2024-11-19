@@ -1932,8 +1932,8 @@ __elfN(freebsd_fixup)(uintcap_t *stack_base, struct image_params *imgp)
 		return (EFAULT);
 	*stack_base = (uintcap_t)base;
 #else
-	//KASSERT(__builtin_is_aligned(*stack_base, sizeof(void * __capability)),
-	//    ("CheriABI stack pointer not properly aligned"));
+	KASSERT(__builtin_is_aligned(*stack_base, sizeof(void * __capability)),
+	    ("CheriABI stack pointer not properly aligned"));
 #endif
 	return (0);
 }
