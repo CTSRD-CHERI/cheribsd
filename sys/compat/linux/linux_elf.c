@@ -522,6 +522,81 @@ linux_trans_osrel(const Elf_Note *note, int32_t *osrel)
 	return (true);
 }
 
+#ifdef __ELF_CHERI
+static void * __capability
+prog_cap(struct image_params *imgp, uint64_t perms)
+{
+	Elf_Addr prog_base;
+	size_t prog_len;
+
+	prog_base = imgp->start_addr;
+	prog_len = imgp->end_addr - imgp->start_addr;
+
+	/*
+	 * Ensure that a capability spanning the program is representable.
+	 * We don't round here since the mapping code is responsible for
+	 * choosing a sensible start address and length.
+	 */
+	KASSERT(prog_len == CHERI_REPRESENTABLE_LENGTH(prog_len) &&
+	    prog_base == CHERI_REPRESENTABLE_ALIGN_DOWN(prog_base, prog_len),
+	    ("program capability [%#jx-%#jx] not representable (length=%#zx)",
+	    (uintmax_t)prog_base, (uintmax_t)imgp->end_addr, prog_len));
+
+	return (cheri_capability_build_user_rwx(perms, prog_base, prog_len,
+	    imgp->start_addr - prog_base));
+}
+
+static void * __capability
+interp_cap(struct image_params *imgp, Elf_Auxargs *args, uint64_t perms)
+{
+	Elf_Addr interp_base;
+	size_t interp_len;
+
+	interp_base = imgp->interp_start;
+	interp_len = imgp->interp_end - imgp->interp_start;
+
+	/*
+	 * Ensure that a capability spanning RTLD is representable.
+	 * We don't round here since the mapping code is responsible for
+	 * choosing a sensible start address.
+	 */
+	KASSERT(interp_len == CHERI_REPRESENTABLE_LENGTH(interp_len) &&
+	    interp_base ==
+	    CHERI_REPRESENTABLE_ALIGN_DOWN(interp_base, interp_len),
+	    ("interp capability [%#jx-%#jx] not representable (length=%#zx)",
+	    (uintmax_t)interp_base, (uintmax_t)imgp->interp_end, interp_len));
+	MPASS(args->base >= interp_base);
+
+	return (cheri_capability_build_user_rwx(perms, interp_base, interp_len,
+	    args->base - interp_base));
+}
+
+static void * __capability
+timekeep_cap(struct image_params *imgp)
+{
+	void * __capability tmpcap;
+	struct vmspace *vmspace = imgp->proc->p_vmspace;
+	uintcap_t timekeep_base;
+	size_t timekeep_len;
+
+	timekeep_base = vmspace->vm_shp_base + imgp->sysent->sv_timekeep_offset;
+	timekeep_len = sizeof(struct vdso_timekeep) +
+	    sizeof(struct vdso_timehands) * VDSO_TH_NUM;
+
+	/* These are sub-page so should be representable as-is. */
+	KASSERT(timekeep_base == CHERI_REPRESENTABLE_ALIGN_DOWN(timekeep_base,
+	    timekeep_len), ("timekeep_base needs rounding"));
+	KASSERT(timekeep_len == CHERI_REPRESENTABLE_LENGTH(timekeep_len),
+	    ("timekeep_len needs rounding"));
+
+	tmpcap = (void * __capability)cheri_setboundsexact(
+	    cheri_andperm(timekeep_base, CHERI_PERMS_USERSPACE_RODATA),
+	    timekeep_len);
+
+	return (tmpcap);
+}
+#endif
+
 int
 __linuxN(copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 {
