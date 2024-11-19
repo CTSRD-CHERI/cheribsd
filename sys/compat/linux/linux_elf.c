@@ -436,7 +436,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
 	imgp->argv = cheri_setbounds(vectp, (argc + 1) * sizeof(*vectp));;
-	if (suptr(&arginfo->ps_argvstr, (intcap_t)vectp) != 0 ||
+	if (suword(&arginfo->ps_argvstr, (long)(intcap_t)vectp) != 0 ||
 	    suword32(&arginfo->ps_nargvstr, argc) != 0)
 		return (EFAULT);
 
@@ -461,7 +461,7 @@ __linuxN(copyout_strings)(struct image_params *imgp, uintcap_t *stack_base)
 		return (EFAULT);
 
 	imgp->envv = cheri_setbounds(vectp, (envc + 1) * sizeof(*vectp));
-	if (suptr(&arginfo->ps_envstr, (intcap_t)vectp) != 0 ||
+	if (suword(&arginfo->ps_envstr, (long)(intcap_t)vectp) != 0 ||
 	    suword32(&arginfo->ps_nenvstr, envc) != 0)
 		return (EFAULT);
 
