@@ -16,6 +16,7 @@ SHLIB_LDSCRIPT=	libc++.ldscript
 
 SRCS+=		algorithm.cpp
 SRCS+=		any.cpp
+SRCS+=		assert.cpp
 SRCS+=		atomic.cpp
 SRCS+=		barrier.cpp
 SRCS+=		bind.cpp
