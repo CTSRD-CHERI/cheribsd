@@ -187,7 +187,11 @@ SET_DECLARE(sdt_argtypes_set, struct sdt_argtype);
 #ifdef _ILP32
 #define	_SDT_ASM_WORD			".long"
 #else
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	_SDT_ASM_WORD			".chericap"
+#else
 #define	_SDT_ASM_WORD			".quad"
+#endif
 #endif
 
 #ifndef _SDT_ASM_PROBE_CONSTRAINT
