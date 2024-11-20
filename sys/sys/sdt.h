@@ -225,8 +225,8 @@ struct sdt_tracepoint {
 	    _SDT_ASM_WORD " 0\n"					\
 	    ".popsection\n"						\
 	    :								\
-	    : _SDT_ASM_PROBE_CONSTRAINT (&_SDT_PROBE_NAME(prov, mod,	\
-	    func, name))						\
+	    : _SDT_ASM_PROBE_CONSTRAINT (__unbounded_addressof(		\
+		_SDT_PROBE_NAME(prov, mod, func, name)))		\
 	    :								\
 	    : __sdt_probe##uniq);					\
 	if (0) {							\
