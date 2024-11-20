@@ -630,16 +630,28 @@ malloc_large(size_t size, struct malloc_type *mtp, struct domainset *policy,
 {
 	void *va;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (size != CHERI_REPRESENTABLE_LENGTH(size)) {
+		flags |= M_ZERO;
+	}
+#endif
+
 	size = roundup(size, PAGE_SIZE);
 	va = kmem_malloc_domainset(policy, size, flags);
 	if (va != NULL) {
-		/* Use low bits unused for slab pointers. */
-		vsetzoneslab((uintptr_t)va, NULL, MALLOC_LARGE_SLAB(size));
+		/*
+		 * Use low bits unused for slab pointers.
+		 * XXX-AM: Abuse the zone pointer to stash the original pointer.
+		 * On CHERI systems, this is necessary to recover the bounds of
+		 * the original allocation.
+		 */
+		vsetzoneslab((uintptr_t)va, va, MALLOC_LARGE_SLAB(size));
 		uma_total_inc(size);
 #ifdef __CHERI_PURE_CAPABILITY__
-		KASSERT(cheri_getlen(va) <= CHERI_REPRESENTABLE_LENGTH(size),
+		va = cheri_setbounds(va, osize);
+		KASSERT(cheri_getlen(va) <= CHERI_REPRESENTABLE_LENGTH(osize),
 		    ("Invalid bounds: expected %zx found %zx",
-		        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
+		        (size_t)CHERI_REPRESENTABLE_LENGTH(osize),
 		        (size_t)cheri_getlen(va)));
 #endif
 	}
@@ -659,10 +671,32 @@ malloc_large(size_t size, struct malloc_type *mtp, struct domainset *policy,
 static void
 free_large(void *addr, size_t size)
 {
-
 	kmem_free(addr, size);
 	uma_total_dec(size);
 }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Recover original bounds for a malloc_large allocation.
+ *
+ * Error conditions:
+ * - Clear the capability tag if the given capability is not a subset of
+ * the saved object capability.
+ */
+static void *
+malloc_large_grow_bounds(void *saved_ptr, void *addr)
+{
+	KASSERT(cheri_is_subset(saved_ptr, addr),
+	    ("Unexpected malloc_large grow bounds: pointer %#p is "
+		"not derived from %#p", addr, saved_ptr));
+
+	addr = cheri_setaddress(saved_ptr, (vm_offset_t)addr);
+	addr = cheri_setboundsexact(addr, cheri_getlen(saved_ptr));
+	KASSERT(cheri_gettag(addr),
+	    ("Failed to recover malloc_large bounds for %#p", addr));
+	return (addr);
+}
+#endif
 #undef	IS_MALLOC_LARGE
 #undef	MALLOC_LARGE_SLAB
 
@@ -1023,7 +1057,7 @@ _free(void *addr, struct malloc_type *mtp, bool dozero)
 #ifdef __CHERI_PURE_CAPABILITY__
 		addr = uma_zgrow_bounds(zone, addr);
 		KASSERT(cheri_getlen(addr) == size,
-		    ("vtozoneslab disagrees witht uma_zgrow_bounds: %zx != %zx",
+		    ("vtozoneslab disagrees with uma_zgrow_bounds: %zx != %zx",
 			cheri_getlen(addr), size));
 #endif
 #if defined(INVARIANTS) && !defined(KASAN)
@@ -1038,11 +1072,10 @@ _free(void *addr, struct malloc_type *mtp, bool dozero)
 	case SLAB_COOKIE_MALLOC_LARGE:
 		size = malloc_large_size(slab);
 #ifdef __CHERI_PURE_CAPABILITY__
-		if (__predict_false(cheri_getlen(addr) !=
-		    CHERI_REPRESENTABLE_LENGTH(size)))
-			panic("Invalid bounds: expected %zx found %zx",
-			    (size_t)CHERI_REPRESENTABLE_LENGTH(size),
-			    cheri_getlen(addr));
+		addr = malloc_large_grow_bounds(zone, addr);
+		KASSERT(cheri_getlen(addr) == size,
+		    ("malloc_large object bounds mismatch: %zx != %zx",
+			cheri_getlen(addr), size));
 #endif
 		if (dozero) {
 			kasan_mark(addr, size, size, 0);

@@ -427,6 +427,12 @@ uma_zfree_pcpu(uma_zone_t zone, void *item)
  * item capabilities?
  * Given that this is a privileged operation, I would like to maintain the
  * intentionality of the operation here.
+ *
+ * Error conditions:
+ * - Clear the item capability tag if the item does not belong
+ * to the given zone.
+ * - Clear the item capability tag if the item does not belong
+ * to the slab from vtoslab.
  */
 void *uma_zgrow_bounds(uma_zone_t zone, void *item);
 #else
