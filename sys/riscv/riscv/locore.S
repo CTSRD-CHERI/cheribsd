@@ -123,8 +123,12 @@ _alt_start:
 	sw	a0, 0(t0)
 #endif
 
-	/* Load zero as modulep */
-	mv	a0, zero
+	/*
+	 * Stash the DTB pointer in the callee-saved register s4, and zero s3
+	 * to indicate that we have no loader metadata.
+	 */
+	mv	s4, a1
+	mv	s3, zero
 	j	pagetables
 
 /*
@@ -148,10 +152,16 @@ _start:
 #endif
 
 	/*
-	 * Zero a1 to indicate that we have no DTB pointer. It is already
-	 * included in the loader(8) metadata.
+	 * Stash modulep in the callee-saved register s3, and zero s4 to
+	 * indicate that we have no DTB pointer. It is already included in the
+	 * loader(8) metadata.
 	 */
-	mv	a1, zero
+#ifdef __CHERI_PURE_CAPABILITY__
+	cmove	cs3, ca0
+#else	
+	mv	s3, a0
+#endif
+	mv	s4, zero
 
 	/*
 	 * Set up page tables: Our goal is to enable virtual memory, doing the
@@ -172,8 +182,8 @@ _start:
 	 * here and will conditionally enable Sv48 (or higher) later.
 	 *
 	 * We arrive here with:
-	 *  a0 - modulep or zero
-	 *  a1 - zero or dtbp
+	 *  s3 - modulep or zero
+	 *  s4 - zero or dtbp
 	 */
 pagetables:
 	/* Get the kernel's load address (kernstart) in s9 */
@@ -348,13 +358,13 @@ va:
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Initialize stack pointer */
-	cllc	cs3, initstack
+	cllc	cs2, initstack
 	cllc	ct0, initstack_end
-	sub	t0, t0, s3
-	csetbounds cs3, cs3, t0
+	sub	t0, t0, s2
+	csetbounds cs2, cs2, t0
 	li	t1, CHERI_PERMS_KERNEL_DATA
-	candperm cs3, cs3, t1
-	cincoffset csp, cs3, t0
+	candperm cs2, cs2, t1
+	cincoffset csp, cs2, t0
 
 	/* Allocate space for thread0 PCB and riscv_bootparams */
 	cincoffset csp, csp, -(PCB_SIZE + RISCV_BOOTPARAMS_SIZE) & ~STACKALIGNBYTES
@@ -372,12 +382,6 @@ va:
 	cmove	ct0, cnull
 	cspecialw ddc, ct0
 
-	/* Save modulep in cs2. */
-	cmove	cs2, ca0
-
-	/* Save DTB physical pointer in s1. */
-	mv	s1, a1
-
 	/* Initialize cap relocs. */
 	li	t0, CHERI_PERMS_KERNEL_DATA
 	candperm ca0, cs0, t0
@@ -394,9 +398,9 @@ va:
 	/* Fill riscv_bootparams */
 	csd	s9, RISCV_BOOTPARAMS_KERN_PHYS(csp)
 
-	csc	cs3, RISCV_BOOTPARAMS_KERN_STACK(csp)
-	csd	s1, RISCV_BOOTPARAMS_DTBP_PHYS(csp)
-	csc	cs2, RISCV_BOOTPARAMS_MODULEP(csp)
+	csc	cs2, RISCV_BOOTPARAMS_KERN_STACK(csp)
+	csd	s4, RISCV_BOOTPARAMS_DTBP_PHYS(csp)
+	csc	cs3, RISCV_BOOTPARAMS_MODULEP(csp)
 
 	/* Discard omnipotent cs0. */
 	cmove	cs0, cnull
@@ -429,12 +433,6 @@ va:
 	addi	t0, t0, 8
 	bltu	t0, t1, 1b
 
-	/* Save modulep in s2. */
-	mv	s2, a0
-
-	/* Save DTB physical pointer in s1. */
-	mv	s1, a1
-
 #if __has_feature(capabilities)
 	/* Initialize capabilities. */
 	cspecialr ca0, ddc
@@ -446,8 +444,8 @@ va:
 
 	la	t0, initstack
 	sd	t0, RISCV_BOOTPARAMS_KERN_STACK(sp)
-	sd	s1, RISCV_BOOTPARAMS_DTBP_PHYS(sp)
-	sd	s2, RISCV_BOOTPARAMS_MODULEP(sp)
+	sd	s4, RISCV_BOOTPARAMS_DTBP_PHYS(sp)
+	sd	s3, RISCV_BOOTPARAMS_MODULEP(sp)
 
 	mv	a0, sp
 	call	_C_LABEL(initriscv)	/* Off we go */
