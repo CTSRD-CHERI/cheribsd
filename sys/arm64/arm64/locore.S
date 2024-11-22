@@ -568,27 +568,6 @@ LENTRY(enter_kernel_el)
 #else
 	mov	x2, xzr /* CPTR_EL2 is managed by vfp.c */
 #endif
-	ldr	x3, =(CNTHCTL_E2H_EL1PCTEN | CNTHCTL_E2H_EL1PTEN)
-	ldr	x5, =(PSR_DAIF | PSR_M_EL2h)
-	b	.Ldone_vhe
-
-.Lno_vhe:
-	/* Hypervisor trap functions */
-	adrp	x2, hyp_stub_vectors
-	add	x2, x2, :lo12:hyp_stub_vectors
-#if __has_feature(capabilities)
-	cvtp	c2, x2
-	msr	cvbar_el2, c2
-#else
-	msr	vbar_el2, x2
-#endif
-
-	ldr	x2, =(CPTR_RES1)
-	ldr	x3, =(CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN)
-	ldr	x5, =(PSR_DAIF | PSR_M_EL1h)
-
-.Ldone_vhe:
-
 	msr	cptr_el2, x2
 #if __has_feature(capabilities)
 	/*
@@ -600,6 +579,31 @@ LENTRY(enter_kernel_el)
 	isb
 #endif
 
+	ldr	x3, =(CNTHCTL_E2H_EL1PCTEN | CNTHCTL_E2H_EL1PTEN)
+	ldr	x5, =(PSR_DAIF | PSR_M_EL2h)
+	b	.Ldone_vhe
+
+.Lno_vhe:
+	ldr	x2, =(CPTR_RES1)
+	msr	cptr_el2, x2
+#if __has_feature(capabilities)
+	/* As noted above, wait for the write to cptr_el2 to complete. */
+	isb
+#endif
+
+	/* Hypervisor trap functions */
+	adrp	x2, hyp_stub_vectors
+	add	x2, x2, :lo12:hyp_stub_vectors
+#if __has_feature(capabilities)
+	cvtp	c2, x2
+	msr	cvbar_el2, c2
+#else
+	msr	vbar_el2, x2
+#endif
+
+	ldr	x3, =(CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN)
+	ldr	x5, =(PSR_DAIF | PSR_M_EL1h)
+.Ldone_vhe:
 	/* Enable access to the physical timers at EL1 */
 	msr	cnthctl_el2, x3
 	/* Set the return PSTATE */
