@@ -181,6 +181,13 @@ reset_vm_el2_regs(void *vcpu)
 		el2ctx->cptr_el2 = CPTR_E2H_TRAP_ALL | CPTR_E2H_FPEN;
 	else
 		el2ctx->cptr_el2 = CPTR_TRAP_ALL & ~CPTR_TFP;
+#if __has_feature(capabilities)
+	/* Don't trap accesses to capability registers. */
+	if (in_vhe())
+		el2ctx->cptr_el2 |= CPTR_E2H_CEN;
+	else
+		el2ctx->cptr_el2 &= ~CPTR_TC;
+#endif
 	el2ctx->cptr_el2 &= ~CPTR_TCPAC;
 	/*
 	 * Disable interrupts in the guest. The guest OS will re-enable
