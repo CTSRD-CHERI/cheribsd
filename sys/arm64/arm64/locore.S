@@ -577,6 +577,9 @@ LENTRY(enter_kernel_el)
 	 * act as in place of this barrier.
 	 */
 	isb
+
+	/* Clear DDC_EL1 */
+	msr	ddc_el1, czr
 #endif
 
 	ldr	x3, =(CNTHCTL_E2H_EL1PCTEN | CNTHCTL_E2H_EL1PTEN)
@@ -603,6 +606,11 @@ LENTRY(enter_kernel_el)
 
 	ldr	x3, =(CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN)
 	ldr	x5, =(PSR_DAIF | PSR_M_EL1h)
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Clear DDC_EL2 */
+	msr	ddc, czr
+#endif
 .Ldone_vhe:
 	/* Enable access to the physical timers at EL1 */
 	msr	cnthctl_el2, x3
@@ -636,9 +644,6 @@ LENTRY(enter_kernel_el)
 	mrs	x2, cctlr_el2
 	orr	x2, x2, #(CCTLR_EL2_C64E_MASK)
 	msr	cctlr_el2, x2
-
-	/* Clear DDC_EL2 */
-	msr	ddc, czr
 #endif
 	/* Set the address to return to our return address */
 #if __has_feature(capabilities)
