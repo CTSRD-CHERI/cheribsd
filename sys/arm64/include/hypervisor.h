@@ -66,6 +66,9 @@
 /* Valid if HCR_EL2.E2H == 1 */
 #define	CPTR_E2H_TRAP_ALL	0xd0000000
 #define	CPTR_E2H_ZPEN		0x00030000
+#if __has_feature(capabilities)
+#define	CPTR_E2H_CEN		0x000c0000
+#endif
 #define	CPTR_E2H_FPEN		0x00300000
 #define	CPTR_E2H_TTA		0x10000000
 /* Unconditionally valid */
