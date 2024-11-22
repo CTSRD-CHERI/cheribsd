@@ -70,6 +70,9 @@ reset_vm_el01_regs(void *vcpu)
 	set_arch_unknown(el2ctx->mdccint_el1);
 	set_arch_unknown(el2ctx->mdscr_el1);
 	set_arch_unknown(el2ctx->par_el1);
+#if __has_feature(capabilities)
+	set_arch_unknown(el2ctx->cctlr_el1);
+#endif
 
 	/*
 	 * Guest starts with:
