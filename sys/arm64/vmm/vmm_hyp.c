@@ -233,7 +233,6 @@ vmm_hyp_reg_store(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 	/* Store the guest special registers */
 #if __has_feature(capabilities)
 	hypctx->cctlr_el0 = READ_SPECIALREG(cctlr_el0);
-	hypctx->cctlr_el1 = READ_SPECIALREG(cctlr_el1);
 	hypctx->cid_el0 = READ_SPECIALREG_CAP(cid_el0);
 	hypctx->ddc_el0 = READ_SPECIALREG_CAP(ddc_el0);
 	hypctx->rcsp_el0 = READ_SPECIALREG_CAP(rcsp_el0);
@@ -259,6 +258,7 @@ vmm_hyp_reg_store(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 	if (guest_or_nonvhe(guest)) {
 #if __has_feature(capabilities)
 		hypctx->elr_el1 = READ_SPECIALREG_CAP(EL1_REG(ELR));
+		hypctx->cctlr_el1 = READ_SPECIALREG(EL1_REG(CCTLR));
 		hypctx->vbar_el1 = READ_SPECIALREG_CAP(EL1_REG(VBAR));
 #else
 		hypctx->elr_el1 = READ_SPECIALREG(EL1_REG(ELR));
@@ -299,7 +299,6 @@ vmm_hyp_reg_restore(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 
 #if __has_feature(capabilities)
 	WRITE_SPECIALREG(cctlr_el0, hypctx->cctlr_el0);
-	WRITE_SPECIALREG(cctlr_el1, hypctx->cctlr_el1);
 	WRITE_SPECIALREG_CAP(cid_el0, hypctx->cid_el0);
 	WRITE_SPECIALREG_CAP(ddc_el0, hypctx->ddc_el0);
 	WRITE_SPECIALREG_CAP(rcsp_el0, hypctx->rcsp_el0);
@@ -325,6 +324,7 @@ vmm_hyp_reg_restore(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 	if (guest_or_nonvhe(guest)) {
 #if __has_feature(capabilities)
 		WRITE_SPECIALREG_CAP(EL1_REG(ELR), hypctx->elr_el1);
+		WRITE_SPECIALREG(EL1_REG(CCTLR), hypctx->cctlr_el1);
 		WRITE_SPECIALREG_CAP(EL1_REG(VBAR), hypctx->vbar_el1);
 #else
 		WRITE_SPECIALREG(EL1_REG(ELR), hypctx->elr_el1);

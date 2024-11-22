@@ -394,6 +394,20 @@
  * CCTLR_EL1/2 - Capability Control Register
  * The rest of the fields mirror CCTLR_EL0
  */
+#define	CCTLR_EL1_REG		MRS_REG_ALT_NAME(CCTLR_EL1)
+#define	CCTLR_EL1_op0		3
+#define	CCTLR_EL1_op1		0
+#define	CCTLR_EL1_CRn		1
+#define	CCTLR_EL1_CRm		2
+#define	CCTLR_EL1_op2		2
+
+#define	CCTLR_EL12_REG		MRS_REG_ALT_NAME(CCTLR_EL12)
+#define	CCTLR_EL12_op0		3
+#define	CCTLR_EL12_op1		5
+#define	CCTLR_EL12_CRn		1
+#define	CCTLR_EL12_CRm		2
+#define	CCTLR_EL12_op2		2
+
 #define	CCTLR_EL1_C64E_MASK	(0x1 << 5) /* Enable C64 mode upon exception */
 #define	CCTLR_EL1_TGEN1_MASK	(0x1 << 1) /* Page table CLG bit for TTBR1 */
 #define	CCTLR_EL1_TGEN0_MASK	(0x1 << 0) /* Page table CLG bit for TTBR0 */
