@@ -563,7 +563,11 @@ LENTRY(enter_kernel_el)
 	isb
 
 	msr	SCTLR_EL12_REG, x2
+#if __has_feature(capabilities)
+	ldr	x2, =(CPTR_E2H_CEN)
+#else
 	mov	x2, xzr /* CPTR_EL2 is managed by vfp.c */
+#endif
 	ldr	x3, =(CNTHCTL_E2H_EL1PCTEN | CNTHCTL_E2H_EL1PTEN)
 	ldr	x5, =(PSR_DAIF | PSR_M_EL2h)
 	b	.Ldone_vhe
