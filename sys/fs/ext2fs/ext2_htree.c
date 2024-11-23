@@ -286,6 +286,8 @@ ext2_htree_find_leaf(struct inode *ip, const char *name, int namelen,
 	    rootp->h_info.h_hash_version != EXT2_HTREE_HALF_MD4 &&
 	    rootp->h_info.h_hash_version != EXT2_HTREE_TEA)
 		goto error;
+	if (rootp->h_info.h_info_len != sizeof(struct ext2fs_htree_root_info))
+		goto error;
 
 	hash_version = rootp->h_info.h_hash_version;
 	if (hash_version <= EXT2_HTREE_TEA)
@@ -300,8 +302,7 @@ ext2_htree_find_leaf(struct inode *ip, const char *name, int namelen,
 	if ((levels = rootp->h_info.h_ind_levels) > 1)
 		goto error;
 
-	entp = (struct ext2fs_htree_entry *)(((char *)&rootp->h_info) +
-	    rootp->h_info.h_info_len);
+	entp = rootp->h_entries;
 
 	if (ext2_htree_get_limit(entp) !=
 	    ext2_htree_root_limit(ip, rootp->h_info.h_info_len))
