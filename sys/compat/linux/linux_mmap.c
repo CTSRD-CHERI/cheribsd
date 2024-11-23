@@ -47,6 +47,8 @@
 #include <vm/vm_map.h>
 #include <vm/vm_object.h>
 
+#include <cheri/cheric.h>
+
 #include <compat/linux/linux_emul.h>
 #include <compat/linux/linux_mmap.h>
 #include <compat/linux/linux_persona.h>
@@ -205,6 +207,12 @@ linux_mmap_common(struct thread *td, uintptr_t addr, size_t len, int prot,
 		.mr_fd = fd,
 		.mr_pos = pos,
 		.mr_check_fp_fn = linux_mmap_check_fp,
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64) && !defined(COMPAT_LINUX32)
+		.mr_kern_flags = MAP_RESERVATION_CREATE,
+		.mr_source_cap = userspace_root_cap,
+#elif defined(__CHERI_PURE_CAPABILITY__)
+		.mr_source_cap = userspace_root_cap,
+#endif
 	};
 	if (addr != 0 && (bsd_flags & MAP_FIXED) == 0 &&
 	    (bsd_flags & MAP_EXCL) == 0) {
