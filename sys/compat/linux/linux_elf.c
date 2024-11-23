@@ -685,6 +685,22 @@ __linuxN(copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	AUXARGS_ENTRY(pos, AT_ENTRY, args->entry);
 #endif
 
+#ifdef __ELF_CHERI
+	if (imgp->interp_end != 0) {
+		AUXARGS_ENTRY_PTR(pos, LINUX_AT_CHERI_INTERP_RW_CAP, cheri_setaddress(interp_cap(imgp, args,
+	    	CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM),
+	    	imgp->interp_start));
+
+		AUXARGS_ENTRY_PTR(pos, LINUX_AT_CHERI_INTERP_RX_CAP, cheri_setaddress(interp_cap(imgp, args,
+	   		CHERI_CAP_USER_CODE_PERMS),
+	    	imgp->interp_start));
+	}
+	AUXARGS_ENTRY(pos, LINUX_AT_ARGC, imgp->args->argc);
+	AUXARGS_ENTRY_PTR(pos, LINUX_AT_ARGV, imgp->argv);
+	AUXARGS_ENTRY(pos, LINUX_AT_ENVC, imgp->args->envc);
+	AUXARGS_ENTRY_PTR(pos, LINUX_AT_ENVP, imgp->envv);
+#endif
+
 	// In PCuABI, we are not using AT_BASE for relocation, unlike CheriABI
 	AUXARGS_ENTRY(pos, AT_BASE, args->base);
 	AUXARGS_ENTRY(pos, AT_PHENT, args->phent);
