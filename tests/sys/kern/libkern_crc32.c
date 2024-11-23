@@ -58,7 +58,7 @@ check_crc32c(uint32_t expected, uint32_t crc32c, const void *buffer,
 		ATF_CHECK_EQ_MSG(expected, act,
 		    "sse42_crc32c expected 0x%08x, got 0x%08x", expected, act);
 	}
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) && !__has_feature(capabilities)
 	act = armv8_crc32c(crc32c, buffer, length);
 	ATF_CHECK_EQ_MSG(expected, act,
 	    "armv8_crc32c expected 0x%08x, got 0x%08x", expected, act);
