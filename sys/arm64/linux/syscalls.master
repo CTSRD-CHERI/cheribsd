@@ -1365,7 +1365,7 @@
 	}
 222	AUE_MMAP	STD	{
 		int linux_mmap2(
-		    l_ulong addr,
+		    void *addr,
 		    l_ulong len,
 		    l_ulong prot,
 		    l_ulong flags,

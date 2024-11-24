@@ -32,6 +32,7 @@
 #include <sys/param.h>
 #include <sys/fcntl.h>
 #include <sys/jail.h>
+#include <sys/ktrace.h>
 #include <sys/imgact.h>
 #include <sys/limits.h>
 #include <sys/lock.h>
@@ -445,7 +446,7 @@ linux_mmap2(struct thread *td, struct linux_mmap2_args *uap)
 	register_t perms, reqperms;
 	vm_offset_t hint;
 
-	if (flags & LINUX_MAP_32BIT) {
+	if (uap->flags & LINUX_MAP_32BIT) {
 		SYSERRCAUSE("LINUX_MAP_32BIT not supported in PCuABI");
 		return (EINVAL);
 	}
@@ -461,7 +462,7 @@ linux_mmap2(struct thread *td, struct linux_mmap2_args *uap)
 	hint = cheri_getaddress(uap->addr);
 
 	if (cheri_gettag(uap->addr)) {
-		if ((flags & LINUX_MAP_FIXED) == 0)
+		if ((uap->flags & LINUX_MAP_FIXED) == 0)
 			return (EPROT);
 		else
 			source_cap = uap->addr;
