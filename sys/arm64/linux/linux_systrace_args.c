@@ -1776,7 +1776,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* linux_mmap2 */
 	case 222: {
 		struct linux_mmap2_args *p = params;
-		iarg[a++] = p->addr; /* l_ulong */
+		uarg[a++] = (intptr_t)p->addr; /* void * __capability */
 		iarg[a++] = p->len; /* l_ulong */
 		iarg[a++] = p->prot; /* l_ulong */
 		iarg[a++] = p->flags; /* l_ulong */
@@ -5375,7 +5375,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 222:
 		switch (ndx) {
 		case 0:
-			p = "l_ulong";
+			p = "userland void * __capability";
 			break;
 		case 1:
 			p = "l_ulong";

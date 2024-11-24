@@ -928,7 +928,7 @@ struct linux_execve_args {
 	char envp_l_[PADL_(l_uintcap_t * __capability)]; l_uintcap_t * __capability envp; char envp_r_[PADR_(l_uintcap_t * __capability)];
 };
 struct linux_mmap2_args {
-	char addr_l_[PADL_(l_ulong)]; l_ulong addr; char addr_r_[PADR_(l_ulong)];
+	char addr_l_[PADL_(void * __capability)]; void * __capability addr; char addr_r_[PADR_(void * __capability)];
 	char len_l_[PADL_(l_ulong)]; l_ulong len; char len_r_[PADR_(l_ulong)];
 	char prot_l_[PADL_(l_ulong)]; l_ulong prot; char prot_r_[PADR_(l_ulong)];
 	char flags_l_[PADL_(l_ulong)]; l_ulong flags; char flags_r_[PADR_(l_ulong)];
