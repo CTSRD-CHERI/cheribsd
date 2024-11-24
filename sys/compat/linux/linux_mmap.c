@@ -72,9 +72,15 @@ linux_mmap_check_fp(struct file *fp, int flags, int prot, int maxprot)
 	return (0);
 }
 
+#if __has_feature(capabilities)
+int
+linux_mmap_common(struct thread *td, uintptr_t addr, size_t len, int prot,
+    int flags, int fd, off_t pos, int kern_flags, void * __capability source_cap)
+#else
 int
 linux_mmap_common(struct thread *td, uintptr_t addr, size_t len, int prot,
     int flags, int fd, off_t pos)
+#endif
 {
 	struct mmap_req mr, mr_fixed;
 	struct proc *p = td->td_proc;
@@ -192,6 +198,15 @@ linux_mmap_common(struct thread *td, uintptr_t addr, size_t len, int prot,
 		}
 	}
 
+    // If MAP_FIXED specified and we are creating new reservation
+	// requirements, then MAP_EXCL is implied to prevent changing
+	// page contents without permission.
+#if __has_feature(capabilities)
+	if (kern_flags & MAP_RESERVATION_CREATE)
+		if (bsd_flags & MAP_FIXED)
+			bsd_flags |= MAP_EXCL;
+#endif
+
 	/*
 	 * FreeBSD is free to ignore the address hint if MAP_FIXED wasn't
 	 * passed.  However, some Linux applications, like the ART runtime,
@@ -207,11 +222,10 @@ linux_mmap_common(struct thread *td, uintptr_t addr, size_t len, int prot,
 		.mr_fd = fd,
 		.mr_pos = pos,
 		.mr_check_fp_fn = linux_mmap_check_fp,
-#if __has_feature(capabilities) && !defined(COMPAT_LINUX64) && !defined(COMPAT_LINUX32)
-		.mr_kern_flags = MAP_RESERVATION_CREATE,
-		.mr_source_cap = userspace_root_cap,
-#elif defined(__CHERI_PURE_CAPABILITY__)
-		.mr_source_cap = userspace_root_cap,
+#if __has_feature(capabilities)
+		.mr_kern_flags = kern_flags,
+		.mr_source_cap = source_cap,
+		.mr_max_addr = cheri_gettop(source_cap),
 #endif
 	};
 	if (addr != 0 && (bsd_flags & MAP_FIXED) == 0 &&

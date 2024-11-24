@@ -423,18 +423,103 @@ linux_madvise(struct thread *td, struct linux_madvise_args *uap)
 int
 linux_mmap2(struct thread *td, struct linux_mmap2_args *uap)
 {
+	uint64_t actual_size = uap->pgoff;
+	
 #if defined(LINUX_ARCHWANT_MMAP2PGOFF)
 	/*
 	 * For architectures with sizeof (off_t) < sizeof (loff_t) mmap is
 	 * implemented with mmap2 syscall and the offset is represented in
 	 * multiples of page size.
 	 */
+	actual_size = (uint64_t)(uint32_t)uap->pgoff * PAGE_SIZE;
+#endif
+
+#if !__has_feature(capabilities)
 	return (linux_mmap_common(td, PTROUT(uap->addr), uap->len, uap->prot,
-	    uap->flags, uap->fd, (uint64_t)(uint32_t)uap->pgoff * PAGE_SIZE));
+			uap->flags, uap->fd, actual_size));
+#elif !defined(COMPAT_LINUX64)
+	// Copied from sys_mmap
+
+	int kern_flags = 0;
+	void * __capability source_cap;
+	register_t perms, reqperms;
+	vm_offset_t hint;
+
+	if (flags & LINUX_MAP_32BIT) {
+		SYSERRCAUSE("LINUX_MAP_32BIT not supported in PCuABI");
+		return (EINVAL);
+	}
+
+	/*
+	 * Allow existing mapping to be replaced using the MAP_FIXED
+	 * flag IFF the addr argument is a valid capability with the
+	 * SW_VMEM user permission (We currently ignore SW_VMEM for 
+	 * PCuABI).  In this case, the new capability is derived from 
+	 * the passed capability.  In all other cases, the new capability 
+	 * is derived from the per-thread mmap capability.
+	 */
+	hint = cheri_getaddress(uap->addr);
+
+	if (cheri_gettag(uap->addr)) {
+		if ((flags & LINUX_MAP_FIXED) == 0)
+			return (EPROT);
+		else
+			source_cap = uap->addr;
+	} else {
+		if (!cheri_is_null_derived(uap->addr))
+			return (EINVAL);
+
+		/*
+		 * When a capability is not provided, we implicitly
+		 * request the creation of a reservation.
+		 */
+		kern_flags |= MAP_RESERVATION_CREATE;
+		source_cap = userspace_root_cap;
+	}
+	KASSERT(cheri_gettag(source_cap),
+	    ("td->td_cheri_mmap_cap is untagged!"));
+
+	/*
+	 * If MAP_FIXED is specified, make sure that the requested
+	 * address range fits within the source capability.
+	 */
+	if ((uap->flags & LINUX_MAP_FIXED) &&
+	    (rounddown2(hint, PAGE_SIZE) < cheri_getbase(source_cap) ||
+	    roundup2(hint + uap->len, PAGE_SIZE) >
+	    cheri_getaddress(source_cap) + cheri_getlen(source_cap))) {
+		SYSERRCAUSE("MAP_FIXED and too little space in "
+		    "capablity (0x%zx < 0x%zx)",
+		    cheri_getlen(source_cap) - cheri_getoffset(source_cap),
+		    roundup2(uap->len, PAGE_SIZE));
+		return (EPROT);
+	}
+
+	perms = cheri_getperm(source_cap);
+	reqperms = vm_map_prot2perms(uap->prot);
+#ifdef CHERI_PERM_EXECUTIVE
+	if ((uap->flags & LINUX_MAP_FIXED) && (perms & CHERI_PERM_EXECUTIVE) == 0)
+		/*
+		 * Don't implicity require CHERI_PERM_EXECUTIVE if it's
+		 * not available in source capability.
+		 */
+		reqperms &= ~CHERI_PERM_EXECUTIVE;
+#endif
+	if ((perms & reqperms) != reqperms) {
+		SYSERRCAUSE("capability has insufficient perms (0x%lx)"
+		    "for request (0x%lx)", perms, reqperms);
+		return (EPROT);
+	}
+
+	return (linux_mmap_common(td, hint, uap->len, uap->prot,
+			uap->flags, uap->fd, actual_size, kern_flags, source_cap));
+#elif defined(__CHERI_PURE_CAPABILITY__)
+	return (linux_mmap_common(td, PTROUT(uap->addr), uap->len, uap->prot,
+			uap->flags, uap->fd, actual_size, 0, userspace_root_cap));
 #else
 	return (linux_mmap_common(td, PTROUT(uap->addr), uap->len, uap->prot,
-	    uap->flags, uap->fd, uap->pgoff));
+			uap->flags, uap->fd, actual_size, 0, 0));
 #endif
+
 }
 
 int

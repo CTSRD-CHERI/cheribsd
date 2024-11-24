@@ -63,8 +63,13 @@
 #define	LINUX_MADV_HWPOISON	100
 #define	LINUX_MADV_SOFT_OFFLINE	101
 
+#if __has_feature(capabilities)
+int linux_mmap_common(struct thread *, uintptr_t, size_t, int, int,
+			int, off_t, int, void * __capability);
+#else
 int linux_mmap_common(struct thread *, uintptr_t, size_t, int, int,
 			int, off_t);
+#endif
 int linux_mprotect_common(struct thread *, uintptr_t, size_t, int);
 int linux_madvise_common(struct thread *, uintptr_t, size_t, int);
 
