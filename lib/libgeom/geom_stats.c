@@ -75,7 +75,7 @@ geom_stats_resync(void)
 		err(1, "DIOCGMEDIASIZE(" _PATH_DEV DEVSTAT_DEVICE_NAME ")");
 
 	munmap(statp, npages * pagesize);
-	p = mmap((void *)(uint64_t)(uintptr_t)statp, mediasize, PROT_READ, MAP_SHARED, statsfd, 0);
+	p = mmap((void *)(uintptr_t)(uint64_t)(uintptr_t)statp, mediasize, PROT_READ, MAP_SHARED, statsfd, 0);
 	if (p == MAP_FAILED)
 		err(1, "mmap(/dev/devstat):");
 	else {
