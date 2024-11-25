@@ -403,6 +403,7 @@ struct uma_hash_slab {
 
 typedef struct uma_hash_slab * uma_hash_slab_t;
 
+#ifdef _KERNEL
 static inline uma_hash_slab_t
 slab_tohashslab(uma_slab_t slab)
 {
@@ -437,6 +438,7 @@ slab_item_index(uma_slab_t slab, uma_keg_t keg, void *item)
 	data = (uintptr_t)slab_data(slab, keg);
 	return (((ptraddr_t)item - (ptraddr_t)data) / keg->uk_rsize);
 }
+#endif /* _KERNEL */
 
 STAILQ_HEAD(uma_bucketlist, uma_bucket);
 
