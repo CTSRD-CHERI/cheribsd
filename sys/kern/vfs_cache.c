@@ -3273,6 +3273,8 @@ kern___realpathat(struct thread *td, int fd, const char * __capability path,
 
 	if (nd.ni_vp->v_type == VREG && nd.ni_dvp->v_type != VDIR &&
 	    (nd.ni_vp->v_vflag & VV_ROOT) != 0) {
+		struct vnode *covered_vp;
+
 		/*
 		 * This happens if vp is a file mount. The call to
 		 * vn_fullpath_hardlink can panic if path resolution can't be
@@ -3282,7 +3284,6 @@ kern___realpathat(struct thread *td, int fd, const char * __capability path,
 		 * this should have a unique global path since we disallow
 		 * mounting on linked files.
 		 */
-		struct vnode *covered_vp;
 		error = vn_lock(nd.ni_vp, LK_SHARED);
 		if (error != 0)
 			goto out;
@@ -3292,8 +3293,9 @@ kern___realpathat(struct thread *td, int fd, const char * __capability path,
 		error = vn_fullpath(covered_vp, &retbuf, &freebuf);
 		vrele(covered_vp);
 	} else {
-		error = vn_fullpath_hardlink(nd.ni_vp, nd.ni_dvp, nd.ni_cnd.cn_nameptr,
-		    nd.ni_cnd.cn_namelen, &retbuf, &freebuf, &size);
+		error = vn_fullpath_hardlink(nd.ni_vp, nd.ni_dvp,
+		    nd.ni_cnd.cn_nameptr, nd.ni_cnd.cn_namelen, &retbuf,
+		    &freebuf, &size);
 	}
 	if (error == 0) {
 		error = copyout(retbuf, buf, size);
