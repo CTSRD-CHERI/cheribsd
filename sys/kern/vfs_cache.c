@@ -3298,7 +3298,7 @@ kern___realpathat(struct thread *td, int fd, const char * __capability path,
 		    &freebuf, &size);
 	}
 	if (error == 0) {
-		error = copyout(retbuf, buf, size);
+		error = copyout(retbuf, buf, min(strlen(retbuf) + 1, size));
 		free(freebuf, M_TEMP);
 	}
 out:
