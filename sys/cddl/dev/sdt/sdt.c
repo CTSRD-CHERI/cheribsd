@@ -60,6 +60,10 @@
 
 #include <cddl/dev/dtrace/dtrace_cddl.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+#endif
+
 /* DTrace methods. */
 static void	sdt_getargdesc(void *, dtrace_id_t, void *, dtrace_argdesc_t *);
 static uint64_t	sdt_getargval(void *, dtrace_id_t, void *, int, int);
@@ -409,6 +413,13 @@ sdt_kld_load_probes(struct linker_file *lf)
 				    tp->probe->func, tp->probe->name);
 				continue;
 			}
+#ifdef __CHERI_PURE_CAPABILITY__
+			tp->patchpoint = (uintcap_t)cheri_setbounds(
+			    cheri_setaddress(kernel_root_cap, tp->patchpoint),
+			    INSN_SIZE);
+			tp->patchpoint = cheri_andperm(tp->patchpoint,
+			    CHERI_PERM_STORE | CHERI_PERM_SEAL);
+#endif
 			STAILQ_INSERT_TAIL(&tp->probe->tracepoint_list, tp,
 			    tracepoint_entry);
 		}
