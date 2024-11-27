@@ -1,0 +1,4 @@
+include GENERIC-PCPU-FUNCS
+include "../../conf/std.nodebug"
+
+ident   GENERIC-PCPU-FUNCS-NODEBUG
