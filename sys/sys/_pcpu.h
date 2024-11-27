@@ -40,7 +40,7 @@
 	    CHERI_REPRESENTABLE_LENGTH(sizeof(pcpu->pc ## _member)))
 #else
 #define	_PCPU_PTR(pcpu, type, _member)					\
-	((type *)(void *)pcpu->pc ## _member)
+	((type *)(void *)&pcpu->pc ## _member)
 #endif
 
 #define	PCPU_DECLARE(type, member)					\
