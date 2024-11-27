@@ -1166,6 +1166,7 @@ vmmops_run(void *vcpui, uintcap_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 	for (;;) {
 		if (hypctx->has_exception) {
 			size_t off;
+			uint64_t c64mask;
 
 			hypctx->has_exception = false;
 			hypctx->elr_el1 = hypctx->tf.tf_elr;
@@ -1183,6 +1184,7 @@ vmmops_run(void *vcpui, uintcap_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 				/* 32-bit EL0 */
 				off = 0x600;
 			}
+			c64mask = 0;
 #if __has_feature(capabilities)
 			switch (hypctx->cpacr_el1 & CPACR_CEN_MASK) {
 			case CPACR_CEN_TRAP_ALL1:
@@ -1192,6 +1194,8 @@ vmmops_run(void *vcpui, uintcap_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 				break;
 			default:
 				hypctx->tf.tf_elr = hypctx->vbar_el1 + off;
+				if (hypctx->cctlr_el1 & CCTLR_EL1_C64E_MASK)
+					c64mask = PSR_C64;
 				break;
 			}
 #else
@@ -1203,7 +1207,7 @@ vmmops_run(void *vcpui, uintcap_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 
 			/* Set the new cpsr */
 			hypctx->tf.tf_spsr = hypctx->spsr_el1 & PSR_FLAGS;
-			hypctx->tf.tf_spsr |= PSR_DAIF | PSR_M_EL1h;
+			hypctx->tf.tf_spsr |= PSR_DAIF | PSR_M_EL1h | c64mask;
 
 			/*
 			 * Update fields that may change on exeption entry
