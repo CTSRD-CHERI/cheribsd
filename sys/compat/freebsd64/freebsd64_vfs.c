@@ -811,7 +811,7 @@ freebsd64_chdir(struct thread *td, struct freebsd64_chdir_args *uap)
 int
 freebsd64_chroot(struct thread *td, struct freebsd64_chroot_args *uap)
 {
-	return (kern_chroot(td, __USER_CAP_STR(uap->path)));
+	return (user_chroot(td, __USER_CAP_STR(uap->path)));
 }
 
 int
