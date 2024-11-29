@@ -468,6 +468,7 @@ typedef int (__sys_timerfd_gettime_t)(int, struct itimerspec * __kerncap);
 typedef int (__sys_timerfd_settime_t)(int, int, const struct itimerspec * __kerncap, struct itimerspec * __kerncap);
 typedef int (__sys_kcmp_t)(pid_t, pid_t, int, kuintcap_t, kuintcap_t);
 typedef int (__sys_getrlimitusage_t)(u_int, int, rlim_t * __kerncap);
+typedef int (__sys_fchroot_t)(int);
 
 void __sys_exit(int rval);
 int __sys_fork(void);
@@ -872,6 +873,7 @@ int __sys_timerfd_gettime(int fd, struct itimerspec * __kerncap curr_value);
 int __sys_timerfd_settime(int fd, int flags, const struct itimerspec * __kerncap new_value, struct itimerspec * __kerncap old_value);
 int __sys_kcmp(pid_t pid1, pid_t pid2, int type, kuintcap_t idx1, kuintcap_t idx2);
 int __sys_getrlimitusage(u_int which, int flags, rlim_t * __kerncap res);
+int __sys_fchroot(int fd);
 __END_DECLS
 
 #endif /* __LIBSYS_H_ */

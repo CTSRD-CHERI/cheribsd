@@ -529,4 +529,5 @@
 #define	FREEBSD64_SYS_freebsd64_timerfd_settime	587
 #define	FREEBSD64_SYS_freebsd64_kcmp	588
 #define	FREEBSD64_SYS_freebsd64_getrlimitusage	589
-#define	FREEBSD64_SYS_MAXSYSCALL	590
+#define	FREEBSD64_SYS_fchroot	590
+#define	FREEBSD64_SYS_MAXSYSCALL	591

@@ -528,7 +528,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct freebsd32_fcntl_args *p = params;
 		iarg[a++] = p->fd; /* int */
 		iarg[a++] = p->cmd; /* int */
-		iarg[a++] = p->arg; /* intptr32_t */
+		uarg[a++] = (intcap_t)p->arg; /* intptr32_t */
 		*n_args = 3;
 		break;
 	}
@@ -3382,8 +3382,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		iarg[a++] = p->pid1; /* pid_t */
 		iarg[a++] = p->pid2; /* pid_t */
 		iarg[a++] = p->type; /* int */
-		uarg[a++] = p->idx1; /* uintptr32_t */
-		uarg[a++] = p->idx2; /* uintptr32_t */
+		uarg[a++] = (intcap_t)p->idx1; /* uintptr32_t */
+		uarg[a++] = (intcap_t)p->idx2; /* uintptr32_t */
 		*n_args = 5;
 		break;
 	}
@@ -3394,6 +3394,13 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		iarg[a++] = p->flags; /* int */
 		uarg[a++] = (intcap_t)p->res; /* rlim_t * */
 		*n_args = 3;
+		break;
+	}
+	/* fchroot */
+	case 590: {
+		struct fchroot_args *p = params;
+		iarg[a++] = p->fd; /* int */
+		*n_args = 1;
 		break;
 	}
 	default:
@@ -9176,6 +9183,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* fchroot */
+	case 590:
+		switch (ndx) {
+		case 0:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -11071,6 +11088,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* getrlimitusage */
 	case 589:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fchroot */
+	case 590:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
