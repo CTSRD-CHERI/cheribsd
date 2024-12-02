@@ -29,7 +29,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/param.h>
+#include <sys/cdefs.h>
 #include <sys/fcntl.h>
 #include <sys/jail.h>
 #include <sys/ktrace.h>
@@ -39,6 +39,7 @@
 #include <sys/msgbuf.h>
 #include <sys/mqueue.h>
 #include <sys/mutex.h>
+#include <sys/param.h>
 #include <sys/poll.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
@@ -136,6 +137,25 @@ static int	linux_pollin(struct thread *, struct pollfd *,
 			struct pollfd * __capability, u_int);
 static int	linux_pollout(struct thread *, struct pollfd *,
 			struct pollfd * __capability, u_int);
+
+// Copied from vm_mmap
+// Place it here temporarily
+#if __has_feature(capabilities)
+static int
+cap_covers_pages(const void * __capability cap, size_t size)
+{
+	const char * __capability addr;
+	size_t pageoff;
+
+	addr = cap;
+	pageoff = ((__cheri_addr ptraddr_t)addr & PAGE_MASK);
+	addr -= pageoff;
+	size += pageoff;
+	size = (vm_size_t)round_page(size);
+
+	return (__CAP_CHECK(__DECONST_CAP(void * __capability, addr), size));
+}
+#endif
 
 int
 linux_sysinfo(struct thread *td, struct linux_sysinfo_args *args)
@@ -527,7 +547,7 @@ int
 linux_munmap(struct thread *td, struct linux_munmap_args *args)
 {
 #if __has_feature(capabilities) && !defined(COMPAT_LINUX64) && !defined(COMPAT_LINUX32)
-	if (cap_covers_pages(uap->addr, uap->len) == 0)
+	if (cap_covers_pages(args->addr, args->len) == 0)
 		return (EPROT);
 #endif
 	return (kern_munmap(td, (uintptr_t)(uintcap_t)args->addr, args->len));
