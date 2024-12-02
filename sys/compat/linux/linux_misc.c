@@ -30,6 +30,7 @@
  */
 
 #include <sys/cdefs.h>
+#include <sys/param.h>
 #include <sys/fcntl.h>
 #include <sys/jail.h>
 #include <sys/ktrace.h>
@@ -39,7 +40,6 @@
 #include <sys/msgbuf.h>
 #include <sys/mqueue.h>
 #include <sys/mutex.h>
-#include <sys/param.h>
 #include <sys/poll.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
