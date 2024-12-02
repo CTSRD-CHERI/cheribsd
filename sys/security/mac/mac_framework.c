@@ -70,6 +70,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/abi_compat.h>
 #include <sys/condvar.h>
 #include <sys/jail.h>
 #include <sys/kernel.h>
@@ -742,6 +743,13 @@ mac_check_structmac_consistent(const struct mac *mac)
 	return (0);
 }
 
+#ifdef COMPAT_FREEBSD32
+struct mac32 {
+	uint32_t	m_buflen;	/* size_t */
+	uint32_t	m_string;	/* char * */
+};
+#endif
+
 int
 copyin_mac(const void * const __capability mac_p, struct mac *mac)
 {
@@ -749,21 +757,32 @@ copyin_mac(const void * const __capability mac_p, struct mac *mac)
 
 	memset(mac, 0, sizeof(*mac));
 #ifdef COMPAT_FREEBSD32
-	if (SV_CURPROC_FLAG(SV_ILP32))
-		error = EOPNOTSUPP;
-	else
+	if (SV_CURPROC_FLAG(SV_ILP32)) {
+		struct mac32 mac32;
+
+		error = copyin(mac_p, &mac32, sizeof(mac32));
+		if (error != 0)
+			return (error);
+
+		CP(mac32, *mac, m_buflen);
+		PTRIN_CP(mac32, *mac, m_string);
+		return (0);
+	}
 #endif
 #ifdef COMPAT_FREEBSD64
 	if (!SV_CURPROC_FLAG(SV_CHERI)) {
 		struct mac64 tmpmac;
+
 		error = copyin(mac_p, &tmpmac, sizeof(tmpmac));
+		if (error != 0)
+			return (error);
+
 		mac->m_buflen = tmpmac.m_buflen;
 		mac->m_string = __USER_CAP(tmpmac.m_string, tmpmac.m_buflen);
-	} else
-#endif
-	{
-		error = copyincap(mac_p, mac, sizeof(*mac));
+		return (0);
 	}
+#endif
+	error = copyincap(mac_p, mac, sizeof(*mac));
 	return (error);
 }
 
