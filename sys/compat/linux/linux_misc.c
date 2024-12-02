@@ -526,16 +526,11 @@ linux_mmap2(struct thread *td, struct linux_mmap2_args *uap)
 int
 linux_munmap(struct thread *td, struct linux_munmap_args *args)
 {
-#if defined(COMPAT_LINUX64) || defined(COMPAT_LINUX32)
-	return (kern_munmap(td, (uintptr_t)args->addr, args->len));
-#else
-	struct munmap_args bargs = {
-		.addr = args->addr,
-		.len = args->len
-	};
-
-	return (sys_munmap(td, &bargs));
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64) && !defined(COMPAT_LINUX32)
+	if (cap_covers_pages(uap->addr, uap->len) == 0)
+		return (EPROT);
 #endif
+	return (kern_munmap(td, (uintptr_t)(uintcap_t)args->addr, args->len));
 }
 
 #ifdef LINUX_LEGACY_SYSCALLS
