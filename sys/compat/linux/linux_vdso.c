@@ -92,10 +92,10 @@ void
 __elfN(linux_shared_page_fini)(vm_object_t obj, void *mapping,
     vm_size_t size)
 {
-	vm_offset_t va;
+	vm_pointer_t va;
 
-	va = (vm_offset_t)mapping;
-	pmap_qremove(va, size / PAGE_SIZE);
+	va = (vm_pointer_t)mapping;
+	pmap_qremove((vm_offset_t)va, size / PAGE_SIZE);
 	kva_free(va, size);
 	vm_object_deallocate(obj);
 }
