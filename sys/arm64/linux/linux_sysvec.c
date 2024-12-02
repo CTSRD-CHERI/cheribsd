@@ -517,7 +517,7 @@ struct sysentvec elf_linux_sysvec = {
 	.sv_maxssiz	= NULL,
 #if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
 	.sv_flags	= SV_ABI_LINUX | SV_LP64 | SV_SHP | SV_SIG_DISCIGN |
-	    SV_SIG_WAITNDQ | SV_TIMEKEEP | SV_CHERI | SV_SKIPCAPREVOKE,
+	    SV_SIG_WAITNDQ | SV_TIMEKEEP | SV_CHERI,
 #else
 	.sv_flags	= SV_ABI_LINUX | SV_LP64 | SV_SHP | SV_SIG_DISCIGN |
 	    SV_SIG_WAITNDQ | SV_TIMEKEEP,

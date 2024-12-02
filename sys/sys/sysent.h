@@ -179,7 +179,6 @@ struct sysentvec {
 #define	SV_DSO_SIG	0x800000	/* Signal trampoline packed in dso */
 #define	SV_UNBOUND_PCC	0x04000000	/* Don't set PCC bounds (CheriABI-only). */
 #define	SV_CHERI	0x08000000	/* CheriABI executable. */
-#define	SV_SKIPCAPREVOKE	0x10000000	/* CheriABI executable. */
 
 #define	SV_ABI_MASK	0xff
 #define	SV_PROC_FLAG(p, x)	((p)->p_sysent->sv_flags & (x))
