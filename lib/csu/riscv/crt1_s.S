@@ -35,6 +35,7 @@
 
 #include <machine/asm.h>
 ENTRY(_start)
+	.cfi_undefined ra	# Stop unwinding here
 	mv	a3, a2		# cleanup
 	addi	a1, a0, 8	# get argv
 	ld	a0, 0(a0)	# load argc
