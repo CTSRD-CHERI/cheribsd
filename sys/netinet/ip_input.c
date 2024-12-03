@@ -1228,7 +1228,7 @@ ip_savecontrol(struct inpcb *inp, struct mbuf **mp, struct ip *ip,
 	if (inp->inp_flags & INP_RECVIF) {
 		struct ifnet *ifp;
 		struct sdlbuf {
-			struct sockaddr_dl sdl;
+			struct sockaddr_dl sdl __subobject_use_container_bounds;
 			u_char	pad[32];
 		} sdlbuf;
 		struct sockaddr_dl *sdp;
