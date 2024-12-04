@@ -39,10 +39,11 @@
 #ifdef __CHERI_PURE_CAPABILITY__
 FEATURE(cheri_purecap_kernel, "CHERI pure-capability kernel");
 #ifdef __CHERI_SUBOBJECT_BOUNDS__
-FEATURE(subobject_bounds, "CheriABI kernel with sub-object bounds");
+FEATURE(cheri_subobject_bounds_kernel,
+    "CHERI pure-capability kernel with sub-object bounds");
 #endif
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-FEATURE(benchmark_abi_kernel, "Morello benchmark ABI kernel");
+FEATURE(morello_purecap_benchmark_abi_kernel, "Morello benchmark ABI kernel");
 #endif
 #endif /* __CHERI_PURE_CAPABILITY__ */
 
