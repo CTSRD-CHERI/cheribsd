@@ -1936,7 +1936,7 @@ vm_map_insert1(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		protoeflags |= MAP_ENTRY_NOSYNC;
 	if (cow & MAP_DISABLE_COREDUMP)
 		protoeflags |= MAP_ENTRY_NOCOREDUMP;
-	if (cow & MAP_STACK_GROWS_DOWN)
+	if (cow & MAP_STACK_AREA)
 		protoeflags |= MAP_ENTRY_GROWS_DOWN;
 	if (cow & MAP_WRITECOUNT)
 		protoeflags |= MAP_ENTRY_WRITECNT;
@@ -2012,7 +2012,7 @@ charged:
 		}
 	} else if ((prev_entry->eflags & ~MAP_ENTRY_USER_WIRED) ==
 	    protoeflags &&
-	    (cow & (MAP_STACK_GROWS_DOWN | MAP_VN_EXEC)) == 0 &&
+	    (cow & (MAP_STACK_AREA | MAP_VN_EXEC)) == 0 &&
 	    prev_entry->end == start && (prev_entry->cred == cred ||
 	    (prev_entry->object.vm_object != NULL &&
 	    prev_entry->object.vm_object->cred == cred)) &&
@@ -2303,7 +2303,7 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 #endif
 
 	end = start + length;
-	KASSERT((cow & MAP_STACK_GROWS_DOWN) == 0 || object == NULL,
+	KASSERT((cow & MAP_STACK_AREA) == 0 || object == NULL,
 	    ("vm_map_fixed: non-NULL backing object for stack"));
 	vm_map_lock(map);
 	VM_MAP_RANGE_CHECK(map, start, end);
@@ -2351,7 +2351,7 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		if (result != KERN_SUCCESS)
 			goto err;
 	}
-	if ((cow & MAP_STACK_GROWS_DOWN) != 0) {
+	if ((cow & MAP_STACK_AREA) != 0) {
 		result = vm_map_stack_locked(map, start, length, sgrowsiz,
 		    prot, max, cow);
 	} else {
@@ -2530,10 +2530,10 @@ vm_map_find_locked(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	vm_pointer_t reservation;
 	const vm_size_t unpadded_length = length;
 
-	KASSERT((cow & MAP_STACK_GROWS_DOWN) == 0 || object == NULL,
+	KASSERT((cow & MAP_STACK_AREA) == 0 || object == NULL,
 	    ("non-NULL backing object for stack"));
 	MPASS((cow & MAP_REMAP) == 0 || (find_space == VMFS_NO_SPACE &&
-	    (cow & MAP_STACK_GROWS_DOWN) == 0));
+	    (cow & MAP_STACK_AREA) == 0));
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_getlen(addr) == sizeof(void *),
 	    ("Invalid bounds for pointer-sized object %zx",
@@ -2561,7 +2561,7 @@ vm_map_find_locked(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	update_anon = cluster = clustering_anon_allowed(*addr, cow) &&
 	    (map->flags & MAP_IS_SUB_MAP) == 0 && max_addr == 0 &&
 	    find_space != VMFS_NO_SPACE && object == NULL &&
-	    (cow & (MAP_INHERIT_SHARE | MAP_STACK_GROWS_DOWN)) == 0 &&
+	    (cow & (MAP_INHERIT_SHARE | MAP_STACK_AREA)) == 0 &&
 	    prot != PROT_NONE;
 	curr_min_addr = min_addr = vaddr = *addr;
 	if (en_aslr && min_addr == 0 && !cluster &&
@@ -2694,7 +2694,7 @@ again:
 	if (cow & MAP_CREATE_GUARD)
 		prot = max = VM_PROT_NONE;
 
-	if ((cow & MAP_STACK_GROWS_DOWN) != 0) {
+	if ((cow & MAP_STACK_AREA) != 0) {
 		rv = vm_map_stack_locked(map, reservation, unpadded_length,
 		    sgrowsiz, prot, max, cow);
 	} else {
@@ -5426,7 +5426,7 @@ vm_map_stack_locked(vm_map_t map, vm_pointer_t addrbos, vm_size_t max_ssize,
 	int rv;
 	vm_offset_t reservation;
 
-	KASSERT((cow & MAP_STACK_GROWS_DOWN) != 0,
+	KASSERT((cow & MAP_STACK_AREA) != 0,
 	    ("New mapping is not a stack"));
 
 	if (max_ssize == 0 ||
@@ -5707,7 +5707,7 @@ retry:
 	}
 	/* XXX-AM: Would be nice to just grow the object as below */
 	rv = vm_map_insert(map, NULL, 0, grow_start,
-	    grow_start + grow_amount, prot, max, MAP_STACK_GROWS_DOWN,
+	    grow_start + grow_amount, prot, max, MAP_STACK_AREA,
 	    stack_entry->reservation);
 	if (rv != KERN_SUCCESS) {
 		if (gap_deleted) {
