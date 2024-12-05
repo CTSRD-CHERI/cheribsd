@@ -414,6 +414,25 @@ uma_zfree_pcpu(uma_zone_t zone, void *item)
 	uma_zfree_pcpu_arg(zone, item, NULL);
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Reset bounds on an item to the full item size.
+ *
+ * This is intended for nested allocators to recover items capabilities before
+ * free-ing them.
+ * Note that UMA maintains the invariant that a full item capability must be
+ * passed to uma_zfree functions.
+ * XXX-AM: Should we instead relax that invariant (optionally via a zone flag),
+ * or add a different set of uma_zfree_narrow functions that allow for partial
+ * item capabilities?
+ * Given that this is a privileged operation, I would like to maintain the
+ * intentionality of the operation here.
+ */
+void *uma_zgrow_bounds(uma_zone_t zone, void *item);
+#else
+#define	uma_zgrow_bounds(zone, item) (item)
+#endif
+
 /*
  * Wait until the specified zone can allocate an item.
  */
