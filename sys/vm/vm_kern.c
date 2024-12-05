@@ -928,12 +928,11 @@ kmem_init(vm_pointer_t start, vm_pointer_t end)
 	KASSERT(cheri_gettag(end), ("Expected valid end capability"));
 #endif
 
-	vm_map_init(kernel_map, kernel_pmap,
+	vm_map_init_system(kernel_map, kernel_pmap,
 	    cheri_kern_setaddress(start, VM_MIN_KERNEL_ADDRESS), end);
 #ifdef __CHERI_PURE_CAPABILITY__
 	kernel_map->flags |= MAP_RESERVATIONS;
 #endif
-	kernel_map->system_map = 1;
 	vm_map_lock(kernel_map);
 	/* N.B.: cannot use kgdb to debug, starting with this assignment ... */
 #ifdef __amd64__

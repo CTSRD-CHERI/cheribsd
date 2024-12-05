@@ -236,8 +236,10 @@ struct cheri_revoke_stats;
  */
 struct vm_map {
 	struct vm_map_entry header;	/* List of entries */
-	struct sx lock;			/* Lock for map data */
-	struct mtx system_mtx;
+	union {
+		struct sx lock;			/* Lock for map data */
+		struct mtx system_mtx;
+	};
 #ifdef CHERI_CAPREVOKE
 	struct cv vm_cheri_revoke_cv;	/* (c) Cap. rev. is single file */
 	cheri_revoke_state_t vm_cheri_revoke_st;	/* Cap. rev. state */
@@ -571,6 +573,7 @@ int vm_map_alignspace(vm_map_t, vm_object_t, vm_ooffset_t,
     vm_offset_t *, vm_size_t, vm_offset_t, vm_offset_t);
 int vm_map_inherit (vm_map_t, vm_offset_t, vm_offset_t, vm_inherit_t);
 void vm_map_init(vm_map_t, pmap_t, vm_pointer_t, vm_pointer_t);
+void vm_map_init_system(vm_map_t, pmap_t, vm_pointer_t, vm_pointer_t);
 int vm_map_insert (vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t,
     vm_pointer_t, vm_prot_t, vm_prot_t, int, vm_offset_t);
 int vm_map_lookup (vm_map_t *, vm_offset_t, vm_prot_t, vm_map_entry_t *, vm_object_t *,
