@@ -5047,15 +5047,14 @@ uma_zgrow_bounds(uma_zone_t zone, void *item)
 
 	KASSERT((zone->uz_flags & UMA_ZFLAG_VTOSLAB) != 0,
 	    ("Purecap kernel UMA zone missing UMA_ZFLAG_VTOSLAB"));
-	// XXX handle PCPU and SMR?
+	KASSERT((zone->uz_flags & (UMA_ZONE_PCPU | UMA_ZONE_SMR)) == 0,
+	    ("Can not grow bounds on PCPU and SMR zones"));
 
 	/*
 	 * XXX-AM: It should be safe to only check the index range
 	 * with INVARIANTS. If an item does not belong to the slab the computed
 	 * index will be garbage but it will fail setbounds with the slab_data()
 	 * capability.
-	 * Not sure whether it can be possible to construct a pointer in the
-	 * middle of two items.
 	 */
 	slab = vtoslab((vm_offset_t)item);
 	index = slab_item_index(slab, keg, item);
