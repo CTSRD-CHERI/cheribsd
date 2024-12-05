@@ -533,6 +533,7 @@ typedef struct {
 #define	PT_PHDR		6	/* Location of program header itself. */
 #define	PT_TLS		7	/* Thread local storage segment */
 #define	PT_LOOS		0x60000000	/* First OS-specific. */
+#define	PT_C18N_NAME	0x64331380	/* Sub-object compartment. */
 #define	PT_CHERI_PCC	0x64348450	/* CHERI PCC bounds. */
 #define	PT_SUNW_UNWIND	0x6464e550	/* amd64 UNWIND program header */
 #define	PT_GNU_EH_FRAME	0x6474e550
@@ -631,6 +632,8 @@ typedef struct {
 #define	DT_SUNW_FILTER		0x6000000f	/* symbol filter name */
 #define	DT_SUNW_CAP		0x60000010	/* hardware/software */
 #define	DT_SUNW_ASLR		0x60000023	/* ASLR control */
+#define	DT_C18N_STRTAB		0x64331380	/* Compartment string table */
+#define	DT_C18N_STRTABSZ	0x64331381	/* Compartment string table size */
 #define	DT_HIOS		0x6ffff000	/* Last OS-specific */
 
 /*
