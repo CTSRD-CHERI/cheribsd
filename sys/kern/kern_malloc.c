@@ -728,14 +728,6 @@ void *
 		return (malloc_large(size, mtp, DOMAINSET_RR(), flags
 		    DEBUG_REDZONE_ARG));
 
-	/*
-	 * XXX-AM: Imply M_ZERO to ensure that non-representable padding
-	 * space is zero-initialized.
-	 */
-	if (size != CHERI_REPRESENTABLE_LENGTH(size)) {
-		flags |= M_ZERO;
-	}
-
 	if (size & KMEM_ZMASK)
 		size = (size & ~KMEM_ZMASK) + KMEM_ZBASE;
 	indx = kmemsize[size >> KMEM_ZSHIFT];
@@ -766,9 +758,13 @@ void *
 	va = cheri_setbounds(va, osize);
 	KASSERT(cheri_gettag(va),
 	    ("Invalid malloc: %#p requested size %zx", va, osize));
-	KASSERT(cheri_getlen(va) == CHERI_REPRESENTABLE_LENGTH(osize),
+	KASSERT(cheri_getlen(va) <= CHERI_REPRESENTABLE_LENGTH(osize),
 	    ("Invalid malloc: %#p expected length %zx", va,
 		(size_t)CHERI_REPRESENTABLE_LENGTH(osize)));
+	if (va != NULL && (flags & M_ZERO) == 0 && osize < cheri_getlen(va)) {
+		bzero((void *)((uintptr_t)va + osize),
+		    cheri_getlen(va) - osize);
+	}
 #endif
 	return ((void *) va);
 }
