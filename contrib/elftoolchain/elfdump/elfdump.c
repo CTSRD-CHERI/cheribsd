@@ -191,6 +191,8 @@ d_tags(uint64_t tag)
 	case DT_FLAGS:		return "DT_FLAGS";
 	case DT_PREINIT_ARRAY:	return "DT_PREINIT_ARRAY"; /* XXX DT_ENCODING */
 	case DT_PREINIT_ARRAYSZ:return "DT_PREINIT_ARRAYSZ";
+	case DT_C18N_STRTAB:	return "DT_C18N_STRTAB";
+	case DT_C18N_STRTABSZ:	return "DT_C18N_STRTABSZ";
 	/* 0x6000000D - 0x6ffff000 operating system-specific semantics */
 	case 0x6ffffdf5:	return "DT_GNU_PRELINKED";
 	case 0x6ffffdf6:	return "DT_GNU_CONFLICTSZ";
@@ -351,6 +353,7 @@ elf_phdr_type_str(unsigned int type)
 	case PT_SHLIB:			return "PT_SHLIB";
 	case PT_PHDR:			return "PT_PHDR";
 	case PT_TLS:			return "PT_TLS";
+	case PT_C18N_NAME:		return "PT_C18N_NAME";
 	case PT_CHERI_PCC:		return "PT_CHERI_PCC";
 	case PT_GNU_EH_FRAME:		return "PT_GNU_EH_FRAME";
 	case PT_GNU_STACK:		return "PT_GNU_STACK";
@@ -1667,6 +1670,7 @@ elf_print_dynamic(struct elfdump *ed)
 		case DT_VERNEED:
 		case DT_VERNEEDNUM:
 		case DT_VERSYM:
+		case DT_C18N_STRTABSZ:
 			if (ed->flags & SOLARIS_FMT)
 				PRT("%#jx\n", (uintmax_t)dyn.d_un.d_val);
 			else
@@ -1683,6 +1687,7 @@ elf_print_dynamic(struct elfdump *ed)
 		case DT_REL:
 		case DT_JMPREL:
 		case DT_DEBUG:
+		case DT_C18N_STRTAB:
 			if (ed->flags & SOLARIS_FMT)
 				PRT("%#jx\n", (uintmax_t)dyn.d_un.d_ptr);
 			else

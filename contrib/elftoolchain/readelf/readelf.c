@@ -711,6 +711,7 @@ phdr_type(unsigned int mach, unsigned int ptype)
 	case PT_SHLIB: return "SHLIB";
 	case PT_PHDR: return "PHDR";
 	case PT_TLS: return "TLS";
+	case PT_C18N_NAME: return "C18N_NAME";
 	case PT_CHERI_PCC: return "CHERI_PCC";
 	case PT_GNU_EH_FRAME: return "GNU_EH_FRAME";
 	case PT_GNU_STACK: return "GNU_STACK";
@@ -886,6 +887,8 @@ dt_type(unsigned int mach, unsigned int dtype)
 	case DT_SUNW_FILTER: return "SUNW_FILTER";
 	case DT_SUNW_CAP: return "SUNW_CAP";
 	case DT_SUNW_ASLR: return "SUNW_ASLR";
+	case DT_C18N_STRTAB: return "C18N_STRTAB";
+	case DT_C18N_STRTABSZ: return "C18N_STRTABSZ";
 	case DT_CHECKSUM: return "CHECKSUM";
 	case DT_PLTPADSZ: return "PLTPADSZ";
 	case DT_MOVEENT: return "MOVEENT";
@@ -3031,6 +3034,7 @@ dump_dyn_val(struct readelf *re, GElf_Dyn *dyn, uint32_t stab)
 	case DT_GNU_HASH:
 	case DT_GNU_LIBLIST:
 	case DT_GNU_CONFLICT:
+	case DT_C18N_STRTAB:
 		printf(" 0x%jx\n", (uintmax_t) dyn->d_un.d_val);
 		break;
 	case DT_PLTRELSZ:
@@ -3045,6 +3049,7 @@ dump_dyn_val(struct readelf *re, GElf_Dyn *dyn, uint32_t stab)
 	case DT_FINI_ARRAYSZ:
 	case DT_GNU_CONFLICTSZ:
 	case DT_GNU_LIBLISTSZ:
+	case DT_C18N_STRTABSZ:
 		printf(" %ju (bytes)\n", (uintmax_t) dyn->d_un.d_val);
 		break;
  	case DT_RELACOUNT:
