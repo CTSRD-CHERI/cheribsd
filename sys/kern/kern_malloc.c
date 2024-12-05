@@ -1126,8 +1126,7 @@ realloc(void *addr, size_t size, struct malloc_type *mtp, int flags)
 	unsigned long alloc;
 	void *newaddr;
 #ifdef __CHERI_PURE_CAPABILITY__
-	uma_keg_t keg;
-	int i;
+	size_t olength;
 #endif
 
 	KASSERT(mtp->ks_version == M_VERSION,
@@ -1143,6 +1142,7 @@ realloc(void *addr, size_t size, struct malloc_type *mtp, int flags)
 		panic("Expect valid capability");
 	if (__predict_false(cheri_getsealed(addr)))
 		panic("Expect unsealed capability");
+	olength = cheri_getlen(addr);
 #endif
 
 	/*
@@ -1167,18 +1167,26 @@ realloc(void *addr, size_t size, struct malloc_type *mtp, int flags)
 	/* Get the size of the original block */
 	switch (GET_SLAB_COOKIE(slab)) {
 	case __predict_true(SLAB_COOKIE_SLAB_PTR):
+		alloc = zone->uz_size;
 #ifdef __CHERI_PURE_CAPABILITY__
-		alloc = zone->uz_size;
-		keg = zone->uz_keg;
-		i = slab_item_index(slab, keg, addr);
-		addr = slab_item(slab, keg, i);
-		addr = cheri_setboundsexact(addr, alloc);
-#else
-		alloc = zone->uz_size;
+		if (size > olength) {
+			addr = uma_zgrow_bounds(zone, addr);
+			KASSERT(cheri_getlen(addr) == alloc,
+			    ("realloc mismatch uma_zgrow_bounds: %zx != %zx",
+			        cheri_getlen(addr), alloc));
+		}
 #endif
 		break;
 	case SLAB_COOKIE_MALLOC_LARGE:
 		alloc = malloc_large_size(slab);
+#ifdef __CHERI_PURE_CAPABILITY__
+		if (size > olength) {
+			addr = malloc_large_grow_bounds(zone, addr);
+			KASSERT(cheri_getlen(addr) == size,
+			    ("realloc large object bounds mismatch: %zx != %zx",
+			        cheri_getlen(addr), size));
+		}
+#endif
 		break;
 	default:
 #ifdef INVARIANTS
@@ -1192,7 +1200,19 @@ realloc(void *addr, size_t size, struct malloc_type *mtp, int flags)
 	if (size <= alloc &&
 	    (size > (alloc >> REALLOC_FRACTION) || alloc == MINALLOCSIZE)) {
 		kasan_mark((void *)addr, size, alloc, KASAN_MALLOC_REDZONE);
+#ifdef __CHERI_PURE_CAPABILITY__
+		addr = cheri_setbounds(addr, size);
+		/*
+		 * Zero only the non-representable portion of allocation
+		 * that was not reachable from the original capability.
+		 */
+		if (size > olength) {
+			bzero((void *)((uintptr_t)addr + olength),
+			    cheri_getlen(addr) - olength);
+		}
+#else
 		return (addr);
+#endif
 	}
 #endif /* !DEBUG_REDZONE */
 
@@ -1205,7 +1225,16 @@ realloc(void *addr, size_t size, struct malloc_type *mtp, int flags)
 	 * valid before performing the copy.
 	 */
 	kasan_mark(addr, alloc, alloc, 0);
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * We have unbounded addr here, need to avoid copying
+	 * past the original length.
+	 * XXX-AM: is it worth it re-setting bounds on addr?
+	 */
+	bcopy(addr, newaddr, min(size, olength));
+#else
 	bcopy(addr, newaddr, min(size, alloc));
+#endif
 	free(addr, mtp);
 	return (newaddr);
 }
