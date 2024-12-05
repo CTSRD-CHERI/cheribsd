@@ -376,6 +376,7 @@ int	open(const char *, int, ...);
 int	creat(const char *, mode_t);
 int	fcntl(int, int, ...);
 #if __BSD_VISIBLE
+int	vfcntl(int, int, __va_list);
 int	flock(int, int);
 int	fspacectl(int, int, const struct spacectl_range *, int,
 	    struct spacectl_range *);

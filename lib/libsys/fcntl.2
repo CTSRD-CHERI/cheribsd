@@ -37,6 +37,9 @@
 .In fcntl.h
 .Ft int
 .Fn fcntl "int fd" "int cmd" "..."
+.In stdarg.h
+.Ft int
+.Fn vfcntl "int fd" "int cmd" "va_list ap"
 .Sh DESCRIPTION
 The
 .Fn fcntl
