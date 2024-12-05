@@ -630,12 +630,6 @@ malloc_large(size_t size, struct malloc_type *mtp, struct domainset *policy,
 {
 	void *va;
 
-#ifdef __CHERI_PURE_CAPABILITY__
-	if (size != CHERI_REPRESENTABLE_LENGTH(size)) {
-		flags |= M_ZERO;
-	}
-#endif
-
 	size = roundup(size, PAGE_SIZE);
 	va = kmem_malloc_domainset(policy, size, flags);
 	if (va != NULL) {
@@ -653,6 +647,10 @@ malloc_large(size_t size, struct malloc_type *mtp, struct domainset *policy,
 		    ("Invalid bounds: expected %zx found %zx",
 		        (size_t)CHERI_REPRESENTABLE_LENGTH(osize),
 		        (size_t)cheri_getlen(va)));
+		if ((flags & M_ZERO) == 0 && osize < cheri_getlen(va)) {
+			bzero((void *)((uintptr_t)va + osize),
+			    cheri_getlen(va) - osize);
+		}
 #endif
 	}
 	malloc_type_allocated(mtp, va, va == NULL ? 0 : size);
