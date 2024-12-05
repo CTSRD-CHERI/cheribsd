@@ -187,6 +187,10 @@ _ELF_DEFINE_DT(DT_SUNW_CAP,         0x60000010UL,			\
 	"address of hardware capabilities section")			\
 _ELF_DEFINE_DT(DT_SUNW_ASLR,        0x60000023UL,			\
 	"Address Space Layout Randomization flag")			\
+_ELF_DEFINE_DT(DT_C18N_STRTAB,      0x64331380UL,			\
+	"address of compartment string table")				\
+_ELF_DEFINE_DT(DT_C18N_STRTABSZ,    0x64331381UL,			\
+	"size of the compartment string table")				\
 _ELF_DEFINE_DT(DT_HIOS,             0x6FFFF000UL,			\
 	"end of OS-specific types")					\
 _ELF_DEFINE_DT(DT_VALRNGLO,         0x6FFFFD00UL,			\
@@ -965,6 +969,8 @@ _ELF_DEFINE_PT(PT_PHDR,             6,				\
 _ELF_DEFINE_PT(PT_TLS,              7, "thread local storage")	\
 _ELF_DEFINE_PT(PT_LOOS,             0x60000000UL,		\
 	"start of OS-specific range")				\
+_ELF_DEFINE_PT(PT_C18N_NAME,        0x64331380UL,		\
+	"Sub-object compartment")				\
 _ELF_DEFINE_PT(PT_CHERI_PCC,        0x64348450UL,		\
 	"CHERI PCC bounds")					\
 _ELF_DEFINE_PT(PT_SUNW_UNWIND,      0x6464E550UL,		\
