@@ -191,6 +191,18 @@ typedef struct Struct_Plt_Entry {
     MD_PLT_ENTRY;
 } Plt_Entry;
 
+#ifdef CHERI_LIB_C18N
+typedef struct Struct_Compart_Entry {
+    struct Struct_Obj_Entry *obj;
+
+    const char *name;
+    Elf_Addr start;
+    Elf_Addr end;
+    char *compart_name;
+    uint16_t compart_id;
+} Compart_Entry;
+#endif
+
 #define VER_INFO_HIDDEN	0x01
 
 /*
@@ -264,6 +276,12 @@ typedef struct Struct_Obj_Entry {
     const Elf_Sym *symtab;	/* Symbol table */
     const char *strtab;		/* String table */
     unsigned long strsize;	/* Size in bytes of string table */
+#ifdef CHERI_LIB_C18N
+    Compart_Entry *comparts;
+    unsigned long ncomparts;
+    const char *c18nstrtab;	/* Compartment string table */
+    unsigned long c18nstrsize;	/* Size in bytes of compartment string table */
+#endif
 #ifdef RTLD_HAS_CAPRELOCS
     caddr_t cap_relocs;		/* start of the __cap_relocs section */
     size_t cap_relocs_size;	/* size of the __cap_relocs section */
@@ -301,6 +319,7 @@ typedef struct Struct_Obj_Entry {
     int vernum;			/* Number of entries in vertab */
 
 #ifdef CHERI_LIB_C18N
+    const char *soname;
     uint16_t compart_id;
     const struct func_sig *sigtab;
 #endif

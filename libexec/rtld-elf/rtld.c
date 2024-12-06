@@ -207,6 +207,9 @@ static void rtld_fill_dl_phdr_info(const Obj_Entry *obj,
 static uint32_t gnu_hash(const char *);
 static bool matched_symbol(SymLook *, const Obj_Entry *, Sym_Match_Result *,
     const unsigned long);
+#ifdef CHERI_LIB_C18N
+static bool c18n_add_obj(Obj_Entry *, const char *);
+#endif
 
 void r_debug_state(struct r_debug *, struct link_map *) __noinline __exported;
 void _r_debug_postinit(struct link_map *) __noinline __exported;
@@ -959,7 +962,8 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	/*
 	 * Manually register the main object after the policy is loaded.
 	 */
-	object_add_name(obj_main, obj_main->path);
+	if (!c18n_add_obj(obj_main, obj_main->path))
+	    rtld_die();
     }
 #endif
 
@@ -1682,6 +1686,14 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 		obj->sigtab = (const struct func_sig *)
 		    (obj->relocbase + dynp->d_un.d_ptr);
 	    break;
+
+	case DT_C18N_STRTAB:
+	    obj->c18nstrtab = (const char *)(obj->relocbase + dynp->d_un.d_ptr);
+	    break;
+
+	case DT_C18N_STRTABSZ:
+	    obj->c18nstrsize = dynp->d_un.d_val;
+	    break;
 #endif
 
 	case DT_STRTAB:
@@ -1996,8 +2008,12 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 		obj->rpath = (const char *)obj->strtab + dyn_rpath->d_un.d_val;
 		obj->rpath = origin_subst(obj, obj->rpath);
 	}
-	if (dyn_soname != NULL)
+	if (dyn_soname != NULL) {
+#ifdef CHERI_LIB_C18N
+		obj->soname = obj->strtab + dyn_soname->d_un.d_val;
+#endif
 		object_add_name(obj, obj->strtab + dyn_soname->d_un.d_val);
+	}
 #ifdef __CHERI_PURE_CAPABILITY__
 	// Set tight bounds on the individual members now (for the ones that
 	// we iterate over) instead of inheriting the relocbase bounds to avoid
@@ -2009,6 +2025,9 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 	    set_bounds_if_nonnull(plt->rel, plt->relsize);
 	    set_bounds_if_nonnull(plt->rela, plt->relasize);
 	}
+#ifdef CHERI_LIB_C18N
+	set_bounds_if_nonnull(obj->c18nstrtab, obj->c18nstrsize);
+#endif
 	set_bounds_if_nonnull(obj->strtab, obj->strsize);
 	set_bounds_if_nonnull(obj->phdr, obj->phsize);
 
@@ -3347,6 +3366,10 @@ do_load_object(int fd, const char *name, char *path, struct stat *sbp,
     obj->path = path;
     if (!digest_dynamic(obj, 0))
 	goto errp;
+#ifdef CHERI_LIB_C18N
+    if (!c18n_add_obj(obj, name))
+	goto errp;
+#endif
     dbg("%s valid_hash_sysv %d valid_hash_gnu %d dynsymcount %d", obj->path,
 	obj->valid_hash_sysv, obj->valid_hash_gnu, obj->dynsymcount);
     if (obj->z_pie && (flags & RTLD_LO_TRACE) == 0) {
@@ -6282,6 +6305,106 @@ _rtld_free_tls(void *tcb, size_t tcbsize, size_t tcbalign)
     lock_release(rtld_bind_lock, &lockstate);
 }
 
+#ifdef CHERI_LIB_C18N
+static bool
+validate_c18nstrtab(const Obj_Entry *obj)
+{
+	const Elf_Phdr *ph;
+
+	if (obj->c18nstrtab != NULL) {
+		if (obj->c18nstrsize == 0)
+			return (false);
+		if (obj->c18nstrtab[obj->c18nstrsize - 1] != '\0')
+			return (false);
+	}
+
+	for (ph = obj->phdr;  (const char *)ph < (const char *)obj->phdr +
+	    obj->phsize; ph++) {
+		switch (ph->p_type) {
+		case PT_C18N_NAME:
+			if (obj->c18nstrtab == NULL ||
+			    ph->p_paddr >= obj->c18nstrsize)
+				return (false);
+			break;
+		}
+	}
+	return (true);
+}
+
+static void
+c18n_setup_compartments(Obj_Entry *obj, const char *name)
+{
+	Compart_Entry *compart;
+	const Elf_Phdr *ph;
+	size_t len;
+
+	assert(obj->compart_id == 0);
+	obj->compart_id = compart_id_allocate(name);
+
+	for (ph = obj->phdr;  (const char *)ph < (const char *)obj->phdr +
+	    obj->phsize; ph++) {
+		switch (ph->p_type) {
+		case PT_C18N_NAME:
+			obj->ncomparts++;
+			break;
+		}
+	}
+
+	if (obj->ncomparts == 0)
+		return;
+
+	obj->comparts = xcalloc(obj->ncomparts, sizeof(*obj->comparts));
+	compart = obj->comparts;
+	for (ph = obj->phdr;  (const char *)ph < (const char *)obj->phdr +
+	    obj->phsize; ph++) {
+		switch (ph->p_type) {
+		case PT_C18N_NAME:
+			compart->obj = obj;
+			compart->name = obj->c18nstrtab + ph->p_paddr;
+			compart->start = (ptraddr_t)obj->relocbase +
+			    ph->p_vaddr;
+			compart->end = compart->start + ph->p_memsz;
+
+			len = strlen(name) + 1 + strlen(compart->name) + 1;
+			compart->compart_name = malloc(len);
+			rtld_snprintf(compart->compart_name, len, "%s:%s",
+			    name, compart->name);
+			compart->compart_id =
+			    compart_id_allocate(compart->compart_name);
+			compart++;
+			break;
+		}
+	}
+}
+
+static bool
+c18n_add_obj(Obj_Entry *obj, const char *name)
+{
+	if (!C18N_ENABLED)
+		return (true);
+
+	if (!validate_c18nstrtab(obj))
+		return (false);
+
+	/* Prefer DT_SONAME as the compartment base name if present. */
+	if (obj->soname != NULL)
+		name = obj->soname;
+
+	/* Try to find a name if none provided. */
+	if (name == NULL) {
+		if (!STAILQ_EMPTY(&obj->names))
+			name = STAILQ_FIRST(&obj->names)->name;
+		else if (obj->path != NULL)
+			name = obj->path;
+		else
+			return (false);
+	}
+
+	c18n_setup_compartments(obj, name);
+	return (true);
+}
+#endif
+
 static void
 object_add_name(Obj_Entry *obj, const char *name)
 {
@@ -6294,10 +6417,6 @@ object_add_name(Obj_Entry *obj, const char *name)
     if (entry != NULL) {
 	strcpy(entry->name, name);
 	STAILQ_INSERT_TAIL(&obj->names, entry, link);
-#ifdef CHERI_LIB_C18N
-	if (C18N_ENABLED && obj->compart_id == 0)
-	    obj->compart_id = compart_id_allocate(entry->name);
-#endif
     }
 }
 
