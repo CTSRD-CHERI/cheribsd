@@ -552,6 +552,14 @@ obj_free(Obj_Entry *obj)
     if (obj->path)
 	free(obj->path);
 #ifdef __CHERI_PURE_CAPABILITY__
+#ifdef CHERI_LIB_C18N
+    if (obj->comparts) {
+	for (unsigned long i = 0; i < obj->ncomparts; i++) {
+	    free(obj->comparts[i].compart_name);
+	}
+	free(obj->comparts);
+    }
+#endif
     if (obj->pcc_caps)
 	free(obj->pcc_caps);
 #endif
