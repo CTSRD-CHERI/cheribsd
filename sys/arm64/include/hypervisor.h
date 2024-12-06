@@ -61,6 +61,7 @@
 #else
 #define	CPTR_RES1		0x000032ff
 #endif
+#define	CPTR_TZ			0x00000100
 #define	CPTR_TFP		0x00000400
 #define	CPTR_TTA		0x00100000
 /* Valid if HCR_EL2.E2H == 1 */
