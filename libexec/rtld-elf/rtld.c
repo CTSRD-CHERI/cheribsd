@@ -1961,12 +1961,6 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 #endif
 	    break;
 
-	case PT_GNU_RELRO:
-	    obj->relro_page = obj->relocbase + rtld_trunc_page(ph->p_vaddr);
-	    obj->relro_size = rtld_trunc_page(ph->p_vaddr + ph->p_memsz) -
-	      rtld_trunc_page(ph->p_vaddr);
-	    break;
-
 	case PT_NOTE:
 	    note_start = obj->relocbase + ph->p_vaddr;
 	    note_end = note_start + ph->p_filesz;
@@ -2680,11 +2674,6 @@ parse_rtld_phdr(Obj_Entry *obj)
 #else
 			obj->stack_flags = ph->p_flags;
 #endif
-			break;
-		case PT_GNU_RELRO:
-			obj->relro_page = obj->relocbase +
-			    rtld_trunc_page(ph->p_vaddr);
-			obj->relro_size = rtld_round_page(ph->p_memsz);
 			break;
 		case PT_NOTE:
 			note_start = (Elf_Note *)((char *)obj->relocbase + ph->p_vaddr);
@@ -3737,7 +3726,7 @@ relocate_object(Obj_Entry *obj, bool bind_now, Obj_Entry *rtldobj,
 	    lockstate) == -1)
 		return (-1);
 
-	if (!obj->mainprog && obj_enforce_relro(obj) == -1)
+	if (obj != rtldobj && !obj->mainprog && obj_enforce_relro(obj) == -1)
 		return (-1);
 
 	/*
@@ -6392,16 +6381,28 @@ _rtld_is_dlopened(void *arg)
 static int
 obj_remap_relro(Obj_Entry *obj, int prot)
 {
-	if (obj->relro_size == 0)
-		return (0);
+	const Elf_Phdr *ph;
+	caddr_t relro_page;
+	size_t relro_size;
 
-	dbg("Enforcing RELRO for %s (%p -> %p)", obj->path, obj->relro_page,
-	    obj->relro_page + obj->relro_size);
-	if (obj->relro_size > 0 && mprotect(obj->relro_page, obj->relro_size,
-	    prot) == -1) {
-		_rtld_error("%s: Cannot set relro protection to %#x: %s",
-		    obj->path, prot, rtld_strerror(errno));
-		return (-1);
+	for (ph = obj->phdr;  (const char *)ph < (const char *)obj->phdr +
+	    obj->phsize; ph++) {
+		switch (ph->p_type) {
+		case PT_GNU_RELRO:
+			relro_page = obj->relocbase +
+			    rtld_trunc_page(ph->p_vaddr);
+			relro_size =
+			    rtld_round_page(ph->p_vaddr + ph->p_memsz) -
+			    rtld_trunc_page(ph->p_vaddr);
+			dbg("Enforcing RELRO for %s (%p -> %p)", obj->path,
+			    relro_page, relro_page + relro_size);
+			if (mprotect(relro_page, relro_size, prot) == -1) {
+				_rtld_error("%s: Cannot set relro protection to %#x: %s",
+				    obj->path, prot, rtld_strerror(errno));
+				return (-1);
+			}
+			break;
+		}
 	}
 	return (0);
 }
