@@ -380,7 +380,7 @@ kern_cheri_revoke(struct thread *td, int flags,
 	{
 		int ires = 0;
 
-		KASSERT(!vmm->system_map, ("%s: system map?", __func__));
+		KASSERT(!vm_map_is_system(vmm), ("%s: system map?", __func__));
 
 		/*
 		 * We need some value that's more or less "now", but we don't have
