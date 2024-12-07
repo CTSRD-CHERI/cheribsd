@@ -83,7 +83,6 @@
  *	vm_map_entry_t		an entry in an address map.
  */
 
-typedef u_short vm_flags_t;
 typedef u_int vm_eflags_t;
 
 /*
