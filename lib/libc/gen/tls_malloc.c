@@ -215,6 +215,8 @@ bound_ptr(void *mem, size_t nbytes)
 {
 	void *ptr;
 
+	if (mem == NULL)
+		return (NULL);
 	ptr = cheri_setbounds(mem, nbytes);
 	ptr = cheri_andperm(ptr,
 	    CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_SW_VMEM);
@@ -525,6 +527,8 @@ __tls_malloc_aligned(size_t size, size_t align)
 		align = sizeof(void *);
 
 	mem = __tls_malloc(size + sizeof(*op) + align - 1);
+	if (mem == NULL)
+		return (NULL);
 	memshift = roundup2((ptraddr_t)mem + sizeof(*op), align) -
 	    (ptraddr_t)mem;
 	op = (struct overhead *)((uintptr_t)mem + memshift);
