@@ -61,6 +61,7 @@ typedef uint16_t compart_id_t;
 typedef struct { uint16_t val; } stk_table_index;
 
 compart_id_t compart_id_allocate(const char *);
+compart_id_t compart_id_for_address(const Obj_Entry *, Elf_Addr);
 
 /*
  * Stack switching
@@ -243,7 +244,7 @@ void tramp_hook(void);
 
 size_t tramp_compile(char **, const struct tramp_data *);
 
-void *tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *);
+void *tramp_intern(const Plt_Entry *, compart_id_t, const struct tramp_data *);
 struct tramp_header *tramp_reflect(const void *);
 struct func_sig sigtab_get(const Obj_Entry *, unsigned long);
 

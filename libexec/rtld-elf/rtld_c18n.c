@@ -561,8 +561,10 @@ evaluate_rules(compart_id_t caller, compart_id_t callee, const char *sym)
 }
 
 static bool
-tramp_should_include(const Obj_Entry *reqobj, const struct tramp_data *data)
+tramp_should_include(const Plt_Entry *plt, compart_id_t caller,
+    const struct tramp_data *data)
 {
+	compart_id_t callee;
 	const char *sym;
 
 	/* XXX: This will not be needed once function pointers are wrapped. */
@@ -580,23 +582,26 @@ tramp_should_include(const Obj_Entry *reqobj, const struct tramp_data *data)
 	if (string_base_search(&uni_compart.trusts, sym) != -1)
 		return (false);
 
-	if (reqobj == NULL)
-		return (true);
+	callee = compart_id_for_address(data->defobj, (ptraddr_t)data->target);
 
-	if (reqobj->compart_id == data->defobj->compart_id)
+	/*
+	 * Jump slots within the same compartment do not require a
+	 * trampoline.
+	 */
+	if (plt != NULL && caller == callee)
 		return (false);
 
-	if (string_base_search(&comparts.data[reqobj->compart_id].trusts, sym)
+	if (string_base_search(&comparts.data[caller].trusts, sym)
 	    != -1)
 		return (false);
 
-	if (evaluate_rules(reqobj->compart_id, data->defobj->compart_id, sym))
+	if (evaluate_rules(caller, callee, sym))
 		return (true);
 
 	rtld_fatal("c18n: Policy violation: %s is not allowed to access symbol "
 	    "%s defined by %s",
-	    comparts.data[reqobj->compart_id].name, sym,
-	    comparts.data[data->defobj->compart_id].name);
+	    comparts.data[caller].name, sym,
+	    comparts.data[callee].name);
 }
 
 /*
@@ -1363,7 +1368,8 @@ tramp_check_sig(const struct tramp_header *found, const Obj_Entry *reqobj,
 		    "%s requests " C18N_SIG_FORMAT_STRING " but "
 		    "%s provides " C18N_SIG_FORMAT_STRING,
 		    symname(found->defobj, found->symnum),
-		    reqobj->path, C18N_SIG_FORMAT(data->sig),
+		    reqobj != NULL ? reqobj->path : "",
+		    C18N_SIG_FORMAT(data->sig),
 		    found->defobj->path, C18N_SIG_FORMAT(sig));
 	}
 }
@@ -1394,7 +1400,8 @@ tramp_make_entry(const struct tramp_header *header)
 }
 
 void *
-tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *data)
+tramp_intern(const Plt_Entry *plt, compart_id_t caller,
+    const struct tramp_data *data)
 {
 	RtldLockState lockstate;
 	const struct tramp_header *header;
@@ -1413,15 +1420,11 @@ tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *data)
 	assert(cheri_gettag(data->defobj));
 	if (data->def == NULL)
 		/*
-		 * XXX-DG: reqobj != NULL causes policies to be evaluated which
-		 * might result in a trampoline being elided. This is only safe
-		 * to do for jump slot relocations.
-		 *
 		 * Currently, the decision to elide the trampoline or not is
 		 * coupled with the decision of whether the symbol should be
-		 * made accesible to the requesting object. This is insecure.
+		 * made accessible to the requesting object. This is insecure.
 		 */
-		assert(reqobj == NULL);
+		assert(plt == NULL);
 	else if (data->def == &sym_zero)
 		assert(data->target == NULL);
 	else
@@ -1430,7 +1433,7 @@ tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *data)
 		    data->defobj->dynsymcount);
 	assert(func_sig_legal(data->sig));
 
-	if (!tramp_should_include(reqobj, data))
+	if (!tramp_should_include(plt, caller, data))
 		return (data->target);
 
 start:
@@ -1531,7 +1534,7 @@ insert:
 end:
 	lock_release(rtld_tramp_lock, &lockstate);
 
-	tramp_check_sig(header, reqobj, data);
+	tramp_check_sig(header, plt != NULL ? plt->obj : NULL, data);
 
 	/*
 	 * Most consumers use type (void *) for function pointers.
@@ -1739,7 +1742,8 @@ c18n_init2(Obj_Entry *obj_rtld)
 	 * XXX: Manually wrap _rtld_unw_setcontext_impl in a trampoline for now
 	 * because it is called via a function pointer.
 	*/
-	_rtld_unw_setcontext_ptr = tramp_intern(NULL, &(struct tramp_data) {
+	_rtld_unw_setcontext_ptr = tramp_intern(NULL, RTLD_COMPART_ID,
+	    &(struct tramp_data) {
 		.target = &_rtld_unw_setcontext_impl,
 		.defobj = obj_rtld,
 		.sig = (struct func_sig) {
@@ -1763,7 +1767,8 @@ _rtld_thread_start_init(void (*p)(struct pthread *))
 {
 	assert((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) == 0);
 	assert(thr_thread_start == NULL);
-	thr_thread_start = tramp_intern(NULL, &(struct tramp_data) {
+	thr_thread_start = tramp_intern(NULL, RTLD_COMPART_ID,
+	    &(struct tramp_data) {
 		.target = p,
 		.defobj = obj_from_addr(p),
 		.sig = (struct func_sig) {
@@ -1907,7 +1912,8 @@ _rtld_sighandler_init(__siginfohandler_t *handler)
 {
 	assert((cheri_getperm(handler) & CHERI_PERM_EXECUTIVE) == 0);
 	assert(signal_dispatcher == sigdispatch);
-	signal_dispatcher = tramp_intern(NULL, &(struct tramp_data) {
+	signal_dispatcher = tramp_intern(NULL, RTLD_COMPART_ID,
+	    &(struct tramp_data) {
 		.target = handler,
 		.defobj = obj_from_addr(handler),
 		.sig = (struct func_sig) {
@@ -2145,13 +2151,16 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 	header = tramp_reflect(sigfunc);
 	if (header == NULL) {
 		defobj = obj_from_addr(sigfunc);
-		sigfunc = tramp_intern(NULL, &(struct tramp_data) {
+		callee = compart_id_for_address(defobj, (ptraddr_t)sigfunc);
+		sigfunc = tramp_intern(NULL, RTLD_COMPART_ID,
+		    &(struct tramp_data) {
 		    .target = sigfunc,
 		    .defobj = defobj
 		});
-	} else
-		defobj = header->defobj;
-	callee = defobj->compart_id;
+	} else {
+		callee = compart_id_for_address(header->defobj,
+		    (ptraddr_t)header->target);
+	}
 	callee_idx = cid_to_index(callee);
 
 	/*

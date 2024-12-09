@@ -86,7 +86,8 @@ uintptr_t reloc_jmpslot(uintptr_t *where, uintptr_t target,
 /* TODO: Per-function captable/PLT/FNDESC support */
 #ifdef CHERI_LIB_C18N
 #define call_init_array_pointer(_obj, _target)				\
-	(((InitArrFunc)tramp_intern(NULL, &(struct tramp_data) {	\
+	(((InitArrFunc)tramp_intern(NULL, RTLD_COMPART_ID,		\
+	    &(struct tramp_data) {					\
 		.target = (void *)(_target).value,			\
 		.defobj = _obj,						\
 		.sig = (struct func_sig) { .valid = true,		\
@@ -94,7 +95,8 @@ uintptr_t reloc_jmpslot(uintptr_t *where, uintptr_t target,
 	}))(main_argc, main_argv, environ))
 
 #define call_fini_array_pointer(_obj, _target)				\
-	(((InitFunc)tramp_intern(NULL, &(struct tramp_data) {		\
+	(((InitFunc)tramp_intern(NULL, RTLD_COMPART_ID,			\
+	    &(struct tramp_data) {					\
 		.target = (void *)(_target).value,			\
 		.defobj = _obj,						\
 		.sig = (struct func_sig) { .valid = true,		\

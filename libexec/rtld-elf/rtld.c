@@ -1152,7 +1152,8 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     if (rtld_exit_ptr == NULL) {
 	rtld_exit_ptr = make_rtld_function_pointer(rtld_exit);
 #ifdef CHERI_LIB_C18N
-	rtld_exit_ptr = tramp_intern(NULL, &(struct tramp_data) {
+	rtld_exit_ptr = tramp_intern(NULL, RTLD_COMPART_ID,
+	    &(struct tramp_data) {
 		.target = rtld_exit_ptr,
 		.defobj = &obj_rtld,
 		.sig = (struct func_sig) {
@@ -1166,7 +1167,8 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     *objp = obj_main;
 
 #ifdef CHERI_LIB_C18N
-    return ((func_ptr_type)tramp_intern(NULL, &(struct tramp_data) {
+    return ((func_ptr_type)tramp_intern(NULL, RTLD_COMPART_ID,
+	&(struct tramp_data) {
 	    .target = cheri_sealentry(obj_main->entry),
 	    .defobj = obj_main,
 	    .sig = (struct func_sig) {
@@ -1187,7 +1189,7 @@ rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def)
 
 	ptr = (void *)make_function_pointer(def, obj);
 #ifdef CHERI_LIB_C18N
-	ptr = tramp_intern(NULL, &(struct tramp_data) {
+	ptr = tramp_intern(NULL, RTLD_COMPART_ID, &(struct tramp_data) {
 		.target = ptr,
 		.defobj = obj,
 		.def = def,
@@ -1238,7 +1240,8 @@ _rtld_bind(Plt_Entry *plt, Elf_Size reloff)
 #ifdef __CHERI_PURE_CAPABILITY__
 	target = (uintptr_t)make_function_pointer(def, defobj);
 #ifdef CHERI_LIB_C18N
-	target = (uintptr_t)tramp_intern(obj, &(struct tramp_data) {
+	target = (uintptr_t)tramp_intern(plt, plt->compart_id,
+	    &(struct tramp_data) {
 	    .target = (void *)target,
 	    .defobj = defobj,
 	    .def = def,
@@ -3663,7 +3666,8 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 	if (reg != NULL) {
 		func_ptr_type exit_ptr = make_rtld_function_pointer(rtld_exit);
 #ifdef CHERI_LIB_C18N
-		exit_ptr = tramp_intern(NULL, &(struct tramp_data) {
+		exit_ptr = tramp_intern(NULL, RTLD_COMPART_ID,
+		    &(struct tramp_data) {
 			.target = exit_ptr,
 			.defobj = &obj_rtld,
 			.sig = (struct func_sig) {
@@ -3676,7 +3680,8 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 		reg(exit_ptr);
 		rtld_exit_ptr = make_rtld_function_pointer(rtld_nop_exit);
 #ifdef CHERI_LIB_C18N
-		rtld_exit_ptr = tramp_intern(NULL, &(struct tramp_data) {
+		rtld_exit_ptr = tramp_intern(NULL, RTLD_COMPART_ID,
+		    &(struct tramp_data) {
 			.target = rtld_exit_ptr,
 			.defobj = &obj_rtld,
 			.sig = (struct func_sig) {
@@ -4849,7 +4854,7 @@ dl_iterate_phdr(__dl_iterate_hdr_callback callback, void *param)
 	error = 0;
 
 #ifdef CHERI_LIB_C18N
-	callback = tramp_intern(NULL, &(struct tramp_data) {
+	callback = tramp_intern(NULL, RTLD_COMPART_ID, &(struct tramp_data) {
 		.target = callback,
 		.defobj = obj_from_addr(callback),
 		.sig = (struct func_sig) {
@@ -5160,7 +5165,7 @@ get_program_var_addr(const char *name, RtldLockState *lockstate)
     if (ELF_ST_TYPE(req.sym_out->st_info) == STT_FUNC) {
 	void *target = make_function_pointer(req.sym_out, req.defobj_out);
 #ifdef CHERI_LIB_C18N
-	target = tramp_intern(NULL, &(struct tramp_data) {
+	target = tramp_intern(NULL, RTLD_COMPART_ID, &(struct tramp_data) {
 		.target = target,
 		.defobj = req.defobj_out,
 		.def = req.sym_out
@@ -5170,7 +5175,7 @@ get_program_var_addr(const char *name, RtldLockState *lockstate)
     } else if (ELF_ST_TYPE(req.sym_out->st_info) == STT_GNU_IFUNC) {
 	void *target = rtld_resolve_ifunc(req.defobj_out, req.sym_out);
 #ifdef CHERI_LIB_C18N
-	target = tramp_intern(NULL, &(struct tramp_data) {
+	target = tramp_intern(NULL, RTLD_COMPART_ID, &(struct tramp_data) {
 		.target = target,
 		.defobj = req.defobj_out,
 		.def = req.sym_out
@@ -6338,8 +6343,8 @@ c18n_setup_compartments(Obj_Entry *obj, const char *name)
 	const Elf_Phdr *ph;
 	size_t len;
 
-	assert(obj->compart_id == 0);
-	obj->compart_id = compart_id_allocate(name);
+	assert(obj->default_compart_id == 0);
+	obj->default_compart_id = compart_id_allocate(name);
 
 	for (ph = obj->phdr;  (const char *)ph < (const char *)obj->phdr +
 	    obj->phsize; ph++) {
@@ -6377,6 +6382,28 @@ c18n_setup_compartments(Obj_Entry *obj, const char *name)
 	}
 }
 
+compart_id_t
+compart_id_for_address(const Obj_Entry *obj, Elf_Addr addr)
+{
+	assert(cheri_is_address_inbounds(obj->relocbase, addr));
+
+	for (unsigned long i = 0; i < obj->ncomparts; i++) {
+		if (addr >= obj->comparts[i].start &&
+		    addr < obj->comparts[i].end)
+			return (obj->comparts[i].compart_id);
+	}
+	return (obj->default_compart_id);
+}
+
+static void
+c18n_assign_plt_compartments(Obj_Entry *obj)
+{
+	for (unsigned long i = 0; i < obj->nplts; i++) {
+		obj->plts[i].compart_id = compart_id_for_address(obj,
+		    (ptraddr_t)obj->plts[i].pltgot);
+	}
+}
+
 static bool
 c18n_add_obj(Obj_Entry *obj, const char *name)
 {
@@ -6401,6 +6428,7 @@ c18n_add_obj(Obj_Entry *obj, const char *name)
 	}
 
 	c18n_setup_compartments(obj, name);
+	c18n_assign_plt_compartments(obj);
 	return (true);
 }
 #endif

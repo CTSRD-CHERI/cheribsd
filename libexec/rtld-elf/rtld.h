@@ -188,6 +188,9 @@ typedef struct Struct_Plt_Entry {
     const Elf_Rela *rela;	/* PLT relocation entries with addend */
     unsigned long relasize;	/* Size in bytes of PLT addend reloc info */
     bool jmpslots_done : 1;	/* Already have relocated the jump slots */
+#ifdef CHERI_LIB_C18N
+    uint16_t compart_id;
+#endif
     MD_PLT_ENTRY;
 } Plt_Entry;
 
@@ -320,7 +323,7 @@ typedef struct Struct_Obj_Entry {
 
 #ifdef CHERI_LIB_C18N
     const char *soname;
-    uint16_t compart_id;
+    uint16_t default_compart_id;
     const struct func_sig *sigtab;
 #endif
 
