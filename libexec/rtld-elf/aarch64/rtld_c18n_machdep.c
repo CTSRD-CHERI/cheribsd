@@ -234,7 +234,7 @@ _rtld_safebox_code(void *target, struct func_sig sig)
 
 	if (!func_sig_legal(sig)) {
 		_rtld_error(
-		    "_rtld_sandbox_code: Invalid signature "
+		    "_rtld_safebox_code: Invalid signature "
 		    C18N_SIG_FORMAT_STRING,
 		    C18N_SIG_FORMAT(sig));
 		return (NULL);
@@ -246,7 +246,7 @@ _rtld_safebox_code(void *target, struct func_sig sig)
 	obj = obj_from_addr(target);
 	if (obj == NULL) {
 		_rtld_error(
-		    "_rtld_sandbox_code: "
+		    "_rtld_safebox_code: "
 		    "%#p does not belong to any object", target);
 		return (NULL);
 	}
