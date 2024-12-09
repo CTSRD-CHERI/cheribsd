@@ -5273,7 +5273,7 @@ if_setifheaderlen(if_t ifp, int len)
 	return (0);
 }
 
-caddr_t
+char *
 if_getlladdr(const if_t ifp)
 {
 	return (IF_LLADDR(ifp));
