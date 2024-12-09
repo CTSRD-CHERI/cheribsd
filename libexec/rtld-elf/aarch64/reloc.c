@@ -492,7 +492,8 @@ reloc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 				target = (uintptr_t)make_function_pointer(def,
 				    defobj);
 #ifdef CHERI_LIB_C18N
-				target = (uintptr_t)tramp_intern(obj,
+				target = (uintptr_t)tramp_intern(plt,
+				    plt->compart_id,
 				    &(struct tramp_data) {
 					.target = (void *)target,
 					.defobj = defobj,
@@ -571,7 +572,8 @@ reloc_jmpslots(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 			}
 			target = (uintptr_t)make_function_pointer(def, defobj);
 #ifdef CHERI_LIB_C18N
-			target = (uintptr_t)tramp_intern(obj, &(struct tramp_data) {
+			target = (uintptr_t)tramp_intern(plt, plt->compart_id,
+			    &(struct tramp_data) {
 				.target = (void *)target,
 				.defobj = defobj,
 				.def = def,
@@ -632,7 +634,8 @@ reloc_iresolve_one(Obj_Entry *obj, const Elf_Rela *rela,
 #endif
 	lock_release(rtld_bind_lock, lockstate);
 #ifdef CHERI_LIB_C18N
-	ptr = (uintptr_t)tramp_intern(NULL, &(struct tramp_data) {
+	ptr = (uintptr_t)tramp_intern(NULL, RTLD_COMPART_ID,
+	    &(struct tramp_data) {
 		.target = (void *)ptr,
 		.defobj = obj,
 		.sig = (struct func_sig) { .valid = true,
@@ -729,7 +732,8 @@ reloc_gnu_ifunc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 			lock_release(rtld_bind_lock, lockstate);
 			target = (uintptr_t)rtld_resolve_ifunc(defobj, def);
 #ifdef CHERI_LIB_C18N
-			target = (uintptr_t)tramp_intern(obj, &(struct tramp_data) {
+			target = (uintptr_t)tramp_intern(plt, plt->compart_id,
+			    &(struct tramp_data) {
 				.target = (void *)target,
 				.defobj = defobj,
 				.def = def,

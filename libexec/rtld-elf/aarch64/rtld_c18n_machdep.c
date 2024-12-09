@@ -67,6 +67,7 @@ tramp_compile(char **entry, const struct tramp_data *data)
 	char *buf = *entry;
 	size_t hook_off, count_off;
 	size_t header_off, target_off, landing_off, unused_regs;
+	compart_id_t callee;
 	bool executive = cheri_getperm(data->target) & CHERI_PERM_EXECUTIVE;
 	bool count = ld_compartment_switch_count != NULL;
 	bool hook = ld_compartment_utrace != NULL ||
@@ -143,9 +144,10 @@ tramp_compile(char **entry, const struct tramp_data *data)
 	target_off = size + offsetof(struct tramp_header, target);
 	*entry = buf + size;
 	size += offsetof(struct tramp_header, entry);
+	callee = compart_id_for_address(data->defobj, (ptraddr_t)data->target);
 
 	COPY(push_frame);
-	PATCH_MOV(push_frame, cid, cid_to_index(data->defobj->compart_id).val);
+	PATCH_MOV(push_frame, cid, cid_to_index(callee).val);
 	landing_off = PATCH_OFF(push_frame, landing);
 	/*
 	 * The trampoline computes the number of return value registers and
@@ -299,7 +301,7 @@ _rtld_sandbox_code(void *target, struct func_sig sig)
 		target = cheri_sealentry(target_unsealed);
 	}
 
-	target = tramp_intern(NULL, &(struct tramp_data) {
+	target = tramp_intern(NULL, RTLD_COMPART_ID, &(struct tramp_data) {
 		.target = target,
 		.defobj = obj,
 		.sig = sig

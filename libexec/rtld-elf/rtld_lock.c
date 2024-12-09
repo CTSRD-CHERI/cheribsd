@@ -428,7 +428,7 @@ _rtld_thread_init(struct RtldLockInfo *pli)
 #ifdef CHERI_LIB_C18N
 		tmplockinfo = *pli;
 #define WRAP(_target, _valid, _reg_args, _mem_args, _ret_args)	\
-	_target = tramp_intern(NULL, &(struct tramp_data) {			\
+	_target = tramp_intern(NULL, RTLD_COMPART_ID, &(struct tramp_data) {	\
 		.target = _target,						\
 		.defobj = obj,							\
 		.sig = (struct func_sig) {					\
