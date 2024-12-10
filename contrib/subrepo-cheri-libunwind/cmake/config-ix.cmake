@@ -111,3 +111,5 @@ else()
   check_library_exists(dl dladdr "" LIBUNWIND_HAS_DL_LIB)
   check_library_exists(pthread pthread_once "" LIBUNWIND_HAS_PTHREAD_LIB)
 endif()
+
+check_symbol_exists(dl_c18n_is_trampoline link.h LIBUNWIND_HAS_CHERI_LIB_C18N)

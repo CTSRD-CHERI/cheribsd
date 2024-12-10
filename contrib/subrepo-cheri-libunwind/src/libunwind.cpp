@@ -28,7 +28,6 @@
 
 #if !defined(__USING_SJLJ_EXCEPTIONS__)
 #include "AddressSpace.hpp"
-#include "CompartmentInfo.hpp"
 #include "UnwindCursor.hpp"
 
 
@@ -42,11 +41,6 @@ using namespace libunwind;
 
 /// internal object to represent this processes address space
 LocalAddressSpace LocalAddressSpace::sThisAddressSpace;
-
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(_LIBUNWIND_CHERI_C18N_SUPPORT)
-/// internal object to represent this processes compartment information
-CompartmentInfo CompartmentInfo::sThisCompartmentInfo;
-#endif // __CHERI_PURE_CAPABILITY__ && _LIBUNWIND_CHERI_C18N_SUPPORT
 
 _LIBUNWIND_EXPORT unw_addr_space_t unw_local_addr_space =
     (unw_addr_space_t)&LocalAddressSpace::sThisAddressSpace;

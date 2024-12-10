@@ -86,6 +86,7 @@ extern "C" _Unwind_Reason_Code __libunwind_seh_personality(
 #include "Registers.hpp"
 #include "RWMutex.hpp"
 #include "Unwind-EHABI.h"
+#include "CompartmentInfo.hpp"
 
 namespace libunwind {
 
@@ -1293,6 +1294,10 @@ private:
                            _registers, _isSignalFrame);
   }
 #endif // defined(_LIBUNWIND_SUPPORT_TBTAB_UNWIND)
+
+  int stepThroughIfAtC18NBoundary() {
+    return CompartmentInfo<A, R>::unwindIfAtBoundary(_registers);
+  }
 
   A               &_addressSpace;
   R                _registers;
@@ -2866,6 +2871,11 @@ int UnwindCursor<A, R>::step() {
               _LIBUNWIND_ARM_EHABI
 #endif
   }
+
+  // If we are at a compartment boundary, step through it by asking RTLD to
+  // restore registers from the trusted stack.
+  if (result == UNW_STEP_SUCCESS)
+    result = stepThroughIfAtC18NBoundary();
 
   // update info based on new PC
   if (result == UNW_STEP_SUCCESS) {
