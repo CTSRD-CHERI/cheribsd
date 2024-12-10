@@ -225,14 +225,23 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 	relalim = (const Elf_Rela *)((const char *)rela + relasz);
 	pcc = __builtin_cheri_program_counter_get();
 
-	/* Self-relocations should all be local, i.e. R_MORELLO_RELATIVE. */
+	/* Self-relocations should all be local, i.e. relative. */
 	for (; rela < relalim; rela++) {
-		if (ELF_R_TYPE(rela->r_info) != R_MORELLO_RELATIVE)
+		switch (ELF_R_TYPE(rela->r_info)) {
+		case R_AARCH64_RELATIVE:
+		case R_AARCH64_FUNC_RELATIVE:
+			*where = (Elf_Addr)(relocbase + rela->r_addend);
+			break;
+		case R_MORELLO_RELATIVE:
+		case R_MORELLO_FUNC_RELATIVE:
+			where = (Elf_Addr *)(relocbase + rela->r_offset);
+			*(uintcap_t *)where = init_cap_from_fragment(where,
+			    relocbase, pcc, (Elf_Addr)(uintptr_t)relocbase,
+			    rela->r_addend);
+			break;
+		default:
 			__builtin_trap();
-
-		where = (Elf_Addr *)(relocbase + rela->r_offset);
-		*(uintcap_t *)where = init_cap_from_fragment(where, relocbase,
-		    pcc, (Elf_Addr)(uintptr_t)relocbase, rela->r_addend);
+		}
 	}
 }
 #endif /* __CHERI_PURE_CAPABILITY__ */
@@ -527,7 +536,13 @@ reloc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 		case R_AARCH64_NONE:
 			break;
 #ifdef __CHERI_PURE_CAPABILITY__
+		/*
+		 * XXX Dapeng: The R_MORELLO_RELATIVE case should be removed
+		 * once the whole system is compiled with -cheri-codeptr-relocs,
+		 * for it would then be impossible to see this relocation here.
+		 */
 		case R_MORELLO_RELATIVE:
+		case R_MORELLO_FUNC_RELATIVE:
 			*where = init_cap_from_fragment(fragment,
 			    obj->relocbase, pcc_cap(obj, where[0]),
 			    (Elf_Addr)(uintptr_t)obj->relocbase,
@@ -919,6 +934,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				return (-1);
 			break;
 		case R_MORELLO_RELATIVE:
+		case R_MORELLO_FUNC_RELATIVE:
 			*(uintcap_t *)(void *)where =
 			    init_cap_from_fragment(where, data_cap,
 				pcc_cap(obj, where[0]),
@@ -996,6 +1012,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			break;
 #endif
 		case R_AARCH64_RELATIVE:
+		case R_AARCH64_FUNC_RELATIVE:
 			*where = (Elf_Addr)(obj->relocbase + rela->r_addend);
 			break;
 		case R_AARCH64_NONE:

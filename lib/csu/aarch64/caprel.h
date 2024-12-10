@@ -77,7 +77,8 @@ elf_reloc(const Elf_Rela *rela, void * __capability data_cap,
 	Elf_Addr addr;
 	Elf_Addr *where;
 
-	if (ELF_R_TYPE(rela->r_info) != R_MORELLO_RELATIVE)
+	if (ELF_R_TYPE(rela->r_info) != R_MORELLO_RELATIVE &&
+	    ELF_R_TYPE(rela->r_info) != R_MORELLO_FUNC_RELATIVE)
 		__builtin_trap();
 
 	addr = relocbase + rela->r_offset;
