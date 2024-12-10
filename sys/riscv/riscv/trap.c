@@ -356,11 +356,6 @@ page_fault_handler(struct trapframe *frame, int usermode)
 	pcb = td->td_pcb;
 	stval = frame->tf_stval;
 
-	if (td->td_critnest != 0 || td->td_intr_nesting_level != 0 ||
-	    WITNESS_CHECK(WARN_SLEEPOK | WARN_GIANTOK, NULL,
-	    "Kernel page fault") != 0)
-		goto fatal;
-
 	if (usermode) {
 		if (!VIRT_IS_VALID(stval)) {
 			call_trapsignal(td, SIGSEGV, SEGV_MAPERR, stval,
@@ -373,7 +368,8 @@ page_fault_handler(struct trapframe *frame, int usermode)
 		 * Enable interrupts for the duration of the page fault. For
 		 * user faults this was done already in do_trap_user().
 		 */
-		intr_enable();
+		if ((frame->tf_sstatus & SSTATUS_SIE) != 0)
+			intr_enable();
 
 		if (stval >= VM_MIN_KERNEL_ADDRESS) {
 			map = kernel_map;
@@ -425,6 +421,11 @@ page_fault_handler(struct trapframe *frame, int usermode)
 #ifdef CHERI_CAPREVOKE
 skip_pmap:
 #endif
+	if (td->td_critnest != 0 || td->td_intr_nesting_level != 0 ||
+	    WITNESS_CHECK(WARN_SLEEPOK | WARN_GIANTOK, NULL,
+	    "Kernel page fault") != 0)
+		goto fatal;
+
 	error = vm_fault_trap(map, va, ftype, VM_FAULT_NORMAL, &sig, &ucode);
 	if (error != KERN_SUCCESS) {
 		if (usermode) {
