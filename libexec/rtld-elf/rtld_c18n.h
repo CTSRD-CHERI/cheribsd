@@ -271,7 +271,12 @@ struct tramp_data {
 };
 
 struct tramp_header {
-	void *target;
+	/*
+	 * The target is atomic because it may be modified, after trampoline
+	 * creation, from an untagged value to a tagged value. Atomicity ensures
+	 * that the tagged value is visible to the trampoline when it is run.
+	 */
+	_Atomic(void *) target;
 	const Obj_Entry *defobj;
 	size_t symnum;
 	struct func_sig sig;

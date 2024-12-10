@@ -1221,7 +1221,7 @@ typedef int32_t slot_idx_t;
 static struct {
 	_Alignas(CACHE_LINE_SIZE) _Atomic(slot_idx_t) size;
 	int exp;
-	const struct tramp_header **data;
+	struct tramp_header **data;
 	struct tramp_map_kv {
 		_Atomic(ptraddr_t) key;
 		_Atomic(slot_idx_t) index;
@@ -1307,7 +1307,8 @@ resize_table(int exp)
 	size = atomic_load_explicit(&tramp_table.size, memory_order_relaxed);
 
 	for (slot_idx_t idx = 0; idx < size; ++idx) {
-		key = (ptraddr_t)tramp_table.data[idx]->target;
+		key = (ptraddr_t)atomic_load_explicit(
+		    &tramp_table.data[idx]->target, memory_order_relaxed);
 		hash = hash_pointer(key);
 		slot = hash;
 
@@ -1361,7 +1362,7 @@ tramp_hook_impl(int event, const struct tramp_header *hdr)
 		getpid();
 }
 
-static const struct tramp_header *
+static struct tramp_header *
 tramp_pgs_alloc(const char buf[], const char *bufp, size_t len)
 {
 	char *tramp;
@@ -1418,10 +1419,11 @@ func_sig_equal(struct func_sig lhs, struct func_sig rhs)
 }
 
 static void
-tramp_check_sig(const struct tramp_header *found, const Obj_Entry *reqobj,
+tramp_check_found(struct tramp_header *found, const Obj_Entry *reqobj,
     const struct tramp_data *data)
 {
 	struct func_sig sig;
+	void *found_target;
 
 	if (data->sig.valid && found->symnum != 0) {
 		sig = sigtab_get(found->defobj, found->symnum);
@@ -1434,11 +1436,42 @@ tramp_check_sig(const struct tramp_header *found, const Obj_Entry *reqobj,
 		    reqobj->path, C18N_SIG_FORMAT(data->sig),
 		    found->defobj->path, C18N_SIG_FORMAT(sig));
 	}
+
+	if (cheri_gettag(data->target)) {
+		found_target = atomic_load_explicit(&found->target,
+		    memory_order_relaxed);
+		do if (cheri_gettag(found_target)) {
+			rtld_require(
+			    cheri_equal_exact(found_target, data->target),
+			    "c18n: Incompatible capability metadata for "
+			    "function %s: found %#p, requested %#p\n",
+			    symname(found->defobj, found->symnum),
+			    found_target, data->target);
+			break;
+		} else if (atomic_compare_exchange_weak_explicit(&found->target,
+		    &found_target, data->target,
+		    memory_order_relaxed, memory_order_relaxed)) {
+			/*
+			 * Issue a data memory barrier so that the updated
+			 * trampoline target is visible to the trampoline when
+			 * it is run potentially in another thread.
+			 *
+			 * XXX Dapeng: The semantics of the fence being relied
+			 * upon here is not the C semantics because there is no
+			 * corresponding acquire operations. Instead, we rely on
+			 * the architecture data memory barrier which guarantees
+			 * ordering between the write and any future load of the
+			 * trampoline.
+			 */
+			atomic_thread_fence(memory_order_release);
+			break;
+		} while (1);
+	}
 }
 
 #define	C18N_MAX_TRAMP_SIZE	768
 
-static const struct tramp_header *
+static struct tramp_header *
 tramp_create(const struct tramp_data *data)
 {
 	struct tramp_data newdata = *data;
@@ -1455,10 +1488,10 @@ tramp_create(const struct tramp_data *data)
 	return (tramp_pgs_alloc(buf, bufp, len));
 }
 
-static const void *
-tramp_make_entry(const struct tramp_header *header)
+static void *
+tramp_make_entry(struct tramp_header *header)
 {
-	const void *entry = header->entry;
+	void *entry = header->entry;
 
 	entry = cheri_clearperm(entry, FUNC_PTR_REMOVE_PERMS);
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
@@ -1472,7 +1505,7 @@ tramp_make_entry(const struct tramp_header *header)
 const void *
 plt_tramp_make(Obj_Entry *data)
 {
-	const struct tramp_header *header;
+	struct tramp_header *header;
 	/* A capability-aligned buffer large enough to hold a trampoline */
 	_Alignas(_Alignof(struct tramp_header)) char buf[72];
 	char *bufp = buf;
@@ -1489,7 +1522,8 @@ void *
 tramp_intern(const Obj_Entry *reqobj, const struct tramp_data *data)
 {
 	RtldLockState lockstate;
-	const struct tramp_header *header;
+	void *tramp_entry;
+	struct tramp_header *header;
 	ptraddr_t target = (ptraddr_t)data->target;
 	const uint32_t hash = hash_pointer(target);
 	slot_idx_t slot, idx, writers;
@@ -1623,12 +1657,22 @@ insert:
 end:
 	lock_release(rtld_tramp_lock, &lockstate);
 
-	tramp_check_sig(header, reqobj, data);
+	/*
+	 * Check that the found trampoline matches the expected signature (if
+	 * any) of the requester. Also fill out the trampoline target if the
+	 * trampoline is partially constructed from a previous untagged target.
+	 */
+	tramp_check_found(header, reqobj, data);
 
 	/*
-	 * Most consumers use type (void *) for function pointers.
+	 * Defensive programming: if the requester supplies an untagged target
+	 * capability, return an untagged trampoline.
 	 */
-	return (__DECONST(void *, tramp_make_entry(header)));
+	tramp_entry = tramp_make_entry(header);
+	if (!cheri_gettag(data->target))
+		tramp_entry = cheri_cleartag(tramp_entry);
+
+	return (tramp_entry);
 }
 
 struct func_sig
