@@ -181,7 +181,17 @@
 	 * registers so must always do this.
 	 */
 #endif
+.if \el == 1
+	/*
+	 * In the kernel, x18 is always used as the per-CPU data pointer and is
+	 * reset to the value in tpidr_el1 further below.  At this point when
+	 * returning to EL1, x18 contains the saved stack pointer, so be careful
+	 * not to clobber it.
+	 */
+	ldr		 CAP(19), [PTRN(sp), #(TF_X + 19 * CAP_WIDTH)]
+.else
 	ldp	CAP(18), CAP(19), [PTRN(sp), #(TF_X + 18 * CAP_WIDTH)]
+.endif
 	ldp	CAP(20), CAP(21), [PTRN(sp), #(TF_X + 20 * CAP_WIDTH)]
 	ldp	CAP(22), CAP(23), [PTRN(sp), #(TF_X + 22 * CAP_WIDTH)]
 	ldp	CAP(24), CAP(25), [PTRN(sp), #(TF_X + 24 * CAP_WIDTH)]
