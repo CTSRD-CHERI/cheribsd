@@ -1,3 +1,5 @@
+.PATH: ${LIBC_SRCTOP}/stdlib/malloc/jemalloc
+
 JEMALLOCSRCS:= jemalloc.c arena.c background_thread.c base.c bin.c bitmap.c \
 	ckh.c ctl.c div.c extent.c extent_dss.c extent_mmap.c hash.c hook.c \
 	large.c log.c malloc_io.c mutex.c mutex_pool.c nstime.c pages.c \
@@ -28,10 +30,7 @@ CFLAGS.jemalloc_${src}+=	-DMALLOC_REVOCATION_SHIM
 
 COMPARTMENT_POLICY+=${LIBC_SRCTOP}/stdlib/malloc/jemalloc/Compartments.json
 
-MAN+=jemalloc.3
-CLEANFILES+=jemalloc.3
-jemalloc.3: ${SRCTOP}/contrib/jemalloc/doc/jemalloc.3 .NOMETA
-	ln -sf ${.ALLSRC} ${.TARGET}
+MAN+=	jemalloc.3
 
 .if ${MK_MALLOC_REVOCATION_SHIM} == no || !${MACHINE_ABI:Mpurecap}
 MLINKS+= \
