@@ -28,6 +28,7 @@
 
 void cheribsdtest_dynamic_dummy_func(void);
 void (*cheribsdtest_dynamic_get_dummy_fptr(void))(void);
+ptraddr_t cheribsdtest_dynamic_get_dummy_fptr_addr(void);
 
 void * __capability cheribsdtest_dynamic_identity_cap(void * __capability cap);
 

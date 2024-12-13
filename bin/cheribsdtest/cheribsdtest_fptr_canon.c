@@ -30,6 +30,8 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/types.h>
+
 #include <dlfcn.h>
 
 #include <cheribsdtest_dynamic.h>
@@ -79,6 +81,24 @@ CHERIBSDTEST(fptr_canon_dlfunc,
 
 	CHERIBSDTEST_VERIFY2(cheri_ptr_equal_exact(fptr_inside, fptr_dlfunc),
 	    "inside %#p differs from dlfunc %#p", fptr_inside, fptr_dlfunc);
+
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(fptr_canon_int,
+    "Check that function pointers are canonical when relocated as integer "
+    "addresses")
+{
+	volatile ptraddr_t fptr_int;
+	void (* volatile fptr_dlsym)(void);
+
+	fptr_int = cheribsdtest_dynamic_get_dummy_fptr_addr();
+	fptr_dlsym = (void (*)(void))dlsym(RTLD_DEFAULT,
+	    "cheribsdtest_dynamic_dummy_func");
+
+	CHERIBSDTEST_VERIFY2(fptr_int == (ptraddr_t)fptr_dlsym,
+	    "Integer address %p differs from dlsym %#p",
+	    (void *)(uintptr_t)fptr_int, fptr_dlsym);
 
 	cheribsdtest_success();
 }

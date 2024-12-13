@@ -44,3 +44,11 @@ void
 {
 	return (&cheribsdtest_dynamic_dummy_func);
 }
+
+ptraddr_t
+cheribsdtest_dynamic_get_dummy_fptr_addr(void)
+{
+	static volatile ptraddr_t addr =
+	    (ptraddr_t)&cheribsdtest_dynamic_dummy_func;
+	return (addr);
+}
