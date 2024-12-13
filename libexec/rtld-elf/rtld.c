@@ -415,6 +415,7 @@ static struct ld_env_var_desc ld_env_vars[] = {
 	LD_ENV_DESC(COMPARTMENT_UNWIND, false),
 	LD_ENV_DESC(COMPARTMENT_STATS, false),
 	LD_ENV_DESC(COMPARTMENT_SWITCH_COUNT, false),
+	LD_ENV_DESC(COMPARTMENT_FPTR, false),
 #endif
 };
 
@@ -821,6 +822,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     ld_compartment_unwind = ld_get_env_var(LD_COMPARTMENT_UNWIND);
     ld_compartment_stats = ld_get_env_var(LD_COMPARTMENT_STATS);
     ld_compartment_switch_count = ld_get_env_var(LD_COMPARTMENT_SWITCH_COUNT);
+    ld_compartment_fptr = ld_get_env_var(LD_COMPARTMENT_FPTR) != NULL;
     /*
      * DISABLE takes precedence over ENABLE.
      */
@@ -1142,19 +1144,8 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     dbg("transferring control to program entry point = " PTR_FMT, obj_main->entry);
 
     /* Return the exit procedure and the program entry point. */
-    if (rtld_exit_ptr == NULL) {
+    if (rtld_exit_ptr == NULL)
 	rtld_exit_ptr = make_rtld_function_pointer(rtld_exit);
-#ifdef CHERI_LIB_C18N
-	rtld_exit_ptr = tramp_intern(NULL, &(struct tramp_data) {
-		.target = rtld_exit_ptr,
-		.defobj = &obj_rtld,
-		.sig = (struct func_sig) {
-			.valid = true,
-			.reg_args = 0, .mem_args = false, .ret_args = NONE
-		}
-	});
-#endif
-    }
     *exit_proc = rtld_exit_ptr;
     *objp = obj_main;
 
@@ -1225,9 +1216,18 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
 	NULL, &lockstate);
     if (def == NULL)
 	rtld_die();
-    if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC)
+    if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
 	target = (uintptr_t)rtld_resolve_ifunc(defobj, def);
-    else {
+#ifdef CHERI_LIB_C18N
+	if (C18N_FPTR_ENABLED)
+		target = (uintptr_t)tramp_intern(obj, &(struct tramp_data) {
+		    .target = (void *)target,
+		    .defobj = defobj,
+		    .def = def,
+		    .sig = sigtab_get(obj, ELF_R_SYM(rel->r_info))
+		});
+#endif
+    } else {
 #ifdef __CHERI_PURE_CAPABILITY__
 	target = (uintptr_t)make_function_pointer(def, defobj);
 #ifdef CHERI_LIB_C18N
@@ -3509,29 +3509,9 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 	lock_release(rtld_bind_lock, lockstate);
 	if (reg != NULL) {
 		func_ptr_type exit_ptr = make_rtld_function_pointer(rtld_exit);
-#ifdef CHERI_LIB_C18N
-		exit_ptr = tramp_intern(NULL, &(struct tramp_data) {
-			.target = exit_ptr,
-			.defobj = &obj_rtld,
-			.sig = (struct func_sig) {
-				.valid = true,
-				.reg_args = 0, .mem_args = false, .ret_args = NONE
-			}
-		});
-#endif
 		dbg("Calling __libc_atexit(rtld_exit (" PTR_FMT "))", (void*)exit_ptr);
 		reg(exit_ptr);
 		rtld_exit_ptr = make_rtld_function_pointer(rtld_nop_exit);
-#ifdef CHERI_LIB_C18N
-		rtld_exit_ptr = tramp_intern(NULL, &(struct tramp_data) {
-			.target = rtld_exit_ptr,
-			.defobj = &obj_rtld,
-			.sig = (struct func_sig) {
-				.valid = true,
-				.reg_args = 0, .mem_args = false, .ret_args = NONE
-			}
-		});
-#endif
 	}
 
         /*
@@ -4451,22 +4431,28 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
 	    sym = __DECONST(void*, make_function_pointer(def, defobj));
 	    dbg("dlsym(%s) is function: " PTR_FMT, name, sym);
-#if defined(CHERI_LIB_C18N) && defined(__riscv)
-	    sym = tramp_intern(NULL, &(struct tramp_data) {
-		.target = sym,
-		.defobj = defobj,
-		.def = def
-	    });
+#ifdef CHERI_LIB_C18N
+#ifndef __riscv
+	    if (C18N_FPTR_ENABLED)
+#endif
+		sym = tramp_intern(NULL, &(struct tramp_data) {
+		    .target = sym,
+		    .defobj = defobj,
+		    .def = def
+		});
 #endif
 	} else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
 	    sym = rtld_resolve_ifunc(defobj, def);
 	    dbg("dlsym(%s) is ifunc. Resolved to: " PTR_FMT, name, sym);
-#if defined(CHERI_LIB_C18N) && defined(__riscv)
-	    sym = tramp_intern(NULL, &(struct tramp_data) {
-		.target = sym,
-		.defobj = defobj,
-		.def = def
-	    });
+#ifdef CHERI_LIB_C18N
+#ifndef __riscv
+	    if (C18N_FPTR_ENABLED)
+#endif
+		sym = tramp_intern(NULL, &(struct tramp_data) {
+		    .target = sym,
+		    .defobj = defobj,
+		    .def = def
+		});
 #endif
 	} else if (ELF_ST_TYPE(def->st_info) == STT_TLS) {
 	    ti.ti_module = defobj->tlsindex;
@@ -4704,14 +4690,16 @@ dl_iterate_phdr(__dl_iterate_hdr_callback callback, void *param)
 	error = 0;
 
 #ifdef CHERI_LIB_C18N
-	callback = tramp_intern(NULL, &(struct tramp_data) {
-		.target = callback,
-		.defobj = obj_from_addr(callback),
-		.sig = (struct func_sig) {
-			.valid = true,
-			.reg_args = 3, .mem_args = false, .ret_args = ONE
-		}
-	});
+	if (!C18N_FPTR_ENABLED)
+		callback = tramp_intern(NULL, &(struct tramp_data) {
+			.target = callback,
+			.defobj = obj_from_addr(callback),
+			.sig = (struct func_sig) {
+				.valid = true,
+				.reg_args = 3, .mem_args = false,
+				.ret_args = ONE
+			}
+		});
 #endif
 
 	wlock_acquire(rtld_phdr_lock, &phdr_lockstate);

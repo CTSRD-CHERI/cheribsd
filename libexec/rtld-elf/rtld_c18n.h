@@ -58,6 +58,7 @@
 #define	c18n_unseal_subset(cap, sealer, super)	cheri_unseal(cap, sealer)
 #endif
 
+extern bool ld_compartment_enable;
 #ifdef HAS_RESTRICTED_MODE
 extern size_t c18n_code_perm_clear;
 #else

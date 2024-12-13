@@ -427,16 +427,18 @@ _rtld_thread_init(struct RtldLockInfo *pli)
 		}
 #ifdef CHERI_LIB_C18N
 		tmplockinfo = *pli;
-#define WRAP(_target, _valid, _reg_args, _mem_args, _ret_args)	\
-	_target = tramp_intern(NULL, &(struct tramp_data) {			\
-		.target = _target,						\
-		.defobj = obj,							\
-		.sig = (struct func_sig) {					\
-			.valid = _valid,					\
-			.reg_args = _reg_args, .mem_args = _mem_args,		\
-			.ret_args = _ret_args					\
-		}								\
-	})
+#define WRAP(_target, _valid, _reg_args, _mem_args, _ret_args)			\
+	do if (!C18N_FPTR_ENABLED)						\
+		_target = tramp_intern(NULL, &(struct tramp_data) {		\
+			.target = _target,					\
+			.defobj = obj,						\
+			.sig = (struct func_sig) {				\
+				.valid = _valid,				\
+				.reg_args = _reg_args, .mem_args = _mem_args,	\
+				.ret_args = _ret_args				\
+			}							\
+		});								\
+	while (0)
 		WRAP(tmplockinfo.lock_create,		true, 0, false, ONE);
 		WRAP(tmplockinfo.lock_destroy,		true, 1, false, NONE);
 		WRAP(tmplockinfo.rlock_acquire,		true, 1, false, NONE);

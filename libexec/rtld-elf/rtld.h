@@ -65,6 +65,14 @@
 extern bool ld_compartment_enable;
 
 #define	C18N_ENABLED	ld_compartment_enable
+
+#ifdef __aarch64__
+extern bool ld_compartment_fptr;
+
+#define C18N_FPTR_ENABLED	ld_compartment_fptr
+#else
+#define C18N_FPTR_ENABLED	0
+#endif
 #endif
 
 #include "rtld_lock.h"
@@ -467,6 +475,7 @@ enum {
 	LD_COMPARTMENT_UNWIND,
 	LD_COMPARTMENT_STATS,
 	LD_COMPARTMENT_SWITCH_COUNT,
+	LD_COMPARTMENT_FPTR,
 #endif
 };
 
@@ -534,7 +543,20 @@ __END_DECLS
 #endif
 
 #ifndef make_rtld_function_pointer
+#ifdef CHERI_LIB_C18N
+#define make_rtld_function_pointer(target_func)                         \
+	tramp_intern(NULL, &(struct tramp_data) {			\
+		.target = &target_func,					\
+		.defobj = &obj_rtld,					\
+		.sig = (struct func_sig) {				\
+			.valid = true,					\
+			.reg_args = 0, .mem_args = false,		\
+			.ret_args = NONE				\
+		}							\
+	})
+#else
 #define make_rtld_function_pointer(target_func)	(&target_func)
+#endif
 #endif
 #ifndef make_rtld_local_function_pointer
 #define make_rtld_local_function_pointer(target_func)	(&target_func)

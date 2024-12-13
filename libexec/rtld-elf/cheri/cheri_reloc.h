@@ -125,13 +125,16 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 			    symname(obj, r_symndx), obj->path);
 			return -1;
 		}
-#if defined(CHERI_LIB_C18N) && defined(__riscv)
-		symval = tramp_intern(NULL, &(struct tramp_data) {
-			.target = __DECONST(void *, symval),
-			.defobj = defobj,
-			.def = def,
-			.sig = sigtab_get(obj, r_symndx)
-		});
+#ifdef CHERI_LIB_C18N
+#ifndef __riscv
+		if (C18N_FPTR_ENABLED)
+#endif
+			symval = tramp_intern(NULL, &(struct tramp_data) {
+				.target = __DECONST(void *, symval),
+				.defobj = defobj,
+				.def = def,
+				.sig = sigtab_get(obj, r_symndx)
+			});
 #endif
 	} else {
 		/* Remove execute permissions and set bounds */
