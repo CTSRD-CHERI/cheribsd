@@ -762,13 +762,16 @@ reloc_gnu_ifunc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 			lock_release(rtld_bind_lock, lockstate);
 			target = (uintptr_t)rtld_resolve_ifunc(defobj, def);
 #ifdef CHERI_LIB_C18N
-			target = (uintptr_t)tramp_intern(plt, plt->compart_id,
-			    &(struct tramp_data) {
-				.target = (void *)target,
-				.defobj = defobj,
-				.def = def,
-				.sig = sigtab_get(obj, ELF_R_SYM(rela->r_info))
-			});
+			if (!C18N_FPTR_ENABLED)
+				target = (uintptr_t)tramp_intern(plt,
+				    plt->compart_id,
+				    &(struct tramp_data) {
+					.target = (void *)target,
+					.defobj = defobj,
+					.def = def,
+					.sig = sigtab_get(obj,
+					    ELF_R_SYM(rela->r_info))
+				});
 #endif
 			wlock_acquire(rtld_bind_lock, lockstate);
 			reloc_jmpslot(where, target, defobj, obj,
@@ -934,17 +937,45 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				return (-1);
 			break;
 		case R_MORELLO_RELATIVE:
-		case R_MORELLO_FUNC_RELATIVE:
 			*(uintcap_t *)(void *)where =
 			    init_cap_from_fragment(where, data_cap,
 				pcc_cap(obj, where[0]),
 				(Elf_Addr)(uintptr_t)obj->relocbase,
 				rela->r_addend);
 			break;
+		case R_MORELLO_FUNC_RELATIVE:
+			*(uintcap_t *)(void *)where =
+			    init_cap_from_fragment(where, data_cap,
+				pcc_cap(obj, where[0]),
+				(Elf_Addr)(uintptr_t)obj->relocbase,
+				rela->r_addend);
+#ifdef CHERI_LIB_C18N
+			if (C18N_FPTR_ENABLED)
+				*(void **)where = tramp_intern(NULL,
+				    RTLD_COMPART_ID,
+				    &(struct tramp_data) {
+					.target = *(void **)where,
+					.defobj = obj
+				});
+#endif
+			break;
 #endif /* __has_feature(capabilities) */
 		case R_AARCH64_ABS64:
 		case R_AARCH64_GLOB_DAT:
 			*where = symval + rela->r_addend;
+#ifdef CHERI_LIB_C18N
+			if (C18N_FPTR_ENABLED &&
+			    ELF_ST_TYPE(def->st_info) == STT_FUNC)
+				*where = (Elf_Addr)tramp_intern(NULL,
+				    RTLD_COMPART_ID,
+				    &(struct tramp_data) {
+					.target = (void *)(uintptr_t)*where,
+					.defobj = defobj,
+					.def = def,
+					.sig = sigtab_get(obj,
+					    ELF_R_SYM(rela->r_info))
+				});
+#endif
 			break;
 		case R_AARCH64_COPY:
 			/*
@@ -1012,8 +1043,19 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			break;
 #endif
 		case R_AARCH64_RELATIVE:
+			*where = (Elf_Addr)(obj->relocbase + rela->r_addend);
+			break;
 		case R_AARCH64_FUNC_RELATIVE:
 			*where = (Elf_Addr)(obj->relocbase + rela->r_addend);
+#ifdef CHERI_LIB_C18N
+			if (C18N_FPTR_ENABLED)
+				*where = (Elf_Addr)tramp_intern(NULL,
+				    RTLD_COMPART_ID,
+				    &(struct tramp_data) {
+					.target = (void *)(uintptr_t)*where,
+					.defobj = obj
+				});
+#endif
 			break;
 		case R_AARCH64_NONE:
 			break;

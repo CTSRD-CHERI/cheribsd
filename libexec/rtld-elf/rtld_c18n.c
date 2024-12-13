@@ -127,6 +127,11 @@ bool ld_compartment_enable;
 /* Permission bit to be cleared for user code */
 uint64_t c18n_code_perm_clear;
 
+#ifdef __aarch64__
+/* Enable wrapping function pointers in trampolines */
+bool ld_compartment_fptr;
+#endif
+
 /* Use utrace() to log compartmentalisation-related events */
 const char *ld_compartment_utrace;
 
@@ -1833,17 +1838,20 @@ void _rtld_thr_exit(long *);
 void
 _rtld_thread_start_init(void (*p)(struct pthread *))
 {
-	assert((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) == 0);
+	assert(((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) != 0) ==
+	    C18N_FPTR_ENABLED);
 	assert(thr_thread_start == NULL);
-	thr_thread_start = tramp_intern(NULL, RTLD_COMPART_ID,
-	    &(struct tramp_data) {
-		.target = p,
-		.defobj = obj_from_addr(p),
-		.sig = (struct func_sig) {
-			.valid = true,
-			.reg_args = 1, .mem_args = false, .ret_args = NONE
-		}
-	});
+	if (!C18N_FPTR_ENABLED)
+		p = tramp_intern(NULL, RTLD_COMPART_ID, &(struct tramp_data) {
+			.target = p,
+			.defobj = obj_from_addr(p),
+			.sig = (struct func_sig) {
+				.valid = true,
+				.reg_args = 1, .mem_args = false,
+				.ret_args = NONE
+			}
+		});
+	thr_thread_start = p;
 }
 
 void
@@ -1978,17 +1986,21 @@ static __siginfohandler_t *signal_dispatcher = sigdispatch;
 void
 _rtld_sighandler_init(__siginfohandler_t *handler)
 {
-	assert((cheri_getperm(handler) & CHERI_PERM_EXECUTIVE) == 0);
+	assert(((cheri_getperm(handler) & CHERI_PERM_EXECUTIVE) != 0) ==
+	    C18N_FPTR_ENABLED);
 	assert(signal_dispatcher == sigdispatch);
-	signal_dispatcher = tramp_intern(NULL, RTLD_COMPART_ID,
-	    &(struct tramp_data) {
-		.target = handler,
-		.defobj = obj_from_addr(handler),
-		.sig = (struct func_sig) {
-			.valid = true,
-			.reg_args = 3, .mem_args = false, .ret_args = NONE
-		}
-	});
+	if (!C18N_FPTR_ENABLED)
+		handler = tramp_intern(NULL, RTLD_COMPART_ID,
+		    &(struct tramp_data) {
+			.target = handler,
+			.defobj = obj_from_addr(handler),
+			.sig = (struct func_sig) {
+				.valid = true,
+				.reg_args = 3, .mem_args = false,
+				.ret_args = NONE
+			}
+		});
+	signal_dispatcher = handler;
 }
 
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
@@ -2205,7 +2217,15 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 		sigfunc = act->sa_sigaction;
 	else
 		sigfunc = act->sa_handler;
-	if (!cheri_gettag(sigfunc)) {
+
+	header = tramp_reflect(sigfunc);
+
+	/*
+	 * The signal handler must be wrapped by a trampoline if function
+	 * pointer wrapping is enabled.
+	 */
+	if (!cheri_gettag(sigfunc) ||
+	    (C18N_FPTR_ENABLED && header == NULL)) {
 		rtld_fdprintf(STDERR_FILENO,
 		    "c18n: Invalid handler %#p for signal %d\n",
 		    sigfunc, sig);
@@ -2216,8 +2236,7 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 	 * If the signal handler is not already wrapped by a trampoline, wrap it
 	 * in one.
 	 */
-	header = tramp_reflect(sigfunc);
-	if (header == NULL) {
+	if (!C18N_FPTR_ENABLED && header == NULL) {
 		defobj = obj_from_addr(sigfunc);
 		callee = compart_id_for_address(defobj, (ptraddr_t)sigfunc);
 		sigfunc = tramp_intern(NULL, RTLD_COMPART_ID,

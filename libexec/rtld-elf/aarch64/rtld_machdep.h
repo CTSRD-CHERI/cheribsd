@@ -86,22 +86,28 @@ uintptr_t reloc_jmpslot(uintptr_t *where, uintptr_t target,
 /* TODO: Per-function captable/PLT/FNDESC support */
 #ifdef CHERI_LIB_C18N
 #define call_init_array_pointer(_obj, _target)				\
-	(((InitArrFunc)tramp_intern(NULL, RTLD_COMPART_ID,		\
-	    &(struct tramp_data) {					\
-		.target = (void *)(_target).value,			\
-		.defobj = _obj,						\
-		.sig = (struct func_sig) { .valid = true,		\
-		    .reg_args = 3, .mem_args = false, .ret_args = NONE }\
-	}))(main_argc, main_argv, environ))
+	(C18N_FPTR_ENABLED ? (InitArrFunc)(_target).value :		\
+	    (InitArrFunc)tramp_intern(NULL, RTLD_COMPART_ID,		\
+	        &(struct tramp_data) {					\
+		    .target = (void *)(_target).value,			\
+		    .defobj = _obj,					\
+		    .sig = (struct func_sig) {				\
+			.valid = true,					\
+			.reg_args = 3, .mem_args = false,		\
+			.ret_args = NONE }				\
+	}))(main_argc, main_argv, environ)
 
 #define call_fini_array_pointer(_obj, _target)				\
-	(((InitFunc)tramp_intern(NULL, RTLD_COMPART_ID,			\
-	    &(struct tramp_data) {					\
-		.target = (void *)(_target).value,			\
-		.defobj = _obj,						\
-		.sig = (struct func_sig) { .valid = true,		\
-		    .reg_args = 0, .mem_args = false, .ret_args = NONE }\
-	}))())
+	(C18N_FPTR_ENABLED ? (InitFunc)(_target).value :		\
+	    (InitFunc)tramp_intern(NULL, RTLD_COMPART_ID,		\
+	        &(struct tramp_data) {					\
+		    .target = (void *)(_target).value,			\
+		    .defobj = _obj,					\
+		    .sig = (struct func_sig) {				\
+			.valid = true,					\
+			.reg_args = 0, .mem_args = false,		\
+			.ret_args = NONE }				\
+	}))()
 #else
 #define call_init_array_pointer(obj, target)				\
 	(((InitArrFunc)(target).value)(main_argc, main_argv, environ))
