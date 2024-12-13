@@ -30,6 +30,8 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/types.h>
+
 #include <dlfcn.h>
 
 #include <cheribsdtest_dynamic.h>
@@ -79,6 +81,27 @@ CHERIBSDTEST(fptr_canon_dlfunc,
 
 	CHERIBSDTEST_VERIFY2(cheri_ptr_equal_exact(fptr_inside, fptr_dlfunc),
 	    "inside %#p differs from dlfunc %#p", fptr_inside, fptr_dlfunc);
+
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(fptr_canon_scalar,
+    "Check that function pointers are canonical when cast to scalar")
+{
+	volatile ptraddr_t fptr_scalar;
+	void (* volatile fptr_dlsym)(void);
+
+	fptr_scalar = cheribsdtest_dynamic_dummy_func_scalar_address;
+	fptr_dlsym = (void (*)(void))dlsym(RTLD_DEFAULT,
+	    "cheribsdtest_dynamic_dummy_func_scalar_only");
+
+	CHERIBSDTEST_VERIFY2(fptr_scalar == (ptraddr_t)fptr_dlsym,
+	    "scalar %#p differs from dlsym %#p",
+	    (void *)(uintptr_t)fptr_scalar, fptr_dlsym);
+
+	fptr_dlsym();
+	// CHERIBSDTEST_VERIFY2(cheri_gettag((void *)fptr_dlsym),
+	//     "dlsym %#p is untagged", fptr_dlsym);
 
 	cheribsdtest_success();
 }

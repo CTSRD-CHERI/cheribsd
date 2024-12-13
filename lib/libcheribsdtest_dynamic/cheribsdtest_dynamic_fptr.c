@@ -44,3 +44,14 @@ void
 {
 	return (&cheribsdtest_dynamic_dummy_func);
 }
+
+/*
+ * This function must only be referenced as a scalar.
+ */
+void
+cheribsdtest_dynamic_dummy_func_scalar_only(void)
+{
+}
+
+ptraddr_t cheribsdtest_dynamic_dummy_func_scalar_address =
+    (ptraddr_t)&cheribsdtest_dynamic_dummy_func_scalar_only;
