@@ -897,7 +897,8 @@ struct proc {
 						   sync core registered */
 #define	P2_MEMBAR_GLOBE		0x00400000	/* membar global expedited
 						   registered */
-
+#define	P2_LOGSIGEXIT_ENABLE	0x00800000	/* Disable logging on sigexit */
+#define	P2_LOGSIGEXIT_CTL	0x01000000	/* Override kern.logsigexit */
 #define	P2_CHERI_C18N_ENABLE	0x10000000	/* Force enable compartmentalisation */
 #define	P2_CHERI_C18N_DISABLE	0x20000000	/* Force disable compartmentalisation */
 #define	P2_CHERI_C18N_MASK \

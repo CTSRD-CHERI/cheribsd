@@ -65,6 +65,8 @@
 #define	PROC_NO_NEW_PRIVS_STATUS 20	/* query suid/sgid disabled status */
 #define	PROC_WXMAP_CTL		21	/* control W^X */
 #define	PROC_WXMAP_STATUS	22	/* query W^X */
+#define	PROC_LOGSIGEXIT_CTL	23	/* en/dis logging on sigexit */
+#define	PROC_LOGSIGEXIT_STATUS	24	/* query logging on sigexit */
 #define	PROC_CHERI_REVOKE_CTL	1001	/* en/dis CHERI revocation */
 #define	PROC_CHERI_REVOKE_STATUS 1002	/* query CHERI revocation status */
 #if __has_feature(capabilities) && defined(__aarch64__)
@@ -158,6 +160,10 @@ struct procctl_reaper_kill {
 #define	PROC_WX_MAPPINGS_PERMIT		0x0001
 #define	PROC_WX_MAPPINGS_DISALLOW_EXEC	0x0002
 #define	PROC_WXORX_ENFORCE		0x80000000
+
+#define	PROC_LOGSIGEXIT_CTL_NOFORCE		1
+#define	PROC_LOGSIGEXIT_CTL_FORCE_ENABLE	2
+#define	PROC_LOGSIGEXIT_CTL_FORCE_DISABLE	3
 
 #define	PROC_CHERI_REVOKE_FORCE_ENABLE	1
 #define	PROC_CHERI_REVOKE_FORCE_DISABLE	2

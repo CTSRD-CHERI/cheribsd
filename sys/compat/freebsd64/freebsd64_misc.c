@@ -610,6 +610,7 @@ freebsd64_procctl(struct thread *td, struct freebsd64_procctl_args *uap)
 	case PROC_TRAPCAP_CTL:
 	case PROC_NO_NEW_PRIVS_CTL:
 	case PROC_WXMAP_CTL:
+	case PROC_LOGSIGEXIT_CTL:
 		error = copyin(__USER_CAP(uap->data, sizeof(flags)), &flags,
 		    sizeof(flags));
 		if (error != 0)
@@ -649,6 +650,7 @@ freebsd64_procctl(struct thread *td, struct freebsd64_procctl_args *uap)
 	case PROC_TRAPCAP_STATUS:
 	case PROC_NO_NEW_PRIVS_STATUS:
 	case PROC_WXMAP_STATUS:
+	case PROC_LOGSIGEXIT_STATUS:
 		data = &flags;
 		break;
 	case PROC_PDEATHSIG_CTL:
@@ -684,6 +686,7 @@ freebsd64_procctl(struct thread *td, struct freebsd64_procctl_args *uap)
 	case PROC_TRAPCAP_STATUS:
 	case PROC_NO_NEW_PRIVS_STATUS:
 	case PROC_WXMAP_STATUS:
+	case PROC_LOGSIGEXIT_STATUS:
 		if (error == 0)
 			error = copyout(&flags, __USER_CAP(uap->data,
 			    sizeof(flags)), sizeof(flags));

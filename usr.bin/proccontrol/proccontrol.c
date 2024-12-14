@@ -51,6 +51,7 @@ enum mode {
 	MODE_LA57,
 	MODE_LA48,
 #endif
+	MODE_LOGSIGEXIT,
 #if __has_feature(capabilities)
 	MODE_CHERI_REVOKE,
 #endif
@@ -77,6 +78,7 @@ static const struct {
 	{ MODE_LA57,		"la57" },
 	{ MODE_LA48,		"la48" },
 #endif
+	{ MODE_LOGSIGEXIT,	"logsigexit" },
 #if __has_feature(capabilities)
 	{ MODE_CHERI_REVOKE,	"cherirevoke" },
 #endif
@@ -206,6 +208,10 @@ main(int argc, char *argv[])
 			error = procctl(P_PID, pid, PROC_LA_STATUS, &arg);
 			break;
 #endif
+		case MODE_LOGSIGEXIT:
+			error = procctl(P_PID, pid, PROC_LOGSIGEXIT_STATUS,
+			    &arg);
+			break;
 #if __has_feature(capabilities)
 		case MODE_CHERI_REVOKE:
 			error = procctl(P_PID, pid, PROC_CHERI_REVOKE_STATUS,
@@ -355,6 +361,19 @@ main(int argc, char *argv[])
 				printf(", la57 active\n");
 			break;
 #endif
+		case MODE_LOGSIGEXIT:
+			switch (arg) {
+			case PROC_LOGSIGEXIT_CTL_NOFORCE:
+				printf("not forced\n");
+				break;
+			case PROC_LOGSIGEXIT_CTL_FORCE_ENABLE:
+				printf("force enabled\n");
+				break;
+			case PROC_LOGSIGEXIT_CTL_FORCE_DISABLE:
+				printf("force disabled\n");
+				break;
+			}
+			break;
 #if __has_feature(capabilities)
 		case MODE_CHERI_REVOKE:
 			switch (arg & ~PROC_CHERI_REVOKE_ACTIVE) {
@@ -448,6 +467,11 @@ main(int argc, char *argv[])
 			error = procctl(P_PID, pid, PROC_LA_CTL, &arg);
 			break;
 #endif
+		case MODE_LOGSIGEXIT:
+			arg = enable ? PROC_LOGSIGEXIT_CTL_FORCE_ENABLE :
+			    PROC_LOGSIGEXIT_CTL_FORCE_DISABLE;
+			error = procctl(P_PID, pid, PROC_LOGSIGEXIT_CTL, &arg);
+			break;
 #if __has_feature(capabilities)
 		case MODE_CHERI_REVOKE:
 			arg = enable ? PROC_CHERI_REVOKE_FORCE_ENABLE :
