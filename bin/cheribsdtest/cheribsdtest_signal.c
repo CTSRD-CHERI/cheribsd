@@ -241,7 +241,7 @@ CHERIBSDTEST(signal_returncap,
     "Test value of signal handler return capability")
 {
 	struct sigaction sa;
-	uintmax_t v;
+	uintmax_t v, expect;
 
 	sa.sa_handler = returncap_func;
 	sigemptyset(&sa.sa_mask);
@@ -261,15 +261,20 @@ CHERIBSDTEST(signal_returncap,
 		cheribsdtest_failure_errx("kill(getpid(), SIGUSR1) failed: %s",
 		                       strerror(errno));
 
-	/* Length -- 256 bytes should be more than enough to cover sigcode. */
+	/* Length. */
 	v = cheri_getlen(handler_returncap);
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	CHERIBSDTEST_VERIFY2(v == CHERI_CAP_USER_CODE_LENGTH,
-	    "length 0x%jx (expected <= 0x%jx)", v,
-	    (uintmax_t)CHERI_CAP_USER_CODE_LENGTH);
+	/* The purecap benchmark ABI does not bound PCC capabilities. */
+	expect = CHERI_CAP_USER_CODE_LENGTH;
+#elif defined(CHERIBSD_C18N_TESTS)
+	/* Signal handlers return to a c18n trampoline. */
+	expect = 0x300;
 #else
-	CHERIBSDTEST_VERIFY2(v <= 0x100, "length 0x%jx (expected <= 0x100)", v);
+	/* 256 bytes should be more than enough to cover sigcode. */
+	expect = 0x100;
 #endif
+	CHERIBSDTEST_VERIFY2(v <= expect, "length %#jx (expected <= %#jx)",
+	    v, expect);
 
 	/* Type -- should be a sentry capability. */
 	v = cheri_gettype(handler_returncap);
