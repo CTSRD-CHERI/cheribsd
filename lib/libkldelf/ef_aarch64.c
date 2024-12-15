@@ -65,6 +65,7 @@ ef_aarch64_reloc(struct elf_file *ef, const void *reldata, Elf_Type reltype,
 
 	switch (rtype) {
 	case R_AARCH64_RELATIVE:
+	case R_AARCH64_FUNC_RELATIVE:
 		addr = relbase + addend;
 		le64enc(where, addr);
 		break;
@@ -73,6 +74,7 @@ ef_aarch64_reloc(struct elf_file *ef, const void *reldata, Elf_Type reltype,
 		le64enc(where, addr);
 		break;
 	case R_MORELLO_RELATIVE:
+	case R_MORELLO_FUNC_RELATIVE:
 		fragment = (Elf64_Addr *)where;
 		le64enc(where, fragment[0] + relbase + addend);
 		break;
