@@ -493,10 +493,12 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 	}
 
 	if ((flags & ARM64_ELF_RELOC_LOCAL) != 0) {
-		if (rtype == R_AARCH64_RELATIVE)
+		if (rtype == R_AARCH64_RELATIVE ||
+		    rtype == R_AARCH64_FUNC_RELATIVE)
 			*where = elf_relocaddr(lf, (Elf_Addr)relocbase + addend);
 #if __has_feature(capabilities)
-		else if (rtype == R_MORELLO_RELATIVE) {
+		else if (rtype == R_MORELLO_RELATIVE ||
+		    rtype == R_MORELLO_FUNC_RELATIVE) {
 			void * __capability base;
 			Elf_Addr addr1, size;
 			uint8_t perms;
@@ -526,6 +528,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 	switch (rtype) {
 	case R_AARCH64_NONE:
 	case R_AARCH64_RELATIVE:
+	case R_AARCH64_FUNC_RELATIVE:
 		break;
 	case R_AARCH64_TSTBR14:
 		error = lookup(lf, symidx, 1, &addr);
@@ -571,6 +574,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		break;
 #if __has_feature(capabilities)
 	case R_MORELLO_RELATIVE:
+	case R_MORELLO_FUNC_RELATIVE:
 		break;
 #ifdef __CHERI_PURE_CAPABILITY__
 	case R_MORELLO_CAPINIT:
@@ -763,13 +767,20 @@ elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap)
 
 	for (; rela < rela_end; rela++) {
 		/* Can not panic yet */
-		if (ELF_R_TYPE(rela->r_info) != R_MORELLO_RELATIVE)
-			continue;
-
-		fragment = (Elf_Addr *)((char *)data_cap + rela->r_offset);
-		cap = build_cap_from_fragment(fragment, 0, rela->r_addend,
-		    data_cap, code_cap);
-		*((uintptr_t *)fragment) = cap;
+		switch (ELF_R_TYPE(rela->r_info)) {
+		case R_AARCH64_RELATIVE:
+		case R_AARCH64_FUNC_RELATIVE:
+			/* XXX Dapeng: Which base to use here? */
+			break;
+		case R_MORELLO_RELATIVE:
+		case R_MORELLO_FUNC_RELATIVE:
+			fragment = (Elf_Addr *)((char *)data_cap +
+			    rela->r_offset);
+			cap = build_cap_from_fragment(fragment, 0,
+			    rela->r_addend, data_cap, code_cap);
+			*((uintptr_t *)fragment) = cap;
+			break;
+		}
 	}
 }
 #endif
