@@ -69,7 +69,7 @@ extern bool ld_compartment_enable;
 #ifdef __aarch64__
 extern bool ld_compartment_fptr;
 
-#define C18N_FPTR_ENABLED	ld_compartment_fptr
+#define C18N_FPTR_ENABLED	C18N_ENABLED
 #else
 #define C18N_FPTR_ENABLED	0
 #endif
