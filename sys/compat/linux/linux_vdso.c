@@ -50,6 +50,7 @@
 #include <vm/vm_pager.h>
 #include <vm/vm_param.h>
 
+#include <compat/linux/linux.h>
 #include <compat/linux/linux_vdso.h>
 
 SLIST_HEAD(, linux_vdso_sym) __elfN(linux_vdso_syms) =
