@@ -44,11 +44,11 @@ int	linux_map_vdso(struct proc *, vm_object_t, vm_offset_t,
 	    vm_offset_t, struct image_params *);
 
 #define	LINUX_VDSO_SYM_INTPTR(name)				\
-uintptr_t name;							\
+l_uintptr_t name;							\
 LINUX_VDSO_SYM_DEFINE(name)
 
 #define	LINUX_VDSO_SYM_CHAR(name)				\
-const char * name;						\
+const char * __linuxcap name;						\
 LINUX_VDSO_SYM_DEFINE(name)
 
 #define	LINUX_VDSO_SYM_DEFINE(name)				\
