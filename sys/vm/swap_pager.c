@@ -2395,7 +2395,7 @@ swp_pager_meta_transfer(vm_object_t srcobject, vm_object_t dstobject,
 				VM_OBJECT_WLOCK(srcobject);
 #if __has_feature(capabilities)
 				swp_pager_cheri_xfer_tags(dstobject,
-				    sb->p + i - offset, sb, blk);
+				    sb->p + i - offset, sb, i);
 #endif
 			} else if (blk != SWAPBLK_NONE)
 				swp_pager_update_freerange(&range, sb->d[i]);
