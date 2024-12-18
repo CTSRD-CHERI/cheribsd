@@ -155,7 +155,11 @@ __elfN(linux_vdso_fixup)(char *base, vm_offset_t offset)
 			symname = strtab + sym->st_name;
 			if (strncmp(lsym->symname, symname, lsym->size) == 0) {
 				sym->st_value += offset;
-				*lsym->ptr = (l_uintptr_t)LINUX_USER_CAP(sym->st_value, lsym->size);
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64) && !defined(COMPAT_LINUX32)
+				*lsym->ptr = (l_uintptr_t)__USER_CAP(sym->st_value, lsym->size);
+#else
+				*lsym->ptr = (l_uintptr_t)sym->st_value;
+#endif
 				break;
 
 			}
