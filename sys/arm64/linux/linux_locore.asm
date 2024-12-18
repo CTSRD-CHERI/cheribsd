@@ -42,10 +42,8 @@
 	.data
 
 	.globl linux_platform
-	.type linux_platform, #object
 linux_platform:
 	.asciz "aarch64"
-	.size linux_platform, . - linux_platform
 	.text
 
 EENTRY(__kernel_rt_sigreturn)
