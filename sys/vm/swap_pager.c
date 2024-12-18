@@ -2393,12 +2393,12 @@ swp_pager_meta_transfer(vm_object_t srcobject, vm_object_t dstobject,
 				swp_pager_meta_build(dstobject,
 				    sb->p + i - offset, sb->d[i], false);
 				VM_OBJECT_WLOCK(srcobject);
-#if __has_feature(capabilities)
-				swp_pager_cheri_xfer_tags(dstobject,
-				    sb->p + i - offset, sb, i);
-#endif
 			} else if (blk != SWAPBLK_NONE)
 				swp_pager_update_freerange(&range, sb->d[i]);
+#if __has_feature(capabilities)
+			swp_pager_cheri_xfer_tags(dstobject,
+			    sb->p + i - offset, sb, i);
+#endif
 			sb->d[i] = SWAPBLK_NONE;
 		}
 		pindex = sb->p + SWAP_META_PAGES;
