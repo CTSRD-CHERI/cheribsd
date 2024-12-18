@@ -31,7 +31,7 @@
 struct linux_vdso_sym {
 	SLIST_ENTRY(linux_vdso_sym) sym;
 	uint32_t	size;
-	uintptr_t *	ptr;
+	l_uintptr_t *	ptr;
 	char		symname[];
 };
 
@@ -55,7 +55,7 @@ LINUX_VDSO_SYM_DEFINE(name)
 static struct linux_vdso_sym name ## sym = {			\
 	.symname	= #name,				\
 	.size		= sizeof(#name),			\
-	.ptr		= (uintptr_t *)&name			\
+	.ptr		= (l_uintptr_t *)&name			\
 };								\
 SYSINIT(__elfN(name ## _sym_init), SI_SUB_EXEC,			\
     SI_ORDER_FIRST, __elfN(linux_vdso_sym_init), &name ## sym);	\

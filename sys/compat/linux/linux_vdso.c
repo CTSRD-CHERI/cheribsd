@@ -147,7 +147,7 @@ __elfN(linux_vdso_fixup)(char *base, vm_offset_t offset)
 			symname = strtab + sym->st_name;
 			if (strncmp(lsym->symname, symname, lsym->size) == 0) {
 				sym->st_value += offset;
-				*lsym->ptr = (uintptr_t)LINUX_USER_CAP(sym->st_value, lsym->size);
+				*lsym->ptr = (l_uintptr_t)LINUX_USER_CAP(sym->st_value, lsym->size);
 				break;
 
 			}
