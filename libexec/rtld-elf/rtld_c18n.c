@@ -753,12 +753,18 @@ create_stk(size_t size)
 }
 
 #define	C18N_TRUSTED_STACK_SIZE		(128 * 1024)
+#define	C18N_SIG_STACK_SIZE		SIGSTKSZ
+
+int     __sys_sigaltstack(const stack_t *, stack_t *);
 
 static void
 init_stk_table(struct stk_table *table, struct tcb_wrapper *wrap)
 {
 	char *sp;
 	size_t size;
+#ifndef USE_RESTRICTED_MODE
+	stack_t osigstk;
+#endif
 	struct trusted_frame *tf;
 
 	/*
@@ -766,15 +772,31 @@ init_stk_table(struct stk_table *table, struct tcb_wrapper *wrap)
 	 */
 	table->meta->wrap = wrap;
 
+#ifndef USE_RESTRICTED_MODE
 	/*
-	 * Create a trusted stack.
+	 * Create a signal stack, record it in the stack lookup table, and
+	 * register it.
+	 */
+	size = C18N_SIG_STACK_SIZE;
+	sp = create_stk(size);
+	table->meta->sig_stk = (struct stk_table_stk_info) {
+		.size = size,
+		.begin = sp - size
+	};
+	if (__sys_sigaltstack(
+	    &(stack_t) { .ss_sp = sp - size, .ss_size = size },
+	    &osigstk) != 0) {
+		rtld_fdprintf(STDERR_FILENO, "c18n: sigaltstack failed\n");
+		abort();
+	}
+	assert(osigstk.ss_flags == SS_DISABLE);
+#endif
+
+	/*
+	 * Create a trusted stack and record it in the stack lookup table.
 	 */
 	size = C18N_TRUSTED_STACK_SIZE;
 	tf = create_stk(size);
-
-	/*
-	 * Record the trusted stack in the stack lookup table.
-	 */
 	table->meta->trusted_stk = (struct stk_table_stk_info) {
 		.size = size,
 		.begin = (char *)tf - size
@@ -1790,6 +1812,9 @@ void
 _rtld_thr_exit(long *state)
 {
 	size_t i;
+#ifndef USE_RESTRICTED_MODE
+	stack_t osigstk;
+#endif
 	struct stk_table_stk_info *data;
 	struct stk_table *table = get_stk_table();
 
@@ -1847,6 +1872,28 @@ _rtld_thr_exit(long *state)
 	}
 	*data = (struct stk_table_stk_info) {};
 
+#ifndef USE_RESTRICTED_MODE
+	/*
+	 * Deregister and unmap the signal stack.
+	 */
+	if (__sys_sigaltstack(
+	    &(stack_t) { .ss_flags = SS_DISABLE }, &osigstk) != 0) {
+		rtld_fdprintf(STDERR_FILENO, "c18n: sigaltstack failed\n");
+		abort();
+	}
+	data = &table->meta->sig_stk;
+	assert(osigstk.ss_sp == data->begin &&
+	    osigstk.ss_size == data->size &&
+	    osigstk.ss_flags == 0);
+	if (munmap(data->begin, data->size) != 0) {
+		rtld_fdprintf(STDERR_FILENO,
+		    "c18n: munmap(%#p, %zu) failed\n",
+		    data->begin, data->size);
+		abort();
+	}
+	*data = (struct stk_table_stk_info) {};
+#endif
+
 	/*
 	 * Push the stack lookup table for garbage collection.
 	 */
@@ -1892,18 +1939,17 @@ _rtld_sighandler_init(__siginfohandler_t *handler)
 	signal_dispatcher = handler;
 }
 
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-void _rtld_sighandler_impl(int, siginfo_t *, ucontext_t *, void *,
-    struct sigframe *);
+#ifdef USE_RESTRICTED_MODE
+void _rtld_sighandler_impl(int, siginfo_t *, ucontext_t *);
 
 void
-_rtld_sighandler_impl(int sig, siginfo_t *info, ucontext_t *ucp, void *nsp,
-    struct sigframe *sf)
+_rtld_sighandler_impl(int sig, siginfo_t *info, ucontext_t *ucp)
 #else
-void _rtld_sighandler_impl(int, siginfo_t *, ucontext_t *, void *);
+void _rtld_sighandler_impl(int, siginfo_t *, ucontext_t *, struct sigframe *);
 
 void
-_rtld_sighandler_impl(int sig, siginfo_t *info, ucontext_t *ucp, void *nsp)
+_rtld_sighandler_impl(int sig, siginfo_t *info, ucontext_t *ucp,
+    struct sigframe *sf)
 #endif
 {
 	struct stk_table *table;
@@ -1911,13 +1957,15 @@ _rtld_sighandler_impl(int sig, siginfo_t *info, ucontext_t *ucp, void *nsp)
 	stk_table_index intr_idx;
 	compart_id_t intr;
 
+#ifdef USE_RESTRICTED_MODE
+	uintptr_t csp;
+#endif
+	void *nsp;
 	void *osp;
 	struct trusted_frame *ntf;
 	uintptr_t *table_reg;
 
-	table = get_stk_table();
-
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+#ifndef USE_RESTRICTED_MODE
 	/*
 	 * Move the sigframe to RTLD's stack.
 	 */
@@ -1934,6 +1982,29 @@ _rtld_sighandler_impl(int sig, siginfo_t *info, ucontext_t *ucp, void *nsp)
 
 	info = &sf->sf_si;
 	ucp = &sf->sf_uc;
+#endif
+
+	/*
+	 * We cannot make compartment transitions yet because the interrupt may
+	 * have happened during the middle of a compartment transition, when
+	 * data structures are not consistent.
+	 *
+	 * First, get the untrusted stack when the interrupt happened and figure
+	 * out which compartment it belongs to.
+	 */
+	table = get_stk_table();
+#ifdef USE_RESTRICTED_MODE
+	/*
+	 * When using Restricted mode, the untrusted stack can only be obtained
+	 * by directly reading the register, which must then be set to RTLD's
+	 * untrusted stack to simulate a transition to RTLD's compartment.
+	 */
+	nsp = get_untrusted_stk();
+	set_untrusted_stk(table->entries[RTLD_COMPART_ID].stack);
+	csp = ucp->uc_mcontext.mc_capregs.cap_sp;
+	ucp->uc_mcontext.mc_capregs.cap_sp = (uintptr_t)nsp;
+#else
+	nsp = (void *)ucp->uc_mcontext.mc_capregs.cap_sp;
 #endif
 
 	tf = get_trusted_stk();
@@ -2075,14 +2146,13 @@ found:
 	assert(get_trusted_stk() == ntf);
 	table->entries[index_to_cid(ntf->caller)].stack = ntf->osp;
 	set_trusted_stk(ntf->previous);
+#ifdef USE_RESTRICTED_MODE
 	/*
-	 * Under the benchmark ABI, do not set the untrusted stack because the
-	 * sigframe has been moved to RTLD's stack. Instead, return from RTLD's
-	 * stack and let the kernel install the stack of the interrupted
-	 * compartment.
+	 * When using Restricted mode, manually set the untrusted stack because
+	 * the kernel does not do that.
 	 */
-#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
-	set_untrusted_stk(ntf->state.sp);
+	set_untrusted_stk((void *)ucp->uc_mcontext.mc_capregs.cap_sp);
+	ucp->uc_mcontext.mc_capregs.cap_sp = csp;
 #endif
 }
 
@@ -2214,8 +2284,8 @@ _rtld_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
 			nactp = &nact;
 
 			nact.sa_sigaction = _rtld_sighandler;
-			/* XXX: Ignore sigaltstack for now */
-			nact.sa_flags &= ~SA_ONSTACK;
+			/* Always use the sigaltstack. */
+			nact.sa_flags |= SA_ONSTACK;
 			nact.sa_flags &= ~SA_NODEFER;
 			nact.sa_flags |= SA_SIGINFO;
 			SIGFILLSET(nact.sa_mask);
