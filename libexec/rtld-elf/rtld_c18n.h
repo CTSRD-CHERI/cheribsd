@@ -32,6 +32,13 @@
 
 #include <stdint.h>
 
+#ifdef __aarch64__
+#define	HAS_RESTRICTED_MODE
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+#define	USE_RESTRICTED_MODE
+#endif
+#endif
+
 /*
  * Global symbols
  */
@@ -92,10 +99,13 @@ struct stk_table_metadata {
 	size_t capacity;
 	struct tcb_wrapper *wrap;
 	/*
-	 * This field and the next array record the base and length of the
-	 * trusted stack and each compartment stack. This information is used to
-	 * unmap the stacks when the thread exits.
+	 * These fields record the base and length of the signal stack, the
+	 * trusted stack, and each compartment stack. This information is used
+	 * to unmap the stacks when the thread exits.
 	 */
+#ifndef USE_RESTRICTED_MODE
+	struct stk_table_stk_info sig_stk;
+#endif
 	struct stk_table_stk_info trusted_stk;
 	struct stk_table_stk_info compart_stk[];
 };
