@@ -54,9 +54,9 @@ EENTRY(__kernel_rt_sigreturn)
 	.globl __user_rt_sigreturn
 __user_rt_sigreturn:
 #ifdef COMPAT_LINUX64
-	mov	x8, #LINUX_SYS_linux_rt_sigreturn
-#else
 	mov	x8, #LINUX64_SYS_linux_rt_sigreturn
+#else
+	mov	x8, #LINUX_SYS_linux_rt_sigreturn
 #endif
 	svc	#0
 EEND(__kernel_rt_sigreturn)
