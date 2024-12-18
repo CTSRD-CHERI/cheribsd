@@ -4483,10 +4483,6 @@ zone_alloc_item(uma_zone_t zone, void *udata, int domain, int flags)
 
 	if (zone->uz_import(zone->uz_arg, &item, 1, domain, flags) != 1)
 		goto fail_cnt;
-#ifdef __CHERI_PURE_CAPABILITY__
-	if ((zone->uz_flags & UMA_ZONE_PCPU) == 0)
-		item = cheri_setboundsexact(item, zone->uz_size);
-#endif
 
 	/*
 	 * We have to call both the zone's init (not the keg's init)
