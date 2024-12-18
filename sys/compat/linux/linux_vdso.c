@@ -50,6 +50,14 @@
 #include <vm/vm_pager.h>
 #include <vm/vm_param.h>
 
+#if defined(COMPAT_LINUX32)
+#include <machine/../linux32/linux.h>
+#elif defined(COMPAT_LINUX64)
+#include <machine/../linux64/linux.h>
+#else
+#include <machine/../linux/linux.h>
+#endif
+
 #include <compat/linux/linux.h>
 #include <compat/linux/linux_vdso.h>
 
