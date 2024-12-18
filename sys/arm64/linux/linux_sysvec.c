@@ -172,7 +172,7 @@ linux64_arch_copyout_auxargs(struct image_params *imgp, Elf_Auxinfo **pos)
 	AUXARGS_ENTRY((*pos), LINUX_AT_HWCAP, *imgp->sysent->sv_hwcap);
 	AUXARGS_ENTRY((*pos), LINUX_AT_HWCAP2, *imgp->sysent->sv_hwcap2);
 	// This should also be a capability. Pending fix.
-	AUXARGS_ENTRY((*pos), LINUX_AT_PLATFORM, (void * __linuxcap)(linux_platform));
+	AUXARGS_ENTRY((*pos), LINUX_AT_PLATFORM, (void * __linuxcap)(l_uintptr_t)(linux_platform));
 }
 
 /*
