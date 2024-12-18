@@ -1149,8 +1149,7 @@ swp_pager_cheri_xfer_tags(vm_object_t dstobject, vm_pindex_t pindex,
 	struct swblk *dstsb;
 	vm_pindex_t modpi;
 
-	dstsb = SWAP_PCTRIE_LOOKUP(&dstobject->un_pager.swp.swp_blks,
-	    rounddown(pindex, SWAP_META_PAGES));
+	dstsb = swblk_lookup(dstobject, pindex);
 
 	modpi = pindex % SWAP_META_PAGES;
 	memcpy(&dstsb->t[modpi], &sb->t[srcmodpi], sizeof(sb->t[srcmodpi]));
@@ -2303,8 +2302,7 @@ swp_pager_meta_cheri_get_tags(vm_page_t page)
 	bool mark_capdirty = false;
 
 	scan = (void *)PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(page));
-	sb = SWAP_PCTRIE_LOOKUP(&page->object->un_pager.swp.swp_blks,
-	    rounddown(page->pindex, SWAP_META_PAGES));
+	sb = swblk_lookup(page->object, page->pindex);
 
 	modpi = page->pindex % SWAP_META_PAGES;
 	for (i = 0; i < nitems(sb->t[modpi]); i++) {
@@ -2338,8 +2336,7 @@ swp_pager_meta_cheri_put_tags(vm_page_t page)
 	vm_pindex_t modpi;
 
 	scan = (void *)PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(page));
-	sb = SWAP_PCTRIE_LOOKUP(&page->object->un_pager.swp.swp_blks,
-	    rounddown(page->pindex, SWAP_META_PAGES));
+	sb = swblk_lookup(page->object, page->pindex);
 
 	modpi = page->pindex % SWAP_META_PAGES;
 	cheri_read_tags_page(scan, &sb->t[modpi], NULL);
