@@ -314,7 +314,7 @@ linux_parse_sigreturn_ctx(struct thread *td, struct l_sigcontext *sc)
 			return (false);
 		}
 
-		offset += ctx->size;
+		offset += roundup(ctx->size, 16);
 	}
 
 }
