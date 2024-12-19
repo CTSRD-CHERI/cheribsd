@@ -216,7 +216,7 @@ linux_sigaltstack(struct thread *td, struct linux_sigaltstack_args *uap)
 	LINUX_CTR2(sigaltstack, "%p, %p", uap->uss, uap->uoss);
 
 	if (uap->uss != NULL) {
-		error = copyin(LINUX_USER_CAP_OBJ(uap->uss), &lss, sizeof(lss));
+		error = copyincap(LINUX_USER_CAP_OBJ(uap->uss), &lss, sizeof(lss));
 		if (error != 0)
 			return (error);
 
@@ -264,7 +264,7 @@ linux_rt_sigaction(struct thread *td, struct linux_rt_sigaction_args *args)
 		return (EINVAL);
 
 	if (args->act != NULL) {
-		error = copyin(LINUX_USER_CAP_OBJ(args->act), &nsa, sizeof(nsa));
+		error = copyincap(LINUX_USER_CAP_OBJ(args->act), &nsa, sizeof(nsa));
 		if (error != 0)
 			return (error);
 	}
