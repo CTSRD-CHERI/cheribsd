@@ -448,6 +448,11 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 	memcpy(&frame->sf.sf_uc.uc_stack, &uc_stack, sizeof(uc_stack));
 
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+	KASSERT(cheri_gettag(fp), ("Expected valid fp capability"));
+	KASSERT(cheri_gettag(catcher), ("Expected valid handler capability"));
+#endif
+
 	/* Copy the sigframe out to the user's stack. */
 	if (copyoutcap(frame, LINUX_USER_CAP((uintcap_t)fp, sizeof(*fp)), sizeof(*fp)) != 0) {
 		/* Process has trashed its stack. Kill it. */
