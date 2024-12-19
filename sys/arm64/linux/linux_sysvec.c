@@ -467,10 +467,8 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		esr->head.magic = L_ESR_MAGIC;
 		esr->head.size = sizeof(struct l_esr_context);
 		esr->esr = tf->tf_esr;
+		scr += roundup(sizeof(struct l_esr_context), 16);
 	}
-
-	memcpy(&frame->sf.sf_uc.uc_stack, &uc_stack, sizeof(uc_stack));
-	scr += roundup(sizeof(struct l_esr_context), 16);
 
 #if __has_feature(capabilities)
 	morello = (struct l_morello_context *) scr;
@@ -483,6 +481,8 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	morello->rcsp = td->td_pcb->pcb_rcsp_el0;
 	morello->pcc = tf->tf_elr;
 #endif
+
+	memcpy(&frame->sf.sf_uc.uc_stack, &uc_stack, sizeof(uc_stack));
 
 #if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
 	KASSERT(cheri_gettag(fp), ("Expected valid fp capability"));
