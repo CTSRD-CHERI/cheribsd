@@ -1,10 +1,16 @@
 /*-
  * SPDX-License-Identifier: BSD-4-Clause
  *
+ * Copyright (c) 2024 Capabilities Limited
  * Copyright (c) 2017 Dell EMC
  * Copyright (c) 2009 Stanislav Sedov <stas@FreeBSD.org>
  * Copyright (c) 1988, 1993
  *      The Regents of the University of California.  All rights reserved.
+ *
+ * This software was developed by SRI International, the University of
+ * Cambridge Computer Laboratory (Department of Computer Science and
+ * Technology), and Capabilities Limited under Defense Advanced Research
+ * Projects Agency (DARPA) Contract No. FA8750-24-C-B047 ("DEC").
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -396,6 +402,54 @@ procstat_getc18n(struct procstat *procstat, struct kinfo_proc *kp,
 	*stats = *rcs;
 	return (0);
 out:
+	return (-1);
+}
+
+/* Caller-allocated compartment list buffer. */
+int
+procstat_getcompartments(struct procstat *procstat, struct kinfo_proc *kp,
+    struct cheri_c18n_compart *comparts, u_int *ncompartsp)
+{
+	int name[4];
+	size_t size;
+
+	if (comparts == NULL || ncompartsp == NULL)
+		goto out;
+
+	switch (procstat->type) {
+	case PROCSTAT_KVM:
+		warnx("kvm method is not supported");
+		goto out;
+
+	case PROCSTAT_SYSCTL:
+		break;
+
+	case PROCSTAT_CORE:
+		warnx("core method is not supported");
+		goto out;
+
+	default:
+		warnx("unknown access method: %d", procstat->type);
+		goto out;
+	}
+
+	name[0] = CTL_KERN;
+	name[1] = KERN_PROC;
+	name[2] = KERN_PROC_C18N_COMPARTS;
+	name[3] = kp->ki_pid;
+	size = *ncompartsp * sizeof(*comparts);
+	if (sysctl(name, nitems(name), comparts, &size, NULL, 0) != 0) {
+		if (errno != ESRCH && errno != EPERM && errno != ENOEXEC)
+			warn("sysctl(kern.proc.c18n_compartments)");
+		goto out;
+	}
+	if (size % sizeof(*comparts) != 0)
+		goto out;
+	*ncompartsp = size / sizeof(*comparts);
+	return (0);
+
+out:
+	*ncompartsp = 0;
 	return (-1);
 }
 

@@ -217,6 +217,9 @@ void	procstat_freevmmap(struct procstat *procstat,
 struct advlock_list	*procstat_getadvlock(struct procstat *procstat);
 int	procstat_getc18n(struct procstat *procstat, struct kinfo_proc *kp,
     struct rtld_c18n_stats *stats);
+int	procstat_getcompartments(struct procstat *procstat,
+    struct kinfo_proc *kp, struct cheri_c18n_compart *comparts,
+    u_int *ncomparts);
 struct filestat_list	*procstat_getfiles(struct procstat *procstat,
     struct kinfo_proc *kp, int mmapped);
 struct kinfo_proc	*procstat_getprocs(struct procstat *procstat,

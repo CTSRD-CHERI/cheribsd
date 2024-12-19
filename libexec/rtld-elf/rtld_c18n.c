@@ -149,6 +149,7 @@ const char *ld_compartment_stats;
 const char *ld_compartment_switch_count;
 
 struct rtld_c18n_stats *c18n_stats;
+struct cheri_c18n_info *c18n_info;		/* From ELF auxiliary arguments. */
 
 #define	INC_NUM_COMPART		(c18n_stats->rcs_compart++, comparts.size++)
 #define	INC_NUM_BYTES(n)						\
@@ -242,7 +243,8 @@ string_base_search(const struct string_base *sb, const char *str)
 
 struct compart {
 	/*
-	 * Name of the compartment
+	 * Name of the compartment.  Must be the first field to enable kernel
+	 * access to compartment information.
 	 */
 	const char *name;
 	/*
@@ -296,9 +298,16 @@ expand_comparts_data(compart_id_t capacity)
 {
 	struct compart *data;
 
+	/*
+	 * XXXRW: There's an annoying race to close here .. made harder to
+	 * resolve by realloc().  We sort of want a "realloc and don't free
+	 * if you copy, so you can free the old one later".
+	 */
 	data = c18n_realloc(comparts.data, sizeof(*data) * capacity);
 	comparts.data = r_debug.r_comparts = data;
 	comparts.capacity = capacity;
+	c18n_info->comparts = comparts.data;
+	c18n_info->capacity = capacity;
 }
 
 static struct compart *
@@ -1583,7 +1592,6 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 	int fd;
 	char *file;
 	struct stat st;
-	struct cheri_c18n_info *info;
 
 	/*
 	 * Create memory mapping for compartmentalisation statistics.
@@ -1609,13 +1617,14 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 	    memory_order_release);
 
 	if (aux_info[AT_CHERI_C18N] != NULL) {
-		info = aux_info[AT_CHERI_C18N]->a_un.a_ptr;
-		*info = (struct cheri_c18n_info) {
+		c18n_info = aux_info[AT_CHERI_C18N]->a_un.a_ptr;
+		*c18n_info = (struct cheri_c18n_info) {
 			.stats_size = sizeof(*c18n_stats),
-			.stats = c18n_stats
+			.stats = c18n_stats,
+			.compart_size = sizeof(struct compart),
 		};
-		atomic_store_explicit(&info->version, CHERI_C18N_INFO_VERSION,
-		    memory_order_release);
+		atomic_store_explicit(&c18n_info->version,
+		    CHERI_C18N_INFO_VERSION, memory_order_release);
 	}
 
 	/*

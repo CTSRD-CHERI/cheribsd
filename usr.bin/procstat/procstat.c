@@ -97,6 +97,8 @@ static const struct procstat_cmd cmd_table[] = {
 	    PS_CMP_NORMAL },
 	{ "cheri", "cheri", "[-v]", &procstat_cheri, &cmdopt_verbose,
 	    PS_CMP_NORMAL },
+	{ "compartments", "compartments", NULL, &procstat_compartments,
+	    cmdopt_none, PS_CMP_NORMAL },
 	{ "cpuset", "cs", NULL, &procstat_cs, &cmdopt_cpuset, PS_CMP_NORMAL },
 	{ "cs", "cs", NULL, &procstat_cs, &cmdopt_cpuset, PS_CMP_NORMAL },
 	{ "credential", "credentials", NULL, &procstat_cred, &cmdopt_none,

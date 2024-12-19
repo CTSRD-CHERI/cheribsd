@@ -43,6 +43,7 @@ extern const char *ld_compartment_unwind;
 extern const char *ld_compartment_stats;
 extern const char *ld_compartment_switch_count;
 extern struct rtld_c18n_stats *c18n_stats;
+extern struct cheri_c18n_info *c18n_info;
 
 /*
  * Policies

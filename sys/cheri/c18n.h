@@ -2,6 +2,12 @@
  * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2024 Dapeng Gao
+ * Copyright (c) 2024 Capabilities Limited
+ *
+ * This software was developed by SRI International, the University of
+ * Cambridge Computer Laboratory (Department of Computer Science and
+ * Technology), and Capabilities Limited under Defense Advanced Research
+ * Projects Agency (DARPA) Contract No. FA8750-24-C-B047 ("DEC").
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,7 +41,7 @@
 #define	_Atomic(t)			t
 #endif
 
-#define RTLD_C18N_STATS_VERSION		1
+#define RTLD_C18N_STATS_VERSION		2
 #define RTLD_C18N_STATS_MAX_SIZE	256
 
 /*
@@ -58,12 +64,33 @@ struct rtld_c18n_stats {
  * information. The version field doubles as a synchronisation flag where a
  * non-zero value indicates that the other fields have been initialised.
  */
-#define CHERI_C18N_INFO_VERSION		1
+#define CHERI_C18N_INFO_VERSION		2
 
 struct cheri_c18n_info {
 	_Atomic(uint8_t) version;
 	size_t stats_size;
 	struct rtld_c18n_stats * __kerncap	stats;
+
+	/*
+	 * Access to the compartment-list array.  Currently, racy to the point
+	 * of sadness.  Ideally we might use a generation field so that races
+	 * could be masked by the kernel.  We don't do this yet.
+	 */
+	size_t compart_size;	/* Size of compartment array entries. */
+	size_t capacity;	/* Number of compartment array entries. */
+	void * __kerncap comparts;
+};
+
+/*
+ * The interface provided by the kernel via sysctl for compartmentalization
+ * monitoring tools such as procstat.
+ */
+#define	CHERI_C18N_COMPART_MAXNAME	64
+#define	CHERI_C18N_COMPART_LAST		-1
+struct cheri_c18n_compart {
+	int	ccc_id;
+	char	ccc_name[CHERI_C18N_COMPART_MAXNAME];
+	u_char	_ccc_pad[60];	/* Shrink as new fields added above. */
 };
 
 #ifndef IN_RTLD
