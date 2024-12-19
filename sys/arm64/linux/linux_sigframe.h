@@ -51,7 +51,7 @@ struct l_esr_context {
 #if __has_feature(capabilities)
 #define L_MORELLO_MAGIC	0x4d524c01
 struct l_morello_context {
-	struct _aarch64_ctx head;
+	struct _l_aarch64_ctx head;
 	uint64_t 	__pad;
 	uintcap_t	cregs[31];
 	uintcap_t	csp;
