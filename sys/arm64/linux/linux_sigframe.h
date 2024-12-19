@@ -48,21 +48,24 @@ struct l_esr_context {
 	uint64_t	esr;
 };
 
-struct l_sigcontext {
 #if __has_feature(capabilities)
-	uintcap_t	fault_address;
-	uintcap_t	regs[31];
-	uintcap_t	sp;
-	uintcap_t	pc;
-	uintcap_t	pstate;
-	uintcap_t   ddc;
-#else
+#define L_MORELLO_MAGIC	0x4d524c01
+struct l_morello_context {
+	struct _aarch64_ctx head;
+	uint64_t 	__pad;
+	uintcap_t	cregs[31];
+	uintcap_t	csp;
+	uintcap_t	rcsp;
+	uintcap_t	pcc;
+};
+#endif
+
+struct l_sigcontext {
 	uint64_t	fault_address;
 	uint64_t	regs[31];
 	uint64_t	sp;
 	uint64_t	pc;
 	uint64_t	pstate;
-#endif
 	uint8_t		__reserved[4096] __attribute__((__aligned__(16)));
 };
 

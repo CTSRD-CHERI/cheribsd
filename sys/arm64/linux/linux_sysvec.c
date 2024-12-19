@@ -246,6 +246,11 @@ linux_parse_sigreturn_ctx(struct thread *td, struct l_sigcontext *sc)
 {
 	struct l_fpsimd_context *fpsimd;
 	struct _l_aarch64_ctx *ctx;
+	struct trapframe *tf;
+#if __has_feature(capabilities)
+	struct l_morello_context *morello;
+#endif
+	tf = td->td_frame;
 	int offset;
 
 	offset = 0;
@@ -292,6 +297,19 @@ linux_parse_sigreturn_ctx(struct thread *td, struct l_sigcontext *sc)
 
 			break;
 #endif
+#if __has_feature(capabilities)
+		case L_MORELLO_MAGIC:
+			morello = (struct l_morello_context *)ctx;
+
+			memcpy(tf->tf_x, morello->cregs, sizeof(tf->tf_x));
+			tf->tf_lr = morello->cregs[30];
+			tf->tf_sp = morello->csp;
+			td->td_pcb->pcb_rcsp_el0 = morello->rcsp;
+			WRITE_SPECIALREG_CAP(rcsp_el0, morello->rcsp);
+			tf->tf_elr = morello->pcc;
+
+			break;
+#endif
 		default:
 			return (false);
 		}
@@ -320,11 +338,12 @@ linux_rt_sigreturn(struct thread *td, struct linux_rt_sigreturn_args *args)
 		return (error);
 	}
 
-	memcpy(tf->tf_x, sf->sf_uc.uc_sc.regs, sizeof(tf->tf_x));
+	for (int i = 0; i < 30; i++) {
+		tf->tf_x[i] = sf->sf_uc.uc_sc.regs[i];
+	}
 	tf->tf_lr = sf->sf_uc.uc_sc.regs[30];
 	tf->tf_sp = sf->sf_uc.uc_sc.sp;
 	tf->tf_elr = sf->sf_uc.uc_sc.pc;
-	tf->tf_ddc = sf->sf_uc.uc_sc.ddc;
 
 	if ((sf->sf_uc.uc_sc.pstate & PSR_M_MASK) != PSR_M_EL0t ||
 	    (sf->sf_uc.uc_sc.pstate & PSR_AARCH32) != 0 ||
@@ -356,6 +375,9 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	struct l_sigframe * __capability fp, *frame;
 	struct l_fpsimd_context *fpsimd;
 	struct l_esr_context *esr;
+#if __has_feature(capabilities)
+	struct l_morello_context *morello;
+#endif
 	l_stack_t uc_stack;
 	ucontext_t uc;
 	uint8_t *scr;
@@ -406,12 +428,13 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* Fill in the frame to copy out */
 	frame = malloc(sizeof(*frame), M_LINUX, M_WAITOK | M_ZERO);
 
-	memcpy(&frame->sf.sf_uc.uc_sc.regs, tf->tf_x, sizeof(tf->tf_x));
+	for (int i = 0; i < 30; i++) {
+		frame->sf.sf_uc.uc_sc.regs[i] = tf->tf_x[i];
+	}
 	frame->sf.sf_uc.uc_sc.regs[30] = tf->tf_lr;
 	frame->sf.sf_uc.uc_sc.sp = tf->tf_sp;
 	frame->sf.sf_uc.uc_sc.pc = tf->tf_elr;
 	frame->sf.sf_uc.uc_sc.pstate = tf->tf_spsr;
-	frame->sf.sf_uc.uc_sc.ddc = tf->tf_ddc;
 	frame->sf.sf_uc.uc_sc.fault_address = (uintcap_t)ksi->ksi_addr;
 
 	/* Stack frame for unwinding */
@@ -447,6 +470,19 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	}
 
 	memcpy(&frame->sf.sf_uc.uc_stack, &uc_stack, sizeof(uc_stack));
+	scr += roundup(sizeof(struct l_esr_context), 16);
+
+#if __has_feature(capabilities)
+	morello = (struct l_morello_context *) scr;
+	morello->head.magic = L_MORELLO_MAGIC;
+	morello->head.size = sizeof(struct l_morello_context);
+	morello->__pad = 0;
+	memcpy(morello->cregs, tf->tf_x, sizeof(tf->tf_x));
+	morello->cregs[30] = tf->tf_lr;
+	morello->csp = tf->tf_sp;
+	morello->rcsp = td->td_pcb->pcb_rcsp_el0;
+	morello->pcc = tf->tf_elr;
+#endif
 
 #if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
 	KASSERT(cheri_gettag(fp), ("Expected valid fp capability"));
