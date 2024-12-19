@@ -171,8 +171,13 @@ linux64_arch_copyout_auxargs(struct image_params *imgp, Elf_Auxinfo **pos)
 	// AUXARGS_ENTRY((*pos), LINUX_AT_SYSINFO_EHDR, linux_vdso_base);
 	AUXARGS_ENTRY((*pos), LINUX_AT_HWCAP, *imgp->sysent->sv_hwcap);
 	AUXARGS_ENTRY((*pos), LINUX_AT_HWCAP2, *imgp->sysent->sv_hwcap2);
-	// This should also be a capability. Pending fix.
-	AUXARGS_ENTRY_PTR((*pos), LINUX_AT_PLATFORM, (void * __linuxcap)(linuxcap_t)(linux_platform));
+
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64) && !defined(COMPAT_LINUX32)
+	// Use unbounded temporarily because we do not have a good method to get string size right now
+	AUXARGS_ENTRY_PTR((*pos), LINUX_AT_PLATFORM, __USER_CAP_UNBOUNDED(linux_platform));
+#else
+	AUXARGS_ENTRY((*pos), LINUX_AT_PLATFORM, PTROUT(linux_platform));
+#endif
 }
 
 /*
