@@ -474,7 +474,11 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	}
 	tf->tf_x[29] = (uintcap_t)fp + offsetof(struct l_sigframe, fp);
 	tf->tf_sp = (uintcap_t)fp;
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+	tf->tf_lr = cheri_capability_build_user_code(td, CHERI_CAP_USER_CODE_PERMS, linux_vdso_base, LINUX_VDSOPAGE_SIZE, (uintcap_t)__user_rt_sigreturn - linux_vdso_base);
+#else
 	tf->tf_lr = (uintcap_t)__user_rt_sigreturn;
+#endif
 
 #if __has_feature(capabilities)
 	trapframe_set_elr(tf, (uintcap_t)catcher);
