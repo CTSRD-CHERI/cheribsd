@@ -636,8 +636,29 @@ linux_futex_wakeop(struct thread *td, struct linux_futex_args *args)
 	int nrwake, op_ret, ret;
 	int error, count;
 
+	// Try to support this case temporarily to pass PCuABI test
 	if (args->uaddr == args->uaddr2)
-		return (EINVAL);
+	{
+		error = futex_key_get(args->uaddr, TYPE_FUTEX, GET_SHARED(args), &key);
+		if (error != 0)
+			return (error);
+
+		error = futex_atomic_op(td, args->val3, args->uaddr2, &op_ret);
+
+		umtxq_lock(&key);
+		if (error != 0)
+			goto same_mutex_out;
+		ret = umtxq_signal_mask(&key, args->val, args->val3);
+		if (op_ret > 0) {
+			nrwake = (int)(unsigned long)args->ts;
+			ret += umtxq_signal_mask(&key, nrwake, args->val3);
+		}
+		td->td_retval[0] = ret;
+same_mutex_out:
+		umtxq_unlock(&key);
+		umtx_key_release(&key);
+		return (error);
+	}
 
 	error = futex_key_get(args->uaddr, TYPE_FUTEX, GET_SHARED(args), &key);
 	if (error != 0)
