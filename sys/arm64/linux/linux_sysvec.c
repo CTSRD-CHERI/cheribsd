@@ -314,7 +314,7 @@ linux_rt_sigreturn(struct thread *td, struct linux_rt_sigreturn_args *args)
 
 	tf = td->td_frame;
 	frame = (struct l_sigframe * __capability)tf->tf_sp;
-	error = copyincap(__USER_CAP((uintcap_t)&frame->sf, sizeof(*sf)), sf, sizeof(*sf));
+	error = copyincap(LINUX_USER_CAP((uintcap_t)&frame->sf, sizeof(*sf)), sf, sizeof(*sf));
 	if (error != 0) {
 		free(sf, M_LINUX);
 		return (error);
