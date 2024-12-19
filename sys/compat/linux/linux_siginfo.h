@@ -34,6 +34,8 @@
 #ifndef _LINUX_SIGINFO_H_
 #define _LINUX_SIGINFO_H_
 
+#include <sys/stddef.h>
+
 /*
  * si_code values
  */
@@ -229,6 +231,45 @@ _Static_assert(sizeof(l_siginfo_t) == LINUX_SI_MAX_SIZE, "l_siginfo_t size");
 #define	lsi_addr	_sifields._sigfault._addr
 #define	lsi_band	_sifields._sigpoll._band
 #define	lsi_fd		_sifields._sigpoll._fd
+
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+_Static_assert(__alignof__(l_siginfo_t) == 16);
+_Static_assert(offsetof(l_siginfo_t, lsi_signo)	== 0x00);
+_Static_assert(offsetof(l_siginfo_t, lsi_errno)	== 0x04);
+_Static_assert(offsetof(l_siginfo_t, lsi_code)	== 0x08);
+_Static_assert(offsetof(l_siginfo_t, lsi_pid)	== 0x10);
+_Static_assert(offsetof(l_siginfo_t, lsi_uid)	== 0x14);
+_Static_assert(offsetof(l_siginfo_t, lsi_tid)	== 0x10);
+_Static_assert(offsetof(l_siginfo_t, lsi_overrun)	== 0x14);
+_Static_assert(offsetof(l_siginfo_t, lsi_status)	== 0x18);
+_Static_assert(offsetof(l_siginfo_t, lsi_utime)	== 0x20);
+_Static_assert(offsetof(l_siginfo_t, lsi_stime)	== 0x28);
+_Static_assert(offsetof(l_siginfo_t, lsi_value)	== 0x20);
+_Static_assert(offsetof(l_siginfo_t, lsi_int)	== 0x20);
+_Static_assert(offsetof(l_siginfo_t, lsi_ptr)	== 0x20);
+_Static_assert(offsetof(l_siginfo_t, lsi_addr)	== 0x10);
+_Static_assert(offsetof(l_siginfo_t, lsi_band)	== 0x10);
+_Static_assert(offsetof(l_siginfo_t, lsi_fd)	== 0x18);
+#else
+_Static_assert(__alignof__(l_siginfo_t) == 8);
+_Static_assert(offsetof(l_siginfo_t, lsi_signo)	== 0x00);
+_Static_assert(offsetof(l_siginfo_t, lsi_errno)	== 0x04);
+_Static_assert(offsetof(l_siginfo_t, lsi_code)	== 0x08);
+_Static_assert(offsetof(l_siginfo_t, lsi_pid)	== 0x10);
+_Static_assert(offsetof(l_siginfo_t, lsi_uid)	== 0x14);
+_Static_assert(offsetof(l_siginfo_t, lsi_tid)	== 0x10);
+_Static_assert(offsetof(l_siginfo_t, lsi_overrun)	== 0x14);
+_Static_assert(offsetof(l_siginfo_t, lsi_status)	== 0x18);
+_Static_assert(offsetof(l_siginfo_t, lsi_utime)	== 0x20);
+_Static_assert(offsetof(l_siginfo_t, lsi_stime)	== 0x28);
+_Static_assert(offsetof(l_siginfo_t, lsi_value)	== 0x18);
+_Static_assert(offsetof(l_siginfo_t, lsi_int)	== 0x18);
+_Static_assert(offsetof(l_siginfo_t, lsi_ptr)	== 0x18);
+_Static_assert(offsetof(l_siginfo_t, lsi_addr)	== 0x10);
+_Static_assert(offsetof(l_siginfo_t, lsi_band)	== 0x10);
+_Static_assert(offsetof(l_siginfo_t, lsi_fd)	== 0x18);
+#endif
+
 
 #endif /* _LINUX_SIGINFO_H_ */
 
