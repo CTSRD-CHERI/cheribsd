@@ -701,7 +701,7 @@ expand_stk_table(struct stk_table *table, size_t capacity)
 	    sizeof(*table->entries);
 
 	for (size_t i = o_capacity; i < table->meta->capacity; ++i) {
-		table->meta->compart_stk[i] = (struct stk_table_stk_info) {};
+		table->meta->compart_stk[i] = (struct stk_table_stk_pair) {};
 		table->entries[i] = (struct stk_table_entry) {
 			.stack = create_untrusted_stk,
 		};
@@ -824,11 +824,11 @@ init_stk_table(struct stk_table *table, struct tcb_wrapper *wrap)
 #endif
 	size = cheri_getlen(sp);
 	assert(size > 0);
-	table->meta->compart_stk[RTLD_COMPART_ID] = (struct stk_table_stk_info)
-	{
-		.size = size,
-		.begin = sp
-	};
+	table->meta->compart_stk[RTLD_COMPART_ID].ord_stk =
+	    (struct stk_table_stk_info) {
+		    .size = size,
+		    .begin = sp
+	    };
 	table->entries[RTLD_COMPART_ID].stack = sp + size;
 
 	/*
@@ -865,13 +865,13 @@ get_or_create_untrusted_stk(compart_id_t cid, struct stk_table **tablep)
 		*tablep = table = expand_stk_table(table, comparts.size);
 		lock_release(rtld_bind_lock, &lockstate);
 		set_stk_table(table);
-	} else if (table->meta->compart_stk[cid].size > 0)
+	} else if (table->meta->compart_stk[cid].ord_stk.size > 0)
 		return (table->entries[cid].stack);
 
 	size = C18N_STACK_SIZE;
 	stk = create_stk(size);
 
-	table->meta->compart_stk[cid] = (struct stk_table_stk_info) {
+	table->meta->compart_stk[cid].ord_stk = (struct stk_table_stk_info) {
 		.size = size,
 		.begin = stk - size
 	};
@@ -1808,6 +1808,16 @@ identify_untrusted_stk(void *canonical, void *untrusted)
 	return (cheri_is_subset(untrusted, canonical));
 }
 
+static bool
+stk_belongs_to(void *stk, size_t i, struct stk_table *table)
+{
+	return (identify_untrusted_stk(
+		    table->meta->compart_stk[i].ord_stk.begin, stk) ||
+		(table->meta->compart_stk[i].sig_stk.size > 0 &&
+		identify_untrusted_stk(
+		    table->meta->compart_stk[i].sig_stk.begin, stk)))
+}
+
 void
 _rtld_thr_exit(long *state)
 {
@@ -1815,6 +1825,7 @@ _rtld_thr_exit(long *state)
 #ifndef USE_RESTRICTED_MODE
 	stack_t osigstk;
 #endif
+	struct stk_table_stk_pair *pair;
 	struct stk_table_stk_info *data;
 	struct stk_table *table = get_stk_table();
 
@@ -1828,7 +1839,7 @@ _rtld_thr_exit(long *state)
 	 * Clear RTLD's stack lookup table entry.
 	 */
 	i = RTLD_COMPART_ID;
-	table->meta->compart_stk[i] = (struct stk_table_stk_info) {};
+	table->meta->compart_stk[i] = (struct stk_table_stk_pair) {};
 	table->entries[i] = (struct stk_table_entry) {
 		.stack = create_untrusted_stk,
 	};
@@ -1837,24 +1848,33 @@ _rtld_thr_exit(long *state)
 	 * Unmap each compartment's stack.
 	 */
 	for (i = i + 1; i < table->meta->capacity; ++i) {
-		data = &table->meta->compart_stk[i];
-		if (data->size == 0)
+		pair = &table->meta->compart_stk[i];
+		if (pair->ord_stk.size == 0) {
+			assert(pair->sig_stk.size == 0);
 			continue;
-		if (!identify_untrusted_stk(
-		    data->begin, table->entries[i].stack)) {
+		}
+		if (!stk_belongs_to(table->entries[i].stack, i, table)) {
 			rtld_fdprintf(STDERR_FILENO,
 			    "c18n: Untrusted stack %#p of %s is not derived "
-			    "from %#p\n", table->entries[i].stack,
-			    comparts.data[i].name, data->begin);
+			    "from %#p or %#p\n", table->entries[i].stack,
+			    comparts.pair[i].name,
+			    pair->ord_stk.begin, pair->sig_stk.begin);
 			abort();
 		}
-		if (munmap(data->begin, data->size) != 0) {
+		if (munmap(pair->ord_stk.begin, pair->ord_stk.size) != 0) {
 			rtld_fdprintf(STDERR_FILENO,
 			    "c18n: munmap(%#p, %zu) failed\n",
-			    data->begin, data->size);
+			    pair->ord_stk.begin, pair->ord_stk.size);
 			abort();
 		}
-		*data = (struct stk_table_stk_info) {};
+		if (pair->sig_stk.size > 0 &&
+		    munmap(pair->sig_stk.begin, pair->sig_stk.size) != 0) {
+			rtld_fdprintf(STDERR_FILENO,
+			    "c18n: munmap(%#p, %zu) failed\n",
+			    pair->sig_stk.begin, pair->sig_stk.size);
+			abort();
+		}
+		*pair = (struct stk_table_stk_pair) {};
 		table->entries[i] = (struct stk_table_entry) {
 			.stack = create_untrusted_stk,
 		};
@@ -2014,8 +2034,8 @@ _rtld_sighandler_impl(int sig, siginfo_t *info, ucontext_t *ucp,
 	intr_idx = tf->callee;
 	intr = index_to_cid(intr_idx);
 	if (intr < table->meta->capacity &&
-	    table->meta->compart_stk[intr].size > 0 &&
-	    identify_untrusted_stk(table->meta->compart_stk[intr].begin, nsp))
+	    table->meta->compart_stk[intr].ord_stk.size > 0 &&
+	    stk_belongs_to(nsp, intr, table))
 		goto found;
 	/*
 	 * If the interrupt occured at a point in the trampoline while a
@@ -2027,8 +2047,8 @@ _rtld_sighandler_impl(int sig, siginfo_t *info, ucontext_t *ucp,
 	intr_idx = tf[-1].caller;
 	intr = index_to_cid(intr_idx);
 	if (intr < table->meta->capacity &&
-	    table->meta->compart_stk[intr].size > 0 &&
-	    identify_untrusted_stk(table->meta->compart_stk[intr].begin, nsp))
+	    table->meta->compart_stk[intr].ord_stk.size > 0 &&
+	    stk_belongs_to(nsp, intr, table))
 		goto found_trusted;
 	/*
 	 * If the interrupt occurred at a point in the trampoline where a new
@@ -2046,7 +2066,7 @@ _rtld_sighandler_impl(int sig, siginfo_t *info, ucontext_t *ucp,
 	 */
 	intr_idx = tf->caller;
 	intr = index_to_cid(intr_idx);
-	if (identify_untrusted_stk(table->meta->compart_stk[intr].begin, nsp))
+	if (stk_belongs_to(nsp, intr, table))
 		goto found_trusted;
 	/*
 	 * Lazy binding, thread-local storage, and stack resolution all involve
@@ -2055,7 +2075,7 @@ _rtld_sighandler_impl(int sig, siginfo_t *info, ucontext_t *ucp,
 	 */
 	intr_idx = cid_to_index(RTLD_COMPART_ID);
 	intr = RTLD_COMPART_ID;
-	if (identify_untrusted_stk(table->meta->compart_stk[intr].begin, nsp))
+	if (stk_belongs_to(nsp, intr, table))
 		goto found_trusted;
 	rtld_fdprintf(STDERR_FILENO,
 	    "c18n: Cannot resolve inconsistent untrusted stack %#p. "
@@ -2169,6 +2189,7 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 	struct sigframe *osp, *nsp;
 	struct trusted_frame *tf, *ntf;
 	sigset_t oset;
+	bool onstack;
 
 	siginfo = (act->sa_flags & SA_SIGINFO) != 0;
 	if (siginfo)
@@ -2201,7 +2222,13 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 	 * Get the stack of the signal handler's compartment.
 	 */
 	table = get_stk_table();
-	osp = get_or_create_untrusted_stk(callee, &table);
+	if ((act->sa_flags & SA_ONSTACK) == 0) {
+		osp = get_or_create_untrusted_stk(callee, &table);
+	} else {
+		struct stk_table_stk_info info = table->meta->compart_stk[callee].sig_stk;
+		assert(info.size > 0);
+		osp = (char *)info.begin + info.size;
+	}
 	nsp = osp - 1;
 	*nsp = (struct sigframe) {
 		.sf_si = *info,
