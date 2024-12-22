@@ -298,15 +298,33 @@ linux_parse_sigreturn_ctx(struct thread *td, struct l_sigcontext *sc)
 			break;
 #endif
 #if __has_feature(capabilities)
+		// We merge the capability registers c0-c30 with the x0-x30
+		// Because standard registers may get modified by the signal handler.
+		// To avoid untagging sealed capabilities unintentionally, 
+		// compare the registers first before assigning the values
+		// This code assumes that addresses without cap have been restored to tf
+
+#define MORELLO_MERGE_C_X(target, addr_source, cap_source) do { \
+		if ((uint64_t)(uintcap_t)addr_source != (uint64_t)(uintcap_t)cap_source) { \
+			target = cheri_setaddress(cap_source, addr_source); \
+		} else { \
+			target = cap_source; \
+		} \
+	} while (0)
+
+
 		case L_MORELLO_MAGIC:
 			morello = (struct l_morello_context *)ctx;
 
-			memcpy(tf->tf_x, morello->cregs, sizeof(tf->tf_x));
-			tf->tf_lr = morello->cregs[30];
-			tf->tf_sp = morello->csp;
+			for (int i = 0; i < 30; i++) {
+				MORELLO_MERGE_C_X(tf->tf_x[i], tf->tf_x[i], morello->cregs[i]);
+			}
+			
+			MORELLO_MERGE_C_X(tf->tf_lr, tf->tf_lr, morello->cregs[30]);
+			MORELLO_MERGE_C_X(tf->tf_sp, tf->tf_sp, morello->csp);
 			td->td_pcb->pcb_rcsp_el0 = morello->rcsp;
 			WRITE_SPECIALREG_CAP(rcsp_el0, morello->rcsp);
-			tf->tf_elr = morello->pcc;
+			MORELLO_MERGE_C_X(tf->tf_elr, tf->tf_elr, morello->pcc);
 
 			break;
 #endif
