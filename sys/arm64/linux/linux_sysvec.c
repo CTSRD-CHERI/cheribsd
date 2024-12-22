@@ -306,7 +306,7 @@ linux_parse_sigreturn_ctx(struct thread *td, struct l_sigcontext *sc)
 
 #define MORELLO_MERGE_C_X(target, addr_source, cap_source) do { \
 		if ((uint64_t)(uintcap_t)addr_source != (uint64_t)(uintcap_t)cap_source) { \
-			target = cheri_setaddress(cap_source, addr_source); \
+			target = cheri_setaddress(cap_source, (uint64_t)(uintcap_t)addr_source); \
 		} else { \
 			target = cap_source; \
 		} \
