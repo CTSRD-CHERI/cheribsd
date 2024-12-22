@@ -33,7 +33,7 @@
 
 #ifndef	__LINUX_ARCH_SIGEV_PREAMBLE_SIZE
 #define	__LINUX_ARCH_SIGEV_PREAMBLE_SIZE	\
-	(sizeof(l_int) * 2 + sizeof(l_sigval_t))
+	roundup((sizeof(l_int) * 2 + sizeof(l_sigval_t)), sizeof(l_uintptr_t))
 #endif
 
 #define	LINUX_SIGEV_MAX_SIZE			64
