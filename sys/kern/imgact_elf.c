@@ -153,7 +153,7 @@ int __elfN(nxstack) =
 #endif
 SYSCTL_INT(ELF_NODE_OID, OID_AUTO,
     nxstack, CTLFLAG_RW, &__elfN(nxstack), 0,
-    ELF_ABI_NAME ": enable non-executable stack");
+    ELF_ABI_NAME ": support PT_GNU_STACK for non-executable stack control");
 #endif
 
 #if defined(__amd64__)
