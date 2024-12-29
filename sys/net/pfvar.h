@@ -1598,7 +1598,7 @@ struct pf_pdesc {
 #ifdef INET6
 		struct icmp6_hdr	icmp6;
 #endif /* INET6 */
-		char any[0];
+		char any[0] __no_subobject_bounds;
 	} hdr;
 
 	struct pf_krule	*nat_rule;	/* nat/rdr rule applied to packet */
