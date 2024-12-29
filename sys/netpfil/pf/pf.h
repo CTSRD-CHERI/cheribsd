@@ -296,7 +296,7 @@ struct pf_addr {
 		u_int8_t		addr8[16];
 		u_int16_t		addr16[8];
 		u_int32_t		addr32[4];
-	};		    /* 128-bit address */
+	} __no_subobject_bounds;		    /* 128-bit address */
 };
 
 #define PFI_AFLAG_NETWORK	0x01
