@@ -1918,6 +1918,7 @@ struct pfioc_qstats_v1 {
 	 * written entirely in terms of the v0 or v1 type.
 	 */
 	u_int32_t	 version;  /* Requested version of stats struct */
+	void	*pad;
 };
 
 /* Latest version of struct pfioc_qstats_vX */
