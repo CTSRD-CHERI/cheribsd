@@ -1478,10 +1478,10 @@ pf_normalize_tcp(struct pfi_kkif *kif, struct mbuf *m, int ipoff,
 	    (tcp_get_flags(th) & (TH_RES1|TH_RES2|TH_RES2)) != 0) {
 		u_int16_t	ov, nv;
 
-		ov = *(u_int16_t *)(&th->th_ack + 1);
+		ov = *(u_int16_t *)(__unbounded_addressof(th->th_ack) + 1);
 		flags &= ~(TH_RES1 | TH_RES2 | TH_RES3);
 		tcp_set_flags(th, flags);
-		nv = *(u_int16_t *)(&th->th_ack + 1);
+		nv = *(u_int16_t *)(__unbounded_addressof(th->th_ack) + 1);
 
 		th->th_sum = pf_proto_cksum_fixup(m, th->th_sum, ov, nv, 0);
 		rewrite = 1;
