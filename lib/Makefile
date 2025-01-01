@@ -17,6 +17,7 @@ SUBDIR_BOOTSTRAP= \
 	cheri-libc++ \
 	cheri-libc++experimental \
 	libcxxrt \
+	libder \
 	libdiff \
 	libelf \
 	libssp \
