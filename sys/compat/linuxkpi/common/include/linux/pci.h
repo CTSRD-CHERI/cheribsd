@@ -1500,6 +1500,13 @@ pci_irq_vector(struct pci_dev *pdev, unsigned int vector)
         return (-ENXIO);
 }
 
+static inline int
+pci_wake_from_d3(struct pci_dev *pdev, bool enable)
+{
+
+	return (0);
+}
+
 #endif	/* _LINUXKPI_LINUX_PCI_H_ */
 // CHERI CHANGES START
 // {
