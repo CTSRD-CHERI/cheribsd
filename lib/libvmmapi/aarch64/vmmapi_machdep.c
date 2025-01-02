@@ -53,6 +53,9 @@ const char *vm_capstrmap[] = {
 const cap_ioctl_t vm_ioctl_cmds[] = {
 	VM_COMMON_IOCTLS,
 	VM_MD_IOCTLS,
+#if __has_feature(capabilities)
+	VM_GET_CHERI_CAPABILITY_TAG,
+#endif
 };
 size_t vm_ioctl_ncmds = nitems(vm_ioctl_cmds);
 
