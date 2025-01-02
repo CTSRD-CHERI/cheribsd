@@ -1570,8 +1570,9 @@ _vm_gpa_hold(struct vm *vm, vm_paddr_t gpa, size_t len, int reqprot,
 			void * __capability gpap;
 
 #if __has_feature(capabilities)
-			gpap = cheri_setaddress(vmm_gpa_root_cap,
-			    trunc_page(gpa));
+			gpap = cheri_setboundsexact(
+			    cheri_setaddress(vmm_gpa_root_cap, trunc_page(gpa)),
+			    PAGE_SIZE);
 #else
 			gpap = (void *)trunc_page(gpa);
 #endif
@@ -1583,7 +1584,7 @@ _vm_gpa_hold(struct vm *vm, vm_paddr_t gpa, size_t len, int reqprot,
 
 	if (count == 1) {
 		*cookie = m;
-		return (cheri_kern_setbounds(
+		return (cheri_kern_setboundsexact(
 		    (void *)(PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m)) + pageoff), len));
 	} else {
 		*cookie = NULL;
