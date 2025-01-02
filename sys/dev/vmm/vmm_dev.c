@@ -375,6 +375,10 @@ static const struct vmmdev_ioctl vmmdev_ioctls[] = {
 	VMMDEV_IOCTL(VM_GET_CPUS, 0),
 	VMMDEV_IOCTL(VM_GET_TOPOLOGY, 0),
 	VMMDEV_IOCTL(VM_SET_TOPOLOGY, 0),
+
+#if __has_feature(capabilities)
+	VMMDEV_IOCTL(VM_GET_CHERI_CAPABILITY_TAG, VMMDEV_IOCTL_SLOCK_MEMSEGS),
+#endif
 };
 
 static int
@@ -648,6 +652,15 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		error = 0;
 		break;
 	}
+#if __has_feature(capabilities)
+	case VM_GET_CHERI_CAPABILITY_TAG: {
+		struct vm_cheri_capability_tag *vt;
+
+		vt = (struct vm_cheri_capability_tag *)data;
+		error = vm_get_cheri_capability_tag(sc->vm, vt);
+		break;
+	}
+#endif
 	default:
 		error = vmmdev_machdep_ioctl(sc->vm, vcpu, cmd, data, fflag,
 		    td);

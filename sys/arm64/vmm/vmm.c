@@ -1690,6 +1690,26 @@ vm_deassert_irq(struct vm *vm, uint32_t irq)
 	return (vgic_inject_irq(vm->cookie, -1, irq, false));
 }
 
+#if __has_feature(capabilities)
+int
+vm_get_cheri_capability_tag(struct vm *vm, struct vm_cheri_capability_tag *vt)
+{
+	uintcap_t *cap;
+	void *cookie;
+
+	if (!__is_aligned(vt->gpa, sizeof(*cap)))
+		return (EINVAL);
+
+	cap = vm_gpa_hold_global(vm, vt->gpa, sizeof(*cap), VM_PROT_READ,
+	    &cookie);
+	if (cap == NULL)
+		return (EFAULT);
+	vt->tag = cheri_gettag(*cap);
+	vm_gpa_release(cookie);
+	return (0);
+}
+#endif
+
 int
 vm_raise_msi(struct vm *vm, uint64_t msg, uint64_t addr, int bus, int slot,
     int func)
