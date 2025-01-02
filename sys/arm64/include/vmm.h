@@ -178,6 +178,9 @@ struct vm_object;
 struct vm_guest_paging;
 struct vm_vgic_descr;
 struct pmap;
+#if __has_feature(capabilities)
+struct vm_cheri_capability_tag;
+#endif
 
 struct vm_eventinfo {
 	void	*rptr;		/* rendezvous cookie */
@@ -222,6 +225,10 @@ void *vm_gpa_hold_global(struct vm *vm, vm_paddr_t gpa, size_t len,
     int prot, void **cookie);
 void vm_gpa_release(void *cookie);
 bool vm_mem_allocated(struct vcpu *vcpu, vm_paddr_t gpa);
+#if __has_feature(capabilities)
+int vm_get_cheri_capability_tag(struct vm *vm,
+    struct vm_cheri_capability_tag *vt);
+#endif
 
 int vm_gla2gpa_nofault(struct vcpu *vcpu, struct vm_guest_paging *paging,
     uint64_t gla, int prot, uint64_t *gpa, int *is_fault);

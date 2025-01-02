@@ -159,6 +159,13 @@ struct vm_cpu_topology {
 	uint16_t	maxcpus;
 };
 
+#if __has_feature(capabilities)
+struct vm_cheri_capability_tag {
+	vm_paddr_t	gpa;	/* input, must be aligned */
+	uint8_t		tag;	/* output */
+};
+#endif
+
 enum {
 	/* general routines */
 	IOCNUM_ABIVERS = 0,
@@ -206,6 +213,10 @@ enum {
 	/* vm_attach_vgic */
 	IOCNUM_GET_VGIC_VERSION = 110,
 	IOCNUM_ATTACH_VGIC = 111,
+
+#if __has_feature(capabilities)
+	IOCNUM_GET_CHERI_CAPABILITY_TAG = 200,
+#endif
 };
 
 #define	VM_RUN		\
@@ -266,4 +277,9 @@ enum {
 	_IOR('v', IOCNUM_GET_VGIC_VERSION, struct vm_vgic_version)
 #define	VM_ATTACH_VGIC	\
 	_IOW('v', IOCNUM_ATTACH_VGIC, struct vm_vgic_descr)
+#if __has_feature(capabilities)
+#define	VM_GET_CHERI_CAPABILITY_TAG			\
+	_IOWR('v', IOCNUM_GET_CHERI_CAPABILITY_TAG,	\
+	    struct vm_cheri_capability_tag)
+#endif
 #endif
