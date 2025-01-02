@@ -1963,12 +1963,16 @@ gdb_query(const uint8_t *data, size_t len)
 			return;
 		}
 
+		error = vm_get_cheri_capability_tag(ctx, gpa, &capbuf[0]);
+		if (error != 0) {
+			send_error(errno);
+			return;
+		}
 		cap = paddr_guest2host(ctx, gpa, sizeof(uintcap_t));
 		if (cap == NULL) {
 			send_error(EFAULT);
 			return;
 		}
-		capbuf[0] = cheri_gettag(*cap);
 		memcpy(&capbuf[1], cap, sizeof(uintcap_t));
 
 		start_packet();
