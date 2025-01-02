@@ -284,6 +284,14 @@ void	vm_setup_freebsd_gdt(uint64_t *gdtr);
 int	vm_snapshot_req(struct vmctx *ctx, struct vm_snapshot_meta *meta);
 int	vm_restore_time(struct vmctx *ctx);
 
+#if __has_feature(capabilities)
+/*
+ * CHERI interfaces
+ */
+int	vm_get_cheri_capability_tag(struct vmctx *ctx, vm_paddr_t gpa,
+	    uint8_t *tag);
+#endif
+
 /*
  * Deprecated interfaces, do not use them in new code.
  */

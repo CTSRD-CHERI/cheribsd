@@ -1122,6 +1122,23 @@ vm_restore_time(struct vmctx *ctx)
 }
 #endif
 
+#if __has_feature(capabilities)
+int
+vm_get_cheri_capability_tag(struct vmctx *ctx, vm_paddr_t gpa, uint8_t *tag)
+{
+	struct vm_cheri_capability_tag vt;
+	int error;
+
+	bzero(&vt, sizeof(vt));
+	vt.gpa = gpa;
+
+	error = ioctl(ctx->fd, VM_GET_CHERI_CAPABILITY_TAG, &vt);
+	if (error == 0)
+		*tag = vt.tag;
+	return (error);
+}
+#endif
+
 int
 vm_set_topology(struct vmctx *ctx,
     uint16_t sockets, uint16_t cores, uint16_t threads, uint16_t maxcpus)
