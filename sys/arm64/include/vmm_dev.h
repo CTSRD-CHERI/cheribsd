@@ -57,12 +57,29 @@ struct vm_register {
 	kuintcap_t	regval;
 };
 
+#if __has_feature(capabilities)
+struct vm_register_cheri_capability_tag {
+	int		cpuid;
+	int		regnum;		/* enum vm_reg_name */
+	uint8_t		tag;
+};
+#endif
+
 struct vm_register_set {
 	int		cpuid;
 	unsigned int	count;
 	const int	* __kerncap regnums;	/* enum vm_reg_name */
 	uintcap_t	* __kerncap regvals;
 };
+
+#if __has_feature(capabilities)
+struct vm_register_cheri_capability_tag_set {
+	int		cpuid;
+	unsigned int	count;
+	const int	* __kerncap regnums;	/* enum vm_reg_name */
+	uint8_t		* __kerncap tags;
+};
+#endif
 
 struct vm_run {
 	int		cpuid;
@@ -216,6 +233,8 @@ enum {
 
 #if __has_feature(capabilities)
 	IOCNUM_GET_CHERI_CAPABILITY_TAG = 200,
+	IOCNUM_GET_REGISTER_CHERI_CAPABILITY_TAG = 201,
+	IOCNUM_GET_REGISTER_CHERI_CAPABILITY_TAG_SET = 202,
 #endif
 };
 
@@ -281,5 +300,11 @@ enum {
 #define	VM_GET_CHERI_CAPABILITY_TAG			\
 	_IOWR('v', IOCNUM_GET_CHERI_CAPABILITY_TAG,	\
 	    struct vm_cheri_capability_tag)
+#define	VM_GET_REGISTER_CHERI_CAPABILITY_TAG			\
+	_IOWR('v', IOCNUM_GET_REGISTER_CHERI_CAPABILITY_TAG,	\
+	    struct vm_register_cheri_capability_tag)
+#define	VM_GET_REGISTER_CHERI_CAPABILITY_TAG_SET		\
+	_IOW('v', IOCNUM_GET_REGISTER_CHERI_CAPABILITY_TAG_SET,	\
+	    struct vm_register_cheri_capability_tag_set)
 #endif
 #endif

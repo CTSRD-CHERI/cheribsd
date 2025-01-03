@@ -303,9 +303,30 @@ vm_get_register_set(struct vcpu *vcpu, unsigned int count, int *regnum,
 		error = vm_get_register(vcpu, regnum[i], &regval[i]);
 		if (error)
 			break;
+#if __has_feature(capabilities)
+		regval[i] = cheri_cleartag(regval[i]);
+#endif
 	}
 	return (error);
 }
+
+#if __has_feature(capabilities)
+static int
+vm_get_register_cheri_capability_tag_set(struct vcpu *vcpu, unsigned int count,
+    int *regnum, uint8_t *tags)
+{
+	int error, i;
+
+	error = 0;
+	for (i = 0; i < count; i++) {
+		error = vm_get_register_cheri_capability_tag(vcpu, regnum[i],
+		    &tags[i]);
+		if (error)
+			break;
+	}
+	return (error);
+}
+#endif
 
 static int
 vm_set_register_set(struct vcpu *vcpu, unsigned int count, int *regnum,
@@ -378,6 +399,10 @@ static const struct vmmdev_ioctl vmmdev_ioctls[] = {
 
 #if __has_feature(capabilities)
 	VMMDEV_IOCTL(VM_GET_CHERI_CAPABILITY_TAG, VMMDEV_IOCTL_SLOCK_MEMSEGS),
+	VMMDEV_IOCTL(VM_GET_REGISTER_CHERI_CAPABILITY_TAG,
+	    VMMDEV_IOCTL_LOCK_ONE_VCPU),
+	VMMDEV_IOCTL(VM_GET_REGISTER_CHERI_CAPABILITY_TAG_SET,
+	    VMMDEV_IOCTL_LOCK_ONE_VCPU),
 #endif
 };
 
@@ -522,6 +547,10 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 
 		vmreg = (struct vm_register *)data;
 		error = vm_get_register(vcpu, vmreg->regnum, &vmreg->regval);
+#if __has_feature(capabilities)
+		if (error == 0)
+			vmreg->regval = cheri_cleartag(vmreg->regval);
+#endif
 		break;
 	}
 	case VM_SET_REGISTER: {
@@ -658,6 +687,40 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 
 		vt = (struct vm_cheri_capability_tag *)data;
 		error = vm_get_cheri_capability_tag(sc->vm, vt);
+		break;
+	}
+	case VM_GET_REGISTER_CHERI_CAPABILITY_TAG: {
+		struct vm_register_cheri_capability_tag *vrct;
+
+		vrct = (struct vm_register_cheri_capability_tag *)data;
+		error = vm_get_register_cheri_capability_tag(vcpu, vrct->regnum,
+		    &vrct->tag);
+		break;
+	}
+	case VM_GET_REGISTER_CHERI_CAPABILITY_TAG_SET: {
+		struct vm_register_cheri_capability_tag_set *vmtagset;
+		uint8_t *tags;
+		int *regnums;
+
+		vmtagset = (struct vm_register_cheri_capability_tag_set *)data;
+		if (vmtagset->count > VM_REG_LAST) {
+			error = EINVAL;
+			break;
+		}
+		tags = malloc(sizeof(tags[0]) * vmtagset->count, M_VMMDEV,
+		    M_WAITOK);
+		regnums = malloc(sizeof(regnums[0]) * vmtagset->count, M_VMMDEV,
+		    M_WAITOK);
+		error = copyin(vmtagset->regnums, regnums, sizeof(regnums[0]) *
+		    vmtagset->count);
+		if (error == 0)
+			error = vm_get_register_cheri_capability_tag_set(vcpu,
+			    vmtagset->count, regnums, tags);
+		if (error == 0)
+			error = copyout(tags, vmtagset->tags,
+			    sizeof(tags[0]) * vmtagset->count);
+		free(tags, M_VMMDEV);
+		free(regnums, M_VMMDEV);
 		break;
 	}
 #endif
