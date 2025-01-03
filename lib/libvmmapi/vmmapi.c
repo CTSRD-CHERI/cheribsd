@@ -650,6 +650,23 @@ vm_get_register(struct vcpu *vcpu, int reg, uintcap_t *ret_val)
 	return (error);
 }
 
+#if __has_feature(capabilities)
+int
+vm_get_register_cheri_capability_tag(struct vcpu *vcpu, int reg, uint8_t *tagp)
+{
+	struct vm_register_cheri_capability_tag vmreg;
+	int error;
+
+	bzero(&vmreg, sizeof(vmreg));
+	vmreg.regnum = reg;
+
+	error = vcpu_ioctl(vcpu, VM_GET_REGISTER_CHERI_CAPABILITY_TAG, &vmreg);
+	if (error == 0)
+		*tagp = vmreg.tag;
+	return (error);
+}
+#endif
+
 int
 vm_set_register_set(struct vcpu *vcpu, unsigned int count,
     const int *regnums, uintcap_t *regvals)
@@ -681,6 +698,25 @@ vm_get_register_set(struct vcpu *vcpu, unsigned int count,
 	error = vcpu_ioctl(vcpu, VM_GET_REGISTER_SET, &vmregset);
 	return (error);
 }
+
+#if __has_feature(capabilities)
+int
+vm_get_register_cheri_capability_tag_set(struct vcpu *vcpu, unsigned int count,
+    const int *regnums, uint8_t *tags)
+{
+	struct vm_register_cheri_capability_tag_set vmtagset;
+	int error;
+
+	bzero(&vmtagset, sizeof(vmtagset));
+	vmtagset.count = count;
+	vmtagset.regnums = regnums;
+	vmtagset.tags = tags;
+
+	error = vcpu_ioctl(vcpu, VM_GET_REGISTER_CHERI_CAPABILITY_TAG_SET,
+	    &vmtagset);
+	return (error);
+}
+#endif
 
 int
 vm_run(struct vcpu *vcpu, struct vm_run *vmrun)
