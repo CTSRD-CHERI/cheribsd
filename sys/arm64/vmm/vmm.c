@@ -1634,6 +1634,23 @@ vm_get_register(struct vcpu *vcpu, int reg, uintcap_t *retval)
 	return (vmmops_getreg(vcpu->cookie, reg, retval));
 }
 
+#if __has_feature(capabilities)
+int
+vm_get_register_cheri_capability_tag(struct vcpu *vcpu, int reg, uint8_t *tagp)
+{
+	uintcap_t val;
+	int error;
+
+	if (reg >= VM_REG_LAST)
+		return (EINVAL);
+
+	error = vmmops_getreg(vcpu->cookie, reg, &val);
+	if (error == 0)
+		*tagp = cheri_gettag(val);
+	return (error);
+}
+#endif
+
 int
 vm_set_register(struct vcpu *vcpu, int reg, uintcap_t val)
 {

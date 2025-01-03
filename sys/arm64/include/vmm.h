@@ -239,6 +239,10 @@ void vm_get_topology(struct vm *vm, uint16_t *sockets, uint16_t *cores,
 int vm_set_topology(struct vm *vm, uint16_t sockets, uint16_t cores,
     uint16_t threads, uint16_t maxcpus);
 int vm_get_register(struct vcpu *vcpu, int reg, uintcap_t *retval);
+#if __has_feature(capabilities)
+int vm_get_register_cheri_capability_tag(struct vcpu *vcpu, int reg,
+    uint8_t *tagp);
+#endif
 int vm_set_register(struct vcpu *vcpu, int reg, uintcap_t val);
 int vm_run(struct vcpu *vcpu);
 int vm_suspend(struct vm *vm, enum vm_suspend_how how);
