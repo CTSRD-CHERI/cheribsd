@@ -746,15 +746,9 @@ append_unsigned_native(uintmax_t value, size_t len)
 }
 
 static void
-append_cap_native(uintcap_t value)
+append_cap_native(uintcap_t value, uint8_t tag)
 {
-#if __has_feature(capabilities)
-	uint8_t tag;
-
-	tag = cheri_gettag(value);
-
 	append_byte(tag);
-#endif
 	for (size_t i = 0; i < sizeof(value); i++)
 		append_byte(((uint8_t *)&value)[i]);
 }
@@ -1253,6 +1247,7 @@ gdb_read_regs(void)
 {
 	uintcap_t regvals[nitems(gdb_regset)];
 	int regnums[nitems(gdb_regset)];
+	uint8_t tags[nitems(gdb_regset)];
 
 	for (size_t i = 0; i < nitems(gdb_regset); i++)
 		regnums[i] = gdb_regset[i].id;
@@ -1261,6 +1256,15 @@ gdb_read_regs(void)
 		send_error(errno);
 		return;
 	}
+#if __has_feature(capabilities)
+	if (vm_get_register_cheri_capability_tag_set(vcpus[cur_vcpu],
+	    nitems(gdb_regset), regnums, tags) == -1) {
+		send_error(errno);
+		return;
+	}
+#else
+	memset(tags, 0, sizeof(tags));
+#endif
 
 	start_packet();
 	for (size_t i = 0; i < nitems(gdb_regset); i++) {
@@ -1271,7 +1275,7 @@ gdb_read_regs(void)
 		if (gdb_regset[i].size <= 8)
 			append_unsigned_native(regvals[i], gdb_regset[i].size);
 		else
-			append_cap_native(regvals[i]);
+			append_cap_native(regvals[i], tags[i]);
 	}
 	finish_packet();
 }
@@ -1281,6 +1285,7 @@ gdb_read_one_reg(const uint8_t *data, size_t len)
 {
 	uintcap_t regval;
 	uintmax_t reg;
+	uint8_t tag;
 
 	reg = parse_integer(data, len);
 	if (reg >= nitems(gdb_regset)) {
@@ -1293,12 +1298,21 @@ gdb_read_one_reg(const uint8_t *data, size_t len)
 		send_error(errno);
 		return;
 	}
+#if __has_feature(capabilities)
+	if (vm_get_register_cheri_capability_tag(vcpus[cur_vcpu],
+	    gdb_regset[reg].id, &tag) == -1) {
+		send_error(errno);
+		return;
+	}
+#else
+	tag = 0;
+#endif
 
 	start_packet();
 	if (gdb_regset[reg].size <= 8)
 		append_unsigned_native(regval, gdb_regset[reg].size);
 	else
-		append_cap_native(regval);
+		append_cap_native(regval, tag);
 	finish_packet();
 }
 
