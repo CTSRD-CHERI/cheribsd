@@ -1391,7 +1391,7 @@
 	}
 226	AUE_MPROTECT	STD	{
 		int linux_mprotect(
-		    l_ulong addr,
+		    void *addr,
 		    l_size_t len,
 		    l_ulong prot
 		);

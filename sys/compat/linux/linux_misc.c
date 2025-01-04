@@ -2708,7 +2708,7 @@ linux_mincore(struct thread *td, struct linux_mincore_args *args)
 	    LINUX_USER_CAP(args->vec, btoc(args->len))));
 #else
 	struct mincore_args bargs = {
-		.addr = args->addr,
+		.addr = args->start,
 		.len = args->len,
 		.vec = args->vec
 	};
