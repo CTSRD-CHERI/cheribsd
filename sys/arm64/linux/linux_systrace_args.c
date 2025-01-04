@@ -1810,7 +1810,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* linux_mprotect */
 	case 226: {
 		struct linux_mprotect_args *p = params;
-		iarg[a++] = p->addr; /* l_ulong */
+		uarg[a++] = (intptr_t)p->addr; /* void * __capability */
 		iarg[a++] = p->len; /* l_size_t */
 		iarg[a++] = p->prot; /* l_ulong */
 		*n_args = 3;
@@ -5432,7 +5432,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 226:
 		switch (ndx) {
 		case 0:
-			p = "l_ulong";
+			p = "userland void * __capability";
 			break;
 		case 1:
 			p = "l_size_t";

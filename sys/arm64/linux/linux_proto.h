@@ -948,7 +948,7 @@ struct linux_swapoff_args {
 	syscallarg_t dummy;
 };
 struct linux_mprotect_args {
-	char addr_l_[PADL_(l_ulong)]; l_ulong addr; char addr_r_[PADR_(l_ulong)];
+	char addr_l_[PADL_(void * __capability)]; void * __capability addr; char addr_r_[PADR_(void * __capability)];
 	char len_l_[PADL_(l_size_t)]; l_size_t len; char len_r_[PADR_(l_size_t)];
 	char prot_l_[PADL_(l_ulong)]; l_ulong prot; char prot_r_[PADR_(l_ulong)];
 };
