@@ -95,7 +95,7 @@ linux_timer_create(struct thread *td, struct linux_timer_create_args *uap)
 	if (uap->evp == NULL) {
 		evp = NULL;
 	} else {
-		error = copyin(LINUX_USER_CAP_OBJ(uap->evp), &l_ev, sizeof(l_ev));
+		error = copyincap(LINUX_USER_CAP_OBJ(uap->evp), &l_ev, sizeof(l_ev));
 		if (error != 0)
 			return (error);
 		error = linux_convert_l_sigevent(&l_ev, &ev);
