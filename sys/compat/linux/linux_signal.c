@@ -805,7 +805,7 @@ lsiginfo_to_siginfo(struct thread *td, const l_siginfo_t *lsi,
 	si->si_signo = sig;
 	si->si_pid = td->td_proc->p_pid;
 	si->si_uid = td->td_ucred->cr_ruid;
-	si->si_value.sival_ptr = LINUX_USER_CAP_UNBOUND(lsi->lsi_value.sival_ptr);
+	si->si_value.sival_ptr = LINUX_USER_CODE_CAP(lsi->lsi_value.sival_ptr);
 	return (0);
 }
 
@@ -820,7 +820,7 @@ linux_rt_sigqueueinfo(struct thread *td, struct linux_rt_sigqueueinfo_args *args
 	if (!LINUX_SIG_VALID(args->sig))
 		return (EINVAL);
 
-	error = copyin(LINUX_USER_CAP_OBJ(args->info), &linfo, sizeof(linfo));
+	error = copyincap(LINUX_USER_CAP_OBJ(args->info), &linfo, sizeof(linfo));
 	if (error != 0)
 		return (error);
 
@@ -848,7 +848,7 @@ linux_rt_tgsigqueueinfo(struct thread *td, struct linux_rt_tgsigqueueinfo_args *
 	if (!LINUX_SIG_VALID(args->sig))
 		return (EINVAL);
 
-	error = copyin(LINUX_USER_CAP_OBJ(args->uinfo), &linfo, sizeof(linfo));
+	error = copyincap(LINUX_USER_CAP_OBJ(args->uinfo), &linfo, sizeof(linfo));
 	if (error != 0)
 		return (error);
 
