@@ -762,7 +762,8 @@ siginfo_to_lsiginfo(const siginfo_t *si, l_siginfo_t *lsi, l_int sig)
 		default:
 			lsi->lsi_pid = si->si_pid;
 			lsi->lsi_uid = si->si_uid;
-			if (sig >= LINUX_SIGRTMIN) {
+			// Pass these info for SIGUSR1 and SIGUSR2 as well to improve compatibility
+			if (sig >= LINUX_SIGRTMIN || sig == LINUX_SIGUSR1 || sig == LINUX_SIGUSR2) {
 				lsi->lsi_int = si->si_value.sival_int;
 				lsi->lsi_ptr = (uintcap_t)(si->si_value.sival_ptr);
 			}
