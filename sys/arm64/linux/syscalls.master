@@ -1331,11 +1331,11 @@
 	}
 216	AUE_NULL	STD	{
 		int linux_mremap(
-		    l_ulong addr,
+		    void *addr,
 		    l_ulong old_len,
 		    l_ulong new_len,
 		    l_ulong flags,
-		    l_ulong new_addr
+		    void *new_addr
 		);
 	}
 217	AUE_NULL	STD	{
@@ -1398,7 +1398,7 @@
 	}
 227	AUE_MSYNC	STD	{
 		int linux_msync(
-		    l_ulong addr,
+		    void *addr,
 		    l_size_t len,
 		    l_int fl
 		);
@@ -1425,14 +1425,14 @@
 	}
 232	AUE_MINCORE	STD	{
 		int linux_mincore(
-		    l_ulong start,
+		    void *start,
 		    l_size_t len,
 		    u_char *vec
 		);
 	}
 233	AUE_MADVISE	STD	{
 		int linux_madvise(
-		    l_ulong addr,
+		    void *addr,
 		    l_size_t len,
 		    l_int behav
 		);
@@ -1653,7 +1653,7 @@
 	}
 284	AUE_NULL	STD	{
 		int linux_mlock2(
-		    l_ulong start,
+		    void *start,
 		    l_size_t len,
 		    l_int flags
 		);

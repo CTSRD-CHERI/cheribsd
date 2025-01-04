@@ -330,6 +330,11 @@ linux_mremap(struct thread *td, struct linux_mremap_args *args)
 	size_t len;
 	int error = 0;
 
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64) && !defined(COMPAT_LINUX32)
+	if (cap_covers_pages(args->addr, args->old_len) == 0)
+		return (EPROT);
+#endif
+
 	if (args->flags & ~(LINUX_MREMAP_FIXED | LINUX_MREMAP_MAYMOVE)) {
 		td->td_retval[0] = 0;
 		return (EINVAL);
@@ -339,7 +344,7 @@ linux_mremap(struct thread *td, struct linux_mremap_args *args)
 	 * Check for the page alignment.
 	 * Linux defines PAGE_MASK to be FreeBSD ~PAGE_MASK.
 	 */
-	if (args->addr & PAGE_MASK) {
+	if ((uintcap_t)args->addr & PAGE_MASK) {
 		td->td_retval[0] = 0;
 		return (EINVAL);
 	}
@@ -353,12 +358,12 @@ linux_mremap(struct thread *td, struct linux_mremap_args *args)
 	}
 
 	if (args->new_len < args->old_len) {
-		addr = args->addr + args->new_len;
+		addr = (uintptr_t)(uintcap_t)args->addr + args->new_len;
 		len = args->old_len - args->new_len;
 		error = kern_munmap(td, addr, len);
 	}
 
-	td->td_retval[0] = error ? 0 : (uintptr_t)args->addr;
+	td->td_retval[0] = error ? 0 : (uintcap_t)args->addr;
 	return (error);
 }
 
@@ -369,15 +374,10 @@ linux_mremap(struct thread *td, struct linux_mremap_args *args)
 // We include the capability-specific checks by calling sys_msync
 // instead of kern_msync directly when the supplied args are capabilities
 
-// PCuABI should pass in capabilities
-// But current argument is still ulong
-// TODO: Fix this
-
 int
 linux_msync(struct thread *td, struct linux_msync_args *args)
 {
-	// defined(COMPAT_LINUX64) || defined(COMPAT_LINUX32)
-#if 1
+#if defined(COMPAT_LINUX64) || defined(COMPAT_LINUX32)
 	return (kern_msync(td, args->addr, args->len,
 	    args->fl & ~LINUX_MS_SYNC));
 #else
@@ -429,7 +429,12 @@ int
 linux_mprotect(struct thread *td, struct linux_mprotect_args *uap)
 {
 
-	return (linux_mprotect_common(td, PTROUT(uap->addr), uap->len,
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64) && !defined(COMPAT_LINUX32)
+	if (cap_covers_pages(uap->addr, uap->len) == 0)
+		return (EPROT);
+#endif
+
+	return (linux_mprotect_common(td, (uintptr_t)(uintcap_t)uap->addr, uap->len,
 	    uap->prot));
 }
 
@@ -437,7 +442,12 @@ int
 linux_madvise(struct thread *td, struct linux_madvise_args *uap)
 {
 
-	return (linux_madvise_common(td, PTROUT(uap->addr), uap->len,
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64) && !defined(COMPAT_LINUX32)
+	if (cap_covers_pages(uap->addr, uap->len) == 0)
+		return (EPROT);
+#endif
+
+	return (linux_madvise_common(td, (uintptr_t)(uintcap_t)uap->addr, uap->len,
 	    uap->behav));
 }
 
@@ -2690,10 +2700,21 @@ linux_mincore(struct thread *td, struct linux_mincore_args *args)
 {
 
 	/* Needs to be page-aligned */
-	if (args->start & PAGE_MASK)
+	if ((uintcap_t)args->start & PAGE_MASK)
 		return (EINVAL);
+
+#if defined(COMPAT_LINUX64) || defined(COMPAT_LINUX32)
 	return (kern_mincore(td, args->start, args->len,
-	    LINUX_USER_CAP(args->vec, args->len)));
+	    LINUX_USER_CAP(args->vec, btoc(args->len))));
+#else
+	struct mincore_args bargs = {
+		.addr = args->addr,
+		.len = args->len,
+		.vec = args->vec
+	};
+
+	return (sys_mincore(td, &bargs));
+#endif
 }
 
 #define	SYSLOG_TAG	"<6>"
