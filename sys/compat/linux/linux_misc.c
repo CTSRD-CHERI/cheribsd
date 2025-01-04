@@ -921,7 +921,7 @@ linux_common_wait(struct thread *td, idtype_t idtype, int id, int * __capability
 	if (error == 0 && infop != NULL && td->td_retval[0] != 0) {
 		sig = bsd_to_linux_signal(siginfo.si_signo);
 		siginfo_to_lsiginfo(&siginfo, &lsi, sig);
-		error = copyout(&lsi, infop, sizeof(lsi));
+		error = copyoutcap(&lsi, infop, sizeof(lsi));
 	}
 
 	return (error);

@@ -507,7 +507,7 @@ linux_common_rt_sigtimedwait(struct thread *td, l_sigset_t * __capability mask,
 	if (ptr) {
 		memset(&lsi, 0, sizeof(lsi));
 		siginfo_to_lsiginfo(&ksi.ksi_info, &lsi, sig);
-		error = copyout(&lsi, ptr, sizeof(lsi));
+		error = copyoutcap(&lsi, ptr, sizeof(lsi));
 	}
 	if (error == 0)
 		td->td_retval[0] = sig;

@@ -264,7 +264,7 @@ linux_ptrace_getsiginfo(struct thread *td, pid_t pid, void * __capability data)
 	sig = bsd_to_linux_signal(lwpinfo.pl_siginfo.si_signo);
 	memset(&l_siginfo, 0, sizeof(l_siginfo));
 	siginfo_to_lsiginfo(&lwpinfo.pl_siginfo, &l_siginfo, sig);
-	error = copyout(&l_siginfo, data, sizeof(l_siginfo));
+	error = copyoutcap(&l_siginfo, data, sizeof(l_siginfo));
 	return (error);
 }
 
