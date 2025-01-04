@@ -900,11 +900,11 @@ struct linux_munmap_args {
 	char len_l_[PADL_(l_size_t)]; l_size_t len; char len_r_[PADR_(l_size_t)];
 };
 struct linux_mremap_args {
-	char addr_l_[PADL_(l_ulong)]; l_ulong addr; char addr_r_[PADR_(l_ulong)];
+	char addr_l_[PADL_(void * __capability)]; void * __capability addr; char addr_r_[PADR_(void * __capability)];
 	char old_len_l_[PADL_(l_ulong)]; l_ulong old_len; char old_len_r_[PADR_(l_ulong)];
 	char new_len_l_[PADL_(l_ulong)]; l_ulong new_len; char new_len_r_[PADR_(l_ulong)];
 	char flags_l_[PADL_(l_ulong)]; l_ulong flags; char flags_r_[PADR_(l_ulong)];
-	char new_addr_l_[PADL_(l_ulong)]; l_ulong new_addr; char new_addr_r_[PADR_(l_ulong)];
+	char new_addr_l_[PADL_(void * __capability)]; void * __capability new_addr; char new_addr_r_[PADR_(void * __capability)];
 };
 struct linux_add_key_args {
 	syscallarg_t dummy;
@@ -953,7 +953,7 @@ struct linux_mprotect_args {
 	char prot_l_[PADL_(l_ulong)]; l_ulong prot; char prot_r_[PADR_(l_ulong)];
 };
 struct linux_msync_args {
-	char addr_l_[PADL_(l_ulong)]; l_ulong addr; char addr_r_[PADR_(l_ulong)];
+	char addr_l_[PADL_(void * __capability)]; void * __capability addr; char addr_r_[PADR_(void * __capability)];
 	char len_l_[PADL_(l_size_t)]; l_size_t len; char len_r_[PADR_(l_size_t)];
 	char fl_l_[PADL_(l_int)]; l_int fl; char fl_r_[PADR_(l_int)];
 };
@@ -966,12 +966,12 @@ struct linux_munlock_args {
 	char len_l_[PADL_(l_size_t)]; l_size_t len; char len_r_[PADR_(l_size_t)];
 };
 struct linux_mincore_args {
-	char start_l_[PADL_(l_ulong)]; l_ulong start; char start_r_[PADR_(l_ulong)];
+	char start_l_[PADL_(void * __capability)]; void * __capability start; char start_r_[PADR_(void * __capability)];
 	char len_l_[PADL_(l_size_t)]; l_size_t len; char len_r_[PADR_(l_size_t)];
 	char vec_l_[PADL_(u_char * __capability)]; u_char * __capability vec; char vec_r_[PADR_(u_char * __capability)];
 };
 struct linux_madvise_args {
-	char addr_l_[PADL_(l_ulong)]; l_ulong addr; char addr_r_[PADR_(l_ulong)];
+	char addr_l_[PADL_(void * __capability)]; void * __capability addr; char addr_r_[PADR_(void * __capability)];
 	char len_l_[PADL_(l_size_t)]; l_size_t len; char len_r_[PADR_(l_size_t)];
 	char behav_l_[PADL_(l_int)]; l_int behav; char behav_r_[PADR_(l_int)];
 };
@@ -1141,7 +1141,7 @@ struct linux_membarrier_args {
 	char flags_l_[PADL_(l_int)]; l_int flags; char flags_r_[PADR_(l_int)];
 };
 struct linux_mlock2_args {
-	char start_l_[PADL_(l_ulong)]; l_ulong start; char start_r_[PADR_(l_ulong)];
+	char start_l_[PADL_(void * __capability)]; void * __capability start; char start_r_[PADR_(void * __capability)];
 	char len_l_[PADL_(l_size_t)]; l_size_t len; char len_r_[PADR_(l_size_t)];
 	char flags_l_[PADL_(l_int)]; l_int flags; char flags_r_[PADR_(l_int)];
 };

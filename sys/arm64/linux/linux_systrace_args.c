@@ -1730,11 +1730,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* linux_mremap */
 	case 216: {
 		struct linux_mremap_args *p = params;
-		iarg[a++] = p->addr; /* l_ulong */
+		uarg[a++] = (intptr_t)p->addr; /* void * __capability */
 		iarg[a++] = p->old_len; /* l_ulong */
 		iarg[a++] = p->new_len; /* l_ulong */
 		iarg[a++] = p->flags; /* l_ulong */
-		iarg[a++] = p->new_addr; /* l_ulong */
+		uarg[a++] = (intptr_t)p->new_addr; /* void * __capability */
 		*n_args = 5;
 		break;
 	}
@@ -1819,7 +1819,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* linux_msync */
 	case 227: {
 		struct linux_msync_args *p = params;
-		iarg[a++] = p->addr; /* l_ulong */
+		uarg[a++] = (intptr_t)p->addr; /* void * __capability */
 		iarg[a++] = p->len; /* l_size_t */
 		iarg[a++] = p->fl; /* l_int */
 		*n_args = 3;
@@ -1856,7 +1856,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* linux_mincore */
 	case 232: {
 		struct linux_mincore_args *p = params;
-		iarg[a++] = p->start; /* l_ulong */
+		uarg[a++] = (intptr_t)p->start; /* void * __capability */
 		iarg[a++] = p->len; /* l_size_t */
 		uarg[a++] = (intptr_t)p->vec; /* u_char * __capability */
 		*n_args = 3;
@@ -1865,7 +1865,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* linux_madvise */
 	case 233: {
 		struct linux_madvise_args *p = params;
-		iarg[a++] = p->addr; /* l_ulong */
+		uarg[a++] = (intptr_t)p->addr; /* void * __capability */
 		iarg[a++] = p->len; /* l_size_t */
 		iarg[a++] = p->behav; /* l_int */
 		*n_args = 3;
@@ -2155,7 +2155,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* linux_mlock2 */
 	case 284: {
 		struct linux_mlock2_args *p = params;
-		iarg[a++] = p->start; /* l_ulong */
+		uarg[a++] = (intptr_t)p->start; /* void * __capability */
 		iarg[a++] = p->len; /* l_size_t */
 		iarg[a++] = p->flags; /* l_int */
 		*n_args = 3;
@@ -5306,7 +5306,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 216:
 		switch (ndx) {
 		case 0:
-			p = "l_ulong";
+			p = "userland void * __capability";
 			break;
 		case 1:
 			p = "l_ulong";
@@ -5318,7 +5318,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "l_ulong";
 			break;
 		case 4:
-			p = "l_ulong";
+			p = "userland void * __capability";
 			break;
 		default:
 			break;
@@ -5448,7 +5448,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 227:
 		switch (ndx) {
 		case 0:
-			p = "l_ulong";
+			p = "userland void * __capability";
 			break;
 		case 1:
 			p = "l_size_t";
@@ -5503,7 +5503,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 232:
 		switch (ndx) {
 		case 0:
-			p = "l_ulong";
+			p = "userland void * __capability";
 			break;
 		case 1:
 			p = "l_size_t";
@@ -5519,7 +5519,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 233:
 		switch (ndx) {
 		case 0:
-			p = "l_ulong";
+			p = "userland void * __capability";
 			break;
 		case 1:
 			p = "l_size_t";
@@ -5994,7 +5994,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 284:
 		switch (ndx) {
 		case 0:
-			p = "l_ulong";
+			p = "userland void * __capability";
 			break;
 		case 1:
 			p = "l_size_t";
