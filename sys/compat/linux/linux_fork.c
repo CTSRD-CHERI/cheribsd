@@ -460,7 +460,7 @@ linux_clone3(struct thread *td, struct linux_clone3_args *args)
 	ca->child_tid = LINUX_USER_CAP(uca->child_tid, sizeof(l_int));
 	ca->parent_tid = LINUX_USER_CAP(uca->parent_tid, sizeof(l_int));
 	ca->exit_signal = uca->exit_signal;
-	ca->stack = LINUX_USER_CAP(uca->stack, uca->stack_size) + uca->stack_size;
+	ca->stack = (uintcap_t)LINUX_USER_CAP(uca->stack, uca->stack_size) + uca->stack_size;
 	ca->stack_size = uca->stack_size;
 	ca->tls = LINUX_USER_CAP_UNBOUND(uca->tls);
 
