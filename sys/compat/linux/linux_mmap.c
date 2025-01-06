@@ -115,7 +115,11 @@ linux_mmap_common(struct thread *td, uintptr_t addr, size_t len, int prot,
 	} else
 		bsd_flags |= MAP_NOSYNC;
 	if (flags & LINUX_MAP_GROWSDOWN)
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64) && !defined(COMPAT_LINUX32)
+		return (EOPNOTSUPP);
+#else
 		bsd_flags |= MAP_STACK;
+#endif
 
 #if defined(__amd64__)
 	/*
