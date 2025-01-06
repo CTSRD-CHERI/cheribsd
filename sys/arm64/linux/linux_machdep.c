@@ -48,11 +48,11 @@
 
 
 int
-linux_set_upcall(struct thread *td, register_t stack)
+linux_set_upcall(struct thread *td, void * __capability stack)
 {
 
 	if (stack)
-		td->td_frame->tf_sp = stack;
+		td->td_frame->tf_sp = (uintcap_t)stack;
 
 	/*
 	 * The newly created Linux thread returns
@@ -63,13 +63,13 @@ linux_set_upcall(struct thread *td, register_t stack)
 }
 
 int
-linux_set_cloned_tls(struct thread *td, void *desc)
+linux_set_cloned_tls(struct thread *td, void * __capability desc)
 {
 
-	if ((uint64_t)desc >= VM_MAXUSER_ADDRESS)
+	if ((uint64_t)(uintcap_t)desc >= VM_MAXUSER_ADDRESS)
 		return (EPERM);
 
-	return (cpu_set_user_tls(td, __USER_CAP_UNBOUND(desc)));
+	return (cpu_set_user_tls(td, desc));
 }
 
 void
