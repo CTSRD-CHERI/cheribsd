@@ -1757,9 +1757,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 220: {
 		struct linux_clone_args *p = params;
 		iarg[a++] = p->flags; /* l_ulong */
-		iarg[a++] = p->stack; /* l_ulong */
+		uarg[a++] = (intptr_t)p->stack; /* l_uintcap_t */
 		uarg[a++] = (intptr_t)p->parent_tidptr; /* l_int * __capability */
-		iarg[a++] = p->tls; /* l_ulong */
+		uarg[a++] = (intptr_t)p->tls; /* l_uintcap_t */
 		uarg[a++] = (intptr_t)p->child_tidptr; /* l_int * __capability */
 		*n_args = 5;
 		break;
@@ -5340,13 +5340,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "l_ulong";
 			break;
 		case 1:
-			p = "l_ulong";
+			p = "l_uintcap_t";
 			break;
 		case 2:
 			p = "userland l_int * __capability";
 			break;
 		case 3:
-			p = "l_ulong";
+			p = "l_uintcap_t";
 			break;
 		case 4:
 			p = "userland l_int * __capability";

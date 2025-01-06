@@ -917,9 +917,9 @@ struct linux_keyctl_args {
 };
 struct linux_clone_args {
 	char flags_l_[PADL_(l_ulong)]; l_ulong flags; char flags_r_[PADR_(l_ulong)];
-	char stack_l_[PADL_(l_ulong)]; l_ulong stack; char stack_r_[PADR_(l_ulong)];
+	char stack_l_[PADL_(l_uintcap_t)]; l_uintcap_t stack; char stack_r_[PADR_(l_uintcap_t)];
 	char parent_tidptr_l_[PADL_(l_int * __capability)]; l_int * __capability parent_tidptr; char parent_tidptr_r_[PADR_(l_int * __capability)];
-	char tls_l_[PADL_(l_ulong)]; l_ulong tls; char tls_r_[PADR_(l_ulong)];
+	char tls_l_[PADL_(l_uintcap_t)]; l_uintcap_t tls; char tls_r_[PADR_(l_uintcap_t)];
 	char child_tidptr_l_[PADL_(l_int * __capability)]; l_int * __capability child_tidptr; char child_tidptr_r_[PADR_(l_int * __capability)];
 };
 struct linux_execve_args {
