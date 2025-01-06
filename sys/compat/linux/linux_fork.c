@@ -210,7 +210,7 @@ linux_clone_proc(struct thread *td, struct l_clone_args *args)
 	linux_set_upcall(td2, args->stack);
 
 	if (args->flags & LINUX_CLONE_SETTLS)
-		linux_set_cloned_tls(td2, PTRIN(args->tls));
+		linux_set_cloned_tls(td2, args->tls);
 
 	/*
 	 * If CLONE_PARENT is set, then the parent of the new process will be
@@ -255,7 +255,7 @@ linux_clone_thread(struct thread *td, struct l_clone_args *args)
 			return (EINVAL);
 
 	/* Threads should be created with own stack */
-	if (PTRIN(args->stack) == NULL)
+	if (args->stack == NULL)
 		return (EINVAL);
 
 	p = td->td_proc;
@@ -292,7 +292,7 @@ linux_clone_thread(struct thread *td, struct l_clone_args *args)
 	KASSERT(em != NULL, ("clone_thread: emuldata not found.\n"));
 
 	if (args->flags & LINUX_CLONE_SETTLS)
-		linux_set_cloned_tls(newtd, PTRIN(args->tls));
+		linux_set_cloned_tls(newtd, args->tls);
 
 	if (args->flags & LINUX_CLONE_CHILD_SETTID)
 		em->child_set_tid = args->child_tid;
@@ -366,8 +366,8 @@ linux_clone(struct thread *td, struct linux_clone_args *args)
 		.child_tid = LINUX_USER_CAP_OBJ(args->child_tidptr),
 		.parent_tid = LINUX_USER_CAP_OBJ(args->parent_tidptr),
 		.exit_signal = (lower_32_bits(args->flags) & LINUX_CSIGNAL),
-		.stack = args->stack,
-		.tls = args->tls,
+		.stack = LINUX_USER_CAP_UNBOUND(args->stack),
+		.tls = LINUX_USER_CAP_UNBOUND(args->tls),
 	};
 
 	if (args->flags & LINUX_CLONE_THREAD)
@@ -449,7 +449,7 @@ linux_clone3(struct thread *td, struct linux_clone3_args *args)
 	 */
 	size = max(args->usize, sizeof(*uca));
 	uca = malloc(size, M_LINUX, M_WAITOK | M_ZERO);
-	error = copyin(LINUX_USER_CAP(args->uargs, args->usize), uca, args->usize);
+	error = copyincap(LINUX_USER_CAP(args->uargs, args->usize), uca, args->usize);
 	if (error != 0)
 		goto out;
 	error = linux_clone3_args_valid(uca);
@@ -460,9 +460,9 @@ linux_clone3(struct thread *td, struct linux_clone3_args *args)
 	ca->child_tid = LINUX_USER_CAP(uca->child_tid, sizeof(l_int));
 	ca->parent_tid = LINUX_USER_CAP(uca->parent_tid, sizeof(l_int));
 	ca->exit_signal = uca->exit_signal;
-	ca->stack = uca->stack + uca->stack_size;
+	ca->stack = LINUX_USER_CAP(uca->stack, uca->stack_size) + uca->stack_size;
 	ca->stack_size = uca->stack_size;
-	ca->tls = uca->tls;
+	ca->tls = LINUX_USER_CAP_UNBOUND(uca->tls);
 
 	if ((ca->flags & LINUX_CLONE_THREAD) != 0)
 		error = linux_clone_thread(td, ca);

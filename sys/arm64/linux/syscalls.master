@@ -1350,9 +1350,9 @@
 220	AUE_RFORK	STD	{
 		int linux_clone(
 		    l_ulong flags,
-		    l_ulong stack,
+		    l_uintptr_t stack,
 		    l_int *parent_tidptr,
-		    l_ulong tls,
+		    l_uintptr_t tls,
 		    l_int *child_tidptr
 		);
 	}

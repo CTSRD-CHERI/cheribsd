@@ -68,14 +68,14 @@
  */
 struct l_user_clone_args {
 	uint64_t flags;
-	uint64_t pidfd;
-	uint64_t child_tid;
-	uint64_t parent_tid;
+	l_uintptr_t pidfd;
+	l_uintptr_t child_tid;
+	l_uintptr_t parent_tid;
 	uint64_t exit_signal;
-	uint64_t stack;
+	l_uintptr_t stack;
 	uint64_t stack_size;
-	uint64_t tls;
-	uint64_t set_tid;
+	l_uintptr_t tls;
+	l_uintptr_t set_tid;
 	uint64_t set_tid_size;
 	uint64_t cgroup;
 };
@@ -88,15 +88,15 @@ struct l_clone_args {
 	l_int * __kerncap child_tid;
 	l_int * __kerncap parent_tid;
 	l_int exit_signal;
-	l_ulong stack;
+	void * __kerncap stack;
 	l_ulong stack_size;
-	l_ulong tls;
+	void * __kerncap tls;
 };
 
 #define	LINUX_CLONE_ARGS_SIZE_VER0	64
 
-int linux_set_upcall(struct thread *, register_t);
-int linux_set_cloned_tls(struct thread *, void *);
+int linux_set_upcall(struct thread *, void * __capability);
+int linux_set_cloned_tls(struct thread *, void * __capability);
 void linux_thread_detach(struct thread *);
 #endif /* defined(_KERNEL) */
 
