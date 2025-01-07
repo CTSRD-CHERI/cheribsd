@@ -335,6 +335,8 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	if (cheri_gettag(uap->addr)) {
 		if ((flags & MAP_FIXED) == 0)
 			return (EPROT);
+		else if ((flags & MAP_STACK) != 0)
+			return (ENOMEM);
 		else if ((cheri_getperm(uap->addr) & CHERI_PERM_SW_VMEM))
 			source_cap = uap->addr;
 		else {
