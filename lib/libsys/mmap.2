@@ -409,6 +409,14 @@ and
 .Dv PROT_WRITE .
 The size of the guard, in pages, is specified by sysctl
 .Dv security.bsd.stack_guard_page .
+.Pp
+Under CheriABI,
+.Dv MAP_STACK
+may not be combined with
+.Dv MAP_FIXED
+and an
+.Fa addr
+argument that is a valid pointer.
 .El
 .Pp
 The
