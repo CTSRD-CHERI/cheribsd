@@ -307,14 +307,23 @@ _cheribsdtest_check_errno(const char *context, int actual, int expected)
 	    context, actual, actual_str, expected, expected_str);
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	__CHERIBSDTEST_PTR_FMT	"%#p"
+#else
+#define	__CHERIBSDTEST_PTR_FMT	"%p"
+#endif
+
 /** Check that @p call fails and errno is set to @p expected_errno */
 #define CHERIBSDTEST_CHECK_CALL_ERROR(call, expected_errno)		\
 	do {								\
 		errno = 0;						\
-		int __ret = call;					\
+		__typeof(call) __ret = call;				\
 		int call_errno = errno;					\
-		CHERIBSDTEST_VERIFY2(__ret == -1,			\
-		    #call " unexpectedly returned %d", __ret);		\
+		CHERIBSDTEST_VERIFY2(__ret == (__typeof(__ret))-1,	\
+		    _Generic((__ret),					\
+			void *: #call " unexpectedly returned " __CHERIBSDTEST_PTR_FMT, \
+			default: #call " unexpectedly returned %d"),	\
+		    __ret);						\
 		_cheribsdtest_check_errno(#call, call_errno,		\
 		    expected_errno);					\
 	} while (0)

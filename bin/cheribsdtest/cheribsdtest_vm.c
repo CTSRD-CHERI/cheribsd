@@ -168,7 +168,7 @@ CHERIBSDTEST(vm_notag_mprotect_no_cap,
 static void
 mmap_check_bad_protections(int prot, int expected_errno)
 {
-	CHERIBSDTEST_CHECK_CALL_ERROR((int)(intptr_t)mmap(NULL, getpagesize(),
+	CHERIBSDTEST_CHECK_CALL_ERROR(mmap(NULL, getpagesize(),
 	    prot, MAP_ANON, -1, 0), expected_errno);
 }
 
