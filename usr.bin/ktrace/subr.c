@@ -73,7 +73,7 @@ getpoints(char *s)
 			facs |= KTRFAC_SYSERRCAUSE;
 			break;
 		case 't':
-			facs |= KTRFAC_STRUCT;
+			facs |= KTRFAC_STRUCT | KTRFAC_STRUCT_ARRAY;
 			break;
 		case 'u':
 			facs |= KTRFAC_USER;
