@@ -5437,6 +5437,7 @@ vm_map_stack_locked(vm_map_t map, vm_pointer_t addrbos, vm_size_t max_ssize,
 	vm_pointer_t bot, gap_bot, gap_top, top;
 	vm_size_t init_ssize, sgp;
 	int orient, rv;
+	vm_offset_t reservation;
 
 	/*
 	 * The stack orientation is piggybacked with the cow argument.
@@ -5462,13 +5463,18 @@ vm_map_stack_locked(vm_map_t map, vm_pointer_t addrbos, vm_size_t max_ssize,
 		init_ssize = max_ssize - sgp;
 
 	if (map->flags & MAP_RESERVATIONS) {
-		/* Check reservation exists */
+		/*
+		 * If this map enables reservations, a reservation must have
+		 * already been created for us.
+		 */
 		if (vm_map_lookup_entry(map, addrbos, &prev_entry) == 0 ||
 		    (prev_entry->eflags & MAP_ENTRY_UNMAPPED) == 0)
 			return (KERN_PROTECTION_FAILURE);
 		/* If reservation can't accommodate max_ssize, no go. */
 		if (prev_entry->end - (vm_offset_t)addrbos < max_ssize)
 			return (KERN_NO_SPACE);
+
+		reservation = prev_entry->reservation;
 	} else {
 		/* If addr is already mapped, no go */
 		if (vm_map_lookup_entry(map, addrbos, &prev_entry))
@@ -5478,6 +5484,8 @@ vm_map_stack_locked(vm_map_t map, vm_pointer_t addrbos, vm_size_t max_ssize,
 		 */
 		if (vm_map_entry_succ(prev_entry)->start < addrbos + max_ssize)
 			return (KERN_NO_SPACE);
+
+		reservation = addrbos;
 	}
 
 	/*
@@ -5501,7 +5509,7 @@ vm_map_stack_locked(vm_map_t map, vm_pointer_t addrbos, vm_size_t max_ssize,
 		gap_bot = top;
 		gap_top = addrbos + max_ssize;
 	}
-	rv = vm_map_insert1(map, NULL, 0, bot, top, prot, max, cow, addrbos,
+	rv = vm_map_insert1(map, NULL, 0, bot, top, prot, max, cow, reservation,
 	    &new_entry);
 	if (rv != KERN_SUCCESS)
 		return (rv);
@@ -5517,7 +5525,7 @@ vm_map_stack_locked(vm_map_t map, vm_pointer_t addrbos, vm_size_t max_ssize,
 		return (KERN_SUCCESS);
 	rv = vm_map_insert1(map, NULL, 0, gap_bot, gap_top, VM_PROT_NONE,
 	    VM_PROT_NONE, MAP_CREATE_GUARD | (orient == MAP_STACK_GROWS_DOWN ?
-	    MAP_CREATE_STACK_GAP_DN : MAP_CREATE_STACK_GAP_UP), addrbos,
+	    MAP_CREATE_STACK_GAP_DN : MAP_CREATE_STACK_GAP_UP), reservation,
 	    &gap_entry);
 	if (rv == KERN_SUCCESS) {
 		KASSERT((gap_entry->eflags & MAP_ENTRY_GUARD) != 0,

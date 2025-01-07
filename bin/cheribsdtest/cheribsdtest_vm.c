@@ -2844,4 +2844,38 @@ CHERIBSDTEST(cheri_revoke_shm_anon_hoard_closed,
 
 #endif /* CHERIBSDTEST_CHERI_REVOKE_TESTS */
 
+/*
+ * This test is derived from a syskiller panic.  Bugs in
+ * vm_map_stack_locked() when the stack was being inserted into an
+ * existing reservation (why would anyone do this in the real world?)
+ * caused a panic.
+ * https://github.com/CTSRD-CHERI/cheribsd/issues/2252
+ */
+CHERIBSDTEST(mmap_insert_stack, "insert a stack mapping in a reservation")
+{
+	void *p;
+
+	p = CHERIBSDTEST_CHECK_SYSCALL(mmap((void *)(intptr_t)0x20000000,
+	    0x1000000, PROT_WRITE | PROT_READ,
+	    MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0));
+
+	/*
+	 * This would fail, but leave the map in a broken state due to
+	 * trying to insert a reservation inside an existing one.
+	 *
+	 * We don't check it because it is needed to set up the panic.
+	 */
+	mmap(cheri_setaddress(p, 0x20ffc000), 0x2000,
+	    PROT_WRITE | PROT_READ, MAP_STACK | MAP_FIXED, -1, 0);
+
+	/*
+	 * This would trigger a panic by trying to remove an unmapped
+	 * entry left by the previous mmap.
+	 */
+	CHERIBSDTEST_CHECK_SYSCALL(munmap(cheri_setaddress(p, 0x20ffc000),
+	    0x3000));
+
+	cheribsdtest_success();
+}
+
 #endif /* __CHERI_PURE_CAPABILITY__ */
