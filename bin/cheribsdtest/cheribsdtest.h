@@ -308,14 +308,15 @@ _cheribsdtest_check_errno(const char *context, int actual, int expected)
 }
 
 /** Check that @p call fails and errno is set to @p expected_errno */
-#define CHERIBSDTEST_CHECK_CALL_ERROR(call, expected_errno)			\
-	do {									\
-		errno = 0;							\
-		int __ret = call;						\
-		int call_errno = errno;						\
-		CHERIBSDTEST_VERIFY2(__ret == -1,				\
-		    #call " unexpectedly returned %d", __ret);			\
-		_cheribsdtest_check_errno(#call, call_errno, expected_errno);	\
+#define CHERIBSDTEST_CHECK_CALL_ERROR(call, expected_errno)		\
+	do {								\
+		errno = 0;						\
+		int __ret = call;					\
+		int call_errno = errno;					\
+		CHERIBSDTEST_VERIFY2(__ret == -1,			\
+		    #call " unexpectedly returned %d", __ret);		\
+		_cheribsdtest_check_errno(#call, call_errno,		\
+		    expected_errno);					\
 	} while (0)
 
 /* For libc_memcpy and libc_memset tests and the unaligned copy tests: */
