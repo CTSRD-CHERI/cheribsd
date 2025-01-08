@@ -1485,6 +1485,11 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	    break;
 
 	case DT_JMPREL:
+#ifdef __aarch64__
+	    /* Ignore empty PLT entries for Morello. */
+	    if (dynp->d_un.d_ptr == 0)
+		break;
+#endif
 	    obj->pltrel = (const Elf_Rel *)
 	      (obj->relocbase + dynp->d_un.d_ptr);
 	    break;
@@ -1643,6 +1648,11 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	    break;
 
 	case DT_PLTGOT:
+#ifdef __aarch64__
+	    /* Ignore empty PLT entries for Morello. */
+	    if (dynp->d_un.d_ptr == 0)
+		break;
+#endif
 	    obj->pltgot = (uintptr_t *)(obj->relocbase + dynp->d_un.d_ptr);
 	    break;
 
