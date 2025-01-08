@@ -1934,7 +1934,7 @@ linux_timer_callback_wrapper(void *context)
 }
 
 int
-mod_timer(struct timer_list *timer, unsigned long expires)
+mod_timer(struct timer_list *timer, int expires)
 {
 	int ret;
 
