@@ -112,6 +112,10 @@ LDFLAGS+= -Wl,-zbti-report=error
 .endif
 .endif
 
+.if ${MACHINE_CPUARCH} == "aarch64" && ${MACHINE_CPU:Mcheri}
+LDFLAGS+= -Wl,--local-caprelocs=elf
+.endif
+
 # Initialize stack variables on function entry
 .if ${OPT_INIT_ALL} != "none"
 .if ${COMPILER_FEATURES:Minit-all}
