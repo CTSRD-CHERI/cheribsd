@@ -51,6 +51,7 @@ FBSD_1.7 {
 	 procstat_get_revoker_epoch;
 	 procstat_get_revoker_state;
 	 procstat_getc18n;
+	 procstat_getcompartments;
 };
 
 FBSD_1.8 {

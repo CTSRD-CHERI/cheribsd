@@ -176,6 +176,10 @@ Display CHERI-specific information about the process.
 If the
 .Fl v
 flag is passed then extra information is shown.
+.It Ar compartments
+Display information on
+.Xr c18n 7
+compartments within the process.
 .It Ar environment | Fl e
 Display environment variables for the process.
 .Pp
@@ -379,6 +383,21 @@ revoker being initialized
 revoker initialized, epoch open
 .It closing
 revoker finishing an epoch
+.El
+.Ss Compartment List
+Display the list of
+.Xr c18n 7
+compartments within a process:
+.Pp
+.Bl -tag -width CNAME -compact
+.It PID
+process ID
+.It COMM
+command
+.It CID
+compartment ID
+.It CNAME
+compartment name
 .El
 .Ss Environment Variables
 Display the process ID, command, and environment variables:
