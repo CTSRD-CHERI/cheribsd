@@ -310,6 +310,7 @@ selectedArchitectures.each { suffix ->
         }
         cheribuildProject(target: "cheribsd-${suffix}", architecture: suffix,
                           extraArgs: cheribuildArgs.join(" "),
+                          nodeLabel: "linux-next",
                           skipArchiving: true, skipTarball: true,
                           sdkCompilerOnly: true,
                           // We only need clang not the CheriBSD sysroot since we are building that.
