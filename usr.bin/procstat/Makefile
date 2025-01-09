@@ -10,6 +10,7 @@ SRCS=	procstat.c		\
 	procstat_bin.c		\
 	procstat_c18n.c		\
 	procstat_cheri.c	\
+	procstat_compartments.c	\
 	procstat_cred.c		\
 	procstat_cs.c		\
 	procstat_files.c	\

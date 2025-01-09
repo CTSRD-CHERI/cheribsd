@@ -1,10 +1,16 @@
 /*-
  * SPDX-License-Identifier: BSD-4-Clause
  *
+ * Copyright (c) 2024 Capabilities Limited
  * Copyright (c) 2017 Dell EMC
  * Copyright (c) 2009 Stanislav Sedov <stas@FreeBSD.org>
  * Copyright (c) 1988, 1993
  *      The Regents of the University of California.  All rights reserved.
+ *
+ * This software was developed by SRI International, the University of
+ * Cambridge Computer Laboratory (Department of Computer Science and
+ * Technology), and Capabilities Limited under Defense Advanced Research
+ * Projects Agency (DARPA) Contract No. FA8750-24-C-B047 ("DEC").
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -384,7 +390,7 @@ procstat_getc18n(struct procstat *procstat, struct kinfo_proc *kp,
 
 	name[0] = CTL_KERN;
 	name[1] = KERN_PROC;
-	name[2] = KERN_PROC_C18N;
+	name[2] = KERN_PROC_C18N_STATS;
 	name[3] = kp->ki_pid;
 	if (sysctl(name, nitems(name), buf, &len, NULL, 0) != 0) {
 		if (errno != ESRCH && errno != EPERM && errno != ENOEXEC)
@@ -396,6 +402,84 @@ procstat_getc18n(struct procstat *procstat, struct kinfo_proc *kp,
 	*stats = *rcs;
 	return (0);
 out:
+	return (-1);
+}
+
+int
+procstat_getcompartments(struct procstat *procstat, struct kinfo_proc *kp,
+    struct cheri_c18n_compart **comparts, size_t *ncompartsp)
+{
+	int name[4];
+	char *inbuf;
+	size_t n, i, cur, size;
+	struct cheri_c18n_compart *outbuf, *cp;
+
+	if (comparts == NULL || ncompartsp == NULL)
+		goto out;
+
+	switch (procstat->type) {
+	case PROCSTAT_KVM:
+		warnx("kvm method is not supported");
+		goto out;
+
+	case PROCSTAT_SYSCTL:
+		break;
+
+	case PROCSTAT_CORE:
+		warnx("core method is not supported");
+		goto out;
+
+	default:
+		warnx("unknown access method: %d", procstat->type);
+		goto out;
+	}
+
+	name[0] = CTL_KERN;
+	name[1] = KERN_PROC;
+	name[2] = KERN_PROC_C18N_COMPARTS;
+	name[3] = kp->ki_pid;
+
+	/* Estimate the size of the input buffer. */
+	if (sysctl(name, nitems(name), NULL, &size, NULL, 0) != 0) {
+		if (errno != ESRCH && errno != EPERM && errno != ENOEXEC)
+			warn("sysctl(kern.proc.c18n_compartments)");
+		goto out;
+	}
+
+	/* Receive the input buffer and count the number of items. */
+	inbuf = malloc(size);
+	if (inbuf == NULL)
+		goto out;
+	if (sysctl(name, nitems(name), inbuf, &size, NULL, 0) != 0) {
+		if (errno != ESRCH && errno != EPERM && errno != ENOEXEC)
+			warn("sysctl(kern.proc.c18n_compartments)");
+		goto out_free;
+	}
+	for (n = 0, cur = 0; cur < size; ++n) {
+		cp = (struct cheri_c18n_compart *)(void *)&inbuf[cur];
+		cur += cp->ccc_structsize;
+	}
+
+	/* Unpack elements of the input buffer into the output buffer. */
+	outbuf = malloc(n * sizeof(*outbuf));
+	if (outbuf == NULL)
+		goto out_free;
+	for (i = 0, cur = 0; i < n; ++i) {
+		cp = (struct cheri_c18n_compart *)(void *)&inbuf[cur];
+		cur += cp->ccc_structsize;
+		memcpy(&outbuf[i], cp, cp->ccc_structsize);
+	}
+
+	*comparts = outbuf;
+	*ncompartsp = n;
+
+	free(inbuf);
+	return (0);
+
+out_free:
+	free(inbuf);
+out:
+	*ncompartsp = 0;
 	return (-1);
 }
 
