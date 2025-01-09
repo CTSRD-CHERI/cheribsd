@@ -148,6 +148,8 @@ const char *ld_compartment_stats;
 /* Export count of compartment switches to statistics */
 const char *ld_compartment_switch_count;
 
+/* Compartmentalisation information exported to the kernel */
+static struct cheri_c18n_info *c18n_info;
 struct rtld_c18n_stats *c18n_stats;
 
 #define	INC_NUM_COMPART		(c18n_stats->rcs_compart++, comparts.size++)
@@ -242,7 +244,8 @@ string_base_search(const struct string_base *sb, const char *str)
 
 struct compart {
 	/*
-	 * Name of the compartment
+	 * Name of the compartment. Must be the first field to enable kernel
+	 * access to compartment information.
 	 */
 	const char *name;
 	/*
@@ -296,9 +299,15 @@ expand_comparts_data(compart_id_t capacity)
 {
 	struct compart *data;
 
+	atomic_fetch_add_explicit(&c18n_info->comparts_gen, 1,
+	    memory_order_acq_rel);
+
 	data = c18n_realloc(comparts.data, sizeof(*data) * capacity);
-	comparts.data = r_debug.r_comparts = data;
+	comparts.data = c18n_info->comparts = r_debug.r_comparts = data;
 	comparts.capacity = capacity;
+
+	atomic_fetch_add_explicit(&c18n_info->comparts_gen, 1,
+	    memory_order_acq_rel);
 }
 
 static struct compart *
@@ -312,12 +321,18 @@ add_comparts_data(const char *name)
 	if (comparts.size == comparts.capacity)
 		expand_comparts_data(comparts.capacity * 2);
 
+	atomic_fetch_add_explicit(&c18n_info->comparts_gen, 1,
+	    memory_order_acq_rel);
 	GDB_COMPARTS_STATE(RCT_ADD, NULL);
+
 	com = &comparts.data[INC_NUM_COMPART];
 	*com = (struct compart) {
 		.name = name
 	};
-	r_debug.r_comparts_size = comparts.size;
+	c18n_info->comparts_size = r_debug.r_comparts_size = comparts.size;
+
+	atomic_fetch_add_explicit(&c18n_info->comparts_gen, 1,
+	    memory_order_acq_rel);
 	GDB_COMPARTS_STATE(RCT_CONSISTENT, com);
 
 	return (com);
@@ -1590,7 +1605,6 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 	int fd;
 	char *file;
 	struct stat st;
-	struct cheri_c18n_info *info;
 
 	/*
 	 * Create memory mapping for compartmentalisation statistics.
@@ -1616,13 +1630,14 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 	    memory_order_release);
 
 	if (aux_info[AT_CHERI_C18N] != NULL) {
-		info = aux_info[AT_CHERI_C18N]->a_un.a_ptr;
-		*info = (struct cheri_c18n_info) {
+		c18n_info = aux_info[AT_CHERI_C18N]->a_un.a_ptr;
+		*c18n_info = (struct cheri_c18n_info) {
 			.stats_size = sizeof(*c18n_stats),
-			.stats = c18n_stats
+			.stats = c18n_stats,
+			.comparts_entry_size = sizeof(*comparts.data)
 		};
-		atomic_store_explicit(&info->version, CHERI_C18N_INFO_VERSION,
-		    memory_order_release);
+		atomic_store_explicit(&c18n_info->version,
+		    CHERI_C18N_INFO_VERSION, memory_order_release);
 	}
 
 	/*

@@ -2,6 +2,12 @@
  * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2024 Dapeng Gao
+ * Copyright (c) 2024 Capabilities Limited
+ *
+ * This software was developed by SRI International, the University of
+ * Cambridge Computer Laboratory (Department of Computer Science and
+ * Technology), and Capabilities Limited under Defense Advanced Research
+ * Projects Agency (DARPA) Contract No. FA8750-24-C-B047 ("DEC").
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -44,7 +50,7 @@
  * initialised.
  */
 struct rtld_c18n_stats {
-	_Atomic(uint8_t) version;
+	_Atomic(size_t) version;
 	size_t rcs_compart;
 	_Atomic(size_t) rcs_ustack;
 	_Atomic(size_t) rcs_tramp;
@@ -58,12 +64,25 @@ struct rtld_c18n_stats {
  * information. The version field doubles as a synchronisation flag where a
  * non-zero value indicates that the other fields have been initialised.
  */
-#define CHERI_C18N_INFO_VERSION		1
+#define CHERI_C18N_INFO_VERSION		2
 
 struct cheri_c18n_info {
-	_Atomic(uint8_t) version;
+	_Atomic(size_t) version;
+
 	size_t stats_size;
 	struct rtld_c18n_stats * __kerncap	stats;
+
+	/*
+	 * Since the `comparts` array may be reallocated or ortherwise change
+	 * whilst the kernel is reading it, the generation counter allows the
+	 * kernel to identify such races. An even value indicates that the
+	 * array and size data are in a consistent state, and an odd value
+	 * indicates that the data may be inconsistent.
+	 */
+	_Atomic(size_t) comparts_gen;
+	size_t comparts_size;
+	size_t comparts_entry_size;
+	void * __kerncap	comparts;
 };
 
 #ifndef IN_RTLD
