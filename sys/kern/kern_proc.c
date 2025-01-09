@@ -2534,8 +2534,8 @@ sysctl_kern_proc_c18n(SYSCTL_HANDLER_ARGS)
 	    info.version != CHERI_C18N_INFO_VERSION ||
 	    info.stats_size == 0 ||
 	    info.stats_size > RTLD_C18N_STATS_MAX_SIZE ||
-	    !__CAP_CHECK(info.stats, info.stats_size) ||
-	    (cheri_getperm(info.stats) & CHERI_PERM_LOAD) == 0) {
+	    !cheri_can_access(info.stats, CHERI_PERM_LOAD,
+	    (__cheri_addr ptraddr_t)info.stats, info.stats_size)) {
 		error = ENOEXEC;
 		goto out;
 	}
@@ -2544,12 +2544,158 @@ sysctl_kern_proc_c18n(SYSCTL_HANDLER_ARGS)
 	n = proc_readmem(curthread, p, (__cheri_addr vm_offset_t)info.stats,
 	    buffer, info.stats_size);
 	if (n != info.stats_size) {
-		error = ENOMEM;
+		error = EFAULT;
 		goto out_free;
 	}
 	error = SYSCTL_OUT(req, buffer, info.stats_size);
 out_free:
 	free(buffer, M_TEMP);
+out:
+	PRELE(p);
+	return (error);
+}
+
+/*
+ * Reads a possibly truncated null-terminated string into the buffer.
+ */
+static int
+proc_read_string_properly(struct thread *td, struct proc *p,
+    const char * __capability sptr, char *buf, size_t len)
+{
+	ssize_t readlen;
+	size_t n, valid;
+
+	if (len < 1)
+		return (EFAULT);
+	valid = MIN(len, cheri_bytes_remaining(sptr));
+	if (!cheri_can_access(sptr, CHERI_PERM_LOAD,
+	    (__cheri_addr ptraddr_t)sptr, valid))
+		return (EPROT);
+	readlen = proc_readmem(td, p, (__cheri_addr ptraddr_t)sptr, buf, valid);
+	if (readlen <= 0)
+		return (EFAULT);
+	n = strnlen(buf, valid);
+	/*
+	 * If the string fits the buffer but is not null-terminated, error out.
+	 */
+	if (cheri_bytes_remaining(sptr) <= len && n == valid)
+		return (EPROT);
+	/* Unconditionally enforce termination. */
+	buf[len - 1] = '\0';
+	return (0);
+}
+
+/*
+ * If usefully accessible, return a c18n compartment list from the target
+ * process.
+ */
+static int
+sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
+{
+	int error, *name = (int *)arg1;
+	u_int namelen = arg2;
+	struct proc *p;
+	struct cheri_c18n_info info;
+	struct cheri_c18n_compart compart;
+	char * __capability namep;
+	char * __capability namepp;
+	ssize_t len;
+	size_t gen;
+
+	if (namelen != 1)
+		return (EINVAL);
+
+	error = pget((pid_t)name[0], PGET_WANTREAD, &p);
+	if (error != 0)
+		return (error);
+
+	if ((p->p_flag & P_SYSTEM) != 0 ||
+	    SV_PROC_FLAG(p, SV_CHERI) == 0 ||
+	    p->p_c18n_info == NULL)
+		goto out;
+
+	len = proc_readmem_cap(curthread, p, (vm_offset_t)p->p_c18n_info, &info,
+	    sizeof(info));
+	/*
+	 * If there is a version mismatch or the compartment array is malformed,
+	 * error out.
+	 */
+	if (len != sizeof(info) ||
+	    info.version != CHERI_C18N_INFO_VERSION ||
+	    info.comparts_gen % 2 != 0 ||
+	    info.comparts_entry_size < sizeof(namep)) {
+		error = ENOEXEC;
+		goto out;
+	}
+
+	/*
+	 * If the old pointer is NULL, output the number of compartments.
+	 */
+	if (req->oldptr == NULL) {
+		error = SYSCTL_OUT(req, NULL,
+		    info.comparts_size * sizeof(compart));
+		goto out;
+	}
+
+	/*
+	 * One by one, copy compartment names out of the target process's
+	 * memory, and into a template struct that we copy out to userspace.
+	 */
+	for (size_t i = 0; i < info.comparts_size; ++i) {
+		/* Initialize userspace structure, including padding. */
+		bzero(&compart, sizeof(compart));
+		compart.ccc_id = i;
+
+		namepp = (char * __capability)info.comparts +
+		    i * info.comparts_entry_size;
+		if (!cheri_can_access(namepp,
+		    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP,
+		    (__cheri_addr ptraddr_t)namepp, sizeof(namep))) {
+			error = ENOEXEC;
+			goto out;
+		}
+
+		/* Copy in next compartment-name string pointer. */
+		len = proc_readmem_cap(curthread, p,
+		    (__cheri_addr vm_offset_t)namepp, &namep, sizeof(namep));
+		if (len != sizeof(namep)) {
+			error = EFAULT;
+			goto out;
+		}
+
+		/*
+		 * Copy in compartment name string. Capability access checks are
+		 * performed by proc_read_string_properly().
+		 */
+		error = proc_read_string_properly(curthread, p, namep,
+		    compart.ccc_name, sizeof(compart.ccc_name));
+		if (error != 0)
+			goto out;
+
+		/* If the generation counter has changed, abort. */
+		len = proc_readmem_cap(curthread, p,
+		    (vm_offset_t)&p->p_c18n_info->comparts_gen, &gen,
+		    sizeof(gen));
+		if (len != sizeof(gen)) {
+			error = EFAULT;
+			goto out;
+		}
+		if (gen != info.comparts_gen) {
+			error = ENOEXEC;
+			goto out;
+		}
+
+		len = offsetof(struct cheri_c18n_compart, ccc_name) +
+		    strlen(compart.ccc_name) + 1;
+		len = roundup2(len, _Alignof(struct cheri_c18n_compart));
+		compart.ccc_structsize = len;
+
+		/* Copy out userspace structure. */
+		error = SYSCTL_OUT(req, &compart, len);
+		if (error != 0)
+			goto out;
+	}
+
 out:
 	PRELE(p);
 	return (error);
@@ -3741,9 +3887,13 @@ static SYSCTL_NODE(_kern_proc, KERN_PROC_AUXV, auxv, CTLFLAG_RD |
 	CTLFLAG_MPSAFE, sysctl_kern_proc_auxv, "Process ELF auxiliary vector");
 
 #if __has_feature(capabilities)
-static SYSCTL_NODE(_kern_proc, KERN_PROC_C18N, c18n, CTLFLAG_RD |
+static SYSCTL_NODE(_kern_proc, KERN_PROC_C18N_STATS, c18n, CTLFLAG_RD |
 	CTLFLAG_MPSAFE, sysctl_kern_proc_c18n,
 	"Compartmentalisation statistics");
+
+static SYSCTL_NODE(_kern_proc, KERN_PROC_C18N_COMPARTS, c18n_compartments,
+	CTLFLAG_RD | CTLFLAG_MPSAFE, sysctl_kern_proc_c18n_compartments,
+	"Compartment list");
 #endif
 
 static SYSCTL_NODE(_kern_proc, KERN_PROC_PATHNAME, pathname, CTLFLAG_RD |
