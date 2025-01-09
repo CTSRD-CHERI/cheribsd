@@ -85,6 +85,23 @@ struct cheri_c18n_info {
 	void * __kerncap	comparts;
 };
 
+/*
+ * The interface provided by the kernel via sysctl for compartmentalization
+ * monitoring tools such as procstat.
+ */
+#define	CHERI_C18N_COMPART_MAXNAME	(PATH_MAX + NAME_MAX + 2)
+
+struct cheri_c18n_compart {
+	/*
+	 * The last field of this struct may be truncated. This field contains
+	 * the actual aligned size of the current object.
+	 */
+	size_t		ccc_structsize;
+	ssize_t		ccc_id;
+	uint8_t		ccc_is_dlopened : 1;
+	char		ccc_name[CHERI_C18N_COMPART_MAXNAME];
+};
+
 #ifndef IN_RTLD
 #undef _Atomic
 #endif
