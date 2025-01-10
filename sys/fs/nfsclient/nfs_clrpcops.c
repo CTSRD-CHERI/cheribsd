@@ -3402,6 +3402,7 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 	nfsattrbit_t attrbits, dattrbits;
 	u_int32_t rderr, *tl2 = NULL;
 	size_t tresid;
+	bool validentry;
 
 	KASSERT(uiop->uio_iovcnt == 1 &&
 	    (uiop->uio_resid & (DIRBLKSIZ - 1)) == 0,
@@ -3623,6 +3624,7 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 
 		/* loop through the dir entries, doctoring them to 4bsd form */
 		while (more_dirs && bigenough) {
+			validentry = true;
 			if (nd->nd_flag & ND_NFSV4) {
 				NFSM_DISSECT(tl, u_int32_t *, 3*NFSX_UNSIGNED);
 				ncookie.lval[0] = *tl++;
@@ -3700,6 +3702,7 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 					uiop->uio_offset = savoff;
 					uiop->uio_resid = savresid;
 					blksiz = savblksiz;
+					validentry = false;
 				} else {
 					cp = (__cheri_fromcap char *)
 					    uiop->uio_iov->iov_base;
@@ -3735,7 +3738,7 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 				ncookie.lval[0] = 0;
 				ncookie.lval[1] = *tl++;
 			}
-			if (bigenough) {
+			if (bigenough && validentry) {
 			    if (nd->nd_flag & ND_NFSV4) {
 				if (rderr) {
 				    dp->d_fileno = 0;
@@ -3868,7 +3871,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 	size_t tresid;
 	u_int32_t *tl2 = NULL, rderr;
 	struct timespec dctime, ts;
-	bool attr_ok;
+	bool attr_ok, validentry;
 
 	KASSERT(uiop->uio_iovcnt == 1 &&
 	    (uiop->uio_resid & (DIRBLKSIZ - 1)) == 0,
@@ -4075,6 +4078,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 
 		/* loop through the dir entries, doctoring them to 4bsd form */
 		while (more_dirs && bigenough) {
+			validentry = true;
 			NFSM_DISSECT(tl, u_int32_t *, 3 * NFSX_UNSIGNED);
 			if (nd->nd_flag & ND_NFSV4) {
 				ncookie.lval[0] = *tl++;
@@ -4147,6 +4151,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 					uiop->uio_offset = savoff;
 					uiop->uio_resid = savresid;
 					blksiz = savblksiz;
+					validentry = false;
 				} else {
 					cp = (__cheri_fromcap void *)
 					    uiop->uio_iov->iov_base;
@@ -4201,7 +4206,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 					goto nfsmout;
 			}
 
-			if (bigenough) {
+			if (bigenough && validentry) {
 			    if (nd->nd_flag & ND_NFSV4) {
 				if (rderr) {
 				    dp->d_fileno = 0;
