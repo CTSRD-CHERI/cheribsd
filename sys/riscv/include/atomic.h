@@ -63,7 +63,7 @@ atomic_##NAME##_rel_##WIDTH(__volatile uint##WIDTH##_t *p, uint##WIDTH##_t v)\
 	atomic_##NAME##_##WIDTH(p, v);					\
 }
 
-#define	ATOMIC_CMPSET_ORDER(WIDTH, SUFFIX, ORDER)			\
+#define	ATOMIC_CMPSET_ORDER(WIDTH, SUFFIX, SUCCESS, FAIL)		\
 static __inline  int							\
 atomic_cmpset##SUFFIX##WIDTH(__volatile uint##WIDTH##_t *p,		\
     uint##WIDTH##_t cmpval, uint##WIDTH##_t newval)			\
@@ -71,10 +71,10 @@ atomic_cmpset##SUFFIX##WIDTH(__volatile uint##WIDTH##_t *p,		\
 									\
 	/* Return 1 on success, 0 on failure */				\
 	return (__atomic_compare_exchange_n(				\
-	    p, &cmpval, newval, 0, ORDER, ORDER));			\
+	    p, &cmpval, newval, 0, SUCCESS, FAIL));			\
 }
 
-#define	ATOMIC_FCMPSET_ORDER(WIDTH, SUFFIX, ORDER)			\
+#define	ATOMIC_FCMPSET_ORDER(WIDTH, SUFFIX, SUCCESS, FAIL)		\
 static __inline  int							\
 atomic_fcmpset##SUFFIX##WIDTH(__volatile uint##WIDTH##_t *p,		\
     uint##WIDTH##_t* cmpval, uint##WIDTH##_t newval)			\
@@ -82,24 +82,24 @@ atomic_fcmpset##SUFFIX##WIDTH(__volatile uint##WIDTH##_t *p,		\
 									\
 	/* fcmpset updates cmpval on failure and uses weak cmpxchg */	\
 	return (__atomic_compare_exchange_n(				\
-	    p, cmpval, newval, 1, ORDER, ORDER));			\
+	    p, cmpval, newval, 1, SUCCESS, FAIL));			\
 }
 
 
 #define	ATOMIC_CMPSET_ACQ_REL(WIDTH)					\
-	ATOMIC_CMPSET_ORDER(WIDTH, _acq_, __ATOMIC_ACQUIRE)		\
-	ATOMIC_CMPSET_ORDER(WIDTH, _rel_, __ATOMIC_RELEASE)
+	ATOMIC_CMPSET_ORDER(WIDTH, _acq_, __ATOMIC_ACQUIRE, __ATOMIC_ACQUIRE) \
+	ATOMIC_CMPSET_ORDER(WIDTH, _rel_, __ATOMIC_RELEASE, __ATOMIC_RELAXED)
 
 #define	ATOMIC_CMPSET(WIDTH)						\
-	ATOMIC_CMPSET_ORDER(WIDTH, _, __ATOMIC_RELAXED)			\
+	ATOMIC_CMPSET_ORDER(WIDTH, _, __ATOMIC_RELAXED, __ATOMIC_RELAXED) \
 	ATOMIC_CMPSET_ACQ_REL(WIDTH)
 
 #define	ATOMIC_FCMPSET_ACQ_REL(WIDTH)					\
-	ATOMIC_FCMPSET_ORDER(WIDTH, _acq_, __ATOMIC_ACQUIRE)		\
-	ATOMIC_FCMPSET_ORDER(WIDTH, _rel_, __ATOMIC_RELEASE)
+	ATOMIC_FCMPSET_ORDER(WIDTH, _acq_, __ATOMIC_ACQUIRE, __ATOMIC_ACQUIRE) \
+	ATOMIC_FCMPSET_ORDER(WIDTH, _rel_, __ATOMIC_RELEASE, __ATOMIC_RELAXED)
 
 #define	ATOMIC_FCMPSET(WIDTH)						\
-	ATOMIC_FCMPSET_ORDER(WIDTH, _, __ATOMIC_RELAXED)		\
+	ATOMIC_FCMPSET_ORDER(WIDTH, _, __ATOMIC_RELAXED, __ATOMIC_RELAXED) \
 	ATOMIC_FCMPSET_ACQ_REL(WIDTH)					\
 
 #ifdef __CHERI_PURE_CAPABILITY__
