@@ -1474,6 +1474,14 @@ freebsd64_getrlimit(struct thread *td, struct freebsd64_getrlimit_args *uap)
 }
 
 int
+freebsd64_getrlimitusage(struct thread *td,
+    struct freebsd64_getrlimitusage_args *uap)
+{
+	return (user_getrlimitusage(td, uap->which, uap->flags,
+	    __USER_CAP_OBJ(uap->res)));
+}
+
+int
 freebsd64_getrusage(struct thread *td, struct freebsd64_getrusage_args *uap)
 {
 	struct rusage ru;

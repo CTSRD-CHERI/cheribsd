@@ -673,6 +673,8 @@ int	user_getfsstat(struct thread *td, struct statfs * __capability buf,
 int	user_getpeername(struct thread *td, int fdes,
 	    struct sockaddr * __restrict __capability asa,
 	    socklen_t * __capability alen, bool compat);
+int	user_getrlimitusage(struct thread *td, u_int which, int flags,
+	    rlim_t * __capability resp);
 int	user_getsockname(struct thread *td, int fdes,
 	    struct sockaddr * __restrict __capability asa,
 	    socklen_t * __capability alen, bool compat);

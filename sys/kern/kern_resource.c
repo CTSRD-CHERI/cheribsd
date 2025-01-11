@@ -924,14 +924,21 @@ getrlimitusage_one(struct proc *p, u_int which, int flags, rlim_t *res)
 int
 sys_getrlimitusage(struct thread *td, struct getrlimitusage_args *uap)
 {
+	return (user_getrlimitusage(td, uap->which, uap->flags, uap->res));
+}
+
+int
+user_getrlimitusage(struct thread *td, u_int which, int flags,
+    rlim_t * __capability resp)
+{
 	rlim_t res;
 	int error;
 
-	if ((uap->flags & ~(GETRLIMITUSAGE_EUID)) != 0)
+	if ((flags & ~(GETRLIMITUSAGE_EUID)) != 0)
 		return (EINVAL);
-	error = getrlimitusage_one(curproc, uap->which, uap->flags, &res);
+	error = getrlimitusage_one(curproc, which, flags, &res);
 	if (error == 0)
-		error = copyout(&res, uap->res, sizeof(res));
+		error = copyout(&res, resp, sizeof(res));
 	return (error);
 }
 
