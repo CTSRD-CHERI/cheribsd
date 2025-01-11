@@ -109,6 +109,15 @@ CXXFLAGS+= -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-cl
 .endif
 .endif
 
+# Zero used registers on return (mitigate some ROP)
+.if ${MK_ZEROREGS} != "no"
+.if ${COMPILER_FEATURES:Mzeroregs}
+ZEROREG_TYPE?= used
+CFLAGS+= -fzero-call-used-regs=${ZEROREG_TYPE}
+CXXFLAGS+= -fzero-call-used-regs=${ZEROREG_TYPE}
+.endif
+.endif
+
 # macOS linker doesn't understand the --fatal-warnings flag
 .if ${LINKER_TYPE} != "mac"
 .if defined(LD_FATAL_WARNINGS) && ${LD_FATAL_WARNINGS} == "no"

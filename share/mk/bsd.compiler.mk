@@ -24,6 +24,7 @@
 # - retpoline: supports the retpoline speculative execution vulnerability
 #              mitigation.
 # - init-all:  supports stack variable initialization.
+# - zeroregs:  supports zeroing used registers on return
 # - aarch64-sha512: supports the AArch64 sha512 intrinsic functions.
 # - morello-codeptr-relocs: support code pointer relocations on Morello
 #
@@ -292,6 +293,11 @@ ${X_}COMPILER_ABSOLUTE_PATH!=	which ${${cc}:N${CCACHE_BIN}:[1]}
 .if ${${X_}COMPILER_TYPE} == "clang" && ${${X_}COMPILER_VERSION} >= 100000 || \
 	(${${X_}COMPILER_TYPE} == "gcc" && ${${X_}COMPILER_VERSION} >= 80100)
 ${X_}COMPILER_FEATURES+=	fileprefixmap
+.endif
+
+.if (${${X_}COMPILER_TYPE} == "clang" && ${${X_}COMPILER_VERSION} >= 150000) || \
+	(${${X_}COMPILER_TYPE} == "gcc" && ${${X_}COMPILER_VERSION} >= 110000)
+${X_}COMPILER_FEATURES+=	zeroregs
 .endif
 
 .if (${${X_}COMPILER_TYPE} == "clang" && ${${X_}COMPILER_VERSION} >= 130000) || \
