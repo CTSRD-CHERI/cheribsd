@@ -2066,7 +2066,7 @@ linux_timer_callback_wrapper(void *context)
 }
 
 int
-mod_timer(struct timer_list *timer, int expires)
+mod_timer(struct timer_list *timer, unsigned long expires)
 {
 	int ret;
 
@@ -2262,12 +2262,12 @@ intr:
 /*
  * Time limited wait for done != 0 with or without signals.
  */
-int
-linux_wait_for_timeout_common(struct completion *c, int timeout, int flags)
+unsigned long
+linux_wait_for_timeout_common(struct completion *c, unsigned long timeout,
+    int flags)
 {
 	struct task_struct *task;
-	int end = jiffies + timeout;
-	int error;
+	unsigned long end = jiffies + timeout, error;
 
 	if (SCHEDULER_STOPPED())
 		return (0);
