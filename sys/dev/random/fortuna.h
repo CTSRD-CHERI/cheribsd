@@ -29,7 +29,7 @@
 
 /* Defined in FS&K */
 #define	RANDOM_FORTUNA_NPOOLS 32		/* The number of accumulation pools */
-#define	RANDOM_FORTUNA_DEFPOOLSIZE 1		/* The default pool size/length for a (re)seed */
+#define	RANDOM_FORTUNA_DEFPOOLSIZE 64		/* The default pool size/length for a (re)seed */
 
 #ifdef _KERNEL
 typedef struct mtx mtx_t;
