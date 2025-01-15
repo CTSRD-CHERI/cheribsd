@@ -1088,7 +1088,6 @@ typedef struct {
 #define	R_AARCH64_TLS_TPREL64 	1030
 #define	R_AARCH64_TLSDESC 	1031	/* Identify the TLS descriptor */
 #define	R_AARCH64_IRELATIVE	1032
-#define	R_AARCH64_FUNC_RELATIVE	1033
 
 #define	R_MORELLO_CAPINIT	59392
 #define	R_MORELLO_GLOB_DAT	59393
@@ -1098,6 +1097,7 @@ typedef struct {
 #define	R_MORELLO_TLSDESC	59397
 #define	R_MORELLO_TLS_TPREL128	59398
 #define	R_MORELLO_FUNC_RELATIVE	59400
+#define	R_AARCH64_FUNC_RELATIVE	59401
 
 #if __has_feature(capabilities)
 #define	MORELLO_FRAG_EXECUTABLE	0x4
