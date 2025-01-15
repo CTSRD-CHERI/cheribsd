@@ -129,8 +129,9 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 	caprelocslim = (const struct capreloc *)((const char *)caprelocs + caprelocssz);
 	pcc = __builtin_cheri_program_counter_get();
 	/* TODO: allow using tight bounds for RTLD */
-	_do___caprelocs(caprelocs, caprelocslim, relocbase, pcc,
-	    (Elf_Addr)relocbase, false);
+	cheri_init_globals_impl(caprelocs, caprelocslim,
+	    /*data_cap=*/relocbase, /*code_cap=*/pcc, /*rodata_cap=*/pcc,
+	    /*tight_code_bounds=*/false, (Elf_Addr)relocbase);
 }
 #endif /* __CHERI_PURE_CAPABILITY__ */
 

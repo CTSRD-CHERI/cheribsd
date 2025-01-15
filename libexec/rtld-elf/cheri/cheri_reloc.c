@@ -53,30 +53,72 @@ process___cap_relocs(Obj_Entry* obj)
 	struct capreloc *start_relocs = (struct capreloc *)obj->cap_relocs;
 	struct capreloc *end_relocs =
 	    (struct capreloc *)(obj->cap_relocs + obj->cap_relocs_size);
-	/*
-	 * It would be nice if we could use a DDC and PCC with smaller bounds
-	 * here. However, the target could be in a different shared library so
-	 * while we are still using __cap_relocs just derive it from RTLD.
-	 *
-	 * TODO: reject those binaries and suggest relinking with the right flag
-	 */
-	void * __capability data_base = get_datasegment_cap(obj);
-	const void * __capability code_base = get_codesegment_cap(obj);
-	data_base = cheri_clearperm(data_base, CAP_RELOC_REMOVE_PERMS);
-	code_base = cheri_clearperm(code_base, CAP_RELOC_REMOVE_PERMS);
+
+	char * __capability data_base = get_datasegment_cap(obj);
+	const char * __capability code_base = get_codesegment_cap(obj);
 
 	dbg("Processing %lu __cap_relocs for %s (code base = %#lp, data base = %#lp)\n",
 	    (end_relocs - start_relocs), obj->path, code_base, data_base);
 
-	ptraddr_t base_addr = (ptraddr_t)(uintptr_t)obj->relocbase;
 	bool tight_pcc_bounds;
 #ifdef __CHERI_PURE_CAPABILITY__
 	tight_pcc_bounds = can_use_tight_pcc_bounds(obj);
 #else
 	tight_pcc_bounds = false;
 #endif
-	_do___caprelocs(start_relocs, end_relocs, data_base, code_base, base_addr,
-	    tight_pcc_bounds);
+
+	for (const struct capreloc *reloc = start_relocs; reloc < end_relocs;
+	     reloc++) {
+		uintcap_t *dest =
+		    (uintcap_t *)(obj->relocbase + reloc->capability_location);
+		uintcap_t cap;
+		bool can_set_bounds = true;
+
+		if (reloc->object == 0) {
+			/*
+			 * XXXAR: clang fills uninitialized
+			 * capabilities with 0xcacaca..., so we we
+			 * need to explicitly write NULL here.
+			 */
+			*dest = 0;
+			continue;
+		}
+
+		if ((reloc->permissions & function_reloc_flag) ==
+		    function_reloc_flag) {
+			/* code pointer */
+			cap = (uintcap_t)code_base + reloc->object;
+			cap = cheri_clearperm(cap, FUNC_PTR_REMOVE_PERMS);
+
+			/*
+			 * Do not set tight bounds for functions
+			 * (unless we are in the plt ABI).
+			 */
+			can_set_bounds = tight_pcc_bounds;
+		} else if ((reloc->permissions & constant_reloc_flag) ==
+		    constant_reloc_flag) {
+			 /* read-only data pointer */
+			cap = (uintcap_t)code_base + reloc->object;
+			cap = cheri_clearperm(cap, FUNC_PTR_REMOVE_PERMS);
+			cap = cheri_clearperm(cap, DATA_PTR_REMOVE_PERMS);
+		} else {
+			/* read-write data */
+			cap = (uintcap_t)data_base + reloc->object;
+			cap = cheri_clearperm(cap, DATA_PTR_REMOVE_PERMS);
+		}
+		cap = cheri_clearperm(cap, CAP_RELOC_REMOVE_PERMS);
+		if (can_set_bounds && (reloc->size != 0)) {
+			cap = cheri_setbounds(cap, reloc->size);
+		}
+		cap += reloc->offset;
+		if ((reloc->permissions & function_reloc_flag) ==
+		    function_reloc_flag) {
+			/* Convert function pointers to sentries: */
+			cap = cheri_sealentry(cap);
+		}
+		*dest = cap;
+	}
+
 	obj->cap_relocs_processed = true;
 }
 #endif

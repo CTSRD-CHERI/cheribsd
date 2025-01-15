@@ -44,17 +44,6 @@
 #if !defined(CHERI_INIT_GLOBALS_VERSION) || CHERI_INIT_GLOBALS_VERSION < 5
 #error "cheri_init_globals.h is outdated. Please update LLVM"
 #endif
-
-/* FIXME: replace this with cheri_init_globals_impl once everyone has updated clang */
-static __attribute__((always_inline))
-void _do___caprelocs(const struct capreloc *start_relocs,
-    const struct capreloc *stop_relocs, void * __capability gdc,
-    const void * __capability pcc, ptraddr_t base_addr, bool tight_pcc_bounds)
-{
-	cheri_init_globals_impl(start_relocs, stop_relocs, /*data_cap=*/gdc,
-	    /*code_cap=*/pcc, /*rodata_cap=*/pcc,
-	    /*tight_code_bounds=*/tight_pcc_bounds, base_addr);
-}
 #endif
 
 static inline int
