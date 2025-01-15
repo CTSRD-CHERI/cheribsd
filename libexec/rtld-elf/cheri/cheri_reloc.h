@@ -40,8 +40,6 @@
 #endif
 
 #ifdef RTLD_HAS_CAPRELOCS
-/* The clang-provided header is not warning-clean: */
-__unused static void cheri_init_globals(void);
 #include <cheri_init_globals.h>
 #if !defined(CHERI_INIT_GLOBALS_VERSION) || CHERI_INIT_GLOBALS_VERSION < 5
 #error "cheri_init_globals.h is outdated. Please update LLVM"
