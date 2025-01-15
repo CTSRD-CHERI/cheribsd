@@ -1697,15 +1697,11 @@ pmap_init_pv_table(void)
 	int domain, i, j, pages;
 
 	/*
-	 * We strongly depend on the size being a power of two, so the assert
-	 * is overzealous. However, should the struct be resized to a
-	 * different power of two, the code below needs to be revisited.
+	 * We depend on the size being evenly divisible into a page so
+	 * that the pv_table array can be indexed directly while
+	 * safely spanning multiple pages from different domains.
 	 */
-#ifdef __CHERI_PURE_CAPABILITY__
-	CTASSERT((sizeof(*pvd) == 128));
-#else
-	CTASSERT((sizeof(*pvd) == 64));
-#endif
+	CTASSERT(PAGE_SIZE % sizeof(*pvd) == 0);
 
 	/*
 	 * Calculate the size of the array.
