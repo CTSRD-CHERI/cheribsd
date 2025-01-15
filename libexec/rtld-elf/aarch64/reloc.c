@@ -794,12 +794,9 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		return (0);
 #endif
 
-#ifdef __CHERI_PURE_CAPABILITY__
-	data_cap = obj->relocbase;
-	text_rodata_cap = obj->text_rodata_cap;
-#elif __has_feature(capabilities)
-	data_cap = cheri_getdefault();
-	text_rodata_cap = cheri_getpcc();
+#if __has_feature(capabilities)
+	data_cap = get_datasegment_cap(obj);
+	text_rodata_cap = get_codesegment_cap(obj);
 #endif
 
 	/*
