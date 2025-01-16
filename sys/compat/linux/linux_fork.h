@@ -93,7 +93,11 @@ struct l_clone_args {
 	void * __kerncap tls;
 };
 
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64) && !defined(COMPAT_LINUX32)
+#define	LINUX_CLONE_ARGS_SIZE_VER0	128
+#else
 #define	LINUX_CLONE_ARGS_SIZE_VER0	64
+#endif
 
 int linux_set_upcall(struct thread *, void * __capability);
 int linux_set_cloned_tls(struct thread *, void * __capability);
