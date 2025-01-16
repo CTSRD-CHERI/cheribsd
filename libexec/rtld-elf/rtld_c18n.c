@@ -1739,6 +1739,20 @@ tramp_reflect(const void *data)
 	return (NULL);
 }
 
+void *
+dl_c18n_unwrap_trampoline(const void *addr)
+{
+	struct tramp_header *header;
+
+	if (C18N_ENABLED) {
+		header = tramp_reflect(addr);
+		if (header != NULL)
+			addr = cheri_cleartag(header->target);
+	}
+
+	return (addr);
+}
+
 /*
  * APIs
  */

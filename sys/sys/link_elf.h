@@ -112,6 +112,7 @@ int _rtld_is_dlopened(void *);
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #include <machine/c18n.h>
+void *dl_c18n_unwrap_trampoline(const void *);
 void *dl_c18n_get_trusted_stack(uintptr_t);
 void dl_c18n_unwind_trusted_stack(void *, void *);
 int dl_c18n_is_trampoline(uintptr_t, void *);

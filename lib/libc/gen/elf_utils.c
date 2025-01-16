@@ -48,6 +48,10 @@ __elf_phdr_match_addr(struct dl_phdr_info *phdr_info, void *addr)
 	const Elf_Phdr *ph;
 	int i;
 
+#ifdef CHERI_LIB_C18N
+	addr = dl_c18n_unwrap_trampoline(addr);
+#endif
+
 	for (i = 0; i < phdr_info->dlpi_phnum; i++) {
 		ph = &phdr_info->dlpi_phdr[i];
 		if (ph->p_type != PT_LOAD)
