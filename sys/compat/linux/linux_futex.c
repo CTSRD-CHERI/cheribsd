@@ -818,7 +818,7 @@ int
 linux_sys_futex(struct thread *td, struct linux_sys_futex_args *args)
 {
 
-#if __has_features(capabilities) && !defined(COMPAT_LINUX64) && !defined(COMPAT_LINUX32)
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64) && !defined(COMPAT_LINUX32)
  	if (!__CAP_CHECK(args->uaddr, 4) || !__CAP_CHECK(args->uaddr2, 4))
 		return (EFAULT);
 #endif
