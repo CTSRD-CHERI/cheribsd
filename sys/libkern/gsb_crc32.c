@@ -761,7 +761,7 @@ table_crc32c(uint32_t crc32c, const unsigned char *buffer, unsigned int length)
 	}
 }
 
-#if defined(_KERNEL) && defined(__aarch64__) && !__has_feature(capabilities)
+#if defined(_KERNEL) && defined(__aarch64__)
 DEFINE_IFUNC(, uint32_t, calculate_crc32c,
     (uint32_t crc32c, const unsigned char *buffer, unsigned int length))
 {
