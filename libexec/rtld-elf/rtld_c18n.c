@@ -1740,14 +1740,17 @@ tramp_reflect(const void *data)
 }
 
 void *
-dl_c18n_unwrap_trampoline(const void *addr)
+dl_c18n_unwrap_trampoline(void *addr)
 {
 	struct tramp_header *header;
 
 	if (C18N_ENABLED) {
 		header = tramp_reflect(addr);
-		if (header != NULL)
-			addr = cheri_cleartag(header->target);
+		if (header != NULL) {
+			addr = atomic_load_explicit(&header->target,
+			    memory_order_relaxed);
+			addr = cheri_cleartag(addr);
+		}
 	}
 
 	return (addr);
