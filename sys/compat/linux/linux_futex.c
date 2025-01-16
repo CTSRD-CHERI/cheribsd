@@ -101,9 +101,6 @@ futex_key_get(const void * __capability uaddr, int type, int share, struct umtx_
 	/* Check that futex address is a 32bit aligned. */
 	if (!__is_aligned(uaddr, sizeof(uint32_t)))
 		return (EINVAL);
-
-	if (!__CAP_CHECK(__DECONST_CAP(void * __capability, uaddr), 4))
-		return (EFAULT);
 	
 	return (umtx_key_get(uaddr, type, share, key));
 }
@@ -820,6 +817,12 @@ linux_umtx_abs_timeout_init(struct umtx_abs_timeout *timo,
 int
 linux_sys_futex(struct thread *td, struct linux_sys_futex_args *args)
 {
+
+#if __has_features(capabilities) && !defined(COMPAT_LINUX64) && !defined(COMPAT_LINUX32)
+ 	if (!__CAP_CHECK(args->uaddr, 4) || !__CAP_CHECK(args->uaddr2, 4))
+		return (EFAULT);
+#endif
+
 	struct linux_futex_args fargs = {
 		.uaddr = LINUX_USER_CAP_UNBOUND(args->uaddr),
 		.op = args->op,
