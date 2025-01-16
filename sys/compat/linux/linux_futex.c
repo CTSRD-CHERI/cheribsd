@@ -103,7 +103,7 @@ futex_key_get(const void * __capability uaddr, int type, int share, struct umtx_
 		return (EINVAL);
 
 	if (!__CAP_CHECK(__DECONST_CAP(void * __capability, uaddr), 4))
-		return (EPROT);
+		return (EINVAL);
 	
 	return (umtx_key_get(uaddr, type, share, key));
 }
