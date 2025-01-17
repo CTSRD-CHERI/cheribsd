@@ -323,7 +323,9 @@ linux_parse_sigreturn_ctx(struct thread *td, struct l_sigcontext *sc)
 			MORELLO_MERGE_C_X(tf->tf_lr, tf->tf_lr, morello->cregs[30]);
 			MORELLO_MERGE_C_X(tf->tf_sp, tf->tf_sp, morello->csp);
 			td->td_pcb->pcb_rcsp_el0 = morello->rcsp;
-			WRITE_SPECIALREG_CAP(rcsp_el0, morello->rcsp);
+			if (td == curthread) {
+				WRITE_SPECIALREG_CAP(rcsp_el0, morello->rcsp);
+			}
 			MORELLO_MERGE_C_X(tf->tf_elr, tf->tf_elr, morello->pcc);
 
 			break;
