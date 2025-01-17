@@ -756,7 +756,7 @@ siginfo_to_lsiginfo(const siginfo_t *si, l_siginfo_t *lsi, l_int sig)
 		case LINUX_SIGILL:
 		case LINUX_SIGFPE:
 		case LINUX_SIGSEGV:
-			lsi->lsi_addr = (uintcap_t)(si->si_addr);
+			lsi->lsi_addr = (ptraddr_t)(si->si_addr);
 			break;
 
 		default:
