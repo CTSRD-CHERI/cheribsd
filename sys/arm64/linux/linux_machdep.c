@@ -33,6 +33,9 @@
 
 #include <vm/vm_param.h>
 
+#include <cheri/cheric.h>
+#include <machine/cherireg.h>
+
 #ifdef COMPAT_LINUX64
 #include <arm64/linux64/linux.h>
 #include <arm64/linux64/linux64_proto.h>
@@ -51,8 +54,22 @@ int
 linux_set_upcall(struct thread *td, void * __capability stack)
 {
 
-	if (stack)
+	if (stack) {
+#if __has_feature(capabilities)
+		/* Set csp/rcsp based on execution mode. */
+		if (cheri_getperm((void * __capability)td->td_frame->tf_elr) 
+		    & CHERI_PERM_EXECUTIVE) {
+			td->td_frame->tf_sp = (uintcap_t)stack;
+		} else {
+			td->td_pcb->pcb_rcsp_el0 = (uintcap_t)stack;
+			if (td == curthread) {
+				WRITE_SPECIALREG_CAP(rcsp_el0, (uintcap_t)stack);
+			}
+		}
+#else
 		td->td_frame->tf_sp = (uintcap_t)stack;
+#endif
+	}
 
 	/*
 	 * The newly created Linux thread returns
