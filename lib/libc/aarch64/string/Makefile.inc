@@ -5,7 +5,6 @@
 
 .if !${MACHINE_ABI:Mpurecap}
 AARCH64_STRING_FUNCS= \
-	memchr \
 	memcmp \
 	memrchr \
 	memset \
@@ -25,6 +24,7 @@ AARCH64_STRING_FUNCS+= \
 
 # SIMD-enhanced routines not derived from Arm's code
 MDSRCS+= \
+	memchr.S \
 	strcmp.S \
 	strspn.S \
 	strcspn.S \
