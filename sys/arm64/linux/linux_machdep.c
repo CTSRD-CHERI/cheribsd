@@ -64,7 +64,7 @@ linux_set_upcall(struct thread *td, void * __capability stack)
 		} else {
 			td->td_pcb->pcb_rcsp_el0 = (uintcap_t)stack;
 			if (td == curthread) {
-				WRITE_SPECIALREG_CAP(rcsp_el0, (uintcap_t)stack);
+				WRITE_SPECIALREG_CAP(rcsp_el0, stack);
 			}
 		}
 #else
@@ -87,7 +87,23 @@ linux_set_cloned_tls(struct thread *td, void * __capability desc)
 	if ((uint64_t)(uintcap_t)desc >= VM_MAXUSER_ADDRESS)
 		return (EPERM);
 
+#if __has_feature(capabilities)
+	/* Set ctpidr/rctpidr based on execution mode. */
+	if (cheri_getperm((void * __capability)td->td_frame->tf_elr) 
+		& CHERI_PERM_EXECUTIVE) 
+		return (cpu_set_user_tls(td, desc));
+	
+	/* This part will only be executed if in restricted mode. */
+	td->td_pcb->pcb_rctpidr_el0 = (uintcap_t)desc;
+	if (td == curthread) {
+		WRITE_SPECIALREG_CAP(rctpidr_el0, desc);
+	}
+
+	return (0);
+#else
 	return (cpu_set_user_tls(td, desc));
+#endif
+
 }
 
 void
