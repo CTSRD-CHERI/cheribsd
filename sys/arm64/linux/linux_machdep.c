@@ -35,6 +35,7 @@
 
 #include <cheri/cheric.h>
 #include <machine/cherireg.h>
+#include <machine/pcb.h>
 
 #ifdef COMPAT_LINUX64
 #include <arm64/linux64/linux.h>
