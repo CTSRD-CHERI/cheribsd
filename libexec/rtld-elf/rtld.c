@@ -6040,7 +6040,7 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign)
     maxalign = rtld_max(tcbalign, tls_static_max_align);
     tls_init_align = rtld_max(obj_main->tlsalign, 1);
 
-    /* Compute fragmets sizes. */
+    /* Compute fragments sizes. */
     extra_size = tcbsize - TLS_TCB_SIZE;
     post_size = calculate_tls_post_size(tls_init_align);
     tls_block_size = tcbsize + post_size;
