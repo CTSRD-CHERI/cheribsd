@@ -565,6 +565,10 @@ tramp_should_include(const Obj_Entry *reqobj, const struct tramp_data *data)
 {
 	const char *sym;
 
+	/* XXX: This will not be needed once function pointers are wrapped. */
+	if (data->target == NULL)
+		return (false);
+
 	if (data->def == NULL)
 		return (true);
 
