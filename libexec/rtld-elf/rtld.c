@@ -6987,22 +6987,20 @@ obj_remap_relro(Obj_Entry *obj, int prot)
 
 	for (ph = obj->phdr; (const char *)ph < (const char *)obj->phdr +
 	    obj->phsize; ph++) {
-		switch (ph->p_type) {
-		case PT_GNU_RELRO:
-			relro_page = obj->relocbase +
-			    rtld_trunc_page(ph->p_vaddr);
-			relro_size = rtld_round_page(ph->p_vaddr +
-			    ph->p_memsz) - rtld_trunc_page(ph->p_vaddr);
-			dbg("Enforcing RELRO for %s (%p -> %p)", obj->path,
-			    relro_page, relro_page + relro_size);
-			if (mprotect(relro_page, relro_size, prot) == -1) {
-				_rtld_error(
+		if (ph->p_type != PT_GNU_RELRO)
+			continue;
+		relro_page = obj->relocbase + rtld_trunc_page(ph->p_vaddr);
+		relro_size = rtld_round_page(ph->p_vaddr + ph->p_memsz) -
+		    rtld_trunc_page(ph->p_vaddr);
+		dbg("Enforcing RELRO for %s (%p -> %p)", obj->path, relro_page,
+		    relro_page + relro_size);
+		if (mprotect(relro_page, relro_size, prot) == -1) {
+			_rtld_error(
 			    "%s: Cannot set relro protection to %#x: %s",
-				    obj->path, prot, rtld_strerror(errno));
-				return (-1);
-			}
-			break;
+			    obj->path, prot, rtld_strerror(errno));
+			return (-1);
 		}
+		break;
 	}
 	return (0);
 }
