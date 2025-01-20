@@ -401,6 +401,7 @@ LDFLAGS += -march=${RISCV_MARCH} -mabi=${RISCV_ABI}
 
 .if !defined(NO_CPU_CFLAGS)
 CFLAGS += ${_CPUCFLAGS}
+CXXFLAGS += ${_CPUCFLAGS}
 .endif
 
 #
