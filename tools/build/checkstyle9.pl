@@ -1255,6 +1255,7 @@ sub process {
 	my $in_header_lines = $file ? 0 : 1;
 	my $in_commit_log = 0;		#Scanning lines before patch
 	my $has_sob = 0;
+	my $author_is_committer = 0;
 	my $non_utf8_charset = 0;
 
 	our @report = ();
@@ -1453,6 +1454,10 @@ sub process {
 # Filter out bad email addresses.
 		if ($line =~ /^(Author|From): .*noreply.*/) {
 		    ERROR("Real email adress is needed\n" . $herecurr);
+		}
+
+		if ($line =~ /^Author: .*[a-z-0-9]\@freebsd\.org/i) {
+			$author_is_committer = 1
 		}
 
 #check the patch for a signoff:
@@ -2655,7 +2660,7 @@ sub process {
 
 	}
 
-	if ($has_sob == 0) {
+	if ($has_sob == 0 && $author_is_committer == 0) {
 	    WARN("Missing Signed-off-by: line");
 	}
 
