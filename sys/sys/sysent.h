@@ -49,7 +49,7 @@ typedef	int	sy_call_t(struct thread *, void *);
 
 typedef	void	(*systrace_probe_func_t)(struct syscall_args *,
 		    enum systrace_probe_t, int);
-typedef	void	(*systrace_args_func_t)(int, void *, uint64_t *, int *);
+typedef	void	(*systrace_args_func_t)(int, void *, uintcap_t *, int *);
 
 #ifdef _KERNEL
 extern systrace_probe_func_t	systrace_probe_func;

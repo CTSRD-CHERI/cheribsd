@@ -184,7 +184,7 @@ static dtrace_provider_id_t	systrace_id;
 static void
 systrace_probe(struct syscall_args *sa, enum systrace_probe_t type, int retval)
 {
-	uint64_t uargs[nitems(sa->args)];
+	uintcap_t uargs[nitems(sa->args)];
 	dtrace_id_t id;
 	int n_args, sysnum;
 
