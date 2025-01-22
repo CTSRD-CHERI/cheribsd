@@ -275,6 +275,20 @@ dtrace_load64(uint64_t *addr, struct trapframe *frame, u_int reg)
 	/* Nothing to do for load to xzr */
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+static void
+dtrace_storecap(uintcap_t *addr, struct trapframe *frame, u_int reg)
+{
+
+	KASSERT(reg <= 31, ("dtrace_store64: Invalid register %u", reg));
+	if (reg < nitems(frame->tf_x))
+		*addr = frame->tf_x[reg];
+	else if (reg == 30) /* lr */
+		*addr = frame->tf_lr;
+	else if (reg == 31) /* xzr */
+		*addr = 0;
+}
+#else
 static void
 dtrace_store64(uint64_t *addr, struct trapframe *frame, u_int reg)
 {
@@ -287,6 +301,7 @@ dtrace_store64(uint64_t *addr, struct trapframe *frame, u_int reg)
 	else if (reg == 31) /* xzr */
 		*addr = 0;
 }
+#endif
 
 static int
 dtrace_invop_start(struct trapframe *frame)
@@ -296,11 +311,33 @@ dtrace_invop_start(struct trapframe *frame)
 	invop = dtrace_invop(frame->tf_elr, frame, frame->tf_x[0]);
 
 	tmp = (invop & LDP_STP_MASK);
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (tmp == STP_C_PREIND) {
+		uintcap_t *csp;
+		int arg1, arg2, offs;
+
+		csp = (uintcap_t *)frame->tf_sp;
+		arg1 = (invop >> ARG1_SHIFT) & ARG1_MASK;
+		arg2 = (invop >> ARG2_SHIFT) & ARG2_MASK;
+		offs = (invop >> OFFSET_SHIFT) & OFFSET_MASK;
+		if (offs >> (OFFSET_SIZE - 1))
+			csp -= (~offs & OFFSET_MASK) + 1;
+		else
+			csp += (offs);
+		dtrace_storecap(csp + 0, frame, arg1);
+		dtrace_storecap(csp + 1, frame, arg2);
+
+		/* Update the stack pointer and program counter to continue */
+		frame->tf_sp = (uintcap_t)csp;
+		frame->tf_elr += INSN_SIZE;
+		return (0);
+	}
+#else
 	if (tmp == STP_64 || tmp == LDP_64) {
 		register_t arg1, arg2, *sp;
 		int offs;
 
-		sp = (register_t *)frame->tf_sp;
+		sp = (register_t *)(uintptr_t)frame->tf_sp;
 		data = invop;
 		arg1 = (data >> ARG1_SHIFT) & ARG1_MASK;
 		arg2 = (data >> ARG2_SHIFT) & ARG2_MASK;
@@ -333,12 +370,21 @@ dtrace_invop_start(struct trapframe *frame)
 		frame->tf_elr += INSN_SIZE;
 		return (0);
 	}
+#endif
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	if ((invop & SUBC_MASK) == SUBC_INSTR) {
+		frame->tf_sp -= (invop >> SUB_IMM_SHIFT) & SUB_IMM_MASK;
+		frame->tf_elr += INSN_SIZE;
+		return (0);
+	}
+#else
 	if ((invop & SUB_MASK) == SUB_INSTR) {
 		frame->tf_sp -= (invop >> SUB_IMM_SHIFT) & SUB_IMM_MASK;
 		frame->tf_elr += INSN_SIZE;
 		return (0);
 	}
+#endif
 
 	if (invop == NOP_INSTR) {
 		frame->tf_elr += INSN_SIZE;
@@ -354,7 +400,11 @@ dtrace_invop_start(struct trapframe *frame)
 	}
 
 	if (invop == RET_INSTR) {
+#if __has_feature(capabilities)
+		trapframe_set_elr(frame, frame->tf_lr);
+#else
 		frame->tf_elr = frame->tf_lr;
+#endif
 		return (0);
 	}
 
