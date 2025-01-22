@@ -82,17 +82,18 @@ fbt_patch_tracepoint(fbt_probe_t *fbt, fbt_patchval_t val)
 
 int
 fbt_provide_module_function(linker_file_t lf, int symindx,
-    linker_symval_t *symval, void *opaque)
+    linker_symval_t *sym, void *opaque)
 {
 	fbt_probe_t *fbt, *retfbt;
 	uint32_t *target, *start;
 	uint32_t *instr, *limit;
 	const char *name;
 	char *modname;
+	uintptr_t symval;
 	int offs;
 
 	modname = opaque;
-	name = symval->name;
+	name = sym->name;
 
 	/* Check if function is excluded from instrumentation */
 	if (fbt_excluded(name))
@@ -106,8 +107,12 @@ fbt_provide_module_function(linker_file_t lf, int symindx,
 	    strcmp(name, "do_el1h_sync") == 0)
 		return (1);
 
-	instr = (uint32_t *)(symval->value);
-	limit = (uint32_t *)(symval->value + symval->size);
+	symval = (uintptr_t)sym->value;
+#ifdef __CHERI_PURE_CAPABILITY__
+	symval &= ~0x1ul;
+#endif
+	instr = (uint32_t *)symval;
+	limit = (uint32_t *)(symval + sym->size);
 
 	/*
 	 * Ignore any bti instruction at the start of the function
@@ -141,10 +146,22 @@ fbt_provide_module_function(linker_file_t lf, int symindx,
 			 */
 			if (((*instr >> ADDR_SHIFT) & ADDR_MASK) == 31)
 				break;
-		} else if ((*instr & SUB_MASK) == SUB_INSTR &&
+		}
+#ifdef __CHERI_PURE_CAPABILITY__
+		else if ((*instr & LDP_STP_MASK) == STP_C_PREIND &&
+		    ((*instr >> ADDR_SHIFT) & ADDR_MASK) == 31)
+			break;
+#endif
+		else if ((*instr & SUB_MASK) == SUB_INSTR &&
 		    ((*instr >> SUB_RD_SHIFT) & SUB_R_MASK) == 31 &&
 		    ((*instr >> SUB_RN_SHIFT) & SUB_R_MASK) == 31)
 			break;
+#ifdef __CHERI_PURE_CAPABILITY__
+		else if ((*instr & SUBC_MASK) == SUBC_INSTR &&
+		    ((*instr >> SUB_RD_SHIFT) & SUB_R_MASK) == 31 &&
+		    ((*instr >> SUB_RN_SHIFT) & SUB_R_MASK) == 31)
+			break;
+#endif
 	}
 found:
 	if (instr >= limit)
@@ -154,7 +171,11 @@ found:
 	fbt->fbtp_name = name;
 	fbt->fbtp_id = dtrace_probe_create(fbt_id, modname,
 	    name, FBT_ENTRY, FBT_AFRAMES, fbt);
+#ifdef __CHERI_PURE_CAPABILITY__
+	fbt->fbtp_patchpoint = cheri_setbounds(instr, INSN_SIZE);
+#else
 	fbt->fbtp_patchpoint = instr;
+#endif
 	fbt->fbtp_ctl = lf;
 	fbt->fbtp_loadcnt = lf->loadcnt;
 	fbt->fbtp_savedval = *instr;
@@ -178,7 +199,7 @@ again:
 		else if ((*instr & B_MASK) == B_INSTR) {
 			offs = (*instr & B_DATA_MASK);
 			target = instr + offs;
-			start = (uint32_t *)symval->value;
+			start = (uint32_t *)symval;
 			if (target >= limit || target < start)
 				break;
 		}
@@ -201,7 +222,11 @@ again:
 	}
 	retfbt = fbt;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	fbt->fbtp_patchpoint = cheri_setbounds(instr, INSN_SIZE);
+#else
 	fbt->fbtp_patchpoint = instr;
+#endif
 	fbt->fbtp_ctl = lf;
 	fbt->fbtp_loadcnt = lf->loadcnt;
 	fbt->fbtp_symindx = symindx;
@@ -209,7 +234,7 @@ again:
 		fbt->fbtp_rval = DTRACE_INVOP_B;
 	else
 		fbt->fbtp_rval = DTRACE_INVOP_RET;
-	fbt->fbtp_roffset = (uintptr_t)instr - (uintptr_t)symval->value;
+	fbt->fbtp_roffset = (uintptr_t)instr - symval;
 	fbt->fbtp_savedval = *instr;
 	fbt->fbtp_patchval = FBT_PATCHVAL;
 	fbt->fbtp_hashnext = fbt_probetab[FBT_ADDR2NDX(instr)];

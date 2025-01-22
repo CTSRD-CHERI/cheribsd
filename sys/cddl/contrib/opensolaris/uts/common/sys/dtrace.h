@@ -2592,10 +2592,18 @@ extern int dtrace_instr_c_ret(uint32_t **instr);
 
 #define	NOP_INSTR	0xd503201f
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	RET_INSTR	0xc2c253c0
+#else
 #define	RET_INSTR	0xd65f03c0
+#endif
 
 #define	SUB_MASK	0xffc00000
 #define	SUB_INSTR	0xd1000000
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	SUBC_MASK	0xff800000
+#define	SUBC_INSTR	0x02800000
+#endif
 #define	SUB_RD_SHIFT	0
 #define	SUB_RN_SHIFT	5
 #define	SUB_R_MASK	0x1f
@@ -2607,6 +2615,10 @@ extern int dtrace_instr_c_ret(uint32_t **instr);
 #define	STP_64		0xa9800000
 #define	LDP_32		0x28c00000
 #define	LDP_64		0xa8c00000
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	STP_C_POSTIND	0x22800000
+#define	STP_C_PREIND	0x62800000
+#endif
 #define	LDP_STP_PREIND	(1 << 24)
 #define	LDP_STP_DIR	(1 << 22) /* Load instruction */
 #define	ARG1_SHIFT	0
