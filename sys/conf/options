@@ -972,6 +972,9 @@ RANDOM_LOADABLE	opt_global.h
 # the uma slab allocator.
 RANDOM_ENABLE_UMA	opt_global.h
 RANDOM_ENABLE_ETHER	opt_global.h
+# This is highly insecure but used in environments without any
+# pre-boot entropy
+RANDOM_NO_ENTROPY	opt_global.h
 
 # This options turns TPM into entropy source.
 TPM_HARVEST	opt_tpm.h
