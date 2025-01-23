@@ -73,7 +73,7 @@ static struct trampchunk *
 kinst_trampchunk_alloc(void)
 {
 	struct trampchunk *chunk;
-	vm_offset_t trampaddr;
+	vm_pointer_t trampaddr;
 	int error __diagused;
 
 	sx_assert(&kinst_tramp_sx, SX_XLOCKED);
