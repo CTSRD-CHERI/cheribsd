@@ -1282,10 +1282,10 @@ extern int dtrace_getipl(void);
 extern uintptr_t dtrace_caller(int);
 extern uint32_t dtrace_cas32(uint32_t *, uint32_t, uint32_t);
 extern void *dtrace_casptr(volatile void *, volatile void *, volatile void *);
-extern void dtrace_copyin(uintptr_t, uintptr_t, size_t, volatile uint16_t *);
-extern void dtrace_copyinstr(uintptr_t, uintptr_t, size_t, volatile uint16_t *);
-extern void dtrace_copyout(uintptr_t, uintptr_t, size_t, volatile uint16_t *);
-extern void dtrace_copyoutstr(uintptr_t, uintptr_t, size_t,
+extern void dtrace_copyin(uintcap_t, uintptr_t, size_t, volatile uint16_t *);
+extern void dtrace_copyinstr(uintcap_t, uintptr_t, size_t, volatile uint16_t *);
+extern void dtrace_copyout(uintptr_t, uintcap_t, size_t, volatile uint16_t *);
+extern void dtrace_copyoutstr(uintptr_t, uintcap_t, size_t,
     volatile uint16_t *);
 extern void dtrace_getpcstack(pc_t *, int, int, uint32_t *);
 extern ulong_t dtrace_getreg(struct trapframe *, uint_t);
@@ -1294,10 +1294,13 @@ extern void dtrace_getupcstack(uint64_t *, int);
 extern void dtrace_getufpstack(uint64_t *, uint64_t *, int);
 extern int dtrace_getustackdepth(void);
 extern uintptr_t dtrace_fulword(void *);
-extern uint8_t dtrace_fuword8(void *);
-extern uint16_t dtrace_fuword16(void *);
-extern uint32_t dtrace_fuword32(void *);
-extern uint64_t dtrace_fuword64(void *);
+extern uint8_t dtrace_fuword8(void * __capability);
+extern uint16_t dtrace_fuword16(void * __capability);
+extern uint32_t dtrace_fuword32(void * __capability);
+extern uint64_t dtrace_fuword64(void * __capability);
+#if __has_feature(capabilities)
+extern uintcap_t dtrace_fucap(void * __capability);
+#endif
 extern void dtrace_probe_error(dtrace_state_t *, dtrace_epid_t, int, int,
     int, uintptr_t);
 extern int dtrace_assfail(const char *, const char *, int);
