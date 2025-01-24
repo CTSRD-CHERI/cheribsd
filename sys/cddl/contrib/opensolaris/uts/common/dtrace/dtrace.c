@@ -500,7 +500,7 @@ static kmutex_t dtrace_errlock;
 #define	DTRACE_RANGE_REMAIN(remp, addr, baseaddr, basesz)		\
 do {									\
 	if ((remp) != NULL) {						\
-		*(remp) = (uintptr_t)(baseaddr) + (basesz) - (addr);	\
+		*(remp) = (ptraddr_t)(baseaddr) + (basesz) - (addr);	\
 	}								\
 } while (0)
 
@@ -6039,7 +6039,8 @@ inetout:	regs[rd] = (uintptr_t)end + 1;
 	case DIF_SUBR_MEMREF: {
 		uintptr_t size = 2 * sizeof(uintptr_t);
 		uintptr_t *memref = (uintptr_t *) P2ROUNDUP(mstate->dtms_scratch_ptr, sizeof(uintptr_t));
-		size_t scratch_size = ((uintptr_t) memref - mstate->dtms_scratch_ptr) + size;
+		size_t scratch_size = ((ptraddr_t) memref -
+		    (ptraddr_t) mstate->dtms_scratch_ptr) + size;
 
 		/* address and length */
 		memref[0] = tupregs[0].dttk_value;
@@ -6912,7 +6913,7 @@ dtrace_action_breakpoint(dtrace_ecb_t *ecb)
 	char *msg = "dtrace: breakpoint action at probe ";
 	char *ecbmsg = " (ecb ";
 	uintptr_t val = (uintptr_t)ecb;
-	int shift = (sizeof (uintptr_t) * NBBY) - 4, i = 0;
+	int shift = (sizeof (ptraddr_t) * NBBY) - 4, i = 0;
 
 	if (dtrace_destructive_disallow)
 		return;
