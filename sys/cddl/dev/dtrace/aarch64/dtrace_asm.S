@@ -68,39 +68,76 @@ ENTRY(dtrace_interrupt_enable)
 END(dtrace_interrupt_enable)
 /*
 uint8_t
-dtrace_fuword8_nocheck(void *addr)
+dtrace_fuword8_nocheck(void * __capability addr)
 */
 ENTRY(dtrace_fuword8_nocheck)
+#if __has_feature(capabilities)
+	ENTER_C64
+	ldtrb	w0, [c0]
+	EXIT_C64
+#else
 	ldtrb	w0, [x0]
+#endif
 	RET
 END(dtrace_fuword8_nocheck)
 
 /*
 uint16_t
-dtrace_fuword16_nocheck(void *addr)
+dtrace_fuword16_nocheck(void * __capability addr)
 */
 ENTRY(dtrace_fuword16_nocheck)
+#if __has_feature(capabilities)
+	ENTER_C64
+	ldtrh	w0, [c0]
+	EXIT_C64
+#else
 	ldtrh	w0, [x0]
+#endif
 	RET
 END(dtrace_fuword16_nocheck)
 
 /*
 uint32_t
-dtrace_fuword32_nocheck(void *addr)
+dtrace_fuword32_nocheck(void * __capability addr)
 */
 ENTRY(dtrace_fuword32_nocheck)
+#if __has_feature(capabilities)
+	ENTER_C64
+	ldtr	w0, [c0]
+	EXIT_C64
+#else
 	ldtr	w0, [x0]
+#endif
 	RET
 END(dtrace_fuword32_nocheck)
 
 /*
 uint64_t
-dtrace_fuword64_nocheck(void *addr)
+dtrace_fuword64_nocheck(void * __capability addr)
 */
 ENTRY(dtrace_fuword64_nocheck)
+#if __has_feature(capabilities)
+	ENTER_C64
+	ldtr	x0, [c0]
+	EXIT_C64
+#else
 	ldtr	x0, [x0]
+#endif
 	RET
 END(dtrace_fuword64_nocheck)
+
+#if __has_feature(capabilities)
+/*
+uintcap_t
+dtrace_fuwordcap_nocheck(void * __capability addr)
+*/
+ENTRY(dtrace_fucap_nocheck)
+	ENTER_C64
+	ldtr	c0, [c0]
+	EXIT_C64
+	RET
+END(dtrace_fucap_nocheck)
+#endif
 
 /*
 void
@@ -108,13 +145,25 @@ dtrace_copy(uintptr_t uaddr, uintptr_t kaddr, size_t size)
 */
 ENTRY(dtrace_copy)
 	cbz	x2, 2f		/* If len == 0 then skip loop */
+	ENTER_C64
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
+	cvtd	c1, x1			/* Store through a capability */
+	scbnds	c1, c1, x2		/* Set the bounds */
+#endif
 1:
+#if __has_feature(capabilities)
+	ldtrb	w4, [c0]	/* Load from uaddr */
+	add	c0, c0, #1
+	strb	w4, [c1], #1	/* Store in kaddr */
+#else
 	ldtrb	w4, [x0]	/* Load from uaddr */
 	add	x0, x0, #1
 	strb	w4, [x1], #1	/* Store in kaddr */
+#endif
 	sub	x2, x2, #1	/* len-- */
 	cbnz	x2, 1b
 2:
+	EXIT_C64
 	RET
 END(dtrace_copy)
 
@@ -126,14 +175,26 @@ XXX: Check for flags?
 */
 ENTRY(dtrace_copystr)
 	cbz     x2, 2f          /* If len == 0 then skip loop */
+	ENTER_C64
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
+	cvtd	c1, x1			/* Store through a capability */
+	scbnds	c1, c1, x2		/* Set the bounds */
+#endif
 1:
+#if __has_feature(capabilities)
+	ldtrb	w4, [c0]	/* Load from uaddr */
+	add	c0, c0, #1
+	strb    w4, [c1], #1    /* Store in kaddr */
+#else
 	ldtrb	w4, [x0]	/* Load from uaddr */
 	add	x0, x0, #1
 	strb    w4, [x1], #1    /* Store in kaddr */
+#endif
 	cbz     w4, 2f          /* If == 0 then break */
 	sub     x2, x2, #1      /* len-- */
 	cbnz    x2, 1b
 2:
+	EXIT_C64
 	RET
 END(dtrace_copystr)
 
@@ -151,10 +212,10 @@ uint32_t
 dtrace_cas32(uint32_t *target, uint32_t cmp, uint32_t new)
 */
 ENTRY(dtrace_cas32)
-1:	ldxr	w3, [x0]	/* Load target */
+1:	ldxr	w3, [PTR(0)]	/* Load target */
 	cmp	w3, w1		/* Check if *target == cmp */
 	bne	2f		/* No, return */
-	stxr	w12, w2, [x0]	/* Store new to target */
+	stxr	w12, w2, [PTR(0)] /* Store new to target */
 	cbnz	w12, 1b		/* Try again if store not succeed */
 2:	mov	w0, w3		/* Return the value loaded from target */
 	RET
@@ -165,12 +226,12 @@ void *
 dtrace_casptr(volatile void *target, volatile void *cmp, volatile void *new)
 */
 ENTRY(dtrace_casptr)
-1:	ldxr	x3, [x0]	/* Load target */
-	cmp	x3, x1		/* Check if *target == cmp */
-	bne	2f		/* No, return */
-	stxr	w12, x2, [x0]	/* Store new to target */
-	cbnz	w12, 1b		/* Try again if store not succeed */
-2:	mov	x0, x3		/* Return the value loaded from target */
+1:	ldxr	PTR(3), [PTR(0)]	/* Load target */
+	cmp	PTR(3), PTR(1)		/* Check if *target == cmp */
+	bne	2f			/* No, return */
+	stxr	w12, PTR(2), [PTR(0)]	/* Store new to target */
+	cbnz	w12, 1b			/* Try again if store not succeed */
+2:	mov	PTR(0), PTR(3)		/* Return the value loaded from target */
 	RET
 END(dtrace_casptr)
 
