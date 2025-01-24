@@ -476,6 +476,17 @@ static const dt_modops_t dt_modops_64 = {
 	.do_symaddr = dt_module_symaddr64
 };
 
+/*
+ * ELF symbols are the same in CHERI, but we use a separate table so that
+ * there's a 1-1 correspondance with data models.
+ */
+static const dt_modops_t dt_modops_128 = {
+	.do_syminit = dt_module_syminit64,
+	.do_symsort = dt_module_symsort64,
+	.do_symname = dt_module_symname64,
+	.do_symaddr = dt_module_symaddr64
+};
+
 dt_module_t *
 dt_module_create(dtrace_hdl_t *dtp, const char *name)
 {
@@ -500,10 +511,17 @@ dt_module_create(dtrace_hdl_t *dtp, const char *name)
 	dtp->dt_mods[h] = dmp;
 	dtp->dt_nmods++;
 
-	if (dtp->dt_conf.dtc_ctfmodel == CTF_MODEL_LP64)
+	switch (dtp->dt_conf.dtc_ctfmodel) {
+	case CTF_MODEL_P128:
+		dmp->dm_ops = &dt_modops_128;
+		break;
+	case CTF_MODEL_LP64:
 		dmp->dm_ops = &dt_modops_64;
-	else
+		break;
+	default:
 		dmp->dm_ops = &dt_modops_32;
+		break;
+	}
 
 	/*
 	 * Modules for userland processes are special. They always refer to a
@@ -791,7 +809,8 @@ dt_module_load(dtrace_hdl_t *dtp, dt_module_t *dmp)
 	dmp->dm_symtab.cts_flags = 0;
 	dmp->dm_symtab.cts_data = NULL;
 	dmp->dm_symtab.cts_size = 0;
-	dmp->dm_symtab.cts_entsize = dmp->dm_ops == &dt_modops_64 ?
+	dmp->dm_symtab.cts_entsize =
+	    (dmp->dm_ops == &dt_modops_64 || dmp->dm_ops == &dt_modops_128) ?
 	    sizeof (Elf64_Sym) : sizeof (Elf32_Sym);
 	dmp->dm_symtab.cts_offset = 0;
 
@@ -879,7 +898,9 @@ dt_module_getctf(dtrace_hdl_t *dtp, dt_module_t *dmp)
 	if (dmp->dm_ctfp != NULL || dt_module_load(dtp, dmp) != 0)
 		return (dmp->dm_ctfp);
 
-	if (dmp->dm_ops == &dt_modops_64)
+	if (dmp->dm_ops == &dt_modops_128)
+		model = CTF_MODEL_P128;
+	else if (dmp->dm_ops == &dt_modops_64)
 		model = CTF_MODEL_LP64;
 	else
 		model = CTF_MODEL_ILP32;
@@ -1098,7 +1119,7 @@ dt_module_extern(dtrace_hdl_t *dtp, dt_module_t *dmp,
 const char *
 dt_module_modelname(dt_module_t *dmp)
 {
-	if (dmp->dm_ops == &dt_modops_64)
+	if (dmp->dm_ops == &dt_modops_64 || dmp->dm_ops == &dt_modops_128)
 		return ("64-bit");
 	else
 		return ("32-bit");
@@ -1196,13 +1217,19 @@ dt_module_update(dtrace_hdl_t *dtp, struct kld_file_stat *k_stat)
 		return;
 	}
 
+	gelf_getehdr(dmp->dm_elf, &ehdr);
 	switch (gelf_getclass(dmp->dm_elf)) {
 	case ELFCLASS32:
 		dmp->dm_ops = &dt_modops_32;
 		bits = 32;
 		break;
 	case ELFCLASS64:
-		dmp->dm_ops = &dt_modops_64;
+#if __CHERI_PURE_CAPABILITY__
+		if (ELF_IS_CHERI(&ehdr))
+			dmp->dm_ops = &dt_modops_128;
+		else
+#endif
+			dmp->dm_ops = &dt_modops_64;
 		bits = 64;
 		break;
 	default:
@@ -1211,7 +1238,6 @@ dt_module_update(dtrace_hdl_t *dtp, struct kld_file_stat *k_stat)
 		return;
 	}
 	mapbase = (uintptr_t)k_stat->address;
-	gelf_getehdr(dmp->dm_elf, &ehdr);
 	is_elf_obj = (ehdr.e_type == ET_REL);
 	if (is_elf_obj) {
 		dmp->dm_sec_offsets =
