@@ -14127,7 +14127,8 @@ dtrace_dof_slurp(dof_hdr_t *dof, dtrace_vstate_t *vstate, cred_t *cr,
 	}
 
 	if (dof->dofh_ident[DOF_ID_MODEL] != DOF_MODEL_ILP32 &&
-	    dof->dofh_ident[DOF_ID_MODEL] != DOF_MODEL_LP64) {
+	    dof->dofh_ident[DOF_ID_MODEL] != DOF_MODEL_LP64 &&
+	    dof->dofh_ident[DOF_ID_MODEL] != DOF_MODEL_P128) {
 		dtrace_dof_error(dof, "DOF has invalid data model");
 		return (-1);
 	}
