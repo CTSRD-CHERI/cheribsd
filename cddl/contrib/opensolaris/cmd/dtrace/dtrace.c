@@ -54,6 +54,7 @@
 #ifdef __FreeBSD__
 #include <locale.h>
 #include <spawn.h>
+#include <stdbool.h>
 #endif
 
 #undef NORETURN /* needed because libxo redefines it */
@@ -81,7 +82,7 @@ typedef struct dtrace_cmd {
 #define	E_USAGE		2
 
 static const char DTRACE_OPTSTR[] =
-	"3:6:aAb:Bc:CdD:ef:FGhHi:I:lL:m:n:o:Op:P:qs:SU:vVwx:X:Z";
+	"1:3:6:aAb:Bc:CdD:ef:FGhHi:I:lL:m:n:o:Op:P:qs:SU:vVwx:X:Z";
 
 static char **g_argv;
 static int g_argc;
@@ -150,7 +151,8 @@ usage(FILE *fp)
 
 	(void) fprintf(fp, "\n"
 	    "\t-32 generate 32-bit D programs and ELF files\n"
-	    "\t-64 generate 64-bit D programs and ELF files\n\n"
+	    "\t-64 generate 64-bit D programs and ELF files\n"
+	    "\t-128 generate 64-bit, 128-bit pointer D programs and ELF files\n\n"
 	    "\t-a  claim anonymous tracing state\n"
 	    "\t-A  generate driver.conf(4) directives for anonymous tracing\n"
 	    "\t-b  set trace buffer size\n"
@@ -1371,6 +1373,16 @@ main(int argc, char *argv[])
 	for (optind = 1; optind < argc; optind++) {
 		while ((c = getopt(argc, argv, DTRACE_OPTSTR)) != -1) {
 			switch (c) {
+			case '1':
+				if (strcmp(optarg, "128") != 0) {
+					(void) fprintf(stderr,
+					    "%s: illegal option -- 1%s\n",
+					    argv[0], optarg);
+					return (usage(stderr));
+				}
+				g_oflags &= ~DTRACE_O_MODEL_MASK;
+				g_oflags |= DTRACE_O_P128;
+				break;
 			case '3':
 				if (strcmp(optarg, "2") != 0) {
 					(void) fprintf(stderr,
@@ -1490,9 +1502,13 @@ main(int argc, char *argv[])
 					fatal("can't mix 32-bit and 64-bit "
 					    "object files\n");
 				}
-				g_oflags |= DTRACE_O_LP64;
+				if (ELF_IS_CHERI(&ehdr))
+					g_oflags |= DTRACE_O_P128;
+				else
+					g_oflags |= DTRACE_O_LP64;
 			} else if (ehdr.e_ident[EI_CLASS] == ELFCLASS32) {
-				if (g_oflags & DTRACE_O_LP64) {
+				if (g_oflags &
+				    (DTRACE_O_LP64 | DTRACE_O_P128)) {
 					fatal("can't mix 32-bit and 64-bit "
 					    "object files\n");
 				}
