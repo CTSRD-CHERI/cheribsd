@@ -35,6 +35,7 @@
 static const ctf_dmodel_t _libctf_models[] = {
 	{ "ILP32", CTF_MODEL_ILP32, 4, 1, 2, 4, 4 },
 	{ "LP64", CTF_MODEL_LP64, 8, 1, 2, 4, 8 },
+	{ "P128", CTF_MODEL_P128, 16, 1, 2, 4, 8 },
 	{ NULL, 0, 0, 0, 0, 0, 0 }
 };
 

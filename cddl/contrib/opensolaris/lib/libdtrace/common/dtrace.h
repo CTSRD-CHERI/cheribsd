@@ -70,8 +70,9 @@ typedef struct dtrace_aggdata dtrace_aggdata_t;
 #define	DTRACE_O_NOSYS		0x02	/* do not load /system/object modules */
 #define	DTRACE_O_LP64		0x04	/* force D compiler to be LP64 */
 #define	DTRACE_O_ILP32		0x08	/* force D compiler to be ILP32 */
-#define	DTRACE_O_MODEL_MASK	(DTRACE_O_LP64 | DTRACE_O_ILP32)
-#define	DTRACE_O_MASK		0x0f	/* mask of valid flags to dtrace_open */
+#define	DTRACE_O_P128		0x10	/* force D compiler to be P128 */
+#define	DTRACE_O_MODEL_MASK	(DTRACE_O_LP64 | DTRACE_O_ILP32 | DTRACE_O_P128)
+#define	DTRACE_O_MASK		0x1f	/* mask of valid flags to dtrace_open */
 
 extern dtrace_hdl_t *dtrace_open(int, int, int *);
 extern dtrace_hdl_t *dtrace_vopen(int, int, int *,
