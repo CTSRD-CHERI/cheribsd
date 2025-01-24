@@ -11480,7 +11480,7 @@ success:
 		act->dta_intuple = 1;
 	}
 
-	return (&agg->dtag_action);
+	return ((dtrace_action_t *) agg);
 }
 
 static void
