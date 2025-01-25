@@ -11031,7 +11031,7 @@ dtrace_predicate_release(dtrace_predicate_t *pred, dtrace_vstate_t *vstate)
  */
 static dtrace_actdesc_t *
 dtrace_actdesc_create(dtrace_actkind_t kind, uint32_t ntuple,
-    dtrace_uarg_t uarg, uint64_t arg)
+    dtrace_uarg_t uarg, dtrace_uarg_t arg)
 {
 	dtrace_actdesc_t *act;
 
@@ -11516,7 +11516,7 @@ dtrace_ecb_action_add(dtrace_ecb_t *ecb, dtrace_actdesc_t *desc)
 	dtrace_recdesc_t *rec;
 	dtrace_state_t *state = ecb->dte_state;
 	dtrace_optval_t *opt = state->dts_options, nframes = 0, strsize;
-	uint64_t arg = desc->dtad_arg;
+	dtrace_uarg_t arg = desc->dtad_arg;
 
 	ASSERT(MUTEX_HELD(&dtrace_lock));
 	ASSERT(ecb->dte_action == NULL || ecb->dte_action->dta_refcnt == 1);
@@ -13827,7 +13827,7 @@ dtrace_dof_actdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 	dof_sec_t *difosec;
 	size_t offs;
 	uintptr_t daddr = (uintptr_t)dof;
-	uint64_t arg;
+	dtrace_uarg_t arg;
 	dtrace_actkind_t kind;
 
 	if (sec->dofs_type != DOF_SECT_ACTDESC) {
@@ -13840,7 +13840,7 @@ dtrace_dof_actdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 		return (NULL);
 	}
 
-	if (sec->dofs_align != sizeof (uint64_t)) {
+	if (sec->dofs_align != sizeof (dtrace_uarg_t)) {
 		dtrace_dof_error(dof, "bad alignment in action description");
 		return (NULL);
 	}
@@ -13905,7 +13905,7 @@ dtrace_dof_actdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 			i -= desc->dofa_arg;
 			fmt = kmem_alloc(i + 1, KM_SLEEP);
 			bcopy(&str[desc->dofa_arg], fmt, i + 1);
-			arg = (uint64_t)(uintptr_t)fmt;
+			arg = (uintptr_t)fmt;
 		} else {
 			if (kind == DTRACEACT_PRINTA) {
 				ASSERT(desc->dofa_strtab == DOF_SECIDX_NONE);
@@ -13965,7 +13965,7 @@ dtrace_dof_ecbdesc(dof_hdr_t *dof, dof_sec_t *sec, dtrace_vstate_t *vstate,
 		return (NULL);
 	}
 
-	if (sec->dofs_align != sizeof (uint64_t)) {
+	if (sec->dofs_align != sizeof (dtrace_uarg_t)) {
 		dtrace_dof_error(dof, "bad alignment in ECB description");
 		return (NULL);
 	}
