@@ -85,6 +85,8 @@ TESTS_SUBDIRS+= aggs \
 		vars \
 		version \
 
+TESTS_SUBDIRS:= ${TESTS_SUBDIRS:Njson:Nusdt}
+
 .PATH:		${.CURDIR:H:H:H:H:H}/tests
 KYUAFILE=	YES
 
