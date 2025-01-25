@@ -989,7 +989,7 @@ dtrace_canload_remains(uint64_t addr, size_t sz, size_t *remain,
 	}
 
 	if ((fp = mstate->dtms_getf) != NULL) {
-		uintptr_t psz = sizeof (void *);
+		size_t psz = sizeof (void *);
 		vnode_t *vp;
 		vnodeops_t *op;
 
@@ -6037,7 +6037,7 @@ inetout:	regs[rd] = (uintptr_t)end + 1;
 	}
 
 	case DIF_SUBR_MEMREF: {
-		uintptr_t size = 2 * sizeof(uintptr_t);
+		size_t size = 2 * sizeof(uintptr_t);
 		uintptr_t *memref = (uintptr_t *) P2ROUNDUP(mstate->dtms_scratch_ptr, sizeof(uintptr_t));
 		size_t scratch_size = ((ptraddr_t) memref -
 		    (ptraddr_t) mstate->dtms_scratch_ptr) + size;
