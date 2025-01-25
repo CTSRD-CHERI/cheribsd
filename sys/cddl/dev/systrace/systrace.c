@@ -139,7 +139,7 @@ static void	systrace_unload(void *);
 
 static void	systrace_getargdesc(void *, dtrace_id_t, void *,
 		    dtrace_argdesc_t *);
-static uint64_t	systrace_getargval(void *, dtrace_id_t, void *, int, int);
+static uint64ptr_t systrace_getargval(void *, dtrace_id_t, void *, int, int);
 static void	systrace_provide(void *, dtrace_probedesc_t *);
 static void	systrace_destroy(void *, dtrace_id_t, void *);
 static void	systrace_enable(void *, dtrace_id_t, void *);
@@ -245,7 +245,7 @@ systrace_getargdesc(void *arg, dtrace_id_t id, void *parg,
 		desc->dtargd_ndx = DTRACE_ARGNONE;
 }
 
-static uint64_t
+static uint64ptr_t
 systrace_getargval(void *arg __unused, dtrace_id_t id __unused,
     void *parg __unused, int argno, int aframes __unused)
 {

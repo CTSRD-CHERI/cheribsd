@@ -1273,11 +1273,7 @@ typedef struct dtrace_toxrange {
 	uintptr_t	dtt_limit;		/* limit of toxic range */
 } dtrace_toxrange_t;
 
-#ifdef illumos
-extern uint64_t dtrace_getarg(int, int);
-#else
-extern uint64_t __noinline dtrace_getarg(int, int);
-#endif
+extern uint64ptr_t dtrace_getarg(int, int);
 extern greg_t dtrace_getfp(void);
 extern int dtrace_getipl(void);
 extern uintptr_t dtrace_caller(int);
