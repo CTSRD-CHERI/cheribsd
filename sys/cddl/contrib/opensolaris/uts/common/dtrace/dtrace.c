@@ -599,7 +599,7 @@ static int dtrace_enabling_match(dtrace_enabling_t *, int *);
 static void dtrace_enabling_matchall(void);
 static void dtrace_enabling_reap(void);
 static dtrace_state_t *dtrace_anon_grab(void);
-static uint64_t dtrace_helper(int, dtrace_mstate_t *,
+static dtrace_difval_t dtrace_helper(int, dtrace_mstate_t *,
     dtrace_state_t *, uint64_t, uint64_t);
 static dtrace_helpers_t *dtrace_helpers_create(proc_t *);
 static void dtrace_buffer_drop(dtrace_buffer_t *);
@@ -2540,7 +2540,8 @@ dtrace_aggregate_sum(uint64_t *oval, uint64_t nval, uint64_t arg)
  */
 static void
 dtrace_aggregate(dtrace_aggregation_t *agg, dtrace_buffer_t *dbuf,
-    intptr_t offset, dtrace_buffer_t *buf, uint64_t expr, uint64_t arg)
+    intptr_t offset, dtrace_buffer_t *buf, dtrace_difval_t expr,
+    dtrace_difval_t arg)
 {
 	dtrace_recdesc_t *rec = &agg->dtag_action.dta_rec;
 	uint32_t i, ndx, size, fsize;
@@ -3319,7 +3320,7 @@ dtrace_dif_varstrz(uintptr_t addr, size_t strsz, dtrace_state_t *state,
  * This function implements the DIF emulator's variable lookups.  The emulator
  * passes a reserved variable identifier and optional built-in array index.
  */
-static uint64_t
+static dtrace_difval_t
 dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
     uint64_t ndx)
 {
@@ -3339,7 +3340,7 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 		    sizeof (mstate->dtms_arg[0])) {
 			int aframes = mstate->dtms_probe->dtpr_aframes + 2;
 			dtrace_provider_t *pv;
-			uint64_t val;
+			dtrace_difval_t val;
 
 			pv = mstate->dtms_probe->dtpr_provider;
 			if (pv->dtpv_pops.dtps_getargval != NULL)
@@ -3390,7 +3391,7 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 	case DIF_VAR_CURTHREAD:
 		if (!dtrace_priv_proc(state))
 			return (0);
-		return ((uint64_t)(uintptr_t)curthread);
+		return ((uintptr_t)curthread);
 
 	case DIF_VAR_TIMESTAMP:
 		if (!(mstate->dtms_present & DTRACE_MSTATE_TIMESTAMP)) {
@@ -4234,7 +4235,7 @@ dtrace_json(uint64_t size, uintptr_t json, char *elemlist, int nelems,
  * happen is that a bogus program can obtain bogus results.
  */
 static void
-dtrace_dif_subr(uint_t subr, uint_t rd, uint64_t *regs,
+dtrace_dif_subr(uint_t subr, uint_t rd, dtrace_difval_t *regs,
     dtrace_key_t *tupregs, int nargs,
     dtrace_mstate_t *mstate, dtrace_state_t *state)
 {
@@ -6097,7 +6098,7 @@ inetout:	regs[rd] = (uintptr_t)end + 1;
  * DIF object.  This function is deliberately void of assertions as all of
  * the necessary checks are handled by a call to dtrace_difo_validate().
  */
-static uint64_t
+static dtrace_difval_t
 dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
     dtrace_vstate_t *vstate, dtrace_state_t *state)
 {
@@ -6106,7 +6107,7 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 	const char *strtab = difo->dtdo_strtab;
 	const uint64_t *inttab = difo->dtdo_inttab;
 
-	uint64_t rval = 0;
+	dtrace_difval_t rval = 0;
 	dtrace_statvar_t *svar;
 	dtrace_dstate_t *dstate = &vstate->dtvs_dynvars;
 	dtrace_difv_t *v;
@@ -6114,8 +6115,8 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 	volatile uintptr_t *illval = &cpu_core[curcpu].cpuc_dtrace_illval;
 
 	dtrace_key_t tupregs[DIF_DTR_NREGS + 2]; /* +2 for thread and id */
-	uint64_t regs[DIF_DIR_NREGS];
-	uint64_t *tmp;
+	dtrace_difval_t regs[DIF_DIR_NREGS];
+	dtrace_difval_t *tmp;
 
 	uint8_t cc_n = 0, cc_z = 0, cc_v = 0, cc_c = 0;
 	int64_t cc_r;
@@ -6142,28 +6143,28 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 
 		switch (DIF_INSTR_OP(instr)) {
 		case DIF_OP_OR:
-			regs[rd] = regs[r1] | regs[r2];
+			regs[rd] = regs[r1] | (uint64_t)regs[r2];
 			break;
 		case DIF_OP_XOR:
-			regs[rd] = regs[r1] ^ regs[r2];
+			regs[rd] = regs[r1] ^ (uint64_t)regs[r2];
 			break;
 		case DIF_OP_AND:
-			regs[rd] = regs[r1] & regs[r2];
+			regs[rd] = regs[r1] & (uint64_t)regs[r2];
 			break;
 		case DIF_OP_SLL:
-			regs[rd] = regs[r1] << regs[r2];
+			regs[rd] = regs[r1] << (uint64_t)regs[r2];
 			break;
 		case DIF_OP_SRL:
-			regs[rd] = regs[r1] >> regs[r2];
+			regs[rd] = regs[r1] >> (uint64_t)regs[r2];
 			break;
 		case DIF_OP_SUB:
-			regs[rd] = regs[r1] - regs[r2];
+			regs[rd] = regs[r1] - (uint64_t)regs[r2];
 			break;
 		case DIF_OP_ADD:
-			regs[rd] = regs[r1] + regs[r2];
+			regs[rd] = regs[r1] + (uint64_t)regs[r2];
 			break;
 		case DIF_OP_MUL:
-			regs[rd] = regs[r1] * regs[r2];
+			regs[rd] = regs[r1] * (uint64_t)regs[r2];
 			break;
 		case DIF_OP_SDIV:
 			if (regs[r2] == 0) {
@@ -6364,7 +6365,7 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 			regs[rd] = inttab[DIF_INSTR_INTEGER(instr)];
 			break;
 		case DIF_OP_SETS:
-			regs[rd] = (uint64_t)(uintptr_t)
+			regs[rd] = (uintptr_t)
 			    (strtab + DIF_INSTR_STRING(instr));
 			break;
 		case DIF_OP_SCMP: {
@@ -6426,7 +6427,7 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 					 */
 					regs[rd] = 0;
 				} else {
-					regs[rd] = a + sizeof (uint64_t);
+					regs[rd] = a + sizeof (dtrace_difval_t);
 				}
 
 				break;
@@ -6458,7 +6459,7 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 					break;
 				} else {
 					*(uint8_t *)a = 0;
-					a += sizeof (uint64_t);
+					a += sizeof (dtrace_difval_t);
 				}
 				if (!dtrace_vcanload(
 				    (void *)(uintptr_t)regs[rd], &v->dtdv_type,
@@ -6507,7 +6508,7 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 				size_t sz = v->dtdv_type.dtdt_size;
 				size_t lim;
 
-				sz += sizeof (uint64_t);
+				sz += sizeof (dtrace_difval_t);
 				ASSERT(svar->dtsv_size == NCPU * sz);
 				a += curcpu * sz;
 
@@ -6519,14 +6520,15 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 					 */
 					regs[rd] = 0;
 				} else {
-					regs[rd] = a + sizeof (uint64_t);
+					regs[rd] = a + sizeof (dtrace_difval_t);
 				}
 
 				break;
 			}
 
-			ASSERT(svar->dtsv_size == NCPU * sizeof (uint64_t));
-			tmp = (uint64_t *)(uintptr_t)svar->dtsv_data;
+			ASSERT(svar->dtsv_size ==
+			    NCPU * sizeof (dtrace_difval_t));
+			tmp = (dtrace_difval_t *)(uintptr_t)svar->dtsv_data;
 			regs[rd] = tmp[curcpu];
 			break;
 
@@ -6547,7 +6549,7 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 				size_t sz = v->dtdv_type.dtdt_size;
 				size_t lim;
 
-				sz += sizeof (uint64_t);
+				sz += sizeof (dtrace_difval_t);
 				ASSERT(svar->dtsv_size == NCPU * sz);
 				a += curcpu * sz;
 
@@ -6556,7 +6558,7 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 					break;
 				} else {
 					*(uint8_t *)a = 0;
-					a += sizeof (uint64_t);
+					a += sizeof (dtrace_difval_t);
 				}
 
 				if (!dtrace_vcanload(
@@ -6569,8 +6571,9 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 				break;
 			}
 
-			ASSERT(svar->dtsv_size == NCPU * sizeof (uint64_t));
-			tmp = (uint64_t *)(uintptr_t)svar->dtsv_data;
+			ASSERT(svar->dtsv_size ==
+			    NCPU * sizeof (dtrace_difval_t));
+			tmp = (dtrace_difval_t *)(uintptr_t)svar->dtsv_data;
 			tmp[curcpu] = regs[rd];
 			break;
 
@@ -6807,7 +6810,8 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 
 		case DIF_OP_ALLOCS: {
 			uintptr_t ptr = P2ROUNDUP(mstate->dtms_scratch_ptr, 8);
-			size_t size = ptr - mstate->dtms_scratch_ptr + regs[r1];
+			size_t size = ptr - mstate->dtms_scratch_ptr +
+			    (size_t)regs[r1];
 
 			/*
 			 * Rounding up the user allocation size could have
@@ -7218,10 +7222,11 @@ out:
 
 static void
 dtrace_store_by_ref(dtrace_difo_t *dp, caddr_t tomax, size_t size,
-    size_t *valoffsp, uint64_t *valp, uint64_t end, int intuple, int dtkind)
+    size_t *valoffsp, dtrace_difval_t *valp, uint64_t end, int intuple,
+    int dtkind)
 {
 	volatile uint16_t *flags;
-	uint64_t val = *valp;
+	dtrace_difval_t val = *valp;
 	size_t valoffs = *valoffsp;
 
 	flags = (volatile uint16_t *)&cpu_core[curcpu].cpuc_dtrace_flags;
@@ -7413,7 +7418,7 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 		 * arguments to aggregating actions, one iteration of the
 		 * action loop will use the last iteration's value.
 		 */
-		uint64_t val = 0;
+		dtrace_difval_t val = 0;
 
 		mstate.dtms_present = DTRACE_MSTATE_ARGS | DTRACE_MSTATE_PROBE;
 		mstate.dtms_getf = NULL;
@@ -7571,7 +7576,7 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 
 		if (pred != NULL) {
 			dtrace_difo_t *dp = pred->dtp_difo;
-			uint64_t rval;
+			dtrace_difval_t rval;
 
 			rval = dtrace_dif_emulate(dp, &mstate, vstate, state);
 
@@ -7600,7 +7605,7 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 			valoffs = offs + rec->dtrd_offset;
 
 			if (DTRACEACT_ISAGG(act->dta_kind)) {
-				uint64_t v = 0xbad;
+				dtrace_difval_t v = 0xbad;
 				dtrace_aggregation_t *agg;
 
 				agg = (dtrace_aggregation_t *)act;
@@ -10685,9 +10690,9 @@ dtrace_difo_init(dtrace_difo_t *dp, dtrace_vstate_t *vstate)
 
 			if (v->dtdv_type.dtdt_flags & DIF_TF_BYREF)
 				dsize = NCPU * (v->dtdv_type.dtdt_size +
-				    sizeof (uint64_t));
+				    sizeof (dtrace_difval_t));
 			else
-				dsize = NCPU * sizeof (uint64_t);
+				dsize = NCPU * sizeof (dtrace_difval_t);
 
 			break;
 
@@ -10697,7 +10702,7 @@ dtrace_difo_init(dtrace_difo_t *dp, dtrace_vstate_t *vstate)
 
 			if (v->dtdv_type.dtdt_flags & DIF_TF_BYREF)
 				dsize = v->dtdv_type.dtdt_size +
-				    sizeof (uint64_t);
+				    sizeof (dtrace_difval_t);
 
 			break;
 
@@ -10731,7 +10736,7 @@ dtrace_difo_init(dtrace_difo_t *dp, dtrace_vstate_t *vstate)
 			svar->dtsv_var = *v;
 
 			if ((svar->dtsv_size = dsize) != 0) {
-				svar->dtsv_data = (uint64_t)(uintptr_t)
+				svar->dtsv_data = (uintptr_t)
 				    kmem_zalloc(dsize, KM_SLEEP);
 			}
 
@@ -15692,7 +15697,7 @@ dtrace_helper_trace(dtrace_helper_action_t *helper,
 	 * framework?  (Well, a hell of a lot simpler, for starters...)
 	 */
 	size = sizeof (dtrace_helptrace_t) + dtrace_helptrace_nlocals *
-	    sizeof (uint64_t) - sizeof (uint64_t);
+	    sizeof (dtrace_difval_t) - sizeof (dtrace_difval_t);
 
 	/*
 	 * Iterate until we can allocate a slot in the trace buffer.
@@ -15731,20 +15736,20 @@ dtrace_helper_trace(dtrace_helper_action_t *helper,
 		if ((svar = vstate->dtvs_locals[i]) == NULL)
 			continue;
 
-		ASSERT(svar->dtsv_size >= NCPU * sizeof (uint64_t));
+		ASSERT(svar->dtsv_size >= NCPU * sizeof (dtrace_difval_t));
 		ent->dtht_locals[i] =
-		    ((uint64_t *)(uintptr_t)svar->dtsv_data)[curcpu];
+		    ((dtrace_difval_t *)(uintptr_t)svar->dtsv_data)[curcpu];
 	}
 }
 
-static uint64_t
+static dtrace_difval_t
 dtrace_helper(int which, dtrace_mstate_t *mstate,
     dtrace_state_t *state, uint64_t arg0, uint64_t arg1)
 {
 	uint16_t *flags = &cpu_core[curcpu].cpuc_dtrace_flags;
 	uint64_t sarg0 = mstate->dtms_arg[0];
 	uint64_t sarg1 = mstate->dtms_arg[1];
-	uint64_t rval = 0;
+	dtrace_difval_t rval = 0;
 	dtrace_helpers_t *helpers = curproc->p_dtrace_helpers;
 	dtrace_helper_action_t *helper;
 	dtrace_vstate_t *vstate;

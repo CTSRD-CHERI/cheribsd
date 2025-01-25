@@ -82,6 +82,7 @@ typedef struct dtrace_state dtrace_state_t;
 typedef uint32_t dtrace_optid_t;
 typedef uint32_t dtrace_specid_t;
 typedef uint64_t dtrace_genid_t;
+typedef uint64ptr_t dtrace_difval_t;
 
 /*
  * DTrace Probes
@@ -877,7 +878,7 @@ typedef struct dtrace_dstate {
  *    dynamically-allocated DIFV_SCOPE_GLOBAL variables.
  */
 typedef struct dtrace_statvar {
-	uint64_t dtsv_data;			/* data or pointer to it */
+	dtrace_difval_t dtsv_data;		/* data or pointer to it */
 	size_t dtsv_size;			/* size of pointed-to data */
 	int dtsv_refcnt;			/* reference count */
 	dtrace_difv_t dtsv_var;			/* variable metadata */
@@ -1069,7 +1070,7 @@ typedef struct dtrace_helptrace {
 	int dtht_fault;				/* type of fault (if any) */
 	int dtht_fltoffs;			/* DIF offset */
 	uint64_t dtht_illval;			/* faulting value */
-	uint64_t dtht_locals[1];		/* local variables */
+	dtrace_difval_t dtht_locals[1];		/* local variables */
 } dtrace_helptrace_t;
 
 /*
