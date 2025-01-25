@@ -1692,7 +1692,7 @@ typedef struct dof_helper {
  *   dtrace_register(), dtrace_unregister(), dtrace_invalidate(), and
  *   dtrace_condense().
  *
- * 1.9  uint64_t dtps_getargval(void *arg, dtrace_id_t id, void *parg,
+ * 1.9  uint64ptr_t dtps_getargval(void *arg, dtrace_id_t id, void *parg,
  *               int argno, int aframes)
  *
  * 1.9.1  Overview
@@ -2142,7 +2142,7 @@ typedef struct dtrace_pops {
 	void (*dtps_resume)(void *arg, dtrace_id_t id, void *parg);
 	void (*dtps_getargdesc)(void *arg, dtrace_id_t id, void *parg,
 	    dtrace_argdesc_t *desc);
-	uint64_t (*dtps_getargval)(void *arg, dtrace_id_t id, void *parg,
+	uint64ptr_t (*dtps_getargval)(void *arg, dtrace_id_t id, void *parg,
 	    int argno, int aframes);
 	int (*dtps_usermode)(void *arg, dtrace_id_t id, void *parg);
 	void (*dtps_destroy)(void *arg, dtrace_id_t id, void *parg);
