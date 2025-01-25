@@ -83,7 +83,7 @@ __BEGIN_DECLS
 	    typeof (Y) y_ = (Y);	\
 	    (x_ > y_) ? x_ : y_; })
 
-#ifdef CHERI_LIB_C18N
+#ifndef CHERI_LIB_C18N
 #define	rtld_get_return_address()	__builtin_return_address(0)
 #else
 #define	rtld_get_return_address()	({				\
