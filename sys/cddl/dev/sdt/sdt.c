@@ -66,7 +66,7 @@
 
 /* DTrace methods. */
 static void	sdt_getargdesc(void *, dtrace_id_t, void *, dtrace_argdesc_t *);
-static uint64_t	sdt_getargval(void *, dtrace_id_t, void *, int, int);
+static uint64ptr_t sdt_getargval(void *, dtrace_id_t, void *, int, int);
 static void	sdt_provide_probes(void *, dtrace_probedesc_t *);
 static void	sdt_destroy(void *, dtrace_id_t, void *);
 static void	sdt_enable(void *, dtrace_id_t, void *);
@@ -344,7 +344,7 @@ sdt_getargdesc(void *arg, dtrace_id_t id, void *parg, dtrace_argdesc_t *desc)
  * FreeBSD's SDT implement currently only supports up to 6 arguments, so we just
  * need to handle arg5 here.
  */
-static uint64_t
+static uint64ptr_t
 sdt_getargval(void *arg __unused, dtrace_id_t id __unused,
     void *parg __unused, int argno, int aframes __unused)
 {
