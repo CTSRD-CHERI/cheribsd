@@ -461,7 +461,7 @@ procstat_getcompartments(struct procstat *procstat, struct kinfo_proc *kp,
 	}
 
 	/* Unpack elements of the input buffer into the output buffer. */
-	outbuf = malloc(n * sizeof(*outbuf));
+	outbuf = calloc(n, sizeof(*outbuf));
 	if (outbuf == NULL)
 		goto out_free;
 	for (i = 0, cur = 0; i < n; ++i) {
