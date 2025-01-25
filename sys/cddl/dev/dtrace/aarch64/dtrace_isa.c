@@ -244,7 +244,7 @@ dtrace_getufpstack(uint64_t *pcstack, uint64_t *fpstack, int pcstack_limit)
 	printf("IMPLEMENT ME: %s\n", __func__);
 }
 
-uint64_t
+uint64ptr_t
 dtrace_getarg(int arg, int aframes __unused)
 {
 	struct trapframe *tf;
@@ -259,20 +259,20 @@ dtrace_getarg(int arg, int aframes __unused)
 		return (tf->tf_x[arg]);
 	} else {
 		uintptr_t p;
-		uint64_t val;
+		uint64ptr_t val;
 
-		p = (tf->tf_sp + (arg - 8) * sizeof(uint64_t));
-		if ((p & 7) != 0) {
+		p = (tf->tf_sp + (arg - 8) * sizeof(uint64ptr_t));
+		if ((p & (sizeof(uint64ptr_t) - 1)) != 0) {
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_BADALIGN);
 			cpu_core[curcpu].cpuc_dtrace_illval = p;
 			return (0);
 		}
-		if (!kstack_contains(curthread, p, sizeof(uint64_t))) {
+		if (!kstack_contains(curthread, p, sizeof(uint64ptr_t))) {
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_BADADDR);
 			cpu_core[curcpu].cpuc_dtrace_illval = p;
 			return (0);
 		}
-		memcpy(&val, (void *)p, sizeof(uint64_t));
+		memcpy(&val, (void *)p, sizeof(uint64ptr_t));
 		return (val);
 	}
 }
