@@ -219,6 +219,11 @@ dt_print_hex(FILE *fp, caddr_t addr, size_t size)
 		xo_emit("{:value/%#llx}",
 		    (unsigned long long)*(uint64_t *)addr);
 		break;
+#if __has_feature(capabilities)
+	case sizeof (uintcap_t):
+		xo_emit("{:value/%#lp}", *(uintcap_t *)addr);
+		break;
+#endif
 	default:
 		xo_emit("<{:warning} {:size/%u}>", "invalid size",
 		    (uint_t)size);
@@ -265,7 +270,8 @@ dt_print_int(ctf_id_t base, ulong_t off, dt_printarg_t *pap)
 	 * an even power of two byte size, or is larger than 8 bytes.
 	 */
 	size = e.cte_bits / NBBY;
-	if (size > 8 || (e.cte_bits % NBBY) != 0 || (size & (size - 1)) != 0) {
+	if (size > sizeof (uint64ptr_t) || (e.cte_bits % NBBY) != 0 ||
+	    (size & (size - 1)) != 0) {
 		print_bitfield(pap, off, &e);
 		return;
 	}

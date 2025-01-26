@@ -298,10 +298,26 @@ pfprint_uint(dtrace_hdl_t *dtp, FILE *fp, const char *format,
 	case sizeof (uint64_t):
 		return (dt_printf(dtp, fp, format,
 		    *((uint64_t *)addr) / normal));
+#if __has_feature(capabilities)
+	case sizeof (uintcap_t):
+		return (dt_printf(dtp, fp, format,
+		    *((uintcap_t *)addr) / normal));
+#endif
 	default:
 		return (dt_set_errno(dtp, EDT_DMISMATCH));
 	}
 }
+
+#if __has_feature(capabilities)
+static int
+pfprint_ptr(dtrace_hdl_t *dtp, FILE *fp, const char *format,
+    const dt_pfargd_t *pfd, const void *addr, size_t size, uint64_t normal)
+{
+	if (size != sizeof (uintcap_t))
+		return (dt_set_errno(dtp, EDT_DMISMATCH));
+	return (dt_printf(dtp, fp, format, *((uintcap_t *)addr) / normal));
+}
+#endif
 
 static int
 pfprint_dint(dtrace_hdl_t *dtp, FILE *fp, const char *format,
@@ -694,6 +710,9 @@ static const dt_pfconv_t _dtrace_conversions[] = {
 { "ls",	"ls", pfproto_wstr, pfcheck_wstr, pfprint_wstr },
 { "lx",	"x", "long", pfcheck_xlong, pfprint_uint },
 { "lX",	"X", "long", pfcheck_xlong, pfprint_uint },
+#if __has_feature(capabilities)
+{ "lp", "lp", "uintcap_t", pfcheck_addr, pfprint_ptr },
+#endif
 { "lld", "d", "long long", pfcheck_type, pfprint_sint },
 { "lli", "i", "long long", pfcheck_type, pfprint_sint },
 { "llo", "o", "unsigned long long", pfcheck_type, pfprint_uint },
@@ -1178,7 +1197,7 @@ dt_printf_validate(dt_pfargv_t *pfv, uint_t flags,
 		if (pfc->pfc_print == &pfprint_sint ||
 		    pfc->pfc_print == &pfprint_uint ||
 		    pfc->pfc_print == &pfprint_dint) {
-			if (dt_node_type_size(vnp) == sizeof (uint64_t))
+			if (dt_node_type_size(vnp) >= sizeof (uint64_t))
 				(void) strcpy(pfd->pfd_fmt, "ll");
 		} else if (pfc->pfc_print == &pfprint_fp) {
 			if (dt_node_type_size(vnp) == sizeof (long double))
