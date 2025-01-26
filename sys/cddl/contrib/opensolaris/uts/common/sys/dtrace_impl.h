@@ -1285,7 +1285,7 @@ extern void dtrace_copyout(uintptr_t, uintcap_t, size_t, volatile uint16_t *);
 extern void dtrace_copyoutstr(uintptr_t, uintcap_t, size_t,
     volatile uint16_t *);
 extern void dtrace_getpcstack(pc_t *, int, int, uint32_t *);
-extern ulong_t dtrace_getreg(struct trapframe *, uint_t);
+extern uintcap_t dtrace_getreg(struct trapframe *, uint_t);
 extern int dtrace_getstackdepth(int);
 extern void dtrace_getupcstack(uint64_t *, int);
 extern void dtrace_getufpstack(uint64_t *, uint64_t *, int);

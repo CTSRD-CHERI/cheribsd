@@ -75,10 +75,17 @@ dtrace_getpcstack(pc_t *pcstack, int pcstack_limit, int aframes,
 		pcstack[depth++] = (pc_t) intrpc;
 	}
 
-	aframes++;
+	if (curthread->t_dtrace_trapframe != NULL) {
+		struct trapframe *tf;
 
-	state.fp = (uintptr_t)__builtin_frame_address(0);
-	state.pc = (uintptr_t)dtrace_getpcstack;
+		tf = curthread->t_dtrace_trapframe;
+		aframes = 0;
+		pcstack[depth++] = tf->tf_lr;
+		state.fp = tf->tf_x[29];
+	} else {
+		aframes++;
+		state.fp = (uintptr_t)__builtin_frame_address(0);
+	}
 
 	while (depth < pcstack_limit) {
 		if (!unwind_frame(curthread, &state))
@@ -136,9 +143,19 @@ dtrace_getustack_common(uint64_t *pcstack, int pcstack_limit, uintptr_t pc,
 		if (fp == 0)
 			break;
 
-		pc = dtrace_fuword64((void * __capability)(fp +
+#if __has_feature(capabilities)
+		if (!cheri_can_access((void * __capability)fp,
+		    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP,
+		    (ptraddr_t)fp, sizeof (struct unwind_state)))
+			break;
+		pc = dtrace_fucap(
+		    (void * __capability)(fp + sizeof (uintcap_t)));
+		fp = dtrace_fucap((void * __capability)fp);
+#else
+		pc = dtrace_fuword64((void *)(fp +
 		    offsetof(struct unwind_state, pc)));
-		fp = dtrace_fuword64((void * __capability)fp);
+		fp = dtrace_fuword64((void *)fp);
+#endif
 
 		if (fp == oldfp) {
 			*flags |= CPU_DTRACE_BADSTACK;
@@ -304,7 +321,7 @@ dtrace_getstackdepth(int aframes)
 		return (depth - aframes);
 }
 
-ulong_t
+uintcap_t
 dtrace_getreg(struct trapframe *frame, uint_t reg)
 {
 	switch (reg) {
