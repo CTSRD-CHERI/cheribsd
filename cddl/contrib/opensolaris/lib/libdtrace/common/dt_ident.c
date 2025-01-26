@@ -464,7 +464,12 @@ dt_idcook_regs(dt_node_t *dnp, dt_ident_t *idp, int argc, dt_node_t *ap)
 		    (longlong_t)ap->dn_value, idp->di_name);
 	}
 
-	if (dt_type_lookup("uint64_t", &dtt) == -1) {
+#if __has_feature(capabilities)
+	const char *t = "uintcap_t";
+#else
+	const char *t = "uint64_t";
+#endif
+	if (dt_type_lookup(t, &dtt) == -1) {
 		xyerror(D_UNKNOWN, "failed to resolve type of %s: %s\n",
 		    idp->di_name, dtrace_errmsg(dtp, dtrace_errno(dtp)));
 	}
