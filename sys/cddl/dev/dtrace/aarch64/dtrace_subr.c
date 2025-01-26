@@ -233,8 +233,26 @@ dtrace_trap(struct trapframe *frame, u_int type)
 		 */
 		switch (type) {
 		case EXCP_DATA_ABORT:
+#if __has_feature(capabilities)
+			switch (frame->tf_esr & ISS_DATA_DFSC_MASK) {
+			case ISS_DATA_DFSC_CAP_TAG:
+			case ISS_DATA_DFSC_CAP_SEALED:
+			case ISS_DATA_DFSC_CAP_BOUND:
+			case ISS_DATA_DFSC_CAP_PERM:
+				cpu_core[curcpu].cpuc_dtrace_flags |=
+				    CPU_DTRACE_CHERI;
+				break;
+			default:
+				cpu_core[curcpu].cpuc_dtrace_flags |=
+				    CPU_DTRACE_BADADDR;
+				break;
+			}
+#else
+			cpu_core[curcpu].cpuc_dtrace_flags |=
+			CPU_DTRACE_BADADDR;
+#endif
+
 			/* Flag a bad address. */
-			cpu_core[curcpu].cpuc_dtrace_flags |= CPU_DTRACE_BADADDR;
 			cpu_core[curcpu].cpuc_dtrace_illval = frame->tf_far;
 
 			/*
