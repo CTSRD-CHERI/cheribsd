@@ -92,7 +92,7 @@ linux${SFX}_vdso.so.o: linux${SFX}_locore.o linux${SFX}_vdso_gtod.o
 linux${SFX}_vdso_inc.o: linux${SFX}_vdso.so.o
 
 linux${SFX}_support.o: linux${SFX}_support.S assym.inc linux${SFX}_assym.h
-	${CC} -c -x assembler-with-cpp -DLOCORE ${CFLAGS} \
+	${CC} -c -x assembler-with-cpp -DLOCORE ${CFLAGS} -fPIC \
 	    ${.ALLSRC:M*linux${SFX}_*.S:u} -o ${.TARGET}
 
 linux${SFX}_genassym.o: offset.inc

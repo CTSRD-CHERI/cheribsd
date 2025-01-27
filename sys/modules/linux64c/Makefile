@@ -87,7 +87,7 @@ linux_vdso.so.o: linux_locore.o linux_vdso_gtod.o
 linux_vdso_inc.o: linux_vdso.so.o
 
 linux_support.o: linux_support.S assym.inc linux_assym.h
-	${CC} -c -x assembler-with-cpp -DLOCORE ${CFLAGS} \
+	${CC} -c -x assembler-with-cpp -DLOCORE ${CFLAGS} -fPIC \
 	    ${.ALLSRC:M*.S:u} -o ${.TARGET}
 
 linux_genassym.o: offset.inc
