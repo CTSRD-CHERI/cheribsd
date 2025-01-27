@@ -47,13 +47,16 @@
 	b.cs	\bad_addr_func
 .endm
 
-EENTRY(futex_fault)
+
+.type futex_fault, #function
+futex_fault:
 	SET_FAULT_HANDLER(xzr, PTR(1))
 	EXIT_USER_ACCESS_CHECK(w0, PTR(1))
 futex_fault_nopcb:
 	mov	x0, #EFAULT
 	ret
-EEND(futex_fault)
+.size futex_fault, . - futex_fault
+
 
 #define	LINUX_FUTEX_MAX_LOOPS	128
 
