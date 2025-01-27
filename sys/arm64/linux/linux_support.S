@@ -54,7 +54,7 @@ futex_fault:
 	EXIT_USER_ACCESS_CHECK(w0, PTR(1))
 futex_fault_nopcb:
 	mov	x0, #EFAULT
-	ret
+	RETURN
 .size futex_fault, . - futex_fault
 
 
@@ -95,7 +95,7 @@ ENTRY(futex_xchgl)
 	EXIT_USER_ACCESS(w9)
 	SET_FAULT_HANDLER(xzr, PTR(9))	/* Reset the fault handler */
 	str w4, [CAP(2)]		/* Store oldval */
-	ret
+	RETURN
 END(futex_xchgl)
 
 /* (int *)uaddr2 += oparg */
@@ -124,7 +124,7 @@ ENTRY(futex_addl)
 	EXIT_USER_ACCESS(w9)
 	SET_FAULT_HANDLER(xzr, PTR(9))
 	str w4, [CAP(2)]
-	ret
+	RETURN
 END(futex_addl)
 
 /* (int *)uaddr2 |= oparg */
@@ -153,7 +153,7 @@ ENTRY(futex_orl)
 	EXIT_USER_ACCESS(w9)
 	SET_FAULT_HANDLER(xzr, PTR(9))
 	str w4, [CAP(2)]
-	ret
+	RETURN
 END(futex_orl)
 
 /* (int *)uaddr2 &= oparg */
@@ -182,7 +182,7 @@ ENTRY(futex_andl)
 	EXIT_USER_ACCESS(w9)
 	SET_FAULT_HANDLER(xzr, PTR(9))
 	str w4, [CAP(2)]
-	ret
+	RETURN
 END(futex_andl)
 
 /* (int *)uaddr2 ^= oparg */
@@ -211,7 +211,7 @@ ENTRY(futex_xorl)
 	EXIT_USER_ACCESS(w9)
 	SET_FAULT_HANDLER(xzr, PTR(9))
 	str w4, [CAP(2)]
-	ret
+	RETURN
 END(futex_xorl)
 
 GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)
