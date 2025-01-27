@@ -135,8 +135,8 @@ clp2(size_t x)
 
 /*
  * Lookup the correct load opcode to use for the specified node and CTF type.
- * We determine the size and convert it to a 3-bit index.  Our lookup table
- * is constructed to use a 5-bit index, consisting of the 3-bit size 0-7, a
+ * We determine the size and convert it to a 4-bit index.  Our lookup table
+ * is constructed to use a 6-bit index, consisting of the 4-bit size 0-15, a
  * bit for the sign, and a bit for userland address.  For example, a 4-byte
  * signed load from userland would be at the following table index:
  * user=1 sign=1 size=4 => binary index 11011 = decimal index 27
@@ -147,12 +147,20 @@ dt_cg_load(dt_node_t *dnp, ctf_file_t *ctfp, ctf_id_t type)
 	static const uint_t ops[] = {
 		DIF_OP_LDUB,	DIF_OP_LDUH,	0,	DIF_OP_LDUW,
 		0,		0,		0,	DIF_OP_LDX,
+		0,		0,		0,	0,
+		0,		0,		0,	DIF_OP_LDC,
 		DIF_OP_LDSB,	DIF_OP_LDSH,	0,	DIF_OP_LDSW,
 		0,		0,		0,	DIF_OP_LDX,
+		0,		0,		0,	0,
+		0,		0,		0,	DIF_OP_LDC,
 		DIF_OP_ULDUB,	DIF_OP_ULDUH,	0,	DIF_OP_ULDUW,
 		0,		0,		0,	DIF_OP_ULDX,
+		0,		0,		0,	0,
+		0,		0,		0,	DIF_OP_ULDC,
 		DIF_OP_ULDSB,	DIF_OP_ULDSH,	0,	DIF_OP_ULDSW,
 		0,		0,		0,	DIF_OP_ULDX,
+		0,		0,		0,	0,
+		0,		0,		0,	DIF_OP_ULDC,
 	};
 
 	ctf_encoding_t e;
@@ -169,7 +177,7 @@ dt_cg_load(dt_node_t *dnp, ctf_file_t *ctfp, ctf_id_t type)
 	else
 		size = ctf_type_size(ctfp, type);
 
-	if (size < 1 || size > 8 || (size & (size - 1)) != 0) {
+	if (size < 1 || size > 16 || (size & (size - 1)) != 0) {
 		xyerror(D_UNKNOWN, "internal error -- cg cannot load "
 		    "size %ld when passed by value\n", (long)size);
 	}
@@ -177,10 +185,11 @@ dt_cg_load(dt_node_t *dnp, ctf_file_t *ctfp, ctf_id_t type)
 	size--; /* convert size to 3-bit index */
 
 	if (dnp->dn_flags & DT_NF_SIGNED)
-		size |= 0x08;
-	if (dnp->dn_flags & DT_NF_USERLAND)
 		size |= 0x10;
+	if (dnp->dn_flags & DT_NF_USERLAND)
+		size |= 0x20;
 
+	assert(ops[size] != 0);
 	return (ops[size]);
 }
 
@@ -445,6 +454,11 @@ dt_cg_store(dt_node_t *src, dt_irlist_t *dlp, dt_regset_t *drp, dt_node_t *dst)
 		case 8:
 			instr = DIF_INSTR_STORE(DIF_OP_STX, reg, dst->dn_reg);
 			break;
+#if __has_feature(capabilities)
+		case 16:
+			instr = DIF_INSTR_STORE(DIF_OP_STC, reg, dst->dn_reg);
+			break;
+#endif
 		default:
 			xyerror(D_UNKNOWN, "internal error -- cg cannot store "
 			    "size %lu when passed by value\n", (ulong_t)size);
@@ -1421,6 +1435,11 @@ dt_cg_xlate_member(const char *name, ctf_id_t type, ulong_t off, void *arg)
 		case 8:
 			instr = DIF_INSTR_STORE(DIF_OP_STX, treg, reg);
 			break;
+#if __has_feature(capabilities)
+		case 16:
+			instr = DIF_INSTR_STORE(DIF_OP_STC, treg, reg);
+			break;
+#endif
 		default:
 			xyerror(D_UNKNOWN, "internal error -- unexpected "
 			    "size: %lu\n", (ulong_t)size);
