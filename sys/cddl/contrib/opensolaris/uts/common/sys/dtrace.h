@@ -211,6 +211,14 @@ typedef enum dtrace_probespec {
 #define	DIF_OP_XLATE	78		/* xlate xlrindex, rd */
 #define	DIF_OP_XLARG	79		/* xlarg xlrindex, rd */
 
+/*
+ * CHERI-specific opcodes.
+ */
+#define	DIF_OP_LDC	90		/* ldc [r1], rd */
+#define	DIF_OP_ULDC	91		/* uldc [r1], rd */
+#define	DIF_OP_RLDC	92		/* rldc [r1], rd */
+#define	DIF_OP_STC	93		/* stc r1, [rd] */
+
 #define	DIF_INTOFF_MAX		0xffff	/* highest integer table offset */
 #define	DIF_STROFF_MAX		0xffff	/* highest string table offset */
 #define	DIF_REGISTER_MAX	0xff	/* highest register number */
