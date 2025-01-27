@@ -288,7 +288,7 @@ lkpi_get_user_pages(void * __capability start, unsigned long nr_pages,
 
 #if defined(LINUXKPI_VERSION) && LINUXKPI_VERSION >= 60500
 static inline long
-pin_user_pages(unsigned long start, unsigned long nr_pages,
+pin_user_pages(void * __capability start, unsigned long nr_pages,
     unsigned int gup_flags, struct page **pages)
 {
 	return (get_user_pages(start, nr_pages, gup_flags, pages));
