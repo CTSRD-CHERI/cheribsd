@@ -101,11 +101,6 @@ futex_key_get(const void * __capability uaddr, int type, int share, struct umtx_
 	/* Check that futex address is a 32bit aligned. */
 	if (!__is_aligned(uaddr, sizeof(uint32_t)))
 		return (EINVAL);
-
-	// Put this here temporarily
-	// Somehow if the capability does not cover the 4 bytes umtx_key_get will hang
-	if (!__CAP_CHECK(__DECONST_CAP(void * __capability, uaddr), 4))
-		return (EFAULT);
 	
 	return (umtx_key_get(uaddr, type, share, key));
 }
