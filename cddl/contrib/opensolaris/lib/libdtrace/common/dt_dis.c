@@ -428,6 +428,12 @@ dt_dis(const dtrace_difo_t *dp, FILE *fp)
 		[DIF_OP_RLDX] = { "rldx", dt_dis_load },
 		[DIF_OP_XLATE] = { "xlate", dt_dis_xlate },
 		[DIF_OP_XLARG] = { "xlarg", dt_dis_xlate },
+#if __has_feature(capabilities)
+		[DIF_OP_LDC] = { "ldc", dt_dis_load },
+		[DIF_OP_RLDC] = { "rldc", dt_dis_load },
+		[DIF_OP_ULDC] = { "uldc", dt_dis_load },
+		[DIF_OP_STC] = { "stc", dt_dis_store },
+#endif
 	};
 
 	const struct opent *op;
