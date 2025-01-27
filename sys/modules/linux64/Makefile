@@ -93,7 +93,7 @@ linux${SFX}_vdso_inc.o: linux${SFX}_vdso.so.o
 
 linux${SFX}_support.o: linux${SFX}_support.S assym.inc linux${SFX}_assym.h
 	${CC} -c -x assembler-with-cpp -DLOCORE ${CFLAGS} \
-	    ${.ALLSRC:M*.S:u} -o ${.TARGET}
+	    ${.ALLSRC:Mlinux${SFX}*.S:u} -o ${.TARGET}
 
 linux${SFX}_genassym.o: offset.inc
 	${CC} -c ${CFLAGS:N-flto*:N-fno-common:N-fsanitize*:N-fno-sanitize*} \
