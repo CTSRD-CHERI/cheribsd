@@ -560,10 +560,45 @@ dtrace_load##bits(uintptr_t addr)					\
 	return (!(*flags & CPU_DTRACE_FAULT) ? rval : 0);		\
 }
 
+#if __has_feature(capabilities)
+static uintcap_t
+dtrace_loadcap(uintcap_t addr)
+{
+	size_t size = 16;
+	uintcap_t rval;
+	volatile uint16_t *flags = (volatile uint16_t *)
+	    &cpu_core[curcpu].cpuc_dtrace_flags;
+
+	DTRACE_ALIGNCHECK(addr, size, flags);
+
+	for (int i = 0; i < dtrace_toxranges; i++) {
+		if (addr >= dtrace_toxrange[i].dtt_limit)
+			continue;
+
+		if (addr + size <= dtrace_toxrange[i].dtt_base)
+			continue;
+
+		*flags |= CPU_DTRACE_BADADDR;
+		cpu_core[curcpu].cpuc_dtrace_illval = addr;
+		return (0);
+	}
+
+	*flags |= CPU_DTRACE_NOFAULT;
+	rval = *((__cheri_fromcap volatile uintcap_t *)addr);
+	*flags &= ~CPU_DTRACE_NOFAULT;
+
+	return (!(*flags & CPU_DTRACE_FAULT) ? rval : 0);
+}
+#endif
+
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	dtrace_loadptr	dtrace_loadcap
+#else
 #ifdef _LP64
 #define	dtrace_loadptr	dtrace_load64
 #else
 #define	dtrace_loadptr	dtrace_load32
+#endif
 #endif
 
 #define	DTRACE_DYNHASH_FREE	0
@@ -6314,6 +6349,20 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 		case DIF_OP_LDX:
 			regs[rd] = dtrace_load64(regs[r1]);
 			break;
+#if __has_feature(capabilities)
+		case DIF_OP_RLDC:
+			if (!dtrace_canload(regs[r1], 16, mstate, vstate))
+				break;
+			/*FALLTHROUGH*/
+		case DIF_OP_LDC:
+			regs[rd] = dtrace_loadcap(regs[r1]);
+			break;
+#else
+		case DIF_OP_RLDC:
+		case DIF_OP_LDC:
+			*flags |= CPU_DTRACE_ILLOP;
+			break;
+#endif
 		case DIF_OP_ULDSB:
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
 			regs[rd] = (int8_t)dtrace_fuword8(
@@ -6355,6 +6404,16 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 			regs[rd] = dtrace_fuword64(
 			    (void * __capability)(uintptr_t)regs[r1]);
 			DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
+			break;
+		case DIF_OP_ULDC:
+#if __has_feature(capabilities)
+			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
+			regs[rd] = dtrace_fucap(
+			    (void * __capability)(uintcap_t)regs[r1]);
+			DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
+#else
+			*flags |= CPU_DTRACE_ILLOP;
+#endif
 			break;
 		case DIF_OP_RET:
 			rval = regs[rd];
@@ -6896,6 +6955,24 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 				break;
 			}
 			*((uint64_t *)(uintptr_t)regs[rd]) = regs[r1];
+			break;
+
+		case DIF_OP_STC:
+#if __has_feature(capabilities)
+			if (!dtrace_canstore(regs[rd], 16, mstate, vstate)) {
+				*flags |= CPU_DTRACE_BADADDR;
+				*illval = regs[rd];
+				break;
+			}
+			if (regs[rd] & 15) {
+				*flags |= CPU_DTRACE_BADALIGN;
+				*illval = regs[rd];
+				break;
+			}
+			*((uintcap_t *)(uintptr_t)regs[rd]) = regs[r1];
+#else
+			*flags |= CPU_DTRACE_ILLOP;
+#endif
 			break;
 		}
 	}
@@ -9865,6 +9942,9 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 		case DIF_OP_LDUH:
 		case DIF_OP_LDUW:
 		case DIF_OP_LDX:
+#if __has_feature(capabilities)
+		case DIF_OP_LDC:
+#endif
 			if (r1 >= nregs)
 				err += efunc(pc, "invalid register %u\n", r1);
 			if (r2 != 0)
@@ -9884,6 +9964,9 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 		case DIF_OP_RLDUH:
 		case DIF_OP_RLDUW:
 		case DIF_OP_RLDX:
+#if __has_feature(capabilities)
+		case DIF_OP_RLDC:
+#endif
 			if (r1 >= nregs)
 				err += efunc(pc, "invalid register %u\n", r1);
 			if (r2 != 0)
@@ -9900,6 +9983,9 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 		case DIF_OP_ULDUH:
 		case DIF_OP_ULDUW:
 		case DIF_OP_ULDX:
+#if __has_feature(capabilities)
+		case DIF_OP_ULDC:
+#endif
 			if (r1 >= nregs)
 				err += efunc(pc, "invalid register %u\n", r1);
 			if (r2 != 0)
@@ -9913,6 +9999,9 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 		case DIF_OP_STH:
 		case DIF_OP_STW:
 		case DIF_OP_STX:
+#if __has_feature(capabilities)
+		case DIF_OP_STC:
+#endif
 			if (r1 >= nregs)
 				err += efunc(pc, "invalid register %u\n", r1);
 			if (r2 != 0)
@@ -10450,6 +10539,10 @@ dtrace_difo_cacheable(dtrace_difo_t *dp)
 		    (op >= DIF_OP_RLDSB && op <= DIF_OP_RLDX) ||
 		    op == DIF_OP_LDGA || op == DIF_OP_STTS)
 			return (0);
+#if __has_feature(capabilities)
+		if (op == DIF_OP_LDC || op == DIF_OP_RLDC || op == DIF_OP_ULDC)
+			return (0);
+#endif
 	}
 
 	return (1);
