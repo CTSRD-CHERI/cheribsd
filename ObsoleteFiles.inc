@@ -465,6 +465,8 @@ OLD_DIRS+=usr/lib/clang/18/share
 OLD_DIRS+=usr/lib/clang/18
 
 # 20241023: new libc++ import which bumps version from 18 to 19
+.if 0
+# CHERI libc++ is still from 15.0.0
 OLD_FILES+=usr/include/c++/v1/__algorithm/pstl_any_all_none_of.h
 OLD_FILES+=usr/include/c++/v1/__algorithm/pstl_backend.h
 OLD_FILES+=usr/include/c++/v1/__algorithm/pstl_backends/cpu_backend.h
@@ -527,6 +529,7 @@ OLD_FILES+=usr/include/c++/v1/__type_traits/is_trivially_move_assignable.h
 OLD_FILES+=usr/include/c++/v1/__type_traits/is_trivially_move_constructible.h
 OLD_FILES+=usr/include/c++/v1/__type_traits/operation_traits.h
 OLD_FILES+=usr/include/c++/v1/experimental/__memory
+.endif
 
 # 20241014: move divapp to netpfil/common/
 OLD_FILES+=usr/tests/sys/netpfil/pf/divapp
