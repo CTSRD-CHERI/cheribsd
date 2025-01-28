@@ -36,6 +36,12 @@ ifunc_init(const Elf_Auxinfo *aux)
 	}
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+static void
+crt1_handle_rela(const Elf_Rela *r, void *data_cap, const void *code_cap)
+{
+}
+#else
 static void
 crt1_handle_rela(const Elf_Rela *r)
 {
@@ -54,3 +60,4 @@ crt1_handle_rela(const Elf_Rela *r)
 		break;
 	}
 }
+#endif
