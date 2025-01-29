@@ -7,17 +7,16 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
-// UNSUPPORTED: libcpp-has-no-incomplete-ranges
 
 // <algorithm>
 
-// template<random_­access_­iterator I, sentinel_­for<I> S, class Comp = ranges::less,
+// template<random_access_iterator I, sentinel_for<I> S, class Comp = ranges::less,
 //         class Proj = identity>
 //   requires sortable<I, Comp, Proj>
 //   constexpr I
 //     ranges::nth_element(I first, I nth, S last, Comp comp = {}, Proj proj = {});            // since C++20
 //
-// template<random_­access_­range R, class Comp = ranges::less, class Proj = identity>
+// template<random_access_range R, class Comp = ranges::less, class Proj = identity>
 //   requires sortable<iterator_t<R>, Comp, Proj>
 //   constexpr borrowed_iterator_t<R>
 //     ranges::nth_element(R&& r, iterator_t<R> nth, Comp comp = {}, Proj proj = {});          // since C++20
@@ -65,8 +64,8 @@ static_assert(!HasNthElementR<UncheckedRange<int*, SentinelForNotWeaklyEqualityC
 static_assert(!HasNthElementR<UncheckedRange<int*>, BadComparator>);
 static_assert(!HasNthElementR<UncheckedRange<const int*>>); // Doesn't satisfy `sortable`.
 
-template <size_t N, class T, class Iter>
-constexpr void verify_nth(const std::array<T, N>& partially_sorted, size_t nth_index, Iter last, T expected_nth) {
+template <std::size_t N, class T, class Iter>
+constexpr void verify_nth(const std::array<T, N>& partially_sorted, std::size_t nth_index, Iter last, T expected_nth) {
   // Note that the exact output of `nth_element` is unspecified and may vary between implementations.
 
   assert(base(last) == partially_sorted.end());
@@ -93,8 +92,8 @@ constexpr void verify_nth(const std::array<T, N>& partially_sorted, size_t nth_i
   }
 }
 
-template <class Iter, class Sent, size_t N>
-constexpr void test_one(std::array<int, N> input, size_t nth_index, std::optional<int> expected_nth = {}) {
+template <class Iter, class Sent, std::size_t N>
+constexpr void test_one(std::array<int, N> input, std::size_t nth_index, std::optional<int> expected_nth = {}) {
   assert(expected_nth || nth_index == N);
 
   { // (iterator, sentinel) overload.
@@ -127,7 +126,7 @@ constexpr void test_one(std::array<int, N> input, size_t nth_index, std::optiona
   }
 }
 
-template <class Iter, class Sent, size_t N>
+template <class Iter, class Sent, std::size_t N>
 constexpr void test_all_cases(std::array<int, N> input) {
   auto sorted = input;
   std::sort(sorted.begin(), sorted.end());
@@ -163,7 +162,7 @@ constexpr void test_iterators() {
 
     { // nth element is in the right place.
       std::array input = {6, 5, 3, 1, 4, 2};
-      constexpr size_t N = input.size();
+      constexpr std::size_t N = input.size();
       test_one<Iter, Sent, N>(input, 2, /*expected_nth=*/3);
     }
 

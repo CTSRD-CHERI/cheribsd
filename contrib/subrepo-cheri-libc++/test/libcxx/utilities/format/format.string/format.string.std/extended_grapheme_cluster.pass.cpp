@@ -6,9 +6,7 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
-// UNSUPPORTED: libcpp-has-no-incomplete-format
-// TODO FMT Fix this test using GCC, it currently times out.
-// UNSUPPORTED: gcc-12
+// UNSUPPORTED: GCC-ALWAYS_INLINE-FIXME
 
 // <format>
 
@@ -40,13 +38,13 @@ constexpr int count_entries(cluster::__property property) {
       });
 }
 
-static_assert(count_entries(cluster::__property::__Prepend) == 26);
+static_assert(count_entries(cluster::__property::__Prepend) == 27);
 static_assert(count_entries(cluster::__property::__CR) == 1);
 static_assert(count_entries(cluster::__property::__LF) == 1);
-static_assert(count_entries(cluster::__property::__Control) == 3886);
-static_assert(count_entries(cluster::__property::__Extend) == 2095);
+static_assert(count_entries(cluster::__property::__Control) == 3893);
+static_assert(count_entries(cluster::__property::__Extend) == 2130);
 static_assert(count_entries(cluster::__property::__Regional_Indicator) == 26);
-static_assert(count_entries(cluster::__property::__SpacingMark) == 388);
+static_assert(count_entries(cluster::__property::__SpacingMark) == 395);
 static_assert(count_entries(cluster::__property::__L) == 125);
 static_assert(count_entries(cluster::__property::__V) == 95);
 static_assert(count_entries(cluster::__property::__T) == 137);
@@ -62,11 +60,11 @@ constexpr void test(const Data& data) {
   for (const auto& d : data) {
     assert(d.code_points.size() == d.breaks.size());
 
-    std::__unicode::__extended_grapheme_cluster_view view{d.input.data(), d.input.data() + d.input.size()};
-    for (size_t i = 0; i < d.breaks.size(); ++i) {
+    std::__unicode::__extended_grapheme_cluster_view view{d.input.begin(), d.input.end()};
+    for (std::size_t i = 0; i < d.breaks.size(); ++i) {
       auto r = view.__consume();
       assert(r.__code_point_ == d.code_points[i]);
-      assert(r.__last_ == d.input.data() + d.breaks[i]);
+      assert(r.__last_ == d.input.begin() + d.breaks[i]);
     }
   }
 }

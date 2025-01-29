@@ -135,10 +135,7 @@ MTREES+=	../${mtree}			/
 # Clean up files that have changed into directories, as mtree cannot handle this
 # scenario.
 DISTRIB_CLEANUP_FILES+=	${INCLUDEDIR}/c++/v1/__string
-.if 0
-# CHERI libc++ is still from 15.0.0
 DISTRIB_CLEANUP_FILES+=	${INCLUDEDIR}/c++/v1/__tuple
-.endif
 DISTRIB_CLEANUP_FILES+=	${LIBEXECDIR}/kgdb
 distrib-cleanup: .PHONY
 	for file in ${DISTRIB_CLEANUP_FILES}; do \
