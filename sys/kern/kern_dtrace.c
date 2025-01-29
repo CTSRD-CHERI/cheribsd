@@ -48,6 +48,14 @@ FEATURE(kdtrace_hooks,
 
 static MALLOC_DEFINE(M_KDTRACE, "kdtrace", "DTrace hooks");
 
+#if __has_feature(capabilities)
+int dtrace_enabled = 0;
+#else
+int dtrace_enabled = 1;
+#endif
+SYSCTL_INT(_debug, OID_AUTO, dtrace_enabled, CTLFLAG_RWTUN, &dtrace_enabled, 0,
+    "DTrace enabled");
+
 /* Hooks used in the machine-dependent trap handlers. */
 dtrace_trap_func_t		dtrace_trap_func;
 dtrace_doubletrap_func_t	dtrace_doubletrap_func;
