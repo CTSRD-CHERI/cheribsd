@@ -780,7 +780,7 @@ typedef struct dtrace_speculation {
  * emulation code, the hash bucket is unlocked.
  */
 typedef struct dtrace_key {
-	uint64_t dttk_value;			/* data value or data pointer */
+	uint64ptr_t dttk_value;			/* data value or data pointer */
 	uint64_t dttk_size;			/* 0 if by-val, >0 if by-ref */
 } dtrace_key_t;
 
