@@ -23,8 +23,8 @@
 #include <ciso646>
 #endif
 
-#define TEST_STRINGIZE_IMPL(x) #x
-#define TEST_STRINGIZE(x) TEST_STRINGIZE_IMPL(x)
+#define TEST_STRINGIZE_IMPL(...) #__VA_ARGS__
+#define TEST_STRINGIZE(...) TEST_STRINGIZE_IMPL(__VA_ARGS__)
 
 #define TEST_CONCAT1(X, Y) X##Y
 #define TEST_CONCAT(X, Y) TEST_CONCAT1(X, Y)
@@ -78,7 +78,8 @@
 #endif
 
 #if defined(__apple_build_version__)
-#define TEST_APPLE_CLANG_VER (__clang_major__ * 100) + __clang_minor__
+// Given AppleClang XX.Y.Z, TEST_APPLE_CLANG_VER is XXYZ (e.g. AppleClang 14.0.3 => 1403)
+#define TEST_APPLE_CLANG_VER (__apple_build_version__ / 10000)
 #elif defined(__clang_major__)
 #define TEST_CLANG_VER (__clang_major__ * 100) + __clang_minor__
 #elif defined(__GNUC__)
@@ -98,6 +99,8 @@
 # define TEST_STD_VER 17
 #elif __cplusplus <= 202002L
 # define TEST_STD_VER 20
+#elif __cplusplus <= 202302L
+# define TEST_STD_VER 23
 #else
 # define TEST_STD_VER 99    // greater than current standard
 // This is deliberately different than _LIBCPP_STD_VER to discourage matching them up.
@@ -166,6 +169,12 @@
 # define TEST_CONSTEXPR_CXX20
 #endif
 
+#if TEST_STD_VER >= 23
+#  define TEST_CONSTEXPR_CXX23 constexpr
+#else
+#  define TEST_CONSTEXPR_CXX23
+#endif
+
 #define TEST_ALIGNAS_TYPE(...) TEST_ALIGNAS(TEST_ALIGNOF(__VA_ARGS__))
 
 #if !TEST_HAS_FEATURE(cxx_rtti) && !defined(__cpp_rtti) \
@@ -184,9 +193,10 @@
 #define TEST_HAS_NO_EXCEPTIONS
 #endif
 
-#if TEST_HAS_FEATURE(address_sanitizer) || TEST_HAS_FEATURE(memory_sanitizer) || \
-    TEST_HAS_FEATURE(thread_sanitizer)
+#if TEST_HAS_FEATURE(address_sanitizer) || TEST_HAS_FEATURE(hwaddress_sanitizer) || \
+    TEST_HAS_FEATURE(memory_sanitizer) || TEST_HAS_FEATURE(thread_sanitizer)
 #define TEST_HAS_SANITIZERS
+#define TEST_IS_EXECUTED_IN_A_SLOW_ENVIRONMENT
 #endif
 
 // Use a function macro to generate an error if test_macros.h was not included
@@ -216,11 +226,6 @@
 #define TEST_CONSTINIT
 #endif
 
-#if !defined(__cpp_impl_three_way_comparison) \
-    && (!defined(_MSC_VER) || defined(__clang__) || _MSC_VER < 1920 || _MSVC_LANG <= 201703L)
-#define TEST_HAS_NO_SPACESHIP_OPERATOR
-#endif
-
 #if TEST_STD_VER < 11
 #define ASSERT_NOEXCEPT(...)
 #define ASSERT_NOT_NOEXCEPT(...)
@@ -245,6 +250,12 @@
 #define LIBCPP_ASSERT_NOEXCEPT(...) static_assert(true, "")
 #define LIBCPP_ASSERT_NOT_NOEXCEPT(...) static_assert(true, "")
 #define LIBCPP_ONLY(...) static_assert(true, "")
+#endif
+
+#if __has_cpp_attribute(nodiscard)
+#  define TEST_NODISCARD [[nodiscard]]
+#else
+#  define TEST_NODISCARD
 #endif
 
 #define TEST_IGNORE_NODISCARD (void)
@@ -382,12 +393,20 @@ inline void DoNotOptimize(Tp const& value) {
 #  define TEST_HAS_NO_THREADS
 #endif
 
-#if defined(_LIBCPP_HAS_NO_FILESYSTEM_LIBRARY)
-#  define TEST_HAS_NO_FILESYSTEM_LIBRARY
+#if defined(_LIBCPP_HAS_NO_FILESYSTEM)
+#  define TEST_HAS_NO_FILESYSTEM
 #endif
 
 #if defined(_LIBCPP_HAS_NO_FGETPOS_FSETPOS)
 #  define TEST_HAS_NO_FGETPOS_FSETPOS
+#endif
+
+#if defined(_LIBCPP_HAS_NO_C8RTOMB_MBRTOC8)
+#  define TEST_HAS_NO_C8RTOMB_MBRTOC8
+#endif
+
+#if defined(_LIBCPP_HAS_NO_RANDOM_DEVICE)
+#  define TEST_HAS_NO_RANDOM_DEVICE
 #endif
 
 #if defined(TEST_COMPILER_CLANG)
@@ -428,6 +447,19 @@ inline void DoNotOptimize(Tp const& value) {
 #define TEST_NO_UNIQUE_ADDRESS [[no_unique_address]]
 #else
 #define TEST_NO_UNIQUE_ADDRESS
+#endif
+
+#ifdef _LIBCPP_SHORT_WCHAR
+#  define TEST_SHORT_WCHAR
+#endif
+
+// This is a temporary workaround for user-defined `operator new` definitions
+// not being picked up on Apple platforms in some circumstances. This is under
+// investigation and should be short-lived.
+#ifdef __APPLE__
+#  define TEST_WORKAROUND_BUG_109234844_WEAK __attribute__((weak))
+#else
+#  define TEST_WORKAROUND_BUG_109234844_WEAK /* nothing */
 #endif
 
 #endif // SUPPORT_TEST_MACROS_HPP

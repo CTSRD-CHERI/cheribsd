@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
-// UNSUPPORTED: libcpp-has-no-incomplete-ranges
 
 // <algorithm>
 
@@ -83,8 +82,8 @@ static_assert(!HasPartitionRange<R<PermutableNotForwardIterator>, UnaryPred>);
 static_assert(!HasPartitionRange<R<PermutableNotSwappable>, UnaryPred>);
 
 // `partition` isn't a stable algorithm so this function cannot test the exact output.
-template <class Iter, class Sent, size_t N, class Pred>
-constexpr void test_one(std::array<int, N> input, Pred pred, size_t partition_point) {
+template <class Iter, class Sent, std::size_t N, class Pred>
+constexpr void test_one(std::array<int, N> input, Pred pred, std::size_t partition_point) {
   auto neg_pred = [&](int x) { return !pred(x); };
 
   { // (iterator, sentinel) overload.

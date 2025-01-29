@@ -14,9 +14,10 @@
 #include <iterator>
 #include <cassert>
 
-#include "test_macros.h"
-#include "min_allocator.h"
 #include "asan_testing.h"
+#include "min_allocator.h"
+#include "MoveOnly.h"
+#include "test_macros.h"
 
 #ifndef TEST_HAS_NO_EXCEPTIONS
 struct Throws {
@@ -33,7 +34,7 @@ struct Throws {
 bool Throws::sThrows = false;
 #endif
 
-int main(int, char**)
+TEST_CONSTEXPR_CXX20 bool tests()
 {
     int a1[] = {1, 2, 3};
     {
@@ -86,6 +87,25 @@ int main(int, char**)
         assert(is_contiguous_container_asan_correct(outer));
         assert(is_contiguous_container_asan_correct(outer[0]));
         assert(is_contiguous_container_asan_correct(outer[1]));
+    }
+    // Make sure vector::erase works with move-only types
+    {
+        // When non-trivial
+        {
+            std::vector<MoveOnly> v;
+            v.emplace_back(1); v.emplace_back(2); v.emplace_back(3);
+            v.erase(v.begin(), v.begin() + 2);
+            assert(v.size() == 1);
+            assert(v[0] == MoveOnly(3));
+        }
+        // When trivial
+        {
+            std::vector<TrivialMoveOnly> v;
+            v.emplace_back(1); v.emplace_back(2); v.emplace_back(3);
+            v.erase(v.begin(), v.begin() + 2);
+            assert(v.size() == 1);
+            assert(v[0] == TrivialMoveOnly(3));
+        }
     }
 #if TEST_STD_VER >= 11
     {
@@ -140,19 +160,30 @@ int main(int, char**)
         assert(is_contiguous_container_asan_correct(outer[1]));
     }
 #endif
+
+    return true;
+}
+
+int main(int, char**)
+{
+    tests();
+#if TEST_STD_VER > 17
+    static_assert(tests());
+#endif
+
 #ifndef TEST_HAS_NO_EXCEPTIONS
 // Test for LWG2853:
 // Throws: Nothing unless an exception is thrown by the assignment operator or move assignment operator of T.
     {
-    Throws arr[] = {1, 2, 3};
-    std::vector<Throws> v(arr, arr+3);
-    Throws::sThrows = true;
-    v.erase(v.begin(), --v.end());
-    assert(v.size() == 1);
-    v.erase(v.begin(), v.end());
-    assert(v.size() == 0);
+        Throws arr[] = {1, 2, 3};
+        std::vector<Throws> v(arr, arr+3);
+        Throws::sThrows = true;
+        v.erase(v.begin(), --v.end());
+        assert(v.size() == 1);
+        v.erase(v.begin(), v.end());
+        assert(v.size() == 0);
     }
 #endif
 
-  return 0;
+    return 0;
 }

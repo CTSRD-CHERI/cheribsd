@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
-// UNSUPPORTED: libcpp-has-no-incomplete-ranges
 
 // <algorithm>
 
@@ -85,8 +84,8 @@ static_assert(!HasStablePartitionRange<R<int*>, IndirectUnaryPredicateNotCopyCon
 static_assert(!HasStablePartitionRange<R<PermutableNotForwardIterator>, UnaryPred>);
 static_assert(!HasStablePartitionRange<R<PermutableNotSwappable>, UnaryPred>);
 
-template <class Iter, class Sent, size_t N, class Pred>
-void test_one(std::array<int, N> input, Pred pred, size_t partition_point, std::array<int, N> expected) {
+template <class Iter, class Sent, std::size_t N, class Pred>
+void test_one(std::array<int, N> input, Pred pred, std::size_t partition_point, std::array<int, N> expected) {
   auto neg_pred = [&](int x) { return !pred(x); };
 
   { // (iterator, sentinel) overload.

@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
-// UNSUPPORTED: libcpp-has-no-incomplete-ranges
 
 // <algorithm>
 
@@ -46,7 +45,7 @@ static_assert(!HasReverseR<BidirectionalRangeNotDecrementable>);
 static_assert(!HasReverseR<PermutableRangeNotForwardIterator>);
 static_assert(!HasReverseR<PermutableRangeNotSwappable>);
 
-template <class Iter, class Sent, size_t N>
+template <class Iter, class Sent, std::size_t N>
 constexpr void test(std::array<int, N> value, std::array<int, N> expected) {
   {
     auto val = value;

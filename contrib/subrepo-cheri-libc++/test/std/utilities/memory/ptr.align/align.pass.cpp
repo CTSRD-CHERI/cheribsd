@@ -12,8 +12,9 @@
 
 // void* align(size_t alignment, size_t size, void*& ptr, size_t& space);
 
-#include <memory>
 #include <cassert>
+#include <cstddef>
+#include <memory>
 
 #include "test_macros.h"
 

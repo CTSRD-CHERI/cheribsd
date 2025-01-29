@@ -7,7 +7,7 @@
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
 // UNSUPPORTED: no-localization
-// UNSUPPORTED: libcpp-has-no-incomplete-format
+// UNSUPPORTED: GCC-ALWAYS_INLINE-FIXME
 
 // REQUIRES: locale.en_US.UTF-8
 // REQUIRES: locale.fr_FR.UTF-8
@@ -17,6 +17,7 @@
 // std::locale locale();
 
 #include <format>
+#include <iterator>
 #include <cassert>
 
 #include "make_string.h"
@@ -39,8 +40,7 @@ void test() {
   {
     std::basic_string<CharT> output;
     OutIt out_it{output};
-    std::basic_format_context context =
-        test_format_context_create(out_it, args, en_US);
+    std::basic_format_context context = test_format_context_create(out_it, args, en_US);
     assert(args.__size() == 4);
     assert(test_basic_format_arg(context.arg(0), true));
     assert(test_basic_format_arg(context.arg(1), CharT('a')));
@@ -59,8 +59,7 @@ void test() {
   {
     std::basic_string<CharT> output;
     OutIt out_it{output};
-    std::basic_format_context context =
-        test_format_context_create(out_it, args, fr_FR);
+    std::basic_format_context context = test_format_context_create(out_it, args, fr_FR);
     assert(args.__size() == 4);
     assert(test_basic_format_arg(context.arg(0), true));
     assert(test_basic_format_arg(context.arg(1), CharT('a')));

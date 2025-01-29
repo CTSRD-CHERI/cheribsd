@@ -18,6 +18,8 @@
 
 // resource_adaptor_imp<Alloc>::resource_adaptor_imp(Alloc &&)
 
+// ADDITIONAL_COMPILE_FLAGS: -D_LIBCPP_DISABLE_DEPRECATION_WARNINGS
+
 #include <experimental/memory_resource>
 #include <cassert>
 

@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
-// UNSUPPORTED: libcpp-has-no-incomplete-ranges
+// UNSUPPORTED: availability-filesystem-missing
 
 // path
 
@@ -15,7 +15,6 @@
 
 #include <concepts>
 #include <ranges>
-
 
 
 static_assert(std::same_as<std::ranges::iterator_t<fs::path>, fs::path::iterator>);
