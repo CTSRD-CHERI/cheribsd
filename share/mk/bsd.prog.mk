@@ -170,6 +170,13 @@ DEBUGMKDIR=
 PROG_FULL=	${PROG}
 .endif
 
+.if ${MK_COMPARTMENT_POLICY} != "no"
+.if !empty(COMPARTMENT_POLICY)
+${PROG_FULL}:	${COMPARTMENT_POLICY}
+LDFLAGS+=	${COMPARTMENT_POLICY:S/^/-Wl,--compartment-policy=/}
+.endif
+.endif
+
 .if defined(PROG)
 PROGNAME?=	${PROG}
 
