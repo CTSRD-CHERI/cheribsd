@@ -35,8 +35,12 @@
 #elif defined(__APPLE__) && defined(__aarch64__)
 #define SEPARATOR %%
 #elif defined(__riscv)
+#ifdef __CHERI_PURE_CAPABILITY__
+# define RISCV_FOFFSET (__SIZEOF_CHERI_CAPABILITY__ * 32)
+#else
 # define RISCV_ISIZE (__riscv_xlen / 8)
 # define RISCV_FOFFSET (RISCV_ISIZE * 32)
+#endif
 # if defined(__riscv_flen)
 #  define RISCV_FSIZE (__riscv_flen / 8)
 # endif

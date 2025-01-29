@@ -5,11 +5,6 @@ set(LIBUNWIND_CXX_SOURCES
     Unwind-EHABI.cpp
     Unwind-seh.cpp
     )
-if(APPLE)
-  list(APPEND LIBUNWIND_CXX_SOURCES
-    Unwind_AppleExtras.cpp
-    )
-endif()
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "AIX")
   list(APPEND LIBUNWIND_CXX_SOURCES
@@ -31,14 +26,6 @@ set(LIBUNWIND_ASM_SOURCES
     UnwindRegistersSave.S
     )
 
-# See add_asm_sources() in compiler-rt for explanation of this workaround.
-# CMake doesn't work correctly with assembly on AIX. Workaround by compiling
-# as C files as well.
-if((APPLE AND CMAKE_VERSION VERSION_LESS 3.19) OR
-   (MINGW AND CMAKE_VERSION VERSION_LESS 3.17) OR
-   (${CMAKE_SYSTEM_NAME} MATCHES "AIX"))
-  set_source_files_properties(${LIBUNWIND_ASM_SOURCES} PROPERTIES LANGUAGE C)
-endif()
 
 if (APPLE AND LLVM_USE_SANITIZER)
     if (("${LLVM_USE_SANITIZER}" STREQUAL "Address") OR
@@ -160,14 +147,19 @@ set_property(SOURCE ${LIBUNWIND_C_SOURCES}
 # ease, but does not rely on C++ at runtime.
 set(CMAKE_CXX_IMPLICIT_LINK_LIBRARIES "")
 
+include(WarningFlags)
+
 # Build the shared library.
 add_library(unwind_shared_objects OBJECT EXCLUDE_FROM_ALL ${LIBUNWIND_SOURCES} ${LIBUNWIND_HEADERS})
+cxx_add_warning_flags(unwind_shared_objects ${LIBUNWIND_ENABLE_WERROR} ${LIBUNWIND_ENABLE_PEDANTIC})
 if(CMAKE_C_COMPILER_ID STREQUAL MSVC)
   target_compile_options(unwind_shared_objects PRIVATE /GR-)
 else()
   target_compile_options(unwind_shared_objects PRIVATE -fno-rtti)
 endif()
 target_link_libraries(unwind_shared_objects PRIVATE unwind-headers ${LIBUNWIND_LIBRARIES})
+target_compile_options(unwind_shared_objects PUBLIC "${LIBUNWIND_ADDITIONAL_COMPILE_FLAGS}")
+target_link_libraries(unwind_shared_objects PUBLIC "${LIBUNWIND_ADDITIONAL_LIBRARIES}")
 set_target_properties(unwind_shared_objects
   PROPERTIES
     CXX_EXTENSIONS OFF
@@ -186,29 +178,33 @@ if (LIBUNWIND_ENABLE_SHARED)
     PROPERTIES
       LINK_FLAGS "${LIBUNWIND_LINK_FLAGS}"
       LINKER_LANGUAGE C
-      OUTPUT_NAME "unwind"
+      OUTPUT_NAME "${LIBUNWIND_SHARED_OUTPUT_NAME}"
       VERSION "1.0"
       SOVERSION "1"
   )
 
-  # To allow testing exceptions with a shared libcxxrt.so
-  if (LIBUNWIND_USE_VERSION_SCRIPT)
-    target_link_libraries(unwind_shared PRIVATE "-Wl,--version-script=${LIBUNWIND_USE_VERSION_SCRIPT}")
-  endif()
   list(APPEND LIBUNWIND_BUILD_TARGETS "unwind_shared")
   if (LIBUNWIND_INSTALL_SHARED_LIBRARY)
     list(APPEND LIBUNWIND_INSTALL_TARGETS "unwind_shared")
   endif()
 endif()
 
+# To allow testing exceptions with a shared libcxxrt.so
+if (LIBUNWIND_USE_VERSION_SCRIPT AND TARGET unwind_shared)
+  target_link_libraries(unwind_shared PRIVATE "-Wl,--version-script=${LIBUNWIND_USE_VERSION_SCRIPT}")
+endif()
+
 # Build the static library.
 add_library(unwind_static_objects OBJECT EXCLUDE_FROM_ALL ${LIBUNWIND_SOURCES} ${LIBUNWIND_HEADERS})
+cxx_add_warning_flags(unwind_static_objects ${LIBUNWIND_ENABLE_WERROR} ${LIBUNWIND_ENABLE_PEDANTIC})
 if(CMAKE_C_COMPILER_ID STREQUAL MSVC)
   target_compile_options(unwind_static_objects PRIVATE /GR-)
 else()
   target_compile_options(unwind_static_objects PRIVATE -fno-rtti)
 endif()
 target_link_libraries(unwind_static_objects PRIVATE unwind-headers ${LIBUNWIND_LIBRARIES})
+target_compile_options(unwind_static_objects PUBLIC "${LIBUNWIND_ADDITIONAL_COMPILE_FLAGS}")
+target_link_libraries(unwind_static_objects PUBLIC "${LIBUNWIND_ADDITIONAL_LIBRARIES}")
 set_target_properties(unwind_static_objects
   PROPERTIES
     CXX_EXTENSIONS OFF
@@ -230,7 +226,7 @@ if (LIBUNWIND_ENABLE_STATIC)
     PROPERTIES
       LINK_FLAGS "${LIBUNWIND_LINK_FLAGS}"
       LINKER_LANGUAGE C
-      OUTPUT_NAME "unwind"
+      OUTPUT_NAME "${LIBUNWIND_STATIC_OUTPUT_NAME}"
   )
 
   list(APPEND LIBUNWIND_BUILD_TARGETS "unwind_static")

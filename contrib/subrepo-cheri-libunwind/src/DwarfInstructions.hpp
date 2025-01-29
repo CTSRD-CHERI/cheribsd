@@ -16,16 +16,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "dwarf2.h"
-#include "Registers.hpp"
 #include "DwarfParser.hpp"
+#include "Registers.hpp"
 #include "config.h"
+#include "dwarf2.h"
+#include "libunwind_ext.h"
 
 
 namespace libunwind {
 
 
-/// DwarfInstructions maps abtract DWARF unwind instructions to a particular
+/// DwarfInstructions maps abstract DWARF unwind instructions to a particular
 /// architecture
 template <typename A, typename R>
 class DwarfInstructions {
@@ -37,7 +38,7 @@ public:
   typedef typename A::capability_t capability_t;
 
   static int stepWithDwarf(A &addressSpace, pc_t pc, pint_t fdeStart,
-                           R &registers, bool &isSignalFrame);
+                           R &registers, bool &isSignalFrame, bool stage2);
 
 private:
 
@@ -249,7 +250,7 @@ bool DwarfInstructions<A, R>::getRA_SIGN_STATE(A &addressSpace, R registers,
 template <typename A, typename R>
 int DwarfInstructions<A, R>::stepWithDwarf(A &addressSpace, pc_t pc,
                                            pint_t fdeStart, R &registers,
-                                           bool &isSignalFrame) {
+                                           bool &isSignalFrame, bool stage2) {
   FDE_Info fdeInfo;
   CIE_Info cieInfo;
   if (CFI_Parser<A>::decodeFDE(addressSpace, fdeStart, &fdeInfo, &cieInfo) ==
@@ -264,7 +265,39 @@ int DwarfInstructions<A, R>::stepWithDwarf(A &addressSpace, pc_t pc,
       if (!cfa_valid)
         return UNW_EBADFRAME;
 
-       // restore registers that DWARF says were saved
+      (void)stage2;
+      // __unw_step_stage2 is not used for cross unwinding, so we use
+      // __aarch64__ rather than LIBUNWIND_TARGET_AARCH64 to make sure we are
+      // building for AArch64 natively.
+#if defined(__aarch64__) && !defined(__CHERI_PURE_CAPABILITY__)
+      if (stage2 && cieInfo.mteTaggedFrame) {
+        pint_t sp = registers.getSP();
+        pint_t p = sp;
+        // AArch64 doesn't require the value of SP to be 16-byte aligned at
+        // all times, only at memory accesses and public interfaces [1]. Thus,
+        // a signal could arrive at a point where SP is not aligned properly.
+        // In that case, the kernel fixes up [2] the signal frame, but we
+        // still have a misaligned SP in the previous frame. If that signal
+        // handler caused stack unwinding, we would have an unaligned SP.
+        // We do not need to fix up the CFA, as that is the SP at a "public
+        // interface".
+        // [1]:
+        // https://github.com/ARM-software/abi-aa/blob/main/aapcs64/aapcs64.rst#622the-stack
+        // [2]:
+        // https://github.com/torvalds/linux/blob/1930a6e739c4b4a654a69164dbe39e554d228915/arch/arm64/kernel/signal.c#L718
+        p &= ~0xfULL;
+        // CFA is the bottom of the current stack frame.
+        for (; p < cfa; p += 16) {
+          __asm__ __volatile__(".arch armv8.5-a\n"
+                               ".arch_extension memtag\n"
+                               "stg %[Ptr], [%[Ptr]]\n"
+                               :
+                               : [Ptr] "r"(p)
+                               : "memory");
+        }
+      }
+#endif
+      // restore registers that DWARF says were saved
       R newRegisters = registers;
 
       // Typically, the CFA is the stack pointer at the call site in
@@ -313,10 +346,10 @@ int DwarfInstructions<A, R>::stepWithDwarf(A &addressSpace, pc_t pc,
           else
             return UNW_EBADREG;
         } else if (i == (int)cieInfo.returnAddressRegister) {
-          // Leaf function keeps the return address in register and there is no
-          // explicit intructions how to restore it.
-          returnAddress = registers.getRegister(cieInfo.returnAddressRegister);
-          CHERI_DBG("GETTING RETURN ADDRESS (leaf) %d (%s): %#p \n", i,
+            // Leaf function keeps the return address in register and there is no
+            // explicit instructions how to restore it.
+            returnAddress = registers.getRegister(cieInfo.returnAddressRegister);
+            CHERI_DBG("GETTING RETURN ADDRESS (leaf) %d (%s): %#p \n", i,
                     registers.getRegisterName(i), (void *)returnAddress);
         }
       }
@@ -406,7 +439,7 @@ int DwarfInstructions<A, R>::stepWithDwarf(A &addressSpace, pc_t pc,
 #endif
 
       // Return address is address after call site instruction, so setting IP to
-      // that does simualates a return.
+      // that does simulates a return.
       newRegisters.setIP(returnAddress);
       CHERI_DBG("SETTING RETURN ADDRESS %#p\n", (void *)returnAddress);
 
@@ -717,7 +750,7 @@ DwarfInstructions<A, R>::evaluateExpression(pint_t expression, A &addressSpace,
       svalue = (sint_t)*sp;
       *sp = (pint_t)(svalue >> value);
       if (log)
-        fprintf(stderr, "shift left arithmetric\n");
+        fprintf(stderr, "shift left arithmetic\n");
       break;
 
     case DW_OP_xor:
