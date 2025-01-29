@@ -10719,7 +10719,7 @@ dtrace_difo_chunksize(dtrace_difo_t *dp, dtrace_vstate_t *vstate)
 		 * We have the size.  If this is larger than the chunk size
 		 * for our dynamic variable state, reset the chunk size.
 		 */
-		size = P2ROUNDUP(size, sizeof (uint64_t));
+		size = P2ROUNDUP(size, sizeof (uint64ptr_t));
 
 		/*
 		 * Before setting the chunk size, check that we're not going
