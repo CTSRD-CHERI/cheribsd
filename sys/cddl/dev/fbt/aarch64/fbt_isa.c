@@ -80,6 +80,19 @@ fbt_patch_tracepoint(fbt_probe_t *fbt, fbt_patchval_t val)
 	cpu_icache_sync_range(fbt->fbtp_patchpoint, 4);
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+static fbt_patchval_t *
+fbt_make_tracepoint_capability(uint32_t *instr)
+{
+	fbt_patchval_t *cap;
+
+	cap = cheri_setaddress(kernel_root_cap, (ptraddr_t)instr);
+	cap = cheri_setbounds(cap, INSN_SIZE);
+	cap = cheri_andperm(cap, CHERI_PERM_STORE);
+	return (cap);
+}
+#endif
+
 int
 fbt_provide_module_function(linker_file_t lf, int symindx,
     linker_symval_t *sym, void *opaque)
@@ -172,7 +185,7 @@ found:
 	fbt->fbtp_id = dtrace_probe_create(fbt_id, modname,
 	    name, FBT_ENTRY, FBT_AFRAMES, fbt);
 #ifdef __CHERI_PURE_CAPABILITY__
-	fbt->fbtp_patchpoint = cheri_setbounds(instr, INSN_SIZE);
+	fbt->fbtp_patchpoint = fbt_make_tracepoint_capability(instr);
 #else
 	fbt->fbtp_patchpoint = instr;
 #endif
@@ -223,7 +236,7 @@ again:
 	retfbt = fbt;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	fbt->fbtp_patchpoint = cheri_setbounds(instr, INSN_SIZE);
+	fbt->fbtp_patchpoint = fbt_make_tracepoint_capability(instr);
 #else
 	fbt->fbtp_patchpoint = instr;
 #endif
