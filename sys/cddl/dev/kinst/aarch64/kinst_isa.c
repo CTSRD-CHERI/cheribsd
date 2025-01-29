@@ -399,10 +399,22 @@ kinst_make_probe(linker_file_t lf, int symindx, linker_symval_t *sym,
 			 */
 			if (((*tmp >> ADDR_SHIFT) & ADDR_MASK) == 31)
 				found = true;
-		} else if ((*tmp & SUB_MASK) == SUB_INSTR &&
+		}
+#ifdef __CHERI_PURE_CAPABILITY__
+		else if ((*tmp & LDP_STP_MASK) == STP_C_PREIND &&
+		    ((*tmp >> ADDR_SHIFT) & ADDR_MASK) == 31)
+			found = true;
+#endif
+		else if ((*tmp & SUB_MASK) == SUB_INSTR &&
 		    ((*tmp >> SUB_RD_SHIFT) & SUB_R_MASK) == 31 &&
 		    ((*tmp >> SUB_RN_SHIFT) & SUB_R_MASK) == 31)
 			found = true;
+#ifdef __CHERI_PURE_CAPABILITY__
+		else if ((*tmp & SUBC_MASK) == SUBC_INSTR &&
+		    ((*tmp >> SUB_RD_SHIFT) & SUB_R_MASK) == 31 &&
+		    ((*tmp >> SUB_RN_SHIFT) & SUB_R_MASK) == 31)
+			found = true;
+#endif
 	}
 
 	if (!found)
