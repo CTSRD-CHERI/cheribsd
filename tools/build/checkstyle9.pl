@@ -204,6 +204,7 @@ our $Attribute	= qr{
 			const|
 			_*restrict|
 			volatile|
+			__capability|
 			QEMU_NORETURN|
 			QEMU_WARN_UNUSED_RESULT|
 			QEMU_SENTINEL|
