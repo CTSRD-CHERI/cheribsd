@@ -7,19 +7,28 @@
 //
 //===----------------------------------------------------------------------===//
 
-#undef NDEBUG
-#include <assert.h>
-#include <libunwind.h>
-#include <stdio.h>
-#include <stdlib.h>
+// Ensure that unw_resume() resumes execution at the stack frame identified by
+// cursor.
 
-int main(int, char**) {
+// TODO: Investigate this failure on AIX system.
+// XFAIL: target={{.*}}-aix{{.*}}
+
+// TODO: Figure out why this fails with Memory Sanitizer.
+// XFAIL: msan
+
+#include <libunwind.h>
+
+void test_unw_resume() {
   unw_context_t context;
-  int ret = unw_getcontext(&context);
-  if (ret != UNW_ESUCCESS) {
-    fprintf(stderr, "unw_getcontext() failed: %d!\n", ret);
-    abort();
-  }
-  fprintf(stderr, "Success!\n");
+  unw_cursor_t cursor;
+
+  unw_getcontext(&context);
+  unw_init_local(&cursor, &context);
+  unw_step(&cursor);
+  unw_resume(&cursor);
+}
+
+int main() {
+  test_unw_resume();
   return 0;
 }
