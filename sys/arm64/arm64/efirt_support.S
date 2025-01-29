@@ -141,6 +141,7 @@ ENTRY(efi_rt_arch_call_nofault)
 
 	/* Save the return code for the caller */
 	str	x0, [c8, #EC_EFI_STATUS]
+	mov	x0, #0
 
 	add	csp, csp, #(17 * PTR_WIDTH)
 	RETURN
