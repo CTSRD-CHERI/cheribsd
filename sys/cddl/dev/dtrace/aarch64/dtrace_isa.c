@@ -276,7 +276,6 @@ dtrace_getarg(int arg, int aframes __unused)
 		return (tf->tf_x[arg]);
 	} else {
 		uintptr_t p;
-		uint64ptr_t val;
 
 		p = (tf->tf_sp + (arg - 8) * sizeof(uint64ptr_t));
 		if ((p & (sizeof(uint64ptr_t) - 1)) != 0) {
@@ -289,8 +288,7 @@ dtrace_getarg(int arg, int aframes __unused)
 			cpu_core[curcpu].cpuc_dtrace_illval = p;
 			return (0);
 		}
-		memcpy(&val, (void *)p, sizeof(uint64ptr_t));
-		return (val);
+		return (*((uint64ptr_t *)p));
 	}
 }
 
