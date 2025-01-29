@@ -8027,6 +8027,12 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 			case sizeof (uint64_t):
 				DTRACE_STORE(uint64_t, tomax, valoffs, val);
 				break;
+#if __has_feature(capabilities)
+			case sizeof (uintcap_t):
+				memcpy(tomax + valoffs, &val,
+				    sizeof (dtrace_difval_t));
+				break;
+#endif
 			default:
 				/*
 				 * Any other size should have been returned by
@@ -10180,6 +10186,9 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 		case sizeof (uint16_t):
 		case sizeof (uint32_t):
 		case sizeof (uint64_t):
+#if __has_feature(capabilities)
+		case sizeof(uintcap_t):
+#endif
 			break;
 
 		default:
