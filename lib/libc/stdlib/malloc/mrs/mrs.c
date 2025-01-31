@@ -115,6 +115,8 @@ extern void snmalloc_flush_message_queue(void);
 
 #define	MALLOC_QUARANTINE_DISABLE_ENV	"_RUNTIME_REVOCATION_DISABLE"
 #define	MALLOC_QUARANTINE_ENABLE_ENV	"_RUNTIME_REVOCATION_ENABLE"
+#define	MALLOC_ABORT_DISABLE_ENV	"_RUNTIME_ABORT_DISABLE"
+#define	MALLOC_ABORT_ENABLE_ENV		"_RUNTIME_ABORT_ENABLE"
 
 #define	MALLOC_REVOKE_EVERY_FREE_DISABLE_ENV \
 	"_RUNTIME_REVOCATION_EVERY_FREE_DISABLE"
@@ -301,6 +303,7 @@ static bool quarantining = true;
 static bool revoke_every_free = false;
 static bool revoke_async = false;
 static bool bound_pointers = false;
+static bool abort_on_validation_failure = true;
 
 /*
  * Optionally apply strict bounds to pointers returned by malloc() and friends.
@@ -1297,6 +1300,11 @@ init(void)
 			quarantining = true;
 		}
 
+		if (getenv(MALLOC_ABORT_DISABLE_ENV) != NULL)
+			abort_on_validation_failure = false;
+		else if (getenv(MALLOC_ABORT_ENABLE_ENV) != NULL)
+			abort_on_validation_failure = true;
+
 		if (getenv(MALLOC_REVOKE_EVERY_FREE_DISABLE_ENV) != NULL)
 			revoke_every_free = false;
 		else if (getenv(MALLOC_REVOKE_EVERY_FREE_ENABLE_ENV) != NULL)
@@ -1636,7 +1644,10 @@ mrs_free(void *ptr)
 	ins = validate_freed_pointer(ptr);
 	if (ins == NULL) {
 		mrs_debug_printf("mrs_free: validation failed\n");
-		return;
+		if (abort_on_validation_failure)
+			abort();
+		else
+			return;
 	}
 #endif /* !OFFLOAD_QUARANTINE */
 
