@@ -318,7 +318,11 @@ CXXFLAGS.clang+=	 -Wno-c++11-extensions
 FORTIFY_SOURCE?=	0
 .if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap}
 # Don't use -Wstack-protector as it breaks world with -Werror.
+.if ${COMPILER_FEATURES:Mstackclash}
 SSP_CFLAGS?=	-fstack-protector-strong -fstack-clash-protection
+.else
+SSP_CFLAGS?=	-fstack-protector-strong
+.endif
 CFLAGS+=	${SSP_CFLAGS}
 .endif # SSP && !purecap
 .if ${FORTIFY_SOURCE} > 0
