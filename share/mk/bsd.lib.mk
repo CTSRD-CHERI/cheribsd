@@ -112,7 +112,9 @@ LDFLAGS+= -Wl,-zbti-report=error
 .endif
 .endif
 
-.if ${MACHINE_CPUARCH} == "aarch64" && ${MACHINE_CPU:Mcheri}
+# Disable when bootstrapping as host may not support new relocations
+# TODO: Remove after the next release
+.if ${MACHINE_CPUARCH} == "aarch64" && ${MACHINE_CPU:Mcheri} && !defined(BOOTSTRAPPING)
 LDFLAGS+= -Wl,--local-caprelocs=elf
 .endif
 
