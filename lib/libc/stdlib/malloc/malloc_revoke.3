@@ -1,12 +1,17 @@
 .\"-
 .\" SPDX-License-Identifier: BSD-2-Clause
 .\"
-.\" Copyright (c) 2021 SRI International
+.\" Copyright (c) 2021, 2025 SRI International
 .\"
 .\" This software was developed by SRI International and the University of
 .\" Cambridge Computer Laboratory (Department of Computer Science and
 .\" Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
 .\" DARPA SSITH research programme.
+.\"
+.\" This software was developed by SRI International, the University of
+.\" Cambridge Computer Laboratory (Department of Computer Science and
+.\" Technology), and Capabilities Limited under Defense Advanced Research
+.\" Projects Agency (DARPA) Contract No. FA8750-24-C-B047 ("DEC").
 .\"
 .\" Redistribution and use in source and binary forms, with or without
 .\" modification, are permitted provided that the following conditions
@@ -29,40 +34,90 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd January 31, 2025
+.Dd February 13, 2025
 .Dt MALLOC_REVOKE 3
 .Os
 .Sh NAME
-.Nm malloc_revoke
-.Nd trigger a revocation pass
+.Nm malloc_revoke_enabled ,
+.Nm malloc_revoke_quarantine_force_flush ,
+.Nm malloc_revoke ,
+.Nm malloc_is_revoking
+.Nd malloc revocation status and control
 .Sh LIBRARY
 .Lb libc
 .Sh SYNOPSIS
+.In sys/errno.h
 .In stdlib.h
+.Ft int
+.Fn malloc_revoke_quarantine_force_flush "void"
 .Ft void
 .Fn malloc_revoke "void"
+.In malloc_np.h
+.Ft bool
+.Fn malloc_revoke_enabled "void"
+.Ft bool
+.Fn malloc_is_revoking "void"
 .Sh DESCRIPTION
-On systems supporting revocation,
-.Fn
-triggers a full revocation pass, returning when the pass is complete.
-This results in the revocation of all pointers staged for quarantine via
+On systems which support heap temporal safety through a quarantine and
+sweep mechanism (such as CHERI systems), these interfaces permit
+control and monitoring of quarantined heap memory.
+On other systems, these interfaces are stubs.
+.Pp
+The
+.Fn malloc_revoke_quarantine_force_flush
+triggers a full flush of the quarantine and scan of memory to ensure that
+all references to memory previously quarantined by
 .Xr free 3
 or
-.Xr realloc 3 .
-.Sh SEE ALSO
-.Xr free 3 ,
 .Xr realloc 3
+are revoked upon successful return.
+.Fn malloc_revoke
+does the same, but does not return a status value.
+.Pp
+The
+.Fn malloc_revoke_enabled
+and
+.Fn malloc_is_revoking
+functions return the state of quarantine in the current process.
+An array of system wide and implementation-specific knobs control this
+state during process startup.
+.Sh RETURN VALUES
+If the current process has
+.Fn malloc
+quarantining enabled
+.Fn malloc_revoke_enabled
+returns
+.Dt true
+otherwise
+.Dt false .
+.Pp
+.Fn malloc_revoke_quarantine_force_flush
+returns
+.Dt 0
+on success and an error code on failure.
+If quarantine is not implemented or is disabled it returns
+.Dt ENOTSUP .
+.Sh SEE ALSO
+.Xr jemalloc 3,
+.Xr mrs 3
 .Sh AUTHORS
 This software and this manual page were
-developed by SRI International and the University of Cambridge Computer
-Laboratory (Department of Computer Science and Technology) under contract
-.Pq HR0011-18-C-0016
-.Pq Do ECATS Dc ,
-as part of the DARPA SSITH research programme.
+developed by SRI International, the University of Cambridge Computer
+Laboratory (Department of Computer Science and Technology), and
+Capabilities Limited under contract
+.Pq FA8750-24-C-B047
+.Pq Do DEC Dc .
 .Sh HISTORY
-The .Nm function was present as a stub in CheriBSD 22.05 where it had no
-effect.
+.Fn malloc_revoke_quarantine_force_flush
+and
+.Fn malloc_revoke_enabled
+were introduced in CheriBSD 25.02.
+.Pp
+.Fn malloc_revoke
+was present as a stub in CheriBSD 22.05 where it had no effect.
 A working implementation was first added in CheriBSD 23.11.
 .Sh BUGS
-The .Nm function provides no indication of success or failure even if
-it is unimplemented.
+The
+.Fn malloc_revoke
+function provides no indication of success or failure even if it is
+unimplemented.

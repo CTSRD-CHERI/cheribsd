@@ -844,12 +844,12 @@ app_quarantine_revoke_async(void)
 }
 
 /*
- * Handle a malloc_revoke() call when operating in async mode.  Perform
- * synchronous revocation for all quarantine arenas, and then revoke the
- * currently active arena.
+ * Handle a malloc_revoke_quarantine_force_flush() call when operating in async mode.
+ * Perform synchronous revocation for all quarantine arenas, and then revoke
+ * the currently active arena.
  */
 static void
-malloc_revoke_async(void)
+malloc_revoke_quarantine_force_flush_async(void)
 {
 	struct mrs_quarantine tmp;
 
@@ -1082,12 +1082,13 @@ quarantine_move(struct mrs_quarantine *dst, struct mrs_quarantine *src)
 }
 
 static void
-_internal_malloc_revoke(struct mrs_quarantine *quarantine)
+_internal_quarantine_flush(struct mrs_quarantine *quarantine)
 {
 #ifdef OFFLOAD_QUARANTINE
 
 #ifdef PRINT_CAPREVOKE_MRS
-	mrs_puts("malloc_revoke (offload): waiting for offload_quarantine to drain\n");
+	mrs_puts("malloc_revoke_quarantine_force_flush (offload): "
+	    "waiting for offload_quarantine to drain\n");
 #endif
 
 	mrs_lock(&offload_quarantine_lock);
@@ -1100,8 +1101,8 @@ _internal_malloc_revoke(struct mrs_quarantine *quarantine)
 	}
 
 #ifdef PRINT_CAPREVOKE_MRS
-	mrs_puts("malloc_revoke (offload): offload_quarantine drained\n");
-	mrs_printf("malloc_revoke: cycle count after waiting on offload %" PRIu64 "\n",
+	mrs_puts("malloc_revoke_quarantine_force_flush (offload): offload_quarantine drained\n");
+	mrs_printf("malloc_revoke_quarantine_force_flush: cycle count after waiting on offload %" PRIu64 "\n",
 	    cheri_revoke_get_cyc());
 #endif /* PRINT_CAPREVOKE_MRS */
 
@@ -1111,7 +1112,7 @@ _internal_malloc_revoke(struct mrs_quarantine *quarantine)
 #endif
 
 #ifdef PRINT_CAPREVOKE_MRS
-	mrs_printf("malloc_revoke: cycle count after waiting on offload %" PRIu64 "\n",
+	mrs_printf("malloc_revoke_quarantine_force_flush: cycle count after waiting on offload %" PRIu64 "\n",
 	    cheri_revoke_get_cyc());
 #endif
 
@@ -1130,7 +1131,7 @@ _internal_malloc_revoke(struct mrs_quarantine *quarantine)
 #else /* OFFLOAD_QUARANTINE */
 
 #ifdef PRINT_CAPREVOKE_MRS
-	mrs_puts("malloc_revoke\n");
+	mrs_puts("malloc_revoke_quarantine_force_flush\n");
 #endif
 	quarantine_revoke(quarantine);
 #ifdef SNMALLOC_FLUSH
@@ -1144,24 +1145,39 @@ _internal_malloc_revoke(struct mrs_quarantine *quarantine)
 #endif /* OFFLOAD_QUARANTINE */
 }
 
-void
-malloc_revoke(void)
+int
+malloc_revoke_quarantine_force_flush(void)
 {
 	struct mrs_quarantine local_quarantine;
 
 	if (!quarantining)
-		return;
+		return (ENOTSUP);
 
-	MRS_UTRACE(UTRACE_MRS_MALLOC_REVOKE, NULL, 0, 0, NULL);
+	MRS_UTRACE(UTRACE_MRS_MALLOC_REVOKE_QUARANTINE_FORCE_FLUSH, NULL, 0,
+	    0, NULL);
 
 	mrs_lock(&app_quarantine_lock);
 	if (revoke_async) {
-		malloc_revoke_async();
+		malloc_revoke_quarantine_force_flush_async();
 	} else {
 		quarantine_move(&local_quarantine, app_quarantine);
 		mrs_unlock(&app_quarantine_lock);
-		_internal_malloc_revoke(&local_quarantine);
+		_internal_quarantine_flush(&local_quarantine);
 	}
+
+	return (0);
+}
+
+bool
+malloc_revoke_enabled(void)
+{
+	return (quarantining);
+}
+
+void
+malloc_revoke(void)
+{
+	(void)malloc_revoke_quarantine_force_flush();
 }
 
 bool
@@ -1221,7 +1237,7 @@ check_and_perform_flush(bool is_free)
 	} else {
 		quarantine_move(&local_quarantine, app_quarantine);
 		mrs_unlock(&app_quarantine_lock);
-		_internal_malloc_revoke(&local_quarantine);
+		_internal_quarantine_flush(&local_quarantine);
 	}
 }
 
