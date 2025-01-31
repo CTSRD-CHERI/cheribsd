@@ -9,6 +9,8 @@ FBSD_1.0 {
 	malloc_usable_size;
 	malloc_revoke;
 	malloc_is_revoking;
+	malloc_revoke_quarantine_force_flush;
+	malloc_revoke_enabled;
 };
 
 FBSD_1.3 {

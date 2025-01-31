@@ -67,8 +67,8 @@ print_utrace_mrs(FILE *fp, void *p)
 	case UTRACE_MRS_QUARANTINE_INSERT:
 		fprintf(fp, "quarantine_insert(%p, %zu)", ut->p, ut->s);
 		break;
-	case UTRACE_MRS_MALLOC_REVOKE:
-		fprintf(fp, "malloc_revoke()");
+	case UTRACE_MRS_MALLOC_REVOKE_QUARANTINE_FORCE_FLUSH:
+		fprintf(fp, "malloc_revoke_quarantine_force_flush()");
 		break;
 	case UTRACE_MRS_QUARANTINE_FLUSH:
 		fprintf(fp, "quarantine_flush()");

@@ -71,6 +71,7 @@ struct extent_hooks_s {
 };
 
 __MyBool malloc_is_revoking(void);
+__MyBool malloc_revoke_enabled(void);
 
 size_t	malloc_usable_size(const void *ptr);
 

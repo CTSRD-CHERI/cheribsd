@@ -9,9 +9,7 @@ MLINKS+= \
 	mrs.3 posix_memalign.3 \
 	mrs.3 aligned_alloc.3 \
 	mrs.3 realloc.3 \
-	mrs.3 free.3 \
-	mrs.3 malloc_revoke.3 \
-	mrs.3 malloc_is_revoking.3
+	mrs.3 free.3
 
 CFLAGS.mrs.c+=-Wno-error=gnu-folding-constant
 
