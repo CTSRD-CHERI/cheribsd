@@ -42,6 +42,24 @@
 
 #include "cheribsdtest.h"
 
+extern volatile void *eptr;
+volatile void *eptr;
+
+CHERIBSDTEST(malloc_double_free, "malloc aborts on double free",
+    .ct_flags = CT_FLAG_SIGEXIT,
+    .ct_signum = SIGABRT)
+{
+	volatile void *ptr;
+
+	/* Externalize to prevent malloc() from being optimized away */
+	eptr = ptr = malloc(2);
+
+	free(__DEVOLATILE(void *, ptr));
+	free(__DEVOLATILE(void *, ptr));
+
+	cheribsdtest_failure_errx("malloc() did not abort");
+}
+
 static const char *
 skip_malloc_not_revoking(const char *name __unused)
 {
@@ -49,9 +67,6 @@ skip_malloc_not_revoking(const char *name __unused)
 		return (NULL);
 	return ("malloc is not revoking");
 }
-
-extern volatile void *eptr;
-volatile void *eptr;
 
 CHERIBSDTEST(malloc_revoke_basic,
     "verify that a free'd pointer is revoked by malloc_revoke",
