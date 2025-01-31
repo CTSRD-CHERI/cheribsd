@@ -1619,6 +1619,9 @@ mrs_free(void *ptr)
 
 	MRS_UTRACE(UTRACE_MRS_FREE, ptr, 0, 0, 0);
 
+	if (ptr == NULL)
+		return;
+
 	void *ins = ptr;
 
 	/*
