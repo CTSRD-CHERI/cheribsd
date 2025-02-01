@@ -2697,7 +2697,7 @@ CHERIBSDTEST(cheri_revoke_shm_anon_hoard_unmapped,
     "Capability is revoked within an unmapped shm object",
     .ct_xfail_reason = "unmapped part of shm objects aren't revoked")
 {
-	int fd;
+	int fd, ret;
 	void * volatile to_revoke;
 	void * volatile *map;
 
@@ -2714,7 +2714,8 @@ CHERIBSDTEST(cheri_revoke_shm_anon_hoard_unmapped,
 	munmap(__DEVOLATILE(void *, map), getpagesize());
 
 	free(to_revoke);
-	malloc_revoke();
+	CHERIBSDTEST_VERIFY2((ret = malloc_revoke_quarantine_force_flush()) == 0,
+	   "malloc_revoke_quarantine_force_flush returned %d", ret);
 	CHERIBSDTEST_VERIFY(check_revoked(to_revoke));
 
 	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
@@ -2818,7 +2819,9 @@ CHERIBSDTEST(cheri_revoke_shm_anon_hoard_closed,
 
 		/* Revoke the pointer */
 		free(to_revoke);
-		malloc_revoke();
+		CHERIBSDTEST_VERIFY2(
+		    (ret = malloc_revoke_quarantine_force_flush()) == 0,
+		    "malloc_revoke_quarantine_force_flush returned %d", ret);
 		CHERIBSDTEST_VERIFY(check_revoked(to_revoke));
 
 		/* Receive the fd back */
