@@ -9,7 +9,7 @@ PROG=	${.CURDIR:T}
 MAN=
 
 .PATH: ${.CURDIR}/..
-SRCS=	malloc_is_revoking.c
+SRCS=	malloc_revoke_enabled.c
 
 NO_SHARED=	malloc_revocation override only works in static binaries
 

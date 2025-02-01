@@ -36,7 +36,7 @@
 int
 main(void)
 {
-	if (malloc_is_revoking())
+	if (malloc_revoke_enabled())
 		return (0);
 	return (1);
 }

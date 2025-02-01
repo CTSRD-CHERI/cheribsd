@@ -153,8 +153,8 @@ is set.
 .Pp
 A program can determine at runtime if
 .Nm
-revocation is enabled by checking the return value of
-.Fn malloc_is_revoking .
+or similar revocation is enabled by checking the return value of
+.Fn malloc_revoke_enabled .
 .Sh TRACING
 .Nm
 supports
