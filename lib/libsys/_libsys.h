@@ -454,7 +454,7 @@ typedef int (__sys_shm_rename_t)(const char * __kerncap, const char * __kerncap,
 typedef int (__sys_sigfastblock_t)(int, void * __kerncap);
 typedef int (__sys___realpathat_t)(int, const char * __kerncap, char * __kerncap, size_t, int);
 typedef int (__sys_close_range_t)(u_int, u_int, int);
-typedef int (__sys_rpctls_syscall_t)(int, const char * __kerncap);
+typedef int (__sys_rpctls_syscall_t)(uint64_t);
 typedef int (__sys___specialfd_t)(int, const void * __kerncap, size_t);
 typedef int (__sys_aio_writev_t)(struct aiocb * __kerncap);
 typedef int (__sys_aio_readv_t)(struct aiocb * __kerncap);
@@ -859,7 +859,7 @@ int __sys_shm_rename(const char * __kerncap path_from, const char * __kerncap pa
 int __sys_sigfastblock(int cmd, void * __kerncap ptr);
 int __sys___realpathat(int fd, const char * __kerncap path, char * __kerncap buf, size_t size, int flags);
 int __sys_close_range(u_int lowfd, u_int highfd, int flags);
-int __sys_rpctls_syscall(int op, const char * __kerncap path);
+int __sys_rpctls_syscall(uint64_t socookie);
 int __sys___specialfd(int type, const void * __kerncap req, size_t len);
 int __sys_aio_writev(struct aiocb * __kerncap aiocbp);
 int __sys_aio_readv(struct aiocb * __kerncap aiocbp);
