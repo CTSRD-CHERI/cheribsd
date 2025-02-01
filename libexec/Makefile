@@ -125,7 +125,7 @@ _tests=		tests
 
 .if ${MACHINE_CPU:Mcheri}
 SUBDIR+=	malloc_early_constructor
-SUBDIR+=	malloc_is_revoking
+SUBDIR+=	malloc_revoke_enabled
 .endif
 
 .if ${MK_NUAGEINIT} != "no"

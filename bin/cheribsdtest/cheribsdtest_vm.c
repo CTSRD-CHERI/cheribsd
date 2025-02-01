@@ -2776,7 +2776,7 @@ CHERIBSDTEST(cheri_revoke_shm_anon_hoard_closed,
 	} else {
 		void * volatile to_revoke;
 		void * volatile * map;
-		int fd, res;
+		int fd, res, ret;
 		struct msghdr msg = { 0 };
 		struct cmsghdr * cmsg;
 		char cmsgbuf[CMSG_SPACE(sizeof(fd))] = { 0 };
