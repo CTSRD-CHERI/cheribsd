@@ -389,7 +389,6 @@ typedef int (__sys_renameat_t)(int, const char * __kerncap, int, const char * __
 typedef int (__sys_symlinkat_t)(const char * __kerncap, int, const char * __kerncap);
 typedef int (__sys_unlinkat_t)(int, const char * __kerncap, int);
 typedef int (__sys_posix_openpt_t)(int);
-typedef int (__sys_gssd_syscall_t)(const char * __kerncap);
 typedef int (__sys_jail_get_t)(struct iovec * __kerncap, unsigned int, int);
 typedef int (__sys_jail_set_t)(struct iovec * __kerncap, unsigned int, int);
 typedef int (__sys_jail_remove_t)(int);
@@ -795,7 +794,6 @@ int __sys_renameat(int oldfd, const char * __kerncap old, int newfd, const char 
 int __sys_symlinkat(const char * __kerncap path1, int fd, const char * __kerncap path2);
 int __sys_unlinkat(int fd, const char * __kerncap path, int flag);
 int __sys_posix_openpt(int flags);
-int __sys_gssd_syscall(const char * __kerncap path);
 int __sys_jail_get(struct iovec * __kerncap iovp, unsigned int iovcnt, int flags);
 int __sys_jail_set(struct iovec * __kerncap iovp, unsigned int iovcnt, int flags);
 int __sys_jail_remove(int jid);

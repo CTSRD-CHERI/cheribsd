@@ -2801,12 +2801,7 @@
 		    int flags
 		);
 	}
-; 505 is initialised by the kgssapi code, if present.
-505	AUE_NULL	NOSTD {
-		int gssd_syscall(
-		    _In_z_ const char *path
-		);
-	}
+505	AUE_NULL	OBSOL	kgssapi
 506	AUE_JAIL_GET	STD {
 		int jail_get(
 		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec *iovp,
