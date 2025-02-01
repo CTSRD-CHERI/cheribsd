@@ -81,7 +81,10 @@ CHERIBSDTEST(malloc_revoke_basic,
 
 	free(__DEVOLATILE(void *, ptr));
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 	malloc_revoke();
+#pragma GCC diagnostic pop
 	CHERIBSDTEST_VERIFY2(!cheri_gettag(ptr),
 	    "revoked ptr not revoked %#lp", ptr);
 	CHERIBSDTEST_VERIFY2(!cheri_gettag(eptr),

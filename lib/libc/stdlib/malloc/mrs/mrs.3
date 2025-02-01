@@ -81,15 +81,6 @@ The undocumented
 3.0 interfaces are not implemented by
 .Nm
 because no CheriABI program should have ever used them.
-.Pp
-The
-.Fn malloc_revoke
-function triggers a full revocation pass, returning when the pass is
-complete.
-This results in the revocation of all pointers staged for quarantine by
-.Fn free
-or
-.Fn realloc .
 .Sh ENABLING REVOCATION
 Because heap temporal safety is an experimental feature with performance
 impacts that are not fully characterized,

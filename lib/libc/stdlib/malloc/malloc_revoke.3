@@ -71,14 +71,15 @@ all references to memory previously quarantined by
 or
 .Xr realloc 3
 are revoked upon successful return.
+The deprecated
 .Fn malloc_revoke
 does the same, but does not return a status value.
 .Pp
 The
 .Fn malloc_revoke_enabled
-and
+function and its deprecated form
 .Fn malloc_is_revoking
-functions return the state of quarantine in the current process.
+return the state of revocation in the current process.
 An array of system wide and implementation-specific knobs control this
 state during process startup.
 .Sh RETURN VALUES
@@ -116,6 +117,11 @@ were introduced in CheriBSD 25.02.
 .Fn malloc_revoke
 was present as a stub in CheriBSD 22.05 where it had no effect.
 A working implementation was first added in CheriBSD 23.11.
+As of CheriBSD 25.02
+.Fn malloc_revoke
+and
+.Fn malloc_is_revoking
+are deprecated.
 .Sh BUGS
 The
 .Fn malloc_revoke
