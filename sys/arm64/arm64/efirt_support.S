@@ -97,7 +97,7 @@ ENTRY(efi_rt_arch_call_nofault)
 	 * Temporarily disable all interrupts as we can't handle them whilst
 	 * CSP is clobbered during the EFI call.
 	 */
-	mrs	x16, daif
+	mrs	x19, daif
 	msr	daifset, #(DAIF_ALL)
 
 	/*
@@ -120,7 +120,7 @@ ENTRY(efi_rt_arch_call_nofault)
 	mov	csp, c8
 
 	/* Restore interrupt mask */
-	msr	daif, x16
+	msr	daif, x19
 
 	/* Done with the almighty DDC */
 	msr	ddc, czr
