@@ -124,6 +124,7 @@ _tests=		tests
 .endif
 
 .if ${MACHINE_CPU:Mcheri}
+SUBDIR+=	malloc_early_constructor
 SUBDIR+=	malloc_is_revoking
 .endif
 

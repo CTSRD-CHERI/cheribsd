@@ -310,6 +310,33 @@ CHERIBSDTEST(malloc_revocation_ctl_suid_elfnote_enable_protctl_disable,
 	    "malloc_is_revoking_suid_elfnote_enable", true, &arg);
 }
 
+CHERIBSDTEST(malloc_early_constructor,
+    "invoke malloc in an early constructor",
+    .ct_check_skip = cheribsdtest_skip_no_helper)
+{
+	pid_t pid;
+	int res;
+	char *helper_path = strdup(cheribsdtest_get_helper_path());
+
+	pid = fork();
+	CHERIBSDTEST_VERIFY(pid >= 0);
+	if (pid == 0) {
+		char *argv[2];
+
+		argv[0] = helper_path;
+		argv[1] = NULL;
+		execve(argv[0], argv, NULL);
+		abort();
+	} else {
+		waitpid(pid, &res, 0);
+		if (WIFEXITED(res) && WEXITSTATUS(res) == 0)
+			cheribsdtest_success();
+		else
+			cheribsdtest_failure_errx("child %s exited improperly",
+			    helper_path);
+	}
+}
+
 static void
 check_mallocx(size_t size)
 {
