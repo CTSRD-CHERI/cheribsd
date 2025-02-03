@@ -304,6 +304,7 @@ static bool revoke_every_free = false;
 static bool revoke_async = false;
 static bool bound_pointers = false;
 static bool abort_on_validation_failure = true;
+static bool mrs_initialized = false;
 
 /*
  * Optionally apply strict bounds to pointers returned by malloc() and friends.
@@ -1242,9 +1243,8 @@ spawn_background(void)
 }
 #endif /* OFFLOAD_QUARANTINE */
 
-__attribute__((constructor))
 static void
-init(void)
+mrs_init_impl(void)
 {
 	initialize_lock(app_quarantine_lock);
 	initialize_lock(printf_lock);
@@ -1357,10 +1357,26 @@ init(void)
 	}
 	app_quarantine = &app_quarantine_store[0];
 
+	mrs_initialized = true;
+
 #if defined(PRINT_CAPREVOKE) || defined(PRINT_CAPREVOKE_MRS) || defined(PRINT_STATS)
 nosys:
 	mrs_puts(VERSION_STRING);
 #endif
+}
+
+static __attribute__((always_inline)) void
+mrs_init(void)
+{
+	if (__predict_false(!mrs_initialized))
+		mrs_init_impl();
+}
+
+__attribute__((__constructor__(100)))
+static void
+mrs_constructor(void)
+{
+	mrs_init();
 }
 
 #ifdef PRINT_STATS
@@ -1391,6 +1407,8 @@ mrs_real_malloc(size_t size)
 static void *
 mrs_malloc(size_t size)
 {
+	mrs_init();
+
 	if (!quarantining)
 		return (mrs_real_malloc(size));
 
@@ -1442,6 +1460,8 @@ void *
 mrs_calloc(size_t number, size_t size)
 {
 	size_t tmpsize;
+
+	mrs_init();
 
 	if (!quarantining)
 		return (mrs_real_calloc(number, size));
@@ -1502,6 +1522,8 @@ mrs_real_posix_memalign(void **ptr, size_t alignment, size_t size)
 static int
 mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 {
+	mrs_init();
+
 	if (!quarantining)
 		return (mrs_real_posix_memalign(ptr, alignment, size));
 
@@ -1537,6 +1559,8 @@ mrs_real_aligned_alloc(size_t alignment, size_t size)
 static void *
 mrs_aligned_alloc(size_t alignment, size_t size)
 {
+	mrs_init();
+
 	if (!quarantining)
 		return (mrs_real_aligned_alloc(alignment, size));
 
@@ -1581,6 +1605,8 @@ mrs_real_realloc(void *ptr, size_t size)
 static void *
 mrs_realloc(void *ptr, size_t size)
 {
+	mrs_init();
+
 	if (!quarantining)
 		return (mrs_real_realloc(ptr, size));
 
@@ -1620,6 +1646,10 @@ mrs_realloc(void *ptr, size_t size)
 static void
 mrs_free(void *ptr)
 {
+	void *ins;
+
+	assert(mrs_initialized || ptr == NULL);
+
 	if (!quarantining)
 		return (REAL(free)(ptr));
 
@@ -1630,16 +1660,12 @@ mrs_free(void *ptr)
 	if (ptr == NULL)
 		return;
 
-	void *ins = ptr;
-
 	/*
 	 * If not offloading, validate the passed-in cap here and
 	 * replace it with the cap to its underlying allocation.
 	 */
 #ifdef OFFLOAD_QUARANTINE
-	if (ins == NULL) {
-		return;
-	}
+	ins = ptr
 #else
 	ins = validate_freed_pointer(ptr);
 	if (ins == NULL) {
@@ -1674,6 +1700,8 @@ mrs_mallocx(size_t size, int flags)
 	size_t align = MALLOCX_ALIGN_GET(flags);
 	void *ret;
 
+	mrs_init();
+
 	if (!quarantining)
 		return (mrs_real_mallocx(size, flags));
 
@@ -1701,6 +1729,8 @@ mrs_rallocx(void *ptr, size_t size, int flags)
 {
 	void *new_alloc;
 	size_t old_size;
+
+	mrs_init();
 
 	if (!quarantining)
 		return (mrs_real_rallocx(ptr, size, flags));
