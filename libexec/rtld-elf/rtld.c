@@ -837,7 +837,6 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	ld_elf_hints_default = _PATH_ELF_HINTS_C18N;
 	ld_path_libmap_conf = _PATH_LIBMAP_CONF_C18N;
 	ld_standard_library_path = STANDARD_LIBRARY_PATH_C18N;
-	c18n_code_perm_clear = CHERI_PERM_EXECUTIVE;
     }
 #endif
 
@@ -886,9 +885,6 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	assert(aux_info[AT_PHENT]->a_un.a_val == sizeof(Elf_Phdr));
 	assert(aux_info[AT_ENTRY] != NULL);
 	imgentry = (dlfunc_t) aux_info[AT_ENTRY]->a_un.a_ptr;
-#ifdef CHERI_LIB_C18N
-	imgentry = (dlfunc_t) cheri_clearperm(imgentry, c18n_code_perm_clear);
-#endif
 	dbg("Values from kernel:\n\tAT_PHDR=" PTR_FMT "\n"
 	    "\tAT_BASE=" PTR_FMT "\n\tAT_ENTRY=" PTR_FMT "\n",
 		phdr, aux_info[AT_BASE]->a_un.a_ptr, (const void *)imgentry);
@@ -6383,6 +6379,15 @@ c18n_assign_plt_compartments(Obj_Entry *obj)
 	}
 }
 
+static const void *
+c18n_clear_pcc_perms(const char *name, const void *pcc)
+{
+	pcc = cheri_clearperm(pcc, CHERI_PERM_EXECUTIVE);
+	if (strcmp("libsys.so.7", name) != 0)
+		pcc = cheri_clearperm(pcc, CHERI_PERM_SYSCALL);
+	return (pcc);
+}
+
 static bool
 c18n_add_obj(Obj_Entry *obj)
 {
@@ -6409,6 +6414,12 @@ c18n_add_obj(Obj_Entry *obj)
 		    obj->mapbase);
 		return (false);
 	}
+
+	/* Reduce the permission of each compartment's pcc. */
+	obj->entry = c18n_clear_pcc_perms(name, obj->entry);
+	obj->text_rodata_cap = c18n_clear_pcc_perms(name, obj->text_rodata_cap);
+	for (unsigned long i = 0; i < obj->npcc_caps; ++i)
+		obj->pcc_caps[i] = c18n_clear_pcc_perms(name, obj->pcc_caps[i]);
 
 	c18n_setup_compartments(obj, name);
 	c18n_assign_plt_compartments(obj);

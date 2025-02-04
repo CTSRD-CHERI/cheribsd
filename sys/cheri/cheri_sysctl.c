@@ -57,20 +57,10 @@ SYSCTL_UINT(_security_cheri, OID_AUTO, capability_size, CTLFLAG_RD,
 SYSCTL_NODE(_security_cheri, OID_AUTO, stats, CTLFLAG_RD, 0,
     "CHERI statistics");
 
-/* XXXRW: Should possibly be u_long. */
-u_int	security_cheri_syscall_violations;
-SYSCTL_UINT(_security_cheri_stats, OID_AUTO, syscall_violations, CTLFLAG_RD,
-    &security_cheri_syscall_violations, 0, "Number of system calls blocked");
-
 /*
  * A set of sysctls that cause the kernel debugger to enter following a policy
  * violation or signal delivery due to CHERI or while in a sandbox.
  */
-u_int	security_cheri_debugger_on_sandbox_syscall;
-SYSCTL_UINT(_security_cheri, OID_AUTO, debugger_on_sandbox_syscall, CTLFLAG_RW,
-    &security_cheri_debugger_on_sandbox_syscall, 0,
-    "Enter KDB when a syscall is rejected while in a sandbox");
-
 u_int	security_cheri_abort_on_memcpy_tag_loss;
 SYSCTL_UINT(_security_cheri, OID_AUTO, abort_on_memcpy_tag_loss,
     CTLFLAG_RW, &security_cheri_abort_on_memcpy_tag_loss, 0,

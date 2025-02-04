@@ -93,17 +93,6 @@ syscallenter(struct thread *td)
 		goto retval;
 	}
 
-#if __has_feature(capabilities) && !defined(CPU_CHERI_NO_SYSCALL_AUTHORIZE)
-	/*
-	 * Constrain code that can originate system calls if
-	 * userspace sandboxing is available.
-	 */
-	error = cheri_syscall_authorize(td, sa->code, sa->callp->sy_narg,
-	    sa->args);
-	if (error != 0)
-		goto retval;
-#endif
-
 	if (__predict_false(traced)) {
 		PROC_LOCK(p);
 		if (p->p_ptevents & PTRACE_SCE)

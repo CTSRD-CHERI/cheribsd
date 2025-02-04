@@ -28,50 +28,17 @@
  * SUCH DAMAGE.
  */
 
-#include "opt_ddb.h"
-
 #include <sys/param.h>
-#include <sys/kernel.h>
 #include <sys/proc.h>
-#include <sys/syscall.h>
-#include <sys/sysctl.h>
-
-#include <ddb/ddb.h>
-#include <sys/kdb.h>
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
 /*
- * Only allow most system calls from either ambient authority, or from
- * sandboxes that have been explicitly delegated CHERI_PERM_SYSCALL via their
- * code capability.  Note that CHERI_PERM_SYSCALL effectively implies ambient
- * authority, as the kernel does not [currently] interpret pointers/lengths
- * via userspace $ddc.
+ * Only allow system calls from code that has the CHERI_PERM_SYSCALL permission.
  */
 int
-cheri_syscall_authorize(struct thread *td, u_int code, int nargs,
-    syscallarg_t *args)
+cheri_syscall_authorize(struct thread *td)
 {
-	uintmax_t c_perms;
-
-	/*
-	 * Check whether userspace holds the rights defined in
-	 * cheri_capability_set_user() in $pcc.  Note that object type doesn't
-	 * come into play here.
-	 *
-	 * XXXRW: Possibly ECAPMODE should be EPROT or ESANDBOX?
-	 */
-	c_perms = cheri_getperm(__USER_PCC);
-	if ((c_perms & CHERI_PERM_SYSCALL) == 0) {
-		atomic_add_int(&security_cheri_syscall_violations, 1);
-
-#ifdef DDB
-		if (security_cheri_debugger_on_sandbox_syscall)
-			kdb_enter(KDB_WHY_CHERI,
-			    "Syscall rejected in CHERI sandbox");
-#endif
-		return (ECAPMODE);
-	}
-	return (0);
+	return ((cheri_getperm(__USER_PCC) & CHERI_PERM_SYSCALL) != 0);
 }
