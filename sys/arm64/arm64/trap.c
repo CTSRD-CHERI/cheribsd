@@ -192,6 +192,11 @@ cpu_fetch_syscall_args(struct thread *td)
 
 	if (__predict_false(sa->code >= p->p_sysent->sv_size))
 		sa->callp = &nosys_sysent;
+#if __has_feature(capabilities) && !defined(CPU_CHERI_NO_SYSCALL_AUTHORIZE)
+	/* Constrain code that can originate system calls. */
+	else if (__predict_false(!cheri_syscall_authorize(td)))
+		sa->callp = &nosys_sysent;
+#endif
 	else
 		sa->callp = &p->p_sysent->sv_table[sa->code];
 

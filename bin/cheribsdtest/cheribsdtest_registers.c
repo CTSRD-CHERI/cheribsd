@@ -74,7 +74,7 @@
 static void
 check_initreg_code(void * __capability c)
 {
-	uintmax_t v;
+	uintmax_t v, expect;
 
 #if defined(__CHERI_PURE_CAPABILITY__) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 	/*
@@ -165,22 +165,28 @@ check_initreg_code(void * __capability c)
 	if ((v & CHERI_PERM_SYSTEM_REGS) != 0)
 		cheribsdtest_failure_errx("perms %jx (system_regs present)", v);
 
-	if ((v & CHERI_PERMS_SWALL) !=
-	    (CHERI_PERMS_SWALL & ~CHERI_PERM_SW_VMEM))
-		cheribsdtest_failure_errx("swperms %jx (expected swperms %x)",
-		    v & CHERI_PERMS_SWALL,
-		    (CHERI_PERMS_SWALL & ~CHERI_PERM_SW_VMEM));
+	expect = CHERI_PERMS_SWALL & ~CHERI_PERM_SW_VMEM;
+#ifdef CHERIBSD_C18N_TESTS
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	expect &= ~CHERI_PERM_SYSCALL;
+#endif
+#endif
+	if ((v & CHERI_PERMS_SWALL) != expect)
+		cheribsdtest_failure_errx("swperms %jx (expected swperms %jx)",
+		    v & CHERI_PERMS_SWALL, expect);
 
 	/* Check that the raw permission bits match the kernel header: */
-#if defined(CHERIBSD_C18N_TESTS) && !defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
-	if (v != (CHERI_CAP_USER_CODE_PERMS & ~CHERI_PERM_EXECUTIVE))
-		cheribsdtest_failure_errx("perms %jx (expected %jx)", v,
-		    (uintmax_t)(CHERI_CAP_USER_CODE_PERMS & ~CHERI_PERM_EXECUTIVE));
-#else
-	if (v != CHERI_CAP_USER_CODE_PERMS)
-		cheribsdtest_failure_errx("perms %jx (expected %jx)", v,
-		    (uintmax_t)CHERI_CAP_USER_CODE_PERMS);
+	expect = CHERI_CAP_USER_CODE_PERMS;
+#ifdef CHERIBSD_C18N_TESTS
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	expect &= ~CHERI_PERM_SYSCALL;
+#ifdef __aarch64__
+	expect &= ~CHERI_PERM_EXECUTIVE;
 #endif
+#endif
+#endif
+	if (v != expect)
+		cheribsdtest_failure_errx("perms %jx (expected %jx)", v, expect);
 
 	cheribsdtest_success();
 }

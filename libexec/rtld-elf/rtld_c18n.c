@@ -124,9 +124,6 @@ uintptr_t sealer_pltgot, sealer_tramp;
 /* Enable compartmentalisation */
 bool ld_compartment_enable;
 
-/* Permission bit to be cleared for user code */
-uint64_t c18n_code_perm_clear;
-
 #ifdef __aarch64__
 /* Enable wrapping function pointers in trampolines */
 bool ld_compartment_fptr;

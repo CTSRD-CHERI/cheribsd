@@ -136,8 +136,7 @@ void * __capability cheri_sigcode_capability(struct thread *td);
  * CHERI context management functions.
  */
 const char	*cheri_exccode_string(uint8_t exccode);
-int	cheri_syscall_authorize(struct thread *td, u_int code,
-	    int nargs, syscallarg_t *args);
+int	cheri_syscall_authorize(struct thread *td);
 
 /*
  * Functions to manage object types.
@@ -164,8 +163,6 @@ bool	vm_derive_capreg(struct proc *p, uintcap_t in, uintcap_t *out);
  */
 SYSCTL_DECL(_security_cheri);
 SYSCTL_DECL(_security_cheri_stats);
-extern u_int	security_cheri_debugger_on_sandbox_syscall;
-extern u_int	security_cheri_syscall_violations;
 extern u_int	security_cheri_bound_legacy_capabilities;
 extern u_int	cheri_cloadtags_stride;
 #ifdef __aarch64__

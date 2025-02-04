@@ -35,8 +35,6 @@
 /*
  * Global symbols
  */
-extern bool ld_compartment_enable;
-extern size_t c18n_code_perm_clear;
 extern uintptr_t sealer_pltgot, sealer_tramp;
 extern const char *ld_compartment_utrace;
 extern const char *ld_compartment_policy;
