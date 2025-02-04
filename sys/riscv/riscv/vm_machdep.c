@@ -60,6 +60,26 @@
 #define	TP_OFFSET64	(2 * sizeof(uint64_t))
 #endif
 
+static void
+cpu_set_pcb_frame(struct thread *td)
+{
+	td->td_pcb = (struct pcb *)((char *)td->td_kstack +
+	    td->td_kstack_pages * PAGE_SIZE) - 1;
+
+	/*
+	 * td->td_frame + TF_SIZE will be the saved kernel stack pointer whilst
+	 * in userspace, so keep it aligned so it's also aligned when we
+	 * subtract TF_SIZE in the trap handler (and here for the initial stack
+	 * pointer). This also keeps the struct kernframe just afterwards
+	 * aligned no matter what's in it or struct pcb.
+	 *
+	 * NB: TF_SIZE not sizeof(struct trapframe) as we need the rounded
+	 * value to match the trap handler.
+	 */
+	td->td_frame = (struct trapframe *)(STACKALIGN(
+	    (char *)td->td_pcb - sizeof(struct kernframe)) - TF_SIZE);
+}
+
 /*
  * Finish a fork operation, with process p2 nearly set up.
  * Copy and update the pcb, set up the stack so that the child
@@ -70,35 +90,22 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 {
 	struct pcb *pcb2;
 	struct trapframe *tf;
-	char *p;
 
 	if ((flags & RFPROC) == 0)
 		return;
 
 	/* RISCVTODO: save the FPU state here */
 
-	pcb2 = (struct pcb *)(td2->td_kstack +
-	    td2->td_kstack_pages * PAGE_SIZE) - 1;
-
-	td2->td_pcb = pcb2;
-	bcopy(td1->td_pcb, pcb2, sizeof(*pcb2));
-
 #if __has_feature(capabilities)
 	p2->p_md.md_sigcode = td1->td_proc->p_md.md_sigcode;
 #endif
 
-	/*
-	 * The "top-most" trapframe uses a "hole" between the pcb and
-	 * trapframe to save the kernel's tp register used for per-CPU
-	 * data.  Leave a gap for the "hole" then align the stack and
-	 * use that as the top of the trapframe.
-	 */
-#if __has_feature(capabilities)
-	p = (char *)pcb2 - sizeof(register_t);
-#else
-	p = (char *)pcb2 - sizeof(uintcap_t);
-#endif
-	tf = (struct trapframe *)STACKALIGN(p) - 1;
+	cpu_set_pcb_frame(td2);
+
+	pcb2 = td2->td_pcb;
+	bcopy(td1->td_pcb, pcb2, sizeof(*pcb2));
+
+	tf = td2->td_frame;
 	bcopy(td1->td_frame, tf, sizeof(*tf));
 
 	/* Clear syscall error flag */
@@ -109,8 +116,6 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	tf->tf_a[1] = 0;
 	tf->tf_sstatus |= (SSTATUS_SPIE); /* Enable interrupts. */
 	tf->tf_sstatus &= ~(SSTATUS_SPP); /* User mode. */
-
-	td2->td_frame = tf;
 
 	/* Set the return value registers for fork() */
 	td2->td_pcb->pcb_s[0] = (uintptr_t)fork_return;
@@ -237,18 +242,7 @@ cpu_thread_exit(struct thread *td)
 void
 cpu_thread_alloc(struct thread *td)
 {
-	char *p;
-
-	td->td_pcb = (struct pcb *)(td->td_kstack +
-	    td->td_kstack_pages * PAGE_SIZE) - 1;
-
-	/* See comment in cpu_fork(). */
-#if __has_feature(capabilities)
-	p = (char *)td->td_pcb - sizeof(register_t);
-#else
-	p = (char *)td->td_pcb - sizeof(uintcap_t);
-#endif
-	td->td_frame = (struct trapframe *)STACKALIGN(p) - 1;
+	cpu_set_pcb_frame(td);
 }
 
 void

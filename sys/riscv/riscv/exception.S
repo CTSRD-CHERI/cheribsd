@@ -49,7 +49,7 @@
 	 * in the kernel DDC.  We haven't saved any registers yet,
 	 * so store 'ct0' in 'scratchc' temporarily.
 	 *
-	 * XXX: Bounds?  Maybe could use TF_SIZE + 16 as length?
+	 * XXX: Bounds?  Maybe could use TF_SIZE + KF_SIZE as length?
 	 * A purecap kernel would have proper bounds on csp already.
 	 */
 	cspecialw sscratchc, ct0
@@ -75,9 +75,9 @@
 .if \mode == 0	/* We came from userspace. */
 	/* Load our pcpu */
 #if __has_feature(capabilities)
-	clc	ctp, (TF_SIZE)(csp)
+	clc	ctp, (TF_SIZE + KF_TP)(csp)
 #else
-	ld	tp, (TF_SIZE)(sp)
+	ld	tp, (TF_SIZE + KF_TP)(sp)
 #endif
 .endif
 
@@ -266,7 +266,7 @@
 	 * Build a capability for 'csp' using 'sp' as an address
 	 * in the kernel DDC.
 	 *
-	 * XXX: Bounds?  Maybe could use TF_SIZE + 16 as length?
+	 * XXX: Bounds?  Maybe could use TF_SIZE + KF_SIZE as length?
 	 * A purecap kernel would have proper bounds on csp already.
 	 */
 	cspecialr ct0, ddc
@@ -289,7 +289,7 @@
 	cspecialw sscratchc, ct0
 
 	/* Store our pcpu */
-	csc	ctp, (TF_SIZE)(csp)
+	csc	ctp, (TF_SIZE + KF_TP)(csp)
 	clc	ctp, (TF_TP)(csp)
 
 	/* And restore the user's global pointer */
@@ -339,7 +339,7 @@
 	csrw	sscratch, t0
 
 	/* Store our pcpu */
-	sd	tp, (TF_SIZE)(sp)
+	sd	tp, (TF_SIZE + KF_TP)(sp)
 	ld	tp, (TF_TP)(sp)
 
 	/* And restore the user's global pointer */
