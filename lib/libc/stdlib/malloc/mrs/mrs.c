@@ -51,6 +51,7 @@
 #include <malloc_np.h>
 #include <pthread.h>
 #include <pthread_np.h>
+#include <spinlock.h>
 #include <stdatomic.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -305,6 +306,16 @@ static bool revoke_async = false;
 static bool bound_pointers = false;
 static bool abort_on_validation_failure = true;
 static bool mrs_initialized = false;
+
+static spinlock_t mrs_init_lock = _SPINLOCK_INITIALIZER;
+#define	MRS_LOCK(x)	__extension__ ({	\
+	if (__isthreaded)			\
+		_SPINLOCK(x);			\
+})
+#define	MRS_UNLOCK(x)	__extension__ ({	\
+	if (__isthreaded)			\
+		_SPINUNLOCK(x);			\
+})
 
 /*
  * Optionally apply strict bounds to pointers returned by malloc() and friends.
@@ -1244,7 +1255,7 @@ spawn_background(void)
 #endif /* OFFLOAD_QUARANTINE */
 
 static void
-mrs_init_impl(void)
+mrs_init_impl_locked(void)
 {
 	initialize_lock(app_quarantine_lock);
 	initialize_lock(printf_lock);
@@ -1363,6 +1374,15 @@ mrs_init_impl(void)
 nosys:
 	mrs_puts(VERSION_STRING);
 #endif
+}
+
+static void
+mrs_init_impl(void)
+{
+	MRS_LOCK(&mrs_init_lock);
+	if (!mrs_initialized)
+		mrs_init_impl_locked();
+	MRS_UNLOCK(&mrs_init_lock);
 }
 
 static __attribute__((always_inline)) void
