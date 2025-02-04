@@ -29,7 +29,11 @@
 	.globl _binary_linux_vdso_so_o_start
 	.type _binary_linux_vdso_so_o_start, #object
 _binary_linux_vdso_so_o_start:
+#if defined(COMPAT_LINUX64)
+	.incbin "linux64_vdso.so.o"
+#else
 	.incbin "linux_vdso.so.o"
+#endif
 	.size _binary_linux_vdso_so_o_start, . - _binary_linux_vdso_so_o_start
 	.globl _binary_linux_vdso_so_o_end
 _binary_linux_vdso_so_o_end:
