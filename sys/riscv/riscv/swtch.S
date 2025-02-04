@@ -675,6 +675,15 @@ ENTRY(fork_trampoline)
 	cmove	csp, ct0
 #endif
 
+#ifndef __CHERI_PURE_CAPABILITY__
+	/*
+	 * Store our DDC on stack, we will load it back
+	 * on kernel mode trap.
+	 */
+	cspecialr ct0, ddc
+	csc	ct0, (TF_SIZE + KF_DDC)(csp)
+#endif
+
 	/*
 	 * Switch to user DDC.  After this point, all stack accesses
 	 * must use 'csp' instead of 'sp'.

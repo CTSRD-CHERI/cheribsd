@@ -106,6 +106,9 @@ ASSYM(TF_SCAUSE, offsetof(struct trapframe, tf_scause));
 ASSYM(TF_SSTATUS, offsetof(struct trapframe, tf_sstatus));
 
 ASSYM(KF_TP, offsetof(struct kernframe, kf_tp));
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
+ASSYM(KF_DDC, offsetof(struct kernframe, kf_ddc));
+#endif
 
 ASSYM(RISCV_BOOTPARAMS_SIZE, sizeof(struct riscv_bootparams));
 ASSYM(RISCV_BOOTPARAMS_KERN_PHYS, offsetof(struct riscv_bootparams, kern_phys));

@@ -322,8 +322,6 @@ va:
 #ifdef __CHERI_PURE_CAPABILITY__
 	cllc	ct0, cpu_exception_handler
 	cspecialw stcc, ct0
-	cmove	ct1, cnull
-	cspecialw stdc, ct1
 #else
 	la	t0, cpu_exception_handler
 #if __has_feature(capabilities)
@@ -332,8 +330,6 @@ va:
 	li	t0, 1
 	csetflags ct1, ct1, t0
 	cspecialw stcc, ct1
-	cspecialr ct1, ddc
-	cspecialw stdc, ct1
 #else
 	csrw	stvec, t0
 #endif
@@ -343,6 +339,8 @@ va:
 #if __has_feature(capabilities)
 	cmove	ct0, cnull
 	cspecialw sscratchc, ct0
+	/* Ensure stdc is null and thus not used */
+	cspecialw stdc, ct0
 #else
 	li	t0, 0
 	csrw	sscratch, t0
@@ -614,8 +612,6 @@ mpva:
 #ifdef __CHERI_PURE_CAPABILITY__
 	cllc	ct0, cpu_exception_handler
 	cspecialw stcc, ct0
-	cmove	ct1, cnull
-	cspecialw stdc, ct1
 #else
 	la	t0, cpu_exception_handler
 #if __has_feature(capabilities)
@@ -624,8 +620,6 @@ mpva:
 	li	t0, 1
 	csetflags ct1, ct1, t0
 	cspecialw stcc, ct1
-	cspecialr ct1, ddc
-	cspecialw stdc, ct1
 #else
 	csrw	stvec, t0
 #endif
@@ -635,6 +629,8 @@ mpva:
 #if __has_feature(capabilities)
 	cmove	ct0, cnull
 	cspecialw sscratchc, ct0
+	/* Ensure stdc is null and thus not used */
+	cspecialw stdc, ct0
 #else
 	li	t0, 0
 	csrw	sscratch, t0
