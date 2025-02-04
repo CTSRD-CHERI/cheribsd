@@ -95,6 +95,9 @@ struct sigframe64 {
  */
 struct kernframe {
 	uintcap_t	kf_tp;
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
+	uintcap_t	kf_ddc;
+#endif
 };
 #endif
 

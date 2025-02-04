@@ -63,7 +63,6 @@ DB_SHOW_COMMAND(scr, ddb_dump_scr)
 	db_printf("ddc: %#.16lp\n",  scr_read(ddc));
 	db_printf("pcc: %#.16lp\n",  scr_read(pcc));
 	db_printf("stcc: %#.16lp\n",  scr_read(stcc));
-	db_printf("stdc: %#.16lp\n",  scr_read(stdc));
 	db_printf("sscratchc: %#.16lp\n",  scr_read(sscratchc));
 	db_printf("sepcc: %#.16lp\n",  scr_read(sepcc));
 
