@@ -60,8 +60,9 @@ while true; do
 	REVISIT=$(echo $CHERI_DESKTOP_REVISIT $CHERI_VM_SUPPORT_REVISIT | \
 	    xargs -o bsddialog --backtitle "$OSNAME Installer" \
 	    --title "Final Configuration" --ok-label "Select" \
-	    --cancel-label "Finish" --default-no --menu \
+	    --no-cancel --menu \
 	    "Setup of your $OSNAME system is nearly complete. You can now modify your configuration choices. After this screen, you will have an opportunity to make more complex changes using a shell." 0 0 0 \
+		"Finish" "Apply configuration and exit installer" \
 		"Add User" "Add a user to the system" \
 		"Root Password" "Change root password" \
 		"Hostname" "Set system hostname" \
@@ -78,6 +79,9 @@ while true; do
 	fi
 
 	case "$REVISIT" in
+	"Finish")
+		break
+		;;
 	"Add User")
 		bsdinstall adduser
 		;;
