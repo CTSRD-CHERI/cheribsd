@@ -89,7 +89,7 @@ linux${SFX}_vdso.so.o: linux${SFX}_locore.o linux${SFX}_vdso_gtod.o
 	-T${SRCTOP}/sys/${MACHINE}/linux${SFX}/linux${SFX}_vdso.lds.s \
 	-o ${.TARGET} ${.ALLSRC:M*.o}
 
-linux${SFX}_vdso_inc.o: linux${SFX}_vdso.so.o
+linux_vdso_inc.o: linux${SFX}_vdso.so.o
 
 linux${SFX}_support.o: linux${SFX}_support.S assym.inc linux${SFX}_assym.h
 	${CC} -c -x assembler-with-cpp -DLOCORE ${CFLAGS} -fPIC \
