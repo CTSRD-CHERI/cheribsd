@@ -75,7 +75,7 @@ linux${SFX}_locore.o: linux${SFX}_assym.h assym.inc
 	-fno-stack-protector -I. -I${SYSDIR} -I${SRCTOP}/include \
 	    ${.IMPSRC} -o ${.TARGET}
 
-linux${SFX}_vdso_gtod.o: linux${SFX}_vdso_gtod.inc ${VDSODEPS}
+linux${SFX}_vdso_gtod.o: linux_vdso_gtod.inc ${VDSODEPS}
 	${CC} -c -fPIC -pipe -O2 -Werror ${VDSOFLAGS} \
 	-nostdinc -fasynchronous-unwind-tables \
 	-fno-omit-frame-pointer -foptimize-sibling-calls \
