@@ -69,6 +69,10 @@ struct trapframe {
 	uint64_t tf_scause;
 };
 
+#ifdef _KERNEL
+#define	TF_SIZE	(roundup2(sizeof(struct trapframe), STACKALIGNBYTES + 1))
+#endif
+
 /*
  * Signal frame. Pushed onto user stack before calling sigcode.
  */
@@ -81,6 +85,16 @@ struct sigframe {
 struct sigframe64 {
 	struct __siginfo64 sf_si;	/* actual saved siginfo */
 	ucontext64_t	sf_uc;	/* actual saved ucontext */
+};
+#endif
+
+#ifdef _KERNEL
+/*
+ * Kernel frame. Reserved near the top of kernel stacks for saving kernel
+ * state while in userspace.
+ */
+struct kernframe {
+	uintcap_t	kf_tp;
 };
 #endif
 
