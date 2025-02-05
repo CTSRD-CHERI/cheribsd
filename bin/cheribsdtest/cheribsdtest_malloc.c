@@ -61,7 +61,7 @@ CHERIBSDTEST(malloc_double_free, "malloc aborts on double free",
 }
 
 static const char *
-skip_malloc_not_revoking(const char *name __unused)
+skip_malloc_not_revoking(const struct cheri_test *ctp __unused)
 {
 	if (malloc_is_revoking())
 		return (NULL);
