@@ -40,6 +40,7 @@
 #include <sys/auxv.h>
 #include <sys/mman.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
 #include <sys/sysctl.h>
 #include <sys/time.h>
 #include <sys/ucontext.h>
@@ -732,6 +733,44 @@ cheribsdtest_spawn_child(enum spawn_child_mode mode)
 	if (mode != SC_MODE_POSIX_SPAWN && pid == 0)
 		execve(exec_args[0], exec_args, NULL);
 	return (pid);
+}
+
+static const char *
+_cheribsdtest_get_helper_path(const struct cheri_test *ctp)
+{
+	static char helper_path[PATH_MAX];
+	const char *prefix = "/usr/libexec";
+
+	if (ctp == NULL)
+		return (NULL);
+
+	snprintf(helper_path, sizeof(helper_path), "%s/%s%s", prefix,
+	    ctp->ct_name, PROG_SUFFIX);
+
+	return (helper_path);
+}
+
+const char *
+cheribsdtest_get_helper_path(void)
+{
+	return (_cheribsdtest_get_helper_path(running_test));
+}
+
+const char *
+cheribsdtest_skip_no_helper(const struct cheri_test *ctp)
+{
+	struct stat sb;
+	const char *path;
+
+	/*
+	 * We want to skip if the file doesn't exist, but run and fail
+	 * of it does and there's something wrong with it (e.g., it's not
+	 * executable).
+	 */
+	path = _cheribsdtest_get_helper_path(ctp);
+	if (path != NULL && stat(path, &sb) != 0)
+		return ("couldn't stat helper");
+	return (NULL);
 }
 
 __noinline void *

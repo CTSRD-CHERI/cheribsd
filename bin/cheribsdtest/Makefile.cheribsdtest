@@ -40,7 +40,7 @@ CHERIBSDTEST_DIR:=	${.PARSEDIR}
 .PATH: ${CHERIBSDTEST_DIR}
 CFLAGS+=	-I${CHERIBSDTEST_DIR}/${MACHINE}
 
-CFLAGS+=	'-DPROG="${PROG}"'
+CFLAGS+=	'-DPROG="${PROG}"' '-DPROG_SUFFIX="${PROG:S/^cheribsdtest//}"'
 
 .if ${MACHINE_ABI:Mpurecap}
 SRCS+=	cheribsdtest_cheriabi.c
