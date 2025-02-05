@@ -42,3 +42,7 @@ nooptions 	PAC
 
 # Stores user and kernel pointers in uint64_t
 nodevice	netmap
+
+# Some devices, notably the GPU, aren't described in ACPI tables.  Prefer
+# the FDT if one is availble.
+envvar		kern.cfg.order="fdt,acpi"
