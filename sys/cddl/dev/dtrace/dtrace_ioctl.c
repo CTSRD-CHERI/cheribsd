@@ -509,14 +509,17 @@ dtrace_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 		dest += offsetof(dtrace_eprobedesc_t, dtepd_rec[0]);
 
 		for (act = ecb->dte_action; act != NULL; act = act->dta_next) {
+			dtrace_recdesc_t rec;
+
 			if (DTRACEACT_ISAGG(act->dta_kind) || act->dta_intuple)
 				continue;
 
 			if (nrecs-- == 0)
 				break;
 
-			bcopy(&act->dta_rec, (void *)dest,
-			    sizeof (dtrace_recdesc_t));
+			bcopy(&act->dta_rec, &rec, sizeof (dtrace_recdesc_t));
+			rec.dtrd_arg = 0; /* clear a kernel capability */
+			bcopy(&rec, (void *)dest, sizeof (dtrace_recdesc_t));
 			dest += sizeof (dtrace_recdesc_t);
 		}
 
