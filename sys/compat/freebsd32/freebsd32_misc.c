@@ -406,8 +406,7 @@ freebsd32_execve(struct thread *td, struct freebsd32_execve_args *uap)
 	if (error != 0)
 		return (error);
 	error = exec_copyin_args(&eargs, USER_PTR_PATH(uap->fname),
-	    UIO_USERSPACE, USER_PTR_UNBOUND(uap->argv),
-	    USER_PTR_UNBOUND(uap->envv));
+	    USER_PTR_UNBOUND(uap->argv), USER_PTR_UNBOUND(uap->envv));
 	if (error == 0)
 		error = kern_execve(td, &eargs, NULL, oldvmspace);
 	post_execve(td, error, oldvmspace);
@@ -425,8 +424,8 @@ freebsd32_fexecve(struct thread *td, struct freebsd32_fexecve_args *uap)
 	error = pre_execve(td, &oldvmspace);
 	if (error != 0)
 		return (error);
-	error = exec_copyin_args(&eargs, NULL, UIO_SYSSPACE,
-	    USER_PTR_UNBOUND(uap->argv), USER_PTR_UNBOUND(uap->envv));
+	error = exec_copyin_args(&eargs, NULL, USER_PTR_UNBOUND(uap->argv),
+	    USER_PTR_UNBOUND(uap->envv));
 	if (error == 0) {
 		eargs.fd = uap->fd;
 		error = kern_execve(td, &eargs, NULL, oldvmspace);

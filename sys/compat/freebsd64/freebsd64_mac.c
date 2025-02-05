@@ -134,8 +134,8 @@ freebsd64___mac_execve(struct thread *td,
 	error = pre_execve(td, &oldvmspace);
 	if (error != 0)
 		return (error);
-	error = exec_copyin_args(&eargs, NULL, UIO_SYSSPACE,
-	    USER_PTR_UNBOUND(uap->argv), USER_PTR_UNBOUND(uap->envv));
+	error = exec_copyin_args(&eargs, NULL, USER_PTR_UNBOUND(uap->argv),
+	    USER_PTR_UNBOUND(uap->envv));
 	if (error == 0)
 		error = kern_execve(td, &eargs, USER_PTR_OBJ(uap->mac_p),
 		    oldvmspace);

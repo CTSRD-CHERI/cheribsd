@@ -2651,8 +2651,7 @@ get_argenv_ptr(l_uintptr_t * __capability *arrayp, void * __capability *ptrp)
  */
 static int
 linux_exec_copyin_args(struct image_args *args, const char * __capability fname,
-    enum uio_seg segflg, l_uintptr_t * __capability argv,
-    l_uintptr_t * __capability envv)
+    l_uintptr_t * __capability argv, l_uintptr_t * __capability envv)
 {
 	void * __capability ptr;
 	int error;
@@ -2672,7 +2671,7 @@ linux_exec_copyin_args(struct image_args *args, const char * __capability fname,
 	/*
 	 * Copy the file name.
 	 */
-	error = exec_args_add_fname(args, fname, segflg);
+	error = exec_args_add_fname(args, fname, UIO_USERSPACE);
 	if (error != 0)
 		goto err_exit;
 
@@ -2732,8 +2731,7 @@ linux_execve(struct thread *td, struct linux_execve_args *args)
 	LINUX_CTR(execve);
 
 	error = linux_exec_copyin_args(&eargs, USER_PTR_PATH(args->path),
-	    UIO_USERSPACE, USER_PTR_UNBOUND(args->argp),
-	    USER_PTR_UNBOUND(args->envp));
+	    USER_PTR_UNBOUND(args->argp), USER_PTR_UNBOUND(args->envp));
 	if (error == 0)
 		error = linux_common_execve(td, &eargs);
 	AUDIT_SYSCALL_EXIT(error == EJUSTRETURN ? 0 : error, td);
