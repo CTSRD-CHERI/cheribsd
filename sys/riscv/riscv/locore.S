@@ -83,15 +83,15 @@ _alt_start:
 	 * our ELF header requests capmode.  The instructions below
 	 * should work in both modes.
 	 */
+#if defined(__riscv_xcheri_std_compat)
+	modesw.cap
+#else
 	lla	t0, 1f
 	cspecialr ct1, pcc
 	csetaddr ct1, ct1, t0
 	li	t0, 1
 	csetflags ct1, ct1, t0
-#ifdef __riscv_xcheri_mode_dependent_jumps
 	jr.cap	ct1
-#else
-	cjr	ct1
 #endif
 1:
 .option pop

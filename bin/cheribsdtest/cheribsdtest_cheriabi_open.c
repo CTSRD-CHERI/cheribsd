@@ -218,6 +218,23 @@ CHERIBSDTEST(cheriabi_open_bad_perm,
 	cheribsdtest_success();
 }
 
+CHERIBSDTEST(cheriabi_open_sentry, "Sealed path")
+{
+	const char *sealed_path;
+	int fd;
+
+	sealed_path = cheri_sealentry("/dev/null");
+	fd = open(sealed_path, O_RDONLY);
+	if (fd > 0)
+		cheribsdtest_failure_errx("open succeeded");
+
+	if (errno != EFAULT)
+		cheribsdtest_failure_err("EFAULT expected");
+
+	cheribsdtest_success();
+}
+
+#if !defined(__riscv_xcheri_std_compat)
 CHERIBSDTEST(cheriabi_open_sealed, "Sealed path")
 {
 	char *path, *sealed_path;
@@ -247,3 +264,4 @@ CHERIBSDTEST(cheriabi_open_sealed, "Sealed path")
 
 	cheribsdtest_success();
 }
+#endif /* !defined(__riscv_xcheri_std_compat) */

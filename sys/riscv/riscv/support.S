@@ -474,7 +474,12 @@ ENTRY(cbuildcap_fault)
 #else
 	SET_FAULT_HANDLER(x0, a2)	/* Reset the handler function */
 #endif
+#if defined(__riscv_xcheri_std_compat)
+	cgethigh a0, ca1
+	csethigh ca0, ca1, a0
+#else
 	ccleartag ca0, ca1
+#endif
 	RETURN
 END(cbuildcap_fault)
 

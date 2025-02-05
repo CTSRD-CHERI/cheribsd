@@ -111,6 +111,7 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
 	} else if (cheri_gettag(cut) && ctp(crshadow, cut, perms, start, end)) {
 		void * __capability cscratch;
 		int ok;
+		long sc_result;
 
 		uintcap_t cutr = cheri_revoke_cap(cut);
 
@@ -135,6 +136,27 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
 		 * mapping of physical memory.
 		 */
 again:
+#if defined(__CHERI_PURE_CAPABILITY__) || defined(__riscv_xcheri_std_compat)
+		__asm__ __volatile__ (
+#if !defined(__CHERI_PURE_CAPABILITY__)
+			".option push"
+			".option capmode"
+			"modesw.cap\n\t"
+#endif
+			"lr.c %[cscratch], (%[cutp])\n\t"
+			"cseqx %[ok], %[cscratch], %[cut]\n\t"
+			"beq x0, %[ok], 1f\n\t"
+			"sc.c %[sc_result], %[cutr], (%[cutp])\n\t"
+			"1:\n\t"
+#if !defined(__CHERI_PURE_CAPABILITY__)
+			".option pop"
+			"modesw.int\n\t"
+#endif
+		  : [ok] "=&r" (ok), [cscratch] "=&C" (cscratch),
+		    [cutr] "+C" (cutr), [sc_result] "=r" (sc_result)
+		  : [cut] "C" (cut), [cutp] "C" (cutp)
+		  : "memory");
+#else
 		__asm__ __volatile__ (
 			"lr.c.cap %[cscratch], (%[cutp])\n\t"
 			"cseqx %[ok], %[cscratch], %[cut]\n\t"
@@ -145,9 +167,11 @@ again:
 		    [cutr] "+C" (cutr)
 		  : [cut] "C" (cut), [cutp] "C" (cutp)
 		  : "memory");
-
 		/* sc.c.cap clobbers its value operand with 0 on success */
-		if (__builtin_expect((uintcap_t)cutr == 0, 1)) {
+		sc_result = (long)(uintcap_t)cutr;
+#endif
+
+		if (__builtin_expect(sc_result == 0, 1)) {
 			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
 			/* Don't count a revoked cap as HASCAPS */
 		} else if (!cheri_gettag(cscratch)) {
@@ -226,7 +250,7 @@ measure_cloadtags_stride(void *ignored __unused)
 		buf[i] = userspace_root_cap;
 	}
 
-	uint64_t tags = __builtin_cheri_cap_load_tags(buf);
+	uint64_t tags = cheri_loadtags(buf);
 	switch (tags) {
 	case 0x0001:
 		cloadtags_stride = 1;
@@ -286,7 +310,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 #endif
 
 #ifdef CHERI_CAPREVOKE_CLOADTAGS
-	tags = __builtin_cheri_cap_load_tags(mvu);
+	tags = cheri_loadtags(mvu);
 
 	mve -= _cloadtags_stride * sizeof(void * __capability);
 
@@ -299,8 +323,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 	for (; cheri_getaddress(mvu) < mve; mvu += _cloadtags_stride) {
 		uintcap_t * __capability mvt = mvu;
 
-		nexttags =
-		    __builtin_cheri_cap_load_tags(mvu + _cloadtags_stride);
+		nexttags = cheri_loadtags(mvu + _cloadtags_stride);
 		if (nexttags != 0) {
 			/* TODO? CPREFETCH(mvu + _cloadtags_stride); */
 			CHERI_REVOKE_STATS_BUMP(crst, lines_scan);

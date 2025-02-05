@@ -88,7 +88,12 @@
 /* Compare capabilities including bounds and perms etc. */
 #define cheri_equal_exact(x, y) __builtin_cheri_equal_exact(x, y)
 
-#ifdef __riscv
+#if defined(__riscv_xcheri_std_compat)
+/* CLoadTags not available, just use gettag(load) instead. */
+#define cheri_loadtags(m) \
+	cheri_gettag(     \
+	    *(uintcap_t * __capability)(__cheri_tocap void * __capability)(m))
+#elif defined(__riscv)
 #define	cheri_loadtags(m)						\
 	__builtin_cheri_cap_load_tags((__cheri_tocap void * __capability)(m))
 #else
