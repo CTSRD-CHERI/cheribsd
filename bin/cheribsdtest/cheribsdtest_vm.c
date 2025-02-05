@@ -81,7 +81,8 @@
 
 #include "cheribsdtest.h"
 
-static const char *skip_need_writable_tmp(const char *name __unused);
+static const char *skip_need_writable_tmp(
+    const struct cheri_test *ctp __unused);
 
 /*
  * Tests to check that tags are ... or aren't ... preserved for various page
@@ -611,7 +612,7 @@ CHERIBSDTEST(vm_tag_tmpfile_private_prefault,
 }
 
 static const char *
-skip_need_writable_tmp(const char *name __unused)
+skip_need_writable_tmp(const struct cheri_test *ctp __unused)
 {
 	static const char *reason = NULL;
 	static int checked = 0;
@@ -1362,7 +1363,8 @@ CHERIBSDTEST(vm_capdirty, "verify capdirty marking and mincore")
  */
 
 static const char *
-skip_need_quarantine_unmapped_reservations(const char *name __unused)
+skip_need_quarantine_unmapped_reservations(
+    const struct cheri_test *ctp __unused)
 {
 	if (!feature_present("cheri_revoke"))
 		return ("Kernel does not support revocation");

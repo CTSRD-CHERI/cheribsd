@@ -42,7 +42,7 @@
 #include "cheribsdtest.h"
 
 static const char *
-skip_non_tmpfs_tmp(const char *name __unused)
+skip_non_tmpfs_tmp(const struct cheri_test *ctp __unused)
 {
 	struct statfs sb;
 

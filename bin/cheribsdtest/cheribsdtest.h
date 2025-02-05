@@ -156,7 +156,7 @@ struct cheri_test {
 	const char	*ct_desc;
 	void		(*ct_func)(void);
 	void		(*ct_child_func)(void);
-	const char *	(*ct_check_skip)(const char *);
+	const char *	(*ct_check_skip)(const struct cheri_test *);
 	const char *	(*ct_check_xfail)(const char *);
 	u_int		 ct_flags;
 	int		 ct_signum;
@@ -340,6 +340,6 @@ extern ptraddr_t find_address_space_gap(size_t len, size_t align);
  */
 extern pid_t cheribsdtest_spawn_child(enum spawn_child_mode mode);
 
-const char *skip_need_cheri_revoke(const char *name);
+const char *skip_need_cheri_revoke(const struct cheri_test *ctp);
 
 #endif /* !_CHERIBSDTEST_H_ */

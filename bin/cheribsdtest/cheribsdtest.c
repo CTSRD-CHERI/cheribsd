@@ -261,7 +261,7 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 		return;
 
 	if (ctp->ct_check_skip != NULL) {
-		skip_reason = ctp->ct_check_skip(ctp->ct_name);
+		skip_reason = ctp->ct_check_skip(ctp);
 		if (skip_reason != NULL) {
 			if (xo_get_style(NULL) == XO_STYLE_XML) {
 				xo_attr("message", "%s", skip_reason);
