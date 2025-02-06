@@ -66,7 +66,6 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <libprocstat.h>
-#include <pthread.h>
 #include <signal.h>
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -75,6 +74,10 @@
 #include <string.h>
 #include <sysexits.h>
 #include <unistd.h>
+
+#ifdef CHERIBSD_THREAD_TESTS
+#include <pthread.h>
+#endif
 
 #include "cheribsdtest.h"
 
@@ -1731,6 +1734,7 @@ CHERIBSDTEST(cheri_revoke_async,
 	cheribsdtest_success();
 }
 
+#ifdef CHERIBSD_THREAD_TESTS
 static void *
 forker(void *arg)
 {
@@ -1820,6 +1824,7 @@ CHERIBSDTEST(cheri_revoke_async_fork,
 
 	cheribsdtest_success();
 }
+#endif /* CHERIBSD_THREAD_TESTS */
 
 /*
  * Repeatedly invoke libcheri_caprevoke logic.

@@ -62,13 +62,9 @@ CFLAGS+=	-DCHERIBSDTEST_CHERI_REVOKE_TESTS
 # Enable sub-object bounds only in tests specifically designed for them.
 CFLAGS.cheribsdtest_bounds_subobject.c+=-cheri-bounds=subobject-safe
 
-.ifdef CHERIBSD_THREAD_TESTS
-CFLAGS+=	-DCHERIBSD_THREAD_TESTS
-.endif
-
 MAN=
 
-LIBADD+=	procstat pthread util xo z
+LIBADD+=	procstat util xo z
 
 .ifdef CHERIBSD_DYNAMIC_TESTS
 CFLAGS+=	-DCHERIBSD_DYNAMIC_TESTS
@@ -85,7 +81,11 @@ NO_SHARED?=	YES
 SRCS+=		cheribsdtest_ifunc.c
 .endif
 
+# Both variants exist so we can test with and without libthr's interposition on
+# things like signals.
 .ifdef CHERIBSD_THREAD_TESTS
+CFLAGS+=	-DCHERIBSD_THREAD_TESTS
+LIBADD+=	pthread
 SRCS+=		cheribsdtest_tls_threads.c
 .endif
 
