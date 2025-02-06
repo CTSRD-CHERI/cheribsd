@@ -523,7 +523,8 @@ dt_cg_typecast(const dt_node_t *src, const dt_node_t *dst,
 			dt_irlist_append(dlp,
 			    dt_cg_node_alloc(DT_LBL_NONE, instr));
 		}
-	} else if (dstsize != sizeof (uint64_t)) {
+	} else if (dstsize != sizeof (uint64_t) &&
+	    dstsize != sizeof (uintcap_t)) {
 		int n = sizeof (uint64_t) * NBBY - dstsize * NBBY;
 
 		dt_cg_setx(dlp, rg, n);
@@ -1301,7 +1302,8 @@ dt_cg_array_op(dt_node_t *dnp, dt_irlist_t *dlp, dt_regset_t *drp)
 	if (idp->di_id != DIF_VAR_ARGS || !dt_node_is_scalar(dnp))
 		return;
 
-	if ((size = dt_node_type_size(dnp)) == sizeof (uint64_t))
+	size = dt_node_type_size(dnp);
+	if (size == sizeof (uint64_t) || size == sizeof (uintcap_t))
 		return;
 
 	reg = dt_regset_alloc(drp);
