@@ -4620,7 +4620,7 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	    sym = __DECONST(void*, make_function_pointer(def, defobj));
 	    dbg("dlsym(%s) is function: " PTR_FMT, name, sym);
 #if defined(CHERI_LIB_C18N) && defined(__riscv)
-	    sym = tramp_intern(NULL, &(struct tramp_data) {
+	    sym = tramp_intern(NULL, RTLD_COMPART_ID, &(struct tramp_data) {
 		.target = sym,
 		.defobj = defobj,
 		.def = def
@@ -4630,7 +4630,7 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	    sym = rtld_resolve_ifunc(defobj, def);
 	    dbg("dlsym(%s) is ifunc. Resolved to: " PTR_FMT, name, sym);
 #if defined(CHERI_LIB_C18N) && defined(__riscv)
-	    sym = tramp_intern(NULL, &(struct tramp_data) {
+	    sym = tramp_intern(NULL, RTLD_COMPART_ID, &(struct tramp_data) {
 		.target = sym,
 		.defobj = defobj,
 		.def = def
