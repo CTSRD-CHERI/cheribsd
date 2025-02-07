@@ -1,7 +1,0 @@
-#NO_UNIVERSE
-
-include "GENERIC-MFS-ROOT"
-
-ident		MORELLO-FPGA
-
-options 	RANDOM_NO_ENTROPY
