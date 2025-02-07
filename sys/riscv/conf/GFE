@@ -11,5 +11,3 @@ makeoptions 	KERNEL_LMA=0xc0200000
 
 options 	BREAK_TO_DEBUGGER
 options 	ALT_BREAK_TO_DEBUGGER
-
-options 	RANDOM_NO_ENTROPY
