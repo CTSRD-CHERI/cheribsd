@@ -113,7 +113,8 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 			return -1;
 		}
 #if defined(CHERI_LIB_C18N) && defined(__riscv)
-		symval = tramp_intern(NULL, &(struct tramp_data) {
+		symval = tramp_intern(NULL, RTLD_COMPART_ID,
+		    &(struct tramp_data) {
 			.target = __DECONST(void *, symval),
 			.defobj = defobj,
 			.def = def,
