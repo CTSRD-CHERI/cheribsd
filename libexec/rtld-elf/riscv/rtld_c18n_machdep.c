@@ -65,6 +65,7 @@ tramp_compile(char **entry, const struct tramp_data *data)
 	char *buf = *entry;
 	size_t count_off, hook_off, hook_pcc_off, header_off;
 	size_t sealer_off, target_off, pcc_off, landing_off, unused_regs;
+	compart_id_t callee;
 	bool count = ld_compartment_switch_count != NULL;
 	bool hook = ld_compartment_utrace != NULL ||
 	    ld_compartment_overhead != NULL;
@@ -131,12 +132,12 @@ tramp_compile(char **entry, const struct tramp_data *data)
 	target_off = size + offsetof(struct tramp_header, target);
 	*entry = buf + size;
 	size += offsetof(struct tramp_header, entry);
+	callee = compart_id_for_address(data->defobj, (ptraddr_t)data->target);
 
 	COPY(push_frame);
 	pcc_off = PATCH_OFF(push_frame, pcc);
 	PATCH_I_TYPE(push_frame, unsealer, sealer_off - pcc_off);
-	PATCH_I_TYPE(push_frame, cid,
-	    cid_to_index(data->defobj->compart_id).val);
+	PATCH_I_TYPE(push_frame, cid, cid_to_index(callee).val);
 	PATCH_I_TYPE(push_frame, target, target_off - pcc_off);
 
 	if (count) {
