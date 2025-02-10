@@ -1376,7 +1376,7 @@ linux_sendmsg_common(struct thread *td, l_int s, struct l_msghdr * __capability 
 	l_size_t clen;
 	int error;
 
-	error = copyin(msghdr, &linux_msghdr, sizeof(linux_msghdr));
+	error = copyincap(msghdr, &linux_msghdr, sizeof(linux_msghdr));
 	if (error != 0)
 		return (error);
 
@@ -1792,7 +1792,7 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr * __capability 
 	void *data, *udata;
 	int error, skiped;
 
-	error = copyin(msghdr, &l_msghdr, sizeof(l_msghdr));
+	error = copyincap(msghdr, &l_msghdr, sizeof(l_msghdr));
 	if (error != 0)
 		return (error);
 
@@ -1926,7 +1926,7 @@ err:
 
 out:
 	l_msghdr.msg_controllen = outlen;
-	error = copyout(&l_msghdr, msghdr, sizeof(l_msghdr));
+	error = copyoutcap(&l_msghdr, msghdr, sizeof(l_msghdr));
 
 bad:
 	if (control != NULL) {
