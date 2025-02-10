@@ -638,7 +638,7 @@ __linuxN(copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	 */
 	AUXARGS_ENTRY_PTR(pos, LINUX_AT_CHERI_EXEC_RW_CAP, cheri_setaddress(prog_cap(imgp,
 	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM),
-	    args->phdr));
+	    imgp->start_addr));
 #else
 	AUXARGS_ENTRY(pos, AT_PHDR, args->phdr);
 #endif
