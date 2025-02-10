@@ -113,6 +113,7 @@ CHERIBSDTEST(nofault_perm_load,
 	cheribsdtest_success();
 }
 
+#if !defined(__riscv_xcheri_std_compat)
 CHERIBSDTEST(illegal_perm_seal,
     "Exercise capability seal permission failure",
     CT_SEAL_VIOLATION_EXCEPTION)
@@ -145,6 +146,7 @@ CHERIBSDTEST(illegal_perm_seal,
 	cheribsdtest_failure_errx("cheri_seal() performed successfully "
 	    "%#lp with bad sealcap %#lp", sealed, sealcap);
 }
+#endif /* !defined(__riscv_xcheri_std_compat) */
 
 CHERIBSDTEST(fault_perm_store,
     "Exercise capability store permission failure",
@@ -168,6 +170,7 @@ CHERIBSDTEST(nofault_perm_store,
 	cheribsdtest_success();
 }
 
+#if !defined(__riscv_xcheri_std_compat)
 CHERIBSDTEST(illegal_perm_unseal,
     "Exercise capability unseal permission failure",
     CT_SEAL_VIOLATION_EXCEPTION)
@@ -204,6 +207,7 @@ CHERIBSDTEST(illegal_perm_unseal,
 	cheribsdtest_failure_errx("cheri_unseal() performed successfully "
 	    "%#lp with bad unsealcap %#lp", unsealed, sealcap);
 }
+#endif /* !defined(__riscv_xcheri_std_compat) */
 
 CHERIBSDTEST(fault_tag, "Store via untagged capability",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,

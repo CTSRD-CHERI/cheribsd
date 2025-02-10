@@ -13,7 +13,9 @@
 #ifndef __COMPARTMENT_INFO_HPP__
 #define __COMPARTMENT_INFO_HPP__
 
+#ifdef _LIBUNWIND_HAS_CHERI_LIB_C18N
 #include <link.h>
+#endif
 
 namespace libunwind {
 
