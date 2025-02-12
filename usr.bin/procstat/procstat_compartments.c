@@ -50,7 +50,7 @@ procstat_compartments(struct procstat *procstat, struct kinfo_proc *kipp)
 		xo_emit("{T:/%5s %-19s %4s %-40s}\n", "PID", "COMM", "CID",
 		    "CNAME");
 	if (procstat_getcompartments(procstat, kipp, &cccp, &ncomparts) != 0)
-		goto out;
+		return;
 	for (size_t i = 0; i < ncomparts; ++i) {
 		xo_emit("{k:process_id/%5d/%d}", kipp->ki_pid);
 		xo_emit(" {:command/%-19s/%s}", kipp->ki_comm);
@@ -58,6 +58,5 @@ procstat_compartments(struct procstat *procstat, struct kinfo_proc *kipp)
 		xo_emit(" {:cname/%-40s/%s}", cccp[i].ccc_name);
 		xo_emit("\n");
 	}
-out:
 	free(cccp);
 }

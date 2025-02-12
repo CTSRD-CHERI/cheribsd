@@ -479,7 +479,6 @@ procstat_getcompartments(struct procstat *procstat, struct kinfo_proc *kp,
 out_free:
 	free(inbuf);
 out:
-	*ncompartsp = 0;
 	return (-1);
 }
 
