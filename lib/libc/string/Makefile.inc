@@ -28,6 +28,7 @@ MISRCS+=bcmp.c bcopy.c bzero.c explicit_bzero.c \
 	wmemcpy.c wmemmove.c wmempcpy.c wmemset.c
 
 SYM_MAPS+=	${LIBC_SRCTOP}/string/Symbol.map
+COMPARTMENT_POLICY+=${LIBC_SRCTOP}/string/Compartments.json
 
 .if ${MACHINE_CPU:Mcheri} && !${MACHINE_ABI:Mpurecap}
 MISRCS+=memcpy_c.c memmove_c.c memset_c.c
