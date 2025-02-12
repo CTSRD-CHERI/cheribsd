@@ -1,0 +1,37 @@
+{
+    "compartments": {
+	"string.trusted": {
+	    "symbols": [
+		"memccpy",
+		"memchr",
+		"memcpy",
+		"memmem",
+		"memmove",
+		"mempcpy",
+		"memrchr",
+		"memset",
+		"stpcpy",
+		"stpncpy",
+		"strcat",
+		"strchr",
+		"strchrnul",
+		"strcmp",
+		"strcpy",
+		"strcspn",
+		"strlcat",
+		"strlcpy",
+		"strlen",
+		"strncat",
+		"strncmp",
+		"strncpy",
+		"strnlen",
+		"strnstr",
+		"strpbrk",
+		"strrchr",
+		"strsep",
+		"strspn",
+		"strstr"
+	    ]
+	}
+    }
+}
