@@ -393,7 +393,8 @@ drm_cdev_pager_dtor(void *handle)
 		if (dog->object->handle == handle)
 			break;
 	}
-	MPASS(dog != NULL);
+	KASSERT((dog->object->flags & OBJ_DEAD) != 0,
+	    ("%s: object %p not quite dead yet", __func__, dog));
 	TAILQ_REMOVE(&drm_vma_head, dog, link);
 	sx_xunlock(&drm_vma_lock);
 
@@ -474,15 +475,21 @@ drm_fstub_do_mmap(struct file *file, const struct file_operations *fops,
 
 		sx_xlock(&drm_vma_lock);
 		TAILQ_FOREACH(dog, &drm_vma_head, link) {
-			if (dog->object->handle == handle)
-				break;
+			if (dog->object->handle == handle) {
+				VM_OBJECT_RLOCK(dog->object);
+				if ((dog->object->flags & OBJ_DEAD) == 0) {
+					vm_object_reference(dog->object);
+					VM_OBJECT_RUNLOCK(dog->object);
+					break;
+				}
+				VM_OBJECT_RUNLOCK(dog->object);
+			}
 		}
 		if (dog != NULL) {
 			KASSERT(dog->ops == vmap->vm_ops,
 			    ("mismatched vm_ops"));
 			TAILQ_INSERT_HEAD(&dog->vmas, vmap, vm_entry);
 			*obj = dog->object;
-			vm_object_reference(*obj);
 		} else {
 			switch (vmap->vm_ops->objtype) {
 			case OBJT_DEVICE:
