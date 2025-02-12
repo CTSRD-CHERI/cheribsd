@@ -210,7 +210,8 @@ preload_search_info(caddr_t mod, int inf)
 void
 preload_delete_name(const char *name)
 {
-    caddr_t	addr, curp;
+    caddr_t	curp;
+    vm_offset_t addr;
     uint32_t	*hdr, sz;
     int		next;
     int		clearing;
@@ -226,7 +227,7 @@ preload_delete_name(const char *name)
 	    if (hdr[0] == MODINFO_NAME || (hdr[0] == 0 && hdr[1] == 0)) {
 		/* Free memory used to store the file. */
 		if (addr != 0 && sz != 0)
-		    kmem_bootstrap_free((vm_offset_t)addr, sz);
+		    kmem_bootstrap_free(addr, sz);
 		addr = 0;
 		sz = 0;
 
@@ -240,7 +241,7 @@ preload_delete_name(const char *name)
 	    }
 	    if (clearing) {
 		if (hdr[0] == MODINFO_ADDR)
-		    addr = *(caddr_t *)(curp + sizeof(uint32_t) * 2);
+		    addr = *(vm_offset_t *)(curp + sizeof(uint32_t) * 2);
 		else if (hdr[0] == MODINFO_SIZE)
 		    sz = *(uint32_t *)(curp + sizeof(uint32_t) * 2);
 		hdr[0] = MODINFO_EMPTY;
