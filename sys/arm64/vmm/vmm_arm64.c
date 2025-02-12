@@ -1165,22 +1165,38 @@ vmmops_run(void *vcpui, uintcap_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 
 	for (;;) {
 		if (hypctx->has_exception) {
+			size_t off;
+
 			hypctx->has_exception = false;
 			hypctx->elr_el1 = hypctx->tf.tf_elr;
 
 			mode = hypctx->tf.tf_spsr & (PSR_M_MASK | PSR_M_32);
 
 			if (mode == PSR_M_EL1t) {
-				hypctx->tf.tf_elr = hypctx->vbar_el1 + 0x0;
+				off = 0;
 			} else if (mode == PSR_M_EL1h) {
-				hypctx->tf.tf_elr = hypctx->vbar_el1 + 0x200;
+				off = 0x200;
 			} else if ((mode & PSR_M_32) == PSR_M_64) {
 				/* 64-bit EL0 */
-				hypctx->tf.tf_elr = hypctx->vbar_el1 + 0x400;
+				off = 0x400;
 			} else {
 				/* 32-bit EL0 */
-				hypctx->tf.tf_elr = hypctx->vbar_el1 + 0x600;
+				off = 0x600;
 			}
+#if __has_feature(capabilities)
+			switch (hypctx->cpacr_el1 & CPACR_CEN_MASK) {
+			case CPACR_CEN_TRAP_ALL1:
+			case CPACR_CEN_TRAP_ALL2:
+				hypctx->tf.tf_elr = cheri_setaddress(hypctx->elr_el1,
+				    hypctx->vbar_el1 + off);
+				break;
+			default:
+				hypctx->tf.tf_elr = hypctx->vbar_el1 + off;
+				break;
+			}
+#else
+			hypctx->tf.tf_elr = hypctx->vbar_el1 + off;
+#endif
 
 			/* Set the new spsr */
 			hypctx->spsr_el1 = hypctx->tf.tf_spsr;
