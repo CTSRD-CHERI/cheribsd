@@ -30,6 +30,7 @@ SRCS+=	xprintf_errno.c xprintf_hexdump.c xprintf_quote.c
 SRCS+=	xprintf_time.c xprintf_vis.c
 
 SYM_MAPS+=	${LIBC_SRCTOP}/stdio/Symbol.map
+COMPARTMENT_POLICY+=${LIBC_SRCTOP}/stdio/Compartments.json
 
 MAN+=	fclose.3 ferror.3 fflush.3 fgetln.3 fgets.3 fgetwln.3 fgetws.3 \
 	flockfile.3 \
