@@ -835,6 +835,31 @@ MLINKS+=callout.9 callout_active.9 \
 	callout.9 callout_schedule_sbt_on.9 \
 	callout.9 callout_stop.9 \
 	callout.9 callout_when.9
+MLINKS+=cheric.9 cheri_andperm.9 \
+	cheric.9 cheri_clear_low_ptr_bits.9 \
+	cheric.9 cheri_setbounds.9 \
+	cheric.9 cheri_fromint.9 \
+	cheric.9 cheri_get_low_ptr_bits.9 \
+	cheric.9 cheri_getaddress.9 \
+	cheric.9 cheri_getbase.9 \
+	cheric.9 cheri_getdefault.9 \
+	cheric.9 cheri_getlen.9 \
+	cheric.9 cheri_getoffset.9 \
+	cheric.9 cheri_getpcc.9 \
+	cheric.9 cheri_getperm.9 \
+	cheric.9 cheri_getsealed.9 \
+	cheric.9 cheri_getstack.9 \
+	cheric.9 cheri_gettop.9 \
+	cheric.9 cheri_gettag.9 \
+	cheric.9 cheri_gettype.9 \
+	cheric.9 cheri_clearperm.9 \
+	cheric.9 cheri_cleartag.9 \
+	cheric.9 cheri_incoffset.9 \
+	cheric.9 cheri_seal.9 \
+	cheric.9 cheri_set_low_ptr_bits.9 \
+	cheric.9 cheri_setaddress.9 \
+	cheric.9 cheri_setoffset.9 \
+	cheric.9 cheri_unseal.9
 MLINKS+=cnv.9 cnvlist.9 \
 	cnv.9 cnvlist_free_binary.9 \
 	cnv.9 cnvlist_free_bool.9 \
