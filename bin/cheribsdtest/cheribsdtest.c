@@ -665,7 +665,7 @@ mk_exec_args(const struct cheri_test *ctp)
 	char const **exec_args;
 	int argc = 0, error;
 
-	execpath = malloc(MAXPATHLEN);
+	execpath = malloc(PATH_MAX);
 	if (execpath == NULL)
 		err(EX_OSERR, "malloc");
 	exec_args = calloc(5, sizeof(*exec_args));
@@ -679,7 +679,7 @@ mk_exec_args(const struct cheri_test *ctp)
 	 * AT_EXECPATH or add some sort of execve_self(3) implemented
 	 * by rtld for dynamic binaries and libc for static.
 	 */
-	error = elf_aux_info(AT_EXECPATH, execpath, MAXPATHLEN);
+	error = elf_aux_info(AT_EXECPATH, execpath, PATH_MAX);
 	if (error != 0)
 		errx(EX_OSERR, "elf_aux_info: %s", strerror(error));
 	exec_args[argc++] = execpath;
