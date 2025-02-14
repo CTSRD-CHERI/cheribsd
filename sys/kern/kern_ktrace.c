@@ -409,7 +409,7 @@ ktr_drain(struct thread *td)
 
 	STAILQ_INIT(&local_queue);
 
-	if (!STAILQ_EMPTY(&td->td_proc->p_ktr)) {
+	if (!STAILQ_EMPTY_ATOMIC(&td->td_proc->p_ktr)) {
 		mtx_lock(&ktrace_mtx);
 		STAILQ_CONCAT(&local_queue, &td->td_proc->p_ktr);
 		mtx_unlock(&ktrace_mtx);
