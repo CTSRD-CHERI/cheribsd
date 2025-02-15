@@ -105,15 +105,14 @@ ENTRY(efi_rt_arch_call_nofault)
 	 * RET X30 won't honour or clear the LSB.
 	 */
 	bx	#4
-	.arch_extension	noc64
-	.arch_extension	a64c
+	.code	a64
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	blr	x6
 #else
 	blr	c6
 #endif
 	bx	#4
-	.arch_extension	c64
+	.code	c64
 
 	/* EFI calls run in the same EL so trash SP metadata */
 	ldr	c8, [sp, #(16 * PTR_WIDTH)]

@@ -139,7 +139,7 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
 		__asm__ __volatile__ (
 #ifndef __CHERI_PURE_CAPABILITY__
 			"bx #4\n\t"
-			".arch_extension c64\n\t"
+			".code c64\n\t"
 #endif
 			"0: ldxr %[cscratch], [%[cutp]]\n\t"
 			"cmp %[cscratch], %[cut]\n\t"
@@ -149,8 +149,7 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
 			"1:\n\t"
 #ifndef __CHERI_PURE_CAPABILITY__
 			"bx #4\n\t"
-			".arch_extension noc64\n\t"
-			".arch_extension a64c\n\t"
+			".code a64\n\t"
 #endif
 		  : [stxr_status] "+&r" (stxr_status),
 		    [cscratch] "=&C" (cscratch), [cutr] "+C" (cutr)

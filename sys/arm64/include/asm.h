@@ -108,11 +108,10 @@
 #if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
 #define	ENTER_C64		\
 	bx #4;			\
-	.arch_extension	c64
+	.code	c64
 #define	EXIT_C64		\
 	bx #4;			\
-	.arch_extension	noc64;	\
-	.arch_extension	a64c
+	.code	a64
 #else
 #define	ENTER_C64
 #define	EXIT_C64

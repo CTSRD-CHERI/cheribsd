@@ -44,7 +44,7 @@
 
 SIGCODE(freebsd64cb_sigcode)
 #ifndef __CHERI_PURE_CAPABILITY__
-	.arch_extension c64
+	.code	c64
 #endif
 	blr	x8
 	add	c0, csp, #SF_UC
@@ -59,8 +59,7 @@ SIGCODE(freebsd64cb_sigcode)
 
 	b	1b
 #ifndef __CHERI_PURE_CAPABILITY__
-	.arch_extension noc64
-	.arch_extension a64c
+	.code	a64
 #endif
 	/* This may be copied to the stack, keep it 16-byte aligned */
 	.align	3
