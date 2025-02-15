@@ -53,7 +53,7 @@
  * Fault handler for the copy{in,out} functions below.
  */
 #if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
-	.arch_extension	c64
+	.code	c64
 #endif
 ENTRY(copyio_c64_fault)
 	EXIT_C64

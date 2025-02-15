@@ -188,14 +188,13 @@
 
 	/* We assume that we enter here in a64 mode. */
 	bx	#4
-	.arch_extension c64
+	.code	c64
 #endif
 #endif
 .endmacro
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	.arch_extension noc64
-	.arch_extension a64c
+	.code	a64
 #endif
 ENTRY(_start)
 	/* Enter the kernel exception level */
@@ -360,8 +359,7 @@ END(_start)
 
 #ifdef SMP
 #ifdef __CHERI_PURE_CAPABILITY__
-	.arch_extension noc64
-	.arch_extension a64c
+	.code	a64
 #endif
 /*
  * void
@@ -387,7 +385,7 @@ ENTRY(mpentry_spintable)
 	b	mpentry_common
 END(mpentry_spintable)
 #ifdef __CHERI_PURE_CAPABILITY__
-	.arch_extension c64
+	.code	c64
 #endif
 
 /* Wait for the current CPU to be released */
@@ -411,8 +409,7 @@ LENTRY(spintable_wait)
 LEND(mpentry_spintable)
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	.arch_extension noc64
-	.arch_extension a64c
+	.code	a64
 #endif
 LENTRY(mpentry_common)
 	/* Disable interrupts */
@@ -502,8 +499,7 @@ LEND(mpentry_common)
  *  - Configure EL2 to support running the kernel at EL1 and exit to that
  */
 #ifdef __CHERI_PURE_CAPABILITY__
-	.arch_extension noc64
-	.arch_extension a64c
+	.code	a64
 #endif
 LENTRY(enter_kernel_el)
 #define	INIT_SCTLR_EL1	(SCTLR_LSMAOE | SCTLR_nTLSMD | SCTLR_EIS | \
@@ -669,7 +665,7 @@ LENTRY(enter_kernel_el)
 #undef INIT_SCTLR_EL1
 LEND(enter_kernel_el)
 #ifdef __CHERI_PURE_CAPABILITY__
-	.arch_extension c64
+	.code	c64
 #endif
 
 /*

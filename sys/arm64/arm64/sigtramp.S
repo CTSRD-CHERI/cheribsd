@@ -46,7 +46,7 @@
 SIGCODE(sigcode)
 #if __has_feature(capabilities)
 #ifndef __CHERI_PURE_CAPABILITY__
-	.arch_extension c64
+	.code	c64
 #endif
 	blrr	c8
 	add	c0, csp, #SF_UC
@@ -67,8 +67,7 @@ SIGCODE(sigcode)
 	b	1b
 #if __has_feature(capabilities)
 #ifndef __CHERI_PURE_CAPABILITY__
-	.arch_extension noc64
-	.arch_extension a64c
+	.code	a64
 #endif
 #endif
 	/* This may be copied to the stack, keep it 16-byte aligned */
