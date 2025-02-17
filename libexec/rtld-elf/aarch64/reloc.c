@@ -526,6 +526,14 @@ reloc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 			break;
 		case R_AARCH64_NONE:
 			break;
+#ifdef __CHERI_PURE_CAPABILITY__
+		case R_MORELLO_RELATIVE:
+			*where = init_cap_from_fragment(fragment,
+			    obj->relocbase, pcc_cap(obj, where[0]),
+			    (Elf_Addr)(uintptr_t)obj->relocbase,
+			    rela->r_addend);
+			break;
+#endif
 		default:
 			_rtld_error("Unknown relocation type %u in PLT",
 			    (unsigned int)ELF_R_TYPE(rela->r_info));
