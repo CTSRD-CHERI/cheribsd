@@ -60,6 +60,8 @@
 
 #include <cheri/cheri.h>
 
+#include <dev/vmm/vmm_mem.h>
+
 #include "mmu.h"
 #include "arm64.h"
 #include "hyp.h"
