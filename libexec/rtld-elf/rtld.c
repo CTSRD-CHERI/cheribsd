@@ -208,7 +208,7 @@ static uint32_t gnu_hash(const char *);
 static bool matched_symbol(SymLook *, const Obj_Entry *, Sym_Match_Result *,
     const unsigned long);
 #ifdef CHERI_LIB_C18N
-static bool c18n_add_obj(Obj_Entry *, const char *);
+static bool c18n_add_obj(Obj_Entry *);
 #endif
 
 void r_debug_state(struct r_debug *, struct link_map *) __noinline __exported;
@@ -962,7 +962,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	/*
 	 * Manually register the main object after the policy is loaded.
 	 */
-	if (!c18n_add_obj(obj_main, obj_main->path))
+	if (!c18n_add_obj(obj_main))
 	    rtld_die();
     }
 #endif
@@ -3370,7 +3370,7 @@ do_load_object(int fd, const char *name, char *path, struct stat *sbp,
     if (!digest_dynamic(obj, 0))
 	goto errp;
 #ifdef CHERI_LIB_C18N
-    if (!c18n_add_obj(obj, name))
+    if (!c18n_add_obj(obj))
 	goto errp;
 #endif
     dbg("%s valid_hash_sysv %d valid_hash_gnu %d dynsymcount %d", obj->path,
@@ -6405,26 +6405,30 @@ c18n_assign_plt_compartments(Obj_Entry *obj)
 }
 
 static bool
-c18n_add_obj(Obj_Entry *obj, const char *name)
+c18n_add_obj(Obj_Entry *obj)
 {
+	const char *name;
+
 	if (!C18N_ENABLED)
 		return (true);
 
 	if (!validate_c18nstrtab(obj))
 		return (false);
 
-	/* Prefer DT_SONAME as the compartment base name if present. */
+	/*
+	 * Prefer DT_SONAME as the compartment base name if present. Otherwise,
+	 * try to find another name. Fail if the object cannot be named.
+	 */
 	if (obj->soname != NULL)
 		name = obj->soname;
-
-	/* Try to find a name if none provided. */
-	if (name == NULL) {
-		if (!STAILQ_EMPTY(&obj->names))
-			name = STAILQ_FIRST(&obj->names)->name;
-		else if (obj->path != NULL)
-			name = obj->path;
-		else
-			return (false);
+	else if (!STAILQ_EMPTY(&obj->names))
+		name = STAILQ_FIRST(&obj->names)->name;
+	else if (obj->path != NULL)
+		name = obj->path;
+	else {
+		_rtld_error("Shared object at %#p cannot be named",
+		    obj->mapbase);
+		return (false);
 	}
 
 	c18n_setup_compartments(obj, name);
