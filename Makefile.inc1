@@ -1705,7 +1705,8 @@ _sysent_dirs+=	sys/compat/freebsd64
 _sysent_dirs+=	sys/amd64/linux		\
 		sys/amd64/linux32	\
 		sys/arm64/linux		\
-		sys/i386/linux
+		sys/i386/linux		\
+		sys/tools/syscalls/examples/cpp
 
 sysent: .PHONY
 .for _dir in ${_sysent_dirs}
