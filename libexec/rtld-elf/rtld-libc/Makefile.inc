@@ -65,7 +65,7 @@ _libc_other_objects=sigsetjmp lstat stat fstat fstatat fstatfs syscall \
     thr_self thr_kill pread mmap lseek _exit \
     getdirentries _close _fcntl _open _openat _read \
     __sysctlbyname \
-    _sigprocmask _write readlink __realpathat _setjmp setjmp setjmperr
+    _sigprocmask _write readlink ___realpathat _setjmp setjmp setjmperr
 
 .ifdef CHERI_LIB_C18N
 _libc_other_objects+=thr_exit _sigaction ftruncate
