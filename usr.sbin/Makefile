@@ -214,6 +214,7 @@ SUBDIR.${MK_UTMPX}+=	ac
 SUBDIR.${MK_UTMPX}+=	lastlogin
 SUBDIR.${MK_UTMPX}+=	utx
 SUBDIR.${MK_WIRELESS}+=	wlandebug
+SUBDIR.${MK_WIRELESS}+=	wlanstats
 SUBDIR.${MK_WIRELESS}+=	wpa
 
 .if !${MACHINE_ABI:Mpurecap}
