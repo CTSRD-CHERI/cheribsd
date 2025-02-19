@@ -2001,7 +2001,7 @@ nvpair_append_nvlist_array(nvpair_t *nvp, const nvlist_t *value)
 		PJDLOG_ASSERT(prev != NULL);
 
 		tmpnvp = nvpair_allocv(" ", NV_TYPE_NVLIST,
-		    (uint64_t)(uintptr_t)nvl, 0, 0);
+		    (uintptr_t)nvl, 0, 0);
 		if (tmpnvp == NULL) {
 			goto fail;
 		}
