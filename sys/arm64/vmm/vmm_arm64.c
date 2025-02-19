@@ -1392,6 +1392,14 @@ vmmops_getreg(void *vcpui, int reg, uintcap_t *retval)
 	case VM_REG_GUEST_SP:
 	case VM_REG_GUEST_X0 ... VM_REG_GUEST_X29:
 #if __has_feature(capabilities)
+	case VM_REG_GUEST_CSP:
+	case VM_REG_GUEST_PCC:
+	case VM_REG_GUEST_DDC:
+	case VM_REG_GUEST_CTPIDR:
+	case VM_REG_GUEST_RCSP:
+	case VM_REG_GUEST_RDDC:
+	case VM_REG_GUEST_RCTPIDR:
+	case VM_REG_GUEST_CID:
 	case VM_REG_GUEST_C0 ... VM_REG_GUEST_C30:
 #endif
 		*retval = *(uintcap_t *)regp;
