@@ -1,6 +1,8 @@
 .PATH: ${LIBC_SRCTOP}/stdlib/malloc/snmalloc
 
-MISRCS+=	malloc.cc
+MISRCS+=	malloc.c
+
+COMPARTMENT_POLICY+=${LIBC_SRCTOP}/stdlib/malloc/snmalloc/Compartments.json
 
 # Specify the locations in contrib for headers.
 CXXFLAGS.malloc.cc+=	-I${SRCTOP}/contrib/subrepo-snmalloc/src/snmalloc

@@ -1,0 +1,9 @@
+{
+    "compartments": {
+	"mrs": {
+	    "files": [
+		"mrs.*o"
+	    ]
+	}
+    }
+}
