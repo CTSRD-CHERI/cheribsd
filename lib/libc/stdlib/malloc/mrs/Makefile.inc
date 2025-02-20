@@ -2,6 +2,8 @@
 
 MISRCS+=	mrs.c
 
+COMPARTMENT_POLICY+=${LIBC_SRCTOP}/stdlib/malloc/mrs/Compartments.json
+
 MAN+=	mrs.3
 MLINKS+= \
 	mrs.3 malloc.3 \

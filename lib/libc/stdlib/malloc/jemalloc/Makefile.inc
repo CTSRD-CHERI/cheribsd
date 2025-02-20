@@ -26,6 +26,8 @@ CFLAGS.jemalloc_${src}+=	-DMALLOC_REVOCATION_SHIM
 .endif
 .endfor
 
+COMPARTMENT_POLICY+=${LIBC_SRCTOP}/stdlib/malloc/jemalloc/Compartments.json
+
 MAN+=jemalloc.3
 CLEANFILES+=jemalloc.3
 jemalloc.3: ${SRCTOP}/contrib/jemalloc/doc/jemalloc.3 .NOMETA
