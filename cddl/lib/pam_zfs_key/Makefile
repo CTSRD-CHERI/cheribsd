@@ -14,6 +14,7 @@ WARNS?=	2
 CSTD=	c99
 CFLAGS+= -DIN_BASE
 CFLAGS+= -I${ZFSTOP}/include
+CFLAGS+= -I${ZFSTOP}
 CFLAGS+= -I${ZFSTOP}/lib/libspl/include/
 CFLAGS+= -I${ZFSTOP}/lib/libspl/include/os/freebsd
 CFLAGS+= -I${ZFSTOP}/lib/libzpool/include
