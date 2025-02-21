@@ -244,8 +244,11 @@ string_base_search(const struct string_base *sb, const char *str)
 
 struct compart {
 	/*
-	 * Name of the compartment. Must be the first field to enable kernel
-	 * access to compartment information.
+	 * Compartment information exposed to the kernel.
+	 */
+	struct rtld_c18n_compart info;
+	/*
+	 * Name of the compartment.
 	 */
 	const char *name;
 	/*
@@ -313,6 +316,7 @@ expand_comparts_data(compart_id_t capacity)
 static struct compart *
 add_comparts_data(const char *name)
 {
+	compart_id_t i;
 	struct compart *com;
 
 	rtld_require(comparts.size <= COMPART_ID_MAX,
@@ -325,8 +329,13 @@ add_comparts_data(const char *name)
 	    memory_order_acq_rel);
 	GDB_COMPARTS_STATE(RCT_ADD, NULL);
 
-	com = &comparts.data[INC_NUM_COMPART];
+	i = INC_NUM_COMPART;
+	com = &comparts.data[i];
 	*com = (struct compart) {
+		.info = (struct rtld_c18n_compart) {
+			.rcc_name = name,
+			.rcc_id = i
+		},
 		.name = name
 	};
 	c18n_info->comparts_size = r_debug.r_comparts_size = comparts.size;

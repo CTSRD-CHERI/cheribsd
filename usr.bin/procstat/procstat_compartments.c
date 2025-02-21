@@ -43,20 +43,20 @@
 void
 procstat_compartments(struct procstat *procstat, struct kinfo_proc *kipp)
 {
-	struct cheri_c18n_compart *cccp;
+	struct kinfo_cheri_c18n_compart *kcccp;
 	size_t ncomparts;
 
 	if ((procstat_opts & PS_OPT_NOHEADER) == 0)
 		xo_emit("{T:/%5s %-19s %4s %-40s}\n", "PID", "COMM", "CID",
 		    "CNAME");
-	if (procstat_getcompartments(procstat, kipp, &cccp, &ncomparts) != 0)
+	if (procstat_getcompartments(procstat, kipp, &kcccp, &ncomparts) != 0)
 		return;
 	for (size_t i = 0; i < ncomparts; ++i) {
 		xo_emit("{k:process_id/%5d/%d}", kipp->ki_pid);
 		xo_emit(" {:command/%-19s/%s}", kipp->ki_comm);
-		xo_emit(" {:cid/%4d/%zu}", cccp[i].ccc_id);
-		xo_emit(" {:cname/%-40s/%s}", cccp[i].ccc_name);
+		xo_emit(" {:cid/%4d/%zu}", kcccp[i].kccc_id);
+		xo_emit(" {:cname/%-40s/%s}", kcccp[i].kccc_name);
 		xo_emit("\n");
 	}
-	free(cccp);
+	free(kcccp);
 }

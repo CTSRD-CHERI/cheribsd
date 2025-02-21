@@ -219,7 +219,7 @@ struct advlock_list	*procstat_getadvlock(struct procstat *procstat);
 int	procstat_getc18n(struct procstat *procstat, struct kinfo_proc *kp,
     struct rtld_c18n_stats *stats);
 int	procstat_getcompartments(struct procstat *procstat,
-    struct kinfo_proc *kp, struct cheri_c18n_compart **comparts,
+    struct kinfo_proc *kp, struct kinfo_cheri_c18n_compart **comparts,
     size_t *ncomparts);
 struct filestat_list	*procstat_getfiles(struct procstat *procstat,
     struct kinfo_proc *kp, int mmapped);

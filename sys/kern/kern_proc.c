@@ -2606,9 +2606,10 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 	u_int namelen = arg2;
 	struct proc *p;
 	struct cheri_c18n_info info;
-	struct cheri_c18n_compart compart;
+	struct rtld_c18n_compart rcc;
+	struct kinfo_cheri_c18n_compart kccc;
+	char * __capability rccp;
 	char * __capability namep;
-	char * __capability namepp;
 	ssize_t len;
 	size_t gen;
 
@@ -2647,7 +2648,7 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 	 */
 	if (req->oldptr == NULL) {
 		error = SYSCTL_OUT(req, NULL,
-		    info.comparts_size * sizeof(compart));
+		    info.comparts_size * sizeof(kccc));
 		goto out;
 	}
 
@@ -2657,22 +2658,21 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 	 */
 	for (size_t i = 0; i < info.comparts_size; ++i) {
 		/* Initialize userspace structure, including padding. */
-		bzero(&compart, sizeof(compart));
-		compart.ccc_id = i;
+		bzero(&kccc, sizeof(kccc));
 
-		namepp = (char * __capability)info.comparts +
+		rccp = (char * __capability)info.comparts +
 		    i * info.comparts_entry_size;
-		if (!cheri_can_access(namepp,
+		if (!cheri_can_access(rccp,
 		    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP,
-		    (__cheri_addr ptraddr_t)namepp, sizeof(namep))) {
+		    (__cheri_addr ptraddr_t)rccp, sizeof(rcc))) {
 			error = EPROT;
 			goto out;
 		}
 
 		/* Copy in next compartment-name string pointer. */
 		len = proc_readmem_cap(curthread, p,
-		    (__cheri_addr vm_offset_t)namepp, &namep, sizeof(namep));
-		if (len != sizeof(namep)) {
+		    (__cheri_addr vm_offset_t)rccp, &rcc, sizeof(rcc));
+		if (len != sizeof(rcc)) {
 			error = EFAULT;
 			goto out;
 		}
@@ -2681,13 +2681,13 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 		 * Copy in compartment name string. Capability access checks are
 		 * performed by proc_read_string_properly().
 		 */
-		error = proc_read_string_properly(curthread, p, namep,
-		    compart.ccc_name, sizeof(compart.ccc_name));
+		error = proc_read_string_properly(curthread, p,
+		    rcc.rcc_name, kccc.kccc_name, sizeof(kccc.kccc_name));
 		if (error != 0)
 			goto out;
 
 		/* If the generation counter has changed, abort. */
-		len = proc_readmem_cap(curthread, p,
+		len = proc_readmem(curthread, p,
 		    (vm_offset_t)&p->p_c18n_info->comparts_gen, &gen,
 		    sizeof(gen));
 		if (len != sizeof(gen)) {
@@ -2699,13 +2699,15 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 			goto out;
 		}
 
-		len = offsetof(struct cheri_c18n_compart, ccc_name) +
-		    strlen(compart.ccc_name) + 1;
-		len = roundup2(len, _Alignof(struct cheri_c18n_compart));
-		compart.ccc_structsize = len;
+		len = offsetof(struct kinfo_cheri_c18n_compart, kccc_name) +
+		    strlen(kccc.kccc_name) + 1;
+		len = roundup2(len, _Alignof(struct kinfo_cheri_c18n_compart));
+		kccc.kccc_structsize = len;
+		kccc.kccc_id = rcc.rcc_id;;
+		kccc.kccc_has_dlopened = rcc.rcc_has_dlopened;
 
 		/* Copy out userspace structure. */
-		error = SYSCTL_OUT(req, &compart, len);
+		error = SYSCTL_OUT(req, &kccc, len);
 		if (error != 0)
 			goto out;
 	}

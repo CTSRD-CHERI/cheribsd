@@ -60,6 +60,15 @@ struct rtld_c18n_stats {
 };
 
 /*
+ * Compartment information exposed by RTLD.
+ */
+struct rtld_c18n_compart {
+	const char * __kerncap	rcc_name;
+	size_t			rcc_id;
+	uint8_t			rcc_has_dlopened : 1;
+};
+
+/*
  * The interface provided by the kernel for RTLD to supply compartmentalisation
  * information. The version field doubles as a synchronisation flag where a
  * non-zero value indicates that the other fields have been initialised.
@@ -91,15 +100,15 @@ struct cheri_c18n_info {
  */
 #define	CHERI_C18N_COMPART_MAXNAME	(PATH_MAX + NAME_MAX + 2)
 
-struct cheri_c18n_compart {
+struct kinfo_cheri_c18n_compart {
 	/*
 	 * The last field of this struct may be truncated. This field contains
 	 * the actual aligned size of the current object.
 	 */
-	size_t		ccc_structsize;
-	ssize_t		ccc_id;
-	uint8_t		ccc_is_dlopened : 1;
-	char		ccc_name[CHERI_C18N_COMPART_MAXNAME];
+	size_t		kccc_structsize;
+	size_t		kccc_id;
+	uint8_t		kccc_has_dlopened : 1;
+	char		kccc_name[CHERI_C18N_COMPART_MAXNAME];
 };
 
 #ifndef IN_RTLD

@@ -407,12 +407,12 @@ out:
 
 int
 procstat_getcompartments(struct procstat *procstat, struct kinfo_proc *kp,
-    struct cheri_c18n_compart **comparts, size_t *ncompartsp)
+    struct kinfo_cheri_c18n_compart **comparts, size_t *ncompartsp)
 {
 	int name[4];
 	char *inbuf;
 	size_t n, i, cur, size;
-	struct cheri_c18n_compart *outbuf, *cp;
+	struct kinfo_cheri_c18n_compart *outbuf, *cp;
 
 	if (comparts == NULL || ncompartsp == NULL)
 		goto out;
@@ -456,8 +456,8 @@ procstat_getcompartments(struct procstat *procstat, struct kinfo_proc *kp,
 		goto out_free;
 	}
 	for (n = 0, cur = 0; cur < size; ++n) {
-		cp = (struct cheri_c18n_compart *)(void *)&inbuf[cur];
-		cur += cp->ccc_structsize;
+		cp = (struct kinfo_cheri_c18n_compart *)(void *)(inbuf + cur);
+		cur += cp->kccc_structsize;
 	}
 
 	/* Unpack elements of the input buffer into the output buffer. */
@@ -465,9 +465,9 @@ procstat_getcompartments(struct procstat *procstat, struct kinfo_proc *kp,
 	if (outbuf == NULL)
 		goto out_free;
 	for (i = 0, cur = 0; i < n; ++i) {
-		cp = (struct cheri_c18n_compart *)(void *)&inbuf[cur];
-		cur += cp->ccc_structsize;
-		memcpy(&outbuf[i], cp, cp->ccc_structsize);
+		cp = (struct kinfo_cheri_c18n_compart *)(void *)(inbuf + cur);
+		cur += cp->kccc_structsize;
+		memcpy(&outbuf[i], cp, cp->kccc_structsize);
 	}
 
 	*comparts = outbuf;
