@@ -532,6 +532,13 @@ reloc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 			    obj->relocbase, pcc_cap(obj, where[0]),
 			    (Elf_Addr)(uintptr_t)obj->relocbase,
 			    rela->r_addend);
+#ifdef CHERI_LIB_C18N
+			*where = (uintptr_t)tramp_intern(NULL, RTLD_COMPART_ID,
+			    &(struct tramp_data) {
+				.target = (void *)*where,
+				.defobj = obj
+			});
+#endif
 			break;
 #endif
 		default:
