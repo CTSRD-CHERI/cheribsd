@@ -125,18 +125,19 @@ init_pltgot(Plt_Entry *plt)
 
 	if (plt->pltgot != NULL) {
 #ifdef CHERI_LIB_C18N
-		if (C18N_ENABLED)
+		if (C18N_ENABLED) {
+#ifdef CHERI_LIB_C18N_NO_OTYPE
+			plt->pltgot[2] = (uintptr_t)plt_tramp_make(plt);
+#else
 			plt->pltgot[1] = (uintptr_t)cheri_seal(plt,
 			    sealer_pltgot);
-		else
-#endif
-			plt->pltgot[1] = (uintptr_t)plt;
-#ifdef CHERI_LIB_C18N
-		if (C18N_ENABLED)
 			plt->pltgot[2] = (uintptr_t)&_rtld_bind_start_c18n;
-		else
 #endif
-			plt->pltgot[2] = (uintptr_t)&_rtld_bind_start;
+			return;
+		}
+#endif
+		plt->pltgot[1] = (uintptr_t)plt;
+		plt->pltgot[2] = (uintptr_t)&_rtld_bind_start;
 	}
 }
 

@@ -835,7 +835,9 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	ld_elf_hints_default = _PATH_ELF_HINTS_C18N;
 	ld_path_libmap_conf = _PATH_LIBMAP_CONF_C18N;
 	ld_standard_library_path = STANDARD_LIBRARY_PATH_C18N;
+#ifdef HAS_RESTRICTED_MODE
 	c18n_code_perm_clear = CHERI_PERM_EXECUTIVE;
+#endif
     }
 #endif
 
@@ -884,7 +886,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	assert(aux_info[AT_PHENT]->a_un.a_val == sizeof(Elf_Phdr));
 	assert(aux_info[AT_ENTRY] != NULL);
 	imgentry = (dlfunc_t) aux_info[AT_ENTRY]->a_un.a_ptr;
-#ifdef CHERI_LIB_C18N
+#ifdef HAS_RESTRICTED_MODE
 	imgentry = (dlfunc_t) cheri_clearperm(imgentry, c18n_code_perm_clear);
 #endif
 	dbg("Values from kernel:\n\tAT_PHDR=" PTR_FMT "\n"
@@ -1215,7 +1217,9 @@ _rtld_bind(Plt_Entry *plt, Elf_Size reloff)
     struct trusted_frame *tf;
 
     if (C18N_ENABLED) {
+#ifndef CHERI_LIB_C18N_NO_OTYPE
 	plt = cheri_unseal(plt, sealer_pltgot);
+#endif
 	tf = push_dummy_rtld_trusted_frame(get_trusted_stk());
     }
 #endif
@@ -4615,9 +4619,23 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
 	    sym = __DECONST(void*, make_function_pointer(def, defobj));
 	    dbg("dlsym(%s) is function: " PTR_FMT, name, sym);
+#if defined(CHERI_LIB_C18N) && defined(__riscv)
+	    sym = tramp_intern(NULL, RTLD_COMPART_ID, &(struct tramp_data) {
+		.target = sym,
+		.defobj = defobj,
+		.def = def
+	    });
+#endif
 	} else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
 	    sym = rtld_resolve_ifunc(defobj, def);
 	    dbg("dlsym(%s) is ifunc. Resolved to: " PTR_FMT, name, sym);
+#if defined(CHERI_LIB_C18N) && defined(__riscv)
+	    sym = tramp_intern(NULL, RTLD_COMPART_ID, &(struct tramp_data) {
+		.target = sym,
+		.defobj = defobj,
+		.def = def
+	    });
+#endif
 	} else if (ELF_ST_TYPE(def->st_info) == STT_TLS) {
 	    ti.ti_module = defobj->tlsindex;
 	    ti.ti_offset = def->st_value;

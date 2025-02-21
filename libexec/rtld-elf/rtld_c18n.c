@@ -69,6 +69,9 @@
 #include <sys/sysctl.h>
 
 #include <machine/sigframe.h>
+#ifdef CHERI_LIB_C18N
+#include <machine/sysarch.h>
+#endif
 
 #include <cheri/c18n.h>
 
@@ -116,16 +119,22 @@ _Static_assert(
 /*
  * Sealers for RTLD privileged information
  */
+#ifndef CHERI_LIB_C18N_NO_OTYPE
 static uintptr_t sealer_tcb;
 static uintptr_t sealer_trusted_stk;
 
-uintptr_t sealer_pltgot, sealer_tramp;
+uintptr_t sealer_pltgot;
+#endif
+
+#ifdef HAS_RESTRICTED_MODE
+/* Permission bit to be cleared for user code */
+uint64_t c18n_code_perm_clear;
+#else
+uintptr_t sealer_tidc;
+#endif
 
 /* Enable compartmentalisation */
 bool ld_compartment_enable;
-
-/* Permission bit to be cleared for user code */
-uint64_t c18n_code_perm_clear;
 
 /* Use utrace() to log compartmentalisation-related events */
 const char *ld_compartment_utrace;
@@ -621,7 +630,57 @@ struct tcb_wrapper {
 	struct tcb header __attribute__((cheri_no_subobject_bounds));
 	struct tcb *tcb;
 	struct stk_table *table;
+#ifndef HAS_RESTRICTED_MODE
+#ifdef CHERI_LIB_C18N_NO_OTYPE
+	struct tidc *tidc;
+#else
+	struct tidc tidc;
+#endif
+#endif
 };
+
+#if !defined(HAS_RESTRICTED_MODE) && defined(CHERI_LIB_C18N_NO_OTYPE)
+/* Maximum number of threads lifted from thr_list.c */
+#define	MAX_THREADS	100000
+
+static struct tidc *tidc_freelist;
+
+static struct tidc *
+allocate_tidc(void)
+{
+	struct tidc *tidc;
+
+	tidc = tidc_freelist;
+	if (tidc == NULL) {
+		rtld_fdprintf(STDERR_FILENO, "c18n: Cannot allocate tidc\n");
+		abort();
+	}
+	tidc_freelist = tidc->next;
+
+	return (tidc);
+}
+
+static void
+free_tidc(struct tidc *tidc)
+{
+	tidc->next = tidc_freelist;
+	tidc_freelist = tidc;
+}
+
+static uintptr_t
+init_tidc_table(size_t len)
+{
+	struct tidc *table, *tidc;
+
+	table = c18n_malloc(sizeof(*table) * len);
+	for (size_t i = 0; i < len; ++i) {
+		tidc = cheri_setboundsexact(&table[i], sizeof(*tidc));
+		free_tidc(tidc);
+	}
+
+	return ((uintptr_t)table);
+}
+#endif
 
 static void
 push_stk_table(_Atomic(struct stk_table *) *head, struct stk_table *table)
@@ -632,10 +691,10 @@ push_stk_table(_Atomic(struct stk_table *) *head, struct stk_table *table)
 
 	while (!atomic_compare_exchange_weak_explicit(head, link, table,
 	    /*
-	     * Use release ordering to ensure that table construction happens
-	     * before the push.
+	     * Use release ordering to ensure that table use happens before the
+	     * push.
 	     */
-	    memory_order_release, memory_order_release));
+	    memory_order_release, memory_order_relaxed));
 }
 
 static struct stk_table *
@@ -649,10 +708,10 @@ pop_stk_table(_Atomic(struct stk_table *) *head)
 		next = SLIST_NEXT(table, next);
 	} while (!atomic_compare_exchange_weak_explicit(head, &table, next,
 	    /*
-	     * Use acquire ordering to ensure that the pop happens after table
-	     * construction.
+	     * Use acquire ordering to ensure that the pop happens before table
+	     * use.
 	     */
-	    memory_order_acquire, memory_order_acquire));
+	    memory_order_acquire, memory_order_relaxed));
 
 	return (table);
 }
@@ -708,8 +767,11 @@ c18n_allocate_tcb(struct tcb *tcb)
 	wrap = c18n_malloc(sizeof(*wrap));
 	*wrap = (struct tcb_wrapper) {
 		.header = *tcb,
-		.tcb = cheri_seal(tcb, sealer_tcb),
-		.table = cheri_seal(table, sealer_tcb)
+		.tcb = c18n_seal(tcb, sealer_tcb),
+		.table = c18n_seal(table, sealer_tcb),
+#if !defined(HAS_RESTRICTED_MODE) && defined(CHERI_LIB_C18N_NO_OTYPE)
+		.tidc = allocate_tidc()
+#endif
 	};
 
 	return (&wrap->header);
@@ -722,6 +784,9 @@ c18n_free_tcb(void)
 
 	table = pop_stk_table(&dead_stk_tables);
 
+#if !defined(HAS_RESTRICTED_MODE) && defined(CHERI_LIB_C18N_NO_OTYPE)
+	free_tidc(table->meta->wrap->tidc);
+#endif
 	c18n_free(table->meta->wrap);
 	c18n_free(table->meta);
 	c18n_free(table);
@@ -747,6 +812,9 @@ init_stk_table(struct stk_table *table, struct tcb_wrapper *wrap)
 	char *sp;
 	size_t size;
 	struct trusted_frame *tf;
+#ifndef HAS_RESTRICTED_MODE
+	struct tidc *tidc;
+#endif
 
 	/*
 	 * Save the fake tcb in the stack lookup table.
@@ -770,7 +838,7 @@ init_stk_table(struct stk_table *table, struct tcb_wrapper *wrap)
 	/*
 	 * Record RTLD's stack in the stack lookup table.
 	 */
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+#ifndef USE_RESTRICTED_MODE
 	sp = cheri_setoffset(cheri_getstack(), 0);
 #else
 	/*
@@ -795,6 +863,23 @@ init_stk_table(struct stk_table *table, struct tcb_wrapper *wrap)
 		.begin = sp
 	};
 	table->entries[RTLD_COMPART_ID].stack = sp + size;
+
+#ifndef HAS_RESTRICTED_MODE
+	/*
+	 * Install the tidc buffer.
+	 */
+#ifdef CHERI_LIB_C18N_NO_OTYPE
+	tidc = wrap->tidc;
+#else
+	tidc = cheri_setboundsexact(&wrap->tidc, sizeof(*tidc));
+#endif
+	tidc = c18n_seal_subset(tidc, sealer_tidc);
+	if (sysarch(RISCV_SET_UTIDC, &tidc) != 0) {
+		rtld_fdprintf(STDERR_FILENO, "c18n: Cannot set tidc %#p\n",
+		    tidc);
+		abort();
+	}
+#endif
 
 	/*
 	 * Push a dummy trusted frame indicating that the 'root' compartment is
@@ -920,9 +1005,10 @@ dl_c18n_get_trusted_stack(uintptr_t pc)
 	if (c18n_is_tramp(pc, tf))
 		tf = tf->previous;
 
-	return (cheri_seal(tf, sealer_trusted_stk));
+	return (c18n_seal_subset(tf, sealer_trusted_stk));
 }
 
+#ifdef __aarch64__
 /*
  * XXX Dapeng: These functions are kept here for compatibility with old libc and
  * libunwind.
@@ -953,6 +1039,7 @@ _rtld_unw_getcontext(uintptr_t ret, void **buf)
  * registers.
  */
 struct jmp_args { uintptr_t ret1; uintptr_t ret2; };
+#endif
 
 void
 dl_c18n_unwind_trusted_stack(void *rcsp, void *target)
@@ -981,7 +1068,7 @@ dl_c18n_unwind_trusted_stack(void *rcsp, void *target)
 	sigprocmask(SIG_SETMASK, &nset, &oset);
 
 	tf = get_trusted_stk();
-	target = cheri_unseal(target, sealer_trusted_stk);
+	target = c18n_unseal_subset(target, sealer_trusted_stk, tf);
 
 	if (!cheri_is_subset(tf, target) ||
 	    (ptraddr_t)tf->previous >= (ptraddr_t)target) {
@@ -1046,7 +1133,7 @@ dl_c18n_is_trampoline(uintptr_t pc, void *tfs)
 	if (!C18N_ENABLED)
 		return (0);
 
-	tf = cheri_unseal(tfs, sealer_trusted_stk);
+	tf = c18n_unseal_subset(tfs, sealer_trusted_stk, get_trusted_stk());
 	if (!cheri_gettag(tf))
 		return (0);
 
@@ -1061,11 +1148,12 @@ dl_c18n_pop_trusted_stack(struct dl_c18n_compart_state *state, void *tfs)
 	if (!C18N_ENABLED)
 		return (NULL);
 
-	tf = cheri_unseal(tfs, sealer_trusted_stk);
+	tf = c18n_unseal_subset(tfs, sealer_trusted_stk, get_trusted_stk());
 	*state = tf->state;
-	return (cheri_seal(tf->previous, sealer_trusted_stk));
+	return (c18n_seal_subset(tf->previous, sealer_trusted_stk));
 }
 
+#ifdef __aarch64__
 /*
  * XXX Dapeng: These functions are kept here for compatibility with old libc and
  * libunwind.
@@ -1091,8 +1179,9 @@ uintptr_t _rtld_unw_getsealer(void);
 uintptr_t
 _rtld_unw_getsealer(void)
 {
-	return (sealer_trusted_stk);
+	return (0);
 }
+#endif
 
 /*
  * Trampolines
@@ -1259,16 +1348,16 @@ resize_table(int exp)
 }
 
 void
-tramp_hook_impl(int, const struct tramp_header *, const struct trusted_frame *);
+tramp_hook_impl(int, const struct tramp_header *);
 
 void
-tramp_hook_impl(int event, const struct tramp_header *hdr,
-    const struct trusted_frame *tf)
+tramp_hook_impl(int event, const struct tramp_header *hdr)
 {
 	const char *sym;
 	const char *callee;
 	const char *caller;
 	struct utrace_c18n ut;
+	const struct trusted_frame *tf = get_trusted_stk();
 
 	if (ld_compartment_utrace != NULL) {
 		if (hdr->symnum == 0)
@@ -1296,22 +1385,12 @@ tramp_hook_impl(int event, const struct tramp_header *hdr,
 		getpid();
 }
 
-#define	C18N_MAX_TRAMP_SIZE	768
-
 static const struct tramp_header *
-tramp_pgs_append(const struct tramp_data *data)
+tramp_pgs_alloc(const char buf[], const char *bufp, size_t len)
 {
-	size_t len;
-	/* A capability-aligned buffer large enough to hold a trampoline */
-	_Alignas(_Alignof(struct tramp_header)) char buf[C18N_MAX_TRAMP_SIZE];
-	struct tramp_header *header;
-	char *bufp = buf;
-
 	char *tramp;
 	struct tramp_pg *pg;
-
-	/* Fill a temporary buffer with the trampoline and obtain its length */
-	len = tramp_compile(&bufp, data);
+	struct tramp_header *header;
 
 	pg = atomic_load_explicit(&tramp_pgs.head, memory_order_acquire);
 	tramp = tramp_pg_push(pg, len);
@@ -1335,6 +1414,7 @@ tramp_pgs_append(const struct tramp_data *data)
 	memcpy(tramp, buf, len);
 	header = (struct tramp_header *)(tramp + (bufp - buf));
 
+#ifdef __aarch64__
 	/*
 	 * Ensure i- and d-cache coherency after writing executable code. The
 	 * __clear_cache procedure rounds the addresses to cache-line-aligned
@@ -1342,6 +1422,13 @@ tramp_pgs_append(const struct tramp_data *data)
 	 * sufficiently large bounds to contain these rounded addresses.
 	 */
 	__clear_cache(cheri_copyaddress(pg, header->entry), tramp + len);
+#elif __riscv
+	/*
+	 * XXX Dapeng: This is insufficient for multicore as fence.i only
+	 * guarantees consistency on the current core.
+	 */
+	asm volatile ("fence.i");
+#endif
 
 	return (header);
 }
@@ -1374,16 +1461,23 @@ tramp_check_sig(const struct tramp_header *found, const Obj_Entry *reqobj,
 	}
 }
 
+#define	C18N_MAX_TRAMP_SIZE	768
+
 static const struct tramp_header *
 tramp_create(const struct tramp_data *data)
 {
 	struct tramp_data newdata = *data;
+	/* A capability-aligned buffer large enough to hold a trampoline */
+	_Alignas(_Alignof(struct tramp_header)) char buf[C18N_MAX_TRAMP_SIZE];
+	char *bufp = buf;
+	size_t len;
 
 	if (!newdata.sig.valid && newdata.def != NULL)
 		newdata.sig = sigtab_get(newdata.defobj,
 		    newdata.def - newdata.defobj->symtab);
 
-	return (tramp_pgs_append(&newdata));
+	len = tramp_compile(&bufp, &newdata);
+	return (tramp_pgs_alloc(buf, bufp, len));
 }
 
 static const void *
@@ -1398,6 +1492,23 @@ tramp_make_entry(const struct tramp_header *header)
 
 	return (cheri_sealentry(entry));
 }
+
+#if defined(__aarch64__) && defined(CHERI_LIB_C18N_NO_OTYPE)
+const void *
+plt_tramp_make(Plt_Entry *plt)
+{
+	const struct tramp_header *header;
+	/* A capability-aligned buffer large enough to hold a trampoline */
+	_Alignas(_Alignof(struct tramp_header)) char buf[72];
+	char *bufp = buf;
+	size_t len;
+
+	len = plt_tramp_compile(&bufp, plt);
+	header = tramp_pgs_alloc(buf, bufp, len);
+
+	return (tramp_make_entry(header));
+}
+#endif
 
 void *
 tramp_intern(const Plt_Entry *plt, compart_id_t caller,
@@ -1567,11 +1678,14 @@ tramp_reflect(const void *data)
 	if (!cheri_gettag(data) || !cheri_getsealed(data) ||
 	    cheri_gettype(data) != CHERI_OTYPE_SENTRY ||
 	    (cheri_getperm(data) & CHERI_PERM_LOAD) == 0 ||
-	    (cheri_getperm(data) & CHERI_PERM_EXECUTE) == 0 ||
-	    (cheri_getperm(data) & CHERI_PERM_EXECUTIVE) == 0)
+	    (cheri_getperm(data) & CHERI_PERM_EXECUTE) == 0
+#ifdef HAS_RESTRICTED_MODE
+	    || (cheri_getperm(data) & CHERI_PERM_EXECUTIVE) == 0
+#endif
+	    )
 		return (NULL);
 
-#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+#ifdef USE_RESTRICTED_MODE
 	data = (const char *)data - 1;
 #endif
 	data = __containerof(data, struct tramp_header, entry);
@@ -1601,8 +1715,6 @@ tramp_reflect(const void *data)
 /*
  * APIs
  */
-#define	C18N_FUNC_SIG_COUNT	72
-
 void
 c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 {
@@ -1693,6 +1805,8 @@ struct jmp_args (*_rtld_unw_setcontext_ptr)(struct jmp_args, void *, void **);
 void
 c18n_init2(Obj_Entry *obj_rtld)
 {
+	struct tcb_wrapper *wrap;
+#ifndef CHERI_LIB_C18N_NO_OTYPE
 	uintptr_t sealer;
 
 	/*
@@ -1711,14 +1825,27 @@ c18n_init2(Obj_Entry *obj_rtld)
 	sealer_trusted_stk = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
 
-	sealer_tramp = cheri_setboundsexact(sealer, C18N_FUNC_SIG_COUNT);
-	sealer += C18N_FUNC_SIG_COUNT;
+#ifndef HAS_RESTRICTED_MODE
+	sealer_tidc = cheri_setboundsexact(sealer, 1);
+	sealer += 1;
+#endif
+#else
+#ifndef HAS_RESTRICTED_MODE
+	sealer_tidc = init_tidc_table(MAX_THREADS);
+#endif
+#endif
 
 	/*
 	 * All libraries have been loaded. Create and initialise a stack lookup
 	 * table with the same size as the number of compartments.
 	 */
-	init_stk_table(expand_stk_table(NULL, comparts.size), NULL);
+	wrap = c18n_malloc(sizeof(*wrap));
+	*wrap = (struct tcb_wrapper) {
+#if !defined(HAS_RESTRICTED_MODE) && defined(CHERI_LIB_C18N_NO_OTYPE)
+		.tidc = allocate_tidc()
+#endif
+	};
+	init_stk_table(expand_stk_table(NULL, comparts.size), wrap);
 
 	/*
 	 * Create a trampoline table with 2^9 = 512 entries.
@@ -1738,6 +1865,7 @@ c18n_init2(Obj_Entry *obj_rtld)
 	atomic_store_explicit(&tramp_pgs.head, tramp_pg_new(NULL),
 	    memory_order_relaxed);
 
+#ifdef __aarch64__
 	/*
 	 * XXX: Manually wrap _rtld_unw_setcontext_impl in a trampoline for now
 	 * because it is called via a function pointer.
@@ -1751,6 +1879,9 @@ c18n_init2(Obj_Entry *obj_rtld)
 			.reg_args = 4, .mem_args = false, .ret_args = TWO
 		}
 	});
+#else
+	(void)obj_rtld;
+#endif
 }
 
 /*
@@ -1765,7 +1896,9 @@ void _rtld_thr_exit(long *);
 void
 _rtld_thread_start_init(void (*p)(struct pthread *))
 {
+#ifdef HAS_RESTRICTED_MODE
 	assert((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) == 0);
+#endif
 	assert(thr_thread_start == NULL);
 	thr_thread_start = tramp_intern(NULL, RTLD_COMPART_ID,
 	    &(struct tramp_data) {
@@ -1790,13 +1923,20 @@ _rtld_thread_start(struct pthread *curthread)
 	 * new thread. Extract and install the actual tcb and stack lookup
 	 * table.
 	 */
-	wrap = __containerof(get_trusted_tp(), struct tcb_wrapper, header);
+	tcb = get_trusted_tp();
+#ifdef __riscv
+	/*
+	 * The TCB is shifted by the kernel on RISC-V. See `cpu_set_user_tls`.
+	 */
+	tcb -= 1;
+#endif
+	wrap = __containerof(tcb, struct tcb_wrapper, header);
 
-	tcb = cheri_unseal(wrap->tcb, sealer_tcb);
+	tcb = c18n_unseal(wrap->tcb, sealer_tcb);
 	*tcb = wrap->header;
 	_tcb_set(tcb);
 
-	table = cheri_unseal(wrap->table, sealer_tcb);
+	table = c18n_unseal(wrap->table, sealer_tcb);
 	init_stk_table(table, wrap);
 
 	thr_thread_start(curthread);
@@ -1821,6 +1961,16 @@ _rtld_thr_exit(long *state)
 	 */
 	set_stk_table(NULL);
 	set_trusted_stk(NULL);
+
+#ifndef HAS_RESTRICTED_MODE
+	/*
+	 * Uninstall the tidc buffer.
+	 */
+	if (sysarch(RISCV_SET_UTIDC, &(void *) { NULL }) != 0) {
+		rtld_fdprintf(STDERR_FILENO, "c18n: Cannot clear tidc\n");
+		abort();
+	}
+#endif
 
 	/*
 	 * Clear RTLD's stack lookup table entry.
@@ -1910,7 +2060,9 @@ static __siginfohandler_t *signal_dispatcher = sigdispatch;
 void
 _rtld_sighandler_init(__siginfohandler_t *handler)
 {
+#ifdef HAS_RESTRICTED_MODE
 	assert((cheri_getperm(handler) & CHERI_PERM_EXECUTIVE) == 0);
+#endif
 	assert(signal_dispatcher == sigdispatch);
 	signal_dispatcher = tramp_intern(NULL, RTLD_COMPART_ID,
 	    &(struct tramp_data) {
@@ -1923,7 +2075,7 @@ _rtld_sighandler_init(__siginfohandler_t *handler)
 	});
 }
 
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+#ifndef USE_RESTRICTED_MODE
 void _rtld_sighandler_impl(int, siginfo_t *, ucontext_t *, void *,
     struct sigframe *);
 
@@ -1948,7 +2100,7 @@ _rtld_sighandler_impl(int sig, siginfo_t *info, ucontext_t *ucp, void *nsp)
 
 	table = get_stk_table();
 
-#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+#ifndef USE_RESTRICTED_MODE
 	/*
 	 * Move the sigframe to RTLD's stack.
 	 */
@@ -2022,7 +2174,7 @@ _rtld_sighandler_impl(int sig, siginfo_t *info, ucontext_t *ucp, void *nsp)
 	    "Please file a bug report!\n", nsp);
 	abort();
 found_trusted:
-#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+#ifdef USE_RESTRICTED_MODE
 	/*
 	 * The untrusted stack can only become temporarily inconsistent when
 	 * running code in Executive mode. This performs a quick sanity check.
@@ -2074,7 +2226,11 @@ found:
 	 * If the interrupted code has loaded the stack lookup table, it would
 	 * be located in register STACK_TABLE_N. Check if this is the case.
 	 */
+#ifdef __aarch64__
 	table_reg = &ucp->uc_mcontext.mc_capregs.cap_x[STACK_TABLE_N];
+#elif defined(__riscv)
+	table_reg = &ucp->uc_mcontext.mc_capregs.cp_ct[STACK_TABLE_N];
+#endif
 	if (!cheri_equal_exact(table, *table_reg))
 		table_reg = NULL;
 
@@ -2112,7 +2268,7 @@ found:
 	 * stack and let the kernel install the stack of the interrupted
 	 * compartment.
 	 */
-#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+#ifdef USE_RESTRICTED_MODE
 	set_untrusted_stk(ntf->state.sp);
 #endif
 }

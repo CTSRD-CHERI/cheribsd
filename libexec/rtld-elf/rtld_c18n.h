@@ -32,11 +32,40 @@
 
 #include <stdint.h>
 
+#ifdef __aarch64__
+#define	HAS_RESTRICTED_MODE
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+#define	USE_RESTRICTED_MODE
+#endif
+#endif
+
 /*
  * Global symbols
  */
+#ifdef CHERI_LIB_C18N_NO_OTYPE
+#define	c18n_seal(cap, sealer)			cap
+#define	c18n_unseal(cap, sealer)		cap
+#define	c18n_seal_subset(cap, sealer)		cheri_sealentry(cap)
+#define	c18n_unseal_subset(cap, sealer, super)	(			\
+	cheri_gettag(cap) ?						\
+	cheri_buildcap(super, (uintptr_t)cheri_unseal(cap, 0)) :	\
+	cap								\
+)
+#else
+#define	c18n_seal(cap, sealer)			cheri_seal(cap, sealer)
+#define	c18n_unseal(cap, sealer)		cheri_unseal(cap, sealer)
+#define	c18n_seal_subset(cap, sealer)		cheri_seal(cap, sealer)
+#define	c18n_unseal_subset(cap, sealer, super)	cheri_unseal(cap, sealer)
+#endif
+
+#ifdef HAS_RESTRICTED_MODE
 extern size_t c18n_code_perm_clear;
-extern uintptr_t sealer_pltgot, sealer_tramp;
+#else
+extern uintptr_t sealer_tidc;
+#endif
+#ifndef CHERI_LIB_C18N_NO_OTYPE
+extern uintptr_t sealer_pltgot;
+#endif
 extern const char *ld_compartment_utrace;
 extern const char *ld_compartment_policy;
 extern const char *ld_compartment_overhead;
@@ -243,6 +272,10 @@ struct tramp_header {
 void tramp_hook(void);
 
 size_t tramp_compile(char **, const struct tramp_data *);
+#ifdef CHERI_LIB_C18N_NO_OTYPE
+size_t plt_tramp_compile(char **, Plt_Entry *);
+const void *plt_tramp_make(Plt_Entry *);
+#endif
 
 void *tramp_intern(const Plt_Entry *, compart_id_t, const struct tramp_data *);
 struct tramp_header *tramp_reflect(const void *);
@@ -263,9 +296,6 @@ func_sig_legal(struct func_sig sig)
 /*
  * APIs
  */
-void *_rtld_sandbox_code(void *, struct func_sig);
-void *_rtld_safebox_code(void *, struct func_sig);
-
 void _rtld_bind_start_c18n(void);
 void *_rtld_tlsdesc_static_c18n(void *);
 void *_rtld_tlsdesc_undef_c18n(void *);
