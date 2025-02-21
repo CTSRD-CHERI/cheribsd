@@ -2529,20 +2529,27 @@ sysctl_kern_proc_c18n(SYSCTL_HANDLER_ARGS)
 
 	n = proc_readmem_cap(curthread, p, (vm_offset_t)p->p_c18n_info, &info,
 	    sizeof(info));
+	if (n != sizeof(info)) {
+		error = EFAULT;
+		goto out;
+	}
+
 	/*
 	 * If there is a version mismatch or the statistics block is oversized,
 	 * error out.
 	 */
-	if (n != sizeof(info) ||
-	    info.version != CHERI_C18N_INFO_VERSION ||
+	if (info.version != CHERI_C18N_INFO_VERSION ||
 	    info.stats_size == 0 ||
-	    info.stats_size > RTLD_C18N_STATS_MAX_SIZE ||
-	    !cheri_can_access(info.stats, CHERI_PERM_LOAD,
-	    (__cheri_addr ptraddr_t)info.stats, info.stats_size)) {
+	    info.stats_size > RTLD_C18N_STATS_MAX_SIZE) {
 		error = ENOEXEC;
 		goto out;
 	}
 
+	if (!cheri_can_access(info.stats, CHERI_PERM_LOAD,
+	    (__cheri_addr ptraddr_t)info.stats, info.stats_size)) {
+		error = EPROT;
+		goto out;
+	}
 	buffer = malloc(info.stats_size, M_TEMP, M_WAITOK);
 	n = proc_readmem(curthread, p, (__cheri_addr vm_offset_t)info.stats,
 	    buffer, info.stats_size);
@@ -2619,12 +2626,16 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 
 	len = proc_readmem_cap(curthread, p, (vm_offset_t)p->p_c18n_info, &info,
 	    sizeof(info));
+	if (len != sizeof(info)) {
+		error = EFAULT;
+		goto out;
+	}
+
 	/*
 	 * If there is a version mismatch or the compartment array is malformed,
 	 * error out.
 	 */
-	if (len != sizeof(info) ||
-	    info.version != CHERI_C18N_INFO_VERSION ||
+	if (info.version != CHERI_C18N_INFO_VERSION ||
 	    info.comparts_gen % 2 != 0 ||
 	    info.comparts_entry_size < sizeof(namep)) {
 		error = ENOEXEC;
@@ -2654,7 +2665,7 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 		if (!cheri_can_access(namepp,
 		    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP,
 		    (__cheri_addr ptraddr_t)namepp, sizeof(namep))) {
-			error = ENOEXEC;
+			error = EPROT;
 			goto out;
 		}
 
