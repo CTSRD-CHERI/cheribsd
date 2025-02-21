@@ -533,7 +533,7 @@ extern bool ld_bind_not;
 extern bool ld_fast_sigblock;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-bool create_pcc_caps(Obj_Entry *);
+bool create_pcc_caps(Obj_Entry *, const char *);
 const char *pcc_cap(const Obj_Entry *, Elf_Off);
 #endif
 void dump_relocations(Obj_Entry *);

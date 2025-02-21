@@ -1459,7 +1459,7 @@ rtld_die(void)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 bool
-create_pcc_caps(Obj_Entry *obj)
+create_pcc_caps(Obj_Entry *obj, const char *name)
 {
 	const Elf_Phdr *ph;
 	const char *pcc_cap;
@@ -1493,12 +1493,12 @@ create_pcc_caps(Obj_Entry *obj)
 			if (cheri_getbase(pcc_cap) !=
 			    cheri_getaddress(pcc_cap)) {
 				_rtld_error("pcc_cap %#p start is not aligned for %s",
-				    pcc_cap, obj->path);
+				    pcc_cap, name);
 				return (false);
 			}
 			if (cheri_getlen(pcc_cap) != ph->p_memsz) {
 				_rtld_error("pcc_cap %#p length is not %zu for %s",
-				    pcc_cap, (size_t)ph->p_memsz, obj->path);
+				    pcc_cap, (size_t)ph->p_memsz, name);
 				return (false);
 			}
 			obj->pcc_caps[i] = pcc_cap;
@@ -2178,7 +2178,7 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
      */
     obj->text_rodata_cap = (const char *)cheri_copyaddress(entry, obj->relocbase);
     fix_obj_mapping_cap_permissions(obj, path);
-    if (!create_pcc_caps(obj))
+    if (!create_pcc_caps(obj, path))
 	return (NULL);
 #endif
 
@@ -2931,7 +2931,7 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 #ifdef __CHERI_PURE_CAPABILITY__
     objtmp.text_rodata_cap = objtmp.relocbase;
     fix_obj_mapping_cap_permissions(&objtmp, "RTLD");
-    if (!create_pcc_caps(&objtmp))
+    if (!create_pcc_caps(&objtmp, "RTLD"))
 	rtld_die();
 #endif
 
