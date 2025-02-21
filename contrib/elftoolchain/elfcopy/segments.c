@@ -528,6 +528,10 @@ copy_phdr(struct elfcopy *ecp)
 			continue;
 		}
 
+		/* Don't rewrite PT_CHERI_PCC and PT_C18N_NAME headers. */
+		if (seg->type == PT_CHERI_PCC || seg->type == PT_C18N_NAME)
+			continue;
+
 		if (seg->nsec > 0) {
 			s = seg->v_sec[0];
 			seg->vaddr = s->vma;
