@@ -378,7 +378,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	obj->tlsinit = mapbase + phtls->p_vaddr;
     }
 #ifdef __CHERI_PURE_CAPABILITY__
-    if (!create_pcc_caps(obj)) {
+    if (!create_pcc_caps(obj, path)) {
 	obj_free(obj);
 	goto error1;
     }
