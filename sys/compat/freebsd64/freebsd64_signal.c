@@ -40,6 +40,7 @@
 #include "opt_posix.h"
 
 #include <sys/param.h>
+#include <sys/event.h>
 #include <sys/signal.h>
 #include <sys/syscallsubr.h>
 #include <sys/user.h>
