@@ -524,6 +524,9 @@ reloc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 #endif
 			obj->irelative = true;
 			break;
+		case R_AARCH64_RELATIVE:
+			*where = (Elf_Addr)(obj->relocbase + rela->r_addend);
+			break;
 		case R_AARCH64_NONE:
 			break;
 #ifdef __CHERI_PURE_CAPABILITY__
