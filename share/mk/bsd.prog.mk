@@ -170,7 +170,7 @@ DEBUGMKDIR=
 PROG_FULL=	${PROG}
 .endif
 
-.if ${MK_COMPARTMENT_POLICY} != "no"
+.if ${MK_COMPARTMENT_POLICY} != "no" && ${MACHINE_ABI:Mpurecap}
 .if !empty(COMPARTMENT_POLICY)
 ${PROG_FULL}:	${COMPARTMENT_POLICY}
 LDFLAGS+=	${COMPARTMENT_POLICY:S/^/-Wl,--compartment-policy=/}
