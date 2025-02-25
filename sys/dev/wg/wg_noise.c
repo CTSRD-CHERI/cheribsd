@@ -61,7 +61,7 @@ struct noise_index {
 };
 
 struct noise_keypair {
-	struct noise_index		 kp_index;
+	struct noise_index		 kp_index __subobject_use_container_bounds;
 	u_int				 kp_refcnt;
 	bool				 kp_can_send;
 	bool				 kp_is_initiator;
@@ -93,7 +93,7 @@ enum noise_handshake_state {
 };
 
 struct noise_remote {
-	struct noise_index		 r_index;
+	struct noise_index		 r_index __subobject_use_container_bounds;
 
 	CK_LIST_ENTRY(noise_remote) 	 r_entry;
 	bool				 r_entry_inserted;
