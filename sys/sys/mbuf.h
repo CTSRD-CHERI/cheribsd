@@ -122,7 +122,7 @@ struct mb_args {
 /*
  * Packet tag structure (see below for details).
  */
-struct m_tag {
+struct __no_subobject_bounds m_tag {
 	SLIST_ENTRY(m_tag)	m_tag_link;	/* List of packet tags */
 	u_int16_t		m_tag_id;	/* Tag ID */
 	u_int16_t		m_tag_len;	/* Length of data */
