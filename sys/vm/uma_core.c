@@ -5032,6 +5032,40 @@ zone_free_item(uma_zone_t zone, void *item, void *udata, enum zfreeskip skip)
 		zone_free_limit(zone, 1);
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+/* See uma.h */
+void *
+uma_zgrow_bounds(uma_zone_t zone, void *item)
+{
+	uma_keg_t keg = zone->uz_keg;
+	uma_slab_t slab;
+	int index;
+
+	KASSERT((zone->uz_flags & UMA_ZFLAG_VTOSLAB) != 0,
+	    ("Purecap kernel UMA zone missing UMA_ZFLAG_VTOSLAB"));
+	KASSERT((zone->uz_flags & (UMA_ZONE_PCPU | UMA_ZONE_SMR)) == 0,
+	    ("Can not grow bounds on PCPU and SMR zones"));
+
+	/*
+	 * XXX-AM: It should be safe to only check the index range
+	 * with INVARIANTS. If an item does not belong to the slab the computed
+	 * index will be garbage but it will fail setbounds with the slab_data()
+	 * capability.
+	 */
+	slab = vtoslab((vm_offset_t)item);
+	index = slab_item_index(slab, keg, item);
+	KASSERT(index >= 0 && index < keg->uk_ipers,
+	    ("Invalid item index %d for slab %#p from item %#p for zone %s",
+		index, slab, item, zone->uz_name));
+	item = cheri_setboundsexact(slab_item(slab, keg, index),
+	    keg->uk_size);
+	KASSERT(cheri_gettag(item),
+	    ("Failed to recover item %#p bounds for zone %s",
+		item, zone->uz_name));
+	return (item);
+}
+#endif
+
 /* See uma.h */
 int
 uma_zone_set_max(uma_zone_t zone, int nitems)
