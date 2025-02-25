@@ -4017,7 +4017,7 @@ struct table_algo addr_kfib = {
 };
 
 struct mac_radix_entry {
-	struct radix_node	rn[2];
+	struct radix_node	rn[2] __subobject_use_container_bounds;
 	uint32_t		value;
 	uint8_t			masklen;
 	struct sa_mac		sa;
