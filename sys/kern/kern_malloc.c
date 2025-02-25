@@ -638,7 +638,7 @@ malloc_large(size_t size, struct malloc_type *mtp, struct domainset *policy,
 		uma_total_inc(size);
 #ifdef __CHERI_PURE_CAPABILITY__
 		KASSERT(cheri_getlen(va) <= CHERI_REPRESENTABLE_LENGTH(size),
-		    ("Invalid bounds: expected %zx found %zx",
+		    ("Invalid bounds: expected %#zx found %#zx",
 		        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
 		        (size_t)cheri_getlen(va)));
 #endif
@@ -723,7 +723,7 @@ void *
 #endif
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_getlen(va) <= CHERI_REPRESENTABLE_LENGTH(size),
-	    ("Invalid bounds: expected %zx found %zx",
+	    ("Invalid bounds: expected %#zx found %#zx",
 	        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
 	        (size_t)cheri_getlen(va)));
 #endif
@@ -998,7 +998,7 @@ _free(void *addr, struct malloc_type *mtp, bool dozero)
 #ifdef __CHERI_PURE_CAPABILITY__
 		if (__predict_false(cheri_getlen(addr) !=
 		    CHERI_REPRESENTABLE_LENGTH(size)))
-			panic("Invalid bounds: expected %zx found %zx",
+			panic("Invalid bounds: expected %#zx found %#zx",
 			    (size_t)CHERI_REPRESENTABLE_LENGTH(size),
 			    cheri_getlen(addr));
 #endif
@@ -1016,7 +1016,7 @@ _free(void *addr, struct malloc_type *mtp, bool dozero)
 #ifdef __CHERI_PURE_CAPABILITY__
 		if (__predict_false(cheri_getlen(addr) !=
 		    CHERI_REPRESENTABLE_LENGTH(size)))
-			panic("Invalid bounds: expected %zx found %zx",
+			panic("Invalid bounds: expected %#zx found %#zx",
 			    (size_t)CHERI_REPRESENTABLE_LENGTH(size),
 			    cheri_getlen(addr));
 #endif
