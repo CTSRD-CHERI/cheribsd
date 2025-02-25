@@ -139,7 +139,7 @@ struct aip_addr {
 };
 
 struct wg_aip {
-	struct radix_node	 a_nodes[2];
+	struct radix_node	 a_nodes[2] __subobject_use_container_bounds;
 	LIST_ENTRY(wg_aip)	 a_entry;
 	struct aip_addr		 a_addr;
 	struct aip_addr		 a_mask;
