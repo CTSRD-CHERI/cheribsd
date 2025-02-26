@@ -131,7 +131,7 @@ typedef int (__sys_getitimer_t)(int, struct itimerval * __kerncap);
 typedef int (__sys_getdtablesize_t)(void);
 typedef int (__sys_dup2_t)(u_int, u_int);
 typedef int (__sys_cheri_cidcap_alloc_t)(uintcap_t * __kerncap);
-typedef int (__sys_fcntl_t)(int, int, intcap_t);
+typedef int (__sys_fcntl_t)(int, int, kintcap_t);
 typedef int (__sys_select_t)(int, fd_set * __kerncap, fd_set * __kerncap, fd_set * __kerncap, struct timeval * __kerncap);
 typedef int (__sys_fsync_t)(int);
 typedef int (__sys_setpriority_t)(int, int, int);
@@ -466,7 +466,7 @@ typedef int (__sys_membarrier_t)(int, unsigned, int);
 typedef int (__sys_timerfd_create_t)(int, int);
 typedef int (__sys_timerfd_gettime_t)(int, struct itimerspec * __kerncap);
 typedef int (__sys_timerfd_settime_t)(int, int, const struct itimerspec * __kerncap, struct itimerspec * __kerncap);
-typedef int (__sys_kcmp_t)(pid_t, pid_t, int, uintcap_t, uintcap_t);
+typedef int (__sys_kcmp_t)(pid_t, pid_t, int, kuintcap_t, kuintcap_t);
 typedef int (__sys_getrlimitusage_t)(u_int, int, rlim_t * __kerncap);
 
 void __sys_exit(int rval);
@@ -535,7 +535,7 @@ int __sys_getitimer(int which, struct itimerval * __kerncap itv);
 int __sys_getdtablesize(void);
 int __sys_dup2(u_int from, u_int to);
 int __sys_cheri_cidcap_alloc(uintcap_t * __kerncap cidp);
-int __sys_fcntl(int fd, int cmd, intcap_t arg);
+int __sys_fcntl(int fd, int cmd, kintcap_t arg);
 int __sys_select(int nd, fd_set * __kerncap in, fd_set * __kerncap ou, fd_set * __kerncap ex, struct timeval * __kerncap tv);
 int __sys_fsync(int fd);
 int __sys_setpriority(int which, int who, int prio);
@@ -870,7 +870,7 @@ int __sys_membarrier(int cmd, unsigned flags, int cpu_id);
 int __sys_timerfd_create(int clockid, int flags);
 int __sys_timerfd_gettime(int fd, struct itimerspec * __kerncap curr_value);
 int __sys_timerfd_settime(int fd, int flags, const struct itimerspec * __kerncap new_value, struct itimerspec * __kerncap old_value);
-int __sys_kcmp(pid_t pid1, pid_t pid2, int type, uintcap_t idx1, uintcap_t idx2);
+int __sys_kcmp(pid_t pid1, pid_t pid2, int type, kuintcap_t idx1, kuintcap_t idx2);
 int __sys_getrlimitusage(u_int which, int flags, rlim_t * __kerncap res);
 __END_DECLS
 

@@ -316,7 +316,7 @@ struct cheri_cidcap_alloc_args {
 struct fcntl_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char arg_l_[PADL_(intcap_t)]; intcap_t arg; char arg_r_[PADR_(intcap_t)];
+	char arg_l_[PADL_(kintcap_t)]; kintcap_t arg; char arg_r_[PADR_(kintcap_t)];
 };
 struct select_args {
 	char nd_l_[PADL_(int)]; int nd; char nd_r_[PADR_(int)];
@@ -1897,8 +1897,8 @@ struct kcmp_args {
 	char pid1_l_[PADL_(pid_t)]; pid_t pid1; char pid1_r_[PADR_(pid_t)];
 	char pid2_l_[PADL_(pid_t)]; pid_t pid2; char pid2_r_[PADR_(pid_t)];
 	char type_l_[PADL_(int)]; int type; char type_r_[PADR_(int)];
-	char idx1_l_[PADL_(uintcap_t)]; uintcap_t idx1; char idx1_r_[PADR_(uintcap_t)];
-	char idx2_l_[PADL_(uintcap_t)]; uintcap_t idx2; char idx2_r_[PADR_(uintcap_t)];
+	char idx1_l_[PADL_(kuintcap_t)]; kuintcap_t idx1; char idx1_r_[PADR_(kuintcap_t)];
+	char idx2_l_[PADL_(kuintcap_t)]; kuintcap_t idx2; char idx2_r_[PADR_(kuintcap_t)];
 };
 struct getrlimitusage_args {
 	char which_l_[PADL_(u_int)]; u_int which; char which_r_[PADR_(u_int)];
