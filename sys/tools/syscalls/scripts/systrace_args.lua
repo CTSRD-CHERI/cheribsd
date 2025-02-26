@@ -144,7 +144,8 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 					end
 
 					if util.isPtrType(argtype,
-					    config.abi_intptr_t) then
+					    config.abi_intptr_t,
+					    config.abi_uintptr_t) then
 						gen:write(string.format([[
 		uarg[a++] = (%s)p->%s; /* %s */
 ]],

@@ -57,7 +57,8 @@ static int %s[] = {
 			local i = 0
 			for _, arg in ipairs(v.args) do
 				if util.isPtrType(arg.type,
-				    config.abi_intptr_t) then
+				    config.abi_intptr_t,
+				    config.abi_uintptr_t) then
 					gen:write(string.format(" | 0x%x",
 					    1 << i))
 				end

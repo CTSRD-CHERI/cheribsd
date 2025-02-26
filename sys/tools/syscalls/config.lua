@@ -47,6 +47,7 @@ local config = {
 	abi_ptr_array_t = "",
 	abi_headers = "",
 	abi_intptr_t = "intptr_t",
+	abi_uintptr_t = "uintptr_t",
 	ptr_intptr_t_cast = "intptr_t",
 	ptr_qualified = "*",
 	obsol = {},
@@ -233,6 +234,10 @@ function config.merge(fh)
 				config[k] = util.setFromString(v, "[^ ]+")
 			else
 				config[k] = v
+				if k:find("abi_intptr_t") and
+				    not config.modifications["abi_uintptr_t"] then
+					config["abi_uintptr_t"] = "u" .. v
+				end
 			end
 			-- Construct config modified table as config
 			-- is processed.

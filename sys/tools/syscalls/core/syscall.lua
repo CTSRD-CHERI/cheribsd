@@ -79,7 +79,8 @@ function syscall:processChangesAbi()
 	    not self.changes_abi
 	if config.abiChanges("pointer_args") then
 		for _, v in ipairs(self.args) do
-			if util.isPtrType(v.type, config.abi_intptr_t) then
+			if util.isPtrType(v.type, config.abi_intptr_t,
+			    config.abi_uintptr_t) then
 				if config.syscall_no_abi_change[self.name] then
 					print("WARNING: " .. self.name ..
 					    " in syscall_no_abi_change, " ..

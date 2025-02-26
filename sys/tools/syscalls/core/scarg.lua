@@ -73,7 +73,8 @@ function scarg:process()
 			(config.abiChanges("pair_64bit") and
 			util.is64bitType(self.type))
 
-		self.type = self.type:gsub("intptr_t", config.abi_intptr_t)
+		self.type = self.type:gsub("^intptr_t", config.abi_intptr_t)
+		self.type = self.type:gsub("^uintptr_t", config.abi_uintptr_t)
 		self.type = self.type:gsub("semid_t", config.abi_semid_t)
 
 		if util.isPtrType(self.type) then

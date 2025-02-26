@@ -113,9 +113,13 @@ end
 --
 -- PARAM: abi, nil or optional ABI-specified intptr_t.
 --
-function util.isPtrType(type, abi)
+-- PARAM: abiu, nil or optional ABI-specified uintptr_t.
+--
+function util.isPtrType(type, abi, abiu)
 	local default = abi or "intptr_t"
-	return type:find("*") or type:find("caddr_t") or type:find(default)
+	local defaultu = abiu or "uintptr_t"
+	return type:find("*") or type:find("caddr_t") or type:find(default) or
+	    type:find(defaultu)
 end
 
 function util.isPtrArrayType(type)
