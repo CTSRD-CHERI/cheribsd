@@ -891,6 +891,9 @@ pmap_bootstrap(vm_paddr_t kernstart, vm_size_t kernlen)
 	vm_pointer_t dpcpu, msgbufpv;
 	pt_entry_t *pte;
 	int i;
+#ifdef __CHERI_PURE_CAPABILITY__
+	void *kmemcap;
+#endif
 
 	printf("pmap_bootstrap %lx %lx\n", kernstart, kernlen);
 
@@ -935,10 +938,18 @@ pmap_bootstrap(vm_paddr_t kernstart, vm_size_t kernlen)
 	 */
 	freeva = freemempos - kernstart + KERNBASE;
 #ifdef __CHERI_PURE_CAPABILITY__
-	freeva = (vm_pointer_t)cheri_setbounds(cheri_setaddress(
-	    kernel_root_cap, freeva), VM_MAX_KERNEL_ADDRESS - freeva);
-#endif
-#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * kmem_init expects to receive a virtual_avail = freeva capability with
+	 * - a cursor at the boundary of the bootstrapped memory
+	 * - a base at VM_MIN_KERNEL_ADDRESS (for vm_mapping the virtual space)
+	 * - a top at VM_MAX_KERNEL_ADDRESS (for vm_mapping the virtual space)
+	 * Therefore generate one such capability. Incrementing freeva will bump
+	 * up the cursor, but not the bounds.
+	 */
+	kmemcap = cheri_setaddress(kernel_root_cap, VM_MIN_KERNEL_ADDRESS);
+	kmemcap = cheri_setbounds(kmemcap, VM_MAX_KERNEL_ADDRESS - VM_MIN_KERNEL_ADDRESS);
+	freeva = (vm_pointer_t)cheri_setaddress(kmemcap, freeva);
+
 #define reserve_space(var, pa, size)					\
 	do {								\
 		var = cheri_setbounds(freeva, size);			\
