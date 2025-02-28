@@ -47,7 +47,7 @@ procstat_compartments(struct procstat *procstat, struct kinfo_proc *kipp)
 	size_t ncomparts;
 
 	if ((procstat_opts & PS_OPT_NOHEADER) == 0)
-		xo_emit("{T:/%5s %-19s %4s %5s %-40s}\n", "PID", "COMM", "CID",
+		xo_emit("{T:/%5s %-19s %4s %4s %-40s}\n", "PID", "COMM", "CID",
 		    "FLAG", "CNAME");
 	if (procstat_getcompartments(procstat, kipp, &kcccp, &ncomparts) != 0)
 		return;
