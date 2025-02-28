@@ -228,13 +228,22 @@ OBJS+=	${_firmw:C/\:.*$/.fwo/:T}
 SRCS+=${SRCS.${_o}}
 .endfor
 
+.if ${SRCS:N*.h:R} != ""
 OBJS+=	${SRCS:N*.h:R:S/$/.o/g}
+.endif
+.for compart in ${COMPARTMENTS}
+COMPART_OBJS.${compart}=${SRCS.${compart}:N*.h:R:S/$/.o/g}
+COMPART_OBJS+=		--compartment=${compart} ${COMPART_OBJS.${compart}}
+.endfor
+.if !empty(COMPART_OBJS)
+COMPART_OBJS+=	--compartment=""
+.endif
 
 .if !defined(PROG)
 PROG=	${KMOD}.ko
 .endif
 
-.if ${KMODMO} == YES
+.if ${KMODMO} == YES || defined(COMPARTMENTS)
 # Multi-object ELF modules are compiled directly into a shared file with debug
 # symbols.
 FULLPROG=	${PROG}
@@ -261,7 +270,12 @@ ${FULLPROG}: ${KMOD}.kld
 .endif # ${KMODMO} != YES
 
 .if defined(COMPILE_IR)
-LLOBJS+=${SRCS:N*.h:N*.S:R:S/$/.llo/g}
+.if ${SRCS:N*.h:R} != ""
+LLOBJS+=	${SRCS:N*.h:N*.S:R:S/$/.llo/g}
+.endif
+.for compart in ${COMPARTMENTS}
+LLOBJS+=	${SRCS.${compart}:N*.h:R:S/$/.llo/g}
+.endfor
 
 ${PROG}.ll: ${LLOBJS}
 	${LLVM_LINK} -S -o ${.TARGET} ${LLOBJS}
@@ -278,23 +292,27 @@ CLEANFILES+=	export_syms
 LDSCRIPT_FLAGS?= -T ${SYSDIR}/conf/ldscript.kmod.${MACHINE}
 .endif
 
-.if ${KMODMO} == YES
-${FULLPROG}: ${OBJS} ${BLOB_OBJS}
+.if ${KMODMO} == YES || defined(COMPARTMENTS)
+${FULLPROG}: ${OBJS} ${COMPART_OBJS:N--compartment*} ${BLOB_OBJS}
 .elif ${__KLD_SHARED} == yes
-${KMOD}.kld: ${OBJS} ${BLOB_OBJS}
+${KMOD}.kld: ${OBJS} ${COMPART_OBJS:N--compartment*} ${BLOB_OBJS}
 .else
-${FULLPROG}: ${OBJS} ${BLOB_OBJS}
+${FULLPROG}: ${OBJS} ${COMPART_OBJS:N--compartment*} ${BLOB_OBJS}
 .endif
 .if ${KMODMO} == YES
 	OBJCOPY_MO="${OBJCOPY_MO}" \
 	    ${LD_MO} -m ${LD_EMULATION} ${_LDFLAGS} ${LDSCRIPT_FLAGS} \
 	    -Bshareable -znotext -znorelro -o ${.TARGET} ${OBJS} ${BLOB_OBJS}
+.elif defined(COMPARTMENTS)
+	${LD} -m ${LD_EMULATION} -Bshareable -znotext -znorelro ${_LDFLAGS} \
+	    ${LDSCRIPT_FLAGS} -o ${.TARGET} ${OBJS} ${BLOB_OBJS} ${COMPART_OBJS}
 .else
 	${LD} -m ${LD_EMULATION} ${_LDFLAGS} ${LDSCRIPT_FLAGS} -r \
-	    -o ${.TARGET} ${OBJS} ${BLOB_OBJS}
+	    -o ${.TARGET} ${OBJS} ${BLOB_OBJS} ${COMPART_OBJS}
 .endif
 .if ${MK_CTF} != "no"
-	${CTFMERGE} ${CTFFLAGS} -o ${.TARGET} ${OBJS} ${BLOB_OBJS}
+	${CTFMERGE} ${CTFFLAGS} -o ${.TARGET} ${OBJS} ${BLOB_OBJS} \
+	    ${COMPART_OBJS:N--compartment*}
 .endif
 .if ${KMODMO} == YES
 # Multi-object ELF modules cannot use EXPORT_SYMS.
@@ -362,7 +380,7 @@ ${_ILINKS}:
 	${ECHO} ${.TARGET:T} "->" $$path ; \
 	ln -fns $$path ${.TARGET:T}
 
-CLEANFILES+= ${PROG} ${KMOD}.kld ${OBJS}
+CLEANFILES+= ${PROG} ${KMOD}.kld ${OBJS} ${COMPART_OBJS:N--compartment*}
 .if ${KMODMO} == YES
 CLEANFILES+= ${OBJS:S/$/.mo/}
 .endif
@@ -389,7 +407,7 @@ realinstall: _kmodinstall
 _kmodinstall: .PHONY
 	${INSTALL} -T release -o ${KMODOWN} -g ${KMODGRP} -m ${KMODMODE} \
 	    ${_INSTALLFLAGS} ${PROG} ${DESTDIR}${KMODDIR}/
-.if ${KMODMO} != YES
+.if ${KMODMO} != YES && !defined(COMPARTMENTS)
 .if defined(DEBUG_FLAGS) && !defined(INSTALL_NODEBUG) && ${MK_KERNEL_SYMBOLS} != "no"
 	${INSTALL} -T dbg -o ${KMODOWN} -g ${KMODGRP} -m ${KMODMODE} \
 	    ${_INSTALLFLAGS} ${PROG}.debug ${DESTDIR}${KERN_DEBUGDIR}${KMODDIR}/
