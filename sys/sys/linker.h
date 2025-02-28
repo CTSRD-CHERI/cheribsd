@@ -48,7 +48,7 @@ struct mod_depend;
 typedef struct linker_file* linker_file_t;
 typedef TAILQ_HEAD(, linker_file) linker_file_list_t;
 
-typedef struct elf_object * elf_object_t;
+typedef struct elf_compartment * elf_compartment_t;
 
 typedef caddr_t linker_sym_t;		/* opaque symbol */
 typedef c_caddr_t c_linker_sym_t;	/* const opaque symbol */
@@ -201,8 +201,10 @@ int linker_ddb_search_symbol(ptraddr_t _value, c_linker_sym_t *_sym,
 int linker_ddb_symbol_values(c_linker_sym_t _sym, linker_symval_t *_symval);
 int linker_ddb_search_symbol_name(ptraddr_t value, char *buf, u_int buflen,
 				  long *offset);
-void elf_ddb_kldstat_objects(linker_file_t lf);
-void elf_ddb_show_compartment_symbols(elf_object_t object);
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+void elf_ddb_kldstat_compartments(linker_file_t lf);
+void elf_ddb_show_compartment_symbols(elf_compartment_t ec);
+#endif
 
 /*
  * stack(9) helper for situations where kernel locking is required.
@@ -307,15 +309,14 @@ extern int kld_debug;
 
 #endif
 
-typedef int elf_lookup_fn(linker_file_t, elf_object_t, Elf_Size, int,
-    Elf_Addr *);
+typedef int elf_lookup_fn(linker_file_t, Elf_Size, int, Elf_Addr *);
 
 /* Support functions */
 bool	elf_is_ifunc_reloc(Elf_Size r_info);
-int	elf_reloc(linker_file_t _lf, elf_object_t object, char *base,
-	    const void *_rel, int _type, elf_lookup_fn _lu);
-int	elf_reloc_local(linker_file_t _lf, elf_object_t object, char *base,
-	    const void *_rel, int _type, elf_lookup_fn _lu);
+int	elf_reloc(linker_file_t _lf, char *base, const void *_rel, int _type,
+	    elf_lookup_fn _lu);
+int	elf_reloc_local(linker_file_t _lf, char *base, const void *_rel,
+	    int _type, elf_lookup_fn _lu);
 void	elf_compartment_entry(linker_file_t lf, uintcap_t ptr, u_long *idp,
 	    uintptr_t *ptrp);
 Elf_Addr elf_relocaddr(linker_file_t _lf, Elf_Addr addr);
@@ -323,8 +324,8 @@ bool	elf_is_preloaded(linker_file_t lf);
 void	link_elf_ireloc(caddr_t kmdp);
 
 #if defined(__aarch64__) || defined(__amd64__)
-int	elf_reloc_late(linker_file_t _lf, elf_object_t object, char *base,
-	    const void *_rel, int _type, elf_lookup_fn _lu);
+int	elf_reloc_late(linker_file_t _lf, char *base, const void *_rel,
+	    int _type, elf_lookup_fn _lu);
 void	link_elf_late_ireloc(void);
 #endif
 

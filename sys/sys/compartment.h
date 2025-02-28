@@ -57,7 +57,7 @@ struct compartment {
 };
 
 u_long compartment_id_create(const char *name, uintcap_t base,
-    elf_object_t object);
+    elf_compartment_t elf_compartment);
 void compartment_linkup0(struct compartment *compartment, struct thread *td);
 struct compartment *compartment_create_for_thread(struct thread *td, u_long id);
 void compartment_destroy(struct compartment *compartment);

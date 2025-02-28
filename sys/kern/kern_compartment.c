@@ -82,7 +82,7 @@ SYSCTL_ULONG(_security_compartment_counters, OID_AUTO, executive_entry,
 struct compartment_metadata {
 	char		*cm_name;
 	uintcap_t	 cm_base;
-	elf_object_t	 cm_object;
+	elf_compartment_t  cm_elf_compartment;
 	TAILQ_HEAD(, compartment) cm_compartments;
 };
 
@@ -122,7 +122,7 @@ MTX_SYSINIT(compartmenttrampolines, &compartment_trampolines_lock,
 
 static void
 compartment_metadata_create(u_long id, const char *name, uintcap_t base,
-    elf_object_t object)
+    elf_compartment_t elf_compartment)
 {
 
 	sx_slock(&compartment_metadatalock);
@@ -150,7 +150,7 @@ compartment_metadata_create(u_long id, const char *name, uintcap_t base,
 	KASSERT(compartment_metadata[id]->cm_name != NULL,
 	    ("%s: unable to initialize compartment metadata", __func__));
 	compartment_metadata[id]->cm_base = base;
-	compartment_metadata[id]->cm_object = object;
+	compartment_metadata[id]->cm_elf_compartment = elf_compartment;
 	TAILQ_INIT(&compartment_metadata[id]->cm_compartments);
 
 	sx_sunlock(&compartment_metadatalock);
@@ -176,11 +176,13 @@ SYSINIT(compartment, SI_SUB_KLD, SI_ORDER_FIRST, compartment_metadata_init,
     NULL);
 
 u_long
-compartment_id_create(const char *name, uintcap_t base, elf_object_t object)
+compartment_id_create(const char *name, uintcap_t base,
+    elf_compartment_t elf_compartment)
 {
 
 	atomic_add_long(&compartment_lastid, 1);
-	compartment_metadata_create(compartment_lastid, name, base, object);
+	compartment_metadata_create(compartment_lastid, name, base,
+	    elf_compartment);
 	return (compartment_lastid);
 }
 
@@ -534,9 +536,9 @@ DB_SHOW_COMMAND(compartment, db_show_compartment)
 	db_printf(" proc command: %s\n", proc->p_comm);
 	db_printf(" thread (tid %d): %p\n", thread->td_tid, thread);
 	db_printf(" thread name: %s\n", thread->td_name);
-	if (metadata->cm_object != NULL) {
+	if (metadata->cm_elf_compartment != NULL) {
 		db_printf(" imported symbols:\n");
-		elf_ddb_show_compartment_symbols(metadata->cm_object);
+		elf_ddb_show_compartment_symbols(metadata->cm_elf_compartment);
 	}
 }
 #endif /* DDB */
