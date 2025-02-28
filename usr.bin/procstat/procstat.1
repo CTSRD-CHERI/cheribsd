@@ -396,8 +396,18 @@ process ID
 command
 .It CID
 compartment ID
+.It FLAG
+flags on the compartment
 .It CNAME
 compartment name
+.El
+.Pp
+The following compartment flags may be displayed:
+.Pp
+.Bl -tag -width X -compact
+.It D
+contains a library loaded via
+.Xr dlopen 3
 .El
 .Ss Environment Variables
 Display the process ID, command, and environment variables:

@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2024 Capabilities Limited
+ * Copyright (c) 2024-2025 Capabilities Limited
  *
  * This software was developed by SRI International, the University of
  * Cambridge Computer Laboratory (Department of Computer Science and
@@ -47,16 +47,16 @@ procstat_compartments(struct procstat *procstat, struct kinfo_proc *kipp)
 	size_t ncomparts;
 
 	if ((procstat_opts & PS_OPT_NOHEADER) == 0)
-		xo_emit("{T:/%5s %-19s %4s %6s %-40s}\n", "PID", "COMM", "CID",
-		    "DLOPEN", "CNAME");
+		xo_emit("{T:/%5s %-19s %4s %4s %-40s}\n", "PID", "COMM", "CID",
+		    "FLAG", "CNAME");
 	if (procstat_getcompartments(procstat, kipp, &kcccp, &ncomparts) != 0)
 		return;
 	for (size_t i = 0; i < ncomparts; ++i) {
 		xo_emit("{k:process_id/%5d/%d}", kipp->ki_pid);
 		xo_emit(" {:command/%-19s/%s}", kipp->ki_comm);
 		xo_emit(" {:cid/%4d/%zu}", kcccp[i].kccc_id);
-		xo_emit(" {n:has_dlopened/%6s/%s}",
-		    kcccp[i].kccc_has_dlopened ?  "true" : "false");
+		xo_emit(" {:flag/%-5s/%s}", kcccp[i].kccc_has_dlopened ? "D"
+		    : "-");
 		xo_emit(" {:cname/%-40s/%s}", kcccp[i].kccc_name);
 		xo_emit("\n");
 	}
