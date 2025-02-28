@@ -42,9 +42,9 @@
 #include <machine/cpufunc.h>
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#define	__PCPU_PAD	168
+#define	__PCPU_PAD	152
 #else
-#define	__PCPU_PAD	56
+#define	__PCPU_PAD	48
 #endif
 
 /* Keep in sync with db_show_mdpcpu() */

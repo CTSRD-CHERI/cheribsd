@@ -43,7 +43,9 @@
  * To minimize memory waste in per-cpu UMA zones, the page size should
  * be a multiple of the size of struct pcpu.
  */
-_Static_assert(PAGE_SIZE % sizeof(struct pcpu) == 0, "fix pcpu size");
+#define	PCPU_ASSERT()							\
+	_Static_assert(PAGE_SIZE % sizeof(struct pcpu) == 0,		\
+	    "fix pcpu size")
 
 extern struct pcpu __pcpu[];
 

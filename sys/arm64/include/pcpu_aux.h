@@ -43,13 +43,13 @@
 #error "Do not include machine/pcpu_aux.h directly"
 #endif
 
-#ifndef PCPU_FUNCS
 /*
  * To minimize memory waste in per-cpu UMA zones, the page size should
  * be a multiple of the size of struct pcpu.
  */
-_Static_assert(PAGE_SIZE % sizeof(struct pcpu) == 0, "fix pcpu size");
-#endif
+#define	PCPU_ASSERT()							\
+	_Static_assert(PAGE_SIZE % sizeof(struct pcpu) == 0,		\
+	    "fix pcpu size")
 
 extern uint64_t pcpu0_early_dummy_counter;
 

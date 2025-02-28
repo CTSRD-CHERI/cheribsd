@@ -63,6 +63,8 @@
 #include <vm/uma.h>
 #include <ddb/ddb.h>
 
+PCPU_ASSERT();
+
 static MALLOC_DEFINE(M_PCPU, "Per-cpu", "Per-cpu resource accouting.");
 
 struct dpcpu_free {
