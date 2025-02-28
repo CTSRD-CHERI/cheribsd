@@ -1527,15 +1527,20 @@ const char *
 pcc_cap(const Obj_Entry *obj, Elf_Off offset)
 {
 	Elf_Addr addr;
+	const char *pcc_cap;
 
-	if (obj->npcc_caps == 0)
-		return (obj->text_rodata_cap + offset);
+	if (obj->npcc_caps == 0) {
+		pcc_cap = obj->text_rodata_cap + offset;
+		return (cheri_clearperm(pcc_cap, CAP_RELOC_REMOVE_PERMS));
+	}
 
 	addr = (Elf_Addr)(uintptr_t)obj->relocbase + offset;
 	for (unsigned long i = 0; i < obj->npcc_caps; i++) {
-		const char *pcc_cap = obj->pcc_caps[i];
-		if (addr >= (ptraddr_t)pcc_cap && addr < cheri_gettop(pcc_cap))
-			return (cheri_setaddress(pcc_cap, addr));
+		pcc_cap = obj->pcc_caps[i];
+		if (addr >= (ptraddr_t)pcc_cap && addr < cheri_gettop(pcc_cap)) {
+			pcc_cap = cheri_setaddress(pcc_cap, addr);
+			return (cheri_clearperm(pcc_cap, CAP_RELOC_REMOVE_PERMS));
+		}
 	}
 	return (NULL);
 }
