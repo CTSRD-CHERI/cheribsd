@@ -3,6 +3,7 @@
 .PATH: ${SRCTOP}/sys/contrib/zlib
 
 KMOD?=	zlib
+.ifndef COMPARTMENTS
 SRCS+=	zlib_mod.c
 SRCS+=	zcalloc.c
 SRCS+=	adler32.c
@@ -15,6 +16,7 @@ SRCS+=	inftrees.c
 SRCS+=	trees.c
 SRCS+=	uncompr.c
 SRCS+=	zutil.c
+.endif
 
 CWARNFLAGS.compress.c+=-Wno-cast-qual # compress:49
 CWARNFLAGS.deflate.c+=-Wno-cast-qual # deflate.c:415

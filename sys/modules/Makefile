@@ -370,7 +370,6 @@ SUBDIR=	\
 	sge \
 	${_sgx} \
 	${_sgx_linux} \
-	sift_sa \
 	siftr \
 	siis \
 	sis \
@@ -929,7 +928,11 @@ _malo=	malo
 .if ${KERN_OPTS:MCHERI_COMPARTMENTALIZE_KERNEL}
 SUBDIR+=	compartment_function
 SUBDIR+=	compartment_test
-SUBDIR+=	zlib_mo
+.endif
+# Modules making use of kernel/toolchain features developed for CHERI.
+.if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "riscv"
+SUBDIR+=	sift_sa
+SUBDIR+=	zlib_c18n
 .endif
 
 # Some of these work in hybrid kernels but we disable them for consistency
