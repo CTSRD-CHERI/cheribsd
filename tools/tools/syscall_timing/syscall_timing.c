@@ -37,7 +37,7 @@
 #include <sys/time.h>
 #include <sys/wait.h>
 
-#ifdef __CHERI__
+#if __has_feature(capabilities)
 #include <cheri/cheri.h>
 #endif
 
