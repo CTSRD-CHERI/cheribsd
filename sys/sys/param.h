@@ -87,7 +87,7 @@
  * FreeBSD.
  */
 #undef __CheriBSD_version
-#define __CheriBSD_version 20250127
+#define __CheriBSD_version 20250301
 
 /*
  * __FreeBSD_kernel__ indicates that this system uses the kernel of FreeBSD,
