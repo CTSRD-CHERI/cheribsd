@@ -40,5 +40,6 @@
 int
 cheri_syscall_authorize(struct thread *td)
 {
-	return ((cheri_getperm(__USER_PCC) & CHERI_PERM_SYSCALL) != 0);
+	return (!security_cheri_check_perm_syscall ||
+	    (cheri_getperm(__USER_PCC) & CHERI_PERM_SYSCALL) != 0);
 }
