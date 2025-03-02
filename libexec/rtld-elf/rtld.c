@@ -648,6 +648,8 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 #ifdef CHERI_LIB_C18N
 	if ((aux_info[AT_BSDFLAGS]->a_un.a_val & ELF_BSDF_CHERI_C18N) != 0)
 	    ld_compartment_enable = true;
+	if ((aux_info[AT_BSDFLAGS]->a_un.a_val & ELF_BSDF_CHERI_C18N_FPTR) != 0)
+	    ld_compartment_fptr = true;
 #endif
     }
 
@@ -825,7 +827,8 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     ld_compartment_unwind = ld_get_env_var(LD_COMPARTMENT_UNWIND);
     ld_compartment_stats = ld_get_env_var(LD_COMPARTMENT_STATS);
     ld_compartment_switch_count = ld_get_env_var(LD_COMPARTMENT_SWITCH_COUNT);
-    ld_compartment_fptr = ld_get_env_var(LD_COMPARTMENT_FPTR) != NULL;
+    if (ld_get_env_var(LD_COMPARTMENT_FPTR) != NULL)
+	ld_compartment_fptr = true;
     /*
      * DISABLE takes precedence over ENABLE.
      */
