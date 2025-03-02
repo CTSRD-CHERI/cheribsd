@@ -826,6 +826,7 @@ BSARGS= 	DESTDIR= \
 		-DNO_PIC \
 		-DNO_SHARED \
 		MK_ASAN=no \
+		MK_CHERI_CODEPTR_RELOCS=no \
 		MK_CTF=no \
 		MK_CLANG_EXTRAS=no \
 		MK_CLANG_FORMAT=no \
@@ -858,6 +859,7 @@ TMAKE=		\
 		-DNO_CPU_CFLAGS \
 		-DNO_LINT \
 		MK_ASAN=no \
+		MK_CHERI_CODEPTR_RELOCS=no \
 		MK_CTF=no \
 		MK_CLANG_EXTRAS=no \
 		MK_CLANG_FORMAT=no \
@@ -896,6 +898,7 @@ KTMAKE=		${TIME_ENV} \
 		-DNO_LINT \
 		-DNO_PIC \
 		-DNO_SHARED \
+		MK_CHERI_CODEPTR_RELOCS=no \
 		MK_CTF=no \
 		MK_HTML=no \
 		MK_MAN=no \
