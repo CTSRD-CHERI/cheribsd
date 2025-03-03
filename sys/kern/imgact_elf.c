@@ -1926,8 +1926,6 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 			bsdflags |= ELF_BSDF_CHERI_C18N;
 	} else if (security_cheri_lib_based_c18n_default)
 		bsdflags |= ELF_BSDF_CHERI_C18N;
-	if (security_cheri_lib_based_c18n_wrap_fptr)
-		bsdflags |= ELF_BSDF_CHERI_C18N_FPTR;
 #endif
 #if defined(__ELF_CHERI) && defined(CHERI_CAPREVOKE)
 	/*

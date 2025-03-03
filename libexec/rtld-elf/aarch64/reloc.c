@@ -761,18 +761,6 @@ reloc_gnu_ifunc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 				continue;
 			lock_release(rtld_bind_lock, lockstate);
 			target = (uintptr_t)rtld_resolve_ifunc(defobj, def);
-#ifdef CHERI_LIB_C18N
-			if (!C18N_FPTR_ENABLED)
-				target = (uintptr_t)tramp_intern(plt,
-				    plt->compart_id,
-				    &(struct tramp_data) {
-					.target = (void *)target,
-					.defobj = defobj,
-					.def = def,
-					.sig = sigtab_get(obj,
-					    ELF_R_SYM(rela->r_info))
-				});
-#endif
 			wlock_acquire(rtld_bind_lock, lockstate);
 			reloc_jmpslot(where, target, defobj, obj,
 			    (const Elf_Rel *)rela);
@@ -950,13 +938,11 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				(Elf_Addr)(uintptr_t)obj->relocbase,
 				rela->r_addend);
 #ifdef CHERI_LIB_C18N
-			if (C18N_FPTR_ENABLED)
-				*(void **)where = tramp_intern(NULL,
-				    RTLD_COMPART_ID,
-				    &(struct tramp_data) {
-					.target = *(void **)where,
-					.defobj = obj
-				});
+			*(void **)where = tramp_intern(NULL, RTLD_COMPART_ID,
+			    &(struct tramp_data) {
+				.target = *(void **)where,
+				.defobj = obj
+			});
 #endif
 			break;
 #endif /* __has_feature(capabilities) */
@@ -964,8 +950,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		case R_AARCH64_GLOB_DAT:
 			*where = symval + rela->r_addend;
 #ifdef CHERI_LIB_C18N
-			if (C18N_FPTR_ENABLED &&
-			    ELF_ST_TYPE(def->st_info) == STT_FUNC)
+			if (ELF_ST_TYPE(def->st_info) == STT_FUNC)
 				*where = (Elf_Addr)tramp_intern(NULL,
 				    RTLD_COMPART_ID,
 				    &(struct tramp_data) {
@@ -1048,13 +1033,11 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		case R_AARCH64_FUNC_RELATIVE:
 			*where = (Elf_Addr)(obj->relocbase + rela->r_addend);
 #ifdef CHERI_LIB_C18N
-			if (C18N_FPTR_ENABLED)
-				*where = (Elf_Addr)tramp_intern(NULL,
-				    RTLD_COMPART_ID,
-				    &(struct tramp_data) {
-					.target = (void *)(uintptr_t)*where,
-					.defobj = obj
-				});
+			*where = (Elf_Addr)tramp_intern(NULL, RTLD_COMPART_ID,
+			    &(struct tramp_data) {
+				.target = (void *)(uintptr_t)*where,
+				.defobj = obj
+			});
 #endif
 			break;
 		case R_AARCH64_NONE:
