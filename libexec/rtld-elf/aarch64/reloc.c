@@ -536,12 +536,6 @@ reloc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 		case R_AARCH64_NONE:
 			break;
 #ifdef __CHERI_PURE_CAPABILITY__
-		/*
-		 * XXX Dapeng: The R_MORELLO_RELATIVE case should be removed
-		 * once the whole system is compiled with -cheri-codeptr-relocs,
-		 * for it would then be impossible to see this relocation here.
-		 */
-		case R_MORELLO_RELATIVE:
 		case R_MORELLO_FUNC_RELATIVE:
 			*where = init_cap_from_fragment(fragment,
 			    obj->relocbase, pcc_cap(obj, where[0]),
