@@ -167,7 +167,6 @@ extern u_int	security_cheri_bound_legacy_capabilities;
 extern u_int	cheri_cloadtags_stride;
 #ifdef __aarch64__
 extern bool	security_cheri_lib_based_c18n_default;
-extern bool	security_cheri_lib_based_c18n_wrap_fptr;
 #endif
 extern bool	security_cheri_check_perm_syscall;
 
