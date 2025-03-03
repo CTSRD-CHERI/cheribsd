@@ -82,14 +82,6 @@ SYSCTL_BOOL(_security_cheri, OID_AUTO, lib_based_c18n_default, CTLFLAG_RWTUN,
     "Userspace library-based compartmentalisation default");
 #endif
 
-/*
- * Forbid system calls from code without CHERI_PERM_SYSCALL.
- */
-bool security_cheri_check_perm_syscall = false;
-SYSCTL_BOOL(_security_cheri, OID_AUTO, check_perm_syscall,
-    CTLFLAG_RWTUN, &security_cheri_check_perm_syscall, 0,
-    "Forbid system calls from code without CHERI_PERM_SYSCALL");
-
 #ifdef CHERI_CAPREVOKE
 /*
  * Set the default state of revocation in userspace.  This is used to
