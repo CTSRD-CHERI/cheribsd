@@ -116,6 +116,11 @@ LDFLAGS+= -Wl,-zbti-report=error
 # TODO: Remove after the next release
 .if ${MACHINE_CPUARCH} == "aarch64" && ${MACHINE_CPU:Mcheri} && !defined(BOOTSTRAPPING)
 LDFLAGS+= -Wl,--local-caprelocs=elf
+
+.if ${MK_CHERI_CODEPTR_RELOCS} != "no" && ${COMPILER_FEATURES:Mmorello-codeptr-relocs}
+CFLAGS+=	-cheri-codeptr-relocs
+LDFLAGS+=	-cheri-codeptr-relocs
+.endif
 .endif
 
 # Initialize stack variables on function entry

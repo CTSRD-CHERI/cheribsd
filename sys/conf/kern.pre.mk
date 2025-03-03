@@ -197,6 +197,13 @@ LDFLAGS+=	-z notext -z ifunc-noplt
 .endif
 .endif  # ${MACHINE_CPUARCH} == "amd64"
 
+.if ${MACHINE_CPUARCH} == "aarch64" && ${MACHINE_ABI:Mcheri}
+.if ${MK_CHERI_CODEPTR_RELOCS} != "no" && ${COMPILER_FEATURES:Mmorello-codeptr-relocs}
+CFLAGS+=	-cheri-codeptr-relocs
+LDFLAGS+=	-cheri-codeptr-relocs
+.endif
+.endif
+
 .if ${MACHINE_CPUARCH} == "riscv"
 # Hack: Work around undefined weak symbols being out of range when linking with
 # LLD (address is a PC-relative calculation, and BFD works around this by
