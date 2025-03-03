@@ -1350,20 +1350,13 @@ mrs_init_impl_locked(void)
 			bound_pointers = false;
 	}
 	if (!quarantining)
-#if defined(PRINT_CAPREVOKE) || defined(PRINT_CAPREVOKE_MRS) || defined(PRINT_STATS)
 		goto nosys;
-#else
-		return;
-#endif
 
 	if (cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
 	    (void **)&cri) != 0) {
 		if (errno == ENOSYS) {
 			quarantining = false;
-#if defined(PRINT_CAPREVOKE) || defined(PRINT_CAPREVOKE_MRS) || defined(PRINT_STATS)
 			goto nosys;
-#endif
-			return;
 		}
 		mrs_puts("error getting kernel caprevoke counters\n");
 		exit(7);
@@ -1384,10 +1377,10 @@ mrs_init_impl_locked(void)
 	}
 	app_quarantine = &app_quarantine_store[0];
 
+nosys:
 	mrs_initialized = true;
 
 #if defined(PRINT_CAPREVOKE) || defined(PRINT_CAPREVOKE_MRS) || defined(PRINT_STATS)
-nosys:
 	mrs_puts(VERSION_STRING);
 #endif
 }
@@ -1406,6 +1399,8 @@ mrs_init(void)
 {
 	if (__predict_false(!mrs_initialized))
 		mrs_init_impl();
+	/* Invariant: mrs_init_impl must initialize mrs or exit. */
+	assert(mrs_initialized);
 }
 
 __attribute__((__constructor__(100)))
