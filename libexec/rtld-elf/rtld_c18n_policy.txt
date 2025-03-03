@@ -56,8 +56,6 @@ export to [TCB]
 	_rtld_sighandler
 	_rtld_siginvoke
 	_rtld_sigaction
-	_rtld_setjmp
-	_rtld_longjmp
 
 callee [RTLD]
 export to [TCB]
@@ -67,8 +65,5 @@ export to [libunwind]
 
 callee [RTLD]
 export to [libunwind]
-	_rtld_unw_getcontext
-	_rtld_unw_setcontext
-	_rtld_unw_getsealer
 	dl_c18n_is_trampoline
 	dl_c18n_pop_trusted_stack
