@@ -410,9 +410,6 @@ _rtld_thread_init(struct RtldLockInfo *pli)
 	SymLook req;
 	void *locks[RTLD_LOCK_CNT];
 	int flags, i, res;
-#ifdef CHERI_LIB_C18N
-	struct RtldLockInfo tmplockinfo;
-#endif
 
 	if (pli == NULL) {
 		lockinfo.rtli_version = RTLI_VERSION;
@@ -425,36 +422,6 @@ _rtld_thread_init(struct RtldLockInfo *pli)
 			if (res == 0)
 				lockinfo.rtli_version = pli->rtli_version;
 		}
-#ifdef CHERI_LIB_C18N
-		tmplockinfo = *pli;
-#define WRAP(_target, _valid, _reg_args, _mem_args, _ret_args)			\
-	do {									\
-		if (!C18N_FPTR_ENABLED)						\
-			_target = tramp_intern(NULL, RTLD_COMPART_ID,		\
-			    &(struct tramp_data) {				\
-				.target = _target,				\
-				.defobj = obj,					\
-				.sig = (struct func_sig) {			\
-					.valid = _valid,			\
-					.reg_args = _reg_args,			\
-					.mem_args = _mem_args,			\
-					.ret_args = _ret_args			\
-				}						\
-			});							\
-	} while (0)
-		WRAP(tmplockinfo.lock_create,		true, 0, false, ONE);
-		WRAP(tmplockinfo.lock_destroy,		true, 1, false, NONE);
-		WRAP(tmplockinfo.rlock_acquire,		true, 1, false, NONE);
-		WRAP(tmplockinfo.wlock_acquire,		true, 1, false, NONE);
-		WRAP(tmplockinfo.lock_release,		true, 1, false, NONE);
-		WRAP(tmplockinfo.thread_set_flag,	true, 1, false, ONE);
-		WRAP(tmplockinfo.thread_clr_flag,	true, 1, false, ONE);
-		WRAP(tmplockinfo.at_fork,		true, 0, false, NONE);
-		WRAP(tmplockinfo.dlerror_loc,		true, 0, false, ONE);
-		WRAP(tmplockinfo.dlerror_seen,		true, 0, false, ONE);
-#undef WRAP
-		pli = &tmplockinfo;
-#endif
 	}
 
 	/* disable all locking while this function is running */

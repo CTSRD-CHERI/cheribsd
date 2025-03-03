@@ -113,14 +113,13 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 			return -1;
 		}
 #ifdef CHERI_LIB_C18N
-		if (C18N_FPTR_ENABLED)
-			symval = tramp_intern(NULL, RTLD_COMPART_ID,
-			    &(struct tramp_data) {
-				.target = __DECONST(void *, symval),
-				.defobj = defobj,
-				.def = def,
-				.sig = sigtab_get(obj, r_symndx)
-			});
+		symval = tramp_intern(NULL, RTLD_COMPART_ID,
+		    &(struct tramp_data) {
+			.target = __DECONST(void *, symval),
+			.defobj = defobj,
+			.def = def,
+			.sig = sigtab_get(obj, r_symndx)
+		});
 #endif
 	} else {
 		/* Remove execute permissions and set bounds */

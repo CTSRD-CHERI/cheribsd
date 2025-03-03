@@ -65,10 +65,6 @@
 extern bool ld_compartment_enable;
 
 #define	C18N_ENABLED	ld_compartment_enable
-
-extern bool ld_compartment_fptr;
-
-#define C18N_FPTR_ENABLED	ld_compartment_fptr
 #endif
 
 #include "rtld_lock.h"
@@ -510,7 +506,6 @@ enum {
 	LD_COMPARTMENT_UNWIND,
 	LD_COMPARTMENT_STATS,
 	LD_COMPARTMENT_SWITCH_COUNT,
-	LD_COMPARTMENT_FPTR,
 #endif
 };
 
