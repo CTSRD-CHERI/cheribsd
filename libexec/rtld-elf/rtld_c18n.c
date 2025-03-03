@@ -590,10 +590,6 @@ tramp_should_include(const Plt_Entry *plt, compart_id_t caller,
 	compart_id_t callee;
 	const char *sym;
 
-	/* XXX: This will not be needed once function pointers are wrapped. */
-	if (data->target == NULL)
-		return (false);
-
 	if (data->def == NULL)
 		return (true);
 
