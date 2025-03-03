@@ -906,13 +906,6 @@ resolve_untrusted_stk_impl(stk_table_index index)
  *
  * APIs exposed to stack unwinders (e.g., libc setjmp/longjmp and libunwind)
  */
-/*
- * Assembly functions that are tail-called when compartmentalisation is
- * disabled.
- */
-uintptr_t _rtld_unw_getcontext_epilogue(uintptr_t, void **);
-struct jmp_args _rtld_unw_setcontext_epilogue(struct jmp_args, void *, void **);
-
 int
 c18n_is_tramp(uintptr_t pc, const struct trusted_frame *tf)
 {
@@ -942,37 +935,6 @@ dl_c18n_get_trusted_stack(uintptr_t pc)
 
 	return (c18n_seal_subset(tf, sealer_trusted_stk));
 }
-
-/*
- * XXX Dapeng: These functions are kept here for compatibility with old libc and
- * libunwind.
- */
-uintptr_t _rtld_setjmp(uintptr_t, void **);
-uintptr_t _rtld_unw_getcontext(uintptr_t, void **);
-
-uintptr_t
-_rtld_setjmp(uintptr_t ret, void **buf)
-{
-	*buf = dl_c18n_get_trusted_stack(0);
-	return (ret);
-}
-
-uintptr_t
-_rtld_unw_getcontext(uintptr_t ret, void **buf)
-{
-	if (!C18N_ENABLED) {
-		__attribute__((musttail))
-		return (_rtld_unw_getcontext_epilogue(ret, buf));
-	}
-	*buf = dl_c18n_get_trusted_stack(0);
-	return (ret);
-}
-
-/*
- * Returning this struct allows us to control the content of unused return value
- * registers.
- */
-struct jmp_args { uintptr_t ret1; uintptr_t ret2; };
 
 void
 dl_c18n_unwind_trusted_stack(void *rcsp, void *target)
@@ -1084,34 +1046,6 @@ dl_c18n_pop_trusted_stack(struct dl_c18n_compart_state *state, void *tfs)
 	tf = c18n_unseal_subset(tfs, sealer_trusted_stk, get_trusted_stk());
 	*state = tf->state;
 	return (c18n_seal_subset(tf->previous, sealer_trusted_stk));
-}
-
-/*
- * XXX Dapeng: These functions are kept here for compatibility with old libc and
- * libunwind.
- */
-struct jmp_args _rtld_longjmp(struct jmp_args, void *, void **);
-struct jmp_args _rtld_unw_setcontext_impl(struct jmp_args, void *, void **);
-
-struct jmp_args
-_rtld_longjmp(struct jmp_args ret, void *rcsp, void **buf)
-{
-	dl_c18n_unwind_trusted_stack(rcsp, *buf);
-	return (ret);
-}
-
-struct jmp_args
-_rtld_unw_setcontext_impl(struct jmp_args ret, void *rcsp, void **buf)
-{
-	dl_c18n_unwind_trusted_stack(rcsp, *buf);
-	return (ret);
-}
-
-uintptr_t _rtld_unw_getsealer(void);
-uintptr_t
-_rtld_unw_getsealer(void)
-{
-	return (sealer_trusted_stk);
 }
 
 /*
@@ -1786,16 +1720,8 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
  */
 #define	MAX_TRAMP_PG_SIZE		(4 * 1024 * 1024)
 
-/*
- * XXX: Manually wrap _rtld_unw_setcontext_impl in a trampoline for now because
- * it is called via a function pointer.
- */
-extern struct jmp_args (*_rtld_unw_setcontext_ptr)(struct jmp_args, void *,
-    void **);
-struct jmp_args (*_rtld_unw_setcontext_ptr)(struct jmp_args, void *, void **);
-
 void
-c18n_init2(Obj_Entry *obj_rtld)
+c18n_init2(void)
 {
 #ifndef CHERI_LIB_C18N_NO_OTYPE
 	uintptr_t sealer;
@@ -1840,20 +1766,6 @@ c18n_init2(Obj_Entry *obj_rtld)
 	assert(tramp_pg_size > 0);
 	atomic_store_explicit(&tramp_pgs.head, tramp_pg_new(NULL),
 	    memory_order_relaxed);
-
-	/*
-	 * XXX: Manually wrap _rtld_unw_setcontext_impl in a trampoline for now
-	 * because it is called via a function pointer.
-	*/
-	_rtld_unw_setcontext_ptr = tramp_intern(NULL, RTLD_COMPART_ID,
-	    &(struct tramp_data) {
-		.target = &_rtld_unw_setcontext_impl,
-		.defobj = obj_rtld,
-		.sig = (struct func_sig) {
-			.valid = true,
-			.reg_args = 4, .mem_args = false, .ret_args = TWO
-		}
-	});
 }
 
 /*

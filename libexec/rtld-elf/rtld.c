@@ -1025,7 +1025,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 
 #ifdef CHERI_LIB_C18N
     if (C18N_ENABLED)
-	c18n_init2(&obj_rtld);
+	c18n_init2();
 #endif
 
     /*
