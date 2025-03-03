@@ -25,6 +25,7 @@
 #              mitigation.
 # - init-all:  supports stack variable initialization.
 # - aarch64-sha512: supports the AArch64 sha512 intrinsic functions.
+# - morello-codeptr-relocs: support code pointer relocations on Morello
 #
 # When bootstrapping on macOS, 'apple-clang' will be set in COMPILER_FEATURES
 # to differentiate Apple's version of Clang. Apple Clang uses a different
@@ -298,6 +299,15 @@ ${X_}COMPILER_FEATURES+=	fileprefixmap
 # AArch64 sha512 intrinsics are supported (and have been tested) in
 # clang 13 and gcc 9.
 ${X_}COMPILER_FEATURES+=	aarch64-sha512
+.endif
+
+.if ${${X_}COMPILER_TYPE} == "clang" && ${${X_}COMPILER_VERSION} >= 150000
+# XXX: This (like aarch64-sha512) depends on the feature only being used
+# on the correct target.  It also isn't completely accurate as revisions
+# of the compiler exist which are based on LLVM 15 and don't support
+# -cheri-codeptr-relocs.  Such systems will fail to build with an error
+# so this should be ok.
+${X_}COMPILER_FEATURES+=	morello-codeptr-relocs
 .endif
 
 .else
