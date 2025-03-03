@@ -109,7 +109,6 @@ DPCPU_DEFINE(xen_intr_handle_t, ipi_handle[nitems(xen_ipis)]);
 
 /*------------------------------- Xen PV APIC --------------------------------*/
 
-#define PCPU_ID_GET(id, field) (pcpu_find(id)->pc_##field)
 static int
 send_nmi(int dest)
 {
