@@ -40,37 +40,29 @@
 
 #define	INT_SIZE	8
 #define	INT(x)		x
-#define	LOAD_INT	PTR(ld)
-#define	STORE_INT	PTR(sd)
+#define	LOAD_INT	ld
+#define	STORE_INT	sd
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	LOAD_PTR	LOAD_CAP
 #define	STORE_PTR	STORE_CAP
-#define	ADD_PTR		cincoffset
-#define	MV_PTR		cmove
+#define	MV_PTR		cmv
 #define	PTR_SIZE	CAP_SIZE
-#define	PTR(x)		CAP(x)
 #else
 #define	LOAD_PTR	LOAD_INT
 #define	STORE_PTR	STORE_INT
-#define	ADD_PTR		add
 #define	MV_PTR		mv
 #define	PTR_SIZE	INT_SIZE
-#define	PTR(x)		INT(x)
 #endif
 
-#define	JR_PTR		PTR(jr)
-
 #if __has_feature(capabilities)
-#define	LOAD_CAP	PTR(lc)
-#define	STORE_CAP	PTR(sc)
+#define	LOAD_CAP	lc
+#define	STORE_CAP	sc
 #define	CAP_SIZE	16
-#define	CAP(x)		c ## x
 #else
 #define	LOAD_CAP	ld
 #define	STORE_CAP	sd
 #define	CAP_SIZE	8
-#define	CAP(x)		x
 #endif
 
 #ifdef __riscv_float_abi_double
@@ -101,32 +93,32 @@
 ENTRY(.rtld_start)
 	.cfi_undefined PTR(ra)	/* Do not attempt to unwind any further. */
 #ifdef __CHERI_PURE_CAPABILITY__
-	cmove	cs0, ca0				/* Put aux in a callee-saved register */
-	cmove	cs1, csp				/* And the stack pointer */
+	cmv	cs0, ca0				/* Put aux in a callee-saved register */
+	cmv	cs1, csp				/* And the stack pointer */
 
-	cincoffset csp, csp, -(CLEN * 2)		/* Make room for obj_main & exit_proc */
+	caddi	csp, csp, -(CLEN * 2)			/* Make room for obj_main & exit_proc */
 
-	cllc	ca0, _DYNAMIC				/* dynp */
-	cmove	ca1, cs0				/* aux */
-	cjal	_rtld_relocate_nonplt_self		/* Relocate ourselves early, including __cap_relocs */
+	llc	ca0, _DYNAMIC				/* dynp */
+	cmv	ca1, cs0				/* aux */
+	jal	_rtld_relocate_nonplt_self		/* Relocate ourselves early, including __cap_relocs */
 
 #if __CHERI_CAPABILITY_TABLE__ != 3
 	/* TODO: CGP for PLT and FNDESC ABIs */
 #error "Only the PC-relative ABI is currently supported"
 #endif
 
-	cmove	ca0, cs0				/* Restore aux */
-	csetbounds	ca1, csp, CLEN			/* exit_proc */
-	cincoffset	ca2, csp, CLEN
-	csetbounds	ca2, ca2, CLEN			/* obj_main */
-	cjal	_rtld					/* Call the loader */
-	cmove	ct0, ca0				/* Backup the entry point */
+	cmv	ca0, cs0				/* Restore aux */
+	scbnds		ca1, csp, CLEN			/* exit_proc */
+	caddi		ca2, csp, CLEN
+	scbnds		ca2, ca2, CLEN			/* obj_main */
+	jal	_rtld					/* Call the loader */
+	cmv	ct0, ca0				/* Backup the entry point */
 
-	clc	ca1, (CLEN * 0)(csp)			/* Load cleanup */
-	clc	ca2, (CLEN * 1)(csp)			/* Load obj_main */
-	cmove	ca0, cs0				/* Restore aux */
-	cmove	csp, cs1				/* Restore the stack pointer */
-	cjr	ct0					/* Jump to the entry point */
+	lc	ca1, (CLEN * 0)(csp)			/* Load cleanup */
+	lc	ca2, (CLEN * 1)(csp)			/* Load obj_main */
+	cmv	ca0, cs0				/* Restore aux */
+	cmv	csp, cs1				/* Restore the stack pointer */
+	jr	ct0					/* Jump to the entry point */
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
 	mv	s0, a0		/* Put ps_strings in a callee-saved register */
 	mv	s1, sp		/* And the stack pointer */
@@ -159,7 +151,7 @@ ENTRY(_rtld_bind_start)
 #define	FLT_OFFSET	(8 * CAP_SIZE + 1 * PTR_SIZE)
 #define	FRAME_SIZE	(((FLT_OFFSET + 8 * FLT_SIZE) + 15) & ~15)
 
-	ADD_PTR		PTR(sp), PTR(sp), -FRAME_SIZE
+	ADDI_PTR	PTR(sp), PTR(sp), -FRAME_SIZE
 	STORE_CAP	CAP(a0), (CAP_SIZE * 0)(PTR(sp))
 	STORE_CAP	CAP(a1), (CAP_SIZE * 1)(PTR(sp))
 	STORE_CAP	CAP(a2), (CAP_SIZE * 2)(PTR(sp))
@@ -194,11 +186,7 @@ ENTRY(_rtld_bind_start)
 	MV_PTR	PTR(a0), PTR(t0)
 
 	/* Call into rtld */
-#ifdef __CHERI_PURE_CAPABILITY__
-	cjal	_rtld_bind
-#else
 	jal	_rtld_bind
-#endif
 
 	/* Backup the address to branch to */
 	MV_PTR	PTR(t0), PTR(a0)
@@ -225,8 +213,8 @@ ENTRY(_rtld_bind_start)
 	LOAD_FLT	fa6, (FLT_OFFSET + FLT_SIZE * 6)(PTR(sp))
 	LOAD_FLT	fa7, (FLT_OFFSET + FLT_SIZE * 7)(PTR(sp))
 #endif
-	ADD_PTR		PTR(sp), PTR(sp), FRAME_SIZE
+	ADDI_PTR	PTR(sp), PTR(sp), FRAME_SIZE
 
 	/* Call into the correct function */
-	JR_PTR	PTR(t0)
+	jr	PTR(t0)
 END(_rtld_bind_start)
