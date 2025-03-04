@@ -38,45 +38,8 @@
 #include <machine/riscvreg.h>
 #endif
 
-#define	INT_SIZE	8
-#define	INT(x)		x
-#define	LOAD_INT	PTR(ld)
-#define	STORE_INT	PTR(sd)
-
-#ifdef __CHERI_PURE_CAPABILITY__
-#define	LOAD_PTR	LOAD_CAP
-#define	STORE_PTR	STORE_CAP
-#define	ADD_PTR		cincoffset
-#define	MV_PTR		cmove
-#define	PTR_SIZE	CAP_SIZE
-#define	PTR(x)		CAP(x)
-#else
-#define	LOAD_PTR	LOAD_INT
-#define	STORE_PTR	STORE_INT
-#define	ADD_PTR		add
-#define	MV_PTR		mv
-#define	PTR_SIZE	INT_SIZE
-#define	PTR(x)		INT(x)
-#endif
-
-#define	JR_PTR		PTR(jr)
-
-#if __has_feature(capabilities)
-#define	LOAD_CAP	PTR(lc)
-#define	STORE_CAP	PTR(sc)
-#define	CAP_SIZE	16
-#define	CAP(x)		c ## x
-#else
-#define	LOAD_CAP	ld
-#define	STORE_CAP	sd
-#define	CAP_SIZE	8
-#define	CAP(x)		x
-#endif
-
 #ifdef __riscv_float_abi_double
 #define	FLT_SIZE	8
-#define	LOAD_FLT	PTR(fld)
-#define	STORE_FLT	PTR(fsd)
 #else
 #define	FLT_SIZE	0
 #endif
@@ -101,32 +64,33 @@
 ENTRY(.rtld_start)
 	.cfi_undefined PTR(ra)	/* Do not attempt to unwind any further. */
 #ifdef __CHERI_PURE_CAPABILITY__
-	cmove	cs0, ca0				/* Put aux in a callee-saved register */
-	cmove	cs1, csp				/* And the stack pointer */
+	_CMV	PTR(s0), PTR(a0)		/* Put aux in a callee-saved register */
+	_CMV	PTR(s1), PTR(sp)		/* And the stack pointer */
 
-	cincoffset csp, csp, -(CLEN * 2)		/* Make room for obj_main & exit_proc */
+	_CADDI	PTR(sp), PTR(sp), -(CLEN * 2)	/* Make room for obj_main & exit_proc */
 
-	cllc	ca0, _DYNAMIC				/* dynp */
-	cmove	ca1, cs0				/* aux */
-	cjal	_rtld_relocate_nonplt_self		/* Relocate ourselves early, including __cap_relocs */
+	_LLC	PTR(a0), _DYNAMIC		/* dynp */
+	_CMV	PTR(a1), PTR(s0)		/* aux */
+	_JAL	_rtld_relocate_nonplt_self	/* Relocate ourselves early, including __cap_relocs */
 
 #if __CHERI_CAPABILITY_TABLE__ != 3
 	/* TODO: CGP for PLT and FNDESC ABIs */
 #error "Only the PC-relative ABI is currently supported"
 #endif
 
-	cmove	ca0, cs0				/* Restore aux */
-	csetbounds	ca1, csp, CLEN			/* exit_proc */
-	cincoffset	ca2, csp, CLEN
-	csetbounds	ca2, ca2, CLEN			/* obj_main */
-	cjal	_rtld					/* Call the loader */
-	cmove	ct0, ca0				/* Backup the entry point */
+	_CMV	PTR(a0), PTR(s0)		/* Restore aux */
+	li	t0, CLEN
+	_SCBNDSR	PTR(a1), PTR(sp), t0	/* exit_proc */
+	_CADDI	PTR(a2), PTR(sp), CLEN
+	_SCBNDSR	PTR(a2), PTR(a2), t0	/* obj_main */
+	_JAL	_rtld				/* Call the loader */
+	_CMV	PTR(t0), PTR(a0)		/* Backup the entry point */
 
-	clc	ca1, (CLEN * 0)(csp)			/* Load cleanup */
-	clc	ca2, (CLEN * 1)(csp)			/* Load obj_main */
-	cmove	ca0, cs0				/* Restore aux */
-	cmove	csp, cs1				/* Restore the stack pointer */
-	cjr	ct0					/* Jump to the entry point */
+	L_PTR	PTR(a1), (CLEN * 0)(PTR(sp))	/* Load cleanup */
+	L_PTR	PTR(a2), (CLEN * 1)(PTR(sp))	/* Load obj_main */
+	_CMV	PTR(a0), PTR(s0)		/* Restore aux */
+	_CMV	PTR(sp), PTR(s1)		/* Restore the stack pointer */
+	_JR	PTR(t0)				/* Jump to the entry point */
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
 	mv	s0, a0		/* Put ps_strings in a callee-saved register */
 	mv	s1, sp		/* And the stack pointer */
@@ -156,30 +120,30 @@ ENTRY(_rtld_bind_start)
 	 * We require 8 GP(C)Rs, 1 pointer and 8 FPRs, but the stack must be
 	 * aligned to 16-bytes.
 	 */
-#define	FLT_OFFSET	(8 * CAP_SIZE + 1 * PTR_SIZE)
+#define	FLT_OFFSET	(8 * CAP_WIDTH + 1 * PTR_WIDTH)
 #define	FRAME_SIZE	(((FLT_OFFSET + 8 * FLT_SIZE) + 15) & ~15)
 
-	ADD_PTR		PTR(sp), PTR(sp), -FRAME_SIZE
-	STORE_CAP	CAP(a0), (CAP_SIZE * 0)(PTR(sp))
-	STORE_CAP	CAP(a1), (CAP_SIZE * 1)(PTR(sp))
-	STORE_CAP	CAP(a2), (CAP_SIZE * 2)(PTR(sp))
-	STORE_CAP	CAP(a3), (CAP_SIZE * 3)(PTR(sp))
-	STORE_CAP	CAP(a4), (CAP_SIZE * 4)(PTR(sp))
-	STORE_CAP	CAP(a5), (CAP_SIZE * 5)(PTR(sp))
-	STORE_CAP	CAP(a6), (CAP_SIZE * 6)(PTR(sp))
-	STORE_CAP	CAP(a7), (CAP_SIZE * 7)(PTR(sp))
-	STORE_PTR	PTR(ra), (CAP_SIZE * 8)(PTR(sp))
+	_CADDI		PTR(sp), PTR(sp), -FRAME_SIZE
+	_SC	CAP(a0), (CAP_WIDTH * 0)(PTR(sp))
+	_SC	CAP(a1), (CAP_WIDTH * 1)(PTR(sp))
+	_SC	CAP(a2), (CAP_WIDTH * 2)(PTR(sp))
+	_SC	CAP(a3), (CAP_WIDTH * 3)(PTR(sp))
+	_SC	CAP(a4), (CAP_WIDTH * 4)(PTR(sp))
+	_SC	CAP(a5), (CAP_WIDTH * 5)(PTR(sp))
+	_SC	CAP(a6), (CAP_WIDTH * 6)(PTR(sp))
+	_SC	CAP(a7), (CAP_WIDTH * 7)(PTR(sp))
+	S_PTR	PTR(ra), (CAP_WIDTH * 8)(PTR(sp))
 
 #if FLT_SIZE != 0
 	/* Save any floating-point arguments */
-	STORE_FLT	fa0, (FLT_OFFSET + FLT_SIZE * 0)(PTR(sp))
-	STORE_FLT	fa1, (FLT_OFFSET + FLT_SIZE * 1)(PTR(sp))
-	STORE_FLT	fa2, (FLT_OFFSET + FLT_SIZE * 2)(PTR(sp))
-	STORE_FLT	fa3, (FLT_OFFSET + FLT_SIZE * 3)(PTR(sp))
-	STORE_FLT	fa4, (FLT_OFFSET + FLT_SIZE * 4)(PTR(sp))
-	STORE_FLT	fa5, (FLT_OFFSET + FLT_SIZE * 5)(PTR(sp))
-	STORE_FLT	fa6, (FLT_OFFSET + FLT_SIZE * 6)(PTR(sp))
-	STORE_FLT	fa7, (FLT_OFFSET + FLT_SIZE * 7)(PTR(sp))
+	_FSD	fa0, (FLT_OFFSET + FLT_SIZE * 0)(PTR(sp))
+	_FSD	fa1, (FLT_OFFSET + FLT_SIZE * 1)(PTR(sp))
+	_FSD	fa2, (FLT_OFFSET + FLT_SIZE * 2)(PTR(sp))
+	_FSD	fa3, (FLT_OFFSET + FLT_SIZE * 3)(PTR(sp))
+	_FSD	fa4, (FLT_OFFSET + FLT_SIZE * 4)(PTR(sp))
+	_FSD	fa5, (FLT_OFFSET + FLT_SIZE * 5)(PTR(sp))
+	_FSD	fa6, (FLT_OFFSET + FLT_SIZE * 6)(PTR(sp))
+	_FSD	fa7, (FLT_OFFSET + FLT_SIZE * 7)(PTR(sp))
 #endif
 
 	/* Reloc offset is 3x or 1.5x of the .got.plt offset */
@@ -191,42 +155,38 @@ ENTRY(_rtld_bind_start)
 	add	a1, a1, t1	/* Plus item */
 
 	/* Load plt */
-	MV_PTR	PTR(a0), PTR(t0)
+	_CMV	PTR(a0), PTR(t0)
 
 	/* Call into rtld */
-#ifdef __CHERI_PURE_CAPABILITY__
-	cjal	_rtld_bind
-#else
-	jal	_rtld_bind
-#endif
+	_JAL	_rtld_bind
 
 	/* Backup the address to branch to */
-	MV_PTR	PTR(t0), PTR(a0)
+	_CMV	PTR(t0), PTR(a0)
 
 	/* Restore the arguments and ra */
-	LOAD_CAP	CAP(a0), (CAP_SIZE * 0)(PTR(sp))
-	LOAD_CAP	CAP(a1), (CAP_SIZE * 1)(PTR(sp))
-	LOAD_CAP	CAP(a2), (CAP_SIZE * 2)(PTR(sp))
-	LOAD_CAP	CAP(a3), (CAP_SIZE * 3)(PTR(sp))
-	LOAD_CAP	CAP(a4), (CAP_SIZE * 4)(PTR(sp))
-	LOAD_CAP	CAP(a5), (CAP_SIZE * 5)(PTR(sp))
-	LOAD_CAP	CAP(a6), (CAP_SIZE * 6)(PTR(sp))
-	LOAD_CAP	CAP(a7), (CAP_SIZE * 7)(PTR(sp))
-	LOAD_PTR	PTR(ra), (CAP_SIZE * 8)(PTR(sp))
+	_LC	CAP(a0), (CAP_WIDTH * 0)(PTR(sp))
+	_LC	CAP(a1), (CAP_WIDTH * 1)(PTR(sp))
+	_LC	CAP(a2), (CAP_WIDTH * 2)(PTR(sp))
+	_LC	CAP(a3), (CAP_WIDTH * 3)(PTR(sp))
+	_LC	CAP(a4), (CAP_WIDTH * 4)(PTR(sp))
+	_LC	CAP(a5), (CAP_WIDTH * 5)(PTR(sp))
+	_LC	CAP(a6), (CAP_WIDTH * 6)(PTR(sp))
+	_LC	CAP(a7), (CAP_WIDTH * 7)(PTR(sp))
+	L_PTR	PTR(ra), (CAP_WIDTH * 8)(PTR(sp))
 
 #if FLT_SIZE != 0
 	/* Restore floating-point arguments */
-	LOAD_FLT	fa0, (FLT_OFFSET + FLT_SIZE * 0)(PTR(sp))
-	LOAD_FLT	fa1, (FLT_OFFSET + FLT_SIZE * 1)(PTR(sp))
-	LOAD_FLT	fa2, (FLT_OFFSET + FLT_SIZE * 2)(PTR(sp))
-	LOAD_FLT	fa3, (FLT_OFFSET + FLT_SIZE * 3)(PTR(sp))
-	LOAD_FLT	fa4, (FLT_OFFSET + FLT_SIZE * 4)(PTR(sp))
-	LOAD_FLT	fa5, (FLT_OFFSET + FLT_SIZE * 5)(PTR(sp))
-	LOAD_FLT	fa6, (FLT_OFFSET + FLT_SIZE * 6)(PTR(sp))
-	LOAD_FLT	fa7, (FLT_OFFSET + FLT_SIZE * 7)(PTR(sp))
+	_FLD	fa0, (FLT_OFFSET + FLT_SIZE * 0)(PTR(sp))
+	_FLD	fa1, (FLT_OFFSET + FLT_SIZE * 1)(PTR(sp))
+	_FLD	fa2, (FLT_OFFSET + FLT_SIZE * 2)(PTR(sp))
+	_FLD	fa3, (FLT_OFFSET + FLT_SIZE * 3)(PTR(sp))
+	_FLD	fa4, (FLT_OFFSET + FLT_SIZE * 4)(PTR(sp))
+	_FLD	fa5, (FLT_OFFSET + FLT_SIZE * 5)(PTR(sp))
+	_FLD	fa6, (FLT_OFFSET + FLT_SIZE * 6)(PTR(sp))
+	_FLD	fa7, (FLT_OFFSET + FLT_SIZE * 7)(PTR(sp))
 #endif
-	ADD_PTR		PTR(sp), PTR(sp), FRAME_SIZE
+	_CADDI	PTR(sp), PTR(sp), FRAME_SIZE
 
 	/* Call into the correct function */
-	JR_PTR	PTR(t0)
+	_JR	PTR(t0)
 END(_rtld_bind_start)
