@@ -72,8 +72,10 @@ struct arm64_addr_mask elf64_addr_mask;
 
 #if __has_feature(capabilities)
 static bool	elf64c_header_supported(const struct image_params *imgp,
+    const Elf64_Ehdr *hdr, const Elf64_Phdr *phdr,
     const int32_t *osrel, const uint32_t *fctl0);
 static bool	elf64cb_header_supported(const struct image_params *imgp,
+    const Elf64_Ehdr *hdr, const Elf64_Phdr *phdr,
     const int32_t *osrel, const uint32_t *fctl0);
 #endif
 
@@ -245,14 +247,11 @@ benchmark_abi_note_cb(const Elf_Note *note, void *arg0, bool *res)
 }
 
 static bool
-get_benchmark_abi_note(const struct image_params *imgp, uint32_t *res)
+get_benchmark_abi_note(const struct image_params *imgp, const Elf64_Ehdr *hdr,
+    const Elf64_Phdr *phdr, uint32_t *res)
 {
-	const __ElfN(Phdr) *phdr;
-	const __ElfN(Ehdr) *hdr;
 	int i;
 
-	hdr = (const Elf_Ehdr *)imgp->image_header;
-	phdr = (const Elf_Phdr *)(imgp->image_header + hdr->e_phoff);
 	for (i = 0; i < hdr->e_phnum; i++)
 		if (phdr[i].p_type == PT_NOTE && __elfN(parse_notes)(imgp,
 		    &benchmark_abi_note, ELF_NOTE_CHERI, &phdr[i],
@@ -264,11 +263,12 @@ get_benchmark_abi_note(const struct image_params *imgp, uint32_t *res)
 
 static bool
 elf64c_header_supported(const struct image_params *imgp,
+    const Elf64_Ehdr *hdr, const Elf64_Phdr *phdr,
     const int32_t *osrel __unused, const uint32_t *fctl0 __unused)
 {
 	uint32_t note_value;
 
-	if (get_benchmark_abi_note(imgp, &note_value))
+	if (get_benchmark_abi_note(imgp, hdr, phdr, &note_value))
 		return (note_value == 0);
 
 	return (true);
@@ -276,11 +276,12 @@ elf64c_header_supported(const struct image_params *imgp,
 
 static bool
 elf64cb_header_supported(const struct image_params *imgp,
+    const Elf64_Ehdr *hdr, const Elf64_Phdr *phdr,
     const int32_t *osrel __unused, const uint32_t *fctl0 __unused)
 {
 	uint32_t note_value;
 
-	if (get_benchmark_abi_note(imgp, &note_value))
+	if (get_benchmark_abi_note(imgp, hdr, phdr, &note_value))
 		return (note_value == 1);
 
 	return (false);

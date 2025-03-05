@@ -163,6 +163,7 @@ amd64_lower_shared_page(struct sysentvec *sv)
 
 static bool
 freebsd_brand_info_la57_img_compat(const struct image_params *imgp,
+    const Elf64_Ehdr *hdr __unused, const Elf64_Phdr *phdr __unused,
     const int32_t *osrel __unused, const uint32_t *fctl0)
 {
 	if ((imgp->proc->p_md.md_flags & P_MD_LA57) != 0)
