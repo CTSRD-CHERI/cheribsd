@@ -248,6 +248,11 @@ SYSCTL_BOOL(ELF_NODE_OID, OID_AUTO, allow_wx, CTLFLAG_RWTUN,
     &__elfN(allow_wx), 0,
     "Allow pages to be mapped simultaneously writable and executable");
 
+static unsigned long __elfN(max_phdr_len) = 4 * PAGE_SIZE;
+SYSCTL_ULONG(ELF_NODE_OID, OID_AUTO, max_phdr_len, CTLFLAG_RWTUN,
+    &__elfN(max_phdr_len), 0,
+    "Maximum length of program headers");
+
 static Elf_Brandinfo *elf_brand_list[MAX_BRANDS];
 
 #define	aligned(a, t)	(rounddown2((u_long)(a), sizeof(t)) == (u_long)(a))
@@ -508,6 +513,56 @@ __elfN(phdr_in_zero_page)(const Elf_Ehdr *hdr)
 {
 	return (hdr->e_phoff <= PAGE_SIZE &&
 	    (u_int)hdr->e_phentsize * hdr->e_phnum <= PAGE_SIZE - hdr->e_phoff);
+}
+
+static const Elf_Phdr *
+__elfN(map_phdr)(struct image_params *imgp, const Elf_Ehdr *hdr, bool complain)
+{
+	struct thread *td;
+	void *buf;
+	size_t len;
+	int error;
+
+	if (__elfN(phdr_in_zero_page)(hdr))
+		return ((const Elf_Phdr *)(imgp->image_header + hdr->e_phoff));
+
+	len = hdr->e_phnum * hdr->e_phentsize;
+	if (len > __elfN(max_phdr_len)) {
+		if (complain)
+			uprintf("Program headers (%zu) too large\n", len);
+		return (NULL);
+	}
+
+	/* See comment in __elfN(get_interp). */
+	ASSERT_VOP_LOCKED(imgp->vp, __func__);
+	buf = malloc(len, M_TEMP, M_NOWAIT);
+	if (buf == NULL) {
+		VOP_UNLOCK(imgp->vp);
+		buf = malloc(len, M_TEMP, M_WAITOK);
+		vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
+	}
+
+	td = curthread;
+	error = vn_rdwr(UIO_READ, imgp->vp, PTR2CAP(buf), len, hdr->e_phoff,
+	    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred, NOCRED, NULL, td);
+	if (error != 0) {
+		free(buf, M_TEMP);
+		if (complain)
+			uprintf("i/o error reading program headers %d\n",
+			    error);
+		return (NULL);
+	}
+
+	return (buf);
+}
+
+static void
+__elfN(unmap_phdr)(const Elf_Ehdr *hdr, const Elf_Phdr *phdr)
+{
+	if (__elfN(phdr_in_zero_page)(hdr))
+		return;
+
+	free(__DECONST(Elf_Phdr *, phdr), M_TEMP);
 }
 
 static int
@@ -986,13 +1041,12 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 		goto fail;
 	}
 
-	/* Only support headers that fit within first page for now      */
-	if (!__elfN(phdr_in_zero_page)(hdr)) {
+	phdr = __elfN(map_phdr)(imgp, hdr, false);
+	if (phdr == NULL) {
 		error = ENOEXEC;
 		goto fail;
 	}
 
-	phdr = (const Elf_Phdr *)(imgp->image_header + hdr->e_phoff);
 	if (!aligned(phdr, Elf_Addr)) {
 		error = ENOEXEC;
 		goto fail;
@@ -1017,6 +1071,9 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 	*entry = (unsigned long)hdr->e_entry + rbase;
 
 fail:
+	if (phdr != NULL)
+		__elfN(unmap_phdr(hdr, phdr));
+
 	if (imgp->firstpage)
 		exec_unmap_first_page(imgp);
 
@@ -1301,14 +1358,18 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	 * detected an ELF file.
 	 */
 
-	if (!__elfN(phdr_in_zero_page)(hdr)) {
-		uprintf("Program headers not in the first page\n");
+	phdr = __elfN(map_phdr)(imgp, hdr, true);
+	if (phdr == NULL) {
 		return (ENOEXEC);
 	}
-	phdr = (const Elf_Phdr *)(imgp->image_header + hdr->e_phoff); 
+
+	interp = NULL;
+	free_interp = false;
+
 	if (!aligned(phdr, Elf_Addr)) {
 		uprintf("Unaligned program headers\n");
-		return (ENOEXEC);
+		error = ENOEXEC;
+		goto ret;
 	}
 
 	n = error = 0;
@@ -1316,8 +1377,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	osrel = 0;
 	fctl0 = 0;
 	entry = proghdr = 0;
-	interp = NULL;
-	free_interp = false;
 	td = curthread;
 
 	/*
@@ -1647,6 +1706,9 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 
 ret:
 	ASSERT_VOP_LOCKED(imgp->vp, "skipped relock");
+	if (phdr != NULL)
+		__elfN(unmap_phdr)(hdr, phdr);
+
 	if (free_interp)
 		free(interp, M_TEMP);
 	return (error);
