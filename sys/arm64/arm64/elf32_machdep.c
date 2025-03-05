@@ -77,6 +77,7 @@ static void freebsd32_setregs(struct thread *td, struct image_params *imgp,
 static void freebsd32_set_syscall_retval(struct thread *, int);
 
 static bool elf32_arm_abi_supported(const struct image_params *,
+    const Elf32_Ehdr *, const Elf32_Phdr *,
     const int32_t *, const uint32_t *);
 static void elf32_fixlimit(struct rlimit *rl, int which);
 
@@ -167,12 +168,10 @@ SYSINIT(elf32, SI_SUB_EXEC, SI_ORDER_FIRST, register_elf32_brand, NULL);
 
 static bool
 elf32_arm_abi_supported(const struct image_params *imgp,
+    const Elf32_Ehdr *hdr, const Elf32_Phdr *phdr __unused,
     const int32_t *osrel __unused, const uint32_t *fctl0 __unused)
 {
-	const Elf32_Ehdr *hdr;
-
 #define	EF_ARM_EABI_FREEBSD_MIN	EF_ARM_EABI_VER4
-	hdr = (const Elf32_Ehdr *)imgp->image_header;
 	if (EF_ARM_EABI_VERSION(hdr->e_flags) < EF_ARM_EABI_FREEBSD_MIN) {
 		if (bootverbose)
 			uprintf("Attempting to execute non EABI binary "

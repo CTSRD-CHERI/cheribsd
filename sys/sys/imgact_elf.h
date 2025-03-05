@@ -89,6 +89,7 @@ typedef struct {
 	int flags;
 	Elf_Brandnote *brand_note;
 	bool		(*header_supported)(const struct image_params *,
+	    const __ElfN(Ehdr) *, const __ElfN(Phdr) *,
 	    const int32_t *, const uint32_t *);
 		/* High 8 bits of flags is private to the ABI */
 #define	BI_CAN_EXEC_DYN		0x0001
