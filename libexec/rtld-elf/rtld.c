@@ -4578,10 +4578,24 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	    sym = __DECONST(void*, make_function_pointer(def, defobj));
 	    dbg("dlsym(%s) is function: " PTR_FMT, name, sym);
 #ifdef CHERI_LIB_C18N
-	    sym = tramp_intern(NULL, RTLD_COMPART_ID, &(struct tramp_data) {
-		.target = sym,
-		.defobj = defobj,
-		.def = def
+	    /*
+	     * XXX Dapeng: Need to handle tail-calls causing the caller to be
+	     * mis-identified.
+	     */
+	    if (handle != NULL && handle != RTLD_NEXT &&
+		handle != RTLD_DEFAULT && handle != RTLD_SELF &&
+		(obj = obj_from_addr(retaddr)) == NULL) {
+		rtld_fdprintf(STDERR_FILENO,
+		    "c18n: obj_from_addr(%#p) = NULL\n",
+		    retaddr);
+		abort();
+	    }
+	    sym = tramp_intern(NULL,
+		compart_id_for_address(obj, (Elf_Addr)retaddr),
+		&(struct tramp_data) {
+		    .target = sym,
+		    .defobj = defobj,
+		    .def = def
 	    });
 #endif
 	} else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
