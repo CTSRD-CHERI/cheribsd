@@ -4578,10 +4578,15 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	    sym = __DECONST(void*, make_function_pointer(def, defobj));
 	    dbg("dlsym(%s) is function: " PTR_FMT, name, sym);
 #ifdef CHERI_LIB_C18N
-	    sym = tramp_intern(NULL, RTLD_COMPART_ID, &(struct tramp_data) {
-		.target = sym,
-		.defobj = defobj,
-		.def = def
+	    /*
+	     * XXX Dapeng: It is unclear on whose behalf we are resolving this
+	     * symbol. `handle` or `retaddr`?
+	     */
+	    sym = tramp_intern(NULL, RTLD_COMPART_ID,
+		&(struct tramp_data) {
+		    .target = sym,
+		    .defobj = defobj,
+		    .def = def
 	    });
 #endif
 	} else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {

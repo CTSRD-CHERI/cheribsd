@@ -917,7 +917,8 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				(Elf_Addr)(uintptr_t)obj->relocbase,
 				rela->r_addend);
 #ifdef CHERI_LIB_C18N
-			*(void **)where = tramp_intern(NULL, RTLD_COMPART_ID,
+			*(void **)where = tramp_intern(NULL,
+			    compart_id_for_address(obj, (Elf_Addr)where),
 			    &(struct tramp_data) {
 				.target = *(void **)where,
 				.defobj = obj
@@ -931,7 +932,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 #ifdef CHERI_LIB_C18N
 			if (ELF_ST_TYPE(def->st_info) == STT_FUNC)
 				*where = (Elf_Addr)tramp_intern(NULL,
-				    RTLD_COMPART_ID,
+				    compart_id_for_address(obj, (Elf_Addr)where),
 				    &(struct tramp_data) {
 					.target = (void *)(uintptr_t)*where,
 					.defobj = defobj,
@@ -1012,7 +1013,8 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		case R_AARCH64_FUNC_RELATIVE:
 			*where = (Elf_Addr)(obj->relocbase + rela->r_addend);
 #ifdef CHERI_LIB_C18N
-			*where = (Elf_Addr)tramp_intern(NULL, RTLD_COMPART_ID,
+			*where = (Elf_Addr)tramp_intern(NULL,
+			    compart_id_for_address(obj, (Elf_Addr)where),
 			    &(struct tramp_data) {
 				.target = (void *)(uintptr_t)*where,
 				.defobj = obj
