@@ -199,7 +199,7 @@ c18n_free(void *buf)
 /*
  * Policies
  */
-typedef ssize_t string_handle;
+typedef size_t string_handle;
 
 struct string_base {
 	char *buf;
@@ -216,38 +216,38 @@ string_base_expand(struct string_base *sb, size_t capacity)
 	sb->capacity = capacity;
 }
 
-static string_handle
+static void
 string_base_push(struct string_base *sb, const char *str)
 {
-	string_handle i = sb->size;
+	string_handle cap;
+	size_t len;
 
-	do {
-		if (sb->size == sb->capacity)
-			string_base_expand(sb,
-			    MAX(C18N_STRING_BASE_INIT, sb->capacity * 2));
-		sb->buf[sb->size++] = *str;
-	} while (*str++ != '\0');
+	len = strlen(str) + 1;
+	if (sb->size + len > sb->capacity) {
+		cap = MAX(C18N_STRING_BASE_INIT, sb->capacity * 2);
+		while (sb->size + len > cap)
+			cap *= 2;
 
-	return (i);
+		string_base_expand(sb, cap);
+	}
+	memcpy(sb->buf + sb->size, str, len);
+	sb->size += len;
 }
 
-static string_handle
+static bool
 string_base_search(const struct string_base *sb, const char *str)
 {
-	const char *cur;
-	string_handle i = 0, s;
+	const char *cp, *end;
 
-	while (i < sb->size) {
-		s = i;
-		cur = str;
-		while (sb->buf[i++] == *cur)
-			if (*cur++ == '\0')
-				return (s);
-		while (sb->buf[i] != '\0') ++i;
-		++i;
+	cp = sb->buf;
+	end = cp + sb->size;
+	while (cp < end) {
+		if (strcmp(cp, str) == 0)
+			return (true);
+		cp = strchr(cp, '\0') + 1;
 	}
 
-	return (-1);
+	return (false);
 }
 
 struct compart {
@@ -366,7 +366,7 @@ compart_id_allocate(const char *lib)
 	 */
 	for (i = RTLD_COMPART_ID; i < comparts.size; ++i) {
 		com = &comparts.data[i];
-		if (string_base_search(&com->libs, lib) != -1)
+		if (string_base_search(&com->libs, lib))
 			goto out;
 	}
 
@@ -564,12 +564,12 @@ evaluate_rules(compart_id_t caller, compart_id_t callee, const char *sym)
 	struct rule_action *act;
 
 	if (comparts.data[caller].restrict_imports &&
-	    string_base_search(&comparts.data[caller].imports, sym) == -1)
+	    !string_base_search(&comparts.data[caller].imports, sym))
 		return (false);
 
 	SLIST_FOREACH(cur, &rules, link) {
 		if (cur->callee != callee ||
-		    string_base_search(&cur->symbols, sym) == -1)
+		    !string_base_search(&cur->symbols, sym))
 			continue;
 		SLIST_FOREACH(act, &cur->action, link) {
 			if (act->caller == caller)
@@ -600,7 +600,7 @@ tramp_should_include(const Plt_Entry *plt, compart_id_t caller,
 
 	sym = strtab_value(data->defobj, data->def->st_name);
 
-	if (string_base_search(&uni_compart.trusts, sym) != -1)
+	if (string_base_search(&uni_compart.trusts, sym))
 		return (false);
 
 	callee = compart_id_for_address(data->defobj, (ptraddr_t)data->target);
@@ -612,8 +612,7 @@ tramp_should_include(const Plt_Entry *plt, compart_id_t caller,
 	if (plt != NULL && caller == callee)
 		return (false);
 
-	if (string_base_search(&comparts.data[caller].trusts, sym)
-	    != -1)
+	if (string_base_search(&comparts.data[caller].trusts, sym))
 		return (false);
 
 	if (evaluate_rules(caller, callee, sym))
