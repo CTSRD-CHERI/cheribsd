@@ -2200,7 +2200,7 @@ linux_ifconf(struct thread *td, struct l_ifconf * __capability uifc)
 		return (error);
 
 	/* handle the 'request buffer size' case */
-	if (ifc.ifc_buf == NULL) {
+	if (!ifc.ifc_buf) {
 		ifc.ifc_len = 0;
 		NET_EPOCH_ENTER(et);
 		if_foreach(linux_ifconf_ifnet_cb, &ifc);
