@@ -825,7 +825,7 @@ static Elf_Brandinfo linux_glibc2brand = {
 	.sysvec		= &elf_linux_sysvec,
 	.interp_newpath	= NULL,
 	.brand_note	= &linux_brandnote,
-	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE
+	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE,
 #if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
 	.header_supported = &linux64c_header_supported,
 #endif
