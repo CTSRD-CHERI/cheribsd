@@ -434,8 +434,8 @@ skip_pmap:
 			if (pcb->pcb_onfault != 0) {
 				frame->tf_a[0] = error;
 #if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
-				frame->tf_sepc = (uintcap_t)cheri_setaddress(
-				    cheri_getpcc(), pcb->pcb_onfault);
+				frame->tf_sepc = cheri_setaddress(
+				    frame->tf_sepc, pcb->pcb_onfault);
 #else
 				frame->tf_sepc = pcb->pcb_onfault;
 #endif
@@ -539,8 +539,8 @@ do_trap_supervisor(struct trapframe *frame)
 		if (curthread->td_pcb->pcb_onfault != 0) {
 			frame->tf_a[0] = EPROT;
 #ifndef __CHERI_PURE_CAPABILITY__
-			frame->tf_sepc = (uintcap_t)cheri_setaddress(
-			    cheri_getpcc(), curthread->td_pcb->pcb_onfault);
+			frame->tf_sepc = cheri_setaddress(frame->tf_sepc,
+			    curthread->td_pcb->pcb_onfault);
 #else
 			frame->tf_sepc = curthread->td_pcb->pcb_onfault;
 #endif
