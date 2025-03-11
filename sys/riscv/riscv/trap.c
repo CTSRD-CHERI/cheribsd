@@ -433,7 +433,7 @@ skip_pmap:
 		} else {
 			if (pcb->pcb_onfault != 0) {
 				frame->tf_a[0] = error;
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
 				frame->tf_sepc = (uintcap_t)cheri_setaddress(
 				    cheri_getpcc(), pcb->pcb_onfault);
 #else
@@ -538,8 +538,12 @@ do_trap_supervisor(struct trapframe *frame)
 	case SCAUSE_CHERI:
 		if (curthread->td_pcb->pcb_onfault != 0) {
 			frame->tf_a[0] = EPROT;
+#ifndef __CHERI_PURE_CAPABILITY__
 			frame->tf_sepc = (uintcap_t)cheri_setaddress(
 			    cheri_getpcc(), curthread->td_pcb->pcb_onfault);
+#else
+			frame->tf_sepc = curthread->td_pcb->pcb_onfault;
+#endif
 			break;
 		}
 		dump_regs(frame);
