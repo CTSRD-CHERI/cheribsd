@@ -2133,11 +2133,7 @@ linux_ioctl_ifname(struct thread *td, struct l_ifreq * __capability uifr)
 static u_int
 linux_ifconf_ifaddr_cb(void *arg, struct ifaddr *ifa, u_int count)
 {
-#ifdef COMPAT_LINUX32
 	struct l_ifconf *ifc;
-#else
-	struct ifconf *ifc;
-#endif
 
 	ifc = arg;
 	ifc->ifc_len += sizeof(struct l_ifreq);
@@ -2191,19 +2187,15 @@ linux_ifconf_ifnet_cb2(if_t ifp, void *arg)
 }
 
 static int
-linux_ifconf(struct thread *td, struct ifconf * __capability uifc)
+linux_ifconf(struct thread *td, struct l_ifconf * __capability uifc)
 {
 	struct linux_ifconfig_ifaddr_cb2_s cbs;
 	struct epoch_tracker et;
-#ifdef COMPAT_LINUX32
 	struct l_ifconf ifc;
-#else
-	struct ifconf ifc;
-#endif
 	struct sbuf *sb;
 	int error, full;
 
-	error = copyin(uifc, &ifc, sizeof(ifc));
+	error = copyincap(uifc, &ifc, sizeof(ifc));
 	if (error != 0)
 		return (error);
 
@@ -2213,7 +2205,7 @@ linux_ifconf(struct thread *td, struct ifconf * __capability uifc)
 		NET_EPOCH_ENTER(et);
 		if_foreach(linux_ifconf_ifnet_cb, &ifc);
 		NET_EPOCH_EXIT(et);
-		return (copyout(&ifc, uifc, sizeof(ifc)));
+		return (copyoutcap(&ifc, uifc, sizeof(ifc)));
 	}
 	if (ifc.ifc_len <= 0)
 		return (EINVAL);
@@ -2242,9 +2234,9 @@ again:
 
 	ifc.ifc_len = cbs.valid_len;
 	sbuf_finish(sb);
-	error = copyout(sbuf_data(sb), ifc.ifc_buf, ifc.ifc_len);
+	error = copyout(sbuf_data(sb), LINUX_USER_CAP(ifc.ifc_buf, ifc.ifc_len), ifc.ifc_len);
 	if (error == 0)
-		error = copyout(&ifc, uifc, sizeof(ifc));
+		error = copyoutcap(&ifc, uifc, sizeof(ifc));
 	sbuf_delete(sb);
 
 	return (error);
@@ -2450,7 +2442,7 @@ linux_ioctl_socket(struct thread *td, struct linux_ioctl_args *args)
 		break;
 
 	case LINUX_SIOCGIFCONF:
-		error = linux_ifconf(td, LINUX_USER_CAP(args->arg, sizeof(struct ifconf)));
+		error = linux_ifconf(td, LINUX_USER_CAP(args->arg, sizeof(struct l_ifconf)));
 		break;
 
 	case LINUX_SIOCADDMULTI:
