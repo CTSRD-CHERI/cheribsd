@@ -142,6 +142,10 @@ extern struct sx linux_ioctl_sx;
 static TAILQ_HEAD(, linux_ioctl_handler_element) linux32_ioctl_handlers =
     TAILQ_HEAD_INITIALIZER(linux32_ioctl_handlers);
 #endif
+#ifdef COMPAT_LINUX64
+static TAILQ_HEAD(, linux_ioctl_handler_element) linux64_ioctl_handlers =
+    TAILQ_HEAD_INITIALIZER(linux64_ioctl_handlers);
+#endif
 
 /*
  * hdio related ioctls for VMWare support
@@ -3609,6 +3613,19 @@ linux_ioctl_fallback(struct thread *td, struct linux_ioctl_args *args)
 		}
 	}
 #endif
+#ifdef COMPAT_LINUX64
+	TAILQ_FOREACH(he, &linux64_ioctl_handlers, list) {
+		if (cmd >= he->low && cmd <= he->high) {
+			error = (*he->func)(td, args);
+			if (error != ENOIOCTL) {
+				mtx_unlock(&Giant);
+				sx_sunlock(&linux_ioctl_sx);
+				fdrop(fp, td);
+				return (error);
+			}
+		}
+	}
+#endif
 	TAILQ_FOREACH(he, &linux_ioctl_handlers, list) {
 		if (cmd >= he->low && cmd <= he->high) {
 			error = (*he->func)(td, args);
@@ -3799,3 +3816,70 @@ linux32_ioctl_unregister_handler(struct linux_ioctl_handler *h)
 	return (EINVAL);
 }
 #endif
+
+#ifdef COMPAT_LINUX64
+int
+linux64_ioctl_register_handler(struct linux_ioctl_handler *h)
+{
+	struct linux_ioctl_handler_element *he, *cur;
+
+	if (h == NULL || h->func == NULL)
+		return (EINVAL);
+
+	/*
+	 * Reuse the element if the handler is already on the list, otherwise
+	 * create a new element.
+	 */
+	sx_xlock(&linux_ioctl_sx);
+	TAILQ_FOREACH(he, &linux64_ioctl_handlers, list) {
+		if (he->func == h->func)
+			break;
+	}
+	if (he == NULL) {
+		he = malloc(sizeof(*he), M_LINUX, M_WAITOK);
+		he->func = h->func;
+	} else
+		TAILQ_REMOVE(&linux64_ioctl_handlers, he, list);
+
+	/* Initialize range information. */
+	he->low = h->low;
+	he->high = h->high;
+	he->span = h->high - h->low + 1;
+
+	/* Add the element to the list, sorted on span. */
+	TAILQ_FOREACH(cur, &linux64_ioctl_handlers, list) {
+		if (cur->span > he->span) {
+			TAILQ_INSERT_BEFORE(cur, he, list);
+			sx_xunlock(&linux_ioctl_sx);
+			return (0);
+		}
+	}
+	TAILQ_INSERT_TAIL(&linux64_ioctl_handlers, he, list);
+	sx_xunlock(&linux_ioctl_sx);
+
+	return (0);
+}
+
+int
+linux64_ioctl_unregister_handler(struct linux_ioctl_handler *h)
+{
+	struct linux_ioctl_handler_element *he;
+
+	if (h == NULL || h->func == NULL)
+		return (EINVAL);
+
+	sx_xlock(&linux_ioctl_sx);
+	TAILQ_FOREACH(he, &linux64_ioctl_handlers, list) {
+		if (he->func == h->func) {
+			TAILQ_REMOVE(&linux64_ioctl_handlers, he, list);
+			sx_xunlock(&linux_ioctl_sx);
+			free(he, M_LINUX);
+			return (0);
+		}
+	}
+	sx_xunlock(&linux_ioctl_sx);
+
+	return (EINVAL);
+}
+#endif
+

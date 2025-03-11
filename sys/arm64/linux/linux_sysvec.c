@@ -852,7 +852,11 @@ linux_elf_modevent(module_t mod, int type, void *data)
 				error = EINVAL;
 		if (error == 0) {
 			SET_FOREACH(lihp, linux_ioctl_handler_set)
+#ifdef COMPAT_LINUX64
+				linux64_ioctl_register_handler(*lihp);
+#else
 				linux_ioctl_register_handler(*lihp);
+#endif
 			stclohz = (stathz ? stathz : hz);
 			if (bootverbose)
 				printf("Linux arm64 ELF exec handler installed\n");
@@ -871,7 +875,11 @@ linux_elf_modevent(module_t mod, int type, void *data)
 		}
 		if (error == 0) {
 			SET_FOREACH(lihp, linux_ioctl_handler_set)
+#ifdef COMPAT_LINUX64
+				linux64_ioctl_unregister_handler(*lihp);
+#else
 				linux_ioctl_unregister_handler(*lihp);
+#endif
 			if (bootverbose)
 				printf("Linux arm64 ELF exec handler removed\n");
 		} else
