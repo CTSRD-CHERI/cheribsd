@@ -281,7 +281,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 #endif
 
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
-	curthread->td_pcb->pcb_onfault = (vm_offset_t)vm_cheri_revoke_tlb_fault;
+	curthread->td_pcb->pcb_onfault = (vm_pointer_t)vm_cheri_revoke_tlb_fault;
 	enable_user_memory_access();
 #endif
 
@@ -366,7 +366,7 @@ vm_cheri_revoke_test(const struct vm_cheri_revoke_cookie *crc, uintcap_t cut)
 
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
 		curthread->td_pcb->pcb_onfault =
-		    (vm_offset_t)vm_cheri_revoke_tlb_fault;
+		    (vm_pointer_t)vm_cheri_revoke_tlb_fault;
 		enable_user_memory_access();
 #endif
 		res = crc->map->vm_cheri_revoke_test(crc->crshadow, cut,
