@@ -230,8 +230,14 @@ static Elf_Note benchmark_abi_note = {
 	.n_type = NT_CHERI_MORELLO_PURECAP_BENCHMARK_ABI
 };
 
+static Elf_Note cheribsd_abi_note = {
+	.n_namesz = sizeof(ELF_NOTE_CHERIBSD),
+	.n_descsz = sizeof(uint32_t),
+	.n_type = NT_CHERIBSD_ABI_TAG
+};
+
 static bool
-benchmark_abi_note_cb(const Elf_Note *note, void *arg0, bool *res)
+abi_note_cb(const Elf_Note *note, void *arg0, bool *res)
 {
 	uint32_t *arg;
 	const char *p;
@@ -256,7 +262,25 @@ get_benchmark_abi_note(const struct image_params *imgp, uint32_t *res)
 	for (i = 0; i < hdr->e_phnum; i++)
 		if (phdr[i].p_type == PT_NOTE && __elfN(parse_notes)(imgp,
 		    &benchmark_abi_note, ELF_NOTE_CHERI, &phdr[i],
-		    benchmark_abi_note_cb, res))
+		    abi_note_cb, res))
+			return (true);
+
+	return (false);
+}
+
+static bool
+get_cheribsd_abi_note(const struct image_params *imgp, uint32_t *res)
+{
+	const __ElfN(Phdr) *phdr;
+	const __ElfN(Ehdr) *hdr;
+	int i;
+
+	hdr = (const Elf_Ehdr *)imgp->image_header;
+	phdr = (const Elf_Phdr *)(imgp->image_header + hdr->e_phoff);
+	for (i = 0; i < hdr->e_phnum; i++)
+		if (phdr[i].p_type == PT_NOTE && __elfN(parse_notes)(imgp,
+		    &cheribsd_abi_note, ELF_NOTE_CHERIBSD, &phdr[i],
+		    abi_note_cb, res))
 			return (true);
 
 	return (false);
@@ -268,8 +292,8 @@ elf64c_header_supported(const struct image_params *imgp,
 {
 	uint32_t note_value;
 
-	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
-	if (hdr->e_ident[EI_OSABI] == ELFOSABI_LINUX) return false;
+	if (!get_cheribsd_abi_note(imgp, &note_value))
+		return false;
 
 	if (get_benchmark_abi_note(imgp, &note_value))
 		return (note_value == 0);
@@ -283,8 +307,8 @@ elf64cb_header_supported(const struct image_params *imgp,
 {
 	uint32_t note_value;
 
-	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
-	if (hdr->e_ident[EI_OSABI] == ELFOSABI_LINUX) return false;
+	if (!get_cheribsd_abi_note(imgp, &note_value))
+		return false;
 
 	if (get_benchmark_abi_note(imgp, &note_value))
 		return (note_value == 1);

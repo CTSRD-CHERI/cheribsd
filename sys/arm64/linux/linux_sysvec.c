@@ -728,6 +728,86 @@ linux_vdso_reloc(char *mapping, Elf_Addr offset)
 	}
 }
 
+
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+static Elf_Note benchmark_abi_note = {
+	.n_namesz = sizeof(ELF_NOTE_CHERI),
+	.n_descsz = sizeof(uint32_t),
+	.n_type = NT_CHERI_MORELLO_PURECAP_BENCHMARK_ABI
+};
+
+static Elf_Note cheribsd_abi_note = {
+	.n_namesz = sizeof(ELF_NOTE_CHERIBSD),
+	.n_descsz = sizeof(uint32_t),
+	.n_type = NT_CHERIBSD_ABI_TAG
+};
+
+static bool
+abi_note_cb(const Elf_Note *note, void *arg0, bool *res)
+{
+	uint32_t *arg;
+	const char *p;
+
+	arg = arg0;
+	p = (const char *)(note + 1);
+	p += roundup2(note->n_namesz, 4);
+	*arg = *(const uint32_t *)p;
+	*res = true;
+	return (true);
+}
+
+static bool
+get_benchmark_abi_note(const struct image_params *imgp, uint32_t *res)
+{
+	const __ElfN(Phdr) *phdr;
+	const __ElfN(Ehdr) *hdr;
+	int i;
+
+	hdr = (const Elf_Ehdr *)imgp->image_header;
+	phdr = (const Elf_Phdr *)(imgp->image_header + hdr->e_phoff);
+	for (i = 0; i < hdr->e_phnum; i++)
+		if (phdr[i].p_type == PT_NOTE && __elfN(parse_notes)(imgp,
+		    &benchmark_abi_note, ELF_NOTE_CHERI, &phdr[i],
+		    abi_note_cb, res))
+			return (true);
+
+	return (false);
+}
+
+static bool
+get_cheribsd_abi_note(const struct image_params *imgp, uint32_t *res)
+{
+	const __ElfN(Phdr) *phdr;
+	const __ElfN(Ehdr) *hdr;
+	int i;
+
+	hdr = (const Elf_Ehdr *)imgp->image_header;
+	phdr = (const Elf_Phdr *)(imgp->image_header + hdr->e_phoff);
+	for (i = 0; i < hdr->e_phnum; i++)
+		if (phdr[i].p_type == PT_NOTE && __elfN(parse_notes)(imgp,
+		    &cheribsd_abi_note, ELF_NOTE_CHERIBSD, &phdr[i],
+		    abi_note_cb, res))
+			return (true);
+
+	return (false);
+}
+
+static bool
+linux64c_header_supported(const struct image_params *imgp,
+    const int32_t *osrel __unused, const uint32_t *fctl0 __unused)
+{
+	uint32_t note_value;
+
+	if (get_cheribsd_abi_note(imgp, &note_value))
+		return false;
+
+	if (get_benchmark_abi_note(imgp, &note_value))
+		return (note_value == 0);
+
+	return (true);
+}
+#endif
+
 static Elf_Brandnote linux_brandnote = {
 	.hdr.n_namesz	= sizeof(GNU_ABI_VENDOR),
 	.hdr.n_descsz	= 16,
@@ -746,6 +826,9 @@ static Elf_Brandinfo linux_glibc2brand = {
 	.interp_newpath	= NULL,
 	.brand_note	= &linux_brandnote,
 	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+	.header_supported = &linux64c_header_supported,
+#endif
 };
 
 Elf_Brandinfo *linux_brandlist[] = {

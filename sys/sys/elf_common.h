@@ -799,6 +799,7 @@ typedef struct {
 #define	ELF_NOTE_SOLARIS	"SUNW Solaris"
 #define	ELF_NOTE_GNU		"GNU"
 #define	ELF_NOTE_CHERI		"CHERI"
+#define	ELF_NOTE_CHERIBSD	"CheriBSD"
 
 /* Values for n_type used in executables. */
 #define	NT_FREEBSD_ABI_TAG	1
