@@ -58,7 +58,7 @@ struct pcb {
 	uint64_t	pcb_fpflags;	/* Floating point flags */
 #define	PCB_FP_STARTED	0x1
 #define	PCB_FP_USERMASK	0x1
-	vm_offset_t	pcb_onfault;	/* Copyinout fault handler */
+	vm_pointer_t	pcb_onfault;	/* Copyinout fault handler */
 };
 
 #ifdef _KERNEL
