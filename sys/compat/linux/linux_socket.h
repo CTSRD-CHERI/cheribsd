@@ -357,6 +357,17 @@ struct l_ifreq {
 };
 
 /*
+ * The layout may be different for linux32 in amd64 or Cheri
+ */
+struct l_ifconf {
+	int	ifc_len;
+	union {
+		l_uintptr_t	ifcu_buf;
+		l_uintptr_t	ifcu_req;
+	} ifc_ifcu;
+};
+
+/*
  * Define here members which are not exists in the FreeBSD struct ifreq.
  */
 #define	ifr_hwaddr	ifr_ifru.ifru_hwaddr	/* MAC address */
