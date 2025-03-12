@@ -107,10 +107,7 @@ struct stk_table_metadata {
 	struct stk_table_stk_info sig_stk;
 #endif
 	struct stk_table_stk_info trusted_stk;
-	struct stk_table_stk_pair {
-		struct stk_table_stk_info ord_stk;
-		struct stk_table_stk_info sig_stk;
-	} compart_stk[];
+	struct stk_table_stk_info compart_stk[];
 };
 
 struct stk_table {
