@@ -154,12 +154,6 @@ const char *ld_compartment_switch_count;
 static struct cheri_c18n_info *c18n_info;
 struct rtld_c18n_stats *c18n_stats;
 
-/*
- * Set to true when c18n_init2 completes, at which point all statically declared
- * libraries have been loaded.
- */
-static bool c18n_init2_completed;
-
 #define	INC_NUM_COMPART		(c18n_stats->rcs_compart++, comparts.size++)
 #define	INC_NUM_BYTES(n)						\
 	atomic_fetch_add_explicit(&c18n_stats->rcs_bytes_total, (n),	\
@@ -356,7 +350,7 @@ add_comparts_data(const char *name)
 }
 
 compart_id_t
-compart_id_allocate(const char *lib)
+compart_id_allocate(const char *lib, int flags)
 {
 	compart_id_t i;
 	struct compart *com;
@@ -374,7 +368,8 @@ compart_id_allocate(const char *lib)
 	string_base_push(&com->libs, lib);
 
 out:
-	com->info.rcc_has_dlopened = c18n_init2_completed;
+	com->info.rcc_dlopened_explicitly = (flags & RTLD_LO_DLOPEN_TOP) != 0;
+	com->info.rcc_dlopened = (flags & RTLD_LO_DLOPEN) != 0;
 	return (i);
 }
 
@@ -1818,8 +1813,6 @@ c18n_init2(Obj_Entry *obj_rtld)
 			.reg_args = 4, .mem_args = false, .ret_args = TWO
 		}
 	});
-
-	c18n_init2_completed = true;
 }
 
 /*

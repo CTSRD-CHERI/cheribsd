@@ -55,8 +55,8 @@ procstat_compartments(struct procstat *procstat, struct kinfo_proc *kipp)
 		xo_emit("{k:process_id/%5d/%d}", kipp->ki_pid);
 		xo_emit(" {:command/%-19s/%s}", kipp->ki_comm);
 		xo_emit(" {:cid/%4d/%zu}", kcccp[i].kccc_id);
-		xo_emit(" {:flag/%-5s/%s}", kcccp[i].kccc_has_dlopened ? "D"
-		    : "-");
+		xo_emit(" {:flag/%-5s/%s%s}", kcccp[i].kccc_dlopened ?
+		    (kcccp[i].kccc_dlopened_explicitly ? "D" : "d") : "-");
 		xo_emit(" {:cname/%-40s/%s}", kcccp[i].kccc_name);
 		xo_emit("\n");
 	}

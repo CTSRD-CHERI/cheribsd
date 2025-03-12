@@ -65,7 +65,8 @@ struct rtld_c18n_stats {
 struct rtld_c18n_compart {
 	const char * __kerncap	rcc_name;
 	size_t			rcc_id;
-	uint8_t			rcc_has_dlopened : 1;
+	uint8_t			rcc_dlopened_explicitly : 1;
+	uint8_t			rcc_dlopened : 1;
 };
 
 /*
@@ -107,7 +108,8 @@ struct kinfo_cheri_c18n_compart {
 	 */
 	size_t		kccc_structsize;
 	size_t		kccc_id;
-	uint8_t		kccc_has_dlopened : 1;
+	uint8_t		kccc_dlopened_explicitly : 1;
+	uint8_t		kccc_dlopened : 1;
 	char		kccc_name[CHERI_C18N_COMPART_MAXNAME];
 };
 

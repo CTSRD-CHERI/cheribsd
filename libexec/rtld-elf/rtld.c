@@ -208,7 +208,7 @@ static uint32_t gnu_hash(const char *);
 static bool matched_symbol(SymLook *, const Obj_Entry *, Sym_Match_Result *,
     const unsigned long);
 #ifdef CHERI_LIB_C18N
-static bool c18n_add_obj(Obj_Entry *);
+static bool c18n_add_obj(Obj_Entry *, int);
 #endif
 
 void r_debug_state(struct r_debug *, struct link_map *) __noinline __exported;
@@ -963,7 +963,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	/*
 	 * Manually register the main object after the policy is loaded.
 	 */
-	if (!c18n_add_obj(obj_main))
+	if (!c18n_add_obj(obj_main, 0))
 	    rtld_die();
     }
 #endif
@@ -3364,7 +3364,7 @@ do_load_object(int fd, const char *name, char *path, struct stat *sbp,
     if (!digest_dynamic(obj, 0))
 	goto errp;
 #ifdef CHERI_LIB_C18N
-    if (!c18n_add_obj(obj))
+    if (!c18n_add_obj(obj, flags))
 	goto errp;
 #endif
     dbg("%s valid_hash_sysv %d valid_hash_gnu %d dynsymcount %d", obj->path,
@@ -4295,7 +4295,7 @@ rtld_dlopen(const char *name, int fd, int mode)
 	environ = __DECONST(char **, *get_program_var_addr("environ", &lockstate));
 	lock_release(rtld_bind_lock, &lockstate);
     }
-    lo_flags = RTLD_LO_DLOPEN;
+    lo_flags = RTLD_LO_DLOPEN | RTLD_LO_DLOPEN_TOP;
     if (mode & RTLD_NODELETE)
 	    lo_flags |= RTLD_LO_NODELETE;
     if (mode & RTLD_NOLOAD)
@@ -6320,16 +6320,16 @@ validate_c18nstrtab(const Obj_Entry *obj)
 }
 
 static void
-c18n_setup_compartments(Obj_Entry *obj, const char *name)
+c18n_setup_compartments(Obj_Entry *obj, const char *name, int flags)
 {
 	Compart_Entry *compart;
 	const Elf_Phdr *ph;
 	size_t len;
 
 	assert(obj->default_compart_id == 0);
-	obj->default_compart_id = compart_id_allocate(name);
+	obj->default_compart_id = compart_id_allocate(name, flags);
 
-	for (ph = obj->phdr;  (const char *)ph < (const char *)obj->phdr +
+	for (ph = obj->phdr; (const char *)ph < (const char *)obj->phdr +
 	    obj->phsize; ph++) {
 		switch (ph->p_type) {
 		case PT_C18N_NAME:
@@ -6358,7 +6358,7 @@ c18n_setup_compartments(Obj_Entry *obj, const char *name)
 			rtld_snprintf(compart->compart_name, len, "%s:%s",
 			    name, compart->name);
 			compart->compart_id =
-			    compart_id_allocate(compart->compart_name);
+			    compart_id_allocate(compart->compart_name, flags);
 			compart++;
 			break;
 		}
@@ -6397,7 +6397,7 @@ c18n_clear_pcc_perms(const char *name, const void *pcc)
 }
 
 static bool
-c18n_add_obj(Obj_Entry *obj)
+c18n_add_obj(Obj_Entry *obj, int flags)
 {
 	const char *name;
 
@@ -6429,7 +6429,7 @@ c18n_add_obj(Obj_Entry *obj)
 	for (unsigned long i = 0; i < obj->npcc_caps; ++i)
 		obj->pcc_caps[i] = c18n_clear_pcc_perms(name, obj->pcc_caps[i]);
 
-	c18n_setup_compartments(obj, name);
+	c18n_setup_compartments(obj, name, flags);
 	c18n_assign_plt_compartments(obj);
 	return (true);
 }
