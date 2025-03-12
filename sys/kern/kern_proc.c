@@ -2704,7 +2704,8 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 		len = roundup2(len, _Alignof(struct kinfo_cheri_c18n_compart));
 		kccc.kccc_structsize = len;
 		kccc.kccc_id = rcc.rcc_id;;
-		kccc.kccc_has_dlopened = rcc.rcc_has_dlopened;
+		kccc.kccc_dlopened_explicitly = rcc.rcc_dlopened_explicitly;
+		kccc.kccc_dlopened = rcc.rcc_dlopened;
 
 		/* Copy out userspace structure. */
 		error = SYSCTL_OUT(req, &kccc, len);

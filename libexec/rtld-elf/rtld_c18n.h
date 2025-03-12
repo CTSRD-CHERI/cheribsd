@@ -59,7 +59,7 @@ typedef uint16_t compart_id_t;
  */
 typedef struct { uint16_t val; } stk_table_index;
 
-compart_id_t compart_id_allocate(const char *);
+compart_id_t compart_id_allocate(const char *, int);
 compart_id_t compart_id_for_address(const Obj_Entry *, Elf_Addr);
 
 /*
