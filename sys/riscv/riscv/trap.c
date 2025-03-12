@@ -374,8 +374,10 @@ page_fault_handler(struct trapframe *frame, int usermode)
 		if (stval >= VM_MIN_KERNEL_ADDRESS) {
 			map = kernel_map;
 		} else {
-			if (pcb->pcb_onfault == 0)
+			if (pcb->pcb_onfault == 0) {
+				printf("%d: pcb_onfault is 0\n", __LINE__);
 				goto fatal;
+			}
 			map = &p->p_vmspace->vm_map;
 		}
 	}
@@ -423,8 +425,11 @@ skip_pmap:
 #endif
 	if (td->td_critnest != 0 || td->td_intr_nesting_level != 0 ||
 	    WITNESS_CHECK(WARN_SLEEPOK | WARN_GIANTOK, NULL,
-	    "Kernel page fault") != 0)
+	    "Kernel page fault") != 0) {
+		printf("%d: td_critnest %u td_intr_nesting_level %u\n",
+		    __LINE__, td->td_critnest, td->td_intr_nesting_level);
 		goto fatal;
+	}
 
 	error = vm_fault_trap(map, va, ftype, VM_FAULT_NORMAL, &sig, &ucode);
 	if (error != KERN_SUCCESS) {
@@ -442,6 +447,8 @@ skip_pmap:
 #endif
 				return;
 			}
+			printf("%d: vm_fault_trap failed with %d\n", __LINE__,
+			    error);
 			goto fatal;
 		}
 	}
