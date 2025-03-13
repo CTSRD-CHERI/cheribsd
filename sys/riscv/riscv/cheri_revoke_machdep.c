@@ -281,6 +281,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 #endif
 
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
+	vm_pointer_t prev_onfault = curthread->td_pcb->pcb_onfault;
 	curthread->td_pcb->pcb_onfault = (vm_pointer_t)vm_cheri_revoke_tlb_fault;
 	enable_user_memory_access();
 #endif
@@ -346,7 +347,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 out:
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
 	disable_user_memory_access();
-	curthread->td_pcb->pcb_onfault = 0;
+	curthread->td_pcb->pcb_onfault = prev_onfault;
 #endif
 	return (res);
 }
@@ -365,6 +366,7 @@ vm_cheri_revoke_test(const struct vm_cheri_revoke_cookie *crc, uintcap_t cut)
 			start = end = 0;
 
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
+		vm_pointer_t prev_onfault = curthread->td_pcb->pcb_onfault;
 		curthread->td_pcb->pcb_onfault =
 		    (vm_pointer_t)vm_cheri_revoke_tlb_fault;
 		enable_user_memory_access();
@@ -373,7 +375,7 @@ vm_cheri_revoke_test(const struct vm_cheri_revoke_cookie *crc, uintcap_t cut)
 		    cheri_getperm(cut), start, end);
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
 		disable_user_memory_access();
-		curthread->td_pcb->pcb_onfault = 0;
+		curthread->td_pcb->pcb_onfault = prev_onfault;
 #endif
 		return (res);
 	}
