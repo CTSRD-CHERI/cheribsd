@@ -379,7 +379,7 @@ CRUNCH_LIBS+=	${LIBNETBSD}
 
 CRUNCH_SRCDIRS+= libexec
 CRUNCH_PROGS_libexec+=	getty
-# from sshd: usr/libexec/sftp-server
+# from sshd: usr/libexec/sftp-server usr/libexec/sshd-session
 
 
 ##### sshd, ssh, scp: #####
@@ -393,7 +393,7 @@ CRUNCH_SRCDIRS+= secure/usr.bin
 CRUNCH_PROGS_secure/usr.bin+=	scp sftp ssh ssh-keygen
 
 CRUNCH_SRCDIRS+= secure/libexec
-CRUNCH_PROGS_secure/libexec+=	sftp-server
+CRUNCH_PROGS_secure/libexec+=	sftp-server sshd-session
 
 # Disable all optional SSH features to make sshd,scp,ssh as small as possible
 DISABLE_OPTIONAL_SSH_FEATURES+=	\
@@ -411,6 +411,7 @@ CRUNCH_BUILDOPTS_scp+=${DISABLE_OPTIONAL_SSH_FEATURES}
 CRUNCH_BUILDOPTS_ssh+=${DISABLE_OPTIONAL_SSH_FEATURES}
 CRUNCH_BUILDOPTS_ssh-keygen+=${DISABLE_OPTIONAL_SSH_FEATURES}
 CRUNCH_BUILDOPTS_sftp-server+=${DISABLE_OPTIONAL_SSH_FEATURES}
+CRUNCH_BUILDOPTS_sshd-session+=${DISABLE_OPTIONAL_SSH_FEATURES}
 
 
 ### END programs ####
