@@ -1,0 +1,19 @@
+{
+	"compartments": {
+		"module": {
+			"files": [
+				"sift_sa.o"
+			]
+		},
+		"private": {
+			"files": [
+				"sift_sa_private.o"
+			]
+		},
+		"public": {
+			"files": [
+				"sift_sa_public.o"
+			]
+		}
+	}
+}
