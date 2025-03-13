@@ -129,6 +129,10 @@ static const struct psc_type_info {
 		.n_type = NT_PTLWPINFO,
 		.structsize = sizeof(struct ptrace_lwpinfo)
 	},
+	[PSC_TYPE_KQUEUES] = {
+		.n_type = NT_PROCSTAT_KQUEUES,
+		.structsize = sizeof(struct kinfo_knote)
+	},
 };
 
 #if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
@@ -180,6 +184,10 @@ static const struct psc_type_info cheri_type_info[PSC_TYPE_MAX] = {
 	[PSC_TYPE_PTLWPINFO] = {
 		.n_type = NT_PTLWPINFO,
 		.structsize = sizeof(struct ptrace_lwpinfo)
+	},
+	[PSC_TYPE_KQUEUES] = {
+		.n_type = NT_PROCSTAT_KQUEUES,
+		.structsize = sizeof(struct kinfo_knote)
 	},
 };
 #endif
