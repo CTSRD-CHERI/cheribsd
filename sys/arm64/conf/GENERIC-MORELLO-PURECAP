@@ -49,6 +49,11 @@ options 	CHERI_COMPARTMENTALIZE_KERNEL
 # Use PCPU/DPCPU accessor functions
 options 	PCPU_FUNCS
 
+# Pass a compartmentalization policy if it exists
+# We need a separate option from CHERI_COMPARTMENTALIZE_KERNEL as not all
+# kernels/architectures support both at the moment.
+makeoptions	CHERI_COMPARTMENT_POLICY
+
 # Compile an IR version of the kernel and kernel modules for analysis
 makeoptions	COMPILE_IR
 

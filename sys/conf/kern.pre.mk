@@ -429,6 +429,9 @@ MKMODULESENV+=	__MPATH="${__MPATH}"
 .if defined(COMPILE_IR)
 MKMODULESENV+=	COMPILE_IR="${COMPILE_IR}"
 .endif
+.if defined(CHERI_COMPARTMENT_POLICY)
+MKMODULESENV+=	CHERI_COMPARTMENT_POLICY="${CHERI_COMPARTMENT_POLICY}"
+.endif
 
 # Detect kernel config options that force stack frames to be turned on.
 DDB_ENABLED!=	grep DDB opt_ddb.h || true ; echo

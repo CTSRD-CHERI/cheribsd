@@ -13,8 +13,6 @@
 #
 # KMOD		The name of the kernel module to build.
 #
-# KMODMO	Set to YES to build as a multi-object kernel module.
-#
 # KMODDIR	Base path for kernel modules (see kld(4)). [/boot/kernel]
 #
 # KMODOWN	Module file owner. [${BINOWN}]
@@ -69,7 +67,6 @@
 #
 
 AWK?=		awk
-KMODMO?=	NO
 KMODLOAD?=	/sbin/kldload
 KMODUNLOAD?=	/sbin/kldunload
 KMODISLOADED?=	/sbin/kldstat -q -n
@@ -231,23 +228,11 @@ SRCS+=${SRCS.${_o}}
 .if ${SRCS:N*.h:R} != ""
 OBJS+=	${SRCS:N*.h:R:S/$/.o/g}
 .endif
-.for compart in ${COMPARTMENTS}
-COMPART_OBJS.${compart}=${SRCS.${compart}:N*.h:R:S/$/.o/g}
-COMPART_OBJS+=		--compartment=${compart} ${COMPART_OBJS.${compart}}
-.endfor
-.if !empty(COMPART_OBJS)
-COMPART_OBJS+=	--compartment=""
-.endif
 
 .if !defined(PROG)
 PROG=	${KMOD}.ko
 .endif
 
-.if ${KMODMO} == YES || defined(COMPARTMENTS)
-# Multi-object ELF modules are compiled directly into a shared file with debug
-# symbols.
-FULLPROG=	${PROG}
-.else
 .if !defined(DEBUG_FLAGS) || ${MK_SPLIT_KERNEL_DEBUG} == "no"
 FULLPROG=	${PROG}
 .else
@@ -259,7 +244,7 @@ ${PROG}.debug: ${FULLPROG}
 	${OBJCOPY} --only-keep-debug ${FULLPROG} ${.TARGET}
 .endif
 
-.if ${__KLD_SHARED} == yes
+.if ${__KLD_SHARED} == yes && !(defined(CHERI_COMPARTMENT_POLICY) && !empty(COMPARTMENT_POLICY))
 ${FULLPROG}: ${KMOD}.kld
 	${LD} -m ${LD_EMULATION} -Bshareable -znotext -znorelro ${_LDFLAGS} \
 	    -o ${.TARGET} ${KMOD}.kld
@@ -267,15 +252,11 @@ ${FULLPROG}: ${KMOD}.kld
 	${OBJCOPY} --strip-debug ${.TARGET}
 .endif
 .endif
-.endif # ${KMODMO} != YES
 
 .if defined(COMPILE_IR)
 .if ${SRCS:N*.h:R} != ""
 LLOBJS+=	${SRCS:N*.h:N*.S:R:S/$/.llo/g}
 .endif
-.for compart in ${COMPARTMENTS}
-LLOBJS+=	${SRCS.${compart}:N*.h:R:S/$/.llo/g}
-.endfor
 
 ${PROG}.ll: ${LLOBJS}
 	${LLVM_LINK} -S -o ${.TARGET} ${LLOBJS}
@@ -292,31 +273,22 @@ CLEANFILES+=	export_syms
 LDSCRIPT_FLAGS?= -T ${SYSDIR}/conf/ldscript.kmod.${MACHINE}
 .endif
 
-.if ${KMODMO} == YES || defined(COMPARTMENTS)
-${FULLPROG}: ${OBJS} ${COMPART_OBJS:N--compartment*} ${BLOB_OBJS}
-.elif ${__KLD_SHARED} == yes
-${KMOD}.kld: ${OBJS} ${COMPART_OBJS:N--compartment*} ${BLOB_OBJS}
+.if ${__KLD_SHARED} == yes && !(defined(CHERI_COMPARTMENT_POLICY) && !empty(COMPARTMENT_POLICY))
+${KMOD}.kld: ${OBJS} ${BLOB_OBJS}
 .else
-${FULLPROG}: ${OBJS} ${COMPART_OBJS:N--compartment*} ${BLOB_OBJS}
+${FULLPROG}: ${OBJS} ${BLOB_OBJS} ${COMPARTMENT_POLICY}
 .endif
-.if ${KMODMO} == YES
-	OBJCOPY_MO="${OBJCOPY_MO}" \
-	    ${LD_MO} -m ${LD_EMULATION} ${_LDFLAGS} ${LDSCRIPT_FLAGS} \
-	    -Bshareable -znotext -znorelro -o ${.TARGET} ${OBJS} ${BLOB_OBJS}
-.elif defined(COMPARTMENTS)
+.if defined(CHERI_COMPARTMENT_POLICY) && !empty(COMPARTMENT_POLICY)
 	${LD} -m ${LD_EMULATION} -Bshareable -znotext -znorelro ${_LDFLAGS} \
-	    ${LDSCRIPT_FLAGS} -o ${.TARGET} ${OBJS} ${BLOB_OBJS} ${COMPART_OBJS}
+	    --compartment-policy=${.CURDIR}/${COMPARTMENT_POLICY} \
+	    ${LDSCRIPT_FLAGS} -o ${.TARGET} ${OBJS} ${BLOB_OBJS}
 .else
 	${LD} -m ${LD_EMULATION} ${_LDFLAGS} ${LDSCRIPT_FLAGS} -r \
-	    -o ${.TARGET} ${OBJS} ${BLOB_OBJS} ${COMPART_OBJS}
+	    -o ${.TARGET} ${OBJS} ${BLOB_OBJS}
 .endif
 .if ${MK_CTF} != "no"
-	${CTFMERGE} ${CTFFLAGS} -o ${.TARGET} ${OBJS} ${BLOB_OBJS} \
-	    ${COMPART_OBJS:N--compartment*}
+	${CTFMERGE} ${CTFFLAGS} -o ${.TARGET} ${OBJS} ${BLOB_OBJS}
 .endif
-.if ${KMODMO} == YES
-# Multi-object ELF modules cannot use EXPORT_SYMS.
-.else
 .if defined(EXPORT_SYMS)
 .if ${EXPORT_SYMS} != YES
 .if ${EXPORT_SYMS} == NO
@@ -337,7 +309,6 @@ ${FULLPROG}: ${OBJS} ${COMPART_OBJS:N--compartment*} ${BLOB_OBJS}
 .if !defined(DEBUG_FLAGS) && ${__KLD_SHARED} == no
 	${OBJCOPY} --strip-debug ${.TARGET}
 .endif
-.endif # ${KMODMO} != YES
 
 _ILINKS=machine
 .if ${MACHINE_CPUARCH} == "i386" || ${MACHINE_CPUARCH} == "amd64"
@@ -380,10 +351,7 @@ ${_ILINKS}:
 	${ECHO} ${.TARGET:T} "->" $$path ; \
 	ln -fns $$path ${.TARGET:T}
 
-CLEANFILES+= ${PROG} ${KMOD}.kld ${OBJS} ${COMPART_OBJS:N--compartment*}
-.if ${KMODMO} == YES
-CLEANFILES+= ${OBJS:S/$/.mo/}
-.endif
+CLEANFILES+= ${PROG} ${KMOD}.kld ${OBJS}
 
 .if defined(DEBUG_FLAGS) && ${MK_SPLIT_KERNEL_DEBUG} != "no"
 CLEANFILES+= ${FULLPROG} ${PROG}.debug
@@ -407,12 +375,10 @@ realinstall: _kmodinstall
 _kmodinstall: .PHONY
 	${INSTALL} -T release -o ${KMODOWN} -g ${KMODGRP} -m ${KMODMODE} \
 	    ${_INSTALLFLAGS} ${PROG} ${DESTDIR}${KMODDIR}/
-.if ${KMODMO} != YES && !defined(COMPARTMENTS)
 .if defined(DEBUG_FLAGS) && !defined(INSTALL_NODEBUG) && ${MK_KERNEL_SYMBOLS} != "no"
 	${INSTALL} -T dbg -o ${KMODOWN} -g ${KMODGRP} -m ${KMODMODE} \
 	    ${_INSTALLFLAGS} ${PROG}.debug ${DESTDIR}${KERN_DEBUGDIR}${KMODDIR}/
 .endif
-.endif # ${KMODMO} != YES
 .if defined(COMPILE_IR)
 	${INSTALL} -T release -o ${KMODOWN} -g ${KMODGRP} -m ${KMODMODE} \
 	    ${_INSTALLFLAGS} ${PROG}.ll ${DESTDIR}${KMODDIR}/
