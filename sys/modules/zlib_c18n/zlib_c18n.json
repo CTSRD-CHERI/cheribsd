@@ -1,0 +1,28 @@
+{
+	"compartments": {
+		"module": {
+			"files": [
+				"zlib_mod.o"
+			]
+		},
+		"allocator": {
+			"files": [
+				"zcalloc.o"
+			]
+		},
+		"zlib": {
+			"files": [
+				"adler32.o",
+				"compress.o",
+				"crc32.o",
+				"deflate.o",
+				"inffast.o",
+				"inflate.o",
+				"inftrees.o",
+				"trees.o",
+				"uncompr.o",
+				"zutil.o"
+			]
+		}
+	}
+}
