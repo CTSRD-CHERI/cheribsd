@@ -535,27 +535,6 @@ reloc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 			break;
 		case R_AARCH64_NONE:
 			break;
-#ifdef __CHERI_PURE_CAPABILITY__
-		/*
-		 * XXX Dapeng: The R_MORELLO_RELATIVE case should be removed
-		 * once the whole system is compiled with -cheri-codeptr-relocs,
-		 * for it would then be impossible to see this relocation here.
-		 */
-		case R_MORELLO_RELATIVE:
-		case R_MORELLO_FUNC_RELATIVE:
-			*where = init_cap_from_fragment(fragment,
-			    obj->relocbase, pcc_cap(obj, where[0]),
-			    (Elf_Addr)(uintptr_t)obj->relocbase,
-			    rela->r_addend);
-#ifdef CHERI_LIB_C18N
-			*where = (uintptr_t)tramp_intern(NULL, RTLD_COMPART_ID,
-			    &(struct tramp_data) {
-				.target = (void *)*where,
-				.defobj = obj
-			});
-#endif
-			break;
-#endif
 		default:
 			_rtld_error("Unknown relocation type %u in PLT",
 			    (unsigned int)ELF_R_TYPE(rela->r_info));
