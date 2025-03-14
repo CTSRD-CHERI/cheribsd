@@ -1885,8 +1885,15 @@ void
 _rtld_thr_exit(long *state)
 {
 	size_t i;
+	sigset_t nset;
 	struct stk_table_stk_info *data;
 	struct stk_table *table = get_stk_table();
+
+	/*
+	 * Block all signals before destroying thread-specific data structures.
+	 */
+	SIGFILLSET(nset);
+	sigprocmask(SIG_SETMASK, &nset, NULL);
 
 	/*
 	 * Uninstall the trusted stack and the stack lookup table.
