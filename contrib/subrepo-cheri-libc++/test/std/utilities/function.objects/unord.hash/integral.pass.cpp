@@ -115,9 +115,9 @@ int main(int, char**)
     test<__uint128_t>();
 #endif
 
-#if defined(__CHERI__) && !defined(__CHERI_PURE_CAPABILITY__)
-  test<__intcap_t>();
-  test<__uintcap_t>();
+#ifdef __CHERI_HYBRID__
+    test<__intcap_t>();
+    test<__uintcap_t>();
 #endif
 
   return 0;

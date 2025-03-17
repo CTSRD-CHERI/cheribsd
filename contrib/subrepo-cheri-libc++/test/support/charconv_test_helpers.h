@@ -303,7 +303,7 @@ auto all_signed = type_list<
     ,
     __int128_t
 #endif
-#if __has_feature(capabilities)
+#if __has_feature(cheri)
     , __intcap
 #endif
     >();
@@ -317,7 +317,7 @@ auto all_unsigned = type_list<
     ,
     __uint128_t
 #endif
-#if __has_feature(capabilities)
+#if __has_feature(cheri)
     , unsigned __intcap
 #endif
     >();
