@@ -174,7 +174,7 @@ class _LIBUNWIND_HIDDEN LocalAddressSpace {
 public:
   typedef uintptr_t pint_t;
   typedef intptr_t  sint_t;
-#ifndef __CHERI__
+#if !__has_feature(capabilities)
   typedef libunwind::fake_capability_t capability_t;
 #else
   typedef ::uintcap_t capability_t;
@@ -342,7 +342,7 @@ public:
   static pint_t to_pint_t(capability_t cap) {
 #ifdef __CHERI_PURE_CAPABILITY__
     return (uintcap_t)cap;
-#elif defined(__CHERI__)
+#elif __has_feature(capabilities)
     return (__cheri_addr pint_t)cap;
 #else
     pint_t result;
@@ -351,7 +351,7 @@ public:
 #endif
   }
   static capability_t to_capability_t(pint_t pint) {
-#ifdef __CHERI__
+#if __has_feature(capabilities)
     return (uintcap_t)pint;
 #else
     capability_t result;

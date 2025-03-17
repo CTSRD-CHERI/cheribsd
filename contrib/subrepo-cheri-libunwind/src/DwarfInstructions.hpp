@@ -460,7 +460,7 @@ DwarfInstructions<A, R>::evaluateExpression(pint_t expression, A &addressSpace,
 // XXXAR: I am not entirely sure these operations should work on a uintcap_t
 // but if it's an untagged integer value it is fine
 #pragma clang diagnostic push
-#ifdef __CHERI__
+#if __has_feature(capabilities)
 #pragma clang diagnostic ignored "-Wcheri-bitwise-operations"
 #endif
   const bool log = true;
