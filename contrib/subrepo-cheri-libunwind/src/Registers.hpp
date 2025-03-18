@@ -24,7 +24,7 @@ namespace libunwind {
 // For emulating 128-bit registers
 struct v128 { uint32_t vec[4]; };
 // For emulating CHERI capability
-#if !_has_feature(capabilities)
+#if !__has_feature(capabilities)
 struct __attribute__((aligned(16))) fake_capability {
   char bytes[16];
 };
