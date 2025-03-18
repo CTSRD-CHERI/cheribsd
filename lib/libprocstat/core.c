@@ -77,7 +77,7 @@ struct cheri_ps_strings {
 };
 #endif
 
-static struct psc_type_info {
+static const struct psc_type_info {
 	unsigned int	n_type;
 	int		structsize;
 } default_type_info[PSC_TYPE_MAX] = {
@@ -132,7 +132,7 @@ static struct psc_type_info {
 };
 
 #if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
-static struct psc_type_info cheri_type_info[PSC_TYPE_MAX] = {
+static const struct psc_type_info cheri_type_info[PSC_TYPE_MAX] = {
 	[PSC_TYPE_PROC] = {
 		.n_type  = NT_PROCSTAT_PROC,
 		.structsize = sizeof(struct kinfo_proc)
@@ -201,7 +201,7 @@ core_is_cheri(struct procstat_core *core)
 }
 #endif
 
-static struct psc_type_info *
+static const struct psc_type_info *
 core_psc_type_info(struct procstat_core *core __unused)
 {
 
@@ -299,7 +299,7 @@ void *
 procstat_core_get(struct procstat_core *core, enum psc_type type, void *buf,
     size_t *lenp)
 {
-	struct psc_type_info *psc_type_info;
+	const struct psc_type_info *psc_type_info;
 	Elf_Note nhdr;
 	off_t offset, eoffset;
 	vm_offset_t psstrings;
@@ -661,7 +661,7 @@ get_auxv(struct procstat_core *core __unused, void *auxv, size_t *lenp __unused)
 int
 procstat_core_note_count(struct procstat_core *core, enum psc_type type)
 {
-	struct psc_type_info *psc_type_info;
+	const struct psc_type_info *psc_type_info;
 	Elf_Note nhdr;
 	off_t offset, eoffset;
 	int cstructsize;
