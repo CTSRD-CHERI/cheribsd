@@ -82,7 +82,7 @@ class LargeMmapAllocator {
     InitLinkerInitialized();
   }
 
-  void *Allocate(AllocatorStats *stat, usize size, usize alignment) {
+  void *Allocate(AllocatorStats *stat, const usize size, usize alignment) {
     CHECK(IsPowerOfTwo(alignment));
     usize map_size = RoundUpMapSize(size);
     if (alignment > page_size_)
@@ -99,11 +99,11 @@ class LargeMmapAllocator {
     if (!map_beg)
       return nullptr;
     CHECK(IsAligned(map_beg, page_size_));
-    MapUnmapCallback().OnMap(map_beg, map_size);
     uptr map_end = map_beg + map_size;
     uptr res = map_beg + page_size_;
     if (!IsAligned(res, alignment))  // Align.
       res = RoundUpTo(res, alignment);
+    MapUnmapCallback().OnMapSecondary(map_beg, map_size, res, size);
     CHECK(IsAligned(res, alignment));
     CHECK(IsAligned(res, page_size_));
     CHECK_GE(res + size, map_beg);
@@ -215,7 +215,7 @@ class LargeMmapAllocator {
 
   // This function does the same as GetBlockBegin, but is much faster.
   // Must be called with the allocator locked.
-  void *GetBlockBeginFastLocked(void *ptr) {
+  void *GetBlockBeginFastLocked(const void *ptr) {
     mutex_.CheckLocked();
     uptr p = reinterpret_cast<uptr>(ptr);
     uptr n = n_chunks_;
