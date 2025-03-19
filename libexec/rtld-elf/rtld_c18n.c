@@ -1660,6 +1660,20 @@ tramp_reflect(const void *data)
 	return (NULL);
 }
 
+ptraddr_t _rtld_tramp_reflect(const void *);
+
+ptraddr_t
+_rtld_tramp_reflect(const void *addr)
+{
+	struct tramp_header *header;
+
+	header = tramp_reflect(addr);
+	if (header == NULL)
+		return (0);
+
+	return ((ptraddr_t)header->target);
+}
+
 /*
  * APIs
  */

@@ -42,11 +42,22 @@ void __pthread_map_stacks_exec(void);
 #endif
 void __pthread_distribute_static_tls(size_t, void *, size_t, size_t);
 
+#ifdef CHERI_LIB_C18N
+ptraddr_t _rtld_tramp_reflect(const void *);
+#endif
+
 int
 __elf_phdr_match_addr(struct dl_phdr_info *phdr_info, void *addr)
 {
 	const Elf_Phdr *ph;
 	int i;
+#ifdef CHERI_LIB_C18N
+	ptraddr_t target;
+
+	target = _rtld_tramp_reflect(addr);
+	if (target != 0)
+		addr = (void *)(uintptr_t)target;
+#endif
 
 	for (i = 0; i < phdr_info->dlpi_phnum; i++) {
 		ph = &phdr_info->dlpi_phdr[i];
