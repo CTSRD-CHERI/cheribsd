@@ -265,7 +265,9 @@ CFLAGS+=	-DCOMPILER_RT_HAS_FLOAT16
 # versions.
 #
 .if ((${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 150000) && \
-     (defined(CRT_COMMON_F16_ARCH))) || \
+     (defined(CRT_COMMON_F16_ARCH)) && ${MACHINE_CPUARCH} != "aarch64") || \
+    ((${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 160000) && \
+     ${MACHINE_CPUARCH} == "aarch64") || \
     ((${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 180000) && \
      ${MACHINE_CPUARCH} == "riscv") || \
     ((${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} >= 130000) && \
