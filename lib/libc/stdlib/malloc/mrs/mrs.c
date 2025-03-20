@@ -91,9 +91,20 @@
  *
  * Values:
  *
- * QUARANTINE_RATIO: Limit the quarantine size to 1 / QUARANTINE_RATIO
- *   times the size of the heap (default 4).
+ * QUARANTINE_NUMERATOR / QUARANTINE_DENOMINATOR: Limit the quarantine
+ * size to QUARANTINE_NUMERATOR / QUARANTINE_DENOMINATOR times the size
+ * of the heap (default 1/4).
  */
+
+#ifdef QUARANTINE_RATIO
+#error QUARANTINE_RATIO is obsolete, use QUARANTINE_NUMERATOR/QUARANTINE_DENOMINATOR
+#endif
+#ifndef QUARANTINE_DENOMINATOR
+#define	QUARANTINE_DENOMINATOR	4
+#endif
+#ifndef QUARANTINE_NUMERATOR
+#define	QUARANTINE_NUMERATOR	1
+#endif
 
 #define	MALLOCX_LG_ALIGN_BITS	6
 #define	MALLOCX_LG_ALIGN_MASK	((1 << MALLOCX_LG_ALIGN_BITS) - 1)
@@ -302,6 +313,9 @@ static bool revoke_async = false;
 static bool bound_pointers = false;
 static bool abort_on_validation_failure = true;
 static bool mrs_initialized = false;
+
+static unsigned int quarantine_denominator = QUARANTINE_DENOMINATOR;
+static unsigned int quarantine_numerator = QUARANTINE_NUMERATOR;
 
 static spinlock_t mrs_init_lock = _SPINLOCK_INITIALIZER;
 #define	MRS_LOCK(x)	__extension__ ({	\
@@ -753,12 +767,19 @@ quarantine_should_flush(struct mrs_quarantine *quarantine, bool is_free)
 		return false;
 #endif
 
-#if !defined(QUARANTINE_RATIO)
-#  define QUARANTINE_RATIO 4
-#endif /* !QUARANTINE_RATIO */
+	if (allocated_size < MIN_REVOKE_HEAP_SIZE)
+		return false;
 
-	return ((allocated_size >= MIN_REVOKE_HEAP_SIZE) &&
-	    ((quarantine->size * QUARANTINE_RATIO) >= allocated_size));
+	/*
+	 * Flush quarantine if
+	 *                                       quarantine_numerator
+	 * quarantine->size >= allocated_size * ----------------------
+	 *                                      quarantine_denominator
+	 *
+	 * Avoid division by multiplying both sides by quarantine_numerator.
+	 */
+	return (quarantine->size * quarantine_denominator >=
+	    allocated_size * quarantine_numerator);
 }
 
 static void
@@ -1292,6 +1313,25 @@ mrs_init_impl_locked(void)
 	page_size = getpagesize();
 	if ((page_size & (page_size - 1)) != 0) {
 		mrs_puts("page_size not a power of 2\n");
+		exit(7);
+	}
+
+	if (quarantine_denominator == 0) {
+		mrs_puts("quarantine_denominator can not be 0\n");
+		exit(7);
+	}
+	if (quarantine_denominator > 256) {
+		/* Could overflow with 56-bits of userspace addresses */
+		mrs_puts("quarantine_denominator > 256\n");
+		exit(7);
+	}
+	if (quarantine_numerator == 0) {
+		mrs_puts("quarantine_numerator can not be 0\n");
+		exit(7);
+	}
+	if (quarantine_numerator > 256) {
+		/* Could overflow with 56-bits of userspace addresses */
+		mrs_puts("quarantine_numerator > 256\n");
 		exit(7);
 	}
 
