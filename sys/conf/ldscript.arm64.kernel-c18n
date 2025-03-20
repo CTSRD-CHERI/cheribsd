@@ -1,0 +1,179 @@
+OUTPUT_ARCH(aarch64)
+ENTRY(_start)
+
+SEARCH_DIR(/usr/lib);
+SECTIONS
+{
+  /* Read-only sections, merged into text segment: */
+  . = text_start; /* This is set using --defsym= on the command line. */
+  .vmm_vectors : { *(.vmm_vectors) }
+  .text      :
+  {
+    kern_compartment.o(.text) locore.o(.text) elf_machdep.o(.text) link_elf.o(.text) bcopy.o(.text) freebsd64_machdep.o(.text) cheri_machdep.o(.text) compartment.o(.text) exception.o(.text)
+    kern_compartment.o(.stub) locore.o(.stub) elf_machdep.o(.stub) link_elf.o(.stub) bcopy.o(.stub) freebsd64_machdep.o(.stub) cheri_machdep.o(.stub) compartment.o(.stub) exception.o(.stub)
+    /* .gnu.warning sections are handled specially by elf32.em.  */
+    kern_compartment.o(.gnu.warning) locore.o(.gnu.warning) elf_machdep.o(.gnu.warning) link_elf.o(.gnu.warning) bcopy.o(.gnu.warning) freebsd64_machdep.o(.gnu.warning) cheri_machdep.o(.gnu.warning) compartment.o(.gnu.warning) exception.o(.gnu.warning)
+    kern_compartment.o(.gnu.linkonce.t*) locore.o(.gnu.linkonce.t*) elf_machdep.o(.gnu.linkonce.t*) link_elf.o(.gnu.linkonce.t*) bcopy.o(.gnu.linkonce.t*) freebsd64_machdep.o(.gnu.linkonce.t*) cheri_machdep.o(.gnu.linkonce.t*) compartment.o(.gnu.linkonce.t*) exception.o(.gnu.linkonce.t*)
+  } =0x9090
+  _etext = .;
+  PROVIDE (etext = .);
+
+  .fini      : { *(.fini)    } =0x9090
+  .rodata    : { kern_compartment.o(.rodata*) locore.o(.rodata*) elf_machdep.o(.rodata*) link_elf.o(.rodata*) bcopy.o(.rodata*) freebsd64_machdep.o(.rodata*) cheri_machdep.o(.rodata*) compartment.o(.rodata*) exception.o(.rodata*) kern_compartment.o(.gnu.linkonce.r*) locore.o(.gnu.linkonce.r*) elf_machdep.o(.gnu.linkonce.r*) link_elf.o(.gnu.linkonce.r*) bcopy.o(.gnu.linkonce.r*) freebsd64_machdep.o(.gnu.linkonce.r*) cheri_machdep.o(.gnu.linkonce.r*) compartment.o(.gnu.linkonce.r*) exception.o(.gnu.linkonce.r*) }
+  .rodata1   : { *(.rodata1) }
+   .interp     : { *(.interp) 	}
+  .hash          : { *(.hash)		}
+  .dynsym        : { *(.dynsym)		}
+  .dynstr        : { *(.dynstr)		}
+  .gnu.version   : { *(.gnu.version)	}
+  .gnu.version_d   : { *(.gnu.version_d)	}
+  .gnu.version_r   : { *(.gnu.version_r)	}
+  .note.gnu.build-id : {
+    PROVIDE (__build_id_start = .);
+    *(.note.gnu.build-id)
+    PROVIDE (__build_id_end = .);
+  }
+  .note.cheri : {
+    *(.note.cheri)
+  }
+  .rel.text      :
+    { *(.rel.text) *(.rel.gnu.linkonce.t*) }
+  .rela.text     :
+    { *(.rela.text) *(.rela.gnu.linkonce.t*) }
+  .rel.data      :
+    { *(.rel.data) *(.rel.gnu.linkonce.d*) }
+  .rela.data     :
+    { *(.rela.data) *(.rela.gnu.linkonce.d*) }
+  .rel.rodata    :
+    { *(.rel.rodata) *(.rel.gnu.linkonce.r*) }
+  .rela.rodata   :
+    { *(.rela.rodata) *(.rela.gnu.linkonce.r*) }
+  .rel.got       : { *(.rel.got)		}
+  .rela.got      : { *(.rela.got)		}
+  .rel.ctors     : { *(.rel.ctors)	}
+  .rela.ctors    : { *(.rela.ctors)	}
+  .rel.dtors     : { *(.rel.dtors)	}
+  .rela.dtors    : { *(.rela.dtors)	}
+  .rel.init      : { *(.rel.init)	}
+  .rela.init     : { *(.rela.init)	}
+  .rel.fini      : { *(.rel.fini)	}
+  .rela.fini     : { *(.rela.fini)	}
+  .rel.bss       : { *(.rel.bss)		}
+  .rela.bss      : { *(.rela.bss)		}
+  .rel.plt       : { *(.rel.plt)		}
+  .rela.plt      : { kern_compartment.o(.rela.plt) locore.o(.rela.plt) elf_machdep.o(.rela.plt) link_elf.o(.rela.plt) bcopy.o(.rela.plt) freebsd64_machdep.o(.rela.plt) cheri_machdep.o(.rela.plt) compartment.o(.rela.plt) exception.o(.rela.plt)		}
+  .init          : { *(.init)	} =0x9090
+  .plt      : { kern_compartment.o(.plt) locore.o(.plt) elf_machdep.o(.plt) link_elf.o(.plt) bcopy.o(.plt) freebsd64_machdep.o(.plt) cheri_machdep.o(.plt) compartment.o(.plt) exception.o(.plt)	}
+
+  . = ALIGN(4);
+  _extab_start = .;
+  PROVIDE(extab_start = .);
+  .ARM.extab : { *(.ARM.extab) }
+  _extab.end = .;
+  PROVIDE(extab_end = .);
+
+  _exidx_start = .;
+  PROVIDE(exidx_start = .);
+  .ARM.exidx : { *(.ARM.exidx) }
+  _exidx_end = .;
+  PROVIDE(exidx_end = .);
+
+  /* Adjust the address for the data segment.  We want to adjust up to
+     the same address within the page on the next page up.  */
+  . = ALIGN(0x1000) + (. & (0x1000 - 1)) ; 
+  .init_pagetable : { *(.init_pagetable) }
+  .data    :
+  {
+    kern_compartment.o(.data) locore.o(.data) elf_machdep.o(.data) link_elf.o(.data) bcopy.o(.data) freebsd64_machdep.o(.data) cheri_machdep.o(.data) compartment.o(.data) exception.o(.data)
+    kern_compartment.o(.gnu.linkonce.d*) locore.o(.gnu.linkonce.d*) elf_machdep.o(.gnu.linkonce.d*) link_elf.o(.gnu.linkonce.d*) bcopy.o(.gnu.linkonce.d*) freebsd64_machdep.o(.gnu.linkonce.d*) cheri_machdep.o(.gnu.linkonce.d*) compartment.o(.gnu.linkonce.d*) exception.o(.gnu.linkonce.d*)
+  }
+  . = ALIGN(128);
+  .data.read_frequently :
+  {
+    *(SORT_BY_ALIGNMENT(.data.read_frequently))
+  }
+  .data.read_mostly :
+  {
+    *(.data.read_mostly)
+  }
+  . = ALIGN(128);
+  .data.exclusive_cache_line :
+  {
+    *(.data.exclusive_cache_line)
+  }
+  . = ALIGN(128);
+  .data1   : { *(.data1) }
+  . = ALIGN(32 / 8);
+  _start_ctors = .;
+  PROVIDE (start_ctors = .);
+  .ctors         :
+  {
+    *(.ctors)
+  }
+  _stop_ctors = .;
+  PROVIDE (stop_ctors = .);
+  .dtors         :
+  {
+    *(.dtors)
+  }
+  .got           : { kern_compartment.o(.got.plt) locore.o(.got.plt) elf_machdep.o(.got.plt) link_elf.o(.got.plt) bcopy.o(.got.plt) freebsd64_machdep.o(.got.plt) cheri_machdep.o(.got.plt) compartment.o(.got.plt) exception.o(.got.plt) kern_compartment.o(.got) locore.o(.got) elf_machdep.o(.got) link_elf.o(.got) bcopy.o(.got) freebsd64_machdep.o(.got) cheri_machdep.o(.got) compartment.o(.got) exception.o(.got) }
+  .dynamic       : { *(.dynamic) }
+  /* We want the small data sections together, so single-instruction offsets
+     can access them all, and initialized data all before uninitialized, so
+     we can shorten the on-disk segment size.  */
+  . = ALIGN(8);
+  .sdata     : { *(.sdata) }
+  _edata  =  .;
+  PROVIDE (edata = .);
+  . = ALIGN(16);
+  _bss_start = .;
+  .sbss      : { *(.sbss) *(.scommon) }
+  .bss       :
+  {
+   kern_compartment.o(.dynbss) locore.o(.dynbss) elf_machdep.o(.dynbss) link_elf.o(.dynbss) bcopy.o(.dynbss) freebsd64_machdep.o(.dynbss) cheri_machdep.o(.dynbss) compartment.o(.dynbss) exception.o(.dynbss)
+   kern_compartment.o(.bss) locore.o(.bss) elf_machdep.o(.bss) link_elf.o(.bss) bcopy.o(.bss) freebsd64_machdep.o(.bss) cheri_machdep.o(.bss) compartment.o(.bss) exception.o(.bss)
+   kern_compartment.o(COMMON) locore.o(COMMON) elf_machdep.o(COMMON) link_elf.o(COMMON) bcopy.o(COMMON) freebsd64_machdep.o(COMMON) cheri_machdep.o(COMMON) compartment.o(COMMON) exception.o(COMMON)
+   . = ALIGN(16);
+   __bss_end = .;
+   /* A section for the initial page table, it doesn't need to be in the
+      kernel file, however unlike normal .bss entries should not be zeroed
+      out as we use it before the .bss section is cleared. */
+   kern_compartment.o(.init_pagetable) locore.o(.init_pagetable) elf_machdep.o(.init_pagetable) link_elf.o(.init_pagetable) bcopy.o(.init_pagetable) freebsd64_machdep.o(.init_pagetable) cheri_machdep.o(.init_pagetable) compartment.o(.init_pagetable) exception.o(.init_pagetable)
+  }
+  _end = . ;
+  PROVIDE (end = .);
+  /* Stabs debugging sections.  */
+  .stab 0 : { *(.stab) }
+  .stabstr 0 : { *(.stabstr) }
+  .stab.excl 0 : { *(.stab.excl) }
+  .stab.exclstr 0 : { *(.stab.exclstr) }
+  .stab.index 0 : { *(.stab.index) }
+  .stab.indexstr 0 : { *(.stab.indexstr) }
+  .comment 0 : { *(.comment) }
+  /* DWARF debug sections.
+     Symbols in the DWARF debugging sections are relative to the beginning
+     of the section so we begin them at 0.  */
+  /* DWARF 1 */
+  .debug          0 : { *(.debug) }
+  .line           0 : { *(.line) }
+  /* GNU DWARF 1 extensions */
+  .debug_srcinfo  0 : { *(.debug_srcinfo) }
+  .debug_sfnames  0 : { *(.debug_sfnames) }
+  /* DWARF 1.1 and DWARF 2 */
+  .debug_aranges  0 : { *(.debug_aranges) }
+  .debug_pubnames 0 : { *(.debug_pubnames) }
+  /* DWARF 2 */
+  .debug_info     0 : { *(.debug_info) }
+  .debug_abbrev   0 : { *(.debug_abbrev) }
+  .debug_line     0 : { *(.debug_line) }
+  .debug_frame    0 : { *(.debug_frame) }
+  .debug_str      0 : { *(.debug_str) }
+  .debug_loc      0 : { *(.debug_loc) }
+  .debug_macinfo  0 : { *(.debug_macinfo) }
+  /* SGI/MIPS DWARF 2 extensions */
+  .debug_weaknames 0 : { *(.debug_weaknames) }
+  .debug_funcnames 0 : { *(.debug_funcnames) }
+  .debug_typenames 0 : { *(.debug_typenames) }
+  .debug_varnames  0 : { *(.debug_varnames) }
+  /* These must appear regardless of  .  */
+}
