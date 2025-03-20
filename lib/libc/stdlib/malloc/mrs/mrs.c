@@ -91,8 +91,6 @@
  *
  * Values:
  *
- * QUARANTINE_HIGHWATER: Limit the quarantine size to
- *   QUARANTINE_HIGHWATER number of bytes.
  * QUARANTINE_RATIO: Limit the quarantine size to 1 / QUARANTINE_RATIO
  *   times the size of the heap (default 4).
  * CONCURRENT_REVOCATION_PASSES: Number of concurrent revocation pass
@@ -757,20 +755,12 @@ quarantine_should_flush(struct mrs_quarantine *quarantine, bool is_free)
 		return false;
 #endif
 
-#if defined(QUARANTINE_HIGHWATER)
-
-	return (quarantine->size >= QUARANTINE_HIGHWATER);
-
-#else /* QUARANTINE_HIGHWATER */
-
 #if !defined(QUARANTINE_RATIO)
 #  define QUARANTINE_RATIO 4
 #endif /* !QUARANTINE_RATIO */
 
 	return ((allocated_size >= MIN_REVOKE_HEAP_SIZE) &&
 	    ((quarantine->size * QUARANTINE_RATIO) >= allocated_size));
-
-#endif /* !QUARANTINE_HIGHWATER */
 }
 
 static void
