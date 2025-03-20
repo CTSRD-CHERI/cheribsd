@@ -352,10 +352,6 @@ virtdone:
 
 	.align 3
 END(_start)
-#ifdef __CHERI_PURE_CAPABILITY__
-.Lpagetable_clrperms:
-	.quad ~(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_STORE)
-#endif
 
 #ifdef SMP
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -719,7 +715,7 @@ LENTRY(create_pagetables)
 	sub	x7, x27, x6
 	cvtd	c6, x6
 	scbnds	c6, c6, x7
-	ldr	x7, =.Lpagetable_clrperms
+	ldr	x7, =~CHERI_PERMS_KERNEL_PAGETABLE
 	clrperm	c6, c6, x7
 	scvalue	c27, c6, x27
 #endif
