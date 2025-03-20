@@ -139,6 +139,11 @@ extern void snmalloc_flush_message_queue(void);
 #define	MALLOC_NOBOUND_CHERI_POINTERS \
 	"_RUNTIME_NOBOUND_CHERI_POINTERS"
 
+#define	MALLOC_QUARANTINE_DENOMINATOR_ENV \
+	"_RUNTIME_QUARANTINE_DENOMINATOR"
+#define	MALLOC_QUARANTINE_NUMERATOR_ENV \
+	"_RUNTIME_QUARANTINE_NUMERATOR"
+
 /*
  * Different allocators give their strong symbols different names.  Hide
  * this implementation detail being the REAL() macro.
@@ -1316,6 +1321,31 @@ mrs_init_impl_locked(void)
 		exit(7);
 	}
 
+	char *envstr, *end;
+	if ((envstr = secure_getenv(MALLOC_QUARANTINE_DENOMINATOR_ENV)) !=
+	    NULL) {
+		errno = 0;
+		quarantine_denominator = strtoul(envstr, &end, 0);
+		if (*end != '\0' ||
+		    (quarantine_denominator == ULONG_MAX &&
+		     errno == ERANGE)) {
+			mrs_puts("invalid "
+			    MALLOC_QUARANTINE_DENOMINATOR_ENV "\n");
+			exit(7);
+		}
+	}
+	if ((envstr = secure_getenv(MALLOC_QUARANTINE_NUMERATOR_ENV)) !=
+	    NULL) {
+		errno = 0;
+		quarantine_numerator = strtoul(envstr, &end, 0);
+		if (*end != '\0' ||
+		    (quarantine_numerator == ULONG_MAX &&
+		     errno == ERANGE)) {
+			mrs_puts("invalid "
+			    MALLOC_QUARANTINE_NUMERATOR_ENV "\n");
+			exit(7);
+		}
+	}
 	if (quarantine_denominator == 0) {
 		mrs_puts("quarantine_denominator can not be 0\n");
 		exit(7);
