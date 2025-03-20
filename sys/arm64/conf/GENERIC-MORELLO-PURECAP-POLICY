@@ -1,0 +1,6 @@
+include	"GENERIC-MORELLO-PURECAP"
+
+# Pass a compartmentalization policy if it exists
+# We need a separate option from CHERI_COMPARTMENTALIZE_KERNEL as not all
+# kernels/architectures support both at the moment.
+makeoptions	CHERI_COMPARTMENT_POLICY
