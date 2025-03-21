@@ -2369,7 +2369,7 @@ cheri_restore_tag(void * __capability *cp)
 	cap = (uintcap_t)*cp;
 
 	newcap = cheri_buildcap(swap_restore_cap, cap);
-#if !defined(__riscv_xcheri_std_compat)
+#ifdef __riscv_xcheri
 	void * __capability sealcap = cheri_copytype(swap_restore_cap, cap);
 	newcap = cheri_condseal(newcap, sealcap);
 #endif
