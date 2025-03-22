@@ -28,7 +28,7 @@ extern int _invalid_type;
 	(__builtin_choose_expr(_IS_A(cfg, iwl_cfg_trans_params),	\
 			       TRANS_CFG_MARKER,			\
 	 __builtin_choose_expr(_IS_A(cfg, iwl_cfg), 0, _invalid_type)))
-#define _ASSIGN_CFG(cfg) (_TRANS_CFG_MARKER(cfg) + (kernel_ulong_t)&(cfg))
+#define _ASSIGN_CFG(cfg) (_TRANS_CFG_MARKER(cfg) + (uintptr_t)&(cfg))
 
 #define IWL_PCI_DEVICE(dev, subdev, cfg) \
 	.vendor = PCI_VENDOR_ID_INTEL,  .device = (dev), \
