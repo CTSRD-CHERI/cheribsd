@@ -93,8 +93,6 @@
  *
  * QUARANTINE_RATIO: Limit the quarantine size to 1 / QUARANTINE_RATIO
  *   times the size of the heap (default 4).
- * CONCURRENT_REVOCATION_PASSES: Number of concurrent revocation pass
- *   before the stop-the-world pass.
  */
 
 #define	MALLOCX_LG_ALIGN_BITS	6
