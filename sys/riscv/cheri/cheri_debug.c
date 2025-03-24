@@ -61,8 +61,13 @@ DB_SHOW_COMMAND(scr, ddb_dump_scr)
 	    sccsr & SCCSR_TAG_CLEARING ? "tag-clearing" : "trapping");
 
 	db_printf("ddc: %#.16lp\n",  scr_read(ddc));
+#ifdef __riscv_xcheri
 	db_printf("pcc: %#.16lp\n",  scr_read(pcc));
 	db_printf("stcc: %#.16lp\n",  scr_read(stcc));
+#else
+        db_printf("pcc: %#.16lp\n",  cheri_getpcc());
+        db_printf("stvecc: %#.16lp\n",  scr_read(stvecc));
+#endif
 	db_printf("sscratchc: %#.16lp\n",  scr_read(sscratchc));
 	db_printf("sepcc: %#.16lp\n",  scr_read(sepcc));
 
