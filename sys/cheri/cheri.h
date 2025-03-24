@@ -135,7 +135,11 @@ void * __capability cheri_sigcode_capability(struct thread *td);
 /*
  * CHERI context management functions.
  */
+#ifdef __riscv_xcheri
 const char	*cheri_exccode_string(uint8_t exccode);
+#else
+const char	*cheri_exccode_string(uint8_t typecode, uint8_t exccode);
+#endif
 int	cheri_syscall_authorize(struct thread *td);
 
 /*

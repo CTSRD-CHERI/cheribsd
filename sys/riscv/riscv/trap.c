@@ -270,6 +270,9 @@ dump_regs(struct trapframe *frame)
 #endif
 	printf("sstatus: 0x%016lx\n", frame->tf_sstatus);
 	printf("stval  : 0x%016lx\n", frame->tf_stval);
+#ifdef __riscv_zcheripurecap
+        printf("stval2  : 0x%016lx\n", frame->tf_stval2);
+#endif
 }
 
 #if __has_feature(capabilities)
@@ -284,6 +287,7 @@ dump_cheri_exception(struct trapframe *frame)
 	printf("pid %d tid %d (%s), uid %d: ", p->p_pid, td->td_tid,
 	    p->p_comm, td->td_ucred->cr_uid);
 	switch (frame->tf_scause & SCAUSE_CODE) {
+#ifdef __riscv_xcheri
 	case SCAUSE_LOAD_CAP_PAGE_FAULT:
 		printf("LOAD CAP page fault");
 		break;
@@ -295,6 +299,13 @@ dump_cheri_exception(struct trapframe *frame)
 		    TVAL_CAP_CAUSE(frame->tf_stval),
 		    TVAL_CAP_IDX(frame->tf_stval));
 		break;
+#else
+	case SCAUSE_CHERI:
+		printf("CHERI fault (type %#lx), cause %lx",
+		    TVAL_CAP_TYPE(frame->tf_stval2),
+		    TVAL_CAP_CAUSE(frame->tf_stval2));
+		break;
+#endif
 	default:
 		printf("fault %ld", frame->tf_scause & SCAUSE_CODE);
 		break;
@@ -383,7 +394,7 @@ page_fault_handler(struct trapframe *frame, int usermode)
 	va = trunc_page(stval);
 
 #ifdef CHERI_CAPREVOKE
-	if ((frame->tf_scause == SCAUSE_LOAD_CAP_PAGE_FAULT) &&
+	if (is_cheri_load_cap_fault(frame) &&
 	    (va < VM_MAX_USER_ADDRESS)) {
 		if (vm_cheri_revoke_fault_visit(p->p_vmspace, va) ==
 		    VM_CHERI_REVOKE_FAULT_RESOLVED)
@@ -406,9 +417,9 @@ page_fault_handler(struct trapframe *frame, int usermode)
 	} else if (frame->tf_scause == SCAUSE_INST_PAGE_FAULT) {
 		ftype = VM_PROT_EXECUTE;
 #if __has_feature(capabilities)
-	} else if (frame->tf_scause == SCAUSE_STORE_AMO_CAP_PAGE_FAULT) {
+	} else if (is_cheri_store_amo_cap_fault(frame)) {
 		ftype = VM_PROT_WRITE | VM_PROT_WRITE_CAP;
-	} else if (frame->tf_scause == SCAUSE_LOAD_CAP_PAGE_FAULT) {
+	} else if (is_cheri_load_cap_fault(frame)) {
 		ftype = VM_PROT_READ | VM_PROT_READ_CAP;
 #endif
 	} else {
@@ -511,7 +522,7 @@ do_trap_supervisor(struct trapframe *frame)
 	case SCAUSE_STORE_PAGE_FAULT:
 	case SCAUSE_LOAD_PAGE_FAULT:
 	case SCAUSE_INST_PAGE_FAULT:
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && defined(__riscv_xcheri)
 	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
 #endif
 		page_fault_handler(frame, 0);
@@ -556,6 +567,7 @@ do_trap_supervisor(struct trapframe *frame)
 			break;
 		case SCAUSE_CHERI:
 		{
+#ifdef __riscv_xcheri
 			u_int cap_cause = TVAL_CAP_CAUSE(frame->tf_stval);
 			u_int cap_idx = TVAL_CAP_IDX(frame->tf_stval);
 
@@ -563,6 +575,14 @@ do_trap_supervisor(struct trapframe *frame)
 			    cheri_exccode_string(cap_cause),
 			    cheri_cap_idx_string(cap_idx),
 			    (unsigned long)frame->tf_sepc);
+#else
+                        u_int cap_cause = TVAL_CAP_CAUSE(frame->tf_stval2);
+			u_int cap_fault_type = TVAL_CAP_TYPE(frame->tf_stval2);
+
+			panic("CHERI %s at %#016lx\n",
+                            cheri_exccode_string(cap_fault_type, cap_cause),
+			    (unsigned long)frame->tf_sepc);
+#endif
 			break;
 		}
 		}
@@ -623,7 +643,7 @@ do_trap_user(struct trapframe *frame)
 	case SCAUSE_STORE_PAGE_FAULT:
 	case SCAUSE_LOAD_PAGE_FAULT:
 	case SCAUSE_INST_PAGE_FAULT:
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && defined(__riscv_xcheri)
 	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
 	case SCAUSE_LOAD_CAP_PAGE_FAULT:
 #endif
@@ -701,9 +721,15 @@ do_trap_user(struct trapframe *frame)
 			}
 		}
 
+#ifdef __riscv_xcheri
 		call_trapsignal(td, SIGPROT,
 		    cheri_stval_to_sicode(frame->tf_stval), frame->tf_sepc,
 		    exception, TVAL_CAP_IDX(frame->tf_stval));
+#else
+		call_trapsignal(td, SIGPROT,
+		    cheri_stval_to_sicode(frame->tf_stval2), frame->tf_sepc,
+		    exception, 0);
+#endif
 		userret(td, frame);
 		break;
 #endif
