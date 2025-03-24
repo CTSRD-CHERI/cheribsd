@@ -36,6 +36,7 @@
 
 #include <machine/riscvreg.h>
 
+#ifdef __riscv_xcheri
 static const char *cheri_exccode_descr[] = {
 	[CHERI_EXCCODE_NONE] = "none",
 	[CHERI_EXCCODE_LENGTH] = "length violation",
@@ -188,3 +189,62 @@ cheri_stval_to_sicode(register_t stval)
 		return (0);
 	}
 }
+#else /* !defined(__riscv_xcheri) */
+static const char *cheri_fault_type_descr[] = {
+	[CHERI_EXCTYPE_FETCH_FAULT] = "pcc fault",
+	[CHERI_EXCTYPE_DATA_FAULT] = " access fault",
+	[CHERI_EXCTYPE_BRANCH_FAULT] = "branch fault",
+};
+
+static const char *cheri_fault_cause_descr[] = {
+	[CHERI_EXCCODE_TAG] = "tag violation",
+	[CHERI_EXCCODE_SEAL] = "seal violation",
+	[CHERI_EXCCODE_PERMS] = "permission violation",
+	[CHERI_EXCCODE_ADDRESS] = "address violation",
+	[CHERI_EXCCODE_BOUNDS] = "bounds violation",
+};
+
+const char *
+cheri_exccode_string(uint8_t fault_type, uint8_t cause)
+{
+	static char buf[64];
+
+	if (fault_type >= nitems(cheri_fault_type_descr) ||
+	    cheri_fault_type_descr[fault_type] == NULL ||
+	    cause >= nitems(cheri_fault_cause_descr) ||
+	    cheri_fault_cause_descr[cause] == NULL) {
+		snprintf(buf, sizeof(buf), "exception type=%#x cause=%#x",
+		    fault_type, cause);
+	} else {
+		snprintf(buf, sizeof(buf), "exception %s: %s",
+		    cheri_fault_type_descr[fault_type],
+		    cheri_fault_cause_descr[cause]);
+	}
+	return (buf);
+}
+
+int
+cheri_stval_to_sicode(register_t stval)
+{
+	uint8_t exccode;
+
+	exccode = TVAL_CAP_CAUSE(stval);
+	switch (exccode) {
+	case CHERI_EXCCODE_TAG:
+		return (PROT_CHERI_TAG);
+	case CHERI_EXCCODE_SEAL:
+		return (PROT_CHERI_SEALED);
+	case CHERI_EXCCODE_PERMS:
+		return (PROT_CHERI_PERM);
+	case CHERI_EXCCODE_ADDRESS:
+		return (PROT_CHERI_INVALID_ADDRESS);
+	case CHERI_EXCCODE_BOUNDS:
+		return (PROT_CHERI_BOUNDS);
+	default:
+		printf(
+		    "%s: Warning: Unknown exccode %u, returning si_code 0\n",
+		    __func__, exccode);
+		return (0);
+	}
+}
+#endif /* !defined(__riscv_xcheri) */
