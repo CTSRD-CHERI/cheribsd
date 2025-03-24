@@ -177,6 +177,7 @@ PROG_FULL=	${PROG}
 
 .if ${MK_COMPARTMENT_POLICY} != "no" && ${MACHINE_ABI:Mpurecap}
 .if !empty(COMPARTMENT_POLICY)
+COMPARTMENT_POLICY+=	${SYSROOT}/usr/lib/crt.json
 ${PROG_FULL}:	${COMPARTMENT_POLICY}
 LDFLAGS+=	${COMPARTMENT_POLICY:S/^/-Wl,--compartment-policy=/}
 .endif
