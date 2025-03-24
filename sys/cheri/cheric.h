@@ -61,7 +61,11 @@
 #ifdef __riscv_xcheri
 #define	cheri_cleartag(x)	__builtin_cheri_tag_clear((x))
 #else
-#define	cheri_cleartag(x)	__builtin_cheri_high_set((x), __builtin_cheri_high_get((x)))
+#define	cheri_cleartag(x)	__extension__({			\
+	__typeof__(x) t = (x);					\
+	__PTRADDR_TYPE__ h = __builtin_cheri_high_get(t);	\
+	__builtin_cheri_high_set(t, h);				\
+})
 #endif
 #define	cheri_incoffset(x, y)	__builtin_cheri_offset_increment((x), (y))
 #define	cheri_setoffset(x, y)	__builtin_cheri_offset_set((x), (y))
