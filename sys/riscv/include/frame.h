@@ -67,6 +67,9 @@ struct trapframe {
 	uint64_t tf_sstatus;
 	uint64_t tf_stval;
 	uint64_t tf_scause;
+#ifdef  __riscv_zcheripurecap
+	uint64_t tf_stval2;
+#endif
 };
 
 #ifdef _KERNEL
