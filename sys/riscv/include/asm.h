@@ -58,9 +58,9 @@
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	SET_FAULT_HANDLER(handler, tmp)					\
-	clc	tmp, PC_CURTHREAD(ctp);					\
-	clc	tmp, TD_PCB(tmp);		/* Load the pcb */	\
-	csc	handler, PCB_ONFAULT(tmp)	/* Set the handler */
+	lc	tmp, PC_CURTHREAD(ctp);					\
+	lc	tmp, TD_PCB(tmp);		/* Load the pcb */	\
+	sc	handler, PCB_ONFAULT(tmp)	/* Set the handler */
 #else
 #define	SET_FAULT_HANDLER(handler, tmp)					\
 	ld	tmp, PC_CURTHREAD(tp);					\
@@ -77,24 +77,49 @@
 	csrc	sstatus, tmp
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#define	CAPABILITY_REG(reg)	c##reg
-#define	MOVE_REG(dst, src)	cmv CAPABILITY_REG(dst), CAPABILITY_REG(src)
-#ifdef __riscv_xcheri
-#define	_CALL	ccall
-#define	_TAIL	ctail
-#define	RETURN	cret
-#else
-#define	_CALL	call
-#define	_TAIL	tail
-#define	RETURN	ret
-#endif
-#else
+#define	PTR(x)	CAP(x)
+#define	LL_PTR	llc
+#define	LD_PTR	LD_CAP
+#define	ST_PTR	ST_CAP
+#define	MODESW_CAP
+#define	MODESW_INT
+#define	MOVE_REG(dst, src)	cmv CAP(dst), CAP(src)
+#else /* !defined(__CHERI_PURE_CAPABILITY__) */
+#define	PTR(x)	x
+#define	LL_PTR	lla
+#define	LD_PTR	ld
+#define	ST_PTR	sd
+#define	MODESW_CAP	_MODESW_CAP
+#define	MODESW_INT	_MODESW_INT
 #define	MOVE_REG(dst, src)	mv dst, src
-#define	_CALL	call
-#define	_TAIL	tail
-#define	RETURN	ret
-#endif
+#endif /* !defined(__CHERI_PURE_CAPABILITY__) */
 
+#if __has_feature(capabilities)
+#define	CAP(x)	c ## x
+#define	LD_CAP	lc
+#define	ST_CAP	sc
+#ifdef __riscv_xcheri
+#define	_MODESW_CAP
+#define	_MODESW_INT
+#else
+#define	_MODESW_CAP				\
+	modesw.cap;				\
+	.option capmode
+#define	_MODESW_INT				\
+	modesw.int;				\
+	.option nocapmode
+#endif
+#else /* !__has_feature(capabilities) */
+#define	CAP(x)	x
+#define	LD_CAP	ld
+#define	ST_CAP	sd
+#define	_MODESW_CAP
+#define	_MODESW_INT
+#endif  /* !__has_feature(capabilities) */
+
+#define	ADDI_CAP	CAP(addi)
+#define	ADD_PTR	PTR(add)
+#define	ADDI_PTR	PTR(addi)
 #endif /* _MACHINE_ASM_H_ */
 // CHERI CHANGES START
 // {

@@ -46,29 +46,23 @@
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	LOAD_PTR	LOAD_CAP
 #define	STORE_PTR	STORE_CAP
-#define	ADD_PTR		caddi
 #define	MV_PTR		cmv
 #define	PTR_SIZE	CAP_SIZE
-#define	PTR(x)		CAP(x)
 #else
 #define	LOAD_PTR	LOAD_INT
 #define	STORE_PTR	STORE_INT
-#define	ADD_PTR		add
 #define	MV_PTR		mv
 #define	PTR_SIZE	INT_SIZE
-#define	PTR(x)		INT(x)
 #endif
 
 #if __has_feature(capabilities)
 #define	LOAD_CAP	lc
 #define	STORE_CAP	sc
 #define	CAP_SIZE	16
-#define	CAP(x)		c ## x
 #else
 #define	LOAD_CAP	ld
 #define	STORE_CAP	sd
 #define	CAP_SIZE	8
-#define	CAP(x)		x
 #endif
 
 #ifdef __riscv_float_abi_double
@@ -157,7 +151,7 @@ ENTRY(_rtld_bind_start)
 #define	FLT_OFFSET	(8 * CAP_SIZE + 1 * PTR_SIZE)
 #define	FRAME_SIZE	(((FLT_OFFSET + 8 * FLT_SIZE) + 15) & ~15)
 
-	ADD_PTR		PTR(sp), PTR(sp), -FRAME_SIZE
+	ADDI_PTR	PTR(sp), PTR(sp), -FRAME_SIZE
 	STORE_CAP	CAP(a0), (CAP_SIZE * 0)(PTR(sp))
 	STORE_CAP	CAP(a1), (CAP_SIZE * 1)(PTR(sp))
 	STORE_CAP	CAP(a2), (CAP_SIZE * 2)(PTR(sp))
@@ -223,7 +217,7 @@ ENTRY(_rtld_bind_start)
 	LOAD_FLT	fa6, (FLT_OFFSET + FLT_SIZE * 6)(PTR(sp))
 	LOAD_FLT	fa7, (FLT_OFFSET + FLT_SIZE * 7)(PTR(sp))
 #endif
-	ADD_PTR		PTR(sp), PTR(sp), FRAME_SIZE
+	ADDI_PTR	PTR(sp), PTR(sp), FRAME_SIZE
 
 	/* Call into the correct function */
 	jr	PTR(t0)
