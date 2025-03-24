@@ -52,10 +52,12 @@ cheri_init_capabilities(void * __capability kroot)
 {
 	void * __capability ctemp;
 
+#ifdef __riscv_xcheri
 	ctemp = cheri_setaddress(kroot, CHERI_SEALCAP_KERNEL_BASE);
 	ctemp = cheri_setbounds(ctemp, CHERI_SEALCAP_KERNEL_LENGTH);
 	ctemp = cheri_andperm(ctemp, CHERI_SEALCAP_KERNEL_PERMS);
 	kernel_root_sealcap = ctemp;
+#endif
 
 	ctemp = cheri_setaddress(kroot, CHERI_CAP_USER_DATA_BASE);
 	ctemp = cheri_setbounds(ctemp, CHERI_CAP_USER_DATA_LENGTH);
@@ -63,10 +65,12 @@ cheri_init_capabilities(void * __capability kroot)
 	    CHERI_CAP_USER_CODE_PERMS | CHERI_PERM_SW_VMEM);
 	userspace_root_cap = ctemp;
 
+#ifdef __riscv_xcheri
 	ctemp = cheri_setaddress(kroot, CHERI_SEALCAP_USERSPACE_BASE);
 	ctemp = cheri_setbounds(ctemp, CHERI_SEALCAP_USERSPACE_LENGTH);
 	ctemp = cheri_andperm(ctemp, CHERI_SEALCAP_USERSPACE_PERMS);
 	userspace_root_sealcap = ctemp;
+#endif
 
 	swap_restore_cap = kroot;
 
@@ -77,8 +81,12 @@ cheri_init_capabilities(void * __capability kroot)
 	ctemp = cheri_andperm(ctemp, CHERI_PERMS_KERNEL_DATA);
 	devmap_init_capability(ctemp);
 
-	kernel_root_cap = cheri_andperm(kroot,
+	ctemp = kroot;
+#ifdef __riscv_xcheri
+	ctemp = cheri_andperm(ctemp,
 	    ~(CHERI_PERM_SEAL | CHERI_PERM_UNSEAL));
+#endif
+	kernel_root_cap = ctemp;
 #endif
 }
 
