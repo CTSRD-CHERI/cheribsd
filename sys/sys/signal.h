@@ -405,6 +405,7 @@ struct __siginfo64 {
 #define	PROT_CHERI_CINVOKE	9	/* CInvoke fault		*/
 #define	PROT_CHERI_SYSREG	11	/* Capability system register fault */
 #define	PROT_CHERI_UNALIGNED_BASE 12	/* Unaligned base address.      */
+#define	PROT_CHERI_INVALID_ADDRESS 13	/* Invalid address conversion	*/
 #endif
 
 #if __POSIX_VISIBLE || __XSI_VISIBLE
