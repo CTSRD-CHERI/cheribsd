@@ -50,6 +50,7 @@
  * XXXRW: CHERI_UNSEALED is not currently considered part of the perms word,
  * but perhaps it should be.
  */
+#ifdef __riscv_xcheri
 #define	CHERI_PERM_GLOBAL			(1 << 0)	/* 0x00000001 */
 #define	CHERI_PERM_EXECUTE			(1 << 1)	/* 0x00000002 */
 #define	CHERI_PERM_LOAD				(1 << 2)	/* 0x00000004 */
@@ -68,6 +69,27 @@
 #define	CHERI_PERM_SW1			(1 << 16)	/* 0x00010000 */
 #define	CHERI_PERM_SW2			(1 << 17)	/* 0x00020000 */
 #define	CHERI_PERM_SW3			(1 << 18)	/* 0x00040000 */
+#else /* !defined(__riscv_xcheri) */
+#define	CHERI_PERM_STORE		(1 << 0)	/* 0x00000001 */
+#define	CHERI_PERM_LOAD_MUTABLE		(1 << 1)	/* 0x00000002 */
+#define	CHERI_PERM_ELEVATE_LEVEL	(1 << 2)	/* 0x00000004 */
+#define	CHERI_PERM_STORE_LEVEL		(1 << 3)	/* 0x00000008 */
+#define	CHERI_PERM_LEVEL		(1 << 4)	/* 0x00000010 */
+#define	CHERI_PERM_CAP			(1 << 5)	/* 0x00000020 */
+#define	CHERI_PERM_SYSTEM_REGS		(1 << 16)	/* 0x00010000 */
+#define	CHERI_PERM_EXECUTE		(1 << 17)	/* 0x00020000 */
+#define	CHERI_PERM_LOAD			(1 << 18)	/* 0x00040000 */
+#define	CHERI_PERM_STORE_CAP		CHERI_PERM_STORE | CHERI_PERM_CAP
+#define	CHERI_PERM_LOAD_CAP		CHERI_PERM_LOAD | CHERI_PERM_CAP
+#define	CHERI_PERM_GLOBAL		CHERI_PERM_LEVEL
+#define	CHERI_PERM_STORE_LOCAL_CAP	CHERI_PERM_STORE_LEVEL
+
+/* User-defined permission bits. */
+#define	CHERI_PERM_SW0			(1 << 6)	/* 0x00000040 */
+#define	CHERI_PERM_SW1			(1 << 7)	/* 0x00000080 */
+#define	CHERI_PERM_SW2			(1 << 8)	/* 0x00000100 */
+#define	CHERI_PERM_SW3			(1 << 9)	/* 0x00000200 */
+#endif /* !defined(__riscv_xcheri) */
 
 /*
  * CHERI_PERMS_SWALL: Mask of all available software-defined permissions
@@ -77,12 +99,19 @@
 	(CHERI_PERM_SW0 | CHERI_PERM_SW1 | CHERI_PERM_SW2 |		\
 	CHERI_PERM_SW3)
 
-#define	CHERI_PERMS_HWALL						\
+#define	_CHERI_PERMS_HWALL_COMMON					\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_EXECUTE |			\
 	CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_LOAD_CAP |	\
 	CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP |		\
-	CHERI_PERM_SEAL | CHERI_PERM_INVOKE | CHERI_PERM_UNSEAL |	\
-	CHERI_PERM_SYSTEM_REGS | CHERI_PERM_SET_CID)
+	CHERI_PERM_SYSTEM_REGS)
+#ifdef __riscv_xcheri
+#define	CHERI_PERMS_HWALL						\
+	(CHERI_PERM_SEAL | CHERI_PERM_INVOKE | CHERI_PERM_UNSEAL |	\
+	CHERI_PERM_SET_CID | _CHERI_PERMS_HWALL_COMMON)
+#else /* !defined(__riscv_xcheri) */
+#define	CHERI_PERMS_HWALL	_CHERI_PERMS_HWALL_COMMON
+#endif /* !defined(__riscv_xcheri) */
+
 
 /*
  * vm_prot_t to capability permission bits
@@ -105,13 +134,21 @@
  * that give us a kind of "kind" for capabilities.  A capability may belong
  * to zero, one, or more than one of these.
  */
-
-#define CHERI_PERMS_HWALL_MEMORY                                        \
-	(CHERI_PERM_EXECUTE | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |   \
-		CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |               \
-		CHERI_PERM_STORE_LOCAL_CAP | CHERI_PERM_INVOKE)
+#define _CHERI_PERMS_HWALL_MEMORY_COMMON				\
+	(CHERI_PERM_EXECUTE | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |	\
+	CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |               	\
+	CHERI_PERM_STORE_LOCAL_CAP)
+#ifdef __riscv_xcheri
+#define CHERI_PERMS_HWALL_MEMORY					\
+	(_CHERI_PERMS_HWALL_MEMORY_COMMON | CHERI_PERM_INVOKE)
 
 #define CHERI_PERMS_HWALL_OTYPE	(CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
+#else /* !defined(__riscv_xcheri) */
+#define CHERI_PERMS_HWALL_MEMORY					\
+	(_CHERI_PERMS_HWALL_MEMORY_COMMON | CHERI_PERM_ELEVATE_LEVEL)
+
+#define CHERI_PERMS_HWALL_OTYPE
+#endif /* !defined(__riscv_xcheri) */
 
 /*
  * Basic userspace permission mask; CHERI_PERM_EXECUTE will be added for
@@ -122,15 +159,23 @@
  * CHERI_PERM_SYSCALL.  CHERI_PERM_SW_VMEM will be added for
  * permissions returned from mmap().
  */
-#define	CHERI_PERMS_USERSPACE						\
+#define	_CHERI_PERMS_USERSPACE_COMMON					\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |	\
-	CHERI_PERM_INVOKE | (CHERI_PERMS_SWALL & ~CHERI_PERM_SW_VMEM))
-
-#define	CHERI_PERMS_USERSPACE_CODE					\
-	(CHERI_PERMS_USERSPACE | CHERI_PERM_EXECUTE)
+	 (CHERI_PERMS_SWALL & ~CHERI_PERM_SW_VMEM))
+#ifdef __riscv_xcheri
+#define	CHERI_PERMS_USERSPACE						\
+	(CHERI_PERM_GLOBAL | CHERI_PERM_INVOKE | _CHERI_PERMS_USERSPACE_COMMON)
 
 #define	CHERI_PERMS_USERSPACE_SEALCAP					\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
+#else /* !defined(__riscv_xcheri) */
+#define	CHERI_PERMS_USERSPACE						\
+	(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |			\
+	(CHERI_PERMS_SWALL & ~CHERI_PERM_SW_VMEM))
+#endif /* !defined(__riscv_xcheri) */
+
+#define	CHERI_PERMS_USERSPACE_CODE					\
+	(CHERI_PERMS_USERSPACE | CHERI_PERM_EXECUTE)
 
 #define	CHERI_PERMS_USERSPACE_DATA					\
 	(CHERI_PERMS_USERSPACE | CHERI_PERM_STORE |			\
@@ -157,8 +202,10 @@
 #define	CHERI_PERMS_KERNEL_RODATA			       		\
 	(CHERI_PERMS_KERNEL)
 
+#ifdef __riscv_xcheri
 #define	CHERI_PERMS_KERNEL_SEALCAP					\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
+#endif
 
 #define	CHERI_FLAGS_CAP_MODE	0x1
 
@@ -186,6 +233,7 @@
 /*
  * List of CHERI capability cause code constants.
  */
+#ifdef __riscv_xcheri
 #define	CHERI_EXCCODE_NONE		0x00
 #define	CHERI_EXCCODE_LENGTH		0x01
 #define	CHERI_EXCCODE_TAG		0x02
@@ -219,5 +267,29 @@
 #define	_CHERI_EXCCODE_RESERVED1d	0x1d
 #define	_CHERI_EXCCODE_RESERVED1e	0x1e
 #define	_CHERI_EXCCODE_RESERVED1f	0x1f
+
+#define	is_cheri_load_cap_fault(frame)				\
+	(frame->tf_scause == SCAUSE_LOAD_CAP_PAGE_FAULT)
+#define	is_cheri_store_amo_cap_fault(frame)			\
+	(frame->tf_scause == SCAUSE_STORE_AMO_CAP_PAGE_FAULT)
+#else /* !defined(__riscv_xcheri) */
+#define	CHERI_EXCTYPE_FETCH_FAULT	0x00
+#define	CHERI_EXCTYPE_DATA_FAULT	0x01
+#define	CHERI_EXCTYPE_BRANCH_FAULT	0x02
+#define	CHERI_EXCCODE_TAG		0x00
+#define	CHERI_EXCCODE_SEAL		0x01
+#define	CHERI_EXCCODE_PERMS		0x02
+#define	CHERI_EXCCODE_ADDRESS		0x03
+#define	CHERI_EXCCODE_BOUNDS		0x04
+
+#define	is_cheri_load_cap_fault(frame)				\
+	(frame->tf_scause == SCAUSE_LOAD_PAGE_FAULT &&		\
+	TVAL_CAP_CAUSE(frame->tf_stval2) != 0)
+#define	is_cheri_store_amo_cap_fault(frame)			\
+	(frame->tf_scause == SCAUSE_STORE_ACCESS_FAULT &&	\
+	frame->tf_stval2 != 0)
+#endif /* !defined(__riscv_xcheri) */
+
+
 
 #endif /* !_MACHINE_CHERIREG_H_ */
