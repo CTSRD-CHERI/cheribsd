@@ -816,6 +816,7 @@ kern_cheri_revoke_get_shadow(struct thread *td, int flags,
 
 	case CHERI_REVOKE_SHADOW_OTYPE:
 	    {
+#ifdef __riscv_xcheri
 		int reqperms;
 
 		if (cheri_tag_get(arena) == 0)
@@ -833,6 +834,9 @@ kern_cheri_revoke_get_shadow(struct thread *td, int flags,
 
 		cres = vm_cheri_revoke_shadow_cap(curproc->p_sysent,
 			sel, base, size, 0);
+#else
+                return (EINVAL);
+#endif
 
 		break;
 	    }
