@@ -139,17 +139,17 @@ again:
 #if defined(__CHERI_PURE_CAPABILITY__) || !defined(__riscv_xcheri)
 		__asm__ __volatile__ (
 #if !defined(__CHERI_PURE_CAPABILITY__)
-			".option push"
-			".option capmode"
+			".option push\n\t"
+			".option capmode\n\t"
 			"modesw.cap\n\t"
 #endif
 			"lr.c %[cscratch], (%[cutp])\n\t"
-			"cseqx %[ok], %[cscratch], %[cut]\n\t"
+			"sceq %[ok], %[cscratch], %[cut]\n\t"
 			"beq x0, %[ok], 1f\n\t"
 			"sc.c %[sc_result], %[cutr], (%[cutp])\n\t"
 			"1:\n\t"
 #if !defined(__CHERI_PURE_CAPABILITY__)
-			".option pop"
+			".option pop\n\t"
 			"modesw.int\n\t"
 #endif
 		  : [ok] "=&r" (ok), [cscratch] "=&C" (cscratch),
@@ -159,7 +159,7 @@ again:
 #else
 		__asm__ __volatile__ (
 			"lr.c.cap %[cscratch], (%[cutp])\n\t"
-			"cseqx %[ok], %[cscratch], %[cut]\n\t"
+			"sceq %[ok], %[cscratch], %[cut]\n\t"
 			"beq x0, %[ok], 1f\n\t"
 			"sc.c.cap %[cutr], (%[cutp])\n\t"
 			"1:\n\t"

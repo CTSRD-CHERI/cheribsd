@@ -170,7 +170,7 @@ init_secondary(uint64_t hart)
 	/* Setup the pcpu pointer */
 	pcpup = &__pcpu[cpuid];
 #ifdef __CHERI_PURE_CAPABILITY__
-	__asm __volatile("cmove ctp, %0" :: "C"(pcpup));
+	__asm __volatile("cmv ctp, %0" :: "C"(pcpup));
 #else
 	__asm __volatile("mv tp, %0" :: "r"(pcpup));
 #endif
