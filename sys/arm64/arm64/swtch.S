@@ -429,6 +429,7 @@ RELRO_ENTRY(ptrauth_switch)
 #ifdef VFP
 RELRO_ENTRY(vfp_discard)
 RELRO_ENTRY(vfp_save_state_savectx)
+RELRO_ENTRY(vfp_save_state_switch)
 #endif
 #endif
 
