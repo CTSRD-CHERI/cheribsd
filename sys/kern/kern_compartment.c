@@ -362,9 +362,8 @@ compartment_trampoline_create(const linker_file_t lf, int type, void *data,
 
 	trampoline->ct_compartment_id = dstid;
 	if (lf != NULL) {
-		cpu_dcache_wb_range((vm_pointer_t)trampoline, (vm_size_t)size);
-		cpu_icache_sync_range((vm_pointer_t)trampoline,
-		    (vm_size_t)size);
+		cpu_dcache_wb_range(trampoline, (vm_size_t)size);
+		cpu_icache_sync_range(trampoline, (vm_size_t)size);
 
 		mtx_lock(&compartment_trampolines_lock);
 	}
