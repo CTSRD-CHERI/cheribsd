@@ -197,7 +197,7 @@ LDFLAGS+=	-z notext -z ifunc-noplt
 .endif
 .endif  # ${MACHINE_CPUARCH} == "amd64"
 
-.if ${MACHINE_CPUARCH} == "aarch64" && ${MACHINE_ABI:Mcheri}
+.if ${MACHINE_CPUARCH} == "aarch64" && ${MACHINE_CPU:Mcheri}
 .if ${MK_CHERI_CODEPTR_RELOCS} != "no" && ${COMPILER_FEATURES:Mmorello-codeptr-relocs}
 CFLAGS+=	-cheri-codeptr-relocs
 LDFLAGS+=	-cheri-codeptr-relocs
