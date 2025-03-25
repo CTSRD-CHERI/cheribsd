@@ -350,6 +350,7 @@ struct mrs_descriptor_slab_entry {
 
 struct mrs_descriptor_slab {
 	int num_descriptors;
+	int next_descriptor;
 	struct mrs_descriptor_slab *next;
 	struct mrs_descriptor_slab_entry slab[DESCRIPTOR_SLAB_ENTRIES];
 };
@@ -533,6 +534,7 @@ alloc_descriptor_slab(void)
 			;
 
 		ret->num_descriptors = 0;
+		ret->next_descriptor = 0;
 		return (ret);
 	}
 }
@@ -933,6 +935,46 @@ print_cheri_revoke_stats(char *what, struct cheri_revoke_syscall_info *crsi,
 }
 #endif /* PRINT_CAPREVOKE */
 
+static inline void
+slab_free_next_descriptor(struct mrs_descriptor_slab *s)
+{
+	int i = s->next_descriptor++;
+
+	assert(s->next_descriptor <= s->num_descriptors);
+
+	/*
+	 * Doesn't matter if the underlying size isn't a 16-byte multiple
+	 * because all allocations will be 16-byte aligned.
+	 */
+	size_t len = __builtin_align_up(cheri_getlen(s->slab[i].ptr),
+	    CAPREVOKE_BITMAP_ALIGNMENT);
+	caprev_shadow_nomap_clear_len(cri->base_mem_nomap, entire_shadow,
+	    cheri_getbase(s->slab[i].ptr), len);
+
+	/*
+	 * Don't construct a pointer to a
+	 * previously revoked region until the
+	 * bitmap is cleared.
+	 */
+	atomic_thread_fence(memory_order_release);
+
+#ifdef CLEAR_ON_RETURN
+	clear_region(s->slab[i].ptr, cheri_getlen(s->slab[i].ptr));
+#endif /* CLEAR_ON_RETURN */
+
+	/*
+	 * We have a VMEM-bearing cap from malloc_underlying_allocation.
+	 *
+	 * XXX: We used to rely on the underlying allocator to rederive
+	 * caps but snmalloc2's CHERI support doesn't do that by default, so
+	 * we'll clear VMEM here.  This feels wrong, somehow; perhaps we want
+	 * to retry with snmalloc1 not doing rederivation now that we're doing
+	 * this?
+	 */
+	REAL(free)(__builtin_cheri_perms_and(s->slab[i].ptr,
+	    ~CHERI_PERM_SW_VMEM));
+}
+
 static void
 quarantine_flush(struct mrs_quarantine *quarantine)
 {
@@ -941,50 +983,11 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 	MRS_UTRACE(UTRACE_MRS_QUARANTINE_FLUSH, NULL, 0, 0, NULL);
 	for (struct mrs_descriptor_slab *iter = quarantine->list; iter != NULL;
 	     iter = iter->next) {
-		for (int i = 0; i < iter->num_descriptors; i++) {
-
-			/*
-			 * Doesn't matter if the underlying
-			 * size isn't a 16-byte multiple
-			 * because all allocations will be
-			 * 16-byte aligned.
-			 */
-			size_t len = __builtin_align_up(
-			    cheri_getlen(iter->slab[i].ptr),
-			    CAPREVOKE_BITMAP_ALIGNMENT);
-			caprev_shadow_nomap_clear_len(
-			    cri->base_mem_nomap, entire_shadow,
-			    cheri_getbase(iter->slab[i].ptr), len);
-
-			/*
-			 * Don't construct a pointer to a
-			 * previously revoked region until the
-			 * bitmap is cleared.
-			 */
-			atomic_thread_fence(memory_order_release);
-
-#ifdef CLEAR_ON_RETURN
-			clear_region(iter->slab[i].ptr,
-			    cheri_getlen(iter->slab[i].ptr));
-#endif /* CLEAR_ON_RETURN */
-
-			/*
-			 * We have a VMEM-bearing cap from
-			 * malloc_underlying_allocation.
-			 *
-			 * XXX: We used to rely on the
-			 * underlying allocator to rederive
-			 * caps but snmalloc2's CHERI support
-			 * doesn't do that by default, so
-			 * we'll clear VMEM here.  This feels
-			 * wrong, somehow; perhaps we want to
-			 * retry with snmalloc1 not doing
-			 * rederivation now that we're doing
-			 * this?
-			 */
-			REAL(free)(__builtin_cheri_perms_and(iter->slab[i].ptr,
-			    ~CHERI_PERM_SW_VMEM));
+		assert(iter->next_descriptor == 0);
+		while(iter->next_descriptor < iter->num_descriptors) {
+			slab_free_next_descriptor(iter);
 		}
+		assert(iter->next_descriptor == iter->num_descriptors);
 		prev = iter;
 	}
 
