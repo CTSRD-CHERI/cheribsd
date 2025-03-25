@@ -338,8 +338,9 @@ ENTRY(handle_el1t_irq)
 	save_registers 1
 	KMSAN_ENTER
 	mov	PTR(0), PTRN(sp)
+	mov	x1, #INTR_ROOT_IRQ
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(1, intr_irq_handler)
+	RELRO_BRANCH(2, intr_irq_handler)
 #else
 	bl	intr_irq_handler
 #endif
@@ -351,7 +352,7 @@ END(handle_el1t_irq)
 ENTRY(handle_el1t_fiq)
 	save_registers 1
 	KMSAN_ENTER
-	mov	x0, sp
+	mov	PTR(0), PTRN(sp)
 	mov	x1, #INTR_ROOT_FIQ
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	RELRO_BRANCH(2, intr_irq_handler)
@@ -362,6 +363,20 @@ ENTRY(handle_el1t_fiq)
 	restore_registers 1
 	ERET
 END(handle_el1t_fiq)
+
+ENTRY(handle_el1t_serror)
+	save_registers 1
+	KMSAN_ENTER
+	mov	x0, sp
+1:
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	RELRO_BRANCH(1, do_serror)
+#else
+	bl	do_serror
+#endif
+	b	1b
+	KMSAN_LEAVE
+END(handle_el1t_serror)
 
 ENTRY(handle_el1h_sync)
 	save_registers 1
@@ -396,7 +411,7 @@ END(handle_el1h_irq)
 ENTRY(handle_el1h_fiq)
 	save_registers 1
 	KMSAN_ENTER
-	mov	x0, sp
+	mov	PTR(0), PTRN(sp)
 	mov	x1, #INTR_ROOT_FIQ
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	RELRO_BRANCH(2, intr_irq_handler)
@@ -460,7 +475,7 @@ END(handle_el0_irq)
 ENTRY(handle_el0_fiq)
 	save_registers 0
 	KMSAN_ENTER
-	mov	x0, sp
+	mov	PTR(0), PTRN(sp)
 	mov	x1, #INTR_ROOT_FIQ
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	RELRO_BRANCH(2, intr_irq_handler)
@@ -520,8 +535,8 @@ END(handle_empty_exception)
 exception_vectors:
 	vector el1t_sync 1	/* Synchronous EL1t */
 	vector el1t_irq 1	/* IRQ EL1t */
-	vector el1t_fq 1	/* FIQ EL1t */
-	vector serror 1		/* Error EL1t */
+	vector el1t_fiq 1	/* FIQ EL1t */
+	vector el1t_serror 1	/* Error EL1t */
 
 	vector el1h_sync 1	/* Synchronous EL1h */
 	vector el1h_irq 1	/* IRQ EL1h */
