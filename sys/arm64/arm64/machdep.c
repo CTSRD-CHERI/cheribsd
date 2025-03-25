@@ -993,20 +993,11 @@ initarm(struct arm64_bootparams *abp)
 
 	update_special_regs(0);
 
-	/* Set the pcpu data, this is needed by pmap_bootstrap */
-	pcpup = &pcpu0;
-	pcpu_init(pcpup, 0, sizeof(struct pcpu));
-
-	/* Initialize the pcpu pointer for this cpu. */
-	init_cpu_pcpup(pcpup);
-
-	/* locore.S sets sp_el0 to &thread0 so no need to set it here. */
-	PCPU_SET(curthread, &thread0);
-	PCPU_SET(midr, get_midr());
-
 	/*
 	 * XXXKW: Must be executed in the Executive mode to construct
 	 * trampolines.
+	 * TODO: link_elf_ireloc() uses TSLOG which accesses curthread.
+	 * If possible, the call should be moved after init_cpu_pcpup().
 	 */
 	link_elf_ireloc(kmdp);
 
