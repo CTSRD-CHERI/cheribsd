@@ -31,6 +31,7 @@
  */
 
 #include <sys/cdefs.h>
+#include <sys/elf_common.h>
 
 #include <machine/asm.h>
 #include <machine/param.h>
@@ -214,3 +215,5 @@ eexecutive_entry_trampoline:
 szexecutive_entry_trampoline:
 	.quad	eexecutive_entry_trampoline - executive_entry_trampoline
 #endif	/* __CHERI_PURE_CAPABILITY__ */
+
+GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)
