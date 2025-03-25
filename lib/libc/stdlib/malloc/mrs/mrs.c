@@ -1013,8 +1013,6 @@ quarantine_flush(struct mrs_quarantine *quarantine)
  * Perform revocation then iterate through the quarantine and free entries with
  * non-zero underlying size (offload thread sets unvalidated caps to have zero
  * size).
- *
- * Supports ablation study knobs.
  */
 static void
 quarantine_revoke(struct mrs_quarantine *quarantine)
