@@ -42,6 +42,10 @@
 #include <sys/rman.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
+#include <sys/vmem.h>
+
+#include <vm/vm.h>
+#include <vm/vm_page.h>
 
 #include <vm/vm.h>
 #include <vm/vm_page.h>
