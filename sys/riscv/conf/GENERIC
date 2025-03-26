@@ -155,6 +155,7 @@ device		gpio
 # SPI
 device		spibus
 device		spigen
+device		xilinx_spi	# Xilinx AXI SPI Controller
 
 # Debugging support.  Always need this:
 options 	KDB			# Enable kernel debugger support.
