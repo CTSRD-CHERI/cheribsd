@@ -252,7 +252,7 @@ CRT_COMMON_F16_ARCH=t
 # _Float16 support, only on some architectures, and with certain compiler
 # versions.
 #
-.if ((${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 150000) && \
+.if ((${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 150001) && \
      (defined(CRT_COMMON_F16_ARCH) || \
       ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "riscv")) || \
     ((${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} >= 120000) && \
@@ -264,7 +264,7 @@ CFLAGS+=	-DCOMPILER_RT_HAS_FLOAT16
 # __bf16 support, only on some architectures, and with certain compiler
 # versions.
 #
-.if ((${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 150000) && \
+.if ((${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 150001) && \
      (defined(CRT_COMMON_F16_ARCH)) && ${MACHINE_CPUARCH} != "aarch64") || \
     ((${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 160000) && \
      ${MACHINE_CPUARCH} == "aarch64") || \
