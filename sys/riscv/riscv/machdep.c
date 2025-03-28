@@ -665,7 +665,7 @@ initriscv(struct riscv_bootparams *rvbp)
 
 	cninit();
 
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && defined __riscv_xcheri
 	/*
 	 * Now that printf() is ready, we check for the required CHERI features
 	 * needed to run this version of CheriBSD to detect incompatible (old)
