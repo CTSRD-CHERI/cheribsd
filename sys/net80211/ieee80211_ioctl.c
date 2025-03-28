@@ -147,7 +147,8 @@ ieee80211_ioctl_getchaninfo(struct ieee80211vap *vap, struct ieee80211req *ireq)
 	if (space > ireq->i_len)
 		space = ireq->i_len;
 	/* XXX assumes compatible layout */
-	return copyout(&ic->ic_nchans, ireq->i_data, space);
+	return copyout((char *)ic + __offsetof(struct ieee80211com, ic_nchans),
+	    ireq->i_data, space);
 }
 
 static int
