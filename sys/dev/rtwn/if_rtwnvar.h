@@ -96,7 +96,7 @@ struct rtwn_cmdq {
 #define RTWN_CMDQ_SIZE		16
 
 struct rtwn_node {
-	struct ieee80211_node	ni;	/* must be the first */
+	struct ieee80211_node	ni __subobject_member_used_for_c_inheritance;	/* must be the first */
 	int			id;
 
 	struct rtwn_tx_phystat	last_physt;
@@ -105,7 +105,7 @@ struct rtwn_node {
 #define RTWN_NODE(ni)		((struct rtwn_node *)(ni))
 
 struct rtwn_vap {
-	struct ieee80211vap	vap;
+	struct ieee80211vap	vap __subobject_member_used_for_c_inheritance;
 	int			id;
 #define RTWN_VAP_ID_INVALID	-1
 	int			curr_mode;
