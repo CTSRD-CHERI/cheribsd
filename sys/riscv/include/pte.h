@@ -67,6 +67,7 @@ typedef	uint64_t	pn_t;			/* page number */
 #define	Ln_ADDR_MASK	(Ln_ENTRIES - 1)
 
 #if __has_feature(capabilities)
+#ifdef __riscv_xcheri
 /* CHERI uses reserved bits in 55:63 */
 #define	PTE_CW		(1UL << 63) /* Capability Write */
 #define	PTE_CR		(1UL << 62) /* Capability Read */
@@ -81,6 +82,17 @@ typedef	uint64_t	pn_t;			/* page number */
 
 #define	PTE_KERN_CHERI	(PTE_CR | PTE_CW | PTE_CD)
 #define	PTE_PROMOTE_CHERI (PTE_CR | PTE_CW | PTE_CD | PTE_CRM | PTE_CRG)
+#else /* !defined(__riscv_xcheri) */
+#define	PTE_CW		(1UL << 60) /* Capability Read/Write */
+#define	PTE_CRG		(1UL << 59) /* Cap Read Generation */
+
+#define	PTE_CR_CLEAR	0			/* clear tags on load and store */
+#define	PTE_CR_OK	PTE_CW			/* tags load OK (assume U=0) */
+#define	PTE_CR_GEN	PTE_CW			/* tags gated by generation */
+
+#define	PTE_KERN_CHERI	PTE_CW
+#define	PTE_PROMOTE_CHERI (PTE_CW | PTE_CRG)
+#endif  /* !defined(__riscv_xcheri) */
 #else
 #define	PTE_KERN_CHERI	0
 #define	PTE_PROMOTE_CHERI 0
