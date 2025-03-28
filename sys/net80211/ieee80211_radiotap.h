@@ -55,7 +55,7 @@
 
 #define	IEEE80211_RADIOTAP_HDRLEN	64	/* XXX deprecated */
 
-struct ieee80211_radiotap_vendor_header {
+struct __no_subobject_bounds ieee80211_radiotap_vendor_header {
 	uint8_t		vh_oui[3];	/* 3 byte vendor OUI */
 	uint8_t		vh_sub_ns;	/* Sub namespace of this section */
 	uint16_t	vh_skip_len;	/* Length of this vendor section */
@@ -66,7 +66,7 @@ struct ieee80211_radiotap_vendor_header {
  *
  * Note well: all radiotap fields are little-endian.
  */
-struct ieee80211_radiotap_header {
+struct __no_subobject_bounds ieee80211_radiotap_header {
 	uint8_t		it_version;	/* Version 0. Only increases
 					 * for drastic changes,
 					 * introduction of compatible
