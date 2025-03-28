@@ -164,11 +164,11 @@
 #define	SATP_MODE_SV48	(9ULL << SATP_MODE_S)
 
 #if __has_feature(capabilities)
+#ifdef __riscv_xcheri
 #define	SCCSR_E			(1 << 0)
 #define	SCCSR_SGCLG		(1 << 2)
 #define	SCCSR_UGCLG		(1 << 3)
 #define	SCCSR_TAG_CLEARING	(1 << 31)
-#ifdef __riscv_xcheri
 #define	TVAL_CAP_CAUSE_SHIFT	0
 #define	TVAL_CAP_IDX_SHIFT	5
 #define	TVAL_CAP_CAUSE_MASK	(0x1f << TVAL_CAP_CAUSE_SHIFT)
@@ -185,6 +185,10 @@
 #endif /* !defined(__riscv_xcheri) */
 #define	TVAL_CAP_CAUSE(tval)						\
 	(((tval) & TVAL_CAP_CAUSE_MASK) >> TVAL_CAP_CAUSE_SHIFT)
+#endif
+
+#ifdef __riscv_zcherihybrid
+#define	SENVCFG_CRE	(0x01 << 28)
 #endif
 
 #define	XLEN		__riscv_xlen
