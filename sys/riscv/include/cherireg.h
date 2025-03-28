@@ -145,7 +145,8 @@
 #define CHERI_PERMS_HWALL_OTYPE	(CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
 #else /* !defined(__riscv_xcheri) */
 #define CHERI_PERMS_HWALL_MEMORY					\
-	(_CHERI_PERMS_HWALL_MEMORY_COMMON | CHERI_PERM_ELEVATE_LEVEL)
+	(_CHERI_PERMS_HWALL_MEMORY_COMMON | CHERI_PERM_LOAD_MUTABLE |	\
+	    CHERI_PERM_ELEVATE_LEVEL)
 
 #define CHERI_PERMS_HWALL_OTYPE
 #endif /* !defined(__riscv_xcheri) */
@@ -170,7 +171,7 @@
 	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
 #else /* !defined(__riscv_xcheri) */
 #define	CHERI_PERMS_USERSPACE						\
-	(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |			\
+	(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP | CHERI_PERM_LOAD_MUTABLE | \
 	(CHERI_PERMS_SWALL & ~CHERI_PERM_SW_VMEM))
 #endif /* !defined(__riscv_xcheri) */
 
@@ -189,8 +190,14 @@
  * currently a bit broad, and should be narrowed over time as the kernel
  * becomes more capability-aware.
  */
+#ifdef __riscv_xcheri
 #define	CHERI_PERMS_KERNEL						\
-	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)	\
+	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
+#else /* !defined(__riscv_xcheri) */
+#define	CHERI_PERMS_KERNEL						\
+	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |	\
+	    CHERI_PERM_LOAD_MUTABLE)
+#endif
 
 #define	CHERI_PERMS_KERNEL_CODE						\
 	(CHERI_PERMS_KERNEL | CHERI_PERM_EXECUTE | CHERI_PERM_SYSTEM_REGS)
