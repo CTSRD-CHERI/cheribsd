@@ -610,7 +610,6 @@ vm_thread_dispose(struct thread *td)
 	vm_kstack_dispose(ks, pages);
 }
 
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 /*
  * Calculate kstack pindex.
  *
@@ -640,6 +639,7 @@ vm_kstack_pindex(vm_offset_t ks, int kpages)
 #endif
 }
 
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 /*
  * Initialise the kernel stack for a compartment.
  *
