@@ -188,9 +188,7 @@
 #endif /* !defined(__riscv_xcheri) */
 #define	TVAL_CAP_CAUSE(tval)						\
 	(((tval) & TVAL_CAP_CAUSE_MASK) >> TVAL_CAP_CAUSE_SHIFT)
-#endif
 
-#ifdef __riscv_zcherihybrid
 #define	SENVCFG_CRE	(0x01 << 28)
 #endif
 
