@@ -178,6 +178,15 @@ r12a_handle_c2h_report(struct rtwn_softc *sc, uint8_t *buf, int len)
 int
 r12a_check_frame_checksum(struct rtwn_softc *sc, struct mbuf *m)
 {
+	/*
+	 * XXX: RTL8821AU seems to incorrectly handle at least UDP checksum
+	 * fields of 0, treating them as an error. Ignore the offloaded
+	 * checksumming result until this has been better characterised
+	 * (including whether all-ones is correctly handled).
+	 *
+	 * https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=285837
+	 */
+#if 0
 	struct r12a_softc *rs = sc->sc_priv;
 	struct r92c_rx_stat *stat;
 	uint32_t rxdw1;
@@ -202,6 +211,7 @@ r12a_check_frame_checksum(struct rtwn_softc *sc, struct mbuf *m)
 			m->m_pkthdr.csum_data = 0xffff;
 		}
 	}
+#endif
 
 	return (0);
 }
