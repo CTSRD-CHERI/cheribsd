@@ -315,7 +315,7 @@ va:
 	llc	ct1, _C_LABEL(_end)
 	sub	t2, t1, t0
 	scaddr	ct1, ct1, t0
-	// scbndsr	ct1, ct1, t2
+	scbndsr	ct1, ct1, t2
 	llc	ct0, 1f
 	scaddr	ct1, ct1, t0
 	jr	ct1
