@@ -229,6 +229,7 @@ dtrace_faultstr(dtrace_hdl_t *dtp, int fault)
 		{ DTRACEFLT_TUPOFLOW,	"tuple stack overflow" },
 		{ DTRACEFLT_BADSTACK,	"bad stack" },
 		{ DTRACEFLT_LIBRARY,	"library-level fault" },
+		{ DTRACEFLT_CHERI,	"CHERI exception" },
 		{ 0,			NULL }
 	};
 

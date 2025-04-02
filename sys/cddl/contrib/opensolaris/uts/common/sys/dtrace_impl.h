@@ -51,11 +51,7 @@ extern "C" {
 #include <sys/file.h>
 
 #ifndef illumos
-#ifdef __sparcv9
-typedef uint32_t		pc_t;
-#else
-typedef uintptr_t		pc_t;
-#endif
+typedef vm_offset_t		pc_t;
 typedef	u_long			greg_t;
 #endif
 
@@ -86,6 +82,7 @@ typedef struct dtrace_state dtrace_state_t;
 typedef uint32_t dtrace_optid_t;
 typedef uint32_t dtrace_specid_t;
 typedef uint64_t dtrace_genid_t;
+typedef uint64ptr_t dtrace_difval_t;
 
 /*
  * DTrace Probes
@@ -153,9 +150,9 @@ typedef struct dtrace_hash {
 	int dth_size;				/* size of hash table */
 	int dth_mask;				/* mask to index into table */
 	int dth_nbuckets;			/* total number of buckets */
-	uintptr_t dth_nextoffs;			/* offset of next in probe */
-	uintptr_t dth_prevoffs;			/* offset of prev in probe */
-	uintptr_t dth_stroffs;			/* offset of str in probe */
+	size_t dth_nextoffs;			/* offset of next in probe */
+	size_t dth_prevoffs;			/* offset of prev in probe */
+	size_t dth_stroffs;			/* offset of str in probe */
 } dtrace_hash_t;
 
 /*
@@ -233,7 +230,7 @@ struct dtrace_ecb {
 	uint32_t dte_cond;			/* security condition */
 	dtrace_probe_t *dte_probe;		/* pointer to probe */
 	dtrace_action_t *dte_action_last;	/* last action on ECB */
-	uint64_t dte_uarg;			/* library argument */
+	dtrace_uarg_t dte_uarg;			/* library argument */
 };
 
 struct dtrace_predicate {
@@ -783,7 +780,7 @@ typedef struct dtrace_speculation {
  * emulation code, the hash bucket is unlocked.
  */
 typedef struct dtrace_key {
-	uint64_t dttk_value;			/* data value or data pointer */
+	uint64ptr_t dttk_value;			/* data value or data pointer */
 	uint64_t dttk_size;			/* 0 if by-val, >0 if by-ref */
 } dtrace_key_t;
 
@@ -881,7 +878,7 @@ typedef struct dtrace_dstate {
  *    dynamically-allocated DIFV_SCOPE_GLOBAL variables.
  */
 typedef struct dtrace_statvar {
-	uint64_t dtsv_data;			/* data or pointer to it */
+	dtrace_difval_t dtsv_data;		/* data or pointer to it */
 	size_t dtsv_size;			/* size of pointed-to data */
 	int dtsv_refcnt;			/* reference count */
 	dtrace_difv_t dtsv_var;			/* variable metadata */
@@ -1073,7 +1070,7 @@ typedef struct dtrace_helptrace {
 	int dtht_fault;				/* type of fault (if any) */
 	int dtht_fltoffs;			/* DIF offset */
 	uint64_t dtht_illval;			/* faulting value */
-	uint64_t dtht_locals[1];		/* local variables */
+	dtrace_difval_t dtht_locals[1];		/* local variables */
 } dtrace_helptrace_t;
 
 /*
@@ -1276,32 +1273,31 @@ typedef struct dtrace_toxrange {
 	uintptr_t	dtt_limit;		/* limit of toxic range */
 } dtrace_toxrange_t;
 
-#ifdef illumos
-extern uint64_t dtrace_getarg(int, int);
-#else
-extern uint64_t __noinline dtrace_getarg(int, int);
-#endif
+extern uint64ptr_t dtrace_getarg(int, int);
 extern greg_t dtrace_getfp(void);
 extern int dtrace_getipl(void);
 extern uintptr_t dtrace_caller(int);
 extern uint32_t dtrace_cas32(uint32_t *, uint32_t, uint32_t);
 extern void *dtrace_casptr(volatile void *, volatile void *, volatile void *);
-extern void dtrace_copyin(uintptr_t, uintptr_t, size_t, volatile uint16_t *);
-extern void dtrace_copyinstr(uintptr_t, uintptr_t, size_t, volatile uint16_t *);
-extern void dtrace_copyout(uintptr_t, uintptr_t, size_t, volatile uint16_t *);
-extern void dtrace_copyoutstr(uintptr_t, uintptr_t, size_t,
+extern void dtrace_copyin(uintcap_t, uintptr_t, size_t, volatile uint16_t *);
+extern void dtrace_copyinstr(uintcap_t, uintptr_t, size_t, volatile uint16_t *);
+extern void dtrace_copyout(uintptr_t, uintcap_t, size_t, volatile uint16_t *);
+extern void dtrace_copyoutstr(uintptr_t, uintcap_t, size_t,
     volatile uint16_t *);
 extern void dtrace_getpcstack(pc_t *, int, int, uint32_t *);
-extern ulong_t dtrace_getreg(struct trapframe *, uint_t);
+extern uintcap_t dtrace_getreg(struct trapframe *, uint_t);
 extern int dtrace_getstackdepth(int);
 extern void dtrace_getupcstack(uint64_t *, int);
 extern void dtrace_getufpstack(uint64_t *, uint64_t *, int);
 extern int dtrace_getustackdepth(void);
 extern uintptr_t dtrace_fulword(void *);
-extern uint8_t dtrace_fuword8(void *);
-extern uint16_t dtrace_fuword16(void *);
-extern uint32_t dtrace_fuword32(void *);
-extern uint64_t dtrace_fuword64(void *);
+extern uint8_t dtrace_fuword8(void * __capability);
+extern uint16_t dtrace_fuword16(void * __capability);
+extern uint32_t dtrace_fuword32(void * __capability);
+extern uint64_t dtrace_fuword64(void * __capability);
+#if __has_feature(capabilities)
+extern uintcap_t dtrace_fucap(void * __capability);
+#endif
 extern void dtrace_probe_error(dtrace_state_t *, dtrace_epid_t, int, int,
     int, uintptr_t);
 extern int dtrace_assfail(const char *, const char *, int);

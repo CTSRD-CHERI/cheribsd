@@ -151,6 +151,32 @@ dtrace_sync(void)
 	dtrace_xcall(DTRACE_CPUALL, (dtrace_xcall_t)dtrace_sync_func, NULL);
 }
 
+static uint64_t nsec_scale;
+
+#define SCALE_SHIFT	25
+
+/*
+ * Choose scaling factors which let us convert a cntvct_el0 value to nanoseconds
+ * without overflow, as in the amd64 implementation.
+ *
+ * Documentation for the ARM generic timer states that typical counter
+ * frequencies are in the range 1Mhz-50Mhz; in ARMv9 the frequency is fixed at
+ * 1GHz.  The lower bound of 1MHz forces the shift to be at most 25 bits.  At
+ * that frequency, the calculation (hi * scale) << (32 - shift) will not
+ * overflow for over 100 years, assuming that the counter value starts at 0 upon
+ * boot.
+ */
+static void
+dtrace_gethrtime_init(void *arg __unused)
+{
+	uint64_t freq;
+
+	freq = READ_SPECIALREG(cntfrq_el0);
+	nsec_scale = ((uint64_t)NANOSEC << SCALE_SHIFT) / freq;
+}
+SYSINIT(dtrace_gethrtime_init, SI_SUB_DTRACE, SI_ORDER_ANY,
+    dtrace_gethrtime_init, NULL);
+
 /*
  * DTrace needs a high resolution time function which can be called from a
  * probe context and guaranteed not to have instrumented with probes itself.
@@ -161,10 +187,13 @@ uint64_t
 dtrace_gethrtime(void)
 {
 	uint64_t count, freq;
+	uint32_t lo, hi;
 
 	count = READ_SPECIALREG(cntvct_el0);
-	freq = READ_SPECIALREG(cntfrq_el0);
-	return ((1000000000UL * count) / freq);
+	lo = count;
+	hi = count >> 32;
+	return (((lo * nsec_scale) >> SCALE_SHIFT) +
+	    ((hi * nsec_scale) << (32 - SCALE_SHIFT)));
 }
 
 /*
@@ -204,8 +233,26 @@ dtrace_trap(struct trapframe *frame, u_int type)
 		 */
 		switch (type) {
 		case EXCP_DATA_ABORT:
+#if __has_feature(capabilities)
+			switch (frame->tf_esr & ISS_DATA_DFSC_MASK) {
+			case ISS_DATA_DFSC_CAP_TAG:
+			case ISS_DATA_DFSC_CAP_SEALED:
+			case ISS_DATA_DFSC_CAP_BOUND:
+			case ISS_DATA_DFSC_CAP_PERM:
+				cpu_core[curcpu].cpuc_dtrace_flags |=
+				    CPU_DTRACE_CHERI;
+				break;
+			default:
+				cpu_core[curcpu].cpuc_dtrace_flags |=
+				    CPU_DTRACE_BADADDR;
+				break;
+			}
+#else
+			cpu_core[curcpu].cpuc_dtrace_flags |=
+			CPU_DTRACE_BADADDR;
+#endif
+
 			/* Flag a bad address. */
-			cpu_core[curcpu].cpuc_dtrace_flags |= CPU_DTRACE_BADADDR;
 			cpu_core[curcpu].cpuc_dtrace_illval = frame->tf_far;
 
 			/*
@@ -246,6 +293,20 @@ dtrace_load64(uint64_t *addr, struct trapframe *frame, u_int reg)
 	/* Nothing to do for load to xzr */
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+static void
+dtrace_storecap(uintcap_t *addr, struct trapframe *frame, u_int reg)
+{
+
+	KASSERT(reg <= 31, ("dtrace_store64: Invalid register %u", reg));
+	if (reg < nitems(frame->tf_x))
+		*addr = frame->tf_x[reg];
+	else if (reg == 30) /* lr */
+		*addr = frame->tf_lr;
+	else if (reg == 31) /* xzr */
+		*addr = 0;
+}
+#else
 static void
 dtrace_store64(uint64_t *addr, struct trapframe *frame, u_int reg)
 {
@@ -258,22 +319,43 @@ dtrace_store64(uint64_t *addr, struct trapframe *frame, u_int reg)
 	else if (reg == 31) /* xzr */
 		*addr = 0;
 }
+#endif
 
 static int
 dtrace_invop_start(struct trapframe *frame)
 {
-	int data, invop, reg, update_sp;
-	register_t arg1, arg2;
-	register_t *sp;
-	int offs;
-	int tmp;
-	int i;
+	int data, invop, tmp;
 
 	invop = dtrace_invop(frame->tf_elr, frame, frame->tf_x[0]);
 
 	tmp = (invop & LDP_STP_MASK);
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (tmp == STP_C_PREIND) {
+		uintcap_t *csp;
+		int arg1, arg2, offs;
+
+		csp = (uintcap_t *)frame->tf_sp;
+		arg1 = (invop >> ARG1_SHIFT) & ARG1_MASK;
+		arg2 = (invop >> ARG2_SHIFT) & ARG2_MASK;
+		offs = (invop >> OFFSET_SHIFT) & OFFSET_MASK;
+		if (offs >> (OFFSET_SIZE - 1))
+			csp -= (~offs & OFFSET_MASK) + 1;
+		else
+			csp += (offs);
+		dtrace_storecap(csp + 0, frame, arg1);
+		dtrace_storecap(csp + 1, frame, arg2);
+
+		/* Update the stack pointer and program counter to continue */
+		frame->tf_sp = (uintcap_t)csp;
+		frame->tf_elr += INSN_SIZE;
+		return (0);
+	}
+#else
 	if (tmp == STP_64 || tmp == LDP_64) {
-		sp = (register_t *)frame->tf_sp;
+		register_t arg1, arg2, *sp;
+		int offs;
+
+		sp = (register_t *)(uintptr_t)frame->tf_sp;
 		data = invop;
 		arg1 = (data >> ARG1_SHIFT) & ARG1_MASK;
 		arg2 = (data >> ARG2_SHIFT) & ARG2_MASK;
@@ -306,12 +388,21 @@ dtrace_invop_start(struct trapframe *frame)
 		frame->tf_elr += INSN_SIZE;
 		return (0);
 	}
+#endif
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	if ((invop & SUBC_MASK) == SUBC_INSTR) {
+		frame->tf_sp -= (invop >> SUB_IMM_SHIFT) & SUB_IMM_MASK;
+		frame->tf_elr += INSN_SIZE;
+		return (0);
+	}
+#else
 	if ((invop & SUB_MASK) == SUB_INSTR) {
 		frame->tf_sp -= (invop >> SUB_IMM_SHIFT) & SUB_IMM_MASK;
 		frame->tf_elr += INSN_SIZE;
 		return (0);
 	}
+#endif
 
 	if (invop == NOP_INSTR) {
 		frame->tf_elr += INSN_SIZE;
@@ -327,7 +418,11 @@ dtrace_invop_start(struct trapframe *frame)
 	}
 
 	if (invop == RET_INSTR) {
+#if __has_feature(capabilities)
+		trapframe_set_elr(frame, frame->tf_lr);
+#else
 		frame->tf_elr = frame->tf_lr;
+#endif
 		return (0);
 	}
 

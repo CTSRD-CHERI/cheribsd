@@ -1790,8 +1790,17 @@ link_elf_symbol_values1(linker_file_t lf, c_linker_sym_t sym,
 			return (ENOENT);
 		symval->name = ef->strtab + es->st_name;
 		val = (caddr_t)ef->address + es->st_value;
-		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC)
+		while (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC) {
+			c_linker_sym_t sym1;
+			long off;
+
 			val = ((caddr_t (*)(void))val)();
+			if (link_elf_search_symbol(lf, (ptraddr_t)val, &sym1,
+			    &off) != 0 || off != 0)
+				return (ENOENT);
+			es = (const Elf_Sym *)sym1;
+			val = (caddr_t)ef->address + es->st_value;
+		}
 #ifdef __CHERI_PURE_CAPABILITY__
 		val = make_capability(es, val);
 #endif
@@ -1827,8 +1836,17 @@ link_elf_debug_symbol_values(linker_file_t lf, c_linker_sym_t sym,
 	if (es >= ef->ddbsymtab && es < (ef->ddbsymtab + ef->ddbsymcnt)) {
 		symval->name = ef->ddbstrtab + es->st_name;
 		val = (caddr_t)ef->address + es->st_value;
-		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC)
+		while (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC) {
+			c_linker_sym_t sym1;
+			long off;
+
 			val = ((caddr_t (*)(void))val)();
+			if (link_elf_search_symbol(lf, (ptraddr_t)val, &sym1,
+			    &off) != 0 || off != 0)
+				return (ENOENT);
+			es = (const Elf_Sym *)sym1;
+			val = (caddr_t)ef->address + es->st_value;
+		}
 #ifdef __CHERI_PURE_CAPABILITY__
 		val = make_capability(es, val);
 #endif
