@@ -9,6 +9,7 @@ SUBDIR= cat \
 	date \
 	dd \
 	df \
+	dlopen \
 	domainname \
 	echo \
 	ed \
