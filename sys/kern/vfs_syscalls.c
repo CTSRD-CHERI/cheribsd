@@ -1474,6 +1474,10 @@ restart:
 			vput(nd.ni_dvp);
 		vrele(vp);
 		return (EEXIST);
+	} else if ((vn_irflag_read(nd.ni_dvp) & VIRF_NAMEDDIR) != 0) {
+		NDFREE_PNBUF(&nd);
+		vput(nd.ni_dvp);
+		return (EINVAL);
 	} else {
 		VATTR_NULL(&vattr);
 		vattr.va_mode = (mode & ALLPERMS) &
@@ -1581,6 +1585,11 @@ restart:
 			vput(nd.ni_dvp);
 		vrele(nd.ni_vp);
 		return (EEXIST);
+	}
+	if ((vn_irflag_read(nd.ni_dvp) & VIRF_NAMEDDIR) != 0) {
+		NDFREE_PNBUF(&nd);
+		vput(nd.ni_dvp);
+		return (EINVAL);
 	}
 	if (vn_start_write(nd.ni_dvp, &mp, V_NOWAIT) != 0) {
 		NDFREE_PNBUF(&nd);
@@ -1728,6 +1737,10 @@ kern_linkat_vp(struct thread *td, struct vnode *vp, int fd,
 		vrele(vp);
 		return (EPERM);		/* POSIX */
 	}
+	if ((vn_irflag_read(vp) & (VIRF_NAMEDDIR | VIRF_NAMEDATTR)) != 0) {
+		vrele(vp);
+		return (EINVAL);
+	}
 	NDINIT_ATRIGHTS(&nd, CREATE,
 	    LOCKPARENT | AUDITVNODE2 | NOCACHE, segflag, path, fd,
 	    &cap_linkat_target_rights);
@@ -1868,6 +1881,10 @@ restart:
 		if ((error = vn_start_write(NULL, &mp, V_XSLEEP | V_PCATCH)) != 0)
 			goto out;
 		goto restart;
+	}
+	if ((vn_irflag_read(nd.ni_dvp) & VIRF_NAMEDDIR) != 0) {
+		error = EINVAL;
+		goto out;
 	}
 	VATTR_NULL(&vattr);
 	vattr.va_mode = ACCESSPERMS &~ td->td_proc->p_pd->pd_cmask;
@@ -3778,6 +3795,7 @@ kern_renameat(struct thread *td, int oldfd, const char * __capability old,
 	struct nameidata fromnd, tond;
 	uint64_t tondflags;
 	int error;
+	short irflag;
 
 again:
 	bwillwrite();
@@ -3829,6 +3847,12 @@ again:
 		if (error != 0)
 			return (error);
 		goto again;
+	}
+	irflag = vn_irflag_read(fvp);
+	if (((irflag & VIRF_NAMEDATTR) != 0 && tdvp != fromnd.ni_dvp) ||
+	    (irflag & VIRF_NAMEDDIR) != 0) {
+		error = EINVAL;
+		goto out;
 	}
 	if (tvp != NULL) {
 		if (fvp->v_type == VDIR && tvp->v_type != VDIR) {
@@ -3948,6 +3972,10 @@ restart:
 		if ((error = vn_start_write(NULL, &mp, V_XSLEEP | V_PCATCH)) != 0)
 			return (error);
 		goto restart;
+	}
+	if ((vn_irflag_read(nd.ni_dvp) & VIRF_NAMEDDIR) != 0) {
+		error = EINVAL;
+		goto out;
 	}
 	VATTR_NULL(&vattr);
 	vattr.va_type = VDIR;
@@ -4714,6 +4742,7 @@ kern_fhopen(struct thread *td, const struct fhandle * __capability u_fhp,
 	struct file *fp;
 	int fmode, error;
 	int indx;
+	bool named_attr;
 
 	error = priv_check(td, PRIV_VFS_FHOPEN);
 	if (error != 0)
@@ -4735,6 +4764,19 @@ kern_fhopen(struct thread *td, const struct fhandle * __capability u_fhp,
 	vfs_unbusy(mp);
 	if (error != 0)
 		return (error);
+
+	/*
+	 * Check to see if the file handle refers to a named attribute
+	 * directory or attribute.  If it does, the O_NAMEDATTR flag
+	 * must have been specified.
+	 */
+	named_attr = (vn_irflag_read(vp) &
+	    (VIRF_NAMEDDIR | VIRF_NAMEDATTR)) != 0;
+	if ((named_attr && (fmode & O_NAMEDATTR) == 0) ||
+	    (!named_attr && (fmode & O_NAMEDATTR) != 0)) {
+		vput(vp);
+		return (ENOATTR);
+	}
 
 	error = falloc_noinstall(td, &fp);
 	if (error != 0) {
