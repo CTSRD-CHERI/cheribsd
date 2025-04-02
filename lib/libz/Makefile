@@ -51,6 +51,7 @@ CFLAGS+=	-DUNALIGNED_OK
 
 VERSION_DEF=	${.CURDIR}/Versions.def
 SYMBOL_MAPS=	${.CURDIR}/Symbol.map
+COMPARTMENT_POLICY=	${.CURDIR}/Compartments.json
 
 INCS=		zconf.h zlib.h
 

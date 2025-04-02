@@ -1,0 +1,23 @@
+{
+    "compartments": {
+	"io": {
+	    "symbols": [
+		"BZ2_bzWriteOpen",
+		"BZ2_bzWrite",
+		"BZ2_bzWriteClose",
+		"BZ2_bzWriteClose64",
+		"BZ2_bzReadOpen",
+		"BZ2_bzReadClose",
+		"BZ2_bzRead",
+		"BZ2_bzReadGetUnused",
+		"BZ2_bzopen",
+		"BZ2_bzdopen",
+		"BZ2_bzread",
+		"BZ2_bzwrite",
+		"BZ2_bzflush",
+		"BZ2_bzclose",
+		"BZ2_bzerror"
+            ]
+        }
+    }
+}

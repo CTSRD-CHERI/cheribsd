@@ -1,0 +1,11 @@
+{
+    "compartments": {
+	"io": {
+	    "files": [
+		"cover.*o",
+		"fastcover.*o",
+		"zdict.*o"
+            ]
+        }
+    }
+}
