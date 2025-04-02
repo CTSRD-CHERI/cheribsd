@@ -52,6 +52,11 @@
 #include <sys/ptrace.h>
 #include <sys/sysent.h>
 
+#ifdef COMPAT_FREEBSD64
+#include <sys/abi_compat.h>
+#include <sys/sysent.h>
+#endif
+
 #include <machine/bus.h>
 
 #include <vm/vm.h>
@@ -1109,8 +1114,19 @@ cuse_server_ioctl(struct cdev *dev, unsigned long cmd,
 		struct cuse_create_dev *pcd;
 		struct cuse_server_dev *pcsd;
 		struct cuse_data_chunk *pchk;
+#ifdef COMPAT_FREEBSD64
+		struct cuse_command64 *pcmd64;
+		struct cuse_create_dev64 *pcd64;
+		struct cuse_create_dev local_pcd;
+		struct cuse_data_chunk64 *pchk64;
+		struct cuse_data_chunk local_pchk;
+#endif
 		int n;
+		bool isread;
 
+#ifdef COMPAT_FREEBSD64
+	case CUSE_IOCTL_GET_COMMAND64:
+#endif
 	case CUSE_IOCTL_GET_COMMAND:
 		pcmd = (void *)data;
 
@@ -1133,7 +1149,18 @@ cuse_server_ioctl(struct cdev *dev, unsigned long cmd,
 
 		pccmd->entered = curthread;
 
-		*pcmd = pccmd->sub;
+#ifdef COMPAT_FREEBSD64
+		if (!SV_CURPROC_FLAG(SV_CHERI)) {
+			pcmd64 = (struct cuse_command64 *)data;
+			pcmd64->dev = (uint64_t)pccmd->sub.dev;
+			CP(pccmd->sub, *pcmd64, fflags);
+			CP(pccmd->sub, *pcmd64, per_file_handle);
+			CP(pccmd->sub, *pcmd64, data_pointer);
+			CP(pccmd->sub, *pcmd64, argument);
+			CP(pccmd->sub, *pcmd64, command);
+		} else
+#endif
+			*pcmd = pccmd->sub;
 
 		cuse_server_unlock(pcs);
 
@@ -1247,6 +1274,9 @@ cuse_server_ioctl(struct cdev *dev, unsigned long cmd,
 
 		break;
 
+#ifdef COMPAT_FREEBSD64
+	case CUSE_IOCTL_SET_PFH64:
+#endif
 	case CUSE_IOCTL_SET_PFH:
 
 		cuse_server_lock(pcs);
@@ -1263,13 +1293,27 @@ cuse_server_ioctl(struct cdev *dev, unsigned long cmd,
 		cuse_server_unlock(pcs);
 		break;
 
+#ifdef COMPAT_FREEBSD64
+	case CUSE_IOCTL_CREATE_DEV64:
+#endif
 	case CUSE_IOCTL_CREATE_DEV:
 
 		error = priv_check(curthread, PRIV_DRIVER);
 		if (error)
 			break;
 
-		pcd = (void *)data;
+#ifdef COMPAT_FREEBSD64
+		if (!SV_CURPROC_FLAG(SV_CHERI)) {
+			pcd64 = (struct cuse_create_dev64 *)data;
+			pcd = &local_pcd;
+			pcd->dev = __USER_CAP(pcd64->dev, sizeof(struct cdev));
+			CP(*pcd64, *pcd, user_id);
+			CP(*pcd64, *pcd, group_id);
+			CP(*pcd64, *pcd, permissions);
+			memcpy(pcd->devname, pcd64->devname, 80);
+		} else
+#endif
+			pcd = (void *)data;
 
 		/* filter input */
 
@@ -1335,11 +1379,36 @@ cuse_server_ioctl(struct cdev *dev, unsigned long cmd,
 		cuse_server_unlock(pcs);
 		break;
 
+#ifdef COMPAT_FREEBSD64
+	case CUSE_IOCTL_WRITE_DATA64:
+	case CUSE_IOCTL_READ_DATA64:
+#endif
 	case CUSE_IOCTL_WRITE_DATA:
 	case CUSE_IOCTL_READ_DATA:
 
+#ifdef COMPAT_FREEBSD64
+		if (cmd == CUSE_IOCTL_READ_DATA ||
+		    cmd == CUSE_IOCTL_READ_DATA64)
+#else
+		if (cmd == CUSE_IOCTL_READ_DATA)
+#endif
+			isread = true;
+		else
+			isread = false;
+
 		cuse_server_lock(pcs);
-		pchk = (struct cuse_data_chunk *)data;
+#ifdef COMPAT_FREEBSD64
+		if (!SV_CURPROC_FLAG(SV_CHERI)) {
+			pchk64 = (struct cuse_data_chunk64 *)data;
+			pchk = &local_pchk;
+			CP(*pchk64, *pchk, length);
+			pchk->local_ptr = (kuintcap_t)__USER_CAP(
+			    pchk64->local_ptr, pchk64->length);
+			pchk->peer_ptr = (kuintcap_t)__USER_CAP(
+			    pchk64->peer_ptr, pchk64->length);
+		} else
+#endif
+			pchk = (struct cuse_data_chunk *)data;
 
 		pccmd = cuse_server_find_command(pcs, curthread);
 
@@ -1351,10 +1420,10 @@ cuse_server_ioctl(struct cdev *dev, unsigned long cmd,
 			/* NOP */
 		} else if (pchk->peer_ptr < CUSE_BUF_MAX_PTR) {
 			error = cuse_server_ioctl_copy_locked(pcs, pccmd,
-			    pchk, cmd == CUSE_IOCTL_READ_DATA);
+			    pchk, isread);
 		} else {
 			error = cuse_server_data_copy_optimized_locked(
-			    pcs, pccmd, pchk, cmd == CUSE_IOCTL_READ_DATA);
+			    pcs, pccmd, pchk, isread);
 		}
 
 		/*
