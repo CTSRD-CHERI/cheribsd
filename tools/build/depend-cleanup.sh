@@ -359,3 +359,12 @@ if [ $MACHINE = arm64 ]; then
 		OBJTOP="$OBJTOP_SAVE"
 	fi
 fi
+
+# 20250402  839d0755fea8    ctld converted to C++
+clean_dep   usr.sbin/ctld   ctld c
+clean_dep   usr.sbin/ctld   conf c
+clean_dep   usr.sbin/ctld   discovery c
+clean_dep   usr.sbin/ctld   isns c
+clean_dep   usr.sbin/ctld   kernel c
+clean_dep   usr.sbin/ctld   login c
+clean_dep   usr.sbin/ctld   uclparse c
