@@ -6324,6 +6324,7 @@ c18n_setup_compartments(Obj_Entry *obj, const char *name, int flags)
 {
 	Compart_Entry *compart;
 	const Elf_Phdr *ph;
+	char *compart_name;
 	size_t len;
 
 	assert(obj->default_compart_id == 0);
@@ -6354,11 +6355,12 @@ c18n_setup_compartments(Obj_Entry *obj, const char *name, int flags)
 			compart->end = compart->start + ph->p_memsz;
 
 			len = strlen(name) + 1 + strlen(compart->name) + 1;
-			compart->compart_name = malloc(len);
-			rtld_snprintf(compart->compart_name, len, "%s:%s",
-			    name, compart->name);
+			compart_name = malloc(len);
+			rtld_snprintf(compart_name, len, "%s:%s", name,
+			    compart->name);
 			compart->compart_id =
-			    compart_id_allocate(compart->compart_name, flags);
+			    compart_id_allocate(compart_name, flags);
+			free(compart_name);
 			compart++;
 			break;
 		}

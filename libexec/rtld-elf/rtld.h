@@ -205,7 +205,6 @@ typedef struct Struct_Compart_Entry {
     const char *name;
     Elf_Addr start;
     Elf_Addr end;
-    char *compart_name;
     uint16_t compart_id;
 } Compart_Entry;
 #endif
