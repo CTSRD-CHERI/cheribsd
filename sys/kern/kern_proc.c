@@ -2628,6 +2628,9 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 	len = proc_readmem_cap(curthread, p, (vm_offset_t)p->p_c18n_info, &info,
 	    sizeof(info));
 	if (len != sizeof(info)) {
+		SYSERRCAUSE("%s: expected to read %zu bytes of "
+		    "struct cheri_c18n_info got %zu", __func__, sizeof(info),
+		    len);
 		error = EFAULT;
 		goto out;
 	}
@@ -2673,6 +2676,9 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 		len = proc_readmem_cap(curthread, p,
 		    (__cheri_addr vm_offset_t)rccp, &rcc, sizeof(rcc));
 		if (len != sizeof(rcc)) {
+			SYSERRCAUSE("%s: expected to read %zu bytes of "
+			    "struct rtld_c18n_compart got %zu", __func__,
+			    sizeof(rcc), len);
 			error = EFAULT;
 			goto out;
 		}
@@ -2683,14 +2689,21 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 		 */
 		error = proc_read_string_properly(curthread, p,
 		    rcc.rcc_name, kccc.kccc_name, sizeof(kccc.kccc_name));
-		if (error != 0)
+		if (error != 0) {
+			SYSERRCAUSE("%s: failed to read string at %#lp",
+			    __func__,
+			    __DECONST_CAP(void * __capability, rcc.rcc_name));
 			goto out;
+		}
 
 		/* If the generation counter has changed, abort. */
 		len = proc_readmem(curthread, p,
 		    (vm_offset_t)&p->p_c18n_info->comparts_gen, &gen,
 		    sizeof(gen));
 		if (len != sizeof(gen)) {
+			SYSERRCAUSE("%s: expected to read %zu bytes of "
+			    "generation counter got %zu", __func__,
+			    sizeof(gen), len);
 			error = EFAULT;
 			goto out;
 		}
@@ -2709,8 +2722,11 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 
 		/* Copy out userspace structure. */
 		error = SYSCTL_OUT(req, &kccc, len);
-		if (error != 0)
+		if (error != 0) {
+			SYSERRCAUSE("%s: failed to write kccc (%zu/%zu)",
+			    __func__, i, info.comparts_size);
 			goto out;
+		}
 	}
 
 out:
