@@ -2609,7 +2609,6 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 	struct rtld_c18n_compart rcc;
 	struct kinfo_cheri_c18n_compart kccc;
 	char * __capability rccp;
-	char * __capability namep;
 	ssize_t len;
 	size_t gen;
 
@@ -2638,7 +2637,7 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 	 */
 	if (info.version != CHERI_C18N_INFO_VERSION ||
 	    info.comparts_gen % 2 != 0 ||
-	    info.comparts_entry_size < sizeof(namep)) {
+	    info.comparts_entry_size < sizeof(rcc)) {
 		error = ENOEXEC;
 		goto out;
 	}
@@ -2653,8 +2652,9 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 	}
 
 	/*
-	 * One by one, copy compartment names out of the target process's
-	 * memory, and into a template struct that we copy out to userspace.
+	 * One by one, copy compartment info structures out of the
+	 * target process's memory and into a template struct that we
+	 * copy out to userspace.
 	 */
 	for (size_t i = 0; i < info.comparts_size; ++i) {
 		/* Initialize userspace structure, including padding. */
@@ -2669,7 +2669,7 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 			goto out;
 		}
 
-		/* Copy in next compartment-name string pointer. */
+		/* Copy in next compartment info structure. */
 		len = proc_readmem_cap(curthread, p,
 		    (__cheri_addr vm_offset_t)rccp, &rcc, sizeof(rcc));
 		if (len != sizeof(rcc)) {
