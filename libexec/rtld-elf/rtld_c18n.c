@@ -190,6 +190,15 @@ c18n_free(void *buf)
 	INC_NUM_BYTES(-old);
 }
 
+static char *
+c18n_strdup(const char *s)
+{
+	char *buf = strdup(s);
+
+	INC_NUM_BYTES(cheri_getlen(buf));
+	return (buf);
+}
+
 /*
  * Policies
  */
@@ -320,9 +329,12 @@ add_comparts_data(const char *name)
 {
 	compart_id_t i;
 	struct compart *com;
+	char *c_name;
 
 	rtld_require(comparts.size <= COMPART_ID_MAX,
 	    "c18n: Compartment ID overflow for %s", name);
+
+	c_name = c18n_strdup(name);
 
 	if (comparts.size == comparts.capacity)
 		expand_comparts_data(comparts.capacity * 2);
@@ -335,10 +347,10 @@ add_comparts_data(const char *name)
 	com = &comparts.data[i];
 	*com = (struct compart) {
 		.info = (struct rtld_c18n_compart) {
-			.rcc_name = name,
+			.rcc_name = c_name,
 			.rcc_id = i
 		},
-		.name = name
+		.name = c_name
 	};
 	c18n_info->comparts_size = r_debug.r_comparts_size = comparts.size;
 
@@ -485,7 +497,7 @@ parse_policy(const char *pol, size_t size)
 
 		if (eat(&cur, "compartment ")) {
 			if (eat_token(&cur, '\n', buf, sizeof(buf)))
-				com = add_comparts_data(strdup(buf));
+				com = add_comparts_data(buf);
 			else
 				policy_error(&cur);
 
