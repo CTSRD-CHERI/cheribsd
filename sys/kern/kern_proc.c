@@ -2608,7 +2608,7 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 	struct cheri_c18n_info info;
 	struct rtld_c18n_compart rcc;
 	struct kinfo_cheri_c18n_compart kccc;
-	char * __capability rccp;
+	vm_offset_t rccp;
 	ssize_t len;
 	size_t gen;
 
@@ -2643,6 +2643,18 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 	}
 
 	/*
+	 * If the compartments array is not fully accessible, error
+	 * out.
+	 */
+	if (!cheri_can_access(info.comparts,
+	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP,
+	    (__cheri_addr vm_offset_t)info.comparts,
+	    info.comparts_size * info.comparts_entry_size)) {
+		error = EPROT;
+		goto out;
+	}
+
+	/*
 	 * If the old pointer is NULL, output the number of compartments.
 	 */
 	if (req->oldptr == NULL) {
@@ -2660,18 +2672,11 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 		/* Initialize userspace structure, including padding. */
 		bzero(&kccc, sizeof(kccc));
 
-		rccp = (char * __capability)info.comparts +
+		rccp = (__cheri_addr vm_offset_t)info.comparts +
 		    i * info.comparts_entry_size;
-		if (!cheri_can_access(rccp,
-		    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP,
-		    (__cheri_addr ptraddr_t)rccp, sizeof(rcc))) {
-			error = EPROT;
-			goto out;
-		}
 
 		/* Copy in next compartment info structure. */
-		len = proc_readmem_cap(curthread, p,
-		    (__cheri_addr vm_offset_t)rccp, &rcc, sizeof(rcc));
+		len = proc_readmem_cap(curthread, p, rccp, &rcc, sizeof(rcc));
 		if (len != sizeof(rcc)) {
 			error = EFAULT;
 			goto out;
