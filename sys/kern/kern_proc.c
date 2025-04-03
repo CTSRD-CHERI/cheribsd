@@ -2573,7 +2573,7 @@ proc_read_string_properly(struct thread *td, struct proc *p,
     const char * __capability sptr, char *buf, size_t len)
 {
 	ssize_t readlen;
-	size_t n, valid;
+	size_t valid;
 
 	if (len < 1)
 		return (EFAULT);
@@ -2584,15 +2584,32 @@ proc_read_string_properly(struct thread *td, struct proc *p,
 	readlen = proc_readmem(td, p, (__cheri_addr ptraddr_t)sptr, buf, valid);
 	if (readlen <= 0)
 		return (EFAULT);
-	n = strnlen(buf, valid);
+
+	/* Reading a null-terminated string is success. */
+	if (strnlen(buf, readlen) < readlen)
+		return (0);
+
 	/*
-	 * If the string fits the buffer but is not null-terminated, error out.
+	 * If the entire buffer was in bounds and was read
+	 * successfully, the string is just longer than the buffer, so
+	 * truncate the result.
 	 */
-	if (cheri_bytes_remaining(sptr) <= len && n == valid)
-		return (EPROT);
-	/* Unconditionally enforce termination. */
-	buf[len - 1] = '\0';
-	return (0);
+	if (cheri_bytes_remaining(sptr) > len && readlen == len) {
+		buf[len - 1] = '\0';
+		return (0);
+	}
+
+	/*
+	 * If the read was shorter than the bounds of the pointer,
+	 * fail with EFAULT.
+	 */
+	if (cheri_bytes_remaining(sptr) > readlen)
+		return (EFAULT);
+
+	/*
+	 * The string was not terminated in-bounds, fail with EPROT.
+	 */
+	return (EPROT);
 }
 
 /*
