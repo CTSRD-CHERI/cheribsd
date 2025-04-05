@@ -6417,9 +6417,11 @@ c18n_add_obj(Obj_Entry *obj, int flags)
 		name = obj->soname;
 	else if (!STAILQ_EMPTY(&obj->names))
 		name = STAILQ_FIRST(&obj->names)->name;
-	else if (obj->path != NULL)
-		name = obj->path;
-	else {
+	else if (obj->path != NULL) {
+		name = strrchr(obj->path, '/');
+		if (name == NULL || name[1] == '\0')
+			name = obj->path;
+	} else {
 		_rtld_error("Shared object at %#p cannot be named",
 		    obj->mapbase);
 		return (false);
