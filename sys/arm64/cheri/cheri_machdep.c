@@ -101,18 +101,16 @@ cheri_init_capabilities(void * __capability kroot)
 	ctemp = cheri_andperm(ctemp, CHERI_PERMS_KERNEL_DATA);
 	devmap_init_capability(ctemp);
 
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	kernel_executive_root_cap =
-#else
-	kernel_root_cap =
-#endif
 	    cheri_andperm(kroot, ~(
 	    CHERI_PERM_SEAL | CHERI_PERM_UNSEAL
 	    ));
-#endif
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	kernel_root_cap = cheri_andperm(kernel_executive_root_cap,
 	    ~CHERI_PERM_EXECUTIVE);
+#else
+	kernel_root_cap = kernel_executive_root_cap;
+#endif
 
 	vmm_el2_root_cap = cheri_setaddress(kroot, HYP_VM_MIN_ADDRESS);
 	vmm_el2_root_cap = cheri_setbounds(vmm_el2_root_cap,
