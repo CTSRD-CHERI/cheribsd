@@ -22,3 +22,7 @@ include "GENERIC-MORELLO-PURECAP"
 ident		GENERIC-MORELLO-PURECAP-BENCHMARK
 
 machine 	arm64 aarch64cb
+
+# Do not enable compartmentalization by default as it is not adapted to the
+# Benchmark ABI yet
+nooptions 	CHERI_COMPARTMENTALIZE_KERNEL
