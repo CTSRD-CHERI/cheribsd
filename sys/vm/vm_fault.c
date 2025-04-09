@@ -2227,20 +2227,6 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
 	if (pmap != vmspace_pmap(curthread->td_proc->p_vmspace))
 		return;
 
-#ifdef CHERI_CAPREVOKE
-	/*
-	 * If we're trying to insert pages during a load-side revocation scan,
-	 * we should be having the revoker visit each before exposing them to
-	 * userland.  However, this raises a number of challenges, and this
-	 * method is just an optimization, so we nop it out right now.
-	 *
-	 * XXX CAPREVOKE This could be much better in just about every way
-	 */
-	if (cheri_revoke_st_is_revoking(fs->map->vm_cheri_revoke_st)) {
-		return;
-	}
-#endif
-
 	entry = fs->entry;
 
 	if (addra < backward * PAGE_SIZE) {
