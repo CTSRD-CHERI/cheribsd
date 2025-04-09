@@ -881,9 +881,6 @@ common:
 	bl	build_l2_block_pagetable
 
 #if defined(SOCDEV_PA)
-#ifdef __CHERI_PURE_CAPABILITY__
-#error "TODO Implement for purecap kernel"
-#endif
 	/* Create a table for the UART */
 	mov	x7, #(ATTR_S1_nG | ATTR_S1_IDX(VM_MEMATTR_DEVICE))
 	ldr	x9, =(L2_SIZE)
@@ -892,8 +889,14 @@ common:
 
 	/* Store the socdev virtual address */
 	add	x17, x8, #(SOCDEV_PA & L2_OFFSET)
-	adrp	x9, socdev_va
-	str	x17, [x9, :lo12:socdev_va]
+	adrp	PTR(9), socdev_va
+	add	x9, x9, :lo12:socdev_va
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* TODO: Set bounds to something sensible? (L2_SIZE?) */
+	cvtd	c17, x17
+	cvtd	c9, x9
+#endif
+	str	PTR(17), [PTR(9)]
 
 	mov	x9, #(SOCDEV_PA & ~L2_OFFSET)	/* PA start */
 	mov	x10, #1
