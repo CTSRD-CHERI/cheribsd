@@ -147,7 +147,7 @@ get_revoker_epoch(struct procstat *procstat, struct kinfo_proc *kipp)
 			return ("na");
 		default:
 			snprintf(revoker_epoch_buf, sizeof(revoker_epoch_buf),
-			    "%#ju", (uintmax_t)epoch);
+			    "%ju", (uintmax_t)epoch);
 			return (revoker_epoch_buf);
 		}
 	} else {
