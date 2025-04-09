@@ -1679,6 +1679,9 @@ _rtld_tramp_reflect(const void *addr)
 {
 	struct tramp_header *header;
 
+	if (!C18N_ENABLED)
+		return (0);
+
 	header = tramp_reflect(addr);
 	if (header == NULL)
 		return (0);
@@ -1690,6 +1693,14 @@ _rtld_tramp_reflect(const void *addr)
  * APIs
  */
 #define	C18N_FUNC_SIG_COUNT	72
+
+bool _rtld_c18n_is_enabled(void);
+
+bool
+_rtld_c18n_is_enabled(void)
+{
+	return (C18N_ENABLED);
+}
 
 void
 c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
@@ -1853,6 +1864,9 @@ void _rtld_thr_exit(long *);
 void
 _rtld_thread_start_init(void (*p)(struct pthread *))
 {
+	if (!C18N_ENABLED)
+		return;
+
 	assert(((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) != 0) ==
 	    C18N_FPTR_ENABLED);
 	assert(thr_thread_start == NULL);
@@ -2008,6 +2022,9 @@ static __siginfohandler_t *signal_dispatcher = sigdispatch;
 void
 _rtld_sighandler_init(__siginfohandler_t *handler)
 {
+	if (!C18N_ENABLED)
+		return;
+
 	assert(((cheri_getperm(handler) & CHERI_PERM_EXECUTIVE) != 0) ==
 	    C18N_FPTR_ENABLED);
 	assert(signal_dispatcher == sigdispatch);

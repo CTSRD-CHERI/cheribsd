@@ -15,18 +15,25 @@
 
 #include "libc_private.h"
 
+__weak_reference(__mmap, mmap);
+__weak_reference(__mmap, _mmap);
+
 void *
-mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
+__mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
 {
-	uint64_t perms;
 	void *ret;
 
-	perms = CHERI_PERM_SYSCALL;
-#ifdef __aarch64__
-	perms |= CHERI_PERM_EXECUTIVE;
-#endif
-
 	ret = __sys_mmap(addr, len, prot, flags, fd, offset);
-	ret = cheri_clearperm(ret, perms);
+#ifdef CHERI_LIB_C18N
+	if (ret != MAP_FAILED && _rtld_c18n_is_enabled()) {
+		uint64_t perms;
+
+		perms = CHERI_PERM_SYSCALL;
+#ifdef __aarch64__
+		perms |= CHERI_PERM_EXECUTIVE;
+#endif
+		ret = cheri_clearperm(ret, perms);
+	}
+#endif
 	return (ret);
 }

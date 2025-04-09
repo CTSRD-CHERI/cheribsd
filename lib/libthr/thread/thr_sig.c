@@ -296,13 +296,16 @@ handle_signal(struct sigaction *actp, int sig, siginfo_t *info, ucontext_t *ucp)
 		curthread->cancel_enable = 0;
 
 #ifdef CHERI_LIB_C18N
-	(void)sigfunc;
-#else
+	if (_rtld_c18n_is_enabled()) {
+		_rtld_siginvoke(sig, info, ucp, actp);
+		goto invoked;
+	}
+#endif
+
 	/* restore correct mask before calling user handler */
 	__sys_sigprocmask(SIG_SETMASK, &actp->sa_mask, NULL);
 
 	sigfunc = actp->sa_sigaction;
-#endif
 
 	/*
 	 * We have already reset cancellation point flags, so if user's code
@@ -312,9 +315,6 @@ handle_signal(struct sigaction *actp, int sig, siginfo_t *info, ucontext_t *ucp)
 	 * so after setjmps() returns once more, the user code may need to
 	 * re-set cancel_enable flag by calling pthread_setcancelstate().
 	 */
-#ifdef CHERI_LIB_C18N
-	_rtld_siginvoke(sig, info, ucp, actp);
-#else
 	if ((actp->sa_flags & SA_SIGINFO) != 0) {
 		sigfunc(sig, info, ucp);
 	} else {
@@ -322,6 +322,8 @@ handle_signal(struct sigaction *actp, int sig, siginfo_t *info, ucontext_t *ucp)
 		    (struct sigcontext *)ucp, info->si_addr,
 		    (__sighandler_t *)sigfunc);
 	}
+#ifdef CHERI_LIB_C18N
+invoked:
 #endif
 	err = errno;
 
@@ -491,10 +493,11 @@ _thr_signal_init(int dlopened)
 			if (sig == SIGCANCEL)
 				continue;
 #ifdef CHERI_LIB_C18N
-			error = _rtld_sigaction(sig, NULL, &oact);
-#else
-			error = __sys_sigaction(sig, NULL, &oact);
+			if (_rtld_c18n_is_enabled())
+				error = _rtld_sigaction(sig, NULL, &oact);
+			else
 #endif
+				error = __sys_sigaction(sig, NULL, &oact);
 			if (error == -1 || oact.sa_handler == SIG_DFL ||
 			    oact.sa_handler == SIG_IGN)
 				continue;
@@ -505,12 +508,13 @@ _thr_signal_init(int dlopened)
 			nact.sa_flags &= ~SA_NODEFER;
 			nact.sa_flags |= SA_SIGINFO;
 #ifdef CHERI_LIB_C18N
-			/* XXX: Ignore sigaltstack for now */
-			nact.sa_flags &= ~SA_ONSTACK;
-			nact.sa_sigaction = _rtld_sighandler;
-#else
-			nact.sa_sigaction = thr_sighandler;
+			if (_rtld_c18n_is_enabled()) {
+				/* XXX: Ignore sigaltstack for now */
+				nact.sa_flags &= ~SA_ONSTACK;
+				nact.sa_sigaction = _rtld_sighandler;
+			} else
 #endif
+				nact.sa_sigaction = thr_sighandler;
 			nact.sa_mask = _thr_maskset;
 			(void)__sys_sigaction(sig, &nact, NULL);
 		}
@@ -641,12 +645,13 @@ __thr_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
 			newact.sa_flags &= ~SA_NODEFER;
 			newact.sa_flags |= SA_SIGINFO;
 #ifdef CHERI_LIB_C18N
-			/* XXX: Ignore sigaltstack for now */
-			newact.sa_flags &= ~SA_ONSTACK;
-			newact.sa_sigaction = _rtld_sighandler;
-#else
-			newact.sa_sigaction = thr_sighandler;
+			if (_rtld_c18n_is_enabled()) {
+				/* XXX: Ignore sigaltstack for now */
+				newact.sa_flags &= ~SA_ONSTACK;
+				newact.sa_sigaction = _rtld_sighandler;
+			} else
 #endif
+				newact.sa_sigaction = thr_sighandler;
 			newact.sa_mask = _thr_maskset; /* mask all signals */
 		}
 		ret = __sys_sigaction(sig, &newact, &oldact);

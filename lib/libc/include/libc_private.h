@@ -39,6 +39,8 @@
 
 #include <libsys.h>
 
+#include <stdbool.h>
+
 extern char **environ;
 
 /*
@@ -395,7 +397,8 @@ int __strerror_rl(int errnum, char *strerrbuf, size_t buflen,
 	    struct _xlocale *locale);
 
 #ifdef CHERI_LIB_C18N
-__pid_t		__sys_rfork(int);
+bool	_rtld_c18n_is_enabled(void);
+void	_rtld_thr_exit(long *);
 int	_rtld_sigaction(int, const struct sigaction *, struct sigaction *);
 #endif
 

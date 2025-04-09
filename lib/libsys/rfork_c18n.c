@@ -40,11 +40,17 @@
 	(RFPROC | RFNOWAIT | RFFDG | RFCFDG | RFTHREAD |	\
 	RFTSIGZMB | RFLINUXTHPN | RFTSIGFLAGS(RFTSIGMASK))
 
+__weak_reference(__rfork, rfork);
+__weak_reference(__rfork, _rfork);
+
 pid_t
-rfork(int flags)
+__rfork(int flags)
 {
-	if ((flags & RFFLAGS_SAFE) == flags)
-		return (__sys_rfork(flags));
-	errno = EINVAL;
-	return (-1);
+#ifdef CHERI_LIB_C18N
+	if (_rtld_c18n_is_enabled() && (flags & ~RFFLAGS_SAFE) != 0) {
+		errno = EINVAL;
+		return (-1);
+	}
+#endif
+	return (__sys_rfork(flags));
 }

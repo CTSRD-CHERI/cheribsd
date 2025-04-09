@@ -27,13 +27,19 @@
 
 #include <sys/cdefs.h>
 
-void _rtld_thr_exit(long *);
+#include "libc_private.h"
 
-__weak_reference(__sys_thr_exit, thr_exit);
-__weak_reference(__sys_thr_exit, _thr_exit);
+__weak_reference(__thr_exit, thr_exit);
+__weak_reference(__thr_exit, _thr_exit);
 
 void
-__sys_thr_exit(long *state)
+__thr_exit(long *state)
 {
-	_rtld_thr_exit(state);
+#ifdef CHERI_LIB_C18N
+	if (_rtld_c18n_is_enabled()) {
+		_rtld_thr_exit(state);
+		return;
+	}
+#endif
+	__sys_thr_exit(state);
 }

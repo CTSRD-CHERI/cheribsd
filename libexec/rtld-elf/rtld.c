@@ -836,11 +836,6 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	ld_compartment_enable = false;
     else if (ld_get_env_var(LD_COMPARTMENT_ENABLE) != NULL)
 	ld_compartment_enable = true;
-    if (C18N_ENABLED) {
-	ld_elf_hints_default = _PATH_ELF_HINTS_C18N;
-	ld_path_libmap_conf = _PATH_LIBMAP_CONF_C18N;
-	ld_standard_library_path = STANDARD_LIBRARY_PATH_C18N;
-    }
 #endif
 
     set_ld_elf_hints_path();

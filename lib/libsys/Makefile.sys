@@ -110,10 +110,9 @@ SRCS+= \
 
 PSEUDO+= \
 	mmap \
-	rfork
-NOASM+=	\
-	thr_exit.o \
-	vfork.o
+	rfork \
+	thr_exit \
+	vfork
 .endif
 
 .if ${MACHINE_ABI:Mpurecap}

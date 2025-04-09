@@ -49,6 +49,7 @@ trust
 
 callee [RTLD]
 export to [TCB]
+	_rtld_c18n_is_enabled
 	_rtld_tramp_reflect
 	_rtld_thread_start_init
 	_rtld_thread_start

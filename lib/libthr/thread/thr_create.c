@@ -156,10 +156,11 @@ _pthread_create(pthread_t * __restrict thread,
 		 * c18n: Always block all signals when creating a new thread to
 		 * allow RTLD to set up the environment to handle signals.
 		 */
-		create_suspended = 1;
-#else
-		create_suspended = 0;
+		if (_rtld_c18n_is_enabled())
+			create_suspended = 1;
+		else
 #endif
+			create_suspended = 0;
 	}
 
 	new_thread->state = PS_RUNNING;
@@ -188,10 +189,11 @@ _pthread_create(pthread_t * __restrict thread,
 	} else
 		locked = 0;
 #ifdef CHERI_LIB_C18N
-	param.start_func = (void (*)(void *)) _rtld_thread_start;
-#else
-	param.start_func = (void (*)(void *)) thread_start;
+	if (_rtld_c18n_is_enabled())
+		param.start_func = (void (*)(void *)) _rtld_thread_start;
+	else
 #endif
+		param.start_func = (void (*)(void *)) thread_start;
 	param.arg = new_thread;
 	param.stack_base = new_thread->attr.stackaddr_attr;
 	param.stack_size = new_thread->attr.stacksize_attr;
@@ -299,16 +301,19 @@ thread_start(struct pthread *curthread)
 	bool restore_sigmask;
 
 #ifdef CHERI_LIB_C18N
-	/*
-	 * At this point, curthread->tcb contains a fake wrapper TCB created by
-	 * RTLD when the thread was created. The real TCB has now been installed
-	 * by RTLD upon thread start, and the struct member should be set to it.
-	 */
-	curthread->tcb = _tcb_get();
-	restore_sigmask = true;
-#else
-	restore_sigmask = curthread->attr.suspend == THR_CREATE_SUSPENDED;
+	if (_rtld_c18n_is_enabled()) {
+		/*
+		 * At this point, curthread->tcb contains a fake wrapper TCB
+		 * created by RTLD when the thread was created. The real TCB has
+		 * now been installed by RTLD upon thread start, and the struct
+		 * member should be set to it.
+		 */
+		curthread->tcb = _tcb_get();
+		restore_sigmask = true;
+	} else
 #endif
+		restore_sigmask =
+		    curthread->attr.suspend == THR_CREATE_SUSPENDED;
 
 	if (restore_sigmask)
 		set = curthread->sigmask;

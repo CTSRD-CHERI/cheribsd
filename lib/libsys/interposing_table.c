@@ -33,15 +33,13 @@
 #include "libc_private.h"
 
 #ifdef CHERI_LIB_C18N
-/*
- * XXX: A wrapper is needed to redirect the call because directly referencing
- * _rtld_sigaction as a function pointer causes it to not be wrapped in a
- * trampoline at the moment.
- */
 int
 _rtld_sigaction_wrapper(int sig, const struct sigaction *oact,
     struct sigaction *act) {
-	return (_rtld_sigaction(sig, oact, act));
+	if (_rtld_c18n_is_enabled())
+		return (_rtld_sigaction(sig, oact, act));
+	else
+		return (__sys_sigaction(sig, oact, act));
 }
 #endif
 
