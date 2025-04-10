@@ -366,10 +366,10 @@ pagecopy(void *s, void *d)
 	memcpy(d, s, PAGE_SIZE);
 }
 
-#if __has_feature(capabilities)
 static __inline void
 pagecopy_cleartags(void *s, void *d)
 {
+#if __has_feature(capabilities)
 	void * __capability *dst;
 	void * __capability *src;
 	u_int i;
@@ -378,8 +378,10 @@ pagecopy_cleartags(void *s, void *d)
 	src = s;
 	for (i = 0; i < PAGE_SIZE / sizeof(*dst); i++)
 		*dst++ = cheri_cleartag(*src++);
-}
+#else
+	pagecopy(s, d);
 #endif
+}
 
 static __inline void
 pagezero(void *p)
@@ -4630,10 +4632,10 @@ pmap_copy_page(vm_page_t msrc, vm_page_t mdst)
 	vm_pointer_t src = PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(msrc));
 	vm_pointer_t dst = PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(mdst));
 
-#if __has_feature(capabilities)
 	pagecopy_cleartags((void *)src, (void *)dst);
 }
 
+#if __has_feature(capabilities)
 void
 pmap_copy_page_tags(vm_page_t msrc, vm_page_t mdst)
 {
@@ -4641,9 +4643,9 @@ pmap_copy_page_tags(vm_page_t msrc, vm_page_t mdst)
 	vm_pointer_t dst = PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(mdst));
 
 	VM_PAGE_ASSERT_PGA_CAPMETA_COPY(msrc, mdst);
-#endif
 	pagecopy((void *)src, (void *)dst);
 }
+#endif
 
 int unmapped_buf_allowed = 1;
 
