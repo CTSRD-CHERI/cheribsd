@@ -1314,12 +1314,25 @@ vm_fault_cow(struct faultstate *fs)
 		 * The destination page will always belong to a
 		 * tag-bearing VM object.
 		 */
-		KASSERT(fs->first_object->flags & (OBJ_HASCAP | OBJ_NOCAP),
-		    ("%s: destination object %p doesn't have OBJ_HASCAP",
+		KASSERT((fs->first_object->flags & (OBJ_HASCAP | OBJ_NOCAP)) &&
+		    (fs->first_object->flags & (OBJ_HASCAP | OBJ_NOCAP)) !=
+		    (OBJ_HASCAP | OBJ_NOCAP),
+		    ("%s: destination object %p cap flags are inconsistent",
 		    __func__, fs->first_object));
 		if (fs->object->flags & OBJ_HASCAP) {
-			vm_page_aflag_set(fs->first_m, fs->m->a.flags &
-			    (PGA_CAPSTORE | PGA_CAPDIRTY));
+			uint16_t flags;
+
+			/*
+			 * If CAPSTORE is set, we have to assume that the source
+			 * is CAPDIRTY as well, as we'd have to examine its PTEs
+			 * to get a definitive answer.
+			 */
+			flags = vm_page_astate_load(fs->m).flags &
+			    (PGA_CAPSTORE | PGA_CAPDIRTY);
+			if ((flags & PGA_CAPSTORE) != 0)
+				flags |= PGA_CAPDIRTY;
+			if (flags != 0)
+				vm_page_aflag_set(fs->first_m, flags);
 			pmap_copy_page_tags(fs->m, fs->first_m);
 		} else
 #endif
@@ -2567,9 +2580,20 @@ again:
 			 * See longer discussion in vm_fault_cow.
 			 */
 			if (object->flags & OBJ_HASCAP) {
-				/* Copy across CAPSTORE | CAPDIRTY state, too */
-				vm_page_aflag_set(dst_m, src_m->a.flags &
-				    (PGA_CAPSTORE | PGA_CAPDIRTY));
+				uint16_t flags;
+
+				/*
+				 * If CAPSTORE is set, we have to assume that
+				 * the source is CAPDIRTY as well, as we'd have
+				 * to examine its PTEs to get a definitive
+				 * answer.
+				 */
+				flags = vm_page_astate_load(src_m).flags &
+				    (PGA_CAPSTORE | PGA_CAPDIRTY);
+				if ((flags & PGA_CAPSTORE) != 0)
+					flags |= PGA_CAPDIRTY;
+				if (flags != 0)
+					vm_page_aflag_set(dst_m, flags);
 				pmap_copy_page_tags(src_m, dst_m);
 			} else
 #endif
