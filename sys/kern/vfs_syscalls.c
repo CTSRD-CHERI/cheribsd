@@ -4768,6 +4768,8 @@ kern_fhopen(struct thread *td, const struct fhandle * __capability u_fhp,
 		return (error);
 
 	indx = -1;
+	if ((flags & O_CREAT) != 0)
+		return (EINVAL);
 	error = openflags(&flags);
 	if (error != 0)
 		return (error);
