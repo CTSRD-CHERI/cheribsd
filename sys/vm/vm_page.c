@@ -3444,8 +3444,8 @@ int
 vm_page_reclaim_contig_domain(int domain, int req, u_long npages,
     vm_paddr_t low, vm_paddr_t high, u_long alignment, vm_paddr_t boundary)
 {
-	return (vm_page_reclaim_contig_domain_ext(domain, req, npages, low, high,
-	    alignment, boundary, 1));
+	return (vm_page_reclaim_contig_domain_ext(domain, req, npages, low,
+	    high, alignment, boundary, 1));
 }
 
 int
@@ -3759,7 +3759,8 @@ vm_page_pagequeue(vm_page_t m)
 #endif
 
 static __always_inline bool
-vm_page_pqstate_fcmpset(vm_page_t m, vm_page_astate_t *old, vm_page_astate_t new)
+vm_page_pqstate_fcmpset(vm_page_t m, vm_page_astate_t *old,
+    vm_page_astate_t new)
 {
 	vm_page_astate_t tmp;
 
