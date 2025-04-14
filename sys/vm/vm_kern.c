@@ -593,6 +593,7 @@ int
 kmem_back_domain(int domain, vm_object_t object, vm_pointer_t addr,
     vm_size_t size, int flags)
 {
+	struct pctrie_iter pages;
 	vm_offset_t offset, i;
 	vm_page_t m, mpred;
 	vm_prot_t prot;
@@ -615,11 +616,12 @@ kmem_back_domain(int domain, vm_object_t object, vm_pointer_t addr,
 	prot |= VM_PROT_CAP;
 
 	i = 0;
+	vm_page_iter_init(&pages, object);
 	VM_OBJECT_WLOCK(object);
 retry:
-	mpred = vm_radix_lookup_le(&object->rtree, atop(offset + i));
+	mpred = vm_radix_iter_lookup_lt(&pages, atop(offset + i));
 	for (; i < size; i += PAGE_SIZE, mpred = m) {
-		m = vm_page_alloc_domain_after(object, atop(offset + i),
+		m = vm_page_alloc_domain_after(object, &pages, atop(offset + i),
 		    domain, pflags, mpred);
 
 		/*
