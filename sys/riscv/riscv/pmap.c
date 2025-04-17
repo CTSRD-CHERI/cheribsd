@@ -3367,6 +3367,10 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if (va < VM_MAX_USER_ADDRESS)
 		new_l3 |= PTE_U;
 #if __has_feature(capabilities)
+#ifdef __riscv_zcheripurecap
+	if (VM_PROT_HAS_READ_CAP(prot))
+		new_l3 |= PTE_CW;
+#endif
 	new_l3 |= cheri_pte_cr(pmap, va, m, prot);
 #endif
 
