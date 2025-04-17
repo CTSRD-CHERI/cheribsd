@@ -145,11 +145,18 @@ check_initreg_code(void * __capability c)
 	if ((v & CHERI_PERM_STORE) != 0)
 		cheribsdtest_failure_errx("perms %jx (store present)", v);
 
+#ifdef CHERI_PERM_LOAD_CAP
 	if ((v & CHERI_PERM_LOAD_CAP) == 0)
 		cheribsdtest_failure_errx("perms %jx (loadcap missing)", v);
-
+#endif
+#ifdef CHERI_PERM_STORE_CAP
 	if ((v & CHERI_PERM_STORE_CAP) != 0)
 		cheribsdtest_failure_errx("perms %jx (storecap present)", v);
+#endif
+#ifdef CHERI_PERM_CAP
+        if ((v & CHERI_PERM_CAP) == 0)
+		cheribsdtest_failure_errx("perms %jx (cap missing)", v);
+#endif
 
 	if ((v & CHERI_PERM_STORE_LOCAL_CAP) != 0)
 		cheribsdtest_failure_errx("perms %jx (store_local_cap present)",
@@ -253,11 +260,18 @@ check_initreg_data_full_addrspace(void * __capability c)
 	if ((v & CHERI_PERM_STORE) == 0)
 		cheribsdtest_failure_errx("perms %jx (store missing)", v);
 
+#ifdef CHERI_PERM_LOAD_CAP
 	if ((v & CHERI_PERM_LOAD_CAP) == 0)
 		cheribsdtest_failure_errx("perms %jx (loadcap missing)", v);
-
+#endif
+#ifdef CHERI_PERM_STORE_CAP
 	if ((v & CHERI_PERM_STORE_CAP) == 0)
 		cheribsdtest_failure_errx("perms %jx (storecap missing)", v);
+#endif
+#ifdef CHERI_PERM_CAP
+	if ((v & CHERI_PERM_CAP) == 0)
+		cheribsdtest_failure_errx("perms %jx (cap missing)", v);
+#endif
 
 	if ((v & CHERI_PERM_STORE_LOCAL_CAP) == 0)
 		cheribsdtest_failure_errx("perms %jx (store_local_cap missing)",
@@ -389,17 +403,23 @@ CHERIBSDTEST(initregs_stack,
 	if ((v & CHERI_PERM_LOAD) == 0)
 		cheribsdtest_failure_errx("perms %jx (load missing)", v);
 
+#ifdef CHERI_PERM_LOAD_CAP
 	if ((v & CHERI_PERM_LOAD_CAP) == 0)
 		cheribsdtest_failure_errx("perms %jx (loadcap missing)", v);
-
+#endif
 	if ((v & CHERI_PERM_GLOBAL) == 0)
 		cheribsdtest_failure_errx("perms %jx (global missing)", v);
 
 	if ((v & CHERI_PERM_STORE) == 0)
 		cheribsdtest_failure_errx("perms %jx (store missing)", v);
-
+#ifdef CHERI_PERM_STORE_CAP
 	if ((v & CHERI_PERM_STORE_CAP) == 0)
 		cheribsdtest_failure_errx("perms %jx (storecap missing)", v);
+#endif
+#ifdef CHERI_PERM_CAP
+	if ((v & CHERI_PERM_CAP) == 0)
+		cheribsdtest_failure_errx("perms %jx (cap missing)", v);
+#endif
 
 	if ((v & CHERI_PERM_STORE_LOCAL_CAP) == 0)
 		cheribsdtest_failure_errx("perms %jx (store_local_cap missing)",
@@ -452,8 +472,14 @@ CHERIBSDTEST(initregs_returncap, "Test value of return capability")
 	    "perms %jx (execute missing)", v);
 	CHERIBSDTEST_VERIFY2((v & CHERI_PERM_STORE) == 0,
 	    "perms %jx (store present)", v);
+#ifdef CHERI_PERM_STORE_CAP
 	CHERIBSDTEST_VERIFY2((v & CHERI_PERM_STORE_CAP) == 0,
 	    "perms %jx (storecap present)", v);
+#endif
+#ifdef CHERI_PERM_CAP
+	CHERIBSDTEST_VERIFY2((v & CHERI_PERM_CAP) != 0,
+	    "perms %jx (cap missing)", v);
+#endif
 	CHERIBSDTEST_VERIFY2((v & CHERI_PERM_STORE_LOCAL_CAP) == 0,
 	    "perms %jx (store_local_cap present)", v);
 

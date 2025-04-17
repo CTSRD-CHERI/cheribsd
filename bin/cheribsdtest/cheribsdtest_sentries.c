@@ -59,8 +59,14 @@ check_fptr(uintptr_t fptr)
 	    "perms %jx (execute missing)", (uintmax_t)perms);
 	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE) == 0,
 	    "perms %jx (store present)", (uintmax_t)perms);
+#ifdef CHERI_PERM_STORE_CAP
 	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE_CAP) == 0,
 	    "perms %jx (storecap present)", (uintmax_t)perms);
+#endif
+#ifdef CHERI_PERM_CAP
+	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_CAP) != 0,
+	    "perms %jx (cap present)", (uintmax_t)perms);
+#endif
 	CHERIBSDTEST_VERIFY2((perms & CHERI_PERM_STORE_LOCAL_CAP) == 0,
 	    "perms %jx (store_local_cap present)", (uintmax_t)perms);
 
