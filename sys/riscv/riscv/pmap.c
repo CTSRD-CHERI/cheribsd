@@ -3371,6 +3371,10 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 #if __has_feature(capabilities)
 	if (prot & VM_PROT_WRITE_CAP)
 		new_l3 |= PTE_CW;
+#ifdef __riscv_zcheripurecap
+	if (prot & VM_PROT_READ_CAP)
+		new_l3 |= PTE_CW;
+#endif
 #ifdef __riscv_xcheri
 	if (flags & VM_PROT_WRITE_CAP)
 		new_l3 |= PTE_CD;
