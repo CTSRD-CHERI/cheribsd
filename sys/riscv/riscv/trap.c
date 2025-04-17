@@ -412,16 +412,17 @@ page_fault_handler(struct trapframe *frame, int usermode)
 	}
 #endif
 
+#if __has_feature(capabilities)
+	if (is_cheri_store_amo_cap_fault(frame)) {
+		ftype = VM_PROT_WRITE | VM_PROT_WRITE_CAP;
+	} else if (is_cheri_load_cap_fault(frame)) {
+		ftype = VM_PROT_READ | VM_PROT_READ_CAP;
+	} else
+#endif
 	if (frame->tf_scause == SCAUSE_STORE_PAGE_FAULT) {
 		ftype = VM_PROT_WRITE;
 	} else if (frame->tf_scause == SCAUSE_INST_PAGE_FAULT) {
 		ftype = VM_PROT_EXECUTE;
-#if __has_feature(capabilities)
-	} else if (is_cheri_store_amo_cap_fault(frame)) {
-		ftype = VM_PROT_WRITE | VM_PROT_WRITE_CAP;
-	} else if (is_cheri_load_cap_fault(frame)) {
-		ftype = VM_PROT_READ | VM_PROT_READ_CAP;
-#endif
 	} else {
 		ftype = VM_PROT_READ;
 	}
