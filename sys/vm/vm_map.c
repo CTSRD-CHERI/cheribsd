@@ -97,6 +97,7 @@
 #include <vm/vm_pageout.h>
 #include <vm/vm_object.h>
 #include <vm/vm_pager.h>
+#include <vm/vm_radix.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_extern.h>
 #include <vm/vnode_pager.h>
@@ -3126,6 +3127,7 @@ static void
 vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
     vm_object_t object, vm_pindex_t pindex, vm_size_t size, int flags)
 {
+	struct pctrie_iter pages;
 	vm_offset_t start;
 	vm_page_t p, p_start;
 	vm_pindex_t mask, psize, threshold, tmpidx;
@@ -3179,19 +3181,14 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 	 */
 	prot = VM_OBJECT_MASK_CAP_PROT(object, prot);
 
-	p = vm_page_find_least(object, pindex);
-	/*
-	 * Assert: the variable p is either (1) the page with the
-	 * least pindex greater than or equal to the parameter pindex
-	 * or (2) NULL.
-	 */
-	for (;
-	     p != NULL && (tmpidx = p->pindex - pindex) < psize;
-	     p = TAILQ_NEXT(p, listq)) {
+	vm_page_iter_limit_init(&pages, object, pindex + psize);
+	for (p = vm_radix_iter_lookup_ge(&pages, pindex); p != NULL;
+	    p = vm_radix_iter_jump(&pages, mask + 1)) {
 		/*
 		 * don't allow an madvise to blow away our really
 		 * free pages allocating pv entries.
 		 */
+		tmpidx = p->pindex - pindex;
 		if (((flags & MAP_PREFAULT_MADVISE) != 0 &&
 		    vm_page_count_severe()) ||
 		    ((flags & MAP_PREFAULT_PARTIAL) != 0 &&
@@ -3199,6 +3196,7 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 			psize = tmpidx;
 			break;
 		}
+		mask = 0;
 		if (vm_page_all_valid(p)) {
 			if (p_start == NULL) {
 				start = addr + ptoa(tmpidx);
@@ -3212,7 +3210,6 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 					if (tmpidx + mask < psize &&
 					    vm_page_ps_test(p, psind,
 					    PS_ALL_VALID, NULL)) {
-						p += mask;
 						threshold += mask;
 						break;
 					}
