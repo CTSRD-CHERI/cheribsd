@@ -26,12 +26,6 @@
 
 typedef void (*crt_func)(void);
 
-#ifndef __CHERI_PURE_CAPABILITY__
-static crt_func __JCR_END__[] __section(".jcr") __used = {
-	(crt_func)0
-};
-#endif
-
 #ifdef HAVE_CTORS
 
 /*
