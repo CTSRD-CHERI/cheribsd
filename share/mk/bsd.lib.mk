@@ -7,7 +7,7 @@
 .include <bsd.compat.mk>
 .endif
 
-__<bsd.lib.mk>__:
+__<bsd.lib.mk>__:	.NOTMAIN
 
 .if defined(LIB_CXX) || defined(SHLIB_CXX)
 _LD=	${CXX}
