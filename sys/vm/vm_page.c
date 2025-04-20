@@ -2181,7 +2181,7 @@ again:
 	 * Can we allocate the page from a reservation?
 	 */
 	if (vm_object_reserv(object) &&
-	    (m = vm_reserv_alloc_page(object, pindex, domain, req, mpred)) !=
+	    (m = vm_reserv_alloc_page(object, pages, pindex, domain, req)) !=
 	    NULL) {
 		goto found;
 	}
@@ -2417,8 +2417,9 @@ vm_page_alloc_contig_domain(vm_object_t object, vm_pindex_t pindex, int domain,
 		 * Can we allocate the pages from a reservation?
 		 */
 		if (vm_object_reserv(object) &&
-		    (m_ret = vm_reserv_alloc_contig(object, pindex, domain, req,
-		    mpred, npages, low, high, alignment, boundary)) != NULL) {
+		    (m_ret = vm_reserv_alloc_contig(object, &pages, pindex,
+		    domain, req, npages, low, high, alignment, boundary)) !=
+		    NULL) {
 			break;
 		}
 #endif
