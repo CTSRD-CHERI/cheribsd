@@ -648,13 +648,6 @@ __linuxN(copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 #ifdef __ELF_CHERI
 	entry = cheri_setaddress(prog_cap(imgp, CHERI_CAP_USER_CODE_PERMS),
 	    args->entry);
-#ifdef CHERI_FLAGS_CAP_MODE
-	/*
-	 * On architectures with a mode flag bit, we must ensure the flag is set in
-	 * AT_ENTRY for RTLD to be able to jump to it.
-	 */
-	entry = cheri_setflags(entry, CHERI_FLAGS_CAP_MODE);
-#endif
 	/*
 	 * A valid unsealed capability with the following properties:
      * Its address is set to the start of the executable's RX region.
@@ -669,7 +662,13 @@ __linuxN(copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	 */
 	AUXARGS_ENTRY_PTR(pos, LINUX_AT_CHERI_EXEC_RX_CAP, entry);
 
-
+#ifdef CHERI_FLAGS_CAP_MODE
+	/*
+	 * On architectures with a mode flag bit, we must ensure the flag is set in
+	 * AT_ENTRY for RTLD to be able to jump to it.
+	 */
+	entry = cheri_setflags(entry, CHERI_FLAGS_CAP_MODE);
+#endif
 	/*
 	 * A valid sealed capability with the following properties:
      * Its address is set to the entry address of the executable (as usual).
