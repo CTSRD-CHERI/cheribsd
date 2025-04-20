@@ -47,13 +47,13 @@ typedef int16_t		l_short;
 typedef uint32_t	l_uint;
 typedef uint64_t	l_ulong;
 typedef uint16_t	l_ushort;
-
-#if defined(COMPAT_LINUX64) || defined(COMPAT_LINUX32)
-typedef l_ulong		l_uintptr_t;
-#else
-typedef uintcap_t	l_uintptr_t;
-#endif
 typedef uintcap_t	l_uintcap_t;
+
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+typedef l_uintcap_t	l_uintptr_t;
+#else
+typedef l_ulong		l_uintptr_t;
+#endif
 typedef l_long		l_clock_t;
 typedef l_int		l_daddr_t;
 typedef l_uint		l_gid_t;
