@@ -60,6 +60,14 @@ The pages can be read.
 The pages can be written.
 .It Dv PROT_EXEC
 The pages can be executed.
+.It Dv PROT_CAP
+CHERI capabilities may be read or written as dictated by
+.Dv PROT_READ
+and
+.Dv PROT_WRITE .
+.It Dv PROT_NO_CAP
+Respect the absence of
+.Dv PROT_CAP .
 .El
 .Pp
 In addition to these standard protection flags,
@@ -80,6 +88,13 @@ values wrapped in the
 macro into the
 .Fa prot
 argument.
+.Pp
+For more information on the
+.Dv PROT_CAP
+and
+.Dv PROT_NO_CAP
+flags, see the discussion in
+.Xr mmap 2 .
 .Sh RETURN VALUES
 .Rv -std mprotect
 .Sh ERRORS
@@ -108,10 +123,17 @@ The
 .Fa prot
 argument contains permissions which are not a subset of the specified
 maximum permissions.
+.It Bq Er ENOTSUP
+.Dv PROT_CAP
+without
+.Dv PROT_READ
+or
+.Dv PROT_WRITE .
 .El
 .Sh SEE ALSO
 .Xr madvise 2 ,
 .Xr mincore 2 ,
+.Xr mmap 2 ,
 .Xr msync 2 ,
 .Xr munmap 2
 .Sh HISTORY
