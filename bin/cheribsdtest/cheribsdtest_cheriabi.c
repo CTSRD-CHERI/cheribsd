@@ -301,6 +301,24 @@ CHERIBSDTEST(cheriabi_mprotect_upgrade_prot_cap,
 	cheribsdtest_success();
 }
 
+CHERIBSDTEST(cheriabi_mprotect_restore_prot_cap,
+    "Check that downgrading and then upgrading restores capability permissions")
+{
+	void * volatile *p;
+
+	p = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, PAGE_SIZE,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0));
+	CHERIBSDTEST_CHECK_SYSCALL(mprotect(__DEVOLATILE(void *, p), PAGE_SIZE,
+	    PROT_NONE));
+	CHERIBSDTEST_CHECK_SYSCALL(mprotect(__DEVOLATILE(void *, p), PAGE_SIZE,
+	    PROT_READ | PROT_WRITE));
+
+	/* Attempt to store a capability */
+	*p = __DEVOLATILE(void *, p);
+
+	cheribsdtest_success();
+}
+
 CHERIBSDTEST(cheriabi_mprotect_downgrade_prot_cap,
     "Check that downgrading to PROT_MAX(PROT_READ) includes capability read",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO | CT_FLAG_SI_ADDR,
