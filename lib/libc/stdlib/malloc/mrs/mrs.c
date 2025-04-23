@@ -1215,9 +1215,7 @@ mrs_init_impl_locked(void)
 		exit(7);
 	}
 
-	if (!issetugid()) {
-		mrs_utrace = (getenv(MRS_UTRACE_ENV) != NULL);
-	}
+	mrs_utrace = (secure_getenv(MRS_UTRACE_ENV) != NULL);
 
 	uint32_t bsdflags;
 
@@ -1228,33 +1226,32 @@ mrs_init_impl_locked(void)
 		revoke_async = ((bsdflags & ELF_BSDF_CHERI_REVOKE_ASYNC) != 0);
 	}
 
-	if (!issetugid()) {
-		if (getenv(MALLOC_QUARANTINE_DISABLE_ENV) != NULL) {
-			quarantining = false;
-		} else if (getenv(MALLOC_QUARANTINE_ENABLE_ENV) != NULL) {
-			quarantining = true;
-		}
-
-		if (getenv(MALLOC_ABORT_DISABLE_ENV) != NULL)
-			abort_on_validation_failure = false;
-		else if (getenv(MALLOC_ABORT_ENABLE_ENV) != NULL)
-			abort_on_validation_failure = true;
-
-		if (getenv(MALLOC_REVOKE_EVERY_FREE_DISABLE_ENV) != NULL)
-			revoke_every_free = false;
-		else if (getenv(MALLOC_REVOKE_EVERY_FREE_ENABLE_ENV) != NULL)
-			revoke_every_free = true;
-
-		if (getenv(MALLOC_REVOKE_SYNC_ENV) != NULL)
-			revoke_async = false;
-		else if (getenv(MALLOC_REVOKE_ASYNC_ENV) != NULL)
-			revoke_async = true;
-
-		if (getenv(MALLOC_BOUND_CHERI_POINTERS) != NULL)
-			bound_pointers = true;
-		else if (getenv(MALLOC_NOBOUND_CHERI_POINTERS) != NULL)
-			bound_pointers = false;
+	if (secure_getenv(MALLOC_QUARANTINE_DISABLE_ENV) != NULL) {
+		quarantining = false;
+	} else if (secure_getenv(MALLOC_QUARANTINE_ENABLE_ENV) != NULL) {
+		quarantining = true;
 	}
+
+	if (secure_getenv(MALLOC_ABORT_DISABLE_ENV) != NULL)
+		abort_on_validation_failure = false;
+	else if (secure_getenv(MALLOC_ABORT_ENABLE_ENV) != NULL)
+		abort_on_validation_failure = true;
+
+	if (secure_getenv(MALLOC_REVOKE_EVERY_FREE_DISABLE_ENV) != NULL)
+		revoke_every_free = false;
+	else if (secure_getenv(MALLOC_REVOKE_EVERY_FREE_ENABLE_ENV) != NULL)
+		revoke_every_free = true;
+
+	if (secure_getenv(MALLOC_REVOKE_SYNC_ENV) != NULL)
+		revoke_async = false;
+	else if (secure_getenv(MALLOC_REVOKE_ASYNC_ENV) != NULL)
+		revoke_async = true;
+
+	if (secure_getenv(MALLOC_BOUND_CHERI_POINTERS) != NULL)
+		bound_pointers = true;
+	else if (secure_getenv(MALLOC_NOBOUND_CHERI_POINTERS) != NULL)
+		bound_pointers = false;
+
 	if (!quarantining)
 		goto nosys;
 
