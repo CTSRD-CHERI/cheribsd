@@ -214,11 +214,22 @@ more_spec:
 				OUT("w");
 			if (cheri_perms_get(cap) & CHERI_PERM_EXECUTE)
 				OUT("x");
+
+#ifdef HAS_CHERI_PERM_LOAD_STORE_CAP
 			if (cheri_perms_get(cap) & CHERI_PERM_LOAD_CAP)
 				OUT("R");
 			if (cheri_perms_get(cap) & CHERI_PERM_STORE_CAP)
 				OUT("W");
-#ifdef CHERI_PERM_EXECUTIVE
+#endif
+#ifdef HAS_CHERI_PERM_CAP
+			if (cheri_perms_get(cap) & CHERI_PERM_CAP)
+				OUT("C");
+#endif
+#ifdef HAS_CHERI_PERM_LOAD_MUTABLE
+			if (cheri_getperm(cap) & CHERI_PERM_LOAD_MUTABLE)
+				OUT("M");
+#endif
+#ifdef HAS_CHERI_PERM_EXECUTIVE
 			if (cheri_perms_get(cap) & CHERI_PERM_EXECUTIVE)
 				OUT("E");
 #endif
