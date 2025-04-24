@@ -107,6 +107,23 @@ test_printf_cap_one(void * __capability p, int expected_tokens,
 			    descr);
 		permsp++;
 	}
+#endif
+#ifdef CHERI_PERM_LOAD_MUTABLE
+	if ((cheri_getperm(p) & CHERI_PERM_LOAD_MUTABLE) != 0) {
+		if (*permsp != 'l')
+			cheribsdtest_failure_errx("Missing 'l' permission for %s",
+			    descr);
+		permsp++;
+	}
+#endif
+#ifdef CHERI_PERM_CAP
+	if ((cheri_getperm(p) & CHERI_PERM_CAP) != 0) {
+		if (*permsp != 'C')
+			cheribsdtest_failure_errx("Missing 'C' permission for %s",
+			    descr);
+		permsp++;
+	}
+#endif
 	if (*permsp != '\0')
 		cheribsdtest_failure_errx("Extra permissions '%s' for %s", permsp,
 		    descr);
