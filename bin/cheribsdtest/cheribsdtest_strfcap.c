@@ -93,13 +93,16 @@ test_strfcap_C_cap_one(void * __capability p, int expected_tokens,
 			    descr);
 		permsp++;
 	}
-	if ((cheri_getperm(p) & CHERI_PERM_LOAD) != 0) {
+#ifdef CHERI_PERM_LOAD_CAP
+	if ((cheri_getperm(p) & CHERI_PERM_LOAD_CAP) != 0) {
 		if (*permsp != 'R')
 			cheribsdtest_failure_errx("Missing 'R' permission for %s",
 			    descr);
 		permsp++;
 	}
-	if ((cheri_getperm(p) & CHERI_PERM_STORE) != 0) {
+#endif
+#ifdef CHERI_PERM_STORE_CAP
+	if ((cheri_getperm(p) & CHERI_PERM_STORE_CAP) != 0) {
 		if (*permsp != 'W')
 			cheribsdtest_failure_errx("Missing 'W' permission for %s",
 			    descr);
