@@ -222,6 +222,10 @@ more_spec:
 			if (cheri_getperm(cap) & CHERI_PERM_STORE_CAP)
 				OUT("W");
 #endif
+#ifdef CHERI_PERM_LOAD_MUTABLE
+			if (cheri_getperm(cap) & CHERI_PERM_LOAD_MUTABLE)
+				OUT("l");
+#endif
 #ifdef CHERI_PERM_CAP
 			if (cheri_getperm(cap) & CHERI_PERM_CAP)
 				OUT("C");
