@@ -290,7 +290,7 @@ pagetables:
 	sfence.vma
 	csrw	satp, s2
 
-	// XXX this is a workaround to failing to fault after satp is set
+	// Enter the kenrnel VA space
 	LL_PTR PTR(t0), va
 	li	t1, KERNBASE
 	sub	t1, t1, s9
