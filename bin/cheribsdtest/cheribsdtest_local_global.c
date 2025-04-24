@@ -74,17 +74,22 @@ CHERIBSDTEST(store_local_allowed,
 	cheribsdtest_success();
 }
 
+#ifndef __riscv_zcheripurecap
 CHERIBSDTEST(store_local_disallowed,
     "Checks local capabilities can not be stored via non-store-local capabilities",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
     .ct_si_code = SI_CODE_STORELOCAL,
     .ct_si_trapno = TRAPNO_LOAD_STORE)
+#else
+CHERIBSDTEST(store_local_disallowed,
+    "Checks local capabilities can not be stored via non-store-local capabilities")
+#endif
 {
 	char str[] = STR_VAL;
 	char * __capability cap = str;
 	char * __capability target;
-	char * __capability * __capability targetp = &target;
+	char * __capability * __capability volatile targetp = &target;
 
 	CHERIBSDTEST_VERIFY(strcmp(STR_VAL, str) == 0);
 	*targetp = cap;
@@ -99,6 +104,11 @@ CHERIBSDTEST(store_local_disallowed,
 	/* This should fault */
 	*targetp = cap;
 
+#ifdef __riscv_zcheripurecap
+        CHERIBSDTEST_VERIFY(cheri_gettag(*targetp) == 0);
+        cheribsdtest_success();
+#else
 	cheribsdtest_failure_errx(
 	    "No fault after storing local cap via non-store-local cap");
+#endif
 }
