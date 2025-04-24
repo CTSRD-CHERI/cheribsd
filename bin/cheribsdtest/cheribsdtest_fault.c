@@ -229,7 +229,7 @@ CHERIBSDTEST(nofault_cfromptr, "Exercise CFromPtr success")
 	char * __capability cd; /* stored into here */
 
 	cb = cheri_ptr(buf, 256);
-#if defined(__aarch64__) || defined(__riscv_xcheri_no_relocation)
+#if defined(__aarch64__) || defined(__riscv_xcheri_no_relocation) || defined(__riscv_zcheripurecap)
 	/*
 	 * morello-llvm emits cvtz for this intrinsic, which has an
 	 * address interpretation by default (unlike CFromPtr, which
