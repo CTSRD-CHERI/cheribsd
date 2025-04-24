@@ -102,6 +102,7 @@
 #include <vm/vm_page.h>
 #include <vm/vm_pageout.h>
 #include <vm/vm_pager.h>
+#include <vm/vm_radix.h>
 #include <vm/swap_pager.h>
 
 struct shm_mapping {
@@ -197,6 +198,7 @@ SYSCTL_INT(_vm_largepages, OID_AUTO, reclaim_tries,
 static int
 uiomove_object_page(vm_object_t obj, size_t len, struct uio *uio)
 {
+	struct pctrie_iter pages;
 	vm_page_t m;
 	vm_pindex_t idx;
 	size_t tlen;
@@ -216,8 +218,9 @@ uiomove_object_page(vm_object_t obj, size_t len, struct uio *uio)
 	 * page: use zero_region.  This is intended to avoid instantiating
 	 * pages on read from a sparse region.
 	 */
+	vm_page_iter_init(&pages, obj);
 	VM_OBJECT_WLOCK(obj);
-	m = vm_page_lookup(obj, idx);
+	m = vm_radix_iter_lookup(&pages, idx);
 	if (uio->uio_rw == UIO_READ && m == NULL &&
 	    !vm_pager_has_page(obj, idx, NULL, NULL)) {
 		VM_OBJECT_WUNLOCK(obj);
@@ -231,7 +234,7 @@ uiomove_object_page(vm_object_t obj, size_t len, struct uio *uio)
 	 * lock to page out tobj's pages because tobj is a OBJT_SWAP
 	 * type object.
 	 */
-	rv = vm_page_grab_valid(&m, obj, idx,
+	rv = vm_page_grab_valid_iter(&m, obj, &pages, idx,
 	    VM_ALLOC_NORMAL | VM_ALLOC_SBUSY | VM_ALLOC_IGN_SBUSY);
 	if (rv != VM_PAGER_OK) {
 		VM_OBJECT_WUNLOCK(obj);
