@@ -120,6 +120,12 @@
 	csrw	sscratchc, ct0
 	csrr	ct0, sepcc
 	sc	ct0, (TF_SEPC)(csp)
+.if \mode == 1
+	csrr	ct0, stidc
+.else
+	csrr	ct0, utidc
+.endif
+	sc	ct0, (TF_TIDC)(csp)
 	csrr	ct0, ddc
 	sc	ct0, (TF_DDC)(csp)
 
@@ -297,6 +303,12 @@
 	 */
 	lc	ct0, (TF_DDC)(csp)
 	csrw	ddc, ct0
+	lc	ct0, (TF_TIDC)(csp)
+.if \mode == 1
+	csrw	stidc, ct0
+.else
+	csrw	utidc, ct0
+.endif
 	lc	ct0, (TF_SEPC)(csp)
 	csrw	sepcc, ct0
 
