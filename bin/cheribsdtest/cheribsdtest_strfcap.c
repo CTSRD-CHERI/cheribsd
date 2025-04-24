@@ -383,7 +383,7 @@ CHERIBSDTEST(strfcap_C, "Various checks of %C (%A and %P indirectly)")
 
 #ifdef CHERI_FLAGS_CAP_MODE
 #ifdef __CHERI_PURE_CAPABILITY__
-	pcc_alt = cheri_setflags(pcc_alt, 0);
+	pcc_alt = cheri_setflags(pcc_alt, CHERI_FLAGS_INT_MODE);
 	test_strfcap_C_cap_one(pcc_alt, 4, "non-capability mode PCC");
 #else
 	pcc_alt = cheri_setflags(pcc_alt, CHERI_FLAGS_CAP_MODE);
