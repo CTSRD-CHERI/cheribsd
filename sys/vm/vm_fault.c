@@ -786,9 +786,8 @@ skip_pmap_bdry:
 	}
 	VM_OBJECT_ASSERT_CAP(fs->first_object, fs->prot);
 	prot = VM_OBJECT_MASK_CAP_PROT(fs->first_object, fs->prot);
-	for (pidx = pager_first, m = vm_page_lookup(fs->first_object, pidx);
-	    pidx <= pager_last;
-	    pidx += npages, m = TAILQ_NEXT(&m[npages - 1], listq)) {
+	for (pidx = pager_first; pidx <= pager_last; pidx += npages) {
+		m = vm_page_lookup(fs->first_object, pidx);
 		vaddr = fs->entry->start + IDX_TO_OFF(pidx) - fs->entry->offset;
 		KASSERT(m != NULL && m->pindex == pidx,
 		    ("%s: pindex mismatch", __func__));
