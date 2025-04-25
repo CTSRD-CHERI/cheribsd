@@ -140,7 +140,9 @@ CHERIBSDTEST(vm_notag_mmap_no_cap,
 	int v;
 
 	cp = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
-	    PROT_READ | PROT_WRITE | PROT_NO_CAP, MAP_ANON, -1, 0));
+	    PROT_READ | PROT_WRITE | PROT_NO_CAP |
+	    PROT_MAX(PROT_READ | PROT_WRITE | PROT_CAP),
+	    MAP_ANON, -1, 0));
 	cheribsdtest_set_expected_si_addr(NULL_DERIVED_VOIDP(cp));
 	cp_value = cheri_ptr(&v, sizeof(v));
 	*cp = cp_value;
