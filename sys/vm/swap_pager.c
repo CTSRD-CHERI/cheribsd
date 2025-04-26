@@ -3649,7 +3649,7 @@ swap_pager_cheri_revoke_next(vm_object_t object, vm_pindex_t pindex)
 
 	VM_OBJECT_ASSERT_LOCKED(object);
 
-	m_next = vm_page_find_least(object, pindex);
+	m_next = vm_radix_lookup_ge(&object->rtree, pindex);
 	respindex = m_next != NULL ? m_next->pindex : object->size;
 
 	for (swpindex = rounddown2(pindex, SWAP_META_PAGES);;
