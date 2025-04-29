@@ -570,6 +570,9 @@ obj_new(void)
     STAILQ_INIT(&obj->dldags);
     STAILQ_INIT(&obj->dagmembers);
     STAILQ_INIT(&obj->names);
+#ifdef C18N_LIB_CHERI
+    obj->tramp_pgs_lock = ATOMIC_FLAG_INIT;
+#endif
     return obj;
 }
 

@@ -1051,13 +1051,6 @@ dl_c18n_pop_trusted_stack(struct dl_c18n_compart_state *state, void *tfs)
 /*
  * Trampolines
  */
-struct tramp_pg {
-	SLIST_ENTRY(tramp_pg) link;
-	_Atomic(size_t) size;
-	size_t capacity;
-	_Alignas(_Alignof(void *)) char trampolines[];
-};
-
 static size_t tramp_pg_size;
 
 static struct tramp_pg *
@@ -1084,9 +1077,12 @@ static void *
 tramp_pg_push(struct tramp_pg *pg, size_t len)
 {
 	char *tramp;
-	size_t n_size;
-	size_t size = atomic_load_explicit(&pg->size, memory_order_relaxed);
+	size_t size, n_size;
 
+	if (pg == NULL)
+		return (NULL);
+
+	size = atomic_load_explicit(&pg->size, memory_order_relaxed);
 	do {
 		tramp = roundup2(pg->trampolines + size,
 		    _Alignof(struct tramp_header));
@@ -1105,10 +1101,9 @@ tramp_pg_push(struct tramp_pg *pg, size_t len)
 	return (tramp);
 }
 
-typedef int32_t slot_idx_t;
-
 static struct {
 	_Alignas(CACHE_LINE_SIZE) _Atomic(slot_idx_t) size;
+	slot_idx_t dead;
 	int exp;
 	struct tramp_header **data;
 	struct tramp_map_kv {
@@ -1118,13 +1113,6 @@ static struct {
 	_Alignas(CACHE_LINE_SIZE) _Atomic(slot_idx_t) writers;
 } tramp_table;
 
-static struct {
-	_Alignas(CACHE_LINE_SIZE) _Atomic(struct tramp_pg *) head;
-	_Alignas(CACHE_LINE_SIZE) atomic_flag lock;
-} tramp_pgs = {
-	.lock = ATOMIC_FLAG_INIT
-};
-
 static slot_idx_t
 tramp_table_max_load(int exp)
 {
@@ -1132,24 +1120,35 @@ tramp_table_max_load(int exp)
 	return (3 << (exp - 3));
 }
 
-static void
+static slot_idx_t
 expand_tramp_table(int exp)
 {
+	slot_idx_t size, cur = 0;
+
 	/*
 	 * The lower bound ensures that the maximum load can be calculated
-	 * without underflow. The upper bound ensures that the hash function
-	 * does not underflow.
+	 * without underflow. The upper bound ensures that the index does not
+	 * overflow.
 	 */
-	assert(3 <= exp && exp <= 31);
+	assert(3 <= exp && exp <= 30);
+	tramp_table.exp = exp;
 
 	c18n_free(tramp_table.map);
-
-	tramp_table.exp = exp;
 	/*
 	 * The data array only needs to be as large as the maximum load.
 	 */
 	tramp_table.data = c18n_realloc(tramp_table.data,
 	    sizeof(*tramp_table.data) * tramp_table_max_load(exp));
+	size = atomic_load_explicit(&tramp_table.size, memory_order_relaxed);
+	for (slot_idx_t i = 0; i < size; ++i)
+		if (tramp_table.data[i] == NULL)
+			tramp_table.dead -= 1;
+		else {
+			tramp_table.data[i]->index = cur;
+			tramp_table.data[cur++] = tramp_table.data[i];
+		}
+	assert(tramp_table.dead == 0);
+	atomic_store_explicit(&tramp_table.size, cur, memory_order_relaxed);
 	tramp_table.map = c18n_malloc(sizeof(*tramp_table.map) << exp);
 
 	for (size_t i = 0; i < (1 << exp); ++i)
@@ -1157,6 +1156,8 @@ expand_tramp_table(int exp)
 			.key = 0,
 			.index = -1
 		};
+
+	return (cur);
 }
 
 /* Public domain. Taken from https://github.com/skeeto/hash-prospector */
@@ -1191,9 +1192,14 @@ resize_table(int exp)
 	uint32_t hash;
 	slot_idx_t size, slot;
 
-	expand_tramp_table(exp);
+	/*
+	 * If there are no dead entries, then we have to increase the size of
+	 * the table rather than just discard the dead entries.
+	 */
+	if (tramp_table.dead == 0)
+		exp += 1;
 
-	size = atomic_load_explicit(&tramp_table.size, memory_order_relaxed);
+	size = expand_tramp_table(exp);
 
 	for (slot_idx_t idx = 0; idx < size; ++idx) {
 		key = (ptraddr_t)atomic_load_explicit(
@@ -1252,27 +1258,27 @@ tramp_hook_impl(int event, const struct tramp_header *hdr,
 }
 
 static struct tramp_header *
-tramp_pgs_alloc(const char buf[], const char *bufp, size_t len)
+tramp_pgs_alloc(Obj_Entry *obj, const char buf[], const char *bufp, size_t len)
 {
 	char *tramp;
 	struct tramp_pg *pg;
 	struct tramp_header *header;
 
-	pg = atomic_load_explicit(&tramp_pgs.head, memory_order_acquire);
+	pg = atomic_load_explicit(&obj->tramp_pgs, memory_order_acquire);
 	tramp = tramp_pg_push(pg, len);
 	if (tramp == NULL) {
-		while (atomic_flag_test_and_set_explicit(&tramp_pgs.lock,
+		while (atomic_flag_test_and_set_explicit(&obj->tramp_pgs_lock,
 		    memory_order_acquire));
-		pg = atomic_load_explicit(&tramp_pgs.head,
+		pg = atomic_load_explicit(&obj->tramp_pgs,
 		    memory_order_relaxed);
 		tramp = tramp_pg_push(pg, len);
 		if (tramp == NULL) {
 			pg = tramp_pg_new(pg);
 			tramp = tramp_pg_push(pg, len);
-			atomic_store_explicit(&tramp_pgs.head, pg,
+			atomic_store_explicit(&obj->tramp_pgs, pg,
 			    memory_order_release);
 		}
-		atomic_flag_clear_explicit(&tramp_pgs.lock,
+		atomic_flag_clear_explicit(&obj->tramp_pgs_lock,
 		    memory_order_release);
 	}
 	assert(cheri_gettag(tramp));
@@ -1370,7 +1376,7 @@ tramp_create(const struct tramp_data *data)
 		    newdata.def - newdata.defobj->symtab);
 
 	len = tramp_compile(&bufp, &newdata);
-	return (tramp_pgs_alloc(buf, bufp, len));
+	return (tramp_pgs_alloc(data->defobj, buf, bufp, len));
 }
 
 static void *
@@ -1516,6 +1522,22 @@ insert:
 	header = tramp_table.data[idx] = tramp_create(data);
 
 	/*
+	 * Complete initialisation of the trampoline.
+	 */
+	do
+		header->next = atomic_load_explicit(&header->defobj->tramps,
+		    memory_order_relaxed);
+	while (!atomic_compare_exchange_weak_explicit(&header->defobj->tramps,
+	    &header->next, header,
+	    /*
+	     * Relaxed ordering is sufficient because the linked-list is only
+	     * otherwise accessed under a mutex, when all trampolines pointing
+	     * to a shared object are deleted from the hash table.
+	     */
+	    memory_order_relaxed, memory_order_relaxed));
+	header->index = idx;
+
+	/*
 	 * Store-release the index.
 	 */
 	atomic_store_explicit(&tramp_table.map[slot].index, idx,
@@ -1534,7 +1556,7 @@ insert:
 		/*
 		 * There can be no other writer racing with us for the resize.
 		 */
-		resize_table(exp + 1);
+		resize_table(exp);
 	}
 end:
 	lock_release(rtld_tramp_lock, &lockstate);
@@ -1576,6 +1598,7 @@ sigtab_get(const Obj_Entry *obj, unsigned long symnum)
 struct tramp_header *
 tramp_reflect(const void *data)
 {
+	Obj_Entry *obj;
 	struct tramp_header *ret;
 	struct tramp_pg *page;
 
@@ -1591,22 +1614,26 @@ tramp_reflect(const void *data)
 #endif
 	data = __containerof(data, struct tramp_header, entry);
 
-	for (page = atomic_load_explicit(&tramp_pgs.head, memory_order_acquire);
-	    page != NULL; page = SLIST_NEXT(page, link)) {
-		ret = cheri_buildcap(page, (uintptr_t)data);
-		if (!cheri_gettag(ret))
-			continue;
-		if (cheri_gettag(ret->defobj))
-			/*
-			 * At this point, the provided data must have been (a)
-			 * tagged and (b) pointing to the entry point of a
-			 * trampoline.
-			 */
-			return (ret);
-		else {
-			rtld_fdprintf(STDERR_FILENO,
-			    "c18n: Cannot reflect trampoline %#p\n", ret);
-			break;
+	TAILQ_FOREACH(obj, &obj_list, next) {
+		for (page = atomic_load_explicit(&obj->tramp_pgs,
+		    memory_order_acquire);
+		    page != NULL; page = SLIST_NEXT(page, link)) {
+			ret = cheri_buildcap(page, (uintptr_t)data);
+			if (cheri_can_access(&ret->defobj, CHERI_PERM_LOAD,
+			    (ptraddr_t)&ret->defobj, sizeof(ret->defobj)) &&
+			    cheri_gettag(ret->defobj))
+				/*
+				 * At this point, the provided data must have
+				 * been (a) tagged and (b) pointing to the entry
+				 * point of a trampoline.
+				 */
+				return (ret);
+			else {
+				rtld_fdprintf(STDERR_FILENO,
+				    "c18n: Cannot reflect trampoline %#p\n",
+				    ret);
+				break;
+			}
 		}
 	}
 
@@ -1764,8 +1791,39 @@ c18n_init2(void)
 		}
 	}
 	assert(tramp_pg_size > 0);
-	atomic_store_explicit(&tramp_pgs.head, tramp_pg_new(NULL),
-	    memory_order_relaxed);
+}
+
+void
+c18n_release_obj(Obj_Entry *obj)
+{
+	RtldLockState lockstate;
+	size_t len;
+	struct tramp_pg *pg, *next_pg;
+	const struct tramp_header *header;
+
+	wlock_acquire(rtld_tramp_lock, &lockstate);
+
+	header = atomic_load_explicit(&obj->tramps, memory_order_relaxed);
+	while (header != NULL) {
+		tramp_table.data[header->index] = NULL;
+		tramp_table.dead += 1;
+		header = header->next;
+	}
+
+	pg = atomic_load_explicit(&obj->tramp_pgs, memory_order_relaxed);
+	while (pg != NULL) {
+		next_pg = SLIST_NEXT(pg, link);
+		len = offsetof(typeof(*pg), trampolines) + pg->capacity;
+		if (munmap(pg, len) != 0) {
+			rtld_fdprintf(STDERR_FILENO,
+			    "c18n: munmap(%#p, %zu) = %s\n",
+			    pg, len, rtld_strerror(errno));
+			abort();
+		}
+		pg = next_pg;
+	}
+
+	lock_release(rtld_tramp_lock, &lockstate);
 }
 
 /*

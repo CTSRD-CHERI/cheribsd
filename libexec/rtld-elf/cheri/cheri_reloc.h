@@ -117,7 +117,7 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 		    compart_id_for_address(obj, (Elf_Addr)where),
 		    &(struct tramp_data) {
 			.target = __DECONST(void *, symval),
-			.defobj = defobj,
+			.defobj = __DECONST(void *, defobj),
 			.def = def,
 			.sig = sigtab_get(obj, r_symndx)
 		});

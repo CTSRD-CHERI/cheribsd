@@ -222,7 +222,15 @@ int c18n_is_tramp(uintptr_t, const struct trusted_frame *);
 #define	C18N_SIG_FORMAT(sig)	\
     (sig.valid), (sig.reg_args), (sig.mem_args), (sig.ret_args)
 
+typedef int32_t slot_idx_t;
 typedef uint8_t func_sig_int;
+
+struct tramp_pg {
+	SLIST_ENTRY(tramp_pg) link;
+	_Atomic(size_t) size;
+	size_t capacity;
+	_Alignas(_Alignof(void *)) char trampolines[];
+};
 
 /* Must not be reordered */
 enum tramp_ret_args {
@@ -241,7 +249,7 @@ struct func_sig {
 
 struct tramp_data {
 	void *target;
-	const Obj_Entry *defobj;
+	Obj_Entry *defobj;
 	const Elf_Sym *def;
 	struct func_sig sig;
 };
@@ -253,8 +261,21 @@ struct tramp_header {
 	 * that the tagged value is visible to the trampoline when it is run.
 	 */
 	_Atomic(void *) target;
-	const Obj_Entry *defobj;
+	/*
+	 * Pointer to the next trampoline in the same shared object
+	 */
+	const struct tramp_header *next;
+	/*
+	 * This field is the last tagged member of this struct and must remain
+	 * this way for trampoline reflection to identify a trampoline's entry
+	 * point.
+	 */
+	Obj_Entry *defobj;
 	size_t symnum;
+	/*
+	 * Index of self in the backing array of the trampoline hash table
+	 */
+	slot_idx_t index;
 	struct func_sig sig;
 	uint32_t entry[];
 };
@@ -296,4 +317,5 @@ void *_rtld_tlsdesc_dynamic_c18n(void *);
 
 void c18n_init(Obj_Entry *, Elf_Auxinfo *[]);
 void c18n_init2(void);
+void c18n_release_obj(Obj_Entry *);
 #endif

@@ -238,7 +238,10 @@ static const char *ld_elf_hints_path;	/* Environment variable for alternative hi
 static const char *ld_tracing;	/* Called from ldd to print libs */
 static const char *ld_utrace;	/* Use utrace() to log events. */
 static bool ld_skip_init_funcs = false;	/* XXXAR: debug environment variable to verify relocation processing */
-static struct obj_entry_q obj_list;	/* Queue of all loaded objects */
+#ifndef CHERI_LIB_C18N
+static
+#endif
+struct obj_entry_q obj_list;	/* Queue of all loaded objects */
 static Obj_Entry *obj_main;	/* The main program shared object */
 static Obj_Entry obj_rtld;	/* The dynamic linker shared object */
 static unsigned int obj_count;	/* Number of objects in obj_list */
@@ -1170,7 +1173,7 @@ rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def)
 #ifdef CHERI_LIB_C18N
 	ptr = tramp_intern(NULL, RTLD_COMPART_ID, &(struct tramp_data) {
 		.target = ptr,
-		.defobj = obj,
+		.defobj = __DECONST(Obj_Entry *, obj),
 		.def = def,
 		.sig = (struct func_sig) { .valid = true,
 		    .reg_args = 8, .mem_args = false, .ret_args = ONE }
@@ -1224,7 +1227,7 @@ _rtld_bind(Plt_Entry *plt, Elf_Size reloff)
 	target = (uintptr_t)tramp_intern(plt, plt->compart_id,
 	    &(struct tramp_data) {
 	    .target = (void *)target,
-	    .defobj = defobj,
+	    .defobj = __DECONST(Obj_Entry *, defobj),
 	    .def = def,
 	    .sig = sigtab_get(obj, ELF_R_SYM(rel->r_info))
 	});
@@ -4587,7 +4590,7 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	    sym = tramp_intern(NULL, RTLD_COMPART_ID,
 		&(struct tramp_data) {
 		    .target = sym,
-		    .defobj = defobj,
+		    .defobj = __DECONST(Obj_Entry *, defobj),
 		    .def = def
 	    });
 #endif
@@ -5107,6 +5110,9 @@ release_object(Obj_Entry *obj)
 		obj->unholdfree = true;
 		return;
 	}
+#ifdef CHERI_LIB_C18N
+	c18n_release_obj(obj);
+#endif
 	munmap(obj->mapbase, obj->mapsize);
 	linkmap_delete(obj);
 	obj_free(obj);
@@ -5132,7 +5138,7 @@ get_program_var_addr(const char *name, RtldLockState *lockstate)
 #ifdef CHERI_LIB_C18N
 	target = tramp_intern(NULL, RTLD_COMPART_ID, &(struct tramp_data) {
 		.target = target,
-		.defobj = req.defobj_out,
+		.defobj = __DECONST(Obj_Entry *, req.defobj_out),
 		.def = req.sym_out
 	});
 #endif

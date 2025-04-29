@@ -49,6 +49,7 @@
 #include <elf-hints.h>
 #include <link.h>
 #include <stdarg.h>
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <setjmp.h>
 #include <stddef.h>
@@ -65,6 +66,8 @@
 extern bool ld_compartment_enable;
 
 #define	C18N_ENABLED	ld_compartment_enable
+
+extern struct obj_entry_q obj_list;
 #endif
 
 #include "rtld_lock.h"
@@ -324,6 +327,11 @@ typedef struct Struct_Obj_Entry {
     const char *soname;
     uint16_t default_compart_id;
     const struct func_sig *sigtab;
+    /* Linked-list of all trampoline pages */
+    _Atomic(struct tramp_pg *) tramp_pgs;
+	atomic_flag tramp_pgs_lock;
+    /* Linked-list of all trampolines pointing to this shared object */
+    _Atomic(const struct tramp_header *) tramps;
 #endif
 
     void* init_ptr;		/* Initialization function to call */

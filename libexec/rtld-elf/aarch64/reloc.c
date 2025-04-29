@@ -506,7 +506,8 @@ reloc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 				    plt->compart_id,
 				    &(struct tramp_data) {
 					.target = (void *)target,
-					.defobj = defobj,
+					.defobj =
+					    __DECONST(Obj_Entry *, defobj),
 					.def = def,
 					.sig = sigtab_get(obj,
 					    ELF_R_SYM(rela->r_info))
@@ -585,7 +586,7 @@ reloc_jmpslots(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 			target = (uintptr_t)tramp_intern(plt, plt->compart_id,
 			    &(struct tramp_data) {
 				.target = (void *)target,
-				.defobj = defobj,
+				.defobj = __DECONST(Obj_Entry *, defobj),
 				.def = def,
 				.sig = sigtab_get(obj, ELF_R_SYM(rela->r_info))
 			});
@@ -936,7 +937,8 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				    compart_id_for_address(obj, (Elf_Addr)where),
 				    &(struct tramp_data) {
 					.target = (void *)(uintptr_t)*where,
-					.defobj = defobj,
+					.defobj =
+					    __DECONST(Obj_Entry *, defobj),
 					.def = def,
 					.sig = sigtab_get(obj,
 					    ELF_R_SYM(rela->r_info))
