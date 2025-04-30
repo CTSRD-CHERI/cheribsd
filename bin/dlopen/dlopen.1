@@ -1,0 +1,66 @@
+.\"-
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.\" Copyright (c) 2025 (holder)
+.\"
+.\" This software was developed by SRI International, the University of
+.\" Cambridge Computer Laboratory (Department of Computer Science and
+.\" Technology), and Capabilities Limited under Defense Advanced Research
+.\" Projects Agency (DARPA) Contract No. FA8750-24-C-B047 ("DEC").
+.\"
+.Dd April 30, 2025
+.Dt DLOPEN 1
+.Os
+.Sh Name
+.Nm dlopen
+.Nd load libraries with dlopen(3) and sleep for analysis
+.Sh SYNOPSIS
+.Nm
+.Op Brq Fl L | Fl N
+.Op Brq Fl g | Fl l
+.Op Fl v
+.Op Fl s Ar seconds
+.Ar library ...
+.Sh DESCRIPTION
+The
+.Nm
+utility supports analysis of the linkage and loading behavior of dynamically
+loaded libraries without the need for custom software.
+It loads each library listed on the command line and then waits for
+input on stdin unless the
+.Fl s
+flag is used to pass a positive number of seconds to sleep.
+.Pp
+The
+.Fl L
+and
+.Fl N
+flags control the use of
+.Dv RTLD_LAZY
+versus
+.Dv RTLD_NOW
+flags.
+.Dv RTLD_NOW
+is the
+.Nm
+utility's default.
+Likewise
+.Fl g
+and
+.Fl l
+control the use of
+.Dv RTLD_GLOBAL
+or
+.Dv RTLD_LOCAL .
+The
+.Fl v
+flag enables verbose mode.
+.Sh EXIT STATUS
+.Ex -std
+.Sh AUTHORS
+This software and this manual page were
+developed by SRI International, the University of Cambridge Computer
+Laboratory (Department of Computer Science and Technology), and
+Capabilities Limited under contract
+.Pq FA8750-24-C-B047
+.Pq Do DEC Dc .
