@@ -345,7 +345,6 @@ mrs_bound_pointer(void *p, size_t size)
 
 struct mrs_descriptor_slab_entry {
 	void *ptr;
-	size_t size;
 };
 
 struct mrs_descriptor_slab {
@@ -621,7 +620,6 @@ quarantine_insert(struct mrs_quarantine *quarantine, void *ptr, size_t size)
 	}
 
 	quarantine->list->slab[quarantine->list->num_descriptors].ptr = ptr;
-	quarantine->list->slab[quarantine->list->num_descriptors].size = size;
 	quarantine->list->num_descriptors++;
 
 	quarantine->size += size;
