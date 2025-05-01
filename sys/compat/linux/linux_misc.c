@@ -333,7 +333,7 @@ linux_mremap(struct thread *td, struct linux_mremap_args *args)
 #if __has_feature(capabilities) && !defined(COMPAT_LINUX64) && !defined(COMPAT_LINUX32)
 	if (cap_covers_pages(args->addr, args->old_len != 0 ? args->old_len : args->new_len) == 0)
 		return (EPROT);
-	if ((cheri_getperm(uap->addr) & CHERI_PERM_SW_VMEM_LINUX) == 0)
+	if ((cheri_getperm(args->addr) & CHERI_PERM_SW_VMEM_LINUX) == 0)
 		return (EPROT);
 #endif
 
