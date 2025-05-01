@@ -621,7 +621,7 @@ __linuxN(copyout_auxargs)(struct image_params *imgp, uintcap_t base)
      * - Load
 	 */
 	AUXARGS_ENTRY_PTR(pos, AT_PHDR, cheri_setaddress(prog_cap(imgp,
-	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM),
+	    CHERI_CAP_USER_DATA_PERMS_LINUX),
 	    args->phdr));
 
 	/*
@@ -637,7 +637,7 @@ __linuxN(copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	 * Note: This is used for relocation
 	 */
 	AUXARGS_ENTRY_PTR(pos, LINUX_AT_CHERI_EXEC_RW_CAP, cheri_setaddress(prog_cap(imgp,
-	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM),
+	    CHERI_CAP_USER_DATA_PERMS_LINUX | CHERI_PERM_SW_VMEM_LINUX),
 	    imgp->start_addr));
 #else
 	AUXARGS_ENTRY(pos, AT_PHDR, args->phdr);
@@ -646,8 +646,6 @@ __linuxN(copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 
 // Handle AT_ENTRY and LINUX_AT_CHERI_EXEC_RX_CAP
 #ifdef __ELF_CHERI
-	entry = cheri_setaddress(prog_cap(imgp, CHERI_CAP_USER_CODE_PERMS),
-	    args->entry);
 	/*
 	 * A valid unsealed capability with the following properties:
      * Its address is set to the start of the executable's RX region.
@@ -660,7 +658,13 @@ __linuxN(copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	 *
 	 * Note: This is used for relocation
 	 */
-	AUXARGS_ENTRY_PTR(pos, LINUX_AT_CHERI_EXEC_RX_CAP, entry);
+	AUXARGS_ENTRY_PTR(pos, LINUX_AT_CHERI_EXEC_RX_CAP, cheri_setaddress(prog_cap(imgp, 
+		CHERI_CAP_USER_CODE_PERMS_LINUX | CHERI_PERM_SW_VMEM_LINUX), 
+		args->entry));
+
+	entry = cheri_setaddress(prog_cap(imgp, 
+		CHERI_CAP_USER_CODE_PERMS_LINUX), 
+		args->entry);
 
 #ifdef CHERI_FLAGS_CAP_MODE
 	/*
@@ -687,11 +691,11 @@ __linuxN(copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 #ifdef __ELF_CHERI
 	if (imgp->interp_end != 0) {
 		AUXARGS_ENTRY_PTR(pos, LINUX_AT_CHERI_INTERP_RW_CAP, cheri_setaddress(interp_cap(imgp, args,
-	    	CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM),
+	    	CHERI_CAP_USER_DATA_PERMS_LINUX | CHERI_PERM_SW_VMEM_LINUX),
 	    	imgp->interp_start));
 
 		AUXARGS_ENTRY_PTR(pos, LINUX_AT_CHERI_INTERP_RX_CAP, cheri_setaddress(interp_cap(imgp, args,
-	   		CHERI_CAP_USER_CODE_PERMS),
+	   		CHERI_CAP_USER_CODE_PERMS_LINUX | CHERI_PERM_SW_VMEM_LINUX),
 	    	imgp->interp_start));
 	}
 	AUXARGS_ENTRY_PTR(pos, LINUX_AT_CHERI_STACK_CAP, imgp->stack);

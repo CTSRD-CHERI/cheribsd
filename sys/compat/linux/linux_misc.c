@@ -331,7 +331,9 @@ linux_mremap(struct thread *td, struct linux_mremap_args *args)
 	int error = 0;
 
 #if __has_feature(capabilities) && !defined(COMPAT_LINUX64) && !defined(COMPAT_LINUX32)
-	if (cap_covers_pages(args->addr, args->old_len) == 0)
+	if (cap_covers_pages(args->addr, args->old_len != 0 ? args->old_len : args->new_len) == 0)
+		return (EPROT);
+	if ((cheri_getperm(uap->addr) & CHERI_PERM_SW_VMEM_LINUX) == 0)
 		return (EPROT);
 #endif
 
@@ -432,6 +434,8 @@ linux_mprotect(struct thread *td, struct linux_mprotect_args *uap)
 #if __has_feature(capabilities) && !defined(COMPAT_LINUX64) && !defined(COMPAT_LINUX32)
 	if (cap_covers_pages(uap->addr, uap->len) == 0)
 		return (EPROT);
+	if ((cheri_getperm(uap->addr) & CHERI_PERM_SW_VMEM_LINUX) == 0)
+		return (EPROT);
 #endif
 
 	return (linux_mprotect_common(td, (uintptr_t)(uintcap_t)uap->addr, uap->len,
@@ -444,6 +448,9 @@ linux_madvise(struct thread *td, struct linux_madvise_args *uap)
 
 #if __has_feature(capabilities) && !defined(COMPAT_LINUX64) && !defined(COMPAT_LINUX32)
 	if (cap_covers_pages(uap->addr, uap->len) == 0)
+		return (EPROT);
+
+	if ((cheri_getperm(uap->addr) & CHERI_PERM_SW_VMEM_LINUX) == 0)
 		return (EPROT);
 #endif
 
@@ -494,8 +501,12 @@ linux_mmap2(struct thread *td, struct linux_mmap2_args *uap)
 	if (cheri_gettag(uap->addr)) {
 		if ((uap->flags & LINUX_MAP_FIXED) == 0)
 			return (EPROT);
-		else
+		else if ((cheri_getperm(uap->addr) & CHERI_PERM_SW_VMEM_LINUX))
 			source_cap = uap->addr;
+		else {
+			SYSERRCAUSE("MAP_FIXED without CHERI_PERM_SW_VMEM_LINUX");
+			return (EINVAL);
+		}
 	} else {
 		if (!cheri_is_null_derived(uap->addr))
 			return (EINVAL);
@@ -558,6 +569,8 @@ linux_munmap(struct thread *td, struct linux_munmap_args *args)
 {
 #if __has_feature(capabilities) && !defined(COMPAT_LINUX64) && !defined(COMPAT_LINUX32)
 	if (cap_covers_pages(args->addr, args->len) == 0)
+		return (EPROT);
+	if ((cheri_getperm(args->addr) & CHERI_PERM_SW_VMEM_LINUX) == 0)
 		return (EPROT);
 #endif
 	return (kern_munmap(td, (uintptr_t)(uintcap_t)args->addr, args->len));

@@ -788,23 +788,37 @@ linux_msgctl(struct thread *td, struct linux_msgctl_args *args)
 int
 linux_shmat(struct thread *td, struct linux_shmat_args *args)
 {
-	struct shmat_args bsd_args = {
-		.shmid = args->shmid,
-		.shmaddr = LINUX_USER_CAP_UNBOUND(args->shmaddr),
-		.shmflg = args->shmflg
-	};
+	const char * __capability shmaddr = LINUX_USER_CAP_UNBOUND(args->shmaddr);
 
-	return (sys_shmat(td, &bsd_args));
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+	/*
+	 * Require that shmaddr be NULL-derived or a valid, unsealed,
+	 * SW_VMEM bearing capability.
+	 */
+	if (!cheri_is_null_derived(shmaddr) &&
+	    (!cheri_gettag(shmaddr) || cheri_getsealed(shmaddr) ||
+	    (cheri_getperm(shmaddr) & CHERI_PERM_SW_VMEM_LINUX) == 0))
+		return (EPROT);
+#endif
+	return (kern_shmat(td, args->shmid, shmaddr, args->shmflg));
 }
 
 int
 linux_shmdt(struct thread *td, struct linux_shmdt_args *args)
 {
-	struct shmdt_args bsd_args = {
-		.shmaddr = LINUX_USER_CAP_UNBOUND(args->shmaddr)
-	};
+	const void * __capability shmaddr = LINUX_USER_CAP_UNBOUND(args->shmaddr);
 
-	return (sys_shmdt(td, &bsd_args));
+#if __has_feature(capabilities)
+	/*
+	 * Require a valid, unsealed, SW_VMEM bearing capability or NULL.
+	 * length is checked after we find our mapping.
+	 */
+	if (shmaddr != NULL &&
+	    (!cheri_gettag(shmaddr) || cheri_getsealed(shmaddr) ||
+	    (cheri_getperm(shmaddr) & CHERI_PERM_SW_VMEM_LINUX) == 0))
+		return (EPROT);
+#endif
+	return (kern_shmdt(td, shmaddr));
 }
 
 int
