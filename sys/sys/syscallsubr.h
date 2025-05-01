@@ -512,6 +512,9 @@ int	kern_shm_rename(struct thread *td,
 	    const char * __capability path_from_p,
 	    const char * __capability path_to_p, int flags);
 int	kern_shm_unlink(struct thread *td, const char * __capability userpath);
+int kern_shmat(struct thread *td, int shmid,
+	const void * __capability shmaddr, int shmflg);
+int kern_shmdt(struct thread *td, const void * __capability shmaddr);
 int	kern_shmctl(struct thread *td, int shmid, int cmd, void *buf,
 	    size_t *bufsz);
 int	kern_shutdown(struct thread *td, int s, int how);
