@@ -1318,6 +1318,7 @@ _rtld_bind(Plt_Entry *plt, Elf_Size reloff)
 #endif
 
 	obj = plt->obj;
+relock:
 	rlock_acquire(rtld_bind_lock, &lockstate);
 	if (sigsetjmp(lockstate.env, 0) != 0)
 		lock_upgrade(rtld_bind_lock, &lockstate);
@@ -1331,9 +1332,13 @@ _rtld_bind(Plt_Entry *plt, Elf_Size reloff)
 	    NULL, &lockstate);
 	if (def == NULL)
 		rtld_die();
-	if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC)
+	if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
+		if (lockstate_wlocked(&lockstate)) {
+			lock_release(rtld_bind_lock, &lockstate);
+			goto relock;
+		}
 		target = (uintptr_t)rtld_resolve_ifunc(defobj, def);
-	else {
+	} else {
 #ifdef __CHERI_PURE_CAPABILITY__
 		target = (uintptr_t)make_function_pointer(def, defobj);
 #ifdef CHERI_LIB_C18N
