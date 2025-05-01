@@ -698,7 +698,11 @@ __linuxN(copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	   		CHERI_CAP_USER_CODE_PERMS_LINUX | CHERI_PERM_SW_VMEM_LINUX),
 	    	imgp->interp_start));
 	}
-	AUXARGS_ENTRY_PTR(pos, LINUX_AT_CHERI_STACK_CAP, imgp->stack);
+	AUXARGS_ENTRY_PTR(pos, LINUX_AT_CHERI_STACK_CAP, cheri_capability_build_user_rwx(
+		CHERI_CAP_USER_DATA_PERMS_LINUX | CHERI_PERM_SW_VMEM_LINUX,
+		cheri_getbase(imgp->stack),
+		cheri_getlen(imgp->stack),
+		0));
 	AUXARGS_ENTRY_PTR(pos, LINUX_AT_CHERI_CID_CAP, (void * __capability)userspace_root_cidcap);
 	AUXARGS_ENTRY_PTR(pos, LINUX_AT_CHERI_SEAL_CAP,  (void * __capability)userspace_root_sealcap);
 	AUXARGS_ENTRY(pos, LINUX_AT_ARGC, imgp->args->argc);
