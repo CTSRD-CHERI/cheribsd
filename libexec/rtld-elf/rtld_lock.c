@@ -347,6 +347,12 @@ lock_restart_for_upgrade(RtldLockState *lockstate)
 	}
 }
 
+bool
+lockstate_wlocked(const RtldLockState *lockstate)
+{
+	return (lockstate->lockstate == RTLD_LOCK_WLOCKED);
+}
+
 #define local_rtld_function_pointer(func) &func
 
 void
@@ -374,7 +380,6 @@ lockdflt_init(void)
 	deflockinfo.dlerror_loc = def_dlerror_loc;
 	deflockinfo.dlerror_loc_sz = sizeof(def_dlerror_msg);
 	deflockinfo.dlerror_seen = def_dlerror_seen;
-
 
 	for (i = 0; i < RTLD_LOCK_CNT; i++) {
 		rtld_locks[i].mask   = (1 << i);
