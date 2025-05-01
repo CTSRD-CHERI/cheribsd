@@ -758,7 +758,7 @@ set_time(struct efi_tm *tm)
 }
 
 static int
-var_get(efi_char *name, struct uuid *vendor, uint32_t *attrib,
+var_get(efi_char *name, efi_guid_t *vendor, uint32_t *attrib,
     size_t *datasize, void *data)
 {
 	struct efirt_callinfo ec;
@@ -782,7 +782,7 @@ var_get(efi_char *name, struct uuid *vendor, uint32_t *attrib,
 }
 
 static int
-var_nextname(size_t *namesize, efi_char *name, struct uuid *vendor)
+var_nextname(size_t *namesize, efi_char *name, efi_guid_t *vendor)
 {
 	struct efirt_callinfo ec;
 	int error;
@@ -803,7 +803,7 @@ var_nextname(size_t *namesize, efi_char *name, struct uuid *vendor)
 }
 
 static int
-var_set(efi_char *name, struct uuid *vendor, uint32_t attrib,
+var_set(efi_char *name, efi_guid_t *vendor, uint32_t attrib,
     size_t datasize, void *data)
 {
 	struct efirt_callinfo ec;
