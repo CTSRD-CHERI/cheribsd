@@ -172,14 +172,17 @@ linux_set_syscall_retval(struct thread *td, int error)
 void
 linux64_arch_copyout_auxargs(struct image_params *imgp, Elf_Auxinfo **pos)
 {
-	// vDSO not yet working for PCuABI, we disable it at the moment
-	// AUXARGS_ENTRY((*pos), LINUX_AT_SYSINFO_EHDR, linux_vdso_base);
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64) && !defined(COMPAT_LINUX32)
+	AUXARGS_ENTRY_PTR((*pos), LINUX_AT_SYSINFO_EHDR, cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS_LINUX, linux_vdso_base, LINUX_VDSOPAGE_SIZE, 0));
+#else
+	AUXARGS_ENTRY((*pos), LINUX_AT_SYSINFO_EHDR, linux_vdso_base);
+#endif
 	AUXARGS_ENTRY((*pos), LINUX_AT_HWCAP, *imgp->sysent->sv_hwcap);
 	AUXARGS_ENTRY((*pos), LINUX_AT_HWCAP2, *imgp->sysent->sv_hwcap2);
 
 #if __has_feature(capabilities) && !defined(COMPAT_LINUX64) && !defined(COMPAT_LINUX32)
 	// Use vdso bound capability because we do not have a good method to get string size yet.
-	AUXARGS_ENTRY_PTR((*pos), LINUX_AT_PLATFORM, cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS_LINUX, linux_vdso_base, LINUX_VDSOPAGE_SIZE, (uintcap_t)linux_platform - linux_vdso_base));
+	AUXARGS_ENTRY_PTR((*pos), LINUX_AT_PLATFORM, cheri_capability_build_user_rwx(CHERI_CAP_USER_DATA_PERMS_LINUX, linux_vdso_base, LINUX_VDSOPAGE_SIZE, (uintcap_t)linux_platform - linux_vdso_base));
 #else
 	AUXARGS_ENTRY((*pos), LINUX_AT_PLATFORM, PTROUT(linux_platform));
 #endif
@@ -536,7 +539,7 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	tf->tf_x[29] = (uintcap_t)fp + offsetof(struct l_sigframe, fp);
 	tf->tf_sp = (uintcap_t)fp;
 #if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
-	tf->tf_lr = (uintcap_t)cheri_capability_build_user_code(td, CHERI_CAP_USER_CODE_PERMS_LINUX, linux_vdso_base, LINUX_VDSOPAGE_SIZE, (uintcap_t)__user_rt_sigreturn - linux_vdso_base);
+	tf->tf_lr = (uintcap_t)cheri_sealentry(cheri_capmode(cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS_LINUX, linux_vdso_base, LINUX_VDSOPAGE_SIZE, (uintcap_t)__user_rt_sigreturn - linux_vdso_base)));
 #else
 	tf->tf_lr = (uintcap_t)__user_rt_sigreturn;
 #endif
@@ -647,10 +650,11 @@ linux_exec_sysvec_init(void *param)
 	tkoff = kern_timekeep_base - linux_vdso_base;
 	ktimekeep_base = (l_uintptr_t *)(linux_vdso_mapping + tkoff);
 
-	/*
-	* TODO: Change timekeep_base to capability when required
-	*/
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+	*ktimekeep_base = cheri_capability_build_user_rwx(CHERI_CAP_USER_DATA_PERMS_LINUX, sv->sv_shared_page_base, sv->sv_shared_page_len, sv->sv_timekeep_offset);
+#else
 	*ktimekeep_base = sv->sv_shared_page_base + sv->sv_timekeep_offset;
+#endif
 }
 SYSINIT(elf_linux_exec_sysvec_init, SI_SUB_EXEC + 1, SI_ORDER_ANY,
     linux_exec_sysvec_init, &elf_linux_sysvec);
