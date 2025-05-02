@@ -643,7 +643,6 @@ reloc_iresolve_one(Obj_Entry *obj, const Elf_Rela *rela,
 #else
 	ptr = (uintptr_t)(obj->relocbase + rela->r_addend);
 #endif
-	lock_release(rtld_bind_lock, lockstate);
 #ifdef CHERI_LIB_C18N
 	ptr = (uintptr_t)tramp_intern(NULL, RTLD_COMPART_ID,
 	    &(struct tramp_data) {
@@ -653,6 +652,7 @@ reloc_iresolve_one(Obj_Entry *obj, const Elf_Rela *rela,
 		    .reg_args = 8, .mem_args = false, .ret_args = ONE }
 	});
 #endif
+	lock_release(rtld_bind_lock, lockstate);
 	target = call_ifunc_resolver(ptr);
 	wlock_acquire(rtld_bind_lock, lockstate);
 	*where = target;
