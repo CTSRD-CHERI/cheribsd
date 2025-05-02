@@ -33,6 +33,7 @@
 #error "no user-serviceable parts inside"
 #endif
 
+#ifdef __HAVE_STATIC_DEVMAP
 /*
  * This structure is used by MD code to describe static mappings of devices
  * which are established as part of bringing up the MMU early in the boot.
@@ -76,15 +77,16 @@ void devmap_register_table(const struct devmap_entry * _table);
  */
 void devmap_bootstrap(void);
 
+/* Print the static mapping table; used for bootverbose output. */
+void devmap_print_table(void);
+#endif
+
 #ifdef __CHERI_PURE_CAPABILITY__
 /*
  * Provide a capability mapping the devmap region.
  */
 void devmap_init_capability(void * __capability _cap);
 #endif
-
-/* Print the static mapping table; used for bootverbose output. */
-void devmap_print_table(void);
 
 #endif /* !_SYS_DEVMAP_H_ */
 
