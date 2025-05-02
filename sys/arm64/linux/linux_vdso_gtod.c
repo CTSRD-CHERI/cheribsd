@@ -51,8 +51,10 @@
 /* Some macros to help implementation */
 #if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
 #define VDSOPTR(a) "c" #a
+#define VDSOTYPE "C"
 #else
 #define VDSOPTR(a) "x" #a
+#define VDSOTYPE "r"
 #endif
 
 #ifdef COMPAT_LINUX64
@@ -77,7 +79,7 @@ write(int lfd, const void *lbuf, size_t lsize)
 	asm volatile(
 	"       svc #0\n"
 	: "=r" (res)
-	: "r" (fd), "r" (buf), "r" (size), "r" (svc)
+	: "r" (fd), VDSOTYPE (buf), "r" (size), "r" (svc)
 	: "memory");
 	return (res);
 }
@@ -93,7 +95,7 @@ __vdso_clock_gettime_fallback(clockid_t clock_id, struct l_timespec *lts)
 	asm volatile(
 	"       svc #0\n"
 	: "=r" (res)
-	: "r" (clockid), "r" (ts), "r" (svc)
+	: "r" (clockid), VDSOTYPE (ts), "r" (svc)
 	: "memory");
 	return (res);
 }
@@ -109,7 +111,7 @@ __vdso_gettimeofday_fallback(l_timeval *ltv, struct timezone *ltz)
 	asm volatile(
 	"       svc #0\n"
 	: "=r" (res)
-	: "r" (tv), "r" (tz), "r" (svc)
+	: VDSOTYPE (tv), VDSOTYPE (tz), "r" (svc)
 	: "memory");
 	return (res);
 }
@@ -125,7 +127,7 @@ __vdso_clock_getres_fallback(clockid_t clock_id, struct l_timespec *lts)
 	asm volatile(
 	"       svc #0\n"
 	: "=r" (res)
-	: "r" (clockid), "r" (ts), "r" (svc)
+	: "r" (clockid), VDSOTYPE (ts), "r" (svc)
 	: "memory");
 	return (res);
 }
