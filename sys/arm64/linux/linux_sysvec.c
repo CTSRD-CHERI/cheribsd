@@ -179,7 +179,7 @@ linux64_arch_copyout_auxargs(struct image_params *imgp, Elf_Auxinfo **pos)
 
 #if __has_feature(capabilities) && !defined(COMPAT_LINUX64) && !defined(COMPAT_LINUX32)
 	// Use vdso bound capability because we do not have a good method to get string size yet.
-	AUXARGS_ENTRY_PTR((*pos), LINUX_AT_PLATFORM, cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS, linux_vdso_base, LINUX_VDSOPAGE_SIZE, (uintcap_t)linux_platform - linux_vdso_base));
+	AUXARGS_ENTRY_PTR((*pos), LINUX_AT_PLATFORM, cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS_LINUX, linux_vdso_base, LINUX_VDSOPAGE_SIZE, (uintcap_t)linux_platform - linux_vdso_base));
 #else
 	AUXARGS_ENTRY((*pos), LINUX_AT_PLATFORM, PTROUT(linux_platform));
 #endif
@@ -536,7 +536,7 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	tf->tf_x[29] = (uintcap_t)fp + offsetof(struct l_sigframe, fp);
 	tf->tf_sp = (uintcap_t)fp;
 #if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
-	tf->tf_lr = (uintcap_t)cheri_capability_build_user_code(td, CHERI_CAP_USER_CODE_PERMS, linux_vdso_base, LINUX_VDSOPAGE_SIZE, (uintcap_t)__user_rt_sigreturn - linux_vdso_base);
+	tf->tf_lr = (uintcap_t)cheri_capability_build_user_code(td, CHERI_CAP_USER_CODE_PERMS_LINUX, linux_vdso_base, LINUX_VDSOPAGE_SIZE, (uintcap_t)__user_rt_sigreturn - linux_vdso_base);
 #else
 	tf->tf_lr = (uintcap_t)__user_rt_sigreturn;
 #endif
