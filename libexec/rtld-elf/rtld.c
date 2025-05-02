@@ -1249,7 +1249,6 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 		rtld_die();
 
 	lock_release(rtld_bind_lock, &lockstate);
-
 	dbg("transferring control to program entry point = " PTR_FMT,
 	    obj_main->entry);
 
