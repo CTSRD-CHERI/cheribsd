@@ -119,6 +119,11 @@ static void	linux_exec_sysvec_init(void *param);
 static int	linux_on_exec_vmspace(struct proc *p,
 		    struct image_params *imgp);
 
+/*
+ * Although the type of these vDSO syms are capability pointers in purecap kernel
+ * they do not contain valid capability. They only contain addresses.
+ * It might be good to change the type later.			
+ */
 LINUX_VDSO_SYM_CHAR(linux_platform);
 LINUX_VDSO_SYM_INTPTR(kern_timekeep_base);
 LINUX_VDSO_SYM_INTPTR(__user_rt_sigreturn);
@@ -631,7 +636,7 @@ linux_on_exec_vmspace(struct proc *p, struct image_params *imgp)
 static void
 linux_exec_sysvec_init(void *param)
 {
-	l_ulong *ktimekeep_base;
+	l_uintptr_t *ktimekeep_base;
 	struct sysentvec *sv;
 	ptrdiff_t tkoff;
 
@@ -640,7 +645,11 @@ linux_exec_sysvec_init(void *param)
 	exec_sysvec_init(sv);
 
 	tkoff = kern_timekeep_base - linux_vdso_base;
-	ktimekeep_base = (l_ulong *)(linux_vdso_mapping + tkoff);
+	ktimekeep_base = (l_uintptr_t *)(linux_vdso_mapping + tkoff);
+
+	/*
+	* TODO: Change timekeep_base to capability when required
+	*/
 	*ktimekeep_base = sv->sv_shared_page_base + sv->sv_timekeep_offset;
 }
 SYSINIT(elf_linux_exec_sysvec_init, SI_SUB_EXEC + 1, SI_ORDER_ANY,

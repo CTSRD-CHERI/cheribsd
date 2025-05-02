@@ -48,6 +48,19 @@
 #include <compat/linux/linux_errno.h>
 #include <compat/linux/linux_time.h>
 
+/* Some macros to help implementation */
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+#define VDSOPTR(a) "c" #a
+#else
+#define VDSOPTR(a) "x" #a
+#endif
+
+#ifdef COMPAT_LINUX64
+#define VDSOSYSCALL(a) __CONCAT(LINUX64_SYS_,a)
+#else
+#define VDSOSYSCALL(a) __CONCAT(LINUX_SYS_,a)
+#endif
+
 /* The kernel fixup this at vDSO install */
 uintptr_t *kern_timekeep_base = NULL;
 uint32_t kern_tsc_selector = 0;
@@ -55,9 +68,9 @@ uint32_t kern_tsc_selector = 0;
 static int
 write(int lfd, const void *lbuf, size_t lsize)
 {
-	register long svc asm("x8") = LINUX_SYS_linux_write;
+	register long svc asm("x8") = VDSOSYSCALL(linux_write);
 	register int fd asm("x0") = lfd;
-	register const char *buf asm("x1") = lbuf;
+	register const char *buf asm(VDSOPTR(1)) = lbuf;
 	register long size asm("x2") = lsize;
 	register long res asm ("x0");
 
@@ -72,9 +85,9 @@ write(int lfd, const void *lbuf, size_t lsize)
 static int
 __vdso_clock_gettime_fallback(clockid_t clock_id, struct l_timespec *lts)
 {
-	register long svc asm("x8") = LINUX_SYS_linux_clock_gettime;
+	register long svc asm("x8") = VDSOSYSCALL(linux_clock_gettime);
 	register clockid_t clockid asm("x0") = clock_id;
-	register struct l_timespec *ts asm("x1") = lts;
+	register struct l_timespec *ts asm(VDSOPTR(1)) = lts;
 	register long res asm ("x0");
 
 	asm volatile(
@@ -88,9 +101,9 @@ __vdso_clock_gettime_fallback(clockid_t clock_id, struct l_timespec *lts)
 static int
 __vdso_gettimeofday_fallback(l_timeval *ltv, struct timezone *ltz)
 {
-	register long svc asm("x8") = LINUX_SYS_linux_gettimeofday;
-	register l_timeval *tv asm("x0") = ltv;
-	register struct timezone *tz asm("x1") = ltz;
+	register long svc asm("x8") = VDSOSYSCALL(linux_gettimeofday);
+	register l_timeval *tv asm(VDSOPTR(0)) = ltv;
+	register struct timezone *tz asm(VDSOPTR(1)) = ltz;
 	register long res asm ("x0");
 
 	asm volatile(
@@ -104,9 +117,9 @@ __vdso_gettimeofday_fallback(l_timeval *ltv, struct timezone *ltz)
 static int
 __vdso_clock_getres_fallback(clockid_t clock_id, struct l_timespec *lts)
 {
-	register long svc asm("x8") = LINUX_SYS_linux_clock_getres;
+	register long svc asm("x8") = VDSOSYSCALL(linux_clock_getres);
 	register clockid_t clockid asm("x0") = clock_id;
-	register struct l_timespec *ts asm("x1") = lts;
+	register struct l_timespec *ts asm(VDSOPTR(1)) = lts;
 	register long res asm ("x0");
 
 	asm volatile(
