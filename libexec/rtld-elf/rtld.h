@@ -329,7 +329,7 @@ typedef struct Struct_Obj_Entry {
     const struct func_sig *sigtab;
     /* Linked-list of all trampoline pages */
     _Atomic(struct tramp_pg *) tramp_pgs;
-	atomic_flag tramp_pgs_lock;
+    atomic_flag tramp_pgs_lock;
     /* Linked-list of all trampolines pointing to this shared object */
     _Atomic(const struct tramp_header *) tramps;
 #endif

@@ -935,25 +935,23 @@ init_stk_table(struct stk_table *table, struct tcb_wrapper *wrap)
 
 #define	C18N_STACK_SIZE		(4 * 1024 * 1024)
 
+/*
+ * This function must be called under an rtld_tramp_lock to ensure that
+ * compartments are not being added or removed concurrently.
+ */
 static void *
 get_or_create_untrusted_stk(compart_id_t cid, struct stk_table **tablep)
 {
 	char *stk;
 	size_t size;
-	RtldLockState lockstate;
 	struct stk_table *table = *tablep;
 
 	if (table->meta->capacity <= cid) {
 		/*
 		 * If the compartment ID exceeds the capacity of the stack
 		 * lookup table, then new libraries must have been loaded.
-		 *
-		 * Acquire a lock first to ensure that the compartment size does
-		 * not change and then expand the stack lookup table.
 		 */
-		wlock_acquire(rtld_bind_lock, &lockstate);
 		*tablep = table = expand_stk_table(table, comparts.size);
-		lock_release(rtld_bind_lock, &lockstate);
 		set_stk_table(table);
 	} else if (table->meta->compart_stk[cid].size > 0)
 		return (table->entries[cid].stack);
@@ -982,6 +980,7 @@ resolve_untrusted_stk_impl(stk_table_index index)
 	sigset_t nset, oset;
 	struct stk_table *table;
 	struct trusted_frame *tf;
+	// RtldLockState lockstate;
 
 	/*
 	 * Push a dummy trusted frame indicating that the current compartment is
@@ -995,10 +994,12 @@ resolve_untrusted_stk_impl(stk_table_index index)
 	 */
 	SIGFILLSET(nset);
 	sigprocmask(SIG_SETMASK, &nset, &oset);
+	// rlock_acquire(rtld_tramp_lock, &lockstate);
 
 	table = get_stk_table();
 	stk = get_or_create_untrusted_stk(index_to_cid(index), &table);
 
+	// lock_release(rtld_tramp_lock, &lockstate);
 	sigprocmask(SIG_SETMASK, &oset, NULL);
 
 	tf = pop_dummy_rtld_trusted_frame(tf);
@@ -1737,7 +1738,9 @@ tramp_reflect(const void *data)
 		    memory_order_acquire);
 		    page != NULL; page = SLIST_NEXT(page, link)) {
 			ret = cheri_buildcap(page, (uintptr_t)data);
-			if (cheri_can_access(&ret->defobj, CHERI_PERM_LOAD,
+			if (!cheri_gettag(ret))
+				continue;
+			if (cheri_can_access(ret, CHERI_PERM_LOAD,
 			    (ptraddr_t)&ret->defobj, sizeof(ret->defobj)) &&
 			    cheri_gettag(ret->defobj))
 				/*
@@ -1937,6 +1940,9 @@ c18n_release_obj(Obj_Entry *obj)
 
 	wlock_acquire(rtld_tramp_lock, &lockstate);
 
+	/*
+	 * Remove trampolines pointing to the object from the hash-table.
+	 */
 	header = atomic_load_explicit(&obj->tramps, memory_order_relaxed);
 	while (header != NULL) {
 		tramp_table.data[header->index] = NULL;
@@ -1944,6 +1950,11 @@ c18n_release_obj(Obj_Entry *obj)
 		header = header->next;
 	}
 
+	/*
+	 * Iterate through the linked-list of all trampoline pages and unmap
+	 * them. This must be done under a mutex so that no trampoline page is
+	 * being concurrently inserted.
+	 */
 	pg = atomic_load_explicit(&obj->tramp_pgs, memory_order_relaxed);
 	while (pg != NULL) {
 		next_pg = SLIST_NEXT(pg, link);
@@ -1958,6 +1969,16 @@ c18n_release_obj(Obj_Entry *obj)
 	}
 
 	lock_release(rtld_tramp_lock, &lockstate);
+
+	/*
+	 * Iterate through the stack lookup table of all threads and remove and
+	 * unmap the untrusted stacks associated with the object.
+	 */
+
+	/*
+	 * Remove compartments associated with the object from the compartment
+	 * table and recycle their compartment IDs.
+	 */
 }
 
 /*
@@ -1988,6 +2009,7 @@ _rtld_thread_start(struct pthread *curthread)
 	struct tcb *tcb;
 	struct stk_table *table;
 	struct tcb_wrapper *wrap;
+	RtldLockState lockstate;
 
 	/*
 	 * The thread pointer register contains the fake tcb upon entering the
@@ -2010,6 +2032,8 @@ _rtld_thread_start(struct pthread *curthread)
 	table = c18n_unseal(wrap->table, sealer_tcb);
 	init_stk_table(table, wrap);
 
+	rlock_acquire(rtld_tramp_lock, &lockstate);
+	lock_release(rtld_tramp_lock, &lockstate);
 	thr_thread_start(curthread);
 }
 
@@ -2144,8 +2168,13 @@ int _rtld_sigaction(int, const struct sigaction *, struct sigaction *);
 static void
 sigdispatch(int sig, siginfo_t *info, void *_ucp)
 {
+	RtldLockState lockstate;
 	ucontext_t *ucp = _ucp;
-	struct sigaction act = sigactions[sig - 1];
+	struct sigaction act;
+
+	rlock_acquire(rtld_sigaction_lock, &lockstate);
+	act = sigactions[sig - 1];
+	lock_release(rtld_sigaction_lock, &lockstate);
 
 	/*
 	 * Compute the signals to be blocked for the duration of the signal
@@ -2402,6 +2431,7 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 {
 	bool siginfo;
 	void *sigfunc;
+	RtldLockState lockstate;
 	struct tramp_header *header;
 	compart_id_t callee;
 	stk_table_index callee_idx;
@@ -2415,6 +2445,13 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 		sigfunc = act->sa_sigaction;
 	else
 		sigfunc = act->sa_handler;
+
+	/*
+	 * Acquire a lock between reflecting the trampoline and getting its
+	 * compartment's stack to ensure that the compartment is not destroyed
+	 * concurrently.
+	 */
+	rlock_acquire(rtld_tramp_lock, &lockstate);
 
 	header = tramp_reflect(sigfunc);
 
@@ -2442,6 +2479,9 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 	 */
 	table = get_stk_table();
 	osp = get_or_create_untrusted_stk(callee, &table);
+
+	lock_release(rtld_tramp_lock, &lockstate);
+
 	nsp = osp - 1;
 	*nsp = (struct sigframe) {
 		.sf_si = *info,
@@ -2506,16 +2546,11 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 int
 _rtld_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
 {
+	RtldLockState lockstate;
 	struct sigaction act2, oact2, nact, *slot;
 	const struct sigaction *nactp = act;
 	sigset_t nset, oset;
 	int ret;
-
-	/*
-	 * Make the function re-entrant by blocking all signals.
-	 */
-	SIGFILLSET(nset);
-	sigprocmask(SIG_SETMASK, &nset, &oset);
 
 	if (act != NULL) {
 		act2 = *act;
@@ -2532,6 +2567,14 @@ _rtld_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
 		}
 	}
 
+	/*
+	 * Make the function re-entrant by blocking all signals. Lock to protect
+	 * the sigaction table.
+	 */
+	SIGFILLSET(nset);
+	sigprocmask(SIG_SETMASK, &nset, &oset);
+	wlock_acquire(rtld_sigaction_lock, &lockstate);
+
 	ret = __sys_sigaction(sig, nactp, &oact2);
 
 	if (ret == 0) {
@@ -2547,6 +2590,7 @@ _rtld_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
 			*slot = act2;
 	}
 
+	lock_release(rtld_sigaction_lock, &lockstate);
 	sigprocmask(SIG_SETMASK, &oset, NULL);
 
 	return (ret);

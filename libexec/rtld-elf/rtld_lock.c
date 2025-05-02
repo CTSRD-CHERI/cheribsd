@@ -249,7 +249,7 @@ thread_mask_clear(int mask)
 }
 
 #ifdef CHERI_LIB_C18N
-#define	RTLD_LOCK_CNT	4
+#define	RTLD_LOCK_CNT	5
 #else
 #define	RTLD_LOCK_CNT	3
 #endif
@@ -263,6 +263,7 @@ rtld_lock_t	rtld_libc_lock = &rtld_locks[1];
 rtld_lock_t	rtld_phdr_lock = &rtld_locks[2];
 #ifdef CHERI_LIB_C18N
 rtld_lock_t	rtld_tramp_lock = &rtld_locks[3];
+rtld_lock_t	rtld_sigaction_lock = &rtld_locks[4];
 #endif
 
 void

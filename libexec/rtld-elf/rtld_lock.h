@@ -84,6 +84,7 @@ extern rtld_lock_t	rtld_libc_lock;
 extern rtld_lock_t	rtld_phdr_lock;
 #ifdef CHERI_LIB_C18N
 extern rtld_lock_t	rtld_tramp_lock;
+extern rtld_lock_t	rtld_sigaction_lock;
 #endif
 
 extern struct RtldLockInfo lockinfo;
