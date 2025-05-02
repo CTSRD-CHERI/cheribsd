@@ -186,7 +186,8 @@ freebsd_binuptime(struct bintime *bt, struct vdso_timekeep *tk, bool abs)
 		curr = atomic_load_acq_32(&tk->tk_current);
 		th = &tk->tk_th[curr];
 		gen = atomic_load_acq_32(&th->th_gen);
-		*bt = th->th_offset;
+		bt->sec = th->th_offset.sec;
+		bt->frac = th->th_offset.frac;
 		error = tc_delta(th, &delta);
 		if (error == EAGAIN)
 			continue;
@@ -230,7 +231,8 @@ freebsd_getnanouptime(struct bintime *bt, struct vdso_timekeep *tk)
 		curr = atomic_load_acq_32(&tk->tk_current);
 		th = &tk->tk_th[curr];
 		gen = atomic_load_acq_32(&th->th_gen);
-		*bt = th->th_offset;
+		bt->sec = th->th_offset.sec;
+		bt->frac = th->th_offset.frac;
 
 		/*
 		 * Ensure that the load of th_offset is completed
