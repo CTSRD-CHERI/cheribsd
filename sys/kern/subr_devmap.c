@@ -45,6 +45,8 @@
 #include <cheri/cheric.h>
 #endif
 
+#define	DEVMAP_PADDR_NOTFOUND	((vm_paddr_t)(-1))
+
 static const struct devmap_entry *devmap_table;
 static boolean_t devmap_bootstrap_done = false;
 
@@ -221,7 +223,7 @@ devmap_bootstrap(void)
  * Look up the given physical address in the static mapping data and return the
  * corresponding virtual address, or NULL if not found.
  */
-void *
+static void *
 devmap_ptov(vm_paddr_t pa, vm_size_t size)
 {
 	const struct devmap_entry *pd;
@@ -252,7 +254,7 @@ devmap_ptov(vm_paddr_t pa, vm_size_t size)
  * Look up the given virtual address in the static mapping data and return the
  * corresponding physical address, or DEVMAP_PADDR_NOTFOUND if not found.
  */
-vm_paddr_t
+static vm_paddr_t
 devmap_vtop(void * vpva, vm_size_t size)
 {
 	const struct devmap_entry *pd;
