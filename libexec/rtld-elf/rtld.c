@@ -1143,6 +1143,17 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     if (obj_enforce_relro(obj_main) == -1)
 	rtld_die();
 
+#ifdef CHERI_LIB_C18N
+    imgentry = tramp_intern(NULL, RTLD_COMPART_ID, &(struct tramp_data) {
+	.target = cheri_sealentry(obj_main->entry),
+	.defobj = obj_main,
+	.sig = (struct func_sig) {
+	    .valid = true,
+	    .reg_args = 3, .mem_args = false, .ret_args = NONE
+	}
+    });
+#endif
+
     lock_release(rtld_bind_lock, &lockstate);
 
     dbg("transferring control to program entry point = " PTR_FMT, obj_main->entry);
@@ -1154,15 +1165,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     *objp = obj_main;
 
 #ifdef CHERI_LIB_C18N
-    return ((func_ptr_type)tramp_intern(NULL, RTLD_COMPART_ID,
-	&(struct tramp_data) {
-	    .target = cheri_sealentry(obj_main->entry),
-	    .defobj = obj_main,
-	    .sig = (struct func_sig) {
-		    .valid = true,
-		    .reg_args = 3, .mem_args = false, .ret_args = NONE
-	    }
-    }));
+    return ((func_ptr_type)imgentry);
 #else
     return ((func_ptr_type)obj_main->entry);
 #endif
@@ -1173,9 +1176,13 @@ rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def)
 {
 	void *ptr;
 	uintptr_t target;
+#ifdef CHERI_LIB_C18N
+	RtldLockState lockstate;
+#endif
 
 	ptr = (void *)make_function_pointer(def, obj);
 #ifdef CHERI_LIB_C18N
+	rlock_acquire(rtld_bind_lock, &lockstate);
 	ptr = tramp_intern(NULL, RTLD_COMPART_ID, &(struct tramp_data) {
 		.target = ptr,
 		.defobj = obj,
@@ -1183,6 +1190,7 @@ rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def)
 		.sig = (struct func_sig) { .valid = true,
 		    .reg_args = 8, .mem_args = false, .ret_args = ONE }
 	});
+	lock_release(rtld_bind_lock, &lockstate);
 #endif
 	target = call_ifunc_resolver(ptr);
 	return ((void *)target);
@@ -4590,6 +4598,7 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 		    retaddr);
 		abort();
 	    }
+	    rlock_acquire(rtld_bind_lock, &lockstate);
 	    sym = tramp_intern(NULL,
 		compart_id_for_address(obj, (Elf_Addr)retaddr),
 		&(struct tramp_data) {
@@ -4597,6 +4606,7 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 		    .defobj = defobj,
 		    .def = def
 	    });
+	    lock_release(rtld_bind_lock, &lockstate);
 #endif
 	} else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
 	    sym = rtld_resolve_ifunc(defobj, def);
