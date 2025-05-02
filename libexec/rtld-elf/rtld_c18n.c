@@ -980,7 +980,7 @@ resolve_untrusted_stk_impl(stk_table_index index)
 	sigset_t nset, oset;
 	struct stk_table *table;
 	struct trusted_frame *tf;
-	// RtldLockState lockstate;
+	RtldLockState lockstate;
 
 	/*
 	 * Push a dummy trusted frame indicating that the current compartment is
@@ -994,12 +994,12 @@ resolve_untrusted_stk_impl(stk_table_index index)
 	 */
 	SIGFILLSET(nset);
 	sigprocmask(SIG_SETMASK, &nset, &oset);
-	// rlock_acquire(rtld_tramp_lock, &lockstate);
+	rlock_acquire(rtld_tramp_lock, &lockstate);
 
 	table = get_stk_table();
 	stk = get_or_create_untrusted_stk(index_to_cid(index), &table);
 
-	// lock_release(rtld_tramp_lock, &lockstate);
+	lock_release(rtld_tramp_lock, &lockstate);
 	sigprocmask(SIG_SETMASK, &oset, NULL);
 
 	tf = pop_dummy_rtld_trusted_frame(tf);
@@ -2009,7 +2009,6 @@ _rtld_thread_start(struct pthread *curthread)
 	struct tcb *tcb;
 	struct stk_table *table;
 	struct tcb_wrapper *wrap;
-	RtldLockState lockstate;
 
 	/*
 	 * The thread pointer register contains the fake tcb upon entering the
@@ -2032,8 +2031,6 @@ _rtld_thread_start(struct pthread *curthread)
 	table = c18n_unseal(wrap->table, sealer_tcb);
 	init_stk_table(table, wrap);
 
-	rlock_acquire(rtld_tramp_lock, &lockstate);
-	lock_release(rtld_tramp_lock, &lockstate);
 	thr_thread_start(curthread);
 }
 
