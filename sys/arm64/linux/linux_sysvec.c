@@ -705,6 +705,11 @@ linux_vdso_reloc(char *mapping, Elf_Addr offset)
 	Elf_Addr addr, addend;
 	int i, relacnt;
 
+	uintcap_t cap;
+	Elf_Addr address, len;
+	uint8_t perms;
+	const Elf_Addr *fragment;
+
 	MPASS(offset != 0);
 
 	relacnt = 0;
@@ -741,11 +746,6 @@ linux_vdso_reloc(char *mapping, Elf_Addr offset)
 #if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
 		/* Only support data relocation at the moment */
 		case R_MORELLO_RELATIVE:
-			uintcap_t cap;
-			Elf_Addr address, len;
-			uint8_t perms;
-			const Elf_Addr *fragment;
-
 			fragment = where;
 
 			address = fragment[0];
