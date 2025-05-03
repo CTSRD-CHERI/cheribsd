@@ -83,7 +83,7 @@ __elfN(linux_shared_page_init)(char **mapping, vm_size_t size)
 
 	addr = kva_alloc(size);
 	obj = vm_pager_allocate(OBJT_PHYS, 0, size,
-	    VM_PROT_DEFAULT, 0, NULL);
+	    VM_PROT_DEFAULT | VM_PROT_CAP, 0, NULL);
 	VM_OBJECT_WLOCK(obj);
 	for (n = 0; n < pages; n++) {
 		m = vm_page_grab(obj, n,
