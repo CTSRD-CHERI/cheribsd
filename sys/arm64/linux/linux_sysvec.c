@@ -734,6 +734,42 @@ linux_vdso_reloc(char *mapping, Elf_Addr offset)
 			if (*where != addr)
 				*where = addr;
 			break;
+
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
+		/* Only support data relocation at the moment */
+		case R_MORELLO_RELATIVE:
+			uintcap_t cap;
+			Elf_Addr address, len;
+			uint8_t perms;
+			const Elf_Addr *fragment;
+
+			fragment = where;
+
+			address = fragment[0];
+			len = fragment[1] & ((1UL << (8 * sizeof(*fragment) - 8)) - 1);
+			perms = fragment[1] >> (8 * sizeof(*fragment) - 8);
+
+			cap = mapping;
+			cap = cheri_setaddress(cap, mapping + address);
+
+			if (perms == MORELLO_FRAG_EXECUTABLE) {
+				printf("Linux Aarch64 vDSO: unsupported executable capability relocation type %ld, "
+					"symbol index %ld\n", rtype, symidx);
+				break;
+			}
+
+			cap = cheri_clearperm(cap, CHERI_PERM_SW_VMEM_LINUX | CHERI_PERM_SEAL | CHERI_PERM_EXECUTE);
+			
+			if (perms == MORELLO_FRAG_RODATA) {
+				cap = cheri_clearperm(cap, CHERI_PERM_STORE | CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP);
+			}
+			
+			cap = cheri_setbounds(cap, len);
+			cap += addend;
+
+			*(uintcap_t *)where = cap;
+			break;
+#endif
 		default:
 			printf("Linux Aarch64 vDSO: unexpected relocation type %ld, "
 			    "symbol index %ld\n", rtype, symidx);
