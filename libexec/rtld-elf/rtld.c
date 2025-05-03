@@ -4560,7 +4560,7 @@ dlopen_object(const char *name, int fd, Obj_Entry *refobj, int lo_flags,
 
 	if (obj != NULL) {
 		obj->dl_refcount++;
-		if (mode & RTLD_GLOBAL &&
+		if ((mode & RTLD_GLOBAL) != 0 &&
 		    objlist_find(&list_global, obj) == NULL)
 			objlist_push_tail(&list_global, obj);
 
