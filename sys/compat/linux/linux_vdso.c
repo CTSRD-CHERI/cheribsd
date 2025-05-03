@@ -179,10 +179,17 @@ linux_map_vdso(struct proc *p, vm_object_t obj, vm_offset_t base,
 	map = &vmspace->vm_map;
 
 	vm_object_reference(obj);
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
 	error = vm_map_fixed(map, obj, 0, base, &addr, size,
 	    VM_PROT_READ | VM_PROT_EXECUTE,
 	    VM_PROT_READ | VM_PROT_EXECUTE,
 	    MAP_INHERIT_SHARE | MAP_ACC_NO_CHARGE);
+#else
+	error = vm_map_fixed(map, obj, 0, base, &addr, size,
+		VM_PROT_READ | VM_PROT_READ_CAP | VM_PROT_EXECUTE,
+		VM_PROT_READ | VM_PROT_READ_CAP | VM_PROT_EXECUTE,
+		MAP_INHERIT_SHARE | MAP_ACC_NO_CHARGE);
+#endif
 	if (error != KERN_SUCCESS) {
 		vm_object_deallocate(obj);
 		return (vm_mmap_to_errno(error));
