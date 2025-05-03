@@ -772,7 +772,7 @@ linux_vdso_reloc(char *mapping, Elf_Addr offset)
 			cap = cheri_setbounds(cap, len);
 			cap += addend;
 
-			*(uintcap_t *)where = cap;
+			*(uintcap_t *)__builtin_assume_aligned(where, sizeof(void* __capability)) = cap;
 			break;
 #endif
 		default:
