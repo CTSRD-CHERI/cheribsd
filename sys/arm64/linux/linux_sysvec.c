@@ -705,10 +705,12 @@ linux_vdso_reloc(char *mapping, Elf_Addr offset)
 	Elf_Addr addr, addend;
 	int i, relacnt;
 
+#if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
 	uintcap_t cap;
 	Elf_Addr address, len;
 	uint8_t perms;
 	const Elf_Addr *fragment;
+#endif
 
 	MPASS(offset != 0);
 
@@ -752,8 +754,8 @@ linux_vdso_reloc(char *mapping, Elf_Addr offset)
 			len = fragment[1] & ((1UL << (8 * sizeof(*fragment) - 8)) - 1);
 			perms = fragment[1] >> (8 * sizeof(*fragment) - 8);
 
-			cap = mapping;
-			cap = cheri_setaddress(cap, mapping + address);
+			cap = (uintcap_t)mapping;
+			cap = cheri_setaddress(cap, (uintcap_t)mapping + address);
 
 			if (perms == MORELLO_FRAG_EXECUTABLE) {
 				printf("Linux Aarch64 vDSO: unsupported executable capability relocation type %ld, "
