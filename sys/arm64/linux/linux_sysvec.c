@@ -740,7 +740,7 @@ linux_vdso_reloc(char *mapping, Elf_Addr offset)
 			break;
 
 		case R_AARCH64_RELATIVE:	/* B + A */
-			addr = (Elf_Addr)(mapping + addend);
+			addr = (Elf_Addr)(offset + addend);
 			if (*where != addr)
 				*where = addr;
 			break;
@@ -754,23 +754,17 @@ linux_vdso_reloc(char *mapping, Elf_Addr offset)
 			len = fragment[1] & ((1UL << (8 * sizeof(*fragment) - 8)) - 1);
 			perms = fragment[1] >> (8 * sizeof(*fragment) - 8);
 
-			cap = (uintcap_t)mapping;
-			cap = cheri_setaddress(cap, (uintcap_t)mapping + address);
-
 			if (perms == MORELLO_FRAG_EXECUTABLE) {
 				printf("Linux Aarch64 vDSO: unsupported executable capability relocation type %ld, "
 					"symbol index %ld\n", rtype, symidx);
 				break;
 			}
 
-			cap = cheri_clearperm(cap, CHERI_PERM_SW_VMEM_LINUX | CHERI_PERM_SEAL | CHERI_PERM_EXECUTE);
+			cap = cheri_capability_build_user_rwx(CHERI_CAP_USER_DATA_PERMS_LINUX, offset + address, len, addend);
 			
 			if (perms == MORELLO_FRAG_RODATA) {
 				cap = cheri_clearperm(cap, CHERI_PERM_STORE | CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP);
 			}
-			
-			cap = cheri_setbounds(cap, len);
-			cap += addend;
 
 			*(uintcap_t *)__builtin_assume_aligned(where, sizeof(void* __capability)) = cap;
 			break;
