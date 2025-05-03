@@ -760,7 +760,7 @@ linux_vdso_reloc(char *mapping, Elf_Addr offset)
 				break;
 			}
 
-			cap = (uintcap_t)cheri_capability_build_user_rwx(CHERI_CAP_USER_DATA_PERMS_LINUX, offset + address, len, addend);
+			cap = (uintcap_t)cheri_capability_build_user_rwx_unchecked(CHERI_CAP_USER_DATA_PERMS_LINUX, offset + address, len, addend);
 			
 			if (perms == MORELLO_FRAG_RODATA) {
 				cap = cheri_clearperm(cap, CHERI_PERM_STORE | CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP);
