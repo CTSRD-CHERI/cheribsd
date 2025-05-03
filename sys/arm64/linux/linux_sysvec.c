@@ -651,7 +651,10 @@ linux_exec_sysvec_init(void *param)
 	ktimekeep_base = (l_uintptr_t *)(linux_vdso_mapping + tkoff);
 
 #if __has_feature(capabilities) && !defined(COMPAT_LINUX64)
-	*ktimekeep_base = (l_uintptr_t)cheri_capability_build_user_rwx(CHERI_CAP_USER_DATA_PERMS_LINUX, sv->sv_shared_page_base, sv->sv_shared_page_len, sv->sv_timekeep_offset);
+	/*
+	 * Shared page might not be mapped yet. Create unchecked cap.
+	 */
+	*ktimekeep_base = (l_uintptr_t)cheri_capability_build_user_rwx_unchecked(CHERI_CAP_USER_DATA_PERMS_LINUX, sv->sv_shared_page_base, sv->sv_shared_page_len, sv->sv_timekeep_offset);
 #else
 	*ktimekeep_base = sv->sv_shared_page_base + sv->sv_timekeep_offset;
 #endif
