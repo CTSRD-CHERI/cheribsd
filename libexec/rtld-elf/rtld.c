@@ -4606,6 +4606,10 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	    ti.ti_module = defobj->tlsindex;
 	    ti.ti_offset = def->st_value - TLS_DTV_OFFSET;
 	    sym = __tls_get_addr(&ti);
+	    /* CHERI-RISC-V ABI does not yet set TLS bounds; mirror in dlsym */
+#if !defined(__riscv) && defined(__CHERI_PURE_CAPABILITY__)
+	    sym = cheri_setbounds(sym, def->st_size);
+#endif
 	    dbg("dlsym(%s) is TLS. Resolved to: " PTR_FMT, name, sym);
 	} else {
 	    sym = make_data_pointer(def, defobj);
