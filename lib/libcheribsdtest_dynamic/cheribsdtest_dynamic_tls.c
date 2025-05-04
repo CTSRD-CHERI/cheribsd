@@ -1,5 +1,7 @@
 /*-
- * Copyright (c) 2021 Jessica Clarke
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright (c) 2025 Jessica Clarke
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,17 +25,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _CHERIBSDTEST_DYNAMIC_H_
-#define _CHERIBSDTEST_DYNAMIC_H_
+#include <sys/types.h>
 
-void cheribsdtest_dynamic_dummy_func(void);
-void (*cheribsdtest_dynamic_get_dummy_fptr(void))(void);
-ptraddr_t cheribsdtest_dynamic_get_dummy_fptr_addr(void);
+#include "cheribsdtest_dynamic.h"
 
-void * __capability cheribsdtest_dynamic_identity_cap(void * __capability cap);
-
-int cheribsdtest_dynamic_ifunc(void);
-
-extern _Thread_local int cheribsdtest_dynamic_tls_var;
-
-#endif
+_Thread_local int cheribsdtest_dynamic_tls_var;
