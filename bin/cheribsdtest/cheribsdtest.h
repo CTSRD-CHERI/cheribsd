@@ -253,6 +253,14 @@ _cheribsdtest_check_cap_eq(void *__capability a, void *__capability b,
 #define CHERIBSDTEST_CHECK_EQ_CAP(a, b)	\
 	_cheribsdtest_check_cap_eq(a, b, __STRING(a), __STRING(b))
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	CHERIBSDTEST_CHECK_EQ_PTR(a, b)	\
+	CHERIBSDTEST_CHECK_EQ_CAP(a, b)
+#else
+#define	CHERIBSDTEST_CHECK_EQ_PTR(a, b)	\
+	CHERIBSDTEST_CHECK_EQ(void *, "%p", a, b, __STRING(a), __STRING(b))
+#endif
+
 static inline void
 _cheribsdtest_check_cap_bounds_precise(void *__capability c,
     size_t expected_len)
