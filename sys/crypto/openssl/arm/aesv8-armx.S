@@ -15,10 +15,12 @@
 
 .text
 .align	5
+.type	.Lrcon,%object
 .Lrcon:
 .long	0x01,0x01,0x01,0x01
 .long	0x0c0f0e0d,0x0c0f0e0d,0x0c0f0e0d,0x0c0f0e0d	@ rotate-n-splat
 .long	0x1b,0x1b,0x1b,0x1b
+.size	.Lrcon, . - .Lrcon
 
 .globl	aes_v8_set_encrypt_key
 .type	aes_v8_set_encrypt_key,%function
@@ -38,13 +40,13 @@ aes_v8_set_encrypt_key:
 	tst	r1,#0x3f
 	bne	.Lenc_key_abort
 
-	adr	r3,.Lrcon
+	adr	PTR(3),.Lrcon
 	cmp	r1,#192
 
 	veor	q0,q0,q0
-	vld1.8	{q3},[r0]!
+	vld1.8	{q3},[PTR(0)]!
 	mov	r1,#8		@ reuse r1
-	vld1.32	{q1,q2},[r3]!
+	vld1.32	{q1,q2},[PTR(3)]!
 
 	blt	.Loop128
 	beq	.L192
@@ -55,7 +57,7 @@ aes_v8_set_encrypt_key:
 	vtbl.8	d20,{q3},d4
 	vtbl.8	d21,{q3},d5
 	vext.8	q9,q0,q3,#12
-	vst1.32	{q3},[r2]!
+	vst1.32	{q3},[PTR(2)]!
 	INST(0x00,0x43,0xf0,0xf3)	@ aese q10,q0
 	subs	r1,r1,#1
 
@@ -69,12 +71,12 @@ aes_v8_set_encrypt_key:
 	veor	q3,q3,q10
 	bne	.Loop128
 
-	vld1.32	{q1},[r3]
+	vld1.32	{q1},[PTR(3)]
 
 	vtbl.8	d20,{q3},d4
 	vtbl.8	d21,{q3},d5
 	vext.8	q9,q0,q3,#12
-	vst1.32	{q3},[r2]!
+	vst1.32	{q3},[PTR(2)]!
 	INST(0x00,0x43,0xf0,0xf3)	@ aese q10,q0
 
 	veor	q3,q3,q9
@@ -89,7 +91,7 @@ aes_v8_set_encrypt_key:
 	vtbl.8	d20,{q3},d4
 	vtbl.8	d21,{q3},d5
 	vext.8	q9,q0,q3,#12
-	vst1.32	{q3},[r2]!
+	vst1.32	{q3},[PTR(2)]!
 	INST(0x00,0x43,0xf0,0xf3)	@ aese q10,q0
 
 	veor	q3,q3,q9
@@ -99,17 +101,17 @@ aes_v8_set_encrypt_key:
 	veor	q10,q10,q1
 	veor	q3,q3,q9
 	veor	q3,q3,q10
-	vst1.32	{q3},[r2]
-	add	r2,r2,#0x50
+	vst1.32	{q3},[PTR(2)]
+	add	PTR(2),PTR(2),#0x50
 
 	mov	r12,#10
 	b	.Ldone
 
 .align	4
 .L192:
-	vld1.8	{d16},[r0]!
+	vld1.8	{d16},[PTR(0)]!
 	vmov.i8	q10,#8			@ borrow q10
-	vst1.32	{q3},[r2]!
+	vst1.32	{q3},[PTR(2)]!
 	vsub.i8	q2,q2,q10	@ adjust the mask
 
 .Loop192:
@@ -117,10 +119,10 @@ aes_v8_set_encrypt_key:
 	vtbl.8	d21,{q8},d5
 	vext.8	q9,q0,q3,#12
 #ifdef __ARMEB__
-	vst1.32	{q8},[r2]!
-	sub	r2,r2,#8
+	vst1.32	{q8},[PTR(2)]!
+	sub	PTR(2),PTR(2),#8
 #else
-	vst1.32	{d16},[r2]!
+	vst1.32	{d16},[PTR(2)]!
 #endif
 	INST(0x00,0x43,0xf0,0xf3)	@ aese q10,q0
 	subs	r1,r1,#1
@@ -139,25 +141,25 @@ aes_v8_set_encrypt_key:
 	veor	q8,q8,q9
 	veor	q3,q3,q10
 	veor	q8,q8,q10
-	vst1.32	{q3},[r2]!
+	vst1.32	{q3},[PTR(2)]!
 	bne	.Loop192
 
 	mov	r12,#12
-	add	r2,r2,#0x20
+	add	PTR(2),PTR(2),#0x20
 	b	.Ldone
 
 .align	4
 .L256:
-	vld1.8	{q8},[r0]
+	vld1.8	{q8},[PTR(0)]
 	mov	r1,#7
 	mov	r12,#14
-	vst1.32	{q3},[r2]!
+	vst1.32	{q3},[PTR(2)]!
 
 .Loop256:
 	vtbl.8	d20,{q8},d4
 	vtbl.8	d21,{q8},d5
 	vext.8	q9,q0,q3,#12
-	vst1.32	{q8},[r2]!
+	vst1.32	{q8},[PTR(2)]!
 	INST(0x00,0x43,0xf0,0xf3)	@ aese q10,q0
 	subs	r1,r1,#1
 
@@ -169,7 +171,7 @@ aes_v8_set_encrypt_key:
 	veor	q3,q3,q9
 	vshl.u8	q1,q1,#1
 	veor	q3,q3,q10
-	vst1.32	{q3},[r2]!
+	vst1.32	{q3},[PTR(2)]!
 	beq	.Ldone
 
 	vdup.32	q10,d7[1]
@@ -186,11 +188,11 @@ aes_v8_set_encrypt_key:
 	b	.Loop256
 
 .Ldone:
-	str	r12,[r2]
+	str	r12,[PTR(2)]
 	mov	r3,#0
 
 .Lenc_key_abort:
-	mov	r0,r3			@ return value
+	mov	r0,r3		@ return value
 
 	bx	lr
 .size	aes_v8_set_encrypt_key,.-aes_v8_set_encrypt_key
@@ -205,28 +207,28 @@ aes_v8_set_decrypt_key:
 	cmp	r0,#0
 	bne	.Ldec_key_abort
 
-	sub	r2,r2,#240		@ restore original r2
+	sub	PTR(2),PTR(2),#240		@ restore original PTR(2)
 	mov	r4,#-16
-	add	r0,r2,r12,lsl#4	@ end of key schedule
+	add	PTR(0),PTR(2),r12,lsl#4	@ end of key schedule
 
-	vld1.32	{q0},[r2]
-	vld1.32	{q1},[r0]
-	vst1.32	{q0},[r0],r4
-	vst1.32	{q1},[r2]!
+	vld1.32	{q0},[PTR(2)]
+	vld1.32	{q1},[PTR(0)]
+	vst1.32	{q0},[PTR(0)],r4
+	vst1.32	{q1},[PTR(2)]!
 
 .Loop_imc:
-	vld1.32	{q0},[r2]
-	vld1.32	{q1},[r0]
+	vld1.32	{q0},[PTR(2)]
+	vld1.32	{q1},[PTR(0)]
 	INST(0xc0,0x03,0xb0,0xf3)	@ aesimc q0,q0
 	INST(0xc2,0x23,0xb0,0xf3)	@ aesimc q1,q1
-	vst1.32	{q0},[r0],r4
-	vst1.32	{q1},[r2]!
-	cmp	r0,r2
+	vst1.32	{q0},[PTR(0)],r4
+	vst1.32	{q1},[PTR(2)]!
+	cmp	PTR(0),PTR(2)
 	bhi	.Loop_imc
 
-	vld1.32	{q0},[r2]
+	vld1.32	{q0},[PTR(2)]
 	INST(0xc0,0x03,0xb0,0xf3)	@ aesimc q0,q0
-	vst1.32	{q0},[r0]
+	vst1.32	{q0},[PTR(0)]
 
 	eor	r0,r0,r0		@ return value
 .Ldec_key_abort:
@@ -236,58 +238,58 @@ aes_v8_set_decrypt_key:
 .type	aes_v8_encrypt,%function
 .align	5
 aes_v8_encrypt:
-	ldr	r3,[r2,#240]
-	vld1.32	{q0},[r2]!
-	vld1.8	{q2},[r0]
+	ldr	r3,[PTR(2),#240]
+	vld1.32	{q0},[PTR(2)]!
+	vld1.8	{q2},[PTR(0)]
 	sub	r3,r3,#2
-	vld1.32	{q1},[r2]!
+	vld1.32	{q1},[PTR(2)]!
 
 .Loop_enc:
 	INST(0x00,0x43,0xb0,0xf3)	@ aese q2,q0
 	INST(0x84,0x43,0xb0,0xf3)	@ aesmc q2,q2
-	vld1.32	{q0},[r2]!
+	vld1.32	{q0},[PTR(2)]!
 	subs	r3,r3,#2
 	INST(0x02,0x43,0xb0,0xf3)	@ aese q2,q1
 	INST(0x84,0x43,0xb0,0xf3)	@ aesmc q2,q2
-	vld1.32	{q1},[r2]!
+	vld1.32	{q1},[PTR(2)]!
 	bgt	.Loop_enc
 
 	INST(0x00,0x43,0xb0,0xf3)	@ aese q2,q0
 	INST(0x84,0x43,0xb0,0xf3)	@ aesmc q2,q2
-	vld1.32	{q0},[r2]
+	vld1.32	{q0},[PTR(2)]
 	INST(0x02,0x43,0xb0,0xf3)	@ aese q2,q1
 	veor	q2,q2,q0
 
-	vst1.8	{q2},[r1]
+	vst1.8	{q2},[PTR(1)]
 	bx	lr
 .size	aes_v8_encrypt,.-aes_v8_encrypt
 .globl	aes_v8_decrypt
 .type	aes_v8_decrypt,%function
 .align	5
 aes_v8_decrypt:
-	ldr	r3,[r2,#240]
-	vld1.32	{q0},[r2]!
-	vld1.8	{q2},[r0]
+	ldr	r3,[PTR(2),#240]
+	vld1.32	{q0},[PTR(2)]!
+	vld1.8	{q2},[PTR(0)]
 	sub	r3,r3,#2
-	vld1.32	{q1},[r2]!
+	vld1.32	{q1},[PTR(2)]!
 
 .Loop_dec:
 	INST(0x40,0x43,0xb0,0xf3)	@ aesd q2,q0
 	INST(0xc4,0x43,0xb0,0xf3)	@ aesimc q2,q2
-	vld1.32	{q0},[r2]!
+	vld1.32	{q0},[PTR(2)]!
 	subs	r3,r3,#2
 	INST(0x42,0x43,0xb0,0xf3)	@ aesd q2,q1
 	INST(0xc4,0x43,0xb0,0xf3)	@ aesimc q2,q2
-	vld1.32	{q1},[r2]!
+	vld1.32	{q1},[PTR(2)]!
 	bgt	.Loop_dec
 
 	INST(0x40,0x43,0xb0,0xf3)	@ aesd q2,q0
 	INST(0xc4,0x43,0xb0,0xf3)	@ aesimc q2,q2
-	vld1.32	{q0},[r2]
+	vld1.32	{q0},[PTR(2)]
 	INST(0x42,0x43,0xb0,0xf3)	@ aesd q2,q1
 	veor	q2,q2,q0
 
-	vst1.8	{q2},[r1]
+	vst1.8	{q2},[PTR(1)]
 	bx	lr
 .size	aes_v8_decrypt,.-aes_v8_decrypt
 .globl	aes_v8_ecb_encrypt
@@ -305,24 +307,24 @@ aes_v8_ecb_encrypt:
 	moveq	r8,#0
 
 	cmp	r4,#0					@ en- or decrypting?
-	ldr	r5,[r3,#240]
+	ldr	r5,[PTR(3),#240]
 	and	r2,r2,#-16
-	vld1.8	{q0},[r0],r8
+	vld1.8	{q0},[PTR(0)],r8
 
-	vld1.32	{q8,q9},[r3]				@ load key schedule...
+	vld1.32	{q8,q9},[PTR(3)]				@ load key schedule...
 	sub	r5,r5,#6
-	add	r7,r3,r5,lsl#4				@ pointer to last 7 round keys
+	add	PTR(7),PTR(3),r5,lsl#4				@ pointer to last 7 round keys
 	sub	r5,r5,#2
-	vld1.32	{q10,q11},[r7]!
-	vld1.32	{q12,q13},[r7]!
-	vld1.32	{q14,q15},[r7]!
-	vld1.32	{q7},[r7]
+	vld1.32	{q10,q11},[PTR(7)]!
+	vld1.32	{q12,q13},[PTR(7)]!
+	vld1.32	{q14,q15},[PTR(7)]!
+	vld1.32	{q7},[PTR(7)]
 
-	add	r7,r3,#32
+	add	PTR(7),PTR(3),#32
 	mov	r6,r5
 	beq	.Lecb_dec
 
-	vld1.8	{q1},[r0]!
+	vld1.8	{q1},[PTR(0)]!
 	subs	r2,r2,#32				@ bias
 	add	r6,r5,#2
 	vorr	q3,q1,q1
@@ -331,7 +333,7 @@ aes_v8_ecb_encrypt:
 	blo	.Lecb_enc_tail
 
 	vorr	q1,q3,q3
-	vld1.8	{q10},[r0]!
+	vld1.8	{q10},[PTR(0)]!
 .Loop3x_ecb_enc:
 	INST(0x20,0x03,0xb0,0xf3)	@ aese q0,q8
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
@@ -339,7 +341,7 @@ aes_v8_ecb_encrypt:
 	INST(0x82,0x23,0xb0,0xf3)	@ aesmc q1,q1
 	INST(0x20,0x43,0xf0,0xf3)	@ aese q10,q8
 	INST(0xa4,0x43,0xf0,0xf3)	@ aesmc q10,q10
-	vld1.32	{q8},[r7]!
+	vld1.32	{q8},[PTR(7)]!
 	subs	r6,r6,#2
 	INST(0x22,0x03,0xb0,0xf3)	@ aese q0,q9
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
@@ -347,7 +349,7 @@ aes_v8_ecb_encrypt:
 	INST(0x82,0x23,0xb0,0xf3)	@ aesmc q1,q1
 	INST(0x22,0x43,0xf0,0xf3)	@ aese q10,q9
 	INST(0xa4,0x43,0xf0,0xf3)	@ aesmc q10,q10
-	vld1.32	{q9},[r7]!
+	vld1.32	{q9},[PTR(7)]!
 	bgt	.Loop3x_ecb_enc
 
 	INST(0x20,0x03,0xb0,0xf3)	@ aese q0,q8
@@ -365,45 +367,45 @@ aes_v8_ecb_encrypt:
 	INST(0x82,0x23,0xb0,0xf3)	@ aesmc q1,q1
 	INST(0x22,0x43,0xf0,0xf3)	@ aese q10,q9
 	INST(0xa4,0x43,0xf0,0xf3)	@ aesmc q10,q10
-	add	r0,r0,r6			@ r0 is adjusted in such way that
+	add	PTR(0),PTR(0),r6			@ PTR(0) is adjusted in such way that
 						@ at exit from the loop q1-q10
 						@ are loaded with last "words"
-	mov	r7,r3
+	mov	PTR(7),PTR(3)
 	INST(0x28,0x03,0xb0,0xf3)	@ aese q0,q12
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
 	INST(0x28,0x23,0xb0,0xf3)	@ aese q1,q12
 	INST(0x82,0x23,0xb0,0xf3)	@ aesmc q1,q1
 	INST(0x28,0x43,0xf0,0xf3)	@ aese q10,q12
 	INST(0xa4,0x43,0xf0,0xf3)	@ aesmc q10,q10
-	vld1.8	{q2},[r0]!
+	vld1.8	{q2},[PTR(0)]!
 	INST(0x2a,0x03,0xb0,0xf3)	@ aese q0,q13
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
 	INST(0x2a,0x23,0xb0,0xf3)	@ aese q1,q13
 	INST(0x82,0x23,0xb0,0xf3)	@ aesmc q1,q1
 	INST(0x2a,0x43,0xf0,0xf3)	@ aese q10,q13
 	INST(0xa4,0x43,0xf0,0xf3)	@ aesmc q10,q10
-	vld1.8	{q3},[r0]!
+	vld1.8	{q3},[PTR(0)]!
 	INST(0x2c,0x03,0xb0,0xf3)	@ aese q0,q14
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
 	INST(0x2c,0x23,0xb0,0xf3)	@ aese q1,q14
 	INST(0x82,0x23,0xb0,0xf3)	@ aesmc q1,q1
 	INST(0x2c,0x43,0xf0,0xf3)	@ aese q10,q14
 	INST(0xa4,0x43,0xf0,0xf3)	@ aesmc q10,q10
-	vld1.8	{q11},[r0]!
+	vld1.8	{q11},[PTR(0)]!
 	INST(0x2e,0x03,0xb0,0xf3)	@ aese q0,q15
 	INST(0x2e,0x23,0xb0,0xf3)	@ aese q1,q15
 	INST(0x2e,0x43,0xf0,0xf3)	@ aese q10,q15
-	vld1.32	{q8},[r7]!		@ re-pre-load rndkey[0]
+	vld1.32	{q8},[PTR(7)]!		@ re-pre-load rndkey[0]
 	add	r6,r5,#2
 	veor	q4,q7,q0
 	veor	q5,q7,q1
 	veor	q10,q10,q7
-	vld1.32	{q9},[r7]!		@ re-pre-load rndkey[1]
-	vst1.8	{q4},[r1]!
+	vld1.32	{q9},[PTR(7)]!		@ re-pre-load rndkey[1]
+	vst1.8	{q4},[PTR(1)]!
 	vorr	q0,q2,q2
-	vst1.8	{q5},[r1]!
+	vst1.8	{q5},[PTR(1)]!
 	vorr	q1,q3,q3
-	vst1.8	{q10},[r1]!
+	vst1.8	{q10},[PTR(1)]!
 	vorr	q10,q11,q11
 	bhs	.Loop3x_ecb_enc
 
@@ -416,13 +418,13 @@ aes_v8_ecb_encrypt:
 	INST(0x82,0x23,0xb0,0xf3)	@ aesmc q1,q1
 	INST(0x20,0x43,0xf0,0xf3)	@ aese q10,q8
 	INST(0xa4,0x43,0xf0,0xf3)	@ aesmc q10,q10
-	vld1.32	{q8},[r7]!
+	vld1.32	{q8},[PTR(7)]!
 	subs	r6,r6,#2
 	INST(0x22,0x23,0xb0,0xf3)	@ aese q1,q9
 	INST(0x82,0x23,0xb0,0xf3)	@ aesmc q1,q1
 	INST(0x22,0x43,0xf0,0xf3)	@ aese q10,q9
 	INST(0xa4,0x43,0xf0,0xf3)	@ aesmc q10,q10
-	vld1.32	{q9},[r7]!
+	vld1.32	{q9},[PTR(7)]!
 	bgt	.Lecb_enc_tail
 
 	INST(0x20,0x23,0xb0,0xf3)	@ aese q1,q8
@@ -451,17 +453,17 @@ aes_v8_ecb_encrypt:
 	beq	.Lecb_enc_one
 	veor	q5,q7,q1
 	veor	q9,q7,q10
-	vst1.8	{q5},[r1]!
-	vst1.8	{q9},[r1]!
+	vst1.8	{q5},[PTR(1)]!
+	vst1.8	{q9},[PTR(1)]!
 	b	.Lecb_done
 
 .Lecb_enc_one:
 	veor	q5,q7,q10
-	vst1.8	{q5},[r1]!
+	vst1.8	{q5},[PTR(1)]!
 	b	.Lecb_done
 .align	5
 .Lecb_dec:
-	vld1.8	{q1},[r0]!
+	vld1.8	{q1},[PTR(0)]!
 	subs	r2,r2,#32			@ bias
 	add	r6,r5,#2
 	vorr	q3,q1,q1
@@ -470,7 +472,7 @@ aes_v8_ecb_encrypt:
 	blo	.Lecb_dec_tail
 
 	vorr	q1,q3,q3
-	vld1.8	{q10},[r0]!
+	vld1.8	{q10},[PTR(0)]!
 .Loop3x_ecb_dec:
 	INST(0x60,0x03,0xb0,0xf3)	@ aesd q0,q8
 	INST(0xc0,0x03,0xb0,0xf3)	@ aesimc q0,q0
@@ -478,7 +480,7 @@ aes_v8_ecb_encrypt:
 	INST(0xc2,0x23,0xb0,0xf3)	@ aesimc q1,q1
 	INST(0x60,0x43,0xf0,0xf3)	@ aesd q10,q8
 	INST(0xe4,0x43,0xf0,0xf3)	@ aesimc q10,q10
-	vld1.32	{q8},[r7]!
+	vld1.32	{q8},[PTR(7)]!
 	subs	r6,r6,#2
 	INST(0x62,0x03,0xb0,0xf3)	@ aesd q0,q9
 	INST(0xc0,0x03,0xb0,0xf3)	@ aesimc q0,q0
@@ -486,7 +488,7 @@ aes_v8_ecb_encrypt:
 	INST(0xc2,0x23,0xb0,0xf3)	@ aesimc q1,q1
 	INST(0x62,0x43,0xf0,0xf3)	@ aesd q10,q9
 	INST(0xe4,0x43,0xf0,0xf3)	@ aesimc q10,q10
-	vld1.32	{q9},[r7]!
+	vld1.32	{q9},[PTR(7)]!
 	bgt	.Loop3x_ecb_dec
 
 	INST(0x60,0x03,0xb0,0xf3)	@ aesd q0,q8
@@ -504,45 +506,45 @@ aes_v8_ecb_encrypt:
 	INST(0xc2,0x23,0xb0,0xf3)	@ aesimc q1,q1
 	INST(0x62,0x43,0xf0,0xf3)	@ aesd q10,q9
 	INST(0xe4,0x43,0xf0,0xf3)	@ aesimc q10,q10
-	add	r0,r0,r6 			@ r0 is adjusted in such way that
+	add	PTR(0),PTR(0),r6 			@ PTR(0) is adjusted in such way that
 						@ at exit from the loop q1-q10
 						@ are loaded with last "words"
-	mov	r7,r3
+	mov	PTR(7),PTR(3)
 	INST(0x68,0x03,0xb0,0xf3)	@ aesd q0,q12
 	INST(0xc0,0x03,0xb0,0xf3)	@ aesimc q0,q0
 	INST(0x68,0x23,0xb0,0xf3)	@ aesd q1,q12
 	INST(0xc2,0x23,0xb0,0xf3)	@ aesimc q1,q1
 	INST(0x68,0x43,0xf0,0xf3)	@ aesd q10,q12
 	INST(0xe4,0x43,0xf0,0xf3)	@ aesimc q10,q10
-	vld1.8	{q2},[r0]!
+	vld1.8	{q2},[PTR(0)]!
 	INST(0x6a,0x03,0xb0,0xf3)	@ aesd q0,q13
 	INST(0xc0,0x03,0xb0,0xf3)	@ aesimc q0,q0
 	INST(0x6a,0x23,0xb0,0xf3)	@ aesd q1,q13
 	INST(0xc2,0x23,0xb0,0xf3)	@ aesimc q1,q1
 	INST(0x6a,0x43,0xf0,0xf3)	@ aesd q10,q13
 	INST(0xe4,0x43,0xf0,0xf3)	@ aesimc q10,q10
-	vld1.8	{q3},[r0]!
+	vld1.8	{q3},[PTR(0)]!
 	INST(0x6c,0x03,0xb0,0xf3)	@ aesd q0,q14
 	INST(0xc0,0x03,0xb0,0xf3)	@ aesimc q0,q0
 	INST(0x6c,0x23,0xb0,0xf3)	@ aesd q1,q14
 	INST(0xc2,0x23,0xb0,0xf3)	@ aesimc q1,q1
 	INST(0x6c,0x43,0xf0,0xf3)	@ aesd q10,q14
 	INST(0xe4,0x43,0xf0,0xf3)	@ aesimc q10,q10
-	vld1.8	{q11},[r0]!
+	vld1.8	{q11},[PTR(0)]!
 	INST(0x6e,0x03,0xb0,0xf3)	@ aesd q0,q15
 	INST(0x6e,0x23,0xb0,0xf3)	@ aesd q1,q15
 	INST(0x6e,0x43,0xf0,0xf3)	@ aesd q10,q15
-	vld1.32	{q8},[r7]!			@ re-pre-load rndkey[0]
+	vld1.32	{q8},[PTR(7)]!			@ re-pre-load rndkey[0]
 	add	r6,r5,#2
 	veor	q4,q7,q0
 	veor	q5,q7,q1
 	veor	q10,q10,q7
-	vld1.32	{q9},[r7]!			@ re-pre-load rndkey[1]
-	vst1.8	{q4},[r1]!
+	vld1.32	{q9},[PTR(7)]!			@ re-pre-load rndkey[1]
+	vst1.8	{q4},[PTR(1)]!
 	vorr	q0,q2,q2
-	vst1.8	{q5},[r1]!
+	vst1.8	{q5},[PTR(1)]!
 	vorr	q1,q3,q3
-	vst1.8	{q10},[r1]!
+	vst1.8	{q10},[PTR(1)]!
 	vorr	q10,q11,q11
 	bhs	.Loop3x_ecb_dec
 
@@ -555,13 +557,13 @@ aes_v8_ecb_encrypt:
 	INST(0xc2,0x23,0xb0,0xf3)	@ aesimc q1,q1
 	INST(0x60,0x43,0xf0,0xf3)	@ aesd q10,q8
 	INST(0xe4,0x43,0xf0,0xf3)	@ aesimc q10,q10
-	vld1.32	{q8},[r7]!
+	vld1.32	{q8},[PTR(7)]!
 	subs	r6,r6,#2
 	INST(0x62,0x23,0xb0,0xf3)	@ aesd q1,q9
 	INST(0xc2,0x23,0xb0,0xf3)	@ aesimc q1,q1
 	INST(0x62,0x43,0xf0,0xf3)	@ aesd q10,q9
 	INST(0xe4,0x43,0xf0,0xf3)	@ aesimc q10,q10
-	vld1.32	{q9},[r7]!
+	vld1.32	{q9},[PTR(7)]!
 	bgt	.Lecb_dec_tail
 
 	INST(0x60,0x23,0xb0,0xf3)	@ aesd q1,q8
@@ -590,13 +592,13 @@ aes_v8_ecb_encrypt:
 	beq	.Lecb_dec_one
 	veor	q5,q7,q1
 	veor	q9,q7,q10
-	vst1.8	{q5},[r1]!
-	vst1.8	{q9},[r1]!
+	vst1.8	{q5},[PTR(1)]!
+	vst1.8	{q9},[PTR(1)]!
 	b	.Lecb_done
 
 .Lecb_dec_one:
 	veor	q5,q7,q10
-	vst1.8	{q5},[r1]!
+	vst1.8	{q5},[PTR(1)]!
 
 .Lecb_done:
 	vldmia	sp!,{d8,d9,d10,d11,d12,d13,d14,d15}
@@ -617,21 +619,21 @@ aes_v8_cbc_encrypt:
 	moveq	r8,#0
 
 	cmp	r5,#0			@ en- or decrypting?
-	ldr	r5,[r3,#240]
+	ldr	r5,[PTR(3),#240]
 	and	r2,r2,#-16
-	vld1.8	{q6},[r4]
-	vld1.8	{q0},[r0],r8
+	vld1.8	{q6},[PTR(4)]
+	vld1.8	{q0},[PTR(0)],r8
 
-	vld1.32	{q8,q9},[r3]		@ load key schedule...
+	vld1.32	{q8,q9},[PTR(3)]		@ load key schedule...
 	sub	r5,r5,#6
-	add	r7,r3,r5,lsl#4	@ pointer to last 7 round keys
+	add	PTR(7),PTR(3),r5,lsl#4	@ pointer to last 7 round keys
 	sub	r5,r5,#2
-	vld1.32	{q10,q11},[r7]!
-	vld1.32	{q12,q13},[r7]!
-	vld1.32	{q14,q15},[r7]!
-	vld1.32	{q7},[r7]
+	vld1.32	{q10,q11},[PTR(7)]!
+	vld1.32	{q12,q13},[PTR(7)]!
+	vld1.32	{q14,q15},[PTR(7)]!
+	vld1.32	{q7},[PTR(7)]
 
-	add	r7,r3,#32
+	add	PTR(7),PTR(3),#32
 	mov	r6,r5
 	beq	.Lcbc_dec
 
@@ -640,39 +642,39 @@ aes_v8_cbc_encrypt:
 	veor	q5,q8,q7
 	beq	.Lcbc_enc128
 
-	vld1.32	{q2,q3},[r7]
-	add	r7,r3,#16
-	add	r6,r3,#16*4
-	add	r12,r3,#16*5
+	vld1.32	{q2,q3},[PTR(7)]
+	add	PTR(7),PTR(3),#16
+	add	PTR(6),PTR(3),#16*4
+	add	PTR(12),PTR(3),#16*5
 	INST(0x20,0x03,0xb0,0xf3)	@ aese q0,q8
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
-	add	r14,r3,#16*6
-	add	r3,r3,#16*7
+	add	PTR(14),PTR(3),#16*6
+	add	PTR(3),PTR(3),#16*7
 	b	.Lenter_cbc_enc
 
 .align	4
 .Loop_cbc_enc:
 	INST(0x20,0x03,0xb0,0xf3)	@ aese q0,q8
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
-	vst1.8	{q6},[r1]!
+	vst1.8	{q6},[PTR(1)]!
 .Lenter_cbc_enc:
 	INST(0x22,0x03,0xb0,0xf3)	@ aese q0,q9
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
 	INST(0x04,0x03,0xb0,0xf3)	@ aese q0,q2
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
-	vld1.32	{q8},[r6]
+	vld1.32	{q8},[PTR(6)]
 	cmp	r5,#4
 	INST(0x06,0x03,0xb0,0xf3)	@ aese q0,q3
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
-	vld1.32	{q9},[r12]
+	vld1.32	{q9},[PTR(12)]
 	beq	.Lcbc_enc192
 
 	INST(0x20,0x03,0xb0,0xf3)	@ aese q0,q8
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
-	vld1.32	{q8},[r14]
+	vld1.32	{q8},[PTR(14)]
 	INST(0x22,0x03,0xb0,0xf3)	@ aese q0,q9
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
-	vld1.32	{q9},[r3]
+	vld1.32	{q9},[PTR(3)]
 	nop
 
 .Lcbc_enc192:
@@ -687,32 +689,32 @@ aes_v8_cbc_encrypt:
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
 	INST(0x26,0x03,0xb0,0xf3)	@ aese q0,q11
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
-	vld1.8	{q8},[r0],r8
+	vld1.8	{q8},[PTR(0)],r8
 	INST(0x28,0x03,0xb0,0xf3)	@ aese q0,q12
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
 	veor	q8,q8,q5
 	INST(0x2a,0x03,0xb0,0xf3)	@ aese q0,q13
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
-	vld1.32	{q9},[r7]		@ re-pre-load rndkey[1]
+	vld1.32	{q9},[PTR(7)]		@ re-pre-load rndkey[1]
 	INST(0x2c,0x03,0xb0,0xf3)	@ aese q0,q14
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
 	INST(0x2e,0x03,0xb0,0xf3)	@ aese q0,q15
 	veor	q6,q0,q7
 	bhs	.Loop_cbc_enc
 
-	vst1.8	{q6},[r1]!
+	vst1.8	{q6},[PTR(1)]!
 	b	.Lcbc_done
 
 .align	5
 .Lcbc_enc128:
-	vld1.32	{q2,q3},[r7]
+	vld1.32	{q2,q3},[PTR(7)]
 	INST(0x20,0x03,0xb0,0xf3)	@ aese q0,q8
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
 	b	.Lenter_cbc_enc128
 .Loop_cbc_enc128:
 	INST(0x20,0x03,0xb0,0xf3)	@ aese q0,q8
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
-	vst1.8	{q6},[r1]!
+	vst1.8	{q6},[PTR(1)]!
 .Lenter_cbc_enc128:
 	INST(0x22,0x03,0xb0,0xf3)	@ aese q0,q9
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
@@ -727,7 +729,7 @@ aes_v8_cbc_encrypt:
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
 	INST(0x26,0x03,0xb0,0xf3)	@ aese q0,q11
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
-	vld1.8	{q8},[r0],r8
+	vld1.8	{q8},[PTR(0)],r8
 	INST(0x28,0x03,0xb0,0xf3)	@ aese q0,q12
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
 	INST(0x2a,0x03,0xb0,0xf3)	@ aese q0,q13
@@ -739,11 +741,11 @@ aes_v8_cbc_encrypt:
 	veor	q6,q0,q7
 	bhs	.Loop_cbc_enc128
 
-	vst1.8	{q6},[r1]!
+	vst1.8	{q6},[PTR(1)]!
 	b	.Lcbc_done
 .align	5
 .Lcbc_dec:
-	vld1.8	{q10},[r0]!
+	vld1.8	{q10},[PTR(0)]!
 	subs	r2,r2,#32		@ bias
 	add	r6,r5,#2
 	vorr	q3,q0,q0
@@ -752,7 +754,7 @@ aes_v8_cbc_encrypt:
 	blo	.Lcbc_dec_tail
 
 	vorr	q1,q10,q10
-	vld1.8	{q10},[r0]!
+	vld1.8	{q10},[PTR(0)]!
 	vorr	q2,q0,q0
 	vorr	q3,q1,q1
 	vorr	q11,q10,q10
@@ -763,7 +765,7 @@ aes_v8_cbc_encrypt:
 	INST(0xc2,0x23,0xb0,0xf3)	@ aesimc q1,q1
 	INST(0x60,0x43,0xf0,0xf3)	@ aesd q10,q8
 	INST(0xe4,0x43,0xf0,0xf3)	@ aesimc q10,q10
-	vld1.32	{q8},[r7]!
+	vld1.32	{q8},[PTR(7)]!
 	subs	r6,r6,#2
 	INST(0x62,0x03,0xb0,0xf3)	@ aesd q0,q9
 	INST(0xc0,0x03,0xb0,0xf3)	@ aesimc q0,q0
@@ -771,7 +773,7 @@ aes_v8_cbc_encrypt:
 	INST(0xc2,0x23,0xb0,0xf3)	@ aesimc q1,q1
 	INST(0x62,0x43,0xf0,0xf3)	@ aesd q10,q9
 	INST(0xe4,0x43,0xf0,0xf3)	@ aesimc q10,q10
-	vld1.32	{q9},[r7]!
+	vld1.32	{q9},[PTR(7)]!
 	bgt	.Loop3x_cbc_dec
 
 	INST(0x60,0x03,0xb0,0xf3)	@ aesd q0,q8
@@ -792,46 +794,46 @@ aes_v8_cbc_encrypt:
 	INST(0x62,0x43,0xf0,0xf3)	@ aesd q10,q9
 	INST(0xe4,0x43,0xf0,0xf3)	@ aesimc q10,q10
 	veor	q9,q3,q7
-	add	r0,r0,r6		@ r0 is adjusted in such way that
+	add	PTR(0),PTR(0),r6		@ PTR(0) is adjusted in such way that
 					@ at exit from the loop q1-q10
 					@ are loaded with last "words"
 	vorr	q6,q11,q11
-	mov	r7,r3
+	mov	PTR(7),PTR(3)
 	INST(0x68,0x03,0xb0,0xf3)	@ aesd q0,q12
 	INST(0xc0,0x03,0xb0,0xf3)	@ aesimc q0,q0
 	INST(0x68,0x23,0xb0,0xf3)	@ aesd q1,q12
 	INST(0xc2,0x23,0xb0,0xf3)	@ aesimc q1,q1
 	INST(0x68,0x43,0xf0,0xf3)	@ aesd q10,q12
 	INST(0xe4,0x43,0xf0,0xf3)	@ aesimc q10,q10
-	vld1.8	{q2},[r0]!
+	vld1.8	{q2},[PTR(0)]!
 	INST(0x6a,0x03,0xb0,0xf3)	@ aesd q0,q13
 	INST(0xc0,0x03,0xb0,0xf3)	@ aesimc q0,q0
 	INST(0x6a,0x23,0xb0,0xf3)	@ aesd q1,q13
 	INST(0xc2,0x23,0xb0,0xf3)	@ aesimc q1,q1
 	INST(0x6a,0x43,0xf0,0xf3)	@ aesd q10,q13
 	INST(0xe4,0x43,0xf0,0xf3)	@ aesimc q10,q10
-	vld1.8	{q3},[r0]!
+	vld1.8	{q3},[PTR(0)]!
 	INST(0x6c,0x03,0xb0,0xf3)	@ aesd q0,q14
 	INST(0xc0,0x03,0xb0,0xf3)	@ aesimc q0,q0
 	INST(0x6c,0x23,0xb0,0xf3)	@ aesd q1,q14
 	INST(0xc2,0x23,0xb0,0xf3)	@ aesimc q1,q1
 	INST(0x6c,0x43,0xf0,0xf3)	@ aesd q10,q14
 	INST(0xe4,0x43,0xf0,0xf3)	@ aesimc q10,q10
-	vld1.8	{q11},[r0]!
+	vld1.8	{q11},[PTR(0)]!
 	INST(0x6e,0x03,0xb0,0xf3)	@ aesd q0,q15
 	INST(0x6e,0x23,0xb0,0xf3)	@ aesd q1,q15
 	INST(0x6e,0x43,0xf0,0xf3)	@ aesd q10,q15
-	vld1.32	{q8},[r7]!	@ re-pre-load rndkey[0]
+	vld1.32	{q8},[PTR(7)]!	@ re-pre-load rndkey[0]
 	add	r6,r5,#2
 	veor	q4,q4,q0
 	veor	q5,q5,q1
 	veor	q10,q10,q9
-	vld1.32	{q9},[r7]!	@ re-pre-load rndkey[1]
-	vst1.8	{q4},[r1]!
+	vld1.32	{q9},[PTR(7)]!	@ re-pre-load rndkey[1]
+	vst1.8	{q4},[PTR(1)]!
 	vorr	q0,q2,q2
-	vst1.8	{q5},[r1]!
+	vst1.8	{q5},[PTR(1)]!
 	vorr	q1,q3,q3
-	vst1.8	{q10},[r1]!
+	vst1.8	{q10},[PTR(1)]!
 	vorr	q10,q11,q11
 	bhs	.Loop3x_cbc_dec
 
@@ -844,13 +846,13 @@ aes_v8_cbc_encrypt:
 	INST(0xc2,0x23,0xb0,0xf3)	@ aesimc q1,q1
 	INST(0x60,0x43,0xf0,0xf3)	@ aesd q10,q8
 	INST(0xe4,0x43,0xf0,0xf3)	@ aesimc q10,q10
-	vld1.32	{q8},[r7]!
+	vld1.32	{q8},[PTR(7)]!
 	subs	r6,r6,#2
 	INST(0x62,0x23,0xb0,0xf3)	@ aesd q1,q9
 	INST(0xc2,0x23,0xb0,0xf3)	@ aesimc q1,q1
 	INST(0x62,0x43,0xf0,0xf3)	@ aesd q10,q9
 	INST(0xe4,0x43,0xf0,0xf3)	@ aesimc q10,q10
-	vld1.32	{q9},[r7]!
+	vld1.32	{q9},[PTR(7)]!
 	bgt	.Lcbc_dec_tail
 
 	INST(0x60,0x23,0xb0,0xf3)	@ aesd q1,q8
@@ -882,17 +884,17 @@ aes_v8_cbc_encrypt:
 	veor	q5,q5,q1
 	veor	q9,q9,q10
 	vorr	q6,q11,q11
-	vst1.8	{q5},[r1]!
-	vst1.8	{q9},[r1]!
+	vst1.8	{q5},[PTR(1)]!
+	vst1.8	{q9},[PTR(1)]!
 	b	.Lcbc_done
 
 .Lcbc_dec_one:
 	veor	q5,q5,q10
 	vorr	q6,q11,q11
-	vst1.8	{q5},[r1]!
+	vst1.8	{q5},[PTR(1)]!
 
 .Lcbc_done:
-	vst1.8	{q6},[r4]
+	vst1.8	{q6},[PTR(4)]
 .Lcbc_abort:
 	vldmia	sp!,{d8,d9,d10,d11,d12,d13,d14,d15}
 	ldmia	sp!,{r4,r5,r6,r7,r8,pc}
@@ -905,24 +907,24 @@ aes_v8_ctr32_encrypt_blocks:
 	stmdb	sp!,{r4,r5,r6,r7,r8,r9,r10,lr}
 	vstmdb	sp!,{d8,d9,d10,d11,d12,d13,d14,d15}            @ ABI specification says so
 	ldr	r4, [ip]		@ load remaining arg
-	ldr	r5,[r3,#240]
+	ldr	r5,[PTR(3),#240]
 
-	ldr	r8, [r4, #12]
+	ldr	r8, [PTR(4), #12]
 #ifdef __ARMEB__
-	vld1.8	{q0},[r4]
+	vld1.8	{q0},[PTR(4)]
 #else
-	vld1.32	{q0},[r4]
+	vld1.32	{q0},[PTR(4)]
 #endif
-	vld1.32	{q8,q9},[r3]		@ load key schedule...
+	vld1.32	{q8,q9},[PTR(3)]		@ load key schedule...
 	sub	r5,r5,#4
 	mov	r12,#16
 	cmp	r2,#2
-	add	r7,r3,r5,lsl#4	@ pointer to last 5 round keys
+	add	PTR(7),PTR(3),r5,lsl#4	@ pointer to last 5 round keys
 	sub	r5,r5,#2
-	vld1.32	{q12,q13},[r7]!
-	vld1.32	{q14,q15},[r7]!
-	vld1.32	{q7},[r7]
-	add	r7,r3,#32
+	vld1.32	{q12,q13},[PTR(7)]!
+	vld1.32	{q14,q15},[PTR(7)]!
+	vld1.32	{q7},[PTR(7)]
+	add	PTR(7),PTR(3),#32
 	mov	r6,r5
 	it	lo
 	movlo	r12,#0
@@ -950,7 +952,7 @@ aes_v8_ctr32_encrypt_blocks:
 	INST(0x82,0x23,0xb0,0xf3)	@ aesmc q1,q1
 	INST(0x20,0x43,0xf0,0xf3)	@ aese q10,q8
 	INST(0xa4,0x43,0xf0,0xf3)	@ aesmc q10,q10
-	vld1.32	{q8},[r7]!
+	vld1.32	{q8},[PTR(7)]!
 	subs	r6,r6,#2
 	INST(0x22,0x03,0xb0,0xf3)	@ aese q0,q9
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
@@ -958,25 +960,25 @@ aes_v8_ctr32_encrypt_blocks:
 	INST(0x82,0x23,0xb0,0xf3)	@ aesmc q1,q1
 	INST(0x22,0x43,0xf0,0xf3)	@ aese q10,q9
 	INST(0xa4,0x43,0xf0,0xf3)	@ aesmc q10,q10
-	vld1.32	{q9},[r7]!
+	vld1.32	{q9},[PTR(7)]!
 	bgt	.Loop3x_ctr32
 
 	INST(0x20,0x03,0xb0,0xf3)	@ aese q0,q8
 	INST(0x80,0x83,0xb0,0xf3)	@ aesmc q4,q0
 	INST(0x20,0x23,0xb0,0xf3)	@ aese q1,q8
 	INST(0x82,0xa3,0xb0,0xf3)	@ aesmc q5,q1
-	vld1.8	{q2},[r0]!
+	vld1.8	{q2},[PTR(0)]!
 	add	r9,r8,#1
 	INST(0x20,0x43,0xf0,0xf3)	@ aese q10,q8
 	INST(0xa4,0x43,0xf0,0xf3)	@ aesmc q10,q10
-	vld1.8	{q3},[r0]!
+	vld1.8	{q3},[PTR(0)]!
 	rev	r9,r9
 	INST(0x22,0x83,0xb0,0xf3)	@ aese q4,q9
 	INST(0x88,0x83,0xb0,0xf3)	@ aesmc q4,q4
 	INST(0x22,0xa3,0xb0,0xf3)	@ aese q5,q9
 	INST(0x8a,0xa3,0xb0,0xf3)	@ aesmc q5,q5
-	vld1.8	{q11},[r0]!
-	mov	r7,r3
+	vld1.8	{q11},[PTR(0)]!
+	mov	PTR(7),PTR(3)
 	INST(0x22,0x43,0xf0,0xf3)	@ aese q10,q9
 	INST(0xa4,0x23,0xf0,0xf3)	@ aesmc q9,q10
 	INST(0x28,0x83,0xb0,0xf3)	@ aese q4,q12
@@ -1016,14 +1018,14 @@ aes_v8_ctr32_encrypt_blocks:
 	INST(0x2e,0x23,0xf0,0xf3)	@ aese q9,q15
 
 	veor	q2,q2,q4
-	vld1.32	{q8},[r7]!	@ re-pre-load rndkey[0]
-	vst1.8	{q2},[r1]!
+	vld1.32	{q8},[PTR(7)]!	@ re-pre-load rndkey[0]
+	vst1.8	{q2},[PTR(1)]!
 	veor	q3,q3,q5
 	mov	r6,r5
-	vst1.8	{q3},[r1]!
+	vst1.8	{q3},[PTR(1)]!
 	veor	q11,q11,q9
-	vld1.32	{q9},[r7]!	@ re-pre-load rndkey[1]
-	vst1.8	{q11},[r1]!
+	vld1.32	{q9},[PTR(7)]!	@ re-pre-load rndkey[1]
+	vst1.8	{q11},[PTR(1)]!
 	bhs	.Loop3x_ctr32
 
 	adds	r2,r2,#3
@@ -1038,13 +1040,13 @@ aes_v8_ctr32_encrypt_blocks:
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
 	INST(0x20,0x23,0xb0,0xf3)	@ aese q1,q8
 	INST(0x82,0x23,0xb0,0xf3)	@ aesmc q1,q1
-	vld1.32	{q8},[r7]!
+	vld1.32	{q8},[PTR(7)]!
 	subs	r6,r6,#2
 	INST(0x22,0x03,0xb0,0xf3)	@ aese q0,q9
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
 	INST(0x22,0x23,0xb0,0xf3)	@ aese q1,q9
 	INST(0x82,0x23,0xb0,0xf3)	@ aesmc q1,q1
-	vld1.32	{q9},[r7]!
+	vld1.32	{q9},[PTR(7)]!
 	bgt	.Lctr32_tail
 
 	INST(0x20,0x03,0xb0,0xf3)	@ aese q0,q8
@@ -1055,12 +1057,12 @@ aes_v8_ctr32_encrypt_blocks:
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
 	INST(0x22,0x23,0xb0,0xf3)	@ aese q1,q9
 	INST(0x82,0x23,0xb0,0xf3)	@ aesmc q1,q1
-	vld1.8	{q2},[r0],r12
+	vld1.8	{q2},[PTR(0)],r12
 	INST(0x28,0x03,0xb0,0xf3)	@ aese q0,q12
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
 	INST(0x28,0x23,0xb0,0xf3)	@ aese q1,q12
 	INST(0x82,0x23,0xb0,0xf3)	@ aesmc q1,q1
-	vld1.8	{q3},[r0]
+	vld1.8	{q3},[PTR(0)]
 	INST(0x2a,0x03,0xb0,0xf3)	@ aese q0,q13
 	INST(0x80,0x03,0xb0,0xf3)	@ aesmc q0,q0
 	INST(0x2a,0x23,0xb0,0xf3)	@ aese q1,q13
@@ -1077,9 +1079,9 @@ aes_v8_ctr32_encrypt_blocks:
 	cmp	r2,#1
 	veor	q2,q2,q0
 	veor	q3,q3,q1
-	vst1.8	{q2},[r1]!
+	vst1.8	{q2},[PTR(1)]!
 	beq	.Lctr32_done
-	vst1.8	{q3},[r1]
+	vst1.8	{q3},[PTR(1)]
 
 .Lctr32_done:
 	vldmia	sp!,{d8,d9,d10,d11,d12,d13,d14,d15}
