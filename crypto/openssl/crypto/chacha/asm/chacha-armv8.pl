@@ -161,8 +161,14 @@ ChaCha20_ctr32:
 	b.lo	.Lshort
 
 #ifndef	__KERNEL__
-	adrp	PTR(17),OPENSSL_armcap_P
-	ldr	w17,[PTR(17),#:lo12:OPENSSL_armcap_P]
+#ifdef __CHERI_PURE_CAPABILITY__
+	adrp	c17,:got:OPENSSL_armcap_P
+	ldr	c17,[c17,#:got_lo12:OPENSSL_armcap_P]
+	ldr	w17,[c17]
+#else
+	adrp	x17,OPENSSL_armcap_P
+	ldr	w17,[x17,#:lo12:OPENSSL_armcap_P]
+#endif
 	tst	w17,#ARMV7_NEON
 	b.ne	.LChaCha20_neon
 #endif

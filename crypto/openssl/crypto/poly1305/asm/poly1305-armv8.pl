@@ -82,8 +82,14 @@ poly1305_init:
 	csel	$ctx,PTR(zr),$ctx,eq
 	b.eq	.Lno_key
 
-	adrp	PTR(17),OPENSSL_armcap_P
-	ldr	w17,[PTR(17),#:lo12:OPENSSL_armcap_P]
+#ifdef __CHERI_PURE_CAPABILITY__
+	adrp	c17,:got:OPENSSL_armcap_P
+	ldr	c17,[c17,#:got_lo12:OPENSSL_armcap_P]
+	ldr	w17,[c17]
+#else
+	adrp	x17,OPENSSL_armcap_P
+	ldr	w17,[x17,#:lo12:OPENSSL_armcap_P]
+#endif
 
 	ldp	$r0,$r1,[$inp]		// load key
 	mov	$s1,#0xfffffffc0fffffff
