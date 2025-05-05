@@ -205,8 +205,14 @@ $code.=<<___;
 $func:
 	AARCH64_VALID_CALL_TARGET
 #ifndef	__KERNEL__
-	adrp	PTR(16),OPENSSL_armcap_P
-	ldr	w16,[PTR(16),#:lo12:OPENSSL_armcap_P]
+#ifdef __CHERI_PURE_CAPABILITY__
+	adrp	c16,:got:OPENSSL_armcap_P
+	ldr	c16,[c16,#:got_lo12:OPENSSL_armcap_P]
+	ldr	w16,[c16]
+#else
+	adrp	x16,OPENSSL_armcap_P
+	ldr	w16,[x16,#:lo12:OPENSSL_armcap_P]
+#endif
 ___
 $code.=<<___	if ($SZ==4);
 	tst	w16,#ARMV8_SHA256
