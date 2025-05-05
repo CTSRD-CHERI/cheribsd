@@ -1,6 +1,6 @@
 .PATH: ${ZFSTOP}/module/avl
 
-PACKAGE=	zfs
+PACKAGE=	libzfs
 LIB=	avl
 LIBADD=	spl
 SRCS=	avl.c

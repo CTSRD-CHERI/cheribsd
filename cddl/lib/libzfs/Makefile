@@ -7,7 +7,7 @@
 .PATH: ${ZFSTOP}/module/zstd
 .PATH: ${ZFSTOP}/module/zstd/lib
 
-PACKAGE=	zfs
+PACKAGE=	libzfs
 LIB=	zfs
 LIBADD= \
 	avl \
