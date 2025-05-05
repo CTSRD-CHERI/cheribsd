@@ -181,7 +181,7 @@ extern unsigned int OPENSSL_armv8_rsa_neonized;
     * Support macros for Morello
     */
 
-#  if __ARM_ARCH__>=8
+#  ifdef __aarch64__
 #   ifdef __CHERI_PURE_CAPABILITY__
 #    define PTR_WIDTH 16
 #    define PTR(n) c ## n
@@ -191,6 +191,10 @@ extern unsigned int OPENSSL_armv8_rsa_neonized;
 #    define PTR(n) x ## n
 #    define PTRN(n) n
 #   endif
+#  else
+#   define PTR_WIDTH 4
+#   define PTR(n) r ## n
+#   define PTRN(n) n
 #  endif
 
 # endif  /* defined __ASSEMBLER__ */
