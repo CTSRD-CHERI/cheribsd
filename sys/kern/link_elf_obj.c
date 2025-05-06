@@ -1556,6 +1556,32 @@ link_elf_lookup_debug_symbol_ctf(linker_file_t lf, const char *name,
 	return (link_elf_ctf_get_ddb(lf, lc));
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Given a pointer into a linker file derived from ef->address, narrow
+ * its permissions and bounds.
+ */
+static caddr_t
+make_capability(const Elf_Sym *sym, caddr_t val)
+{
+
+	switch (ELF_ST_TYPE(sym->st_info)) {
+	case STT_FUNC:
+	case STT_GNU_IFUNC:
+		val = cheri_andperm(val, CHERI_PERMS_KERNEL_CODE);
+#ifdef CHERI_FLAGS_CAP_MODE
+		val = cheri_setflags(val, CHERI_FLAGS_CAP_MODE);
+#endif
+		break;
+	default:
+		val = cheri_setbounds(val, sym->st_size);
+		val = cheri_andperm(val, CHERI_PERMS_KERNEL_DATA);
+		break;
+	}
+	return (val);
+}
+#endif
+
 static int
 link_elf_symbol_values1(linker_file_t lf, c_linker_sym_t sym,
     linker_symval_t *symval, bool see_local)
@@ -1578,16 +1604,7 @@ link_elf_symbol_values1(linker_file_t lf, c_linker_sym_t sym,
 		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC)
 			val = ((caddr_t (*)(void))val)();
 #ifdef __CHERI_PURE_CAPABILITY__
-		val = cheri_setbounds(val, es->st_size);
-		switch (ELF_ST_TYPE(es->st_info)) {
-		case STT_FUNC:
-		case STT_GNU_IFUNC:
-			val = cheri_andperm(val, CHERI_PERMS_KERNEL_CODE);
-			break;
-		default:
-			val = cheri_andperm(val, CHERI_PERMS_KERNEL_DATA);
-			break;
-		}
+		val = make_capability(es, val);
 #endif
 		symval->value = val;
 		symval->size = es->st_size;
