@@ -789,7 +789,6 @@ vn_sendfile(struct file *fp, int sockfd, struct uio *hdr_uio,
 	error = sendfile_getsock(td, sockfd, &sock_fp, &so);
 	if (error != 0)
 		goto out;
-	CURVNET_SET(so->so_vnet);
 	pr = so->so_proto;
 
 #ifdef MAC
@@ -819,6 +818,7 @@ vn_sendfile(struct file *fp, int sockfd, struct uio *hdr_uio,
 	error = SOCK_IO_SEND_LOCK(so, SBL_WAIT | SBL_NOINTR);
 	if (error != 0)
 		goto out;
+	CURVNET_SET(so->so_vnet);
 #ifdef KERN_TLS
 	tls = ktls_hold(so->so_snd.sb_tls_info);
 #endif
@@ -1228,6 +1228,7 @@ prepend_header:
 	 */
 	if (trl_uio != NULL) {
 		SOCK_IO_SEND_UNLOCK(so);
+		CURVNET_RESTORE();
 		error = kern_writev(td, sockfd, trl_uio);
 		if (error == 0)
 			sbytes += td->td_retval[0];
@@ -1236,6 +1237,7 @@ prepend_header:
 
 done:
 	SOCK_IO_SEND_UNLOCK(so);
+	CURVNET_RESTORE();
 out:
 	/*
 	 * If there was no error we have to clear td->td_retval[0]
@@ -1273,7 +1275,6 @@ out:
 #endif
 	if (error == ERESTART)
 		error = EINTR;
-	CURVNET_RESTORE();
 
 	return (error);
 }
