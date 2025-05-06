@@ -583,17 +583,21 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		error = LINKER_SYMIDX_CAPABILITY(lf, symidx, 1, &cap);
 		if (error != 0)
 			return (-1);
-		cap += addend;
+
+		/*
+		 * XXX: This is conditional to avoid invalidating
+		 * sentries.  The addend should probably be passed to
+		 * the lookup function instead.
+		 */
+		if (addend != 0)
+			cap += addend;
 		*(uintcap_t *)where = cap;
 		break;
 	case R_MORELLO_JUMP_SLOT:
 		error = LINKER_SYMIDX_CAPABILITY(lf, symidx, 1, &cap);
 		if (error != 0)
 			return (-1);
-		cap = cheri_clearperm(cap, CHERI_PERM_SEAL |
-		    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
-		    CHERI_PERM_STORE_LOCAL_CAP);
-		*(uintcap_t *)where = cheri_sealentry(cap);
+		*(uintcap_t *)where = cap;
 		break;
 	case R_MORELLO_IRELATIVE:
 		/* XXX: See libexec/rtld-elf/aarch64/reloc.c. */
