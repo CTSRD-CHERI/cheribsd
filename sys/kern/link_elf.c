@@ -1790,11 +1790,11 @@ link_elf_symbol_values1(linker_file_t lf, c_linker_sym_t sym,
 			return (ENOENT);
 		symval->name = ef->strtab + es->st_name;
 		val = (caddr_t)ef->address + es->st_value;
-		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC)
-			val = ((caddr_t (*)(void))val)();
 #ifdef __CHERI_PURE_CAPABILITY__
 		val = make_capability(es, val);
 #endif
+		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC)
+			val = ((caddr_t (*)(void))val)();
 		symval->value = val;
 		symval->size = es->st_size;
 		return (0);
@@ -1827,11 +1827,11 @@ link_elf_debug_symbol_values(linker_file_t lf, c_linker_sym_t sym,
 	if (es >= ef->ddbsymtab && es < (ef->ddbsymtab + ef->ddbsymcnt)) {
 		symval->name = ef->ddbstrtab + es->st_name;
 		val = (caddr_t)ef->address + es->st_value;
-		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC)
-			val = ((caddr_t (*)(void))val)();
 #ifdef __CHERI_PURE_CAPABILITY__
 		val = make_capability(es, val);
 #endif
+		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC)
+			val = ((caddr_t (*)(void))val)();
 		symval->value = val;
 		symval->size = es->st_size;
 		return (0);
@@ -2249,6 +2249,9 @@ elf_lookup_ifunc(linker_file_t lf, Elf_Size symidx, int deps __unused,
 	symp = ef->symtab + symidx;
 	if (ELF_ST_TYPE(symp->st_info) == STT_GNU_IFUNC) {
 		val = (caddr_t)ef->address + symp->st_value;
+#ifdef __CHERI_PURE_CAPABILITY__
+		val = make_capability(symp, val);
+#endif
 		*res = ((Elf_Addr (*)(void))val)();
 		return (0);
 	}
