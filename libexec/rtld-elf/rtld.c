@@ -4599,7 +4599,7 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	    dbg("dlsym(%s) is ifunc. Resolved to: " PTR_FMT, name, sym);
 	} else if (ELF_ST_TYPE(def->st_info) == STT_TLS) {
 	    ti.ti_module = defobj->tlsindex;
-	    ti.ti_offset = def->st_value;
+	    ti.ti_offset = def->st_value - TLS_DTV_OFFSET;
 	    sym = __tls_get_addr(&ti);
 	    dbg("dlsym(%s) is TLS. Resolved to: " PTR_FMT, name, sym);
 	} else {
