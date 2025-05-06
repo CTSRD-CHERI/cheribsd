@@ -1572,6 +1572,7 @@ make_capability(const Elf_Sym *sym, caddr_t val)
 #ifdef CHERI_FLAGS_CAP_MODE
 		val = cheri_setflags(val, CHERI_FLAGS_CAP_MODE);
 #endif
+		val = cheri_sealentry(val);
 		break;
 	default:
 		val = cheri_setbounds(val, sym->st_size);

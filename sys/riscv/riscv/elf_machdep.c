@@ -580,7 +580,14 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		if (error != 0)
 			return (-1);
 
-		cap += addend;
+		/*
+		 * XXX: This is conditional to avoid invalidating
+		 * sentries.  The addend should probably be passed to
+		 * the lookup function instead.
+		 */
+		if (addend != 0)
+			cap += addend;
+
 		beforecap = *(uintcap_t *)where;
 		*(uintcap_t *)where = cap;
 		if (debug_kld)
