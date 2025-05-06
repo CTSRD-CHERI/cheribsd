@@ -527,7 +527,8 @@ symname(const Obj_Entry* obj, size_t r_symndx) {
 	return strtab_value(obj, obj->symtab[r_symndx].st_name);
 }
 const char *rtld_strerror(int);
-Obj_Entry *map_object(int, const char *, const struct stat *, const char *);
+Obj_Entry *map_object(int, const char *, const struct stat *, bool,
+    const char *);
 void *xcalloc(size_t, size_t);
 void *xmalloc(size_t);
 char *xstrdup(const char *);
