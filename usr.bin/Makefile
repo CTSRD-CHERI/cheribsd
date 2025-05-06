@@ -124,6 +124,7 @@ SUBDIR=	alias \
 	revoke \
 	rpcinfo \
 	rs \
+	runat \
 	rup \
 	ruptime \
 	rusers \
