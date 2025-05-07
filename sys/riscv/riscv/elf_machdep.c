@@ -364,7 +364,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 	uintptr_t addr;
 	Elf_Addr val;
 #ifdef __CHERI_PURE_CAPABILITY__
-	uintcap_t beforecap, cap;
+	uintcap_t beforecap;
 #endif
 	Elf64_Addr *where;
 	Elf_Addr addend;
@@ -577,7 +577,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	case R_RISCV_CHERI_CAPABILITY:
-		error = LINKER_SYMIDX_CAPABILITY(lf, symidx, 1, &cap);
+		error = lookup(lf, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 
@@ -587,15 +587,14 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		 * the lookup function instead.
 		 */
 		if (addend != 0)
-			cap += addend;
+			addr += addend;
 
-		beforecap = *(uintcap_t *)where;
-		*(uintcap_t *)where = cap;
+		beforecap = *(uintptr_t *)where;
+		*(uintptr_t *)where = addr;
 		if (debug_kld)
-			printf("%p %c %-24s %#lp -> %#lp\n", where,
+			printf("%p %c %-24s %#lp -> %#p\n", where,
 			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
-			    (void * __capability)beforecap,
-			    (void * __capability)cap);
+			    (void *)beforecap, (void *)addr);
 		break;
 #endif
 	default:

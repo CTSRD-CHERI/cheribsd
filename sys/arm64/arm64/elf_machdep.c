@@ -452,9 +452,6 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 #define	ARM64_ELF_RELOC_LATE_IFUNC	(1 << 1)
 	Elf_Addr *where, addend;
 	uintptr_t addr;
-#ifdef __CHERI_PURE_CAPABILITY__
-	uintcap_t cap;
-#endif
 	Elf_Addr val;
 	Elf_Word rtype, symidx;
 	const Elf_Rel *rel;
@@ -580,7 +577,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 #ifdef __CHERI_PURE_CAPABILITY__
 	case R_MORELLO_CAPINIT:
 	case R_MORELLO_GLOB_DAT:
-		error = LINKER_SYMIDX_CAPABILITY(lf, symidx, 1, &cap);
+		error = lookup(lf, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
 
@@ -590,30 +587,30 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		 * the lookup function instead.
 		 */
 		if (addend != 0)
-			cap += addend;
-		*(uintcap_t *)where = cap;
+			addr += addend;
+		*(uintptr_t *)where = addr;
 		break;
 	case R_MORELLO_JUMP_SLOT:
-		error = LINKER_SYMIDX_CAPABILITY(lf, symidx, 1, &cap);
+		error = lookup(lf, symidx, 1, &addr);
 		if (error != 0)
 			return (-1);
-		*(uintcap_t *)where = cap;
+		*(uintptr_t *)where = addr;
 		break;
 	case R_MORELLO_IRELATIVE:
 		/* XXX: See libexec/rtld-elf/aarch64/reloc.c. */
 		if ((where[0] == 0 && where[1] == 0) ||
 		    (Elf_Ssize)where[0] == rela->r_addend) {
-			cap = (uintptr_t)(relocbase + rela->r_addend);
-			cap = cheri_clearperm(cap, CHERI_PERM_SEAL |
+			addr = (uintptr_t)(relocbase + rela->r_addend);
+			addr = cheri_clearperm(addr, CHERI_PERM_SEAL |
 			    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
 			    CHERI_PERM_STORE_LOCAL_CAP);
-			cap = cheri_sealentry(cap);
+			addr = cheri_sealentry(addr);
 		} else
-			cap = build_cap_from_fragment(where,
+			addr = build_cap_from_fragment(where,
 			    (Elf_Addr)relocbase, rela->r_addend,
 			    relocbase, relocbase);
-		cap = ((uintptr_t (*)(void))cap)();
-		*(uintcap_t *)where = cap;
+		addr = ((uintptr_t (*)(void))addr)();
+		*(uintptr_t *)where = addr;
 		break;
 #endif
 #endif
