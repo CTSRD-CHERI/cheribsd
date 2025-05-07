@@ -101,11 +101,13 @@
 	ldr	x\regn, =\dstsym
 #ifdef __CHERI_PURE_CAPABILITY__
 	orr	x\regn, x\regn, #1	/* c64 mode */
-	ldr	x\scratch2n, =etext	/* XXX-AM: TODO use correct end symbol */
+	ldr	x\scratch2n, =_end
 	ldr	x\scratch1n, =KERNBASE
 	sub	x\scratch2n, x\scratch2n, x\scratch1n
 	cvtp	c\scratch1n, x\scratch1n
-	//scbnds	c\scratch1n, c\scratch1n, x\scratch2n /* XXX-AM: needs reordering of ELF sections */
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	scbnds	c\scratch1n, c\scratch1n, x\scratch2n
+#endif
 	scvalue	c\regn, c\scratch1n, x\regn
 	clrperm	c\regn, c\regn, w
 #endif
@@ -277,6 +279,19 @@ virtdone:
 	ldr	x0, =~CHERI_PERMS_KERNEL_CODE
 	adr	c2, #0
 	clrperm	c2, c2, x0
+
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	/*
+	 * Narrow bounds on the code_cap passed to elf_reloc_self since
+	 * PCC has infinite bounds in the benchmark ABI.
+	 */
+	ldr	x0, =_end
+	ldr	x3, =KERNBASE
+	sub	x0, x0, x3
+	scvalue	c2, c2, x3
+	scbnds	c2, c2, x0
+#endif
+
 	/* Assume can we reach _DYNAMIC from PCC */
 	adrp	c0, _DYNAMIC
 	add	c0, c0, :lo12:_DYNAMIC
