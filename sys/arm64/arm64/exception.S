@@ -287,7 +287,7 @@ END(handle_el1h_irq)
 ENTRY(handle_el1h_fiq)
 	save_registers 1
 	KMSAN_ENTER
-	mov	x0, sp
+	mov	PTR(0), PTRN(sp)
 	mov	x1, #INTR_ROOT_FIQ
 	bl	intr_irq_handler
 	KMSAN_LEAVE
@@ -298,7 +298,7 @@ END(handle_el1h_fiq)
 ENTRY(handle_el1h_serror)
 	save_registers 1
 	KMSAN_ENTER
-	mov	x0, sp
+	mov	PTR(0), PTRN(sp)
 1:	bl	do_serror
 	b	1b
 	KMSAN_LEAVE
@@ -334,7 +334,7 @@ END(handle_el0_irq)
 ENTRY(handle_el0_fiq)
 	save_registers 0
 	KMSAN_ENTER
-	mov	x0, sp
+	mov	PTR(0), PTRN(sp)
 	mov	x1, #INTR_ROOT_FIQ
 	bl	intr_irq_handler
 	do_ast
