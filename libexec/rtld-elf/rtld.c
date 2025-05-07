@@ -5953,7 +5953,8 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign)
 {
     Obj_Entry *obj;
     char *tls_block;
-    uintptr_t *dtv, **tcb;
+    uintptr_t *dtv;
+    struct tcb *tcb;
     char *addr;
     uintptr_t i;
     size_t extra_size, maxalign, post_size, pre_size, tls_block_size;
@@ -5975,7 +5976,7 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign)
 
     /* Allocate whole TLS block */
     tls_block = xmalloc_aligned(tls_block_size, maxalign, 0);
-    tcb = (uintptr_t **)(tls_block + pre_size + extra_size);
+    tcb = (struct tcb *)(tls_block + pre_size + extra_size);
 
     if (oldtcb != NULL) {
 	memcpy(tls_block, get_tls_block_ptr(oldtcb, tcbsize),
@@ -5983,7 +5984,7 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign)
 	free(get_tls_block_ptr(oldtcb, tcbsize));
 
 	/* Adjust the DTV. */
-	dtv = tcb[0];
+	dtv = tcb->tcb_dtv;
 	for (i = 0; i < dtv[1]; i++) {
 	    if (dtv[i + 2] >= (uintptr_t)oldtcb &&
 		dtv[i + 2] < (uintptr_t)oldtcb + tls_static_space) {
@@ -5992,7 +5993,7 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign)
 	}
     } else {
 	dtv = xcalloc(tls_max_index + 2, sizeof(uintptr_t));
-	tcb[0] = dtv;
+	tcb->tcb_dtv = dtv;
 	dtv[0] = tls_dtv_generation;
 	dtv[1] = tls_max_index;
 
@@ -6036,7 +6037,7 @@ free_tls(void *tcb, size_t tcbsize, size_t tcbalign __unused)
     tlsstart = (uintptr_t)tcb + TLS_TCB_SIZE + post_size;
     tlsend = (uintptr_t)tcb + tls_static_space;
 
-    dtv = *(uintptr_t **)tcb;
+    dtv = ((struct tcb *)tcb)->tcb_dtv;
     dtvsize = dtv[1];
     for (i = 0; i < dtvsize; i++) {
 	if (dtv[i + 2] != 0 && (dtv[i + 2] < tlsstart ||
@@ -6062,7 +6063,7 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign)
     size_t size, ralign;
     char *tls_block;
     uintptr_t *dtv, *olddtv;
-    uintptr_t **tcb;
+    struct tcb *tcb;
     char *addr;
     size_t i;
 
@@ -6075,9 +6076,9 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign)
     tls_block = xmalloc_aligned(size, ralign, 0 /* XXX */);
     dtv = xcalloc(tls_max_index + 2, sizeof(uintptr_t));
 
-    tcb = (uintptr_t **)(tls_block + roundup(tls_static_space, ralign));
-    tcb[0] = (uintptr_t *)tcb;
-    tcb[1] = dtv;
+    tcb = (struct tcb *)(tls_block + roundup(tls_static_space, ralign));
+    tcb->tcb_self = tcb;
+    tcb->tcb_dtv = dtv;
 
     dtv[0] = tls_dtv_generation;
     dtv[1] = tls_max_index;
@@ -6094,7 +6095,7 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign)
 	 * If any dynamic TLS blocks have been created tls_get_addr(),
 	 * move them over.
 	 */
-	olddtv = ((uintptr_t **)oldtcb)[1];
+	olddtv = ((struct tcb *)oldtcb)->tcb_dtv;
 	for (i = 0; i < olddtv[1]; i++) {
 	    if (olddtv[i + 2] < (uintptr_t)oldtcb - size ||
 		olddtv[i + 2] > (uintptr_t)oldtcb) {
@@ -6143,7 +6144,7 @@ free_tls(void *tcb, size_t tcbsize  __unused, size_t tcbalign)
 	    ralign = tls_static_max_align;
     size = roundup(tls_static_space, ralign);
 
-    dtv = ((uintptr_t **)tcb)[1];
+    dtv = ((struct tcb *)tcb)->tcb_dtv;
     dtvsize = dtv[1];
     tlsend = (uintptr_t)tcb;
     tlsstart = tlsend - size;
