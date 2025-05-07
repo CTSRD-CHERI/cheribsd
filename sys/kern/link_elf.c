@@ -1017,6 +1017,8 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	if (ctors_addrp != NULL && ctors_sizep != NULL) {
 		lf->ctors_addr = ef->address + *ctors_addrp;
 		lf->ctors_size = *ctors_sizep;
+		lf->ctors_addr = cheri_kern_setbounds(lf->ctors_addr,
+		    lf->ctors_size);
 	}
 
 #ifdef __arm__
@@ -1401,6 +1403,8 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 			/* Record relocated address and size of .ctors. */
 			lf->ctors_addr = mapbase + shdr[i].sh_addr - base_vaddr;
 			lf->ctors_size = shdr[i].sh_size;
+			lf->ctors_addr = cheri_kern_setbounds(lf->ctors_addr,
+			    lf->ctors_size);
 		}
 	}
 	if (symtabindex < 0 || symstrindex < 0)
