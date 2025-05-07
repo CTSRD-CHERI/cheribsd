@@ -175,12 +175,6 @@ static long	link_elf_strtab_get(linker_file_t, caddr_t *);
 #ifdef VIMAGE
 static void	link_elf_propagate_vnets(linker_file_t);
 #endif
-static int	link_elf_symidx_address(linker_file_t, unsigned long, int,
-		    ptraddr_t *);
-#ifdef __CHERI_PURE_CAPABILITY__
-static int	link_elf_symidx_capability(linker_file_t, unsigned long, int,
-		    uintcap_t *);
-#endif
 static int	elf_lookup(linker_file_t, Elf_Size, int, uintptr_t *);
 
 static kobj_method_t link_elf_methods[] = {
@@ -190,10 +184,6 @@ static kobj_method_t link_elf_methods[] = {
 	KOBJMETHOD(linker_symbol_values,	link_elf_symbol_values),
 	KOBJMETHOD(linker_debug_symbol_values,	link_elf_debug_symbol_values),
 	KOBJMETHOD(linker_search_symbol,	link_elf_search_symbol),
-	KOBJMETHOD(linker_symidx_address,	link_elf_symidx_address),
-#ifdef __CHERI_PURE_CAPABILITY__
-	KOBJMETHOD(linker_symidx_capability,	link_elf_symidx_capability),
-#endif
 	KOBJMETHOD(linker_unload,		link_elf_unload_file),
 	KOBJMETHOD(linker_load_file,		link_elf_load_file),
 	KOBJMETHOD(linker_link_preload,		link_elf_link_preload),
@@ -2001,21 +1991,14 @@ elf_get_symname(linker_file_t lf, Elf_Size symidx)
 }
 
 /*
- * Symbol lookup functions that can be used when the symbol index is known (ie
+ * Symbol lookup function that can be used when the symbol index is known (ie
  * in relocations). It uses the symbol index instead of doing a fully fledged
  * hash table based lookup when such is valid. For example for local symbols.
  * This is not only more efficient, it's also more correct. It's not always
  * the case that the symbol can be found through the hash table.
  */
-#ifdef __CHERI_PURE_CAPABILITY__
 static int
-link_elf_symidx_capability(linker_file_t lf, unsigned long symidx, int deps,
-    uintcap_t *res)
-#else
-static int
-link_elf_symidx_address(linker_file_t lf, unsigned long symidx, int deps,
-    ptraddr_t *res)
-#endif
+elf_lookup(linker_file_t lf, Elf_Size symidx, int deps, uintptr_t *res)
 {
 	elf_file_t ef = (elf_file_t)lf;
 	const Elf_Sym *sym;
@@ -2041,10 +2024,10 @@ link_elf_symidx_address(linker_file_t lf, unsigned long symidx, int deps,
 			return (EINVAL);
 		}
 #ifdef __CHERI_PURE_CAPABILITY__
-		*res = (uintcap_t)make_capability(sym, ef->address +
+		*res = (uintptr_t)make_capability(sym, ef->address +
 		    sym->st_value);
 #else
-		*res = ((ptraddr_t)ef->address + sym->st_value);
+		*res = ((uintptr_t)ef->address + sym->st_value);
 #endif
 		return (0);
 	}
@@ -2084,39 +2067,8 @@ link_elf_symidx_address(linker_file_t lf, unsigned long symidx, int deps,
 #endif
 	}
 #endif
-#ifdef __CHERI_PURE_CAPABILITY__
-	*res = (uintcap_t)addr;
-#else
-	*res = (ptraddr_t)addr;
-#endif
+	*res = (uintptr_t)addr;
 	return (0);
-}
-
-#ifdef __CHERI_PURE_CAPABILITY__
-static int
-link_elf_symidx_address(linker_file_t lf, unsigned long symidx, int deps,
-    ptraddr_t *res)
-{
-	uintcap_t cap;
-	int error;
-
-	error = link_elf_symidx_capability(lf, symidx, deps, &cap);
-	if (error == 0)
-		*res = (ptraddr_t)cap;
-	return (error);
-}
-#endif
-
-static int
-elf_lookup(linker_file_t lf, Elf_Size symidx, int deps, uintptr_t *res)
-{
-	ptraddr_t addr;
-	int error;
-
-	error = link_elf_symidx_address(lf, symidx, deps, &addr);
-	if (error == 0)
-		*res = addr;
-	return (error);
 }
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(DT_CHERI___CAPRELOCS)
