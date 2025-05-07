@@ -93,13 +93,13 @@ static void *libc_tls_init;
 void *
 __libc_tls_get_addr(void *vti)
 {
-	uintptr_t *dtv;
+	struct dtv *dtv;
 	tls_index *ti;
 
 	dtv = _tcb_get()->tcb_dtv;
 	ti = vti;
-	return ((char *)dtv[ti->ti_module + 1] + (ti->ti_offset +
-	    TLS_DTV_OFFSET));
+	return (dtv->dtv_slots[ti->ti_module - 1].dtvs_tls +
+	    (ti->ti_offset + TLS_DTV_OFFSET));
 }
 
 #ifdef __i386__
@@ -182,7 +182,7 @@ get_tls_block_ptr(void *tcb, size_t tcbsize)
 void
 __libc_free_tls(void *tcb, size_t tcbsize, size_t tcbalign __unused)
 {
-	uintptr_t *dtv;
+	struct dtv *dtv;
 
 	dtv = ((struct tcb *)tcb)->tcb_dtv;
 	tls_free(dtv);
@@ -212,7 +212,7 @@ __libc_free_tls(void *tcb, size_t tcbsize, size_t tcbalign __unused)
 void *
 __libc_allocate_tls(void *oldtcb, size_t tcbsize, size_t tcbalign)
 {
-	uintptr_t *dtv;
+	struct dtv *dtv;
 	struct tcb *tcb;
 	char *tls_block, *tls;
 	size_t extra_size, maxalign, post_size, pre_size, tls_block_size;
@@ -252,18 +252,19 @@ __libc_allocate_tls(void *oldtcb, size_t tcbsize, size_t tcbalign)
 
 		/* Adjust the DTV. */
 		dtv = tcb->tcb_dtv;
-		dtv[2] = (uintptr_t)tls;
+		dtv->dtv_slots[0].dtvs_tls = tls;
 	} else {
-		dtv = tls_malloc(3 * sizeof(uintptr_t));
+		dtv = tls_malloc(sizeof(struct dtv) +
+		    sizeof(struct dtv_slot));
 		if (dtv == NULL) {
 			tls_msg("__libc_allocate_tls: Out of memory.\n");
 			abort();
 		}
 		/* Build the DTV. */
 		tcb->tcb_dtv = dtv;
-		dtv[0] = 1;		/* Generation. */
-		dtv[1] = 1;		/* Segments count. */
-		dtv[2] = (uintptr_t)tls;
+		dtv->dtv_gen = 1;		/* Generation. */
+		dtv->dtv_size = 1;		/* Segments count. */
+		dtv->dtv_slots[0].dtvs_tls = tls;
 
 		if (libc_tls_init_size > 0)
 			memcpy(tls, libc_tls_init, libc_tls_init_size);
@@ -283,7 +284,7 @@ void
 __libc_free_tls(void *tcb, size_t tcbsize __unused, size_t tcbalign)
 {
 	size_t size;
-	uintptr_t *dtv;
+	struct dtv *dtv;
 	uintptr_t tlsstart, tlsend;
 
 	/*
@@ -308,7 +309,7 @@ __libc_allocate_tls(void *oldtcb, size_t tcbsize, size_t tcbalign)
 {
 	size_t size;
 	char *tls_block, *tls;
-	uintptr_t *dtv;
+	struct dtv *dtv;
 	struct tcb *tcb;
 
 	tcbalign = MAX(tcbalign, libc_tls_init_align);
@@ -321,7 +322,8 @@ __libc_allocate_tls(void *oldtcb, size_t tcbsize, size_t tcbalign)
 		tls_msg("__libc_allocate_tls: Out of memory.\n");
 		abort();
 	}
-	dtv = tls_malloc(3 * sizeof(uintptr_t));
+	dtv = tls_malloc(sizeof(struct dtv) +
+	    sizeof(struct dtv_slot));
 	if (dtv == NULL) {
 		tls_msg("__libc_allocate_tls: Out of memory.\n");
 		abort();
@@ -332,9 +334,9 @@ __libc_allocate_tls(void *oldtcb, size_t tcbsize, size_t tcbalign)
 	tcb->tcb_self = tcb;
 	tcb->tcb_dtv = dtv;
 
-	dtv[0] = 1;
-	dtv[1] = 1;
-	dtv[2] = (uintptr_t)tls;
+	dtv->dtv_gen = 1;
+	dtv->dtv_size = 1;
+	dtv->dtv_slots[0].dtvs_tls = tls;
 
 	if (oldtcb != NULL) {
 		/*
