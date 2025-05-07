@@ -75,15 +75,6 @@
 	ldr	\reg, [STACK_TABLE_C, #STACK_TABLE_RTLD]
 .endmacro
 
-.macro	update_stk_table	osp, sp, index
-	mrs	STACK_TABLE_C, TRUSTED_STACK
-	ldrh	\index, [STACK_TABLE_C, #TRUSTED_FRAME_CALLEE]
-
-	mrs	STACK_TABLE_C, STACK_TABLE
-	ldr	\osp, [STACK_TABLE_C, \index, uxtw #0]
-	str	\sp, [STACK_TABLE_C, \index, uxtw #0]
-.endmacro
-
 #else
 
 static inline void *

@@ -167,29 +167,6 @@ struct tcb *c18n_allocate_tcb(struct tcb *);
 void c18n_free_tcb(void);
 
 /*
- * When entering the RTLD without a trampoline (e.g., during lazy binding, TLS
- * lookup, or stack resolution), a dummy trusted frame indicating that the
- * current compartment is RTLD must be pushed.
- */
-static inline struct trusted_frame *
-push_dummy_rtld_trusted_frame(struct trusted_frame *tf)
-{
-	*--tf = (struct trusted_frame) {
-		.callee = cid_to_index(RTLD_COMPART_ID)
-	};
-	set_trusted_stk(tf);
-	return (tf);
-}
-
-static inline struct trusted_frame *
-pop_dummy_rtld_trusted_frame(struct trusted_frame *tf)
-{
-	assert(get_trusted_stk() == tf);
-	set_trusted_stk(++tf);
-	return (tf);
-}
-
-/*
  * Stack unwinding
  */
 int c18n_is_tramp(uintptr_t, const struct trusted_frame *);
@@ -269,11 +246,6 @@ func_sig_legal(struct func_sig sig)
  */
 void *_rtld_sandbox_code(void *, struct func_sig);
 void *_rtld_safebox_code(void *, struct func_sig);
-
-void _rtld_bind_start_c18n(void);
-void *_rtld_tlsdesc_static_c18n(void *);
-void *_rtld_tlsdesc_undef_c18n(void *);
-void *_rtld_tlsdesc_dynamic_c18n(void *);
 
 void c18n_init(Obj_Entry *, Elf_Auxinfo *[]);
 void c18n_init2(Obj_Entry *);

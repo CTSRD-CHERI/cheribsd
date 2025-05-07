@@ -104,6 +104,9 @@ __BEGIN_DECLS
 #define NEW(type)	((type *) xmalloc(sizeof(type)))
 #define CNEW(type)	((type *) xcalloc(1, sizeof(type)))
 
+extern void *rtld_bind_fptr;
+extern void *tls_get_addr_common_fptr;
+
 extern size_t tls_last_offset;
 extern size_t tls_last_size;
 extern size_t tls_static_space;

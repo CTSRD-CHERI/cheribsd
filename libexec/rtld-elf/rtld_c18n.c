@@ -768,6 +768,29 @@ create_stk(size_t size)
 
 #define	C18N_TRUSTED_STACK_SIZE		(128 * 1024)
 
+/*
+ * When entering the RTLD without a trampoline (e.g., during stack resolution),
+ * a dummy trusted frame indicating that the current compartment is RTLD must be
+ * pushed.
+ */
+static struct trusted_frame *
+push_dummy_rtld_trusted_frame(struct trusted_frame *tf)
+{
+	*--tf = (struct trusted_frame) {
+		.callee = cid_to_index(RTLD_COMPART_ID)
+	};
+	set_trusted_stk(tf);
+	return (tf);
+}
+
+static struct trusted_frame *
+pop_dummy_rtld_trusted_frame(struct trusted_frame *tf)
+{
+	assert(get_trusted_stk() == tf);
+	set_trusted_stk(++tf);
+	return (tf);
+}
+
 static void
 init_stk_table(struct stk_table *table, struct tcb_wrapper *wrap)
 {
@@ -1691,6 +1714,14 @@ _rtld_tramp_reflect(const void *addr)
  */
 #define	C18N_FUNC_SIG_COUNT	72
 
+static void *
+make_restricted(void *fptr)
+{
+	fptr = cheri_clearperm(fptr, CHERI_PERM_EXECUTIVE);
+	fptr = cheri_buildcap(cheri_getpcc(), (uintptr_t)fptr);
+	return (cheri_sealentry(fptr));
+}
+
 void
 c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 {
@@ -1825,6 +1856,39 @@ c18n_init2(Obj_Entry *obj_rtld)
 	assert(tramp_pg_size > 0);
 	atomic_store_explicit(&tramp_pgs.head, tramp_pg_new(NULL),
 	    memory_order_relaxed);
+
+	/*
+	 * Turn function pointers to be inserted into objects' GOTs into
+	 * Restricted mode capabilities.
+	 */
+	rtld_bind_start_fptr = make_restricted(rtld_bind_start_fptr);
+	rtld_tlsdesc_static_fptr = make_restricted(rtld_tlsdesc_static_fptr);
+	rtld_tlsdesc_undef_fptr = make_restricted(rtld_tlsdesc_undef_fptr);
+	rtld_tlsdesc_dynamic_fptr = make_restricted(rtld_tlsdesc_dynamic_fptr);
+
+	/*
+	 * Wrap RTLD function pointers that are called by user code in
+	 * trampolines.
+	 */
+	rtld_bind_fptr = tramp_intern(NULL, RTLD_COMPART_ID,
+	    &(struct tramp_data) {
+		.target = rtld_bind_fptr,
+		.defobj = obj_rtld,
+		.sig = (struct func_sig) {
+			.valid = true,
+			.reg_args = 2, .mem_args = false, .ret_args = ONE
+		}
+	});
+
+	tls_get_addr_common_fptr = tramp_intern(NULL, RTLD_COMPART_ID,
+	    &(struct tramp_data) {
+		.target = tls_get_addr_common_fptr,
+		.defobj = obj_rtld,
+		.sig = (struct func_sig) {
+			.valid = true,
+			.reg_args = 3, .mem_args = false, .ret_args = ONE
+		}
+	});
 
 	/*
 	 * XXX: Manually wrap _rtld_unw_setcontext_impl in a trampoline for now

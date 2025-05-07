@@ -63,6 +63,11 @@ void *_rtld_tlsdesc_static(void *);
 void *_rtld_tlsdesc_undef(void *);
 void *_rtld_tlsdesc_dynamic(void *);
 
+void (*rtld_bind_start_fptr)(void) = &_rtld_bind_start;
+void *(*rtld_tlsdesc_static_fptr)(void *) = &_rtld_tlsdesc_static;
+void *(*rtld_tlsdesc_undef_fptr)(void *) = &_rtld_tlsdesc_undef;
+void *(*rtld_tlsdesc_dynamic_fptr)(void *) = &_rtld_tlsdesc_dynamic;
+
 bool
 arch_digest_dynamic(struct Struct_Obj_Entry *obj, const Elf_Dyn *dynp)
 {
@@ -131,12 +136,7 @@ init_pltgot(Plt_Entry *plt)
 		else
 #endif
 			plt->pltgot[1] = (uintptr_t)plt;
-#ifdef CHERI_LIB_C18N
-		if (C18N_ENABLED)
-			plt->pltgot[2] = (uintptr_t)&_rtld_bind_start_c18n;
-		else
-#endif
-			plt->pltgot[2] = (uintptr_t)&_rtld_bind_start;
+		plt->pltgot[2] = (uintptr_t)rtld_bind_start_fptr;
 	}
 }
 
@@ -371,12 +371,7 @@ reloc_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela,
 		obj = defobj;
 		if (def->st_shndx == SHN_UNDEF) {
 			/* Weak undefined thread variable */
-#ifdef CHERI_LIB_C18N
-			if (C18N_ENABLED)
-				where->func = _rtld_tlsdesc_undef_c18n;
-			else
-#endif
-				where->func = _rtld_tlsdesc_undef;
+			where->func = rtld_tlsdesc_undef_fptr;
 			where->addend = rela->r_addend;
 			return;
 		}
@@ -385,24 +380,14 @@ reloc_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela,
 
 	if (obj->tlsoffset != 0) {
 		/* Variable is in initially allocated TLS segment */
-#ifdef CHERI_LIB_C18N
-		if (C18N_ENABLED)
-			where->func = _rtld_tlsdesc_static_c18n;
-		else
-#endif
-			where->func = _rtld_tlsdesc_static;
+		where->func = rtld_tlsdesc_static_fptr;
 		where->offset = obj->tlsoffset + offs;
 #ifdef __CHERI_PURE_CAPABILITY__
 		where->size = size;
 #endif
 	} else {
 		/* TLS offset is unknown at load time, use dynamic resolving */
-#ifdef CHERI_LIB_C18N
-		if (C18N_ENABLED)
-			where->func = _rtld_tlsdesc_dynamic_c18n;
-		else
-#endif
-			where->func = _rtld_tlsdesc_dynamic;
+		where->func = rtld_tlsdesc_dynamic_fptr;
 #ifdef __CHERI_PURE_CAPABILITY__
 		where->data = reloc_tlsdesc_alloc(obj->tlsindex, offs, size);
 #else
