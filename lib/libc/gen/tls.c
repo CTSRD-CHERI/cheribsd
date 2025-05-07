@@ -182,10 +182,10 @@ get_tls_block_ptr(void *tcb, size_t tcbsize)
 void
 __libc_free_tls(void *tcb, size_t tcbsize, size_t tcbalign __unused)
 {
-	intptr_t *dtv;
-	intptr_t **tls;
+	uintptr_t *dtv;
+	uintptr_t **tls;
 
-	tls = (intptr_t **)tcb;
+	tls = (uintptr_t **)tcb;
 	dtv = tls[0];
 	tls_free(dtv);
 	tls_free_aligned(get_tls_block_ptr(tcb, tcbsize));
@@ -214,7 +214,7 @@ __libc_free_tls(void *tcb, size_t tcbsize, size_t tcbalign __unused)
 void *
 __libc_allocate_tls(void *oldtcb, size_t tcbsize, size_t tcbalign)
 {
-	intptr_t *dtv, **tcb;
+	uintptr_t *dtv, **tcb;
 	char *tls_block, *tls;
 	size_t extra_size, maxalign, post_size, pre_size, tls_block_size;
 
@@ -243,7 +243,7 @@ __libc_allocate_tls(void *oldtcb, size_t tcbsize, size_t tcbalign)
 		abort();
 	}
 	memset(tls_block, 0, tls_block_size);
-	tcb = (intptr_t **)(tls_block + pre_size + extra_size);
+	tcb = (uintptr_t **)(tls_block + pre_size + extra_size);
 	tls = (char *)tcb + TLS_TCB_SIZE + post_size;
 
 	if (oldtcb != NULL) {
@@ -253,9 +253,9 @@ __libc_allocate_tls(void *oldtcb, size_t tcbsize, size_t tcbalign)
 
 		/* Adjust the DTV. */
 		dtv = tcb[0];
-		dtv[2] = (intptr_t)tls;
+		dtv[2] = (uintptr_t)tls;
 	} else {
-		dtv = tls_malloc(3 * sizeof(void *));
+		dtv = tls_malloc(3 * sizeof(uintptr_t));
 		if (dtv == NULL) {
 			tls_msg("__libc_allocate_tls: Out of memory.\n");
 			abort();
@@ -264,7 +264,7 @@ __libc_allocate_tls(void *oldtcb, size_t tcbsize, size_t tcbalign)
 		tcb[0] = dtv;
 		dtv[0] = 1;		/* Generation. */
 		dtv[1] = 1;		/* Segments count. */
-		dtv[2] = (intptr_t)tls;
+		dtv[2] = (uintptr_t)tls;
 
 		if (libc_tls_init_size > 0)
 			memcpy(tls, libc_tls_init, libc_tls_init_size);
@@ -284,8 +284,8 @@ void
 __libc_free_tls(void *tcb, size_t tcbsize __unused, size_t tcbalign)
 {
 	size_t size;
-	Elf_Addr* dtv;
-	Elf_Addr tlsstart, tlsend;
+	uintptr_t *dtv;
+	uintptr_t tlsstart, tlsend;
 
 	/*
 	 * Figure out the size of the initial TLS block so that we can
@@ -294,8 +294,8 @@ __libc_free_tls(void *tcb, size_t tcbsize __unused, size_t tcbalign)
 	tcbalign = MAX(tcbalign, libc_tls_init_align);
 	size = roundup2(libc_tls_static_space, tcbalign);
 
-	dtv = ((Elf_Addr**)tcb)[1];
-	tlsend = (Elf_Addr) tcb;
+	dtv = ((uintptr_t **)tcb)[1];
+	tlsend = (uintptr_t)tcb;
 	tlsstart = tlsend - size;
 	tls_free_aligned((void*)tlsstart);
 	tls_free(dtv);
@@ -309,28 +309,28 @@ __libc_allocate_tls(void *oldtls, size_t tcbsize, size_t tcbalign)
 {
 	size_t size;
 	char *tls;
-	Elf_Addr *dtv;
-	Elf_Addr segbase, oldsegbase;
+	uintptr_t *dtv;
+	uintptr_t segbase, oldsegbase;
 
 	tcbalign = MAX(tcbalign, libc_tls_init_align);
 	size = roundup2(libc_tls_static_space, tcbalign);
 
-	if (tcbsize < 2 * sizeof(Elf_Addr))
-		tcbsize = 2 * sizeof(Elf_Addr);
+	if (tcbsize < 2 * sizeof(uintptr_t))
+		tcbsize = 2 * sizeof(uintptr_t);
 	tls = tls_calloc(1, size + tcbsize);
 	if (tls == NULL) {
 		tls_msg("__libc_allocate_tls: Out of memory.\n");
 		abort();
 	}
-	dtv = tls_malloc(3 * sizeof(Elf_Addr));
+	dtv = tls_malloc(3 * sizeof(uintptr_t));
 	if (dtv == NULL) {
 		tls_msg("__libc_allocate_tls: Out of memory.\n");
 		abort();
 	}
 
-	segbase = (Elf_Addr)(tls + size);
-	((Elf_Addr*)segbase)[0] = segbase;
-	((Elf_Addr*)segbase)[1] = (Elf_Addr) dtv;
+	segbase = (uintptr_t)(tls + size);
+	((uintptr_t *)segbase)[0] = segbase;
+	((uintptr_t *)segbase)[1] = (uintptr_t)dtv;
 
 	dtv[0] = 1;
 	dtv[1] = 1;
@@ -340,7 +340,7 @@ __libc_allocate_tls(void *oldtls, size_t tcbsize, size_t tcbalign)
 		/*
 		 * Copy the static TLS block over whole.
 		 */
-		oldsegbase = (Elf_Addr) oldtls;
+		oldsegbase = (uintptr_t)oldtls;
 		memcpy((void *)(segbase - libc_tls_static_space),
 		    (const void *)(oldsegbase - libc_tls_static_space),
 		    libc_tls_static_space);
@@ -349,7 +349,8 @@ __libc_allocate_tls(void *oldtls, size_t tcbsize, size_t tcbalign)
 		 * We assume that this block was the one we created with
 		 * allocate_initial_tls().
 		 */
-		_rtld_free_tls(oldtls, 2*sizeof(Elf_Addr), sizeof(Elf_Addr));
+		_rtld_free_tls(oldtls, 2 * sizeof(uintptr_t),
+		    sizeof(uintptr_t));
 	} else {
 		memcpy((void *)(segbase - libc_tls_static_space),
 		    libc_tls_init, libc_tls_init_size);
