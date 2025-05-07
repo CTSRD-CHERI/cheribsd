@@ -156,7 +156,7 @@ static void	link_elf_propagate_vnets(linker_file_t);
 #endif
 
 static int	elf_obj_lookup(linker_file_t lf, Elf_Size symidx, int deps,
-		    Elf_Addr *);
+		    uintptr_t *);
 
 static kobj_method_t link_elf_methods[] = {
 	KOBJMETHOD(linker_lookup_symbol,	link_elf_lookup_symbol),
@@ -1765,12 +1765,12 @@ elf_obj_cleanup_globals_cache(elf_file_t ef)
  * the case that the symbol can be found through the hash table.
  */
 static int
-elf_obj_lookup(linker_file_t lf, Elf_Size symidx, int deps, Elf_Addr *res)
+elf_obj_lookup(linker_file_t lf, Elf_Size symidx, int deps, uintptr_t *res)
 {
 	elf_file_t ef = (elf_file_t)lf;
 	Elf_Sym *sym;
 	const char *symbol;
-	Elf_Addr res1;
+	uintptr_t res1;
 	void *ifunc;
 
 	/* Don't even try to lookup the symbol if the index is bogus. */
@@ -1790,7 +1790,7 @@ elf_obj_lookup(linker_file_t lf, Elf_Size symidx, int deps, Elf_Addr *res)
 		ifunc = (void *)res1;
 #endif
 		if (ELF_ST_TYPE(sym->st_info) == STT_GNU_IFUNC)
-			res1 = ((Elf_Addr (*)(void))ifunc)();
+			res1 = ((uintptr_t (*)(void))ifunc)();
 		*res = res1;
 		return (0);
 	}
@@ -1812,7 +1812,7 @@ elf_obj_lookup(linker_file_t lf, Elf_Size symidx, int deps, Elf_Addr *res)
 			*res = 0;
 			return (EINVAL);
 		}
-		res1 = (Elf_Addr)linker_file_lookup_symbol(lf, symbol, deps);
+		res1 = (uintptr_t)linker_file_lookup_symbol(lf, symbol, deps);
 
 		/*
 		 * Cache global lookups during module relocation. The failure

@@ -301,7 +301,7 @@ extern int kld_debug;
 
 #endif
 
-typedef int elf_lookup_fn(linker_file_t, Elf_Size, int, Elf_Addr *);
+typedef int elf_lookup_fn(linker_file_t, Elf_Size, int, uintptr_t *);
 
 /* Support functions */
 bool	elf_is_ifunc_reloc(Elf_Size r_info);

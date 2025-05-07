@@ -181,7 +181,7 @@ static int	link_elf_symidx_address(linker_file_t, unsigned long, int,
 static int	link_elf_symidx_capability(linker_file_t, unsigned long, int,
 		    uintcap_t *);
 #endif
-static int	elf_lookup(linker_file_t, Elf_Size, int, Elf_Addr *);
+static int	elf_lookup(linker_file_t, Elf_Size, int, uintptr_t *);
 
 static kobj_method_t link_elf_methods[] = {
 	KOBJMETHOD(linker_lookup_symbol,	link_elf_lookup_symbol),
@@ -2108,7 +2108,7 @@ link_elf_symidx_address(linker_file_t lf, unsigned long symidx, int deps,
 #endif
 
 static int
-elf_lookup(linker_file_t lf, Elf_Size symidx, int deps, Elf_Addr *res)
+elf_lookup(linker_file_t lf, Elf_Size symidx, int deps, uintptr_t *res)
 {
 	ptraddr_t addr;
 	int error;
@@ -2240,7 +2240,7 @@ link_elf_propagate_vnets(linker_file_t lf)
  */
 static int
 elf_lookup_ifunc(linker_file_t lf, Elf_Size symidx, int deps __unused,
-    Elf_Addr *res)
+    uintptr_t *res)
 {
 	elf_file_t ef;
 	const Elf_Sym *symp;
@@ -2253,7 +2253,7 @@ elf_lookup_ifunc(linker_file_t lf, Elf_Size symidx, int deps __unused,
 #ifdef __CHERI_PURE_CAPABILITY__
 		val = make_capability(symp, val);
 #endif
-		*res = ((Elf_Addr (*)(void))val)();
+		*res = ((uintptr_t (*)(void))val)();
 		return (0);
 	}
 	return (ENOENT);

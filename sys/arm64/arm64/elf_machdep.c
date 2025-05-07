@@ -450,12 +450,12 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 {
 #define	ARM64_ELF_RELOC_LOCAL		(1 << 0)
 #define	ARM64_ELF_RELOC_LATE_IFUNC	(1 << 1)
-	Elf_Addr *where, addr, addend;
+	Elf_Addr *where, addend;
+	uintptr_t addr;
 #ifdef __CHERI_PURE_CAPABILITY__
 	uintcap_t cap;
-#else
-	Elf_Addr val;
 #endif
+	Elf_Addr val;
 	Elf_Word rtype, symidx;
 	const Elf_Rel *rel;
 	const Elf_Rela *rela;
@@ -504,7 +504,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 			Elf_Addr addr1, size;
 			uint8_t perms;
 
-			decode_fragment(where, (Elf_Addr)relocbase, &addr,
+			decode_fragment(where, (Elf_Addr)relocbase, &val,
 			    &size, &perms);
 
 			/*
@@ -514,9 +514,9 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 			 * In this case we must use the kernel's base
 			 * capability.
 			 */
-			addr1 = elf_relocaddr(lf, addr + addend) - addend;
+			addr1 = elf_relocaddr(lf, val + addend) - addend;
 			base = (__cheri_tocap void * __capability)
-			    (addr == addr1 ? relocbase :
+			    (val == addr1 ? relocbase :
 			    linker_kernel_file->address);
 			*(uintcap_t *)(void *)where = build_reloc_cap(addr1,
 			    size, perms, addend, base, base);

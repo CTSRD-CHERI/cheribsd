@@ -361,7 +361,8 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 {
 	Elf_Size rtype, symidx;
 	const Elf_Rela *rela;
-	Elf_Addr val, addr;
+	uintptr_t addr;
+	Elf_Addr val;
 #ifdef __CHERI_PURE_CAPABILITY__
 	uintcap_t beforecap, cap;
 #endif
