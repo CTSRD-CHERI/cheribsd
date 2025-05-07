@@ -1771,7 +1771,6 @@ elf_obj_lookup(linker_file_t lf, Elf_Size symidx, int deps, uintptr_t *res)
 	Elf_Sym *sym;
 	const char *symbol;
 	uintptr_t res1;
-	void *ifunc;
 
 	/* Don't even try to lookup the symbol if the index is bogus. */
 	if (symidx >= ef->ddbsymcnt) {
@@ -1783,14 +1782,14 @@ elf_obj_lookup(linker_file_t lf, Elf_Size symidx, int deps, uintptr_t *res)
 
 	/* Quick answer if there is a definition included. */
 	if (sym->st_shndx != SHN_UNDEF) {
-		res1 = (Elf_Addr)sym->st_value;
 #ifdef __CHERI_PURE_CAPABILITY__
-		ifunc = cheri_setaddress(ef->address, res1);
+		res1 = make_capability(sym, cheri_setaddress(ef->address,
+		    sym->st_value));
 #else
-		ifunc = (void *)res1;
+		res1 = (Elf_Addr)sym->st_value;
 #endif
 		if (ELF_ST_TYPE(sym->st_info) == STT_GNU_IFUNC)
-			res1 = ((uintptr_t (*)(void))ifunc)();
+			res1 = ((uintptr_t (*)(void))res1)();
 		*res = res1;
 		return (0);
 	}
