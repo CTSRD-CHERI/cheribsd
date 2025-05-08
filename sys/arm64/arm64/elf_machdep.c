@@ -755,7 +755,7 @@ elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap)
 	for (; dynp->d_tag != DT_NULL; dynp++) {
 		switch (dynp->d_tag) {
 		case DT_RELA:
-			rela = (const Elf_Rela *)((const char *)data_cap +
+			rela = (const Elf_Rela *)cheri_setaddress(data_cap,
 			    dynp->d_un.d_ptr);
 			break;
 		case DT_RELASZ:
@@ -772,7 +772,7 @@ elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap)
 		switch (ELF_R_TYPE(rela->r_info)) {
 		case R_MORELLO_RELATIVE:
 		case R_MORELLO_FUNC_RELATIVE:
-			fragment = (Elf_Addr *)((char *)data_cap +
+			fragment = (Elf_Addr *)cheri_setaddress(data_cap,
 			    rela->r_offset);
 			cap = build_cap_from_fragment(fragment, 0,
 			    rela->r_addend, data_cap, code_cap);

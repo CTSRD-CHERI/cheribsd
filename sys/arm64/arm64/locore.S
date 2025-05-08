@@ -292,6 +292,12 @@ virtdone:
 	scbnds	c2, c2, x0
 #endif
 
+	/* Narrow bounds on data_cap to match code_cap. */
+	gcbase	x0, c2
+	scvalue c1, c1, x0
+	gclen	x0, c2
+	scbnds	c1, c1, x0
+
 	/* Assume can we reach _DYNAMIC from PCC */
 	adrp	c0, _DYNAMIC
 	add	c0, c0, :lo12:_DYNAMIC
