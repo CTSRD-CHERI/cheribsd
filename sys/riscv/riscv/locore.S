@@ -381,10 +381,10 @@ va:
 	/* Initialize cap relocs. */
 	li	t0, CHERI_PERMS_KERNEL_DATA
 	candperm ca0, cs0, t0
-	cllc	ca1, _C_LABEL(init_cap_relocs)
+	cllc	cra, _C_LABEL(init_cap_relocs)
 	li	t0, CHERI_PERMS_KERNEL_CODE
-	candperm ca2, cs0, t0
-	cjalr	ca1
+	candperm ca1, cra, t0
+	cjalr	cra
 
 	/* Initialize capabilities. */
 	cmove	ca0, cs0
