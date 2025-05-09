@@ -382,7 +382,7 @@ struct ieee80211_channel {
 
 struct ieee80211_rateset {
 	uint8_t		rs_nrates;
-	uint8_t		rs_rates[IEEE80211_RATE_MAXSIZE];
+	uint8_t		rs_rates[IEEE80211_RATE_MAXSIZE] __subobject_variable_length;
 };
 
 /*
