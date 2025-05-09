@@ -355,20 +355,20 @@ int __result_use_check copyinptr(const void * __restrict __capability udaddr,
 int __result_use_check copyin_nofault(
     const void * __capability __restrict udaddr,
     void * _Nonnull __restrict kaddr, size_t len);
-int __result_use_or_ignore_check copyout(const void * _Nonnull __restrict kaddr,
+__nodiscard int copyout(const void * _Nonnull __restrict kaddr,
     void * __restrict __capability udaddr, size_t len);
 #if __has_feature(capabilities)
-int __result_use_or_ignore_check copyoutptr(
+__nodiscard int copyoutptr(
     const void * _Nonnull __restrict kaddr,
     void * __capability __restrict udaddr, size_t len);
 #else
 #define	copyoutptr	copyout
 #endif
-int __result_use_or_ignore_check copyout_nofault(
+__nodiscard int copyout_nofault(
     const void * _Nonnull __restrict kaddr,
     void * __capability __restrict udaddr, size_t len);
 #if __has_feature(capabilities)
-int __result_use_or_ignore_check copyoutptr_nofault(
+__nodiscard int copyoutptr_nofault(
     const void * _Nonnull __restrict kaddr,
     void * __capability __restrict udaddr, size_t len);
 #else
@@ -404,19 +404,13 @@ int __result_use_check fueword32(volatile const void * __capability base,
     int32_t *val);
 int __result_use_check fueword64(volatile const void * __capability base,
     int64_t *val);
-int __result_use_or_ignore_check subyte(volatile void * __capability base,
-    int byte);
-int __result_use_or_ignore_check suword(volatile void * __capability base,
-    long word);
-int __result_use_or_ignore_check suword16(volatile void * __capability base,
-    int word);
-int __result_use_or_ignore_check suword32(volatile void * __capability base,
-    int32_t word);
-int __result_use_or_ignore_check suword64(volatile void * __capability base,
-    int64_t word);
+__nodiscard int subyte(volatile void * __capability base, int byte);
+__nodiscard int suword(volatile void * __capability base, long word);
+__nodiscard int suword16(volatile void * __capability base, int word);
+__nodiscard int suword32(volatile void * __capability base, int32_t word);
+__nodiscard int suword64(volatile void * __capability base, int64_t word);
 #if __has_feature(capabilities)
-int __result_use_or_ignore_check sucap(volatile const void * __capability base,
-    intcap_t val);
+__nodiscard int sucap(volatile const void * __capability base, intcap_t val);
 #define	suptr			sucap
 #else
 #define	suptr			suword
