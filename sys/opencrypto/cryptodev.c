@@ -824,7 +824,6 @@ again:
 
 	if (crp->crp_etype == EAGAIN) {
 		crp->crp_etype = 0;
-		crp->crp_flags &= ~CRYPTO_F_DONE;
 		cod->done = false;
 		goto again;
 	}
@@ -1027,7 +1026,6 @@ again:
 
 	if (crp->crp_etype == EAGAIN) {
 		crp->crp_etype = 0;
-		crp->crp_flags &= ~CRYPTO_F_DONE;
 		cod->done = false;
 		goto again;
 	}
