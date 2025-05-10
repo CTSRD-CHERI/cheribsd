@@ -1050,7 +1050,7 @@ skb_orphan(struct sk_buff *skb)
 	SKB_TODO();
 }
 
-static inline __sum16
+static inline __wsum
 csum_unfold(__sum16 sum)
 {
 	return (sum);
