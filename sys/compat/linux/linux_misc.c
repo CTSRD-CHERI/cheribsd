@@ -943,7 +943,7 @@ linux_common_wait(struct thread *td, idtype_t idtype, int id, int * __capability
 		error = linux_copyout_rusage(&wru.wru_self, rup);
 	if (error == 0 && infop != NULL && td->td_retval[0] != 0) {
 		sig = bsd_to_linux_signal(siginfo.si_signo);
-		siginfo_to_lsiginfo(&siginfo, &lsi, sig);
+		siginfo_to_lsiginfo(&siginfo, &lsi, sig, siginfo.si_signo);
 		error = copyoutcap(&lsi, infop, sizeof(lsi));
 	}
 

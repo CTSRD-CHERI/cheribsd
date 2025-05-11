@@ -67,7 +67,7 @@ static int	linux_tdksignal(struct thread *td, lwpid_t tid,
 		    int tgid, int sig, ksiginfo_t *ksi);
 static int	linux_tdsignal(struct thread *td, lwpid_t tid,
 		    int tgid, int sig);
-static void	sicode_to_lsicode(int sig, int si_code, int *lsi_code);
+static void	sicode_to_lsicode(int sig, int si_code, int *lsi_code, int bsd_sig);
 static int	linux_common_rt_sigtimedwait(struct thread *,
 		    l_sigset_t * __capability, struct timespec *, l_siginfo_t * __capability,
 		    l_size_t);
@@ -174,7 +174,6 @@ linux_do_sigaction(struct thread *td, int linux_sig, l_sigaction_t *linux_nsa,
 	if (!LINUX_SIG_VALID(linux_sig))
 		return (EINVAL);
 	sig = linux_to_bsd_signal(linux_sig);
-
 	osa = (linux_osa != NULL) ? &oact : NULL;
 	if (linux_nsa != NULL) {
 		nsa = &act;
@@ -190,6 +189,10 @@ linux_do_sigaction(struct thread *td, int linux_sig, l_sigaction_t *linux_nsa,
 	} else
 		nsa = NULL;
 
+#if __has_feature(capabilities)
+	if (sig == SIGSEGV)
+		error = kern_sigaction(td, SIGPROT, nsa, osa, 0);
+#endif
 	error = kern_sigaction(td, sig, nsa, osa, 0);
 	if (error != 0)
 		return (error);
@@ -506,7 +509,7 @@ linux_common_rt_sigtimedwait(struct thread *td, l_sigset_t * __capability mask,
 
 	if (ptr) {
 		memset(&lsi, 0, sizeof(lsi));
-		siginfo_to_lsiginfo(&ksi.ksi_info, &lsi, sig);
+		siginfo_to_lsiginfo(&ksi.ksi_info, &lsi, sig, ksi.ksi_signo);
 		error = copyoutcap(&lsi, ptr, sizeof(lsi));
 	}
 	if (error == 0)
@@ -640,6 +643,24 @@ sigsegv_sicode2lsicode(int si_code)
 }
 
 static int
+sigprot_sicode2lsicode(int si_code)
+{
+
+	switch (si_code) {
+	case PROT_CHERI_BOUNDS:
+		return (LINUX_SEGV_CAPBOUNDSERR);
+	case PROT_CHERI_TAG:
+		return (LINUX_SEGV_CAPTAGERR);
+	case PROT_CHERI_SEALED:
+		return (LINUX_SEGV_CAPSEALEDERR);
+	case PROT_CHERI_PERM:
+		return (LINUX_SEGV_CAPPERMERR);
+	default:
+		return (LINUX_SEGV_CAPACCESSERR);
+	}
+}
+
+static int
 sigtrap_sicode2lsicode(int si_code)
 {
 
@@ -654,8 +675,13 @@ sigtrap_sicode2lsicode(int si_code)
 }
 
 static void
-sicode_to_lsicode(int sig, int si_code, int *lsi_code)
+sicode_to_lsicode(int sig, int si_code, int *lsi_code, int bsd_sig)
 {
+
+	if (bsd_sig == SIGPROT) {
+		*lsi_code = sigprot_sicode2lsicode(si_code);
+		return;
+	}
 
 	switch (si_code) {
 	case SI_USER:
@@ -702,12 +728,12 @@ sicode_to_lsicode(int sig, int si_code, int *lsi_code)
 }
 
 void
-siginfo_to_lsiginfo(const siginfo_t *si, l_siginfo_t *lsi, l_int sig)
+siginfo_to_lsiginfo(const siginfo_t *si, l_siginfo_t *lsi, l_int sig, l_int bsd_sig)
 {
 
 	/* sig already converted */
 	lsi->lsi_signo = sig;
-	sicode_to_lsicode(sig, si->si_code, &lsi->lsi_code);
+	sicode_to_lsicode(sig, si->si_code, &lsi->lsi_code, bsd_sig);
 
 	switch (si->si_code) {
 	case SI_LWP:

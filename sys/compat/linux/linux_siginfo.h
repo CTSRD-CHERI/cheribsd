@@ -101,6 +101,12 @@
 #define	LINUX_SEGV_MTEAERR	8	/* Asynchronous ARM MTE error */
 #define	LINUX_SEGV_MTESERR	9	/* Synchronous ARM MTE exception */
 
+#define LINUX_SEGV_CAPTAGERR		10	/* Capability tag fault */
+#define LINUX_SEGV_CAPSEALEDERR	11	/* Capability sealed fault */
+#define LINUX_SEGV_CAPBOUNDSERR	12	/* Capability bounds fault */
+#define LINUX_SEGV_CAPPERMERR		13	/* Capability permission fault */
+#define LINUX_SEGV_CAPACCESSERR	14	/* Capability access fault */
+
 /*
  * SIGBUS si_codes
  */

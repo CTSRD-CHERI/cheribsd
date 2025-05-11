@@ -178,6 +178,12 @@ int
 bsd_to_linux_signal(int sig)
 {
 
+#if __has_feature(capabilities)
+	/* Handle SIGPROT */
+	if (sig == SIGPROT)
+		return (LINUX_SIGSEGV);
+#endif
+
 	if (sig <= LINUX_SIGTBLSZ)
 		return (bsd_to_linux_sigtbl[_SIG_IDX(sig)]);
 	if (sig == LINUX_SIGPWREMU)
@@ -220,6 +226,10 @@ linux_to_bsd_sigset(l_sigset_t *lss, sigset_t *bss)
 	SIGEMPTYSET(*bss);
 	for (l = 1; l <= LINUX_SIGRTMAX; l++) {
 		if (LINUX_SIGISMEMBER(*lss, l)) {
+#if __has_feature(capabilities)
+			if (l == LINUX_SIGSEGV)
+				SIGADDSET(*bss, SIGPROT);
+#endif
 			b = linux_to_bsd_signal(l);
 			if (b)
 				SIGADDSET(*bss, b);

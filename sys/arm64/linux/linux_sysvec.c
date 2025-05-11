@@ -471,7 +471,7 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 	/* Translate the signal. */
 	sig = bsd_to_linux_signal(sig);
-	siginfo_to_lsiginfo(&ksi->ksi_info, &frame->sf.sf_si, sig);
+	siginfo_to_lsiginfo(&ksi->ksi_info, &frame->sf.sf_si, sig, ksi->ksi_signo);
 	bsd_to_linux_sigset(mask, &frame->sf.sf_uc.uc_sigmask);
 
 	/*
