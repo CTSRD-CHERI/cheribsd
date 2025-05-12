@@ -747,8 +747,6 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 		panic("FPAC kernel exception");
 		break;
 	case EXCP_UNKNOWN:
-		if (undef_insn(1, frame))
-			break;
 		print_registers(frame);
 		print_gp_register("far", far);
 		panic("Undefined instruction: %08x",
@@ -845,7 +843,7 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		}
 		break;
 	case EXCP_UNKNOWN:
-		if (!undef_insn(0, frame))
+		if (!undef_insn(frame))
 			call_trapsignal(td, SIGILL, ILL_ILLTRP,
 			    (void * __capability)(uintcap_t)far, exception);
 		userret(td, frame);
@@ -885,7 +883,7 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		 * instruction to access a special register userspace doesn't
 		 * have access to.
 		 */
-		if (!undef_insn(0, frame))
+		if (!undef_insn(frame))
 			call_trapsignal(td, SIGILL, ILL_PRVOPC,
 			    (void * __capability)frame->tf_elr, exception); 
 		userret(td, frame);

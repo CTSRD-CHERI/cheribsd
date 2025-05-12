@@ -359,7 +359,7 @@ tmr_setup_user_access(void *arg __unused)
 #ifdef __aarch64__
 		if (TUNABLE_INT_FETCH("hw.emulate_phys_counter", &emulate) &&
 		    emulate != 0) {
-			install_undef_handler(true, cntpct_handler);
+			install_undef_handler(cntpct_handler);
 		}
 #if __has_feature(capabilities)
 		/*
@@ -368,7 +368,7 @@ tmr_setup_user_access(void *arg __unused)
 		 * making it inaccessible to user space.
 		 * We emulate access here to work around this issue.
 		 */
-		install_undef_handler(true, cntfrq_handler);
+		install_undef_handler(cntfrq_handler);
 #endif
 #endif
 	}
