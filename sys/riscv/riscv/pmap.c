@@ -4259,8 +4259,8 @@ retry:
 		break;
 	}
 #else
-	if ((oldpte & PTE_CW) == 0) {
-		/* tag clearing */
+	if ((oldpte & (PTE_CW | PTE_CRG)) == 0) {
+		/* Not cap writable and not dirtiable, always trapping */
 		m = NULL;
 		res = PMAP_CAPLOADGEN_UNABLE;
 		goto out;
