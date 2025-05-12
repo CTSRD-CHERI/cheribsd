@@ -90,7 +90,7 @@ struct delayed_work {
 	struct {
 		struct callout callout;
 		struct mtx mtx;
-		long	expires;
+		unsigned long expires;
 	} timer;
 } __subobject_use_container_bounds;
 
