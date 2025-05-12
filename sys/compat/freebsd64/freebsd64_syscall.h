@@ -533,4 +533,6 @@
 #define	FREEBSD64_SYS_fchroot	590
 #define	FREEBSD64_SYS_freebsd64_setcred	591
 #define	FREEBSD64_SYS_freebsd64_exterrctl	592
-#define	FREEBSD64_SYS_MAXSYSCALL	593
+#define	FREEBSD64_SYS_freebsd64_inotify_add_watch_at	593
+#define	FREEBSD64_SYS_inotify_rm_watch	594
+#define	FREEBSD64_SYS_MAXSYSCALL	595

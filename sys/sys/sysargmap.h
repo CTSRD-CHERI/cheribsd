@@ -416,6 +416,8 @@ static int sysargmask[] = {
 	[SYS_fchroot] = (0x0),
 	[SYS_setcred] = (0x0 | 0x2),
 	[SYS_exterrctl] = (0x0 | 0x4),
+	[SYS_inotify_add_watch_at] = (0x0 | 0x4),
+	[SYS_inotify_rm_watch] = (0x0),
 };
 
 #endif /* !_SYSARGMAP_H_ */

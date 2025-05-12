@@ -1529,6 +1529,12 @@ struct freebsd64_exterrctl_args {
 	char flags_l_[PADL_(u_int)]; u_int flags; char flags_r_[PADR_(u_int)];
 	char ptr_l_[PADL_(void *)]; void * ptr; char ptr_r_[PADR_(void *)];
 };
+struct freebsd64_inotify_add_watch_at_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char dfd_l_[PADL_(int)]; int dfd; char dfd_r_[PADR_(int)];
+	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
+	char mask_l_[PADL_(uint32_t)]; uint32_t mask; char mask_r_[PADR_(uint32_t)];
+};
 int	freebsd64_read(struct thread *, struct freebsd64_read_args *);
 int	freebsd64_write(struct thread *, struct freebsd64_write_args *);
 int	freebsd64_open(struct thread *, struct freebsd64_open_args *);
@@ -1837,6 +1843,7 @@ int	freebsd64_kcmp(struct thread *, struct freebsd64_kcmp_args *);
 int	freebsd64_getrlimitusage(struct thread *, struct freebsd64_getrlimitusage_args *);
 int	freebsd64_setcred(struct thread *, struct freebsd64_setcred_args *);
 int	freebsd64_exterrctl(struct thread *, struct freebsd64_exterrctl_args *);
+int	freebsd64_inotify_add_watch_at(struct thread *, struct freebsd64_inotify_add_watch_at_args *);
 
 #ifdef COMPAT_43
 
@@ -2412,6 +2419,7 @@ int	freebsd13_freebsd64_swapoff(struct thread *, struct freebsd13_freebsd64_swap
 #define	FREEBSD64_SYS_AUE_freebsd64_getrlimitusage	AUE_NULL
 #define	FREEBSD64_SYS_AUE_freebsd64_setcred	AUE_SETCRED
 #define	FREEBSD64_SYS_AUE_freebsd64_exterrctl	AUE_NULL
+#define	FREEBSD64_SYS_AUE_freebsd64_inotify_add_watch_at	AUE_INOTIFY
 
 #undef PAD_
 #undef PADL_
