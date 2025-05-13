@@ -30,6 +30,7 @@
 
 #include <machine/c18n.h>
 
+#include <inttypes.h>
 #include <stdint.h>
 
 /*
@@ -57,6 +58,7 @@ extern struct rtld_c18n_stats *c18n_stats;
 #define	RTLD_COMPART_ID		0
 
 typedef uint16_t compart_id_t;
+#define	C18N_COMPART_ID_FORMAT	PRIu16
 /*
  * Define another type for the stack table index to avoid confusion.
  */
@@ -68,7 +70,14 @@ compart_id_t compart_id_for_address(const Obj_Entry *, Elf_Addr);
 /*
  * Stack switching
  */
+enum stk_state {
+	STK_LIVE,
+	STK_OCCUPIED,
+	STK_DESTROYED,
+};
+
 struct stk_table_stk_info {
+	_Atomic(enum stk_state) state;
 	size_t size;
 	void *begin;
 };

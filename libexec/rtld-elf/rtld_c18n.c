@@ -214,6 +214,37 @@ c18n_strdup(const char *s)
 	return (buf);
 }
 
+static void *
+c18n_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
+{
+	void *ret;
+
+	ret = mmap(addr, len, prot, flags, fd, offset);
+	if (ret == MAP_FAILED) {
+		rtld_fdprintf(STDERR_FILENO,
+		    "c18n: mmap(%#p, %zu, %#x, %#x, %d, %ld) = %s\n",
+		    addr, len, prot, flags, fd, offset, rtld_strerror(errno));
+		abort();
+	}
+
+	return (ret);
+}
+
+static int
+c18n_munmap(void *addr, size_t len)
+{
+	int ret;
+
+	ret = munmap(addr, len);
+	if (ret != 0) {
+		rtld_fdprintf(STDERR_FILENO, "c18n: munmap(%#p, %zu) = %s\n",
+		    addr, len, rtld_strerror(errno));
+		abort();
+	}
+
+	return (ret);
+}
+
 /*
  * Policies
  */
@@ -781,11 +812,8 @@ create_stk(size_t size)
 {
 	char *stk;
 
-	stk = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_STACK, -1, 0);
-	if (stk == MAP_FAILED)
-		rtld_fatal("mmap failed");
+	stk = c18n_mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_STACK, -1, 0);
 	(void)msetname(stk, size, "rtld:c18n_stack");
-
 	return (stk + size);
 }
 
@@ -864,6 +892,7 @@ init_stk_table(struct stk_table *table, struct tcb_wrapper *wrap)
 	assert(size > 0);
 	table->meta->compart_stk[RTLD_COMPART_ID] = (struct stk_table_stk_info)
 	{
+		.state = STK_LIVE,
 		.size = size,
 		.begin = sp
 	};
@@ -886,6 +915,16 @@ init_stk_table(struct stk_table *table, struct tcb_wrapper *wrap)
 
 #define	C18N_STACK_SIZE		(4 * 1024 * 1024)
 
+static void
+stk_state_fatal(const char *op, compart_id_t cid, enum stk_state state)
+{
+	rtld_fdprintf(STDERR_FILENO,
+	    "c18n: %s: invalid stack state %d for compartment %s (%"
+	    C18N_COMPART_ID_FORMAT_STRING ")\n",
+	    op, state, comparts.data[cid].name, cid);
+	abort();
+}
+
 static struct stk_table_entry
 get_or_create_untrusted_stk(compart_id_t cid, struct stk_table **tablep)
 {
@@ -895,6 +934,8 @@ get_or_create_untrusted_stk(compart_id_t cid, struct stk_table **tablep)
 	struct stk_table_entry ret;
 	RtldLockState lockstate;
 	struct stk_table *table = *tablep;
+	struct stk_table_stk_info *data;
+	enum stk_state state;
 
 	if (table->meta->capacity <= cid) {
 		/*
@@ -908,8 +949,21 @@ get_or_create_untrusted_stk(compart_id_t cid, struct stk_table **tablep)
 		*tablep = table = expand_stk_table(table, comparts.size);
 		lock_release(rtld_bind_lock, &lockstate);
 		set_stk_table(table);
-	} else if (table->meta->compart_stk[cid].size > 0)
-		return (table->entries[cid]);
+	}
+
+	data = &table->meta->compart_stk[cid];
+	state = atomic_load_explicit(&data->state, memory_order_acquire);
+	switch (state) {
+	case STK_LIVE:
+		if (data->size > 0)
+			return (table->entries[cid]);
+		if (atomic_compare_exchange_strong_explicit(&data->state,
+		    &state, STK_OCCUPIED, memory_order_acquire,
+		    memory_order_acquire))
+			break;
+	default:
+		stk_state_fatal("get_or_create_untrusted_stk", cid, state);
+	}
 
 	size = C18N_STACK_SIZE;
 	stk = create_stk(size);
@@ -928,14 +982,13 @@ get_or_create_untrusted_stk(compart_id_t cid, struct stk_table **tablep)
 	}
 #endif
 
-	table->meta->compart_stk[cid] = (struct stk_table_stk_info) {
-		.size = size,
-		.begin = stk - size
-	};
 	ret = table->entries[cid] = (struct stk_table_entry) {
 		.stack = cheri_perms_clear(stk, CHERI_PERM_SW_VMEM),
 		.tcb = tcb
 	};
+	data->size = size;
+	data->begin = stk - size;
+	atomic_store_explicit(&data->state, STK_LIVE, memory_order_release);
 
 	atomic_fetch_add_explicit(&c18n_stats->rcs_ustack, 1,
 	    memory_order_relaxed);
@@ -1181,10 +1234,8 @@ tramp_pg_new(struct tramp_pg *next)
 	size_t capacity = tramp_pg_size;
 	struct tramp_pg *pg;
 
-	pg = mmap(NULL, capacity, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON,
-	    -1, 0);
-	if (pg == MAP_FAILED)
-		rtld_fatal("mmap failed");
+	pg = c18n_mmap(NULL, capacity, PROT_READ | PROT_WRITE | PROT_EXEC,
+	    MAP_ANON, -1, 0);
 	(void)msetname(pg, capacity, "rtld:c18n_tramp");
 	SLIST_NEXT(pg, link) = next;
 	atomic_store_explicit(&pg->size, 0, memory_order_relaxed);
@@ -1811,10 +1862,8 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 			    rtld_strerror(errno));
 	}
 
-	c18n_stats = mmap(NULL, sizeof(*c18n_stats), PROT_READ | PROT_WRITE,
-	    fd == -1 ? MAP_ANON : MAP_SHARED, fd, 0);
-	if (c18n_stats == MAP_FAILED)
-		rtld_fatal("c18n: Cannot mmap file (%s)", rtld_strerror(errno));
+	c18n_stats = c18n_mmap(NULL, sizeof(*c18n_stats),
+	    PROT_READ | PROT_WRITE, fd == -1 ? MAP_ANON : MAP_SHARED, fd, 0);
 	(void)msetname(c18n_stats, sizeof(*c18n_stats), "rtld:c18n_stats");
 	atomic_store_explicit(&c18n_stats->version, RTLD_C18N_STATS_VERSION,
 	    memory_order_release);
@@ -2037,11 +2086,56 @@ identify_untrusted_stk(void *canonical, void *untrusted)
 	return (cheri_is_subset(untrusted, canonical));
 }
 
+static void
+destroy_untrusted_stk(struct stk_table *table, compart_id_t cid)
+{
+	struct stk_table_stk_info *data;
+	enum stk_state state;
+	size_t size;
+
+	data = &table->meta->compart_stk[cid];
+
+	state = atomic_load_explicit(&data->state, memory_order_acquire);
+	switch (state) {
+	case STK_DESTROYED:
+		return;
+	case STK_LIVE:
+		size = data->size;
+		if (size == 0) {
+			if (atomic_compare_exchange_strong_explicit(
+			    &data->state, &state, STK_DESTROYED,
+			    memory_order_acquire, memory_order_acquire))
+				return;
+		} else if (atomic_compare_exchange_strong_explicit(&data->state,
+		    &state, STK_OCCUPIED, memory_order_acquire,
+		    memory_order_acquire))
+			break;
+	default:
+		stk_state_fatal("destroy_untrusted_stk", cid, state);
+	}
+
+	if (!identify_untrusted_stk(data->begin, table->entries[cid].stack)) {
+		rtld_fdprintf(STDERR_FILENO,
+		    "c18n: Untrusted stack %#p of %s is not derived from %#p\n",
+		    table->entries[cid].stack, comparts.data[cid].name,
+		    data->begin);
+		abort();
+	}
+	c18n_munmap(data->begin, size);
+	data->size = 0;
+	data->begin = NULL;
+	atomic_store_explicit(&data->state, STK_DESTROYED,
+	    memory_order_release);
+
+	atomic_fetch_sub_explicit(&c18n_stats->rcs_ustack, 1,
+	    memory_order_relaxed);
+}
+
 void
 _rtld_thr_exit(long *state)
 {
-	size_t i;
 	sigset_t nset;
+	compart_id_t i;
 	struct stk_table_stk_info *data;
 	struct stk_table *table;
 
@@ -2071,38 +2165,14 @@ _rtld_thr_exit(long *state)
 	/*
 	 * Unmap each compartment's stack.
 	 */
-	for (i = i + 1; i < table->meta->capacity; ++i) {
-		data = &table->meta->compart_stk[i];
-		if (data->size == 0)
-			continue;
-		if (!identify_untrusted_stk(
-		    data->begin, table->entries[i].stack)) {
-			rtld_fdprintf(STDERR_FILENO,
-			    "c18n: Untrusted stack %#p of %s is not derived "
-			    "from %#p\n", table->entries[i].stack,
-			    comparts.data[i].name, data->begin);
-			abort();
-		}
-		if (munmap(data->begin, data->size) != 0) {
-			rtld_fdprintf(STDERR_FILENO,
-			    "c18n: munmap(%#p, %zu) failed\n",
-			    data->begin, data->size);
-			abort();
-		}
-		*data = (struct stk_table_stk_info) {};
-		table->entries[i].stack = NULL;
-	}
+	for (i = i + 1; i < table->meta->capacity; ++i)
+		destroy_untrusted_stk(table, i);
 
 	/*
 	 * Unmap the trusted stack.
 	 */
 	data = &table->meta->trusted_stk;
-	if (munmap(data->begin, data->size) != 0) {
-		rtld_fdprintf(STDERR_FILENO,
-		    "c18n: munmap(%#p, %zu) failed\n",
-		    data->begin, data->size);
-		abort();
-	}
+	c18n_munmap(data->begin, data->size);
 	*data = (struct stk_table_stk_info) {};
 
 	/*
@@ -2202,6 +2272,8 @@ _rtld_sighandler_impl(int sig, siginfo_t *info, ucontext_t *ucp, void *nsp)
 	intr_idx = tf->callee;
 	intr = index_to_cid(intr_idx);
 	if (intr < table->meta->capacity &&
+	    atomic_load_explicit(&table->meta->compart_stk[intr].state,
+		memory_order_acquire) == STK_LIVE &&
 	    table->meta->compart_stk[intr].size > 0 &&
 	    identify_untrusted_stk(table->meta->compart_stk[intr].begin, nsp))
 		goto found;
@@ -2215,6 +2287,8 @@ _rtld_sighandler_impl(int sig, siginfo_t *info, ucontext_t *ucp, void *nsp)
 	intr_idx = tf[-1].caller;
 	intr = index_to_cid(intr_idx);
 	if (intr < table->meta->capacity &&
+	    atomic_load_explicit(&table->meta->compart_stk[intr].state,
+		memory_order_acquire) == STK_LIVE &&
 	    table->meta->compart_stk[intr].size > 0 &&
 	    identify_untrusted_stk(table->meta->compart_stk[intr].begin, nsp))
 		goto found_trusted;
