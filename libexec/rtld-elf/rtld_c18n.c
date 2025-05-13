@@ -199,6 +199,37 @@ c18n_strdup(const char *s)
 	return (buf);
 }
 
+static void *
+c18n_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
+{
+	void *ret;
+
+	ret = mmap(addr, len, prot, flags, fd, offset);
+	if (ret == MAP_FAILED) {
+		rtld_fdprintf(STDERR_FILENO,
+		    "c18n: mmap(%#p, %zu, %#x, %#x, %d, %ld) = %s\n",
+		    addr, len, prot, flags, fd, offset, rtld_strerror(errno));
+		abort();
+	}
+
+	return (ret);
+}
+
+static int
+c18n_munmap(void *addr, size_t len)
+{
+	int ret;
+
+	ret = munmap(addr, len);
+	if (ret != 0) {
+		rtld_fdprintf(STDERR_FILENO, "c18n: munmap(%#p, %zu) = %s\n",
+		    addr, len, rtld_strerror(errno));
+		abort();
+	}
+
+	return (ret);
+}
+
 /*
  * Policies
  */
@@ -759,10 +790,7 @@ create_stk(size_t size)
 {
 	char *stk;
 
-	stk = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_STACK, -1, 0);
-	if (stk == MAP_FAILED)
-		rtld_fatal("mmap failed");
-
+	stk = c18n_mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_STACK, -1, 0);
 	return (stk + size);
 }
 
@@ -1162,10 +1190,8 @@ tramp_pg_new(struct tramp_pg *next)
 	size_t capacity = tramp_pg_size;
 	struct tramp_pg *pg;
 
-	pg = mmap(NULL, capacity, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON,
-	    -1, 0);
-	if (pg == MAP_FAILED)
-		rtld_fatal("mmap failed");
+	pg = c18n_mmap(NULL, capacity, PROT_READ | PROT_WRITE | PROT_EXEC,
+	    MAP_ANON, -1, 0);
 	SLIST_NEXT(pg, link) = next;
 	atomic_store_explicit(&pg->size, 0, memory_order_relaxed);
 	pg->capacity = capacity - offsetof(typeof(*pg), trampolines);
@@ -1759,10 +1785,8 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 			    rtld_strerror(errno));
 	}
 
-	c18n_stats = mmap(NULL, sizeof(*c18n_stats), PROT_READ | PROT_WRITE,
-	    fd == -1 ? MAP_ANON : MAP_SHARED, fd, 0);
-	if (c18n_stats == MAP_FAILED)
-		rtld_fatal("c18n: Cannot mmap file (%s)", rtld_strerror(errno));
+	c18n_stats = c18n_mmap(NULL, sizeof(*c18n_stats),
+	    PROT_READ | PROT_WRITE, fd == -1 ? MAP_ANON : MAP_SHARED, fd, 0);
 	atomic_store_explicit(&c18n_stats->version, RTLD_C18N_STATS_VERSION,
 	    memory_order_release);
 
@@ -1979,11 +2003,47 @@ identify_untrusted_stk(void *canonical, void *untrusted)
 	return (cheri_is_subset(untrusted, canonical));
 }
 
+static void
+destroy_untrusted_stk(struct stk_table *table, compart_id_t cid)
+{
+	struct stk_table_stk_info *data;
+	size_t size;
+
+	data = &table->meta->compart_stk[cid];
+
+	/*
+	 * Non-zero size indicates that a stack has been allocated. Race to set
+	 * the size to zero and whoever wins gets to unmap the stack.
+	 */
+	size = atomic_load_explicit(&data->size, memory_order_relaxed);
+	do
+		if (size == 0)
+			return;
+	while (!atomic_compare_exchange_weak_explicit(&data->size, &size, 0,
+	    memory_order_relaxed, memory_order_relaxed));
+
+	if (!identify_untrusted_stk(data->begin, table->entries[cid].stack)) {
+		rtld_fdprintf(STDERR_FILENO,
+		    "c18n: Untrusted stack %#p of %s is not derived from %#p\n",
+		    table->entries[cid].stack, comparts.data[cid].name,
+		    data->begin);
+		abort();
+	}
+	c18n_munmap(data->begin, size);
+	*data = (struct stk_table_stk_info) {};
+	table->entries[cid] = (struct stk_table_entry) {
+		.stack = create_untrusted_stk,
+	};
+
+	atomic_fetch_sub_explicit(&c18n_stats->rcs_ustack, 1,
+	    memory_order_relaxed);
+}
+
 void
 _rtld_thr_exit(long *state)
 {
-	size_t i;
 	sigset_t nset;
+	compart_id_t i;
 	struct stk_table_stk_info *data;
 	struct stk_table *table = get_stk_table();
 
@@ -2014,40 +2074,14 @@ _rtld_thr_exit(long *state)
 	/*
 	 * Unmap each compartment's stack.
 	 */
-	for (i = i + 1; i < table->meta->capacity; ++i) {
-		data = &table->meta->compart_stk[i];
-		if (data->size == 0)
-			continue;
-		if (!identify_untrusted_stk(
-		    data->begin, table->entries[i].stack)) {
-			rtld_fdprintf(STDERR_FILENO,
-			    "c18n: Untrusted stack %#p of %s is not derived "
-			    "from %#p\n", table->entries[i].stack,
-			    comparts.data[i].name, data->begin);
-			abort();
-		}
-		if (munmap(data->begin, data->size) != 0) {
-			rtld_fdprintf(STDERR_FILENO,
-			    "c18n: munmap(%#p, %zu) failed\n",
-			    data->begin, data->size);
-			abort();
-		}
-		*data = (struct stk_table_stk_info) {};
-		table->entries[i] = (struct stk_table_entry) {
-			.stack = create_untrusted_stk,
-		};
-	}
+	for (i = i + 1; i < table->meta->capacity; ++i)
+		destroy_untrusted_stk(table, i);
 
 	/*
 	 * Unmap the trusted stack.
 	 */
 	data = &table->meta->trusted_stk;
-	if (munmap(data->begin, data->size) != 0) {
-		rtld_fdprintf(STDERR_FILENO,
-		    "c18n: munmap(%#p, %zu) failed\n",
-		    data->begin, data->size);
-		abort();
-	}
+	c18n_munmap(data->begin, data->size);
 	*data = (struct stk_table_stk_info) {};
 
 	/*
