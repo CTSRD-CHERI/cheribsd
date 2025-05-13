@@ -66,7 +66,7 @@ compart_id_t compart_id_for_address(const Obj_Entry *, Elf_Addr);
  * Stack switching
  */
 struct stk_table_stk_info {
-	size_t size;
+	_Atomic(size_t) size;
 	void *begin;
 };
 
