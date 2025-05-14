@@ -55,6 +55,9 @@
 OLD_DIRS+=usr/include/compat/cheriabi
 OLD_DIRS+=usr/include/compat
 
+# 20250511: mailx test renamed
+OLD_FILES+=usr/tests/usr.bin/mail/mail_sigint_test
+
 # 20250505: Remove audio(8) files after rename to sndctl(8)
 OLD_FILES+=usr/sbin/audio
 OLD_FILES+=usr/share/man/man8/audio.8.gz
