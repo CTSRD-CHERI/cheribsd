@@ -2460,9 +2460,9 @@ again:
 		}
 	}
 	if (m == NULL) {
-		if (vm_domain_alloc_fail(vmd, NULL, req))
-			goto again;
-		return (NULL);
+		if (!vm_domain_alloc_fail(vmd, NULL, req))
+			return (NULL);
+		goto again;
 	}
 
 found:
