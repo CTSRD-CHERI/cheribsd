@@ -385,7 +385,7 @@ null_lookup(struct vop_lookup_args *ap)
 {
 	struct componentname *cnp = ap->a_cnp;
 	struct vnode *dvp = ap->a_dvp;
-	int flags = cnp->cn_flags;
+	uint64_t flags = cnp->cn_flags;
 	struct vnode *vp, *ldvp, *lvp;
 	struct mount *mp;
 	int error;
