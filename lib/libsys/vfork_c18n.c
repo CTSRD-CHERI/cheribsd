@@ -29,14 +29,17 @@
 
 #include "libc_private.h"
 
-__weak_reference(__sys_vfork, vfork);
-__weak_reference(__sys_vfork, _vfork);
-
-pid_t
-__sys_vfork(void)
+static __used pid_t
+__vfork(void)
 {
+#ifdef CHERI_LIB_C18N
 	/*
 	 * Use the raw syscall to avoid the interposing table.
 	 */
-	return (__sys_fork());
+	if (_rtld_c18n_is_enabled())
+		return (__sys_fork());
+#endif
+	return (__sys_vfork());
 }
+
+__weak_reference(__vfork, vfork);

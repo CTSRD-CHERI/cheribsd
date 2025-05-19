@@ -51,6 +51,26 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20250421: Removal of /usr/lib{,64cb}/c18n
+OLD_FILES+=usr/lib/c18n/libc.so
+OLD_FILES+=usr/lib/c18n/libc.so.7
+OLD_FILES+=usr/lib/c18n/libsys.a
+OLD_FILES+=usr/lib/c18n/libsys.so
+OLD_FILES+=usr/lib/c18n/libsys.so.7
+OLD_FILES+=usr/lib/c18n/libsys_pic.a
+OLD_FILES+=usr/lib/c18n/libthr.so
+OLD_FILES+=usr/lib/c18n/libthr.so.3
+OLD_DIRS+=usr/lib/c18n
+OLD_FILES+=usr/lib64cb/c18n/libc.so
+OLD_FILES+=usr/lib64cb/c18n/libc.so.7
+OLD_FILES+=usr/lib64cb/c18n/libsys.a
+OLD_FILES+=usr/lib64cb/c18n/libsys.so
+OLD_FILES+=usr/lib64cb/c18n/libsys.so.7
+OLD_FILES+=usr/lib64cb/c18n/libsys_pic.a
+OLD_FILES+=usr/lib64cb/c18n/libthr.so
+OLD_FILES+=usr/lib64cb/c18n/libthr.so.3
+OLD_DIRS+=usr/lib64cb/c18n
+
 # 20241023: new clang import which bumps version from 18 to 19
 OLD_FILES+=usr/lib/clang/18/include/__clang_cuda_builtin_vars.h
 OLD_FILES+=usr/lib/clang/18/include/__clang_cuda_cmath.h
