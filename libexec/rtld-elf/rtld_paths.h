@@ -45,12 +45,6 @@
 #endif
 #endif
 
-#ifdef CHERI_LIB_C18N
-#ifndef _RTLD_C18N_FILE_SUFFIX
-#define	_RTLD_C18N_FILE_SUFFIX	"-c18n"
-#endif
-#endif
-
 #ifndef __PATH_ELF_HINTS
 #define	__PATH_ELF_HINTS(_lc)	"/var/run/ld-elf" _lc ".so.hints"
 #endif
@@ -59,24 +53,12 @@
 #define	_PATH_ELF_HINTS		__PATH_ELF_HINTS(_RTLD_COMPAT_LIB_SUFFIX)
 #endif
 
-#ifdef CHERI_LIB_C18N
-#ifndef _PATH_ELF_HINTS_C18N
-#define	_PATH_ELF_HINTS_C18N	__PATH_ELF_HINTS(_RTLD_COMPAT_LIB_SUFFIX _RTLD_C18N_FILE_SUFFIX)
-#endif
-#endif
-
 #ifndef __PATH_LIBMAP_CONF
 #define	__PATH_LIBMAP_CONF(_lc)	"/etc/libmap" _lc ".conf"
 #endif
 
 #ifndef _PATH_LIBMAP_CONF
 #define	_PATH_LIBMAP_CONF	__PATH_LIBMAP_CONF(_RTLD_COMPAT_LIB_SUFFIX)
-#endif
-
-#ifdef CHERI_LIB_C18N
-#ifndef _PATH_LIBMAP_CONF_C18N
-#define	_PATH_LIBMAP_CONF_C18N	__PATH_LIBMAP_CONF(_RTLD_COMPAT_LIB_SUFFIX _RTLD_C18N_FILE_SUFFIX)
-#endif
 #endif
 
 #ifndef __BASENAME_RTLD
@@ -97,14 +79,6 @@
 
 #ifndef STANDARD_LIBRARY_PATH
 #define	STANDARD_LIBRARY_PATH	"/lib" _RTLD_COMPAT_LIB_SUFFIX ":/usr/lib" _RTLD_COMPAT_LIB_SUFFIX
-#endif
-
-#ifdef CHERI_LIB_C18N
-#ifndef STANDARD_LIBRARY_PATH_C18N
-#define	STANDARD_LIBRARY_PATH_C18N	\
-				"/usr/lib" _RTLD_COMPAT_LIB_SUFFIX "/c18n:" \
-				STANDARD_LIBRARY_PATH
-#endif
 #endif
 
 #ifndef LD_

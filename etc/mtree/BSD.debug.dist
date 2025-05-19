@@ -27,8 +27,6 @@
             bin
             ..
             lib
-                c18n
-                ..
                 clang
                     19
                         lib

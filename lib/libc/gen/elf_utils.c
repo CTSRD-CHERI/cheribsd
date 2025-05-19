@@ -45,10 +45,6 @@ void __pthread_map_stacks_exec(void);
 #endif
 void __pthread_distribute_static_tls(size_t, void *, size_t, size_t);
 
-#ifdef CHERI_LIB_C18N
-ptraddr_t _rtld_tramp_reflect(const void *);
-#endif
-
 int
 __elf_phdr_match_addr(struct dl_phdr_info *phdr_info, void *addr)
 {
