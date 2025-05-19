@@ -1702,6 +1702,9 @@ _rtld_tramp_reflect(const void *addr)
 {
 	struct tramp_header *header;
 
+	if (!C18N_ENABLED)
+		return (0);
+
 	header = tramp_reflect(addr);
 	if (header == NULL)
 		return (0);
@@ -1713,6 +1716,14 @@ _rtld_tramp_reflect(const void *addr)
  * APIs
  */
 #define	C18N_FUNC_SIG_COUNT	72
+
+bool _rtld_c18n_is_enabled(void);
+
+bool
+_rtld_c18n_is_enabled(void)
+{
+	return (C18N_ENABLED);
+}
 
 static void *
 make_restricted(void *fptr)
@@ -1917,7 +1928,8 @@ void _rtld_thr_exit(long *);
 void
 _rtld_thread_start_init(void (*p)(struct pthread *))
 {
-	assert(((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) != 0) ==
+	assert(!C18N_ENABLED ||
+	    ((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) != 0) ==
 	    C18N_FPTR_ENABLED);
 	assert(thr_thread_start == NULL);
 	if (!C18N_FPTR_ENABLED)
@@ -1940,19 +1952,22 @@ _rtld_thread_start(struct pthread *curthread)
 	struct stk_table *table;
 	struct tcb_wrapper *wrap;
 
-	/*
-	 * The thread pointer register contains the fake tcb upon entering the
-	 * new thread. Extract and install the actual tcb and stack lookup
-	 * table.
-	 */
-	wrap = __containerof(get_trusted_tp(), struct tcb_wrapper, header);
+	if (C18N_ENABLED) {
+		/*
+		 * The thread pointer register contains the fake tcb upon
+		 * entering the new thread. Extract and install the actual tcb
+		 * and stack lookup table.
+		 */
+		tcb = get_trusted_tp();
+		wrap = __containerof(tcb, struct tcb_wrapper, header);
 
-	tcb = cheri_unseal(wrap->tcb, sealer_tcb);
-	*tcb = wrap->header;
-	_tcb_set(tcb);
+		tcb = cheri_unseal(wrap->tcb, sealer_tcb);
+		*tcb = wrap->header;
+		_tcb_set(tcb);
 
-	table = cheri_unseal(wrap->table, sealer_tcb);
-	init_stk_table(table, wrap);
+		table = cheri_unseal(wrap->table, sealer_tcb);
+		init_stk_table(table, wrap);
+	}
 
 	thr_thread_start(curthread);
 }
@@ -1971,6 +1986,9 @@ _rtld_thr_exit(long *state)
 	sigset_t nset;
 	struct stk_table_stk_info *data;
 	struct stk_table *table = get_stk_table();
+
+	if (!C18N_ENABLED)
+		goto out;
 
 	/*
 	 * Block all signals before destroying thread-specific data structures.
@@ -2037,6 +2055,7 @@ _rtld_thr_exit(long *state)
 	 */
 	push_stk_table(&dead_stk_tables, table);
 
+out:
 	__sys_thr_exit(state);
 }
 
@@ -2072,7 +2091,8 @@ static __siginfohandler_t *signal_dispatcher = sigdispatch;
 void
 _rtld_sighandler_init(__siginfohandler_t *handler)
 {
-	assert(((cheri_getperm(handler) & CHERI_PERM_EXECUTIVE) != 0) ==
+	assert(!C18N_ENABLED ||
+	    ((cheri_getperm(handler) & CHERI_PERM_EXECUTIVE) != 0) ==
 	    C18N_FPTR_ENABLED);
 	assert(signal_dispatcher == sigdispatch);
 	if (!C18N_FPTR_ENABLED)
@@ -2409,6 +2429,9 @@ _rtld_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
 	const struct sigaction *nactp = act;
 	sigset_t nset, oset;
 	int ret;
+
+	if (!C18N_ENABLED)
+		return (__sys_sigaction(sig, act, oact));
 
 	/*
 	 * Make the function re-entrant by blocking all signals.

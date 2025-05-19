@@ -108,12 +108,11 @@ SRCS+= \
 	thr_exit_c18n.c \
 	vfork_c18n.c
 
-PSEUDO+= \
+NO_UNDERSCORE+= \
 	mmap \
-	rfork
-NOASM+=	\
-	thr_exit.o \
-	vfork.o
+	rfork \
+	thr_exit \
+	vfork
 .endif
 
 .if ${MACHINE_ABI:Mpurecap}
