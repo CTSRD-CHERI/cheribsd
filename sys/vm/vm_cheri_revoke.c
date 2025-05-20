@@ -99,6 +99,26 @@ SYSCTL_COUNTER_U64(_vm_stats_cheri_revoke, OID_AUTO, last_ref_early_finish, CTLF
     &cheri_last_ref_early_finish,
     "Scans finished early because the target exited");
 
+static COUNTER_U64_DEFINE_EARLY(cheri_skip_cap_clean);
+SYSCTL_COUNTER_U64(_vm_stats_cheri_revoke, OID_AUTO, skip_cap_clean, CTLFLAG_RD,
+    &cheri_skip_cap_clean,
+    "Scans elided because the page is cap-clean");
+
+COUNTER_U64_DEFINE_EARLY(cheri_became_cap_clean);
+SYSCTL_COUNTER_U64(_vm_stats_cheri_revoke, OID_AUTO, became_cap_clean, CTLFLAG_RD,
+    &cheri_became_cap_clean,
+    "Number of times a cap-dirtyable page became cap-clean");
+
+COUNTER_U64_DEFINE_EARLY(cheri_scan_ro);
+SYSCTL_COUNTER_U64(_vm_stats_cheri_revoke, OID_AUTO, scan_ro, CTLFLAG_RD,
+    &cheri_scan_ro,
+    "Count of read-only page scans");
+
+COUNTER_U64_DEFINE_EARLY(cheri_scan_rw);
+SYSCTL_COUNTER_U64(_vm_stats_cheri_revoke, OID_AUTO, scan_rw, CTLFLAG_RD,
+    &cheri_scan_rw,
+    "Count of read-write page scans");
+
 /***************************** KERNEL THREADS ***************************/
 
 static MALLOC_DEFINE(M_REVOKE, "cheri_revoke", "cheri_revoke temporary data");
@@ -326,6 +346,7 @@ vm_cheri_revoke_visit_rw(const struct vm_cheri_revoke_cookie *crc, vm_page_t m,
 	 */
 	vm_page_aflag_clear(m, PGA_CAPDIRTY);
 
+	counter_u64_add(cheri_scan_rw, 1);
 	hascaps = vm_cheri_revoke_page_rw(crc, m);
 	if (hascaps & VM_CHERI_REVOKE_PAGE_DIRTY) {
 		KASSERT((hascaps & VM_CHERI_REVOKE_PAGE_HASCAPS) != 0,
@@ -369,6 +390,7 @@ vm_cheri_revoke_visit_ro(const struct vm_cheri_revoke_cookie *crc, vm_page_t m,
 	 * As above, it's safe to clear this flag here, regardless of aliasing.
 	 * We won't IDLE the page in any racing CLG fault handler.
 	 */
+	counter_u64_add(cheri_scan_ro, 1);
 	vm_page_aflag_clear(m, PGA_CAPDIRTY);
 	hascaps = vm_cheri_revoke_page_ro(crc, m);
 
@@ -415,9 +437,11 @@ again:
 	    (hascap ? PMAP_CAPLOADGEN_HASCAPS : 0));
 
 	switch (pres) {
+	case PMAP_CAPLOADGEN_CLEAN:
+		counter_u64_add(cheri_skip_cap_clean, 1);
+		/* FALLTHROUGH */
 	case PMAP_CAPLOADGEN_OK:
 	case PMAP_CAPLOADGEN_ALREADY:
-	case PMAP_CAPLOADGEN_CLEAN:
 		res = VM_CHERI_REVOKE_FAULT_RESOLVED;
 		goto out;
 
@@ -457,6 +481,7 @@ again:
 
 	case PMAP_CAPLOADGEN_SCAN_RO_WIRED:
 	case PMAP_CAPLOADGEN_SCAN_RO_XBUSIED:
+		counter_u64_add(cheri_scan_ro, 1);
 		vres = vm_cheri_revoke_page_ro(&crc, m);
 		if (vres & VM_CHERI_REVOKE_PAGE_DIRTY) {
 			/*
@@ -476,6 +501,7 @@ again:
 		break;
 
 	case PMAP_CAPLOADGEN_SCAN_RW_XBUSIED:
+		counter_u64_add(cheri_scan_rw, 1);
 		vres = vm_cheri_revoke_page_rw(&crc, m);
 
 		/*
@@ -610,8 +636,10 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc,
 	case PMAP_CAPLOADGEN_TEARDOWN:
 		panic("Bad first return %d from pmap_caploadgen_update", pres);
 
-	case PMAP_CAPLOADGEN_ALREADY:
 	case PMAP_CAPLOADGEN_CLEAN:
+		counter_u64_add(cheri_skip_cap_clean, 1);
+		/* FALLTHROUGH */
+	case PMAP_CAPLOADGEN_ALREADY:
 		*ooff = ioff + PAGE_SIZE;
 		return (VM_CHERI_REVOKE_AT_OK);
 
@@ -829,8 +857,10 @@ ok:
 		case PMAP_CAPLOADGEN_OK:
 			/* Update applied */
 			break;
-		case PMAP_CAPLOADGEN_ALREADY:
 		case PMAP_CAPLOADGEN_CLEAN:
+			counter_u64_add(cheri_skip_cap_clean, 1);
+			/* FALLTHROUGH */
+		case PMAP_CAPLOADGEN_ALREADY:
 			/* We lost a narrow race & visited the page twice */
 			break;
 		case PMAP_CAPLOADGEN_UNABLE:
