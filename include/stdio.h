@@ -300,6 +300,9 @@ void	 setbuf(FILE * __restrict, char * __restrict);
 int	 setvbuf(FILE * __restrict, char * __restrict, int, size_t);
 int	 (sprintf)(char * __restrict, const char * __restrict, ...);
 int	 sscanf(const char * __restrict, const char * __restrict, ...);
+#if __BSD_VISIBLE
+int	 __stderr_printf(const char * __restrict, ...);
+#endif
 FILE	*tmpfile(void);
 char	*tmpnam(char *);
 int	 ungetc(int, FILE *);
