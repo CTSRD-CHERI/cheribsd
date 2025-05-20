@@ -107,6 +107,7 @@
 #include <sys/asan.h>
 #include <sys/bitstring.h>
 #include <sys/bus.h>
+#include <sys/counter.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
@@ -6712,6 +6713,8 @@ pmap_caploadgen_next(pmap_t pmap)
 	PMAP_UNLOCK(pmap);
 }
 
+extern counter_u64_t cheri_became_cap_clean;
+
 /* XREF pmap_page_test_mappings */
 static void
 pmap_caploadgen_test_all_clean(vm_page_t m)
@@ -6796,6 +6799,7 @@ out:
 	 * created.
 	 */
 	if (rv && !(vm_page_astate_load(m).flags & PGA_CAPDIRTY)) {
+		counter_u64_add(cheri_became_cap_clean, 1);
 		vm_page_aflag_clear(m, PGA_CAPSTORE);
 	}
 }
