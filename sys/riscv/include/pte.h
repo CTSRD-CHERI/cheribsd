@@ -83,12 +83,20 @@ typedef	uint64_t	pn_t;			/* page number */
 #define	PTE_KERN_CHERI	(PTE_CR | PTE_CW | PTE_CD)
 #define	PTE_PROMOTE_CHERI (PTE_CR | PTE_CW | PTE_CD | PTE_CRM | PTE_CRG)
 #else /* !defined(__riscv_xcheri) */
+/*
+ * XXX-AM: Use only 3 states here
+ * cap-dirty: CW=1 CRG=*
+ * cap-never: CW=0 CRG=0
+ *
+ * In the first instance, do not optimize scans by transitioning to
+ * an ephemeral clean state.
+ */
 #define	PTE_CW		(1UL << 60) /* Capability Read/Write */
 #define	PTE_CRG		(1UL << 59) /* Cap Read Generation */
 
-#define	PTE_CR_CLEAR	0			/* clear tags on load and store */
-#define	PTE_CR_OK	PTE_CW			/* tags load OK (assume U=0) */
-#define	PTE_CR_GEN	PTE_CW			/* tags gated by generation */
+#define	PTE_CR_CLEAR	0
+#define	PTE_CR_OK	PTE_CW
+#define	PTE_CR_GEN	PTE_CW
 
 #define	PTE_KERN_CHERI	PTE_CW
 #define	PTE_PROMOTE_CHERI (PTE_CW | PTE_CRG)

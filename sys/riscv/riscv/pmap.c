@@ -3175,18 +3175,12 @@ pmap_promote_l2(pmap_t pmap, pd_entry_t *l2, vm_offset_t va, vm_page_t ml3,
 
 #if __has_feature(capabilities)
 #ifdef __riscv_xcheri
-	if ((firstl3e & (PTE_CW | PTE_CD)) == PTE_CW)
-#else
 	/*
-	 * XXX-AM: TODO figure out how to translate this for Zcheri.
-	 * CW=0 CRG=1 is the pre-CW state that logically corresponds to a
-	 * page that can hold capabilities and will become CW=1 if a capability
-	 * is stored there. Therefore, this implicitly allows capability writes
-	 * to the page, but corresponds to the non-dirty state.
+	 * XXX-AM: No special promotion logic for Zcheri.
+	 * We do not use dirty tracking for now, so we never have state transitions
+	 * outside CRG updates.
 	 */
-	if ((firstl3e & (PTE_CW | PTE_CRG)) == PTE_CRG)
-#endif
-	{
+	if ((firstl3e & (PTE_CW | PTE_CD)) == PTE_CW) {
 		/*
 		 * Prohibit superpages involving CW-set CD-clear PTEs.  The
 		 * revoker creates these without TLB shootdown, and so there
@@ -3203,6 +3197,7 @@ pmap_promote_l2(pmap_t pmap, pd_entry_t *l2, vm_offset_t va, vm_page_t ml3,
 		atomic_add_long(&pmap_l2_p_failures, 1);
 		return (false);
 	}
+#endif
 #endif
 
 	/*
@@ -4142,6 +4137,7 @@ pmap_caploadgen_update_crg(pmap_t pmap, pt_entry_t *pte)
 	}
 }
 
+#ifdef __riscv_xcheri
 static inline void
 pmap_caploadgen_update_clear_cw(pt_entry_t *pte, pt_entry_t oldpte)
 {
@@ -4174,9 +4170,10 @@ pmap_caploadgen_update_clear_cw(pt_entry_t *pte, pt_entry_t oldpte)
 	}
 
 }
+#endif
 
 static inline bool
-pmap_caploadgen_get_ucrg()
+pmap_caploadgen_get_ucrg(void)
 {
 #ifdef __riscv_xcheri
 	return ((csr_read(sccsr) & SCSSR_UGCLG) != 0);
@@ -4260,7 +4257,7 @@ retry:
 	}
 #else
 	if ((oldpte & (PTE_CW | PTE_CRG)) == 0) {
-		/* Not cap writable and not dirtiable, always trapping */
+		/* CAP-NEVER, always trapping */
 		m = NULL;
 		res = PMAP_CAPLOADGEN_UNABLE;
 		goto out;
@@ -4288,6 +4285,12 @@ retry:
 		 */
 		res = PMAP_CAPLOADGEN_OK;
 
+                /*
+		 * XXX-AM: Zcheri doesn't ever transition to cap clean for now.
+		 * We also ignore dirty tracking, everything that is cap-permissive
+		 * is dirty.
+		 */
+#ifdef __riscv_xcheri
 		if (!(flags & PMAP_CAPLOADGEN_HASCAPS)) {
 			/*
 			 * We didn't see a capability on this page; step this
@@ -4353,6 +4356,7 @@ retry:
 				pmap_store_bits(pte, PTE_CD);
 			}
 		}
+#endif /* __riscv_xcheri */
 
 		/*
 		 * On the fast path, where we're just updating the CRG bit, this
@@ -4369,7 +4373,9 @@ retry:
 		m = NULL;
 	} else if (!(vm_page_astate_load(m).flags & PGA_CAPSTORE)) {
 		KASSERT(!(oldpte & PTE_CW), ("!PGA_CAPSTORE but CW?"));
+#ifdef __riscv_xcheri
 		KASSERT(!(oldpte & PTE_CD), ("!PGA_CAPSTORE but CD?"));
+#endif
 
 #if defined(INVARIANTS)
 		/*
@@ -4460,7 +4466,9 @@ out:
 
 	PMAP_UNLOCK(pmap);
 	rw_runlock(&pvh_global_lock);
+#ifdef __riscv_xcheri
 out_unlocked:
+#endif
 
 	if (*mp != NULL) {
 		if (flags & PMAP_CAPLOADGEN_XBUSIED) {
@@ -5861,10 +5869,13 @@ update_crg:
 	else
 		csr_clear(sccsr, SCCSR_UGCLG);
 #else
-	if (pmap->flags.uclg)
+	if (pmap->flags.uclg) {
 		csr_set(sstatus, SSTATUS_UCRG);
-	else
+		td->td_frame->tf_sstatus |= SSTATUS_UCRG;
+	} else {
 		csr_clear(sstatus, SSTATUS_UCRG);
+		td->td_frame->tf_sstatus &= ~SSTATUS_UCRG;
+	}
 #endif
 #endif
 
