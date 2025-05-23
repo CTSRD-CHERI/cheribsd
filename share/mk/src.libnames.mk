@@ -709,6 +709,9 @@ LIBC_NOSSP_PIC?=	${LIBC_NOSSP_PICDIR}/libc_nossp_pic${PIE_SUFFIX}.a
 LIBSYS_PICDIR=	${_LIB_OBJTOP}/lib/libsys
 LIBSYS_PIC?=	${LIBSYS_PICDIR}/libsys_pic.a
 
+LIBSYS_PICDIR=	${_LIB_OBJTOP}/lib/libsys
+LIBSYS_PIC?=	${LIBSYS_PICDIR}/libsys_pic.a
+
 # Define a directory for each library.  This is useful for adding -L in when
 # not using a --sysroot or for meta mode bootstrapping when there is no
 # Makefile.depend.  These are sorted by directory.
