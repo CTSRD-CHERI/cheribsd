@@ -1914,6 +1914,11 @@ struct setcred_args {
 	char wcred_l_[PADL_(const struct setcred * __kerncap)]; const struct setcred * __kerncap wcred; char wcred_r_[PADR_(const struct setcred * __kerncap)];
 	char size_l_[PADL_(size_t)]; size_t size; char size_r_[PADR_(size_t)];
 };
+struct exterrctl_args {
+	char op_l_[PADL_(u_int)]; u_int op; char op_r_[PADR_(u_int)];
+	char flags_l_[PADL_(u_int)]; u_int flags; char flags_r_[PADR_(u_int)];
+	char ptr_l_[PADL_(void * __kerncap)]; void * __kerncap ptr; char ptr_r_[PADR_(void * __kerncap)];
+};
 int	sys_exit(struct thread *, struct exit_args *);
 int	sys_fork(struct thread *, struct fork_args *);
 int	sys_read(struct thread *, struct read_args *);
@@ -2321,6 +2326,7 @@ int	sys_kcmp(struct thread *, struct kcmp_args *);
 int	sys_getrlimitusage(struct thread *, struct getrlimitusage_args *);
 int	sys_fchroot(struct thread *, struct fchroot_args *);
 int	sys_setcred(struct thread *, struct setcred_args *);
+int	sys_exterrctl(struct thread *, struct exterrctl_args *);
 
 #ifdef COMPAT_43
 
@@ -3308,6 +3314,7 @@ int	freebsd13_swapoff(struct thread *, struct freebsd13_swapoff_args *);
 #define	SYS_AUE_getrlimitusage	AUE_NULL
 #define	SYS_AUE_fchroot	AUE_NULL
 #define	SYS_AUE_setcred	AUE_SETCRED
+#define	SYS_AUE_exterrctl	AUE_NULL
 
 #undef PAD_
 #undef PADL_

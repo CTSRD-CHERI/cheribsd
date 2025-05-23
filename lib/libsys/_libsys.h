@@ -471,6 +471,7 @@ typedef int (__sys_kcmp_t)(pid_t, pid_t, int, kuintcap_t, kuintcap_t);
 typedef int (__sys_getrlimitusage_t)(u_int, int, rlim_t * __kerncap);
 typedef int (__sys_fchroot_t)(int);
 typedef int (__sys_setcred_t)(u_int, const struct setcred * __kerncap, size_t);
+typedef int (__sys_exterrctl_t)(u_int, u_int, void * __kerncap);
 
 void __sys_exit(int rval);
 int __sys_fork(void);
@@ -877,6 +878,7 @@ int __sys_kcmp(pid_t pid1, pid_t pid2, int type, kuintcap_t idx1, kuintcap_t idx
 int __sys_getrlimitusage(u_int which, int flags, rlim_t * __kerncap res);
 int __sys_fchroot(int fd);
 int __sys_setcred(u_int flags, const struct setcred * __kerncap wcred, size_t size);
+int __sys_exterrctl(u_int op, u_int flags, void * __kerncap ptr);
 __END_DECLS
 
 #endif /* __LIBSYS_H_ */
