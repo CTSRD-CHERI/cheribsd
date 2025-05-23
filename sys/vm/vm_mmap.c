@@ -45,14 +45,15 @@
  * Mapped file (mmap) interface to VM
  */
 
-#include <sys/cdefs.h>
 #include "opt_hwpmc_hooks.h"
 #include "opt_ktrace.h"
 #include "opt_vm.h"
 
+#define	EXTERR_CATEGORY	EXTERR_CAT_MMAP
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/capsicum.h>
+#include <sys/exterrvar.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
@@ -459,6 +460,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 		SYSERRCAUSE(
 		    "%s: invalid bits in prot %x", __func__,
 		    (mrp->mr_prot & ~(_PROT_ALL | PROT_MAX(_PROT_ALL))));
+		SET_ERROR0(EINVAL, "unknown PROT bits");
 		return (EINVAL);
 	}
 	max_prot = PROT_MAX_EXTRACT(mrp->mr_prot);
@@ -483,6 +485,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 		if ((max_prot & prot) != prot) {
 			SYSERRCAUSE("%s: requested page permissions exceed "
 			    "requested maximum", __func__);
+			SET_ERROR0(ENOTSUP, "prot is not subset of max_prot");
 			return (ENOTSUP);
 		}
 	}
