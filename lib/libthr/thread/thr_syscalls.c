@@ -77,9 +77,9 @@
  */
 
 #include "namespace.h"
-#include <sys/types.h>
-#include <sys/mman.h>
 #include <sys/param.h>
+#include <sys/exterrvar.h>
+#include <sys/mman.h>
 #include <sys/select.h>
 #include <sys/signalvar.h>
 #include <sys/socket.h>
@@ -631,6 +631,15 @@ __thr_writev(int fd, const struct iovec *iov, int iovcnt)
 	return (ret);
 }
 
+static int
+__thr_uexterr_gettext(char *buf, size_t bufsz)
+{
+	struct pthread *curthread;
+
+	curthread = _get_curthread();
+	return (__uexterr_format(&curthread->uexterr, buf, bufsz));
+}
+
 void
 __thr_interpose_libc(void)
 {
@@ -688,6 +697,7 @@ __thr_interpose_libc(void)
 	SLOT(fdatasync);
 	SLOT(clock_nanosleep);
 	SLOT(pdfork);
+	SLOT(uexterr_gettext);
 #undef SLOT
 	*(__libc_interposing_slot(
 	    INTERPOS__pthread_mutex_init_calloc_cb)) =

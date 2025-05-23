@@ -470,6 +470,7 @@ FBSD_1.8 {
 	psiginfo;
 	rtld_get_var;
 	rtld_set_var;
+	uexterr_gettext;
 };
 
 FBSDprivate_1.0 {
@@ -604,4 +605,5 @@ FBSDprivate_1.0 {
 	__fillcontextx2;
 	__getcontextx_size;
 	__makecontext;
+	__uexterr_format;
 };

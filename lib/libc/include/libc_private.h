@@ -257,6 +257,7 @@ enum {
 	INTERPOS_clock_nanosleep,
 	INTERPOS__reserved0, /* was distribute_static_tls */
 	INTERPOS_pdfork,
+	INTERPOS_uexterr_gettext,
 	INTERPOS_MAX
 };
 
@@ -406,6 +407,10 @@ struct __nl_cat_d *__catopen_l(const char *name, int type,
 	    struct _xlocale *locale);
 int __strerror_rl(int errnum, char *strerrbuf, size_t buflen,
 	    struct _xlocale *locale);
+
+struct uexterror;
+int __uexterr_format(const struct uexterror *ue, char *buf, size_t bufsz);
+int __libc_uexterr_gettext(char *buf, size_t bufsz);
 
 #ifdef CHERI_LIB_C18N
 bool	_rtld_c18n_is_enabled(void);
