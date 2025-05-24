@@ -87,7 +87,7 @@
  */
 #define	KI_NSPARE_INT	2
 #define	KI_NSPARE_LONG	12
-#define	KI_NSPARE_PTR	5
+#define	KI_NSPARE_PTR	4
 
 #ifndef _KERNEL
 #ifndef KINFO_PROC_SIZE
@@ -213,6 +213,7 @@ struct kinfo_proc {
 	 * That way the spare room from both arrays will remain contiguous.
 	 */
 	struct pwddesc * __kerncap ki_pd; /* pointer to process paths info */
+	void * __kerncap ki_uerrmsg;	/* address of the ext err msg place */
 	void * __kerncap ki_spareptrs[KI_NSPARE_PTR];	/* spare room for growth */
 	long	ki_sparelongs[KI_NSPARE_LONG];	/* spare room for growth */
 	long	ki_sflag;		/* PS_* flags */

@@ -1364,6 +1364,9 @@ fill_kinfo_thread(struct thread *td, struct kinfo_proc *kp, int preferthread)
 	thread_unlock(td);
 	if (preferthread)
 		PROC_STATUNLOCK(p);
+
+	if ((td->td_pflags & TDP2_UEXTERR) != 0)
+		kp->ki_uerrmsg = td->td_exterr_ptr;
 }
 
 /*
@@ -1519,6 +1522,7 @@ freebsd32_kinfo_proc_out(const struct kinfo_proc *ki, struct kinfo_proc32 *ki32)
 	PTRTRIM_CP(*ki, *ki32, ki_tdaddr);
 	CP(*ki, *ki32, ki_sflag);
 	CP(*ki, *ki32, ki_tdflags);
+	PTRTRIM_CP(*ki, *ki32, ki_uerrmsg);
 }
 
 #undef PTRTRIM_CP
@@ -1630,6 +1634,7 @@ freebsd64_kinfo_proc_out(const struct kinfo_proc *ki, struct kinfo_proc64 *ki64)
 	PTRTRIM_CP(*ki, *ki64, ki_udata);
 	PTRTRIM_CP(*ki, *ki64, ki_tdaddr);
 	PTRTRIM_CP(*ki, *ki64, ki_pd);
+	PTRTRIM_CP(*ki, *ki64, ki_uerrmsg);
 	CP(*ki, *ki64, ki_sflag);
 	CP(*ki, *ki64, ki_tdflags);
 }
