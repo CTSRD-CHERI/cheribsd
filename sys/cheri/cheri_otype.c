@@ -42,7 +42,7 @@
 #include <vm/vm_cheri_revoke.h>
 #endif
 
-#ifdef __riscv_xcheri
+#if defined(__riscv_xcheri) || defined(__aarch64__)
 static struct mtx cheri_otype_lock;
 static struct unrhdr *cheri_otypes;
 /* Initialized in _start() */
