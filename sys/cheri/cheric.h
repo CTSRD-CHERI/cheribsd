@@ -58,7 +58,16 @@
 
 #define	cheri_andperm(x, y)	__builtin_cheri_perms_and((x), (y))
 #define	cheri_clearperm(x, y)	__builtin_cheri_perms_and((x), ~(y))
+/* Work around lack of cheri_tag_clear built-in for zcheri */
+#ifdef __riscv_zcheripurecap
+#define	cheri_cleartag(x)	__extension__({			\
+	__typeof__(((void)0, (x))) t = (x);			\
+	__PTRADDR_TYPE__ h = __builtin_cheri_high_get(t);	\
+	__builtin_cheri_high_set(t, h);				\
+})
+#else
 #define	cheri_cleartag(x)	__builtin_cheri_tag_clear((x))
+#endif
 #define	cheri_incoffset(x, y)	__builtin_cheri_offset_increment((x), (y))
 #define	cheri_setoffset(x, y)	__builtin_cheri_offset_set((x), (y))
 #define	cheri_setaddress(x, y)	__builtin_cheri_address_set((x), (y))

@@ -187,7 +187,7 @@ CHERIBSDTEST(cheriabi_open_bad_tag, "Path with tag bit missing")
 	char *path;
 	int fd;
 
-	path = cheri_cleartag(pathbuf);
+	path = cheri_cleartag((char *)pathbuf);
 
 	fd = open(path, O_RDONLY);
 	if (fd > 0)
