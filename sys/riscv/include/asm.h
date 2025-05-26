@@ -78,10 +78,16 @@
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	CAPABILITY_REG(reg)	c##reg
-#define	MOVE_REG(dst, src)	cmove CAPABILITY_REG(dst), CAPABILITY_REG(src)
+#define	MOVE_REG(dst, src)	cmv CAPABILITY_REG(dst), CAPABILITY_REG(src)
+#ifdef __riscv_xcheri
 #define	_CALL	ccall
 #define	_TAIL	ctail
 #define	RETURN	cret
+#else
+#define	_CALL	call
+#define	_TAIL	tail
+#define	RETURN	ret
+#endif
 #else
 #define	MOVE_REG(dst, src)	mv dst, src
 #define	_CALL	call
