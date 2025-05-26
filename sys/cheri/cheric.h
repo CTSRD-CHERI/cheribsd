@@ -86,7 +86,19 @@
 #define cheri_seal_conditionally(x, y)				 	\
     __builtin_cheri_conditional_seal((x), (y))
 #define cheri_sentry_create(x)	__builtin_cheri_seal_entry(x)
-#define cheri_tag_clear(x)	__builtin_cheri_tag_clear(x)
+/* XXX-AM
+ * Work around lack of cheri_tag_clear built-in for zcheri.
+ * This should be removed once the compiler supports this.
+ */
+#ifdef __riscv_zcheripurecap
+#define	cheri_tag_clear(x)	__extension__({			\
+	__typeof__(((void)0, (x))) t = (x);			\
+	__PTRADDR_TYPE__ h = __builtin_cheri_high_get(t);	\
+	__builtin_cheri_high_set(t, h);				\
+})
+#else
+#define	cheri_tag_clear(x)	__builtin_cheri_tag_clear((x))
+#endif
 #define cheri_tag_get(x)	__builtin_cheri_tag_get(x)
 #define cheri_type_copy(x, y)	__builtin_cheri_cap_type_copy((x), (y))
 #define cheri_type_get(x)	__builtin_cheri_type_get(x)
@@ -109,7 +121,6 @@
 
 #define	cheri_andperm(x, y)	__builtin_cheri_perms_and((x), (y))
 #define	cheri_clearperm(x, y)	__builtin_cheri_perms_and((x), ~(y))
-#define	cheri_cleartag(x)	__builtin_cheri_tag_clear((x))
 #define	cheri_incoffset(x, y)	__builtin_cheri_offset_increment((x), (y))
 #define	cheri_setoffset(x, y)	__builtin_cheri_offset_set((x), (y))
 #define	cheri_setaddress(x, y)	__builtin_cheri_address_set((x), (y))
