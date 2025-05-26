@@ -58,7 +58,11 @@
 
 #define	cheri_andperm(x, y)	__builtin_cheri_perms_and((x), (y))
 #define	cheri_clearperm(x, y)	__builtin_cheri_perms_and((x), ~(y))
+#ifdef __riscv_xcheri
 #define	cheri_cleartag(x)	__builtin_cheri_tag_clear((x))
+#else
+#define	cheri_cleartag(x)	__builtin_cheri_high_set((x), __builtin_cheri_high_get((x)))
+#endif
 #define	cheri_incoffset(x, y)	__builtin_cheri_offset_increment((x), (y))
 #define	cheri_setoffset(x, y)	__builtin_cheri_offset_set((x), (y))
 #define	cheri_setaddress(x, y)	__builtin_cheri_address_set((x), (y))
