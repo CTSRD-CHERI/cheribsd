@@ -327,6 +327,8 @@ MACHINE_CPU += vsx3
 . elif ${MACHINE_CPUARCH} == "riscv"
 .  if ${CPUTYPE} == "cheri"
 MACHINE_CPU = cheri
+.  elif ${CPUTYPE} == "xcheri"
+MACHINE_CPU = xcheri
 .  endif
 MACHINE_CPU += riscv
 . endif
@@ -383,8 +385,10 @@ CFLAGS.gcc+= -mabi=spe -mfloat-gprs=double -Wa,-me500
 
 .if ${MACHINE_CPUARCH} == "riscv"
 RISCV_MARCH=	rv64imafdc
-.if ${MACHINE_CPU:Mcheri}
+.if ${MACHINE_CPU:Mxcheri}
 RISCV_MARCH:=	${RISCV_MARCH}xcheri
+.elif ${MACHINE_CPU:Mcheri}
+RISCV_MARCH:=	${RISCV_MARCH}zcherihybrid
 .endif
 
 .if ${MACHINE_ARCH:Mriscv*c*}
