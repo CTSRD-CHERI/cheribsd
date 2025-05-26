@@ -53,12 +53,20 @@
  */
 DB_SHOW_COMMAND(scr, ddb_dump_scr)
 {
+#ifdef __riscv_xcheri
 	uint64_t sccsr;
 
 	sccsr = csr_read(sccsr);
 	db_printf("sccsr: %s, %s semantics\n",
 	    sccsr & SCCSR_E ? "enabled" : "disabled",
 	    sccsr & SCCSR_TAG_CLEARING ? "tag-clearing" : "trapping");
+#else
+	uint64_t senvcfg;
+
+	senvcfg = csr_read(senvcfg);
+	db_printf("senvcfg Y: %s\n",
+	    senvcfg & SENVCFG_Y ? "enabled" : "disabled");
+#endif
 
 	db_printf("ddc: %#.16lp\n",  scr_read(ddc));
 	db_printf("pcc: %#.16lp\n",  scr_read(pcc));
