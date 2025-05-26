@@ -4303,7 +4303,7 @@ retry:
 		 * We also ignore dirty tracking, everything that is cap-permissive
 		 * is dirty.
 		 */
-#ifdef __riscv_xcheri
+#ifndef CHERI_CAPREVOKE_NO_CLEAN
 		if (!(flags & PMAP_CAPLOADGEN_HASCAPS)) {
 			/*
 			 * We didn't see a capability on this page; step this
@@ -4369,7 +4369,7 @@ retry:
 				pmap_store_bits(pte, PTE_CD);
 			}
 		}
-#endif /* __riscv_xcheri */
+#endif /* !defined(CHERI_CAPREVOKE_NO_CLEAN) */
 
 		/*
 		 * On the fast path, where we're just updating the CRG bit, this
@@ -4391,6 +4391,9 @@ retry:
 #endif
 
 #if defined(INVARIANTS)
+#if defined(CHERI_CAPREVOKE_NO_CLEAN)
+		panic("Attempt to scan page without PGA_CAPSTORE");
+#endif
 		/*
 		 * We think there aren't any unrevoked capabilities on this
 		 * page.  Make sure we're not loading one.
@@ -4479,7 +4482,7 @@ out:
 
 	PMAP_UNLOCK(pmap);
 	rw_runlock(&pvh_global_lock);
-#ifdef __riscv_xcheri
+#ifndef CHERI_CAPREVOKE_NO_CLEAN
 out_unlocked:
 #endif
 
