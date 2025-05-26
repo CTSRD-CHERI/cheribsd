@@ -320,11 +320,45 @@
 #endif
 
 #if __has_feature(capabilities)
+#ifdef __riscv_xcheri
 #define	scr_read(scr)							\
 ({	void * __capability val;					\
 	__asm __volatile("cspecialr %0, " #scr : "=C" (val));		\
 	val;								\
 })
+#define	scr_write(scr, val)						\
+({									\
+	__asm __volatile("cspecialw " #scr ", %0" :: "C" (val));	\
+})
+#else /* !defined(__riscv_xcheri) */
+#ifdef __CHERI__
+#define	scr_read(scr)							\
+({	void * __capability val;					\
+	__asm __volatile("csrr %0, " #scr : "=C" (val));		\
+	val;								\
+})
+#define	scr_write(scr, val)						\
+({									\
+	__asm __volatile("csrw " #scr ", %0" :: "C" (val));		\
+})
+#else /* !defined(__CHERI__) */
+#define	scr_read(scr)							\
+({	void * __capability val;					\
+	__asm __volatile("ymodeswy\n"					\
+			 "csrr %0, " #scr "\n"				\
+			 "ymodeswi\n"					\
+			: "=C" (val));					\
+	val;								\
+})
+#define	scr_write(scr, val)						\
+({									\
+	__asm __volatile("ymodeswy\n"					\
+			 "csrw " #scr ", %0\n"				\
+			 "ymodeswi\n"					\
+			:: "C" (val));					\
+})
+#endif /* !defined(__CHERI__) */
+#endif /* defined(__riscv_xcheri) */
 #endif
 
 #endif /* !_MACHINE_RISCVREG_H_ */
