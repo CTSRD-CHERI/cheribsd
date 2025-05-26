@@ -109,11 +109,13 @@ check_initreg_code(void * __capability c)
 	/* Offset. */
 	CHERIBSDTEST_VERIFY(cheri_getoffset(c) == 0);
 
+#ifndef __riscv_zcheripurecap
 	/* Type -- should have unsealed type. */
 	v = cheri_gettype(c);
 	if (v != (uintmax_t)CHERI_OTYPE_UNSEALED)
 		cheribsdtest_failure_errx("otype %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_OTYPE_UNSEALED);
+#endif
 
 	/* Sealed bit. */
 	v = cheri_getsealed(c);
@@ -153,6 +155,10 @@ check_initreg_code(void * __capability c)
 		cheribsdtest_failure_errx("perms %jx (store_local_cap present)",
 		    v);
 
+#ifdef __riscv_zcheripurecap
+	if ((v & CHERI_PERM_LOAD_MUTABLE) == 0)
+		cheribsdtest_failure_errx("perms %jx (load mutable missing)", v);
+#else
 	if ((v & CHERI_PERM_SEAL) != 0)
 		cheribsdtest_failure_errx("perms %jx (seal present)", v);
 
@@ -161,6 +167,7 @@ check_initreg_code(void * __capability c)
 
 	if ((v & CHERI_PERM_UNSEAL) != 0)
 		cheribsdtest_failure_errx("perms %jx (unseal present)", v);
+#endif
 
 	if ((v & CHERI_PERM_SYSTEM_REGS) != 0)
 		cheribsdtest_failure_errx("perms %jx (system_regs present)", v);
@@ -215,11 +222,13 @@ check_initreg_data_full_addrspace(void * __capability c)
 		cheribsdtest_failure_errx("offset %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_CAP_USER_DATA_OFFSET);
 
+#ifndef __riscv_zcheripurecap
 	/* Type -- should have unsealed type. */
 	v = cheri_gettype(c);
 	if (v != (uintmax_t)CHERI_OTYPE_UNSEALED)
 		cheribsdtest_failure_errx("otype %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_OTYPE_UNSEALED);
+#endif
 
 	/* Permissions. */
 	v = cheri_getperm(c);
@@ -254,6 +263,10 @@ check_initreg_data_full_addrspace(void * __capability c)
 		cheribsdtest_failure_errx("perms %jx (store_local_cap missing)",
 		    v);
 
+#ifdef __riscv_zcheripurecap
+	if ((v & CHERI_PERM_LOAD_MUTABLE) == 0)
+		cheribsdtest_failure_errx("perms %jx (load mutable missing)", v);
+#else
 	if ((v & CHERI_PERM_SEAL) != 0)
 		cheribsdtest_failure_errx("perms %jx (seal present)", v);
 
@@ -262,6 +275,7 @@ check_initreg_data_full_addrspace(void * __capability c)
 
 	if ((v & CHERI_PERM_UNSEAL) != 0)
 		cheribsdtest_failure_errx("perms %jx (unseal present)", v);
+#endif
 
 	if ((v & CHERI_PERM_SYSTEM_REGS) != 0)
 		cheribsdtest_failure_errx("perms %jx (system_regs present)", v);
@@ -355,10 +369,12 @@ CHERIBSDTEST(initregs_stack,
 		    "(0x%jx)", (intmax_t)CHERI_STACK_USE_MAX,
 		    cheri_getlen(c) - cheri_getoffset(c));
 
+#ifndef __riscv_zcheripurecap
 	/* Type -- should have unsealed type. */
 	if (cheri_gettype(c) != CHERI_OTYPE_UNSEALED)
 		cheribsdtest_failure_errx("otype 0x%jx (expected 0x%jx)",
 		    cheri_gettype(c), (uintmax_t)CHERI_OTYPE_UNSEALED);
+#endif
 
 	/* Permissions. */
 	v = cheri_getperm(c);
@@ -389,17 +405,21 @@ CHERIBSDTEST(initregs_stack,
 		cheribsdtest_failure_errx("perms %jx (store_local_cap missing)",
 		    v);
 
+#ifdef __riscv_zcheripurecap
+	if ((v & CHERI_PERM_LOAD_MUTABLE) == 0)
+		cheribsdtest_failure_errx("perms %jx (load mutable missing)", v);
+#else
 	if ((v & CHERI_PERM_SEAL) != 0)
 		cheribsdtest_failure_errx("perms %jx (seal present)", v);
-
-	if ((v & CHERI_PERM_SYSTEM_REGS) != 0)
-		cheribsdtest_failure_errx("perms %jx (system_regs present)", v);
 
 	if ((v & CHERI_PERM_INVOKE) == 0)
 		cheribsdtest_failure_errx("perms %jx (invoke missing)", v);
 
 	if ((v & CHERI_PERM_UNSEAL) != 0)
 		cheribsdtest_failure_errx("perms %jx (unseal present)", v);
+#endif
+	if ((v & CHERI_PERM_SYSTEM_REGS) != 0)
+		cheribsdtest_failure_errx("perms %jx (system_regs present)", v);
 
 	if (v != CHERI_CAP_USER_DATA_PERMS)
 		cheribsdtest_failure_errx("perms %jx (expected %jx)", v,
