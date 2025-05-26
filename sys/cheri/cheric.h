@@ -97,7 +97,7 @@
 /* Compare capabilities including bounds and perms etc. */
 #define cheri_equal_exact(x, y) __builtin_cheri_equal_exact(x, y)
 
-#if !defined(__riscv_xcheri)
+#if defined(__riscv_zcheripurecap)
 /* CLoadTags not available, just use gettag(load) instead. */
 #define cheri_loadtags(m) \
 	cheri_gettag(     \
