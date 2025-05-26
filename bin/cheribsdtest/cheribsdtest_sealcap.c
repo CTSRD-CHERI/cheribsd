@@ -32,6 +32,8 @@
 
 #include "cheribsdtest.h"
 
+#ifdef __riscv_xcheri
+
 static void * __capability
 get_sealcap(void)
 {
@@ -257,3 +259,5 @@ CHERIBSDTEST(sealcap_seal_unseal,
 
 	cheribsdtest_success();
 }
+
+#endif /* defined(__riscv_xcheri) */
