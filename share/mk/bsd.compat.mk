@@ -116,8 +116,13 @@ HAS_COMPAT+=	64
 LIB64_RISCV_ABI=	lp64d
 LIB64_MACHINE=	riscv
 LIB64_MACHINE_ARCH=riscv64
-LIB64WMAKEENV=	MACHINE_CPU="riscv cheri"
-LIB64WMAKEFLAGS= LD="${XLD}" CPUTYPE=cheri
+.  if ${TARGET_CPUTYPE} == "cheri"
+.    warning "CPUTYPE=cheri is deprecated, please use xcheri or rvy"
+LIB64WMAKEENV=	MACHINE_CPU="riscv xcheri"
+.  else
+LIB64WMAKEENV=	MACHINE_CPU="riscv ${TARGET_CPUTYPE}"
+.  endif
+LIB64WMAKEFLAGS= LD="${XLD}" CPUTYPE=${TARGET_CPUTYPE}
 # XXX: clang specific
 LIB64CPUFLAGS=	-target riscv64-unknown-freebsd${OS_REVISION}
 LIB64CPUFLAGS+=	-march=${LIB64_RISCV_MARCH} -mabi=${LIB64_RISCV_ABI}
@@ -142,7 +147,7 @@ LIB64CCPUFLAGS+=	-march=morello -mabi=purecap
 HAS_COMPAT+=	64C
 LIB64C_MACHINE=	riscv
 LIB64C_MACHINE_ARCH=	${COMPAT_ARCH}c
-LIB64CWMAKEFLAGS=	CPUTYPE=cheri
+LIB64CWMAKEFLAGS=	CPUTYPE=${TARGET_CPUTYPE}
 LIB64CCPUFLAGS=	-target riscv64-unknown-freebsd${OS_REVISION}
 LIB64C_RISCV_ABI=	l64pc128d
 LIB64CCPUFLAGS+=	-march=${LIB64C_RISCV_MARCH} -mabi=${LIB64C_RISCV_ABI}
@@ -154,7 +159,13 @@ LIB64CCPUFLAGS+=	-march=${LIB64C_RISCV_MARCH} -mabi=${LIB64C_RISCV_ABI}
 # See bsd.cpu.mk
 LIB${_LIBCOMPAT}_RISCV_MARCH=	rv64imafdc
 .if ${COMPAT_ARCH:Mriscv*c*} || ${_LIBCOMPAT:M64C}
+.  if ${__C:Mxcheri} || ${__C} == "cheri"
 LIB${_LIBCOMPAT}_RISCV_MARCH:=	${LIB${_LIBCOMPAT}_RISCV_MARCH}xcheri
+.  elif ${__C:Mrvy}
+LIB${_LIBCOMPAT}_RISCV_MARCH:=	${LIB${_LIBCOMPAT}_RISCV_MARCH}zcherihybrid_zcherilevels
+.  else
+.    error "Invalid CHERI variant ${__C}"
+.  endif
 .endif
 .endfor
 .endif
