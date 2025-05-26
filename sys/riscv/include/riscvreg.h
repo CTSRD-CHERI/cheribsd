@@ -200,6 +200,7 @@
 #define	SATP_MODE_SV48	(9ULL << SATP_MODE_S)
 
 #if __has_feature(capabilities)
+#ifdef __riscv_xcheri
 #define	SCCSR_E			(1 << 0)
 #define	SCCSR_SGCLG		(1 << 2)
 #define	SCCSR_UGCLG		(1 << 3)
@@ -212,6 +213,10 @@
 #define	TVAL_CAP_IDX_MASK	(0x3f << TVAL_CAP_IDX_SHIFT)
 #define	TVAL_CAP_IDX(tval)						\
 	(((tval) & TVAL_CAP_IDX_MASK) >> TVAL_CAP_IDX_SHIFT)
+
+#if defined(__riscv_y)
+#define	SENVCFG_Y	(0x01 << 9)
+#endif
 #endif
 
 #define	XLEN		__riscv_xlen
