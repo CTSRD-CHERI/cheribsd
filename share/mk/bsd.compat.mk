@@ -154,7 +154,11 @@ LIB64CCPUFLAGS+=	-march=${LIB64C_RISCV_MARCH} -mabi=${LIB64C_RISCV_ABI}
 # See bsd.cpu.mk
 LIB${_LIBCOMPAT}_RISCV_MARCH=	rv64imafdc
 .if ${COMPAT_ARCH:Mriscv*c*} || ${_LIBCOMPAT:M64C}
+.  if ${__C:Mxcheri}
 LIB${_LIBCOMPAT}_RISCV_MARCH:=	${LIB${_LIBCOMPAT}_RISCV_MARCH}xcheri
+.  else
+LIB${_LIBCOMPAT}_RISCV_MARCH:=	${LIB${_LIBCOMPAT}_RISCV_MARCH}zcherihybrid
+.  endif
 .endif
 .endfor
 .endif
