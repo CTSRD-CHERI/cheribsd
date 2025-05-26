@@ -231,6 +231,7 @@ CHERIBSDTEST(cheriabi_open_sentry, "Sealed path")
 	cheribsdtest_success();
 }
 
+#ifdef HAS_CHERI_PERM_SEAL
 CHERIBSDTEST(cheriabi_open_sealed, "Sealed path")
 {
 	char *path, *sealed_path;
@@ -260,3 +261,4 @@ CHERIBSDTEST(cheriabi_open_sealed, "Sealed path")
 
 	cheribsdtest_success();
 }
+#endif

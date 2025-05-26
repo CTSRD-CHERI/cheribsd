@@ -32,6 +32,7 @@
 
 #include "cheribsdtest.h"
 
+#ifdef HAS_CHERI_PERM_SEAL
 static void * __capability
 get_sealcap(void)
 {
@@ -263,3 +264,4 @@ CHERIBSDTEST(sealcap_seal_unseal,
 
 	cheribsdtest_success();
 }
+#endif /* defined(HAS_CHERI_PERM_SEAL) */
