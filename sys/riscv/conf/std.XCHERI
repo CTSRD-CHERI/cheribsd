@@ -1,0 +1,4 @@
+include "std.CHERI"
+
+nomakeoptions   CPUTYPE
+makeoptions	CPUTYPE=xcheri
