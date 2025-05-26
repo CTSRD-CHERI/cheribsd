@@ -529,8 +529,8 @@ mrs_utrace_log(int event, void *p, size_t s, size_t n, void *r)
 	memcpy(ut.sig, mrs_utrace_sig, sizeof(ut.sig));
 	ut.event = event;
 	ut.s = s;
-	ut.p = __builtin_cheri_tag_clear(p);
-	ut.r = __builtin_cheri_tag_clear(r);
+	ut.p = cheri_cleartag(p);
+	ut.r = cheri_cleartag(r);
 	ut.n = n;
 	utrace(&ut, sizeof(ut));
 }
