@@ -201,7 +201,7 @@ cheri_can_access(const void * __capability cap, ptraddr_t perms, ptraddr_t base,
 #define cheri_ptrpermoff(ptr, len, perm, off)	\
 	cheri_setoffset(cheri_ptrperm(ptr, len, perm), off)
 
-#ifdef __riscv_xcheri
+#if defined(__riscv_xcheri) || defined(__aarch64__)
 /*
  * Construct a capability suitable to describe a type identified by 'ptr';
  * set it to zero-length with the offset equal to the base.  The caller must
