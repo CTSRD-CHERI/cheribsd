@@ -357,14 +357,24 @@
  * Derive an unbounded pointer before initial relocation.  For
  * purecap, derive the pointer from PCC.
  */
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI__
+#ifdef __riscv_y
 #define	CHERI_RODATA_PTR(x) ({						\
 	__typeof__((0, x)) _p;						\
 									\
 	__asm__ (							\
-	    "cllc %0, %c1\n\t"						\
+	    "lly %0, %c1\n\t"						\
 	    : "=C" (_p) : "i" (x));					\
 	_p; })
+#else
+#define	CHERI_RODATA_PTR(x) ({						\
+	__typeof__((0, x)) _p;						\
+									\
+	__asm__ (							\
+	    "llc %0, %c1\n\t"						\
+	    : "=C" (_p) : "i" (x));					\
+	_p; })
+#endif
 #else
 #define	CHERI_RODATA_PTR(x)	(&(*x))
 #endif
