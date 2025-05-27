@@ -605,7 +605,8 @@ __crt_aligned_alloc_offset(size_t align, size_t size, size_t offset)
 		if (cheri_align > align)
 			align = cheri_align;
 #endif
-		return (__simple_malloc_aligned(size, align));
+		p = __simple_malloc_aligned(size, align);
+		return (bound_ptr(p, size));
 	}
 
 	/*
