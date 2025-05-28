@@ -6,8 +6,11 @@ PLAIN_TESTS_PORCH+=	test_canon_fullbuf
 PLAIN_TESTS_PORCH+=	test_ncanon
 PLAIN_TESTS_PORCH+=	test_recanon
 PLAIN_TESTS_C+=		tiocnotty
+ATF_TESTS_C+=		test_sti
 
 PROGS+=			fionread
 PROGS+=			readsz
+
+LIBADD.test_sti=	util
 
 .include <bsd.test.mk>
