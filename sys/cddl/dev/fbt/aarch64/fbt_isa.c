@@ -91,6 +91,17 @@ fbt_make_tracepoint_capability(uint32_t *instr)
 	cap = cheri_andperm(cap, CHERI_PERM_STORE);
 	return (cap);
 }
+
+static uintcap_t
+fbt_unseal_symval(linker_symval_t *sym)
+{
+	extern void * __capability sentry_unsealcap;
+	uintcap_t val;
+
+	val = cheri_unseal((uintcap_t)sym->value, sentry_unsealcap);
+	val = cheri_andperm(val, CHERI_PERM_LOAD | CHERI_PERM_STORE);
+	return (val);
+}
 #endif
 
 int
@@ -120,9 +131,11 @@ fbt_provide_module_function(linker_file_t lf, int symindx,
 	    strcmp(name, "do_el1h_sync") == 0)
 		return (1);
 
-	symval = (uintptr_t)sym->value;
 #ifdef __CHERI_PURE_CAPABILITY__
+	symval = fbt_unseal_symval(sym);
 	symval &= ~0x1ul;
+#else
+	symval = (uintptr_t)sym->value;
 #endif
 	instr = (uint32_t *)symval;
 	limit = (uint32_t *)(symval + sym->size);
