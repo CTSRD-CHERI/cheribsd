@@ -4438,7 +4438,6 @@ static struct protosw seqpacketproto = {
 static struct domain localdomain = {
 	.dom_family =		AF_LOCAL,
 	.dom_name =		"local",
-	.dom_externalize =	unp_externalize,
 	.dom_nprotosw =		3,
 	.dom_protosw =		{
 		&streamproto,
