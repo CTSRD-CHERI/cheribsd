@@ -200,7 +200,7 @@ SYSCTL_INT(_vm, OID_AUTO, pfault_oom_wait, CTLFLAG_RWTUN,
     "the page fault handler");
 
 static bool capstore_on_alloc = 1;
-SYSCTL_BOOL(_vm, OID_AUTO, capstore_on_alloc, CTLFLAG_RW,
+SYSCTL_BOOL(_vm_cheri_revoke, OID_AUTO, capstore_on_alloc, CTLFLAG_RW,
     &capstore_on_alloc, 0,
     "Mark cap-writable pages CAPSTORE on allocation; trades revoker effort for "
     "the expense of upgrading.");
