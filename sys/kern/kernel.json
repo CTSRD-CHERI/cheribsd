@@ -1,7 +1,13 @@
 {
-	"TCB": {
+	"default-compartment": {
 		"files": [
-			"kern_compartment.o"
+			"kern_compartment.o",
+			"kern_linker.o",
+			"kern_thread.o",
+			"kern_sig.o",
+			"kern_timeout.o",
+			"subr_kobj.o",
+			"subr_pcpu.o"
 		]
 	},
 	"compartments": {
@@ -46,7 +52,6 @@
 				"kern_khelp.o",
 				"kern_kthread.o",
 				"kern_ktrace.o",
-				"kern_linker.o",
 				"kern_lock.o",
 				"kern_lockf.o",
 				"kern_loginclass.o",
@@ -75,7 +80,6 @@
 				"kern_sendfile.o",
 				"kern_sharedpage.o",
 				"kern_shutdown.o",
-				"kern_sig.o",
 				"kern_switch.o",
 				"kern_sx.o",
 				"kern_synch.o",
@@ -83,9 +87,7 @@
 				"kern_sysctl.o",
 				"kern_tc.o",
 				"kern_thr.o",
-				"kern_thread.o",
 				"kern_time.o",
-				"kern_timeout.o",
 				"kern_umtx.o",
 				"kern_uuid.o",
 				"kern_vnodedumper.o",
@@ -122,14 +124,12 @@
 				"subr_hash.o",
 				"subr_hints.o",
 				"subr_kdb.o",
-				"subr_kobj.o",
 				"subr_lock.o",
 				"subr_log.o",
 				"subr_memdesc.o",
 				"subr_module.o",
 				"subr_msgbuf.o",
 				"subr_param.o",
-				"subr_pcpu.o",
 				"subr_pctrie.o",
 				"subr_pidctrl.o",
 				"subr_power.o",
