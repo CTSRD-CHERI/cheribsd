@@ -41,11 +41,23 @@
  * for the prologue.
  */
 .macro	save_registers_head el
+/*
+ * Allocation space on the stack for:
+ * - a trap frame;
+ * - instruction emulation in DTrace (128 bytes), if an exception is taken from
+ * EL1;
+ * - the compartment caller's stack (CAP_WIDTH), if an exception is taken from
+ * EL0 and kernel compartmentalization is enabled.
+ */
 .if \el == 1
 	mov	PTR(18), PTRN(sp)
 	stp	CAP(0),  CAP(1),  [PTRN(sp), #(TF_X - TF_SIZE - 128)]!
 .else
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	stp	CAP(0),  CAP(1),  [PTRN(sp), #(TF_X - TF_SIZE - CAP_WIDTH)]!
+#else
 	stp	CAP(0),  CAP(1),  [PTRN(sp), #(TF_X - TF_SIZE)]!
+#endif
 .endif
 	stp	CAP(2),  CAP(3),  [PTRN(sp), #(2  * CAP_WIDTH)]
 	stp	CAP(4),  CAP(5),  [PTRN(sp), #(4  * CAP_WIDTH)]
@@ -92,22 +104,16 @@
 	str	CAP(2), [PTRN(sp), #(TF_RCTPIDR)]
 .if \el == 0
 	/*
-	 * Install the kernel compartment stack before branching into any
-	 * trampoline. The trampoline code assumes a caller's compartment stack
-	 * is valid and hence the call to compartment_entry_stackptr() must not
-	 * use a trampoline as well.
+	 * Since the exception is taken from EL0, we do not have a restricted
+	 * kernel compartment to set as the caller for trampolines.
+	 *
+	 * Use a part of the executive stack as a caller's dummy stack.
 	 */
-	mov	x0, COMPARTMENT_KERNEL_ID
-	mov	x1, TRAMPOLINE_TYPE_COMPARTMENT_ENTRY
-	bl	compartment_entry_stackptr
-	gclim	x1, c0
-	scvalue	c0, c0, x1
-	ldr	c0, [c0, #-CAP_WIDTH]
+	add	c0, PTRN(sp), #(TF_SIZE)
+	scbnds	c0, c0, #(CAP_WIDTH)
+	str	czr, [c0]
 	msr	rcsp_el0, c0
 .endif
-	/*
-	 * TODO: Clear capability registers (or tags)?
-	 */
 #endif
 .if \el == 0
 #if defined(PERTHREAD_SSP)
@@ -241,7 +247,11 @@
 .endif
 #endif
 .if \el == 0
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	add	PTRN(sp), PTRN(sp), #(CAP_WIDTH + TF_SIZE)
+#else
 	add	PTRN(sp), PTRN(sp), #(TF_SIZE)
+#endif
 .else
 	add	PTRN(sp), PTRN(sp), #(128 + TF_SIZE)
 	mrs	PTR(18), PTRN(tpidr_el1)

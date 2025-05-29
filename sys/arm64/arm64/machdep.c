@@ -167,6 +167,9 @@ static struct trapframe proc0_tf;
 int early_boot = 1;
 int cold = 1;
 static int boot_el;
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+static uintptr_t dummy_stack;
+#endif
 
 struct kva_md_info kmi;
 
@@ -1007,6 +1010,9 @@ initarm(struct arm64_bootparams *abp)
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	init_proc0(abp->kern_stack, abp->compartments0_stacks);
+
+	/* Set the caller stack to a dummy value. */
+	WRITE_SPECIALREG_CAP(rcsp_el0, &dummy_stack);
 
 	/*
 	 * Everything until here was only using TCB.
