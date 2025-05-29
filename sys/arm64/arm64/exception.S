@@ -30,7 +30,6 @@
 #include <machine/asm.h>
 #include <machine/armreg.h>
 #include <machine/cherireg.h>
-#include <machine/compartment_asm.h>
 
 #include "assym.inc"
 
@@ -132,19 +131,11 @@
 
 #ifdef PAC
 	ldr	PTR(0), [PTR(18), #PC_CURTHREAD]
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(1, ptrauth_exit_el0)
-#else
 	bl	ptrauth_exit_el0
-#endif
 #endif
 
 	ldr	PTR(0), [PTR(18), #(PC_CURTHREAD)]
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(1, dbg_monitor_enter)
-#else
 	bl	dbg_monitor_enter
-#endif
 
 	/* Unmask debug and SError exceptions */
 	msr	daifclr, #(DAIF_D | DAIF_A)
@@ -167,19 +158,11 @@
 .if \el == 0
 	ldr	PTR(0), [PTR(18), #PC_CURTHREAD]
 	mov	PTR(1), PTRN(sp)
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(2, dbg_monitor_exit)
-#else
 	bl	dbg_monitor_exit
-#endif
 
 #ifdef PAC
 	ldr	x0, [x18, #PC_CURTHREAD]
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(ptrauth_enter_el0)
-#else
 	bl	ptrauth_enter_el0
-#endif
 #endif
 
 	/* Remove the SSBD (CVE-2018-3639) workaround if needed */
@@ -287,11 +270,7 @@
 
 	/* handle the ast */
 	mov	PTR(0), PTRN(sp)
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(1, ast)
-#else
 	bl	_C_LABEL(ast)
-#endif
 
 	/* Re-check for new ast scheduled */
 	b	1b
@@ -325,11 +304,7 @@ ENTRY(handle_el1t_sync)
 	KMSAN_ENTER
 	ldr	PTR(0), [PTR(18), #PC_CURTHREAD]
 	mov	PTR(1), PTRN(sp)
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(2, do_el1t_sync)
-#else
 	bl	do_el1t_sync
-#endif
 	restore_registers 1
 	ERET
 END(handle_el1t_sync)
@@ -339,11 +314,7 @@ ENTRY(handle_el1t_irq)
 	KMSAN_ENTER
 	mov	PTR(0), PTRN(sp)
 	mov	x1, #INTR_ROOT_IRQ
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(2, intr_irq_handler)
-#else
 	bl	intr_irq_handler
-#endif
 	KMSAN_LEAVE
 	restore_registers 1
 	ERET
@@ -354,11 +325,7 @@ ENTRY(handle_el1t_fiq)
 	KMSAN_ENTER
 	mov	PTR(0), PTRN(sp)
 	mov	x1, #INTR_ROOT_FIQ
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(2, intr_irq_handler)
-#else
 	bl	intr_irq_handler
-#endif
 	KMSAN_LEAVE
 	restore_registers 1
 	ERET
@@ -369,11 +336,7 @@ ENTRY(handle_el1t_serror)
 	KMSAN_ENTER
 	mov	x0, sp
 1:
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(1, do_serror)
-#else
 	bl	do_serror
-#endif
 	b	1b
 	KMSAN_LEAVE
 END(handle_el1t_serror)
@@ -383,11 +346,7 @@ ENTRY(handle_el1h_sync)
 	KMSAN_ENTER
 	ldr	PTR(0), [PTR(18), #PC_CURTHREAD]
 	mov	PTR(1), PTRN(sp)
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(2, do_el1h_sync)
-#else
 	bl	do_el1h_sync
-#endif
 	KMSAN_LEAVE
 	restore_registers 1
 	ERET
@@ -398,11 +357,7 @@ ENTRY(handle_el1h_irq)
 	KMSAN_ENTER
 	mov	PTR(0), PTRN(sp)
 	mov	x1, #INTR_ROOT_IRQ
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(2, intr_irq_handler)
-#else
 	bl	intr_irq_handler
-#endif
 	KMSAN_LEAVE
 	restore_registers 1
 	ERET
@@ -413,11 +368,7 @@ ENTRY(handle_el1h_fiq)
 	KMSAN_ENTER
 	mov	PTR(0), PTRN(sp)
 	mov	x1, #INTR_ROOT_FIQ
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(2, intr_irq_handler)
-#else
 	bl	intr_irq_handler
-#endif
 	KMSAN_LEAVE
 	restore_registers 1
 	ERET
@@ -428,11 +379,7 @@ ENTRY(handle_el1h_serror)
 	KMSAN_ENTER
 	mov	x0, sp
 1:
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(1, do_serror)
-#else
 	bl	do_serror
-#endif
 	b	1b
 	KMSAN_LEAVE
 END(handle_el1h_serror)
@@ -444,11 +391,7 @@ ENTRY(handle_el0_sync)
 	mov	PTR(1), PTRN(sp)
 	mov	PTR(22), PTR(0)
 	str	PTR(1), [PTR(0), #TD_FRAME]
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(2, do_el0_sync)
-#else
 	bl	do_el0_sync
-#endif
 	do_ast
 	str	PTR(zr), [PTR(22), #TD_FRAME]
 	KMSAN_LEAVE
@@ -461,11 +404,7 @@ ENTRY(handle_el0_irq)
 	KMSAN_ENTER
 	mov	PTR(0), PTRN(sp)
 	mov	x1, #INTR_ROOT_IRQ
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(2, intr_irq_handler)
-#else
 	bl	intr_irq_handler
-#endif
 	do_ast
 	KMSAN_LEAVE
 	restore_registers 0
@@ -477,11 +416,7 @@ ENTRY(handle_el0_fiq)
 	KMSAN_ENTER
 	mov	PTR(0), PTRN(sp)
 	mov	x1, #INTR_ROOT_FIQ
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(2, intr_irq_handler)
-#else
 	bl	intr_irq_handler
-#endif
 	do_ast
 	KMSAN_LEAVE
 	restore_registers 0
@@ -493,11 +428,7 @@ ENTRY(handle_el0_serror)
 	KMSAN_ENTER
 	mov	PTR(0), PTRN(sp)
 1:
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(1, do_serror)
-#else
 	bl	do_serror
-#endif
 	b	1b
 	KMSAN_LEAVE
 END(handle_el0_serror)
@@ -507,11 +438,7 @@ ENTRY(handle_empty_exception)
 	KMSAN_ENTER
 	mov	PTR(0), PTRN(sp)
 1:
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(1, unhandled_exception)
-#else
 	bl	unhandled_exception
-#endif
 	b	1b
 	KMSAN_LEAVE
 END(handle_empty_exception)
@@ -554,18 +481,3 @@ exception_vectors:
 	vector el0_serror 0	/* Error 32-bit EL0 */
 
 GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-RELRO_ENTRY(ast)
-RELRO_ENTRY(dbg_monitor_enter)
-RELRO_ENTRY(dbg_monitor_exit)
-RELRO_ENTRY(do_el0_sync)
-RELRO_ENTRY(do_el1h_sync)
-RELRO_ENTRY(do_el1t_sync)
-RELRO_ENTRY(do_serror)
-RELRO_ENTRY(intr_irq_handler)
-#ifdef PAC
-RELRO_ENTRY(ptrauth_enter_el0)
-RELRO_ENTRY(ptrauth_exit_el0)
-#endif
-RELRO_ENTRY(unhandled_exception)
-#endif

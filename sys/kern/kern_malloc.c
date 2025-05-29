@@ -811,8 +811,8 @@ malloc_domainset(size_t size, struct malloc_type *mtp, struct domainset *ds,
 /*
  * Allocate an executable area.
  */
-COMPARTMENT_ENTRY(void *, malloc_exec, (size_t size, struct malloc_type *mtp,
-    int flags))
+void *
+malloc_exec(size_t size, struct malloc_type *mtp, int flags)
 {
 
 	return (malloc_domainset_exec(size, mtp, DOMAINSET_RR(), flags));

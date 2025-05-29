@@ -651,8 +651,8 @@ fail:
 }
 #endif
 
-EXECUTIVE_ENTRY(void, exec_setregs, (struct thread *td,
-    struct image_params *imgp, uintcap_t stack))
+void
+exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 {
 	struct trapframe *tf = td->td_frame;
 	struct pcb *pcb = td->td_pcb;

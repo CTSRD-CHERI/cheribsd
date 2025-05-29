@@ -35,13 +35,21 @@
 
 #ifdef _KERNEL
 
-#include <sys/_compartment.h>
 #include <sys/malloc.h>
 #include <sys/linker.h>
 #include <sys/queue.h>
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 #include <machine/compartment.h>
+
+/*
+ * A compartment identifier for the kernel itself.
+ */
+#define	COMPARTMENT_KERNEL_ID			1
+
+#define	TRAMPOLINE_TYPE_COMPARTMENT_ENTRY	0
+#define	TRAMPOLINE_TYPE_EXECUTIVE_ENTRY	1
+#define	TRAMPOLINE_TYPE_MAX			TRAMPOLINE_TYPE_EXECUTIVE_ENTRY
 
 SYSCTL_DECL(_security_compartment);
 
@@ -71,15 +79,7 @@ void *executive_get_function(uintptr_t func);
 #ifdef MALLOC_DECLARE
 MALLOC_DECLARE(M_COMPARTMENT);
 #endif
-#else	/* CHERI_COMPARTMENTALIZE_KERNEL */
-#define	COMPARTMENT_ENTRY(ret_type, name, args)				\
-	ret_type							\
-	COMPARTMENT_ENTRY_NAME(name) args
-
-#define	EXECUTIVE_ENTRY(ret_type, name, args)				\
-	ret_type							\
-	EXECUTIVE_ENTRY_NAME(name) args
-#endif
+#endif	/* CHERI_COMPARTMENTALIZE_KERNEL */
 
 #endif	/* _KERNEL */
 

@@ -71,8 +71,9 @@ cpu_reset_hook_t cpu_reset_hook = psci_reset;
  * Copy and update the pcb, set up the stack so that the child
  * ready to run and return to user mode.
  */
-EXECUTIVE_ENTRY(void, cpu_fork, (struct thread *td1, struct proc *p2,
-    struct thread *td2, int flags))
+void
+cpu_fork(struct thread *td1, struct proc *p2,
+    struct thread *td2, int flags)
 {
 	struct pcb *pcb2;
 	struct trapframe *tf;
@@ -202,8 +203,8 @@ cpu_set_syscall_retval(struct thread *td, int error)
  * finalizes the thread state and handles peculiarities of the first
  * return to userspace for the new thread.
  */
-EXECUTIVE_ENTRY(void, cpu_copy_thread, (struct thread *td,
-    struct thread *td0))
+void
+cpu_copy_thread(struct thread *td, struct thread *td0)
 {
 	bcopy(td0->td_frame, td->td_frame, sizeof(struct trapframe));
 	bcopy(td0->td_pcb, td->td_pcb, sizeof(struct pcb));

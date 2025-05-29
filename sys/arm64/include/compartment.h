@@ -33,53 +33,9 @@
 #ifndef _MACHINE_COMPARTMENT_H_
 #define	_MACHINE_COMPARTMENT_H_
 
-#include <sys/_compartment.h>
-
 #include <machine/elf.h>
 #include <machine/ifunc.h>
 
-/*
- * This header file includes compartmentalization-related macros for C source
- * code files.
- */
-
-#define	COMPARTMENT_ADD_ENTRY(ret_type, name, args)			\
-	DEFINE_IFUNC(, ret_type, name, args)				\
-	{								\
-		uintptr_t func;						\
-									\
-		ELF_STATIC_RELOC_LABEL(func,				\
-		    COMPARTMENT_ENTRY_NAME(name));			\
-		return (compartment_entry_for_kernel(func));		\
-	}
-#define	COMPARTMENT_ENTRY(ret_type, name, args)				\
-	static ret_type COMPARTMENT_ENTRY_NAME(name) args;		\
-	COMPARTMENT_ADD_ENTRY(ret_type, name, args);			\
-	static __attribute__((used)) ret_type				\
-	COMPARTMENT_ENTRY_NAME(name) args
-
-#define	EXECUTIVE_ADD_ENTRY(ret_type, name, args)			\
-	DEFINE_IFUNC(, ret_type, name, args)				\
-	{								\
-		uintptr_t func;						\
-									\
-		ELF_STATIC_RELOC_LABEL(func,				\
-		    EXECUTIVE_ENTRY_NAME(name));			\
-		return (executive_entry_for_kernel(func));		\
-	}
-#define	EXECUTIVE_EXIT(name, args)					\
-	({								\
-		KASSERT((cheri_getperm(&name) &				\
-		    CHERI_PERM_EXECUTIVE) == 0,				\
-		    ("Executive's exit %s has invalid permissions",	\
-		    #name));						\
-		name args;						\
-	})
-#define	EXECUTIVE_ENTRY(ret_type, name, args)				\
-	static ret_type EXECUTIVE_ENTRY_NAME(name) args;		\
-	EXECUTIVE_ADD_ENTRY(ret_type, name, args)			\
-	static __attribute__((used)) ret_type				\
-	EXECUTIVE_ENTRY_NAME(name) args
 #define	EXECUTIVE_ASSERT()						\
 	KASSERT((cheri_getperm(cheri_getpcc()) &			\
 	    CHERI_PERM_EXECUTIVE) != 0,					\

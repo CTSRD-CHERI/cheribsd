@@ -256,7 +256,8 @@ efi_arch_enter(void)
 	return (0);
 }
 
-EXECUTIVE_ENTRY(void, efi_arch_leave, (void))
+void
+efi_arch_leave(void)
 {
 
 	/*

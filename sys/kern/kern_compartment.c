@@ -210,8 +210,8 @@ compartment_linkup0(struct compartment *compartment, struct thread *td)
 	compartment_linkup(compartment, COMPARTMENT_KERNEL_ID, td);
 }
 
-EXECUTIVE_ENTRY(struct compartment *, compartment_create_for_thread,
-    (struct thread *td, u_long id))
+struct compartment *
+compartment_create_for_thread(struct thread *td, u_long id)
 {
 	struct compartment *compartment;
 
@@ -244,11 +244,11 @@ compartment_create(u_long id)
 
 	EXECUTIVE_ASSERT();
 
-	return (EXECUTIVE_ENTRY_NAME(compartment_create_for_thread)
-	    (curthread, id));
+	return (compartment_create_for_thread(curthread, id));
 }
 
-EXECUTIVE_ENTRY(void, compartment_destroy, (struct compartment *compartment))
+void
+compartment_destroy(struct compartment *compartment)
 {
 
 
@@ -392,7 +392,8 @@ out:
 	return ((void *)func);
 }
 
-EXECUTIVE_ENTRY(void, compartment_trampoline_destroy, (uintptr_t func))
+void
+compartment_trampoline_destroy(uintptr_t func)
 {
 	struct compartment_trampoline *trampoline;
 
@@ -413,7 +414,8 @@ compartment_entry_for_kernel(uintptr_t func)
 	    szcompartment_entry_trampoline, func));
 }
 
-EXECUTIVE_ENTRY(void *, compartment_entry, (uintptr_t func))
+void *
+compartment_entry(uintptr_t func)
 {
 	linker_file_t lf;
 

@@ -37,7 +37,6 @@
 
 #include <machine/asm.h>
 #include <machine/armreg.h>
-#include <machine/compartment_asm.h>
 
 .macro clear_step_flag pcbflags, tmp
 	tbz	\pcbflags, #PCB_SINGLE_STEP_SHIFT, 999f
@@ -81,7 +80,7 @@
 /*
  * void cpu_throw(struct thread *old, struct thread *new)
  */
-EXECUTIVE_ENTRY(cpu_throw)
+ENTRY(cpu_throw)
 	/* Of old == NULL skip disabling stepping */
 	cbz	x0, 1f
 
@@ -97,11 +96,7 @@ EXECUTIVE_ENTRY(cpu_throw)
 #ifdef VFP
 	/* Backup the new thread pointer around a call to C code */
 	mov	PTR(19), PTR(1)
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(1, vfp_discard)
-#else
 	bl	vfp_discard
-#endif
 	mov	PTR(0), PTR(19)
 #else
 	mov	PTR(0), PTR(1)
@@ -109,21 +104,13 @@ EXECUTIVE_ENTRY(cpu_throw)
 
 #ifdef PAC
 	/* This returns the thread pointer so no need to save it */
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(1, ptrauth_switch)
-#else
 	bl	ptrauth_switch
-#endif
 #endif
 #ifdef PERTHREAD_SSP
 	mov	x19, x0
 #endif
 	/* This returns the thread pcb */
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(1, pmap_switch)
-#else
 	bl	pmap_switch
-#endif
 	mov	PTR(4), PTR(0)
 #ifdef PERTHREAD_SSP
 	/* Update the per-thread stack canary pointer. */
@@ -173,7 +160,7 @@ END(cpu_throw)
  * x/c2 = mtx
  * x3 to x7, x16 and x17 are caller saved
  */
-EXECUTIVE_ENTRY(cpu_switch)
+ENTRY(cpu_switch)
 	/*
 	 * Save the old context.
 	 */
@@ -218,11 +205,7 @@ EXECUTIVE_ENTRY(cpu_switch)
 	pid_in_context_idr
 
 #ifdef VFP
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(1, vfp_save_state_switch)
-#else
 	bl	vfp_save_state_switch
-#endif
 	mov	PTR(0), PTR(20)
 #else
 	mov	PTR(0), PTR(1)
@@ -230,18 +213,10 @@ EXECUTIVE_ENTRY(cpu_switch)
 
 #ifdef PAC
 	/* This returns the thread pointer so no need to save it */
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(1, ptrauth_switch)
-#else
 	bl	ptrauth_switch
 #endif
-#endif
 	/* This returns the thread pcb */
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(1, pmap_switch)
-#else
 	bl	pmap_switch
-#endif
 	/* Move the new pcb out of the way */
 	mov	PTR(4), PTR(0)
 
@@ -301,16 +276,12 @@ EXECUTIVE_ENTRY(cpu_switch)
 	RETURN
 END(cpu_switch)
 
-EXECUTIVE_ENTRY(fork_trampoline)
+ENTRY(fork_trampoline)
 	mov	PTR(0), PTR(19)
 	mov	PTR(1), PTR(20)
 	mov	PTR(2), PTRN(sp)
 	mov	fp, #0	/* Stack traceback stops here. */
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(3, fork_exit)
-#else
 	bl	_C_LABEL(fork_exit)
-#endif
 
 	/*
 	 * Disable interrupts as we are setting userspace specific
@@ -321,11 +292,7 @@ EXECUTIVE_ENTRY(fork_trampoline)
 
 #ifdef PAC
 	ldr	x0, [x18, #PC_CURTHREAD]
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(1, ptrauth_enter_el0)
-#else
 	bl	ptrauth_enter_el0
-#endif
 #endif
 
 	/* Restore sp, lr, elr, and spsr */
@@ -378,7 +345,7 @@ EXECUTIVE_ENTRY(fork_trampoline)
 	
 END(fork_trampoline)
 
-EXECUTIVE_ENTRY(savectx)
+ENTRY(savectx)
 	/* Store the callee-saved registers */
 	stp	PTR(19), PTR(20), [PTR(0), #PCB_REGS + (PCB_X19 + 0) * PTR_WIDTH]
 	stp	PTR(21), PTR(22), [PTR(0), #PCB_REGS + (PCB_X19 + 2) * PTR_WIDTH]
@@ -408,30 +375,13 @@ EXECUTIVE_ENTRY(savectx)
 
 #ifdef VFP
 	/* Store the VFP registers */
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	RELRO_BRANCH(1, vfp_save_state_savectx)
-#else
 	b	vfp_save_state_savectx
-#endif
 #else
 	ret
 #endif
 END(savectx)
 
 GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-RELRO_ENTRY(fork_exit)
-RELRO_ENTRY(pmap_switch)
-#ifdef PAC
-RELRO_ENTRY(ptrauth_enter_el0)
-RELRO_ENTRY(ptrauth_switch)
-#endif
-#ifdef VFP
-RELRO_ENTRY(vfp_discard)
-RELRO_ENTRY(vfp_save_state_savectx)
-RELRO_ENTRY(vfp_save_state_switch)
-#endif
-#endif
 
 // CHERI CHANGES START
 // {
