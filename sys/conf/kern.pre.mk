@@ -40,12 +40,10 @@ KERNEL_KO?=	kernel
 KERNEL?=	kernel
 KODIR?=		/boot/${KERNEL}
 LDSCRIPT_NAME?=	ldscript.$M
+LDSCRIPT?=	$S/conf/${LDSCRIPT_NAME}
 .if defined(CHERI_COMPARTMENT_POLICY)
-LDSCRIPT?=	$S/conf/${LDSCRIPT_NAME}.kernel-c18n
 LDFLAGS+=	--compartment-policy=${SRCTOP}/sys/kernel.json \
 		--compartment-policy=${SRCTOP}/sys/kern/kernel.json
-.else
-LDSCRIPT?=	$S/conf/${LDSCRIPT_NAME}
 .endif
 
 M=		${MACHINE}
