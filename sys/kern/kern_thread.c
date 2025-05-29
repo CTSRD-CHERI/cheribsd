@@ -843,9 +843,7 @@ thread_alloc_compartments(struct thread *td)
 	KASSERT(TAILQ_EMPTY(&td->td_compartments),
 	    ("thread_alloc_compartments called on a thread with existing compartments"));
 
-	if (compartment_create_for_thread(td, COMPARTMENT_KERNEL_ID) == NULL)
-		return (0);
-	return (1);
+	return (link_elf_create_compartments(linker_kernel_file, td));
 }
 
 void

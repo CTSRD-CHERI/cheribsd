@@ -1,6 +1,12 @@
 /*-
- * Copyright (c) 2013 Andrew Turner <andrew@freebsd.org>
- * All rights reserved.
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright (c) 2025 Konrad Witaszczyk
+ *
+ * This software was developed by the University of Cambridge Computer
+ * Laboratory (Department of Computer Science and Technology) under Office of
+ * Naval Research (ONR) Contract No. N00014-22-1-2463 ("SoftWare Integrated
+ * with Secure Hardware (SWISH)").
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,49 +30,18 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _MACHINE_MACHDEP_H_
-#define	_MACHINE_MACHDEP_H_
+#include <sys/param.h>
+#include <sys/compartment.h>
+#include <sys/proc.h>
 
-#ifdef _KERNEL
+void
+cpu_compartment_alloc(struct compartment *compartment)
+{
 
-struct arm64_bootparams {
-	vm_pointer_t	modulep;
-	vm_pointer_t	kern_stack;
-	vm_paddr_t	kern_ttbr0;
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	vm_pointer_t	compartments0_stacks;
-#endif
-	int		boot_el;	/* EL the kernel booted from */
-	int		pad;
-};
-
-enum arm64_bus {
-	ARM64_BUS_NONE,
-	ARM64_BUS_FDT,
-	ARM64_BUS_ACPI,
-};
-
-extern enum arm64_bus arm64_bus_method;
-
-void dbg_init(void);
-bool has_hyp(void);
-bool in_vhe(void);
-void initarm(struct arm64_bootparams *);
-vm_offset_t parse_boot_param(struct arm64_bootparams *abp);
-#ifdef FDT
-void parse_fdt_bootargs(void);
-#endif
-int memory_mapping_mode(vm_paddr_t pa);
-extern void (*pagezero)(void *);
-
-#ifdef SOCDEV_PA
-/*
- * The virtual address SOCDEV_PA is mapped at.
- * Only valid while the early pagetables are valid.
- */
-extern uintptr_t socdev_va;
-#endif
-
-#endif /* _KERNEL */
-
-#endif /* _MACHINE_MACHDEP_H_ */
+	/*
+	 * The bottom of compartment's stack contains the current stack pointer.
+	 */
+	compartment->c_kstackptr =
+	    (vm_pointer_t)(((vm_pointer_t *)compartment->c_kstackptr) - 1);
+	*((vm_pointer_t *)compartment->c_kstackptr) = compartment->c_kstackptr;
+}

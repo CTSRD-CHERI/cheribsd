@@ -94,22 +94,11 @@
 	 * no place to store the PCB pointer here.
 	 * XXX-AM: It could be another bootparam if needed
 	 */
-.if \restricted == 1
-	/*
-	 * Make room for the saved restricted stack pointer.
-	 */
-#if __has_feature(capabilities)
-	sub	c\dregn, c\dregn, PTR_WIDTH
-#else
-	sub	x\dregn, x\dregn, PTR_WIDTH
-#endif
-.else
 #if __has_feature(capabilities)
 	sub	c\dregn, c\dregn, #PCB_SIZE
 #else
 	sub	x\dregn, x\dregn, #PCB_SIZE
 #endif
-.endif
 .endmacro
 
 .macro buildptr_range sregn, eregn, start_sym, end_sym, clrperm = x
@@ -142,28 +131,6 @@
 #endif
 	br	PTR(\regn)
 .endmacro
-
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-/*
- * Use the linker-based compartmentalization model.
- *
- * TODO: Use the compartment API to allocate and call a trampoline.
- */
-.macro enter_kern_compartment scratch1n, scratch2n, dstsym
-	/* Set up the compartment entry. */
-	ldr	x\scratch2n, =\dstsym
-	orr	x\scratch2n, x\scratch2n, #1
-	adr	c\scratch1n, #0
-	scvalue	c\scratch1n, c\scratch1n, x\scratch2n
-	/* Clear the Executive permission bit to use the Restricted mode. */
-	mov	x\scratch2n, #CHERI_PERM_EXECUTIVE
-	clrperm	c\scratch1n, c\scratch1n, x\scratch2n
-	seal	c\scratch1n, c\scratch1n, rb
-
-	/* Branch into the compartment. */
-	brr	c\scratch1n
-.endmacro
-#endif
 
 /*
  * Helper to clear ddc and all other general-purpose capability registers,
@@ -294,16 +261,14 @@ virtdone:
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	/*
-	 * Set up the compartment stack for thread0
-	 *
-	 * Preserve the stack pointer in x/c26 for bootparams.
+	 * Prepare the in-kernel compartments' stacks for thread0.
+	 * Preserve a pointer to the stacks in x/c26 for bootparams.
 	 */
-	buildptr_stack 7, 26, rinitstack, 1
-	msr	rcsp_el0, c7
+	ldr	x7, =(PAGE_SIZE * KSTACK_PAGES * KERNEL_MAXC18NS)
+	buildptr 26, compartments0_stacks, x7
 #endif
 	/*
-	 * Set up the stack
-	 *
+	 * Set up the stack.
 	 * Preserve the stack pointer in x/c25 for bootparams.
 	 */
 	buildptr_stack 7, 25, initstack
@@ -323,34 +288,12 @@ virtdone:
 	msr	sp_el0, x15
 #endif
 
-	/* Backup the module pointer */
-	mov	x19, x0
-
-#if __has_feature(capabilities)
-#ifdef __CHERI_PURE_CAPABILITY__
-	/* Do capability relocations */
-	ldr	x0, =~CHERI_PERMS_KERNEL_DATA
-	mrs	c1, ddc
-	clrperm	c1, c1, x0
-	ldr	x0, =~CHERI_PERMS_KERNEL_CODE
-	adr	c2, #0
-	clrperm	c2, c2, x0
-	/* Assume can we reach _DYNAMIC from PCC */
-	adrp	c0, _DYNAMIC
-	add	c0, c0, :lo12:_DYNAMIC
-	bl	elf_reloc_self
-#endif
-	/* Initialize capabilities. */
-	mrs	c0, ddc
-	bl	cheri_init_capabilities
-#endif
-
 #ifdef __CHERI_PURE_CAPABILITY__
 	/*
 	 * Convert modulep into a capability
 	 * XXX-AM: can we set bounds on this?
 	 */
-	cvtd	c19, x19
+	cvtd	c19, x0
 #endif
 
 	sub	PTRN(sp), PTRN(sp), #BOOTPARAMS_SIZE
@@ -359,10 +302,67 @@ virtdone:
 	str	PTR(19), [PTR(0), #BP_MODULEP]
 	str	PTR(25), [PTR(0), #BP_KERN_STACK]
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	str	PTR(26), [PTR(0), #BP_COMPARTMENT_STACK]
+	str	PTR(26), [PTR(0), #BP_COMPARTMENTS0_STACKS]
 #endif
 	str	x27, [PTR(0), #BP_KERN_TTBR0]
 	str	x23, [PTR(0), #BP_BOOT_EL]
+
+	/* Save bootparams */
+	mov	PTR(19), PTR(0)
+
+#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * Do capability relocations.
+	 *
+	 * Statically relocate dependencies of dynamic relocation routines and
+	 * pass them as arguments to the relocation routines.
+	 *
+	 * The dependencies must be reachable from DDC and PCC at this stage.
+	 */
+	ldr	x0, =~CHERI_PERMS_KERNEL_DATA
+	mrs	c2, ddc
+	clrperm	c2, c2, x0
+
+	adrp	c0, elf_kernel_file
+	add	c0, c0, :lo12:elf_kernel_file
+	scvalue c0, c2, x0
+
+	adrp	c1, _DYNAMIC
+	add	c1, c1, :lo12:_DYNAMIC
+	scvalue	c1, c2, x1
+
+	adrp	c3, elf_kernel_plts
+	add	c3, c3, :lo12:elf_kernel_plts
+	scvalue	c3, c2, x3
+
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	adrp	c4, elf_kernel_compartments
+	add	c4, c4, :lo12:elf_kernel_compartments
+	scvalue	c4, c2, x4
+
+	adrp	c5, compartment_lastid
+	add	c5, c5, :lo12:compartment_lastid
+	scvalue	c5, c2, x5
+
+	adrp	c6, elf_kernel_pccs
+	add	c6, c6, :lo12:elf_kernel_pccs
+	scvalue	c6, c2, x6
+#endif
+
+	/*
+	 * Pass DDC without restrictions. We use it as a relocation base that
+	 * must be both executable and writable (for ifunc resolvers).
+	 */
+	mrs	c2, ddc
+
+	bl	elf_reloc_self
+#endif
+
+	/* Initialize capabilities. */
+	mrs	c0, ddc
+	bl	cheri_init_capabilities
+#endif
 
 	/* Set this before it's used in kasan_init_early */
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -375,31 +375,22 @@ virtdone:
 #endif
 
 #ifdef KASAN
-	/* Save bootparams */
-	mov	x19, x0
-
 	/* Bootstrap an early shadow map for the boot stack. */
-	ldr	x0, [x0, #BP_KERN_STACK]
+	ldr	x0, [x19, #BP_KERN_STACK]
 	ldr	x1, =BOOT_STACK_SIZE
 	bl	kasan_init_early
-
-	/* Restore bootparams */
-	mov	x0, x19
 #endif
 
 	/* trace back starts here */
 	mov	fp, #0
 
+	/* Set the first argument of the initarm() call to boot params. */
+	mov	PTR(0), PTR(19)
+
 	/* Clear registers before branching into C code */
 	clear_capregs
 
 	/* Branch to C code */
-	/*
-	 * XXXKW: There are C functions called earlier:
-	 * - elf_reloc_self()
-	 * - cheri_init_capabilities()
-	 * - pmap_san_bootstrap()
-	 */
 	bl	initarm
 	/* We are done with the boot params */
 	add	PTRN(sp), PTRN(sp), #BOOTPARAMS_SIZE
@@ -413,23 +404,6 @@ virtdone:
 	 * disabled.
 	 */
 	bl	ptrauth_start
-#endif
-
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	/*
-	 * TODO:
-	 * - Move before cheri_init_capabilities()?
-	 * - Move before initarm()?
-	 * - Move after initarm() to allow relocations to be executed in the
-	 *   Executive mode?
-	 */
-	/*
-	 * XXXKW: Ideally, we would enter the root compartment before branching
-	 * into any C code to allow static analysis of the assembly executed
-	 * before entering the root compartment.
-	 */
-	enter_kern_compartment 15, 7, compartment
-compartment:
 #endif
 
 	bl	mi_startup
@@ -1385,13 +1359,13 @@ initstack_end:
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	/*
-	 * Root compartment stack.
+	 * In-kernel compartments' stacks.
 	 */
-	.type	rinitstack,#object
-rinitstack:
-	.space	(PAGE_SIZE * KSTACK_PAGES)
-rinitstack_end:
-	.size	rinitstack, rinitstack_end - rinitstack
+	.type	compartments0_stacks,#object
+compartments0_stacks:
+	.space	(PAGE_SIZE * KSTACK_PAGES * KERNEL_MAXC18NS)
+compartments0_stacks_end:
+	.size	compartments0_stacks, compartments0_stacks_end - compartments0_stacks
 #endif
 
 	.section .init_pagetable, "aw", %nobits

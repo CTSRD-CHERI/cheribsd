@@ -64,16 +64,22 @@ struct compartment {
 	TAILQ_ENTRY(compartment) c_mnext;	/* Next with the same id. */
 };
 
+extern struct compartment compartments0[KERNEL_MAXC18NS];
+
+void compartment_metadata_create(u_long id, const char *name, uintcap_t base,
+    elf_compartment_t elf_compartment);
+void compartment_metadata_insert(struct compartment *compartment);
 u_long compartment_id_create(const char *name, uintcap_t base,
     elf_compartment_t elf_compartment);
-void compartment_linkup0(struct compartment *compartment, struct thread *td);
+void compartment_linkup(struct compartment *compartment, u_long id,
+    struct thread *td);
+void compartment_init_stack(struct compartment *compartment,
+    vm_pointer_t stack);
 struct compartment *compartment_create_for_thread(struct thread *td, u_long id);
 void compartment_destroy(struct compartment *compartment);
 void compartment_trampoline_destroy(uintptr_t func);
-vm_pointer_t compartment_entry_stackptr(u_long id, int type);
 void *compartment_entry_for_kernel(uintptr_t func);
 void *compartment_entry(uintptr_t func);
-void *executive_entry_for_kernel(uintptr_t func);
 void *executive_get_function(uintptr_t func);
 
 #ifdef MALLOC_DECLARE

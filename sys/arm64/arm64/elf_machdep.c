@@ -398,7 +398,7 @@ decode_fragment(Elf_Addr *fragment, Elf_Addr relocbase, Elf_Addr *addrp,
 static uintcap_t __nosanitizecoverage
 build_reloc_cap(Elf_Addr addr, Elf_Addr size, uint8_t perms, Elf_Addr offset,
     void * __capability data_cap, const void * __capability code_cap,
-    bool bootrelocs, bool isresolver)
+    bool iskernel)
 {
 	uintcap_t cap;
 
@@ -422,22 +422,13 @@ build_reloc_cap(Elf_Addr addr, Elf_Addr size, uint8_t perms, Elf_Addr offset,
 	if (perms == MORELLO_FRAG_EXECUTABLE) {
 		cap = cheri_sealentry(cap);
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-		if (bootrelocs) {
+		if (iskernel) {
 			/*
-			 * We cannot use compartmentalization trampolines to
-			 * call into a compartment trampoline allocator as we
-			 * are relocating symbols used by the allocator.
+			 * We call a kernel-specific variant because
+			 * linker_kernel_file does not exist yet.
 			 */
-			if (isresolver) {
-				/*
-				 * We cannot wrap a boot-time ifunc resolver
-				 * with a trampoline as the trampoline requires
-				 * in-kernel symbols to be relocated first.
-				 */
-			} else {
-				cap = (uintptr_t)compartment_entry_for_kernel(
-				    (uintptr_t)cap);
-			}
+			cap = (uintptr_t)compartment_entry_for_kernel(
+			    (uintptr_t)cap);
 		} else
 			cap = (uintptr_t)compartment_entry((uintptr_t)cap);
 #endif
@@ -452,14 +443,14 @@ build_reloc_cap(Elf_Addr addr, Elf_Addr size, uint8_t perms, Elf_Addr offset,
 static uintcap_t __nosanitizecoverage
 build_cap_from_fragment(Elf_Addr *fragment, Elf_Addr relocbase, Elf_Addr offset,
     void * __capability data_cap, const void * __capability code_cap,
-    bool bootrelocs, bool isresolver)
+    bool iskernel)
 {
 	Elf_Addr addr, size;
 	uint8_t perms;
 
 	decode_fragment(fragment, relocbase, &addr, &size, &perms);
 	return (build_reloc_cap(addr, size, perms, offset, data_cap, code_cap,
-	    bootrelocs, isresolver));
+	    iskernel));
 }
 #endif
 #endif
@@ -544,7 +535,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 			    linker_kernel_file->address);
 			*(uintcap_t *)(void *)where = build_reloc_cap(addr1,
 			    size, perms, addend, base, base,
-			    elf_is_preloaded(lf), false);
+			    lf == linker_kernel_file);
 		}
 #endif
 		return (0);
@@ -614,8 +605,14 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		 * compartmentalization?
 		 */
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-		if ((cheri_getperm(cap) & CHERI_PERM_EXECUTE) != 0)
-			cap = (uintcap_t)compartment_entry(cap);
+		if ((cheri_getperm(cap) & CHERI_PERM_EXECUTE) != 0) {
+			if (lf == linker_kernel_file) {
+				cap =
+				    (uintcap_t)compartment_entry_for_kernel(cap);
+			} else {
+				cap = (uintcap_t)compartment_entry(cap);
+			}
+		}
 #endif
 		*(uintcap_t *)where = cap;
 		break;
@@ -628,7 +625,10 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		    CHERI_PERM_STORE_LOCAL_CAP);
 		cap = cheri_sealentry(cap);
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-		cap = (uintcap_t)compartment_entry(cap);
+		if (lf == linker_kernel_file)
+			cap = (uintcap_t)compartment_entry_for_kernel(cap);
+		else
+			cap = (uintcap_t)compartment_entry(cap);
 #endif
 		*(uintcap_t *)where = cap;
 		break;
@@ -652,7 +652,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		} else
 			cap = build_cap_from_fragment(where,
 			    (Elf_Addr)relocbase, rela->r_addend,
-			    relocbase, relocbase, elf_is_preloaded(lf), true);
+			    relocbase, relocbase, lf == linker_kernel_file);
 		cap = ((uintptr_t (*)(void))cap)();
 		*(uintcap_t *)where = cap;
 		break;
@@ -825,7 +825,7 @@ elf_reloc_self_perms(const Elf_Dyn *dynp, void *data_cap, const void *code_cap,
 				continue;
 
 			cap = build_reloc_cap(addr, size, perms, rela->r_addend,
-			    data_cap, code_cap, true, false);
+			    data_cap, code_cap, true);
 			*((uintptr_t *)fragment) = cap;
 			break;
 		}
@@ -833,11 +833,31 @@ elf_reloc_self_perms(const Elf_Dyn *dynp, void *data_cap, const void *code_cap,
 }
 
 void __nosanitizecoverage
-elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap)
+elf_reloc_self(elf_file_t ef, Elf_Dyn *dynp, void *kroot, elf_plt_t plts
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+    , elf_compartment_t compartments, u_long *lastidp, elf_pcc_t pccs
+#endif
+    )
 {
+	void *code_cap, *data_cap;
 
+	data_cap = cheri_clearperm(kroot, ~CHERI_PERMS_KERNEL_DATA);
+	code_cap = cheri_clearperm(kroot,
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	    ~CHERI_PERMS_KERNEL_EXECUTIVE_CODE
+#else
+	    ~CHERI_PERMS_KERNEL_CODE
+#endif
+	    );
+
+	elf_init(ef, dynp, kroot, plts
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	    , compartments, lastidp, pccs
+#endif
+	    );
 	elf_reloc_self_perms(dynp, data_cap, code_cap, MORELLO_FRAG_RODATA |
 	    MORELLO_FRAG_RWDATA);
+	elf_init_data();
 	elf_reloc_self_perms(dynp, data_cap, code_cap, MORELLO_FRAG_EXECUTABLE);
 }
 

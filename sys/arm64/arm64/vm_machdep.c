@@ -339,20 +339,6 @@ cpu_thread_clean(struct thread *td)
 {
 }
 
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-void
-cpu_compartment_alloc(struct compartment *compartment)
-{
-
-	/*
-	 * The bottom of compartment's stack contains the current stack pointer.
-	 */
-	compartment->c_kstackptr =
-	    (vm_pointer_t)(((vm_pointer_t *)compartment->c_kstackptr) - 1);
-	*((vm_pointer_t *)compartment->c_kstackptr) = compartment->c_kstackptr;
-}
-#endif
-
 /*
  * Intercept the return address from a freshly forked process that has NOT
  * been scheduled yet.

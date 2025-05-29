@@ -45,8 +45,8 @@ ASSYM(BOOTPARAMS_SIZE, roundup2(sizeof(struct arm64_bootparams),
 ASSYM(BP_MODULEP, offsetof(struct arm64_bootparams, modulep));
 ASSYM(BP_KERN_STACK, offsetof(struct arm64_bootparams, kern_stack));
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-ASSYM(BP_COMPARTMENT_STACK, offsetof(struct arm64_bootparams,
-    compartment_stack));
+ASSYM(BP_COMPARTMENTS0_STACKS, offsetof(struct arm64_bootparams,
+    compartments0_stacks));
 #endif
 ASSYM(BP_KERN_TTBR0, offsetof(struct arm64_bootparams, kern_ttbr0));
 ASSYM(BP_BOOT_EL, offsetof(struct arm64_bootparams, boot_el));

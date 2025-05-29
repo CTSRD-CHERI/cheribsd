@@ -138,8 +138,6 @@ void vm_imgact_unmap_page(struct sf_buf *sf);
 void vm_thread_dispose(struct thread *td);
 int vm_thread_new(struct thread *td, int pages);
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-void vm_compartment_init_stack(struct compartment *compartment,
-    vm_pointer_t stack);
 int vm_compartment_new(struct compartment *compartment);
 void vm_compartment_dispose(struct compartment *compartment);
 #endif

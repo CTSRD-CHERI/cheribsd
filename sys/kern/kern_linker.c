@@ -144,6 +144,7 @@ struct modlist {
 typedef struct modlist *modlist_t;
 static modlisthead_t found_modules;
 
+static linker_file_t linker_file_init(linker_file_t lf);
 static void	linker_file_add_dependency(linker_file_t file,
 		    linker_file_t dep);
 static caddr_t	linker_file_lookup_symbol_internal(linker_file_t file,
@@ -153,13 +154,21 @@ static int	linker_load_module(const char *kldname,
 		    const struct mod_depend *verinfo, struct linker_file **lfpp);
 static modlist_t modlist_lookup2(const char *name, const struct mod_depend *verinfo);
 
+void
+linker_init_boot(linker_file_t lf)
+{
+
+	TAILQ_INIT(&classes);
+	TAILQ_INIT(&linker_files);
+	linker_file_init(lf);
+	linker_kernel_file = lf;
+}
+
 static void
 linker_init(void *arg)
 {
 
 	sx_init(&kld_sx, "kernel linker");
-	TAILQ_INIT(&classes);
-	TAILQ_INIT(&linker_files);
 }
 
 SYSINIT(linker, SI_SUB_KLD, SI_ORDER_FIRST, linker_init, NULL);
@@ -655,20 +664,13 @@ linker_file_foreach(linker_predicate_t *predicate, void *context)
 	return (retval);
 }
 
-linker_file_t
-linker_make_file(const char *pathname, linker_class_t lc)
+static linker_file_t
+linker_file_init(linker_file_t lf)
 {
-	linker_file_t lf;
-	const char *filename;
 
 	if (!cold)
 		sx_assert(&kld_sx, SA_XLOCKED);
-	filename = linker_basename(pathname);
 
-	KLD_DPF(FILE, ("linker_make_file: new file, filename='%s' for pathname='%s'\n", filename, pathname));
-	lf = (linker_file_t)kobj_create((kobj_class_t)lc, M_LINKER, M_WAITOK);
-	if (lf == NULL)
-		return (NULL);
 	lf->ctors_addr = 0;
 	lf->ctors_size = 0;
 	lf->ctors_invoked = LF_NONE;
@@ -677,8 +679,8 @@ linker_make_file(const char *pathname, linker_class_t lc)
 	lf->refs = 1;
 	lf->userrefs = 0;
 	lf->flags = 0;
-	lf->filename = strdup(filename, M_LINKER);
-	lf->pathname = strdup(pathname, M_LINKER);
+	lf->filename = NULL;
+	lf->pathname = NULL;
 	LINKER_GET_NEXT_FILE_ID(lf->id);
 	lf->ndeps = 0;
 	lf->deps = NULL;
@@ -689,7 +691,49 @@ linker_make_file(const char *pathname, linker_class_t lc)
 #endif
 	STAILQ_INIT(&lf->common);
 	TAILQ_INIT(&lf->modules);
+	return (lf);
+}
+
+void
+linker_file_register(linker_file_t lf, linker_class_t lc)
+{
+
+	linker_add_class(lc);
+	kobj_init((kobj_t)lf, (kobj_class_t)lc);
 	TAILQ_INSERT_TAIL(&linker_files, lf, link);
+}
+
+void
+linker_file_set_filename(linker_file_t lf, const char *pathname)
+{
+	const char *filename;
+
+	if (!cold)
+		sx_assert(&kld_sx, SA_XLOCKED);
+
+	filename = linker_basename(pathname);
+	lf->filename = strdup(filename, M_LINKER);
+	lf->pathname = strdup(pathname, M_LINKER);
+}
+
+linker_file_t
+linker_make_file(const char *pathname, linker_class_t lc)
+{
+	linker_file_t lf;
+
+	if (!cold)
+		sx_assert(&kld_sx, SA_XLOCKED);
+
+	lf = (linker_file_t)kobj_create((kobj_class_t)lc, M_LINKER, M_WAITOK);
+	if (lf == NULL)
+		return (NULL);
+
+	linker_file_init(lf);
+	TAILQ_INSERT_TAIL(&linker_files, lf, link);
+	linker_file_set_filename(lf, pathname);
+
+	KLD_DPF(FILE, ("linker_make_file: new file, filename='%s' for pathname='%s'\n",
+	    lf->filename, lf->pathname));
 	return (lf);
 }
 

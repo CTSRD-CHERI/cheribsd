@@ -41,6 +41,10 @@ MALLOC_DECLARE(M_LINKER);
 #endif
 
 struct mod_depend;
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+struct thread;
+struct compartment;
+#endif
 
 /*
  * Object representing a file which has been loaded by the linker.
@@ -48,7 +52,12 @@ struct mod_depend;
 typedef struct linker_file* linker_file_t;
 typedef TAILQ_HEAD(, linker_file) linker_file_list_t;
 
-typedef struct elf_compartment * elf_compartment_t;
+typedef struct elf_file *elf_file_t;
+typedef struct elf_plt *elf_plt_t;
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+typedef struct elf_pcc *elf_pcc_t;
+typedef struct elf_compartment *elf_compartment_t;
+#endif
 
 typedef caddr_t linker_sym_t;		/* opaque symbol */
 typedef c_caddr_t c_linker_sym_t;	/* const opaque symbol */
@@ -140,6 +149,8 @@ extern linker_file_t	linker_kernel_file;
  */
 extern linker_file_t __this_linker_file;
 
+void linker_init_boot(linker_file_t lf);
+
 /*
  * Obtain a reference to a module, loading it if required.
  */
@@ -190,6 +201,8 @@ int linker_file_function_listall(linker_file_t,
 int linker_add_class(linker_class_t _cls);
 int linker_file_unload(linker_file_t _file, int flags);
 int linker_load_dependencies(linker_file_t _lf);
+void linker_file_register(linker_file_t lf, linker_class_t lc);
+void linker_file_set_filename(linker_file_t lf, const char *pathname);
 linker_file_t linker_make_file(const char* _filename, linker_class_t _cls);
 
 /*
@@ -312,15 +325,28 @@ extern int kld_debug;
 typedef int elf_lookup_fn(linker_file_t, Elf_Size, int, Elf_Addr *);
 
 /* Support functions */
+void	elf_init(elf_file_t ef, Elf_Dyn *dynp, void *relocbase, elf_plt_t plts
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	    , elf_compartment_t compartments, u_long *lastidp, elf_pcc_t pccs
+#endif
+	);
+void	elf_init_data(void);
 bool	elf_is_ifunc_reloc(Elf_Size r_info);
 int	elf_reloc(linker_file_t _lf, char *base, const void *_rel, int _type,
 	    elf_lookup_fn _lu);
 int	elf_reloc_local(linker_file_t _lf, char *base, const void *_rel,
 	    int _type, elf_lookup_fn _lu);
+bool	elf_compartment_isdefault(linker_file_t lf, uintcap_t ptr);
 void	elf_compartment_entry(linker_file_t lf, uintcap_t ptr, u_long *idp,
 	    uintptr_t *ptrp);
 Elf_Addr elf_relocaddr(linker_file_t _lf, Elf_Addr addr);
 bool	elf_is_preloaded(linker_file_t lf);
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+void	link_elf_linkup_compartments(linker_file_t lf,
+	    struct compartment *compartments, size_t ncompartments,
+	    struct thread *td);
+int	link_elf_create_compartments(linker_file_t lf, struct thread *td);
+#endif
 void	link_elf_ireloc(caddr_t kmdp);
 
 #if defined(__aarch64__) || defined(__amd64__)

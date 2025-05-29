@@ -95,7 +95,11 @@ struct compartment_trampoline {
 	char		ct_code[] __subobject_use_container_bounds;
 };
 
-static u_long compartment_lastid = COMPARTMENT_KERNEL_ID;
+#if defined(__aarch64__) || defined(__riscv)
+extern int early_boot;
+#endif
+
+u_long compartment_lastid = COMPARTMENT_KERNEL_ID;
 static u_long compartment_maxnid;
 static struct compartment_metadata **compartment_metadata;
 struct sx __exclusive_cache_line compartment_metadatalock;
@@ -120,7 +124,7 @@ static struct mtx compartment_trampolines_lock;
 MTX_SYSINIT(compartmenttrampolines, &compartment_trampolines_lock,
     "compartment_trampolines", MTX_DEF);
 
-static void
+void
 compartment_metadata_create(u_long id, const char *name, uintcap_t base,
     elf_compartment_t elf_compartment)
 {
@@ -156,20 +160,32 @@ compartment_metadata_create(u_long id, const char *name, uintcap_t base,
 	sx_sunlock(&compartment_metadatalock);
 }
 
+void
+compartment_metadata_insert(struct compartment *compartment)
+{
+
+	sx_slock(&compartment_metadatalock);
+	KASSERT(compartment->c_id < compartment_maxnid,
+	    ("%s: id %lu exceeds the maximum value %lu", __func__,
+	     compartment->c_id, compartment_maxnid - 1));
+	TAILQ_INSERT_TAIL(
+	    &compartment_metadata[compartment->c_id]->cm_compartments,
+	    compartment, c_mnext);
+	sx_sunlock(&compartment_metadatalock);
+}
+
 static void
 compartment_metadata_init(void *arg __unused)
 {
 
 	sx_init(&compartment_metadatalock, "compartment_metadata");
 
-	compartment_maxnid = COMPARTMENT_KERNEL_ID + 1;
+	compartment_maxnid = roundup_pow_of_two(compartment_lastid);
 	compartment_metadata = malloc(sizeof(*compartment_metadata) *
 	    compartment_maxnid, M_COMPARTMENT, M_NOWAIT | M_USE_RESERVE |
 	    M_ZERO);
 	KASSERT(compartment_metadata != NULL,
 	    ("%s: unable to allocate compartment metadata array", __func__));
-	compartment_metadata_create(COMPARTMENT_KERNEL_ID, "kernel",
-	    (uintcap_t)kernel_root_cap, NULL);
 }
 
 SYSINIT(compartment, SI_SUB_KLD, SI_ORDER_FIRST, compartment_metadata_init,
@@ -186,7 +202,7 @@ compartment_id_create(const char *name, uintcap_t base,
 	return (compartment_lastid);
 }
 
-static void
+void
 compartment_linkup(struct compartment *compartment, u_long id,
     struct thread *td)
 {
@@ -201,13 +217,12 @@ compartment_linkup(struct compartment *compartment, u_long id,
 }
 
 void
-compartment_linkup0(struct compartment *compartment, struct thread *td)
+compartment_init_stack(struct compartment *compartment, vm_pointer_t stack)
 {
 
-	EXECUTIVE_ASSERT();
-
-	TAILQ_INIT(&td->td_compartments);
-	compartment_linkup(compartment, COMPARTMENT_KERNEL_ID, td);
+	compartment->c_kstack = stack;
+	compartment->c_kstackptr = stack + kstack_pages * PAGE_SIZE;
+	cpu_compartment_alloc(compartment);
 }
 
 struct compartment *
@@ -224,7 +239,6 @@ compartment_create_for_thread(struct thread *td, u_long id)
 		panic("compartment_create unable to allocate stack");
 	}
 
-	cpu_compartment_alloc(compartment);
 	compartment_linkup(compartment, id, td);
 
 	sx_slock(&compartment_metadatalock);
@@ -277,7 +291,7 @@ compartment_find(u_long id)
 	return (compartment);
 }
 
-vm_pointer_t
+static vm_pointer_t __used
 compartment_entry_stackptr(u_long id, int type)
 {
 	struct compartment *compartment;
@@ -306,24 +320,10 @@ compartment_trampoline_create(const linker_file_t lf, int type, void *data,
 	u_long dstid;
 
 	EXECUTIVE_ASSERT();
+	KASSERT(lf != NULL,
+	    ("%s: linker file cannot be NULL", __func__));
 
-	if (lf != NULL) {
-		elf_compartment_entry(lf, func, &dstid, &dstfunc);
-	} else {
-		/*
-		 * We're creating a trampoline for the kernel while the kernel
-		 * is being relocated and elf_compartment_entry() isn't
-		 * available.
-		 *
-		 * Use PCC instead of the base address of the linker file.
-		 */
-		dstid = COMPARTMENT_KERNEL_ID;
-		dstfunc = (intcap_t)cheri_kern_setaddress(cheri_getpcc(),
-		    (intptr_t)func);
-		dstfunc = cheri_andperm(dstfunc, cheri_getperm(func));
-		dstfunc = cheri_capmode(dstfunc);
-		dstfunc = cheri_sealentry(dstfunc);
-	}
+	elf_compartment_entry(lf, func, &dstid, &dstfunc);
 
 	tmptrampoline.ct_compartment_func = dstfunc;
 	oldtrampoline = RB_FIND(compartment_tree, &compartment_trampolines,
@@ -336,7 +336,7 @@ compartment_trampoline_create(const linker_file_t lf, int type, void *data,
 	/*
 	 * TODO: Free the trampoline.
 	 */
-	if (lf != NULL) {
+	if (!early_boot) {
 		trampoline = malloc_exec(size, M_COMPARTMENT, M_NOWAIT |
 		    M_USE_RESERVE | M_ZERO);
 		KASSERT(trampoline != NULL,
@@ -361,7 +361,7 @@ compartment_trampoline_create(const linker_file_t lf, int type, void *data,
 	    cheri_sealentry(trampoline->ct_compartment_stackptr_func);
 
 	trampoline->ct_compartment_id = dstid;
-	if (lf != NULL) {
+	if (!early_boot) {
 		cpu_dcache_wb_range(trampoline, (vm_size_t)size);
 		cpu_icache_sync_range(trampoline, (vm_size_t)size);
 
@@ -374,12 +374,20 @@ compartment_trampoline_create(const linker_file_t lf, int type, void *data,
 	    ("Trampoline for 0x%#lp already exists",
 	    (void *)trampoline->ct_compartment_func));
 
-	if (lf != NULL)
+	if (!early_boot)
 		mtx_unlock(&compartment_trampolines_lock);
 
 out:
-	func = (intcap_t)cheri_kern_setaddress(cheri_getpcc(),
-	    (intptr_t)trampoline);
+	/*
+	 * TODO: branch into the executive compartment before relocating the
+	 * kernel. Currently, this function is called in different contexts
+	 * depending if it's creating an entry to the kernel or kernel module.
+	 */
+	if (early_boot)
+		func = (intcap_t)cheri_getpcc();
+	else
+		func = (intcap_t)kernel_executive_root_cap;
+	func = (intcap_t)cheri_kern_setaddress(func, (intptr_t)trampoline);
 	/*
 	 * XXXKW: The bounds cover both metadata and code of the trampoline to
 	 * allow the code to access the metadata.
@@ -408,16 +416,29 @@ compartment_entry_for_kernel(uintptr_t func)
 
 	EXECUTIVE_ASSERT();
 
-	func = cheri_clearperm(func, CHERI_PERM_EXECUTIVE);
-	return (compartment_trampoline_create(NULL,
-	    TRAMPOLINE_TYPE_COMPARTMENT_ENTRY, compartment_entry_trampoline,
-	    szcompartment_entry_trampoline, func));
+	if (elf_compartment_isdefault(linker_kernel_file, func)) {
+		KASSERT((cheri_getperm(func) & CHERI_PERM_EXECUTIVE) != 0,
+		    ("Executive entry capability %#lp has invalid permissions",
+		     (void *)func));
+
+		return (compartment_trampoline_create(linker_kernel_file,
+		    TRAMPOLINE_TYPE_EXECUTIVE_ENTRY, executive_entry_trampoline,
+		    szexecutive_entry_trampoline, func));
+	} else {
+		func = cheri_clearperm(func, CHERI_PERM_EXECUTIVE);
+		return (compartment_trampoline_create(linker_kernel_file,
+		    TRAMPOLINE_TYPE_COMPARTMENT_ENTRY,
+		    compartment_entry_trampoline,
+		    szcompartment_entry_trampoline, func));
+	}
 }
 
 void *
 compartment_entry(uintptr_t func)
 {
 	linker_file_t lf;
+
+	EXECUTIVE_ASSERT();
 
 	lf = linker_find_file_by_ptr((uintptr_t)func);
 	if (lf == NULL)
@@ -430,20 +451,6 @@ compartment_entry(uintptr_t func)
 }
 
 void *
-executive_entry_for_kernel(uintptr_t func)
-{
-
-	EXECUTIVE_ASSERT();
-	KASSERT((cheri_getperm(func) & CHERI_PERM_EXECUTIVE) != 0,
-	    ("Executive entry capability %#lp has invalid permissions",
-	     (void *)func));
-
-	return (compartment_trampoline_create(NULL,
-	    TRAMPOLINE_TYPE_EXECUTIVE_ENTRY, executive_entry_trampoline,
-	    szexecutive_entry_trampoline, func));
-}
-
-void *
 executive_get_function(uintptr_t func)
 {
 	struct compartment_trampoline *trampoline;
@@ -453,7 +460,7 @@ executive_get_function(uintptr_t func)
 	    ("Executive trampoline capability %#lp has invalid permissions",
 	     (void *)func));
 
-	trampoline = cheri_kern_setaddress(cheri_getpcc(), func - 1);
+	trampoline = cheri_kern_setaddress(kernel_executive_root_cap, func - 1);
 	trampoline = __containerof((char (*)[])trampoline,
 	    struct compartment_trampoline, ct_code);
 	KASSERT(trampoline->ct_type == TRAMPOLINE_TYPE_EXECUTIVE_ENTRY,

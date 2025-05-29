@@ -44,6 +44,7 @@ arm64/arm64/compartment.S			optional cheri_compartmentalize_kernel
 arm64/arm64/copyinout.S				standard
 arm64/arm64/cpu_errata.c			standard
 arm64/arm64/cpufunc_asm.S			standard
+arm64/arm64/compartment_machdep.c		optional cheri_compartmentalize_kernel
 arm64/arm64/db_disasm.c				optional ddb
 arm64/arm64/db_interface.c			optional ddb
 arm64/arm64/db_trace.c				optional ddb

@@ -440,9 +440,29 @@ makectx(struct trapframe *tf, struct pcb *pcb)
 	pcb->pcb_sp = tf->tf_sp;
 }
 
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+static void
+init_compartments0(vm_pointer_t compartments0_stacks)
+{
+	struct compartment *compartment;
+	vm_pointer_t stack;
+	unsigned int ii;
+
+	TAILQ_INIT(&thread0.td_compartments);
+	for (ii = 0; ii < KERNEL_MAXC18NS; ii++) {
+		compartment = &compartments0[ii];
+		stack = compartments0_stacks + ii * (kstack_pages * PAGE_SIZE);
+		stack = cheri_setbounds(stack, kstack_pages * PAGE_SIZE);
+		compartment_init_stack(compartment, stack);
+	}
+	link_elf_linkup_compartments(linker_kernel_file, compartments0,
+	    KERNEL_MAXC18NS, &thread0);
+}
+#endif
+
 static void
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-init_proc0(vm_pointer_t kstack, vm_pointer_t compartmentstack)
+init_proc0(vm_pointer_t kstack, vm_pointer_t compartments0_stacks)
 #else
 init_proc0(vm_pointer_t kstack)
 #endif
@@ -456,9 +476,6 @@ init_proc0(vm_pointer_t kstack)
 	proc_linkup0(&proc0, &thread0);
 	thread0.td_kstack = cheri_kern_andperm(kstack, CHERI_PERMS_KERNEL_DATA);
 	thread0.td_kstack_pages = KSTACK_PAGES;
-	/*
-	 * TODO: create the very first compartment for thread0.
-	 */
 #if defined(PERTHREAD_SSP)
 	thread0.td_md.md_canary = boot_canary;
 #endif
@@ -470,9 +487,7 @@ init_proc0(vm_pointer_t kstack)
 	thread0.td_pcb->pcb_vfpcpu = UINT_MAX;
 	thread0.td_frame = &proc0_tf;
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	vm_compartment_init_stack(&compartment0, compartmentstack);
-	cpu_compartment_alloc(&compartment0);
-	compartment_linkup0(&compartment0, &thread0);
+	init_compartments0(compartments0_stacks);
 #endif
 #ifdef PAC
 	ptrauth_thread0(&thread0);
@@ -979,6 +994,29 @@ initarm(struct arm64_bootparams *abp)
 
 	TSRAW(&thread0, TS_ENTER, __func__, NULL);
 
+	/* Set the pcpu data, this is needed by pmap_bootstrap */
+	pcpup = &pcpu0;
+	pcpu_init(pcpup, 0, sizeof(struct pcpu));
+
+	/* Initialize the pcpu pointer for this cpu. */
+	init_cpu_pcpup(pcpup);
+
+	/* locore.S sets sp_el0 to &thread0 so no need to set it here. */
+	PCPU_SET(curthread, &thread0);
+	PCPU_SET(midr, get_midr());
+
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	init_proc0(abp->kern_stack, abp->compartments0_stacks);
+
+	/*
+	 * Everything until here was only using TCB.
+	 *
+	 * From now on, we can use trampolines.
+	 */
+#else
+	init_proc0(abp->kern_stack);
+#endif
+
 	boot_el = abp->boot_el;
 
 	/* Parse loader or FDT boot parameters. Determine last used address. */
@@ -994,37 +1032,7 @@ initarm(struct arm64_bootparams *abp)
 
 	update_special_regs(0);
 
-	/*
-	 * XXXKW: Must be executed in the Executive mode to construct
-	 * trampolines.
-	 * TODO: link_elf_ireloc() uses TSLOG which accesses curthread.
-	 * If possible, the call should be moved after init_cpu_pcpup().
-	 */
 	link_elf_ireloc(kmdp);
-
-	/* Set the pcpu data, this is needed by pmap_bootstrap */
-	pcpup = &pcpu0;
-	pcpu_init(pcpup, 0, sizeof(struct pcpu));
-
-	/* Initialize the pcpu pointer for this cpu. */
-	init_cpu_pcpup(pcpup);
-
-	/* locore.S sets sp_el0 to &thread0 so no need to set it here. */
-	PCPU_SET(curthread, &thread0);
-	PCPU_SET(midr, get_midr());
-
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	/*
-	 * init_proc0 links compartment0 that must be linked before any
-	 * trampoline is called.
-	 *
-	 * XXXKW: consdev_ops.cn_probe() called by cninit() is the first
-	 * function requiring a trampoline.
-	 */
-	init_proc0(abp->kern_stack, abp->compartment_stack);
-#else
-	init_proc0(abp->kern_stack);
-#endif
 
 #ifdef FDT
 	try_load_dtb(kmdp);
