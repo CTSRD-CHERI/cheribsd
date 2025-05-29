@@ -948,23 +948,27 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m,
 
 	VM_PAGE_ASSERT_PGA_CAPMETA_PMAP_ENTER(m, prot);
 	if ((prot & VM_PROT_WRITE_CAP) != 0) {
-		KASSERT((vm_page_astate_load(m).flags & PGA_CAPSTORE) != 0,
-		    ("%s: page %p does not have CAPSTORE set", __func__, m));
-
 		/*
-		 * The page is CAPSTORE and this mapping is VM_PROT_WRITE_CAP.
-		 * Always set ATTR_CDBM for userspace.
+		 * If we set CAPSTORE upon page allocation, the page is CAPSTORE
+		 * and this mapping is VM_PROT_WRITE_CAP.
+		 * Set ATTR_CDBM for userspace in this case.
+		 * If the maping is VM_PROT_WRITE_CAP but the page does not have
+		 * CAPSTORE, we will pay the cost of upgrading later.
+		 * Keep the SC fault for userspace.
 		 *
 		 * XXX: work around a qemu limitation (no CDBM support) and set
 		 * ATTR_SC for the kernel where emulating ATTR_CDBM is hard.
 		 *
 		 * XXX We could also conditionally set ATTR_SC if PGA_CAPDIRTY,
 		 * but it's not required.
+		 *
 		 */
-		if (pmap->pm_stage == PM_STAGE1 && va < VM_MAX_USER_ADDRESS)
-			val |= ATTR_CDBM;
-		else
+		if (pmap->pm_stage == PM_STAGE1 && va < VM_MAX_USER_ADDRESS) {
+			if ((vm_page_astate_load(m).flags & PGA_CAPSTORE) != 0)
+				val |= ATTR_CDBM;
+		} else {
 			val |= ATTR_SC;
+		}
 	}
 #endif
 
