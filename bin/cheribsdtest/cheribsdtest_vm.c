@@ -1303,7 +1303,8 @@ CHERIBSDTEST(vm_shm_largepage_basic,
  * particular test is not able to distinguish CAPSTORE and CAPDIRTY and so is
  * not sensitive to the vm.pmap.enter_capstore_as_capdirty sysctl.
  *
- * On the other hand, this test is sensitive to the vm.capstore_on_alloc sysctl:
+ * On the other hand, this test is sensitive to the
+ * vm.cheri_revoke.capstore_on_alloc sysctl:
  * if that is asserted, our cap-capable anonymous memory will be installed
  * CAPSTORE (and possibly even CAPDIRTY, in light of the above) whereas, if this
  * sysctl is clear, our initial view of said memory will be !CAPSTORE.
@@ -1319,8 +1320,8 @@ CHERIBSDTEST(vm_capdirty, "verify capdirty marking and mincore")
 	unsigned char mcv[CHERIBSDTEST_VM_CAPDIRTY_NPG] = { 0 };
 
 	CHERIBSDTEST_CHECK_SYSCALL(
-	    sysctlbyname("vm.capstore_on_alloc", &capstore_on_alloc,
-	        &capstore_on_alloc_sz, NULL, 0));
+	    sysctlbyname("vm.cheri_revoke.capstore_on_alloc",
+		&capstore_on_alloc, &capstore_on_alloc_sz, NULL, 0));
 
 	pg0 = CHERIBSDTEST_CHECK_SYSCALL(
 	    mmap(NULL, sz, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
