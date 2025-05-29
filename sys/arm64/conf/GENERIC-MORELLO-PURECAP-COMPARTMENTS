@@ -1,0 +1,29 @@
+include	"GENERIC-MORELLO-PURECAP"
+
+ident		GENERIC-MORELLO-PURECAP-COMPARTMENTS
+
+device		cryptodev	# /dev/crypto to test zlib via crypto(9)
+
+# Don't compile in the zlib device
+nodevice	zlib
+
+# Enable compartmentalization by default
+options 	CHERI_COMPARTMENTALIZE_KERNEL
+
+# Use PCPU/DPCPU accessor functions
+options 	PCPU_FUNCS
+
+# Pass a compartmentalization policy if it exists
+# We need a separate option from CHERI_COMPARTMENTALIZE_KERNEL as not all
+# kernels/architectures support both at the moment.
+makeoptions	CHERI_COMPARTMENT_POLICY
+
+# Compile an IR version of the kernel and kernel modules for analysis
+makeoptions	COMPILE_IR
+
+# Make sure not compile in components that depend on contrib zlib code
+nooptions 	DDB_CTF		# Kernel ELF linker loads CTF data
+nooptions 	GEOM_UZIP	# Read-only compressed disks
+nooptions 	GZIO		# zlib I/O stream support
+nooptions	ZFS		# ZFS support
+nodevice	mxge		# Myricom Myri-10G 10GbE NIC
