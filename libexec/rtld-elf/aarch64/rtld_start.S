@@ -277,7 +277,7 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	/*
 	 * Slow path
 	 * return(
-	 *    tls_get_addr_common(tp, tlsdesc->tls_index, tlsdesc->tls_offs));
+	 *    tls_get_addr_common(tcb, tlsdesc->tls_index, tlsdesc->tls_offs));
 	 *
 	 */
 1:
@@ -316,7 +316,7 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	.cfi_rel_offset		c19, 288
 
 	/* Find the tls offset */
-	mov	c0, c2			/* tp */
+	mov	c0, c2			/* tcb */
 	mov	c3, c1			/* tlsdesc ptr */
 	ldr	w1, [c3, #16]		/* tlsdesc->tls_index */
 	ldr	x2, [c3, #24]		/* tlsdesc->tls_offs */
@@ -387,7 +387,7 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	/*
 	 * Slow path
 	  * return(
-	 *    tls_get_addr_common(tp, tlsdesc->tls_index, tlsdesc->tls_offs));
+	 *    tls_get_addr_common(tcb, tlsdesc->tls_index, tlsdesc->tls_offs));
 	 *
 	 */
 1:
@@ -421,7 +421,7 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	.cfi_rel_offset		x18, 120
 
 	/* Find the tls offset */
-	mov	x0, x4			/* tp */
+	mov	x0, x4			/* tcb */
 	mov	x3, x1			/* tlsdesc ptr */
 	ldr	w1, [x3, #8]		/* tlsdec->tls_index */
 	ldr	x2, [x3, #16]		/* tlsdec->tls_offs */
