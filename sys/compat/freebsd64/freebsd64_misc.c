@@ -1720,7 +1720,7 @@ freebsd64_thr_new_initthr(struct thread *td, void *thunk)
 	    (void (* __capability)(void *))(uintcap_t)param->start_func,
 	    (void * __capability)(uintcap_t)param->arg, &stack);
 	return (cpu_set_user_tls(td,
-		(void * __capability)(uintcap_t)param->tls_base));
+		(void * __capability)(uintcap_t)param->tls_base, param->flags));
 }
 
 int
