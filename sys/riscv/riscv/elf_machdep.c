@@ -63,6 +63,12 @@
 
 #include "linker_if.h"
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	PTR_ALT	"#"
+#else
+#define	PTR_ALT
+#endif
+
 u_long elf_hwcap;
 
 static struct sysentvec elf_freebsd_sysvec = {
@@ -367,11 +373,13 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 #endif
 	Elf64_Addr *where;
 	Elf_Addr addend;
+	uintptr_t beforeptr;
 	uint32_t before32_1;
 	uint32_t before32;
 	uint64_t before64;
 	uint32_t *insn32p;
 	uint32_t imm20;
+	uintptr_t ptr;
 	int error;
 
 	switch (type) {
@@ -407,16 +415,20 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		break;
 
 	case R_RISCV_JUMP_SLOT:
-		error = lookup(lf, symidx, 1, &addr);
+#ifdef __CHERI_PURE_CAPABILITY__
+		error = LINKER_SYMIDX_CAPABILITY(lf, symidx, 1, &ptr);
+#else
+		error = lookup(lf, symidx, 1, &ptr);
+#endif
 		if (error != 0)
 			return (-1);
 
-		before64 = *where;
-		*where = addr;
+		beforeptr = *(uintptr_t *)where;
+		*(uintptr_t *)where = ptr;
 		if (debug_kld)
-			printf("%p %c %-24s %016lx -> %016lx\n", where,
-			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
-			    before64, *where);
+			printf("%p %c %-24s %" PTR_ALT "p -> %" PTR_ALT "p\n",
+			    where, (local ? 'l' : 'g'), reloctype_to_str(rtype),
+			    (void *)beforeptr, (void *)ptr);
 		break;
 
 	case R_RISCV_RELATIVE:
