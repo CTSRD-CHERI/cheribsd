@@ -118,6 +118,7 @@ struct ktr_request {
 		struct	ktr_fault ktr_fault;
 		struct	ktr_faultend ktr_faultend;
 		struct  ktr_struct_array ktr_struct_array;
+		struct	ktr_exterr ktr_exterr;
 	} ktr_data;
 	STAILQ_ENTRY(ktr_request) ktr_list;
 };
@@ -140,6 +141,7 @@ static const int data_lengths[] = {
 	[KTR_STRUCT_ARRAY] = sizeof(struct ktr_struct_array),
 	[KTR_ARGS] = 0,
 	[KTR_ENVS] = 0,
+	[KTR_EXTERR] = sizeof(struct ktr_exterr),
 	[KTR_SYSERRCAUSE] = 0,
 };
 
@@ -1056,6 +1058,26 @@ ktrfaultend(int result)
 }
 
 void
+ktrexterr(struct thread *td)
+{
+	struct ktr_request *req;
+	struct ktr_exterr *ktre;
+
+	if (!KTRPOINT(td, KTR_EXTERR))
+		return;
+
+	req = ktr_getrequest(KTR_EXTERR);
+	if (req == NULL)
+		return;
+	ktre = &req->ktr_data.ktr_exterr;
+	if (exterr_to_ue(td, &ktre->ue) == 0)
+		ktr_enqueuerequest(td, req);
+	else
+		ktr_freerequest(req);
+	ktrace_exit(td);
+}
+
+void
 ktrsyserrcause(const char *format, ...)
 {
 	struct ktr_request *req;
@@ -1086,6 +1108,13 @@ ktrsyserrcause(const char *format, ...)
 	ktr_submitrequest(curthread, req);
 }
 #endif /* KTRACE */
+
+#ifndef KTRACE
+void
+ktrexterr(struct thread *td __unused)
+{
+}
+#endif
 
 /* Interface and common routines */
 
