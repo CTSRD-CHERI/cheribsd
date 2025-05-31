@@ -2136,6 +2136,24 @@ link_elf_reloc_local(linker_file_t lf)
 	const Elf_Rela *rela;
 	elf_file_t ef = (elf_file_t)lf;
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(DT_CHERI___CAPRELOCS)
+	/*
+	 * Perform __cap_relocs relocations if there are any:
+	 *
+	 * NB: Must come first as each CHERI-RISC-V's R_RISCV_JUMP_SLOT has a
+	 * corresponding relocation here for .plt[0] and we don't want that to
+	 * overwrite the eagerly-bound target.
+	 */
+	if (ef->caprelocs != NULL) {
+		void *data_cap;
+
+		data_cap = cheri_andperm(ef->mapbase, CHERI_PERMS_KERNEL_DATA);
+		init_linker_file_cap_relocs(ef->caprelocs,
+		    (char *)ef->caprelocs + ef->caprelocssize, data_cap,
+		    (ptraddr_t)ef->address, resolve_cap_reloc, ef);
+	}
+#endif
+
 	/* Perform relocations without addend if there are any: */
 	if ((rel = ef->rel) != NULL) {
 		rellim = (const Elf_Rel *)((const char *)ef->rel + ef->relsize);
@@ -2156,17 +2174,6 @@ link_elf_reloc_local(linker_file_t lf)
 			rela++;
 		}
 	}
-
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(DT_CHERI___CAPRELOCS)
-	if (ef->caprelocs != NULL) {
-		void *data_cap;
-
-		data_cap = cheri_andperm(ef->mapbase, CHERI_PERMS_KERNEL_DATA);
-		init_linker_file_cap_relocs(ef->caprelocs,
-		    (char *)ef->caprelocs + ef->caprelocssize, data_cap,
-		    (ptraddr_t)ef->address, resolve_cap_reloc, ef);
-	}
-#endif
 }
 
 static long
