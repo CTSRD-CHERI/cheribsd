@@ -147,14 +147,10 @@ ENTRY(.rtld_start)
 END(.rtld_start)
 
 /*
- * t0 = plt pointer
+ * (c)t0 = plt pointer
  * t1 = reloc offset
  */
 ENTRY(_rtld_bind_start)
-#ifdef __CHERI_PURE_CAPABILITY__
-	/* Currently unused and unimplemented for pure-capability code */
-	unimp
-#else /* defined(__CHERI_PURE_CAPABILITY__) */
 	/* Save the arguments and (c)ra */
 	/*
 	 * We require 8 GP(C)Rs, 1 pointer and 8 FPRs, but the stack must be
@@ -186,15 +182,23 @@ ENTRY(_rtld_bind_start)
 	STORE_FLT	fa7, (FLT_OFFSET + FLT_SIZE * 7)(PTR(sp))
 #endif
 
-	/* Reloc offset is 3x of the .got.plt offset */
+	/* Reloc offset is 3x or 1.5x of the .got.plt offset */
+#ifdef __CHERI_PURE_CAPABILITY__
+	srli	a1, t1, 1	/* Divide items by 2 */
+#else
 	slli	a1, t1, 1	/* Mult items by 2 */
+#endif
 	add	a1, a1, t1	/* Plus item */
 
 	/* Load plt */
 	MV_PTR	PTR(a0), PTR(t0)
 
 	/* Call into rtld */
+#ifdef __CHERI_PURE_CAPABILITY__
+	cjal	_rtld_bind
+#else
 	jal	_rtld_bind
+#endif
 
 	/* Backup the address to branch to */
 	MV_PTR	PTR(t0), PTR(a0)
@@ -225,5 +229,4 @@ ENTRY(_rtld_bind_start)
 
 	/* Call into the correct function */
 	JR_PTR	PTR(t0)
-#endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(_rtld_bind_start)

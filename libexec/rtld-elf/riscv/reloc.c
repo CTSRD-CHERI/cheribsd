@@ -81,8 +81,8 @@ init_pltgot(Plt_Entry *plt)
 {
 
 	if (plt->pltgot != NULL) {
-		plt->pltgot[0] = (Elf_Addr)&_rtld_bind_start;
-		plt->pltgot[1] = (Elf_Addr)plt;
+		plt->pltgot[0] = (uintptr_t)&_rtld_bind_start;
+		plt->pltgot[1] = (uintptr_t)plt;
 	}
 }
 
@@ -206,13 +206,18 @@ reloc_plt(Plt_Entry *plt, int flags __unused, RtldLockState *lockstate __unused)
 	relalim = (const Elf_Rela *)((const char *)plt->rela +
 	    plt->relasize);
 	for (rela = plt->rela; rela < relalim; rela++) {
-		Elf_Addr *where;
+		uintptr_t *where;
 
-		where = (Elf_Addr *)(obj->relocbase + rela->r_offset);
+		where = (uintptr_t *)(obj->relocbase + rela->r_offset);
 
 		switch (ELF_R_TYPE(rela->r_info)) {
 		case R_RISCV_JUMP_SLOT:
+#ifdef __CHERI_PURE_CAPABILITY__
+			/* Relocated by __cap_relocs for CHERI */
+			(void)where;
+#else
 			*where += (Elf_Addr)obj->relocbase;
+#endif
 			break;
 		case R_RISCV_IRELATIVE:
 			obj->irelative = true;
@@ -242,9 +247,9 @@ reloc_jmpslots(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 	relalim = (const Elf_Rela *)((const char *)plt->rela +
 	    plt->relasize);
 	for (rela = plt->rela; rela < relalim; rela++) {
-		Elf_Addr *where;
+		uintptr_t *where;
 
-		where = (Elf_Addr *)(obj->relocbase + rela->r_offset);
+		where = (uintptr_t *)(obj->relocbase + rela->r_offset);
 		switch(ELF_R_TYPE(rela->r_info)) {
 		case R_RISCV_JUMP_SLOT:
 			def = find_symdef(ELF_R_SYM(rela->r_info), obj,
@@ -259,7 +264,7 @@ reloc_jmpslots(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 				continue;
 			}
 
-			*where = (Elf_Addr)(defobj->relocbase + def->st_value);
+			*where = (uintptr_t)make_function_pointer(def, defobj);
 			break;
 		default:
 			_rtld_error("Unknown relocation type %x in jmpslot",
