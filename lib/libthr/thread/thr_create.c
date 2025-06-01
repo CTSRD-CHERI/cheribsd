@@ -70,6 +70,8 @@ static void thread_start(struct pthread *curthread) __used;
 void _rtld_thread_start(struct pthread *);
 #endif
 
+int __thr_new_flags = THR_C_RUNTIME;
+
 __weak_reference(_pthread_create, pthread_create);
 
 int
@@ -210,7 +212,7 @@ _pthread_create(pthread_t * __restrict thread,
 	param.tls_size = sizeof(struct tcb);
 	param.child_tid = &new_thread->tid;
 	param.parent_tid = &new_thread->tid;
-	param.flags = THR_C_RUNTIME;
+	param.flags = __thr_new_flags;
 	if (new_thread->attr.flags & PTHREAD_SCOPE_SYSTEM)
 		param.flags |= THR_SYSTEM_SCOPE;
 	if (new_thread->attr.sched_inherit == PTHREAD_INHERIT_SCHED)
