@@ -593,8 +593,18 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		 * sentries.  The addend should probably be passed to
 		 * the lookup function instead.
 		 */
-		if (addend != 0)
+		if (addend != 0) {
+			KASSERT(!cheri_getsealed(addr),
+			    ("%s: sentry %#p with non-zero addend %#lx",
+			    __func__, (void *)addr, addend));
+
+			/*
+			 * XXX: Prevent the add below from being
+			 * hoisted out of the condition.
+			 */
+			__asm__("" : "+r" (addend));
 			addr += addend;
+		}
 
 		beforecap = *(uintptr_t *)where;
 		*(uintptr_t *)where = addr;
