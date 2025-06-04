@@ -38,6 +38,7 @@
  * CHERI CHANGES END
  */
 
+#define _WANT_P_OSREL
 #include "namespace.h"
 #include <sys/types.h>
 #include <sys/rtprio.h>
@@ -54,6 +55,8 @@
 
 #include "libc_private.h"
 #include "thr_private.h"
+
+int __getosreldate(void);
 
 static int  create_stack(struct pthread_attr *pattr);
 static void thread_start(struct pthread *curthread) __used;
@@ -349,7 +352,8 @@ thread_start(struct pthread *curthread)
 #endif
 
 	curthread->uexterr.ver = UEXTERROR_VER;
-	exterrctl(EXTERRCTL_ENABLE, 0, &curthread->uexterr);
+	if (__getosreldate() >= P_OSREL_EXTERRCTL)
+		exterrctl(EXTERRCTL_ENABLE, 0, &curthread->uexterr);
 
 	/* Run the current thread's start routine with argument: */
 	_pthread_exit(curthread->start_routine(curthread->arg));
