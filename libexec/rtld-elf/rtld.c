@@ -4486,7 +4486,6 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
     const Elf_Sym *def;
     SymLook req;
     RtldLockState lockstate;
-    tls_index ti;
     void *sym;
     int res;
 
@@ -4618,9 +4617,7 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	    sym = rtld_resolve_ifunc(defobj, def);
 	    dbg("dlsym(%s) is ifunc. Resolved to: " PTR_FMT, name, sym);
 	} else if (ELF_ST_TYPE(def->st_info) == STT_TLS) {
-	    ti.ti_module = defobj->tlsindex;
-	    ti.ti_offset = def->st_value - TLS_DTV_OFFSET;
-	    sym = __tls_get_addr(&ti);
+	    sym = (char *)_rtld_tls_get_block(defobj->tlsindex) + def->st_value;
 	    /* CHERI-RISC-V ABI does not yet set TLS bounds; mirror in dlsym */
 #if !defined(__riscv) && defined(__CHERI_PURE_CAPABILITY__)
 	    sym = cheri_setbounds(sym, def->st_size);
