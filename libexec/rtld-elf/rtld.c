@@ -282,6 +282,7 @@ int _rtld_addr_phdr(const void *, struct dl_phdr_info *) __exported;
 int _rtld_get_stack_prot(void) __exported;
 int _rtld_is_dlopened(void *) __exported;
 void _rtld_error(const char *, ...) __exported __printflike(1, 2);
+void *_rtld_tls_get_block(unsigned long) __exported;
 
 /* Only here to fix -Wmissing-prototypes warnings */
 int __getosreldate(void);
@@ -5948,6 +5949,12 @@ tls_get_addr_common(struct tcb *tcb, int index, size_t offset)
 
 	p = tls_get_block(tcb, index);
 	return (p + offset);
+}
+
+void *
+_rtld_tls_get_block(unsigned long index)
+{
+	return (tls_get_block(_tcb_get(), index));
 }
 
 static struct tcb *

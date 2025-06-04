@@ -64,6 +64,7 @@
       __XSTRING(__LINE__) "\n"), abort()))
 #define	tls_msg(s)		write(STDOUT_FILENO, s, strlen(s))
 
+__weak_reference(__libc_tls_get_block, _rtld_tls_get_block);
 __weak_reference(__libc_allocate_tls, _rtld_allocate_tls);
 __weak_reference(__libc_free_tls, _rtld_free_tls);
 
@@ -77,8 +78,10 @@ __attribute__((__regparm__(1))) void * ___libc_tls_get_addr(void *);
 void * __libc_tls_get_addr(void *);
 __weak_reference(__libc_tls_get_addr, __tls_get_addr);
 
+void *_rtld_tls_get_block(unsigned long);
 void *_rtld_allocate_tls(void *oldtls, size_t tcbsize, size_t tcbalign);
 void _rtld_free_tls(void *tls, size_t tcbsize, size_t tcbalign);
+void *__libc_tls_get_block(unsigned long);
 void *__libc_allocate_tls(void *oldtls, size_t tcbsize, size_t tcbalign);
 void __libc_free_tls(void *tls, size_t tcbsize, size_t tcbalign);
 
@@ -114,6 +117,15 @@ ___libc_tls_get_addr(void *vti)
 }
 
 #endif
+
+void *
+__libc_tls_get_block(unsigned long module)
+{
+	struct dtv *dtv;
+
+	dtv = _tcb_get()->tcb_dtv;
+	return (dtv->dtv_slots[module - 1].dtvs_tls);
+}
 
 #ifndef PIC
 
