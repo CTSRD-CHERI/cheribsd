@@ -55,6 +55,7 @@
 
 static const char sorry[] = "Service unavailable";
 
+void *_rtld_tls_get_block(unsigned long);
 void _rtld_thread_init(void *);
 void _rtld_atfork_pre(int *);
 void _rtld_atfork_post(int *);
@@ -261,16 +262,13 @@ _dl_iterate_phdr_locked(
 		return (0);
 	return (r(callback, data));
 #else
-	tls_index ti;
 	int ret;
 
 	__init_elf_aux_vector();
 	if (__elf_aux_vector == NULL)
 		return (1);
 	_once(&dl_phdr_info_once, dl_init_phdr_info);
-	ti.ti_module = 1;
-	ti.ti_offset = -TLS_DTV_OFFSET;
-	phdr_info.dlpi_tls_data = __tls_get_addr(&ti);
+	phdr_info.dlpi_tls_data = _rtld_tls_get_block(1);
 	ret = callback(&phdr_info, sizeof(phdr_info), data);
 	return (ret);
 #endif
