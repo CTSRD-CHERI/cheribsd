@@ -192,7 +192,7 @@ static int symlook_list(SymLook *, const Objlist *, DoneList *);
 static int symlook_needed(SymLook *, const Needed_Entry *, DoneList *);
 static int symlook_obj1_sysv(SymLook *, const Obj_Entry *);
 static int symlook_obj1_gnu(SymLook *, const Obj_Entry *);
-static void *tls_get_addr_slow(struct tcb *, int, size_t, bool) __noinline;
+static char *tls_get_block_slow(struct tcb *, int, bool) __noinline;
 static void trace_loaded_objects(Obj_Entry *, bool);
 static void unlink_object(Obj_Entry *);
 static void unload_object(Obj_Entry *, RtldLockState *lockstate);
@@ -4835,8 +4835,8 @@ rtld_fill_dl_phdr_info(const Obj_Entry *obj, struct dl_phdr_info *phdr_info)
 	phdr_info->dlpi_name = obj->path;
 	phdr_info->dlpi_phnum = obj->phsize / sizeof(obj->phdr[0]);
 	phdr_info->dlpi_tls_modid = obj->tlsindex;
-	phdr_info->dlpi_tls_data = (char *)tls_get_addr_slow(_tcb_get(),
-	    obj->tlsindex, 0, true);
+	phdr_info->dlpi_tls_data = (char *)tls_get_block_slow(_tcb_get(),
+	    obj->tlsindex, true);
 	phdr_info->dlpi_adds = obj_loads;
 	phdr_info->dlpi_subs = obj_loads - obj_count;
 }
@@ -5863,8 +5863,8 @@ unref_dag(Obj_Entry *root)
 /*
  * Common code for MD __tls_get_addr().
  */
-static void *
-tls_get_addr_slow(struct tcb *tcb, int index, size_t offset, bool locked)
+static struct dtv_slot *
+tls_get_slot_slow(struct tcb *tcb, int index, bool locked)
 {
 	struct dtv *newdtv, *dtv;
 	RtldLockState lockstate;
@@ -5890,22 +5890,40 @@ tls_get_addr_slow(struct tcb *tcb, int index, size_t offset, bool locked)
 		dtv = tcb->tcb_dtv = newdtv;
 	}
 
+	return (&dtv->dtv_slots[index - 1]);
+}
+
+static char *
+tls_slot_get_tls(struct tcb *tcb, struct dtv_slot *slot, int index,
+    bool locked)
+{
+	RtldLockState lockstate;
+
 	/* Dynamically allocate module TLS if necessary */
-	if (dtv->dtv_slots[index - 1].dtvs_tls == 0) {
+	if (slot->dtvs_tls == 0) {
 		/* Signal safe, wlock will block out signals. */
 		if (!locked)
 			wlock_acquire(rtld_bind_lock, &lockstate);
-		if (!dtv->dtv_slots[index - 1].dtvs_tls)
-			dtv->dtv_slots[index - 1].dtvs_tls =
-			    allocate_module_tls(tcb, index);
+		if (!slot->dtvs_tls)
+			slot->dtvs_tls = allocate_module_tls(tcb, index);
 		if (!locked)
 			lock_release(rtld_bind_lock, &lockstate);
 	}
-	return (dtv->dtv_slots[index - 1].dtvs_tls + offset);
+
+	return (slot->dtvs_tls);
 }
 
-void *
-tls_get_addr_common(struct tcb *tcb, int index, size_t offset)
+static char *
+tls_get_block_slow(struct tcb *tcb, int index, bool locked)
+{
+	struct dtv_slot *slot;
+
+	slot = tls_get_slot_slow(tcb, index, locked);
+	return (tls_slot_get_tls(tcb, slot, index, locked));
+}
+
+static __always_inline char *
+tls_get_block_common(struct tcb *tcb, int index, bool locked)
 {
 	struct dtv *dtv;
 
@@ -5913,8 +5931,23 @@ tls_get_addr_common(struct tcb *tcb, int index, size_t offset)
 	/* Check dtv generation in case new modules have arrived */
 	if (__predict_true(dtv->dtv_gen == tls_dtv_generation &&
 	    dtv->dtv_slots[index - 1].dtvs_tls != 0))
-		return (dtv->dtv_slots[index - 1].dtvs_tls + offset);
-	return (tls_get_addr_slow(tcb, index, offset, false));
+		return (dtv->dtv_slots[index - 1].dtvs_tls);
+	return (tls_get_block_slow(tcb, index, locked));
+}
+
+static __always_inline char *
+tls_get_block(struct tcb *tcb, int index)
+{
+	return (tls_get_block_common(tcb, index, false));
+}
+
+void *
+tls_get_addr_common(struct tcb *tcb, int index, size_t offset)
+{
+	char *p;
+
+	p = tls_get_block(tcb, index);
+	return (p + offset);
 }
 
 static struct tcb *
