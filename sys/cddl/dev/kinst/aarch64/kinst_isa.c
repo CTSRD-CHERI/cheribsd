@@ -287,27 +287,80 @@ kinst_instr_stx(kinst_patchval_t instr)
 	return (false);
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Given the address of an instruction that we might patch in order to enable a
+ * probe, return a capability that can be used to do just that and no more.
+ * Unfortunately, the capability provided by the linker cannot be used directly
+ * here since it does not provide store permissions.
+ */
+static kinst_patchval_t *
+kinst_make_tracepoint_capability(uint32_t *instr)
+{
+	kinst_patchval_t *cap;
+	ptraddr_t addr;
+
+	if (cheri_getsealed(instr))
+		return (NULL);
+	if (!cheri_gettag(instr))
+		return (NULL);
+	addr = (ptraddr_t)instr;
+	if (addr + INSN_SIZE < addr ||
+	    addr < cheri_getbase(instr) ||
+	    addr + INSN_SIZE > cheri_getbase(instr) + cheri_getlength(instr))
+		return (NULL);
+
+	cap = cheri_setaddress(kernel_root_cap, addr);
+	cap = cheri_setbounds(cap, INSN_SIZE);
+	cap = cheri_andperm(cap, CHERI_PERM_STORE);
+	return (cap);
+}
+
+/*
+ * The linker provides us with a sealed capability for the function symbol
+ * value.  We need to disassemble the function, so the capability must be
+ * unsealed.
+ */
+static uintcap_t
+kinst_unseal_symval(linker_symval_t *sym)
+{
+	extern void * __capability sentry_unsealcap;
+	uintcap_t val;
+
+	val = cheri_unseal((uintcap_t)sym->value, sentry_unsealcap);
+	val = cheri_andperm(val, CHERI_PERM_LOAD);
+	return (val);
+}
+#endif
+
 int
-kinst_make_probe(linker_file_t lf, int symindx, linker_symval_t *symval,
+kinst_make_probe(linker_file_t lf, int symindx, linker_symval_t *sym,
     void *opaque)
 {
 	struct kinst_probe *kp;
 	dtrace_kinst_probedesc_t *pd;
 	const char *func;
 	kinst_patchval_t *instr, *limit, *tmp;
+	uintptr_t symval;
 	int n, off;
 	bool ldxstx_block, found;
 
 	pd = opaque;
-	func = symval->name;
+	func = sym->name;
 
 	if (kinst_excluded(func))
 		return (0);
 	if (strcmp(func, pd->kpd_func) != 0)
 		return (0);
 
-	instr = (kinst_patchval_t *)(symval->value);
-	limit = (kinst_patchval_t *)(symval->value + symval->size);
+#ifdef __CHERI_PURE_CAPABILITY__
+	symval = kinst_unseal_symval(sym);
+	symval &= ~0x1ul;
+#else
+	symval = (uintptr_t)sym->value;
+#endif
+	instr = (kinst_patchval_t *)symval;
+	limit = (kinst_patchval_t *)(symval + sym->size);
 	if (instr >= limit)
 		return (0);
 
@@ -357,7 +410,7 @@ kinst_make_probe(linker_file_t lf, int symindx, linker_symval_t *symval,
 
 	ldxstx_block = false;
 	for (n = 0; instr < limit; instr++) {
-		off = (int)((uint8_t *)instr - (uint8_t *)symval->value);
+		off = (int)((uint8_t *)instr - (uint8_t *)symval);
 
 		/*
 		 * Skip LDX/STX blocks that contain atomic operations. If a
@@ -403,7 +456,11 @@ kinst_make_probe(linker_file_t lf, int symindx, linker_symval_t *symval,
 		    M_WAITOK | M_ZERO);
 		kp->kp_func = func;
 		snprintf(kp->kp_name, sizeof(kp->kp_name), "%d", off);
+#ifdef __CHERI_PURE_CAPABILITY__
+		kp->kp_patchpoint = kinst_make_tracepoint_capability(instr);
+#else
 		kp->kp_patchpoint = instr;
+#endif
 		kp->kp_savedval = *instr;
 		kp->kp_patchval = KINST_PATCHVAL;
 		if ((kp->kp_tramp = kinst_trampoline_alloc(M_WAITOK)) == NULL) {
