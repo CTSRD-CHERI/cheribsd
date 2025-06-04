@@ -34,8 +34,9 @@
 
 #ifndef _LIBC_PRIVATE_H_
 #define _LIBC_PRIVATE_H_
-#include <sys/_types.h>
-#include <sys/_pthreadtypes.h>
+#include <sys/types.h>
+
+#include <machine/tls.h>
 
 #include <libsys.h>
 
@@ -283,6 +284,9 @@ void __libc_start1_gcrt(int, char *[], char *[],
  * Initialise TLS for static programs
  */
 void _init_tls(void);
+#ifdef TLS_TGOT
+void __libc_init_tgot(void *tgot, const void *init, __size_t size, void *tls);
+#endif
 
 /*
  * Internal allocator for TLS

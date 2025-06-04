@@ -91,6 +91,12 @@ static size_t libc_tls_static_space;
 static size_t libc_tls_init_size;
 static size_t libc_tls_init_align = 1;
 static void *libc_tls_init;
+#ifdef TLS_TGOT
+static size_t libc_tgot_static_space;
+static size_t libc_tgot_init_size;
+static size_t libc_tgot_init_align = 1;
+static void *libc_tgot_init;
+#endif
 #endif
 
 void *
@@ -101,8 +107,13 @@ __libc_tls_get_addr(void *vti)
 
 	dtv = _tcb_get()->tcb_dtv;
 	ti = vti;
+#ifdef TLS_TGOT
+	return (*(void **)(dtv->dtv_slots[ti->ti_module - 1].dtvs_tgot +
+	    ti->ti_offset));
+#else
 	return (dtv->dtv_slots[ti->ti_module - 1].dtvs_tls +
 	    (ti->ti_offset + TLS_DTV_OFFSET));
+#endif
 }
 
 #ifdef __i386__
@@ -128,6 +139,135 @@ __libc_tls_get_block(unsigned long module)
 }
 
 #ifndef PIC
+
+#ifdef TLS_TGOT
+
+/*
+ * Return pointer to allocated TLS block
+ */
+static void *
+get_tls_block_ptr(void *tcb, size_t tcbsize)
+{
+	size_t extra_size, pre_size, tls_block_size;
+
+	/* Compute fragments sizes. */
+	extra_size = tcbsize - TLS_TCB_SIZE;
+	tls_block_size = tcbsize;
+	pre_size = roundup2(tls_block_size, libc_tgot_init_align) -
+	    tls_block_size;
+
+	return ((char *)tcb - pre_size - extra_size);
+}
+
+/*
+ * Free Static TLS using the TGOT method. The tcbsize
+ * and tcbalign parameters must be the same as those used to allocate
+ * the block.
+ */
+void
+__libc_free_tls(void *tcb, size_t tcbsize, size_t tcbalign __unused)
+{
+	struct dtv *dtv;
+
+	dtv = ((struct tcb *)tcb)->tcb_dtv;
+	tls_free(dtv->dtv_slots[0].dtvs_tls);
+	tls_free(dtv);
+	tls_free_aligned(get_tls_block_ptr(tcb, tcbsize));
+}
+
+/*
+ * Allocate Static TLS using the TGOT method.
+ *
+ * We setup the following layout for the TLS block:
+ * (whole memory block is aligned with MAX(TLS_TCB_ALIGN, tgot_init_align))
+ *
+ * +----------+--------------+--------------+-------------------+
+ * | pre gap  | extended TCB |     TCB      |   TGOT segment    |
+ * | pre_size |  extra_size  | TLS_TCB_SIZE | tgot_static_space |
+ * +----------+--------------+--------------+-------------------+
+ *
+ * where:
+ *  extra_size is tcbsize - TLS_TCB_SIZE
+ *  pre_size   is used to adjust TGOT alignment
+ */
+void *
+__libc_allocate_tls(void *oldtcb, size_t tcbsize, size_t tcbalign)
+{
+	struct dtv *dtv;
+	struct tcb *tcb;
+	char *tls_block, *tls, *tgot;
+	size_t extra_size, maxalign, pre_size, tls_block_size;
+
+	if (oldtcb != NULL && tcbsize == TLS_TCB_SIZE)
+		return (oldtcb);
+
+	tls_assert(tcbalign >= TLS_TCB_ALIGN);
+	maxalign = MAX(tcbalign, libc_tgot_init_align);
+
+	/* Compute fragmets sizes. */
+	extra_size = tcbsize - TLS_TCB_SIZE;
+	tls_block_size = tcbsize;
+	pre_size = roundup2(tls_block_size, libc_tgot_init_align) -
+	    tls_block_size;
+	tls_block_size += pre_size + libc_tgot_static_space;
+
+	/* Allocate whole TLS block */
+	tls_block = tls_malloc_aligned(tls_block_size, maxalign);
+	if (tls_block == NULL) {
+		tls_msg("__libc_allocate_tls: Out of memory.\n");
+		abort();
+	}
+	memset(tls_block, 0, tls_block_size);
+	tcb = (struct tcb *)(tls_block + pre_size + extra_size);
+	tgot = (char *)tcb + TLS_TCB_SIZE;
+#ifdef __CHERI_PURE_CAPABILITY__
+	tgot = cheri_setbounds(tgot, libc_tgot_static_space);
+#endif
+
+	if (oldtcb != NULL) {
+		memcpy(tls_block, get_tls_block_ptr(oldtcb, tcbsize),
+		    tls_block_size);
+		tls_free_aligned(oldtcb);
+
+		/* Adjust the DTV. */
+		dtv = tcb->tcb_dtv;
+		dtv->dtv_slots[0].dtvs_tgot = tgot;
+	} else {
+		tls = tls_malloc_aligned(libc_tls_static_space,
+		    libc_tls_init_align);
+		if (tls == NULL) {
+			tls_msg("__libc_allocate_tls: Out of memory.\n");
+			abort();
+		}
+
+		dtv = tls_malloc(sizeof(struct dtv) +
+		    sizeof(struct dtv_slot));
+		if (dtv == NULL) {
+			tls_msg("__libc_allocate_tls: Out of memory.\n");
+			abort();
+		}
+		/* Build the DTV. */
+		tcb->tcb_dtv = dtv;
+		dtv->dtv_gen = 1;		/* Generation. */
+		dtv->dtv_size = 1;		/* Segments count. */
+		dtv->dtv_defer = NULL;
+		dtv->dtv_slots[0].dtvs_tls = tls;
+		dtv->dtv_slots[0].dtvs_tgot = tgot;
+
+		memset(tls, 0, libc_tls_static_space);
+		if (libc_tls_init_size > 0)
+			memcpy(tls, libc_tls_init, libc_tls_init_size);
+		if (libc_tgot_init_size > 0)
+			memcpy(tgot, libc_tgot_init, libc_tgot_init_size);
+		if (libc_tgot_static_space > 0)
+			__libc_init_tgot(tgot, libc_tgot_init,
+			    libc_tgot_static_space, tls);
+	}
+
+	return (tcb);
+}
+
+#endif	/* TLS_TGOT */
 
 #ifdef TLS_VARIANT_I
 
@@ -448,7 +588,23 @@ _init_tls(void)
 			libc_tls_init = cheri_setbounds(cheri_setaddress(phdr,
 			    phdr[i].p_vaddr), libc_tls_init_size);
 #endif
-			break;
+		}
+		if (phdr[i].p_type == PT_CHERI_TGOT) {
+#ifdef TLS_TGOT
+			libc_tgot_static_space = roundup2(phdr[i].p_memsz,
+			    phdr[i].p_align);
+			libc_tgot_init_size = phdr[i].p_filesz;
+			libc_tgot_init_align = phdr[i].p_align;
+#ifndef __CHERI_PURE_CAPABILITY__
+			libc_tgot_init = (void *)phdr[i].p_vaddr;
+#else
+			libc_tgot_init = cheri_setbounds(cheri_setaddress(phdr,
+			    phdr[i].p_vaddr), libc_tgot_init_size);
+#endif
+#else
+			tls_msg("_init_tls: TGOT not supported.\n");
+			abort();
+#endif
 		}
 	}
 	tls = _rtld_allocate_tls(NULL, TLS_TCB_SIZE, TLS_TCB_ALIGN);
