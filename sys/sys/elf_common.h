@@ -535,6 +535,7 @@ typedef struct {
 #define	PT_LOOS		0x60000000	/* First OS-specific. */
 #define	PT_C18N_NAME	0x64331380	/* Sub-object compartment. */
 #define	PT_CHERI_PCC	0x64348450	/* CHERI PCC bounds. */
+#define	PT_CHERI_TGOT	0x64348451	/* CHERI TLS TGOT. */
 #define	PT_SUNW_UNWIND	0x6464e550	/* amd64 UNWIND program header */
 #define	PT_GNU_EH_FRAME	0x6474e550
 #define	PT_GNU_STACK	0x6474e551
@@ -634,6 +635,9 @@ typedef struct {
 #define	DT_SUNW_ASLR		0x60000023	/* ASLR control */
 #define	DT_C18N_STRTAB		0x64331380	/* Compartment string table */
 #define	DT_C18N_STRTABSZ	0x64331381	/* Compartment string table size */
+#define	DT_CHERI_TGOTREL	0x64348450	/* Address of TGOT relocations. */
+#define	DT_CHERI_TGOTRELT	0x64348451	/* Type of relocation used for TGOT. */
+#define	DT_CHERI_TGOTRELSZ	0x64348453	/* Total size in bytes of TGOT relocations. */
 #define	DT_HIOS		0x6ffff000	/* Last OS-specific */
 
 /*
