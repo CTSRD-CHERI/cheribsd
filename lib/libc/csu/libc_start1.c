@@ -68,6 +68,10 @@ extern void _init(void) __hidden;
 extern int _DYNAMIC __no_subobject_bounds;
 #pragma weak _DYNAMIC
 
+#if defined(CRT_IRELOC_RELA) || defined(CRT_IRELOC_REL)
+#include "reloc.c"
+#endif
+
 #if defined(CRT_IRELOC_RELA)
 #ifdef __CHERI_PURE_CAPABILITY__
 extern Elf_Auxinfo *__auxargs;
@@ -75,8 +79,6 @@ extern Elf_Auxinfo *__auxargs;
 
 extern const Elf_Rela __rela_iplt_start[] __weak_symbol __hidden;
 extern const Elf_Rela __rela_iplt_end[] __weak_symbol __hidden;
-
-#include "reloc.c"
 
 static void
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -97,8 +99,6 @@ process_irelocs(void)
 #elif defined(CRT_IRELOC_REL)
 extern const Elf_Rel __rel_iplt_start[] __weak_symbol __hidden;
 extern const Elf_Rel __rel_iplt_end[] __weak_symbol __hidden;
-
-#include "reloc.c"
 
 static void
 process_irelocs(void)
