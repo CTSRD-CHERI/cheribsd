@@ -62,6 +62,8 @@ typedef	uint64_t	pt_entry_t;		/* page table entry */
 #define	ATTR_LC_GEN1		(3UL << 61)
 #define	ATTR_SC			(1UL << 60)
 #define	ATTR_CDBM		(1UL << 59)
+
+#define	ATTR_CAPREVOKE_MASK	(ATTR_LC_MASK | ATTR_SC | ATTR_CDBM)
 #endif
 
 #define BASE_MASK		~ATTR_MASK
