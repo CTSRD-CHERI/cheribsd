@@ -83,7 +83,6 @@ build${libcompat}: .PHONY
 	    OBJROOT='$${OBJTOP}/' \
 	    UNIVERSE_TOOLCHAIN_PATH=${UNIVERSE_TOOLCHAIN_PATH} \
 	    MAKEOBJDIRPREFIX= \
-	    -DNO_LINT \
 	    -DNO_CPU_CFLAGS \
 	    MK_ASAN=no \
 	    OPT_CHERI_TGOT_TLS=native \
