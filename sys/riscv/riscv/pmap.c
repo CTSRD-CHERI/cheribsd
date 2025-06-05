@@ -4188,6 +4188,320 @@ pmap_caploadgen_get_ucrg(void)
 #endif
 }
 
+#ifdef CHERI_CAPREVOKE_TWOSTAGE_CLEAN
+
+#ifdef __riscv_xcheri
+#error "TWOSTAGE_CLEAN revoker requires Zcheri"
+#endif
+
+/*
+ * The two-stage clean revoker attempts to transition pages from
+ * dirty to clean within the same pass.
+ * The transition is triggered when the page scan does not find any
+ * capabilities.
+ * Since the first scan may race with capability stores, the second-stage
+ * scan must ensure that there are no capabilities in the page in a race-free
+ * way, this is costly.
+ * Use the data dirty bit (D) in the PTE entry to detect concurrent writes
+ * to the page.
+ * Note that PGA_CAPDIRTY is not used in this implementation.
+ */
+enum pmap_caploadgen_res
+pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
+{
+	enum pmap_caploadgen_res res;
+	struct rwlock *lock;
+	pd_entry_t *l2, l2e;
+	pt_entry_t *pte, exppte, oldpte = 0;
+	vm_page_t m;
+
+	rw_rlock(&pvh_global_lock);
+	PMAP_LOCK(pmap);
+
+	KASSERT(pmap_caploadgen_get_ucrg() == pmap->flags.uclg,
+	    ("pmap_caploadgen_update: pmap crg %d but CPU mismatch",
+	    (int)pmap->flags.uclg));
+
+retry:
+	l2 = pmap_l2(pmap, va);
+	if (l2 == NULL || ((l2e = pmap_load(l2)) & PTE_V) == 0) {
+		m = NULL;
+		res = PMAP_CAPLOADGEN_UNABLE;
+		goto out;
+	}
+	if ((l2e & PTE_RWX) != 0) {
+		bool demoted;
+
+		/*
+		 * Demote superpage and contiguous mappings.  When performing
+		 * load-side revocation, we don't want to pay the latency
+		 * penalty of scanning a large mapping.  Ideally, however, the
+		 * background scan could avoid breaking these mappings.  For
+		 * now, we attempt to reconstruct them below.
+		 */
+		lock = NULL;
+		demoted = pmap_demote_l2_locked(pmap, l2, va, &lock);
+		if (lock != NULL)
+			rw_wunlock(lock);
+		if (!demoted) {
+			m = NULL;
+			res = PMAP_CAPLOADGEN_UNABLE;
+			goto out;
+		}
+		goto retry;
+	}
+	pte = pmap_l2_to_l3(l2, va);
+	if (pte == NULL || ((oldpte = pmap_load(pte)) & PTE_V) == 0) {
+		m = NULL;
+		res = PMAP_CAPLOADGEN_UNABLE;
+		goto out;
+	}
+
+	if ((oldpte & (PTE_CW | PTE_CRG)) == 0) {
+		/* CAP-NEVER, always trapping */
+		m = NULL;
+		res = PMAP_CAPLOADGEN_UNABLE;
+		goto out;
+	}
+
+	if (!(oldpte & PTE_CRG) == !(pmap->flags.uclg)) {
+		/* Page already scanned, just fence (maybe redundantly) */
+		if (flags & PMAP_CAPLOADGEN_UPDATETLB)
+			sfence_vma_page(va);
+
+		m = NULL;
+		res = PMAP_CAPLOADGEN_ALREADY;
+		goto out;
+	}
+
+	KASSERT(oldpte & PTE_U, ("!PTE_U w/ CLG mismatch va=%lx", va));
+
+	m = PHYS_TO_VM_PAGE(PTE_TO_PHYS(oldpte));
+	if (*mp == m) {
+		/*
+		 * We expected this page here (i.e., this is the page we just
+		 * scanned), so go ahead and update.  We know that the CLG bits
+		 * must still be wrong in light of the earlier test.
+		 */
+		res = PMAP_CAPLOADGEN_OK;
+
+		if (!(flags & PMAP_CAPLOADGEN_HASCAPS)) {
+			/* We didn't see a capability on this page. */
+			if (flags & PMAP_CAPLOADGEN_CLEANED) {
+				/*
+				 * Second-stage scan done, page cap-clean.
+				 * Complete page ACTIVE -> IDLE transition.
+				 *
+				 * Note that in reaching here we must have
+				 * retained the page xbusy across the secondary
+				 * scan.
+				 */
+				KASSERT(flags & PMAP_CAPLOADGEN_NONEWMAPS,
+				    ("CLEANED but !NONEWMAPS"));
+				vm_page_assert_xbusied(m);
+
+				/*
+				 * We need an fcmpset to clean the page
+				 * in order to ensure that we still did
+				 * not lose the race.
+				 * Should be safe to not restore the D bit here,
+				 * because we synchronised it with the MI state
+				 * before?
+				 *
+				 * XXX-AM: Assumes non-aliasing pages for now.
+				 * With aliasing pages we need to ensure
+				 * that all aliases go to CLEAN before
+				 * clearing PGA_CAPSTORE.
+				 */
+				exppte = oldpte;
+				if (pmap_fcmpset(pte, &exppte,
+				    oldpte & ~PTE_CHERI_MASK)) {
+					pmap_invalidate_page(pmap, va);
+					vm_page_aflag_clear(m,
+					    PGA_CAPDIRTY | PGA_CAPSTORE);
+					counter_u64_add(cheri_became_cap_clean, 1);
+					PMAP_UNLOCK(pmap);
+					rw_runlock(&pvh_global_lock);
+					m = NULL;
+					goto out_unlocked;
+				}
+				/* Lost the race, fall-through update CLG */
+				counter_u64_add(cheri_second_stage_dirty, 1);
+			} else if (flags & PMAP_CAPLOADGEN_NONEWMAPS) {
+				/*
+				 * Observed cap-clean page, initiate
+				 * DIRTY -> CLEAN transition.
+				 *
+				 * Note that the PTE may be CLEAN CW=0 CRG=0
+				 * if pmap_enter() mapped it without
+				 * V_PROT_{READ, WRITE}_CAP even though the
+				 * vm_map entry may be capstore-permissive.
+				 */
+				struct rwlock *lock;
+
+				/* XXX-AM: See above for aliasing pages */
+				vm_page_assert_xbusied(m);
+				lock = VM_PAGE_TO_PV_LIST_LOCK(m);
+				rw_rlock(lock);
+				if (TAILQ_NEXT(TAILQ_FIRST(&m->md.pv_list),
+				    pv_next) != NULL) {
+					rw_runlock(lock);
+					counter_u64_add(cheri_second_stage_alias, 1);
+					goto clean_bail;
+				}
+				rw_runlock(lock);
+
+				pmap_page_dirty(oldpte, m);
+				/*
+				 * We may reach here after SCAN_RO_XBUSIED, so
+				 * need to check for read-only mapping.
+				 * XXX-AM: If so, there is no point in re-scanning
+				 * and can immediately go to clean? This
+				 * changes if we have aliases though.
+				 */
+				if (oldpte & PTE_W) {
+					pmap_clear_bits(pte, PTE_D);
+					pmap_invalidate_page(pmap, va);
+				}
+
+				res = PMAP_CAPLOADGEN_CLEANING;
+				PMAP_UNLOCK(pmap);
+				rw_runlock(&pvh_global_lock);
+				m = NULL;
+				goto out_cleaning;
+			}
+		}
+
+clean_bail:
+		/* Page is cap-dirty, should reach here with CW=1 */
+		KASSERT((oldpte & PTE_CW) != 0, ("Dirty PTE lacks PTE_CW"));
+
+		/*
+		 * On the fast path, where we're just updating the CRG bit, this
+		 * is the only store to the PTE we'll do.  This is probably a
+		 * better state of affairs (1 + epsilon AMOs, no retries) than
+		 * we could otherwise easily get (either 1 LL/SC CAS + epsilon
+		 * retries or 1 AMOSWAP to a zero PTE + 1 store).
+		 */
+		pmap_caploadgen_update_crg(pmap, pte);
+
+		if (flags & PMAP_CAPLOADGEN_UPDATETLB) {
+			sfence_vma_page(va);
+		}
+		m = NULL;
+	} else if (!(vm_page_astate_load(m).flags & PGA_CAPSTORE)) {
+		KASSERT(!(oldpte & PTE_CW), ("!PGA_CAPSTORE but CW?"));
+
+#if defined(INVARIANTS)
+		/*
+		 * We think there aren't any unrevoked capabilities on this
+		 * page.  Make sure we're not loading one.
+		 */
+		vm_pointer_t mva = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
+		mva += va & L3_OFFSET;
+		KASSERT(cheri_revoke_is_revoked(*(void * __capability *)mva),
+		    ("Unrevoked cap on !PGA_CAPSTORE m=%p va=%lx", m, va));
+#endif
+
+		/*
+		 * For tag-independent faults, we might still raise a fault for
+		 * !PGA_CAPSTORE pages if the TLB is holding a stale LCLG.
+		 * Since the page really ought to be capability clean at this
+		 * point, we should be OK to arbitarily manipulate the LCLG, so
+		 * appease the TLB.
+		 *
+		 * See the note on pmap_caploadgen_test_all_clean for what we'd
+		 * rather do, though.
+		 */
+		pmap_caploadgen_update_crg(pmap, pte);
+		if (flags & PMAP_CAPLOADGEN_UPDATETLB) {
+			sfence_vma_page(va);
+		}
+
+		m = NULL;
+		res = PMAP_CAPLOADGEN_CLEAN;
+	} else if (vm_page_tryxbusy(m)) {
+		/*
+		 * OK, we have the page xbusy'd and so new writeable mappings
+		 * will not appear.
+		 */
+		if ((oldpte & PTE_W) != 0) {
+			res = PMAP_CAPLOADGEN_SCAN_RW_XBUSIED;
+		} else {
+			res = PMAP_CAPLOADGEN_SCAN_RO_XBUSIED;
+		}
+	} else if (vm_page_wire_mapped(m)) {
+		/*
+		 * OK, couldn't xbusy the page but could wire it down.  It's
+		 * safe to do a RO sweep now, and hopefully that's enough to
+		 * clear the page for return to service.
+		 */
+		res = PMAP_CAPLOADGEN_SCAN_RO_WIRED;
+	} else {
+		/* Could neither xbusy nor wire this page; fall back to VM */
+		m = NULL;
+		res = PMAP_CAPLOADGEN_TEARDOWN;
+	}
+
+out:
+#if VM_NRESERVLEVEL > 0
+	/*
+	 * If we...
+	 *   are on the background scan (as indicated by EXCLUSIVE),
+	 *   are writing back a PTE (m != NULL),
+	 *   have superpages enabled,
+	 *   are at the last page of an L2 entry,
+	 * then see if we can put a superpage back together.
+	 */
+	if ((flags & PMAP_CAPLOADGEN_NONEWMAPS) &&
+	    (m != NULL) && pmap_ps_enabled(pmap) &&
+	    ((va & (L2_OFFSET - L3_OFFSET)) == (L2_OFFSET - L3_OFFSET))) {
+
+		KASSERT((l2e & PTE_RWX) == 0,
+		    ("pmap_caploadgen_update superpage: already l2"));
+		KASSERT((m->flags & PG_FICTITIOUS) == 0,
+		    ("pmap_caploadgen_update superpage: m fictitious"));
+
+		/*
+		 * Find the page holding our L3 PTEs.  If all L3 entries exist
+		 * and the superpage would come from a fully populated
+		 * reservation, attempt promotion.
+		 */
+		vm_page_t mpte = PHYS_TO_VM_PAGE(PTE_TO_PHYS(l2e));
+		if ((mpte->ref_count == Ln_ENTRIES) &&
+		    (vm_reserv_level_iffullpop(m) == 0)) {
+
+			struct rwlock *lock = NULL;
+			pmap_promote_l2(pmap, l2, va, mpte, &lock);
+			if (lock != NULL)
+				rw_wunlock(lock);
+		}
+	}
+#endif /* VM_NRESERVLEVEL > 0 */
+
+	PMAP_UNLOCK(pmap);
+	rw_runlock(&pvh_global_lock);
+out_unlocked:
+
+	if (*mp != NULL) {
+		if (flags & PMAP_CAPLOADGEN_XBUSIED) {
+			vm_page_xunbusy(*mp);
+		} else {
+			vm_page_unwire_in_situ(*mp);
+		}
+	}
+out_cleaning:
+	*mp = m;
+
+	return (res);
+}
+
+#else /* !defined(CHERI_CAPREVOKE_TWOSTAGE_CLEAN) */
+
+#if !defined(__riscv_xcheri) && !defined(CHERI_CAPREVOKE_NO_CLEAN)
+#error "Zcheri requires CHERI_CAPREVOKE_NO_CLEAN or CHERI_CAPREVOKE_TWOSTAGE_CLEAN"
+#endif
+
 enum pmap_caploadgen_res
 pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 {
@@ -4490,6 +4804,7 @@ out_unlocked:
 
 	return res;
 }
+#endif /* !defined(CHERI_CAPREVOKE_TWOSTAGE_CLEAN) */
 
 void
 pmap_assert_consistent_clg(pmap_t pmap, vm_offset_t va)
