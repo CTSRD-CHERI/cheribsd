@@ -399,6 +399,9 @@ vm_cheri_revoke_fault_visit(struct vmspace *uvms, vm_offset_t va)
 	vm_page_t m = NULL;
 	bool hascap = false;
 	bool xbusied = false;
+#ifdef CHERI_CAPREVOKE_TWOSTAGE_CLEAN
+	bool clean_rescan = false;
+#endif
 
 	/*
 	 * Since faults may be spurious, avoid looking at VM data structures
@@ -412,6 +415,9 @@ again:
 	pres = pmap_caploadgen_update(upmap, va, &m,
 	    PMAP_CAPLOADGEN_UPDATETLB |
 	    (xbusied ? PMAP_CAPLOADGEN_XBUSIED : 0) |
+#ifdef CHERI_CAPREVOKE_TWOSTAGE_CLEAN
+	    (clean_rescan ? PMAP_CAPLOADGEN_CLEANED : 0) |
+#endif
 	    (hascap ? PMAP_CAPLOADGEN_HASCAPS : 0));
 
 	switch (pres) {
@@ -428,12 +434,23 @@ again:
 
 	case PMAP_CAPLOADGEN_SCAN_RO_WIRED:
 		xbusied = false;
+		counter_u64_add(wired_count, 1);
 		break;
 
 	case PMAP_CAPLOADGEN_SCAN_RO_XBUSIED:
 	case PMAP_CAPLOADGEN_SCAN_RW_XBUSIED:
 		xbusied = true;
+		counter_u64_add(xbusy_count, 1);
 		break;
+#ifdef CHERI_CAPREVOKE_TWOSTAGE_CLEAN
+	case PMAP_CAPLOADGEN_CLEANING:
+		if (clean_rescan) {
+			/* Could not clean, bail */
+			res = VM_CHERI_REVOKE_FAULT_RESOLVED;
+			goto out;
+		}
+		clean_rescan = true;
+#endif
 	}
 
 	if (!hascookie) {
@@ -583,6 +600,9 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc,
 	bool mxbusy = false;
 	bool mdidvm = false;
 	bool viscap = false;
+#ifdef CHERI_CAPREVOKE_TWOSTAGE_CLEAN
+	bool clean_rescan = false;
+#endif
 
 	VM_OBJECT_ASSERT_WLOCKED(obj);
 
@@ -608,6 +628,9 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc,
 	switch (pres) {
 	case PMAP_CAPLOADGEN_OK:
 	case PMAP_CAPLOADGEN_TEARDOWN:
+#ifdef CHERI_CAPREVOKE_TWOSTAGE_CLEAN
+	case PMAP_CAPLOADGEN_CLEANING:
+#endif
 		panic("Bad first return %d from pmap_caploadgen_update", pres);
 
 	case PMAP_CAPLOADGEN_ALREADY:
@@ -736,6 +759,9 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc,
 		goto ok;
 	}
 
+#ifdef CHERI_CAPREVOKE_TWOSTAGE_CLEAN
+visit_restart:
+#endif
 	/*
 	 * The page isn't mapped but we may need to modify it.  Use the map
 	 * entry's state to decide whether we can bypass the page fault handler.
@@ -823,6 +849,9 @@ ok:
 		pres = pmap_caploadgen_update(crc->map->pmap, addr, &m2,
 		    (mxbusy ? PMAP_CAPLOADGEN_XBUSIED : 0) |
 		    (mxbusy ? PMAP_CAPLOADGEN_NONEWMAPS : 0) |
+#ifdef CHERI_CAPREVOKE_TWOSTAGE_CLEAN
+		    (clean_rescan ? PMAP_CAPLOADGEN_CLEANED : 0) |
+#endif
 		    (viscap ? PMAP_CAPLOADGEN_HASCAPS : 0));
 
 		switch (pres) {
@@ -848,6 +877,21 @@ ok:
 
 		case PMAP_CAPLOADGEN_TEARDOWN:
 			break;
+#ifdef CHERI_CAPREVOKE_TWOSTAGE_CLEAN
+		case PMAP_CAPLOADGEN_CLEANING:
+			/*
+			 * Page moved to maybe-cap-clean, rescan.
+			 * This can only occur with an xbusied page.
+			 * If we already scanned the page twice, bail on
+			 * attempting to clean the page to avoid stalling
+			 * the revoker.
+			 */
+			if (!clean_rescan) {
+				clean_rescan = true;
+				goto visit_restart;
+			}
+			break;
+#endif
 		}
 
 		/*
