@@ -114,14 +114,6 @@ struct xswdev {
 #define	KERN_MEM_PROT_FAILURE	11
 #define	KERN_PAGE_NOT_FILLED	12	/* VM_FAULT_NOFILL didn't insert page */
 
-#ifndef PA_LOCK_COUNT
-#ifdef SMP
-#define	PA_LOCK_COUNT	32
-#else
-#define PA_LOCK_COUNT	1
-#endif	/* !SMP */
-#endif	/* !PA_LOCK_COUNT */
-
 #ifndef KSTACK_MAX_PAGES
 #define KSTACK_MAX_PAGES 32
 #endif
