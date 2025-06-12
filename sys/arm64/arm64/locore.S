@@ -93,6 +93,20 @@
 #endif
 .endmacro
 
+.macro buildptr_pagetable dregn, sym, scratchn
+	adrp	PTR(\dregn), \sym
+	add	x\dregn, x\dregn, :lo12:\sym
+#ifdef __CHERI_PURE_CAPABILITY__
+	cvtd	c\dregn, x\dregn
+	adrp	PTR(\scratchn), \sym\()_end
+	add	x\scratchn, x\scratchn, :lo12:\sym\()_end
+	sub	x\scratchn, x\scratchn, x\dregn
+	scbnds	c\dregn, c\dregn, x\scratchn
+	ldr	x\scratchn, =~CHERI_PERMS_KERNEL_DATA_NOCAP
+	clrperm	c\dregn, c\dregn, x\scratchn
+#endif
+.endmacro
+
 /*
  * Jump into the kernel virtual address at the given position
  * This also restricts the kernel PCC
@@ -223,7 +237,6 @@ ENTRY(_start)
 	/*
 	 * At this point:
 	 * x27 = TTBR0 table phys addr
-	 * x26 = Kernel L1 table phys addr
 	 * x24 = TTBR1 table phys addr
 	 * x22 = PTE shareability attributes
 	 * x21 = BTI guarded page attribute if supported
@@ -726,7 +739,6 @@ LEND(get_load_phys_addr)
  *
  * Returns:
  *  x27 TTBR0 table phys addr
- *  x26 Kernel L1 table phys addr
  *  x24 TTBR1 table phys addr
  *
  *  There are 7 or 8 pages before that address for the page tables
@@ -757,7 +769,6 @@ LENTRY(create_pagetables)
 	clrperm	c6, c6, x7
 	scvalue	c27, c6, x27
 #endif
-	mov	PTR(26), PTR(6)	/* Save start addr for later */
 1:
 	stp	xzr, xzr, [PTR(6)], #16
 	stp	xzr, xzr, [PTR(6)], #16
@@ -865,9 +876,11 @@ common:
 	 * with 2M alignment.
 	 */
 #define	PTE_SHIFT	L3_SHIFT
+#define	LL_PAGE_TABLE	pagetable_l3_ttbr1
 #define	BUILD_PTE_FUNC	build_l3_page_pagetable
 #else
 #define	PTE_SHIFT	L2_SHIFT
+#define	LL_PAGE_TABLE	pagetable_l2_ttbr1
 #define	BUILD_PTE_FUNC	build_l2_block_pagetable
 #endif
 
@@ -875,50 +888,43 @@ common:
 	lsr	x10, x8, #(PTE_SHIFT)
 
 	/* Create the kernel space PTE table */
-	mov	PTR(6), PTR(26)
+	buildptr_pagetable 6, LL_PAGE_TABLE, 11
 	mov	x7, #(ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK))
 	mov	x8, #(KERNBASE)
 	mov	x9, x28
 	bl	BUILD_PTE_FUNC
 
 #undef PTE_SHIFT
+#undef LL_PAGE_TABLE
 #undef BUILD_PTE_FUNC
 
 #if PAGE_SIZE != PAGE_SIZE_4K
-	/* Move to the l2 table */
-	ldr	x9, =(PAGE_SIZE * L3_PAGE_COUNT)
-	add	PTR(26), PTR(26), x9
-
 	/* Link the l2 -> l3 table */
 	mov	x9, x6
-	mov	PTR(6), PTR(26)
+	buildptr_pagetable 6, pagetable_l2_ttbr1, 11
 	bl	link_l2_pagetable
 #endif
 
-	/* Move to the l1 table */
-	add	PTR(26), PTR(26), #PAGE_SIZE
-
 	/* Link the l1 -> l2 table */
 	mov	x9, x6
-	mov	PTR(6), PTR(26)
+	buildptr_pagetable 6, pagetable_l1_ttbr1, 11
 	bl	link_l1_pagetable
-
-	/* Move to the l0 table */
-	add	PTR(24), PTR(26), #PAGE_SIZE
 
 	/* Link the l0 -> l1 table */
 	mov	x9, x6
-	mov	PTR(6), PTR(24)
+	buildptr_pagetable 6, pagetable_l0_ttbr1, 11
 	mov	x10, #1
 	bl	link_l0_pagetable
+
+	/* Save the TTBR1 table physical address */
+	mov	x24, x6
 
 	/*
 	 * Build the TTBR0 maps.  As TTBR0 maps, they must specify ATTR_S1_nG.
 	 * They are only needed early on, so the VA = PA map is uncached.
 	 */
-	add	PTR(27), PTR(24), #PAGE_SIZE
 
-	mov	PTR(6), PTR(27)		/* The initial page table */
+	buildptr_pagetable 6, pagetable_l2_ttbr0_bootstrap, 11
 
 	/* Create the VA = PA map */
 	mov	x7, #(ATTR_S1_nG | ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK))
@@ -972,32 +978,19 @@ common:
 1:
 #endif
 
-	/* Move to the l1 table */
-	add	PTR(27), PTR(27), #PAGE_SIZE
-
 	/* Link the l1 -> l2 table */
 	mov	x9, x6
-	mov	PTR(6), PTR(27)
+	buildptr_pagetable 6, pagetable_l1_ttbr0_bootstrap, 11
 	bl	link_l1_pagetable
-
-	/* Move to the l0 table */
-	add	PTR(27), PTR(27), #PAGE_SIZE
 
 	/* Link the l0 -> l1 table */
 	mov	x9, x6
-	mov	PTR(6), PTR(27)
+	buildptr_pagetable 6, pagetable_l1_ttbr0_bootstrap, 11
 	mov	x10, #1
 	bl	link_l0_pagetable
 
-#ifdef __CHERI_PURE_CAPABILITY__
-	/*
-	 * Return physical addresses instead of capabilities
-	 * into the identity-mapped early address space.
-	 */
-	gcvalue x24, c24
-	gcvalue x26, c26
-	gcvalue x27, c27
-#endif
+	/* Save the TTBR0 table physical address */
+	mov	x27, x6
 
 	/* Restore the Link register */
 	mov	PTR(30), PTR(5)
@@ -1356,25 +1349,34 @@ initstack_end:
 	 */
 pagetable:
 #if PAGE_SIZE != PAGE_SIZE_4K
+pagetable_l3_ttbr1:
 	.space	(PAGE_SIZE * L3_PAGE_COUNT)
-pagetable_l2_ttbr1:
+pagetable_l3_ttbr1_end:
 #endif
+pagetable_l2_ttbr1:
 	.space	PAGE_SIZE
+pagetable_l2_ttbr1_end:
 pagetable_l1_ttbr1:
 	.space	PAGE_SIZE
+pagetable_l1_ttbr1_end:
 	.globl pagetable_l0_ttbr1
 	.type	pagetable_l0_ttbr1,#object
 pagetable_l0_ttbr1:
 	.space	PAGE_SIZE
+pagetable_l0_ttbr1_end:
 	.size	pagetable_l0_ttbr1, . - pagetable_l0_ttbr1
 pagetable_l2_ttbr0_bootstrap:
 	.space	PAGE_SIZE
+pagetable_l2_ttbr0_bootstrap_end:
 pagetable_l1_ttbr0_bootstrap:
 	.space	PAGE_SIZE
+pagetable_l1_ttbr0_bootstrap_end:
 pagetable_l0_ttbr0_bootstrap:
 	.space	PAGE_SIZE
+pagetable_l0_ttbr0_bootstrap_end:
 pagetable_l0_ttbr0:
 	.space	PAGE_SIZE
+pagetable_l0_ttbr0_end:
 pagetable_end:
 
 	.type	el2_pagetable,#object
