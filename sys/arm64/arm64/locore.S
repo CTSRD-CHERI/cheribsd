@@ -288,6 +288,8 @@ virtdone:
 	msr	sp_el0, x15
 #endif
 
+	/* Prepare a value for arm64_bootparams.modulep. */
+	mov	x19, x0
 #ifdef __CHERI_PURE_CAPABILITY__
 	/*
 	 * Convert modulep into a capability
@@ -310,43 +312,49 @@ virtdone:
 	/* Save bootparams */
 	mov	PTR(19), PTR(0)
 
-#if __has_feature(capabilities)
-#ifdef __CHERI_PURE_CAPABILITY__
 	/*
-	 * Do capability relocations.
+	 * Initialize kernel's ELF file.
 	 *
 	 * Statically relocate dependencies of dynamic relocation routines and
-	 * pass them as arguments to the relocation routines.
+	 * pass them as arguments to the relocation routines. The dependencies
+	 * must be reachable from DDC and PCC at this stage.
 	 *
-	 * The dependencies must be reachable from DDC and PCC at this stage.
+	 * In a purecap kernel, also relocate the kernel itself to construct
+	 * valid capabilities.
 	 */
+
+#ifdef __CHERI_PURE_CAPABILITY__
 	ldr	x0, =~CHERI_PERMS_KERNEL_DATA
 	mrs	c2, ddc
 	clrperm	c2, c2, x0
+#endif
 
-	adrp	c0, elf_kernel_file
-	add	c0, c0, :lo12:elf_kernel_file
+	adrp	PTR(0), elf_kernel_file
+	add	PTR(0), PTR(0), :lo12:elf_kernel_file
+
+	adrp	PTR(1), _DYNAMIC
+	add	PTR(1), PTR(1), :lo12:_DYNAMIC
+
+	adrp	PTR(3), elf_kernel_plts
+	add	PTR(3), PTR(3), :lo12:elf_kernel_plts
+
+#ifdef __CHERI_PURE_CAPABILITY__
 	scvalue c0, c2, x0
-
-	adrp	c1, _DYNAMIC
-	add	c1, c1, :lo12:_DYNAMIC
 	scvalue	c1, c2, x1
-
-	adrp	c3, elf_kernel_plts
-	add	c3, c3, :lo12:elf_kernel_plts
 	scvalue	c3, c2, x3
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	adrp	c4, elf_kernel_compartments
 	add	c4, c4, :lo12:elf_kernel_compartments
-	scvalue	c4, c2, x4
 
 	adrp	c5, compartment_lastid
 	add	c5, c5, :lo12:compartment_lastid
-	scvalue	c5, c2, x5
 
 	adrp	c6, elf_kernel_pccs
 	add	c6, c6, :lo12:elf_kernel_pccs
+
+	scvalue	c4, c2, x4
+	scvalue	c5, c2, x5
 	scvalue	c6, c2, x6
 #endif
 
@@ -355,10 +363,13 @@ virtdone:
 	 * must be both executable and writable (for ifunc resolvers).
 	 */
 	mrs	c2, ddc
-
-	bl	elf_reloc_self
+#else
+	mov	x2, 0
 #endif
 
+	bl	elf_init
+
+#if __has_feature(capabilities)
 	/* Initialize capabilities. */
 	mrs	c0, ddc
 	bl	cheri_init_capabilities

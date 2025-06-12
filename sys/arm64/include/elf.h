@@ -234,19 +234,7 @@ __ElfType(Auxinfo);
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
-struct elf_file;
-struct elf_plt;
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-struct elf_pcc;
-struct elf_compartment;
-#endif
-void elf_reloc_self(struct elf_file *ef, Elf_Dyn *dynp, void *kroot,
-    struct elf_plt *plts
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-    , struct elf_compartment *compartments, u_long *lastidp,
-    struct elf_pcc *pccs
-#endif
-    );
+void elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap);
 #endif
 
 #define	ELF_STATIC_RELOC_LABEL(var, label)				\

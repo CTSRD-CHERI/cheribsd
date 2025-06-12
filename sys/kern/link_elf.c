@@ -570,6 +570,9 @@ elf_init(elf_file_t ef, Elf_Dyn *dynp, void *relocbase, elf_plt_t plts
 	Elf_Ehdr *hdr;
 	Elf_Phdr *phlimit, *phdr, *phtable;
 #endif
+#ifdef __CHERI_PURE_CAPABILITY__
+	void *code_cap, *data_cap;
+#endif
 	int error;
 
 	/*
@@ -657,6 +660,21 @@ elf_init(elf_file_t ef, Elf_Dyn *dynp, void *relocbase, elf_plt_t plts
 	if (error != 0) {
 		panic("%s: Can't initialize the kernel ELF file", __func__);
 	}
+
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	data_cap = cheri_clearperm(relocbase, ~CHERI_PERMS_KERNEL_DATA);
+	code_cap = cheri_clearperm(relocbase,
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	    ~CHERI_PERMS_KERNEL_EXECUTIVE_CODE
+#else
+	    ~CHERI_PERMS_KERNEL_CODE
+#endif
+	    );
+	elf_reloc_self(dynp, data_cap, code_cap);
+#else
+	elf_init_data();
+#endif
 }
 
 void

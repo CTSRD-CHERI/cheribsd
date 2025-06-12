@@ -833,28 +833,9 @@ elf_reloc_self_perms(const Elf_Dyn *dynp, void *data_cap, const void *code_cap,
 }
 
 void __nosanitizecoverage
-elf_reloc_self(elf_file_t ef, Elf_Dyn *dynp, void *kroot, elf_plt_t plts
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-    , elf_compartment_t compartments, u_long *lastidp, elf_pcc_t pccs
-#endif
-    )
+elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap)
 {
-	void *code_cap, *data_cap;
 
-	data_cap = cheri_clearperm(kroot, ~CHERI_PERMS_KERNEL_DATA);
-	code_cap = cheri_clearperm(kroot,
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	    ~CHERI_PERMS_KERNEL_EXECUTIVE_CODE
-#else
-	    ~CHERI_PERMS_KERNEL_CODE
-#endif
-	    );
-
-	elf_init(ef, dynp, kroot, plts
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	    , compartments, lastidp, pccs
-#endif
-	    );
 	elf_reloc_self_perms(dynp, data_cap, code_cap, MORELLO_FRAG_RODATA |
 	    MORELLO_FRAG_RWDATA);
 	elf_init_data();
