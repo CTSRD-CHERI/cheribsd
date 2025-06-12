@@ -186,11 +186,7 @@ ENTRY(_rtld_bind_start)
 	MV_PTR	PTR(a0), PTR(t0)
 
 	/* Call into rtld */
-#ifdef __CHERI_PURE_CAPABILITY__
-	cjal	_rtld_bind
-#else
 	jal	_rtld_bind
-#endif
 
 	/* Backup the address to branch to */
 	MV_PTR	PTR(t0), PTR(a0)
