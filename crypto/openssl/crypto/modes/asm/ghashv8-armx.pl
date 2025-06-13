@@ -78,9 +78,7 @@ $code=<<___;
 #if __ARM_MAX_ARCH__>=7
 ___
 $code.=<<___					if ($flavour =~ /64/);
-#ifndef __CHERI_PURE_CAPABILITY__
-.arch	armv8-a+crypto
-#endif
+.arch_extension	crypto
 .text
 ___
 $code.=<<___					if ($flavour !~ /64/);
