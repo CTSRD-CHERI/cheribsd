@@ -124,12 +124,14 @@ my @C = map("x$_", (26,27,28,30));
 my @P = map("PTR($_)", (26,27,28,30));
 
 $code.=<<___;
+#define	KeccakF1600_int_FRAMESZ	(16 + 2*PTR_WIDTH)
+
 .type	KeccakF1600_int,%function
 .align	5
 KeccakF1600_int:
 	AARCH64_SIGN_LINK_REGISTER
 	adr	@P[2],iotas
-	stp	@P[2],PTR(30),[PTRN(sp),#(2*PTR_WIDTH)]	// 32 bytes on top are mine
+	stp	@P[2],PTR(30),[PTRN(sp),#16]	// 32/48 bytes on top are mine
 	b	.Loop
 .align	4
 .Loop:
@@ -252,7 +254,7 @@ $code.=<<___;
 
 	bic	$C[0],$A[1][2],$A[1][1]
 	 tst	$C[1],#255			// are we done?
-	 str	$C[1],[PTRN(sp),#16]
+	 str	$P[1],[PTRN(sp),#16]
 	bic	$C[1],$A[1][3],$A[1][2]
 	bic	$C[2],$A[1][0],$A[1][4]
 	 eor	$A[0][0],$A[0][0],$C[3]		// A[0][0] ^= Iota
@@ -299,7 +301,7 @@ $code.=<<___;
 
 	bne	.Loop
 
-	ldr	PTR(30),[PTRN(sp),#(2*PTR_WIDTH+8)]
+	ldr	PTR(30),[PTRN(sp),#(16+PTR_WIDTH)]
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
 .size	KeccakF1600_int,.-KeccakF1600_int
@@ -315,9 +317,9 @@ KeccakF1600:
 	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
 	stp	PTR(25),PTR(26),[PTRN(sp),#(8*PTR_WIDTH)]
 	stp	PTR(27),PTR(28),[PTRN(sp),#(10*PTR_WIDTH)]
-	sub	PTRN(sp),PTRN(sp),#(2*PTR_WIDTH+32)
+	sub	PTRN(sp),PTRN(sp),#(KeccakF1600_int_FRAMESZ+2*PTR_WIDTH)
 
-	str	PTR(0),[PTRN(sp),#32]		// offload argument
+	str	PTR(0),[PTRN(sp),#(KeccakF1600_int_FRAMESZ)]		// offload argument
 	mov	$P[0],PTR(0)
 	ldp	$A[0][0],$A[0][1],[PTR(0),#16*0]
 	ldp	$A[0][2],$A[0][3],[$P[0],#16*1]
@@ -335,7 +337,7 @@ KeccakF1600:
 
 	bl	KeccakF1600_int
 
-	ldr	$P[0],[PTRN(sp),#32]
+	ldr	$P[0],[PTRN(sp),#(KeccakF1600_int_FRAMESZ)]
 	stp	$A[0][0],$A[0][1],[$P[0],#16*0]
 	stp	$A[0][2],$A[0][3],[$P[0],#16*1]
 	stp	$A[0][4],$A[1][0],[$P[0],#16*2]
@@ -351,7 +353,7 @@ KeccakF1600:
 	str	$A[4][4],[$P[0],#16*12]
 
 	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
-	add	PTRN(sp),PTRN(sp),#(2*PTR_WIDTH+32)
+	add	PTRN(sp),PTRN(sp),#(KeccakF1600_int_FRAMESZ+2*PTR_WIDTH)
 	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
 	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
 	ldp	PTR(25),PTR(26),[PTR(29),#(8*PTR_WIDTH)]
@@ -373,10 +375,10 @@ SHA3_absorb:
 	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
 	stp	PTR(25),PTR(26),[PTRN(sp),#(8*PTR_WIDTH)]
 	stp	PTR(27),PTR(28),[PTRN(sp),#(10*PTR_WIDTH)]
-	sub	PTRN(sp),PTRN(sp),#(2*PTR_WIDTH+48)
+	sub	PTRN(sp),PTRN(sp),#(KeccakF1600_int_FRAMESZ+2*PTR_WIDTH+16)
 
-	stp	PTR(0),PTR(1),[PTRN(sp),#32]	// offload arguments
-	stp	x2,x3,[PTRN(sp),#(2*PTR_WIDTH+32)]
+	stp	PTR(0),PTR(1),[PTRN(sp),#(KeccakF1600_int_FRAMESZ)]	// offload arguments
+	stp	x2,x3,[PTRN(sp),#(KeccakF1600_int_FRAMESZ+2*PTR_WIDTH)]
 
 	mov	$P[0],PTR(0)			// uint64_t A[5][5]
 	mov	$P[1],PTR(1)			// const void *inp
@@ -402,7 +404,7 @@ SHA3_absorb:
 	subs	$C[0],$C[2],$C[3]		// len - bsz
 	blo	.Labsorbed
 
-	str	$C[0],[PTRN(sp),#(2*PTR_WIDTH+32)]	// save len - bsz
+	str	$C[0],[PTRN(sp),#(KeccakF1600_int_FRAMESZ+2*PTR_WIDTH)]	// save len - bsz
 ___
 for (my $i=0; $i<24; $i+=2) {
 my $j = $i+1;
@@ -430,17 +432,17 @@ $code.=<<___;
 	eor	$A[4][4],$A[4][4],$C[0]
 
 .Lprocess_block:
-	str	$P[1],[PTRN(sp),#(PTR_WIDTH+32)]	// save inp
+	str	$P[1],[PTRN(sp),#(KeccakF1600_int_FRAMESZ+PTR_WIDTH)]	// save inp
 
 	bl	KeccakF1600_int
 
-	ldr	$P[1],[PTRN(sp),#(PTR_WIDTH+32)]	// restore arguments
-	ldp	$C[2],$C[3],[PTRN(sp),#(2*PTR_WIDTH+32)]
+	ldr	$P[1],[PTRN(sp),#(KeccakF1600_int_FRAMESZ+PTR_WIDTH)]	// restore arguments
+	ldp	$C[2],$C[3],[PTRN(sp),#(KeccakF1600_int_FRAMESZ+2*PTR_WIDTH)]
 	b	.Loop_absorb
 
 .align	4
 .Labsorbed:
-	ldr	$P[1],[PTRN(sp),#32]
+	ldr	$P[1],[PTRN(sp),#(KeccakF1600_int_FRAMESZ)]
 	stp	$A[0][0],$A[0][1],[$P[1],#16*0]
 	stp	$A[0][2],$A[0][3],[$P[1],#16*1]
 	stp	$A[0][4],$A[1][0],[$P[1],#16*2]
@@ -457,7 +459,7 @@ $code.=<<___;
 
 	mov	x0,$C[2]			// return value
 	ldp	PTR(19),PTR(20),[PTR(29),#(2*PTR_WIDTH)]
-	add	PTRN(sp),PTRN(sp),#(2*PTR_WIDTH+48)
+	add	PTRN(sp),PTRN(sp),#(KeccakF1600_int_FRAMESZ+2*PTR_WIDTH+16)
 	ldp	PTR(21),PTR(22),[PTR(29),#(4*PTR_WIDTH)]
 	ldp	PTR(23),PTR(24),[PTR(29),#(6*PTR_WIDTH)]
 	ldp	PTR(25),PTR(26),[PTR(29),#(8*PTR_WIDTH)]
