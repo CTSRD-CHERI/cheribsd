@@ -460,8 +460,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 		SYSERRCAUSE(
 		    "%s: invalid bits in prot %x", __func__,
 		    (mrp->mr_prot & ~(_PROT_ALL | PROT_MAX(_PROT_ALL))));
-		SET_ERROR0(EINVAL, "unknown PROT bits");
-		return (EINVAL);
+		return (SET_ERROR0(EINVAL, "unknown PROT bits"));
 	}
 	max_prot = PROT_MAX_EXTRACT(mrp->mr_prot);
 	prot = PROT_EXTRACT(mrp->mr_prot);
@@ -485,8 +484,8 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 		if ((max_prot & prot) != prot) {
 			SYSERRCAUSE("%s: requested page permissions exceed "
 			    "requested maximum", __func__);
-			SET_ERROR0(ENOTSUP, "prot is not subset of max_prot");
-			return (ENOTSUP);
+			return (SET_ERROR0(ENOTSUP,
+			    "prot is not subset of max_prot"));
 		}
 	}
 	if ((prot & (PROT_WRITE | PROT_EXEC)) == (PROT_WRITE | PROT_EXEC) &&
@@ -523,10 +522,9 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	if (!SV_CURPROC_FLAG(SV_AOUT)) {
 		if ((len == 0 && p->p_osrel >= P_OSREL_MAP_ANON) ||
 		    ((flags & MAP_ANON) != 0 && (fd != -1 || pos != 0))) {
-			SET_ERROR2(EINVAL,
+			return (SET_ERROR2(EINVAL,
 			    "offset not zero/fd not -1 for MAP_ANON",
-			    fd, pos);
-			return (EINVAL);
+			    fd, pos));
 		}
 	} else {
 		if ((flags & MAP_ANON) != 0)
@@ -536,8 +534,8 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	if (flags & MAP_STACK) {
 		if ((fd != -1) || ((prot & (PROT_READ | PROT_WRITE)) !=
 		    (PROT_READ | PROT_WRITE))) {
-			SET_ERROR1(EINVAL, "MAP_STACK with prot < rw", prot);
-			return (EINVAL);
+			return (SET_ERROR1(EINVAL, "MAP_STACK with prot < rw",
+			    prot));
 		}
 		flags |= MAP_ANON;
 		pos = 0;
@@ -546,22 +544,18 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	    MAP_STACK | MAP_NOSYNC | MAP_ANON | MAP_EXCL | MAP_NOCORE |
 	    MAP_PREFAULT_READ | MAP_GUARD | MAP_32BIT |
 	    MAP_ALIGNMENT_MASK)) != 0) {
-		SET_ERROR0(EINVAL, "reserved flag set");
-		return (EINVAL);
+		return (SET_ERROR0(EINVAL, "reserved flag set"));
 	}
 	flags |= mrp->mr_kern_flags;
 	if ((flags & (MAP_EXCL | MAP_FIXED)) == MAP_EXCL) {
-		SET_ERROR0(EINVAL, "EXCL without FIXED");
-		return (EINVAL);
+		return (SET_ERROR0(EINVAL, "EXCL without FIXED"));
 	}
 	if ((flags & (MAP_SHARED | MAP_PRIVATE)) == (MAP_SHARED |
 	    MAP_PRIVATE)) {
-		SET_ERROR0(EINVAL, "both SHARED and PRIVATE set");
-		return (EINVAL);
+		return (SET_ERROR0(EINVAL, "both SHARED and PRIVATE set"));
 	}
 	if (prot != PROT_NONE && (prot & ~_PROT_ALL) != 0) {
-		SET_ERROR1(EINVAL, "invalid prot", prot);
-		return (EINVAL);
+		return (SET_ERROR1(EINVAL, "invalid prot", prot));
 	}
 	if ((flags & MAP_GUARD) != 0 &&
 	    ((prot != PROT_NONE
@@ -572,8 +566,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	    pos != 0 || (flags & ~(MAP_FIXED | MAP_GUARD | MAP_EXCL |
 	    MAP_RESERVATION_CREATE |
 	    MAP_32BIT | MAP_ALIGNMENT_MASK)) != 0)) {
-		SET_ERROR0(EINVAL, "GUARD with wrong parameters");
-		return (EINVAL);
+		return (SET_ERROR0(EINVAL, "GUARD with wrong parameters"));
 	}
 	error = vm_prot2vmprot(&prot, "mmap", "prot");
 	if (error)
@@ -607,8 +600,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	if (align != 0 && align != MAP_ALIGNED_SUPER &&
 	    (align >> MAP_ALIGNMENT_SHIFT >= sizeof(void *) * NBBY ||
 	    align >> MAP_ALIGNMENT_SHIFT < PAGE_SHIFT)) {
-		SET_ERROR1(EINVAL, "bad alignment", align);
-		return (EINVAL);
+		return (SET_ERROR1(EINVAL, "bad alignment", align));
 	}
 
 	/*
@@ -623,8 +615,8 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 		 */
 		addr -= pageoff;
 		if ((addr & addr_mask) != 0) {
-			SET_ERROR1(EINVAL, "fixed mapping not aligned", addr);
-			return (EINVAL);
+			return (SET_ERROR1(EINVAL, "fixed mapping not aligned",
+			    addr));
 		}
 
 		/* Address range must be all in user VM space. */
@@ -633,9 +625,8 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 			return (EINVAL);
 		}
 		if (flags & MAP_32BIT && addr + size > MAP_32BIT_MAX_ADDR) {
-			SET_ERROR0(EINVAL,
-			    "fixed 32bit mapping does not fit into 4G");
-			return (EINVAL);
+			return (SET_ERROR0(EINVAL,
+			    "fixed 32bit mapping does not fit into 4G"));
 		}
 		if (flags & MAP_32BIT) {
 			KASSERT(!SV_CURPROC_FLAG(SV_CHERI),
@@ -1864,8 +1855,7 @@ vm_mmap_vnode(struct thread *td, vm_size_t objsize,
 			vm_pager_update_writecount(obj, 0, objsize);
 		}
 	} else {
-		SET_ERROR0(EINVAL, "non-reg file");
-		error = EINVAL;
+		error = SET_ERROR0(EINVAL, "non-reg file");
 		goto done;
 	}
 	if ((error = VOP_GETATTR(vp, &va, cred)))
@@ -1959,8 +1949,7 @@ vm_mmap_cdev(struct thread *td, vm_size_t objsize, vm_prot_t *protp,
 	    (prot & VM_PROT_WRITE) != 0)
 		return (EACCES);
 	if ((flags & (MAP_PRIVATE | MAP_COPY)) != 0) {
-		SET_ERROR0(EINVAL, "cdev mapping must be shared");
-		return (EINVAL);
+		return (SET_ERROR0(EINVAL, "cdev mapping must be shared"));
 	}
 
 	/*
@@ -1987,8 +1976,8 @@ vm_mmap_cdev(struct thread *td, vm_size_t objsize, vm_prot_t *protp,
 	obj = vm_pager_allocate(OBJT_DEVICE, cdev, objsize, prot, *foff,
 	    td->td_ucred);
 	if (obj == NULL) {
-		SET_ERROR0(EINVAL, "cdev driver does not support mmap");
-		return (EINVAL);
+		return (SET_ERROR0(EINVAL,
+		    "cdev driver does not support mmap"));
 	}
 	*objp = obj;
 	*flagsp = flags;
@@ -2007,8 +1996,7 @@ vm_mmap(vm_map_t map, vm_pointer_t *addr, vm_size_t size, vm_prot_t prot,
 	boolean_t writecounted;
 
 	if (size == 0) {
-		SET_ERROR0(EINVAL, "zero-sized req");
-		return (EINVAL);
+		return (SET_ERROR0(EINVAL, "zero-sized req"));
 	}
 
 	size = round_page(size);
@@ -2038,8 +2026,8 @@ vm_mmap(vm_map_t map, vm_pointer_t *addr, vm_size_t size, vm_prot_t prot,
 		    handle, &foff, &object, &writecounted);
 		break;
 	default:
-		SET_ERROR1(EINVAL, "unsupported backing obj type", handle_type);
-		error = EINVAL;
+		error = SET_ERROR1(EINVAL, "unsupported backing obj type",
+		    handle_type);
 		break;
 	}
 	if (error)
@@ -2129,8 +2117,7 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
 	 * exec).
 	 */
 	if ((foff & PAGE_MASK) != 0) {
-		SET_ERROR1(EINVAL, "offset not page-aligned", foff);
-		return (EINVAL);
+		return (SET_ERROR1(EINVAL, "offset not page-aligned", foff));
 	}
 
 	if ((flags & MAP_FIXED) == 0) {
@@ -2138,21 +2125,20 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
 		*addr = round_page(*addr);
 	} else {
 		if (*addr != trunc_page(*addr)) {
-			SET_ERROR1(EINVAL,
-			    "non-fixed mapping address not aligned", *addr);
-			return (EINVAL);
+			return (SET_ERROR1(EINVAL,
+			    "non-fixed mapping address not aligned", *addr));
 		}
 		fitit = false;
 	}
 
 	if (flags & MAP_ANON) {
 		if (object != NULL) {
-			SET_ERROR0(EINVAL, "anon mapping backed by an object");
-			return (EINVAL);
+			return (SET_ERROR0(EINVAL,
+			    "anon mapping backed by an object"));
 		}
 		if (foff != 0) {
-			SET_ERROR0(EINVAL, "anon mapping with non-zero offset");
-			return (EINVAL);
+			return (SET_ERROR0(EINVAL,
+			    "anon mapping with non-zero offset"));
 		}
 		docow = 0;
 	} else if (flags & MAP_PREFAULT_READ)
@@ -2173,8 +2159,8 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
 		docow |= MAP_WRITECOUNT;
 	if (flags & MAP_STACK) {
 		if (object != NULL) {
-			SET_ERROR0(EINVAL, "stack mapping backed by an object");
-			return (EINVAL);
+			return (SET_ERROR0(EINVAL,
+			    "stack mapping backed by an object"));
 		}
 		docow |= MAP_STACK_AREA;
 	}
