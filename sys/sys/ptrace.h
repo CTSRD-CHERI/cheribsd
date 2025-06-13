@@ -90,7 +90,15 @@
 #define	PT_SETCAPREGS	51	/* set capability registers */
 
 #define PT_FIRSTMACH    64	/* for machine-specific requests */
+#define	PT_LASTMACH     127
 #include <machine/ptrace.h>	/* machine-specific requests, if any */
+
+#ifdef _KERNEL
+/* Space for Linux ptrace emulation. */
+#define	PTLINUX_FIRST	128
+#define	PTLINUX_LAST	191
+#define	PTLINUX_GET_SC_ARGS	(PTLINUX_FIRST + 0)
+#endif
 
 /* Events used with PT_GET_EVENT_MASK and PT_SET_EVENT_MASK */
 #define	PTRACE_EXEC	0x0001

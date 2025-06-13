@@ -317,6 +317,9 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 			pscr_args[i] = pscr_args64[i];
 		r.sr.pscr_args = pscr_args;
 		break;
+	case PTLINUX_FIRST ... PTLINUX_LAST:
+		error = EINVAL;
+		break;
 	default:
 		addr = USER_PTR_UNBOUND(uap->addr);
 		break;
