@@ -247,4 +247,5 @@ cheri_stval_to_sicode(register_t stval)
 		return (0);
 	}
 }
+
 #endif /* !defined(__riscv_xcheri) */
