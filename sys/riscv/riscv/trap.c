@@ -695,8 +695,8 @@ do_trap_user(struct trapframe *frame)
 		 * accesses to SIGSEGV instead of SIGPROT.
 		 */
 		if (!SV_PROC_FLAG(td->td_proc, SV_CHERI) &&
-		    TVAL_CAP_CAUSE(frame->tf_stval) == CHERI_EXCCODE_LENGTH) {
-			if (TVAL_CAP_IDX(frame->tf_stval) == 32 /* PCC */ &&
+		    cheri_is_length_violation(frame)) {
+			if (cheri_is_pcc_violation(frame) &&
 			    cheri_getbase(frame->tf_sepc) ==
 			    CHERI_CAP_USER_DATA_BASE &&
 			    cheri_getlen(frame->tf_sepc) ==
@@ -715,7 +715,7 @@ do_trap_user(struct trapframe *frame)
 			 * (R/W) to determine the non-CHERI exception
 			 * that would have been raised.
 			 */
-			if (TVAL_CAP_IDX(frame->tf_stval) == 33 /* DDC */ &&
+			if (cheri_is_ddc_violation(frame) &&
 			    cheri_getbase(frame->tf_ddc) ==
 			    CHERI_CAP_USER_DATA_BASE &&
 			    cheri_getlen(frame->tf_ddc) ==
