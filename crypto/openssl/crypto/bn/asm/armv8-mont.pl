@@ -657,10 +657,10 @@ $code.=<<___;
 #ifdef __CHERI_PURE_CAPABILITY__
 	add	$nptr,$nptr,$negnum,lsl#2	// rewind $nptr
 	sub	$aptr,PTRN(sp),#0
-	cmn	x0,xzr				// clear carry flag
+	cmp	x0,xzr				// set carry flag
 #else
 	sub	$nptr,$nptr,$num,lsl#2		// rewind $nptr
-	subs	$aptr,PTRN(sp),#0		// clear carry flag
+	subs	$aptr,PTRN(sp),#0		// set carry flag
 #endif
 	add	$bptr,PTRN(sp),$num,lsl#2
 
