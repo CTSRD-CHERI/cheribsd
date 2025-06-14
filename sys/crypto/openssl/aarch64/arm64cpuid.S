@@ -2,9 +2,7 @@
 #include "arm_arch.h"
 
 .text
-#ifndef __CHERI_PURE_CAPABILITY__
-.arch	armv8-a+crypto
-#endif
+.arch_extension	crypto
 
 .align	5
 .globl	_armv7_neon_probe

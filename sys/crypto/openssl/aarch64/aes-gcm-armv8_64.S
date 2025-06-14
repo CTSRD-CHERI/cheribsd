@@ -2,9 +2,7 @@
 #include "arm_arch.h"
 
 #if __ARM_MAX_ARCH__>=8
-#ifndef __CHERI_PURE_CAPABILITY__
-.arch	armv8-a+crypto
-#endif
+.arch_extension	crypto
 .text
 .globl	aes_gcm_enc_128_kernel
 .type	aes_gcm_enc_128_kernel,%function
