@@ -89,8 +89,10 @@ extern unsigned int OPENSSL_armv8_rsa_neonized;
  *
  */
 
+# define ARM_CPU_IMP_RESEARCH      0x3F
 # define ARM_CPU_IMP_ARM           0x41
 
+# define ARM_CPU_PART_MORELLO      0x412
 # define ARM_CPU_PART_CORTEX_A72   0xD08
 # define ARM_CPU_PART_N1           0xD0C
 
