@@ -917,10 +917,10 @@ bn_mul8x_mont_neon:
 #ifdef __CHERI_PURE_CAPABILITY__
 	add	PTR(3),PTR(3),x12,lsl#2	// rewind PTR(3)
 	sub	PTR(1),PTRN(sp),#0
-	cmn	x0,xzr				// clear carry flag
+	cmp	x0,xzr				// set carry flag
 #else
 	sub	PTR(3),PTR(3),x5,lsl#2		// rewind PTR(3)
-	subs	PTR(1),PTRN(sp),#0		// clear carry flag
+	subs	PTR(1),PTRN(sp),#0		// set carry flag
 #endif
 	add	PTR(2),PTRN(sp),x5,lsl#2
 
