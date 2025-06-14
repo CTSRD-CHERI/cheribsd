@@ -31,6 +31,7 @@ MAN=	arch.7 \
 	stdint.7 \
 	sticky.7 \
 	tests.7 \
+	tracing.7 \
 	tuning.7
 
 MLINKS=	intro.7 miscellaneous.7
