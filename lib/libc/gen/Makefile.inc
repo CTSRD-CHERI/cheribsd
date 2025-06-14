@@ -5,11 +5,9 @@
 CFLAGS+=	-DNO_COMPAT7
 .endif
 
-.ifndef CHERI_LIB_C18N
 CONFS+=	group master.passwd shells
 CONFSMODE_master.passwd=	600
 CONFSPACKAGE=   runtime
-.endif
 
 SRCS+= \
 	__pthread_mutex_init_calloc_cb_stub.c \

@@ -114,12 +114,6 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	ncurses \
 	nss_tacplus
 
-.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
-.if !defined(COMPAT_LIBCOMPAT) || ${COMPAT_LIBCOMPAT} == "64CB"
-SUBDIR+=	c18n
-.endif
-.endif
-
 .if !${MACHINE_ABI:Mpurecap}
 # Needs changes to be useful for purecap and not used by anything (yet)
 SUBDIR+=	libthread_db

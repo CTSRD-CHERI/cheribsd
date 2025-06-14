@@ -61,13 +61,6 @@ and
 .Ev LD_COMPARTMENT_DISABLE .
 If both environtment variables are set, c18n is disabled.
 Note that environment variables are not reliable inherited when processes fork.
-.Pp
-Compartmentalization depends on modified versions of
-.Lb libc
-and
-.Lb libthr .
-These are located in
-.Pa /usr/lib/c18n .
 .Xr rtld 1
 automatically searches from this path first when c18n is enabled.
 .Ss COMPARTMENT TRANSITION TRACING
