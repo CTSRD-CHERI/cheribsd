@@ -287,27 +287,58 @@ kinst_instr_stx(kinst_patchval_t instr)
 	return (false);
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+static kinst_patchval_t *
+kinst_make_tracepoint_capability(uint32_t *instr)
+{
+	kinst_patchval_t *cap;
+
+	cap = cheri_setaddress(kernel_root_cap, (ptraddr_t)instr);
+	cap = cheri_setbounds(cap, INSN_SIZE);
+	cap = cheri_andperm(cap, CHERI_PERM_STORE);
+	return (cap);
+}
+
+static uintcap_t
+kinst_unseal_symval(linker_symval_t *sym)
+{
+	extern void * __capability sentry_unsealcap;
+	uintcap_t val;
+
+	val = cheri_unseal((uintcap_t)sym->value, sentry_unsealcap);
+	val = cheri_andperm(val, CHERI_PERM_LOAD | CHERI_PERM_STORE);
+	return (val);
+}
+#endif
+
 int
-kinst_make_probe(linker_file_t lf, int symindx, linker_symval_t *symval,
+kinst_make_probe(linker_file_t lf, int symindx, linker_symval_t *sym,
     void *opaque)
 {
 	struct kinst_probe *kp;
 	dtrace_kinst_probedesc_t *pd;
 	const char *func;
 	kinst_patchval_t *instr, *limit, *tmp;
+	uintptr_t symval;
 	int n, off;
 	bool ldxstx_block, found;
 
 	pd = opaque;
-	func = symval->name;
+	func = sym->name;
 
 	if (kinst_excluded(func))
 		return (0);
 	if (strcmp(func, pd->kpd_func) != 0)
 		return (0);
 
-	instr = (kinst_patchval_t *)(symval->value);
-	limit = (kinst_patchval_t *)(symval->value + symval->size);
+#ifdef __CHERI_PURE_CAPABILITY__
+	symval = kinst_unseal_symval(sym);
+	symval &= ~0x1ul;
+#else
+	symval = (uintptr_t)sym->value;
+#endif
+	instr = (kinst_patchval_t *)symval;
+	limit = (kinst_patchval_t *)(symval + sym->size);
 	if (instr >= limit)
 		return (0);
 
@@ -346,10 +377,22 @@ kinst_make_probe(linker_file_t lf, int symindx, linker_symval_t *symval,
 			 */
 			if (((*tmp >> ADDR_SHIFT) & ADDR_MASK) == 31)
 				found = true;
-		} else if ((*tmp & SUB_MASK) == SUB_INSTR &&
+		}
+#ifdef __CHERI_PURE_CAPABILITY__
+		else if ((*tmp & LDP_STP_MASK) == STP_C_PREIND &&
+		    ((*tmp >> ADDR_SHIFT) & ADDR_MASK) == 31)
+			found = true;
+#endif
+		else if ((*tmp & SUB_MASK) == SUB_INSTR &&
 		    ((*tmp >> SUB_RD_SHIFT) & SUB_R_MASK) == 31 &&
 		    ((*tmp >> SUB_RN_SHIFT) & SUB_R_MASK) == 31)
 			found = true;
+#ifdef __CHERI_PURE_CAPABILITY__
+		else if ((*tmp & SUBC_MASK) == SUBC_INSTR &&
+		    ((*tmp >> SUB_RD_SHIFT) & SUB_R_MASK) == 31 &&
+		    ((*tmp >> SUB_RN_SHIFT) & SUB_R_MASK) == 31)
+			found = true;
+#endif
 	}
 
 	if (!found)
@@ -357,7 +400,7 @@ kinst_make_probe(linker_file_t lf, int symindx, linker_symval_t *symval,
 
 	ldxstx_block = false;
 	for (n = 0; instr < limit; instr++) {
-		off = (int)((uint8_t *)instr - (uint8_t *)symval->value);
+		off = (int)((uint8_t *)instr - (uint8_t *)symval);
 
 		/*
 		 * Skip LDX/STX blocks that contain atomic operations. If a
@@ -403,7 +446,11 @@ kinst_make_probe(linker_file_t lf, int symindx, linker_symval_t *symval,
 		    M_WAITOK | M_ZERO);
 		kp->kp_func = func;
 		snprintf(kp->kp_name, sizeof(kp->kp_name), "%d", off);
+#ifdef __CHERI_PURE_CAPABILITY__
+		kp->kp_patchpoint = kinst_make_tracepoint_capability(instr);
+#else
 		kp->kp_patchpoint = instr;
+#endif
 		kp->kp_savedval = *instr;
 		kp->kp_patchval = KINST_PATCHVAL;
 		if ((kp->kp_tramp = kinst_trampoline_alloc(M_WAITOK)) == NULL) {
