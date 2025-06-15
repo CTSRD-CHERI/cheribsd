@@ -395,7 +395,6 @@ MAN=	accept_filter.9 \
 	vm_map_max.9 \
 	vm_map_protect.9 \
 	vm_map_remove.9 \
-	vm_map_simplify_entry.9 \
 	vm_map_stack.9 \
 	vm_map_submap.9 \
 	vm_map_sync.9 \
