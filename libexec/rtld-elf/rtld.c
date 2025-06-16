@@ -1246,7 +1246,7 @@ _rtld_bind(Plt_Entry *plt, Elf_Size reloff)
 
 #ifdef CHERI_LIB_C18N
     if (C18N_ENABLED)
-	plt = cheri_unseal(plt, sealer_pltgot);
+	plt = c18n_unseal(plt, sealer_pltgot);
 #endif
 
     obj = plt->obj;
