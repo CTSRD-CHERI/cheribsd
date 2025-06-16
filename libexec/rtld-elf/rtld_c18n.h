@@ -35,7 +35,27 @@
 /*
  * Global symbols
  */
+#define	c18n_unsealentry(cap)			cheri_unseal(cap, 0)
+
+#ifdef CHERI_LIB_C18N_NO_OTYPE
+#define	c18n_seal(cap, sealer)			cap
+#define	c18n_unseal(cap, sealer)		cap
+#define	c18n_seal_subset(cap, sealer)		cheri_sealentry(cap)
+#define	c18n_unseal_subset(cap, sealer, super)	(			\
+	cheri_gettag(cap) ?						\
+	cheri_buildcap(super, (uintptr_t)c18n_unsealentry(cap)) :	\
+	cap								\
+)
+#else
+#define	c18n_seal(cap, sealer)			cheri_seal(cap, sealer)
+#define	c18n_unseal(cap, sealer)		cheri_unseal(cap, sealer)
+#define	c18n_seal_subset(cap, sealer)		cheri_seal(cap, sealer)
+#define	c18n_unseal_subset(cap, sealer, super)	cheri_unseal(cap, sealer)
+#endif
+
+#ifndef CHERI_LIB_C18N_NO_OTYPE
 extern uintptr_t sealer_pltgot;
+#endif
 extern const char *ld_compartment_utrace;
 extern const char *ld_compartment_policy;
 extern const char *ld_compartment_overhead;

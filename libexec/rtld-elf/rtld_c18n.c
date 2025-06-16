@@ -116,10 +116,12 @@ _Static_assert(
 /*
  * Sealers for RTLD privileged information
  */
+#ifndef CHERI_LIB_C18N_NO_OTYPE
 static uintptr_t sealer_tcb;
 static uintptr_t sealer_trusted_stk;
 
 uintptr_t sealer_pltgot;
+#endif
 
 /* Enable compartmentalisation */
 bool ld_compartment_enable;
@@ -763,8 +765,8 @@ c18n_allocate_tcb(struct tcb *tcb)
 	wrap = c18n_malloc(sizeof(*wrap));
 	*wrap = (struct tcb_wrapper) {
 		.header = *tcb,
-		.tcb = cheri_seal(tcb, sealer_tcb),
-		.table = cheri_seal(table, sealer_tcb)
+		.tcb = c18n_seal(tcb, sealer_tcb),
+		.table = c18n_seal(table, sealer_tcb)
 	};
 
 	return (&wrap->header);
@@ -993,7 +995,7 @@ dl_c18n_get_trusted_stack(uintptr_t pc)
 	if (c18n_is_tramp(pc, tf))
 		tf = tf->previous;
 
-	return (cheri_seal(tf, sealer_trusted_stk));
+	return (c18n_seal_subset(tf, sealer_trusted_stk));
 }
 
 void
@@ -1023,7 +1025,7 @@ dl_c18n_unwind_trusted_stack(void *rcsp, void *target)
 	sigprocmask(SIG_SETMASK, &nset, &oset);
 
 	tf = get_trusted_stk();
-	target = cheri_unseal(target, sealer_trusted_stk);
+	target = c18n_unseal_subset(target, sealer_trusted_stk, tf);
 
 	/*
 	 * If the trusted frame is not a subset of the target, abort.
@@ -1103,7 +1105,7 @@ dl_c18n_is_trampoline(uintptr_t pc, void *tfs)
 	if (!C18N_ENABLED)
 		return (0);
 
-	tf = cheri_unseal(tfs, sealer_trusted_stk);
+	tf = c18n_unseal_subset(tfs, sealer_trusted_stk, get_trusted_stk());
 	if (!cheri_gettag(tf))
 		return (0);
 
@@ -1138,9 +1140,9 @@ dl_c18n_pop_trusted_stack(struct dl_c18n_compart_state *state, void *tfs)
 	if (!C18N_ENABLED)
 		return (NULL);
 
-	tf = cheri_unseal(tfs, sealer_trusted_stk);
+	tf = c18n_unseal_subset(tfs, sealer_trusted_stk, get_trusted_stk());
 	*state = tf->state;
-	return (cheri_seal(tf->previous, sealer_trusted_stk));
+	return (c18n_seal_subset(tf->previous, sealer_trusted_stk));
 }
 
 /*
@@ -1664,6 +1666,8 @@ tramp_reflect(const void *data)
 	    (cheri_getperm(data) & CHERI_PERM_EXECUTIVE) == 0)
 		return (NULL);
 
+	data = c18n_unsealentry(data);
+	data = cheri_clearperm(data, CHERI_PERM_EXECUTE);
 #ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	data = (const char *)data - 1;
 #endif
@@ -1825,6 +1829,7 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 void
 c18n_init2(Obj_Entry *obj_rtld)
 {
+#ifndef CHERI_LIB_C18N_NO_OTYPE
 	uintptr_t sealer;
 
 	/*
@@ -1842,6 +1847,7 @@ c18n_init2(Obj_Entry *obj_rtld)
 
 	sealer_trusted_stk = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
+#endif
 
 	/*
 	 * All libraries have been loaded. Create and initialise a stack lookup
@@ -1935,11 +1941,11 @@ _rtld_thread_start(struct pthread *curthread)
 		tcb = get_trusted_tp();
 		wrap = __containerof(tcb, struct tcb_wrapper, header);
 
-		tcb = cheri_unseal(wrap->tcb, sealer_tcb);
+		tcb = c18n_unseal(wrap->tcb, sealer_tcb);
 		*tcb = wrap->header;
 		_tcb_set(tcb);
 
-		table = cheri_unseal(wrap->table, sealer_tcb);
+		table = c18n_unseal(wrap->table, sealer_tcb);
 		init_stk_table(table, wrap);
 	}
 
