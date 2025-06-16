@@ -131,7 +131,7 @@ init_pltgot(Plt_Entry *plt)
 	if (plt->pltgot != NULL) {
 #ifdef CHERI_LIB_C18N
 		if (C18N_ENABLED)
-			plt->pltgot[1] = (uintptr_t)cheri_seal(plt,
+			plt->pltgot[1] = (uintptr_t)c18n_seal(plt,
 			    sealer_pltgot);
 		else
 #endif
