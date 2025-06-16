@@ -683,10 +683,10 @@ push_stk_table(_Atomic(struct stk_table *) *head, struct stk_table *table)
 
 	while (!atomic_compare_exchange_weak_explicit(head, link, table,
 	    /*
-	     * Use release ordering to ensure that table construction happens
-	     * before the push.
+	     * Use release ordering to ensure that table use happens before the
+	     * push.
 	     */
-	    memory_order_release, memory_order_release));
+	    memory_order_release, memory_order_relaxed));
 }
 
 static struct stk_table *
@@ -700,10 +700,10 @@ pop_stk_table(_Atomic(struct stk_table *) *head)
 		next = SLIST_NEXT(table, next);
 	} while (!atomic_compare_exchange_weak_explicit(head, &table, next,
 	    /*
-	     * Use acquire ordering to ensure that the pop happens after table
-	     * construction.
+	     * Use acquire ordering to ensure that the pop happens before table
+	     * use.
 	     */
-	    memory_order_acquire, memory_order_acquire));
+	    memory_order_acquire, memory_order_relaxed));
 
 	return (table);
 }
