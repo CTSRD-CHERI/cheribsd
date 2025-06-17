@@ -35,7 +35,7 @@ CFLAGS+=-D_FORTIFY_SOURCE_read=_read
 # To include RCS ID strings from other BSD projects, remove -DNO__RCSID from CFLAGS.
 CFLAGS+=-DNO__SCCSID -DNO__RCSID
 
-.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
+.if ${MACHINE_ABI:Mpurecap}
 SHARED_CFLAGS+=-DCHERI_LIB_C18N
 .endif
 
