@@ -42,6 +42,19 @@ ENTRY(_setjmp)
 	S_PTR	t0, (0 * PTR_WIDTH)(a0)
 	S_PTR	sp, (1 * PTR_WIDTH)(a0)
 	ADDI_PTR	a0, a0, (2 * PTR_WIDTH)
+#ifdef CHERI_LIB_C18N
+	/* Store the trusted stack pointer */
+	ADDI_PTR	sp, sp, -(2 * PTR_WIDTH)
+	S_PTR	a0, (0 * PTR_WIDTH)(sp)
+	S_PTR	ra, (1 * PTR_WIDTH)(sp)
+	MV_PTR	a0, ra
+	LA_PTR	t0, _C_LABEL(dl_c18n_get_trusted_stack)
+	jalr	t0
+	L_PTR	a1, (0 * PTR_WIDTH)(sp)
+	L_PTR	ra, (1 * PTR_WIDTH)(sp)
+	ADDI_PTR	sp, sp, (2 * PTR_WIDTH)
+	S_PTR	a0, 0(a1)
+	ADDI_PTR	a0, a1, PTR_WIDTH
 #endif
 
 	/* Store the general purpose registers and ra */
@@ -98,11 +111,29 @@ ENTRY(_longjmp)
 	ld	t1, (t1)
 	bne	t0, t1, botch
 
+#ifdef CHERI_LIB_C18N
+	/*
+	 * Preserve the arguments in callee-saved registers instead of pushing
+	 * them onto the stack because stack unwinding will switch the stack.
+	 */
+	MV_PTR	s0, a0
+	MV_PTR	s1, a1
+	/* Pass the target untrusted stack pointer and trusted stack pointer */
+	L_PTR	a0, (1 * PTR_WIDTH)(s0)
+	L_PTR	a1, (2 * PTR_WIDTH)(s0)
+	LA_PTR	t0, _C_LABEL(dl_c18n_unwind_trusted_stack)
+	jalr	t0
+	MV_PTR	a0, s0
+	MV_PTR	a1, s1
 #endif
 
 	/* Restore the stack pointer */
 	L_PTR	sp, PTR_WIDTH(a0)
 	ADDI_PTR	a0, a0, (2 * PTR_WIDTH)
+#ifdef CHERI_LIB_C18N
+	/* Skip the trusted stack pointer */
+	ADDI_PTR	a0, a0, PTR_WIDTH
+#endif
 
 	/* Restore the general purpose registers and ra */
 	L_PTR	s0, (0 * PTR_WIDTH)(a0)

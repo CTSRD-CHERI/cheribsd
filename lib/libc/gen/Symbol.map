@@ -83,7 +83,7 @@ FBSD_1.0 {
 	dlvsym;
 	dlinfo;
 	dl_iterate_phdr;
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(__aarch64__)
+#if defined(__CHERI_PURE_CAPABILITY__)
 	dl_c18n_get_trusted_stack;
 	dl_c18n_unwind_trusted_stack;
 	dl_c18n_is_trampoline;
@@ -338,7 +338,7 @@ FBSD_1.1 {
 	tcsetsid;
 	__pthread_cleanup_pop_imp;
 	__pthread_cleanup_push_imp;
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(__aarch64__)
+#if defined(__CHERI_PURE_CAPABILITY__)
 	dl_c18n_pop_trusted_stack;
 #endif
 };
