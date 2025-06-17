@@ -396,11 +396,19 @@ va:
 
 	/* Initialize cap relocs. */
 	li	t0, CHERI_PERMS_KERNEL_DATA
-	candperm ca0, cs0, t0
-	cllc	cra, _C_LABEL(init_cap_relocs)
-	li	t0, CHERI_PERMS_KERNEL_CODE
-	candperm ca1, cra, t0
+	cllc	ca0, _C_LABEL(__start___cap_relocs)
+	candperm ca0, ca0, t0
+	cllc	ca1, _C_LABEL(__stop___cap_relocs)
+	sub	t1, a1, a0
+	csetbounds ca0, ca0, t1
+	cincoffset ca1, ca0, t1
+	candperm ca2, cs0, t0
+	mv	a3,zero
+	cllc	ca4, _C_LABEL(kernel_cap_relocs_cb)
+	csetflags ca5, ca4, zero
+	cllc	cra, _C_LABEL(init_linker_file_cap_relocs)
 	cjalr	cra
+	cincoffset csp, csp, (2 * 16)
 
 	/* Initialize capabilities. */
 	cmove	ca0, cs0

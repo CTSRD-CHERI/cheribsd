@@ -31,15 +31,31 @@
  */
 
 #include <sys/types.h>
+#include <machine/cherireg.h>
 #include <cheri_init_globals.h>
 
-/* Invoked from locore. */
-extern void init_cap_relocs(void *data_cap, void *code_cap);
+/* Referenced from locore. */
+void kernel_cap_relocs_cb(void *arg, bool function, bool constant,
+    ptraddr_t object, void **src);
 
 void
-init_cap_relocs(void *data_cap, void *code_cap)
+kernel_cap_relocs_cb(void *arg, bool function, bool constant,
+    ptraddr_t object, void **src)
 {
-	cheri_init_globals_3(data_cap, code_cap, data_cap);
+	void *cap;
+
+	cap = __builtin_cheri_address_set(arg, object);
+	if (function) {
+		cap = __builtin_cheri_perms_and(cap, CHERI_PERMS_KERNEL_CODE);
+#ifdef CHERI_FLAGS_CAP_MODE
+		cap = __builtin_cheri_flags_set(cap, CHERI_FLAGS_CAP_MODE);
+#endif
+	} else if (constant) {
+		cap = __builtin_cheri_perms_and(cap, CHERI_PERMS_KERNEL_RODATA);
+	} else {
+		cap = __builtin_cheri_perms_and(cap, CHERI_PERMS_KERNEL_DATA);
+	}
+	*src = cap;
 }
 
 /* Can't include <sys/cheri.h>. */
