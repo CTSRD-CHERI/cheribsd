@@ -31,6 +31,7 @@
  */
 
 #include <sys/types.h>
+#include <machine/cherireg.h>
 #include <cheri_init_globals.h>
 
 /* Invoked from locore. */
@@ -39,7 +40,70 @@ extern void init_cap_relocs(void *data_cap, void *code_cap);
 void
 init_cap_relocs(void *data_cap, void *code_cap)
 {
-	cheri_init_globals_3(data_cap, code_cap, data_cap);
+	const struct capreloc *start_relocs, *stop_relocs;
+
+	start_relocs = CHERI_RODATA_PTR(__start___cap_relocs);
+	stop_relocs = CHERI_RODATA_PTR(__stop___cap_relocs);
+
+	/*
+	 * Set code bounds if the ABI allows it.
+	 * When building for hybrid or with the pc-relative captable ABI we do
+	 * not further constrain the given code_cap.
+	 */
+#if !defined(__CHERI_PURE_CAPABILITY__) || __CHERI_CAPABILITY_TABLE__ == 3
+	bool can_set_code_bounds = false;
+#else
+	bool can_set_code_bounds = true;
+#endif
+
+	for (const struct capreloc *reloc = start_relocs; reloc < stop_relocs;
+	     reloc++) {
+		const void **dest = __builtin_cheri_address_set(data_cap,
+		    reloc->capability_location);
+		void *src;
+		bool can_set_bounds = true;
+
+		if (reloc->object == 0) {
+			*dest = 0;
+			continue;
+		}
+
+		if ((reloc->permissions & function_reloc_flag) ==
+		    function_reloc_flag) {
+			/* code pointer */
+			src = __builtin_cheri_address_set(code_cap,
+			    reloc->object);
+			src = __builtin_cheri_perms_and(src,
+			    CHERI_PERMS_KERNEL_CODE);
+#ifdef CHERI_FLAGS_CAP_MODE
+			src = __builtin_cheri_flags_set(src,
+			    CHERI_FLAGS_CAP_MODE);
+#endif
+			can_set_bounds = can_set_code_bounds;
+		} else if ((reloc->permissions & constant_reloc_flag) ==
+		    constant_reloc_flag) {
+			/* read-only data pointer */
+			src = __builtin_cheri_address_set(data_cap,
+			    reloc->object);
+			src = __builtin_cheri_perms_and(src,
+			    CHERI_PERMS_KERNEL_RODATA);
+		} else {
+			/* read-write data */
+			src = __builtin_cheri_address_set(data_cap,
+			    reloc->object);
+			src = __builtin_cheri_perms_and(src,
+			    CHERI_PERMS_KERNEL_DATA);
+		}
+		if (can_set_bounds && reloc->size != 0)
+			src = __builtin_cheri_bounds_set(src, reloc->size);
+		src = (char *)src + reloc->offset;
+		if ((reloc->permissions & function_reloc_flag) ==
+		    function_reloc_flag) {
+			/* Convert function pointers to sentries: */
+			src = __builtin_cheri_seal_entry(src);
+		}
+		*dest = src;
+	}
 }
 
 /* Can't include <sys/cheri.h>. */
@@ -95,6 +159,6 @@ init_linker_file_cap_relocs(const void *start_relocs, const void *stop_relocs,
 			/* Convert function pointers to sentries: */
 			src = __builtin_cheri_seal_entry(src);
 		}
-		*dest = src;	
+		*dest = src;
 	}
 }
