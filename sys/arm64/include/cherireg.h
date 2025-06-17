@@ -206,4 +206,21 @@
 #define	CHERI_COMPARTMENT_ID_USERSPACE_LENGTH	0x8000000000000000UL
 #define	CHERI_COMPARTMENT_ID_USERSPACE_OFFSET	0x0
 
+/*
+ * Derive an unbounded pointer to a named symbol before initial
+ * relocation.  For purecap, derive the pointer from PCC.
+ */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	CHERI_RODATA_PTR(x) ({						\
+	__typeof__(x) *_p;						\
+									\
+	__asm__ (							\
+	    "adrp %0, " __STRING(x) "\n\t"				\
+	    "add %0, %0, :lo12:" __STRING(x) "\n\t"			\
+	    : "=C" (_p));						\
+	_p; })
+#else
+#define	CHERI_RODATA_PTR(x)	(&x)
+#endif
+
 #endif /* _ARM64_INCLUDE_CHERIREG_H_ */
