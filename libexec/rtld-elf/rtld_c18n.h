@@ -42,13 +42,21 @@
 /*
  * Global symbols
  */
+#ifdef __riscv
+#define	c18n_unsealentry(cap)						\
+	__builtin_cheri_high_set(cap,					\
+	    __builtin_cheri_high_get(cap) & ~(1ULL << 27))
+#else
+#define	c18n_unsealentry(cap)			cheri_unseal(cap, 0)
+#endif
+
 #ifdef CHERI_LIB_C18N_NO_OTYPE
 #define	c18n_seal(cap, sealer)			cap
 #define	c18n_unseal(cap, sealer)		cap
 #define	c18n_seal_subset(cap, sealer)		cheri_sealentry(cap)
 #define	c18n_unseal_subset(cap, sealer, super)	(			\
 	cheri_gettag(cap) ?						\
-	cheri_buildcap(super, (uintptr_t)cheri_unseal(cap, 0)) :	\
+	cheri_buildcap(super, (uintptr_t)c18n_unsealentry(cap)) :	\
 	cap								\
 )
 #else
@@ -58,6 +66,9 @@
 #define	c18n_unseal_subset(cap, sealer, super)	cheri_unseal(cap, sealer)
 #endif
 
+#ifndef HAS_RESTRICTED_MODE
+extern uintptr_t sealer_tidc;
+#endif
 #ifndef CHERI_LIB_C18N_NO_OTYPE
 extern uintptr_t sealer_pltgot;
 #endif

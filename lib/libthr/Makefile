@@ -19,7 +19,7 @@ LIBTHR_SRCTOP:=	${.PARSEDIR}
 .endif
 .PATH: ${LIBTHR_SRCTOP}
 
-.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
+.if ${MACHINE_ABI:Mpurecap}
 SHARED_CFLAGS+=-DCHERI_LIB_C18N
 .endif
 
