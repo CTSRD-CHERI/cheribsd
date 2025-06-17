@@ -43,8 +43,6 @@
 extern int _DYNAMIC;
 #pragma weak _DYNAMIC
 
-#define	RODATA_PTR(x)	(&(*x))
-
 #include "caprel.h"
 
 #include "crt_init_globals.c"
