@@ -109,6 +109,8 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum,
 				__builtin_trap();
 				break;
 			}
+			if (ph->p_type == PT_CHERI_PCC)
+				use_code_bounds = true;
 			continue;
 		}
 		/*
