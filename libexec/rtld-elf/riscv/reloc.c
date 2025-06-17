@@ -265,6 +265,15 @@ reloc_jmpslots(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 			}
 
 			*where = (uintptr_t)make_function_pointer(def, defobj);
+#ifdef CHERI_LIB_C18N
+			*where = (uintptr_t)tramp_intern(plt, plt->compart_id,
+			    &(struct tramp_data) {
+				.target = (void *)*where,
+				.defobj = defobj,
+				.def = def,
+				.sig = sigtab_get(obj, ELF_R_SYM(rela->r_info))
+			});
+#endif
 			break;
 		default:
 			_rtld_error("Unknown relocation type %x in jmpslot",
@@ -285,6 +294,15 @@ reloc_iresolve_one(Obj_Entry *obj, const Elf_Rela *rela,
 	ptr = (Elf_Addr *)(obj->relocbase + rela->r_addend);
 	where = (Elf_Addr *)(obj->relocbase + rela->r_offset);
 	lock_release(rtld_bind_lock, lockstate);
+#ifdef CHERI_LIB_C18N
+	ptr = tramp_intern(NULL, RTLD_COMPART_ID,
+	    &(struct tramp_data) {
+		.target = (void *)ptr,
+		.defobj = obj,
+		.sig = (struct func_sig) { .valid = true,
+		    .reg_args = 8, .mem_args = false, .ret_args = ONE }
+	});
+#endif
 	target = call_ifunc_resolver(ptr);
 	wlock_acquire(rtld_bind_lock, lockstate);
 	*where = target;
@@ -358,6 +376,15 @@ reloc_gnu_ifunc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 
 			lock_release(rtld_bind_lock, lockstate);
 			target = (uintptr_t)rtld_resolve_ifunc(defobj, def);
+#ifdef CHERI_LIB_C18N
+			target = (uintptr_t)tramp_intern(plt, plt->compart_id,
+			    &(struct tramp_data) {
+				.target = (void *)target,
+				.defobj = defobj,
+				.def = def,
+				.sig = sigtab_get(obj, ELF_R_SYM(rela->r_info))
+			});
+#endif
 			wlock_acquire(rtld_bind_lock, lockstate);
 			reloc_jmpslot(where, target, defobj, obj,
 			    (const Elf_Rel *)rela);
@@ -469,6 +496,18 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			}
 
 			*where = symval + rela->r_addend;
+#ifdef CHERI_LIB_C18N
+			if (ELF_ST_TYPE(def->st_info) == STT_FUNC)
+				*where = (Elf_Addr)tramp_intern(NULL,
+				    RTLD_COMPART_ID,
+				    &(struct tramp_data) {
+					.target = (void *)(uintptr_t)*where,
+					.defobj = defobj,
+					.def = def,
+					.sig = sigtab_get(obj,
+					    ELF_R_SYM(rela->r_info))
+				});
+#endif
 			break;
 		case R_RISCV_TLS_DTPMOD64:
 			def = find_symdef(symnum, obj, &defobj, flags, cache,
@@ -528,8 +567,17 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			    defobj->tlsoffset - TLS_TP_OFFSET - TLS_TCB_SIZE);
 			break;
 		case R_RISCV_RELATIVE:
+			*where = (Elf_Addr)(obj->relocbase + rela->r_addend);
+			break;
 		case R_RISCV_FUNC_RELATIVE:
 			*where = (Elf_Addr)(obj->relocbase + rela->r_addend);
+#ifdef __CHERI_PURE_CAPABILITY__
+			*where = (Elf_Addr)tramp_intern(NULL, RTLD_COMPART_ID,
+			    &(struct tramp_data) {
+				.target = (void *)(uintptr_t)*where,
+				.defobj = obj
+			});
+#endif /* __CHERI_PURE_CAPABILITY__ */
 			break;
 		case R_RISCV_IRELATIVE:
 			obj->irelative_nonplt = true;

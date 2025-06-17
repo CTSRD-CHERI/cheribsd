@@ -419,7 +419,7 @@ rtld_set_var(const char *name __unused, const char *val __unused)
 	return (EINVAL);
 }
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(__aarch64__)
+#if defined(__CHERI_PURE_CAPABILITY__)
 #pragma weak dl_c18n_get_trusted_stack
 void *
 dl_c18n_get_trusted_stack(uintptr_t pc __unused)

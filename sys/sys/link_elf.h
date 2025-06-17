@@ -112,7 +112,7 @@ int _rtld_is_dlopened(void *);
 const char *rtld_get_var(const char *name);
 int rtld_set_var(const char *name, const char *val);
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(__aarch64__)
+#ifdef __CHERI_PURE_CAPABILITY__
 #include <machine/c18n.h>
 void *dl_c18n_get_trusted_stack(uintptr_t);
 void dl_c18n_unwind_trusted_stack(void *, void *);
