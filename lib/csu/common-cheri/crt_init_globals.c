@@ -60,8 +60,8 @@ crt_init_rela(const Elf_Phdr *phdr __unused)
 
 	code_cap = cheri_getpcc();
 
-	rela = RODATA_PTR(__rela_dyn_start);
-	relalim = RODATA_PTR(__rela_dyn_end);
+	rela = CHERI_RODATA_PTR(__rela_dyn_start);
+	relalim = CHERI_RODATA_PTR(__rela_dyn_end);
 	for (; rela < relalim; rela++)
 		elf_reloc(rela, data_cap, code_cap, 0);
 }
