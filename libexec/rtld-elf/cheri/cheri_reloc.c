@@ -123,8 +123,17 @@ process___cap_relocs(Obj_Entry *obj)
 		/* Convert function pointers to sentries */
 		if (reloc->permissions == function_reloc_flag ||
 		    reloc->permissions == (function_reloc_flag |
-		    code_reloc_flag))
+		    code_reloc_flag)) {
 			cap = cheri_sealentry(cap);
+#ifdef CHERI_LIB_C18N
+			if ((reloc->permissions & code_reloc_flag) == 0)
+				cap = (uintcap_t)tramp_intern(NULL,
+				    RTLD_COMPART_ID, &(struct tramp_data) {
+					.target = (void *)cap,
+					.defobj = obj
+				});
+#endif
+		}
 		*dest = cap;
 	}
 

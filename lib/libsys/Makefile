@@ -18,7 +18,7 @@ LIBC_ARCH=${M}
 LIBC_ARCH=${MACHINE_CPUARCH}
 .endif
 
-.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
+.if ${MACHINE_ABI:Mpurecap}
 SHARED_CFLAGS+=-DCHERI_LIB_C18N
 CHERI_LIB_C18N=yes
 .endif
