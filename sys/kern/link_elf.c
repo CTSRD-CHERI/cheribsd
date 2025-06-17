@@ -2194,7 +2194,7 @@ link_elf_reloc_local(linker_file_t lf)
 		data_cap = cheri_andperm(ef->mapbase, CHERI_PERMS_KERNEL_DATA);
 		if (init_linker_file_cap_relocs(ef->caprelocs,
 		    (char *)ef->caprelocs + ef->caprelocssize, data_cap,
-		    (ptraddr_t)ef->address, resolve_cap_reloc, ef) != 0)
+		    (ptraddr_t)ef->address, false, resolve_cap_reloc, ef) != 0)
 			return (ENOEXEC);
 	}
 #endif

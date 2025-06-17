@@ -64,26 +64,16 @@ typedef void (cap_relocs_cb)(void *arg, bool function, bool constant,
 
 int	init_linker_file_cap_relocs(const void *start_relocs,
 	    const void *stop_relocs, void *data_cap, ptraddr_t base_addr,
-	    cap_relocs_cb *cb, void *cb_arg);
+	    bool can_set_code_bounds, cap_relocs_cb *cb, void *cb_arg);
 
 /* Can't include <sys/systm.h>. */
 int	printf(const char *, ...) __printflike(1, 2);
 
 int
 init_linker_file_cap_relocs(const void *start_relocs, const void *stop_relocs,
-    void *data_cap, ptraddr_t base_addr, cap_relocs_cb *cb, void *cb_arg)
+    void *data_cap, ptraddr_t base_addr, bool can_set_code_bounds,
+    cap_relocs_cb *cb, void *cb_arg)
 {
-	/*
-	 * Set code bounds if the ABI allows it.
-	 * When building for hybrid or with the pc-relative captable ABI we do
-	 * not further constrain the given code_cap.
-	 */
-#if !defined(__CHERI_PURE_CAPABILITY__) || __CHERI_CAPABILITY_TABLE__ == 3
-	bool can_set_code_bounds = false;
-#else
-	bool can_set_code_bounds = true;
-#endif
-
 	/*
 	 * This cannot use cheri_init_globals_impl directly as symbols
 	 * for kernel modules in the vnet and dpcpu sets need to use
