@@ -396,13 +396,16 @@ decode_fragment(Elf_Addr *fragment, Elf_Addr relocbase, Elf_Addr *addrp,
 
 static uintcap_t __nosanitizecoverage
 build_reloc_cap(Elf_Addr addr, Elf_Addr size, uint8_t perms, Elf_Addr offset,
-    void * __capability data_cap, const void * __capability code_cap)
+    void * __capability data_cap, const void * __capability code_cap,
+    bool use_code_bounds)
 {
 	uintcap_t cap;
 
 	cap = perms == MORELLO_FRAG_EXECUTABLE ?
 	    (uintcap_t)code_cap : (uintcap_t)data_cap;
 	cap = cheri_setaddress(cap, addr);
+	if (perms != MORELLO_FRAG_EXECUTABLE || use_code_bounds)
+		cap = cheri_setbounds(cap, size);
 
 	if (perms == MORELLO_FRAG_EXECUTABLE ||
 	    perms == MORELLO_FRAG_RODATA) {
@@ -414,7 +417,6 @@ build_reloc_cap(Elf_Addr addr, Elf_Addr size, uint8_t perms, Elf_Addr offset,
 	    perms == MORELLO_FRAG_RODATA) {
 		cap = cheri_clearperm(cap, CHERI_PERM_SEAL |
 		    CHERI_PERM_EXECUTE);
-		cap = cheri_setbounds(cap, size);
 	}
 	cap += offset;
 	if (perms == MORELLO_FRAG_EXECUTABLE) {
@@ -429,13 +431,15 @@ build_reloc_cap(Elf_Addr addr, Elf_Addr size, uint8_t perms, Elf_Addr offset,
 #ifdef __CHERI_PURE_CAPABILITY__
 static uintcap_t __nosanitizecoverage
 build_cap_from_fragment(Elf_Addr *fragment, Elf_Addr relocbase, Elf_Addr offset,
-    void * __capability data_cap, const void * __capability code_cap)
+    void * __capability data_cap, const void * __capability code_cap,
+    bool use_code_bounds)
 {
 	Elf_Addr addr, size;
 	uint8_t perms;
 
 	decode_fragment(fragment, relocbase, &addr, &size, &perms);
-	return (build_reloc_cap(addr, size, perms, offset, data_cap, code_cap));
+	return (build_reloc_cap(addr, size, perms, offset, data_cap, code_cap,
+	    use_code_bounds));
 }
 #endif
 #endif
@@ -516,7 +520,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 			    (val == addr1 ? relocbase :
 			    linker_kernel_file->address);
 			*(uintcap_t *)(void *)where = build_reloc_cap(addr1,
-			    size, perms, addend, base, base);
+			    size, perms, addend, base, base, false);
 		}
 #endif
 		return (0);
@@ -618,7 +622,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		} else
 			addr = build_cap_from_fragment(where,
 			    (Elf_Addr)relocbase, rela->r_addend,
-			    relocbase, relocbase);
+			    relocbase, relocbase, false);
 		addr = ((uintptr_t (*)(void))addr)();
 		*(uintptr_t *)where = addr;
 		break;
@@ -785,7 +789,7 @@ elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap)
 			fragment = (Elf_Addr *)cheri_setaddress(data_cap,
 			    rela->r_offset);
 			cap = build_cap_from_fragment(fragment, 0,
-			    rela->r_addend, data_cap, code_cap);
+			    rela->r_addend, data_cap, code_cap, false);
 			*((uintptr_t *)fragment) = cap;
 			break;
 		}
