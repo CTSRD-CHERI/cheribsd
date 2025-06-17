@@ -22,7 +22,7 @@ SRCS+=		${SRCS_EXC}
 CFLAGS.UnwindLevel1-gcc-ext.c+=	-D_LIBUNWIND_SUPPORT_FRAME_APIS
 .endif
 .endif
-.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
+.if ${MACHINE_ABI:Mpurecap}
 CFLAGS+=	-D_LIBUNWIND_HAS_CHERI_LIB_C18N
 .endif
 .for file in ${SRCS_EXC:M*.c}
