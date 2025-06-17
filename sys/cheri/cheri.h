@@ -154,9 +154,7 @@ SYSCTL_DECL(_security_cheri);
 SYSCTL_DECL(_security_cheri_stats);
 extern u_int	security_cheri_bound_legacy_capabilities;
 extern u_int	cheri_cloadtags_stride;
-#ifdef __aarch64__
 extern bool	security_cheri_lib_based_c18n_default;
-#endif
 extern bool	security_cheri_check_perm_syscall;
 
 #ifdef __CHERI_PURE_CAPABILITY__
