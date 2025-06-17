@@ -148,7 +148,7 @@ init_pltgot(Plt_Entry *plt)
 static uintcap_t
 init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
     const void * __capability pcc_cap, Elf_Addr base_addr,
-    Elf_Size addend)
+    Elf_Size addend, bool use_code_bounds)
 {
 	uintcap_t cap;
 	Elf_Addr address, len;
@@ -161,6 +161,8 @@ init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
 	cap = perms == MORELLO_FRAG_EXECUTABLE ?
 	    (uintcap_t)pcc_cap : (uintcap_t)data_cap;
 	cap = cheri_setaddress(cap, base_addr + address);
+	if (perms != MORELLO_FRAG_EXECUTABLE || use_code_bounds)
+		cap = cheri_setbounds(cap, len);
 	cap = cheri_clearperm(cap, CAP_RELOC_REMOVE_PERMS);
 
 	if (perms == MORELLO_FRAG_EXECUTABLE || perms == MORELLO_FRAG_RODATA) {
@@ -168,16 +170,11 @@ init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
 	}
 	if (perms == MORELLO_FRAG_RWDATA || perms == MORELLO_FRAG_RODATA) {
 		cap = cheri_clearperm(cap, DATA_PTR_REMOVE_PERMS);
-		cap = cheri_setbounds(cap, len);
 	}
 
 	cap += addend;
 
 	if (perms == MORELLO_FRAG_EXECUTABLE) {
-		/*
-		 * TODO tight bounds: lower bound and len should be set
-		 * with LSB == 0 for C64 code.
-		 */
 		cap = cheri_sealentry(cap);
 	}
 
@@ -198,14 +195,36 @@ void
 _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 {
 	caddr_t relocbase = NULL;
+	const Elf_Phdr *phdr = NULL;
 	const Elf_Rela *rela = NULL, *relalim;
+	size_t phnum = 0;
 	unsigned long relasz;
 	Elf_Addr *where;
 	void *pcc;
+	bool use_code_bounds = false;
 
 	for (; aux->a_type != AT_NULL; aux++) {
-		if (aux->a_type == AT_BASE) {
+		switch (aux->a_type) {
+		case AT_BASE:
 			relocbase = aux->a_un.a_ptr;
+			break;
+		case AT_PHDR:
+			phdr = aux->a_un.a_ptr;
+			break;
+		case AT_PHNUM:
+			phnum = aux->a_un.a_val;
+			break;
+		case AT_PHENT:
+			/* NB: Can't use assert() here. */
+			if (aux->a_un.a_val != sizeof(*phdr))
+				__builtin_trap();
+			break;
+		}
+	}
+
+	for (; phnum > 0; phdr++, phnum--) {
+		if (phdr->p_type == PT_CHERI_PCC) {
+			use_code_bounds = true;
 			break;
 		}
 	}
@@ -237,7 +256,7 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 			where = (Elf_Addr *)(relocbase + rela->r_offset);
 			*(uintcap_t *)where = init_cap_from_fragment(where,
 			    relocbase, pcc, (Elf_Addr)(uintptr_t)relocbase,
-			    rela->r_addend);
+			    rela->r_addend, use_code_bounds);
 			break;
 		default:
 			__builtin_trap();
@@ -409,6 +428,7 @@ reloc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 	const Elf_Sym *def, *sym;
 #ifdef __CHERI_PURE_CAPABILITY__
 	const char *pcc;
+	bool use_code_bounds = obj->npcc_caps != 0;
 #endif
 	bool lazy;
 
@@ -469,7 +489,7 @@ reloc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 					*where = init_cap_from_fragment(
 					    fragment, obj->relocbase, pcc,
 					    (Elf_Addr)(uintptr_t)obj->relocbase,
-					    rela->r_addend);
+					    rela->r_addend, use_code_bounds);
 #else
 				*where += (Elf_Addr)obj->relocbase;
 #endif
@@ -591,6 +611,7 @@ reloc_iresolve_one(Obj_Entry *obj, const Elf_Rela *rela,
 	uintptr_t *where, target, ptr;
 #ifdef __CHERI_PURE_CAPABILITY__
 	Elf_Addr *fragment;
+	bool use_code_bounds = obj->npcc_caps != 0;
 #endif
 
 	where = (uintptr_t *)(obj->relocbase + rela->r_offset);
@@ -622,7 +643,7 @@ reloc_iresolve_one(Obj_Entry *obj, const Elf_Rela *rela,
 		ptr = init_cap_from_fragment(fragment, obj->relocbase,
 		    pcc_cap(obj, fragment[0]),
 		    (Elf_Addr)(uintptr_t)obj->relocbase,
-		    rela->r_addend);
+		    rela->r_addend, use_code_bounds);
 #else
 	ptr = (uintptr_t)(obj->relocbase + rela->r_addend);
 #endif
@@ -788,6 +809,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 	Elf_Addr *where, symval;
 #if __has_feature(capabilities)
 	void * __capability data_cap;
+	bool use_code_bounds = false;
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -797,6 +819,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 	 */
 	if (obj == obj_rtld)
 		return (0);
+	use_code_bounds = obj->npcc_caps != 0;
 #endif
 
 #if __has_feature(capabilities)
@@ -900,14 +923,14 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			    init_cap_from_fragment(where, data_cap,
 				pcc_cap(obj, where[0]),
 				(Elf_Addr)(uintptr_t)obj->relocbase,
-				rela->r_addend);
+				rela->r_addend, use_code_bounds);
 			break;
 		case R_MORELLO_FUNC_RELATIVE:
 			*(uintcap_t *)(void *)where =
 			    init_cap_from_fragment(where, data_cap,
 				pcc_cap(obj, where[0]),
 				(Elf_Addr)(uintptr_t)obj->relocbase,
-				rela->r_addend);
+				rela->r_addend, use_code_bounds);
 #ifdef CHERI_LIB_C18N
 			*(void **)where = tramp_intern(NULL, RTLD_COMPART_ID,
 			    &(struct tramp_data) {

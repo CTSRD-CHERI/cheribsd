@@ -104,13 +104,35 @@ void
 _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 {
 	caddr_t relocbase = NULL;
+	const Elf_Phdr *phdr = NULL;
 	const struct capreloc *caprelocs = NULL, *caprelocslim;
 	Elf_Addr caprelocssz = 0;
+	size_t phnum = 0;
 	void *pcc;
+	bool use_code_bounds = false;
 
 	for (; aux->a_type != AT_NULL; aux++) {
-		if (aux->a_type == AT_BASE) {
+		switch (aux->a_type) {
+		case AT_BASE:
 			relocbase = aux->a_un.a_ptr;
+			break;
+		case AT_PHDR:
+			phdr = aux->a_un.a_ptr;
+			break;
+		case AT_PHNUM:
+			phnum = aux->a_un.a_val;
+			break;
+		case AT_PHENT:
+			/* NB: Can't use assert() here. */
+			if (aux->a_un.a_val != sizeof(*phdr))
+				__builtin_trap();
+			break;
+		}
+	}
+
+	for (; phnum > 0; phdr++, phnum--) {
+		if (phdr->p_type == PT_CHERI_PCC) {
+			use_code_bounds = true;
 			break;
 		}
 	}
@@ -131,7 +153,7 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 	/* TODO: allow using tight bounds for RTLD */
 	cheri_init_globals_impl(caprelocs, caprelocslim,
 	    /*data_cap=*/relocbase, /*code_cap=*/pcc, /*rodata_cap=*/pcc,
-	    /*tight_code_bounds=*/false, (Elf_Addr)relocbase);
+	    /*tight_code_bounds=*/use_code_bounds, (Elf_Addr)relocbase);
 }
 #endif /* __CHERI_PURE_CAPABILITY__ */
 
