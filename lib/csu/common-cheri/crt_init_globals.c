@@ -81,12 +81,15 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum,
     const void * __capability *rodata_cap_out)
 {
 	const Elf_Phdr *phlimit = phdr + phnum;
+	const struct capreloc *start_relocs;
+	const struct capreloc *stop_relocs;
 	Elf_Addr text_start = (Elf_Addr)-1l;
 	Elf_Addr text_end = 0;
 	Elf_Addr readonly_start = (Elf_Addr)-1l;
 	Elf_Addr readonly_end = 0;
 	Elf_Addr writable_start = (Elf_Addr)-1l;
 	Elf_Addr writable_end = 0;
+	bool use_code_bounds = false;
 	bool have_rodata_segment = false;
 	bool have_text_segment = false;
 	bool have_data_segment = false;
@@ -204,7 +207,12 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum,
 		if (!cheri_gettag(code_cap))
 			__builtin_trap();
 	}
-	cheri_init_globals_3(data_cap, code_cap, rodata_cap);
+
+	start_relocs = CHERI_RODATA_PTR(__start___cap_relocs);
+	stop_relocs = CHERI_RODATA_PTR(__stop___cap_relocs);
+
+	cheri_init_globals_impl(start_relocs, stop_relocs, data_cap, code_cap,
+	    rodata_cap, use_code_bounds, 0);
 	if (data_cap_out)
 		*data_cap_out = data_cap;
 	if (code_cap_out)
