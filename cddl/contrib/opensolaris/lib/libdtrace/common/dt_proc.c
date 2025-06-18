@@ -358,6 +358,9 @@ dt_proc_attach(dt_proc_t *dpr, int exec)
 
 	if (Pxlookup_by_name(dpr->dpr_proc, LM_ID_BASE,
 	    "a.out", "main", &sym, NULL) == 0) {
+#ifdef __CHERI_PURE_CAPABILITY__
+		sym.st_value &= ~0x1ul;
+#endif
 		(void) dt_proc_bpcreate(dpr, (uintptr_t)sym.st_value,
 		    (dt_bkpt_f *)dt_proc_bpmain, "a.out`main");
 	} else {
