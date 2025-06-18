@@ -44,14 +44,21 @@ extern const Elf_Rela __weak_symbol __rela_dyn_start[] __hidden;
 extern const Elf_Rela __weak_symbol __rela_dyn_end[] __hidden;
 
 static __always_inline void
-crt_init_rela(const Elf_Phdr *phdr __unused)
+crt_init_rela(const Elf_Phdr *phdr __unused, const Elf_Phdr *phlimit __unused)
 {
 	const Elf_Rela *rela, *relalim;
 	void * __capability data_cap;
 	const void * __capability code_cap;
+	bool use_code_bounds = false;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	data_cap = __DECONST(void *, phdr);
+	for (const Elf_Phdr *ph = phdr; ph < phlimit; ph++) {
+		if (ph->p_type == PT_CHERI_PCC) {
+			use_code_bounds = true;
+			break;
+		}
+	}
 #else
 	data_cap = cheri_getdefault();
 #endif
@@ -63,7 +70,7 @@ crt_init_rela(const Elf_Phdr *phdr __unused)
 	rela = CHERI_RODATA_PTR(__rela_dyn_start);
 	relalim = CHERI_RODATA_PTR(__rela_dyn_end);
 	for (; rela < relalim; rela++)
-		elf_reloc(rela, data_cap, code_cap, 0);
+		elf_reloc(rela, data_cap, code_cap, 0, use_code_bounds);
 }
 #endif
 
@@ -84,12 +91,15 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum,
     const void * __capability *rodata_cap_out)
 {
 	const Elf_Phdr *phlimit = phdr + phnum;
+	const struct capreloc *start_relocs;
+	const struct capreloc *stop_relocs;
 	Elf_Addr text_start = (Elf_Addr)-1l;
 	Elf_Addr text_end = 0;
 	Elf_Addr readonly_start = (Elf_Addr)-1l;
 	Elf_Addr readonly_end = 0;
 	Elf_Addr writable_start = (Elf_Addr)-1l;
 	Elf_Addr writable_end = 0;
+	bool use_code_bounds = false;
 	bool have_rodata_segment = false;
 	bool have_text_segment = false;
 	bool have_data_segment = false;
@@ -98,7 +108,7 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum,
 	const void * __capability rodata_cap;
 
 #ifdef CHERI_INIT_RELA
-	crt_init_rela(phdr);
+	crt_init_rela(phdr, phlimit);
 #endif
 
 	/* Attempt to bound the data capability to only the writable segment */
@@ -109,6 +119,8 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum,
 				__builtin_trap();
 				break;
 			}
+			if (ph->p_type == PT_CHERI_PCC)
+				use_code_bounds = true;
 			continue;
 		}
 		/*
@@ -207,7 +219,12 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum,
 		if (!cheri_gettag(code_cap))
 			__builtin_trap();
 	}
-	cheri_init_globals_3(data_cap, code_cap, rodata_cap);
+
+	start_relocs = CHERI_RODATA_PTR(__start___cap_relocs);
+	stop_relocs = CHERI_RODATA_PTR(__stop___cap_relocs);
+
+	cheri_init_globals_impl(start_relocs, stop_relocs, data_cap, code_cap,
+	    rodata_cap, use_code_bounds, 0);
 	if (data_cap_out)
 		*data_cap_out = data_cap;
 	if (code_cap_out)
