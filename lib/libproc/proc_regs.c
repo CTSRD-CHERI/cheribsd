@@ -30,6 +30,11 @@
 
 #include <sys/types.h>
 #include <sys/ptrace.h>
+#include <sys/reg.h>
+
+#if defined(__aarch64__) && defined(__CHERI_PURE_CAPABILITY__)
+#include <cheri/cheric.h>
+#endif
 
 #include <err.h>
 #include <stdio.h>
@@ -93,18 +98,33 @@ proc_regget(struct proc_handle *phdl, proc_reg_t reg, unsigned long *regvalue)
 int
 proc_regset(struct proc_handle *phdl, proc_reg_t reg, unsigned long regvalue)
 {
+#if defined(__aarch64__) && defined(__CHERI_PURE_CAPABILITY__)
+	struct capreg capregs;
+	uint64_t tagmask;
+#else
 	struct reg regs;
+#endif
 
 	if (phdl->status == PS_DEAD || phdl->status == PS_UNDEAD ||
 	    phdl->status == PS_IDLE) {
 		errno = ENOENT;
 		return (-1);
 	}
+#if defined(__aarch64__) && defined(__CHERI_PURE_CAPABILITY__)
+	if (ptrace(PT_GETCAPREGS, proc_getpid(phdl), (caddr_t)&capregs, 0) < 0)
+		return (-1);
+	tagmask = 0;
+#else
 	if (ptrace(PT_GETREGS, proc_getpid(phdl), (caddr_t)&regs, 0) < 0)
 		return (-1);
+#endif
 	switch (reg) {
 	case REG_PC:
-#if defined(__aarch64__)
+#if defined(__aarch64__) && defined(__CHERI_PURE_CAPABILITY__)
+		capregs.celr = cheri_setaddress(capregs.celr, regvalue);
+		tagmask |= 1ul <<
+		    (__offsetof(struct capreg, celr) / sizeof(uintcap_t));
+#elif defined(__aarch64__)
 		regs.elr = regvalue;
 #elif defined(__amd64__)
 		regs.r_rip = regvalue;
@@ -119,7 +139,11 @@ proc_regset(struct proc_handle *phdl, proc_reg_t reg, unsigned long regvalue)
 #endif
 		break;
 	case REG_SP:
-#if defined(__aarch64__)
+#if defined(__aarch64__) && defined(__CHERI_PURE_CAPABILITY__)
+		capregs.csp = cheri_setaddress(capregs.csp, regvalue);
+		tagmask |= 1ul <<
+		    (__offsetof(struct capreg, csp) / sizeof(uintcap_t));
+#elif defined(__aarch64__)
 		regs.sp = regvalue;
 #elif defined(__amd64__)
 		regs.r_rsp = regvalue;
@@ -137,8 +161,14 @@ proc_regset(struct proc_handle *phdl, proc_reg_t reg, unsigned long regvalue)
 		DPRINTFX("ERROR: no support for reg number %d", reg);
 		return (-1);
 	}
+#if defined(__aarch64__) && defined(__CHERI_PURE_CAPABILITY__)
+	capregs.tagmask |= tagmask;
+	if (ptrace(PT_SETCAPREGS, proc_getpid(phdl), (caddr_t)&capregs, 0) < 0)
+		return (-1);
+#else
 	if (ptrace(PT_SETREGS, proc_getpid(phdl), (caddr_t)&regs, 0) < 0)
 		return (-1);
+#endif
 
 	return (0);
 }
