@@ -319,6 +319,9 @@ rtld_syms(rd_agent_t *rdap, const char *rtldpath, u_long base)
 		if (symname == NULL)
 			continue;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+		sym.st_value &= ~0x1ul;
+#endif
 		if (strcmp(symname, "r_debug_state") == 0) {
 			rdap->rda_preinit_addr = sym.st_value + base;
 			rdap->rda_dlactivity_addr = sym.st_value + base;
