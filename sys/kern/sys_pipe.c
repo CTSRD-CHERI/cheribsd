@@ -555,7 +555,7 @@ kern_pipe2(struct thread *td, int * __capability ufildes, int flags)
 {
 	int error, fildes[2];
 
-	if (flags & ~(O_CLOEXEC | O_NONBLOCK))
+	if ((flags & ~(O_CLOEXEC | O_CLOFORK | O_NONBLOCK)) != 0)
 		return (EINVAL);
 	error = kern_pipe(td, fildes, flags, NULL, NULL);
 	if (error)
