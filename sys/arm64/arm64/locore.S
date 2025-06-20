@@ -671,6 +671,10 @@ LENTRY(enter_kernel_el)
 
 	/* Hypervisor trap functions */
 	adrp	x2, hyp_stub_vectors
+	/*
+	 * NB: hyp_stub_vectors must not use :got_lo12: on CHERI as it is
+	 * accessed before relocations.
+	 */
 	add	x2, x2, :lo12:hyp_stub_vectors
 #if __has_feature(capabilities)
 	cvtp	c2, x2

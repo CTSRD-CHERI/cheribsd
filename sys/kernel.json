@@ -17,6 +17,7 @@
 			"vm_machdep.o",
 			"exec_machdep.o",
 			"efirt_machdep.o",
+			"hyp_stub.o",
 			"exception.o"
 		]
 	},
@@ -678,7 +679,6 @@
 				"hwvalid.o",
 				"hwxface.o",
 				"hwxfsleep.o",
-				"hyp_stub.o",
 				"hyperv.o",
 				"hyperv_aarch64.o",
 				"hyperv_busdma.o",
