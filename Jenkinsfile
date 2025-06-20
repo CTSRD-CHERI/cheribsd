@@ -304,10 +304,12 @@ selectedArchitectures.each { suffix ->
             cheribuildArgs.add('--cheribsd/build-alternate-abi-kernels')
             if (suffix.startsWith('morello')) {
                 cheribuildArgs.add('--cheribsd/build-benchmark-abi-kernels')
+            }
+            if (suffix == "morello-purecap") {
                 // Build GENERIC-MORELLO-PURECAP-COMPARTMENTS in addition to
                 // other kernels that we build for dev, and make it the default
                 // kernel.
-                cheribuildArgs.add('--cheribsd-morello-purecap/kernel-config "GENERIC-MORELLO-PURECAP-COMPARTMENTS GENERIC-MORELLO GENERIC-MORELLO-NODEBUG GENERIC-MORELLO-PURECAP GENERIC-MORELLO-PURECAP-BENCHMARK GENERIC-MORELLO-PURECAP-BENCHMARK-NODEBUG GENERIC-MORELLO-PURECAP-NODEBUG"')
+                cheribuildArgs.add('--kernel-config "GENERIC-MORELLO-PURECAP-COMPARTMENTS GENERIC-MORELLO GENERIC-MORELLO-PURECAP GENERIC-MORELLO-PURECAP-BENCHMARK GENERIC-MORELLO-NODEBUG GENERIC-MORELLO-PURECAP-NODEBUG GENERIC-MORELLO-PURECAP-BENCHMARK-NODEBUG"')
             }
         }
         cheribuildProject(target: "cheribsd-${suffix}", architecture: suffix,
