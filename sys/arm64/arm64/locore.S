@@ -463,13 +463,23 @@ LENTRY(spintable_wait)
 	ldr	x2, =CPU_AFF_MASK
 	and	x1, x1, x2
 
-	adrp	PTR(2), ap_cpuid
+#ifdef __CHERI_PURE_CAPABILITY__
+	adrp	c2, :got:ap_cpuid
 1:
-	ldr	x0, [PTR(2), :lo12:ap_cpuid]
+	ldr	x0, [c2, :got_lo12:ap_cpuid]
+#else
+	adrp	x2, ap_cpuid
+1:
+	ldr	x0, [x2, :lo12:ap_cpuid]
+#endif
 	cmp	x0, x1
 	b.ne	1b
 
-	str	xzr, [PTR(2), :lo12:ap_cpuid]
+#ifdef __CHERI_PURE_CAPABILITY__
+	str	xzr, [c2, :got_lo12:ap_cpuid]
+#else
+	str	xzr, [x2, :lo12:ap_cpuid]
+#endif
 	dsb	sy
 	sev
 
@@ -550,8 +560,13 @@ mp_virtdone:
 	 * Initialize the per-CPU pointer before calling into C code, for the
 	 * benefit of kernel sanitizers.
 	 */
-	adrp	PTR(18), bootpcpu
-	ldr	PTR(18), [PTR(18), :lo12:bootpcpu]
+#ifdef __CHERI_PURE_CAPABILITY__
+	adrp	c18, :got:bootpcpu
+	ldr	c18, [c18, :got_lo12:bootpcpu]
+#else
+	adrp	x18, bootpcpu
+	ldr	x18, [x18, :lo12:bootpcpu]
+#endif
 	msr	PTRN(tpidr_el1), PTR(18)
 
 	b	init_secondary
