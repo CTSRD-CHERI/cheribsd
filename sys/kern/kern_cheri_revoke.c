@@ -43,6 +43,7 @@
 #include <cheri/cheric.h>
 
 #include <sys/lock.h>
+#include <sys/ktr.h>
 #include <sys/mutex.h>
 
 #include <vm/vm.h>
@@ -430,6 +431,9 @@ fast_out:
 			    &crepochs));
 		}
 
+		CTR4(KTR_CAPREVOKE, "%d/%d cheri_revoke epoch=%lu state=%d",
+		    td->td_proc->p_pid, td->td_tid, epoch, entryst);
+
 		/*
 		 * OK, the initial epoch clock isn't in the past.  Let's see
 		 * what state we're in and what we can accomplish.
@@ -515,6 +519,9 @@ fast_out:
 			(myst == CHERI_REVOKE_ST_CLOSING),
 		    ("Beginning revocation with bad current state"));
 
+		CTR4(KTR_CAPREVOKE, "%d/%d cheri_revoke epoch=%lu nextstate=%d",
+		    td->td_proc->p_pid, td->td_tid, epoch, myst);
+
 		if (entryst == CHERI_REVOKE_ST_NONE) {
 			int test_flags =
 			    VM_CHERI_REVOKE_CF_NO_COARSE_MEM |
@@ -569,6 +576,9 @@ fast_out:
 	vm_cheri_revoke_publish_epochs(info_page, &crepochs);
 	wmb();
 
+	CTR4(KTR_CAPREVOKE, "%d/%d cheri_revoke publish closing=%lu opening=%lu",
+	    td->td_proc->p_pid, td->td_tid, crepochs.dequeue, crepochs.enqueue);
+
 	/*
 	 * If we've already begun the load-side work and are now just going
 	 * to close it out, there's no need to do any thread singling, so
@@ -586,6 +596,8 @@ fast_out:
 	    myst == CHERI_REVOKE_ST_CLOSING,
 	    ("Bad target state in revoker."));
 
+	CTR3(KTR_CAPREVOKE, "%d/%d cheri_revoke epoch=%ld barrier phase",
+	    td->td_proc->p_pid, td->td_tid, epoch);
 	/* Begin barrier phase! */
 
 	{
@@ -692,6 +704,8 @@ fast_out:
 	PROC_UNLOCK(td->td_proc);
 
 	/* Post barrier phase! */
+	CTR3(KTR_CAPREVOKE, "%d/%d cheri_revoke epoch=%ld async phase",
+	    td->td_proc->p_pid, td->td_tid, epoch);
 
 	/*
 	 * If we came in with no epoch open, we have just opened one.
@@ -709,13 +723,20 @@ close_already_inited:	/* (entryst == CHERI_REVOKE_ST_INITED) above */
 			KASSERT((flags & CHERI_REVOKE_ASYNC) == 0,
 			    ("closing with async"));
 
+			CTR3(KTR_CAPREVOKE,
+			    "%d/%d cheri_revoke sync pass for vmm=%p",
+			    td->td_proc->p_pid, td->td_tid, vmcrc.map);
 			res = vm_cheri_revoke_pass(&vmcrc);
 			if (res != KERN_SUCCESS)
 				myst = CHERI_REVOKE_ST_INITED;
 			break;
 		case CHERI_REVOKE_ST_INITING:
-			if ((flags & CHERI_REVOKE_ASYNC) != 0)
+			if ((flags & CHERI_REVOKE_ASYNC) != 0) {
+				CTR3(KTR_CAPREVOKE,
+				    "%d/%d cheri_revoke async pass for vmm=%p",
+				    td->td_proc->p_pid, td->td_tid, vmcrc.map);
 				vm_cheri_revoke_pass_async(vm, &vmcrc);
+			}
 			myst = CHERI_REVOKE_ST_INITED;
 			break;
 		}
@@ -731,6 +752,10 @@ post_revoke_pass:
 		myst = CHERI_REVOKE_ST_NONE;
 
 		vm_map_entry_end_revocation(&vm->vm_map);
+		CTR4(KTR_CAPREVOKE,
+		    "%d/%d cheri_revoke publish closed=%lu open=%lu",
+		    td->td_proc->p_pid, td->td_tid, crepochs.dequeue,
+		    crepochs.enqueue);
 	}
 
 	vm_map_lock(vmm);

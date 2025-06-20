@@ -38,6 +38,7 @@
 #include <sys/counter.h>
 #include <sys/kernel.h>
 #include <sys/kthread.h>
+#include <sys/ktr.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
@@ -677,6 +678,8 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc,
 	 *
 	 */
 	pres = pmap_caploadgen_update(crc->map->pmap, addr, &m, 0);
+	CTR4(KTR_CAPREVOKE, "revoke_pass %p: m=%p va=%lx pre-visit state=%d",
+	    map, m, addr, pres);
 	switch (pres) {
 	case PMAP_CAPLOADGEN_OK:
 	case PMAP_CAPLOADGEN_TEARDOWN:
@@ -912,6 +915,9 @@ ok:
 #endif
 		    (viscap ? PMAP_CAPLOADGEN_HASCAPS : 0));
 
+		CTR4(KTR_CAPREVOKE,
+		    "revoke_pass %p: m=%p va=%lx post-visit state=%d", map, m,
+		    addr, pres);
 		switch (pres) {
 		case PMAP_CAPLOADGEN_OK:
 			/* Update applied */
@@ -1079,6 +1085,10 @@ vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc,
 		goto fini;
 	}
 
+	CTR5(KTR_CAPREVOKE,
+	    "revoke_pass %p: entry [%lx, %lx] prot=%#hhx maxprot=%#hhx",
+	    crc->map, entry->start, entry->end, entry->protection,
+	    entry->max_protection);
 	VM_OBJECT_WLOCK(obj);
 	while (*addr < entry->end) {
 		int vmres;
@@ -1175,6 +1185,8 @@ vm_cheri_revoke_pass_locked(struct vmspace *vm,
 
 	vm_map_lock_downgrade(map);
 
+	CTR1(KTR_CAPREVOKE, "revoke_pass %p start", map);
+
 	/*
 	 * Pinning the revoker helps improve determinism and so is useful for
 	 * benchmarking, but might be a liability under load.
@@ -1237,6 +1249,7 @@ out:
 		sched_unpin();
 
 	vm_map_lock(crc->map);
+	CTR1(KTR_CAPREVOKE, "revoke_pass %p done", map);
 
 	return (res);
 }

@@ -422,6 +422,9 @@ vm_fault_cheri_revoke(struct faultstate *fs, vm_page_t m, bool canwrite)
 		hascaps = vm_cheri_revoke_page_ro(&crc, m);
 	}
 
+	CTR3(KTR_CAPREVOKE, "fault_cheri_revoke vmm=%p va=%lx prot=%##hhx",
+	    fs->map, fs->vaddr, fs->prot);
+
 	/*
 	 * TODO: Well, this is kind of awkward.  We should, on the load side, be
 	 * leaving pages marked capdirty if VM_CHERI_REVOKE_PAGE_HASCAPS here.
@@ -574,8 +577,12 @@ vm_fault_soft_fast(struct faultstate *fs)
 	 * Importantly, realprot is exempt from vm_page_mask_cap_prot()!
 	 */
 	if ((realprot & (VM_PROT_WRITE | VM_PROT_WRITE_CAP)) ==
-	    (VM_PROT_WRITE | VM_PROT_WRITE_CAP))
+	    (VM_PROT_WRITE | VM_PROT_WRITE_CAP)) {
 		vm_page_aflag_set(m_map, PGA_CAPSTORE);
+	CTR4(KTR_CAPREVOKE,
+	    "fault_soft_fast vmm=%p va=%lx prot=%#hhx PGA_CAPSTORE=%d",
+	    fs->map, fs->vaddr, realprot,
+	    (vm_page_astate_load(m_map).flags & PGA_CAPSTORE) != 0);
 
 	if ((fs->fault_flags & VM_FAULT_NOPMAP) == 0 &&
 	    pmap_enter(fs->map->pmap, vaddr, m_map, realprot,
@@ -1583,6 +1590,10 @@ vm_fault_allocate(struct faultstate *fs)
 
 	if (capstore_on_alloc && (fs->prot & VM_PROT_WRITE_CAP))
 		vm_page_aflag_set(fs->m, PGA_CAPSTORE);
+	CTR4(KTR_CAPREVOKE,
+	    "fault_allocate vmm=%p va=%lx prot=%#hhx PGA_CAPSTORE=%d",
+	    fs->map, fs->vaddr, fs->prot,
+	    (vm_page_astate_load(fs->m).flags & PGA_CAPSTORE) != 0);
 
 	return (FAULT_CONTINUE);
 }
