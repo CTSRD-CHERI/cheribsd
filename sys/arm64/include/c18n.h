@@ -40,6 +40,14 @@ struct dl_c18n_compart_state {
 	 * caller made the call.
 	 */
 	void *sp;
+	/*
+	 * INVARIANT: This field contains the top of the caller's stack when the
+	 * caller was last entered.
+	 */
+	void *osp;
+#ifndef IN_RTLD
+	void *reserved[3];
+#endif
 };
 
 #endif /* __MACHINE_C18N_H__ */
