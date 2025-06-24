@@ -85,8 +85,35 @@
 #define	cheri_ccheckperm(c, p)	__builtin_cheri_perms_check((c), (p))
 #define	cheri_cchecktype(c, t)	__builtin_cheri_type_check((c), (t))
 
+#if defined(__riscv_zcheripurecap) && !defined(__CHERI_PURE_CAPABILITY__)
+#define	cheri_getdefault()	__extension__({				\
+	void * __capability tmp;					\
+	__asm__ __volatile__(						\
+		"modesw.cap\n"						\
+		".option push\n"					\
+		".option capmode\n"					\
+		"csrr %0, ddc\n"					\
+		"modesw.int\n"						\
+		".option pop\n"						\
+		: "=C" (tmp) ::);					\
+	(tmp);								\
+})
+#define	cheri_getpcc()	__extension__({					\
+	void * __capability tmp;					\
+	__asm__ __volatile__(						\
+		"modesw.cap\n"						\
+		".option push\n"					\
+		".option capmode\n"					\
+		"auipc %0, 0\n"						\
+		"modesw.int\n"						\
+		".option pop\n"						\
+		: "=C" (tmp) ::);					\
+	(tmp);								\
+})
+#else /* !defined(__riscv_zcheripurecap) || defined(__CHERI_PURE_CAPABILITY__) */
 #define	cheri_getdefault()	__builtin_cheri_global_data_get()
 #define	cheri_getpcc()		__builtin_cheri_program_counter_get()
+#endif /* !defined(__riscv_zcheripurecap) || defined(__CHERI_PURE_CAPABILITY__) */
 #define	cheri_getstack()	__builtin_cheri_stack_get()
 
 #define	cheri_local(c)		cheri_andperm((c), ~CHERI_PERM_GLOBAL)

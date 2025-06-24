@@ -280,10 +280,10 @@ CHERIBSDTEST(strfcap_numbers, "Checks of formats of a single number")
 	    "stack array");
 
 	test_strfcap_number_one_cap(
-	    (uintcap_t)__builtin_cheri_global_data_get(), "DDC");
+	    (uintcap_t)cheri_getdefault(), "DDC");
 
 	test_strfcap_number_one_cap(
-	    (uintcap_t)__builtin_cheri_program_counter_get(), "PCC");
+	    (uintcap_t)cheri_getpcc(), "PCC");
 
 	cheribsdtest_success();
 }
@@ -346,7 +346,7 @@ CHERIBSDTEST(strfcap_C, "Various checks of %C (%A and %P indirectly)")
 	uintcap_t scalar = (uintcap_t)4;
 	char * __capability datap = data;
 #ifdef CHERI_FLAGS_CAP_MODE
-	void * __capability pcc_alt = __builtin_cheri_program_counter_get();
+	void * __capability pcc_alt = cheri_getpcc();
 #endif
 
 	strfcap(data, sizeof(data), "%#C", scalar);
