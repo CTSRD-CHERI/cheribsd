@@ -38,45 +38,8 @@
 #include <machine/riscvreg.h>
 #endif
 
-#define	INT_SIZE	8
-#define	INT(x)		x
-#define	LOAD_INT	PTR(ld)
-#define	STORE_INT	PTR(sd)
-
-#ifdef __CHERI_PURE_CAPABILITY__
-#define	LOAD_PTR	LOAD_CAP
-#define	STORE_PTR	STORE_CAP
-#define	ADD_PTR		cincoffset
-#define	MV_PTR		cmove
-#define	PTR_SIZE	CAP_SIZE
-#define	PTR(x)		CAP(x)
-#else
-#define	LOAD_PTR	LOAD_INT
-#define	STORE_PTR	STORE_INT
-#define	ADD_PTR		add
-#define	MV_PTR		mv
-#define	PTR_SIZE	INT_SIZE
-#define	PTR(x)		INT(x)
-#endif
-
-#define	JR_PTR		PTR(jr)
-
-#if __has_feature(capabilities)
-#define	LOAD_CAP	PTR(lc)
-#define	STORE_CAP	PTR(sc)
-#define	CAP_SIZE	16
-#define	CAP(x)		c ## x
-#else
-#define	LOAD_CAP	ld
-#define	STORE_CAP	sd
-#define	CAP_SIZE	8
-#define	CAP(x)		x
-#endif
-
 #ifdef __riscv_float_abi_double
 #define	FLT_SIZE	8
-#define	LOAD_FLT	PTR(fld)
-#define	STORE_FLT	PTR(fsd)
 #else
 #define	FLT_SIZE	0
 #endif
@@ -155,8 +118,16 @@ ENTRY(_rtld_bind_start)
 	/*
 	 * We require 8 GP(C)Rs, 1 pointer and 8 FPRs, but the stack must be
 	 * aligned to 16-bytes.
-	 */
-#define	FLT_OFFSET	(8 * CAP_SIZE + 1 * PTR_SIZE)
+	 *       
+	 * We require 9 GP(C)Rs, 1 pointer and 8 FPRs for the CHERI 
+	 * bounded vararg ABI. Currently implied by Zcheri and not present
+	 * for Xcheri.
+	*/
+#if defined(__riscv_xcheri)
+#define	FLT_OFFSET	(8 * CAP_WIDTH + 1 * PTR_WIDTH)
+#else
+#define	FLT_OFFSET	(9 * CAP_WIDTH + 1 * PTR_WIDTH)
+#endif    
 #define	FRAME_SIZE	(((FLT_OFFSET + 8 * FLT_SIZE) + 15) & ~15)
 
 	ADD_PTR		PTR(sp), PTR(sp), -FRAME_SIZE
