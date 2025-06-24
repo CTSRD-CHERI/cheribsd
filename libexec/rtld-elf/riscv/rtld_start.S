@@ -145,10 +145,10 @@ END(.rtld_start)
 ENTRY(_rtld_bind_start)
 	/* Save the arguments and (c)ra */
 	/*
-	 * We require 8 GP(C)Rs, 1 pointer and 8 FPRs, but the stack must be
+	 * We require 9 GP(C)Rs, 1 pointer and 8 FPRs, but the stack must be
 	 * aligned to 16-bytes.
 	 */
-#define	FLT_OFFSET	(8 * CAP_SIZE + 1 * PTR_SIZE)
+#define	FLT_OFFSET	(9 * CAP_SIZE + 1 * PTR_SIZE)
 #define	FRAME_SIZE	(((FLT_OFFSET + 8 * FLT_SIZE) + 15) & ~15)
 
 	ADDI_PTR	PTR(sp), PTR(sp), -FRAME_SIZE
@@ -160,7 +160,8 @@ ENTRY(_rtld_bind_start)
 	STORE_CAP	CAP(a5), (CAP_SIZE * 5)(PTR(sp))
 	STORE_CAP	CAP(a6), (CAP_SIZE * 6)(PTR(sp))
 	STORE_CAP	CAP(a7), (CAP_SIZE * 7)(PTR(sp))
-	STORE_PTR	PTR(ra), (CAP_SIZE * 8)(PTR(sp))
+	STORE_CAP	CAP(t6), (CAP_SIZE * 8)(PTR(sp))
+	STORE_PTR	PTR(ra), (CAP_SIZE * 9)(PTR(sp))
 
 #if FLT_SIZE != 0
 	/* Save any floating-point arguments */
@@ -200,7 +201,8 @@ ENTRY(_rtld_bind_start)
 	LOAD_CAP	CAP(a5), (CAP_SIZE * 5)(PTR(sp))
 	LOAD_CAP	CAP(a6), (CAP_SIZE * 6)(PTR(sp))
 	LOAD_CAP	CAP(a7), (CAP_SIZE * 7)(PTR(sp))
-	LOAD_PTR	PTR(ra), (CAP_SIZE * 8)(PTR(sp))
+	LOAD_CAP	CAP(t6), (CAP_SIZE * 8)(PTR(sp))
+	LOAD_PTR	PTR(ra), (CAP_SIZE * 9)(PTR(sp))
 
 #if FLT_SIZE != 0
 	/* Restore floating-point arguments */

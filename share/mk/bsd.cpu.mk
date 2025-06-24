@@ -334,6 +334,15 @@ MACHINE_CPU += riscv
 . endif
 .endif
 
+.if ${MACHINE_CPUARCH} == "riscv"
+. if ${MACHINE_CPU:Mcheri}
+CFLAGS+=	-Xclang -target-feature -Xclang +cheri-bounded-vararg
+CFLAGS+=	-Xclang -target-feature -Xclang +cheri-bounded-memarg-caller
+CFLAGS+=	-Xclang -target-feature -Xclang +cheri-bounded-memarg-callee
+LDFLAGS+=	-z no-cheri-riscv-jump-slot
+. endif
+.endif
+
 .if ${MACHINE_CPUARCH} == "aarch64"
 . if ${MACHINE_CPU:Mcheri}
 CFLAGS+=	-march=morello

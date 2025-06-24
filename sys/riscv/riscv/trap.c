@@ -126,8 +126,7 @@ cpu_fetch_syscall_args(struct thread *td)
 	syscallarg_t *ap, *dst_ap;
 	struct syscall_args *sa;
 #if __has_feature(capabilities)
-	char * __capability stack_args = NULL;
-	u_int i;
+	syscallarg_t * __capability stack_args = NULL;
 	int error;
 #endif
 
@@ -145,10 +144,11 @@ cpu_fetch_syscall_args(struct thread *td)
 #if __has_feature(capabilities)
 		/*
 		 * For syscall() and __syscall(), the arguments are
-		 * stored in a var args block on the stack.
+		 * stored in a var args block pointed to be ct6.
 		 */
 		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
-			stack_args = (char * __capability)td->td_frame->tf_sp;
+			stack_args =
+			    (syscallarg_t * __capability)td->td_frame->tf_t[6];
 #endif
 	} else {
 		*dst_ap++ = *ap++;
@@ -156,6 +156,11 @@ cpu_fetch_syscall_args(struct thread *td)
 
 	if (__predict_false(sa->code >= p->p_sysent->sv_size))
 		sa->callp = &nosys_sysent;
+#if __has_feature(capabilities) && !defined(CPU_CHERI_NO_SYSCALL_AUTHORIZE)
+	/* Constrain code that can originate system calls. */
+	else if (__predict_false(!cheri_syscall_authorize(td)))
+		sa->callp = &nosys_sysent;
+#endif
 	else
 		sa->callp = &p->p_sysent->sv_table[sa->code];
 
@@ -164,30 +169,10 @@ cpu_fetch_syscall_args(struct thread *td)
 
 #if __has_feature(capabilities)
 	if (__predict_false(stack_args != NULL)) {
-		register_t intval;
-		int offset, ptrmask;
-
-		if (sa->code >= nitems(sysargmask))
-			ptrmask = 0;
-		else
-			ptrmask = sysargmask[sa->code];
-
-		offset = 0;
-		for (i = 0; i < sa->callp->sy_narg; i++) {
-			if (ptrmask & (1 << i)) {
-				offset = roundup2(offset, sizeof(uintcap_t));
-				error = fuecap(stack_args + offset,
-				    dst_ap);
-				offset += sizeof(uintcap_t);
-			} else {
-				error = fueword(stack_args + offset, &intval);
-				*dst_ap = intval;
-				offset += sizeof(intval);
-			}
-			dst_ap++;
-			if (error)
-				return (error);
-		}
+		error = copyincap(stack_args, dst_ap, sa->callp->sy_narg *
+		    sizeof(*dst_ap));
+		if (error)
+			return (error);
 	} else
 #endif
 	{
