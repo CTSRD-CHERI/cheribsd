@@ -1328,6 +1328,8 @@ typedef union {
   BBS_BBS_DEVICE_PATH                        Bbs;
 } EFI_DEV_PATH;
 
+#pragma pack()
+
 typedef union {
   EFI_DEVICE_PATH_PROTOCOL                   *DevPath;
   PCI_DEVICE_PATH                            *Pci;
@@ -1386,7 +1388,6 @@ typedef union {
   UINT8                                      *Raw;
 } EFI_DEV_PATH_PTR;
 
-#pragma pack()
 
 #define END_DEVICE_PATH_TYPE              0x7f
 #define END_ENTIRE_DEVICE_PATH_SUBTYPE    0xFF
@@ -1395,3 +1396,12 @@ typedef union {
 extern EFI_GUID  gEfiDevicePathProtocolGuid;
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20250624,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_shape"
+//   ]
+// }
+// CHERI CHANGES END
