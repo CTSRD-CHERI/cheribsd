@@ -127,7 +127,6 @@ cpu_fetch_syscall_args(struct thread *td)
 	struct syscall_args *sa;
 #if __has_feature(capabilities)
 	char * __capability stack_args = NULL;
-	u_int i;
 	int error;
 #endif
 
@@ -146,26 +145,42 @@ cpu_fetch_syscall_args(struct thread *td)
 		/*
 		 * For syscall() and __syscall(), the arguments are
 		 * stored in a var args block on the stack.
+		 * If using the CHERI bounded varargs ABI, the stack structure
+		 * is passed in ct6.
 		 */
-		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+		if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
+#if defined(__riscv_xcheri)
 			stack_args = (char * __capability)td->td_frame->tf_sp;
+#else /* defined(__riscv_zcheripurecap) */
+			/* CHERI bounded-vararg ABI */
+			stack_args = (char * __capability)td->td_frame->tf_t[6];
+#endif /* defined(__riscv_zcheripurecap) */
+		}
 #endif
 	} else {
 		*dst_ap++ = *ap++;
 	}
 
-	if (__predict_false(sa->code >= p->p_sysent->sv_size))
+	if (__predict_false(sa->code >= p->p_sysent->sv_size)) {
 		sa->callp = &nosys_sysent;
-	else
+#if __has_feature(capabilities) && !defined(CPU_CHERI_NO_SYSCALL_AUTHORIZE)
+	/* Constrain code that can originate system calls. */
+	} else if (__predict_false(!cheri_syscall_authorize(td))) {
+		sa->callp = &nosys_sysent;
+#endif
+	} else {
 		sa->callp = &p->p_sysent->sv_table[sa->code];
+	}
 
 	KASSERT(sa->callp->sy_narg <= nitems(sa->args),
 	    ("Syscall %d takes too many arguments", sa->code));
 
 #if __has_feature(capabilities)
 	if (__predict_false(stack_args != NULL)) {
+#if defined(__riscv_xcheri)
 		register_t intval;
 		int offset, ptrmask;
+		u_int i;
 
 		if (sa->code >= nitems(sysargmask))
 			ptrmask = 0;
@@ -188,6 +203,13 @@ cpu_fetch_syscall_args(struct thread *td)
 			if (error)
 				return (error);
 		}
+#else /* defined(__riscv_zcheripurecap) */
+		/* CHERI bounded-vararg ABI */
+		error = copyinptr(stack_args, dst_ap, sa->callp->sy_narg *
+		    sizeof(*dst_ap));
+		if (error)
+			return (error);
+#endif /* defined(__riscv_zcheripurecap) */
 	} else
 #endif
 	{

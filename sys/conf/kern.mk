@@ -201,6 +201,12 @@ INLINE_LIMIT?=	8000
 .if ${LINKER_FEATURES:Mriscv-relaxations} == ""
 CFLAGS+=	-mno-relax
 .endif
+
+.if ${MACHINE_CPU:Mzcheri*}
+CFLAGS+=	-Xclang -target-feature -Xclang +cheri-bounded-vararg
+CFLAGS+=	-Xclang -target-feature -Xclang +cheri-bounded-memarg-caller
+CFLAGS+=	-Xclang -target-feature -Xclang +cheri-bounded-memarg-callee
+.endif
 .endif
 
 #
