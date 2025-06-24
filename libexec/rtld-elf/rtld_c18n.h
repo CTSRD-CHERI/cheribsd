@@ -129,11 +129,6 @@ struct trusted_frame {
 	 */
 	struct dl_c18n_compart_state state;
 	/*
-	 * INVARIANT: This field contains the top of the caller's stack when the
-	 * caller was last entered.
-	 */
-	void *osp;
-	/*
 	 * Pointer to the previous trusted frame
 	 */
 	struct trusted_frame *previous;

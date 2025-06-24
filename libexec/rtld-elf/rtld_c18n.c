@@ -1050,14 +1050,14 @@ dl_c18n_unwind_trusted_stack(void *rcsp, void *target)
 		cid = index_to_cid(index);
 		ospp = &table->entries[cid].stack;
 
-		if ((ptraddr_t)*ospp > (ptraddr_t)cur->osp) {
+		if ((ptraddr_t)*ospp > (ptraddr_t)cur->state.osp) {
 			rtld_fdprintf(STDERR_FILENO,
 			    "c18n: Cannot unwind %s from %#p to %#p\n",
-			    comparts.data[cid].name, *ospp, cur->osp);
+			    comparts.data[cid].name, *ospp, cur->state.osp);
 			abort();
 		}
 
-		*ospp = cur->osp;
+		*ospp = cur->state.osp;
 		cur = cur->previous;
 	} while ((ptraddr_t)cur < (ptraddr_t)target);
 
@@ -1081,7 +1081,7 @@ dl_c18n_unwind_trusted_stack(void *rcsp, void *target)
 	}
 
 	tf->state.sp = rcsp;
-	tf->osp = *ospp;
+	tf->state.osp = *ospp;
 	tf->previous = cur;
 	tf->caller = index;
 
@@ -1335,7 +1335,7 @@ tramp_hook_impl(int event, const struct tramp_header *hdr,
 		ut.fp = tf->state.fp;
 		ut.pc = tf->state.pc;
 		ut.sp = tf->state.sp;
-		ut.osp = tf->osp;
+		ut.osp = tf->state.osp;
 		ut.previous = tf->previous;
 		memcpy(&ut.fsig, &hdr->sig, sizeof(ut.fsig));
 		strlcpy(ut.symbol, sym, sizeof(ut.symbol));
@@ -2223,9 +2223,9 @@ found:
 	ntf = tf - 2;
 	*ntf = (struct trusted_frame) {
 		.state = (struct dl_c18n_compart_state) {
-			.sp = nsp
+			.sp = nsp,
+			.osp = osp
 		},
-		.osp = osp,
 		.previous = tf,
 		.caller = intr_idx,
 		/*
@@ -2270,7 +2270,7 @@ found:
 	 * compartment. Pop the dummy frame from the trusted stack.
 	 */
 	assert(get_trusted_stk() == ntf);
-	table->entries[index_to_cid(ntf->caller)].stack = ntf->osp;
+	table->entries[index_to_cid(ntf->caller)].stack = ntf->state.osp;
 	set_trusted_stk(ntf->previous);
 	/*
 	 * Under the benchmark ABI, do not set the untrusted stack because the
@@ -2355,7 +2355,9 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 	tf = get_trusted_stk();
 	ntf = tf - 1;
 	*ntf = (struct trusted_frame) {
-		.osp = osp,
+		.state = (struct dl_c18n_compart_state) {
+			.osp = osp,
+		},
 		.previous = tf,
 		.caller = callee_idx,
 		/*
@@ -2398,7 +2400,7 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 	 * Pop the dummy frame from the trusted stack.
 	 */
 	assert(get_trusted_stk() == ntf);
-	table->entries[index_to_cid(ntf->caller)].stack = ntf->osp;
+	table->entries[index_to_cid(ntf->caller)].stack = ntf->state.osp;
 	set_trusted_stk(ntf->previous);
 }
 
