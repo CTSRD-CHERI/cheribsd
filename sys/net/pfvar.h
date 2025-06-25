@@ -1596,7 +1596,7 @@ struct pf_pdesc {
 #ifdef INET6
 		struct icmp6_hdr	icmp6;
 #endif /* INET6 */
-		char any[0];
+		char any[0] __no_subobject_bounds;
 	} hdr;
 
 	struct pfi_kkif	*kif;		/* incomming interface */
@@ -1923,6 +1923,7 @@ struct pfioc_qstats_v1 {
 	 * written entirely in terms of the v0 or v1 type.
 	 */
 	u_int32_t	 version;  /* Requested version of stats struct */
+	void	*pad;
 };
 
 /* Latest version of struct pfioc_qstats_vX */
