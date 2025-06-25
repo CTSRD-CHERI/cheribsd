@@ -375,6 +375,9 @@ struct vmspace {
 	vm_offset_t vm_maxsaddr;	/* user VA at max stack growth */
 	vm_offset_t vm_stacktop; /* top of the stack, may not be page-aligned */
 	uintcap_t vm_shp_base;	/* shared page pointer */
+
+	struct mtx vm_mtx;
+	LIST_HEAD(, proc) vm_proclist;	/* processes sharing this vmspace */
 	u_int vm_refcnt;	/* number of references */
 #if __has_feature(capabilities)
 	uint64_t vm_prev_cid;	/* (d) last compartment ID allocated */
@@ -386,6 +389,9 @@ struct vmspace {
 	 */
 	struct pmap vm_pmap;	/* private physical map */
 };
+
+#define	VMSPACE_LOCK(vm)	mtx_lock(&(vm)->vm_mtx)
+#define	VMSPACE_UNLOCK(vm)	mtx_unlock(&(vm)->vm_mtx)
 
 #ifdef	_KERNEL
 static __inline pmap_t
@@ -440,6 +446,8 @@ bool vm_map_range_valid_KBI(vm_map_t map, vm_offset_t start, vm_offset_t end);
 			_vm_map_lock_downgrade(map, LOCK_FILE, LOCK_LINE)
 
 long vmspace_resident_count(struct vmspace *vmspace);
+void vmspace_insert_proc(struct vmspace *vm, struct proc *p);
+void vmspace_remove_proc(struct vmspace *vm, struct proc *p);
 #endif	/* _KERNEL */
 
 /*
