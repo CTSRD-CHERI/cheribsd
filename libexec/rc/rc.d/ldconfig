@@ -57,18 +57,10 @@ ldconfig_start()
 
 		case ${machine_arch} in
 		aarch64c)
-			_LDC="/usr/lib/c18n ${_LDC}"
-			startmsg 'Library-based compartmentalization ldconfig path:' ${_LDC}
-			${ldconfig} -f /var/run/ld-elf-c18n.so.hints ${_ins} ${_LDC}
-
 			_LDC=$(ldconfig_paths "${ldconfig_local64cb_dirs}" \
 			    "${ldconfig64cb_paths}" "")
 			startmsg 'Benchmark ABI ldconfig path:' ${_LDC}
 			${ldconfig} -f /var/run/ld-elf64cb.so.hints ${_ins} ${_LDC}
-
-			_LDC="/usr/lib64cb/c18n ${_LDC}"
-			startmsg 'Library-based compartmentalization (benchmark ABI) ldconfig path:' ${_LDC}
-			${ldconfig} -f /var/run/ld-elf64cb-c18n.so.hints ${_ins} ${_LDC}
 			;&
 			# FALLTHROUGH
 		riscv64c)
