@@ -2,7 +2,6 @@ FBSDprivate_1.0 {
     r_debug_comparts_state;
     _compart_size;
     _rtld_c18n_is_enabled;
-    _rtld_tramp_reflect;
     _rtld_thread_start_init;
     _rtld_thread_start;
     _rtld_thr_exit;
@@ -21,6 +20,7 @@ FBSD_1.0 {
     dl_c18n_get_trusted_stack;
     dl_c18n_unwind_trusted_stack;
     dl_c18n_is_trampoline;
+    dl_c18n_unwrap_trampoline;
 };
 
 FBSD_1.1 {

@@ -116,6 +116,7 @@ void *dl_c18n_get_trusted_stack(uintptr_t);
 void dl_c18n_unwind_trusted_stack(void *, void *);
 int dl_c18n_is_trampoline(uintptr_t, void *);
 void *dl_c18n_pop_trusted_stack(struct dl_c18n_compart_state *, void *);
+ptraddr_t dl_c18n_unwrap_trampoline(const void *);
 #endif
 
 #ifdef __ARM_EABI__

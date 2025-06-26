@@ -85,6 +85,7 @@ FBSD_1.0 {
 	dl_c18n_get_trusted_stack;
 	dl_c18n_unwind_trusted_stack;
 	dl_c18n_is_trampoline;
+	dl_c18n_unwrap_trampoline;
 #endif
 	drand48;
 	erand48;

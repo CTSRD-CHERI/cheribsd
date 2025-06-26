@@ -52,7 +52,7 @@ __elf_phdr_match_addr(struct dl_phdr_info *phdr_info, void *addr)
 #ifdef CHERI_LIB_C18N
 	ptraddr_t target;
 
-	target = _rtld_tramp_reflect(addr);
+	target = dl_c18n_unwrap_trampoline(addr);
 	if (target != 0)
 		addr = (void *)(uintptr_t)target;
 #endif
