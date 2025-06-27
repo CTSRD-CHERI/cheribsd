@@ -119,15 +119,10 @@ _Static_assert(
 static uintptr_t sealer_tcb;
 static uintptr_t sealer_trusted_stk;
 
-uintptr_t sealer_pltgot, sealer_tramp;
+uintptr_t sealer_pltgot;
 
 /* Enable compartmentalisation */
 bool ld_compartment_enable;
-
-#ifdef __aarch64__
-/* Enable wrapping function pointers in trampolines */
-bool ld_compartment_fptr;
-#endif
 
 /* Use utrace() to log compartmentalisation-related events */
 const char *ld_compartment_utrace;
@@ -197,6 +192,37 @@ c18n_strdup(const char *s)
 
 	INC_NUM_BYTES(cheri_getlen(buf));
 	return (buf);
+}
+
+static void *
+c18n_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
+{
+	void *ret;
+
+	ret = mmap(addr, len, prot, flags, fd, offset);
+	if (ret == MAP_FAILED) {
+		rtld_fdprintf(STDERR_FILENO,
+		    "c18n: mmap(%#p, %zu, %#x, %#x, %d, %ld) = %s\n",
+		    addr, len, prot, flags, fd, offset, rtld_strerror(errno));
+		abort();
+	}
+
+	return (ret);
+}
+
+static int
+c18n_munmap(void *addr, size_t len)
+{
+	int ret;
+
+	ret = munmap(addr, len);
+	if (ret != 0) {
+		rtld_fdprintf(STDERR_FILENO, "c18n: munmap(%#p, %zu) = %s\n",
+		    addr, len, rtld_strerror(errno));
+		abort();
+	}
+
+	return (ret);
 }
 
 /*
@@ -595,10 +621,6 @@ tramp_should_include(const Plt_Entry *plt, compart_id_t caller,
 	compart_id_t callee;
 	const char *sym;
 
-	/* XXX: This will not be needed once function pointers are wrapped. */
-	if (data->target == NULL)
-		return (false);
-
 	if (data->def == NULL)
 		return (true);
 
@@ -759,10 +781,7 @@ create_stk(size_t size)
 {
 	char *stk;
 
-	stk = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_STACK, -1, 0);
-	if (stk == MAP_FAILED)
-		rtld_fatal("mmap failed");
-
+	stk = c18n_mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_STACK, -1, 0);
 	return (stk + size);
 }
 
@@ -936,13 +955,6 @@ resolve_untrusted_stk_impl(stk_table_index index)
  *
  * APIs exposed to stack unwinders (e.g., libc setjmp/longjmp and libunwind)
  */
-/*
- * Assembly functions that are tail-called when compartmentalisation is
- * disabled.
- */
-uintptr_t _rtld_unw_getcontext_epilogue(uintptr_t, void **);
-struct jmp_args _rtld_unw_setcontext_epilogue(struct jmp_args, void *, void **);
-
 int
 c18n_is_tramp(uintptr_t pc, const struct trusted_frame *tf)
 {
@@ -972,37 +984,6 @@ dl_c18n_get_trusted_stack(uintptr_t pc)
 
 	return (cheri_seal(tf, sealer_trusted_stk));
 }
-
-/*
- * XXX Dapeng: These functions are kept here for compatibility with old libc and
- * libunwind.
- */
-uintptr_t _rtld_setjmp(uintptr_t, void **);
-uintptr_t _rtld_unw_getcontext(uintptr_t, void **);
-
-uintptr_t
-_rtld_setjmp(uintptr_t ret, void **buf)
-{
-	*buf = dl_c18n_get_trusted_stack(0);
-	return (ret);
-}
-
-uintptr_t
-_rtld_unw_getcontext(uintptr_t ret, void **buf)
-{
-	if (!C18N_ENABLED) {
-		__attribute__((musttail))
-		return (_rtld_unw_getcontext_epilogue(ret, buf));
-	}
-	*buf = dl_c18n_get_trusted_stack(0);
-	return (ret);
-}
-
-/*
- * Returning this struct allows us to control the content of unused return value
- * registers.
- */
-struct jmp_args { uintptr_t ret1; uintptr_t ret2; };
 
 void
 dl_c18n_unwind_trusted_stack(void *rcsp, void *target)
@@ -1117,34 +1098,6 @@ dl_c18n_pop_trusted_stack(struct dl_c18n_compart_state *state, void *tfs)
 }
 
 /*
- * XXX Dapeng: These functions are kept here for compatibility with old libc and
- * libunwind.
- */
-struct jmp_args _rtld_longjmp(struct jmp_args, void *, void **);
-struct jmp_args _rtld_unw_setcontext_impl(struct jmp_args, void *, void **);
-
-struct jmp_args
-_rtld_longjmp(struct jmp_args ret, void *rcsp, void **buf)
-{
-	dl_c18n_unwind_trusted_stack(rcsp, *buf);
-	return (ret);
-}
-
-struct jmp_args
-_rtld_unw_setcontext_impl(struct jmp_args ret, void *rcsp, void **buf)
-{
-	dl_c18n_unwind_trusted_stack(rcsp, *buf);
-	return (ret);
-}
-
-uintptr_t _rtld_unw_getsealer(void);
-uintptr_t
-_rtld_unw_getsealer(void)
-{
-	return (sealer_trusted_stk);
-}
-
-/*
  * Trampolines
  */
 struct tramp_pg {
@@ -1162,10 +1115,8 @@ tramp_pg_new(struct tramp_pg *next)
 	size_t capacity = tramp_pg_size;
 	struct tramp_pg *pg;
 
-	pg = mmap(NULL, capacity, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON,
-	    -1, 0);
-	if (pg == MAP_FAILED)
-		rtld_fatal("mmap failed");
+	pg = c18n_mmap(NULL, capacity, PROT_READ | PROT_WRITE | PROT_EXEC,
+	    MAP_ANON, -1, 0);
 	SLIST_NEXT(pg, link) = next;
 	atomic_store_explicit(&pg->size, 0, memory_order_relaxed);
 	pg->capacity = capacity - offsetof(typeof(*pg), trampolines);
@@ -1712,8 +1663,6 @@ _rtld_tramp_reflect(const void *addr)
 /*
  * APIs
  */
-#define	C18N_FUNC_SIG_COUNT	72
-
 static void *
 make_restricted(void *fptr)
 {
@@ -1748,10 +1697,8 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
 			    rtld_strerror(errno));
 	}
 
-	c18n_stats = mmap(NULL, sizeof(*c18n_stats), PROT_READ | PROT_WRITE,
-	    fd == -1 ? MAP_ANON : MAP_SHARED, fd, 0);
-	if (c18n_stats == MAP_FAILED)
-		rtld_fatal("c18n: Cannot mmap file (%s)", rtld_strerror(errno));
+	c18n_stats = c18n_mmap(NULL, sizeof(*c18n_stats),
+	    PROT_READ | PROT_WRITE, fd == -1 ? MAP_ANON : MAP_SHARED, fd, 0);
 	atomic_store_explicit(&c18n_stats->version, RTLD_C18N_STATS_VERSION,
 	    memory_order_release);
 
@@ -1801,14 +1748,6 @@ c18n_init(Obj_Entry *obj_rtld, Elf_Auxinfo *aux_info[])
  */
 #define	MAX_TRAMP_PG_SIZE		(4 * 1024 * 1024)
 
-/*
- * XXX: Manually wrap _rtld_unw_setcontext_impl in a trampoline for now because
- * it is called via a function pointer.
- */
-extern struct jmp_args (*_rtld_unw_setcontext_ptr)(struct jmp_args, void *,
-    void **);
-struct jmp_args (*_rtld_unw_setcontext_ptr)(struct jmp_args, void *, void **);
-
 void
 c18n_init2(Obj_Entry *obj_rtld)
 {
@@ -1829,9 +1768,6 @@ c18n_init2(Obj_Entry *obj_rtld)
 
 	sealer_trusted_stk = cheri_setboundsexact(sealer, 1);
 	sealer += 1;
-
-	sealer_tramp = cheri_setboundsexact(sealer, C18N_FUNC_SIG_COUNT);
-	sealer += C18N_FUNC_SIG_COUNT;
 
 	/*
 	 * All libraries have been loaded. Create and initialise a stack lookup
@@ -1889,20 +1825,6 @@ c18n_init2(Obj_Entry *obj_rtld)
 			.reg_args = 3, .mem_args = false, .ret_args = ONE
 		}
 	});
-
-	/*
-	 * XXX: Manually wrap _rtld_unw_setcontext_impl in a trampoline for now
-	 * because it is called via a function pointer.
-	*/
-	_rtld_unw_setcontext_ptr = tramp_intern(NULL, RTLD_COMPART_ID,
-	    &(struct tramp_data) {
-		.target = &_rtld_unw_setcontext_impl,
-		.defobj = obj_rtld,
-		.sig = (struct func_sig) {
-			.valid = true,
-			.reg_args = 4, .mem_args = false, .ret_args = TWO
-		}
-	});
 }
 
 /*
@@ -1917,19 +1839,8 @@ void _rtld_thr_exit(long *);
 void
 _rtld_thread_start_init(void (*p)(struct pthread *))
 {
-	assert(((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) != 0) ==
-	    C18N_FPTR_ENABLED);
+	assert((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) != 0);
 	assert(thr_thread_start == NULL);
-	if (!C18N_FPTR_ENABLED)
-		p = tramp_intern(NULL, RTLD_COMPART_ID, &(struct tramp_data) {
-			.target = p,
-			.defobj = obj_from_addr(p),
-			.sig = (struct func_sig) {
-				.valid = true,
-				.reg_args = 1, .mem_args = false,
-				.ret_args = NONE
-			}
-		});
 	thr_thread_start = p;
 }
 
@@ -1964,11 +1875,47 @@ identify_untrusted_stk(void *canonical, void *untrusted)
 	return (cheri_is_subset(untrusted, canonical));
 }
 
+static void
+destroy_untrusted_stk(struct stk_table *table, compart_id_t cid)
+{
+	struct stk_table_stk_info *data;
+	size_t size;
+
+	data = &table->meta->compart_stk[cid];
+
+	/*
+	 * Non-zero size indicates that a stack has been allocated. Race to set
+	 * the size to zero and whoever wins gets to unmap the stack.
+	 */
+	size = atomic_load_explicit(&data->size, memory_order_relaxed);
+	do
+		if (size == 0)
+			return;
+	while (!atomic_compare_exchange_weak_explicit(&data->size, &size, 0,
+	    memory_order_relaxed, memory_order_relaxed));
+
+	if (!identify_untrusted_stk(data->begin, table->entries[cid].stack)) {
+		rtld_fdprintf(STDERR_FILENO,
+		    "c18n: Untrusted stack %#p of %s is not derived from %#p\n",
+		    table->entries[cid].stack, comparts.data[cid].name,
+		    data->begin);
+		abort();
+	}
+	c18n_munmap(data->begin, size);
+	*data = (struct stk_table_stk_info) {};
+	table->entries[cid] = (struct stk_table_entry) {
+		.stack = create_untrusted_stk,
+	};
+
+	atomic_fetch_sub_explicit(&c18n_stats->rcs_ustack, 1,
+	    memory_order_relaxed);
+}
+
 void
 _rtld_thr_exit(long *state)
 {
-	size_t i;
 	sigset_t nset;
+	compart_id_t i;
 	struct stk_table_stk_info *data;
 	struct stk_table *table = get_stk_table();
 
@@ -1996,40 +1943,14 @@ _rtld_thr_exit(long *state)
 	/*
 	 * Unmap each compartment's stack.
 	 */
-	for (i = i + 1; i < table->meta->capacity; ++i) {
-		data = &table->meta->compart_stk[i];
-		if (data->size == 0)
-			continue;
-		if (!identify_untrusted_stk(
-		    data->begin, table->entries[i].stack)) {
-			rtld_fdprintf(STDERR_FILENO,
-			    "c18n: Untrusted stack %#p of %s is not derived "
-			    "from %#p\n", table->entries[i].stack,
-			    comparts.data[i].name, data->begin);
-			abort();
-		}
-		if (munmap(data->begin, data->size) != 0) {
-			rtld_fdprintf(STDERR_FILENO,
-			    "c18n: munmap(%#p, %zu) failed\n",
-			    data->begin, data->size);
-			abort();
-		}
-		*data = (struct stk_table_stk_info) {};
-		table->entries[i] = (struct stk_table_entry) {
-			.stack = create_untrusted_stk,
-		};
-	}
+	for (i = i + 1; i < table->meta->capacity; ++i)
+		destroy_untrusted_stk(table, i);
 
 	/*
 	 * Unmap the trusted stack.
 	 */
 	data = &table->meta->trusted_stk;
-	if (munmap(data->begin, data->size) != 0) {
-		rtld_fdprintf(STDERR_FILENO,
-		    "c18n: munmap(%#p, %zu) failed\n",
-		    data->begin, data->size);
-		abort();
-	}
+	c18n_munmap(data->begin, data->size);
 	*data = (struct stk_table_stk_info) {};
 
 	/*
@@ -2072,20 +1993,8 @@ static __siginfohandler_t *signal_dispatcher = sigdispatch;
 void
 _rtld_sighandler_init(__siginfohandler_t *handler)
 {
-	assert(((cheri_getperm(handler) & CHERI_PERM_EXECUTIVE) != 0) ==
-	    C18N_FPTR_ENABLED);
+	assert((cheri_getperm(handler) & CHERI_PERM_EXECUTIVE) != 0);
 	assert(signal_dispatcher == sigdispatch);
-	if (!C18N_FPTR_ENABLED)
-		handler = tramp_intern(NULL, RTLD_COMPART_ID,
-		    &(struct tramp_data) {
-			.target = handler,
-			.defobj = obj_from_addr(handler),
-			.sig = (struct func_sig) {
-				.valid = true,
-				.reg_args = 3, .mem_args = false,
-				.ret_args = NONE
-			}
-		});
 	signal_dispatcher = handler;
 }
 
@@ -2290,7 +2199,6 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 	bool siginfo;
 	void *sigfunc;
 	struct tramp_header *header;
-	const Obj_Entry *defobj;
 	compart_id_t callee;
 	stk_table_index callee_idx;
 	struct stk_table *table;
@@ -2310,8 +2218,7 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 	 * The signal handler must be wrapped by a trampoline if function
 	 * pointer wrapping is enabled.
 	 */
-	if (!cheri_gettag(sigfunc) ||
-	    (C18N_FPTR_ENABLED && header == NULL)) {
+	if (header == NULL) {
 		rtld_fdprintf(STDERR_FILENO,
 		    "c18n: Invalid handler %#p for signal %d\n",
 		    sigfunc, sig);
@@ -2322,18 +2229,8 @@ _rtld_siginvoke(int sig, siginfo_t *info, ucontext_t *ucp,
 	 * If the signal handler is not already wrapped by a trampoline, wrap it
 	 * in one.
 	 */
-	if (!C18N_FPTR_ENABLED && header == NULL) {
-		defobj = obj_from_addr(sigfunc);
-		callee = compart_id_for_address(defobj, (ptraddr_t)sigfunc);
-		sigfunc = tramp_intern(NULL, RTLD_COMPART_ID,
-		    &(struct tramp_data) {
-		    .target = sigfunc,
-		    .defobj = defobj
-		});
-	} else {
-		callee = compart_id_for_address(header->defobj,
-		    (ptraddr_t)header->target);
-	}
+	callee = compart_id_for_address(header->defobj,
+	    (ptraddr_t)header->target);
 	callee_idx = cid_to_index(callee);
 
 	/*
