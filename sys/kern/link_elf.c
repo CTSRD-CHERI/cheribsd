@@ -2025,11 +2025,10 @@ link_elf_symbol_values1(linker_file_t lf, c_linker_sym_t sym,
 			return (ENOENT);
 		symval->name = ef->strtab + es->st_name;
 		val = ef_symbol_address(ef, es);
-		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC) {
+		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC)
 			link_elf_ifunc_symbol_value(lf, &val, &size);
-		} else {
+		else
 			size = es->st_size;
-		}
 		symval->value = val;
 		symval->size = size;
 		return (0);
@@ -2063,11 +2062,10 @@ link_elf_debug_symbol_values(linker_file_t lf, c_linker_sym_t sym,
 	if (es >= ef->ddbsymtab && es < (ef->ddbsymtab + ef->ddbsymcnt)) {
 		symval->name = ef->ddbstrtab + es->st_name;
 		val = ef_symbol_address(ef, es);
-		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC) {
+		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC)
 			link_elf_ifunc_symbol_value(lf, &val, &size);
-		} else {
+		else
 			size = es->st_size;
-		}
 		symval->value = val;
 		symval->size = size;
 		return (0);

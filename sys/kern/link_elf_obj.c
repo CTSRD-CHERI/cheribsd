@@ -1633,11 +1633,10 @@ link_elf_symbol_values1(linker_file_t lf, c_linker_sym_t sym,
 #ifdef __CHERI_PURE_CAPABILITY__
 		val = make_capability(es, val);
 #endif
-		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC) {
+		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC)
 			link_elf_ifunc_symbol_value(lf, &val, &size);
-		} else {
+		else
 			size = es->st_size;
-		}
 		symval->value = val;
 		symval->size = size;
 		return (0);
