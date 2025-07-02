@@ -1584,13 +1584,11 @@ static void
 link_elf_ifunc_symbol_value(linker_file_t lf, caddr_t *valp, size_t *sizep)
 {
 	c_linker_sym_t sym;
-	elf_file_t ef;
 	const Elf_Sym *es;
 	caddr_t val;
 	long off;
 
 	val = *valp;
-	ef = (elf_file_t)lf;
 
 	/* Provide the value and size of the target symbol, if available. */
 	val = ((caddr_t (*)(void))val)();
@@ -1598,10 +1596,9 @@ link_elf_ifunc_symbol_value(linker_file_t lf, caddr_t *valp, size_t *sizep)
 	    off == 0) {
 		es = (const Elf_Sym *)sym;
 #ifdef __CHERI_PURE_CAPABILITY__
-		(void)ef;
 		*valp = val;
 #else
-		*valp = (caddr_t)ef->address + es->st_value;
+		*valp = (caddr_t)es->st_value;
 #endif
 		*sizep = es->st_size;
 	} else {
