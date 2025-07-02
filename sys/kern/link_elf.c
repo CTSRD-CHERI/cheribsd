@@ -1798,6 +1798,36 @@ link_elf_lookup_debug_symbol_ctf(linker_file_t lf, const char *name,
 	return (i < ef->ddbsymcnt ? link_elf_ctf_get_ddb(lf, lc) : ENOENT);
 }
 
+static void
+link_elf_ifunc_symbol_value(linker_file_t lf, caddr_t *valp, size_t *sizep)
+{
+	c_linker_sym_t sym;
+	elf_file_t ef;
+	const Elf_Sym *es;
+	caddr_t val;
+	long off;
+
+	val = *valp;
+	ef = (elf_file_t)lf;
+
+	/* Provide the value and size of the target symbol, if available. */
+	val = ((caddr_t (*)(void))val)();
+	if (link_elf_search_symbol(lf, (ptraddr_t)val, &sym, &off) == 0 &&
+	    off == 0) {
+		es = (const Elf_Sym *)sym;
+#ifdef __CHERI_PURE_CAPABILITY__
+		(void)ef;
+		*valp = val;
+#else
+		*valp = (caddr_t)ef->address + es->st_value;
+#endif
+		*sizep = es->st_size;
+	} else {
+		*valp = val;
+		*sizep = 0;
+	}
+}
+
 static int
 link_elf_symbol_values1(linker_file_t lf, c_linker_sym_t sym,
     linker_symval_t *symval, bool see_local)
@@ -1805,6 +1835,7 @@ link_elf_symbol_values1(linker_file_t lf, c_linker_sym_t sym,
 	elf_file_t ef;
 	const Elf_Sym *es;
 	caddr_t val;
+	size_t size;
 
 	ef = (elf_file_t)lf;
 	es = (const Elf_Sym *)sym;
@@ -1816,10 +1847,13 @@ link_elf_symbol_values1(linker_file_t lf, c_linker_sym_t sym,
 #ifdef __CHERI_PURE_CAPABILITY__
 		val = make_capability(es, val);
 #endif
-		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC)
-			val = ((caddr_t (*)(void))val)();
+		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC) {
+			link_elf_ifunc_symbol_value(lf, &val, &size);
+		} else {
+			size = es->st_size;
+		}
 		symval->value = val;
-		symval->size = es->st_size;
+		symval->size = size;
 		return (0);
 	}
 	return (ENOENT);
@@ -1841,6 +1875,7 @@ link_elf_debug_symbol_values(linker_file_t lf, c_linker_sym_t sym,
 	elf_file_t ef = (elf_file_t)lf;
 	const Elf_Sym *es = (const Elf_Sym *)sym;
 	caddr_t val;
+	size_t size;
 
 	if (link_elf_symbol_values1(lf, sym, symval, true) == 0)
 		return (0);
@@ -1853,10 +1888,13 @@ link_elf_debug_symbol_values(linker_file_t lf, c_linker_sym_t sym,
 #ifdef __CHERI_PURE_CAPABILITY__
 		val = make_capability(es, val);
 #endif
-		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC)
-			val = ((caddr_t (*)(void))val)();
+		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC) {
+			link_elf_ifunc_symbol_value(lf, &val, &size);
+		} else {
+			size = es->st_size;
+		}
 		symval->value = val;
-		symval->size = es->st_size;
+		symval->size = size;
 		return (0);
 	}
 	return (ENOENT);
