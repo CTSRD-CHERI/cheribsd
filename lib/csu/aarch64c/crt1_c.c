@@ -46,15 +46,6 @@
 #ifndef PIC
 #define	CHERI_INIT_RELA
 
-#define	RODATA_PTR(x) ({						\
-	__typeof__(x) *_p;						\
-									\
-	__asm__ (							\
-	    "adrp %0, " __STRING(x) "\n\t"				\
-	    "add %0, %0, :lo12:" __STRING(x) "\n\t"			\
-	    : "=C" (_p));						\
-	_p; })
-
 #include "caprel.h"
 
 #include "crt_init_globals.c"

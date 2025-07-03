@@ -220,4 +220,20 @@
 #define	_CHERI_EXCCODE_RESERVED1e	0x1e
 #define	_CHERI_EXCCODE_RESERVED1f	0x1f
 
+/*
+ * Derive an unbounded pointer to a named symbol before initial
+ * relocation.  For purecap, derive the pointer from PCC.
+ */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	CHERI_RODATA_PTR(x) ({						\
+	__typeof__(x) *_p;						\
+									\
+	__asm__ (							\
+	    "cllc %0, " __STRING(x) "\n\t"				\
+	    : "=C" (_p));						\
+	_p; })
+#else
+#define	CHERI_RODATA_PTR(x)	(&x)
+#endif
+
 #endif /* !_MACHINE_CHERIREG_H_ */
