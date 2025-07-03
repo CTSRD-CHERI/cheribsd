@@ -46,6 +46,7 @@
  */
 
 #include "opt_hwpmc_hooks.h"
+#include "opt_hwt_hooks.h"
 #include "opt_vm.h"
 
 #define	EXTERR_CATEGORY	EXTERR_CAT_MMAP
@@ -101,6 +102,10 @@
 
 #ifdef HWPMC_HOOKS
 #include <sys/pmckern.h>
+#endif
+
+#ifdef HWT_HOOKS
+#include <dev/hwt/hwt_hook.h>
 #endif
 
 #if __has_feature(capabilities)
@@ -964,6 +969,17 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 	}
 #endif
 	rv = vm_map_remove_locked(map, addr, addr + size);
+
+#ifdef HWT_HOOKS
+	if (HWT_HOOK_INSTALLED && rv == KERN_SUCCESS) {
+		struct hwt_record_entry ent;
+
+		ent.addr = (uintptr_t) addr;
+		ent.fullpath = NULL;
+		ent.record_type = HWT_RECORD_MUNMAP;
+		HWT_CALL_HOOK(td, HWT_RECORD, &ent);
+	}
+#endif
 
 #ifdef HWPMC_HOOKS
 	if (rv == KERN_SUCCESS && __predict_false(pmc_handled)) {

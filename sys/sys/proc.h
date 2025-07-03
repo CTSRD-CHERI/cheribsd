@@ -915,6 +915,8 @@ struct proc {
 #define	P2_CHERI_REVOKE_MASK \
 	(P2_CHERI_REVOKE_ENABLE | P2_CHERI_REVOKE_DISABLE)
 
+#define	P2_HWT			0x02000000	/* Process is using HWT. */
+
 /* Flags protected by proctree_lock, kept in p_treeflags. */
 #define	P_TREE_ORPHANED		0x00000001	/* Reparented, on orphan list */
 #define	P_TREE_FIRST_ORPHAN	0x00000002	/* First element of orphan
