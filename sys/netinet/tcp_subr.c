@@ -2722,8 +2722,12 @@ tcp_ktlslist_locked(SYSCTL_HANDLER_ARGS, bool export_keys)
 				    ksr->snd_tag->sw->snd_tag_status_str !=
 				    NULL) {
 					sz = SND_TAG_STATUS_MAXLEN;
+					in_pcbref(inp);
+					INP_RUNLOCK(inp);
 					ksr->snd_tag->sw->snd_tag_status_str(
 					    ksr->snd_tag, NULL, &sz);
+					if (in_pcbrele_rlock(inp))
+						return (EDEADLK);
 					len += sz;
 				}
 			}
@@ -2741,8 +2745,12 @@ tcp_ktlslist_locked(SYSCTL_HANDLER_ARGS, bool export_keys)
 				    kss->snd_tag->sw->snd_tag_status_str !=
 				    NULL) {
 					sz = SND_TAG_STATUS_MAXLEN;
+					in_pcbref(inp);
+					INP_RUNLOCK(inp);
 					kss->snd_tag->sw->snd_tag_status_str(
 					    kss->snd_tag, NULL, &sz);
+					if (in_pcbrele_rlock(inp))
+						return (EDEADLK);
 					len += sz;
 				}
 			}
@@ -2813,8 +2821,12 @@ tcp_ktlslist_locked(SYSCTL_HANDLER_ARGS, bool export_keys)
 			if (ksr->snd_tag != NULL &&
 			    ksr->snd_tag->sw->snd_tag_status_str != NULL) {
 				sz = SND_TAG_STATUS_MAXLEN;
+				in_pcbref(inp);
+				INP_RUNLOCK(inp);
 				ksr->snd_tag->sw->snd_tag_status_str(
 				    ksr->snd_tag, buf + len, &sz);
+				if (in_pcbrele_rlock(inp))
+					return (EDEADLK);
 				len += sz;
 			}
 		}
@@ -2830,8 +2842,12 @@ tcp_ktlslist_locked(SYSCTL_HANDLER_ARGS, bool export_keys)
 			if (kss->snd_tag != NULL &&
 			    kss->snd_tag->sw->snd_tag_status_str != NULL) {
 				sz = SND_TAG_STATUS_MAXLEN;
+				in_pcbref(inp);
+				INP_RUNLOCK(inp);
 				kss->snd_tag->sw->snd_tag_status_str(
 				    kss->snd_tag, buf + len, &sz);
+				if (in_pcbrele_rlock(inp))
+					return (EDEADLK);
 				len += sz;
 			}
 		}
@@ -2855,6 +2871,10 @@ tcp_ktlslist_locked(SYSCTL_HANDLER_ARGS, bool export_keys)
 
 	zfree(buf, M_TEMP);
 	return (error);
+
+again_reset:
+	req->oldidx = 0;
+	goto again;
 }
 
 static int
