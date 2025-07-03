@@ -42,11 +42,12 @@
 #include <sys/systm.h>
 #include <sys/sysproto.h>
 #include <sys/capsicum.h>
+#include <sys/exterrvar.h>
 #include <sys/filedesc.h>
 #include <sys/filio.h>
 #include <sys/fcntl.h>
 #include <sys/file.h>
-#include <sys/exterrvar.h>
+#include <sys/inotify.h>
 #include <sys/lock.h>
 #include <sys/proc.h>
 #include <sys/signalvar.h>
@@ -1002,7 +1003,6 @@ int
 kern_specialfd(struct thread *td, int type, void * __capability arg)
 {
 	struct file *fp;
-	struct specialfd_eventfd * __capability ae;
 	int error, fd, fflags;
 
 	fflags = 0;
@@ -1011,12 +1011,22 @@ kern_specialfd(struct thread *td, int type, void * __capability arg)
 		return (error);
 
 	switch (type) {
-	case SPECIALFD_EVENTFD:
+	case SPECIALFD_EVENTFD: {
+		struct specialfd_eventfd * __capability ae;
+
 		ae = arg;
 		if ((ae->flags & EFD_CLOEXEC) != 0)
 			fflags |= O_CLOEXEC;
 		error = eventfd_create_file(td, fp, ae->initval, ae->flags);
 		break;
+	}
+	case SPECIALFD_INOTIFY: {
+		struct specialfd_inotify * __capability si;
+
+		si = arg;
+		error = inotify_create_file(td, fp, si->flags, &fflags);
+		break;
+	}
 	default:
 		error = EINVAL;
 		break;
@@ -1034,11 +1044,12 @@ int
 user_specialfd(struct thread *td, int type, const void * __capability req,
     size_t len)
 {
-	struct specialfd_eventfd ae;
 	int error;
 
 	switch (type) {
-	case SPECIALFD_EVENTFD:
+	case SPECIALFD_EVENTFD: {
+		struct specialfd_eventfd ae;
+
 		if (len != sizeof(struct specialfd_eventfd)) {
 			error = EINVAL;
 			break;
@@ -1053,6 +1064,20 @@ user_specialfd(struct thread *td, int type, const void * __capability req,
 		}
 		error = kern_specialfd(td, type, &ae);
 		break;
+	}
+	case SPECIALFD_INOTIFY: {
+		struct specialfd_inotify si;
+
+		if (len != sizeof(si)) {
+			error = EINVAL;
+			break;
+		}
+		error = copyin(req, &si, sizeof(si));
+		if (error != 0)
+			break;
+		error = kern_specialfd(td, type, &si);
+		break;
+	}
 	default:
 		error = EINVAL;
 		break;

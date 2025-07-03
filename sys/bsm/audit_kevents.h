@@ -663,7 +663,8 @@
 #define	AUE_FSPACECTL		43269	/* FreeBSD-specific. */
 #define	AUE_TIMERFD		43270	/* FreeBSD/Linux. */
 #define	AUE_SETCRED		43271	/* FreeBSD-specific. */
-#define	AUE_MSETNAME		43272	/* FreeBSD-specific. */
+#define	AUE_INOTIFY		43272	/* FreeBSD/Linux. */
+#define	AUE_MSETNAME		43273	/* FreeBSD-specific. */
 
 /*
  * Darwin BSM uses a number of AUE_O_* definitions, which are aliased to the
