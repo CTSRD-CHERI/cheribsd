@@ -87,6 +87,7 @@ SRCS+= \
 	getvfsbyname.c \
 	glob.c \
 	initgroups.c \
+	inotify.c \
 	isatty.c \
 	isinf.c \
 	isnan.c \
