@@ -35,6 +35,7 @@
 
 #if __has_feature(capabilities)
 #define	cheri_capmode(cap)	cheri_setflags(cap, CHERI_FLAGS_CAP_MODE)
+#define	cheri_intmode(cap)	cheri_setflags(cap, CHERI_FLAGS_INT_MODE)
 #endif
 
 #ifdef _KERNEL
