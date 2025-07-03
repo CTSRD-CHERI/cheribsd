@@ -601,7 +601,9 @@ dof_hdr(dtrace_hdl_t *dtp, uint8_t dofversion, dof_hdr_t *hp)
 	hp->dofh_ident[DOF_ID_MAG2] = DOF_MAG_MAG2;
 	hp->dofh_ident[DOF_ID_MAG3] = DOF_MAG_MAG3;
 
-	if (dtp->dt_conf.dtc_ctfmodel == CTF_MODEL_LP64)
+	if (dtp->dt_conf.dtc_ctfmodel == CTF_MODEL_P128)
+		hp->dofh_ident[DOF_ID_MODEL] = DOF_MODEL_P128;
+	else if (dtp->dt_conf.dtc_ctfmodel == CTF_MODEL_LP64)
 		hp->dofh_ident[DOF_ID_MODEL] = DOF_MODEL_LP64;
 	else
 		hp->dofh_ident[DOF_ID_MODEL] = DOF_MODEL_ILP32;
@@ -813,7 +815,7 @@ dtrace_dof_create(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t flags)
 		dofe.dofe_uarg = edp->dted_uarg;
 
 		(void) dof_add_lsect(ddo, &dofe, DOF_SECT_ECBDESC,
-		    sizeof (uint64_t), 0, 0, sizeof (dof_ecbdesc_t));
+		    sizeof (dtrace_uarg_t), 0, 0, sizeof (dof_ecbdesc_t));
 	}
 
 	/*

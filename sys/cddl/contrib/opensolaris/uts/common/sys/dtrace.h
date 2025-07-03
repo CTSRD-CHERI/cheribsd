@@ -105,6 +105,7 @@ typedef int64_t dtrace_aggvarid_t;	/* aggregation variable identifier */
 typedef uint16_t dtrace_actkind_t;	/* action kind */
 typedef int64_t dtrace_optval_t;	/* option value */
 typedef uint32_t dtrace_cacheid_t;	/* predicate cache identifier */
+typedef uint64ptr_t dtrace_uarg_t;	/* user argument cookie */
 
 typedef enum dtrace_probespec {
 	DTRACE_PROBESPEC_NONE = -1,
@@ -209,6 +210,14 @@ typedef enum dtrace_probespec {
 #define	DIF_OP_RLDX	77		/* rldx  [r1], rd */
 #define	DIF_OP_XLATE	78		/* xlate xlrindex, rd */
 #define	DIF_OP_XLARG	79		/* xlarg xlrindex, rd */
+
+/*
+ * CHERI-specific opcodes.
+ */
+#define	DIF_OP_LDC	90		/* ldc [r1], rd */
+#define	DIF_OP_ULDC	91		/* uldc [r1], rd */
+#define	DIF_OP_RLDC	92		/* rldc [r1], rd */
+#define	DIF_OP_STC	93		/* stc r1, [rd] */
 
 #define	DIF_INTOFF_MAX		0xffff	/* highest integer table offset */
 #define	DIF_STROFF_MAX		0xffff	/* highest string table offset */
@@ -665,6 +674,7 @@ typedef struct dof_hdr {
 #define	DOF_MODEL_NONE	0	/* DOF_ID_MODEL */
 #define	DOF_MODEL_ILP32	1
 #define	DOF_MODEL_LP64	2
+#define	DOF_MODEL_P128	3
 
 #ifdef _LP64
 #define	DOF_MODEL_NATIVE	DOF_MODEL_LP64
@@ -747,18 +757,12 @@ typedef struct dof_sec {
 	((x) == DOF_SECT_XLEXPORT) ||  ((x) == DOF_SECT_PREXPORT) || 	\
 	((x) == DOF_SECT_PRENOFFS))
 
-#if __has_feature(capabilities)
-typedef kuintcap_t dtrace_uarg_t;
-#else
-typedef uint64_t dtrace_uarg_t;
-#endif
-
 typedef struct dof_ecbdesc {
 	dof_secidx_t dofe_probes;	/* link to DOF_SECT_PROBEDESC */
 	dof_secidx_t dofe_pred;		/* link to DOF_SECT_DIFOHDR */
 	dof_secidx_t dofe_actions;	/* link to DOF_SECT_ACTDESC */
 	uint32_t dofe_pad;		/* reserved for future use */
-	uint64_t dofe_uarg;		/* user-supplied library argument */
+	dtrace_uarg_t dofe_uarg;	/* user-supplied library argument */
 } dof_ecbdesc_t;
 
 typedef struct dof_probedesc {
@@ -775,20 +779,9 @@ typedef struct dof_actdesc {
 	dof_secidx_t dofa_strtab;	/* link to DOF_SECT_STRTAB section */
 	uint32_t dofa_kind;		/* action kind (DTRACEACT_* constant) */
 	uint32_t dofa_ntuple;		/* number of subsequent tuple actions */
-	uint64_t dofa_arg;		/* kind-specific argument */
+	dtrace_uarg_t dofa_arg;		/* kind-specific argument */
 	dtrace_uarg_t dofa_uarg;	/* user-supplied argument */
 } dof_actdesc_t;
-
-#if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
-typedef struct dof_actdesc64 {
-	dof_secidx_t dofa_difo;		/* link to DOF_SECT_DIFOHDR */
-	dof_secidx_t dofa_strtab;	/* link to DOF_SECT_STRTAB section */
-	uint32_t dofa_kind;		/* action kind (DTRACEACT_* constant) */
-	uint32_t dofa_ntuple;		/* number of subsequent tuple actions */
-	uint64_t dofa_arg;		/* kind-specific argument */
-	uint64_t dofa_uarg;
-} dof_actdesc64_t;
-#endif
 
 typedef struct dof_difohdr {
 	dtrace_diftype_t dofd_rtype;	/* return type for this fragment */
@@ -956,8 +949,8 @@ typedef struct dtrace_actdesc {
 	struct dtrace_actdesc *dtad_next;	/* next action */
 	dtrace_actkind_t dtad_kind;		/* kind of action */
 	uint32_t dtad_ntuple;			/* number in tuple */
-	uint64_t dtad_arg;			/* action argument */
-	dtrace_uarg_t dtad_uarg;			/* user argument */
+	dtrace_uarg_t dtad_arg;			/* action argument */
+	dtrace_uarg_t dtad_uarg;		/* user argument */
 	int dtad_refcnt;			/* reference count */
 } dtrace_actdesc_t;
 
@@ -965,7 +958,7 @@ typedef struct dtrace_ecbdesc {
 	dtrace_actdesc_t *dted_action;		/* action description(s) */
 	dtrace_preddesc_t dted_pred;		/* predicate description */
 	dtrace_probedesc_t dted_probe;		/* probe description */
-	uint64_t dted_uarg;			/* library argument */
+	dtrace_uarg_t dted_uarg;		/* library argument */
 	int dted_refcnt;			/* reference count */
 } dtrace_ecbdesc_t;
 
@@ -992,41 +985,18 @@ typedef struct dtrace_recdesc {
 	uint32_t dtrd_offset;			/* offset in ECB's data */
 	uint16_t dtrd_alignment;		/* required alignment */
 	uint16_t dtrd_format;			/* format, if any */
-	uint64_t dtrd_arg;			/* action argument */
+	dtrace_uarg_t dtrd_arg;			/* action argument */
 	dtrace_uarg_t dtrd_uarg;		/* user argument */
 } dtrace_recdesc_t;
-
-#if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
-typedef struct dtrace_recdesc64 {
-	dtrace_actkind_t dtrd_action;		/* kind of action */
-	uint32_t dtrd_size;			/* size of record */
-	uint32_t dtrd_offset;			/* offset in ECB's data */
-	uint16_t dtrd_alignment;		/* required alignment */
-	uint16_t dtrd_format;			/* format, if any */
-	uint64_t dtrd_arg;			/* action argument */
-	uint64_t dtrd_uarg;			/* user argument */
-} dtrace_recdesc64_t;
-#endif
 
 typedef struct dtrace_eprobedesc {
 	dtrace_epid_t dtepd_epid;		/* enabled probe ID */
 	dtrace_id_t dtepd_probeid;		/* probe ID */
-	uint64_t dtepd_uarg;			/* library argument */
+	dtrace_uarg_t dtepd_uarg;		/* library argument */
 	uint32_t dtepd_size;			/* total size */
 	int dtepd_nrecs;			/* number of records */
 	dtrace_recdesc_t dtepd_rec[1];		/* records themselves */
 } dtrace_eprobedesc_t;
-
-#if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
-typedef struct dtrace_eprobedesc64 {
-	dtrace_epid_t dtepd_epid;		/* enabled probe ID */
-	dtrace_id_t dtepd_probeid;		/* probe ID */
-	uint64_t dtepd_uarg;			/* library argument */
-	uint32_t dtepd_size;			/* total size */
-	int dtepd_nrecs;			/* number of records */
-	dtrace_recdesc64_t dtepd_rec[1];	/* records themselves */
-} dtrace_eprobedesc64_t;
-#endif
 
 typedef struct dtrace_aggdesc {
 	DTRACE_PTR(char, dtagd_name);		/* not filled in by kernel */
@@ -1040,33 +1010,11 @@ typedef struct dtrace_aggdesc {
 	dtrace_recdesc_t dtagd_rec[1];		/* record descriptions */
 } dtrace_aggdesc_t;
 
-#if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
-typedef struct dtrace_aggdesc64 {
-	uint64_t tagd_name; // char *		/* not filled in by kernel */
-	dtrace_aggvarid_t dtagd_varid;		/* not filled in by kernel */
-	int dtagd_flags;			/* not filled in by kernel */
-	dtrace_aggid_t dtagd_id;		/* aggregation ID */
-	dtrace_epid_t dtagd_epid;		/* enabled probe ID */
-	uint32_t dtagd_size;			/* size in bytes */
-	int dtagd_nrecs;			/* number of records */
-	uint32_t dtagd_pad;			/* explicit padding */
-	dtrace_recdesc64_t dtagd_rec[1];		/* record descriptions */
-} dtrace_aggdesc64_t;
-#endif
-
 typedef struct dtrace_fmtdesc {
 	DTRACE_PTR(char, dtfd_string);		/* format string */
 	int dtfd_length;			/* length of format string */
 	uint16_t dtfd_format;			/* format identifier */
 } dtrace_fmtdesc_t;
-
-#if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
-typedef struct dtrace_fmtdesc64 {
-	uint64_t dtfd_string; // char *		/* format string */
-	int dtfd_length;			/* length of format string */
-	uint16_t dtfd_format;			/* format identifier */
-} dtrace_fmtdesc64_t;
-#endif
 
 #define	DTRACE_SIZEOF_EPROBEDESC(desc)				\
 	(sizeof (dtrace_eprobedesc_t) + ((desc)->dtepd_nrecs ?	\
@@ -1159,18 +1107,6 @@ typedef struct dtrace_bufdesc {
 	uint64_t dtbd_timestamp;		/* hrtime of snapshot */
 } dtrace_bufdesc_t;
 
-#if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
-typedef struct dtrace_bufdesc64 {
-	uint64_t dtbd_size;			/* size of buffer */
-	uint32_t dtbd_cpu;			/* CPU or DTRACE_CPUALL */
-	uint32_t dtbd_errors;			/* number of errors */
-	uint64_t dtbd_drops;			/* number of drops */
-	uint64_t dtbd_data; // char *		/* data */
-	uint64_t dtbd_oldest;			/* offset of oldest record */
-	uint64_t dtbd_timestamp;		/* hrtime of snapshot */
-} dtrace_bufdesc64_t;
-#endif
-
 /*
  * Each record in the buffer (dtbd_data) begins with a header that includes
  * the epid and a timestamp.  The timestamp is split into two 4-byte parts
@@ -1257,6 +1193,7 @@ typedef struct dtrace_conf {
 #define	DTRACEFLT_UPRIV			7	/* Illegal user access */
 #define	DTRACEFLT_TUPOFLOW		8	/* Tuple stack overflow */
 #define	DTRACEFLT_BADSTACK		9	/* Bad stack */
+#define	DTRACEFLT_CHERI			10	/* CHERI exception */
 
 #define	DTRACEFLT_LIBRARY		1000	/* Library-level fault */
 
@@ -1389,13 +1326,6 @@ typedef struct {
 	int	n_matched;	/* # matches returned by driver. */
 } dtrace_enable_io_t;
 
-#if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
-typedef struct {
-	uint64_t dof;		/* DOF userland address written to driver. */
-	int n_matched;		/* # matches returned by driver. */
-} dtrace_enable_io64_t;
-#endif
-
 #define	DTRACEIOC_ENABLE	_IOWR('x',6,dtrace_enable_io_t)
 							/* enable probes */
 #define	DTRACEIOC_AGGSNAP	_IOW('x',7,dtrace_bufdesc_t * __kerncap)
@@ -1421,15 +1351,6 @@ typedef struct {
 #define	DTRACEIOC_REPLICATE	_IOW('x',18,dtrace_repldesc_t)	
 							/* replicate enab */
 
-#if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
-#define DTRACEIOC_BUFSNAP64 _IOC_NEWTYPE(DTRACEIOC_BUFSNAP, uint64_t)
-#define DTRACEIOC_ENABLE64  _IOC_NEWTYPE(DTRACEIOC_ENABLE, dtrace_enable_io64_t)
-#define DTRACEIOC_AGGSNAP64 _IOC_NEWTYPE(DTRACEIOC_AGGSNAP, uint64_t)
-#define DTRACEIOC_EPROBE64  _IOC_NEWTYPE(DTRACEIOC_EPROBE, uint64_t)
-#define DTRACEIOC_AGGDESC64 _IOC_NEWTYPE(DTRACEIOC_AGGDESC, uint64_t)
-#define DTRACEIOC_FORMAT64  _IOC_NEWTYPE(DTRACEIOC_FORMAT, dtrace_fmtdesc64_t)
-#define DTRACEIOC_DOFGET64  _IOC_NEWTYPE(DTRACEIOC_DOFGET, uint64_t)
-#endif
 #endif
 
 /*
@@ -1780,7 +1701,7 @@ typedef struct dof_helper {
  *   dtrace_register(), dtrace_unregister(), dtrace_invalidate(), and
  *   dtrace_condense().
  *
- * 1.9  uint64_t dtps_getargval(void *arg, dtrace_id_t id, void *parg,
+ * 1.9  uint64ptr_t dtps_getargval(void *arg, dtrace_id_t id, void *parg,
  *               int argno, int aframes)
  *
  * 1.9.1  Overview
@@ -2230,7 +2151,7 @@ typedef struct dtrace_pops {
 	void (*dtps_resume)(void *arg, dtrace_id_t id, void *parg);
 	void (*dtps_getargdesc)(void *arg, dtrace_id_t id, void *parg,
 	    dtrace_argdesc_t *desc);
-	uint64_t (*dtps_getargval)(void *arg, dtrace_id_t id, void *parg,
+	uint64ptr_t (*dtps_getargval)(void *arg, dtrace_id_t id, void *parg,
 	    int argno, int aframes);
 	int (*dtps_usermode)(void *arg, dtrace_id_t id, void *parg);
 	void (*dtps_destroy)(void *arg, dtrace_id_t id, void *parg);
@@ -2513,11 +2434,17 @@ extern void dtrace_helpers_destroy(proc_t *);
 #define	DTRACE_CPUFLAG_ISSET(flag) \
 	(cpu_core[curcpu].cpuc_dtrace_flags & (flag))
 
-#define	DTRACE_CPUFLAG_SET(flag) \
-	(cpu_core[curcpu].cpuc_dtrace_flags |= (flag))
+#define	DTRACE_CPUFLAG_SET(flag) do {				\
+	__compiler_membar();					\
+	cpu_core[curcpu].cpuc_dtrace_flags |= (flag);		\
+	__compiler_membar();					\
+} while (0)
 
-#define	DTRACE_CPUFLAG_CLEAR(flag) \
-	(cpu_core[curcpu].cpuc_dtrace_flags &= ~(flag))
+#define	DTRACE_CPUFLAG_CLEAR(flag) do {				\
+	__compiler_membar();					\
+	cpu_core[curcpu].cpuc_dtrace_flags &= ~(flag);		\
+	__compiler_membar();					\
+} while (0)
 
 #endif /* _KERNEL */
 
@@ -2586,10 +2513,18 @@ extern int dtrace_instr_c_ret(uint32_t **instr);
 
 #define	NOP_INSTR	0xd503201f
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	RET_INSTR	0xc2c253c0
+#else
 #define	RET_INSTR	0xd65f03c0
+#endif
 
 #define	SUB_MASK	0xffc00000
 #define	SUB_INSTR	0xd1000000
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	SUBC_MASK	0xff800000
+#define	SUBC_INSTR	0x02800000
+#endif
 #define	SUB_RD_SHIFT	0
 #define	SUB_RN_SHIFT	5
 #define	SUB_R_MASK	0x1f
@@ -2601,6 +2536,10 @@ extern int dtrace_instr_c_ret(uint32_t **instr);
 #define	STP_64		0xa9800000
 #define	LDP_32		0x28c00000
 #define	LDP_64		0xa8c00000
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	STP_C_POSTIND	0x22800000
+#define	STP_C_PREIND	0x62800000
+#endif
 #define	LDP_STP_PREIND	(1 << 24)
 #define	LDP_STP_DIR	(1 << 22) /* Load instruction */
 #define	ARG1_SHIFT	0
