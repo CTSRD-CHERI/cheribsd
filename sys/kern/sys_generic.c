@@ -2426,6 +2426,12 @@ kern_exterrctl(struct thread *td, u_int op, u_int flags,
 			return (EINVAL);
 		td->td_pflags2 &= ~TDP2_UEXTERR;
 		return (0);
+	case EXTERRCTL_UD:
+		/*
+		 * Important: this code must always return EINVAL and never any
+		 * extended error, for testing purposes.
+		 */
+		/* FALLTHROUGH */
 	default:
 		return (EINVAL);
 	}
