@@ -89,6 +89,8 @@ _cheri_capability_build_user_code(struct thread *td, uint32_t perms,
 
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
 		tmpcap = cheri_capmode(tmpcap);
+	else
+		tmpcap = cheri_intmode(tmpcap);
 
 	return (cheri_sentry_create(tmpcap));
 }
