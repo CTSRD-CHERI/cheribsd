@@ -665,9 +665,9 @@ SOURCE_DATE_EPOCH=	${TIMEEPOCHNOW:gmtime}
 SOURCE_DATE_EPOCH=	${PKG_TIMESTAMP}
 .endif
 
-PKG_NAME_PREFIX?=	FreeBSD
+PKG_NAME_PREFIX?=	CheriBSD
 PKG_MAINTAINER?=	re@FreeBSD.org
-PKG_WWW?=		https://www.FreeBSD.org
+PKG_WWW?=		https://www.CheriBSD.org
 .export PKG_NAME_PREFIX
 .export PKG_MAINTAINER
 .export PKG_WWW
