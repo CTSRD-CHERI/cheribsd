@@ -313,7 +313,7 @@ static TAILQ_HEAD(,kaiocb) aio_jobs;			/* (c) Async job list */
 static struct unrhdr *aiod_unr;
 
 static void	aio_biocleanup(struct bio *bp);
-void		aio_init_aioinfo(struct proc *p);
+static void	aio_init_aioinfo(struct proc *p);
 static int	aio_onceonly(void);
 static int	aio_free_entry(struct kaiocb *job);
 static void	aio_process_rw(struct kaiocb *job);
@@ -436,7 +436,7 @@ aio_onceonly(void)
  * Init the per-process aioinfo structure.  The aioinfo limits are set
  * per-process for user limit (resource) management.
  */
-void
+static void
 aio_init_aioinfo(struct proc *p)
 {
 	struct kaioinfo *ki;
@@ -1520,7 +1520,7 @@ static struct aiocb_ops aiocb_ops_osigevent = {
  * Queue a new AIO request.  Choosing either the threaded or direct bio VCHR
  * technique is done in this code.
  */
-int
+static int
 aio_aqueue(struct thread *td, struct aiocb * __capability ujob,
     struct aioliojob *lj, int type, struct aiocb_ops *ops)
 {
