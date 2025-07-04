@@ -826,15 +826,15 @@ init_stk_table(struct stk_table *table, struct tcb_wrapper *wrap)
 	/*
 	 * RTLD's actual stack is the Executive stack which does not need to be
 	 * stored in the stack lookup table. Instead, fill the table entry with
-	 * a one-byte dummy stack.
+	 * a minimal dummy stack.
 	 *
 	 * Note that NULL cannot be used here because a compartment can then
 	 * pretend to be RTLD when a signal is delivered. Nor can a zero-length
 	 * stack be used because the signal handler uses the recorded size of
 	 * the stack to determine whether it has been allocated.
 	 */
-	static char dummy_stk;
-	sp = &dummy_stk;
+	static _Alignas(16) char dummy_stk[16];
+	sp = dummy_stk;
 	set_untrusted_stk(sp);
 #endif
 	size = cheri_getlen(sp);
