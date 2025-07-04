@@ -341,7 +341,17 @@ do_posix_spawn(pid_t *pid, const char *path,
 	p = rfork_thread(RFSPAWN, stack + stacksz, _posix_spawn_thr, &psa);
 	free(stack);
 #else
+#ifdef CHERI_LIB_C18N
+	/*
+	 * When c18n is enabled, vfork behaves like fork, ensuring that c18n
+	 * state is not corrupted by the forked process. Ideally we'd want
+	 * something that also resets all signal handlers, but this does not
+	 * exist at the moment.
+	 */
+	p = vfork();
+#else
 	p = __sys_rfork(RFSPAWN);
+#endif
 	if (p == 0)
 		/* _posix_spawn_thr does not return */
 		_posix_spawn_thr(&psa);
