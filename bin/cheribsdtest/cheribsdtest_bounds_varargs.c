@@ -80,8 +80,7 @@ CHERIBSDTEST(bounds_varargs_vaarg_overflow,
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
     .ct_si_code = PROT_CHERI_BOUNDS,
-    .ct_si_trapno = TRAPNO_LOAD_STORE,
-    .ct_xfail_reason = XFAIL_VARARG_BOUNDS)
+    .ct_si_trapno = TRAPNO_LOAD_STORE)
 {
 
 	varargs_test_onearg("%p", NULL);
@@ -103,8 +102,7 @@ CHERIBSDTEST(bounds_varargs_empty_pointer_null,
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
     .ct_si_code = PROT_CHERI_TAG,
-    .ct_si_trapno = TRAPNO_LOAD_STORE,
-    .ct_xfail_reason = XFAIL_VARARG_BOUNDS)
+    .ct_si_trapno = TRAPNO_LOAD_STORE)
 {
 
 #pragma clang diagnostic push
@@ -124,8 +122,7 @@ CHERIBSDTEST(bounds_varargs_printf_load,
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
     .ct_si_code = PROT_CHERI_BOUNDS,
-    .ct_si_trapno = TRAPNO_LOAD_STORE,
-    .ct_xfail_reason = XFAIL_VARARG_BOUNDS)
+    .ct_si_trapno = TRAPNO_LOAD_STORE)
 {
 
 #pragma clang diagnostic push
@@ -146,8 +143,7 @@ CHERIBSDTEST(bounds_varargs_printf_store,
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
     .ct_si_code = PROT_CHERI_BOUNDS,
-    .ct_si_trapno = TRAPNO_LOAD_STORE,
-    .ct_xfail_reason = XFAIL_VARARG_BOUNDS)
+    .ct_si_trapno = TRAPNO_LOAD_STORE)
 {
 
 #pragma clang diagnostic push
