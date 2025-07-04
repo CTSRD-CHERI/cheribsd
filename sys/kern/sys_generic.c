@@ -37,7 +37,7 @@
 #include "opt_capsicum.h"
 #include "opt_ktrace.h"
 
-#define	EXTERR_CATEGORY	EXTERR_CAT_FILEDESC
+#define	EXTERR_CATEGORY	EXTERR_CAT_GENIO
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
@@ -202,7 +202,7 @@ user_read(struct thread *td, int fd, void * __capability buf, size_t nbyte)
 	struct iovec aiov;
 
 	if (nbyte > IOSIZE_MAX)
-		return (EINVAL);
+		return (EXTERROR(EINVAL, "length > iosize_max"));
 	IOVEC_INIT_C(&aiov, buf, nbyte);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
@@ -238,7 +238,7 @@ kern_pread(struct thread *td, int fd, void * __capability buf, size_t nbyte,
 	struct iovec aiov;
 
 	if (nbyte > IOSIZE_MAX)
-		return (EINVAL);
+		return (EXTERROR(EINVAL, "length > iosize_max"));
 	IOVEC_INIT_C(&aiov, buf, nbyte);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
@@ -348,7 +348,7 @@ kern_preadv(struct thread *td, int fd, struct uio *auio, off_t offset)
 		error = ESPIPE;
 	else if (offset < 0 &&
 	    (fp->f_vnode == NULL || fp->f_vnode->v_type != VCHR))
-		error = EINVAL;
+		error = EXTERROR(EINVAL, "neg offset");
 	else
 		error = dofileread(td, fd, fp, auio, offset, FOF_OFFSET);
 	fdrop(fp, td);
@@ -423,7 +423,7 @@ kern_write(struct thread *td, int fd, const void * __capability buf,
 	int error;
 
 	if (nbyte > IOSIZE_MAX)
-		return (EINVAL);
+		return (EXTERROR(EINVAL, "length > iosize_max"));
 	IOVEC_INIT_C(&aiov, __DECONST_CAP(void * __capability, buf), nbyte);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
@@ -461,7 +461,7 @@ kern_pwrite(struct thread *td, int fd, const void * __capability buf,
 	int error;
 
 	if (nbyte > IOSIZE_MAX)
-		return (EINVAL);
+		return (EXTERROR(EINVAL, "length > iosize_max"));
 	IOVEC_INIT_C(&aiov, __DECONST_CAP(void * __capability, buf), nbyte);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
@@ -572,7 +572,7 @@ kern_pwritev(struct thread *td, int fd, struct uio *auio, off_t offset)
 		error = ESPIPE;
 	else if (offset < 0 &&
 	    (fp->f_vnode == NULL || fp->f_vnode->v_type != VCHR))
-		error = EINVAL;
+		error = EXTERROR(EINVAL, "neg offset");
 	else
 		error = dofilewrite(td, fd, fp, auio, offset, FOF_OFFSET);
 	fdrop(fp, td);
@@ -643,14 +643,14 @@ kern_ftruncate(struct thread *td, int fd, off_t length)
 
 	AUDIT_ARG_FD(fd);
 	if (length < 0)
-		return (EINVAL);
+		return (EXTERROR(EINVAL, "negative length"));
 	error = fget(td, fd, &cap_ftruncate_rights, &fp);
 	if (error)
 		return (error);
 	AUDIT_ARG_FILE(td->td_proc, fp);
 	if (!(fp->f_flag & FWRITE)) {
 		fdrop(fp, td);
-		return (EINVAL);
+		return (EXTERROR(EINVAL, "non-writable"));
 	}
 	error = fo_truncate(fp, length, td->td_ucred, td);
 	fdrop(fp, td);
@@ -896,8 +896,10 @@ kern_posix_fallocate(struct thread *td, int fd, off_t offset, off_t len)
 	int error;
 
 	AUDIT_ARG_FD(fd);
-	if (offset < 0 || len <= 0)
-		return (EINVAL);
+	if (offset < 0)
+		return (EXTERROR(EINVAL, "negative offset"));
+	if (len <= 0)
+		return (EXTERROR(EINVAL, "negative length"));
 	/* Check for wrap. */
 	if (offset > OFF_MAX - len)
 		return (EFBIG);
@@ -962,16 +964,21 @@ kern_fspacectl(struct thread *td, int fd, int cmd,
 	AUDIT_ARG_FFLAGS(flags);
 
 	if (rqsr == NULL)
-		return (EINVAL);
+		return (EXTERROR(EINVAL, "no range"));
 	rmsr = *rqsr;
 	if (rmsrp != NULL)
 		*rmsrp = rmsr;
 
-	if (cmd != SPACECTL_DEALLOC ||
-	    rqsr->r_offset < 0 || rqsr->r_len <= 0 ||
-	    rqsr->r_offset > OFF_MAX - rqsr->r_len ||
-	    (flags & ~SPACECTL_F_SUPPORTED) != 0)
-		return (EINVAL);
+	if (cmd != SPACECTL_DEALLOC)
+		return (EXTERROR(EINVAL, "cmd", cmd));
+	if (rqsr->r_offset < 0)
+		return (EXTERROR(EINVAL, "neg offset"));
+	if (rqsr->r_len <= 0)
+		return (EXTERROR(EINVAL, "neg len"));
+	if (rqsr->r_offset > OFF_MAX - rqsr->r_len)
+		return (EXTERROR(EINVAL, "offset too large"));
+	if ((flags & ~SPACECTL_F_SUPPORTED) != 0)
+		return (EXTERROR(EINVAL, "reserved flags", flags));
 
 	error = fget_write(td, fd, &cap_pwrite_rights, &fp);
 	if (error != 0)
@@ -1028,7 +1035,7 @@ kern_specialfd(struct thread *td, int type, void * __capability arg)
 		break;
 	}
 	default:
-		error = EINVAL;
+		error = EXTERROR(EINVAL, "invalid type", type);
 		break;
 	}
 
@@ -1051,7 +1058,7 @@ user_specialfd(struct thread *td, int type, const void * __capability req,
 		struct specialfd_eventfd ae;
 
 		if (len != sizeof(struct specialfd_eventfd)) {
-			error = EINVAL;
+			error = EXTERROR(EINVAL, "eventfd params ABI");
 			break;
 		}
 		error = copyin(req, &ae, sizeof(ae));
@@ -1059,7 +1066,7 @@ user_specialfd(struct thread *td, int type, const void * __capability req,
 			break;
 		if ((ae.flags & ~(EFD_CLOEXEC | EFD_NONBLOCK |
 		    EFD_SEMAPHORE)) != 0) {
-			error = EINVAL;
+			error = EXTERROR(EINVAL, "reserved flag");
 			break;
 		}
 		error = kern_specialfd(td, type, &ae);
@@ -1079,7 +1086,7 @@ user_specialfd(struct thread *td, int type, const void * __capability req,
 		break;
 	}
 	default:
-		error = EINVAL;
+		error = EXTERROR(EINVAL, "unknown type", type);
 		break;
 	}
 	return (error);
@@ -1281,7 +1288,7 @@ kern_select(struct thread *td, int nd, fd_set * __capability fd_in,
 	int error, lf, ndu;
 
 	if (nd < 0)
-		return (EINVAL);
+		return (EXTERROR(EINVAL, "negative ndescs"));
 	fdp = td->td_proc->p_fd;
 	ndu = nd;
 	lf = fdp->fd_nfiles;
@@ -1374,7 +1381,7 @@ kern_select(struct thread *td, int nd, fd_set * __capability fd_in,
 		rtv = *tvp;
 		if (rtv.tv_sec < 0 || rtv.tv_usec < 0 ||
 		    rtv.tv_usec >= 1000000) {
-			error = EINVAL;
+			error = EXTERROR(EINVAL, "invalid timeval");
 			goto done;
 		}
 		if (!timevalisset(&rtv))
@@ -1614,7 +1621,7 @@ user_poll(struct thread *td, struct pollfd * __capability fds, u_int nfds,
 
 	if (timeout != INFTIM) {
 		if (timeout < 0)
-			return (EINVAL);
+			return (EXTERROR(EINVAL, "invalid timeout"));
 		ts.tv_sec = timeout / 1000;
 		ts.tv_nsec = (timeout % 1000) * 1000000;
 		tsp = &ts;
@@ -1639,7 +1646,7 @@ kern_poll_kfds(struct thread *td, struct pollfd *kfds, u_int nfds,
 	precision = 0;
 	if (tsp != NULL) {
 		if (!timespecvalid_interval(tsp))
-			return (EINVAL);
+			return (EXTERROR(EINVAL, "invalid timespec"));
 		if (tsp->tv_sec == 0 && tsp->tv_nsec == 0)
 			sbt = 0;
 		else {
@@ -1751,7 +1758,7 @@ kern_poll(struct thread *td, struct pollfd * __capability ufds, u_int nfds,
 	int error;
 
 	if (kern_poll_maxfds(nfds))
-		return (EINVAL);
+		return (EXTERROR(EINVAL, "too large nfds"));
 	if (nfds > nitems(stackfds))
 		kfds = mallocarray(nfds, sizeof(*kfds), M_TEMP, M_WAITOK);
 	else
@@ -1929,7 +1936,7 @@ selsocket(struct socket *so, int events, struct timeval *tvp, struct thread *td)
 		rtv = *tvp;
 		if (rtv.tv_sec < 0 || rtv.tv_usec < 0 || 
 		    rtv.tv_usec >= 1000000)
-			return (EINVAL);
+			return (EXTERROR(EINVAL, "invalid timeval"));
 		if (!timevalisset(&rtv))
 			asbt = 0;
 		else if (rtv.tv_sec <= INT32_MAX) {
@@ -2306,7 +2313,7 @@ kern_kcmp(struct thread *td, pid_t pid1, pid_t pid2, int type,
 		    (uintptr_t)p2->p_vmspace);
 		break;
 	default:
-		error = EINVAL;
+		error = EXTERROR(EINVAL, "unknown op");
 		break;
 	}
 
