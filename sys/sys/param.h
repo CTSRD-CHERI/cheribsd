@@ -74,7 +74,7 @@
  * cannot include sys/param.h and should only be updated here.
  */
 #undef __FreeBSD_version
-#define __FreeBSD_version 1500049
+#define __FreeBSD_version 1500050
 
 /*
  * __CheriBSD_version numbers describe CheriBSD ABIs.
