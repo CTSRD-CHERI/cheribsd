@@ -35,7 +35,7 @@
 /*
  * Global symbols
  */
-extern uintptr_t sealer_pltgot, sealer_tramp;
+extern uintptr_t sealer_pltgot;
 extern const char *ld_compartment_utrace;
 extern const char *ld_compartment_policy;
 extern const char *ld_compartment_overhead;
@@ -66,7 +66,7 @@ compart_id_t compart_id_for_address(const Obj_Entry *, Elf_Addr);
  * Stack switching
  */
 struct stk_table_stk_info {
-	size_t size;
+	_Atomic(size_t) size;
 	void *begin;
 };
 
@@ -244,9 +244,6 @@ func_sig_legal(struct func_sig sig)
 /*
  * APIs
  */
-void *_rtld_sandbox_code(void *, struct func_sig);
-void *_rtld_safebox_code(void *, struct func_sig);
-
 void c18n_init(Obj_Entry *, Elf_Auxinfo *[]);
 void c18n_init2(Obj_Entry *);
 #endif
