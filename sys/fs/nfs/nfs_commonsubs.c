@@ -630,6 +630,10 @@ nfscl_fillsattr(struct nfsrv_descript *nd, struct vattr *vap,
 			NFSSETBIT_ATTRBIT(&attrbits, NFSATTRBIT_OWNERGROUP);
 		if ((flags & NFSSATTR_FULL) && vap->va_size != VNOVAL)
 			NFSSETBIT_ATTRBIT(&attrbits, NFSATTRBIT_SIZE);
+		if ((flags & NFSSATTR_FULL) && vap->va_flags != VNOVAL) {
+			NFSSETBIT_ATTRBIT(&attrbits, NFSATTRBIT_HIDDEN);
+			NFSSETBIT_ATTRBIT(&attrbits, NFSATTRBIT_SYSTEM);
+		}
 		if (vap->va_atime.tv_sec != VNOVAL)
 			NFSSETBIT_ATTRBIT(&attrbits, NFSATTRBIT_TIMEACCESSSET);
 		if (vap->va_mtime.tv_sec != VNOVAL)
@@ -1313,6 +1317,7 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 	u_int32_t freenum = 0, tuint;
 	u_int64_t uquad = 0, thyp, thyp2;
 	uint16_t tui16;
+	long has_pathconf;
 #ifdef QUOTA
 	struct dqblk dqb;
 	uid_t savuid;
@@ -1420,6 +1425,16 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 				NFSCLRBIT_ATTRBIT(&checkattrbits, NFSATTRBIT_ACL);
 				NFSCLRBIT_ATTRBIT(&checkattrbits, NFSATTRBIT_ACLSUPPORT);
 		   	   }
+			   /* Some filesystems do not support uf_hidden */
+			   if (vp == NULL || VOP_PATHCONF(vp,
+				_PC_HAS_HIDDENSYSTEM, &has_pathconf) != 0)
+			       has_pathconf = 0;
+			   if (has_pathconf == 0) {
+				 NFSCLRBIT_ATTRBIT(&checkattrbits,
+				    NFSATTRBIT_HIDDEN);
+				 NFSCLRBIT_ATTRBIT(&checkattrbits,
+				    NFSATTRBIT_SYSTEM);
+			   }
 			   if (!NFSEQUAL_ATTRBIT(&retattrbits, &checkattrbits)
 			       || retnotsup)
 				*retcmpp = NFSERR_NOTSAME;
@@ -1520,15 +1535,13 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 			NFSM_DISSECT(tl, u_int32_t *, NFSX_UNSIGNED);
 			if (compare) {
 				if (!(*retcmpp)) {
-					long has_named_attr;
-
 					if (vp == NULL || VOP_PATHCONF(vp,
-					    _PC_HAS_NAMEDATTR, &has_named_attr)
+					    _PC_HAS_NAMEDATTR, &has_pathconf)
 					    != 0)
-						has_named_attr = 0;
-					if ((has_named_attr != 0 &&
+						has_pathconf = 0;
+					if ((has_pathconf != 0 &&
 					     *tl != newnfs_true) ||
-					    (has_named_attr == 0 &&
+					    (has_pathconf == 0 &&
 					    *tl != newnfs_false))
 						*retcmpp = NFSERR_NOTSAME;
 				}
@@ -1791,9 +1804,17 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 				free(cp2, M_NFSSTRING);
 			break;
 		case NFSATTRBIT_HIDDEN:
-			NFSM_DISSECT(tl, u_int32_t *, NFSX_UNSIGNED);
-			if (compare && !(*retcmpp))
-				*retcmpp = NFSERR_ATTRNOTSUPP;
+			NFSM_DISSECT(tl, uint32_t *, NFSX_UNSIGNED);
+			if (compare) {
+				if (!(*retcmpp) && ((*tl == newnfs_true &&
+				    (nap->na_flags & UF_HIDDEN) == 0) ||
+				    (*tl == newnfs_false &&
+				     (nap->na_flags & UF_HIDDEN) != 0)))
+					*retcmpp = NFSERR_NOTSAME;
+			} else if (nap != NULL) {
+				if (*tl == newnfs_true)
+					nap->na_flags |= UF_HIDDEN;
+			}
 			attrsum += NFSX_UNSIGNED;
 			break;
 		case NFSATTRBIT_HOMOGENEOUS:
@@ -2165,9 +2186,17 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 			attrsum += NFSX_HYPER;
 			break;
 		case NFSATTRBIT_SYSTEM:
-			NFSM_DISSECT(tl, u_int32_t *, NFSX_UNSIGNED);
-			if (compare && !(*retcmpp))
-				*retcmpp = NFSERR_ATTRNOTSUPP;
+			NFSM_DISSECT(tl, uint32_t *, NFSX_UNSIGNED);
+			if (compare) {
+				if (!(*retcmpp) && ((*tl == newnfs_true &&
+				    (nap->na_flags & UF_SYSTEM) == 0) ||
+				    (*tl == newnfs_false &&
+				     (nap->na_flags & UF_SYSTEM) != 0)))
+					*retcmpp = NFSERR_NOTSAME;
+			} else if (nap != NULL) {
+				if (*tl == newnfs_true)
+					nap->na_flags |= UF_SYSTEM;
+			}
 			attrsum += NFSX_UNSIGNED;
 			break;
 		case NFSATTRBIT_TIMEACCESS:
@@ -2633,7 +2662,7 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 	size_t atsiz;
 	bool xattrsupp;
 	short irflag;
-	long has_named_attr;
+	long has_pathconf;
 #ifdef QUOTA
 	struct dqblk dqb;
 	uid_t savuid;
@@ -2750,6 +2779,14 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 			    NFSCLRBIT_ATTRBIT(&attrbits,NFSATTRBIT_ACLSUPPORT);
 			    NFSCLRBIT_ATTRBIT(&attrbits,NFSATTRBIT_ACL);
 			}
+			if (cred == NULL || p == NULL || vp == NULL ||
+			    VOP_PATHCONF(vp, _PC_HAS_HIDDENSYSTEM,
+			    &has_pathconf) != 0)
+			    has_pathconf = 0;
+			if (has_pathconf == 0) {
+			    NFSCLRBIT_ATTRBIT(&attrbits, NFSATTRBIT_HIDDEN);
+			    NFSCLRBIT_ATTRBIT(&attrbits, NFSATTRBIT_SYSTEM);
+			}
 			retnum += nfsrv_putattrbit(nd, &attrbits);
 			break;
 		case NFSATTRBIT_TYPE:
@@ -2790,10 +2827,10 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 			break;
 		case NFSATTRBIT_NAMEDATTR:
 			NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
-			if (VOP_PATHCONF(vp, _PC_HAS_NAMEDATTR, &has_named_attr)
-			    != 0)
-				has_named_attr = 0;
-			if (has_named_attr != 0)
+			if (VOP_PATHCONF(vp, _PC_HAS_NAMEDATTR,
+			    &has_pathconf) != 0)
+				has_pathconf = 0;
+			if (has_pathconf != 0)
 				*tl = newnfs_true;
 			else
 				*tl = newnfs_false;
@@ -2897,6 +2934,14 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 			*tl++ = 0;
 			*tl = 0;
 			retnum += 2 * NFSX_UNSIGNED;
+			break;
+		case NFSATTRBIT_HIDDEN:
+			NFSM_BUILD(tl, uint32_t *, NFSX_UNSIGNED);
+			if ((vap->va_flags & UF_HIDDEN) != 0)
+				*tl = newnfs_true;
+			else
+				*tl = newnfs_false;
+			retnum += NFSX_UNSIGNED;
 			break;
 		case NFSATTRBIT_HOMOGENEOUS:
 			NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
@@ -3086,6 +3131,14 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 			NFSM_BUILD(tl, u_int32_t *, NFSX_HYPER);
 			txdr_hyper(vap->va_bytes, tl);
 			retnum += NFSX_HYPER;
+			break;
+		case NFSATTRBIT_SYSTEM:
+			NFSM_BUILD(tl, uint32_t *, NFSX_UNSIGNED);
+			if ((vap->va_flags & UF_SYSTEM) != 0)
+				*tl = newnfs_true;
+			else
+				*tl = newnfs_false;
+			retnum += NFSX_UNSIGNED;
 			break;
 		case NFSATTRBIT_TIMEACCESS:
 			NFSM_BUILD(tl, u_int32_t *, NFSX_V4TIME);
