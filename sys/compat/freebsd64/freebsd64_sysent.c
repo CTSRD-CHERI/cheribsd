@@ -659,7 +659,7 @@ struct sysent freebsd64_sysent[] = {
 	{ .sy_narg = AS(freebsd64_getrlimitusage_args), .sy_call = (sy_call_t *)freebsd64_getrlimitusage, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 589 = freebsd64_getrlimitusage */
 	{ .sy_narg = AS(fchroot_args), .sy_call = (sy_call_t *)sys_fchroot, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 590 = fchroot */
 	{ .sy_narg = AS(freebsd64_setcred_args), .sy_call = (sy_call_t *)freebsd64_setcred, .sy_auevent = AUE_SETCRED, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 591 = freebsd64_setcred */
-	{ .sy_narg = AS(freebsd64_exterrctl_args), .sy_call = (sy_call_t *)freebsd64_exterrctl, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 592 = freebsd64_exterrctl */
+	{ .sy_narg = AS(freebsd64_exterrctl_args), .sy_call = (sy_call_t *)freebsd64_exterrctl, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 592 = freebsd64_exterrctl */
 	{ .sy_narg = AS(freebsd64_inotify_add_watch_at_args), .sy_call = (sy_call_t *)freebsd64_inotify_add_watch_at, .sy_auevent = AUE_INOTIFY, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 593 = freebsd64_inotify_add_watch_at */
 	{ .sy_narg = AS(inotify_rm_watch_args), .sy_call = (sy_call_t *)sys_inotify_rm_watch, .sy_auevent = AUE_INOTIFY, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 594 = inotify_rm_watch */
 };

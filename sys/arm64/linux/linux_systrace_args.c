@@ -212,7 +212,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 27: {
 		struct linux_inotify_add_watch_args *p = params;
 		iarg[a++] = p->fd; /* l_int */
-		uarg[a++] = (intptr_t)p->pathname; /* const char * */
+		uarg[a++] = (intcap_t)p->pathname; /* const char * */
 		uarg[a++] = p->mask; /* uint32_t */
 		*n_args = 3;
 		break;
