@@ -362,6 +362,7 @@ int     kern_nanosleep(struct thread *td, struct timespec *rqt,
 	    struct timespec *rmt);
 int	kern_nmount(struct thread *td, struct iovec *iovp, u_int iovcnt,
 	    int flags32, copyinuio_t *copyinuio_f);
+int	kern_nosys(struct thread *td, int dummy);
 int	kern_ntp_adjtime(struct thread *td, struct timex *ntv, int *retvalp);
 int	kern_ntp_gettime(struct thread *td, struct ntptimeval *ntvp);
 int	kern_ogetdirentries(struct thread *td, struct ogetdirentries_args *uap,
