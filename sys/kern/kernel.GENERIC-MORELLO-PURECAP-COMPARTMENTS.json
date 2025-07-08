@@ -1,17 +1,6 @@
 {
-	"default-compartment": {
-		"files": [
-			"kern_compartment.o",
-			"kern_linker.o",
-			"kern_thread.o",
-			"kern_sig.o",
-			"kern_timeout.o",
-			"subr_kobj.o",
-			"subr_pcpu.o"
-		]
-	},
 	"compartments": {
-		"kernel": {
+		"kern": {
 			"files": [
 				"bus_if.o",
 				"clock_if.o",

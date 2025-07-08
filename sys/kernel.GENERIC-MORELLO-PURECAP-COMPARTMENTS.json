@@ -1,26 +1,4 @@
 {
-	"default-compartment": {
-		"files": [
-			"locore.o",
-			"elf_machdep.o",
-			"link_elf.o",
-			"bcopy.o",
-			"freebsd64_machdep.o",
-			"cheri_machdep.o",
-			"compartment.o",
-			"compartment_machdep.o",
-			"machdep.o",
-			"memset.o",
-			"machdep_executive.o",
-			"swtch.o",
-			"smccc_arm64.o",
-			"vm_machdep.o",
-			"exec_machdep.o",
-			"efirt_machdep.o",
-			"hyp_stub.o",
-			"exception.o"
-		]
-	},
 	"compartments": {
 		"kernel": {
 			"files": [
@@ -1614,62 +1592,6 @@
 				"zynqmp_firmware.o",
 				"zynqmp_reset.o",
 				"zynqmp_firmware_if.o"
-			]
-		},
-		"libkern": {
-			"files": [
-				"arc4random.o",
-				"arc4random_uniform.o",
-				"asprintf.o",
-				"bcd.o",
-				"bsearch.o",
-				"crc16.o",
-				"crc32c_armv8.o",
-				"explicit_bzero.o",
-				"fnmatch.o",
-				"gsb_crc32.o",
-				"inet_aton.o",
-				"inet_ntoa.o",
-				"inet_ntop.o",
-				"inet_pton.o",
-				"jenkins_hash.o",
-				"memcchr.o",
-				"memchr.o",
-				"memcmp.o",
-				"memmem.o",
-				"murmur3_32.o",
-				"qsort.o",
-				"qsort_r.o",
-				"random.o",
-				"scanc.o",
-				"strcasecmp.o",
-				"strcasestr.o",
-				"strcat.o",
-				"strchr.o",
-				"strchrnul.o",
-				"strcmp.o",
-				"strcpy.o",
-				"strcspn.o",
-				"strdup.o",
-				"strlcat.o",
-				"strlcpy.o",
-				"strlen.o",
-				"strncat.o",
-				"strncmp.o",
-				"strncpy.o",
-				"strndup.o",
-				"strnlen.o",
-				"strnstr.o",
-				"strrchr.o",
-				"strsep.o",
-				"strspn.o",
-				"strstr.o",
-				"strtol.o",
-				"strtoq.o",
-				"strtoul.o",
-				"strtouq.o",
-				"strvalid.o",
-				"timingsafe_bcmp.o"
 			]
 		}
 	}
