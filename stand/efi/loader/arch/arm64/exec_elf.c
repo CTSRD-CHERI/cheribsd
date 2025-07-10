@@ -63,14 +63,18 @@ __elfN(exec)(struct preloaded_file *fp)
 
 	ehdr = (Elf_Ehdr *)&(md->md_data);
 
+	/*
+	 * we have to cleanup here because net_cleanup() doesn't work after
+	 * we call ExitBootServices
+	 */
+	dev_cleanup();
+
 	efi_time_fini();
 	err = bi_load(fp->f_args, &modulep, &kernendp, true);
 	if (err != 0) {
 		efi_time_init();
 		return (err);
 	}
-
-	dev_cleanup();
 
 	entry = efi_translate(ehdr->e_entry);
 
