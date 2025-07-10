@@ -6188,52 +6188,64 @@ allocate_module_tls(struct tcb *tcb, int index)
 	return (p);
 }
 
+static bool
+allocate_tls_offset_common(size_t *offp, size_t tlssize, size_t tlsalign,
+    size_t tlspoffset __unused)
+{
+	size_t off;
+
+	if (tls_last_offset == 0)
+		off = calculate_first_tls_offset(tlssize, tlsalign,
+		    tlspoffset);
+	else
+		off = calculate_tls_offset(tls_last_offset, tls_last_size,
+		    tlssize, tlsalign, tlspoffset);
+
+	*offp = off;
+#ifdef TLS_VARIANT_I
+	off += tlssize;
+#endif
+
+	/*
+	 * If we have already fixed the size of the static TLS block, we
+	 * must stay within that size. When allocating the static TLS, we
+	 * leave a small amount of space spare to be used for dynamically
+	 * loading modules which use static TLS.
+	 */
+	if (tls_static_space != 0) {
+		if (off > tls_static_space)
+			return (false);
+	} else if (tlsalign > tls_static_max_align) {
+		tls_static_max_align = tlsalign;
+	}
+
+	tls_last_offset = off;
+	tls_last_size = tlssize;
+
+	return (true);
+}
+
 bool
 allocate_tls_offset(Obj_Entry *obj)
 {
-    size_t off;
+	if (obj->tls_dynamic)
+		return (false);
 
-    if (obj->tls_dynamic)
-	return (false);
+	if (obj->tls_static)
+		return (true);
 
-    if (obj->tls_static)
-	return (true);
+	if (obj->tlssize == 0) {
+		obj->tls_static = true;
+		return (true);
+	}
 
-    if (obj->tlssize == 0) {
+	if (!allocate_tls_offset_common(&obj->tlsoffset, obj->tlssize,
+	    obj->tlsalign, obj->tlspoffset))
+		return (false);
+
 	obj->tls_static = true;
+
 	return (true);
-    }
-
-    if (tls_last_offset == 0)
-	off = calculate_first_tls_offset(obj->tlssize, obj->tlsalign,
-	  obj->tlspoffset);
-    else
-	off = calculate_tls_offset(tls_last_offset, tls_last_size,
-	  obj->tlssize, obj->tlsalign, obj->tlspoffset);
-
-    obj->tlsoffset = off;
-#ifdef TLS_VARIANT_I
-    off += obj->tlssize;
-#endif
-
-    /*
-     * If we have already fixed the size of the static TLS block, we
-     * must stay within that size. When allocating the static TLS, we
-     * leave a small amount of space spare to be used for dynamically
-     * loading modules which use static TLS.
-     */
-    if (tls_static_space != 0) {
-	if (off > tls_static_space)
-	    return (false);
-    } else if (obj->tlsalign > tls_static_max_align) {
-	    tls_static_max_align = obj->tlsalign;
-    }
-
-    tls_last_offset = off;
-    tls_last_size = obj->tlssize;
-    obj->tls_static = true;
-
-    return (true);
 }
 
 void
