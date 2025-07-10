@@ -996,8 +996,6 @@ void _thr_sigact_unload(struct dl_phdr_info *phdr_info) __hidden;
 #ifndef __CHERI_PURE_CAPABILITY__
 void _thr_stack_fix_protection(struct pthread *thrd);
 #endif
-void __pthread_distribute_static_tls(size_t offset, void *src, size_t len,
-    size_t total_len);
 
 int *__error_threaded(void) __hidden;
 void __thr_interpose_libc(void) __hidden;
