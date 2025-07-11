@@ -1,11 +1,15 @@
 /* Do not modify. This file is auto-generated from chacha-armv8.pl. */
 #include "arm_arch.h"
 #ifndef	__KERNEL__
+#ifndef __CHERI_PURE_CAPABILITY__
 
 .hidden	OPENSSL_armcap_P
+
+
+#endif
 #endif
 
-.text
+.section	.rodata
 
 .align	5
 .Lsigma:
@@ -17,15 +21,24 @@
 .byte	67,104,97,67,104,97,50,48,32,102,111,114,32,65,82,77,118,56,44,32,67,82,89,80,84,79,71,65,77,83,32,98,121,32,64,100,111,116,45,97,115,109,0
 .align	2
 
+.text
+
+#ifdef __CHERI_PURE_CAPABILITY__
 .globl	ChaCha20_ctr32
 .type	ChaCha20_ctr32,%function
+#else
+.globl	ChaCha20_ctr32_dflt
+.type	ChaCha20_ctr32_dflt,%function
+#endif
 .align	5
+#ifdef __CHERI_PURE_CAPABILITY__
 ChaCha20_ctr32:
+#else
+ChaCha20_ctr32_dflt:
+#endif
 	AARCH64_SIGN_LINK_REGISTER
-	cbz	x2,.Labort
 	cmp	x2,#192
 	b.lo	.Lshort
-
 #ifndef	__KERNEL__
 #ifdef __CHERI_PURE_CAPABILITY__
 	adrp	c17,:got:OPENSSL_armcap_P
@@ -35,6 +48,7 @@ ChaCha20_ctr32:
 	adrp	x17,OPENSSL_armcap_P
 	ldr	w17,[x17,#:lo12:OPENSSL_armcap_P]
 #endif
+.Lcheck_neon:
 	tst	w17,#ARMV7_NEON
 	b.ne	.LChaCha20_neon
 #endif
@@ -43,7 +57,8 @@ ChaCha20_ctr32:
 	stp	PTR(29),PTR(30),[PTRN(sp),#-(12*PTR_WIDTH)]!
 	add	PTR(29),PTRN(sp),#0
 
-	adr	PTR(5),.Lsigma
+	adrp	PTR(5),.Lsigma
+	add	PTR(5),PTR(5),#:lo12:.Lsigma
 	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
 	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
 	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
@@ -310,7 +325,46 @@ ChaCha20_ctr32:
 	ldp	PTR(29),PTR(30),[PTRN(sp)],#(12*PTR_WIDTH)
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
+#ifdef __CHERI_PURE_CAPABILITY__
 .size	ChaCha20_ctr32,.-ChaCha20_ctr32
+#else
+.size	ChaCha20_ctr32_dflt,.-ChaCha20_ctr32_dflt
+
+.globl	ChaCha20_ctr32
+.type	ChaCha20_ctr32,%function
+.align	5
+ChaCha20_ctr32:
+	AARCH64_SIGN_LINK_REGISTER
+	cbz	x2,.Labort
+	cmp	x2,#192
+	b.lo	.Lshort
+#ifndef	__KERNEL__
+	adrp	x17,OPENSSL_armcap_P
+	ldr	w17,[x17,#:lo12:OPENSSL_armcap_P]
+	tst	w17,#ARMV8_SVE
+	b.eq	.Lcheck_neon
+	stp	x29,x30,[sp,#-16]!
+	sub	sp,sp,#16
+	// SVE handling will inevitably increment the counter
+	// Neon/Scalar code that follows to process tail data needs to
+	// use new counter, unfortunately the input counter buffer
+	// pointed to by ctr is meant to be read-only per API contract
+	// we have to copy the buffer to stack to be writable by SVE
+	ldp	x5,x6,[x4]
+	stp	x5,x6,[sp]
+	mov	x4,sp
+	bl	ChaCha20_ctr32_sve
+	cbz	x2,1f
+	bl	ChaCha20_ctr32_dflt
+1:
+	add	sp,sp,#16
+	ldp	x29,x30,[sp],#16
+	AARCH64_VALIDATE_LINK_REGISTER
+	ret
+#endif
+	b	.Lshort
+.size	ChaCha20_ctr32,.-ChaCha20_ctr32
+#endif
 
 #ifdef	__KERNEL__
 .globl	ChaCha20_neon
@@ -323,7 +377,8 @@ ChaCha20_neon:
 	stp	PTR(29),PTR(30),[PTRN(sp),#-(12*PTR_WIDTH)]!
 	add	PTR(29),PTRN(sp),#0
 
-	adr	PTR(5),.Lsigma
+	adrp	PTR(5),.Lsigma
+	add	PTR(5),PTR(5),#:lo12:.Lsigma
 	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
 	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
 	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
@@ -896,7 +951,8 @@ ChaCha20_512_neon:
 	stp	PTR(29),PTR(30),[PTRN(sp),#-(12*PTR_WIDTH)]!
 	add	PTR(29),PTRN(sp),#0
 
-	adr	PTR(5),.Lsigma
+	adrp	PTR(5),.Lsigma
+	add	PTR(5),PTR(5),#:lo12:.Lsigma
 	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
 	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
 	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]

@@ -1,7 +1,7 @@
 /* Do not modify. This file is auto-generated from ecp_nistz256-armv8.pl. */
 #include "arm_arch.h"
 
-.text
+.section	.rodata
 .globl	ecp_nistz256_precomputed
 .type	ecp_nistz256_precomputed,%object
 .align	12
@@ -2391,6 +2391,8 @@ ecp_nistz256_precomputed:
 .byte	69,67,80,95,78,73,83,84,90,50,53,54,32,102,111,114,32,65,82,77,118,56,44,32,67,82,89,80,84,79,71,65,77,83,32,98,121,32,60,97,112,112,114,111,64,111,112,101,110,115,115,108,46,111,114,103,62,0
 .align	2
 
+.text
+
 // void	ecp_nistz256_to_mont(BN_ULONG x0[4],const BN_ULONG x1[4]);
 .globl	ecp_nistz256_to_mont
 .type	ecp_nistz256_to_mont,%function
@@ -2401,12 +2403,16 @@ ecp_nistz256_to_mont:
 	add	PTR(29),PTRN(sp),#0
 	stp	PTR(19),PTR(20),[PTRN(sp),#(2*PTR_WIDTH)]
 
-	ldr	x3,.LRR		// bp[0]
+	adrp	PTR(3),.LRR
+	ldr	x3,[PTR(3),#:lo12:.LRR]	// bp[0]
 	ldp	x4,x5,[PTR(1)]
 	ldp	x6,x7,[PTR(1),#16]
-	ldr	x12,.Lpoly+8
-	ldr	x13,.Lpoly+24
-	adr	PTR(2),.LRR		// &bp[0]
+	adrp	PTR(13),.Lpoly
+	add	PTR(13),PTR(13),#:lo12:.Lpoly
+	ldr	x12,[PTR(13),#8]
+	ldr	x13,[PTR(13),#24]
+	adrp	PTR(2),.LRR
+	add	PTR(2),PTR(2),#:lo12:.LRR
 
 	bl	__ecp_nistz256_mul_mont
 
@@ -2429,9 +2435,12 @@ ecp_nistz256_from_mont:
 	mov	x3,#1			// bp[0]
 	ldp	x4,x5,[PTR(1)]
 	ldp	x6,x7,[PTR(1),#16]
-	ldr	x12,.Lpoly+8
-	ldr	x13,.Lpoly+24
-	adr	PTR(2),.Lone		// &bp[0]
+	adrp	PTR(13),.Lpoly
+	add	PTR(13),PTR(13),#:lo12:.Lpoly
+	ldr	x12,[PTR(13),#8]
+	ldr	x13,[PTR(13),#24]
+	adrp	PTR(2),.Lone
+	add	PTR(2),PTR(2),#:lo12:.Lone
 
 	bl	__ecp_nistz256_mul_mont
 
@@ -2455,8 +2464,10 @@ ecp_nistz256_mul_mont:
 	ldr	x3,[PTR(2)]		// bp[0]
 	ldp	x4,x5,[PTR(1)]
 	ldp	x6,x7,[PTR(1),#16]
-	ldr	x12,.Lpoly+8
-	ldr	x13,.Lpoly+24
+	adrp	PTR(13),.Lpoly
+	add	PTR(13),PTR(13),#:lo12:.Lpoly
+	ldr	x12,[PTR(13),#8]
+	ldr	x13,[PTR(13),#24]
 
 	bl	__ecp_nistz256_mul_mont
 
@@ -2478,8 +2489,10 @@ ecp_nistz256_sqr_mont:
 
 	ldp	x4,x5,[PTR(1)]
 	ldp	x6,x7,[PTR(1),#16]
-	ldr	x12,.Lpoly+8
-	ldr	x13,.Lpoly+24
+	adrp	PTR(13),.Lpoly
+	add	PTR(13),PTR(13),#:lo12:.Lpoly
+	ldr	x12,[PTR(13),#8]
+	ldr	x13,[PTR(13),#24]
 
 	bl	__ecp_nistz256_sqr_mont
 
@@ -2503,8 +2516,10 @@ ecp_nistz256_add:
 	ldp	x8,x9,[PTR(2)]
 	ldp	x16,x17,[PTR(1),#16]
 	ldp	x10,x11,[PTR(2),#16]
-	ldr	x12,.Lpoly+8
-	ldr	x13,.Lpoly+24
+	adrp	PTR(13),.Lpoly
+	add	PTR(13),PTR(13),#:lo12:.Lpoly
+	ldr	x12,[PTR(13),#8]
+	ldr	x13,[PTR(13),#24]
 
 	bl	__ecp_nistz256_add
 
@@ -2524,8 +2539,10 @@ ecp_nistz256_div_by_2:
 
 	ldp	x14,x15,[PTR(1)]
 	ldp	x16,x17,[PTR(1),#16]
-	ldr	x12,.Lpoly+8
-	ldr	x13,.Lpoly+24
+	adrp	PTR(13),.Lpoly
+	add	PTR(13),PTR(13),#:lo12:.Lpoly
+	ldr	x12,[PTR(13),#8]
+	ldr	x13,[PTR(13),#24]
 
 	bl	__ecp_nistz256_div_by_2
 
@@ -2545,8 +2562,10 @@ ecp_nistz256_mul_by_2:
 
 	ldp	x14,x15,[PTR(1)]
 	ldp	x16,x17,[PTR(1),#16]
-	ldr	x12,.Lpoly+8
-	ldr	x13,.Lpoly+24
+	adrp	PTR(13),.Lpoly
+	add	PTR(13),PTR(13),#:lo12:.Lpoly
+	ldr	x12,[PTR(13),#8]
+	ldr	x13,[PTR(13),#24]
 	mov	x8,x14
 	mov	x9,x15
 	mov	x10,x16
@@ -2570,8 +2589,10 @@ ecp_nistz256_mul_by_3:
 
 	ldp	x14,x15,[PTR(1)]
 	ldp	x16,x17,[PTR(1),#16]
-	ldr	x12,.Lpoly+8
-	ldr	x13,.Lpoly+24
+	adrp	PTR(13),.Lpoly
+	add	PTR(13),PTR(13),#:lo12:.Lpoly
+	ldr	x12,[PTR(13),#8]
+	ldr	x13,[PTR(13),#24]
 	mov	x8,x14
 	mov	x9,x15
 	mov	x10,x16
@@ -2607,8 +2628,10 @@ ecp_nistz256_sub:
 
 	ldp	x14,x15,[PTR(1)]
 	ldp	x16,x17,[PTR(1),#16]
-	ldr	x12,.Lpoly+8
-	ldr	x13,.Lpoly+24
+	adrp	PTR(13),.Lpoly
+	add	PTR(13),PTR(13),#:lo12:.Lpoly
+	ldr	x12,[PTR(13),#8]
+	ldr	x13,[PTR(13),#24]
 
 	bl	__ecp_nistz256_sub_from
 
@@ -2631,8 +2654,10 @@ ecp_nistz256_neg:
 	mov	x15,xzr
 	mov	x16,xzr
 	mov	x17,xzr
-	ldr	x12,.Lpoly+8
-	ldr	x13,.Lpoly+24
+	adrp	PTR(13),.Lpoly
+	add	PTR(13),PTR(13),#:lo12:.Lpoly
+	ldr	x12,[PTR(13),#8]
+	ldr	x13,[PTR(13),#24]
 
 	bl	__ecp_nistz256_sub_from
 
@@ -3027,9 +3052,11 @@ ecp_nistz256_point_double:
 	mov	PTR(21),PTR(0)
 	ldp	x16,x17,[PTR(1),#48]
 	mov	PTR(22),PTR(1)
-	ldr	x12,.Lpoly+8
+	adrp	PTR(13),.Lpoly
+	add	PTR(13),PTR(13),#:lo12:.Lpoly
+	ldr	x12,[PTR(13),#8]
 	mov	x8,x14
-	ldr	x13,.Lpoly+24
+	ldr	x13,[PTR(13),#24]
 	mov	x9,x15
 	ldp	x4,x5,[PTR(22),#64]	// forward load for p256_sqr_mont
 	mov	x10,x16
@@ -3172,8 +3199,10 @@ ecp_nistz256_point_add:
 	mov	PTR(21),PTR(0)
 	mov	PTR(22),PTR(1)
 	mov	PTR(23),PTR(2)
-	ldr	x12,.Lpoly+8
-	ldr	x13,.Lpoly+24
+	adrp	PTR(13),.Lpoly
+	add	PTR(13),PTR(13),#:lo12:.Lpoly
+	ldr	x12,[PTR(13),#8]
+	ldr	x13,[PTR(13),#24]
 	orr	x8,x4,x5
 	orr	x10,x6,x7
 	orr	x25,x8,x10
@@ -3423,8 +3452,10 @@ ecp_nistz256_point_add_affine:
 	mov	PTR(21),PTR(0)
 	mov	PTR(22),PTR(1)
 	mov	PTR(23),PTR(2)
-	ldr	x12,.Lpoly+8
-	ldr	x13,.Lpoly+24
+	adrp	PTR(13),.Lpoly
+	add	PTR(13),PTR(13),#:lo12:.Lpoly
+	ldr	x12,[PTR(13),#8]
+	ldr	x13,[PTR(13),#24]
 
 	ldp	x4,x5,[PTR(1),#64]	// in1_z
 	ldp	x6,x7,[PTR(1),#64+16]
@@ -3570,7 +3601,8 @@ ecp_nistz256_point_add_affine:
 	ldp	x10,x11,[PTR(23),#0+48]
 	stp	x14,x15,[PTR(21),#0]
 	stp	x16,x17,[PTR(21),#0+16]
-	adr	PTR(23),.Lone_mont-64
+	adrp	PTR(23),.Lone_mont-64
+	add	PTR(23),PTR(23),#:lo12:.Lone_mont-64
 	ldp	x14,x15,[PTR(22),#32]	// in1
 	cmp	x24,#0			// ~, remember?
 	ldp	x16,x17,[PTR(22),#32+16]
@@ -3628,7 +3660,8 @@ ecp_nistz256_ord_mul_mont:
 	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
 	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
 
-	adr	PTR(23),.Lord
+	adrp	PTR(23),.Lord
+	add	PTR(23),PTR(23),#:lo12:.Lord
 	ldr	x3,[PTR(2)]		// bp[0]
 	ldp	x4,x5,[PTR(1)]
 	ldp	x6,x7,[PTR(1),#16]
@@ -3838,7 +3871,8 @@ ecp_nistz256_ord_sqr_mont:
 	stp	PTR(21),PTR(22),[PTRN(sp),#(4*PTR_WIDTH)]
 	stp	PTR(23),PTR(24),[PTRN(sp),#(6*PTR_WIDTH)]
 
-	adr	PTR(23),.Lord
+	adrp	PTR(23),.Lord
+	add	PTR(23),PTR(23),#:lo12:.Lord
 	ldp	x4,x5,[PTR(1)]
 	ldp	x6,x7,[PTR(1),#16]
 

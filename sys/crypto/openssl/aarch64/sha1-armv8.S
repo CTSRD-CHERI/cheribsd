@@ -1087,7 +1087,8 @@ sha1_block_armv8:
 	stp	PTR(29),PTR(30),[PTRN(sp),#-(2*PTR_WIDTH)]!
 	add	PTR(29),PTRN(sp),#0
 
-	adr	PTR(4),.Lconst
+	adrp	PTR(4),.Lconst
+	add	PTR(4),PTR(4),#:lo12:.Lconst
 	eor	v1.16b,v1.16b,v1.16b
 	ld1	{v0.4s},[PTR(0)],#16
 	ld1	{v1.s}[0],[PTR(0)]
@@ -1210,6 +1211,9 @@ sha1_block_armv8:
 	ldr	PTR(29),[PTRN(sp)],#(2*PTR_WIDTH)
 	ret
 .size	sha1_block_armv8,.-sha1_block_armv8
+
+.section	.rodata
+
 .align	6
 .Lconst:
 .long	0x5a827999,0x5a827999,0x5a827999,0x5a827999	//K_00_19

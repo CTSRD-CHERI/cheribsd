@@ -1,7 +1,7 @@
 /* Do not modify. This file is auto-generated from keccak1600-armv8.pl. */
 #include "arm_arch.h"
 
-.text
+.section	.rodata
 
 .align	8	// strategic alignment and padding that allows to use
 		// address value as loop termination condition...
@@ -33,13 +33,16 @@ iotas:
 .quad	0x0000000080000001
 .quad	0x8000000080008008
 .size	iotas,.-iotas
+.text
+
 #define	KeccakF1600_int_FRAMESZ	(16 + 2*PTR_WIDTH)
 
 .type	KeccakF1600_int,%function
 .align	5
 KeccakF1600_int:
 	AARCH64_SIGN_LINK_REGISTER
-	adr	PTR(28),iotas
+	adrp	PTR(28),iotas
+	add	PTR(28),PTR(28),#:lo12:iotas
 	stp	PTR(28),PTR(30),[PTRN(sp),#16]	// 32/48 bytes on top are mine
 	b	.Loop
 .align	4
@@ -519,6 +522,8 @@ SHA3_squeeze:
 	mov	PTR(20),PTR(1)
 	mov	x21,x2
 	mov	x22,x3
+	cmp	w4, #0				// w4 = 'next' argument
+	bne	.Lnext_block
 
 .Loop_squeeze:
 	ldr	x4,[PTR(0)],#8
@@ -533,7 +538,7 @@ SHA3_squeeze:
 
 	subs	x3,x3,#8
 	bhi	.Loop_squeeze
-
+.Lnext_block:
 	mov	PTR(0),PTR(19)
 	bl	KeccakF1600
 	mov	PTR(0),PTR(19)
@@ -579,7 +584,8 @@ SHA3_squeeze:
 .align	5
 KeccakF1600_ce:
 	mov	x9,#24
-	adr	PTR(10),iotas
+	adrp	PTR(10),iotas
+	add	PTR(10),PTR(10),#:lo12:iotas
 	b	.Loop_ce
 .align	4
 .Loop_ce:

@@ -47,10 +47,14 @@ poly1305_init:
 
 	tst	w17,#ARMV7_NEON
 
-	adr	PTR(12),.Lpoly1305_blocks
-	adr	PTR(7),.Lpoly1305_blocks_neon
-	adr	PTR(13),.Lpoly1305_emit
-	adr	PTR(8),.Lpoly1305_emit_neon
+	adrp	PTR(12),poly1305_blocks
+	add	PTR(12),PTR(12),#:lo12:.Lpoly1305_blocks
+	adrp	PTR(7),poly1305_blocks_neon
+	add	PTR(7),PTR(7),#:lo12:.Lpoly1305_blocks_neon
+	adrp	PTR(13),poly1305_emit
+	add	PTR(13),PTR(13),#:lo12:.Lpoly1305_emit
+	adrp	PTR(8),poly1305_emit_neon
+	add	PTR(8),PTR(8),#:lo12:.Lpoly1305_emit_neon
 
 	csel	PTR(12),PTR(12),PTR(7),eq
 	csel	PTR(13),PTR(13),PTR(8),eq
@@ -383,7 +387,8 @@ poly1305_blocks_neon:
 	ldr	PTR(30),[PTRN(sp),#PTR_WIDTH]
 
 	add	PTR(16),PTR(1),#32
-	adr	PTR(17),.Lzeros
+	adrp	PTR(17),.Lzeros
+	add	PTR(17),PTR(17),#:lo12:.Lzeros
 	subs	x2,x2,#64
 	csel	PTR(16),PTR(17),PTR(16),lo
 
@@ -395,7 +400,8 @@ poly1305_blocks_neon:
 .align	4
 .Leven_neon:
 	add	PTR(16),PTR(1),#32
-	adr	PTR(17),.Lzeros
+	adrp	PTR(17),.Lzeros
+	add	PTR(17),PTR(17),#:lo12:.Lzeros
 	subs	x2,x2,#64
 	csel	PTR(16),PTR(17),PTR(16),lo
 
@@ -878,6 +884,8 @@ poly1305_emit_neon:
 
 	ret
 .size	poly1305_emit_neon,.-poly1305_emit_neon
+
+.section	.rodata
 
 .align	5
 .Lzeros:
