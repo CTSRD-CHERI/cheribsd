@@ -6028,7 +6028,8 @@ get_tls_block_ptr(void *tcb, size_t tcbsize)
  *     the end of the TCB.
  */
 void *
-allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign)
+allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign,
+    RtldLockState *lockstate __unused)
 {
     Obj_Entry *obj;
     char *tls_block;
@@ -6144,7 +6145,8 @@ free_tls(void *tcb, size_t tcbsize, size_t tcbalign __unused)
  * Allocate Static TLS using the Variant II method.
  */
 void *
-allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign)
+allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign,
+    RtldLockState *lockstate __unused)
 {
     Obj_Entry *obj;
     size_t size, ralign;
@@ -6380,7 +6382,7 @@ _rtld_allocate_tls(void *oldtcb, size_t tcbsize, size_t tcbalign)
 
     wlock_acquire(rtld_bind_lock, &lockstate);
     ret = allocate_tls(globallist_curr(TAILQ_FIRST(&obj_list)), oldtcb,
-      tcbsize, tcbalign);
+      tcbsize, tcbalign, &lockstate);
 #ifdef CHERI_LIB_C18N
     /*
      * Create a fake wrapper TCB containing pointers to the real TCB and stack

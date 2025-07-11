@@ -552,7 +552,7 @@ allocate_initial_tls(Obj_Entry *objs)
 	 */
 	tls_static_space = tls_last_offset + ld_static_tls_extra;
 
-	addr = allocate_tls(objs, 0, TLS_TCB_SIZE, TLS_TCB_ALIGN);
+	addr = allocate_tls(objs, 0, TLS_TCB_SIZE, TLS_TCB_ALIGN, NULL);
 
 	/*
 	 * This does not use _tcb_set() as it calls amd64_set_fsbase()
