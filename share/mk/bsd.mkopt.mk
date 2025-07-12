@@ -112,10 +112,12 @@ MK_${var}:=	no
 .if !defined(__${opt}_DEFAULT) || empty(__${opt}_DEFAULT)
 .error __${opt}_DEFAULT undefined or empty
 .endif
+.if !defined(OPT_${var})
 .if defined(${opt})
 OPT_${opt}:=	${${opt}}
 .else
 OPT_${opt}:=	${__${opt}_DEFAULT}
+.endif
 .endif
 .if empty(OPT_${opt}) || ${__${opt}_OPTIONS:M${OPT_${opt}}} != ${OPT_${opt}}
 .error Invalid option OPT_${opt} (${OPT_${opt}}), must be one of: ${__${opt}_OPTIONS}
