@@ -286,6 +286,9 @@ void __libc_start1_gcrt(int, char *[], char *[],
 void _init_tls(void);
 #ifdef TLS_TGOT
 void __libc_init_tgot(void *tgot, const void *init, __size_t size, void *tls);
+#ifdef TLS_TGOT_COMPAT
+void __libc_init_got_tgot(void *data_cap, __ptrdiff_t tcbtgotoff);
+#endif
 #endif
 
 /*
