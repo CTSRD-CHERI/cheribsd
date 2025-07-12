@@ -42,6 +42,61 @@
 #include "rtld.h"
 
 #ifdef RTLD_HAS_CAPRELOCS
+uintcap_t
+process___cap_reloc(const struct capreloc *reloc, void * __capability data_cap,
+    const void * __capability pcc_cap, bool tight_pcc_bounds, bool allow_zero)
+{
+	uintcap_t cap;
+	bool can_set_bounds = true;
+
+	if (reloc->object == 0 && !allow_zero) {
+		/*
+		 * XXXAR: clang fills uninitialized capabilities with
+		 * 0xcacaca..., so the caller needs to write this NULL.
+		 *
+		 * CHERI LLD now fills in the NULL (plus possible addend, which
+		 * this historical implementation failed to account for) and
+		 * omits the capreloc, so this should be removed once we can
+		 * assume that as our baseline.
+		 */
+		return (0);
+	}
+
+	if ((reloc->permissions & function_reloc_flag) ==
+	    function_reloc_flag) {
+		/* code pointer */
+		cap = (uintcap_t)pcc_cap;
+		cap = cheri_clearperm(cap, FUNC_PTR_REMOVE_PERMS);
+
+		/*
+		 * Do not set tight bounds for functions
+		 * (unless we are in the plt ABI).
+		 */
+		can_set_bounds = tight_pcc_bounds;
+	} else if ((reloc->permissions & constant_reloc_flag) ==
+	    constant_reloc_flag) {
+		 /* read-only data pointer */
+		cap = (uintcap_t)pcc_cap;
+		cap = cheri_clearperm(cap, FUNC_PTR_REMOVE_PERMS);
+		cap = cheri_clearperm(cap, DATA_PTR_REMOVE_PERMS);
+	} else {
+		/* read-write data */
+		cap = (uintcap_t)data_cap + reloc->object;
+		cap = cheri_clearperm(cap, DATA_PTR_REMOVE_PERMS);
+	}
+	cap = cheri_clearperm(cap, CAP_RELOC_REMOVE_PERMS);
+	if (can_set_bounds && (reloc->size != 0)) {
+		cap = cheri_setbounds(cap, reloc->size);
+	}
+	cap += reloc->offset;
+	if ((reloc->permissions & function_reloc_flag) ==
+	    function_reloc_flag) {
+		/* Convert function pointers to sentries: */
+		cap = cheri_sealentry(cap);
+	}
+	return (cap);
+}
+
 void
 process___cap_relocs(Obj_Entry* obj)
 {
@@ -70,52 +125,9 @@ process___cap_relocs(Obj_Entry* obj)
 	     reloc++) {
 		uintcap_t *dest =
 		    (uintcap_t *)(obj->relocbase + reloc->capability_location);
-		uintcap_t cap;
-		bool can_set_bounds = true;
 
-		if (reloc->object == 0) {
-			/*
-			 * XXXAR: clang fills uninitialized
-			 * capabilities with 0xcacaca..., so we we
-			 * need to explicitly write NULL here.
-			 */
-			*dest = 0;
-			continue;
-		}
-
-		if ((reloc->permissions & function_reloc_flag) ==
-		    function_reloc_flag) {
-			/* code pointer */
-			cap = (uintcap_t)pcc_cap(obj, reloc->object);
-			cap = cheri_clearperm(cap, FUNC_PTR_REMOVE_PERMS);
-
-			/*
-			 * Do not set tight bounds for functions
-			 * (unless we are in the plt ABI).
-			 */
-			can_set_bounds = tight_pcc_bounds;
-		} else if ((reloc->permissions & constant_reloc_flag) ==
-		    constant_reloc_flag) {
-			 /* read-only data pointer */
-			cap = (uintcap_t)pcc_cap(obj, reloc->object);
-			cap = cheri_clearperm(cap, FUNC_PTR_REMOVE_PERMS);
-			cap = cheri_clearperm(cap, DATA_PTR_REMOVE_PERMS);
-		} else {
-			/* read-write data */
-			cap = (uintcap_t)data_base + reloc->object;
-			cap = cheri_clearperm(cap, DATA_PTR_REMOVE_PERMS);
-		}
-		cap = cheri_clearperm(cap, CAP_RELOC_REMOVE_PERMS);
-		if (can_set_bounds && (reloc->size != 0)) {
-			cap = cheri_setbounds(cap, reloc->size);
-		}
-		cap += reloc->offset;
-		if ((reloc->permissions & function_reloc_flag) ==
-		    function_reloc_flag) {
-			/* Convert function pointers to sentries: */
-			cap = cheri_sealentry(cap);
-		}
-		*dest = cap;
+		*dest = process___cap_reloc(reloc, data_base,
+		    pcc_cap(obj, reloc->object), tight_pcc_bounds, false);
 	}
 
 	obj->cap_relocs_processed = true;

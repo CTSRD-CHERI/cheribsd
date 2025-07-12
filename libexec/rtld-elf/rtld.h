@@ -657,6 +657,10 @@ void init_pltgot(Plt_Entry *);
 void allocate_initial_tls(Obj_Entry *);
 
 #ifdef RTLD_HAS_CAPRELOCS
+struct capreloc;
+uintcap_t process___cap_reloc(const struct capreloc *reloc,
+    void * __capability data_cap, const void * __capability pcc_cap,
+    bool tight_pcc_bounds, bool allow_zero);
 void process___cap_relocs(Obj_Entry*);
 #endif
 
