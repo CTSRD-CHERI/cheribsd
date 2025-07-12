@@ -37,9 +37,36 @@ ifunc_init(const Elf_Auxinfo *aux)
 }
 
 #ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+
+#include <cheri_init_globals.h>
+
 static void
 crt1_handle_rela(const Elf_Rela *r, void *data_cap, const void *code_cap)
 {
+}
+
+static void
+crt1_handle_tgot_capreloc(const struct capreloc *r, void *tgot, Elf_Addr init,
+    void *tls)
+{
+	uintptr_t *where, val;
+
+	where = (uintptr_t *)((uintptr_t)tgot +
+	    (r->capability_location - init));
+
+	val = (uintptr_t)tls;
+	if ((r->permissions & function_reloc_flag) == function_reloc_flag)
+		__builtin_trap();
+	else if ((r->permissions & constant_reloc_flag) == constant_reloc_flag)
+		val = cheri_andperm(val, constant_pointer_permissions_mask);
+	else
+		val = cheri_andperm(val, global_pointer_permissions_mask);
+
+	val = cheri_setaddress(val, r->object + (ptraddr_t)tls);
+	val = cheri_setbounds(val, r->size);
+	val += r->offset;
+	*where = val;
 }
 #else
 static void
