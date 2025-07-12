@@ -69,6 +69,29 @@ crt1_handle_capreloc(const struct capreloc *r, void *data_cap,
 		*where = target;
 	}
 }
+
+static void
+crt1_handle_tgot_capreloc(const struct capreloc *r, void *tgot, Elf_Addr init,
+    void *tls)
+{
+	uintptr_t *where, val;
+
+	where = (uintptr_t *)((uintptr_t)tgot +
+	    (r->capability_location - init));
+
+	val = (uintptr_t)tls;
+	if (r->permissions == constant_reloc_flag)
+		val = cheri_perms_and(val, constant_pointer_permissions_mask);
+	else if (r->permissions == 0)
+		val = cheri_perms_and(val, global_pointer_permissions_mask);
+	else
+		__builtin_trap();
+
+	val = cheri_address_set(val, r->object + (ptraddr_t)tls);
+	val = cheri_bounds_set(val, r->size);
+	val += r->offset;
+	*where = val;
+}
 #else
 static void
 crt1_handle_rela(const Elf_Rela *r)
