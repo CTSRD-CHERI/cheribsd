@@ -193,7 +193,7 @@ ENTRY(_rtld_bind_start)
 #endif
 END(_rtld_bind_start)
 
-#ifndef __CHERI_TGOT_TLS__
+#if !defined(__CHERI_TGOT_TLS__) || defined(__ARM_MORELLO_TGOT_TLS_COMPAT)
 /*
  * struct rel_tlsdesc {
  *  uint64_t resolver_fnc;
@@ -260,11 +260,15 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	b.ne	1f			/* dtv[0] != tlsdec->dtv_gen */
 
 	ldr	w3, [c1, #16]		/* tlsdesc->tls_index */
+#ifdef __ARM_MORELLO_TGOT_TLS_COMPAT
+	lsl	w3, w3, #1
+#else
 	add	w3, w3, #1
-	ldr     c3, [c0, w3, sxtw #4]	/* dtv[tlsdesc->tls_index + 1] */
+#endif
+	ldr     c3, [c0, w3, sxtw #4]	/* dtv->dtv_slots[tlsdesc->tls_index - 1].dtvs_tls */
 	cbz	x3, 1f
 
-	/* Return (dtv[tlsdesc->tls_index + 1] + tlsdesc->tls_offs) */
+	/* Return (dtv->dtv_slots[tlsdesc->tls_index + 1].dtvs_tls + tlsdesc->tls_offs) */
 	ldr	x4, [c1, #24]		/* tlsdesc->tls_offs */
 	add 	c3, c3, x4
 	ldr	x4, [c1, #32]		/* tlsdesc->tls_size */
@@ -278,7 +282,7 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	/*
 	 * Slow path
 	 * return(
-	 *    tls_get_addr_common(tcb, tlsdesc->tls_index, tlsdesc->tls_offs));
+	 *    tls_get_addr_common(_compat)(tcb, tlsdesc->tls_index, tlsdesc->tls_offs));
 	 *
 	 */
 1:
@@ -322,8 +326,13 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	ldr	w1, [c3, #16]		/* tlsdesc->tls_index */
 	ldr	x2, [c3, #24]		/* tlsdesc->tls_offs */
 	ldr	x19, [c3, #32]		/* tlsdesc->tls_size */
+#ifdef __ARM_MORELLO_TGOT_TLS_COMPAT
+	adrp	PTR(10), :got:tls_get_addr_common_compat_fptr
+	ldr	PTR(10), [PTR(10), :got_lo12:tls_get_addr_common_compat_fptr]
+#else
 	adrp	PTR(10), :got:tls_get_addr_common_fptr
 	ldr	PTR(10), [PTR(10), :got_lo12:tls_get_addr_common_fptr]
+#endif
 	ldr	PTR(10), [PTR(10)]
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	blr	x10
@@ -450,7 +459,7 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	ret
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(_rtld_tlsdesc_dynamic)
-#endif /* !__CHERI_TGOT_TLS__ */
+#endif /* !defined(__CHERI_TGOT_TLS__) || defined(__ARM_MORELLO_TGOT_TLS_COMPAT) */
 
 #ifdef __CHERI_TGOT_TLS__
 /*

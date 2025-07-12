@@ -59,7 +59,7 @@
  * This is not the correct prototype, but we only need it for
  * a function pointer to a simple asm function.
  */
-#ifndef TLS_TGOT
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 void *_rtld_tlsdesc_static(void *);
 void *_rtld_tlsdesc_undef(void *);
 void *_rtld_tlsdesc_dynamic(void *);
@@ -70,7 +70,7 @@ void *_rtld_tgot_tlsdesc_dynamic(void *);
 #endif
 
 void (*rtld_bind_start_fptr)(void) = &_rtld_bind_start;
-#ifndef TLS_TGOT
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 void *(*rtld_tlsdesc_static_fptr)(void *) = &_rtld_tlsdesc_static;
 void *(*rtld_tlsdesc_undef_fptr)(void *) = &_rtld_tlsdesc_undef;
 void *(*rtld_tlsdesc_dynamic_fptr)(void *) = &_rtld_tlsdesc_dynamic;
@@ -315,7 +315,7 @@ do_copy_relocations(Obj_Entry *dstobj)
 	return (0);
 }
 
-#ifndef TLS_TGOT
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 struct tls_data {
 	uintptr_t	dtv_gen;
 	int		tls_index;
@@ -408,7 +408,7 @@ reloc_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela,
 #endif
 	}
 }
-#endif /* !TLS_TGOT */
+#endif /* !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT) */
 
 #ifdef TLS_TGOT
 struct tgot_tls_data {
@@ -445,7 +445,11 @@ reloc_tgot_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela,
 	if (obj->tgotoffset != 0) {
 		/* Object's TGOT is in initially allocated TGOT segment */
 		where->func = rtld_tgot_tlsdesc_static_fptr;
+#ifdef TLS_TGOT_COMPAT
+		where->offset = -obj->tgotoffset + rela->r_addend;
+#else
 		where->offset = obj->tgotoffset + rela->r_addend;
+#endif
 	} else {
 		/* Object's TGOT is dynamically allocated */
 		where->func = rtld_tgot_tlsdesc_dynamic_fptr;
@@ -567,7 +571,7 @@ reloc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 #else
 		case R_AARCH64_TLSDESC:
 #endif
-#ifndef TLS_TGOT
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 			reloc_tlsdesc(obj, rela, (struct tlsdesc_entry *)where,
 			    SYMLOOK_IN_PLT | flags, lockstate);
 			break;
@@ -911,7 +915,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		case R_AARCH64_ABS64:
 		case R_AARCH64_GLOB_DAT:
 #ifdef __CHERI_PURE_CAPABILITY__
-#ifndef TLS_TGOT
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 		case R_MORELLO_TLS_TPREL128:
 #endif
 #else
@@ -1037,7 +1041,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 #else
 		case R_AARCH64_TLSDESC:
 #endif
-#ifndef TLS_TGOT
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 			reloc_tlsdesc(obj, rela, (struct tlsdesc_entry *)where,
 			    flags, lockstate);
 			break;
@@ -1062,7 +1066,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 #else
 		case R_AARCH64_TLS_TPREL64:
 #endif
-#ifndef TLS_TGOT
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 			/*
 			 * We lazily allocate offsets for static TLS as we
 			 * see the first relocation that references the
@@ -1104,7 +1108,11 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 					return (-1);
 				}
 			}
+#ifdef TLS_TGOT_COMPAT
+			*where = -obj->tgotoffset + rela->r_addend;
+#else
 			*where = obj->tgotoffset + rela->r_addend;
+#endif
 			break;
 #else
 			_rtld_error("%s: TGOT not supported", obj->path);
@@ -1222,7 +1230,7 @@ allocate_initial_tls(Obj_Entry *objs)
 	* offset allocated so far and adding a bit for dynamic modules to
 	* use.
 	*/
-#ifndef TLS_TGOT
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 	tls_static_space = tls_last_offset + tls_last_size +
 	    ld_static_tls_extra;
 #endif
@@ -1239,3 +1247,26 @@ __tls_get_addr(tls_index* ti)
 {
 	return (tls_get_addr_common(_tcb_get(), ti->ti_module, ti->ti_offset));
 }
+
+#ifdef TLS_TGOT_COMPAT
+size_t
+calculate_tgot_offset(size_t prev_offset, size_t prev_size __unused,
+    size_t size, size_t align, size_t offset)
+{
+	size_t res;
+
+	/*
+	 * res is the smallest integer satisfying res - prev_offset >= size
+	 * and (-res) % p_align = p_vaddr % p_align (= p_offset % p_align).
+	 */
+	res = prev_offset + size + align - 1;
+	res -= (res + offset) & (align - 1);
+	return (res);
+}
+
+size_t
+calculate_first_tgot_offset(size_t size, size_t align, size_t offset)
+{
+	return (calculate_tgot_offset(0, 0, size, align, offset));
+}
+#endif
