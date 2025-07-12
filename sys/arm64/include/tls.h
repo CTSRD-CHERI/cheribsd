@@ -41,6 +41,11 @@
 #include <sys/_tls_variant_i.h>
 #endif
 
+#ifdef __ARM_MORELLO_TGOT_TLS_COMPAT
+#define	TLS_TGOT_COMPAT
+#define	TLS_VARIANT_I
+#endif
+
 #define	TLS_DTV_OFFSET	0
 #define	TLS_TCB_ALIGN	16
 #define	TLS_TP_OFFSET	0
