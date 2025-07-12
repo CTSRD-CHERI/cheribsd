@@ -142,12 +142,22 @@ uintptr_t reloc_jmpslot(uintptr_t *where, uintptr_t target,
 
 #define	round(size, align)				\
 	(((size) + (align) - 1) & ~((align) - 1))
+
+#ifndef TLS_TGOT
 #define	calculate_first_tls_offset(size, align, offset)	\
 	round(TLS_TCB_SIZE, align)
 #define	calculate_tls_offset(prev_offset, prev_size, size, align, offset) \
 	round(prev_offset + prev_size, align)
 #define calculate_tls_post_size(align) \
 	round(TLS_TCB_SIZE, align) - TLS_TCB_SIZE
+#endif
+
+#ifdef TLS_TGOT
+#define	calculate_first_tgot_offset(size, align, offset)	\
+	TLS_TCB_SIZE
+#define	calculate_tgot_offset(prev_offset, prev_size, size, align, offset) \
+	round(prev_offset + prev_size, align)
+#endif
 
 typedef struct {
     unsigned long ti_module;
@@ -159,8 +169,14 @@ extern void *__tls_get_addr(tls_index *ti);
 #define md_abi_variant_hook(x)
 
 extern void (*rtld_bind_start_fptr)(void);
+#ifndef TLS_TGOT
 extern void *(*rtld_tlsdesc_static_fptr)(void *);
 extern void *(*rtld_tlsdesc_undef_fptr)(void *);
 extern void *(*rtld_tlsdesc_dynamic_fptr)(void *);
+#endif
+#ifdef TLS_TGOT
+extern void *(*rtld_tgot_tlsdesc_static_fptr)(void *);
+extern void *(*rtld_tgot_tlsdesc_dynamic_fptr)(void *);
+#endif
 
 #endif
