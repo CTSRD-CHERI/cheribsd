@@ -125,11 +125,18 @@ extern unsigned long elf_hwcap;
 
 #define round(size, align) \
     (((size) + (align) - 1) & ~((align) - 1))
+#ifdef TLS_TGOT
+#define calculate_first_tgot_offset(size, align, offset)	\
+    TLS_TCB_SIZE
+#define calculate_tgot_offset(prev_offset, prev_size, size, align, offset) \
+    round(prev_offset + prev_size, align)
+#else
 #define calculate_first_tls_offset(size, align, offset)	\
     TLS_TCB_SIZE
 #define calculate_tls_offset(prev_offset, prev_size, size, align, offset) \
     round(prev_offset + prev_size, align)
 #define calculate_tls_post_size(align)  0
+#endif
 
 typedef struct {
 	unsigned long ti_module;

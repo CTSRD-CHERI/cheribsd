@@ -4790,8 +4790,11 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	    dbg("dlsym(%s) is ifunc. Resolved to: " PTR_FMT, name, sym);
 	} else if (ELF_ST_TYPE(def->st_info) == STT_TLS) {
 	    sym = (char *)_rtld_tls_get_block(defobj->tlsindex) + def->st_value;
-	    /* CHERI-RISC-V ABI does not yet set TLS bounds; mirror in dlsym */
-#if !defined(__riscv) && defined(__CHERI_PURE_CAPABILITY__)
+	    /*
+	     * CHERI-RISC-V's traditional TLS ABI does not set bounds; mirror
+	     * in dlsym
+	     */
+#if (!defined(__riscv) || defined(TLS_TGOT)) && defined(__CHERI_PURE_CAPABILITY__)
 	    sym = cheri_setbounds(sym, def->st_size);
 #endif
 	    dbg("dlsym(%s) is TLS. Resolved to: " PTR_FMT, name, sym);
