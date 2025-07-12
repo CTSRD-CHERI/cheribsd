@@ -826,6 +826,7 @@ BSARGS= 	DESTDIR= \
 		-DNO_PIC \
 		-DNO_SHARED \
 		MK_ASAN=no \
+		OPT_CHERI_TGOT_TLS=native \
 		MK_COMPARTMENT_POLICY=no \
 		MK_CTF=no \
 		MK_CLANG_EXTRAS=no \
@@ -858,6 +859,7 @@ TMAKE=		\
 		-DNO_CPU_CFLAGS \
 		-DNO_LINT \
 		MK_ASAN=no \
+		OPT_CHERI_TGOT_TLS=native \
 		MK_COMPARTMENT_POLICY=no \
 		MK_CTF=no \
 		MK_CLANG_EXTRAS=no \
@@ -897,6 +899,7 @@ KTMAKE=		${TIME_ENV} \
 		-DNO_LINT \
 		-DNO_PIC \
 		-DNO_SHARED \
+		OPT_CHERI_TGOT_TLS=native \
 		MK_COMPARTMENT_POLICY=no \
 		MK_CTF=no \
 		MK_HTML=no \
