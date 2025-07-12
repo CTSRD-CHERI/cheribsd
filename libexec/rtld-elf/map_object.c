@@ -538,7 +538,7 @@ obj_free(Obj_Entry *obj)
 {
     Objlist_Entry *elm;
 
-#ifndef TLS_TGOT
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
     if (obj->tls_static)
 	free_tls_offset(obj);
 #endif

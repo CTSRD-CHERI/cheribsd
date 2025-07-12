@@ -106,8 +106,11 @@ __BEGIN_DECLS
 
 extern void *rtld_bind_fptr;
 extern void *tls_get_addr_common_fptr;
+#ifdef TLS_TGOT_COMPAT
+extern void *tls_get_addr_common_compat_fptr;
+#endif
 
-#ifndef TLS_TGOT
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 extern size_t tls_last_offset;
 extern size_t tls_last_size;
 extern size_t tls_static_space;
@@ -119,7 +122,7 @@ extern size_t tgot_static_space;
 #endif
 extern Elf_Addr tls_dtv_generation;
 extern int tls_max_index;
-#ifndef TLS_TGOT
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 extern size_t ld_static_tls_extra;
 #endif
 #ifdef TLS_TGOT
@@ -281,7 +284,7 @@ typedef struct Struct_Obj_Entry {
     void *tlsinit;		/* Base address of TLS init block */
     size_t tlsinitsize;		/* Size of TLS init block for this module */
     size_t tlssize;		/* Size of TLS block for this module */
-#ifndef TLS_TGOT
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
     size_t tlsoffset;		/* Offset of static TLS block for this module */
 #endif
     size_t tlsalign;		/* Alignment of static TLS block */
@@ -388,7 +391,7 @@ typedef struct Struct_Obj_Entry {
     bool bind_now : 1;		/* True if all relocations should be made first */
     bool traced : 1;		/* Already printed in ldd trace output */
     bool init_done : 1;		/* Already have added object to init list */
-#ifndef TLS_TGOT
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
     bool tls_static : 1;	/* Already allocated offset for static TLS */
     bool tls_dynamic : 1;	/* A non-static DTV entry has been allocated */
 #endif
@@ -405,7 +408,7 @@ typedef struct Struct_Obj_Entry {
     bool z_nodeflib : 1;	/* Don't search default library path */
     bool z_global : 1;		/* Make the object global */
     bool z_pie : 1;		/* Object proclaimed itself PIE executable */
-#ifndef TLS_TGOT
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
     bool static_tls : 1;	/* Needs static TLS allocation */
     bool static_tls_copied : 1;	/* Needs static TLS copying */
 #endif
@@ -450,7 +453,7 @@ typedef struct Struct_Obj_Entry {
 
 TAILQ_HEAD(obj_entry_q, Struct_Obj_Entry);
 
-#ifndef TLS_TGOT
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 #define RTLD_STATIC_TLS_EXTRA	128
 #endif
 #ifdef TLS_TGOT
@@ -551,7 +554,7 @@ enum {
 	LD_TRACE_LOADED_OBJECTS_FMT2,
 	LD_TRACE_LOADED_OBJECTS_ALL,
 	LD_SHOW_AUXV,
-#ifndef TLS_TGOT
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 	LD_STATIC_TLS_EXTRA,
 #endif
 #ifdef TLS_TGOT
@@ -691,6 +694,9 @@ void *rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def);
 void symlook_init(SymLook *, const char *);
 int symlook_obj(SymLook *, const Obj_Entry *);
 void *tls_get_addr_common(struct tcb *tcb, int index, size_t offset);
+#ifdef TLS_TGOT_COMPAT
+void *tls_get_addr_common_compat(struct tcb *tcb, int index, size_t offset);
+#endif
 void *allocate_tls(Obj_Entry *, void *, size_t, size_t,
     struct Struct_RtldLockState *);
 void free_tls(void *, size_t, size_t);
@@ -699,7 +705,7 @@ void *allocate_module_tls(struct tcb *tcb, int index);
 void *allocate_module_tgot(struct tcb *tcb, int index,
     struct Struct_RtldLockState *lockstate);
 #endif
-#ifndef TLS_TGOT
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 bool allocate_tls_offset(Obj_Entry *obj);
 void free_tls_offset(Obj_Entry *obj);
 #endif
