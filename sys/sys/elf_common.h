@@ -758,8 +758,10 @@ typedef struct {
 #define	DT_PPC64_OPDSZ			0x70000002
 #define	DT_PPC64_TLSOPT			0x70000003
 
-#define	DT_RISCV_CHERI___CAPRELOCS	0x7000c000 /* start of __cap_relocs section */
-#define	DT_RISCV_CHERI___CAPRELOCSSZ	0x7000c001 /* size of __cap_relocs section */
+#define	DT_RISCV_CHERI___CAPRELOCS		0x7000c000 /* start of __cap_relocs section */
+#define	DT_RISCV_CHERI___CAPRELOCSSZ		0x7000c001 /* size of __cap_relocs section */
+#define	DT_RISCV_CHERI___TGOTCAPRELOCS		0x7000c002 /* start of __tgot_cap_relocs section */
+#define	DT_RISCV_CHERI___TGOTCAPRELOCSSZ	0x7000c003 /* size of __tgot_cap_relocs section */
 
 #define	DT_AUXILIARY	0x7ffffffd	/* shared library auxiliary name */
 #define	DT_USED		0x7ffffffe	/* ignored - same as needed */
@@ -1433,6 +1435,13 @@ typedef struct {
 
 /* Relocation types added by CHERI */
 #define	R_RISCV_CHERI_CAPABILITY		193
+#define	R_RISCV_CHERI_TLS_TGOT_HI20		202
+#define	R_RISCV_CHERI_TLS_TGOT_LO12_I		203
+#define	R_RISCV_CHERI_TLS_TGOT_ADD		204
+#define	R_RISCV_CHERI_TLS_TGOT_GOT_HI20		205
+#define	R_RISCV_CHERI_TLS_TGOT_GD_HI20		206
+#define	R_RISCV_CHERI_TLS_TGOTREL		207
+#define	R_RISCV_CHERI_TLS_TGOT_SLOT		208
 
 #define	R_SPARC_NONE		0
 #define	R_SPARC_8		1

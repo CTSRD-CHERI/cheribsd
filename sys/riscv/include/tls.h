@@ -36,7 +36,11 @@
 #ifndef _MACHINE_TLS_H_
 #define	_MACHINE_TLS_H_
 
+#ifdef __CHERI_TGOT_TLS__
+#include <sys/_tls_tgot.h>
+#else
 #include <sys/_tls_variant_i.h>
+#endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	TLS_DTV_OFFSET	0
