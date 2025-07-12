@@ -51,6 +51,10 @@
 #define	XFAIL_VARARG_BOUNDS	"varargs bounds known to be unimplemented"
 #endif
 
+#ifdef __CHERI_TGOT_TLS__
+#define	TLS_EXACT_BOUNDS
+#endif
+
 #define	CAPREG_PCC(capreg)	((capreg)->sepcc)
 
 #endif /* !_CHERIBSDTEST_H_ */
