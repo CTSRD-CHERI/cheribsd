@@ -107,12 +107,24 @@ __BEGIN_DECLS
 extern void *rtld_bind_fptr;
 extern void *tls_get_addr_common_fptr;
 
+#ifndef TLS_TGOT
 extern size_t tls_last_offset;
 extern size_t tls_last_size;
 extern size_t tls_static_space;
+#endif
+#ifdef TLS_TGOT
+extern size_t tgot_last_offset;
+extern size_t tgot_last_size;
+extern size_t tgot_static_space;
+#endif
 extern Elf_Addr tls_dtv_generation;
 extern int tls_max_index;
+#ifndef TLS_TGOT
 extern size_t ld_static_tls_extra;
+#endif
+#ifdef TLS_TGOT
+extern size_t ld_static_tgot_extra;
+#endif
 
 extern int npagesizes;
 extern size_t *pagesizes;
@@ -269,9 +281,19 @@ typedef struct Struct_Obj_Entry {
     void *tlsinit;		/* Base address of TLS init block */
     size_t tlsinitsize;		/* Size of TLS init block for this module */
     size_t tlssize;		/* Size of TLS block for this module */
+#ifndef TLS_TGOT
     size_t tlsoffset;		/* Offset of static TLS block for this module */
+#endif
     size_t tlsalign;		/* Alignment of static TLS block */
     size_t tlspoffset;		/* p_offset of the static TLS block */
+#ifdef TLS_TGOT
+    void *tgotinit;		/* Base address of TGOT init block */
+    size_t tgotinitsize;	/* Size of TGOT init block for this module */
+    size_t tgotsize;		/* Size of TGOT block for this module */
+    size_t tgotoffset;		/* Offset of static TGOT block for this module */
+    size_t tgotalign;		/* Alignment of static TGOT block */
+    size_t tgotpoffset;		/* p_offset of the static TGOT block */
+#endif
 
     /* Items from the dynamic section. */
     Plt_Entry *plts;
@@ -285,6 +307,13 @@ typedef struct Struct_Obj_Entry {
     const Elf_Sym *symtab;	/* Symbol table */
     const char *strtab;		/* String table */
     unsigned long strsize;	/* Size in bytes of string table */
+#ifdef TLS_TGOT
+    /* TODO: sub-library TGOTs */
+    const Elf_Rel *tgotrel;	/* TGOT relocation entries */
+    unsigned long tgotrelsize;	/* Size in bytes of TGOT relocation info */
+    const Elf_Rela *tgotrela;	/* TGOT relocation entries with addend */
+    unsigned long tgotrelasize;	/* Size in bytes of TGOT added relocation info */
+#endif
 #ifdef CHERI_LIB_C18N
     Compart_Entry *comparts;
     unsigned long ncomparts;
@@ -294,6 +323,10 @@ typedef struct Struct_Obj_Entry {
 #ifdef RTLD_HAS_CAPRELOCS
     caddr_t cap_relocs;		/* start of the __cap_relocs section */
     size_t cap_relocs_size;	/* size of the __cap_relocs section */
+#ifdef TLS_TGOT
+    caddr_t tgot_cap_relocs;	/* start of the __tgot_cap_relocs section */
+    size_t tgot_cap_relocs_size;/* size of the __tgot_cap_relocs section */
+#endif
 #endif
 
     const Elf_Verneed *verneed; /* Required versions. */
@@ -355,8 +388,14 @@ typedef struct Struct_Obj_Entry {
     bool bind_now : 1;		/* True if all relocations should be made first */
     bool traced : 1;		/* Already printed in ldd trace output */
     bool init_done : 1;		/* Already have added object to init list */
+#ifndef TLS_TGOT
     bool tls_static : 1;	/* Already allocated offset for static TLS */
     bool tls_dynamic : 1;	/* A non-static DTV entry has been allocated */
+#endif
+#ifdef TLS_TGOT
+    bool tgot_static : 1;	/* Already allocated offset for static TLS */
+    bool tgot_dynamic : 1;	/* A non-static DTV entry has been allocated */
+#endif
     bool phdr_alloc : 1;	/* Phdr is allocated and needs to be freed. */
     bool z_origin : 1;		/* Process rpath and soname tokens */
     bool z_nodelete : 1;	/* Do not unload the object and dependencies */
@@ -366,8 +405,14 @@ typedef struct Struct_Obj_Entry {
     bool z_nodeflib : 1;	/* Don't search default library path */
     bool z_global : 1;		/* Make the object global */
     bool z_pie : 1;		/* Object proclaimed itself PIE executable */
+#ifndef TLS_TGOT
     bool static_tls : 1;	/* Needs static TLS allocation */
     bool static_tls_copied : 1;	/* Needs static TLS copying */
+#endif
+#ifdef TLS_TGOT
+    bool static_tgot : 1;	/* Needs static TGOT allocation */
+    bool static_tgot_copied : 1;/* Needs static TGOT copying */
+#endif
     bool ref_nodel : 1;		/* Refcount increased to prevent dlclose */
     bool init_scanned: 1;	/* Object is already on init list. */
     bool on_fini_list: 1;	/* Object is already on fini list. */
@@ -405,7 +450,12 @@ typedef struct Struct_Obj_Entry {
 
 TAILQ_HEAD(obj_entry_q, Struct_Obj_Entry);
 
+#ifndef TLS_TGOT
 #define RTLD_STATIC_TLS_EXTRA	128
+#endif
+#ifdef TLS_TGOT
+#define RTLD_STATIC_TGOT_EXTRA	128
+#endif
 
 /* Flags to be passed into symlook_ family of functions. */
 #define SYMLOOK_IN_PLT	0x01	/* Lookup for PLT symbol */
@@ -414,6 +464,7 @@ TAILQ_HEAD(obj_entry_q, Struct_Obj_Entry);
 #define	SYMLOOK_EARLY	0x04	/* Symlook is done during initialization. */
 #define	SYMLOOK_IFUNC	0x08	/* Allow IFUNC processing in
 				   reloc_non_plt(). */
+#define	SYMLOOK_IN_TGOT	0x10	/* Lookup for TGOT symbol */
 
 /* Flags for load_object(). */
 #define	RTLD_LO_NOLOAD	0x01	/* dlopen() specified RTLD_NOLOAD. */
@@ -500,7 +551,12 @@ enum {
 	LD_TRACE_LOADED_OBJECTS_FMT2,
 	LD_TRACE_LOADED_OBJECTS_ALL,
 	LD_SHOW_AUXV,
+#ifndef TLS_TGOT
 	LD_STATIC_TLS_EXTRA,
+#endif
+#ifdef TLS_TGOT
+	LD_STATIC_TGOT_EXTRA,
+#endif
 	LD_NO_DL_ITERATE_PHDR_AFTER_FORK,
 	LD_SKIP_INIT_FUNCS,
 #ifdef CHERI_LIB_C18N
@@ -516,6 +572,10 @@ enum {
 	LD_COMPARTMENT_FPTR,
 #endif
 };
+
+#ifdef TLS_TGOT
+typedef char *(*tls_get_block_cb)(struct tcb *, int);
+#endif
 
 void _rtld_error(const char *, ...) __printflike(1, 2) __exported;
 void rtld_die(void) __dead2;
@@ -635,8 +695,18 @@ void *allocate_tls(Obj_Entry *, void *, size_t, size_t,
     struct Struct_RtldLockState *);
 void free_tls(void *, size_t, size_t);
 void *allocate_module_tls(struct tcb *tcb, int index);
+#ifdef TLS_TGOT
+void *allocate_module_tgot(struct tcb *tcb, int index,
+    struct Struct_RtldLockState *lockstate);
+#endif
+#ifndef TLS_TGOT
 bool allocate_tls_offset(Obj_Entry *obj);
 void free_tls_offset(Obj_Entry *obj);
+#endif
+#ifdef TLS_TGOT
+bool allocate_tgot_offset(Obj_Entry *obj);
+void free_tgot_offset(Obj_Entry *obj);
+#endif
 const Ver_Entry *fetch_ventry(const Obj_Entry *obj, unsigned long);
 int convert_prot(int elfflags);
 bool check_elf_headers(const Elf_Ehdr *hdr, const char *path);
@@ -652,6 +722,10 @@ int reloc_jmpslots(Plt_Entry *, int flags, struct Struct_RtldLockState *);
 int reloc_iresolve(Obj_Entry *, struct Struct_RtldLockState *);
 int reloc_iresolve_nonplt(Obj_Entry *, struct Struct_RtldLockState *);
 int reloc_gnu_ifunc(Obj_Entry *, int flags, struct Struct_RtldLockState *);
+#ifdef TLS_TGOT
+int reloc_tgot(Obj_Entry *, struct tcb *, void *, int flags, tls_get_block_cb,
+    struct Struct_RtldLockState *);
+#endif
 void ifunc_init(Elf_Auxinfo *[__min_size(AT_COUNT)]);
 void init_pltgot(Plt_Entry *);
 void allocate_initial_tls(Obj_Entry *);

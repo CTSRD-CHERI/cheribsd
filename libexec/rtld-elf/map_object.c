@@ -89,6 +89,7 @@ map_object(int fd, const char *path, const struct stat *sb, bool ismain,
     Elf_Phdr *phdyn;
     Elf_Phdr *phinterp;
     Elf_Phdr *phtls;
+    Elf_Phdr *phtgot;
     caddr_t mapbase;
     size_t mapsize;
     Elf_Addr base_vaddr;
@@ -129,7 +130,7 @@ map_object(int fd, const char *path, const struct stat *sb, bool ismain,
     phsize  = hdr->e_phnum * sizeof(phdr[0]);
     phlimit = phdr + hdr->e_phnum;
     nsegs = -1;
-    phdyn = phinterp = phtls = NULL;
+    phdyn = phinterp = phtls = phtgot = NULL;
     phdr_vaddr = 0;
     note_start = 0;
     note_end = 0;
@@ -172,6 +173,10 @@ map_object(int fd, const char *path, const struct stat *sb, bool ismain,
 
 	case PT_TLS:
 	    phtls = phdr;
+	    break;
+
+	case PT_CHERI_TGOT:
+	    phtgot = phdr;
 	    break;
 
 	case PT_GNU_STACK:
@@ -366,18 +371,32 @@ map_object(int fd, const char *path, const struct stat *sb, bool ismain,
     obj->phsize = phsize;
     if (phinterp != NULL)
 	obj->interp = (const char *)(obj->relocbase + phinterp->p_vaddr);
-    if (phtls != NULL) {
+    if (phtls != NULL || phtgot != NULL) {
 	if (ismain)
 	    obj->tlsindex = 1;
 	else {
 	    tls_dtv_generation++;
 	    obj->tlsindex = ++tls_max_index;
 	}
+    }
+    if (phtls != NULL) {
 	obj->tlssize = phtls->p_memsz;
 	obj->tlsalign = phtls->p_align;
 	obj->tlspoffset = phtls->p_offset;
 	obj->tlsinitsize = phtls->p_filesz;
 	obj->tlsinit = mapbase + phtls->p_vaddr;
+    }
+    if (phtgot != NULL) {
+#ifdef TLS_TGOT
+	obj->tgotsize = phtgot->p_memsz;
+	obj->tgotalign = phtgot->p_align;
+	obj->tgotpoffset = phtgot->p_offset;
+	obj->tgotinitsize = phtgot->p_filesz;
+	obj->tgotinit = mapbase + phtgot->p_vaddr;
+#else
+	_rtld_error("%s: TGOT not supported", path);
+	goto error;
+#endif
     }
 #ifdef __CHERI_PURE_CAPABILITY__
     if (!create_pcc_caps(obj, path)) {
@@ -519,8 +538,14 @@ obj_free(Obj_Entry *obj)
 {
     Objlist_Entry *elm;
 
+#ifndef TLS_TGOT
     if (obj->tls_static)
 	free_tls_offset(obj);
+#endif
+#ifdef TLS_TGOT
+    if (obj->tgot_static)
+	free_tgot_offset(obj);
+#endif
     while (obj->needed != NULL) {
 	Needed_Entry *needed = obj->needed;
 	obj->needed = needed->next;

@@ -1873,9 +1873,17 @@ c18n_init2(Obj_Entry *obj_rtld)
 	 * Restricted mode capabilities.
 	 */
 	rtld_bind_start_fptr = make_restricted(rtld_bind_start_fptr);
+#ifndef TLS_TGOT
 	rtld_tlsdesc_static_fptr = make_restricted(rtld_tlsdesc_static_fptr);
 	rtld_tlsdesc_undef_fptr = make_restricted(rtld_tlsdesc_undef_fptr);
 	rtld_tlsdesc_dynamic_fptr = make_restricted(rtld_tlsdesc_dynamic_fptr);
+#endif
+#ifdef TLS_TGOT
+	rtld_tgot_tlsdesc_static_fptr =
+	    make_restricted(rtld_tgot_tlsdesc_static_fptr);
+	rtld_tgot_tlsdesc_dynamic_fptr =
+	    make_restricted(rtld_tgot_tlsdesc_dynamic_fptr);
+#endif
 
 	/*
 	 * Wrap RTLD function pointers that are called by user code in
