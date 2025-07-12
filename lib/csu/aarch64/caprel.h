@@ -77,6 +77,12 @@ elf_reloc(const Elf_Rela *rela, void * __capability data_cap,
 	Elf_Addr addr;
 	Elf_Addr *where;
 
+#ifdef TLS_TGOT_COMPAT
+	/* See __libc_init_got_tgot */
+	if (ELF_R_TYPE(rela->r_info) == R_MORELLO_TLS_TGOTREL128)
+		return;
+#endif
+
 	if (ELF_R_TYPE(rela->r_info) != R_MORELLO_RELATIVE &&
 	    ELF_R_TYPE(rela->r_info) != R_MORELLO_FUNC_RELATIVE)
 		__builtin_trap();
