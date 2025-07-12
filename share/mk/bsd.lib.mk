@@ -123,6 +123,16 @@ LDFLAGS+=	-cheri-codeptr-relocs
 .endif
 .endif
 
+.if ${MACHINE_ABI:Mpurecap}
+.if ${OPT_CHERI_TGOT_TLS} == "yes"
+CFLAGS+=	-cheri-tgot-tls
+.elif ${OPT_CHERI_TGOT_TLS} == "compat"
+CFLAGS+=	-cheri-tgot-tls=compat
+.elif ${OPT_CHERI_TGOT_TLS} == "no"
+CFLAGS+=	-no-cheri-tgot-tls
+.endif
+.endif
+
 # Initialize stack variables on function entry
 .if ${OPT_INIT_ALL} != "none"
 .if ${COMPILER_FEATURES:Minit-all}

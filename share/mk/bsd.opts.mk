@@ -110,7 +110,11 @@ BROKEN_OPTIONS+=	BRANCH_PROTECTION
 .endif
 
 __SINGLE_OPTIONS = \
+   CHERI_TGOT_TLS \
    INIT_ALL
+
+__CHERI_TGOT_TLS_OPTIONS=	native no compat yes
+__CHERI_TGOT_TLS_DEFAULT=	native
 
 __INIT_ALL_OPTIONS=	none pattern zero
 __INIT_ALL_DEFAULT=	none
