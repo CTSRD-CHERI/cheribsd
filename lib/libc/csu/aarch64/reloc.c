@@ -36,6 +36,8 @@ ifunc_init(const Elf_Auxinfo *aux __unused)
 #include <cheri/cherireg.h>
 #include <cheriintrin.h>
 
+#include <stddef.h>
+
 /*
  * Fragments consist of a 64-bit address followed by a 56-bit length and an
  * 8-bit permission field.
@@ -108,6 +110,23 @@ crt1_handle_rela(const Elf_Rela *r, void *data_cap, const void *code_cap)
 			    code_cap, 0, r->r_addend);
 		target = ((ifunc_resolver_t)ptr)(0, 0, 0, 0, 0, 0, 0, 0);
 		*where = target;
+		break;
+	}
+}
+
+static void
+crt1_handle_tgot_rela(const Elf_Rela *r, void *tgot, Elf_Addr init, void *tls)
+{
+	uintptr_t *where;
+	Elf_Addr *fragment;
+
+	switch (ELF_R_TYPE(r->r_info)) {
+	case R_MORELLO_TLS_TGOT_SLOT:
+		where = (uintptr_t *)((uintptr_t)tgot +
+		    (r->r_offset - init));
+		fragment = (Elf_Addr *)where;
+		*where = init_cap_from_fragment(fragment, tls,
+		    NULL, (ptraddr_t)tls, 0);
 		break;
 	}
 }
