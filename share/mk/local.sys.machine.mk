@@ -10,7 +10,7 @@ MACHINE_ARCH_host32?= ${_HOST_ARCH32}
 CHERI_ARCHES_arm64?= aarch64c
 CHERI_ARCHES_riscv?= riscv64c
 
-MACHINE_ARCH_LIST_arm?= armv7 ${EXTRA_ARCHES_arm}
+MACHINE_ARCH_LIST_arm?= armv7
 MACHINE_ARCH_LIST_arm64?= aarch64 ${CHERI_ARCHES_arm64}
 MACHINE_ARCH_LIST_powerpc?= powerpc64 powerpc64le ${EXTRA_ARCHES_powerpc}
 MACHINE_ARCH_LIST_riscv?= riscv64 ${CHERI_ARCHES_riscv}
