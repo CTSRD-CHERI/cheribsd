@@ -69,6 +69,7 @@ struct rtprio;
 struct sched_param;
 struct sembuf;
 union semun;
+struct shmfd;
 struct sockaddr;
 struct spacectl_range;
 struct stat;
@@ -514,7 +515,7 @@ int	kern_shm_open(struct thread *td, const char * __capability userpath,
 	    int flags, mode_t mode, struct filecaps *fcaps);
 int	kern_shm_open2(struct thread *td, const char * __capability path,
 	    int flags, mode_t mode, int shmflags, struct filecaps *fcaps,
-	    const char * __capability name);
+	    const char * __capability name, struct shmfd *shmfd);
 int	kern_shm_rename(struct thread *td,
 	    const char * __capability path_from_p,
 	    const char * __capability path_to_p, int flags);
