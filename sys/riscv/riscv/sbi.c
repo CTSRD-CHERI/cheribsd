@@ -260,7 +260,7 @@ sbi_remote_sfence_vma_asid(const u_long *hart_mask, u_long start, u_long size,
 }
 
 int
-sbi_hsm_hart_start(u_long hart, u_long start_addr, u_long priv)
+sbi_hsm_hart_start(u_long hart, uintptr_t start_addr, u_long priv)
 {
 	struct sbi_ret ret;
 
