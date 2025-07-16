@@ -63,6 +63,8 @@
 #include <machine/smp.h>
 #include <machine/sbi.h>
 
+#include <cheri/cheri.h>
+
 #ifdef FDT
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/ofw_cpu.h>
@@ -388,7 +390,20 @@ cpu_init_fdt(u_int id, phandle_t node, u_int addr_size, pcell_t *reg)
 	 */
 	if (sbi_probe_extension(SBI_EXT_ID_HSM) != 0) {
 		start_addr = pmap_kextract((vm_offset_t)mpentry);
+		/*
+		 * XXX-AM: This relies on a pure-capability SBI implementation
+		 * that expects a capability as start_addr.
+		 * Note that the standard SBI requires a ulong start_addr,
+		 * however it should work because the integer view of the
+		 * capability register is the required address.
+		 */
+#ifdef __CHERI_PURE_CAPABILITY__
+		error = sbi_hsm_hart_start(hart,
+		    cheri_setaddress((uintptr_t)kernel_root_cap, start_addr),
+		    0);
+#else
 		error = sbi_hsm_hart_start(hart, start_addr, 0);
+#endif
 		if (error != 0) {
 			mp_ncpus--;
 
