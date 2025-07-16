@@ -143,24 +143,40 @@ struct sbi_ret {
 };
 
 static __inline struct sbi_ret
-sbi_call(uint64_t arg7, uint64_t arg6, uint64_t arg0, uint64_t arg1,
-    uint64_t arg2, uint64_t arg3, uint64_t arg4)
+sbi_call(uintptr_t arg7, uintptr_t arg6, uintptr_t arg0, uintptr_t arg1,
+    uintptr_t arg2, uintptr_t arg3, uintptr_t arg4)
 {
 	struct sbi_ret ret;
 
-	register register_t a0 __asm ("a0") = (register_t)(arg0);
-	register register_t a1 __asm ("a1") = (register_t)(arg1);
-	register register_t a2 __asm ("a2") = (register_t)(arg2);
-	register register_t a3 __asm ("a3") = (register_t)(arg3);
-	register register_t a4 __asm ("a4") = (register_t)(arg4);
-	register register_t a6 __asm ("a6") = (register_t)(arg6);
-	register register_t a7 __asm ("a7") = (register_t)(arg7);
+#ifdef __CHERI_PURE_CAPABILITY__
+	register uintcap_t a0 __asm ("ca0") = arg0;
+	register uintcap_t a1 __asm ("ca1") = arg1;
+	register uintcap_t a2 __asm ("ca2") = arg2;
+	register uintcap_t a3 __asm ("ca3") = arg3;
+	register uintcap_t a4 __asm ("ca4") = arg4;
+	register uintcap_t a6 __asm ("ca6") = arg6;
+	register uintcap_t a7 __asm ("ca7") = arg7;
+
+	__asm __volatile(			\
+		"ecall"				\
+		:"+C"(a0), "+C"(a1)		\
+		:"C"(a2), "C"(a3), "C"(a4), "C"(a6), "C"(a7)	\
+		:"memory");
+#else
+	register register_t a0 __asm ("a0") = (register_t)arg0;
+	register register_t a1 __asm ("a1") = (register_t)arg1;
+	register register_t a2 __asm ("a2") = (register_t)arg2;
+	register register_t a3 __asm ("a3") = (register_t)arg3;
+	register register_t a4 __asm ("a4") = (register_t)arg4;
+	register register_t a6 __asm ("a6") = (register_t)arg6;
+	register register_t a7 __asm ("a7") = (register_t)arg7;
 
 	__asm __volatile(			\
 		"ecall"				\
 		:"+r"(a0), "+r"(a1)		\
 		:"r"(a2), "r"(a3), "r"(a4), "r"(a6), "r"(a7)	\
 		:"memory");
+#endif
 
 	ret.error = a0;
 	ret.value = a1;
@@ -193,7 +209,7 @@ void sbi_remote_sfence_vma_asid(const u_long *hart_mask, u_long start,
  * register a0 will contain the hart's ID, and a1 will contain the value of
  * priv.
  */
-int sbi_hsm_hart_start(u_long hart, u_long start_addr, u_long priv);
+int sbi_hsm_hart_start(u_long hart, uintptr_t start_addr, u_long priv);
 
 /*
  * Stop execution on the current hart. Interrupts should be disabled, or this
