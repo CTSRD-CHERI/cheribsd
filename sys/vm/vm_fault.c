@@ -376,6 +376,7 @@ enum vm_fault_cheri_revoke_res {
 };
 
 extern counter_u64_t cheri_scan_rw, cheri_scan_ro;
+extern counter_u64_t cheri_became_cap_dirty;
 
 static int
 vm_fault_cheri_revoke(struct faultstate *fs, vm_page_t m, bool canwrite)
@@ -576,8 +577,10 @@ vm_fault_soft_fast(struct faultstate *fs)
 	 *
 	 * Importantly, realprot is exempt from vm_page_mask_cap_prot()!
 	 */
-	if (VM_PROT_HAS_WRITE_CAP(realprot))
+	if (VM_PROT_HAS_WRITE_CAP(realprot)) {
 		vm_page_aflag_set(m_map, PGA_CAPSTORE);
+		counter_u64_add(cheri_became_cap_dirty, 1);
+	}
 
 	if ((fs->fault_flags & VM_FAULT_NOPMAP) == 0 &&
 	    pmap_enter(fs->map->pmap, vaddr, m_map, realprot,
@@ -745,8 +748,10 @@ vm_fault_populate(struct faultstate *fs)
 		KASSERT((VM_PAGE_TO_PHYS(m) & (pagesizes[bdry_idx] - 1)) == 0,
 		    ("unaligned superpage m %p %#jx", m,
 		    (uintmax_t)VM_PAGE_TO_PHYS(m)));
-		if (VM_PROT_HAS_WRITE_CAP(fs->prot))
+		if (VM_PROT_HAS_WRITE_CAP(fs->prot)) {
 			vm_page_aflag_set(m, PGA_CAPSTORE);
+			counter_u64_add(cheri_became_cap_dirty, 1);
+		}
 		if (fs->fault_flags & VM_FAULT_NOPMAP) {
 			rv = KERN_SUCCESS;
 			goto skip_pmap_bdry;

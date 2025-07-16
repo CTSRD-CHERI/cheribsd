@@ -119,6 +119,11 @@ SYSCTL_COUNTER_U64(_vm_stats_cheri_revoke, OID_AUTO, scan_rw, CTLFLAG_RD,
     &cheri_scan_rw,
     "Count of read-write page scans");
 
+COUNTER_U64_DEFINE_EARLY(cheri_became_cap_dirty);
+SYSCTL_COUNTER_U64(_vm_stats_cheri_revoke, OID_AUTO, became_cap_dirty, CTLFLAG_RD,
+    &cheri_became_cap_dirty,
+    "Number of times a cap-clean page became cap-dirty, possibly page de-idle");
+
 /***************************** KERNEL THREADS ***************************/
 
 static MALLOC_DEFINE(M_REVOKE, "cheri_revoke", "cheri_revoke temporary data");
