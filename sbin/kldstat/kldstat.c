@@ -48,7 +48,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <strings.h>
+#include <string.h>
 #include <unistd.h>
 
 #define	PTR_WIDTH ((int)(sizeof(ptraddr_t) * 2 + 2))
@@ -64,7 +64,7 @@ printmod(int modid)
 {
 	struct module_stat stat;
 
-	bzero(&stat, sizeof(stat));
+	memset(&stat, 0, sizeof(stat));
 	stat.version = sizeof(struct module_stat);
 	if (modstat(modid, &stat) < 0) {
 		warn("can't stat module id %d", modid);
