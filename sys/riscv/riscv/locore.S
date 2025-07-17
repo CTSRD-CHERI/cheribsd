@@ -312,7 +312,7 @@ pagetables:
 	sfence.vma
 	csrw	satp, s2
 
-	// Enter the kenrnel VA space
+	/* Enter the kernel VA space */
 	LL_PTR PTR(t0), va
 	li	t1, KERNBASE
 	sub	t1, t1, s9
@@ -533,6 +533,22 @@ END(mpentry)
  * Called by a core when it is being brought online.
  */
 ENTRY(mpentry)
+#ifdef __CHERI_PURE_CAPABILITY__
+.option push
+.option nocapmode
+#ifndef __riscv_xcheri
+	modesw.cap
+#else
+	lla	t0, 1f
+	csrr	ct1, pcc
+	scaddr	ct1, ct1, t0
+	li	t0, 1
+	csetflags ct1, ct1, t0
+	jr.cap	ct1
+#endif
+1:
+.option pop
+#endif
 	/*
 	 * Calculate the offset to __riscv_boot_ap
 	 * for the current core, cpuid is in a0.
