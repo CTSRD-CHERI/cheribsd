@@ -12181,10 +12181,12 @@ sysctl_kmaps(SYSCTL_HANDLER_ARGS)
 	for (sva = 0, i = pmap_pml4e_index(sva); i < NPML4EPG; i++) {
 		switch (i) {
 		case PML4PML4I:
-			sbuf_printf(sb, "\nRecursive map:\n");
+			if (!la57)
+				sbuf_printf(sb, "\nRecursive map:\n");
 			break;
 		case DMPML4I:
-			sbuf_printf(sb, "\nDirect map:\n");
+			if (!la57)
+				sbuf_printf(sb, "\nDirect map:\n");
 			break;
 #ifdef KASAN
 		case KASANPML4I:
@@ -12203,7 +12205,8 @@ sysctl_kmaps(SYSCTL_HANDLER_ARGS)
 			sbuf_printf(sb, "\nKernel map:\n");
 			break;
 		case LMSPML4I:
-			sbuf_printf(sb, "\nLarge map:\n");
+			if (!la57)
+				sbuf_printf(sb, "\nLarge map:\n");
 			break;
 		}
 
