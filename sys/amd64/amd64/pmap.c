@@ -11955,12 +11955,18 @@ sysctl_kmaps_reinit(struct pmap_kernel_map_range *range, vm_offset_t va,
  */
 static void
 sysctl_kmaps_check(struct sbuf *sb, struct pmap_kernel_map_range *range,
-    vm_offset_t va, pml4_entry_t pml4e, pdp_entry_t pdpe, pd_entry_t pde,
-    pt_entry_t pte)
+    vm_offset_t va, pml5_entry_t pml5e, pml4_entry_t pml4e, pdp_entry_t pdpe,
+    pd_entry_t pde, pt_entry_t pte)
 {
 	pt_entry_t attrs;
 
-	attrs = pml4e & (X86_PG_RW | X86_PG_U | pg_nx);
+	if (la57) {
+		attrs = pml5e & (X86_PG_RW | X86_PG_U | pg_nx);
+		attrs |= pml4e & pg_nx;
+		attrs &= pg_nx | (pml4e & (X86_PG_RW | X86_PG_U));
+	} else {
+		attrs = pml4e & (X86_PG_RW | X86_PG_U | pg_nx);
+	}
 
 	attrs |= pdpe & pg_nx;
 	attrs &= pg_nx | (pdpe & (X86_PG_RW | X86_PG_U));
@@ -12075,8 +12081,8 @@ restart:
 			pa = pdpe & PG_FRAME;
 			if ((pdpe & PG_PS) != 0) {
 				sva = rounddown2(sva, NBPDP);
-				sysctl_kmaps_check(sb, &range, sva, pml4e, pdpe,
-				    0, 0);
+				sysctl_kmaps_check(sb, &range, sva, 0,
+				    pml4e, pdpe, 0, 0);
 				range.pdpes++;
 				sva += NBPDP;
 				continue;
@@ -12104,7 +12110,7 @@ restart:
 				if ((pde & PG_PS) != 0) {
 					sva = rounddown2(sva, NBPDR);
 					sysctl_kmaps_check(sb, &range, sva,
-					    pml4e, pdpe, pde, 0);
+					    0, pml4e, pdpe, pde, 0);
 					range.pdes++;
 					sva += NBPDR;
 					continue;
@@ -12129,7 +12135,7 @@ restart:
 						continue;
 					}
 					sysctl_kmaps_check(sb, &range, sva,
-					    pml4e, pdpe, pde, pte);
+					    0, pml4e, pdpe, pde, pte);
 					range.ptes++;
 				}
 			}
