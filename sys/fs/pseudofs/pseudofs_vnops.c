@@ -869,7 +869,7 @@ pfs_readdir(struct vop_readdir_args *va)
 	struct uio *uio;
 	struct pfsentry *pfsent, *pfsent2;
 	struct pfsdirentlist lst;
-	off_t offset;
+	off_t coffset, offset;
 	int error, i, resid;
 
 	STAILQ_INIT(&lst);
@@ -878,6 +878,9 @@ pfs_readdir(struct vop_readdir_args *va)
 	    ("%s(): pn_info does not match mountpoint", __func__));
 	PFS_TRACE(("%s pid %lu", pd->pn_name, (unsigned long)pid));
 	pfs_assert_not_owned(pd);
+
+	if (va->a_eofflag != NULL)
+		*va->a_eofflag = 0;
 
 	if (vn->v_type != VDIR)
 		PFS_RETURN (ENOTDIR);
@@ -897,6 +900,10 @@ pfs_readdir(struct vop_readdir_args *va)
 	if (pid != NO_PID && !pfs_lookup_proc(pid, &proc))
 		PFS_RETURN (ENOENT);
 
+	/*
+	 * The allproc lock is required in pfs_iterate() for procdir
+	 * directories.
+	 */
 	sx_slock(&allproc_lock);
 	pfs_lock(pd);
 
@@ -918,23 +925,15 @@ pfs_readdir(struct vop_readdir_args *va)
 		}
 	}
 
-	/* skip unwanted entries */
-	for (pn = NULL, p = NULL; offset > 0; offset -= PFS_DELEN) {
+	for (pn = NULL, p = NULL, coffset = 0; resid >= PFS_DELEN;
+	    coffset += PFS_DELEN) {
 		if (pfs_iterate(curthread, proc, pd, &pn, &p) == -1) {
-			/* nothing left... */
-			if (proc != NULL) {
-				_PRELE(proc);
-				PROC_UNLOCK(proc);
-			}
-			pfs_unlock(pd);
-			sx_sunlock(&allproc_lock);
-			PFS_RETURN (0);
+			if (va->a_eofflag != NULL)
+				*va->a_eofflag = 1;
+			break;
 		}
-	}
-
-	/* fill in entries */
-	while (pfs_iterate(curthread, proc, pd, &pn, &p) != -1 &&
-	    resid >= PFS_DELEN) {
+		if (coffset < offset)
+			continue;
 		if ((pfsent = malloc(sizeof(struct pfsentry), M_IOV,
 		    M_NOWAIT | M_ZERO)) == NULL) {
 			error = ENOMEM;
