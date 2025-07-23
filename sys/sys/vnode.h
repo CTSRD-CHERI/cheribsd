@@ -1045,7 +1045,7 @@ void	vop_rename_fail(struct vop_rename_args *ap);
 	}								\
 } while (0)
 
-#define	VOP_WRITE_PRE(ap)						\
+#define	vop_write_pre(ap)						\
 	struct vattr va;						\
 	int error;							\
 	off_t osize, ooffset, noffset;					\
@@ -1059,7 +1059,7 @@ void	vop_rename_fail(struct vop_rename_args *ap);
 		osize = (off_t)va.va_size;				\
 	}
 
-#define VOP_WRITE_POST(ap, ret)						\
+#define vop_write_post(ap, ret)						\
 	noffset = (ap)->a_uio->uio_offset;				\
 	if (noffset > ooffset) {					\
 		if (!VN_KNLIST_EMPTY((ap)->a_vp)) {			\
