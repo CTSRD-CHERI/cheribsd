@@ -1281,10 +1281,8 @@ dqget(struct vnode *vp, uint64_t id, struct ufsmount *ump, int type,
 	struct uio auio;
 	int dqvplocked, error;
 
-#ifdef DEBUG_VFS_LOCKS
 	if (vp != NULLVP)
 		ASSERT_VOP_ELOCKED(vp, "dqget");
-#endif
 
 	if (vp != NULLVP && *dqp != NODQUOT) {
 		return (0);
@@ -1556,10 +1554,8 @@ dqsync(struct vnode *vp, struct dquot *dq)
 	struct mount *mp;
 	struct ufsmount *ump;
 
-#ifdef DEBUG_VFS_LOCKS
 	if (vp != NULL)
 		ASSERT_VOP_ELOCKED(vp, "dqsync");
-#endif
 
 	mp = NULL;
 	error = 0;
