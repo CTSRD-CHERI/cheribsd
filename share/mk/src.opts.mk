@@ -397,7 +397,7 @@ BROKEN_OPTIONS+=CXGBETOOL
 BROKEN_OPTIONS+=MLX5TOOL
 .endif
 
-.if (${__C} != "cheri" && ${__C} != "morello" && \
+.if (${__C} != "cheri" && ${__C} != "xcheri" && ${__C} != "morello" && \
     !${__T:Maarch64*c*} && !${__T:Mriscv64*c*})
 BROKEN_OPTIONS+=CHERI_CAPREVOKE
 .endif
@@ -409,7 +409,7 @@ BROKEN_OPTIONS+=MALLOC_REVOCATION_SHIM
 # We'd really like this to be:
 #    !${MACHINE_CPU:Mcheri} || ${MACHINE_ABI:Mpurecap}
 # but that logic doesn't work in Makefile.inc1...
-.if (${__C} != "cheri" && ${__C} != "morello") || \
+.if (${__C} != "cheri" && ${__C} != "xcheri" && ${__C} != "morello") || \
     (${__T:Maarch64*c*} || ${__T:Mriscv64*c*})
 BROKEN_OPTIONS+=LIB64C
 .endif

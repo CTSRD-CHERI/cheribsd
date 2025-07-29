@@ -96,7 +96,7 @@ __DEFAULT_NO_OPTIONS += FDT
 __DEFAULT_YES_OPTIONS += FDT
 .endif
 
-.if ${MACHINE_CPU:Mcheri}
+.if ${MACHINE_CPU:M*cheri}
 # iw_cxgbe fails to build
 BROKEN_OPTIONS+=OFED
 .endif

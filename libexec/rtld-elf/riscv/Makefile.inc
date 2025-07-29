@@ -1,3 +1,3 @@
-.if ${MACHINE_CPU:Mcheri}
+.if ${MACHINE_CPU:M*cheri}
 CFLAGS+=	-DRTLD_HAS_CAPRELOCS
 .endif

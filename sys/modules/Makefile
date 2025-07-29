@@ -926,7 +926,7 @@ _malo=	malo
 # Some of these work in hybrid kernels but we disable them for consistency
 # (e.g. we don't want purecap kernels penalised by not having accelerated
 # crypto just because we haven't ported the assembly).
-.if ${MACHINE_CPU:Mcheri}
+.if ${MACHINE_CPU:M*cheri}
 BROKEN_MODULES+=bnxt
 BROKEN_MODULES+=dpaa2
 BROKEN_MODULES+=ena
