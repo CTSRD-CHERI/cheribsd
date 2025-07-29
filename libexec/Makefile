@@ -123,7 +123,7 @@ _atf=		atf
 _tests=		tests
 .endif
 
-.if ${MACHINE_CPU:Mcheri}
+.if ${MACHINE_CPU:M*cheri}
 SUBDIR+=	malloc_early_constructor
 SUBDIR+=	malloc_revoke_enabled
 .endif
