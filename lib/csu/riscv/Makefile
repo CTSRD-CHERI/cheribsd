@@ -2,7 +2,7 @@
 
 .include <src.opts.mk>
 
-.if ${MACHINE_CPU:Mcheri}
+.if ${MACHINE_CPU:M*cheri}
 CFLAGS+=	-I${.CURDIR:H}/common-cheri
 .endif
 
