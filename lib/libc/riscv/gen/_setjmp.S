@@ -38,50 +38,50 @@
 ENTRY(_setjmp)
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Store the magic value and stack pointer */
-	llc	ct0, .Lmagic
-	ld	t0, (ct0)
-	sc	ct0, (0 * 16)(ca0)
-	sc	csp, (1 * 16)(ca0)
-	caddi	ca0, ca0, (2 * 16)
+	_LLC	PTR(t0), .Lmagic
+	_LD	t0, (PTR(t0))
+	_SC	PTR(t0), (0 * 16)(PTR(a0))
+	_SC	PTR(sp), (1 * 16)(PTR(a0))
+	_CADDI	PTR(a0), PTR(a0), (2 * 16)
 
 	/* Store the general purpose registers and ra */
-	sc	cs0, (0 * 16)(ca0)
-	sc	cs1, (1 * 16)(ca0)
-	sc	cs2, (2 * 16)(ca0)
-	sc	cs3, (3 * 16)(ca0)
-	sc	cs4, (4 * 16)(ca0)
-	sc	cs5, (5 * 16)(ca0)
-	sc	cs6, (6 * 16)(ca0)
-	sc	cs7, (7 * 16)(ca0)
-	sc	cs8, (8 * 16)(ca0)
-	sc	cs9, (9 * 16)(ca0)
-	sc	cs10, (10 * 16)(ca0)
-	sc	cs11, (11 * 16)(ca0)
-	sc	cra, (12 * 16)(ca0)
-	csrr	ct0, ddc
-	sc	ct0, (13 * 16)(ca0)
-	caddi	ca0, ca0, (14 * 16)
+	_SC	PTR(s0), (0 * 16)(PTR(a0))
+	_SC	PTR(s1), (1 * 16)(PTR(a0))
+	_SC	PTR(s2), (2 * 16)(PTR(a0))
+	_SC	PTR(s3), (3 * 16)(PTR(a0))
+	_SC	PTR(s4), (4 * 16)(PTR(a0))
+	_SC	PTR(s5), (5 * 16)(PTR(a0))
+	_SC	PTR(s6), (6 * 16)(PTR(a0))
+	_SC	PTR(s7), (7 * 16)(PTR(a0))
+	_SC	PTR(s8), (8 * 16)(PTR(a0))
+	_SC	PTR(s9), (9 * 16)(PTR(a0))
+	_SC	PTR(s10), (10 * 16)(PTR(a0))
+	_SC	PTR(s11), (11 * 16)(PTR(a0))
+	_SC	PTR(ra), (12 * 16)(PTR(a0))
+	_CSRR	PTR(t0), ddc
+	_SC	PTR(t0), (13 * 16)(PTR(a0))
+	_CADDI	PTR(a0), PTR(a0), (14 * 16)
 
 #if !defined(_STANDALONE) && defined(__riscv_float_abi_double)
 	/* Store the fpe registers */
-	fsd	fs0, (0 * 8)(ca0)
-	fsd	fs1, (1 * 8)(ca0)
-	fsd	fs2, (2 * 8)(ca0)
-	fsd	fs3, (3 * 8)(ca0)
-	fsd	fs4, (4 * 8)(ca0)
-	fsd	fs5, (5 * 8)(ca0)
-	fsd	fs6, (6 * 8)(ca0)
-	fsd	fs7, (7 * 8)(ca0)
-	fsd	fs8, (8 * 8)(ca0)
-	fsd	fs9, (9 * 8)(ca0)
-	fsd	fs10, (10 * 8)(ca0)
-	fsd	fs11, (11 * 8)(ca0)
-	caddi	ca0, ca0, (12 * 8)
+	_FSD	fs0, (0 * 8)(PTR(a0))
+	_FSD	fs1, (1 * 8)(PTR(a0))
+	_FSD	fs2, (2 * 8)(PTR(a0))
+	_FSD	fs3, (3 * 8)(PTR(a0))
+	_FSD	fs4, (4 * 8)(PTR(a0))
+	_FSD	fs5, (5 * 8)(PTR(a0))
+	_FSD	fs6, (6 * 8)(PTR(a0))
+	_FSD	fs7, (7 * 8)(PTR(a0))
+	_FSD	fs8, (8 * 8)(PTR(a0))
+	_FSD	fs9, (9 * 8)(PTR(a0))
+	_FSD	fs10, (10 * 8)(PTR(a0))
+	_FSD	fs11, (11 * 8)(PTR(a0))
+	_CADDI	PTR(a0), PTR(a0), (12 * 8)
 #endif
 
 	/* Return value */
 	li	a0, 0
-	ret
+	RETURN
 #else
 	/* Store the magic value and stack pointer */
 	ld	t0, .Lmagic
@@ -134,53 +134,53 @@ END(_setjmp)
 ENTRY(_longjmp)
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Check the magic value */
-	ld	t0, 0(ca0)
-	llc	ct1, .Lmagic
-	ld	t1, (ct1)
+	_LD	t0, 0(PTR(a0))
+	_LLC	PTR(t1), .Lmagic
+	_LD	t1, (PTR(t1))
 	bne	t0, t1, botch
 
 	/* Restore the stack pointer */
-	lc	csp, 16(ca0)
-	caddi	ca0, ca0, (2 * 16)
+	_LC	PTR(sp), 16(PTR(a0))
+	_CADDI	PTR(a0), PTR(a0), (2 * 16)
 
 	/* Restore the general purpose registers and ra */
-	lc	cs0, (0 * 16)(ca0)
-	lc	cs1, (1 * 16)(ca0)
-	lc	cs2, (2 * 16)(ca0)
-	lc	cs3, (3 * 16)(ca0)
-	lc	cs4, (4 * 16)(ca0)
-	lc	cs5, (5 * 16)(ca0)
-	lc	cs6, (6 * 16)(ca0)
-	lc	cs7, (7 * 16)(ca0)
-	lc	cs8, (8 * 16)(ca0)
-	lc	cs9, (9 * 16)(ca0)
-	lc	cs10, (10 * 16)(ca0)
-	lc	cs11, (11 * 16)(ca0)
-	lc	cra, (12 * 16)(ca0)
-	lc	ct0, (13 * 16)(ca0)
-	csrw	ddc, ct0
-	caddi	ca0, ca0, (14 * 16)
+	_LC	PTR(s0), (0 * 16)(PTR(a0))
+	_LC	PTR(s1), (1 * 16)(PTR(a0))
+	_LC	PTR(s2), (2 * 16)(PTR(a0))
+	_LC	PTR(s3), (3 * 16)(PTR(a0))
+	_LC	PTR(s4), (4 * 16)(PTR(a0))
+	_LC	PTR(s5), (5 * 16)(PTR(a0))
+	_LC	PTR(s6), (6 * 16)(PTR(a0))
+	_LC	PTR(s7), (7 * 16)(PTR(a0))
+	_LC	PTR(s8), (8 * 16)(PTR(a0))
+	_LC	PTR(s9), (9 * 16)(PTR(a0))
+	_LC	PTR(s10), (10 * 16)(PTR(a0))
+	_LC	PTR(s11), (11 * 16)(PTR(a0))
+	_LC	PTR(ra), (12 * 16)(PTR(a0))
+	_LC	PTR(t0), (13 * 16)(PTR(a0))
+	_CSRW	ddc, PTR(t0)
+	_CADDI	PTR(a0), PTR(a0), (14 * 16)
 
 #if !defined(_STANDALONE) && defined(__riscv_float_abi_double)
 	/* Restore the fpe registers */
-	fld	fs0, (0 * 8)(ca0)
-	fld	fs1, (1 * 8)(ca0)
-	fld	fs2, (2 * 8)(ca0)
-	fld	fs3, (3 * 8)(ca0)
-	fld	fs4, (4 * 8)(ca0)
-	fld	fs5, (5 * 8)(ca0)
-	fld	fs6, (6 * 8)(ca0)
-	fld	fs7, (7 * 8)(ca0)
-	fld	fs8, (8 * 8)(ca0)
-	fld	fs9, (9 * 8)(ca0)
-	fld	fs10, (10 * 8)(ca0)
-	fld	fs11, (11 * 8)(ca0)
-	caddi	ca0, ca0, (12 * 8)
+	_FLD	fs0, (0 * 8)(PTR(a0))
+	_FLD	fs1, (1 * 8)(PTR(a0))
+	_FLD	fs2, (2 * 8)(PTR(a0))
+	_FLD	fs3, (3 * 8)(PTR(a0))
+	_FLD	fs4, (4 * 8)(PTR(a0))
+	_FLD	fs5, (5 * 8)(PTR(a0))
+	_FLD	fs6, (6 * 8)(PTR(a0))
+	_FLD	fs7, (7 * 8)(PTR(a0))
+	_FLD	fs8, (8 * 8)(PTR(a0))
+	_FLD	fs9, (9 * 8)(PTR(a0))
+	_FLD	fs10, (10 * 8)(PTR(a0))
+	_FLD	fs11, (11 * 8)(PTR(a0))
+	_CADDI	PTR(a0), PTR(a0), (12 * 8)
 #endif
 
 	/* Load the return value */
 	mv	a0, a1
-	ret
+	RETURN
 #else
 	/* Check the magic value */
 	ld	t0, 0(a0)
@@ -237,10 +237,10 @@ botch:
 #ifdef _STANDALONE
 	j	botch
 #elif defined(__CHERI_PURE_CAPABILITY__)
-	lgc	ct0, _C_LABEL(longjmperror)
-	jalr	ct0
-	lgc	ct0, _C_LABEL(abort)
-	jalr	ct0
+	_LGC	ct0, _C_LABEL(longjmperror)
+	_JALR	ct0
+	_LGC	ct0, _C_LABEL(abort)
+	_JALR	ct0
 #else
 	call	_C_LABEL(longjmperror)
 	call	_C_LABEL(abort)
