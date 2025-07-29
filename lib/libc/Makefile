@@ -110,7 +110,7 @@ NOASM=
 .include "${LIBC_SRCTOP}/${LIBC_ARCH}/Makefile.inc"
 .include "${LIBC_SRCTOP}/csu/Makefile.inc"
 .include "${LIBC_SRCTOP}/db/Makefile.inc"
-.if ${MACHINE_CPU:Mcheri}
+.if ${MACHINE_CPU:M*cheri}
 .include "${LIBC_SRCTOP}/cheri/Makefile.inc"
 .endif
 .include "${LIBC_SRCTOP}/compat-43/Makefile.inc"

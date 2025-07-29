@@ -173,7 +173,7 @@ SUBDIR+=	libcheri_caprevoke
 SUBDIR_DEPEND_libc+=	libcheri_caprevoke
 .endif
 
-.if ${MACHINE_CPU:Mcheri}
+.if ${MACHINE_CPU:M*cheri}
 _libcheribsdtest_dynamic=	libcheribsdtest_dynamic
 .endif
 
