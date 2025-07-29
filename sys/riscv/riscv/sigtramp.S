@@ -60,7 +60,7 @@
 #endif
 SIGCODE(sigcode)
 #if __has_feature(capabilities)
-	caddi	ca0, csp, SF_UC
+	CADDI_CAP	CAP(a0), CAP(sp), SF_UC
 #else
 	mv	a0, sp
 	addi	a0, a0, SF_UC
