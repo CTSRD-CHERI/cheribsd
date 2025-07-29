@@ -38,14 +38,14 @@
 ENTRY(__sys_vfork)
 	WEAK_REFERENCE(__sys_vfork, vfork)
 	WEAK_REFERENCE(__sys_vfork, _vfork)
-	MOVE_REG(a2, ra)
+	CMV_CAP	CAP(a2), CAP(ra)
 
 	_SYSCALL(vfork)
 	bnez	t0, 1f
 	addi	a1, a1, -1
 	and	a0, a0, a1
-	MOVE_REG(ra, a2)
+	CMV_CAP	CAP(ra), CAP(a2)
 
-	ret
-1:	tail	cerror@plt
+	RETURN
+1:	_TAIL	cerror@plt
 END(__sys_vfork)
