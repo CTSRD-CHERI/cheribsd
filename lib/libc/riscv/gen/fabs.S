@@ -44,5 +44,5 @@ ENTRY(fabs)
 	slli	a0, a0, 1
 	srli	a0, a0, 1
 #endif
-	ret
+	RETURN
 END(fabs)
