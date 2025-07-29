@@ -146,7 +146,7 @@ _alt_start:
 
 	/* Pick a hart to run the boot process. */
 	li	t1, 1
-	LL_PTR	PTR(t0), hart_lottery
+	_LLC	PTR(t0), hart_lottery
 	amoadd.w t0, t1, 0(PTR(t0))
 
 	/*
@@ -157,7 +157,7 @@ _alt_start:
 	j	mpentry
 1:
 	/* Store the boot hart */
-	LL_PTR	PTR(t0), boot_hart
+	_LLC	PTR(t0), boot_hart
 	sw	a0, 0(PTR(t0))
 
 	/*
@@ -240,7 +240,7 @@ pagetables:
 #endif
 
 	/* Construct 1GB Identity Map (1:1 PA->VA) */
-	LL_PTR	PTR(s1), bootstrap_pt_l1
+	_LLC	PTR(s1), bootstrap_pt_l1
 
 	srli	s2, s9, L1_SHIFT	/* kernstart >> L1_SHIFT */
 	andi	a5, s2, Ln_ADDR_MASK	/* & Ln_ADDR_MASK */
@@ -252,14 +252,14 @@ pagetables:
 	/* Store L1 PTE entry to position */
 	li	a6, PTE_SIZE
 	mulw	a5, a5, a6		/* calculate L1 slot */
-	ADD_PTR	PTR(t0), PTR(s1), a5
+	_CADD	PTR(t0), PTR(s1), a5
 	sd	t6, (PTR(t0))		/* Store new PTE */
 
 	/* Construct the virtual address space at KERNBASE */
 
 	/* Add L1 entry for kernel */
-	LL_PTR	PTR(s1), bootstrap_pt_l1
-	LL_PTR	PTR(s2), bootstrap_pt_l2	/* Link to next level PN */
+	_LLC	PTR(s1), bootstrap_pt_l1
+	_LLC	PTR(s2), bootstrap_pt_l2	/* Link to next level PN */
 	srli	s2, s2, PAGE_SHIFT
 
 	li	a5, KERNBASE
@@ -272,11 +272,11 @@ pagetables:
 	/* Store L1 PTE entry to position */
 	li	a6, PTE_SIZE
 	mulw	a5, a5, a6
-	ADD_PTR	PTR(t0), PTR(s1), a5
+	_CADD	PTR(t0), PTR(s1), a5
 	sd	t6, (PTR(t0))
 
 	/* Level 2 superpages (512 x 2MiB) */
-	LL_PTR	PTR(s1), bootstrap_pt_l2
+	_LLC	PTR(s1), bootstrap_pt_l2
 	srli	t4, s9, L2_SHIFT	/* Div physmem base by 2 MiB */
 	li	t2, Ln_ENTRIES		/* Build 512 entries */
 	add	t3, t4, t2
@@ -286,7 +286,7 @@ pagetables:
 	slli	t2, t4, PTE_PPN1_S	/* << PTE_PPN1_S */
 	or	t5, t0, t2
 	sd	t5, (PTR(s1))		/* Store PTE entry to position */
-	ADDI_PTR PTR(s1), PTR(s1), PTE_SIZE
+	_CADDI	PTR(s1), PTR(s1), PTE_SIZE
 
 	addi	t4, t4, 1
 	bltu	t4, t3, 1b
@@ -300,12 +300,12 @@ pagetables:
 	 */
 	li	t1, KERNBASE
 	sub	t1, t1, s9
-	LL_PTR	PTR(t0), va
-	ADD_PTR PTR(t0), PTR(t0), t1
+	_LLC	PTR(t0), va
+	_CADD	PTR(t0), PTR(t0), t1
 	set_stvec	PTR(t0)
 
 	/* Set page tables base register */
-	LL_PTR	PTR(s2), bootstrap_pt_l1
+	_LLC	PTR(s2), bootstrap_pt_l1
 	srli	s2, s2, PAGE_SHIFT
 	li	t0, SATP_MODE_SV39
 	or	s2, s2, t0
@@ -313,10 +313,10 @@ pagetables:
 	csrw	satp, s2
 
 	/* Enter the kernel VA space */
-	LL_PTR PTR(t0), va
+	_LLC PTR(t0), va
 	li	t1, KERNBASE
 	sub	t1, t1, s9
-	ADD_PTR	PTR(t0), PTR(t0), t1
+	_CADD	PTR(t0), PTR(t0), t1
 	jr	PTR(t0)
 
 	.align 2
@@ -466,7 +466,7 @@ va:
  * Get the physical address the kernel is loaded to. Returned in s9.
  */
 get_physmem:
-	LL_PTR	PTR(t0), virt_map	/* physical address of virt_map */
+	_LLC	PTR(t0), virt_map	/* physical address of virt_map */
 	ld	t1, 0(PTR(t0))	/* virtual address of virt_map */
 	sub	t1, t1, t0	/* calculate phys->virt delta */
 	li	t2, KERNBASE
@@ -557,8 +557,8 @@ ENTRY(mpentry)
 	mulw	t1, t1, a0
 	/* Get the pointer */
 
-	LL_PTR	PTR(t0), __riscv_boot_ap
-	ADD_PTR	PTR(t0), PTR(t0), t1
+	_LLC	PTR(t0), __riscv_boot_ap
+	_CADD	PTR(t0), PTR(t0), t1
 
 1:
 	/* Wait the kernel to be ready */
@@ -566,22 +566,22 @@ ENTRY(mpentry)
 	beqz	t1, 1b
 
 	/* Setup stack pointer */
-	LL_PTR	PTR(t0), bootstack
-	LD_PTR	PTR(sp), 0(PTR(t0))
+	_LLC	PTR(t0), bootstack
+	_LD	PTR(sp), 0(PTR(t0))
 
 	/* Get the kernel's load address */
-	LL_PTR	PTR(ra), get_physmem
+	_LLC	PTR(ra), get_physmem
 	jalr	PTR(ra)
 
 	/* Setup supervisor trap vector */
-	LL_PTR	PTR(t0), mpva
+	_LLC	PTR(t0), mpva
 	li	t1, KERNBASE
 	sub	t1, t1, s9
-	ADD_PTR	PTR(t0), PTR(t0), t1
+	_CADD	PTR(t0), PTR(t0), t1
 	set_stvec	PTR(t0)
 
 	/* Set page tables base register */
-	LL_PTR	PTR(t2), kernel_pmap_store
+	_LLC	PTR(t2), kernel_pmap_store
 	ld	s2, PM_SATP(PTR(t2))
 	sfence.vma
 	csrw	satp, s2
