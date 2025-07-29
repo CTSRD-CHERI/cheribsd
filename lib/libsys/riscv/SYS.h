@@ -44,8 +44,8 @@
 #define	_SYSCALL_BODY(name)					\
 	_SYSCALL(name);						\
 	bnez	t0, 1f; 					\
-	ret;							\
-1:	tail	cerror@plt
+	RETURN;							\
+1:	_TAIL	cerror@plt
 #endif
 
 #define	PSEUDO(name)						\
