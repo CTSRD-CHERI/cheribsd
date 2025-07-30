@@ -502,8 +502,15 @@ namespace snmalloc
        * permissions checks are required in the non-SNMALLOC_CHECK_CLIENT case
        * to defend ourselves or other clients against a misbehaving client.
        */
+#if defined(CHERI_PERM_LOAD_CAP) && defined(CHERI_PERM_STORE_CAP)
       static const size_t reqperm = CHERI_PERM_LOAD | CHERI_PERM_STORE |
         CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP;
+#elif defined(CHERI_PERM_CAP)
+      static const size_t reqperm = CHERI_PERM_LOAD | CHERI_PERM_STORE |
+        CHERI_PERM_CAP;
+#else
+#error "Missing LOAD/STORE CAP permission"
+#endif
       snmalloc_check_client(
         mitigations(cheri_checks),
         (__builtin_cheri_perms_get(p) & reqperm) == reqperm,

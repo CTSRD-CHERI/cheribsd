@@ -4853,10 +4853,19 @@ static void
 rtld_fill_dl_phdr_info(const Obj_Entry *obj, struct dl_phdr_info *phdr_info)
 {
 #ifdef __CHERI_PURE_CAPABILITY__
+#ifdef CHERI_PERM_LOAD_CAP
 	phdr_info->dlpi_addr = (uintptr_t)cheri_andperm(obj->relocbase,
 	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP);
 	phdr_info->dlpi_phdr = cheri_andperm(obj->phdr, CHERI_PERM_LOAD |
 	    CHERI_PERM_LOAD_CAP);
+#elif defined(CHERI_PERM_CAP)
+	phdr_info->dlpi_addr = (uintptr_t)cheri_andperm(obj->relocbase,
+	    CHERI_PERM_LOAD | CHERI_PERM_CAP);
+	phdr_info->dlpi_phdr = cheri_andperm(obj->phdr, CHERI_PERM_LOAD |
+	    CHERI_PERM_CAP);
+#else
+#error "Missing LOAD_CAP permission"
+#endif
 #else
 	phdr_info->dlpi_addr = (Elf_Addr)obj->relocbase;
 	phdr_info->dlpi_phdr = obj->phdr;
