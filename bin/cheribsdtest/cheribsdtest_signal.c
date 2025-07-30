@@ -293,8 +293,14 @@ CHERIBSDTEST(signal_returncap,
 	    "perms %jx (execute missing)", v);
 	CHERIBSDTEST_VERIFY2((v & CHERI_PERM_STORE) == 0,
 	    "perms %jx (store present)", v);
+#ifdef CHERI_PERM_STORE_CAP
 	CHERIBSDTEST_VERIFY2((v & CHERI_PERM_STORE_CAP) == 0,
 	    "perms %jx (storecap present)", v);
+#endif
+#ifdef CHERI_PERM_CAP
+	CHERIBSDTEST_VERIFY2((v & CHERI_PERM_CAP) != 0,
+	    "perms %jx (cap missing)", v);
+#endif
 	CHERIBSDTEST_VERIFY2((v & CHERI_PERM_STORE_LOCAL_CAP) == 0,
 	    "perms %jx (store_local_cap present)", v);
 
