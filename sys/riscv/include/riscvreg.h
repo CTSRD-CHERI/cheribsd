@@ -281,11 +281,30 @@
 #endif
 
 #if __has_feature(capabilities)
+#ifdef __riscv_xcheri
 #define	scr_read(scr)							\
 ({	void * __capability val;					\
 	__asm __volatile("cspecialr %0, " #scr : "=C" (val));		\
 	val;								\
 })
+#else /* !defined(__riscv_xcheri) */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	scr_read(scr)							\
+({	void * __capability val;					\
+	__asm __volatile("csrr %0, " #scr : "=C" (val));		\
+	val;								\
+})
+#else /* !defined(__CHERI_PURE_CAPABLITY__) */
+#define	scr_read(scr)							\
+({	void * __capability val;					\
+	__asm __volatile("modesw.cap\n"					\
+			 "csrr %0, " #scr "\n"				\
+			 "modesw.int\n"					\
+			: "=C" (val));					\
+	val;								\
+})
+#endif /* !defined(__CHERI_PURE_CAPABLITY__) */
+#endif /* defined(__riscv_xcheri) */
 #endif
 
 #endif /* !_MACHINE_RISCVREG_H_ */
