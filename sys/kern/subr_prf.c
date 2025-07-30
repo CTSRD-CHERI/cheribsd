@@ -870,10 +870,18 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 					PCHAR('w');
 				if (num & CHERI_PERM_EXECUTE)
 					PCHAR('x');
+#ifdef CHERI_PERM_LOAD_CAP
 				if (num & CHERI_PERM_LOAD_CAP)
 					PCHAR('R');
+#endif
+#ifdef CHERI_PERM_STORE_CAP
 				if (num & CHERI_PERM_STORE_CAP)
 					PCHAR('W');
+#endif
+#ifdef CHERI_PERM_CAP
+				if (num & CHERI_PERM_CAP)
+					PCHAR('C');
+#endif
 				PCHAR(',');
 
 				/* bounds */
