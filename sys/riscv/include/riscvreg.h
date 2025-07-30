@@ -57,8 +57,10 @@
 #define	SCAUSE_VIRTUAL_INSTRUCTION	22
 #define	SCAUSE_STORE_GUEST_PAGE_FAULT	23
 #if __has_feature(capabilities)
+#ifdef __riscv_xcheri
 #define	SCAUSE_LOAD_CAP_PAGE_FAULT	26
 #define	SCAUSE_STORE_AMO_CAP_PAGE_FAULT	27
+#endif
 #define	SCAUSE_CHERI			28
 #endif
 
@@ -204,14 +206,23 @@
 #define	SCCSR_SGCLG		(1 << 2)
 #define	SCCSR_UGCLG		(1 << 3)
 #define	SCCSR_TAG_CLEARING	(1 << 31)
+#ifdef __riscv_xcheri
 #define	TVAL_CAP_CAUSE_SHIFT	0
-#define	TVAL_CAP_CAUSE_MASK	(0x1f << TVAL_CAP_CAUSE_SHIFT)
-#define	TVAL_CAP_CAUSE(tval)						\
-	(((tval) & TVAL_CAP_CAUSE_MASK) >> TVAL_CAP_CAUSE_SHIFT)
 #define	TVAL_CAP_IDX_SHIFT	5
+#define	TVAL_CAP_CAUSE_MASK	(0x1f << TVAL_CAP_CAUSE_SHIFT)
 #define	TVAL_CAP_IDX_MASK	(0x3f << TVAL_CAP_IDX_SHIFT)
 #define	TVAL_CAP_IDX(tval)						\
 	(((tval) & TVAL_CAP_IDX_MASK) >> TVAL_CAP_IDX_SHIFT)
+#else /* !defined(__riscv_xcheri) */
+#define	TVAL_CAP_CAUSE_SHIFT	0
+#define	TVAL_CAP_CAUSE_MASK	(0x0f << TVAL_CAP_CAUSE_SHIFT)
+#define	TVAL_CAP_TYPE_SHIFT	16
+#define	TVAL_CAP_TYPE_MASK	(0x0f << TVAL_CAP_TYPE_SHIFT)
+#define	TVAL_CAP_TYPE(tval)						\
+	(((tval) & TVAL_CAP_TYPE_MASK) >> TVAL_CAP_TYPE_SHIFT)
+#endif /* !defined(__riscv_xcheri) */
+#define	TVAL_CAP_CAUSE(tval)						\
+	(((tval) & TVAL_CAP_CAUSE_MASK) >> TVAL_CAP_CAUSE_SHIFT)
 #endif
 
 #define	XLEN		__riscv_xlen
