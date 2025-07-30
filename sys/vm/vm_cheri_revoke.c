@@ -1433,7 +1433,13 @@ vm_cheri_revoke_shadow_cap(struct sysentvec *sv, int sel, vm_offset_t base,
 	}
 	case CHERI_REVOKE_SHADOW_INFO_STRUCT: {
 		return (cheri_capability_build_user_data(
+#ifdef CHERI_PERM_LOAD_CAP
 		    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP | CHERI_PERM_GLOBAL,
+#elif defined(CHERI_PERM_CAP)
+		    CHERI_PERM_LOAD | CHERI_PERM_CAP | CHERI_PERM_GLOBAL,
+#else
+		    CHERI_PERM_LOAD | CHERI_PERM_GLOBAL,
+#endif
 		    sv->sv_cheri_revoke_info_page,
 		    sizeof(struct cheri_revoke_info), 0));
 	}
@@ -1462,7 +1468,12 @@ vm_cheri_revoke_info_page(struct vm_map *map, struct sysentvec *sv,
 	    ("vm_cheri_revoke_page_info req. intraprocess work right now"));
 
 	*ifp = cheri_capability_build_user_data(CHERI_PERM_LOAD |
-	    CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
+	    CHERI_PERM_STORE |
+#if defined(CHERI_PERM_LOAD_CAP) && defined(CHERI_PERM_STORE_CAP)
+	    CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |
+#elif defined(CHERI_PERM_CAP)
+	    CHERI_PERM_CAP |
+#endif
 	    CHERI_PERM_GLOBAL,
 	    sv->sv_cheri_revoke_info_page, PAGE_SIZE, 0);
 }
