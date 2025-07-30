@@ -106,7 +106,7 @@
 #endif
 #endif /* !_KERNEL */
 
-#ifdef __riscv_zcheripurecap
+#ifdef __riscv_y
 /*
  * Re-define these because RVY cheriintrin.h uses different names.
  * XXX-AM: Ideally we unify on a single naming convention.
@@ -145,7 +145,7 @@
 	CHERI_PERM_STORE_CAP | _CHERI_PERMS_HWALL_COMMON)
 #else /* !defined(__riscv_xcheri) */
 #define	CHERI_PERMS_HWALL						\
-	(CHERI_PERM_CAP | CHERI_PERM_ELEVATE_LEVEL |			\
+	(CHERI_PERM_CAP | CHERI_PERM_LOAD_GLOBAL |			\
 	CHERI_PERM_LOAD_MUTABLE | _CHERI_PERMS_HWALL_COMMON)
 #endif /* !defined(__riscv_xcheri) */
 
@@ -167,7 +167,7 @@
 #else /* !defined(__riscv_xcheri) */
 #define CHERI_PERMS_HWALL_MEMORY					\
 	(CHERI_PERM_CAP | CHERI_PERM_LOAD_MUTABLE |			\
-	CHERI_PERM_ELEVATE_LEVEL | _CHERI_PERMS_HWALL_MEMORY_COMMON)
+	CHERI_PERM_LOAD_GLOBAL | _CHERI_PERMS_HWALL_MEMORY_COMMON)
 
 #define CHERI_PERMS_HWALL_OTYPE
 #endif /* !defined(__riscv_xcheri) */
@@ -191,7 +191,7 @@
 #else /* !defined(__riscv_xcheri) */
 #define	CHERI_PERMS_USERSPACE						\
 	(CHERI_PERM_CAP | CHERI_PERM_LOAD_MUTABLE |			\
-	CHERI_PERM_ELEVATE_LEVEL | _CHERI_PERMS_USERSPACE_COMMON)
+	CHERI_PERM_LOAD_GLOBAL | _CHERI_PERMS_USERSPACE_COMMON)
 #endif /* !defined(__riscv_xcheri) */
 
 #define	CHERI_PERMS_USERSPACE_RODATA					\
@@ -230,7 +230,7 @@
 #else /* !defined(__riscv_xcheri) */
 #define	CHERI_PERMS_KERNEL						\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_CAP |		\
-	CHERI_PERM_LOAD_MUTABLE | CHERI_PERM_ELEVATE_LEVEL)
+	CHERI_PERM_LOAD_MUTABLE | CHERI_PERM_LOAD_GLOBAL)
 #endif /* !defined(__riscv_xcheri) */
 
 #define	CHERI_PERMS_KERNEL_RODATA					\
