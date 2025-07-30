@@ -247,6 +247,7 @@
  * User and kernel software should be written so as to not place assumptions
  * about the specific values used here, as they may change.
  */
+#ifdef __riscv_xcheri
 #define	CHERI_OTYPE_BITS	(18)
 #define	CHERI_OTYPE_USER_MIN	(0)
 #define	CHERI_OTYPE_USER_MAX	((1 << (CHERI_OTYPE_BITS - 1)) - 1)
@@ -259,6 +260,12 @@
 /* Reserved CHERI object types: */
 #define	CHERI_OTYPE_UNSEALED	(-1l)
 #define	CHERI_OTYPE_SENTRY	(-2l)
+#else /* !defined(__riscv_xcheri) */
+#define	CHERI_OTYPE_BITS	(1)
+
+#define	CHERI_OTYPE_UNSEALED	(0l)
+#define	CHERI_OTYPE_SENTRY	(1l)
+#endif /* !defined(__riscv_xcheri) */
 
 /*
  * List of CHERI capability cause code constants.
