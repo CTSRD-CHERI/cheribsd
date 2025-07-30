@@ -214,10 +214,18 @@ more_spec:
 				OUT("w");
 			if (cheri_getperm(cap) & CHERI_PERM_EXECUTE)
 				OUT("x");
+#ifdef CHERI_PERM_LOAD_CAP
 			if (cheri_getperm(cap) & CHERI_PERM_LOAD_CAP)
 				OUT("R");
+#endif
+#ifdef CHERI_PERM_STORE_CAP
 			if (cheri_getperm(cap) & CHERI_PERM_STORE_CAP)
 				OUT("W");
+#endif
+#ifdef CHERI_PERM_CAP
+			if (cheri_getperm(cap) & CHERI_PERM_CAP)
+				OUT("C");
+#endif
 #ifdef CHERI_PERM_EXECUTIVE
 			if (cheri_getperm(cap) & CHERI_PERM_EXECUTIVE)
 				OUT("E");
