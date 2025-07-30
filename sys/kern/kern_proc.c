@@ -2664,7 +2664,11 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 	 * out.
 	 */
 	if (!cheri_can_access(info.comparts,
+#ifdef CHERI_PERM_LOAD_CAP
 	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP,
+#elif defined(CHERI_PERM_CAP)
+	    CHERI_PERM_LOAD | CHERI_PERM_CAP,
+#endif
 	    (__cheri_addr vm_offset_t)info.comparts,
 	    info.comparts_size * info.comparts_entry_size)) {
 		error = EPROT;
