@@ -609,8 +609,14 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
     void * __capability *imgact_cap, const Elf_Ehdr *hdr, const Elf_Phdr *phdr,
     Elf_Addr *preferred_rbase)
 {
-	u_long perm = CHERI_PERM_STORE | CHERI_PERM_GLOBAL |
-	    CHERI_PERM_STORE_CAP;
+	u_long perm = CHERI_PERM_STORE |
+#ifdef CHERI_PERM_STORE_CAP
+	    CHERI_PERM_STORE_CAP |
+#endif
+#ifdef CHERI_PERM_CAP
+	    CHERI_PERM_CAP |
+#endif
+	    CHERI_PERM_GLOBAL;
 	vm_offset_t start = (vm_offset_t)-1;
 	vm_offset_t end = 0;
 	vm_offset_t seg_addr;
