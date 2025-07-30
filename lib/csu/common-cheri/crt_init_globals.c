@@ -185,7 +185,10 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum,
 
 		code_cap = cheri_getpcc();
 		rodata_cap = cheri_clearperm(data_cap,
-		    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
+		    CHERI_PERM_STORE |
+#ifdef CHERI_PERM_STORE_CAP
+		    CHERI_PERM_STORE_CAP |
+#endif
 		    CHERI_PERM_STORE_LOCAL_CAP | CHERI_PERM_SW_VMEM);
 
 		data_cap = cheri_setaddress(data_cap, writable_start);
