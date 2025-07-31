@@ -40,29 +40,15 @@
 #define SPILLSLOT_ERRNO	(1 * __SIZEOF_POINTER__)
 
 ENTRY(cerror)
-#ifdef __CHERI_PURE_CAPABILITY__
-	cincoffset	csp, csp, -FRAME_SIZE
-	csc	cra, SPILLSLOT_RA(csp)
-	csd	a0, SPILLSLOT_ERRNO(csp)	# spill new errno value
-	ccall	_C_LABEL(__error)		# locate address of errno (in ca0)
-	cld	a1, SPILLSLOT_ERRNO(csp)	# re-load new errno value
-	csw	a1, 0(ca0)			# update errno value
-	clc	cra, SPILLSLOT_RA(csp)
+	_CADDI	PTR(sp), PTR(sp), -FRAME_SIZE
+	S_PTR	PTR(ra), SPILLSLOT_RA(PTR(sp))
+	_SD	a0, SPILLSLOT_ERRNO(PTR(sp))	# spill new errno value
+	_CALL	_C_LABEL(__error)		# locate address of errno (in ca0)
+	_LD	a1, SPILLSLOT_ERRNO(PTR(sp))	# re-load new errno value
+	_SW	a1, 0(PTR(a0))			# update errno value
+	L_PTR	PTR(ra), SPILLSLOT_RA(PTR(sp))
 	li	a0, -1			# Set both return registers to -1 to
 	li	a1, -1			# indicate syscall failure.
-	cincoffset	csp, csp, FRAME_SIZE
-	cret
-#else
-	addi	sp, sp, -FRAME_SIZE
-	sd	a0, SPILLSLOT_ERRNO(sp)
-	sd	ra, SPILLSLOT_RA(sp)
-	call	_C_LABEL(__error)
-	ld	a1, SPILLSLOT_ERRNO(sp)
-	ld	ra, SPILLSLOT_RA(sp)
-	sw	a1, 0(a0)
-	li	a0, -1
-	li	a1, -1
-	addi	sp, sp, FRAME_SIZE
-	ret
-#endif
+	_CADDI	PTR(sp), PTR(sp), FRAME_SIZE
+	RETURN
 END(cerror)
