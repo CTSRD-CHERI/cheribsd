@@ -41,17 +41,17 @@
 
 ENTRY(cerror)
 #ifdef __CHERI_PURE_CAPABILITY__
-	cincoffset	csp, csp, -FRAME_SIZE
-	csc	cra, SPILLSLOT_RA(csp)
-	csd	a0, SPILLSLOT_ERRNO(csp)	# spill new errno value
-	ccall	_C_LABEL(__error)		# locate address of errno (in ca0)
-	cld	a1, SPILLSLOT_ERRNO(csp)	# re-load new errno value
-	csw	a1, 0(ca0)			# update errno value
-	clc	cra, SPILLSLOT_RA(csp)
+	caddi	csp, csp, -FRAME_SIZE
+	sc	cra, SPILLSLOT_RA(csp)
+	sd	a0, SPILLSLOT_ERRNO(csp)	# spill new errno value
+	call	_C_LABEL(__error)		# locate address of errno (in ca0)
+	ld	a1, SPILLSLOT_ERRNO(csp)	# re-load new errno value
+	sw	a1, 0(ca0)			# update errno value
+	lc	cra, SPILLSLOT_RA(csp)
 	li	a0, -1			# Set both return registers to -1 to
 	li	a1, -1			# indicate syscall failure.
-	cincoffset	csp, csp, FRAME_SIZE
-	cret
+	caddi	csp, csp, FRAME_SIZE
+	ret
 #else
 	addi	sp, sp, -FRAME_SIZE
 	sd	a0, SPILLSLOT_ERRNO(sp)

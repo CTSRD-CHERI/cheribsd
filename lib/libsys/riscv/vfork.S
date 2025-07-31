@@ -46,6 +46,6 @@ ENTRY(__sys_vfork)
 	and	a0, a0, a1
 	MOVE_REG(ra, a2)
 
-	RETURN
-1:	_TAIL	cerror@plt
+	ret
+1:	tail	cerror@plt
 END(__sys_vfork)
