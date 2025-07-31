@@ -37,12 +37,14 @@
 #include "assym.inc"
 
 .macro check_user_access user_arg, size_arg, bad_access_func
-#if __has_feature(capabilities)
-	gcvalue	x7, c\user_arg		/* Read the user capability value */
-	adds	x6, x7, x\size_arg
-#else
-	adds	x6, x\user_arg, x\size_arg
-#endif
+	/*
+	 * TBI is enabled from 15.0. Clear the top byte of the userspace
+	 * address before checking whether it's within the given limit.
+	 * The later load/store instructions will fault if TBI is disabled
+	 * for the current process.
+	 */
+	and	x6, x\user_arg, #(~TBI_ADDR_MASK)
+	adds	x6, x6, x\size_arg
 	b.cs	\bad_access_func
 	ldr	x7, =VM_MAXUSER_ADDRESS
 	cmp	x6, x7
@@ -126,15 +128,15 @@ ENTRY(copyinstr)
 	adr	PTR(6), copyio_fault /* Get the handler address */
 	SET_FAULT_HANDLER(PTR(6), PTR(7)) /* Set the handler */
 
+	/*
+	 *  As in check_user_access mask off the TBI bits for the cmp
+	 * instruction. The load will fail trap if TBI is disabled, but we
+	 * need to check the address didn't wrap.
+	 */
+	and	x6, x0, #(~TBI_ADDR_MASK)
 	ldr	x7, =VM_MAXUSER_ADDRESS
 	ENTER_C64
-1:
-#if __has_feature(capabilities)
-	gcvalue	x9, c0
-	cmp	x9, x7
-#else
-	cmp	x0, x7
-#endif
+1:	cmp	x6, x7
 	b.cs	copyio_c64_fault
 #if __has_feature(capabilities)
 	ldtrb	w4, [c0]	/* Load from uaddr */
@@ -146,6 +148,7 @@ ENTRY(copyinstr)
 	strb	w4, [x1], #1	/* Store in kaddr */
 #endif
 	add	x5, x5, #1	/* count++ */
+	add	x6, x6, #1	/* Increment masked address */
 	cbz	w4, 2f		/* Break when NUL-terminated */
 	sub	x2, x2, #1	/* len-- */
 	cbnz	x2, 1b
