@@ -37,5 +37,5 @@
 	.align	2
 
 ENTRY(riscv_nullop)
-	RETURN
+	ret
 END(riscv_nullop)
