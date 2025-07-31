@@ -111,6 +111,7 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
 	} else if (cheri_gettag(cut) && ctp(crshadow, cut, perms, start, end)) {
 		void * __capability cscratch;
 		int ok;
+		long sc_result;
 
 		uintcap_t cutr = cheri_revoke_cap(cut);
 
@@ -135,9 +136,30 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
 		 * mapping of physical memory.
 		 */
 again:
+#if defined(__CHERI_PURE_CAPABILITY__) || !defined(__riscv_xcheri)
+		__asm__ __volatile__ (
+#if !defined(__CHERI_PURE_CAPABILITY__)
+			".option push\n\t"
+			".option capmode\n\t"
+			"modesw.cap\n\t"
+#endif
+			"lr.c %[cscratch], (%[cutp])\n\t"
+			"sceq %[ok], %[cscratch], %[cut]\n\t"
+			"beq x0, %[ok], 1f\n\t"
+			"sc.c %[sc_result], %[cutr], (%[cutp])\n\t"
+			"1:\n\t"
+#if !defined(__CHERI_PURE_CAPABILITY__)
+			".option pop\n\t"
+			"modesw.int\n\t"
+#endif
+		  : [ok] "=&r" (ok), [cscratch] "=&C" (cscratch),
+		    [cutr] "+C" (cutr), [sc_result] "=r" (sc_result)
+		  : [cut] "C" (cut), [cutp] "C" (cutp)
+		  : "memory");
+#else
 		__asm__ __volatile__ (
 			"lr.c.cap %[cscratch], (%[cutp])\n\t"
-			"cseqx %[ok], %[cscratch], %[cut]\n\t"
+			"sceq %[ok], %[cscratch], %[cut]\n\t"
 			"beq x0, %[ok], 1f\n\t"
 			"sc.c.cap %[cutr], (%[cutp])\n\t"
 			"1:\n\t"
@@ -145,9 +167,11 @@ again:
 		    [cutr] "+C" (cutr)
 		  : [cut] "C" (cut), [cutp] "C" (cutp)
 		  : "memory");
-
 		/* sc.c.cap clobbers its value operand with 0 on success */
-		if (__builtin_expect((uintcap_t)cutr == 0, 1)) {
+		sc_result = (long)(uintcap_t)cutr;
+#endif
+
+		if (__builtin_expect(sc_result == 0, 1)) {
 			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
 			/* Don't count a revoked cap as HASCAPS */
 		} else if (!cheri_gettag(cscratch)) {

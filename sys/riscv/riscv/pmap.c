@@ -220,7 +220,7 @@
 #define	VM_PAGE_TO_PV_LIST_LOCK(m)	\
 			PHYS_TO_PV_LIST_LOCK(VM_PAGE_TO_PHYS(m))
 
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && defined(__riscv_xcheri)
 #define	PTE_DIRTY_BITS	(PTE_D | PTE_CD)
 #else
 #define	PTE_DIRTY_BITS	(PTE_D)
@@ -1215,10 +1215,16 @@ pmap_extract_and_hold(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
 		if ((prot & VM_PROT_WRITE) != 0 && (l3 & PTE_W) == 0)
 			use = false;
 #if __has_feature(capabilities)
+#if defined(__riscv_xcheri)
 		if ((prot & VM_PROT_READ_CAP) != 0 && (l3 & PTE_CR) == 0)
 			use = false;
 		if ((prot & VM_PROT_WRITE_CAP) != 0 && (l3 & PTE_CW) == 0)
 			use = false;
+#elif defined(__riscv_zcheripurecap)
+		if ((prot & (VM_PROT_READ_CAP | VM_PROT_WRITE_CAP)) != 0 &&
+		    (l3 & PTE_CW) == 0)
+			use = false;
+#endif
 #endif
 		if (use) {
 			m = PTE_TO_VM_PAGE(l3);
@@ -2953,7 +2959,7 @@ pmap_fault(pmap_t pmap, vm_offset_t va, vm_prot_t ftype)
 	if ((ftype & VM_PROT_WRITE) != 0)
 		bits |= PTE_D;
 
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && defined(__riscv_xcheri)
 	if ((ftype & VM_PROT_WRITE_CAP) != 0)
 		bits |= PTE_CD;
 #endif
@@ -3174,6 +3180,12 @@ pmap_promote_l2(pmap_t pmap, pd_entry_t *l2, vm_offset_t va, vm_page_t ml3,
 	}
 
 #if __has_feature(capabilities)
+#ifdef __riscv_xcheri
+	/*
+	 * XXX-AM: No special promotion logic for Zcheri.
+	 * We do not use dirty tracking for now, so we never have state transitions
+	 * outside CRG updates.
+	 */
 	if ((firstl3e & (PTE_CW | PTE_CD)) == PTE_CW) {
 		/*
 		 * Prohibit superpages involving CW-set CD-clear PTEs.  The
@@ -3191,6 +3203,7 @@ pmap_promote_l2(pmap_t pmap, pd_entry_t *l2, vm_offset_t va, vm_page_t ml3,
 		atomic_add_long(&pmap_l2_p_failures, 1);
 		return (false);
 	}
+#endif
 #endif
 
 	/*
@@ -3366,6 +3379,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 #ifdef __riscv_xcheri
 	if (flags & VM_PROT_WRITE_CAP)
 		new_l3 |= PTE_CD;
+#endif
 	new_l3 |= cheri_pte_cr(pmap, va, m, prot);
 #endif
 
@@ -3382,7 +3396,8 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if ((m->oflags & VPO_UNMANAGED) != 0) {
 		if (prot & VM_PROT_WRITE)
 			new_l3 |= PTE_D;
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && defined(__riscv_xcheri)
+		// XXX-AM: Is this redundant? PTE_CD is set unconditionally above.
 		if (prot & VM_PROT_WRITE_CAP)
 			new_l3 |= PTE_CD;
 #endif
@@ -4128,6 +4143,7 @@ pmap_caploadgen_update_crg(pmap_t pmap, pt_entry_t *pte)
 	}
 }
 
+#ifdef __riscv_xcheri
 static inline void
 pmap_caploadgen_update_clear_cw(pt_entry_t *pte, pt_entry_t oldpte)
 {
@@ -4160,6 +4176,17 @@ pmap_caploadgen_update_clear_cw(pt_entry_t *pte, pt_entry_t oldpte)
 	}
 
 }
+#endif
+
+static inline bool
+pmap_caploadgen_get_ucrg(void)
+{
+#ifdef __riscv_xcheri
+	return ((csr_read(sccsr) & SCCSR_UGCLG) != 0);
+#else
+	return ((csr_read(sstatus) & SSTATUS_UCRG) != 0);
+#endif
+}
 
 enum pmap_caploadgen_res
 pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
@@ -4173,7 +4200,7 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 	rw_rlock(&pvh_global_lock);
 	PMAP_LOCK(pmap);
 
-	KASSERT(!(csr_read(sccsr) & SCCSR_UGCLG) == !(pmap->flags.uclg),
+	KASSERT(pmap_caploadgen_get_ucrg() == pmap->flags.uclg,
 	    ("pmap_caploadgen_update: pmap crg %d but CPU mismatch",
 	    (int)pmap->flags.uclg));
 
@@ -4212,6 +4239,7 @@ retry:
 		goto out;
 	}
 
+#ifdef __riscv_xcheri
 	switch (oldpte & (PTE_CR | PTE_CRM)) {
 	case 0:		/* tag clearing */
 	case PTE_CRM:	/* always trapping; not something we can fix? */
@@ -4233,6 +4261,14 @@ retry:
 	case PTE_CR | PTE_CRM: /* ah, here we go */
 		break;
 	}
+#else
+	if ((oldpte & (PTE_CW | PTE_CRG)) == 0) {
+		/* CAP-NEVER, always trapping */
+		m = NULL;
+		res = PMAP_CAPLOADGEN_UNABLE;
+		goto out;
+	}
+#endif
 
 	if (!(oldpte & PTE_CRG) == !(pmap->flags.uclg)) {
 		/* Page already scanned, just fence (maybe redundantly) */
@@ -4255,6 +4291,12 @@ retry:
 		 */
 		res = PMAP_CAPLOADGEN_OK;
 
+                /*
+		 * XXX-AM: Zcheri doesn't ever transition to cap clean for now.
+		 * We also ignore dirty tracking, everything that is cap-permissive
+		 * is dirty.
+		 */
+#ifdef __riscv_xcheri
 		if (!(flags & PMAP_CAPLOADGEN_HASCAPS)) {
 			/*
 			 * We didn't see a capability on this page; step this
@@ -4266,6 +4308,7 @@ retry:
 				 * here as there might be a capability store
 				 * between us having examined the page and the
 				 * store-release below, and so we're going to
+
 				 * scan the page again anyway.
 				 */
 				pmap_clear_bits(pte, PTE_CD);
@@ -4319,6 +4362,7 @@ retry:
 				pmap_store_bits(pte, PTE_CD);
 			}
 		}
+#endif /* __riscv_xcheri */
 
 		/*
 		 * On the fast path, where we're just updating the CRG bit, this
@@ -4335,7 +4379,9 @@ retry:
 		m = NULL;
 	} else if (!(vm_page_astate_load(m).flags & PGA_CAPSTORE)) {
 		KASSERT(!(oldpte & PTE_CW), ("!PGA_CAPSTORE but CW?"));
+#ifdef __riscv_xcheri
 		KASSERT(!(oldpte & PTE_CD), ("!PGA_CAPSTORE but CD?"));
+#endif
 
 #if defined(INVARIANTS)
 		/*
@@ -4426,7 +4472,9 @@ out:
 
 	PMAP_UNLOCK(pmap);
 	rw_runlock(&pvh_global_lock);
+#ifdef __riscv_xcheri
 out_unlocked:
+#endif
 
 	if (*mp != NULL) {
 		if (flags & PMAP_CAPLOADGEN_XBUSIED) {
@@ -5821,10 +5869,20 @@ pmap_activate_sw(struct thread *td)
 
 #if __has_feature(capabilities)
 update_crg:
+#ifdef __riscv_xcheri
 	if (pmap->flags.uclg)
 		csr_set(sccsr, SCCSR_UGCLG);
 	else
 		csr_clear(sccsr, SCCSR_UGCLG);
+#else
+	if (pmap->flags.uclg) {
+		csr_set(sstatus, SSTATUS_UCRG);
+		td->td_frame->tf_sstatus |= SSTATUS_UCRG;
+	} else {
+		csr_clear(sstatus, SSTATUS_UCRG);
+		td->td_frame->tf_sstatus &= ~SSTATUS_UCRG;
+	}
+#endif
 #endif
 
 	sfence_vma();
