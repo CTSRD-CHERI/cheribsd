@@ -52,9 +52,9 @@ END(sigsetjmp)
 ENTRY(siglongjmp)
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Load the _setjmp magic */
-	cllc	ca2, .Lmagic
-	cld	a2, (ca2)
-	cld	a3, 0(ca0)
+	_LLC	PTR(a2), .Lmagic
+	_LD	a2, (PTR(a2))
+	_LD	a3, 0(PTR(a0))
 
 	/* Check the magic */
 	beq	a2, a3, 1f
