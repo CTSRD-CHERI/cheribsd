@@ -2375,13 +2375,17 @@ cheri_restore_tag(void * __capability *cp)
 {
 	uintcap_t cap;
 	void * __capability newcap;
+#ifdef __riscv_xcheri
 	void * __capability sealcap;
+#endif
 
 	cap = (uintcap_t)*cp;
 
 	newcap = cheri_cap_build(swap_restore_cap, cap);
+#ifdef __riscv_xcheri
 	sealcap = cheri_type_copy(swap_restore_cap, cap);
 	newcap = cheri_seal_conditionally(newcap, sealcap);
+#endif
 
 	*cp = newcap;
 }
