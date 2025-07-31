@@ -956,9 +956,17 @@ vm_page_dirty(vm_page_t m)
 static __inline void
 vm_page_capdirty(vm_page_t m)
 {
-
+#ifdef __riscv_zcheripurecap
+	// XXX-AM: Zcheri can't distinguish between capdirty,
+	// capload and capstore pages, so we try to dirty the page if
+	// CAPSTORE is allowed.
+	// This is likely not the right approach and review is needed.
+	if ((vm_page_astate_load(m).flags & PGA_CAPSTORE) == 0)
+		return;
+#else
 	KASSERT(vm_page_astate_load(m).flags & PGA_CAPSTORE,
 		("vm_page_capdirty w/o PGA_CAPSTORE m=%p", m));
+#endif
 
 	vm_page_aflag_set(m, PGA_CAPDIRTY);
 }
