@@ -33,6 +33,8 @@
 
 #include "cheribsdtest.h"
 
+/* TODO: Support IRELATIVE-style caprelocs */
+#if !defined(__riscv) || !defined(__CHERI_PURE_CAPABILITY__)
 static int
 simple_ifunc_impl(void)
 {
@@ -84,6 +86,7 @@ CHERIBSDTEST(global_data_ifunc_fptr,
 
 	cheribsdtest_success();
 }
+#endif
 #endif
 
 #ifdef CHERIBSD_DYNAMIC_TESTS
