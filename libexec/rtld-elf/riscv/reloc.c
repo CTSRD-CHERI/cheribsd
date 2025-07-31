@@ -471,6 +471,13 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			*where = symval + rela->r_addend;
 			break;
 		case R_RISCV_TLS_DTPMOD64:
+#ifdef TLS_TGOT
+			if (symnum != 0) {
+				_rtld_error("%s: Traditional TLS not supported",
+				    obj->path);
+				return (-1);
+			}
+#endif
 			def = find_symdef(symnum, obj, &defobj, flags, cache,
 			    lockstate);
 			if (def == NULL)
@@ -492,6 +499,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			}
 			break;
 		case R_RISCV_TLS_DTPREL64:
+#ifndef TLS_TGOT
 			def = find_symdef(symnum, obj, &defobj, flags, cache,
 			    lockstate);
 			if (def == NULL)
@@ -500,7 +508,13 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			*where += (Elf_Addr)(def->st_value + rela->r_addend
 			    - TLS_DTV_OFFSET);
 			break;
+#else
+			_rtld_error("%s: Traditional TLS not supported",
+			    obj->path);
+			return (-1);
+#endif
 		case R_RISCV_TLS_TPREL64:
+#ifndef TLS_TGOT
 			def = find_symdef(symnum, obj, &defobj, flags, cache,
 			    lockstate);
 			if (def == NULL)
@@ -527,6 +541,11 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			*where = (def->st_value + rela->r_addend +
 			    defobj->tlsoffset - TLS_TP_OFFSET - TLS_TCB_SIZE);
 			break;
+#else
+			_rtld_error("%s: Traditional TLS not supported",
+			    obj->path);
+			return (-1);
+#endif
 		case R_RISCV_RELATIVE:
 			*where = (Elf_Addr)(obj->relocbase + rela->r_addend);
 			break;
@@ -539,6 +558,25 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			    flags, where, rela->r_addend) != 0)
 				return (-1);
 			break;
+		case R_RISCV_CHERI_TLS_TGOTREL:
+#ifdef TLS_TGOT
+			if (!obj->tgot_static) {
+				if (!allocate_tgot_offset(
+				    __DECONST(Obj_Entry *, obj))) {
+					_rtld_error(
+					    "%s: No space available for static "
+					    "Thread Local Storage", obj->path);
+					return (-1);
+				}
+			}
+
+			*where = obj->tgotoffset + rela->r_addend -
+			    TLS_TP_OFFSET - TLS_TCB_SIZE;
+			break;
+#else
+			_rtld_error("%s: TGOT not supported", obj->path);
+			return (-1);
+#endif
 #endif /* __CHERI_PURE_CAPABILITY__ */
 		default:
 			rtld_printf("%s: Unhandled relocation %lu\n",
@@ -559,6 +597,64 @@ ifunc_init(Elf_Auxinfo *aux_info[__min_size(AT_COUNT)])
 		elf_hwcap = aux_info[AT_HWCAP]->a_un.a_val;
 }
 
+#ifdef TLS_TGOT
+/*
+ * Process the TGOT relocations.
+ */
+int
+reloc_tgot(Obj_Entry *obj, struct tcb *tcb, void *tgot, int flags,
+    tls_get_block_cb get_block, RtldLockState *lockstate)
+{
+	const struct capreloc *relclim;
+	const struct capreloc *relc;
+	const Obj_Entry *defobj;
+	const Elf_Rela *relalim;
+	const Elf_Rela *rela;
+	const Elf_Sym *def;
+	Elf_Addr tgotinit;
+	uintptr_t *where;
+	uintptr_t val;
+	void *tls;
+
+	tls = NULL;
+	relalim = (const Elf_Rela *)((const char *)obj->tgotrela +
+	    obj->tgotrelasize);
+	tgotinit = (const char *)obj->tgotinit - obj->relocbase;
+	for (rela = obj->tgotrela; rela < relalim; rela++) {
+		where = (uintptr_t *)((uintptr_t)tgot +
+		    (rela->r_offset - tgotinit));
+
+		assert(ELF_R_TYPE(rela->r_info) == R_RISCV_CHERI_TLS_TGOT_SLOT);
+
+		def = find_symdef(ELF_R_SYM(rela->r_info), obj,
+		    &defobj, flags, NULL, lockstate);
+		if (def == NULL)
+			return (-1);
+		if (def->st_shndx == SHN_UNDEF)
+			val = 0;
+		else {
+			val = (uintptr_t)get_block(tcb, defobj->tlsindex) +
+			    def->st_value;
+			val = cheri_setbounds(val, def->st_size);
+		}
+		*where = val;
+	}
+
+	relclim = (const struct capreloc *)((const char *)obj->tgot_cap_relocs +
+	    obj->tgot_cap_relocs_size);
+	for (relc = (const struct capreloc *)obj->tgot_cap_relocs;
+	    relc < relclim; relc++) {
+		where = (uintptr_t *)((uintptr_t)tgot +
+		    (relc->capability_location - tgotinit));
+		if (tls == NULL)
+			tls = get_block(tcb, obj->tlsindex);
+		val = process___cap_reloc(relc, tls, NULL, false, true);
+		*where = val;
+	}
+	return (0);
+}
+#endif
+
 void
 allocate_initial_tls(Obj_Entry *objs)
 {
@@ -568,10 +664,15 @@ allocate_initial_tls(Obj_Entry *objs)
 	 * offset allocated so far and adding a bit for dynamic modules to
 	 * use.
 	 */
+#ifdef TLS_TGOT
+	tgot_static_space = tgot_last_offset + tgot_last_size +
+	    ld_static_tgot_extra;
+#else
 	tls_static_space = tls_last_offset + tls_last_size +
 	    ld_static_tls_extra;
+#endif
 
-	_tcb_set(allocate_tls(objs, NULL, TLS_TCB_SIZE, TLS_TCB_ALIGN));
+	_tcb_set(allocate_tls(objs, NULL, TLS_TCB_SIZE, TLS_TCB_ALIGN, NULL));
 }
 
 void *

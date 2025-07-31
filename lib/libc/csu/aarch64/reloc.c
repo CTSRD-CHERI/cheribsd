@@ -35,6 +35,8 @@ ifunc_init(const Elf_Auxinfo *aux __unused)
 #ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
 
+#include <stddef.h>
+
 /*
  * Fragments consist of a 64-bit address followed by a 56-bit length and an
  * 8-bit permission field.
@@ -110,6 +112,51 @@ crt1_handle_rela(const Elf_Rela *r, void *data_cap, const void *code_cap)
 		break;
 	}
 }
+
+static void
+crt1_handle_tgot_rela(const Elf_Rela *r, void *tgot, Elf_Addr init, void *tls)
+{
+	uintptr_t *where;
+	Elf_Addr *fragment;
+
+	switch (ELF_R_TYPE(r->r_info)) {
+	case R_MORELLO_TLS_TGOT_SLOT:
+		where = (uintptr_t *)((uintptr_t)tgot +
+		    (r->r_offset - init));
+		fragment = (Elf_Addr *)where;
+		*where = init_cap_from_fragment(fragment, tls,
+		    NULL, (ptraddr_t)tls, 0);
+		break;
+	}
+}
+
+#ifdef TLS_TGOT_COMPAT
+extern const Elf_Rela __rela_dyn_start[] __weak_symbol __hidden;
+extern const Elf_Rela __rela_dyn_end[] __weak_symbol __hidden;
+
+/*
+ * Statically-linked TGOT binaries normally have their Initial-Exec GOT entries
+ * filled in by the static linker (and in fact should never even use
+ * Initial-Exec), but with the mixed ABI we force Initial-Exec with dynamic
+ * relocations so that the static TLS block can remain next to the TCB for ABI
+ * compatibility. Those relocations are deferred until _init_tls, which calls
+ * here to apply them.
+ */
+void
+__libc_init_got_tgot(void *data_cap, ptrdiff_t tcbtgotoff)
+{
+	const Elf_Rela *r;
+	uintptr_t *where;
+
+	for (r = &__rela_dyn_start[0]; r < &__rela_dyn_end[0]; r++) {
+		if (ELF_R_TYPE(r->r_info) != R_MORELLO_TLS_TGOTREL128)
+			continue;
+		where = (uintptr_t *)((uintptr_t)data_cap +
+		    (r->r_offset - (ptraddr_t)data_cap));
+		*where = tcbtgotoff + r->r_addend;
+	}
+}
+#endif
 #else
 static void
 crt1_handle_rela(const Elf_Rela *r)

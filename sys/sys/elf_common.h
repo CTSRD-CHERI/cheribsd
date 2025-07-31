@@ -535,6 +535,7 @@ typedef struct {
 #define	PT_LOOS		0x60000000	/* First OS-specific. */
 #define	PT_C18N_NAME	0x64331380	/* Sub-object compartment. */
 #define	PT_CHERI_PCC	0x64348450	/* CHERI PCC bounds. */
+#define	PT_CHERI_TGOT	0x64348451	/* CHERI TLS TGOT. */
 #define	PT_SUNW_UNWIND	0x6464e550	/* amd64 UNWIND program header */
 #define	PT_GNU_EH_FRAME	0x6474e550
 #define	PT_GNU_STACK	0x6474e551
@@ -634,6 +635,9 @@ typedef struct {
 #define	DT_SUNW_ASLR		0x60000023	/* ASLR control */
 #define	DT_C18N_STRTAB		0x64331380	/* Compartment string table */
 #define	DT_C18N_STRTABSZ	0x64331381	/* Compartment string table size */
+#define	DT_CHERI_TGOTREL	0x64348450	/* Address of TGOT relocations. */
+#define	DT_CHERI_TGOTRELT	0x64348451	/* Type of relocation used for TGOT. */
+#define	DT_CHERI_TGOTRELSZ	0x64348453	/* Total size in bytes of TGOT relocations. */
 #define	DT_HIOS		0x6ffff000	/* Last OS-specific */
 
 /*
@@ -754,8 +758,10 @@ typedef struct {
 #define	DT_PPC64_OPDSZ			0x70000002
 #define	DT_PPC64_TLSOPT			0x70000003
 
-#define	DT_RISCV_CHERI___CAPRELOCS	0x7000c000 /* start of __cap_relocs section */
-#define	DT_RISCV_CHERI___CAPRELOCSSZ	0x7000c001 /* size of __cap_relocs section */
+#define	DT_RISCV_CHERI___CAPRELOCS		0x7000c000 /* start of __cap_relocs section */
+#define	DT_RISCV_CHERI___CAPRELOCSSZ		0x7000c001 /* size of __cap_relocs section */
+#define	DT_RISCV_CHERI___TGOTCAPRELOCS		0x7000c002 /* start of __tgot_cap_relocs section */
+#define	DT_RISCV_CHERI___TGOTCAPRELOCSSZ	0x7000c003 /* size of __tgot_cap_relocs section */
 
 #define	DT_AUXILIARY	0x7ffffffd	/* shared library auxiliary name */
 #define	DT_USED		0x7ffffffe	/* ignored - same as needed */
@@ -1103,6 +1109,9 @@ typedef struct {
 #define	R_MORELLO_TLS_TPREL128	59398
 #define	R_MORELLO_FUNC_RELATIVE	59400
 #define	R_AARCH64_FUNC_RELATIVE	59401
+#define	R_MORELLO_TLS_TGOT_SLOT	59916
+#define	R_MORELLO_TLS_TGOTREL128	59917
+#define	R_MORELLO_TGOT_TLSDESC	59918
 
 #if __has_feature(capabilities)
 #define	MORELLO_FRAG_EXECUTABLE	0x4
@@ -1424,15 +1433,15 @@ typedef struct {
 #define	R_RISCV_32_PCREL	57
 #define	R_RISCV_IRELATIVE	58
 
-/* Relocation types added by CHERI used by the dynamic linker */
+/* Relocation types added by CHERI */
 #define	R_RISCV_CHERI_CAPABILITY		193
-#define	R_RISCV_CHERI_CAPABILITY_CALL		194
-
-/* Relocation types added by CHERI not used by the dynamic linker */
-#define	R_RISCV_CHERI_SIZE			195
-#define	R_RISCV_CHERI_TPREL_CINCOFFSET		196
-#define	R_RISCV_CHERI_TLS_IE_CAPTAB_PCREL_HI20	197
-#define	R_RISCV_CHERI_TLS_GD_CAPTAB_PCREL_HI20	198
+#define	R_RISCV_CHERI_TLS_TGOT_HI20		202
+#define	R_RISCV_CHERI_TLS_TGOT_LO12_I		203
+#define	R_RISCV_CHERI_TLS_TGOT_ADD		204
+#define	R_RISCV_CHERI_TLS_TGOT_GOT_HI20		205
+#define	R_RISCV_CHERI_TLS_TGOT_GD_HI20		206
+#define	R_RISCV_CHERI_TLS_TGOTREL		207
+#define	R_RISCV_CHERI_TLS_TGOT_SLOT		208
 
 #define	R_SPARC_NONE		0
 #define	R_SPARC_8		1

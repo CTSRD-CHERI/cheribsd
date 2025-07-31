@@ -193,6 +193,7 @@ ENTRY(_rtld_bind_start)
 #endif
 END(_rtld_bind_start)
 
+#if !defined(__CHERI_TGOT_TLS__) || defined(__ARM_MORELLO_TGOT_TLS_COMPAT)
 /*
  * struct rel_tlsdesc {
  *  uint64_t resolver_fnc;
@@ -259,11 +260,15 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	b.ne	1f			/* dtv[0] != tlsdec->dtv_gen */
 
 	ldr	w3, [c1, #16]		/* tlsdesc->tls_index */
+#ifdef __ARM_MORELLO_TGOT_TLS_COMPAT
+	lsl	w3, w3, #1
+#else
 	add	w3, w3, #1
-	ldr     c3, [c0, w3, sxtw #4]	/* dtv[tlsdesc->tls_index + 1] */
+#endif
+	ldr     c3, [c0, w3, sxtw #4]	/* dtv->dtv_slots[tlsdesc->tls_index - 1].dtvs_tls */
 	cbz	x3, 1f
 
-	/* Return (dtv[tlsdesc->tls_index + 1] + tlsdesc->tls_offs) */
+	/* Return (dtv->dtv_slots[tlsdesc->tls_index + 1].dtvs_tls + tlsdesc->tls_offs) */
 	ldr	x4, [c1, #24]		/* tlsdesc->tls_offs */
 	add 	c3, c3, x4
 	ldr	x4, [c1, #32]		/* tlsdesc->tls_size */
@@ -277,7 +282,7 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	/*
 	 * Slow path
 	 * return(
-	 *    tls_get_addr_common(tcb, tlsdesc->tls_index, tlsdesc->tls_offs));
+	 *    tls_get_addr_common(_compat)(tcb, tlsdesc->tls_index, tlsdesc->tls_offs));
 	 *
 	 */
 1:
@@ -321,8 +326,13 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	ldr	w1, [c3, #16]		/* tlsdesc->tls_index */
 	ldr	x2, [c3, #24]		/* tlsdesc->tls_offs */
 	ldr	x19, [c3, #32]		/* tlsdesc->tls_size */
+#ifdef __ARM_MORELLO_TGOT_TLS_COMPAT
+	adrp	PTR(10), :got:tls_get_addr_common_compat_fptr
+	ldr	PTR(10), [PTR(10), :got_lo12:tls_get_addr_common_compat_fptr]
+#else
 	adrp	PTR(10), :got:tls_get_addr_common_fptr
 	ldr	PTR(10), [PTR(10), :got_lo12:tls_get_addr_common_fptr]
+#endif
 	ldr	PTR(10), [PTR(10)]
 #ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
 	blr	x10
@@ -449,5 +459,130 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	ret
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(_rtld_tlsdesc_dynamic)
+#endif /* !defined(__CHERI_TGOT_TLS__) || defined(__ARM_MORELLO_TGOT_TLS_COMPAT) */
+
+#ifdef __CHERI_TGOT_TLS__
+/*
+ * uintptr_t _rtld_tgot_tlsdesc_static(struct rel_tlsdesc *);
+ *
+ * Resolver function for objects present at load time
+ */
+ENTRY(_rtld_tgot_tlsdesc_static)
+	ldr	x0, [c0, #16]
+	ldr	c0, [c1, x0]
+	RETURN
+END(_rtld_tgot_tlsdesc_static)
+
+/*
+ * uintptr_t _rtld_tgot_tlsdesc_dynamic(struct rel_tlsdesc *);
+ *
+ * Resolver function for objects from dlopen()
+ */
+ENTRY(_rtld_tgot_tlsdesc_dynamic)
+	/* Save registers used in fast path */
+	str	c2,     [csp, #(-3 * 16)]!
+	stp	c3, c4, [csp, #(1 * 16)]
+	.cfi_adjust_cfa_offset	3 * 16
+	.cfi_rel_offset		c2, 0
+	.cfi_rel_offset		c3, 16
+	.cfi_rel_offset		c4, 32
+
+	/* Test fastpath - inlined version of tls_get_addr_common(). */
+	ldr	c2, [c0, #16]
+	ldr	c0, [c1]		/* DTV pointer */
+	ldr	x3, [c0]		/* dtv[0] (generation count) */
+	ldr	x4, [c2]		/* tlsdesc->dtv_gen */
+	cmp	x3, x4
+	b.ne	1f			/* dtv[0] != tlsdec->dtv_gen */
+
+	ldr	w3, [c2, #16]		/* tlsdesc->tls_index */
+	lsl	w3, w3, #1
+	add	w3, w3, #1
+	ldr     c3, [c0, w3, sxtw #4]	/* dtv->dtv_slots[tlsdesc->tls_index - 1].dtvs_tgot */
+	cbz	x3, 1f
+
+	/* Return (*(dtv->dtv_slots[tlsdesc->tls_index - 1].dtvs_tgot + tlsdesc->tgot_offs)) */
+	ldr	x4, [c2, #24]		/* tlsdesc->tgot_offs */
+	ldr	c3, [c3, x4]
+
+	/* Restore registers and return */
+	ldp	c3,  c4, [csp, #(1 * 16)]
+	ldr	c2,      [csp], #(3 * 16)
+	.cfi_adjust_cfa_offset 	-3 * 16
+	RETURN
+
+	/*
+	 * Slow path
+	 * return(
+	 *    tls_get_addr_common(tcb, tlsdesc->tls_index, tlsdesc->tls_offs));
+	 *
+	 */
+1:
+	/* Save non-callee-saved capability registers */
+	stp	c29, c30, [csp, #-(17 * 16)]!
+	.cfi_adjust_cfa_offset	17 * 16
+	.cfi_rel_offset		c29, 0
+	.cfi_rel_offset		c30, 16
+
+	mov	c29, csp
+	str	c1,       [csp, #(2 * 16)]
+	stp	c5,   c6, [csp, #(3 * 16)]
+	stp	c7,   c8, [csp, #(5 * 16)]
+	stp	c9,  c10, [csp, #(7 * 16)]
+	stp	c11, c12, [csp, #(9 * 16)]
+	stp	c13, c14, [csp, #(11 * 16)]
+	stp	c15, c16, [csp, #(13 * 16)]
+	stp	c17, c18, [csp, #(15 * 16)]
+	.cfi_rel_offset		 c1, 32
+	.cfi_rel_offset		 c5, 48
+	.cfi_rel_offset		 c6, 64
+	.cfi_rel_offset		 c7, 80
+	.cfi_rel_offset		 c8, 96
+	.cfi_rel_offset		 c9, 112
+	.cfi_rel_offset		c10, 128
+	.cfi_rel_offset		c11, 144
+	.cfi_rel_offset		c12, 160
+	.cfi_rel_offset		c13, 176
+	.cfi_rel_offset		c14, 192
+	.cfi_rel_offset		c15, 208
+	.cfi_rel_offset		c16, 224
+	.cfi_rel_offset		c17, 240
+	.cfi_rel_offset		c18, 256
+
+	/* Find the tls offset */
+	mov	c0, c1			/* tcb */
+	mov	c3, c2			/* tlsdesc ptr */
+	ldr	w1, [c3, #8]		/* tlsdesc->tls_index */
+	ldr	x2, [c3, #16]		/* tlsdesc->tgot_offs */
+	adrp	PTR(10), :got:tls_get_addr_common_fptr
+	ldr	PTR(10), [PTR(10), :got_lo12:tls_get_addr_common_fptr]
+	ldr	PTR(10), [PTR(10)]
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	blr	x10
+#else
+	blr	PTR(10)
+#endif
+
+	/* Restore slow path registers */
+	ldp	c17, c18, [csp, #(15 * 16)]
+	ldp	c15, c16, [csp, #(13 * 16)]
+	ldp	c13, c14, [csp, #(11 * 16)]
+	ldp	c11, c12, [csp, #(9 * 16)]
+	ldp	c9, c10,  [csp, #(7 * 16)]
+	ldp	c7, c8,   [csp, #(5 * 16)]
+	ldp	c5, c6,   [csp, #(3 * 16)]
+	ldr	c1,       [csp, #(2 * 16)]
+	ldp	c29, c30, [csp], #(17 * 16)
+	.cfi_adjust_cfa_offset 	-17 * 16
+	.cfi_restore		c29
+	.cfi_restore		c30
+
+	/* Restore fast path registers and return */
+	ldp	c3,  c4, [csp, #(1 * 16)]
+	ldr	c2,      [csp], #(3 * 16)
+	.cfi_adjust_cfa_offset 	-3 * 16
+	RETURN
+END(_rtld_tgot_tlsdesc_dynamic)
+#endif /* __CHERI_TGOT_TLS__ */
 
 GNU_PROPERTY_AARCH64_FEATURE_1_NOTE(GNU_PROPERTY_AARCH64_FEATURE_1_VAL)

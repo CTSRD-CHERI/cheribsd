@@ -533,7 +533,7 @@ allocate_initial_tls(Obj_Entry *objs)
      * use.
      */
     tls_static_space = tls_last_offset + ld_static_tls_extra;
-    tls = allocate_tls(objs, NULL, TLS_TCB_SIZE, TLS_TCB_ALIGN);
+    tls = allocate_tls(objs, NULL, TLS_TCB_SIZE, TLS_TCB_ALIGN, NULL);
     _tcb_set(tls);
 }
 

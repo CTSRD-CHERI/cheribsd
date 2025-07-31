@@ -1873,9 +1873,17 @@ c18n_init2(Obj_Entry *obj_rtld)
 	 * Restricted mode capabilities.
 	 */
 	rtld_bind_start_fptr = make_restricted(rtld_bind_start_fptr);
+#if !defined(TLS_TGOT) || defined(TLS_TGOT_COMPAT)
 	rtld_tlsdesc_static_fptr = make_restricted(rtld_tlsdesc_static_fptr);
 	rtld_tlsdesc_undef_fptr = make_restricted(rtld_tlsdesc_undef_fptr);
 	rtld_tlsdesc_dynamic_fptr = make_restricted(rtld_tlsdesc_dynamic_fptr);
+#endif
+#ifdef TLS_TGOT
+	rtld_tgot_tlsdesc_static_fptr =
+	    make_restricted(rtld_tgot_tlsdesc_static_fptr);
+	rtld_tgot_tlsdesc_dynamic_fptr =
+	    make_restricted(rtld_tgot_tlsdesc_dynamic_fptr);
+#endif
 
 	/*
 	 * Wrap RTLD function pointers that are called by user code in
@@ -1900,6 +1908,18 @@ c18n_init2(Obj_Entry *obj_rtld)
 			.reg_args = 3, .mem_args = false, .ret_args = ONE
 		}
 	});
+
+#ifdef TLS_TGOT_COMPAT
+	tls_get_addr_common_compat_fptr = tramp_intern(NULL, RTLD_COMPART_ID,
+	    &(struct tramp_data) {
+		.target = tls_get_addr_common_compat_fptr,
+		.defobj = obj_rtld,
+		.sig = (struct func_sig) {
+			.valid = true,
+			.reg_args = 3, .mem_args = false, .ret_args = ONE
+		}
+	});
+#endif
 
 	/*
 	 * XXX: Manually wrap _rtld_unw_setcontext_impl in a trampoline for now

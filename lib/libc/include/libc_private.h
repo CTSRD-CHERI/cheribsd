@@ -34,8 +34,9 @@
 
 #ifndef _LIBC_PRIVATE_H_
 #define _LIBC_PRIVATE_H_
-#include <sys/_types.h>
-#include <sys/_pthreadtypes.h>
+#include <sys/types.h>
+
+#include <machine/tls.h>
 
 #include <libsys.h>
 
@@ -249,7 +250,7 @@ enum {
 	INTERPOS_map_stacks_exec,
 	INTERPOS_fdatasync,
 	INTERPOS_clock_nanosleep,
-	INTERPOS_distribute_static_tls,
+	INTERPOS__reserved0, /* was distribute_static_tls */
 	INTERPOS_pdfork,
 	INTERPOS_MAX
 };
@@ -283,6 +284,12 @@ void __libc_start1_gcrt(int, char *[], char *[],
  * Initialise TLS for static programs
  */
 void _init_tls(void);
+#ifdef TLS_TGOT
+void __libc_init_tgot(void *tgot, const void *init, __size_t size, void *tls);
+#ifdef TLS_TGOT_COMPAT
+void __libc_init_got_tgot(void *data_cap, __ptrdiff_t tcbtgotoff);
+#endif
+#endif
 
 /*
  * Internal allocator for TLS
@@ -376,8 +383,6 @@ void __init_elf_aux_vector(void);
 #ifndef __CHERI_PURE_CAPABILITY__
 void __libc_map_stacks_exec(void);
 #endif
-void __libc_distribute_static_tls(__size_t, void *, __size_t, __size_t);
-__uintptr_t __libc_static_tls_base(__size_t);
 
 void	_pthread_cancel_enter(int);
 void	_pthread_cancel_leave(int);
