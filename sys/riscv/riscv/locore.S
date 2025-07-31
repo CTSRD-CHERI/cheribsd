@@ -51,50 +51,45 @@
 #include <machine/riscvreg.h>
 #include <machine/sbi.h>
 
-.macro set_stvec ptrreg
-#ifdef __CHERI_PURE_CAPABILITY__
 #ifdef __riscv_xcheri
-	cspecialw	stcc, \ptrreg
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	CSR_STVEC	stcc
 #else
-	csrw	stvecc, \ptrreg
+#define	CSR_STVEC	stvec
 #endif
-#else /* !defined(__CHERI_PURE_CAPABILITY__) */
-	csrw	stvec, \ptrreg
+#else /* __riscv_zcheripurecap */
+#define	CSR_STVEC	PTR_CSR(stvec)
 #endif
-.endmacro
 
 /*
  * Set the CPU exception vector register.
+ * Ensure that the installed exception handler is in cap-mode.
  * Trashes t0, t1.
  */
 .macro set_exception_handler
-#ifdef __CHERI_PURE_CAPABILITY__
-	_LLC	ct0, cpu_exception_handler
-	set_stvec	ct0
-#else /* !defined(__CHERI_PURE_CAPABILITY__) */
-	la	t0, cpu_exception_handler
-#if __has_feature(capabilities)
+	_LLC	PTR(t0), cpu_exception_handler
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
 #ifdef __riscv_xcheri
-	cspecialr	ct1, pcc
-	csetaddr	ct1, ct1, t0
+	cspecialr	CAP(t1), pcc
+	csetaddr	CAP(t1), CAP(t1), t0
 	li	t0, 1
-	csetflags ct1, ct1, t0
+	csetflags	CAP(t1), CAP(t1), t0
 	cspecialw	stcc, ct1
 #else
 	modesw.cap
 .option push
 .option capmode
-	auipc	ct1, 0
-	scaddr	ct1, ct1, t0
-	csrw	stvecc, ct1
+	auipc	CAP(t1), 0
+	scaddr	CAP(t1), CAP(t1), t0
+	csrw	stvecc, CAP(t1)
 	modesw.int
 .option pop
 #endif
-#else /* !__has_feature(capabilities) */
-	csrw	stvec, t0
-#endif /* __has_feature(capabilities) */
-#endif /* defined(__CHERI_PURE_CAPABILITY__) */
+#else
+	_CSRW	CSR_STVEC, PTR(t0)
+#endif
 .endmacro
+
 
 	.globl	kernbase
 	.set	kernbase, KERNBASE
@@ -113,7 +108,7 @@
 _alt_start:
 	/* Set the global pointer */
 #ifdef __CHERI_PURE_CAPABILITY__
-	_CMV	cgp, cnull
+	_CMV	PTR(gp), PTR(null)
 #else
 .option push
 .option norelax
@@ -134,11 +129,11 @@ _alt_start:
 	modesw.cap
 #else
 	lla	t0, 1f
-	cspecialr	ct1, pcc
-	csetaddr	ct1, ct1, t0
+	cspecialr	PTR(t1), pcc
+	csetaddr	PTR(t1), PTR(t1), t0
 	li	t0, 1
-	csetflags	ct1, ct1, t0
-	jr.cap	ct1
+	csetflags	PTR(t1), PTR(t1), t0
+	jr.cap	PTR(t1)
 #endif
 1:
 .option pop
@@ -302,7 +297,7 @@ pagetables:
 	sub	t1, t1, s9
 	_LLC	PTR(t0), va
 	_CADD	PTR(t0), PTR(t0), t1
-	set_stvec	PTR(t0)
+	_CSRW	CSR_STVEC, PTR(t0)
 
 	/* Set page tables base register */
 	_LLC	PTR(s2), bootstrap_pt_l1
@@ -348,16 +343,11 @@ va:
 	set_exception_handler
 
 	/* Ensure sscratch is zero */
-#if __has_feature(capabilities)
-	CMV_CAP	CAP(t0), CAP(null)
-	CSRW_CAP	sscratchc, CAP(t0)
+	CMV_CAP	CAP(t0), CAPN(0)
+	CSRW_CAP	CAP_CSR(sscratch), CAP(t0)
 #ifdef __riscv_xcheri
 	/* Ensure stdc is null and thus not used */
 	cspecialw	stdc, CAP(t0)
-#endif
-#else
-	li	t0, 0
-	csrw	sscratch, t0
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -540,11 +530,11 @@ ENTRY(mpentry)
 	modesw.cap
 #else
 	lla	t0, 1f
-	cspecialr	ct1, pcc
-	csetaddr	ct1, ct1, t0
+	cspecialr	PTR(t1), pcc
+	csetaddr	PTR(t1), PTR(t1), t0
 	li	t0, 1
-	csetflags	ct1, ct1, t0
-	jr.cap	ct1
+	csetflags	PTR(t1), PTR(t1), t0
+	jr.cap	PTR(t1)
 #endif
 1:
 .option pop
@@ -578,7 +568,7 @@ ENTRY(mpentry)
 	li	t1, KERNBASE
 	sub	t1, t1, s9
 	_CADD	PTR(t0), PTR(t0), t1
-	set_stvec	PTR(t0)
+	_CSRW	CSR_STVEC, PTR(t0)
 
 	/* Set page tables base register */
 	_LLC	PTR(t2), kernel_pmap_store
@@ -591,7 +581,7 @@ mpva:
 	/* Set the global pointer again, this time with the virtual address. */
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* CHERI-RISC-V purecap doesn't currently use cgp. */
-	_CMV	PTR(gp), cnull
+	_CMV	PTR(gp), PTR(null)
 #else
 .option push
 .option norelax
@@ -616,16 +606,11 @@ mpva:
 	set_exception_handler
 
 	/* Ensure sscratch is zero */
-#if __has_feature(capabilities)
-	CMV_CAP	CAP(t0), cnull
-	CSRW_CAP	sscratchc, CAP(t0)
+	CMV_CAP	CAP(t0), CAPN(0)
+	CSRW_CAP	CAP_CSR(sscratch), CAP(t0)
 #ifdef __riscv_xcheri
 	/* Ensure stdc is null and thus not used */
 	cspecialw	stdc, CAP(t0)
-#endif
-#else
-	li	t0, 0
-	csrw	sscratch, t0
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
