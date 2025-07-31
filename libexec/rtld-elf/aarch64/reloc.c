@@ -878,6 +878,13 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				    def->st_value;
 			}
 			break;
+		case R_MORELLO_CAPINIT:
+		case R_MORELLO_GLOB_DAT:
+			/*
+			 * SYMLOOK_IFUNC is instead handled below as part of
+			 * process_r_cheri_capability.
+			 */
+			break;
 		default:
 			if ((flags & SYMLOOK_IFUNC) != 0)
 				continue;
