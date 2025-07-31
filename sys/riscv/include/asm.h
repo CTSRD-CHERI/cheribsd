@@ -123,6 +123,7 @@
 #define	PTR(x)	CAP(x)
 #define	PTRN(n)	CAPN(n)
 #define	PTR_CSR(x)	CAP_CSR(x)
+#define	PTR_NULL	PTR(null)
 #define	PTR_WIDTH	CAP_WIDTH
 #define	_PTR_INSTR(x)	_CAP_INSTR(x)
 #define	MODESW_CAP
@@ -134,6 +135,7 @@
 #define	PTR(x)	x
 #define	PTRN(n)	x ## n
 #define	PTR_CSR(x)	x
+#define	PTR_NULL	x0
 #define	PTR_WIDTH	INT_WIDTH
 #define	_PTR_INSTR(x)	x
 #define	MODESW_CAP	_MODESW_CAP
