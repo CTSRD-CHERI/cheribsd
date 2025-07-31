@@ -44,7 +44,7 @@ DEFINE_UIFUNC(static, int, simple_ifunc, (void))
 	return (simple_ifunc_impl);
 }
 
-CHERIBSDTEST(call_ifunc, "Check that IFUNCs can be called")
+CHERIBSDTEST(call_ifunc, "Check IFUNCs can be called")
 {
 	int ret;
 
@@ -57,7 +57,7 @@ CHERIBSDTEST(call_ifunc, "Check that IFUNCs can be called")
 
 #ifdef CHERIBSD_DYNAMIC_TESTS
 CHERIBSDTEST(dynamic_ifunc,
-    "Check that IFUNCs can be called from another object")
+    "Check IFUNCs can be called from another object")
 {
 	int ret;
 
