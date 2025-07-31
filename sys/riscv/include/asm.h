@@ -92,6 +92,7 @@
 #if __has_feature(capabilities)
 #define	CAP(x)	c ## x
 #define	CAPN(n)	c ## n
+#define	CAP_CSR(x)	x ## c
 #define	CAP_WIDTH	16
 
 #ifdef __riscv_xcheri
@@ -111,6 +112,7 @@
 #else /* !__has_feature(capabilities) */
 #define	CAP(x)	x
 #define	CAPN(n)	x ## n
+#define	CAP_CSR(x)	x
 #define	CAP_WIDTH	INT_WIDTH
 #define	_CAP_INSTR(x)	x
 #define	_MODESW_CAP
@@ -120,6 +122,7 @@
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	PTR(x)	CAP(x)
 #define	PTRN(n)	CAPN(n)
+#define	PTR_CSR(x)	CAP_CSR(x)
 #define	PTR_WIDTH	CAP_WIDTH
 #define	_PTR_INSTR(x)	_CAP_INSTR(x)
 #define	MODESW_CAP
@@ -130,6 +133,7 @@
 #else /* !defined(__CHERI_PURE_CAPABILITY__) */
 #define	PTR(x)	x
 #define	PTRN(n)	x ## n
+#define	PTR_CSR(x)	x
 #define	PTR_WIDTH	INT_WIDTH
 #define	_PTR_INSTR(x)	x
 #define	MODESW_CAP	_MODESW_CAP
