@@ -55,6 +55,37 @@ CHERIBSDTEST(call_ifunc, "Check IFUNCs can be called")
 	cheribsdtest_success();
 }
 
+/*
+ * Morello LLD forgets to set the size for the canonical PLT symbol, and we use
+ * --fatal-warnings, so fails with the following error:
+ *
+ *   ld: error: could not determine size of cap reloc against function (in PLT) canon_plt_ifunc
+ *
+ * Morello LLD also fails to set the C64 LSB in the canonical PLT's VA so it
+ * wouldn't work anyway.
+ *
+ * Enable once both are fixed.
+ */
+#if !defined(__aarch64__) || !defined(__CHERI_PURE_CAPABILITY__)
+DEFINE_UIFUNC(static, int, canon_plt_ifunc, (void))
+{
+	return (simple_ifunc_impl);
+}
+
+CHERIBSDTEST(global_data_ifunc_fptr,
+    "Check global function pointers can be initialised to an IFUNC")
+{
+	static int (* volatile fptr)(void) = &canon_plt_ifunc;
+	int ret;
+
+	ret = (*fptr)();
+	if (ret != 42)
+		cheribsdtest_failure_errx("Returned %d, expected 42", ret);
+
+	cheribsdtest_success();
+}
+#endif
+
 #ifdef CHERIBSD_DYNAMIC_TESTS
 CHERIBSDTEST(dynamic_ifunc,
     "Check IFUNCs can be called from another object")
@@ -62,6 +93,19 @@ CHERIBSDTEST(dynamic_ifunc,
 	int ret;
 
 	ret = cheribsdtest_dynamic_ifunc();
+	if (ret != 42)
+		cheribsdtest_failure_errx("Returned %d, expected 42", ret);
+
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(global_data_dynamic_ifunc_fptr,
+    "Check global function pointers can be initialised to an IFUNC from another object")
+{
+	static int (* volatile fptr)(void) = &cheribsdtest_dynamic_ifunc;
+	int ret;
+
+	ret = (*fptr)();
 	if (ret != 42)
 		cheribsdtest_failure_errx("Returned %d, expected 42", ret);
 
