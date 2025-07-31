@@ -40,9 +40,9 @@ ENTRY(_ctx_start)
 	call	_C_LABEL(ctx_done)
 	call	_C_LABEL(abort)
 #else
-	cjalr	cs0		/* Call func from makecontext */
-	cmove	ca0, cs1	/* Load ucp saved in makecontext */
-	ccall	_C_LABEL(ctx_done)
-	ccall	_C_LABEL(abort)
+	jalr	cs0		/* Call func from makecontext */
+	cmv	ca0, cs1	/* Load ucp saved in makecontext */
+	call	_C_LABEL(ctx_done)
+	call	_C_LABEL(abort)
 #endif
 END(_ctx_start)
