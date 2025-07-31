@@ -50,39 +50,39 @@
 	/* Store registers */
 	frcsr	t0
 #ifdef __CHERI_PURE_CAPABILITY__
-	csd	t0, (PCB_FCSR)(\p)
-	cfsd	f0, (PCB_X + 0 * 16)(\p)
-	cfsd	f1, (PCB_X + 1 * 16)(\p)
-	cfsd	f2, (PCB_X + 2 * 16)(\p)
-	cfsd	f3, (PCB_X + 3 * 16)(\p)
-	cfsd	f4, (PCB_X + 4 * 16)(\p)
-	cfsd	f5, (PCB_X + 5 * 16)(\p)
-	cfsd	f6, (PCB_X + 6 * 16)(\p)
-	cfsd	f7, (PCB_X + 7 * 16)(\p)
-	cfsd	f8, (PCB_X + 8 * 16)(\p)
-	cfsd	f9, (PCB_X + 9 * 16)(\p)
-	cfsd	f10, (PCB_X + 10 * 16)(\p)
-	cfsd	f11, (PCB_X + 11 * 16)(\p)
-	cfsd	f12, (PCB_X + 12 * 16)(\p)
-	cfsd	f13, (PCB_X + 13 * 16)(\p)
-	cfsd	f14, (PCB_X + 14 * 16)(\p)
-	cfsd	f15, (PCB_X + 15 * 16)(\p)
-	cfsd	f16, (PCB_X + 16 * 16)(\p)
-	cfsd	f17, (PCB_X + 17 * 16)(\p)
-	cfsd	f18, (PCB_X + 18 * 16)(\p)
-	cfsd	f19, (PCB_X + 19 * 16)(\p)
-	cfsd	f20, (PCB_X + 20 * 16)(\p)
-	cfsd	f21, (PCB_X + 21 * 16)(\p)
-	cfsd	f22, (PCB_X + 22 * 16)(\p)
-	cfsd	f23, (PCB_X + 23 * 16)(\p)
-	cfsd	f24, (PCB_X + 24 * 16)(\p)
-	cfsd	f25, (PCB_X + 25 * 16)(\p)
-	cfsd	f26, (PCB_X + 26 * 16)(\p)
-	cfsd	f27, (PCB_X + 27 * 16)(\p)
-	cfsd	f28, (PCB_X + 28 * 16)(\p)
-	cfsd	f29, (PCB_X + 29 * 16)(\p)
-	cfsd	f30, (PCB_X + 30 * 16)(\p)
-	cfsd	f31, (PCB_X + 31 * 16)(\p)
+	sd	t0, (PCB_FCSR)(\p)
+	fsd	f0, (PCB_X + 0 * 16)(\p)
+	fsd	f1, (PCB_X + 1 * 16)(\p)
+	fsd	f2, (PCB_X + 2 * 16)(\p)
+	fsd	f3, (PCB_X + 3 * 16)(\p)
+	fsd	f4, (PCB_X + 4 * 16)(\p)
+	fsd	f5, (PCB_X + 5 * 16)(\p)
+	fsd	f6, (PCB_X + 6 * 16)(\p)
+	fsd	f7, (PCB_X + 7 * 16)(\p)
+	fsd	f8, (PCB_X + 8 * 16)(\p)
+	fsd	f9, (PCB_X + 9 * 16)(\p)
+	fsd	f10, (PCB_X + 10 * 16)(\p)
+	fsd	f11, (PCB_X + 11 * 16)(\p)
+	fsd	f12, (PCB_X + 12 * 16)(\p)
+	fsd	f13, (PCB_X + 13 * 16)(\p)
+	fsd	f14, (PCB_X + 14 * 16)(\p)
+	fsd	f15, (PCB_X + 15 * 16)(\p)
+	fsd	f16, (PCB_X + 16 * 16)(\p)
+	fsd	f17, (PCB_X + 17 * 16)(\p)
+	fsd	f18, (PCB_X + 18 * 16)(\p)
+	fsd	f19, (PCB_X + 19 * 16)(\p)
+	fsd	f20, (PCB_X + 20 * 16)(\p)
+	fsd	f21, (PCB_X + 21 * 16)(\p)
+	fsd	f22, (PCB_X + 22 * 16)(\p)
+	fsd	f23, (PCB_X + 23 * 16)(\p)
+	fsd	f24, (PCB_X + 24 * 16)(\p)
+	fsd	f25, (PCB_X + 25 * 16)(\p)
+	fsd	f26, (PCB_X + 26 * 16)(\p)
+	fsd	f27, (PCB_X + 27 * 16)(\p)
+	fsd	f28, (PCB_X + 28 * 16)(\p)
+	fsd	f29, (PCB_X + 29 * 16)(\p)
+	fsd	f30, (PCB_X + 30 * 16)(\p)
+	fsd	f31, (PCB_X + 31 * 16)(\p)
 #else
 	sd	t0, (PCB_FCSR)(\p)
 	fsd	f0, (PCB_X + 0 * 16)(\p)
@@ -134,44 +134,44 @@
 
 	/* Restore registers */
 #ifdef __CHERI_PURE_CAPABILITY__
-	cld	t0, (PCB_FCSR)(\p)
+	ld	t0, (PCB_FCSR)(\p)
 #else
 	ld	t0, (PCB_FCSR)(\p)
 #endif
 	fscsr	t0
 #ifdef __CHERI_PURE_CAPABILITY__
-	cfld	f0, (PCB_X + 0 * 16)(\p)
-	cfld	f1, (PCB_X + 1 * 16)(\p)
-	cfld	f2, (PCB_X + 2 * 16)(\p)
-	cfld	f3, (PCB_X + 3 * 16)(\p)
-	cfld	f4, (PCB_X + 4 * 16)(\p)
-	cfld	f5, (PCB_X + 5 * 16)(\p)
-	cfld	f6, (PCB_X + 6 * 16)(\p)
-	cfld	f7, (PCB_X + 7 * 16)(\p)
-	cfld	f8, (PCB_X + 8 * 16)(\p)
-	cfld	f9, (PCB_X + 9 * 16)(\p)
-	cfld	f10, (PCB_X + 10 * 16)(\p)
-	cfld	f11, (PCB_X + 11 * 16)(\p)
-	cfld	f12, (PCB_X + 12 * 16)(\p)
-	cfld	f13, (PCB_X + 13 * 16)(\p)
-	cfld	f14, (PCB_X + 14 * 16)(\p)
-	cfld	f15, (PCB_X + 15 * 16)(\p)
-	cfld	f16, (PCB_X + 16 * 16)(\p)
-	cfld	f17, (PCB_X + 17 * 16)(\p)
-	cfld	f18, (PCB_X + 18 * 16)(\p)
-	cfld	f19, (PCB_X + 19 * 16)(\p)
-	cfld	f20, (PCB_X + 20 * 16)(\p)
-	cfld	f21, (PCB_X + 21 * 16)(\p)
-	cfld	f22, (PCB_X + 22 * 16)(\p)
-	cfld	f23, (PCB_X + 23 * 16)(\p)
-	cfld	f24, (PCB_X + 24 * 16)(\p)
-	cfld	f25, (PCB_X + 25 * 16)(\p)
-	cfld	f26, (PCB_X + 26 * 16)(\p)
-	cfld	f27, (PCB_X + 27 * 16)(\p)
-	cfld	f28, (PCB_X + 28 * 16)(\p)
-	cfld	f29, (PCB_X + 29 * 16)(\p)
-	cfld	f30, (PCB_X + 30 * 16)(\p)
-	cfld	f31, (PCB_X + 31 * 16)(\p)
+	fld	f0, (PCB_X + 0 * 16)(\p)
+	fld	f1, (PCB_X + 1 * 16)(\p)
+	fld	f2, (PCB_X + 2 * 16)(\p)
+	fld	f3, (PCB_X + 3 * 16)(\p)
+	fld	f4, (PCB_X + 4 * 16)(\p)
+	fld	f5, (PCB_X + 5 * 16)(\p)
+	fld	f6, (PCB_X + 6 * 16)(\p)
+	fld	f7, (PCB_X + 7 * 16)(\p)
+	fld	f8, (PCB_X + 8 * 16)(\p)
+	fld	f9, (PCB_X + 9 * 16)(\p)
+	fld	f10, (PCB_X + 10 * 16)(\p)
+	fld	f11, (PCB_X + 11 * 16)(\p)
+	fld	f12, (PCB_X + 12 * 16)(\p)
+	fld	f13, (PCB_X + 13 * 16)(\p)
+	fld	f14, (PCB_X + 14 * 16)(\p)
+	fld	f15, (PCB_X + 15 * 16)(\p)
+	fld	f16, (PCB_X + 16 * 16)(\p)
+	fld	f17, (PCB_X + 17 * 16)(\p)
+	fld	f18, (PCB_X + 18 * 16)(\p)
+	fld	f19, (PCB_X + 19 * 16)(\p)
+	fld	f20, (PCB_X + 20 * 16)(\p)
+	fld	f21, (PCB_X + 21 * 16)(\p)
+	fld	f22, (PCB_X + 22 * 16)(\p)
+	fld	f23, (PCB_X + 23 * 16)(\p)
+	fld	f24, (PCB_X + 24 * 16)(\p)
+	fld	f25, (PCB_X + 25 * 16)(\p)
+	fld	f26, (PCB_X + 26 * 16)(\p)
+	fld	f27, (PCB_X + 27 * 16)(\p)
+	fld	f28, (PCB_X + 28 * 16)(\p)
+	fld	f29, (PCB_X + 29 * 16)(\p)
+	fld	f30, (PCB_X + 30 * 16)(\p)
+	fld	f31, (PCB_X + 31 * 16)(\p)
 #else
 	fld	f0, (PCB_X + 0 * 16)(\p)
 	fld	f1, (PCB_X + 1 * 16)(\p)
@@ -219,9 +219,9 @@
 ENTRY(fpe_state_save)
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Get pointer to PCB */
-	clc	ca0, TD_PCB(ca0)
+	lc	ca0, TD_PCB(ca0)
 	__fpe_state_save ca0
-	cret
+	ret
 #else
 	/* Get pointer to PCB */
 	ld	a0, TD_PCB(a0)
@@ -280,7 +280,7 @@ ENTRY(fpe_state_clear)
 	li	t0, SSTATUS_FS_MASK
 	csrc	sstatus, t0
 
-	RETURN
+	ret
 END(fpe_state_clear)
 
 /*
@@ -289,17 +289,17 @@ END(fpe_state_clear)
 ENTRY(cpu_throw)
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Activate the new thread's pmap. */
-	cmove	cs0, ca1
-	cmove	ca0, ca1
-	clgc	cra, _C_LABEL(pmap_activate_sw)
-	cjalr	cra
-	cmove	ca0, cs0
+	cmv	cs0, ca1
+	cmv	ca0, ca1
+	lgc	cra, _C_LABEL(pmap_activate_sw)
+	jalr	cra
+	cmv	ca0, cs0
 
 	/* Store the new curthread */
-	csc	ca0, PC_CURTHREAD(ctp)
+	sc	ca0, PC_CURTHREAD(ctp)
 	/* And the new pcb */
-	clc	c13, TD_PCB(ca0)
-	csc	c13, PC_CURPCB(ctp)
+	lc	c13, TD_PCB(ca0)
+	sc	c13, PC_CURPCB(ctp)
 #else
 	/* Activate the new thread's pmap. */
 	mv	s0, a1
@@ -316,22 +316,22 @@ ENTRY(cpu_throw)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Load registers */
-	clc	cra, (PCB_RA)(c13)
-	clc	csp, (PCB_SP)(c13)
+	lc	cra, (PCB_RA)(c13)
+	lc	csp, (PCB_SP)(c13)
 
 	/* s[0-11] */
-	clc	cs0, (PCB_S + 0 * 16)(c13)
-	clc	cs1, (PCB_S + 1 * 16)(c13)
-	clc	cs2, (PCB_S + 2 * 16)(c13)
-	clc	cs3, (PCB_S + 3 * 16)(c13)
-	clc	cs4, (PCB_S + 4 * 16)(c13)
-	clc	cs5, (PCB_S + 5 * 16)(c13)
-	clc	cs6, (PCB_S + 6 * 16)(c13)
-	clc	cs7, (PCB_S + 7 * 16)(c13)
-	clc	cs8, (PCB_S + 8 * 16)(c13)
-	clc	cs9, (PCB_S + 9 * 16)(c13)
-	clc	cs10, (PCB_S + 10 * 16)(c13)
-	clc	cs11, (PCB_S + 11 * 16)(c13)
+	lc	cs0, (PCB_S + 0 * 16)(c13)
+	lc	cs1, (PCB_S + 1 * 16)(c13)
+	lc	cs2, (PCB_S + 2 * 16)(c13)
+	lc	cs3, (PCB_S + 3 * 16)(c13)
+	lc	cs4, (PCB_S + 4 * 16)(c13)
+	lc	cs5, (PCB_S + 5 * 16)(c13)
+	lc	cs6, (PCB_S + 6 * 16)(c13)
+	lc	cs7, (PCB_S + 7 * 16)(c13)
+	lc	cs8, (PCB_S + 8 * 16)(c13)
+	lc	cs9, (PCB_S + 9 * 16)(c13)
+	lc	cs10, (PCB_S + 10 * 16)(c13)
+	lc	cs11, (PCB_S + 11 * 16)(c13)
 #else
 	/* Load registers */
 	ld	ra, (PCB_RA)(x13)
@@ -354,8 +354,8 @@ ENTRY(cpu_throw)
 
 	/* Is FPE enabled for new thread? */
 #ifdef __CHERI_PURE_CAPABILITY__
-	clc	ct0, TD_FRAME(ca0)
-	cld	t1, (TF_SSTATUS)(ct0)
+	lc	ct0, TD_FRAME(ca0)
+	ld	t1, (TF_SSTATUS)(ct0)
 #else
 	ld	t0, TD_FRAME(a0)
 	ld	t1, (TF_SSTATUS)(t0)
@@ -371,7 +371,7 @@ ENTRY(cpu_throw)
 	__fpe_state_load x13
 #endif
 1:
-	RETURN
+	ret
 END(cpu_throw)
 
 /*
@@ -385,13 +385,13 @@ END(cpu_throw)
 ENTRY(cpu_switch)
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Store the new curthread */
-	csc	ca1, PC_CURTHREAD(ctp)
+	sc	ca1, PC_CURTHREAD(ctp)
 	/* And the new pcb */
-	clc	c13, TD_PCB(ca1)
-	csc	c13, PC_CURPCB(ctp)
+	lc	c13, TD_PCB(ca1)
+	sc	c13, PC_CURPCB(ctp)
 
 	/* Save the old context. */
-	clc	c13, TD_PCB(ca0)
+	lc	c13, TD_PCB(ca0)
 #else
 	/* Store the new curthread */
 	sd	a1, PC_CURTHREAD(tp)
@@ -405,22 +405,22 @@ ENTRY(cpu_switch)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Store ra, sp and the callee-saved registers */
-	csc	cra, (PCB_RA)(c13)
-	csc	csp, (PCB_SP)(c13)
+	sc	cra, (PCB_RA)(c13)
+	sc	csp, (PCB_SP)(c13)
 
 	/* s[0-11] */
-	csc	cs0, (PCB_S + 0 * 16)(c13)
-	csc	cs1, (PCB_S + 1 * 16)(c13)
-	csc	cs2, (PCB_S + 2 * 16)(c13)
-	csc	cs3, (PCB_S + 3 * 16)(c13)
-	csc	cs4, (PCB_S + 4 * 16)(c13)
-	csc	cs5, (PCB_S + 5 * 16)(c13)
-	csc	cs6, (PCB_S + 6 * 16)(c13)
-	csc	cs7, (PCB_S + 7 * 16)(c13)
-	csc	cs8, (PCB_S + 8 * 16)(c13)
-	csc	cs9, (PCB_S + 9 * 16)(c13)
-	csc	cs10, (PCB_S + 10 * 16)(c13)
-	csc	cs11, (PCB_S + 11 * 16)(c13)
+	sc	cs0, (PCB_S + 0 * 16)(c13)
+	sc	cs1, (PCB_S + 1 * 16)(c13)
+	sc	cs2, (PCB_S + 2 * 16)(c13)
+	sc	cs3, (PCB_S + 3 * 16)(c13)
+	sc	cs4, (PCB_S + 4 * 16)(c13)
+	sc	cs5, (PCB_S + 5 * 16)(c13)
+	sc	cs6, (PCB_S + 6 * 16)(c13)
+	sc	cs7, (PCB_S + 7 * 16)(c13)
+	sc	cs8, (PCB_S + 8 * 16)(c13)
+	sc	cs9, (PCB_S + 9 * 16)(c13)
+	sc	cs10, (PCB_S + 10 * 16)(c13)
+	sc	cs11, (PCB_S + 11 * 16)(c13)
 #else
 	/* Store ra, sp and the callee-saved registers */
 	sd	ra, (PCB_RA)(x13)
@@ -446,8 +446,8 @@ ENTRY(cpu_switch)
 	 * for the old thread?
 	 */
 #ifdef __CHERI_PURE_CAPABILITY__
-	clc	ct0, TD_FRAME(ca0)
-	cld	t1, (TF_SSTATUS)(ct0)
+	lc	ct0, TD_FRAME(ca0)
+	ld	t1, (TF_SSTATUS)(ct0)
 #else
 	ld	t0, TD_FRAME(a0)
 	ld	t1, (TF_SSTATUS)(t0)
@@ -463,7 +463,7 @@ ENTRY(cpu_switch)
 	li	t2, SSTATUS_FS_CLEAN
 	or	t3, t3, t2
 #ifdef __CHERI_PURE_CAPABILITY__
-	csd	t3, (TF_SSTATUS)(ct0)
+	sd	t3, (TF_SSTATUS)(ct0)
 #else
 	sd	t3, (TF_SSTATUS)(t0)
 #endif
@@ -477,13 +477,13 @@ ENTRY(cpu_switch)
 
 	/* Activate the new thread's pmap */
 #ifdef __CHERI_PURE_CAPABILITY__
-	cmove	cs0, ca0
-	cmove	cs1, ca1
-	cmove	cs2, ca2
-	cmove	ca0, ca1
-	clgc	cra, _C_LABEL(pmap_activate_sw)
-	cjalr	cra
-	cmove	ca1, cs1
+	cmv	cs0, ca0
+	cmv	cs1, ca1
+	cmv	cs2, ca2
+	cmv	ca0, ca1
+	lgc	cra, _C_LABEL(pmap_activate_sw)
+	jalr	cra
+	cmv	ca1, cs1
 #else
 	mv	s0, a0
 	mv	s1, a1
@@ -495,16 +495,16 @@ ENTRY(cpu_switch)
 
 	/* Release the old thread */
 #ifdef __CHERI_PURE_CAPABILITY__
-	csc	cs2, TD_LOCK(cs0)
+	sc	cs2, TD_LOCK(cs0)
 #else
 	sd	s2, TD_LOCK(s0)
 #endif
 #if defined(SCHED_ULE) && defined(SMP)
 	/* Spin if TD_LOCK points to a blocked_lock */
 #ifdef __CHERI_PURE_CAPABILITY__
-	clgc	cs2, _C_LABEL(blocked_lock)
+	lgc	cs2, _C_LABEL(blocked_lock)
 1:
-	clc	ct0, TD_LOCK(ca1)
+	lc	ct0, TD_LOCK(ca1)
 	beq	t0, s2, 1b
 #else
 	la	s2, _C_LABEL(blocked_lock)
@@ -521,15 +521,15 @@ ENTRY(cpu_switch)
 	 * flag.
 	 */
 #ifdef __CHERI_PURE_CAPABILITY__
-	clgc	ct0, _C_LABEL(qemu_trace_perthread)
-	clw	t0, (ct0)
+	lgc	ct0, _C_LABEL(qemu_trace_perthread)
+	lw	t0, (ct0)
 #else
 	lw	t0, _C_LABEL(qemu_trace_perthread)
 #endif
 	beqz	t0, .Lout_qemu_tracing
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	clw	t0, TD_MDFLAGS(ca1)
+	lw	t0, TD_MDFLAGS(ca1)
 #else
 	lw	t0, TD_MDFLAGS(a1)
 #endif
@@ -552,29 +552,29 @@ ENTRY(cpu_switch)
 	 * Restore the saved context.
 	 */
 #ifdef __CHERI_PURE_CAPABILITY__
-	clc	c13, TD_PCB(ca1)
+	lc	c13, TD_PCB(ca1)
 #else
 	ld	x13, TD_PCB(a1)
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Restore the registers */
-	clc	cra, (PCB_RA)(c13)
-	clc	csp, (PCB_SP)(c13)
+	lc	cra, (PCB_RA)(c13)
+	lc	csp, (PCB_SP)(c13)
 
 	/* s[0-11] */
-	clc	cs0, (PCB_S + 0 * 16)(c13)
-	clc	cs1, (PCB_S + 1 * 16)(c13)
-	clc	cs2, (PCB_S + 2 * 16)(c13)
-	clc	cs3, (PCB_S + 3 * 16)(c13)
-	clc	cs4, (PCB_S + 4 * 16)(c13)
-	clc	cs5, (PCB_S + 5 * 16)(c13)
-	clc	cs6, (PCB_S + 6 * 16)(c13)
-	clc	cs7, (PCB_S + 7 * 16)(c13)
-	clc	cs8, (PCB_S + 8 * 16)(c13)
-	clc	cs9, (PCB_S + 9 * 16)(c13)
-	clc	cs10, (PCB_S + 10 * 16)(c13)
-	clc	cs11, (PCB_S + 11 * 16)(c13)
+	lc	cs0, (PCB_S + 0 * 16)(c13)
+	lc	cs1, (PCB_S + 1 * 16)(c13)
+	lc	cs2, (PCB_S + 2 * 16)(c13)
+	lc	cs3, (PCB_S + 3 * 16)(c13)
+	lc	cs4, (PCB_S + 4 * 16)(c13)
+	lc	cs5, (PCB_S + 5 * 16)(c13)
+	lc	cs6, (PCB_S + 6 * 16)(c13)
+	lc	cs7, (PCB_S + 7 * 16)(c13)
+	lc	cs8, (PCB_S + 8 * 16)(c13)
+	lc	cs9, (PCB_S + 9 * 16)(c13)
+	lc	cs10, (PCB_S + 10 * 16)(c13)
+	lc	cs11, (PCB_S + 11 * 16)(c13)
 #else
 	/* Restore the registers */
 	ld	ra, (PCB_RA)(x13)
@@ -597,8 +597,8 @@ ENTRY(cpu_switch)
 
 	/* Is FPE enabled for new thread? */
 #ifdef __CHERI_PURE_CAPABILITY__
-	clc	ct0, TD_FRAME(ca1)
-	cld	t1, (TF_SSTATUS)(ct0)
+	lc	ct0, TD_FRAME(ca1)
+	ld	t1, (TF_SSTATUS)(ct0)
 #else
 	ld	t0, TD_FRAME(a1)
 	ld	t1, (TF_SSTATUS)(t0)
@@ -614,7 +614,7 @@ ENTRY(cpu_switch)
 	__fpe_state_load x13
 #endif
 1:
-	RETURN
+	ret
 END(cpu_switch)
 
 /*
@@ -624,11 +624,11 @@ END(cpu_switch)
 
 ENTRY(fork_trampoline)
 #ifdef __CHERI_PURE_CAPABILITY__
-	cmove	ca0, cs0
-	cmove	ca1, cs1
-	cmove	ca2, csp
-	clgc	cra, _C_LABEL(fork_exit)
-	cjalr	cra
+	cmv	ca0, cs0
+	cmv	ca1, cs1
+	cmv	ca2, csp
+	lgc	cra, _C_LABEL(fork_exit)
+	jalr	cra
 #else
 	mv	a0, s0
 	mv	a1, s1
@@ -638,7 +638,7 @@ ENTRY(fork_trampoline)
 
 	/* Restore sstatus */
 #ifdef __CHERI_PURE_CAPABILITY__
-	cld	t0, (TF_SSTATUS)(csp)
+	ld	t0, (TF_SSTATUS)(csp)
 #else
 	ld	t0, (TF_SSTATUS)(sp)
 #endif
@@ -650,16 +650,20 @@ ENTRY(fork_trampoline)
 #if __has_feature(capabilities)
 #ifndef __CHERI_PURE_CAPABILITY__
 	/* Switch to capmode PCC. */
+#ifdef __riscv_xcheri
 	lla	t0, 1f
 	cspecialr ct1, pcc
-	csetaddr ct1, ct1, t0
+	scaddr ct1, ct1, t0
 	li	t0, 1
 	csetflags ct1, ct1, t0
 #ifdef __riscv_xcheri_mode_dependent_jumps
 	jr.cap	ct1
 #else
-	cjr	ct1
+	jr	ct1
 #endif
+#else /* !defined(__riscv_xcheri) */
+	modesw.cap
+#endif /* !defined(__riscv_xcheri) */
 .option push
 .option capmode
 1:
@@ -670,9 +674,9 @@ ENTRY(fork_trampoline)
 	 * XXX: Bounds?  Maybe could use TF_SIZE + KF_SIZE as length?
 	 * A purecap kernel would have proper bounds on csp already.
 	 */
-	cspecialr ct0, ddc
-	csetaddr ct0, ct0, sp
-	cmove	csp, ct0
+	csrr	ct0, ddc
+	scaddr	ct0, ct0, sp
+	cmv	csp, ct0
 #endif
 
 #ifndef __CHERI_PURE_CAPABILITY__
@@ -680,69 +684,69 @@ ENTRY(fork_trampoline)
 	 * Store our DDC on stack, we will load it back
 	 * on kernel mode trap.
 	 */
-	cspecialr ct0, ddc
-	csc	ct0, (TF_SIZE + KF_DDC)(csp)
+	csrr	ct0, ddc
+	sc	ct0, (TF_SIZE + KF_DDC)(csp)
 #endif
 
 	/*
 	 * Switch to user DDC.  After this point, all stack accesses
 	 * must use 'csp' instead of 'sp'.
 	 */
-	clc	ct0, (TF_DDC)(csp)
-	cspecialw ddc, ct0
+	lc	ct0, (TF_DDC)(csp)
+	csrw	ddc, ct0
 
 	/* Restore exception program counter */
-	clc	ct0, (TF_SEPC)(csp)
-	cspecialw sepcc, ct0
+	lc	ct0, (TF_SEPC)(csp)
+	csrw	sepcc, ct0
 
 	/* Restore the registers */
-	clc	ct0, (TF_T + 0 * 16)(csp)
-	clc	ct1, (TF_T + 1 * 16)(csp)
-	clc	ct2, (TF_T + 2 * 16)(csp)
-	clc	ct3, (TF_T + 3 * 16)(csp)
-	clc	ct4, (TF_T + 4 * 16)(csp)
-	clc	ct5, (TF_T + 5 * 16)(csp)
-	clc	ct6, (TF_T + 6 * 16)(csp)
+	lc	ct0, (TF_T + 0 * 16)(csp)
+	lc	ct1, (TF_T + 1 * 16)(csp)
+	lc	ct2, (TF_T + 2 * 16)(csp)
+	lc	ct3, (TF_T + 3 * 16)(csp)
+	lc	ct4, (TF_T + 4 * 16)(csp)
+	lc	ct5, (TF_T + 5 * 16)(csp)
+	lc	ct6, (TF_T + 6 * 16)(csp)
 
-	clc	cs0, (TF_S + 0 * 16)(csp)
-	clc	cs1, (TF_S + 1 * 16)(csp)
-	clc	cs2, (TF_S + 2 * 16)(csp)
-	clc	cs3, (TF_S + 3 * 16)(csp)
-	clc	cs4, (TF_S + 4 * 16)(csp)
-	clc	cs5, (TF_S + 5 * 16)(csp)
-	clc	cs6, (TF_S + 6 * 16)(csp)
-	clc	cs7, (TF_S + 7 * 16)(csp)
-	clc	cs8, (TF_S + 8 * 16)(csp)
-	clc	cs9, (TF_S + 9 * 16)(csp)
-	clc	cs10, (TF_S + 10 * 16)(csp)
-	clc	cs11, (TF_S + 11 * 16)(csp)
+	lc	cs0, (TF_S + 0 * 16)(csp)
+	lc	cs1, (TF_S + 1 * 16)(csp)
+	lc	cs2, (TF_S + 2 * 16)(csp)
+	lc	cs3, (TF_S + 3 * 16)(csp)
+	lc	cs4, (TF_S + 4 * 16)(csp)
+	lc	cs5, (TF_S + 5 * 16)(csp)
+	lc	cs6, (TF_S + 6 * 16)(csp)
+	lc	cs7, (TF_S + 7 * 16)(csp)
+	lc	cs8, (TF_S + 8 * 16)(csp)
+	lc	cs9, (TF_S + 9 * 16)(csp)
+	lc	cs10, (TF_S + 10 * 16)(csp)
+	lc	cs11, (TF_S + 11 * 16)(csp)
 
-	clc	ca0, (TF_A + 0 * 16)(csp)
-	clc	ca1, (TF_A + 1 * 16)(csp)
-	clc	ca2, (TF_A + 2 * 16)(csp)
-	clc	ca3, (TF_A + 3 * 16)(csp)
-	clc	ca4, (TF_A + 4 * 16)(csp)
-	clc	ca5, (TF_A + 5 * 16)(csp)
-	clc	ca6, (TF_A + 6 * 16)(csp)
-	clc	ca7, (TF_A + 7 * 16)(csp)
+	lc	ca0, (TF_A + 0 * 16)(csp)
+	lc	ca1, (TF_A + 1 * 16)(csp)
+	lc	ca2, (TF_A + 2 * 16)(csp)
+	lc	ca3, (TF_A + 3 * 16)(csp)
+	lc	ca4, (TF_A + 4 * 16)(csp)
+	lc	ca5, (TF_A + 5 * 16)(csp)
+	lc	ca6, (TF_A + 6 * 16)(csp)
+	lc	ca7, (TF_A + 7 * 16)(csp)
 
 	/* Load user ra and gp */
-	clc	cra, (TF_RA)(csp)
-	clc	cgp, (TF_GP)(csp)
+	lc	cra, (TF_RA)(csp)
+	lc	cgp, (TF_GP)(csp)
 
 	/*
 	 * Store our pcpup on stack, we will load it back
 	 * on kernel mode trap.
 	 */
-	csc	ctp, (TF_SIZE + KF_TP)(csp)
-	clc	ctp, (TF_TP)(csp)
+	sc	ctp, (TF_SIZE + KF_TP)(csp)
+	lc	ctp, (TF_TP)(csp)
 
 	/* Save kernel stack so we can use it doing a user trap */
-	cincoffset csp, csp, TF_SIZE
-	cspecialw sscratchc, csp
+	caddi	csp, csp, TF_SIZE
+	csrw	sscratchc, csp
 
 	/* Load user stack */
-	clc	csp, (TF_SP - TF_SIZE)(csp)
+	lc	csp, (TF_SP - TF_SIZE)(csp)
 #ifndef __CHERI_PURE_CAPABILITY__
 .option pop
 #endif
@@ -807,24 +811,24 @@ END(fork_trampoline)
 ENTRY(savectx)
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Store ra, sp and the callee-saved registers */
-	csc	cra, (PCB_RA)(ca0)
-	csc	csp, (PCB_SP)(ca0)
-	csc	ctp, (PCB_TP)(ca0)
-	csc	cgp, (PCB_GP)(ca0)
+	sc	cra, (PCB_RA)(ca0)
+	sc	csp, (PCB_SP)(ca0)
+	sc	ctp, (PCB_TP)(ca0)
+	sc	cgp, (PCB_GP)(ca0)
 
 	/* s[0-11] */
-	csc	cs0, (PCB_S + 0 * 16)(ca0)
-	csc	cs1, (PCB_S + 1 * 16)(ca0)
-	csc	cs2, (PCB_S + 2 * 16)(ca0)
-	csc	cs3, (PCB_S + 3 * 16)(ca0)
-	csc	cs4, (PCB_S + 4 * 16)(ca0)
-	csc	cs5, (PCB_S + 5 * 16)(ca0)
-	csc	cs6, (PCB_S + 6 * 16)(ca0)
-	csc	cs7, (PCB_S + 7 * 16)(ca0)
-	csc	cs8, (PCB_S + 8 * 16)(ca0)
-	csc	cs9, (PCB_S + 9 * 16)(ca0)
-	csc	cs10, (PCB_S + 10 * 16)(ca0)
-	csc	cs11, (PCB_S + 11 * 16)(ca0)
+	sc	cs0, (PCB_S + 0 * 16)(ca0)
+	sc	cs1, (PCB_S + 1 * 16)(ca0)
+	sc	cs2, (PCB_S + 2 * 16)(ca0)
+	sc	cs3, (PCB_S + 3 * 16)(ca0)
+	sc	cs4, (PCB_S + 4 * 16)(ca0)
+	sc	cs5, (PCB_S + 5 * 16)(ca0)
+	sc	cs6, (PCB_S + 6 * 16)(ca0)
+	sc	cs7, (PCB_S + 7 * 16)(ca0)
+	sc	cs8, (PCB_S + 8 * 16)(ca0)
+	sc	cs9, (PCB_S + 9 * 16)(ca0)
+	sc	cs10, (PCB_S + 10 * 16)(ca0)
+	sc	cs11, (PCB_S + 11 * 16)(ca0)
 #elif __has_feature(capabilities)
 	/* Store ra, sp and the callee-saved registers */
 	sc	cra, (PCB_RA)(a0)
@@ -872,7 +876,7 @@ ENTRY(savectx)
 #else
 	__fpe_state_save a0
 #endif
-	RETURN
+	ret
 END(savectx)
 
 /*
