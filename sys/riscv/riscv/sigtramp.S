@@ -59,12 +59,7 @@
 .option capmode
 #endif
 SIGCODE(sigcode)
-#if __has_feature(capabilities)
-	cincoffset ca0, csp, SF_UC
-#else
-	mv	a0, sp
-	addi	a0, a0, SF_UC
-#endif
+	ADDI_CAP	a0, sp, SF_UC
 
 1:
 	li	t0, SYS_sigreturn
