@@ -38,11 +38,11 @@
 ENTRY(sigsetjmp)
 #ifdef __CHERI_PURE_CAPABILITY__
 	beqz	a1, 1f
-	clgc	ct0, _C_LABEL(setjmp)
-	cjr	ct0
+	lgc	ct0, _C_LABEL(setjmp)
+	jr	ct0
 1:
-	clgc	ct0, _C_LABEL(_setjmp)
-	cjr	ct0
+	lgc	ct0, _C_LABEL(_setjmp)
+	jr	ct0
 #else
 	beqz	a1, 1f
 	tail	_C_LABEL(setjmp)
@@ -54,17 +54,17 @@ END(sigsetjmp)
 ENTRY(siglongjmp)
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Load the _setjmp magic */
-	cllc	ca2, .Lmagic
-	cld	a2, (ca2)
-	cld	a3, 0(ca0)
+	llc	ca2, .Lmagic
+	ld	a2, (ca2)
+	ld	a3, 0(ca0)
 
 	/* Check the magic */
 	beq	a2, a3, 1f
-	clgc	ct0, _C_LABEL(longjmp)
-	cjr	ct0
+	lgc	ct0, _C_LABEL(longjmp)
+	jr	ct0
 1:
-	clgc	ct0, _C_LABEL(_longjmp)
-	cjr	ct0
+	lgc	ct0, _C_LABEL(_longjmp)
+	jr	ct0
 #else
 	/* Load the _setjmp magic */
 	ld	a2, .Lmagic
