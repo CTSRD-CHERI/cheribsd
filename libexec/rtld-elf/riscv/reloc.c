@@ -357,7 +357,7 @@ reloc_gnu_ifunc_plt(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 				continue;
 
 			lock_release(rtld_bind_lock, lockstate);
-			target = (Elf_Addr)rtld_resolve_ifunc(defobj, def);
+			target = (uintptr_t)rtld_resolve_ifunc(defobj, def);
 			wlock_acquire(rtld_bind_lock, lockstate);
 			reloc_jmpslot(where, target, defobj, obj,
 			    (const Elf_Rel *)rela);
