@@ -65,11 +65,10 @@ END(copyio_fault)
 	.macro copycommon
 #ifdef __CHERI_PURE_CAPABILITY__
 	_LGC	PTR(a6), copyio_fault	/* Get the handler address */
-	SET_FAULT_HANDLER(PTR(a6), PTR(a7))	/* Set the handler */
 #else
 	la	a6, copyio_fault	/* Get the handler address */
-	SET_FAULT_HANDLER(a6, a7)	/* Set the handler */
 #endif
+	SET_FAULT_HANDLER(PTR(a6), PTR(a7))	/* Set the handler */
 	ENTER_USER_ACCESS(a7)
 	MODESW_CAP
 
@@ -87,17 +86,10 @@ END(copyio_fault)
 
 	/* Byte copy until the first word-aligned address */
 1:
-#if __has_feature(capabilities)
 	LB_CAP	a4, 0(CAP(a0))		/* Load byte from src */
 	CADDI_CAP	CAP(a0), CAP(a0), 1
 	SB_CAP	a4, 0(CAP(a1))
 	CADDI_CAP	CAP(a1), CAP(a1), 1	/* Store byte in dest */
-#else
-	lb	a4, 0(a0)		/* Load byte from src */
-	addi	a0, a0, 1
-	sb	a4, 0(a1)		/* Store byte in dest */
-	addi	a1, a1, 1
-#endif
 	addi	a2, a2, -1		/* len-- */
 	andi	t0, a0, (XLEN_BYTES-1)
 	bnez	t0, 1b
@@ -105,17 +97,10 @@ END(copyio_fault)
 
 	/* Copy words */
 2:
-#if __has_feature(capabilities)
 	LD_CAP	a4, 0(CAP(a0))		/* Load word from src */
 	CADDI_CAP	CAP(a0), CAP(a0), XLEN_BYTES
 	SD_CAP	a4, 0(CAP(a1))		/* Store word in dest */
 	CADDI_CAP	CAP(a1), CAP(a1), XLEN_BYTES
-#else
-	ld	a4, 0(a0)		/* Load word from src */
-	addi	a0, a0, XLEN_BYTES
-	sd	a4, 0(a1)		/* Store word in dest */
-	addi	a1, a1, XLEN_BYTES
-#endif
 	addi	a2, a2, -XLEN_BYTES	/* len -= XLEN_BYTES */
 3:	bgeu	a2, t2, 2b		/* Again if len >= XLEN_BYTES */
 
@@ -124,27 +109,16 @@ END(copyio_fault)
 
 	/* Copy any remaining bytes */
 4:
-#if __has_feature(capabilities)
 	LB_CAP	a4, 0(CAP(a0))		/* Load byte from src */
 	CADDI_CAP	CAP(a0), CAP(a0), 1
 	SB_CAP	a4, 0(CAP(a1))		/* Store byte in dest */
 	CADDI_CAP	CAP(a1), CAP(a1), 1
-#else
-	lb	a4, 0(a0)		/* Load byte from src */
-	addi	a0, a0, 1
-	sb	a4, 0(a1)		/* Store byte in dest */
-	addi	a1, a1, 1
-#endif
 	addi	a2, a2, -1		/* len-- */
 	bnez	a2, 4b
 
 5:	MODESW_INT
 	EXIT_USER_ACCESS(a7)
-#ifdef __CHERI_PURE_CAPABILITY__
-	SET_FAULT_HANDLER(PTR(null), PTR(a7))	/* Clear the handler */
-#else
-	SET_FAULT_HANDLER(x0, a7)	/* Clear the handler */
-#endif
+	SET_FAULT_HANDLER(PTR_NULL, PTR(a7))	/* Clear the handler */
 	.endm
 
 /*
@@ -207,11 +181,10 @@ ENTRY(copyinstr)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	_LGC	PTR(a6), copyio_fault /* Get the handler address */
-	SET_FAULT_HANDLER(PTR(a6), PTR(a7)) /* Set the handler */
 #else
 	la	a6, copyio_fault /* Get the handler address */
-	SET_FAULT_HANDLER(a6, a7) /* Set the handler */
 #endif
+	SET_FAULT_HANDLER(PTR(a6), PTR(a7)) /* Set the handler */
 	ENTER_USER_ACCESS(a7)
 	MODESW_CAP
 
@@ -223,17 +196,10 @@ ENTRY(copyinstr)
 
 	li	a7, VM_MAXUSER_ADDRESS
 1:	bgeu	a0, a7, copyio_fault
-#if __has_feature(capabilities)
 	LB_CAP	a4, 0(CAP(a0))	/* Load from uaddr */
 	CADDI_CAP	CAP(a0), CAP(a0), 1
 	SB_CAP	a4, 0(CAP(a1))	/* Store in kaddr */
 	CADDI_CAP	CAP(a1), CAP(a1), 1
-#else
-	lb	a4, 0(a0)	/* Load from uaddr */
-	addi	a0, a0, 1
-	sb	a4, 0(a1)	/* Store in kaddr */
-	addi	a1, a1, 1
-#endif
 	beqz	a4, 2f
 	addi	a2, a2, -1	/* len-- */
 	addi	a5, a5, 1	/* count++ */
@@ -241,11 +207,7 @@ ENTRY(copyinstr)
 
 2:	MODESW_INT
 	EXIT_USER_ACCESS(a7)
-#ifdef __CHERI_PURE_CAPABILITY__
-	SET_FAULT_HANDLER(PTR(null), PTR(a7)) /* Clear the handler */
-#else
-	SET_FAULT_HANDLER(x0, a7) /* Clear the handler */
-#endif
+	SET_FAULT_HANDLER(PTR_NULL, PTR(a7)) /* Clear the handler */
 
 3:	beqz	a3, 4f		/* Check if done != NULL */
 	addi	a5, a5, 1	/* count++ */
@@ -269,11 +231,10 @@ END(copyinstr)
 	.macro copycapcommon
 #ifdef __CHERI_PURE_CAPABILITY__
 	_LGC	PTR(a6), copyio_fault	/* Get the handler address */
-	SET_FAULT_HANDLER(PTR(a6), PTR(a7))	/* Set the handler */
 #else
 	la	a6, copyio_fault	/* Get the handler address */
-	SET_FAULT_HANDLER(a6, a7)	/* Set the handler */
 #endif
+	SET_FAULT_HANDLER(PTR(a6), PTR(a7))	/* Set the handler */
 	ENTER_USER_ACCESS(a7)
 	MODESW_CAP
 
@@ -323,11 +284,7 @@ END(copyinstr)
 
 5:	MODESW_INT
 	EXIT_USER_ACCESS(a7)
-#ifdef __CHERI_PURE_CAPABILITY__
-	SET_FAULT_HANDLER(PTR(null), PTR(a7)) /* Clear the handler */
-#else
-	SET_FAULT_HANDLER(x0, a7)	/* Clear the handler */
-#endif
+	SET_FAULT_HANDLER(PTR_NULL, PTR(a7)) /* Clear the handler */
 	.endm
 
 /*
