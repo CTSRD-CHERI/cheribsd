@@ -84,7 +84,7 @@ stack_save(struct stack *st)
 	uintptr_t sp;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	__asm __volatile("cmove %0, csp" : "=&C" (sp));
+	__asm __volatile("cmv %0, csp" : "=&C" (sp));
 #else
 	__asm __volatile("mv %0, sp" : "=&r" (sp));
 #endif
