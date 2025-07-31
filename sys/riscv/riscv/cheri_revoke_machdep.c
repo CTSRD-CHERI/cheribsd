@@ -226,7 +226,7 @@ measure_cloadtags_stride(void *ignored __unused)
 		buf[i] = userspace_root_cap;
 	}
 
-	uint64_t tags = __builtin_cheri_cap_load_tags(buf);
+	uint64_t tags = cheri_loadtags(buf);
 	switch (tags) {
 	case 0x0001:
 		cloadtags_stride = 1;
@@ -287,7 +287,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 #endif
 
 #ifdef CHERI_CAPREVOKE_CLOADTAGS
-	tags = __builtin_cheri_cap_load_tags(mvu);
+	tags = cheri_loadtags(mvu);
 
 	mve -= _cloadtags_stride * sizeof(void * __capability);
 
@@ -300,8 +300,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 	for (; cheri_getaddress(mvu) < mve; mvu += _cloadtags_stride) {
 		uintcap_t * __capability mvt = mvu;
 
-		nexttags =
-		    __builtin_cheri_cap_load_tags(mvu + _cloadtags_stride);
+		nexttags = cheri_loadtags(mvu + _cloadtags_stride);
 		if (nexttags != 0) {
 			/* TODO? CPREFETCH(mvu + _cloadtags_stride); */
 			CHERI_REVOKE_STATS_BUMP(crst, lines_scan);
