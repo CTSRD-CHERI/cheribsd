@@ -2500,7 +2500,7 @@ sys___sysctl(struct thread *td, struct __sysctl_args *uap)
 }
 
 int
-kern_sysctl(struct thread *td, int * __capability uname, u_int namelen,
+kern_sysctl(struct thread *td, const int * __capability uname, u_int namelen,
     void * __capability old, size_t * __capability oldlenp,
     const void * __capability new, size_t newlen, int flags)
 {
