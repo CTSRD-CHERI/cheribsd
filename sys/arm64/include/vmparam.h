@@ -318,7 +318,7 @@
 #define	VM_INITIAL_PAGEIN	16
 #endif
 
-#if !defined(KASAN) && !defined(KMSAN)
+#if !defined(KASAN) && !defined(KMSAN) && !defined(CHERI_CAPREVOKE_KERNEL)
 #define UMA_USE_DMAP
 #endif
 
