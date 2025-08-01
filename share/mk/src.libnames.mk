@@ -73,6 +73,7 @@ _INTERNALLIBS=	\
 		pfctl \
 		pkgecc \
 		pmcstat \
+		samplerate \
 		sl \
 		sm \
 		smdb \
@@ -753,6 +754,9 @@ LIBSYS_PIC?=	${LIBSYS_PICDIR}/libsys_pic.a
 
 LIBSYS_PICDIR=	${_LIB_OBJTOP}/lib/libsys
 LIBSYS_PIC?=	${LIBSYS_PICDIR}/libsys_pic.a
+
+LIBSAMPLERATEDIR?=	${_LIB_OBJTOP}/lib/libsamplerate
+LIBSAMPLERATE?=	${LIBSAMPLERATEDIR}/libsamplerate${PIE_SUFFIX}.a
 
 # Define a directory for each library.  This is useful for adding -L in when
 # not using a --sysroot or for meta mode bootstrapping when there is no
