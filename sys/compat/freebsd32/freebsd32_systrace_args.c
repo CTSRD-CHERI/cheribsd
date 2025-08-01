@@ -932,7 +932,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* freebsd32___sysctl */
 	case 202: {
 		struct freebsd32___sysctl_args *p = params;
-		uarg[a++] = (intcap_t)p->name; /* int * */
+		uarg[a++] = (intcap_t)p->name; /* const int * */
 		uarg[a++] = p->namelen; /* u_int */
 		uarg[a++] = (intcap_t)p->old; /* void * */
 		uarg[a++] = (intcap_t)p->oldlenp; /* uint32_t * */
@@ -4928,7 +4928,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 202:
 		switch (ndx) {
 		case 0:
-			p = "userland int *";
+			p = "userland const int *";
 			break;
 		case 1:
 			p = "u_int";

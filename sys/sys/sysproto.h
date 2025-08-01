@@ -549,7 +549,7 @@ struct setrlimit_args {
 	char rlp_l_[PADL_(struct rlimit * __kerncap)]; struct rlimit * __kerncap rlp; char rlp_r_[PADR_(struct rlimit * __kerncap)];
 };
 struct __sysctl_args {
-	char name_l_[PADL_(int * __kerncap)]; int * __kerncap name; char name_r_[PADR_(int * __kerncap)];
+	char name_l_[PADL_(const int * __kerncap)]; const int * __kerncap name; char name_r_[PADR_(const int * __kerncap)];
 	char namelen_l_[PADL_(u_int)]; u_int namelen; char namelen_r_[PADR_(u_int)];
 	char old_l_[PADL_(void * __kerncap)]; void * __kerncap old; char old_r_[PADR_(void * __kerncap)];
 	char oldlenp_l_[PADL_(size_t * __kerncap)]; size_t * __kerncap oldlenp; char oldlenp_r_[PADR_(size_t * __kerncap)];

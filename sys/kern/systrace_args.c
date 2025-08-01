@@ -962,7 +962,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* __sysctl */
 	case 202: {
 		struct __sysctl_args *p = params;
-		uarg[a++] = (intcap_t)p->name; /* int * __kerncap */
+		uarg[a++] = (intcap_t)p->name; /* const int * __kerncap */
 		uarg[a++] = p->namelen; /* u_int */
 		uarg[a++] = (intcap_t)p->old; /* void * __kerncap */
 		uarg[a++] = (intcap_t)p->oldlenp; /* size_t * __kerncap */
@@ -5095,7 +5095,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 202:
 		switch (ndx) {
 		case 0:
-			p = "userland int * __kerncap";
+			p = "userland const int * __kerncap";
 			break;
 		case 1:
 			p = "u_int";
