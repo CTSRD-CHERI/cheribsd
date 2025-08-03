@@ -966,7 +966,15 @@ dl_c18n_get_trusted_stack(uintptr_t pc)
 	if (!C18N_ENABLED)
 		return (NULL);
 
-	tf = get_trusted_stk()->previous;
+	/*
+	 * If the current function does not return to a trampoline, ignore the
+	 * request as that is required for this function to work.
+	 */
+	tf = get_trusted_stk();
+	if (!c18n_is_tramp((uintptr_t)__builtin_return_address(0), tf))
+		return (NULL);
+
+	tf = tf->previous;
 	if (c18n_is_tramp(pc, tf))
 		tf = tf->previous;
 
@@ -1030,11 +1038,21 @@ dl_c18n_unwind_trusted_stack(void *rcsp, void *target)
 	SIGFILLSET(nset);
 	sigprocmask(SIG_SETMASK, &nset, &oset);
 
+	/*
+	 * If the current function does not return to a trampoline, ignore the
+	 * request as that is required for this function to work.
+	 */
 	tf = get_trusted_stk();
+	if (!c18n_is_tramp((uintptr_t)__builtin_return_address(0), tf))
+		goto out;
 	target = cheri_unseal(target, sealer_trusted_stk);
 
-	if (!cheri_is_subset(tf, target) ||
-	    (ptraddr_t)tf->previous >= (ptraddr_t)target) {
+	/*
+	 * If the trusted frame is not a subset of the target, or if the
+	 * caller's frame is after the target, abort.
+	 */
+	if (!cheri_is_subset(target, tf) ||
+	    (ptraddr_t)tf->previous > (ptraddr_t)target) {
 		rtld_fdprintf(STDERR_FILENO,
 		    "c18n: Illegal unwind from %#p to %#p\n", tf, target);
 		abort();
@@ -1085,6 +1103,7 @@ dl_c18n_unwind_trusted_stack(void *rcsp, void *target)
 	tf->previous = cur;
 	tf->caller = index;
 
+out:
 	sigprocmask(SIG_SETMASK, &oset, NULL);
 }
 
