@@ -955,10 +955,12 @@ void *
 dl_c18n_get_trusted_stack(uintptr_t pc)
 {
 	/*
-	 * Return a sealed capability to the caller's trusted frame. But if the
-	 * caller is entered via a trampoline and a return capability to said
-	 * trampoline is passed as the argument, return a sealed capability to
-	 * the trusted frame of the caller's own caller.
+	 * Return a sealed capability to the caller's trusted frame (which is
+	 * the previous trusted frame unless we were not called via a
+	 * trampoline). But if the caller is entered via a trampoline and a
+	 * return capability to said trampoline is passed as the argument,
+	 * return a sealed capability to the trusted frame of the caller's own
+	 * caller.
 	 */
 
 	struct trusted_frame *tf;
@@ -966,7 +968,10 @@ dl_c18n_get_trusted_stack(uintptr_t pc)
 	if (!C18N_ENABLED)
 		return (NULL);
 
-	tf = get_trusted_stk()->previous;
+	tf = get_trusted_stk();
+	if (c18n_is_tramp((uintptr_t)__builtin_return_address(0), tf))
+		tf = tf->previous;
+
 	if (c18n_is_tramp(pc, tf))
 		tf = tf->previous;
 
@@ -1033,8 +1038,10 @@ dl_c18n_unwind_trusted_stack(void *rcsp, void *target)
 	tf = get_trusted_stk();
 	target = cheri_unseal(target, sealer_trusted_stk);
 
-	if (!cheri_is_subset(tf, target) ||
-	    (ptraddr_t)tf->previous >= (ptraddr_t)target) {
+	/*
+	 * If the trusted frame is not a subset of the target, abort.
+	 */
+	if (!cheri_is_subset(target, tf)) {
 		rtld_fdprintf(STDERR_FILENO,
 		    "c18n: Illegal unwind from %#p to %#p\n", tf, target);
 		abort();
@@ -1045,7 +1052,7 @@ dl_c18n_unwind_trusted_stack(void *rcsp, void *target)
 	 */
 	cur = tf;
 	table = get_stk_table();
-	do {
+	while ((ptraddr_t)cur < (ptraddr_t)target) {
 		index = cur->caller;
 		cid = index_to_cid(index);
 		ospp = &table->entries[cid].stack;
@@ -1059,7 +1066,7 @@ dl_c18n_unwind_trusted_stack(void *rcsp, void *target)
 
 		*ospp = cur->osp;
 		cur = cur->previous;
-	} while ((ptraddr_t)cur < (ptraddr_t)target);
+	}
 
 	if ((ptraddr_t)cur != (ptraddr_t)target) {
 		rtld_fdprintf(STDERR_FILENO,
@@ -1068,22 +1075,35 @@ dl_c18n_unwind_trusted_stack(void *rcsp, void *target)
 	}
 
 	/*
-	 * Link the topmost trusted frame to the target frame. Modify the
-	 * topmost trusted frame to restore the untrusted stack when it is
-	 * popped.
+	 * If we were called via a trampoline, link the topmost trusted frame
+	 * to the target frame and modify it to restore the untrusted stack
+	 * when it is popped.
+	 *
+	 * If we were not called via a trampoline, directly set the trusted
+	 * stack to the target frame and let the caller restore the untrusted
+	 * stack.
 	 */
-	if ((ptraddr_t)rcsp > (ptraddr_t)*ospp) {
-		rtld_fdprintf(STDERR_FILENO,
-		    "c18n: Cannot complete unwind %s from %#p to %#p, ",
-		    "tf: %#p -> %#p\n", comparts.data[cid].name, rcsp, *ospp,
-		    tf, target);
-		abort();
-	}
+	if (c18n_is_tramp((uintptr_t)__builtin_return_address(0), tf)) {
+		/*
+		 * Since we were called via a trampoline, the topmost trusted
+		 * frame should be at least one frame away from the target
+		 * frame, which ensures that ospp is initialised.
+		 */
+		if ((ptraddr_t)tf == (ptraddr_t)cur ||
+		    (ptraddr_t)rcsp > (ptraddr_t)*ospp) {
+			rtld_fdprintf(STDERR_FILENO,
+			    "c18n: Cannot complete unwind %s from %#p to %#p, ",
+			    "tf: %#p -> %#p\n",
+			    comparts.data[cid].name, rcsp, *ospp, tf, target);
+			abort();
+		}
 
-	tf->state.sp = rcsp;
-	tf->osp = *ospp;
-	tf->previous = cur;
-	tf->caller = index;
+		tf->state.sp = rcsp;
+		tf->osp = *ospp;
+		tf->previous = cur;
+		tf->caller = index;
+	} else
+		set_trusted_stk(rcsp);
 
 	sigprocmask(SIG_SETMASK, &oset, NULL);
 }
