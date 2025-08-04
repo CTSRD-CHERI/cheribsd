@@ -128,7 +128,7 @@ CHERIBSDTEST(vm_tag_mmap_anon_cap,
 }
 
 CHERIBSDTEST(vm_notag_mmap_no_cap,
-    "check tags are not stored it we request no capablity permissions",
+    "check tags are not stored it we request no capability permissions",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO | CT_FLAG_SI_ADDR,
     .ct_signum = SIGSEGV,
     .ct_si_code = SEGV_STORETAG,
