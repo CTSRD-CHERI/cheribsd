@@ -172,7 +172,7 @@ static int	link_elf_each_function_name(linker_file_t,
 		    int (*)(const char *, void *), void *);
 static int	link_elf_each_function_nameval(linker_file_t,
 		    linker_function_nameval_callback_t, void *);
-static void	link_elf_reloc_local(linker_file_t);
+static int	link_elf_reloc_local(linker_file_t);
 static long	link_elf_symtab_get(linker_file_t, const Elf_Sym **);
 static long	link_elf_strtab_get(linker_file_t, caddr_t *);
 #ifdef VIMAGE
@@ -1057,7 +1057,11 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 		linker_file_unload(lf, LINKER_UNLOAD_FORCE);
 		return (error);
 	}
-	link_elf_reloc_local(lf);
+	error = link_elf_reloc_local(lf);
+	if (error != 0) {
+		linker_file_unload(lf, LINKER_UNLOAD_FORCE);
+		return (error);
+	}
 	*result = lf;
 	return (0);
 }
@@ -1346,7 +1350,9 @@ link_elf_load_file(linker_class_t cls, const char* filename,
 	if (error != 0)
 		goto out;
 #endif
-	link_elf_reloc_local(lf);
+	error = link_elf_reloc_local(lf);
+	if (error != 0)
+		goto out;
 
 	VOP_UNLOCK(nd.ni_vp);
 	error = linker_load_dependencies(lf);
@@ -2127,7 +2133,7 @@ resolve_cap_reloc(void *arg, bool function, bool constant, ptraddr_t object,
 }
 #endif
 
-static void
+static int
 link_elf_reloc_local(linker_file_t lf)
 {
 	const Elf_Rel *rellim;
@@ -2148,9 +2154,10 @@ link_elf_reloc_local(linker_file_t lf)
 		void *data_cap;
 
 		data_cap = cheri_andperm(ef->mapbase, CHERI_PERMS_KERNEL_DATA);
-		init_linker_file_cap_relocs(ef->caprelocs,
+		if (init_linker_file_cap_relocs(ef->caprelocs,
 		    (char *)ef->caprelocs + ef->caprelocssize, data_cap,
-		    (ptraddr_t)ef->address, resolve_cap_reloc, ef);
+		    (ptraddr_t)ef->address, resolve_cap_reloc, ef) != 0)
+			return (ENOEXEC);
 	}
 #endif
 
@@ -2174,6 +2181,8 @@ link_elf_reloc_local(linker_file_t lf)
 			rela++;
 		}
 	}
+
+	return (0);
 }
 
 static long
