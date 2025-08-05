@@ -43,23 +43,24 @@
 
 #ifdef RTLD_HAS_CAPRELOCS
 void
-process___cap_relocs(Obj_Entry* obj)
+process___cap_relocs(Obj_Entry *obj)
 {
-	if (obj->cap_relocs_processed) {
-		dbg("__cap_relocs for %s have already been processed!", obj->path);
-		/* TODO: abort() to prevent this from happening? */
-		return;
-	}
 	struct capreloc *start_relocs = (struct capreloc *)obj->cap_relocs;
 	struct capreloc *end_relocs =
 	    (struct capreloc *)(obj->cap_relocs + obj->cap_relocs_size);
-
 	char * __capability data_base = get_datasegment_cap(obj);
+	bool tight_pcc_bounds;
+
+	if (obj->cap_relocs_processed) {
+		dbg("__cap_relocs for %s have already been processed!",
+		    obj->path);
+		/* TODO: abort() to prevent this from happening? */
+		return;
+	}
 
 	dbg("Processing %lu __cap_relocs for %s (data base = %#lp)\n",
-	    (end_relocs - start_relocs), obj->path, data_base);
+	    end_relocs - start_relocs, obj->path, data_base);
 
-	bool tight_pcc_bounds;
 #ifdef __CHERI_PURE_CAPABILITY__
 	tight_pcc_bounds = can_use_tight_pcc_bounds(obj);
 #else
@@ -106,15 +107,12 @@ process___cap_relocs(Obj_Entry* obj)
 			cap = cheri_clearperm(cap, DATA_PTR_REMOVE_PERMS);
 		}
 		cap = cheri_clearperm(cap, CAP_RELOC_REMOVE_PERMS);
-		if (can_set_bounds && (reloc->size != 0)) {
+		if (can_set_bounds && reloc->size != 0)
 			cap = cheri_setbounds(cap, reloc->size);
-		}
 		cap += reloc->offset;
-		if ((reloc->permissions & function_reloc_flag) ==
-		    function_reloc_flag) {
-			/* Convert function pointers to sentries: */
+		/* Convert function pointers to sentries */
+		if (reloc->permissions == function_reloc_flag)
 			cap = cheri_sealentry(cap);
-		}
 		*dest = cap;
 	}
 
