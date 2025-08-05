@@ -85,6 +85,9 @@ process_irelocs(void *data_cap, const void *code_cap)
 process_irelocs(void)
 #endif
 {
+#ifdef CRT_IRELOC_CAPRELOC
+	const struct capreloc *cr;
+#endif
 	const Elf_Rela *r;
 
 	for (r = &__rela_iplt_start[0]; r < &__rela_iplt_end[0]; r++)
@@ -92,6 +95,11 @@ process_irelocs(void)
 		crt1_handle_rela(r, data_cap, code_cap);
 #else
 		crt1_handle_rela(r);
+#endif
+
+#ifdef CRT_IRELOC_CAPRELOC
+	for (cr = &__start___cap_relocs[0]; cr < &__stop___cap_relocs[0]; cr++)
+		crt1_handle_capreloc(cr, data_cap, code_cap);
 #endif
 }
 #elif defined(CRT_IRELOC_REL)
