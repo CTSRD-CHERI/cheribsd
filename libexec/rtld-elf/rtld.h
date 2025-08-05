@@ -388,6 +388,7 @@ typedef struct Struct_Obj_Entry {
     bool doomed : 1;		/* Object cannot be referenced */
 #if __has_feature(capabilities)
     bool cap_relocs_processed : 1; /* __cap_relocs section has been processed */
+    bool irelative_cap_relocs : 1; /* __cap_relocs has IRELATIVE relocs */
 #endif
 
     MD_OBJ_ENTRY
@@ -657,6 +658,7 @@ void allocate_initial_tls(Obj_Entry *);
 
 #ifdef RTLD_HAS_CAPRELOCS
 int process___cap_relocs(Obj_Entry *);
+int process_ifunc___cap_relocs(Obj_Entry *);
 #endif
 
 __END_DECLS
