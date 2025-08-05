@@ -42,7 +42,7 @@
 #include "rtld.h"
 
 #ifdef RTLD_HAS_CAPRELOCS
-void
+int
 process___cap_relocs(Obj_Entry *obj)
 {
 	struct capreloc *start_relocs = (struct capreloc *)obj->cap_relocs;
@@ -54,8 +54,8 @@ process___cap_relocs(Obj_Entry *obj)
 	if (obj->cap_relocs_processed) {
 		dbg("__cap_relocs for %s have already been processed!",
 		    obj->path);
-		/* TODO: abort() to prevent this from happening? */
-		return;
+		/* TODO: abort / return -1 to prevent this from happening? */
+		return (0);
 	}
 
 	dbg("Processing %lu __cap_relocs for %s (data base = %#lp)\n",
@@ -117,5 +117,6 @@ process___cap_relocs(Obj_Entry *obj)
 	}
 
 	obj->cap_relocs_processed = true;
+	return (0);
 }
 #endif

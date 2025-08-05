@@ -3901,8 +3901,8 @@ relocate_object(Obj_Entry *obj, bool bind_now, Obj_Entry *rtldobj,
 
 #ifdef RTLD_HAS_CAPRELOCS
 	/* Process the __cap_relocs section to initialize global capabilities */
-	if (obj->cap_relocs_size)
-		process___cap_relocs(obj);
+	if (obj->cap_relocs_size && process___cap_relocs(obj) != 0)
+		return (-1);
 #endif
 
 	/* Re-protected the text segment. */
