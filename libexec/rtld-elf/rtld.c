@@ -3983,6 +3983,9 @@ resolve_object_ifunc(Obj_Entry *obj, bool bind_now, int flags,
 		return (0);
 	obj->ifuncs_resolved = true;
 	if (!obj->irelative && !obj->irelative_nonplt &&
+#ifdef RTLD_HAS_CAPRELOCS
+	    !obj->irelative_cap_relocs &&
+#endif
 	    !((obj->bind_now || bind_now) && obj->gnu_ifunc) &&
 	    !obj->non_plt_gnu_ifunc)
 		return (0);
@@ -3990,6 +3993,10 @@ resolve_object_ifunc(Obj_Entry *obj, bool bind_now, int flags,
 	    (obj->irelative && reloc_iresolve(obj, lockstate) == -1) ||
 	    (obj->irelative_nonplt && reloc_iresolve_nonplt(obj,
 	    lockstate) == -1) ||
+#ifdef RTLD_HAS_CAPRELOCS
+	    (obj->irelative_cap_relocs &&
+	     process_ifunc___cap_relocs(obj) == -1) ||
+#endif
 	    ((obj->bind_now || bind_now) && obj->gnu_ifunc &&
 	    reloc_gnu_ifunc(obj, flags, lockstate) == -1) ||
 	    (obj->non_plt_gnu_ifunc && reloc_non_plt(obj, &obj_rtld,
