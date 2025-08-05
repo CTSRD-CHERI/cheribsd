@@ -68,6 +68,9 @@ crt_init_rela(const Elf_Phdr *phdr __unused)
 #endif
 
 #define CHERI_INIT_GLOBALS_GDC_ONLY
+#if defined(__riscv) && defined(__CHERI_PURE_CAPABILITY__)
+#define CHERI_INIT_GLOBALS_ALLOW_IFUNCS
+#endif
 #include <cheri_init_globals.h>
 #if !defined(CHERI_INIT_GLOBALS_VERSION) || CHERI_INIT_GLOBALS_VERSION < 4
 #error "cheri_init_globals.h is outdated. Please update LLVM"
