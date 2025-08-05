@@ -84,8 +84,7 @@ process___cap_relocs(Obj_Entry *obj)
 			continue;
 		}
 
-		if ((reloc->permissions & function_reloc_flag) ==
-		    function_reloc_flag) {
+		if (reloc->permissions == function_reloc_flag) {
 			/* code pointer */
 			cap = (uintcap_t)pcc_cap(obj, reloc->object);
 			cap = cheri_clearperm(cap, FUNC_PTR_REMOVE_PERMS);
@@ -95,16 +94,19 @@ process___cap_relocs(Obj_Entry *obj)
 			 * (unless we are in the plt ABI).
 			 */
 			can_set_bounds = tight_pcc_bounds;
-		} else if ((reloc->permissions & constant_reloc_flag) ==
-		    constant_reloc_flag) {
+		} else if (reloc->permissions == constant_reloc_flag) {
 			 /* read-only data pointer */
 			cap = (uintcap_t)pcc_cap(obj, reloc->object);
 			cap = cheri_clearperm(cap, FUNC_PTR_REMOVE_PERMS);
 			cap = cheri_clearperm(cap, DATA_PTR_REMOVE_PERMS);
-		} else {
+		} else if (reloc->permissions == 0) {
 			/* read-write data */
 			cap = (uintcap_t)data_base + reloc->object;
 			cap = cheri_clearperm(cap, DATA_PTR_REMOVE_PERMS);
+		} else {
+			_rtld_error("%s: Unknown capreloc type %#zx",
+			    obj->path, reloc->permissions);
+			return (-1);
 		}
 		cap = cheri_clearperm(cap, CAP_RELOC_REMOVE_PERMS);
 		if (can_set_bounds && reloc->size != 0)
