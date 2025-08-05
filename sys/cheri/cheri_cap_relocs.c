@@ -50,6 +50,9 @@ int	init_linker_file_cap_relocs(const void *start_relocs,
 	    const void *stop_relocs, void *data_cap, ptraddr_t base_addr,
 	    cap_relocs_cb *cb, void *cb_arg);
 
+/* Can't include <sys/systm.h>. */
+int	printf(const char *, ...) __printflike(1, 2);
+
 int
 init_linker_file_cap_relocs(const void *start_relocs, const void *stop_relocs,
     void *data_cap, ptraddr_t base_addr, cap_relocs_cb *cb, void *cb_arg)
@@ -83,10 +86,13 @@ init_linker_file_cap_relocs(const void *start_relocs, const void *stop_relocs,
 			*dest = 0;
 			continue;
 		}
-		function = (reloc->permissions & function_reloc_flag) ==
-		    function_reloc_flag;
-		constant = (reloc->permissions & constant_reloc_flag) ==
-		    constant_reloc_flag;
+		function = reloc->permissions == function_reloc_flag;
+		constant = reloc->permissions == constant_reloc_flag;
+		if (reloc->permissions != 0 && !function && !constant) {
+			printf("kldload: unexpected capreloc type %#zx\n",
+			    reloc->permissions);
+			return (-1);
+		}
 		cb(cb_arg, function, constant, reloc->object, &src);
 		if ((!function || can_set_code_bounds) && reloc->size != 0)
 			src = __builtin_cheri_bounds_set(src, reloc->size);
