@@ -656,7 +656,7 @@ void init_pltgot(Plt_Entry *);
 void allocate_initial_tls(Obj_Entry *);
 
 #ifdef RTLD_HAS_CAPRELOCS
-void process___cap_relocs(Obj_Entry*);
+int process___cap_relocs(Obj_Entry *);
 #endif
 
 __END_DECLS
