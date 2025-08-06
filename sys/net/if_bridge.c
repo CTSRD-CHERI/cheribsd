@@ -916,12 +916,12 @@ bridge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		bc = &bridge_control_table[ifd->ifd_cmd];
 
 		if (cmd == SIOCGDRVSPEC &&
-		    (bc->bc_flags & BC_F_COPYOUT) == 0) {
+		    (bc->bc_flags & (BC_F_COPYOUT | BC_F_COPYOUTCAP)) == 0) {
 			error = EINVAL;
 			break;
 		}
 		else if (cmd == SIOCSDRVSPEC &&
-		    (bc->bc_flags & BC_F_COPYOUT) != 0) {
+		    (bc->bc_flags & (BC_F_COPYOUT | BC_F_COPYOUTCAP)) != 0) {
 			error = EINVAL;
 			break;
 		}
