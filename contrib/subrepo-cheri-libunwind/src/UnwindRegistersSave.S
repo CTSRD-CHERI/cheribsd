@@ -1237,7 +1237,7 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
 
 .macro save_fpr num, ctxreg
 #ifdef __CHERI_PURE_CAPABILITY__
-  cfsd   f\num, (RISCV_FOFFSET + RISCV_FSIZE * \num)(c\ctxreg)
+  fsd    f\num, (RISCV_FOFFSET + RISCV_FSIZE * \num)(c\ctxreg)
 #else
   FSTORE f\num, (RISCV_FOFFSET + RISCV_FSIZE * \num)(\ctxreg)
 #endif
@@ -1245,7 +1245,7 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
 
 .macro save_gpr num, ctxreg
 #ifdef __CHERI_PURE_CAPABILITY__
-  csc   c\num, (__SIZEOF_CHERI_CAPABILITY__ * \num)(c\ctxreg)
+  sc     c\num, (__SIZEOF_CHERI_CAPABILITY__ * \num)(c\ctxreg)
 #else
   ISTORE x\num, (RISCV_ISIZE * \num)(\ctxreg)
 #endif
@@ -1259,7 +1259,7 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
 #
 DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
 #ifdef __CHERI_PURE_CAPABILITY__
-  csc   c1, (__SIZEOF_CHERI_CAPABILITY__ * 0)(ca0) // store ra as pc
+  sc        c1, (__SIZEOF_CHERI_CAPABILITY__ * 0)(ca0) // store ra as pc
 #else
   ISTORE    x1, (RISCV_ISIZE * 0)(a0) // store ra as pc
 #endif
@@ -1274,11 +1274,7 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
 # endif
 
   li     a0, 0  // return UNW_ESUCCESS
-#ifdef __CHERI_PURE_CAPABILITY__
-  cret          // jump to cra
-#else
-  ret           // jump to ra
-#endif
+  ret          // jump to ra
 END_LIBUNWIND_FUNCTION(__unw_getcontext)
 
 #elif defined(__s390x__)
