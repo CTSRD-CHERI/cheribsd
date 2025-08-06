@@ -45,9 +45,7 @@
 #include <stdarg.h>
 #include "libc_private.h"
 
-#ifndef __CHERI_PURE_CAPABILITY__
-__weak_reference(__sys_openat, __openat);
-#else
+#ifdef __CHERI_PURE_CAPABILITY__
 __weak_reference(_openat, __openat);
 #endif
 __sym_compat(openat, __impl_openat, FBSD_1.1);

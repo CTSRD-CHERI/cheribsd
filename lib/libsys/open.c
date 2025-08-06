@@ -45,9 +45,7 @@
 #include <stdarg.h>
 #include "libc_private.h"
 
-#ifndef __CHERI_PURE_CAPABILITY__
-__weak_reference(__sys_open, __open);
-#else
+#ifdef __CHERI_PURE_CAPABILITY__
 __weak_reference(_open, __open);
 #endif
 
