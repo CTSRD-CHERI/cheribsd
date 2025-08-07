@@ -162,6 +162,7 @@ LDFLAGS+=	-march=morello+noa64c -mabi=aapcs
 CFLAGS+=	-march=rv64imac -mabi=lp64 -fPIC
 CFLAGS.clang+=	-mcmodel=medium
 CFLAGS.gcc+=	-mcmodel=medany
+LDFLAGS+=	-march=rv64imac -mabi=lp64 -fPIC
 .else
 CFLAGS+=	-msoft-float
 .endif
