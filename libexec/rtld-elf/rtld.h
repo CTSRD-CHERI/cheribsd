@@ -198,7 +198,7 @@ typedef struct Struct_Plt_Entry {
 #ifdef CHERI_LIB_C18N
     uint16_t compart_id;
 #endif
-    MD_PLT_ENTRY;
+    MD_PLT_ENTRY
 } Plt_Entry;
 
 #ifdef CHERI_LIB_C18N
@@ -390,7 +390,7 @@ typedef struct Struct_Obj_Entry {
     bool cap_relocs_processed : 1; /* __cap_relocs section has been processed */
 #endif
 
-    MD_OBJ_ENTRY;
+    MD_OBJ_ENTRY
 
     struct link_map linkmap;	/* For GDB and dlinfo() */
     Objlist dldags;		/* Object belongs to these dlopened DAGs (%) */
