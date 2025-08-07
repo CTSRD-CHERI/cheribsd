@@ -4010,6 +4010,13 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 
 #if __has_feature(capabilities)
 #ifdef CHERI_CAPREVOKE
+
+extern counter_u64_t cheri_became_cap_clean;
+#ifdef CHERI_CAPREVOKE_TWOSTAGE_CLEAN
+extern counter_u64_t cheri_second_stage_dirty;
+extern counter_u64_t cheri_second_stage_alias;
+#endif
+
 void
 pmap_caploadgen_next(pmap_t pmap)
 {
