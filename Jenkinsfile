@@ -184,7 +184,7 @@ def buildRelease(params, String suffix) {
                // params.extraArgs includes --install-prefix=/rootfs but we
                // don't want the release media to end up there, so override it
                // to the top-level output directory.
-               script: "./cheribuild/jenkins-cheri-build.py --build cheribsd-release-${suffix} --cheribsd-release/install-dir=\${WORKSPACE}/tarball ${params.extraArgs}"
+               script: "./cheribuild/jenkins-cheri-build.py --build cheribsd-release-${suffix} --cheribsd-release/install-dir=\${WORKSPACE}/tarball --cheribsd-release/build-vm-images ${params.extraArgs}"
         }
     }
 }
