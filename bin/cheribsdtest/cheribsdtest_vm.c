@@ -1543,7 +1543,7 @@ CHERIBSDTEST(cheri_revoke_lightly, "A gentle test of capability revocation",
 }
 
 CHERIBSDTEST(cheri_revoke_loadside, "Test load-side revoker",
-    .ct_check_skip = skip_need_cheri_revoke)
+    .ct_check_skip = skip_need_xcheri_revoke)
 {
 #define CHERIBSDTEST_VM_CHERI_REVOKE_LOADSIDE_NPG	3
 
