@@ -1372,6 +1372,8 @@ hypctx_regptr(struct hypctx *hypctx, int reg)
 		return (&hypctx->tcr_el1);
 	case VM_REG_GUEST_TCR2_EL1:
 		return (&hypctx->tcr2_el1);
+	case VM_REG_GUEST_MPIDR_EL1:
+		return (&hypctx->vmpidr_el2);
 #if __has_feature(capabilities)
 	case VM_REG_GUEST_PCC:
 		return (&hypctx->tf.tf_elr); /* XXX-MJ */

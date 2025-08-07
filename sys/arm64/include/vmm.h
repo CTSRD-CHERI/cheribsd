@@ -90,6 +90,7 @@ enum vm_reg_name {
 	VM_REG_GUEST_TTBR1_EL1,
 	VM_REG_GUEST_TCR_EL1,
 	VM_REG_GUEST_TCR2_EL1,
+	VM_REG_GUEST_MPIDR_EL1,
 
 #if __has_feature(capabilities)
 	VM_REG_GUEST_C0,
