@@ -135,3 +135,15 @@ skip_need_cheri_revoke(const struct cheri_test *ctp __unused)
 		return ("Kernel does not support revocation");
 	return (NULL);
 }
+
+const char *
+skip_need_xcheri_revoke(const struct cheri_test *ctp __unused)
+{
+#ifdef __riscv_zcheripurecap
+	return ("Xcheri revocation test not supported on Zcheri");
+#else
+	if (!feature_present("cheri_revoke"))
+		return ("Kernel does not support xcheri-style revocation");
+	return (NULL);
+#endif
+}
