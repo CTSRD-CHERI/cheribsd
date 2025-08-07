@@ -218,7 +218,7 @@ vmexit_smccc(struct vmctx *ctx, struct vcpu *vcpu, struct vm_run *vmrun)
 			break;
 		}
 
-		if (CPU_ISSET(newcpu, &running_cpumask)) {
+		if (CPU_TEST_SET_ATOMIC(newcpu, &running_cpumask)) {
 			smccc_rv = PSCI_RETVAL_ALREADY_ON;
 			break;
 		}
@@ -237,7 +237,6 @@ vmexit_smccc(struct vmctx *ctx, struct vcpu *vcpu, struct vm_run *vmrun)
 		assert(error == 0);
 
 		vm_resume_cpu(newvcpu);
-		CPU_SET_ATOMIC(newcpu, &running_cpumask);
 
 		smccc_rv = PSCI_RETVAL_SUCCESS;
 		break;
