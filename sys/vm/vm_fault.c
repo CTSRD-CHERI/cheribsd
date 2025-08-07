@@ -78,6 +78,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/counter.h>
 #include <sys/kdb.h>
 #include <sys/lock.h>
 #include <sys/mman.h>
@@ -371,6 +372,8 @@ enum vm_fault_cheri_revoke_res {
 	VFCR_NEED_WRITE = 1,
 };
 
+extern counter_u64_t cheri_scan_rw, cheri_scan_ro;
+
 static int
 vm_fault_cheri_revoke(struct faultstate *fs, vm_page_t m, bool canwrite)
 {
@@ -412,8 +415,10 @@ vm_fault_cheri_revoke(struct faultstate *fs, vm_page_t m, bool canwrite)
 
 	vm_page_aflag_clear(m, PGA_CAPDIRTY);
 	if (canwrite) {
+		counter_u64_add(cheri_scan_rw, 1);
 		hascaps = vm_cheri_revoke_page_rw(&crc, m);
 	} else {
+		counter_u64_add(cheri_scan_ro, 1);
 		hascaps = vm_cheri_revoke_page_ro(&crc, m);
 	}
 
