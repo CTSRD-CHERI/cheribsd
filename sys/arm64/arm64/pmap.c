@@ -107,6 +107,7 @@
 #include <sys/asan.h>
 #include <sys/bitstring.h>
 #include <sys/bus.h>
+#include <sys/counter.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
@@ -6406,6 +6407,13 @@ pmap_update_pte_clg(pmap_t pmap, pt_entry_t *pte)
 }
 
 #ifdef CHERI_CAPREVOKE
+
+extern counter_u64_t cheri_became_cap_clean;
+#ifdef CHERI_CAPREVOKE_TWOSTAGE_CLEAN
+extern counter_u64_t cheri_second_stage_dirty;
+extern counter_u64_t cheri_second_stage_alias;
+#endif
+
 void
 pmap_caploadgen_next(pmap_t pmap)
 {
@@ -6508,6 +6516,7 @@ out:
 	 * created.
 	 */
 	if (rv && !(vm_page_astate_load(m).flags & PGA_CAPDIRTY)) {
+		counter_u64_add(cheri_became_cap_clean, 1);
 		vm_page_aflag_clear(m, PGA_CAPSTORE);
 	}
 }
@@ -6696,6 +6705,7 @@ retry:
 				if (TAILQ_NEXT(TAILQ_FIRST(&m->md.pv_list),
 				    pv_next) != NULL) {
 					rw_runlock(lock);
+					counter_u64_add(cheri_second_stage_alias, 1);
 					goto clean_bail;
 				}
 				rw_runlock(lock);
@@ -6995,7 +7005,6 @@ retry:
 				 */
 				exppte = tpte;
 				pmap_fcmpset(pte, &exppte, exppte & ~ATTR_CDBM);
-
 			} else if (flags & PMAP_CAPLOADGEN_NONEWMAPS) {
 				/* No new mappings possible */
 				vm_page_astate_t mas = vm_page_astate_load(m);
