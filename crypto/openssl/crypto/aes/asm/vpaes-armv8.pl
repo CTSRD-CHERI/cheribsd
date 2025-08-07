@@ -1,5 +1,5 @@
 #! /usr/bin/env perl
-# Copyright 2015-2020 The OpenSSL Project Authors. All Rights Reserved.
+# Copyright 2015-2025 The OpenSSL Project Authors. All Rights Reserved.
 #
 # Licensed under the Apache License 2.0 (the "License").  You may not use
 # this file except in compliance with the License.  You can obtain a copy
@@ -55,7 +55,7 @@ open OUT,"| \"$^X\" $xlate $flavour \"$output\""
 $code.=<<___;
 #include "arm_arch.h"
 
-.text
+.rodata
 
 .type	_vpaes_consts,%object
 .align	7	// totally strategic alignment
@@ -146,6 +146,9 @@ _vpaes_consts:
 .asciz  "Vector Permutation AES for ARMv8, Mike Hamburg (Stanford University)"
 .size	_vpaes_consts,.-_vpaes_consts
 .align	6
+
+.text
+
 ___
 
 {
@@ -165,7 +168,8 @@ $code.=<<___;
 .type	_vpaes_encrypt_preheat,%function
 .align	4
 _vpaes_encrypt_preheat:
-	adr	PTR(10), .Lk_inv
+	adrp	PTR(10), .Lk_inv
+	add	PTR(10), PTR(10), :lo12:.Lk_inv
 	movi	v17.16b, #0x0f
 	ld1	{v18.2d-v19.2d}, [PTR(10)],#32	// .Lk_inv
 	ld1	{v20.2d-v23.2d}, [PTR(10)],#64	// .Lk_ipt, .Lk_sbo
@@ -193,7 +197,8 @@ _vpaes_encrypt_preheat:
 _vpaes_encrypt_core:
 	mov	PTR(9), $key
 	ldr	w8, [$key,#240]			// pull rounds
-	adr	PTR(11), .Lk_mc_forward+16
+	adrp	PTR(11), .Lk_mc_forward+16
+	add	PTR(11), PTR(11), :lo12:.Lk_mc_forward+16
 						// vmovdqa	.Lk_ipt(%rip),	%xmm2	# iptlo
 	ld1	{v16.2d}, [PTR(9)], #16		// vmovdqu	(%r9),	%xmm5		# round0 key
 	and	v1.16b, v7.16b, v17.16b		// vpand	%xmm9,	%xmm0,	%xmm1
@@ -285,7 +290,8 @@ vpaes_encrypt:
 _vpaes_encrypt_2x:
 	mov	PTR(9), $key
 	ldr	w8, [$key,#240]			// pull rounds
-	adr	PTR(11), .Lk_mc_forward+16
+	adrp	PTR(11), .Lk_mc_forward+16
+	add	PTR(11), PTR(11), :lo12:.Lk_mc_forward+16
 						// vmovdqa	.Lk_ipt(%rip),	%xmm2	# iptlo
 	ld1	{v16.2d}, [PTR(9)], #16		// vmovdqu	(%r9),	%xmm5		# round0 key
 	and	v1.16b,  v14.16b,  v17.16b	// vpand	%xmm9,	%xmm0,	%xmm1
@@ -393,9 +399,11 @@ _vpaes_encrypt_2x:
 .type	_vpaes_decrypt_preheat,%function
 .align	4
 _vpaes_decrypt_preheat:
-	adr	PTR(10), .Lk_inv
+	adrp	PTR(10), .Lk_inv
+	add	PTR(10), PTR(10), :lo12:.Lk_inv
 	movi	v17.16b, #0x0f
-	adr	PTR(11), .Lk_dipt
+	adrp	PTR(11), .Lk_dipt
+	add	PTR(11), PTR(11), :lo12:.Lk_dipt
 	ld1	{v18.2d-v19.2d}, [PTR(10)],#32	// .Lk_inv
 	ld1	{v20.2d-v23.2d}, [PTR(11)],#64	// .Lk_dipt, .Lk_dsbo
 	ld1	{v24.2d-v27.2d}, [PTR(11)],#64	// .Lk_dsb9, .Lk_dsbd
@@ -417,10 +425,12 @@ _vpaes_decrypt_core:
 						// vmovdqa	.Lk_dipt(%rip), %xmm2	# iptlo
 	lsl	x11, x8, #4			// mov	%rax,	%r11;	shl	\$4, %r11
 	eor	x11, x11, #0x30			// xor		\$0x30,	%r11
-	adr	PTR(10), .Lk_sr
+	adrp	PTR(10), .Lk_sr
+	add	PTR(10), PTR(10), :lo12:.Lk_sr
 	and	x11, x11, #0x30			// and		\$0x30,	%r11
 	add	PTR(11), PTR(10), x11
-	adr	PTR(10), .Lk_mc_forward+48
+	adrp	PTR(10), .Lk_mc_forward+48
+	add	PTR(10), PTR(10), :lo12:.Lk_mc_forward+48
 
 	ld1	{v16.2d}, [PTR(9)],#16		// vmovdqu	(%r9),	%xmm4		# round0 key
 	and	v1.16b, v7.16b, v17.16b		// vpand	%xmm9,	%xmm0,	%xmm1
@@ -528,10 +538,12 @@ _vpaes_decrypt_2x:
 						// vmovdqa	.Lk_dipt(%rip), %xmm2	# iptlo
 	lsl	x11, x8, #4			// mov	%rax,	%r11;	shl	\$4, %r11
 	eor	x11, x11, #0x30			// xor		\$0x30,	%r11
-	adr	PTR(10), .Lk_sr
+	adrp	PTR(10), .Lk_sr
+	add	PTR(10), PTR(10), :lo12:.Lk_sr
 	and	x11, x11, #0x30			// and		\$0x30,	%r11
 	add	PTR(11), PTR(10), x11
-	adr	PTR(10), .Lk_mc_forward+48
+	adrp	PTR(10), .Lk_mc_forward+48
+	add	PTR(10), PTR(10), :lo12:.Lk_mc_forward+48
 
 	ld1	{v16.2d}, [PTR(9)],#16		// vmovdqu	(%r9),	%xmm4		# round0 key
 	and	v1.16b,  v14.16b, v17.16b	// vpand	%xmm9,	%xmm0,	%xmm1
@@ -668,14 +680,18 @@ $code.=<<___;
 .type	_vpaes_key_preheat,%function
 .align	4
 _vpaes_key_preheat:
-	adr	PTR(10), .Lk_inv
+	adrp	PTR(10), .Lk_inv
+	add	PTR(10), PTR(10), :lo12:.Lk_inv
 	movi	v16.16b, #0x5b			// .Lk_s63
-	adr	PTR(11), .Lk_sb1
+	adrp	PTR(11), .Lk_sb1
+	add	PTR(11), PTR(11), :lo12:.Lk_sb1
 	movi	v17.16b, #0x0f			// .Lk_s0F
 	ld1	{v18.2d-v21.2d}, [PTR(10)]	// .Lk_inv, .Lk_ipt
-	adr	PTR(10), .Lk_dksd
+	adrp	PTR(10), .Lk_dksd
+	add	PTR(10), PTR(10), :lo12:.Lk_dksd
 	ld1	{v22.2d-v23.2d}, [PTR(11)]	// .Lk_sb1
-	adr	PTR(11), .Lk_mc_forward
+	adrp	PTR(11), .Lk_mc_forward
+	add	PTR(11), PTR(11), :lo12:.Lk_mc_forward
 	ld1	{v24.2d-v27.2d}, [PTR(10)],#64	// .Lk_dksd, .Lk_dksb
 	ld1	{v28.2d-v31.2d}, [PTR(10)],#64	// .Lk_dkse, .Lk_dks9
 	ld1	{v8.2d}, [PTR(10)]		// .Lk_rcon
@@ -699,7 +715,8 @@ _vpaes_schedule_core:
 	bl	_vpaes_schedule_transform
 	mov	v7.16b, v0.16b			// vmovdqa	%xmm0,	%xmm7
 
-	adr	PTR(10), .Lk_sr			// lea	.Lk_sr(%rip),%r10
+	adrp	PTR(10), .Lk_sr			// lea	.Lk_sr(%rip),%r10
+	add	PTR(10), PTR(10), :lo12:.Lk_sr
 	add	PTR(8), PTR(10), x8
 	cbnz	$dir, .Lschedule_am_decrypting
 
@@ -830,12 +847,14 @@ _vpaes_schedule_core:
 .align	4
 .Lschedule_mangle_last:
 	// schedule last round key from xmm0
-	adr	PTR(11), .Lk_deskew		// lea	.Lk_deskew(%rip),%r11	# prepare to deskew
+	adrp	PTR(11), .Lk_deskew		// lea	.Lk_deskew(%rip),%r11	# prepare to deskew
+	add	PTR(11), PTR(11), :lo12:.Lk_deskew
 	cbnz	$dir, .Lschedule_mangle_last_dec
 
 	// encrypting
 	ld1	{v1.2d}, [PTR(8)]		// vmovdqa	(%r8,%r10),%xmm1
-	adr	PTR(11), .Lk_opt		// lea	.Lk_opt(%rip),	%r11		# prepare to output transform
+	adrp	PTR(11), .Lk_opt		// lea	.Lk_opt(%rip),	%r11		# prepare to output transform
+	add	PTR(11), PTR(11), :lo12:.Lk_opt
 	add	$out, $out, #32			// add	\$32,	%rdx
 	tbl	v0.16b, {v0.16b}, v1.16b	// vpshufb	%xmm1,	%xmm0,	%xmm0		# output permute
 

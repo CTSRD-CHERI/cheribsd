@@ -1,5 +1,5 @@
 #! /usr/bin/env perl
-# Copyright 2016-2023 The OpenSSL Project Authors. All Rights Reserved.
+# Copyright 2016-2025 The OpenSSL Project Authors. All Rights Reserved.
 #
 # Licensed under the Apache License 2.0 (the "License").  You may not use
 # this file except in compliance with the License.  You can obtain a copy
@@ -105,10 +105,14 @@ poly1305_init:
 
 	tst	w17,#ARMV7_NEON
 
-	adr	$d0p,.Lpoly1305_blocks
-	adr	$r0p,.Lpoly1305_blocks_neon
-	adr	$d1p,.Lpoly1305_emit
-	adr	$r1p,.Lpoly1305_emit_neon
+	adrp	$d0p,poly1305_blocks
+	add	$d0p,$d0p,#:lo12:.Lpoly1305_blocks
+	adrp	$r0p,poly1305_blocks_neon
+	add	$r0p,$r0p,#:lo12:.Lpoly1305_blocks_neon
+	adrp	$d1p,poly1305_emit
+	add	$d1p,$d1p,#:lo12:.Lpoly1305_emit
+	adrp	$r1p,poly1305_emit_neon
+	add	$r1p,$r1p,#:lo12:.Lpoly1305_emit_neon
 
 	csel	$d0p,$d0p,$r0p,eq
 	csel	$d1p,$d1p,$r1p,eq
@@ -453,7 +457,8 @@ poly1305_blocks_neon:
 	ldr	PTR(30),[PTRN(sp),#PTR_WIDTH]
 
 	add	$in2,$inp,#32
-	adr	$zeros,.Lzeros
+	adrp	$zeros,.Lzeros
+	add	$zeros,$zeros,:lo12:.Lzeros
 	subs	$len,$len,#64
 	csel	$in2,$zeros,$in2,lo
 
@@ -465,7 +470,8 @@ poly1305_blocks_neon:
 .align	4
 .Leven_neon:
 	add	$in2,$inp,#32
-	adr	$zeros,.Lzeros
+	adrp	$zeros,.Lzeros
+	add	$zeros,$zeros,:lo12:.Lzeros
 	subs	$len,$len,#64
 	csel	$in2,$zeros,$in2,lo
 
@@ -948,6 +954,8 @@ poly1305_emit_neon:
 
 	ret
 .size	poly1305_emit_neon,.-poly1305_emit_neon
+
+.rodata
 
 .align	5
 .Lzeros:

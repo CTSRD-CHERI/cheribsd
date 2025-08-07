@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# Copyright 2017-2020 The OpenSSL Project Authors. All Rights Reserved.
+# Copyright 2017-2025 The OpenSSL Project Authors. All Rights Reserved.
 #
 # Licensed under the Apache License 2.0 (the "License").  You may not use
 # this file except in compliance with the License.  You can obtain a copy
@@ -82,7 +82,7 @@ my @rhotates = ([  0,  1, 62, 28, 27 ],
 $code.=<<___;
 #include "arm_arch.h"
 
-.text
+.rodata
 
 .align 8	// strategic alignment and padding that allows to use
 		// address value as loop termination condition...
@@ -124,13 +124,16 @@ my @C = map("x$_", (26,27,28,30));
 my @P = map("PTR($_)", (26,27,28,30));
 
 $code.=<<___;
+.text
+
 #define	KeccakF1600_int_FRAMESZ	(16 + 2*PTR_WIDTH)
 
 .type	KeccakF1600_int,%function
 .align	5
 KeccakF1600_int:
 	AARCH64_SIGN_LINK_REGISTER
-	adr	@P[2],iotas
+	adrp	@P[2],iotas
+	add	@P[2],@P[2],:lo12:iotas
 	stp	@P[2],PTR(30),[PTRN(sp),#16]	// 32/48 bytes on top are mine
 	b	.Loop
 .align	4
@@ -487,6 +490,8 @@ SHA3_squeeze:
 	mov	$out,PTR(1)
 	mov	$len,x2
 	mov	$bsz,x3
+	cmp	w4, #0				// w4 = 'next' argument
+	bne	.Lnext_block
 
 .Loop_squeeze:
 	ldr	x4,[PTR(0)],#8
@@ -501,7 +506,7 @@ SHA3_squeeze:
 
 	subs	x3,x3,#8
 	bhi	.Loop_squeeze
-
+.Lnext_block:
 	mov	PTR(0),$A_flat
 	bl	KeccakF1600
 	mov	PTR(0),$A_flat
@@ -558,7 +563,8 @@ $code.=<<___;
 .align	5
 KeccakF1600_ce:
 	mov	x9,#24
-	adr	PTR(10),iotas
+	adrp	PTR(10),iotas
+	add	PTR(10),PTR(10),:lo12:iotas
 	b	.Loop_ce
 .align	4
 .Loop_ce:
