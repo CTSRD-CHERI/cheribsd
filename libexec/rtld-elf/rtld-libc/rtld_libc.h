@@ -44,7 +44,7 @@
 #define __libc_interposing error, must not use this variable inside rtld
 
 int	__sys_close(int);
-void	__sys_exit(int) __dead2;
+void	__sys__exit(int) __dead2;
 int	__sys_fstat(int fd, struct stat *);
 int	__sys_fstatat(int, const char *, struct stat *, int);
 int	__sys___getcwd(char *, size_t);
@@ -73,8 +73,8 @@ int __getosreldate(void);
  */
 #define close(fd)	__sys_close(fd)
 #define _close(fd)	__sys_close(fd)
-#define exit(status)	__sys_exit(status)
-#define _exit(status)	__sys_exit(status)
+#define exit(status)	__sys__exit(status)
+#define _exit(status)	__sys__exit(status)
 #define _fstat(fd, sb)	__sys_fstat(fd, sb)
 #define mmap(addr, len, prot, flags, fd, pos) \
 	__sys_mmap((addr), (len), (prot),(flags), (fd), (pos))
