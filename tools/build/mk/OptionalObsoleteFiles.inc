@@ -2262,6 +2262,12 @@ OLD_FILES+=usr/share/man/man3/gpio_pin_tristate.3.gz
 OLD_FILES+=usr/share/man/man8/gpioctl.8.gz
 .endif
 
+.if ${MK_GSSAPI} == "no" || ${MK_KERBEROS_SUPPORT} == "no"
+OLD_FILES+=etc/rc.d/gssd
+OLD_FILES+=usr/sbin/gssd
+OLD_FILES+=usr/share/man/man8/gssd.8.gz
+.endif
+
 .if ${MK_GSSAPI} == no
 OLD_FILES+=usr/include/gssapi/gssapi.h
 OLD_DIRS+=usr/include/gssapi
@@ -2273,7 +2279,6 @@ OLD_FILES+=usr/lib/libgssapi_p.a
 OLD_FILES+=usr/lib/librpcsec_gss.a
 OLD_FILES+=usr/lib/librpcsec_gss.so
 OLD_LIBS+=usr/lib/librpcsec_gss.so.1
-OLD_FILES+=usr/sbin/gssd
 OLD_FILES+=usr/share/man/man3/gss_accept_sec_context.3.gz
 OLD_FILES+=usr/share/man/man3/gss_acquire_cred.3.gz
 OLD_FILES+=usr/share/man/man3/gss_add_cred.3.gz
@@ -2332,7 +2337,6 @@ OLD_FILES+=usr/share/man/man3/rpc_gss_svc_max_data_length.3.gz
 OLD_FILES+=usr/share/man/man3/rpcsec_gss.3.gz
 OLD_FILES+=usr/share/man/man5/mech.5.gz
 OLD_FILES+=usr/share/man/man5/qop.5.gz
-OLD_FILES+=usr/share/man/man8/gssd.8.gz
 .endif
 
 .if ${MK_HAST} == no
