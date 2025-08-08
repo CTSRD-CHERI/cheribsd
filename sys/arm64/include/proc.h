@@ -35,6 +35,7 @@
 #ifndef	_MACHINE_PROC_H_
 #define	_MACHINE_PROC_H_
 
+#ifndef LOCORE
 struct ptrauth_key {
 	uint64_t pa_key_lo;
 	uint64_t pa_key_hi;
@@ -73,11 +74,15 @@ struct mdthread {
 };
 
 struct mdproc {
+	uint64_t md_tcr;		/* TCR_EL1 fields to update */
 #if __has_feature(capabilities)
 	void * __capability md_sigcode;
 #endif
-	long	md_dummy;
 };
+#endif /* !LOCORE */
+
+/* Fields that can be set in md_tcr */
+#define	MD_TCR_FIELDS			TCR_TBI0
 
 #if __has_feature(capabilities)
 #define	KINFO_PROC_SIZE		1248
