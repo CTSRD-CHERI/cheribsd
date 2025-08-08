@@ -7,6 +7,6 @@
 	remote = https://github.com/CTSRD-CHERI/compiler-rt.git
 	branch = monorepo-mirror
 	commit = c34d2cb2e4a9fee4b2d668a6218504896269f8db
-	parent = d1984cf461afdc0661133909513dc255821d9c66
+	parent = 7dcbe229f11f5717452c3d99df5be3cb14f79a6d
 	method = rebase
 	cmdver = 0.4.1
