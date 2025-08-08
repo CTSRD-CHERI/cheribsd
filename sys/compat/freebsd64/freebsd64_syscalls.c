@@ -6,7 +6,7 @@
 
 const char *freebsd64_syscallnames[] = {
 	"syscall",			/* 0 = syscall */
-	"exit",			/* 1 = exit */
+	"_exit",			/* 1 = _exit */
 	"fork",			/* 2 = fork */
 	"freebsd64_read",			/* 3 = freebsd64_read */
 	"freebsd64_write",			/* 4 = freebsd64_write */

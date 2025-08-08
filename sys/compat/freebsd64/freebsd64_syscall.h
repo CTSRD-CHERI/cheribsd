@@ -5,7 +5,7 @@
  */
 
 #define	FREEBSD64_SYS_syscall	0
-#define	FREEBSD64_SYS_exit	1
+#define	FREEBSD64_SYS__exit	1
 #define	FREEBSD64_SYS_fork	2
 #define	FREEBSD64_SYS_freebsd64_read	3
 #define	FREEBSD64_SYS_freebsd64_write	4
