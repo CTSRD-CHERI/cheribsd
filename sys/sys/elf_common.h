@@ -1426,7 +1426,7 @@ typedef struct {
 
 /* Relocation types added by CHERI used by the dynamic linker */
 #define	R_RISCV_CHERI_CAPABILITY		193
-#define	R_RISCV_CHERI_CAPABILITY_CALL		194
+#define	R_RISCV_FUNC_RELATIVE			194
 
 /* Relocation types added by CHERI not used by the dynamic linker */
 #define	R_RISCV_CHERI_SIZE			195
