@@ -203,6 +203,7 @@ __elfN(reloc)(struct elf_file *ef, symaddr_fn *symaddr, const void *reldata,
 			case R_PPC_RELATIVE:
 #elif defined(__riscv)
 			case R_RISCV_RELATIVE:
+			case R_RISCV_FUNC_RELATIVE:
 #endif
 				w = relbase + rela->r_addend;
 				bcopy(&w, (u_char *)data + (relbase +
