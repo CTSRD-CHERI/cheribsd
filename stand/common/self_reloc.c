@@ -106,6 +106,9 @@ self_reloc(Elf_Addr baseaddr, ElfW_Dyn *dynamic)
 			break;
 
 		case RELOC_TYPE_RELATIVE:
+#ifdef __riscv
+		case R_RISCV_FUNC_RELATIVE:
+#endif
 			newaddr = (Elf_Addr *)(rel->r_offset + baseaddr);
 #ifdef ELF_RELA
 			/* Addend relative to the base address. */
