@@ -1330,6 +1330,18 @@ DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind15Registers_sparc6jumptoEv)
 //
   .p2align 2
 DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind15Registers_riscv6jumptoEv)
+#ifdef _LIBUNWIND_HAS_CHERI_LIB_C18N
+  // Preserve the argument in a callee-saved register instead of pushing it onto
+  // the stack because stack unwinding will switch the stack.
+  cmv      cs1, ca0
+  // Pass the target untrusted stack pointer
+  lc       ca0, (__SIZEOF_CHERI_CAPABILITY__ * 2)(cs1)
+  // Pass the target trusted stack pointer
+  lc       ca1, (__SIZEOF_CHERI_CAPABILITY__ * 32)(cs1)
+  call     dl_c18n_unwind_trusted_stack
+  cmv      ca0, cs1
+#endif
+
 # if defined(__riscv_flen)
   .irp i,FROM_0_TO_31
     restore_fpr \i, a0
