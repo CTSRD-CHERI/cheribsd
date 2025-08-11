@@ -2206,8 +2206,6 @@ inline const char *Registers_arm64::getRegisterName(int regNum) {
     return "clr";
   case UNW_ARM64_C31:
     return "csp";
-  case UNW_ARM64_ECSP:
-    return "ecsp";
   default:
     return "unknown register";
   }
