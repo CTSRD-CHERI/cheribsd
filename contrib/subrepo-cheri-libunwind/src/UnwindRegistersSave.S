@@ -1273,6 +1273,19 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
   .endr
 # endif
 
+#ifdef _LIBUNWIND_HAS_CHERI_LIB_C18N
+  // Store the trusted stack pointer
+  caddi     csp, csp, -(__SIZEOF_CHERI_CAPABILITY__ * 2)
+  sc        ca0, 0(csp)
+  sc        cra, __SIZEOF_CHERI_CAPABILITY__(csp)
+  cmv       ca0, cra
+  call      dl_c18n_get_trusted_stack
+  lc        ca1, 0(csp)
+  lc        cra, __SIZEOF_CHERI_CAPABILITY__(csp)
+  caddi     csp, csp, (__SIZEOF_CHERI_CAPABILITY__ * 2)
+  sc        ca0, (__SIZEOF_CHERI_CAPABILITY__ * 32)(ca1)
+#endif
+
   li     a0, 0  // return UNW_ESUCCESS
   ret          // jump to ra
 END_LIBUNWIND_FUNCTION(__unw_getcontext)
