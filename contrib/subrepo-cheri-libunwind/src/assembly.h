@@ -36,7 +36,7 @@
 #define SEPARATOR %%
 #elif defined(__riscv)
 #ifdef __CHERI_PURE_CAPABILITY__
-# define RISCV_FOFFSET (__SIZEOF_CHERI_CAPABILITY__ * 32)
+# define RISCV_FOFFSET (__SIZEOF_CHERI_CAPABILITY__ * 33)
 #else
 # define RISCV_ISIZE (__riscv_xlen / 8)
 # define RISCV_FOFFSET (RISCV_ISIZE * 32)
