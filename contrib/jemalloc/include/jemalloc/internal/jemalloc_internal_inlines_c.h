@@ -18,7 +18,9 @@
 
 #include "jemalloc/internal/hook.h"
 #include "jemalloc/internal/jemalloc_internal_types.h"
+#include "jemalloc/internal/log.h"
 #include "jemalloc/internal/sz.h"
+#include "jemalloc/internal/thread_event.h"
 #include "jemalloc/internal/witness.h"
 
 JEMALLOC_ALWAYS_INLINE void *
@@ -28,11 +30,6 @@ get_underlying_allocation(tsdn_t *tsdn, void *ptr) {
 #ifndef __CHERI_PURE_CAPABILITY__
 	ubptr = ptr;
 #else
-	rtree_ctx_t *rtree_ctx;
-	rtree_ctx_t rtree_ctx_fallback;
-	extent_t *extent;
-	szind_t szind;
-
 	/*
 	 * These checks catch attacks from an adversary that can manipulate the 
 	 * offset and the bounds of a ptr passed to free() or realloc().
@@ -52,19 +49,26 @@ get_underlying_allocation(tsdn_t *tsdn, void *ptr) {
 		return NULL;
 	}
 
-	rtree_ctx = tsdn_rtree_ctx(tsdn, &rtree_ctx_fallback);
-	if (rtree_extent_szind_read(tsdn, &extents_rtree, rtree_ctx,
-	    (uintptr_t)ptr, false, &extent, &szind)) {
+	emap_full_alloc_ctx_t full_alloc_ctx;
+	bool missing = emap_full_alloc_ctx_try_lookup(tsdn, &arena_emap_global,
+	    ptr, &full_alloc_ctx);
+	if (missing) {
 		return NULL;
 	}
 
-	assert(extent_state_get(extent) == extent_state_active);
+	if (full_alloc_ctx.edata == NULL) {
+		return NULL;
+	}
+	assert(edata_state_get(full_alloc_ctx.edata) == extent_state_active);
 	/* Only slab members should be looked up via interior pointers. */
-	assert(extent_addr_get(extent) == ptr || extent_slab_get(extent));
-	assert(szind != SC_NSIZES);
+	assert(edata_addr_get(full_alloc_ctx.edata) == ptr
+	    || edata_slab_get(full_alloc_ctx.edata));
 
-	size_t underlying_size = sz_index2size(szind);
-	void *extent_base = extent->e_addr;
+	assert(full_alloc_ctx.szind != SC_NSIZES);
+
+	size_t underlying_size = sz_index2size(full_alloc_ctx.szind);
+
+	void *extent_base = edata_base_get(full_alloc_ctx.edata);
 
 	size_t offset = (uintptr_t)ptr - (uintptr_t)extent_base;
 	size_t region_index = offset / underlying_size;
@@ -85,10 +89,6 @@ unbound_ptr(tsdn_t *tsdn, void *ptr) {
 #ifndef __CHERI_PURE_CAPABILITY__
 	ubptr = ptr;
 #else
-	rtree_ctx_t *rtree_ctx;
-	rtree_ctx_t rtree_ctx_fallback;
-	extent_t *extent;
-
 	/*
 	 * These checks catch the most egregious attacks from an adversary
 	 * who can't manipulate the bounds of capabilities can manipulate
@@ -108,11 +108,20 @@ unbound_ptr(tsdn_t *tsdn, void *ptr) {
 		return NULL;
 	}
 
-	rtree_ctx = tsdn_rtree_ctx(tsdn, &rtree_ctx_fallback);
-	extent = rtree_extent_read(tsdn, &extents_rtree,
-	    rtree_ctx, (uintptr_t)ptr, true);
-	assert(extent != NULL);
-	ubptr = cheri_address_set(extent->e_addr, (ptraddr_t)ptr);
+	emap_full_alloc_ctx_t full_alloc_ctx;
+	bool missing = emap_full_alloc_ctx_try_lookup(tsdn, &arena_emap_global,
+	    ptr, &full_alloc_ctx);
+	if (missing) {
+		return NULL;
+	}
+
+	if (full_alloc_ctx.edata == NULL) {
+		return NULL;
+	}
+
+
+	ubptr = cheri_address_set(edata_addr_get(full_alloc_ctx.edata),
+	    (ptraddr_t)ptr);
 	/*
 	 * Compare pointer addresses to work around an issue where
 	 * LLVM's GVN pass replaces ubptr with ptr in the assert
@@ -122,8 +131,10 @@ unbound_ptr(tsdn_t *tsdn, void *ptr) {
 	 * https://github.com/CTSRD-CHERI/llvm-project/issues/619
 	 */
 	assert((ptraddr_t)ptr == (ptraddr_t)ubptr);
-	assert(cheri_base_get(ubptr) == cheri_base_get(extent->e_addr));
-	assert(cheri_length_get(ubptr) == cheri_length_get(extent->e_addr));
+	assert(cheri_base_get(ubptr) ==
+	    cheri_base_get(edata_addr_get(full_alloc_ctx.edata)));
+	assert(cheri_length_get(ubptr) ==
+	    cheri_length_get(edata_addr_get(full_alloc_ctx.edata)));
 #endif
 	return (ubptr);
 }
@@ -223,8 +234,8 @@ ivsalloc(tsdn_t *tsdn, const void *ptr) {
 }
 
 JEMALLOC_ALWAYS_INLINE void
-idalloctm(tsdn_t *tsdn, void *ptr, tcache_t *tcache, alloc_ctx_t *alloc_ctx,
-    bool is_internal, bool slow_path) {
+idalloctm(tsdn_t *tsdn, void *ptr, tcache_t *tcache,
+    emap_alloc_ctx_t *alloc_ctx, bool is_internal, bool slow_path) {
 	assert(ptr != NULL);
 	assert(!is_internal || tcache == NULL);
 	assert(!is_internal || arena_is_auto(iaalloc(tsdn, ptr)));
@@ -248,7 +259,7 @@ idalloc(tsd_t *tsd, void *ptr) {
 
 JEMALLOC_ALWAYS_INLINE void
 isdalloct(tsdn_t *tsdn, void *ptr, size_t size, tcache_t *tcache,
-    alloc_ctx_t *alloc_ctx, bool slow_path) {
+    emap_alloc_ctx_t *alloc_ctx, bool slow_path) {
 	witness_assert_depth_to_rank(tsdn_witness_tsdp_get(tsdn),
 	    WITNESS_RANK_CORE, 0);
 	arena_sdalloc(tsdn, ptr, size, tcache, alloc_ctx, slow_path);
@@ -340,6 +351,123 @@ ixalloc(tsdn_t *tsdn, void *ptr, size_t oldsize, size_t size, size_t extra,
 
 	return arena_ralloc_no_move(tsdn, ptr, oldsize, size, extra, zero,
 	    newsize);
+}
+
+JEMALLOC_ALWAYS_INLINE void
+fastpath_success_finish(tsd_t *tsd, uint64_t allocated_after,
+    cache_bin_t *bin, void *ret) {
+	thread_allocated_set(tsd, allocated_after);
+	if (config_stats) {
+		bin->tstats.nrequests++;
+	}
+
+	LOG("core.malloc.exit", "result: %p", ret);
+}
+
+JEMALLOC_ALWAYS_INLINE bool
+malloc_initialized(void) {
+	return (malloc_init_state == malloc_init_initialized);
+}
+
+/*
+ * malloc() fastpath.  Included here so that we can inline it into operator new;
+ * function call overhead there is non-negligible as a fraction of total CPU in
+ * allocation-heavy C++ programs.  We take the fallback alloc to allow malloc
+ * (which can return NULL) to differ in its behavior from operator new (which
+ * can't).  It matches the signature of malloc / operator new so that we can
+ * tail-call the fallback allocator, allowing us to avoid setting up the call
+ * frame in the common case.
+ *
+ * Fastpath assumes size <= SC_LOOKUP_MAXCLASS, and that we hit
+ * tcache.  If either of these is false, we tail-call to the slowpath,
+ * malloc_default().  Tail-calling is used to avoid any caller-saved
+ * registers.
+ *
+ * fastpath supports ticker and profiling, both of which will also
+ * tail-call to the slowpath if they fire.
+ */
+JEMALLOC_ALWAYS_INLINE void *
+imalloc_fastpath(size_t size, void *(fallback_alloc)(size_t)) {
+	LOG("core.malloc.entry", "size: %zu", size);
+	size = ROUND_SIZE(size);
+	if (tsd_get_allocates() && unlikely(!malloc_initialized())) {
+		return fallback_alloc(size);
+	}
+
+	tsd_t *tsd = tsd_get(false);
+	if (unlikely((size > SC_LOOKUP_MAXCLASS) || tsd == NULL)) {
+		return fallback_alloc(size);
+	}
+	/*
+	 * The code below till the branch checking the next_event threshold may
+	 * execute before malloc_init(), in which case the threshold is 0 to
+	 * trigger slow path and initialization.
+	 *
+	 * Note that when uninitialized, only the fast-path variants of the sz /
+	 * tsd facilities may be called.
+	 */
+	szind_t ind;
+	/*
+	 * The thread_allocated counter in tsd serves as a general purpose
+	 * accumulator for bytes of allocation to trigger different types of
+	 * events.  usize is always needed to advance thread_allocated, though
+	 * it's not always needed in the core allocation logic.
+	 */
+	size_t usize;
+	sz_size2index_usize_fastpath(size, &ind, &usize);
+	/* Fast path relies on size being a bin. */
+	assert(ind < SC_NBINS);
+	assert((SC_LOOKUP_MAXCLASS < SC_SMALL_MAXCLASS) &&
+	    (size <= SC_SMALL_MAXCLASS));
+
+	uint64_t allocated, threshold;
+	te_malloc_fastpath_ctx(tsd, &allocated, &threshold);
+	uint64_t allocated_after = allocated + usize;
+	/*
+	 * The ind and usize might be uninitialized (or partially) before
+	 * malloc_init().  The assertions check for: 1) full correctness (usize
+	 * & ind) when initialized; and 2) guaranteed slow-path (threshold == 0)
+	 * when !initialized.
+	 */
+	if (!malloc_initialized()) {
+		assert(threshold == 0);
+	} else {
+		assert(ind == sz_size2index(size));
+		assert(usize > 0 && usize == sz_index2size(ind));
+	}
+	/*
+	 * Check for events and tsd non-nominal (fast_threshold will be set to
+	 * 0) in a single branch.
+	 */
+	if (unlikely(allocated_after >= threshold)) {
+		return fallback_alloc(size);
+	}
+	assert(tsd_fast(tsd));
+
+	tcache_t *tcache = tsd_tcachep_get(tsd);
+	assert(tcache == tcache_get(tsd));
+	cache_bin_t *bin = &tcache->bins[ind];
+	bool tcache_success;
+	void *ret;
+
+	/*
+	 * We split up the code this way so that redundant low-water
+	 * computation doesn't happen on the (more common) case in which we
+	 * don't touch the low water mark.  The compiler won't do this
+	 * duplication on its own.
+	 */
+	ret = cache_bin_alloc_easy(bin, &tcache_success);
+	if (tcache_success) {
+		fastpath_success_finish(tsd, allocated_after, bin, ret);
+		return BOUND_PTR(ret, usize);
+	}
+	ret = cache_bin_alloc(bin, &tcache_success);
+	if (tcache_success) {
+		fastpath_success_finish(tsd, allocated_after, bin, ret);
+		return BOUND_PTR(ret, usize);
+	}
+
+	return fallback_alloc(size);
 }
 
 #endif /* JEMALLOC_INTERNAL_INLINES_C_H */
