@@ -211,6 +211,7 @@ END(tramp_hook)
 
 #define	TRUSTED_STACK_S		t4
 #define	TRUSTED_STACK_C		ct4
+#undef	CHERI_C18N_ZICOND
 
 TRAMP(tramp_push_frame)
 1:	auipc		ct0, 0
