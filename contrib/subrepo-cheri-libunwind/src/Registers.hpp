@@ -4552,10 +4552,18 @@ public:
   void        setSP(reg_t value) { _registers[2] = value; }
   reg_t       getIP() const { return _registers[0]; }
   void        setIP(reg_t value) { _registers[0] = value; }
+#ifdef __CHERI_PURE_CAPABILITY__
+  reg_t       getTrustedStack() const { return _tsp; }
+  void        setTrustedStack(reg_t value) { _tsp = value; }
+#endif
 
 private:
   // _registers[0] holds the pc
   reg_t _registers[32];
+#ifdef __CHERI_PURE_CAPABILITY__
+  // Trusted stack pointer
+  reg_t _tsp;
+#endif
 # if defined(__riscv_flen)
   fp_t _floats[32];
 # endif
@@ -4578,15 +4586,27 @@ inline Registers_riscv::Registers_riscv(const void *registers) {
 # error "Unexpected float registers."
 # endif
 
-# if defined(__riscv_flen)
-  memcpy(_floats,
+# ifdef __CHERI_PURE_CAPABILITY__
+  memcpy(&_tsp,
          static_cast<const uint8_t *>(registers) + sizeof(_registers),
-         sizeof(_floats));
+         sizeof(_tsp));
+# endif
+
+# if defined(__riscv_flen)
+  const uint8_t *floats = static_cast<const uint8_t *>(registers);
+  floats += sizeof(_registers);
+#  ifdef __CHERI_PURE_CAPABILITY__
+  floats += sizeof(_tsp);
+#  endif
+  memcpy(_floats, floats, sizeof(_floats));
 # endif
 }
 
 inline Registers_riscv::Registers_riscv() {
   memset(&_registers, 0, sizeof(_registers));
+# ifdef __CHERI_PURE_CAPABILITY__
+  memset(&_tsp, 0, sizeof(_tsp));
+# endif
 # if defined(__riscv_flen)
   memset(&_floats, 0, sizeof(_floats));
 # endif
