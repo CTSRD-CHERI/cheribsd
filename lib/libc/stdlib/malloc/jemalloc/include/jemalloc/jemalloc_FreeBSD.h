@@ -14,6 +14,8 @@
  * CHERI CHANGES END
  */
 
+#ifndef JEMALLOC_NO_PRIVATE_NAMESPACE
+
 #undef JEMALLOC_OVERRIDE_VALLOC
 
 #ifndef MALLOC_PRODUCTION
@@ -125,8 +127,12 @@
 #include <machine/cpufunc.h>
 #define	CPU_SPINWAIT		cpu_spinwait()
 
-/* Disable lazy-lock machinery, mangle isthreaded, and adjust its type. */
+/*
+ * Disable lazy-lock machinery, redirect isthreaded to libc's flag, undo
+ * jemalloc's namespace stuff for it and adjust its type.
+ */
 #undef JEMALLOC_LAZY_LOCK
+#undef isthreaded
 extern int __isthreaded;
 #define	isthreaded		((bool)__isthreaded)
 
@@ -235,4 +241,6 @@ __sym_compat(sallocm, weak_sallocm, FBSD_1.3);
 __sym_compat(dallocm, weak_dallocm, FBSD_1.3);
 __sym_compat(nallocm, weak_nallocm, FBSD_1.3);
 #endif
+#endif
+
 #endif
