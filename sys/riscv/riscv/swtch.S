@@ -241,6 +241,11 @@ ENTRY(cpu_throw)
 	L_PTR	PTR(s10), (PCB_S + 10 * PTR_WIDTH)(PTRN(13))
 	L_PTR	PTR(s11), (PCB_S + 11 * PTR_WIDTH)(PTRN(13))
 
+#if __has_feature(capabilities)
+	_LC	CAP(t0), (PCB_TIDC)(PTRN(13))
+	CSRW_CAP	utidc, CAP(t0)
+#endif
+
 	/* Is FPE enabled for new thread? */
 	L_PTR	PTR(t0), TD_FRAME(PTR(a0))
 	_LD	t1, (TF_SSTATUS)(PTR(t0))
@@ -290,6 +295,11 @@ ENTRY(cpu_switch)
 	S_PTR	PTR(s9), (PCB_S + 9 * PTR_WIDTH)(PTRN(13))
 	S_PTR	PTR(s10), (PCB_S + 10 * PTR_WIDTH)(PTRN(13))
 	S_PTR	PTR(s11), (PCB_S + 11 * PTR_WIDTH)(PTRN(13))
+
+#if __has_feature(capabilities)
+	CSRR_CAP	CAP(t0), utidc
+	_SC	CAP(t0), (PCB_TIDC)(PTRN(13))
+#endif
 
 	/*
 	 * Is FPE enabled and is it in dirty state
@@ -395,6 +405,11 @@ ENTRY(cpu_switch)
 	L_PTR	PTR(s9), (PCB_S + 9 * PTR_WIDTH)(PTRN(13))
 	L_PTR	PTR(s10), (PCB_S + 10 * PTR_WIDTH)(PTRN(13))
 	L_PTR	PTR(s11), (PCB_S + 11 * PTR_WIDTH)(PTRN(13))
+
+#if __has_feature(capabilities)
+	_LC	CAP(t0), (PCB_TIDC)(PTRN(13))
+	CSRW_CAP	utidc, CAP(t0)
+#endif
 
 	/* Is FPE enabled for new thread? */
 	L_PTR	PTR(t0), TD_FRAME(PTR(a1))
@@ -559,6 +574,11 @@ ENTRY(savectx)
 	_SC	CAP(s9), (PCB_S + 9 * CAP_WIDTH)(PTR(a0))
 	_SC	CAP(s10), (PCB_S + 10 * CAP_WIDTH)(PTR(a0))
 	_SC	CAP(s11), (PCB_S + 11 * CAP_WIDTH)(PTR(a0))
+
+#if __has_feature(capabilities)
+	CSRR_CAP	CAP(t0), utidc
+	_SC	CAP(t0), (PCB_TIDC)(PTR(a0))
+#endif
 
 	__fpe_state_save PTR(a0)
 	RETURN
