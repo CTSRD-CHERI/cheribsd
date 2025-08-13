@@ -309,12 +309,20 @@
 	__asm __volatile("cspecialr %0, " #scr : "=C" (val));		\
 	val;								\
 })
+#define	scr_write(scr, val)						\
+({									\
+	__asm __volatile("cspecialw " #scr ", %0" :: "C" (val));	\
+})
 #else /* !defined(__riscv_xcheri) */
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	scr_read(scr)							\
 ({	void * __capability val;					\
 	__asm __volatile("csrr %0, " #scr : "=C" (val));		\
 	val;								\
+})
+#define	scr_write(scr, val)						\
+({									\
+	__asm __volatile("csrw " #scr ", %0" :: "C" (val));		\
 })
 #else /* !defined(__CHERI_PURE_CAPABLITY__) */
 #define	scr_read(scr)							\
@@ -324,6 +332,13 @@
 			 "modesw.int\n"					\
 			: "=C" (val));					\
 	val;								\
+})
+#define	scr_write(scr, val)						\
+({									\
+	__asm __volatile("modesw.cap\n"					\
+			 "csrw " #scr ", %0\n"				\
+			 "modesw.int\n"					\
+			:: "C" (val));					\
 })
 #endif /* !defined(__CHERI_PURE_CAPABLITY__) */
 #endif /* defined(__riscv_xcheri) */
