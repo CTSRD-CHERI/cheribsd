@@ -7,7 +7,6 @@ class GlobalVars { // "Groovy"
     public static String buildTimestamp = null
     public static boolean archiveArtifacts = false
     public static boolean isTestSuiteJob = false
-    public static List<String> selectedPurecapKernelArchitectures = []
 }
 
 GlobalVars.buildTimestamp = DateTimeFormatter.ISO_INSTANT.format(Instant.ofEpochMilli(currentBuild.startTimeInMillis));
@@ -50,16 +49,15 @@ jobProperties.add(parameters([
         text(defaultValue: allArchitectures.join('\n'),
              description: 'The architectures (cheribuild suffixes) to build for (one per line)',
              name: 'architectures'),
-        text(defaultValue: ["riscv64-hybrid", "riscv64-purecap", "morello-hybrid", "morello-purecap"].join('\n'),
-             description: 'The architectures (cheribuild suffixes) to build a purecap kernel for (one per line)',
-             name: 'purecapKernelArchitectures'),
 ]))
 // Set the default job properties (work around properties() not being additive but replacing)
 setDefaultJobProperties(jobProperties)
 
 jobs = [:]
 
-GlobalVars.selectedPurecapKernelArchitectures = params.purecapKernelArchitectures.split('\n')
+def isCheriArchitecture(String arch) {
+    return arch.endsWith("-hybrid") || arch.endsWith("-purecap")
+}
 
 def runTestStep(params, String testSuffix, String suffix, testExtraArgs, extraArgs) {
     testExtraArgs.add("--test-output-dir=\$WORKSPACE/test-results/${testSuffix}")
@@ -150,7 +148,7 @@ def runTests(params, String suffix) {
     }
 
     // Run test configurations in parallel (if there is be more than one).
-    if (GlobalVars.selectedPurecapKernelArchitectures.contains(suffix)) {
+    if (isCheriArchitecture(suffix)) {
         def testSteps = [:]
         testSteps["Test ${suffix} hybrid kernel"] = { ->
             runTestStep(params, "${suffix}-hybrid-kernel", suffix, testExtraArgs,
@@ -301,7 +299,7 @@ selectedArchitectures.each { suffix ->
                 '--cheribsd/debug-info',
                 '--cheribsd/debug-files',
         ]
-        if (GlobalVars.selectedPurecapKernelArchitectures.contains(suffix)) {
+        if (isCheriArchitecture(suffix)) {
             cheribuildArgs.add('--cheribsd/build-alternate-abi-kernels')
             if (suffix.startsWith('morello')) {
                 cheribuildArgs.add('--cheribsd/build-benchmark-abi-kernels')
