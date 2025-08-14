@@ -287,7 +287,7 @@ selectedArchitectures.each { arch ->
             extraBuildOptions += ' -DWITHOUT_MALLOC_PRODUCTION'
         }
         def cheribuildArgs = [
-                "'--cheribsd/build-options=${extraBuildOptions}'",
+                "--cheribsd/build-options=${extraBuildOptions}",
                 '--cheribsd/default-kernel-abi=purecap',
                 '--keep-install-dir',
                 '--install-prefix=/rootfs',
@@ -305,7 +305,7 @@ selectedArchitectures.each { arch ->
             }
         }
         cheribuildProject(target: "cheribsd-${arch}", architecture: arch,
-                          extraArgs: cheribuildArgs.join(" "),
+                          extraArgs: cheribuildArgs,
                           skipArchiving: true, skipTarball: true,
                           sdkCompilerOnly: true,
                           // We only need clang not the CheriBSD sysroot since we are building that.
