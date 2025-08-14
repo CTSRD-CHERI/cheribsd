@@ -323,14 +323,5 @@ selectedArchitectures.each { arch ->
     }
 }
 
-boolean runParallel = true
-echo("Running jobs in parallel: ${runParallel}")
-if (runParallel) {
-    jobs.failFast = false
-    parallel jobs
-} else {
-    jobs.each { key, value ->
-        echo("RUNNING ${key}")
-        value()
-    }
-}
+jobs.failFast = false
+parallel jobs
