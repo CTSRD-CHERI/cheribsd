@@ -968,6 +968,10 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 
     linkmap_add(obj_main);
     linkmap_add(&obj_rtld);
+    LD_UTRACE(UTRACE_LOAD_OBJECT, obj_main, obj_main->mapbase,
+	obj_main->mapsize, 0, obj_main->path);
+    LD_UTRACE(UTRACE_LOAD_OBJECT, &obj_rtld, obj_rtld.mapbase,
+	obj_rtld.mapsize, 0, obj_rtld.path);
 
 #ifdef CHERI_LIB_C18N
     if (C18N_ENABLED) {
