@@ -280,7 +280,6 @@ ls -la "artifacts-${suffix}/"
 def selectedArchitectures = isManualBuild() ? params.architectures.split('\n') : allArchitectures
 echo("Selected architectures: ${selectedArchitectures}")
 selectedArchitectures.each { suffix ->
-    String name = "cheribsd-${suffix}"
     jobs[suffix] = { ->
         def extraBuildOptions = '-s'
         if (GlobalVars.isTestSuiteJob) {
