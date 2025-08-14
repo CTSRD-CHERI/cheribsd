@@ -53,8 +53,6 @@ jobProperties.add(parameters([
 // Set the default job properties (work around properties() not being additive but replacing)
 setDefaultJobProperties(jobProperties)
 
-jobs = [:]
-
 def isCheriArchitecture(String arch) {
     return arch.endsWith("-hybrid") || arch.endsWith("-purecap")
 }
@@ -279,49 +277,51 @@ ls -la "artifacts-${arch}/"
 // Therefore, only read the parameter value for manually-triggered builds.
 def selectedArchitectures = isManualBuild() ? params.architectures.split('\n') : allArchitectures
 echo("Selected architectures: ${selectedArchitectures}")
+def archArgs = [:]
 selectedArchitectures.each { arch ->
-    jobs[arch] = { ->
-        def extraBuildOptions = '-s'
-        if (GlobalVars.isTestSuiteJob) {
-            // Enable additional debug checks when running the testsuite
-            extraBuildOptions += ' -DWITHOUT_MALLOC_PRODUCTION'
-        }
-        def cheribuildArgs = [
-                "--cheribsd/build-options=${extraBuildOptions}",
-                '--cheribsd/default-kernel-abi=purecap',
-                '--keep-install-dir',
-                '--install-prefix=/rootfs',
-                '--cheribsd/build-lib32',
-                '--cheribsd/build-tests',
-                '--cheribsd/build-bench-kernels',
-                '--cheribsd/with-manpages',
-                '--cheribsd/debug-info',
-                '--cheribsd/debug-files',
-        ]
-        if (isCheriArchitecture(arch)) {
-            cheribuildArgs.add('--cheribsd/build-alternate-abi-kernels')
-            if (arch.startsWith('morello')) {
-                cheribuildArgs.add('--cheribsd/build-benchmark-abi-kernels')
-            }
-        }
-        cheribuildProject(target: "cheribsd-${arch}", architecture: arch,
-                          extraArgs: cheribuildArgs,
-                          skipArchiving: true, skipTarball: true,
-                          sdkCompilerOnly: true,
-                          // We only need clang not the CheriBSD sysroot since we are building that.
-                          customGitCheckoutDir: 'cheribsd',
-                          gitHubStatusContext: GlobalVars.isTestSuiteJob ? "testsuite/${arch}" : "ci/${arch}",
-                          // Delete stale compiler/sysroot
-                          beforeBuild: { params ->
-                              dir('cherisdk') { deleteDir() }
-                              sh label: 'Deleting outputs from previous builds',
-                                 script: 'rm -rfv artifacts-* tarball kernel*'
-                          },
-                          /* Custom function to run tests since --test will not work (yet) */
-                          runTests: false,
-                          afterBuild: { params -> buildImageAndRunTests(params, arch) })
+    def extraBuildOptions = '-s'
+    if (GlobalVars.isTestSuiteJob) {
+        // Enable additional debug checks when running the testsuite
+        extraBuildOptions += ' -DWITHOUT_MALLOC_PRODUCTION'
     }
+    def cheribuildArgs = [
+            "--cheribsd/build-options=${extraBuildOptions}",
+            '--cheribsd/default-kernel-abi=purecap',
+            '--keep-install-dir',
+            '--install-prefix=/rootfs',
+            '--cheribsd/build-lib32',
+            '--cheribsd/build-tests',
+            '--cheribsd/build-bench-kernels',
+            '--cheribsd/with-manpages',
+            '--cheribsd/debug-info',
+            '--cheribsd/debug-files',
+    ]
+    if (isCheriArchitecture(arch)) {
+        cheribuildArgs.add('--cheribsd/build-alternate-abi-kernels')
+        if (arch.startsWith('morello')) {
+            cheribuildArgs.add('--cheribsd/build-benchmark-abi-kernels')
+        }
+    }
+    archArgs[arch] = [
+        extraArgs: cheribuildArgs,
+        gitHubStatusContext: GlobalVars.isTestSuiteJob ? "testsuite/${arch}" : "ci/${arch}",
+        afterBuild: { params -> buildImageAndRunTests(params, arch) },
+    ]
 }
 
-jobs.failFast = false
-parallel jobs
+cheribuildProject(target: "cheribsd",
+                  targetArchitectures: selectedArchitectures,
+                  skipArchiving: true, skipTarball: true,
+                  sdkCompilerOnly: true,
+                  // We only need clang not the CheriBSD sysroot since we are building that.
+                  customGitCheckoutDir: 'cheribsd',
+                  // Delete stale compiler/sysroot
+                  beforeBuild: { params ->
+                      dir('cherisdk') { deleteDir() }
+                      sh label: 'Deleting outputs from previous builds',
+                         script: 'rm -rfv artifacts-* tarball kernel*'
+                  },
+                  /* Custom function to run tests since --test will not work (yet) */
+                  runTests: false,
+                  failFast: false,
+                  archArgs: archArgs)
