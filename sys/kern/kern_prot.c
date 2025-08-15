@@ -311,6 +311,46 @@ sys_getegid(struct thread *td, struct getegid_args *uap)
 	return (0);
 }
 
+#ifdef COMPAT_FREEBSD14
+int
+freebsd14_getgroups(struct thread *td, struct freebsd14_getgroups_args *uap)
+{
+	return (freebsd14_kern_getgroups(td, uap->gidsetsize, uap->gidset));
+}
+
+int
+freebsd14_kern_getgroups(struct thread *td, int gidsetsize,
+    gid_t * __capability gidset)
+{
+	struct ucred *cred;
+	int ngrp, error;
+
+	cred = td->td_ucred;
+
+	/*
+	 * For FreeBSD < 15.0, we account for the egid being placed at the
+	 * beginning of the group list prior to all supplementary groups.
+	 */
+	ngrp = cred->cr_ngroups + 1;
+	if (gidsetsize == 0) {
+		error = 0;
+		goto out;
+	} else if (gidsetsize < ngrp) {
+		return (EINVAL);
+	}
+
+	error = copyout(&cred->cr_gid, gidset, sizeof(gid_t));
+	if (error != 0)
+		error = copyout(cred->cr_groups, gidset + 1,
+		    (ngrp - 1) * sizeof(gid_t));
+
+out:
+	td->td_retval[0] = ngrp;
+	return (error);
+
+}
+#endif	/* COMPAT_FREEBSD14 */
+
 #ifndef _SYS_SYSPROTO_H_
 struct getgroups_args {
 	int	gidsetsize;
@@ -325,20 +365,14 @@ sys_getgroups(struct thread *td, struct getgroups_args *uap)
 }
 
 int
-kern_getgroups(struct thread *td, int gidsetsize, gid_t * __capability ugidset)
+kern_getgroups(struct thread *td, int gidsetsize, gid_t * __capability gidset)
 {
 	struct ucred *cred;
 	int ngrp, error;
 
 	cred = td->td_ucred;
 
-	/*
-	 * cr_gid has been moved out of cr_groups, but we'll continue exporting
-	 * the egid as groups[0] for the time being until we audit userland for
-	 * any surprises.
-	 */
-	ngrp = cred->cr_ngroups + 1;
-
+	ngrp = cred->cr_ngroups;
 	if (gidsetsize == 0) {
 		error = 0;
 		goto out;
@@ -346,13 +380,7 @@ kern_getgroups(struct thread *td, int gidsetsize, gid_t * __capability ugidset)
 	if (gidsetsize < ngrp)
 		return (EINVAL);
 
-	error = copyout(&cred->cr_gid, ugidset, sizeof(*ugidset));
-	if (error != 0)
-		goto out;
-
-	if (ngrp > 1)
-		error = copyout(cred->cr_groups, ugidset + 1,
-		    (ngrp - 1) * sizeof(*ugidset));
+	error = copyout(cred->cr_groups, gidset, ngrp * sizeof(gid_t));
 out:
 	td->td_retval[0] = ngrp;
 	return (error);
@@ -1177,6 +1205,50 @@ fail:
 	return (error);
 }
 
+#ifdef COMPAT_FREEBSD14
+int
+freebsd14_setgroups(struct thread *td, struct freebsd14_setgroups_args *uap)
+{
+	return (freebsd14_user_setgroups(td, uap->gidsetsize, uap->gidset));
+}
+
+int
+freebsd14_user_setgroups(struct thread *td, int gidsetsize,
+    const gid_t * __capability gidset)
+{
+	gid_t smallgroups[CRED_SMALLGROUPS_NB];
+	gid_t *groups;
+	int error;
+
+	/*
+	 * Before FreeBSD 15.0, we allow one more group to be supplied to
+	 * account for the egid appearing before the supplementary groups.  This
+	 * may technically allow one more supplementary group for systems that
+	 * did use the default NGROUPS_MAX if we round it back up to 1024.
+	 */
+	if (gidsetsize > ngroups_max + 1 || gidsetsize < 0)
+		return (EINVAL);
+
+	if (gidsetsize > CRED_SMALLGROUPS_NB)
+		groups = malloc(gidsetsize * sizeof(gid_t), M_TEMP, M_WAITOK);
+	else
+		groups = smallgroups;
+
+	error = copyin(gidset, groups, gidsetsize * sizeof(gid_t));
+	if (error == 0) {
+		int ngroups = gidsetsize > 0 ? gidsetsize - 1 /* egid */ : 0;
+
+		error = kern_setgroups(td, &ngroups, groups + 1);
+		if (error == 0 && gidsetsize > 0)
+			td->td_proc->p_ucred->cr_gid = groups[0];
+	}
+
+	if (groups != smallgroups)
+		free(groups, M_TEMP);
+	return (error);
+}
+#endif	/* COMPAT_FREEBSD14 */
+
 #ifndef _SYS_SYSPROTO_H_
 struct setgroups_args {
 	int	gidsetsize;
@@ -1208,8 +1280,7 @@ user_setgroups(struct thread *td, int gidsetsize,
 	 * getgroups() to take an 'int' and it would be quite entrapping to have
 	 * setgroups() differ.
 	 */
-	/* XXXKE Limit to ngroups_max when we change the userland interface. */
-	if (gidsetsize > ngroups_max + 1 || gidsetsize < 0)
+	if (gidsetsize > ngroups_max || gidsetsize < 0)
 		return (EINVAL);
 
 	if (gidsetsize > CRED_SMALLGROUPS_NB)
@@ -1236,35 +1307,17 @@ kern_setgroups(struct thread *td, int *ngrpp, gid_t *groups)
 	struct proc *p = td->td_proc;
 	struct ucred *newcred, *oldcred;
 	int ngrp, error;
-	gid_t egid;
 
 	ngrp = *ngrpp;
 	/* Sanity check size. */
-	/* XXXKE Limit to ngroups_max when we change the userland interface. */
-	if (ngrp < 0 || ngrp > ngroups_max + 1)
+	if (ngrp < 0 || ngrp > ngroups_max)
 		return (EINVAL);
 
 	AUDIT_ARG_GROUPSET(groups, ngrp);
-	/*
-	 * setgroups(0, NULL) is a legitimate way of clearing the groups vector
-	 * on non-BSD systems (which generally do not have the egid in the
-	 * groups[0]).  We risk security holes when running non-BSD software if
-	 * we do not do the same.  So we allow and treat 0 for 'ngrp' specially
-	 * below (twice).
-	 */
-	if (ngrp != 0) {
-		/*
-		 * To maintain userland compat for now, we use the first group
-		 * as our egid and we'll use the rest as our supplemental
-		 * groups.
-		 */
-		egid = groups[0];
-		ngrp--;
-		groups++;
 
-		groups_normalize(&ngrp, groups);
-		*ngrpp = ngrp;
-	}
+	groups_normalize(&ngrp, groups);
+	*ngrpp = ngrp;
+
 	newcred = crget();
 	crextend(newcred, ngrp);
 	PROC_LOCK(p);
@@ -1288,15 +1341,7 @@ kern_setgroups(struct thread *td, int *ngrpp, gid_t *groups)
 	if (error)
 		goto fail;
 
-	/*
-	 * If some groups were passed, the first one is currently the desired
-	 * egid.  This code is to be removed (along with some commented block
-	 * above) when setgroups() is changed to take only supplementary groups.
-	 */
-	if (ngrp != 0)
-		newcred->cr_gid = egid;
 	crsetgroups_internal(newcred, ngrp, groups);
-
 	setsugid(p);
 	proc_set_cred(p, newcred);
 	PROC_UNLOCK(p);

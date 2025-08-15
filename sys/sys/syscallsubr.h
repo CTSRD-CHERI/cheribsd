@@ -775,6 +775,11 @@ int	freebsd11_kern_getdirentries(struct thread *td, int fd,
 	    char * __capability ubuf, u_int count, long *basep,
 	    void (*func)(struct freebsd11_dirent *));
 
+int	freebsd14_kern_getgroups(struct thread *td, int gidsetsize,
+	    gid_t * __capability gidset);
+int	freebsd14_user_setgroups(struct thread *td, int gidsetsize,
+	    const gid_t * __capability gidset);
+
 #endif /* !_SYS_SYSCALLSUBR_H_ */
 // CHERI CHANGES START
 // {

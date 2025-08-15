@@ -1359,6 +1359,24 @@ freebsd64_modstat(struct thread *td, struct freebsd64_modstat_args *uap)
 /*
  * kern_prot.c
  */
+#ifdef COMPAT_FREEBSD14
+int
+freebsd14_freebsd64_getgroups(struct thread *td,
+    struct freebsd14_freebsd64_getgroups_args *uap)
+{
+	return (freebsd14_kern_getgroups(td, uap->gidsetsize,
+	    USER_PTR_ARRAY(uap->gidset, uap->gidsetsize)));
+}
+
+int
+freebsd14_freebsd64_setgroups(struct thread *td,
+    struct freebsd14_freebsd64_setgroups_args *uap)
+{
+	return (freebsd14_user_setgroups(td, uap->gidsetsize,
+	    USER_PTR_ARRAY(uap->gidset, uap->gidsetsize)));
+}
+#endif
+
 int
 freebsd64_getgroups(struct thread *td, struct freebsd64_getgroups_args *uap)
 {
