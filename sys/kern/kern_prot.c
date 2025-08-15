@@ -340,7 +340,7 @@ freebsd14_kern_getgroups(struct thread *td, int gidsetsize,
 	}
 
 	error = copyout(&cred->cr_gid, gidset, sizeof(gid_t));
-	if (error != 0)
+	if (error == 0)
 		error = copyout(cred->cr_groups, gidset + 1,
 		    (ngrp - 1) * sizeof(gid_t));
 
