@@ -2,3 +2,5 @@ include "std.CHERI"
 
 nomakeoptions   CPUTYPE
 makeoptions	CPUTYPE=xcheri
+
+options		CHERI_CAPREVOKE_CLOADTAGS
