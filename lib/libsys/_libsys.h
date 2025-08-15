@@ -122,8 +122,6 @@ typedef int (__sys_munmap_t)(void * __kerncap, size_t);
 typedef int (__sys_mprotect_t)(void * __kerncap, size_t, int);
 typedef int (__sys_madvise_t)(void * __kerncap, size_t, int);
 typedef int (__sys_mincore_t)(const void * __kerncap, size_t, char * __kerncap);
-typedef int (__sys_getgroups_t)(int, gid_t * __kerncap);
-typedef int (__sys_setgroups_t)(int, const gid_t * __kerncap);
 typedef int (__sys_getpgrp_t)(void);
 typedef int (__sys_setpgid_t)(int, int);
 typedef int (__sys_setitimer_t)(int, const struct itimerval * __kerncap, struct itimerval * __kerncap);
@@ -474,6 +472,8 @@ typedef int (__sys_setcred_t)(u_int, const struct setcred * __kerncap, size_t);
 typedef int (__sys_exterrctl_t)(u_int, u_int, void * __kerncap);
 typedef int (__sys_inotify_add_watch_at_t)(int, int, const char * __kerncap, uint32_t);
 typedef int (__sys_inotify_rm_watch_t)(int, int);
+typedef int (__sys_getgroups_t)(int, gid_t * __kerncap);
+typedef int (__sys_setgroups_t)(int, const gid_t * __kerncap);
 
 _Noreturn void __sys__exit(int rval);
 int __sys_fork(void);
@@ -531,8 +531,6 @@ int __sys_munmap(void * __kerncap addr, size_t len);
 int __sys_mprotect(void * __kerncap addr, size_t len, int prot);
 int __sys_madvise(void * __kerncap addr, size_t len, int behav);
 int __sys_mincore(const void * __kerncap addr, size_t len, char * __kerncap vec);
-int __sys_getgroups(int gidsetsize, gid_t * __kerncap gidset);
-int __sys_setgroups(int gidsetsize, const gid_t * __kerncap gidset);
 int __sys_getpgrp(void);
 int __sys_setpgid(int pid, int pgid);
 int __sys_setitimer(int which, const struct itimerval * __kerncap itv, struct itimerval * __kerncap oitv);
@@ -883,6 +881,8 @@ int __sys_setcred(u_int flags, const struct setcred * __kerncap wcred, size_t si
 int __sys_exterrctl(u_int op, u_int flags, void * __kerncap ptr);
 int __sys_inotify_add_watch_at(int fd, int dfd, const char * __kerncap path, uint32_t mask);
 int __sys_inotify_rm_watch(int fd, int wd);
+int __sys_getgroups(int gidsetsize, gid_t * __kerncap gidset);
+int __sys_setgroups(int gidsetsize, const gid_t * __kerncap gidset);
 __END_DECLS
 
 #endif /* __LIBSYS_H_ */

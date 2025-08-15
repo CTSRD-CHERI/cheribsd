@@ -83,8 +83,8 @@
 				/* 76 is obsolete vhangup */
 				/* 77 is obsolete vlimit */
 #define	FREEBSD64_SYS_freebsd64_mincore	78
-#define	FREEBSD64_SYS_freebsd64_getgroups	79
-#define	FREEBSD64_SYS_freebsd64_setgroups	80
+#define	FREEBSD64_SYS_freebsd14_freebsd64_getgroups	79
+#define	FREEBSD64_SYS_freebsd14_freebsd64_setgroups	80
 #define	FREEBSD64_SYS_getpgrp	81
 #define	FREEBSD64_SYS_setpgid	82
 #define	FREEBSD64_SYS_freebsd64_setitimer	83
@@ -535,4 +535,6 @@
 #define	FREEBSD64_SYS_freebsd64_exterrctl	592
 #define	FREEBSD64_SYS_freebsd64_inotify_add_watch_at	593
 #define	FREEBSD64_SYS_inotify_rm_watch	594
-#define	FREEBSD64_SYS_MAXSYSCALL	595
+#define	FREEBSD64_SYS_freebsd64_getgroups	595
+#define	FREEBSD64_SYS_freebsd64_setgroups	596
+#define	FREEBSD64_SYS_MAXSYSCALL	597
