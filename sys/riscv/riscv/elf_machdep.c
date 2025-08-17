@@ -319,6 +319,7 @@ static const struct type2str_ent t2s[] = {
 	{ R_RISCV_64,		"R_RISCV_64"		},
 	{ R_RISCV_JUMP_SLOT,	"R_RISCV_JUMP_SLOT"	},
 	{ R_RISCV_RELATIVE,	"R_RISCV_RELATIVE"	},
+	{ R_RISCV_FUNC_RELATIVE,"R_RISCV_FUNC_RELATIVE"	},
 	{ R_RISCV_JAL,		"R_RISCV_JAL"		},
 	{ R_RISCV_CALL,		"R_RISCV_CALL"		},
 	{ R_RISCV_PCREL_HI20,	"R_RISCV_PCREL_HI20"	},
@@ -432,6 +433,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		break;
 
 	case R_RISCV_RELATIVE:
+	case R_RISCV_FUNC_RELATIVE:
 		before64 = *where;
 		*where = elf_relocaddr(lf, (Elf_Addr)relocbase + addend);
 		if (debug_kld)
