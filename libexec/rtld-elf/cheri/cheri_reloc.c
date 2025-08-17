@@ -90,7 +90,9 @@ process___cap_relocs(Obj_Entry *obj)
 			continue;
 		}
 
-		if (reloc->permissions == function_reloc_flag) {
+		if (reloc->permissions == function_reloc_flag ||
+		    reloc->permissions == (function_reloc_flag |
+		    code_reloc_flag)) {
 			/* code pointer */
 			cap = (uintcap_t)pcc_cap(obj, reloc->object);
 			cap = cheri_clearperm(cap, FUNC_PTR_REMOVE_PERMS);
@@ -119,7 +121,9 @@ process___cap_relocs(Obj_Entry *obj)
 			cap = cheri_setbounds(cap, reloc->size);
 		cap += reloc->offset;
 		/* Convert function pointers to sentries */
-		if (reloc->permissions == function_reloc_flag)
+		if (reloc->permissions == function_reloc_flag ||
+		    reloc->permissions == (function_reloc_flag |
+		    code_reloc_flag))
 			cap = cheri_sealentry(cap);
 		*dest = cap;
 	}
