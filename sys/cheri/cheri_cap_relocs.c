@@ -86,7 +86,9 @@ init_linker_file_cap_relocs(const void *start_relocs, const void *stop_relocs,
 			*dest = 0;
 			continue;
 		}
-		function = reloc->permissions == function_reloc_flag;
+		function = reloc->permissions == function_reloc_flag ||
+		    reloc->permissions == (function_reloc_flag |
+		    code_reloc_flag);
 		constant = reloc->permissions == constant_reloc_flag;
 		if (reloc->permissions != 0 && !function && !constant) {
 			printf("kldload: unexpected capreloc type %#zx\n",
