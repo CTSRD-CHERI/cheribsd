@@ -105,9 +105,8 @@ print_utrace_c18n(FILE *fp, void *p)
 	default:
 		return (0);
 	}
-	fprintf(fp, "\nnsp = %#p\nosp = %#p, previous = %#p\n"
-	    "fp = %#p, pc = %#p", ut->sp, ut->osp, ut->previous,
-	    ut->fp, ut->pc);
+	fprintf(fp, "\nnsp = %#p, pc = %#p\nosp = %#p, previous = %#p",
+	    ut->sp, ut->pc, ut->osp, ut->previous);
 	return (1);
 }
 #endif
