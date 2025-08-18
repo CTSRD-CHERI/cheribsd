@@ -1347,7 +1347,6 @@ tramp_hook_impl(int event, const struct tramp_header *hdr,
 		memcpy(ut.sig, C18N_UTRACE_SIG, C18N_UTRACE_SIG_SZ);
 		ut.event = event;
 		ut.symnum = hdr->symnum;
-		ut.fp = tf->state.fp;
 		ut.pc = tf->state.pc;
 		ut.sp = tf->state.sp;
 		ut.osp = tf->state.osp;
