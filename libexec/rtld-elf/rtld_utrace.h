@@ -69,7 +69,6 @@ struct utrace_c18n {
 	char sig[C18N_UTRACE_SIG_SZ];
 	int event;
 	size_t symnum;
-	void *fp;
 	void *pc;
 	void *sp;
 	void *osp;
