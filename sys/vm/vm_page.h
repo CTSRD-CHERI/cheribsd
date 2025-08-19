@@ -921,15 +921,22 @@ vm_page_aflag_set(vm_page_t m, uint16_t bits)
  * through the vm fault machinery even if the permissions dictated by the entry
  * (->protection) and object (->flags & OBJ_HASCAP) containing this page
  * nominally authorize capability store.
+ *
+ * The prot mask that implies PGA_CAPSTORE is architecture-dependent, see
+ * vm_fault_needs_capstore().
  */
 static inline vm_prot_t
 vm_page_mask_cap_prot(vm_page_t m, vm_prot_t prot)
 {
 
 	if (vm_page_astate_load(m).flags & PGA_CAPSTORE) {
-		return prot;
+		return (prot);
 	} else {
-		return prot & ~VM_PROT_WRITE_CAP;
+#ifdef __riscv_zcheripurecap
+		return (prot & ~VM_PROT_CAP);
+#else
+		return (prot & ~VM_PROT_WRITE_CAP);
+#endif
 	}
 }
 

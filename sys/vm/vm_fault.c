@@ -454,6 +454,25 @@ vm_fault_cheri_revoke(struct faultstate *fs, vm_page_t m, bool canwrite)
 #endif
 
 /*
+ * Check whether the given page permission imply the page having
+ * PGA_CAPSTORE set.
+ * This is handled differently on architectures that distinguish
+ * between VM_PROT_WRITE_CAP and VM_PROT_READ_CAP in the PTE entries.
+ *
+ * XXX-AM: This is really MD and should likely be somewhere else, but I
+ * want this to be inlined.
+ */
+static bool
+vm_fault_needs_capstore(vm_prot_t prot)
+{
+#ifdef __riscv_zcheripurecap
+	return ((prot & VM_PROT_CAP) != 0);
+#else
+	return ((prot & VM_PROT_WRITE_CAP) != 0);
+#endif
+}
+
+/*
  * Unlocks fs.first_object and fs.map on success.
  */
 static enum fault_status
@@ -576,8 +595,7 @@ vm_fault_soft_fast(struct faultstate *fs)
 	 *
 	 * Importantly, realprot is exempt from vm_page_mask_cap_prot()!
 	 */
-	if ((realprot & (VM_PROT_WRITE | VM_PROT_WRITE_CAP)) ==
-	    (VM_PROT_WRITE | VM_PROT_WRITE_CAP)) {
+	if (vm_fault_needs_capstore(realprot))
 		vm_page_aflag_set(m_map, PGA_CAPSTORE);
 	CTR4(KTR_CAPREVOKE,
 	    "fault_soft_fast vmm=%p va=%lx prot=%#hhx PGA_CAPSTORE=%d",
@@ -751,7 +769,7 @@ vm_fault_populate(struct faultstate *fs)
 		KASSERT((VM_PAGE_TO_PHYS(m) & (pagesizes[bdry_idx] - 1)) == 0,
 		    ("unaligned superpage m %p %#jx", m,
 		    (uintmax_t)VM_PAGE_TO_PHYS(m)));
-		if (fs->prot & VM_PROT_WRITE_CAP)
+		if (vm_fault_needs_capstore(fs->prot))
 			vm_page_aflag_set(m, PGA_CAPSTORE);
 		if (fs->fault_flags & VM_FAULT_NOPMAP) {
 			rv = KERN_SUCCESS;
@@ -814,7 +832,7 @@ skip_pmap_bdry:
 		npages = atop(pagesizes[psind]);
 		for (i = 0; i < npages; i++) {
 			vm_fault_populate_check_page(&m[i]);
-			if (prot & VM_PROT_WRITE_CAP)
+			if (vm_fault_needs_capstore(prot))
 				vm_page_aflag_set(&m[i], PGA_CAPSTORE);
 			vm_fault_dirty(fs, &m[i]);
 
@@ -1588,7 +1606,7 @@ vm_fault_allocate(struct faultstate *fs)
 	}
 	fs->oom_started = false;
 
-	if (capstore_on_alloc && (fs->prot & VM_PROT_WRITE_CAP))
+	if (capstore_on_alloc && vm_fault_needs_capstore(fs->prot))
 		vm_page_aflag_set(fs->m, PGA_CAPSTORE);
 	CTR4(KTR_CAPREVOKE,
 	    "fault_allocate vmm=%p va=%lx prot=%#hhx PGA_CAPSTORE=%d",
