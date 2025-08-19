@@ -4503,7 +4503,7 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
     int flags)
 {
     DoneList donelist;
-    const Obj_Entry *obj, *defobj;
+    const Obj_Entry *obj, *defobj, *retobj;
     const Elf_Sym *def;
     SymLook req;
     RtldLockState lockstate;
@@ -4522,10 +4522,11 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
     rlock_acquire(rtld_bind_lock, &lockstate);
     if (sigsetjmp(lockstate.env, 0) != 0)
 	    lock_upgrade(rtld_bind_lock, &lockstate);
+    retobj = obj_from_addr(retaddr);
     if (handle == NULL || handle == RTLD_NEXT ||
 	handle == RTLD_DEFAULT || handle == RTLD_SELF) {
 
-	if ((obj = obj_from_addr(retaddr)) == NULL) {
+	if ((obj = retobj) == NULL) {
 	    _rtld_error("Cannot determine caller's shared object");
 	    lock_release(rtld_bind_lock, &lockstate);
 	    LD_UTRACE(UTRACE_DLSYM_STOP, handle, NULL, 0, 0, name);
@@ -4628,11 +4629,23 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	    sym = __DECONST(void*, make_function_pointer(def, defobj));
 	    dbg("dlsym(%s) is function: " PTR_FMT, name, sym);
 #ifdef CHERI_LIB_C18N
+	    /*
+	     * XXX Dapeng: Need to handle tail-calls causing the caller to be
+	     * mis-identified.
+	     */
+	    if (retobj == NULL) {
+		rtld_fdprintf(STDERR_FILENO,
+		    "c18n: obj_from_addr(%#p) = NULL\n",
+		    retaddr);
+		abort();
+	    }
 	    if (C18N_FPTR_ENABLED)
-		sym = tramp_intern(NULL, RTLD_COMPART_ID, &(struct tramp_data) {
-		    .target = sym,
-		    .defobj = defobj,
-		    .def = def
+		sym = tramp_intern(NULL,
+		    compart_id_for_address(retobj, (Elf_Addr)retaddr),
+		    &(struct tramp_data) {
+		        .target = sym,
+		        .defobj = defobj,
+		        .def = def
 		});
 #endif
 	} else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {

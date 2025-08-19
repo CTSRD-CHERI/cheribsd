@@ -132,7 +132,8 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 		}
 #ifdef CHERI_LIB_C18N
 		if (C18N_FPTR_ENABLED)
-			symval = tramp_intern(NULL, RTLD_COMPART_ID,
+			symval = tramp_intern(NULL,
+			    compart_id_for_address(obj, (Elf_Addr)where),
 			    &(struct tramp_data) {
 				.target = __DECONST(void *, symval),
 				.defobj = defobj,

@@ -938,7 +938,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			if (C18N_FPTR_ENABLED &&
 			    ELF_ST_TYPE(def->st_info) == STT_FUNC)
 				*where = (Elf_Addr)tramp_intern(NULL,
-				    RTLD_COMPART_ID,
+				    compart_id_for_address(obj, (Elf_Addr)where),
 				    &(struct tramp_data) {
 					.target = (void *)(uintptr_t)*where,
 					.defobj = defobj,
