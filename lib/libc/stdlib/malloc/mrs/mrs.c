@@ -125,7 +125,8 @@ extern void snmalloc_flush_message_queue(void);
 #define	MALLOC_QUARANTINE_ENABLE_ENV	"_RUNTIME_REVOCATION_ENABLE"
 #define	MALLOC_ABORT_DISABLE_ENV	"_RUNTIME_ABORT_DISABLE"
 #define	MALLOC_ABORT_ENABLE_ENV		"_RUNTIME_ABORT_ENABLE"
-
+#define	MALLOC_POISON_ENABLE_ENV		"_RUNTIME_POISON_ENABLE"
+#define	MALLOC_POISON_DISABLE_ENV		"_RUNTIME_POISON_DISABLE"
 #define	MALLOC_REVOKE_EVERY_FREE_DISABLE_ENV \
 	"_RUNTIME_REVOCATION_EVERY_FREE_DISABLE"
 #define	MALLOC_REVOKE_EVERY_FREE_ENABLE_ENV \
@@ -244,6 +245,12 @@ sdallocx(void *ptr, size_t size, int flags)
 {
 	return (mrs_sdallocx(ptr, size, flags));
 }
+static inline void cpoison(char * a){
+  asm volatile("cpoison %0, 0(%1)": :"C"(a),"C"(a));
+}
+static inline void cclear(char * a){
+  asm volatile("cclearpoison %0, 0(%1)": :"C"(a),"C"(a));
+}
 
 /*
  * Defined by CHERIfied mallocs for use with mrs - given a capability returned
@@ -313,6 +320,7 @@ static size_t page_size;
 /* Flags are constant after initialization. */
 static void *entire_shadow;
 static bool quarantining = true;
+static bool poisoning = false;
 static bool revoke_every_free = false;
 static bool revoke_async = false;
 static bool bound_pointers = false;
@@ -643,7 +651,11 @@ quarantine_insert(struct mrs_quarantine *quarantine, void *ptr, size_t size)
 		mrs_printf("fatal error: can't insert pointer without SW_VMEM");
 		exit(7);
 	}
-
+	if(poisoning){
+		for(size_t i =0; i< size;i+=CAPREVOKE_BITMAP_ALIGNMENT){
+			cpoison((char*)(ptr+i));
+		}
+	}
 	quarantine->list->slab[quarantine->list->num_descriptors].ptr = ptr;
 	quarantine->list->slab[quarantine->list->num_descriptors].size = size;
 	quarantine->list->num_descriptors++;
@@ -986,6 +998,11 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 			size_t len = __builtin_align_up(
 			    cheri_getlen(iter->slab[i].ptr),
 			    CAPREVOKE_BITMAP_ALIGNMENT);
+			if(poisoning){
+				for(size_t i =0; i< len;i+=CAPREVOKE_BITMAP_ALIGNMENT){
+					cclear((char*)(iter->slab[i].ptr+i));
+				}
+			}
 			caprev_shadow_nomap_clear_len(
 			    cri->base_mem_nomap, entire_shadow,
 			    cheri_getbase(iter->slab[i].ptr), len);
@@ -1384,7 +1401,11 @@ mrs_init_impl_locked(void)
 		} else if (getenv(MALLOC_QUARANTINE_ENABLE_ENV) != NULL) {
 			quarantining = true;
 		}
-
+		if (getenv(MALLOC_POISON_DISABLE_ENV) != NULL) {
+			poisoning = false;
+		} else if (getenv(MALLOC_POISON_ENABLE_ENV) != NULL) {
+			poisoning = true;
+		}
 		if (getenv(MALLOC_ABORT_DISABLE_ENV) != NULL)
 			abort_on_validation_failure = false;
 		else if (getenv(MALLOC_ABORT_ENABLE_ENV) != NULL)
