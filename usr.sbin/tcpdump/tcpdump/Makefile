@@ -5,25 +5,35 @@ TCPDUMP_DISTDIR?= ${SRCTOP}/contrib/tcpdump
 
 PROG=	tcpdump
 
-SRCS=	addrtoname.c \
+SRCS=	\
+	addrtoname.c \
+	fptype.c \
+	machdep.c \
+	tcpdump.c
+
+SRCS+= \
 	addrtostr.c \
 	af.c \
 	ascii_strcasecmp.c \
 	checksum.c \
 	cpack.c \
-	fptype.c \
 	gmpls.c \
 	in_cksum.c \
 	ipproto.c \
 	l2vpn.c \
-	machdep.c \
-	netdissect.c \
 	netdissect-alloc.c \
+	netdissect.c \
 	nlpid.c \
 	ntp.c \
 	oui.c \
 	parsenfsfh.c \
 	print.c \
+	signature.c \
+	smbutil.c \
+	strtoaddr.c \
+	util-print.c
+
+SRCS+= \
 	print-802_11.c \
 	print-802_15_4.c \
 	print-ah.c \
@@ -32,15 +42,18 @@ SRCS=	addrtoname.c \
 	print-aoe.c \
 	print-ap1394.c \
 	print-arcnet.c \
+	print-arista.c \
 	print-arp.c \
 	print-ascii.c \
 	print-atalk.c \
 	print-atm.c \
 	print-babel.c \
+	print-bcm-li.c \
 	print-beep.c \
 	print-bfd.c \
 	print-bgp.c \
 	print-bootp.c \
+	print-brcmtag.c \
 	print-bt.c \
 	print-calm-fast.c \
 	print-carp.c \
@@ -53,6 +66,7 @@ SRCS=	addrtoname.c \
 	print-decnet.c \
 	print-dhcp6.c \
 	print-domain.c \
+	print-dsa.c \
 	print-dtp.c \
 	print-dvmrp.c \
 	print-eap.c \
@@ -76,12 +90,14 @@ SRCS=	addrtoname.c \
 	print-icmp6.c \
 	print-igmp.c \
 	print-igrp.c \
+	print-ip-demux.c \
 	print-ip.c \
 	print-ip6.c \
 	print-ip6opts.c \
 	print-ipcomp.c \
 	print-ipfc.c \
 	print-ipnet.c \
+	print-ipoib.c \
 	print-ipx.c \
 	print-isakmp.c \
 	print-isoclns.c \
@@ -99,6 +115,7 @@ SRCS=	addrtoname.c \
 	print-lwapp.c \
 	print-lwres.c \
 	print-m3ua.c \
+	print-macsec.c \
 	print-mobile.c \
 	print-mobility.c \
 	print-mpcp.c \
@@ -112,8 +129,9 @@ SRCS=	addrtoname.c \
 	print-ntp.c \
 	print-null.c \
 	print-olsr.c \
-	print-openflow.c \
 	print-openflow-1.0.c \
+	print-openflow-1.3.c \
+	print-openflow.c \
 	print-ospf.c \
 	print-ospf6.c \
 	print-otv.c \
@@ -124,8 +142,10 @@ SRCS=	addrtoname.c \
 	print-ppp.c \
 	print-pppoe.c \
 	print-pptp.c \
+	print-ptp.c \
 	print-radius.c \
 	print-raw.c \
+	print-realtek.c \
 	print-resp.c \
 	print-rip.c \
 	print-ripng.c \
@@ -143,6 +163,8 @@ SRCS=	addrtoname.c \
 	print-smb.c \
 	print-smtp.c \
 	print-snmp.c \
+	print-someip.c \
+	print-ssh.c \
 	print-stp.c \
 	print-sunatm.c \
 	print-sunrpc.c \
@@ -156,37 +178,20 @@ SRCS=	addrtoname.c \
 	print-token.c \
 	print-udld.c \
 	print-udp.c \
+	print-unsupported.c \
 	print-usb.c \
 	print-vjc.c \
 	print-vqp.c \
 	print-vrrp.c \
-	print-vtp.c \
-	print-vxlan.c \
-	print-vxlan-gpe.c \
-	print-wb.c \
-	print-zephyr.c \
-	print-zeromq.c \
-	signature.c \
-	smbutil.c \
-	strtoaddr.c \
-	tcpdump.c \
-	util-print.c \
-	print-arista.c \
-	print-bcm-li.c \
-	print-brcmtag.c \
-	print-dsa.c \
-	print-ip-demux.c \
-	print-ipoib.c \
-	print-macsec.c \
-	print-openflow-1.3.c \
-	print-ptp.c \
-	print-realtek.c \
-	print-someip.c \
-	print-ssh.c \
-	print-unsupported.c \
 	print-vsock.c \
+	print-vtp.c \
+	print-vxlan-gpe.c \
+	print-vxlan.c \
+	print-wb.c \
 	print-whois.c \
-	print-zep.c
+	print-zep.c \
+	print-zephyr.c \
+	print-zeromq.c
 
 CLEANFILES+=	${MAN}
 
