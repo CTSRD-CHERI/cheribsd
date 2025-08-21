@@ -11831,7 +11831,8 @@ dtrace_ecb_action_add(dtrace_ecb_t *ecb, dtrace_actdesc_t *desc)
 	rec = &action->dta_rec;
 	size = rec->dtrd_size;
 
-	for (mask = sizeof (uint64_t) - 1; size != 0 && mask > 0; mask >>= 1) {
+	for (mask = sizeof (uint64ptr_t) - 1; size != 0 && mask > 0;
+	    mask >>= 1) {
 		if (!(size & mask)) {
 			align = mask + 1;
 			break;
@@ -14990,13 +14991,13 @@ dtrace_state_buffer(dtrace_state_t *state, dtrace_buffer_t *buf, int which)
 			flags |= DTRACEBUF_INACTIVE;
 	}
 
-	for (size = opt[which]; size >= sizeof (uint64_t); size /= divisor) {
+	for (size = opt[which]; size >= sizeof (uint64ptr_t); size /= divisor) {
 		/*
-		 * The size must be 8-byte aligned.  If the size is not 8-byte
-		 * aligned, drop it down by the difference.
+		 * The size must be 8-byte and pointer size aligned.  If the
+		 * size is not aligned, drop it down by the difference.
 		 */
-		if (size & (sizeof (uint64_t) - 1))
-			size -= size & (sizeof (uint64_t) - 1);
+		if (size & (sizeof (uint64ptr_t) - 1))
+			size -= size & (sizeof (uint64ptr_t) - 1);
 
 		if (size < state->dts_reserve) {
 			/*
