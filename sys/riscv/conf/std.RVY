@@ -3,4 +3,5 @@ include "std.CHERI"
 nomakeoptions	CPUTYPE
 makeoptions	CPUTYPE=rvy
 
+options		CHERI_CAPREVOKE_NO_CLEAN
 nooptions 	CHERI_CAPREVOKE_CLOADTAGS
