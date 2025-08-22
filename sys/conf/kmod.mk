@@ -415,6 +415,13 @@ unload: .PHONY
 reload: unload load .PHONY
 .endif
 
+.if !target(policy)
+policy:
+	@printf '{\n\t"compartments": {\n\t\t"%s": {\n\t\t\t"files": [' "${KMOD}"
+	@printf "${OBJS:S/^/\n\t\t\t\t\"/:S/$/\"/:ts,}"
+	@printf '\n\t\t\t]\n\t\t}\n\t}\n}\n'
+.endif
+
 .if defined(KERNBUILDDIR)
 .PATH: ${KERNBUILDDIR}
 CFLAGS+=	-I${KERNBUILDDIR}
