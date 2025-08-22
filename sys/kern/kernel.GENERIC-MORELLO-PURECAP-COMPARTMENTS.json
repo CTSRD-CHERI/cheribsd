@@ -1,6 +1,6 @@
 {
 	"compartments": {
-		"kern": {
+		"kernel": {
 			"files": [
 				"bus_if.o",
 				"clock_if.o",
