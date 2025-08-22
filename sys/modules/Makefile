@@ -929,10 +929,12 @@ _malo=	malo
 SUBDIR+=	compartment_function
 SUBDIR+=	compartment_test
 .endif
-# Modules making use of kernel/toolchain features developed for CHERI.
+# Modules added to experiment with kernel-c18n, including those that explicitly
+# disable sub-module compartmentalization for comparisons with their variants
+# making use of sub-module compartmentalization.
 .if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "riscv"
 SUBDIR+=	sift_sa
-SUBDIR+=	zlib_c18n
+SUBDIR+=	zlib_noc18n
 .endif
 
 # Some of these work in hybrid kernels but we disable them for consistency
