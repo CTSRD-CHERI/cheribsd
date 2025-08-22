@@ -159,16 +159,16 @@ SYSCTL_INT(ELF_NODE_OID, OID_AUTO,
 
 #if defined(__amd64__)
 static int __elfN(vdso) = 1;
-SYSCTL_INT(__CONCAT(_kern_elf, __ELF_WORD_SIZE), OID_AUTO,
+SYSCTL_INT(ELF_NODE_OID, OID_AUTO,
     vdso, CTLFLAG_RWTUN, &__elfN(vdso), 0,
-    __XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE)) ": enable vdso preloading");
+    ELF_ABI_NAME ": enable vdso preloading");
 #else
 static int __elfN(vdso) = 0;
 #endif
 
 #if __ELF_WORD_SIZE == 32 && (defined(__amd64__) || defined(__i386__))
 int i386_read_exec = 0;
-SYSCTL_INT(_kern_elf32, OID_AUTO, read_exec, CTLFLAG_RW, &i386_read_exec, 0,
+SYSCTL_INT(ELF_NODE_OID, OID_AUTO, read_exec, CTLFLAG_RW, &i386_read_exec, 0,
     "enable execution from readable segments");
 #endif
 
@@ -193,7 +193,8 @@ SYSCTL_PROC(ELF_NODE_OID, OID_AUTO, pie_base,
     sysctl_pie_base, "LU",
     "PIE load base without randomization");
 
-SYSCTL_NODE(ELF_NODE_OID, OID_AUTO, aslr, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+SYSCTL_NODE(ELF_NODE_OID, OID_AUTO, aslr,
+    CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "");
 #define	ASLR_NODE_OID	__CONCAT(ELF_NODE_OID, _aslr)
 
@@ -205,8 +206,7 @@ SYSCTL_NODE(ELF_NODE_OID, OID_AUTO, aslr, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
 static int __elfN(aslr_enabled) = __ELF_WORD_SIZE == 64;
 SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, enable, CTLFLAG_RWTUN,
     &__elfN(aslr_enabled), 0,
-    ELF_ABI_NAME
-    ": enable address map randomization");
+    ELF_ABI_NAME ": enable address map randomization");
 
 /*
  * Enable ASLR by default for 64-bit PIE binaries.
@@ -214,8 +214,7 @@ SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, enable, CTLFLAG_RWTUN,
 static int __elfN(pie_aslr_enabled) = __ELF_WORD_SIZE == 64;
 SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, pie_enable, CTLFLAG_RWTUN,
     &__elfN(pie_aslr_enabled), 0,
-    ELF_ABI_NAME
-    ": enable address map randomization for PIE binaries");
+    ELF_ABI_NAME ": enable address map randomization for PIE binaries");
 
 /*
  * Sbrk is deprecated and it can be assumed that in most cases it will not be
@@ -230,14 +229,12 @@ SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, honor_sbrk, CTLFLAG_RW,
 static int __elfN(aslr_stack) = __ELF_WORD_SIZE == 64;
 SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, stack, CTLFLAG_RWTUN,
     &__elfN(aslr_stack), 0,
-    ELF_ABI_NAME
-    ": enable stack address randomization");
+    ELF_ABI_NAME ": enable stack address randomization");
 
 static int __elfN(aslr_shared_page) = __ELF_WORD_SIZE == 64;
 SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, shared_page, CTLFLAG_RWTUN,
     &__elfN(aslr_shared_page), 0,
-    __XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE))
-    ": enable shared page address randomization");
+    ELF_ABI_NAME ": enable shared page address randomization");
 
 static int __elfN(sigfastblock) = 1;
 SYSCTL_INT(ELF_NODE_OID, OID_AUTO, sigfastblock,
@@ -245,8 +242,8 @@ SYSCTL_INT(ELF_NODE_OID, OID_AUTO, sigfastblock,
     "enable sigfastblock for new processes");
 
 static bool __elfN(allow_wx) = true;
-SYSCTL_BOOL(ELF_NODE_OID, OID_AUTO, allow_wx, CTLFLAG_RWTUN,
-    &__elfN(allow_wx), 0,
+SYSCTL_BOOL(ELF_NODE_OID, OID_AUTO, allow_wx,
+    CTLFLAG_RWTUN, &__elfN(allow_wx), 0,
     "Allow pages to be mapped simultaneously writable and executable");
 
 static unsigned long __elfN(max_phdr_len) = 4 * PAGE_SIZE;
