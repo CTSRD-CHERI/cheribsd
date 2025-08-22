@@ -49,6 +49,7 @@
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
+#include <sys/compartment.h>
 #include <sys/resourcevar.h>
 #include <sys/sched.h>
 #include <sys/sdt.h>
@@ -472,6 +473,9 @@ mi_switch(int flags)
 {
 	uint64_t runtime, new_switchtime;
 	struct thread *td;
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	u_long cpuid;
+#endif
 
 	td = curthread;			/* XXX */
 	THREAD_LOCK_ASSERT(td, MA_OWNED | MA_NOTRECURSED);
@@ -538,7 +542,14 @@ mi_switch(int flags)
 		PCPU_SET(deadthread, NULL);
 		thread_stash(td);
 	}
+
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	cpuid = curcpu;
+#endif
 	spinlock_exit();
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	compartment_cpu_cache_fill(cpuid);
+#endif
 }
 
 /*

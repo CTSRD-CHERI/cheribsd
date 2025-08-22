@@ -62,13 +62,19 @@ struct compartment {
 	vm_pointer_t	 c_kstackptr;
 	TAILQ_ENTRY(compartment) c_next;	/* Next in a thread. */
 	TAILQ_ENTRY(compartment) c_mnext;	/* Next with the same id. */
+	STAILQ_ENTRY(compartment) c_critical_next; /* Next in a cache. */
 };
+
+STAILQ_HEAD(compartment_list, compartment);
 
 extern struct compartment compartments0[KERNEL_MAXC18NS];
 
 void compartment_metadata_create(u_long id, const char *name, uintcap_t base,
     elf_compartment_t elf_compartment);
 void compartment_metadata_insert(struct compartment *compartment);
+
+void compartment_cpu_cache_fill(u_int cpuid);
+
 u_long compartment_id_create(const char *name, uintcap_t base,
     elf_compartment_t elf_compartment);
 void compartment_linkup(struct compartment *compartment, u_long id,
