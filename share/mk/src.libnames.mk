@@ -30,6 +30,7 @@ _PRIVATELIBS=	\
 		heimipcs \
 		kldelf \
 		ldns \
+		netdissect \
 		sqlite3 \
 		ssh \
 		ucl \
@@ -450,6 +451,10 @@ _DP_be=		zfs spl nvpair zfsbootenv
 _DP_netmap=
 _DP_ifconfig=	m
 _DP_pfctl=	nv
+_DP_netdissect=	pcap
+.if ${MK_OPENSSL} == "yes"
+_DP_netdissect+=	crypto
+.endif
 
 # OFED support
 .if ${MK_OFED} != "no"
@@ -807,6 +812,7 @@ LIBSSLDIR=	${_LIB_OBJTOP}/secure/lib/libssl
 LIBTEKENDIR=	${_LIB_OBJTOP}/sys/teken/libteken
 LIBEGACYDIR=	${_LIB_OBJTOP}/tools/build
 LIBLNDIR=	${_LIB_OBJTOP}/usr.bin/lex/lib
+LIBNETDISSECTDIR=	${_LIB_OBJTOP}/usr.sbin/tcpdump/libnetdissect
 
 LIBTERMCAPWDIR=	${LIBTINFOWDIR}
 
