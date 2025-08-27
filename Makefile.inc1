@@ -3465,6 +3465,7 @@ _generic_libs=	${_cddl_lib} gnu/lib ${_kerberos5_lib} lib ${_secure_lib}
 .if ${MK_IPFILTER} != "no"
 _generic_libs+=	sbin/ipf/libipf
 .endif
+_generic_libs+=usr.sbin/tcpdump/libnetdissect
 .for _DIR in ${LOCAL_LIB_DIRS}
 .if ${_DIR} == ".WAIT"  || (empty(_generic_libs:M${_DIR}) && exists(${.CURDIR}/${_DIR}/Makefile))
 _generic_libs+= ${_DIR}
