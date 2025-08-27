@@ -1,8 +1,5 @@
 .include <src.opts.mk>
 
-TCPDUMP_DISTDIR?= ${SRCTOP}/contrib/tcpdump
-.PATH: ${TCPDUMP_DISTDIR}
-
 PROG=	tcpdump
 
 SRCS=	\
@@ -13,15 +10,6 @@ SRCS=	\
 
 CLEANFILES+=	${MAN}
 
-CFLAGS+= -I${.CURDIR:H} -I${TCPDUMP_DISTDIR}
-CFLAGS+= -DHAVE_CONFIG_H
-CFLAGS+= -D_U_="__attribute__((unused))"
-
-.if ${MK_INET6_SUPPORT} != "no"
-CFLAGS+=	-DINET6 -DHAVE_OS_IPV6_SUPPORT
-.endif
-
-LIBADD=	pcap
 LIBADD+=	netdissect
 .if ${MK_CASPER} != "no"
 LIBADD+=	casper

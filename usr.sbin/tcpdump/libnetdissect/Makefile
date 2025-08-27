@@ -1,8 +1,5 @@
 .include <src.opts.mk>
 
-TCPDUMP_DISTDIR?= ${SRCTOP}/contrib/tcpdump
-.PATH: ${TCPDUMP_DISTDIR}
-
 LIB=	netdissect
 PRIVATELIB=
 MAN=
@@ -189,22 +186,6 @@ SRCS+= \
 	print-zep.c \
 	print-zephyr.c \
 	print-zeromq.c
-
-CFLAGS+= -I${.CURDIR:H} -I${TCPDUMP_DISTDIR}
-CFLAGS+= -DHAVE_CONFIG_H
-CFLAGS+= -D_U_="__attribute__((unused))"
-
-.if ${MK_INET6_SUPPORT} != "no"
-CFLAGS+=	-DINET6 -DHAVE_OS_IPV6_SUPPORT
-.endif
-
-LIBADD=	pcap
-.if ${MK_OPENSSL} != "no"
-LIBADD+=	crypto
-CFLAGS+= -I${SYSROOT:U${DESTDIR}}/usr/include/openssl
-CFLAGS+= -DHAVE_LIBCRYPTO -DHAVE_OPENSSL_EVP_H
-CFLAGS+= -DOPENSSL_API_COMPAT=0x10100000L
-.endif
 
 .if ${MK_PF} != "no"
 SRCS+=	print-pflog.c \
