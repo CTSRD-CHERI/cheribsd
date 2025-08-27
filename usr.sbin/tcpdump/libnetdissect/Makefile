@@ -190,7 +190,7 @@ SRCS+= \
 	print-zephyr.c \
 	print-zeromq.c
 
-CFLAGS+= -I${SRCTOP}/usr.sbin/tcpdump/tcpdump -I${TCPDUMP_DISTDIR}
+CFLAGS+= -I${.CURDIR:H} -I${TCPDUMP_DISTDIR}
 CFLAGS+= -DHAVE_CONFIG_H
 CFLAGS+= -D_U_="__attribute__((unused))"
 
