@@ -4510,7 +4510,8 @@ dtrace_dif_subr(uint_t subr, uint_t rd, dtrace_difval_t *regs,
 
 	case DIF_SUBR_ALLOCA:
 	case DIF_SUBR_COPYIN: {
-		uintptr_t dest = P2ROUNDUP(mstate->dtms_scratch_ptr, 8);
+		uintptr_t dest = P2ROUNDUP(mstate->dtms_scratch_ptr,
+		    sizeof (uint64ptr_t));
 		uint64_t size =
 		    tupregs[subr == DIF_SUBR_ALLOCA ? 0 : 1].dttk_value;
 		size_t scratch_size = (dest - mstate->dtms_scratch_ptr) + size;
