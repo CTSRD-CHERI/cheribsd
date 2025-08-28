@@ -1,6 +1,7 @@
 .include <src.opts.mk>
 
 LIB=	netdissect
+COMPARTMENT_POLICY=	${.CURDIR}/Compartments.json	print.json
 PRIVATELIB=
 MAN=
 SHLIB_MAJOR=1
@@ -192,5 +193,14 @@ SRCS+=	print-pflog.c \
 	print-pfsync.c
 CFLAGS+= -DHAVE_NET_PFVAR_H -DHAVE_NET_IF_PFLOG_H
 .endif
+
+print.json: ${.PARSEFILE}
+	@(printf '{\n"compartments": {' ; \
+	comma=""; \
+	for printer in ${SRCS:Mprint-*.c:R}; do \
+		printf '%s\n"%s": { "files": [ "%s.*o" ] }' "$${comma}" $${printer%.c} $${printer}; \
+		comma=","; \
+	done; \
+	printf '\n}\n}\n') > ${.TARGET}
 
 .include <bsd.lib.mk>
