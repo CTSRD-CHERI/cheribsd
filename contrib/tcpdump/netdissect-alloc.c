@@ -14,6 +14,12 @@
  * FOR A PARTICULAR PURPOSE.
  */
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+#else
+#define	cheri_setbounds(x, y) (x)
+#endif
+
 #include <config.h>
 
 #include <stdlib.h>
@@ -44,7 +50,7 @@ nd_malloc(netdissect_options *ndo, size_t size)
 	if (chunkp == NULL)
 		return NULL;
 	nd_add_alloc_list(ndo, chunkp);
-	return chunkp + 1;
+	return cheri_setbounds(chunkp + 1, size);
 }
 
 /* Free chunks in allocation linked list from last to first */
