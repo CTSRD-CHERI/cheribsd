@@ -2853,7 +2853,6 @@ OLD_FILES+=usr/lib/libroken.a
 OLD_FILES+=usr/lib/libroken.so
 OLD_FILES+=usr/lib/libwind.a
 OLD_FILES+=usr/lib/libwind.so
-OLD_FILES+=usr/lib/libwind.so.11
 OLD_FILES+=usr/libexec/digest-service
 OLD_FILES+=usr/libexec/hprop
 OLD_FILES+=usr/libexec/hpropd
@@ -3636,6 +3635,7 @@ OLD_LIBS+=usr/lib/libkrb5.so.11
 OLD_LIBS+=usr/lib/libprivateheimipcc.so.11
 OLD_LIBS+=usr/lib/libprivateheimipcs.so.11
 OLD_LIBS+=usr/lib/libroken.so.11
+OLD_LIBS+=usr/lib/libwind.so.11
 .endif	# ${MK_KERBEROS} == "no" || ${MK_MITKRB5} != "no"
 
 # MIT-specific files that don't exist in Heimdal.  These should be removed if
