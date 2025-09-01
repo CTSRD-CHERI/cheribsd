@@ -1,0 +1,10 @@
+#NO_UNIVERSE
+
+include "QEMU"
+include "std.CHERI"
+
+ident CHERI-QEMU-HOBGOBLIN
+
+options 	FDT
+options 	FDT_DTB_STATIC
+makeoptions	FDT_DTS_FILE=x730-mp1-hobgoblin-vcu118.dts

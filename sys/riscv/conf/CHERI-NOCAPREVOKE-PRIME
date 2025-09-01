@@ -1,0 +1,11 @@
+#NO_UNIVERSE
+
+include "GENERIC"
+include "std.MFS-ROOT"
+include "std.CHERI-PURECAP"
+include "std.CHERI-NOCAPREVOKE"
+
+ident CHERI-NOCAPREVOKE-PRIME
+
+options 	FDT
+
