@@ -1,0 +1,12 @@
+#NO_UNIVERSE
+
+include "GENERIC"
+include "std.MFS-ROOT"
+include "std.CHERI-PURECAP"
+include "std.CHERI-NOCAPREVOKE"
+
+ident CHERI-NOCAPREVOKE-PRIME
+
+options 	FDT
+# options 	FDT_DTB_STATIC
+# makeoptions	FDT_DTS_FILE=x730-mp1-prime-vcu118.dts
