@@ -1,0 +1,9 @@
+#NO_UNIVERSE
+
+include "GENERIC"
+include "std.MFS-ROOT"
+include "std.CHERI-PURECAP"
+
+ident CHERI-PURECAP-PRIME
+
+options 	FDT
