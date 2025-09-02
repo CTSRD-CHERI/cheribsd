@@ -106,6 +106,7 @@
 #define	MMCSPI_DATA_BLOCK_LEN	512
 #define	MMCSPI_DATA_CRC_LEN	2
 
+#define	MMCSPI_STOP_RETRIES	5  /* times to retry STOP command */
 #define	MMCSPI_POLL_LEN		8  /* amount to read when searching */
 
 #define	MMCSPI_R1_MASK	0x80 /* mask used to search for R1 tokens */
@@ -1411,7 +1412,7 @@ mmcspi_read_block(device_t dev, uint8_t *data, unsigned int len,
 }
 
 static unsigned int
-mmcspi_send_stop(device_t dev, unsigned int retries)
+mmcspi_send_stop(device_t dev)
 {
 	struct mmcspi_command stop;
 	struct mmc_command mmc_stop;
@@ -1424,6 +1425,7 @@ mmcspi_send_stop(device_t dev, unsigned int retries)
 	memset(&mmc_stop, 0, sizeof(mmc_stop));
 	mmc_stop.opcode = MMC_STOP_TRANSMISSION;
 	mmc_stop.flags = MMC_RSP_R1B | MMC_CMD_AC;
+	mmc_stop.retries = MMCSPI_STOP_RETRIES;
 
 	err = mmcspi_set_up_command(dev, &stop, &mmc_stop);
 	if (MMC_ERR_NONE != err) {
@@ -1436,10 +1438,12 @@ mmcspi_send_stop(device_t dev, unsigned int retries)
 	 * the caller retry the entire read/write command due to such a
 	 * failure is pointlessly expensive.
 	 */
-	for (i = 0; i <= retries; i++) {
+	for (i = 0; i <= mmc_stop.retries; i++) {
 		TRACE(dev, ACTION, "sending stop message\n");
 
 		err = mmcspi_send_cmd(dev, &stop, &stop_response);
+		if (MMC_ERR_BADCRC == err)
+			continue;
 		if (MMC_ERR_NONE != err) {
 			TRACE_EXIT(dev);
 			return (err);
@@ -1447,10 +1451,7 @@ mmcspi_send_stop(device_t dev, unsigned int retries)
 
 		TRACE(dev, RESULT, "stop response=0x%02x\n", stop_response);
 
-		/* retry on crc error */
-		if (stop_response & stop.error_mask & MMCSPI_R1_CRC_ERR) {
-			continue;
-		}
+		break;
 	}
 
 	if (stop_response & stop.error_mask) {
@@ -1525,7 +1526,7 @@ mmcspi_read_phase(device_t dev, struct mmcspi_command *cmd)
 
 	/* multi-block read commands require a stop */
 	if (num_blocks > 1) {
-		err = mmcspi_send_stop(dev, cmd->retries);
+		err = mmcspi_send_stop(dev);
 		if (MMC_ERR_NONE != err) {
 			TRACE_EXIT(dev);
 			return (err);
@@ -1621,7 +1622,7 @@ mmcspi_write_phase(device_t dev, struct mmcspi_command *cmd)
 				 * write phase will be whatever error was
 				 * indicated in the data respone token.
 				 */
-				mmcspi_send_stop(dev, cmd->retries);
+				mmcspi_send_stop(dev);
 			}
 
 			/*
