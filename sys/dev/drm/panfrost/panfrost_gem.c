@@ -308,7 +308,7 @@ retry:
 			device_printf(sc->dev, "%s: error: requested page is "
 			    "out of range (%d/%d)\n", __func__, bo->npages,
 			    pidx);
-			return (VM_FAULT_SIGBUS);
+			goto fail_unlock;
 		}
 		page = bo->pages[pidx];
 	} else {
@@ -316,11 +316,12 @@ retry:
 		KASSERT(bo->sgt != NULL, ("sgt is NULL"));
 		page = sgt_get_page_by_idx(bo->sgt, pidx);
 		if (!page)
-			return (VM_FAULT_SIGBUS);
+			goto fail_unlock;
 	}
 
 	if (!vm_page_tryxbusy(page)) {
-		vm_page_busy_sleep(page, "panfrost", 0);
+		if (!vm_page_busy_sleep(page, "panfrost", 0))
+			VM_OBJECT_WUNLOCK(obj);
 		goto retry;
 	}
 	if (vm_page_insert(page, obj, pidx)) {
