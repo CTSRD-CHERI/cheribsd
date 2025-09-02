@@ -999,8 +999,8 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 			    cheri_getlen(iter->slab[i].ptr),
 			    CAPREVOKE_BITMAP_ALIGNMENT);
 			if(poisoning){
-				for(size_t i =0; i< len;i+=CAPREVOKE_BITMAP_ALIGNMENT){
-					cclear((char*)(iter->slab[i].ptr+i));
+				for(size_t j =0; j< len;j+=CAPREVOKE_BITMAP_ALIGNMENT){
+					cclear((char*)(iter->slab[i].ptr+j));
 				}
 			}
 			caprev_shadow_nomap_clear_len(
