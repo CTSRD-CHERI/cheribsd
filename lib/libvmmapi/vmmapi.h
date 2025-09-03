@@ -76,6 +76,13 @@ enum {
 	VM_PCIROM,
 };
 
+#if __has_feature(capabilities) && defined(__aarch64__)
+#define	VMMAPI_CHERI
+typedef uintcap_t vm_register_t;
+#else
+typedef uint64_t vm_register_t;
+#endif
+
 __BEGIN_DECLS
 /*
  * Get the length and name of the memory segment identified by 'segid'.
@@ -150,17 +157,17 @@ int	vm_get_desc(struct vcpu *vcpu, int reg,
 		    uint64_t *base, uint32_t *limit, uint32_t *access);
 int	vm_get_seg_desc(struct vcpu *vcpu, int reg, struct seg_desc *seg_desc);
 #endif
-int	vm_set_register(struct vcpu *vcpu, int reg, uintcap_t val);
-int	vm_get_register(struct vcpu *vcpu, int reg, uintcap_t *retval);
-#if __has_feature(capabilities)
+int	vm_set_register(struct vcpu *vcpu, int reg, vm_register_t val);
+int	vm_get_register(struct vcpu *vcpu, int reg, vm_register_t *retval);
+#ifdef VMMAPI_CHERI
 int	vm_get_register_cheri_capability_tag(struct vcpu *vcpu, int reg,
     uint8_t *tagp);
 #endif
 int	vm_set_register_set(struct vcpu *vcpu, unsigned int count,
-    const int *regnums, uintcap_t *regvals);
+    const int *regnums, vm_register_t *regvals);
 int	vm_get_register_set(struct vcpu *vcpu, unsigned int count,
-    const int *regnums, uintcap_t *regvals);
-#if __has_feature(capabilities)
+    const int *regnums, vm_register_t *regvals);
+#ifdef VMMAPI_CHERI
 int	vm_get_register_cheri_capability_tag_set(struct vcpu *vcpu,
     unsigned int count, const int *regnums, uint8_t *tags);
 #endif
@@ -297,7 +304,7 @@ void	vm_setup_freebsd_gdt(uint64_t *gdtr);
 int	vm_snapshot_req(struct vmctx *ctx, struct vm_snapshot_meta *meta);
 int	vm_restore_time(struct vmctx *ctx);
 
-#if __has_feature(capabilities)
+#ifdef VMMAPI_CHERI
 /*
  * CHERI interfaces
  */

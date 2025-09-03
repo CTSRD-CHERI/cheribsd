@@ -142,7 +142,8 @@ typedef int (mem_cb_t)(struct vcpu *vcpu, uint64_t gpa, struct mem_range *mr,
     void *arg);
 
 static int
-mem_read(struct vcpu *vcpu, uint64_t gpa, uintcap_t *rval, int size, void *arg)
+mem_read(struct vcpu *vcpu, uint64_t gpa, vm_register_t *rval, int size,
+    void *arg)
 {
 	int error;
 	struct mem_range *mr = arg;
@@ -157,7 +158,8 @@ mem_read(struct vcpu *vcpu, uint64_t gpa, uintcap_t *rval, int size, void *arg)
 }
 
 static int
-mem_write(struct vcpu *vcpu, uint64_t gpa, uintcap_t wval, int size, void *arg)
+mem_write(struct vcpu *vcpu, uint64_t gpa, vm_register_t wval, int size,
+    void *arg)
 {
 	int error;
 	struct mem_range *mr = arg;

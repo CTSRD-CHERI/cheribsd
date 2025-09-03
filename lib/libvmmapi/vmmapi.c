@@ -623,7 +623,7 @@ vcpu_ioctl(struct vcpu *vcpu, u_long cmd, void *arg)
 }
 
 int
-vm_set_register(struct vcpu *vcpu, int reg, uintcap_t val)
+vm_set_register(struct vcpu *vcpu, int reg, vm_register_t val)
 {
 	int error;
 	struct vm_register vmreg;
@@ -637,7 +637,7 @@ vm_set_register(struct vcpu *vcpu, int reg, uintcap_t val)
 }
 
 int
-vm_get_register(struct vcpu *vcpu, int reg, uintcap_t *ret_val)
+vm_get_register(struct vcpu *vcpu, int reg, vm_register_t *ret_val)
 {
 	int error;
 	struct vm_register vmreg;
@@ -650,7 +650,7 @@ vm_get_register(struct vcpu *vcpu, int reg, uintcap_t *ret_val)
 	return (error);
 }
 
-#if __has_feature(capabilities)
+#ifdef VMMAPI_CHERI
 int
 vm_get_register_cheri_capability_tag(struct vcpu *vcpu, int reg, uint8_t *tagp)
 {
@@ -669,7 +669,7 @@ vm_get_register_cheri_capability_tag(struct vcpu *vcpu, int reg, uint8_t *tagp)
 
 int
 vm_set_register_set(struct vcpu *vcpu, unsigned int count,
-    const int *regnums, uintcap_t *regvals)
+    const int *regnums, vm_register_t *regvals)
 {
 	int error;
 	struct vm_register_set vmregset;
@@ -685,7 +685,7 @@ vm_set_register_set(struct vcpu *vcpu, unsigned int count,
 
 int
 vm_get_register_set(struct vcpu *vcpu, unsigned int count,
-    const int *regnums, uintcap_t *regvals)
+    const int *regnums, vm_register_t *regvals)
 {
 	int error;
 	struct vm_register_set vmregset;
@@ -699,7 +699,7 @@ vm_get_register_set(struct vcpu *vcpu, unsigned int count,
 	return (error);
 }
 
-#if __has_feature(capabilities)
+#ifdef VMMAPI_CHERI
 int
 vm_get_register_cheri_capability_tag_set(struct vcpu *vcpu, unsigned int count,
     const int *regnums, uint8_t *tags)
@@ -1158,7 +1158,7 @@ vm_restore_time(struct vmctx *ctx)
 }
 #endif
 
-#if __has_feature(capabilities)
+#ifdef VMMAPI_CHERI
 int
 vm_get_cheri_capability_tag(struct vmctx *ctx, vm_paddr_t gpa, uint8_t *tag)
 {
