@@ -616,7 +616,7 @@ struct iwl_tso_page_info {
 
 #define IWL_TSO_PAGE_DATA_SIZE	(PAGE_SIZE - sizeof(struct iwl_tso_page_info))
 #define IWL_TSO_PAGE_INFO(addr)	\
-	((struct iwl_tso_page_info *)(((unsigned long)addr & PAGE_MASK) + \
+	((struct iwl_tso_page_info *)(((uintptr_t)addr & PAGE_MASK) + \
 				      IWL_TSO_PAGE_DATA_SIZE))
 
 int iwl_pcie_tx_init(struct iwl_trans *trans);
@@ -653,7 +653,7 @@ static inline dma_addr_t iwl_pcie_get_tso_page_phys(void *addr)
 	dma_addr_t res;
 
 	res = IWL_TSO_PAGE_INFO(addr)->dma_addr;
-	res += (unsigned long)addr & ~PAGE_MASK;
+	res += (uintptr_t)addr & ~PAGE_MASK;
 
 	return res;
 }
