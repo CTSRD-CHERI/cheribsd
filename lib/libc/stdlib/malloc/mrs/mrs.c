@@ -251,6 +251,11 @@ static inline void cpoison(char * a){
 static inline void cclear(char * a){
   asm volatile("cclearpoison %0, 0(%1)": :"C"(a),"C"(a));
 }
+static inline void* csetcappoison(char * a){
+   void * ptr;
+   asm volatile("csetcappoison %0, %1" :"=C"(ptr) : "C"(a));
+   return ptr;
+}
 
 /*
  * Defined by CHERIfied mallocs for use with mrs - given a capability returned
@@ -1557,6 +1562,8 @@ mrs_malloc(size_t size)
 	    size, allocated_region);*/
 
 	MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0, allocated_region);
+	allocated_region = csetcappoison((char *)allocated_region);
+	//printf("mrs malloc check if poison %lx \n", (long) *allocated_region);
 	return (allocated_region);
 }
 
@@ -1615,6 +1622,7 @@ mrs_calloc(size_t number, size_t size)
 	/*mrs_debug_printf("mrs_calloc: exit called %d size 0x%zx address %p\n", number, size, allocated_region);*/
 
 	MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number, allocated_region);
+	//csetcappoison((char *)allocated_region);
 	return (allocated_region);
 }
 
@@ -1697,6 +1705,7 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 
 	MRS_UTRACE(UTRACE_MRS_ALIGNED_ALLOC, NULL, size, alignment,
 	    allocated_region);
+	//csetcappoison((char *)allocated_region);
 	return (allocated_region);
 }
 
@@ -1750,6 +1759,7 @@ mrs_realloc(void *ptr, size_t size)
 		mrs_free(ptr);
 	}
 	MRS_UTRACE(UTRACE_MRS_REALLOC, ptr, size, 0, new_alloc);
+	//csetcappoison((char *)new_alloc);
 	return (new_alloc);
 }
 
@@ -1825,6 +1835,7 @@ mrs_mallocx(size_t size, int flags)
 	if (ret != NULL && (flags & MALLOCX_ZERO) != 0)
 		clear_region(ret, cheri_getlen(ret));
 #endif
+	//csetcappoison((char *)ret);
 	return (ret);
 }
 
@@ -1867,6 +1878,7 @@ mrs_rallocx(void *ptr, size_t size, int flags)
 		mrs_free(ptr);
 	}
 	MRS_UTRACE(UTRACE_MRS_REALLOC, ptr, size, 0, new_alloc);
+	//csetcappoison((char *)new_alloc);
 	return (new_alloc);
 }
 
