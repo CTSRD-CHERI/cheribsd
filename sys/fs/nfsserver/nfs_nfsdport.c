@@ -2602,6 +2602,7 @@ again:
 	 * rpc reply
 	 */
 	if (siz == 0) {
+ateof:
 		vput(vp);
 		if (nd->nd_flag & ND_NFSV3)
 			nfsrv_postopattr(nd, getret, &at);
@@ -2643,6 +2644,8 @@ again:
 		ncookies--;
 	}
 	if (cpos >= cend || ncookies == 0) {
+		if (eofflag != 0)
+			goto ateof;
 		siz = fullsiz;
 		toff = off;
 		goto again;
