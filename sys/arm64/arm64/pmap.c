@@ -1888,78 +1888,92 @@ CPU_FEAT(feat_hafdbs, "Hardware management of the Access flag and dirty state",
     pmap_dbm_check, pmap_dbm_has_errata, pmap_dbm_enable,
     CPU_FEAT_AFTER_DEV | CPU_FEAT_PER_CPU);
 
-static void
-pmap_init_multiple_tlbi(void *dummy __unused)
+static cpu_feat_en
+pmap_multiple_tlbi_check(const struct cpu_feat *feat __unused, u_int midr)
 {
-	u_int cpu, midr;
-
-	CPU_FOREACH(cpu) {
-		midr = pcpu_find(cpu)->pc_midr;
-
-		/*
-		 * ARM C1-Premium erratum 4193780
-		 * ARM C1-Ultra erratum 4193780
-		 * ARM Cortex-A76 erratum 4193800
-		 * ARM Cortex-A76AE erratum 4193801
-		 * ARM Cortex-A77 erratum 4193798
-		 * ARM Cortex-A78 erratum 4193791
-		 * ARM Cortex-A78AE erratum 4193793
-		 * ARM Cortex-A78C erratum 4193794
-		 * ARM Cortex-A710 erratum 4193788
-		 * ARM Cortex-X1 erratum 4193791
-		 * ARM Cortex-X1C erratum 4193792
-		 * ARM Cortex-X2 erratum 4193788
-		 * ARM Cortex-X3 erratum 4193786
-		 * ARM Cortex-X4 erratum 4118414
-		 * ARM Cortex-X925 erratum 4193781
-		 * ARM Neoverse-N1 erratum 4193800
-		 * ARM Neoverse-N2 erratum 4193789
-		 * ARM Neoverse-V1 erratum 4193790
-		 * ARM Neoverse-V2 erratum 4193787
-		 * ARM Neoverse-V3 erratum 4193784
-		 * ARM Neoverse-V3AE erratum 4193784
-		 * Present in all revisions
-		 */
-		if (CPU_IMPL(midr) == CPU_IMPL_ARM) {
-			switch(CPU_PART(midr)) {
-			case CPU_PART_C1_PREMIUM:
-			case CPU_PART_C1_ULTRA:
-			case CPU_PART_CORTEX_A76:
-			case CPU_PART_CORTEX_A76AE:
-			case CPU_PART_CORTEX_A77:
-			case CPU_PART_CORTEX_A78:
-			case CPU_PART_CORTEX_A78AE:
-			case CPU_PART_CORTEX_A78C:
-			case CPU_PART_CORTEX_A710:
-			case CPU_PART_CORTEX_X1:
-			case CPU_PART_CORTEX_X1C:
-			case CPU_PART_CORTEX_X2:
-			case CPU_PART_CORTEX_X3:
-			case CPU_PART_CORTEX_X4:
-			case CPU_PART_CORTEX_X925:
-			case CPU_PART_NEOVERSE_N1:
-			case CPU_PART_NEOVERSE_N2:
-			case CPU_PART_NEOVERSE_V1:
-			case CPU_PART_NEOVERSE_V2:
-			case CPU_PART_NEOVERSE_V3:
-			case CPU_PART_NEOVERSE_V3AE:
-				pmap_multiple_tlbi = true;
-				return;
-			}
-		}
-
-		/*
-		 * ARM Morello (based on Neoverse-N1)
-		 */
-		if (CPU_IMPL(midr) == CPU_IMPL_RESEARCH &&
-		    CPU_PART(midr) == CPU_PART_MORELLO) {
-			pmap_multiple_tlbi = true;
-			return;
+	/*
+	 * ARM C1-Premium erratum 4193780
+	 * ARM C1-Ultra erratum 4193780
+	 * ARM Cortex-A76 erratum 4193800
+	 * ARM Cortex-A76AE erratum 4193801
+	 * ARM Cortex-A77 erratum 4193798
+	 * ARM Cortex-A78 erratum 4193791
+	 * ARM Cortex-A78AE erratum 4193793
+	 * ARM Cortex-A78C erratum 4193794
+	 * ARM Cortex-A710 erratum 4193788
+	 * ARM Cortex-X1 erratum 4193791
+	 * ARM Cortex-X1C erratum 4193792
+	 * ARM Cortex-X2 erratum 4193788
+	 * ARM Cortex-X3 erratum 4193786
+	 * ARM Cortex-X4 erratum 4118414
+	 * ARM Cortex-X925 erratum 4193781
+	 * ARM Neoverse-N1 erratum 4193800
+	 * ARM Neoverse-N2 erratum 4193789
+	 * ARM Neoverse-V1 erratum 4193790
+	 * ARM Neoverse-V2 erratum 4193787
+	 * ARM Neoverse-V3 erratum 4193784
+	 * ARM Neoverse-V3AE erratum 4193784
+	 * Present in all revisions
+	 */
+	if (CPU_IMPL(midr) == CPU_IMPL_ARM) {
+		switch(CPU_PART(midr)) {
+		case CPU_PART_C1_PREMIUM:
+		case CPU_PART_C1_ULTRA:
+		case CPU_PART_CORTEX_A76:
+		case CPU_PART_CORTEX_A76AE:
+		case CPU_PART_CORTEX_A77:
+		case CPU_PART_CORTEX_A78:
+		case CPU_PART_CORTEX_A78AE:
+		case CPU_PART_CORTEX_A78C:
+		case CPU_PART_CORTEX_A710:
+		case CPU_PART_CORTEX_X1:
+		case CPU_PART_CORTEX_X1C:
+		case CPU_PART_CORTEX_X2:
+		case CPU_PART_CORTEX_X3:
+		case CPU_PART_CORTEX_X4:
+		case CPU_PART_CORTEX_X925:
+		case CPU_PART_NEOVERSE_N1:
+		case CPU_PART_NEOVERSE_N2:
+		case CPU_PART_NEOVERSE_V1:
+		case CPU_PART_NEOVERSE_V2:
+		case CPU_PART_NEOVERSE_V3:
+		case CPU_PART_NEOVERSE_V3AE:
+			return (FEAT_DEFAULT_ENABLE);
 		}
 	}
+
+	/*
+	 * Cortex-A55 erratum 2441007 (Cat B rare)
+	 * Present in all revisions
+	 */
+	if (CPU_IMPL(midr) == CPU_IMPL_ARM &&
+	    CPU_PART(midr) == CPU_PART_CORTEX_A55)
+		return (FEAT_DEFAULT_DISABLE);
+
+	/*
+	 * Cortex-A510 erratum 2441009 (Cat B rare)
+	 * Present in r0p0 - r1p1
+	 * Fixed in r1p2
+	 */
+	if (midr_check_var_part_range(midr, CPU_IMPL_ARM, CPU_PART_CORTEX_A510,
+	    0, 0, 1, 1))
+		return (FEAT_DEFAULT_DISABLE);
+
+	return (FEAT_ALWAYS_DISABLE);
 }
-SYSINIT(pmap_init_multiple_tlbi, SI_SUB_CPU, SI_ORDER_ANY,
-    pmap_init_multiple_tlbi, NULL);
+
+static bool
+pmap_multiple_tlbi_enable(const struct cpu_feat *feat __unused,
+    cpu_feat_errata errata_status, u_int *errata_list __unused,
+    u_int errata_count __unused)
+{
+	pmap_multiple_tlbi = true;
+	return (true);
+}
+
+CPU_FEAT(errata_multi_tlbi, "Multiple TLBI errata",
+    pmap_multiple_tlbi_check, NULL, pmap_multiple_tlbi_enable,
+    CPU_FEAT_EARLY_BOOT | CPU_FEAT_PER_CPU);
 
 /*
  *	Initialize the pmap module.
@@ -2114,13 +2128,17 @@ pmap_s1_invalidate_page(pmap_t pmap, vm_offset_t va, bool final_only)
 	r = TLBI_VA(va);
 	if (pmap == kernel_pmap) {
 		pmap_s1_invalidate_kernel(r, final_only);
+		if (pmap_multiple_tlbi) {
+			dsb(ish);
+			pmap_s1_invalidate_kernel(r, final_only);
+		}
 	} else {
 		r |= ASID_TO_OPERAND(COOKIE_TO_ASID(pmap->pm_cookie));
 		pmap_s1_invalidate_user(r, final_only);
-	}
-	if (pmap_multiple_tlbi) {
-		dsb(ish);
-		__asm __volatile("tlbi	vale1is, xzr" ::: "memory");
+		if (pmap_multiple_tlbi) {
+			dsb(ish);
+			pmap_s1_invalidate_user(r, final_only);
+		}
 	}
 	dsb(ish);
 	isb();
@@ -2162,16 +2180,24 @@ pmap_s1_invalidate_strided(pmap_t pmap, vm_offset_t sva, vm_offset_t eva,
 		end = TLBI_VA(eva);
 		for (r = start; r < end; r += TLBI_VA(stride))
 			pmap_s1_invalidate_kernel(r, final_only);
+
+		if (pmap_multiple_tlbi) {
+			dsb(ish);
+			for (r = start; r < end; r += TLBI_VA(stride))
+				pmap_s1_invalidate_kernel(r, final_only);
+		}
 	} else {
 		start = end = ASID_TO_OPERAND(COOKIE_TO_ASID(pmap->pm_cookie));
 		start |= TLBI_VA(sva);
 		end |= TLBI_VA(eva);
 		for (r = start; r < end; r += TLBI_VA(stride))
 			pmap_s1_invalidate_user(r, final_only);
-	}
-	if (pmap_multiple_tlbi) {
-		dsb(ish);
-		__asm __volatile("tlbi	vale1is, xzr" ::: "memory");
+
+		if (pmap_multiple_tlbi) {
+			dsb(ish);
+			for (r = start; r < end; r += TLBI_VA(stride))
+				pmap_s1_invalidate_user(r, final_only);
+		}
 	}
 	dsb(ish);
 	isb();
@@ -2213,6 +2239,10 @@ pmap_s1_invalidate_all_kernel(void)
 	dsb(ishst);
 	__asm __volatile("tlbi vmalle1is");
 	dsb(ish);
+	if (pmap_multiple_tlbi) {
+		__asm __volatile("tlbi vmalle1is");
+		dsb(ish);
+	}
 	isb();
 }
 
@@ -2230,13 +2260,17 @@ pmap_s1_invalidate_all(pmap_t pmap)
 	dsb(ishst);
 	if (pmap == kernel_pmap) {
 		__asm __volatile("tlbi vmalle1is");
+		if (pmap_multiple_tlbi) {
+			dsb(ish);
+			__asm __volatile("tlbi vmalle1is");
+		}
 	} else {
 		r = ASID_TO_OPERAND(COOKIE_TO_ASID(pmap->pm_cookie));
 		__asm __volatile("tlbi aside1is, %0" : : "r" (r));
-	}
-	if (pmap_multiple_tlbi) {
-		dsb(ish);
-		__asm __volatile("tlbi	vale1is, xzr" ::: "memory");
+		if (pmap_multiple_tlbi) {
+			dsb(ish);
+			__asm __volatile("tlbi aside1is, %0" : : "r" (r));
+		}
 	}
 	dsb(ish);
 	isb();
