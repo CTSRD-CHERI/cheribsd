@@ -2572,7 +2572,7 @@ pci_nvme_dealloc_sm(struct blockif_req *br, int err)
 		iov += req->prev_gpaddr;
 
 		/* The iov_* values already include the sector size */
-		req->io_req.br_offset = (off_t)iov->iov_base;
+		req->io_req.br_offset = (off_t)(uintptr_t)iov->iov_base;
 		req->io_req.br_resid = iov->iov_len;
 		if (blockif_delete(sc->nvstore.ctx, &req->io_req)) {
 			pci_nvme_status_genc(&status,
@@ -2682,7 +2682,7 @@ nvme_opc_dataset_mgmt(struct pci_nvme_softc *sc,
 					    NVME_SC_LBA_OUT_OF_RANGE);
 					goto out;
 				}
-				iov[dr].iov_base = (void *)offset;
+				iov[dr].iov_base = (void *)(uintptr_t)offset;
 				iov[dr].iov_len = bytes;
 				dr++;
 			}
