@@ -474,6 +474,8 @@ typedef int (__sys_inotify_add_watch_at_t)(int, int, const char * __kerncap, uin
 typedef int (__sys_inotify_rm_watch_t)(int, int);
 typedef int (__sys_getgroups_t)(int, gid_t * __kerncap);
 typedef int (__sys_setgroups_t)(int, const gid_t * __kerncap);
+typedef int (__sys_jail_attach_jd_t)(int);
+typedef int (__sys_jail_remove_jd_t)(int);
 
 _Noreturn void __sys__exit(int rval);
 int __sys_fork(void);
@@ -883,6 +885,8 @@ int __sys_inotify_add_watch_at(int fd, int dfd, const char * __kerncap path, uin
 int __sys_inotify_rm_watch(int fd, int wd);
 int __sys_getgroups(int gidsetsize, gid_t * __kerncap gidset);
 int __sys_setgroups(int gidsetsize, const gid_t * __kerncap gidset);
+int __sys_jail_attach_jd(int fd);
+int __sys_jail_remove_jd(int fd);
 __END_DECLS
 
 #endif /* __LIBSYS_H_ */

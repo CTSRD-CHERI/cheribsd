@@ -602,4 +602,6 @@ const char *freebsd64_syscallnames[] = {
 	"inotify_rm_watch",			/* 594 = inotify_rm_watch */
 	"freebsd64_getgroups",			/* 595 = freebsd64_getgroups */
 	"freebsd64_setgroups",			/* 596 = freebsd64_setgroups */
+	"jail_attach_jd",			/* 597 = jail_attach_jd */
+	"jail_remove_jd",			/* 598 = jail_remove_jd */
 };

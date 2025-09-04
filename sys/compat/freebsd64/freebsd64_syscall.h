@@ -537,4 +537,6 @@
 #define	FREEBSD64_SYS_inotify_rm_watch	594
 #define	FREEBSD64_SYS_freebsd64_getgroups	595
 #define	FREEBSD64_SYS_freebsd64_setgroups	596
-#define	FREEBSD64_SYS_MAXSYSCALL	597
+#define	FREEBSD64_SYS_jail_attach_jd	597
+#define	FREEBSD64_SYS_jail_remove_jd	598
+#define	FREEBSD64_SYS_MAXSYSCALL	599

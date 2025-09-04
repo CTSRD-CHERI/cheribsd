@@ -418,6 +418,8 @@ static int sysargmask[] = {
 	[SYS_inotify_rm_watch] = (0x0),
 	[SYS_getgroups] = (0x0 | 0x2),
 	[SYS_setgroups] = (0x0 | 0x2),
+	[SYS_jail_attach_jd] = (0x0),
+	[SYS_jail_remove_jd] = (0x0),
 };
 
 #endif /* !_SYSARGMAP_H_ */
