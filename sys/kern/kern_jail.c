@@ -45,6 +45,7 @@
 #include <sys/priv.h>
 #include <sys/proc.h>
 #include <sys/epoch.h>
+#include <sys/event.h>
 #include <sys/taskqueue.h>
 #include <sys/fcntl.h>
 #include <sys/jail.h>
@@ -154,7 +155,8 @@ static void prison_complete(void *context, int pending);
 static void prison_deref(struct prison *pr, int flags);
 static void prison_deref_kill(struct prison *pr, struct prisonlist *freeprison);
 static int prison_lock_xlock(struct prison *pr, int flags);
-static void prison_cleanup(struct prison *pr);
+static void prison_cleanup_locked(struct prison *pr);
+static void prison_cleanup_unlocked(struct prison *pr);
 static void prison_free_not_last(struct prison *pr);
 static void prison_proc_free_not_last(struct prison *pr);
 static void prison_proc_relink(struct prison *opr, struct prison *npr,
@@ -167,6 +169,7 @@ static void prison_racct_attach(struct prison *pr);
 static void prison_racct_modify(struct prison *pr);
 static void prison_racct_detach(struct prison *pr);
 #endif
+static void prison_knote(struct prison *pr, long hint);
 
 /* Flags for prison_deref */
 #define	PD_DEREF	0x01	/* Decrement pr_ref */
@@ -1025,6 +1028,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 	int ip6s;
 	bool redo_ip6;
 #endif
+	bool maybe_changed;
 	uint64_t pr_allow, ch_allow, pr_flags, ch_flags;
 	uint64_t pr_allow_diff;
 	unsigned tallow;
@@ -1430,6 +1434,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 	pr = NULL;
 	inspr = NULL;
 	deadpr = NULL;
+	maybe_changed = false;
 	if (cuflags == JAIL_CREATE && jid == 0 && name != NULL) {
 		namelc = strrchr(name, '.');
 		jid = strtoul(namelc != NULL ? namelc + 1 : name, &p, 10);
@@ -1651,6 +1656,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 		LIST_INSERT_HEAD(&ppr->pr_children, pr, pr_sibling);
 		for (tpr = ppr; tpr != NULL; tpr = tpr->pr_parent)
 			tpr->pr_childcount++;
+		pr->pr_klist = knlist_alloc(&pr->pr_mtx);
 
 		/* Set some default values, and inherit some from the parent. */
 		if (namelc == NULL)
@@ -1888,6 +1894,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 			goto done_deref;
 		}
 	}
+	maybe_changed = true;
 
 	/* Set the parameters of the prison. */
 #ifdef INET
@@ -2120,7 +2127,12 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 	 * reference via persistence, or is about to gain one via attachment.
 	 */
 	if (created) {
-		drflags = prison_lock_xlock(pr, drflags);
+		sx_assert(&allprison_lock, SX_XLOCKED);
+		mtx_lock(&ppr->pr_mtx);
+		knote_fork(ppr->pr_klist, pr->pr_id);
+		mtx_unlock(&ppr->pr_mtx);
+		mtx_lock(&pr->pr_mtx);
+		drflags |= PD_LOCKED;
 		pr->pr_state = PRISON_STATE_ALIVE;
 	}
 
@@ -2158,6 +2170,13 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 	td->td_retval[0] = pr->pr_id;
 
  done_deref:
+	/*
+	 * Report changes to kevent.  This can happen even if the
+	 * system call fails, as changes might have been made before
+	 * the failure.
+	 */
+	if (maybe_changed && !created)
+		prison_knote(pr, NOTE_JAIL_SET);
 	/* Release any temporary prison holds and/or locks. */
 	if (pr != NULL)
 		prison_deref(pr, drflags);
@@ -2773,6 +2792,7 @@ do_jail_attach(struct thread *td, struct prison *pr, int drflags)
 	prison_proc_relink(oldcred->cr_prison, pr, p);
 	prison_deref(oldcred->cr_prison, drflags);
 	crfree(oldcred);
+	prison_knote(pr, NOTE_JAIL_ATTACH | td->td_proc->p_pid);
 
 	/*
 	 * If the prison was killed while changing credentials, die along
@@ -3200,9 +3220,10 @@ prison_deref(struct prison *pr, int flags)
 					    refcount_load(&prison0.pr_uref) > 0,
 					    ("prison0 pr_uref=0"));
 					pr->pr_state = PRISON_STATE_DYING;
+					prison_cleanup_locked(pr);
 					mtx_unlock(&pr->pr_mtx);
 					flags &= ~PD_LOCKED;
-					prison_cleanup(pr);
+					prison_cleanup_unlocked(pr);
 				}
 			}
 		}
@@ -3345,8 +3366,9 @@ prison_deref_kill(struct prison *pr, struct prisonlist *freeprison)
 		}
 		if (!(cpr->pr_flags & PR_REMOVE))
 			continue;
-		prison_cleanup(cpr);
+		prison_cleanup_unlocked(cpr);
 		mtx_lock(&cpr->pr_mtx);
+		prison_cleanup_locked(cpr);
 		cpr->pr_flags &= ~PR_REMOVE;
 		if (cpr->pr_flags & PR_PERSIST) {
 			cpr->pr_flags &= ~PR_PERSIST;
@@ -3381,8 +3403,9 @@ prison_deref_kill(struct prison *pr, struct prisonlist *freeprison)
 	if (rpr != NULL)
 		LIST_REMOVE(rpr, pr_sibling);
 
-	prison_cleanup(pr);
+	prison_cleanup_unlocked(pr);
 	mtx_lock(&pr->pr_mtx);
+	prison_cleanup_locked(pr);
 	if (pr->pr_flags & PR_PERSIST) {
 		pr->pr_flags &= ~PR_PERSIST;
 		prison_proc_free_not_last(pr);
@@ -3429,10 +3452,21 @@ prison_lock_xlock(struct prison *pr, int flags)
 
 /*
  * Release a prison's resources when it starts dying (when the last user
- * reference is dropped, or when it is killed).
+ * reference is dropped, or when it is killed).  Two functions are called,
+ * for work that requires a locked prison or an unlocked one.
  */
 static void
-prison_cleanup(struct prison *pr)
+prison_cleanup_locked(struct prison *pr)
+{
+	sx_assert(&allprison_lock, SA_XLOCKED);
+	mtx_assert(&pr->pr_mtx, MA_OWNED);
+	prison_knote(pr, NOTE_JAIL_REMOVE);
+	knlist_detach(pr->pr_klist);
+	pr->pr_klist = NULL;
+}
+
+static void
+prison_cleanup_unlocked(struct prison *pr)
 {
 	sx_assert(&allprison_lock, SA_XLOCKED);
 	mtx_assert(&pr->pr_mtx, MA_NOTOWNED);
@@ -5056,6 +5090,22 @@ prison_racct_detach(struct prison *pr)
 	pr->pr_prison_racct = NULL;
 }
 #endif /* RACCT */
+
+/*
+ * Submit a knote for a prison, locking if necessary.
+ */
+static void
+prison_knote(struct prison *pr, long hint)
+{
+	int locked;
+
+	locked = mtx_owned(&pr->pr_mtx);
+	if (!locked)
+		mtx_lock(&pr->pr_mtx);
+	KNOTE_LOCKED(pr->pr_klist, hint);
+	if (!locked)
+		mtx_unlock(&pr->pr_mtx);
+}
 
 #ifdef DDB
 
