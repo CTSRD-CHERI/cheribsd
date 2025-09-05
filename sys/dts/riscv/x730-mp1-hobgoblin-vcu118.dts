@@ -1,0 +1,339 @@
+// SPDX-License-Identifier: GPL-2.0 or MIT
+/*
+ * Copyright (c) 2024 Codasip GmbH
+ *
+ * X730 MP1 Hobgoblin FPGA platform for VCU118
+ */
+
+/dts-v1/;
+
+/  {
+
+	#address-cells = <0x2>;
+	#size-cells = <0x2>;
+	compatible = "codasip,a730";
+	chosen {
+
+		stdout-path = "serial0:115200n8";
+		bootargs = "earlycon console=ttyS0,115200n8";
+	};
+	cpus {
+
+		#address-cells = <0x1>;
+		#size-cells = <0x0>;
+		timebase-frequency = <0x5f5e100>;
+		cpu@0 {
+
+			compatible = "riscv";
+			device_type = "cpu";
+			reg = <0x0>;
+			riscv,isa = "rv64imafdc_svpbmt_zicbom_zicboz_zicbop_zcheripurecap_zcherihybrid";
+			riscv,isa-base = "rv64i";
+			riscv,isa-extensions = "i", "m", "a", "f", "d", "c", "svpbmt", "zicbom",
+                                               "zicboz", "zicbop", "zcheripurecap", "zcherihybrid";
+			riscv,cbom-block-size = <0x40>;
+			riscv,cboz-block-size = <0x40>;
+			mmu-type = "riscv,sv39";
+			status = "okay";
+			interrupt-controller {
+
+				#interrupt-cells = <0x1>;
+				#address-cells = <0x0>;
+				compatible = "riscv,cpu-intc";
+				interrupt-controller;
+				status = "okay";
+				phandle = <0x1>;
+			};
+		};
+	};
+	aliases {
+
+		serial0 = "/soc@0/serial@60101000";
+		spi0 = "/soc@0/spi@60210000";
+	};
+	soc@0 {
+
+		#address-cells = <0x1>;
+		#size-cells = <0x1>;
+		compatible = "simple-bus";
+		ranges = <0x0 0x0 0x0 0x80000000>;
+		dma-noncoherent;
+		interrupt-controller@40000000 {
+
+			compatible = "codasip,plic", "sifive,plic-1.0.0", "riscv,plic0";
+			reg = <0x40000000 0x4000000>;
+			#address-cells = <0x0>;
+			interrupt-controller;
+			#interrupt-cells = <0x1>;
+			riscv,ndev = <0x1f>;
+			interrupts-extended = <0x1 0xb 0x1 0x9>;
+			phandle = <0x2>;
+		};
+		timer@60014000 {
+
+			compatible = "codasip,clint", "sifive,clint0", "riscv,clint0";
+			reg = <0x60014000 0xc000>;
+			interrupts-extended = <0x1 0x3 0x1 0x7>;
+		};
+		serial@60101000 {
+
+			compatible = "ns16550a";
+			reg = <0x60101000 0x1020>;
+			clock-frequency = <0x5f5e100>;
+			current-speed = <0x1c200>;
+			reg-shift = <0x2>;
+			reg-offset = <0x0>;
+			interrupts-extended = <0x2 0x1>;
+		};
+		spi@60210000 {
+
+			compatible = "xlnx,xps-spi-2.00.a";
+			reg = <0x60210000 0x1000>;
+			xlnx,num-ss-bits = <0x1>;
+			xlnx,num-transfer-bits = <0x8>;
+			clock-frequency = <0x5f5e100>;
+			interrupts-extended = <0x2 0x4>;
+			fifo-size = <0x100>;
+			#address-cells = <0x1>;
+			#size-cells = <0x0>;
+			mmc@0 {
+
+				compatible = "mmc-spi-slot";
+				reg = <0x0>;
+				spi-max-frequency = <0x1312d00>;
+				voltage-ranges = <0xce4 0xce4>;
+				disable-wp;
+				gpios = <0x3 0x0 0x1>;
+			};
+		};
+		gpio@60300000 {
+
+			compatible = "xlnx,xps-gpio-1.00.a";
+			reg = <0x60300000 0x10000>;
+			#gpio-cells = <0x2>;
+			#interrupt-cells = <0x2>;
+			#address-cells = <0x0>;
+			gpio-controller;
+			interrupt-controller;
+			interrupts-extended = <0x2 0x7>;
+			xlnx,all-inputs = <0x0>;
+			xlnx,all-outputs = <0x0>;
+			xlnx,dout-default = <0x0>;
+			xlnx,gpio-width = <0x20>;
+			xlnx,interrupt-present = <0x1>;
+			xlnx,is-dual = <0x0>;
+			xlnx,tri-default = <0xfe>;
+			phandle = <0x9>;
+		};
+		gpio@60310000 {
+
+			compatible = "xlnx,xps-gpio-1.00.a";
+			reg = <0x60310000 0x10000>;
+			#gpio-cells = <0x2>;
+			#interrupt-cells = <0x2>;
+			#address-cells = <0x0>;
+			gpio-controller;
+			interrupt-controller;
+			interrupts-extended = <0x2 0x8>;
+			xlnx,all-inputs = <0x0>;
+			xlnx,all-outputs = <0x0>;
+			xlnx,dout-default = <0x0>;
+			xlnx,gpio-width = <0x20>;
+			xlnx,interrupt-present = <0x1>;
+			xlnx,is-dual = <0x0>;
+			xlnx,tri-default = <0x1>;
+			phandle = <0x3>;
+			sdcard_hog {
+
+				gpio-hog;
+				gpios = <0x2 0x0>;
+				output-high;
+				line-name = "sdcard-fast-gpio";
+			};
+		};
+		ethernet@600c0000 {
+
+			compatible = "xlnx,axi-ethernet-1.00.a";
+			interrupts-extended = <0x2 0xf>;
+			clock-names = "s_axi_lite_clk";
+			clocks = <0x4>;
+			phy-mode = "sgmii";
+			reg = <0x600c0000 0x40000>;
+			xlnx,rxcsum = <0x2>;
+			xlnx,rxmem = <0x4000>;
+			xlnx,txcsum = <0x2>;
+			phy-handle = <0x5>;
+			axistream-connected = <0x6>;
+			local-mac-address = [00 0a 35 00 00 02];
+			mdio {
+
+				#address-cells = <0x1>;
+				#size-cells = <0x0>;
+				ethernet-phy@0 {
+
+					device_type = "ethernet-phy";
+					reg = <0x3>;
+					interrupts-extended = <0x2 0x12>;
+					ti,dp83867-rxctrl-strap-quirk;
+					ti,sgmii-ref-clock-output-enable;
+					phandle = <0x5>;
+				};
+			};
+		};
+		axistream_dma@600a0000 {
+			compatible = "xlnx,eth-dma";
+
+			reg = <0x600a0000 0x10000>;
+			interrupts-extended = <0x2 0x10 0x2 0x11>;
+			phandle = <0x6>;
+		};
+		ethernet@60040000 {
+
+			compatible = "xlnx,axi-ethernet-1.00.a";
+			interrupts-extended = <0x2 0xa>;
+			clock-names = "s_axi_lite_clk";
+			clocks = <0x4>;
+			phy-mode = "rgmii-rxid";
+			reg = <0x60040000 0x40000>;
+			xlnx,rxcsum = <0x2>;
+			xlnx,rxmem = <0x4000>;
+			xlnx,txcsum = <0x2>;
+			phy-handle = <0x7>;
+			axistream-connected = <0x8>;
+			status = "disabled";
+			mdio {
+
+				#address-cells = <0x1>;
+				#size-cells = <0x0>;
+				ethernet-phy@1 {
+
+					device_type = "ethernet-phy";
+					reg = <0x1>;
+					interrupts-extended = <0x2 0xd>;
+					rx-internal-delay-ps = <0x7d0>;
+					phandle = <0x7>;
+				};
+			};
+		};
+		axistream_dma@60030000 {
+			compatible = "xlnx,eth-dma";
+
+			reg = <0x60030000 0x10000>;
+			interrupts-extended = <0x2 0xb 0x2 0xc>;
+			phandle = <0x8>;
+		};
+	};
+	clock {
+
+		compatible = "fixed-clock";
+		#clock-cells = <0x0>;
+		clock-frequency = <0x5f5e100>;
+		phandle = <0x4>;
+	};
+	gpio-restart {
+
+		compatible = "gpio-restart";
+		gpios = <0x3 0x3 0x0>;
+	};
+	memory@80000000 {
+
+		device_type = "memory";
+		reg = <0x0 0x80000000 0x1 0x0>;
+	};
+	gpio-keys {
+
+		compatible = "gpio-keys";
+		key-enter {
+
+			label = "BTNC";
+			linux,code = <0x1c>;
+			gpios = <0x9 0x10 0x0>;
+		};
+		key-down {
+
+			label = "BTND";
+			linux,code = <0x6c>;
+			gpios = <0x9 0x11 0x0>;
+		};
+		key-left {
+
+			label = "BTNL";
+			linux,code = <0x69>;
+			gpios = <0x9 0x12 0x0>;
+		};
+		key-right {
+
+			label = "BTNR";
+			linux,code = <0x6a>;
+			gpios = <0x9 0x13 0x0>;
+		};
+		key-up {
+
+			label = "BTNU";
+			linux,code = <0x67>;
+			gpios = <0x9 0x14 0x0>;
+		};
+	};
+	leds {
+
+		compatible = "gpio-leds";
+		led-0 {
+
+			label = "LD0";
+			gpios = <0x9 0x0 0x0>;
+			linux,default-trigger = "heartbeat";
+		};
+		led-1 {
+
+			label = "LD1";
+			gpios = <0x9 0x1 0x0>;
+			linux,default-trigger = "mmc0";
+		};
+		led-2 {
+
+			label = "LD2";
+			gpios = <0x9 0x2 0x0>;
+		};
+		led-3 {
+
+			label = "LD3";
+			gpios = <0x9 0x3 0x0>;
+		};
+		led-4 {
+
+			label = "LD4";
+			gpios = <0x9 0x4 0x0>;
+		};
+		led-5 {
+
+			label = "LD5";
+			gpios = <0x9 0x5 0x0>;
+		};
+		led-6 {
+
+			label = "LD6";
+			gpios = <0x9 0x6 0x0>;
+		};
+		led-7 {
+
+			label = "LD7";
+			gpios = <0x9 0x7 0x0>;
+		};
+	};
+	reserved-memory {
+
+		#address-cells = <0x2>;
+		#size-cells = <0x2>;
+		ranges;
+		cmu@0f0000000 {
+
+			reg = <0x0 0xf0000000 0x0 0x10000000>;
+			no-map;
+		};
+		cmu@170000000 {
+
+			reg = <0x1 0x70000000 0x0 0x10000000>;
+			no-map;
+		};
+	};
+};
