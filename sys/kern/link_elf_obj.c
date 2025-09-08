@@ -156,7 +156,7 @@ static void	link_elf_propagate_vnets(linker_file_t);
 #endif
 
 static int	elf_obj_lookup(linker_file_t lf, Elf_Size symidx, int deps,
-		    Elf_Addr *);
+		    uintptr_t *);
 
 static kobj_method_t link_elf_methods[] = {
 	KOBJMETHOD(linker_lookup_symbol,	link_elf_lookup_symbol),
@@ -1556,6 +1556,33 @@ link_elf_lookup_debug_symbol_ctf(linker_file_t lf, const char *name,
 	return (link_elf_ctf_get_ddb(lf, lc));
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Given a pointer into a linker file derived from ef->address, narrow
+ * its permissions and bounds.
+ */
+static caddr_t
+make_capability(const Elf_Sym *sym, caddr_t val)
+{
+
+	switch (ELF_ST_TYPE(sym->st_info)) {
+	case STT_FUNC:
+	case STT_GNU_IFUNC:
+		val = cheri_andperm(val, CHERI_PERMS_KERNEL_CODE);
+#ifdef CHERI_FLAGS_CAP_MODE
+		val = cheri_setflags(val, CHERI_FLAGS_CAP_MODE);
+#endif
+		val = cheri_sealentry(val);
+		break;
+	default:
+		val = cheri_setbounds(val, sym->st_size);
+		val = cheri_andperm(val, CHERI_PERMS_KERNEL_DATA);
+		break;
+	}
+	return (val);
+}
+#endif
+
 static int
 link_elf_symbol_values1(linker_file_t lf, c_linker_sym_t sym,
     linker_symval_t *symval, bool see_local)
@@ -1575,20 +1602,11 @@ link_elf_symbol_values1(linker_file_t lf, c_linker_sym_t sym,
 		if (!see_local && ELF_ST_BIND(es->st_info) == STB_LOCAL)
 			return (ENOENT);
 		symval->name = ef->ddbstrtab + es->st_name;
+#ifdef __CHERI_PURE_CAPABILITY__
+		val = make_capability(es, val);
+#endif
 		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC)
 			val = ((caddr_t (*)(void))val)();
-#ifdef __CHERI_PURE_CAPABILITY__
-		val = cheri_setbounds(val, es->st_size);
-		switch (ELF_ST_TYPE(es->st_info)) {
-		case STT_FUNC:
-		case STT_GNU_IFUNC:
-			val = cheri_andperm(val, CHERI_PERMS_KERNEL_CODE);
-			break;
-		default:
-			val = cheri_andperm(val, CHERI_PERMS_KERNEL_DATA);
-			break;
-		}
-#endif
 		symval->value = val;
 		symval->size = es->st_size;
 		return (0);
@@ -1747,13 +1765,12 @@ elf_obj_cleanup_globals_cache(elf_file_t ef)
  * the case that the symbol can be found through the hash table.
  */
 static int
-elf_obj_lookup(linker_file_t lf, Elf_Size symidx, int deps, Elf_Addr *res)
+elf_obj_lookup(linker_file_t lf, Elf_Size symidx, int deps, uintptr_t *res)
 {
 	elf_file_t ef = (elf_file_t)lf;
 	Elf_Sym *sym;
 	const char *symbol;
-	Elf_Addr res1;
-	void *ifunc;
+	uintptr_t res1;
 
 	/* Don't even try to lookup the symbol if the index is bogus. */
 	if (symidx >= ef->ddbsymcnt) {
@@ -1765,14 +1782,14 @@ elf_obj_lookup(linker_file_t lf, Elf_Size symidx, int deps, Elf_Addr *res)
 
 	/* Quick answer if there is a definition included. */
 	if (sym->st_shndx != SHN_UNDEF) {
-		res1 = (Elf_Addr)sym->st_value;
 #ifdef __CHERI_PURE_CAPABILITY__
-		ifunc = cheri_setaddress(ef->address, res1);
+		res1 = make_capability(sym, cheri_setaddress(ef->address,
+		    sym->st_value));
 #else
-		ifunc = (void *)res1;
+		res1 = (Elf_Addr)sym->st_value;
 #endif
 		if (ELF_ST_TYPE(sym->st_info) == STT_GNU_IFUNC)
-			res1 = ((Elf_Addr (*)(void))ifunc)();
+			res1 = ((uintptr_t (*)(void))res1)();
 		*res = res1;
 		return (0);
 	}
@@ -1794,7 +1811,7 @@ elf_obj_lookup(linker_file_t lf, Elf_Size symidx, int deps, Elf_Addr *res)
 			*res = 0;
 			return (EINVAL);
 		}
-		res1 = (Elf_Addr)linker_file_lookup_symbol(lf, symbol, deps);
+		res1 = (uintptr_t)linker_file_lookup_symbol(lf, symbol, deps);
 
 		/*
 		 * Cache global lookups during module relocation. The failure

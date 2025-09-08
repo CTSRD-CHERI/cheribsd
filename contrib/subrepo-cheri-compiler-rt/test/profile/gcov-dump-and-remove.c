@@ -1,9 +1,8 @@
-// XFAIL: aix
 /// Test we close file handle on flush, so the .gcda file can be deleted on
 /// Windows while the process is still running. In addition, test we create
 /// a new .gcda on flush, so there is a file when the process exists.
 // RUN: mkdir -p %t.d && cd %t.d
-// RUN: %clang --coverage -o %t %s
+// RUN: %clang --coverage -o %t %s -dumpdir ./
 // RUN: test -f gcov-dump-and-remove.gcno
 
 // RUN: rm -f gcov-dump-and-remove.gcda && %run %t

@@ -121,11 +121,13 @@
 	ldr	x\regn, =\dstsym
 #ifdef __CHERI_PURE_CAPABILITY__
 	orr	x\regn, x\regn, #1	/* c64 mode */
-	ldr	x\scratch2n, =etext	/* XXX-AM: TODO use correct end symbol */
+	ldr	x\scratch2n, =_end
 	ldr	x\scratch1n, =KERNBASE
 	sub	x\scratch2n, x\scratch2n, x\scratch1n
 	cvtp	c\scratch1n, x\scratch1n
-	//scbnds	c\scratch1n, c\scratch1n, x\scratch2n /* XXX-AM: needs reordering of ELF sections */
+#ifndef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	scbnds	c\scratch1n, c\scratch1n, x\scratch2n
+#endif
 	scvalue	c\regn, c\scratch1n, x\regn
 	clrperm	c\regn, c\regn, w
 #endif
@@ -335,27 +337,28 @@ virtdone:
 	adrp	PTR(1), _DYNAMIC
 	add	PTR(1), PTR(1), :lo12:_DYNAMIC
 
-	adrp	PTR(3), elf_kernel_plts
-	add	PTR(3), PTR(3), :lo12:elf_kernel_plts
+	adrp	PTR(4), elf_kernel_plts
+	add	PTR(4), PTR(4), :lo12:elf_kernel_plts
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	scvalue c0, c2, x0
 	scvalue	c1, c2, x1
-	scvalue	c3, c2, x3
+	ldr	x3, =_end
+	scvalue	c4, c2, x4
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	adrp	c4, elf_kernel_compartments
-	add	c4, c4, :lo12:elf_kernel_compartments
+	adrp	c5, elf_kernel_compartments
+	add	c5, c5, :lo12:elf_kernel_compartments
 
-	adrp	c5, compartment_lastid
-	add	c5, c5, :lo12:compartment_lastid
+	adrp	c6, compartment_lastid
+	add	c6, c6, :lo12:compartment_lastid
 
-	adrp	c6, elf_kernel_pccs
-	add	c6, c6, :lo12:elf_kernel_pccs
+	adrp	c7, elf_kernel_pccs
+	add	c7, c7, :lo12:elf_kernel_pccs
 
-	scvalue	c4, c2, x4
 	scvalue	c5, c2, x5
 	scvalue	c6, c2, x6
+	scvalue	c7, c2, x7
 #endif
 
 	/*
@@ -976,9 +979,6 @@ common:
 	bl	build_l2_block_pagetable
 
 #if defined(SOCDEV_PA)
-#ifdef __CHERI_PURE_CAPABILITY__
-#error "TODO Implement for purecap kernel"
-#endif
 	/* Create a table for the UART */
 	mov	x7, #(ATTR_S1_nG | ATTR_S1_IDX(VM_MEMATTR_DEVICE))
 	ldr	x9, =(L2_SIZE)
@@ -987,8 +987,14 @@ common:
 
 	/* Store the socdev virtual address */
 	add	x17, x8, #(SOCDEV_PA & L2_OFFSET)
-	adrp	x9, socdev_va
-	str	x17, [x9, :lo12:socdev_va]
+	adrp	PTR(9), socdev_va
+	add	x9, x9, :lo12:socdev_va
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* TODO: Set bounds to something sensible? (L2_SIZE?) */
+	cvtd	c17, x17
+	cvtd	c9, x9
+#endif
+	str	PTR(17), [PTR(9)]
 
 	mov	x9, #(SOCDEV_PA & ~L2_OFFSET)	/* PA start */
 	mov	x10, #1

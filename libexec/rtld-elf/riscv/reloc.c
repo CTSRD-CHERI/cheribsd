@@ -81,8 +81,8 @@ init_pltgot(Plt_Entry *plt)
 {
 
 	if (plt->pltgot != NULL) {
-		plt->pltgot[0] = (Elf_Addr)&_rtld_bind_start;
-		plt->pltgot[1] = (Elf_Addr)plt;
+		plt->pltgot[0] = (uintptr_t)&_rtld_bind_start;
+		plt->pltgot[1] = (uintptr_t)plt;
 	}
 }
 
@@ -206,13 +206,18 @@ reloc_plt(Plt_Entry *plt, int flags __unused, RtldLockState *lockstate __unused)
 	relalim = (const Elf_Rela *)((const char *)plt->rela +
 	    plt->relasize);
 	for (rela = plt->rela; rela < relalim; rela++) {
-		Elf_Addr *where;
+		uintptr_t *where;
 
-		where = (Elf_Addr *)(obj->relocbase + rela->r_offset);
+		where = (uintptr_t *)(obj->relocbase + rela->r_offset);
 
 		switch (ELF_R_TYPE(rela->r_info)) {
 		case R_RISCV_JUMP_SLOT:
+#ifdef __CHERI_PURE_CAPABILITY__
+			/* Relocated by __cap_relocs for CHERI */
+			(void)where;
+#else
 			*where += (Elf_Addr)obj->relocbase;
+#endif
 			break;
 		case R_RISCV_IRELATIVE:
 			obj->irelative = true;
@@ -242,9 +247,9 @@ reloc_jmpslots(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 	relalim = (const Elf_Rela *)((const char *)plt->rela +
 	    plt->relasize);
 	for (rela = plt->rela; rela < relalim; rela++) {
-		Elf_Addr *where;
+		uintptr_t *where;
 
-		where = (Elf_Addr *)(obj->relocbase + rela->r_offset);
+		where = (uintptr_t *)(obj->relocbase + rela->r_offset);
 		switch(ELF_R_TYPE(rela->r_info)) {
 		case R_RISCV_JUMP_SLOT:
 			def = find_symdef(ELF_R_SYM(rela->r_info), obj,
@@ -259,7 +264,7 @@ reloc_jmpslots(Plt_Entry *plt, int flags, RtldLockState *lockstate)
 				continue;
 			}
 
-			*where = (Elf_Addr)(defobj->relocbase + def->st_value);
+			*where = (uintptr_t)make_function_pointer(def, defobj);
 			break;
 		default:
 			_rtld_error("Unknown relocation type %x in jmpslot",
@@ -491,23 +496,6 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			    lockstate);
 			if (def == NULL)
 				return (-1);
-			/*
-			 * We lazily allocate offsets for static TLS as we
-			 * see the first relocation that references the
-			 * TLS block. This allows us to support (small
-			 * amounts of) static TLS in dynamically loaded
-			 * modules. If we run out of space, we generate an
-			 * error.
-			 */
-			if (!defobj->tls_static) {
-				if (!allocate_tls_offset(
-				    __DECONST(Obj_Entry *, defobj))) {
-					_rtld_error(
-					    "%s: No space available for static "
-					    "Thread Local Storage", obj->path);
-					return (-1);
-				}
-			}
 
 			*where += (Elf_Addr)(def->st_value + rela->r_addend
 			    - TLS_DTV_OFFSET);
@@ -589,11 +577,6 @@ allocate_initial_tls(Obj_Entry *objs)
 void *
 __tls_get_addr(tls_index* ti)
 {
-	uintptr_t **dtvp;
-	void *p;
-
-	dtvp = &_tcb_get()->tcb_dtv;
-	p = tls_get_addr_common(dtvp, ti->ti_module, ti->ti_offset);
-
-	return ((char*)p + TLS_DTV_OFFSET);
+	return (tls_get_addr_common(_tcb_get(), ti->ti_module, ti->ti_offset +
+	    TLS_DTV_OFFSET));
 }

@@ -1314,25 +1314,38 @@ vm_fault_cow(struct faultstate *fs)
 		 * The destination page will always belong to a
 		 * tag-bearing VM object.
 		 */
-		KASSERT(fs->first_object->flags & (OBJ_HASCAP | OBJ_NOCAP),
-		    ("%s: destination object %p doesn't have OBJ_HASCAP",
+		KASSERT((fs->first_object->flags & (OBJ_HASCAP | OBJ_NOCAP)) &&
+		    (fs->first_object->flags & (OBJ_HASCAP | OBJ_NOCAP)) !=
+		    (OBJ_HASCAP | OBJ_NOCAP),
+		    ("%s: destination object %p cap flags are inconsistent",
 		    __func__, fs->first_object));
 		if (fs->object->flags & OBJ_HASCAP) {
-			vm_page_aflag_set(fs->first_m, fs->m->a.flags &
-			    (PGA_CAPSTORE | PGA_CAPDIRTY));
+			uint16_t flags;
+
+			/*
+			 * If CAPSTORE is set, we have to assume that the source
+			 * is CAPDIRTY as well, as we'd have to examine its PTEs
+			 * to get a definitive answer.
+			 */
+			flags = vm_page_astate_load(fs->m).flags &
+			    (PGA_CAPSTORE | PGA_CAPDIRTY);
+			if ((flags & PGA_CAPSTORE) != 0)
+				flags |= PGA_CAPDIRTY;
+			if (flags != 0)
+				vm_page_aflag_set(fs->first_m, flags);
 			pmap_copy_page_tags(fs->m, fs->first_m);
 		} else
 #endif
 			pmap_copy_page(fs->m, fs->first_m);
 
-		vm_page_valid(fs->first_m);
 		if (fs->wired && (fs->fault_flags & VM_FAULT_WIRE) == 0) {
 			vm_page_wire(fs->first_m);
 			vm_page_unwire(fs->m, PQ_INACTIVE);
 		}
 		/*
-		 * Save the cow page to be released after
-		 * pmap_enter is complete.
+		 * Save the COW page to be released after pmap_enter is
+		 * complete.  The new copy will be marked valid when we're ready
+		 * to map it.
 		 */
 		fs->m_cow = fs->m;
 		fs->m = NULL;
@@ -2058,6 +2071,19 @@ found:
 		fs.entry->next_read = vaddr + ptoa(ahead) + PAGE_SIZE;
 
 	/*
+	 * If the page to be mapped was copied from a backing object, we defer
+	 * marking it valid until here, where the fault handler is guaranteed to
+	 * succeed.  Otherwise we can end up with a shadowed, mapped page in the
+	 * backing object, which violates an invariant of vm_object_collapse()
+	 * that shadowed pages are not mapped.
+	 */
+	if (fs.m_cow != NULL) {
+		KASSERT(vm_page_none_valid(fs.m),
+		    ("vm_fault: page %p is already valid", fs.m_cow));
+		vm_page_valid(fs.m);
+	}
+
+	/*
 	 * Page must be completely valid or it is not fit to
 	 * map into user space.  vm_pager_get_pages() ensures this.
 	 */
@@ -2226,20 +2252,6 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
 	pmap = fs->map->pmap;
 	if (pmap != vmspace_pmap(curthread->td_proc->p_vmspace))
 		return;
-
-#ifdef CHERI_CAPREVOKE
-	/*
-	 * If we're trying to insert pages during a load-side revocation scan,
-	 * we should be having the revoker visit each before exposing them to
-	 * userland.  However, this raises a number of challenges, and this
-	 * method is just an optimization, so we nop it out right now.
-	 *
-	 * XXX CAPREVOKE This could be much better in just about every way
-	 */
-	if (cheri_revoke_st_is_revoking(fs->map->vm_cheri_revoke_st)) {
-		return;
-	}
-#endif
 
 	entry = fs->entry;
 
@@ -2581,9 +2593,20 @@ again:
 			 * See longer discussion in vm_fault_cow.
 			 */
 			if (object->flags & OBJ_HASCAP) {
-				/* Copy across CAPSTORE | CAPDIRTY state, too */
-				vm_page_aflag_set(dst_m, src_m->a.flags &
-				    (PGA_CAPSTORE | PGA_CAPDIRTY));
+				uint16_t flags;
+
+				/*
+				 * If CAPSTORE is set, we have to assume that
+				 * the source is CAPDIRTY as well, as we'd have
+				 * to examine its PTEs to get a definitive
+				 * answer.
+				 */
+				flags = vm_page_astate_load(src_m).flags &
+				    (PGA_CAPSTORE | PGA_CAPDIRTY);
+				if ((flags & PGA_CAPSTORE) != 0)
+					flags |= PGA_CAPDIRTY;
+				if (flags != 0)
+					vm_page_aflag_set(dst_m, flags);
 				pmap_copy_page_tags(src_m, dst_m);
 			} else
 #endif

@@ -34,4 +34,6 @@ void * __capability cheribsdtest_dynamic_identity_cap(void * __capability cap);
 
 int cheribsdtest_dynamic_ifunc(void);
 
+extern _Thread_local int cheribsdtest_dynamic_tls_var;
+
 #endif

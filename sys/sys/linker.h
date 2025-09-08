@@ -322,10 +322,11 @@ extern int kld_debug;
 
 #endif
 
-typedef int elf_lookup_fn(linker_file_t, Elf_Size, int, Elf_Addr *);
+typedef int elf_lookup_fn(linker_file_t, Elf_Size, int, uintptr_t *);
 
 /* Support functions */
-void	elf_init(elf_file_t ef, Elf_Dyn *dynp, void *relocbase, elf_plt_t plts
+void	elf_init(elf_file_t ef, Elf_Dyn *dynp, void *relocbase,
+	    ptraddr_t baseend, elf_plt_t plts
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	    , elf_compartment_t compartments, u_long *lastidp, elf_pcc_t pccs
 #endif

@@ -583,9 +583,7 @@ _vmware=	vmware
 .if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
     ${MACHINE_CPUARCH} == "i386" || ${MACHINE_ARCH} == "armv7" || \
 	${MACHINE_ARCH:Mpowerpc64*} != ""
-.if !${MACHINE_ABI:Mpurecap}
 _ossl=		ossl
-.endif
 .endif
 
 # MAC framework
@@ -941,7 +939,6 @@ SUBDIR+=	zlib_noc18n
 # (e.g. we don't want purecap kernels penalised by not having accelerated
 # crypto just because we haven't ported the assembly).
 .if ${MACHINE_CPU:Mcheri}
-BROKEN_MODULES+=armv8crypto
 BROKEN_MODULES+=bnxt
 BROKEN_MODULES+=dpaa2
 BROKEN_MODULES+=ena

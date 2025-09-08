@@ -42,6 +42,8 @@ LIBADD=	pthread
 # explicitly disable assembly.
 CFLAGS+=	-DZSTD_DISABLE_ASM
 
+COMPARTMENT_POLICY=	${.CURDIR}/Compartments.json
+
 PRIVATELIB=	yes
 PACKAGE=	runtime
 

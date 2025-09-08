@@ -1061,12 +1061,14 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 #define	KERN_PROC_SIGFASTBLK	44	/* address of fastsigblk magic word */
 #define	KERN_PROC_VM_LAYOUT	45	/* virtual address space layout info */
 #define	KERN_PROC_RLIMIT_USAGE	46	/* array of rlim_t */
-
-#define	KERN_PROC_QUARANTINING	46	/* is this process quarantining? */
-#define	KERN_PROC_REVOKER_STATE	47	/* revoker state */
-#define	KERN_PROC_REVOKER_EPOCH	48	/* revoker epoch */
-#define	KERN_PROC_C18N_STATS	49	/* compartmentalisation statistics */
-#define	KERN_PROC_C18N_COMPARTS	50	/* compartment list */
+/*
+ * CHERI-specific KERN_PROC subtypes
+ */
+#define	KERN_PROC_QUARANTINING	100	/* is this process quarantining? */
+#define	KERN_PROC_REVOKER_STATE	101	/* revoker state */
+#define	KERN_PROC_REVOKER_EPOCH	102	/* revoker epoch */
+#define	KERN_PROC_C18N_STATS	103	/* compartmentalisation statistics */
+#define	KERN_PROC_C18N_COMPARTS	104	/* compartment list */
 
 /*
  * KERN_IPC identifiers

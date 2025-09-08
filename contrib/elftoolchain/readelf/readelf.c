@@ -2520,7 +2520,7 @@ dump_phdr(struct readelf *re)
 {
 	const char	*rawfile;
 	GElf_Phdr	 phdr;
-	size_t		 phnum, size;
+	size_t		 c18noff, c18nsize, phnum, size;
 	int		 i, j;
 
 #define	PH_HDR	"Type", "Offset", "VirtAddr", "PhysAddr", "FileSiz",	\
@@ -2541,6 +2541,20 @@ dump_phdr(struct readelf *re)
 	if (phnum == 0) {
 		printf("\nThere are no program headers in this file.\n");
 		return;
+	}
+
+	c18noff = 0;
+	c18nsize = 0;
+	for (j = 1; (size_t)j < re->shnum; j++) {
+		if (re->sl[j].type != SHT_STRTAB ||
+		    (re->sl[j].flags & SHF_ALLOC) == 0)
+			continue;
+
+		if (strcmp(re->sl[j].name, ".c18nstrtab") == 0) {
+			c18noff = re->sl[j].off;
+			c18nsize = re->sl[j].sz;
+			break;
+		}
 	}
 
 	printf("\nElf file type is %s", elf_type(re->ehdr.e_type));
@@ -2584,6 +2598,26 @@ dump_phdr(struct readelf *re)
 			}
 			printf("      [Requesting program interpreter: %s]\n",
 				rawfile + phdr.p_offset);
+		}
+		if (phdr.p_type == PT_C18N_NAME) {
+			if (c18noff == 0) {
+				warnx("missing .c18nstrtab");
+				continue;
+			}
+			if ((rawfile = elf_rawfile(re->elf, &size)) == NULL) {
+				warnx("elf_rawfile failed: %s", elf_errmsg(-1));
+				continue;
+			}
+			if (c18noff >= size || c18noff + c18nsize >= size) {
+				warnx("invalid .c18nstrtab bounds");
+				continue;
+			}
+			if (phdr.p_paddr >= c18nsize) {
+				warnx("invalid compartment name offset");
+				continue;
+			}
+			printf("      [Compartment: %s]\n",
+				rawfile + c18noff + phdr.p_paddr);
 		}
 	}
 

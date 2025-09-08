@@ -353,8 +353,20 @@ cap_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 		printf(" esr:         %.8lx\n", esr);
 	}
 
-	call_trapsignal(td, SIGPROT, cheri_esr_to_sicode(esr),
-	    (void * __capability)frame->tf_elr, ESR_ELx_EXCEPTION(esr));
+	/*
+	 * User accesses to invalid addresses in a compat64 process
+	 * raise SIGSEGV under a non-CHERI kernel via a non-capability
+	 * data abort.  With CHERI however, those accesses can raise a
+	 * capability abort if they are outside the bounds of the user
+	 * DDC.  Map those accesses to SIGSEGV instead of SIGPROT.
+	 */
+	if (!SV_PROC_FLAG(td->td_proc, SV_CHERI) &&
+	    far > CHERI_CAP_USER_DATA_BASE + CHERI_CAP_USER_DATA_LENGTH)
+		call_trapsignal(td, SIGSEGV, SEGV_MAPERR,
+		    (void * __capability)(uintcap_t)far, ESR_ELx_EXCEPTION(esr));
+	else
+		call_trapsignal(td, SIGPROT, cheri_esr_to_sicode(esr),
+		    (void * __capability)frame->tf_elr, ESR_ELx_EXCEPTION(esr));
 	userret(td, frame);
 }
 #endif

@@ -152,8 +152,12 @@ INLINE_LIMIT?=	8000
 
 .if ${MACHINE_CPU:Mcheri}
 CFLAGS+=	-march=morello
-CFLAGS+=	-Xclang -morello-vararg=new -Xclang -morello-bounded-memargs -cheri-codeptr-relocs
+CFLAGS+=	-Xclang -morello-vararg=new -Xclang -morello-bounded-memargs
+
+.if ${MK_CHERI_CODEPTR_RELOCS} != "no" && ${COMPILER_FEATURES:Mmorello-codeptr-relocs}
+CFLAGS+=	-cheri-codeptr-relocs
 LDFLAGS+=	-cheri-codeptr-relocs
+.endif
 .endif
 
 .if ${MACHINE_ARCH:Maarch*c*}

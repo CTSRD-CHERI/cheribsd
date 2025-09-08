@@ -158,4 +158,9 @@ extern void *__tls_get_addr(tls_index *ti);
 
 #define md_abi_variant_hook(x)
 
+extern void (*rtld_bind_start_fptr)(void);
+extern void *(*rtld_tlsdesc_static_fptr)(void *);
+extern void *(*rtld_tlsdesc_undef_fptr)(void *);
+extern void *(*rtld_tlsdesc_dynamic_fptr)(void *);
+
 #endif

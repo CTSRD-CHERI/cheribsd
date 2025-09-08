@@ -658,6 +658,49 @@ do_trap_user(struct trapframe *frame)
 	case SCAUSE_CHERI:
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
+
+		/*
+		 * User accesses to invalid addresses in a compat64
+		 * process raise SIGSEGV under a non-CHERI kernel via
+		 * a page fault exception.  With CHERI however, those
+		 * accesses can raise a capability abort if they are
+		 * outside the bounds of the user DDC.  Map those
+		 * accesses to SIGSEGV instead of SIGPROT.
+		 */
+		if (!SV_PROC_FLAG(td->td_proc, SV_CHERI) &&
+		    TVAL_CAP_CAUSE(frame->tf_stval) == CHERI_EXCCODE_LENGTH) {
+			if (TVAL_CAP_IDX(frame->tf_stval) == 32 /* PCC */ &&
+			    cheri_getbase(frame->tf_sepc) ==
+			    CHERI_CAP_USER_DATA_BASE &&
+			    cheri_getlen(frame->tf_sepc) ==
+			    CHERI_CAP_USER_DATA_LENGTH) {
+				call_trapsignal(td, SIGSEGV, SEGV_MAPERR,
+				    (ptraddr_t)frame->tf_sepc,
+				    SCAUSE_INST_PAGE_FAULT, 0);
+				userret(td, frame);
+				break;
+			}
+
+			/*
+			 * To fully mimic SIGSEGV, this would need to
+			 * decode the instruction to compute the
+			 * effective faulting address and access type
+			 * (R/W) to determine the non-CHERI exception
+			 * that would have been raised.
+			 */
+			if (TVAL_CAP_IDX(frame->tf_stval) == 33 /* DDC */ &&
+			    cheri_getbase(frame->tf_ddc) ==
+			    CHERI_CAP_USER_DATA_BASE &&
+			    cheri_getlen(frame->tf_ddc) ==
+			    CHERI_CAP_USER_DATA_LENGTH) {
+				call_trapsignal(td, SIGSEGV, SEGV_MAPERR,
+				    0 /* XXX */,
+				    SCAUSE_LOAD_PAGE_FAULT /* XXX */, 0);
+				userret(td, frame);
+				break;
+			}
+		}
+
 		call_trapsignal(td, SIGPROT,
 		    cheri_stval_to_sicode(frame->tf_stval), frame->tf_sepc,
 		    exception, TVAL_CAP_IDX(frame->tf_stval));

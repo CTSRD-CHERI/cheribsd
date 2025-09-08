@@ -25,10 +25,6 @@
  * SUCH DAMAGE.
  */
 
-#define	C18N_VARIANT	_c18n
-#include "rtld_start.S"
-#undef C18N_VARIANT
-
 .section	.rodata
 .globl	c18n_default_policy
 .type	c18n_default_policy,%object

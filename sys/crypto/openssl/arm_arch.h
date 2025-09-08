@@ -89,8 +89,10 @@ extern unsigned int OPENSSL_armv8_rsa_neonized;
  *
  */
 
+# define ARM_CPU_IMP_RESEARCH      0x3F
 # define ARM_CPU_IMP_ARM           0x41
 
+# define ARM_CPU_PART_MORELLO      0x412
 # define ARM_CPU_PART_CORTEX_A72   0xD08
 # define ARM_CPU_PART_N1           0xD0C
 
@@ -175,6 +177,26 @@ extern unsigned int OPENSSL_armv8_rsa_neonized;
     .long (GNU_PROPERTY_AARCH64_POINTER_AUTH | GNU_PROPERTY_AARCH64_BTI);
     .long 0;
     .popsection;
+#  endif
+
+   /*
+    * Support macros for Morello
+    */
+
+#  ifdef __aarch64__
+#   ifdef __CHERI_PURE_CAPABILITY__
+#    define PTR_WIDTH 16
+#    define PTR(n) c ## n
+#    define PTRN(n) c ## n
+#   else
+#    define PTR_WIDTH 8
+#    define PTR(n) x ## n
+#    define PTRN(n) n
+#   endif
+#  else
+#   define PTR_WIDTH 4
+#   define PTR(n) r ## n
+#   define PTRN(n) n
 #  endif
 
 # endif  /* defined __ASSEMBLER__ */

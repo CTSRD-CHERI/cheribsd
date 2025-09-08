@@ -1,8 +1,8 @@
 The compilation of software known as CheriBSD is distributed under the
 following terms:
 
-Copyright 2011-2024 The University of Cambridge.
-Copyright 2012-2024 SRI International.
+Copyright 2011-2025 The University of Cambridge.
+Copyright 2012-2025 SRI International.
 
 This software was developed by SRI International and the University of
 Cambridge Computer Laboratory under DARPA/AFRL contract FA8750-10-C-0237
@@ -22,6 +22,11 @@ This software was developed by SRI International, the University of
 Cambridge Computer Laboratory (Department of Computer Science and
 Technology), and Capabilities Limited under Defense Advanced Research
 Projects Agency (DARPA) Contract No. HR001123C0031 ("MTSS").
+
+This software was developed by SRI International, the University of
+Cambridge Computer Laboratory (Department of Computer Science and
+Technology), and Capabilities Limited under Defense Advanced Research
+Projects Agency (DARPA) Contract No. FA8750-24-C-B047 ("DEC").
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions

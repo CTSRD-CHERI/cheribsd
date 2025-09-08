@@ -2573,7 +2573,7 @@ proc_read_string_properly(struct thread *td, struct proc *p,
     const char * __capability sptr, char *buf, size_t len)
 {
 	ssize_t readlen;
-	size_t n, valid;
+	size_t valid;
 
 	if (len < 1)
 		return (EFAULT);
@@ -2584,15 +2584,32 @@ proc_read_string_properly(struct thread *td, struct proc *p,
 	readlen = proc_readmem(td, p, (__cheri_addr ptraddr_t)sptr, buf, valid);
 	if (readlen <= 0)
 		return (EFAULT);
-	n = strnlen(buf, valid);
+
+	/* Reading a null-terminated string is success. */
+	if (strnlen(buf, readlen) < readlen)
+		return (0);
+
 	/*
-	 * If the string fits the buffer but is not null-terminated, error out.
+	 * If the entire buffer was in bounds and was read
+	 * successfully, the string is just longer than the buffer, so
+	 * truncate the result.
 	 */
-	if (cheri_bytes_remaining(sptr) <= len && n == valid)
-		return (EPROT);
-	/* Unconditionally enforce termination. */
-	buf[len - 1] = '\0';
-	return (0);
+	if (cheri_bytes_remaining(sptr) > len && readlen == len) {
+		buf[len - 1] = '\0';
+		return (0);
+	}
+
+	/*
+	 * If the read was shorter than the bounds of the pointer,
+	 * fail with EFAULT.
+	 */
+	if (cheri_bytes_remaining(sptr) > readlen)
+		return (EFAULT);
+
+	/*
+	 * The string was not terminated in-bounds, fail with EPROT.
+	 */
+	return (EPROT);
 }
 
 /*
@@ -2608,8 +2625,7 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 	struct cheri_c18n_info info;
 	struct rtld_c18n_compart rcc;
 	struct kinfo_cheri_c18n_compart kccc;
-	char * __capability rccp;
-	char * __capability namep;
+	vm_offset_t rccp;
 	ssize_t len;
 	size_t gen;
 
@@ -2638,8 +2654,20 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 	 */
 	if (info.version != CHERI_C18N_INFO_VERSION ||
 	    info.comparts_gen % 2 != 0 ||
-	    info.comparts_entry_size < sizeof(namep)) {
+	    info.comparts_entry_size < sizeof(rcc)) {
 		error = ENOEXEC;
+		goto out;
+	}
+
+	/*
+	 * If the compartments array is not fully accessible, error
+	 * out.
+	 */
+	if (!cheri_can_access(info.comparts,
+	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP,
+	    (__cheri_addr vm_offset_t)info.comparts,
+	    info.comparts_size * info.comparts_entry_size)) {
+		error = EPROT;
 		goto out;
 	}
 
@@ -2653,25 +2681,19 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 	}
 
 	/*
-	 * One by one, copy compartment names out of the target process's
-	 * memory, and into a template struct that we copy out to userspace.
+	 * One by one, copy compartment info structures out of the
+	 * target process's memory and into a template struct that we
+	 * copy out to userspace.
 	 */
 	for (size_t i = 0; i < info.comparts_size; ++i) {
 		/* Initialize userspace structure, including padding. */
 		bzero(&kccc, sizeof(kccc));
 
-		rccp = (char * __capability)info.comparts +
+		rccp = (__cheri_addr vm_offset_t)info.comparts +
 		    i * info.comparts_entry_size;
-		if (!cheri_can_access(rccp,
-		    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP,
-		    (__cheri_addr ptraddr_t)rccp, sizeof(rcc))) {
-			error = EPROT;
-			goto out;
-		}
 
-		/* Copy in next compartment-name string pointer. */
-		len = proc_readmem_cap(curthread, p,
-		    (__cheri_addr vm_offset_t)rccp, &rcc, sizeof(rcc));
+		/* Copy in next compartment info structure. */
+		len = proc_readmem_cap(curthread, p, rccp, &rcc, sizeof(rcc));
 		if (len != sizeof(rcc)) {
 			error = EFAULT;
 			goto out;

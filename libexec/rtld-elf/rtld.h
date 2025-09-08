@@ -104,6 +104,9 @@ __BEGIN_DECLS
 #define NEW(type)	((type *) xmalloc(sizeof(type)))
 #define CNEW(type)	((type *) xcalloc(1, sizeof(type)))
 
+extern void *rtld_bind_fptr;
+extern void *tls_get_addr_common_fptr;
+
 extern size_t tls_last_offset;
 extern size_t tls_last_size;
 extern size_t tls_static_space;
@@ -205,7 +208,6 @@ typedef struct Struct_Compart_Entry {
     const char *name;
     Elf_Addr start;
     Elf_Addr end;
-    char *compart_name;
     uint16_t compart_id;
 } Compart_Entry;
 #endif
@@ -528,7 +530,8 @@ symname(const Obj_Entry* obj, size_t r_symndx) {
 	return strtab_value(obj, obj->symtab[r_symndx].st_name);
 }
 const char *rtld_strerror(int);
-Obj_Entry *map_object(int, const char *, const struct stat *, const char *);
+Obj_Entry *map_object(int, const char *, const struct stat *, bool,
+    const char *);
 void *xcalloc(size_t, size_t);
 void *xmalloc(size_t);
 char *xstrdup(const char *);
@@ -627,10 +630,10 @@ void _rtld_bind_start(void);
 void *rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def);
 void symlook_init(SymLook *, const char *);
 int symlook_obj(SymLook *, const Obj_Entry *);
-void *tls_get_addr_common(uintptr_t **dtvp, int index, size_t offset);
+void *tls_get_addr_common(struct tcb *tcb, int index, size_t offset);
 void *allocate_tls(Obj_Entry *, void *, size_t, size_t);
 void free_tls(void *, size_t, size_t);
-void *allocate_module_tls(int index);
+void *allocate_module_tls(struct tcb *tcb, int index);
 bool allocate_tls_offset(Obj_Entry *obj);
 void free_tls_offset(Obj_Entry *obj);
 const Ver_Entry *fetch_ventry(const Obj_Entry *obj, unsigned long);

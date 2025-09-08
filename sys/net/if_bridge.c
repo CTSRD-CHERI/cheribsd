@@ -514,6 +514,8 @@ struct bridge_control {
 #define	BC_F_COPYIN		0x01	/* copy arguments in */
 #define	BC_F_COPYOUT		0x02	/* copy arguments out */
 #define	BC_F_SUSER		0x04	/* do super-user check */
+#define	BC_F_COPYINCAP		0x08	/* copy capability arguments in */
+#define	BC_F_COPYOUTCAP		0x10	/* copy capability arguments out */
 
 static const struct bridge_control bridge_control_table[] = {
 	{ bridge_ioctl_add,		sizeof(struct ifbreq),
@@ -532,9 +534,9 @@ static const struct bridge_control bridge_control_table[] = {
 	  BC_F_COPYOUT },
 
 	{ bridge_ioctl_gifs,		sizeof(struct ifbifconf),
-	  BC_F_COPYIN|BC_F_COPYOUT },
+	  BC_F_COPYINCAP|BC_F_COPYOUTCAP },
 	{ bridge_ioctl_rts,		sizeof(struct ifbaconf),
-	  BC_F_COPYIN|BC_F_COPYOUT },
+	  BC_F_COPYINCAP|BC_F_COPYOUTCAP },
 
 	{ bridge_ioctl_saddr,		sizeof(struct ifbareq),
 	  BC_F_COPYIN|BC_F_SUSER },
@@ -588,7 +590,7 @@ static const struct bridge_control bridge_control_table[] = {
 	  BC_F_COPYOUT },
 
 	{ bridge_ioctl_gifsstp,		sizeof(struct ifbpstpconf),
-	  BC_F_COPYIN|BC_F_COPYOUT },
+	  BC_F_COPYINCAP|BC_F_COPYOUTCAP },
 
 	{ bridge_ioctl_sproto,		sizeof(struct ifbrparam),
 	  BC_F_COPYIN|BC_F_SUSER },
@@ -941,6 +943,10 @@ bridge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			error = copyin(ifd->ifd_data, &args, ifd->ifd_len);
 			if (error)
 				break;
+		} else if (bc->bc_flags & BC_F_COPYINCAP) {
+			error = copyincap(ifd->ifd_data, &args, ifd->ifd_len);
+			if (error)
+				break;
 		}
 
 		oldmtu = ifp->if_mtu;
@@ -957,6 +963,8 @@ bridge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 		if (bc->bc_flags & BC_F_COPYOUT)
 			error = copyout(&args, ifd->ifd_data, ifd->ifd_len);
+		else if (bc->bc_flags & BC_F_COPYOUTCAP)
+			error = copyoutcap(&args, ifd->ifd_data, ifd->ifd_len);
 
 		break;
 

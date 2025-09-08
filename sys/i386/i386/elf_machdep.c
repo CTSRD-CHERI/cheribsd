@@ -173,7 +173,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
     int type, elf_lookup_fn lookup, int flags)
 {
 	Elf_Addr *where;
-	Elf_Addr addr;
+	uintptr_t addr;
 	Elf_Addr addend;
 	Elf_Word rtype, symidx;
 	const Elf_Rel *rel;
