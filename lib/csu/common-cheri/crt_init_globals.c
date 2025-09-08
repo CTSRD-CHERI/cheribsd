@@ -40,8 +40,8 @@
 #endif
 
 #ifdef CHERI_INIT_RELA
-extern const Elf_Rela __weak_symbol __rela_dyn_start __hidden;
-extern const Elf_Rela __weak_symbol __rela_dyn_end __hidden;
+extern const Elf_Rela __weak_symbol __rela_dyn_start[] __hidden;
+extern const Elf_Rela __weak_symbol __rela_dyn_end[] __hidden;
 
 static __always_inline void
 crt_init_rela(const Elf_Phdr *phdr __unused)
