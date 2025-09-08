@@ -48,7 +48,6 @@
  * EL1.
  */
 .if \el == 1
-	mov	PTR(18), PTRN(sp)
 	stp	CAP(0),  CAP(1),  [PTRN(sp), #(TF_X - TF_SIZE - 128)]!
 .else
 	stp	CAP(0),  CAP(1),  [PTRN(sp), #(TF_X - TF_SIZE)]!
@@ -67,7 +66,9 @@
 	stp	CAP(24), CAP(25), [PTRN(sp), #(24 * CAP_WIDTH)]
 	stp	CAP(26), CAP(27), [PTRN(sp), #(26 * CAP_WIDTH)]
 	stp	CAP(28), CAP(29), [PTRN(sp), #(28 * CAP_WIDTH)]
-.if \el == 0
+.if \el == 1
+	add	PTR(18), PTRN(sp), #(TF_SIZE - TF_X + 128)
+.else
 	mrs	CAP(18), CAPN(sp_el0)
 .endif
 #if __has_feature(capabilities)
