@@ -89,8 +89,18 @@
 .endm
 
 .macro	save_registers el
+	/*
+	 * Before calling into C:
+	 * - Set the pcpu pointer
+	 * - Set the frame pointer
+	 */
 	mrs	PTR(18), PTRN(tpidr_el1)
+.if \el == 1
+	add	PTR(29), PTRN(sp), #(TF_SIZE + 128)
+.else
 	add	PTR(29), PTRN(sp), #(TF_SIZE)
+.endif
+
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	mrs	CAP(0), rcsp_el0
 
