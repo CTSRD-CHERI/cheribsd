@@ -391,9 +391,6 @@ compartment_alloc_from_cache(struct thread *td)
 	struct compartment *compartment;
 	u_long ncritical_compartments;
 
-	KASSERT(curthread->td_critnest > 0,
-	    ("%s: called outside a critical section", __func__));
-
 	critical_compartments_spinlock =
 	    DPCPU_PTR(critical_compartments_spinlock);
 	mtx_lock_spin(critical_compartments_spinlock);
@@ -413,16 +410,15 @@ compartment_alloc_from_cache(struct thread *td)
 }
 
 struct compartment *
-compartment_create_for_thread(struct thread *td, u_long id)
+compartment_create(struct thread *td, u_long id, bool usecache)
 {
 	struct compartment_metadata *metadata;
 	struct compartment *compartment;
 
-	if (curthread->td_critnest == 0) {
-		compartment = compartment_alloc();
-	} else {
+	if (usecache)
 		compartment = compartment_alloc_from_cache(td);
-	}
+	else
+		compartment = compartment_alloc();
 	compartment_linkup(compartment, id, td);
 
 	/* NB: compartment_maxnid can be unlocked as it never decreases. */
@@ -439,15 +435,6 @@ compartment_create_for_thread(struct thread *td, u_long id)
 	mtx_unlock_spin(&metadata->cm_lock);
 
 	return (compartment);
-}
-
-static struct compartment *
-compartment_create(u_long id)
-{
-
-	EXECUTIVE_ASSERT();
-
-	return (compartment_create_for_thread(curthread, id));
 }
 
 void
@@ -503,7 +490,7 @@ compartment_entry_stackptr(u_long id, int type)
 
 	compartment = compartment_find(id);
 	if (compartment == NULL)
-		compartment = compartment_create(id);
+		compartment = compartment_create(curthread, id, true);
 	return (compartment->c_kstackptr);
 }
 

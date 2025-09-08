@@ -81,7 +81,8 @@ void compartment_linkup(struct compartment *compartment, u_long id,
     struct thread *td);
 void compartment_init_stack(struct compartment *compartment,
     vm_pointer_t stack);
-struct compartment *compartment_create_for_thread(struct thread *td, u_long id);
+struct compartment *compartment_create(struct thread *td, u_long id,
+    bool usecache);
 void compartment_destroy(struct compartment *compartment);
 void compartment_trampoline_destroy(uintptr_t func);
 void *compartment_entry_for_kernel(uintptr_t func);

@@ -1488,11 +1488,11 @@ link_elf_create_compartments(linker_file_t lf, struct thread *td)
 	for (compartmentii = 0; compartmentii < ef->ncompartments;
 	    compartmentii++) {
 		ec = &ef->compartments[compartmentii];
-		if (compartment_create_for_thread(td, ec->id) == NULL)
+		if (compartment_create(td, ec->id, false) == NULL)
 			return (0);
 	}
 	ec = &ef->defcompartment;
-	if (compartment_create_for_thread(td, ec->id) == NULL)
+	if (compartment_create(td, ec->id, false) == NULL)
 		return (0);
 	return (1);
 }
