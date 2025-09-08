@@ -657,9 +657,10 @@ quarantine_insert(struct mrs_quarantine *quarantine, void *ptr, size_t size)
 		exit(7);
 	}
 	if(poisoning){
-		for(size_t i =0; i< size;i+=CAPREVOKE_BITMAP_ALIGNMENT){
-			cpoison((char*)(ptr+i));
-		}
+		if(size>= CAPREVOKE_BITMAP_ALIGNMENT)
+			for(size_t i =0; i< size;i+=CAPREVOKE_BITMAP_ALIGNMENT){
+				cpoison((char*)(ptr+i));
+			}
 	}
 	quarantine->list->slab[quarantine->list->num_descriptors].ptr = ptr;
 	quarantine->list->slab[quarantine->list->num_descriptors].size = size;
@@ -1003,11 +1004,11 @@ quarantine_flush(struct mrs_quarantine *quarantine)
 			size_t len = __builtin_align_up(
 			    cheri_getlen(iter->slab[i].ptr),
 			    CAPREVOKE_BITMAP_ALIGNMENT);
-			if(poisoning){
-				for(size_t j =0; j< len;j+=CAPREVOKE_BITMAP_ALIGNMENT){
-					cclear((char*)(iter->slab[i].ptr+j));
-				}
+			//if(poisoning){
+			for(size_t j =0; j< len;j+=CAPREVOKE_BITMAP_ALIGNMENT){
+				cclear((char*)(iter->slab[i].ptr+j));
 			}
+			//}
 			caprev_shadow_nomap_clear_len(
 			    cri->base_mem_nomap, entire_shadow,
 			    cheri_getbase(iter->slab[i].ptr), len);
@@ -1542,10 +1543,18 @@ mrs_malloc(size_t size)
 	 * for size=0 we might want to pass those calls through, but none
 	 * of the currently supported allocators do.
 	 */
-	if (size < CAPREVOKE_BITMAP_ALIGNMENT)
+	if (size < CAPREVOKE_BITMAP_ALIGNMENT){
 		allocated_region = mrs_real_malloc(CAPREVOKE_BITMAP_ALIGNMENT);
-	else
+		if((allocated_region != NULL))
+			cclear((char*)(allocated_region));
+	}
+	else{
 		allocated_region = mrs_real_malloc(size);
+		for(int j =0; j< cheri_getlen(allocated_region);j+=16){
+			if(allocated_region != NULL)
+				cclear((char*)(allocated_region+j));
+		}
+	}
 	if (allocated_region == NULL) {
 		MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0,
 		    allocated_region);
@@ -1564,7 +1573,10 @@ mrs_malloc(size_t size)
 	MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0, allocated_region);
 	allocated_region = csetcappoison((char *)allocated_region);
 	//printf("mrs malloc check if poison %lx \n", (long) *allocated_region);
-	return (allocated_region);
+	//printf("malloc before\n");
+	//printf("malloc %lx\n", *allocated_region);
+	//printf("malloc after\n");
+	return (void *)(allocated_region);
 }
 
 static void *
@@ -1603,10 +1615,20 @@ mrs_calloc(size_t number, size_t size)
 	 * extraordinarily unlikely and highly questionable optimization.
 	 */
 	if (!__builtin_mul_overflow(number, size, &tmpsize) &&
-	    tmpsize < CAPREVOKE_BITMAP_ALIGNMENT)
+	    tmpsize < CAPREVOKE_BITMAP_ALIGNMENT){
 		allocated_region = mrs_real_calloc(1, CAPREVOKE_BITMAP_ALIGNMENT);
-	else
+		if((allocated_region != NULL))
+			cclear((char*)(allocated_region));
+	}
+	else{
 		allocated_region = mrs_real_calloc(number, size);
+		if((allocated_region != NULL)){
+			for(int j =0; j< cheri_getlen(allocated_region);j+=16){
+				if(allocated_region != NULL)
+					cclear((char*)(allocated_region+j));
+			}
+		}
+	}
 	if (allocated_region == NULL) {
 		MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number,
 		    allocated_region);
@@ -1622,7 +1644,7 @@ mrs_calloc(size_t number, size_t size)
 	/*mrs_debug_printf("mrs_calloc: exit called %d size 0x%zx address %p\n", number, size, allocated_region);*/
 
 	MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number, allocated_region);
-	//csetcappoison((char *)allocated_region);
+	allocated_region = csetcappoison((char *)allocated_region);
 	return (allocated_region);
 }
 
@@ -1705,7 +1727,11 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 
 	MRS_UTRACE(UTRACE_MRS_ALIGNED_ALLOC, NULL, size, alignment,
 	    allocated_region);
-	//csetcappoison((char *)allocated_region);
+	for(int j =0; j< cheri_getlen(allocated_region);j+=16){
+		if(allocated_region != NULL)
+			cclear((char*)(allocated_region+j));
+	}
+	//allocated_region = csetcappoison((char *)allocated_region);
 	return (allocated_region);
 }
 
@@ -1745,21 +1771,33 @@ mrs_realloc(void *ptr, size_t size)
 	 * copying such cases.
 	 */
 	if (ptr != NULL && cheri_gettag(ptr) && cheri_getoffset(ptr) == 0 &&
-	    size <= old_size && old_size - size <= (old_size >> 1))
-		return (ptr);
+	    size <= old_size && old_size - size <= (old_size >> 1)){
+			for(int j =0; j< cheri_getlen(ptr);j+=16){
+				cclear((char*)(ptr+j));
+			}
+		
+			return (ptr);
+	}
 
 	void *new_alloc = mrs_malloc(size);
-
+	for(int j =0; j< cheri_getlen(new_alloc);j+=16){
+		if(new_alloc != NULL)
+			cclear((char*)(new_alloc+j));
+	}
 	/*
 	 * Per the C standard, copy and free IFF the old pointer is valid
 	 * and allocation succeeds.
 	 */
 	if (ptr != NULL && new_alloc != NULL) {
+		for(int j =0; j< cheri_getlen(ptr);j+=16){
+			cclear((char*)(ptr+j));
+		}
 		memcpy(new_alloc, ptr, size < old_size ? size : old_size);
 		mrs_free(ptr);
 	}
 	MRS_UTRACE(UTRACE_MRS_REALLOC, ptr, size, 0, new_alloc);
-	//csetcappoison((char *)new_alloc);
+
+	//new_alloc = csetcappoison((char *)new_alloc);
 	return (new_alloc);
 }
 
@@ -1779,7 +1817,13 @@ mrs_free(void *ptr)
 
 	if (ptr == NULL)
 		return;
-
+	if((long)ptr >= 0x40cda000 && (long) ptr <= 0x40cda040){
+		printf("mrs_free ptr %lx\n", (long) ptr);
+	}
+	if((long)ptr >= 0x40d1b600 && (long) ptr <= 0x40d1b800){
+		printf("mrs_free ptr %lx\n", (long) ptr);
+	}
+	
 	/*
 	 * If not offloading, validate the passed-in cap here and
 	 * replace it with the cap to its underlying allocation.
@@ -1825,8 +1869,10 @@ mrs_mallocx(size_t size, int flags)
 	if (!quarantining)
 		return (mrs_real_mallocx(size, flags));
 
-	if (align <= CAPREVOKE_BITMAP_ALIGNMENT)
+	if (align <= CAPREVOKE_BITMAP_ALIGNMENT){
 		ret = mrs_malloc(size);
+		cclear((char *)ret);
+	}
 	else if (mrs_posix_memalign(&ret, size, align) != 0)
 		ret = NULL;
 
@@ -1835,7 +1881,11 @@ mrs_mallocx(size_t size, int flags)
 	if (ret != NULL && (flags & MALLOCX_ZERO) != 0)
 		clear_region(ret, cheri_getlen(ret));
 #endif
-	//csetcappoison((char *)ret);
+	for(int j =0; j< cheri_getlen(ret);j+=16){
+		if(ret != NULL)
+			cclear((char*)(ret+j));
+	}
+	//ret = csetcappoison((char *)ret);
 	return (ret);
 }
 
@@ -1878,7 +1928,11 @@ mrs_rallocx(void *ptr, size_t size, int flags)
 		mrs_free(ptr);
 	}
 	MRS_UTRACE(UTRACE_MRS_REALLOC, ptr, size, 0, new_alloc);
-	//csetcappoison((char *)new_alloc);
+	for(int j =0; j< cheri_getlen(new_alloc);j+=16){
+		if(new_alloc != NULL)
+			cclear((char*)(new_alloc+j));
+	}
+	//new_alloc = csetcappoison((char *)new_alloc);
 	return (new_alloc);
 }
 
