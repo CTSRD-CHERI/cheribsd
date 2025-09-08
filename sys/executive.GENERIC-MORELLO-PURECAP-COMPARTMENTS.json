@@ -12,6 +12,8 @@
 			"machdep.o",
 			"memset.o",
 			"machdep_executive.o",
+			"mp_machdep.o",
+			"identcpu.o",
 			"swtch.o",
 			"smccc_arm64.o",
 			"vm_machdep.o",
