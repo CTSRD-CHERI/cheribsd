@@ -859,6 +859,7 @@ do_ir_rules(FILE *f)
 			    ftp->f_objprefix, tail(np));
 			break;
 		case 'S':
+		case 'o':
 			break;
 		default:
 			continue;
@@ -872,11 +873,9 @@ do_ir_rules(FILE *f)
 			 */
 			fprintf(f, "%s%sc",
 			    ftp->f_objprefix, tail(np));
-		} else {
+		} else if (!(ftp->f_flags & NO_IMPLCT_RULE)) {
 			/*
-			 * Always depend on a source file that is compiled into
-			 * IR. This includes the case when no implicit rule is
-			 * used for the .o file.
+			 * Depend on a source file that is compiled into IR.
 			 */
 			fprintf(f, "%s%s%c",
 			    ftp->f_srcprefix, np, och);
@@ -885,7 +884,7 @@ do_ir_rules(FILE *f)
 			fprintf(f, " %s", ftp->f_depends);
 		fprintf(f, "\n");
 
-		if (och == 'S') {
+		if (och == 'S' || och == 'o') {
 			/*
 			 * Currently, we don't support assembly files.
 			 * Create an empty file and skip the rest for now.
