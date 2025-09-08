@@ -964,6 +964,11 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m,
 		 *
 		 */
 		if (pmap->pm_stage == PM_STAGE1 && va < VM_MAX_USER_ADDRESS) {
+			/*
+			 * To avoid races with pmap_caploadgen_test_all_clean()
+			 * the page should be xbusied at this point.
+			 */
+			vm_page_assert_xbusied(m);
 			if ((vm_page_astate_load(m).flags & PGA_CAPSTORE) != 0)
 				val |= ATTR_CDBM;
 		} else {
@@ -6672,13 +6677,13 @@ retry:
 				 * in order to ensure that we still did
 				 * not lose AP_RW races with HW dirty.
 				 */
-				/* XXX-AM: Something about aliasing pages,
-				 * grumble...
+				/* XXX-AM: Deal with aliasing pages,
 				 * probably need to whack all aliases into
-				 * CLEAN...
+				 * CLEAN. See pmap_caploadgen_test_all_clean().
 				 */
-				// XXX if we get here, surely the mapping was writable so
-				// restoring AP_RW is fine?
+				/* XXX-AM: if we get here, surely the mapping
+				 * was writable so restoring AP_RW is fine
+				 */
 				exppte = tpte;
 				if (pmap_fcmpset(pte, &exppte,
 					(tpte & ~ATTR_CAPREVOKE_MASK) |
@@ -6710,6 +6715,7 @@ retry:
 				 * CDBM=1, depending whether we observed a
 				 * capability store since pmap_enter().
 				 */
+				PMAP_ASSERT_STAGE1(pmap);
 				KASSERT(tpte & (ATTR_SC | ATTR_CDBM),
 				    ("Cleaning page but !ATTR_SC | !ATTR_CDBM?"));
 				vm_page_assert_xbusied(m);
@@ -6729,8 +6735,13 @@ retry:
 				}
 				rw_runlock(lock);
 
-				pmap_page_dirty(pmap, tpte, m);
+				while (!atomic_fcmpset_64(pte, &tpte,
+				    tpte & ~ATTR_S1_AP_RW_BIT))
+					cpu_spinwait();
+
 				/*
+				 * See pmap_remove_write().
+				 *
 				 * We may reach here after SCAN_RO_XBUSIED, so
 				 * need to check for read-only mapping.
 				 * XXX-AM: If so, there is no point in re-scanning
@@ -6739,11 +6750,14 @@ retry:
 				 * XXX-AM do we need to check that FEAT_HAFDBS
 				 * is enabled at this point?
 				 */
-				// vm_page_aflag_clear(m, PGA_CAPDIRTY) ?
-				if ((tpte & (ATTR_S1_AP_RW_BIT | ATTR_SW_DBM)) ==
-				    (ATTR_S1_AP(ATTR_S1_AP_RW) | ATTR_SW_DBM)) {
-					pmap_clear_bits(pte, ATTR_S1_AP_RW_BIT);
-					pmap_s1_invalidate_page(pmap, va, true);
+				if ((tpte & ATTR_SW_DBM) != 0) {
+					while (!atomic_fcmpset_64(pte, &tpte,
+					    tpte & ~ATTR_S1_AP_RW_BIT))
+						cpu_spinwait();
+					if ((tpte & ATTR_S1_AP_RW_BIT) != 0) {
+						pmap_page_dirty(pmap, tpte, m);
+						pmap_s1_invalidate_page(pmap, va, true);
+					}
 				}
 				// else counter_u64_add(cheri_second_stage_ro_clean, 1);
 
