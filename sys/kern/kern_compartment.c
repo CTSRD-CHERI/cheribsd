@@ -153,13 +153,13 @@ compartment_cpu_cache_fill(u_int cpuid)
 	struct compartment *compartment;
 	struct compartment_list list;
 
-	if (curthread->td_incachefill)
-		return;
 	/*
 	 * Do not attempt to fill the cache if it is already happening.
 	 * A thread would enter this function if it's rescheduled while it's
 	 * executing the function.
 	 */
+	KASSERT(!curthread->td_incachefill,
+	    ("%s: curthread is already filling the cache", __func__));
 	curthread->td_incachefill = true;
 
 	critical_compartments_spinlock = DPCPU_ID_PTR(cpuid,

@@ -548,8 +548,20 @@ mi_switch(int flags)
 #endif
 	spinlock_exit();
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	if (!TD_IS_IDLETHREAD(curthread))
+	if (!curthread->td_incachefill &&
+	    !TD_IS_IDLETHREAD(curthread) &&
+	    curthread->td_wantedlock == NULL) {
+		/*
+		 * Do not fill the cache if any of the following holds:
+		 * - The thread is already executing the cache filling routines.
+		 *   It could've been rescheduled whilst executing them.
+		 * - The thread is idle.
+		 *   It doesn't need the cache but also cannot allocate memory.
+		 * - The thread is in the process of acquiring a lock.
+		 *   It cannot acquire cache-related locks.
+		 */
 		compartment_cpu_cache_fill(cpuid);
+	}
 #endif
 }
 
