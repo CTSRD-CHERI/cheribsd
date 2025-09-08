@@ -45,19 +45,13 @@
  * Allocation space on the stack for:
  * - a trap frame;
  * - instruction emulation in DTrace (128 bytes), if an exception is taken from
- * EL1;
- * - the compartment caller's stack (CAP_WIDTH), if an exception is taken from
- * EL0 and kernel compartmentalization is enabled.
+ * EL1.
  */
 .if \el == 1
 	mov	PTR(18), PTRN(sp)
 	stp	CAP(0),  CAP(1),  [PTRN(sp), #(TF_X - TF_SIZE - 128)]!
 .else
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	stp	CAP(0),  CAP(1),  [PTRN(sp), #(TF_X - TF_SIZE - CAP_WIDTH)]!
-#else
 	stp	CAP(0),  CAP(1),  [PTRN(sp), #(TF_X - TF_SIZE)]!
-#endif
 .endif
 	stp	CAP(2),  CAP(3),  [PTRN(sp), #(2  * CAP_WIDTH)]
 	stp	CAP(4),  CAP(5),  [PTRN(sp), #(4  * CAP_WIDTH)]
@@ -102,19 +96,16 @@
 	mrs	CAP(2), rctpidr_el0
 	stp	CAP(0), CAP(1), [PTRN(sp), #(TF_RCSP)]
 	str	CAP(2), [PTRN(sp), #(TF_RCTPIDR)]
-.if \el == 0
+
 	/*
-	 * Since the exception is taken from EL0, we do not have a restricted
-	 * kernel compartment to set as the caller for trampolines.
-	 *
-	 * Use a part of the executive stack as a caller's dummy stack.
+	 * Set the caller's stack pointer to a void stack.
 	 */
-	add	c0, PTRN(sp), #(TF_SIZE)
-	scbnds	c0, c0, #(CAP_WIDTH)
-	str	czr, [c0]
-	msr	rcsp_el0, c0
-.endif
+	ldr	CAP(0), [CAP(18), #(PC_CURTHREAD)]
+	add	CAP(0), CAP(0), #(TD_VOIDSTACK)
+	scbnds	CAP(0), CAP(0), #(CAP_WIDTH)
+	msr	rcsp_el0, CAP(0)
 #endif
+
 .if \el == 0
 #if defined(PERTHREAD_SSP)
 	/* Load the SSP canary to sp_el0 */
@@ -247,11 +238,7 @@
 .endif
 #endif
 .if \el == 0
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	add	PTRN(sp), PTRN(sp), #(CAP_WIDTH + TF_SIZE)
-#else
 	add	PTRN(sp), PTRN(sp), #(TF_SIZE)
-#endif
 .else
 	add	PTRN(sp), PTRN(sp), #(128 + TF_SIZE)
 	mrs	PTR(18), PTRN(tpidr_el1)

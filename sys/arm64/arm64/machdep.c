@@ -167,9 +167,6 @@ static struct trapframe proc0_tf;
 int early_boot = 1;
 int cold = 1;
 static int boot_el;
-#ifdef CHERI_COMPARTMENTALIZE_KERNEL
-static uintptr_t dummy_stack;
-#endif
 
 struct kva_md_info kmi;
 
@@ -490,6 +487,9 @@ init_proc0(vm_pointer_t kstack)
 	thread0.td_pcb->pcb_vfpcpu = UINT_MAX;
 	thread0.td_frame = &proc0_tf;
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	thread0.td_voidstack = (vm_pointer_t)&thread0.td_voidstack;
+	thread0.td_pcb->pcb_rcsp_el0 = thread0.td_voidstack;
+	WRITE_SPECIALREG_CAP(rcsp_el0, thread0.td_pcb->pcb_rcsp_el0);
 	init_compartments0(compartments0_stacks);
 #endif
 #ifdef PAC
@@ -1010,9 +1010,6 @@ initarm(struct arm64_bootparams *abp)
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	init_proc0(abp->kern_stack, abp->compartments0_stacks);
-
-	/* Set the caller stack to a dummy value. */
-	WRITE_SPECIALREG_CAP(rcsp_el0, &dummy_stack);
 
 	/*
 	 * Everything until here was only using TCB.

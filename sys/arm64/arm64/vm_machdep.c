@@ -145,6 +145,12 @@ cpu_fork(struct thread *td1, struct proc *p2,
 	    (uintptr_t)fork_trampoline;
 #endif
 	td2->td_pcb->pcb_sp = (uintptr_t)td2->td_frame;
+	/*
+	 * Use the void stack as the caller's stack to satisfy the requirements
+	 * of a compartment trampoline that is branched into by
+	 * fork_trampoline() when calling fork_exit().
+	 */
+	td2->td_pcb->pcb_rcsp_el0 = td2->td_voidstack;
 
 	vfp_new_thread(td2, td1, true);
 
@@ -218,6 +224,8 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	    (uintptr_t)fork_trampoline;
 #endif
 	td->td_pcb->pcb_sp = (uintptr_t)td->td_frame;
+	/* See cpu_fork(). */
+	td->td_pcb->pcb_rcsp_el0 = td->td_voidstack;
 
 	/* Update VFP state for the new thread */
 	vfp_new_thread(td, td0, false);

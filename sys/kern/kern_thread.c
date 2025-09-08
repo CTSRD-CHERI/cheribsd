@@ -798,6 +798,7 @@ thread_alloc(int pages)
 	td->td_tid = tid;
 	bzero(&td->td_sa.args, sizeof(td->td_sa.args));
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	td->td_voidstack = (vm_pointer_t)&td->td_voidstack;
 	TAILQ_INIT(&td->td_compartments);
 	if (!thread_alloc_compartments(td)) {
 		return (NULL);
@@ -824,6 +825,7 @@ thread_recycle(struct thread *td, int pages)
 		cpu_thread_alloc(td);
 	}
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	td->td_voidstack = (vm_pointer_t)&td->td_voidstack;
 	if (!thread_alloc_compartments(td))
 		return (ENOMEM);
 #endif
