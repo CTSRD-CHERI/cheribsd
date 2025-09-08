@@ -548,7 +548,8 @@ mi_switch(int flags)
 #endif
 	spinlock_exit();
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
-	compartment_cpu_cache_fill(cpuid);
+	if (!TD_IS_IDLETHREAD(curthread))
+		compartment_cpu_cache_fill(cpuid);
 #endif
 }
 
