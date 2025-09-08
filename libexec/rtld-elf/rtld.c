@@ -1533,14 +1533,10 @@ create_pcc_caps(Obj_Entry *obj, const char *name)
 		for (j = 0; j < i; j++) {
 			if (cheri_is_address_inbounds(pcc_cap,
 			    cheri_getbase(obj->pcc_caps[j])) ||
-			    cheri_is_address_inbounds(pcc_cap,
-			    cheri_gettop(obj->pcc_caps[j])) ||
 			    cheri_is_address_inbounds(obj->pcc_caps[j],
-			    cheri_getbase(pcc_cap)) ||
-			    cheri_is_address_inbounds(obj->pcc_caps[j],
-			    cheri_gettop(pcc_cap))) {
+			    cheri_getbase(pcc_cap))) {
 				_rtld_error("Overlapping PCC capabilities for %s",
-				    obj->path);
+				    name);
 				return (false);
 			}
 		}
