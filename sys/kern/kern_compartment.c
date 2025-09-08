@@ -378,7 +378,7 @@ compartment_alloc(void)
 
 	compartment = uma_zalloc(compartment_zone, M_NOWAIT | M_ZERO);
 	if (!vm_compartment_new(compartment)) {
-		panic("compartment_create unable to allocate stack");
+		panic("%s: unable to allocate stack.", __func__);
 	}
 	return (compartment);
 }
