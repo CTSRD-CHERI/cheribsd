@@ -153,6 +153,15 @@ compartment_cpu_cache_fill(u_int cpuid)
 	struct compartment *compartment;
 	struct compartment_list list;
 
+	if (curthread->td_incachefill)
+		return;
+	/*
+	 * Do not attempt to fill the cache if it is already happening.
+	 * A thread would enter this function if it's rescheduled while it's
+	 * executing the function.
+	 */
+	curthread->td_incachefill = true;
+
 	critical_compartments_spinlock = DPCPU_ID_PTR(cpuid,
 	    critical_compartments_spinlock);
 
@@ -175,6 +184,8 @@ compartment_cpu_cache_fill(u_int cpuid)
 	DPCPU_ID_SET(cpuid, ncritical_compartments,
 	    ncritical_compartments + needed);
 	mtx_unlock_spin(critical_compartments_spinlock);
+
+	curthread->td_incachefill = false;
 }
 
 static void

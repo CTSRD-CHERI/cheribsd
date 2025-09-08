@@ -395,6 +395,7 @@ struct thread {
 	void		*td_remotereq;	/* (c) dbg remote request. */
 	off_t		td_ktr_io_lim;	/* (k) limit for ktrace file size */
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	bool		td_incachefill;
 	vm_pointer_t	td_voidstack;	/* (k) First stack for a c18n call. */
 	TAILQ_HEAD(, compartment) td_compartments;	/* (k) Thread compartments. */
 #endif
