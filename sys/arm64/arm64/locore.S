@@ -569,6 +569,9 @@ mp_virtdone:
 	ldr	x18, [x18, :lo12:bootpcpu]
 #endif
 	msr	PTRN(tpidr_el1), PTR(18)
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	msr	rctpidr_el0, c18
+#endif
 
 	b	init_secondary
 LEND(mpentry_common)

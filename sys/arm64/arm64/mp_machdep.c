@@ -46,6 +46,7 @@
 #include <sys/pcpu.h>
 #include <sys/pcpu_executive.h>
 #include <sys/proc.h>
+#include <sys/compartment.h>
 #include <sys/sched.h>
 #include <sys/smp.h>
 
@@ -187,6 +188,7 @@ SYSINIT(start_aps, SI_SUB_SMP, SI_ORDER_FIRST, release_aps, NULL);
 void
 init_secondary(uint64_t cpu)
 {
+	struct thread *idlethread;
 	struct pcpu *pcpup;
 	pmap_t pmap0;
 	uint64_t mpidr;
@@ -220,6 +222,7 @@ init_secondary(uint64_t cpu)
 	 * let the boot CPU use the results.
 	 */
 	pcpup = pcpu_find(cpu);
+	KASSERT(pcpup == bootpcpu, ("pcpu and bootpcpu mismatch"));
 	PCPU_REF_SET(pcpup, midr, get_midr());
 	identify_cpu(cpu);
 
@@ -232,8 +235,15 @@ init_secondary(uint64_t cpu)
 		__asm __volatile("wfe");
 
 	/* Initialize curthread */
-	KASSERT(PCPU_GET(idlethread) != NULL, ("no idle thread"));
-	PCPU_REF_SET(pcpup, curthread, PCPU_REF_GET(pcpup, idlethread));
+	idlethread = PCPU_REF_GET(pcpup, idlethread);
+	KASSERT(idlethread != NULL, ("no idle thread"));
+	PCPU_REF_SET(pcpup, curthread, idlethread);
+
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	/* Set the caller stack to the void stack. */
+	WRITE_SPECIALREG_CAP(rcsp_el0, idlethread->td_voidstack);
+#endif
+
 	schedinit_ap();
 
 	/* Initialize curpmap to match TTBR0's current setting. */
@@ -498,7 +508,9 @@ start_cpu(u_int cpuid, uint64_t target_cpu, int domain, vm_paddr_t release_addr)
 		pa = pmap_extract(kernel_pmap, (vm_offset_t)mpentry_spintable);
 		err = enable_cpu_spin(target_cpu, pa, release_addr);
 	} else {
-		pa = pmap_extract(kernel_pmap, (vm_offset_t)mpentry_psci);
+		pa = pmap_extract(kernel_pmap,
+		    (vm_offset_t)executive_get_function(
+		    (uintptr_t)mpentry_psci) - 1);
 		err = enable_cpu_psci(target_cpu, pa, cpuid);
 	}
 
