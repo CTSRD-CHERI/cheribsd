@@ -558,11 +558,12 @@ mp_virtdone:
 
 	/*
 	 * Initialize the per-CPU pointer before calling into C code, for the
-	 * benefit of kernel sanitizers.
+	 * benefit of kernel sanitizers. See init_cpu_pcpup() for more details.
 	 */
 #ifdef __CHERI_PURE_CAPABILITY__
 	adrp	c18, :got:bootpcpu
 	ldr	c18, [c18, :got_lo12:bootpcpu]
+	ldr	c18, [c18]
 #else
 	adrp	x18, bootpcpu
 	ldr	x18, [x18, :lo12:bootpcpu]
