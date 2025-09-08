@@ -92,6 +92,23 @@
 	add	PTR(29), PTRN(sp), #(TF_SIZE)
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	mrs	CAP(0), rcsp_el0
+
+.if \el == 1
+	/*
+	 * Update the stack pointer of an interrupted compartment.
+	 *
+	 * An exception handler might branch into the same compartment that was
+	 * interrupted. We must update the stack pointer here to make sure that
+	 * it uses a valid stack pointer.
+	 */
+	gclim	x1, CAP(0)
+	scvalue	CAP(1), CAP(0), x1
+	str	CAP(0), [CAP(1), #-CAP_WIDTH]
+.endif
+
+	/*
+	 * Stash the compartment's stack pointer.
+	 */
 	mrs	CAP(1), rddc_el0
 	mrs	CAP(2), rctpidr_el0
 	stp	CAP(0), CAP(1), [PTRN(sp), #(TF_RCSP)]
