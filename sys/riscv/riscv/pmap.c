@@ -4353,14 +4353,19 @@ retry:
 
 				pmap_page_dirty(oldpte, m);
 				/*
+                                 * See pmap_remove_write().
+                                 *
 				 * We may reach here after SCAN_RO_XBUSIED, so
 				 * need to check for read-only mapping.
 				 * XXX-AM: If so, there is no point in re-scanning
 				 * and can immediately go to clean? This
 				 * changes if we have aliases though.
 				 */
-				if (oldpte & PTE_W) {
-					pmap_clear_bits(pte, PTE_D);
+				if ((oldpte & PTE_W) != 0) {
+					while (!atomic_fcmpset_64(pte, &oldpte,
+					    oldpte & ~PTE_D))
+						cpu_spinwait();
+					pmap_page_dirty(oldpte, m);
 					pmap_invalidate_page(pmap, va);
 				}
 
