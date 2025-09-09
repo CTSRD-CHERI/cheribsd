@@ -33,6 +33,7 @@
 #define	_DLFCN_H_
 
 #include <sys/_types.h>
+#include <stdbool.h>
 
 /*
  * Modes and flags for dlopen().
@@ -65,6 +66,9 @@
 #define	RTLD_SELF	((void *) -3)	/* Search the caller itself. */
 
 #if __BSD_VISIBLE
+
+#define	C18N_CONTROL_DUMP	1
+#define	C18N_CONTROL_DISABLE	2
 
 #ifndef	_SIZE_T_DECLARED
 typedef __size_t        size_t;
@@ -133,6 +137,8 @@ void	 dllockinit(void *_context,
 	    void (*_context_destroy)(void *_context));
 void	*dlvsym(void * __restrict, const char * __restrict,
 	    const char * __restrict);
+
+bool	dl_c18n_control(const char *path, const char *name, int cmd, int flags);
 #endif /* __BSD_VISIBLE */
 __END_DECLS
 
