@@ -465,6 +465,7 @@ FBSD_1.7 {
 FBSD_1.8 {
 	aio_read2;
 	aio_write2;
+	dl_c18n_control;
 	execvpe;
 	rtld_get_var;
 	rtld_set_var;
