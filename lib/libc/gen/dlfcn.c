@@ -41,6 +41,7 @@
 #include <dlfcn.h>
 #include <link.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -406,5 +407,13 @@ dl_c18n_pop_trusted_stack(struct dl_c18n_compart_state *state __unused,
 	return (NULL);
 }
 #endif
+
+#pragma weak dl_c18n_control
+bool
+dl_c18n_control(const char *path __unused, const char * name __unused,
+    int cmd __unused, int flags __unused)
+{
+	return (false);
+}
 
 #endif /* !defined(IN_LIBDL) || defined(PIC) */
