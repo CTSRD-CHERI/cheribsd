@@ -6523,6 +6523,76 @@ c18n_add_obj(Obj_Entry *obj, int flags)
 	c18n_assign_plt_compartments(obj);
 	return (true);
 }
+
+bool
+dl_c18n_control(const char *path, const char *name, int cmd, int flags __unused)
+{
+	Obj_Entry *obj;
+
+	rtld_printf("dl_c18n_control cmd = %d\n", cmd);
+	switch (cmd) {
+	case C18N_CONTROL_DUMP:
+		TAILQ_FOREACH(obj, &obj_list, next) {
+			if (path != NULL && strcmp(obj->path, path) != 0)
+				continue;
+			rtld_printf("path: %s\n", obj->path);
+			for (unsigned long i = 0; i < obj->ncomparts; i++) {
+				rtld_printf(
+				    "\tcompart[%lu]: %s %u (%#lx - %#lx)\n",
+				    i, obj->comparts[i].name,
+				    obj->comparts[i].compart_id,
+				    obj->comparts[i].start,
+				    obj->comparts[i].end);
+			}
+		}
+		return (true);
+	case C18N_CONTROL_DISABLE: {
+		long disabled = 0;
+
+		if (name == NULL)
+			return (false);
+
+		TAILQ_FOREACH(obj, &obj_list, next) {
+			if (path != NULL && strcmp(obj->path, path) != 0)
+				continue;
+			for (unsigned long i = 0; i < obj->ncomparts; i++) {
+				ptraddr_t start, end;
+				void *mapped;
+
+				if (strcmp(obj->comparts[i].name, name) != 0)
+					continue;
+
+				start = rtld_trunc_page(obj->comparts[i].start);
+				end = rtld_round_page(obj->comparts[i].end);
+				mapped = cheri_setaddress(obj->mapbase,
+				    start);
+#if 0
+				rtld_printf(
+				    "disabling %s:%s at %#lp (len %#lx)\n",
+				    obj->path, obj->comparts[i].name,
+				    mapped, end - start);
+#endif
+				if (mmap(mapped, end - start, PROT_NONE,
+				    MAP_FIXED|MAP_GUARD, -1, 0) == MAP_FAILED) {
+					_rtld_error(
+					    "failed to disable compartment: %d",
+					    errno);
+					return (false);
+				} else
+					disabled++;
+			}
+		}
+#if 0
+		rtld_printf("disabled %ld compartments\n", disabled);
+#endif
+		/* XXX: maybe we should return a signed count instead? */
+		return (disabled > 0);
+	}
+	default:
+		return (false);
+	}
+	__unreachable();
+}
 #endif
 
 static void

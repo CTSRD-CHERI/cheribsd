@@ -23,3 +23,7 @@ FBSD_1.0 {
     dl_c18n_is_trampoline;
     dl_c18n_pop_trusted_stack;
 };
+
+FBSD_1.8 {
+    dl_c18n_control;
+};
