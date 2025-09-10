@@ -667,8 +667,8 @@ elf_init(elf_file_t ef, Elf_Dyn *dynp, void *relocbase, ptraddr_t baseend,
 
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	data_cap = cheri_clearperm(relocbase, ~CHERI_PERMS_KERNEL_DATA);
-	code_cap = cheri_clearperm(relocbase,
+	data_cap = cheri_clearperm(ef->mapbase, ~CHERI_PERMS_KERNEL_DATA);
+	code_cap = cheri_clearperm(ef->mapbase,
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
 	    ~CHERI_PERMS_KERNEL_EXECUTIVE_CODE
 #else
