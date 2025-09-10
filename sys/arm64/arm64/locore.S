@@ -343,7 +343,11 @@ virtdone:
 #ifdef __CHERI_PURE_CAPABILITY__
 	scvalue c0, c2, x0
 	scvalue	c1, c2, x1
+#ifdef CHERI_COMPARTMENTALIZE_KERNEL
+	gclim	x3, c2
+#else
 	ldr	x3, =_end
+#endif
 	scvalue	c4, c2, x4
 
 #ifdef CHERI_COMPARTMENTALIZE_KERNEL
