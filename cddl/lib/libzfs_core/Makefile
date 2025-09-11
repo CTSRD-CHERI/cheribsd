@@ -3,10 +3,11 @@
 .PATH: ${ZFSTOP}/include/os/freebsd/zfs
 .PATH: ${ZFSTOP}/module/os/freebsd/zfs
 
+PACKAGE=	zfs
+LIB_PACKAGE=
 
 LIB=	zfs_core
 LIBADD=	nvpair spl zutil
-PACKAGE=	libzfs
 
 INCS=	libzfs_core.h
 SRCS=	libzfs_core.c \

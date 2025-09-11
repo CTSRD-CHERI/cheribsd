@@ -27,6 +27,8 @@ PICFLAG=	-fPIC
 .endif
 
 PACKAGE=	zfs
+LIB_PACKAGE=
+
 LIB=		zpool
 
 USER_C = \

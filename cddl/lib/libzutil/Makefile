@@ -2,9 +2,11 @@
 .PATH: ${ZFSTOP}/lib/libzutil/os/freebsd
 .PATH: ${ZFSTOP}/module/os/freebsd/zfs
 
+PACKAGE=	zfs
+LIB_PACKAGE=
+
 LIB=	zutil
 LIBADD=	avl geom m tpool
-PACKAGE=	libzfs
 
 INCS = zutil_import.h
 

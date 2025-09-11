@@ -1,6 +1,8 @@
 .PATH: ${ZFSTOP}/module/icp
 
 PACKAGE=	zfs
+LIB_PACKAGE=
+
 LIB=	icp
 LIBADD=
 

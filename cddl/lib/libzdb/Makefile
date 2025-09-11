@@ -1,8 +1,10 @@
 .PATH: ${ZFSTOP}/lib/libzdb
 .PATH: ${ZFSTOP}/include
 
-LIB=	zdb
 PACKAGE=	zfs
+LIB_PACKAGE=
+
+LIB=	zdb
 
 INCS = libzdb.h
 

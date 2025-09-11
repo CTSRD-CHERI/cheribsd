@@ -4,9 +4,11 @@
 .PATH: ${ZFSTOP}/lib/libspl
 .PATH: ${ZFSTOP}/include
 
+PACKAGE=	zfs
+LIB_PACKAGE=
+
 LIB=	spl
 LIBADD=
-PACKAGE=	libzfs
 
 SRCS = \
         assert.c \

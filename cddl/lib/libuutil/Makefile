@@ -1,6 +1,8 @@
 .PATH: ${ZFSTOP}/lib/libuutil
 
-PACKAGE=	libzfs
+PACKAGE=	zfs
+LIB_PACKAGE=
+
 LIB=	uutil
 SRCS=\
 	uu_alloc.c \

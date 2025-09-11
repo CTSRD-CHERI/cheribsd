@@ -2,10 +2,12 @@
 .PATH: ${ZFSTOP}/lib/libnvpair
 .PATH: ${ZFSTOP}/include
 
+PACKAGE=	zfs
+LIB_PACKAGE=
+
 LIB=	nvpair
 LIBADD=	spl
 
-PACKAGE=	libzfs
 # user
 INCS=	libnvpair.h
 SRCS=	libnvpair.c \
