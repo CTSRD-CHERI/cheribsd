@@ -875,9 +875,9 @@ single_user(void)
 	const char *shell;
 	char *argv[2];
 	struct timeval tv, tn;
+	struct passwd *pp;
 #ifdef SECURE
 	struct ttyent *typ;
-	struct passwd *pp;
 	static const char banner[] =
 		"Enter root password, or ^D to go multi-user\n";
 	char *clear, *password;
@@ -909,6 +909,7 @@ single_user(void)
 		 */
 		open_console();
 
+		pp = getpwnam("root");
 #ifdef SECURE
 		/*
 		 * Check the root password.
@@ -916,7 +917,6 @@ single_user(void)
 		 * it's the only tty that can be 'off' and 'secure'.
 		 */
 		typ = getttynam("console");
-		pp = getpwnam("root");
 		if (typ && (typ->ty_status & TTY_SECURE) == 0 &&
 		    pp && *pp->pw_passwd) {
 			write_stderr(banner);
@@ -933,7 +933,6 @@ single_user(void)
 			}
 		}
 		endttyent();
-		endpwent();
 #endif /* SECURE */
 
 #ifdef DEBUGSHELL
@@ -953,6 +952,15 @@ single_user(void)
 				shell = altshell;
 		}
 #endif /* DEBUGSHELL */
+
+		if (pp != NULL && pp->pw_dir != NULL && *pp->pw_dir != '\0' &&
+		    chdir(pp->pw_dir) == 0) {
+			setenv("HOME", pp->pw_dir, 1);
+		} else {
+			chdir("/");
+			setenv("HOME", "/", 1);
+		}
+		endpwent();
 
 		/*
 		 * Unblock signals.
