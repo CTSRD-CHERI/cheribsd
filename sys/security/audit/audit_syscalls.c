@@ -55,6 +55,29 @@
 
 #ifdef AUDIT
 
+static int
+audit_priv_check_cred(struct ucred *cred, int priv)
+{
+	int error;
+
+	error = priv_check_cred(cred, priv);
+	if (error == EPERM && jailed(cred)) {
+		/*
+		 * The audit system calls historically returned ENOSYS when
+		 * invoked from within a jail, and some userspace applications
+		 * handle that case specially.  Thus, convert the error here.
+		 */
+		error = ENOSYS;
+	}
+	return (error);
+}
+
+static int
+audit_priv_check(struct thread *td, int priv)
+{
+	return (audit_priv_check_cred(td->td_ucred, priv));
+}
+
 /*
  * System call to allow a user space application to submit a BSM audit record
  * to the kernel for inclusion in the audit log.  This function does little
@@ -615,9 +638,7 @@ kern_getauid(struct thread *td, uid_t * __capability auid)
 {
 	int error;
 
-	if (jailed(td->td_ucred))
-		return (ENOSYS);
-	error = priv_check(td, PRIV_AUDIT_GETAUDIT);
+	error = audit_priv_check(td, PRIV_AUDIT_GETAUDIT);
 	if (error)
 		return (error);
 	return (copyout(&td->td_ucred->cr_audit.ai_auid, auid,
@@ -639,8 +660,6 @@ kern_setauid(struct thread *td, uid_t * __capability auid)
 	au_id_t id;
 	int error;
 
-	if (jailed(td->td_ucred))
-		return (ENOSYS);
 	error = copyin(auid, &id, sizeof(id));
 	if (error)
 		return (error);
@@ -654,7 +673,7 @@ kern_setauid(struct thread *td, uid_t * __capability auid)
 	if (error)
 		goto fail;
 #endif
-	error = priv_check_cred(oldcred, PRIV_AUDIT_SETAUDIT);
+	error = audit_priv_check_cred(oldcred, PRIV_AUDIT_SETAUDIT);
 	if (error)
 		goto fail;
 	newcred->cr_audit.ai_auid = id;
@@ -687,9 +706,7 @@ kern_getaudit(struct thread *td, struct auditinfo * __capability auditinfo)
 	int error;
 
 	cred = td->td_ucred;
-	if (jailed(cred))
-		return (ENOSYS);
-	error = priv_check(td, PRIV_AUDIT_GETAUDIT);
+	error = audit_priv_check(td, PRIV_AUDIT_GETAUDIT);
 	if (error)
 		return (error);
 	if (cred->cr_audit.ai_termid.at_type == AU_IPv6)
@@ -718,8 +735,6 @@ kern_setaudit(struct thread *td, struct auditinfo * __capability auditinfo)
 	struct auditinfo ai;
 	int error;
 
-	if (jailed(td->td_ucred))
-		return (ENOSYS);
 	error = copyin(auditinfo, &ai, sizeof(ai));
 	if (error)
 		return (error);
@@ -733,7 +748,7 @@ kern_setaudit(struct thread *td, struct auditinfo * __capability auditinfo)
 	if (error)
 		goto fail;
 #endif
-	error = priv_check_cred(oldcred, PRIV_AUDIT_SETAUDIT);
+	error = audit_priv_check_cred(oldcred, PRIV_AUDIT_SETAUDIT);
 	if (error)
 		goto fail;
 	bzero(&newcred->cr_audit, sizeof(newcred->cr_audit));
@@ -767,11 +782,9 @@ kern_getaudit_addr(struct thread *td,
 {
 	int error;
 
-	if (jailed(td->td_ucred))
-		return (ENOSYS);
 	if (length < sizeof(*auditinfo_addr))
 		return (EOVERFLOW);
-	error = priv_check(td, PRIV_AUDIT_GETAUDIT);
+	error = audit_priv_check(td, PRIV_AUDIT_GETAUDIT);
 	if (error)
 		return (error);
 	return (copyout(&td->td_ucred->cr_audit, auditinfo_addr,
@@ -794,8 +807,6 @@ kern_setaudit_addr(struct thread *td,
 	struct auditinfo_addr aia;
 	int error;
 
-	if (jailed(td->td_ucred))
-		return (ENOSYS);
 	error = copyin(auditinfo_addr, &aia, sizeof(aia));
 	if (error)
 		return (error);
@@ -812,7 +823,7 @@ kern_setaudit_addr(struct thread *td,
 	if (error)
 		goto fail;
 #endif
-	error = priv_check_cred(oldcred, PRIV_AUDIT_SETAUDIT);
+	error = audit_priv_check_cred(oldcred, PRIV_AUDIT_SETAUDIT);
 	if (error)
 		goto fail;
 	newcred->cr_audit = aia;
