@@ -253,7 +253,7 @@ static inline void cclear(char * a){
 }
 static inline void* csetcappoison(char * a){
    void * ptr;
-   asm volatile("csetcappoison %0, %1" :"=C"(ptr) : "C"(a));
+   asm volatile("csetcappermpoison %0, %1" :"=C"(ptr) : "C"(a));
    return ptr;
 }
 
@@ -1731,7 +1731,7 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 		if(allocated_region != NULL)
 			cclear((char*)(allocated_region+j));
 	}
-	//allocated_region = csetcappoison((char *)allocated_region);
+	allocated_region = csetcappoison((char *)allocated_region);
 	return (allocated_region);
 }
 
@@ -1797,7 +1797,7 @@ mrs_realloc(void *ptr, size_t size)
 	}
 	MRS_UTRACE(UTRACE_MRS_REALLOC, ptr, size, 0, new_alloc);
 
-	//new_alloc = csetcappoison((char *)new_alloc);
+	new_alloc = csetcappoison((char *)new_alloc);
 	return (new_alloc);
 }
 
@@ -1817,12 +1817,12 @@ mrs_free(void *ptr)
 
 	if (ptr == NULL)
 		return;
-	if((long)ptr >= 0x40cda000 && (long) ptr <= 0x40cda040){
-		printf("mrs_free ptr %lx\n", (long) ptr);
-	}
-	if((long)ptr >= 0x40d1b600 && (long) ptr <= 0x40d1b800){
-		printf("mrs_free ptr %lx\n", (long) ptr);
-	}
+	//if((long)ptr >= 0x40cda000 && (long) ptr <= 0x40cda040){
+	//	printf("mrs_free ptr %lx\n", (long) ptr);
+	//}
+	//if((long)ptr >= 0x40d1b600 && (long) ptr <= 0x40d1b800){
+	//	printf("mrs_free ptr %lx\n", (long) ptr);
+	//}
 	
 	/*
 	 * If not offloading, validate the passed-in cap here and
@@ -1885,7 +1885,7 @@ mrs_mallocx(size_t size, int flags)
 		if(ret != NULL)
 			cclear((char*)(ret+j));
 	}
-	//ret = csetcappoison((char *)ret);
+	ret = csetcappoison((char *)ret);
 	return (ret);
 }
 
@@ -1932,7 +1932,7 @@ mrs_rallocx(void *ptr, size_t size, int flags)
 		if(new_alloc != NULL)
 			cclear((char*)(new_alloc+j));
 	}
-	//new_alloc = csetcappoison((char *)new_alloc);
+	new_alloc = csetcappoison((char *)new_alloc);
 	return (new_alloc);
 }
 
