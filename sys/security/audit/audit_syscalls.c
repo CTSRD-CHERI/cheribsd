@@ -615,6 +615,8 @@ kern_getauid(struct thread *td, uid_t * __capability auid)
 {
 	int error;
 
+	if (jailed(td->td_ucred))
+		return (ENOSYS);
 	error = priv_check(td, PRIV_AUDIT_GETAUDIT);
 	if (error)
 		return (error);
@@ -637,6 +639,8 @@ kern_setauid(struct thread *td, uid_t * __capability auid)
 	au_id_t id;
 	int error;
 
+	if (jailed(td->td_ucred))
+		return (ENOSYS);
 	error = copyin(auid, &id, sizeof(id));
 	if (error)
 		return (error);
@@ -683,6 +687,8 @@ kern_getaudit(struct thread *td, struct auditinfo * __capability auditinfo)
 	int error;
 
 	cred = td->td_ucred;
+	if (jailed(cred))
+		return (ENOSYS);
 	error = priv_check(td, PRIV_AUDIT_GETAUDIT);
 	if (error)
 		return (error);
@@ -712,6 +718,8 @@ kern_setaudit(struct thread *td, struct auditinfo * __capability auditinfo)
 	struct auditinfo ai;
 	int error;
 
+	if (jailed(td->td_ucred))
+		return (ENOSYS);
 	error = copyin(auditinfo, &ai, sizeof(ai));
 	if (error)
 		return (error);
@@ -759,6 +767,8 @@ kern_getaudit_addr(struct thread *td,
 {
 	int error;
 
+	if (jailed(td->td_ucred))
+		return (ENOSYS);
 	if (length < sizeof(*auditinfo_addr))
 		return (EOVERFLOW);
 	error = priv_check(td, PRIV_AUDIT_GETAUDIT);
@@ -784,6 +794,8 @@ kern_setaudit_addr(struct thread *td,
 	struct auditinfo_addr aia;
 	int error;
 
+	if (jailed(td->td_ucred))
+		return (ENOSYS);
 	error = copyin(auditinfo_addr, &aia, sizeof(aia));
 	if (error)
 		return (error);
