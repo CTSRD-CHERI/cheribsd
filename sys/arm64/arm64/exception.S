@@ -43,9 +43,9 @@
 .macro	save_registers_head el
 .if \el == 1
 	mov	PTR(18), PTRN(sp)
-	stp	CAP(0),  CAP(1),  [PTRN(sp), #(TF_X - TF_SIZE - 128)]!
+	stp	CAP(0),  CAP(1),  [PTRN(sp), #-(TF_SIZE - TF_X + 128)]!
 .else
-	stp	CAP(0),  CAP(1),  [PTRN(sp), #(TF_X - TF_SIZE)]!
+	stp	CAP(0),  CAP(1),  [PTRN(sp), #-(TF_SIZE - TF_X)]!
 .endif
 	stp	CAP(2),  CAP(3),  [PTRN(sp), #(2  * CAP_WIDTH)]
 	stp	CAP(4),  CAP(5),  [PTRN(sp), #(4  * CAP_WIDTH)]
