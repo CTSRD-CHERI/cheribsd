@@ -326,9 +326,12 @@ MACHINE_CPU += vsx3
 ########## riscv
 . elif ${MACHINE_CPUARCH} == "riscv"
 .  if ${CPUTYPE} == "cheri"
-MACHINE_CPU = cheri
+.warning "CPUTYPE=cheri is deprecated, please use xcheri, zcheri093, or rvy"
+MACHINE_CPU = cheri xcheri
 .  elif ${CPUTYPE} == "xcheri"
-MACHINE_CPU = xcheri
+MACHINE_CPU = cheri xcheri
+.  elif ${CPUTYPE} == "zcheri093"
+MACHINE_CPU = cheri zcheri093
 .  endif
 MACHINE_CPU += riscv
 . endif
@@ -387,7 +390,7 @@ CFLAGS.gcc+= -mabi=spe -mfloat-gprs=double -Wa,-me500
 RISCV_MARCH=	rv64imafdc
 .if ${MACHINE_CPU:Mxcheri}
 RISCV_MARCH:=	${RISCV_MARCH}xcheri
-.elif ${MACHINE_CPU:Mcheri}
+.elif ${MACHINE_CPU:Mzcheri093}
 RISCV_MARCH:=	${RISCV_MARCH}zcherihybrid
 .endif
 

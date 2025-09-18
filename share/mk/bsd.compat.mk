@@ -156,8 +156,10 @@ LIB${_LIBCOMPAT}_RISCV_MARCH=	rv64imafdc
 .if ${COMPAT_ARCH:Mriscv*c*} || ${_LIBCOMPAT:M64C}
 .  if ${__C:Mxcheri}
 LIB${_LIBCOMPAT}_RISCV_MARCH:=	${LIB${_LIBCOMPAT}_RISCV_MARCH}xcheri
-.  else
+.  elif ${__C:Mzcheri093}
 LIB${_LIBCOMPAT}_RISCV_MARCH:=	${LIB${_LIBCOMPAT}_RISCV_MARCH}zcherihybrid
+.  else
+.    error "Invalid CHERI variant"
 .  endif
 .endif
 .endfor
