@@ -32,18 +32,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20221129,
- *   "target_type": "lib",
- *   "changes": [
- *     "other"
- *   ],
- *   "change_comment": "fixes mbtowc_test:mbtowc buffer overrun"
- * }
- * CHERI CHANGES END
- */
 
 /*
  * PRC National Standard GB 18030-2000 encoding of Chinese text.
@@ -122,7 +110,7 @@ _GB18030_mbrtowc(wchar_t * __restrict pwc, const char * __restrict s,
 		pwc = NULL;
 	}
 
-	ncopy = MIN(MIN(MIN(n, MB_CUR_MAX), sizeof(gs->bytes) - gs->count), strlen(s));
+	ncopy = MIN(MIN(n, MB_CUR_MAX), sizeof(gs->bytes) - gs->count);
 	memcpy(gs->bytes + gs->count, s, ncopy);
 	ocount = gs->count;
 	gs->count += ncopy;
