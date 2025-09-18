@@ -186,7 +186,7 @@ CFLAGS+=	-mabi=aapcs
 RISCV_MARCH=	rv64imafdc
 .if ${MACHINE_CPU:Mxcheri}
 RISCV_MARCH:=	${RISCV_MARCH}xcheri
-.elif ${MACHINE_CPU:Mcheri}
+.elif ${MACHINE_CPU:Mzcheri093}
 RISCV_MARCH:=	${RISCV_MARCH}zcherihybrid
 .endif
 
