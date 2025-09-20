@@ -185,6 +185,11 @@ void *mrs_rallocx(void *, size_t, int);
 void mrs_dallocx(void *, int);
 void mrs_sdallocx(void *, size_t, int);
 
+static inline void dczero(char * a){
+  asm volatile("dczero %0, 0(%1)": :"C"(a),"C"(a));
+}
+
+
 void *
 malloc(size_t size)
 {
@@ -304,6 +309,7 @@ void *REAL(malloc_underlying_allocation)(void *);
  * XXX VM_CAPREVOKE_GSZ_MEM_NOMAP from machine/vmparam.h
  */
 static const size_t CAPREVOKE_BITMAP_ALIGNMENT = sizeof(void *);
+static const size_t MALLOC_CACHELINE_ALIGNMENT = 64;
 static const size_t DESCRIPTOR_SLAB_ENTRIES = 10000;
 static const size_t MIN_REVOKE_HEAP_SIZE = 8 * 1024 * 1024;
 
@@ -1506,7 +1512,9 @@ mrs_malloc(size_t size)
 	check_and_perform_flush(false);
 
 	void *allocated_region;
-
+	size = __builtin_align_up(
+			    size,
+			    MALLOC_CACHELINE_ALIGNMENT);
 	/*
 	 * Round up here to make sure there is only one allocation per
 	 * granule without requiring modifications to the underlying
@@ -1520,6 +1528,9 @@ mrs_malloc(size_t size)
 		allocated_region = mrs_real_malloc(CAPREVOKE_BITMAP_ALIGNMENT);
 	else
 		allocated_region = mrs_real_malloc(size);
+	for(int i =0; i< size;i+=64){
+		dczero((char*)(allocated_region+i));
+	}
 	if (allocated_region == NULL) {
 		MRS_UTRACE(UTRACE_MRS_MALLOC, NULL, size, 0,
 		    allocated_region);
