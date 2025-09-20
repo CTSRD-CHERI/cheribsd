@@ -1528,7 +1528,7 @@ mrs_malloc(size_t size)
 		allocated_region = mrs_real_malloc(CAPREVOKE_BITMAP_ALIGNMENT);
 	else
 		allocated_region = mrs_real_malloc(size);
-	for(int i =0; i< size;i+=64){
+	for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT){
 		dczero((char*)(allocated_region+i));
 	}
 	if (allocated_region == NULL) {
@@ -1585,6 +1585,9 @@ mrs_calloc(size_t number, size_t size)
 	 * the alignment requirement for small sizes but that seems like an
 	 * extraordinarily unlikely and highly questionable optimization.
 	 */
+	size = __builtin_align_up(
+		    size,
+		    MALLOC_CACHELINE_ALIGNMENT);
 	if (!__builtin_mul_overflow(number, size, &tmpsize) &&
 	    tmpsize < CAPREVOKE_BITMAP_ALIGNMENT)
 		allocated_region = mrs_real_calloc(1, CAPREVOKE_BITMAP_ALIGNMENT);
@@ -1593,11 +1596,14 @@ mrs_calloc(size_t number, size_t size)
 	if (allocated_region == NULL) {
 		MRS_UTRACE(UTRACE_MRS_CALLOC, NULL, size, number,
 		    allocated_region);
+		for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT)
+			dczero((char*)(allocated_region+i));
 		return (allocated_region);
 	}
-
+	
 	increment_allocated_size(allocated_region);
-
+	for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT)
+		dczero((char*)(allocated_region+i));
 	/*
 	 * This causes problems if our library is initialized before
 	 * the thread library.
@@ -1612,10 +1618,13 @@ static int
 mrs_real_posix_memalign(void **ptr, size_t alignment, size_t size)
 {
 	int ret;
-
+	size = __builtin_align_up(
+		    size,
+		    MALLOC_CACHELINE_ALIGNMENT);
 	ret = REAL(posix_memalign)(ptr, alignment, size);
 	if (ret == 0)
 		*ptr = mrs_bound_pointer(*ptr, size);
+
 	return (ret);
 }
 
@@ -1632,11 +1641,13 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 
 	check_and_perform_flush(false);
 
-	if (alignment < CAPREVOKE_BITMAP_ALIGNMENT)
-		alignment = CAPREVOKE_BITMAP_ALIGNMENT;
+	if (alignment < MALLOC_CACHELINE_ALIGNMENT)
+		alignment = MALLOC_CACHELINE_ALIGNMENT;
 
 	int ret = mrs_real_posix_memalign(ptr, alignment, size);
+	
 	if (ret != 0) {
+
 		return (ret);
 	}
 
@@ -1647,6 +1658,7 @@ mrs_posix_memalign(void **ptr, size_t alignment, size_t size)
 	increment_allocated_size(*ptr);
 
 	MRS_UTRACE(UTRACE_MRS_POSIX_MEMALIGN, NULL, size, alignment, *ptr);
+
 	return (ret);
 }
 
@@ -1669,13 +1681,15 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 
 	check_and_perform_flush(false);
 
-	if (alignment < CAPREVOKE_BITMAP_ALIGNMENT)
-		alignment = CAPREVOKE_BITMAP_ALIGNMENT;
+	if (alignment < MALLOC_CACHELINE_ALIGNMENT)
+		alignment = MALLOC_CACHELINE_ALIGNMENT;
 
 	void *allocated_region = mrs_real_aligned_alloc(alignment, size);
 	if (allocated_region == NULL) {
 		MRS_UTRACE(UTRACE_MRS_ALIGNED_ALLOC, NULL, size, alignment,
 		    allocated_region);
+		for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT)
+			dczero((char*)(allocated_region+i));
 		return (allocated_region);
 	}
 
@@ -1687,6 +1701,8 @@ mrs_aligned_alloc(size_t alignment, size_t size)
 
 	MRS_UTRACE(UTRACE_MRS_ALIGNED_ALLOC, NULL, size, alignment,
 	    allocated_region);
+	for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT)
+			dczero((char*)(allocated_region+i));
 	return (allocated_region);
 }
 
@@ -1713,7 +1729,9 @@ mrs_realloc(void *ptr, size_t size)
 	size_t old_size = cheri_getlen(ptr);
 	mrs_debug_printf("mrs_realloc: called ptr %p ptr size %zu new size %zu\n",
 	    ptr, old_size, size);
-
+	size = __builtin_align_up(
+		    size,
+		    MALLOC_CACHELINE_ALIGNMENT);
 	/*
 	 * If the new size fits in the current allocation and we won't
 	 * be wasting too much space, just return the existing pointer.
@@ -1728,9 +1746,10 @@ mrs_realloc(void *ptr, size_t size)
 	if (ptr != NULL && cheri_gettag(ptr) && cheri_getoffset(ptr) == 0 &&
 	    size <= old_size && old_size - size <= (old_size >> 1))
 		return (ptr);
-
+	
 	void *new_alloc = mrs_malloc(size);
-
+	for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT)
+		dczero((char*)(new_alloc+i));
 	/*
 	 * Per the C standard, copy and free IFF the old pointer is valid
 	 * and allocation succeeds.
@@ -1804,7 +1823,9 @@ mrs_mallocx(size_t size, int flags)
 
 	if (!quarantining)
 		return (mrs_real_mallocx(size, flags));
-
+	size = __builtin_align_up(
+		    size,
+		    MALLOC_CACHELINE_ALIGNMENT);
 	if (align <= CAPREVOKE_BITMAP_ALIGNMENT)
 		ret = mrs_malloc(size);
 	else if (mrs_posix_memalign(&ret, size, align) != 0)
@@ -1815,6 +1836,8 @@ mrs_mallocx(size_t size, int flags)
 	if (ret != NULL && (flags & MALLOCX_ZERO) != 0)
 		clear_region(ret, cheri_getlen(ret));
 #endif
+	for(int i =0; i< size;i+=MALLOC_CACHELINE_ALIGNMENT)
+		dczero((char*)(ret+i));
 	return (ret);
 }
 
