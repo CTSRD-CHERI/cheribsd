@@ -782,6 +782,8 @@ kern_cheri_revoke_get_shadow(struct thread *td, int flags,
 		if (cheri_gettag(arena) == 0)
 			return (EINVAL);
 
+		/* XXX-AM: Should we reject sealed capabilities? */
+
 		arena_perms = cheri_getperm(arena);
 
 		if ((arena_perms & CHERI_PERM_SW_VMEM) == 0)
