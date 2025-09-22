@@ -7,7 +7,7 @@ ident GFE
 
 options 	HZ=100
 
-makeoptions 	KERNEL_LMA=0xc0200000
+makeoptions 	KERNEL_LMA=0x80200000
 
 options 	BREAK_TO_DEBUGGER
 options 	ALT_BREAK_TO_DEBUGGER
