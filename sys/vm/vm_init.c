@@ -162,6 +162,10 @@ vm_mem_init(void *dummy)
 	pmap_init();
 	vm_pager_init();
 
+#ifdef CHERI_CAPREVOKE_KERNEL
+	kmem_cheri_revoke_init();
+#endif
+
 #ifdef INVARIANTS
 	vm_check_pagesizes();
 #endif
