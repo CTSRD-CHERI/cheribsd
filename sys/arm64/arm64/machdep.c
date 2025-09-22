@@ -881,7 +881,6 @@ initarm(struct arm64_bootparams *abp)
 #ifdef CHERI_CAPREVOKE_KERNEL
 	pmap_bootstrap_kshadow();
 #endif
-
 	physmem_init_kernel_globals();
 
 	valid = bus_probe();
