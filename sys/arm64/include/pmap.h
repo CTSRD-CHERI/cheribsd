@@ -200,6 +200,9 @@ struct arm64_bootparams;
 void	pmap_bootstrap_san(void);
 void	pmap_san_enter(vm_offset_t);
 #endif
+#ifdef CHERI_CAPREVOKE_KERNEL
+void	pmap_bootstrap_kshadow(void);
+#endif
 
 #endif	/* _KERNEL */
 

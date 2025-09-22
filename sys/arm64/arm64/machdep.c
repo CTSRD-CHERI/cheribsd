@@ -1014,6 +1014,9 @@ initarm(struct arm64_bootparams *abp)
 #if defined(KASAN) || defined(KMSAN)
 	pmap_bootstrap_san();
 #endif
+#ifdef CHERI_CAPREVOKE_KERNEL
+	pmap_bootstrap_kshadow();
+#endif
 
 	physmem_init_kernel_globals();
 

@@ -6860,6 +6860,124 @@ pmap_assert_consistent_clg(pmap_t pmap, vm_offset_t va)
 		panic("impossible?");
 	}
 }
+
+#ifdef CHERI_CAPREVOKE_KERNEL
+
+#define	PMAP_KSHADOW_PTE_BITS (ATTR_AF | pmap_sh_attr |	ATTR_KERN_GP | \
+    ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK) | ATTR_S1_AP(ATTR_S1_AP_RW) | ATTR_S1_XN)
+
+static void
+pmap_bootstrap_kshadow_allocate_l2(vm_paddr_t plow, vm_paddr_t phigh,
+    vm_offset_t *kva)
+{
+	const size_t scale = sizeof(void *) * 8;
+	pd_entry_t *l2;
+	vm_paddr_t pa;
+	vm_offset_t shadow_va;
+
+	pa = rounddown2(phigh - L2_SIZE, L2_SIZE);
+	shadow_va = CHERI_REVOKE_KSHADOW_MIN;
+	for (; pa >= plow && *kva < kernel_vm_end;
+	     *kva += L2_SIZE * scale, pa -= L2_SIZE, shadow_va += L2_SIZE) {
+		l2 = pmap_l2(kernel_pmap, shadow_va);
+		KASSERT(cheri_gettag(l2), ("Untagged L2 pointer %#p", l2)); // XXX tag fault?
+		bzero((void *)PHYS_TO_DMAP(pa), L2_SIZE);
+		physmem_exclude_region(pa, L2_SIZE, EXFLAG_NOALLOC);
+		pmap_store(l2, PHYS_TO_PTE(pa) | L2_BLOCK | PMAP_KSHADOW_PTE_BITS);
+	}
+}
+
+/*
+ * XXX-AM: I wonder whether this can be unified with pmap_bootstrap_san(),
+ * as they are both initializing a shadow bitmap, just in different places.
+ *
+ * XXX By using virtual_avail and virtual_end we cut out a number of
+ * structures from the shadow map:
+ * - the base kernel mapping
+ * - the early devmap reserved pages
+ * - the dynamic per-cpu ares
+ * - msgbuf
+ * - BIOS/ACPI mappings
+ * - the direct map
+ *
+ * Presumably we want to have the option of revoking capabilities
+ * to kernel globals and such. Similarly we need to eventually support
+ * the direct map.
+ */
+void
+pmap_bootstrap_kshadow(void)
+{
+	pd_entry_t *l0, *l1;
+	vm_paddr_t l1_pa, l2_pa;
+	vm_paddr_t plow, phigh;
+	vm_offset_t kva;
+	int i;
+
+	/*
+	 * Rebuild physmap, we may have excluded more regions from
+	 * allocation since pmap_bootstrap(). See pmap_bootstrap_san1().
+	 */
+	physmap_idx = physmem_avail(physmap, nitems(physmap));
+
+	/*
+	 * Grab two pages for the L1 and L2 tables off the top of
+	 * the first segment.
+	 */
+	for (i = 0; physmap[i] != 0; i += 2) {
+		plow = roundup2(physmap[i], PAGE_SIZE);
+		phigh = physmap[i + 1];
+		if (phigh - plow >= 2 * PAGE_SIZE) {
+			l1_pa = plow;
+			l2_pa = plow + PAGE_SIZE;
+			physmem_exclude_region(l1_pa, 2 * PAGE_SIZE,
+			    EXFLAG_NOALLOC);
+			break;
+		}
+	}
+	if (i == physmap_idx - 2)
+		panic("Could not find phys region for revoker shadow map PT");
+
+	/*
+	 * Install the L0 entry which will suffice for the entire
+	 * shadow bitmap.
+	 */
+	l0 = pmap_l0(kernel_pmap, CHERI_REVOKE_KSHADOW_MIN);
+	KASSERT((pmap_load(l0) & ATTR_DESCR_VALID) == 0,
+	    ("Shadow map L0 PTE already installed"));
+	pagezero((void *)PHYS_TO_DMAP_PAGE(l1_pa));
+	pmap_store(l0, L0_TABLE | PHYS_TO_PTE(l1_pa));
+
+	/*
+	 * Populate L1 entries necessary for the initial shadow map.
+	 * Note that pmap_bootstrap() expects that the loader initializes the
+	 * L2 table to map the kernel, so the initial shadow map will be 1/128th
+	 * of that size. Therefore, a single L1 entry is more than enough
+	 * for the initial kernel map.
+	 */
+	l1 = pmap_l0_to_l1(l0, CHERI_REVOKE_KSHADOW_MIN);
+	KASSERT((pmap_load(l1) & ATTR_DESCR_VALID) == 0,
+	    ("Shadow map L1 PTE already installed"));
+	pagezero((void *)PHYS_TO_DMAP_PAGE(l2_pa));
+
+	kva = KERNBASE;
+	/* Populate the L2 table using L2-aligned blocks in high memory */
+	for (i = physmap_idx - 2; i >= 0; i -= 2) {
+		plow = roundup2(physmap[i], L2_SIZE);
+		phigh = physmap[i + 1];
+		if (phigh - plow >= L2_SIZE) {
+			pmap_bootstrap_kshadow_allocate_l2(plow, phigh, &kva);
+			if (kva >= kernel_vm_end)
+				break;
+		}
+	}
+	if (i < 0)
+		panic("Could not find phys region for revoker shadow map");
+}
+
+/* void pmap_revoke_shadow_enter(void); */
+/* void pmap_revoke_shadow_remove(void); */
+
+#endif /* CHERI_CAPREVOKE_KERNEL*/
 #endif /* CHERI_CAPREVOKE */
 #endif /* __has_feature(capabilities) */
 
