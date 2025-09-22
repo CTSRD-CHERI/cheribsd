@@ -208,6 +208,7 @@ SUBDIR=	\
 	kgssapi \
 	kgssapi_krb5 \
 	khelp \
+	${_krevoke_test} \
 	krpc \
 	ksyms \
 	le \
@@ -932,6 +933,10 @@ BROKEN_MODULES+=dpaa2
 BROKEN_MODULES+=ena
 BROKEN_MODULES+=linprocfs linux64 linux_common
 BROKEN_MODULES+=mlx4 mlx4en mlx5 mlx5en
+.endif
+
+.if ${MACHINE_CPUARCH} == "aarch64" && ${MACHINE_ABI:Mpurecap} && ${KERN_OPTS:MCHERI_CAPREVOKE_KERNEL}
+_krevoke_test=		krevoke_test
 .endif
 
 SUBDIR+=${MODULES_EXTRA}
