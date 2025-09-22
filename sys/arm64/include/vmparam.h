@@ -158,6 +158,9 @@
  *                  0xfffffeffffffffff  End of DMAP
  *                  0xffffa00000000000  Start of DMAP
  *
+ *                  0xffff0300ffffffff  End of CAPREVOKE shadow bitmap
+ *                  0xffff030000000000  Start of CAPREVOKE shadow bitmap
+ *
  *                  0xffff027fffffffff  End of KMSAN origin map
  *                  0xffff020000000000  Start of KMSAN origin map
  *
@@ -294,6 +297,12 @@
 #define	KERNBASE		(VM_MIN_KERNEL_ADDRESS)
 #define	SHAREDPAGE		(VM_MAXUSER_ADDRESS - PAGE_SIZE)
 #define	USRSTACK		SHAREDPAGE
+
+#ifdef CHERI_CAPREVOKE_KERNEL
+/* 4GiB kernel shadow bitmap location */
+#define	CHERI_REVOKE_KSHADOW_MIN (0xffff030000000000)
+#define	CHERI_REVOKE_KSHADOW_MAX (0xffff030100000000)
+#endif
 
 /*
  * How many physical pages per kmem arena virtual page.
