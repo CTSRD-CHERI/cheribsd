@@ -163,6 +163,16 @@ extern int security_cheri_runtime_revocation_async;
 
 struct vmspace;
 void cheri_revoke_vmspace_fork(struct vmspace *dst, struct vmspace *src);
+
+#ifdef CHERI_CAPREVOKE_KERNEL
+extern struct vm_object kernel_shadow_object_store;
+#define	kernel_shadow_object (&kernel_shadow_object_store)
+
+extern struct cheri_revoke_info kernel_revoke_info_store;
+#define	kernel_revoke_info (&kernel_revoke_info_store)
+
+void kmem_cheri_revoke_init(void);
+#endif
 #endif
 
 #endif /* !__SYS_CHERI_REVOKE_KERN_H__ */
