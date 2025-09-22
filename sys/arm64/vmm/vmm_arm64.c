@@ -296,7 +296,6 @@ vmmops_modinit(int ipinum)
 	vm_offset_t next_hyp_va;
 	vm_paddr_t vmm_base;
 	uint64_t id_aa64mmfr0_el1, pa_range_bits, pa_range_field;
-	uint64_t cnthctl_el2;
 	int cpu, i;
 	bool rv __diagused;
 
@@ -523,10 +522,9 @@ vmmops_modinit(int ipinum)
 			el2_vmem_add(next_hyp_va,
 			    HYP_VM_MAX_ADDRESS - next_hyp_va);
 	}
-	cnthctl_el2 = vmm_read_reg(HYP_REG_CNTHCTL);
 
 	vgic_init();
-	vtimer_init(cnthctl_el2);
+	vtimer_init();
 
 	return (0);
 }
