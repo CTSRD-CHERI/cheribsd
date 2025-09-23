@@ -895,6 +895,7 @@ struct proc {
 						   sync core registered */
 #define	P2_MEMBAR_GLOBE		0x00400000	/* membar global expedited
 						   registered */
+#define	P2_HWC			0x00800000	/* hardware counters */
 
 #define	P2_CHERI_C18N_ENABLE	0x10000000	/* Force enable compartmentalisation */
 #define	P2_CHERI_C18N_DISABLE	0x20000000	/* Force disable compartmentalisation */

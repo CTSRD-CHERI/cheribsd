@@ -72,6 +72,9 @@ int __read_mostly (*pmc_hook)(struct thread *td, int function, void *arg) = NULL
 /* Interrupt handler */
 int __read_mostly (*pmc_intr)(struct trapframe *tf) = NULL;
 
+/* HWC hooks */
+void __read_mostly (*hwc_hook)(struct thread *td, int func, void *arg) = NULL;
+
 DPCPU_DEFINE(uint8_t, pmc_sampled);
 
 /*

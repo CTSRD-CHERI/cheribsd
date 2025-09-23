@@ -1,0 +1,20 @@
+mhpmcounters {
+	mhpmcounter = {
+		id = 3;
+		name = 'dtlb read miss';
+		event_id = 0x10019;
+		enabled = true;
+	}
+	mhpmcounter = {
+		id = 4;
+		name = 'dtlb write miss';
+		event_id = 0x1001B;
+		enabled = true;
+	}
+	mhpmcounter = {
+		id = 5;
+		name = 'itlb prefetch miss';
+		event_id = 0x10021;
+		enabled = true;
+	}
+}

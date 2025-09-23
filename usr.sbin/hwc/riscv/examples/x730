@@ -1,0 +1,612 @@
+# 
+# Codasip X730 event id table.
+# Counter IDs available: 3 to 6.
+# 
+mhpmcounters {
+	mhpmcounter = {
+		id = 3;
+		name = 'RISC-V Exception taken';
+		event_id = 0x001;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'CHERI Exception taken (distinguished by mcause=0x1c)';
+		event_id = 0x002;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Interrupt taken';
+		event_id = 0x003;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Integer/FP Load committed';
+		event_id = 0x004;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Integer/FP Store committed';
+		event_id = 0x005;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Integer/FP Atomic committed';
+		event_id = 0x006;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Capability (XLEN*2-1 width) Load committed';
+		event_id = 0x007;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Capability (XLEN*2-1 width) Store committed';
+		event_id = 0x008;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Capability (XLEN*2-1 width) Atomic committed';
+		event_id = 0x009;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Any instruction committed in Integer Pointer Mode';
+		event_id = 0x00a;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Any instruction committed in Capability Pointer Mode';
+		event_id = 0x00b;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'CCU_I0_ALU_I1 class instruction committed in Integer Pointer Mode';
+		event_id = 0x100;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'CSR_I0_ALU_I1 class instruction committed in Integer Pointer Mode';
+		event_id = 0x101;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'EARLY_ALU_DUAL class instruction committed in Integer Pointer Mode';
+		event_id = 0x102;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'EARLY_ALU_DUAL_SINGLE class instruction committed in Integer Pointer Mode';
+		event_id = 0x103;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'EARLY_LATE_ALU_DUAL class instruction committed in Integer Pointer Mode';
+		event_id = 0x104;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'FPU_I0_ALU_I1 class instruction committed in Integer Pointer Mode';
+		event_id = 0x105;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'LSU_ALU_DUAL class instruction committed in Integer Pointer Mode';
+		event_id = 0x106;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'MUL_ALU_DUAL class instruction committed in Integer Pointer Mode';
+		event_id = 0x107;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'SINGLE class instruction committed in Integer Pointer Mode';
+		event_id = 0x108;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'CCU_I0_ALU_I1 class instruction committed in CHERI mode';
+		event_id = 0x200;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'CSR_I0_ALU_I1 class instruction committed in CHERI mode';
+		event_id = 0x201;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'EARLY_ALU_DUAL class instruction committed in CHERI mode';
+		event_id = 0x202;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'EARLY_ALU_DUAL_SINGLE class instruction committed in CHERI mode';
+		event_id = 0x203;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'EARLY_LATE_ALU_DUAL class instruction committed in CHERI mode';
+		event_id = 0x204;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'FPU_I0_ALU_I1 class instruction committed in CHERI mode';
+		event_id = 0x205;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'LSU_ALU_DUAL class instruction committed in CHERI mode';
+		event_id = 0x206;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'MUL_ALU_DUAL class instruction committed in CHERI mode';
+		event_id = 0x207;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'SINGLE class instruction committed in CHERI mode';
+		event_id = 0x208;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed not taken conditional branch on i0';
+		event_id = 0x300;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed taken conditional branch on i0';
+		event_id = 0x301;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed inferable call on i0';
+		event_id = 0x302;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed uninferable call on i0';
+		event_id = 0x303;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed uninferable tail-call on i0';
+		event_id = 0x304;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed inferable tail-call on i0';
+		event_id = 0x305;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed co-routine swap on i0';
+		event_id = 0x306;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed return on i0';
+		event_id = 0x307;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed other uninferable jump on i0';
+		event_id = 0x308;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed other inferable jump on i0';
+		event_id = 0x309;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed not taken conditional branch on i1';
+		event_id = 0x310;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed taken conditional branch on i1';
+		event_id = 0x311;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed inferable call on i1';
+		event_id = 0x312;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed uninferable call on i1';
+		event_id = 0x313;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed uninferable tail-call on i1';
+		event_id = 0x314;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed inferable tail-call on i1';
+		event_id = 0x315;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed co-routine swap on i1';
+		event_id = 0x316;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed return on i1';
+		event_id = 0x317;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed other uninferable jump on i1';
+		event_id = 0x318;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed other inferable jump on i1';
+		event_id = 0x319;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed and mispredicted not taken conditional branch on i0';
+		event_id = 0x330;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed and mispredicted taken conditional branch on i0';
+		event_id = 0x331;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed and mispredicted uninferable call on i0';
+		event_id = 0x332;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed and mispredicted uninferable tail-call on i0';
+		event_id = 0x333;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed and mispredicted co-routine swap on i0';
+		event_id = 0x334;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed and mispredicted return on i0';
+		event_id = 0x335;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed and mispredicted other uninferable jump on i0';
+		event_id = 0x336;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed and mispredicted not taken conditional branch on i1';
+		event_id = 0x340;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed and mispredicted taken conditional branch on i1';
+		event_id = 0x341;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed and mispredicted uninferable call on i1';
+		event_id = 0x342;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed and mispredicted uninferable tail-call on i1';
+		event_id = 0x343;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed and mispredicted co-routine swap on i1';
+		event_id = 0x344;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed and mispredicted return on i1';
+		event_id = 0x345;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Committed and mispredicted other uninferable jump on i1';
+		event_id = 0x346;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Cycles with zero instructions available from the Instruction Queue';
+		event_id = 0x800;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Cycles with one instruction available from the Instruction Queue';
+		event_id = 0x801;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Cycles with two instructions available from the Instruction Queue';
+		event_id = 0x802;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Cycles with zero instructions issued';
+		event_id = 0x803;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Cycles with one instruction issued';
+		event_id = 0x804;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Cycles with two instructions issued';
+		event_id = 0x805;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'i0 Issue stall due to RAW hazard';
+		event_id = 0x806;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'i1 Issue stall due to RAW hazard';
+		event_id = 0x807;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'i0 Issue stall due to AGU hazard (subset of RAW hazard)';
+		event_id = 0x808;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'i1 Issue stall due to AGU hazard (subset of RAW hazard)';
+		event_id = 0x809;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'i1 not issued due to instruction mapping to i0 only';
+		event_id = 0x80a;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'LSU stall cycle';
+		event_id = 0x905;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'SINGLE class pipelined stalls';
+		event_id = 0x906;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Branch to next PC due to CHERI tag clear';
+		event_id = 0x908;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'I$ miss when I$ is enabled';
+		event_id = 0xa00;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'ITLB miss';
+		event_id = 0xa01;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'A PTW triggered by an ITLB miss that found a 1GB leaf page';
+		event_id = 0xa03;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'A PTW triggered by an ITLB miss that found a 2MB leaf page';
+		event_id = 0xa04;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'A PTW triggered by an ITLB miss that found a 4KB leaf page';
+		event_id = 0xa05;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'IQ underflow';
+		event_id = 0xa07;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'IQ full';
+		event_id = 0xa08;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Fetch stall due to BPU RAM contention';
+		event_id = 0xa10;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Speculative prediction originating from the Static Branch Predictor 0';
+		event_id = 0xa11;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Speculative prediction originating from the Static Branch Predictor 1';
+		event_id = 0xa12;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Speculative prediction originating from the Static Branch Predictor 2';
+		event_id = 0xa13;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Speculative prediction originating from the Static Branch Predictor 3';
+		event_id = 0xa14;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Speculative prediction originating from the RAS';
+		event_id = 0xa15;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Speculative prediction originating from the ITB';
+		event_id = 0xa16;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Speculative prediction originating from the BTB';
+		event_id = 0xa17;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Speculative prediction originating from the uPredictor';
+		event_id = 0xa18;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'D$ miss when D$ is enabled';
+		event_id = 0xb00;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'DTLB miss';
+		event_id = 0xb01;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'Main TLB miss';
+		event_id = 0xb02;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'A PTW triggered by a DTLB miss that found a 1GB leaf page';
+		event_id = 0xb03;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'A PTW triggered by a DTLB miss that found a 2MB leaf page';
+		event_id = 0xb04;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'A PTW triggered by a DTLB miss that found a 4KB leaf page';
+		event_id = 0xb05;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'D$ physical index predictor hit';
+		event_id = 0xb10;
+		enabled = false;
+	}
+	mhpmcounter = {
+		id = 3;
+		name = 'D$ physical index predictor miss';
+		event_id = 0xb11;
+		enabled = false;
+	}
+}
