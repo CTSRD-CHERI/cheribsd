@@ -6872,7 +6872,7 @@ _Static_assert((CHERI_REVOKE_KSHADOW_MAX - CHERI_REVOKE_KSHADOW_MIN) /
     "Shadow bitmat exceeds L1 table size");
 
 static void
-pmap_bootstrap_kshadow_allocate_l2(vm_paddr_t plow, vm_paddr_t phigh,
+pmap_krevoke_bootstrap_allocate_l2(vm_paddr_t plow, vm_paddr_t phigh,
     vm_offset_t *kva, vm_offset_t *shadow_va)
 {
 	pd_entry_t *l2;
@@ -6911,7 +6911,7 @@ pmap_bootstrap_kshadow_allocate_l2(vm_paddr_t plow, vm_paddr_t phigh,
  * the direct map. We should be able to add these at a later point.
  */
 void
-pmap_bootstrap_kshadow(void)
+pmap_krevoke_bootstrap(void)
 {
 	pd_entry_t *l0, *l1;
 	vm_paddr_t l1_pa, l2_pa;
@@ -6974,7 +6974,7 @@ pmap_bootstrap_kshadow(void)
 		plow = roundup2(physmap[i], L2_SIZE);
 		phigh = physmap[i + 1];
 		if (phigh - plow >= L2_SIZE) {
-			pmap_bootstrap_kshadow_allocate_l2(plow, phigh, &kva,
+			pmap_krevoke_bootstrap_allocate_l2(plow, phigh, &kva,
 			    &shadow_va);
 			if (kva >= kernel_vm_end)
 				break;

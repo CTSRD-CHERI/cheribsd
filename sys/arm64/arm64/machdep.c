@@ -95,6 +95,7 @@
 #include <cheri/cheric.h>
 #ifdef CHERI_CAPREVOKE
 #include <cheri/revoke.h>
+#include <cheri/revoke_kern.h>
 #include <vm/vm_cheri_revoke.h>
 #endif
 #endif
@@ -1015,7 +1016,7 @@ initarm(struct arm64_bootparams *abp)
 	pmap_bootstrap_san();
 #endif
 #ifdef CHERI_CAPREVOKE_KERNEL
-	pmap_bootstrap_kshadow();
+	pmap_krevoke_bootstrap();
 #endif
 	physmem_init_kernel_globals();
 

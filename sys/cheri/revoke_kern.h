@@ -172,6 +172,9 @@ extern struct cheri_revoke_info kernel_revoke_info_store;
 #define	kernel_revoke_info (&kernel_revoke_info_store)
 
 void kmem_cheri_revoke_init(void);
+
+/* MD interface */
+void pmap_krevoke_bootstrap(void);
 #endif
 #endif
 
