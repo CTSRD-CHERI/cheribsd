@@ -1324,7 +1324,7 @@ nfs_lookup(struct vop_lookup_args *ap)
 		newvp = NULL;
 	} else if (opennamed && cnp->cn_namelen == 1 &&
 	    *cnp->cn_nameptr == '.') {
-		VREF(dvp);
+		vref(dvp);
 		*vpp = dvp;
 		return (0);
 	}
@@ -1586,7 +1586,7 @@ handle_error:
 			    0, 1);
 	} else if (NFS_CMPFH(np, nfhp->nfh_fh, nfhp->nfh_len)) {
 		free(nfhp, M_NFSFH);
-		VREF(dvp);
+		vref(dvp);
 		newvp = dvp;
 		if (attrflag)
 			(void) nfscl_loadattrcache(&newvp, &nfsva, NULL,
@@ -2862,7 +2862,7 @@ nfs_sillyrename(struct vnode *dvp, struct vnode *vp, struct componentname *cnp)
 	    M_NEWNFSREQ, M_WAITOK);
 	sp->s_cred = crhold(cnp->cn_cred);
 	sp->s_dvp = dvp;
-	VREF(dvp);
+	vref(dvp);
 
 	/* 
 	 * Fudge together a funny name.
@@ -2960,7 +2960,7 @@ nfs_lookitup(struct vnode *dvp, char *name, int len, struct ucred *cred,
 		    newvp = NFSTOV(np);
 		} else if (NFS_CMPFH(dnp, nfhp->nfh_fh, nfhp->nfh_len)) {
 		    free(nfhp, M_NFSFH);
-		    VREF(dvp);
+		    vref(dvp);
 		    newvp = dvp;
 		} else {
 		    cn.cn_nameptr = name;
