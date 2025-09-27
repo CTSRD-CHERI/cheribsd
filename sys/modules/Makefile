@@ -392,6 +392,7 @@ SUBDIR=	\
 	${_sym} \
 	${_syscons} \
 	sysvipc \
+	tagscan \
 	tarfs \
 	tcp \
 	${_ti} \
