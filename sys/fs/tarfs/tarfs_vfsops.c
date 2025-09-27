@@ -1202,7 +1202,7 @@ tarfs_vget(struct mount *mp, ino_t ino, int lkflags, struct vnode **vpp)
 	return (0);
 
 bad:
-	*vpp = NULLVP;
+	*vpp = NULL;
 	return (error);
 }
 
@@ -1221,7 +1221,7 @@ tarfs_fhtovp(struct mount *mp, struct fid *fhp, int flags, struct vnode **vpp)
 
 	error = VFS_VGET(mp, tfp->ino, LK_EXCLUSIVE, &nvp);
 	if (error != 0) {
-		*vpp = NULLVP;
+		*vpp = NULL;
 		return (error);
 	}
 	tnp = VP_TO_TARFS_NODE(nvp);
@@ -1229,7 +1229,7 @@ tarfs_fhtovp(struct mount *mp, struct fid *fhp, int flags, struct vnode **vpp)
 	    tnp->gen != tfp->gen ||
 	    tnp->nlink <= 0) {
 		vput(nvp);
-		*vpp = NULLVP;
+		*vpp = NULL;
 		return (ESTALE);
 	}
 	*vpp = nvp;

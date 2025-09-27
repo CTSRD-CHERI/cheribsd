@@ -235,7 +235,7 @@ p9fs_lookup(struct vop_lookup_args *ap)
 	dnp = P9FS_VTON(dvp);
 	error = 0;
 	flags = cnp->cn_flags;
-	*vpp = NULLVP;
+	*vpp = NULL;
 
 	if (dnp == NULL)
 		return (ENOENT);
@@ -331,7 +331,7 @@ p9fs_lookup(struct vop_lookup_args *ap)
 		else
 			vrele(vp);
 
-		*vpp = NULLVP;
+		*vpp = NULL;
 	} else if (error == ENOENT) {
 		if (VN_IS_DOOMED(dvp))
 			goto out;
@@ -343,7 +343,7 @@ p9fs_lookup(struct vop_lookup_args *ap)
 	}
 	/* Reset values */
 	error = 0;
-	vp = NULLVP;
+	vp = NULL;
 
 	tmpchr = cnp->cn_nameptr[cnp->cn_namelen];
 	cnp->cn_nameptr[cnp->cn_namelen] = '\0';
