@@ -99,6 +99,7 @@ SUBDIR=	adduser \
 	${_valectl} \
 	vigr \
 	vipw \
+	virtual_oss \
 	wake \
 	watch \
 	watchdogd \
