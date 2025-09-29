@@ -33,6 +33,9 @@
 #include <sys/_domainset.h>
 #include <sys/_task.h>
 
+#include <cheri/revoke.h>
+#include <cheri/revoke_kern.h>
+
 /* 
  * This file includes definitions, structures, prototypes, and inlines that
  * should not be used outside of the actual implementation of UMA.

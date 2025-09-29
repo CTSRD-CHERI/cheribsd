@@ -4646,6 +4646,23 @@ uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
 			goto zfree_item;
 	}
 
+#ifdef CHERI_CAPREVOKE_KERNEL
+	/*
+	 * Currently we bypass cache logic for KREVOKE zones.
+	 * this is sub-optimal and I'd like to use the revokebucket.
+	 * XXX-AM: The item_dtor should only be called after revocation.
+	 * Currently, it is called in the wrong order.
+	 *
+	 * XXX-AM: When the zone enables revocation, attempt to free the item to
+	 * the per-CPU quarantine bucket. In order to reuse items as fast
+	 * as possible, attempt to drain the quarantine bucket into the
+	 * freebucket.
+	 */
+	if ((uz_flags & UMA_ZONE_KREVOKE) != 0) {
+		goto zfree_item;
+	}
+#endif
+
 	/*
 	 * If possible, free to the per-CPU cache.  There are two
 	 * requirements for safe access to the per-CPU cache: (1) the thread
@@ -5012,6 +5029,19 @@ zone_free_item(uma_zone_t zone, void *item, void *udata, enum zfreeskip skip)
 	 */
 	if ((zone->uz_flags & UMA_ZONE_SMR) != 0 && skip == SKIP_NONE)
 		smr_synchronize(zone->uz_smr);
+
+#ifdef CHERI_CAPREVOKE_KERNEL
+	/*
+	 * If a free is sent directly to a KREVOKE zone, we
+	 * have to trigger revocation immediately, because the
+	 * item can instantly be reallocated.
+	 * XXX-AM: This is similar to SMR zones, but the revocation pass
+	 * is probably more costly.
+	 */
+	if ((zone->uz_flags & UMA_ZONE_KREVOKE) != 0) {
+		kmem_quarantine(item, zone->uz_size);
+	}
+#endif
 
 	item_dtor(zone, item, zone->uz_size, udata, skip);
 
