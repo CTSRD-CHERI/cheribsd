@@ -1923,7 +1923,9 @@ startup_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	/* Allocate KVA and indirectly advance bootmem. */
 	mem = (void *)pmap_map(&bootmem, m->phys_addr,
 	    m->phys_addr + (pages * PAGE_SIZE), VM_PROT_READ | VM_PROT_WRITE);
-	return (cheri_kern_setboundsexact(mem, bytes));
+	mem = cheri_kern_setboundsexact(mem, bytes);
+	mem = cheri_kern_andperm(mem, ~CHERI_PERM_SW_KMEM);
+	return (mem);
 }
 
 static void
@@ -2095,7 +2097,9 @@ noobj_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *flags,
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_gettag(retkva), ("Expected valid capability"));
 #endif
-	return (cheri_kern_setboundsexact((void *)retkva, bytes));
+	retkva = cheri_kern_setboundsexact(retkva, bytes);
+	retkva = cheri_kern_andperm(retkva, ~CHERI_PERM_SW_KMEM);
+	return ((void *)retkva);
 }
 
 /*
@@ -4161,6 +4165,7 @@ slab_alloc_item(uma_keg_t keg, uma_slab_t slab)
 	if ((keg->uk_flags & UMA_ZONE_PCPU) == 0)
 		item = cheri_setboundsexact(item, keg->uk_size);
 #endif
+	item = cheri_kern_andperm(item, ~CHERI_PERM_SW_KMEM);
 
 	return (item);
 }
@@ -4653,12 +4658,41 @@ uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
 	 * XXX-AM: The item_dtor should only be called after revocation.
 	 * Currently, it is called in the wrong order.
 	 *
+	 * We need to re-derive the item pointer from the slab, because
+	 * we need to recover the PERM_SW_VMEM permission bit to ensure
+	 * that our item capability survives revocation.
+	 * XXX-AM: It might be useful to have non-revocable pages that we use
+	 * for buckets, so that we don't have to vtoslab in the fast-path.
+	 *
 	 * XXX-AM: When the zone enables revocation, attempt to free the item to
 	 * the per-CPU quarantine bucket. In order to reuse items as fast
 	 * as possible, attempt to drain the quarantine bucket into the
 	 * freebucket.
 	 */
 	if ((uz_flags & UMA_ZONE_KREVOKE) != 0) {
+		uma_slab_t slab;
+		if (__predict_true((zone->uz_flags & UMA_ZFLAG_VTOSLAB) != 0)) {
+			slab = vtoslab((vm_offset_t)item);
+			item = cheri_setaddress(slab, (vm_offset_t)item);
+		} else {
+			KASSERT((zone->uz_flags & UMA_ZFLAG_HASH) != 0,
+			    ("KREVOKE zone requires either UMA_ZFLAG_VTOSLAB or "
+				"UMA_ZFLAG_HASH"));
+			// XXX having to lock the keg on this path is quite bad.
+			// I'm not entirely sure we need to do that for the hash
+			// lookup though.
+			struct mtx *lock;
+			uma_keg_t keg = zone->uz_keg;
+			lock = KEG_LOCK(keg, 0);
+			slab = hash_sfind(&keg->uk_hash,
+			    rounddown2((uint8_t *)item, UMA_SLAB_SIZE));
+			mtx_unlock(lock);
+			item = cheri_setaddress(slab_tohashslab(slab)->uhs_data,
+			    (vm_offset_t)item);
+		}
+		// PCPU zones span multiple pages and the item is narrowed later
+		if ((zone->uz_flags & UMA_ZONE_PCPU) == 0)
+			item = cheri_setboundsexact(item, zone->uz_size);
 		goto zfree_item;
 	}
 #endif
@@ -5020,6 +5054,9 @@ zone_free_item(uma_zone_t zone, void *item, void *udata, enum zfreeskip skip)
 		panic("Expect valid capability");
 	if (__predict_false(cheri_getsealed(item)))
 		panic("Expect unsealed capability");
+	if (__predict_false((zone->uz_flags & UMA_ZONE_KREVOKE) != 0 &&
+		(cheri_getperm(item) & CHERI_PERM_SW_KMEM) == 0))
+		panic("Missing CHERI_PERM_SW_KMEM");
 #endif
 	/*
 	 * If a free is sent directly to an SMR zone we have to

@@ -146,9 +146,14 @@
  * currently a bit broad, and should be narrowed over time as the kernel
  * becomes more capability-aware.
  */
-#define	CHERI_PERMS_KERNEL						\
+#define	_CHERI_PERMS_KERNEL						\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |	\
-		CHERI_PERM_MUTABLE_LOAD)
+	CHERI_PERM_MUTABLE_LOAD)
+#ifdef CHERI_CAPREVOKE_KERNEL
+#define	CHERI_PERMS_KERNEL (_CHERI_PERMS_KERNEL | CHERI_PERM_SW_KMEM)
+#else
+#define	CHERI_PERMS_KERNEL _CHERI_PERMS_KERNEL
+#endif
 
 #define	CHERI_PERMS_KERNEL_PAGETABLE					\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_STORE)
