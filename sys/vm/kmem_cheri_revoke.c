@@ -30,7 +30,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/rwlock.h>
+#include <sys/mutex.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -51,18 +51,25 @@ _Static_assert((CHERI_REVOKE_KSHADOW_MAX - CHERI_REVOKE_KSHADOW_MIN) ==
 	"Invalid kernel revoke shadow bitmap size");
 
 /*
- * Kernel revocation info contents.
+ * Kernel revocation info context.
  * This is a statically allocated version of the user info page.
+ *
+ * XXX I think only the epochs are used here, we should simplify this.
  */
 struct cheri_revoke_info kernel_revoke_info_store;
 
 /*
  * Initialize revocation structures for the kernel map.
  *
- * This is called early during kernel boot, after kernel memory and UMA
- * are brought up.
- * There is an argument that this should happen as part of kmem_init(),
- * before uma_startup2() if we are going to revoke pervasively across UMA.
+ * This must be called after the kernel_map is initialized, so that the
+ * revocation structures in the kernel_map are properly initialized.
+ *
+ * Before kmem_cheri_revoke_init(), kernel memory revocation is impossible,
+ * any early memory freed (e.g. by UMA) will be marked as quarantined but
+ * no revocation is possible until after this call.
+ *
+ * In practice, this is close to uma_startup2() in kmem_init(), so it will
+ * enable revocation for most of the boot sequence.
  *
  * The kernel shadow bitmap is allocated using a kernel shadow vm_object,
  * similarly to the user shadow map.
@@ -76,14 +83,6 @@ kmem_cheri_revoke_init(void)
 {
 	/* int error; */
 	/* int cow = MAP_CREATE_SHADOW; */
-	/* const size_t shadow_size = CHERI_REPRESENTABLE_LENGTH( */
-	/*     CHERI_REVOKE_KSHADOW_MAX - CHERI_REVOKE_KSHADOW_MIN); */
-	/* vm_pointer_t start = CHERI_REVOKE_KSHADOW_MIN; */
-
-	/* KASSERT((start & ~CHERI_REPRESENTABLE_ALIGNMENT_MASK(shadow_size)) == 0, */
-	/*     ("Kernel shadow bitmap is not aligned")); */
-
-	/* vm_map_lock(kernel_map); */
 
 	/* // XXX how do I map this? It is outside of the kernel map... */
 	/* error = vm_map_reservation_create_locked(kernel_map, &start, */
@@ -101,17 +100,20 @@ kmem_cheri_revoke_init(void)
 	/* if (error != KERN_SUCCESS) */
 	/* 	panic("Failed to map kernel shadow bitmap error: %d", error); */
 
-	/* struct cheri_revoke_info init = { */
-	/* 	.base_mem_nomap = start, */
-	/* 	/\* */
-	/* 	 * XXX we are not using the otype shadow map in the kernel and space */
-	/* 	 * for it is not allocated. */
-	/* 	 *\/ */
-	/* 	.base_otype = -1, */
-	/* 	.epochs = {0, 0} */
-	/* }; */
-	/* memcpy(kernel_revoke_info, &init, sizeof(*kernel_revoke_info)); */
-	/* kernel_map->vm_cheri_async_revoke_shadow = (uint8_t *)start; */
+	vm_map_lock(kernel_map);
 
-	/* vm_map_unlock(kernel_map); */
+	kernel_map->vm_cheri_async_revoke_shadow = kernel_shadow_root_cap;
+
+	struct cheri_revoke_info init = {
+		.base_mem_nomap = CHERI_REVOKE_KSHADOW_MIN,
+		/*
+		 * Note: we are not using the otype shadow map in the kernel
+		 * and space for it is not allocated.
+		 */
+		.base_otype = -1,
+		.epochs = {0, 0}
+	};
+	memcpy(kernel_revoke_info, &init, sizeof(*kernel_revoke_info));
+
+	vm_map_unlock(kernel_map);
 }
