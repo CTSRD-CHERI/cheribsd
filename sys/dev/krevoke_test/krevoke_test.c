@@ -11,16 +11,75 @@
 #include <cheri/cheric.h>
 #include <vm/uma.h>
 
-static uma_zone_t krevoke_zone;
+static uma_zone_t krevoke_small_zone;
+static uma_zone_t krevoke_medium_zone;
+static uma_zone_t krevoke_large_zone;
 
+/* Common krevoke block header */
 struct krevoke_block {
-	vm_offset_t magic;
-	struct krevoke_block *next;
+	void *ptr;
+};
+
+/* This paints a single bit in the shadow bitmap */
+struct krevoke_small_block {
+	void *ptr;
+};
+
+/* This paints a 2 words in the shadow bitmap */
+struct krevoke_medium_block {
+	void *ptr;
+	uintptr_t pad[sizeof(uint64_t) * NBBY + 1];
+};
+
+/* This paints a 4 words in the shadow bitmap */
+struct krevoke_large_block {
+	void *ptr;
+	uintptr_t pad[3 * sizeof(uint64_t) * NBBY + 1];
 };
 
 #define	CHECK(cond, msg)				\
-	if (!(cond))					\
-		uprintf("FAIL:" msg "\n")
+	if (!(cond)) {					\
+		uprintf("FAIL:" msg "\n");		\
+		return (EINVAL);			\
+	}
+
+#define	KREVOKE_TEST1(fn, arg)						\
+	if (fn((arg))) {						\
+		fail = true;						\
+		uprintf("FAIL: " __XSTRING(fn) "(" __XSTRING(arg) ")\n"); \
+	} else {							\
+		uprintf("PASS: " __XSTRING(fn) "(" __XSTRING(arg) ")\n"); \
+	}
+
+/*
+ * Test revocation for different zone sizes.
+ */
+static int
+test_uma_krevoke_zone(uma_zone_t zone)
+{
+	struct krevoke_block *kb0, *kb1;
+
+	kb0 = uma_zalloc(zone, M_WAITOK);
+	CHECK((cheri_getperm(kb0) & CHERI_PERM_SW_KMEM) == 0,
+	    "kb0: SW_KMEM is set");
+	uprintf("%s: allocated kb0 at %#p\n", __func__, kb0);
+	kb1 = uma_zalloc(zone, M_WAITOK);
+	CHECK((cheri_getperm(kb1) & CHERI_PERM_SW_KMEM) == 0,
+	    "kb1: SW_KMEM is set");
+	uprintf("%s: allocated kb1 at %#p\n", __func__, kb1);
+
+	kb1->ptr = kb0;
+
+	uprintf("%s: free(kb0)\n", __func__);
+	uma_zfree(zone, kb0);
+
+	// Force revoke pass
+	// uma_revoke_now();
+	uprintf("%s: check revoked kb1->ptr\n", __func__);
+	CHECK(!cheri_gettag(kb1->ptr), "Revoked ptr is valid");
+
+	return (0);
+}
 
 /*
  * Trigger UMA zone revocation test.
@@ -28,9 +87,9 @@ struct krevoke_block {
  * fail otherwise.
  */
 static int
-uma_krevoke_test_handler(SYSCTL_HANDLER_ARGS)
+krevoke_test_handler(SYSCTL_HANDLER_ARGS)
 {
-	struct krevoke_block *kb0, *kb1;
+	bool fail = false;
 	int error = 0;
 	int value = 0;
 
@@ -41,18 +100,12 @@ uma_krevoke_test_handler(SYSCTL_HANDLER_ARGS)
 
 	uprintf("uma_krevoke_test: begin krevoke test\n");
 
-	kb0 = uma_zalloc(krevoke_zone, M_WAITOK);
-	kb1 = uma_zalloc(krevoke_zone, M_WAITOK);
+	KREVOKE_TEST1(test_uma_krevoke_zone, krevoke_small_zone);
+	KREVOKE_TEST1(test_uma_krevoke_zone, krevoke_medium_zone);
+	KREVOKE_TEST1(test_uma_krevoke_zone, krevoke_large_zone);
 
-	kb1->next = kb0;
-
-	uma_zfree(krevoke_zone, kb0);
-
-	// Force revoke pass
-	// uma_revoke_now();
-	CHECK(!cheri_gettag(kb1->next), "Revoked ptr is valid");
-
-	uprintf("uma_krevoke_test: krevoke test done\n");
+	if (fail)
+		error = EINVAL;
 
 	return (error);
 }
@@ -61,16 +114,25 @@ uma_krevoke_test_handler(SYSCTL_HANDLER_ARGS)
 SYSCTL_NODE(_debug, OID_AUTO, krevoke, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "krevoke debug namespace");
 
-SYSCTL_PROC(_debug_krevoke, OID_AUTO, uma_krevoke_test,
+SYSCTL_PROC(_debug_krevoke, OID_AUTO, krevoke_test,
     CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE,
-    NULL, 0, uma_krevoke_test_handler, "I", "Trigger krevoke test");
+    NULL, 0, krevoke_test_handler, "I", "Trigger krevoke test");
 
 
 static int
 krevoke_init(void)
 {
-	krevoke_zone = uma_zcreate("krevoke_zone", sizeof(struct krevoke_block),
-	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_KREVOKE);
+	krevoke_small_zone = uma_zcreate("krevoke_s_zone",
+	    sizeof(struct krevoke_small_block), NULL, NULL, NULL, NULL,
+	    UMA_ALIGN_PTR, UMA_ZONE_KREVOKE);
+
+	krevoke_medium_zone = uma_zcreate("krevoke_m_zone",
+	    sizeof(struct krevoke_medium_block), NULL, NULL, NULL, NULL,
+	    UMA_ALIGN_PTR, UMA_ZONE_KREVOKE);
+
+	krevoke_large_zone = uma_zcreate("krevoke_l_zone",
+	    sizeof(struct krevoke_large_block), NULL, NULL, NULL, NULL,
+	    UMA_ALIGN_PTR, UMA_ZONE_KREVOKE);
 
 	return (0);
 }
@@ -78,7 +140,9 @@ krevoke_init(void)
 static void
 krevoke_cleanup(void)
 {
-	uma_zdestroy(krevoke_zone);
+	uma_zdestroy(krevoke_small_zone);
+	uma_zdestroy(krevoke_medium_zone);
+	uma_zdestroy(krevoke_large_zone);
 }
 
 static int
