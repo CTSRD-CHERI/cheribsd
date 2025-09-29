@@ -157,6 +157,8 @@ kmem_quarantine(void *mem, size_t size)
 		panic("Quarantine sealed capability %#p", mem);
 	if (__predict_false(!cheri_gettag(mem)))
 		panic("Quarantine invalid capability %#p", mem);
+	if (__predict_false((cheri_getperm(mem) & CHERI_PERM_SW_KMEM) == 0))
+		panic("Quarantine operation requires PERM_SW_KMEM %#p", mem);
 	if (__predict_false(cheri_gettop(mem) < (ptraddr_t)mem + size))
 		panic("Quarantine invalid bounds %#p", mem);
 
