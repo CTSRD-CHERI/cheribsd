@@ -398,3 +398,62 @@ vm_cheri_revoke_page_ro(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 
 	return (res);
 }
+
+#ifdef CHERI_CAPREVOKE_KERNEL
+/*
+ * Paint the first word of the shadow bitmap corresponding to an object
+ * to be revoked.
+ *
+ * The shadow argument points to the first word of the kernel shadow bitmap
+ * that is occupied by the revoked object.
+ * The mem argument is the capability for the object to be revoked.
+ * The mask argument is the mask to apply to the first word of the shadow
+ * bitmap, in order to paint it.
+ *
+ * This is borrowed from libcheri_caprevoke, probably should be unified.
+ */
+bool
+kmem_shadow_set_first_word(uint64_t *shadow, void *obj, uint64_t mask)
+{
+	uint64_t shadow_bits, scratch;
+	int stxr_status = 1;
+
+	__asm__ __volatile__ (
+		"1:\n\t"
+		/* Load reserve first word */
+		"ldxr %[shadow_bits], [%[s]]\n\t"
+
+		/* Jump out if shadow set */
+		"ands %[scratch], %[shadow_bits], %[mask]\n\t"
+		"bne 2f\n\t"
+
+		/* Jump out if object detagged */
+		"gctag %[scratch], %[obj]\n\t"
+		"cbz %[scratch], 2f\n\t"
+
+		/* Jump out if zero perms */
+		"gcperm %[scratch], %[obj]\n\t"
+		"cbz %[scratch], 2f\n\t"
+
+		/* bitwise or in the mask */
+		"orr %[shadow_bits], %[shadow_bits], %[mask]\n\t"
+
+		/* SC the updated mask - status nonzero on failure */
+		"stxr %w[stxr_status], %[shadow_bits], [%[s]]\n\t"
+		"cbnz %w[stxr_status], 1b\n\t"
+		"2:\n\t"
+	: /* outputs */
+		[stxr_status] "+&r" (stxr_status),
+		[shadow_bits] "=&r" (shadow_bits),
+		[scratch] "=&r" (scratch)
+	: /* inputs */
+		[obj] "C" (obj),
+		[s] "C" (shadow),
+		[mask] "r" (mask)
+	: /* clobbers */
+		"memory"
+	);
+
+	return (stxr_status == 0);
+}
+#endif

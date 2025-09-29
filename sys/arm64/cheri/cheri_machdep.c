@@ -50,6 +50,10 @@ void * __capability vmm_gpa_root_cap = (void * __capability)(intcap_t)-1;
 #ifdef __CHERI_PURE_CAPABILITY__
 void *kernel_root_cap = (void *)(intcap_t)-1;
 void *vmm_el2_root_cap = (void *)(intcap_t)-1;
+
+#ifdef CHERI_CAPREVOKE_KERNEL
+void *kernel_shadow_root_cap = (void *)(intcap_t)-1;
+#endif
 #endif
 
 void __nosanitizecoverage
@@ -106,6 +110,15 @@ cheri_init_capabilities(void * __capability kroot)
 	vmm_el2_root_cap = cheri_setaddress(kroot, HYP_VM_MIN_ADDRESS);
 	vmm_el2_root_cap = cheri_setbounds(vmm_el2_root_cap,
 	    HYP_VM_MAX_ADDRESS - HYP_VM_MIN_ADDRESS);
+
+#ifdef CHERI_CAPREVOKE_KERNEL
+	ctemp = cheri_setaddress(kroot, CHERI_REVOKE_KSHADOW_MIN);
+	ctemp = cheri_setboundsexact(ctemp, CHERI_REVOKE_KSHADOW_MAX -
+	    CHERI_REVOKE_KSHADOW_MIN);
+	ctemp = cheri_andperm(ctemp, CHERI_PERMS_KERNEL_DATA &
+	    ~(CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP));
+	kernel_shadow_root_cap = ctemp;
+#endif
 #endif
 }
 

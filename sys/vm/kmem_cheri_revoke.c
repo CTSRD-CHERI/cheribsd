@@ -79,6 +79,123 @@ kmem_shadow_word_offset(ptraddr_t addr)
 	return (offset);
 }
 
+static vm_offset_t
+kmem_shadow_last_word_offset(ptraddr_t addr, size_t size)
+{
+	if (size > 0)
+		return kmem_shadow_word_offset(addr + size - 1);
+	else
+		return kmem_shadow_word_offset(addr);
+}
+
+static uint64_t
+kmem_shadow_first_word_mask(ptraddr_t addr, size_t size)
+{
+	const size_t shadow_size = size / CHERI_REVOKE_KSHADOW_GRANULE;
+	size_t lsb_offset;
+	uint64_t mask;
+
+	lsb_offset = kmem_shadow_granule_offset(addr) %
+	    (NBBY * sizeof(uint64_t));
+	mask = ~((1ULL << lsb_offset) - 1);
+
+	if (kmem_shadow_word_offset(addr) ==
+	    kmem_shadow_last_word_offset(addr, size) &&
+	    lsb_offset + size != 64) {
+		/* Shadow region is entirely within the first word */
+		mask ^= ~((1ULL << (lsb_offset + shadow_size)) - 1);
+	}
+
+	return (htole64(mask));
+}
+
+static uint64_t
+kmem_shadow_last_word_mask(ptraddr_t addr, size_t size)
+{
+	size_t msb_offset;
+	uint64_t mask;
+
+	msb_offset = kmem_shadow_granule_offset(addr + size - 1) %
+	    (NBBY * sizeof(uint64_t));
+	mask = (1ULL << msb_offset) - 1;
+
+	return (htole64(mask));
+}
+
+/*
+ * Paint the kernel shadow bitmap corresponding to the given memory region.
+ *
+ * It is interesting how we deal with double-free, because these can occur
+ * across threads.
+ * This currently should protect against malicious races where the quarantine
+ * is painted concurrently from two different threads 0 and 1 and
+ * thread 1 is stopped until the revocation pass is done and quarantine
+ * cleared from thread 0, leading to thread 1 painting the quarantine for
+ * a no-longer-revoked capability.
+ *
+ * Note that the capability must have the PERM_SW_VMEM bit set to authorize
+ * this operation.
+ * XXX-AM: This must be adapted to work before kmem_init().
+ *
+ * XXX-AM: See userspace caprev_shadow_nomap_set_len() in libcheri_caprevoke,
+ * perhaps there is a way to reuse the same code, but it is unclear
+ * at this point.
+ *
+ * Return 0 if the quarantine is painted normally. 1 if this was detected as
+ * a double-free or the quarantine was already partially painted.
+ */
+int
+kmem_quarantine(void *mem, size_t size)
+{
+	uint64_t *shadow_mem;
+	vm_offset_t fwo, lwo;
+	vm_offset_t mask;
+	const ptraddr_t shadow_base = (ptraddr_t)kernel_shadow_root_cap;
+	ptraddr_t addr = (ptraddr_t)mem;
+
+	if (__predict_false(cheri_getsealed(mem)))
+		panic("Quarantine sealed capability %#p", mem);
+	if (__predict_false(!cheri_gettag(mem)))
+		panic("Quarantine invalid capability %#p", mem);
+	if (__predict_false(cheri_gettop(mem) < (ptraddr_t)mem + size))
+		panic("Quarantine invalid bounds %#p", mem);
+
+	KASSERT(cheri_gettag(kernel_shadow_root_cap),
+	    ("Invalid kernel shadow root %#p", kernel_shadow_root_cap));
+
+	fwo = kmem_shadow_word_offset(addr);
+	lwo = kmem_shadow_last_word_offset(addr, size);
+	shadow_mem = cheri_setaddress(kernel_shadow_root_cap,
+	    shadow_base + fwo);
+
+	/* Insert a KTR/Dtrace probe here? */
+
+	/*
+	 * Follow userland approach of using the first word to synchronize
+	 * concurrent quarantine requests.
+	 */
+	mask = kmem_shadow_first_word_mask(addr, size);
+	if (!kmem_shadow_set_first_word(shadow_mem, mem, mask)) {
+		return (1);
+	}
+	shadow_mem = shadow_mem + 1;
+
+	/* Paint words [1, N - 2] of the bitmap, excluding both the first and last */
+	if (lwo - fwo > sizeof(uint64_t)) {
+		memset(shadow_mem, 1, lwo - fwo - sizeof(uint64_t));
+	}
+
+	/* Paint the last word, this may race with another partial painting */
+	if (lwo != fwo) {
+		shadow_mem = cheri_setaddress(kernel_shadow_root_cap,
+		    shadow_base + lwo);
+		mask = kmem_shadow_last_word_mask(addr, size);
+		atomic_set_64(shadow_mem, mask);
+	}
+
+	return (0);
+}
+
 /*
  * Extend the shadow bitmap to the given memory region.
  *
