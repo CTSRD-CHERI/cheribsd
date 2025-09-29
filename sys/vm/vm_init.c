@@ -158,13 +158,12 @@ vm_mem_init(void *dummy)
 	kmem_init(virtual_avail, virtual_end);
 	/* XXX-AM: in principle we could now destroy the virtual_avail/end capabilities */
 
-	kmem_init_zero_region();
-	pmap_init();
-	vm_pager_init();
-
 #ifdef CHERI_CAPREVOKE_KERNEL
 	kmem_cheri_revoke_init();
 #endif
+	kmem_init_zero_region();
+	pmap_init();
+	vm_pager_init();
 
 #ifdef INVARIANTS
 	vm_check_pagesizes();
