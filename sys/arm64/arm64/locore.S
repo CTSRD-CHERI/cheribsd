@@ -37,7 +37,7 @@
 #include <machine/vm.h>
 #include <machine/vmparam.h>
 
-#include <machine/cherireg.h>
+#include <cheri/cherireg.h>
 
 #define	VIRT_BITS	48
 

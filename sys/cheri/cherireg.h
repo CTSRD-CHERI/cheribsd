@@ -69,6 +69,15 @@
     CHERI_PERM_SW_VMEM
 
 /*
+ * Use a software-defined permission bit to authorize kernel allocators to manipulate the kernel
+ * shadow bitmap for a given memory region.
+ * This bit also ensures that the revoker will not revoke allocator-owned capabilities.
+ * XXX-AM: This currently aliases CHERI_PERM_SW_VMEM, because these never need to coexist in
+ * the same ring. Conceptually SW_VMEM is also doing a similar thing in userland.
+ */
+#define	CHERI_PERM_SW_KMEM			CHERI_PERM_SW1
+
+/*
  * Definition for a highly privileged kernel capability able to name the
  * entire address space, and suitable to derive all other kernel-related
  * capabilities from, including sealing capabilities.
