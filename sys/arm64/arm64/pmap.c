@@ -3174,6 +3174,9 @@ pmap_growkernel(vm_offset_t addr)
 	if (kernel_vm_end < addr) {
 		kasan_shadow_map(kernel_vm_end, addr - kernel_vm_end);
 		kmsan_shadow_map(kernel_vm_end, addr - kernel_vm_end);
+#ifdef CHERI_CAPREVOKE_KERNEL
+		kmem_shadow_map(kernel_vm_end, addr - kernel_vm_end);
+#endif
 	}
 	while (kernel_vm_end < addr) {
 		l0 = pmap_l0(kernel_pmap, kernel_vm_end);
@@ -6984,9 +6987,85 @@ pmap_krevoke_bootstrap(void)
 		panic("Could not find phys region for revoker shadow map");
 }
 
-/* TODO add interface to grow/shrink the shadow bitmap for loadable modules? */
-/* void pmap_revoke_shadow_enter(void); */
-/* void pmap_revoke_shadow_remove(void); */
+static vm_page_t
+pmap_krevoke_shadow_alloc_l3(void)
+{
+	vm_page_t m;
+
+	m = vm_page_alloc_noobj(VM_ALLOC_INTERRUPT | VM_ALLOC_WIRED |
+	    VM_ALLOC_ZERO);
+	if (m == NULL)
+		panic("%s: can not grow krevoke shadow bitmap", __func__);
+	return (m);
+}
+
+static vm_page_t
+pmap_krevoke_shadow_alloc_l2(void)
+{
+	vm_page_t m;
+
+	m = vm_page_alloc_noobj_contig(VM_ALLOC_WIRED | VM_ALLOC_ZERO,
+	    Ln_ENTRIES, 0, ~0ul, L2_SIZE, 0, VM_MEMATTR_DEFAULT);
+	if (m == NULL)
+		panic("%s: can not grow krevoke shadow bitmap", __func__);
+	return (m);
+}
+
+/*
+ * Expand the shadow bitmap in L2_SIZE blocks.
+ * This expands the shadow bitmap as the kernel_map grows.
+ *
+ * XXX-AM: Note that there is no pmap_krevoke_shadow_remove.
+ * Removal is tricky, because we must ensure that the bitmap is
+ * not painted when we remove it.
+ * The painting occurs concurrently without any locks held, so the only
+ * option is to make the shadow-bitmap pages RO and catch the fault if
+ * the page is painted.
+ * This is also complicated by the fact that each shadow bitmap page
+ * maps shadow space for 8 * GRANULE_SIZE kernel pages. This means that
+ * the shadow bitmap can be removed only when all the corresponding kernel
+ * pages are removed AND the capabilities have been revoked at the
+ * kernel_map quarantine level.
+ *
+ * Since we hook pmap_growkernel, it is unclear exactly how we would go
+ * about removing the shadow map pages, since there is no mechanism for
+ * shrinking the kernel page tables. Note that kva_import has no equivalent
+ * kva_free, so once kva is imported in the kernel_arena, it will never
+ * be released.
+ *
+ * Releasing shadow-bitmap pages is left for later work.
+ *
+ * XXX-AM: This code could be unified with the pmap_asan implementation.
+ */
+void
+pmap_krevoke_shadow_enter(vm_offset_t va)
+{
+	pd_entry_t *l1, *l2;
+	vm_page_t m;
+
+	mtx_assert(&kernel_map->system_mtx, MA_OWNED);
+	/* XXX-AM: Do we need to ensure that kernel_pmap is also locked? */
+
+	/* Handle early enter? */
+	CTR1(KTR_PMAP, "pmap_krevoke_shadow_enter: va %#lx", va);
+
+	l1 = pmap_l1(kernel_pmap, va);
+	MPASS(l1 != NULL);
+	if ((pmap_load(l1) & ATTR_DESCR_VALID) == 0) {
+		m = pmap_krevoke_shadow_alloc_l3();
+		pmap_store(l1, VM_PAGE_TO_PTE(m) | L1_TABLE);
+	}
+
+	l2 = pmap_l1_to_l2(l1, va);
+	if ((pmap_load(l2) & ATTR_DESCR_VALID) == 0) {
+		m = pmap_krevoke_shadow_alloc_l2();
+		pmap_store(l2, VM_PAGE_TO_PTE(m) | PMAP_KSHADOW_PTE_BITS |
+		    L2_BLOCK);
+		dmb(ishst);
+	}
+	KASSERT((pmap_load(l2) & ATTR_DESCR_MASK) == L2_BLOCK,
+	    ("Unexpected shadow bitmap L2 PTE entry: %lx", pmap_load(l2)));
+}
 
 #endif /* CHERI_CAPREVOKE_KERNEL*/
 #endif /* CHERI_CAPREVOKE */

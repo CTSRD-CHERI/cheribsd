@@ -172,9 +172,12 @@ extern struct cheri_revoke_info kernel_revoke_info_store;
 #define	kernel_revoke_info (&kernel_revoke_info_store)
 
 void kmem_cheri_revoke_init(void);
+void kmem_shadow_map(vm_offset_t addr, size_t size);
 
 /* MD interface */
 void pmap_krevoke_bootstrap(void);
+void pmap_krevoke_shadow_enter(vm_offset_t va);
+
 #endif
 #endif
 
