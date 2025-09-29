@@ -58,6 +58,55 @@ _Static_assert((CHERI_REVOKE_KSHADOW_MAX - CHERI_REVOKE_KSHADOW_MIN) ==
  */
 struct cheri_revoke_info kernel_revoke_info_store;
 
+static vm_offset_t
+kmem_shadow_granule_offset(ptraddr_t addr)
+{
+	/* Exclude the DMAP for now */
+	KASSERT(addr >= VM_MIN_KERNEL_ADDRESS && addr < VM_MAX_KERNEL_ADDRESS,
+	    ("Invalid kernel address to quarantine %lx", addr));
+
+	return ((addr - VM_MIN_KERNEL_ADDRESS) / CHERI_REVOKE_KSHADOW_GRANULE);
+}
+
+static vm_offset_t
+kmem_shadow_word_offset(ptraddr_t addr)
+{
+	vm_offset_t offset;
+
+	offset = rounddown2(kmem_shadow_granule_offset(addr) / NBBY,
+	    sizeof(uint64_t));
+
+	return (offset);
+}
+
+/*
+ * Extend the shadow bitmap to the given memory region.
+ *
+ * This ensures that the shadow bitmap will cover the
+ * given region. The MD pmap implementation is free to map
+ * additional shadow bitmap space, if necessary.
+ * Notionally, this is similar to kasan shadow mappings.
+ */
+void
+kmem_shadow_map(vm_offset_t addr, size_t size)
+{
+	vm_offset_t shadow_start;
+	vm_offset_t shadow_end;
+	int i;
+
+	mtx_assert(&kernel_map->system_mtx, MA_OWNED);
+
+	size = roundup2(size, CHERI_REVOKE_KSHADOW_GRANULE);
+	shadow_start = rounddown2(kmem_shadow_word_offset(addr), PAGE_SIZE);
+	shadow_end = roundup2(kmem_shadow_word_offset(addr + size), PAGE_SIZE);
+
+	for (i = 0; i < howmany(shadow_end - shadow_start, PAGE_SIZE); i++) {
+		pmap_krevoke_shadow_enter(CHERI_REVOKE_KSHADOW_MIN +
+		    shadow_start + ptoa(i));
+	}
+}
+
+
 /*
  * Initialize revocation structures for the kernel map.
  *
