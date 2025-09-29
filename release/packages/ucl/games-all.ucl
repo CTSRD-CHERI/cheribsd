@@ -28,5 +28,5 @@ Games distributed with the system:
 EOD
 
 annotations {
-	set = "base,base-jail"
+	set = "optional,optional-jail"
 }
