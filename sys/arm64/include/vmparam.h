@@ -302,6 +302,7 @@
 /* 4GiB kernel shadow bitmap location */
 #define	CHERI_REVOKE_KSHADOW_MIN (0xffff030000000000)
 #define	CHERI_REVOKE_KSHADOW_MAX (0xffff030100000000)
+#define	CHERI_REVOKE_KSHADOW_GRANULE (sizeof(void *))
 #endif
 
 /*
