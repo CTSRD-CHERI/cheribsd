@@ -557,6 +557,9 @@ static int t4_fec = -1;
 SYSCTL_INT(_hw_cxgbe, OID_AUTO, fec, CTLFLAG_RDTUN, &t4_fec, 0,
     "Forward Error Correction (bit 0 = RS, bit 1 = BASER_RS)");
 
+static const char *
+t4_fec_bits = "\20\1RS-FEC\2FC-FEC\3NO-FEC\4RSVD1\5RSVD2\6auto\7module";
+
 /*
  * Controls when the driver sets the FORCE_FEC bit in the L1_CFG32 that it
  * issues to the firmware.  If the firmware doesn't support FORCE_FEC then the
@@ -3638,6 +3641,8 @@ port_mword(struct port_info *pi, uint32_t speed)
 	case FW_PORT_TYPE_CR_QSFP:
 	case FW_PORT_TYPE_CR2_QSFP:
 	case FW_PORT_TYPE_SFP28:
+	case FW_PORT_TYPE_SFP56:
+	case FW_PORT_TYPE_QSFP56:
 		/* Pluggable transceiver */
 		switch (pi->mod_type) {
 		case FW_PORT_MOD_TYPE_LR:
@@ -3655,6 +3660,8 @@ port_mword(struct port_info *pi, uint32_t speed)
 				return (IFM_50G_LR2);
 			case FW_PORT_CAP32_SPEED_100G:
 				return (IFM_100G_LR4);
+			case FW_PORT_CAP32_SPEED_200G:
+				return (IFM_200G_LR4);
 			}
 			break;
 		case FW_PORT_MOD_TYPE_SR:
@@ -3671,6 +3678,8 @@ port_mword(struct port_info *pi, uint32_t speed)
 				return (IFM_50G_SR2);
 			case FW_PORT_CAP32_SPEED_100G:
 				return (IFM_100G_SR4);
+			case FW_PORT_CAP32_SPEED_200G:
+				return (IFM_200G_SR4);
 			}
 			break;
 		case FW_PORT_MOD_TYPE_ER:
@@ -3692,6 +3701,8 @@ port_mword(struct port_info *pi, uint32_t speed)
 				return (IFM_50G_CR2);
 			case FW_PORT_CAP32_SPEED_100G:
 				return (IFM_100G_CR4);
+			case FW_PORT_CAP32_SPEED_200G:
+				return (IFM_200G_CR4_PAM4);
 			}
 			break;
 		case FW_PORT_MOD_TYPE_LRM:
@@ -3701,6 +3712,8 @@ port_mword(struct port_info *pi, uint32_t speed)
 		case FW_PORT_MOD_TYPE_DR:
 			if (speed == FW_PORT_CAP32_SPEED_100G)
 				return (IFM_100G_DR);
+			if (speed == FW_PORT_CAP32_SPEED_200G)
+				return (IFM_200G_DR4);
 			break;
 		case FW_PORT_MOD_TYPE_NA:
 			MPASS(0);	/* Not pluggable? */
@@ -8933,13 +8946,12 @@ sysctl_link_fec(SYSCTL_HANDLER_ARGS)
 	struct link_config *lc = &pi->link_cfg;
 	int rc;
 	struct sbuf *sb;
-	static char *bits = "\20\1RS-FEC\2FC-FEC\3NO-FEC\4RSVD1\5RSVD2";
 
 	sb = sbuf_new_for_sysctl(NULL, NULL, 128, req);
 	if (sb == NULL)
 		return (ENOMEM);
 	if (lc->link_ok)
-		sbuf_printf(sb, "%b", lc->fec, bits);
+		sbuf_printf(sb, "%b", lc->fec, t4_fec_bits);
 	else
 		sbuf_printf(sb, "no link");
 	rc = sbuf_finish(sb);
@@ -8959,14 +8971,12 @@ sysctl_requested_fec(SYSCTL_HANDLER_ARGS)
 
 	if (req->newptr == NULL) {
 		struct sbuf *sb;
-		static char *bits = "\20\1RS-FEC\2FC-FEC\3NO-FEC\4RSVD2"
-		    "\5RSVD3\6auto\7module";
 
 		sb = sbuf_new_for_sysctl(NULL, NULL, 128, req);
 		if (sb == NULL)
 			return (ENOMEM);
 
-		sbuf_printf(sb, "%b", lc->requested_fec, bits);
+		sbuf_printf(sb, "%b", lc->requested_fec, t4_fec_bits);
 		rc = sbuf_finish(sb);
 		sbuf_delete(sb);
 	} else {
@@ -9035,7 +9045,6 @@ sysctl_module_fec(SYSCTL_HANDLER_ARGS)
 	int rc;
 	int8_t fec;
 	struct sbuf *sb;
-	static char *bits = "\20\1RS-FEC\2FC-FEC\3NO-FEC\4RSVD2\5RSVD3";
 
 	sb = sbuf_new_for_sysctl(NULL, NULL, 128, req);
 	if (sb == NULL)
@@ -9069,7 +9078,7 @@ sysctl_module_fec(SYSCTL_HANDLER_ARGS)
 		if (fec == 0)
 			fec = FEC_NONE;
 		PORT_UNLOCK(pi);
-		sbuf_printf(sb, "%b", fec & M_FW_PORT_CAP32_FEC, bits);
+		sbuf_printf(sb, "%b", fec & M_FW_PORT_CAP32_FEC, t4_fec_bits);
 	}
 	rc = sbuf_finish(sb);
 done:
