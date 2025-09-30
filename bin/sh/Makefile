@@ -72,3 +72,5 @@ token.h: mktokens
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
 .endif
+
+.include <bsd.prog.mk>
