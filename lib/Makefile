@@ -116,8 +116,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libz \
 	libzstd \
 	ncurses \
-	nss_tacplus \
-	virtual_oss
+	nss_tacplus
 
 .if !${MACHINE_ABI:Mpurecap}
 # Needs changes to be useful for purecap and not used by anything (yet)
@@ -198,6 +197,7 @@ SUBDIR+=	clang
 .endif
 
 SUBDIR.${MK_CUSE}+= 	libcuse
+SUBDIR.${MK_CUSE}+=	virtual_oss
 SUBDIR.${MK_TOOLCHAIN}+=libpe
 SUBDIR.${MK_DIALOG}+=	libdpv libfigpar
 SUBDIR.${MK_FDT}+=	libfdt
