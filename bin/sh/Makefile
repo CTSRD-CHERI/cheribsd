@@ -67,17 +67,8 @@ syntax.c syntax.h:
 token.h: mktokens
 	sh ${SRCDIR}/mktokens
 
-# Don't include tests or .profile for the static sh used by atf.
+# Don't include tests for the static sh used by atf.
 .if ${.CURDIR} == ${SRCDIR}
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
-
-beforeinstallconfig:
-	rm -f ${DESTDIR}/.profile
-
-LINKMODE=${CONFMODE}
-afterinstallconfig:
-	${INSTALL_LINK} ${TAG_ARGS:D${TAG_ARGS},config} ${DESTDIR}/root/.profile ${DESTDIR}/.profile
 .endif
-
-.include <bsd.prog.mk>
