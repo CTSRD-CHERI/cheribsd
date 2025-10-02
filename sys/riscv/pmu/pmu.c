@@ -39,7 +39,11 @@
 #include <dev/hwc/hwc_context.h>
 #include <dev/hwc/hwc_backend.h>
 
-#define	dprintf(...)
+#if 0
+#define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)
+#else
+#define	dprintf(fmt, ...)
+#endif
 
 static struct ofw_compat_data compat_data[] = {
 	{ "riscv,pmu",			1 },
@@ -92,14 +96,14 @@ pmu_backend_configure(struct hwc_context *ctx, struct hwc_configure *hc)
 	dprintf("%s: event_id %d counter_id %d\n", __func__, hc->event_id,
 	    hc->counter_id);
 
-#if 0
+#if 1
 	/* Raw counter example usage. */
 	ret = SBI_CALL5(SBI_EXT_ID_PMU, SBI_PMU_COUNTER_CONFIG_MATCHING, 0,
 	    (1 << hc->counter_id), hc->flags, 0x20000, hc->event_id);
-#endif
-
+#else
 	ret = SBI_CALL5(SBI_EXT_ID_PMU, SBI_PMU_COUNTER_CONFIG_MATCHING, 0,
 	    (1 << hc->counter_id), hc->flags, hc->event_id, 0);
+#endif
 
 	dprintf("%s: config match ev_id %d counter_id %d, err %ld val %ld\n",
 	    __func__, hc->event_id, hc->counter_id, ret.error, ret.value);
