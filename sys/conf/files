@@ -1904,6 +1904,18 @@ dev/hwpmc/hwpmc_soft.c		optional hwpmc
 dev/hwreset/hwreset.c		optional hwreset
 dev/hwreset/hwreset_array.c	optional hwreset
 dev/hwreset/hwreset_if.m	optional hwreset
+
+dev/hwc/hwc.c			optional hwc
+dev/hwc/hwc_cpu.c		optional hwc
+dev/hwc/hwc_hook.c		optional hwc
+dev/hwc/hwc_ioctl.c		optional hwc
+dev/hwc/hwc_backend.c		optional hwc
+dev/hwc/hwc_context.c		optional hwc
+dev/hwc/hwc_contexthash.c	optional hwc
+dev/hwc/hwc_owner.c		optional hwc
+dev/hwc/hwc_ownerhash.c		optional hwc
+dev/hwc/hwc_vm.c		optional hwc
+
 dev/ichiic/ig4_acpi.c		optional ig4 acpi iicbus
 dev/ichiic/ig4_iic.c		optional ig4 iicbus
 dev/ichiic/ig4_pci.c		optional ig4 pci iicbus
