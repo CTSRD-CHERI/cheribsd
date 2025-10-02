@@ -461,9 +461,9 @@ MACHINE_ABI+=	hard-float
 # (which uses arm64/arm).
 .if ${MACHINE_ARCH:M*64*} || \
     (defined(BOOTSTRAPPING) && ${.MAKE.OS} == "Darwin" && ${MACHINE} == "arm64")
-MACHINE_ABI+=  long64
+MACHINE_ABI+=	long64
 .else
-MACHINE_ABI+=  long32
+MACHINE_ABI+=	long32
 .endif
 .if (${MACHINE_ARCH:Maarch64*c*} || ${MACHINE_ARCH:Mriscv*c*})
 MACHINE_ABI+=	purecap ptr128c
