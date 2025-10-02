@@ -104,7 +104,7 @@ process___cap_relocs(Obj_Entry *obj)
 			can_set_bounds = tight_pcc_bounds;
 		} else if (reloc->permissions == constant_reloc_flag) {
 			 /* read-only data pointer */
-			cap = (uintcap_t)pcc_cap(obj, reloc->object);
+			cap = (uintcap_t)data_base + reloc->object;
 			cap = cheri_clearperm(cap, FUNC_PTR_REMOVE_PERMS);
 			cap = cheri_clearperm(cap, DATA_PTR_REMOVE_PERMS);
 		} else if (reloc->permissions == 0) {
