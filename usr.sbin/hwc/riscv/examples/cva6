@@ -1,0 +1,137 @@
+# 
+# CVA6 event id table.
+# 
+mhpmcounters {
+	mhpmcounter = {
+		id = 3;
+		name = 'L1 I-Cache misses';
+		event_id = 0x01;
+		enabled = true;
+	}
+	mhpmcounter = {
+		id = 4;
+		name = 'L1 D-Cache misses';
+		event_id = 0x02;
+		enabled = true;
+	}
+	mhpmcounter = {
+		id = 5;
+		name = 'ITLB misses';
+		event_id = 0x03;
+		enabled = true;
+	}
+	mhpmcounter = {
+		id = 6;
+		name = 'DTLB misses';
+		event_id = 0x04;
+		enabled = true;
+	}
+	mhpmcounter = {
+		id = 7;
+		name = 'Load accesses';
+		event_id = 0x05;
+		enabled = true;
+	}
+	mhpmcounter = {
+		id = 8;
+		name = 'Store accesses';
+		event_id = 0x06;
+		enabled = true;
+	}
+	mhpmcounter = {
+		id = 9;
+		name = 'Exceptions';
+		event_id = 0x07;
+		enabled = true;
+	}
+	mhpmcounter = {
+		id = 10;
+		name = 'Exception handler returns';
+		event_id = 0x08;
+		enabled = true;
+	}
+	mhpmcounter = {
+		id = 11;
+		name = 'Branch instructions';
+		event_id = 0x09;
+		enabled = true;
+	}
+	mhpmcounter = {
+		id = 12;
+		name = 'Branch mispredicts';
+		event_id = 0x0a;
+		enabled = true;
+	}
+	mhpmcounter = {
+		id = 13;
+		name = 'Branch exceptions';
+		event_id = 0x0b;
+		enabled = true;
+	}
+	mhpmcounter = {
+		id = 14;
+		name = 'Call';
+		event_id = 0x0c;
+		enabled = true;
+	}
+	mhpmcounter = {
+		id = 15;
+		name = 'Return';
+		event_id = 0x0d;
+		enabled = true;
+	}
+	mhpmcounter = {
+		id = 16;
+		name = 'MSB Full';
+		event_id = 0x0e;
+		enabled = true;
+	}
+	mhpmcounter = {
+		id = 17;
+		name = 'Instruction fetch Empty';
+		event_id = 0x0f;
+		enabled = true;
+	}
+	mhpmcounter = {
+		id = 18;
+		name = 'L1 I-Cache accesses';
+		event_id = 0x10;
+		enabled = true;
+	}
+	mhpmcounter = {
+		id = 19;
+		name = 'L1 D-Cache accesses';
+		event_id = 0x11;
+		enabled = true;
+	}
+	mhpmcounter = {
+		id = 20;
+		name = 'Eviction';
+		event_id = 0x12;
+		enabled = true;
+	}
+	mhpmcounter = {
+		id = 21;
+		name = 'I-TLB flush';
+		event_id = 0x13;
+		enabled = true;
+	}
+	mhpmcounter = {
+		id = 22;
+		name = 'Integer instructions';
+		event_id = 0x14;
+		enabled = true;
+	}
+	mhpmcounter = {
+		id = 23;
+		name = 'Floating Point Instruction';
+		event_id = 0x15;
+		enabled = true;
+	}
+	mhpmcounter = {
+		id = 24;
+		name = 'Pipeline bubbles';
+		event_id = 0x16;
+		enabled = true;
+	}
+}
