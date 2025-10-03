@@ -204,6 +204,8 @@ more_spec:
 			break;
 
 		case 'p':
+			if (number_fmt == 'd')
+				number_fmt = 'x';
 			number = cheri_getperm(cap);
 			break;
 

@@ -179,7 +179,7 @@ test_strfcap_C_cap_one(void * __capability p, int expected_tokens,
 static void
 test_strfcap_number_one_cap(uintcap_t cap, const char *cap_desc)
 {
-	char *cap_bytes, *format, str_s[33], str_p[33];
+	char *cap_bytes, *printf_format, *strfcap_format, str_s[33], str_p[33];
 	const char spec_chars[] = "ablopstv";
 	struct {
 		const char *strfcap_format;
@@ -211,9 +211,10 @@ test_strfcap_number_one_cap(uintcap_t cap, const char *cap_desc)
 
 	for (size_t s = 0; s < nitems(formats); s++) {
 		for (const char *scp = spec_chars; *scp != '\0'; scp++) {
-			format = strdup(formats[s].strfcap_format);
-			*strchr(format, 'S') = *scp;
-			ret_s = strfcap(str_s, sizeof(str_s), format, cap);
+			strfcap_format = strdup(formats[s].strfcap_format);
+			*strchr(strfcap_format, 'S') = *scp;
+			ret_s = strfcap(str_s, sizeof(str_s), strfcap_format,
+			    cap);
 
 			switch (*scp) {
 			case 'a':	value = cheri_getaddress(cap); break;
@@ -229,6 +230,12 @@ test_strfcap_number_one_cap(uintcap_t cap, const char *cap_desc)
 				cheribsdtest_failure_errx("Internal error: "
 				    "unknown specifier %c", *scp);
 			}
+
+			printf_format = strdup(formats[s].printf_format);
+			char *d = strchr(printf_format, 'd');
+			if (*scp == 'p' && d != NULL)
+				*d = 'x';
+
 			if (*scp == 'S' &&
 			    value == (size_t)CHERI_OTYPE_UNSEALED)
 				strcpy(str_p, "<unsealed>");
@@ -237,15 +244,16 @@ test_strfcap_number_one_cap(uintcap_t cap, const char *cap_desc)
 				strcpy(str_p, "<sentry>");
 			else
 				snprintf(str_p, sizeof(str_p),
-				    formats[s].printf_format, value);
+				    printf_format, value);
 			if (strcmp(str_s, str_p) != 0) {
 				cheribsdtest_failure_errx("strfcap (%s) and "
 				    "printf (%s) don't match when formatting "
 				    "%s with %s (%s)",
 				    str_s, str_p, cap_desc, formats[s].desc,
-				    format);
+				    strfcap_format);
 			}
-			free(format);
+			free(strfcap_format);
+			free(printf_format);
 		}
 	}
 
