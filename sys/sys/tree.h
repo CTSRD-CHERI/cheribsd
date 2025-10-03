@@ -33,8 +33,10 @@
 
 #include <sys/cdefs.h>
 #ifdef _KERNEL
+#include <sys/stddef.h>
 #include <sys/stdint.h>
 #else
+#include <stddef.h>
 #include <stdint.h>
 #endif
 

@@ -45,6 +45,7 @@
 #include <sys/queue.h>
 #include <sys/_rmlock.h>
 #include <sys/resource.h>
+#include <sys/stddef.h>
 #include <machine/pcpu.h>
 
 #define	DPCPU_SETNAME		"set_pcpu"

@@ -5,6 +5,7 @@
 #ifndef _SYS_MEMRANGE_H_
 #define	_SYS_MEMRANGE_H_
 
+#include <sys/stddef.h>
 #include <sys/ioccom.h>
 
 /* Memory range attributes */

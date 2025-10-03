@@ -26,6 +26,8 @@
 #ifndef _CHERIBSDTEST_DYNAMIC_H_
 #define _CHERIBSDTEST_DYNAMIC_H_
 
+#include <stddef.h>
+
 void cheribsdtest_dynamic_dummy_func(void);
 void (*cheribsdtest_dynamic_get_dummy_fptr(void))(void);
 ptraddr_t cheribsdtest_dynamic_get_dummy_fptr_addr(void);
