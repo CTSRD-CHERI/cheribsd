@@ -81,6 +81,17 @@ convert_sigevent64(const struct sigevent64 *sig64, struct sigevent *sig)
 	return (0);
 }
 
+static inline bool
+is_magic_sighandler_constant(ptraddr_t handler) {
+	/*
+	 * Instead of enumerating all the SIG_* constants, just check if
+	 * it is a small (positive or negative) integer so that this doesn't
+	 * break if someone adds a new SIG_* constant. The manual checks that
+	 * we were using before weren't handling SIG_HOLD.
+	 */
+	return (handler < 64);
+}
+
 int
 freebsd64_sigaction(struct thread *td, struct freebsd64_sigaction_args *uap)
 {
