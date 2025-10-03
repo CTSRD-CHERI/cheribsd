@@ -6,6 +6,7 @@
 #define	_SYS_MEMRANGE_H_
 
 #include <sys/ioccom.h>
+#include <sys/stddef.h>
 
 /* Memory range attributes */
 #define MDF_UNCACHEABLE		(1<<0)	/* region not cached */

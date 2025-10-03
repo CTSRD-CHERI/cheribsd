@@ -33,6 +33,7 @@
 #define	_SYS_CHERIC_H_
 
 #include <sys/cdefs.h>
+#include <sys/stddef.h>
 #include <sys/types.h>
 
 #if __has_feature(capabilities)
