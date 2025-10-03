@@ -47,6 +47,8 @@
  *  13aa749a5b0a454917a944ed8fffc530b784f5ead522b1aacaf4ec8aa55a6239  COPYING.mbsd
  */
 
+#include <stddef.h>
+
 static void
 enum_err(tOptions * pOpts, tOptDesc * pOD,
          char const * const * paz_names, int name_ct)

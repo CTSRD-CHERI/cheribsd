@@ -113,6 +113,11 @@ const char *rtld_get_var(const char *name);
 int rtld_set_var(const char *name, const char *val);
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(__aarch64__)
+#ifdef _KERNEL
+#include <sys/stddef.h>
+#else
+#include <stddef.h>
+#endif
 #include <machine/c18n.h>
 void *dl_c18n_get_trusted_stack(uintptr_t);
 void dl_c18n_unwind_trusted_stack(void *, void *);

@@ -35,6 +35,7 @@
 
 #include <machine/elf.h>
 #include <sys/kobj.h>
+#include <sys/stddef.h>
 
 #ifdef MALLOC_DECLARE
 MALLOC_DECLARE(M_LINKER);

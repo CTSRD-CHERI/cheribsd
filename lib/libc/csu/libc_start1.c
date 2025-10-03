@@ -41,6 +41,7 @@
 #include <sys/param.h>
 #include <sys/elf.h>
 #include <sys/elf_common.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include "libc_private.h"
 
