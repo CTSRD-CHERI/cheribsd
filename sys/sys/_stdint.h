@@ -119,11 +119,6 @@ typedef	kuintcap_t		kuint64cap_t;
 #define	_KUINT64CAP_T_DECLARED
 #endif
 
-#ifndef _PTRADDR_T_DECLARED
-typedef	__ptraddr_t		ptraddr_t;
-#define	_PTRADDR_T_DECLARED
-#endif
-
 /* Limits of ptraddr_t. */
 #define	PTRADDR_MAX		SIZE_MAX
 
