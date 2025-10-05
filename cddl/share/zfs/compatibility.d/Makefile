@@ -22,6 +22,7 @@ FILES= \
 	openzfs-2.1-linux \
 	openzfs-2.2 \
 	openzfs-2.3 \
+	openzfs-2.4 \
 	zol-0.6.1 \
 	zol-0.6.4 \
 	zol-0.6.5 \
@@ -58,7 +59,9 @@ LINKS= \
 	${FILESDIR}/openzfs-2.2		${FILESDIR}/openzfs-2.2-linux \
 	${FILESDIR}/openzfs-2.2		${FILESDIR}/openzfs-2.2-freebsd \
 	${FILESDIR}/openzfs-2.3		${FILESDIR}/openzfs-2.3-linux \
-	${FILESDIR}/openzfs-2.3		${FILESDIR}/openzfs-2.3-freebsd
+	${FILESDIR}/openzfs-2.3		${FILESDIR}/openzfs-2.3-freebsd \
+	${FILESDIR}/openzfs-2.4		${FILESDIR}/openzfs-2.4-linux \
+	${FILESDIR}/openzfs-2.4		${FILESDIR}/openzfs-2.4-freebsd
 
 LINKMODE= ${NOBINMODE}
 
