@@ -154,7 +154,17 @@ static int kmemcount;
 
 #define KMEM_ZMAX	65536
 #define KMEM_ZSIZE	(KMEM_ZMAX >> KMEM_ZSHIFT)
-static uint8_t kmemsize[KMEM_ZSIZE + 1];
+static uint8_t kmemsize_store[KMEM_ZSIZE + 1];
+/*
+ * When sub-object bounds are enabled, the kmemsize array is likely
+ * not representable. This is not a security problem, due to the padding
+ * inserted by the compiler, however we can not expect exact bounds to
+ * work here.
+ * XXX-AM: an alternative solution would be to have a constexpr crrl supplied
+ * by the compiler.
+ */
+#define	kmemsize (__builtin_no_change_bounds(kmemsize_store))
+
 
 #ifndef MALLOC_DEBUG_MAXZONES
 #define	MALLOC_DEBUG_MAXZONES	1
