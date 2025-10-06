@@ -2,6 +2,6 @@ include "std.CHERI"
 
 machine		riscv	riscv64c
 
-makeoptions	CHERI_SUBOBJECT_BOUNDS=subobject-safe
+makeoptions	CHERI_SUBOBJECT_BOUNDS=subobject-safe-exact
 
 options 	CHERI_PURECAP_KERNEL
