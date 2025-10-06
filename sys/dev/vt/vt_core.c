@@ -196,8 +196,8 @@ static void vt_update_static(void *);
 #ifndef SC_NO_CUTPASTE
 static void vt_mouse_paste(void);
 #endif
-static void vt_suspend_handler(void *priv);
-static void vt_resume_handler(void *priv);
+static void vt_suspend_handler(void *priv, enum power_stype stype);
+static void vt_resume_handler(void *priv, enum power_stype stype);
 
 SET_DECLARE(vt_drv_set, struct vt_driver);
 
@@ -3332,7 +3332,7 @@ vt_replace_backend(const struct vt_driver *drv, void *softc)
 }
 
 static void
-vt_suspend_handler(void *priv)
+vt_suspend_handler(void *priv, enum power_stype stype)
 {
 	struct vt_device *vd;
 
@@ -3343,7 +3343,7 @@ vt_suspend_handler(void *priv)
 }
 
 static void
-vt_resume_handler(void *priv)
+vt_resume_handler(void *priv, enum power_stype stype)
 {
 	struct vt_device *vd;
 
