@@ -138,6 +138,7 @@ struct hypctx {
 	struct vgic_v3_regs	vgic_v3_regs;
 	struct vgic_v3_cpu	*vgic_cpu;
 	bool			has_exception;
+	bool			dbg_oslock;
 };
 
 struct hyp {
