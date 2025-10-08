@@ -42,8 +42,8 @@ if (!env.CHANGE_ID && (archiveBranches.contains(env.BRANCH_NAME) || env.BRANCH_N
 // Add an architecture selector for manual builds
 def allArchitectures = [
         "aarch64", "amd64",
-        "morello-hybrid", "morello-purecap",
-        "riscv64", "riscv64-hybrid", "riscv64-purecap"
+        "morello-purecap",
+        "riscv64", "riscv64-purecap"
 ]
 jobProperties.add(parameters([
         text(defaultValue: allArchitectures.join('\n'),
@@ -54,7 +54,7 @@ jobProperties.add(parameters([
 setDefaultJobProperties(jobProperties)
 
 def isCheriArchitecture(String arch) {
-    return arch.endsWith("-hybrid") || arch.endsWith("-purecap")
+    return arch.endsWith("-purecap")
 }
 
 def runTestStep(params, String testId, String arch, testExtraArgs, extraArgs) {
@@ -148,10 +148,6 @@ def runTests(params, String arch) {
     // Run test configurations in parallel (if there is be more than one).
     if (isCheriArchitecture(arch)) {
         def testSteps = [:]
-        testSteps["Test ${arch} hybrid kernel"] = { ->
-            runTestStep(params, "${arch}-hybrid-kernel", arch, testExtraArgs,
-                        ["--run-${arch}/kernel-abi hybrid"])
-        }
         testSteps["Test ${arch} purecap kernel"] = { ->
             runTestStep(params, "${arch}-purecap-kernel", arch, testExtraArgs,
                         ["--run-${arch}/kernel-abi purecap"])
@@ -297,7 +293,6 @@ selectedArchitectures.each { arch ->
             '--cheribsd/debug-files',
     ]
     if (isCheriArchitecture(arch)) {
-        cheribuildArgs.add('--cheribsd/build-alternate-abi-kernels')
         if (arch.startsWith('morello')) {
             cheribuildArgs.add('--cheribsd/build-benchmark-abi-kernels')
         }
