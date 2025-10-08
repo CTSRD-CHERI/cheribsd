@@ -57,8 +57,3 @@ export to [TCB]
 	_rtld_sighandler
 	_rtld_siginvoke
 	_rtld_sigaction
-
-callee [RTLD]
-export to [libunwind]
-	dl_c18n_is_trampoline
-	dl_c18n_pop_trusted_stack
