@@ -1,4 +1,4 @@
-SYSDIR?=	${SRCTOP}/sys
+SYSDIR?=${SRCTOP}/sys
 
 .PATH:		${SYSDIR}/cddl/compat/opensolaris/kern
 .PATH:		${ZFSTOP}/module/os/freebsd/spl
