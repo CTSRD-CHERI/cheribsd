@@ -59,12 +59,25 @@ manipulations of pointers as integers should be performed via
 .Vt uintptr_t
 or
 .Vt intptr_t
-and no other types.
-In particular,
-.Vt long
+and no other types as these types are the only integer types where the
+C standard guarantees that a pointer may be cast to it and then cast back
+to the original type.
+On CHERI systems,
+.Vt uintptr_t
 and
-.Vt ptrdiff_t
-should be avoided.
+.Vt intptr_t
+are defined as
+.Vt __uintcap_t
+and
+.Vt __intcap_t
+which represent capabilities that can be manipulated by integer operations.
+Pointers should not be cast to
+.Vt long ,
+.Vt ptrdiff_t ,
+or
+.Vt size_t
+if they will later be cast back to a pointer that is expected to be
+dereferencable as they remain bare integer types on all architectures.
 .Pp
 On some architectures, e.g.,
 AIM variants of
@@ -85,13 +98,13 @@ release to support each architecture.
 .Bl -column -offset indent "Architecture" "Initial Release"
 .It Sy Architecture Ta Sy Initial Release
 .It aarch64     Ta 11.0
-.It aarch64c    Ta CheriBSD only
+.It aarch64c    Ta 16.0 (planned)
 .It amd64       Ta 5.1
 .It armv7       Ta 12.0
 .It powerpc64   Ta 9.0
 .It powerpc64le Ta 13.0
 .It riscv64     Ta 12.0
-.It riscv64c    Ta CheriBSD only
+.It riscv64c    Ta 16.0 (planned)
 .El
 .Pp
 Discontinued architectures are shown in the following table.
@@ -125,7 +138,7 @@ architectures use some variant of the ELF (see
 .Xr elf 5 )
 .Sy Application Binary Interface
 (ABI) for the machine processor.
-All supported ABIs can be divided into three groups:
+Supported ABIs can be divided into three main groups:
 .Bl -tag -width "Dv L64PC128"
 .It Dv ILP32
 .Vt int ,
@@ -187,7 +200,6 @@ Architectures with 128-bit capabilities support both a
 .Dq native
 .Dv L64PC128
 execution environment and a
-.Dq legacy
 .Dv LP64
 environment:
 .Bl -column -offset indent "aarch64c" "LP64 counterpart"
@@ -265,6 +277,7 @@ is 8 bytes on all supported architectures except i386.
 .Bl -column -offset indent "riscv64 (Sv48)" "0x0001000000000000" "NNNU"
 .It Sy Architecture Ta Sy Maximum Address Ta Sy Address Space Size
 .It aarch64        Ta 0x0001000000000000 Ta 256TiB
+.It aarch64c       Ta 0x0001000000000000 Ta 256TiB
 .It amd64 (LA48)   Ta 0x0000800000000000 Ta 128TiB
 .It amd64 (LA57)   Ta 0x0100000000000000 Ta 64PiB
 .It armv7          Ta 0xbfc00000         Ta 3GiB
@@ -274,7 +287,9 @@ is 8 bytes on all supported architectures except i386.
 .It powerpc64      Ta 0x000fffffc0000000 Ta 4PiB
 .It powerpc64le    Ta 0x000fffffc0000000 Ta 4PiB
 .It riscv64 (Sv39) Ta 0x0000004000000000 Ta 256GiB
+.It riscv64c (Sv39) Ta 0x0000004000000000 Ta 256GiB
 .It riscv64 (Sv48) Ta 0x0000800000000000 Ta 128TiB
+.It riscv64c (Sv48) Ta 0x0000800000000000 Ta 128TiB
 .El
 .Pp
 The layout of a process' address space can be queried via the
@@ -374,14 +389,14 @@ cc -x c -dM -E /dev/null
 .Ed
 .Pp
 Common type size and endianness macros:
-.Bl -column -offset indent "__CHERI_PURE_CAPABILITY__" "Meaning"
+.Bl -column -offset indent "__SIZEOF_POINTER__" "Meaning"
 .It Sy Macro Ta Sy Meaning
 .It Dv __SIZEOF_LONG__ Ta size in bytes of long
 .It Dv __SIZEOF_POINTER__ Ta size in bytes of intptr_t and pointers
 .It Dv __SIZEOF_SIZE_T__ Ta size in bytes of size_t
 .It Dv __LP64__ Ta 64-bit (8-byte) long and pointer, 32-bit (4-byte) int
 .It Dv __ILP32__ Ta 32-bit (4-byte) int, long and pointer
-.It Dv __CHERI_PURE_CAPABILITY__ Ta 128-bit (16-byte) capability pointer, 64-bit (8-byte) long
+.It Dv __CHERI__ Ta 128-bit (16-byte) capability pointer, 64-bit (8-byte) long
 .It Dv BYTE_ORDER Ta Either Dv BIG_ENDIAN or Dv LITTLE_ENDIAN .
 .El
 .Pp
@@ -407,7 +422,7 @@ Architecture-specific macros:
 .Bl -column -offset indent "Architecture" "Predefined macros"
 .It Sy Architecture Ta Sy Predefined macros
 .It aarch64     Ta Dv __aarch64__
-.It aarch64c    Ta Dv __aarch64__
+.It aarch64c    Ta Dv __aarch64__ , Dv __CHERI__
 .It amd64       Ta Dv __amd64__ , Dv __x86_64__
 .It armv7       Ta Dv __arm__ , Dv __ARM_ARCH >= 7
 .It i386        Ta Dv __i386__
@@ -416,7 +431,7 @@ Architecture-specific macros:
 .It powerpc64   Ta Dv __powerpc__ , Dv __powerpc64__
 .It powerpc64le Ta Dv __powerpc__ , Dv __powerpc64__
 .It riscv64     Ta Dv __riscv , Dv __riscv_xlen == 64
-.It riscv64c    Ta Dv __riscv , Dv __riscv_xlen == 64
+.It riscv64c    Ta Dv __riscv , Dv __riscv_xlen == 64 , Dv __CHERI__
 .El
 .Pp
 Compilers may define additional variants of architecture-specific macros.
