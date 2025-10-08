@@ -579,10 +579,12 @@ vm_fault_soft_fast(struct faultstate *fs)
 	 */
 	if (realprot & VM_PROT_CAP)
 		vm_page_aflag_set(m_map, PGA_CAPSTORE);
+#ifdef CHERI_CAPREVOKE
 	CTR4(KTR_CAPREVOKE,
 	    "fault_soft_fast vmm=%p va=%lx prot=%#hhx PGA_CAPSTORE=%d",
 	    fs->map, fs->vaddr, realprot,
 	    (vm_page_astate_load(m_map).flags & PGA_CAPSTORE) != 0);
+#endif
 
 	if ((fs->fault_flags & VM_FAULT_NOPMAP) == 0 &&
 	    pmap_enter(fs->map->pmap, vaddr, m_map, realprot,
@@ -1590,10 +1592,12 @@ vm_fault_allocate(struct faultstate *fs, struct pctrie_iter *pages)
 
 	if (capstore_on_alloc && (fs->prot & VM_PROT_CAP) != 0)
 		vm_page_aflag_set(fs->m, PGA_CAPSTORE);
+#ifdef CHERI_CAPREVOKE
 	CTR4(KTR_CAPREVOKE,
 	    "fault_allocate vmm=%p va=%lx prot=%#hhx PGA_CAPSTORE=%d",
 	    fs->map, fs->vaddr, fs->prot,
 	    (vm_page_astate_load(fs->m).flags & PGA_CAPSTORE) != 0);
+#endif
 
 	return (FAULT_CONTINUE);
 }
