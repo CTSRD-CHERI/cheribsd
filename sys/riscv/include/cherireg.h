@@ -319,10 +319,10 @@
 
 #define	is_cheri_load_cap_fault(frame)				\
 	(frame->tf_scause == SCAUSE_LOAD_PAGE_FAULT &&		\
-	frame->tf_stval2 != 0)
+	frame->tf_stval2 == 1)
 #define	is_cheri_store_amo_cap_fault(frame)			\
 	(frame->tf_scause == SCAUSE_STORE_PAGE_FAULT &&		\
-	frame->tf_stval2 != 0)
+	frame->tf_stval2 == 1)
 #endif /* !defined(__riscv_xcheri) */
 
 
