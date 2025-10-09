@@ -1056,7 +1056,7 @@ dl_c18n_unwind_trusted_stack(void *rcsp, void *target)
 		tf->previous = cur;
 		tf->caller = index;
 	} else
-		set_trusted_stk(rcsp);
+		set_trusted_stk(cur);
 
 	sigprocmask(SIG_SETMASK, &oset, NULL);
 }
