@@ -176,6 +176,7 @@ extern void *kernel_shadow_root_cap;
 
 void kmem_cheri_revoke_init(void);
 int kmem_quarantine(void *mem, size_t size);
+void kmem_revoke(void);
 void kmem_shadow_map(vm_offset_t addr, size_t size);
 
 /* MD interface */

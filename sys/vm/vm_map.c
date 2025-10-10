@@ -1029,6 +1029,7 @@ _vm_map_init(vm_map_t map, pmap_t pmap, uintcap_t min, uintcap_t max)
 	map->vm_cheri_revoke_st = CHERI_REVOKE_ST_NONE; /* and epoch 0 */
 	map->vm_cheri_async_revoke_st = CHERI_REVOKE_ST_NONE; /* and epoch 0 */
 	map->vm_cheri_revoke_quarantining = false;
+	map->vm_cheri_async_revoke_shadow = NULL;
 	RB_INIT(&map->quarantine);
 #endif
 }

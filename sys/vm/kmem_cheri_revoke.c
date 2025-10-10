@@ -30,7 +30,10 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/kthread.h>
 #include <sys/mutex.h>
+#include <sys/proc.h>
+#include <sys/unistd.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -57,6 +60,9 @@ _Static_assert((CHERI_REVOKE_KSHADOW_MAX - CHERI_REVOKE_KSHADOW_MIN) ==
  * XXX I think only the epochs are used here, we should simplify this.
  */
 struct cheri_revoke_info kernel_revoke_info_store;
+
+static struct mtx krevoke_mtx;
+MTX_SYSINIT(krevoke_mtx, &krevoke_mtx, "kmem async revoker", MTX_DEF);
 
 static vm_offset_t
 kmem_shadow_granule_offset(ptraddr_t addr)
@@ -120,6 +126,49 @@ kmem_shadow_last_word_mask(ptraddr_t addr, size_t size)
 	mask = (1ULL << msb_offset) - 1;
 
 	return (htole64(mask));
+}
+
+/*
+ * Kernel map background revoker thread.
+ */
+static void
+kmem_revoke_kproc(void *arg __unused)
+{
+	cheri_revoke_epoch_t epoch;
+	enum cheri_revoke_state asyncst;
+
+	for (;;) {
+		/* Check if we are scheduled to advance to the next epoch */
+		mtx_lock(&krevoke_mtx);
+		vm_map_lock(kernel_map);
+		asyncst = cheri_revoke_st_get_state(
+		    kernel_map->vm_cheri_async_revoke_st);
+		epoch = cheri_revoke_st_get_epoch(
+		    kernel_map->vm_cheri_async_revoke_st);
+		if (asyncst == CHERI_REVOKE_ST_NONE) {
+			vm_map_unlock(kernel_map);
+
+			msleep(&kernel_map->vm_cheri_async_revoke_st,
+			    &krevoke_mtx, PDROP, "krevoker", 0);
+			continue;
+		}
+		KASSERT(asyncst == CHERI_REVOKE_ST_INITING,
+		    ("kmem_revoke_kproc !ST_INITING"));
+
+		/* Barrier phase */
+		printf("XXX-AM: barrier phase %#lx\n", epoch);
+
+		/* Revocation pass */
+		printf("XXX-AM: revocation phase %#lx\n", epoch);
+
+		vm_map_unlock(kernel_map);
+
+		/* Wakeup any sleepers waiting for the revoker to finish */
+		cv_broadcast(&kernel_map->vm_cheri_revoke_cv);
+		printf("XXX-AM: krevoke kproc done\n");
+	}
+
+	kproc_exit(0);
 }
 
 /*
@@ -199,6 +248,71 @@ kmem_quarantine(void *mem, size_t size)
 }
 
 /*
+ * Trigger a revocation pass on kernel_map.
+ *
+ * The kernel revocation is inherently asynchronous. This manages the epochs
+ * based on the kernel_map revoker async state. The synchronous state is unused.
+ *
+ * We don't use the user-space async revoker work queue, because the revocation
+ * loop diverges for kernel revocation.
+ *
+ * XXX-AM: This is the moral equivalent of kern_cheri_revoke that operates on
+ * the kernel_map. Since this is not a system call, this only operates
+ * asynchronously to avoid blocking.
+ *
+ * In principle, we should be able to merge this code and the kern_cheri_revoke
+ * state machine, however we don't necessarily have a thread structure here from
+ * which to grab the vmspace and vm_map, instead we use the kernel map
+ * and kernel_pmap directly. Note that locking is also slightly different.
+ *
+ * XXX-AM: do we need authorization to start a revocation pass?
+ */
+void
+kmem_revoke(void)
+{
+	cheri_revoke_epoch_t epoch;
+	enum cheri_revoke_state entryst;
+
+	KASSERT((curthread)->td_critnest == 0,
+	    ("kmem_revoke in critical section"));
+
+	vm_map_lock(kernel_map);
+	epoch = cheri_revoke_st_get_epoch(kernel_map->vm_cheri_async_revoke_st);
+	entryst = cheri_revoke_st_get_state(
+	    kernel_map->vm_cheri_async_revoke_st);
+
+	if (entryst == CHERI_REVOKE_ST_NONE) {
+		/*
+		 * Advance state and wakeup the kernel revoker loop.
+		 * Note that the epoch does not change yet, we will
+		 * do that in the async worker when we are sure that
+		 * the epoch is fully open.
+		 */
+		KASSERT((epoch & 1) == 0, ("Odd epoch NONE"));
+		cheri_revoke_st_set(&kernel_map->vm_cheri_async_revoke_st, epoch,
+		    CHERI_REVOKE_ST_INITING);
+		vm_map_unlock(kernel_map);
+
+		mtx_lock(&krevoke_mtx);
+		wakeup_one(&kernel_map->vm_cheri_async_revoke_st);
+		mtx_unlock(&krevoke_mtx);
+	} else {
+		/* Pending kernel revoker run, schedule next pass? */
+		/* TODO unimplemented */
+		vm_map_unlock(kernel_map);
+	}
+}
+
+/*
+ * Sleep until the current epoch clears the given start_epoch.
+ */
+/* void */
+/* kmem_wait_epoch_clears(cheri_revoke_epoch_t start_epoch) */
+/* { */
+/* 	/\* cv_wait(kernel_map->vm_cheri_revoke_cv); *\/ */
+/* } */
+
+/*
  * Extend the shadow bitmap to the given memory region.
  *
  * This ensures that the shadow bitmap will cover the
@@ -249,27 +363,10 @@ kmem_shadow_map(vm_offset_t addr, size_t size)
 void
 kmem_cheri_revoke_init(void)
 {
-	/* int error; */
-	/* int cow = MAP_CREATE_SHADOW; */
-
-	/* // XXX how do I map this? It is outside of the kernel map... */
-	/* error = vm_map_reservation_create_locked(kernel_map, &start, */
-	/*     CHERI_REVOKE_KSHADOW_MAX - CHERI_REVOKE_KSHADOW_MIN, */
-	/*     VM_PROT_READ | VM_PROT_WRITE); */
-	/* /\* */
-	/*  * XXX-AM in principle we could still boot here, we just can't revoke? */
-	/*  *\/ */
-	/* if (error != KERN_SUCCESS) */
-	/* 	panic("Failed to reserve kernel shadow bitmap error: %d", error); */
-
-	/* error = vm_map_insert(kernel_map, kernel_shadow_object, 0, start, */
-	/*     start + shadow_size, VM_PROT_READ | VM_PROT_WRITE, */
-	/*     VM_PROT_READ | VM_PROT_WRITE, cow, start); */
-	/* if (error != KERN_SUCCESS) */
-	/* 	panic("Failed to map kernel shadow bitmap error: %d", error); */
-
 	vm_map_lock(kernel_map);
 
+	/* Not sure if this is useless, since vmem never releases kva */
+	/* kernel_map->vm_cheri_revoke_quarantining = true; */
 	kernel_map->vm_cheri_async_revoke_shadow = kernel_shadow_root_cap;
 
 	struct cheri_revoke_info init = {
@@ -285,3 +382,16 @@ kmem_cheri_revoke_init(void)
 
 	vm_map_unlock(kernel_map);
 }
+
+static void
+kmem_revoke_kproc_init(void *arg __unused)
+{
+	int error;
+
+	error = kproc_create(kmem_revoke_kproc, NULL, NULL, RFNOWAIT,
+	    0, "cheri_krevoke");
+	if (error != 0)
+		panic("%s: failed to create worker process", __func__);
+}
+SYSINIT(kmem_revoke_kproc, SI_SUB_KTHREAD_INIT, SI_ORDER_ANY,
+    kmem_revoke_kproc_init, NULL);
