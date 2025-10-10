@@ -205,7 +205,7 @@
  * Only zones with memory not touchable by the allocator use the
  * hash table.  Otherwise slabs are found with vtoslab().
  */
-#define UMA_HASH_SIZE_INIT	32		
+#define UMA_HASH_SIZE_INIT	32
 
 #define UMA_HASH(h, s) ((((uintptr_t)s) >> UMA_SLAB_SHIFT) & (h)->uh_hashmask)
 
@@ -246,6 +246,15 @@ struct uma_bucket {
 	int16_t		ub_cnt;			/* Count of items in bucket. */
 	int16_t		ub_entries;		/* Max items. */
 	smr_seq_t	ub_seq;			/* SMR sequence number. */
+#ifdef CHERI_CAPREVOKE_KERNEL
+	/*
+	 * CHERI Revocation epoch.
+	 * Note that this fits into the padding for purecap kernels.
+	 * XXX-AM: Can we alias this with ub_seq? Can we have caprevoke
+	 * SMR zones?
+	 */
+	cheri_revoke_epoch_t ub_epoch;
+#endif
 	void		*ub_bucket[];		/* actual allocation storage */
 };
 
@@ -260,6 +269,10 @@ struct uma_cache_bucket {
 	int16_t		ucb_cnt;
 	int16_t		ucb_entries;
 	uint32_t	ucb_spare;
+#ifdef CHERI_CAPREVOKE_KERNEL
+	/* Note that this fits into the padding for purecap kernels */
+	cheri_revoke_epoch_t ucb_epoch;
+#endif
 };
 
 typedef struct uma_cache_bucket * uma_cache_bucket_t;
@@ -272,6 +285,9 @@ struct uma_cache {
 	struct uma_cache_bucket	uc_freebucket;	/* Bucket we're freeing to */
 	struct uma_cache_bucket	uc_allocbucket;	/* Bucket to allocate from */
 	struct uma_cache_bucket	uc_crossbucket;	/* cross domain bucket */
+#ifdef CHERI_CAPREVOKE_KERNEL
+	struct uma_cache_bucket uc_revokebucket; /* Quarantine bucket */
+#endif
 	uint64_t		uc_allocs;	/* Count of allocations */
 	uint64_t		uc_frees;	/* Count of frees */
 } UMA_ALIGN;

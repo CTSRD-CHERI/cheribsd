@@ -4716,6 +4716,7 @@ uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
 	critical_enter();
 	do {
 		cache = &zone->uz_cpu[curcpu];
+
 		/*
 		 * Try to free into the allocbucket first to give LIFO
 		 * ordering for cache-hot datastructures.  Spill over
@@ -4723,6 +4724,7 @@ uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
 		 * them if one runs dry.
 		 */
 		bucket = &cache->uc_allocbucket;
+
 #ifdef NUMA
 		if ((uz_flags & UMA_ZONE_FIRSTTOUCH) != 0 &&
 		    PCPU_GET(domain) != itemdomain) {
@@ -5077,6 +5079,7 @@ zone_free_item(uma_zone_t zone, void *item, void *udata, enum zfreeskip skip)
 	 */
 	if ((zone->uz_flags & UMA_ZONE_KREVOKE) != 0) {
 		kmem_quarantine(item, zone->uz_size);
+		kmem_revoke();
 	}
 #endif
 
