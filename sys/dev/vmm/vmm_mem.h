@@ -36,6 +36,7 @@ enum {
 
 struct vm;
 struct vm_object;
+struct vmspace;
 #if __has_feature(capabilities)
 struct vm_cheri_capability_tag;
 #endif
@@ -59,11 +60,14 @@ struct vm_mem {
 	struct vm_mem_map	mem_maps[VM_MAX_MEMMAPS];
 	struct vm_mem_seg	mem_segs[VM_MAX_MEMSEGS];
 	struct sx		mem_segs_lock;
+	struct vmspace		*mem_vmspace;
 };
 
-void	vm_mem_init(struct vm_mem *mem);
+int	vm_mem_init(struct vm_mem *mem, vm_offset_t lo, vm_offset_t hi);
 void	vm_mem_cleanup(struct vm *vm);
 void	vm_mem_destroy(struct vm *vm);
+
+struct vmspace *vm_vmspace(struct vm *vm);
 
 /*
  * APIs that modify the guest memory map require all vcpus to be frozen.
