@@ -8,3 +8,7 @@ ident CHERI-PURECAP-PRIME
 
 options 	FDT
 options         HZ=100
+
+nooptions	CHERI_CAPREVOKE_NO_CLEAN
+options		CHERI_CAPREVOKE_TWOSTAGE_CLEAN
+
