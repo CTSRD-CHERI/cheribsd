@@ -131,14 +131,15 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 			return -1;
 		}
 #ifdef CHERI_LIB_C18N
-		symval = tramp_intern(NULL,
-		    compart_id_for_address(obj, (Elf_Addr)where),
-		    &(struct tramp_data) {
-			.target = __DECONST(void *, symval),
-			.defobj = defobj,
-			.def = def,
-			.sig = sigtab_get(obj, r_symndx)
-		});
+		if (C18N_FPTR_ENABLED)
+			symval = tramp_intern(NULL,
+			    compart_id_for_address(obj, (Elf_Addr)where),
+			    &(struct tramp_data) {
+				.target = __DECONST(void *, symval),
+				.defobj = defobj,
+				.def = def,
+				.sig = sigtab_get(obj, r_symndx)
+			});
 #endif
 #ifdef __CHERI_PURE_CAPABILITY__
 	} else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {

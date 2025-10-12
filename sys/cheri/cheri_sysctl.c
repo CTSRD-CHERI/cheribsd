@@ -80,6 +80,16 @@ bool security_cheri_lib_based_c18n_default = false;
 SYSCTL_BOOL(_security_cheri, OID_AUTO, lib_based_c18n_default, CTLFLAG_RWTUN,
     &security_cheri_lib_based_c18n_default, 0,
     "Userspace library-based compartmentalisation default");
+
+/*
+ * When userspace library-based compartmentalisation (c18n) is enabled, wrap
+ * function pointers in trampolines.
+ */
+bool security_cheri_lib_based_c18n_wrap_fptr = false;
+SYSCTL_BOOL(_security_cheri, OID_AUTO, lib_based_c18n_wrap_fptr, CTLFLAG_RWTUN,
+    &security_cheri_lib_based_c18n_wrap_fptr, 0,
+    "When userspace library-based compartmentalisation is enabled, wrap "
+    "function pointers in trampolines");
 #endif
 
 /*
