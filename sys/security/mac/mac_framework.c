@@ -323,7 +323,7 @@ mac_policy_xlock_assert(void)
  * Initialize the MAC subsystem, including appropriate SMP locks.
  */
 static void
-mac_init(void)
+mac_init(void *dummy __unused)
 {
 
 	LIST_INIT(&mac_static_policy_list);
@@ -343,7 +343,7 @@ mac_init(void)
  * kernel, or loaded before the kernel startup.
  */
 static void
-mac_late_init(void)
+mac_late_init(void *dummy __unused)
 {
 
 	mac_late = 1;
