@@ -94,7 +94,7 @@ static uma_zone_t	itimer_zone = NULL;
 static int	settime(struct thread *, struct timeval *);
 static void	timevalfix(struct timeval *);
 
-static void	itimer_start(void);
+static void	itimer_start(void *);
 static int	itimer_init(void *, int, int);
 static void	itimer_fini(void *, int);
 static void	itimer_enter(struct itimer *);
@@ -1191,7 +1191,7 @@ eventratecheck(struct timeval *lasttime, int *cureps, int maxeps)
 }
 
 static void
-itimer_start(void)
+itimer_start(void *dummy __unused)
 {
 	static const struct kclock rt_clock = {
 		.timer_create  = realtimer_create,
