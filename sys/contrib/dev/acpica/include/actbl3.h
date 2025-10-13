@@ -983,11 +983,15 @@ typedef struct acpi_table_wpbt
 
 } ACPI_TABLE_WPBT;
 
+/* XXX-AM: HACK: work around RV64Y compiler spurious complaints */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcheri-capability-misuse"
 typedef struct acpi_wpbt_unicode
 {
     UINT16                  *UnicodeString;
 
 } ACPI_WPBT_UNICODE;
+#pragma GCC diagnostic pop
 
 
 /*******************************************************************************
