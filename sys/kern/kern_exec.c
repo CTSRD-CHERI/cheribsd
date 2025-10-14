@@ -503,7 +503,7 @@ do_execve(struct thread *td, struct image_args *args,
 #endif
 	int error, i, orig_osrel;
 	uint32_t orig_fctl0;
-	Elf_Brandinfo *orig_brandinfo;
+	const Elf_Brandinfo *orig_brandinfo;
 	size_t freepath_size;
 	static const char fexecv_proc_title[] = "(fexecv)";
 

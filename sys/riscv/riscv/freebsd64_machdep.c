@@ -121,7 +121,7 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 };
 INIT_SYSENTVEC(freebsd64_sysent, &elf_freebsd_freebsd64_sysvec);
 
-static Elf64_Brandinfo freebsd_freebsd64_brand_info = {
+static const Elf64_Brandinfo freebsd_freebsd64_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,
 	.machine	= EM_RISCV,
 	.compat_3_brand	= "FreeBSD",
@@ -132,7 +132,7 @@ static Elf64_Brandinfo freebsd_freebsd64_brand_info = {
 	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE,
 };
 
-SYSINIT(freebsd64, SI_SUB_EXEC, SI_ORDER_ANY,
+C_SYSINIT(freebsd64, SI_SUB_EXEC, SI_ORDER_ANY,
     (sysinit_cfunc_t) elf64_insert_brand_entry,
     &freebsd_freebsd64_brand_info);
 
