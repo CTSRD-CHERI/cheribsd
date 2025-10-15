@@ -51,9 +51,9 @@
  * the pointers.
  */
 struct ps_strings {
-	char * __kerncap * __kerncap ps_argvstr; /* first of 0 or more argument strings */
+	char **ps_argvstr; /* first of 0 or more argument strings */
 	unsigned int ps_nargvstr; /* the number of argument strings */
-	char * __kerncap * __kerncap ps_envstr;	/* first of 0 or more environment strings */
+	char **ps_envstr;	/* first of 0 or more environment strings */
 	unsigned int ps_nenvstr; /* the number of environment strings */
 };
 

@@ -50,7 +50,7 @@ struct gctl_req_arg {
 	off_t				offset;
 	int				flag;
 	int				len;
-	void * __kerncap		value;
+	void				*value;
 	/* kernel only fields */
 	union {
 #ifdef _KERNEL
@@ -81,8 +81,8 @@ struct gctl_req {
 		struct gctl_req_arg	*arg;
 	};
 	u_int				lerror;
-	char * __kerncap		error;
-	struct gctl_req_table* __kerncap reqt;
+	char *		error;
+	struct gctl_req_table*reqt;
 
 	/* kernel only fields */
 	int				nerror;

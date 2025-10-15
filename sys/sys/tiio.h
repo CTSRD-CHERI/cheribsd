@@ -307,7 +307,7 @@ typedef enum {
 } ti_trace_type;
 
 struct ti_trace_buf {
-	u_long	* __kerncap buf;
+	u_long	*buf;
 	int	buf_len;
 	int	fill_len;
 	u_long	cur_trace_ptr;

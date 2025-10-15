@@ -35,7 +35,7 @@
 
 /* Compatible with usb_gen_descriptor structure */
 struct hidraw_gen_descriptor {
-	void * __kerncap hgd_data;
+	void	*hgd_data;
 	uint16_t hgd_lang_id;
 	uint16_t hgd_maxlen;
 	uint16_t hgd_actlen;

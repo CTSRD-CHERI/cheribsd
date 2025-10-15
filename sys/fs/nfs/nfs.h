@@ -171,7 +171,7 @@
  */
 struct nfsd_addsock_args {
 	int	sock;		/* Socket to serve */
-	char * __kerncap name;	/* Client addr for connection based sockets */
+	caddr_t	name;		/* Client addr for connection based sockets */
 	int	namelen;	/* Length of name */
 };
 
@@ -180,17 +180,17 @@ struct nfsd_addsock_args {
  * (New version supports pNFS, indicated by NFSSVC_NEWSTRUCT flag.)
  */
 struct nfsd_nfsd_args {
-	const char * __kerncap principal; /* GSS-API service principal name */
+	const char *principal;	/* GSS-API service principal name */
 	int	minthreads;	/* minimum service thread count */
 	int	maxthreads;	/* maximum service thread count */
 	int	version;	/* Allow multiple variants */
-	char * __kerncap addr;	/* pNFS DS addresses */
+	char	*addr;		/* pNFS DS addresses */
 	int	addrlen;	/* Length of addrs */
-	char * __kerncap dnshost; /* DNS names for DS addresses */
+	char	*dnshost;	/* DNS names for DS addresses */
 	int	dnshostlen;	/* Length of DNS names */
-	char * __kerncap dspath; /* DS Mount path on MDS */
+	char	*dspath;	/* DS Mount path on MDS */
 	int	dspathlen;	/* Length of DS Mount path on MDS */
-	char * __kerncap mdspath; /* MDS mount for DS path on MDS */
+	char	*mdspath;	/* MDS mount for DS path on MDS */
 	int	mdspathlen;	/* Length of MDS mount for DS path on MDS */
 	int	mirrorcnt;	/* Number of mirrors to create on DSs */
 };
@@ -205,9 +205,9 @@ struct nfsd_nfsd_args {
 
 struct nfsd_pnfsd_args {
 	int	op;		/* Which pNFSd op to perform. */
-	char * __kerncap mdspath; /* Path of MDS file. */
-	char * __kerncap dspath; /* Path of recovered DS mounted on dir. */
-	char * __kerncap curdspath; /* Path of current DS mounted on dir. */
+	char	*mdspath;	/* Path of MDS file. */
+	char	*dspath;	/* Path of recovered DS mounted on dir. */
+	char	*curdspath;	/* Path of current DS mounted on dir. */
 };
 
 #define	PNFSDOP_DELDSSERVER	1
@@ -216,7 +216,7 @@ struct nfsd_pnfsd_args {
 
 /* Old version. */
 struct nfsd_nfsd_oargs {
-	const char * __kerncap principal; /* GSS-API service principal name */
+	const char *principal; /* GSS-API service principal name */
 	int	minthreads;	/* minimum service thread count */
 	int	maxthreads;	/* maximum service thread count */
 };
@@ -225,12 +225,12 @@ struct nfsd_nfsd_oargs {
  * Arguments for use by the callback daemon.
  */
 struct nfsd_nfscbd_args {
-	const char * __kerncap principal; /* GSS-API service principal name */
+	const char *principal;	/* GSS-API service principal name */
 };
 
 struct nfscbd_args {
 	int	sock;		/* Socket to serve */
-	char * __kerncap name;	/* Client addr for connection based sockets */
+	char	*name;		/* Client addr for connection based sockets */
 	int	namelen;	/* Length of name */
 	u_short	port;		/* Port# for callbacks */
 };
@@ -241,9 +241,9 @@ struct nfsd_idargs {
 	gid_t		nid_gid;
 	int		nid_usermax;	/* Upper bound on user name cache */
 	int		nid_usertimeout;/* User name timeout (minutes) */
-	u_char 	* __kerncap nid_name;	/* Name */
+	u_char 		*nid_name;	/* Name */
 	int		nid_namelen;	/* and its length */
-	gid_t 	* __kerncap nid_grps;	/* and the list */
+	gid_t 		*nid_grps;	/* and the list */
 	int		nid_ngroup;	/* Size of groups list */
 };
 
@@ -253,7 +253,7 @@ struct nfsd_oidargs {
 	gid_t		nid_gid;
 	int		nid_usermax;	/* Upper bound on user name cache */
 	int		nid_usertimeout;/* User name timeout (minutes) */
-	u_char 	* __kerncap nid_name;	/* Name */
+	u_char		*nid_name;	/* Name */
 	int		nid_namelen;	/* and its length */
 };
 
@@ -269,7 +269,7 @@ struct nfsd_clid {
 
 struct nfsd_dumplist {
 	int		ndl_size;	/* Number of elements */
-	void * __kerncap ndl_list;	/* and the list of elements */
+	void		*ndl_list;	/* and the list of elements */
 };
 
 struct nfsd_dumpclients {
@@ -289,9 +289,9 @@ struct nfsd_dumpclients {
 };
 
 struct nfsd_dumplocklist {
-	char * __kerncap ndllck_fname;	/* File Name */
+	char		*ndllck_fname;	/* File Name */
 	int		ndllck_size;	/* Number of elements */
-	void * __kerncap ndllck_list;	/* and the list of elements */
+	void		*ndllck_list;	/* and the list of elements */
 };
 
 struct nfsd_dumplocks {

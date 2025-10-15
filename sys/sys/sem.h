@@ -47,7 +47,7 @@ struct semid_ds_old {
 
 struct semid_ds {
 	struct ipc_perm	sem_perm;	/* operation permission struct */
-	struct sem * __kerncap __sem_base; /* first semaphore in set */
+	struct sem *__sem_base; /* first semaphore in set */
 	unsigned short	sem_nsems;	/* number of sems in set */
 	time_t		sem_otime;	/* last operation time */
 	time_t		sem_ctime;	/* last change time */
@@ -70,8 +70,8 @@ struct sembuf {
     defined(_WANT_SEMUN_OLD)
 union semun_old {
 	int		val;		/* value for SETVAL */
-	struct semid_ds_old * __kerncap buf; /* buffer for IPC_STAT & IPC_SET */
-	unsigned short * __kerncap array; /* array for GETALL & SETALL */
+	struct semid_ds_old *buf; /* buffer for IPC_STAT & IPC_SET */
+	unsigned short *array; /* array for GETALL & SETALL */
 };
 #endif
 #if defined(_WANT_SEMUN) || defined(_KERNEL)
@@ -80,8 +80,8 @@ union semun_old {
  */
 union semun {
 	int		val;		/* value for SETVAL */
-	struct semid_ds * __kerncap buf; /* buffer for IPC_STAT & IPC_SET */
-	unsigned short * __kerncap array; /* array for GETALL & SETALL */
+	struct semid_ds *buf; /* buffer for IPC_STAT & IPC_SET */
+	unsigned short *array; /* array for GETALL & SETALL */
 };
 #endif
 
@@ -152,8 +152,8 @@ struct semid_kernel_sysctl {
 struct semid_kernel {
 #endif
 	struct semid_ds u;
-	void * __kerncap label;	/* Always NULL */
-	void * __kerncap cred;	/* Always NULL */
+	void *label;	/* Always NULL */
+	void *cred;	/* Always NULL */
 };
 
 /* internal "mode" bits */

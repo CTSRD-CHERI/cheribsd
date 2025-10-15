@@ -68,24 +68,24 @@ struct vm_register_cheri_capability_tag {
 struct vm_register_set {
 	int		cpuid;
 	unsigned int	count;
-	const int	* __kerncap regnums;	/* enum vm_reg_name */
-	uintcap_t	* __kerncap regvals;
+	const int	*regnums;	/* enum vm_reg_name */
+	uintcap_t	*regvals;
 };
 
 #if __has_feature(capabilities)
 struct vm_register_cheri_capability_tag_set {
 	int		cpuid;
 	unsigned int	count;
-	const int	* __kerncap regnums;	/* enum vm_reg_name */
-	uint8_t		* __kerncap tags;
+	const int	*regnums;	/* enum vm_reg_name */
+	uint8_t		*tags;
 };
 #endif
 
 struct vm_run {
 	int		cpuid;
-	cpuset_t	* __kerncap cpuset;	/* CPU set storage */
+	cpuset_t	*cpuset;	/* CPU set storage */
 	size_t		cpusetsize;
-	struct vm_exit	* __kerncap vm_exit;
+	struct vm_exit	*vm_exit;
 };
 
 struct vm_exception {
@@ -142,7 +142,7 @@ struct vm_activate_cpu {
 struct vm_cpuset {
 	int		which;
 	int		cpusetsize;
-	cpuset_t	* __kerncap cpus;
+	cpuset_t	*cpus;
 };
 #define	VM_ACTIVE_CPUS		0
 #define	VM_SUSPENDED_CPUS	1

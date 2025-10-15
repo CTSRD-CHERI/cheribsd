@@ -85,7 +85,7 @@ struct kevent {
 	unsigned short	flags;		/* action flags for kqueue */
 	unsigned int	fflags;		/* filter flag value */
 	__int64_t	data;		/* filter data value */
-	void * __kerncap udata;		/* opaque user data identifier */
+	void *udata;		/* opaque user data identifier */
 	__uint64_t	ext[4];		/* extensions */
 };
 
@@ -108,7 +108,7 @@ struct freebsd11_kevent {
 	unsigned short	flags;
 	unsigned int	fflags;
 	__intptr_t	data;
-	void * __kerncap udata;		/* opaque user data identifier */
+	void *udata;		/* opaque user data identifier */
 };
 #endif
 

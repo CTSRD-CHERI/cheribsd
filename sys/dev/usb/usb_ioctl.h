@@ -64,13 +64,13 @@ enum {
 };
 
 struct usb_read_dir {
-	void   * __kerncap urd_data;
+	void   *urd_data;
 	uint32_t urd_startentry;
 	uint32_t urd_maxlen;
 };
 
 struct usb_ctl_request {
-	void   * __kerncap ucr_data;
+	void   *ucr_data;
 	uint16_t ucr_flags;
 	uint16_t ucr_actlen;		/* actual length transferred */
 	uint8_t	ucr_addr;		/* zero - currently not used */
@@ -83,7 +83,7 @@ struct usb_alt_interface {
 };
 
 struct usb_gen_descriptor {
-	void   * __kerncap ugd_data;
+	void   *ugd_data;
 	uint16_t ugd_lang_id;
 	uint16_t ugd_maxlen;
 	uint16_t ugd_actlen;
@@ -159,8 +159,8 @@ struct usb_fs_endpoint {
 	 * NOTE: isochronous USB transfer only use one buffer, but can have
 	 * multiple frame lengths !
 	 */
-	void  * __kerncap * __kerncap ppBuffer;	/* pointer to userland buffers */
-	uint32_t  * __kerncap pLength;	/* pointer to frame lengths, updated
+	void  **ppBuffer;		/* pointer to userland buffers */
+	uint32_t  *pLength;		/* pointer to frame lengths, updated
 					 * to actual length */
 	uint32_t nFrames;		/* number of frames */
 	uint32_t aFrames;		/* actual number of frames */
@@ -183,7 +183,7 @@ struct usb_fs_endpoint {
 
 struct usb_fs_init {
 	/* userland pointer to endpoints structure */
-	struct usb_fs_endpoint * __kerncap pEndpoints;
+	struct usb_fs_endpoint *pEndpoints;
 	/* maximum number of endpoints */
 	uint8_t	ep_index_max;
 };

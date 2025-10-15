@@ -1863,7 +1863,7 @@ struct nvme_pt_command {
 	struct nvme_completion	cpl;
 
 	/* buf is the data buffer associated with this passthrough command. */
-	void * __kerncap	buf;
+	void *			buf;
 
 	/*
 	 * len is the length of the data buffer associated with this
