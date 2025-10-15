@@ -2886,7 +2886,7 @@ kqueue_cheri_revoke_note(const struct vm_cheri_revoke_cookie *crc,
 		; /* nothing to be done */
 	} else if (__builtin_cheri_equal_exact(id, kn->kn_kevent.ident)) {
 		CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
-		kn->kn_kevent.ident = (kuintcap_t)cheri_revoke_cap(id);
+		kn->kn_kevent.ident = cheri_revoke_cap(id);
 	} else {
 		/*
 		 * Otherwise, the value changed out from under us; don't advance

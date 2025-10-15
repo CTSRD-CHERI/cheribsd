@@ -532,7 +532,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct fcntl_args *p = params;
 		iarg[a++] = p->fd; /* int */
 		iarg[a++] = p->cmd; /* int */
-		uarg[a++] = (intcap_t)p->arg; /* kintcap_t */
+		uarg[a++] = (intcap_t)p->arg; /* intptr_t */
 		*n_args = 3;
 		break;
 	}
@@ -3494,8 +3494,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		iarg[a++] = p->pid1; /* pid_t */
 		iarg[a++] = p->pid2; /* pid_t */
 		iarg[a++] = p->type; /* int */
-		uarg[a++] = (intcap_t)p->idx1; /* kuintcap_t */
-		uarg[a++] = (intcap_t)p->idx2; /* kuintcap_t */
+		uarg[a++] = (intcap_t)p->idx1; /* uintptr_t */
+		uarg[a++] = (intcap_t)p->idx2; /* uintptr_t */
 		*n_args = 5;
 		break;
 	}
@@ -4340,7 +4340,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "kintcap_t";
+			p = "intptr_t";
 			break;
 		default:
 			break;
@@ -9379,10 +9379,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "kuintcap_t";
+			p = "uintptr_t";
 			break;
 		case 4:
-			p = "kuintcap_t";
+			p = "uintptr_t";
 			break;
 		default:
 			break;

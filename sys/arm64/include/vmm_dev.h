@@ -54,7 +54,7 @@ struct vm_memseg {
 struct vm_register {
 	int		cpuid;
 	int		regnum;		/* enum vm_reg_name */
-	kuintcap_t	regval;
+	uintptr_t	regval;
 };
 
 #if __has_feature(capabilities)
