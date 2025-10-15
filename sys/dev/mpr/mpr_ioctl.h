@@ -82,7 +82,7 @@
 struct mpr_cfg_page_req {	
 	MPI2_CONFIG_PAGE_HEADER header;
 	uint32_t page_address;
-	void * __kerncap buf;
+	void	*buf;
 	int	len;
 	uint16_t ioc_status;
 };
@@ -90,7 +90,7 @@ struct mpr_cfg_page_req {
 struct mpr_ext_cfg_page_req {
 	MPI2_CONFIG_EXTENDED_PAGE_HEADER header;
 	uint32_t page_address;
-	void * __kerncap buf;
+	void	*buf;
 	int	len;
 	uint16_t ioc_status;
 };
@@ -101,7 +101,7 @@ struct mpr_raid_action {
 	uint8_t volume_id;
 	uint8_t phys_disk_num;
 	uint32_t action_data_word;
-	void * __kerncap buf;
+	void *buf;
 	int len;
 	uint32_t volume_status;
 	uint32_t action_data[4];
@@ -111,11 +111,11 @@ struct mpr_raid_action {
 };
 
 struct mpr_usr_command {
-	void * __kerncap req;
+	void *req;
 	uint32_t req_len;
-	void * __kerncap rpl;
+	void *rpl;
 	uint32_t rpl_len;
-	void * __kerncap buf;
+	void *buf;
 	int len;
 	uint32_t flags;
 };

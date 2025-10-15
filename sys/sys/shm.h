@@ -93,7 +93,7 @@ struct shmid_ds_old {
 	time_t          shm_atime;	/* time of last shmat() */
 	time_t          shm_dtime;	/* time of last shmdt() */
 	time_t          shm_ctime;	/* time of last change by shmctl() */
-	void * __kerncap shm_internal;	/* sysv stupidity */
+	void *shm_internal;	/* sysv stupidity */
 };
 #endif
 
@@ -158,9 +158,9 @@ struct shmid_kernel_sysctl {
 struct shmid_kernel {
 #endif
 	struct shmid_ds u;
-	void * __kerncap object;	/* Always NULL */
-	void * __kerncap label;	/* Always NULL */
-	void * __kerncap cred;	/* Always NULL */
+	void *object;	/* Always NULL */
+	void *label;	/* Always NULL */
+	void *cred;	/* Always NULL */
 };
 #endif
 

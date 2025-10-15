@@ -55,10 +55,10 @@ struct hwt_alloc {
 	size_t		bufsize;
 	int		mode;
 	pid_t		pid;		/* thread mode */
-	cpuset_t * __kerncap cpu_map;	/* cpu mode only */
+	cpuset_t	*cpu_map;	/* cpu mode only */
 	size_t		cpusetsize;
-	const char * __kerncap backend_name;
-	int * __kerncap	ident;
+	const char	*backend_name;
+	int		*ident;
 	int		kqueue_fd;
 } __aligned(16);
 
@@ -98,15 +98,15 @@ struct hwt_record_user_entry {
 } __aligned(16);
 
 struct hwt_record_get {
-	struct hwt_record_user_entry * __kerncap records;
-	int * __kerncap			nentries;
+	struct hwt_record_user_entry *records;
+	int		*nentries;
 	int             wait;
 } __aligned(16);
 
 struct hwt_bufptr_get {
-	int * __kerncap	ident;
-	vm_offset_t * __kerncap offset;
-	uint64_t * __kerncap data;
+	int *ident;
+	vm_offset_t *offset;
+	uint64_t *data;
 } __aligned(16);
 
 struct hwt_set_config {
@@ -114,14 +114,14 @@ struct hwt_set_config {
 	int			pause_on_mmap;
 
 	/* The following passed to backend as is. */
-	void * __kerncap	config;
+	void			*config;
 	size_t			config_size;
 	int			config_version;
 } __aligned(16);
 
 struct hwt_svc_buf {
 	/* The following passed to backend as is. */
-	void * __kerncap	data;
+	void			*data;
 	size_t			data_size;
 	int			data_version;
 } __aligned(16);

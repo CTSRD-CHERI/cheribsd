@@ -55,7 +55,7 @@ struct vm_memseg {
 	int		segid;
 	size_t		len;
 	char 		name[VM_MAX_SUFFIXLEN + 1];
-	domainset_t * __kerncap ds_mask;
+	domainset_t	*ds_mask;
 	size_t		ds_mask_size;
 	int 		ds_policy;
 };

@@ -64,7 +64,7 @@ struct rtld_c18n_stats {
  * Compartment information exposed by RTLD.
  */
 struct rtld_c18n_compart {
-	const char * __kerncap	rcc_name;
+	const char *		rcc_name;
 	size_t			rcc_id;
 	uint8_t			rcc_dlopened_explicitly : 1;
 	uint8_t			rcc_dlopened : 1;
@@ -81,7 +81,7 @@ struct cheri_c18n_info {
 	_Atomic(size_t) version;
 
 	size_t stats_size;
-	struct rtld_c18n_stats * __kerncap	stats;
+	struct rtld_c18n_stats *	stats;
 
 	/*
 	 * Since the `comparts` array may be reallocated or ortherwise change
@@ -93,7 +93,7 @@ struct cheri_c18n_info {
 	_Atomic(size_t) comparts_gen;
 	size_t comparts_size;
 	size_t comparts_entry_size;
-	void * __kerncap	comparts;
+	void *	comparts;
 };
 
 /*

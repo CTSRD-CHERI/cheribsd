@@ -91,8 +91,8 @@ struct msqid_ds_old {
 
 struct msqid_ds {
 	struct	ipc_perm msg_perm;	/* msg queue permission bits */
-	void * __kerncap __msg_first __attribute__((deprecated));
-	void * __kerncap __msg_last __attribute__((deprecated));
+	void *__msg_first __attribute__((deprecated));
+	void *__msg_last __attribute__((deprecated));
 	msglen_t msg_cbytes;	/* number of bytes in use on the queue */
 	msgqnum_t msg_qnum;	/* number of msgs in the queue */
 	msglen_t msg_qbytes;	/* max # of bytes on the queue */
@@ -165,8 +165,8 @@ struct msqid_kernel_sysctl {
 struct msqid_kernel {
 #endif
 	struct  msqid_ds u;
-	void * __kerncap label;	/* Always NULL */
-	void * __kerncap cred;	/* Always NULL */
+	void *label;	/* Always NULL */
+	void *cred;	/* Always NULL */
 };
 #endif
 

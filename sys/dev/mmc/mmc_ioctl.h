@@ -55,7 +55,7 @@ struct mmc_ioc_cmd {
 
 struct mmc_ioc_multi_cmd {
 	uint64_t		num_of_cmds;
-	void * __kerncap	cmds;
+	void *	cmds;
 };
 
 #define	MMC_IOC_BASE		'M'

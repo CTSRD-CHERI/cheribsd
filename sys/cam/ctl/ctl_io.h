@@ -357,25 +357,25 @@ struct ctl_scsiio {
 	uint8_t	   cdb[CTL_MAX_CDBLEN];	/* CDB */
 	union {
 #ifdef _KERNEL
-		void * __kerncap _dummy0;
+		void *_dummy0;
 #endif
 		ctl_be_move_done_t be_move_done;	/* called by fe */
 	};
 	union {
 #ifdef _KERNEL
-		void * __kerncap _dummy1;
+		void *_dummy1;
 #endif
 		ctl_io_cont io_cont;		/* to continue processing */
 	};
 	union {
 #ifdef _KERNEL
-		void * __kerncap _dummy2;
+		void *_dummy2;
 #endif
 		ctl_ref	    kern_data_ref; /* Method to reference/release data */
 	};
 	union {
 #ifdef _KERNEL
-		void * __kerncap _dummy3;
+		void *_dummy3;
 #endif
 		void	   *kern_data_arg; /* Opaque argument for kern_data_ref() */
 	};
@@ -483,25 +483,25 @@ struct ctl_nvmeio {
 	bool       success_sent;	/* datamove already sent CQE */
 	union {
 #ifdef _KERNEL
-		void * __kerncap _dummy0;
+		void *_dummy0;
 #endif
 		ctl_be_move_done_t be_move_done;	/* called by fe */
 	};
 	union {
 #ifdef _KERNEL
-		void * __kerncap _dummy1;
+		void *_dummy1;
 #endif
 		ctl_io_cont io_cont;		/* to continue processing */
 	};
 	union {
 #ifdef _KERNEL
-		void * __kerncap _dummy2;
+		void *_dummy2;
 #endif
 		ctl_ref	    kern_data_ref; /* Method to reference/release data */
 	};
 	union {
 #ifdef _KERNEL
-		void * __kerncap _dummy3;
+		void *_dummy3;
 #endif
 		void	   *kern_data_arg; /* Opaque argument for kern_data_ref() */
 	};

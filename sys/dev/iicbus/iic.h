@@ -63,11 +63,11 @@ struct iiccmd {
 	u_char slave;
 	int count;
 	int last;
-	char * __kerncap buf;
+	char *buf;
 };
 
 struct iic_rdwr_data {
-	struct iic_msg * __kerncap msgs;
+	struct iic_msg *msgs;
 	uint32_t nmsgs;
 };
 

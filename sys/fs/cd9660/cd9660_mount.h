@@ -38,7 +38,7 @@
  * Arguments to mount ISO 9660 filesystems.
  */
 struct iso_args {
-	char * __kerncap fspec;		/* block special device to mount */
+	char	*fspec;		/* block special device to mount */
 	struct	oexport_args export;	/* network export info */
 	uid_t   uid;		    	/* uid that owns ISO-9660 files */
 	gid_t   gid;		    	/* gid that owns ISO-9660 files */
@@ -46,8 +46,8 @@ struct iso_args {
 	mode_t  dmask;		  	/* file mask to be applied for directories */
 	int	flags;			/* mounting flags, see below */
 	int	ssector;		/* starting sector, 0 for 1st session */
-	char * __kerncap cs_disk;	/* disk charset for Joliet cs conversion */
-	char * __kerncap cs_local;	/* local charset for Joliet cs conversion */
+	char	*cs_disk;		/* disk charset for Joliet cs conversion */
+	char	*cs_local;		/* local charset for Joliet cs conversion */
 };
 #define	ISOFSMNT_NORRIP	0x00000001	/* disable Rock Ridge Ext.*/
 #define	ISOFSMNT_GENS	0x00000002	/* enable generation numbers */

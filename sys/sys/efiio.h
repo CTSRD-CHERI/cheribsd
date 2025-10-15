@@ -47,7 +47,7 @@ _Static_assert(sizeof(struct uuid) == sizeof(efi_guid_t),
 
 struct efi_get_table_ioctl
 {
-	void * __kerncap buf;	/* Pointer to userspace buffer */
+	void *buf;		/* Pointer to userspace buffer */
 	efi_guid_t guid;	/* GUID to look up */
 	size_t table_len;	/* Table size */
 	size_t buf_len;		/* Size of the buffer */
@@ -55,11 +55,11 @@ struct efi_get_table_ioctl
 
 struct efi_var_ioctl
 {
-	efi_char * __kerncap name;	/* User pointer to name, in wide chars */
+	efi_char *name;	/* User pointer to name, in wide chars */
 	size_t namesize;		/* Number of wide characters in name */
 	efi_guid_t vendor;		/* Vendor's GUID for variable */
 	uint32_t attrib;		/* Attributes */
-	void * __kerncap data;		/* User pointer to the data */
+	void *data;		/* User pointer to the data */
 	size_t datasize;		/* Number of *bytes* in the data */
 };
 

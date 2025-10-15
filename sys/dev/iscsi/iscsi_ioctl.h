@@ -227,7 +227,7 @@ struct iscsi_session_remove {
 
 struct iscsi_session_list {
 	unsigned int			isl_nentries;
-	struct iscsi_session_state * __kerncap isl_pstates;
+	struct iscsi_session_state	*isl_pstates;
 	int				isl_spare[4];
 };
 

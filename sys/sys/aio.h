@@ -97,7 +97,7 @@
 struct __aiocb_private {
 	long	status;
 	long	error;
-	void	* __kerncap spare;
+	void	*spare;
 };
 
 /*
@@ -106,10 +106,10 @@ struct __aiocb_private {
 typedef struct aiocb {
 	int	aio_fildes;		/* File descriptor */
 	off_t	aio_offset;		/* File offset for I/O */
-	volatile void * __kerncap aio_buf; /* I/O buffer in process space */
+	volatile void *aio_buf; /* I/O buffer in process space */
 	size_t	aio_nbytes;		/* Number of bytes for I/O */
 	int	__spare__[2];
-	void	* __kerncap __spare2__;
+	void	*__spare2__;
 	int	aio_lio_opcode;		/* LIO opcode */
 	int	aio_reqprio;		/* Request priority -- ignored */
 	struct __aiocb_private _aiocb_private;

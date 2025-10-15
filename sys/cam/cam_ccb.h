@@ -346,7 +346,7 @@ typedef union {
 } ccb_spriv_area;
 
 typedef struct {
-	struct timeval	* __kerncap etime;
+	struct timeval	*etime;
 	uintptr_t	sim_data;
 	uintptr_t	periph_data;
 } ccb_qos_area;
@@ -767,7 +767,7 @@ struct ccb_smpio {
 };
 
 typedef union {
-	uint8_t * __kerncap sense_ptr;	/*
+	uint8_t *sense_ptr;	/*
 					 * Pointer to storage
 					 * for sense information
 					 */
@@ -792,7 +792,7 @@ typedef union {
  */
 struct ccb_scsiio {
 	struct	   ccb_hdr ccb_h;
-	union	   ccb * __kerncap next_ccb;	/* Ptr for next CCB for action */
+	union	   ccb *next_ccb;	/* Ptr for next CCB for action */
 	union {
 #ifdef _KERNEL
 		uint8_t * __capability user_req_map;
@@ -815,7 +815,7 @@ struct ccb_scsiio {
 	uint8_t   sense_resid;		/* Autosense resid length: 2's comp */
 	uint32_t  resid;		/* Transfer residual length: 2's comp */
 	cdb_t	   cdb_io;		/* Union for CDB bytes/pointer */
-	uint8_t   * __kerncap msg_ptr;	/* Pointer to the message buffer */
+	uint8_t   *msg_ptr;		/* Pointer to the message buffer */
 	uint16_t  msg_len;		/* Number of bytes for the Message */
 	uint8_t   tag_action;		/* What to do for tag queueing */
 	/*
@@ -844,7 +844,7 @@ scsiio_cdb_ptr(struct ccb_scsiio *ccb)
  */
 struct ccb_ataio {
 	struct	   ccb_hdr ccb_h;
-	union	   ccb * __kerncap next_ccb;	/* Ptr for next CCB for action */
+	union	   ccb *next_ccb;	/* Ptr for next CCB for action */
 	struct ata_cmd	cmd;		/* ATA command register set */
 	struct ata_res	res;		/* ATA result register set */
 	union {
@@ -868,7 +868,7 @@ struct ccb_ataio {
  */
 struct ccb_mmcio {
 	struct	   ccb_hdr ccb_h;
-	union	   ccb * __kerncap next_ccb;	/* Ptr for next CCB for action */
+	union	   ccb *next_ccb;	/* Ptr for next CCB for action */
 	struct mmc_command cmd;
         struct mmc_command stop;
 };
@@ -910,7 +910,7 @@ struct ccb_relsim {
  */
 struct ccb_nvmeio {
 	struct	   ccb_hdr ccb_h;
-	union	   ccb * __kerncap next_ccb;	/* Ptr for next CCB for action */
+	union	   ccb *next_ccb;	/* Ptr for next CCB for action */
 	struct nvme_command cmd;	/* NVME command, per NVME standard */
 	struct nvme_completion cpl;	/* NVME completion, per NVME standard */
 	union {
@@ -1372,11 +1372,11 @@ struct ccb_eng_inq {
 
 struct ccb_eng_exec {	/* This structure must match SCSIIO size */
 	struct	  ccb_hdr ccb_h;
-	uint8_t  * __kerncap pdrv_ptr;	/* Ptr used by the peripheral driver */
-	uint8_t  * __kerncap req_map;	/* Ptr for mapping info on the req. */
-	uint8_t  * __kerncap data_ptr;	/* Pointer to the data buf/SG list */
+	uint8_t  *pdrv_ptr;	/* Ptr used by the peripheral driver */
+	uint8_t  *req_map;	/* Ptr for mapping info on the req. */
+	uint8_t  *data_ptr;	/* Pointer to the data buf/SG list */
 	uint32_t dxfer_len;	/* Data transfer length */
-	uint8_t  * __kerncap engdata_ptr;	/* Pointer to the engine buffer data */
+	uint8_t  *engdata_ptr;	/* Pointer to the engine buffer data */
 	uint16_t sglist_cnt;	/* Num of scatter gather list entries */
 	uint32_t dmax_len;	/* Destination data maximum length */
 	uint32_t dest_len;	/* Destination data length */
