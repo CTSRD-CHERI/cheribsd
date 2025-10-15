@@ -273,11 +273,7 @@
 struct fsck_cmd {
 	int32_t	version;	/* version of command structure */
 	int32_t	handle;		/* reference to filesystem to be changed */
-#ifdef __ILP32__
-	int64_t value;		/* inode or block number to be affected */
-#else
-	kintcap_t value;
-#endif
+	int64ptr_t value;	/* inode or block number to be affected */
 	int64_t	size;		/* amount or range to be adjusted */
 	int64_t	spare;		/* reserved for future use */
 };
