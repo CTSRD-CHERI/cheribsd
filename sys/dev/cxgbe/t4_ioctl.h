@@ -77,19 +77,19 @@ struct t4_reg {
 struct t4_regdump {
 	uint32_t version;
 	uint32_t len; /* bytes */
-	uint32_t * __kerncap data;
+	uint32_t *data;
 };
 
 struct t4_data {
 	uint32_t len;
-	uint8_t * __kerncap data;
+	uint8_t *data;
 };
 
 struct t4_bootrom {
 	uint32_t pf_offset;
 	uint32_t pfidx_addr;
 	uint32_t len;
-	uint8_t * __kerncap data;
+	uint8_t *data;
 };
 
 struct t4_i2c_data {
@@ -338,7 +338,7 @@ struct t4_sge_context {
 struct t4_mem_range {
 	uint32_t addr;
 	uint32_t len;
-	uint32_t * __kerncap data;
+	uint32_t *data;
 };
 
 #define T4_TRACE_LEN 112
@@ -364,7 +364,7 @@ struct t4_cudbg_dump {
 	uint8_t wr_flash;
 	uint8_t	bitmap[16];
 	uint32_t len;
-	uint8_t * __kerncap data;
+	uint8_t *data;
 };
 
 enum {

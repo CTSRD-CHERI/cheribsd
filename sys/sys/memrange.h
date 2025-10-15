@@ -71,7 +71,7 @@ struct mem_livedump_arg {
 
 struct mem_cheri_cap_arg {
 	ptraddr_t	vaddr;
-	void * __kerncap buf;
+	void *buf;
 	size_t		len;
 };
 

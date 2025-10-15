@@ -119,8 +119,8 @@ struct bpf_version {
  * buffer as used by BPF.
  */
 struct bpf_zbuf {
-	void * __kerncap bz_bufa;	/* Location of 'a' zero-copy buffer. */
-	void * __kerncap bz_bufb;	/* Location of 'b' zero-copy buffer. */
+	void *bz_bufa;	/* Location of 'a' zero-copy buffer. */
+	void *bz_bufb;	/* Location of 'b' zero-copy buffer. */
 	size_t	 bz_buflen;		/* Size of zero-copy buffers. */
 };
 
@@ -382,7 +382,7 @@ struct bpf_insn {
  */
 struct bpf_dltlist {
 	u_int	bfl_len;	/* number of bfd_list array */
-	u_int * __kerncap bfl_list;	/* array of DLTs */
+	u_int *bfl_list;	/* array of DLTs */
 };
 
 #ifdef _KERNEL

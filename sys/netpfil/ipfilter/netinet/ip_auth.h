@@ -17,7 +17,7 @@ typedef struct  frauth {
 	int	fra_index;
 	u_32_t	fra_pass;
 	fr_info_t	fra_info;
-	char	* __kerncap fra_buf;
+	char	*fra_buf;
 	u_32_t	fra_flx;
 #if SOLARIS
 	queue_t	*fra_q;

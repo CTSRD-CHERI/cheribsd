@@ -41,10 +41,10 @@
 union sigval {
 	/* Members as suggested by Annex C of POSIX 1003.1b. */
 	int	sival_int;
-	void	* __kerncap sival_ptr;
+	void	*sival_ptr;
 	/* 6.0 compatibility */
 	int     sigval_int;
-	void    * __kerncap sigval_ptr;
+	void    *sigval_ptr;
 };
 
 #if defined(_WANT_LWPINFO32) || (defined(_KERNEL) && defined(__LP64__))

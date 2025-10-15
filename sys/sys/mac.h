@@ -73,7 +73,7 @@ typedef	__size_t	size_t;
 
 struct mac {
 	size_t			m_buflen;
-	char * __kerncap	m_string;
+	char *	m_string;
 };
 
 typedef struct mac	*mac_t;

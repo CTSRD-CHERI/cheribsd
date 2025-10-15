@@ -242,7 +242,7 @@ enum	{ PF_ADDR_ADDRMASK, PF_ADDR_NOROUTE, PF_ADDR_DYNIFTL,
 #define	PF_QNAME_SIZE		64
 
 struct pfioc_nv {
-	void * __kerncap data;
+	void *data;
 	size_t           len;   /* The length of the nvlist data. */
 	size_t           size;  /* The total size of the data buffer. */
 };

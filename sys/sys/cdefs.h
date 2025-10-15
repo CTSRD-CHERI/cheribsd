@@ -977,17 +977,6 @@
 #define	__capability
 #endif
 
-/*
- * Used to tag pointer variables (typically structure members) shared
- * with userspace that should always use capabilities in the kernel,
- * but honor the default pointer ABI in userspace.
- */
-#ifdef _KERNEL
-#define	__kerncap	__capability
-#else
-#define	__kerncap
-#endif
-
 #if (defined(_KERNEL) && __has_feature(capabilities)) || \
     defined(__CHERI_PURE_CAPABILITY__)
 #define __CHERI_USER_ABI 1

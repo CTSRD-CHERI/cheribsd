@@ -57,7 +57,7 @@ typedef	struct __stack_t stack_t;
  * tag is actually sigaltstack.
  */
 struct __stack_t {
-	void * __kerncap ss_sp;		/* signal stack base */
+	void *ss_sp;		/* signal stack base */
 	__size_t ss_size;		/* signal stack length */
 	int	ss_flags;		/* SS_DISABLE and/or SS_ONSTACK */
 };

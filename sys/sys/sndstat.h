@@ -38,7 +38,7 @@
 
 struct sndstioc_nv_arg {
 	size_t nbytes;	/* [IN/OUT] buffer size/number of bytes filled */
-	void * __kerncap buf;	/* [OUT] buffer holding a packed nvlist */
+	void *buf;	/* [OUT] buffer holding a packed nvlist */
 };
 
 /*

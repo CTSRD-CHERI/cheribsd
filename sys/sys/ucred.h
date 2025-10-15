@@ -114,7 +114,7 @@ struct xucred {
 	short	cr_ngroups;		/* number of groups */
 	gid_t	cr_groups[XU_NGROUPS];	/* groups */
 	union {
-		void * __kerncap _cr_unused1;	/* old ucred compat */
+		void	*_cr_unused1;	/* compatibility with old ucred */
 		pid_t	cr_pid;
 	};
 };
@@ -136,8 +136,8 @@ struct setcred {
 	gid_t	 sc_svgid;		/* saved group id */
 	u_int	 sc_pad;		/* see 32-bit compat structure */
 	u_int	 sc_supp_groups_nb;	/* number of supplementary groups */
-	gid_t	* __kerncap sc_supp_groups;	/* supplementary groups */
-	struct mac * __kerncap sc_label;	/* MAC label */
+	gid_t	*sc_supp_groups;	/* supplementary groups */
+	struct mac *sc_label;		/* MAC label */
 };
 /*
  * Initializer for 'struct setcred' variables.

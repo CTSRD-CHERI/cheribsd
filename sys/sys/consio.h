@@ -218,8 +218,8 @@ struct fnt16 {
 typedef struct fnt16	fnt16_t;
 
 struct vfnt {
-	vfnt_map_t * __kerncap map[VFNT_MAPS];
-	uint8_t * __kerncap glyphs;
+	vfnt_map_t *map[VFNT_MAPS];
+	uint8_t *glyphs;
 	unsigned int	map_count[VFNT_MAPS];
 	unsigned int	glyph_count;
 	unsigned int	width;

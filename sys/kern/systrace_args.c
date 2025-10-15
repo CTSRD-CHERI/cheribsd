@@ -33,7 +33,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 3: {
 		struct read_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->buf; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->buf; /* void * */
 		uarg[a++] = p->nbyte; /* size_t */
 		*n_args = 3;
 		break;
@@ -42,7 +42,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 4: {
 		struct write_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->buf; /* const void * __kerncap */
+		uarg[a++] = (intcap_t)p->buf; /* const void * */
 		uarg[a++] = p->nbyte; /* size_t */
 		*n_args = 3;
 		break;
@@ -50,7 +50,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* open */
 	case 5: {
 		struct open_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->flags; /* int */
 		iarg[a++] = p->mode; /* mode_t */
 		*n_args = 3;
@@ -67,31 +67,31 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 7: {
 		struct wait4_args *p = params;
 		iarg[a++] = p->pid; /* int */
-		uarg[a++] = (intcap_t)p->status; /* int * __kerncap */
+		uarg[a++] = (intcap_t)p->status; /* int * */
 		iarg[a++] = p->options; /* int */
-		uarg[a++] = (intcap_t)p->rusage; /* struct rusage * __kerncap */
+		uarg[a++] = (intcap_t)p->rusage; /* struct rusage * */
 		*n_args = 4;
 		break;
 	}
 	/* link */
 	case 9: {
 		struct link_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->to; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
+		uarg[a++] = (intcap_t)p->to; /* const char * */
 		*n_args = 2;
 		break;
 	}
 	/* unlink */
 	case 10: {
 		struct unlink_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		*n_args = 1;
 		break;
 	}
 	/* chdir */
 	case 12: {
 		struct chdir_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		*n_args = 1;
 		break;
 	}
@@ -105,7 +105,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* chmod */
 	case 15: {
 		struct chmod_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->mode; /* mode_t */
 		*n_args = 2;
 		break;
@@ -113,7 +113,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* chown */
 	case 16: {
 		struct chown_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->uid; /* int */
 		iarg[a++] = p->gid; /* int */
 		*n_args = 3;
@@ -122,7 +122,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* break */
 	case 17: {
 		struct break_args *p = params;
-		uarg[a++] = (intcap_t)p->nsize; /* char * __kerncap */
+		uarg[a++] = (intcap_t)p->nsize; /* char * */
 		*n_args = 1;
 		break;
 	}
@@ -134,17 +134,17 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* mount */
 	case 21: {
 		struct mount_args *p = params;
-		uarg[a++] = (intcap_t)p->type; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->type; /* const char * */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->flags; /* int */
-		uarg[a++] = (intcap_t)p->data; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->data; /* void * */
 		*n_args = 4;
 		break;
 	}
 	/* unmount */
 	case 22: {
 		struct unmount_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->flags; /* int */
 		*n_args = 2;
 		break;
@@ -171,7 +171,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct ptrace_args *p = params;
 		iarg[a++] = p->req; /* int */
 		iarg[a++] = p->pid; /* pid_t */
-		uarg[a++] = (intcap_t)p->addr; /* char * __kerncap */
+		uarg[a++] = (intcap_t)p->addr; /* char * */
 		iarg[a++] = p->data; /* int */
 		*n_args = 4;
 		break;
@@ -180,7 +180,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 27: {
 		struct recvmsg_args *p = params;
 		iarg[a++] = p->s; /* int */
-		uarg[a++] = (intcap_t)p->msg; /* struct msghdr * __kerncap */
+		uarg[a++] = (intcap_t)p->msg; /* struct msghdr * */
 		iarg[a++] = p->flags; /* int */
 		*n_args = 3;
 		break;
@@ -189,7 +189,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 28: {
 		struct sendmsg_args *p = params;
 		iarg[a++] = p->s; /* int */
-		uarg[a++] = (intcap_t)p->msg; /* const struct msghdr * __kerncap */
+		uarg[a++] = (intcap_t)p->msg; /* const struct msghdr * */
 		iarg[a++] = p->flags; /* int */
 		*n_args = 3;
 		break;
@@ -198,11 +198,11 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 29: {
 		struct recvfrom_args *p = params;
 		iarg[a++] = p->s; /* int */
-		uarg[a++] = (intcap_t)p->buf; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->buf; /* void * */
 		uarg[a++] = p->len; /* size_t */
 		iarg[a++] = p->flags; /* int */
-		uarg[a++] = (intcap_t)p->from; /* struct sockaddr * __kerncap */
-		uarg[a++] = (intcap_t)p->fromlenaddr; /* __socklen_t * __kerncap */
+		uarg[a++] = (intcap_t)p->from; /* struct sockaddr * */
+		uarg[a++] = (intcap_t)p->fromlenaddr; /* __socklen_t * */
 		*n_args = 6;
 		break;
 	}
@@ -210,8 +210,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 30: {
 		struct accept_args *p = params;
 		iarg[a++] = p->s; /* int */
-		uarg[a++] = (intcap_t)p->name; /* struct sockaddr * __kerncap */
-		uarg[a++] = (intcap_t)p->anamelen; /* __socklen_t * __kerncap */
+		uarg[a++] = (intcap_t)p->name; /* struct sockaddr * */
+		uarg[a++] = (intcap_t)p->anamelen; /* __socklen_t * */
 		*n_args = 3;
 		break;
 	}
@@ -219,8 +219,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 31: {
 		struct getpeername_args *p = params;
 		iarg[a++] = p->fdes; /* int */
-		uarg[a++] = (intcap_t)p->asa; /* struct sockaddr * __kerncap */
-		uarg[a++] = (intcap_t)p->alen; /* __socklen_t * __kerncap */
+		uarg[a++] = (intcap_t)p->asa; /* struct sockaddr * */
+		uarg[a++] = (intcap_t)p->alen; /* __socklen_t * */
 		*n_args = 3;
 		break;
 	}
@@ -228,15 +228,15 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 32: {
 		struct getsockname_args *p = params;
 		iarg[a++] = p->fdes; /* int */
-		uarg[a++] = (intcap_t)p->asa; /* struct sockaddr * __kerncap */
-		uarg[a++] = (intcap_t)p->alen; /* __socklen_t * __kerncap */
+		uarg[a++] = (intcap_t)p->asa; /* struct sockaddr * */
+		uarg[a++] = (intcap_t)p->alen; /* __socklen_t * */
 		*n_args = 3;
 		break;
 	}
 	/* access */
 	case 33: {
 		struct access_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->amode; /* int */
 		*n_args = 2;
 		break;
@@ -244,7 +244,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* chflags */
 	case 34: {
 		struct chflags_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		uarg[a++] = p->flags; /* u_long */
 		*n_args = 2;
 		break;
@@ -290,7 +290,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* profil */
 	case 44: {
 		struct profil_args *p = params;
-		uarg[a++] = (intcap_t)p->samples; /* char * __kerncap */
+		uarg[a++] = (intcap_t)p->samples; /* char * */
 		uarg[a++] = p->size; /* size_t */
 		uarg[a++] = p->offset; /* size_t */
 		uarg[a++] = p->scale; /* u_int */
@@ -300,7 +300,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* ktrace */
 	case 45: {
 		struct ktrace_args *p = params;
-		uarg[a++] = (intcap_t)p->fname; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->fname; /* const char * */
 		iarg[a++] = p->ops; /* int */
 		iarg[a++] = p->facs; /* int */
 		iarg[a++] = p->pid; /* int */
@@ -315,7 +315,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* getlogin */
 	case 49: {
 		struct getlogin_args *p = params;
-		uarg[a++] = (intcap_t)p->namebuf; /* char * __kerncap */
+		uarg[a++] = (intcap_t)p->namebuf; /* char * */
 		uarg[a++] = p->namelen; /* u_int */
 		*n_args = 2;
 		break;
@@ -323,22 +323,22 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* setlogin */
 	case 50: {
 		struct setlogin_args *p = params;
-		uarg[a++] = (intcap_t)p->namebuf; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->namebuf; /* const char * */
 		*n_args = 1;
 		break;
 	}
 	/* acct */
 	case 51: {
 		struct acct_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		*n_args = 1;
 		break;
 	}
 	/* sigaltstack */
 	case 53: {
 		struct sigaltstack_args *p = params;
-		uarg[a++] = (intcap_t)p->ss; /* const struct sigaltstack * __kerncap */
-		uarg[a++] = (intcap_t)p->oss; /* struct sigaltstack * __kerncap */
+		uarg[a++] = (intcap_t)p->ss; /* const struct sigaltstack * */
+		uarg[a++] = (intcap_t)p->oss; /* struct sigaltstack * */
 		*n_args = 2;
 		break;
 	}
@@ -347,7 +347,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct ioctl_args *p = params;
 		iarg[a++] = p->fd; /* int */
 		uarg[a++] = p->com; /* u_long */
-		uarg[a++] = (intcap_t)p->data; /* char * __kerncap */
+		uarg[a++] = (intcap_t)p->data; /* char * */
 		*n_args = 3;
 		break;
 	}
@@ -361,23 +361,23 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* revoke */
 	case 56: {
 		struct revoke_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		*n_args = 1;
 		break;
 	}
 	/* symlink */
 	case 57: {
 		struct symlink_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->link; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
+		uarg[a++] = (intcap_t)p->link; /* const char * */
 		*n_args = 2;
 		break;
 	}
 	/* readlink */
 	case 58: {
 		struct readlink_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->buf; /* char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
+		uarg[a++] = (intcap_t)p->buf; /* char * */
 		uarg[a++] = p->count; /* size_t */
 		*n_args = 3;
 		break;
@@ -385,9 +385,9 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* execve */
 	case 59: {
 		struct execve_args *p = params;
-		uarg[a++] = (intcap_t)p->fname; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->argv; /* char * __kerncap * __kerncap */
-		uarg[a++] = (intcap_t)p->envv; /* char * __kerncap * __kerncap */
+		uarg[a++] = (intcap_t)p->fname; /* const char * */
+		uarg[a++] = (intcap_t)p->argv; /* char ** */
+		uarg[a++] = (intcap_t)p->envv; /* char ** */
 		*n_args = 3;
 		break;
 	}
@@ -401,14 +401,14 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* chroot */
 	case 61: {
 		struct chroot_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		*n_args = 1;
 		break;
 	}
 	/* msync */
 	case 65: {
 		struct msync_args *p = params;
-		uarg[a++] = (intcap_t)p->addr; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->addr; /* void * */
 		uarg[a++] = p->len; /* size_t */
 		iarg[a++] = p->flags; /* int */
 		*n_args = 3;
@@ -422,7 +422,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* munmap */
 	case 73: {
 		struct munmap_args *p = params;
-		uarg[a++] = (intcap_t)p->addr; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->addr; /* void * */
 		uarg[a++] = p->len; /* size_t */
 		*n_args = 2;
 		break;
@@ -430,7 +430,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* mprotect */
 	case 74: {
 		struct mprotect_args *p = params;
-		uarg[a++] = (intcap_t)p->addr; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->addr; /* void * */
 		uarg[a++] = p->len; /* size_t */
 		iarg[a++] = p->prot; /* int */
 		*n_args = 3;
@@ -439,7 +439,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* madvise */
 	case 75: {
 		struct madvise_args *p = params;
-		uarg[a++] = (intcap_t)p->addr; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->addr; /* void * */
 		uarg[a++] = p->len; /* size_t */
 		iarg[a++] = p->behav; /* int */
 		*n_args = 3;
@@ -448,9 +448,9 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* mincore */
 	case 78: {
 		struct mincore_args *p = params;
-		uarg[a++] = (intcap_t)p->addr; /* const void * __kerncap */
+		uarg[a++] = (intcap_t)p->addr; /* const void * */
 		uarg[a++] = p->len; /* size_t */
-		uarg[a++] = (intcap_t)p->vec; /* char * __kerncap */
+		uarg[a++] = (intcap_t)p->vec; /* char * */
 		*n_args = 3;
 		break;
 	}
@@ -458,7 +458,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 79: {
 		struct getgroups_args *p = params;
 		iarg[a++] = p->gidsetsize; /* int */
-		uarg[a++] = (intcap_t)p->gidset; /* gid_t * __kerncap */
+		uarg[a++] = (intcap_t)p->gidset; /* gid_t * */
 		*n_args = 2;
 		break;
 	}
@@ -466,7 +466,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 80: {
 		struct setgroups_args *p = params;
 		iarg[a++] = p->gidsetsize; /* int */
-		uarg[a++] = (intcap_t)p->gidset; /* const gid_t * __kerncap */
+		uarg[a++] = (intcap_t)p->gidset; /* const gid_t * */
 		*n_args = 2;
 		break;
 	}
@@ -487,15 +487,15 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 83: {
 		struct setitimer_args *p = params;
 		iarg[a++] = p->which; /* int */
-		uarg[a++] = (intcap_t)p->itv; /* const struct itimerval * __kerncap */
-		uarg[a++] = (intcap_t)p->oitv; /* struct itimerval * __kerncap */
+		uarg[a++] = (intcap_t)p->itv; /* const struct itimerval * */
+		uarg[a++] = (intcap_t)p->oitv; /* struct itimerval * */
 		*n_args = 3;
 		break;
 	}
 	/* swapon */
 	case 85: {
 		struct swapon_args *p = params;
-		uarg[a++] = (intcap_t)p->name; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->name; /* const char * */
 		*n_args = 1;
 		break;
 	}
@@ -503,7 +503,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 86: {
 		struct getitimer_args *p = params;
 		iarg[a++] = p->which; /* int */
-		uarg[a++] = (intcap_t)p->itv; /* struct itimerval * __kerncap */
+		uarg[a++] = (intcap_t)p->itv; /* struct itimerval * */
 		*n_args = 2;
 		break;
 	}
@@ -523,7 +523,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* cheri_cidcap_alloc */
 	case 91: {
 		struct cheri_cidcap_alloc_args *p = params;
-		uarg[a++] = (intcap_t)p->cidp; /* uintcap_t * __kerncap */
+		uarg[a++] = (intcap_t)p->cidp; /* uintcap_t * */
 		*n_args = 1;
 		break;
 	}
@@ -540,10 +540,10 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 93: {
 		struct select_args *p = params;
 		iarg[a++] = p->nd; /* int */
-		uarg[a++] = (intcap_t)p->in; /* fd_set * __kerncap */
-		uarg[a++] = (intcap_t)p->ou; /* fd_set * __kerncap */
-		uarg[a++] = (intcap_t)p->ex; /* fd_set * __kerncap */
-		uarg[a++] = (intcap_t)p->tv; /* struct timeval * __kerncap */
+		uarg[a++] = (intcap_t)p->in; /* fd_set * */
+		uarg[a++] = (intcap_t)p->ou; /* fd_set * */
+		uarg[a++] = (intcap_t)p->ex; /* fd_set * */
+		uarg[a++] = (intcap_t)p->tv; /* struct timeval * */
 		*n_args = 5;
 		break;
 	}
@@ -576,7 +576,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 98: {
 		struct connect_args *p = params;
 		iarg[a++] = p->s; /* int */
-		uarg[a++] = (intcap_t)p->name; /* const struct sockaddr * __kerncap */
+		uarg[a++] = (intcap_t)p->name; /* const struct sockaddr * */
 		iarg[a++] = p->namelen; /* __socklen_t */
 		*n_args = 3;
 		break;
@@ -593,7 +593,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 104: {
 		struct bind_args *p = params;
 		iarg[a++] = p->s; /* int */
-		uarg[a++] = (intcap_t)p->name; /* const struct sockaddr * __kerncap */
+		uarg[a++] = (intcap_t)p->name; /* const struct sockaddr * */
 		iarg[a++] = p->namelen; /* __socklen_t */
 		*n_args = 3;
 		break;
@@ -604,7 +604,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		iarg[a++] = p->s; /* int */
 		iarg[a++] = p->level; /* int */
 		iarg[a++] = p->name; /* int */
-		uarg[a++] = (intcap_t)p->val; /* const void * __kerncap */
+		uarg[a++] = (intcap_t)p->val; /* const void * */
 		iarg[a++] = p->valsize; /* __socklen_t */
 		*n_args = 5;
 		break;
@@ -620,8 +620,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* gettimeofday */
 	case 116: {
 		struct gettimeofday_args *p = params;
-		uarg[a++] = (intcap_t)p->tp; /* struct timeval * __kerncap */
-		uarg[a++] = (intcap_t)p->tzp; /* struct timezone * __kerncap */
+		uarg[a++] = (intcap_t)p->tp; /* struct timeval * */
+		uarg[a++] = (intcap_t)p->tzp; /* struct timezone * */
 		*n_args = 2;
 		break;
 	}
@@ -629,7 +629,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 117: {
 		struct getrusage_args *p = params;
 		iarg[a++] = p->who; /* int */
-		uarg[a++] = (intcap_t)p->rusage; /* struct rusage * __kerncap */
+		uarg[a++] = (intcap_t)p->rusage; /* struct rusage * */
 		*n_args = 2;
 		break;
 	}
@@ -639,8 +639,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		iarg[a++] = p->s; /* int */
 		iarg[a++] = p->level; /* int */
 		iarg[a++] = p->name; /* int */
-		uarg[a++] = (intcap_t)p->val; /* void * __kerncap */
-		uarg[a++] = (intcap_t)p->avalsize; /* __socklen_t * __kerncap */
+		uarg[a++] = (intcap_t)p->val; /* void * */
+		uarg[a++] = (intcap_t)p->avalsize; /* __socklen_t * */
 		*n_args = 5;
 		break;
 	}
@@ -648,7 +648,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 120: {
 		struct readv_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->iovp; /* const struct iovec * __kerncap */
+		uarg[a++] = (intcap_t)p->iovp; /* const struct iovec * */
 		uarg[a++] = p->iovcnt; /* u_int */
 		*n_args = 3;
 		break;
@@ -657,7 +657,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 121: {
 		struct writev_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->iovp; /* const struct iovec * __kerncap */
+		uarg[a++] = (intcap_t)p->iovp; /* const struct iovec * */
 		uarg[a++] = p->iovcnt; /* u_int */
 		*n_args = 3;
 		break;
@@ -665,8 +665,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* settimeofday */
 	case 122: {
 		struct settimeofday_args *p = params;
-		uarg[a++] = (intcap_t)p->tv; /* const struct timeval * __kerncap */
-		uarg[a++] = (intcap_t)p->tzp; /* const struct timezone * __kerncap */
+		uarg[a++] = (intcap_t)p->tv; /* const struct timeval * */
+		uarg[a++] = (intcap_t)p->tzp; /* const struct timezone * */
 		*n_args = 2;
 		break;
 	}
@@ -706,8 +706,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* rename */
 	case 128: {
 		struct rename_args *p = params;
-		uarg[a++] = (intcap_t)p->from; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->to; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->from; /* const char * */
+		uarg[a++] = (intcap_t)p->to; /* const char * */
 		*n_args = 2;
 		break;
 	}
@@ -722,7 +722,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* mkfifo */
 	case 132: {
 		struct mkfifo_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->mode; /* mode_t */
 		*n_args = 2;
 		break;
@@ -731,10 +731,10 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 133: {
 		struct sendto_args *p = params;
 		iarg[a++] = p->s; /* int */
-		uarg[a++] = (intcap_t)p->buf; /* const void * __kerncap */
+		uarg[a++] = (intcap_t)p->buf; /* const void * */
 		uarg[a++] = p->len; /* size_t */
 		iarg[a++] = p->flags; /* int */
-		uarg[a++] = (intcap_t)p->to; /* const struct sockaddr * __kerncap */
+		uarg[a++] = (intcap_t)p->to; /* const struct sockaddr * */
 		iarg[a++] = p->tolen; /* __socklen_t */
 		*n_args = 6;
 		break;
@@ -753,14 +753,14 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		iarg[a++] = p->domain; /* int */
 		iarg[a++] = p->type; /* int */
 		iarg[a++] = p->protocol; /* int */
-		uarg[a++] = (intcap_t)p->rsv; /* int * __kerncap */
+		uarg[a++] = (intcap_t)p->rsv; /* int * */
 		*n_args = 4;
 		break;
 	}
 	/* mkdir */
 	case 136: {
 		struct mkdir_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->mode; /* mode_t */
 		*n_args = 2;
 		break;
@@ -768,23 +768,23 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* rmdir */
 	case 137: {
 		struct rmdir_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		*n_args = 1;
 		break;
 	}
 	/* utimes */
 	case 138: {
 		struct utimes_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->tptr; /* const struct timeval * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
+		uarg[a++] = (intcap_t)p->tptr; /* const struct timeval * */
 		*n_args = 2;
 		break;
 	}
 	/* adjtime */
 	case 140: {
 		struct adjtime_args *p = params;
-		uarg[a++] = (intcap_t)p->delta; /* const struct timeval * __kerncap */
-		uarg[a++] = (intcap_t)p->olddelta; /* struct timeval * __kerncap */
+		uarg[a++] = (intcap_t)p->delta; /* const struct timeval * */
+		uarg[a++] = (intcap_t)p->olddelta; /* struct timeval * */
 		*n_args = 2;
 		break;
 	}
@@ -796,10 +796,10 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* quotactl */
 	case 148: {
 		struct quotactl_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->cmd; /* int */
 		iarg[a++] = p->uid; /* int */
-		uarg[a++] = (intcap_t)p->arg; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->arg; /* void * */
 		*n_args = 4;
 		break;
 	}
@@ -809,7 +809,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		iarg[a++] = p->debug_level; /* int */
 		iarg[a++] = p->grace_period; /* int */
 		iarg[a++] = p->addr_count; /* int */
-		uarg[a++] = (intcap_t)p->addrs; /* char * __kerncap * __kerncap */
+		uarg[a++] = (intcap_t)p->addrs; /* char ** */
 		*n_args = 4;
 		break;
 	}
@@ -817,23 +817,23 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 155: {
 		struct nfssvc_args *p = params;
 		iarg[a++] = p->flag; /* int */
-		uarg[a++] = (intcap_t)p->argp; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->argp; /* void * */
 		*n_args = 2;
 		break;
 	}
 	/* lgetfh */
 	case 160: {
 		struct lgetfh_args *p = params;
-		uarg[a++] = (intcap_t)p->fname; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->fhp; /* struct fhandle * __kerncap */
+		uarg[a++] = (intcap_t)p->fname; /* const char * */
+		uarg[a++] = (intcap_t)p->fhp; /* struct fhandle * */
 		*n_args = 2;
 		break;
 	}
 	/* getfh */
 	case 161: {
 		struct getfh_args *p = params;
-		uarg[a++] = (intcap_t)p->fname; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->fhp; /* struct fhandle * __kerncap */
+		uarg[a++] = (intcap_t)p->fname; /* const char * */
+		uarg[a++] = (intcap_t)p->fhp; /* struct fhandle * */
 		*n_args = 2;
 		break;
 	}
@@ -841,7 +841,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 165: {
 		struct sysarch_args *p = params;
 		iarg[a++] = p->op; /* int */
-		uarg[a++] = (intcap_t)p->parms; /* char * __kerncap */
+		uarg[a++] = (intcap_t)p->parms; /* char * */
 		*n_args = 2;
 		break;
 	}
@@ -850,7 +850,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct rtprio_args *p = params;
 		iarg[a++] = p->function; /* int */
 		iarg[a++] = p->pid; /* pid_t */
-		uarg[a++] = (intcap_t)p->rtp; /* struct rtprio * __kerncap */
+		uarg[a++] = (intcap_t)p->rtp; /* struct rtprio * */
 		*n_args = 3;
 		break;
 	}
@@ -897,7 +897,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* ntp_adjtime */
 	case 176: {
 		struct ntp_adjtime_args *p = params;
-		uarg[a++] = (intcap_t)p->tp; /* struct timex * __kerncap */
+		uarg[a++] = (intcap_t)p->tp; /* struct timex * */
 		*n_args = 1;
 		break;
 	}
@@ -925,7 +925,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* pathconf */
 	case 191: {
 		struct pathconf_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->name; /* int */
 		*n_args = 2;
 		break;
@@ -942,7 +942,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 194: {
 		struct getrlimit_args *p = params;
 		uarg[a++] = p->which; /* u_int */
-		uarg[a++] = (intcap_t)p->rlp; /* struct rlimit * __kerncap */
+		uarg[a++] = (intcap_t)p->rlp; /* struct rlimit * */
 		*n_args = 2;
 		break;
 	}
@@ -950,7 +950,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 195: {
 		struct setrlimit_args *p = params;
 		uarg[a++] = p->which; /* u_int */
-		uarg[a++] = (intcap_t)p->rlp; /* struct rlimit * __kerncap */
+		uarg[a++] = (intcap_t)p->rlp; /* struct rlimit * */
 		*n_args = 2;
 		break;
 	}
@@ -962,11 +962,11 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* __sysctl */
 	case 202: {
 		struct __sysctl_args *p = params;
-		uarg[a++] = (intcap_t)p->name; /* int * __kerncap */
+		uarg[a++] = (intcap_t)p->name; /* int * */
 		uarg[a++] = p->namelen; /* u_int */
-		uarg[a++] = (intcap_t)p->old; /* void * __kerncap */
-		uarg[a++] = (intcap_t)p->oldlenp; /* size_t * __kerncap */
-		uarg[a++] = (intcap_t)p->new; /* const void * __kerncap */
+		uarg[a++] = (intcap_t)p->old; /* void * */
+		uarg[a++] = (intcap_t)p->oldlenp; /* size_t * */
+		uarg[a++] = (intcap_t)p->new; /* const void * */
 		uarg[a++] = p->newlen; /* size_t */
 		*n_args = 6;
 		break;
@@ -974,7 +974,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* mlock */
 	case 203: {
 		struct mlock_args *p = params;
-		uarg[a++] = (intcap_t)p->addr; /* const void * __kerncap */
+		uarg[a++] = (intcap_t)p->addr; /* const void * */
 		uarg[a++] = p->len; /* size_t */
 		*n_args = 2;
 		break;
@@ -982,7 +982,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* munlock */
 	case 204: {
 		struct munlock_args *p = params;
-		uarg[a++] = (intcap_t)p->addr; /* const void * __kerncap */
+		uarg[a++] = (intcap_t)p->addr; /* const void * */
 		uarg[a++] = p->len; /* size_t */
 		*n_args = 2;
 		break;
@@ -990,7 +990,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* undelete */
 	case 205: {
 		struct undelete_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		*n_args = 1;
 		break;
 	}
@@ -998,7 +998,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 206: {
 		struct futimes_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->tptr; /* const struct timeval * __kerncap */
+		uarg[a++] = (intcap_t)p->tptr; /* const struct timeval * */
 		*n_args = 2;
 		break;
 	}
@@ -1012,7 +1012,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* poll */
 	case 209: {
 		struct poll_args *p = params;
-		uarg[a++] = (intcap_t)p->fds; /* struct pollfd * __kerncap */
+		uarg[a++] = (intcap_t)p->fds; /* struct pollfd * */
 		uarg[a++] = p->nfds; /* u_int */
 		iarg[a++] = p->timeout; /* int */
 		*n_args = 3;
@@ -1081,7 +1081,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 222: {
 		struct semop_args *p = params;
 		iarg[a++] = p->semid; /* int */
-		uarg[a++] = (intcap_t)p->sops; /* struct sembuf * __kerncap */
+		uarg[a++] = (intcap_t)p->sops; /* struct sembuf * */
 		uarg[a++] = p->nsops; /* size_t */
 		*n_args = 3;
 		break;
@@ -1098,7 +1098,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 226: {
 		struct msgsnd_args *p = params;
 		iarg[a++] = p->msqid; /* int */
-		uarg[a++] = (intcap_t)p->msgp; /* const void * __kerncap */
+		uarg[a++] = (intcap_t)p->msgp; /* const void * */
 		uarg[a++] = p->msgsz; /* size_t */
 		iarg[a++] = p->msgflg; /* int */
 		*n_args = 4;
@@ -1108,7 +1108,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 227: {
 		struct msgrcv_args *p = params;
 		iarg[a++] = p->msqid; /* int */
-		uarg[a++] = (intcap_t)p->msgp; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->msgp; /* void * */
 		uarg[a++] = p->msgsz; /* size_t */
 		iarg[a++] = p->msgtyp; /* long */
 		iarg[a++] = p->msgflg; /* int */
@@ -1119,7 +1119,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 228: {
 		struct shmat_args *p = params;
 		iarg[a++] = p->shmid; /* int */
-		uarg[a++] = (intcap_t)p->shmaddr; /* const void * __kerncap */
+		uarg[a++] = (intcap_t)p->shmaddr; /* const void * */
 		iarg[a++] = p->shmflg; /* int */
 		*n_args = 3;
 		break;
@@ -1127,7 +1127,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* shmdt */
 	case 230: {
 		struct shmdt_args *p = params;
-		uarg[a++] = (intcap_t)p->shmaddr; /* const void * __kerncap */
+		uarg[a++] = (intcap_t)p->shmaddr; /* const void * */
 		*n_args = 1;
 		break;
 	}
@@ -1144,7 +1144,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 232: {
 		struct clock_gettime_args *p = params;
 		iarg[a++] = p->clock_id; /* clockid_t */
-		uarg[a++] = (intcap_t)p->tp; /* struct timespec * __kerncap */
+		uarg[a++] = (intcap_t)p->tp; /* struct timespec * */
 		*n_args = 2;
 		break;
 	}
@@ -1152,7 +1152,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 233: {
 		struct clock_settime_args *p = params;
 		iarg[a++] = p->clock_id; /* clockid_t */
-		uarg[a++] = (intcap_t)p->tp; /* const struct timespec * __kerncap */
+		uarg[a++] = (intcap_t)p->tp; /* const struct timespec * */
 		*n_args = 2;
 		break;
 	}
@@ -1160,7 +1160,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 234: {
 		struct clock_getres_args *p = params;
 		iarg[a++] = p->clock_id; /* clockid_t */
-		uarg[a++] = (intcap_t)p->tp; /* struct timespec * __kerncap */
+		uarg[a++] = (intcap_t)p->tp; /* struct timespec * */
 		*n_args = 2;
 		break;
 	}
@@ -1168,8 +1168,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 235: {
 		struct ktimer_create_args *p = params;
 		iarg[a++] = p->clock_id; /* clockid_t */
-		uarg[a++] = (intcap_t)p->evp; /* struct sigevent * __kerncap */
-		uarg[a++] = (intcap_t)p->timerid; /* int * __kerncap */
+		uarg[a++] = (intcap_t)p->evp; /* struct sigevent * */
+		uarg[a++] = (intcap_t)p->timerid; /* int * */
 		*n_args = 3;
 		break;
 	}
@@ -1185,8 +1185,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct ktimer_settime_args *p = params;
 		iarg[a++] = p->timerid; /* int */
 		iarg[a++] = p->flags; /* int */
-		uarg[a++] = (intcap_t)p->value; /* const struct itimerspec * __kerncap */
-		uarg[a++] = (intcap_t)p->ovalue; /* struct itimerspec * __kerncap */
+		uarg[a++] = (intcap_t)p->value; /* const struct itimerspec * */
+		uarg[a++] = (intcap_t)p->ovalue; /* struct itimerspec * */
 		*n_args = 4;
 		break;
 	}
@@ -1194,7 +1194,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 238: {
 		struct ktimer_gettime_args *p = params;
 		iarg[a++] = p->timerid; /* int */
-		uarg[a++] = (intcap_t)p->value; /* struct itimerspec * __kerncap */
+		uarg[a++] = (intcap_t)p->value; /* struct itimerspec * */
 		*n_args = 2;
 		break;
 	}
@@ -1208,29 +1208,29 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* nanosleep */
 	case 240: {
 		struct nanosleep_args *p = params;
-		uarg[a++] = (intcap_t)p->rqtp; /* const struct timespec * __kerncap */
-		uarg[a++] = (intcap_t)p->rmtp; /* struct timespec * __kerncap */
+		uarg[a++] = (intcap_t)p->rqtp; /* const struct timespec * */
+		uarg[a++] = (intcap_t)p->rmtp; /* struct timespec * */
 		*n_args = 2;
 		break;
 	}
 	/* ffclock_getcounter */
 	case 241: {
 		struct ffclock_getcounter_args *p = params;
-		uarg[a++] = (intcap_t)p->ffcount; /* ffcounter * __kerncap */
+		uarg[a++] = (intcap_t)p->ffcount; /* ffcounter * */
 		*n_args = 1;
 		break;
 	}
 	/* ffclock_setestimate */
 	case 242: {
 		struct ffclock_setestimate_args *p = params;
-		uarg[a++] = (intcap_t)p->cest; /* struct ffclock_estimate * __kerncap */
+		uarg[a++] = (intcap_t)p->cest; /* struct ffclock_estimate * */
 		*n_args = 1;
 		break;
 	}
 	/* ffclock_getestimate */
 	case 243: {
 		struct ffclock_getestimate_args *p = params;
-		uarg[a++] = (intcap_t)p->cest; /* struct ffclock_estimate * __kerncap */
+		uarg[a++] = (intcap_t)p->cest; /* struct ffclock_estimate * */
 		*n_args = 1;
 		break;
 	}
@@ -1239,8 +1239,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct clock_nanosleep_args *p = params;
 		iarg[a++] = p->clock_id; /* clockid_t */
 		iarg[a++] = p->flags; /* int */
-		uarg[a++] = (intcap_t)p->rqtp; /* const struct timespec * __kerncap */
-		uarg[a++] = (intcap_t)p->rmtp; /* struct timespec * __kerncap */
+		uarg[a++] = (intcap_t)p->rqtp; /* const struct timespec * */
+		uarg[a++] = (intcap_t)p->rmtp; /* struct timespec * */
 		*n_args = 4;
 		break;
 	}
@@ -1249,21 +1249,21 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct clock_getcpuclockid2_args *p = params;
 		iarg[a++] = p->id; /* id_t */
 		iarg[a++] = p->which; /* int */
-		uarg[a++] = (intcap_t)p->clock_id; /* clockid_t * __kerncap */
+		uarg[a++] = (intcap_t)p->clock_id; /* clockid_t * */
 		*n_args = 3;
 		break;
 	}
 	/* ntp_gettime */
 	case 248: {
 		struct ntp_gettime_args *p = params;
-		uarg[a++] = (intcap_t)p->ntvp; /* struct ntptimeval * __kerncap */
+		uarg[a++] = (intcap_t)p->ntvp; /* struct ntptimeval * */
 		*n_args = 1;
 		break;
 	}
 	/* minherit */
 	case 250: {
 		struct minherit_args *p = params;
-		uarg[a++] = (intcap_t)p->addr; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->addr; /* void * */
 		uarg[a++] = p->len; /* size_t */
 		iarg[a++] = p->inherit; /* int */
 		*n_args = 3;
@@ -1284,7 +1284,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* lchown */
 	case 254: {
 		struct lchown_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->uid; /* int */
 		iarg[a++] = p->gid; /* int */
 		*n_args = 3;
@@ -1293,14 +1293,14 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* aio_read */
 	case 255: {
 		struct aio_read_args *p = params;
-		uarg[a++] = (intcap_t)p->aiocbp; /* struct aiocb * __kerncap */
+		uarg[a++] = (intcap_t)p->aiocbp; /* struct aiocb * */
 		*n_args = 1;
 		break;
 	}
 	/* aio_write */
 	case 256: {
 		struct aio_write_args *p = params;
-		uarg[a++] = (intcap_t)p->aiocbp; /* struct aiocb * __kerncap */
+		uarg[a++] = (intcap_t)p->aiocbp; /* struct aiocb * */
 		*n_args = 1;
 		break;
 	}
@@ -1308,17 +1308,17 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 257: {
 		struct lio_listio_args *p = params;
 		iarg[a++] = p->mode; /* int */
-		uarg[a++] = (intcap_t)p->acb_list; /* struct aiocb * __kerncap const * __kerncap */
+		uarg[a++] = (intcap_t)p->acb_list; /* struct aiocb * const * */
 		iarg[a++] = p->nent; /* int */
-		uarg[a++] = (intcap_t)p->sig; /* struct sigevent * __kerncap */
+		uarg[a++] = (intcap_t)p->sig; /* struct sigevent * */
 		*n_args = 4;
 		break;
 	}
 	/* kbounce */
 	case 258: {
 		struct kbounce_args *p = params;
-		uarg[a++] = (intcap_t)p->src; /* const void * __kerncap */
-		uarg[a++] = (intcap_t)p->dst; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->src; /* const void * */
+		uarg[a++] = (intcap_t)p->dst; /* void * */
 		uarg[a++] = p->len; /* size_t */
 		iarg[a++] = p->flags; /* int */
 		*n_args = 4;
@@ -1327,7 +1327,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* flag_captured */
 	case 259: {
 		struct flag_captured_args *p = params;
-		uarg[a++] = (intcap_t)p->message; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->message; /* const char * */
 		uarg[a++] = p->key; /* uint32_t */
 		*n_args = 2;
 		break;
@@ -1336,8 +1336,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 260: {
 		struct cheri_revoke_get_shadow_args *p = params;
 		iarg[a++] = p->flags; /* int */
-		uarg[a++] = (intcap_t)p->arena; /* void * __kerncap */
-		uarg[a++] = (intcap_t)p->shadow; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->arena; /* void * */
+		uarg[a++] = (intcap_t)p->shadow; /* void * */
 		*n_args = 3;
 		break;
 	}
@@ -1346,14 +1346,14 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct cheri_revoke_args *p = params;
 		iarg[a++] = p->flags; /* int */
 		uarg[a++] = p->start_epoch; /* uint64_t */
-		uarg[a++] = (intcap_t)p->crsi; /* struct cheri_revoke_syscall_info * __kerncap */
+		uarg[a++] = (intcap_t)p->crsi; /* struct cheri_revoke_syscall_info * */
 		*n_args = 3;
 		break;
 	}
 	/* lchmod */
 	case 274: {
 		struct lchmod_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->mode; /* mode_t */
 		*n_args = 2;
 		break;
@@ -1361,8 +1361,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* lutimes */
 	case 276: {
 		struct lutimes_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->tptr; /* const struct timeval * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
+		uarg[a++] = (intcap_t)p->tptr; /* const struct timeval * */
 		*n_args = 2;
 		break;
 	}
@@ -1370,7 +1370,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 289: {
 		struct preadv_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->iovp; /* struct iovec * __kerncap */
+		uarg[a++] = (intcap_t)p->iovp; /* struct iovec * */
 		uarg[a++] = p->iovcnt; /* u_int */
 		iarg[a++] = p->offset; /* off_t */
 		*n_args = 4;
@@ -1380,7 +1380,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 290: {
 		struct pwritev_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->iovp; /* struct iovec * __kerncap */
+		uarg[a++] = (intcap_t)p->iovp; /* struct iovec * */
 		uarg[a++] = p->iovcnt; /* u_int */
 		iarg[a++] = p->offset; /* off_t */
 		*n_args = 4;
@@ -1389,7 +1389,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* fhopen */
 	case 298: {
 		struct fhopen_args *p = params;
-		uarg[a++] = (intcap_t)p->u_fhp; /* const struct fhandle * __kerncap */
+		uarg[a++] = (intcap_t)p->u_fhp; /* const struct fhandle * */
 		iarg[a++] = p->flags; /* int */
 		*n_args = 2;
 		break;
@@ -1405,7 +1405,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 301: {
 		struct modstat_args *p = params;
 		iarg[a++] = p->modid; /* int */
-		uarg[a++] = (intcap_t)p->stat; /* struct module_stat * __kerncap */
+		uarg[a++] = (intcap_t)p->stat; /* struct module_stat * */
 		*n_args = 2;
 		break;
 	}
@@ -1419,14 +1419,14 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* modfind */
 	case 303: {
 		struct modfind_args *p = params;
-		uarg[a++] = (intcap_t)p->name; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->name; /* const char * */
 		*n_args = 1;
 		break;
 	}
 	/* kldload */
 	case 304: {
 		struct kldload_args *p = params;
-		uarg[a++] = (intcap_t)p->file; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->file; /* const char * */
 		*n_args = 1;
 		break;
 	}
@@ -1440,7 +1440,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* kldfind */
 	case 306: {
 		struct kldfind_args *p = params;
-		uarg[a++] = (intcap_t)p->file; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->file; /* const char * */
 		*n_args = 1;
 		break;
 	}
@@ -1455,7 +1455,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 308: {
 		struct kldstat_args *p = params;
 		iarg[a++] = p->fileid; /* int */
-		uarg[a++] = (intcap_t)p->stat; /* struct kld_file_stat * __kerncap */
+		uarg[a++] = (intcap_t)p->stat; /* struct kld_file_stat * */
 		*n_args = 2;
 		break;
 	}
@@ -1494,16 +1494,16 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* aio_return */
 	case 314: {
 		struct aio_return_args *p = params;
-		uarg[a++] = (intcap_t)p->aiocbp; /* struct aiocb * __kerncap */
+		uarg[a++] = (intcap_t)p->aiocbp; /* struct aiocb * */
 		*n_args = 1;
 		break;
 	}
 	/* aio_suspend */
 	case 315: {
 		struct aio_suspend_args *p = params;
-		uarg[a++] = (intcap_t)p->aiocbp; /* const struct aiocb * __kerncap const * __kerncap */
+		uarg[a++] = (intcap_t)p->aiocbp; /* const struct aiocb * const * */
 		iarg[a++] = p->nent; /* int */
-		uarg[a++] = (intcap_t)p->timeout; /* const struct timespec * __kerncap */
+		uarg[a++] = (intcap_t)p->timeout; /* const struct timespec * */
 		*n_args = 3;
 		break;
 	}
@@ -1511,14 +1511,14 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 316: {
 		struct aio_cancel_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->aiocbp; /* struct aiocb * __kerncap */
+		uarg[a++] = (intcap_t)p->aiocbp; /* struct aiocb * */
 		*n_args = 2;
 		break;
 	}
 	/* aio_error */
 	case 317: {
 		struct aio_error_args *p = params;
-		uarg[a++] = (intcap_t)p->aiocbp; /* struct aiocb * __kerncap */
+		uarg[a++] = (intcap_t)p->aiocbp; /* struct aiocb * */
 		*n_args = 1;
 		break;
 	}
@@ -1542,7 +1542,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* __getcwd */
 	case 326: {
 		struct __getcwd_args *p = params;
-		uarg[a++] = (intcap_t)p->buf; /* char * __kerncap */
+		uarg[a++] = (intcap_t)p->buf; /* char * */
 		uarg[a++] = p->buflen; /* size_t */
 		*n_args = 2;
 		break;
@@ -1551,7 +1551,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 327: {
 		struct sched_setparam_args *p = params;
 		iarg[a++] = p->pid; /* pid_t */
-		uarg[a++] = (intcap_t)p->param; /* const struct sched_param * __kerncap */
+		uarg[a++] = (intcap_t)p->param; /* const struct sched_param * */
 		*n_args = 2;
 		break;
 	}
@@ -1559,7 +1559,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 328: {
 		struct sched_getparam_args *p = params;
 		iarg[a++] = p->pid; /* pid_t */
-		uarg[a++] = (intcap_t)p->param; /* struct sched_param * __kerncap */
+		uarg[a++] = (intcap_t)p->param; /* struct sched_param * */
 		*n_args = 2;
 		break;
 	}
@@ -1568,7 +1568,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct sched_setscheduler_args *p = params;
 		iarg[a++] = p->pid; /* pid_t */
 		iarg[a++] = p->policy; /* int */
-		uarg[a++] = (intcap_t)p->param; /* const struct sched_param * __kerncap */
+		uarg[a++] = (intcap_t)p->param; /* const struct sched_param * */
 		*n_args = 3;
 		break;
 	}
@@ -1602,14 +1602,14 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 334: {
 		struct sched_rr_get_interval_args *p = params;
 		iarg[a++] = p->pid; /* pid_t */
-		uarg[a++] = (intcap_t)p->interval; /* struct timespec * __kerncap */
+		uarg[a++] = (intcap_t)p->interval; /* struct timespec * */
 		*n_args = 2;
 		break;
 	}
 	/* utrace */
 	case 335: {
 		struct utrace_args *p = params;
-		uarg[a++] = (intcap_t)p->addr; /* const void * __kerncap */
+		uarg[a++] = (intcap_t)p->addr; /* const void * */
 		uarg[a++] = p->len; /* size_t */
 		*n_args = 2;
 		break;
@@ -1619,14 +1619,14 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct kldsym_args *p = params;
 		iarg[a++] = p->fileid; /* int */
 		iarg[a++] = p->cmd; /* int */
-		uarg[a++] = (intcap_t)p->data; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->data; /* void * */
 		*n_args = 3;
 		break;
 	}
 	/* jail */
 	case 338: {
 		struct jail_args *p = params;
-		uarg[a++] = (intcap_t)p->jailp; /* struct jail * __kerncap */
+		uarg[a++] = (intcap_t)p->jailp; /* struct jail * */
 		*n_args = 1;
 		break;
 	}
@@ -1634,9 +1634,9 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 339: {
 		struct nnpfs_syscall_args *p = params;
 		iarg[a++] = p->operation; /* int */
-		uarg[a++] = (intcap_t)p->a_pathP; /* char * __kerncap */
+		uarg[a++] = (intcap_t)p->a_pathP; /* char * */
 		iarg[a++] = p->a_opcode; /* int */
-		uarg[a++] = (intcap_t)p->a_paramsP; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->a_paramsP; /* void * */
 		iarg[a++] = p->a_followSymlinks; /* int */
 		*n_args = 5;
 		break;
@@ -1645,57 +1645,57 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 340: {
 		struct sigprocmask_args *p = params;
 		iarg[a++] = p->how; /* int */
-		uarg[a++] = (intcap_t)p->set; /* const sigset_t * __kerncap */
-		uarg[a++] = (intcap_t)p->oset; /* sigset_t * __kerncap */
+		uarg[a++] = (intcap_t)p->set; /* const sigset_t * */
+		uarg[a++] = (intcap_t)p->oset; /* sigset_t * */
 		*n_args = 3;
 		break;
 	}
 	/* sigsuspend */
 	case 341: {
 		struct sigsuspend_args *p = params;
-		uarg[a++] = (intcap_t)p->sigmask; /* const sigset_t * __kerncap */
+		uarg[a++] = (intcap_t)p->sigmask; /* const sigset_t * */
 		*n_args = 1;
 		break;
 	}
 	/* sigpending */
 	case 343: {
 		struct sigpending_args *p = params;
-		uarg[a++] = (intcap_t)p->set; /* sigset_t * __kerncap */
+		uarg[a++] = (intcap_t)p->set; /* sigset_t * */
 		*n_args = 1;
 		break;
 	}
 	/* sigtimedwait */
 	case 345: {
 		struct sigtimedwait_args *p = params;
-		uarg[a++] = (intcap_t)p->set; /* const sigset_t * __kerncap */
-		uarg[a++] = (intcap_t)p->info; /* struct __siginfo * __kerncap */
-		uarg[a++] = (intcap_t)p->timeout; /* const struct timespec * __kerncap */
+		uarg[a++] = (intcap_t)p->set; /* const sigset_t * */
+		uarg[a++] = (intcap_t)p->info; /* struct __siginfo * */
+		uarg[a++] = (intcap_t)p->timeout; /* const struct timespec * */
 		*n_args = 3;
 		break;
 	}
 	/* sigwaitinfo */
 	case 346: {
 		struct sigwaitinfo_args *p = params;
-		uarg[a++] = (intcap_t)p->set; /* const sigset_t * __kerncap */
-		uarg[a++] = (intcap_t)p->info; /* struct __siginfo * __kerncap */
+		uarg[a++] = (intcap_t)p->set; /* const sigset_t * */
+		uarg[a++] = (intcap_t)p->info; /* struct __siginfo * */
 		*n_args = 2;
 		break;
 	}
 	/* __acl_get_file */
 	case 347: {
 		struct __acl_get_file_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->type; /* __acl_type_t */
-		uarg[a++] = (intcap_t)p->aclp; /* struct acl * __kerncap */
+		uarg[a++] = (intcap_t)p->aclp; /* struct acl * */
 		*n_args = 3;
 		break;
 	}
 	/* __acl_set_file */
 	case 348: {
 		struct __acl_set_file_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->type; /* __acl_type_t */
-		uarg[a++] = (intcap_t)p->aclp; /* struct acl * __kerncap */
+		uarg[a++] = (intcap_t)p->aclp; /* struct acl * */
 		*n_args = 3;
 		break;
 	}
@@ -1704,7 +1704,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct __acl_get_fd_args *p = params;
 		iarg[a++] = p->filedes; /* int */
 		iarg[a++] = p->type; /* __acl_type_t */
-		uarg[a++] = (intcap_t)p->aclp; /* struct acl * __kerncap */
+		uarg[a++] = (intcap_t)p->aclp; /* struct acl * */
 		*n_args = 3;
 		break;
 	}
@@ -1713,14 +1713,14 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct __acl_set_fd_args *p = params;
 		iarg[a++] = p->filedes; /* int */
 		iarg[a++] = p->type; /* __acl_type_t */
-		uarg[a++] = (intcap_t)p->aclp; /* struct acl * __kerncap */
+		uarg[a++] = (intcap_t)p->aclp; /* struct acl * */
 		*n_args = 3;
 		break;
 	}
 	/* __acl_delete_file */
 	case 351: {
 		struct __acl_delete_file_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->type; /* __acl_type_t */
 		*n_args = 2;
 		break;
@@ -1736,9 +1736,9 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* __acl_aclcheck_file */
 	case 353: {
 		struct __acl_aclcheck_file_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->type; /* __acl_type_t */
-		uarg[a++] = (intcap_t)p->aclp; /* struct acl * __kerncap */
+		uarg[a++] = (intcap_t)p->aclp; /* struct acl * */
 		*n_args = 3;
 		break;
 	}
@@ -1747,28 +1747,28 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct __acl_aclcheck_fd_args *p = params;
 		iarg[a++] = p->filedes; /* int */
 		iarg[a++] = p->type; /* __acl_type_t */
-		uarg[a++] = (intcap_t)p->aclp; /* struct acl * __kerncap */
+		uarg[a++] = (intcap_t)p->aclp; /* struct acl * */
 		*n_args = 3;
 		break;
 	}
 	/* extattrctl */
 	case 355: {
 		struct extattrctl_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->cmd; /* int */
-		uarg[a++] = (intcap_t)p->filename; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->filename; /* const char * */
 		iarg[a++] = p->attrnamespace; /* int */
-		uarg[a++] = (intcap_t)p->attrname; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->attrname; /* const char * */
 		*n_args = 5;
 		break;
 	}
 	/* extattr_set_file */
 	case 356: {
 		struct extattr_set_file_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->attrnamespace; /* int */
-		uarg[a++] = (intcap_t)p->attrname; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->data; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->attrname; /* const char * */
+		uarg[a++] = (intcap_t)p->data; /* void * */
 		uarg[a++] = p->nbytes; /* size_t */
 		*n_args = 5;
 		break;
@@ -1776,10 +1776,10 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* extattr_get_file */
 	case 357: {
 		struct extattr_get_file_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->attrnamespace; /* int */
-		uarg[a++] = (intcap_t)p->attrname; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->data; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->attrname; /* const char * */
+		uarg[a++] = (intcap_t)p->data; /* void * */
 		uarg[a++] = p->nbytes; /* size_t */
 		*n_args = 5;
 		break;
@@ -1787,35 +1787,35 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* extattr_delete_file */
 	case 358: {
 		struct extattr_delete_file_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->attrnamespace; /* int */
-		uarg[a++] = (intcap_t)p->attrname; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->attrname; /* const char * */
 		*n_args = 3;
 		break;
 	}
 	/* aio_waitcomplete */
 	case 359: {
 		struct aio_waitcomplete_args *p = params;
-		uarg[a++] = (intcap_t)p->aiocbp; /* struct aiocb * __kerncap * __kerncap */
-		uarg[a++] = (intcap_t)p->timeout; /* struct timespec * __kerncap */
+		uarg[a++] = (intcap_t)p->aiocbp; /* struct aiocb ** */
+		uarg[a++] = (intcap_t)p->timeout; /* struct timespec * */
 		*n_args = 2;
 		break;
 	}
 	/* getresuid */
 	case 360: {
 		struct getresuid_args *p = params;
-		uarg[a++] = (intcap_t)p->ruid; /* uid_t * __kerncap */
-		uarg[a++] = (intcap_t)p->euid; /* uid_t * __kerncap */
-		uarg[a++] = (intcap_t)p->suid; /* uid_t * __kerncap */
+		uarg[a++] = (intcap_t)p->ruid; /* uid_t * */
+		uarg[a++] = (intcap_t)p->euid; /* uid_t * */
+		uarg[a++] = (intcap_t)p->suid; /* uid_t * */
 		*n_args = 3;
 		break;
 	}
 	/* getresgid */
 	case 361: {
 		struct getresgid_args *p = params;
-		uarg[a++] = (intcap_t)p->rgid; /* gid_t * __kerncap */
-		uarg[a++] = (intcap_t)p->egid; /* gid_t * __kerncap */
-		uarg[a++] = (intcap_t)p->sgid; /* gid_t * __kerncap */
+		uarg[a++] = (intcap_t)p->rgid; /* gid_t * */
+		uarg[a++] = (intcap_t)p->egid; /* gid_t * */
+		uarg[a++] = (intcap_t)p->sgid; /* gid_t * */
 		*n_args = 3;
 		break;
 	}
@@ -1829,8 +1829,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct extattr_set_fd_args *p = params;
 		iarg[a++] = p->fd; /* int */
 		iarg[a++] = p->attrnamespace; /* int */
-		uarg[a++] = (intcap_t)p->attrname; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->data; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->attrname; /* const char * */
+		uarg[a++] = (intcap_t)p->data; /* void * */
 		uarg[a++] = p->nbytes; /* size_t */
 		*n_args = 5;
 		break;
@@ -1840,8 +1840,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct extattr_get_fd_args *p = params;
 		iarg[a++] = p->fd; /* int */
 		iarg[a++] = p->attrnamespace; /* int */
-		uarg[a++] = (intcap_t)p->attrname; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->data; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->attrname; /* const char * */
+		uarg[a++] = (intcap_t)p->data; /* void * */
 		uarg[a++] = p->nbytes; /* size_t */
 		*n_args = 5;
 		break;
@@ -1851,7 +1851,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct extattr_delete_fd_args *p = params;
 		iarg[a++] = p->fd; /* int */
 		iarg[a++] = p->attrnamespace; /* int */
-		uarg[a++] = (intcap_t)p->attrname; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->attrname; /* const char * */
 		*n_args = 3;
 		break;
 	}
@@ -1865,7 +1865,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* eaccess */
 	case 376: {
 		struct eaccess_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->amode; /* int */
 		*n_args = 2;
 		break;
@@ -1886,7 +1886,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* nmount */
 	case 378: {
 		struct nmount_args *p = params;
-		uarg[a++] = (intcap_t)p->iovp; /* struct iovec * __kerncap */
+		uarg[a++] = (intcap_t)p->iovp; /* struct iovec * */
 		uarg[a++] = p->iovcnt; /* unsigned int */
 		iarg[a++] = p->flags; /* int */
 		*n_args = 3;
@@ -1895,14 +1895,14 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* __mac_get_proc */
 	case 384: {
 		struct __mac_get_proc_args *p = params;
-		uarg[a++] = (intcap_t)p->mac_p; /* struct mac * __kerncap */
+		uarg[a++] = (intcap_t)p->mac_p; /* struct mac * */
 		*n_args = 1;
 		break;
 	}
 	/* __mac_set_proc */
 	case 385: {
 		struct __mac_set_proc_args *p = params;
-		uarg[a++] = (intcap_t)p->mac_p; /* struct mac * __kerncap */
+		uarg[a++] = (intcap_t)p->mac_p; /* struct mac * */
 		*n_args = 1;
 		break;
 	}
@@ -1910,15 +1910,15 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 386: {
 		struct __mac_get_fd_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->mac_p; /* struct mac * __kerncap */
+		uarg[a++] = (intcap_t)p->mac_p; /* struct mac * */
 		*n_args = 2;
 		break;
 	}
 	/* __mac_get_file */
 	case 387: {
 		struct __mac_get_file_args *p = params;
-		uarg[a++] = (intcap_t)p->path_p; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->mac_p; /* struct mac * __kerncap */
+		uarg[a++] = (intcap_t)p->path_p; /* const char * */
+		uarg[a++] = (intcap_t)p->mac_p; /* struct mac * */
 		*n_args = 2;
 		break;
 	}
@@ -1926,15 +1926,15 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 388: {
 		struct __mac_set_fd_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->mac_p; /* struct mac * __kerncap */
+		uarg[a++] = (intcap_t)p->mac_p; /* struct mac * */
 		*n_args = 2;
 		break;
 	}
 	/* __mac_set_file */
 	case 389: {
 		struct __mac_set_file_args *p = params;
-		uarg[a++] = (intcap_t)p->path_p; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->mac_p; /* struct mac * __kerncap */
+		uarg[a++] = (intcap_t)p->path_p; /* const char * */
+		uarg[a++] = (intcap_t)p->mac_p; /* struct mac * */
 		*n_args = 2;
 		break;
 	}
@@ -1942,8 +1942,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 390: {
 		struct kenv_args *p = params;
 		iarg[a++] = p->what; /* int */
-		uarg[a++] = (intcap_t)p->name; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->value; /* char * __kerncap */
+		uarg[a++] = (intcap_t)p->name; /* const char * */
+		uarg[a++] = (intcap_t)p->value; /* char * */
 		iarg[a++] = p->len; /* int */
 		*n_args = 4;
 		break;
@@ -1951,7 +1951,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* lchflags */
 	case 391: {
 		struct lchflags_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		uarg[a++] = p->flags; /* u_long */
 		*n_args = 2;
 		break;
@@ -1959,7 +1959,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* uuidgen */
 	case 392: {
 		struct uuidgen_args *p = params;
-		uarg[a++] = (intcap_t)p->store; /* struct uuid * __kerncap */
+		uarg[a++] = (intcap_t)p->store; /* struct uuid * */
 		iarg[a++] = p->count; /* int */
 		*n_args = 2;
 		break;
@@ -1971,8 +1971,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		iarg[a++] = p->s; /* int */
 		iarg[a++] = p->offset; /* off_t */
 		uarg[a++] = p->nbytes; /* size_t */
-		uarg[a++] = (intcap_t)p->hdtr; /* struct sf_hdtr * __kerncap */
-		uarg[a++] = (intcap_t)p->sbytes; /* off_t * __kerncap */
+		uarg[a++] = (intcap_t)p->hdtr; /* struct sf_hdtr * */
+		uarg[a++] = (intcap_t)p->sbytes; /* off_t * */
 		iarg[a++] = p->flags; /* int */
 		*n_args = 7;
 		break;
@@ -1980,9 +1980,9 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* mac_syscall */
 	case 394: {
 		struct mac_syscall_args *p = params;
-		uarg[a++] = (intcap_t)p->policy; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->policy; /* const char * */
 		iarg[a++] = p->call; /* int */
-		uarg[a++] = (intcap_t)p->arg; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->arg; /* void * */
 		*n_args = 3;
 		break;
 	}
@@ -2017,7 +2017,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* ksem_init */
 	case 404: {
 		struct ksem_init_args *p = params;
-		uarg[a++] = (intcap_t)p->idp; /* semid_t * __kerncap */
+		uarg[a++] = (intcap_t)p->idp; /* semid_t * */
 		uarg[a++] = p->value; /* unsigned int */
 		*n_args = 2;
 		break;
@@ -2025,8 +2025,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* ksem_open */
 	case 405: {
 		struct ksem_open_args *p = params;
-		uarg[a++] = (intcap_t)p->idp; /* semid_t * __kerncap */
-		uarg[a++] = (intcap_t)p->name; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->idp; /* semid_t * */
+		uarg[a++] = (intcap_t)p->name; /* const char * */
 		iarg[a++] = p->oflag; /* int */
 		iarg[a++] = p->mode; /* mode_t */
 		uarg[a++] = p->value; /* unsigned int */
@@ -2036,7 +2036,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* ksem_unlink */
 	case 406: {
 		struct ksem_unlink_args *p = params;
-		uarg[a++] = (intcap_t)p->name; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->name; /* const char * */
 		*n_args = 1;
 		break;
 	}
@@ -2044,7 +2044,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 407: {
 		struct ksem_getvalue_args *p = params;
 		iarg[a++] = p->id; /* semid_t */
-		uarg[a++] = (intcap_t)p->val; /* int * __kerncap */
+		uarg[a++] = (intcap_t)p->val; /* int * */
 		*n_args = 2;
 		break;
 	}
@@ -2059,33 +2059,33 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 409: {
 		struct __mac_get_pid_args *p = params;
 		iarg[a++] = p->pid; /* pid_t */
-		uarg[a++] = (intcap_t)p->mac_p; /* struct mac * __kerncap */
+		uarg[a++] = (intcap_t)p->mac_p; /* struct mac * */
 		*n_args = 2;
 		break;
 	}
 	/* __mac_get_link */
 	case 410: {
 		struct __mac_get_link_args *p = params;
-		uarg[a++] = (intcap_t)p->path_p; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->mac_p; /* struct mac * __kerncap */
+		uarg[a++] = (intcap_t)p->path_p; /* const char * */
+		uarg[a++] = (intcap_t)p->mac_p; /* struct mac * */
 		*n_args = 2;
 		break;
 	}
 	/* __mac_set_link */
 	case 411: {
 		struct __mac_set_link_args *p = params;
-		uarg[a++] = (intcap_t)p->path_p; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->mac_p; /* struct mac * __kerncap */
+		uarg[a++] = (intcap_t)p->path_p; /* const char * */
+		uarg[a++] = (intcap_t)p->mac_p; /* struct mac * */
 		*n_args = 2;
 		break;
 	}
 	/* extattr_set_link */
 	case 412: {
 		struct extattr_set_link_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->attrnamespace; /* int */
-		uarg[a++] = (intcap_t)p->attrname; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->data; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->attrname; /* const char * */
+		uarg[a++] = (intcap_t)p->data; /* void * */
 		uarg[a++] = p->nbytes; /* size_t */
 		*n_args = 5;
 		break;
@@ -2093,10 +2093,10 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* extattr_get_link */
 	case 413: {
 		struct extattr_get_link_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->attrnamespace; /* int */
-		uarg[a++] = (intcap_t)p->attrname; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->data; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->attrname; /* const char * */
+		uarg[a++] = (intcap_t)p->data; /* void * */
 		uarg[a++] = p->nbytes; /* size_t */
 		*n_args = 5;
 		break;
@@ -2104,19 +2104,19 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* extattr_delete_link */
 	case 414: {
 		struct extattr_delete_link_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->attrnamespace; /* int */
-		uarg[a++] = (intcap_t)p->attrname; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->attrname; /* const char * */
 		*n_args = 3;
 		break;
 	}
 	/* __mac_execve */
 	case 415: {
 		struct __mac_execve_args *p = params;
-		uarg[a++] = (intcap_t)p->fname; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->argv; /* char * __kerncap * __kerncap */
-		uarg[a++] = (intcap_t)p->envv; /* char * __kerncap * __kerncap */
-		uarg[a++] = (intcap_t)p->mac_p; /* struct mac * __kerncap */
+		uarg[a++] = (intcap_t)p->fname; /* const char * */
+		uarg[a++] = (intcap_t)p->argv; /* char ** */
+		uarg[a++] = (intcap_t)p->envv; /* char ** */
+		uarg[a++] = (intcap_t)p->mac_p; /* struct mac * */
 		*n_args = 4;
 		break;
 	}
@@ -2124,62 +2124,62 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 416: {
 		struct sigaction_args *p = params;
 		iarg[a++] = p->sig; /* int */
-		uarg[a++] = (intcap_t)p->act; /* const struct sigaction * __kerncap */
-		uarg[a++] = (intcap_t)p->oact; /* struct sigaction * __kerncap */
+		uarg[a++] = (intcap_t)p->act; /* const struct sigaction * */
+		uarg[a++] = (intcap_t)p->oact; /* struct sigaction * */
 		*n_args = 3;
 		break;
 	}
 	/* sigreturn */
 	case 417: {
 		struct sigreturn_args *p = params;
-		uarg[a++] = (intcap_t)p->sigcntxp; /* const struct __ucontext * __kerncap */
+		uarg[a++] = (intcap_t)p->sigcntxp; /* const struct __ucontext * */
 		*n_args = 1;
 		break;
 	}
 	/* getcontext */
 	case 421: {
 		struct getcontext_args *p = params;
-		uarg[a++] = (intcap_t)p->ucp; /* struct __ucontext * __kerncap */
+		uarg[a++] = (intcap_t)p->ucp; /* struct __ucontext * */
 		*n_args = 1;
 		break;
 	}
 	/* setcontext */
 	case 422: {
 		struct setcontext_args *p = params;
-		uarg[a++] = (intcap_t)p->ucp; /* const struct __ucontext * __kerncap */
+		uarg[a++] = (intcap_t)p->ucp; /* const struct __ucontext * */
 		*n_args = 1;
 		break;
 	}
 	/* swapcontext */
 	case 423: {
 		struct swapcontext_args *p = params;
-		uarg[a++] = (intcap_t)p->oucp; /* struct __ucontext * __kerncap */
-		uarg[a++] = (intcap_t)p->ucp; /* const struct __ucontext * __kerncap */
+		uarg[a++] = (intcap_t)p->oucp; /* struct __ucontext * */
+		uarg[a++] = (intcap_t)p->ucp; /* const struct __ucontext * */
 		*n_args = 2;
 		break;
 	}
 	/* __acl_get_link */
 	case 425: {
 		struct __acl_get_link_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->type; /* __acl_type_t */
-		uarg[a++] = (intcap_t)p->aclp; /* struct acl * __kerncap */
+		uarg[a++] = (intcap_t)p->aclp; /* struct acl * */
 		*n_args = 3;
 		break;
 	}
 	/* __acl_set_link */
 	case 426: {
 		struct __acl_set_link_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->type; /* __acl_type_t */
-		uarg[a++] = (intcap_t)p->aclp; /* struct acl * __kerncap */
+		uarg[a++] = (intcap_t)p->aclp; /* struct acl * */
 		*n_args = 3;
 		break;
 	}
 	/* __acl_delete_link */
 	case 427: {
 		struct __acl_delete_link_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->type; /* __acl_type_t */
 		*n_args = 2;
 		break;
@@ -2187,25 +2187,25 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* __acl_aclcheck_link */
 	case 428: {
 		struct __acl_aclcheck_link_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->type; /* __acl_type_t */
-		uarg[a++] = (intcap_t)p->aclp; /* struct acl * __kerncap */
+		uarg[a++] = (intcap_t)p->aclp; /* struct acl * */
 		*n_args = 3;
 		break;
 	}
 	/* sigwait */
 	case 429: {
 		struct sigwait_args *p = params;
-		uarg[a++] = (intcap_t)p->set; /* const sigset_t * __kerncap */
-		uarg[a++] = (intcap_t)p->sig; /* int * __kerncap */
+		uarg[a++] = (intcap_t)p->set; /* const sigset_t * */
+		uarg[a++] = (intcap_t)p->sig; /* int * */
 		*n_args = 2;
 		break;
 	}
 	/* thr_create */
 	case 430: {
 		struct thr_create_args *p = params;
-		uarg[a++] = (intcap_t)p->ctx; /* struct __ucontext * __kerncap */
-		uarg[a++] = (intcap_t)p->id; /* long * __kerncap */
+		uarg[a++] = (intcap_t)p->ctx; /* struct __ucontext * */
+		uarg[a++] = (intcap_t)p->id; /* long * */
 		iarg[a++] = p->flags; /* int */
 		*n_args = 3;
 		break;
@@ -2213,14 +2213,14 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* thr_exit */
 	case 431: {
 		struct thr_exit_args *p = params;
-		uarg[a++] = (intcap_t)p->state; /* long * __kerncap */
+		uarg[a++] = (intcap_t)p->state; /* long * */
 		*n_args = 1;
 		break;
 	}
 	/* thr_self */
 	case 432: {
 		struct thr_self_args *p = params;
-		uarg[a++] = (intcap_t)p->id; /* long * __kerncap */
+		uarg[a++] = (intcap_t)p->id; /* long * */
 		*n_args = 1;
 		break;
 	}
@@ -2244,7 +2244,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct extattr_list_fd_args *p = params;
 		iarg[a++] = p->fd; /* int */
 		iarg[a++] = p->attrnamespace; /* int */
-		uarg[a++] = (intcap_t)p->data; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->data; /* void * */
 		uarg[a++] = p->nbytes; /* size_t */
 		*n_args = 4;
 		break;
@@ -2252,9 +2252,9 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* extattr_list_file */
 	case 438: {
 		struct extattr_list_file_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->attrnamespace; /* int */
-		uarg[a++] = (intcap_t)p->data; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->data; /* void * */
 		uarg[a++] = p->nbytes; /* size_t */
 		*n_args = 4;
 		break;
@@ -2262,9 +2262,9 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* extattr_list_link */
 	case 439: {
 		struct extattr_list_link_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->attrnamespace; /* int */
-		uarg[a++] = (intcap_t)p->data; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->data; /* void * */
 		uarg[a++] = p->nbytes; /* size_t */
 		*n_args = 4;
 		break;
@@ -2273,14 +2273,14 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 441: {
 		struct ksem_timedwait_args *p = params;
 		iarg[a++] = p->id; /* semid_t */
-		uarg[a++] = (intcap_t)p->abstime; /* const struct timespec * __kerncap */
+		uarg[a++] = (intcap_t)p->abstime; /* const struct timespec * */
 		*n_args = 2;
 		break;
 	}
 	/* thr_suspend */
 	case 442: {
 		struct thr_suspend_args *p = params;
-		uarg[a++] = (intcap_t)p->timeout; /* const struct timespec * __kerncap */
+		uarg[a++] = (intcap_t)p->timeout; /* const struct timespec * */
 		*n_args = 1;
 		break;
 	}
@@ -2302,7 +2302,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* audit */
 	case 445: {
 		struct audit_args *p = params;
-		uarg[a++] = (intcap_t)p->record; /* const void * __kerncap */
+		uarg[a++] = (intcap_t)p->record; /* const void * */
 		uarg[a++] = p->length; /* u_int */
 		*n_args = 2;
 		break;
@@ -2311,7 +2311,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 446: {
 		struct auditon_args *p = params;
 		iarg[a++] = p->cmd; /* int */
-		uarg[a++] = (intcap_t)p->data; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->data; /* void * */
 		uarg[a++] = p->length; /* u_int */
 		*n_args = 3;
 		break;
@@ -2319,35 +2319,35 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* getauid */
 	case 447: {
 		struct getauid_args *p = params;
-		uarg[a++] = (intcap_t)p->auid; /* uid_t * __kerncap */
+		uarg[a++] = (intcap_t)p->auid; /* uid_t * */
 		*n_args = 1;
 		break;
 	}
 	/* setauid */
 	case 448: {
 		struct setauid_args *p = params;
-		uarg[a++] = (intcap_t)p->auid; /* uid_t * __kerncap */
+		uarg[a++] = (intcap_t)p->auid; /* uid_t * */
 		*n_args = 1;
 		break;
 	}
 	/* getaudit */
 	case 449: {
 		struct getaudit_args *p = params;
-		uarg[a++] = (intcap_t)p->auditinfo; /* struct auditinfo * __kerncap */
+		uarg[a++] = (intcap_t)p->auditinfo; /* struct auditinfo * */
 		*n_args = 1;
 		break;
 	}
 	/* setaudit */
 	case 450: {
 		struct setaudit_args *p = params;
-		uarg[a++] = (intcap_t)p->auditinfo; /* struct auditinfo * __kerncap */
+		uarg[a++] = (intcap_t)p->auditinfo; /* struct auditinfo * */
 		*n_args = 1;
 		break;
 	}
 	/* getaudit_addr */
 	case 451: {
 		struct getaudit_addr_args *p = params;
-		uarg[a++] = (intcap_t)p->auditinfo_addr; /* struct auditinfo_addr * __kerncap */
+		uarg[a++] = (intcap_t)p->auditinfo_addr; /* struct auditinfo_addr * */
 		uarg[a++] = p->length; /* u_int */
 		*n_args = 2;
 		break;
@@ -2355,7 +2355,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* setaudit_addr */
 	case 452: {
 		struct setaudit_addr_args *p = params;
-		uarg[a++] = (intcap_t)p->auditinfo_addr; /* struct auditinfo_addr * __kerncap */
+		uarg[a++] = (intcap_t)p->auditinfo_addr; /* struct auditinfo_addr * */
 		uarg[a++] = p->length; /* u_int */
 		*n_args = 2;
 		break;
@@ -2363,25 +2363,25 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* auditctl */
 	case 453: {
 		struct auditctl_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		*n_args = 1;
 		break;
 	}
 	/* _umtx_op */
 	case 454: {
 		struct _umtx_op_args *p = params;
-		uarg[a++] = (intcap_t)p->obj; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->obj; /* void * */
 		iarg[a++] = p->op; /* int */
 		uarg[a++] = p->val; /* u_long */
-		uarg[a++] = (intcap_t)p->uaddr1; /* void * __kerncap */
-		uarg[a++] = (intcap_t)p->uaddr2; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->uaddr1; /* void * */
+		uarg[a++] = (intcap_t)p->uaddr2; /* void * */
 		*n_args = 5;
 		break;
 	}
 	/* thr_new */
 	case 455: {
 		struct thr_new_args *p = params;
-		uarg[a++] = (intcap_t)p->param; /* struct thr_param * __kerncap */
+		uarg[a++] = (intcap_t)p->param; /* struct thr_param * */
 		iarg[a++] = p->param_size; /* int */
 		*n_args = 2;
 		break;
@@ -2391,17 +2391,17 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct sigqueue_args *p = params;
 		iarg[a++] = p->pid; /* pid_t */
 		iarg[a++] = p->signum; /* int */
-		uarg[a++] = (intcap_t)p->value; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->value; /* void * */
 		*n_args = 3;
 		break;
 	}
 	/* kmq_open */
 	case 457: {
 		struct kmq_open_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->flags; /* int */
 		iarg[a++] = p->mode; /* mode_t */
-		uarg[a++] = (intcap_t)p->attr; /* const struct mq_attr * __kerncap */
+		uarg[a++] = (intcap_t)p->attr; /* const struct mq_attr * */
 		*n_args = 4;
 		break;
 	}
@@ -2409,8 +2409,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 458: {
 		struct kmq_setattr_args *p = params;
 		iarg[a++] = p->mqd; /* int */
-		uarg[a++] = (intcap_t)p->attr; /* const struct mq_attr * __kerncap */
-		uarg[a++] = (intcap_t)p->oattr; /* struct mq_attr * __kerncap */
+		uarg[a++] = (intcap_t)p->attr; /* const struct mq_attr * */
+		uarg[a++] = (intcap_t)p->oattr; /* struct mq_attr * */
 		*n_args = 3;
 		break;
 	}
@@ -2418,10 +2418,10 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 459: {
 		struct kmq_timedreceive_args *p = params;
 		iarg[a++] = p->mqd; /* int */
-		uarg[a++] = (intcap_t)p->msg_ptr; /* char * __kerncap */
+		uarg[a++] = (intcap_t)p->msg_ptr; /* char * */
 		uarg[a++] = p->msg_len; /* size_t */
-		uarg[a++] = (intcap_t)p->msg_prio; /* unsigned * __kerncap */
-		uarg[a++] = (intcap_t)p->abs_timeout; /* const struct timespec * __kerncap */
+		uarg[a++] = (intcap_t)p->msg_prio; /* unsigned * */
+		uarg[a++] = (intcap_t)p->abs_timeout; /* const struct timespec * */
 		*n_args = 5;
 		break;
 	}
@@ -2429,10 +2429,10 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 460: {
 		struct kmq_timedsend_args *p = params;
 		iarg[a++] = p->mqd; /* int */
-		uarg[a++] = (intcap_t)p->msg_ptr; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->msg_ptr; /* const char * */
 		uarg[a++] = p->msg_len; /* size_t */
 		uarg[a++] = p->msg_prio; /* unsigned */
-		uarg[a++] = (intcap_t)p->abs_timeout; /* const struct timespec * __kerncap */
+		uarg[a++] = (intcap_t)p->abs_timeout; /* const struct timespec * */
 		*n_args = 5;
 		break;
 	}
@@ -2440,23 +2440,23 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 461: {
 		struct kmq_notify_args *p = params;
 		iarg[a++] = p->mqd; /* int */
-		uarg[a++] = (intcap_t)p->sigev; /* const struct sigevent * __kerncap */
+		uarg[a++] = (intcap_t)p->sigev; /* const struct sigevent * */
 		*n_args = 2;
 		break;
 	}
 	/* kmq_unlink */
 	case 462: {
 		struct kmq_unlink_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		*n_args = 1;
 		break;
 	}
 	/* abort2 */
 	case 463: {
 		struct abort2_args *p = params;
-		uarg[a++] = (intcap_t)p->why; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->why; /* const char * */
 		iarg[a++] = p->nargs; /* int */
-		uarg[a++] = (intcap_t)p->args; /* void * __kerncap * __kerncap */
+		uarg[a++] = (intcap_t)p->args; /* void ** */
 		*n_args = 3;
 		break;
 	}
@@ -2464,7 +2464,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 464: {
 		struct thr_set_name_args *p = params;
 		iarg[a++] = p->id; /* long */
-		uarg[a++] = (intcap_t)p->name; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->name; /* const char * */
 		*n_args = 2;
 		break;
 	}
@@ -2472,7 +2472,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 465: {
 		struct aio_fsync_args *p = params;
 		iarg[a++] = p->op; /* int */
-		uarg[a++] = (intcap_t)p->aiocbp; /* struct aiocb * __kerncap */
+		uarg[a++] = (intcap_t)p->aiocbp; /* struct aiocb * */
 		*n_args = 2;
 		break;
 	}
@@ -2481,7 +2481,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct rtprio_thread_args *p = params;
 		iarg[a++] = p->function; /* int */
 		iarg[a++] = p->lwpid; /* lwpid_t */
-		uarg[a++] = (intcap_t)p->rtp; /* struct rtprio * __kerncap */
+		uarg[a++] = (intcap_t)p->rtp; /* struct rtprio * */
 		*n_args = 3;
 		break;
 	}
@@ -2497,11 +2497,11 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 472: {
 		struct sctp_generic_sendmsg_args *p = params;
 		iarg[a++] = p->sd; /* int */
-		uarg[a++] = (intcap_t)p->msg; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->msg; /* void * */
 		iarg[a++] = p->mlen; /* int */
-		uarg[a++] = (intcap_t)p->to; /* const struct sockaddr * __kerncap */
+		uarg[a++] = (intcap_t)p->to; /* const struct sockaddr * */
 		iarg[a++] = p->tolen; /* __socklen_t */
-		uarg[a++] = (intcap_t)p->sinfo; /* struct sctp_sndrcvinfo * __kerncap */
+		uarg[a++] = (intcap_t)p->sinfo; /* struct sctp_sndrcvinfo * */
 		iarg[a++] = p->flags; /* int */
 		*n_args = 7;
 		break;
@@ -2510,11 +2510,11 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 473: {
 		struct sctp_generic_sendmsg_iov_args *p = params;
 		iarg[a++] = p->sd; /* int */
-		uarg[a++] = (intcap_t)p->iov; /* struct iovec * __kerncap */
+		uarg[a++] = (intcap_t)p->iov; /* struct iovec * */
 		iarg[a++] = p->iovlen; /* int */
-		uarg[a++] = (intcap_t)p->to; /* const struct sockaddr * __kerncap */
+		uarg[a++] = (intcap_t)p->to; /* const struct sockaddr * */
 		iarg[a++] = p->tolen; /* __socklen_t */
-		uarg[a++] = (intcap_t)p->sinfo; /* struct sctp_sndrcvinfo * __kerncap */
+		uarg[a++] = (intcap_t)p->sinfo; /* struct sctp_sndrcvinfo * */
 		iarg[a++] = p->flags; /* int */
 		*n_args = 7;
 		break;
@@ -2523,12 +2523,12 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 474: {
 		struct sctp_generic_recvmsg_args *p = params;
 		iarg[a++] = p->sd; /* int */
-		uarg[a++] = (intcap_t)p->iov; /* struct iovec * __kerncap */
+		uarg[a++] = (intcap_t)p->iov; /* struct iovec * */
 		iarg[a++] = p->iovlen; /* int */
-		uarg[a++] = (intcap_t)p->from; /* struct sockaddr * __kerncap */
-		uarg[a++] = (intcap_t)p->fromlenaddr; /* __socklen_t * __kerncap */
-		uarg[a++] = (intcap_t)p->sinfo; /* struct sctp_sndrcvinfo * __kerncap */
-		uarg[a++] = (intcap_t)p->msg_flags; /* int * __kerncap */
+		uarg[a++] = (intcap_t)p->from; /* struct sockaddr * */
+		uarg[a++] = (intcap_t)p->fromlenaddr; /* __socklen_t * */
+		uarg[a++] = (intcap_t)p->sinfo; /* struct sctp_sndrcvinfo * */
+		uarg[a++] = (intcap_t)p->msg_flags; /* int * */
 		*n_args = 7;
 		break;
 	}
@@ -2536,7 +2536,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 475: {
 		struct pread_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->buf; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->buf; /* void * */
 		uarg[a++] = p->nbyte; /* size_t */
 		iarg[a++] = p->offset; /* off_t */
 		*n_args = 4;
@@ -2546,7 +2546,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 476: {
 		struct pwrite_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->buf; /* const void * __kerncap */
+		uarg[a++] = (intcap_t)p->buf; /* const void * */
 		uarg[a++] = p->nbyte; /* size_t */
 		iarg[a++] = p->offset; /* off_t */
 		*n_args = 4;
@@ -2555,7 +2555,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* mmap */
 	case 477: {
 		struct mmap_args *p = params;
-		uarg[a++] = (intcap_t)p->addr; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->addr; /* void * */
 		uarg[a++] = p->len; /* size_t */
 		iarg[a++] = p->prot; /* int */
 		iarg[a++] = p->flags; /* int */
@@ -2576,7 +2576,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* truncate */
 	case 479: {
 		struct truncate_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->length; /* off_t */
 		*n_args = 2;
 		break;
@@ -2601,14 +2601,14 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* shm_unlink */
 	case 483: {
 		struct shm_unlink_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		*n_args = 1;
 		break;
 	}
 	/* cpuset */
 	case 484: {
 		struct cpuset_args *p = params;
-		uarg[a++] = (intcap_t)p->setid; /* cpusetid_t * __kerncap */
+		uarg[a++] = (intcap_t)p->setid; /* cpusetid_t * */
 		*n_args = 1;
 		break;
 	}
@@ -2627,7 +2627,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		iarg[a++] = p->level; /* cpulevel_t */
 		iarg[a++] = p->which; /* cpuwhich_t */
 		iarg[a++] = p->id; /* id_t */
-		uarg[a++] = (intcap_t)p->setid; /* cpusetid_t * __kerncap */
+		uarg[a++] = (intcap_t)p->setid; /* cpusetid_t * */
 		*n_args = 4;
 		break;
 	}
@@ -2638,7 +2638,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		iarg[a++] = p->which; /* cpuwhich_t */
 		iarg[a++] = p->id; /* id_t */
 		uarg[a++] = p->cpusetsize; /* size_t */
-		uarg[a++] = (intcap_t)p->mask; /* cpuset_t * __kerncap */
+		uarg[a++] = (intcap_t)p->mask; /* cpuset_t * */
 		*n_args = 5;
 		break;
 	}
@@ -2649,7 +2649,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		iarg[a++] = p->which; /* cpuwhich_t */
 		iarg[a++] = p->id; /* id_t */
 		uarg[a++] = p->cpusetsize; /* size_t */
-		uarg[a++] = (intcap_t)p->mask; /* const cpuset_t * __kerncap */
+		uarg[a++] = (intcap_t)p->mask; /* const cpuset_t * */
 		*n_args = 5;
 		break;
 	}
@@ -2657,7 +2657,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 489: {
 		struct faccessat_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->amode; /* int */
 		iarg[a++] = p->flag; /* int */
 		*n_args = 4;
@@ -2667,7 +2667,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 490: {
 		struct fchmodat_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->mode; /* mode_t */
 		iarg[a++] = p->flag; /* int */
 		*n_args = 4;
@@ -2677,7 +2677,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 491: {
 		struct fchownat_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		uarg[a++] = p->uid; /* uid_t */
 		iarg[a++] = p->gid; /* gid_t */
 		iarg[a++] = p->flag; /* int */
@@ -2688,8 +2688,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 492: {
 		struct fexecve_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->argv; /* char * __kerncap * __kerncap */
-		uarg[a++] = (intcap_t)p->envv; /* char * __kerncap * __kerncap */
+		uarg[a++] = (intcap_t)p->argv; /* char ** */
+		uarg[a++] = (intcap_t)p->envv; /* char ** */
 		*n_args = 3;
 		break;
 	}
@@ -2697,8 +2697,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 494: {
 		struct futimesat_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->times; /* const struct timeval * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
+		uarg[a++] = (intcap_t)p->times; /* const struct timeval * */
 		*n_args = 3;
 		break;
 	}
@@ -2706,9 +2706,9 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 495: {
 		struct linkat_args *p = params;
 		iarg[a++] = p->fd1; /* int */
-		uarg[a++] = (intcap_t)p->path1; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path1; /* const char * */
 		iarg[a++] = p->fd2; /* int */
-		uarg[a++] = (intcap_t)p->path2; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path2; /* const char * */
 		iarg[a++] = p->flag; /* int */
 		*n_args = 5;
 		break;
@@ -2717,7 +2717,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 496: {
 		struct mkdirat_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->mode; /* mode_t */
 		*n_args = 3;
 		break;
@@ -2726,7 +2726,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 497: {
 		struct mkfifoat_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->mode; /* mode_t */
 		*n_args = 3;
 		break;
@@ -2735,7 +2735,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 499: {
 		struct openat_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->flag; /* int */
 		iarg[a++] = p->mode; /* mode_t */
 		*n_args = 4;
@@ -2745,8 +2745,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 500: {
 		struct readlinkat_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->buf; /* char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
+		uarg[a++] = (intcap_t)p->buf; /* char * */
 		uarg[a++] = p->bufsize; /* size_t */
 		*n_args = 4;
 		break;
@@ -2755,18 +2755,18 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 501: {
 		struct renameat_args *p = params;
 		iarg[a++] = p->oldfd; /* int */
-		uarg[a++] = (intcap_t)p->old; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->old; /* const char * */
 		iarg[a++] = p->newfd; /* int */
-		uarg[a++] = (intcap_t)p->new; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->new; /* const char * */
 		*n_args = 4;
 		break;
 	}
 	/* symlinkat */
 	case 502: {
 		struct symlinkat_args *p = params;
-		uarg[a++] = (intcap_t)p->path1; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path1; /* const char * */
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->path2; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path2; /* const char * */
 		*n_args = 3;
 		break;
 	}
@@ -2774,7 +2774,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 503: {
 		struct unlinkat_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->flag; /* int */
 		*n_args = 3;
 		break;
@@ -2789,14 +2789,14 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* gssd_syscall */
 	case 505: {
 		struct gssd_syscall_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		*n_args = 1;
 		break;
 	}
 	/* jail_get */
 	case 506: {
 		struct jail_get_args *p = params;
-		uarg[a++] = (intcap_t)p->iovp; /* struct iovec * __kerncap */
+		uarg[a++] = (intcap_t)p->iovp; /* struct iovec * */
 		uarg[a++] = p->iovcnt; /* unsigned int */
 		iarg[a++] = p->flags; /* int */
 		*n_args = 3;
@@ -2805,7 +2805,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* jail_set */
 	case 507: {
 		struct jail_set_args *p = params;
-		uarg[a++] = (intcap_t)p->iovp; /* struct iovec * __kerncap */
+		uarg[a++] = (intcap_t)p->iovp; /* struct iovec * */
 		uarg[a++] = p->iovcnt; /* unsigned int */
 		iarg[a++] = p->flags; /* int */
 		*n_args = 3;
@@ -2824,7 +2824,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		iarg[a++] = p->semid; /* int */
 		iarg[a++] = p->semnum; /* int */
 		iarg[a++] = p->cmd; /* int */
-		uarg[a++] = (intcap_t)p->arg; /* union semun * __kerncap */
+		uarg[a++] = (intcap_t)p->arg; /* union semun * */
 		*n_args = 4;
 		break;
 	}
@@ -2833,7 +2833,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct msgctl_args *p = params;
 		iarg[a++] = p->msqid; /* int */
 		iarg[a++] = p->cmd; /* int */
-		uarg[a++] = (intcap_t)p->buf; /* struct msqid_ds * __kerncap */
+		uarg[a++] = (intcap_t)p->buf; /* struct msqid_ds * */
 		*n_args = 3;
 		break;
 	}
@@ -2842,14 +2842,14 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct shmctl_args *p = params;
 		iarg[a++] = p->shmid; /* int */
 		iarg[a++] = p->cmd; /* int */
-		uarg[a++] = (intcap_t)p->buf; /* struct shmid_ds * __kerncap */
+		uarg[a++] = (intcap_t)p->buf; /* struct shmid_ds * */
 		*n_args = 3;
 		break;
 	}
 	/* lpathconf */
 	case 513: {
 		struct lpathconf_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->name; /* int */
 		*n_args = 2;
 		break;
@@ -2859,7 +2859,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct __cap_rights_get_args *p = params;
 		iarg[a++] = p->version; /* int */
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->rightsp; /* cap_rights_t * __kerncap */
+		uarg[a++] = (intcap_t)p->rightsp; /* cap_rights_t * */
 		*n_args = 3;
 		break;
 	}
@@ -2871,14 +2871,14 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* cap_getmode */
 	case 517: {
 		struct cap_getmode_args *p = params;
-		uarg[a++] = (intcap_t)p->modep; /* u_int * __kerncap */
+		uarg[a++] = (intcap_t)p->modep; /* u_int * */
 		*n_args = 1;
 		break;
 	}
 	/* pdfork */
 	case 518: {
 		struct pdfork_args *p = params;
-		uarg[a++] = (intcap_t)p->fdp; /* int * __kerncap */
+		uarg[a++] = (intcap_t)p->fdp; /* int * */
 		iarg[a++] = p->flags; /* int */
 		*n_args = 2;
 		break;
@@ -2895,7 +2895,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 520: {
 		struct pdgetpid_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->pidp; /* pid_t * __kerncap */
+		uarg[a++] = (intcap_t)p->pidp; /* pid_t * */
 		*n_args = 2;
 		break;
 	}
@@ -2903,18 +2903,18 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 522: {
 		struct pselect_args *p = params;
 		iarg[a++] = p->nd; /* int */
-		uarg[a++] = (intcap_t)p->in; /* fd_set * __kerncap */
-		uarg[a++] = (intcap_t)p->ou; /* fd_set * __kerncap */
-		uarg[a++] = (intcap_t)p->ex; /* fd_set * __kerncap */
-		uarg[a++] = (intcap_t)p->ts; /* const struct timespec * __kerncap */
-		uarg[a++] = (intcap_t)p->sm; /* const sigset_t * __kerncap */
+		uarg[a++] = (intcap_t)p->in; /* fd_set * */
+		uarg[a++] = (intcap_t)p->ou; /* fd_set * */
+		uarg[a++] = (intcap_t)p->ex; /* fd_set * */
+		uarg[a++] = (intcap_t)p->ts; /* const struct timespec * */
+		uarg[a++] = (intcap_t)p->sm; /* const sigset_t * */
 		*n_args = 6;
 		break;
 	}
 	/* getloginclass */
 	case 523: {
 		struct getloginclass_args *p = params;
-		uarg[a++] = (intcap_t)p->namebuf; /* char * __kerncap */
+		uarg[a++] = (intcap_t)p->namebuf; /* char * */
 		uarg[a++] = p->namelen; /* size_t */
 		*n_args = 2;
 		break;
@@ -2922,16 +2922,16 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* setloginclass */
 	case 524: {
 		struct setloginclass_args *p = params;
-		uarg[a++] = (intcap_t)p->namebuf; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->namebuf; /* const char * */
 		*n_args = 1;
 		break;
 	}
 	/* rctl_get_racct */
 	case 525: {
 		struct rctl_get_racct_args *p = params;
-		uarg[a++] = (intcap_t)p->inbufp; /* const void * __kerncap */
+		uarg[a++] = (intcap_t)p->inbufp; /* const void * */
 		uarg[a++] = p->inbuflen; /* size_t */
-		uarg[a++] = (intcap_t)p->outbufp; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->outbufp; /* void * */
 		uarg[a++] = p->outbuflen; /* size_t */
 		*n_args = 4;
 		break;
@@ -2939,9 +2939,9 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* rctl_get_rules */
 	case 526: {
 		struct rctl_get_rules_args *p = params;
-		uarg[a++] = (intcap_t)p->inbufp; /* const void * __kerncap */
+		uarg[a++] = (intcap_t)p->inbufp; /* const void * */
 		uarg[a++] = p->inbuflen; /* size_t */
-		uarg[a++] = (intcap_t)p->outbufp; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->outbufp; /* void * */
 		uarg[a++] = p->outbuflen; /* size_t */
 		*n_args = 4;
 		break;
@@ -2949,9 +2949,9 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* rctl_get_limits */
 	case 527: {
 		struct rctl_get_limits_args *p = params;
-		uarg[a++] = (intcap_t)p->inbufp; /* const void * __kerncap */
+		uarg[a++] = (intcap_t)p->inbufp; /* const void * */
 		uarg[a++] = p->inbuflen; /* size_t */
-		uarg[a++] = (intcap_t)p->outbufp; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->outbufp; /* void * */
 		uarg[a++] = p->outbuflen; /* size_t */
 		*n_args = 4;
 		break;
@@ -2959,9 +2959,9 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* rctl_add_rule */
 	case 528: {
 		struct rctl_add_rule_args *p = params;
-		uarg[a++] = (intcap_t)p->inbufp; /* const void * __kerncap */
+		uarg[a++] = (intcap_t)p->inbufp; /* const void * */
 		uarg[a++] = p->inbuflen; /* size_t */
-		uarg[a++] = (intcap_t)p->outbufp; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->outbufp; /* void * */
 		uarg[a++] = p->outbuflen; /* size_t */
 		*n_args = 4;
 		break;
@@ -2969,9 +2969,9 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* rctl_remove_rule */
 	case 529: {
 		struct rctl_remove_rule_args *p = params;
-		uarg[a++] = (intcap_t)p->inbufp; /* const void * __kerncap */
+		uarg[a++] = (intcap_t)p->inbufp; /* const void * */
 		uarg[a++] = p->inbuflen; /* size_t */
-		uarg[a++] = (intcap_t)p->outbufp; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->outbufp; /* void * */
 		uarg[a++] = p->outbuflen; /* size_t */
 		*n_args = 4;
 		break;
@@ -3000,10 +3000,10 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct wait6_args *p = params;
 		iarg[a++] = p->idtype; /* idtype_t */
 		iarg[a++] = p->id; /* id_t */
-		uarg[a++] = (intcap_t)p->status; /* int * __kerncap */
+		uarg[a++] = (intcap_t)p->status; /* int * */
 		iarg[a++] = p->options; /* int */
-		uarg[a++] = (intcap_t)p->wrusage; /* struct __wrusage * __kerncap */
-		uarg[a++] = (intcap_t)p->info; /* struct __siginfo * __kerncap */
+		uarg[a++] = (intcap_t)p->wrusage; /* struct __wrusage * */
+		uarg[a++] = (intcap_t)p->info; /* struct __siginfo * */
 		*n_args = 6;
 		break;
 	}
@@ -3011,7 +3011,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 533: {
 		struct cap_rights_limit_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->rightsp; /* cap_rights_t * __kerncap */
+		uarg[a++] = (intcap_t)p->rightsp; /* cap_rights_t * */
 		*n_args = 2;
 		break;
 	}
@@ -3019,7 +3019,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 534: {
 		struct cap_ioctls_limit_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->cmds; /* const u_long * __kerncap */
+		uarg[a++] = (intcap_t)p->cmds; /* const u_long * */
 		uarg[a++] = p->ncmds; /* size_t */
 		*n_args = 3;
 		break;
@@ -3028,7 +3028,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 535: {
 		struct cap_ioctls_get_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->cmds; /* u_long * __kerncap */
+		uarg[a++] = (intcap_t)p->cmds; /* u_long * */
 		uarg[a++] = p->maxcmds; /* size_t */
 		*n_args = 3;
 		break;
@@ -3045,7 +3045,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 537: {
 		struct cap_fcntls_get_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->fcntlrightsp; /* uint32_t * __kerncap */
+		uarg[a++] = (intcap_t)p->fcntlrightsp; /* uint32_t * */
 		*n_args = 2;
 		break;
 	}
@@ -3054,7 +3054,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct bindat_args *p = params;
 		iarg[a++] = p->fd; /* int */
 		iarg[a++] = p->s; /* int */
-		uarg[a++] = (intcap_t)p->name; /* const struct sockaddr * __kerncap */
+		uarg[a++] = (intcap_t)p->name; /* const struct sockaddr * */
 		iarg[a++] = p->namelen; /* __socklen_t */
 		*n_args = 4;
 		break;
@@ -3064,7 +3064,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct connectat_args *p = params;
 		iarg[a++] = p->fd; /* int */
 		iarg[a++] = p->s; /* int */
-		uarg[a++] = (intcap_t)p->name; /* const struct sockaddr * __kerncap */
+		uarg[a++] = (intcap_t)p->name; /* const struct sockaddr * */
 		iarg[a++] = p->namelen; /* __socklen_t */
 		*n_args = 4;
 		break;
@@ -3073,7 +3073,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 540: {
 		struct chflagsat_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		uarg[a++] = p->flags; /* u_long */
 		iarg[a++] = p->atflag; /* int */
 		*n_args = 4;
@@ -3083,8 +3083,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 541: {
 		struct accept4_args *p = params;
 		iarg[a++] = p->s; /* int */
-		uarg[a++] = (intcap_t)p->name; /* struct sockaddr * __kerncap */
-		uarg[a++] = (intcap_t)p->anamelen; /* __socklen_t * __kerncap */
+		uarg[a++] = (intcap_t)p->name; /* struct sockaddr * */
+		uarg[a++] = (intcap_t)p->anamelen; /* __socklen_t * */
 		iarg[a++] = p->flags; /* int */
 		*n_args = 4;
 		break;
@@ -3092,7 +3092,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* pipe2 */
 	case 542: {
 		struct pipe2_args *p = params;
-		uarg[a++] = (intcap_t)p->fildes; /* int * __kerncap */
+		uarg[a++] = (intcap_t)p->fildes; /* int * */
 		iarg[a++] = p->flags; /* int */
 		*n_args = 2;
 		break;
@@ -3100,7 +3100,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* aio_mlock */
 	case 543: {
 		struct aio_mlock_args *p = params;
-		uarg[a++] = (intcap_t)p->aiocbp; /* struct aiocb * __kerncap */
+		uarg[a++] = (intcap_t)p->aiocbp; /* struct aiocb * */
 		*n_args = 1;
 		break;
 	}
@@ -3110,17 +3110,17 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		iarg[a++] = p->idtype; /* idtype_t */
 		iarg[a++] = p->id; /* id_t */
 		iarg[a++] = p->com; /* int */
-		uarg[a++] = (intcap_t)p->data; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->data; /* void * */
 		*n_args = 4;
 		break;
 	}
 	/* ppoll */
 	case 545: {
 		struct ppoll_args *p = params;
-		uarg[a++] = (intcap_t)p->fds; /* struct pollfd * __kerncap */
+		uarg[a++] = (intcap_t)p->fds; /* struct pollfd * */
 		uarg[a++] = p->nfds; /* u_int */
-		uarg[a++] = (intcap_t)p->ts; /* const struct timespec * __kerncap */
-		uarg[a++] = (intcap_t)p->set; /* const sigset_t * __kerncap */
+		uarg[a++] = (intcap_t)p->ts; /* const struct timespec * */
+		uarg[a++] = (intcap_t)p->set; /* const sigset_t * */
 		*n_args = 4;
 		break;
 	}
@@ -3128,7 +3128,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 546: {
 		struct futimens_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->times; /* const struct timespec * __kerncap */
+		uarg[a++] = (intcap_t)p->times; /* const struct timespec * */
 		*n_args = 2;
 		break;
 	}
@@ -3136,8 +3136,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 547: {
 		struct utimensat_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->times; /* const struct timespec * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
+		uarg[a++] = (intcap_t)p->times; /* const struct timespec * */
 		iarg[a++] = p->flag; /* int */
 		*n_args = 4;
 		break;
@@ -3153,7 +3153,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 551: {
 		struct fstat_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->sb; /* struct stat * __kerncap */
+		uarg[a++] = (intcap_t)p->sb; /* struct stat * */
 		*n_args = 2;
 		break;
 	}
@@ -3161,8 +3161,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 552: {
 		struct fstatat_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->buf; /* struct stat * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
+		uarg[a++] = (intcap_t)p->buf; /* struct stat * */
 		iarg[a++] = p->flag; /* int */
 		*n_args = 4;
 		break;
@@ -3170,8 +3170,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* fhstat */
 	case 553: {
 		struct fhstat_args *p = params;
-		uarg[a++] = (intcap_t)p->u_fhp; /* const struct fhandle * __kerncap */
-		uarg[a++] = (intcap_t)p->sb; /* struct stat * __kerncap */
+		uarg[a++] = (intcap_t)p->u_fhp; /* const struct fhandle * */
+		uarg[a++] = (intcap_t)p->sb; /* struct stat * */
 		*n_args = 2;
 		break;
 	}
@@ -3179,17 +3179,17 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 554: {
 		struct getdirentries_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->buf; /* char * __kerncap */
+		uarg[a++] = (intcap_t)p->buf; /* char * */
 		uarg[a++] = p->count; /* size_t */
-		uarg[a++] = (intcap_t)p->basep; /* off_t * __kerncap */
+		uarg[a++] = (intcap_t)p->basep; /* off_t * */
 		*n_args = 4;
 		break;
 	}
 	/* statfs */
 	case 555: {
 		struct statfs_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->buf; /* struct statfs * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
+		uarg[a++] = (intcap_t)p->buf; /* struct statfs * */
 		*n_args = 2;
 		break;
 	}
@@ -3197,14 +3197,14 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 556: {
 		struct fstatfs_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->buf; /* struct statfs * __kerncap */
+		uarg[a++] = (intcap_t)p->buf; /* struct statfs * */
 		*n_args = 2;
 		break;
 	}
 	/* getfsstat */
 	case 557: {
 		struct getfsstat_args *p = params;
-		uarg[a++] = (intcap_t)p->buf; /* struct statfs * __kerncap */
+		uarg[a++] = (intcap_t)p->buf; /* struct statfs * */
 		iarg[a++] = p->bufsize; /* long */
 		iarg[a++] = p->mode; /* int */
 		*n_args = 3;
@@ -3213,8 +3213,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* fhstatfs */
 	case 558: {
 		struct fhstatfs_args *p = params;
-		uarg[a++] = (intcap_t)p->u_fhp; /* const struct fhandle * __kerncap */
-		uarg[a++] = (intcap_t)p->buf; /* struct statfs * __kerncap */
+		uarg[a++] = (intcap_t)p->u_fhp; /* const struct fhandle * */
+		uarg[a++] = (intcap_t)p->buf; /* struct statfs * */
 		*n_args = 2;
 		break;
 	}
@@ -3222,7 +3222,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 559: {
 		struct mknodat_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->mode; /* mode_t */
 		iarg[a++] = p->dev; /* dev_t */
 		*n_args = 4;
@@ -3232,11 +3232,11 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 560: {
 		struct kevent_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->changelist; /* const struct kevent * __kerncap */
+		uarg[a++] = (intcap_t)p->changelist; /* const struct kevent * */
 		iarg[a++] = p->nchanges; /* int */
-		uarg[a++] = (intcap_t)p->eventlist; /* struct kevent * __kerncap */
+		uarg[a++] = (intcap_t)p->eventlist; /* struct kevent * */
 		iarg[a++] = p->nevents; /* int */
-		uarg[a++] = (intcap_t)p->timeout; /* const struct timespec * __kerncap */
+		uarg[a++] = (intcap_t)p->timeout; /* const struct timespec * */
 		*n_args = 6;
 		break;
 	}
@@ -3247,8 +3247,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		iarg[a++] = p->which; /* cpuwhich_t */
 		iarg[a++] = p->id; /* id_t */
 		uarg[a++] = p->domainsetsize; /* size_t */
-		uarg[a++] = (intcap_t)p->mask; /* domainset_t * __kerncap */
-		uarg[a++] = (intcap_t)p->policy; /* int * __kerncap */
+		uarg[a++] = (intcap_t)p->mask; /* domainset_t * */
+		uarg[a++] = (intcap_t)p->policy; /* int * */
 		*n_args = 6;
 		break;
 	}
@@ -3259,7 +3259,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		iarg[a++] = p->which; /* cpuwhich_t */
 		iarg[a++] = p->id; /* id_t */
 		uarg[a++] = p->domainsetsize; /* size_t */
-		uarg[a++] = (intcap_t)p->mask; /* domainset_t * __kerncap */
+		uarg[a++] = (intcap_t)p->mask; /* domainset_t * */
 		iarg[a++] = p->policy; /* int */
 		*n_args = 6;
 		break;
@@ -3267,7 +3267,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* getrandom */
 	case 563: {
 		struct getrandom_args *p = params;
-		uarg[a++] = (intcap_t)p->buf; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->buf; /* void * */
 		uarg[a++] = p->buflen; /* size_t */
 		uarg[a++] = p->flags; /* unsigned int */
 		*n_args = 3;
@@ -3277,8 +3277,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 564: {
 		struct getfhat_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->path; /* char * __kerncap */
-		uarg[a++] = (intcap_t)p->fhp; /* struct fhandle * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* char * */
+		uarg[a++] = (intcap_t)p->fhp; /* struct fhandle * */
 		iarg[a++] = p->flags; /* int */
 		*n_args = 4;
 		break;
@@ -3286,25 +3286,25 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* fhlink */
 	case 565: {
 		struct fhlink_args *p = params;
-		uarg[a++] = (intcap_t)p->fhp; /* struct fhandle * __kerncap */
-		uarg[a++] = (intcap_t)p->to; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->fhp; /* struct fhandle * */
+		uarg[a++] = (intcap_t)p->to; /* const char * */
 		*n_args = 2;
 		break;
 	}
 	/* fhlinkat */
 	case 566: {
 		struct fhlinkat_args *p = params;
-		uarg[a++] = (intcap_t)p->fhp; /* struct fhandle * __kerncap */
+		uarg[a++] = (intcap_t)p->fhp; /* struct fhandle * */
 		iarg[a++] = p->tofd; /* int */
-		uarg[a++] = (intcap_t)p->to; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->to; /* const char * */
 		*n_args = 3;
 		break;
 	}
 	/* fhreadlink */
 	case 567: {
 		struct fhreadlink_args *p = params;
-		uarg[a++] = (intcap_t)p->fhp; /* struct fhandle * __kerncap */
-		uarg[a++] = (intcap_t)p->buf; /* char * __kerncap */
+		uarg[a++] = (intcap_t)p->fhp; /* struct fhandle * */
+		uarg[a++] = (intcap_t)p->buf; /* char * */
 		uarg[a++] = p->bufsize; /* size_t */
 		*n_args = 3;
 		break;
@@ -3313,7 +3313,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 568: {
 		struct funlinkat_args *p = params;
 		iarg[a++] = p->dfd; /* int */
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->fd; /* int */
 		iarg[a++] = p->flag; /* int */
 		*n_args = 4;
@@ -3323,9 +3323,9 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 569: {
 		struct copy_file_range_args *p = params;
 		iarg[a++] = p->infd; /* int */
-		uarg[a++] = (intcap_t)p->inoffp; /* off_t * __kerncap */
+		uarg[a++] = (intcap_t)p->inoffp; /* off_t * */
 		iarg[a++] = p->outfd; /* int */
-		uarg[a++] = (intcap_t)p->outoffp; /* off_t * __kerncap */
+		uarg[a++] = (intcap_t)p->outoffp; /* off_t * */
 		uarg[a++] = p->len; /* size_t */
 		uarg[a++] = p->flags; /* unsigned int */
 		*n_args = 6;
@@ -3334,11 +3334,11 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* __sysctlbyname */
 	case 570: {
 		struct __sysctlbyname_args *p = params;
-		uarg[a++] = (intcap_t)p->name; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->name; /* const char * */
 		uarg[a++] = p->namelen; /* size_t */
-		uarg[a++] = (intcap_t)p->old; /* void * __kerncap */
-		uarg[a++] = (intcap_t)p->oldlenp; /* size_t * __kerncap */
-		uarg[a++] = (intcap_t)p->new; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->old; /* void * */
+		uarg[a++] = (intcap_t)p->oldlenp; /* size_t * */
+		uarg[a++] = (intcap_t)p->new; /* void * */
 		uarg[a++] = p->newlen; /* size_t */
 		*n_args = 6;
 		break;
@@ -3346,19 +3346,19 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* shm_open2 */
 	case 571: {
 		struct shm_open2_args *p = params;
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		iarg[a++] = p->flags; /* int */
 		iarg[a++] = p->mode; /* mode_t */
 		iarg[a++] = p->shmflags; /* int */
-		uarg[a++] = (intcap_t)p->name; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->name; /* const char * */
 		*n_args = 5;
 		break;
 	}
 	/* shm_rename */
 	case 572: {
 		struct shm_rename_args *p = params;
-		uarg[a++] = (intcap_t)p->path_from; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->path_to; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path_from; /* const char * */
+		uarg[a++] = (intcap_t)p->path_to; /* const char * */
 		iarg[a++] = p->flags; /* int */
 		*n_args = 3;
 		break;
@@ -3367,7 +3367,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 573: {
 		struct sigfastblock_args *p = params;
 		iarg[a++] = p->cmd; /* int */
-		uarg[a++] = (intcap_t)p->ptr; /* void * __kerncap */
+		uarg[a++] = (intcap_t)p->ptr; /* void * */
 		*n_args = 2;
 		break;
 	}
@@ -3375,8 +3375,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 574: {
 		struct __realpathat_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
-		uarg[a++] = (intcap_t)p->buf; /* char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
+		uarg[a++] = (intcap_t)p->buf; /* char * */
 		uarg[a++] = p->size; /* size_t */
 		iarg[a++] = p->flags; /* int */
 		*n_args = 5;
@@ -3395,7 +3395,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 576: {
 		struct rpctls_syscall_args *p = params;
 		iarg[a++] = p->op; /* int */
-		uarg[a++] = (intcap_t)p->path; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->path; /* const char * */
 		*n_args = 2;
 		break;
 	}
@@ -3403,7 +3403,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 577: {
 		struct __specialfd_args *p = params;
 		iarg[a++] = p->type; /* int */
-		uarg[a++] = (intcap_t)p->req; /* const void * __kerncap */
+		uarg[a++] = (intcap_t)p->req; /* const void * */
 		uarg[a++] = p->len; /* size_t */
 		*n_args = 3;
 		break;
@@ -3411,14 +3411,14 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* aio_writev */
 	case 578: {
 		struct aio_writev_args *p = params;
-		uarg[a++] = (intcap_t)p->aiocbp; /* struct aiocb * __kerncap */
+		uarg[a++] = (intcap_t)p->aiocbp; /* struct aiocb * */
 		*n_args = 1;
 		break;
 	}
 	/* aio_readv */
 	case 579: {
 		struct aio_readv_args *p = params;
-		uarg[a++] = (intcap_t)p->aiocbp; /* struct aiocb * __kerncap */
+		uarg[a++] = (intcap_t)p->aiocbp; /* struct aiocb * */
 		*n_args = 1;
 		break;
 	}
@@ -3427,9 +3427,9 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct fspacectl_args *p = params;
 		iarg[a++] = p->fd; /* int */
 		iarg[a++] = p->cmd; /* int */
-		uarg[a++] = (intcap_t)p->rqsr; /* const struct spacectl_range * __kerncap */
+		uarg[a++] = (intcap_t)p->rqsr; /* const struct spacectl_range * */
 		iarg[a++] = p->flags; /* int */
-		uarg[a++] = (intcap_t)p->rmsr; /* struct spacectl_range * __kerncap */
+		uarg[a++] = (intcap_t)p->rmsr; /* struct spacectl_range * */
 		*n_args = 5;
 		break;
 	}
@@ -3441,7 +3441,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	/* swapoff */
 	case 582: {
 		struct swapoff_args *p = params;
-		uarg[a++] = (intcap_t)p->name; /* const char * __kerncap */
+		uarg[a++] = (intcap_t)p->name; /* const char * */
 		uarg[a++] = p->flags; /* u_int */
 		*n_args = 2;
 		break;
@@ -3474,7 +3474,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 	case 586: {
 		struct timerfd_gettime_args *p = params;
 		iarg[a++] = p->fd; /* int */
-		uarg[a++] = (intcap_t)p->curr_value; /* struct itimerspec * __kerncap */
+		uarg[a++] = (intcap_t)p->curr_value; /* struct itimerspec * */
 		*n_args = 2;
 		break;
 	}
@@ -3483,8 +3483,8 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct timerfd_settime_args *p = params;
 		iarg[a++] = p->fd; /* int */
 		iarg[a++] = p->flags; /* int */
-		uarg[a++] = (intcap_t)p->new_value; /* const struct itimerspec * __kerncap */
-		uarg[a++] = (intcap_t)p->old_value; /* struct itimerspec * __kerncap */
+		uarg[a++] = (intcap_t)p->new_value; /* const struct itimerspec * */
+		uarg[a++] = (intcap_t)p->old_value; /* struct itimerspec * */
 		*n_args = 4;
 		break;
 	}
@@ -3504,7 +3504,7 @@ systrace_args(int sysnum, void *params, uintcap_t *uarg, int *n_args)
 		struct getrlimitusage_args *p = params;
 		uarg[a++] = p->which; /* u_int */
 		iarg[a++] = p->flags; /* int */
-		uarg[a++] = (intcap_t)p->res; /* rlim_t * __kerncap */
+		uarg[a++] = (intcap_t)p->res; /* rlim_t * */
 		*n_args = 3;
 		break;
 	}
@@ -3557,7 +3557,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 2:
 			p = "size_t";
@@ -3573,7 +3573,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const void * __kerncap";
+			p = "userland const void *";
 			break;
 		case 2:
 			p = "size_t";
@@ -3586,7 +3586,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 5:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
@@ -3615,13 +3615,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland int * __kerncap";
+			p = "userland int *";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "userland struct rusage * __kerncap";
+			p = "userland struct rusage *";
 			break;
 		default:
 			break;
@@ -3631,10 +3631,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 9:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -3644,7 +3644,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 10:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -3654,7 +3654,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 12:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -3674,7 +3674,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 15:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "mode_t";
@@ -3687,7 +3687,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 16:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
@@ -3703,7 +3703,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 17:
 		switch (ndx) {
 		case 0:
-			p = "userland char * __kerncap";
+			p = "userland char *";
 			break;
 		default:
 			break;
@@ -3716,16 +3716,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 21:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		default:
 			break;
@@ -3735,7 +3735,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 22:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
@@ -3770,7 +3770,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "pid_t";
 			break;
 		case 2:
-			p = "userland char * __kerncap";
+			p = "userland char *";
 			break;
 		case 3:
 			p = "int";
@@ -3786,7 +3786,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct msghdr * __kerncap";
+			p = "userland struct msghdr *";
 			break;
 		case 2:
 			p = "int";
@@ -3802,7 +3802,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct msghdr * __kerncap";
+			p = "userland const struct msghdr *";
 			break;
 		case 2:
 			p = "int";
@@ -3818,7 +3818,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 2:
 			p = "size_t";
@@ -3827,10 +3827,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 4:
-			p = "userland struct sockaddr * __kerncap";
+			p = "userland struct sockaddr *";
 			break;
 		case 5:
-			p = "userland __socklen_t * __kerncap";
+			p = "userland __socklen_t *";
 			break;
 		default:
 			break;
@@ -3843,10 +3843,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct sockaddr * __kerncap";
+			p = "userland struct sockaddr *";
 			break;
 		case 2:
-			p = "userland __socklen_t * __kerncap";
+			p = "userland __socklen_t *";
 			break;
 		default:
 			break;
@@ -3859,10 +3859,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct sockaddr * __kerncap";
+			p = "userland struct sockaddr *";
 			break;
 		case 2:
-			p = "userland __socklen_t * __kerncap";
+			p = "userland __socklen_t *";
 			break;
 		default:
 			break;
@@ -3875,10 +3875,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct sockaddr * __kerncap";
+			p = "userland struct sockaddr *";
 			break;
 		case 2:
-			p = "userland __socklen_t * __kerncap";
+			p = "userland __socklen_t *";
 			break;
 		default:
 			break;
@@ -3888,7 +3888,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 33:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
@@ -3901,7 +3901,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 34:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "u_long";
@@ -3959,7 +3959,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 44:
 		switch (ndx) {
 		case 0:
-			p = "userland char * __kerncap";
+			p = "userland char *";
 			break;
 		case 1:
 			p = "size_t";
@@ -3978,7 +3978,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 45:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
@@ -4000,7 +4000,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 49:
 		switch (ndx) {
 		case 0:
-			p = "userland char * __kerncap";
+			p = "userland char *";
 			break;
 		case 1:
 			p = "u_int";
@@ -4013,7 +4013,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 50:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -4023,7 +4023,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 51:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -4033,10 +4033,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 53:
 		switch (ndx) {
 		case 0:
-			p = "userland const struct sigaltstack * __kerncap";
+			p = "userland const struct sigaltstack *";
 			break;
 		case 1:
-			p = "userland struct sigaltstack * __kerncap";
+			p = "userland struct sigaltstack *";
 			break;
 		default:
 			break;
@@ -4052,7 +4052,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "u_long";
 			break;
 		case 2:
-			p = "userland char * __kerncap";
+			p = "userland char *";
 			break;
 		default:
 			break;
@@ -4072,7 +4072,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 56:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -4082,10 +4082,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 57:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -4095,10 +4095,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 58:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland char * __kerncap";
+			p = "userland char *";
 			break;
 		case 2:
 			p = "size_t";
@@ -4111,13 +4111,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 59:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland char * __kerncap * __kerncap";
+			p = "userland char **";
 			break;
 		case 2:
-			p = "userland char * __kerncap * __kerncap";
+			p = "userland char **";
 			break;
 		default:
 			break;
@@ -4137,7 +4137,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 61:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -4147,7 +4147,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 65:
 		switch (ndx) {
 		case 0:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 1:
 			p = "size_t";
@@ -4166,7 +4166,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 73:
 		switch (ndx) {
 		case 0:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 1:
 			p = "size_t";
@@ -4179,7 +4179,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 74:
 		switch (ndx) {
 		case 0:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 1:
 			p = "size_t";
@@ -4195,7 +4195,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 75:
 		switch (ndx) {
 		case 0:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 1:
 			p = "size_t";
@@ -4211,13 +4211,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 78:
 		switch (ndx) {
 		case 0:
-			p = "userland const void * __kerncap";
+			p = "userland const void *";
 			break;
 		case 1:
 			p = "size_t";
 			break;
 		case 2:
-			p = "userland char * __kerncap";
+			p = "userland char *";
 			break;
 		default:
 			break;
@@ -4230,7 +4230,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland gid_t * __kerncap";
+			p = "userland gid_t *";
 			break;
 		default:
 			break;
@@ -4243,7 +4243,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const gid_t * __kerncap";
+			p = "userland const gid_t *";
 			break;
 		default:
 			break;
@@ -4272,10 +4272,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct itimerval * __kerncap";
+			p = "userland const struct itimerval *";
 			break;
 		case 2:
-			p = "userland struct itimerval * __kerncap";
+			p = "userland struct itimerval *";
 			break;
 		default:
 			break;
@@ -4285,7 +4285,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 85:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -4298,7 +4298,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct itimerval * __kerncap";
+			p = "userland struct itimerval *";
 			break;
 		default:
 			break;
@@ -4324,7 +4324,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 91:
 		switch (ndx) {
 		case 0:
-			p = "userland uintcap_t * __kerncap";
+			p = "userland uintcap_t *";
 			break;
 		default:
 			break;
@@ -4353,16 +4353,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland fd_set * __kerncap";
+			p = "userland fd_set *";
 			break;
 		case 2:
-			p = "userland fd_set * __kerncap";
+			p = "userland fd_set *";
 			break;
 		case 3:
-			p = "userland fd_set * __kerncap";
+			p = "userland fd_set *";
 			break;
 		case 4:
-			p = "userland struct timeval * __kerncap";
+			p = "userland struct timeval *";
 			break;
 		default:
 			break;
@@ -4417,7 +4417,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct sockaddr * __kerncap";
+			p = "userland const struct sockaddr *";
 			break;
 		case 2:
 			p = "__socklen_t";
@@ -4446,7 +4446,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct sockaddr * __kerncap";
+			p = "userland const struct sockaddr *";
 			break;
 		case 2:
 			p = "__socklen_t";
@@ -4468,7 +4468,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "userland const void * __kerncap";
+			p = "userland const void *";
 			break;
 		case 4:
 			p = "__socklen_t";
@@ -4494,10 +4494,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 116:
 		switch (ndx) {
 		case 0:
-			p = "userland struct timeval * __kerncap";
+			p = "userland struct timeval *";
 			break;
 		case 1:
-			p = "userland struct timezone * __kerncap";
+			p = "userland struct timezone *";
 			break;
 		default:
 			break;
@@ -4510,7 +4510,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct rusage * __kerncap";
+			p = "userland struct rusage *";
 			break;
 		default:
 			break;
@@ -4529,10 +4529,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 4:
-			p = "userland __socklen_t * __kerncap";
+			p = "userland __socklen_t *";
 			break;
 		default:
 			break;
@@ -4545,7 +4545,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct iovec * __kerncap";
+			p = "userland const struct iovec *";
 			break;
 		case 2:
 			p = "u_int";
@@ -4561,7 +4561,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct iovec * __kerncap";
+			p = "userland const struct iovec *";
 			break;
 		case 2:
 			p = "u_int";
@@ -4574,10 +4574,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 122:
 		switch (ndx) {
 		case 0:
-			p = "userland const struct timeval * __kerncap";
+			p = "userland const struct timeval *";
 			break;
 		case 1:
-			p = "userland const struct timezone * __kerncap";
+			p = "userland const struct timezone *";
 			break;
 		default:
 			break;
@@ -4642,10 +4642,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 128:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -4668,7 +4668,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 132:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "mode_t";
@@ -4684,7 +4684,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const void * __kerncap";
+			p = "userland const void *";
 			break;
 		case 2:
 			p = "size_t";
@@ -4693,7 +4693,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 4:
-			p = "userland const struct sockaddr * __kerncap";
+			p = "userland const struct sockaddr *";
 			break;
 		case 5:
 			p = "__socklen_t";
@@ -4728,7 +4728,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "userland int * __kerncap";
+			p = "userland int *";
 			break;
 		default:
 			break;
@@ -4738,7 +4738,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 136:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "mode_t";
@@ -4751,7 +4751,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 137:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -4761,10 +4761,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 138:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland const struct timeval * __kerncap";
+			p = "userland const struct timeval *";
 			break;
 		default:
 			break;
@@ -4774,10 +4774,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 140:
 		switch (ndx) {
 		case 0:
-			p = "userland const struct timeval * __kerncap";
+			p = "userland const struct timeval *";
 			break;
 		case 1:
-			p = "userland struct timeval * __kerncap";
+			p = "userland struct timeval *";
 			break;
 		default:
 			break;
@@ -4790,7 +4790,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 148:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
@@ -4799,7 +4799,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		default:
 			break;
@@ -4818,7 +4818,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "userland char * __kerncap * __kerncap";
+			p = "userland char **";
 			break;
 		default:
 			break;
@@ -4831,7 +4831,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		default:
 			break;
@@ -4841,10 +4841,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 160:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland struct fhandle * __kerncap";
+			p = "userland struct fhandle *";
 			break;
 		default:
 			break;
@@ -4854,10 +4854,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 161:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland struct fhandle * __kerncap";
+			p = "userland struct fhandle *";
 			break;
 		default:
 			break;
@@ -4870,7 +4870,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char * __kerncap";
+			p = "userland char *";
 			break;
 		default:
 			break;
@@ -4886,7 +4886,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "pid_t";
 			break;
 		case 2:
-			p = "userland struct rtprio * __kerncap";
+			p = "userland struct rtprio *";
 			break;
 		default:
 			break;
@@ -4972,7 +4972,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 176:
 		switch (ndx) {
 		case 0:
-			p = "userland struct timex * __kerncap";
+			p = "userland struct timex *";
 			break;
 		default:
 			break;
@@ -5012,7 +5012,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 191:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
@@ -5041,7 +5041,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "u_int";
 			break;
 		case 1:
-			p = "userland struct rlimit * __kerncap";
+			p = "userland struct rlimit *";
 			break;
 		default:
 			break;
@@ -5054,7 +5054,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "u_int";
 			break;
 		case 1:
-			p = "userland struct rlimit * __kerncap";
+			p = "userland struct rlimit *";
 			break;
 		default:
 			break;
@@ -5067,19 +5067,19 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 202:
 		switch (ndx) {
 		case 0:
-			p = "userland int * __kerncap";
+			p = "userland int *";
 			break;
 		case 1:
 			p = "u_int";
 			break;
 		case 2:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 3:
-			p = "userland size_t * __kerncap";
+			p = "userland size_t *";
 			break;
 		case 4:
-			p = "userland const void * __kerncap";
+			p = "userland const void *";
 			break;
 		case 5:
 			p = "size_t";
@@ -5092,7 +5092,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 203:
 		switch (ndx) {
 		case 0:
-			p = "userland const void * __kerncap";
+			p = "userland const void *";
 			break;
 		case 1:
 			p = "size_t";
@@ -5105,7 +5105,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 204:
 		switch (ndx) {
 		case 0:
-			p = "userland const void * __kerncap";
+			p = "userland const void *";
 			break;
 		case 1:
 			p = "size_t";
@@ -5118,7 +5118,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 205:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -5131,7 +5131,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct timeval * __kerncap";
+			p = "userland const struct timeval *";
 			break;
 		default:
 			break;
@@ -5151,7 +5151,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 209:
 		switch (ndx) {
 		case 0:
-			p = "userland struct pollfd * __kerncap";
+			p = "userland struct pollfd *";
 			break;
 		case 1:
 			p = "u_int";
@@ -5216,7 +5216,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct sembuf * __kerncap";
+			p = "userland struct sembuf *";
 			break;
 		case 2:
 			p = "size_t";
@@ -5245,7 +5245,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const void * __kerncap";
+			p = "userland const void *";
 			break;
 		case 2:
 			p = "size_t";
@@ -5264,7 +5264,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 2:
 			p = "size_t";
@@ -5286,7 +5286,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const void * __kerncap";
+			p = "userland const void *";
 			break;
 		case 2:
 			p = "int";
@@ -5299,7 +5299,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 230:
 		switch (ndx) {
 		case 0:
-			p = "userland const void * __kerncap";
+			p = "userland const void *";
 			break;
 		default:
 			break;
@@ -5328,7 +5328,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "clockid_t";
 			break;
 		case 1:
-			p = "userland struct timespec * __kerncap";
+			p = "userland struct timespec *";
 			break;
 		default:
 			break;
@@ -5341,7 +5341,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "clockid_t";
 			break;
 		case 1:
-			p = "userland const struct timespec * __kerncap";
+			p = "userland const struct timespec *";
 			break;
 		default:
 			break;
@@ -5354,7 +5354,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "clockid_t";
 			break;
 		case 1:
-			p = "userland struct timespec * __kerncap";
+			p = "userland struct timespec *";
 			break;
 		default:
 			break;
@@ -5367,10 +5367,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "clockid_t";
 			break;
 		case 1:
-			p = "userland struct sigevent * __kerncap";
+			p = "userland struct sigevent *";
 			break;
 		case 2:
-			p = "userland int * __kerncap";
+			p = "userland int *";
 			break;
 		default:
 			break;
@@ -5396,10 +5396,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland const struct itimerspec * __kerncap";
+			p = "userland const struct itimerspec *";
 			break;
 		case 3:
-			p = "userland struct itimerspec * __kerncap";
+			p = "userland struct itimerspec *";
 			break;
 		default:
 			break;
@@ -5412,7 +5412,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct itimerspec * __kerncap";
+			p = "userland struct itimerspec *";
 			break;
 		default:
 			break;
@@ -5432,10 +5432,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 240:
 		switch (ndx) {
 		case 0:
-			p = "userland const struct timespec * __kerncap";
+			p = "userland const struct timespec *";
 			break;
 		case 1:
-			p = "userland struct timespec * __kerncap";
+			p = "userland struct timespec *";
 			break;
 		default:
 			break;
@@ -5445,7 +5445,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 241:
 		switch (ndx) {
 		case 0:
-			p = "userland ffcounter * __kerncap";
+			p = "userland ffcounter *";
 			break;
 		default:
 			break;
@@ -5455,7 +5455,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 242:
 		switch (ndx) {
 		case 0:
-			p = "userland struct ffclock_estimate * __kerncap";
+			p = "userland struct ffclock_estimate *";
 			break;
 		default:
 			break;
@@ -5465,7 +5465,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 243:
 		switch (ndx) {
 		case 0:
-			p = "userland struct ffclock_estimate * __kerncap";
+			p = "userland struct ffclock_estimate *";
 			break;
 		default:
 			break;
@@ -5481,10 +5481,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland const struct timespec * __kerncap";
+			p = "userland const struct timespec *";
 			break;
 		case 3:
-			p = "userland struct timespec * __kerncap";
+			p = "userland struct timespec *";
 			break;
 		default:
 			break;
@@ -5500,7 +5500,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland clockid_t * __kerncap";
+			p = "userland clockid_t *";
 			break;
 		default:
 			break;
@@ -5510,7 +5510,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 248:
 		switch (ndx) {
 		case 0:
-			p = "userland struct ntptimeval * __kerncap";
+			p = "userland struct ntptimeval *";
 			break;
 		default:
 			break;
@@ -5520,7 +5520,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 250:
 		switch (ndx) {
 		case 0:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 1:
 			p = "size_t";
@@ -5549,7 +5549,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 254:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
@@ -5565,7 +5565,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 255:
 		switch (ndx) {
 		case 0:
-			p = "userland struct aiocb * __kerncap";
+			p = "userland struct aiocb *";
 			break;
 		default:
 			break;
@@ -5575,7 +5575,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 256:
 		switch (ndx) {
 		case 0:
-			p = "userland struct aiocb * __kerncap";
+			p = "userland struct aiocb *";
 			break;
 		default:
 			break;
@@ -5588,13 +5588,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct aiocb * __kerncap const * __kerncap";
+			p = "userland struct aiocb * const *";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "userland struct sigevent * __kerncap";
+			p = "userland struct sigevent *";
 			break;
 		default:
 			break;
@@ -5604,10 +5604,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 258:
 		switch (ndx) {
 		case 0:
-			p = "userland const void * __kerncap";
+			p = "userland const void *";
 			break;
 		case 1:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 2:
 			p = "size_t";
@@ -5623,7 +5623,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 259:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "uint32_t";
@@ -5639,10 +5639,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 2:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		default:
 			break;
@@ -5658,7 +5658,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "uint64_t";
 			break;
 		case 2:
-			p = "userland struct cheri_revoke_syscall_info * __kerncap";
+			p = "userland struct cheri_revoke_syscall_info *";
 			break;
 		default:
 			break;
@@ -5668,7 +5668,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 274:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "mode_t";
@@ -5681,10 +5681,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 276:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland const struct timeval * __kerncap";
+			p = "userland const struct timeval *";
 			break;
 		default:
 			break;
@@ -5697,7 +5697,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec * __kerncap";
+			p = "userland struct iovec *";
 			break;
 		case 2:
 			p = "u_int";
@@ -5716,7 +5716,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec * __kerncap";
+			p = "userland struct iovec *";
 			break;
 		case 2:
 			p = "u_int";
@@ -5732,7 +5732,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 298:
 		switch (ndx) {
 		case 0:
-			p = "userland const struct fhandle * __kerncap";
+			p = "userland const struct fhandle *";
 			break;
 		case 1:
 			p = "int";
@@ -5758,7 +5758,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct module_stat * __kerncap";
+			p = "userland struct module_stat *";
 			break;
 		default:
 			break;
@@ -5778,7 +5778,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 303:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -5788,7 +5788,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 304:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -5808,7 +5808,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 306:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -5831,7 +5831,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct kld_file_stat * __kerncap";
+			p = "userland struct kld_file_stat *";
 			break;
 		default:
 			break;
@@ -5893,7 +5893,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 314:
 		switch (ndx) {
 		case 0:
-			p = "userland struct aiocb * __kerncap";
+			p = "userland struct aiocb *";
 			break;
 		default:
 			break;
@@ -5903,13 +5903,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 315:
 		switch (ndx) {
 		case 0:
-			p = "userland const struct aiocb * __kerncap const * __kerncap";
+			p = "userland const struct aiocb * const *";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland const struct timespec * __kerncap";
+			p = "userland const struct timespec *";
 			break;
 		default:
 			break;
@@ -5922,7 +5922,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct aiocb * __kerncap";
+			p = "userland struct aiocb *";
 			break;
 		default:
 			break;
@@ -5932,7 +5932,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 317:
 		switch (ndx) {
 		case 0:
-			p = "userland struct aiocb * __kerncap";
+			p = "userland struct aiocb *";
 			break;
 		default:
 			break;
@@ -5958,7 +5958,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 326:
 		switch (ndx) {
 		case 0:
-			p = "userland char * __kerncap";
+			p = "userland char *";
 			break;
 		case 1:
 			p = "size_t";
@@ -5974,7 +5974,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "pid_t";
 			break;
 		case 1:
-			p = "userland const struct sched_param * __kerncap";
+			p = "userland const struct sched_param *";
 			break;
 		default:
 			break;
@@ -5987,7 +5987,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "pid_t";
 			break;
 		case 1:
-			p = "userland struct sched_param * __kerncap";
+			p = "userland struct sched_param *";
 			break;
 		default:
 			break;
@@ -6003,7 +6003,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland const struct sched_param * __kerncap";
+			p = "userland const struct sched_param *";
 			break;
 		default:
 			break;
@@ -6049,7 +6049,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "pid_t";
 			break;
 		case 1:
-			p = "userland struct timespec * __kerncap";
+			p = "userland struct timespec *";
 			break;
 		default:
 			break;
@@ -6059,7 +6059,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 335:
 		switch (ndx) {
 		case 0:
-			p = "userland const void * __kerncap";
+			p = "userland const void *";
 			break;
 		case 1:
 			p = "size_t";
@@ -6078,7 +6078,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		default:
 			break;
@@ -6088,7 +6088,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 338:
 		switch (ndx) {
 		case 0:
-			p = "userland struct jail * __kerncap";
+			p = "userland struct jail *";
 			break;
 		default:
 			break;
@@ -6101,13 +6101,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char * __kerncap";
+			p = "userland char *";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 4:
 			p = "int";
@@ -6123,10 +6123,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const sigset_t * __kerncap";
+			p = "userland const sigset_t *";
 			break;
 		case 2:
-			p = "userland sigset_t * __kerncap";
+			p = "userland sigset_t *";
 			break;
 		default:
 			break;
@@ -6136,7 +6136,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 341:
 		switch (ndx) {
 		case 0:
-			p = "userland const sigset_t * __kerncap";
+			p = "userland const sigset_t *";
 			break;
 		default:
 			break;
@@ -6146,7 +6146,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 343:
 		switch (ndx) {
 		case 0:
-			p = "userland sigset_t * __kerncap";
+			p = "userland sigset_t *";
 			break;
 		default:
 			break;
@@ -6156,13 +6156,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 345:
 		switch (ndx) {
 		case 0:
-			p = "userland const sigset_t * __kerncap";
+			p = "userland const sigset_t *";
 			break;
 		case 1:
-			p = "userland struct __siginfo * __kerncap";
+			p = "userland struct __siginfo *";
 			break;
 		case 2:
-			p = "userland const struct timespec * __kerncap";
+			p = "userland const struct timespec *";
 			break;
 		default:
 			break;
@@ -6172,10 +6172,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 346:
 		switch (ndx) {
 		case 0:
-			p = "userland const sigset_t * __kerncap";
+			p = "userland const sigset_t *";
 			break;
 		case 1:
-			p = "userland struct __siginfo * __kerncap";
+			p = "userland struct __siginfo *";
 			break;
 		default:
 			break;
@@ -6185,13 +6185,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 347:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "__acl_type_t";
 			break;
 		case 2:
-			p = "userland struct acl * __kerncap";
+			p = "userland struct acl *";
 			break;
 		default:
 			break;
@@ -6201,13 +6201,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 348:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "__acl_type_t";
 			break;
 		case 2:
-			p = "userland struct acl * __kerncap";
+			p = "userland struct acl *";
 			break;
 		default:
 			break;
@@ -6223,7 +6223,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "__acl_type_t";
 			break;
 		case 2:
-			p = "userland struct acl * __kerncap";
+			p = "userland struct acl *";
 			break;
 		default:
 			break;
@@ -6239,7 +6239,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "__acl_type_t";
 			break;
 		case 2:
-			p = "userland struct acl * __kerncap";
+			p = "userland struct acl *";
 			break;
 		default:
 			break;
@@ -6249,7 +6249,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 351:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "__acl_type_t";
@@ -6275,13 +6275,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 353:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "__acl_type_t";
 			break;
 		case 2:
-			p = "userland struct acl * __kerncap";
+			p = "userland struct acl *";
 			break;
 		default:
 			break;
@@ -6297,7 +6297,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "__acl_type_t";
 			break;
 		case 2:
-			p = "userland struct acl * __kerncap";
+			p = "userland struct acl *";
 			break;
 		default:
 			break;
@@ -6307,19 +6307,19 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 355:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 3:
 			p = "int";
 			break;
 		case 4:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -6329,16 +6329,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 356:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 3:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 4:
 			p = "size_t";
@@ -6351,16 +6351,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 357:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 3:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 4:
 			p = "size_t";
@@ -6373,13 +6373,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 358:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -6389,10 +6389,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 359:
 		switch (ndx) {
 		case 0:
-			p = "userland struct aiocb * __kerncap * __kerncap";
+			p = "userland struct aiocb **";
 			break;
 		case 1:
-			p = "userland struct timespec * __kerncap";
+			p = "userland struct timespec *";
 			break;
 		default:
 			break;
@@ -6402,13 +6402,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 360:
 		switch (ndx) {
 		case 0:
-			p = "userland uid_t * __kerncap";
+			p = "userland uid_t *";
 			break;
 		case 1:
-			p = "userland uid_t * __kerncap";
+			p = "userland uid_t *";
 			break;
 		case 2:
-			p = "userland uid_t * __kerncap";
+			p = "userland uid_t *";
 			break;
 		default:
 			break;
@@ -6418,13 +6418,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 361:
 		switch (ndx) {
 		case 0:
-			p = "userland gid_t * __kerncap";
+			p = "userland gid_t *";
 			break;
 		case 1:
-			p = "userland gid_t * __kerncap";
+			p = "userland gid_t *";
 			break;
 		case 2:
-			p = "userland gid_t * __kerncap";
+			p = "userland gid_t *";
 			break;
 		default:
 			break;
@@ -6443,10 +6443,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 3:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 4:
 			p = "size_t";
@@ -6465,10 +6465,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 3:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 4:
 			p = "size_t";
@@ -6487,7 +6487,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -6507,7 +6507,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 376:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
@@ -6548,7 +6548,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 378:
 		switch (ndx) {
 		case 0:
-			p = "userland struct iovec * __kerncap";
+			p = "userland struct iovec *";
 			break;
 		case 1:
 			p = "unsigned int";
@@ -6564,7 +6564,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 384:
 		switch (ndx) {
 		case 0:
-			p = "userland struct mac * __kerncap";
+			p = "userland struct mac *";
 			break;
 		default:
 			break;
@@ -6574,7 +6574,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 385:
 		switch (ndx) {
 		case 0:
-			p = "userland struct mac * __kerncap";
+			p = "userland struct mac *";
 			break;
 		default:
 			break;
@@ -6587,7 +6587,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct mac * __kerncap";
+			p = "userland struct mac *";
 			break;
 		default:
 			break;
@@ -6597,10 +6597,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 387:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland struct mac * __kerncap";
+			p = "userland struct mac *";
 			break;
 		default:
 			break;
@@ -6613,7 +6613,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct mac * __kerncap";
+			p = "userland struct mac *";
 			break;
 		default:
 			break;
@@ -6623,10 +6623,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 389:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland struct mac * __kerncap";
+			p = "userland struct mac *";
 			break;
 		default:
 			break;
@@ -6639,10 +6639,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 2:
-			p = "userland char * __kerncap";
+			p = "userland char *";
 			break;
 		case 3:
 			p = "int";
@@ -6655,7 +6655,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 391:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "u_long";
@@ -6668,7 +6668,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 392:
 		switch (ndx) {
 		case 0:
-			p = "userland struct uuid * __kerncap";
+			p = "userland struct uuid *";
 			break;
 		case 1:
 			p = "int";
@@ -6693,10 +6693,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "size_t";
 			break;
 		case 4:
-			p = "userland struct sf_hdtr * __kerncap";
+			p = "userland struct sf_hdtr *";
 			break;
 		case 5:
-			p = "userland off_t * __kerncap";
+			p = "userland off_t *";
 			break;
 		case 6:
 			p = "int";
@@ -6709,13 +6709,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 394:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		default:
 			break;
@@ -6765,7 +6765,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 404:
 		switch (ndx) {
 		case 0:
-			p = "userland semid_t * __kerncap";
+			p = "userland semid_t *";
 			break;
 		case 1:
 			p = "unsigned int";
@@ -6778,10 +6778,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 405:
 		switch (ndx) {
 		case 0:
-			p = "userland semid_t * __kerncap";
+			p = "userland semid_t *";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "int";
@@ -6800,7 +6800,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 406:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -6813,7 +6813,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "semid_t";
 			break;
 		case 1:
-			p = "userland int * __kerncap";
+			p = "userland int *";
 			break;
 		default:
 			break;
@@ -6836,7 +6836,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "pid_t";
 			break;
 		case 1:
-			p = "userland struct mac * __kerncap";
+			p = "userland struct mac *";
 			break;
 		default:
 			break;
@@ -6846,10 +6846,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 410:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland struct mac * __kerncap";
+			p = "userland struct mac *";
 			break;
 		default:
 			break;
@@ -6859,10 +6859,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 411:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland struct mac * __kerncap";
+			p = "userland struct mac *";
 			break;
 		default:
 			break;
@@ -6872,16 +6872,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 412:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 3:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 4:
 			p = "size_t";
@@ -6894,16 +6894,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 413:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 3:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 4:
 			p = "size_t";
@@ -6916,13 +6916,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 414:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -6932,16 +6932,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 415:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland char * __kerncap * __kerncap";
+			p = "userland char **";
 			break;
 		case 2:
-			p = "userland char * __kerncap * __kerncap";
+			p = "userland char **";
 			break;
 		case 3:
-			p = "userland struct mac * __kerncap";
+			p = "userland struct mac *";
 			break;
 		default:
 			break;
@@ -6954,10 +6954,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct sigaction * __kerncap";
+			p = "userland const struct sigaction *";
 			break;
 		case 2:
-			p = "userland struct sigaction * __kerncap";
+			p = "userland struct sigaction *";
 			break;
 		default:
 			break;
@@ -6967,7 +6967,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 417:
 		switch (ndx) {
 		case 0:
-			p = "userland const struct __ucontext * __kerncap";
+			p = "userland const struct __ucontext *";
 			break;
 		default:
 			break;
@@ -6977,7 +6977,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 421:
 		switch (ndx) {
 		case 0:
-			p = "userland struct __ucontext * __kerncap";
+			p = "userland struct __ucontext *";
 			break;
 		default:
 			break;
@@ -6987,7 +6987,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 422:
 		switch (ndx) {
 		case 0:
-			p = "userland const struct __ucontext * __kerncap";
+			p = "userland const struct __ucontext *";
 			break;
 		default:
 			break;
@@ -6997,10 +6997,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 423:
 		switch (ndx) {
 		case 0:
-			p = "userland struct __ucontext * __kerncap";
+			p = "userland struct __ucontext *";
 			break;
 		case 1:
-			p = "userland const struct __ucontext * __kerncap";
+			p = "userland const struct __ucontext *";
 			break;
 		default:
 			break;
@@ -7010,13 +7010,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 425:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "__acl_type_t";
 			break;
 		case 2:
-			p = "userland struct acl * __kerncap";
+			p = "userland struct acl *";
 			break;
 		default:
 			break;
@@ -7026,13 +7026,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 426:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "__acl_type_t";
 			break;
 		case 2:
-			p = "userland struct acl * __kerncap";
+			p = "userland struct acl *";
 			break;
 		default:
 			break;
@@ -7042,7 +7042,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 427:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "__acl_type_t";
@@ -7055,13 +7055,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 428:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "__acl_type_t";
 			break;
 		case 2:
-			p = "userland struct acl * __kerncap";
+			p = "userland struct acl *";
 			break;
 		default:
 			break;
@@ -7071,10 +7071,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 429:
 		switch (ndx) {
 		case 0:
-			p = "userland const sigset_t * __kerncap";
+			p = "userland const sigset_t *";
 			break;
 		case 1:
-			p = "userland int * __kerncap";
+			p = "userland int *";
 			break;
 		default:
 			break;
@@ -7084,10 +7084,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 430:
 		switch (ndx) {
 		case 0:
-			p = "userland struct __ucontext * __kerncap";
+			p = "userland struct __ucontext *";
 			break;
 		case 1:
-			p = "userland long * __kerncap";
+			p = "userland long *";
 			break;
 		case 2:
 			p = "int";
@@ -7100,7 +7100,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 431:
 		switch (ndx) {
 		case 0:
-			p = "userland long * __kerncap";
+			p = "userland long *";
 			break;
 		default:
 			break;
@@ -7110,7 +7110,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 432:
 		switch (ndx) {
 		case 0:
-			p = "userland long * __kerncap";
+			p = "userland long *";
 			break;
 		default:
 			break;
@@ -7149,7 +7149,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 3:
 			p = "size_t";
@@ -7162,13 +7162,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 438:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 3:
 			p = "size_t";
@@ -7181,13 +7181,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 439:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 3:
 			p = "size_t";
@@ -7203,7 +7203,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "semid_t";
 			break;
 		case 1:
-			p = "userland const struct timespec * __kerncap";
+			p = "userland const struct timespec *";
 			break;
 		default:
 			break;
@@ -7213,7 +7213,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 442:
 		switch (ndx) {
 		case 0:
-			p = "userland const struct timespec * __kerncap";
+			p = "userland const struct timespec *";
 			break;
 		default:
 			break;
@@ -7246,7 +7246,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 445:
 		switch (ndx) {
 		case 0:
-			p = "userland const void * __kerncap";
+			p = "userland const void *";
 			break;
 		case 1:
 			p = "u_int";
@@ -7262,7 +7262,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 2:
 			p = "u_int";
@@ -7275,7 +7275,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 447:
 		switch (ndx) {
 		case 0:
-			p = "userland uid_t * __kerncap";
+			p = "userland uid_t *";
 			break;
 		default:
 			break;
@@ -7285,7 +7285,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 448:
 		switch (ndx) {
 		case 0:
-			p = "userland uid_t * __kerncap";
+			p = "userland uid_t *";
 			break;
 		default:
 			break;
@@ -7295,7 +7295,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 449:
 		switch (ndx) {
 		case 0:
-			p = "userland struct auditinfo * __kerncap";
+			p = "userland struct auditinfo *";
 			break;
 		default:
 			break;
@@ -7305,7 +7305,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 450:
 		switch (ndx) {
 		case 0:
-			p = "userland struct auditinfo * __kerncap";
+			p = "userland struct auditinfo *";
 			break;
 		default:
 			break;
@@ -7315,7 +7315,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 451:
 		switch (ndx) {
 		case 0:
-			p = "userland struct auditinfo_addr * __kerncap";
+			p = "userland struct auditinfo_addr *";
 			break;
 		case 1:
 			p = "u_int";
@@ -7328,7 +7328,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 452:
 		switch (ndx) {
 		case 0:
-			p = "userland struct auditinfo_addr * __kerncap";
+			p = "userland struct auditinfo_addr *";
 			break;
 		case 1:
 			p = "u_int";
@@ -7341,7 +7341,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 453:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -7351,7 +7351,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 454:
 		switch (ndx) {
 		case 0:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 1:
 			p = "int";
@@ -7360,10 +7360,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "u_long";
 			break;
 		case 3:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 4:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		default:
 			break;
@@ -7373,7 +7373,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 455:
 		switch (ndx) {
 		case 0:
-			p = "userland struct thr_param * __kerncap";
+			p = "userland struct thr_param *";
 			break;
 		case 1:
 			p = "int";
@@ -7392,7 +7392,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		default:
 			break;
@@ -7402,7 +7402,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 457:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
@@ -7411,7 +7411,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "mode_t";
 			break;
 		case 3:
-			p = "userland const struct mq_attr * __kerncap";
+			p = "userland const struct mq_attr *";
 			break;
 		default:
 			break;
@@ -7424,10 +7424,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct mq_attr * __kerncap";
+			p = "userland const struct mq_attr *";
 			break;
 		case 2:
-			p = "userland struct mq_attr * __kerncap";
+			p = "userland struct mq_attr *";
 			break;
 		default:
 			break;
@@ -7440,16 +7440,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char * __kerncap";
+			p = "userland char *";
 			break;
 		case 2:
 			p = "size_t";
 			break;
 		case 3:
-			p = "userland unsigned * __kerncap";
+			p = "userland unsigned *";
 			break;
 		case 4:
-			p = "userland const struct timespec * __kerncap";
+			p = "userland const struct timespec *";
 			break;
 		default:
 			break;
@@ -7462,7 +7462,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "size_t";
@@ -7471,7 +7471,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "unsigned";
 			break;
 		case 4:
-			p = "userland const struct timespec * __kerncap";
+			p = "userland const struct timespec *";
 			break;
 		default:
 			break;
@@ -7484,7 +7484,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct sigevent * __kerncap";
+			p = "userland const struct sigevent *";
 			break;
 		default:
 			break;
@@ -7494,7 +7494,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 462:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -7504,13 +7504,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 463:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland void * __kerncap * __kerncap";
+			p = "userland void **";
 			break;
 		default:
 			break;
@@ -7523,7 +7523,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "long";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -7536,7 +7536,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct aiocb * __kerncap";
+			p = "userland struct aiocb *";
 			break;
 		default:
 			break;
@@ -7552,7 +7552,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "lwpid_t";
 			break;
 		case 2:
-			p = "userland struct rtprio * __kerncap";
+			p = "userland struct rtprio *";
 			break;
 		default:
 			break;
@@ -7578,19 +7578,19 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "userland const struct sockaddr * __kerncap";
+			p = "userland const struct sockaddr *";
 			break;
 		case 4:
 			p = "__socklen_t";
 			break;
 		case 5:
-			p = "userland struct sctp_sndrcvinfo * __kerncap";
+			p = "userland struct sctp_sndrcvinfo *";
 			break;
 		case 6:
 			p = "int";
@@ -7606,19 +7606,19 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec * __kerncap";
+			p = "userland struct iovec *";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "userland const struct sockaddr * __kerncap";
+			p = "userland const struct sockaddr *";
 			break;
 		case 4:
 			p = "__socklen_t";
 			break;
 		case 5:
-			p = "userland struct sctp_sndrcvinfo * __kerncap";
+			p = "userland struct sctp_sndrcvinfo *";
 			break;
 		case 6:
 			p = "int";
@@ -7634,22 +7634,22 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec * __kerncap";
+			p = "userland struct iovec *";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "userland struct sockaddr * __kerncap";
+			p = "userland struct sockaddr *";
 			break;
 		case 4:
-			p = "userland __socklen_t * __kerncap";
+			p = "userland __socklen_t *";
 			break;
 		case 5:
-			p = "userland struct sctp_sndrcvinfo * __kerncap";
+			p = "userland struct sctp_sndrcvinfo *";
 			break;
 		case 6:
-			p = "userland int * __kerncap";
+			p = "userland int *";
 			break;
 		default:
 			break;
@@ -7662,7 +7662,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 2:
 			p = "size_t";
@@ -7681,7 +7681,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const void * __kerncap";
+			p = "userland const void *";
 			break;
 		case 2:
 			p = "size_t";
@@ -7697,7 +7697,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 477:
 		switch (ndx) {
 		case 0:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 1:
 			p = "size_t";
@@ -7738,7 +7738,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 479:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "off_t";
@@ -7780,7 +7780,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 483:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -7790,7 +7790,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 484:
 		switch (ndx) {
 		case 0:
-			p = "userland cpusetid_t * __kerncap";
+			p = "userland cpusetid_t *";
 			break;
 		default:
 			break;
@@ -7825,7 +7825,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "id_t";
 			break;
 		case 3:
-			p = "userland cpusetid_t * __kerncap";
+			p = "userland cpusetid_t *";
 			break;
 		default:
 			break;
@@ -7847,7 +7847,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "size_t";
 			break;
 		case 4:
-			p = "userland cpuset_t * __kerncap";
+			p = "userland cpuset_t *";
 			break;
 		default:
 			break;
@@ -7869,7 +7869,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "size_t";
 			break;
 		case 4:
-			p = "userland const cpuset_t * __kerncap";
+			p = "userland const cpuset_t *";
 			break;
 		default:
 			break;
@@ -7882,7 +7882,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "int";
@@ -7901,7 +7901,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "mode_t";
@@ -7920,7 +7920,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "uid_t";
@@ -7942,10 +7942,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char * __kerncap * __kerncap";
+			p = "userland char **";
 			break;
 		case 2:
-			p = "userland char * __kerncap * __kerncap";
+			p = "userland char **";
 			break;
 		default:
 			break;
@@ -7958,10 +7958,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 2:
-			p = "userland const struct timeval * __kerncap";
+			p = "userland const struct timeval *";
 			break;
 		default:
 			break;
@@ -7974,13 +7974,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 4:
 			p = "int";
@@ -7996,7 +7996,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "mode_t";
@@ -8012,7 +8012,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "mode_t";
@@ -8028,7 +8028,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "int";
@@ -8047,10 +8047,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 2:
-			p = "userland char * __kerncap";
+			p = "userland char *";
 			break;
 		case 3:
 			p = "size_t";
@@ -8066,13 +8066,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -8082,13 +8082,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 502:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -8101,7 +8101,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "int";
@@ -8124,7 +8124,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 505:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -8134,7 +8134,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 506:
 		switch (ndx) {
 		case 0:
-			p = "userland struct iovec * __kerncap";
+			p = "userland struct iovec *";
 			break;
 		case 1:
 			p = "unsigned int";
@@ -8150,7 +8150,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 507:
 		switch (ndx) {
 		case 0:
-			p = "userland struct iovec * __kerncap";
+			p = "userland struct iovec *";
 			break;
 		case 1:
 			p = "unsigned int";
@@ -8185,7 +8185,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "userland union semun * __kerncap";
+			p = "userland union semun *";
 			break;
 		default:
 			break;
@@ -8201,7 +8201,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland struct msqid_ds * __kerncap";
+			p = "userland struct msqid_ds *";
 			break;
 		default:
 			break;
@@ -8217,7 +8217,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland struct shmid_ds * __kerncap";
+			p = "userland struct shmid_ds *";
 			break;
 		default:
 			break;
@@ -8227,7 +8227,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 513:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
@@ -8246,7 +8246,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland cap_rights_t * __kerncap";
+			p = "userland cap_rights_t *";
 			break;
 		default:
 			break;
@@ -8259,7 +8259,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 517:
 		switch (ndx) {
 		case 0:
-			p = "userland u_int * __kerncap";
+			p = "userland u_int *";
 			break;
 		default:
 			break;
@@ -8269,7 +8269,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 518:
 		switch (ndx) {
 		case 0:
-			p = "userland int * __kerncap";
+			p = "userland int *";
 			break;
 		case 1:
 			p = "int";
@@ -8298,7 +8298,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland pid_t * __kerncap";
+			p = "userland pid_t *";
 			break;
 		default:
 			break;
@@ -8311,19 +8311,19 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland fd_set * __kerncap";
+			p = "userland fd_set *";
 			break;
 		case 2:
-			p = "userland fd_set * __kerncap";
+			p = "userland fd_set *";
 			break;
 		case 3:
-			p = "userland fd_set * __kerncap";
+			p = "userland fd_set *";
 			break;
 		case 4:
-			p = "userland const struct timespec * __kerncap";
+			p = "userland const struct timespec *";
 			break;
 		case 5:
-			p = "userland const sigset_t * __kerncap";
+			p = "userland const sigset_t *";
 			break;
 		default:
 			break;
@@ -8333,7 +8333,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 523:
 		switch (ndx) {
 		case 0:
-			p = "userland char * __kerncap";
+			p = "userland char *";
 			break;
 		case 1:
 			p = "size_t";
@@ -8346,7 +8346,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 524:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -8356,13 +8356,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 525:
 		switch (ndx) {
 		case 0:
-			p = "userland const void * __kerncap";
+			p = "userland const void *";
 			break;
 		case 1:
 			p = "size_t";
 			break;
 		case 2:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 3:
 			p = "size_t";
@@ -8375,13 +8375,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 526:
 		switch (ndx) {
 		case 0:
-			p = "userland const void * __kerncap";
+			p = "userland const void *";
 			break;
 		case 1:
 			p = "size_t";
 			break;
 		case 2:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 3:
 			p = "size_t";
@@ -8394,13 +8394,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 527:
 		switch (ndx) {
 		case 0:
-			p = "userland const void * __kerncap";
+			p = "userland const void *";
 			break;
 		case 1:
 			p = "size_t";
 			break;
 		case 2:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 3:
 			p = "size_t";
@@ -8413,13 +8413,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 528:
 		switch (ndx) {
 		case 0:
-			p = "userland const void * __kerncap";
+			p = "userland const void *";
 			break;
 		case 1:
 			p = "size_t";
 			break;
 		case 2:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 3:
 			p = "size_t";
@@ -8432,13 +8432,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 529:
 		switch (ndx) {
 		case 0:
-			p = "userland const void * __kerncap";
+			p = "userland const void *";
 			break;
 		case 1:
 			p = "size_t";
 			break;
 		case 2:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 3:
 			p = "size_t";
@@ -8492,16 +8492,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "id_t";
 			break;
 		case 2:
-			p = "userland int * __kerncap";
+			p = "userland int *";
 			break;
 		case 3:
 			p = "int";
 			break;
 		case 4:
-			p = "userland struct __wrusage * __kerncap";
+			p = "userland struct __wrusage *";
 			break;
 		case 5:
-			p = "userland struct __siginfo * __kerncap";
+			p = "userland struct __siginfo *";
 			break;
 		default:
 			break;
@@ -8514,7 +8514,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland cap_rights_t * __kerncap";
+			p = "userland cap_rights_t *";
 			break;
 		default:
 			break;
@@ -8527,7 +8527,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const u_long * __kerncap";
+			p = "userland const u_long *";
 			break;
 		case 2:
 			p = "size_t";
@@ -8543,7 +8543,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland u_long * __kerncap";
+			p = "userland u_long *";
 			break;
 		case 2:
 			p = "size_t";
@@ -8572,7 +8572,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland uint32_t * __kerncap";
+			p = "userland uint32_t *";
 			break;
 		default:
 			break;
@@ -8588,7 +8588,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland const struct sockaddr * __kerncap";
+			p = "userland const struct sockaddr *";
 			break;
 		case 3:
 			p = "__socklen_t";
@@ -8607,7 +8607,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland const struct sockaddr * __kerncap";
+			p = "userland const struct sockaddr *";
 			break;
 		case 3:
 			p = "__socklen_t";
@@ -8623,7 +8623,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "u_long";
@@ -8642,10 +8642,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct sockaddr * __kerncap";
+			p = "userland struct sockaddr *";
 			break;
 		case 2:
-			p = "userland __socklen_t * __kerncap";
+			p = "userland __socklen_t *";
 			break;
 		case 3:
 			p = "int";
@@ -8658,7 +8658,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 542:
 		switch (ndx) {
 		case 0:
-			p = "userland int * __kerncap";
+			p = "userland int *";
 			break;
 		case 1:
 			p = "int";
@@ -8671,7 +8671,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 543:
 		switch (ndx) {
 		case 0:
-			p = "userland struct aiocb * __kerncap";
+			p = "userland struct aiocb *";
 			break;
 		default:
 			break;
@@ -8690,7 +8690,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		default:
 			break;
@@ -8700,16 +8700,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 545:
 		switch (ndx) {
 		case 0:
-			p = "userland struct pollfd * __kerncap";
+			p = "userland struct pollfd *";
 			break;
 		case 1:
 			p = "u_int";
 			break;
 		case 2:
-			p = "userland const struct timespec * __kerncap";
+			p = "userland const struct timespec *";
 			break;
 		case 3:
-			p = "userland const sigset_t * __kerncap";
+			p = "userland const sigset_t *";
 			break;
 		default:
 			break;
@@ -8722,7 +8722,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct timespec * __kerncap";
+			p = "userland const struct timespec *";
 			break;
 		default:
 			break;
@@ -8735,10 +8735,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 2:
-			p = "userland const struct timespec * __kerncap";
+			p = "userland const struct timespec *";
 			break;
 		case 3:
 			p = "int";
@@ -8764,7 +8764,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct stat * __kerncap";
+			p = "userland struct stat *";
 			break;
 		default:
 			break;
@@ -8777,10 +8777,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 2:
-			p = "userland struct stat * __kerncap";
+			p = "userland struct stat *";
 			break;
 		case 3:
 			p = "int";
@@ -8793,10 +8793,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 553:
 		switch (ndx) {
 		case 0:
-			p = "userland const struct fhandle * __kerncap";
+			p = "userland const struct fhandle *";
 			break;
 		case 1:
-			p = "userland struct stat * __kerncap";
+			p = "userland struct stat *";
 			break;
 		default:
 			break;
@@ -8809,13 +8809,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char * __kerncap";
+			p = "userland char *";
 			break;
 		case 2:
 			p = "size_t";
 			break;
 		case 3:
-			p = "userland off_t * __kerncap";
+			p = "userland off_t *";
 			break;
 		default:
 			break;
@@ -8825,10 +8825,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 555:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland struct statfs * __kerncap";
+			p = "userland struct statfs *";
 			break;
 		default:
 			break;
@@ -8841,7 +8841,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct statfs * __kerncap";
+			p = "userland struct statfs *";
 			break;
 		default:
 			break;
@@ -8851,7 +8851,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 557:
 		switch (ndx) {
 		case 0:
-			p = "userland struct statfs * __kerncap";
+			p = "userland struct statfs *";
 			break;
 		case 1:
 			p = "long";
@@ -8867,10 +8867,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 558:
 		switch (ndx) {
 		case 0:
-			p = "userland const struct fhandle * __kerncap";
+			p = "userland const struct fhandle *";
 			break;
 		case 1:
-			p = "userland struct statfs * __kerncap";
+			p = "userland struct statfs *";
 			break;
 		default:
 			break;
@@ -8883,7 +8883,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "mode_t";
@@ -8902,19 +8902,19 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct kevent * __kerncap";
+			p = "userland const struct kevent *";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "userland struct kevent * __kerncap";
+			p = "userland struct kevent *";
 			break;
 		case 4:
 			p = "int";
 			break;
 		case 5:
-			p = "userland const struct timespec * __kerncap";
+			p = "userland const struct timespec *";
 			break;
 		default:
 			break;
@@ -8936,10 +8936,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "size_t";
 			break;
 		case 4:
-			p = "userland domainset_t * __kerncap";
+			p = "userland domainset_t *";
 			break;
 		case 5:
-			p = "userland int * __kerncap";
+			p = "userland int *";
 			break;
 		default:
 			break;
@@ -8961,7 +8961,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "size_t";
 			break;
 		case 4:
-			p = "userland domainset_t * __kerncap";
+			p = "userland domainset_t *";
 			break;
 		case 5:
 			p = "int";
@@ -8974,7 +8974,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 563:
 		switch (ndx) {
 		case 0:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 1:
 			p = "size_t";
@@ -8993,10 +8993,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char * __kerncap";
+			p = "userland char *";
 			break;
 		case 2:
-			p = "userland struct fhandle * __kerncap";
+			p = "userland struct fhandle *";
 			break;
 		case 3:
 			p = "int";
@@ -9009,10 +9009,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 565:
 		switch (ndx) {
 		case 0:
-			p = "userland struct fhandle * __kerncap";
+			p = "userland struct fhandle *";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -9022,13 +9022,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 566:
 		switch (ndx) {
 		case 0:
-			p = "userland struct fhandle * __kerncap";
+			p = "userland struct fhandle *";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -9038,10 +9038,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 567:
 		switch (ndx) {
 		case 0:
-			p = "userland struct fhandle * __kerncap";
+			p = "userland struct fhandle *";
 			break;
 		case 1:
-			p = "userland char * __kerncap";
+			p = "userland char *";
 			break;
 		case 2:
 			p = "size_t";
@@ -9057,7 +9057,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "int";
@@ -9076,13 +9076,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland off_t * __kerncap";
+			p = "userland off_t *";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "userland off_t * __kerncap";
+			p = "userland off_t *";
 			break;
 		case 4:
 			p = "size_t";
@@ -9098,19 +9098,19 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 570:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "size_t";
 			break;
 		case 2:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 3:
-			p = "userland size_t * __kerncap";
+			p = "userland size_t *";
 			break;
 		case 4:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		case 5:
 			p = "size_t";
@@ -9123,7 +9123,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 571:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
@@ -9135,7 +9135,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 4:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -9145,10 +9145,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 572:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "int";
@@ -9164,7 +9164,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland void * __kerncap";
+			p = "userland void *";
 			break;
 		default:
 			break;
@@ -9177,10 +9177,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 2:
-			p = "userland char * __kerncap";
+			p = "userland char *";
 			break;
 		case 3:
 			p = "size_t";
@@ -9215,7 +9215,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -9228,7 +9228,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const void * __kerncap";
+			p = "userland const void *";
 			break;
 		case 2:
 			p = "size_t";
@@ -9241,7 +9241,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 578:
 		switch (ndx) {
 		case 0:
-			p = "userland struct aiocb * __kerncap";
+			p = "userland struct aiocb *";
 			break;
 		default:
 			break;
@@ -9251,7 +9251,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 579:
 		switch (ndx) {
 		case 0:
-			p = "userland struct aiocb * __kerncap";
+			p = "userland struct aiocb *";
 			break;
 		default:
 			break;
@@ -9267,13 +9267,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland const struct spacectl_range * __kerncap";
+			p = "userland const struct spacectl_range *";
 			break;
 		case 3:
 			p = "int";
 			break;
 		case 4:
-			p = "userland struct spacectl_range * __kerncap";
+			p = "userland struct spacectl_range *";
 			break;
 		default:
 			break;
@@ -9286,7 +9286,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 582:
 		switch (ndx) {
 		case 0:
-			p = "userland const char * __kerncap";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "u_int";
@@ -9341,7 +9341,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct itimerspec * __kerncap";
+			p = "userland struct itimerspec *";
 			break;
 		default:
 			break;
@@ -9357,10 +9357,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland const struct itimerspec * __kerncap";
+			p = "userland const struct itimerspec *";
 			break;
 		case 3:
-			p = "userland struct itimerspec * __kerncap";
+			p = "userland struct itimerspec *";
 			break;
 		default:
 			break;
@@ -9398,7 +9398,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "userland rlim_t * __kerncap";
+			p = "userland rlim_t *";
 			break;
 		default:
 			break;

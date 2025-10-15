@@ -36,8 +36,6 @@
 
 #include_next <sys/cdefs.h>
 
-/* Provide stub __kerncap when bootstrapping */
-#define __kerncap
 #define __CHERI_USER_ABI 0
 
 /* Provide stub sub-object opt-out macros when bootstrapping */

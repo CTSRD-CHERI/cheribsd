@@ -581,7 +581,7 @@ typedef struct dtrace_difv {
 #define	DTRACE_PTR(type, name)	type *name; uint32_t name##pad
 #endif
 #else
-#define	DTRACE_PTR(type, name)	type * __kerncap name
+#define	DTRACE_PTR(type, name)	type *name
 #endif
 
 /*
@@ -1317,20 +1317,20 @@ typedef struct dtrace_providerdesc {
 							/* provider query */
 #define	DTRACEIOC_PROBES	_IOWR('x',2,dtrace_probedesc_t)
 							/* probe query */
-#define	DTRACEIOC_BUFSNAP	_IOW('x',4,dtrace_bufdesc_t * __kerncap)
+#define	DTRACEIOC_BUFSNAP	_IOW('x',4,dtrace_bufdesc_t *)
 							/* snapshot buffer */
 #define	DTRACEIOC_PROBEMATCH	_IOWR('x',5,dtrace_probedesc_t)
 							/* match probes */
 typedef struct {
-	void * __kerncap dof;	/* DOF userland address written to driver. */
+	void *dof;	/* DOF userland address written to driver. */
 	int	n_matched;	/* # matches returned by driver. */
 } dtrace_enable_io_t;
 
 #define	DTRACEIOC_ENABLE	_IOWR('x',6,dtrace_enable_io_t)
 							/* enable probes */
-#define	DTRACEIOC_AGGSNAP	_IOW('x',7,dtrace_bufdesc_t * __kerncap)
+#define	DTRACEIOC_AGGSNAP	_IOW('x',7,dtrace_bufdesc_t *)
 							/* snapshot agg. */
-#define	DTRACEIOC_EPROBE	_IOW('x',8,dtrace_eprobedesc_t * __kerncap)
+#define	DTRACEIOC_EPROBE	_IOW('x',8,dtrace_eprobedesc_t *)
 							/* get eprobe desc. */
 #define	DTRACEIOC_PROBEARG	_IOWR('x',9,dtrace_argdesc_t)
 							/* get probe arg */
@@ -1342,11 +1342,11 @@ typedef struct {
 							/* start tracing */
 #define	DTRACEIOC_STOP		_IOWR('x',13,processorid_t)
 							/* stop tracing */
-#define	DTRACEIOC_AGGDESC	_IOW('x',15,dtrace_aggdesc_t * __kerncap)
+#define	DTRACEIOC_AGGDESC	_IOW('x',15,dtrace_aggdesc_t *)
 							/* get agg. desc. */
 #define	DTRACEIOC_FORMAT	_IOWR('x',16,dtrace_fmtdesc_t)	
 							/* get format str */
-#define	DTRACEIOC_DOFGET	_IOW('x',17,dof_hdr_t * __kerncap)
+#define	DTRACEIOC_DOFGET	_IOW('x',17,dof_hdr_t *)
 							/* get DOF */
 #define	DTRACEIOC_REPLICATE	_IOW('x',18,dtrace_repldesc_t)	
 							/* replicate enab */

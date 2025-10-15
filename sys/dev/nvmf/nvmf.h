@@ -51,8 +51,8 @@ struct nvmf_handoff_host {
 	u_int	num_io_queues;
 	u_int	kato;
 	struct nvmf_handoff_qpair_params admin;
-	struct nvmf_handoff_qpair_params * __kerncap io;
-	const struct nvme_controller_data * __kerncap cdata;
+	struct nvmf_handoff_qpair_params *io;
+	const struct nvme_controller_data *cdata;
 };
 
 struct nvmf_reconnect_params {
@@ -63,13 +63,13 @@ struct nvmf_reconnect_params {
 struct nvmf_handoff_controller_qpair {
 	u_int	trtype;
 	struct nvmf_handoff_qpair_params params;
-	const struct nvmf_fabric_connect_cmd * __kerncap cmd;
-	const struct nvmf_fabric_connect_data * __kerncap data;
+	const struct nvmf_fabric_connect_cmd *cmd;
+	const struct nvmf_fabric_connect_data *data;
 };
 
 /* Operations on /dev/nvmf */
 #define	NVMF_HANDOFF_HOST	_IOW('n', 200, struct nvmf_handoff_host)
-#define	NVMF_DISCONNECT_HOST	_IOW('n', 201, const char * __kerncap)
+#define	NVMF_DISCONNECT_HOST	_IOW('n', 201, const char *)
 #define	NVMF_DISCONNECT_ALL	_IO('n', 202)
 
 /* Operations on /dev/nvmeX */
