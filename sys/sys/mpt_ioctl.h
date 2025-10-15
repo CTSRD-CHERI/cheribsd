@@ -54,7 +54,7 @@
 struct mpt_cfg_page_req {	
 	CONFIG_PAGE_HEADER header;
 	uint32_t page_address;
-	void	* __kerncap buf;
+	void	*buf;
 	int	len;
 	uint16_t ioc_status;
 };
@@ -62,7 +62,7 @@ struct mpt_cfg_page_req {
 struct mpt_ext_cfg_page_req {
 	CONFIG_EXTENDED_PAGE_HEADER header;
 	uint32_t page_address;
-	void	* __kerncap buf;
+	void	*buf;
 	int	len;
 	uint16_t ioc_status;
 };
@@ -73,7 +73,7 @@ struct mpt_raid_action {
 	uint8_t volume_id;
 	uint8_t phys_disk_num;
 	uint32_t action_data_word;
-	void * __kerncap buf;
+	void *buf;
 	int len;
 	uint32_t volume_status;
 	uint32_t action_data[4];

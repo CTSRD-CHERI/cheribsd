@@ -136,7 +136,7 @@ struct mfi_ioc_passthru {
 	struct mrsas_dcmd_frame ioc_frame;
 	uint32_t pad_skinny_flag;
 	uint32_t buf_size;
-	uint8_t * __kerncap buf;
+	uint8_t *buf;
 };
 
 #pragma pack()

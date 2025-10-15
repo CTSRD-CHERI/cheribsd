@@ -105,18 +105,18 @@ struct tws_ioctl_packet {
  */
 
 #define	PDATA_PADDING							\
-	(sizeof(struct tws_driver_packet) % sizeof(void *__kerncap) == 0 ? \
+	(sizeof(struct tws_driver_packet) % sizeof(void *) == 0 ? \
 	    0 :								\
-	    sizeof(void * __kerncap) -					\
-	    sizeof(struct tws_driver_packet) % sizeof(void * __kerncap))
+	    sizeof(void *) -					\
+	    sizeof(struct tws_driver_packet) % sizeof(void *))
 
 struct tws_ioctl_no_data_buf {
     struct tws_driver_packet     driver_pkt;
     char                         pdata_padding[PDATA_PADDING];
-    void * __kerncap             pdata; /* points to data_buf */
-    char                         padding[488 - sizeof(void * __kerncap) - PDATA_PADDING];
+    void *pdata; /* points to data_buf */
+    char                         padding[488 - sizeof(void *) - PDATA_PADDING];
     struct tws_command_packet    cmd_pkt;
-} __aligned(sizeof(void * __kerncap));
+} __aligned(sizeof(void *));
 
 #undef PDATA_PADDING
 

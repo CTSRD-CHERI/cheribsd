@@ -1944,7 +1944,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	destp -= sizeof(*imgp->c18n_info);
 	destp = rounddown2(destp, sizeof(void * __capability));
-	imgp->c18n_info = (struct cheri_c18n_info * __kerncap)
+	imgp->c18n_info = (struct cheri_c18n_info *)
 	    cheri_setboundsexact(destp, sizeof(*imgp->c18n_info));
 	p->p_c18n_info =
 	    (__cheri_fromcap struct cheri_c18n_info *)imgp->c18n_info;

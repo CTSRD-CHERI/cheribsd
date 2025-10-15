@@ -434,11 +434,11 @@ struct sockproto {
  * Used value-result for recvmsg, value only for sendmsg.
  */
 struct msghdr {
-	void * __kerncap msg_name;		/* optional address */
+	void *msg_name;		/* optional address */
 	socklen_t	 msg_namelen;		/* size of address */
-	struct iovec * __kerncap msg_iov;	/* scatter/gather array */
+	struct iovec *msg_iov;	/* scatter/gather array */
 	int		 msg_iovlen;		/* # elements in msg_iov */
-	void * __kerncap msg_control;		/* ancillary data, see below */
+	void *msg_control;		/* ancillary data, see below */
 	socklen_t	 msg_controllen;	/* ancillary data buffer len */
 	int		 msg_flags;		/* flags on received message */
 };
@@ -654,11 +654,11 @@ struct osockaddr {
  * 4.3-compat message header (move to compat file later).
  */
 struct omsghdr {
-	char * __kerncap msg_name;	/* optional address */
+	char *msg_name;	/* optional address */
 	int	msg_namelen;		/* size of address */
-	struct iovec * __kerncap msg_iov; /* scatter/gather array */
+	struct iovec *msg_iov; /* scatter/gather array */
 	int	msg_iovlen;		/* # elements in msg_iov */
-	char * __kerncap msg_accrights;	/* access rights sent/received */
+	char *msg_accrights;	/* access rights sent/received */
 	int	msg_accrightslen;
 };
 #endif
@@ -680,9 +680,9 @@ enum shutdown_how {
  * sendfile(2) header/trailer struct
  */
 struct sf_hdtr {
-	struct iovec * __kerncap headers;	/* header struct iovec's */
+	struct iovec *headers;	/* header struct iovec's */
 	int hdr_cnt;		/* number of header iovec's */
-	struct iovec * __kerncap trailers;	/* trailer struct iovec's */
+	struct iovec *trailers;	/* trailer struct iovec's */
 	int trl_cnt;		/* number of trailer iovec's */
 };
 #ifdef _KERNEL

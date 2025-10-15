@@ -64,7 +64,7 @@
 struct if_clonereq {
 	int	ifcr_total;		/* total cloners (out) */
 	int	ifcr_count;		/* room for this many in user buffer */
-	char * __kerncap ifcr_buffer;	/* buffer for cloner names */
+	char *ifcr_buffer;	/* buffer for cloner names */
 };
 
 /*
@@ -436,14 +436,14 @@ struct if_announcemsghdr {
  */
 struct ifreq_buffer {
 	size_t	length;
-	void * __kerncap buffer;
+	void *buffer;
 };
 
 struct ifreq_nv_req {
 	u_int	buf_length;	/* Total size of buffer,
 				   u_int for ABI struct ifreq */
 	u_int	length;		/* Length of the filled part */
-	void * __kerncap buffer; /* Buffer itself, containing packed nv */
+	void *buffer; /* Buffer itself, containing packed nv */
 };
 
 #define	IFR_CAP_NV_MAXBUFSIZE	(2 * 1024 * 1024)
@@ -468,7 +468,7 @@ struct ifreq {
 		int	ifru_mtu;
 		int	ifru_phys;
 		int	ifru_media;
-		char * __kerncap ifru_data;
+		char *ifru_data;
 		int	ifru_cap[2];
 		u_int	ifru_fib;
 		u_char	ifru_vlan_pcp;
@@ -527,14 +527,14 @@ struct ifmediareq {
 	int	ifm_status;		/* media status */
 	int	ifm_active;		/* active options */
 	int	ifm_count;		/* # entries in ifm_ulist array */
-	int * __kerncap ifm_ulist;		/* media words */
+	int *ifm_ulist;		/* media words */
 };
 
 struct ifdrv {
 	char		ifd_name[IFNAMSIZ];	/* if name, e.g. "en0" */
 	unsigned long	ifd_cmd;
 	size_t		ifd_len;
-	void* __kerncap	ifd_data;
+	void*	ifd_data;
 };
 
 /* 
@@ -559,8 +559,8 @@ struct ifstat {
 struct ifconf {
 	int	ifc_len;		/* size of associated buffer */
 	union {
-		char * __kerncap		ifcu_buf;
-		struct ifreq * __kerncap	ifcu_req;
+		char *		ifcu_buf;
+		struct ifreq *	ifcu_req;
 	} ifc_ifcu;
 #define	ifc_buf	ifc_ifcu.ifcu_buf	/* buffer address */
 #define	ifc_req	ifc_ifcu.ifcu_req	/* array of structures returned */
@@ -591,7 +591,7 @@ struct ifgroupreq {
 	u_int	ifgr_len;
 	union {
 		char	ifgru_group[IFNAMSIZ];
-		struct ifg_req * __kerncap ifgru_groups;
+		struct ifg_req *ifgru_groups;
 	} ifgr_ifgru;
 #define ifgr_group	ifgr_ifgru.ifgru_group
 #define ifgr_groups	ifgr_ifgru.ifgru_groups

@@ -135,7 +135,7 @@ struct ioc_read_subchannel {
 #define CD_TRACK_INFO		3
 	u_char track;
 	int	data_len;
-	struct  cd_sub_channel_info * __kerncap data;
+	struct  cd_sub_channel_info *data;
 };
 #define CDIOCREADSUBCHANNEL _IOWR('c', 3 , struct ioc_read_subchannel )
 
@@ -150,7 +150,7 @@ struct ioc_read_toc_entry {
 	u_char	address_format;
 	u_char	starting_track;
 	u_short	data_len;
-	struct  cd_toc_entry * __kerncap data;
+	struct  cd_toc_entry *data;
 };
 #define CDIOREADTOCENTRYS _IOWR('c',5,struct ioc_read_toc_entry)
 

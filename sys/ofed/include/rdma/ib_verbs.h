@@ -1419,8 +1419,8 @@ struct ib_uobject {
 };
 
 struct ib_udata {
-	const u8 __user * __kerncap inbuf;
-	u8 __user * __kerncap outbuf;
+	const u8 __user *inbuf;
+	u8 __user *outbuf;
 	size_t       inlen;
 	size_t       outlen;
 };
@@ -2513,7 +2513,7 @@ static inline int ib_copy_to_udata(struct ib_udata *udata, void *src, size_t len
 	return copy_to_user(udata->outbuf, src, len) ? -EFAULT : 0;
 }
 
-static inline bool ib_is_buffer_cleared(const void __user * __kerncap p,
+static inline bool ib_is_buffer_cleared(const void __user *p,
 					size_t len)
 {
 	bool ret;

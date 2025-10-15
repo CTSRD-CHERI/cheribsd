@@ -137,7 +137,7 @@ typedef	__uid_t		uid_t;
 #define	SIGRTMAX	126
 
 #define __SIGHANDLER_CONSTANT(value)	\
-    ((__sighandler_t * __kerncap)value)
+    ((__sighandler_t *)value)
 #define	SIG_DFL		__SIGHANDLER_CONSTANT(0)
 #define	SIG_IGN		__SIGHANDLER_CONSTANT(1)
 #define	SIG_ERR		__SIGHANDLER_CONSTANT(-1)
@@ -180,8 +180,8 @@ struct sigevent {
 	union {
 		__lwpid_t	_threadid;
 		struct {
-			void (* __kerncap _function)(union sigval);
-			struct pthread_attr * __kerncap * __kerncap _attribute;
+			void (*_function)(union sigval);
+			struct pthread_attr **_attribute;
 		} _sigev_thread;
 		unsigned short _kevent_flags;
 		long __spare__[8];
@@ -220,7 +220,7 @@ typedef	struct __siginfo {
 	__pid_t	si_pid;			/* sending process */
 	__uid_t	si_uid;			/* sender's ruid */
 	int	si_status;		/* exit value */
-	void	* __kerncap si_addr;   	/* faulting instruction */
+	void	*si_addr;   	/* faulting instruction */
 	union sigval si_value;		/* signal value */
 	union	{
 		struct {
@@ -409,8 +409,8 @@ struct __siginfo;
  */
 struct sigaction {
 	union {
-		void    (* __kerncap __sa_handler)(int);
-		void    (* __kerncap __sa_sigaction)(int, struct __siginfo *, void *);
+		void    (*__sa_handler)(int);
+		void    (*__sa_sigaction)(int, struct __siginfo *, void *);
 	} __sigaction_u;		/* signal handler */
 	int	sa_flags;		/* see signal options below */
 	sigset_t sa_mask;		/* signal mask to apply */
@@ -459,7 +459,7 @@ struct sigaction {
 #endif
 
 #if __BSD_VISIBLE
-typedef	__sighandler_t	* __kerncap sig_t;	/* type of pointer to a signal function */
+typedef	__sighandler_t	*sig_t;	/* type of pointer to a signal function */
 typedef	void __siginfohandler_t(int, struct __siginfo *, void *);
 #endif
 

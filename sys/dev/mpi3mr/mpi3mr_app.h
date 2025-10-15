@@ -203,8 +203,8 @@ struct mpi3mr_ioctl_mptcmd {
         U16 timeout;
         U16 rsvd2;          
         U16 mpi_msg_size;
-        void * __kerncap mpi_msg_buf;
-        void * __kerncap buf_entry_list;
+        void *mpi_msg_buf;
+        void *buf_entry_list;
         U32 buf_entry_list_size;
 };
 
@@ -213,7 +213,7 @@ struct mpi3mr_buf_entry {
 	U8 rsvd1;
 	U16 rsvd2;
 	U32 buf_len;
-	void * __kerncap buffer;
+	void *buffer;
 };
 
 struct mpi3mr_ioctl_buf_entry_list {
@@ -225,7 +225,7 @@ struct mpi3mr_ioctl_buf_entry_list {
 };
 
 struct mpi3mr_ioctl_mpt_dma_buffer {
-	void * __kerncap user_buf;
+	void *user_buf;
 	void *kern_buf;
 	U32 user_buf_len;
 	U32 kern_buf_len;

@@ -191,8 +191,8 @@ struct ath_diag {
 #define	ATH_DIAG_OUT	0x0000		/* copy out results (always) */
 #define	ATH_DIAG_ID	0x0fff
 	u_int16_t ad_in_size;		/* pack to fit, yech */
-	char * __kerncap ad_in_data;
-	char * __kerncap ad_out_data;
+	char *ad_in_data;
+	char *ad_out_data;
 	u_int	ad_out_size;
 
 };
@@ -240,7 +240,7 @@ struct ath_rateioctl {
 		uint64_t	pad;
 	} is_u;
 	uint32_t		len;
-	char * __kerncap	buf;
+	char *	buf;
 };
 #define	SIOCGATHNODERATESTATS	_IOWR('i', 149, struct ath_rateioctl)
 #define	SIOCGATHRATESTATS	_IOWR('i', 150, struct ath_rateioctl)

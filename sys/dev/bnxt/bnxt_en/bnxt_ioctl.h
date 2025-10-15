@@ -66,7 +66,7 @@ struct bnxt_ioctl_hwrm_nvm_find_dir_entry {
 
 struct bnxt_ioctl_hwrm_nvm_read {
 	struct bnxt_ioctl_header hdr;
-	uint8_t * __kerncap data;
+	uint8_t		*data;
 	uint32_t	length;
 	uint32_t	offset;
 	uint16_t	index;
@@ -86,7 +86,7 @@ struct bnxt_ioctl_hwrm_fw_qstatus {
 
 struct bnxt_ioctl_hwrm_nvm_write {
 	struct bnxt_ioctl_header hdr;
-	uint8_t	* __kerncap data;
+	uint8_t		*data;
 	uint32_t	data_length;
 	uint32_t	item_length;
 	uint16_t	attr;
@@ -113,7 +113,7 @@ struct bnxt_ioctl_hwrm_nvm_get_dir_info {
 
 struct bnxt_ioctl_hwrm_nvm_get_dir_entries {
 	struct bnxt_ioctl_header hdr;
-	uint8_t * __kerncap data;
+	uint8_t		*data;
 	size_t		max_size;
 	uint32_t	entries;
 	uint32_t	entry_length;
@@ -137,7 +137,7 @@ struct bnxt_ioctl_hwrm_nvm_verify_update {
 
 struct bnxt_ioctl_hwrm_nvm_modify {
 	struct bnxt_ioctl_header hdr;
-	uint8_t * __kerncap data;
+	uint8_t		*data;
 	uint32_t	length;
 	uint32_t	offset;
 	uint16_t	index;

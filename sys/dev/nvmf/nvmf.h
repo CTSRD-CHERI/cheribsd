@@ -34,7 +34,7 @@
  * set to the required buffer size.
  */
 struct nvmf_ioc_nv {
-	void	* __kerncap data;
+	void	*data;
 	size_t	len;
 	size_t	size;
 };
@@ -91,7 +91,7 @@ struct nvmf_ioc_nv {
 
 /* Operations on /dev/nvmf */
 #define	NVMF_HANDOFF_HOST	_IOW('n', 200, struct nvmf_ioc_nv)
-#define	NVMF_DISCONNECT_HOST	_IOW('n', 201, const char * __kerncap)
+#define	NVMF_DISCONNECT_HOST	_IOW('n', 201, const char *)
 #define	NVMF_DISCONNECT_ALL	_IO('n', 202)
 
 /* Operations on /dev/nvmeX */

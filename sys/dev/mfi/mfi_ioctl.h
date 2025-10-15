@@ -55,7 +55,7 @@ union mfi_statrequest {
 #define MAX_SPACE_FOR_SENSE_PTR		32
 union mfi_sense_ptr {
 	uint8_t		sense_ptr_data[MAX_SPACE_FOR_SENSE_PTR];
-	void * __kerncap user_space;
+	void		*user_space;
 	struct {
 		uint32_t	low;
 		uint32_t	high;
@@ -178,7 +178,7 @@ __packed
 struct mfi_ioc_passthru {
 	struct mfi_dcmd_frame	ioc_frame;
 	uint32_t		buf_size;
-	uint8_t			* __kerncap buf;
+	uint8_t			*buf;
 }
 #if !__CHERI_USER_ABI
 /*

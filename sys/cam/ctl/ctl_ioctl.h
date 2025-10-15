@@ -268,7 +268,7 @@ struct ctl_ooa {
 	uint64_t		lun_num;	/* passed to kernel */
 	uint32_t		alloc_len;	/* passed to kernel */
 	uint32_t		alloc_num;	/* passed to kernel */
-	struct ctl_ooa_entry * __kerncap entries; /* filled in kernel */
+	struct ctl_ooa_entry *entries; /* filled in kernel */
 	uint32_t		fill_len;	/* passed to userland */
 	uint32_t		fill_num;	/* passed to userland */
 	uint32_t		dropped_num;	/* passed to userland */
@@ -460,19 +460,19 @@ struct ctl_lun_req {
 	char			backend[CTL_BE_NAME_LEN];
 	ctl_lunreq_type		reqtype;
 	union ctl_lunreq_data	reqdata;
-	void * __kerncap	args;
+	void *	args;
 	union {
 #ifdef _KERNEL
-		nvlist_t * __kerncap _dummy0;
+		nvlist_t *_dummy0;
 #endif
 		nvlist_t *	args_nvl;
 	};
 #define	CTL_MAX_ARGS_LEN	(1024 * 1024)
 	size_t			args_len;
-	void * __kerncap	result;
+	void *	result;
 	union {
 #ifdef _KERNEL
-		nvlist_t * __kerncap _dummy1;
+		nvlist_t *_dummy1;
 #endif
 		nvlist_t *	result_nvl;
 	};
@@ -528,7 +528,7 @@ typedef enum {
 struct ctl_lun_list {
 	char			backend[CTL_BE_NAME_LEN]; /* passed to kernel*/
 	uint32_t		alloc_len;	/* passed to kernel */
-	char * __kerncap	lun_xml;	/* filled in kernel */
+	char *	lun_xml;	/* filled in kernel */
 	uint32_t		fill_len;	/* passed to userland */
 	ctl_lun_list_status	status;		/* passed to userland */
 	char			error_str[CTL_ERROR_STR_LEN];
@@ -567,18 +567,18 @@ typedef enum {
 struct ctl_req {
 	char			driver[CTL_DRIVER_NAME_LEN];
 	ctl_req_type		reqtype;
-	void * __kerncap	args;
+	void *	args;
 	union {
 #ifdef _KERNEL
-		nvlist_t * __kerncap _dummy0;
+		nvlist_t *_dummy0;
 #endif
 		nvlist_t *	args_nvl;
 	};
 	size_t			args_len;
-	void * __kerncap	result;
+	void *	result;
 	union {
 #ifdef _KERNEL
-		nvlist_t * __kerncap _dummy1;
+		nvlist_t *_dummy1;
 #endif
 		nvlist_t *	result_nvl;
 	};
@@ -664,7 +664,7 @@ struct ctl_iscsi_handoff_params {
 
 struct ctl_iscsi_list_params {
 	uint32_t		alloc_len;	/* passed to kernel */
-	char * __kerncap        conn_xml;	/* filled in kernel */
+	char *conn_xml;	/* filled in kernel */
 	uint32_t		fill_len;	/* passed to userland */
 	int			spare[4];
 };
@@ -806,7 +806,7 @@ typedef enum {
 
 struct ctl_nvmf_list_params {
 	uint32_t		alloc_len;	/* passed to kernel */
-	char * __kerncap        conn_xml;	/* filled in kernel */
+	char *conn_xml;	/* filled in kernel */
 	uint32_t		fill_len;	/* passed to userland */
 	int			spare[4];
 };

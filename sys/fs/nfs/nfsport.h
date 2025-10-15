@@ -1104,12 +1104,12 @@ void ncl_copy_vattr(struct vattr *dst, struct vattr *src);
  * Define a structure similar to ufs_args for use in exporting the V4 root.
  */
 struct nfsex_args {
-	char * __kerncap	fspec;
+	char	*fspec;
 	struct export_args	export;
 };
 
 struct nfsex_oldargs {
-	char * __kerncap fspec;
+	char	*fspec;
 	struct o2export_args	export;
 };
 

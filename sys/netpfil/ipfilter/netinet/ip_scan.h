@@ -23,9 +23,9 @@ struct ip;
 struct ipstate;
 
 
-# define	SIOCADSCA	_IOWR('r', 60, struct ipscan * __kerncap)
-# define	SIOCRMSCA	_IOWR('r', 61, struct ipscan * __kerncap)
-# define	SIOCGSCST	_IOWR('r', 62, struct ipscan * __kerncap)
+# define	SIOCADSCA	_IOWR('r', 60, struct ipscan *)
+# define	SIOCRMSCA	_IOWR('r', 61, struct ipscan *)
+# define	SIOCGSCST	_IOWR('r', 62, struct ipscan *)
 
 struct	action	{
 	int		act_val;	/* what to do */
