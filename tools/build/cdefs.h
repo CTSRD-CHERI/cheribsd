@@ -36,8 +36,6 @@
 
 #include_next <sys/cdefs.h>
 
-#define __CHERI_USER_ABI 0
-
 /* Provide stub sub-object opt-out macros when bootstrapping */
 #define __no_subobject_bounds
 #define __subobject_use_container_bounds
