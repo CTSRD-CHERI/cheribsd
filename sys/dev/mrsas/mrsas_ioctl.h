@@ -83,7 +83,7 @@
 
 #define	MEGAMFI_RAW_FRAME_SIZE	128
 
-#if !__CHERI_USER_ABI
+#if !__has_feature(capabilities)
 /*
  * Packing is gratutious, but part of the ABI. Don't pack in CheriABI
  * where it won't work.
@@ -125,7 +125,7 @@ struct mrsas_iocpacket32 {
 #pragma pack()
 #endif					/* COMPAT_FREEBSD32 */
 
-#if !__CHERI_USER_ABI
+#if !__has_feature(capabilities)
 /*
  * Packing is gratutious, but part of the ABI. Don't pack in CheriABI
  * where it won't work.
