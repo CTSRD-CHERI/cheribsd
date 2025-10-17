@@ -1,0 +1,46 @@
+.\" Copyright (c) 2025 John Baldwin <john@araratriver.co>
+.\"
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.\" This software was developed by SRI International, the University of
+.\" Cambridge Computer Laboratory (Department of Computer Science and
+.\" Technology), and Capabilities Limited under Defense Advanced Research
+.\" Projects Agency (DARPA) Contract No. FA8750-24-C-B047 ("DEC").
+.\"
+.Dd December 1, 2025
+.Dt ACE2 4
+.Os
+.Sh NAME
+.Nm ace2
+.Sh DESCRIPTION
+This module provides a set of character devices which provide utilities used
+in the evaluation of the DARPA CPM program.
+.Pp
+The
+.Nm
+module provides the following character devices in
+.Pa /dev :
+.Bl -tag -width "ace2-ace-capability"
+.It Pa ace2-ace-data
+Permits reading and writing arbitrary scalar data.
+The offset of the read or write operation specifies the starting kernel
+virtual address similar to
+.Pa /dev/kmem .
+.It Pa ace2-ace-capability
+Permits reading and writing capability addresses.
+The offset of the read or write operation specifies the starting kernel
+virtual address.
+The length of the user request only covers the address portion of capabilities,
+so on CHERI systems it will be half of the address range examined.
+Reads return the addresses of capability in the requested range,
+while write operations set addresses of existing capabilities in the requested
+range preserving other capability metadata.
+Note that setting an address of a capability may clear the capability's tag
+if the new address is unrepresentable.
+.El
+.Sh FILES
+.Bl -tag -width "/dev/ace2-ace-capability" -compact
+.It Pa /boot/kernel/ace2.ko
+.It Pa /dev/ace2-ace-capability
+.It Pa /dev/ace2-ace-data
+.El
