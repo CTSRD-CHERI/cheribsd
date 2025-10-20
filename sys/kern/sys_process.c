@@ -1629,9 +1629,9 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		case PT_TO_SCE:
 		case PT_TO_SCX:
 		case PT_SYSCALL:
-			if ((__cheri_addr ptraddr_t)addr != 1) {
+			if ((ptraddr_t)addr != 1) {
 				error = ptrace_set_pc(td2,
-				    (__cheri_addr u_long)addr);
+				    (u_long)addr);
 				if (error)
 					goto out;
 				td2->td_dbgflags |= TDB_USERWR;
@@ -1642,26 +1642,26 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 				CTR4(KTR_PTRACE,
 		    "PT_TO_SCE: pid %d, events = %#x, PC = %#lx, sig = %d",
 				    p->p_pid, p->p_ptevents,
-				    (__cheri_addr u_long)addr, data);
+				    (u_long)addr, data);
 				break;
 			case PT_TO_SCX:
 				p->p_ptevents |= PTRACE_SCX;
 				CTR4(KTR_PTRACE,
 		    "PT_TO_SCX: pid %d, events = %#x, PC = %#lx, sig = %d",
 				    p->p_pid, p->p_ptevents,
-				    (__cheri_addr u_long)addr, data);
+				    (u_long)addr, data);
 				break;
 			case PT_SYSCALL:
 				p->p_ptevents |= PTRACE_SYSCALL;
 				CTR4(KTR_PTRACE,
 		    "PT_SYSCALL: pid %d, events = %#x, PC = %#lx, sig = %d",
 				    p->p_pid, p->p_ptevents,
-				    (__cheri_addr u_long)addr, data);
+				    (u_long)addr, data);
 				break;
 			case PT_CONTINUE:
 				CTR3(KTR_PTRACE,
 				    "PT_CONTINUE: pid %d, PC = %#lx, sig = %d",
-				    p->p_pid, (__cheri_addr u_long)addr, data);
+				    p->p_pid, (u_long)addr, data);
 				break;
 			}
 			break;
@@ -1781,12 +1781,12 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		td2->td_dbgflags |= TDB_USERWR;
 		PROC_UNLOCK(p);
 		error = 0;
-		if (proc_writemem(td, p, (__cheri_addr vm_offset_t)addr,
+		if (proc_writemem(td, p, (vm_offset_t)addr,
 		    &data, sizeof(int)) != sizeof(int))
 			error = ENOMEM;
 		else
 			CTR3(KTR_PTRACE, "PT_WRITE: pid %d: %lx <= %#x",
-			    p->p_pid, (__cheri_addr u_long)addr, data);
+			    p->p_pid, (u_long)addr, data);
 		PROC_LOCK(p);
 		break;
 
@@ -1794,12 +1794,12 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 	case PT_READ_D:
 		PROC_UNLOCK(p);
 		error = tmp = 0;
-		if (proc_readmem(td, p, (__cheri_addr vm_offset_t)addr,
+		if (proc_readmem(td, p, (vm_offset_t)addr,
 		    &tmp, sizeof(int)) != sizeof(int))
 			error = ENOMEM;
 		else
 			CTR3(KTR_PTRACE, "PT_READ: pid %d: %lx >= %#x",
-			    p->p_pid, (__cheri_addr u_long)addr, tmp);
+			    p->p_pid, (u_long)addr, tmp);
 		td->td_retval[0] = tmp;
 		PROC_LOCK(p);
 		break;
@@ -1811,7 +1811,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			goto out;
 		}
 		IOVEC_INIT_C(&iov, piod->piod_addr, piod->piod_len);
-		uio.uio_offset = (__cheri_addr off_t)piod->piod_offs;
+		uio.uio_offset = (off_t)piod->piod_offs;
 		uio.uio_resid = piod->piod_len;
 		uio.uio_iov = &iov;
 		uio.uio_iovcnt = 1;

@@ -49,8 +49,8 @@ memcpy_c(void * __capability dst0, const void * __capability src0, size_t len)
 	if (len == 0 || dst == src)
 		return (dst);
 
-	dst_addr = (__cheri_addr ptraddr_t)dst;
-	src_addr = (__cheri_addr ptraddr_t)src;
+	dst_addr = (ptraddr_t)dst;
+	src_addr = (ptraddr_t)src;
 	if (dst_addr < src_addr) {
 		/* Forwards. */
 
@@ -68,12 +68,12 @@ memcpy_c(void * __capability dst0, const void * __capability src0, size_t len)
 				} while (--tocopy != 0);
 			}
 
-			KASSERT((__cheri_addr ptraddr_t)dst % sizeof(uintcap_t) == 0,
+			KASSERT((ptraddr_t)dst % sizeof(uintcap_t) == 0,
 			    ("dst %p not aligned",
-			    (void *)(__cheri_addr uintptr_t)dst));
-			KASSERT((__cheri_addr ptraddr_t)src % sizeof(uintcap_t) == 0,
+			    (void *)(uintptr_t)dst));
+			KASSERT((ptraddr_t)src % sizeof(uintcap_t) == 0,
 			    ("src %p not aligned",
-			    (void *)(__cheri_addr uintptr_t)src));
+			    (void *)(uintptr_t)src));
 
 			/* Copy capabilities. */
 			while (len >= sizeof(uintcap_t)) {
@@ -96,8 +96,8 @@ memcpy_c(void * __capability dst0, const void * __capability src0, size_t len)
 
 		src += len;
 		dst += len;
-		dst_addr = (__cheri_addr ptraddr_t)dst;
-		src_addr = (__cheri_addr ptraddr_t)src;
+		dst_addr = (ptraddr_t)dst;
+		src_addr = (ptraddr_t)src;
 		
 		/* Do both buffers have the same relative alignment? */
 		if ((dst_addr ^ src_addr) % sizeof(uintcap_t) == 0 &&
@@ -112,10 +112,10 @@ memcpy_c(void * __capability dst0, const void * __capability src0, size_t len)
 				} while (--tocopy != 0);
 			}
 
-			KASSERT((__cheri_addr ptraddr_t)dst % sizeof(uintcap_t) == 0,
-			    ("dst %p not aligned", (void *)(__cheri_addr uintptr_t)dst));
-			KASSERT((__cheri_addr ptraddr_t)src % sizeof(uintcap_t) == 0,
-			    ("src %p not aligned", (void *)(__cheri_addr uintptr_t)src));
+			KASSERT((ptraddr_t)dst % sizeof(uintcap_t) == 0,
+			    ("dst %p not aligned", (void *)(uintptr_t)dst));
+			KASSERT((ptraddr_t)src % sizeof(uintcap_t) == 0,
+			    ("src %p not aligned", (void *)(uintptr_t)src));
 
 			/* Copy capabilities. */
 			while (len >= sizeof(uintcap_t)) {

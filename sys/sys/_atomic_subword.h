@@ -52,16 +52,16 @@
 
 #if _BYTE_ORDER == _BIG_ENDIAN
 #define	_ATOMIC_BYTE_SHIFT(p)		\
-    ((3 - ((__cheri_addr ptraddr_t)(p) % 4)) * NBBY)
+    ((3 - ((ptraddr_t)(p) % 4)) * NBBY)
 
 #define	_ATOMIC_HWORD_SHIFT(p)		\
-    ((2 - ((__cheri_addr ptraddr_t)(p) % 4)) * NBBY)
+    ((2 - ((ptraddr_t)(p) % 4)) * NBBY)
 #else
 #define	_ATOMIC_BYTE_SHIFT(p)		\
-    ((((__cheri_addr ptraddr_t)(p) % 4)) * NBBY)
+    ((((ptraddr_t)(p) % 4)) * NBBY)
 
 #define	_ATOMIC_HWORD_SHIFT(p)		\
-    ((((__cheri_addr ptraddr_t)(p) % 4)) * NBBY)
+    ((((ptraddr_t)(p) % 4)) * NBBY)
 #endif
 
 #ifndef	_atomic_cmpset_masked_word

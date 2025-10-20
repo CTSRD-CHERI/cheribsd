@@ -10,7 +10,7 @@
 #ifndef	_LINUXKPI_LINUX_CLEANUP_H
 #define	_LINUXKPI_LINUX_CLEANUP_H
 
-#define	__cleanup(_f)		__attribute__((__cleanup__(_f)))
+#define	__cleanup(_f)		__attribute__((__cleanup__(_f))) __attribute__((__unused__))
 
 /*
  * Note: "_T" are special as they are exposed into common code for
