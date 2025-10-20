@@ -113,7 +113,7 @@ mmap_and_check_tag_stored(int fd, int protflags, int mapflags)
 
 	cp = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(), protflags,
 	     mapflags, fd, 0));
-	cp_value = cheri_ptr(&v, sizeof(v));
+	cp_value = (void * __capability)&v;
 	*cp = cp_value;
 	cp_value = *cp;
 	CHERIBSDTEST_VERIFY2(cheri_tag_get(cp_value) != 0, "tag lost");
@@ -153,7 +153,7 @@ CHERIBSDTEST(vm_notag_mmap_no_cap,
 		PROT_MAX(PROT_READ | PROT_WRITE | PROT_CAP) |
 		PROT_READ | PROT_WRITE | PROT_NO_CAP, MAP_ANON, -1, 0));
 	cheribsdtest_set_expected_si_addr(NULL_DERIVED_VOIDP(cp));
-	cp_value = cheri_ptr(&v, sizeof(v));
+	cp_value = (void * __capability)&v;
 	*cp = cp_value;
 	cheribsdtest_failure_errx("tagged store succeeded");
 }
@@ -175,7 +175,7 @@ CHERIBSDTEST(vm_notag_mprotect_no_cap,
 	CHERIBSDTEST_CHECK_SYSCALL(mprotect(__DEVOLATILE(void *, cp),
 	    getpagesize(), PROT_READ | PROT_WRITE | PROT_NO_CAP));
 	cheribsdtest_set_expected_si_addr(NULL_DERIVED_VOIDP(cp));
-	cp_value = cheri_ptr(&v, sizeof(v));
+	cp_value = (void * __capability)&v;
 	*cp = cp_value;
 	cheribsdtest_failure_errx("tagged store succeeded");
 }
@@ -598,7 +598,7 @@ CHERIBSDTEST(vm_notag_tmpfile_shared,
 	cp = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
 	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
 	cheribsdtest_set_expected_si_addr(NULL_DERIVED_VOIDP(cp));
-	cp_value = cheri_ptr(&v, sizeof(v));
+	cp_value = (void * __capability)&v;
 	*cp = cp_value;
 	cheribsdtest_failure_errx("tagged store succeeded");
 }
@@ -684,7 +684,7 @@ CHERIBSDTEST(vm_cow_read,
 	 * Write out a tagged capability to 'real' mapping -- doesn't really
 	 * matter what it points at.  Confirm it has a tag.
 	 */
-	cp = cheri_ptr(&fd, sizeof(fd));
+	cp = (void * __capability)&fd;
 	cp_real[0] = cp;
 	cp = cp_real[0];
 	CHERIBSDTEST_VERIFY2(cheri_tag_get(cp) != 0, "pretest: tag missing");
@@ -733,7 +733,7 @@ CHERIBSDTEST(vm_cow_write,
 	 * Write out a tagged capability to 'real' mapping -- doesn't really
 	 * matter what it points at.  Confirm it has a tag.
 	 */
-	cp = cheri_ptr(&fd, sizeof(fd));
+	cp = (void * __capability)&fd;
 	cp_real[0] = cp;
 	cp = cp_real[0];
 	CHERIBSDTEST_VERIFY2(cheri_tag_get(cp) != 0, "pretest: tag missing");
@@ -749,7 +749,7 @@ CHERIBSDTEST(vm_cow_write,
 	 * Diverge from cheribsdtest_vm_cow_read(): write via the second mapping
 	 * to force a copy-on-write rather than continued sharing of the page.
 	 */
-	cp = cheri_ptr(&fd, sizeof(fd));
+	cp = (void * __capability)&fd;
 	cp_copy[1] = cp;
 
 	/*
