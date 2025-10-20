@@ -141,12 +141,7 @@
 
 #endif /* __WANT_OLD_CHERI_MACROS */
 
-#ifdef __riscv
-#define	cheri_loadtags(m)						\
-	__builtin_cheri_cap_load_tags((__cheri_tocap void * __capability)(m))
-#else
 #define	cheri_loadtags(m)	__builtin_cheri_cap_load_tags((m))
-#endif
 
 /*
  * Soft implementation of cheri_subset_test().
