@@ -94,20 +94,20 @@ fill_regs(struct thread *td, struct reg *regs)
 #endif
 
 	frame = td->td_frame;
-	regs->sepc = (__cheri_addr register_t)frame->tf_sepc;
+	regs->sepc = (register_t)frame->tf_sepc;
 	regs->sstatus = frame->tf_sstatus;
-	regs->ra = (__cheri_addr register_t)frame->tf_ra;
-	regs->sp = (__cheri_addr register_t)frame->tf_sp;
-	regs->gp = (__cheri_addr register_t)frame->tf_gp;
-	regs->tp = (__cheri_addr register_t)frame->tf_tp;
+	regs->ra = (register_t)frame->tf_ra;
+	regs->sp = (register_t)frame->tf_sp;
+	regs->gp = (register_t)frame->tf_gp;
+	regs->tp = (register_t)frame->tf_tp;
 
 #if __has_feature(capabilities)
 	for (i = 0; i < nitems(regs->t); i++)
-		regs->t[i] = (__cheri_addr register_t)frame->tf_t[i];
+		regs->t[i] = (register_t)frame->tf_t[i];
 	for (i = 0; i < nitems(regs->s); i++)
-		regs->s[i] = (__cheri_addr register_t)frame->tf_s[i];
+		regs->s[i] = (register_t)frame->tf_s[i];
 	for (i = 0; i < nitems(regs->a); i++)
-		regs->a[i] = (__cheri_addr register_t)frame->tf_a[i];
+		regs->a[i] = (register_t)frame->tf_a[i];
 #else
 	memcpy(regs->t, frame->tf_t, sizeof(regs->t));
 	memcpy(regs->s, frame->tf_s, sizeof(regs->s));
@@ -361,8 +361,8 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 	} else
 #endif
 	{
-		tf->tf_a[0] = (__cheri_addr ptraddr_t)stack;
-		tf->tf_sp = STACKALIGN((__cheri_addr ptraddr_t)stack);
+		tf->tf_a[0] = (ptraddr_t)stack;
+		tf->tf_sp = STACKALIGN((ptraddr_t)stack);
 #if __has_feature(capabilities)
 		hybridabi_thread_setregs(td, imgp->entry_addr);
 #else
@@ -600,7 +600,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	onstack = sigonstack(tf->tf_sp);
 
 	CTR4(KTR_SIG, "sendsig: td=%p (%s) catcher=%p sig=%d", td, p->p_comm,
-	    (__cheri_addr ptraddr_t)catcher, sig);
+	    (ptraddr_t)catcher, sig);
 
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !onstack &&
@@ -630,7 +630,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	if (copyoutcap(&frame, fp, sizeof(*fp)) != 0) {
 		/* Process has trashed its stack. Kill it. */
 		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td,
-				(__cheri_addr ptraddr_t)fp);
+				(ptraddr_t)fp);
 		PROC_LOCK(p);
 		sigexit(td, SIGILL);
 	}

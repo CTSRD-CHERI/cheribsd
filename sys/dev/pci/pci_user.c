@@ -1558,7 +1558,7 @@ getconfexit:
 #ifdef COMPAT_FREEBSD64
 		if (cmd == PCIOCBARMMAP64) {
 			pbm64->pbm_map_base =
-			    (__cheri_addr uint64_t)pbm->pbm_map_base;
+			    (uint64_t)pbm->pbm_map_base;
 			CP(pbms, *pbm64, pbm_map_length);
 			CP(pbms, *pbm64, pbm_bar_length);
 			CP(pbms, *pbm64, pbm_bar_off);

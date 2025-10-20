@@ -119,8 +119,8 @@ ptrace_sc_ret_to64(const struct ptrace_sc_ret *psr,
     struct ptrace_sc_ret64 *psr64)
 {
 	bzero(psr64, sizeof(*psr64));
-	psr64->sr_retval[0] = (__cheri_addr uint64_t)psr->sr_retval[0];
-	psr64->sr_retval[1] = (__cheri_addr uint64_t)psr->sr_retval[1];
+	psr64->sr_retval[0] = (uint64_t)psr->sr_retval[0];
+	psr64->sr_retval[1] = (uint64_t)psr->sr_retval[1];
 	psr64->sr_error = psr->sr_error;
 }
 
@@ -382,7 +382,7 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 		break;
 	case PT_GET_SC_ARGS:
 		for (i = 0; i < nitems(r.args); i++)
-			r64.args[i] = (__cheri_addr uint64_t)r.args[i];
+			r64.args[i] = (uint64_t)r.args[i];
 		error = copyout(r64.args, __USER_CAP(uap->addr, uap->data),
 		    MIN(uap->data, sizeof(r64.args)));
 		break;

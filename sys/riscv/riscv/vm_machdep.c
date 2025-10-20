@@ -203,8 +203,8 @@ cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
 	tf->tf_sp = STACKALIGN((uintcap_t)stack->ss_sp + stack->ss_size);
 #if __has_feature(capabilities)
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI) == 0) {
-		tf->tf_sp = (uintcap_t)(__cheri_addr ptraddr_t)tf->tf_sp;
-		hybridabi_thread_setregs(td, (__cheri_addr unsigned long)entry);
+		tf->tf_sp = (uintcap_t)(ptraddr_t)tf->tf_sp;
+		hybridabi_thread_setregs(td, (unsigned long)entry);
 	} else
 #endif
 		tf->tf_sepc = (uintcap_t)entry;
@@ -216,7 +216,7 @@ int
 cpu_set_user_tls(struct thread *td, void * __capability tls_base)
 {
 
-	if ((__cheri_addr ptraddr_t)tls_base >= VM_MAXUSER_ADDRESS)
+	if ((ptraddr_t)tls_base >= VM_MAXUSER_ADDRESS)
 		return (EINVAL);
 
 	/*
@@ -225,7 +225,7 @@ cpu_set_user_tls(struct thread *td, void * __capability tls_base)
 	 */
 #ifdef COMPAT_FREEBSD64
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI | SV_LP64) == SV_LP64)
-		td->td_frame->tf_tp = (__cheri_addr ptraddr_t)tls_base +
+		td->td_frame->tf_tp = (ptraddr_t)tls_base +
 		    TP_OFFSET64;
 	else
 #endif

@@ -5115,7 +5115,7 @@ vmapbuf(struct buf *bp, void * __capability uaddr, size_t len, int mapbuf)
 		return (-1);
 	bp->b_bufsize = len;
 	bp->b_npages = pidx;
-	bp->b_offset = ((__cheri_addr vm_offset_t)uaddr) & PAGE_MASK;
+	bp->b_offset = ((vm_offset_t)uaddr) & PAGE_MASK;
 	if (mapbuf || !unmapped_buf_allowed) {
 		pmap_qenter((vm_offset_t)bp->b_kvabase, bp->b_pages, pidx);
 		bp->b_data = bp->b_kvabase + bp->b_offset;

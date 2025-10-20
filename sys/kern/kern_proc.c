@@ -1531,7 +1531,7 @@ static inline uint64_t
 ptr64_trim(const void * __capability ptr)
 {
 
-	return ((__cheri_addr uint64_t)ptr);
+	return ((uint64_t)ptr);
 }
 
 #define PTRTRIM_CP(src,dst,fld) \
@@ -1997,7 +1997,7 @@ proc_read_string(struct thread *td, struct proc *p,
 	 * and is aligned at the end of the page, and the following page is not
 	 * mapped.
 	 */
-	n = proc_readmem(td, p, (__cheri_addr vm_offset_t)sptr, buf, len);
+	n = proc_readmem(td, p, (vm_offset_t)sptr, buf, len);
 	if (n <= 0)
 		return (ENOMEM);
 	return (0);
@@ -2189,14 +2189,14 @@ get_proc_vector(struct thread *td, struct proc *p,
 		return (ENOMEM);
 	switch (type) {
 	case PROC_ARG:
-		vptr = (__cheri_addr vm_offset_t)pss.ps_argvstr;
+		vptr = (vm_offset_t)pss.ps_argvstr;
 		vsize = pss.ps_nargvstr;
 		if (vsize > ARG_MAX)
 			return (ENOEXEC);
 		size = vsize * sizeof(char * __capability);
 		break;
 	case PROC_ENV:
-		vptr = (__cheri_addr vm_offset_t)pss.ps_envstr;
+		vptr = (vm_offset_t)pss.ps_envstr;
 		vsize = pss.ps_nenvstr;
 		if (vsize > ARG_MAX)
 			return (ENOEXEC);
@@ -2207,7 +2207,7 @@ get_proc_vector(struct thread *td, struct proc *p,
 		 * The aux array is just above env array on the stack. Check
 		 * that the address is naturally aligned.
 		 */
-		vptr = (__cheri_addr vm_offset_t)pss.ps_envstr +
+		vptr = (vm_offset_t)pss.ps_envstr +
 		    (pss.ps_nenvstr + 1) * sizeof(char * __capability);
 #if __ELF_WORD_SIZE == 64
 		if (vptr % sizeof(uint64_t) != 0)
@@ -2546,12 +2546,12 @@ sysctl_kern_proc_c18n(SYSCTL_HANDLER_ARGS)
 	}
 
 	if (!cheri_can_access(info.stats, CHERI_PERM_LOAD,
-	    (__cheri_addr ptraddr_t)info.stats, info.stats_size)) {
+	    (ptraddr_t)info.stats, info.stats_size)) {
 		error = EPROT;
 		goto out;
 	}
 	buffer = malloc(info.stats_size, M_TEMP, M_WAITOK);
-	n = proc_readmem(curthread, p, (__cheri_addr vm_offset_t)info.stats,
+	n = proc_readmem(curthread, p, (vm_offset_t)info.stats,
 	    buffer, info.stats_size);
 	if (n != info.stats_size) {
 		error = EFAULT;
@@ -2579,9 +2579,9 @@ proc_read_string_properly(struct thread *td, struct proc *p,
 		return (EFAULT);
 	valid = MIN(len, cheri_bytes_remaining(sptr));
 	if (!cheri_can_access(sptr, CHERI_PERM_LOAD,
-	    (__cheri_addr ptraddr_t)sptr, valid))
+	    (ptraddr_t)sptr, valid))
 		return (EPROT);
-	readlen = proc_readmem(td, p, (__cheri_addr ptraddr_t)sptr, buf, valid);
+	readlen = proc_readmem(td, p, (ptraddr_t)sptr, buf, valid);
 	if (readlen <= 0)
 		return (EFAULT);
 
@@ -2665,7 +2665,7 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 	 */
 	if (!cheri_can_access(info.comparts,
 	    CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP,
-	    (__cheri_addr vm_offset_t)info.comparts,
+	    (vm_offset_t)info.comparts,
 	    info.comparts_size * info.comparts_entry_size)) {
 		error = EPROT;
 		goto out;
@@ -2689,7 +2689,7 @@ sysctl_kern_proc_c18n_compartments(SYSCTL_HANDLER_ARGS)
 		/* Initialize userspace structure, including padding. */
 		bzero(&kccc, sizeof(kccc));
 
-		rccp = (__cheri_addr vm_offset_t)info.comparts +
+		rccp = (vm_offset_t)info.comparts +
 		    i * info.comparts_entry_size;
 
 		/* Copy in next compartment info structure. */
@@ -3802,7 +3802,7 @@ sysctl_kern_proc_sigfastblk(SYSCTL_HANDLER_ARGS)
 	 * meantime.
 	 */
 	if ((td1->td_pflags & TDP_SIGFASTBLOCK) != 0)
-		addr = (uintptr_t)(__cheri_addr ptraddr_t)td1->td_sigblock_ptr;
+		addr = (uintptr_t)(ptraddr_t)td1->td_sigblock_ptr;
 	else
 		error = ENOTTY;
 
