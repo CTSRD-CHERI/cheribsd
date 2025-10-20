@@ -155,8 +155,7 @@ mcontext_to_mcontext64(mcontext_t *mc, mcontext64_t *mc64)
 	greg = (register_t *)&mc64->mc_gpregs;
 	for (i = 0; i < CONTEXT64_GPREGS; i++)
 		greg[i] = (__cheri_addr register_t)creg[i];
-	mc64->mc_gpregs.gp_sepc =
-	    (__cheri_offset register_t)mc->mc_capregs.cp_sepcc;
+	mc64->mc_gpregs.gp_sepc = cheri_getoffset(mc->mc_capregs.cp_sepcc);
 	mc64->mc_gpregs.gp_sstatus = mc->mc_capregs.cp_sstatus;
 	mc64->mc_flags = mc->mc_flags;
 	if (mc->mc_flags & _MC_FP_VALID)
