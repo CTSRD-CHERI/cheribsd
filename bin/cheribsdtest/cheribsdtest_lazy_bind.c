@@ -39,7 +39,7 @@ CHERIBSDTEST(lazy_bind_args,
 {
 	void * __capability cap, * __capability cap2;
 
-	cap = (__cheri_tocap void * __capability)&cap;
+	cap = (void * __capability)&cap;
 	cap2 = cheribsdtest_dynamic_identity_cap(cap);
 	CHERIBSDTEST_CHECK_EQ_CAP(cap, cap2);
 

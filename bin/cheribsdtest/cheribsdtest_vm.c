@@ -1344,7 +1344,7 @@ CHERIBSDTEST(vm_capdirty, "verify capdirty marking and mincore")
 	 * Write a capability to page 1 and check that it is MODIFIED and
 	 * CAPSTORE regardless of vm.capstore_on_alloc.
 	 */
-	*pg1 = (__cheri_tocap void * __capability)pg0;
+	*pg1 = (void * __capability)pg0;
 
 	CHERIBSDTEST_CHECK_SYSCALL(mincore(pg0, sz, &mcv[0]));
 	CHERIBSDTEST_VERIFY2(

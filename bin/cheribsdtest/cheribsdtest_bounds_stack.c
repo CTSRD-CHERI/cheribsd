@@ -92,7 +92,7 @@ test_bounds_precise(void * __capability c, size_t expected_len)
 static __noinline void
 test_bounds_stack_alloca(size_t len)
 {
-	void * __capability c = (__cheri_tocap void * __capability)alloca(len);
+	void * __capability c = (void * __capability)alloca(len);
 
 	test_bounds_precise(c, len);
 }
@@ -101,7 +101,7 @@ static __noinline void
 test_bounds_stack_vla(size_t len)
 {
 	char vla[len];
-	void * __capability c = (__cheri_tocap void * __capability)&vla;
+	void * __capability c = (void * __capability)&vla;
 
 	test_bounds_precise(c, len);
 }
@@ -110,7 +110,7 @@ CHERIBSDTEST(bounds_stack_static_uint8,
     "Check bounds on 8-bit static stack allocation")
 {
 	uint8_t u8;
-	uint8_t * __capability u8p = (__cheri_tocap uint8_t * __capability)&u8;
+	uint8_t * __capability u8p = (uint8_t * __capability)&u8;
 
 	test_bounds_precise(u8p, sizeof(*u8p));
 }
@@ -131,7 +131,7 @@ CHERIBSDTEST(bounds_stack_static_uint16,
     "Check bounds on 16-bit static stack allocation")
 {
 	uint16_t u16;
-	uint16_t * __capability u16p = (__cheri_tocap uint16_t * __capability)&u16;
+	uint16_t * __capability u16p = (uint16_t * __capability)&u16;
 
 	test_bounds_precise(u16p, sizeof(*u16p));
 }
@@ -152,7 +152,7 @@ CHERIBSDTEST(bounds_stack_static_uint32,
     "Check bounds 32-bit static stack allocation")
 {
 	uint32_t u32;
-	uint32_t * __capability u32p = (__cheri_tocap uint32_t * __capability)&u32;
+	uint32_t * __capability u32p = (uint32_t * __capability)&u32;
 
 	test_bounds_precise(u32p, sizeof(*u32p));
 }
@@ -173,7 +173,7 @@ CHERIBSDTEST(bounds_stack_static_uint64,
     "Check bounds on 64-bit static stack allocation")
 {
 	uint64_t u64;
-	uint64_t * __capability u64p = (__cheri_tocap uint64_t * __capability)&u64;
+	uint64_t * __capability u64p = (uint64_t * __capability)&u64;
 
 	test_bounds_precise(u64p, sizeof(*u64p));
 }
@@ -195,7 +195,7 @@ CHERIBSDTEST(bounds_stack_static_cap,
 {
 	void * __capability c;
 	void * __capability * __capability cp =
-	    (__cheri_tocap void * __capability * __capability)&c;
+	    (void * __capability * __capability)&c;
 
 	test_bounds_precise(cp, sizeof(*cp));
 }
@@ -216,7 +216,7 @@ CHERIBSDTEST(bounds_stack_static_16,
     "Check bounds on a 16-byte static stack allocation")
 {
 	uint8_t array[16];
-	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
+	uint8_t * __capability arrayp = (uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -237,7 +237,7 @@ CHERIBSDTEST(bounds_stack_static_32,
     "Check bounds on a 32-byte static stack allocation")
 {
 	uint8_t array[32];
-	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
+	uint8_t * __capability arrayp = (uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -258,7 +258,7 @@ CHERIBSDTEST(bounds_stack_static_64,
     "Check bounds on a 64-byte static stack allocation")
 {
 	uint8_t array[64];
-	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
+	uint8_t * __capability arrayp = (uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -279,7 +279,7 @@ CHERIBSDTEST(bounds_stack_static_128,
     "Check bounds on a 128-byte static stack allocation")
 {
 	uint8_t array[128];
-	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
+	uint8_t * __capability arrayp = (uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -300,7 +300,7 @@ CHERIBSDTEST(bounds_stack_static_256,
     "Check bounds on a 256-byte static stack allocation")
 {
 	uint8_t array[256];
-	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
+	uint8_t * __capability arrayp = (uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -321,7 +321,7 @@ CHERIBSDTEST(bounds_stack_static_512,
     "Check bounds on a 512-byte static stack allocation")
 {
 	uint8_t array[512];
-	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
+	uint8_t * __capability arrayp = (uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -342,7 +342,7 @@ CHERIBSDTEST(bounds_stack_static_1024,
     "Check bounds on a 1,024-byte static stack allocation")
 {
 	uint8_t array[1024];
-	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
+	uint8_t * __capability arrayp = (uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -363,7 +363,7 @@ CHERIBSDTEST(bounds_stack_static_2048,
     "Check bounds on a 2,048-byte static stack allocation")
 {
 	uint8_t array[2048];
-	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
+	uint8_t * __capability arrayp = (uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -384,7 +384,7 @@ CHERIBSDTEST(bounds_stack_static_4096,
     "Check bounds on a 4,096-byte static stack allocation")
 {
 	uint8_t array[4096];
-	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
+	uint8_t * __capability arrayp = (uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -405,7 +405,7 @@ CHERIBSDTEST(bounds_stack_static_8192,
     "Check bounds on a 8,192-byte static stack allocation")
 {
 	uint8_t array[8192];
-	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
+	uint8_t * __capability arrayp = (uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -426,7 +426,7 @@ CHERIBSDTEST(bounds_stack_static_16384,
     "Check bounds on a 16,384-byte static stack allocation")
 {
 	uint8_t array[16384];
-	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
+	uint8_t * __capability arrayp = (uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -447,7 +447,7 @@ CHERIBSDTEST(bounds_stack_static_32768,
     "Check bounds on a 32,768-byte static stack allocation")
 {
 	uint8_t array[32768];
-	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
+	uint8_t * __capability arrayp = (uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -468,7 +468,7 @@ CHERIBSDTEST(bounds_stack_static_65536,
     "Check bounds on a 65,536-byte static stack allocation")
 {
 	uint8_t array[65536];
-	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
+	uint8_t * __capability arrayp = (uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -489,7 +489,7 @@ CHERIBSDTEST(bounds_stack_static_131072,
     "Check bounds on a 131,072-byte static stack allocation")
 {
 	uint8_t array[131072];
-	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
+	uint8_t * __capability arrayp = (uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -510,7 +510,7 @@ CHERIBSDTEST(bounds_stack_static_262144,
     "Check bounds on a 262,144-byte static stack allocation")
 {
 	uint8_t array[262144];
-	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
+	uint8_t * __capability arrayp = (uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -531,7 +531,7 @@ CHERIBSDTEST(bounds_stack_static_524288,
     "Check bounds on a 524,288-byte static stack allocation")
 {
 	uint8_t array[524288];
-	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
+	uint8_t * __capability arrayp = (uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -552,7 +552,7 @@ CHERIBSDTEST(bounds_stack_static_1048576,
     "Check bounds on a 1,048,576-byte static stack allocation")
 {
 	uint8_t array[1048576];
-	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
+	uint8_t * __capability arrayp = (uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }

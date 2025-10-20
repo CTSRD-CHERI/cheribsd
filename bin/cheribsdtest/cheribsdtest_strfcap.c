@@ -291,7 +291,7 @@ CHERIBSDTEST(strfcap_numbers, "Checks of formats of a single number")
 CHERIBSDTEST(strfcap_T, "Check of tag in format")
 {
 	char str_t[128], str_u[128];
-	char * __capability cap = (__cheri_tocap char * __capability)str_t;
+	char * __capability cap = (char * __capability)str_t;
 
 	strfcap(str_t, sizeof(str_t), "%C", (uintcap_t)cap);
 	strfcap(str_u, sizeof(str_u), "%C", (uintcap_t)cheri_cleartag(cap));

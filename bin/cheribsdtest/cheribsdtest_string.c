@@ -52,7 +52,7 @@ void * __capability
 #endif
 
 /* XXXAR: extra cast to void* to work around CTSRD-CHERI/clang#178 */
-#define	CAP(x)	((__cheri_tocap void *__capability)(void*)(x))
+#define	CAP(x)	((void *__capability)(void*)(x))
 
 /*
  * Test structure which will be memcpy'd.  Contains data and a capability in
@@ -460,7 +460,7 @@ CHERIBSDTEST(unaligned_capability_copy_memcpy,
 	/* TODO: verify the contents of the buffer? */
 
 	/* Even if we have a valid cap and operate misaligned, we should not fault. */
-	src_buffer[1] = (__cheri_tocap void* __capability)&expected_y;
+	src_buffer[1] = (void* __capability)&expected_y;
 	CHERIBSDTEST_VERIFY(!cheri_gettag(src_buffer[0]));
 	CHERIBSDTEST_VERIFY(cheri_gettag(src_buffer[1]));
 
@@ -494,7 +494,7 @@ CHERIBSDTEST(unaligned_capability_copy_memmove,
 	/* TODO: verify the contents of the buffer? */
 
 	/* Even if we have a valid cap and operate misaligned, we should not fault. */
-	src_buffer[1] = (__cheri_tocap void* __capability)&expected_y;
+	src_buffer[1] = (void* __capability)&expected_y;
 	CHERIBSDTEST_VERIFY(!cheri_gettag(src_buffer[0]));
 	CHERIBSDTEST_VERIFY(cheri_gettag(src_buffer[1]));
 

@@ -79,7 +79,7 @@ CHERIBSDTEST(ipc_pipe_sleep_signal,
 	int fds[2];
 
 	memset(buffer, 0, sizeof(buffer));
-	buffer[0] = (__cheri_tocap void * __capability)buffer;
+	buffer[0] = (void * __capability)buffer;
 
 	CHERIBSDTEST_CHECK_SYSCALL(pipe(fds));
 	CHERIBSDTEST_CHECK_SYSCALL(alarm(1));
@@ -101,7 +101,7 @@ CHERIBSDTEST(ipc_pipe_nocaps,
 	len = getpagesize();
 	buffer = calloc(1, len);
 	buffer2 = calloc(1, len);
-	buffer[0] = (__cheri_tocap void * __capability)buffer;
+	buffer[0] = (void * __capability)buffer;
 	CHERIBSDTEST_VERIFY2(cheri_gettag(buffer[0]) != 0,
 	    "pretest: tag missing");
 

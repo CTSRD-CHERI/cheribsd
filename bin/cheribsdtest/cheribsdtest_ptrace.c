@@ -100,7 +100,7 @@ CHERIBSDTEST(ptrace_readcap, "Basic tests of PIOD_READ_CHERI_CAP")
 	char capbuf[2][sizeof(uintcap_t) + 1];
 
 	pp = malloc(sizeof(*pp) * 2);
-	pp[0] = (uintcap_t)(__cheri_tocap void * __capability)&piod;
+	pp[0] = (uintcap_t)(void * __capability)&piod;
 	pp[1] = 42;
 
 	CHERIBSDTEST_VERIFY(cheri_gettag(pp[0]) != 0);
@@ -142,8 +142,8 @@ CHERIBSDTEST(ptrace_readtags, "Basic test of PIOD_READ_CHERI_TAGS")
 	pp = aligned_alloc(ppsz, ppsz);
 	memset(pp, 0, ppsz);
 
-	pp[0] = (uintcap_t)(__cheri_tocap void * __capability)&piod;
-	pp[2] = (uintcap_t)(__cheri_tocap void * __capability)tagbuf;
+	pp[0] = (uintcap_t)(void * __capability)&piod;
+	pp[2] = (uintcap_t)(void * __capability)tagbuf;
 
 	CHERIBSDTEST_VERIFY(cheri_gettag(pp[0]) != 0);
 	CHERIBSDTEST_VERIFY(cheri_gettag(pp[1]) == 0);
@@ -184,7 +184,7 @@ CHERIBSDTEST(ptrace_readcap_pageend,
 	pp = aligned_alloc(page_size, page_size);
 	memset(pp, 0, page_size);
 	last_index = (page_size / sizeof(uintcap_t)) - 1;
-	pp[last_index] = (uintcap_t)(__cheri_tocap void * __capability)&piod;
+	pp[last_index] = (uintcap_t)(void * __capability)&piod;
 
 	CHERIBSDTEST_VERIFY(cheri_gettag(pp[last_index]) != 0);
 

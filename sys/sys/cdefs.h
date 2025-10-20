@@ -979,7 +979,6 @@
 
 #if !__has_feature(cheri_casts)
 /* Support old compiler versions without CHERI casts: */
-#define __cheri_tocap
 #define __cheri_fromcap
 #define __cheri_addr
 #endif
