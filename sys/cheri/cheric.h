@@ -159,35 +159,6 @@ cheri_can_access(const void * __capability cap, ptraddr_t perms, ptraddr_t base,
 }
 
 /*
- * Two variations on cheri_ptr() based on whether we are looking for a code or
- * data capability.  The compiler's use of CFromPtr will be with respect to
- * $ddc or $pcc depending on the type of the pointer derived, so we need to
- * use types to differentiate the two versions at compile time.  We don't
- * provide the full set of function variations for code pointers as they
- * haven't proven necessary as yet.
- *
- * XXXRW: Ideally, casting via a function pointer would cause the compiler to
- * derive the capability using CFromPtr on $pcc rather than on $ddc.  This
- * appears not currently to be the case, so manually derive using
- * cheri_getpcc() for now.
- */
-#define cheri_codeptr(ptr, len)	\
-	cheri_setbounds(__builtin_cheri_cap_from_pointer(cheri_getpcc(), ptr), len)
-
-#define cheri_codeptrperm(ptr, len, perm)	\
-	cheri_andperm(cheri_codeptr(ptr, len), perm | CHERI_PERM_GLOBAL)
-
-#define cheri_ptr(ptr, len)	\
-	cheri_setbounds(    \
-	    (__cheri_tocap __typeof__((ptr)[0]) *__capability)ptr, len)
-
-#define cheri_ptrperm(ptr, len, perm)	\
-	cheri_andperm(cheri_ptr(ptr, len), perm | CHERI_PERM_GLOBAL)
-
-#define cheri_ptrpermoff(ptr, len, perm, off)	\
-	cheri_setoffset(cheri_ptrperm(ptr, len, perm), off)
-
-/*
  * Construct a capability suitable to describe a type identified by 'ptr';
  * set it to zero-length with the offset equal to the base.  The caller must
  * provide a root sealing capability.
