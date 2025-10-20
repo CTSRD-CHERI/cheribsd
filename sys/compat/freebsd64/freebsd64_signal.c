@@ -105,7 +105,7 @@ freebsd64_sigaction(struct thread *td, struct freebsd64_sigaction_args *uap)
 	error = kern_sigaction(td, uap->sig, actp, oactp, 0);
 	if (oactp && !error) {
 		memset(&oact64, 0, sizeof(oact64));
-		oact64.sa_u = (__cheri_addr ptraddr_t)oactp->sa_handler;
+		oact64.sa_u = (ptraddr_t)oactp->sa_handler;
 		oact64.sa_flags = oactp->sa_flags;
 		oact64.sa_mask = oactp->sa_mask;
 		error = copyout(&oact64, __USER_CAP_OBJ(uap->oact),
@@ -138,8 +138,8 @@ siginfo_to_siginfo64(const siginfo_t *si, struct __siginfo64 *si64)
 	si64->si_pid = si->si_pid;
 	si64->si_uid = si->si_uid;
 	si64->si_status = si->si_status;
-	si64->si_addr = (__cheri_addr uint64_t)si->si_addr;
-	si64->si_value.sival_ptr = (__cheri_addr uint64_t)si->si_value.sival_ptr;
+	si64->si_addr = (uint64_t)si->si_addr;
+	si64->si_value.sival_ptr = (uint64_t)si->si_value.sival_ptr;
 	_Static_assert(sizeof(si64->_reason) == sizeof(si->_reason),
 	    "siginfo _reason size mismatch");
 	memcpy(&si64->_reason, &si->_reason, sizeof(si64->_reason));
@@ -205,7 +205,7 @@ freebsd64_sigaltstack(struct thread *td,
 		return (error);
 	if (uap->oss != NULL) {
 		memset(&ss64, 0, sizeof(ss64));
-		ss64.ss_sp = (__cheri_addr uint64_t)oss.ss_sp;
+		ss64.ss_sp = (uint64_t)oss.ss_sp;
 		ss64.ss_size = oss.ss_size;
 		ss64.ss_flags = oss.ss_flags;
 		error = copyout(&ss64, __USER_CAP_OBJ(uap->oss), sizeof(ss64));

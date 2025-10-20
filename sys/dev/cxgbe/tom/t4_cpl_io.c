@@ -2112,7 +2112,7 @@ alloc_aiotx_mbuf(struct kaiocb *job, int len)
 	map = &vm->vm_map;
 	start = __DEVOLATILE_CAP(char * __capability, job->uaiocb.aio_buf) +
 	    job->aio_sent;
-	pgoff = (__cheri_addr vm_offset_t)start & PAGE_MASK;
+	pgoff = (vm_offset_t)start & PAGE_MASK;
 
 	top = NULL;
 	last = NULL;

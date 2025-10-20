@@ -245,7 +245,7 @@ __get_user_pages_fast(void * __capability addr, int nr_pages, int write,
 #endif
 	MPASS(pages != NULL);
 	map = &curthread->td_proc->p_vmspace->vm_map;
-	start = (__cheri_addr vm_offset_t)addr;
+	start = (vm_offset_t)addr;
 	end = start + len;
 	if (!vm_map_range_valid(map, start, end))
 		return (-EINVAL);

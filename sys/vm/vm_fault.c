@@ -2370,8 +2370,8 @@ vm_fault_quick_hold_pages(vm_map_t map, void * __capability addr, vm_size_t len,
 	if (!__CAP_CHECK(addr, len) || !vm_cap_allows_prot(addr, prot))
 		return (-1);
 #endif
-	start = (__cheri_addr vm_offset_t)trunc_page(addr);
-	end = (__cheri_addr vm_offset_t)round_page((char * __capability)addr + len);
+	start = (vm_offset_t)trunc_page(addr);
+	end = (vm_offset_t)round_page((char * __capability)addr + len);
 
 	if (!vm_map_range_valid(map, start, end))
 		return (-1);

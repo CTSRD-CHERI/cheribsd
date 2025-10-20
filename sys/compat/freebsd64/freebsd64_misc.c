@@ -227,7 +227,7 @@ freebsd64_kevent_copyout(void *arg, struct kevent *kevp, int count)
 		ks64[i].flags = kevp[i].flags;
 		ks64[i].fflags = kevp[i].fflags;
 		ks64[i].data = kevp[i].data;
-		ks64[i].udata = (__cheri_addr uint64_t)kevp[i].udata;
+		ks64[i].udata = (uint64_t)kevp[i].udata;
 		memcpy(&ks64[i].ext[0], &kevp->ext[0], sizeof(kevp->ext));
 	}
 	error = copyout(ks64, __USER_CAP_ARRAY(uap->eventlist, count),
@@ -310,12 +310,12 @@ kevent11_freebsd64_copyout(void *arg, struct kevent *kevp, int count)
 	uap = (struct freebsd11_freebsd64_kevent_args *)arg;
 
 	for (i = 0; i < count; i++) {
-		kev11.ident = (__cheri_addr uint64_t)kevp->ident;
+		kev11.ident = (uint64_t)kevp->ident;
 		kev11.filter = kevp->filter;
 		kev11.flags = kevp->flags;
 		kev11.fflags = kevp->fflags;
 		kev11.data = kevp->data;
-		kev11.udata = (__cheri_addr uint64_t)kevp->udata;
+		kev11.udata = (uint64_t)kevp->udata;
 		error = copyout(&kev11, __USER_CAP_OBJ(uap->eventlist),
 		    sizeof(kev11));
 		if (error != 0)
@@ -829,7 +829,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
 	imgp->argv = cheri_setbounds(vectp, (argc + 1) * sizeof(*vectp));
-	if (suword(&arginfo->ps_argvstr, (__cheri_addr uint64_t)vectp) != 0 ||
+	if (suword(&arginfo->ps_argvstr, (uint64_t)vectp) != 0 ||
 	    suword32(&arginfo->ps_nargvstr, argc) != 0)
 		return (EFAULT);
 
@@ -849,7 +849,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		return (EFAULT);
 
 	imgp->envv = cheri_setbounds(vectp, (envc + 1) * sizeof(*vectp));
-	if (suword(&arginfo->ps_envstr, (__cheri_addr uint64_t)vectp) != 0 ||
+	if (suword(&arginfo->ps_envstr, (uint64_t)vectp) != 0 ||
 	    suword32(&arginfo->ps_nenvstr, envc) != 0)
 		return (EFAULT);
 
@@ -1252,7 +1252,7 @@ freebsd64_kldstat(struct thread *td, struct freebsd64_kldstat_args *uap)
 	bcopy(&stat.name[0], &stat64.name[0], sizeof(stat.name));
 	CP(stat, stat64, refs);
 	CP(stat, stat64, id);
-	stat64.address = (__cheri_addr uint64_t)stat.address;
+	stat64.address = (uint64_t)stat.address;
 	CP(stat, stat64, size);
 	bcopy(&stat.pathname[0], &stat64.pathname[0], sizeof(stat.pathname));
 	return (copyout(&stat64, __USER_CAP(uap->stat, version), version));

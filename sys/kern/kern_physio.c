@@ -166,7 +166,7 @@ physio(struct cdev *dev, struct uio *uio, int ioflag)
 					error = EFAULT;
 					goto doerror;
 				}
-				poff = (__cheri_addr vm_offset_t)base & PAGE_MASK;
+				poff = (vm_offset_t)base & PAGE_MASK;
 				if (pbuf && sa) {
 					pmap_qenter((vm_offset_t)sa,
 					    pages, npages);

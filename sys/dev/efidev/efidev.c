@@ -292,7 +292,7 @@ vs_out:
 
 		CP(*ev, *ev64, attrib);
 		/* Can be replaced with NULL */
-		ev64->data = (__cheri_addr uint64_t)ev->data;
+		ev64->data = (uint64_t)ev->data;
 		CP(*ev, *ev64, datasize);
 		break;
 	}
@@ -302,7 +302,7 @@ vs_out:
 		struct efi_var_ioc *ev = &local_ev;
 
 		/* Can be replaced with NULL */
-		ev64->name = (__cheri_addr uint64_t)ev->name;
+		ev64->name = (uint64_t)ev->name;
 		CP(*ev, *ev64, namesize);
 		CP(*ev, *ev64, vendor);
 		break;

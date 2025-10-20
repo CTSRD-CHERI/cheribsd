@@ -976,7 +976,7 @@ pipe_build_write_buffer(struct pipe *wpipe, struct uio *uio)
 
 	wpipe->pipe_pages.npages = i;
 	wpipe->pipe_pages.pos =
-	    ((__cheri_addr vm_offset_t) uio->uio_iov->iov_base) & PAGE_MASK;
+	    ((vm_offset_t) uio->uio_iov->iov_base) & PAGE_MASK;
 	wpipe->pipe_pages.cnt = size;
 
 	IOVEC_ADVANCE(uio->uio_iov, size);

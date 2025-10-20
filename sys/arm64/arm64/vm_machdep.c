@@ -249,7 +249,7 @@ cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
 		if (SV_PROC_FLAG(td->td_proc, SV_UNBOUND_PCC))
 			tf->tf_elr = cheri_setaddress(tf->tf_elr,
-			    (__cheri_addr ptraddr_t)entry);
+			    (ptraddr_t)entry);
 		else
 			trapframe_set_elr(tf, (uintcap_t)entry);
 	} else
@@ -268,7 +268,7 @@ cpu_set_user_tls(struct thread *td, void * __capability tls_base)
 {
 	struct pcb *pcb;
 
-	if ((__cheri_addr ptraddr_t)tls_base >= VM_MAXUSER_ADDRESS)
+	if ((ptraddr_t)tls_base >= VM_MAXUSER_ADDRESS)
 		return (EINVAL);
 
 	pcb = td->td_pcb;

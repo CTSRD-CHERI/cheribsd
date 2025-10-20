@@ -786,7 +786,7 @@ linux_dev_fdopen(struct cdev *dev, int fflags, struct thread *td,
 static inline int
 linux_remap_address(void * __capability *uaddr, size_t len)
 {
-	ptraddr_t uaddr_val = (__cheri_addr ptraddr_t)(*uaddr);
+	ptraddr_t uaddr_val = (ptraddr_t)(*uaddr);
 
 	if (unlikely(uaddr_val >= LINUX_IOCTL_MIN_PTR &&
 	    uaddr_val < LINUX_IOCTL_MAX_PTR)) {
@@ -883,8 +883,8 @@ linux_access_ok(const void * __capability uaddr, size_t len)
 	ptraddr_t eaddr;
 
 	/* get start and end address */
-	saddr = (__cheri_addr ptraddr_t)uaddr;
-	eaddr = (__cheri_addr ptraddr_t)uaddr + len;
+	saddr = (ptraddr_t)uaddr;
+	eaddr = (ptraddr_t)uaddr + len;
 
 	/* verify addresses are valid for userspace */
 	return ((saddr == eaddr) ||

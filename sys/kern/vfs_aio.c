@@ -1296,7 +1296,7 @@ aio_qbio(struct proc *p, struct kaiocb *job)
 		bios[i] = g_alloc_bio();
 		bp = bios[i];
 
-		poff = (__cheri_addr vm_offset_t)buf & PAGE_MASK;
+		poff = (vm_offset_t)buf & PAGE_MASK;
 		if (use_unmapped) {
 			pbuf = NULL;
 			pages = malloc(sizeof(vm_page_t) * (atop(round_page(
@@ -1674,7 +1674,7 @@ aio_aqueue(struct thread *td, struct aiocb * __capability ujob,
 	}
 	kqfd = job->uaiocb.aio_sigevent.sigev_notify_kqueue;
 	memset(&kev, 0, sizeof(kev));
-	kev.ident = (__cheri_addr ptraddr_t)job->ujob;
+	kev.ident = (ptraddr_t)job->ujob;
 	kev.filter = EVFILT_AIO;
 	kev.flags = EV_ADD | EV_ENABLE | EV_FLAG1 | evflags;
 	kev.udata = job->uaiocb.aio_sigevent.sigev_value.sival_ptr;
@@ -1947,7 +1947,7 @@ kern_aio_return(struct thread *td, void * __capability ujob,
 		return (EINVAL);
 	AIO_LOCK(ki);
 	TAILQ_FOREACH(job, &ki->kaio_done, plist) {
-		if ((__cheri_addr ptraddr_t)job->ujob == (__cheri_addr ptraddr_t)ujob)
+		if ((ptraddr_t)job->ujob == (ptraddr_t)ujob)
 			break;
 	}
 	if (job != NULL) {
@@ -2107,7 +2107,7 @@ kern_aio_cancel(struct thread *td, int fd, void * __capability ujob,
 	TAILQ_FOREACH_SAFE(job, &ki->kaio_jobqueue, plist, jobn) {
 		if ((fd == job->uaiocb.aio_fildes) &&
 		    ((ujob == NULL) ||
-		     ((__cheri_addr ptraddr_t)ujob == (__cheri_addr ptraddr_t)job->ujob))) {
+		     ((ptraddr_t)ujob == (ptraddr_t)job->ujob))) {
 			if (aio_cancel_job(p, ki, job)) {
 				cancelled++;
 			} else {
@@ -3046,7 +3046,7 @@ aiocb32_store_aiocb(struct aiocb ** __capability ujobp,
     struct aiocb * __capability ujob)
 {
 
-	return (suword32(ujobp, (__cheri_addr ptraddr_t)ujob));
+	return (suword32(ujobp, (ptraddr_t)ujob));
 }
 
 static size_t
@@ -3503,7 +3503,7 @@ aiocb64_store_aiocb(struct aiocb ** __capability ujobp,
     struct aiocb * __capability ujob)
 {
 
-	return (suword(ujobp, (__cheri_addr ptraddr_t)ujob));
+	return (suword(ujobp, (ptraddr_t)ujob));
 }
 
 static size_t

@@ -363,7 +363,7 @@ kern_shmdt_locked(struct thread *td, const void * __capability shmaddr)
 		KASSERT(shmmap_s->shmid == -1 || shmmap_s->va != 0,
 		    ("SysV SHM segment %d mapped at NULL\n", shmmap_s->shmid));
 		if (shmmap_s->shmid != -1 &&
-		    shmmap_s->va == (__cheri_addr vm_offset_t)shmaddr) {
+		    shmmap_s->va == (vm_offset_t)shmaddr) {
 			break;
 		}
 	}
@@ -478,11 +478,11 @@ kern_shmat_locked(struct thread *td, int shmid,
 	if ((shmflg & SHM_RDONLY) == 0)
 		prot |= VM_PROT_WRITE;
 	if (shmaddr != NULL) {
-		attach_va = (__cheri_addr vm_offset_t)shmaddr;
+		attach_va = (vm_offset_t)shmaddr;
 		if ((shmflg & SHM_RND) != 0)
 			attach_va = rounddown2(attach_va, SHMLBA);
-		else if (((__cheri_addr vm_offset_t)shmaddr & (SHMLBA-1)) == 0)
-			attach_va = (__cheri_addr vm_offset_t)shmaddr;
+		else if (((vm_offset_t)shmaddr & (SHMLBA-1)) == 0)
+			attach_va = (vm_offset_t)shmaddr;
 		else
 			return (EINVAL);
 #if __has_feature(capabilities)

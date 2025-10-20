@@ -196,7 +196,7 @@ ffs_rawread_readahead(struct vnode *vp,
 	ip = VTOI(vp);
 	dp = ITODEVVP(ip);
 
-	iolen = ((__cheri_addr vm_offset_t) udata) & PAGE_MASK;
+	iolen = ((vm_offset_t) udata) & PAGE_MASK;
 	bp->b_bcount = len;
 	if (bp->b_bcount + iolen > bp->b_kvasize) {
 		bp->b_bcount = bp->b_kvasize;
