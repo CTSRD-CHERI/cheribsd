@@ -144,12 +144,7 @@
 /* Compare capabilities including bounds and perms etc. */
 #define cheri_equal_exact(x, y) __builtin_cheri_equal_exact(x, y)
 
-#ifdef __riscv
-#define	cheri_loadtags(m)						\
-	__builtin_cheri_cap_load_tags((__cheri_tocap void * __capability)(m))
-#else
 #define	cheri_loadtags(m)	__builtin_cheri_cap_load_tags((m))
-#endif
 
 #endif /* __WANT_OLD_CHERI_MACROS */
 
