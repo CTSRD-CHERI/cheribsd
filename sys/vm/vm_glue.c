@@ -175,7 +175,7 @@ useracc(void * __capability cap, int len, int rw)
 	if (!cheri_can_access(cap, vm_prot2perms(0, prot), len))
 		return (false);
 #endif
-	addr = (__cheri_addr vm_offset_t)cap;
+	addr = (vm_offset_t)cap;
 	map = &curproc->p_vmspace->vm_map;
 	if (addr + len > vm_map_max(map) || addr + len < addr) {
 		return (false);
@@ -199,7 +199,7 @@ vslock(void * __capability addr, size_t len, vm_prot_t prot __unused)
 	    vm_prot2perms(0, prot | VM_PROT_NO_IMPLY_CAP), len))
 		return (EPROT);
 #endif
-	vaddr = (__cheri_addr vm_offset_t)addr;
+	vaddr = (vm_offset_t)addr;
 	last = vaddr + len;
 	start = trunc_page(vaddr);
 	end = round_page(last);
@@ -228,7 +228,7 @@ vsunlock(void * __capability addr, size_t len)
 	vm_offset_t vaddr;
 
 	/* Rely on the parameter sanity checks performed by vslock(). */
-	vaddr = (__cheri_addr vm_offset_t)addr;
+	vaddr = (vm_offset_t)addr;
 	MPASS(curthread->td_vslock_sz >= len);
 	curthread->td_vslock_sz -= len;
 	(void)vm_map_unwire(&curproc->p_vmspace->vm_map,
