@@ -512,7 +512,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 			 * capability.
 			 */
 			addr1 = elf_relocaddr(lf, val + addend) - addend;
-			base = (__cheri_tocap void * __capability)
+			base = (void * __capability)
 			    (val == addr1 ? relocbase :
 			    linker_kernel_file->address);
 			*(uintcap_t *)(void *)where = build_reloc_cap(addr1,
