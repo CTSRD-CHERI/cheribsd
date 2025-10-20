@@ -76,7 +76,8 @@ CHERIBSDTEST(fault_bounds, "Exercise capability bounds check failure",
     .ct_si_code = PROT_CHERI_BOUNDS,
     .ct_si_trapno = TRAPNO_LOAD_STORE)
 {
-	char * __capability arrayp = cheri_ptr(array, sizeof(array));
+	char * __capability arrayp =
+	    cheri_bounds_set((void * __capability)array, sizeof(array));
 	int i;
 
 	for (i = 0; i < ARRAY_LEN; i++)
@@ -93,7 +94,8 @@ CHERIBSDTEST(fault_perm_load,
     .ct_si_code = PROT_CHERI_PERM,
     .ct_si_trapno = TRAPNO_LOAD_STORE)
 {
-	char * __capability arrayp = cheri_ptrperm(array, sizeof(array), 0);
+	char * __capability arrayp =
+	    cheri_perms_and((void * __capability)array, 0);
 
 	sink = arrayp[0];
 
@@ -103,8 +105,8 @@ CHERIBSDTEST(fault_perm_load,
 CHERIBSDTEST(nofault_perm_load,
     "Exercise capability load permission success")
 {
-	char * __capability arrayp = cheri_ptrperm(array, sizeof(array),
-	    CHERI_PERM_LOAD);
+	char * __capability arrayp =
+	    cheri_perms_and((void * __capability)array, CHERI_PERM_LOAD);
 
 	sink = arrayp[0];
 	cheribsdtest_success();
@@ -152,7 +154,8 @@ CHERIBSDTEST(fault_perm_store,
     .ct_si_code = PROT_CHERI_PERM,
     .ct_si_trapno = TRAPNO_LOAD_STORE)
 {
-	char * __capability arrayp = cheri_ptrperm(array, sizeof(array), 0);
+	char * __capability arrayp =
+	    cheri_perms_and((void * __capability)array, 0);
 
 	arrayp[0] = sink;
 }
@@ -160,8 +163,8 @@ CHERIBSDTEST(fault_perm_store,
 CHERIBSDTEST(nofault_perm_store,
     "Exercise capability store permission success")
 {
-	char * __capability arrayp = cheri_ptrperm(array, sizeof(array),
-	    CHERI_PERM_STORE);
+	char * __capability arrayp =
+	    cheri_perms_and((void * __capability)array, CHERI_PERM_STORE);
 
 	arrayp[0] = sink;
 	cheribsdtest_success();
@@ -213,7 +216,7 @@ CHERIBSDTEST(fault_tag, "Store via untagged capability",
     .ct_si_trapno = TRAPNO_LOAD_STORE)
 {
 	char ch;
-	char * __capability chp = cheri_ptr(&ch, sizeof(ch));
+	char * __capability chp = (void * __capability)&ch;
 
 	chp = cheri_tag_clear(chp);
 	*chp = '\0';
@@ -225,7 +228,7 @@ CHERIBSDTEST(nofault_cfromptr, "Exercise CFromPtr success")
 	void * __capability cb; /* derived from here */
 	char * __capability cd; /* stored into here */
 
-	cb = cheri_ptr(buf, 256);
+	cb = cheri_bounds_set((void * __capability)buf, 256);
 	cd = __builtin_cheri_cap_from_pointer(cb, (ptraddr_t)buf + 10);
 	*cd = '\0';
 	cheribsdtest_success();
