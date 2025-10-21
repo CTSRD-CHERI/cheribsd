@@ -369,8 +369,8 @@ sysdecode_utrace(FILE *fp, void *p, size_t len)
 		memset(&ur, 0, sizeof(ur));
 		memcpy(ur.sig, rc->sig, sizeof(ur.sig));
 		ur.event = rc->event;
-		ur.handle = (void *)(__cheri_addr uintptr_t)rc->handle;
-		ur.mapbase = (void *)(__cheri_addr uintptr_t)rc->mapbase;
+		ur.handle = (void *)(uintptr_t)rc->handle;
+		ur.mapbase = (void *)(uintptr_t)rc->mapbase;
 		ur.mapsize = rc->mapsize;
 		ur.refcnt = rc->refcnt;
 		memcpy(ur.name, rc->name, sizeof(ur.name));
@@ -380,9 +380,9 @@ sysdecode_utrace(FILE *fp, void *p, size_t len)
 	if (len == sizeof(struct utrace_malloc_cheri)) {
 		mc = p;
 		memset(&um, 0, sizeof(um));
-		um.p = (void *)(__cheri_addr uintptr_t)mc->p;
+		um.p = (void *)(uintptr_t)mc->p;
 		um.s = mc->s;
-		um.r = (void *)(__cheri_addr uintptr_t)mc->r;
+		um.r = (void *)(uintptr_t)mc->r;
 		print_utrace_malloc(fp, &um);
 		return (1);
 	}

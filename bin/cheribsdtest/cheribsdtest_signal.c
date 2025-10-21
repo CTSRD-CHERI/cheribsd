@@ -124,7 +124,7 @@ static void
 sigaltstack_func(int signum __unused)
 {
 	int x;
-	sigaltstack_local_addr = (__cheri_addr size_t)&x;
+	sigaltstack_local_addr = (size_t)&x;
 }
 
 CHERIBSDTEST(signal_sigaltstack,
@@ -139,7 +139,7 @@ CHERIBSDTEST(signal_sigaltstack,
 		cheribsdtest_failure_errx("malloc(SIGSTKSZ) failed: %s",
 		                       strerror(errno));
 
-	altstack_addr = (__cheri_addr size_t)sigstk.ss_sp;
+	altstack_addr = (size_t)sigstk.ss_sp;
 	sigstk.ss_size = SIGSTKSZ;
 	sigstk.ss_flags = 0;
 	if (sigaltstack(&sigstk, NULL) != 0)
@@ -177,7 +177,7 @@ static void
 sigaltstack_disable_func(int signum __unused)
 {
 	int x;
-	sigaltstack_disable_local_addr = (__cheri_addr size_t)&x;
+	sigaltstack_disable_local_addr = (size_t)&x;
 }
 
 CHERIBSDTEST(signal_sigaltstack_disable,
@@ -191,7 +191,7 @@ CHERIBSDTEST(signal_sigaltstack_disable,
 		cheribsdtest_failure_errx("malloc(SIGSTKSZ) failed: %s",
 		                       strerror(errno));
 
-	altstack_addr = (__cheri_addr size_t)sigstk.ss_sp;
+	altstack_addr = (size_t)sigstk.ss_sp;
 	sigstk.ss_size = SIGSTKSZ;
 	sigstk.ss_flags = 0;
 	if (sigaltstack(&sigstk, NULL) != 0)
