@@ -343,7 +343,7 @@ public:
 #ifdef __CHERI_PURE_CAPABILITY__
     return (uintcap_t)cap;
 #elif __has_feature(capabilities)
-    return (__cheri_addr pint_t)cap;
+    return (pint_t)cap;
 #else
     pint_t result;
     memcpy(&result, &cap, uw_min(sizeof(result), sizeof(cap)));
@@ -1012,11 +1012,11 @@ inline bool LocalAddressSpace::findFunctionName(pc_t ip, char *buf,
   if (dladdr((void *)ip.get(), &dyldInfo)) {
     if (dyldInfo.dli_sname != NULL) {
       snprintf(buf, bufLen, "%s", dyldInfo.dli_sname);
-      *offset = ip.address() - (__cheri_addr addr_t)dyldInfo.dli_saddr;
+      *offset = ip.address() - (addr_t)dyldInfo.dli_saddr;
       return true;
     } else if (dyldInfo.dli_fname != NULL) {
       snprintf(buf, bufLen, "%s", dyldInfo.dli_fname);
-      *offset = ip.address() - (__cheri_addr addr_t)dyldInfo.dli_fbase;
+      *offset = ip.address() - (addr_t)dyldInfo.dli_fbase;
       return true;
     }
   }

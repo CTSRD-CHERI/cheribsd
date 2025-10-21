@@ -312,7 +312,7 @@ caprev_shadow_nomap_set(ptraddr_t sbase, uint64_t * __capability sb,
     void * __capability priv_obj, void * __capability user_obj)
 {
 	return (caprev_shadow_nomap_set_len(sbase, sb,
-	    (__cheri_addr ptraddr_t)priv_obj, cheri_getlen(priv_obj),
+	    (ptraddr_t)priv_obj, cheri_getlen(priv_obj),
 	    user_obj));
 }
 
@@ -388,7 +388,7 @@ caprev_shadow_nomap_clear(ptraddr_t sbase, uint64_t * __capability sb,
     void * __capability obj)
 {
 	return (caprev_shadow_nomap_clear_len(sbase, sb,
-	    (__cheri_addr ptraddr_t)obj, cheri_getlen(obj)));
+	    (ptraddr_t)obj, cheri_getlen(obj)));
 }
 
 /*
