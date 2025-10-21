@@ -416,8 +416,8 @@ core_read_ps_strings(struct procstat_core *core, vm_offset_t psstrings,
 			return ((vm_offset_t)0);
 		nargstr = pss.ps_nargvstr;
 		nenvstr = pss.ps_nenvstr;
-		argaddr = (__cheri_addr vm_offset_t)pss.ps_argvstr;
-		envaddr = (__cheri_addr vm_offset_t)pss.ps_envstr;
+		argaddr = (vm_offset_t)pss.ps_argvstr;
+		envaddr = (vm_offset_t)pss.ps_envstr;
 		*size = sizeof(uintcap_t);
 	} else
 #endif
@@ -451,7 +451,7 @@ core_image_off(struct procstat_core *core __unused, char **ptr, int i)
 	if (core_is_cheri(core)) {
 		char * __capability *cap = (char * __capability *)
 		    __builtin_assume_aligned(ptr, sizeof(char * __capability));
-		return ((__cheri_addr vm_offset_t)cap[i]);
+		return ((vm_offset_t)cap[i]);
 	} else
 #endif
 		return ((vm_offset_t)ptr[i]);
@@ -573,7 +573,7 @@ get_auxv(struct procstat_core *core __unused, void *auxv, size_t *lenp __unused)
 		for (i = 0; i < count; i++) {
 			buf[i].a_type = auxv_cheri[i].a_type;
 			if (is_auxv_ptr(auxv_cheri[i].a_type))
-				buf[i].a_un.a_ptr = (void *)(__cheri_addr uintptr_t)
+				buf[i].a_un.a_ptr = (void *)(uintptr_t)
 				    auxv_cheri[i].a_un.a_ptr;
 			else
 				buf[i].a_un.a_val = auxv_cheri[i].a_un.a_val;
