@@ -95,6 +95,7 @@ LIB32_MACHINE_ABI+=	time32
 .else
 LIB32_MACHINE_ABI+=	time64
 .endif
+LIB32_MACHINE_CPU=	${MACHINE_CPU}
 .endif # ${MK_LIB32} != "no"
 
 # -------------------------------------------------------------------
@@ -104,11 +105,11 @@ LIB32_MACHINE_ABI+=	time64
 HAS_COMPAT+=	64
 LIB64_MACHINE=	arm64
 LIB64_MACHINE_ARCH=aarch64
-LIB64WMAKEENV=	MACHINE_CPU="arm64 cheri"
-LIB64WMAKEFLAGS= LD="${XLD}" CPUTYPE=morello
+LIB64WMAKEENV=	MACHINE_CPU="arm64"
+LIB64WMAKEFLAGS= LD="${XLD}" CPUTYPE=
 # XXX: clang specific
 LIB64CPUFLAGS=	-target aarch64-unknown-freebsd13.0
-LIB64CPUFLAGS+=	-march=morello -mabi=aapcs
+LIB64CPUFLAGS+=	-mabi=aapcs -march=armv8-a
 .endif
 
 .if ${COMPAT_ARCH:Mriscv*c*}
@@ -116,8 +117,8 @@ HAS_COMPAT+=	64
 LIB64_RISCV_ABI=	lp64d
 LIB64_MACHINE=	riscv
 LIB64_MACHINE_ARCH=riscv64
-LIB64WMAKEENV=	MACHINE_CPU="riscv cheri"
-LIB64WMAKEFLAGS= LD="${XLD}" CPUTYPE=cheri
+LIB64WMAKEENV=	MACHINE_CPU="riscv"
+LIB64WMAKEFLAGS= LD="${XLD}" CPUTYPE=
 # XXX: clang specific
 LIB64CPUFLAGS=	-target riscv64-unknown-freebsd13.0
 LIB64CPUFLAGS+=	-march=${LIB64_RISCV_MARCH} -mabi=${LIB64_RISCV_ABI}
@@ -127,6 +128,7 @@ LIB64WMAKEFLAGS+= NM="${XNM}" OBJCOPY="${XOBJCOPY}"
 
 LIB64DTRACE=	${DTRACE} -64
 LIB64_MACHINE_ABI=	${MACHINE_ABI:Npurecap:Nptr*} ptr64
+LIB64_MACHINE_CPU=	${MACHINE_CPU:Ncheri}
 .endif # ${MK_LIB64} != "no"
 
 # -------------------------------------------------------------------
@@ -153,7 +155,7 @@ LIB64CCPUFLAGS+=	-march=${LIB64C_RISCV_MARCH} -mabi=${LIB64C_RISCV_ABI}
 .for _LIBCOMPAT in ${HAS_COMPAT}
 # See bsd.cpu.mk
 LIB${_LIBCOMPAT}_RISCV_MARCH=	rv64imafdc
-.if ${COMPAT_ARCH:Mriscv*c*} || ${_LIBCOMPAT:M64C}
+.if ${_LIBCOMPAT:M64C}
 LIB${_LIBCOMPAT}_RISCV_MARCH:=	${LIB${_LIBCOMPAT}_RISCV_MARCH}xcheri
 .endif
 .endfor
@@ -162,6 +164,7 @@ LIB${_LIBCOMPAT}_RISCV_MARCH:=	${LIB${_LIBCOMPAT}_RISCV_MARCH}xcheri
 # Common CHERI flags
 .if defined(HAS_COMPAT) && ${HAS_COMPAT:M64C}
 LIB64C_MACHINE_ABI=	${MACHINE_ABI:Nptr*} purecap ptr128c
+LIB64C_MACHINE_CPU=	${MACHINE_CPU} cheri
 
 # This duplicates some logic in bsd.cpu.mk that is needed for the
 # WANT_COMPAT/NEED_COMPAT case.
@@ -195,6 +198,7 @@ LIB64CCFLAGS+=	-mllvm -cheri-subobject-bounds-clear-swperm=2
 HAS_COMPAT+=	64CB
 LIB64CB_MACHINE=	arm64
 LIB64CB_MACHINE_ARCH=aarch64cb
+LIB64CB_MACHINE_CPU=	${MACHINE_CPU}
 LIB64CBCPUFLAGS=	-target aarch64-unknown-freebsd13.0
 LIB64CBCPUFLAGS+=	-march=morello -mabi=purecap-benchmark
 LIB64CB_MACHINE_ABI=	${MACHINE_ABI:Nptr*:Npurecap} purecap ptr128c benchmark
@@ -260,7 +264,7 @@ libcompats=	${_LIBCOMPATS:tl}
 # Update MACHINE and MACHINE_ARCH so they can be used in bsd.opts.mk via
 # bsd.compiler.mk
 .if defined(USE_COMPAT)
-_LIBCOMPAT_MAKEVARS=	_MACHINE _MACHINE_ARCH _MACHINE_ABI
+_LIBCOMPAT_MAKEVARS=	_MACHINE _MACHINE_ARCH _MACHINE_ABI _MACHINE_CPU
 .for _var in ${_LIBCOMPAT_MAKEVARS}
 .if !empty(LIB${USE_COMPAT}${_var})
 LIBCOMPAT${_var}?=	${LIB${USE_COMPAT}${_var}}
@@ -270,6 +274,7 @@ LIBCOMPAT${_var}?=	${LIB${USE_COMPAT}${_var}}
 MACHINE:=	${LIBCOMPAT_MACHINE}
 MACHINE_ARCH:=	${LIBCOMPAT_MACHINE_ARCH}
 MACHINE_ABI:=	${LIBCOMPAT_MACHINE_ABI}
+MACHINE_CPU:=	${LIBCOMPAT_MACHINE_CPU}
 .endif
 
 .if !defined(COMPAT_COMPILER_TYPE)
