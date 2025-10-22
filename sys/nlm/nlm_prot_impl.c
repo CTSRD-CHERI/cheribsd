@@ -1425,7 +1425,7 @@ extern void nlm_prog_4(struct svc_req *rqstp, SVCXPRT *transp);
 
 static int
 nlm_register_services(SVCPOOL *pool, int addr_count,
-    char * __capability * __capability addrs)
+    char **addrs)
 {
 	static rpcvers_t versions[] = {
 		NLM_SM, NLM_VERS, NLM_VERSX, NLM_VERS4
@@ -1460,7 +1460,7 @@ nlm_register_services(SVCPOOL *pool, int addr_count,
 			 * same transports.
 			 */
 			if (i == 0) {
-				char * __capability up;
+				char *up;
 
 				error = copyin(&addrs[2*j], &up,
 				    sizeof(up));
@@ -1524,7 +1524,7 @@ out:
  * by a signal.
  */
 static int
-nlm_server_main(int addr_count, char * __capability * __capability addrs)
+nlm_server_main(int addr_count, char **addrs)
 {
 	struct thread *td = curthread;
 	int error;

@@ -160,7 +160,7 @@ kernacc(void *addr, int len, int rw)
  * used in conjunction with this call.
  */
 bool
-useracc(void * __capability cap, int len, int rw)
+useracc(void *cap, int len, int rw)
 {
 	vm_offset_t addr;
 	boolean_t rv;
@@ -187,7 +187,7 @@ useracc(void * __capability cap, int len, int rw)
 }
 
 int
-vslock(void * __capability addr, size_t len)
+vslock(void *addr, size_t len)
 {
 	vm_offset_t end, last, start, vaddr;
 	vm_size_t npages;
@@ -219,7 +219,7 @@ vslock(void * __capability addr, size_t len)
 }
 
 void
-vsunlock(void * __capability addr, size_t len)
+vsunlock(void *addr, size_t len)
 {
 	vm_offset_t vaddr;
 
@@ -860,7 +860,7 @@ vm_waitproc(struct proc *p)
 
 #if __has_feature(capabilities)
 bool
-vm_cap_allows_prot(const void * __capability cap, vm_prot_t prot)
+vm_cap_allows_prot(const void *cap, vm_prot_t prot)
 {
 	register_t reqperm;
 

@@ -56,11 +56,11 @@
 /*
  * Create a pointer to a function.
  */
-static inline dlfunc_t __capability
+static inline dlfunc_t
 make_code_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
     bool tight_bounds, size_t addend)
 {
-	const void * __capability ret;
+	const void *ret;
 
 	ret = pcc_cap(defobj, def->st_value);
 	/* Remove store and seal permissions */
@@ -75,13 +75,13 @@ make_code_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
 	ret = cheri_incoffset(ret, addend);
 	/* All code pointers should be sentries: */
 	ret = __builtin_cheri_seal_entry(ret);
-	return __DECONST_CAP(dlfunc_t __capability, ret);
+	return __DECONST_CAP(dlfunc_t, ret);
 }
 
 /*
  * Create a function pointer that can be called anywhere
  */
-static inline dlfunc_t __capability
+static inline dlfunc_t
 make_function_cap_with_addend(const Elf_Sym *def,
     const struct Struct_Obj_Entry *defobj, size_t addend)
 {
@@ -89,16 +89,16 @@ make_function_cap_with_addend(const Elf_Sym *def,
 	return make_code_cap(def, defobj, /*tight_bounds=*/false, addend);
 }
 
-static inline dlfunc_t __capability
+static inline dlfunc_t
 make_function_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
 {
 	return make_function_cap_with_addend(def, defobj, /*addend=*/0);
 }
 
-static inline void * __capability
+static inline void *
 make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
 {
-	void * __capability ret;
+	void *ret;
 	ret = get_datasegment_cap(defobj) + def->st_value;
 	/* Remove execute and seal permissions */
 	ret = cheri_clearperm(ret, DATA_PTR_REMOVE_PERMS);

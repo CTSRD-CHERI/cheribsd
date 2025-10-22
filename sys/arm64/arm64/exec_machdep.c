@@ -448,37 +448,37 @@ fill_capregs(struct thread *td, struct capreg *regs)
 
 	for (i = 0; i < nitems(frame->tf_x); i++) {
 		regs->c[i] = frame->tf_x[i];
-		if (cheri_gettag((void * __capability)frame->tf_x[i]))
+		if (cheri_gettag((void *)frame->tf_x[i]))
 			regs->tagmask |= (uint64_t)1 << i;
 	}
-	if (cheri_gettag((void * __capability)frame->tf_lr))
+	if (cheri_gettag((void *)frame->tf_lr))
 		regs->tagmask |= (uint64_t)1 << i;
 	i++;
-	if (cheri_gettag((void * __capability)frame->tf_sp))
+	if (cheri_gettag((void *)frame->tf_sp))
 		regs->tagmask |= (uint64_t)1 << i;
 	i++;
-	if (cheri_gettag((void * __capability)frame->tf_elr))
+	if (cheri_gettag((void *)frame->tf_elr))
 		regs->tagmask |= (uint64_t)1 << i;
 	i++;
-	if (cheri_gettag((void * __capability)frame->tf_ddc))
+	if (cheri_gettag((void *)frame->tf_ddc))
 		regs->tagmask |= (uint64_t)1 << i;
 	i++;
-	if (cheri_gettag((void * __capability)regs->ctpidr))
+	if (cheri_gettag((void *)regs->ctpidr))
 		regs->tagmask |= (uint64_t)1 << i;
 	i++;
-	if (cheri_gettag((void * __capability)regs->ctpidrro))
+	if (cheri_gettag((void *)regs->ctpidrro))
 		regs->tagmask |= (uint64_t)1 << i;
 	i++;
-	if (cheri_gettag((void * __capability)regs->cid))
+	if (cheri_gettag((void *)regs->cid))
 		regs->tagmask |= (uint64_t)1 << i;
 	i++;
-	if (cheri_gettag((void * __capability)regs->rcsp))
+	if (cheri_gettag((void *)regs->rcsp))
 		regs->tagmask |= (uint64_t)1 << i;
 	i++;
-	if (cheri_gettag((void * __capability)regs->rddc))
+	if (cheri_gettag((void *)regs->rddc))
 		regs->tagmask |= (uint64_t)1 << i;
 	i++;
-	if (cheri_gettag((void * __capability)regs->rctpidr))
+	if (cheri_gettag((void *)regs->rctpidr))
 		regs->tagmask |= (uint64_t)1 << i;
 
 	return (0);
@@ -488,7 +488,7 @@ fill_capregs(struct thread *td, struct capreg *regs)
 static bool
 derive_capreg(uintcap_t reg, uintcap_t in, uintcap_t *out)
 {
-	void * __capability cap;
+	void *cap;
 	int otype;
 
 	if (!cheri_gettag(reg))
@@ -509,7 +509,7 @@ derive_capreg(uintcap_t reg, uintcap_t in, uintcap_t *out)
 		return (false);
 	}
 
-	cap = cheri_buildcap((void * __capability)reg, in);
+	cap = cheri_buildcap((void *)reg, in);
 	if (otype == CHERI_OTYPE_SENTRY)
 		cap = cheri_sealentry(cap);
 	if (cheri_gettag(cap)) {
@@ -1027,7 +1027,7 @@ sendsig_ctx_end(struct thread *td, uintcap_t *addrp)
 	end_ctx.ctx_id = ARM64_CTX_END;
 	end_ctx.ctx_size = sizeof(end_ctx);
 
-	if (copyout(&end_ctx, (void * __capability)ctx_addr, sizeof(end_ctx)) != 0)
+	if (copyout(&end_ctx, (void *)ctx_addr, sizeof(end_ctx)) != 0)
 		return (false);
 
 	return (true);
@@ -1061,9 +1061,9 @@ sendsig_ctx_sve(struct thread *td, uintcap_t *addrp)
 	ctx.sve_flags = 0;
 
 	/* Copy out the header and data */
-	if (copyout(&ctx, (void * __capability)ctx_addr, sizeof(ctx)) != 0)
+	if (copyout(&ctx, (void *)ctx_addr, sizeof(ctx)) != 0)
 		return (false);
-	if (copyout(pcb->pcb_svesaved, (void * __capability)(ctx_addr + sizeof(ctx)),
+	if (copyout(pcb->pcb_svesaved, (void *)(ctx_addr + sizeof(ctx)),
 	    buf_size) != 0)
 		return (false);
 
@@ -1083,7 +1083,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	struct thread *td;
 	struct proc *p;
 	struct trapframe *tf;
-	struct sigframe * __capability fp, frame;
+	struct sigframe *fp, frame;
 	struct sigacts *psp;
 	uintcap_t addr;
 	int onstack, sig;
@@ -1141,9 +1141,9 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	frame.sf_uc.uc_mcontext.mc_ptr = addr;
 
 	/* Make room, keeping the stack aligned */
-	fp = (struct sigframe * __capability)addr;
+	fp = (struct sigframe *)addr;
 	fp--;
-	fp = (struct sigframe * __capability)STACKALIGN(fp);
+	fp = (struct sigframe *)STACKALIGN(fp);
 
 	/* Copy the sigframe out to the user's stack. */
 	if (copyoutcap(&frame, fp, sizeof(*fp)) != 0) {

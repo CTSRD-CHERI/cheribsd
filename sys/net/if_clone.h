@@ -44,7 +44,7 @@ struct if_clone;
 struct ifc_data {
 	uint32_t	flags;
 	uint32_t	unit;	/* Selected unit when IFC_C_AUTOUNIT set */
-	void * __capability params;
+	void *params;
 	struct vnet	*vnet;
 };
 
@@ -61,7 +61,7 @@ struct ifc_data_nl {
 	struct nl_parsed_link		*lattrs;/* (in) Parsed link attributes */
 	const struct nlattr_bmask	*bm;	/* (in) Bitmask of set link attributes */
 	struct nl_pstate		*npt;	/* (in) Netlink context */
-	void * __capability		params;/* (in) (Compat) data from ioctl */
+	void *		params;/* (in) (Compat) data from ioctl */
 	uint32_t			flags;	/* (in) IFC_F flags */
 	uint32_t			unit;	/* (in/out) Selected unit when IFC_C_AUTOUNIT set */
 	int				error;	/* (out) Return error code */
@@ -124,10 +124,10 @@ int ifc_copyin(const struct ifc_data *ifd, void *target, size_t len);
 /* Methods. */
 typedef int	ifc_match_t(struct if_clone *, const char *);
 typedef int	ifc_create_t(struct if_clone *, char *, size_t,
-		    void * __capability);
+		    void *);
 typedef int	ifc_destroy_t(struct if_clone *, struct ifnet *);
 
-typedef int	ifcs_create_t(struct if_clone *, int, void * __capability);
+typedef int	ifcs_create_t(struct if_clone *, int, void *);
 typedef void	ifcs_destroy_t(struct ifnet *);
 
 /* Interface cloner (de)allocating functions. */
@@ -150,7 +150,7 @@ EVENTHANDLER_DECLARE(if_clone_event, if_clone_event_handler_t);
 
 /* The below interfaces used only by net/if.c. */
 void	vnet_if_clone_init(void);
-int	if_clone_create(char *, size_t, void * __capability);
+int	if_clone_create(char *, size_t, void *);
 int	if_clone_destroy(const char *);
 int	if_clone_list(struct if_clonereq *);
 void	if_clone_restoregroup(struct ifnet *);

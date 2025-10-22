@@ -251,7 +251,7 @@ typedef	struct __siginfo {
 } siginfo_t;
 
 #ifdef _KERNEL
-typedef int (copyout_siginfo_t)(const siginfo_t *si, void * __capability info);
+typedef int (copyout_siginfo_t)(const siginfo_t *si, void *info);
 #endif /* _KERNEL */
 
 #define si_trapno	_reason._fault._trapno

@@ -518,7 +518,7 @@ linprocfs_domtab(PFS_FILL_ARGS)
 	struct pwd *pwd;
 	size_t lep_len;
 	int error;
-	struct statfs * __capability buf;
+	struct statfs *buf;
 	struct statfs *sp;
 	size_t count;
 

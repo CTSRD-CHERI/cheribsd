@@ -314,7 +314,7 @@ __ujtoa(uintmax_t val, CHAR *endp, int base, int octzero, const char *xdigs)
  */
 
 static CHAR *
-__cheri_ptr_alt(void * __capability pointer, CHAR *cp, const char *xdigs,
+__cheri_ptr_alt(void *pointer, CHAR *cp, const char *xdigs,
     int precision)
 {
 	uintmax_t ujval;

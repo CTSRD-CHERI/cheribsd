@@ -103,9 +103,9 @@ int    freebsd64_syscall_helper_unregister(struct syscall_helper_data *sd);
 struct iovec64;
 int	freebsd64_copyout_strings(struct image_params *imgp,
 	    uintcap_t *);
-int	freebsd64_copyiniov(const struct iovec * __capability cb_arg,
+int	freebsd64_copyiniov(const struct iovec *cb_arg,
 	    u_int iovcnt, struct iovec **iov, int error);
-int	freebsd64_copyinuio(const struct iovec * __capability cb_arg,
+int	freebsd64_copyinuio(const struct iovec *cb_arg,
 	    u_int iovcnt, struct uio **uiop);
 
 int	freebsd64_get_mcontext(struct thread *td, mcontext64_t *mcp, int flags);

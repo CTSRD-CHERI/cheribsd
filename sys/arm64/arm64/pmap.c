@@ -560,8 +560,8 @@ static __inline void
 pagecopy_cleartags(void *s, void *d)
 {
 #if __has_feature(capabilities)
-	void * __capability *dst;
-	void * __capability *src;
+	void **dst;
+	void **src;
 	u_int i;
 
 	dst = d;

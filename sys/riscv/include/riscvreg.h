@@ -309,7 +309,7 @@
 
 #if __has_feature(capabilities)
 #define	scr_read(scr)							\
-({	void * __capability val;					\
+({	void *val;					\
 	__asm __volatile("cspecialr %0, " #scr : "=C" (val));		\
 	val;								\
 })

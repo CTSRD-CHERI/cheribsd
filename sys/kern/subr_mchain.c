@@ -192,12 +192,12 @@ mb_put_int64le(struct mbchain *mbp, int64_t x)
 }
 
 int
-mb_put_mem(struct mbchain *mbp, const char * __capability source, int size,
+mb_put_mem(struct mbchain *mbp, const char *source, int size,
     int type)
 {
 	struct mbuf *m;
 	caddr_t dst;
-	const char * __capability src;
+	const char *src;
 	int cplen, error, mleft, count;
 	size_t srclen, dstlen;
 
@@ -466,7 +466,7 @@ md_get_int64le(struct mdchain *mdp, int64_t *x)
 }
 
 int
-md_get_mem(struct mdchain *mdp, char * __capability target, int size, int type)
+md_get_mem(struct mdchain *mdp, char *target, int size, int type)
 {
 	struct mbuf *m = mdp->md_cur;
 	int error;

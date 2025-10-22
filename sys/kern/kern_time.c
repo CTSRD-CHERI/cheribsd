@@ -621,8 +621,8 @@ sys_clock_nanosleep(struct thread *td, struct clock_nanosleep_args *uap)
 
 int
 user_clock_nanosleep(struct thread *td, clockid_t clock_id, int flags,
-    const struct timespec * __capability ua_rqtp,
-    struct timespec * __capability ua_rmtp)
+    const struct timespec *ua_rqtp,
+    struct timespec *ua_rmtp)
 {
 	struct timespec rmt, rqt;
 	int error, error2;
@@ -654,8 +654,8 @@ sys_gettimeofday(struct thread *td, struct gettimeofday_args *uap)
 }
 
 int
-kern_gettimeofday(struct thread *td, struct timeval * __capability tp,
-    struct timezone * __capability tzp)
+kern_gettimeofday(struct thread *td, struct timeval *tp,
+    struct timezone *tzp)
 {
 	struct timeval atv;
 	struct timezone rtz;
@@ -688,8 +688,8 @@ sys_settimeofday(struct thread *td, struct settimeofday_args *uap)
 }
 
 int
-user_settimeofday(struct thread *td, const struct timeval * __capability tv,
-    const struct timezone * __capability tz)
+user_settimeofday(struct thread *td, const struct timeval *tv,
+    const struct timezone *tz)
 {
 	struct timeval atv, *tvp;
 	struct timezone atz, *tzp;

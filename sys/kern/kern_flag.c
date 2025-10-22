@@ -64,7 +64,7 @@ sys_flag_captured(struct thread *td, struct flag_captured_args *uap)
 }
 
 int
-kern_flag_captured(struct thread *td, const char * __capability message,
+kern_flag_captured(struct thread *td, const char *message,
     uint32_t key, const char *source)
 {
 	struct proc *p = td->td_proc;

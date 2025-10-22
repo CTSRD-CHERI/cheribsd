@@ -171,7 +171,7 @@ kvprintf(char const *fmt, struct snprintf_arg *arg, int radix, va_list ap)
 	char nbuf[MAXNBUF];
 	const char *p, *percent, *q;
 #if __has_feature(capabilities)
-	void * __capability cap;
+	void *cap;
 #endif
 	u_char *up;
 	int ch, n;
@@ -332,7 +332,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 #if __has_feature(capabilities)
 			if (lflag) {
 				/* %lp: Always read a cap (even in hybrid). */
-				cap = va_arg(ap, void * __capability);
+				cap = va_arg(ap, void *);
 			} else {
 				/*
 				 * %p: Read a native pointer and cast it to a
@@ -341,7 +341,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 #ifdef __CHERI_PURE_CAPABILITY__
 				cap = va_arg(ap, void *);
 #else
-				cap = (void * __capability)(uintcap_t)
+				cap = (void *)(uintcap_t)
 				    (uintptr_t)va_arg(ap, void *);
 #endif
 			}

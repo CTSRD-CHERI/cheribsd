@@ -990,7 +990,7 @@ ugen_re_enumerate(struct usb_fifo *f)
 
 static int
 ugen_fs_init(struct usb_fifo *f,
-    struct usb_fs_endpoint * __capability fs_ep_ptr, usb_size_t fs_ep_sz,
+    struct usb_fs_endpoint *fs_ep_ptr, usb_size_t fs_ep_sz,
     int fflags, uint8_t ep_index_max)
 {
 	int error;
@@ -1258,17 +1258,17 @@ ugen_fs_set_complete(struct usb_fifo *f, uint8_t index)
 }
 
 static int
-ugen_fs_getbuffer(void * __capability *uptrp, struct usb_fifo *f,
-    void * __capability buffer, uint32_t * __capability lengths,
+ugen_fs_getbuffer(void **uptrp, struct usb_fifo *f,
+    void *buffer, uint32_t *lengths,
     usb_frcount_t n)
 {
 	union {
-		void * __capability * __capability ppBuffer;
+		void **ppBuffer;
 #ifdef COMPAT_FREEBSD32
 		uint32_t *ppBuffer32;
 #endif
 #ifdef COMPAT_FREEBSD64
-		uint64_t * __capability ppBuffer64;
+		uint64_t *ppBuffer64;
 #endif
 	} u;
 #ifdef COMPAT_FREEBSD32
@@ -1312,7 +1312,7 @@ ugen_fs_copy_in(struct usb_fifo *f, uint8_t ep_index)
 	struct usb_device_request *req;
 	struct usb_xfer *xfer;
 	struct usb_fs_endpoint fs_ep;
-	void * __capability uaddr;	/* userland pointer */
+	void *uaddr;	/* userland pointer */
 	void *kaddr;
 	usb_frlength_t offset;
 	usb_frlength_t rem;
@@ -1475,11 +1475,11 @@ complete:
 	return (0);
 }
 
-static struct usb_fs_endpoint * __capability
+static struct usb_fs_endpoint *
 ugen_fs_ep_uptr(struct usb_fifo *f, uint8_t ep_index)
 {
-	return ((struct usb_fs_endpoint * __capability)
-	    ((char * __capability)f->fs_ep_ptr + (ep_index * f->fs_ep_sz)));
+	return ((struct usb_fs_endpoint *)
+	    ((char *)f->fs_ep_ptr + (ep_index * f->fs_ep_sz)));
 }
 
 static int
@@ -1548,17 +1548,17 @@ ugen_fs_update(const struct usb_fs_endpoint *fs_ep,
     struct usb_fifo *f, uint8_t ep_index)
 {
 	union {
-		struct usb_fs_endpoint * __capability fs_ep_uptr;
+		struct usb_fs_endpoint *fs_ep_uptr;
 #ifdef COMPAT_FREEBSD32
 		struct usb_fs_endpoint32 *fs_ep_uptr32;
 #endif
 #ifdef COMPAT_FREEBSD64
-		struct usb_fs_endpoint64 * __capability fs_ep_uptr64;
+		struct usb_fs_endpoint64 *fs_ep_uptr64;
 #endif
 	} u;
-	uint32_t * __capability aFrames_uptr;
-	uint16_t * __capability isoc_time_complete_uptr;
-	int * __capability status_uptr;
+	uint32_t *aFrames_uptr;
+	uint16_t *isoc_time_complete_uptr;
+	int *status_uptr;
 
 	switch (f->fs_ep_sz) {
 	case sizeof(struct usb_fs_endpoint):
@@ -1578,7 +1578,7 @@ ugen_fs_update(const struct usb_fs_endpoint *fs_ep,
 #endif
 #ifdef COMPAT_FREEBSD64
 	case sizeof(struct usb_fs_endpoint64):
-		u.fs_ep_uptr64 = (struct usb_fs_endpoint64 * __capability)
+		u.fs_ep_uptr64 = (struct usb_fs_endpoint64 *)
 		    ugen_fs_ep_uptr(f, ep_index);
 		aFrames_uptr = &u.fs_ep_uptr64->aFrames;
 		isoc_time_complete_uptr = &u.fs_ep_uptr64->isoc_time_complete;
@@ -1627,7 +1627,7 @@ ugen_fs_copy_out(struct usb_fifo *f, uint8_t ep_index)
 	struct usb_device_request *req;
 	struct usb_xfer *xfer;
 	struct usb_fs_endpoint fs_ep;
-	void * __capability uaddr;		/* userland ptr */
+	void *uaddr;		/* userland ptr */
 	void *kaddr;
 	usb_frlength_t offset;
 	usb_frlength_t rem;

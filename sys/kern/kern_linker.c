@@ -1246,7 +1246,7 @@ kern_kldload(struct thread *td, const char *file, int *fileid)
 }
 
 int
-user_kldload(struct thread *td, const char * __capability file)
+user_kldload(struct thread *td, const char *file)
 {
 	char *pathname = NULL;
 	int error, fileid;
@@ -1341,7 +1341,7 @@ sys_kldfind(struct thread *td, struct kldfind_args *uap)
 }
 
 int
-kern_kldfind(struct thread *td, const char * __capability file)
+kern_kldfind(struct thread *td, const char *file)
 {
 	char *pathname;
 	const char *filename;
@@ -1461,7 +1461,7 @@ kern_kldstat(struct thread *td, int fileid, struct kld_file_stat *stat)
 	bcopy(lf->filename, &stat->name[0], namelen);
 	stat->refs = lf->refs;
 	stat->id = lf->id;
-	stat->address = (char * __capability)(uintcap_t)lf->address;
+	stat->address = (char *)(uintcap_t)lf->address;
 	stat->size = lf->size;
 	/* Version 2 fields: */
 	namelen = strlen(lf->pathname) + 1;
@@ -1524,7 +1524,7 @@ int
 sys_kldsym(struct thread *td, struct kldsym_args *uap)
 {
 	struct kld_sym_lookup lookup;
-	struct kld_sym_lookup * __capability user_lookup;
+	struct kld_sym_lookup *user_lookup;
 	int error;
 
 	user_lookup = uap->data;
@@ -1547,7 +1547,7 @@ sys_kldsym(struct thread *td, struct kldsym_args *uap)
 
 int
 kern_kldsym(struct thread *td, int fileid, int cmd,
-    const char * __capability symname, u_long *symvalue, size_t *symsize)
+    const char *symname, u_long *symvalue, size_t *symsize)
 {
 	c_linker_sym_t sym;
 	linker_symval_t symval;

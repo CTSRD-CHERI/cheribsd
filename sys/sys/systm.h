@@ -132,7 +132,7 @@ extern bool scheduler_stopped;
     ((void *)(uintptr_t)(ptr) == NULL ? NULL :				\
      ((vm_offset_t)(ptr) < 4096 ||					\
       (vm_offset_t)(ptr) > VM_MAXUSER_ADDRESS) ?			\
-	(void * __capability)(uintcap_t)(ptraddr_t)(ptr) :		\
+	(void *)(uintcap_t)(ptraddr_t)(ptr) :		\
 	(is_offset) ?							\
 	__builtin_cheri_offset_set((cap), (ptraddr_t)(ptr)) :		\
 	__builtin_cheri_address_set((cap), (ptraddr_t)(ptr)))
@@ -145,7 +145,7 @@ extern bool scheduler_stopped;
 
 #define	__USER_CAP(ptr, len)						\
 ({									\
-	void * __capability unbound = __USER_CAP_UNBOUND(ptr);		\
+	void *unbound = __USER_CAP_UNBOUND(ptr);		\
 	(security_cheri_bound_legacy_capabilities &&			\
 	    __builtin_cheri_tag_get(unbound) ?				\
 	    __builtin_cheri_bounds_set(unbound, (len)) : unbound);	\
@@ -327,16 +327,16 @@ void	*memmovenocap(void * _Nonnull dest, const void * _Nonnull src,
 #define	memmovenocap	memmove
 #endif
 #if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
-void	* __capability memset_c(void * _Nonnull __capability buf, int c,
+void	*memset_c(void * _Nonnullbuf, int c,
 	    size_t len);
-void	* __capability memcpy_c(void * _Nonnull __capability to,
-	    const void * _Nonnull __capability from, size_t len);
-void	* __capability memcpynocap_c(void * _Nonnull __capability to,
-	    const void * _Nonnull __capability from, size_t len);
-void	* __capability memmove_c(void * _Nonnull __capability dest,
-	    const void * _Nonnull __capability src, size_t n);
-void	* __capability memmovenocap_c(void * _Nonnull __capability dest,
-	    const void * _Nonnull __capability src, size_t n);
+void	*memcpy_c(void * _Nonnullto,
+	    const void * _Nonnullfrom, size_t len);
+void	*memcpynocap_c(void * _Nonnullto,
+	    const void * _Nonnullfrom, size_t len);
+void	*memmove_c(void * _Nonnulldest,
+	    const void * _Nonnullsrc, size_t n);
+void	*memmovenocap_c(void * _Nonnulldest,
+	    const void * _Nonnullsrc, size_t n);
 #else
 #define	memset_c	memset
 #define	memcpy_c	memcpy
@@ -392,36 +392,36 @@ void	*memmove_early(void * _Nonnull dest, const void * _Nonnull src, size_t n);
 	((__r >= __len) ? ENAMETOOLONG : 0);			\
 })
 
-int __result_use_check copyinstr(const void * __restrict __capability udaddr,
+int __result_use_check copyinstr(const void * __restrictudaddr,
     void * _Nonnull __restrict kaddr, size_t len,
     size_t * __restrict lencopied);
-int __result_use_check copyin(const void * __restrict __capability udaddr,
+int __result_use_check copyin(const void * __restrictudaddr,
     void * _Nonnull __restrict kaddr, size_t len);
 #if __has_feature(capabilities)
-int __result_use_check copyincap(const void * __restrict __capability udaddr,
+int __result_use_check copyincap(const void * __restrictudaddr,
     void * _Nonnull __restrict kaddr, size_t len);
 #else
 #define	copyincap	copyin
 #endif
 int __result_use_check copyin_nofault(
-    const void * __capability __restrict udaddr,
+    const void *__restrict udaddr,
     void * _Nonnull __restrict kaddr, size_t len);
 int __result_use_or_ignore_check copyout(const void * _Nonnull __restrict kaddr,
-    void * __restrict __capability udaddr, size_t len);
+    void * __restrictudaddr, size_t len);
 #if __has_feature(capabilities)
 int __result_use_or_ignore_check copyoutcap(
     const void * _Nonnull __restrict kaddr,
-    void * __capability __restrict udaddr, size_t len);
+    void *__restrict udaddr, size_t len);
 #else
 #define	copyoutcap	copyout
 #endif
 int __result_use_or_ignore_check copyout_nofault(
     const void * _Nonnull __restrict kaddr,
-    void * __capability __restrict udaddr, size_t len);
+    void *__restrict udaddr, size_t len);
 #if __has_feature(capabilities)
 int __result_use_or_ignore_check copyoutcap_nofault(
     const void * _Nonnull __restrict kaddr,
-    void * __capability __restrict udaddr, size_t len);
+    void *__restrict udaddr, size_t len);
 #else
 #define	copyoutcap_nofault	copyout_nofault
 #endif
@@ -437,48 +437,48 @@ int	SAN_INTERCEPTOR(copyout)(const void *, void *, size_t);
 #endif /* !SAN_RUNTIME */
 #endif /* SAN_NEEDS_INTERCEPTORS */
 
-int	fubyte(volatile const void * __capability base);
-long	fuword(volatile const void * __capability base);
-int	fuword16(volatile const void * __capability base);
-int32_t	fuword32(volatile const void * __capability base);
-int64_t	fuword64(volatile const void * __capability base);
+int	fubyte(volatile const void *base);
+long	fuword(volatile const void *base);
+int	fuword16(volatile const void *base);
+int32_t	fuword32(volatile const void *base);
+int64_t	fuword64(volatile const void *base);
 #if __has_feature(capabilities)
-int __result_use_check fuecap(volatile const void * __capability base,
+int __result_use_check fuecap(volatile const void *base,
     intcap_t *val);
 #define	fueptr			fuecap
 #else
 #define	fueptr(base, val)	fueword((base), (long *)(val))
 #endif
-int __result_use_check fueword(volatile const void * __capability base,
+int __result_use_check fueword(volatile const void *base,
     long *val);
-int __result_use_check fueword32(volatile const void * __capability base,
+int __result_use_check fueword32(volatile const void *base,
     int32_t *val);
-int __result_use_check fueword64(volatile const void * __capability base,
+int __result_use_check fueword64(volatile const void *base,
     int64_t *val);
-int __result_use_or_ignore_check subyte(volatile void * __capability base,
+int __result_use_or_ignore_check subyte(volatile void *base,
     int byte);
-int __result_use_or_ignore_check suword(volatile void * __capability base,
+int __result_use_or_ignore_check suword(volatile void *base,
     long word);
-int __result_use_or_ignore_check suword16(volatile void * __capability base,
+int __result_use_or_ignore_check suword16(volatile void *base,
     int word);
-int __result_use_or_ignore_check suword32(volatile void * __capability base,
+int __result_use_or_ignore_check suword32(volatile void *base,
     int32_t word);
-int __result_use_or_ignore_check suword64(volatile void * __capability base,
+int __result_use_or_ignore_check suword64(volatile void *base,
     int64_t word);
 #if __has_feature(capabilities)
-int __result_use_or_ignore_check sucap(volatile const void * __capability base,
+int __result_use_or_ignore_check sucap(volatile const void *base,
     intcap_t val);
 #define	suptr			sucap
 #else
 #define	suptr			suword
 #endif
-uint32_t casuword32(volatile uint32_t * __capability base, uint32_t oldval,
+uint32_t casuword32(volatile uint32_t *base, uint32_t oldval,
 	    uint32_t newval);
-u_long	casuword(volatile u_long * __capability base, u_long oldval,
+u_long	casuword(volatile u_long *base, u_long oldval,
 	    u_long newval);
-int	casueword(volatile u_long * __capability base, u_long oldval,
+int	casueword(volatile u_long *base, u_long oldval,
 	    u_long *oldvalp, u_long newval);
-int	casueword32(volatile uint32_t * __capability base, uint32_t oldval,
+int	casueword32(volatile uint32_t *base, uint32_t oldval,
 	    uint32_t *oldvalp, uint32_t newval);
 
 #if defined(SAN_NEEDS_INTERCEPTORS) && !defined(KCSAN)

@@ -276,7 +276,7 @@ get_page(struct page *page)
 }
 
 extern long
-lkpi_get_user_pages(void * __capability start, unsigned long nr_pages,
+lkpi_get_user_pages(void *start, unsigned long nr_pages,
     unsigned int gup_flags, struct page **);
 #if defined(LINUXKPI_VERSION) && LINUXKPI_VERSION >= 60500
 #define	get_user_pages(start, nr_pages, gup_flags, pages)	\
@@ -288,14 +288,14 @@ lkpi_get_user_pages(void * __capability start, unsigned long nr_pages,
 
 #if defined(LINUXKPI_VERSION) && LINUXKPI_VERSION >= 60500
 static inline long
-pin_user_pages(void * __capability start, unsigned long nr_pages,
+pin_user_pages(void *start, unsigned long nr_pages,
     unsigned int gup_flags, struct page **pages)
 {
 	return (get_user_pages(start, nr_pages, gup_flags, pages));
 }
 #else
 static inline long
-pin_user_pages(void * __capability start, unsigned long nr_pages,
+pin_user_pages(void *start, unsigned long nr_pages,
     unsigned int gup_flags, struct page **pages,
     struct vm_area_struct **vmas)
 {
@@ -304,11 +304,11 @@ pin_user_pages(void * __capability start, unsigned long nr_pages,
 #endif
 
 extern int
-__get_user_pages_fast(void * __capability start, int nr_pages, int write,
+__get_user_pages_fast(void *start, int nr_pages, int write,
     struct page **);
 
 static inline int
-pin_user_pages_fast(void * __capability start, int nr_pages,
+pin_user_pages_fast(void *start, int nr_pages,
     unsigned int gup_flags, struct page **pages)
 {
 	return __get_user_pages_fast(
@@ -317,13 +317,13 @@ pin_user_pages_fast(void * __capability start, int nr_pages,
 
 extern long
 get_user_pages_remote(struct task_struct *, struct mm_struct *,
-    void * __capability start, unsigned long nr_pages,
+    void *start, unsigned long nr_pages,
     unsigned int gup_flags, struct page **,
     struct vm_area_struct **);
 
 static inline long
 pin_user_pages_remote(struct task_struct *task, struct mm_struct *mm,
-    void * __capability start, unsigned long nr_pages,
+    void *start, unsigned long nr_pages,
     unsigned int gup_flags, struct page **pages,
     struct vm_area_struct **vmas)
 {

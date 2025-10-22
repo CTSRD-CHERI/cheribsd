@@ -90,8 +90,8 @@ vm_cheri_revoke_tlb_fault(void)
 
 static int
 vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
-    const uint8_t * __capability crshadow, vm_cheri_revoke_test_fn ctp,
-    uintcap_t * __capability cutp, uintcap_t cut, vm_offset_t start,
+    const uint8_t *crshadow, vm_cheri_revoke_test_fn ctp,
+    uintcap_t *cutp, uintcap_t cut, vm_offset_t start,
     vm_offset_t end)
 {
 	int perms = cheri_getperm(cut);
@@ -109,7 +109,7 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
 
 		CHERI_REVOKE_STATS_BUMP(crst, caps_found_revoked);
 	} else if (cheri_gettag(cut) && ctp(crshadow, cut, perms, start, end)) {
-		void * __capability cscratch;
+		void *cscratch;
 		int ok;
 
 		uintcap_t cutr = cheri_revoke_cap(cut);
@@ -218,7 +218,7 @@ static void
 measure_cloadtags_stride(void *ignored __unused)
 {
 	/* A 256-byte cache-line is probably beyond the pale, so use that */
-	void * __capability buf[16] __attribute__((aligned(256)));
+	void *buf[16] __attribute__((aligned(256)));
 	int i;
 
 	/* Fill with capabilities */
@@ -256,9 +256,9 @@ SYSINIT(
 static inline int
 vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
     int (*cb)(int *, const struct vm_cheri_revoke_cookie *,
-	const uint8_t * __capability, vm_cheri_revoke_test_fn,
-	uintcap_t * __capability, uintcap_t, vm_offset_t, vm_offset_t),
-    uintcap_t * __capability mvu, vm_offset_t mve)
+	const uint8_t *, vm_cheri_revoke_test_fn,
+	uintcap_t *, uintcap_t, vm_offset_t, vm_offset_t),
+    uintcap_t *mvu, vm_offset_t mve)
 {
 #ifdef CHERI_CAPREVOKE_CLOADTAGS
 	CHERI_REVOKE_STATS_FOR(crst, crc);
@@ -274,7 +274,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 
 	/* Load once up front, which is almost as good as const */
 	vm_cheri_revoke_test_fn ctp = crc->map->vm_cheri_revoke_test;
-	const uint8_t * __capability crshadow = crc->crshadow;
+	const uint8_t *crshadow = crc->crshadow;
 #ifdef CHERI_CAPREVOKE_CLOADTAGS
 	uint8_t _cloadtags_stride = cloadtags_stride;
 	uint64_t tags, nexttags;
@@ -289,7 +289,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 #ifdef CHERI_CAPREVOKE_CLOADTAGS
 	tags = __builtin_cheri_cap_load_tags(mvu);
 
-	mve -= _cloadtags_stride * sizeof(void * __capability);
+	mve -= _cloadtags_stride * sizeof(void *);
 
 #ifdef CHERI_CAPREVOKE_STATS
 	if (tags) {
@@ -298,7 +298,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 #endif
 
 	for (; cheri_getaddress(mvu) < mve; mvu += _cloadtags_stride) {
-		uintcap_t * __capability mvt = mvu;
+		uintcap_t *mvt = mvu;
 
 		nexttags =
 		    __builtin_cheri_cap_load_tags(mvu + _cloadtags_stride);
@@ -320,7 +320,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 
 	/* And the last line */
 	{
-		uintcap_t * __capability mvt = mvu;
+		uintcap_t *mvt = mvu;
 
 		for (; tags != 0; (tags >>= 1), mvt += 1) {
 			if (!(tags & 1))
@@ -392,13 +392,13 @@ vm_cheri_revoke_page_rw(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 #endif
 	vm_offset_t mva;
 	vm_offset_t mve;
-	uintcap_t * __capability mvu;
+	uintcap_t *mvu;
 	/*
 	 * XXX NWF
 	 * This isn't what we really want, but we want to be able to fake up a
 	 * a capability to the DMAP area somehow.
 	 */
-	void * __capability kdc = swap_restore_cap;
+	void *kdc = swap_restore_cap;
 	int res;
 
 	vm_page_assert_busied(m);
@@ -427,8 +427,8 @@ vm_cheri_revoke_page_rw(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 static inline int
 vm_cheri_revoke_page_ro_adapt(int *res,
     const struct vm_cheri_revoke_cookie *vmcrc,
-    const uint8_t * __capability crshadow, vm_cheri_revoke_test_fn ctp,
-    uintcap_t * __capability cutp __unused, uintcap_t cut, vm_offset_t start,
+    const uint8_t *crshadow, vm_cheri_revoke_test_fn ctp,
+    uintcap_t *cutp __unused, uintcap_t cut, vm_offset_t start,
     vm_offset_t end)
 {
 	/* If the thing has no permissions, we don't need to scan it later */
@@ -470,8 +470,8 @@ vm_cheri_revoke_page_ro(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 
 	vm_offset_t mva;
 	vm_offset_t mve;
-	uintcap_t * __capability mvu;
-	void * __capability kdc = swap_restore_cap;
+	uintcap_t *mvu;
+	void *kdc = swap_restore_cap;
 	int res = 0;
 
 	/*

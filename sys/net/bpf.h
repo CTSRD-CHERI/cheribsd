@@ -68,7 +68,7 @@ struct bpf_program {
 	u_int bf_len;
 #ifdef _KERNEL
 	union {
-		struct bpf_insn * __capability bf_user_insns;
+		struct bpf_insn *bf_user_insns;
 #endif
 		struct bpf_insn *bf_insns;
 #ifdef _KERNEL

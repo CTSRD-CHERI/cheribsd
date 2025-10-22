@@ -32,9 +32,9 @@
 #include <sys/param.h>
 #include <sys/vnode.h>
 
-int lookupname(char * __capability, enum uio_seg, enum symfollow, vnode_t **,
+int lookupname(char *, enum uio_seg, enum symfollow, vnode_t **,
     vnode_t **);
-int lookupnameat(char * __capability, enum uio_seg, enum symfollow, vnode_t **,
+int lookupnameat(char *, enum uio_seg, enum symfollow, vnode_t **,
     vnode_t **, vnode_t *);
 
 #endif	/* _KERNEL */

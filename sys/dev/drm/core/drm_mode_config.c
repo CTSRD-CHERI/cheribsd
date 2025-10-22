@@ -103,10 +103,10 @@ int drm_mode_getresources(struct drm_device *dev, void *data,
 	struct drm_crtc *crtc;
 	struct drm_encoder *encoder;
 	int count, ret = 0;
-	uint32_t __user * __capability fb_id;
-	uint32_t __user * __capability crtc_id;
-	uint32_t __user * __capability connector_id;
-	uint32_t __user * __capability encoder_id;
+	uint32_t __user *fb_id;
+	uint32_t __user *crtc_id;
+	uint32_t __user *connector_id;
+	uint32_t __user *encoder_id;
 	struct drm_connector_list_iter conn_iter;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))

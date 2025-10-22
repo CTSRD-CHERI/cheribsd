@@ -371,8 +371,8 @@ static __inline void
 pagecopy_cleartags(void *s, void *d)
 {
 #if __has_feature(capabilities)
-	void * __capability *dst;
-	void * __capability *src;
+	void **dst;
+	void **src;
 	u_int i;
 
 	dst = d;
@@ -4339,7 +4339,7 @@ retry:
 		 */
 		vm_pointer_t mva = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 		mva += va & L3_OFFSET;
-		KASSERT(cheri_revoke_is_revoked(*(void * __capability *)mva),
+		KASSERT(cheri_revoke_is_revoked(*(void **)mva),
 		    ("Unrevoked cap on !PGA_CAPSTORE m=%p va=%lx", m, va));
 #endif
 

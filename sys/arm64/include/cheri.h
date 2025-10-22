@@ -39,9 +39,9 @@
 
 #ifdef _KERNEL
 #define	__USER_DDC ((cheri_getperm(__USER_PCC) & CHERI_PERM_EXECUTIVE) ? \
-    (void * __capability)curthread->td_frame->tf_ddc :			\
-    (void * __capability)READ_SPECIALREG_CAP(rddc_el0))
-#define	__USER_PCC	((void * __capability)curthread->td_frame->tf_elr)
+    (void *)curthread->td_frame->tf_ddc :			\
+    (void *)READ_SPECIALREG_CAP(rddc_el0))
+#define	__USER_PCC	((void *)curthread->td_frame->tf_elr)
 
 /* Does the current thread add the base in CToPtr */
 #define __USER_DDC_OFFSET_ENABLED	\
@@ -63,14 +63,14 @@
 struct thread;
 
 /* Used to set DDC_EL0 in psci call functions. */
-extern void * __capability smccc_ddc_el0;
+extern void *smccc_ddc_el0;
 
 extern uintcap_t userspace_root_cidcap;
 
 /*
  * Morello specific kernel utility functions.
  */
-void		cheri_init_capabilities(void * __capability kroot);
+void		cheri_init_capabilities(void *kroot);
 void		hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr);
 int		cheri_esr_to_sicode(uint64_t esr);
 const char	*cheri_fsc_string(uint8_t fsc);

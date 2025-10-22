@@ -146,7 +146,7 @@ siginfo_to_siginfo64(const siginfo_t *si, struct __siginfo64 *si64)
 }
 
 static int
-freebsd64_copyout_siginfo(const siginfo_t *si, void * __capability info)
+freebsd64_copyout_siginfo(const siginfo_t *si, void *info)
 {
 	struct __siginfo64 si64;
 	

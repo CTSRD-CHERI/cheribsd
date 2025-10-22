@@ -3764,7 +3764,7 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 {
 	struct pmc_syscall_args *c;
 	void *pmclog_proc_handle;
-	void * __capability arg;
+	void *arg;
 	int error, op;
 	bool is_sx_downgraded;
 
@@ -3935,14 +3935,14 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 	{
 		enum pmc_class			cl;
 		enum pmc_event			ev;
-		struct pmc_op_getdyneventinfo	* __capability gei;
+		struct pmc_op_getdyneventinfo	*gei;
 		struct pmc_dyn_event_descr	dev;
 		struct pmc_soft			*ps;
 		uint32_t			nevent;
 
 		sx_assert(&pmc_sx, SX_LOCKED);
 
-		gei = (struct pmc_op_getdyneventinfo * __capability) arg;
+		gei = (struct pmc_op_getdyneventinfo *) arg;
 
 		if ((error = copyin(&gei->pm_class, &cl, sizeof(cl))) != 0)
 			break;
@@ -4035,11 +4035,11 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 		struct pmc_binding pb;
 		struct pmc_classdep *pcd;
 		struct pmc_info *p, *pmcinfo;
-		struct pmc_op_getpmcinfo * __capability gpi;
+		struct pmc_op_getpmcinfo *gpi;
 
 		PMC_DOWNGRADE_SX();
 
-		gpi = (struct pmc_op_getpmcinfo * __capability) arg;
+		gpi = (struct pmc_op_getpmcinfo *) arg;
 
 		if ((error = copyin(&gpi->pm_cpu, &cpu, sizeof(cpu))) != 0)
 			break;
@@ -4363,7 +4363,7 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 	case PMC_OP_PMCRW:
 	{
 		struct pmc_op_pmcrw prw;
-		struct pmc_op_pmcrw * __capability pprw;
+		struct pmc_op_pmcrw *pprw;
 		pmc_value_t oldvalue;
 
 		PMC_DOWNGRADE_SX();

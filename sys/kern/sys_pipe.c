@@ -546,7 +546,7 @@ sys_pipe2(struct thread *td, struct pipe2_args *uap)
 }
 
 int
-kern_pipe2(struct thread *td, int * __capability ufildes, int flags)
+kern_pipe2(struct thread *td, int *ufildes, int flags)
 {
 	int error, fildes[2];
 

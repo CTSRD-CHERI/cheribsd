@@ -170,7 +170,7 @@ typedef struct mps_adapter_data
 typedef struct mps_update_flash
 {
 #if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
-	void * __capability PtrBuffer;
+	void *PtrBuffer;
 #else
 	uint64_t	PtrBuffer;
 #endif
@@ -188,9 +188,9 @@ typedef struct mps_update_flash
 typedef struct mps_pass_thru
 {
 #if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
-	void * __capability PtrRequest;
-	void * __capability PtrReply;
-	void * __capability PtrData;
+	void *PtrRequest;
+	void *PtrReply;
+	void *PtrData;
 #else
 	uint64_t	PtrRequest;
 	uint64_t	PtrReply;
@@ -201,7 +201,7 @@ typedef struct mps_pass_thru
 	uint32_t	DataSize;
 	uint32_t	DataDirection;
 #if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
-	void * __capability PtrDataOut;
+	void *PtrDataOut;
 #else
 	uint64_t	PtrDataOut;
 #endif
@@ -241,7 +241,7 @@ typedef struct mps_event_report
 {
 	uint32_t	Size;
 #if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
-	void * __capability PtrEvents;
+	void *PtrEvents;
 #else
 	uint64_t	PtrEvents;
 #endif
@@ -261,7 +261,7 @@ typedef struct mps_diag_action
 	uint32_t	Action;
 	uint32_t	Length;
 #if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
-	void * __capability PtrDiagAction;
+	void *PtrDiagAction;
 #else
 	uint64_t	PtrDiagAction;
 #endif
@@ -341,7 +341,7 @@ typedef struct mps_diag_read_buffer
 	uint32_t	BytesToRead;
 	uint32_t	UniqueId;
 #if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
-	void * __capability PtrDataBuffer;
+	void *PtrDataBuffer;
 #else
 	uint64_t	PtrDataBuffer;
 #endif

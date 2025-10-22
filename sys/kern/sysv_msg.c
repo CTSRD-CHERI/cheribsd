@@ -768,7 +768,7 @@ done2:
 }
 
 int
-kern_msgsnd(struct thread *td, int msqid, const void * __capability msgp,
+kern_msgsnd(struct thread *td, int msqid, const void *msgp,
     size_t msgsz, int msgflg, long mtype)
 {
 	int msqix, segs_needed, error = 0;
@@ -1033,7 +1033,7 @@ kern_msgsnd(struct thread *td, int msqid, const void * __capability msgp,
 		}
 		mtx_lock(&msq_mtx);
 		msgsz -= tlen;
-		msgp = (const char * __capability)msgp + tlen;
+		msgp = (const char *)msgp + tlen;
 		next = msgmaps[next].next;
 	}
 	if (next != -1)
@@ -1124,13 +1124,13 @@ sys_msgsnd(struct thread *td, struct msgsnd_args *uap)
 		return (error);
 	}
 	return (kern_msgsnd(td, uap->msqid,
-	    (const char * __capability)uap->msgp + sizeof(mtype),
+	    (const char *)uap->msgp + sizeof(mtype),
 	    uap->msgsz, uap->msgflg, mtype));
 }
 
 /* XXX msgp is actually mtext. */
 int
-kern_msgrcv(struct thread *td, int msqid, void * __capability msgp,
+kern_msgrcv(struct thread *td, int msqid, void *msgp,
     size_t msgsz, long msgtyp, int msgflg, long *mtype)
 {
 	size_t len;
@@ -1342,7 +1342,7 @@ kern_msgrcv(struct thread *td, int msqid, void * __capability msgp,
 			wakeup(msqkptr);
 			goto done2;
 		}
-		msgp = (char * __capability)msgp + tlen;
+		msgp = (char *)msgp + tlen;
 		next = msgmaps[next].next;
 	}
 
@@ -1377,7 +1377,7 @@ sys_msgrcv(struct thread *td, struct msgrcv_args *uap)
 	    uap->msgp, uap->msgsz, uap->msgtyp, uap->msgflg));
 
 	if ((error = kern_msgrcv(td, uap->msqid,
-	    (char * __capability)uap->msgp + sizeof(mtype), uap->msgsz,
+	    (char *)uap->msgp + sizeof(mtype), uap->msgsz,
 	    uap->msgtyp, uap->msgflg, &mtype)) != 0)
 		return (error);
 	if ((error = copyout(&mtype, uap->msgp, sizeof(mtype))) != 0)
@@ -1831,7 +1831,7 @@ freebsd32_msgsnd(struct thread *td, struct freebsd32_msgsnd_args *uap)
 		return (error);
 	mtype = mtype32;
 	return (kern_msgsnd(td, uap->msqid,
-	    (const char * __capability)__USER_CAP(msgp, uap->msgsz) +
+	    (const char *)__USER_CAP(msgp, uap->msgsz) +
 	    sizeof(mtype32), uap->msgsz, uap->msgflg, mtype));
 }
 
@@ -1845,7 +1845,7 @@ freebsd32_msgrcv(struct thread *td, struct freebsd32_msgrcv_args *uap)
 
 	msgp = PTRIN(uap->msgp);
 	if ((error = kern_msgrcv(td, uap->msqid,
-	    (char * __capability)__USER_CAP(msgp, uap->msgsz) + sizeof(mtype32),
+	    (char *)__USER_CAP(msgp, uap->msgsz) + sizeof(mtype32),
 	    uap->msgsz, uap->msgtyp, uap->msgflg, &mtype)) != 0)
 		return (error);
 	mtype32 = (int32_t)mtype;
@@ -1955,7 +1955,7 @@ freebsd64_msgsnd(struct thread *td, struct freebsd64_msgsnd_args *uap)
 	    &mtype, sizeof(mtype))) != 0)
 		return (error);
 	return (kern_msgsnd(td, uap->msqid,
-	    (const char * __capability)__USER_CAP(uap->msgp, uap->msgsz) +
+	    (const char *)__USER_CAP(uap->msgp, uap->msgsz) +
 	    sizeof(mtype), uap->msgsz, uap->msgflg, mtype));
 }
 
@@ -1966,7 +1966,7 @@ freebsd64_msgrcv(struct thread *td, struct freebsd64_msgrcv_args *uap)
 	int error;
 
 	if ((error = kern_msgrcv(td, uap->msqid,
-	    (char * __capability)__USER_CAP(uap->msgp, uap->msgsz) +
+	    (char *)__USER_CAP(uap->msgp, uap->msgsz) +
 	    sizeof(mtype), uap->msgsz, uap->msgtyp, uap->msgflg, &mtype)) != 0)
 		return (error);
 	return (copyout(&mtype, __USER_CAP(uap->msgp, sizeof(mtype)),

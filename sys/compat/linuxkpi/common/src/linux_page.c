@@ -208,7 +208,7 @@ linux_free_kmem(vm_pointer_t addr, unsigned int order)
 }
 
 static int
-linux_get_user_pages_internal(vm_map_t map, void * __capability start,
+linux_get_user_pages_internal(vm_map_t map, void *start,
     int nr_pages, int write, struct page **pages)
 {
 	vm_prot_t prot;
@@ -222,7 +222,7 @@ linux_get_user_pages_internal(vm_map_t map, void * __capability start,
 }
 
 int
-__get_user_pages_fast(void * __capability addr, int nr_pages, int write,
+__get_user_pages_fast(void *addr, int nr_pages, int write,
     struct page **pages)
 {
 	vm_map_t map;
@@ -274,7 +274,7 @@ __get_user_pages_fast(void * __capability addr, int nr_pages, int write,
 
 long
 get_user_pages_remote(struct task_struct *task, struct mm_struct *mm,
-    void * __capability start, unsigned long nr_pages, unsigned int gup_flags,
+    void *start, unsigned long nr_pages, unsigned int gup_flags,
     struct page **pages, struct vm_area_struct **vmas)
 {
 	vm_map_t map;
@@ -285,7 +285,7 @@ get_user_pages_remote(struct task_struct *task, struct mm_struct *mm,
 }
 
 long
-lkpi_get_user_pages(void * __capability start, unsigned long nr_pages,
+lkpi_get_user_pages(void *start, unsigned long nr_pages,
     unsigned int gup_flags, struct page **pages)
 {
 	vm_map_t map;

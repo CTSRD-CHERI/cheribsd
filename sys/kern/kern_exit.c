@@ -738,8 +738,8 @@ struct abort2_args {
 int
 sys_abort2(struct thread *td, struct abort2_args *uap)
 {
-	void * __capability uargs[16];
-	void * __capability *uargsp;
+	void *uargs[16];
+	void **uargsp;
 	int error, nargs;
 
 	nargs = uap->nargs;
@@ -749,7 +749,7 @@ sys_abort2(struct thread *td, struct abort2_args *uap)
 	if (nargs > 0) {
 		if (uap->args != NULL) {
 			error = copyin(uap->args, uargs,
-			    nargs * sizeof(void * __capability));
+			    nargs * sizeof(void *));
 			if (error != 0)
 				nargs = -1;
 			else
@@ -768,8 +768,8 @@ sys_abort2(struct thread *td, struct abort2_args *uap)
  *  args - pointer to an array of pointers in kernel format
  */
 int
-kern_abort2(struct thread *td, const char * __capability why, int nargs,
-    void * __capability *uargs)
+kern_abort2(struct thread *td, const char *why, int nargs,
+    void **uargs)
 {
 	struct proc *p = td->td_proc;
 	struct sbuf *sb;
@@ -859,8 +859,8 @@ sys_wait4(struct thread *td, struct wait4_args *uap)
 }
 
 int
-kern_wait4(struct thread *td, int pid, int * __capability statusp, int options,
-    struct rusage * __capability rusage)
+kern_wait4(struct thread *td, int pid, int *statusp, int options,
+    struct rusage *rusage)
 {
 	struct rusage ru, *rup;
 	int error, status;
@@ -904,8 +904,8 @@ sys_wait6(struct thread *td, struct wait6_args *uap)
 
 int
 user_wait6(struct thread *td, idtype_t idtype, id_t id,
-    int * __capability statusp, int options,
-    struct __wrusage * __capability wrusage, siginfo_t *sip)
+    int *statusp, int options,
+    struct __wrusage *wrusage, siginfo_t *sip)
 {
 	struct __wrusage wru, *wrup;
 	int error, status;

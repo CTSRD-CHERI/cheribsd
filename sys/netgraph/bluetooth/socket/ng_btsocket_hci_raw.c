@@ -1348,7 +1348,7 @@ ng_btsocket_hci_raw_control(struct socket *so, u_long cmd, void *data,
 	case SIOC_HCI_RAW_NODE_LIST_NAMES: {
 		struct ng_btsocket_hci_raw_node_list_names	*nl =
 			(struct ng_btsocket_hci_raw_node_list_names *) data;
-		struct nodeinfo	* __capability			 ni = nl->names;
+		struct nodeinfo	*			 ni = nl->names;
 
 		if (nl->num_names == 0) {
 			mtx_unlock(&pcb->pcb_mtx);

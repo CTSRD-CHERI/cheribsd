@@ -174,7 +174,7 @@ struct __drm_crtcs_state {
 	 */
 	struct drm_crtc_commit *commit;
 
-	s32 __user * __capability out_fence_ptr;
+	s32 __user *out_fence_ptr;
 	u64 last_vblank_count;
 };
 
@@ -188,7 +188,7 @@ struct __drm_connnectors_state {
 	 * file descriptor. Used by writeback connectors to signal completion of
 	 * the writeback.
 	 */
-	s32 __user * __capability out_fence_ptr;
+	s32 __user *out_fence_ptr;
 };
 
 struct drm_private_obj;

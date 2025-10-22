@@ -41,17 +41,17 @@
  * The per-object interface protects against concurrent mutation and both
  * intra- and inter-epoch double-frees.
  */
-int caprev_shadow_nomap_set_len(ptraddr_t sbase, uint64_t * __capability sb,
-    ptraddr_t ob, size_t len, void * __capability user_obj);
+int caprev_shadow_nomap_set_len(ptraddr_t sbase, uint64_t *sb,
+    ptraddr_t ob, size_t len, void *user_obj);
 
-void caprev_shadow_nomap_clear_len(ptraddr_t sbase, uint64_t * __capability sb,
+void caprev_shadow_nomap_clear_len(ptraddr_t sbase, uint64_t *sb,
     ptraddr_t ob, size_t len);
 
-int caprev_shadow_nomap_set(ptraddr_t sbase, uint64_t * __capability sb,
-    void * __capability priv_obj, void * __capability user_obj);
+int caprev_shadow_nomap_set(ptraddr_t sbase, uint64_t *sb,
+    void *priv_obj, void *user_obj);
 
-void caprev_shadow_nomap_clear(ptraddr_t sbase, uint64_t * __capability sb,
-    void * __capability obj);
+void caprev_shadow_nomap_clear(ptraddr_t sbase, uint64_t *sb,
+    void *obj);
 
 /*
  * For already interlocked allocators where these protections are not
@@ -60,10 +60,10 @@ void caprev_shadow_nomap_clear(ptraddr_t sbase, uint64_t * __capability sb,
  * revocation, as fewer bitmap writes are necessary.
  */
 
-void caprev_shadow_nomap_set_raw(ptraddr_t sbase, uint64_t * __capability sb,
+void caprev_shadow_nomap_set_raw(ptraddr_t sbase, uint64_t *sb,
     ptraddr_t heap_start, ptraddr_t heap_end);
 
-void caprev_shadow_nomap_clear_raw(ptraddr_t sbase, uint64_t * __capability sb,
+void caprev_shadow_nomap_clear_raw(ptraddr_t sbase, uint64_t *sb,
     ptraddr_t heap_start, ptraddr_t heap_end);
 
 /* Utility functions for testing */

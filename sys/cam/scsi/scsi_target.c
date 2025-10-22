@@ -55,7 +55,7 @@
 struct targ_cmd_descr {
 	struct cam_periph_map_info  mapinfo;
 	TAILQ_ENTRY(targ_cmd_descr) tqe;
-	union ccb * __capability user_ccb;
+	union ccb *user_ccb;
 	int	   priority;
 	int	   func_code;
 };
@@ -520,7 +520,7 @@ targdtor(struct cam_periph *periph)
 static int
 targwrite(struct cdev *dev, struct uio *uio, int ioflag)
 {
-	union ccb * __capability user_ccb;
+	union ccb *user_ccb;
 	struct targ_softc *softc;
 	struct targ_cmd_descr *descr;
 	int write_len, error;
@@ -651,7 +651,7 @@ static int
 targusermerge(struct targ_softc *softc, struct targ_cmd_descr *descr,
 	      union ccb *ccb)
 {
-	struct ccb_hdr * __capability u_ccbh, *k_ccbh;
+	struct ccb_hdr *u_ccbh, *k_ccbh;
 	size_t ccb_len;
 	int error;
 
@@ -803,7 +803,7 @@ targread(struct cdev *dev, struct uio *uio, int ioflag)
 	struct targ_softc	*softc;
 	struct ccb_queue  *user_queue;
 	struct ccb_hdr	  *ccb_h;
-	union  ccb	  * __capability user_ccb;
+	union  ccb	  *user_ccb;
 	int		   read_len, error;
 
 	error = 0;
@@ -902,7 +902,7 @@ static int
 targreturnccb(struct targ_softc *softc, union ccb *ccb)
 {
 	struct targ_cmd_descr *descr;
-	struct ccb_hdr * __capability u_ccbh;
+	struct ccb_hdr *u_ccbh;
 	size_t ccb_len;
 	int error;
 

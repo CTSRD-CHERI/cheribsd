@@ -55,7 +55,7 @@ struct iic_msg_user {
 	uint16_t	slave;
 	uint16_t	flags;
 	uint16_t	len;
-	uint8_t * __capability buf;
+	uint8_t *buf;
 };
 #endif
 

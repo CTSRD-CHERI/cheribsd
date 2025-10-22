@@ -2326,7 +2326,7 @@ exit:
 
 int
 bnxt_hwrm_nvm_modify(struct bnxt_softc *softc, uint16_t index, uint32_t offset,
-    void * __capability data, bool cpyin, uint32_t length)
+    void *data, bool cpyin, uint32_t length)
 {
 	struct hwrm_nvm_modify_input req = {0};
 	struct iflib_dma_info dma_data;
@@ -2418,7 +2418,7 @@ exit:
 }
 
 int
-bnxt_hwrm_nvm_write(struct bnxt_softc *softc, void * __capability data,
+bnxt_hwrm_nvm_write(struct bnxt_softc *softc, void *data,
     bool cpyin,
     uint16_t type, uint16_t ordinal, uint16_t ext, uint16_t attr,
     uint16_t option, uint32_t data_length, bool keep, uint32_t *item_length,

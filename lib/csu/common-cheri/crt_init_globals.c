@@ -47,8 +47,8 @@ static __always_inline void
 crt_init_rela(const Elf_Phdr *phdr __unused)
 {
 	const Elf_Rela *rela, *relalim;
-	void * __capability data_cap;
-	const void * __capability code_cap;
+	void *data_cap;
+	const void *code_cap;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	data_cap = __DECONST(void *, phdr);
@@ -79,9 +79,9 @@ crt_init_rela(const Elf_Phdr *phdr __unused)
 /* This is __always_inline since it is called before globals have been set up */
 static __always_inline void
 crt_init_globals(const Elf_Phdr *phdr, long phnum,
-    void * __capability *data_cap_out,
-    const void * __capability *code_cap_out,
-    const void * __capability *rodata_cap_out)
+    void **data_cap_out,
+    const void **code_cap_out,
+    const void **rodata_cap_out)
 {
 	const Elf_Phdr *phlimit = phdr + phnum;
 	Elf_Addr text_start = (Elf_Addr)-1l;
@@ -93,9 +93,9 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum,
 	bool have_rodata_segment = false;
 	bool have_text_segment = false;
 	bool have_data_segment = false;
-	void * __capability data_cap;
-	const void * __capability code_cap;
-	const void * __capability rodata_cap;
+	void *data_cap;
+	const void *code_cap;
+	const void *rodata_cap;
 
 #ifdef CHERI_INIT_RELA
 	crt_init_rela(phdr);

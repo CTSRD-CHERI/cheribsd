@@ -103,7 +103,7 @@ struct sysentvec {
 	struct sysent	*sv_table;	/* pointer to sysent */
 	int		(*sv_fixup)(uintcap_t *, struct image_params *);
 					/* stack fixup function */
-	void		(*sv_sendsig)(void (* __capability)(int), struct ksiginfo *, struct __sigset *);
+	void		(*sv_sendsig)(void (*)(int), struct ksiginfo *, struct __sigset *);
 			    		/* send signal */
 	const char 	*sv_sigcode;	/* start of sigtramp code */
 	int 		*sv_szsigcode;	/* size of sigtramp code */

@@ -59,7 +59,7 @@ static vm_offset_t		akva_devmap_vaddr = DEVMAP_MAX_VADDR;
 extern int early_boot;
 #endif
 #ifdef __CHERI_PURE_CAPABILITY__
-static void * __capability devmap_capability;
+static void *devmap_capability;
 #endif
 
 /*
@@ -407,7 +407,7 @@ pmap_unmapdev(void *p, vm_size_t size)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 void __nosanitizecoverage
-devmap_init_capability(void * __capability cap)
+devmap_init_capability(void *cap)
 {
 	devmap_capability = cap;
 

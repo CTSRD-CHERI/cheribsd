@@ -898,7 +898,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		int ptevents;
 	} r;
 	syscallarg_t pscr_args[nitems(td->td_sa.args)];
-	void * __capability addr;
+	void *addr;
 	int error;
 
 	if (!allow_ptrace)
@@ -1028,7 +1028,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 #endif
 	case PT_GETREGSET:
 		error = suword(
-		    &((struct iovec * __capability)uap->addr)->iov_len,
+		    &((struct iovec *)uap->addr)->iov_len,
 		    r.vec.iov_len);
 		break;
 	case PT_GET_EVENT_MASK:
@@ -1152,7 +1152,7 @@ ptrace_sel_coredump_thread(struct proc *p)
 }
 
 int
-kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int data)
+kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 {
 	struct iovec iov;
 	struct uio uio;
@@ -1459,7 +1459,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		}
 		CTR2(KTR_PTRACE, "PT_GET_EVENT_MASK: pid %d mask %#x", p->p_pid,
 		    p->p_ptevents);
-		*(int * __capability)addr = p->p_ptevents;
+		*(int *)addr = p->p_ptevents;
 		break;
 
 	case PT_SET_EVENT_MASK:
@@ -1467,7 +1467,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			error = EINVAL;
 			break;
 		}
-		tmp = *(int * __capability)addr;
+		tmp = *(int *)addr;
 		if ((tmp & ~(PTRACE_EXEC | PTRACE_SCE | PTRACE_SCX |
 		    PTRACE_FORK | PTRACE_LWP | PTRACE_VFORK)) != 0) {
 			error = EINVAL;

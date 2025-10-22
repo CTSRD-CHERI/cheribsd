@@ -405,12 +405,12 @@ ctl_ioctl_do_datamove(struct ctl_scsiio *ctsio)
 	ext_watermark = ext_offset;
 	for (i = ext_sg_start, j = 0;
 	     i < ext_sg_entries && j < kern_sg_entries;) {
-		uint8_t * __capability ext_ptr, *kern_ptr;
+		uint8_t *ext_ptr, *kern_ptr;
 
 		len_to_copy = MIN(ext_sglist[i].len - ext_watermark,
 				  kern_sglist[j].len - kern_watermark);
 
-		ext_ptr = (uint8_t * __capability)ext_sglist[i].uaddr;
+		ext_ptr = (uint8_t *)ext_sglist[i].uaddr;
 		ext_ptr = ext_ptr + ext_watermark;
 		if (ctsio->io_hdr.flags & CTL_FLAG_BUS_ADDR) {
 			/*

@@ -72,22 +72,22 @@ struct image_params {
 	char *interpreter_name;		/* name of the interpreter */
 	void *auxargs;			/* ELF Auxinfo structure pointer */
 	struct sf_buf *firstpage;	/* first page that we mapped */
-	void * __capability strings;	/* pointer to string space (user) */
-	void * __capability ps_strings;	/* pointer to ps_string (user space) */
+	void *strings;			/* pointer to string space (user) */
+	void *ps_strings;		/* pointer to ps_string (user space) */
 	struct image_args *args;	/* system call arguments */
 	struct sysentvec *sysent;	/* system entry vector */
-	void * __capability argv;	/* pointer to argv (user space) */
-	void * __capability envv;	/* pointer to envv (user space) */
-	void * __capability auxv;	/* pointer to auxv (user space) */
+	void *argv;			/* pointer to argv (user space) */
+	void *envv;			/* pointer to envv (user space) */
+	void *auxv;			/* pointer to auxv (user space) */
 	char *execpath;
-	void * __capability execpathp;
+	void *execpathp;
 	char *freepath;
-	void * __capability canary;
+	void *canary;
 	int canarylen;
-	void * __capability pagesizes;
+	void *pagesizes;
 	int pagesizeslen;
 	struct cheri_c18n_info *c18n_info;
-	void * __capability stack;
+	void *stack;
 	vm_prot_t stack_prot;
 	u_long stack_sz;
 	struct ucred *newcred;		/* new credentials if changing */
@@ -99,7 +99,7 @@ struct image_params {
 	bool opened;			/* we have opened executable vnode */
 	bool textset;
 	u_int map_flags;
-	void * __capability imgact_capability;	/* copyout and mapping cap */
+	void *imgact_capability;	/* copyout and mapping cap */
 #define IMGP_ASLR_SHARED_PAGE	0x1
 	uint32_t imgp_flags;
 	struct vnode *interpreter_vp;	/* vnode of the interpreter */
@@ -112,11 +112,11 @@ struct vmspace;
 
 int	exec_alloc_args(struct image_args *);
 int	exec_args_add_arg(struct image_args *args,
-	    const char * __capability argp, enum uio_seg segflg);
+	    const char *argp, enum uio_seg segflg);
 int	exec_args_add_env(struct image_args *args,
-	    const char * __capability envp, enum uio_seg segflg);
+	    const char *envp, enum uio_seg segflg);
 int	exec_args_add_fname(struct image_args *args,
-	    const char *__capability fname, enum uio_seg segflg);
+	    const char *fname, enum uio_seg segflg);
 int	exec_args_adjust_args(struct image_args *args, size_t consume,
 	    ssize_t extend);
 char	*exec_args_get_begin_envv(struct image_args *args);
@@ -128,8 +128,8 @@ int	exec_map_stack(struct image_params *);
 int	exec_new_vmspace(struct image_params *, struct sysentvec *);
 void	exec_setregs(struct thread *, struct image_params *, uintcap_t);
 int	exec_shell_imgact(struct image_params *);
-int	exec_copyin_args(struct image_args *, const char * __capability,
-	    enum uio_seg, void * __capability, void * __capability);
+int	exec_copyin_args(struct image_args *, const char *,
+	    enum uio_seg, void *, void *);
 int	pre_execve(struct thread *td, struct vmspace **oldvmspace);
 void	post_execve(struct thread *td, int error, struct vmspace *oldvmspace);
 #endif

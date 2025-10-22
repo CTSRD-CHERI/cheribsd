@@ -638,7 +638,7 @@ cryptodev_op(struct csession *cse, const struct crypt_op *cop)
 	const struct crypto_session_params *csp;
 	struct cryptop_data *cod = NULL;
 	struct cryptop *crp = NULL;
-	char * __capability dst;
+	char *dst;
 	int error;
 
 	if (cop->len > 256*1024-4) {
@@ -867,7 +867,7 @@ cryptodev_aead(struct csession *cse, struct crypt_aead *caead)
 	const struct crypto_session_params *csp;
 	struct cryptop_data *cod = NULL;
 	struct cryptop *crp = NULL;
-	char * __capability dst;
+	char *dst;
 	int error;
 
 	if (caead->len > 256*1024-4 || caead->aadlen > 256*1024-4) {

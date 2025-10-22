@@ -131,10 +131,10 @@ static int shmget_allocate_segment(struct thread *td, key_t key, size_t size,
 static int shmget_existing(struct thread *td, size_t size, int shmflg,
     int mode, int segnum);
 static int kern_shmat(struct thread *td, int shmid,
-	const void * __capability shmaddr, int shmflg);
-static int kern_shmdt(struct thread *td, const void * __capability shmaddr);
+	const void *shmaddr, int shmflg);
+static int kern_shmdt(struct thread *td, const void *shmaddr);
 static int user_shmctl(struct thread *td, int shmid, int cmd,
-    struct shmid_ds * __capability ubuf);
+    struct shmid_ds *ubuf);
 static void shmrealloc(void);
 static int shminit(void);
 static int sysvshm_modload(struct module *, int, void *);
@@ -342,7 +342,7 @@ shm_prison_cansee(struct prison *rpr, struct shmid_kernel *shmseg)
 }
 
 static int
-kern_shmdt_locked(struct thread *td, const void * __capability shmaddr)
+kern_shmdt_locked(struct thread *td, const void *shmaddr)
 {
 	struct proc *p = td->td_proc;
 	struct shmmap_state *shmmap_s;
@@ -394,7 +394,7 @@ struct shmdt_args {
 int
 sys_shmdt(struct thread *td, struct shmdt_args *uap)
 {
-	const void * __capability shmaddr = uap->shmaddr;
+	const void *shmaddr = uap->shmaddr;
 
 #if __has_feature(capabilities)
 	/*
@@ -410,7 +410,7 @@ sys_shmdt(struct thread *td, struct shmdt_args *uap)
 }
 
 static int
-kern_shmdt(struct thread *td, const void * __capability shmaddr)
+kern_shmdt(struct thread *td, const void *shmaddr)
 {
 	int error;
 
@@ -422,7 +422,7 @@ kern_shmdt(struct thread *td, const void * __capability shmaddr)
 
 static int
 kern_shmat_locked(struct thread *td, int shmid,
-    const void * __capability shmaddr, int shmflg)
+    const void *shmaddr, int shmflg)
 {
 	struct prison *rpr;
 	struct proc *p = td->td_proc;
@@ -589,7 +589,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 		shmaddr = cheri_andperm(shmaddr, ~(CHERI_PERM_EXECUTE |
 		    CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |
 		    ((shmflg & SHM_RDONLY) != 0 ? CHERI_PERM_STORE : 0)));
-		td->td_retval[0] = (uintcap_t)__DECONST_CAP(void * __capability,
+		td->td_retval[0] = (uintcap_t)__DECONST_CAP(void *,
 		    shmaddr);
 	} else
 #endif
@@ -598,7 +598,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 }
 
 static int
-kern_shmat(struct thread *td, int shmid, const void * __capability shmaddr,
+kern_shmat(struct thread *td, int shmid, const void *shmaddr,
     int shmflg)
 {
 	int error;
@@ -619,7 +619,7 @@ struct shmat_args {
 int
 sys_shmat(struct thread *td, struct shmat_args *uap)
 {
-	const char * __capability shmaddr = uap->shmaddr;
+	const char *shmaddr = uap->shmaddr;
 
 #if __has_feature(capabilities)
 	/*
@@ -765,7 +765,7 @@ sys_shmctl(struct thread *td, struct shmctl_args *uap)
 
 static int
 user_shmctl(struct thread *td, int shmid, int cmd,
-    struct shmid_ds * __capability ubuf)
+    struct shmid_ds *ubuf)
 {
 	int error;
 	struct shmid_ds buf;

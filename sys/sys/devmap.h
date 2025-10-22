@@ -81,7 +81,7 @@ void devmap_bootstrap(void);
 /*
  * Provide a capability mapping the devmap region.
  */
-void devmap_init_capability(void * __capability _cap);
+void devmap_init_capability(void *_cap);
 #endif
 
 /*

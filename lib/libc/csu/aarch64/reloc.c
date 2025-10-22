@@ -40,8 +40,8 @@ ifunc_init(const Elf_Auxinfo *aux __unused)
  * 8-bit permission field.
  */
 static uintcap_t
-init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
-    const void * __capability text_rodata_cap, Elf_Addr base_addr,
+init_cap_from_fragment(const Elf_Addr *fragment, void *data_cap,
+    const void *text_rodata_cap, Elf_Addr base_addr,
     Elf_Size addend)
 {
 	uintcap_t cap;

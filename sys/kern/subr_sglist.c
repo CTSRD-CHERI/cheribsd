@@ -105,7 +105,7 @@ _sglist_append_range(struct sglist *sg, struct sglist_seg **ssp,
  * user) to a scatter/gather list.
  */
 static __inline int
-_sglist_append_buf(struct sglist *sg, void * __capability buf, size_t len,
+_sglist_append_buf(struct sglist *sg, void *buf, size_t len,
     pmap_t pmap, size_t *donep)
 {
 	struct sglist_seg *ss;
@@ -532,7 +532,7 @@ sglist_append_vmpages(struct sglist *sg, vm_page_t *m, size_t pgoff,
  * fails with EFBIG.
  */
 int
-sglist_append_user(struct sglist *sg, void * __capability buf, size_t len,
+sglist_append_user(struct sglist *sg, void *buf, size_t len,
     struct thread *td)
 {
 	struct sgsave save;

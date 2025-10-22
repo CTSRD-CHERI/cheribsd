@@ -1426,7 +1426,7 @@ mdcreate_vnode(struct md_s *sc, struct md_req *mdr, struct thread *td)
 {
 	struct vattr vattr;
 	struct nameidata nd;
-	char * __capability fname;
+	char *fname;
 	int error, flags;
 	long v;
 

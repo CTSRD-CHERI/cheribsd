@@ -354,7 +354,7 @@ void	ktrprocfork(struct proc *, struct proc *);
 void	ktruserret(struct thread *);
 void	ktrstruct(const char *, const void *, size_t);
 void	ktrstruct_error(const char *, const void *, size_t, int);
-void	ktrstructarray(const char *, enum uio_seg, const void * __capability,
+void	ktrstructarray(const char *, enum uio_seg, const void *,
 	    int, size_t);
 void	ktrcapfail(enum ktr_cap_violation, const void *);
 void	ktrdata(int, const void *, size_t);

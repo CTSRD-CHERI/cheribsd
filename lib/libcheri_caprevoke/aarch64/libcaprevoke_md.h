@@ -39,7 +39,7 @@
 #pragma once
 
 static inline uint64_t
-caprev_shadow_set_fw(uint64_t * __capability fw, void * __capability user_obj,
+caprev_shadow_set_fw(uint64_t *fw, void *user_obj,
     uint64_t fwm)
 {
 	uint64_t lshadow, scratch;
@@ -121,13 +121,13 @@ caprev_shadow_set_fw(uint64_t * __capability fw, void * __capability user_obj,
  */
 
 static inline void
-caprev_shadow_set_lw(_Atomic(uint64_t) * __capability lw, uint64_t lwm)
+caprev_shadow_set_lw(_Atomic(uint64_t) *lw, uint64_t lwm)
 {
 	atomic_fetch_or_explicit(lw, lwm, memory_order_relaxed);
 }
 
 static inline void
-caprev_shadow_clear_w(_Atomic(uint64_t) * __capability w, uint64_t m)
+caprev_shadow_clear_w(_Atomic(uint64_t) *w, uint64_t m)
 {
 	atomic_fetch_and_explicit(w, m, memory_order_relaxed);
 }

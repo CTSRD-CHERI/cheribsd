@@ -403,7 +403,7 @@ int	 truncate(const char *, off_t);
 __END_DECLS
 #endif /* !_KERNEL */
 
-typedef	void * __capability	otype_t;
+typedef	void *	otype_t;
 
 #endif /* __BSD_VISIBLE */
 

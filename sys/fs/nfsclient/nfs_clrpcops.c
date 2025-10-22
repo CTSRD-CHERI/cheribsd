@@ -70,7 +70,7 @@ SYSCTL_U64(_vfs_nfs, OID_AUTO, maxcopyrange, CTLFLAG_RW,
  */
 #define	IOVEC_REWIND(iovp, amt)	do {					\
 	size_t amount = (amt);						\
-	(iovp)->iov_base = (char * __capability)((iovp)->iov_base) - amount; \
+	(iovp)->iov_base = (char *)((iovp)->iov_base) - amount; \
 	(iovp)->iov_len += amount;					\
 } while(0)
 
@@ -6366,7 +6366,7 @@ nfscl_doiods(vnode_t vp, struct uio *uiop, int *iomode, int *must_commit,
 	int eof, error, firstmirror, i, iolaymode, mirrorcnt, recalled, timo;
 	void *lckp;
 	uint8_t *dev;
-	void * __capability iovbase = NULL;
+	void *iovbase = NULL;
 	size_t iovlen = 0;
 	off_t offs = 0;
 	ssize_t resid = 0;

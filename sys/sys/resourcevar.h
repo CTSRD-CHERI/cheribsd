@@ -39,16 +39,8 @@
 #include <sys/_mutex.h>
 #endif
 
-/*
- * NOTE: pr_base is the native pointer type in userspace and a
- * capabililty in kernel unless they aren't supported.
- */
 struct uprof {
-#ifdef _KERNEL
-	char * __capability	pr_base;	/* Buffer base. */
-#else
 	char *			pr_base;	/* Buffer base. */
-#endif
 	u_long			pr_size;	/* Buffer size. */
 	u_long			pr_off;		/* PC offset. */
 	u_long			pr_scale;	/* PC scaling. */

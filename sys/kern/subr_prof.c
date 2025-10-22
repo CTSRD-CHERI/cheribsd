@@ -66,7 +66,7 @@ sys_profil(struct thread *td, struct profil_args *uap)
 }
 
 int
-kern_profil(struct thread *td, char * __capability samples, size_t size,
+kern_profil(struct thread *td, char *samples, size_t size,
     size_t offset, u_int scale)
 {
 	struct uprof *upp;
@@ -147,7 +147,7 @@ addupc_task(struct thread *td, uintfptr_t pc, u_int ticks)
 {
 	struct proc *p = td->td_proc; 
 	struct uprof *prof;
-	char * __capability addr;
+	char *addr;
 	u_int i;
 	u_short v;
 	int stop = 0;

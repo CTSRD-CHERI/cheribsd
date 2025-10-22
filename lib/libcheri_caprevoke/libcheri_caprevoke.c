@@ -167,9 +167,9 @@ caprev_shadow_nomap_masks(ptraddr_t ob, size_t len, uint64_t *fwm,
  * need up front.
  */
 static inline void
-caprev_shadow_nomap_common_pfx(ptraddr_t sbase, uint64_t * __capability sb,
+caprev_shadow_nomap_common_pfx(ptraddr_t sbase, uint64_t *sb,
     ptraddr_t ob, size_t len, ptrdiff_t *fwo, ptrdiff_t *lwo,
-    uint64_t * __capability *fw)
+    uint64_t **fw)
 {
 	caprev_shadow_nomap_offsets(ob, len, fwo, lwo);
 	*fw = cheri_setaddress(sb, sbase + *fwo);
@@ -194,11 +194,11 @@ caprev_shadow_nomap_common_pfx(ptraddr_t sbase, uint64_t * __capability sb,
  * racing second call to free on the same pointer).
  */
 int
-caprev_shadow_nomap_set_len(ptraddr_t sbase, uint64_t * __capability sb,
-    ptraddr_t ob, size_t len, void * __capability user_obj)
+caprev_shadow_nomap_set_len(ptraddr_t sbase, uint64_t *sb,
+    ptraddr_t ob, size_t len, void *user_obj)
 {
 	ptrdiff_t fwo, lwo;
-	uint64_t * __capability fw;
+	uint64_t *fw;
 	uint64_t fwm;
 
 	caprev_shadow_nomap_common_pfx(sbase, sb, ob, len, &fwo, &lwo, &fw);
@@ -234,9 +234,9 @@ caprev_shadow_nomap_set_len(ptraddr_t sbase, uint64_t * __capability sb,
 	}
 
 	if (lwo != fwo) {
-		uint64_t * __capability lw;
+		uint64_t *lw;
 		uint64_t lwm;
-		uint64_t * __capability sbo;
+		uint64_t *sbo;
 		ptrdiff_t wo;
 
 		/*
@@ -257,7 +257,7 @@ caprev_shadow_nomap_set_len(ptraddr_t sbase, uint64_t * __capability sb,
 
 		if (lwm != ~(uint64_t)0) {
 			caprev_shadow_set_lw(
-			    (_Atomic(uint64_t) * __capability)lw, lwm);
+			    (_Atomic(uint64_t) *)lw, lwm);
 		} else {
 			*lw = ~(uint64_t)0;
 		}
@@ -308,8 +308,8 @@ caprev_shadow_nomap_set_len(ptraddr_t sbase, uint64_t * __capability sb,
  * racing second call to free on the same pointer).
  */
 int
-caprev_shadow_nomap_set(ptraddr_t sbase, uint64_t * __capability sb,
-    void * __capability priv_obj, void * __capability user_obj)
+caprev_shadow_nomap_set(ptraddr_t sbase, uint64_t *sb,
+    void *priv_obj, void *user_obj)
 {
 	return (caprev_shadow_nomap_set_len(sbase, sb,
 	    (ptraddr_t)priv_obj, cheri_getlen(priv_obj),
@@ -322,11 +322,11 @@ caprev_shadow_nomap_set(ptraddr_t sbase, uint64_t * __capability sb,
  * The masks here are subtractive: they're going to be AND'd with the shadow.
  */
 void
-caprev_shadow_nomap_clear_len(ptraddr_t sbase, uint64_t * __capability sb,
+caprev_shadow_nomap_clear_len(ptraddr_t sbase, uint64_t *sb,
     ptraddr_t ob, size_t len)
 {
 	ptrdiff_t fwo, lwo;
-	uint64_t * __capability fw;
+	uint64_t *fw;
 	uint64_t fwm;
 
 	caprev_shadow_nomap_common_pfx(sbase, sb, ob, len, &fwo, &lwo, &fw);
@@ -337,12 +337,12 @@ caprev_shadow_nomap_clear_len(ptraddr_t sbase, uint64_t * __capability sb,
 	 * The first word must be handled atomically, so that it interlocks
 	 * with the atomic manipulation in caprev_shadow_nomap_set.
 	 */
-	caprev_shadow_clear_w((_Atomic(uint64_t) * __capability)fw, fwm);
+	caprev_shadow_clear_w((_Atomic(uint64_t) *)fw, fwm);
 
 	if (lwo != fwo) {
-		uint64_t * __capability lw;
+		uint64_t *lw;
 		uint64_t lwm;
-		uint64_t * __capability sbo;
+		uint64_t *sbo;
 		ptrdiff_t wo;
 
 		lw = cheri_setaddress(sb, sbase + lwo);
@@ -353,7 +353,7 @@ caprev_shadow_nomap_clear_len(ptraddr_t sbase, uint64_t * __capability sb,
 		 */
 		if (lwm != 0) {
 			caprev_shadow_clear_w(
-			    (_Atomic(uint64_t) * __capability)lw, lwm);
+			    (_Atomic(uint64_t) *)lw, lwm);
 		} else {
 			*lw = 0;
 		}
@@ -384,8 +384,8 @@ caprev_shadow_nomap_clear_len(ptraddr_t sbase, uint64_t * __capability sb,
  * The masks here are subtractive: they're going to be AND'd with the shadow.
  */
 void
-caprev_shadow_nomap_clear(ptraddr_t sbase, uint64_t * __capability sb,
-    void * __capability obj)
+caprev_shadow_nomap_clear(ptraddr_t sbase, uint64_t *sb,
+    void *obj)
 {
 	return (caprev_shadow_nomap_clear_len(sbase, sb,
 	    (ptraddr_t)obj, cheri_getlen(obj)));
@@ -402,11 +402,11 @@ caprev_shadow_nomap_clear(ptraddr_t sbase, uint64_t * __capability sb,
  * likely a divisor of the units of management by the caller.
  */
 void
-caprev_shadow_nomap_set_raw(ptraddr_t sbase, uint64_t * __capability sb,
+caprev_shadow_nomap_set_raw(ptraddr_t sbase, uint64_t *sb,
     ptraddr_t heap_start, ptraddr_t heap_end)
 {
 	ptrdiff_t fwo, lwo;
-	uint64_t * __capability fw;
+	uint64_t *fw;
 	size_t len = heap_end - heap_start;
 
 	caprev_shadow_nomap_offsets(heap_start, len, &fwo, &lwo);
@@ -415,7 +415,7 @@ caprev_shadow_nomap_set_raw(ptraddr_t sbase, uint64_t * __capability sb,
 	*fw |= caprev_shadow_nomap_first_word_mask(heap_start, len);
 
 	if (lwo != fwo) {
-		uint64_t * __capability w = fw + 1;
+		uint64_t *w = fw + 1;
 		ptrdiff_t wo = fwo + sizeof(uint64_t);
 		w = fw + 1;
 		for (; wo < lwo; wo += sizeof(uint64_t), w++) {
@@ -428,11 +428,11 @@ caprev_shadow_nomap_set_raw(ptraddr_t sbase, uint64_t * __capability sb,
 }
 
 void
-caprev_shadow_nomap_clear_raw(ptraddr_t sbase, uint64_t * __capability sb,
+caprev_shadow_nomap_clear_raw(ptraddr_t sbase, uint64_t *sb,
     ptraddr_t heap_start, ptraddr_t heap_end)
 {
 	ptrdiff_t fwo, lwo;
-	uint64_t * __capability fw;
+	uint64_t *fw;
 	size_t len = heap_end - heap_start;
 
 	caprev_shadow_nomap_offsets(heap_start, len, &fwo, &lwo);
@@ -441,7 +441,7 @@ caprev_shadow_nomap_clear_raw(ptraddr_t sbase, uint64_t * __capability sb,
 	*fw &= ~caprev_shadow_nomap_first_word_mask(heap_start, len);
 
 	if (lwo != fwo) {
-		uint64_t * __capability w = fw + 1;
+		uint64_t *w = fw + 1;
 		ptrdiff_t wo = fwo + sizeof(uint64_t);
 		w = fw + 1;
 		for (; wo < lwo; wo += sizeof(uint64_t), w++) {

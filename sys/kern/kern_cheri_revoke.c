@@ -158,7 +158,7 @@ cheri_revoke_vmspace_fork(struct vmspace *dstvm, struct vmspace *srcvm)
 }
 
 static int
-cheri_revoke_fini(struct cheri_revoke_syscall_info * __capability crsi,
+cheri_revoke_fini(struct cheri_revoke_syscall_info *crsi,
     int res, struct cheri_revoke_stats *crst,
     struct cheri_revoke_epochs *crepochs)
 {
@@ -348,7 +348,7 @@ _Static_assert(sizeof(struct cheri_revoke_stats) ==
 static int
 kern_cheri_revoke(struct thread *td, int flags,
     cheri_revoke_epoch_t start_epoch,
-    struct cheri_revoke_syscall_info * __capability crsi)
+    struct cheri_revoke_syscall_info *crsi)
 {
 	int res;
 	cheri_revoke_epoch_t epoch;
@@ -362,7 +362,7 @@ kern_cheri_revoke(struct thread *td, int flags,
 	struct vmspace *vm;
 	vm_map_t vmm;
 	struct vm_cheri_revoke_cookie vmcrc;
-	struct cheri_revoke_info_page * __capability info_page;
+	struct cheri_revoke_info_page *info_page;
 
 	KASSERT(td == curthread, ("%s: td is not curthread", __func__));
 
@@ -760,11 +760,11 @@ post_revoke_pass:
 
 static int
 kern_cheri_revoke_get_shadow(struct thread *td, int flags,
-    void * __capability arena, void * __capability * __capability shadow)
+    void *arena, void **shadow)
 {
 	struct vmspace *vm;
 	vm_map_t vmm;
-	void * __capability cres;
+	void *cres;
 	vm_offset_t base, size;
 	int arena_perms, error;
 	int sel = flags & CHERI_REVOKE_SHADOW_SPACE_MASK;

@@ -105,7 +105,7 @@ freebsd64_sendto(struct thread *td, struct freebsd64_sendto_args *uap)
 }
 
 static int
-freebsd64_copyinmsghdr(struct msghdr64 * __capability umsg, struct msghdr *msg,
+freebsd64_copyinmsghdr(struct msghdr64 *umsg, struct msghdr *msg,
     struct msghdr64 *m64)
 {
 	struct iovec *iov;
@@ -119,7 +119,7 @@ freebsd64_copyinmsghdr(struct msghdr64 * __capability umsg, struct msghdr *msg,
 
 	msg->msg_iov = NULL;
 	error = freebsd64_copyiniov(
-	    (struct iovec *__capability)__USER_CAP_ARRAY(
+	    (struct iovec *)__USER_CAP_ARRAY(
 		(struct iovec64 *)(uintptr_t)m64->msg_iov, m64->msg_iovlen),
 	    m64->msg_iovlen, &iov, EMSGSIZE);
 	if (error)
@@ -139,7 +139,7 @@ freebsd64_copyinmsghdr(struct msghdr64 * __capability umsg, struct msghdr *msg,
  */
 static int
 freebsd64_copyoutmsghdr(struct msghdr64 *m64, struct msghdr *msg,
-    struct msghdr64 * __capability umsg)
+    struct msghdr64 *umsg)
 {
 	int error;
 
@@ -166,7 +166,7 @@ freebsd64_copyout_control(struct msghdr *msg, struct mbuf *control)
 	void *data;
 	socklen_t clen, datalen, oldclen;
 	int error;
-	char * __capability ctlbuf;
+	char *ctlbuf;
 	int len, copylen;
 	struct mbuf *m;
 	error = 0;
@@ -246,7 +246,7 @@ exit:
 }
 
 static int
-freebsd64_copyin_control(struct mbuf **mp, char * __capability buf,
+freebsd64_copyin_control(struct mbuf **mp, char *buf,
     u_int buflen)
 {
 	struct cmsghdr *cm;
@@ -399,7 +399,7 @@ freebsd64_recvmsg(struct thread *td, struct freebsd64_recvmsg_args *uap)
 	struct mbuf *control = NULL;
 	struct mbuf **controlp;
 	int error;
-	struct msghdr64 * __capability umsg = __USER_CAP_OBJ(uap->msg);
+	struct msghdr64 *umsg = __USER_CAP_OBJ(uap->msg);
 
 	error = freebsd64_copyinmsghdr(umsg, &msg, &umsg64);
 	if (error != 0)

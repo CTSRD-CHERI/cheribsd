@@ -38,8 +38,8 @@
 #include <sys/kbounce.h>
 
 static int
-kern_kbounce(struct thread *td, const void * __capability src,
-    void * __capability dst, size_t len, int flags)
+kern_kbounce(struct thread *td, const void *src,
+    void *dst, size_t len, int flags)
 {
 	void *bounce;
 	int error;

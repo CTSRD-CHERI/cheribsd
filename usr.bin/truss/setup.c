@@ -74,7 +74,7 @@ static void	new_proc(struct trussinfo *, pid_t, lwpid_t);
 static struct procabi freebsd = {
 	.type = "FreeBSD",
 	.abi = SYSDECODE_ABI_FREEBSD,
-	.pointer_size = sizeof(void * __capability),
+	.pointer_size = sizeof(void *),
 	.extra_syscalls = STAILQ_HEAD_INITIALIZER(freebsd.extra_syscalls),
 	.syscalls = { NULL }
 };

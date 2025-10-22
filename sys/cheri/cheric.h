@@ -135,7 +135,7 @@ cheri_ptr_equal_exact(void *x, void *y)
 
 /* Check if the address is between cap.base and cap.top, i.e. in bounds */
 static inline bool
-cheri_is_address_inbounds(const void * __capability cap, ptraddr_t addr)
+cheri_is_address_inbounds(const void *cap, ptraddr_t addr)
 {
 	return (addr >= cheri_getbase(cap) && addr < cheri_gettop(cap));
 }
@@ -145,7 +145,7 @@ cheri_is_address_inbounds(const void * __capability cap, ptraddr_t addr)
  * grants access to length bytes at address base.
  */
 static inline bool
-cheri_can_access(const void * __capability cap, ptraddr_t perms, ptraddr_t base,
+cheri_can_access(const void *cap, ptraddr_t perms, ptraddr_t base,
     size_t length)
 {
 	return (cheri_gettag(cap) && !cheri_getsealed(cap) &&
@@ -162,9 +162,9 @@ cheri_can_access(const void * __capability cap, ptraddr_t perms, ptraddr_t base,
  * capability, including that CHERI_PERM_SEAL is set.
  */
 static inline otype_t
-cheri_maketype(void * __capability root_type, register_t type)
+cheri_maketype(void *root_type, register_t type)
 {
-	void * __capability c;
+	void *c;
 
 	c = root_type;
 	c = cheri_setoffset(c, type);	/* Set type as desired. */
@@ -173,14 +173,14 @@ cheri_maketype(void * __capability root_type, register_t type)
 	return (c);
 }
 
-static inline void * __capability
+static inline void *
 cheri_zerocap(void)
 {
-	return (void * __capability)0;
+	return (void *)0;
 }
 
 static inline size_t
-cheri_bytes_remaining(const void * __capability cap)
+cheri_bytes_remaining(const void *cap)
 {
 	if (cheri_getoffset(cap) >= cheri_getlen(cap))
 		return 0;

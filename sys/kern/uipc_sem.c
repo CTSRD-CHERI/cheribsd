@@ -120,8 +120,8 @@ static int	kern_sem_wait(struct thread *td, semid_t id, int tryflag,
 static int	ksem_access(struct ksem *ks, struct ucred *ucred);
 static struct ksem *ksem_alloc(struct ucred *ucred, mode_t mode,
 		    unsigned int value);
-static int	ksem_create(struct thread *td, const char * __capability path,
-		    semid_t * __capability semidp, mode_t mode,
+static int	ksem_create(struct thread *td, const char *path,
+		    semid_t *semidp, mode_t mode,
 		    unsigned int value, int flags);
 static void	ksem_drop(struct ksem *ks);
 static int	ksem_get(struct thread *td, semid_t id, cap_rights_t *rightsp,
@@ -431,7 +431,7 @@ ksem_remove(char *path, Fnv32_t fnv, struct ucred *ucred)
 }
 
 static int
-ksem_create_copyout_semid(struct thread *td, semid_t * __capability semidp,
+ksem_create_copyout_semid(struct thread *td, semid_t *semidp,
     int fd)
 {
 	semid_t semid;
@@ -459,8 +459,8 @@ ksem_create_copyout_semid(struct thread *td, semid_t * __capability semidp,
 
 /* Other helper routines. */
 static int
-ksem_create(struct thread *td, const char * __capability name,
-    semid_t * __capability semidp, mode_t mode, unsigned int value, int flags)
+ksem_create(struct thread *td, const char *name,
+    semid_t *semidp, mode_t mode, unsigned int value, int flags)
 {
 	struct pwddesc *pdp;
 	struct ksem *ks;

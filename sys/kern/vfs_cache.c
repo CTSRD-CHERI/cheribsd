@@ -3202,7 +3202,7 @@ sys___getcwd(struct thread *td, struct __getcwd_args *uap)
 }
 
 int
-kern___getcwd(struct thread *td, char * __capability ubuf, size_t buflen)
+kern___getcwd(struct thread *td, char *ubuf, size_t buflen)
 {
 	char *buf, *retbuf;
 	int error;
@@ -3257,8 +3257,8 @@ vn_getcwd(char *buf, char **retbuf, size_t *buflen)
  *   calling thread lacks permission to traverse "quux".
  */
 int
-kern___realpathat(struct thread *td, int fd, const char * __capability path,
-    char * __capability buf, size_t size, int flags, enum uio_seg pathseg)
+kern___realpathat(struct thread *td, int fd, const char *path,
+    char *buf, size_t size, int flags, enum uio_seg pathseg)
 {
 	struct nameidata nd;
 	char *retbuf, *freebuf;

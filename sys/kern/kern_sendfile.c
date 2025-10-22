@@ -1268,7 +1268,7 @@ out:
 }
 
 static int
-copyin_hdtr(const struct sf_hdtr * __capability uhdtr, struct sf_hdtr *hdtr)
+copyin_hdtr(const struct sf_hdtr *uhdtr, struct sf_hdtr *hdtr)
 {
 
 	return (copyincap(uhdtr, hdtr, sizeof(*hdtr)));
@@ -1276,7 +1276,7 @@ copyin_hdtr(const struct sf_hdtr * __capability uhdtr, struct sf_hdtr *hdtr)
 
 int
 kern_sendfile(struct thread *td, int fd, int s, off_t offset, size_t nbytes,
-    void * __capability uhdtr, off_t * __capability usbytes, int flags,
+    void *uhdtr, off_t *usbytes, int flags,
     int compat, copyin_hdtr_t *copyin_hdtr_f, copyinuio_t *copyinuio_f)
 {
 	struct sf_hdtr hdtr;

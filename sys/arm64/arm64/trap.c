@@ -141,7 +141,7 @@ static abort_handler *abort_handlers[] = {
 };
 
 static __inline void
-call_trapsignal(struct thread *td, int sig, int code, void * __capability addr,
+call_trapsignal(struct thread *td, int sig, int code, void *addr,
     int trapno)
 {
 	ksiginfo_t ksi;
@@ -161,7 +161,7 @@ cpu_fetch_syscall_args(struct thread *td)
 	syscallarg_t *ap, *dst_ap;
 	struct syscall_args *sa;
 #if __has_feature(capabilities)
-	syscallarg_t * __capability stack_args = NULL;
+	syscallarg_t *stack_args = NULL;
 	int error;
 #endif
 
@@ -184,7 +184,7 @@ cpu_fetch_syscall_args(struct thread *td)
 		 */
 		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
 			stack_args =
-			    (syscallarg_t * __capability)td->td_frame->tf_x[9];
+			    (syscallarg_t *)td->td_frame->tf_x[9];
 #endif
 	} else {
 		*dst_ap++ = *ap++;
@@ -252,7 +252,7 @@ svc_handler(struct thread *td, struct trapframe *frame)
 		syscallret(td);
 	} else {
 		call_trapsignal(td, SIGILL, ILL_ILLOPN,
-		    (void * __capability)frame->tf_elr,
+		    (void *)frame->tf_elr,
 		    ESR_ELx_EXCEPTION(frame->tf_esr));
 		userret(td, frame);
 	}
@@ -270,7 +270,7 @@ align_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	}
 
 	call_trapsignal(td, SIGBUS, BUS_ADRALN,
-	    (void * __capability)frame->tf_elr,
+	    (void *)frame->tf_elr,
 	    ESR_ELx_EXCEPTION(frame->tf_esr));
 	userret(td, frame);
 }
@@ -282,7 +282,7 @@ external_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 {
 	if (lower) {
 		call_trapsignal(td, SIGBUS, BUS_OBJERR,
-		    (void * __capability)(uintcap_t)far,
+		    (void *)(uintcap_t)far,
 		    ESR_ELx_EXCEPTION(frame->tf_esr));
 		userret(td, frame);
 		return;
@@ -362,10 +362,10 @@ cap_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	if (!SV_PROC_FLAG(td->td_proc, SV_CHERI) &&
 	    far > CHERI_CAP_USER_DATA_BASE + CHERI_CAP_USER_DATA_LENGTH)
 		call_trapsignal(td, SIGSEGV, SEGV_MAPERR,
-		    (void * __capability)(uintcap_t)far, ESR_ELx_EXCEPTION(esr));
+		    (void *)(uintcap_t)far, ESR_ELx_EXCEPTION(esr));
 	else
 		call_trapsignal(td, SIGPROT, cheri_esr_to_sicode(esr),
-		    (void * __capability)frame->tf_elr, ESR_ELx_EXCEPTION(esr));
+		    (void *)frame->tf_elr, ESR_ELx_EXCEPTION(esr));
 	userret(td, frame);
 }
 #endif
@@ -524,7 +524,7 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 bad_far:
 		if (lower) {
 			call_trapsignal(td, sig, ucode,
-			    (void * __capability)(uintcap_t)far,
+			    (void *)(uintcap_t)far,
 			    ESR_ELx_EXCEPTION(esr));
 		} else {
 			if (td->td_intr_nesting_level == 0 &&
@@ -569,7 +569,7 @@ bad_far:
 
 #if __has_feature(capabilities)
 #define PRINT_REG(name, value)					\
-	printf(" %s: %#.16lp\n", name, (void * __capability)(value))
+	printf(" %s: %#.16lp\n", name, (void *)(value))
 #else
 #define PRINT_REG(name, value)	printf(" %s: 0x%.16lx\n", name, value)
 #endif
@@ -585,7 +585,7 @@ print_gp_register(const char *name, uintcap_t value)
 #endif
 
 #if __has_feature(capabilities)
-	printf(" %s: %#.16lp", name, (void * __capability)value);
+	printf(" %s: %#.16lp", name, (void *)value);
 #else
 	printf(" %s: 0x%.16lx", name, value);
 #endif
@@ -624,7 +624,7 @@ print_registers(struct trapframe *frame)
 
 #ifdef VFP
 static void
-fpe_trap(struct thread *td, void * __capability addr, uint32_t exception)
+fpe_trap(struct thread *td, void *addr, uint32_t exception)
 {
 	int code;
 
@@ -750,7 +750,7 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 		print_registers(frame);
 		print_gp_register("far", far);
 		panic("Undefined instruction: %08x",
-		    *(uint32_t * __capability)frame->tf_elr);
+		    *(uint32_t *)frame->tf_elr);
 		break;
 	case EXCP_BTI:
 		print_registers(frame);
@@ -809,7 +809,7 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		break;
 	case EXCP_TRAP_FP:
 #ifdef VFP
-		fpe_trap(td, (void * __capability)frame->tf_elr, esr);
+		fpe_trap(td, (void *)frame->tf_elr, esr);
 		userret(td, frame);
 #else
 		panic("VFP exception in userland");
@@ -819,7 +819,7 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		/* Returns true if this thread can use SVE */
 		if (!sve_restore_state(td))
 			call_trapsignal(td, SIGILL, ILL_ILLTRP,
-			    (void * __capability)frame->tf_elr, exception);
+			    (void *)frame->tf_elr, exception);
 		userret(td, frame);
 		break;
 	case EXCP_SVC32:
@@ -845,22 +845,22 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 	case EXCP_UNKNOWN:
 		if (!undef_insn(0, frame))
 			call_trapsignal(td, SIGILL, ILL_ILLTRP,
-			    (void * __capability)(uintcap_t)far, exception);
+			    (void *)(uintcap_t)far, exception);
 		userret(td, frame);
 		break;
 	case EXCP_FPAC:
 		call_trapsignal(td, SIGILL, ILL_ILLOPN,
-		    (void * __capability)frame->tf_elr, exception);
+		    (void *)frame->tf_elr, exception);
 		userret(td, frame);
 		break;
 	case EXCP_SP_ALIGN:
 		call_trapsignal(td, SIGBUS, BUS_ADRALN,
-		    (void * __capability)frame->tf_sp, exception);
+		    (void *)frame->tf_sp, exception);
 		userret(td, frame);
 		break;
 	case EXCP_PC_ALIGN:
 		call_trapsignal(td, SIGBUS, BUS_ADRALN,
-		    (void * __capability)frame->tf_elr, exception);
+		    (void *)frame->tf_elr, exception);
 		userret(td, frame);
 		break;
 	case EXCP_BRKPT_EL0:
@@ -869,12 +869,12 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 	case EXCP_BRKPT_32:
 #endif /* COMPAT_FREEBSD32 */
 		call_trapsignal(td, SIGTRAP, TRAP_BRKPT,
-		    (void * __capability)frame->tf_elr, exception);
+		    (void *)frame->tf_elr, exception);
 		userret(td, frame);
 		break;
 	case EXCP_WATCHPT_EL0:
 		call_trapsignal(td, SIGTRAP, TRAP_TRACE,
-		    (void * __capability)(uintcap_t)far, exception);
+		    (void *)(uintcap_t)far, exception);
 		userret(td, frame);
 		break;
 	case EXCP_MSR:
@@ -885,7 +885,7 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		 */
 		if (!undef_insn(0, frame))
 			call_trapsignal(td, SIGILL, ILL_PRVOPC,
-			    (void * __capability)frame->tf_elr, exception); 
+			    (void *)frame->tf_elr, exception); 
 		userret(td, frame);
 		break;
 	case EXCP_SOFTSTP_EL0:
@@ -898,17 +898,17 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		}
 		PROC_UNLOCK(td->td_proc);
 		call_trapsignal(td, SIGTRAP, TRAP_TRACE,
-		    (void * __capability)frame->tf_elr, exception);
+		    (void *)frame->tf_elr, exception);
 		userret(td, frame);
 		break;
 	case EXCP_BTI:
 		call_trapsignal(td, SIGILL, ILL_ILLOPC,
-		    (void * __capability)frame->tf_elr, exception);
+		    (void *)frame->tf_elr, exception);
 		userret(td, frame);
 		break;
 	default:
 		call_trapsignal(td, SIGBUS, BUS_OBJERR,
-		    (void * __capability)frame->tf_elr, exception);
+		    (void *)frame->tf_elr, exception);
 		userret(td, frame);
 		break;
 	}

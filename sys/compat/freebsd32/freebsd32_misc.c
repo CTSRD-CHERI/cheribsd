@@ -330,7 +330,7 @@ int
 freebsd4_freebsd32_getfsstat(struct thread *td,
     struct freebsd4_freebsd32_getfsstat_args *uap)
 {
-	struct statfs * __capability buf;
+	struct statfs *buf;
 	struct statfs *sp;
 	struct ostatfs32 stat32;
 	size_t count, size, copycount;
@@ -932,7 +932,7 @@ freebsd32_ptrace(struct thread *td, struct freebsd32_ptrace_args *uap)
 	} r32;
 	syscallarg_t pscr_args[nitems(td->td_sa.args)];
 	u_int pscr_args32[nitems(td->td_sa.args)];
-	void * __capability addr;
+	void *addr;
 	int data, error, i;
 
 	if (!allow_ptrace)
@@ -1124,7 +1124,7 @@ freebsd32_ptrace(struct thread *td, struct freebsd32_ptrace_args *uap)
 }
 
 int
-freebsd32_copyinuio(const struct iovec * __capability cb_arg, u_int iovcnt,
+freebsd32_copyinuio(const struct iovec *cb_arg, u_int iovcnt,
     struct uio **uiop)
 {
 	struct iovec32 iov32;
@@ -1135,8 +1135,8 @@ freebsd32_copyinuio(const struct iovec * __capability cb_arg, u_int iovcnt,
 	 * The first argument is not actually a struct iovec *, but C's type
 	 * system does not allow for overloaded callbacks.
 	 */
-	const struct iovec32 * __capability iovp =
-	    (const struct iovec32 * __capability)cb_arg;
+	const struct iovec32 *iovp =
+	    (const struct iovec32 *)cb_arg;
 
 	*uiop = NULL;
 	if (iovcnt > UIO_MAXIOV)
@@ -1197,13 +1197,13 @@ freebsd32_pwritev(struct thread *td, struct freebsd32_pwritev_args *uap)
 {
 
 	return (user_pwritev(td, uap->fd,
-	    (struct iovec *__capability)__USER_CAP_ARRAY(uap->iovp,
+	    (struct iovec *)__USER_CAP_ARRAY(uap->iovp,
 		uap->iovcnt), uap->iovcnt, PAIR32TO64(off_t, uap->offset),
 	    freebsd32_copyinuio));
 }
 
 int
-freebsd32_copyiniov(const struct iovec * __capability cb_arg, u_int iovcnt,
+freebsd32_copyiniov(const struct iovec *cb_arg, u_int iovcnt,
     struct iovec **iovp, int error)
 {
 	struct iovec32 iov32;
@@ -1214,8 +1214,8 @@ freebsd32_copyiniov(const struct iovec * __capability cb_arg, u_int iovcnt,
 	 * The first argument is not actually a struct iovec *, but C's type
 	 * system does not allow for overloaded callbacks.
 	 */
-	const struct iovec32 * __capability iovp32 =
-	    (const struct iovec32 * __capability)cb_arg;
+	const struct iovec32 *iovp32 =
+	    (const struct iovec32 *)cb_arg;
 
 	*iovp = NULL;
 	if (iovcnt > UIO_MAXIOV)
@@ -2051,7 +2051,7 @@ struct sf_hdtr32 {
 };
 
 static int
-freebsd32_copyin_hdtr(const struct sf_hdtr32 * __capability uhdtr,
+freebsd32_copyin_hdtr(const struct sf_hdtr32 *uhdtr,
     struct sf_hdtr *hdtr)
 {
 	struct sf_hdtr32 hdtr32;
@@ -2643,15 +2643,15 @@ freebsd32_jail_set(struct thread *td, struct freebsd32_jail_set_args *uap)
 }
 
 static int
-freebsd32_updateiov(const struct uio *uiop, struct iovec * __capability cb_arg)
+freebsd32_updateiov(const struct uio *uiop, struct iovec *cb_arg)
 {
 	int i, error;
 	/*
 	 * The second argument is not actually a struct iovec *, but C's type
 	 * system does not allow for overloaded callbacks.
 	 */
-	struct iovec32 * __capability iovp =
-	    (struct iovec32 * __capability)cb_arg;
+	struct iovec32 *iovp =
+	    (struct iovec32 *)cb_arg;
 
 	for (i = 0; i < uiop->uio_iovcnt; i++) {
 		error = suword32(&iovp[i].iov_len, uiop->uio_iov[i].iov_len);
@@ -3148,7 +3148,7 @@ siginfo_to_siginfo32(const siginfo_t *src, struct __siginfo32 *dst)
 }
 
 static int
-freebsd32_copyout_siginfo(const siginfo_t *si, void * __capability info)
+freebsd32_copyout_siginfo(const siginfo_t *si, void *info)
 {
 	struct __siginfo32 si32;
 
@@ -3616,7 +3616,7 @@ int
 freebsd32___specialfd(struct thread *td,
     struct freebsd32___specialfd_args *args)
 {
-	void * __capability req;
+	void *req;
 
 	switch(args->type) {
 	case SPECIALFD_EVENTFD:

@@ -123,7 +123,7 @@ int
 freebsd64_pwritev(struct thread *td, struct freebsd64_pwritev_args *uap)
 {
 	return (user_pwritev(td, uap->fd,
-	    (struct iovec *__capability)__USER_CAP_ARRAY(uap->iovp,
+	    (struct iovec *)__USER_CAP_ARRAY(uap->iovp,
 		uap->iovcnt), uap->iovcnt, uap->offset, freebsd64_copyinuio));
 }
 
@@ -131,11 +131,11 @@ int
 freebsd64_ioctl(struct thread *td, struct freebsd64_ioctl_args *uap)
 {
 	u_long com;
-	void * __capability udata;
+	void *udata;
 
 	com = uap->com;
 	if (com & IOC_VOID)
-		udata = (void * __capability)(intcap_t)uap->data;
+		udata = (void *)(intcap_t)uap->data;
 	else
 		udata = __USER_CAP(uap->data, IOCPARM_LEN(com));
 
@@ -146,7 +146,7 @@ int
 freebsd64_fspacectl(struct thread *td, struct freebsd64_fspacectl_args *uap)
 {
 	return (user_fspacectl(td, uap->fd, uap->cmd,
-	    (const void * __capability)__USER_CAP_OBJ(uap->rqsr), uap->flags,
+	    (const void *)__USER_CAP_OBJ(uap->rqsr), uap->flags,
 	    __USER_CAP_OBJ(uap->rmsr)));
 }
 
@@ -154,7 +154,7 @@ int
 freebsd64___specialfd(struct thread *td,
     struct freebsd64___specialfd_args *args)
 {
-	void * __capability req;
+	void *req;
 
 	switch(args->type) {
 	case SPECIALFD_EVENTFD:

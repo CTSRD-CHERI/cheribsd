@@ -185,7 +185,7 @@ sys_getloginclass(struct thread *td, struct getloginclass_args *uap)
 }
 
 int
-kern_getloginclass(struct thread *td, char * __capability namebuf,
+kern_getloginclass(struct thread *td, char *namebuf,
     size_t namelen)
 {
 	struct loginclass *lc;
@@ -215,7 +215,7 @@ sys_setloginclass(struct thread *td, struct setloginclass_args *uap)
 }
 
 int
-kern_setloginclass(struct thread *td, const char * __capability namebuf)
+kern_setloginclass(struct thread *td, const char *namebuf)
 {
 	struct proc *p = td->td_proc;
 	int error;

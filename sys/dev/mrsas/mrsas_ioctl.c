@@ -150,7 +150,7 @@ mrsas_passthru(struct mrsas_softc *sc, void *arg, u_long ioctlCmd)
 	int i, ioctl_data_size = 0, ioctl_sense_size, ret = 0;
 	struct mrsas_sge32 *kern_sge32;
 	unsigned long *sense_ptr;
-	uint8_t * __capability iov_base_ptrin = NULL;
+	uint8_t *iov_base_ptrin = NULL;
 	size_t iov_len = 0;
 
 	/*

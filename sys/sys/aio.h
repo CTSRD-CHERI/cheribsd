@@ -146,7 +146,7 @@ struct kaiocb {
 	struct	ucred *cred;		/* (*) active credential when created */
 	struct	file *fd_file;		/* (*) pointer to file structure */
 	struct	aioliojob *lio;		/* (*) optional lio job */
-	void * __capability ujob;	/* (*) pointer to userspace aiocb */
+	void	*ujob;			/* (*) pointer to userspace aiocb */
 	intcap_t	ujobptr;
 	struct	knlist klist;		/* (a) list of knotes */
 	struct	aiocb uaiocb;		/* (*) copy of user I/O control block */

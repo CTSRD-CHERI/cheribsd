@@ -70,8 +70,8 @@ typedef struct {	/* Auxiliary vector entry on initial stack */
 	int64_t	a_type;			/* Entry type. */
 	union {
 		int64_t	a_val;		/* Integer value. */
-		void * __capability a_ptr; /* Address. */
-		void	(* __capability a_fcn)(void); /* Function pointer (not used). */
+		void *a_ptr; /* Address. */
+		void	(*a_fcn)(void); /* Function pointer (not used). */
 	} a_un;
 } Elf64C_Auxinfo;
 #endif

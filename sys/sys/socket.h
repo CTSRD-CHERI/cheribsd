@@ -571,7 +571,7 @@ struct sockcred2 {
  * purecap userspace combination.
  */
 #if __has_feature(capabilities) && defined(_KERNEL)
-#define	_CMSG_ALIGN(n)	__builtin_align_up((n), sizeof(void * __capability))
+#define	_CMSG_ALIGN(n)	__builtin_align_up((n), sizeof(void *))
 #else
 #define	_CMSG_ALIGN(n)	_ALIGN(n)
 #endif
@@ -679,7 +679,7 @@ struct sf_hdtr {
 	int trl_cnt;		/* number of trailer iovec's */
 };
 #ifdef _KERNEL
-typedef	int copyin_hdtr_t(const void * __capability hdtrp, struct sf_hdtr *hdtr);
+typedef	int copyin_hdtr_t(const void *hdtrp, struct sf_hdtr *hdtr);
 #endif /* _KERNEL */
 
 /*

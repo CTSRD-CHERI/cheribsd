@@ -2612,9 +2612,9 @@ linux_seccomp(struct thread *td, struct linux_seccomp_args *args)
  * the loads the current value and updates the array pointer.
  */
 static int
-get_argenv_ptr(l_uintptr_t * __capability *arrayp, void * __capability *ptrp)
+get_argenv_ptr(l_uintptr_t **arrayp, void **ptrp)
 {
-	l_uintptr_t * __capability array;
+	l_uintptr_t *array;
 #ifdef COMPAT_LINUX32
 	uint32_t ptr32;
 #elif defined(COMPAT_LINUX64)
@@ -2638,7 +2638,7 @@ get_argenv_ptr(l_uintptr_t * __capability *arrayp, void * __capability *ptrp)
 	if (fueptr(array, &ptr) == -1)
 		return (EFAULT);
 	array += sizeof(ptr);
-	*ptrp = (void * __capability)ptr;
+	*ptrp = (void *)ptr;
 #endif
 	*arrayp = array;
 	return (0);
@@ -2650,11 +2650,11 @@ get_argenv_ptr(l_uintptr_t * __capability *arrayp, void * __capability *ptrp)
  * Based on freebsd32_exec_copyin_args.
  */
 static int
-linux_exec_copyin_args(struct image_args *args, const char * __capability fname,
-    enum uio_seg segflg, l_uintptr_t * __capability argv,
-    l_uintptr_t * __capability envv)
+linux_exec_copyin_args(struct image_args *args, const char *fname,
+    enum uio_seg segflg, l_uintptr_t *argv,
+    l_uintptr_t *envv)
 {
-	void * __capability ptr;
+	void *ptr;
 	int error;
 
 	bzero(args, sizeof(*args));

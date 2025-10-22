@@ -90,7 +90,7 @@ ipfw_clone_destroy(struct ifnet *ifp)
 }
 
 static int
-ipfw_clone_create(struct if_clone *ifc, int unit, void * __capability params)
+ipfw_clone_create(struct if_clone *ifc, int unit, void *params)
 {
 	struct ifnet *ifp;
 
@@ -114,7 +114,7 @@ ipfw_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 }
 
 static int
-ipfwlog_clone_create(struct if_clone *ifc, int unit, void * __capability params)
+ipfwlog_clone_create(struct if_clone *ifc, int unit, void *params)
 {
 	struct ifnet *ifp;
 

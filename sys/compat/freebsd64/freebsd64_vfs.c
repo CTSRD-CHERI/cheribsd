@@ -716,7 +716,7 @@ freebsd11_freebsd64_getfsstat(struct thread *td,
     struct freebsd11_freebsd64_getfsstat_args *uap)
 {
 	struct freebsd11_statfs64 osb;
-	struct statfs * __capability buf;
+	struct statfs *buf;
 	struct statfs *sp;
 	size_t count, size;
 	int error;

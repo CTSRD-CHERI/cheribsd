@@ -48,7 +48,7 @@ process___cap_relocs(Obj_Entry *obj)
 	struct capreloc *start_relocs = (struct capreloc *)obj->cap_relocs;
 	struct capreloc *end_relocs =
 	    (struct capreloc *)(obj->cap_relocs + obj->cap_relocs_size);
-	char * __capability data_base = get_datasegment_cap(obj);
+	char *data_base = get_datasegment_cap(obj);
 	bool tight_pcc_bounds;
 
 	if (obj->cap_relocs_processed) {

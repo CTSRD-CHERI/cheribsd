@@ -678,7 +678,7 @@ kvprintf(char const *fmt, void (*func)(int, void*), void *arg, int radix, va_lis
 	char padc;
 	int stop = 0, retval = 0;
 #if __has_feature(capabilities)
-	void * __capability cap;
+	void *cap;
 #endif
 
 	num = 0;
@@ -834,7 +834,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 			} else
 #endif
 			{
-				cap = va_arg(ap, void * __capability);
+				cap = va_arg(ap, void *);
 				num = cheri_getaddress(cap);
 			}
 			if (sharpflag) {

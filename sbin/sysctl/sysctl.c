@@ -1264,7 +1264,7 @@ show_var(int *oid, int nlen, bool honor_skip)
 		while (len >= sizeof(uintcap_t)) {
 			uintcap_t ptr = *(uintcap_t*)p;
 			fputs(sep1, stdout);
-			printf("%#lp", (void * __capability)ptr);
+			printf("%#lp", (void *)ptr);
 			sep1 = " ";
 			len -= sizeof(uintcap_t);
 			p += sizeof(uintcap_t);

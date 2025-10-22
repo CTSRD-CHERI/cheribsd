@@ -884,7 +884,7 @@ devfs_ioctl_f(struct file *fp, u_long com, void *data, struct ucred *cred, struc
 	return (error);
 }
 
-void * __capability
+void *
 fiodgname_buf_get_ptr(void *fgnp, u_long com)
 {
 	union {

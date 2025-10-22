@@ -68,7 +68,7 @@ ptrace_set_pc(struct thread *td, u_long addr)
 #if __has_feature(capabilities)
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI) &&
 	    !cheri_is_address_inbounds(
-	    (void * __capability)td->td_frame->tf_sepc, addr))
+	    (void *)td->td_frame->tf_sepc, addr))
 		return (EINVAL);
 	td->td_frame->tf_sepc = cheri_setaddress(td->td_frame->tf_sepc, addr);
 #else

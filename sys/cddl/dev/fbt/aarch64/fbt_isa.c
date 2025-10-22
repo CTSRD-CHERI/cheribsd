@@ -117,7 +117,7 @@ fbt_make_tracepoint_capability(uint32_t *instr)
 static uintcap_t
 fbt_unseal_symval(linker_symval_t *sym)
 {
-	extern void * __capability sentry_unsealcap;
+	extern void *sentry_unsealcap;
 	uintcap_t val;
 
 	val = cheri_unseal((uintcap_t)sym->value, sentry_unsealcap);

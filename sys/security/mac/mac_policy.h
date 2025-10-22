@@ -116,7 +116,7 @@ typedef void	(*mpo_init_t)(struct mac_policy_conf *mpc);
  * implement new services without reserving explicit system call numbers.
  */
 typedef int	(*mpo_syscall_t)(struct thread *td, int call,
-		    void * __capability arg);
+		    void *arg);
 
 /*
  * Place-holder function pointers for ABI-compatibility purposes.

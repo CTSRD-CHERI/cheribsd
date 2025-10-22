@@ -113,7 +113,7 @@ mem_read_cheri_caps(struct cdev *dev, const struct mem_cheri_cap_arg *arg)
 	char capbuf[sizeof(uintcap_t) + 1];
 	struct vm_page m;
 	vm_page_t marr[1];
-	uintcap_t * __capability dst;
+	uintcap_t *dst;
 	const uintcap_t *src;
 	vm_paddr_t pa;
 	vm_pointer_t mapped_ptr;

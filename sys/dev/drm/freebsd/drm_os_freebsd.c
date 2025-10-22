@@ -96,7 +96,7 @@ drm_fstub_read(struct file *file, struct uio *uio, struct ucred *cred,
 	   &uio->uio_offset);
 	if (rv >= 0) {
 		uio->uio_iov->iov_base =
-		    ((uint8_t * __capability)uio->uio_iov->iov_base) + bytes;
+		    ((uint8_t *)uio->uio_iov->iov_base) + bytes;
 		uio->uio_iov->iov_len -= bytes;
 		uio->uio_resid -= bytes;
 		rv = 0;
@@ -143,7 +143,7 @@ drm_fstub_write(struct file *file, struct uio *uio, struct ucred *cred,
 	   &uio->uio_offset);
 	if (rv >= 0) {
 		uio->uio_iov->iov_base =
-		    ((uint8_t * __capability)uio->uio_iov->iov_base) + bytes;
+		    ((uint8_t *)uio->uio_iov->iov_base) + bytes;
 		uio->uio_iov->iov_len -= bytes;
 		uio->uio_resid -= bytes;
 		rv = 0;

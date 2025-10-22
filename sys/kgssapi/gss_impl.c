@@ -76,7 +76,7 @@ struct mtx kgss_gssd_lock;
 KGSS_VNET_DEFINE(CLIENT *, kgss_gssd_handle) = NULL;
 
 static int	kern_gssd_syscall(struct thread *td,
-		    const char * __capability upath);
+		    const char *upath);
 
 static int
 kgss_load(void)
@@ -114,7 +114,7 @@ sys_gssd_syscall(struct thread *td, struct gssd_syscall_args *uap)
 }
 
 static int
-kern_gssd_syscall(struct thread *td, const char * __capability upath)
+kern_gssd_syscall(struct thread *td, const char *upath)
 {
         struct sockaddr_un sun;
         struct netconfig *nconf;

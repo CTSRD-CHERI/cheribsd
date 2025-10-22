@@ -230,7 +230,7 @@ ifc_create_ifp_nl(const char *name, struct ifc_data_nl *ifd)
 }
 
 int
-if_clone_create(char *name, size_t len, void * __capability params)
+if_clone_create(char *name, size_t len, void *params)
 {
 	struct ifc_data ifd = { .params = params };
 	struct ifnet *ifp;
@@ -701,7 +701,7 @@ if_clone_free(struct if_clone *ifc)
 int
 if_clone_list(struct if_clonereq *ifcr)
 {
-	char *buf, * __capability dst, *outbuf = NULL;
+	char *buf, *dst, *outbuf = NULL;
 	struct if_clone *ifc;
 	int buf_count, count, err = 0;
 

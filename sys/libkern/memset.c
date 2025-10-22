@@ -32,7 +32,7 @@
 
 #ifdef CAPABILITY_VERSION
 #define	__CAPSUFFIX(func)	(func ## _c)
-#define	__CAP		__capability
+#define	__CAP		
 #else
 #define	__CAPSUFFIX(func)	(func)
 #define	__CAP

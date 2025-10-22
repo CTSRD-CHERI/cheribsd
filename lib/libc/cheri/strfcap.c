@@ -43,7 +43,7 @@ static ssize_t
 _strfcap(char * __restrict buf, size_t maxsize, const char * __restrict format,
     uintcap_t cap, bool tag)
 {
-	char tmp[(sizeof(void * __capability) * 2) + 1], fmt[9], *fmtp;
+	char tmp[(sizeof(void *) * 2) + 1], fmt[9], *fmtp;
 	const char *percent, *opt_start = NULL;
 	char number_fmt, *orig_buf;
 	size_t size = 0;

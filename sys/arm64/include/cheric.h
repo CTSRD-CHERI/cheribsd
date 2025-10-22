@@ -41,7 +41,7 @@
 static __inline void
 trapframe_set_elr(struct trapframe *tf, uintcap_t elr)
 {
-	extern void * __capability sentry_unsealcap;
+	extern void *sentry_unsealcap;
 
 	if (cheri_getsealed(elr))
 		elr = cheri_unseal(elr, sentry_unsealcap);

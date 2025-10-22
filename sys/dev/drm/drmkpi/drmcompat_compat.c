@@ -55,23 +55,23 @@ drmcompat_panic_cmp(struct rb_node *one, struct rb_node *two)
 RB_GENERATE(drmcompat_root, rb_node, __entry, drmcompat_panic_cmp);
 
 int
-drmcompat_copyin(const void * __capability uaddr, void *kaddr, size_t len)
+drmcompat_copyin(const void *uaddr, void *kaddr, size_t len)
 {
 
 	return (-copyincap(uaddr, kaddr, len));
 }
 
 int
-drmcompat_copyout(const void *kaddr, void * __capability uaddr, size_t len)
+drmcompat_copyout(const void *kaddr, void *uaddr, size_t len)
 {
 
 	return (-copyoutcap(kaddr, uaddr, len));
 }
 
 size_t
-drmcompat_clear_user(void * __capability _uaddr, size_t _len)
+drmcompat_clear_user(void *_uaddr, size_t _len)
 {
-	uint8_t * __capability uaddr = _uaddr;
+	uint8_t *uaddr = _uaddr;
 	size_t len = _len;
 
 	/* make sure uaddr is aligned before going into the fast loop */
@@ -108,7 +108,7 @@ drmcompat_clear_user(void * __capability _uaddr, size_t _len)
 }
 
 int
-drmcompat_access_ok(const void * __capability uaddr, size_t len)
+drmcompat_access_ok(const void *uaddr, size_t len)
 {
 	uintptr_t saddr;
 	uintptr_t eaddr;

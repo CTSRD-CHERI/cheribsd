@@ -1291,12 +1291,12 @@ extern void dtrace_getupcstack(uint64_t *, int);
 extern void dtrace_getufpstack(uint64_t *, uint64_t *, int);
 extern int dtrace_getustackdepth(void);
 extern uintptr_t dtrace_fulword(void *);
-extern uint8_t dtrace_fuword8(void * __capability);
-extern uint16_t dtrace_fuword16(void * __capability);
-extern uint32_t dtrace_fuword32(void * __capability);
-extern uint64_t dtrace_fuword64(void * __capability);
+extern uint8_t dtrace_fuword8(void *);
+extern uint16_t dtrace_fuword16(void *);
+extern uint32_t dtrace_fuword32(void *);
+extern uint64_t dtrace_fuword64(void *);
 #if __has_feature(capabilities)
-extern uintcap_t dtrace_fucap(void * __capability);
+extern uintcap_t dtrace_fucap(void *);
 #endif
 extern void dtrace_probe_error(dtrace_state_t *, dtrace_epid_t, int, int,
     int, uintptr_t);
