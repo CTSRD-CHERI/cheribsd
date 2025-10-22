@@ -2345,7 +2345,7 @@ bnxt_hwrm_nvm_modify(struct bnxt_softc *softc, uint16_t index, uint32_t offset,
 			goto exit;
 	}
 	else
-		memcpy(dma_data.idi_vaddr, (__cheri_fromcap void *)data,
+		memcpy(dma_data.idi_vaddr, (void *)data,
 		    length);
 	bus_dmamap_sync(dma_data.idi_tag, dma_data.idi_map,
 	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
@@ -2443,7 +2443,7 @@ bnxt_hwrm_nvm_write(struct bnxt_softc *softc, void * __capability data,
 		}
 		else
 			memcpy(dma_data.idi_vaddr,
-			    (__cheri_fromcap void *)data, data_length);
+			    (void *)data, data_length);
 		bus_dmamap_sync(dma_data.idi_tag, dma_data.idi_map,
 		    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
 	}

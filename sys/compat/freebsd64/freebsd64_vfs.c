@@ -728,7 +728,7 @@ freebsd11_freebsd64_getfsstat(struct thread *td,
 	if (error == 0)
 		td->td_retval[0] = count;
 	if (size > 0) {
-		sp = (__cheri_fromcap struct statfs *)buf;
+		sp = (struct statfs *)buf;
 		while (count > 0 && error == 0) {
 			freebsd11_freebsd64_cvtstatfs(sp, &osb);
 			error = copyout(&osb, __USER_CAP_OBJ(uap->buf),

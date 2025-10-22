@@ -357,7 +357,7 @@ ktls_copyin_tls_enable(struct sockopt *sopt, struct tls_enable *tls)
 			if (error != 0)
 				goto done;
 		} else {
-			bcopy((__cheri_fromcap const void *)tls->cipher_key,
+			bcopy((const void *)tls->cipher_key,
 			    cipher_key, tls->cipher_key_len);
 		}
 	}
@@ -368,7 +368,7 @@ ktls_copyin_tls_enable(struct sockopt *sopt, struct tls_enable *tls)
 			if (error != 0)
 				goto done;
 		} else {
-			bcopy((__cheri_fromcap const void *)tls->iv, iv,
+			bcopy((const void *)tls->iv, iv,
 			    tls->iv_len);
 		}
 	}
@@ -379,7 +379,7 @@ ktls_copyin_tls_enable(struct sockopt *sopt, struct tls_enable *tls)
 			if (error != 0)
 				goto done;
 		} else {
-			bcopy((__cheri_fromcap const void *)tls->auth_key,
+			bcopy((const void *)tls->auth_key,
 			    auth_key, tls->auth_key_len);
 		}
 	}
@@ -400,10 +400,10 @@ done:
 void
 ktls_cleanup_tls_enable(struct tls_enable *tls)
 {
-	zfree(__DECONST(void *, (__cheri_fromcap const void *)tls->cipher_key),
+	zfree(__DECONST(void *, (const void *)tls->cipher_key),
 	    M_KTLS);
-	zfree(__DECONST(void *, (__cheri_fromcap const void *)tls->iv), M_KTLS);
-	zfree(__DECONST(void *, (__cheri_fromcap const void *)tls->auth_key),
+	zfree(__DECONST(void *, (const void *)tls->iv), M_KTLS);
+	zfree(__DECONST(void *, (const void *)tls->auth_key),
 	    M_KTLS);
 }
 
@@ -801,13 +801,13 @@ ktls_create_session(struct socket *so, struct tls_enable *en,
 		tls->params.auth_key_len = en->auth_key_len;
 		tls->params.auth_key = malloc(en->auth_key_len, M_KTLS,
 		    M_WAITOK);
-		bcopy((__cheri_fromcap const void *)en->auth_key,
+		bcopy((const void *)en->auth_key,
 		    tls->params.auth_key, en->auth_key_len);
 	}
 
 	tls->params.cipher_key_len = en->cipher_key_len;
 	tls->params.cipher_key = malloc(en->cipher_key_len, M_KTLS, M_WAITOK);
-	bcopy((__cheri_fromcap const void *)en->cipher_key,
+	bcopy((const void *)en->cipher_key,
 	    tls->params.cipher_key, en->cipher_key_len);
 
 	/*
@@ -817,7 +817,7 @@ ktls_create_session(struct socket *so, struct tls_enable *en,
 	 */
 	if (en->iv_len != 0) {
 		tls->params.iv_len = en->iv_len;
-		bcopy((__cheri_fromcap const void *)en->iv, tls->params.iv,
+		bcopy((const void *)en->iv, tls->params.iv,
 		    en->iv_len);
 
 		/*

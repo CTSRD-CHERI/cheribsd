@@ -3531,7 +3531,7 @@ postsig(int sig)
 		 * If we get here, the signal must be caught.
 		 */
 		KASSERT(action != SIG_IGN, ("postsig action %p",
-		    (__cheri_fromcap void *)action));
+		    (void *)action));
 		KASSERT(!SIGISMEMBER(td->td_sigmask, sig),
 		    ("postsig action: blocked sig %d", sig));
 

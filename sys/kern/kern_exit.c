@@ -808,7 +808,7 @@ kern_abort2(struct thread *td, const char * __capability why, int nargs,
 		sbuf_putc(sb, '(');
 		for (i = 0;i < nargs; i++)
 			sbuf_printf(sb, "%s%p", i == 0 ? "" : ", ",
-			    (__cheri_fromcap void *)uargs[i]);
+			    (void *)uargs[i]);
 		sbuf_putc(sb, ')');
 	}
 	/*

@@ -632,7 +632,7 @@
 	void * __capability tmpcap = (cap);				\
 	if (!__CAP_CHECK((cap), (len)))					\
 		tmpcap = NULL;						\
-	(__cheri_fromcap void *)(tmpcap);				\
+	(void *)(tmpcap);				\
 })
 #else
 #define __DECAP_CHECK(cap, len) (cap)
@@ -975,11 +975,6 @@
 /* Disable CHERI capability annotations for non-CHERI architectures. */
 #if !__has_feature(capabilities)
 #define	__capability
-#endif
-
-#if !__has_feature(cheri_casts)
-/* Support old compiler versions without CHERI casts: */
-#define __cheri_fromcap
 #endif
 
 #if 0

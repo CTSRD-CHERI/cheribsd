@@ -3864,7 +3864,7 @@ nfssvc_nfsd(struct thread *td, struct nfssvc_args *uap)
 			cp = malloc(nfsdarg.dnshostlen + 1, M_TEMP, M_WAITOK);
 			error = copyin(nfsdarg.dnshost, cp, nfsdarg.dnshostlen);
 			if (error != 0) {
-				free((__cheri_fromcap char *)nfsdarg.addr,
+				free((char *)nfsdarg.addr,
 				    M_TEMP);
 				free(cp, M_TEMP);
 				goto out;
@@ -3874,9 +3874,9 @@ nfssvc_nfsd(struct thread *td, struct nfssvc_args *uap)
 			cp = malloc(nfsdarg.dspathlen + 1, M_TEMP, M_WAITOK);
 			error = copyin(nfsdarg.dspath, cp, nfsdarg.dspathlen);
 			if (error != 0) {
-				free((__cheri_fromcap char *)nfsdarg.addr,
+				free((char *)nfsdarg.addr,
 				    M_TEMP);
-				free((__cheri_fromcap char *)nfsdarg.dnshost,
+				free((char *)nfsdarg.dnshost,
 				    M_TEMP);
 				free(cp, M_TEMP);
 				goto out;
@@ -3886,11 +3886,11 @@ nfssvc_nfsd(struct thread *td, struct nfssvc_args *uap)
 			cp = malloc(nfsdarg.mdspathlen + 1, M_TEMP, M_WAITOK);
 			error = copyin(nfsdarg.mdspath, cp, nfsdarg.mdspathlen);
 			if (error != 0) {
-				free((__cheri_fromcap char *)nfsdarg.addr,
+				free((char *)nfsdarg.addr,
 				    M_TEMP);
-				free((__cheri_fromcap char *)nfsdarg.dnshost,
+				free((char *)nfsdarg.dnshost,
 				    M_TEMP);
-				free((__cheri_fromcap char *)nfsdarg.dspath,
+				free((char *)nfsdarg.dspath,
 				    M_TEMP);
 				free(cp, M_TEMP);
 				goto out;
@@ -3911,10 +3911,10 @@ nfssvc_nfsd(struct thread *td, struct nfssvc_args *uap)
 		nfsd_timer(NFSD_TD_TO_VNET(td));
 		error = nfsrvd_nfsd(td, &nfsdarg);
 		callout_drain(&NFSD_VNET(nfsd_callout));
-		free((__cheri_fromcap char *)nfsdarg.addr, M_TEMP);
-		free((__cheri_fromcap char *)nfsdarg.dnshost, M_TEMP);
-		free((__cheri_fromcap char *)nfsdarg.dspath, M_TEMP);
-		free((__cheri_fromcap char *)nfsdarg.mdspath, M_TEMP);
+		free((char *)nfsdarg.addr, M_TEMP);
+		free((char *)nfsdarg.dnshost, M_TEMP);
+		free((char *)nfsdarg.dspath, M_TEMP);
+		free((char *)nfsdarg.mdspath, M_TEMP);
 	} else if (uap->flag & NFSSVC_PNFSDS) {
 		error = copyincap(uap->argp, &pnfsdarg, sizeof(pnfsdarg));
 		if (error == 0 && (pnfsdarg.op == PNFSDOP_DELDSSERVER ||

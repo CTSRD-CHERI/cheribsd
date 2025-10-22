@@ -892,7 +892,7 @@ out:
 		if ((rmerr = namei(&nd)) != 0 ||
 		    (rmerr = VOP_REMOVE(nd.ni_dvp, nd.ni_vp, &nd.ni_cnd)) != 0)
 			printf("Delete of %s failed with error %d\n",
-			    (__cheri_fromcap const char *)nd.ni_dirp, rmerr);
+			    (const char *)nd.ni_dirp, rmerr);
 		NDFREE_PNBUF(&nd);
 		if (nd.ni_dvp != NULL)
 			vput(nd.ni_dvp);

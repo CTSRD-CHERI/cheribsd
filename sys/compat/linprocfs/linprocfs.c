@@ -541,7 +541,7 @@ linprocfs_domtab(PFS_FILL_ARGS)
 		goto out;
 	}
 
-	for (sp = (__cheri_fromcap struct statfs *)buf; count > 0;
+	for (sp = (struct statfs *)buf; count > 0;
 	    sp++, count--) {
 		error = _mtab_helper(pn, sp, &mntfrom, &mntto, &fstype);
 		if (error != 0) {

@@ -748,7 +748,7 @@ kern_sendit(struct thread *td, int s, struct msghdr *mp, int flags,
 	rights = &cap_send_rights;
 	if (mp->msg_name != NULL) {
 		AUDIT_ARG_SOCKADDR(td, AT_FDCWD,
-		    (__cheri_fromcap struct sockaddr *)mp->msg_name);
+		    (struct sockaddr *)mp->msg_name);
 		rights = &cap_send_connect_rights;
 	}
 	error = getsock(td, s, rights, &fp);
@@ -760,12 +760,12 @@ kern_sendit(struct thread *td, int s, struct msghdr *mp, int flags,
 
 #ifdef KTRACE
 	if (mp->msg_name != NULL && KTRPOINT(td, KTR_STRUCT))
-		ktrsockaddr((__cheri_fromcap void *)mp->msg_name);
+		ktrsockaddr((void *)mp->msg_name);
 #endif
 #ifdef MAC
 	if (mp->msg_name != NULL) {
 		error = mac_socket_check_connect(td->td_ucred, so,
-		    (__cheri_fromcap void *)mp->msg_name);
+		    (void *)mp->msg_name);
 		if (error != 0) {
 			m_freem(control);
 			goto bad;
@@ -778,7 +778,7 @@ kern_sendit(struct thread *td, int s, struct msghdr *mp, int flags,
 	}
 #endif
 
-	auio.uio_iov = (__cheri_fromcap struct iovec *)mp->msg_iov;
+	auio.uio_iov = (struct iovec *)mp->msg_iov;
 	auio.uio_iovcnt = mp->msg_iovlen;
 	auio.uio_segflg = segflg;
 	auio.uio_rw = UIO_WRITE;
@@ -798,7 +798,7 @@ kern_sendit(struct thread *td, int s, struct msghdr *mp, int flags,
 		ktruio = cloneuio(&auio);
 #endif
 	len = auio.uio_resid;
-	error = sousrsend(so, (__cheri_fromcap struct sockaddr *)mp->msg_name,
+	error = sousrsend(so, (struct sockaddr *)mp->msg_name,
 	    &auio, control, flags, NULL);
 	if (error == 0)
 		td->td_retval[0] = len - auio.uio_resid;
@@ -945,7 +945,7 @@ kern_recvit(struct thread *td, int s, struct msghdr *mp, enum uio_seg fromseg,
 	}
 #endif
 
-	auio.uio_iov = (__cheri_fromcap struct iovec *)mp->msg_iov;
+	auio.uio_iov = (struct iovec *)mp->msg_iov;
 	auio.uio_iovcnt = mp->msg_iovlen;
 	auio.uio_segflg = UIO_USERSPACE;
 	auio.uio_rw = UIO_READ;
@@ -1005,7 +1005,7 @@ kern_recvit(struct thread *td, int s, struct msghdr *mp, enum uio_seg fromseg,
 					goto out;
 			} else
 				bcopy(fromsa,
-				    (__cheri_fromcap void *)mp->msg_name,
+				    (void *)mp->msg_name,
 				    len);
 		}
 		mp->msg_namelen = len;

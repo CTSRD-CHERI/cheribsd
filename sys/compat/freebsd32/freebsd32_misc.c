@@ -340,7 +340,7 @@ freebsd4_freebsd32_getfsstat(struct thread *td,
 	size = count * sizeof(struct statfs);
 	error = kern_getfsstat(td, &buf, size, &count, UIO_SYSSPACE, uap->mode);
 	if (size > 0) {
-		sp = (__cheri_fromcap struct statfs *)buf;
+		sp = (struct statfs *)buf;
 		copycount = count;
 		while (copycount > 0 && error == 0) {
 			copy_statfs(sp, &stat32);
@@ -387,7 +387,7 @@ freebsd32_sigaltstack(struct thread *td,
 		ssp = NULL;
 	error = kern_sigaltstack(td, ssp, &oss);
 	if (error == 0 && uap->oss != NULL) {
-		s32.ss_sp = PTROUT((__cheri_fromcap void *)oss.ss_sp);
+		s32.ss_sp = PTROUT((void *)oss.ss_sp);
 		CP(oss, s32, ss_size);
 		CP(oss, s32, ss_flags);
 		error = copyout(&s32, uap->oss, sizeof(s32));

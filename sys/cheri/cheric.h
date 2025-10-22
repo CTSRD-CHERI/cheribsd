@@ -195,7 +195,7 @@ cheri_bytes_remaining(const void * __capability cap)
 	typedef __typeof__(*(cap)) __underlying_type;			\
 	__underlying_type* __result = 0;				\
 	if (cheri_gettag(cap) && cheri_bytes_remaining(cap) >= min_size) { \
-		__result = (__cheri_fromcap __underlying_type*)(cap);	\
+		__result = (__underlying_type*)(cap);	\
 	} __result; })
 
 /*

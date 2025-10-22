@@ -61,7 +61,7 @@ CHERIBSDTEST(store_local_allowed,
 	CHERIBSDTEST_VERIFY(strcmp(STR_VAL, str) == 0);
 	*targetp = cap;
 	CHERIBSDTEST_VERIFY(
-	    strcmp(STR_VAL, (__cheri_fromcap char *)target) == 0);
+	    strcmp(STR_VAL, (char *)target) == 0);
 
 	/* Make cap local */
 	cap = cheri_andperm(cap, ~CHERI_PERM_GLOBAL);
@@ -69,7 +69,7 @@ CHERIBSDTEST(store_local_allowed,
 	/* Store local cap through cap with store-local permission */
 	*targetp = cap;
 	CHERIBSDTEST_VERIFY(
-	    strcmp(STR_VAL, (__cheri_fromcap char *)target) == 0);
+	    strcmp(STR_VAL, (char *)target) == 0);
 
 	cheribsdtest_success();
 }
@@ -89,7 +89,7 @@ CHERIBSDTEST(store_local_disallowed,
 	CHERIBSDTEST_VERIFY(strcmp(STR_VAL, str) == 0);
 	*targetp = cap;
 	CHERIBSDTEST_VERIFY(
-	    strcmp(STR_VAL, (__cheri_fromcap char *)target) == 0);
+	    strcmp(STR_VAL, (char *)target) == 0);
 
 	/* Make cap local */
 	cap = cheri_andperm(cap, ~CHERI_PERM_GLOBAL);
