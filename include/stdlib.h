@@ -367,26 +367,6 @@ static inline void qsort_r(void *base, size_t nmemb, size_t size,
 __BEGIN_DECLS
 #endif
 
-#if __has_feature(capabilities)
-long	 strtol_c(const char * __capability __restrict,
-	    char * __capability * __capability __restrict, int);
-long double
-	 strtold_c(const char * __capability __restrict,
-	    char * __capability * __restrict);
-
-#if !defined(__CHERI_PURE_CAPABILITY__)
-#define	malloc_c(size) cheri_ptr(malloc(size), size)
-#define	calloc_c(num, size) cheri_ptr(calloc(num, size), num * size)
-#define	realloc_c(cap, size) cheri_ptr(realloc(cheri_cap_to_ptr(cap, 0), size), size)
-#define	free_c(cap) free(cheri_cap_to_ptr(cap, 0))
-#else
-#define	malloc_c(size) malloc(size)
-#define	calloc_c(num, size) calloc(num, size)
-#define	realloc_c(cap, size) realloc(cap, size)
-#define	free_c(cap) free(cap)
-#endif
-#endif
-
 int timsort(void *base, size_t nel, size_t width,
 	    int (*compar) (const void *, const void *));
 
