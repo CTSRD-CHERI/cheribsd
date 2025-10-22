@@ -35,7 +35,6 @@
 #include <sys/types.h>
 
 #include <limits.h>
-#include "cheri_private.h"
 
 #define	wsize	sizeof(u_long)
 #define	wmask	(wsize - 1)
@@ -60,15 +59,15 @@ bzero(void *dst0, size_t length)
 #define	VAL	c0
 #define	WIDEVAL	c
 
-void * __CAP
-__CAPSUFFIX(memset)(void * __CAP dst0, int c0, size_t length)
+void *
+memset(void *dst0, int c0, size_t length)
 #endif
 {
 	size_t t;
 #ifndef BZERO
 	u_long c;
 #endif
-	u_char * __CAP dst;
+	u_char *dst;
 
 	dst = dst0;
 	/*
@@ -118,7 +117,7 @@ __CAPSUFFIX(memset)(void * __CAP dst0, int c0, size_t length)
 	/* Fill words.  Length was >= 2*words so we know t >= 1 here. */
 	t = length / wsize;
 	do {
-		*(u_long * __CAP)(void * __CAP)dst = WIDEVAL;
+		*(u_long *)(void *)dst = WIDEVAL;
 		dst += wsize;
 	} while (--t != 0);
 
