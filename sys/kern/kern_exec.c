@@ -1802,7 +1802,7 @@ exec_args_add_fname(struct image_args *args, const char * __capability fname,
 	if (fname != NULL) {
 		args->fname = args->buf;
 		if (segflg == UIO_SYSSPACE)
-			error = copystr((__cheri_fromcap const char *)fname,
+			error = copystr((const char *)fname,
 			    args->fname, PATH_MAX, &length);
 		else
 			error = copyinstr(fname, args->fname, PATH_MAX,
@@ -1839,7 +1839,7 @@ exec_args_add_str(struct image_args *args, const char * __capability str,
 	KASSERT(args->begin_argv != NULL, ("begin_argp not initialized"));
 
 	if (segflg == UIO_SYSSPACE)
-		error = copystr((__cheri_fromcap const char *)str, args->endp,
+		error = copystr((const char *)str, args->endp,
 		    args->stringspace, &length);
 	else
 		error = copyinstr(str, args->endp, args->stringspace,
@@ -2045,7 +2045,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	imgp->c18n_info = (struct cheri_c18n_info *)
 	    cheri_bounds_set_exact(destp, sizeof(*imgp->c18n_info));
 	p->p_c18n_info =
-	    (__cheri_fromcap struct cheri_c18n_info *)imgp->c18n_info;
+	    (struct cheri_c18n_info *)imgp->c18n_info;
 #endif
 
 	if (imgp->auxargs) {

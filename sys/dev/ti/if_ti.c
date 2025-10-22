@@ -589,12 +589,12 @@ ti_copy_mem(struct ti_softc *sc, uint32_t tigon_addr, uint32_t len,
 					    sc->ti_membuf2, segsize,
 					    TI_SWAP_NTOH);
 					TI_UNLOCK(sc);
-					bcopy(&sc->ti_membuf2[segresid], (__cheri_fromcap void *)ptr,
+					bcopy(&sc->ti_membuf2[segresid], (void *)ptr,
 					    segsize - segresid);
 					TI_LOCK(sc);
 					first_pass = 0;
 				} else
-					ti_bcopy_swap(sc->ti_membuf, (__cheri_fromcap void *)ptr,
+					ti_bcopy_swap(sc->ti_membuf, (void *)ptr,
 					    segsize, TI_SWAP_NTOH);
 			}
 
@@ -606,7 +606,7 @@ ti_copy_mem(struct ti_softc *sc, uint32_t tigon_addr, uint32_t len,
 				ti_bcopy_swap(sc->ti_membuf2, sc->ti_membuf,
 				    segsize, TI_SWAP_HTON);
 			} else
-				ti_bcopy_swap((__cheri_fromcap void *)ptr, sc->ti_membuf, segsize,
+				ti_bcopy_swap((void *)ptr, sc->ti_membuf, segsize,
 				    TI_SWAP_HTON);
 
 			if (error == 0) {
@@ -659,7 +659,7 @@ ti_copy_mem(struct ti_softc *sc, uint32_t tigon_addr, uint32_t len,
 				error = copyout(&tmpval2, ptr, resid);
 				TI_LOCK(sc);
 			} else
-				bcopy(&tmpval2, (__cheri_fromcap void *)ptr, resid);
+				bcopy(&tmpval2, (void *)ptr, resid);
 		} else {
 			/*
 			 * If we're writing, first copy the bytes to be
@@ -677,7 +677,7 @@ ti_copy_mem(struct ti_softc *sc, uint32_t tigon_addr, uint32_t len,
 				error = copyin(ptr, &tmpval2, resid);
 				TI_LOCK(sc);
 			} else
-				bcopy((__cheri_fromcap void *)ptr, &tmpval2, resid);
+				bcopy((void *)ptr, &tmpval2, resid);
 
 			if (error == 0) {
 				tmpval = htonl(tmpval2);
@@ -766,12 +766,12 @@ ti_copy_scratch(struct ti_softc *sc, uint32_t tigon_addr, uint32_t len,
 			if (useraddr)
 				error = copyout(&tmpval, ptr, 4);
 			else
-				bcopy(&tmpval, (__cheri_fromcap void *)ptr, 4);
+				bcopy(&tmpval, (void *)ptr, 4);
 		} else {
 			if (useraddr)
 				error = copyin(ptr, &tmpval2, 4);
 			else
-				bcopy((__cheri_fromcap void *)ptr, &tmpval2, 4);
+				bcopy((void *)ptr, &tmpval2, 4);
 
 			if (error == 0) {
 				tmpval = htonl(tmpval2);

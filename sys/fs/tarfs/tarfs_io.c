@@ -387,7 +387,7 @@ tarfs_zread_zstd(struct tarfs_zio *zio, struct uio *uiop)
 	MPASS(uiop->uio_iovcnt == 1);
 	MPASS(uiop->uio_iov->iov_len >= len);
 	if (uiop->uio_segflg == UIO_SYSSPACE) {
-		zob.dst = (__cheri_fromcap void *)uiop->uio_iov->iov_base;
+		zob.dst = (void *)uiop->uio_iov->iov_base;
 	} else {
 		TARFS_DPF(BOUNCE, "%s: allocating %zu-byte bounce buffer\n",
 		    __func__, len);

@@ -103,7 +103,7 @@ nfsm_uiombuf(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 			}
 			xfer = (left > mlen) ? mlen : left;
 			if (uiop->uio_segflg == UIO_SYSSPACE)
-				NFSBCOPY((__cheri_fromcap char *)uiocp, mcp, xfer);
+				NFSBCOPY((char *)uiocp, mcp, xfer);
 			else {
 				error = copyin(uiocp, mcp, xfer);
 				if (error != 0)
@@ -218,7 +218,7 @@ nfsm_uiombuflist(struct uio *uiop, int siz, u_int maxext)
 			}
 			xfer = (left > mlen) ? mlen : left;
 			if (uiop->uio_segflg == UIO_SYSSPACE)
-				NFSBCOPY((__cheri_fromcap char *)uiocp,
+				NFSBCOPY((char *)uiocp,
 				    mcp, xfer);
 			else {
 				error = copyin(uiocp, mcp, xfer);

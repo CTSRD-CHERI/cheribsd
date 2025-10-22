@@ -316,7 +316,7 @@ _bus_dmamap_load_uio(bus_dma_tag_t dmat, bus_dmamap_t map, struct uio *uio,
 		if (!cheri_can_access(iov[i].iov_base, 0, minlen))
 			return (EPROT);
 #endif
-		addr = (__cheri_fromcap char *)iov[i].iov_base;
+		addr = iov[i].iov_base;
 		if (minlen > 0) {
 			error = _bus_dmamap_load_buffer(dmat, map, addr,
 			    minlen, pmap, flags, NULL, nsegs);

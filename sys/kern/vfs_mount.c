@@ -354,7 +354,7 @@ vfs_buildopts(struct uio *auio, struct vfsoptlist **options)
 		TAILQ_INSERT_TAIL(opts, opt, link);
 
 		if (auio->uio_segflg == UIO_SYSSPACE) {
-			bcopy((__cheri_fromcap void *)auio->uio_iov[i].iov_base,
+			bcopy((void *)auio->uio_iov[i].iov_base,
 			    opt->name, namelen);
 		} else {
 			error = copyin(auio->uio_iov[i].iov_base, opt->name,
@@ -371,7 +371,7 @@ vfs_buildopts(struct uio *auio, struct vfsoptlist **options)
 			opt->len = optlen;
 			opt->value = malloc(optlen, M_MOUNT, M_WAITOK);
 			if (auio->uio_segflg == UIO_SYSSPACE) {
-				bcopy((__cheri_fromcap void *)
+				bcopy((void *)
 				    auio->uio_iov[i + 1].iov_base, opt->value,
 				    optlen);
 			} else {
@@ -453,7 +453,7 @@ kern_nmount(struct thread *td, struct iovec * __capability iovp, u_int iovcnt,
 
 	AUDIT_ARG_FFLAGS(flags);
 	CTR4(KTR_VFS, "%s: iovp %#lx with iovcnt %d and flags %d", __func__,
-	    (__cheri_fromcap void *)iovp, (u_long)iovcnt, flags);
+	    (void *)iovp, (u_long)iovcnt, flags);
 
 	/*
 	 * Filter out MNT_ROOTFS.  We do not want clients of nmount() in
@@ -1030,7 +1030,7 @@ bail:
 	    && errmsg_len > 0 && errmsg != NULL) {
 		if (fsoptions->uio_segflg == UIO_SYSSPACE) {
 			bcopy(errmsg,
-			    (__cheri_fromcap void *)
+			    (void *)
 			    fsoptions->uio_iov[2 * errmsg_pos + 1].iov_base,
 			    fsoptions->uio_iov[2 * errmsg_pos + 1].iov_len);
 		} else {

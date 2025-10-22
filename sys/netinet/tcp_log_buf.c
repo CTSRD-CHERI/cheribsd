@@ -2051,7 +2051,7 @@ tcp_log_copyout(struct sockopt *sopt, void *src, void * __capability dst,
 
 	if (sopt->sopt_td != NULL)
 		return (copyout(src, dst, len));
-	bcopy(src, (__cheri_fromcap void *)dst, len);
+	bcopy(src, (void *)dst, len);
 	return (0);
 }
 

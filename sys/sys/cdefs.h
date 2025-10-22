@@ -974,11 +974,6 @@
 #define	__capability
 #endif
 
-#if !__has_feature(cheri_casts)
-/* Support old compiler versions without CHERI casts: */
-#define __cheri_fromcap
-#endif
-
 #if 0
 #define __static_assert_if_constant(val, expr, message) \
 	_Static_assert(__builtin_choose_expr(__builtin_constant_p(val), \

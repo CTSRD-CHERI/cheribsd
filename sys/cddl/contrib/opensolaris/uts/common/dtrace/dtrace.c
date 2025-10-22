@@ -584,7 +584,7 @@ dtrace_loadcap(uintcap_t addr)
 	}
 
 	*flags |= CPU_DTRACE_NOFAULT;
-	rval = *((__cheri_fromcap volatile uintcap_t *)addr);
+	rval = *((volatile uintcap_t *)addr);
 	*flags &= ~CPU_DTRACE_NOFAULT;
 
 	return (!(*flags & CPU_DTRACE_FAULT) ? rval : 0);
