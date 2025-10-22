@@ -31,11 +31,6 @@ MISRCS+=bcmp.c bcopy.c bzero.c explicit_bzero.c \
 SYM_MAPS+=	${LIBC_SRCTOP}/string/Symbol.map
 COMPARTMENT_POLICY+=${LIBC_SRCTOP}/string/Compartments.json
 
-.if ${MACHINE_CPU:Mcheri} && !${MACHINE_ABI:Mpurecap}
-MISRCS+=memcpy_c.c memmove_c.c memset_c.c
-SYM_MAPS+=	${LIBC_SRCTOP}/string/Symbol_cheri_hybrid.map
-.endif
-
 .if ${MK_ASAN} != "no"
 # These source files deliberately read out of bounds since they assume that
 # out-of-bounds memory accesses that don't cross pages are always legal.

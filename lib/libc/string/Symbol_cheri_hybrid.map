@@ -1,5 +1,0 @@
-FBSD_1.0 {
-	memcpy_c;
-	memmove_c;
-	memset_c;
-};
