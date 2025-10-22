@@ -71,7 +71,7 @@ ddi_copyin(const void * __capability from, void *to, size_t len, int flags)
 {
 	/* Fake ioctl() issued by kernel, 'from' is a kernel address */
 	if (flags & FKIOCTL) {
-		memcpy(to, (__cheri_fromcap const void *)from, len);
+		memcpy(to, (const void *)from, len);
 		return (0);
 	}
 
@@ -83,7 +83,7 @@ ddi_copyout(const void *from, void * __capability to, size_t len, int flags)
 {
 	/* Fake ioctl() issued by kernel, 'from' is a kernel address */
 	if (flags & FKIOCTL) {
-		memcpy((__cheri_fromcap void *)to, from, len);
+		memcpy((void *)to, from, len);
 		return (0);
 	}
 

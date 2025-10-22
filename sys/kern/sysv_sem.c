@@ -577,10 +577,10 @@ sem_remove(int semidx, struct ucred *cred)
 	    ("semidx out of bounds"));
 	mtx_assert(&sem_mtx, MA_OWNED);
 	semakptr = &sema[semidx];
-	KASSERT((__cheri_fromcap struct sem *)semakptr->u.__sem_base -
+	KASSERT((struct sem *)semakptr->u.__sem_base -
 	    sem + semakptr->u.sem_nsems <= semtot,
 	    ("sem_remove: sema %d corrupted sem pointer %p %p %d %d",
-	    semidx, (__cheri_fromcap struct sem *)semakptr->u.__sem_base,
+	    semidx, (struct sem *)semakptr->u.__sem_base,
 	    sem, semakptr->u.sem_nsems, semtot));
 
 	semakptr->u.sem_perm.cuid = cred ? cred->cr_uid : 0;
@@ -601,7 +601,7 @@ sem_remove(int semidx, struct ucred *cred)
 		    sema[i].u.__sem_base > semakptr->u.__sem_base)
 			mtx_lock_flags(&sema_mtx[i], LOP_DUPOK);
 	}
-	for (i = (__cheri_fromcap struct sem *)semakptr->u.__sem_base -
+	for (i = (struct sem *)semakptr->u.__sem_base -
 	    sem + semakptr->u.sem_nsems; i < semtot; i++)
 		sem[i - semakptr->u.sem_nsems] = sem[i];
 	for (i = 0; i < seminfo.semmni; i++) {
@@ -794,7 +794,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 		break;
 
 	case IPC_SET:
-		AUDIT_ARG_SVIPC_PERM((__cheri_fromcap struct ipc_perm *)
+		AUDIT_ARG_SVIPC_PERM((struct ipc_perm *)
 		    &arg->buf->sem_perm);
 		if ((error = semvalid(semid, rpr, semakptr)) != 0)
 			goto done2;
@@ -1092,7 +1092,7 @@ sys_semget(struct thread *td, struct semget_args *uap)
 #endif
 		mtx_unlock(&sema_mtx[semid]);
 		DPRINTF(("sembase = %p, next = %p\n",
-		    (__cheri_fromcap struct sem *)sema[semid].u.__sem_base,
+		    (struct sem *)sema[semid].u.__sem_base,
 		    &sem[semtot]));
 	} else {
 		DPRINTF(("didn't find it and wasn't asked to create it\n"));

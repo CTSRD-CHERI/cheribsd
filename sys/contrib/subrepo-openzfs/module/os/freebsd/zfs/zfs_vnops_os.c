@@ -1667,7 +1667,7 @@ zfs_readdir(vnode_t *vp, zfs_uio_t *uio, cred_t *cr, int *eofp,
 	} else {
 		bufsize = bytes_wanted;
 		outbuf = NULL;
-		odp = (__cheri_fromcap void *)iovp->iov_base;
+		odp = (void *)iovp->iov_base;
 	}
 
 	if (ncookies != NULL) {

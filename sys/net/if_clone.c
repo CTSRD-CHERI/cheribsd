@@ -950,7 +950,7 @@ ifc_copyin(const struct ifc_data *ifd, void *target, size_t len)
 		return (EINVAL);
 
 	if (ifd->flags & IFC_F_SYSSPACE) {
-		memcpy(target, (__cheri_fromcap void *)ifd->params, len);
+		memcpy(target, (void *)ifd->params, len);
 		return (0);
 	} else
 		return (copyin(ifd->params, target, len));

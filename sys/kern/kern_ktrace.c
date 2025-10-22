@@ -939,7 +939,7 @@ ktrstructarray(const char *name, enum uio_seg seg,
 	buf = malloc(buflen, M_KTRACE, M_WAITOK);
 	strcpy(buf, name);
 	if (seg == UIO_SYSSPACE)
-		bcopy((__cheri_fromcap const void *)data, buf + namelen,
+		bcopy((const void *)data, buf + namelen,
 		    datalen);
 	else {
 		if (copyin(data, buf + namelen, datalen) != 0) {

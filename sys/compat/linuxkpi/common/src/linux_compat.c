@@ -819,7 +819,7 @@ linux_copyin(const void * __capability uaddr, void *kaddr, size_t len)
 	if (linux_remap_address(__DECONST(void * __capability *, &uaddr), len)) {
 		if (uaddr == NULL)
 			return (-EFAULT);
-		memcpy(kaddr, (__cheri_fromcap const void *)uaddr, len);
+		memcpy(kaddr, (const void *)uaddr, len);
 		return (0);
 	}
 	return (-copyin(uaddr, kaddr, len));
@@ -831,7 +831,7 @@ linux_copyout(const void *kaddr, void * __capability uaddr, size_t len)
 	if (linux_remap_address(&uaddr, len)) {
 		if (uaddr == NULL)
 			return (-EFAULT);
-		memcpy((__cheri_fromcap void *)uaddr, kaddr, len);
+		memcpy((void *)uaddr, kaddr, len);
 		return (0);
 	}
 	return (-copyout(kaddr, uaddr, len));

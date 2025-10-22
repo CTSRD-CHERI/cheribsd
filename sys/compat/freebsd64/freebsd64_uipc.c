@@ -379,7 +379,7 @@ out:
 	if (to)
 		free(to, M_SONAME);
 	if (msg.msg_iov != NULL)
-		free((__cheri_fromcap struct iovec *)msg.msg_iov, M_IOV);
+		free((struct iovec *)msg.msg_iov, M_IOV);
 	return (error);
 }
 
@@ -417,7 +417,7 @@ freebsd64_recvmsg(struct thread *td, struct freebsd64_recvmsg_args *uap)
 		if (error == 0)
 			error = freebsd64_copyoutmsghdr(&umsg64, &msg, umsg);
 	}
-	free((__cheri_fromcap struct iovec *)msg.msg_iov, M_IOV);
+	free((struct iovec *)msg.msg_iov, M_IOV);
 
 	if (control != NULL) {
 		if (error != 0)

@@ -702,7 +702,7 @@ usbhid_ioctl(device_t dev, device_t child __unused, unsigned long cmd,
 		if (error)
 			break;
 		error = usbhid_sync_xfer(
-		    sc, USBHID_CTRL_DT, &req, (__cheri_fromcap void *)ucr->ucr_data);
+		    sc, USBHID_CTRL_DT, &req, (void *)ucr->ucr_data);
 		if (error == 0)
 			ucr->ucr_actlen = UGETW(req.ctrl.wLength);
 		break;

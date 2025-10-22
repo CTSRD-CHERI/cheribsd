@@ -1281,7 +1281,7 @@ nvme_ctrlr_passthrough_cmd(struct nvme_controller *ctrlr,
 			    M_WAITOK, nvme_pt_done, pt);
 		} else
 			req = nvme_allocate_request_vaddr(
-			    (__cheri_fromcap void *)pt->buf, pt->len,
+			    (void *)pt->buf, pt->len,
 			    M_WAITOK, nvme_pt_done, pt);
 	} else
 		req = nvme_allocate_request_null(M_WAITOK, nvme_pt_done, pt);

@@ -987,7 +987,7 @@ iichid_ioctl(device_t dev, device_t child __unused, unsigned long cmd,
 	switch (cmd) {
 	case I2CRDWR:
 		error = iic2errno(iicbus_transfer(dev,
-		    (__cheri_fromcap struct iic_msg *)((struct iic_rdwr_data *)data)->msgs,
+		    (struct iic_msg *)((struct iic_rdwr_data *)data)->msgs,
 		    ((struct iic_rdwr_data *)data)->nmsgs));
 		break;
 	default:

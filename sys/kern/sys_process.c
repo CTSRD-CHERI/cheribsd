@@ -1488,9 +1488,9 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			error = EINVAL;
 			break;
 		}
-		bzero((__cheri_fromcap void *)addr, sizeof(td2->td_sa.args));
+		bzero((void *)addr, sizeof(td2->td_sa.args));
 		/* See the explanation in linux_ptrace_get_syscall_info(). */
-		bcopy(td2->td_sa.args, (__cheri_fromcap void *)addr,
+		bcopy(td2->td_sa.args, (void *)addr,
 		    SV_PROC_ABI(td->td_proc) == SV_ABI_LINUX ?
 		    sizeof(td2->td_sa.args) :
 		    td2->td_sa.callp->sy_narg * sizeof(syscallarg_t));
@@ -1505,7 +1505,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			error = EINVAL;
 			break;
 		}
-		psr = (__cheri_fromcap void *)addr;
+		psr = (void *)addr;
 		bzero(psr, sizeof(*psr));
 		psr->sr_error = td2->td_errno;
 		if (psr->sr_error == 0) {
@@ -1693,7 +1693,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		break;
 
 	case PT_IO:
-		piod = (__cheri_fromcap void *)addr;
+		piod = (void *)addr;
 		IOVEC_INIT_C(&iov, piod->piod_addr, piod->piod_len);
 		uio.uio_offset = (off_t)piod->piod_offs;
 		uio.uio_resid = piod->piod_len;
@@ -1767,39 +1767,39 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		CTR2(KTR_PTRACE, "PT_SETREGS: tid %d (pid %d)", td2->td_tid,
 		    p->p_pid);
 		td2->td_dbgflags |= TDB_USERWR;
-		error = PROC_WRITE(regs, td2, (__cheri_fromcap void *)addr);
+		error = PROC_WRITE(regs, td2, (void *)addr);
 		break;
 
 	case PT_GETREGS:
 		CTR2(KTR_PTRACE, "PT_GETREGS: tid %d (pid %d)", td2->td_tid,
 		    p->p_pid);
-		error = PROC_READ(regs, td2, (__cheri_fromcap void *)addr);
+		error = PROC_READ(regs, td2, (void *)addr);
 		break;
 
 	case PT_SETFPREGS:
 		CTR2(KTR_PTRACE, "PT_SETFPREGS: tid %d (pid %d)", td2->td_tid,
 		    p->p_pid);
 		td2->td_dbgflags |= TDB_USERWR;
-		error = PROC_WRITE(fpregs, td2, (__cheri_fromcap void *)addr);
+		error = PROC_WRITE(fpregs, td2, (void *)addr);
 		break;
 
 	case PT_GETFPREGS:
 		CTR2(KTR_PTRACE, "PT_GETFPREGS: tid %d (pid %d)", td2->td_tid,
 		    p->p_pid);
-		error = PROC_READ(fpregs, td2, (__cheri_fromcap void *)addr);
+		error = PROC_READ(fpregs, td2, (void *)addr);
 		break;
 
 	case PT_SETDBREGS:
 		CTR2(KTR_PTRACE, "PT_SETDBREGS: tid %d (pid %d)", td2->td_tid,
 		    p->p_pid);
 		td2->td_dbgflags |= TDB_USERWR;
-		error = PROC_WRITE(dbregs, td2, (__cheri_fromcap void *)addr);
+		error = PROC_WRITE(dbregs, td2, (void *)addr);
 		break;
 
 	case PT_GETDBREGS:
 		CTR2(KTR_PTRACE, "PT_GETDBREGS: tid %d (pid %d)", td2->td_tid,
 		    p->p_pid);
-		error = PROC_READ(dbregs, td2, (__cheri_fromcap void *)addr);
+		error = PROC_READ(dbregs, td2, (void *)addr);
 		break;
 
 #if __has_feature(capabilities)
@@ -1807,13 +1807,13 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		CTR2(KTR_PTRACE, "PT_SETCAPREGS: tid %d (pid %d)", td2->td_tid,
 		    p->p_pid);
 		td2->td_dbgflags |= TDB_USERWR;
-		error = PROC_WRITE(capregs, td2, (__cheri_fromcap void *)addr);
+		error = PROC_WRITE(capregs, td2, (void *)addr);
 		break;
 
 	case PT_GETCAPREGS:
 		CTR2(KTR_PTRACE, "PT_GETCAPREGS: tid %d (pid %d)", td2->td_tid,
 		    p->p_pid);
-		error = PROC_READ(capregs, td2, (__cheri_fromcap void *)addr);
+		error = PROC_READ(capregs, td2, (void *)addr);
 		break;
 #endif
 
@@ -1821,14 +1821,14 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		CTR2(KTR_PTRACE, "PT_SETREGSET: tid %d (pid %d)", td2->td_tid,
 		    p->p_pid);
 		error = proc_write_regset(td2, data,
-		    (__cheri_fromcap void *)addr);
+		    (void *)addr);
 		break;
 
 	case PT_GETREGSET:
 		CTR2(KTR_PTRACE, "PT_GETREGSET: tid %d (pid %d)", td2->td_tid,
 		    p->p_pid);
 		error = proc_read_regset(td2, data,
-		    (__cheri_fromcap void *)addr);
+		    (void *)addr);
 		break;
 
 	case PT_LWPINFO:
@@ -1837,7 +1837,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			break;
 		}
 
-		pl = (__cheri_fromcap void *)addr;
+		pl = (void *)addr;
 		bzero(pl, sizeof(*pl));
 		pl->pl_lwpid = td2->td_tid;
 		pl->pl_event = PL_EVENT_NONE;
@@ -1926,12 +1926,12 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 
 	case PT_VM_ENTRY:
 		PROC_UNLOCK(p);
-		error = ptrace_vm_entry(td, p, (__cheri_fromcap void *)addr);
+		error = ptrace_vm_entry(td, p, (void *)addr);
 		PROC_LOCK(p);
 		break;
 
 	case PT_COREDUMP:
-		pc = (__cheri_fromcap void *)addr;
+		pc = (void *)addr;
 		CTR2(KTR_PTRACE, "PT_COREDUMP: pid %d, fd %d",
 		    p->p_pid, pc->pc_fd);
 
@@ -1988,7 +1988,7 @@ coredump_cleanup_nofp:
 		break;
 
 	case PT_SC_REMOTE:
-		pscr = (__cheri_fromcap void *)addr;
+		pscr = (void *)addr;
 		CTR2(KTR_PTRACE, "PT_SC_REMOTE: pid %d, syscall %d",
 		    p->p_pid, pscr->pscr_syscall);
 		if ((td2->td_dbgflags & TDB_BOUNDARY) == 0) {
@@ -2004,7 +2004,7 @@ coredump_cleanup_nofp:
 		tsr->ts_sa.code = pscr->pscr_syscall;
 		tsr->ts_nargs = pscr->pscr_nargs;
 		memcpy(&tsr->ts_sa.args,
-		    (__cheri_fromcap void *)pscr->pscr_args,
+		    (void *)pscr->pscr_args,
 		    sizeof(syscallarg_t) * tsr->ts_nargs);
 
 		PROC_LOCK(p);
@@ -2037,7 +2037,7 @@ coredump_cleanup_nofp:
 		if (req >= PT_FIRSTMACH) {
 			PROC_UNLOCK(p);
 			error = cpu_ptrace(td2, req,
-					(__cheri_fromcap void *)addr, data);
+					(void *)addr, data);
 			PROC_LOCK(p);
 		} else
 #endif

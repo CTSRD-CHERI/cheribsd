@@ -221,7 +221,7 @@ mb_put_mem(struct mbchain *mbp, const char * __capability source, int size,
 			srclen = size;
 			dstlen = mleft;
 			error = mbp->mb_copy(mbp,
-			    (__cheri_fromcap const char *)source, dst, &srclen,
+			    (const char *)source, dst, &srclen,
 			    &dstlen);
 			if (error)
 				return (error);
@@ -231,7 +231,7 @@ mb_put_mem(struct mbchain *mbp, const char * __capability source, int size,
 				*dst++ = *src++;
 			break;
 		    case MB_MSYSTEM:
-			bcopy((__cheri_fromcap const char *)source, dst, cplen);
+			bcopy((const char *)source, dst, cplen);
 			break;
 		    case MB_MUSER:
 			error = copyin(source, dst, cplen);
@@ -499,7 +499,7 @@ md_get_mem(struct mdchain *mdp, char * __capability target, int size, int type)
 				return error;
 			break;
 		    case MB_MSYSTEM:
-			bcopy(s, (__cheri_fromcap char *)target, count);
+			bcopy(s, (char *)target, count);
 			break;
 		    case MB_MINLINE:
 			while (count--)

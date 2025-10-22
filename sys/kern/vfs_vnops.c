@@ -1576,12 +1576,12 @@ vn_io_fault_uiomove(char *data, int xfersize, struct uio *uio)
 	}
 	transp_uio.uio_td = uio->uio_td;
 	error = uiomove_fromphys(td->td_ma,
-	    ((vm_offset_t)(__cheri_fromcap void *)uio->uio_iov->iov_base) & PAGE_MASK,
+	    ((vm_offset_t)(void *)uio->uio_iov->iov_base) & PAGE_MASK,
 	    xfersize, &transp_uio);
 	adv = xfersize - transp_uio.uio_resid;
 	pgadv =
-	    (((vm_offset_t)(__cheri_fromcap void *)uio->uio_iov->iov_base + adv) >> PAGE_SHIFT) -
-	    (((vm_offset_t)(__cheri_fromcap void *)uio->uio_iov->iov_base) >> PAGE_SHIFT);
+	    (((vm_offset_t)(void *)uio->uio_iov->iov_base + adv) >> PAGE_SHIFT) -
+	    (((vm_offset_t)(void *)uio->uio_iov->iov_base) >> PAGE_SHIFT);
 	td->td_ma += pgadv;
 	KASSERT(td->td_ma_cnt >= pgadv, ("consumed pages %d %d", td->td_ma_cnt,
 	    pgadv));
@@ -1607,7 +1607,7 @@ vn_io_fault_pgmove(vm_page_t ma[], vm_offset_t offset, int xfersize,
 
 	KASSERT(uio->uio_iovcnt == 1, ("uio_iovcnt %d", uio->uio_iovcnt));
 	cnt = xfersize > uio->uio_resid ? uio->uio_resid : xfersize;
-	iov_base = (vm_offset_t)(__cheri_fromcap void *)uio->uio_iov->iov_base;
+	iov_base = (vm_offset_t)(void *)uio->uio_iov->iov_base;
 	switch (uio->uio_rw) {
 	case UIO_WRITE:
 		pmap_copy_pages(td->td_ma, iov_base & PAGE_MASK, ma,

@@ -285,7 +285,7 @@ static inline void
 free_c(void * __capability addr, struct malloc_type *type)
 {
 
-	free((__cheri_fromcap void *)addr, type);
+	free((void *)addr, type);
 }
 
 static inline void * __capability

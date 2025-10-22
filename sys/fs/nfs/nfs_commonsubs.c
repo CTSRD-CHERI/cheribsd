@@ -686,7 +686,7 @@ nfsm_mbufuio(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 			xfer = (left > len) ? len : left;
 			if (uiop->uio_segflg == UIO_SYSSPACE)
 				NFSBCOPY(mbufcp,
-				    (__cheri_fromcap char *)uiocp, xfer);
+				    (char *)uiocp, xfer);
 			else {
 				error = copyout(mbufcp, uiocp, xfer);
 				if (error != 0)

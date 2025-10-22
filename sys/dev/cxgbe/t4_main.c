@@ -11723,7 +11723,7 @@ cudbg_dump(struct adapter *sc, struct t4_cudbg_dump *dump)
 #ifndef notyet
 	device_printf(sc->dev, "%s: wr_flash %u, len %u, data %p.\n",
 	    __func__, dump->wr_flash, dump->len,
-	    (__cheri_fromcap void *)dump->data);
+	    (void *)dump->data);
 #endif
 
 	if (dump->wr_flash)

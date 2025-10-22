@@ -8081,10 +8081,10 @@ nfsrv_createdevids(struct nfsd_nfsd_args *args, NFSPROC_T *p)
 	char *addrp, *dnshostp, *dspathp, *mdspathp;
 	int error, i;
 
-	addrp = (__cheri_fromcap char *)args->addr;
-	dnshostp = (__cheri_fromcap char *)args->dnshost;
-	dspathp = (__cheri_fromcap char *)args->dspath;
-	mdspathp = (__cheri_fromcap char *)args->mdspath;
+	addrp = (char *)args->addr;
+	dnshostp = (char *)args->dnshost;
+	dspathp = (char *)args->dspath;
+	mdspathp = (char *)args->mdspath;
 	nfsrv_maxpnfsmirror = args->mirrorcnt;
 	if (addrp == NULL || dnshostp == NULL || dspathp == NULL ||
 	    mdspathp == NULL)
@@ -8094,10 +8094,10 @@ nfsrv_createdevids(struct nfsd_nfsd_args *args, NFSPROC_T *p)
 	 * Loop around for each nul-terminated string in args->addr,
 	 * args->dnshost, args->dnspath and args->mdspath.
 	 */
-	while (addrp < ((__cheri_fromcap char *)args->addr + args->addrlen) &&
-	    dnshostp < ((__cheri_fromcap char *)args->dnshost + args->dnshostlen) &&
-	    dspathp < ((__cheri_fromcap char *)args->dspath + args->dspathlen) &&
-	    mdspathp < ((__cheri_fromcap char *)args->mdspath + args->mdspathlen)) {
+	while (addrp < ((char *)args->addr + args->addrlen) &&
+	    dnshostp < ((char *)args->dnshost + args->dnshostlen) &&
+	    dspathp < ((char *)args->dspath + args->dspathlen) &&
+	    mdspathp < ((char *)args->mdspath + args->mdspathlen)) {
 		error = nfsrv_setdsserver(dspathp, mdspathp, p, &ds);
 		if (error != 0) {
 			/* Free all DS servers. */

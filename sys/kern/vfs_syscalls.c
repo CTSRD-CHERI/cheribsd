@@ -581,7 +581,7 @@ restart:
 		} else
 			sptmp = NULL;
 		if (bufseg == UIO_SYSSPACE) {
-			bcopy(sp, (__cheri_fromcap struct statfs *)sfsp,
+			bcopy(sp, (struct statfs *)sfsp,
 			    sizeof(*sp));
 			free(sptmp, M_STATFS);
 		} else /* if (bufseg == UIO_USERSPACE) */ {
@@ -695,7 +695,7 @@ freebsd4_getfsstat(struct thread *td, struct freebsd4_getfsstat_args *uap)
 	if (error == 0)
 		td->td_retval[0] = count;
 	if (size != 0) {
-		sp = (__cheri_fromcap struct statfs *)buf;
+		sp = (struct statfs *)buf;
 		while (count != 0 && error == 0) {
 			freebsd4_cvtstatfs(sp, &osb);
 			error = copyout(&osb, uap->buf, sizeof(osb));
@@ -842,7 +842,7 @@ kern_freebsd11_getfsstat(struct thread *td,
 	if (error == 0)
 		td->td_retval[0] = count;
 	if (size > 0) {
-		sp = (__cheri_fromcap struct statfs *)buf;
+		sp = (struct statfs *)buf;
 		while (count > 0 && error == 0) {
 			freebsd11_cvtstatfs(sp, &osb);
 			error = copyout(&osb, ubuf, sizeof(osb));
@@ -1836,7 +1836,7 @@ kern_symlinkat(struct thread *td, const char * __capability path1, int fd,
 	int error;
 
 	if (segflg == UIO_SYSSPACE) {
-		syspath = (__cheri_fromcap const char *)path1;
+		syspath = (const char *)path1;
 	} else {
 		tmppath = uma_zalloc(namei_zone, M_WAITOK);
 		if ((error = copyinstr(path1, tmppath, MAXPATHLEN, NULL)) != 0)
@@ -4583,7 +4583,7 @@ kern_getfhat(struct thread *td, int flags, int fd,
 		if (fhseg == UIO_USERSPACE)
 			error = copyout(&fh, fhp, sizeof (fh));
 		else
-			memcpy((__cheri_fromcap fhandle_t *)fhp, &fh,
+			memcpy((fhandle_t *)fhp, &fh,
 			    sizeof(fh));
 	}
 	return (error);

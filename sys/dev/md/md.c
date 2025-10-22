@@ -1434,7 +1434,7 @@ mdcreate_vnode(struct md_s *sc, struct md_req *mdr, struct thread *td)
 	if (mdr->md_file_seg == UIO_USERSPACE)
 		error = copyinstr(fname, sc->file, sizeof(sc->file), NULL);
 	else if (mdr->md_file_seg == UIO_SYSSPACE)
-		error = copystr((__cheri_fromcap char *)fname, sc->file,
+		error = copystr((char *)fname, sc->file,
 		    sizeof(sc->file), NULL);
 	else
 		error = EDOOFUS;

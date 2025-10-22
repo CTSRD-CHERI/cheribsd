@@ -445,7 +445,7 @@ crypto_cursor_segment(struct crypto_buffer_cursor *cc, size_t *len)
 		    *cc->cc_vmpage)) + cc->cc_offset);
 	case CRYPTO_BUF_UIO:
 		*len = cc->cc_iov->iov_len - cc->cc_offset;
-		return ((__cheri_fromcap char *)cc->cc_iov->iov_base + cc->cc_offset);
+		return ((char *)cc->cc_iov->iov_base + cc->cc_offset);
 	default:
 		__assert_unreachable();
 	}
@@ -516,7 +516,7 @@ crypto_cursor_copyback(struct crypto_buffer_cursor *cc, int size,
 		break;
 	case CRYPTO_BUF_UIO:
 		for (;;) {
-			dst = (__cheri_fromcap char *)cc->cc_iov->iov_base + cc->cc_offset;
+			dst = (char *)cc->cc_iov->iov_base + cc->cc_offset;
 			remain = cc->cc_iov->iov_len - cc->cc_offset;
 			todo = MIN(remain, size);
 			memcpy(dst, src, todo);
@@ -605,7 +605,7 @@ crypto_cursor_copydata(struct crypto_buffer_cursor *cc, int size, void *vdst)
 		break;
 	case CRYPTO_BUF_UIO:
 		for (;;) {
-			src = (__cheri_fromcap const char *)cc->cc_iov->iov_base +
+			src = (const char *)cc->cc_iov->iov_base +
 			    cc->cc_offset;
 			remain = cc->cc_iov->iov_len - cc->cc_offset;
 			todo = MIN(remain, size);
@@ -823,7 +823,7 @@ cuio_contiguous_segment(struct uio *uio, size_t skip, size_t len)
 	skip = rel_off;
 	if (skip + len > uio->uio_iov[idx].iov_len)
 		return (NULL);
-	return ((__cheri_fromcap char *)uio->uio_iov[idx].iov_base + skip);
+	return ((char *)uio->uio_iov[idx].iov_base + skip);
 }
 
 void *
