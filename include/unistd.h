@@ -595,10 +595,6 @@ pid_t	 _Fork(void);
 #define	_OPTRESET_DECLARED
 extern int optreset;			/* getopt(3) external variable */
 #endif
-
-#if __has_feature(capabilities)
-ssize_t	 write_c(int, const void * __capability, size_t);
-#endif
 #endif /* __BSD_VISIBLE */
 __END_DECLS
 
