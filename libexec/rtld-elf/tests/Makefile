@@ -18,8 +18,4 @@ ATF_TESTS_C+=	dlopen_test
 
 WARNS?=		3
 
-.if ${MACHINE_ABI:Mpurecap}
-TESTS_SUBDIRS+=	cheri
-.endif
-
 .include <bsd.test.mk>
