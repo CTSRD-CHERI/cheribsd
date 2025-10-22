@@ -737,7 +737,7 @@ freebsd11_freebsd64_getfsstat(struct thread *td,
 			uap->buf++;
 			count--;
 		}
-		free_c(buf, M_STATFS);
+		free(buf, M_STATFS);
 	}
 	return (error);
 }

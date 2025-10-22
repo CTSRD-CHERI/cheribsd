@@ -281,20 +281,6 @@ void	*malloc_domainset_aligned(size_t size, size_t align,
 	    struct malloc_type *mtp, struct domainset *ds, int flags)
 	    __malloc_like __result_use_check __alloc_size(1);
 
-static inline void
-free_c(void *addr, struct malloc_type *type)
-{
-
-	free((void *)addr, type);
-}
-
-static inline void *
-malloc_c(unsigned long size, struct malloc_type *type, int flags)
-{
-
-	return (PTR2CAP(malloc(size, type, flags)));
-}
-
 struct malloc_type *malloc_desc2type(const char *desc);
 
 /*
