@@ -3640,7 +3640,7 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 			if (error)
 			    return (error);
 			nd->nd_mrep = NULL;
-			dp = (__cheri_fromcap struct dirent *)uiop->uio_iov->iov_base;
+			dp = (struct dirent *)uiop->uio_iov->iov_base;
 			dp->d_pad0 = dp->d_pad1 = 0;
 			dp->d_off = 0;
 			dp->d_type = DT_DIR;
@@ -3659,7 +3659,7 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 			uiop->uio_resid -= dp->d_reclen;
 			uiop->uio_offset += dp->d_reclen;
 			IOVEC_ADVANCE(uiop->uio_iov, dp->d_reclen);
-			dp = (__cheri_fromcap struct dirent *)uiop->uio_iov->iov_base;
+			dp = (struct dirent *)uiop->uio_iov->iov_base;
 			dp->d_pad0 = dp->d_pad1 = 0;
 			dp->d_off = 0;
 			dp->d_type = DT_DIR;
@@ -3772,7 +3772,7 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 				tlen += 8;  /* To ensure null termination. */
 			left = DIRBLKSIZ - blksiz;
 			if (_GENERIC_DIRLEN(len) + NFSX_HYPER > left) {
-				NFSBZERO((__cheri_fromcap void *)
+				NFSBZERO((void *)
 				    uiop->uio_iov->iov_base, left);
 				dp->d_reclen += left;
 				IOVEC_ADVANCE(uiop->uio_iov, left);
@@ -3795,7 +3795,7 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 				savresid = uiop->uio_resid;
 				savblksiz = blksiz;
 
-				dp = (__cheri_fromcap struct dirent *)uiop->uio_iov->iov_base;
+				dp = (struct dirent *)uiop->uio_iov->iov_base;
 				dp->d_pad0 = dp->d_pad1 = 0;
 				dp->d_off = 0;
 				dp->d_namlen = len;
@@ -3808,7 +3808,7 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 				uiop->uio_resid -= DIRHDSIZ;
 				uiop->uio_offset += DIRHDSIZ;
 				IOVEC_ADVANCE(uiop->uio_iov, DIRHDSIZ);
-				cp = (__cheri_fromcap char *)
+				cp = (char *)
 				    uiop->uio_iov->iov_base;
 				error = nfsm_mbufuio(nd, uiop, len);
 				if (error)
@@ -3826,7 +3826,7 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 					blksiz = savblksiz;
 					validentry = false;
 				} else {
-					cp = (__cheri_fromcap char *)
+					cp = (char *)
 					    uiop->uio_iov->iov_base;
 					tlen -= len;
 					NFSBZERO(cp, tlen);
@@ -3917,7 +3917,7 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 	 */
 	if (blksiz > 0) {
 		left = DIRBLKSIZ - blksiz;
-		NFSBZERO((__cheri_fromcap void *)uiop->uio_iov->iov_base, left);
+		NFSBZERO((void *)uiop->uio_iov->iov_base, left);
 		dp->d_reclen += left;
 		IOVEC_ADVANCE(uiop->uio_iov, left);
 		uiop->uio_resid -= left;
@@ -3943,7 +3943,7 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 	 * Add extra empty records to any remaining DIRBLKSIZ chunks.
 	 */
 	while (uiop->uio_resid > 0 && uiop->uio_resid != tresid) {
-		dp = (__cheri_fromcap struct dirent *)uiop->uio_iov->iov_base;
+		dp = (struct dirent *)uiop->uio_iov->iov_base;
 		NFSBZERO(dp, DIRBLKSIZ);
 		dp->d_type = DT_UNKNOWN;
 		tl = (u_int32_t *)&dp->d_name[4];
@@ -4103,7 +4103,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 			if (error)
 			    return (error);
 			nd->nd_mrep = NULL;
-			dp = (__cheri_fromcap struct dirent *)uiop->uio_iov->iov_base;
+			dp = (struct dirent *)uiop->uio_iov->iov_base;
 			dp->d_pad0 = dp->d_pad1 = 0;
 			dp->d_off = 0;
 			dp->d_type = DT_DIR;
@@ -4122,7 +4122,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 			uiop->uio_resid -= dp->d_reclen;
 			uiop->uio_offset += dp->d_reclen;
 			IOVEC_ADVANCE(uiop->uio_iov, dp->d_reclen);
-			dp = (__cheri_fromcap struct dirent *)uiop->uio_iov->iov_base;
+			dp = (struct dirent *)uiop->uio_iov->iov_base;
 			dp->d_pad0 = dp->d_pad1 = 0;
 			dp->d_off = 0;
 			dp->d_type = DT_DIR;
@@ -4229,7 +4229,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 				tlen += 8;  /* To ensure null termination. */
 			left = DIRBLKSIZ - blksiz;
 			if (_GENERIC_DIRLEN(len) + NFSX_HYPER > left) {
-				NFSBZERO((__cheri_fromcap void *)uiop->uio_iov->iov_base, left);
+				NFSBZERO((void *)uiop->uio_iov->iov_base, left);
 				dp->d_reclen += left;
 				IOVEC_ADVANCE(uiop->uio_iov, left);
 				uiop->uio_resid -= left;
@@ -4251,7 +4251,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 				savresid = uiop->uio_resid;
 				savblksiz = blksiz;
 
-				dp = (__cheri_fromcap struct dirent *)uiop->uio_iov->iov_base;
+				dp = (struct dirent *)uiop->uio_iov->iov_base;
 				dp->d_pad0 = dp->d_pad1 = 0;
 				dp->d_off = 0;
 				dp->d_namlen = len;
@@ -4264,10 +4264,10 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 				uiop->uio_resid -= DIRHDSIZ;
 				uiop->uio_offset += DIRHDSIZ;
 				IOVEC_ADVANCE(uiop->uio_iov, DIRHDSIZ);
-				cnp->cn_nameptr = (__cheri_fromcap void *)uiop->uio_iov->iov_base;
+				cnp->cn_nameptr = (void *)uiop->uio_iov->iov_base;
 				cnp->cn_namelen = len;
 				NFSCNHASHZERO(cnp);
-				cp = (__cheri_fromcap char *)
+				cp = (char *)
 				    uiop->uio_iov->iov_base;
 				error = nfsm_mbufuio(nd, uiop, len);
 				if (error)
@@ -4285,7 +4285,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 					blksiz = savblksiz;
 					validentry = false;
 				} else {
-					cp = (__cheri_fromcap void *)
+					cp = (void *)
 					    uiop->uio_iov->iov_base;
 					tlen -= len;
 					NFSBZERO(cp, tlen);
@@ -4482,7 +4482,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 	 */
 	if (blksiz > 0) {
 		left = DIRBLKSIZ - blksiz;
-		NFSBZERO((__cheri_fromcap void *)uiop->uio_iov->iov_base, left);
+		NFSBZERO((void *)uiop->uio_iov->iov_base, left);
 		dp->d_reclen += left;
 		IOVEC_ADVANCE(uiop->uio_iov, left);
 		uiop->uio_resid -= left;
@@ -4508,7 +4508,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 	 * Add extra empty records to any remaining DIRBLKSIZ chunks.
 	 */
 	while (uiop->uio_resid > 0 && uiop->uio_resid != tresid) {
-		dp = (__cheri_fromcap struct dirent *)uiop->uio_iov->iov_base;
+		dp = (struct dirent *)uiop->uio_iov->iov_base;
 		NFSBZERO(dp, DIRBLKSIZ);
 		dp->d_type = DT_UNKNOWN;
 		tl = (u_int32_t *)&dp->d_name[4];

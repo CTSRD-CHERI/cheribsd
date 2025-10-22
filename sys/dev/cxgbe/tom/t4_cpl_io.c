@@ -2120,7 +2120,7 @@ alloc_aiotx_mbuf(struct kaiocb *job, int len)
 		mlen = imin(len, MBUF_PEXT_MAX_PGS * PAGE_SIZE - pgoff);
 		KASSERT(mlen == len || is_aligned(start + mlen, PAGE_SIZE),
 		    ("%s: next start (%p + %#x) is not page aligned",
-		    __func__, (__cheri_fromcap void *)start, mlen));
+		    __func__, (void *)start, mlen));
 
 		npages = vm_fault_quick_hold_pages(map, start, mlen,
 		    VM_PROT_WRITE, pgs, nitems(pgs));

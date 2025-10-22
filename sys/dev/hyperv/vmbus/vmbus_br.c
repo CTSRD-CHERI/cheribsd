@@ -397,7 +397,7 @@ vmbus_txbr_write_call(struct vmbus_txbr *tbr,
 	for (i = 0; i < iovlen; i++) {
 		if (iov[i].iov_base != NULL) {
 			windex = vmbus_txbr_copyto(tbr, windex,
-			    (__cheri_fromcap const void *)iov[i].iov_base,
+			    (const void *)iov[i].iov_base,
 			    iov[i].iov_len);
 		} else if (cb != NULL) {
 			windex = vmbus_txbr_copyto_call(tbr, windex,
@@ -477,7 +477,7 @@ vmbus_txbr_write(struct vmbus_txbr *tbr, const struct iovec iov[], int iovlen,
 	windex = old_windex;
 	for (i = 0; i < iovlen; i++) {
 		windex = vmbus_txbr_copyto(tbr, windex,
-		    (__cheri_fromcap const void *)iov[i].iov_base,
+		    (const void *)iov[i].iov_base,
 		    iov[i].iov_len);
 	}
 

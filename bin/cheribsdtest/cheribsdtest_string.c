@@ -123,14 +123,14 @@ CHERIBSDTEST(string_memcpy_c, "Test explicit capability memcpy")
 	/* Simple case: aligned start and end */
 	invalidate(&t2);
 	cpy = memcpy_c(CAP(&t2), CAP(&t1), sizeof(t1));
-	if ((__cheri_fromcap void *)cpy != &t2)
+	if ((void *)cpy != &t2)
 		cheribsdtest_failure_errx("memcpy_c did not return dst (&t2)");
 	check(&t2, 0, 32);
 
 	/* Test that it still works with an unaligned start... */
 	invalidate(&t2);
 	cpy = memcpy_c(CAP(&t2.pad0[3]), CAP(&t1.pad0[3]), sizeof(t1) - 3);
-	if ((__cheri_fromcap void*)cpy != &t2.pad0[3])
+	if ((void*)cpy != &t2.pad0[3])
 		cheribsdtest_failure_errx("memcpy_c did not return dst "
 		    "(&t2.pad0[3])");
 	check(&t2, 3, 32);
@@ -138,14 +138,14 @@ CHERIBSDTEST(string_memcpy_c, "Test explicit capability memcpy")
 	/* ...or and unaligned end... */
 	invalidate(&t2);
 	cpy = memcpy_c(CAP(&t2), CAP(&t1), sizeof(t1) - 3);
-	if ((__cheri_fromcap void *)cpy != &t2)
+	if ((void *)cpy != &t2)
 		cheribsdtest_failure_errx("memcpy_c did not return dst (&t2)");
 	check(&t2, 0, 29);
 
 	/* ...or both... */
 	invalidate(&t2);
 	cpy = memcpy_c(CAP(&t2.pad0[3]), CAP(&t1.pad0[3]), sizeof(t1) - 6);
-	if ((__cheri_fromcap void*)cpy != &t2.pad0[3])
+	if ((void*)cpy != &t2.pad0[3])
 		cheribsdtest_failure_errx("memcpy_c did not return dst "
 		    "(&t2.pad0[3])");
 	check(&t2, 3, 29);
@@ -153,7 +153,7 @@ CHERIBSDTEST(string_memcpy_c, "Test explicit capability memcpy")
 	/* ...and case where the alignment is different for both... */
 	invalidate(&t2);
 	cpy = memcpy_c(CAP(&t2), CAP(&t1.pad0[1]), sizeof(t1) - 1);
-	if ((__cheri_fromcap void*)cpy != &t2)
+	if ((void*)cpy != &t2)
 		cheribsdtest_failure_errx("memcpy_c did not return dst (&t2)");
 	/* This should have invalidated the capability */
 	if (cheri_tag_get(t2.y) != 0)
@@ -177,7 +177,7 @@ CHERIBSDTEST(string_memcpy_c, "Test explicit capability memcpy")
 	    __builtin_cheri_offset_increment(CAP(&t2), 3),
 	    __builtin_cheri_offset_increment(CAP(&t1), 3),
 	    sizeof(t1)-6);
-	if ((__cheri_fromcap void*)cpy != &t2.pad0[3])
+	if ((void*)cpy != &t2.pad0[3])
 		cheribsdtest_failure_errx("memcpy_c did not return dst "
 		    "(&t2.pad0[3])");
 	check(&t2, 3, 29);
@@ -191,7 +191,7 @@ CHERIBSDTEST(string_memcpy_c, "Test explicit capability memcpy")
 	    __builtin_cheri_offset_increment(CAP(t2.pad0-1), 1),
 	    __builtin_cheri_offset_increment(CAP(t1.pad0-1), 1),
 	    sizeof(t1));
-	if ((__cheri_fromcap void*)cpy != &t2.pad0)
+	if ((void*)cpy != &t2.pad0)
 		cheribsdtest_failure_errx("(void*)cpy != &t2.pad0");
 	check(&t2, 0, 32);
 
@@ -201,7 +201,7 @@ CHERIBSDTEST(string_memcpy_c, "Test explicit capability memcpy")
 	    __builtin_cheri_offset_increment(CAP(t2.pad0-1), 32),
 	    __builtin_cheri_offset_increment(CAP(t1.pad0-1), 32),
 	    sizeof(t1) - 31);
-	if ((__cheri_fromcap void*)cpy != t2.pad0+31)
+	if ((void*)cpy != t2.pad0+31)
 		cheribsdtest_failure_errx("(void*)cpy != t2.pad0+31");
 	check(&t2, 31, 32);
 
@@ -284,14 +284,14 @@ CHERIBSDTEST(string_memmove_c, "Test explicit capability memmove")
 	/* Simple case: aligned start and end */
 	invalidate(&t2);
 	cpy = memmove_c(CAP(&t2), CAP(&t1), sizeof(t1));
-	if ((__cheri_fromcap void *)cpy != &t2)
+	if ((void *)cpy != &t2)
 		cheribsdtest_failure_errx("memmove_c did not return dst (&t2)");
 	check(&t2, 0, 32);
 
 	/* Test that it still works with an unaligned start... */
 	invalidate(&t2);
 	cpy = memmove_c(CAP(&t2.pad0[3]), CAP(&t1.pad0[3]), sizeof(t1) - 3);
-	if ((__cheri_fromcap void*)cpy != &t2.pad0[3])
+	if ((void*)cpy != &t2.pad0[3])
 		cheribsdtest_failure_errx("memmove_c did not return dst "
 		    "(&t2.pad0[3])");
 	check(&t2, 3, 32);
@@ -299,14 +299,14 @@ CHERIBSDTEST(string_memmove_c, "Test explicit capability memmove")
 	/* ...or and unaligned end... */
 	invalidate(&t2);
 	cpy = memmove_c(CAP(&t2), CAP(&t1), sizeof(t1) - 3);
-	if ((__cheri_fromcap void *)cpy != &t2)
+	if ((void *)cpy != &t2)
 		cheribsdtest_failure_errx("memmove_c did not return dst (&t2)");
 	check(&t2, 0, 29);
 
 	/* ...or both... */
 	invalidate(&t2);
 	cpy = memmove_c(CAP(&t2.pad0[3]), CAP(&t1.pad0[3]), sizeof(t1) - 6);
-	if ((__cheri_fromcap void*)cpy != &t2.pad0[3])
+	if ((void*)cpy != &t2.pad0[3])
 		cheribsdtest_failure_errx("memmove_c did not return dst "
 		    "(&t2.pad0[3])");
 	check(&t2, 3, 29);
@@ -314,7 +314,7 @@ CHERIBSDTEST(string_memmove_c, "Test explicit capability memmove")
 	/* ...and case where the alignment is different for both... */
 	invalidate(&t2);
 	cpy = memmove_c(CAP(&t2), CAP(&t1.pad0[1]), sizeof(t1) - 1);
-	if ((__cheri_fromcap void*)cpy != &t2)
+	if ((void*)cpy != &t2)
 		cheribsdtest_failure_errx("memmove_c did not return dst (&t2)");
 	/* This should have invalidated the capability */
 	if (cheri_tag_get(t2.y) != 0)
@@ -338,7 +338,7 @@ CHERIBSDTEST(string_memmove_c, "Test explicit capability memmove")
 	    __builtin_cheri_offset_increment(CAP(&t2), 3),
 	    __builtin_cheri_offset_increment(CAP(&t1), 3),
 	    sizeof(t1)-6);
-	if ((__cheri_fromcap void*)cpy != &t2.pad0[3])
+	if ((void*)cpy != &t2.pad0[3])
 		cheribsdtest_failure_errx("memmove_c did not return dst "
 		    "(&t2.pad0[3])");
 	check(&t2, 3, 29);
@@ -349,7 +349,7 @@ CHERIBSDTEST(string_memmove_c, "Test explicit capability memmove")
 	    __builtin_cheri_offset_increment(CAP(t2.pad0-1), 1),
 	    __builtin_cheri_offset_increment(CAP(t1.pad0-1), 1),
 	    sizeof(t1));
-	if ((__cheri_fromcap void*)cpy != &t2.pad0)
+	if ((void*)cpy != &t2.pad0)
 		cheribsdtest_failure_errx("(void*)cpy != &t2.pad0");
 	check(&t2, 0, 32);
 
@@ -359,7 +359,7 @@ CHERIBSDTEST(string_memmove_c, "Test explicit capability memmove")
 	    __builtin_cheri_offset_increment(CAP(t2.pad0-1), 32),
 	    __builtin_cheri_offset_increment(CAP(t1.pad0-1), 32),
 	    sizeof(t1) - 31);
-	if ((__cheri_fromcap void*)cpy != t2.pad0+31)
+	if ((void*)cpy != t2.pad0+31)
 		cheribsdtest_failure_errx("(void*)cpy != t2.pad0+31");
 	check(&t2, 31, 32);
 
@@ -527,7 +527,7 @@ CHERIBSDTEST(string_kern_memcpy_c,
 			cpy = kern_memcpy_c(CAP(&t2.pad0[head]),
 			    CAP(&t1.pad0[head]),
 			    len);
-			if ((__cheri_fromcap void*)cpy != &t2.pad0[head])
+			if ((void*)cpy != &t2.pad0[head])
 				cheribsdtest_failure_errx(
 				    "kern_memcpy_c did not return dst "
 				    "(&t2.pad0[%zu])", head);
@@ -538,7 +538,7 @@ CHERIBSDTEST(string_kern_memcpy_c,
 	/* ...and case where the alignment is different for both... */
 	invalidate(&t2);
 	cpy = kern_memcpy_c(CAP(&t2), CAP(&t1.pad0[1]), sizeof(t1) - 1);
-	if ((__cheri_fromcap void*)cpy != &t2)
+	if ((void*)cpy != &t2)
 		cheribsdtest_failure_errx("kern_memcpy_c did not return dst (&t2)");
 	/* This should have invalidated the capability */
 	if (cheri_tag_get(t2.y) != 0)
@@ -562,7 +562,7 @@ CHERIBSDTEST(string_kern_memcpy_c,
 	    __builtin_cheri_offset_increment(CAP(&t2), 3),
 	    __builtin_cheri_offset_increment(CAP(&t1), 3),
 	    sizeof(t1)-6);
-	if ((__cheri_fromcap void*)cpy != &t2.pad0[3])
+	if ((void*)cpy != &t2.pad0[3])
 		cheribsdtest_failure_errx("kern_memcpy_c did not return dst "
 		    "(&t2.pad0[3])");
 	check(&t2, 3, 29);
@@ -576,7 +576,7 @@ CHERIBSDTEST(string_kern_memcpy_c,
 	    __builtin_cheri_offset_increment(CAP(t2.pad0-1), 1),
 	    __builtin_cheri_offset_increment(CAP(t1.pad0-1), 1),
 	    sizeof(t1));
-	if ((__cheri_fromcap void*)cpy != &t2.pad0)
+	if ((void*)cpy != &t2.pad0)
 		cheribsdtest_failure_errx("(void*)cpy != &t2.pad0");
 	check(&t2, 0, 32);
 
@@ -586,7 +586,7 @@ CHERIBSDTEST(string_kern_memcpy_c,
 	    __builtin_cheri_offset_increment(CAP(t2.pad0-1), 32),
 	    __builtin_cheri_offset_increment(CAP(t1.pad0-1), 32),
 	    sizeof(t1) - 31);
-	if ((__cheri_fromcap void*)cpy != t2.pad0+31)
+	if ((void*)cpy != t2.pad0+31)
 		cheribsdtest_failure_errx("(void*)cpy != t2.pad0+31");
 	check(&t2, 31, 32);
 
@@ -615,7 +615,7 @@ CHERIBSDTEST(string_kern_memmove_c,
 			cpy = kern_memmove_c(CAP(&t2.pad0[head]),
 			    CAP(&t1.pad0[head]),
 			    len);
-			if ((__cheri_fromcap void*)cpy != &t2.pad0[head])
+			if ((void*)cpy != &t2.pad0[head])
 				cheribsdtest_failure_errx(
 				    "kern_memcpy_c did not return dst "
 				    "(&t2.pad0[%zu])", head);
@@ -626,7 +626,7 @@ CHERIBSDTEST(string_kern_memmove_c,
 	/* ...and case where the alignment is different for both... */
 	invalidate(&t2);
 	cpy = kern_memmove_c(CAP(&t2), CAP(&t1.pad0[1]), sizeof(t1) - 1);
-	if ((__cheri_fromcap void*)cpy != &t2)
+	if ((void*)cpy != &t2)
 		cheribsdtest_failure_errx("kern_memmove_c did not return dst (&t2)");
 	/* This should have invalidated the capability */
 	if (cheri_tag_get(t2.y) != 0)
@@ -650,7 +650,7 @@ CHERIBSDTEST(string_kern_memmove_c,
 	    __builtin_cheri_offset_increment(CAP(&t2), 3),
 	    __builtin_cheri_offset_increment(CAP(&t1), 3),
 	    sizeof(t1)-6);
-	if ((__cheri_fromcap void*)cpy != &t2.pad0[3])
+	if ((void*)cpy != &t2.pad0[3])
 		cheribsdtest_failure_errx("kern_memmove_c did not return dst "
 		    "(&t2.pad0[3])");
 	check(&t2, 3, 29);
@@ -661,7 +661,7 @@ CHERIBSDTEST(string_kern_memmove_c,
 	    __builtin_cheri_offset_increment(CAP(t2.pad0-1), 1),
 	    __builtin_cheri_offset_increment(CAP(t1.pad0-1), 1),
 	    sizeof(t1));
-	if ((__cheri_fromcap void*)cpy != &t2.pad0)
+	if ((void*)cpy != &t2.pad0)
 		cheribsdtest_failure_errx("(void*)cpy != &t2.pad0");
 	check(&t2, 0, 32);
 
@@ -671,7 +671,7 @@ CHERIBSDTEST(string_kern_memmove_c,
 	    __builtin_cheri_offset_increment(CAP(t2.pad0-1), 32),
 	    __builtin_cheri_offset_increment(CAP(t1.pad0-1), 32),
 	    sizeof(t1) - 31);
-	if ((__cheri_fromcap void*)cpy != t2.pad0+31)
+	if ((void*)cpy != t2.pad0+31)
 		cheribsdtest_failure_errx("(void*)cpy != t2.pad0+31");
 	check(&t2, 31, 32);
 

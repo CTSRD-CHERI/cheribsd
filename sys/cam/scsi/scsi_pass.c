@@ -1254,7 +1254,7 @@ passcopysglist(struct cam_periph *periph, struct pass_io_req *io_req,
 					  "bytes from %p to %p failed with "
 					  "error %d\n", __func__, len_to_copy,
 					  kern_ptr,
-					  (__cheri_fromcap void *)user_ptr,
+					  (void *)user_ptr,
 					  error);
 				goto bailout;
 			}
@@ -1264,7 +1264,7 @@ passcopysglist(struct cam_periph *periph, struct pass_io_req *io_req,
 				xpt_print(periph->path, "%s: copyin of %u "
 					  "bytes from %p to %p failed with "
 					  "error %d\n", __func__, len_to_copy,
-					  (__cheri_fromcap void *)user_ptr,
+					  (void *)user_ptr,
 					  kern_ptr, error);
 				goto bailout;
 			}
@@ -1477,7 +1477,7 @@ passmemsetup(struct cam_periph *periph, struct pass_io_req *io_req)
 				xpt_print(periph->path, "%s: copy of user "
 					  "buffer from %p to %p failed with "
 					  "error %d\n", __func__,
-					  (__cheri_fromcap void *)io_req->user_bufs[i],
+					  (void *)io_req->user_bufs[i],
 					  io_req->kern_bufs[i], error);
 				goto bailout;
 			}
@@ -1560,7 +1560,7 @@ passmemsetup(struct cam_periph *periph, struct pass_io_req *io_req)
 		if (error != 0) {
 			xpt_print(periph->path, "%s: copy of user S/G list "
 				  "from %p to %p failed with error %d\n",
-				  __func__, (__cheri_fromcap void *)*data_ptrs[0], io_req->user_segptr,
+				  __func__, (void *)*data_ptrs[0], io_req->user_segptr,
 				  error);
 			goto bailout;
 		}
@@ -1658,7 +1658,7 @@ passmemsetup(struct cam_periph *periph, struct pass_io_req *io_req)
 		if (error != 0) {
 			xpt_print(periph->path, "%s: copy of user S/G list "
 				  "from %p to %p failed with error %d\n",
-				  __func__, (__cheri_fromcap void *)*data_ptrs[0], io_req->user_segptr,
+				  __func__, (void *)*data_ptrs[0], io_req->user_segptr,
 				  error);
 			goto bailout;
 		}
@@ -1707,7 +1707,7 @@ passmemdone(struct cam_periph *periph, struct pass_io_req *io_req)
 					  "bytes from %p to user address %p\n",
 					  io_req->lengths[i],
 					  io_req->kern_bufs[i],
-					  (__cheri_fromcap void *)io_req->user_bufs[i]);
+					  (void *)io_req->user_bufs[i]);
 				goto bailout;
 			}
 		}
@@ -1892,7 +1892,7 @@ passdoioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, struct thread 
 		if (error != 0) {
 			xpt_print(periph->path, "Copy of user CCB %p to "
 				  "kernel address %p failed with error %d\n",
-				  (__cheri_fromcap void *)*user_ccb, ccb, error);
+				  (void *)*user_ccb, ccb, error);
 			goto camioqueue_error;
 		}
 #if defined(BUF_TRACKING) || defined(FULL_BUF_TRACKING)
@@ -2083,7 +2083,7 @@ camioqueue_error:
 		if (error != 0) {
 			xpt_print(periph->path, "Copy to user CCB %p from "
 				  "kernel address %p failed with error %d\n",
-				  (__cheri_fromcap void *)*user_ccb, &io_req->ccb, error);
+				  (void *)*user_ccb, &io_req->ccb, error);
 		}
 
 		/*

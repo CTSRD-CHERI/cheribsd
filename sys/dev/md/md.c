@@ -1460,8 +1460,7 @@ mdcreate_vnode(struct md_s *sc, struct md_req *mdr, struct thread *td)
 		if (error != 0)
 			return (error);
 	} else if (mdr->md_file_seg == UIO_SYSSPACE)
-		strlcpy(sc->s_vnode.file, (__cheri_fromcap char *)fname,
-		    sizeof(sc->s_vnode.file));
+		strlcpy(sc->s_vnode.file, fname, sizeof(sc->s_vnode.file));
 	else
 		return (EDOOFUS);
 
