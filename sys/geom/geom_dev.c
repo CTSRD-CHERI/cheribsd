@@ -671,7 +671,7 @@ g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 	case DIOCZONECMD: {
 		struct disk_zone_args *zone_args =(struct disk_zone_args *)data;
 		struct disk_zone_rep_entry *new_entries;
-		struct disk_zone_rep_entry * __capability old_entries;
+		struct disk_zone_rep_entry *old_entries;
 		struct disk_zone_report *rep;
 		size_t alloc_size;
 

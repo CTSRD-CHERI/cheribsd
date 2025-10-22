@@ -3606,7 +3606,7 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 		if (fsckcmds) {
 			char buf[32];
 
-			if (copyinstr((char * __capability)(intcap_t)cmd.value,
+			if (copyinstr((char *)(intcap_t)cmd.value,
 			    buf, sizeof(buf), NULL))
 				strncpy(buf, "Name_too_long", 32);
 			printf("%s: unlink %s (inode %jd)\n",
@@ -3621,7 +3621,7 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 		vn_finished_write(mp);
 		mp = NULL;
 		error = kern_funlinkat(td, AT_FDCWD,
-		    (char * __capability)(intcap_t)cmd.value, FD_NONE,
+		    (char *)(intcap_t)cmd.value, FD_NONE,
 		    UIO_USERSPACE, 0, (ino_t)cmd.size);
 		break;
 

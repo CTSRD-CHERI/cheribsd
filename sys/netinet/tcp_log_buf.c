@@ -2044,7 +2044,7 @@ tcp_log_drain(struct tcpcb *tp)
 }
 
 static inline int
-tcp_log_copyout(struct sockopt *sopt, void *src, void * __capability dst,
+tcp_log_copyout(struct sockopt *sopt, void *src, void *dst,
     size_t len)
 {
 
@@ -2056,9 +2056,9 @@ tcp_log_copyout(struct sockopt *sopt, void *src, void * __capability dst,
 
 static int
 tcp_log_logs_to_buf(struct sockopt *sopt, struct tcp_log_stailq *log_tailqp,
-    struct tcp_log_buffer * __capability * end, int count)
+    struct tcp_log_buffer ** end, int count)
 {
-	struct tcp_log_buffer * __capability out_entry;
+	struct tcp_log_buffer *out_entry;
 	struct tcp_log_mem *log_entry;
 	size_t entrysize;
 	int error;
@@ -2068,7 +2068,7 @@ tcp_log_logs_to_buf(struct sockopt *sopt, struct tcp_log_stailq *log_tailqp,
 
 	/* Copy the data out. */
 	error = 0;
-	out_entry = (struct tcp_log_buffer * __capability) sopt->sopt_val;
+	out_entry = (struct tcp_log_buffer *) sopt->sopt_val;
 	STAILQ_FOREACH(log_entry, log_tailqp, tlm_queue) {
 		count--;
 		KASSERT(count >= 0,
@@ -2095,7 +2095,7 @@ tcp_log_logs_to_buf(struct sockopt *sopt, struct tcp_log_stailq *log_tailqp,
 			break;
 		if (!(log_entry->tlm_buf.tlb_eventflags & TLB_FLAG_HDR)) {
 			error = tcp_log_copyout(sopt, zerobuf,
-			    ((uint8_t * __capability )out_entry) + entrysize,
+			    ((uint8_t *)out_entry) + entrysize,
 			    sizeof(struct tcp_log_buffer) - entrysize);
 		}
 
@@ -2109,8 +2109,8 @@ tcp_log_logs_to_buf(struct sockopt *sopt, struct tcp_log_stailq *log_tailqp,
 			    sizeof(struct tcp_log_verbose));
 			if (error)
 				break;
-			out_entry = (struct tcp_log_buffer * __capability)
-			    (((uint8_t * __capability) (out_entry + 1)) +
+			out_entry = (struct tcp_log_buffer *)
+			    (((uint8_t *) (out_entry + 1)) +
 			    sizeof(struct tcp_log_verbose));
 		} else
 			out_entry++;
@@ -2138,7 +2138,7 @@ tcp_log_getlogbuf(struct sockopt *sopt, struct tcpcb *tp)
 {
 	struct tcp_log_stailq log_tailq;
 	struct tcp_log_mem *log_entry, *log_next;
-	struct tcp_log_buffer * __capability out_entry;
+	struct tcp_log_buffer *out_entry;
 	struct inpcb *inp = tptoinpcb(tp);
 	size_t outsize, entrysize;
 	int error, outnum;
@@ -2256,12 +2256,12 @@ tcp_log_getlogbuf(struct sockopt *sopt, struct tcpcb *tp)
 		INP_WUNLOCK(inp);
 	} else {
 		/* Sanity check entries */
-		KASSERT(((char * __capability)out_entry -
-		    (char * __capability)sopt->sopt_val) ==
+		KASSERT(((char *)out_entry -
+		    (char *)sopt->sopt_val) ==
 		    outsize, ("%s: Actual output size (%zu) != "
 			"calculated output size (%zu)", __func__,
-			(size_t)((char * __capability)out_entry -
-			    (char * __capability)sopt->sopt_val),
+			(size_t)((char *)out_entry -
+			    (char *)sopt->sopt_val),
 		    outsize));
 
 		/* Free the entries we just copied out. */
@@ -2271,8 +2271,8 @@ tcp_log_getlogbuf(struct sockopt *sopt, struct tcpcb *tp)
 		}
 	}
 
-	sopt->sopt_valsize = (size_t)((char * __capability)out_entry -
-	    (char * __capability)sopt->sopt_val);
+	sopt->sopt_valsize = (size_t)((char *)out_entry -
+	    (char *)sopt->sopt_val);
 	return (error);
 }
 
@@ -2303,7 +2303,7 @@ tcp_log_expandlogbuf(struct tcp_log_dev_queue *param)
 {
 	struct tcp_log_dev_log_queue *entry;
 	struct tcp_log_header *hdr;
-	uint8_t * __capability end;
+	uint8_t *end;
 	struct sockopt sopt;
 	int error;
 
@@ -2325,7 +2325,7 @@ tcp_log_expandlogbuf(struct tcp_log_dev_queue *param)
 	sopt.sopt_td = NULL;
 
 	error = tcp_log_logs_to_buf(&sopt, &entry->tldl_entries,
-	    (struct tcp_log_buffer * __capability *)&end, entry->tldl_count);
+	    (struct tcp_log_buffer **)&end, entry->tldl_count);
 	if (error) {
 		free(hdr, M_TCPLOGDEV);
 		return (NULL);
@@ -2338,7 +2338,7 @@ tcp_log_expandlogbuf(struct tcp_log_dev_queue *param)
 	memset(hdr, 0, sizeof(struct tcp_log_header));
 	hdr->tlh_version = TCP_LOG_BUF_VER;
 	hdr->tlh_type = TCP_LOG_DEV_TYPE_BBR;
-	hdr->tlh_length = end - (uint8_t * __capability)(uint8_t *)hdr;
+	hdr->tlh_length = end - (uint8_t *)(uint8_t *)hdr;
 	hdr->tlh_ie = entry->tldl_ie;
 	hdr->tlh_af = entry->tldl_af;
 	getboottime(&hdr->tlh_offset);

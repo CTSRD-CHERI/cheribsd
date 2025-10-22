@@ -92,11 +92,11 @@ struct kevent {
 #ifdef _KERNEL
 struct g_kevent_args {
 	int	fd;
-	const void * __capability changelist;
+	const void *changelist;
 	int	nchanges;
-	void	* __capability eventlist;
+	void	*eventlist;
 	int	nevents;
-	const struct timespec * __capability timeout;
+	const struct timespec *timeout;
 };
 #endif /* _KERNEL */
 

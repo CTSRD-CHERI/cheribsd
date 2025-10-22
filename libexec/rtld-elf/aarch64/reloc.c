@@ -146,8 +146,8 @@ init_pltgot(Plt_Entry *plt)
  * 8-bit permission field.
  */
 static uintcap_t
-init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
-    const void * __capability pcc_cap, Elf_Addr base_addr,
+init_cap_from_fragment(const Elf_Addr *fragment, void *data_cap,
+    const void *pcc_cap, Elf_Addr base_addr,
     Elf_Size addend)
 {
 	uintcap_t cap;
@@ -787,7 +787,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 	SymCache *cache;
 	Elf_Addr *where, symval;
 #if __has_feature(capabilities)
-	void * __capability data_cap;
+	void *data_cap;
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__

@@ -230,8 +230,8 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
  * the entry function with the given argument.
  */
 int
-cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
-    void * __capability arg, stack_t *stack)
+cpu_set_upcall(struct thread *td, void (*entry)(void *),
+    void *arg, stack_t *stack)
 {
 	struct trapframe *tf = td->td_frame;
 
@@ -264,7 +264,7 @@ cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
 }
 
 int
-cpu_set_user_tls(struct thread *td, void * __capability tls_base)
+cpu_set_user_tls(struct thread *td, void *tls_base)
 {
 	struct pcb *pcb;
 
@@ -355,7 +355,7 @@ cpu_exec_vmspace_reuse(struct proc *p __unused, vm_map_t map __unused)
 
 int
 cpu_procctl(struct thread *td __unused, int idtype __unused, id_t id __unused,
-    int com __unused, void * __capability data __unused)
+    int com __unused, void *data __unused)
 {
 
 	return (EINVAL);

@@ -606,7 +606,7 @@ __elfN(check_header)(const Elf_Ehdr *hdr)
  */
 static int
 __elfN(build_imgact_capability)(struct image_params *imgp,
-    void * __capability *imgact_cap, const Elf_Ehdr *hdr, const Elf_Phdr *phdr,
+    void **imgact_cap, const Elf_Ehdr *hdr, const Elf_Phdr *phdr,
     Elf_Addr *preferred_rbase)
 {
 	u_long perm = CHERI_PERM_STORE | CHERI_PERM_GLOBAL |
@@ -617,7 +617,7 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 	vm_size_t seg_size;
 	int i, result;
 	vm_pointer_t reservation;
-	void * __capability reservation_cap;
+	void *reservation_cap;
 	vm_map_t map;
 	Elf_Addr rbase = *preferred_rbase;
 
@@ -700,7 +700,7 @@ __elfN(map_partial)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 			return (KERN_FAILURE);
 		off = offset - trunc_page(offset);
 		error = copyout((void *)(sf_buf_kva(sf) + off),
-		    (void * __capability)start, (ptraddr_t)end - (ptraddr_t)start);
+		    (void *)start, (ptraddr_t)end - (ptraddr_t)start);
 		vm_imgact_unmap_page(sf);
 		if (error != 0)
 			return (KERN_FAILURE);
@@ -759,7 +759,7 @@ __elfN(map_insert)(const struct image_params *imgp, vm_map_t map,
 			if (sz > PAGE_SIZE - off)
 				sz = PAGE_SIZE - off;
 			error = copyout((void *)(sf_buf_kva(sf) + off),
-			    (void * __capability)start,
+			    (void *)start,
 			    (ptraddr_t)end - (ptraddr_t)start);
 			vm_imgact_unmap_page(sf);
 			if (error != 0)
@@ -878,7 +878,7 @@ __elfN(load_section)(const struct image_params *imgp, vm_ooffset_t offset,
 			return (EIO);
 
 		/* send the page fragment to user space */
-		error = copyout((void *)sf_buf_kva(sf), (void * __capability)map_addr,
+		error = copyout((void *)sf_buf_kva(sf), (void *)map_addr,
 		    copy_len);
 		vm_imgact_unmap_page(sf);
 		if (error != 0)
@@ -1717,7 +1717,7 @@ ret:
 #define	elf_suword __CONCAT(suword, __ELF_WORD_SIZE)
 
 #ifdef __ELF_CHERI
-static void * __capability
+static void *
 prog_cap(struct image_params *imgp, uint64_t perms)
 {
 	Elf_Addr prog_base;
@@ -1740,7 +1740,7 @@ prog_cap(struct image_params *imgp, uint64_t perms)
 	    imgp->start_addr - prog_base));
 }
 
-static void * __capability
+static void *
 interp_cap(struct image_params *imgp, Elf_Auxargs *args, uint64_t perms)
 {
 	Elf_Addr interp_base;
@@ -1765,10 +1765,10 @@ interp_cap(struct image_params *imgp, Elf_Auxargs *args, uint64_t perms)
 	    args->base - interp_base));
 }
 
-static void * __capability
+static void *
 timekeep_cap(struct image_params *imgp)
 {
-	void * __capability tmpcap;
+	void *tmpcap;
 	struct vmspace *vmspace = imgp->proc->p_vmspace;
 	uintcap_t timekeep_base;
 	size_t timekeep_len;
@@ -1783,7 +1783,7 @@ timekeep_cap(struct image_params *imgp)
 	KASSERT(timekeep_len == CHERI_REPRESENTABLE_LENGTH(timekeep_len),
 	    ("timekeep_len needs rounding"));
 
-	tmpcap = (void * __capability)cheri_setboundsexact(
+	tmpcap = (void *)cheri_setboundsexact(
 	    cheri_andperm(timekeep_base, CHERI_PERMS_USERSPACE_RODATA),
 	    timekeep_len);
 
@@ -1798,8 +1798,8 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	Elf_Auxinfo *argarray, *pos;
 	struct vmspace *vmspace;
 #ifdef __ELF_CHERI
-	void * __capability exec_base;
-	void * __capability entry;
+	void *exec_base;
+	void *entry;
 #endif
 	rlim_t stacksz;
 	int error, oc;
@@ -1849,7 +1849,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 			 * out-of-bounds capability with address zero that may
 			 * or may not be tagged.
 			 */
-			exec_base = (void *__capability)(uintcap_t)args->base;
+			exec_base = (void *)(uintcap_t)args->base;
 		} else {
 			/*
 			 * For static-PIE we need AT_BASE for relocations and
@@ -1983,7 +1983,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	imgp->auxargs = NULL;
 	KASSERT(pos - argarray <= AT_COUNT, ("Too many auxargs"));
 
-	error = copyoutcap(argarray, (void * __capability)base,
+	error = copyoutcap(argarray, (void *)base,
 	    sizeof(*argarray) * AT_COUNT);
 	free(argarray, M_TEMP);
 	return (error);
@@ -1993,15 +1993,15 @@ int
 __elfN(freebsd_fixup)(uintcap_t *stack_base, struct image_params *imgp)
 {
 #ifndef __ELF_CHERI
-	Elf_Addr * __capability base;
+	Elf_Addr *base;
 
-	base = (Elf_Addr * __capability)*stack_base;
+	base = (Elf_Addr *)*stack_base;
 	base--;
 	if (elf_suword(base, imgp->args->argc) == -1)
 		return (EFAULT);
 	*stack_base = (uintcap_t)base;
 #else
-	KASSERT(__builtin_is_aligned(*stack_base, sizeof(void * __capability)),
+	KASSERT(__builtin_is_aligned(*stack_base, sizeof(void *)),
 	    ("CheriABI stack pointer not properly aligned"));
 #endif
 	return (0);
@@ -2155,7 +2155,7 @@ __elfN(coredump)(struct thread *td, struct vnode *vp, off_t limit, int flags)
 	if (error == 0) {
 		Elf_Phdr *php;
 		int i;
-		char * __capability section_cap;
+		char *section_cap;
 
 		php = (Elf_Phdr *)((char *)hdr + sizeof(Elf_Ehdr)) + 1;
 		for (i = 0; i < seginfo.count; i++) {

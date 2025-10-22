@@ -668,11 +668,11 @@ uint8_t usbd_xfer_maxp_was_clamped(struct usb_xfer *xfer);
 void	usbd_copy_in(struct usb_page_cache *cache, usb_frlength_t offset,
 	    const void *ptr, usb_frlength_t len);
 int	usbd_copy_in_user(struct usb_page_cache *cache, usb_frlength_t offset,
-	    const void * __capability ptr, usb_frlength_t len);
+	    const void *ptr, usb_frlength_t len);
 void	usbd_copy_out(struct usb_page_cache *cache, usb_frlength_t offset,
 	    void *ptr, usb_frlength_t len);
 int	usbd_copy_out_user(struct usb_page_cache *cache, usb_frlength_t offset,
-	    void * __capability ptr, usb_frlength_t len);
+	    void *ptr, usb_frlength_t len);
 void	usbd_get_page(struct usb_page_cache *pc, usb_frlength_t offset,
 	    struct usb_page_search *res);
 void	usbd_m_copy_in(struct usb_page_cache *cache, usb_frlength_t dst_offset,

@@ -265,7 +265,7 @@ bool
 ptrace_derive_capreg_td(struct thread *td, uintcap_t in, uintcap_t *out)
 {
 	struct trapframe *frame;
-	void * __capability cap;
+	void *cap;
 	uintcap_t *fcap;
 	int otype;
 	u_int i;
@@ -291,7 +291,7 @@ ptrace_derive_capreg_td(struct thread *td, uintcap_t in, uintcap_t *out)
 			continue;
 		}
 
-		cap = cheri_buildcap((void * __capability)fcap[i], in);
+		cap = cheri_buildcap((void *)fcap[i], in);
 		if (cheri_gettag(cap)) {
 			*out = (uintcap_t)cap;
 			return (true);
@@ -570,7 +570,7 @@ sys_sigreturn(struct thread *td, struct sigreturn_args *uap)
 void
 sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
-	struct sigframe * __capability fp, frame;
+	struct sigframe *fp, frame;
 #if !__has_feature(capabilities)
 	struct sysentvec *sysent;
 #endif
@@ -605,10 +605,10 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !onstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		fp = (struct sigframe * __capability)((uintcap_t)td->td_sigstk.ss_sp +
+		fp = (struct sigframe *)((uintcap_t)td->td_sigstk.ss_sp +
 		    td->td_sigstk.ss_size);
 	} else {
-		fp = (struct sigframe * __capability)td->td_frame->tf_sp;
+		fp = (struct sigframe *)td->td_frame->tf_sp;
 	}
 
 	/* Make room, keeping the stack aligned */

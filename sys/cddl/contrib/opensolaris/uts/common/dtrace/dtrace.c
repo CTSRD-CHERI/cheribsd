@@ -6367,50 +6367,50 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 		case DIF_OP_ULDSB:
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
 			regs[rd] = (int8_t)dtrace_fuword8(
-			    (void * __capability)(uintptr_t)regs[r1]);
+			    (void *)(uintptr_t)regs[r1]);
 			DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
 			break;
 		case DIF_OP_ULDSH:
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
 			regs[rd] = (int16_t)dtrace_fuword16(
-			    (void * __capability)(uintptr_t)regs[r1]);
+			    (void *)(uintptr_t)regs[r1]);
 			DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
 			break;
 		case DIF_OP_ULDSW:
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
 			regs[rd] = (int32_t)dtrace_fuword32(
-			    (void * __capability)(uintptr_t)regs[r1]);
+			    (void *)(uintptr_t)regs[r1]);
 			DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
 			break;
 		case DIF_OP_ULDUB:
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
 			regs[rd] = dtrace_fuword8(
-			    (void * __capability)(uintptr_t)regs[r1]);
+			    (void *)(uintptr_t)regs[r1]);
 			DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
 			break;
 		case DIF_OP_ULDUH:
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
 			regs[rd] = dtrace_fuword16(
-			    (void * __capability)(uintptr_t)regs[r1]);
+			    (void *)(uintptr_t)regs[r1]);
 			DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
 			break;
 		case DIF_OP_ULDUW:
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
 			regs[rd] = dtrace_fuword32(
-			    (void * __capability)(uintptr_t)regs[r1]);
+			    (void *)(uintptr_t)regs[r1]);
 			DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
 			break;
 		case DIF_OP_ULDX:
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
 			regs[rd] = dtrace_fuword64(
-			    (void * __capability)(uintptr_t)regs[r1]);
+			    (void *)(uintptr_t)regs[r1]);
 			DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
 			break;
 		case DIF_OP_ULDC:
 #if __has_feature(capabilities)
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
 			regs[rd] = dtrace_fucap(
-			    (void * __capability)(uintcap_t)regs[r1]);
+			    (void *)(uintcap_t)regs[r1]);
 			DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
 #else
 			*flags |= CPU_DTRACE_ILLOP;
@@ -7325,7 +7325,7 @@ dtrace_store_by_ref(dtrace_difo_t *dp, caddr_t tomax, size_t size,
 			} else if (c != '\0' && dtkind == DIF_TF_BYUREF) {
 				DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
 				c = dtrace_fuword8(
-				    (void * __capability)(uintptr_t)val++);
+				    (void *)(uintptr_t)val++);
 				DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
 				if (*flags & CPU_DTRACE_FAULT)
 					break;
@@ -7344,7 +7344,7 @@ dtrace_store_by_ref(dtrace_difo_t *dp, caddr_t tomax, size_t size,
 			} else if (dtkind == DIF_TF_BYUREF) {
 				DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
 				c = dtrace_fuword8(
-				    (void * __capability)(uintptr_t)val++);
+				    (void *)(uintptr_t)val++);
 				DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
 				if (*flags & CPU_DTRACE_FAULT)
 					break;
@@ -13396,7 +13396,7 @@ dtrace_dof_copyin(uintcap_t uarg, int *errp)
 	/*
 	 * First, we're going to copyin() the sizeof (dof_hdr_t).
 	 */
-	if (copyin((void * __capability) uarg, &hdr, sizeof (hdr)) != 0) {
+	if (copyin((void *) uarg, &hdr, sizeof (hdr)) != 0) {
 		dtrace_dof_error(NULL, "failed to copyin DOF header");
 		*errp = EFAULT;
 		return (NULL);
@@ -13420,7 +13420,7 @@ dtrace_dof_copyin(uintcap_t uarg, int *errp)
 
 	dof = kmem_alloc(hdr.dofh_loadsz, KM_SLEEP);
 
-	if (copyincap((void *__capability)uarg, dof, hdr.dofh_loadsz) != 0 ||
+	if (copyincap((void *)uarg, dof, hdr.dofh_loadsz) != 0 ||
 	    dof->dofh_loadsz != hdr.dofh_loadsz) {
 		kmem_free(dof, hdr.dofh_loadsz);
 		*errp = EFAULT;

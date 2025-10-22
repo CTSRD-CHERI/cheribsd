@@ -6448,11 +6448,11 @@ vm_map_reservation_is_unmapped(vm_map_t map, vm_offset_t reservation)
 
 #if __has_feature(capabilities)
 /* Return a capability for the reservation that includes va. */
-void * __capability
+void *
 vm_map_reservation_cap(vm_map_t map, vm_offset_t va)
 {
 	vm_map_entry_t entry;
-	void * __capability cap;
+	void *cap;
 	vm_offset_t end, reservation;
 	vm_prot_t max_prot;
 
@@ -6491,7 +6491,7 @@ vm_map_reservation_cap(vm_map_t map, vm_offset_t va)
 	}
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	cap = (void * __capability)vm_map_buildcap(map, reservation,
+	cap = (void *)vm_map_buildcap(map, reservation,
 	    end - reservation, max_prot);
 #else
 	cap = cheri_setaddress(userspace_root_cap, reservation);

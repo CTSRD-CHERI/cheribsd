@@ -291,13 +291,13 @@ find_top_affected_fs(spa_t *spa, uint64_t head_ds, zbookmark_err_phys_t *zep,
  * uaddr and has *count unused entries, and decrement *count by 1.
  */
 static int
-copyout_entry(const zbookmark_phys_t *zb, void * __capability uaddr, uint64_t *count)
+copyout_entry(const zbookmark_phys_t *zb, void *uaddr, uint64_t *count)
 {
 	if (*count == 0)
 		return (SET_ERROR(ENOMEM));
 
 	*count -= 1;
-	if (copyout(zb, (char * __capability)uaddr + (*count) * sizeof (zbookmark_phys_t),
+	if (copyout(zb, (char *)uaddr + (*count) * sizeof (zbookmark_phys_t),
 	    sizeof (zbookmark_phys_t)) != 0)
 		return (SET_ERROR(EFAULT));
 	return (0);
@@ -312,7 +312,7 @@ copyout_entry(const zbookmark_phys_t *zb, void * __capability uaddr, uint64_t *c
  */
 static int
 check_filesystem(spa_t *spa, uint64_t head_ds, zbookmark_err_phys_t *zep,
-    void * __capability uaddr, uint64_t *count, list_t *clones_list)
+    void *uaddr, uint64_t *count, list_t *clones_list)
 {
 	dsl_dataset_t *ds;
 	dsl_pool_t *dp = spa->spa_dsl_pool;
@@ -473,7 +473,7 @@ out:
 
 static int
 process_error_block(spa_t *spa, uint64_t head_ds, zbookmark_err_phys_t *zep,
-    void * __capability uaddr, uint64_t *count)
+    void *uaddr, uint64_t *count)
 {
 	/*
 	 * If zb_birth == 0 or head_ds == 0 it means we failed to retrieve the
@@ -950,7 +950,7 @@ spa_upgrade_errlog(spa_t *spa, dmu_tx_t *tx)
  * If an error block is shared by two datasets it will be counted twice.
  */
 static int
-process_error_log(spa_t *spa, uint64_t obj, void * __capability uaddr, uint64_t *count)
+process_error_log(spa_t *spa, uint64_t obj, void *uaddr, uint64_t *count)
 {
 	if (obj == 0)
 		return (0);
@@ -1034,7 +1034,7 @@ process_error_log(spa_t *spa, uint64_t obj, void * __capability uaddr, uint64_t 
 }
 
 static int
-process_error_list(spa_t *spa, avl_tree_t *list, void * __capability uaddr, uint64_t *count)
+process_error_list(spa_t *spa, avl_tree_t *list, void *uaddr, uint64_t *count)
 {
 	spa_error_entry_t *se;
 
@@ -1084,7 +1084,7 @@ process_error_list(spa_t *spa, avl_tree_t *list, void * __capability uaddr, uint
  * the error list lock when we are finished.
  */
 int
-spa_get_errlog(spa_t *spa, void * __capability uaddr, uint64_t *count)
+spa_get_errlog(spa_t *spa, void *uaddr, uint64_t *count)
 {
 	int ret = 0;
 

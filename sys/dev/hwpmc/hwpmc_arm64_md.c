@@ -125,7 +125,7 @@ pmc_save_user_callchain(uintptr_t *cc, int maxsamples,
 #endif
 		{
 			r = fp + sizeof(uintcap_t);
-			if (fueptr((void * __capability)r, &pc) != 0)
+			if (fueptr((void *)r, &pc) != 0)
 				break;
 		}
 		pc &= ~1;
@@ -145,7 +145,7 @@ pmc_save_user_callchain(uintptr_t *cc, int maxsamples,
 		} else
 #endif
 		{
-			if (fueptr((void * __capability)r, &fp) != 0)
+			if (fueptr((void *)r, &fp) != 0)
 				break;
 		}
 		if (fp < oldfp || !PMC_IN_USERSPACE(fp))

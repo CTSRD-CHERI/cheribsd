@@ -381,14 +381,14 @@ sys_modstat(struct thread *td, struct modstat_args *uap)
 
 int
 kern_modstat(struct thread *td, int modid,
-    struct module_stat __no_user_subobject_bounds * __capability stat)
+    struct module_stat __no_user_subobject_bounds *stat)
 {
 	module_t mod;
 	modspecific_t data;
 	int error = 0;
 	int id, namelen, refs, version;
-	struct module_stat_v2 * __capability stat_v2;
-	char * __capability user_namep;
+	struct module_stat_v2 *stat_v2;
+	char *user_namep;
 	char *name;
 	bool is_v1v2;
 
@@ -414,7 +414,7 @@ kern_modstat(struct thread *td, int modid,
 	if (!is_v1v2 && version != sizeof(struct module_stat))
 		return (EINVAL);
 	if (is_v1v2)
-		user_namep = ((struct module_stat_v1 * __capability)stat)->name;
+		user_namep = ((struct module_stat_v1 *)stat)->name;
 	else
 		user_namep = stat->name;
 	namelen = strlen(mod->name) + 1;
@@ -427,7 +427,7 @@ kern_modstat(struct thread *td, int modid,
 
 	/* Extending MAXMODNAME gives an offset change for v3. */
 	if (is_v1v2) {
-		stat_v2 = (struct module_stat_v2 * __capability)stat;
+		stat_v2 = (struct module_stat_v2 *)stat;
 		if ((error = copyout(&refs, &stat_v2->refs, sizeof(int))) != 0)
 			return (error);
 		if ((error = copyout(&id, &stat_v2->id, sizeof(int))) != 0)
@@ -463,7 +463,7 @@ sys_modfind(struct thread *td, struct modfind_args *uap)
 }
 
 int
-kern_modfind(struct thread *td, const char * __capability uname)
+kern_modfind(struct thread *td, const char *uname)
 {
 	int error = 0;
 	char name[MAXMODNAMEV3];

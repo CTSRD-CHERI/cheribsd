@@ -61,10 +61,10 @@
 
 #define	access_ok(a,b)		linux_access_ok(a,b)
 
-extern int linux_copyin(const void * __capability uaddr, void *kaddr, size_t len);
-extern int linux_copyout(const void *kaddr, void * __capability uaddr, size_t len);
-extern size_t linux_clear_user(void * __capability uaddr, size_t len);
-extern int linux_access_ok(const void * __capability uaddr, size_t len);
+extern int linux_copyin(const void *uaddr, void *kaddr, size_t len);
+extern int linux_copyout(const void *kaddr, void *uaddr, size_t len);
+extern size_t linux_clear_user(void *uaddr, size_t len);
+extern int linux_access_ok(const void *uaddr, size_t len);
 
 /*
  * NOTE: Each pagefault_disable() call must have a corresponding
@@ -88,7 +88,7 @@ pagefault_disabled(void)
 }
 
 static inline int
-__copy_to_user_inatomic(void * __capability to, const void *from, unsigned n)
+__copy_to_user_inatomic(void *to, const void *from, unsigned n)
 {
 
 	return (copyout_nofault(from, to, n) != 0 ? n : 0);
@@ -97,7 +97,7 @@ __copy_to_user_inatomic(void * __capability to, const void *from, unsigned n)
 	__copy_to_user_inatomic((to), (from), (n))
 
 static inline unsigned long
-__copy_from_user_inatomic(void *to, const void * __capability from,
+__copy_from_user_inatomic(void *to, const void *from,
     unsigned long n)
 {
 	/*
@@ -107,7 +107,7 @@ __copy_from_user_inatomic(void *to, const void * __capability from,
 	 * only somewhat slower, to use normal copyin.  All uses
 	 * except shmem_pwrite_fast() have the destination mapped WC.
 	 */
-	return ((copyin_nofault(__DECONST_CAP(void * __capability, from), to, n) != 0 ? n : 0));
+	return ((copyin_nofault(__DECONST_CAP(void *, from), to, n) != 0 ? n : 0));
 }
 #define	__copy_from_user_inatomic_nocache(to, from, n)	\
 	__copy_from_user_inatomic((to), (from), (n))

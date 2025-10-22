@@ -1044,7 +1044,7 @@ static void syncobj_wait_syncobj_func(struct drm_syncobj *syncobj,
 }
 
 static signed long drm_syncobj_array_wait_timeout(struct drm_syncobj **syncobjs,
-						  void __user * __capability user_points,
+						  void __user *user_points,
 						  uint32_t count,
 						  uint32_t flags,
 						  signed long timeout,
@@ -1270,7 +1270,7 @@ static int drm_syncobj_array_wait(struct drm_device *dev,
 }
 
 static int drm_syncobj_array_find(struct drm_file *file_private,
-				  void __user * __capability user_handles,
+				  void __user *user_handles,
 				  uint32_t count_handles,
 				  struct drm_syncobj ***syncobjs_out)
 {
@@ -1640,7 +1640,7 @@ int drm_syncobj_query_ioctl(struct drm_device *dev, void *data,
 	struct drm_syncobj_timeline_array local_args;
 #endif
 	struct drm_syncobj **syncobjs;
-	uint64_t __user * __capability points = u64_to_user_ptr(args->points);
+	uint64_t __user *points = u64_to_user_ptr(args->points);
 	uint32_t i;
 	int ret;
 

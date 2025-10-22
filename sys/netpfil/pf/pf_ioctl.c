@@ -3922,7 +3922,7 @@ DIOCCHANGERULE_error:
 		struct pfsync_state_1301	*pstore, *p;
 		int			 i, nr;
 		size_t			 slice_count = 16, count;
-		void			* __capability out;
+		void			*out;
 
 		if (ps->ps_len <= 0) {
 			nr = uma_zone_get_cur(V_pf_state_z);
@@ -3996,7 +3996,7 @@ DIOCGETSTATES_full:
 		struct pf_state_export	*pstore, *p;
 		int i, nr;
 		size_t slice_count = 16, count;
-		void * __capability out;
+		void *out;
 
 		if (ps->ps_req_version > PF_STATE_VERSION) {
 			error = ENOTSUP;

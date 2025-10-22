@@ -86,7 +86,7 @@ typedef	struct	ap_control {
 	u_long	apc_arg;
 	union {
 #ifdef _KERNEL
-		void * __capability apc_udata;
+		void *apc_udata;
 #endif
 		void	*apc_data;
 	};

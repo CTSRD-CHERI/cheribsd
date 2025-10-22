@@ -715,7 +715,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 	struct ucred *cred = td->td_ucred;
 	int i, error;
 	struct prison *rpr;
-	struct semid_ds * __capability sbuf;
+	struct semid_ds *sbuf;
 	struct semid_kernel *semakptr;
 	struct mtx *sema_mtxp;
 	u_short usval, count;
@@ -1126,7 +1126,7 @@ sys_semop(struct thread *td, struct semop_args *uap)
 }
 
 int
-kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
+kern_semop(struct thread *td, int usemid, struct sembuf *usops,
     size_t nsops, struct timespec *timeout)
 {
 #define SMALL_SOPS	8
@@ -1135,7 +1135,7 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 	struct sembuf *sops;
 	struct semid_kernel *semakptr;
 	struct sembuf *sopptr = NULL;
-	struct sem * __capability semptr = NULL;
+	struct sem *semptr = NULL;
 	struct sem_undo *suptr;
 	struct mtx *sema_mtxp;
 	sbintime_t sbt, precision;

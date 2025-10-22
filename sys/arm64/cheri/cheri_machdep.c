@@ -43,19 +43,19 @@
 #include <machine/pte.h>
 #include <machine/vmparam.h>
 
-void * __capability sentry_unsealcap;
-void * __capability smccc_ddc_el0;
-void * __capability vmm_gva_root_cap = (void * __capability)(intcap_t)-1;
-void * __capability vmm_gpa_root_cap = (void * __capability)(intcap_t)-1;
+void *sentry_unsealcap;
+void *smccc_ddc_el0;
+void *vmm_gva_root_cap = (void *)(intcap_t)-1;
+void *vmm_gpa_root_cap = (void *)(intcap_t)-1;
 #ifdef __CHERI_PURE_CAPABILITY__
 void *kernel_root_cap = (void *)(intcap_t)-1;
 void *vmm_el2_root_cap = (void *)(intcap_t)-1;
 #endif
 
 void __nosanitizecoverage
-cheri_init_capabilities(void * __capability kroot)
+cheri_init_capabilities(void *kroot)
 {
-	void * __capability ctemp;
+	void *ctemp;
 
 	ctemp = cheri_setaddress(kroot, CHERI_SEALCAP_KERNEL_BASE);
 	ctemp = cheri_setbounds(ctemp, CHERI_SEALCAP_KERNEL_LENGTH);

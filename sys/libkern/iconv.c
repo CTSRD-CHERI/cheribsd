@@ -437,7 +437,7 @@ iconv_sysctl_add(SYSCTL_HANDLER_ARGS)
 		struct iconv_add64 din64;
 #endif
 	} du;
-	const void * __capability ia_data;
+	const void *ia_data;
 	struct iconv_add_out dout;
 	int error;
 

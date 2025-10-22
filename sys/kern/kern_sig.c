@@ -793,8 +793,8 @@ sigact_flag_test(const struct sigaction *act, int flag)
 	 * settings.
 	 */
 	return ((act->sa_flags & flag) != 0 && (flag != SA_SIGINFO ||
-	    ((__sighandler_t * __capability)act->sa_sigaction != SIG_IGN &&
-	    (__sighandler_t * __capability)act->sa_sigaction != SIG_DFL)));
+	    ((__sighandler_t *)act->sa_sigaction != SIG_IGN &&
+	    (__sighandler_t *)act->sa_sigaction != SIG_DFL)));
 }
 
 /*
@@ -834,7 +834,7 @@ kern_sigaction(struct thread *td, int sig, const struct sigaction *act,
 			oact->sa_flags |= SA_NODEFER;
 		if (SIGISMEMBER(ps->ps_siginfo, sig)) {
 			oact->sa_flags |= SA_SIGINFO;
-			oact->sa_sigaction = (__siginfohandler_t * __capability)
+			oact->sa_sigaction = (__siginfohandler_t *)
 			    ps->ps_sigact[_SIG_IDX(sig)];
 		} else {
 			oact->sa_handler = ps->ps_sigact[_SIG_IDX(sig)];
@@ -860,7 +860,7 @@ kern_sigaction(struct thread *td, int sig, const struct sigaction *act,
 		SIG_CANTMASK(ps->ps_catchmask[_SIG_IDX(sig)]);
 		if (sigact_flag_test(act, SA_SIGINFO)) {
 			ps->ps_sigact[_SIG_IDX(sig)] =
-			    (__sighandler_t * __capability)act->sa_sigaction;
+			    (__sighandler_t *)act->sa_sigaction;
 			SIGADDSET(ps->ps_siginfo, sig);
 		} else {
 			ps->ps_sigact[_SIG_IDX(sig)] = act->sa_handler;
@@ -1219,7 +1219,7 @@ sys_sigprocmask(struct thread *td, struct sigprocmask_args *uap)
 
 int
 user_sigprocmask(struct thread *td, int how,
-    const sigset_t * __capability uset, sigset_t * __capability uoset)
+    const sigset_t *uset, sigset_t *uoset)
 {
 	sigset_t set, oset;
 	sigset_t *setp, *osetp;
@@ -1267,8 +1267,8 @@ sys_sigwait(struct thread *td, struct sigwait_args *uap)
 }
 
 int
-user_sigwait(struct thread *td, const sigset_t * __capability uset,
-    int * __capability usig)
+user_sigwait(struct thread *td, const sigset_t *uset,
+    int *usig)
 {
 	ksiginfo_t ksi;
 	sigset_t set;
@@ -1301,7 +1301,7 @@ user_sigwait(struct thread *td, const sigset_t * __capability uset,
 }
 
 static int
-copyout_siginfo(const siginfo_t *si, void * __capability info)
+copyout_siginfo(const siginfo_t *si, void *info)
 {
 
 	return (copyoutcap(si, info, sizeof(*si)));
@@ -1316,8 +1316,8 @@ sys_sigtimedwait(struct thread *td, struct sigtimedwait_args *uap)
 }
 
 int
-user_sigtimedwait(struct thread *td, const sigset_t * __capability uset,
-    void * __capability info, const struct timespec * __capability utimeout,
+user_sigtimedwait(struct thread *td, const sigset_t *uset,
+    void *info, const struct timespec *utimeout,
     copyout_siginfo_t *copyout_siginfop)
 {
 	struct timespec ts;
@@ -1359,8 +1359,8 @@ sys_sigwaitinfo(struct thread *td, struct sigwaitinfo_args *uap)
 }
 
 int
-user_sigwaitinfo(struct thread *td, const sigset_t * __capability uset,
-    void * __capability info, copyout_siginfo_t *copyout_siginfop)
+user_sigwaitinfo(struct thread *td, const sigset_t *uset,
+    void *info, copyout_siginfo_t *copyout_siginfop)
 {
 	ksiginfo_t ksi;
 	sigset_t set;
@@ -1542,7 +1542,7 @@ sys_sigpending(struct thread *td, struct sigpending_args *uap)
 }
 
 int
-kern_sigpending(struct thread *td, sigset_t * __capability set)
+kern_sigpending(struct thread *td, sigset_t *set)
 {
 	struct proc *p = td->td_proc;
 	sigset_t pending;
@@ -1671,7 +1671,7 @@ sys_sigsuspend(struct thread *td, struct sigsuspend_args *uap)
 }
 
 int
-user_sigsuspend(struct thread *td, const sigset_t * __capability sigmask)
+user_sigsuspend(struct thread *td, const sigset_t *sigmask)
 {
 	sigset_t mask;
 	int error;
@@ -4559,7 +4559,7 @@ sys_sigfastblock(struct thread *td, struct sigfastblock_args *uap)
 }
 
 int
-kern_sigfastblock(struct thread *td, int cmd, uint32_t * __capability ptr)
+kern_sigfastblock(struct thread *td, int cmd, uint32_t *ptr)
 {
 	struct proc *p;
 	int error, res;

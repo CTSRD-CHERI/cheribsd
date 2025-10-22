@@ -86,7 +86,7 @@ fsu_fault_nopcb:
 END(fsu_fault)
 
 /*
- * int casueword32(volatile uint32_t * __capability, uint32_t, uint32_t *, uint32_t)
+ * int casueword32(volatile uint32_t *, uint32_t, uint32_t *, uint32_t)
  */
 ENTRY(casueword32)
 	li	a4, (VM_MAXUSER_ADDRESS-3)
@@ -128,7 +128,7 @@ ENTRY(casueword32)
 END(casueword32)
 
 /*
- * int casueword(volatile u_long * __capability, u_long, u_long *, u_long)
+ * int casueword(volatile u_long *, u_long, u_long *, u_long)
  */
 ENTRY(casueword)
 	li	a4, (VM_MAXUSER_ADDRESS-7)
@@ -170,7 +170,7 @@ ENTRY(casueword)
 END(casueword)
 
 /*
- * int fubyte(volatile const void * __capability)
+ * int fubyte(volatile const void *)
  */
 ENTRY(fubyte)
 	li	a1, VM_MAXUSER_ADDRESS
@@ -198,7 +198,7 @@ ENTRY(fubyte)
 END(fubyte)
 
 /*
- * int fuword16(volatile const void * __capability)
+ * int fuword16(volatile const void *)
  */
 ENTRY(fuword16)
 	li	a1, (VM_MAXUSER_ADDRESS-1)
@@ -226,7 +226,7 @@ ENTRY(fuword16)
 END(fuword16)
 
 /*
- * int32_t fueword32(volatile const void * __capability, int32_t *)
+ * int32_t fueword32(volatile const void *, int32_t *)
  */
 ENTRY(fueword32)
 	li	a2, (VM_MAXUSER_ADDRESS-3)
@@ -257,8 +257,8 @@ ENTRY(fueword32)
 END(fueword32)
 
 /*
- * long fueword(volatile const void __capability *, int64_t *)
- * int64_t fueword64(volatile const void __capability *, int64_t *)
+ * long fueword(volatile const void*, int64_t *)
+ * int64_t fueword64(volatile const void*, int64_t *)
  */
 ENTRY(fueword)
 EENTRY(fueword64)
@@ -292,7 +292,7 @@ END(fueword)
 
 #if __has_feature(capabilities)
 /*
- * int fuecap(volatile const void __capability *, intcap_t *)
+ * int fuecap(volatile const void*, intcap_t *)
  */
 ENTRY(fuecap)
 	li	a2, (VM_MAXUSER_ADDRESS-7)
@@ -320,7 +320,7 @@ END(fuecap)
 #endif
 
 /*
- * int subyte(volatile void * __capability, int)
+ * int subyte(volatile void *, int)
  */
 ENTRY(subyte)
 	li	a2, VM_MAXUSER_ADDRESS
@@ -349,7 +349,7 @@ ENTRY(subyte)
 END(subyte)
 
 /*
- * int suword16(volatile void * __capability, int)
+ * int suword16(volatile void *, int)
  */
 ENTRY(suword16)
 	li	a2, (VM_MAXUSER_ADDRESS-1)
@@ -378,7 +378,7 @@ ENTRY(suword16)
 END(suword16)
 
 /*
- * int suword32(volatile void * __capability, int)
+ * int suword32(volatile void *, int)
  */
 ENTRY(suword32)
 	li	a2, (VM_MAXUSER_ADDRESS-3)
@@ -407,7 +407,7 @@ ENTRY(suword32)
 END(suword32)
 
 /*
- * int suword(volatile void * __capability, long)
+ * int suword(volatile void *, long)
  */
 ENTRY(suword)
 EENTRY(suword64)
@@ -439,7 +439,7 @@ END(suword)
 
 #if __has_feature(capabilities)
 /*
- * int sucap(volatile void * __capability, intcap_t)
+ * int sucap(volatile void *, intcap_t)
  */
 ENTRY(sucap)
 	li	a2, (VM_MAXUSER_ADDRESS-3)
@@ -479,7 +479,7 @@ ENTRY(cbuildcap_fault)
 END(cbuildcap_fault)
 
 /*
- * void * __capability cheri_buildcap_safe(volatile void * __capability,
+ * void *cheri_buildcap_safe(volatile void *,
  *	intcap_t)
  */
 ENTRY(cheri_buildcap_safe)

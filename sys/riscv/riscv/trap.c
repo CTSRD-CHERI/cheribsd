@@ -113,7 +113,7 @@ call_trapsignal(struct thread *td, int sig, int code, uintcap_t addr,
 	ksiginfo_init_trap(&ksi);
 	ksi.ksi_signo = sig;
 	ksi.ksi_code = code;
-	ksi.ksi_addr = (void * __capability)addr;
+	ksi.ksi_addr = (void *)addr;
 	ksi.ksi_capreg = capreg;
 	ksi.ksi_trapno = trapno;
 	trapsignal(td, &ksi);
@@ -126,7 +126,7 @@ cpu_fetch_syscall_args(struct thread *td)
 	syscallarg_t *ap, *dst_ap;
 	struct syscall_args *sa;
 #if __has_feature(capabilities)
-	char * __capability stack_args = NULL;
+	char *stack_args = NULL;
 	u_int i;
 	int error;
 #endif
@@ -148,7 +148,7 @@ cpu_fetch_syscall_args(struct thread *td)
 		 * stored in a var args block on the stack.
 		 */
 		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
-			stack_args = (char * __capability)td->td_frame->tf_sp;
+			stack_args = (char *)td->td_frame->tf_sp;
 #endif
 	} else {
 		*dst_ap++ = *ap++;
@@ -219,7 +219,7 @@ print_with_symbol(const char *name, uintcap_t value)
 #endif
 
 #if __has_feature(capabilities)
-	printf("%7s: %#.16lp", name, (void * __capability)value);
+	printf("%7s: %#.16lp", name, (void *)value);
 #else
 	printf("%7s: 0x%016lx", name, value);
 #endif

@@ -601,9 +601,9 @@
 #endif
 
 #if __has_feature(capabilities)
-#define	__DECONST_CAP(type, var)	((type)(__uintcap_t)(const void * __capability)(var))
-#define	__DEVOLATILE_CAP(type, var)	((type)(__uintcap_t)(volatile void * __capability)(var))
-#define	__DEQUALIFY_CAP(type, var)	((type)(__uintcap_t)(const volatile void * __capability)(var))
+#define	__DECONST_CAP(type, var)	((type)(__uintcap_t)(const void *)(var))
+#define	__DEVOLATILE_CAP(type, var)	((type)(__uintcap_t)(volatile void *)(var))
+#define	__DEQUALIFY_CAP(type, var)	((type)(__uintcap_t)(const volatile void *)(var))
 #else
 #define	__DECONST_CAP		__DECONST
 #define	__DEVOLATILE_CAP	__DEVOLATILE
@@ -629,7 +629,7 @@
 #if __has_feature(capabilities)
 #define __DECAP_CHECK(cap, len)						\
 ({									\
-	void * __capability tmpcap = (cap);				\
+	void *tmpcap = (cap);				\
 	if (!__CAP_CHECK((cap), (len)))					\
 		tmpcap = NULL;						\
 	(void *)(tmpcap);				\
@@ -970,11 +970,6 @@
 #else
 #define __REQUIRE_CAPABILITIES \
 	_Pragma("GCC error \"This file requires a capability-aware compiler\"")
-#endif
-
-/* Disable CHERI capability annotations for non-CHERI architectures. */
-#if !__has_feature(capabilities)
-#define	__capability
 #endif
 
 #if 0

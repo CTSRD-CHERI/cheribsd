@@ -751,7 +751,7 @@ struct mac32 {
 #endif
 
 int
-copyin_mac(const void * const __capability mac_p, struct mac *mac)
+copyin_mac(void *mac_p, struct mac *mac)
 {
 	int error;
 

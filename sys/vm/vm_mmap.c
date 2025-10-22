@@ -127,9 +127,9 @@ _Static_assert(MAXPAGESIZES <= 4, "MINCORE_SUPER too narrow");
 
 #if __has_feature(capabilities)
 static int
-cap_covers_pages(const void * __capability cap, size_t size)
+cap_covers_pages(const void *cap, size_t size)
 {
-	const char * __capability addr;
+	const char *addr;
 	size_t pageoff;
 
 	addr = cap;
@@ -138,7 +138,7 @@ cap_covers_pages(const void * __capability cap, size_t size)
 	size += pageoff;
 	size = (vm_size_t)round_page(size);
 
-	return (__CAP_CHECK(__DECONST_CAP(void * __capability, addr), size));
+	return (__CAP_CHECK(__DECONST_CAP(void *, addr), size));
 }
 
 static uintcap_t
@@ -302,7 +302,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	    }));
 #else
 	int flags = uap->flags, kern_flags = 0;
-	void * __capability source_cap;
+	void *source_cap;
 	register_t perms, reqperms;
 	vm_offset_t hint;
 
@@ -1259,7 +1259,7 @@ sys_mincore(struct thread *td, struct mincore_args *uap)
 
 int
 kern_mincore(struct thread *td, uintptr_t addr0, size_t len,
-    char * __capability vec)
+    char *vec)
 {
 	pmap_t pmap;
 	vm_map_t map;
@@ -2165,7 +2165,7 @@ vm_mmap_to_errno(int rv)
 bool
 vm_derive_capreg(struct proc *p, uintcap_t in, uintcap_t *out)
 {
-	void * __capability cap;
+	void *cap;
 	vm_map_t map;
 	int otype;
 

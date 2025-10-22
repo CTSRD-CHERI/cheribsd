@@ -46,11 +46,11 @@
 
 /* Check the coarse-grained MAP bitmap */
 static inline unsigned long
-vm_cheri_revoke_test_mem_map(const uint8_t * __capability crshadow,
+vm_cheri_revoke_test_mem_map(const uint8_t *crshadow,
     uintcap_t cut)
 {
 	uint8_t bmbits;
-	const uint8_t * __capability bmloc;
+	const uint8_t *bmloc;
 
 	ptraddr_t va = cheri_getbase(cut);
 
@@ -65,7 +65,7 @@ vm_cheri_revoke_test_mem_map(const uint8_t * __capability crshadow,
 		if (bmbits_ext == -1) {
 			printf("%s: failed to read shadow for %#lp; "
 			    "assuming not revoked!\n", __func__,
-			    (void * __capability)cut);
+			    (void *)cut);
 			return (0);
 		}
 		bmbits = bmbits_ext & 0xFF;
@@ -83,11 +83,11 @@ vm_cheri_revoke_test_mem_map(const uint8_t * __capability crshadow,
 
 /* Check the fine-grained NOMAP bitmap */
 static inline unsigned long
-vm_cheri_revoke_test_mem_nomap(const uint8_t * __capability crshadow,
+vm_cheri_revoke_test_mem_nomap(const uint8_t *crshadow,
     uintcap_t cut)
 {
 	uint8_t bmbits;
-	const uint8_t * __capability bmloc;
+	const uint8_t *bmloc;
 
 	ptraddr_t va = cheri_getbase(cut);
 
@@ -101,7 +101,7 @@ vm_cheri_revoke_test_mem_nomap(const uint8_t * __capability crshadow,
 		if (bmbits_ext == -1) {
 			printf("%s: failed to read shadow for %#lp; "
 			    "assuming not revoked!\n", __func__,
-			    (void * __capability)cut);
+			    (void *)cut);
 			return (0);
 		}
 		bmbits = bmbits_ext & 0xFF;
@@ -127,7 +127,7 @@ vm_cheri_revoke_test_range(vm_offset_t start, vm_offset_t end, uintcap_t cut)
 // TODO: if ((perms & CHERI_PERMS_HWALL_CID) != 0)
 
 static unsigned long
-vm_cheri_revoke_test_just_mem(const uint8_t * __capability crshadow,
+vm_cheri_revoke_test_just_mem(const uint8_t *crshadow,
     uintcap_t cut, unsigned long perms, vm_offset_t start, vm_offset_t end)
 {
 	if ((perms & (CHERI_PERMS_HWALL_MEMORY | CHERI_PERM_SW_VMEM)) != 0) {
@@ -142,7 +142,7 @@ vm_cheri_revoke_test_just_mem(const uint8_t * __capability crshadow,
 }
 
 static unsigned long
-vm_cheri_revoke_test_just_mem_fine(const uint8_t * __capability crshadow,
+vm_cheri_revoke_test_just_mem_fine(const uint8_t *crshadow,
     uintcap_t cut, unsigned long perms, vm_offset_t start, vm_offset_t end)
 {
 	/*
@@ -163,7 +163,7 @@ vm_cheri_revoke_test_just_mem_fine(const uint8_t * __capability crshadow,
 }
 
 static unsigned long
-vm_cheri_revoke_test_mem_fine_range(const uint8_t * __capability crshadow,
+vm_cheri_revoke_test_mem_fine_range(const uint8_t *crshadow,
     uintcap_t cut, unsigned long perms, vm_offset_t start, vm_offset_t end)
 {
 	/*

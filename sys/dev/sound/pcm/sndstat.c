@@ -745,7 +745,7 @@ sndstat_refresh_devs(struct sndstat_file *pf)
 }
 
 static int
-sndstat_get_devs(struct sndstat_file *pf, void * __capability arg_buf,
+sndstat_get_devs(struct sndstat_file *pf, void *arg_buf,
     size_t *arg_nbytes)
 {
 	int err;
@@ -814,7 +814,7 @@ done:
 }
 
 static int
-sndstat_unpack_user_nvlbuf(const void * __capability unvlbuf, size_t nbytes,
+sndstat_unpack_user_nvlbuf(const void *unvlbuf, size_t nbytes,
     nvlist_t **nvl)
 {
 	void *nvlbuf;
@@ -974,7 +974,7 @@ sndstat_dsp_unpack_nvlist(const nvlist_t *nvlist, struct sndstat_userdev *ud)
 }
 
 static int
-sndstat_add_user_devs(struct sndstat_file *pf, void * __capability nvlbuf,
+sndstat_add_user_devs(struct sndstat_file *pf, void *nvlbuf,
     size_t nbytes)
 {
 	int err;

@@ -188,7 +188,7 @@ union ctl_priv {
 struct ctl_sg_entry {
 	union {
 #ifdef _KERNEL
-		void * __capability uaddr;
+		void *uaddr;
 #endif
 		void	*addr;
 	};
@@ -294,7 +294,7 @@ struct ctl_scsiio {
 	uint32_t   ext_sg_entries;	/* 0 = no S/G list, > 0 = num entries */
 	union {
 #ifdef _KERNEL
-		uint8_t * __capability ext_data_uptr;
+		uint8_t *ext_data_uptr;
 #endif
 		uint8_t    *ext_data_ptr;	/* data buffer or S/G list */
 	};
@@ -314,7 +314,7 @@ struct ctl_scsiio {
 	 */
 	union {
 #ifdef _KERNEL
-		uint8_t * __capability kern_data_uptr;
+		uint8_t *kern_data_uptr;
 #endif
 		uint8_t *kern_data_ptr;
 	};

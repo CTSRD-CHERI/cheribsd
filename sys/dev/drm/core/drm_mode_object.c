@@ -363,8 +363,8 @@ EXPORT_SYMBOL(drm_object_property_get_value);
 
 /* helper for getconnector and getproperties ioctls */
 int drm_mode_object_get_properties(struct drm_mode_object *obj, bool atomic,
-				   uint32_t __user * __capability prop_ptr,
-				   uint64_t __user * __capability prop_values,
+				   uint32_t __user *prop_ptr,
+				   uint64_t __user *prop_values,
 				   uint32_t *arg_count_props)
 {
 	int i, ret, count;
@@ -454,8 +454,8 @@ int drm_mode_obj_get_properties_ioctl(struct drm_device *dev, void *data,
 	}
 
 	ret = drm_mode_object_get_properties(obj, file_priv->atomic,
-			(uint32_t __user * __capability)(arg->props_ptr),
-			(uint64_t __user * __capability)(arg->prop_values_ptr),
+			(uint32_t __user *)(arg->props_ptr),
+			(uint64_t __user *)(arg->prop_values_ptr),
 			&arg->count_props);
 
 out_unref:

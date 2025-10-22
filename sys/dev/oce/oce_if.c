@@ -2234,8 +2234,8 @@ oce_handle_passthrough(if_t ifp, u_long command, caddr_t data)
 	struct ifreq *ifr = (struct ifreq *)data;
 	int rc = ENXIO;
 	char cookie[32] = {0};
-	void * __capability priv_data = ifr_data_get_ptr(command, ifr);
-	void * __capability ioctl_ptr;
+	void *priv_data = ifr_data_get_ptr(command, ifr);
+	void *ioctl_ptr;
 	uint32_t req_size;
 	struct mbx_hdr req;
 	OCE_DMA_MEM dma_mem;
@@ -2246,7 +2246,7 @@ oce_handle_passthrough(if_t ifp, u_long command, caddr_t data)
 	if (memcmp(cookie, IOCTL_COOKIE, strlen(IOCTL_COOKIE)))
 		return EINVAL;
 
-	ioctl_ptr = (char * __capability)priv_data + strlen(IOCTL_COOKIE);
+	ioctl_ptr = (char *)priv_data + strlen(IOCTL_COOKIE);
 	if (copyin(ioctl_ptr, &req, sizeof(struct mbx_hdr)))
 		return EFAULT;
 
@@ -2280,8 +2280,8 @@ oce_handle_passthrough(if_t ifp, u_long command, caddr_t data)
 	   the driver version..so fill it 
 	 */
 	if(req.u0.rsp.opcode == OPCODE_COMMON_GET_CNTL_ATTRIBUTES) {
-		struct mbx_common_get_cntl_attr * __capability fw_cmd =
-		    (struct mbx_common_get_cntl_attr * __capability)ioctl_ptr;
+		struct mbx_common_get_cntl_attr *fw_cmd =
+		    (struct mbx_common_get_cntl_attr *)ioctl_ptr;
 		_Static_assert(sizeof(COMPONENT_REVISION) <=
 		     sizeof(fw_cmd->params.rsp.cntl_attr_info.hba_attr.drv_ver_str),
 		     "driver version string too long");

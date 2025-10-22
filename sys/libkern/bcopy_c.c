@@ -35,11 +35,11 @@
 
 #include <cheri/cheric.h>
 
-void * __capability
-memcpy_c(void * __capability dst0, const void * __capability src0, size_t len)
+void *
+memcpy_c(void *dst0, const void *src0, size_t len)
 {
-	const char * __capability src;
-	char * __capability dst;
+	const char *src;
+	char *dst;
 	ptraddr_t dst_addr, src_addr;
 	int tocopy;
 
@@ -77,8 +77,8 @@ memcpy_c(void * __capability dst0, const void * __capability src0, size_t len)
 
 			/* Copy capabilities. */
 			while (len >= sizeof(uintcap_t)) {
-				*(uintcap_t * __capability)dst =
-				    *(const uintcap_t * __capability)src;
+				*(uintcap_t *)dst =
+				    *(const uintcap_t *)src;
 				dst += sizeof(uintcap_t);
 				src += sizeof(uintcap_t);
 				len -= sizeof(uintcap_t);
@@ -121,8 +121,8 @@ memcpy_c(void * __capability dst0, const void * __capability src0, size_t len)
 			while (len >= sizeof(uintcap_t)) {
 				dst -= sizeof(uintcap_t);
 				src -= sizeof(uintcap_t);
-				*(uintcap_t * __capability)dst =
-				    *(const uintcap_t * __capability)src;
+				*(uintcap_t *)dst =
+				    *(const uintcap_t *)src;
 				len -= sizeof(uintcap_t);
 			}
 		}
@@ -139,8 +139,8 @@ memcpy_c(void * __capability dst0, const void * __capability src0, size_t len)
 
 __strong_reference(memcpy_c, memmove_c);
 
-void * __capability
-memcpynocap_c(void * __capability dst, const void *  __capability src,
+void *
+memcpynocap_c(void *dst, const void *src,
     size_t len)
 {
 	return (memcpy_c(dst, cheri_andperm(src, ~CHERI_PERM_LOAD_CAP), len));

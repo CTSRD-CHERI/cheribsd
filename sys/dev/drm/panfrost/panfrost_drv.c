@@ -183,7 +183,7 @@ panfrost_copy_in_fences(struct drm_device *dev, struct drm_file *file_priv,
 	sz = job->in_fence_count * sizeof(uint32_t);
 	handles = malloc(sz, M_PANFROST1, M_WAITOK | M_ZERO);
 
-	error = copyin((void * __capability)args->in_syncs, handles, sz);
+	error = copyin((void *)args->in_syncs, handles, sz);
 	if (error) {
 		free(job->in_fences, M_PANFROST1);
 		goto done;
@@ -224,7 +224,7 @@ panfrost_lookup_bos(struct drm_device *dev, struct drm_file *file_priv,
 	job->implicit_fences = malloc(sz, M_PANFROST1, M_WAITOK | M_ZERO);
 
 	error = drm_gem_objects_lookup(file_priv,
-	    (void __user * __capability)args->bo_handles, job->bo_count,
+	    (void __user *)args->bo_handles, job->bo_count,
 	    &job->bos);
 	if (error) {
 		free(job->implicit_fences, M_PANFROST1);

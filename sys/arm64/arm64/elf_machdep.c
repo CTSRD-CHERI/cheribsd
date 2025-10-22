@@ -396,7 +396,7 @@ decode_fragment(Elf_Addr *fragment, Elf_Addr relocbase, Elf_Addr *addrp,
 
 static uintcap_t __nosanitizecoverage
 build_reloc_cap(Elf_Addr addr, Elf_Addr size, uint8_t perms, Elf_Addr offset,
-    void * __capability data_cap, const void * __capability code_cap)
+    void *data_cap, const void *code_cap)
 {
 	uintcap_t cap;
 
@@ -422,14 +422,14 @@ build_reloc_cap(Elf_Addr addr, Elf_Addr size, uint8_t perms, Elf_Addr offset,
 	}
 	KASSERT(cheri_gettag(cap) != 0,
 	    ("Relocation produce invalid capability %#lp",
-	    (void * __capability)cap));
+	    (void *)cap));
 	return (cap);
 }
 
 #ifdef __CHERI_PURE_CAPABILITY__
 static uintcap_t __nosanitizecoverage
 build_cap_from_fragment(Elf_Addr *fragment, Elf_Addr relocbase, Elf_Addr offset,
-    void * __capability data_cap, const void * __capability code_cap)
+    void *data_cap, const void *code_cap)
 {
 	Elf_Addr addr, size;
 	uint8_t perms;
@@ -497,7 +497,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 #if __has_feature(capabilities)
 		else if (rtype == R_MORELLO_RELATIVE ||
 		    rtype == R_MORELLO_FUNC_RELATIVE) {
-			void * __capability base;
+			void *base;
 			Elf_Addr addr1, size;
 			uint8_t perms;
 
@@ -512,7 +512,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 			 * capability.
 			 */
 			addr1 = elf_relocaddr(lf, val + addend) - addend;
-			base = (void * __capability)
+			base = (void *)
 			    (val == addr1 ? relocbase :
 			    linker_kernel_file->address);
 			*(uintcap_t *)(void *)where = build_reloc_cap(addr1,

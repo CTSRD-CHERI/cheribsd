@@ -82,7 +82,7 @@ struct uio {
 								   array */
 		struct iovec	*uio_ext_iov;	/* external iovec array */
 	};
-} __aligned(sizeof(void * __capability));
+} __aligned(sizeof(void *));
 
 #if __has_feature(capabilities)
 static __inline void
@@ -123,9 +123,9 @@ struct bus_dma_segment;
 struct uio *allocuio(u_int iovcnt);
 void	freeuio(struct uio *uio);
 struct uio *cloneuio(struct uio *uiop);
-int	copyiniov(const struct iovec * __capability iovp, u_int iovcnt,
+int	copyiniov(const struct iovec *iovp, u_int iovcnt,
 	    struct iovec **iov, int error);
-int	copyinuio(const struct iovec * __capability iovp, u_int iovcnt,
+int	copyinuio(const struct iovec *iovp, u_int iovcnt,
 	    struct uio **uiop);
 int	copyout_map(struct thread *td, vm_pointer_t *addr, size_t sz);
 int	copyout_unmap(struct thread *td, vm_pointer_t addr, size_t sz);
@@ -141,7 +141,7 @@ int	uiomove_fromphys(struct vm_page *ma[], vm_offset_t offset, int n,
 	    struct uio *uio);
 int	uiomove_nofault(void *cp, int n, struct uio *uio);
 int	uiomove_object(struct vm_object *obj, off_t obj_size, struct uio *uio);
-int	updateiov(const struct uio *uiop, struct iovec * __capability iovp);
+int	updateiov(const struct uio *uiop, struct iovec *iovp);
 
 #else /* !_KERNEL */
 

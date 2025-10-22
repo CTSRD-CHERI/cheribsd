@@ -106,7 +106,7 @@ VNET_DEFINE_STATIC(struct me_list *, me_srchashtbl) = NULL;
 static struct sx me_ioctl_sx;
 SX_SYSINIT(me_ioctl_sx, &me_ioctl_sx, "me_ioctl");
 
-static int	me_clone_create(struct if_clone *, int, void * __capability);
+static int	me_clone_create(struct if_clone *, int, void *);
 static void	me_clone_destroy(struct ifnet *);
 VNET_DEFINE_STATIC(struct if_clone *, me_cloner);
 #define	V_me_cloner	VNET(me_cloner)
@@ -185,7 +185,7 @@ VNET_SYSUNINIT(vnet_me_uninit, SI_SUB_PROTO_IFATTACHDOMAIN, SI_ORDER_ANY,
     vnet_me_uninit, NULL);
 
 static int
-me_clone_create(struct if_clone *ifc, int unit, void * __capability params)
+me_clone_create(struct if_clone *ifc, int unit, void *params)
 {
 	struct me_softc *sc;
 

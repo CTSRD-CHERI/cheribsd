@@ -1122,7 +1122,7 @@ DB_SHOW_COMMAND(specialregs, db_show_spregs)
 #if __has_feature(capabilities)
 #define	PRINT_REG_CAP(reg)						\
 do {									\
-    void * __capability _tmp = (void * __capability)READ_SPECIALREG_CAP(reg); \
+    void *_tmp = (void *)READ_SPECIALREG_CAP(reg); \
     db_printf(__STRING(reg) " = %#.16lp\n", _tmp);				\
 } while (0)
 #endif

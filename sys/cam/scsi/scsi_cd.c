@@ -1731,7 +1731,7 @@ cdgetpagesize(int page_num)
 	return (-1);
 }
 
-static struct cd_toc_entry * __capability
+static struct cd_toc_entry *
 te_data_get_ptr(void *irtep, u_long cmd)
 {
 	union {

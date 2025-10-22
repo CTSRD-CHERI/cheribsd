@@ -195,7 +195,7 @@ sys_pdgetpid(struct thread *td, struct pdgetpid_args *uap)
 }
 
 int
-user_pdgetpid(struct thread *td, int fd, pid_t * __capability pidp)
+user_pdgetpid(struct thread *td, int fd, pid_t *pidp)
 {
 	pid_t pid;
 	int error;

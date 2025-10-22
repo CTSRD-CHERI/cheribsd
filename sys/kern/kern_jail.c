@@ -369,10 +369,10 @@ sys_jail(struct thread *td, struct jail_args *uap)
 }
 
 int
-kern_jail(struct thread *td, const char * __capability path,
-    const char * __capability hostname, const char * __capability jailname,
-    struct in_addr * __capability ip4, size_t ip4s,
-    struct in6_addr * __capability ip6, size_t ip6s, enum uio_seg ipseg)
+kern_jail(struct thread *td, const char *path,
+    const char *hostname, const char *jailname,
+    struct in_addr *ip4, size_t ip4s,
+    struct in6_addr *ip6, size_t ip6s, enum uio_seg ipseg)
 {
 	struct iovec optiov[2 * (4 + nitems(pr_flag_allow)
 #ifdef INET
@@ -538,7 +538,7 @@ sys_jail_set(struct thread *td, struct jail_set_args *uap)
 }
 
 int
-user_jail_set(struct thread *td, struct iovec * __capability iovp,
+user_jail_set(struct thread *td, struct iovec *iovp,
     unsigned int iovcnt, int flags, copyinuio_t *copyinuio_f)
 {
 	struct uio *auio;
@@ -2305,7 +2305,7 @@ sys_jail_get(struct thread *td, struct jail_get_args *uap)
 }
 
 int
-user_jail_get(struct thread *td, struct iovec * __capability iovp,
+user_jail_get(struct thread *td, struct iovec *iovp,
     unsigned int iovcnt, int flags, copyinuio_t *copyinuio_f,
     updateiov_t *updateiov_f)
 {

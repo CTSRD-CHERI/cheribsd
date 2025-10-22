@@ -168,7 +168,7 @@ gctl_post_messages(struct gctl_req *req)
  * XXX: this should really be a standard function in the kernel.
  */
 static void *
-geom_alloc_copyin(struct gctl_req *req, void * __capability uaddr, size_t len,
+geom_alloc_copyin(struct gctl_req *req, void *uaddr, size_t len,
     bool preserve_tags)
 {
 	void *ptr;

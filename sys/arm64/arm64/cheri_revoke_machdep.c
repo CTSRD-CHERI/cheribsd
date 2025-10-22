@@ -90,8 +90,8 @@ vm_cheri_revoke_tlb_fault(void)
 
 static int
 vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
-    const uint8_t * __capability crshadow, vm_cheri_revoke_test_fn ctp,
-    uintcap_t * __capability cutp, uintcap_t cut, vm_offset_t start,
+    const uint8_t *crshadow, vm_cheri_revoke_test_fn ctp,
+    uintcap_t *cutp, uintcap_t cut, vm_offset_t start,
     vm_offset_t end)
 {
 	int perms = cheri_getperm(cut);
@@ -109,7 +109,7 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
 
 		CHERI_REVOKE_STATS_BUMP(crst, caps_found_revoked);
 	} else if (cheri_gettag(cut) && ctp(crshadow, cut, perms, start, end)) {
-		void * __capability cscratch;
+		void *cscratch;
 		int stxr_status = 1;
 
 		uintcap_t cutr = cheri_revoke_cap(cut);
@@ -208,9 +208,9 @@ disable_user_memory_access(void)
 static inline int
 vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
     int (*cb)(int *, const struct vm_cheri_revoke_cookie *,
-	const uint8_t * __capability, vm_cheri_revoke_test_fn,
-	uintcap_t * __capability, uintcap_t, vm_offset_t, vm_offset_t),
-    uintcap_t * __capability mvu, vm_offset_t mve)
+	const uint8_t *, vm_cheri_revoke_test_fn,
+	uintcap_t *, uintcap_t, vm_offset_t, vm_offset_t),
+    uintcap_t *mvu, vm_offset_t mve)
 {
 	int res = 0;
 	vm_offset_t start, end;
@@ -223,7 +223,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 
 	/* Load once up front, which is almost as good as const */
 	vm_cheri_revoke_test_fn ctp = crc->map->vm_cheri_revoke_test;
-	const uint8_t * __capability crshadow = crc->crshadow;
+	const uint8_t *crshadow = crc->crshadow;
 
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
 	vm_pointer_t prev_onfault = curthread->td_pcb->pcb_onfault;
@@ -288,13 +288,13 @@ vm_cheri_revoke_page_rw(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 #endif
 	vm_offset_t mva;
 	vm_offset_t mve;
-	uintcap_t * __capability mvu;
+	uintcap_t *mvu;
 	/*
 	 * XXX NWF
 	 * This isn't what we really want, but we want to be able to fake up a
 	 * a capability to the DMAP area somehow.
 	 */
-	void * __capability kdc = swap_restore_cap;
+	void *kdc = swap_restore_cap;
 	int res;
 
 	vm_page_assert_busied(m);
@@ -323,8 +323,8 @@ vm_cheri_revoke_page_rw(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 static inline int
 vm_cheri_revoke_page_ro_adapt(int *res,
     const struct vm_cheri_revoke_cookie *vmcrc,
-    const uint8_t * __capability crshadow, vm_cheri_revoke_test_fn ctp,
-    uintcap_t * __capability cutp, uintcap_t cut, vm_offset_t start,
+    const uint8_t *crshadow, vm_cheri_revoke_test_fn ctp,
+    uintcap_t *cutp, uintcap_t cut, vm_offset_t start,
     vm_offset_t end)
 {
 	(void)cutp;
@@ -372,8 +372,8 @@ vm_cheri_revoke_page_ro(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 
 	vm_offset_t mva;
 	vm_offset_t mve;
-	uintcap_t * __capability mvu;
-	void * __capability kdc = swap_restore_cap;
+	uintcap_t *mvu;
+	void *kdc = swap_restore_cap;
 	int res = 0;
 
 	mva = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));

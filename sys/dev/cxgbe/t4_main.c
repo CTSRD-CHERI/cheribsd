@@ -11767,7 +11767,7 @@ set_offload_policy(struct adapter *sc, struct t4_offload_policy *uop)
 	struct bpf_program *bf;
 	const struct offload_settings *s;
 	struct offload_rule *r;
-	void * __capability u;
+	void *u;
 
 	if (!is_offload(sc))
 		return (ENODEV);
@@ -11856,7 +11856,7 @@ read_card_mem(struct adapter *sc, int win, struct t4_mem_range *mr)
 	uint32_t addr, remaining, n;
 	uint32_t *buf;
 	int rc;
-	uint8_t * __capability dst;
+	uint8_t *dst;
 
 	mtx_lock(&sc->reg_lock);
 	if (hw_off_limits(sc))
@@ -11870,7 +11870,7 @@ read_card_mem(struct adapter *sc, int win, struct t4_mem_range *mr)
 	buf = malloc(min(mr->len, MAX_READ_BUF_SIZE), M_CXGBE, M_WAITOK);
 	addr = mr->addr;
 	remaining = mr->len;
-	dst = (void * __capability)mr->data;
+	dst = (void *)mr->data;
 
 	while (remaining) {
 		n = min(remaining, MAX_READ_BUF_SIZE);

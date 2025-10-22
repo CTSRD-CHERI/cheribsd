@@ -109,7 +109,7 @@ _memcpy(void *dst0, const void *src0, size_t length, bool keeptags)
 #if __has_feature(capabilities)
 		if (!keeptags) {
 			TLOOP(*(word *)dst = (word)cheri_cleartag(
-			        (void * __capability)*(const word *)src);
+			        (void *)*(const word *)src);
 			    src += wsize; dst += wsize);
 		} else
 #endif
@@ -142,7 +142,7 @@ _memcpy(void *dst0, const void *src0, size_t length, bool keeptags)
 		if (!keeptags) {
 			TLOOP(src -= wsize; dst -= wsize;
 			    *(word *)dst = (word)cheri_cleartag(
-			        (void * __capability)*(const word *)src));
+			        (void *)*(const word *)src));
 		} else
 #endif
 			TLOOP(src -= wsize; dst -= wsize;

@@ -99,9 +99,9 @@ struct md_req {
 	unsigned	md_options;	/* options */
 	int		md_fwheads;	/* firmware heads */
 	int		md_fwsectors;	/* firmware sectors */
-	char * __capability md_file;	/* pathname of file to mount */
+	char *md_file;	/* pathname of file to mount */
 	enum uio_seg	md_file_seg;	/* location of md_file */
-	char * __capability md_label;	/* label of the device (userspace) */
+	char *md_label;	/* label of the device (userspace) */
 	int		*md_units;	/* pointer to units array (kernel) */
 	size_t		md_units_nitems; /* items in md_units array */
 };

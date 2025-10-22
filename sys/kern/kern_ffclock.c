@@ -422,7 +422,7 @@ sys_ffclock_setestimate(struct thread *td, struct ffclock_setestimate_args *uap)
 
 int
 kern_ffclock_setestimate(struct thread *td,
-    const struct ffclock_estimate * __capability ucest)
+    const struct ffclock_estimate *ucest)
 {
 	struct ffclock_estimate cest;
 	int error;
@@ -462,7 +462,7 @@ sys_ffclock_getestimate(struct thread *td, struct ffclock_getestimate_args *uap)
 
 int
 kern_ffclock_getestimate(struct thread *td,
-    struct ffclock_estimate * __capability ucest)
+    struct ffclock_estimate *ucest)
 {
 	struct ffclock_estimate cest;
 	int error;

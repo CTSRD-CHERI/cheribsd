@@ -43,7 +43,7 @@ struct nfs_args {
 	int		version;	/* args structure version number */
 	union {
 #ifdef _KERNEL
-		struct sockaddr * __capability user_addr;
+		struct sockaddr *user_addr;
 #endif
 		struct sockaddr	*addr; /* file server address */
 	};
@@ -52,7 +52,7 @@ struct nfs_args {
 	int		proto;		/* and Protocol */
 	union {
 #ifdef _KERNEL
-		u_char * __capability user_fh;
+		u_char *user_fh;
 #endif
 		u_char *fh;		/* File handle to be mounted */
 	};
@@ -69,7 +69,7 @@ struct nfs_args {
 	int		deadthresh;	/* Retrans threshold */
 	union {
 #ifdef _KERNEL
-		char * __capability user_hostname;
+		char *user_hostname;
 #endif
 		char *hostname;		/* server's name */
 	};

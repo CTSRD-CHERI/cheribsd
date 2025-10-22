@@ -2356,7 +2356,7 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
  * likely want to bound the first and last pages when rounding is required.
  */
 int
-vm_fault_quick_hold_pages(vm_map_t map, void * __capability addr, vm_size_t len,
+vm_fault_quick_hold_pages(vm_map_t map, void *addr, vm_size_t len,
     vm_prot_t prot, vm_page_t *ma, int max_count)
 {
 	vm_offset_t start, end, va;
@@ -2371,7 +2371,7 @@ vm_fault_quick_hold_pages(vm_map_t map, void * __capability addr, vm_size_t len,
 		return (-1);
 #endif
 	start = (vm_offset_t)trunc_page(addr);
-	end = (vm_offset_t)round_page((char * __capability)addr + len);
+	end = (vm_offset_t)round_page((char *)addr + len);
 
 	if (!vm_map_range_valid(map, start, end))
 		return (-1);

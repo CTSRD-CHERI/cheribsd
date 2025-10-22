@@ -51,7 +51,7 @@ FEATURE(cheriabi, "CheriABI process support");
  * programs.
  */
 
-void * __capability
+void *
 cheri_exec_pcc(struct thread *td, struct image_params *imgp)
 {
 	vm_offset_t code_start, code_end;
@@ -85,10 +85,10 @@ cheri_exec_pcc(struct thread *td, struct image_params *imgp)
 	    code_start, code_length, imgp->entry_addr - code_start));
 }
 
-void * __capability
+void *
 cheri_sigcode_capability(struct thread *td)
 {
-	void * __capability tmpcap;
+	void *tmpcap;
 	struct proc *p = td->td_proc;
 	struct sysentvec *sv;
 
@@ -102,7 +102,7 @@ cheri_sigcode_capability(struct thread *td)
 		    CHERI_CAP_USER_CODE_LENGTH,
 		    PROC_SIGCODE(p) - CHERI_CAP_USER_CODE_BASE));
 
-	tmpcap = (void * __capability)cheri_setboundsexact(
+	tmpcap = (void *)cheri_setboundsexact(
 	    cheri_andperm(PROC_SIGCODE(p), CHERI_CAP_USER_CODE_PERMS),
 	    *sv->sv_szsigcode);
 

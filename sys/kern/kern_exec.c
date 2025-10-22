@@ -129,7 +129,7 @@ static int sysctl_kern_ps_strings(SYSCTL_HANDLER_ARGS);
 static int sysctl_kern_usrstack(SYSCTL_HANDLER_ARGS);
 static int sysctl_kern_stackprot(SYSCTL_HANDLER_ARGS);
 static int do_execve(struct thread *td, struct image_args *args,
-    void * __capability mac_p, struct vmspace *oldvmspace);
+    void *mac_p, struct vmspace *oldvmspace);
 
 /* XXX This should be vm_size_t. */
 SYSCTL_PROC(_kern, KERN_PS_STRINGS, ps_strings, CTLTYPE_ULONG|CTLFLAG_RD|
@@ -357,7 +357,7 @@ post_execve(struct thread *td, int error, struct vmspace *oldvmspace)
  */
 int
 kern_execve(struct thread *td, struct image_args *args,
-    void * __capability mac_p, struct vmspace *oldvmspace)
+    void *mac_p, struct vmspace *oldvmspace)
 {
 
 	TSEXEC(td->td_proc->p_pid, args->begin_argv);
@@ -399,7 +399,7 @@ execve_nosetid(struct image_params *imgp)
  */
 static int
 do_execve(struct thread *td, struct image_args *args,
-    void * __capability umac, struct vmspace *oldvmspace)
+    void *umac, struct vmspace *oldvmspace)
 {
 	struct proc *p = td->td_proc;
 	struct nameidata nd;
@@ -1455,10 +1455,10 @@ out:
  * the loads the current value and updates the array pointer.
  */
 static int
-get_argenv_ptr(void * __capability *arrayp, void * __capability *ptrp)
+get_argenv_ptr(void **arrayp, void **ptrp)
 {
 	uintcap_t ptr;
-	char * __capability array;
+	char *array;
 #ifdef COMPAT_FREEBSD32
 	uint32_t ptr32;
 #endif
@@ -1487,7 +1487,7 @@ get_argenv_ptr(void * __capability *arrayp, void * __capability *ptrp)
 		if (fueptr(array, &ptr) == -1)
 			return (EFAULT);
 		array += sizeof(ptr);
-		*ptrp = (void * __capability)ptr;
+		*ptrp = (void *)ptr;
 	}
 	*arrayp = array;
 	return (0);
@@ -1498,10 +1498,10 @@ get_argenv_ptr(void * __capability *arrayp, void * __capability *ptrp)
  * space into the temporary string buffer.
  */
 int
-exec_copyin_args(struct image_args *args, const char * __capability fname,
-    enum uio_seg segflg, void * __capability argv, void * __capability envv)
+exec_copyin_args(struct image_args *args, const char *fname,
+    enum uio_seg segflg, void *argv, void *envv)
 {
-	void * __capability ptr;
+	void *ptr;
 	int error;
 
 	bzero(args, sizeof(*args));
@@ -1713,7 +1713,7 @@ exec_free_args(struct image_args *args)
  *                           allow new arguments to be prepended
  */
 int
-exec_args_add_fname(struct image_args *args, const char * __capability fname,
+exec_args_add_fname(struct image_args *args, const char *fname,
     enum uio_seg segflg)
 {
 	int error;
@@ -1748,7 +1748,7 @@ exec_args_add_fname(struct image_args *args, const char * __capability fname,
 }
 
 static int
-exec_args_add_str(struct image_args *args, const char * __capability str,
+exec_args_add_str(struct image_args *args, const char *str,
     enum uio_seg segflg, int *countp)
 {
 	int error;
@@ -1773,7 +1773,7 @@ exec_args_add_str(struct image_args *args, const char * __capability str,
 }
 
 int
-exec_args_add_arg(struct image_args *args, const char * __capability argp,
+exec_args_add_arg(struct image_args *args, const char *argp,
     enum uio_seg segflg)
 {
 
@@ -1783,7 +1783,7 @@ exec_args_add_arg(struct image_args *args, const char * __capability argp,
 }
 
 int
-exec_args_add_env(struct image_args *args, const char * __capability envp,
+exec_args_add_env(struct image_args *args, const char *envp,
     enum uio_seg segflg)
 {
 
@@ -1836,10 +1836,10 @@ int
 exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 {
 	int argc, envc;
-	char * __capability * __capability vectp;
+	char **vectp;
 	char *stringp;
 	uintcap_t destp, ustringp;
-	struct ps_strings * __capability arginfo;
+	struct ps_strings *arginfo;
 	struct proc *p;
 	struct sysentvec *sysent;
 	size_t execpath_len, len;
@@ -1856,7 +1856,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		strings_on_stack = false;
 	destp = (uintcap_t)imgp->strings;
 	destp = cheri_setaddress(destp, PROC_PS_STRINGS(p));
-	arginfo = (struct ps_strings * __capability)cheri_setboundsexact(destp,
+	arginfo = (struct ps_strings *)cheri_setboundsexact(destp,
 	    sizeof(*arginfo));
 #else
 	destp = (uintptr_t)PROC_PS_STRINGS(p);
@@ -1870,8 +1870,8 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	if (sysent->sv_shared_page_base == 0 && sysent->sv_szsigcode != NULL) {
 		szsigcode = *(sysent->sv_szsigcode);
 		destp -= szsigcode;
-		destp = rounddown2(destp, sizeof(void * __capability));
-		error = copyout(sysent->sv_sigcode, (void * __capability)destp,
+		destp = rounddown2(destp, sizeof(void *));
+		error = copyout(sysent->sv_sigcode, (void *)destp,
 		    szsigcode);
 		if (error != 0)
 			return (error);
@@ -1883,9 +1883,9 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	if (imgp->execpath != NULL && imgp->auxargs != NULL) {
 		execpath_len = strlen(imgp->execpath) + 1;
 		destp -= execpath_len;
-		destp = rounddown2(destp, sizeof(void * __capability));
+		destp = rounddown2(destp, sizeof(void *));
 #if __has_feature(capabilities)
-		imgp->execpathp = (void * __capability)
+		imgp->execpathp = (void *)
 		    cheri_setboundsexact(destp, execpath_len);
 #else
 		imgp->execpathp = (void *)destp;
@@ -1901,7 +1901,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
 #if __has_feature(capabilities)
-	imgp->canary = (void * __capability)cheri_setboundsexact(destp,
+	imgp->canary = (void *)cheri_setboundsexact(destp,
 	    sizeof(canary));
 #else
 	imgp->canary = (void *)destp;
@@ -1916,9 +1916,9 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	imgp->pagesizeslen = sizeof(pagesizes[0]) * MAXPAGESIZES;
 	destp -= imgp->pagesizeslen;
-	destp = rounddown2(destp, sizeof(void * __capability));
+	destp = rounddown2(destp, sizeof(void *));
 #if __has_feature(capabilities)
-	imgp->pagesizes = (void * __capability)cheri_setboundsexact(destp,
+	imgp->pagesizes = (void *)cheri_setboundsexact(destp,
 	    imgp->pagesizeslen);
 #else
 	imgp->pagesizes = (void *)destp;
@@ -1931,7 +1931,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * Allocate room for the argument and environment strings.
 	 */
 	destp -= ARG_MAX - imgp->args->stringspace;
-	destp = rounddown2(destp, sizeof(void * __capability));
+	destp = rounddown2(destp, sizeof(void *));
 #if __has_feature(capabilities)
 	ustringp = cheri_setbounds(destp, ARG_MAX - imgp->args->stringspace);
 #else
@@ -1943,7 +1943,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * Allocate the compartment statistics header.
 	 */
 	destp -= sizeof(*imgp->c18n_info);
-	destp = rounddown2(destp, sizeof(void * __capability));
+	destp = rounddown2(destp, sizeof(void *));
 	imgp->c18n_info = (struct cheri_c18n_info *)
 	    cheri_setboundsexact(destp, sizeof(*imgp->c18n_info));
 	p->p_c18n_info =
@@ -1956,10 +1956,10 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		 * array.  It has up to AT_COUNT entries.
 		 */
 		destp -= AT_COUNT * sizeof(Elf_Auxinfo);
-		destp = rounddown2(destp, sizeof(void * __capability));
+		destp = rounddown2(destp, sizeof(void *));
 	}
 
-	vectp = (char * __capability * __capability)destp;
+	vectp = (char **)destp;
 
 	/*
 	 * Allocate room for the argv[] and env vectors including the
@@ -1983,7 +1983,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	/*
 	 * Copy out strings - arguments and environment.
 	 */
-	error = copyout(stringp, (void * __capability)ustringp,
+	error = copyout(stringp, (void *)ustringp,
 	    ARG_MAX - imgp->args->stringspace);
 	if (error != 0)
 		return (error);
@@ -2202,7 +2202,7 @@ exec_unregister(const struct execsw *execsw_arg)
  * Write out a core segment to the compression stream.
  */
 static int
-compress_chunk(struct coredump_params *cp, char * __capability base, char *buf,
+compress_chunk(struct coredump_params *cp, char *base, char *buf,
     size_t len)
 {
 	size_t chunk_len;
@@ -2229,17 +2229,17 @@ compress_chunk(struct coredump_params *cp, char * __capability base, char *buf,
 }
 
 int
-core_write(struct coredump_params *cp, const void * __capability base, size_t len,
+core_write(struct coredump_params *cp, const void *base, size_t len,
     off_t offset, enum uio_seg seg, size_t *resid)
 {
 
-	return (vn_rdwr_inchunks(UIO_WRITE, cp->vp, __DECONST_CAP(void * __capability, base),
+	return (vn_rdwr_inchunks(UIO_WRITE, cp->vp, __DECONST_CAP(void *, base),
 	    len, offset, seg, IO_UNIT | IO_DIRECT | IO_RANGELOCKED,
 	    cp->active_cred, cp->file_cred, resid, cp->td));
 }
 
 int
-core_output(char * __capability base, size_t len, off_t offset,
+core_output(char *base, size_t len, off_t offset,
     struct coredump_params *cp, void *tmpbuf)
 {
 	vm_map_t map;
@@ -2332,7 +2332,7 @@ core_extend_file(struct coredump_params *cp, off_t newlen)
 }
 
 int
-core_output_memtag_cheri(char * __capability base, size_t mem_len,
+core_output_memtag_cheri(char *base, size_t mem_len,
     size_t file_len, off_t offset, struct coredump_params *cp,
     void *tagtmpbuf, void *tmpbuf)
 {

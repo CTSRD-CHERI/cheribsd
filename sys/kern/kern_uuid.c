@@ -183,7 +183,7 @@ sys_uuidgen(struct thread *td, struct uuidgen_args *uap)
 }
 
 int
-user_uuidgen(struct thread *td, struct uuid * __capability storep, int count)
+user_uuidgen(struct thread *td, struct uuid *storep, int count)
 {
 	struct uuid *store;
 	int error;

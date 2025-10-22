@@ -908,7 +908,7 @@ ktrstruct_error(const char *name, const void *data, size_t datalen, int error)
 
 void
 ktrstructarray(const char *name, enum uio_seg seg,
-    const void * __capability data, int num_items, size_t struct_size)
+    const void *data, int num_items, size_t struct_size)
 {
 	struct ktr_request *req;
 	struct ktr_struct_array *ksa;
@@ -1097,7 +1097,7 @@ sys_ktrace(struct thread *td, struct ktrace_args *uap)
 }
 
 int
-kern_ktrace(struct thread *td, const char * __capability fname, int uops,
+kern_ktrace(struct thread *td, const char *fname, int uops,
     int ufacs, int pid)
 {
 #ifdef KTRACE
@@ -1240,7 +1240,7 @@ sys_utrace(struct thread *td, struct utrace_args *uap)
 }
 
 int
-kern_utrace(struct thread *td, const void * __capability addr, size_t len)
+kern_utrace(struct thread *td, const void *addr, size_t len)
 {
 #ifdef KTRACE
 	struct ktr_request *req;

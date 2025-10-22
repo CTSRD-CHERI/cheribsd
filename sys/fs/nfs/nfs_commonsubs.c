@@ -651,7 +651,7 @@ nfscl_fillsattr(struct nfsrv_descript *nd, struct vattr *vap,
 int
 nfsm_mbufuio(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 {
-	char *mbufcp, * __capability uiocp;
+	char *mbufcp, *uiocp;
 	int xfer, left, len;
 	struct mbuf *mp;
 	long uiosiz, rem;
@@ -2903,7 +2903,7 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 			savuid = p->p_cred->p_ruid;
 			p->p_cred->p_ruid = cred->cr_uid;
 			if (!VFS_QUOTACTL(mp, QCMD(Q_GETQUOTA,USRQUOTA),
-			    cred->cr_uid, (struct dqblk * __capability)&dqb))
+			    cred->cr_uid, (struct dqblk *)&dqb))
 			    freenum = min(dqb.dqb_bhardlimit, freenum);
 			p->p_cred->p_ruid = savuid;
 #endif	/* QUOTA */
@@ -2927,7 +2927,7 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 			savuid = p->p_cred->p_ruid;
 			p->p_cred->p_ruid = cred->cr_uid;
 			if (!VFS_QUOTACTL(mp, QCMD(Q_GETQUOTA,USRQUOTA),
-			    cred->cr_uid, (struct dqblk * __capability)&dqb))
+			    cred->cr_uid, (struct dqblk *)&dqb))
 			    freenum = min(dqb.dqb_bsoftlimit, freenum);
 			p->p_cred->p_ruid = savuid;
 #endif	/* QUOTA */
@@ -2948,7 +2948,7 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 			savuid = p->p_cred->p_ruid;
 			p->p_cred->p_ruid = cred->cr_uid;
 			if (!VFS_QUOTACTL(mp, QCMD(Q_GETQUOTA,USRQUOTA),
-			    cred->cr_uid, (struct dqblk * __capability)&dqb))
+			    cred->cr_uid, (struct dqblk *)&dqb))
 			    freenum = dqb.dqb_curblocks;
 			p->p_cred->p_ruid = savuid;
 #endif	/* QUOTA */

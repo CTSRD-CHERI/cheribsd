@@ -101,7 +101,7 @@ typedef enum {
 struct pass_io_req {
 	union ccb			 ccb;
 	union ccb			*alloced_ccb;
-	union ccb * __capability	 user_ccb_ptr;
+	union ccb *	 user_ccb_ptr;
 	camq_entry			 user_periph_links;
 	ccb_ppriv_area			 user_periph_priv;
 	struct cam_periph_map_info	 mapinfo;
@@ -116,7 +116,7 @@ struct pass_io_req {
 	int				 num_bufs;
 	uint32_t			 dirs[CAM_PERIPH_MAXMAPS];
 	uint32_t			 lengths[CAM_PERIPH_MAXMAPS];
-	uint8_t	* __capability		 user_bufs[CAM_PERIPH_MAXMAPS];
+	uint8_t	*		 user_bufs[CAM_PERIPH_MAXMAPS];
 	uint8_t				*kern_bufs[CAM_PERIPH_MAXMAPS];
 	struct bintime			 start_time;
 	TAILQ_ENTRY(pass_io_req)	 links;
@@ -1117,7 +1117,7 @@ static void
 passiocleanup(struct pass_softc *softc, struct pass_io_req *io_req)
 {
 	union ccb *ccb;
-	uint8_t * __capability *data_ptrs[CAM_PERIPH_MAXMAPS];
+	uint8_t **data_ptrs[CAM_PERIPH_MAXMAPS];
 	int i, numbufs;
 
 	ccb = &io_req->ccb;
@@ -1127,10 +1127,10 @@ passiocleanup(struct pass_softc *softc, struct pass_io_req *io_req)
 		numbufs = min(io_req->num_bufs, 2);
 
 		if (numbufs == 1) {
-			data_ptrs[0] = (uint8_t * __capability *)&ccb->cdm.user_matches;
+			data_ptrs[0] = (uint8_t **)&ccb->cdm.user_matches;
 		} else {
-			data_ptrs[0] = (uint8_t * __capability *)&ccb->cdm.user_patterns;
-			data_ptrs[1] = (uint8_t * __capability *)&ccb->cdm.user_matches;
+			data_ptrs[0] = (uint8_t **)&ccb->cdm.user_patterns;
+			data_ptrs[1] = (uint8_t **)&ccb->cdm.user_matches;
 		}
 		break;
 	case XPT_SCSI_IO:
@@ -1149,7 +1149,7 @@ passiocleanup(struct pass_softc *softc, struct pass_io_req *io_req)
 		break;
 	case XPT_DEV_ADVINFO:
 		numbufs = min(io_req->num_bufs, 1);
-		data_ptrs[0] = (uint8_t * __capability *)&ccb->cdai.user_buf;
+		data_ptrs[0] = (uint8_t **)&ccb->cdai.user_buf;
 		break;
 	case XPT_NVME_IO:
 	case XPT_NVME_ADMIN:
@@ -1224,7 +1224,7 @@ passcopysglist(struct cam_periph *periph, struct pass_io_req *io_req,
 
 	for (i = 0, j = 0; i < io_req->num_user_segs &&
 	     j < io_req->num_kern_segs;) {
-		uint8_t * __capability user_ptr;
+		uint8_t *user_ptr;
 		uint8_t *kern_ptr;
 
 		len_to_copy = min(user_sglist[i].ds_len -user_watermark,
@@ -1284,7 +1284,7 @@ passmemsetup(struct cam_periph *periph, struct pass_io_req *io_req)
 	union ccb *ccb;
 	struct pass_softc *softc;
 	int numbufs, i;
-	uint8_t * __capability *data_ptrs[CAM_PERIPH_MAXMAPS];
+	uint8_t **data_ptrs[CAM_PERIPH_MAXMAPS];
 	uint32_t lengths[CAM_PERIPH_MAXMAPS];
 	uint32_t dirs[CAM_PERIPH_MAXMAPS];
 	uint32_t num_segs;
@@ -1309,15 +1309,15 @@ passmemsetup(struct cam_periph *periph, struct pass_io_req *io_req)
 			return(EINVAL);
 		}
 		if (ccb->cdm.pattern_buf_len > 0) {
-			data_ptrs[0] = (uint8_t * __capability *)&ccb->cdm.user_patterns;
+			data_ptrs[0] = (uint8_t **)&ccb->cdm.user_patterns;
 			lengths[0] = ccb->cdm.pattern_buf_len;
 			dirs[0] = CAM_DIR_OUT;
-			data_ptrs[1] = (uint8_t * __capability *)&ccb->cdm.user_matches;
+			data_ptrs[1] = (uint8_t **)&ccb->cdm.user_matches;
 			lengths[1] = ccb->cdm.match_buf_len;
 			dirs[1] = CAM_DIR_IN;
 			numbufs = 2;
 		} else {
-			data_ptrs[0] = (uint8_t * __capability *)&ccb->cdm.user_matches;
+			data_ptrs[0] = (uint8_t **)&ccb->cdm.user_matches;
 			lengths[0] = ccb->cdm.match_buf_len;
 			dirs[0] = CAM_DIR_IN;
 			numbufs = 1;
@@ -1381,7 +1381,7 @@ passmemsetup(struct cam_periph *periph, struct pass_io_req *io_req)
 
 		io_req->data_flags = CAM_DATA_VADDR;
 
-		data_ptrs[0] = (uint8_t * __capability *)&ccb->cdai.user_buf;
+		data_ptrs[0] = (uint8_t **)&ccb->cdai.user_buf;
 		lengths[0] = ccb->cdai.bufsiz;
 		dirs[0] = CAM_DIR_IN;
 		numbufs = 1;
@@ -1832,7 +1832,7 @@ passdoioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, struct thread 
 	case CAMIOQUEUE:
 	{
 		struct pass_io_req *io_req;
-		union ccb * __capability *user_ccb, *ccb;
+		union ccb **user_ccb, *ccb;
 		xpt_opcode fc;
 
 #ifdef COMPAT_FREEBSD32
@@ -1861,7 +1861,7 @@ passdoioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, struct thread 
 
 		io_req = uma_zalloc(softc->pass_zone, M_WAITOK | M_ZERO);
 		ccb = &io_req->ccb;
-		user_ccb = (union ccb * __capability *)addr;
+		user_ccb = (union ccb **)addr;
 
 		/*
 		 * Unlike the CAMIOCOMMAND ioctl above, we only have a
@@ -2017,7 +2017,7 @@ camioqueue_error:
 	}
 	case CAMIOGET:
 	{
-		union ccb * __capability *user_ccb;
+		union ccb **user_ccb;
 		struct pass_io_req *io_req;
 		int old_error;
 
@@ -2033,7 +2033,7 @@ camioqueue_error:
 			goto bailout;
 		}
 #endif
-		user_ccb = (union ccb * __capability *)addr;
+		user_ccb = (union ccb **)addr;
 		old_error = 0;
 
 		io_req = TAILQ_FIRST(&softc->done_queue);

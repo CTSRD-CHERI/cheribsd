@@ -80,7 +80,7 @@ uio_init(void *arg __unused)
 SYSINIT(uio_init, SI_SUB_SYSCALLS, SI_ORDER_ANY, uio_init, NULL);
 
 int
-copyin_nofault(const void * __capability udaddr, void *kaddr, size_t len)
+copyin_nofault(const void *udaddr, void *kaddr, size_t len)
 {
 	int error, save;
 
@@ -91,7 +91,7 @@ copyin_nofault(const void * __capability udaddr, void *kaddr, size_t len)
 }
 
 int
-copyout_nofault(const void *kaddr, void * __capability udaddr, size_t len)
+copyout_nofault(const void *kaddr, void *udaddr, size_t len)
 {
 	int error, save;
 
@@ -103,7 +103,7 @@ copyout_nofault(const void *kaddr, void * __capability udaddr, size_t len)
 
 #if __has_feature(capabilities)
 int
-copyoutcap_nofault(const void *kaddr, void * __capability udaddr, size_t len)
+copyoutcap_nofault(const void *kaddr, void *udaddr, size_t len)
 {
 	int error, save;
 
@@ -356,7 +356,7 @@ int
 ureadc(int c, struct uio *uio)
 {
 	struct iovec *iov;
-	char * __capability iov_base;
+	char *iov_base;
 
 	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
 	    "Calling ureadc()");
@@ -391,7 +391,7 @@ again:
 }
 
 int
-copyiniov(const struct iovec* __capability iovp, u_int iovcnt, struct iovec **iov,
+copyiniov(const struct iovec*iovp, u_int iovcnt, struct iovec **iov,
     int error)
 {
 	struct iovec *iovs;
@@ -410,7 +410,7 @@ copyiniov(const struct iovec* __capability iovp, u_int iovcnt, struct iovec **io
 }
 
 int
-copyinuio(const struct iovec * __capability iovp, u_int iovcnt,
+copyinuio(const struct iovec *iovp, u_int iovcnt,
     struct uio **uiop)
 {
 	struct iovec *iov;
@@ -450,7 +450,7 @@ copyinuio(const struct iovec * __capability iovp, u_int iovcnt,
  * iovec.
  */
 int
-updateiov(const struct uio *uiop, struct iovec * __capability iovp)
+updateiov(const struct uio *uiop, struct iovec *iovp)
 {
 	int i, error;
 
@@ -572,7 +572,7 @@ copyout_unmap(struct thread *td, vm_pointer_t addr, size_t sz)
 }
 
 int32_t
-fuword32(volatile const void * __capability addr)
+fuword32(volatile const void *addr)
 {
 	int rv;
 	int32_t val;
@@ -583,7 +583,7 @@ fuword32(volatile const void * __capability addr)
 
 #if __SIZEOF_SIZE_T__ == 8
 int64_t
-fuword64(volatile const void * __capability addr)
+fuword64(volatile const void *addr)
 {
 	int rv;
 	int64_t val;
@@ -594,7 +594,7 @@ fuword64(volatile const void * __capability addr)
 #endif /* __SIZEOF_SIZE_T == 8 */
 
 long
-fuword(volatile const void * __capability addr)
+fuword(volatile const void *addr)
 {
 	long val;
 	int rv;
@@ -604,7 +604,7 @@ fuword(volatile const void * __capability addr)
 }
 
 uint32_t
-casuword32(volatile uint32_t * __capability addr, uint32_t old, uint32_t new)
+casuword32(volatile uint32_t *addr, uint32_t old, uint32_t new)
 {
 	int rv;
 	uint32_t val;
@@ -614,7 +614,7 @@ casuword32(volatile uint32_t * __capability addr, uint32_t old, uint32_t new)
 }
 
 u_long
-casuword(volatile u_long * __capability addr, u_long old, u_long new)
+casuword(volatile u_long *addr, u_long old, u_long new)
 {
 	int rv;
 	u_long val;

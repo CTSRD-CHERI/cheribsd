@@ -171,7 +171,7 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 	} r64;
 	syscallarg_t pscr_args[nitems(td->td_sa.args)];
 	uint64_t pscr_args64[nitems(td->td_sa.args)];
-	void * __capability addr;
+	void *addr;
 	int data, error, i;
 
 	if (!allow_ptrace)
@@ -263,7 +263,7 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 			break;
 		CP(r64.piod, r.piod, piod_op);
 		r.piod.piod_offs =
-		    (void * __capability)(uintcap_t)r64.piod.piod_offs;
+		    (void *)(uintcap_t)r64.piod.piod_offs;
 		r.piod.piod_addr = __USER_CAP(r64.piod.piod_addr,
 		    r64.piod.piod_len);
 		CP(r64.piod, r.piod, piod_len);
@@ -394,7 +394,7 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 	case PT_SC_REMOTE:
 		ptrace_sc_ret_to64(&r.sr.pscr_ret, &r64.sr.pscr_ret);
 		error = copyout(&r64.sr.pscr_ret,
-		    (char * __capability)__USER_CAP(uap->addr, uap->data) +
+		    (char *)__USER_CAP(uap->addr, uap->data) +
 		    offsetof(struct ptrace_sc_remote64, pscr_ret),
 		    sizeof(r64.psr));
 		break;

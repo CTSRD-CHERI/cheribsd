@@ -116,20 +116,20 @@ static struct syscall_helper_data sctp64_syscalls[] = {
 #endif
 
 static int	kern_sys_sctp_generic_sendmsg(struct thread *td, int sd,
-		    void * __capability msg, int mlen,
-		    const struct sockaddr * __capability uto, socklen_t tolen,
-		    struct sctp_sndrcvinfo * __capability usinfo, int flags);
+		    void *msg, int mlen,
+		    const struct sockaddr *uto, socklen_t tolen,
+		    struct sctp_sndrcvinfo *usinfo, int flags);
 static int	kern_sctp_generic_sendmsg_iov(struct thread *td, int sd,
-		    struct iovec * __capability uiov, int iovlen,
-		    const struct sockaddr * __capability uto, socklen_t tolen,
-		    struct sctp_sndrcvinfo * __capability usinfo, int flags,
+		    struct iovec *uiov, int iovlen,
+		    const struct sockaddr *uto, socklen_t tolen,
+		    struct sctp_sndrcvinfo *usinfo, int flags,
 		    copyiniov_t *copyiniov_f);
 static int	kern_sctp_generic_recvmsg(struct thread *td, int sd,
-		    struct iovec * __capability uiov, int iovlen,
-		    struct sockaddr * __capability from,
-		    socklen_t * __capability fromlenaddr,
-		    struct sctp_sndrcvinfo * __capability usinfo,
-		    int * __capability umsg_flags,
+		    struct iovec *uiov, int iovlen,
+		    struct sockaddr *from,
+		    socklen_t *fromlenaddr,
+		    struct sctp_sndrcvinfo *usinfo,
+		    int *umsg_flags,
 		    copyiniov_t *copyiniov_f);
 
 int
@@ -290,8 +290,8 @@ freebsd64_sctp_generic_sendmsg(struct thread *td,
 
 static int
 kern_sys_sctp_generic_sendmsg(struct thread *td, int sd,
-    void * __capability msg, int mlen, const struct sockaddr * __capability uto,
-    socklen_t tolen, struct sctp_sndrcvinfo * __capability usinfo, int flags)
+    void *msg, int mlen, const struct sockaddr *uto,
+    socklen_t tolen, struct sctp_sndrcvinfo *usinfo, int flags)
 {
 	struct sctp_sndrcvinfo sinfo, *u_sinfo = NULL;
 	struct socket *so;
@@ -416,7 +416,7 @@ freebsd32_sctp_generic_sendmsg_iov(struct thread *td,
 {
 
 	return (kern_sctp_generic_sendmsg_iov(td, uap->sd,
-	    (struct iovec * __capability)__USER_CAP_ARRAY(uap->iov, uap->iovlen),
+	    (struct iovec *)__USER_CAP_ARRAY(uap->iov, uap->iovlen),
 	    uap->iovlen, __USER_CAP(uap->to, uap->tolen), uap->tolen,
 	    __USER_CAP_OBJ(uap->sinfo), uap->flags, freebsd32_copyiniov));
 }
@@ -429,7 +429,7 @@ freebsd64_sctp_generic_sendmsg_iov(struct thread *td,
 {
 
 	return (kern_sctp_generic_sendmsg_iov(td, uap->sd,
-	    (struct iovec * __capability)__USER_CAP_ARRAY(uap->iov, uap->iovlen),
+	    (struct iovec *)__USER_CAP_ARRAY(uap->iov, uap->iovlen),
 	    uap->iovlen, __USER_CAP(uap->to, uap->tolen), uap->tolen,
 	    __USER_CAP_OBJ(uap->sinfo), uap->flags, freebsd64_copyiniov));
 }
@@ -437,9 +437,9 @@ freebsd64_sctp_generic_sendmsg_iov(struct thread *td,
 
 static int
 kern_sctp_generic_sendmsg_iov(struct thread *td, int sd,
-    struct iovec * __capability uiov, int iovlen,
-    const struct sockaddr * __capability uto, socklen_t tolen,
-    struct sctp_sndrcvinfo * __capability usinfo, int flags,
+    struct iovec *uiov, int iovlen,
+    const struct sockaddr *uto, socklen_t tolen,
+    struct sctp_sndrcvinfo *usinfo, int flags,
     copyiniov_t *copyiniov_f)
 {
 	struct sctp_sndrcvinfo sinfo, *u_sinfo = NULL;
@@ -577,7 +577,7 @@ freebsd32_sctp_generic_recvmsg(struct thread *td,
 {
 
 	return (kern_sctp_generic_recvmsg(td, uap->sd,
-	    (struct iovec * __capability)__USER_CAP_ARRAY(uap->iov, uap->iovlen),
+	    (struct iovec *)__USER_CAP_ARRAY(uap->iov, uap->iovlen),
 	    uap->iovlen, __USER_CAP_UNBOUND(uap->from),
 	    __USER_CAP_OBJ(uap->fromlenaddr), __USER_CAP_OBJ(uap->sinfo),
 	    __USER_CAP_OBJ(uap->msg_flags), freebsd32_copyiniov));
@@ -591,7 +591,7 @@ freebsd64_sctp_generic_recvmsg(struct thread *td,
 {
 
 	return (kern_sctp_generic_recvmsg(td, uap->sd,
-	    (struct iovec * __capability)__USER_CAP_ARRAY(uap->iov, uap->iovlen),
+	    (struct iovec *)__USER_CAP_ARRAY(uap->iov, uap->iovlen),
 	    uap->iovlen, __USER_CAP_UNBOUND(uap->from),
 	    __USER_CAP_OBJ(uap->fromlenaddr), __USER_CAP_OBJ(uap->sinfo),
 	    __USER_CAP_OBJ(uap->msg_flags), freebsd64_copyiniov));
@@ -600,10 +600,10 @@ freebsd64_sctp_generic_recvmsg(struct thread *td,
 
 static int
 kern_sctp_generic_recvmsg(struct thread *td, int sd,
-    struct iovec * __capability uiov, int iovlen,
-    struct sockaddr * __capability from, socklen_t * __capability fromlenaddr,
-    struct sctp_sndrcvinfo * __capability usinfo,
-    int * __capability umsg_flags, copyiniov_t *copyiniov_f)
+    struct iovec *uiov, int iovlen,
+    struct sockaddr *from, socklen_t *fromlenaddr,
+    struct sctp_sndrcvinfo *usinfo,
+    int *umsg_flags, copyiniov_t *copyiniov_f)
 {
 	uint8_t sockbufstore[256];
 	struct uio auio;

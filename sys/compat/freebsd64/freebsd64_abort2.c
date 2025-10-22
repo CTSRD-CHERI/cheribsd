@@ -37,9 +37,9 @@
 int
 freebsd64_abort2(struct thread *td, struct freebsd64_abort2_args *uap)
 {
-	void * __capability uargs[16];
+	void *uargs[16];
 	void *uargsp;
-	uint64_t * __capability uargscap;
+	uint64_t *uargscap;
 	uint64_t ptr;
 	int i, nargs;
 

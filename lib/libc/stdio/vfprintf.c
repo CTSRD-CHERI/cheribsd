@@ -389,7 +389,7 @@ __vfprintf(FILE *fp, locale_t locale, int serrno, const char *fmt0, va_list ap)
 	char *convbuf;		/* wide to multibyte conversion result */
 	int savserr;
 #if __has_feature(capabilities)
-	void * __capability cap;
+	void *cap;
 #endif
 
 	static const char xdigs_lower[16] = "0123456789abcdef";
@@ -917,7 +917,7 @@ fp_common:
 			} else
 #endif
 			{
-				cap = GETARG(void * __capability);
+				cap = GETARG(void *);
 				ujval = cheri_getaddress(cap);
 			}
 			if (flags & ALT) {

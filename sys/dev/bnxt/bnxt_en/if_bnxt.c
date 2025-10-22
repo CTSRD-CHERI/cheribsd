@@ -3583,7 +3583,7 @@ bnxt_priv_ioctl(if_ctx_t ctx, u_long command, caddr_t data)
 {
 	struct bnxt_softc *softc = iflib_get_softc(ctx);
 	struct ifreq *ifr = (struct ifreq *)data;
-	struct bnxt_ioctl_header * __capability ioh;
+	struct bnxt_ioctl_header *ioh;
 	size_t iol;
 	int rc = ENOTSUP;
 	struct bnxt_ioctl_data iod_storage, *iod = &iod_storage;

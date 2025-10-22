@@ -2117,11 +2117,11 @@ sysctl_old_kernel(struct sysctl_req *req, const void *p, size_t l)
 		if (i > 0) {
 #if __has_feature(capabilities)
 			if (req->flags & SCTL_PTROUT)
-				memcpy_c((char * __capability)req->oldptr +
+				memcpy_c((char *)req->oldptr +
 				    req->oldidx, PTR2CAP(p), i);
 			else
 #endif
-				memcpynocap_c((char * __capability)req->oldptr +
+				memcpynocap_c((char *)req->oldptr +
 				    req->oldidx, PTR2CAP(p), i);
 		}
 	}
@@ -2141,11 +2141,11 @@ sysctl_new_kernel(struct sysctl_req *req, void *p, size_t l)
 #if __has_feature(capabilities)
 	if (req->flags & SCTL_PTRIN)
 		memcpy_c(PTR2CAP(p),
-		    (const char * __capability)req->newptr + req->newidx, l);
+		    (const char *)req->newptr + req->newidx, l);
 	else
 #endif
 		memcpynocap_c(PTR2CAP(p),
-		    (const char * __capability)req->newptr + req->newidx, l);
+		    (const char *)req->newptr + req->newidx, l);
 	req->newidx += l;
 	return (0);
 }
@@ -2250,20 +2250,20 @@ sysctl_old_user(struct sysctl_req *req, const void *p, size_t l)
 		if (req->lock == REQ_WIRED) {
 			if (req->flags & SCTL_PTROUT)
 				error = copyoutcap_nofault(p,
-				    (char * __capability)req->oldptr +
+				    (char *)req->oldptr +
 				    origidx, i);
 			else
 				error = copyout_nofault(p,
-				    (char * __capability)req->oldptr + origidx,
+				    (char *)req->oldptr + origidx,
 				    i);
 		} else
 			if (req->flags & SCTL_PTROUT)
 				error = copyoutcap(p,
-				    (char * __capability)req->oldptr + origidx,
+				    (char *)req->oldptr + origidx,
 				    i);
 			else
 				error = copyout(p,
-				    (char * __capability)req->oldptr + origidx,
+				    (char *)req->oldptr + origidx,
 				    i);
 		if (error != 0)
 			return (error);
@@ -2285,10 +2285,10 @@ sysctl_new_user(struct sysctl_req *req, void *p, size_t l)
 	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
 	    "sysctl_new_user()");
 	if (req->flags & SCTL_PTRIN)
-		error = copyincap((const char * __capability)req->newptr +
+		error = copyincap((const char *)req->newptr +
 		    req->newidx, p, l);
 	else
-		error = copyin((const char * __capability)req->newptr +
+		error = copyin((const char *)req->newptr +
 		    req->newidx, p, l);
 	req->newidx += l;
 	return (error);
@@ -2500,9 +2500,9 @@ sys___sysctl(struct thread *td, struct __sysctl_args *uap)
 }
 
 int
-kern_sysctl(struct thread *td, int * __capability uname, u_int namelen,
-    void * __capability old, size_t * __capability oldlenp,
-    const void * __capability new, size_t newlen, int flags)
+kern_sysctl(struct thread *td, int *uname, u_int namelen,
+    void *old, size_t *oldlenp,
+    const void *new, size_t newlen, int flags)
 {
 	int error, i, name[CTL_MAXNAME];
 	size_t j;
@@ -2527,9 +2527,9 @@ kern_sysctl(struct thread *td, int * __capability uname, u_int namelen,
 }
 
 int
-kern___sysctlbyname(struct thread *td, const char * __capability oname,
-    size_t namelen, void * __capability old, size_t * __capability oldlenp,
-    void * __capability new, size_t newlen, size_t *retval, int flags,
+kern___sysctlbyname(struct thread *td, const char *oname,
+    size_t namelen, void *old, size_t *oldlenp,
+    void *new, size_t newlen, size_t *retval, int flags,
     bool inkernel)
 {
 	int oid[CTL_MAXNAME];
@@ -2595,8 +2595,8 @@ sys___sysctlbyname(struct thread *td, struct __sysctlbyname_args *uap)
  */
 int
 userland_sysctl(struct thread *td, int *name, u_int namelen,
-    void * __capability old, size_t * __capability oldlenp, int inkernel,
-    const void * __capability new, size_t newlen, size_t *retval, int flags)
+    void *old, size_t *oldlenp, int inkernel,
+    const void *new, size_t newlen, size_t *retval, int flags)
 {
 	struct sysctl_req req;
 	int error = 0;
@@ -2912,7 +2912,7 @@ sysctl_new_ddb(struct sysctl_req *req, void *p, size_t l)
  */
 static int
 db_sysctl(struct sysctl_oid *oidp, int *name, u_int namelen,
-    void * __capability old, size_t *oldlenp, size_t *retval, int flags)
+    void *old, size_t *oldlenp, size_t *retval, int flags)
 {
 	struct sysctl_req req;
 	int error;
@@ -3034,7 +3034,7 @@ db_show_oid(struct sysctl_oid *oidp, int *oid, size_t nlen, int flags)
 	if (!g_ddb_sysctl_printed)
 		/* Lie about the size */
 		error = db_sysctl(oidp, oid, nlen,
-		    (void * __capability)(uintptr_t)1, &len, NULL, flags);
+		    (void *)(uintptr_t)1, &len, NULL, flags);
 
 out:
 	db_printf("\n");

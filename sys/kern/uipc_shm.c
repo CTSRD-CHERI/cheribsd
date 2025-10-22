@@ -131,7 +131,7 @@ static int	shm_dotruncate_cookie(struct shmfd *shmfd, off_t length,
 static int	shm_dotruncate_locked(struct shmfd *shmfd, off_t length,
     void *rl_cookie);
 static int	shm_copyin_path(struct thread *td,
-    const char * __capability userpath_in, char **path_out);
+    const char *userpath_in, char **path_out);
 static int	shm_deallocate(struct shmfd *shmfd, off_t *offset,
     off_t *length, int flags);
 
@@ -658,7 +658,7 @@ shm_close(struct file *fp, struct thread *td)
 }
 
 static int
-shm_copyin_path(struct thread *td, const char * __capability userpath_in,
+shm_copyin_path(struct thread *td, const char *userpath_in,
     char **path_out) {
 	int error;
 	char *path;
@@ -1167,9 +1167,9 @@ shm_doremove(struct shm_mapping *map)
 }
 
 int
-kern_shm_open2(struct thread *td, const char * __capability userpath,
+kern_shm_open2(struct thread *td, const char *userpath,
     int flags, mode_t mode, int shmflags, struct filecaps *fcaps,
-    const char * __capability name __unused)
+    const char *name __unused)
 {
 	struct pwddesc *pdp;
 	struct shmfd *shmfd;
@@ -1407,7 +1407,7 @@ sys_shm_unlink(struct thread *td, struct shm_unlink_args *uap)
 }
 
 int
-kern_shm_unlink(struct thread *td, const char * __capability userpath)
+kern_shm_unlink(struct thread *td, const char *userpath)
 {
 	char *path;
 	Fnv32_t fnv;
@@ -1436,8 +1436,8 @@ sys_shm_rename(struct thread *td, struct shm_rename_args *uap)
 }
 
 int
-kern_shm_rename(struct thread *td, const char * __capability path_from_p,
-    const char * __capability path_to_p, int flags)
+kern_shm_rename(struct thread *td, const char *path_from_p,
+    const char *path_to_p, int flags)
 {
 	char *path_from = NULL, *path_to = NULL;
 	Fnv32_t fnv_from, fnv_to;
@@ -2273,7 +2273,7 @@ SYSCTL_PROC(_kern_ipc, OID_AUTO, posix_shm_list,
     "POSIX SHM list");
 
 int
-kern_shm_open(struct thread *td, const char * __capability path, int flags,
+kern_shm_open(struct thread *td, const char *path, int flags,
     mode_t mode, struct filecaps *caps)
 {
 

@@ -204,7 +204,7 @@ sys_acct(struct thread *td, struct acct_args *uap)
 }
 
 int
-kern_acct(struct thread *td, const char * __capability path)
+kern_acct(struct thread *td, const char *path)
 {
 	struct nameidata nd;
 	int error, flags, replacing;

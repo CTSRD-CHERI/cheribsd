@@ -430,7 +430,7 @@ kern_fcntl_freebsd(struct thread *td, int fd, int cmd, intcap_t arg)
 		/*
 		 * Convert old flock structure to new.
 		 */
-		error = copyin((void * __capability)arg, &ofl, sizeof(ofl));
+		error = copyin((void *)arg, &ofl, sizeof(ofl));
 		fl.l_start = ofl.l_start;
 		fl.l_len = ofl.l_len;
 		fl.l_pid = ofl.l_pid;
@@ -455,7 +455,7 @@ kern_fcntl_freebsd(struct thread *td, int fd, int cmd, intcap_t arg)
 	case F_SETLK:
 	case F_SETLKW:
 	case F_SETLK_REMOTE:
-		error = copyin((void * __capability)arg, &fl, sizeof(fl));
+		error = copyin((void *)arg, &fl, sizeof(fl));
 		arg1 = (intptr_t)&fl;
 		break;
 	default:
@@ -473,9 +473,9 @@ kern_fcntl_freebsd(struct thread *td, int fd, int cmd, intcap_t arg)
 		ofl.l_pid = fl.l_pid;
 		ofl.l_type = fl.l_type;
 		ofl.l_whence = fl.l_whence;
-		error = copyout(&ofl, (void * __capability)arg, sizeof(ofl));
+		error = copyout(&ofl, (void *)arg, sizeof(ofl));
 	} else if (cmd == F_GETLK) {
-		error = copyout(&fl, (void * __capability)arg, sizeof(fl));
+		error = copyout(&fl, (void *)arg, sizeof(fl));
 	}
 	return (error);
 }
@@ -882,7 +882,7 @@ revert_f_setfl:
 			break;
 		}
 #endif
-		error = copyin((void * __capability)arg, &kif_sz,
+		error = copyin((void *)arg, &kif_sz,
 		    sizeof(kif_sz));
 		if (error != 0)
 			break;
@@ -899,7 +899,7 @@ revert_f_setfl:
 			fdrop(fp, td);
 			if ((kif->kf_status & KF_ATTR_VALID) != 0) {
 				kif->kf_structsize = sizeof(*kif);
-				error = copyout(kif, (void * __capability)arg,
+				error = copyout(kif, (void *)arg,
 				    sizeof(*kif));
 			} else {
 				error = EBADF;
@@ -1604,7 +1604,7 @@ sys_fstat(struct thread *td, struct fstat_args *uap)
 }
 
 int
-user_fstat(struct thread *td, int fd, struct stat * __capability sb)
+user_fstat(struct thread *td, int fd, struct stat *sb)
 {
 	struct stat ub;
 	int error;

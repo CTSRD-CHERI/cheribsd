@@ -1365,7 +1365,7 @@ nvme_ctrlr_linux_passthru_cmd(struct nvme_controller *ctrlr,
 		if (is_user) {
 			buf = uma_zalloc(pbuf_zone, M_WAITOK);
 			buf->b_iocmd = npc->opcode & 1 ? BIO_WRITE : BIO_READ;
-			if (vmapbuf(buf, (void * __capability)(uintcap_t)npc->addr,
+			if (vmapbuf(buf, (void *)(uintcap_t)npc->addr,
 			    npc->data_len, 1) < 0) {
 				ret = EFAULT;
 				goto err;

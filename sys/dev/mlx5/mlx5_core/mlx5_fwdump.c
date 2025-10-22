@@ -287,7 +287,7 @@ static int
 mlx5_fwdump_copyout(struct mlx5_core_dev *mdev, struct mlx5_fwdump_get *fwg)
 {
 	const struct mlx5_crspace_regmap *r;
-	struct mlx5_fwdump_reg rv, * __capability urv;
+	struct mlx5_fwdump_reg rv, *urv;
 	uint32_t i, ri;
 	int error;
 

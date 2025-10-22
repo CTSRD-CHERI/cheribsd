@@ -780,9 +780,9 @@ struct ifreq64 {
 #endif /* !COMPAT_FREEBSD64 */
 
 /* accessors for struct ifreq */
-void * __capability ifr_buffer_get_buffer(u_long cmd, void *data);
+void *ifr_buffer_get_buffer(u_long cmd, void *data);
 size_t ifr_buffer_get_length(u_long cmd, void *data);
-void * __capability ifr_data_get_ptr(u_long cmd, void *ifrp);
+void *ifr_data_get_ptr(u_long cmd, void *ifrp);
 
 int ifhwioctl(u_long, if_t, caddr_t, struct thread *);
 

@@ -784,7 +784,7 @@ linux_dev_fdopen(struct cdev *dev, int fflags, struct thread *td,
 #define	LINUX_IOCTL_MAX_PTR (LINUX_IOCTL_MIN_PTR + IOCPARM_MAX)
 
 static inline int
-linux_remap_address(void * __capability *uaddr, size_t len)
+linux_remap_address(void **uaddr, size_t len)
 {
 	ptraddr_t uaddr_val = (ptraddr_t)(*uaddr);
 
@@ -814,9 +814,9 @@ linux_remap_address(void * __capability *uaddr, size_t len)
 }
 
 int
-linux_copyin(const void * __capability uaddr, void *kaddr, size_t len)
+linux_copyin(const void *uaddr, void *kaddr, size_t len)
 {
-	if (linux_remap_address(__DECONST(void * __capability *, &uaddr), len)) {
+	if (linux_remap_address(__DECONST(void **, &uaddr), len)) {
 		if (uaddr == NULL)
 			return (-EFAULT);
 		memcpy(kaddr, (const void *)uaddr, len);
@@ -826,7 +826,7 @@ linux_copyin(const void * __capability uaddr, void *kaddr, size_t len)
 }
 
 int
-linux_copyout(const void *kaddr, void * __capability uaddr, size_t len)
+linux_copyout(const void *kaddr, void *uaddr, size_t len)
 {
 	if (linux_remap_address(&uaddr, len)) {
 		if (uaddr == NULL)
@@ -838,9 +838,9 @@ linux_copyout(const void *kaddr, void * __capability uaddr, size_t len)
 }
 
 size_t
-linux_clear_user(void * __capability _uaddr, size_t _len)
+linux_clear_user(void *_uaddr, size_t _len)
 {
-	uint8_t * __capability uaddr = _uaddr;
+	uint8_t *uaddr = _uaddr;
 	size_t len = _len;
 
 	/* make sure uaddr is aligned before going into the fast loop */
@@ -877,7 +877,7 @@ linux_clear_user(void * __capability _uaddr, size_t _len)
 }
 
 int
-linux_access_ok(const void * __capability uaddr, size_t len)
+linux_access_ok(const void *uaddr, size_t len)
 {
 	ptraddr_t saddr;
 	ptraddr_t eaddr;
@@ -913,7 +913,7 @@ linux_file_ioctl_sub(struct file *fp, struct linux_file *filp,
     struct thread *td)
 {
 	struct task_struct *task = current;
-	void * __capability udata;
+	void *udata;
 	unsigned size;
 	int error;
 
@@ -928,10 +928,10 @@ linux_file_ioctl_sub(struct file *fp, struct linux_file *filp,
 		 */
 		task->bsd_ioctl_data = data;
 		task->bsd_ioctl_len = size;
-		udata = (void * __capability)(uintcap_t)LINUX_IOCTL_MIN_PTR;
+		udata = (void *)(uintcap_t)LINUX_IOCTL_MIN_PTR;
 	} else {
 		/* fetch user-space pointer */
-		udata = *(void * __capability *)data;
+		udata = *(void **)data;
 	}
 #ifdef COMPAT_FREEBSD32
 	if (SV_PROC_FLAG(td->td_proc, SV_ILP32)) {

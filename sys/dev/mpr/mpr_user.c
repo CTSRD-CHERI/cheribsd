@@ -158,12 +158,12 @@ static int mpr_diag_unregister(struct mpr_softc *sc,
 static int mpr_diag_query(struct mpr_softc *sc, mpr_fw_diag_query_t *diag_query,
     uint32_t *return_code);
 static int mpr_diag_read_buffer(struct mpr_softc *sc,
-    mpr_diag_read_buffer_t *diag_read_buffer, uint8_t * __capability ioctl_buf,
+    mpr_diag_read_buffer_t *diag_read_buffer, uint8_t *ioctl_buf,
     uint32_t *return_code);
 static int mpr_diag_release(struct mpr_softc *sc,
     mpr_fw_diag_release_t *diag_release, uint32_t *return_code);
 static int mpr_do_diag_action(struct mpr_softc *sc, uint32_t action,
-    uint8_t * __capability diag_action, uint32_t length, uint32_t *return_code);
+    uint8_t *diag_action, uint32_t length, uint32_t *return_code);
 static int mpr_user_diag_action(struct mpr_softc *sc, mpr_diag_action_t *data);
 static void mpr_user_event_query(struct mpr_softc *sc, mpr_event_query_t *data);
 static void mpr_user_event_enable(struct mpr_softc *sc,
@@ -1104,7 +1104,7 @@ mpr_user_pass_thru(struct mpr_softc *sc, mpr_pass_thru_t *data)
 				    scsi_sense_data));
 				mpr_unlock(sc);
 				err = copyout(cm->cm_sense,
-				    (char * __capability)data->PtrReply +
+				    (char *)data->PtrReply +
 				    sizeof(MPI2_SCSI_IO_REPLY), sense_len);
 				if (err != 0)
 					mpr_dprint(sc, MPR_FAULT,
@@ -1143,7 +1143,7 @@ mpr_user_pass_thru(struct mpr_softc *sc, mpr_pass_thru_t *data)
 			    NVME_ERROR_RESPONSE_SIZE);
 			mpr_unlock(sc);
 			err = copyout(cm->cm_sense,
-			    (char * __capability)data->PtrReply +
+			    (char *)data->PtrReply +
 			    sizeof(MPI2_SCSI_IO_REPLY), sz);
 			if (err != 0)
 				mpr_dprint(sc, MPR_FAULT,
@@ -1772,7 +1772,7 @@ mpr_diag_query(struct mpr_softc *sc, mpr_fw_diag_query_t *diag_query,
 
 static int
 mpr_diag_read_buffer(struct mpr_softc *sc,
-    mpr_diag_read_buffer_t *diag_read_buffer, uint8_t * __capability ioctl_buf,
+    mpr_diag_read_buffer_t *diag_read_buffer, uint8_t *ioctl_buf,
     uint32_t *return_code)
 {
 	mpr_fw_diagnostic_buffer_t	*pBuffer;
@@ -1881,7 +1881,7 @@ mpr_diag_release(struct mpr_softc *sc, mpr_fw_diag_release_t *diag_release,
 }
 
 static int
-mpr_do_diag_action(struct mpr_softc *sc, uint32_t action, uint8_t * __capability diag_action,
+mpr_do_diag_action(struct mpr_softc *sc, uint32_t action, uint8_t *diag_action,
     uint32_t length, uint32_t *return_code)
 {
 	mpr_fw_diag_register_t		diag_register;

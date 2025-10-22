@@ -267,7 +267,7 @@ scnprintf(char *buf, size_t size, const char *fmt, ...)
 
 #define	ARRAY_SIZE(x)	(sizeof(x) / sizeof((x)[0]))
 
-#define	u64_to_user_ptr(val)	((void * __capability)val)
+#define	u64_to_user_ptr(val)	((void *)val)
 
 static inline unsigned long long
 simple_strtoull(const char *cp, char **endp, unsigned int base)
@@ -404,7 +404,7 @@ kstrtobool(const char *s, bool *res)
 }
 
 static inline int
-kstrtobool_from_user(const char __user * __capability s, size_t count, bool *res)
+kstrtobool_from_user(const char __user *s, size_t count, bool *res)
 {
 	char buf[8] = {};
 

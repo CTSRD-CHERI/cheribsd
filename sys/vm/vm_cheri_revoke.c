@@ -1357,7 +1357,7 @@ out:
 			    VM_CHERI_REVOKE_BSZ_OTYPE,
 			{0, 0}
 		};
-		struct cheri_revoke_info_page * __capability infopage;
+		struct cheri_revoke_info_page *infopage;
 		vm_cheri_revoke_info_page(map, sv, &infopage);
 
 		error = copyout(&initinfo, infopage, sizeof(initinfo));
@@ -1373,10 +1373,10 @@ out:
 
 void
 vm_cheri_revoke_publish_epochs(
-    struct cheri_revoke_info_page * __capability info_page,
+    struct cheri_revoke_info_page *info_page,
     const struct cheri_revoke_epochs *ip)
 {
-	struct cheri_revoke_epochs * __capability target =
+	struct cheri_revoke_epochs *target =
 	    &info_page->pub.epochs;
 	int res __diagused;
 
@@ -1387,7 +1387,7 @@ vm_cheri_revoke_publish_epochs(
 /*
  * Grant access to a capability shadow
  */
-void * __capability
+void *
 vm_cheri_revoke_shadow_cap(struct sysentvec *sv, int sel, vm_offset_t base,
     vm_offset_t size, int pmask)
 {
@@ -1398,9 +1398,9 @@ vm_cheri_revoke_shadow_cap(struct sysentvec *sv, int sel, vm_offset_t base,
 
 		/* Require at least byte granularity in the shadow space */
 		if ((base & ((VM_CHERI_REVOKE_GSZ_MEM_NOMAP * 8) - 1)) != 0)
-			return (void * __capability)(uintptr_t)EINVAL;
+			return (void *)(uintptr_t)EINVAL;
 		if ((size & ((VM_CHERI_REVOKE_GSZ_MEM_NOMAP * 8) - 1)) != 0)
-			return (void * __capability)(uintptr_t)EINVAL;
+			return (void *)(uintptr_t)EINVAL;
 
 		shadow_base = sv->sv_cheri_revoke_shadow_base +
 		    sv->sv_cheri_revoke_shadow_offset +
@@ -1417,9 +1417,9 @@ vm_cheri_revoke_shadow_cap(struct sysentvec *sv, int sel, vm_offset_t base,
 
 		/* Require at least byte granularity in the shadow space */
 		if ((base & ((VM_CHERI_REVOKE_GSZ_OTYPE * 8) - 1)) != 0)
-			return (void * __capability)(uintptr_t)EINVAL;
+			return (void *)(uintptr_t)EINVAL;
 		if ((size & ((VM_CHERI_REVOKE_GSZ_OTYPE * 8) - 1)) != 0)
-			return (void * __capability)(uintptr_t)EINVAL;
+			return (void *)(uintptr_t)EINVAL;
 
 		shadow_base = sv->sv_cheri_revoke_shadow_base +
 		    sv->sv_cheri_revoke_shadow_offset -
@@ -1450,13 +1450,13 @@ vm_cheri_revoke_shadow_cap(struct sysentvec *sv, int sel, vm_offset_t base,
 		    shadow_base, shadow_size, 0));
 	}
 	default:
-		return ((void * __capability)(uintptr_t)EINVAL);
+		return ((void *)(uintptr_t)EINVAL);
 	}
 }
 
 void
 vm_cheri_revoke_info_page(struct vm_map *map, struct sysentvec *sv,
-    struct cheri_revoke_info_page * __capability *ifp)
+    struct cheri_revoke_info_page **ifp)
 {
 	KASSERT(map == &curthread->td_proc->p_vmspace->vm_map,
 	    ("vm_cheri_revoke_page_info req. intraprocess work right now"));

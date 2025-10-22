@@ -331,7 +331,7 @@ SYSCTL_UINT(_net_pfsync, OID_AUTO, defer_delay, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(pfsync_defer_timeout), 0, "Deferred packet timeout (in ms)");
 
 static int	pfsync_clone_create(struct if_clone *, int,
-		    void * __capability);
+		    void *);
 static void	pfsync_clone_destroy(struct ifnet *);
 static int	pfsync_alloc_scrub_memory(struct pfsync_state_peer *,
 		    struct pf_state_peer *);
@@ -380,7 +380,7 @@ const struct in6_addr in6addr_linklocal_pfsync_group =
 	{{{ 0xff, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0 }}};
 static int
-pfsync_clone_create(struct if_clone *ifc, int unit, void * __capability param)
+pfsync_clone_create(struct if_clone *ifc, int unit, void *param)
 {
 	struct pfsync_softc *sc;
 	struct ifnet *ifp;

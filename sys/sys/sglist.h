@@ -95,7 +95,7 @@ int	sglist_append_sglist(struct sglist *sg, struct sglist *source,
 	    size_t offset, size_t length);
 int	sglist_append_single_mbuf(struct sglist *sg, struct mbuf *m);
 int	sglist_append_uio(struct sglist *sg, struct uio *uio);
-int	sglist_append_user(struct sglist *sg, void * __capability buf,
+int	sglist_append_user(struct sglist *sg, void *buf,
 	    size_t len, struct thread *td);
 int	sglist_append_vmpages(struct sglist *sg, vm_page_t *m, size_t pgoff,
 	    size_t len);

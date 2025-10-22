@@ -609,7 +609,7 @@ sequential_heuristic(struct uio *uio, struct file *fp)
  * Package up an I/O request on a vnode into a uio and do it.
  */
 int
-vn_rdwr(enum uio_rw rw, struct vnode *vp, void * __capability base,
+vn_rdwr(enum uio_rw rw, struct vnode *vp, void *base,
     int len, off_t offset,
     enum uio_seg segflg, int ioflg, struct ucred *active_cred,
     struct ucred *file_cred, ssize_t *aresid, struct thread *td)
@@ -713,7 +713,7 @@ vn_rdwr(enum uio_rw rw, struct vnode *vp, void * __capability base,
  * core'ing the same binary, or unrelated processes scanning the directory).
  */
 int
-vn_rdwr_inchunks(enum uio_rw rw, struct vnode *vp, void * __capability base,
+vn_rdwr_inchunks(enum uio_rw rw, struct vnode *vp, void *base,
     size_t len,
     off_t offset, enum uio_seg segflg, int ioflg, struct ucred *active_cred,
     struct ucred *file_cred, size_t *aresid, struct thread *td)
@@ -743,7 +743,7 @@ vn_rdwr_inchunks(enum uio_rw rw, struct vnode *vp, void * __capability base,
 		if (error)
 			break;
 		offset += chunk;
-		base = (char * __capability)base + chunk;
+		base = (char *)base + chunk;
 		kern_yield(PRI_USER);
 	} while (len);
 	if (aresid)
@@ -1285,7 +1285,7 @@ vn_io_fault_doio(struct vn_io_fault_args *args, struct uio *uio,
 }
 
 static int
-vn_io_fault_touch(char * __capability base, const struct uio *uio)
+vn_io_fault_touch(char *base, const struct uio *uio)
 {
 	int r;
 
@@ -1298,7 +1298,7 @@ vn_io_fault_touch(char * __capability base, const struct uio *uio)
 static int
 vn_io_fault_prefault_user(const struct uio *uio)
 {
-	char * __capability base;
+	char *base;
 	struct iovec *iov;
 	size_t len;
 	ssize_t resid;
@@ -1353,7 +1353,7 @@ vn_io_fault1(struct vnode *vp, struct uio *uio, struct vn_io_fault_args *args,
 	struct iovec short_iovec[1];
 	vm_page_t *prev_td_ma;
 	vm_prot_t prot;
-	char * __capability addr, * __capability end;
+	char *addr, *end;
 	size_t len, resid;
 	ssize_t adv;
 	int error, cnt, saveheld, prev_td_ma_cnt;

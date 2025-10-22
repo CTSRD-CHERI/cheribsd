@@ -89,7 +89,7 @@ cheri_read_tags_page(const void *page, void *tagbuf, bool *hastagsp)
 static void
 measure_cloadtags_stride(void *dummy __unused)
 {
-	void * __capability *buf;
+	void **buf;
 	uint64_t tags;
 	u_int i;
 

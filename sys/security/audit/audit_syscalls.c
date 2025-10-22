@@ -73,7 +73,7 @@ sys_audit(struct thread *td, struct audit_args *uap)
 }
 
 int
-kern_audit(struct thread *td, const void * __capability record, u_int length)
+kern_audit(struct thread *td, const void *record, u_int length)
 {
 	int error;
 	void * rec;
@@ -173,7 +173,7 @@ sys_auditon(struct thread *td, struct auditon_args *uap)
 }
 
 int
-kern_auditon(struct thread *td, int cmd, void * __capability data,
+kern_auditon(struct thread *td, int cmd, void *data,
     u_int length)
 {
 	struct ucred *cred, *newcred, *oldcred;
@@ -611,7 +611,7 @@ sys_getauid(struct thread *td, struct getauid_args *uap)
 }
 
 int
-kern_getauid(struct thread *td, uid_t * __capability auid)
+kern_getauid(struct thread *td, uid_t *auid)
 {
 	int error;
 
@@ -633,7 +633,7 @@ sys_setauid(struct thread *td, struct setauid_args *uap)
 }
 
 int
-kern_setauid(struct thread *td, uid_t * __capability auid)
+kern_setauid(struct thread *td, uid_t *auid)
 {
 	struct ucred *newcred, *oldcred;
 	au_id_t id;
@@ -680,7 +680,7 @@ sys_getaudit(struct thread *td, struct getaudit_args *uap)
 }
 
 int
-kern_getaudit(struct thread *td, struct auditinfo * __capability auditinfo)
+kern_getaudit(struct thread *td, struct auditinfo *auditinfo)
 {
 	struct auditinfo ai;
 	struct ucred *cred;
@@ -712,7 +712,7 @@ sys_setaudit(struct thread *td, struct setaudit_args *uap)
 }
 
 int
-kern_setaudit(struct thread *td, struct auditinfo * __capability auditinfo)
+kern_setaudit(struct thread *td, struct auditinfo *auditinfo)
 {
 	struct ucred *newcred, *oldcred;
 	struct auditinfo ai;
@@ -763,7 +763,7 @@ sys_getaudit_addr(struct thread *td, struct getaudit_addr_args *uap)
 
 int
 kern_getaudit_addr(struct thread *td,
-    struct auditinfo_addr * __capability auditinfo_addr, u_int length)
+    struct auditinfo_addr *auditinfo_addr, u_int length)
 {
 	int error;
 
@@ -788,7 +788,7 @@ sys_setaudit_addr(struct thread *td, struct setaudit_addr_args *uap)
 
 int
 kern_setaudit_addr(struct thread *td,
-    struct auditinfo_addr * __capability auditinfo_addr, u_int length)
+    struct auditinfo_addr *auditinfo_addr, u_int length)
 {
 	struct ucred *newcred, *oldcred;
 	struct auditinfo_addr aia;
@@ -838,7 +838,7 @@ sys_auditctl(struct thread *td, struct auditctl_args *uap)
 }
 
 int
-kern_auditctl(struct thread *td, const char * __capability path)
+kern_auditctl(struct thread *td, const char *path)
 {
 	struct nameidata nd;
 	struct ucred *cred;

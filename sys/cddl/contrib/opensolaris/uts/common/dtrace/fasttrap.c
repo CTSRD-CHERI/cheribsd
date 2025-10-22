@@ -2246,7 +2246,7 @@ fasttrap_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int fflag,
 		return (EAGAIN);
 
 	if (cmd == FASTTRAPIOC_MAKEPROBE) {
-		fasttrap_probe_spec_t * __capability uprobe;
+		fasttrap_probe_spec_t *uprobe;
 		fasttrap_probe_spec_t *probe;
 		uint64_t noffs;
 		size_t size;
@@ -2258,7 +2258,7 @@ fasttrap_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int fflag,
 			    sizeof(fasttrap_probe_spec_t));
 		else
 #endif
-			uprobe = *(fasttrap_probe_spec_t * __capability *)arg;
+			uprobe = *(fasttrap_probe_spec_t **)arg;
 		if (copyin(&uprobe->ftps_noffs, &noffs,
 		    sizeof (uprobe->ftps_noffs)))
 			return (EFAULT);

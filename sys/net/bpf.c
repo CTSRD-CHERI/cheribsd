@@ -1934,7 +1934,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	return (error);
 }
 
-static struct bpf_insn * __capability
+static struct bpf_insn *
 bf_insns_get_ptr(void *fpp)
 {
 	union {
@@ -2894,7 +2894,7 @@ bpf_peers_present_if(struct ifnet *ifp)
 	return (bpf_peers_present(ifp->if_bpf));
 }
 
-static u_int * __capability
+static u_int *
 bfl_list_get_ptr(void *bflp)
 {
 	union {

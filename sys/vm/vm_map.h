@@ -201,7 +201,7 @@ vm_map_entry_system_wired_count(vm_map_entry_t entry)
  * Returns any nonzero value to indicate revocation required.
  */
 typedef unsigned long (*vm_cheri_revoke_test_fn)(
-    const uint8_t * __capability shadow, uintcap_t cut, unsigned long cutperm,
+    const uint8_t *shadow, uintcap_t cut, unsigned long cutperm,
     vm_offset_t start, vm_offset_t end);
 
 #ifdef CHERI_CAPREVOKE_STATS
@@ -244,7 +244,7 @@ struct vm_map {
 	cheri_revoke_state_t vm_cheri_revoke_st;	/* Cap. rev. state */
 	cheri_revoke_state_t vm_cheri_async_revoke_st;
 	int vm_cheri_async_revoke_status;
-	const uint8_t * __capability vm_cheri_async_revoke_shadow;
+	const uint8_t *vm_cheri_async_revoke_shadow;
 	/*
 	 * If revocation is in progress (as determined by vm_cheri_revoke_st,
 	 * this holds our current test predicate.
@@ -600,7 +600,7 @@ int vm_map_reservation_create_locked(vm_map_t, vm_pointer_t *, vm_size_t, vm_pro
 int vm_map_reservation_get(vm_map_t, vm_offset_t, vm_size_t, vm_offset_t *);
 #if __has_feature(capabilities)
 int vm_map_prot2perms(vm_prot_t prot);
-void * __capability vm_map_reservation_cap(vm_map_t, vm_offset_t);
+void *vm_map_reservation_cap(vm_map_t, vm_offset_t);
 #endif
 #ifdef __CHERI_PURE_CAPABILITY__
 vm_pointer_t _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,

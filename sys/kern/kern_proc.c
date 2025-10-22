@@ -1086,7 +1086,7 @@ fill_kinfo_aggregate(struct proc *p, struct kinfo_proc *kp)
 	}
 }
 
-#define	EXPORT_KPTR(p) ((void * __capability)(intcap_t)(intptr_t)(p))
+#define	EXPORT_KPTR(p) ((void *)(intcap_t)(intptr_t)(p))
 
 /*
  * Fill in any information that is common to all threads in the process.
@@ -1414,7 +1414,7 @@ pstats_free(struct pstats *ps)
  * it can be replaced by assignment of zero.
  */
 static inline uint32_t
-ptr32_trim(const void * __capability ptr)
+ptr32_trim(const void *ptr)
 {
 	uintptr_t uptr;
 
@@ -1528,7 +1528,7 @@ freebsd32_kinfo_proc_out(const struct kinfo_proc *ki, struct kinfo_proc32 *ki32)
  * it can be replaced by assignment of zero.
  */
 static inline uint64_t
-ptr64_trim(const void * __capability ptr)
+ptr64_trim(const void *ptr)
 {
 
 	return ((uint64_t)ptr);
@@ -1988,7 +1988,7 @@ pargs_drop(struct pargs *pa)
 
 static int
 proc_read_string(struct thread *td, struct proc *p,
-    const char * __capability sptr, char *buf, size_t len)
+    const char *sptr, char *buf, size_t len)
 {
 	ssize_t n;
 
@@ -2014,14 +2014,14 @@ enum proc_vector_type {
 #ifdef COMPAT_FREEBSD32
 static int
 get_proc_vector32(struct thread *td, struct proc *p,
-    char * __capability **proc_vectorp,
+    char ***proc_vectorp,
     size_t *vsizep, enum proc_vector_type type)
 {
 	struct freebsd32_ps_strings pss;
 	Elf32_Auxinfo aux;
 	vm_offset_t vptr, ptr;
 	uint32_t *proc_vector32;
-	char * __capability *proc_vector;
+	char **proc_vector;
 	size_t vsize, size;
 	int i, error;
 
@@ -2072,7 +2072,7 @@ get_proc_vector32(struct thread *td, struct proc *p,
 		goto done;
 	}
 	if (type == PROC_AUX) {
-		*proc_vectorp = (char * __capability *)(uintptr_t)proc_vector32;
+		*proc_vectorp = (char **)(uintptr_t)proc_vector32;
 		*vsizep = vsize;
 		return (0);
 	}
@@ -2090,14 +2090,14 @@ done:
 #ifdef COMPAT_FREEBSD64
 static int
 get_proc_vector64(struct thread *td, struct proc *p,
-    char * __capability **proc_vectorp,
+    char ***proc_vectorp,
     size_t *vsizep, enum proc_vector_type type)
 {
 	struct freebsd64_ps_strings pss;
 	Elf64_Auxinfo aux;
 	vm_offset_t vptr, ptr;
 	uint64_t *proc_vector64;
-	char * __capability *proc_vector;
+	char **proc_vector;
 	size_t vsize, size;
 	int i, error;
 
@@ -2148,11 +2148,11 @@ get_proc_vector64(struct thread *td, struct proc *p,
 		goto done;
 	}
 	if (type == PROC_AUX) {
-		*proc_vectorp = (char * __capability *)(uintptr_t)proc_vector64;
+		*proc_vectorp = (char **)(uintptr_t)proc_vector64;
 		*vsizep = vsize;
 		return (0);
 	}
-	proc_vector = malloc(vsize * sizeof(char * __capability), M_TEMP,
+	proc_vector = malloc(vsize * sizeof(char *), M_TEMP,
 	    M_WAITOK);
 	for (i = 0; i < (int)vsize; i++)
 		proc_vector[i] = cheri_fromint(proc_vector64[i]);
@@ -2166,13 +2166,13 @@ done:
 
 static int
 get_proc_vector(struct thread *td, struct proc *p,
-    char * __capability **proc_vectorp,
+    char ***proc_vectorp,
     size_t *vsizep, enum proc_vector_type type)
 {
 	struct ps_strings pss;
 	Elf_Auxinfo aux;
 	vm_offset_t vptr, ptr;
-	char * __capability *proc_vector;
+	char **proc_vector;
 	size_t vsize, size;
 	int i;
 
@@ -2193,14 +2193,14 @@ get_proc_vector(struct thread *td, struct proc *p,
 		vsize = pss.ps_nargvstr;
 		if (vsize > ARG_MAX)
 			return (ENOEXEC);
-		size = vsize * sizeof(char * __capability);
+		size = vsize * sizeof(char *);
 		break;
 	case PROC_ENV:
 		vptr = (vm_offset_t)pss.ps_envstr;
 		vsize = pss.ps_nenvstr;
 		if (vsize > ARG_MAX)
 			return (ENOEXEC);
-		size = vsize * sizeof(char * __capability);
+		size = vsize * sizeof(char *);
 		break;
 	case PROC_AUX:
 		/*
@@ -2208,7 +2208,7 @@ get_proc_vector(struct thread *td, struct proc *p,
 		 * that the address is naturally aligned.
 		 */
 		vptr = (vm_offset_t)pss.ps_envstr +
-		    (pss.ps_nenvstr + 1) * sizeof(char * __capability);
+		    (pss.ps_nenvstr + 1) * sizeof(char *);
 #if __ELF_WORD_SIZE == 64
 		if (vptr % sizeof(uint64_t) != 0)
 #else
@@ -2264,7 +2264,7 @@ get_ps_strings(struct thread *td, struct proc *p, struct sbuf *sb,
 {
 	size_t done, len, nchr, vsize;
 	int error, i;
-	char * __capability *proc_vector, * __capability sptr;
+	char **proc_vector, *sptr;
 	char pss_string[GET_PS_STRINGS_CHUNK_SZ];
 
 	PROC_ASSERT_HELD(p);
@@ -2324,7 +2324,7 @@ int
 proc_getauxv(struct thread *td, struct proc *p, struct sbuf *sb)
 {
 	size_t vsize, size;
-	char * __capability *auxv;
+	char **auxv;
 	int error;
 
 	error = get_proc_vector(td, p, &auxv, &vsize, PROC_AUX);
@@ -2570,7 +2570,7 @@ out:
  */
 static int
 proc_read_string_properly(struct thread *td, struct proc *p,
-    const char * __capability sptr, char *buf, size_t len)
+    const char *sptr, char *buf, size_t len)
 {
 	ssize_t readlen;
 	size_t valid;

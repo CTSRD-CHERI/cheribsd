@@ -44,8 +44,8 @@
  * data capabilities in registers or memory.
  */
 struct cheri_object {
-	void * __capability	co_codecap;
-	void * __capability	co_datacap;
+	void *	co_codecap;
+	void *	co_datacap;
 };
 
 #if !defined(_KERNEL) && __has_feature(capabilities)
@@ -58,16 +58,16 @@ struct cheri_object {
 /*
  * Functions to construct userspace capabilities.
  */
-void * __capability	_cheri_capability_build_user_code(struct thread *td,
+void *	_cheri_capability_build_user_code(struct thread *td,
 			    uint32_t perms, ptraddr_t basep, size_t length,
 			    off_t off, const char* func, int line);
-void * __capability	_cheri_capability_build_user_data(uint32_t perms,
+void *	_cheri_capability_build_user_data(uint32_t perms,
 			    ptraddr_t basep, size_t length, off_t off,
 			    const char* func, int line, bool exact);
-void * __capability	_cheri_capability_build_user_rwx(uint32_t perms,
+void *	_cheri_capability_build_user_rwx(uint32_t perms,
 			    ptraddr_t basep, size_t length, off_t off,
 			    const char* func, int line, bool exact);
-void * __capability	_cheri_capability_build_user_rwx_unchecked(
+void *	_cheri_capability_build_user_rwx_unchecked(
 			    uint32_t perms, ptraddr_t basep, size_t length,
 			    off_t off, const char* func, int line, bool exact);
 #define cheri_capability_build_user_code(td, perms, basep, length, off)	\
@@ -91,10 +91,10 @@ void * __capability	_cheri_capability_build_user_rwx_unchecked(
  */
 
 /* Root of all unsealed userspace capabilities. */
-extern void * __capability userspace_root_cap;
+extern void *userspace_root_cap;
 
 /* Root of all sealed userspace capabilities. */
-extern void * __capability userspace_root_sealcap;
+extern void *userspace_root_sealcap;
 
 /*
  * Omnipotent capability for restoring swapped capabilities.
@@ -102,24 +102,24 @@ extern void * __capability userspace_root_sealcap;
  * XXXBD: These should be a way to do this without storing such a potent
  * capability.  Splitting sealed and unsealed caps would be a start.
  */
-extern void * __capability swap_restore_cap;
+extern void *swap_restore_cap;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 /* Root kernel capability */
-extern void * __capability kernel_root_cap;
+extern void *kernel_root_cap;
 #endif
 
 /* Root of all sealed kernel capabilities. */
-extern void * __capability kernel_root_sealcap;
+extern void *kernel_root_sealcap;
 
 #ifdef __aarch64__
 /* Root capability for vmm guest virtual address spaces. */
-extern void * __capability vmm_gva_root_cap;
+extern void *vmm_gva_root_cap;
 /* Root capability for vmm guest physical address spaces. */
-extern void * __capability vmm_gpa_root_cap;
+extern void *vmm_gpa_root_cap;
 #ifdef __CHERI_PURE_CAPABILITY__
 /* Root capability for EL2 address space used by vmm. */
-extern void * __capability vmm_el2_root_cap;
+extern void *vmm_el2_root_cap;
 #endif
 #endif
 
@@ -128,9 +128,9 @@ extern void * __capability vmm_el2_root_cap;
  */
 struct image_params;
 struct thread;
-void * __capability cheri_exec_pcc(struct thread *td,
+void *cheri_exec_pcc(struct thread *td,
 	    struct image_params *imgp);
-void * __capability cheri_sigcode_capability(struct thread *td);
+void *cheri_sigcode_capability(struct thread *td);
 
 /*
  * CHERI context management functions.

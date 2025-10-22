@@ -282,13 +282,13 @@ void	*malloc_domainset_aligned(size_t size, size_t align,
 	    __malloc_like __result_use_check __alloc_size(1);
 
 static inline void
-free_c(void * __capability addr, struct malloc_type *type)
+free_c(void *addr, struct malloc_type *type)
 {
 
 	free((void *)addr, type);
 }
 
-static inline void * __capability
+static inline void *
 malloc_c(unsigned long size, struct malloc_type *type, int flags)
 {
 

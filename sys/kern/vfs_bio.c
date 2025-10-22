@@ -5100,7 +5100,7 @@ vm_hold_free_pages(struct buf *bp, int newbsize)
  * This function only works with pager buffers.
  */
 int
-vmapbuf(struct buf *bp, void * __capability uaddr, size_t len, int mapbuf)
+vmapbuf(struct buf *bp, void *uaddr, size_t len, int mapbuf)
 {
 	vm_prot_t prot;
 	int pidx;
