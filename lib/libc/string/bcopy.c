@@ -44,7 +44,6 @@
  */
 
 #include <sys/types.h>
-#include "cheri_private.h"
 
 #if __has_feature(capabilities)
 typedef	__intcap_t word;	/* "word" used for optimal copy speed */
@@ -69,13 +68,13 @@ typedef	intptr_t word;		/* "word" used for optimal copy speed */
 #ifdef IN_LIBSYSCALLS
 __attribute__((weak, visibility("hidden")))
 #endif
-void * __CAP
+void *
 #ifdef MEMCOPY
-__CAPSUFFIX(memcpy)
+memcpy
 #else
-__CAPSUFFIX(memmove)
+memmove
 #endif
-(void * __CAP dst0, const void * __CAP src0, size_t length)
+(void *dst0, const void *src0, size_t length)
 #else
 #include <strings.h>
 
@@ -85,8 +84,8 @@ void
 bcopy(const void *src0, void *dst0, size_t length)
 #endif
 {
-	char * __CAP dst = dst0;
-	const char * __CAP src = src0;
+	char *dst = dst0;
+	const char *src = src0;
 	size_t t;
 
 	if (length == 0 || dst == src)		/* nothing to do */
@@ -119,8 +118,7 @@ bcopy(const void *src0, void *dst0, size_t length)
 		 * Copy whole words, then mop up any trailing bytes.
 		 */
 		t = length / wsize;
-		TLOOP(*(word * __CAP)(void * __CAP)dst =
-		    *(const word * __CAP)(const void * __CAP)src;
+		TLOOP(*(word *)(void *)dst = *(const word *)(const void *)src;
 		    src += wsize; dst += wsize);
 		t = length & wmask;
 		TLOOP(*dst++ = *src++);
@@ -143,8 +141,8 @@ bcopy(const void *src0, void *dst0, size_t length)
 		}
 		t = length / wsize;
 		TLOOP(src -= wsize; dst -= wsize;
-		    *(word * __CAP)(void * __CAP)dst =
-		    *(const word * __CAP)(const void * __CAP)src);
+		    *(word *)(void *)dst =
+		    *(const word *)(const void *)src);
 		t = length & wmask;
 		TLOOP(*--dst = *--src);
 	}

@@ -51,12 +51,6 @@ CFLAGS.strrchr.c+=-Wno-cast-qual
 CFLAGS.strspn.c+=-Wno-sign-compare
 CFLAGS.strstr.c+=-Wno-cast-qual -Wno-sign-compare
 CFLAGS.strtok.c+=-Wno-cast-qual
-# These need cheri_private.h from libc:
-CFLAGS.bcopy.c+=-I${LIBC_SRCTOP}/include
-CFLAGS.bzero.c+=-I${LIBC_SRCTOP}/include
-CFLAGS.memcpy.c+=-I${LIBC_SRCTOP}/include
-CFLAGS.memmove.c+=-I${LIBC_SRCTOP}/include
-CFLAGS.memset.c+=-I${LIBC_SRCTOP}/include
 
 # Also use all the syscall .o files from libsys_pic (libsys is always NO_SSP):
 _libsys_other_objects= fstat fstatat fstatfs syscall \
