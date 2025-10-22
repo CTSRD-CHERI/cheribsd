@@ -483,7 +483,7 @@ restart:
 		mtx_unlock(&mountlist_mtx);
 		if (maxcount > count)
 			maxcount = count;
-		tofree = sfsp = *buf = malloc_c(maxcount * sizeof(struct statfs),
+		tofree = sfsp = *buf = malloc(maxcount * sizeof(struct statfs),
 		    M_STATFS, M_WAITOK);
 	}
 
@@ -548,7 +548,7 @@ restart:
 				 * no other choice than to start over.
 				 */
 				mtx_unlock(&mountlist_mtx);
-				free_c(tofree, M_STATFS);
+				free(tofree, M_STATFS);
 				goto restart;
 			}
 		} else {
@@ -703,7 +703,7 @@ freebsd4_getfsstat(struct thread *td, struct freebsd4_getfsstat_args *uap)
 			uap->buf++;
 			count--;
 		}
-		free_c(buf, M_STATFS);
+		free(buf, M_STATFS);
 	}
 	return (error);
 }
@@ -850,7 +850,7 @@ kern_freebsd11_getfsstat(struct thread *td,
 			ubuf++;
 			count--;
 		}
-		free_c(buf, M_STATFS);
+		free(buf, M_STATFS);
 	}
 	return (error);
 }

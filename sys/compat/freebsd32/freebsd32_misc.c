@@ -349,7 +349,7 @@ freebsd4_freebsd32_getfsstat(struct thread *td,
 			uap->buf++;
 			copycount--;
 		}
-		free_c(buf, M_STATFS);
+		free(buf, M_STATFS);
 	}
 	if (error == 0)
 		td->td_retval[0] = count;

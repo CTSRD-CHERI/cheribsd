@@ -561,7 +561,7 @@ linprocfs_domtab(PFS_FILL_ARGS)
 
 	error = 0;
 out:
-	free_c(buf, M_TEMP);
+	free(buf, M_TEMP);
 	free(flep, M_TEMP);
 	return (error);
 }
