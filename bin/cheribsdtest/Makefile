@@ -1,12 +1,5 @@
 .include <src.opts.mk>
 
-.if !${MACHINE_ABI:Mpurecap} || ${MK_LIB64} == "yes"
-SUBDIR+=	hybrid \
-		hybrid-dynamic \
-		hybrid-dynamic-mt \
-		hybrid-mt
-.endif
-
 .if (${MACHINE_ABI:Mpurecap} && !${MACHINE_ABI:Mbenchmark}) || ${MK_LIB64C} == "yes"
 SUBDIR+=	purecap \
 		purecap-dynamic \
