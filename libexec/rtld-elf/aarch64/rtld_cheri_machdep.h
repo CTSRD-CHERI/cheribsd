@@ -75,7 +75,7 @@ make_code_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
 	ret = cheri_incoffset(ret, addend);
 	/* All code pointers should be sentries: */
 	ret = __builtin_cheri_seal_entry(ret);
-	return __DECONST_CAP(dlfunc_t, ret);
+	return __DECONST(dlfunc_t, ret);
 }
 
 /*

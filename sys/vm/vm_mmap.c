@@ -138,7 +138,7 @@ cap_covers_pages(const void *cap, size_t size)
 	size += pageoff;
 	size = (vm_size_t)round_page(size);
 
-	return (__CAP_CHECK(__DECONST_CAP(void *, addr), size));
+	return (__CAP_CHECK(__DECONST(void *, addr), size));
 }
 
 static uintcap_t
@@ -1514,7 +1514,7 @@ sys_mlock(struct thread *td, struct mlock_args *uap)
 #endif
 
 	return (kern_mlock(td->td_proc, td->td_ucred,
-	    (uintptr_t)__DECONST_CAP(uintcap_t, uap->addr), uap->len));
+	    (uintptr_t)__DECONST(uintcap_t, uap->addr), uap->len));
 }
 
 int

@@ -830,7 +830,7 @@ user_sendto(struct thread *td, int s, const char *buf,
 	struct msghdr msg;
 	struct iovec aiov;
 
-	msg.msg_name = __DECONST_CAP(void *, to);
+	msg.msg_name = __DECONST(void *, to);
 	msg.msg_namelen = tolen;
 	msg.msg_iov = &aiov;
 	msg.msg_iovlen = 1;
@@ -839,7 +839,7 @@ user_sendto(struct thread *td, int s, const char *buf,
 	if (SV_PROC_FLAG(td->td_proc, SV_AOUT))
 		msg.msg_flags = 0;
 #endif
-	IOVEC_INIT_C(&aiov, __DECONST_CAP(void *, buf), len);
+	IOVEC_INIT_C(&aiov, __DECONST(void *, buf), len);
 	return (user_sendit(td, s, &msg, flags));
 }
 
@@ -854,7 +854,7 @@ osend(struct thread *td, struct osend_args *uap)
 	msg.msg_namelen = 0;
 	msg.msg_iov = &aiov;
 	msg.msg_iovlen = 1;
-	IOVEC_INIT_C(&aiov, __DECONST_CAP(void *, uap->buf),
+	IOVEC_INIT_C(&aiov, __DECONST(void *, uap->buf),
 	    uap->len);
 	msg.msg_control = 0;
 	msg.msg_flags = 0;
@@ -1276,7 +1276,7 @@ kern_setsockopt(struct thread *td, int s, int level, int name,
 	sopt.sopt_dir = SOPT_SET;
 	sopt.sopt_level = level;
 	sopt.sopt_name = name;
-	sopt.sopt_val = __DECONST_CAP(void *, val);
+	sopt.sopt_val = __DECONST(void *, val);
 	sopt.sopt_valsize = valsize;
 	switch (valseg) {
 	case UIO_USERSPACE:
