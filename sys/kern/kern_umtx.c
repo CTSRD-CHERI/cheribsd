@@ -1078,7 +1078,7 @@ do_unlock_umtx(struct thread *td, struct umtx *umtx, u_long id)
 	/*
 	 * Make sure we own this mtx.
 	 */
-	owner = fuword(__DEVOLATILE_CAP(u_long *, &umtx->u_owner));
+	owner = fuword(__DEVOLATILE(u_long *, &umtx->u_owner));
 	if (owner == -1)
 		return (EFAULT);
 
