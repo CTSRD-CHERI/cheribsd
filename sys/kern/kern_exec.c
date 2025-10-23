@@ -2233,7 +2233,7 @@ core_write(struct coredump_params *cp, const void *base, size_t len,
     off_t offset, enum uio_seg seg, size_t *resid)
 {
 
-	return (vn_rdwr_inchunks(UIO_WRITE, cp->vp, __DECONST_CAP(void *, base),
+	return (vn_rdwr_inchunks(UIO_WRITE, cp->vp, __DECONST(void *, base),
 	    len, offset, seg, IO_UNIT | IO_DIRECT | IO_RANGELOCKED,
 	    cp->active_cred, cp->file_cred, resid, cp->td));
 }

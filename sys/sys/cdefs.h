@@ -600,12 +600,6 @@
 #define	__DEQUALIFY(type, var)	((type)(__uintptr_t)(const volatile void *)(var))
 #endif
 
-#if __has_feature(capabilities)
-#define	__DECONST_CAP(type, var)	((type)(__uintcap_t)(const void *)(var))
-#else
-#define	__DECONST_CAP		__DECONST
-#endif
-
 #ifndef __CAP_CHECK
 #if __has_feature(capabilities)
 #define __CAP_CHECK(cap, len) ({					\
