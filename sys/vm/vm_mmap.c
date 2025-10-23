@@ -1597,7 +1597,7 @@ sys_mlock(struct thread *td, struct mlock_args *uap)
 #endif
 
 	return (kern_mlock(td->td_proc, td->td_ucred,
-	    (uintptr_t)__DECONST_CAP(uintcap_t, uap->addr), uap->len));
+	    (uintptr_t)__DECONST(uintcap_t, uap->addr), uap->len));
 }
 
 int
