@@ -2110,7 +2110,7 @@ alloc_aiotx_mbuf(struct kaiocb *job, int len)
 	 */
 	vm = job->userproc->p_vmspace;
 	map = &vm->vm_map;
-	start = __DEVOLATILE_CAP(char *, job->uaiocb.aio_buf) +
+	start = __DEVOLATILE(char *, job->uaiocb.aio_buf) +
 	    job->aio_sent;
 	pgoff = (vm_offset_t)start & PAGE_MASK;
 
