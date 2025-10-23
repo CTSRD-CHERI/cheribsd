@@ -1561,7 +1561,7 @@ CHERIBSDTEST(cheri_revoke_loadside, "Test load-side revoker",
 
 	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke_get_shadow(
 	    CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
-	    __DEQUALIFY_CAP(void **, &cri)));
+	    __DEQUALIFY(void **, &cri)));
 
 	revme = cheri_andperm(mb, ~CHERI_PERM_SW_VMEM);
 	((void **)mb)[1] = revme;
