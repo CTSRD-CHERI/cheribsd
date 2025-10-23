@@ -603,11 +603,9 @@
 #if __has_feature(capabilities)
 #define	__DECONST_CAP(type, var)	((type)(__uintcap_t)(const void *)(var))
 #define	__DEVOLATILE_CAP(type, var)	((type)(__uintcap_t)(volatile void *)(var))
-#define	__DEQUALIFY_CAP(type, var)	((type)(__uintcap_t)(const volatile void *)(var))
 #else
 #define	__DECONST_CAP		__DECONST
 #define	__DEVOLATILE_CAP	__DEVOLATILE
-#define	__DEQUALIFY_CAP		__DEQUALIFY
 #endif
 
 #ifndef __CAP_CHECK
