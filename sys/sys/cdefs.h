@@ -602,10 +602,8 @@
 
 #if __has_feature(capabilities)
 #define	__DECONST_CAP(type, var)	((type)(__uintcap_t)(const void *)(var))
-#define	__DEVOLATILE_CAP(type, var)	((type)(__uintcap_t)(volatile void *)(var))
 #else
 #define	__DECONST_CAP		__DECONST
-#define	__DEVOLATILE_CAP	__DEVOLATILE
 #endif
 
 #ifndef __CAP_CHECK

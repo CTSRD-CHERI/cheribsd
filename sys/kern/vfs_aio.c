@@ -867,7 +867,7 @@ aio_process_mlock(struct kaiocb *job)
 
 	aio_switch_vmspace(job);
 	error = kern_mlock(job->userproc, job->cred, (uintptr_t)(uintcap_t)
-	__DEVOLATILE_CAP(void *, cb->aio_buf), cb->aio_nbytes);
+	__DEVOLATILE(void *, cb->aio_buf), cb->aio_nbytes);
 	aio_complete(job, error != 0 ? -1 : 0, error);
 }
 
@@ -1426,7 +1426,7 @@ aiocb_copyin(void *ujob, struct kaiocb *kjob, int type)
 	if (type & LIO_VECTORED) {
 		/* malloc a uio and copy in the iovec */
 		error = copyinuio(
-		    __DEVOLATILE_CAP(struct iovec *, kcb->aio_iov),
+		    __DEVOLATILE(struct iovec *, kcb->aio_iov),
 		    kcb->aio_iovcnt, &kjob->uiop);
 	}
 
@@ -1695,7 +1695,7 @@ no_kqueue:
 		MPASS(job->uiop != &job->uio && job->uiop != NULL);
 	} else {
 		/* Setup the inline uio */
-		IOVEC_INIT_C(&job->iov[0], __DEVOLATILE_CAP(
+		IOVEC_INIT_C(&job->iov[0], __DEVOLATILE(
 		    struct iovec *, job->uaiocb.aio_buf),
 		    job->uaiocb.aio_nbytes);
 		job->uio.uio_iov = job->iov;
