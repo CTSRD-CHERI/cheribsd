@@ -18,9 +18,11 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
 static bool verbose = false;
+static bool dump_comparts = false;
 static int seconds = -1;
 static int dlopen_mode = RTLD_NOW;
 static int dlopen_local_global = 0; /* dlopen(3)'s default is RTLD_LOCAL */
@@ -28,7 +30,7 @@ static int dlopen_local_global = 0; /* dlopen(3)'s default is RTLD_LOCAL */
 static void _Noreturn
 usage(void)
 {
-	printf("usage: dlopen [-L|N] [-g|l] [-s <seconds>] [-v] <lib> [...]\n");
+	printf("usage: dlopen [-L|N] [-g|l] [-s <seconds>] [-d <compname>] [-p <comppath> [-v] <lib> [...]\n");
 	exit(1);
 }
 
@@ -37,9 +39,16 @@ main(int argc, char **argv)
 {
 	int ch;
 	uint64_t num;
+	char *disable = NULL, *path = NULL;
 
-	while ((ch = getopt(argc, argv, "gLlNs:v")) != -1) {
+	while ((ch = getopt(argc, argv, "d:DgLlNp:s:v")) != -1) {
 		switch (ch) {
+		case 'd':
+			disable = optarg;
+			break;
+		case 'D':
+			dump_comparts = true;
+			break;
 		case 'g':
 			dlopen_local_global = RTLD_GLOBAL;
 			break;
@@ -51,6 +60,9 @@ main(int argc, char **argv)
 			break;
 		case 'N':
 			dlopen_mode = RTLD_NOW;
+			break;
+		case 'p':
+			path = optarg;
 			break;
 		case 's':
 			if (expand_number(optarg, &num) != 0)
@@ -76,6 +88,16 @@ main(int argc, char **argv)
 			errx(1, "dlopen(%s)", argv[i]);
 		if (verbose)
 			printf("loaded %s\n", argv[i]);
+	}
+
+	if (dump_comparts)
+		if (!dl_c18n_control(NULL, NULL, C18N_CONTROL_DUMP, 0))
+			errx(1, "dl_c18n_control(C18N_CONTROL_DUMP)");
+
+	if (disable != NULL) {
+		if (!dl_c18n_control(path, disable, C18N_CONTROL_DISABLE, 0))
+			errx(1, "dl_c18n_control(\"%s\", \"%s\", "
+			    "C18N_CONTROL_DISABLE)", path, disable);
 	}
 
 	if (seconds <= 0) {

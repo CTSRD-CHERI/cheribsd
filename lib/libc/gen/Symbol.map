@@ -464,6 +464,7 @@ FBSD_1.8 {
 	aio_read2;
 	aio_write2;
 	execvpe;
+	dl_c18n_control;
 };
 
 FBSDprivate_1.0 {
