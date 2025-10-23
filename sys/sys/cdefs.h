@@ -626,12 +626,6 @@
 #define	__DEQUALIFY(type, var)	((type)(__uintptr_t)(const volatile void *)(var))
 #endif
 
-#if __has_feature(capabilities)
-#define	__DECONST_CAP(type, var)	((type)(__uintcap_t)(const void *)(var))
-#else
-#define	__DECONST_CAP		__DECONST
-#endif
-
 #if !defined(_STANDALONE) && !defined(_KERNEL)
 #define	__RENAME(x)	__asm(__STRING(x))
 #else /* _STANDALONE || _KERNEL */

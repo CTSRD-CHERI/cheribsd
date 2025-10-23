@@ -2393,7 +2393,6 @@ core_extend(struct coredump_params *cp, off_t newsz)
 {
 	return ((*cp->cdw->extend_fn)(cp->cdw, newsz, cp->active_cred));
 }
-}
 
 int
 core_output(char *base, size_t len, off_t offset,

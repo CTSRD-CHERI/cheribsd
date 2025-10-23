@@ -424,7 +424,7 @@ kern_write(struct thread *td, int fd, const void *buf,
 
 	if (nbyte > IOSIZE_MAX)
 		return (EXTERROR(EINVAL, "length > iosize_max"));
-	IOVEC_INIT_C(&aiov, __DECONST_CAP(void *, buf), nbyte);
+	IOVEC_INIT_C(&aiov, __DECONST(void *, buf), nbyte);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_resid = nbyte;
@@ -462,7 +462,7 @@ kern_pwrite(struct thread *td, int fd, const void *buf,
 
 	if (nbyte > IOSIZE_MAX)
 		return (EXTERROR(EINVAL, "length > iosize_max"));
-	IOVEC_INIT_C(&aiov, __DECONST_CAP(void *, buf), nbyte);
+	IOVEC_INIT_C(&aiov, __DECONST(void *, buf), nbyte);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_resid = nbyte;

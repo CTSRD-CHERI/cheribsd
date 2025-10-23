@@ -107,7 +107,7 @@ __copy_from_user_inatomic(void *to, const void *from,
 	 * only somewhat slower, to use normal copyin.  All uses
 	 * except shmem_pwrite_fast() have the destination mapped WC.
 	 */
-	return ((copyin_nofault(__DECONST_CAP(void *, from), to, n) != 0 ? n : 0));
+	return ((copyin_nofault(__DECONST(void *, from), to, n) != 0 ? n : 0));
 }
 #define	__copy_from_user_inatomic_nocache(to, from, n)	\
 	__copy_from_user_inatomic((to), (from), (n))
