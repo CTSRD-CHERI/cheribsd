@@ -1078,7 +1078,7 @@ struct procctl_cmd_info {
 	int (*exec)(struct thread *, struct proc *, void *);
 	bool (*sapblk)(struct thread *, void *);
 };
-static const struct procctl_cmd_info procctl_cmds_info[] = {
+static const struct procctl_cmd_info procctl_cmds_info[] __cheri_pad_representable = {
 	[PROC_SPROTECT] =
 	    { .lock_tree = PCTL_SLOCKED, .one_proc = false,
 	      .esrch_is_einval = false, .no_nonnull_data = false,
