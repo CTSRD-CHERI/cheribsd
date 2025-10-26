@@ -166,6 +166,20 @@
 
 #if __has_attribute(cheri_no_subobject_bounds)
 /*
+ * Helper definitions to abstract away the compiler subobject bounds level
+ */
+#ifdef __CHERI_SUBOBJECT_BOUNDS__
+#if __CHERI_SUBOBJECT_BOUNDS__ == 2
+/* subobject-safe mode */
+#define	CHERI_SUBOBJECT_BOUNDS
+#elif __CHERI_SUBOBJECT_BOUNDS__ == 3
+/* subobject-safe-exact mode */
+#define	CHERI_SUBOBJECT_BOUNDS
+#define	CHERI_SUBOBJECT_EXACT
+#endif
+#endif /* defined(__CHERI_SUBOBJECT_BOUNDS__) */
+
+/*
  * Never add sub-object bounds for this field/type.
  *
  * TODO: this should rarely be used and instead we should opt out of specific
@@ -241,6 +255,22 @@
  * FIXME: add an attribute to clang. Can we make it apply recursively?
  */
 #define __subobject_type_used_for_c_inheritance /* Not implemented yet */
+
+/*
+ * Round size of a field or type to its representable size.
+ * These are only enabled when we use exact sub-object bounds, because
+ * the structure padding is going to be disrupted.
+ */
+#ifdef CHERI_SUBOBJECT_EXACT
+#define	__cheri_pad_representable			\
+	__attribute__((cheri_pad_representable))
+#define	__cheri_pad_representable_max(t, n)				\
+	__subobject_use_remaining_size					\
+	__attribute__((cheri_pad_representable(sizeof(t) * (n))))
+#else
+#define	__cheri_pad_representable
+#define	__cheri_pad_representable_max(t, n)
+#endif /* !CHERI_SUBOBJECT_EXACT */
 #else
 /* Not compiling with sub-object bounds -> define these to be no-ops */
 #define __no_subobject_bounds
@@ -253,6 +283,8 @@
 #define __subobject_cxx_reference_use_full_array_bounds
 #define __subobject_member_used_for_c_inheritance
 #define __subobject_type_used_for_c_inheritance
+#define	__cheri_pad_representable
+#define	__cheri_pad_representable_max(t, n)
 #endif
 
 /*
