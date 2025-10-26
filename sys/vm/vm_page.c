@@ -622,6 +622,10 @@ vm_page_startup(vm_pointer_t vaddr)
 	vm_page_dump = (void *)(uintptr_t)pmap_map(&vaddr, new_end,
 	    new_end + vm_page_dump_size, VM_PROT_READ | VM_PROT_WRITE);
 	bzero((void *)vm_page_dump, vm_page_dump_size);
+
+	KASSERT(is_aligned(vm_page_dump,
+		CHERI_REPRESENTABLE_ALIGNMENT(vm_page_dump_size)),
+	    ("vm_page_dump bitset is not representable"));
 #if MINIDUMP_STARTUP_PAGE_TRACKING
 	/*
 	 * Include the UMA bootstrap pages, witness pages and vm_page_dump
