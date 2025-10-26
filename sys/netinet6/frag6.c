@@ -136,7 +136,7 @@ VNET_DEFINE_STATIC(int,			ip6_maxfragsperpacket);
 /* Per-VNET reassembly queue buckets. */
 VNET_DEFINE_STATIC(struct ip6qbucket,	ip6qb[IP6REASS_NHASH]);
 VNET_DEFINE_STATIC(uint32_t,		ip6qb_hashseed);
-#define	V_ip6qb				VNET(ip6qb)
+#define	V_ip6qb				__builtin_no_change_bounds(VNET(ip6qb))
 #define	V_ip6qb_hashseed		VNET(ip6qb_hashseed)
 
 #define	IP6QB_LOCK(_b)		mtx_lock(&V_ip6qb[(_b)].lock)
