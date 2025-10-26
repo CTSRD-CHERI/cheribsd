@@ -44,7 +44,7 @@
 
 #define	__BITSET_DEFINE(_t, _s)						\
 struct _t {								\
-        unsigned long    __bits[__bitset_words((_s))];			\
+        unsigned long    __bits[__bitset_words((_s))] __cheri_pad_representable; \
 }
 
 /*
@@ -52,8 +52,17 @@ struct _t {								\
  *
  * Sadly we cannot declare a bitset struct with 'bits[]', because it's
  * the only member of the struct and the compiler complains.
+ *
+ * XXX-AM: We should use cheri_pad_representable_max() here.
+ * Currently __BITSET_DEFINE_VAR uses a 0-sized bits array.
+ * We would like to align it to a representable boundary, but we can't
+ * easily enforce a maximum bitset size, especially for the generic kernel
+ * struct bitset.
  */
-#define __BITSET_DEFINE_VAR(_t)	__BITSET_DEFINE(_t, 1)
+#define __BITSET_DEFINE_VAR(_t)					\
+struct _t {							\
+	unsigned long	__bits[0] __no_subobject_bounds;	\
+} __subobject_use_remaining_size
 
 /*
  * Define a default type that can be used while manually specifying size
@@ -61,7 +70,7 @@ struct _t {								\
  */
 
 #if defined(_KERNEL) || defined(_WANT_FREEBSD_BITSET)
-__BITSET_DEFINE(bitset, 1);
+__BITSET_DEFINE_VAR(bitset);
 
 #define	BITSET_DEFINE(_t, _s)	__BITSET_DEFINE(_t, _s)
 #define	BITSET_DEFINE_VAR(_t)	__BITSET_DEFINE_VAR(_t)

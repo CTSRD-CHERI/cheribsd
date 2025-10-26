@@ -368,7 +368,7 @@ typedef struct uma_keg	* uma_keg_t;
  */
 #define	SLAB_MAX_SETSIZE	(PAGE_SIZE / UMA_SMALLEST_UNIT)
 #define	SLAB_MIN_SETSIZE	_BITSET_BITS
-BITSET_DEFINE(noslabbits, 0);
+BITSET_DEFINE_VAR(noslabbits);
 
 /*
  * The slab structure manages a single contiguous allocation from backing
