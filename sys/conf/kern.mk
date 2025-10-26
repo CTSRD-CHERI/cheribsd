@@ -153,6 +153,7 @@ INLINE_LIMIT?=	8000
 .if ${MACHINE_CPU:Mcheri}
 CFLAGS+=	-march=morello
 CFLAGS+=	-Xclang -morello-vararg=new -Xclang -morello-bounded-memargs
+CFLAGS+=	-Wno-cheri-inefficient
 
 .if ${MK_CHERI_CODEPTR_RELOCS} != "no" && ${COMPILER_FEATURES:Mmorello-codeptr-relocs}
 CFLAGS+=	-cheri-codeptr-relocs
@@ -191,6 +192,7 @@ RISCV_MARCH:=	${RISCV_MARCH}xcheri
 RISCV_ABI=	lp64
 .if ${MACHINE_ARCH:Mriscv*c*}
 RISCV_ABI=	l64pc128
+CFLAGS+=	-Wno-cheri-inefficient
 .endif
 
 CFLAGS+=	-march=${RISCV_MARCH} -mabi=${RISCV_ABI}
