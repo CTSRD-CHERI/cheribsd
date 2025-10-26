@@ -53,6 +53,9 @@
 
 #include "virtio_bus_if.h"
 
+/* XXX-AM: This is rather arbitrary and should be tuned */
+#define	VIRTQUEUE_MAX_DESCX 1024
+
 struct virtqueue {
 	device_t		 vq_dev;
 	uint16_t		 vq_queue_index;
@@ -93,7 +96,8 @@ struct virtqueue {
 		struct vring_desc *indirect;
 		vm_paddr_t	   indirect_paddr;
 		uint16_t	   ndescs;
-	} vq_descx[0];
+	} vq_descx[0] __cheri_pad_representable_max(struct vq_desc_extra,
+	    VIRTQUEUE_MAX_DESCX);
 };
 
 /*
@@ -176,6 +180,10 @@ virtqueue_alloc(device_t dev, uint16_t queue, uint16_t size,
 		    VIRTIO_MAX_INDIRECT);
 		return (EINVAL);
 	}
+
+#ifdef CHERI_SUBOBJECT_EXEC
+	KASSERT(size <= VIRTQUEUE_MAX_DESCX, ("Virtqueue too large: %u", size));
+#endif
 
 	vq = malloc(sizeof(struct virtqueue) +
 	    size * sizeof(struct vq_desc_extra), M_DEVBUF, M_NOWAIT | M_ZERO);
