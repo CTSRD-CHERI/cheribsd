@@ -97,7 +97,7 @@ struct plic_softc {
 	struct resource		*mem_res;
 	struct resource		*irq_res;
 	void			*ih;
-	struct plic_irqsrc	isrcs[PLIC_MAX_IRQS];
+	struct plic_irqsrc	isrcs[PLIC_MAX_IRQS] __cheri_pad_representable;
 	struct plic_context	contexts[MAXCPU];
 	int			ndev;
 };
