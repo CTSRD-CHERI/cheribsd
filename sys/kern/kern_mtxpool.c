@@ -60,6 +60,8 @@ static MALLOC_DEFINE(M_MTXPOOL, "mtx_pool", "mutex pool");
 #ifndef MTX_POOL_SLEEP_SIZE
 #define MTX_POOL_SLEEP_SIZE		1024
 #endif
+/* XXX-AM: Currently the max size is used by hwpmc */
+#define	MTX_POOL_MAX_SIZE	2048
 
 struct mtxpool_header {
 	int		mtxpool_size;
@@ -70,7 +72,7 @@ struct mtxpool_header {
 
 struct mtx_pool {
 	struct mtxpool_header mtx_pool_header;
-	struct mtx	mtx_pool_ary[1];
+	struct mtx	mtx_pool_ary[1] __cheri_pad_representable_max(struct mtx, MTX_POOL_MAX_SIZE);
 };
 
 #define mtx_pool_size	mtx_pool_header.mtxpool_size
@@ -130,6 +132,9 @@ mtx_pool_create(const char *mtx_name, int pool_size, int opts)
 {
 	struct mtx_pool *pool;
 
+#ifdef CHERI_SUBOBJECT_EXACT
+	KASSERT(pool_size <= MTX_POOL_MAX_SIZE, ("Mutex pool too large"));
+#endif
 	if (pool_size <= 0 || !powerof2(pool_size)) {
 		printf("WARNING: %s pool size is not a power of 2.\n",
 		    mtx_name);
