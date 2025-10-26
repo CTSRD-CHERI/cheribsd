@@ -224,6 +224,10 @@ blist_create(daddr_t blocks, int flags)
 	if (blocks % BLIST_RADIX == 0)
 		nodes++;
 
+#ifdef CHERI_SUBOBJECT_EXACT
+	KASSERT(nodes <= BLIST_MAX_NODES, ("Too many blist blocks: %lu", nodes));
+#endif
+
 	bl = malloc(offsetof(struct blist, bl_root[nodes]), M_SWAP, flags |
 	    M_ZERO);
 	if (bl == NULL)

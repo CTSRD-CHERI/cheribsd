@@ -70,6 +70,15 @@ typedef	uint64_t	u_daddr_t;	/* unsigned disk address */
  * Both blmeta and bm_bitmap MUST be a power of 2 in size.
  */
 
+/*
+ * XXX-AM: This is rather arbitrary and needs tuning.
+ * But also very large. We should consider allocating the radix
+ * roots as a separate array.
+ * Note that blist structs are not very common in the kernel, so
+ * the wasted space can be manageable here.
+ */
+#define	BLIST_MAX_NODES		(1 << 14)
+
 typedef struct blmeta {
 	u_daddr_t	bm_bitmap;	/* marking unfilled block sets	*/
 	daddr_t		bm_bighint;	/* biggest contiguous block hint*/
@@ -80,7 +89,8 @@ typedef struct blist {
 	daddr_t		bl_avail;	/* # available blocks		*/
 	u_daddr_t	bl_radix;	/* coverage radix		*/
 	daddr_t		bl_cursor;	/* next-fit search starts at	*/
-	blmeta_t	bl_root[1];	/* root of radix tree		*/
+	/* root of radix tree */
+	blmeta_t	bl_root[1] __cheri_pad_representable_max(blmeta_t, BLIST_MAX_NODES);
 } *blist_t;
 
 #define BLIST_RADIX		(sizeof(u_daddr_t) * 8)
