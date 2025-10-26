@@ -93,7 +93,7 @@ struct fha_info {
 };
 
 struct fha_params {
-	struct fha_hash_slot fha_hash[FHA_HASH_SIZE];
+	struct fha_hash_slot fha_hash[FHA_HASH_SIZE] __cheri_pad_representable;
 	char server_name[32];
 };
 
