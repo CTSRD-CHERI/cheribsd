@@ -86,6 +86,9 @@ struct sync_list {
 	bus_size_t	datacount;	/* client data count */
 };
 
+/* XXX-AM: Limit is arbitrary and likely needs tuning. */
+#define	SLIST_MAX	256
+
 struct bus_dmamap {
 	STAILQ_HEAD(, bounce_page) bpages;
 	int		       pagesneeded;
@@ -100,7 +103,7 @@ struct bus_dmamap {
 #define	DMAMAP_COULD_BOUNCE	(1 << 0)
 #define	DMAMAP_FROM_DMAMEM	(1 << 1)
 	int			sync_count;
-	struct sync_list	slist[];
+	struct sync_list	slist[] __cheri_pad_representable_max(struct sync_list, SLIST_MAX);
 };
 
 static void _bus_dmamap_count_pages(bus_dma_tag_t dmat, bus_dmamap_t map,
@@ -222,6 +225,10 @@ alloc_dmamap(bus_dma_tag_t dmat, int flags)
 	u_long mapsize;
 	bus_dmamap_t map;
 
+#ifdef CHERI_SUBOBJECT_EXACT
+	KASSERT(dmat->common.nsegments <= SLIST_MAX,
+	    ("Too many segments: %u", dmat->common.nsegments));
+#endif
 	mapsize = sizeof(*map);
 	mapsize += sizeof(struct sync_list) * dmat->common.nsegments;
 	map = malloc(mapsize, M_DEVBUF, flags | M_ZERO);
