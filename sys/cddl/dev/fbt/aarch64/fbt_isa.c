@@ -151,7 +151,7 @@ fbt_provide_module_function(linker_file_t lf, int symindx,
 	 */
 	 if (strcmp(name, "handle_el1h_sync") == 0 ||
 	    strcmp(name, "do_el1h_sync") == 0)
-		return (1);
+		return (0);
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	symval = fbt_unseal_symval(sym);
