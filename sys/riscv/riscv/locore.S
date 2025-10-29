@@ -90,6 +90,17 @@
 #endif
 .endmacro
 
+/*
+ * Initialize CHERI CPU state.
+ */
+.macro cheri_cpu_init
+#if __has_feature(capabilities) && defined(__riscv_zcheripurecap)
+	/* Enable CHERI for U-mode */
+	li	t0, SENVCFG_CRE
+	csrs	senvcfg, t0
+#endif
+.endmacro
+
 
 	.globl	kernbase
 	.set	kernbase, KERNBASE
@@ -138,6 +149,7 @@ _alt_start:
 1:
 .option pop
 #endif
+	cheri_cpu_init
 
 	/* Pick a hart to run the boot process. */
 	li	t1, 1
@@ -182,6 +194,8 @@ _start:
 	lla	gp, __global_pointer$
 .option pop
 #endif
+
+	cheri_cpu_init
 
 	/*
 	 * Stash modulep in the callee-saved register s3, and zero s4 to
@@ -539,6 +553,9 @@ ENTRY(mpentry)
 1:
 .option pop
 #endif
+
+	cheri_cpu_init
+
 	/*
 	 * Calculate the offset to __riscv_boot_ap
 	 * for the current core, cpuid is in a0.
