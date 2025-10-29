@@ -101,7 +101,11 @@ fpe_store(struct fpreg *regs)
 	    "fsd	f29, (16 * 29)(%2)\n"
 	    "fsd	f30, (16 * 30)(%2)\n"
 	    "fsd	f31, (16 * 31)(%2)\n"
+#ifdef __CHERI_PURE_CAPABILITY__
+	    : "=&r"(fcsr), "=m"(*fp_x) : "C"(fp_x));
+#else
 	    : "=&r"(fcsr), "=m"(*fp_x) : "r"(fp_x));
+#endif
 
 	regs->fp_fcsr = fcsr;
 }
@@ -148,7 +152,11 @@ fpe_restore(struct fpreg *regs)
 	    "fld	f29, (16 * 29)(%1)\n"
 	    "fld	f30, (16 * 30)(%1)\n"
 	    "fld	f31, (16 * 31)(%1)\n"
+#ifdef __CHERI_PURE_CAPABILITY__
+	    :: "r"(fcsr), "C"(fp_x), "m"(*fp_x));
+#else
 	    :: "r"(fcsr), "r"(fp_x), "m"(*fp_x));
+#endif
 }
 
 struct fpreg *
