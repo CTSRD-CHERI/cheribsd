@@ -868,7 +868,9 @@ _p2sb=		p2sb
     ${MACHINE_CPUARCH} == "riscv"
 .if ${MK_BHYVE} != "no" || defined(ALL_MODULES)
 .if ${KERN_OPTS:MSMP}
+.if ${MACHINE_CPUARCH} != "riscv" || !${MACHINE_CPU:Mcheri}
 _vmm=		vmm
+.endif
 .endif
 .endif
 .endif
