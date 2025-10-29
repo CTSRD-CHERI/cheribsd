@@ -1286,7 +1286,7 @@ _vm_gpa_hold(struct vm *vm, vm_paddr_t gpa, size_t len, int reqprot,
 		if (sysmem_mapping(vm, mm) && gpa >= mm->gpa &&
 		    gpa < mm->gpa + mm->len) {
 			count = vm_fault_quick_hold_pages(&vm->vmspace->vm_map,
-			    trunc_page(gpa), PAGE_SIZE, reqprot, &m, 1);
+			    (void *)trunc_page(gpa), PAGE_SIZE, reqprot, &m, 1);
 			break;
 		}
 	}
