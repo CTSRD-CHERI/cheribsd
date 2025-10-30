@@ -13,8 +13,6 @@ BINDIR?=${CHERIBSDBOX_DIR}
 
 CRUNCH_OBJTOP?=		${OBJTOP}
 CRUNCH_BUILDOPTS+=	-DWITHOUT_TESTS MK_TESTS=no -D_CRUNCHGEN
-# Avoid linking against libcasper for tcpdump/traceroute/kdump:
-CRUNCH_BUILDOPTS+=	MK_CASPER=no
 # Try to reduce size by avoiding locale support
 CRUNCH_BUILDOPTS+=	-DWITHOUT_LOCALES MK_LOCALES=no
 # Disable kerberos support
@@ -69,6 +67,9 @@ CRUNCH_SHLIBS+=	-lc -lutil -lcrypt -lxo
 CRUNCH_SHLIBS+=	-lm
 # libz is needed by libprivatessh so we might as well link dynamically
 CRUNCH_SHLIBS+=	-lz
+# casper and services needed by various tools
+CRUNCH_SHLIBS+= -lcasper -lcap_dns -lcap_grp -lcap_net -lcap_netdb
+CRUNCH_SHLIBS+= -lcap_pwd -lcap_sysctl
 
 # diff
 CRUNCH_LIBS+=		${CRUNCH_OBJTOP}/lib/libdiff/libdiff.a
