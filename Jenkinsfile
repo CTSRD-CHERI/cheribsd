@@ -28,7 +28,7 @@ def jobProperties = [
         rateLimit,
 ]
 // Don't archive sysroot/disk image/kernel images for pull requests and non-default/releng branches:
-def archiveBranches = ['main', 'master', 'dev']
+def archiveBranches = ['main', 'master', 'dev', 'dev-nocaprevoke']
 if (!env.CHANGE_ID && (archiveBranches.contains(env.BRANCH_NAME) || env.BRANCH_NAME.startsWith('releng/'))) {
     if (!GlobalVars.isTestSuiteJob) {
         // Don't archive disk images for the test suite job
@@ -292,6 +292,7 @@ selectedArchitectures.each { arch ->
             '--cheribsd/build-lib32',
             '--cheribsd/build-tests',
             '--cheribsd/build-bench-kernels',
+            '--cheribsd/build-nocaprevoke-kernels',
             '--cheribsd/with-manpages',
             '--cheribsd/debug-info',
             '--cheribsd/debug-files',
