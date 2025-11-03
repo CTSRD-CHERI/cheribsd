@@ -488,10 +488,10 @@ int drm_mode_getproperty_ioctl(struct drm_device *dev,
 		CP(*out_resp64, *out_resp, flags);
 		CP(*out_resp64, *out_resp, count_values);
 		CP(*out_resp64, *out_resp, count_enum_blobs);
-		out_resp->values_ptr = (uintcap_t)__USER_CAP(
+		out_resp->values_ptr = (uintptr_t)__USER_CAP(
 		    out_resp64->values_ptr,
 		    out_resp64->count_values * sizeof(uint64_t));
-		out_resp->enum_blob_ptr = (uintcap_t)__USER_CAP(
+		out_resp->enum_blob_ptr = (uintptr_t)__USER_CAP(
 		    out_resp64->enum_blob_ptr,
 		    out_resp64->count_enum_blobs * sizeof(uint64_t));
 	}
@@ -810,7 +810,7 @@ int drm_mode_getblob_ioctl(struct drm_device *dev,
 		out_resp = &local_out_resp;
 		CP(*out_resp64, *out_resp, blob_id);
 		CP(*out_resp64, *out_resp, length);
-		out_resp->data = (uintcap_t)__USER_CAP(out_resp64->data,
+		out_resp->data = (uintptr_t)__USER_CAP(out_resp64->data,
 		    out_resp64->length);
 	}
 #endif
@@ -858,7 +858,7 @@ int drm_mode_createblob_ioctl(struct drm_device *dev,
 		out_resp64 = (struct drm_mode_create_blob64 *)data;
 		out_resp = &local_out_resp;
 		CP(*out_resp64, *out_resp, length);
-		out_resp->data = (uintcap_t)__USER_CAP(out_resp64->data,
+		out_resp->data = (uintptr_t)__USER_CAP(out_resp64->data,
 		    out_resp64->length);
 	}
 #endif

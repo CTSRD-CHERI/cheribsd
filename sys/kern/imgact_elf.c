@@ -110,7 +110,7 @@ static Elf_Brandinfo *__elfN(get_brandinfo)(struct image_params *imgp,
 static int __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
     u_long *end_addr, u_long *entry);
 static int __elfN(load_section)(const struct image_params *imgp,
-    vm_ooffset_t offset, uintcap_t vmaddr, size_t memsz, size_t filsz,
+    vm_ooffset_t offset, uintptr_t vmaddr, size_t memsz, size_t filsz,
     vm_prot_t prot);
 static int __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp);
 static bool __elfN(freebsd_trans_osrel)(const Elf_Note *note,
@@ -678,7 +678,7 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 
 static int
 __elfN(map_partial)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
-    uintcap_t start, uintcap_t end, vm_prot_t prot)
+    uintptr_t start, uintptr_t end, vm_prot_t prot)
 {
 	struct sf_buf *sf;
 	int error;
@@ -711,7 +711,7 @@ __elfN(map_partial)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 
 static int
 __elfN(map_insert)(const struct image_params *imgp, vm_map_t map,
-    vm_object_t object, vm_ooffset_t offset, uintcap_t start, uintcap_t end,
+    vm_object_t object, vm_ooffset_t offset, uintptr_t start, uintptr_t end,
     vm_prot_t prot, int cow)
 {
 	struct sf_buf *sf;
@@ -788,13 +788,13 @@ __elfN(map_insert)(const struct image_params *imgp, vm_map_t map,
 
 static int
 __elfN(load_section)(const struct image_params *imgp, vm_ooffset_t offset,
-    uintcap_t vmaddr, size_t memsz, size_t filsz, vm_prot_t prot)
+    uintptr_t vmaddr, size_t memsz, size_t filsz, vm_prot_t prot)
 {
 	struct sf_buf *sf;
 	size_t map_len;
 	vm_map_t map;
 	vm_object_t object;
-	uintcap_t map_addr;
+	uintptr_t map_addr;
 	int error, rv, cow;
 	size_t copy_len;
 	vm_ooffset_t file_addr;
@@ -904,7 +904,7 @@ __elfN(load_sections)(const struct image_params *imgp, const Elf_Ehdr *hdr,
 	u_long base_vaddr, max_vaddr;
 	bool first;
 	int error, i;
-	uintcap_t section_addr;
+	uintptr_t section_addr;
 
 	ASSERT_VOP_LOCKED(imgp->vp, __func__);
 
@@ -918,7 +918,7 @@ __elfN(load_sections)(const struct image_params *imgp, const Elf_Ehdr *hdr,
 
 		/* Loadable segment */
 #if __has_feature(capabilities)
-		section_addr = (uintcap_t)cheri_setaddress(
+		section_addr = (uintptr_t)cheri_setaddress(
 		    imgp->imgact_capability, phdr[i].p_vaddr + rbase);
 #else
 		section_addr = phdr[i].p_vaddr + rbase;
@@ -1770,7 +1770,7 @@ timekeep_cap(struct image_params *imgp)
 {
 	void *tmpcap;
 	struct vmspace *vmspace = imgp->proc->p_vmspace;
-	uintcap_t timekeep_base;
+	uintptr_t timekeep_base;
 	size_t timekeep_len;
 
 	timekeep_base = vmspace->vm_shp_base + imgp->sysent->sv_timekeep_offset;
@@ -1792,7 +1792,7 @@ timekeep_cap(struct image_params *imgp)
 #endif
 
 int
-__elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
+__elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintptr_t base)
 {
 	Elf_Auxargs *args = (Elf_Auxargs *)imgp->auxargs;
 	Elf_Auxinfo *argarray, *pos;
@@ -1849,7 +1849,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 			 * out-of-bounds capability with address zero that may
 			 * or may not be tagged.
 			 */
-			exec_base = (void *)(uintcap_t)args->base;
+			exec_base = (void *)(uintptr_t)args->base;
 		} else {
 			/*
 			 * For static-PIE we need AT_BASE for relocations and
@@ -1990,7 +1990,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 }
 
 int
-__elfN(freebsd_fixup)(uintcap_t *stack_base, struct image_params *imgp)
+__elfN(freebsd_fixup)(uintptr_t *stack_base, struct image_params *imgp)
 {
 #ifndef __ELF_CHERI
 	Elf_Addr *base;
@@ -1999,7 +1999,7 @@ __elfN(freebsd_fixup)(uintcap_t *stack_base, struct image_params *imgp)
 	base--;
 	if (elf_suword(base, imgp->args->argc) == -1)
 		return (EFAULT);
-	*stack_base = (uintcap_t)base;
+	*stack_base = (uintptr_t)base;
 #else
 	KASSERT(__builtin_is_aligned(*stack_base, sizeof(void *)),
 	    ("CheriABI stack pointer not properly aligned"));
@@ -2244,7 +2244,7 @@ cb_put_memtag_phdr(vm_map_entry_t entry, void *closure)
 		phdr->p_vaddr = entry->start;
 		phdr->p_paddr = 0;
 		phdr->p_memsz = entry->end - entry->start;
-		phdr->p_filesz = phdr->p_memsz / (sizeof(uintcap_t) * NBBY);
+		phdr->p_filesz = phdr->p_memsz / (sizeof(uintptr_t) * NBBY);
 		phdr->p_align = 0;
 		phdr->p_flags = __elfN(untrans_capprot)(entry->protection);
 
@@ -2276,7 +2276,7 @@ cb_size_memtag_segment(vm_map_entry_t entry, void *closure)
 	if ((entry->protection & VM_PROT_CAP) != 0) {
 		ssc->count++;
 		ssc->size += (entry->end - entry->start) /
-		    (sizeof(uintcap_t) * NBBY);
+		    (sizeof(uintptr_t) * NBBY);
 	}
 }
 #endif

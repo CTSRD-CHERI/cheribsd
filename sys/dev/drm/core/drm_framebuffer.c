@@ -724,7 +724,7 @@ int drm_mode_dirtyfb_ioctl(struct drm_device *dev,
 		CP(*r64, *r, flags);
 		CP(*r64, *r, color);
 		CP(*r64, *r, num_clips);
-		r->clips_ptr = (uintcap_t)__USER_CAP(r64->clips_ptr,
+		r->clips_ptr = (uintptr_t)__USER_CAP(r64->clips_ptr,
 		    r64->num_clips * sizeof(uint64_t));
 	}
 #endif

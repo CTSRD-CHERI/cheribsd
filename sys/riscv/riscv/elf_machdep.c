@@ -371,7 +371,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 	uintptr_t addr;
 	Elf_Addr val;
 #ifdef __CHERI_PURE_CAPABILITY__
-	uintcap_t beforecap;
+	uintptr_t beforecap;
 #endif
 	Elf64_Addr *where;
 	Elf_Addr addend;

@@ -105,17 +105,17 @@ struct arm64_addr_mask {
 
 #if __has_feature(capabilities)
 struct capreg {
-	__uintcap_t c[30];
-	__uintcap_t clr;
-	__uintcap_t csp;
-	__uintcap_t celr;
-	__uintcap_t ddc;
-	__uintcap_t ctpidr;
-	__uintcap_t ctpidrro;
-	__uintcap_t cid;
-	__uintcap_t rcsp;
-	__uintcap_t rddc;
-	__uintcap_t rctpidr;
+	__uintptr_t c[30];
+	__uintptr_t clr;
+	__uintptr_t csp;
+	__uintptr_t celr;
+	__uintptr_t ddc;
+	__uintptr_t ctpidr;
+	__uintptr_t ctpidrro;
+	__uintptr_t cid;
+	__uintptr_t rcsp;
+	__uintptr_t rddc;
+	__uintptr_t rctpidr;
 	__uint64_t tagmask;
 	__uint64_t pad;
 };

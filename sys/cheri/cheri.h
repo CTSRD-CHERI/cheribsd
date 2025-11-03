@@ -153,10 +153,10 @@ void	cheri_read_tags_page(const void *page, void *tagbuf, bool *hastagsp);
  * Functions to derive capabilities for ptrace.
  */
 struct proc;
-bool	ptrace_derive_cap(struct proc *p, uintcap_t in, uintcap_t *out);
-bool	ptrace_derive_capreg_td(struct thread *td, uintcap_t in,
-    uintcap_t *out);
-bool	vm_derive_capreg(struct proc *p, uintcap_t in, uintcap_t *out);
+bool	ptrace_derive_cap(struct proc *p, uintptr_t in, uintptr_t *out);
+bool	ptrace_derive_capreg_td(struct thread *td, uintptr_t in,
+    uintptr_t *out);
+bool	vm_derive_capreg(struct proc *p, uintptr_t in, uintptr_t *out);
 
 /*
  * Global sysctl definitions.

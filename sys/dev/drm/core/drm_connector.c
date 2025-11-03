@@ -2284,16 +2284,16 @@ int drm_mode_getconnector(struct drm_device *dev, void *data,
 		CP(*out_resp64, *out_resp, mm_height);
 		CP(*out_resp64, *out_resp, subpixel);
 
-		out_resp->encoders_ptr = (uintcap_t)__USER_CAP(
+		out_resp->encoders_ptr = (uintptr_t)__USER_CAP(
 		    out_resp64->encoders_ptr,
 		    out_resp64->count_encoders * sizeof(uint32_t));
-		out_resp->modes_ptr = (uintcap_t)__USER_CAP(
+		out_resp->modes_ptr = (uintptr_t)__USER_CAP(
 		    out_resp64->modes_ptr,
 		    out_resp64->count_modes * sizeof(struct drm_mode_modeinfo));
-		out_resp->props_ptr = (uintcap_t)__USER_CAP(
+		out_resp->props_ptr = (uintptr_t)__USER_CAP(
 		    out_resp64->props_ptr,
 		    out_resp64->count_props * sizeof(uint32_t));
-		out_resp->prop_values_ptr = (uintcap_t)__USER_CAP(
+		out_resp->prop_values_ptr = (uintptr_t)__USER_CAP(
 		    out_resp64->prop_values_ptr,
 		    out_resp64->count_props * sizeof(uint64_t));
 	}

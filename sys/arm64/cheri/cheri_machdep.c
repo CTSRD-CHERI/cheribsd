@@ -45,11 +45,11 @@
 
 void *sentry_unsealcap;
 void *smccc_ddc_el0;
-void *vmm_gva_root_cap = (void *)(intcap_t)-1;
-void *vmm_gpa_root_cap = (void *)(intcap_t)-1;
+void *vmm_gva_root_cap = (void *)(intptr_t)-1;
+void *vmm_gpa_root_cap = (void *)(intptr_t)-1;
 #ifdef __CHERI_PURE_CAPABILITY__
-void *kernel_root_cap = (void *)(intcap_t)-1;
-void *vmm_el2_root_cap = (void *)(intcap_t)-1;
+void *kernel_root_cap = (void *)(intptr_t)-1;
+void *vmm_el2_root_cap = (void *)(intptr_t)-1;
 #endif
 
 void __nosanitizecoverage
@@ -76,7 +76,7 @@ cheri_init_capabilities(void *kroot)
 	ctemp = cheri_setaddress(kroot, CHERI_COMPARTMENT_ID_USERSPACE_BASE);
 	ctemp = cheri_setbounds(ctemp, CHERI_COMPARTMENT_ID_USERSPACE_LENGTH);
 	ctemp = cheri_andperm(ctemp, CHERI_COMPARTMENT_ID_USERSPACE_PERMS);
-	userspace_root_cidcap = (uintcap_t)ctemp;
+	userspace_root_cidcap = (uintptr_t)ctemp;
 
 	ctemp = cheri_setaddress(kroot, CHERI_OTYPE_SENTRY);
 	ctemp = cheri_setbounds(ctemp, 1);
@@ -117,13 +117,13 @@ hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr)
 	tf = td->td_frame;
 
 	/* Set DDC to full user privilege. */
-	tf->tf_ddc = (uintcap_t)cheri_capability_build_user_rwx(
+	tf->tf_ddc = (uintptr_t)cheri_capability_build_user_rwx(
 	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM,
 	    CHERI_CAP_USER_DATA_BASE, CHERI_CAP_USER_DATA_LENGTH,
 	    CHERI_CAP_USER_DATA_OFFSET);
 
 	/* Use 'entry_addr' as offset of PCC. */
-	trapframe_set_elr(tf, (uintcap_t)cheri_capability_build_user_code(
+	trapframe_set_elr(tf, (uintptr_t)cheri_capability_build_user_code(
 	    td, CHERI_CAP_USER_CODE_PERMS, CHERI_CAP_USER_CODE_BASE,
 	    CHERI_CAP_USER_CODE_LENGTH, entry_addr));
 }

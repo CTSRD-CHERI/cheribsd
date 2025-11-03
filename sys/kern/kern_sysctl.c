@@ -1887,16 +1887,16 @@ int
 sysctl_handle_cap(SYSCTL_HANDLER_ARGS)
 {
 	int error = 0;
-	uintcap_t tmpout;
+	uintptr_t tmpout;
 
 	/*
 	 * Attempt to get a coherent snapshot by making a copy of the data.
 	 */
 	if (arg1)
-		tmpout = *(uintcap_t *)arg1;
+		tmpout = *(uintptr_t *)arg1;
 	else
 		tmpout = arg2;
-	error = SYSCTL_OUT(req, &tmpout, sizeof(uintcap_t));
+	error = SYSCTL_OUT(req, &tmpout, sizeof(uintptr_t));
 
 	if (error || !req->newptr)
 		return (error);

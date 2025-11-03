@@ -486,7 +486,7 @@ fill_capregs(struct thread *td, struct capreg *regs)
 
 /* Try to derive tagged version of in from reg. */
 static bool
-derive_capreg(uintcap_t reg, uintcap_t in, uintcap_t *out)
+derive_capreg(uintptr_t reg, uintptr_t in, uintptr_t *out)
 {
 	void *cap;
 	int otype;
@@ -513,7 +513,7 @@ derive_capreg(uintcap_t reg, uintcap_t in, uintcap_t *out)
 	if (otype == CHERI_OTYPE_SENTRY)
 		cap = cheri_sealentry(cap);
 	if (cheri_gettag(cap)) {
-		*out = (uintcap_t)cap;
+		*out = (uintptr_t)cap;
 		return (true);
 	}
 
@@ -527,7 +527,7 @@ derive_capreg(uintcap_t reg, uintcap_t in, uintcap_t *out)
  * the new capability matches an existing cap register.
  */
 bool
-ptrace_derive_capreg_td(struct thread *td, uintcap_t in, uintcap_t *out)
+ptrace_derive_capreg_td(struct thread *td, uintptr_t in, uintptr_t *out)
 {
 	struct trapframe *frame;
 	u_int i;
@@ -549,8 +549,8 @@ ptrace_derive_capreg_td(struct thread *td, uintcap_t in, uintcap_t *out)
 }
 
 static bool
-set_capreg(struct thread *td, u_int idx, uint64_t tagmask, uintcap_t old,
-    uintcap_t new, uintcap_t *out)
+set_capreg(struct thread *td, u_int idx, uint64_t tagmask, uintptr_t old,
+    uintptr_t new, uintptr_t *out)
 {
 	if ((tagmask & ((uint64_t)1 << idx)) == 0) {
 		/* Always ok to set untagged values. */
@@ -651,7 +651,7 @@ fail:
 #endif
 
 void
-exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
+exec_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
 {
 	struct trapframe *tf = td->td_frame;
 	struct pcb *pcb = td->td_pcb;
@@ -660,9 +660,9 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 
 #if __has_feature(capabilities)
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
-		tf->tf_x[0] = (uintcap_t)imgp->auxv;
+		tf->tf_x[0] = (uintptr_t)imgp->auxv;
 		tf->tf_sp = stack;
-		tf->tf_lr = (uintcap_t)cheri_exec_pcc(td, imgp);
+		tf->tf_lr = (uintptr_t)cheri_exec_pcc(td, imgp);
 		trapframe_set_elr(tf, tf->tf_lr);
 		td->td_proc->p_md.md_sigcode = cheri_sigcode_capability(td);
 	} else
@@ -1015,10 +1015,10 @@ sys_sigreturn(struct thread *td, struct sigreturn_args *uap)
 }
 
 static bool
-sendsig_ctx_end(struct thread *td, uintcap_t *addrp)
+sendsig_ctx_end(struct thread *td, uintptr_t *addrp)
 {
 	struct arm64_reg_context end_ctx;
-	uintcap_t ctx_addr;
+	uintptr_t ctx_addr;
 
 	*addrp -= sizeof(end_ctx);
 	ctx_addr = *addrp;
@@ -1034,12 +1034,12 @@ sendsig_ctx_end(struct thread *td, uintcap_t *addrp)
 }
 
 static bool
-sendsig_ctx_sve(struct thread *td, uintcap_t *addrp)
+sendsig_ctx_sve(struct thread *td, uintptr_t *addrp)
 {
 	struct sve_context ctx;
 	struct pcb *pcb;
 	size_t buf_size;
-	uintcap_t ctx_addr;
+	uintptr_t ctx_addr;
 
 	pcb = td->td_pcb;
 	/* Do nothing if sve hasn't started */
@@ -1070,7 +1070,7 @@ sendsig_ctx_sve(struct thread *td, uintcap_t *addrp)
 	return (true);
 }
 
-typedef bool(*ctx_func)(struct thread *, uintcap_t *);
+typedef bool(*ctx_func)(struct thread *, uintptr_t *);
 static const ctx_func ctx_funcs[] = {
 	sendsig_ctx_end,	/* Must be first to end the linked list */
 	sendsig_ctx_sve,
@@ -1085,7 +1085,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	struct trapframe *tf;
 	struct sigframe *fp, frame;
 	struct sigacts *psp;
-	uintcap_t addr;
+	uintptr_t addr;
 	int onstack, sig;
 
 	td = curthread;
@@ -1105,7 +1105,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !onstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		addr = ((uintcap_t)td->td_sigstk.ss_sp +
+		addr = ((uintptr_t)td->td_sigstk.ss_sp +
 		    td->td_sigstk.ss_size);
 #if defined(COMPAT_43)
 		td->td_sigstk.ss_flags |= SS_ONSTACK;
@@ -1156,18 +1156,18 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 	tf->tf_x[0] = sig;
 #if __has_feature(capabilities)
-	tf->tf_x[1] = (uintcap_t)cheri_setbounds(&fp->sf_si,
+	tf->tf_x[1] = (uintptr_t)cheri_setbounds(&fp->sf_si,
 	    sizeof(fp->sf_si));
-	tf->tf_x[2] = (uintcap_t)cheri_setbounds(&fp->sf_uc,
+	tf->tf_x[2] = (uintptr_t)cheri_setbounds(&fp->sf_uc,
 	    sizeof(fp->sf_uc));
 #else
 	tf->tf_x[1] = (register_t)&fp->sf_si;
 	tf->tf_x[2] = (register_t)&fp->sf_uc;
 #endif
-	tf->tf_x[8] = (uintcap_t)catcher;
-	tf->tf_sp = (uintcap_t)fp;
+	tf->tf_x[8] = (uintptr_t)catcher;
+	tf->tf_sp = (uintptr_t)fp;
 #if __has_feature(capabilities)
-	trapframe_set_elr(tf, (uintcap_t)p->p_md.md_sigcode);
+	trapframe_set_elr(tf, (uintptr_t)p->p_md.md_sigcode);
 #else
 	tf->tf_elr = (register_t)PROC_SIGCODE(p);
 #endif

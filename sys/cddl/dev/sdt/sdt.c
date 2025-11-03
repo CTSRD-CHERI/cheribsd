@@ -414,7 +414,7 @@ sdt_kld_load_probes(struct linker_file *lf)
 				continue;
 			}
 #ifdef __CHERI_PURE_CAPABILITY__
-			tp->patchpoint = (uintcap_t)cheri_setbounds(
+			tp->patchpoint = (uintptr_t)cheri_setbounds(
 			    cheri_setaddress(kernel_root_cap, tp->patchpoint),
 			    INSN_SIZE);
 			tp->patchpoint = cheri_andperm(tp->patchpoint,

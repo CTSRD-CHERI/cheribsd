@@ -295,7 +295,7 @@ dtrace_load64(uint64_t *addr, struct trapframe *frame, u_int reg)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 static void
-dtrace_storecap(uintcap_t *addr, struct trapframe *frame, u_int reg)
+dtrace_storecap(uintptr_t *addr, struct trapframe *frame, u_int reg)
 {
 
 	KASSERT(reg <= 31, ("dtrace_store64: Invalid register %u", reg));
@@ -331,10 +331,10 @@ dtrace_invop_start(struct trapframe *frame)
 	tmp = (invop & LDP_STP_MASK);
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (tmp == STP_C_PREIND) {
-		uintcap_t *csp;
+		uintptr_t *csp;
 		int arg1, arg2, offs;
 
-		csp = (uintcap_t *)frame->tf_sp;
+		csp = (uintptr_t *)frame->tf_sp;
 		arg1 = (invop >> ARG1_SHIFT) & ARG1_MASK;
 		arg2 = (invop >> ARG2_SHIFT) & ARG2_MASK;
 		offs = (invop >> OFFSET_SHIFT) & OFFSET_MASK;
@@ -346,7 +346,7 @@ dtrace_invop_start(struct trapframe *frame)
 		dtrace_storecap(csp + 1, frame, arg2);
 
 		/* Update the stack pointer and program counter to continue */
-		frame->tf_sp = (uintcap_t)csp;
+		frame->tf_sp = (uintptr_t)csp;
 		frame->tf_elr += INSN_SIZE;
 		return (0);
 	}

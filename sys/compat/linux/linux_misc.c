@@ -2620,7 +2620,7 @@ get_argenv_ptr(l_uintptr_t **arrayp, void **ptrp)
 #elif defined(COMPAT_LINUX64)
 	uint64_t ptr64;
 #else
-	uintcap_t ptr;
+	uintptr_t ptr;
 #endif
 
 	array = *arrayp;

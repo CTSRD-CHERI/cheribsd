@@ -146,12 +146,12 @@ SYSINIT(freebsd64_register_sysvec, SI_SUB_VM, SI_ORDER_ANY,
 static void
 mcontext_to_mcontext64(mcontext_t *mc, mcontext64_t *mc64)
 {
-	const uintcap_t *creg;
+	const uintptr_t *creg;
 	register_t *greg;
 	u_int i;
 
 	memset(mc64, 0, sizeof(*mc64));
-	creg = (uintcap_t *)&mc->mc_capregs;
+	creg = (uintptr_t *)&mc->mc_capregs;
 	greg = (register_t *)&mc64->mc_gpregs;
 	for (i = 0; i < CONTEXT64_GPREGS; i++)
 		greg[i] = (register_t)creg[i];
@@ -181,7 +181,7 @@ int
 freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 {
 	mcontext_t mc;
-	uintcap_t *creg;
+	uintptr_t *creg;
 	const register_t *greg;
 	int error;
 	u_int i;
@@ -200,10 +200,10 @@ freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 		mc.mc_capregs.cp_sepcc = cheri_setoffset(
 		    mc.mc_capregs.cp_sepcc, mcp->mc_gpregs.gp_sepc);
 	} else {
-		creg = (uintcap_t *)&mc.mc_capregs;
+		creg = (uintptr_t *)&mc.mc_capregs;
 		greg = (register_t *)&mcp->mc_gpregs;
 		for (i = 0; i < CONTEXT64_GPREGS; i++)
-			creg[i] = (uintcap_t)greg[i];
+			creg[i] = (uintptr_t)greg[i];
 
 		mc.mc_capregs.cp_sepcc = cheri_setoffset(
 		    td->td_frame->tf_sepc, mcp->mc_gpregs.gp_sepc);
@@ -257,7 +257,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 	/* Allocate room for the capability register context. */
 	sp -= sizeof(mc.mc_capregs);
-	sp = rounddown2(sp, sizeof(uintcap_t));
+	sp = rounddown2(sp, sizeof(uintptr_t));
 	capregs = sp;
 
 	/* Make room, keeping the stack aligned */
@@ -303,7 +303,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	tf->tf_a[1] = (register_t)fp + offsetof(struct sigframe64, sf_si);
 	tf->tf_a[2] = (register_t)fp + offsetof(struct sigframe64, sf_uc);
 
-	tf->tf_sepc = (uintcap_t)catcher;
+	tf->tf_sepc = (uintptr_t)catcher;
 	tf->tf_sp = (register_t)fp;
 
 	sysent = p->p_sysent;

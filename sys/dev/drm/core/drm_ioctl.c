@@ -869,7 +869,7 @@ EXPORT_SYMBOL(drm_ioctl_kernel);
  * Zero on success, negative error code on failure.
  */
 long drm_ioctl(struct file *filp,
-	      unsigned int cmd, uintcap_t arg)
+	      unsigned int cmd, uintptr_t arg)
 {
 	struct drm_file *file_priv = filp->private_data;
 	struct drm_device *dev;

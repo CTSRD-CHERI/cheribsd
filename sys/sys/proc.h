@@ -333,9 +333,9 @@ struct thread {
 	u_char		td_pri_class;	/* (t) Scheduling class. */
 	u_char		td_user_pri;	/* (t) User pri from estcpu and nice. */
 	u_char		td_base_user_pri; /* (t) Base user pri */
-	uintcap_t	td_rb_list;	/* (k) Robust list head. */
-	uintcap_t	td_rbp_list;	/* (k) Robust priv list head. */
-	uintcap_t	td_rb_inact;	/* (k) Current in-action mutex loc. */
+	uintptr_t	td_rb_list;	/* (k) Robust list head. */
+	uintptr_t	td_rbp_list;	/* (k) Robust priv list head. */
+	uintptr_t	td_rb_inact;	/* (k) Current in-action mutex loc. */
 	struct syscall_args td_sa;	/* (kx) Syscall parameters. Copied on
 					   fork for child tracing. */
 	void *td_sigblock_ptr; /* (k) uptr for fast sigblock. */

@@ -131,7 +131,7 @@ typedef STAILQ_HEAD(Struct_Objlist, Struct_Objlist_Entry) Objlist;
 
 /* Types of init and fini functions */
 #ifdef __CHERI_PURE_CAPABILITY__
-typedef struct { uintcap_t value; } InitArrayEntry;
+typedef struct { uintptr_t value; } InitArrayEntry;
 #define initfini_array_addr(entry)	((entry).value)
 #else
 typedef struct { Elf_Addr value; } InitArrayEntry;

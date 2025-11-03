@@ -114,13 +114,13 @@ fbt_make_tracepoint_capability(uint32_t *instr)
  * value.  We need to disassemble the function, so the capability must be
  * unsealed.
  */
-static uintcap_t
+static uintptr_t
 fbt_unseal_symval(linker_symval_t *sym)
 {
 	extern void *sentry_unsealcap;
-	uintcap_t val;
+	uintptr_t val;
 
-	val = cheri_unseal((uintcap_t)sym->value, sentry_unsealcap);
+	val = cheri_unseal((uintptr_t)sym->value, sentry_unsealcap);
 	val = cheri_andperm(val, CHERI_PERM_LOAD);
 	return (val);
 }

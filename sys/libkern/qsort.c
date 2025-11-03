@@ -71,10 +71,10 @@ static inline void	 swapfunc(char *, char *, size_t, int, int);
 	es % sizeof(TYPE) ? 2 : es == sizeof(TYPE) ? 0 : 1;
 
 static inline void
-swapfunc(char *a, char *b, size_t n, int swaptype_intcap_t, int swaptype_int)
+swapfunc(char *a, char *b, size_t n, int swaptype_intptr_t, int swaptype_int)
 {
-	if (swaptype_intcap_t <= 1)
-		swapcode(intcap_t, a, b, n)
+	if (swaptype_intptr_t <= 1)
+		swapcode(intptr_t, a, b, n)
 	else if (swaptype_int <= 1)
 		swapcode(int, a, b, n)
 	else
@@ -82,19 +82,19 @@ swapfunc(char *a, char *b, size_t n, int swaptype_intcap_t, int swaptype_int)
 }
 
 #define	swap(a, b)					\
-	if (swaptype_intcap_t == 0) {			\
-		intcap_t t = *(intcap_t *)(a);		\
-		*(intcap_t *)(a) = *(intcap_t *)(b);	\
-		*(intcap_t *)(b) = t;			\
+	if (swaptype_intptr_t == 0) {			\
+		intptr_t t = *(intptr_t *)(a);		\
+		*(intptr_t *)(a) = *(intptr_t *)(b);	\
+		*(intptr_t *)(b) = t;			\
 	} else if (swaptype_int == 0) {			\
 		int t = *(int *)(a);			\
 		*(int *)(a) = *(int *)(b);		\
 		*(int *)(b) = t;			\
 	} else						\
-		swapfunc(a, b, es, swaptype_intcap_t, swaptype_int)
+		swapfunc(a, b, es, swaptype_intptr_t, swaptype_int)
 
 #define	vecswap(a, b, n)				\
-	if ((n) > 0) swapfunc(a, b, n, swaptype_intcap_t, swaptype_int)
+	if ((n) > 0) swapfunc(a, b, n, swaptype_intptr_t, swaptype_int)
 
 #ifdef I_AM_QSORT_R
 #define	CMP(t, x, y) (cmp((x), (y), (t)))
@@ -126,9 +126,9 @@ qsort(void *a, size_t n, size_t es, cmp_t *cmp)
 	char *pa, *pb, *pc, *pd, *pl, *pm, *pn;
 	size_t d1, d2;
 	int cmp_result;
-	int swaptype_intcap_t, swaptype_int, swap_cnt;
+	int swaptype_intptr_t, swaptype_int, swap_cnt;
 
-loop:	SWAPINIT(intcap_t, a, es);
+loop:	SWAPINIT(intptr_t, a, es);
 	SWAPINIT(int, a, es);
 	swap_cnt = 0;
 	if (n < 7) {

@@ -4322,7 +4322,7 @@ __umtx_op_sem2_wait(struct thread *td, struct _umtx_op_args *uap,
 	    (timeout._flags & UMTX_ABSTIME) == 0 &&
 	    uasize >= ops->umtx_time_sz + ops->timespec_sz) {
 		error = ops->copyout_timeout(
-		    (void *)((uintcap_t)uap->uaddr2 + ops->umtx_time_sz),
+		    (void *)((uintptr_t)uap->uaddr2 + ops->umtx_time_sz),
 		    uasize - ops->umtx_time_sz, &timeout._timeout);
 		if (error == 0) {
 			error = EINTR;
@@ -5479,11 +5479,11 @@ __umtx_op_robust_lists64(struct thread *td, struct freebsd64__umtx_op_args *uap)
 	if (error != 0)
 		return (error);
 	rb.robust_list_offset =
-	    (intcap_t)__USER_CAP_UNBOUND(rb64.robust_list_offset);
+	    (intptr_t)__USER_CAP_UNBOUND(rb64.robust_list_offset);
 	rb.robust_priv_list_offset =
-	    (intcap_t)__USER_CAP_UNBOUND(rb64.robust_priv_list_offset);
+	    (intptr_t)__USER_CAP_UNBOUND(rb64.robust_priv_list_offset);
 	rb.robust_inact_offset =
-	    (intcap_t)__USER_CAP_UNBOUND(rb64.robust_inact_offset);
+	    (intptr_t)__USER_CAP_UNBOUND(rb64.robust_inact_offset);
 
 	td->td_rb_list = rb.robust_list_offset;
 	td->td_rbp_list = rb.robust_priv_list_offset;
@@ -5631,9 +5631,9 @@ umtx_thread_exit(struct thread *td)
 }
 
 static int
-umtx_read_uptr(struct thread *td, uintcap_t ptr, uintcap_t *res, bool compat32)
+umtx_read_uptr(struct thread *td, uintptr_t ptr, uintptr_t *res, bool compat32)
 {
-	intcap_t res1;
+	intptr_t res1;
 #ifdef COMPAT_FREEBSD64
 	uint64_t res64;
 #endif
@@ -5663,16 +5663,16 @@ umtx_read_uptr(struct thread *td, uintcap_t ptr, uintcap_t *res, bool compat32)
 }
 
 static void
-umtx_read_rb_list(struct thread *td, union umutex_all *mu, uintcap_t *rb_list,
+umtx_read_rb_list(struct thread *td, union umutex_all *mu, uintptr_t *rb_list,
     bool compat32)
 {
 	if (compat32) {
-		*rb_list = (uintcap_t)__USER_CAP_UNBOUND(
+		*rb_list = (uintptr_t)__USER_CAP_UNBOUND(
 		    (void *)(uintptr_t)mu->m32.m_rb_lnk);
 	} else
 #ifdef COMPAT_FREEBSD64
 	if (!SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
-		*rb_list = (uintcap_t)__USER_CAP_UNBOUND(
+		*rb_list = (uintptr_t)__USER_CAP_UNBOUND(
 		    (void *)(uintptr_t)mu->m64.m_rb_lnk);
 	} else
 #endif
@@ -5680,7 +5680,7 @@ umtx_read_rb_list(struct thread *td, union umutex_all *mu, uintcap_t *rb_list,
 }
 
 static int
-umtx_handle_rb(struct thread *td, uintcap_t rbp, uintcap_t *rb_list, bool inact,
+umtx_handle_rb(struct thread *td, uintptr_t rbp, uintptr_t *rb_list, bool inact,
     bool compat32)
 {
 	union umutex_all mu;
@@ -5712,11 +5712,11 @@ umtx_handle_rb(struct thread *td, uintcap_t rbp, uintcap_t *rb_list, bool inact,
 }
 
 static void
-umtx_cleanup_rb_list(struct thread *td, uintcap_t rb_list, uintcap_t *rb_inact,
+umtx_cleanup_rb_list(struct thread *td, uintptr_t rb_list, uintptr_t *rb_inact,
     const char *name, bool compat32)
 {
 	int error, i;
-	uintcap_t rbp;
+	uintptr_t rbp;
 	bool inact;
 
 	if (rb_list == 0)
@@ -5748,7 +5748,7 @@ umtx_thread_cleanup(struct thread *td)
 {
 	struct umtx_q *uq;
 	struct umtx_pi *pi;
-	uintcap_t rb_inact = 0;
+	uintptr_t rb_inact = 0;
 	bool compat32;
 
 	/*

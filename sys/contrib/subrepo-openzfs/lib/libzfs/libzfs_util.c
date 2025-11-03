@@ -1256,7 +1256,7 @@ zcmd_write_src_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, nvlist_t *nvl)
 int
 zcmd_read_dst_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, nvlist_t **nvlp)
 {
-	if (nvlist_unpack((void *)(uintcap_t)zc->zc_nvlist_dst,
+	if (nvlist_unpack((void *)(uintptr_t)zc->zc_nvlist_dst,
 	    zc->zc_nvlist_dst_size, nvlp, 0) != 0)
 		return (no_memory(hdl));
 

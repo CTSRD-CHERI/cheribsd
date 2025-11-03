@@ -589,7 +589,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 		shmaddr = cheri_andperm(shmaddr, ~(CHERI_PERM_EXECUTE |
 		    CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |
 		    ((shmflg & SHM_RDONLY) != 0 ? CHERI_PERM_STORE : 0)));
-		td->td_retval[0] = (uintcap_t)__DECONST(void *,
+		td->td_retval[0] = (uintptr_t)__DECONST(void *,
 		    shmaddr);
 	} else
 #endif

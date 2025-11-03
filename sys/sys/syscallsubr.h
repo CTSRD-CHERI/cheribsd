@@ -148,7 +148,7 @@ int	kern_cap_rights_limit(struct thread *td, int fd, cap_rights_t *rights);
 int	kern_chdir(struct thread *td, const char *path,
 	    enum uio_seg pathseg);
 int	kern_cheri_cidcap_alloc(struct thread *td,
-	    uintcap_t *cidp);
+	    uintptr_t *cidp);
 int	kern_chflagsat(struct thread *td, int fd, const char *path,
 	    enum uio_seg pathseg, u_long flags, int atflag);
 int	kern_clock_getcpuclockid2(struct thread *td, id_t id, int which,
@@ -217,7 +217,7 @@ int	kern_fchmodat(struct thread *td, int fd, const char *path,
 int	kern_fchownat(struct thread *td, int fd, const char *path,
 	    enum uio_seg pathseg, int uid, int gid, int flag);
 int	kern_fcntl(struct thread *td, int fd, int cmd, intptr_t arg);
-int	kern_fcntl_freebsd(struct thread *td, int fd, int cmd, intcap_t arg);
+int	kern_fcntl_freebsd(struct thread *td, int fd, int cmd, intptr_t arg);
 int	kern_ffclock_getestimate(struct thread *td,
 	    struct ffclock_estimate *cest);
 int	kern_ffclock_setestimate(struct thread *td,

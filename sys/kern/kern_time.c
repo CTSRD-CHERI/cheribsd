@@ -1442,7 +1442,7 @@ ktimer_cheri_revoke(struct proc *p, const struct vm_cheri_revoke_cookie *crc)
 			continue;
 
 		vm_cheri_revoke_cap(crc,
-		    (uintcap_t *)&it->it_sigev.sigev_value.sival_ptr);
+		    (uintptr_t *)&it->it_sigev.sigev_value.sival_ptr);
 	}
 	PROC_UNLOCK(p);
 }

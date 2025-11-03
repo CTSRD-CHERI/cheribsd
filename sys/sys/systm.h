@@ -132,7 +132,7 @@ extern bool scheduler_stopped;
     ((void *)(uintptr_t)(ptr) == NULL ? NULL :				\
      ((vm_offset_t)(ptr) < 4096 ||					\
       (vm_offset_t)(ptr) > VM_MAXUSER_ADDRESS) ?			\
-	(void *)(uintcap_t)(ptraddr_t)(ptr) :		\
+	(void *)(uintptr_t)(ptraddr_t)(ptr) :		\
 	(is_offset) ?							\
 	__builtin_cheri_offset_set((cap), (ptraddr_t)(ptr)) :		\
 	__builtin_cheri_address_set((cap), (ptraddr_t)(ptr)))
@@ -444,7 +444,7 @@ int32_t	fuword32(volatile const void *base);
 int64_t	fuword64(volatile const void *base);
 #if __has_feature(capabilities)
 int __result_use_check fuecap(volatile const void *base,
-    intcap_t *val);
+    intptr_t *val);
 #define	fueptr			fuecap
 #else
 #define	fueptr(base, val)	fueword((base), (long *)(val))
@@ -467,7 +467,7 @@ int __result_use_or_ignore_check suword64(volatile void *base,
     int64_t word);
 #if __has_feature(capabilities)
 int __result_use_or_ignore_check sucap(volatile const void *base,
-    intcap_t val);
+    intptr_t val);
 #define	suptr			sucap
 #else
 #define	suptr			suword

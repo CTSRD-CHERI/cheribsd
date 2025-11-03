@@ -3304,7 +3304,7 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 		CP(cmd_compat, cmd, version);
 		CP(cmd_compat, cmd, handle);
 		if (oidp->oid_number == FFS_UNLINK)
-			cmd.value = (uintcap_t)__USER_CAP_STR(cmd_compat.value);
+			cmd.value = (uintptr_t)__USER_CAP_STR(cmd_compat.value);
 		else
 			CP(cmd_compat, cmd, value);
 		CP(cmd_compat, cmd, size);
@@ -3606,7 +3606,7 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 		if (fsckcmds) {
 			char buf[32];
 
-			if (copyinstr((char *)(intcap_t)cmd.value,
+			if (copyinstr((char *)(intptr_t)cmd.value,
 			    buf, sizeof(buf), NULL))
 				strncpy(buf, "Name_too_long", 32);
 			printf("%s: unlink %s (inode %jd)\n",
@@ -3621,7 +3621,7 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 		vn_finished_write(mp);
 		mp = NULL;
 		error = kern_funlinkat(td, AT_FDCWD,
-		    (char *)(intcap_t)cmd.value, FD_NONE,
+		    (char *)(intptr_t)cmd.value, FD_NONE,
 		    UIO_USERSPACE, 0, (ino_t)cmd.size);
 		break;
 
