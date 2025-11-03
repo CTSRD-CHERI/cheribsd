@@ -6,7 +6,6 @@ SRCS+=	cheribsdtest_bounds_globals.c					\
 	cheribsdtest_bounds_globals_x.c					\
 	cheribsdtest_bounds_heap.c					\
 	cheribsdtest_bounds_stack.c					\
-	cheribsdtest_cidcap.c						\
 	cheribsdtest_context.c						\
 	cheribsdtest_fault.c						\
 	cheribsdtest_flag_captured.c					\
@@ -20,9 +19,7 @@ SRCS+=	cheribsdtest_bounds_globals.c					\
 	cheribsdtest_printf.c						\
 	cheribsdtest_ptrace.c						\
 	cheribsdtest_registers.c					\
-	cheribsdtest_sealcap.c						\
 	cheribsdtest_signal.c						\
-	cheribsdtest_strfcap.c						\
 	cheribsdtest_string.c						\
 	cheribsdtest_syscall.c						\
 	cheribsdtest_tls.c						\
@@ -32,9 +29,12 @@ SRCS+=	cheribsdtest_bounds_globals.c					\
 	cheribsdtest_zlib.c
 .if ${MACHINE_ABI:Mpurecap}
 SRCS+=	cheribsdtest_bounds_subobject.c					\
+	cheribsdtest_cidcap.c						\
 	cheribsdtest_bounds_varargs.c					\
 	cheribsdtest_malloc.c						\
-	cheribsdtest_sentries.c
+	cheribsdtest_sealcap.c						\
+	cheribsdtest_sentries.c						\
+	cheribsdtest_strfcap.c
 .endif
 
 CHERIBSDTEST_DIR:=	${.PARSEDIR}
