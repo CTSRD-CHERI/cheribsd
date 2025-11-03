@@ -110,11 +110,11 @@ memopen(struct cdev *dev __unused, int flags, int fmt __unused,
 static int
 mem_read_cheri_caps(struct cdev *dev, const struct mem_cheri_cap_arg *arg)
 {
-	char capbuf[sizeof(uintcap_t) + 1];
+	char capbuf[sizeof(uintptr_t) + 1];
 	struct vm_page m;
 	vm_page_t marr[1];
-	uintcap_t *dst;
-	const uintcap_t *src;
+	uintptr_t *dst;
+	const uintptr_t *src;
 	vm_paddr_t pa;
 	vm_pointer_t mapped_ptr;
 	ptraddr_t va;
@@ -123,14 +123,14 @@ mem_read_cheri_caps(struct cdev *dev, const struct mem_cheri_cap_arg *arg)
 	int error;
 	bool mapped;
 
-	if (!is_aligned(arg->vaddr, sizeof(uintcap_t)))
+	if (!is_aligned(arg->vaddr, sizeof(uintptr_t)))
 		return (EINVAL);
-	if (arg->len == 0 || arg->len % (sizeof(uintcap_t) + 1) != 0)
+	if (arg->len == 0 || arg->len % (sizeof(uintptr_t) + 1) != 0)
 		return (EINVAL);
 
 	va = arg->vaddr;
 	dst = arg->buf;
-	len = arg->len / (sizeof(uintcap_t) + 1) * sizeof(uintcap_t);
+	len = arg->len / (sizeof(uintptr_t) + 1) * sizeof(uintptr_t);
 	error = 0;
 	while (len != 0 && error == 0) {
 		page_off = va & PAGE_MASK;
@@ -167,7 +167,7 @@ mem_read_cheri_caps(struct cdev *dev, const struct mem_cheri_cap_arg *arg)
 		va += todo;
 		len -= todo;
 
-		src = (uintcap_t *)((char *)mapped_ptr + page_off);
+		src = (uintptr_t *)((char *)mapped_ptr + page_off);
 		while (todo != 0) {
 			capbuf[0] = cheri_gettag(*src);
 			memcpy(capbuf + 1, src, sizeof(*src));
@@ -178,7 +178,7 @@ mem_read_cheri_caps(struct cdev *dev, const struct mem_cheri_cap_arg *arg)
 
 			src++;
 			dst++;
-			todo -= sizeof(uintcap_t);
+			todo -= sizeof(uintptr_t);
 		}
 
 		if (__predict_false(mapped))

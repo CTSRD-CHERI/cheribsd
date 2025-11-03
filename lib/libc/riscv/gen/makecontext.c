@@ -98,7 +98,7 @@ __makecontext(ucontext_t *ucp, void (*func)(void), int argc, ...)
 	/* Arrange for return via the trampoline code. */
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Can't use CTX_REG here since the c is a suffix instead of a prefix */
-	gp->cp_sepcc = (__uintcap_t)_ctx_start;
+	gp->cp_sepcc = (__uintptr_t)_ctx_start;
 #else
 	gp->gp_sepc = (__register_t)_ctx_start;
 #endif

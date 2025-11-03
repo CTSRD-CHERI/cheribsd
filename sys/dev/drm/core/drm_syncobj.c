@@ -1348,7 +1348,7 @@ drm_syncobj_wait_ioctl(struct drm_device *dev, void *data,
 		CP(*args64, *args, count_handles);
 		CP(*args64, *args, flags);
 		CP(*args64, *args, first_signaled);
-		args->handles = (uintcap_t)__USER_CAP(args64->handles,
+		args->handles = (uintptr_t)__USER_CAP(args64->handles,
 		    args64->count_handles * sizeof(uint64_t));
 	}
 #endif
@@ -1407,9 +1407,9 @@ drm_syncobj_timeline_wait_ioctl(struct drm_device *dev, void *data,
 		CP(*args64, *args, count_handles);
 		CP(*args64, *args, flags);
 		CP(*args64, *args, first_signaled);
-		args->handles = (uintcap_t)__USER_CAP(args64->handles,
+		args->handles = (uintptr_t)__USER_CAP(args64->handles,
 		    args64->count_handles * sizeof(uint64_t));
-		args->points = (uintcap_t)__USER_CAP(args64->points,
+		args->points = (uintptr_t)__USER_CAP(args64->points,
 		    args64->count_handles * sizeof(uint64_t));
 	}
 #endif
@@ -1468,7 +1468,7 @@ drm_syncobj_reset_ioctl(struct drm_device *dev, void *data,
 		args64 = (struct drm_syncobj_array64 *)data;
 		args = &local_args;
 		CP(*args64, *args, count_handles);
-		args->handles = (uintcap_t)__USER_CAP(args64->handles,
+		args->handles = (uintptr_t)__USER_CAP(args64->handles,
 		    args64->count_handles * sizeof(uint64_t));
 	}
 #endif
@@ -1515,7 +1515,7 @@ drm_syncobj_signal_ioctl(struct drm_device *dev, void *data,
 		args64 = (struct drm_syncobj_array64 *)data;
 		args = &local_args;
 		CP(*args64, *args, count_handles);
-		args->handles = (uintcap_t)__USER_CAP(args64->handles,
+		args->handles = (uintptr_t)__USER_CAP(args64->handles,
 		    args64->count_handles * sizeof(uint64_t));
 	}
 #endif
@@ -1565,9 +1565,9 @@ drm_syncobj_timeline_signal_ioctl(struct drm_device *dev, void *data,
 		args = &local_args;
 		CP(*args64, *args, count_handles);
 		CP(*args64, *args, flags);
-		args->handles = (uintcap_t)__USER_CAP(args64->handles,
+		args->handles = (uintptr_t)__USER_CAP(args64->handles,
 		    args64->count_handles * sizeof(uint64_t));
-		args->points = (uintcap_t)__USER_CAP(args64->points,
+		args->points = (uintptr_t)__USER_CAP(args64->points,
 		    args64->count_handles * sizeof(uint64_t));
 	}
 #endif
@@ -1653,9 +1653,9 @@ int drm_syncobj_query_ioctl(struct drm_device *dev, void *data,
 		args = &local_args;
 		CP(*args64, *args, count_handles);
 		CP(*args64, *args, flags);
-		args->handles = (uintcap_t)__USER_CAP(args64->handles,
+		args->handles = (uintptr_t)__USER_CAP(args64->handles,
 		    args64->count_handles * sizeof(uint64_t));
-		args->points = (uintcap_t)__USER_CAP(args64->points,
+		args->points = (uintptr_t)__USER_CAP(args64->points,
 		    args64->count_handles * sizeof(uint64_t));
 		points = u64_to_user_ptr(args->points);
 	}

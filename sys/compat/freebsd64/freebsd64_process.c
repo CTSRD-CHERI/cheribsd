@@ -263,7 +263,7 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 			break;
 		CP(r64.piod, r.piod, piod_op);
 		r.piod.piod_offs =
-		    (void *)(uintcap_t)r64.piod.piod_offs;
+		    (void *)(uintptr_t)r64.piod.piod_offs;
 		r.piod.piod_addr = __USER_CAP(r64.piod.piod_addr,
 		    r64.piod.piod_len);
 		CP(r64.piod, r.piod, piod_len);

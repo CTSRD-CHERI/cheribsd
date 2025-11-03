@@ -39,7 +39,7 @@
 
 #ifdef _KERNEL
 /* XXX: Convert faulting CBuildCap into tag-stripping. */
-extern void *cheri_buildcap_safe(void *, intcap_t);
+extern void *cheri_buildcap_safe(void *, intptr_t);
 
 #undef cheri_buildcap
 #define	cheri_buildcap(x, y)	cheri_buildcap_safe((x), (y))

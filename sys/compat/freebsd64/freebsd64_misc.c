@@ -261,7 +261,7 @@ freebsd64_kevent_copyin(void *arg, struct kevent *kevp, int count)
 		kevp[i].fflags = ks64[i].fflags;
 		kevp[i].data = ks64[i].data;
 		/* Store untagged. */
-		kevp[i].udata = (void *)(intcap_t)ks64[i].udata;
+		kevp[i].udata = (void *)(intptr_t)ks64[i].udata;
 		memcpy(&kevp[i].ext[0], &ks64->ext[0], sizeof(ks64->ext));
 	}
 	uap->changelist += count;
@@ -349,7 +349,7 @@ kevent11_freebsd64_copyin(void *arg, struct kevent *kevp, int count)
 		kevp->flags = kev11.flags;
 		kevp->fflags = kev11.fflags;
 		kevp->data = kev11.data;
-		kevp->udata = (void *)(uintcap_t)kev11.udata;
+		kevp->udata = (void *)(uintptr_t)kev11.udata;
 		bzero(&kevp->ext, sizeof(kevp->ext));
 		uap->changelist++;
 		kevp++;
@@ -708,12 +708,12 @@ freebsd64_nmount(struct thread *td, struct freebsd64_nmount_args *uap)
 }
 
 int
-freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
+freebsd64_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 {
 	int argc, envc;
 	uint64_t *vectp;
 	char *stringp;
-	uintcap_t destp, ustringp;
+	uintptr_t destp, ustringp;
 	struct freebsd64_ps_strings *arginfo;
 	struct proc *p;
 	struct sysentvec *sysent;
@@ -727,7 +727,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	KASSERT(imgp->stack == imgp->strings,
 	    ("%s: stack != strings", __func__));
 
-	destp = (uintcap_t)imgp->strings;
+	destp = (uintptr_t)imgp->strings;
 	destp = cheri_setaddress(destp, PROC_PS_STRINGS(p));
 	arginfo = (struct freebsd64_ps_strings *)
 	    cheri_setboundsexact(destp, sizeof(*arginfo));
@@ -811,7 +811,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	/*
 	 * vectp also becomes our initial stack base
 	 */
-	*stack_base = (uintcap_t)vectp; // XXX-AM: should bound?
+	*stack_base = (uintptr_t)vectp; // XXX-AM: should bound?
 
 	stringp = imgp->args->begin_argv;
 	argc = imgp->args->argc;
@@ -873,7 +873,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		imgp->auxv = cheri_setbounds(vectp,
 		    AT_COUNT * sizeof(Elf64_Auxinfo));
 		error = imgp->sysent->sv_copyout_auxargs(imgp,
-		    (uintcap_t)imgp->auxv);
+		    (uintptr_t)imgp->auxv);
 		if (error != 0)
 			return (error);
 	}
@@ -1172,7 +1172,7 @@ freebsd64_cpuset_setdomain(struct thread *td,
 int
 freebsd64_fcntl(struct thread *td, struct freebsd64_fcntl_args *uap)
 {
-	intcap_t arg;
+	intptr_t arg;
 
 	switch (uap->cmd) {
 	case F_GETLK:
@@ -1182,10 +1182,10 @@ freebsd64_fcntl(struct thread *td, struct freebsd64_fcntl_args *uap)
 	case F_SETLK:
 	case F_SETLKW:
 	case F_SETLK_REMOTE:
-		arg = (intcap_t)__USER_CAP_UNBOUND(uap->arg);
+		arg = (intptr_t)__USER_CAP_UNBOUND(uap->arg);
 		break;
 	default:
-		arg = (intcap_t)uap->arg;
+		arg = (intptr_t)uap->arg;
 	}
 
 	return (kern_fcntl_freebsd(td, uap->fd, uap->cmd, arg));
@@ -1681,10 +1681,10 @@ freebsd64_thr_new_initthr(struct thread *td, void *thunk)
 	stack.ss_sp = __USER_CAP_UNBOUND(param->stack_base);
 	stack.ss_size = param->stack_size;
 	cpu_set_upcall(td,
-	    (void (*)(void *))(uintcap_t)param->start_func,
-	    (void *)(uintcap_t)param->arg, &stack);
+	    (void (*)(void *))(uintptr_t)param->start_func,
+	    (void *)(uintptr_t)param->arg, &stack);
 	return (cpu_set_user_tls(td,
-		(void *)(uintcap_t)param->tls_base));
+		(void *)(uintptr_t)param->tls_base));
 }
 
 int

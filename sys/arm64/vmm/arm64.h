@@ -48,23 +48,23 @@ struct hypctx {
 #if __has_feature(capabilities)
 	uint64_t	cctlr_el0;
 	uint64_t	cctlr_el1;
-	uintcap_t	cid_el0;
-	uintcap_t	ddc_el0;
-	uintcap_t	rcsp_el0;
-	uintcap_t	rddc_el0;
-	uintcap_t	rctpidr_el0;
+	uintptr_t	cid_el0;
+	uintptr_t	ddc_el0;
+	uintptr_t	rcsp_el0;
+	uintptr_t	rddc_el0;
+	uintptr_t	rctpidr_el0;
 #endif
 
 	/*
 	 * EL1 control registers.
 	 */
 #if __has_feature(capabilities)
-	uintcap_t	elr_el1;	/* Exception Link Register */
-	uintcap_t	sp_el0;		/* Stack pointer */
-	uintcap_t	tpidr_el0;	/* EL0 Software ID Register */
-	uintcap_t	tpidrro_el0;	/* Read-only Thread ID Register */
-	uintcap_t	tpidr_el1;	/* EL1 Software ID Register */
-	uintcap_t	vbar_el1;	/* Vector Base Address Register */
+	uintptr_t	elr_el1;	/* Exception Link Register */
+	uintptr_t	sp_el0;		/* Stack pointer */
+	uintptr_t	tpidr_el0;	/* EL0 Software ID Register */
+	uintptr_t	tpidrro_el0;	/* Read-only Thread ID Register */
+	uintptr_t	tpidr_el1;	/* EL1 Software ID Register */
+	uintptr_t	vbar_el1;	/* Vector Base Address Register */
 #else
 	uint64_t	elr_el1;	/* Exception Link Register */
 	uint64_t	sp_el0;		/* Stack pointer */
@@ -156,15 +156,15 @@ DEFINE_VMMOPS_IFUNC(int, modcleanup, (void))
 DEFINE_VMMOPS_IFUNC(void *, init, (struct vm *vm, struct pmap *pmap))
 DEFINE_VMMOPS_IFUNC(int, gla2gpa, (void *vcpui, struct vm_guest_paging *paging,
     uint64_t gla, int prot, uint64_t *gpa, int *is_fault))
-DEFINE_VMMOPS_IFUNC(int, run, (void *vcpui, uintcap_t pc, struct pmap *pmap,
+DEFINE_VMMOPS_IFUNC(int, run, (void *vcpui, uintptr_t pc, struct pmap *pmap,
     struct vm_eventinfo *info))
 DEFINE_VMMOPS_IFUNC(void, cleanup, (void *vmi))
 DEFINE_VMMOPS_IFUNC(void *, vcpu_init, (void *vmi, struct vcpu *vcpu,
     int vcpu_id))
 DEFINE_VMMOPS_IFUNC(void, vcpu_cleanup, (void *vcpui))
 DEFINE_VMMOPS_IFUNC(int, exception, (void *vcpui, uint64_t esr, uint64_t far))
-DEFINE_VMMOPS_IFUNC(int, getreg, (void *vcpui, int num, uintcap_t *retval))
-DEFINE_VMMOPS_IFUNC(int, setreg, (void *vcpui, int num, uintcap_t val))
+DEFINE_VMMOPS_IFUNC(int, getreg, (void *vcpui, int num, uintptr_t *retval))
+DEFINE_VMMOPS_IFUNC(int, setreg, (void *vcpui, int num, uintptr_t val))
 DEFINE_VMMOPS_IFUNC(int, getcap, (void *vcpui, int num, int *retval))
 DEFINE_VMMOPS_IFUNC(int, setcap, (void *vcpui, int num, int val))
 DEFINE_VMMOPS_IFUNC(struct vmspace *, vmspace_alloc, (vm_offset_t min,
@@ -179,7 +179,7 @@ DEFINE_VMMOPS_IFUNC(int, restore_tsc, (void *vcpui, uint64_t now))
 #endif
 #endif
 
-uintptr_t	vmm_call_hyp_init(uintcap_t);
+uintptr_t	vmm_call_hyp_init(uintptr_t);
 uintptr_t	vmm_call_hyp0(uint64_t);
 uintptr_t	vmm_call_hyp1(uint64_t, uintptr_t);
 uintptr_t	vmm_call_hyp2(uint64_t, uintptr_t, uintptr_t);

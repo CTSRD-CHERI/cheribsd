@@ -147,7 +147,7 @@ struct kaiocb {
 	struct	file *fd_file;		/* (*) pointer to file structure */
 	struct	aioliojob *lio;		/* (*) optional lio job */
 	void	*ujob;			/* (*) pointer to userspace aiocb */
-	intcap_t	ujobptr;
+	intptr_t	ujobptr;
 	struct	knlist klist;		/* (a) list of knotes */
 	struct	aiocb uaiocb;		/* (*) copy of user I/O control block */
 	struct	uio uio;		/* (*) storage for non-vectored uio */

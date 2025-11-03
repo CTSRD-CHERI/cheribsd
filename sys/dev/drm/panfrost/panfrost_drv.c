@@ -281,10 +281,10 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 		CP(*args64, *args, requirements);
 
 		sz = args64->in_sync_count * sizeof(uint32_t);
-		args->in_syncs = (uintcap_t)__USER_CAP(args64->in_syncs, sz);
+		args->in_syncs = (uintptr_t)__USER_CAP(args64->in_syncs, sz);
 
 		sz = args64->bo_handle_count * sizeof(uint32_t);
-		args->bo_handles = (uintcap_t)__USER_CAP(args64->bo_handles,sz);
+		args->bo_handles = (uintptr_t)__USER_CAP(args64->bo_handles,sz);
 	}
 #endif
 

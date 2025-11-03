@@ -39,7 +39,7 @@
  * address in elr and setting or clearing PSR_C64 in a trapframe.
  */
 static __inline void
-trapframe_set_elr(struct trapframe *tf, uintcap_t elr)
+trapframe_set_elr(struct trapframe *tf, uintptr_t elr)
 {
 	extern void *sentry_unsealcap;
 
@@ -57,7 +57,7 @@ trapframe_set_elr(struct trapframe *tf, uintcap_t elr)
 #endif
 
 #if __has_feature(capabilities)
-#define	cheri_capmode(cap)	(__typeof(cap))((uintcap_t)(cap) | 1)
+#define	cheri_capmode(cap)	(__typeof(cap))((uintptr_t)(cap) | 1)
 #endif
 
 #endif /* !_MACHINE_CHERIC_H_ */

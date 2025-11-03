@@ -311,7 +311,7 @@ struct dup2_args {
 	char to_l_[PADL_(u_int)]; u_int to; char to_r_[PADR_(u_int)];
 };
 struct cheri_cidcap_alloc_args {
-	char cidp_l_[PADL_(uintcap_t *)]; uintcap_t * cidp; char cidp_r_[PADR_(uintcap_t *)];
+	char cidp_l_[PADL_(uintptr_t *)]; uintptr_t * cidp; char cidp_r_[PADR_(uintptr_t *)];
 };
 struct fcntl_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];

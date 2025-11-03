@@ -561,11 +561,11 @@ dtrace_load##bits(uintptr_t addr)					\
 }
 
 #if __has_feature(capabilities)
-static uintcap_t
-dtrace_loadcap(uintcap_t addr)
+static uintptr_t
+dtrace_loadcap(uintptr_t addr)
 {
 	size_t size = 16;
-	uintcap_t rval;
+	uintptr_t rval;
 	volatile uint16_t *flags = (volatile uint16_t *)
 	    &cpu_core[curcpu].cpuc_dtrace_flags;
 
@@ -584,7 +584,7 @@ dtrace_loadcap(uintcap_t addr)
 	}
 
 	*flags |= CPU_DTRACE_NOFAULT;
-	rval = *((volatile uintcap_t *)addr);
+	rval = *((volatile uintptr_t *)addr);
 	*flags &= ~CPU_DTRACE_NOFAULT;
 
 	return (!(*flags & CPU_DTRACE_FAULT) ? rval : 0);
@@ -6410,7 +6410,7 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 #if __has_feature(capabilities)
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
 			regs[rd] = dtrace_fucap(
-			    (void *)(uintcap_t)regs[r1]);
+			    (void *)(uintptr_t)regs[r1]);
 			DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
 #else
 			*flags |= CPU_DTRACE_ILLOP;
@@ -6970,7 +6970,7 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 				*illval = regs[rd];
 				break;
 			}
-			*((uintcap_t *)(uintptr_t)regs[rd]) = regs[r1];
+			*((uintptr_t *)(uintptr_t)regs[rd]) = regs[r1];
 #else
 			*flags |= CPU_DTRACE_ILLOP;
 #endif
@@ -10188,7 +10188,7 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 		case sizeof (uint32_t):
 		case sizeof (uint64_t):
 #if __has_feature(capabilities)
-		case sizeof(uintcap_t):
+		case sizeof(uintptr_t):
 #endif
 			break;
 
@@ -13387,7 +13387,7 @@ dtrace_dof_create(dtrace_state_t *state)
 }
 
 static dof_hdr_t *
-dtrace_dof_copyin(uintcap_t uarg, int *errp)
+dtrace_dof_copyin(uintptr_t uarg, int *errp)
 {
 	dof_hdr_t hdr, *dof;
 

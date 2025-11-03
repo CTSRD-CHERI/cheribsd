@@ -932,7 +932,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 	    ptr, val, sysctl_handle_cap, "P", descr);		\
 	CTASSERT((((access) & CTLTYPE) == 0 ||			\
 	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_CAP) && \
-	    sizeof(uintcap_t) == sizeof(*(ptr)))
+	    sizeof(uintptr_t) == sizeof(*(ptr)))
 #endif
 
 #define	SYSCTL_FOREACH(oidp, list) \

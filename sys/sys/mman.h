@@ -193,7 +193,7 @@
 #ifndef _KERNEL
 #define	SHM_ANON		((char *)1)
 #else
-#define	SHM_ANON		((char *)(intcap_t)1)
+#define	SHM_ANON		((char *)(intptr_t)1)
 #endif
 
 /*

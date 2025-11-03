@@ -87,8 +87,8 @@ cheri_otype_free(otype_t cap)
 #ifndef CHERI_CAPREVOKE_CLEARTAGS
 
 /* If this changes, make the comment in sys/cheri/revoke.h match! */
-uintcap_t
-cheri_revoke_sealed(uintcap_t c)
+uintptr_t
+cheri_revoke_sealed(uintptr_t c)
 {
 	c = cheri_unseal(c, kernel_root_sealcap);
 	c = cheri_andperm(c, 0);

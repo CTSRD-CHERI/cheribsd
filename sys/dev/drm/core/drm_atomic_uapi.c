@@ -898,7 +898,7 @@ int drm_atomic_get_property(struct drm_mode_object *obj,
  */
 
 static struct drm_pending_vblank_event *create_vblank_event(
-		struct drm_crtc *crtc, uintcap_t user_data)
+		struct drm_crtc *crtc, uintptr_t user_data)
 {
 	struct drm_pending_vblank_event *e = NULL;
 
@@ -1309,10 +1309,10 @@ int drm_mode_atomic_ioctl(struct drm_device *dev,
 		CP(*arg64, *arg, count_objs);
 		CP(*arg64, *arg, user_data);
 		CP(*arg64, *arg, reserved);
-		arg->objs_ptr = (uintcap_t)__USER_CAP(
+		arg->objs_ptr = (uintptr_t)__USER_CAP(
 		    arg64->objs_ptr,
 		    arg64->count_objs * sizeof(uint32_t));
-		arg->count_props_ptr = (uintcap_t)__USER_CAP(
+		arg->count_props_ptr = (uintptr_t)__USER_CAP(
 		    arg64->count_props_ptr,
 		    arg64->count_objs * sizeof(uint32_t));
 	}

@@ -928,7 +928,7 @@ linux_file_ioctl_sub(struct file *fp, struct linux_file *filp,
 		 */
 		task->bsd_ioctl_data = data;
 		task->bsd_ioctl_len = size;
-		udata = (void *)(uintcap_t)LINUX_IOCTL_MIN_PTR;
+		udata = (void *)(uintptr_t)LINUX_IOCTL_MIN_PTR;
 	} else {
 		/* fetch user-space pointer */
 		udata = *(void **)data;
@@ -938,7 +938,7 @@ linux_file_ioctl_sub(struct file *fp, struct linux_file *filp,
 		/* try the compat IOCTL handler first */
 		if (fop->compat_ioctl != NULL) {
 			error = -OPW(fp, td, fop->compat_ioctl(filp,
-			    cmd, (uintcap_t)udata));
+			    cmd, (uintptr_t)udata));
 		} else {
 			error = ENOTTY;
 		}
@@ -946,14 +946,14 @@ linux_file_ioctl_sub(struct file *fp, struct linux_file *filp,
 		/* fallback to the regular IOCTL handler, if any */
 		if (error == ENOTTY && fop->unlocked_ioctl != NULL) {
 			error = -OPW(fp, td, fop->unlocked_ioctl(filp,
-			    cmd, (uintcap_t)udata));
+			    cmd, (uintptr_t)udata));
 		}
 	} else
 #endif
 	{
 		if (fop->unlocked_ioctl != NULL) {
 			error = -OPW(fp, td, fop->unlocked_ioctl(filp,
-			    cmd, (uintcap_t)udata));
+			    cmd, (uintptr_t)udata));
 		} else {
 			error = ENOTTY;
 		}

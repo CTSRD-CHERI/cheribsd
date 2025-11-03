@@ -47,7 +47,7 @@
 /* Check the coarse-grained MAP bitmap */
 static inline unsigned long
 vm_cheri_revoke_test_mem_map(const uint8_t *crshadow,
-    uintcap_t cut)
+    uintptr_t cut)
 {
 	uint8_t bmbits;
 	const uint8_t *bmloc;
@@ -85,7 +85,7 @@ vm_cheri_revoke_test_mem_map(const uint8_t *crshadow,
 /* Check the fine-grained NOMAP bitmap */
 static inline unsigned long
 vm_cheri_revoke_test_mem_nomap(const uint8_t *crshadow,
-    uintcap_t cut)
+    uintptr_t cut)
 {
 	uint8_t bmbits;
 	const uint8_t *bmloc;
@@ -118,7 +118,7 @@ vm_cheri_revoke_test_mem_nomap(const uint8_t *crshadow,
 }
 
 static inline unsigned
-vm_cheri_revoke_test_range(vm_offset_t start, vm_offset_t end, uintcap_t cut)
+vm_cheri_revoke_test_range(vm_offset_t start, vm_offset_t end, uintptr_t cut)
 {
 	ptraddr_t va = cheri_getbase(cut);
 
@@ -130,7 +130,7 @@ vm_cheri_revoke_test_range(vm_offset_t start, vm_offset_t end, uintcap_t cut)
 
 static unsigned long
 vm_cheri_revoke_test_just_mem(const uint8_t *crshadow,
-    uintcap_t cut, unsigned long perms, vm_offset_t start, vm_offset_t end)
+    uintptr_t cut, unsigned long perms, vm_offset_t start, vm_offset_t end)
 {
 	if ((perms & (CHERI_PERMS_HWALL_MEMORY | CHERI_PERM_SW_VMEM)) != 0) {
 		if (vm_cheri_revoke_test_mem_map(crshadow, cut))
@@ -145,7 +145,7 @@ vm_cheri_revoke_test_just_mem(const uint8_t *crshadow,
 
 static unsigned long
 vm_cheri_revoke_test_just_mem_fine(const uint8_t *crshadow,
-    uintcap_t cut, unsigned long perms, vm_offset_t start, vm_offset_t end)
+    uintptr_t cut, unsigned long perms, vm_offset_t start, vm_offset_t end)
 {
 	/*
 	 * Most capabilities are memory capabilities, most are unrevoked,
@@ -166,7 +166,7 @@ vm_cheri_revoke_test_just_mem_fine(const uint8_t *crshadow,
 
 static unsigned long
 vm_cheri_revoke_test_mem_fine_range(const uint8_t *crshadow,
-    uintcap_t cut, unsigned long perms, vm_offset_t start, vm_offset_t end)
+    uintptr_t cut, unsigned long perms, vm_offset_t start, vm_offset_t end)
 {
 	/*
 	 * Only check the capability if it has some memory permissions.

@@ -55,12 +55,12 @@ memcpy_c(void *dst0, const void *src0, size_t len)
 		/* Forwards. */
 
 		/* Do both buffers have the same relative alignment? */
-		if ((dst_addr ^ src_addr) % sizeof(uintcap_t) == 0 &&
-		    len >= sizeof(uintcap_t)) {
+		if ((dst_addr ^ src_addr) % sizeof(uintptr_t) == 0 &&
+		    len >= sizeof(uintptr_t)) {
 			/* Byte copy to get aligned. */
-			tocopy = dst_addr % sizeof(uintcap_t);
+			tocopy = dst_addr % sizeof(uintptr_t);
 			if (tocopy != 0) {
-				tocopy = sizeof(uintcap_t) - tocopy;
+				tocopy = sizeof(uintptr_t) - tocopy;
 				KASSERT(tocopy <= len, ("tocopy %d too large", tocopy));
 				do {
 					*dst++ = *src++;
@@ -68,20 +68,20 @@ memcpy_c(void *dst0, const void *src0, size_t len)
 				} while (--tocopy != 0);
 			}
 
-			KASSERT((ptraddr_t)dst % sizeof(uintcap_t) == 0,
+			KASSERT((ptraddr_t)dst % sizeof(uintptr_t) == 0,
 			    ("dst %p not aligned",
 			    (void *)(uintptr_t)dst));
-			KASSERT((ptraddr_t)src % sizeof(uintcap_t) == 0,
+			KASSERT((ptraddr_t)src % sizeof(uintptr_t) == 0,
 			    ("src %p not aligned",
 			    (void *)(uintptr_t)src));
 
 			/* Copy capabilities. */
-			while (len >= sizeof(uintcap_t)) {
-				*(uintcap_t *)dst =
-				    *(const uintcap_t *)src;
-				dst += sizeof(uintcap_t);
-				src += sizeof(uintcap_t);
-				len -= sizeof(uintcap_t);
+			while (len >= sizeof(uintptr_t)) {
+				*(uintptr_t *)dst =
+				    *(const uintptr_t *)src;
+				dst += sizeof(uintptr_t);
+				src += sizeof(uintptr_t);
+				len -= sizeof(uintptr_t);
 			}
 		}
 
@@ -100,10 +100,10 @@ memcpy_c(void *dst0, const void *src0, size_t len)
 		src_addr = (ptraddr_t)src;
 		
 		/* Do both buffers have the same relative alignment? */
-		if ((dst_addr ^ src_addr) % sizeof(uintcap_t) == 0 &&
-		    len >= sizeof(uintcap_t)) {
+		if ((dst_addr ^ src_addr) % sizeof(uintptr_t) == 0 &&
+		    len >= sizeof(uintptr_t)) {
 			/* Byte copy to get aligned. */
-			tocopy = dst_addr % sizeof(uintcap_t);
+			tocopy = dst_addr % sizeof(uintptr_t);
 			if (tocopy != 0) {
 				KASSERT(tocopy <= len, ("tocopy %d too large", tocopy));
 				do {
@@ -112,18 +112,18 @@ memcpy_c(void *dst0, const void *src0, size_t len)
 				} while (--tocopy != 0);
 			}
 
-			KASSERT((ptraddr_t)dst % sizeof(uintcap_t) == 0,
+			KASSERT((ptraddr_t)dst % sizeof(uintptr_t) == 0,
 			    ("dst %p not aligned", (void *)(uintptr_t)dst));
-			KASSERT((ptraddr_t)src % sizeof(uintcap_t) == 0,
+			KASSERT((ptraddr_t)src % sizeof(uintptr_t) == 0,
 			    ("src %p not aligned", (void *)(uintptr_t)src));
 
 			/* Copy capabilities. */
-			while (len >= sizeof(uintcap_t)) {
-				dst -= sizeof(uintcap_t);
-				src -= sizeof(uintcap_t);
-				*(uintcap_t *)dst =
-				    *(const uintcap_t *)src;
-				len -= sizeof(uintcap_t);
+			while (len >= sizeof(uintptr_t)) {
+				dst -= sizeof(uintptr_t);
+				src -= sizeof(uintptr_t);
+				*(uintptr_t *)dst =
+				    *(const uintptr_t *)src;
+				len -= sizeof(uintptr_t);
 			}
 		}
 

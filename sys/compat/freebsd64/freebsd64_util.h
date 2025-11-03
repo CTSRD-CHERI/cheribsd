@@ -102,7 +102,7 @@ int    freebsd64_syscall_helper_unregister(struct syscall_helper_data *sd);
 
 struct iovec64;
 int	freebsd64_copyout_strings(struct image_params *imgp,
-	    uintcap_t *);
+	    uintptr_t *);
 int	freebsd64_copyiniov(const struct iovec *cb_arg,
 	    u_int iovcnt, struct iovec **iov, int error);
 int	freebsd64_copyinuio(const struct iovec *cb_arg,

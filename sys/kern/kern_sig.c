@@ -1856,9 +1856,9 @@ void
 sig_thread_cheri_revoke(struct thread *td,
     const struct vm_cheri_revoke_cookie *crc)
 {
-	vm_cheri_revoke_cap(crc, (uintcap_t *)&td->td_sigstk.ss_sp);
+	vm_cheri_revoke_cap(crc, (uintptr_t *)&td->td_sigstk.ss_sp);
 	if ((td->td_pflags & TDP_SIGFASTBLOCK) != 0)
-		vm_cheri_revoke_cap(crc, (uintcap_t *)&td->td_sigblock_ptr);
+		vm_cheri_revoke_cap(crc, (uintptr_t *)&td->td_sigblock_ptr);
 }
 #endif
 
@@ -3302,8 +3302,8 @@ sigprocess(struct thread *td, int sig)
 	 * Return the signal's number, or fall through
 	 * to clear it from the pending mask.
 	 */
-	switch ((intcap_t)p->p_sigacts->ps_sigact[_SIG_IDX(sig)]) {
-	case (intcap_t)SIG_DFL:
+	switch ((intptr_t)p->p_sigacts->ps_sigact[_SIG_IDX(sig)]) {
+	case (intptr_t)SIG_DFL:
 		/*
 		 * Don't take default actions on system processes.
 		 */
@@ -3365,7 +3365,7 @@ sigprocess(struct thread *td, int sig)
 			return (SIGSTATUS_HANDLE);
 		}
 
-	case (intcap_t)SIG_IGN:
+	case (intptr_t)SIG_IGN:
 		if ((td->td_flags & TDF_SIGWAIT) == 0)
 			return (SIGSTATUS_IGNORE);
 		else

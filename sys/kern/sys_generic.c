@@ -735,7 +735,7 @@ user_ioctl(struct thread *td, int fd, u_long ucom,
 	if (size > 0) {
 		if (com & IOC_VOID) {
 			/* Integer argument. */
-			arg = (intptr_t)(intcap_t)udata;
+			arg = (intptr_t)(intptr_t)udata;
 			data = (void *)&arg;
 			size = 0;
 		} else {

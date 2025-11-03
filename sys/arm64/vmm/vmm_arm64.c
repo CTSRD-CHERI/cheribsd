@@ -126,7 +126,7 @@ arm_setup_vectors(void *arg)
 	vm_pointer_t stack_top;
 	uint32_t sctlr_el2;
 	register_t daif;
-	uintcap_t codep;
+	uintptr_t codep;
 
 	el2_regs = arg;
 	arm64_set_active_vcpu(NULL);
@@ -162,14 +162,14 @@ arm_setup_vectors(void *arg)
 		 */
 #if __has_feature(capabilities)
 #ifdef __CHERI_PURE_CAPABILITY__
-		codep = (uintcap_t)cheri_setaddress(kernel_root_cap,
+		codep = (uintptr_t)cheri_setaddress(kernel_root_cap,
 		    vtophys(&vmm_hyp_code));
 		codep = cheri_andperm(codep, cheri_getperm(cheri_getpcc()));
 #else
-		codep = (uintcap_t)cheri_setaddress(cheri_getpcc(),
+		codep = (uintptr_t)cheri_setaddress(cheri_getpcc(),
 		    vtophys(&vmm_hyp_code));
 #endif
-		codep = (uintcap_t)cheri_setbounds(codep, hyp_code_len);
+		codep = (uintptr_t)cheri_setbounds(codep, hyp_code_len);
 #else
 		codep = vtophys(&vmm_hyp_code);
 #endif
@@ -1145,7 +1145,7 @@ fault:
 }
 
 int
-vmmops_run(void *vcpui, uintcap_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
+vmmops_run(void *vcpui, uintptr_t pc, pmap_t pmap, struct vm_eventinfo *evinfo)
 {
 	uint64_t excp_type;
 	int handled;
@@ -1392,7 +1392,7 @@ hypctx_regptr(struct hypctx *hypctx, int reg)
 }
 
 int
-vmmops_getreg(void *vcpui, int reg, uintcap_t *retval)
+vmmops_getreg(void *vcpui, int reg, uintptr_t *retval)
 {
 	void *regp;
 	int running, hostcpu;
@@ -1422,7 +1422,7 @@ vmmops_getreg(void *vcpui, int reg, uintcap_t *retval)
 	case VM_REG_GUEST_CID:
 	case VM_REG_GUEST_C0 ... VM_REG_GUEST_C30:
 #endif
-		*retval = *(uintcap_t *)regp;
+		*retval = *(uintptr_t *)regp;
 		break;
 	default:
 		*retval = *(uint64_t *)regp;
@@ -1432,7 +1432,7 @@ vmmops_getreg(void *vcpui, int reg, uintcap_t *retval)
 }
 
 int
-vmmops_setreg(void *vcpui, int reg, uintcap_t val)
+vmmops_setreg(void *vcpui, int reg, uintptr_t val)
 {
 	void *regp;
 	struct hypctx *hypctx = vcpui;
@@ -1455,7 +1455,7 @@ vmmops_setreg(void *vcpui, int reg, uintcap_t val)
 		 * capability for the entire guest virtual address
 		 * space, so we must derive a capability here.
 		 */
-		*(uintcap_t *)regp = (uintcap_t)
+		*(uintptr_t *)regp = (uintptr_t)
 		    cheri_setaddress(kernel_root_cap, val);
 		break;
 #endif
@@ -1472,7 +1472,7 @@ vmmops_setreg(void *vcpui, int reg, uintcap_t val)
 	case VM_REG_GUEST_CID:
 	case VM_REG_GUEST_C0 ... VM_REG_GUEST_C30:
 #endif
-		*(uintcap_t *)regp = val;
+		*(uintptr_t *)regp = val;
 		break;
 	default:
 		*(uint64_t *)regp = (uint64_t)val;

@@ -2877,7 +2877,7 @@ knote_cheri_revoke_epoch_next(struct knote *kn)
 
 static int
 kqueue_cheri_revoke_note(const struct vm_cheri_revoke_cookie *crc,
-    struct kqueue *kq, struct knote *kn, uintcap_t id, uintcap_t ud)
+    struct kqueue *kq, struct knote *kn, uintptr_t id, uintptr_t ud)
 {
 	CHERI_REVOKE_STATS_FOR(crst, crc);
 	int res = 1;
@@ -2926,8 +2926,8 @@ kqueue_cheri_revoke_list(struct kqueue *kq,
 		 * so we don't revisit them every time?
 		 */
 
-		uintcap_t ud = (uintcap_t)kn->kn_kevent.udata;
-		uintcap_t id = kn->kn_kevent.ident;
+		uintptr_t ud = (uintptr_t)kn->kn_kevent.udata;
+		uintptr_t id = kn->kn_kevent.ident;
 		if (!cheri_gettag(ud) && !cheri_gettag(id)) {
 			continue;
 		} else {

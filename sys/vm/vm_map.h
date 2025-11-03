@@ -201,7 +201,7 @@ vm_map_entry_system_wired_count(vm_map_entry_t entry)
  * Returns any nonzero value to indicate revocation required.
  */
 typedef unsigned long (*vm_cheri_revoke_test_fn)(
-    const uint8_t *shadow, uintcap_t cut, unsigned long cutperm,
+    const uint8_t *shadow, uintptr_t cut, unsigned long cutperm,
     vm_offset_t start, vm_offset_t end);
 
 #ifdef CHERI_CAPREVOKE_STATS
@@ -384,7 +384,7 @@ struct vmspace {
 	caddr_t vm_daddr;	/* (c) user virtual address of data */
 	vm_offset_t vm_maxsaddr;	/* user VA at max stack growth */
 	vm_offset_t vm_stacktop; /* top of the stack, may not be page-aligned */
-	uintcap_t vm_shp_base;	/* shared page pointer */
+	uintptr_t vm_shp_base;	/* shared page pointer */
 	u_int vm_refcnt;	/* number of references */
 #if __has_feature(capabilities)
 	uint64_t vm_prev_cid;	/* (d) last compartment ID allocated */

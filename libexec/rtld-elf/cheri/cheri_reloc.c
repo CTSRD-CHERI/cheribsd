@@ -69,9 +69,9 @@ process___cap_relocs(Obj_Entry *obj)
 
 	for (const struct capreloc *reloc = start_relocs; reloc < end_relocs;
 	     reloc++) {
-		uintcap_t *dest =
-		    (uintcap_t *)(obj->relocbase + reloc->capability_location);
-		uintcap_t cap;
+		uintptr_t *dest =
+		    (uintptr_t *)(obj->relocbase + reloc->capability_location);
+		uintptr_t cap;
 		bool can_set_bounds = true;
 
 		if (reloc->object == 0) {
@@ -94,7 +94,7 @@ process___cap_relocs(Obj_Entry *obj)
 		    reloc->permissions == (function_reloc_flag |
 		    code_reloc_flag)) {
 			/* code pointer */
-			cap = (uintcap_t)pcc_cap(obj, reloc->object);
+			cap = (uintptr_t)pcc_cap(obj, reloc->object);
 			cap = cheri_clearperm(cap, FUNC_PTR_REMOVE_PERMS);
 
 			/*
@@ -104,12 +104,12 @@ process___cap_relocs(Obj_Entry *obj)
 			can_set_bounds = tight_pcc_bounds;
 		} else if (reloc->permissions == constant_reloc_flag) {
 			 /* read-only data pointer */
-			cap = (uintcap_t)data_base + reloc->object;
+			cap = (uintptr_t)data_base + reloc->object;
 			cap = cheri_clearperm(cap, FUNC_PTR_REMOVE_PERMS);
 			cap = cheri_clearperm(cap, DATA_PTR_REMOVE_PERMS);
 		} else if (reloc->permissions == 0) {
 			/* read-write data */
-			cap = (uintcap_t)data_base + reloc->object;
+			cap = (uintptr_t)data_base + reloc->object;
 			cap = cheri_clearperm(cap, DATA_PTR_REMOVE_PERMS);
 		} else {
 			_rtld_error("%s: Unknown capreloc type %#zx",
@@ -146,15 +146,15 @@ process_ifunc___cap_relocs(Obj_Entry *obj)
 
 	for (const struct capreloc *reloc = start_relocs; reloc < end_relocs;
 	     reloc++) {
-		uintcap_t *dest =
-		    (uintcap_t *)(obj->relocbase + reloc->capability_location);
-		uintcap_t cap;
+		uintptr_t *dest =
+		    (uintptr_t *)(obj->relocbase + reloc->capability_location);
+		uintptr_t cap;
 
 		if (reloc->permissions !=
 		    (function_reloc_flag | indirect_reloc_flag))
 			continue;
 
-		cap = (uintcap_t)pcc_cap(obj, reloc->object);
+		cap = (uintptr_t)pcc_cap(obj, reloc->object);
 		cap = cheri_clearperm(cap,
 		    FUNC_PTR_REMOVE_PERMS | CAP_RELOC_REMOVE_PERMS);
 		if (tight_pcc_bounds && reloc->size != 0)

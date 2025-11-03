@@ -45,10 +45,10 @@
  */
 struct trapframe {
 #if __has_feature(capabilities)
-	uintcap_t tf_sp;
-	uintcap_t tf_lr;
-	uintcap_t tf_elr;
-	uintcap_t tf_ddc;
+	uintptr_t tf_sp;
+	uintptr_t tf_lr;
+	uintptr_t tf_elr;
+	uintptr_t tf_ddc;
 #else
 	uint64_t tf_sp;
 	uint64_t tf_lr;
@@ -59,7 +59,7 @@ struct trapframe {
 	uint64_t tf_far;
 #if __has_feature(capabilities)
 	uint64_t tf_pad;
-	uintcap_t tf_x[30];
+	uintptr_t tf_x[30];
 #else
 	uint64_t tf_x[30];
 #endif

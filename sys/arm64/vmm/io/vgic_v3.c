@@ -1376,7 +1376,7 @@ vgic_register_write(struct hypctx *hypctx, struct vgic_register *reg_list,
 }
 
 static int
-dist_read(struct vcpu *vcpu, uint64_t fault_ipa, uintcap_t *rval,
+dist_read(struct vcpu *vcpu, uint64_t fault_ipa, uintptr_t *rval,
     int size, void *arg)
 {
 	struct hyp *hyp;
@@ -1411,7 +1411,7 @@ dist_read(struct vcpu *vcpu, uint64_t fault_ipa, uintcap_t *rval,
 }
 
 static int
-dist_write(struct vcpu *vcpu, uint64_t fault_ipa, uintcap_t wval,
+dist_write(struct vcpu *vcpu, uint64_t fault_ipa, uintptr_t wval,
     int size, void *arg)
 {
 	struct hyp *hyp;
@@ -1613,7 +1613,7 @@ redist_icfgr1_write(struct hypctx *hypctx, u_int reg, u_int offset, u_int size,
 }
 
 static int
-redist_read(struct vcpu *vcpu, uint64_t fault_ipa, uintcap_t *rval,
+redist_read(struct vcpu *vcpu, uint64_t fault_ipa, uintptr_t *rval,
     int size, void *arg)
 {
 	struct hyp *hyp;
@@ -1676,7 +1676,7 @@ redist_read(struct vcpu *vcpu, uint64_t fault_ipa, uintcap_t *rval,
 }
 
 static int
-redist_write(struct vcpu *vcpu, uint64_t fault_ipa, uintcap_t wval,
+redist_write(struct vcpu *vcpu, uint64_t fault_ipa, uintptr_t wval,
     int size, void *arg)
 {
 	struct hyp *hyp;
@@ -1733,7 +1733,7 @@ redist_write(struct vcpu *vcpu, uint64_t fault_ipa, uintcap_t wval,
 }
 
 static int
-vgic_v3_icc_sgi1r_read(struct vcpu *vcpu, uintcap_t *rval, void *arg)
+vgic_v3_icc_sgi1r_read(struct vcpu *vcpu, uintptr_t *rval, void *arg)
 {
 	/*
 	 * TODO: Inject an unknown exception.
@@ -1743,7 +1743,7 @@ vgic_v3_icc_sgi1r_read(struct vcpu *vcpu, uintcap_t *rval, void *arg)
 }
 
 static int
-vgic_v3_icc_sgi1r_write(struct vcpu *vcpu, uintcap_t rval, void *arg)
+vgic_v3_icc_sgi1r_write(struct vcpu *vcpu, uintptr_t rval, void *arg)
 {
 	struct vm *vm;
 	struct hyp *hyp;

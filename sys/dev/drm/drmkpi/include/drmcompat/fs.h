@@ -68,8 +68,8 @@ struct file_operations {
 	int (*iterate) (struct file *, struct dir_context *);
 	int (*iterate_shared) (struct file *, struct dir_context *);
 	__poll_t (*poll) (struct file *, struct poll_table_struct *);
-	long (*unlocked_ioctl) (struct file *, unsigned int, uintcap_t);
-	long (*compat_ioctl) (struct file *, unsigned int, uintcap_t);
+	long (*unlocked_ioctl) (struct file *, unsigned int, uintptr_t);
+	long (*compat_ioctl) (struct file *, unsigned int, uintptr_t);
 	int (*mmap) (struct file *, struct vm_area_struct *);
 	unsigned long mmap_supported_flags;
 	int (*open) (struct inode *, struct file *);

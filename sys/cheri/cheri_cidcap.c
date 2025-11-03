@@ -48,18 +48,18 @@
 #if __has_feature(capabilities) && defined(CHERI_PERM_COMPARTMENT_ID)
 
 /* Set to -1 to prevent it from being zeroed with the rest of BSS */
-uintcap_t userspace_root_cidcap = (uintcap_t)-1;
+uintptr_t userspace_root_cidcap = (uintptr_t)-1;
 SYSCTL_CAPABILITY(_security_cheri, OID_AUTO, cidcap, CTLFLAG_RD | CTLFLAG_PTROUT,
     &userspace_root_cidcap, 0, "CHERI compartment ID root capability");
 
 int
-kern_cheri_cidcap_alloc(struct thread *td, uintcap_t *cidp)
+kern_cheri_cidcap_alloc(struct thread *td, uintptr_t *cidp)
 {
 	uint64_t cid;
-	uintcap_t cidcap;
+	uintptr_t cidcap;
 
 	cid = vmspace_cid_alloc(td->td_proc->p_vmspace);
-	cidcap = (uintcap_t)cheri_setbounds(
+	cidcap = (uintptr_t)cheri_setbounds(
 	    cheri_setaddress(userspace_root_cidcap, cid), 1);
 
 	KASSERT(cheri_gettag(cidcap), ("untagged cidcap allocated"));

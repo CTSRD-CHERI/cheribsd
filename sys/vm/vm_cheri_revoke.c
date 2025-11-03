@@ -1468,11 +1468,11 @@ vm_cheri_revoke_info_page(struct vm_map *map, struct sysentvec *sv,
 }
 
 void
-vm_cheri_revoke_cap(const struct vm_cheri_revoke_cookie *crc, uintcap_t *p)
+vm_cheri_revoke_cap(const struct vm_cheri_revoke_cookie *crc, uintptr_t *p)
 {
 	CHERI_REVOKE_STATS_FOR(crst, crc);
 
-	uintcap_t v = *p;
+	uintptr_t v = *p;
 
 	if (!cheri_gettag(v))
 		return;

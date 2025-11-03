@@ -119,7 +119,7 @@ cheri_ptr_equal_exact(void *x, void *y)
 	 (cheri_getperm(ptr) & cheri_getperm(parent)) == cheri_getperm(ptr))
 
 #define	cheri_is_null_derived(x)					\
-	__builtin_cheri_equal_exact((uintcap_t)cheri_getaddress(x), x)
+	__builtin_cheri_equal_exact((uintptr_t)cheri_getaddress(x), x)
 
 /* Create an untagged capability from an integer */
 #define cheri_fromint(x)	cheri_incoffset(NULL, x)
@@ -251,7 +251,7 @@ static inline __result_use_check uintptr_t
 __cheri_set_low_ptr_bits(uintptr_t ptr, size_t bits) {
 	/*
 	 * We want to return a LHS-derived capability here so using the default
-	 * uintcap_t semantics is fine.
+	 * uintptr_t semantics is fine.
 	 */
 	return ptr | bits;
 }
@@ -260,7 +260,7 @@ static inline __result_use_check uintptr_t
 __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 	/*
 	 * We want to return a LHS-derived capability here so using the default
-	 * uintcap_t semantics is fine.
+	 * uintptr_t semantics is fine.
 	 */
 	return ptr & (~bits_mask);
 }
@@ -304,7 +304,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
  * For example lots of mutex code uses something like `if ((x & 1) == 1)` to
  * detect if the lock is currently contented. This comparison always returns
  * false under CHERI the LHS of the == is a valid capability with offset 3 and
- * the RHS is an untagged intcap_t with offset 3.
+ * the RHS is an untagged intptr_t with offset 3.
  * See https://github.com/CTSRD-CHERI/clang/issues/189
  */
 #define cheri_get_low_ptr_bits(ptr, mask)                                      \
@@ -403,7 +403,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 
 #ifndef _KERNEL
 ssize_t	strfcap(char * __restrict buf, size_t maxsize,
-    const char * __restrict format, uintcap_t cap);
+    const char * __restrict format, uintptr_t cap);
 #endif
 
 #endif /* _SYS_CHERIC_H_ */

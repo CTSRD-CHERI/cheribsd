@@ -42,7 +42,7 @@
 #include <cheri/cheric.h>
 
 /* Set to -1 to prevent it from being zeroed with the rest of BSS */
-void *userspace_root_cap = (void *)(intcap_t)-1;
+void *userspace_root_cap = (void *)(intptr_t)-1;
 
 static u_int cheri_ptrace_caps;
 SYSCTL_UINT(_security_cheri, OID_AUTO, ptrace_caps, CTLFLAG_RWTUN,
@@ -187,7 +187,7 @@ _cheri_capability_build_user_rwx_unchecked(uint32_t perms, ptraddr_t basep,
  * return false and leave *out unchanged.
  */
 bool
-ptrace_derive_cap(struct proc *p, uintcap_t in, uintcap_t *out)
+ptrace_derive_cap(struct proc *p, uintptr_t in, uintptr_t *out)
 {
 	struct thread *td;
 	void *cap;
@@ -215,7 +215,7 @@ ptrace_derive_cap(struct proc *p, uintcap_t in, uintcap_t *out)
 		cap = cheri_condseal(cap, sealcap);
 		if (cheri_gettag(cap)) {
 			atomic_add_long(&cheri_forged_ptrace_caps, 1);
-			*out = (uintcap_t)cap;
+			*out = (uintptr_t)cap;
 			return (true);
 		}
 	}

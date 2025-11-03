@@ -49,7 +49,7 @@ typedef	int	sy_call_t(struct thread *, void *);
 
 typedef	void	(*systrace_probe_func_t)(struct syscall_args *,
 		    enum systrace_probe_t, int);
-typedef	void	(*systrace_args_func_t)(int, void *, uintcap_t *, int *);
+typedef	void	(*systrace_args_func_t)(int, void *, uintptr_t *, int *);
 
 #ifdef _KERNEL
 extern systrace_probe_func_t	systrace_probe_func;
@@ -101,7 +101,7 @@ struct note_info_list;
 struct sysentvec {
 	int		sv_size;	/* number of entries */
 	struct sysent	*sv_table;	/* pointer to sysent */
-	int		(*sv_fixup)(uintcap_t *, struct image_params *);
+	int		(*sv_fixup)(uintptr_t *, struct image_params *);
 					/* stack fixup function */
 	void		(*sv_sendsig)(void (*)(int), struct ksiginfo *, struct __sigset *);
 			    		/* send signal */
@@ -116,7 +116,7 @@ struct sysentvec {
 	void		(*sv_elf_core_prepare_notes)(struct thread *,
 			    struct note_info_list *, size_t *);
 	int		(*sv_copyout_auxargs)(struct image_params *,
-			    uintcap_t);
+			    uintptr_t);
 	int		sv_minsigstksz;	/* minimum signal stack size */
 	vm_offset_t	sv_minuser;	/* VM_MIN_ADDRESS */
 	vm_offset_t	sv_maxuser;	/* VM_MAXUSER_ADDRESS */
@@ -130,9 +130,9 @@ struct sysentvec {
 	size_t		sv_psstringssz;	/* PS_STRINGS size */
 	int		sv_stackprot;	/* vm protection for stack */
 	int		(*sv_copyout_strings)(struct image_params *,
-			    uintcap_t *);
+			    uintptr_t *);
 	void		(*sv_setregs)(struct thread *, struct image_params *,
-			    uintcap_t);
+			    uintptr_t);
 	void		(*sv_fixlimit)(struct rlimit *, int);
 	u_long		*sv_maxssiz;
 	u_int		sv_flags;

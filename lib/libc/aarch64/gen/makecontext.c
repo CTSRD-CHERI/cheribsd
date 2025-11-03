@@ -79,7 +79,7 @@ __makecontext(ucontext_t *ucp, void (*func)(void), int argc, ...)
 	/* Pass up to eight arguments in x0-7. */
 	for (i = 0; i < argc && i < 8; i++) {
 #ifdef __CHERI_PURE_CAPABILITY__
-		cap->cap_x[i] = va_arg(ap, uintcap_t);
+		cap->cap_x[i] = va_arg(ap, uintptr_t);
 #else
 		gp->gp_x[i] = va_arg(ap, uint64_t);
 #endif

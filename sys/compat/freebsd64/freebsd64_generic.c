@@ -135,7 +135,7 @@ freebsd64_ioctl(struct thread *td, struct freebsd64_ioctl_args *uap)
 
 	com = uap->com;
 	if (com & IOC_VOID)
-		udata = (void *)(intcap_t)uap->data;
+		udata = (void *)(intptr_t)uap->data;
 	else
 		udata = __USER_CAP(uap->data, IOCPARM_LEN(com));
 

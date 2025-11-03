@@ -94,7 +94,7 @@ void do_el0_error(struct trapframe *);
 void do_serror(struct trapframe *);
 void unhandled_exception(struct trapframe *);
 
-static void print_gp_register(const char *name, uintcap_t value);
+static void print_gp_register(const char *name, uintptr_t value);
 static void print_registers(struct trapframe *frame);
 
 int (*dtrace_invop_jump_addr)(struct trapframe *);
@@ -231,16 +231,16 @@ extern uint32_t generic_bs_poke_1f, generic_bs_poke_2f;
 extern uint32_t generic_bs_poke_4f, generic_bs_poke_8f;
 
 static bool
-test_bs_fault(uintcap_t addr)
+test_bs_fault(uintptr_t addr)
 {
-	return (addr == (uintcap_t)&generic_bs_peek_1f ||
-	    addr == (uintcap_t)&generic_bs_peek_2f ||
-	    addr == (uintcap_t)&generic_bs_peek_4f ||
-	    addr == (uintcap_t)&generic_bs_peek_8f ||
-	    addr == (uintcap_t)&generic_bs_poke_1f ||
-	    addr == (uintcap_t)&generic_bs_poke_2f ||
-	    addr == (uintcap_t)&generic_bs_poke_4f ||
-	    addr == (uintcap_t)&generic_bs_poke_8f);
+	return (addr == (uintptr_t)&generic_bs_peek_1f ||
+	    addr == (uintptr_t)&generic_bs_peek_2f ||
+	    addr == (uintptr_t)&generic_bs_peek_4f ||
+	    addr == (uintptr_t)&generic_bs_peek_8f ||
+	    addr == (uintptr_t)&generic_bs_poke_1f ||
+	    addr == (uintptr_t)&generic_bs_poke_2f ||
+	    addr == (uintptr_t)&generic_bs_poke_4f ||
+	    addr == (uintptr_t)&generic_bs_poke_8f);
 }
 
 static void
@@ -282,7 +282,7 @@ external_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 {
 	if (lower) {
 		call_trapsignal(td, SIGBUS, BUS_OBJERR,
-		    (void *)(uintcap_t)far,
+		    (void *)(uintptr_t)far,
 		    ESR_ELx_EXCEPTION(frame->tf_esr));
 		userret(td, frame);
 		return;
@@ -292,7 +292,7 @@ external_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	 * Try to handle synchronous external aborts caused by
 	 * bus_space_peek() and/or bus_space_poke() functions.
 	 */
-	if (test_bs_fault((uintcap_t)frame->tf_elr)) {
+	if (test_bs_fault((uintptr_t)frame->tf_elr)) {
 #if defined(__ARM_MORELLO_PURECAP_BENCHMARK_ABI)
 		frame->tf_elr = cheri_setaddress(frame->tf_elr,
 		    (ptraddr_t)generic_bs_fault);
@@ -362,7 +362,7 @@ cap_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	if (!SV_PROC_FLAG(td->td_proc, SV_CHERI) &&
 	    far > CHERI_CAP_USER_DATA_BASE + CHERI_CAP_USER_DATA_LENGTH)
 		call_trapsignal(td, SIGSEGV, SEGV_MAPERR,
-		    (void *)(uintcap_t)far, ESR_ELx_EXCEPTION(esr));
+		    (void *)(uintptr_t)far, ESR_ELx_EXCEPTION(esr));
 	else
 		call_trapsignal(td, SIGPROT, cheri_esr_to_sicode(esr),
 		    (void *)frame->tf_elr, ESR_ELx_EXCEPTION(esr));
@@ -524,7 +524,7 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 bad_far:
 		if (lower) {
 			call_trapsignal(td, sig, ucode,
-			    (void *)(uintcap_t)far,
+			    (void *)(uintptr_t)far,
 			    ESR_ELx_EXCEPTION(esr));
 		} else {
 			if (td->td_intr_nesting_level == 0 &&
@@ -575,7 +575,7 @@ bad_far:
 #endif
 
 static void
-print_gp_register(const char *name, uintcap_t value)
+print_gp_register(const char *name, uintptr_t value)
 {
 #if defined(DDB)
 	c_db_sym_t sym;
@@ -845,7 +845,7 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 	case EXCP_UNKNOWN:
 		if (!undef_insn(0, frame))
 			call_trapsignal(td, SIGILL, ILL_ILLTRP,
-			    (void *)(uintcap_t)far, exception);
+			    (void *)(uintptr_t)far, exception);
 		userret(td, frame);
 		break;
 	case EXCP_FPAC:
@@ -874,7 +874,7 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		break;
 	case EXCP_WATCHPT_EL0:
 		call_trapsignal(td, SIGTRAP, TRAP_TRACE,
-		    (void *)(uintcap_t)far, exception);
+		    (void *)(uintptr_t)far, exception);
 		userret(td, frame);
 		break;
 	case EXCP_MSR:

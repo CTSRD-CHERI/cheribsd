@@ -45,15 +45,15 @@
  */
 struct trapframe {
 #if __has_feature(capabilities)
-	uintcap_t tf_ra;
-	uintcap_t tf_sp;
-	uintcap_t tf_gp;
-	uintcap_t tf_tp;
-	uintcap_t tf_t[7];
-	uintcap_t tf_s[12];
-	uintcap_t tf_a[8];
-	uintcap_t tf_sepc;
-	uintcap_t tf_ddc;
+	uintptr_t tf_ra;
+	uintptr_t tf_sp;
+	uintptr_t tf_gp;
+	uintptr_t tf_tp;
+	uintptr_t tf_t[7];
+	uintptr_t tf_s[12];
+	uintptr_t tf_a[8];
+	uintptr_t tf_sepc;
+	uintptr_t tf_ddc;
 #else
 	uint64_t tf_ra;
 	uint64_t tf_sp;
@@ -94,9 +94,9 @@ struct sigframe64 {
  * state while in userspace.
  */
 struct kernframe {
-	uintcap_t	kf_tp;
+	uintptr_t	kf_tp;
 #if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
-	uintcap_t	kf_ddc;
+	uintptr_t	kf_ddc;
 #endif
 };
 #endif

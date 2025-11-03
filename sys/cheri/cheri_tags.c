@@ -75,8 +75,8 @@ cheri_read_tags_page(const void *page, void *tagbuf, bool *hastagsp)
 			dst++;
 		}
 
-		src += cheri_cloadtags_stride * sizeof(uintcap_t);
-		len -= cheri_cloadtags_stride * sizeof(uintcap_t);
+		src += cheri_cloadtags_stride * sizeof(uintptr_t);
+		len -= cheri_cloadtags_stride * sizeof(uintptr_t);
 	}
 
 	KASSERT(tagbits == 0, ("%s: partial tag bits %u at end of page",

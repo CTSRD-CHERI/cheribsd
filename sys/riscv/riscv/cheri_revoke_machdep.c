@@ -91,7 +91,7 @@ vm_cheri_revoke_tlb_fault(void)
 static int
 vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
     const uint8_t *crshadow, vm_cheri_revoke_test_fn ctp,
-    uintcap_t *cutp, uintcap_t cut, vm_offset_t start,
+    uintptr_t *cutp, uintptr_t cut, vm_offset_t start,
     vm_offset_t end)
 {
 	int perms = cheri_getperm(cut);
@@ -112,7 +112,7 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
 		void *cscratch;
 		int ok;
 
-		uintcap_t cutr = cheri_revoke_cap(cut);
+		uintptr_t cutr = cheri_revoke_cap(cut);
 
 		CHERI_REVOKE_STATS_BUMP(crst, caps_found);
 
@@ -147,7 +147,7 @@ again:
 		  : "memory");
 
 		/* sc.c.cap clobbers its value operand with 0 on success */
-		if (__builtin_expect((uintcap_t)cutr == 0, 1)) {
+		if (__builtin_expect((uintptr_t)cutr == 0, 1)) {
 			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
 			/* Don't count a revoked cap as HASCAPS */
 		} else if (!cheri_gettag(cscratch)) {
@@ -257,8 +257,8 @@ static inline int
 vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
     int (*cb)(int *, const struct vm_cheri_revoke_cookie *,
 	const uint8_t *, vm_cheri_revoke_test_fn,
-	uintcap_t *, uintcap_t, vm_offset_t, vm_offset_t),
-    uintcap_t *mvu, vm_offset_t mve)
+	uintptr_t *, uintptr_t, vm_offset_t, vm_offset_t),
+    uintptr_t *mvu, vm_offset_t mve)
 {
 #ifdef CHERI_CAPREVOKE_CLOADTAGS
 	CHERI_REVOKE_STATS_FOR(crst, crc);
@@ -298,7 +298,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 #endif
 
 	for (; cheri_getaddress(mvu) < mve; mvu += _cloadtags_stride) {
-		uintcap_t *mvt = mvu;
+		uintptr_t *mvt = mvu;
 
 		nexttags =
 		    __builtin_cheri_cap_load_tags(mvu + _cloadtags_stride);
@@ -320,7 +320,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 
 	/* And the last line */
 	{
-		uintcap_t *mvt = mvu;
+		uintptr_t *mvt = mvu;
 
 		for (; tags != 0; (tags >>= 1), mvt += 1) {
 			if (!(tags & 1))
@@ -335,7 +335,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 	/* TODO: lines_scan approximation for CHERI_REVOKE_STATS? */
 
 	for (; cheri_getaddress(mvu) < mve; mvu++) {
-		uintcap_t cut = *mvu;
+		uintptr_t cut = *mvu;
 
 		if (cheri_gettag(cut)) {
 			if (cb(&res, crc, crshadow, ctp, mvu, cut, start, end))
@@ -353,7 +353,7 @@ out:
 }
 
 int
-vm_cheri_revoke_test(const struct vm_cheri_revoke_cookie *crc, uintcap_t cut)
+vm_cheri_revoke_test(const struct vm_cheri_revoke_cookie *crc, uintptr_t cut)
 {
 	if (cheri_gettag(cut)) {
 		int res;
@@ -392,7 +392,7 @@ vm_cheri_revoke_page_rw(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 #endif
 	vm_offset_t mva;
 	vm_offset_t mve;
-	uintcap_t *mvu;
+	uintptr_t *mvu;
 	/*
 	 * XXX NWF
 	 * This isn't what we really want, but we want to be able to fake up a
@@ -428,7 +428,7 @@ static inline int
 vm_cheri_revoke_page_ro_adapt(int *res,
     const struct vm_cheri_revoke_cookie *vmcrc,
     const uint8_t *crshadow, vm_cheri_revoke_test_fn ctp,
-    uintcap_t *cutp __unused, uintcap_t cut, vm_offset_t start,
+    uintptr_t *cutp __unused, uintptr_t cut, vm_offset_t start,
     vm_offset_t end)
 {
 	/* If the thing has no permissions, we don't need to scan it later */
@@ -470,7 +470,7 @@ vm_cheri_revoke_page_ro(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 
 	vm_offset_t mva;
 	vm_offset_t mve;
-	uintcap_t *mvu;
+	uintptr_t *mvu;
 	void *kdc = swap_restore_cap;
 	int res = 0;
 

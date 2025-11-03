@@ -229,7 +229,7 @@ struct freebsd64_getitimer_args {
 	char itv_l_[PADL_(struct itimerval *)]; struct itimerval * itv; char itv_r_[PADR_(struct itimerval *)];
 };
 struct freebsd64_cheri_cidcap_alloc_args {
-	char cidp_l_[PADL_(uintcap_t *)]; uintcap_t * cidp; char cidp_r_[PADR_(uintcap_t *)];
+	char cidp_l_[PADL_(uintptr_t *)]; uintptr_t * cidp; char cidp_r_[PADR_(uintptr_t *)];
 };
 struct freebsd64_fcntl_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];

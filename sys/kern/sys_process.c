@@ -558,7 +558,7 @@ proc_read_cheri_tags(struct proc *p, struct uio *uio)
 	 * returned by proc_read_cheri_tags_page.
 	 */
 	va = uio->uio_offset;
-	if (!is_aligned(va, sizeof(uintcap_t) * CHAR_BIT))
+	if (!is_aligned(va, sizeof(uintptr_t) * CHAR_BIT))
 		return (EINVAL);
 
 	/* Handle partial first page. */
@@ -571,7 +571,7 @@ proc_read_cheri_tags(struct proc *p, struct uio *uio)
 		if (error != 0)
 			return (error);
 
-		tagoff = pageoff / (sizeof(uintcap_t) * CHAR_BIT);
+		tagoff = pageoff / (sizeof(uintptr_t) * CHAR_BIT);
 		error = uiomove(tagbuf + tagoff, sizeof(tagbuf) - tagoff, uio);
 		if (error != 0)
 			return (error);
@@ -597,17 +597,17 @@ proc_read_cheri_tags(struct proc *p, struct uio *uio)
 static int
 proc_read_cheri_cap_page(vm_map_t map, vm_offset_t va, struct uio *uio)
 {
-	char capbuf[sizeof(uintcap_t) + 1];
-	uintcap_t *src;
+	char capbuf[sizeof(uintptr_t) + 1];
+	uintptr_t *src;
 	vm_page_t m;
 	u_int pageoff, todo;
 	int error;
 
-	KASSERT(is_aligned(va, sizeof(uintcap_t)),
+	KASSERT(is_aligned(va, sizeof(uintptr_t)),
 	    ("%s: user address %lx is not capability-aligned", __func__, va));
 	pageoff = va & PAGE_MASK;
-	todo = (PAGE_SIZE - pageoff) / sizeof(uintcap_t) *
-	    (sizeof(uintcap_t) + 1);
+	todo = (PAGE_SIZE - pageoff) / sizeof(uintptr_t) *
+	    (sizeof(uintptr_t) + 1);
 	todo = MIN(todo, uio->uio_resid);
 	va = trunc_page(va);
 
@@ -626,8 +626,8 @@ proc_read_cheri_cap_page(vm_map_t map, vm_offset_t va, struct uio *uio)
 	if (error != KERN_SUCCESS)
 		return (EFAULT);
 
-	src = (uintcap_t *)PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(m)) + pageoff /
-	    sizeof(uintcap_t);
+	src = (uintptr_t *)PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(m)) + pageoff /
+	    sizeof(uintptr_t);
 	while (todo > 0) {
 		capbuf[0] = cheri_gettag(*src);
 		memcpy(capbuf + 1, src, sizeof(*src));
@@ -655,10 +655,10 @@ proc_read_cheri_cap(struct proc *p, struct uio *uio)
 	 * based on the expanded capability size.
 	 */
 	va = uio->uio_offset;
-	if (!is_aligned(va, sizeof(uintcap_t)))
+	if (!is_aligned(va, sizeof(uintptr_t)))
 		return (EINVAL);
 
-	if (uio->uio_resid % (sizeof(uintcap_t) + 1) != 0)
+	if (uio->uio_resid % (sizeof(uintptr_t) + 1) != 0)
 		return (EINVAL);
 
 	error = 0;
@@ -675,17 +675,17 @@ static int
 proc_write_cheri_cap_page(struct proc *p, vm_map_t map, vm_offset_t va,
     struct uio *uio)
 {
-	char capbuf[sizeof(uintcap_t) + 1];
-	uintcap_t *dst, cap;
+	char capbuf[sizeof(uintptr_t) + 1];
+	uintptr_t *dst, cap;
 	vm_page_t m;
 	u_int pageoff, todo;
 	int error;
 
-	KASSERT(is_aligned(va, sizeof(uintcap_t)),
+	KASSERT(is_aligned(va, sizeof(uintptr_t)),
 	    ("%s: user address %lx is not capability-aligned", __func__, va));
 	pageoff = va & PAGE_MASK;
-	todo = (PAGE_SIZE - pageoff) / sizeof(uintcap_t) *
-	    (sizeof(uintcap_t) + 1);
+	todo = (PAGE_SIZE - pageoff) / sizeof(uintptr_t) *
+	    (sizeof(uintptr_t) + 1);
 	todo = MIN(todo, uio->uio_resid);
 	va = trunc_page(va);
 
@@ -694,8 +694,8 @@ proc_write_cheri_cap_page(struct proc *p, vm_map_t map, vm_offset_t va,
 	if (error != KERN_SUCCESS)
 		return (EFAULT);
 
-	dst = (uintcap_t *)PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(m)) + pageoff /
-	    sizeof(uintcap_t);
+	dst = (uintptr_t *)PHYS_TO_DMAP_PAGE(VM_PAGE_TO_PHYS(m)) + pageoff /
+	    sizeof(uintptr_t);
 	while (todo > 0) {
 		error = uiomove(capbuf, sizeof(capbuf), uio);
 		if (error != 0)
@@ -730,10 +730,10 @@ proc_write_cheri_cap(struct proc *p, struct uio *uio)
 	 * based on the expanded capability size.
 	 */
 	va = uio->uio_offset;
-	if (!is_aligned(va, sizeof(uintcap_t)))
+	if (!is_aligned(va, sizeof(uintptr_t)))
 		return (EINVAL);
 
-	if (uio->uio_resid % (sizeof(uintcap_t) + 1) != 0)
+	if (uio->uio_resid % (sizeof(uintptr_t) + 1) != 0)
 		return (EINVAL);
 
 	error = 0;

@@ -50,7 +50,7 @@ struct vmspace;
 /***************************** REVOCATION ITSELF *****************************/
 
 /* sys/cheri/cheri_otype.c */
-uintcap_t cheri_revoke_sealed(uintcap_t);
+uintptr_t cheri_revoke_sealed(uintptr_t);
 
 /*
  * The revoked image of a capability is a *tagged* quantity with zero
@@ -62,8 +62,8 @@ uintcap_t cheri_revoke_sealed(uintcap_t);
  * This is almost certainly a sufficiently subtle point that this is not
  * entirely the right answer, though I hope it's not entirely wrong, either.
  */
-static __always_inline uintcap_t
-cheri_revoke_cap(uintcap_t c)
+static __always_inline uintptr_t
+cheri_revoke_cap(uintptr_t c)
 {
 #ifndef CHERI_CAPREVOKE_CLEARTAGS
 	if (__builtin_expect(cheri_gettype(c) == -1, 1)) {
@@ -116,11 +116,11 @@ void vm_cheri_revoke_publish_epochs(
     const struct cheri_revoke_epochs *);
 
 /*  Revoke a single capability if needed */
-void vm_cheri_revoke_cap(const struct vm_cheri_revoke_cookie *, uintcap_t *);
+void vm_cheri_revoke_cap(const struct vm_cheri_revoke_cookie *, uintptr_t *);
 
 /***************************** KERNEL MD LAYER ******************************/
 
-int vm_cheri_revoke_test(const struct vm_cheri_revoke_cookie *, uintcap_t);
+int vm_cheri_revoke_test(const struct vm_cheri_revoke_cookie *, uintptr_t);
 
 enum {
 	/* If no coarse bits set */

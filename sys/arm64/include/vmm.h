@@ -238,12 +238,12 @@ void vm_get_topology(struct vm *vm, uint16_t *sockets, uint16_t *cores,
     uint16_t *threads, uint16_t *maxcpus);
 int vm_set_topology(struct vm *vm, uint16_t sockets, uint16_t cores,
     uint16_t threads, uint16_t maxcpus);
-int vm_get_register(struct vcpu *vcpu, int reg, uintcap_t *retval);
+int vm_get_register(struct vcpu *vcpu, int reg, uintptr_t *retval);
 #if __has_feature(capabilities)
 int vm_get_register_cheri_capability_tag(struct vcpu *vcpu, int reg,
     uint8_t *tagp);
 #endif
-int vm_set_register(struct vcpu *vcpu, int reg, uintcap_t val);
+int vm_set_register(struct vcpu *vcpu, int reg, uintptr_t val);
 int vm_run(struct vcpu *vcpu);
 int vm_suspend(struct vm *vm, enum vm_suspend_how how);
 void* vm_get_cookie(struct vm *vm);
@@ -263,8 +263,8 @@ int vm_deassert_irq(struct vm *vm, uint32_t irq);
 int vm_raise_msi(struct vm *vm, uint64_t msg, uint64_t addr, int bus, int slot,
     int func);
 struct vm_exit *vm_exitinfo(struct vcpu *vcpu);
-void vm_exit_suspended(struct vcpu *vcpu, uintcap_t pc);
-void vm_exit_debug(struct vcpu *vcpu, uintcap_t pc);
+void vm_exit_suspended(struct vcpu *vcpu, uintptr_t pc);
+void vm_exit_debug(struct vcpu *vcpu, uintptr_t pc);
 
 cpuset_t vm_active_cpus(struct vm *vm);
 cpuset_t vm_debug_cpus(struct vm *vm);
@@ -385,7 +385,7 @@ enum vm_exitcode {
 struct vm_exit {
 	enum vm_exitcode	exitcode;
 	int			inst_length;
-	uintcap_t		pc;
+	uintptr_t		pc;
 	union {
 		/*
 		 * ARM specific payload.

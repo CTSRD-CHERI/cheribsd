@@ -49,7 +49,7 @@
  * SO THAT wmask BELOW IS ALL ONES
  */
 #if __has_feature(capabilities)
-typedef	uintcap_t word;
+typedef	uintptr_t word;
 #else
 typedef	long	word;		/* "word" used for optimal copy speed */
 #endif

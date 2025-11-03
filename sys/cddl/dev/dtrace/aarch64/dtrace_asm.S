@@ -128,7 +128,7 @@ END(dtrace_fuword64_nocheck)
 
 #if __has_feature(capabilities)
 /*
-uintcap_t
+uintptr_t
 dtrace_fuwordcap_nocheck(void *addr)
 */
 ENTRY(dtrace_fucap_nocheck)

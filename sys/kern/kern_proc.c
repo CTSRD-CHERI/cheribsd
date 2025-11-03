@@ -1086,7 +1086,7 @@ fill_kinfo_aggregate(struct proc *p, struct kinfo_proc *kp)
 	}
 }
 
-#define	EXPORT_KPTR(p) ((void *)(intcap_t)(intptr_t)(p))
+#define	EXPORT_KPTR(p) ((void *)(intptr_t)(intptr_t)(p))
 
 /*
  * Fill in any information that is common to all threads in the process.
@@ -3731,7 +3731,7 @@ sysctl_kern_proc_sigtramp(SYSCTL_HANDLER_ARGS)
 	bzero(&kst, sizeof(kst));
 	if (PROC_HAS_SHP(p)) {
 		kst.ksigtramp_start = EXPORT_KPTR(PROC_SIGCODE(p));
-		kst.ksigtramp_end = EXPORT_KPTR((intcap_t)kst.ksigtramp_start +
+		kst.ksigtramp_end = EXPORT_KPTR((intptr_t)kst.ksigtramp_start +
 		    ((sv->sv_flags & SV_DSO_SIG) == 0 ? *sv->sv_szsigcode :
 		    (ptraddr_t)sv->sv_szsigcode));
 	} else {
@@ -3758,7 +3758,7 @@ sysctl_kern_proc_sigfastblk(SYSCTL_HANDLER_ARGS)
 	uint32_t addr32;
 #endif
 #if __has_feature(capabilities)
-	uintcap_t addrcap;
+	uintptr_t addrcap;
 #ifdef COMPAT_FREEBSD64
 	uint64_t addr64;
 #endif

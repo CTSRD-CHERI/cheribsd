@@ -394,14 +394,14 @@ decode_fragment(Elf_Addr *fragment, Elf_Addr relocbase, Elf_Addr *addrp,
 	*permsp = fragment[1] >> (8 * sizeof(Elf_Addr) - 8);
 }
 
-static uintcap_t __nosanitizecoverage
+static uintptr_t __nosanitizecoverage
 build_reloc_cap(Elf_Addr addr, Elf_Addr size, uint8_t perms, Elf_Addr offset,
     void *data_cap, const void *code_cap)
 {
-	uintcap_t cap;
+	uintptr_t cap;
 
 	cap = perms == MORELLO_FRAG_EXECUTABLE ?
-	    (uintcap_t)code_cap : (uintcap_t)data_cap;
+	    (uintptr_t)code_cap : (uintptr_t)data_cap;
 	cap = cheri_setaddress(cap, addr);
 
 	if (perms == MORELLO_FRAG_EXECUTABLE ||
@@ -427,7 +427,7 @@ build_reloc_cap(Elf_Addr addr, Elf_Addr size, uint8_t perms, Elf_Addr offset,
 }
 
 #ifdef __CHERI_PURE_CAPABILITY__
-static uintcap_t __nosanitizecoverage
+static uintptr_t __nosanitizecoverage
 build_cap_from_fragment(Elf_Addr *fragment, Elf_Addr relocbase, Elf_Addr offset,
     void *data_cap, const void *code_cap)
 {
@@ -515,7 +515,7 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 			base = (void *)
 			    (val == addr1 ? relocbase :
 			    linker_kernel_file->address);
-			*(uintcap_t *)(void *)where = build_reloc_cap(addr1,
+			*(uintptr_t *)(void *)where = build_reloc_cap(addr1,
 			    size, perms, addend, base, base);
 		}
 #endif

@@ -349,7 +349,7 @@ EEND(fueword64)
 
 #if __has_feature(capabilities)
 /*
- * int fuecap(volatile const void *, intcap_t *)
+ * int fuecap(volatile const void *, intptr_t *)
  */
 ENTRY(fuecap)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-15), fsu_fault_nopcb
@@ -404,7 +404,7 @@ EEND(suword64)
 
 #if __has_feature(capabilities)
 /*
- * int sucap(volatile void *, intcap_t)
+ * int sucap(volatile void *, intptr_t)
  */
 ENTRY(sucap)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-15), fsu_fault_nopcb

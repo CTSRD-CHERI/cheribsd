@@ -237,12 +237,12 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *),
 
 	/* 32bits processes use r13 for sp */
 	if (td->td_frame->tf_spsr & PSR_M_32) {
-		tf->tf_x[13] = STACKALIGN((uintcap_t)stack->ss_sp +
+		tf->tf_x[13] = STACKALIGN((uintptr_t)stack->ss_sp +
 		    stack->ss_size);
-		if ((uintcap_t)entry & 1)
+		if ((uintptr_t)entry & 1)
 			tf->tf_spsr |= PSR_T;
 	} else
-		tf->tf_sp = STACKALIGN((uintcap_t)stack->ss_sp +
+		tf->tf_sp = STACKALIGN((uintptr_t)stack->ss_sp +
 		    stack->ss_size);
 
 #if __has_feature(capabilities)
@@ -251,13 +251,13 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *),
 			tf->tf_elr = cheri_setaddress(tf->tf_elr,
 			    (ptraddr_t)entry);
 		else
-			trapframe_set_elr(tf, (uintcap_t)entry);
+			trapframe_set_elr(tf, (uintptr_t)entry);
 	} else
-		hybridabi_thread_setregs(td, (unsigned long)(uintcap_t)entry);
+		hybridabi_thread_setregs(td, (unsigned long)(uintptr_t)entry);
 #else
-	tf->tf_elr = (uintcap_t)entry;
+	tf->tf_elr = (uintptr_t)entry;
 #endif
-	tf->tf_x[0] = (uintcap_t)arg;
+	tf->tf_x[0] = (uintptr_t)arg;
 	tf->tf_x[29] = 0;
 	tf->tf_lr = 0;
 	return (0);
@@ -274,8 +274,8 @@ cpu_set_user_tls(struct thread *td, void *tls_base)
 	pcb = td->td_pcb;
 	if (td->td_frame->tf_spsr & PSR_M_32) {
 		/* 32bits arm stores the user TLS into tpidrro */
-		pcb->pcb_tpidrro_el0 = (uintcap_t)tls_base;
-		pcb->pcb_tpidr_el0 = (uintcap_t)tls_base;
+		pcb->pcb_tpidrro_el0 = (uintptr_t)tls_base;
+		pcb->pcb_tpidr_el0 = (uintptr_t)tls_base;
 		if (td == curthread) {
 #if __has_feature(capabilities)
 			WRITE_SPECIALREG_CAP(ctpidrro_el0, tls_base);
@@ -286,7 +286,7 @@ cpu_set_user_tls(struct thread *td, void *tls_base)
 #endif
 		}
 	} else {
-		pcb->pcb_tpidr_el0 = (uintcap_t)tls_base;
+		pcb->pcb_tpidr_el0 = (uintptr_t)tls_base;
 		if (td == curthread) {
 #if __has_feature(capabilities)
 			WRITE_SPECIALREG_CAP(ctpidr_el0, tls_base);

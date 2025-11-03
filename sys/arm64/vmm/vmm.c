@@ -84,7 +84,7 @@ struct vcpu {
 	int		vcpuid;
 	void		*stats;
 	struct vm_exit	exitinfo;
-	uintcap_t	nextpc;		/* (x) next instruction to execute */
+	uintptr_t	nextpc;		/* (x) next instruction to execute */
 	struct vm	*vm;		/* (o) */
 	void		*cookie;	/* (i) cpu-specific data */
 	struct vfpstate	*guestfpu;	/* (a,i) guest fpu state */
@@ -943,21 +943,21 @@ vm_gla2gpa_nofault(struct vcpu *vcpu, struct vm_guest_paging *paging,
 }
 
 static int
-vmm_reg_raz(struct vcpu *vcpu, uintcap_t *rval, void *arg)
+vmm_reg_raz(struct vcpu *vcpu, uintptr_t *rval, void *arg)
 {
 	*rval = 0;
 	return (0);
 }
 
 static int
-vmm_reg_read_arg(struct vcpu *vcpu, uintcap_t *rval, void *arg)
+vmm_reg_read_arg(struct vcpu *vcpu, uintptr_t *rval, void *arg)
 {
 	*rval = *(uint64_t *)arg;
 	return (0);
 }
 
 static int
-vmm_reg_wi(struct vcpu *vcpu, uintcap_t wval, void *arg)
+vmm_reg_wi(struct vcpu *vcpu, uintptr_t wval, void *arg)
 {
 	return (0);
 }
@@ -1217,7 +1217,7 @@ vm_suspend(struct vm *vm, enum vm_suspend_how how)
 }
 
 void
-vm_exit_suspended(struct vcpu *vcpu, uintcap_t pc)
+vm_exit_suspended(struct vcpu *vcpu, uintptr_t pc)
 {
 	struct vm *vm = vcpu->vm;
 	struct vm_exit *vmexit;
@@ -1233,7 +1233,7 @@ vm_exit_suspended(struct vcpu *vcpu, uintcap_t pc)
 }
 
 void
-vm_exit_debug(struct vcpu *vcpu, uintcap_t pc)
+vm_exit_debug(struct vcpu *vcpu, uintptr_t pc)
 {
 	struct vm_exit *vmexit;
 
@@ -1629,7 +1629,7 @@ vm_gpa_release(void *cookie)
 }
 
 int
-vm_get_register(struct vcpu *vcpu, int reg, uintcap_t *retval)
+vm_get_register(struct vcpu *vcpu, int reg, uintptr_t *retval)
 {
 
 	if (reg >= VM_REG_LAST)
@@ -1642,7 +1642,7 @@ vm_get_register(struct vcpu *vcpu, int reg, uintcap_t *retval)
 int
 vm_get_register_cheri_capability_tag(struct vcpu *vcpu, int reg, uint8_t *tagp)
 {
-	uintcap_t val;
+	uintptr_t val;
 	int error;
 
 	if (reg >= VM_REG_LAST)
@@ -1656,7 +1656,7 @@ vm_get_register_cheri_capability_tag(struct vcpu *vcpu, int reg, uint8_t *tagp)
 #endif
 
 int
-vm_set_register(struct vcpu *vcpu, int reg, uintcap_t val)
+vm_set_register(struct vcpu *vcpu, int reg, uintptr_t val)
 {
 	int error;
 
@@ -1668,11 +1668,11 @@ vm_set_register(struct vcpu *vcpu, int reg, uintcap_t val)
 
 #if __has_feature(capabilities)
 #ifdef __CHERI_PURE_CAPABILITY__
-	vcpu->nextpc = (uintcap_t)cheri_andperm(
+	vcpu->nextpc = (uintptr_t)cheri_andperm(
 	    cheri_setaddress(vmm_gva_root_cap, val),
 	    cheri_getperm(cheri_getpcc()));
 #else
-	vcpu->nextpc = (uintcap_t)cheri_setaddress(cheri_getpcc(), val);
+	vcpu->nextpc = (uintptr_t)cheri_setaddress(cheri_getpcc(), val);
 #endif
 #else
 	vcpu->nextpc = val;
@@ -1715,7 +1715,7 @@ vm_deassert_irq(struct vm *vm, uint32_t irq)
 int
 vm_get_cheri_capability_tag(struct vm *vm, struct vm_cheri_capability_tag *vt)
 {
-	uintcap_t *cap;
+	uintptr_t *cap;
 	void *cookie;
 
 	if (!__is_aligned(vt->gpa, sizeof(*cap)))

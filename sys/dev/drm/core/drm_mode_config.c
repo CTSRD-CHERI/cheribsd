@@ -125,19 +125,19 @@ int drm_mode_getresources(struct drm_device *dev, void *data,
 		CP(*card_res64, *card_res, min_height);
 		CP(*card_res64, *card_res, max_height);
 
-		card_res->fb_id_ptr = (uintcap_t)__USER_CAP(
+		card_res->fb_id_ptr = (uintptr_t)__USER_CAP(
 		    card_res64->fb_id_ptr,
 		    card_res64->count_fbs * sizeof(uint32_t));
 
-		card_res->crtc_id_ptr = (uintcap_t)__USER_CAP(
+		card_res->crtc_id_ptr = (uintptr_t)__USER_CAP(
 		    card_res64->crtc_id_ptr,
 		    card_res64->count_crtcs * sizeof(uint32_t));
 
-		card_res->connector_id_ptr = (uintcap_t)__USER_CAP(
+		card_res->connector_id_ptr = (uintptr_t)__USER_CAP(
 		    card_res64->connector_id_ptr,
 		    card_res64->count_connectors * sizeof(uint32_t));
 
-		card_res->encoder_id_ptr = (uintcap_t)__USER_CAP(
+		card_res->encoder_id_ptr = (uintptr_t)__USER_CAP(
 		    card_res64->encoder_id_ptr,
 		    card_res64->count_encoders * sizeof(uint32_t));
 	}
