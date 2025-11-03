@@ -219,20 +219,20 @@ create_adjacent_mappings(struct adjacent_mappings *mappings)
 
 	len = getpagesize() * 2;
 	memset(mappings, 0, sizeof(*mappings));
-	requested_addr = (void *)(uintcap_t)find_address_space_gap(len * 3, 0);
+	requested_addr = (void *)(uintptr_t)find_address_space_gap(len * 3, 0);
 	mappings->first = CHERIBSDTEST_CHECK_SYSCALL(mmap(requested_addr, len,
 	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0));
 	CHERIBSDTEST_VERIFY(cheri_gettag(mappings->first));
 	/* Try to create a mapping immediately following the latest one. */
 	requested_addr =
-	    (void *)(uintcap_t)(cheri_getaddress(mappings->first) + len);
+	    (void *)(uintptr_t)(cheri_getaddress(mappings->first) + len);
 	mappings->middle = CHERIBSDTEST_CHECK_SYSCALL2(mmap(requested_addr, len,
 	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0),
 	    "Failed to create mapping at address %p", requested_addr);
 	CHERIBSDTEST_CHECK_EQ_LONG((ptraddr_t)mappings->middle,
 	    (ptraddr_t)mappings->first + len);
 	requested_addr =
-	    (void *)(uintcap_t)(cheri_getaddress(mappings->middle) + len);
+	    (void *)(uintptr_t)(cheri_getaddress(mappings->middle) + len);
 	CHERIBSDTEST_VERIFY(cheri_gettag(mappings->middle));
 	mappings->last = CHERIBSDTEST_CHECK_SYSCALL2(mmap(requested_addr, len,
 	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0),
@@ -433,13 +433,13 @@ create_adjacent_mappings_shm(struct adjacent_mappings *mappings)
 	len = getpagesize() * 2;
 	memset(mappings, 0, sizeof(*mappings));
 	shmid = CHERIBSDTEST_CHECK_SYSCALL(shmget(IPC_PRIVATE, len, 0600));
-	requested_addr = (void *)(uintcap_t)find_address_space_gap(len * 3, 0);
+	requested_addr = (void *)(uintptr_t)find_address_space_gap(len * 3, 0);
 	mappings->first = CHERIBSDTEST_CHECK_SYSCALL(shmat(shmid,
 	    requested_addr, 0));
 	CHERIBSDTEST_VERIFY(cheri_gettag(mappings->first));
 	/* Try to create a mapping immediately following the latest one. */
 	requested_addr =
-	    (void *)(uintcap_t)(cheri_getaddress(mappings->first) + len);
+	    (void *)(uintptr_t)(cheri_getaddress(mappings->first) + len);
 	mappings->middle = CHERIBSDTEST_CHECK_SYSCALL2(
 	    shmat(shmid, requested_addr, 0),
 	    "Failed to create mapping at address %p", requested_addr);
@@ -447,7 +447,7 @@ create_adjacent_mappings_shm(struct adjacent_mappings *mappings)
 	    (ptraddr_t)requested_addr);
 	CHERIBSDTEST_VERIFY(cheri_gettag(mappings->middle));
 	requested_addr =
-	    (void *)(uintcap_t)(cheri_getaddress(mappings->middle) + len);
+	    (void *)(uintptr_t)(cheri_getaddress(mappings->middle) + len);
 	mappings->last = CHERIBSDTEST_CHECK_SYSCALL2(
 	    shmat(shmid, requested_addr, 0),
 	    "Failed to create mapping at address %p", requested_addr);
