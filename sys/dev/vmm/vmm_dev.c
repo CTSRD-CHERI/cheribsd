@@ -297,7 +297,7 @@ done:
 
 static int
 vm_get_register_set(struct vcpu *vcpu, unsigned int count, int *regnum,
-    uintcap_t *regval)
+    uintptr_t *regval)
 {
 	int error, i;
 
@@ -333,7 +333,7 @@ vm_get_register_cheri_capability_tag_set(struct vcpu *vcpu, unsigned int count,
 
 static int
 vm_set_register_set(struct vcpu *vcpu, unsigned int count, int *regnum,
-    uintcap_t *regval)
+    uintptr_t *regval)
 {
 	int error, i;
 
@@ -565,7 +565,7 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	}
 	case VM_GET_REGISTER_SET: {
 		struct vm_register_set *vmregset;
-		uintcap_t *regvals;
+		uintptr_t *regvals;
 		int *regnums;
 
 		vmregset = (struct vm_register_set *)data;
@@ -591,7 +591,7 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	}
 	case VM_SET_REGISTER_SET: {
 		struct vm_register_set *vmregset;
-		uintcap_t *regvals;
+		uintptr_t *regvals;
 		int *regnums;
 
 		vmregset = (struct vm_register_set *)data;

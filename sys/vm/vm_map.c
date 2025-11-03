@@ -137,8 +137,8 @@ static uma_zone_t mapentzone;
 static uma_zone_t kmapentzone;
 static uma_zone_t vmspace_zone;
 static int vmspace_zinit(void *mem, int size, int flags);
-static void _vm_map_init(vm_map_t map, pmap_t pmap, uintcap_t min,
-    uintcap_t max);
+static void _vm_map_init(vm_map_t map, pmap_t pmap, uintptr_t min,
+    uintptr_t max);
 static void vm_map_entry_deallocate(vm_map_entry_t entry, boolean_t system_map);
 static void vm_map_entry_delete(vm_map_t map, vm_map_entry_t entry);
 static void vm_map_entry_dispose(vm_map_t map, vm_map_entry_t entry);
@@ -392,7 +392,7 @@ vmspace_zdtor(void *mem, int size, void *arg)
  * and initialize those structures.  The refcnt is set to 1.
  */
 struct vmspace *
-vmspace_alloc(uintcap_t min, uintcap_t max, pmap_pinit_t pinit)
+vmspace_alloc(uintptr_t min, uintptr_t max, pmap_pinit_t pinit)
 {
 	struct vmspace *vm;
 
@@ -993,7 +993,7 @@ vmspace_resident_count(struct vmspace *vmspace)
  * such as that in the vmspace structure.
  */
 static void
-_vm_map_init(vm_map_t map, pmap_t pmap, uintcap_t min, uintcap_t max)
+_vm_map_init(vm_map_t map, pmap_t pmap, uintptr_t min, uintptr_t max)
 {
 
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -1034,15 +1034,15 @@ _vm_map_init(vm_map_t map, pmap_t pmap, uintcap_t min, uintcap_t max)
 }
 
 void
-vm_map_init(vm_map_t map, pmap_t pmap, uintcap_t min, uintcap_t max)
+vm_map_init(vm_map_t map, pmap_t pmap, uintptr_t min, uintptr_t max)
 {
 	_vm_map_init(map, pmap, min, max);
 	sx_init(&map->lock, "vm map (user)");
 }
 
 void
-vm_map_init_system(vm_map_t map, pmap_t pmap, uintcap_t min,
-    uintcap_t max)
+vm_map_init_system(vm_map_t map, pmap_t pmap, uintptr_t min,
+    uintptr_t max)
 {
 	_vm_map_init(map, pmap, min, max);
 	vm_map_modflags(map, MAP_SYSTEM_MAP, 0);
@@ -5904,8 +5904,8 @@ vmspace_exec(struct proc *p, vm_offset_t minuser, vm_offset_t maxuser)
 	struct vmspace *oldvmspace = p->p_vmspace;
 	struct vmspace *newvmspace;
 #if __has_feature(capabilities)
-	uintcap_t minuser_cap;
-	uintcap_t maxuser_cap;
+	uintptr_t minuser_cap;
+	uintptr_t maxuser_cap;
 #endif
 
 	KASSERT((curthread->td_pflags & TDP_EXECVMSPC) == 0,
@@ -6314,12 +6314,12 @@ vm_map_reservation_init_entry(vm_map_entry_t new_entry)
  * Create a capability for the given map, derived from the map root
  * capability.
  */
-uintcap_t
+uintptr_t
 _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
     vm_prot_t prot)
 {
-	uintcap_t retcap;
-	uintcap_t rootcap = vm_map_rootcap(map);
+	uintptr_t retcap;
+	uintptr_t rootcap = vm_map_rootcap(map);
 	int perms = vm_prot2perms(cheri_perms_get(rootcap), prot);
 
 	retcap = cheri_bounds_set(cheri_address_set(rootcap, addr), length);

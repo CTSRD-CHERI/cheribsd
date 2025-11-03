@@ -1009,7 +1009,7 @@ pci_bar_mmap(device_t pcidev, struct pci_bar_mmap *pbm)
 	obj->memattr = pbm->pbm_memattr;
 	addr = 0;
 	if ((pbm->pbm_flags & PCIIO_BAR_MMAP_FIXED) != 0) {
-		addr = (uintptr_t)(uintcap_t)pbm->pbm_map_base;
+		addr = (uintptr_t)(uintptr_t)pbm->pbm_map_base;
 		flags |= MAP_FIXED;
 	}
 	if ((pbm->pbm_flags & PCIIO_BAR_MMAP_EXCL) != 0)

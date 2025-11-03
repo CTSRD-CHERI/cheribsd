@@ -45,7 +45,7 @@
 #include <machine/vmparam.h>
 
 #ifdef __CHERI_PURE_CAPABILITY__
-void *kernel_root_cap = (void *)(intcap_t)-1;
+void *kernel_root_cap = (void *)(intptr_t)-1;
 #endif
 
 void
@@ -99,13 +99,13 @@ hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr)
 	tf = td->td_frame;
 
 	/* Set DDC to full user privilege. */
-	tf->tf_ddc = (uintcap_t)cheri_capability_build_user_rwx(
+	tf->tf_ddc = (uintptr_t)cheri_capability_build_user_rwx(
 	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERMS_SWALL,
 	    CHERI_CAP_USER_DATA_BASE, CHERI_CAP_USER_DATA_LENGTH,
 	    CHERI_CAP_USER_DATA_BASE);
 
 	/* Use 'entry_addr' as offset of PCC. */
-	tf->tf_sepc = (uintcap_t)cheri_capability_build_user_code(
+	tf->tf_sepc = (uintptr_t)cheri_capability_build_user_code(
 	    td, CHERI_CAP_USER_CODE_PERMS, CHERI_CAP_USER_CODE_BASE,
 	    CHERI_CAP_USER_CODE_LENGTH, entry_addr);
 }

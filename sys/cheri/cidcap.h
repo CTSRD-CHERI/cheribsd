@@ -35,7 +35,7 @@
 
 #ifndef _KERNEL
 /* XXX: currently Morello specific */
-int	cheri_cidcap_alloc(uintcap_t *cidcap);
+int	cheri_cidcap_alloc(uintptr_t *cidcap);
 #endif
 
 #endif /* __SYS_CHERI_CIDCAP_H__ */

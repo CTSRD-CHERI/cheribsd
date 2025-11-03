@@ -474,7 +474,7 @@ do_execve(struct thread *td, struct image_args *args,
 	struct nameidata nd;
 	struct ucred *oldcred;
 	struct uidinfo *euip = NULL;
-	uintcap_t stack_base;
+	uintptr_t stack_base;
 	struct image_params image_params, *imgp;
 	struct vattr attr;
 	struct pargs *oldargs = NULL, *newargs = NULL;
@@ -1519,7 +1519,7 @@ out:
 	 * We use _rwx here because we need a capability with execute
 	 * permissions, not a sealed one.
 	 */
-	vmspace->vm_shp_base = (uintcap_t)cheri_capability_build_user_rwx(
+	vmspace->vm_shp_base = (uintptr_t)cheri_capability_build_user_rwx(
 	    CHERI_CAP_USER_CODE_PERMS, sharedpage_addr,
 	    sv->sv_shared_page_len, sharedpage_addr);
 #endif
@@ -1534,7 +1534,7 @@ out:
 static int
 get_argenv_ptr(void **arrayp, void **ptrp)
 {
-	uintcap_t ptr;
+	uintptr_t ptr;
 	char *array;
 #ifdef COMPAT_FREEBSD32
 	uint32_t ptr32;
@@ -1920,12 +1920,12 @@ exec_args_get_begin_envv(struct image_args *args)
  * as the initial stack pointer.
  */
 int
-exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
+exec_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 {
 	int argc, envc;
 	char **vectp;
 	char *stringp;
-	uintcap_t destp, ustringp;
+	uintptr_t destp, ustringp;
 	struct ps_strings *arginfo;
 	struct proc *p;
 	struct sysentvec *sysent;
@@ -1937,7 +1937,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #if __has_feature(capabilities)
 	size_t rounded_len;
 	size_t argv_space, envv_space;
-	uintcap_t vecstr_cap;
+	uintptr_t vecstr_cap;
 #endif
 
 	p = imgp->proc;
@@ -1947,7 +1947,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #if __has_feature(capabilities)
 	if (imgp->stack != imgp->strings)
 		strings_on_stack = false;
-	destp = (uintcap_t)imgp->strings;
+	destp = (uintptr_t)imgp->strings;
 	destp = cheri_address_set(destp, PROC_PS_STRINGS(p));
 	arginfo = (struct ps_strings *)cheri_bounds_set_exact(destp,
 	    sizeof(*arginfo));
@@ -2077,12 +2077,12 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #endif
 
 	if (!strings_on_stack) {
-		*stack_base = (uintcap_t)imgp->stack;
+		*stack_base = (uintptr_t)imgp->stack;
 	} else {
 		/*
 		 * vectp also becomes our initial stack base
 		 */
-		*stack_base = (uintcap_t)vectp;
+		*stack_base = (uintptr_t)vectp;
 	}
 
 	stringp = imgp->args->begin_argv;
@@ -2111,7 +2111,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #else
 	imgp->argv = vectp;
 #endif
-	if (suptr(&arginfo->ps_argvstr, (intcap_t)imgp->argv) != 0 ||
+	if (suptr(&arginfo->ps_argvstr, (intptr_t)imgp->argv) != 0 ||
 	    suword32(&arginfo->ps_nargvstr, argc) != 0)
 		return (EFAULT);
 
@@ -2148,7 +2148,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #else
 	imgp->envv = vectp;
 #endif
-	if (suptr(&arginfo->ps_envstr, (intcap_t)imgp->envv) != 0 ||
+	if (suptr(&arginfo->ps_envstr, (intptr_t)imgp->envv) != 0 ||
 	    suword32(&arginfo->ps_nenvstr, envc) != 0)
 		return (EFAULT);
 
@@ -2189,7 +2189,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		imgp->auxv = vectp;
 #endif
 		error = imgp->sysent->sv_copyout_auxargs(imgp,
-		    (uintcap_t)imgp->auxv);
+		    (uintptr_t)imgp->auxv);
 		if (error != 0)
 			return (error);
 	}
@@ -2381,7 +2381,7 @@ core_output(char *base, size_t len, off_t offset,
 
 	KASSERT(is_aligned(base, PAGE_SIZE),
 	    ("%s: user address %zd is not page-aligned", __func__,
-	    (ptraddr_t)(uintcap_t)base));
+	    (ptraddr_t)(uintptr_t)base));
 
 	if (cp->comp != NULL)
 		return (compress_chunk(cp, base, tmpbuf, len));
@@ -2398,7 +2398,7 @@ core_output(char *base, size_t len, off_t offset,
 		for (runlen = 0; runlen < len; runlen += PAGE_SIZE) {
 			if (core_dump_can_intr && curproc_sigkilled())
 				return (EINTR);
-			error = vm_fault(map, (ptraddr_t)(uintcap_t)base + runlen,
+			error = vm_fault(map, (ptraddr_t)(uintptr_t)base + runlen,
 			    VM_PROT_READ, VM_FAULT_NOFILL, NULL);
 			if (runlen == 0)
 				success = error == KERN_SUCCESS;
@@ -2485,7 +2485,7 @@ core_output_memtag_cheri(char *base, size_t mem_len,
 		if (core_dump_can_intr && curproc_sigkilled())
 			return (EINTR);
 
-		error = proc_read_cheri_tags_page(map, (uintcap_t)base,
+		error = proc_read_cheri_tags_page(map, (uintptr_t)base,
 		    tagbuf + tagbuflen, &pagehastags);
 		if (error != 0)
 			return (error);

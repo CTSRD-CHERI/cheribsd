@@ -100,7 +100,7 @@ void do_trap_supervisor(struct trapframe *);
 void do_trap_user(struct trapframe *);
 
 static __inline void
-call_trapsignal(struct thread *td, int sig, int code, uintcap_t addr,
+call_trapsignal(struct thread *td, int sig, int code, uintptr_t addr,
     int trapno, int capreg)
 {
 	ksiginfo_t ksi;
@@ -175,10 +175,10 @@ cpu_fetch_syscall_args(struct thread *td)
 		offset = 0;
 		for (i = 0; i < sa->callp->sy_narg; i++) {
 			if (ptrmask & (1 << i)) {
-				offset = roundup2(offset, sizeof(uintcap_t));
+				offset = roundup2(offset, sizeof(uintptr_t));
 				error = fuecap(stack_args + offset,
 				    dst_ap);
-				offset += sizeof(uintcap_t);
+				offset += sizeof(uintptr_t);
 			} else {
 				error = fueword(stack_args + offset, &intval);
 				*dst_ap = intval;
@@ -209,7 +209,7 @@ cpu_fetch_syscall_args(struct thread *td)
 #endif
 
 static void
-print_with_symbol(const char *name, uintcap_t value)
+print_with_symbol(const char *name, uintptr_t value)
 {
 #ifdef DDB
 	c_db_sym_t sym;

@@ -75,8 +75,8 @@ cheri_read_tags_page(const void *page, void *tagbuf, bool *hastagsp)
 			dst++;
 		}
 
-		src += cheri_cloadtags_stride * sizeof(uintcap_t);
-		len -= cheri_cloadtags_stride * sizeof(uintcap_t);
+		src += cheri_cloadtags_stride * sizeof(uintptr_t);
+		len -= cheri_cloadtags_stride * sizeof(uintptr_t);
 	}
 
 	KASSERT(tagbits == 0, ("%s: partial tag bits %u at end of page",
@@ -90,6 +90,7 @@ static void
 measure_cloadtags_stride(void *dummy __unused)
 {
 	void **buf;
+	void *cap;
 	uint64_t tags;
 	u_int i;
 
@@ -103,6 +104,7 @@ measure_cloadtags_stride(void *dummy __unused)
 	 */
 	buf = malloc_aligned(sizeof(*buf) * 64, sizeof(*buf) * 64,
 	    M_TEMP, M_WAITOK | M_ZERO);
+	cap = &tags;
 
 #ifdef INVARIANTS
 	tags = cheri_loadtags(buf);

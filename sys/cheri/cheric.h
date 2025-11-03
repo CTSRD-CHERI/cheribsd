@@ -157,7 +157,7 @@
 	 (cheri_perms_get(ptr) & cheri_perms_get(parent)) == cheri_perms_get(ptr))
 
 #define	cheri_is_null_derived(x)					\
-	cheri_is_equal_exact((uintcap_t)cheri_address_get(x), x)
+	cheri_is_equal_exact((uintptr_t)cheri_address_get(x), x)
 
 /* Increment @p dst to have the address of @p src */
 #define cheri_address_copy(dst, src)					\
@@ -256,7 +256,7 @@ cheri_can_access(const void *cap, ptraddr_t perms, size_t length)
 
 #ifndef _KERNEL
 ssize_t	strfcap(char * __restrict buf, size_t maxsize,
-    const char * __restrict format, uintcap_t cap);
+    const char * __restrict format, uintptr_t cap);
 #endif
 
 #endif /* _SYS_CHERIC_H_ */

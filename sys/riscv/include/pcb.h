@@ -41,11 +41,11 @@ struct trapframe;
 
 struct pcb {
 #ifdef __CHERI_PURE_CAPABILITY__
-	uintcap_t	pcb_ra;		/* Return address */
-	uintcap_t	pcb_sp;		/* Stack pointer */
-	uintcap_t	pcb_gp;		/* Global pointer */
-	uintcap_t	pcb_tp;		/* Thread pointer */
-	uintcap_t	pcb_s[12];	/* Saved registers */
+	uintptr_t	pcb_ra;		/* Return address */
+	uintptr_t	pcb_sp;		/* Stack pointer */
+	uintptr_t	pcb_gp;		/* Global pointer */
+	uintptr_t	pcb_tp;		/* Thread pointer */
+	uintptr_t	pcb_s[12];	/* Saved registers */
 #else
 	uint64_t	pcb_ra;		/* Return address */
 	uint64_t	pcb_sp;		/* Stack pointer */

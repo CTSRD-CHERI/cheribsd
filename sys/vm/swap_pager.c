@@ -2324,13 +2324,13 @@ allocated:
 static void
 cheri_restore_tag(void **cp)
 {
-	uintcap_t cap;
+	uintptr_t cap;
 	void *newcap;
 #ifdef HAS_CHERI_PERM_SEAL
 	void *sealcap;
 #endif
 
-	cap = (uintcap_t)*cp;
+	cap = (uintptr_t)*cp;
 
 	newcap = cheri_cap_build(swap_restore_cap, cap);
 #ifdef HAS_CHERI_PERM_SEAL

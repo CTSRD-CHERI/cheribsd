@@ -1726,7 +1726,7 @@ static int ucma_close(struct inode *inode, struct file *filp)
 }
 
 static long
-ucma_ioctl(struct file *filp, unsigned int cmd, uintcap_t arg)
+ucma_ioctl(struct file *filp, unsigned int cmd, uintptr_t arg)
 {
 
 	switch (cmd) {

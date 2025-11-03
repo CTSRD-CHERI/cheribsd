@@ -157,11 +157,11 @@ init_pltgot(Plt_Entry *plt)
  * Fragments consist of a 64-bit address followed by a 56-bit length and an
  * 8-bit permission field.
  */
-static uintcap_t
+static uintptr_t
 init_cap_from_fragment(const Elf_Addr *fragment, void *data_cap,
     const void *pcc_cap, Elf_Addr base_addr, Elf_Size addend)
 {
-	uintcap_t cap;
+	uintptr_t cap;
 	Elf_Addr address, len;
 	uint8_t perms;
 
@@ -170,7 +170,7 @@ init_cap_from_fragment(const Elf_Addr *fragment, void *data_cap,
 	perms = fragment[1] >> (8 * sizeof(*fragment) - 8);
 
 	cap = perms == MORELLO_FRAG_EXECUTABLE ?
-	    (uintcap_t)pcc_cap : (uintcap_t)data_cap;
+	    (uintptr_t)pcc_cap : (uintptr_t)data_cap;
 	cap = cheri_address_set(cap, base_addr + address);
 	cap = cheri_bounds_set(cap, len);
 	cap = cheri_perms_clear(cap, CAP_RELOC_REMOVE_PERMS);
@@ -243,7 +243,7 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 		case R_MORELLO_RELATIVE:
 		case R_MORELLO_FUNC_RELATIVE:
 			where = (Elf_Addr *)(relocbase + rela->r_offset);
-			*(uintcap_t *)where = init_cap_from_fragment(where,
+			*(uintptr_t *)where = init_cap_from_fragment(where,
 			    relocbase, pcc, (Elf_Addr)(uintptr_t)relocbase,
 			    rela->r_addend);
 			break;
@@ -928,14 +928,14 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				return (-1);
 			break;
 		case R_MORELLO_RELATIVE:
-			*(uintcap_t *)(void *)where =
+			*(uintptr_t *)(void *)where =
 			    init_cap_from_fragment(where, data_cap,
 				get_codesegment_cap(obj),
 				(Elf_Addr)(uintptr_t)obj->relocbase,
 				rela->r_addend);
 			break;
 		case R_MORELLO_FUNC_RELATIVE:
-			*(uintcap_t *)(void *)where =
+			*(uintptr_t *)(void *)where =
 			    init_cap_from_fragment(where, data_cap,
 				get_codesegment_cap(obj),
 				(Elf_Addr)(uintptr_t)obj->relocbase,

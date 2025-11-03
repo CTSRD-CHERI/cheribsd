@@ -486,7 +486,7 @@ vm_gpa_release(void *cookie)
 int
 vm_get_cheri_capability_tag(struct vm *vm, struct vm_cheri_capability_tag *vt)
 {
-	uintcap_t *cap;
+	uintptr_t *cap;
 	void *cookie;
 
 	if (!__is_aligned(vt->gpa, sizeof(*cap)))

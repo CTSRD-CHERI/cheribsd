@@ -222,7 +222,7 @@ cheri_sysvec_init(struct sysentvec *sv)
 	 * Use the unchecked version here because we're not in a syscall
 	 * and the associated map is probably the kernel map.
 	 */
-	sv->sv_vmspace_cap = (uintcap_t)
+	sv->sv_vmspace_cap = (uintptr_t)
 	    cheri_capability_build_user_rwx_unchecked(
 	    CHERI_CAP_USER_CODE_PERMS | CHERI_CAP_USER_DATA_PERMS |
 	    CHERI_PERMS_SWALL, padded_minuser, user_length,
@@ -238,7 +238,7 @@ cheri_sysvec_init(struct sysentvec *sv)
  * return false and leave *out unchanged.
  */
 bool
-ptrace_derive_cap(struct proc *p, uintcap_t in, uintcap_t *out)
+ptrace_derive_cap(struct proc *p, uintptr_t in, uintptr_t *out)
 {
 	struct thread *td;
 	void *cap;
@@ -270,7 +270,7 @@ ptrace_derive_cap(struct proc *p, uintcap_t in, uintcap_t *out)
 #endif
 		if (cheri_tag_get(cap)) {
 			atomic_add_long(&cheri_forged_ptrace_caps, 1);
-			*out = (uintcap_t)cap;
+			*out = (uintptr_t)cap;
 			return (true);
 		}
 	}

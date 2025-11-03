@@ -93,7 +93,7 @@ int
 pmc_save_user_callchain(uintptr_t *cc, int maxsamples,
     struct trapframe *tf)
 {
-	uintcap_t pc, r, oldfp, fp;
+	uintptr_t pc, r, oldfp, fp;
 #ifdef COMPAT_FREEBSD64
 	int64_t r64;
 #endif
@@ -125,7 +125,7 @@ pmc_save_user_callchain(uintptr_t *cc, int maxsamples,
 		} else
 #endif
 		{
-			r = fp + sizeof(uintcap_t);
+			r = fp + sizeof(uintptr_t);
 			if (fueptr((void *)r, &pc) != 0)
 				break;
 		}

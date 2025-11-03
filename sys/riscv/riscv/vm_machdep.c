@@ -200,15 +200,15 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *),
 
 	tf = td->td_frame;
 
-	tf->tf_sp = STACKALIGN((uintcap_t)stack->ss_sp + stack->ss_size);
+	tf->tf_sp = STACKALIGN((uintptr_t)stack->ss_sp + stack->ss_size);
 #if __has_feature(capabilities)
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI) == 0) {
-		tf->tf_sp = (uintcap_t)(ptraddr_t)tf->tf_sp;
+		tf->tf_sp = (uintptr_t)(ptraddr_t)tf->tf_sp;
 		hybridabi_thread_setregs(td, (unsigned long)entry);
 	} else
 #endif
-		tf->tf_sepc = (uintcap_t)entry;
-	tf->tf_a[0] = (uintcap_t)arg;
+		tf->tf_sepc = (uintptr_t)entry;
+	tf->tf_a[0] = (uintptr_t)arg;
 	return (0);
 }
 
@@ -229,7 +229,7 @@ cpu_set_user_tls(struct thread *td, void *tls_base)
 		    TP_OFFSET64;
 	else
 #endif
-		td->td_frame->tf_tp = (uintcap_t)tls_base + TP_OFFSET;
+		td->td_frame->tf_tp = (uintptr_t)tls_base + TP_OFFSET;
 
 	return (0);
 }

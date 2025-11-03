@@ -157,8 +157,8 @@ struct cuse_client {
 	struct cuse_server *server;
 	struct cuse_server_dev *server_dev;
 
-	uintcap_t read_base;
-	uintcap_t write_base;
+	uintptr_t read_base;
+	uintptr_t write_base;
 	int read_length;
 	int write_length;
 	uint8_t	read_buffer[CUSE_COPY_BUFFER_MAX] __aligned(4);
@@ -564,7 +564,7 @@ cuse_client_is_closing(struct cuse_client *pcc)
 
 static void
 cuse_client_send_command_locked(struct cuse_client_command *pccmd,
-    uintcap_t data_ptr, unsigned long arg, int fflags, int ioflag)
+    uintptr_t data_ptr, unsigned long arg, int fflags, int ioflag)
 {
 	unsigned long cuse_fflags = 0;
 	struct cuse_server *pcs;
@@ -888,8 +888,8 @@ cuse_server_ioctl_copy_locked(struct cuse_server *pcs,
 }
 
 static int
-cuse_proc2proc_copy(struct proc *proc_s, uintcap_t data_s,
-    struct proc *proc_d, uintcap_t data_d, size_t len)
+cuse_proc2proc_copy(struct proc *proc_s, uintptr_t data_s,
+    struct proc *proc_d, uintptr_t data_d, size_t len)
 {
 	struct thread *td;
 	struct proc *proc_cur;
@@ -1255,7 +1255,7 @@ cuse_server_ioctl(struct cdev *dev, unsigned long cmd,
 		if (pccmd != NULL) {
 			pcc = pccmd->client;
 			for (n = 0; n != CUSE_CMD_MAX; n++) {
-				pcc->cmds[n].sub.per_file_handle = *(uintcap_t *)data;
+				pcc->cmds[n].sub.per_file_handle = *(uintptr_t *)data;
 			}
 		} else {
 			error = ENXIO;
@@ -1669,11 +1669,11 @@ cuse_client_read(struct cdev *dev, struct uio *uio, int ioflag)
 		cuse_server_lock(pcs);
 		if (len <= CUSE_COPY_BUFFER_MAX) {
 			/* set read buffer region for small reads */
-			pcc->read_base = (uintcap_t)uio->uio_iov->iov_base;
+			pcc->read_base = (uintptr_t)uio->uio_iov->iov_base;
 			pcc->read_length = len;
 		}
 		cuse_client_send_command_locked(pccmd,
-		    (uintcap_t)uio->uio_iov->iov_base,
+		    (uintptr_t)uio->uio_iov->iov_base,
 		    (unsigned long)(unsigned int)len, pcc->fflags, ioflag);
 
 		error = cuse_client_receive_command_locked(pccmd, 0, 0);
@@ -1764,11 +1764,11 @@ cuse_client_write(struct cdev *dev, struct uio *uio, int ioflag)
 		cuse_server_lock(pcs);
 		if (len <= CUSE_COPY_BUFFER_MAX) {
 			/* set write buffer region for small writes */
-			pcc->write_base = (uintcap_t)uio->uio_iov->iov_base;
+			pcc->write_base = (uintptr_t)uio->uio_iov->iov_base;
 			pcc->write_length = len;
 		}
 		cuse_client_send_command_locked(pccmd,
-		    (uintcap_t)uio->uio_iov->iov_base,
+		    (uintptr_t)uio->uio_iov->iov_base,
 		    (unsigned long)(unsigned int)len, pcc->fflags, ioflag);
 
 		error = cuse_client_receive_command_locked(pccmd, 0, 0);
@@ -1847,7 +1847,7 @@ cuse_client_ioctl(struct cdev *dev, unsigned long cmd,
 
 	cuse_server_lock(pcs);
 	cuse_client_send_command_locked(pccmd,
-	    (len == 0) ? *(uintcap_t *)data : CUSE_BUF_MIN_PTR,
+	    (len == 0) ? *(uintptr_t *)data : CUSE_BUF_MIN_PTR,
 	    (unsigned long)cmd, pcc->fflags,
 	    (fflag & O_NONBLOCK) ? IO_NDELAY : 0);
 

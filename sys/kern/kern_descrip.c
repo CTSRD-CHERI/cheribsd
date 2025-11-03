@@ -400,7 +400,7 @@ sys_dup(struct thread *td, struct dup_args *uap)
 struct fcntl_args {
 	int	fd;
 	int	cmd;
-	intcap_t arg;
+	intptr_t arg;
 };
 #endif
 /* ARGSUSED */
@@ -412,7 +412,7 @@ sys_fcntl(struct thread *td, struct fcntl_args *uap)
 }
 
 int
-kern_fcntl_freebsd(struct thread *td, int fd, int cmd, intcap_t arg)
+kern_fcntl_freebsd(struct thread *td, int fd, int cmd, intptr_t arg)
 {
 	struct flock fl;
 	struct __oflock ofl;
