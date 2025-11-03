@@ -652,8 +652,8 @@ proc0_init(void *dummy __unused)
 	 * we strip all access permission because proc0 is not
 	 * expected to enter usermode.
 	 */
-	uintcap_t minuser_cap =
-	    (uintcap_t)cheri_capability_build_user_rwx_unchecked(
+	uintptr_t minuser_cap =
+	    (uintptr_t)cheri_capability_build_user_rwx_unchecked(
 	    0, p->p_sysent->sv_minuser,
 	    p->p_sysent->sv_maxuser - p->p_sysent->sv_minuser,
 	    p->p_sysent->sv_minuser);

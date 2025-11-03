@@ -75,7 +75,7 @@ drmcompat_clear_user(void *_uaddr, size_t _len)
 	size_t len = _len;
 
 	/* make sure uaddr is aligned before going into the fast loop */
-	while (((uintcap_t)uaddr & 7) != 0 && len > 7) {
+	while (((uintptr_t)uaddr & 7) != 0 && len > 7) {
 		if (subyte(uaddr, 0))
 			return (_len);
 		uaddr++;
@@ -114,8 +114,8 @@ drmcompat_access_ok(const void *uaddr, size_t len)
 	uintptr_t eaddr;
 
 	/* get start and end address */
-	saddr = (uintcap_t)uaddr;
-	eaddr = (uintcap_t)uaddr + len;
+	saddr = (uintptr_t)uaddr;
+	eaddr = (uintptr_t)uaddr + len;
 
 	/* verify addresses are valid for userspace */
 	return ((saddr == eaddr) ||

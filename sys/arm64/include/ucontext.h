@@ -53,11 +53,11 @@ struct fpregs {
 
 #ifdef __CHERI_PURE_CAPABILITY__
 struct capregs {
-	__uintcap_t	cap_x[30];
-	__uintcap_t	cap_lr;
-	__uintcap_t	cap_sp;
-	__uintcap_t	cap_elr;
-	__uintcap_t	cap_ddc;
+	__uintptr_t	cap_x[30];
+	__uintptr_t	cap_lr;
+	__uintptr_t	cap_sp;
+	__uintptr_t	cap_elr;
+	__uintptr_t	cap_ddc;
 };
 #endif
 
@@ -94,7 +94,7 @@ struct __mcontext {
 #ifdef __CHERI_PURE_CAPABILITY__
 	__uint32_t	mc_spsr;
 	__uint64_t	mc_pad;		/* Padding */
-	__uintcap_t	mc_ptr;		/* Address of extra_regs struct */
+	__uintptr_t	mc_ptr;		/* Address of extra_regs struct */
 	__uint64_t	mc_spare[5];	/* Space for expansion, set to zero */
 #else
 	int		mc_pad;		/* Padding */

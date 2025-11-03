@@ -334,7 +334,7 @@ vtimer_remove_irq(struct hypctx *hypctx, struct vcpu *vcpu)
  */
 
 int
-vtimer_phys_ctl_read(struct vcpu *vcpu, uintcap_t *rval, void *arg)
+vtimer_phys_ctl_read(struct vcpu *vcpu, uintptr_t *rval, void *arg)
 {
 	struct hyp *hyp;
 	struct hypctx *hypctx;
@@ -356,7 +356,7 @@ vtimer_phys_ctl_read(struct vcpu *vcpu, uintcap_t *rval, void *arg)
 }
 
 int
-vtimer_phys_ctl_write(struct vcpu *vcpu, uintcap_t wval, void *arg)
+vtimer_phys_ctl_write(struct vcpu *vcpu, uintptr_t wval, void *arg)
 {
 	struct hypctx *hypctx;
 	struct vtimer_cpu *vtimer_cpu;
@@ -383,7 +383,7 @@ vtimer_phys_ctl_write(struct vcpu *vcpu, uintcap_t wval, void *arg)
 }
 
 int
-vtimer_phys_cnt_read(struct vcpu *vcpu, uintcap_t *rval, void *arg)
+vtimer_phys_cnt_read(struct vcpu *vcpu, uintptr_t *rval, void *arg)
 {
 	struct vm *vm;
 	struct hyp *hyp;
@@ -395,13 +395,13 @@ vtimer_phys_cnt_read(struct vcpu *vcpu, uintcap_t *rval, void *arg)
 }
 
 int
-vtimer_phys_cnt_write(struct vcpu *vcpu, uintcap_t wval, void *arg)
+vtimer_phys_cnt_write(struct vcpu *vcpu, uintptr_t wval, void *arg)
 {
 	return (0);
 }
 
 int
-vtimer_phys_cval_read(struct vcpu *vcpu, uintcap_t *rval, void *arg)
+vtimer_phys_cval_read(struct vcpu *vcpu, uintptr_t *rval, void *arg)
 {
 	struct hypctx *hypctx;
 	struct vtimer_cpu *vtimer_cpu;
@@ -415,7 +415,7 @@ vtimer_phys_cval_read(struct vcpu *vcpu, uintcap_t *rval, void *arg)
 }
 
 int
-vtimer_phys_cval_write(struct vcpu *vcpu, uintcap_t wval, void *arg)
+vtimer_phys_cval_write(struct vcpu *vcpu, uintptr_t wval, void *arg)
 {
 	struct hypctx *hypctx;
 	struct vtimer_cpu *vtimer_cpu;
@@ -434,7 +434,7 @@ vtimer_phys_cval_write(struct vcpu *vcpu, uintcap_t wval, void *arg)
 }
 
 int
-vtimer_phys_tval_read(struct vcpu *vcpu, uintcap_t *rval, void *arg)
+vtimer_phys_tval_read(struct vcpu *vcpu, uintptr_t *rval, void *arg)
 {
 	struct hyp *hyp;
 	struct hypctx *hypctx;
@@ -463,7 +463,7 @@ vtimer_phys_tval_read(struct vcpu *vcpu, uintcap_t *rval, void *arg)
 }
 
 int
-vtimer_phys_tval_write(struct vcpu *vcpu, uintcap_t wval, void *arg)
+vtimer_phys_tval_write(struct vcpu *vcpu, uintptr_t wval, void *arg)
 {
 	struct hyp *hyp;
 	struct hypctx *hypctx;

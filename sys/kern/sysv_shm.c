@@ -565,7 +565,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 	shmseg->u.shm_nattch++;
 #if __has_feature(capabilities)
 	if (SV_CURPROC_FLAG(SV_CHERI)) {
-		uintcap_t retaddr;
+		uintptr_t retaddr;
 		int perm;
 
 		retaddr = attach_va;

@@ -56,15 +56,15 @@ struct fpregs {
 
 #ifdef __CHERI_PURE_CAPABILITY__
 struct capregs {
-	__uintcap_t	cp_cra;
-	__uintcap_t	cp_csp;
-	__uintcap_t	cp_cgp;
-	__uintcap_t	cp_ctp;
-	__uintcap_t	cp_ct[7];
-	__uintcap_t	cp_cs[12];
-	__uintcap_t	cp_ca[8];
-	__uintcap_t	cp_sepcc;
-	__uintcap_t	cp_ddc;
+	__uintptr_t	cp_cra;
+	__uintptr_t	cp_csp;
+	__uintptr_t	cp_cgp;
+	__uintptr_t	cp_ctp;
+	__uintptr_t	cp_ct[7];
+	__uintptr_t	cp_cs[12];
+	__uintptr_t	cp_ca[8];
+	__uintptr_t	cp_sepcc;
+	__uintptr_t	cp_ddc;
 	__register_t	cp_sstatus;
 	__register_t	cp_pad;
 };

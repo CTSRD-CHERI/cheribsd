@@ -203,7 +203,7 @@ vm_map_entry_system_wired_count(vm_map_entry_t entry)
  * Returns any nonzero value to indicate revocation required.
  */
 typedef unsigned long (*vm_cheri_revoke_test_fn)(
-    const uint8_t *shadow, uintcap_t cut, unsigned long cutperm,
+    const uint8_t *shadow, uintptr_t cut, unsigned long cutperm,
     vm_offset_t start, vm_offset_t end);
 
 #ifdef CHERI_CAPREVOKE_STATS
@@ -238,7 +238,7 @@ struct cheri_revoke_stats;
 struct vm_map {
 	struct vm_map_entry header;	/* List of entries */
 #if __has_feature(capabilities)
-	uintcap_t map_capability;	/* (c) Capability spanning the map */
+	uintptr_t map_capability;	/* (c) Capability spanning the map */
 #endif
 	union {
 		struct sx lock;			/* Lock for map data */
@@ -360,7 +360,7 @@ vm_map_is_system(vm_map_t map)
 
 #endif	/* KLD_MODULE */
 #if __has_feature(capabilities)
-static __inline uintcap_t
+static __inline uintptr_t
 vm_map_rootcap(vm_map_t map)
 {
 	return (map->map_capability);
@@ -386,7 +386,7 @@ struct vmspace {
 	caddr_t vm_daddr;	/* (c) user virtual address of data */
 	vm_offset_t vm_maxsaddr;	/* user VA at max stack growth */
 	vm_offset_t vm_stacktop; /* top of the stack, may not be page-aligned */
-	uintcap_t vm_shp_base;	/* shared page pointer */
+	uintptr_t vm_shp_base;	/* shared page pointer */
 	u_int vm_refcnt;	/* number of references */
 #if __has_feature(capabilities)
 	uint64_t vm_prev_cid;	/* (d) last compartment ID allocated */
@@ -589,8 +589,8 @@ vm_offset_t vm_map_findspace(vm_map_t, vm_offset_t, vm_size_t);
 int vm_map_alignspace(vm_map_t, vm_object_t, vm_ooffset_t,
     vm_offset_t *, vm_size_t, vm_offset_t, vm_offset_t);
 int vm_map_inherit (vm_map_t, vm_offset_t, vm_offset_t, vm_inherit_t);
-void vm_map_init(vm_map_t, pmap_t, uintcap_t, uintcap_t);
-void vm_map_init_system(vm_map_t, pmap_t, uintcap_t, uintcap_t);
+void vm_map_init(vm_map_t, pmap_t, uintptr_t, uintptr_t);
+void vm_map_init_system(vm_map_t, pmap_t, uintptr_t, uintptr_t);
 int vm_map_insert (vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t,
     vm_pointer_t, vm_prot_t, vm_prot_t, int, vm_offset_t);
 int vm_map_insert_name (vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t,
@@ -611,7 +611,7 @@ int vm_map_reservation_create_locked(vm_map_t, vm_pointer_t *, vm_size_t, vm_pro
 int vm_map_reservation_get(vm_map_t, vm_offset_t, vm_size_t, vm_offset_t *);
 #if __has_feature(capabilities)
 void *vm_map_reservation_cap(vm_map_t, vm_offset_t);
-uintcap_t _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
+uintptr_t _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
     vm_prot_t prot);
 #define	vm_map_buildcap(map, addr, length, prot)	\
     _vm_map_buildcap(map, addr, length, prot)

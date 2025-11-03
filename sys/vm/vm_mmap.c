@@ -144,11 +144,11 @@ cap_covers_pages(const void *cap, size_t size)
 	return (cheri_can_access(addr, 0, size));
 }
 
-static uintcap_t
+static uintptr_t
 mmap_retcap(struct thread *td, vm_pointer_t addr,
     const struct mmap_req *mrp)
 {
-	uintcap_t newcap;
+	uintptr_t newcap;
 #ifndef __CHERI_PURE_CAPABILITY__
 	ptraddr_t cap_base __diagused;
 	size_t cap_len __diagused;
@@ -160,7 +160,7 @@ mmap_retcap(struct thread *td, vm_pointer_t addr,
 	 * reservation, just return the capability we were passed.
 	 */
 	if ((mrp->mr_kern_flags & MAP_RESERVATION_CREATE) == 0)
-		return ((uintcap_t)mrp->mr_source_cap);
+		return ((uintptr_t)mrp->mr_source_cap);
 
 	/*
 	 * The purecap kernel returns a properly bounded capability
@@ -173,7 +173,7 @@ mmap_retcap(struct thread *td, vm_pointer_t addr,
 	/* Enforce per-thread mmap capability permission */
 	newcap = cheri_perms_and(newcap, cheri_perms_get(mrp->mr_source_cap));
 #else
-	newcap = (uintcap_t)mrp->mr_source_cap;
+	newcap = (uintptr_t)mrp->mr_source_cap;
 	if (mrp->mr_flags & MAP_FIXED) {
 		/*
 		 * If hint was under aligned, we need to return a
@@ -633,7 +633,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 		 * virtual address and will not be a valid capability.
 		 */
 		if ((flags & MAP_RESERVATION_CREATE) == 0)
-			addr = cheri_address_set((uintcap_t)mrp->mr_source_cap,
+			addr = cheri_address_set((uintptr_t)mrp->mr_source_cap,
 			    addr);
 #endif
 	} else if (flags & MAP_32BIT) {
@@ -855,7 +855,7 @@ sys_msync(struct thread *td, struct msync_args *uap)
 		return (EINVAL);
 #endif
 
-	return (kern_msync(td, (uintptr_t)(uintcap_t)uap->addr, uap->len,
+	return (kern_msync(td, (uintptr_t)(uintptr_t)uap->addr, uap->len,
 	    uap->flags));
 }
 
@@ -916,7 +916,7 @@ sys_munmap(struct thread *td, struct munmap_args *uap)
 		return (EPROT);
 #endif
 
-	return (kern_munmap(td, (uintptr_t)(uintcap_t)uap->addr, uap->len));
+	return (kern_munmap(td, (uintptr_t)(uintptr_t)uap->addr, uap->len));
 }
 
 int
@@ -1013,7 +1013,7 @@ sys_mprotect(struct thread *td, struct mprotect_args *uap)
 		return (EPROT);
 #endif
 
-	return (kern_mprotect(td, (uintptr_t)(uintcap_t)uap->addr, uap->len,
+	return (kern_mprotect(td, (uintptr_t)(uintptr_t)uap->addr, uap->len,
 	    uap->prot, 0));
 }
 
@@ -1102,7 +1102,7 @@ sys_minherit(struct thread *td, struct minherit_args *uap)
 	if ((cheri_perms_get(uap->addr) & CHERI_PERM_SW_VMEM) == 0)
 		return (EPROT);
 #endif
-	return (kern_minherit(td, (uintptr_t)(uintcap_t)uap->addr, uap->len,
+	return (kern_minherit(td, (uintptr_t)(uintptr_t)uap->addr, uap->len,
 	    uap->inherit));
 }
 
@@ -1159,7 +1159,7 @@ sys_madvise(struct thread *td, struct madvise_args *uap)
 		return (EPROT);
 #endif
 
-	return (kern_madvise(td, (uintptr_t)(uintcap_t)uap->addr, uap->len,
+	return (kern_madvise(td, (uintptr_t)(uintptr_t)uap->addr, uap->len,
 	    uap->behav));
 }
 
@@ -1213,7 +1213,7 @@ struct mincore_args {
 int
 sys_mincore(struct thread *td, struct mincore_args *uap)
 {
-	uintcap_t addr = (uintcap_t)uap->addr;
+	uintptr_t addr = (uintptr_t)uap->addr;
 
 #if __has_feature(capabilities)
 	vm_offset_t range_bottom_page = trunc_page(addr);
@@ -1511,8 +1511,7 @@ sys_msetname(struct thread *td, struct msetname_args *uap)
 		return (EPROT);
 #endif
 
-	return (kern_msetname(td, (uintptr_t)(uintcap_t)uap->addr, uap->len,
-	    uap->name));
+	return (kern_msetname(td, (uintptr_t)uap->addr, uap->len, uap->name));
 }
 
 int
@@ -1581,7 +1580,7 @@ sys_mlock(struct thread *td, struct mlock_args *uap)
 #endif
 
 	return (kern_mlock(td->td_proc, td->td_ucred,
-	    (uintptr_t)__DECONST(uintcap_t, uap->addr), uap->len));
+	    (uintptr_t)__DECONST(uintptr_t, uap->addr), uap->len));
 }
 
 int
@@ -1767,7 +1766,7 @@ sys_munlock(struct thread *td, struct munlock_args *uap)
 		return (EPROT);
 #endif
 
-	return (kern_munlock(td, (uintptr_t)(uintcap_t)uap->addr, uap->len));
+	return (kern_munlock(td, (uintptr_t)(uintptr_t)uap->addr, uap->len));
 }
 
 int
@@ -2254,7 +2253,7 @@ vm_mmap_to_errno(int rv)
 
 #if __has_feature(capabilities)
 bool
-vm_derive_capreg(struct proc *p, uintcap_t in, uintcap_t *out)
+vm_derive_capreg(struct proc *p, uintptr_t in, uintptr_t *out)
 {
 	void *cap;
 	vm_map_t map;
@@ -2280,7 +2279,7 @@ vm_derive_capreg(struct proc *p, uintcap_t in, uintcap_t *out)
 		cap = cheri_sentry_create(cap);
 #endif
 	if (cheri_tag_get(cap)) {
-		*out = (uintcap_t)cap;
+		*out = (uintptr_t)cap;
 		return (true);
 	}
 	return (false);

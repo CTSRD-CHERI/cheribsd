@@ -74,7 +74,7 @@ struct vm_register_set {
 	int		cpuid;
 	unsigned int	count;
 	const int	*regnums;	/* enum vm_reg_name */
-	uintcap_t	*regvals;
+	uintptr_t	*regvals;
 };
 
 #if __has_feature(capabilities)

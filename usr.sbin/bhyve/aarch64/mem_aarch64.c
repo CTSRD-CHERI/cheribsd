@@ -44,7 +44,7 @@ mmio_handle_non_backed_mem(struct vcpu *vcpu, uint64_t paddr,
     struct mem_range **mr_paramp __unused)
 {
 	int err;
-	uintcap_t spsr;
+	uintptr_t spsr;
 	uint64_t esr;
 
 	if (vm_get_register(vcpu, VM_REG_GUEST_CPSR, &spsr) == -1)

@@ -426,7 +426,7 @@ ispioctl(struct cdev *dev, u_long c, caddr_t addr, int flags, struct thread *td)
 			chan = *(uint64_t *)addr;
 		else
 #endif
-			chan =  *(intcap_t *)addr;
+			chan =  *(intptr_t *)addr;
 		if (chan < 0 || chan >= isp->isp_nchan) {
 			retval = -ENXIO;
 			break;
@@ -446,7 +446,7 @@ ispioctl(struct cdev *dev, u_long c, caddr_t addr, int flags, struct thread *td)
 			chan = *(uint64_t *)addr;
 		else
 #endif
-			chan =  *(intcap_t *)addr;
+			chan =  *(intptr_t *)addr;
 		if (chan < 0 || chan >= isp->isp_nchan) {
 			retval = -ENXIO;
 			break;

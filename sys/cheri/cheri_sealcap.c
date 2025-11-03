@@ -37,6 +37,6 @@
 #include <cheri/cheri.h>
 
 /* Set to -1 to prevent it from being zeroed with the rest of BSS */
-void *userspace_root_sealcap = (void *)(intcap_t)-1;
+void *userspace_root_sealcap = (void *)(intptr_t)-1;
 SYSCTL_CAPABILITY(_security_cheri, OID_AUTO, sealcap, CTLFLAG_RD | CTLFLAG_PTROUT,
     &userspace_root_sealcap, 0, "CHERI sealing root capability");

@@ -292,7 +292,7 @@ END(fueword)
 
 #if __has_feature(capabilities)
 /*
- * int fuecap(volatile const void*, intcap_t *)
+ * int fuecap(volatile const void*, intptr_t *)
  */
 ENTRY(fuecap)
 	li	a2, (VM_MAXUSER_ADDRESS-7)
@@ -439,7 +439,7 @@ END(suword)
 
 #if __has_feature(capabilities)
 /*
- * int sucap(volatile void *, intcap_t)
+ * int sucap(volatile void *, intptr_t)
  */
 ENTRY(sucap)
 	li	a2, (VM_MAXUSER_ADDRESS-3)

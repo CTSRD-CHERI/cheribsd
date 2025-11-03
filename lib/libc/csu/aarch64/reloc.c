@@ -42,12 +42,12 @@ ifunc_init(const Elf_Auxinfo *aux __unused)
  * Fragments consist of a 64-bit address followed by a 56-bit length and an
  * 8-bit permission field.
  */
-static uintcap_t
+static uintptr_t
 init_cap_from_fragment(const Elf_Addr *fragment, void *data_cap,
     const void *text_rodata_cap, Elf_Addr base_addr,
     Elf_Size addend)
 {
-	uintcap_t cap;
+	uintptr_t cap;
 	Elf_Addr address, len;
 	uint8_t perms;
 
@@ -56,7 +56,7 @@ init_cap_from_fragment(const Elf_Addr *fragment, void *data_cap,
 	perms = fragment[1] >> (8 * sizeof(*fragment) - 8);
 
 	cap = perms == MORELLO_FRAG_EXECUTABLE ?
-	    (uintcap_t)text_rodata_cap : (uintcap_t)data_cap;
+	    (uintptr_t)text_rodata_cap : (uintptr_t)data_cap;
 	cap = cheri_address_set(cap, base_addr + address);
 	cap = cheri_bounds_set(cap, len);
 	cap = cheri_perms_clear(cap, CHERI_PERM_SW_VMEM);
