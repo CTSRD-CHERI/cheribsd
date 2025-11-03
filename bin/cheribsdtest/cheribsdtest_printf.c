@@ -157,7 +157,7 @@ test_printf_cap_one(void * __capability p, int expected_tokens,
 CHERIBSDTEST(printf_cap, "Various checks of %#p")
 {
 	char data[64];
-	void * __capability scalar = (void * __capability)(uintcap_t)4;
+	void * __capability scalar = (void * __capability)(__uintcap_t)4;
 	char * __capability datap = data;
 
 	snprintf(data, sizeof(data), "%#lp", scalar);

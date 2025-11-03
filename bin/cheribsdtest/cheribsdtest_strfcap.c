@@ -61,7 +61,7 @@ test_strfcap_C_cap_one(void * __capability p, int expected_tokens,
 	assert(expected_tokens == 1 || expected_tokens == 4 ||
 	    expected_tokens == 5);
 
-	strfcap(str, sizeof(str), "%C", (uintcap_t)p);
+	strfcap(str, sizeof(str), "%C", (__uintcap_t)p);
 	tokens = sscanf(str, "%lx [%15[^,],%lx-%lx] %31s", &addr, perms, &base,
 	    &top, attr);
 	if (tokens != expected_tokens)
@@ -177,7 +177,7 @@ test_strfcap_C_cap_one(void * __capability p, int expected_tokens,
 }
 
 static void
-test_strfcap_number_one_cap(uintcap_t cap, const char *cap_desc)
+test_strfcap_number_one_cap(__uintcap_t cap, const char *cap_desc)
 {
 	char *cap_bytes, *format, str_s[33], str_p[33];
 	const char spec_chars[] = "ablopstv";
@@ -272,18 +272,18 @@ CHERIBSDTEST(strfcap_numbers, "Checks of formats of a single number")
 	char foo[4];
 	char * __capability foop = foo;
 
-	test_strfcap_number_one_cap((uintcap_t)4, "scaler (4)");
+	test_strfcap_number_one_cap((__uintcap_t)4, "scaler (4)");
 
-	test_strfcap_number_one_cap((uintcap_t)foop, "stack array");
+	test_strfcap_number_one_cap((__uintcap_t)foop, "stack array");
 
-	test_strfcap_number_one_cap((uintcap_t)cheri_cleartag(foop),
+	test_strfcap_number_one_cap((__uintcap_t)cheri_cleartag(foop),
 	    "stack array");
 
 	test_strfcap_number_one_cap(
-	    (uintcap_t)__builtin_cheri_global_data_get(), "DDC");
+	    (__uintcap_t)__builtin_cheri_global_data_get(), "DDC");
 
 	test_strfcap_number_one_cap(
-	    (uintcap_t)__builtin_cheri_program_counter_get(), "PCC");
+	    (__uintcap_t)__builtin_cheri_program_counter_get(), "PCC");
 
 	cheribsdtest_success();
 }
@@ -293,13 +293,13 @@ CHERIBSDTEST(strfcap_T, "Check of tag in format")
 	char str_t[128], str_u[128];
 	char * __capability cap = (char * __capability)str_t;
 
-	strfcap(str_t, sizeof(str_t), "%C", (uintcap_t)cap);
-	strfcap(str_u, sizeof(str_u), "%C", (uintcap_t)cheri_cleartag(cap));
+	strfcap(str_t, sizeof(str_t), "%C", (__uintcap_t)cap);
+	strfcap(str_u, sizeof(str_u), "%C", (__uintcap_t)cheri_cleartag(cap));
 	if (strcmp(str_t, str_u) == 0)
 		cheribsdtest_failure_errx("Tagged (%s) and untagged (%s) %%C "
 		    "formatted output is identical", str_t, str_u);
 
-	strfcap(str_u, sizeof(str_u), "%T%C", (uintcap_t)cheri_cleartag(cap));
+	strfcap(str_u, sizeof(str_u), "%T%C", (__uintcap_t)cheri_cleartag(cap));
 	if (strcmp(str_t, str_u) != 0)
 		cheribsdtest_failure_errx("Tagged (%s) and untagged (%s) "
 		    "differs when untagged formatted with %%T%%C",
@@ -320,19 +320,19 @@ CHERIBSDTEST(strfcap_textual, "Checks of %? and %%")
 		cheribsdtest_failure_errx("(%s) produced (%s)", fmt, str);
 
 	fmt = "%?12345%a";
-	strfcap(str, sizeof(str), fmt, (uintcap_t)cap);
+	strfcap(str, sizeof(str), fmt, (__uintcap_t)cap);
 	if (strncmp(str, "12345", 5) != 0)
 		cheribsdtest_failure_errx("(%s) did not include 12345 (%s)",
 		    fmt, str);
 
 	fmt = "%?12345%A";
-	strfcap(str, sizeof(str), fmt, (uintcap_t)cap);
+	strfcap(str, sizeof(str), fmt, (__uintcap_t)cap);
 	if (strcmp(str, "") != 0)
 		cheribsdtest_failure_errx("(%s) of valid cap is not empty (%s)",
 		    fmt, str);
 
 	fmt = "%?12345%A";
-	strfcap(str, sizeof(str), fmt, (uintcap_t)cheri_cleartag(cap));
+	strfcap(str, sizeof(str), fmt, (__uintcap_t)cheri_cleartag(cap));
 	if (strncmp(str, "12345", 5) != 0)
 		cheribsdtest_failure_errx("(%s) of untagged cap did not "
 		    "include 12345 (%s)", fmt, str);
@@ -343,7 +343,7 @@ CHERIBSDTEST(strfcap_textual, "Checks of %? and %%")
 CHERIBSDTEST(strfcap_C, "Various checks of %C (%A and %P indirectly)")
 {
 	char data[64];
-	uintcap_t scalar = (uintcap_t)4;
+	__uintcap_t scalar = (__uintcap_t)4;
 	char * __capability datap = data;
 #ifdef CHERI_FLAGS_CAP_MODE
 	void * __capability pcc_alt = __builtin_cheri_program_counter_get();

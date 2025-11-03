@@ -96,11 +96,11 @@ CHERIBSDTEST(ptrace_readcap, "Basic tests of PIOD_READ_CHERI_CAP")
 {
 	struct ptrace_io_desc piod;
 	pid_t pid;
-	uintcap_t cap, *pp;
-	char capbuf[2][sizeof(uintcap_t) + 1];
+	__uintcap_t cap, *pp;
+	char capbuf[2][sizeof(__uintcap_t) + 1];
 
 	pp = malloc(sizeof(*pp) * 2);
-	pp[0] = (uintcap_t)(void * __capability)&piod;
+	pp[0] = (__uintcap_t)(void * __capability)&piod;
 	pp[1] = 42;
 
 	CHERIBSDTEST_VERIFY(cheri_gettag(pp[0]) != 0);
@@ -135,15 +135,15 @@ CHERIBSDTEST(ptrace_readtags, "Basic test of PIOD_READ_CHERI_TAGS")
 {
 	struct ptrace_io_desc piod;
 	pid_t pid;
-	size_t ppsz = 8 * sizeof(uintcap_t);
-	uintcap_t *pp;
+	size_t ppsz = 8 * sizeof(__uintcap_t);
+	__uintcap_t *pp;
 	char tagbuf[1];
 
 	pp = aligned_alloc(ppsz, ppsz);
 	memset(pp, 0, ppsz);
 
-	pp[0] = (uintcap_t)(void * __capability)&piod;
-	pp[2] = (uintcap_t)(void * __capability)tagbuf;
+	pp[0] = (__uintcap_t)(void * __capability)&piod;
+	pp[2] = (__uintcap_t)(void * __capability)tagbuf;
 
 	CHERIBSDTEST_VERIFY(cheri_gettag(pp[0]) != 0);
 	CHERIBSDTEST_VERIFY(cheri_gettag(pp[1]) == 0);
@@ -176,15 +176,15 @@ CHERIBSDTEST(ptrace_readcap_pageend,
 	struct ptrace_io_desc piod;
 	size_t page_size;
 	pid_t pid;
-	uintcap_t cap, *pp;
+	__uintcap_t cap, *pp;
 	u_int last_index;
-	char capbuf[sizeof(uintcap_t) + 1];
+	char capbuf[sizeof(__uintcap_t) + 1];
 
 	page_size = getpagesize();
 	pp = aligned_alloc(page_size, page_size);
 	memset(pp, 0, page_size);
-	last_index = (page_size / sizeof(uintcap_t)) - 1;
-	pp[last_index] = (uintcap_t)(void * __capability)&piod;
+	last_index = (page_size / sizeof(__uintcap_t)) - 1;
+	pp[last_index] = (__uintcap_t)(void * __capability)&piod;
 
 	CHERIBSDTEST_VERIFY(cheri_gettag(pp[last_index]) != 0);
 
@@ -214,8 +214,8 @@ CHERIBSDTEST(ptrace_writecap, "Basic tests of PIOD_WRITE_CHERI_CAP")
 	struct ptrace_io_desc piod;
 	pid_t pid;
 	int fd;
-	uintcap_t *map, pp[2];
-	char capbuf[2][sizeof(uintcap_t) + 1];
+	__uintcap_t *map, pp[2];
+	char capbuf[2][sizeof(__uintcap_t) + 1];
 
 	fd = CHERIBSDTEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
 	CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
