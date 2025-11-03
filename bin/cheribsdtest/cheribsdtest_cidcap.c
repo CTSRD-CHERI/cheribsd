@@ -39,10 +39,10 @@
 
 #ifdef CHERI_PERM_COMPARTMENT_ID
 
-static uintcap_t
+static uintptr_t
 get_cidcap_sysctl(void)
 {
-	uintcap_t cidcap;
+	uintptr_t cidcap;
 	size_t cidcap_size;
 
 	cidcap_size = sizeof(cidcap);
@@ -53,7 +53,7 @@ get_cidcap_sysctl(void)
 }
 
 static void
-check_cidcap(uintcap_t cidcap, size_t base, size_t length, size_t offset)
+check_cidcap(uintptr_t cidcap, size_t base, size_t length, size_t offset)
 {
 	uint64_t v;
 
@@ -102,7 +102,7 @@ check_cidcap(uintcap_t cidcap, size_t base, size_t length, size_t offset)
 
 CHERIBSDTEST(cidcap_sysctl, "Retrieve cidcap using sysctl(3)")
 {
-	uintcap_t cidcap;
+	uintptr_t cidcap;
 
 	cidcap = get_cidcap_sysctl();
 
@@ -115,7 +115,7 @@ CHERIBSDTEST(cidcap_sysctl, "Retrieve cidcap using sysctl(3)")
 
 CHERIBSDTEST(cidcap_alloc, "Retrieve cidcap using cheri_cidcap_alloc(2)")
 {
-	uintcap_t cidcap1, cidcap2;
+	uintptr_t cidcap1, cidcap2;
 
 	/*
 	 * XXX: there's no inherent reason why the allocator should

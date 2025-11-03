@@ -825,7 +825,7 @@ CHERIBSDTEST(vm_reservation_access_fault,
 	    "mmap() returned a pointer with an unrepresentable length "
 	    "(%zu vs %zu): %#p", cheri_getlen(map), expected_len, map);
 
-	padding = (int *)((uintcap_t)map + expected_len - sizeof(int));
+	padding = (int *)((intptr_t)map + expected_len - sizeof(int));
 	sink = *padding;
 
 	cheribsdtest_failure_errx("reservation padding access allowed");
