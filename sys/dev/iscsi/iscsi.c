@@ -2833,12 +2833,3 @@ moduledata_t iscsi_data = {
 DECLARE_MODULE(iscsi, iscsi_data, SI_SUB_DRIVERS, SI_ORDER_MIDDLE);
 MODULE_DEPEND(iscsi, cam, 1, 1, 1);
 MODULE_DEPEND(iscsi, icl, 1, 1, 1);
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes": [
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END
