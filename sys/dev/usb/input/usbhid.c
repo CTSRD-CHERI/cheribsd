@@ -702,7 +702,7 @@ usbhid_ioctl(device_t dev, device_t child __unused, unsigned long cmd,
 		if (error)
 			break;
 		error = usbhid_sync_xfer(
-		    sc, USBHID_CTRL_DT, &req, (void *)ucr->ucr_data);
+		    sc, USBHID_CTRL_DT, &req, ucr->ucr_data);
 		if (error == 0)
 			ucr->ucr_actlen = UGETW(req.ctrl.wLength);
 		break;
@@ -898,14 +898,3 @@ MODULE_DEPEND(usbhid, hid, 1, 1, 1);
 MODULE_DEPEND(usbhid, hidbus, 1, 1, 1);
 MODULE_VERSION(usbhid, 1);
 USB_PNP_HOST_INFO(usbhid_devs);
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20230509,
- *   "target_type": "kernel",
- *   "changes": [
- *     "ctoptr"
- *   ]
- * }
- * CHERI CHANGES END
- */
