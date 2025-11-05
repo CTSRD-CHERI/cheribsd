@@ -145,8 +145,8 @@ filemon_event_process_exec(void *arg __unused, struct proc *p,
 }
 
 static void
-_filemon_wrapper_openat(struct thread *td, const char *upath,
-    int flags, int fd)
+_filemon_wrapper_openat(struct thread *td, const char *upath, int flags,
+    int fd)
 {
 	int error;
 	struct file *fp;
