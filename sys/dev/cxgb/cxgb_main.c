@@ -2852,7 +2852,7 @@ cxgb_extension_ioctl(struct cdev *dev, unsigned long cmd, caddr_t data,
 		 * Read 256 bytes at a time as len can be large and we don't
 		 * want to use huge intermediate buffers.
 		 */
-		useraddr = (uint8_t *)t->buf;
+		useraddr = (uint8_t *)t->buf; 
 		while (len) {
 			unsigned int chunk = min(len, sizeof(buf));
 
@@ -3646,12 +3646,3 @@ cxgb_debugnet_poll(if_t ifp, int count)
 	return (0);
 }
 #endif /* DEBUGNET */
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes": [
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END
