@@ -1258,9 +1258,8 @@ ugen_fs_set_complete(struct usb_fifo *f, uint8_t index)
 }
 
 static int
-ugen_fs_getbuffer(void **uptrp, struct usb_fifo *f,
-    void *buffer, uint32_t *lengths,
-    usb_frcount_t n)
+ugen_fs_getbuffer(void **uptrp, struct usb_fifo *f, void *buffer,
+    uint32_t *lengths, usb_frcount_t n)
 {
 	union {
 		void **ppBuffer;
@@ -1312,7 +1311,7 @@ ugen_fs_copy_in(struct usb_fifo *f, uint8_t ep_index)
 	struct usb_device_request *req;
 	struct usb_xfer *xfer;
 	struct usb_fs_endpoint fs_ep;
-	void *uaddr;	/* userland pointer */
+	void *uaddr;			/* userland pointer */
 	void *kaddr;
 	usb_frlength_t offset;
 	usb_frlength_t rem;
@@ -1627,7 +1626,7 @@ ugen_fs_copy_out(struct usb_fifo *f, uint8_t ep_index)
 	struct usb_device_request *req;
 	struct usb_xfer *xfer;
 	struct usb_fs_endpoint fs_ep;
-	void *uaddr;		/* userland ptr */
+	void *uaddr;			/* userland ptr */
 	void *kaddr;
 	usb_frlength_t offset;
 	usb_frlength_t rem;
@@ -2412,7 +2411,7 @@ ugen_ioctl_post(struct usb_fifo *f, u_long cmd, void *addr, int fflags)
 		error = ugen_get32(cmd, f, addr);
 		break;
 #endif
-	
+
 #ifdef COMPAT_FREEBSD64
 	case USB_GET_FULL_DESC64:
 	case USB_GET_STRING_DESC64:
