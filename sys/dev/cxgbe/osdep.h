@@ -90,7 +90,6 @@ typedef boolean_t bool;
 #define DIV_ROUND_UP(x, y) howmany(x, y)
 
 #define ARRAY_SIZE(x) nitems(x)
-/* #define container_of(p, s, f) ((s *)(((uint8_t *)(p)) - offsetof(s, f))) */
 #define container_of(ptr, type, member) __containerof(ptr, type, member)
 
 #define swab16(x) bswap16(x)
