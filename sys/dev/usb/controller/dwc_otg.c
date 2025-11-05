@@ -4968,12 +4968,3 @@ static const struct usb_bus_methods dwc_otg_bus_methods =
 	.device_resume = &dwc_otg_device_resume,
 	.device_suspend = &dwc_otg_device_suspend,
 };
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes_purecap": [
-//     "pointer_as_integer"
-//   ]
-// }
-// CHERI CHANGES END
