@@ -397,8 +397,7 @@ vmbus_txbr_write_call(struct vmbus_txbr *tbr,
 	for (i = 0; i < iovlen; i++) {
 		if (iov[i].iov_base != NULL) {
 			windex = vmbus_txbr_copyto(tbr, windex,
-			    (const void *)iov[i].iov_base,
-			    iov[i].iov_len);
+			    iov[i].iov_base, iov[i].iov_len);
 		} else if (cb != NULL) {
 			windex = vmbus_txbr_copyto_call(tbr, windex,
 			    iov[i].iov_len, cb, cbarg, &cb_ret);
@@ -477,8 +476,7 @@ vmbus_txbr_write(struct vmbus_txbr *tbr, const struct iovec iov[], int iovlen,
 	windex = old_windex;
 	for (i = 0; i < iovlen; i++) {
 		windex = vmbus_txbr_copyto(tbr, windex,
-		    (const void *)iov[i].iov_base,
-		    iov[i].iov_len);
+		    iov[i].iov_base, iov[i].iov_len);
 	}
 
 	/*
@@ -727,14 +725,3 @@ vmbus_rxbr_read(struct vmbus_rxbr *rbr, void *data, int dlen, uint32_t skip,
 
 	return (0);
 }
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20230509,
- *   "target_type": "kernel",
- *   "changes": [
- *     "ctoptr"
- *   ]
- * }
- * CHERI CHANGES END
- */
