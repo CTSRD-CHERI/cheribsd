@@ -160,7 +160,7 @@ struct usb_fs_endpoint {
 	 * multiple frame lengths !
 	 */
 	void  **ppBuffer;		/* pointer to userland buffers */
-	uint32_t  *pLength;		/* pointer to frame lengths, updated
+	uint32_t *pLength;		/* pointer to frame lengths, updated
 					 * to actual length */
 	uint32_t nFrames;		/* number of frames */
 	uint32_t aFrames;		/* actual number of frames */
