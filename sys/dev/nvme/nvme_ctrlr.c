@@ -1280,8 +1280,7 @@ nvme_ctrlr_passthrough_cmd(struct nvme_controller *ctrlr,
 			req = nvme_allocate_request_vaddr(buf->b_data, pt->len,
 			    M_WAITOK, nvme_pt_done, pt);
 		} else
-			req = nvme_allocate_request_vaddr(
-			    (void *)pt->buf, pt->len,
+			req = nvme_allocate_request_vaddr(pt->buf, pt->len,
 			    M_WAITOK, nvme_pt_done, pt);
 	} else
 		req = nvme_allocate_request_null(M_WAITOK, nvme_pt_done, pt);
@@ -1829,14 +1828,3 @@ fail:
 	(void)atomic_cmpset_32(&ctrlr->is_resetting, 1, 0);
 	return (0);
 }
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20230509,
- *   "target_type": "kernel",
- *   "changes": [
- *     "ctoptr"
- *   ]
- * }
- * CHERI CHANGES END
- */
