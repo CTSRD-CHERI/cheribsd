@@ -43,8 +43,8 @@
 #include <sys/param.h>
 #include <net80211/ieee80211_radiotap.h>
 
-#define	SIOCGATHSTATS	_IOWR('i', 237, struct ifreq)
-#define	SIOCZATHSTATS	_IOWR('i', 239, struct ifreq)
+#define	SIOCGATHSTATS	_IOWR('i', 137, struct ifreq)
+#define	SIOCZATHSTATS	_IOWR('i', 139, struct ifreq)
 
 #define WTAPIOCTLCRT	_IOW('W', 1, int)
 #define WTAPIOCTLDEL	_IOW('W', 2, int)
@@ -177,12 +177,3 @@ struct wtap_tx_radiotap_header {
 } __packed;
 
 #endif
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "header",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END
