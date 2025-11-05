@@ -1210,7 +1210,7 @@ cleanup:
 		sgl_node = LIST_FIRST(&g_hv_sgl_page_pool.free_sgl_list);
 		LIST_REMOVE(sgl_node, link);
 		for (j = 0; j < STORVSC_DATA_SEGCNT_MAX; j++) {
-			free((void *)sgl_node->sgl_data->sg_iov[j].iov_base, M_DEVBUF);
+			free(sgl_node->sgl_data->sg_iov[j].iov_base, M_DEVBUF);
 		}
 		free(sgl_node->sgl_data, M_DEVBUF);
 		free(sgl_node, M_DEVBUF);
@@ -1270,7 +1270,7 @@ storvsc_detach(device_t dev)
 		sgl_node = LIST_FIRST(&g_hv_sgl_page_pool.free_sgl_list);
 		LIST_REMOVE(sgl_node, link);
 		for (j = 0; j < STORVSC_DATA_SEGCNT_MAX; j++){
-			free((void *)sgl_node->sgl_data->sg_iov[j].iov_base, M_DEVBUF);
+			free(sgl_node->sgl_data->sg_iov[j].iov_base, M_DEVBUF);
 		}
 		free(sgl_node->sgl_data, M_DEVBUF);
 		free(sgl_node, M_DEVBUF);
@@ -1694,7 +1694,7 @@ storvsc_copy_sgl_to_bounce_buf(struct hv_sglist *bounce_sgl,
 
 	for (src_sgl_idx = 0; src_sgl_idx < orig_sgl_count; src_sgl_idx++) {
 		if (seg_bits & (1 << src_sgl_idx)) {
-			memcpy((void *)bounce_sgl->sg_iov[src_sgl_idx].iov_base,
+			memcpy(bounce_sgl->sg_iov[src_sgl_idx].iov_base,
 			    (void*)(uintptr_t)orig_sgl[src_sgl_idx].ds_addr,
 			    orig_sgl[src_sgl_idx].ds_len);
 
@@ -2032,7 +2032,7 @@ create_storvsc_request(union ccb *ccb, struct hv_storvsc_request *reqp)
 			/* transfer virtual address to physical frame number */
 			if (reqp->not_aligned_seg_bits & 0x1){
  				phys_addr =
-				    vtophys((void *)reqp->bounce_sgl->sg_iov[0].iov_base);
+				    vtophys(reqp->bounce_sgl->sg_iov[0].iov_base);
 			}else{
  				phys_addr =
 					vtophys(storvsc_sglist[0].ds_addr);
@@ -2045,7 +2045,7 @@ create_storvsc_request(union ccb *ccb, struct hv_storvsc_request *reqp)
 			for (i = 1; i < storvsc_sg_count; i++) {
 				if (reqp->not_aligned_seg_bits & (1 << i)) {
 					phys_addr =
-					    vtophys((void *)reqp->bounce_sgl->sg_iov[i].iov_base);
+					    vtophys(reqp->bounce_sgl->sg_iov[i].iov_base);
 				} else {
 					phys_addr =
 					    vtophys(storvsc_sglist[i].ds_addr);
