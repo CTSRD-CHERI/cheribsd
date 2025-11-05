@@ -168,11 +168,7 @@ typedef struct mpr_adapter_data
 
 typedef struct mpr_update_flash
 {
-#if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
-	void *PtrBuffer;
-#else
-	uint64_t	PtrBuffer;
-#endif
+	uint64ptr_t	PtrBuffer;
 	uint32_t	ImageChecksum;
 	uint32_t	ImageOffset;
 	uint32_t	ImageSize;
@@ -186,24 +182,14 @@ typedef struct mpr_update_flash
 
 typedef struct mpr_pass_thru
 {
-#if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
-	void *PtrRequest;
-	void *PtrReply;
-	void *PtrData;
-#else
-	uint64_t	PtrRequest;
-	uint64_t	PtrReply;
-	uint64_t	PtrData;
-#endif
+	uint64ptr_t	PtrRequest;
+	uint64ptr_t	PtrReply;
+	uint64ptr_t	PtrData;
 	uint32_t	RequestSize;
 	uint32_t	ReplySize;
 	uint32_t	DataSize;
 	uint32_t	DataDirection;
-#if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
-	void *PtrDataOut;
-#else
-	uint64_t	PtrDataOut;
-#endif
+	uint64ptr_t	PtrDataOut;
 	uint32_t	DataOutSize;
 	uint32_t	Timeout;
 } mpr_pass_thru_t;
@@ -239,11 +225,7 @@ typedef struct mpr_event_entry
 typedef struct mpr_event_report
 {
 	uint32_t	Size;
-#if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
-	void *PtrEvents;
-#else
-	uint64_t	PtrEvents;
-#endif
+	uint64ptr_t	PtrEvents;
 } mpr_event_report_t;
 
 typedef struct mpr_pci_info
@@ -259,11 +241,7 @@ typedef struct mpr_diag_action
 {
 	uint32_t	Action;
 	uint32_t	Length;
-#if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
-	void *PtrDiagAction;
-#else
-	uint64_t	PtrDiagAction;
-#endif
+	uint64ptr_t	PtrDiagAction;
 	uint32_t	ReturnCode;
 } mpr_diag_action_t;
 
@@ -339,11 +317,7 @@ typedef struct mpr_diag_read_buffer
 	uint32_t	StartingOffset;
 	uint32_t	BytesToRead;
 	uint32_t	UniqueId;
-#if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
-	void *PtrDataBuffer;
-#else
-	uint64_t	PtrDataBuffer;
-#endif
+	uint64ptr_t	PtrDataBuffer;
 } mpr_diag_read_buffer_t;
 
 /*

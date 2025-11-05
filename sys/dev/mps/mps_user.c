@@ -659,8 +659,7 @@ mps_user_command(struct mps_softc *sc, struct mps_usr_command *cmd)
 	hdr = (MPI2_REQUEST_HEADER *)cm->cm_req;
 
 	mps_dprint(sc, MPS_USER, "%s: req %p %d  rpl %p %d\n", __func__,
-	    (void *)cmd->req, cmd->req_len,
-	    (void *)cmd->rpl, cmd->rpl_len);
+	    PTRIN(cmd->req), cmd->req_len, PTRIN(cmd->rpl), cmd->rpl_len);
 
 	if (cmd->req_len > sc->reqframesz) {
 		err = EINVAL;
@@ -786,10 +785,10 @@ mps_user_pass_thru(struct mps_softc *sc, mps_pass_thru_t *data)
 
 	mps_dprint(sc, MPS_USER, "%s: req %p %d  rpl %p %d "
 	    "data in %p %d data out %p %d data dir %d\n", __func__,
-	    (void *)data->PtrRequest, data->RequestSize,
-	    (void *)data->PtrReply, data->ReplySize,
-	    (void *)data->PtrData, data->DataSize,
-	    (void *)data->PtrDataOut, data->DataOutSize,
+	    PTRIN(data->PtrRequest), data->RequestSize,
+	    PTRIN(data->PtrReply), data->ReplySize,
+	    PTRIN(data->PtrData), data->DataSize,
+	    PTRIN(data->PtrDataOut), data->DataOutSize,
 	    data->DataDirection);
 
 	if (data->RequestSize > sc->reqframesz) {
@@ -800,7 +799,7 @@ mps_user_pass_thru(struct mps_softc *sc, mps_pass_thru_t *data)
 	req = malloc(data->RequestSize, M_MPSUSER, M_WAITOK | M_ZERO);
 	tmphdr = (MPI2_REQUEST_HEADER *)req;
 
-	err = copyin(data->PtrRequest, req, data->RequestSize);
+	err = copyin(PTRIN(data->PtrRequest), req, data->RequestSize);
 	if (err != 0)
 		goto RetFreeUnlocked;
 
@@ -860,7 +859,7 @@ mps_user_pass_thru(struct mps_softc *sc, mps_pass_thru_t *data)
 				    __func__, data->ReplySize, sz);
 			}
 			mps_unlock(sc);
-			err = copyout(cm->cm_reply, data->PtrReply,
+			err = copyout(cm->cm_reply, PTRIN(data->PtrReply),
 			    MIN(sz, data->ReplySize));
 			if (err != 0)
 				mps_dprint(sc, MPS_FAULT,
@@ -908,12 +907,12 @@ mps_user_pass_thru(struct mps_softc *sc, mps_pass_thru_t *data)
 		cm->cm_flags = MPS_CM_FLAGS_DATAIN;
 		if (data->DataOutSize) {
 			cm->cm_flags |= MPS_CM_FLAGS_DATAOUT;
-			err = copyin(data->PtrDataOut,
+			err = copyin(PTRIN(data->PtrDataOut),
 			    cm->cm_data, data->DataOutSize);
 		} else if (data->DataDirection ==
 		    MPS_PASS_THRU_DIRECTION_WRITE) {
 			cm->cm_flags = MPS_CM_FLAGS_DATAOUT;
-			err = copyin(data->PtrData,
+			err = copyin(PTRIN(data->PtrData),
 			    cm->cm_data, data->DataSize);
 		}
 		if (err != 0)
@@ -996,7 +995,7 @@ mps_user_pass_thru(struct mps_softc *sc, mps_pass_thru_t *data)
 		if (cm->cm_flags & MPS_CM_FLAGS_DATAIN) {
 			mps_unlock(sc);
 			err = copyout(cm->cm_data,
-			    data->PtrData, data->DataSize);
+			    PTRIN(data->PtrData), data->DataSize);
 			mps_lock(sc);
 			if (err != 0)
 				mps_dprint(sc, MPS_FAULT, "%s: failed to copy "
@@ -1017,7 +1016,7 @@ mps_user_pass_thru(struct mps_softc *sc, mps_pass_thru_t *data)
 			    data->ReplySize, sz);
 		}
 		mps_unlock(sc);
-		err = copyout(cm->cm_reply, data->PtrReply,
+		err = copyout(cm->cm_reply, PTRIN(data->PtrReply),
 		    MIN(sz, data->ReplySize));
 		mps_lock(sc);
 		if (err != 0)
@@ -1034,9 +1033,8 @@ mps_user_pass_thru(struct mps_softc *sc, mps_pass_thru_t *data)
 				    SenseCount)), sizeof(struct
 				    scsi_sense_data));
 				mps_unlock(sc);
-				err = copyout(cm->cm_sense,
-				    (char *)data->PtrReply +
-				    sizeof(MPI2_SCSI_IO_REPLY), sense_len);
+				err = copyout(cm->cm_sense, (PTRIN(data->PtrReply +
+				    sizeof(MPI2_SCSI_IO_REPLY))), sense_len);
 				mps_lock(sc);
 				if (err != 0)
 					mps_dprint(sc, MPS_FAULT,
@@ -1841,7 +1839,7 @@ mps_do_diag_action(struct mps_softc *sc, uint32_t action, uint8_t *diag_action,
 				break;
 			}
 			status = mps_diag_read_buffer(sc, &diag_read_buffer,
-			    diag_read_buffer.PtrDataBuffer,
+			    PTRIN(diag_read_buffer.PtrDataBuffer),
 			    return_code);
 			if (status == MPS_DIAG_SUCCESS) {
 				if (copyout(&diag_read_buffer, diag_action,
@@ -1904,7 +1902,7 @@ mps_user_diag_action(struct mps_softc *sc, mps_diag_action_t *data)
 	    data->Action == MPS_FW_DIAG_TYPE_READ_BUFFER ||
 	    data->Action == MPS_FW_DIAG_TYPE_RELEASE) {
 		status = mps_do_diag_action(sc, data->Action,
-		    data->PtrDiagAction, data->Length,
+		    PTRIN(data->PtrDiagAction), data->Length,
 		    &data->ReturnCode);
 	} else
 		status = EINVAL;
@@ -1967,7 +1965,7 @@ mps_user_event_report(struct mps_softc *sc, mps_event_report_t *data)
 	if ((size >= sizeof(sc->recorded_events)) && (status == 0)) {
 		mps_unlock(sc);
 		if (copyout((void *)sc->recorded_events,
-		    data->PtrEvents, sizeof(sc->recorded_events)) != 0)
+		    PTRIN(data->PtrEvents), sizeof(sc->recorded_events)) != 0)
 			status = EFAULT;
 		mps_lock(sc);
 	} else {
