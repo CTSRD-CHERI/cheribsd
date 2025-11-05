@@ -858,7 +858,7 @@ ata_pio_read(struct ata_request *request, int length)
 		if (__predict_false((ch->flags & ATA_USE_16BIT) ||
 		    !is_aligned(size, 4) || !is_aligned(addr, 4))) {
 #ifndef __NO_STRICT_ALIGNMENT
-			if (__predict_false(is_aligned(addr, 2))) {
+			if (__predict_false(!is_aligned(addr, 2))) {
 				for (i = 0; i + 1 < size; i += 2) {
 					*(uint16_t *)&buf =
 					    ATA_IDX_INW_STRM(ch, ATA_DATA);
@@ -945,7 +945,7 @@ ata_pio_write(struct ata_request *request, int length)
 		if (__predict_false((ch->flags & ATA_USE_16BIT) ||
 		    !is_aligned(size, 4) || !is_aligned(addr, 4))) {
 #ifndef __NO_STRICT_ALIGNMENT
-			if (__predict_false(is_aligned(addr, 2))) {
+			if (__predict_false(!is_aligned(addr, 2))) {
 				for (i = 0; i + 1 < size; i += 2) {
 					buf[0] = addr[i];
 					buf[1] = addr[i + 1];
