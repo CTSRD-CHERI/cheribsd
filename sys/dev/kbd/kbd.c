@@ -966,8 +966,7 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 		} else
 #endif /* COMPAT_FREEBSD13 */
 		{
-			error = copyin(*(void **)arg, accentmapp,
-			    sizeof(*accentmapp));
+			error = copyin(*(void **)arg, accentmapp, sizeof(*accentmapp));
 			if (error != 0) {
 				free(accentmapp, M_TEMP);
 				return (error);
@@ -1541,6 +1540,7 @@ kbdinit(void)
 			printf("kbd: registered driver '%s'\n",
 			    drv->name);
 	}
+
 }
 // CHERI CHANGES START
 // {
