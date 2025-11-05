@@ -471,7 +471,7 @@ pci_conf_match_freebsd6(struct pci_match_conf_freebsd6 *matches, int num_matches
 
 		if (((matches[i].flags & PCI_GETCONF_MATCH_NAME_FREEBSD6) != 0)
 		 && (strncmp(matches[i].pd_name, match_buf->pd_name,
-		 sizeof(match_buf->pd_name)) != 0))
+			     sizeof(match_buf->pd_name)) != 0))
 			continue;
 
 		return(0);
@@ -1009,7 +1009,7 @@ pci_bar_mmap(device_t pcidev, struct pci_bar_mmap *pbm)
 	obj->memattr = pbm->pbm_memattr;
 	addr = 0;
 	if ((pbm->pbm_flags & PCIIO_BAR_MMAP_FIXED) != 0) {
-		addr = (uintptr_t)(uintptr_t)pbm->pbm_map_base;
+		addr = (uintptr_t)pbm->pbm_map_base;
 		flags |= MAP_FIXED;
 	}
 	if ((pbm->pbm_flags & PCIIO_BAR_MMAP_EXCL) != 0)
@@ -1020,12 +1020,7 @@ pci_bar_mmap(device_t pcidev, struct pci_bar_mmap *pbm)
 		vm_object_deallocate(obj);
 		goto out;
 	}
-#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
-	pbm->pbm_map_base = cheri_capability_build_user_data(
-	    vm_map_prot2perms(prot), addr, plen, 0);
-#else
 	pbm->pbm_map_base = (void *)addr;
-#endif
 	pbm->pbm_map_length = plen;
 	pbm->pbm_bar_off = membase - pbase;
 	pbm->pbm_bar_length = (pci_addr_t)1 << pm->pm_size;
