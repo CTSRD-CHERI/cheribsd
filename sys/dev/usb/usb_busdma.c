@@ -46,7 +46,6 @@
 #include <sys/callout.h>
 #include <sys/malloc.h>
 #include <sys/priv.h>
-#include <sys/proc.h>
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
@@ -209,7 +208,7 @@ usbd_copy_in_user(struct usb_page_cache *cache, usb_frlength_t offset,
 
 		offset += buf_res.length;
 		len -= buf_res.length;
-		ptr = (const char *)ptr + buf_res.length;
+		ptr = USB_ADD_BYTES(ptr, buf_res.length);
 	}
 	return (0);			/* success */
 }
@@ -326,7 +325,7 @@ usbd_copy_out_user(struct usb_page_cache *cache, usb_frlength_t offset,
 
 		offset += res.length;
 		len -= res.length;
-		ptr = (char *)ptr + res.length;
+		ptr = USB_ADD_BYTES(ptr, res.length);
 	}
 	return (0);			/* success */
 }
