@@ -11821,13 +11821,13 @@ error:
 		}
 
 		bf = &r->bpf_prog;
-		u = bf->bf_user_insns;	/* userspace ptr */
-		bf->bf_user_insns = NULL;
+		u = bf->bf_insns;	/* userspace ptr */
+		bf->bf_insns = NULL;
 		if (bf->bf_len == 0) {
 			/* legal, matches everything */
 			continue;
 		}
-		len = bf->bf_len * sizeof(*bf->bf_user_insns);
+		len = bf->bf_len * sizeof(*bf->bf_insns);
 		bf->bf_insns = malloc(len, M_CXGBE, M_ZERO | M_WAITOK);
 		rc = copyin(u, bf->bf_insns, len);
 		if (rc != 0)
