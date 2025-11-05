@@ -889,7 +889,7 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 		page_req64->ioc_status = page_req->ioc_status;
 		break;
 	case MPTIO_READ_EXT_CFG_HEADER64:
-	case MPTIO_READ_EXT_CFG_PAGE64:		
+	case MPTIO_READ_EXT_CFG_PAGE64:
 		ext_page_req64->header = ext_page_req->header;
 		ext_page_req64->page_address = ext_page_req->page_address;
 		ext_page_req64->len = ext_page_req->len;
