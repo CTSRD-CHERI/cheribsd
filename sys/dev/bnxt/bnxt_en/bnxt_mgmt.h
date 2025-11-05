@@ -119,10 +119,10 @@ struct bnxt_mgmt_req_hdr {
 };
 
 struct bnxt_mgmt_req {
-        struct bnxt_mgmt_req_hdr hdr;
-        union {
+	struct bnxt_mgmt_req_hdr hdr;
+	union {
 		kuint64cap_t hreq;
-        } req;
+	} req;
 };
 
 struct bnxt_mgmt_app_tlv {
