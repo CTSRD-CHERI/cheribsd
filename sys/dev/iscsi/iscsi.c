@@ -1758,8 +1758,7 @@ iscsi_ioctl_daemon_connect(struct iscsi_softc *sc,
 	sx_sunlock(&sc->sc_lock);
 
 	if (idc->idc_from_addrlen > 0) {
-		error = getsockaddr(&from_sa, __USER_CAP(idc->idc_from_addr,
-		    idc->idc_from_addrlen), idc->idc_from_addrlen);
+		error = getsockaddr(&from_sa, (void *)idc->idc_from_addr, idc->idc_from_addrlen);
 		if (error != 0) {
 			ISCSI_SESSION_WARN(is,
 			    "getsockaddr failed with error %d", error);
@@ -1768,8 +1767,7 @@ iscsi_ioctl_daemon_connect(struct iscsi_softc *sc,
 	} else {
 		from_sa = NULL;
 	}
-	error = getsockaddr(&to_sa, __USER_CAP(idc->idc_to_addr,
-	    idc->idc_to_addrlen), idc->idc_to_addrlen);
+	error = getsockaddr(&to_sa, (void *)idc->idc_to_addr, idc->idc_to_addrlen);
 	if (error != 0) {
 		ISCSI_SESSION_WARN(is, "getsockaddr failed with error %d",
 		    error);
@@ -2834,12 +2832,3 @@ moduledata_t iscsi_data = {
 DECLARE_MODULE(iscsi, iscsi_data, SI_SUB_DRIVERS, SI_ORDER_MIDDLE);
 MODULE_DEPEND(iscsi, cam, 1, 1, 1);
 MODULE_DEPEND(iscsi, icl, 1, 1, 1);
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes": [
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END
