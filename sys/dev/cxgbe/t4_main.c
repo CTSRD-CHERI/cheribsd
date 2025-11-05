@@ -11722,8 +11722,7 @@ cudbg_dump(struct adapter *sc, struct t4_cudbg_dump *dump)
 
 #ifndef notyet
 	device_printf(sc->dev, "%s: wr_flash %u, len %u, data %p.\n",
-	    __func__, dump->wr_flash, dump->len,
-	    (void *)dump->data);
+	    __func__, dump->wr_flash, dump->len, dump->data);
 #endif
 
 	if (dump->wr_flash)
@@ -11785,7 +11784,7 @@ set_offload_policy(struct adapter *sc, struct t4_offload_policy *uop)
 	op->nrules = uop->nrules;
 	len = op->nrules * sizeof(struct offload_rule);
 	op->rule = malloc(len, M_CXGBE, M_ZERO | M_WAITOK);
-	rc = copyin(uop->user_rule, op->rule, len);
+	rc = copyin(uop->rule, op->rule, len);
 	if (rc) {
 		free(op->rule, M_CXGBE);
 		free(op, M_CXGBE);

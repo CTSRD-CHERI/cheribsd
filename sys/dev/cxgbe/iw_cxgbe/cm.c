@@ -825,7 +825,7 @@ setiwsockopt(struct socket *so)
 	sopt.sopt_dir = SOPT_SET;
 	sopt.sopt_level = IPPROTO_TCP;
 	sopt.sopt_name = TCP_NODELAY;
-	sopt.sopt_val = &on;
+	sopt.sopt_val = (caddr_t)&on;
 	sopt.sopt_valsize = sizeof on;
 	sopt.sopt_td = NULL;
 	rc = -sosetopt(so, &sopt);
@@ -1647,7 +1647,7 @@ send_abort(struct c4iw_ep *ep)
 	sopt.sopt_dir = SOPT_SET;
 	sopt.sopt_level = SOL_SOCKET;
 	sopt.sopt_name = SO_LINGER;
-	sopt.sopt_val = &l;
+	sopt.sopt_val = (caddr_t)&l;
 	sopt.sopt_valsize = sizeof l;
 	sopt.sopt_td = NULL;
 	rc = -sosetopt(so, &sopt);
@@ -3063,7 +3063,6 @@ void __exit c4iw_cm_term(void)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END
