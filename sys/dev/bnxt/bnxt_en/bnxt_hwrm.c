@@ -2345,8 +2345,7 @@ bnxt_hwrm_nvm_modify(struct bnxt_softc *softc, uint16_t index, uint32_t offset,
 			goto exit;
 	}
 	else
-		memcpy(dma_data.idi_vaddr, (void *)data,
-		    length);
+		memcpy(dma_data.idi_vaddr, data, length);
 	bus_dmamap_sync(dma_data.idi_tag, dma_data.idi_map,
 	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
 
@@ -2418,8 +2417,7 @@ exit:
 }
 
 int
-bnxt_hwrm_nvm_write(struct bnxt_softc *softc, void *data,
-    bool cpyin,
+bnxt_hwrm_nvm_write(struct bnxt_softc *softc, void *data, bool cpyin,
     uint16_t type, uint16_t ordinal, uint16_t ext, uint16_t attr,
     uint16_t option, uint32_t data_length, bool keep, uint32_t *item_length,
     uint16_t *index)
@@ -2442,8 +2440,7 @@ bnxt_hwrm_nvm_write(struct bnxt_softc *softc, void *data,
 				goto early_exit;
 		}
 		else
-			memcpy(dma_data.idi_vaddr,
-			    (void *)data, data_length);
+			memcpy(dma_data.idi_vaddr, data, data_length);
 		bus_dmamap_sync(dma_data.idi_tag, dma_data.idi_map,
 		    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
 	}
@@ -3093,15 +3090,3 @@ void bnxt_hwrm_ring_info_get(struct bnxt_softc *softc, uint8_t ring_type,
 
 	return;
 }
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20230509,
- *   "target_type": "kernel",
- *   "changes": [
- *     "user_capabilities",
- *     "ctoptr"
- *   ]
- * }
- * CHERI CHANGES END
- */
