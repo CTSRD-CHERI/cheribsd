@@ -873,7 +873,7 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo,
 		 * pointer and then tries to modify the copy of the
 		 * pointer in userspace.
 		 */
-		data_ptrs[0] = (u_int8_t **)&ccb->mmcio.cmd.user_data;
+		data_ptrs[0] = (u_int8_t **)&ccb->mmcio.cmd.data;
 		lengths[0] = sizeof(struct mmc_data *);
 		dirs[0] = ccb->ccb_h.flags & CAM_DIR_MASK;
 #if 0
@@ -1055,7 +1055,7 @@ cam_periph_unmapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo)
 		numbufs = 1;
 		break;
 	case XPT_MMC_IO:
-		data_ptrs[0] = (uint8_t **)&ccb->mmcio.cmd.user_data;
+		data_ptrs[0] = (uint8_t **)&ccb->mmcio.cmd.data;
 		lengths[0] = sizeof(struct mmc_data *);
 		dirs[0] = ccb->ccb_h.flags & CAM_DIR_MASK;
 #if 0
