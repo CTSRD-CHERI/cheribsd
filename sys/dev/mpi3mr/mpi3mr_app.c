@@ -1869,8 +1869,7 @@ mpi3mr_get_alltgtinfo(struct mpi3mr_softc *sc,
 	struct mpi3mr_target *tgtdev = NULL;
         struct mpi3mr_device_map_info *devmap_info = NULL;
 	struct mpi3mr_cam_softc *cam_sc = sc->cam_sc;
-        struct mpi3mr_ioctl_all_tgtinfo *all_tgtinfo =
-	    (struct mpi3mr_ioctl_all_tgtinfo *)data_in_buf;
+        struct mpi3mr_ioctl_all_tgtinfo *all_tgtinfo = (struct mpi3mr_ioctl_all_tgtinfo *)data_in_buf;
 
         if (data_in_sz < sizeof(uint32_t)) {
                 printf(IOCNAME "failure at %s:%d/%s()!\n", sc->name, __FILE__,
