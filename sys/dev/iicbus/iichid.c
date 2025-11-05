@@ -987,7 +987,7 @@ iichid_ioctl(device_t dev, device_t child __unused, unsigned long cmd,
 	switch (cmd) {
 	case I2CRDWR:
 		error = iic2errno(iicbus_transfer(dev,
-		    (struct iic_msg *)((struct iic_rdwr_data *)data)->msgs,
+		    ((struct iic_rdwr_data *)data)->msgs,
 		    ((struct iic_rdwr_data *)data)->nmsgs));
 		break;
 	default:
@@ -1345,14 +1345,3 @@ MODULE_DEPEND(iichid, hid, 1, 1, 1);
 MODULE_DEPEND(iichid, hidbus, 1, 1, 1);
 MODULE_VERSION(iichid, 1);
 IICBUS_ACPI_PNP_INFO(iichid_ids);
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20230509,
- *   "target_type": "kernel",
- *   "changes": [
- *     "ctoptr"
- *   ]
- * }
- * CHERI CHANGES END
- */

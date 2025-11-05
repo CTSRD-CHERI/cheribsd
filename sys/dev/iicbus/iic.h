@@ -44,21 +44,6 @@ struct iic_msg
 	uint8_t *	buf;
 };
 
-#ifdef _KERNEL
-/*
- * This does not use the normal pattern of a union on 'buf' because
- * there are many statically initialized instances of 'struct iic_msg'
- * in the kernel that would all have to be updated to cope with the
- * union.
- */
-struct iic_msg_user {
-	uint16_t	slave;
-	uint16_t	flags;
-	uint16_t	len;
-	uint8_t *buf;
-};
-#endif
-
 struct iiccmd {
 	u_char slave;
 	int count;

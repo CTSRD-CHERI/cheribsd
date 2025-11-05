@@ -329,7 +329,7 @@ iicuio(struct cdev *dev, struct uio *uio, int ioflag)
 
 #ifdef COMPAT_FREEBSD32
 static int
-iic_copyinmsgs32(struct iic_rdwr_data *d, struct iic_msg_user *buf)
+iic_copyinmsgs32(struct iic_rdwr_data *d, struct iic_msg *buf)
 {
 	struct iic_msg32 msg32;
 	struct iic_msg32 *m32;
@@ -358,7 +358,7 @@ iicrdwr(struct iic_cdevpriv *priv, struct iic_rdwr_data *d, int flags,
 	struct iic_rdwr_data32 *d32;
 #endif
 	struct iic_msg *buf, *m;
-	struct iic_msg_user *usrbufs;
+	void **usrbufs;
 	device_t iicdev, parent;
 	int error;
 	uint32_t i;
@@ -378,26 +378,25 @@ iicrdwr(struct iic_cdevpriv *priv, struct iic_rdwr_data *d, int flags,
 	if (d->nmsgs > IIC_RDRW_MAX_MSGS)
 		return (EINVAL);
 
-	buf = malloc(sizeof(*d->msgs) * d->nmsgs, M_IIC, M_WAITOK | M_ZERO);
-	usrbufs = malloc(sizeof(*usrbufs) * d->nmsgs, M_IIC, M_WAITOK);
+	buf = malloc(sizeof(*d->msgs) * d->nmsgs, M_IIC, M_WAITOK);
 
 #ifdef COMPAT_FREEBSD32
 	if (compat32)
-		error = iic_copyinmsgs32(d, usrbufs);
+		error = iic_copyinmsgs32(d, buf);
 	else
 #endif
-	error = copyin(d->msgs, usrbufs, sizeof(*usrbufs) * d->nmsgs);
+	error = copyin(d->msgs, buf, sizeof(*d->msgs) * d->nmsgs);
 	if (error != 0) {
-		free(usrbufs, M_IIC);
 		free(buf, M_IIC);
 		return (error);
 	}
 
+	/* Alloc kernel buffers for userland data, copyin write data */
+	usrbufs = malloc(sizeof(void *) * d->nmsgs, M_IIC, M_WAITOK | M_ZERO);
+
 	for (i = 0; i < d->nmsgs; i++) {
 		m = &(buf[i]);
-		m->slave = usrbufs[i].slave;
-		m->flags = usrbufs[i].flags;
-		m->len = usrbufs[i].len;
+		usrbufs[i] = m->buf;
 
 		/*
 		 * At least init the buffer to NULL so we can safely free() it later.
@@ -410,7 +409,7 @@ iicrdwr(struct iic_cdevpriv *priv, struct iic_rdwr_data *d, int flags,
 		/* m->len is uint16_t, so allocation size is capped at 64K. */
 		m->buf = malloc(m->len, M_IIC, M_WAITOK);
 		if (!(m->flags & IIC_M_RD))
-			error = copyin(usrbufs[i].buf, m->buf, m->len);
+			error = copyin(usrbufs[i], m->buf, m->len);
 	}
 
 	if (error == 0)
@@ -426,7 +425,7 @@ iicrdwr(struct iic_cdevpriv *priv, struct iic_rdwr_data *d, int flags,
 	for (i = 0; i < d->nmsgs; i++) {
 		m = &(buf[i]);
 		if ((error == 0) && (m->flags & IIC_M_RD))
-			error = copyout(m->buf, usrbufs[i].buf, m->len);
+			error = copyout(m->buf, usrbufs[i], m->len);
 		free(m->buf, M_IIC);
 	}
 
