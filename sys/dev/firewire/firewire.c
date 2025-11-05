@@ -1856,7 +1856,7 @@ fw_rcv_copy(struct fw_rcv_buf *rb)
 
 	/* Copy header */
 	p = (u_char *)&rb->xfer->recv.hdr;
-	bcopy((void *)rb->vec->iov_base, p, tinfo->hdr_len);
+	bcopy(rb->vec->iov_base, p, tinfo->hdr_len);
 	IOVEC_ADVANCE(rb->vec, tinfo->hdr_len);
 
 	/* Copy payload */
@@ -1884,7 +1884,7 @@ fw_rcv_copy(struct fw_rcv_buf *rb)
 				__func__, rb->xfer->recv.pay_len, len - res);
 			len = res;
 		}
-		bcopy((void *)rb->vec->iov_base, p, len);
+		bcopy(rb->vec->iov_base, p, len);
 		p += len;
 		res -= len;
 		plen -= len;
