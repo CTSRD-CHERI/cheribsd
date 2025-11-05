@@ -1606,12 +1606,3 @@ usie_driver_loaded(struct module *mod, int what, void *arg)
 	}
 	return (0);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20230509,
-//   "target_type": "kernel",
-//   "changes": [
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END
