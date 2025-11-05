@@ -2359,8 +2359,7 @@ usb_free_symlink(struct usb_symlink *ps)
  * Else: Failure
  *------------------------------------------------------------------------*/
 int
-usb_read_symlink(uint8_t *user_ptr, uint32_t startentry,
-    uint32_t user_len)
+usb_read_symlink(uint8_t *user_ptr, uint32_t startentry, uint32_t user_len)
 {
 	struct usb_symlink *ps;
 	uint32_t temp;
@@ -2397,7 +2396,8 @@ usb_read_symlink(uint8_t *user_ptr, uint32_t startentry,
 
 		/* copy out total length */
 
-		error = copyout(&len, user_ptr + delta, 1);
+		error = copyout(&len,
+		    USB_ADD_BYTES(user_ptr, delta), 1);
 		if (error) {
 			break;
 		}
@@ -2405,13 +2405,15 @@ usb_read_symlink(uint8_t *user_ptr, uint32_t startentry,
 
 		/* copy out source string */
 
-		error = copyout(ps->src_path, user_ptr + delta, ps->src_len);
+		error = copyout(ps->src_path,
+		    USB_ADD_BYTES(user_ptr, delta), ps->src_len);
 		if (error) {
 			break;
 		}
 		len = 0;
 		delta += ps->src_len;
-		error = copyout(&len, user_ptr + delta, 1);
+		error = copyout(&len,
+		    USB_ADD_BYTES(user_ptr, delta), 1);
 		if (error) {
 			break;
 		}
@@ -2419,13 +2421,15 @@ usb_read_symlink(uint8_t *user_ptr, uint32_t startentry,
 
 		/* copy out destination string */
 
-		error = copyout(ps->dst_path, user_ptr + delta, ps->dst_len);
+		error = copyout(ps->dst_path,
+		    USB_ADD_BYTES(user_ptr, delta), ps->dst_len);
 		if (error) {
 			break;
 		}
 		len = 0;
 		delta += ps->dst_len;
-		error = copyout(&len, user_ptr + delta, 1);
+		error = copyout(&len,
+		    USB_ADD_BYTES(user_ptr, delta), 1);
 		if (error) {
 			break;
 		}
@@ -2439,7 +2443,8 @@ usb_read_symlink(uint8_t *user_ptr, uint32_t startentry,
 	if ((user_len != 0) && (error == 0)) {
 		len = 0;
 
-		error = copyout(&len, user_ptr + delta, 1);
+		error = copyout(&len,
+		    USB_ADD_BYTES(user_ptr, delta), 1);
 	}
 	sx_unlock(&usb_sym_lock);
 	return (error);
