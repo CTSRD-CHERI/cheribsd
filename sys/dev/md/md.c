@@ -1431,15 +1431,14 @@ mdcreate_vnode(struct md_s *sc, struct md_req *mdr, struct thread *td)
 	long v;
 
 	fname = mdr->md_file;
-	if (mdr->md_file_seg == UIO_USERSPACE)
+	if (mdr->md_file_seg == UIO_USERSPACE) {
 		error = copyinstr(fname, sc->file, sizeof(sc->file), NULL);
-	else if (mdr->md_file_seg == UIO_SYSSPACE)
-		error = copystr((char *)fname, sc->file,
-		    sizeof(sc->file), NULL);
+		if (error != 0)
+			return (error);
+	} else if (mdr->md_file_seg == UIO_SYSSPACE)
+		strlcpy(sc->file, fname, sizeof(sc->file));
 	else
-		error = EDOOFUS;
-	if (error != 0)
-		return (error);
+		return (EDOOFUS);
 
 	/*
 	 * If the user specified that this is a read only device, don't
@@ -1925,12 +1924,11 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		if (mdio->md_version != MDIOVERSION)
 			return (EINVAL);
 		MD_IOCTL2REQ(mdio, &mdr);
-		/* If the file is adjacent to the md_ioctl it's in kernel. */
-		if ((ptraddr_t)mdio->md_file == (ptraddr_t)(mdio + 1))
-			mdr.md_file_seg = UIO_SYSSPACE;
-		else
-			mdr.md_file_seg = UIO_USERSPACE;
 		mdr.md_file = mdio->md_file;
+		mdr.md_file_seg = UIO_USERSPACE;
+		/* If the file is adjacent to the md_ioctl it's in kernel. */
+		if ((void *)mdio->md_file == (void *)(mdio + 1))
+			mdr.md_file_seg = UIO_SYSSPACE;
 		mdr.md_label = mdio->md_label;
 		break;
 	}
