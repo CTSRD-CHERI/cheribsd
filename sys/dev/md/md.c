@@ -1966,12 +1966,11 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		if (mdio->md_version != MDIOVERSION)
 			return (EINVAL);
 		MD_IOCTL2REQ(mdio, &mdr);
-		/* If the file is adjacent to the md_ioctl it's in kernel. */
-		if ((ptraddr_t)mdio->md_file == (ptraddr_t)(mdio + 1))
-			mdr.md_file_seg = UIO_SYSSPACE;
-		else
-			mdr.md_file_seg = UIO_USERSPACE;
 		mdr.md_file = mdio->md_file;
+		mdr.md_file_seg = UIO_USERSPACE;
+		/* If the file is adjacent to the md_ioctl it's in kernel. */
+		if ((void *)mdio->md_file == (void *)(mdio + 1))
+			mdr.md_file_seg = UIO_SYSSPACE;
 		mdr.md_label = mdio->md_label;
 		break;
 	}
