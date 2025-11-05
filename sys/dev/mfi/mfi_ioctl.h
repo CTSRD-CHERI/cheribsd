@@ -55,17 +55,13 @@ union mfi_statrequest {
 #define MAX_SPACE_FOR_SENSE_PTR		32
 union mfi_sense_ptr {
 	uint8_t		sense_ptr_data[MAX_SPACE_FOR_SENSE_PTR];
-	void		*user_space;
+	void 		*user_space;
 	struct {
 		uint32_t	low;
 		uint32_t	high;
 	} addr;
 }
-#if !__has_feature(capabilities)
-/*
- * XXX-BD: This __packed appears to be gratutious and won't whole thing
- * is a bit absurd in CheriABI.
- */
+#ifndef __CHERI__
 __packed
 #endif
 ;
@@ -86,11 +82,7 @@ struct mfi_ioc_packet {
 
 	struct iovec mfi_sgl[MAX_IOCTL_SGE];
 }
-#if !__has_feature(capabilities)
-/*
- * Packing is gratutious, but part of the ABI. Don't pack in CheriABI
- * where it won't work.
- */
+#ifndef __CHERI__
 __packed
 #endif
 ;
@@ -166,11 +158,7 @@ struct mfi_linux_ioc_packet {
 	struct iovec lioc_sgl[MAX_LINUX_IOCTL_SGE];
 #endif
 }
-#if !__has_feature(capabilities)
-/*
- * Packing is gratutious, but part of the ABI. Don't pack in CheriABI
- * where it won't work.
- */
+#ifndef __CHERI__
 __packed
 #endif
 ;
@@ -180,11 +168,7 @@ struct mfi_ioc_passthru {
 	uint32_t		buf_size;
 	uint8_t			*buf;
 }
-#if !__has_feature(capabilities)
-/*
- * Packing is gratutious, but part of the ABI. Don't pack in CheriABI
- * where it won't work.
- */
+#ifndef __CHERI__
 __packed
 #endif
 ;
