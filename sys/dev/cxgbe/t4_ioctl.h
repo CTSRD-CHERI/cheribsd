@@ -407,14 +407,7 @@ struct offload_rule {
  */
 struct t4_offload_policy {
 	uint32_t nrules;
-#ifdef _KERNEL
-	union {
-		struct offload_rule *user_rule;
-#endif
-		struct offload_rule *rule;
-#ifdef _KERNEL
-	};
-#endif
+	struct offload_rule *rule;
 };
 
 /* Address/mask entry in the CLIP.  FW_CLIP2_CMD is aware of the mask. */
